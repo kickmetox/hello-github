@@ -1,0 +1,33 @@
+Drittanbieter / Third-party components in ScanTuxio (Windows)
+
+==============================================================================
+POPPLER
+==============================================================================
+Name:        Poppler (PDF rendering tools: pdftoppm, pdfinfo, pdftocairo, …)
+Upstream:    https://poppler.freedesktop.org/
+Windows zip: https://github.com/oschwartz10612/poppler-windows
+             (Packaging-Skripte dieses Repos: MIT; die Binaries sind Poppler)
+
+Lizenz:      GNU GPL (typisch GPL-2.0 oder GPL-3.0 — siehe COPYING im Upstream-
+             Quellcode des jeweiligen Releases)
+
+Einbindung:  ScanTuxio startet Poppler-Werkzeuge als separate Prozesse
+             (Subprocess / PATH). Es erfolgt keine Link-Einbindung der
+             Poppler-Bibliothek in die ScanTuxio-EXE.
+
+Weitergabe:  Wenn Poppler-Binaries mitgeliefert werden, müssen GPL-Hinweise
+             erhalten bleiben. Quellcode zu den verwendeten Poppler-Binaries
+             ist über den Upstream bzw. das conda-forge poppler-feedstock
+             des entsprechenden Releases erhältlich.
+
+Hinweis:     Poppler ist NICHT „lizenzfrei“. Wer eine permissive Stack-
+             Alternative für PDF→Bild braucht, siehe pypdfium2 / PDFium
+             (docs/poppler-windows.md). Das erfordert Quellcode-Anpassung
+             und ist in diesem Frozen-Bestand nicht umsetzbar.
+
+==============================================================================
+Weitere Komponenten
+==============================================================================
+Python-Runtime / PyInstaller-Artefakte (_*.pyd, ScanTuxio.exe): eigenen
+Lizenzen der jeweiligen Bibliotheken unterworfen — Original-requirements.txt
+und Build-Manifest des vollständigen Quellbaums beachten.
