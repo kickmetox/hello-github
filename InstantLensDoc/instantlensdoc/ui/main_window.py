@@ -48,8 +48,12 @@ from instantlensdoc.core.app_settings import (
     get_minimize_to_tray,
     get_page_size_unit,
     get_update_check_on_start,
+    get_window_geometry_b64,
+    get_window_state_b64,
     remember_recent_dir,
     set_last_export_dir,
+    set_window_geometry_b64,
+    set_window_state_b64,
     toggle_page_size_unit,
 )
 from instantlensdoc.ui.batch_dialog import BatchConvertDialog
@@ -101,6 +105,7 @@ class MainWindow(QMainWindow):
 
         self._build_ui()
         self._build_menus()
+        self._restore_window_geometry()
         self.apply_tray_setting()
         self._refresh_recent()
         self._refresh_recent_searches()
@@ -114,6 +119,35 @@ class MainWindow(QMainWindow):
         QTimer.singleShot(200, self._restore_session)
         if get_update_check_on_start():
             QTimer.singleShot(1500, lambda: self._check_updates(silent=True))
+
+    def _restore_window_geometry(self) -> None:
+        import base64
+
+        from PySide6.QtCore import QByteArray
+
+        geo = get_window_geometry_b64()
+        state = get_window_state_b64()
+        if geo:
+            try:
+                self.restoreGeometry(QByteArray(base64.b64decode(geo)))
+            except Exception:
+                pass
+        if state:
+            try:
+                self.restoreState(QByteArray(base64.b64decode(state)))
+            except Exception:
+                pass
+
+    def _save_window_geometry(self) -> None:
+        import base64
+
+        try:
+            geo = bytes(self.saveGeometry())
+            state = bytes(self.saveState())
+            set_window_geometry_b64(base64.b64encode(geo).decode("ascii"))
+            set_window_state_b64(base64.b64encode(state).decode("ascii"))
+        except Exception:
+            pass
 
     def changeEvent(self, event):
         from PySide6.QtCore import QEvent
@@ -134,6 +168,10 @@ class MainWindow(QMainWindow):
         if not self._confirm_close_current(allow_discard=True, quitting=True):
             event.ignore()
             return
+        try:
+            self._save_window_geometry()
+        except Exception:
+            pass
         try:
             self._save_session()
         except Exception:
@@ -437,6 +475,11 @@ class MainWindow(QMainWindow):
         act_dup_line.setToolTip("Aktuelle Zeile / Auswahl darunter duplizieren")
         act_dup_line.triggered.connect(self._duplicate_line)
         m_edit.addAction(act_dup_line)
+        act_comment = QAction("Zeile kommentieren/auskommentieren", self)
+        act_comment.setShortcut(QKeySequence("Ctrl+/"))
+        act_comment.setToolTip("Kommentarpräfix # oder // je nach Dateityp umschalten")
+        act_comment.triggered.connect(self._toggle_line_comment)
+        m_edit.addAction(act_comment)
         act_mark = QAction("Auswahl markieren", self)
         act_mark.setShortcut(QKeySequence("Ctrl+H"))
         act_mark.triggered.connect(self._mark_selection)
@@ -475,6 +518,13 @@ class MainWindow(QMainWindow):
         act_dup_ann.setToolTip("Ausgewählte Annotation kopieren (leicht versetzt)")
         act_dup_ann.triggered.connect(self._duplicate_annotation)
         m_edit.addAction(act_dup_ann)
+        act_sel_all_ann = QAction("Alle Annotationen auf Seite auswählen", self)
+        act_sel_all_ann.setShortcut(QKeySequence.SelectAll)  # Ctrl+A
+        act_sel_all_ann.setToolTip(
+            "PDF: alle Annotationen der Seite; Editor: gesamten Text auswählen"
+        )
+        act_sel_all_ann.triggered.connect(self._select_all_annotations_on_page)
+        m_edit.addAction(act_sel_all_ann)
 
         m_view = mb.addMenu("&Ansicht")
         a = QAction("Seitenleiste", self)
@@ -849,6 +899,39 @@ class MainWindow(QMainWindow):
             self._set_status("Zeile dupliziert")
         else:
             self._set_status("Zeile duplizieren nicht möglich")
+
+    def _toggle_line_comment(self):
+        if self.stack.currentWidget() is not self.editor_pane:
+            self._set_status("Kommentieren nur im Texteditor")
+            return
+        path = self.doc.path if self.doc else None
+        prefix = self.editor.comment_prefix_for_path(path)
+        if self.editor.toggle_line_comment(prefix):
+            if self.doc and self.doc.kind in (
+                DocKind.TEXT,
+                DocKind.MARKDOWN,
+                DocKind.HTML,
+                DocKind.DOCX,
+            ):
+                self.doc.text = self.editor.toPlainText()
+                self.doc.dirty = True
+            self._on_text_changed()
+            self._set_status(f"Kommentar umgeschaltet ({prefix})")
+        else:
+            self._set_status("Kommentieren nicht möglich")
+
+    def _select_all_annotations_on_page(self):
+        if self.stack.currentWidget() is self.pdf_view and self.pdf_view.pdf_path:
+            n = self.pdf_view.select_all_annotations_on_page()
+            if n == 0:
+                self._set_status("Keine Annotationen auf dieser Seite")
+            return
+        # Editor / sonst: klassisches Alles auswählen
+        if self.stack.currentWidget() is self.editor_pane:
+            self.editor.selectAll()
+            self._set_status("Text ausgewählt")
+        else:
+            self._set_status("Auswahl: PDF mit Annotationen öffnen oder Texteditor nutzen")
 
     def _on_pdf_zoom_changed(self, scale: float):
         self.zoom_status_label.setText(f"{int(round(float(scale) * 100))} %")

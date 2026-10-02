@@ -124,6 +124,115 @@ class TextEditor(QPlainTextEdit):
         self.ensureCursorVisible()
         return True
 
+    def comment_prefix_for_path(self, path: Path | str | None = None) -> str:
+        """Kommentarpräfix für einfache Sprachen: # oder //."""
+        ext = ""
+        if path is not None:
+            ext = Path(path).suffix.lower()
+        hash_ext = {
+            ".py", ".pyw", ".rb", ".pl", ".pm", ".sh", ".bash", ".zsh",
+            ".ps1", ".psm1", ".r", ".yaml", ".yml", ".toml", ".ini", ".cfg",
+            ".conf", ".properties", ".gitignore", ".dockerfile", ".cmake",
+            ".mak", ".mk", ".am", ".m4",
+        }
+        slash_ext = {
+            ".js", ".jsx", ".ts", ".tsx", ".mjs", ".c", ".h", ".cpp", ".cc",
+            ".cxx", ".hpp", ".hh", ".cs", ".java", ".kt", ".kts", ".go",
+            ".rs", ".swift", ".scala", ".php", ".sql", ".jsonc", ".scss",
+            ".less", ".dart",
+        }
+        if ext in hash_ext:
+            return "#"
+        if ext in slash_ext:
+            return "//"
+        # Heuristik am Dokumentanfang
+        text = self.toPlainText()
+        for line in text.splitlines()[:40]:
+            s = line.lstrip()
+            if s.startswith("//"):
+                return "//"
+            if s.startswith("#") and not s.startswith("#!"):
+                return "#"
+        return "#"
+
+    def toggle_line_comment(self, prefix: str | None = None) -> bool:
+        """Zeilen kommentieren/auskommentieren (# oder //)."""
+        marker = (prefix or "#").strip() or "#"
+        if marker not in ("#", "//"):
+            marker = "#"
+        cur = self.textCursor()
+        doc = self.document()
+        if cur.hasSelection():
+            start = cur.selectionStart()
+            end = cur.selectionEnd()
+            start_block = doc.findBlock(start)
+            end_block = doc.findBlock(end if end > start else start)
+            if end > start and doc.findBlock(end).position() == end:
+                end_block = end_block.previous()
+                if not end_block.isValid():
+                    end_block = start_block
+        else:
+            start_block = end_block = cur.block()
+
+        blocks: list = []
+        block = start_block
+        while block.isValid() and block.blockNumber() <= end_block.blockNumber():
+            blocks.append(block)
+            block = block.next()
+        if not blocks:
+            return False
+
+        def _is_commented(text: str) -> bool:
+            s = text.lstrip()
+            if not s:
+                return True  # leere Zeilen zählen als „schon kommentiert“ für Uncomment-Entscheidung
+            return s.startswith(marker)
+
+        nonempty = [b.text() for b in blocks if b.text().strip()]
+        all_commented = bool(nonempty) and all(_is_commented(t) for t in nonempty)
+
+        start_bn = start_block.blockNumber()
+        end_bn = end_block.blockNumber()
+        cur.beginEditBlock()
+        block = start_block
+        while block.isValid() and block.blockNumber() <= end_bn:
+            text = block.text()
+            bcur = QTextCursor(block)
+            bcur.movePosition(QTextCursor.StartOfBlock)
+            if all_commented:
+                # Präfix nach Einrückung entfernen
+                lead = len(text) - len(text.lstrip()) if text.strip() else 0
+                rest = text[lead:]
+                if rest.startswith(marker):
+                    remove = len(marker)
+                    if rest[remove:].startswith(" "):
+                        remove += 1
+                    bcur.movePosition(QTextCursor.Right, QTextCursor.MoveAnchor, lead)
+                    bcur.movePosition(QTextCursor.Right, QTextCursor.KeepAnchor, remove)
+                    bcur.removeSelectedText()
+            else:
+                if text.strip():
+                    lead = len(text) - len(text.lstrip())
+                    bcur.movePosition(QTextCursor.Right, QTextCursor.MoveAnchor, lead)
+                    bcur.insertText(marker + " ")
+            block = block.next()
+        cur.endEditBlock()
+
+        new_cur = self.textCursor()
+        start_blk = doc.findBlockByNumber(start_bn)
+        end_blk = doc.findBlockByNumber(end_bn)
+        if not start_blk.isValid():
+            start_blk = doc.firstBlock()
+        if not end_blk.isValid():
+            end_blk = doc.lastBlock()
+        new_cur.setPosition(start_blk.position())
+        new_cur.setPosition(
+            end_blk.position() + max(0, end_blk.length() - 1),
+            QTextCursor.KeepAnchor,
+        )
+        self.setTextCursor(new_cur)
+        return True
+
     def _update_line_number_area_width(self, _new_block_count: int = 0) -> None:
         self.setViewportMargins(self.line_number_area_width(), 0, 0, 0)
 

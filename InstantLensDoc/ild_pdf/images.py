@@ -103,6 +103,7 @@ def extract_page_image(
     scale: float = 2.0,
     format: str = "PNG",
     *,
+    dpi: int | None = None,
     jpeg_quality: int = 90,
     password: str | None = None,
     grayscale: bool = False,
@@ -110,14 +111,16 @@ def extract_page_image(
     """
     Rendert eine PDF-Seite und speichert sie als Bild.
     out_path default: <pdf>_p{N}.png
+    dpi: wenn gesetzt (z. B. 72/150/300), überschreibt scale (dpi/72).
     """
     from .render import render_page
 
     pdf_path = Path(pdf_path)
+    render_scale = (max(1, int(dpi)) / 72.0) if dpi is not None else float(scale)
     img = render_page(
         pdf_path,
         page_index=page_index,
-        scale=scale,
+        scale=render_scale,
         password=password,
         grayscale=grayscale,
     )
@@ -146,6 +149,7 @@ def extract_pages_as_images(
     pages: list[int] | None = None,
     scale: float = 2.0,
     format: str = "PNG",
+    dpi: int | None = None,
     jpeg_quality: int = 90,
     password: str | None = None,
     grayscale: bool = False,
@@ -153,6 +157,7 @@ def extract_pages_as_images(
     """
     Exportiert eine oder mehrere PDF-Seiten als PNG/JPEG in out_dir.
     pages=None → alle Seiten. Rückgabe: Liste geschriebener Pfade.
+    dpi: wenn gesetzt, überschreibt scale (siehe extract_page_image).
     """
     from .document import PdfDocument
 
@@ -178,6 +183,7 @@ def extract_pages_as_images(
                 out,
                 scale=scale,
                 format=fmt,
+                dpi=dpi,
                 jpeg_quality=jpeg_quality,
                 password=password,
                 grayscale=grayscale,

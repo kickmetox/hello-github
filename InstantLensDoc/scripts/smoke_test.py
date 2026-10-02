@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Smoke-Test 0.3.5 (CLI + optional offscreen Qt). Kernpfade: open/annotate/export/license."""
+"""Smoke-Test 0.3.6 (CLI + optional offscreen Qt). Kernpfade: open/annotate/export/license."""
 
 from __future__ import annotations
 
@@ -112,8 +112,8 @@ def main() -> int:
     from instantlensdoc.core.update_check import check_for_updates
     from instantlensdoc.license import KEY_DAYS, TRIAL_DAYS, generate_key, verify_key
 
-    assert __version__ == "0.3.5", __version__
-    assert ild_ver == "0.3.5", ild_ver
+    assert __version__ == "0.3.6", __version__
+    assert ild_ver == "0.3.6", ild_ver
     assert TRIAL_DAYS == 28 and KEY_DAYS == 32
     key = generate_key("ame@sellerbach.de")
     ok, msg, _ = verify_key(key)
@@ -131,7 +131,7 @@ def main() -> int:
     assert "Settings" in tr("settings")
     set_lang("de")
     upd = check_for_updates(allow_network=False)
-    assert upd.local_version == "0.3.5" and not upd.online
+    assert upd.local_version == "0.3.6" and not upd.online
     assert get_export_jpeg_quality() >= 10
     assert get_ui_lang() in ("de", "en")
     assert 25 <= get_default_zoom_percent() <= 500
@@ -172,8 +172,8 @@ def main() -> int:
     assert get_ann_pen_color() == "#112233"
     assert (ROOT / "CHANGELOG.md").is_file()
     cl = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-    assert "0.3.5" in cl
-    assert "## 0.3.5" in cl
+    assert "0.3.6" in cl
+    assert "## 0.3.6" in cl
     assert "## 0.3.1" in cl
     assert "## 0.3.0" in cl
     assert "0.2.0 → 0.3.0" in cl or "0.2.0→0.3.0" in cl
@@ -185,7 +185,7 @@ def main() -> int:
     # Kompakt: Einzel-Header 0.2.1–0.2.9 entfernt (nur Kurz-Tabelle)
     assert "## 0.2.9" not in cl and "## 0.2.8" not in cl
     assert "0.2.9" in cl  # noch in Kurz-Tabelle
-    assert "0.3.5" in (ROOT / "README.md").read_text(encoding="utf-8")
+    assert "0.3.6" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "run.bat" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "sync-ild.ps1" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "scripts/sync-ild.ps1" in (ROOT / "FEATURES.md").read_text(encoding="utf-8")
@@ -534,13 +534,13 @@ def main() -> int:
 
         assert (ROOT / "installer" / "installer-hinweis.txt").exists()
         iss = (ROOT / "installer" / "instantlensdoc.iss").read_text(encoding="utf-8")
-        assert "0.3.5" in iss and "desktopicon" in iss and "DisableProgramGroupPage=no" in iss
+        assert "0.3.6" in iss and "desktopicon" in iss and "DisableProgramGroupPage=no" in iss
         assert "UninstallDisplayName" in iss and "Uninstallable=yes" in iss
         assert "IncludeKeygen" in iss and "SetupIconFile" in iss
         assert "InstantLensKeygen.exe" in iss
         assert "uninstallexe" in iss
         bw = (ROOT / "build-windows.ps1").read_text(encoding="utf-8")
-        assert "0.3.5" in bw and "NoKeygenInApp" in bw and "--icon" in bw
+        assert "0.3.6" in bw and "NoKeygenInApp" in bw and "--icon" in bw
         assert "InstantLensKeygen.exe" in bw
         bi = (ROOT / "installer" / "build-installer.ps1").read_text(encoding="utf-8")
         assert "InstantLensKeygen.exe" in bi and "IncludeKeygen" in bi
@@ -559,7 +559,7 @@ def main() -> int:
         assert "QProgressDialog" in (ROOT / "instantlensdoc" / "ui" / "main_window.py").read_text(encoding="utf-8")
 
         assert (ROOT / "examples" / "ild_pdf_demo.py").exists()
-        assert "0.3.5" in (ROOT / "INFO.md").read_text(encoding="utf-8")
+        assert "0.3.6" in (ROOT / "INFO.md").read_text(encoding="utf-8")
         assert (ROOT / "assets" / "app.ico").is_file()
 
         # --- Kernpfade: open / annotate / export / license ---
@@ -722,7 +722,7 @@ def main() -> int:
         win._add_chained_frame()
         assert len(win.layout_doc.text_frames) >= 2
         assert "Lizenz:" in win.license_label.text() or "⚠" in win.license_label.text()
-        assert "v0.3.5" in win.version_label.text()
+        assert "v0.3.6" in win.version_label.text()
         # Lizenz <7 Tage: Style prominent
         st_lic = win.license_manager.status()
         if st_lic.allowed and st_lic.days_remaining < 7:
@@ -897,11 +897,11 @@ def main() -> int:
             assert win.editor.outdent_selection(4)
             assert win.editor.toPlainText().splitlines()[0] == "alpha"
             # Fenstertitel mit Version
-            assert "0.3.5" in win.windowTitle()
+            assert "0.3.6" in win.windowTitle()
             from instantlensdoc.ui.help_dialog import AboutDialog, HelpDialog, open_log_folder
 
             about = AboutDialog(win)
-            assert "0.3.5" in about.windowTitle()
+            assert "0.3.6" in about.windowTitle()
             help_dlg = HelpDialog(win)
             assert help_dlg.windowTitle() == "Hilfe"
             assert callable(open_log_folder)
@@ -1176,7 +1176,7 @@ def main() -> int:
             assert "Ablaufdatum" in dlg_lic.info.text()
             dlg_lic.close()
             print("0.3.3 single-pdf/flatten/softwrap/license: OK")
-            # 0.3.5: PDF-Text→Editor / Ann.-Duplikat / Goto Line / Tray
+            # 0.3.4: PDF-Text→Editor / Ann.-Duplikat / Goto Line / Tray
             from instantlensdoc.core.app_settings import (
                 get_minimize_to_tray,
                 set_minimize_to_tray,
@@ -1321,6 +1321,78 @@ def main() -> int:
             assert txt_path.read_text(encoding="utf-8") == "v2"
             set_backup_on_save(False)
             print("0.3.5 size/ann-group/dup-line/backup: OK")
+            # 0.3.6: Raster-DPI, Ann. Select-All, Kommentar, Fenstergeometrie
+            from instantlensdoc.core.app_settings import (
+                EXPORT_RASTER_DPI_CHOICES,
+                get_export_raster_dpi,
+                get_window_geometry_b64,
+                get_window_state_b64,
+                set_export_raster_dpi,
+                set_window_geometry_b64,
+                set_window_state_b64,
+            )
+
+            assert EXPORT_RASTER_DPI_CHOICES == (72, 150, 300)
+            set_export_raster_dpi(150)
+            assert get_export_raster_dpi() == 150
+            assert set_export_raster_dpi(300) == 300
+            assert get_export_raster_dpi() == 300
+            assert set_export_raster_dpi(72) == 72
+            dpi_out = Path(td2) / "dpi72.png"
+            extract_page_image(smoke_pdf, 0, dpi_out, dpi=72)
+            assert dpi_out.is_file()
+            from PIL import Image as _Img
+
+            with _Img.open(dpi_out) as im72:
+                w72, h72 = im72.size
+            dpi_out150 = Path(td2) / "dpi150.png"
+            extract_page_image(smoke_pdf, 0, dpi_out150, dpi=150)
+            with _Img.open(dpi_out150) as im150:
+                w150, h150 = im150.size
+            assert w150 > w72 and h150 > h72
+            set_export_raster_dpi(150)
+
+            # Select-all annotations on page
+            win.stack.setCurrentWidget(win.pdf_view)
+            win.pdf_view.store.add(
+                Annotation(0, AnnotationType.HIGHLIGHT, 12, 12, width=30, height=10, text="sa1")
+            )
+            win.pdf_view.store.add(
+                Annotation(0, AnnotationType.STICKY, 80, 80, width=40, height=30, text="sa2")
+            )
+            n_sel = win.pdf_view.select_all_annotations_on_page()
+            assert n_sel >= 2
+            assert len(win.pdf_view._selected_ann_ids) >= 2
+            assert callable(win._select_all_annotations_on_page)
+            win._select_all_annotations_on_page()
+
+            # Comment / uncomment
+            win.stack.setCurrentWidget(win.editor_pane)
+            win.editor.setPlainText("print(1)\nprint(2)\n")
+            assert win.editor.comment_prefix_for_path("x.py") == "#"
+            assert win.editor.comment_prefix_for_path("x.js") == "//"
+            assert win.editor.toggle_line_comment("#")
+            lines = win.editor.toPlainText().splitlines()
+            assert lines[0].startswith("# ")
+            assert win.editor.toggle_line_comment("#")
+            assert win.editor.toPlainText().splitlines()[0] == "print(1)"
+            win.editor.setPlainText("const a = 1;\nconst b = 2;")
+            assert win.editor.toggle_line_comment("//")
+            assert win.editor.toPlainText().splitlines()[0].startswith("// ")
+            assert callable(win._toggle_line_comment)
+
+            # Window geometry persistence
+            set_window_geometry_b64("dGVzdA==")
+            set_window_state_b64("c3RhdGU=")
+            assert get_window_geometry_b64() == "dGVzdA=="
+            assert get_window_state_b64() == "c3RhdGU="
+            assert callable(win._save_window_geometry)
+            assert callable(win._restore_window_geometry)
+            win._save_window_geometry()
+            assert get_window_geometry_b64()  # non-empty after save
+            set_window_geometry_b64("")
+            set_window_state_b64("")
+            print("0.3.6 dpi/select-all/comment/geometry: OK")
             win.pdf_view.store.add(
                 Annotation(0, AnnotationType.REDACTION, 5, 5, width=30, height=20, color="#000000", text="REDACT")
             )
@@ -1330,9 +1402,9 @@ def main() -> int:
             from instantlensdoc.ui.password_dialog import CompressPdfDialog, SetPasswordDialog
             from instantlensdoc.ui.stubs import PLANNED
             assert KeyboardHelpDialog and SetPasswordDialog and CompressPdfDialog
-            assert "0.3.5" in PLANNED["ki"]
+            assert "0.3.6" in PLANNED["ki"]
             assert "Coming soon" in PLANNED["cloud"]
-            assert "0.3.5" in PLANNED["stylus"] and "0.3.5" in PLANNED["extrude3d"]
+            assert "0.3.6" in PLANNED["stylus"] and "0.3.6" in PLANNED["extrude3d"]
             # Toolbar ↔ Menü Sync Graustufen/Nacht
             win.pdf_view.set_grayscale(True)
             assert win._grayscale_action.isChecked()
@@ -1367,9 +1439,9 @@ def main() -> int:
             assert win.editor.toPlainText().splitlines() == ["one", "two"]
             from instantlensdoc.ui.help_dialog import HELP_HTML
 
-            assert "Stub 0.3.5" in HELP_HTML
+            assert "Stub 0.3.6" in HELP_HTML
             assert "scripts/sync-ild.ps1" in HELP_HTML
-            print("0.3.4 review + text/dup/goto/tray + 0.3.5 size/group/dup/bak: OK")
+            print("0.3.4 review + text/dup/goto/tray + 0.3.5 size/group/dup/bak + 0.3.6 dpi/sel/comment/geo: OK")
             assert callable(win.pdf_view.bake_redactions)
             assert callable(win.pdf_view.clear_redactions)
             assert callable(win._set_pdf_password)

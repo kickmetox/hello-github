@@ -7,6 +7,7 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | Hauptfenster (Menü, Sidebar, Editor, Status) | fertig | PySide6; Status: Dateiname, Seite x/y, **Seitengröße mm/inch** 0.3.5, Zoom %, Wörter/Ann.; Ann.-Liste Sidebar 0.2.4; **Ann.-Filter Typ** 0.2.6 |
 | App-Icon Fenster/Taskleiste/About | fertig | Robuste Pfade: `assets/`, CWD, `D:\AI_Temp\InstantLensDoc` |
 | Session-Restore (offene Docs) | fertig | `session.json`, Sidebar-Liste |
+| Fenster-Geometrie speichern | fertig | Größe/Position/State in Settings 0.3.6 |
 | Clipboard-Paste Bild | fertig | Editor + PDF (Stempel/Seite) |
 | TXT / MD / HTML öffnen & speichern | fertig | HTML-Export mit einfachem Markdownish |
 | DOCX öffnen & speichern | teilweise | python-docx; Headings/Listen beim Export |
@@ -33,6 +34,7 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | Annotation Undo/Redo | fertig | Ctrl+Z/Y inkl. Overlay-Text |
 | Annotation löschen | fertig | Auswahl oder letzte; Entf / Menü 0.2.3 |
 | Annotation duplizieren | fertig | Auswahl leicht versetzt; Ctrl+Shift+D 0.3.4 |
+| Annotation Select-All Seite | fertig | Alle Ann. der aktuellen Seite; Ctrl+A im PDF 0.3.6 |
 | Annotation-Text editieren | fertig | Notiz/Kommentar/Overlay nachträglich; Doppelklick / Ctrl+E 0.2.7 |
 | Annotation-Deckkraft | fertig | `opacity` Sidecar + Toolbar α + Dialog 0.2.8 |
 | Annotation-Suche Sidebar | fertig | Textfilter in Annotationsliste 0.3.0 |
@@ -52,7 +54,7 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | Messwerkzeug (Lineal) | fertig | Distanz in pt (Scale-bewusst) |
 | Text-Overlay-Editor | fertig | Sidecar; Doppelklick/Strg+Klick; Bake optional |
 | PDF-Text → Overlay | teilweise | Extraktion via pypdfium2; kein natives Rewrite |
-| PDF Seite↔Bild Hooks | fertig | Seite/Seiten → PNG/JPEG Export 0.2.3; Bild als Seite / Bildstempel |
+| PDF Seite↔Bild Hooks | fertig | Seite/Seiten → PNG/JPEG Export 0.2.3; **DPI 72/150/300** 0.3.6; Bild als Seite / Bildstempel |
 | PDF drehen / Seite löschen | fertig | Toolbar ⟲/⟳ (−90°/+90°) speichert; Annotation-Remap |
 | PDF spiegeln (H/V) | fertig | Toolbar ↔/↕ + Menü; `ild_pdf.flip_page` 0.2.7 |
 | PDF Graustufen | fertig | Toggle Ansicht/Export; `render_page(..., grayscale=True)` 0.2.8 |
@@ -70,6 +72,7 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | Editor Soft-Wrap | fertig | Toggle Ansicht/Einstellungen; Ctrl+Shift+W 0.3.3 |
 | Editor Gehe zu Zeile | fertig | Dialog Ctrl+G 0.3.4 |
 | Editor Zeile duplizieren | fertig | Ctrl+D (aktuelle/Auswahl) 0.3.5 |
+| Editor Kommentar/Unkommentar | fertig | Ctrl+/ für # und // (einfache Sprachen) 0.3.6 |
 | Backup .bak beim Speichern | fertig | Optional in Einstellungen 0.3.5 |
 | Zuletzt verwendete Ordner | fertig | Datei-Dialoge merken `recent_dirs` 0.3.2 |
 | Alles speichern (Tabs) | fertig | Datei → Alles speichern; aktuelles Doc + PDF-Sidecars 0.2.7 |
@@ -93,25 +96,25 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | PyInstaller Build Windows | fertig | `build-windows.ps1`, Icon `assets/app.ico` |
 | Inno-Installer | fertig | Icon, Desktop, Uninstaller, Keygen optional (`InstantLensKeygen.exe`) 0.2.1 |
 | Sync-Skript Windows | fertig | Repo `scripts/sync-ild.ps1`; Store `docs/sync-ild.ps1` |
-| In-App Hilfe / About | fertig | Version 0.3.5; Fenstertitel + Splash; Logordner-Button |
-| CHANGELOG | fertig | **0.3.5** Seitengröße mm/inch / Ann.-Gruppen / Zeile duplizieren / Backup .bak |
+| In-App Hilfe / About | fertig | Version 0.3.6; Fenstertitel + Splash; Logordner-Button |
+| CHANGELOG | fertig | **0.3.6** Raster-DPI / Ann. Select-All / Kommentar / Fenstergeometrie |
 | FEATURES.md / INFO.md | fertig | |
 | `ild_pdf` Modul + Beispielskript | fertig | metadata / page size / watermark / redact / acroform / attachments / flatten / **plain text** |
 | Font-Matching | geplant | |
 | Objekt-/Bildbearbeitung | geplant | |
 | Layout-Erhaltung (Scan→edit) | geplant | |
 | Freihand | geplant | |
-| KI-Assistent | Stub | Menü „Geplant“ 0.3.5 (keine Fake-KI) |
+| KI-Assistent | Stub | Menü „Geplant“ 0.3.6 (keine Fake-KI) |
 | Signieren (rechtssicher) | Stub | |
-| Cloud-Sync | Stub | Menü „Geplant“ 0.3.5 (keine Fake-Cloud) |
+| Cloud-Sync | Stub | Menü „Geplant“ 0.3.6 (keine Fake-Cloud) |
 | Text on Path / Text zu Pfaden | geplant | |
 | Envelope Distort / Text Wrap / Area Type | Stub/geplant | |
 | Schnittmasken | geplant | |
 | Füllungen / Live-Effekte | geplant | |
-| 3D-Extrusion | Stub | Menü „Geplant“ 0.3.5 |
+| 3D-Extrusion | Stub | Menü „Geplant“ 0.3.6 |
 | Variable Fonts (voll) | Stub | |
 | Glyphen-Palette | geplant | |
-| Stylus / Palm Rejection | Stub | Menü „Geplant“ 0.3.5 |
-| Intelligente Formerkennung | Stub | Menü „Geplant“ 0.3.5 |
+| Stylus / Palm Rejection | Stub | Menü „Geplant“ 0.3.6 |
+| Intelligente Formerkennung | Stub | Menü „Geplant“ 0.3.6 |
 
 Nicht behauptet als fertig: Cloud, KI, Stylus, 3D — nur Menü-Stubs + dieser Status.

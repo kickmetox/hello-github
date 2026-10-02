@@ -263,6 +263,7 @@ class PdfCanvas(QLabel):
         self._search_rects: list[tuple[float, float, float, float]] = []
         self._search_active: int = -1
         self._selected_id: str | None = None
+        self._selected_ids: set[str] = set()
         self._annotations_visible = True
         self.setMouseTracking(True)
         self.setFocusPolicy(Qt.StrongFocus)
@@ -280,6 +281,13 @@ class PdfCanvas(QLabel):
 
     def set_selected_id(self, ann_id: str | None):
         self._selected_id = ann_id
+        self._selected_ids = {ann_id} if ann_id else set()
+        self._repaint_overlay()
+
+    def set_selected_ids(self, ann_ids: list[str] | set[str] | None):
+        ids = {str(i) for i in (ann_ids or []) if i}
+        self._selected_ids = ids
+        self._selected_id = next(iter(ids), None)
         self._repaint_overlay()
 
     def set_search_highlights(
@@ -528,7 +536,9 @@ class PdfCanvas(QLabel):
         if self._annotations_visible:
             for ann in self._annotations:
                 self._draw_ann(painter, ann)
-                if self._selected_id and ann.id == self._selected_id:
+                if ann.id in self._selected_ids or (
+                    self._selected_id and ann.id == self._selected_id
+                ):
                     x0, y0, x1, y1 = self._ann_bounds(ann)
                     sel = QPen(QColor(30, 144, 255), 2, Qt.DashLine)
                     painter.setPen(sel)
@@ -666,6 +676,7 @@ class PdfViewer(QWidget):
         self._search_rects: list[tuple[float, float, float, float]] = []
         self._search_index = -1
         self._selected_ann_id: str | None = None
+        self._selected_ann_ids: set[str] = set()
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
 
@@ -1046,6 +1057,7 @@ class PdfViewer(QWidget):
 
     def _on_annotation_selected(self, ann_id: str):
         self._selected_ann_id = ann_id or None
+        self._selected_ann_ids = {self._selected_ann_id} if self._selected_ann_id else set()
         self.canvas.set_selected_id(self._selected_ann_id)
         if self._selected_ann_id and self.store:
             ann = self.store.get(self._selected_ann_id)
@@ -1056,26 +1068,45 @@ class PdfViewer(QWidget):
         else:
             self.status.emit("Auswahl aufgehoben")
 
+    def select_all_annotations_on_page(self) -> int:
+        """Alle Annotationen der aktuellen Seite auswählen. Rückgabe: Anzahl."""
+        if not self.store:
+            self.status.emit("Keine Annotationen")
+            return 0
+        ids = [a.id for a in self.store.for_page(self.page_index)]
+        self._selected_ann_ids = set(ids)
+        self._selected_ann_id = ids[0] if ids else None
+        self.canvas.set_selected_ids(ids)
+        n = len(ids)
+        if n:
+            self.status.emit(f"{n} Annotation(en) auf Seite {self.page_index + 1} ausgewählt")
+        else:
+            self.status.emit(f"Keine Annotationen auf Seite {self.page_index + 1}")
+        return n
+
     def delete_annotation(self) -> bool:
-        """Löscht ausgewählte Annotation, sonst die letzte auf der aktuellen Seite (bzw. global)."""
+        """Löscht ausgewählte Annotation(en), sonst die letzte auf der aktuellen Seite (bzw. global)."""
         if not self.store:
             self.status.emit("Keine Annotationen")
             return False
-        removed = None
-        if self._selected_ann_id and self.store.get(self._selected_ann_id):
-            aid = self._selected_ann_id
-            if self.store.remove(aid):
-                removed = aid
-        else:
+        removed: list[str] = []
+        targets = list(self._selected_ann_ids) if self._selected_ann_ids else (
+            [self._selected_ann_id] if self._selected_ann_id else []
+        )
+        for aid in targets:
+            if aid and self.store.get(aid) and self.store.remove(aid):
+                removed.append(aid)
+        if not removed:
             target = self.store.remove_last(page=self.page_index)
             if target is None:
                 target = self.store.remove_last(page=None)
             if target is not None:
-                removed = target.id
+                removed.append(target.id)
         if not removed:
             self.status.emit("Keine Annotation zum Löschen")
             return False
         self._selected_ann_id = None
+        self._selected_ann_ids = set()
         self.canvas.set_selected_id(None)
         try:
             self.store.save(force=True)
@@ -1084,12 +1115,17 @@ class PdfViewer(QWidget):
             return False
         self.refresh()
         self.annotations_changed.emit()
-        self.status.emit("Annotation gelöscht")
+        if len(removed) > 1:
+            self.status.emit(f"{len(removed)} Annotationen gelöscht")
+        else:
+            self.status.emit("Annotation gelöscht")
         return True
 
     def clear_annotation_selection(self):
         self._selected_ann_id = None
+        self._selected_ann_ids = set()
         self.canvas.set_selected_id(None)
+
     def load(self, path: str | Path, password: str | None = None) -> bool:
         from PySide6.QtWidgets import QApplication
 
@@ -2043,6 +2079,7 @@ class PdfViewer(QWidget):
             QMessageBox.warning(self, "Annotation duplizieren", str(e))
             return False
         self._selected_ann_id = dup.id
+        self._selected_ann_ids = {dup.id}
         self.canvas.set_selected_id(dup.id)
         self.refresh()
         self.annotations_changed.emit()
@@ -2097,13 +2134,32 @@ class PdfViewer(QWidget):
     def extract_page_as_image(self):
         if not self.pdf_path:
             return
-        from PySide6.QtWidgets import QFileDialog
+        from PySide6.QtWidgets import QFileDialog, QInputDialog
         from ild_pdf import extract_page_image
         from instantlensdoc.core.app_settings import (
+            EXPORT_RASTER_DPI_CHOICES,
             dialog_start_dir,
+            get_export_raster_dpi,
             remember_recent_dir,
+            set_export_raster_dpi,
             set_last_export_dir,
         )
+
+        dpi_items = [str(d) for d in EXPORT_RASTER_DPI_CHOICES]
+        default_dpi = str(get_export_raster_dpi())
+        dpi_idx = dpi_items.index(default_dpi) if default_dpi in dpi_items else 1
+        dpi_str, ok = QInputDialog.getItem(
+            self,
+            "Seite als Bild",
+            "Auflösung (DPI):",
+            dpi_items,
+            dpi_idx,
+            False,
+        )
+        if not ok:
+            return
+        dpi = int(dpi_str)
+        set_export_raster_dpi(dpi)
 
         start_dir = dialog_start_dir(self.pdf_path.parent)
         default = str(Path(start_dir) / f"{self.pdf_path.stem}_p{self.page_index + 1}.png")
@@ -2120,14 +2176,14 @@ class PdfViewer(QWidget):
                 self.pdf_path,
                 self.page_index,
                 path,
-                scale=max(self.scale, 1.5),
+                dpi=dpi,
                 format=fmt,
                 password=self.password,
                 grayscale=self._grayscale,
             )
             set_last_export_dir(Path(out).parent)
             remember_recent_dir(Path(out).parent)
-            self.status.emit(f"Seite exportiert: {out.name}")
+            self.status.emit(f"Seite exportiert ({dpi} DPI): {out.name}")
         except Exception as e:
             QMessageBox.warning(self, "Extrahieren", str(e))
 
@@ -2139,8 +2195,11 @@ class PdfViewer(QWidget):
         from PySide6.QtWidgets import QFileDialog, QInputDialog
         from ild_pdf import extract_pages_as_images
         from instantlensdoc.core.app_settings import (
+            EXPORT_RASTER_DPI_CHOICES,
             dialog_start_dir,
+            get_export_raster_dpi,
             remember_recent_dir,
+            set_export_raster_dpi,
             set_last_export_dir,
         )
 
@@ -2164,6 +2223,21 @@ class PdfViewer(QWidget):
         )
         if not ok:
             return
+        dpi_items = [str(d) for d in EXPORT_RASTER_DPI_CHOICES]
+        default_dpi = str(get_export_raster_dpi())
+        dpi_idx = dpi_items.index(default_dpi) if default_dpi in dpi_items else 1
+        dpi_str, ok = QInputDialog.getItem(
+            self,
+            "Seiten als Bilder",
+            "Auflösung (DPI):",
+            dpi_items,
+            dpi_idx,
+            False,
+        )
+        if not ok:
+            return
+        dpi = int(dpi_str)
+        set_export_raster_dpi(dpi)
         start_dir = dialog_start_dir(self.pdf_path.parent)
         out_dir = QFileDialog.getExistingDirectory(self, "Zielordner für Bilder", start_dir)
         if not out_dir:
@@ -2174,18 +2248,18 @@ class PdfViewer(QWidget):
                 self.pdf_path,
                 out_dir,
                 pages=pages,
-                scale=max(self.scale, 1.5),
+                dpi=dpi,
                 format=fmt,
                 password=self.password,
                 grayscale=self._grayscale,
             )
             set_last_export_dir(out_dir)
             remember_recent_dir(out_dir)
-            self.status.emit(f"{len(written)} Bild(er) → {Path(out_dir).name}")
+            self.status.emit(f"{len(written)} Bild(er) @ {dpi} DPI → {Path(out_dir).name}")
             QMessageBox.information(
                 self,
                 "Export",
-                f"{len(written)} Seite(n) als {fmt} exportiert nach:\n{out_dir}",
+                f"{len(written)} Seite(n) als {fmt} ({dpi} DPI) exportiert nach:\n{out_dir}",
             )
         except Exception as e:
             QMessageBox.warning(self, "Export", str(e))
@@ -2446,6 +2520,7 @@ class PdfViewer(QWidget):
                 self.page_count = len(doc)
             self.page_index = new_idx
             self._selected_ann_id = None
+            self._selected_ann_ids = set()
             self.canvas.set_selected_id(None)
             self.refresh()
             self.annotations_changed.emit()
@@ -2470,6 +2545,7 @@ class PdfViewer(QWidget):
                 self.page_count = len(doc)
             self.page_index = new_idx
             self._selected_ann_id = None
+            self._selected_ann_ids = set()
             self.canvas.set_selected_id(None)
             self.refresh()
             self.annotations_changed.emit()
@@ -2494,6 +2570,7 @@ class PdfViewer(QWidget):
         if page != self.page_index:
             self.goto_page(page)
         self._selected_ann_id = aid
+        self._selected_ann_ids = {aid} if aid else set()
         self.canvas.set_selected_id(aid)
         self.refresh()
         self.status.emit(f"Annotation: {target.type.value} (S. {page + 1})")
@@ -2564,6 +2641,7 @@ class PdfViewer(QWidget):
                 self.store.save(force=True)
             self.page_index = 0
             self._selected_ann_id = None
+            self._selected_ann_ids = set()
             self.canvas.set_selected_id(None)
             from ild_pdf import PdfDocument
 
@@ -2583,6 +2661,7 @@ class PdfViewer(QWidget):
         self.pdf_path = None
         self.store = None
         self._selected_ann_id = None
+        self._selected_ann_ids = set()
         self.canvas.set_selected_id(None)
         self.canvas.clear()
         self.lbl_page.setText("—")

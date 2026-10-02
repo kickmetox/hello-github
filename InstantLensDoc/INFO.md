@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | 0.3.5 |
+| Version | 0.3.6 |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -33,10 +33,10 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)
 
-## Neu in 0.3.5
+## Neu in 0.3.6
 
-- PDF-Seitengröße in Statusleiste + Dialog (mm/inch Toggle)
-- Annotationen in Sidebar nach Seite gruppiert
-- Editor: Zeile duplizieren (Ctrl+D)
-- Optional: Backup-Kopie `.bak` beim Speichern (Einstellungen)
+- PDF-Raster-Export: DPI 72/150/300 wählbar
+- Annotationen: alle auf Seite auswählen (Ctrl+A)
+- Editor: Zeile kommentieren/auskommentieren (Ctrl+/; # //)
+- Fenster-Geometrie speichern/wiederherstellen
 - Stubs KI/Cloud/Stylus/3D unverändert

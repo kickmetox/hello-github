@@ -1,5 +1,22 @@
 # Changelog — InstantLens Doc
 
+## 0.3.6 — Raster-DPI, Ann. Select-All, Kommentar, Fenstergeometrie
+
+Fokus auf sinnvolle Ausbauten nach 0.3.5. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### PDF
+- **Raster-Export DPI wählbar** (72 / 150 / 300) beim Export Seite/Seiten als Bild; Einstellung merken
+- **Alle Annotationen auf Seite auswählen** (Ctrl+A im PDF-Modus; Mehrfachauswahl + Löschen)
+
+### Editor / UX
+- **Zeile kommentieren/auskommentieren** (Ctrl+/; Präfix `#` oder `//` je nach Dateityp)
+- **Fenster-Geometrie** speichern/wiederherstellen (Größe, Position, Window-State)
+
+### Packaging / Docs
+- Version **0.3.6** (App, `ild_pdf`, ISS, Smoke, INFO/FEATURES/README)
+
+---
+
 ## 0.3.5 — Seitengröße, Ann.-Gruppen, Zeile duplizieren, Backup
 
 Fokus auf sinnvolle Ausbauten nach 0.3.4. Stubs KI/Cloud/Stylus/3D bleiben Stubs.

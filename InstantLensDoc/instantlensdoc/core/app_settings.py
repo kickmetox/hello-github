@@ -39,6 +39,9 @@ DEFAULTS: dict[str, Any] = {
     "minimize_to_tray": False,
     "page_size_unit": "mm",
     "backup_on_save": False,
+    "export_raster_dpi": 150,
+    "window_geometry": "",
+    "window_state": "",
 }
 
 
@@ -387,3 +390,44 @@ def get_backup_on_save() -> bool:
 
 def set_backup_on_save(enabled: bool) -> None:
     save_settings({"backup_on_save": bool(enabled)})
+
+
+EXPORT_RASTER_DPI_CHOICES = (72, 150, 300)
+
+
+def get_export_raster_dpi() -> int:
+    try:
+        v = int(load_settings().get("export_raster_dpi", 150))
+    except (TypeError, ValueError):
+        v = 150
+    if v not in EXPORT_RASTER_DPI_CHOICES:
+        # nächster bekannter Wert
+        return min(EXPORT_RASTER_DPI_CHOICES, key=lambda x: abs(x - v))
+    return v
+
+
+def set_export_raster_dpi(dpi: int) -> int:
+    try:
+        v = int(dpi)
+    except (TypeError, ValueError):
+        v = 150
+    if v not in EXPORT_RASTER_DPI_CHOICES:
+        v = min(EXPORT_RASTER_DPI_CHOICES, key=lambda x: abs(x - v))
+    save_settings({"export_raster_dpi": v})
+    return v
+
+
+def get_window_geometry_b64() -> str:
+    return str(load_settings().get("window_geometry", "") or "")
+
+
+def set_window_geometry_b64(data: str) -> None:
+    save_settings({"window_geometry": str(data or "")})
+
+
+def get_window_state_b64() -> str:
+    return str(load_settings().get("window_state", "") or "")
+
+
+def set_window_state_b64(data: str) -> None:
+    save_settings({"window_state": str(data or "")})
