@@ -49,6 +49,8 @@ from .overlay import (
     TextBlock,
     TextMatchRect,
     bake_text_overlays,
+    extract_all_plain_text,
+    extract_page_plain_text,
     extract_text_blocks,
     find_text_rects,
     import_page_text_as_overlays,
@@ -120,6 +122,8 @@ __all__ = [
     "TextBlock",
     "TextMatchRect",
     "extract_text_blocks",
+    "extract_page_plain_text",
+    "extract_all_plain_text",
     "find_text_rects",
     "import_page_text_as_overlays",
     "bake_text_overlays",
@@ -148,4 +152,4 @@ __all__ = [
     "extract_all_attachments",
 ]
 
-__version__ = "0.3.3"
+__version__ = "0.3.4"

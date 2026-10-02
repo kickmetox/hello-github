@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | 0.3.3 |
+| Version | 0.3.4 |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -33,10 +33,10 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)
 
-## Neu in 0.3.3
+## Neu in 0.3.4
 
-- PDF-Seiten als Einzel-PDFs aufteilen
-- Annotationen flatten/bake Export (alle Seiten)
-- Editor: Soft-Wrap Toggle
-- Lizenz-Dialog: Resttage + Ablaufdatum
+- PDF-Text (Seite / alles) → Editor-Tab
+- Annotationen duplizieren (Auswahl)
+- Editor: Gehe zu Zeile (Ctrl+G)
+- Optional: Minimieren in System-Tray (Einstellungen)
 - Stubs KI/Cloud/Stylus/3D unverändert

@@ -2028,6 +2028,27 @@ class PdfViewer(QWidget):
         self._edit_overlay(ann.id)
         return True
 
+    def duplicate_selected_annotation(self) -> bool:
+        """Ausgewählte Annotation duplizieren (neue ID, leicht versetzt)."""
+        if not self.store or not self._selected_ann_id:
+            self.status.emit("Keine Annotation ausgewählt")
+            return False
+        dup = self.store.duplicate(self._selected_ann_id)
+        if dup is None:
+            self.status.emit("Duplizieren fehlgeschlagen")
+            return False
+        try:
+            self.store.save()
+        except Exception as e:
+            QMessageBox.warning(self, "Annotation duplizieren", str(e))
+            return False
+        self._selected_ann_id = dup.id
+        self.canvas.set_selected_id(dup.id)
+        self.refresh()
+        self.annotations_changed.emit()
+        self.status.emit(f"Annotation dupliziert ({dup.type.value})")
+        return True
+
     def rotate_current(self, degrees: int = 90):
         """Aktuelle Seite drehen (−90/90/180/270) und PDF speichern."""
         if not self.pdf_path:

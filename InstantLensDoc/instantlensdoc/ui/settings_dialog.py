@@ -28,6 +28,7 @@ from instantlensdoc.core.app_settings import (
     get_export_image_max_edge,
     get_export_jpeg_quality,
     get_export_pdf_page,
+    get_minimize_to_tray,
     get_ocr_lang,
     get_pdf_grayscale,
     get_pdf_night_mode,
@@ -41,6 +42,7 @@ from instantlensdoc.core.app_settings import (
     set_default_zoom_percent,
     set_editor_line_numbers,
     set_editor_soft_wrap,
+    set_minimize_to_tray,
     set_ocr_lang,
     set_pdf_grayscale,
     set_pdf_night_mode,
@@ -113,6 +115,13 @@ class SettingsDialog(QDialog):
         self.soft_wrap.setChecked(get_editor_soft_wrap())
         self.soft_wrap.setToolTip("Lange Zeilen am Fensterrand umbrechen")
         form.addRow(self.soft_wrap)
+
+        self.minimize_tray = QCheckBox("Beim Minimieren in den System-Tray")
+        self.minimize_tray.setChecked(get_minimize_to_tray())
+        self.minimize_tray.setToolTip(
+            "Fenster in den Infobereich legen statt Taskleisten-Minimierung (optional)"
+        )
+        form.addRow(self.minimize_tray)
 
         self.pdf_grayscale = QCheckBox("PDF in Graustufen rendern/exportieren")
         self.pdf_grayscale.setChecked(get_pdf_grayscale())
@@ -194,6 +203,7 @@ class SettingsDialog(QDialog):
         set_autosave_interval_sec(int(self.autosave_sec.value()))
         set_editor_line_numbers(self.line_numbers.isChecked())
         set_editor_soft_wrap(self.soft_wrap.isChecked())
+        set_minimize_to_tray(self.minimize_tray.isChecked())
         set_pdf_grayscale(self.pdf_grayscale.isChecked())
         set_pdf_night_mode(self.pdf_night.isChecked())
         save_settings(
@@ -214,4 +224,10 @@ class SettingsDialog(QDialog):
         else:
             save_settings({"default_open_dir": ""})
         apply_theme(mode=get_theme())
+        parent = self.parent()
+        if parent is not None and hasattr(parent, "apply_tray_setting"):
+            try:
+                parent.apply_tray_setting()
+            except Exception:
+                pass
         self.accept()

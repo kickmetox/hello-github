@@ -144,6 +144,74 @@ def extract_text_blocks(
     return blocks
 
 
+def extract_page_plain_text(
+    pdf_path: str | Path,
+    page_index: int = 0,
+    *,
+    password: str | None = None,
+) -> str:
+    """Sichtbaren Text einer Seite als Plaintext (pypdfium2 get_text_bounded)."""
+    import pypdfium2 as pdfium
+
+    pdf_path = Path(pdf_path)
+    kwargs = {}
+    if password:
+        kwargs["password"] = password
+    doc = pdfium.PdfDocument(str(pdf_path), **kwargs)
+    try:
+        if page_index < 0 or page_index >= len(doc):
+            raise IndexError(f"Seite {page_index} existiert nicht")
+        page = doc[page_index]
+        try:
+            tp = page.get_textpage()
+            try:
+                return tp.get_text_bounded() or ""
+            finally:
+                tp.close()
+        finally:
+            page.close()
+    finally:
+        doc.close()
+
+
+def extract_all_plain_text(
+    pdf_path: str | Path,
+    *,
+    password: str | None = None,
+    page_headers: bool = True,
+) -> str:
+    """
+    Text aller Seiten als Plaintext.
+    Mit page_headers: Abschnitte „--- Seite N ---“ zwischen den Seiten.
+    """
+    import pypdfium2 as pdfium
+
+    pdf_path = Path(pdf_path)
+    kwargs = {}
+    if password:
+        kwargs["password"] = password
+    doc = pdfium.PdfDocument(str(pdf_path), **kwargs)
+    try:
+        parts: list[str] = []
+        for i in range(len(doc)):
+            page = doc[i]
+            try:
+                tp = page.get_textpage()
+                try:
+                    blob = tp.get_text_bounded() or ""
+                finally:
+                    tp.close()
+            finally:
+                page.close()
+            if page_headers:
+                parts.append(f"--- Seite {i + 1} ---\n{blob}".rstrip())
+            else:
+                parts.append(blob.rstrip())
+        return "\n\n".join(parts).strip() + ("\n" if parts else "")
+    finally:
+        doc.close()
+
+
 @dataclass
 class TextMatchRect:
     """Treffer-Rechteck einer Textsuche (PDF-Punkte, Y von oben; optional skaliert)."""

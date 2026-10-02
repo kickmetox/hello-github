@@ -245,6 +245,32 @@ class AnnotationStore:
         self.dirty = True
         return ann
 
+    def duplicate(
+        self,
+        ann_id: str,
+        *,
+        dx: float = 12.0,
+        dy: float = 12.0,
+    ) -> Optional[Annotation]:
+        """
+        Auswahl duplizieren: Kopie mit neuer ID, leicht versetzt (inkl. Callout-Endpunkt).
+        """
+        src = self.get(ann_id)
+        if src is None:
+            return None
+        data = src.to_dict()
+        data.pop("id", None)
+        data.pop("created", None)
+        data.pop("modified", None)
+        data["x"] = float(data.get("x", 0.0)) + float(dx)
+        data["y"] = float(data.get("y", 0.0)) + float(dy)
+        cx = float(data.get("callout_x", 0.0) or 0.0)
+        cy = float(data.get("callout_y", 0.0) or 0.0)
+        if cx or cy:
+            data["callout_x"] = cx + float(dx)
+            data["callout_y"] = cy + float(dy)
+        return self.add(Annotation.from_dict(data))
+
     def get(self, ann_id: str) -> Optional[Annotation]:
         for a in self.annotations:
             if a.id == ann_id:

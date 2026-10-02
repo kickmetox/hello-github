@@ -28,7 +28,8 @@ HELP_HTML = f"""
 <ul>
 <li><b>Datei → Öffnen</b>: TXT, MD, HTML, DOCX, PDF, Bilder</li>
 <li><b>Extras → Einstellungen</b>: Theme, <b>UI-Sprache DE/EN</b>, OCR, Export-Qualität,
-    <b>Standard-Zoom</b>, <b>Autosave-Intervall</b>, Update-Hinweis, Pfade</li>
+    <b>Standard-Zoom</b>, <b>Autosave-Intervall</b>, Soft-Wrap, optional <b>Minimieren in System-Tray</b>,
+    Update-Hinweis, Pfade</li>
 <li><b>Datei → Zuletzt geöffnet</b>: Menü + Seitenleiste (persistiert)</li>
 <li><b>Datei → Speichern unter</b> (Ctrl+Shift+S): Text → Dokument; PDF → Annotation-Sidecar wählen (PDF unverändert)</li>
 <li><b>Datei → Alles speichern</b> (Ctrl+Alt+Shift+S): aktuelles Doc + PDF-Sidecars offener Tabs</li>
@@ -40,6 +41,7 @@ HELP_HTML = f"""
     <b>Textsuche in der Liste</b>), Markierungen/Treffer</li>
 <li><b>Bearbeiten → Rückgängig/Wiederholen</b>: Editor-Text <i>oder</i> PDF-Annotationen/Overlay-Text (Ctrl+Z / Ctrl+Y)</li>
 <li><b>Bearbeiten → Suchen und Ersetzen</b> (Ctrl+R): Find/Replace im Texteditor</li>
+<li><b>Bearbeiten → Gehe zu Zeile</b> (Ctrl+G): Sprung zur Zeilennummer</li>
 <li><b>Bearbeiten → Auswahl markieren</b> (Ctrl+H): Markierung im Editor + Eintrag in der Seitenleiste</li>
 <li><b>Bearbeiten → Groß-/Kleinschreibung umschalten</b> (Ctrl+Shift+U): Auswahl GROSS → klein → Titel</li>
 <li><b>Bearbeiten → Einrückung erhöhen/verringern</b> (Ctrl+] / Ctrl+[; Tab / Shift+Tab bei Auswahl)</li>
@@ -58,7 +60,8 @@ HELP_HTML = f"""
     Sidecar <code>*.ildann.json</code> (v3, Auto-Save, Undo/Redo); JSON Export/Import;
     <b>Textsuche</b> highlightet Treffer auf der aktuellen Seite;
     Doppelklick / Strg+Klick / <b>Ctrl+E</b> auf Notiz/Overlay zum Bearbeiten;
-    PDF → Text→Overlay / Overlay einbrennen;
+    <b>Ctrl+Shift+D</b> Auswahl duplizieren;
+    PDF → Text→Overlay / Overlay einbrennen / <b>Text Seite/alles → Editor</b>;
     <b>Signaturfeld</b> (Platzhalter) und <b>Signatur (Bild)</b> einfügen;
     <b>PDFs zusammenführen / teilen / Seitenbereich</b>;
     <b>Wasserzeichen / Seitennummern</b>;

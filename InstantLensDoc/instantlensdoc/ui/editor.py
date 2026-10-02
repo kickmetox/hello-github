@@ -70,6 +70,21 @@ class TextEditor(QPlainTextEdit):
     def soft_wrap_enabled(self) -> bool:
         return bool(self._soft_wrap)
 
+    def goto_line(self, line: int) -> bool:
+        """Cursor auf 1-basierte Zeilennummer setzen; True bei Erfolg."""
+        n = int(line)
+        if n < 1 or n > self.blockCount():
+            return False
+        block = self.document().findBlockByNumber(n - 1)
+        if not block.isValid():
+            return False
+        cursor = QTextCursor(block)
+        cursor.movePosition(QTextCursor.StartOfBlock)
+        self.setTextCursor(cursor)
+        self.ensureCursorVisible()
+        self.setFocus()
+        return True
+
     def _update_line_number_area_width(self, _new_block_count: int = 0) -> None:
         self.setViewportMargins(self.line_number_area_width(), 0, 0, 0)
 

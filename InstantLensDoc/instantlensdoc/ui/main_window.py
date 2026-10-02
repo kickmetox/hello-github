@@ -11,10 +11,12 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QMainWindow,
+    QMenu,
     QMessageBox,
     QSplitter,
     QStackedWidget,
     QStatusBar,
+    QSystemTrayIcon,
     QWidget,
 )
 
@@ -43,6 +45,7 @@ from instantlensdoc.core.app_settings import (
     get_editor_markdown_preview,
     get_editor_soft_wrap,
     get_last_export_dir,
+    get_minimize_to_tray,
     get_update_check_on_start,
     remember_recent_dir,
     set_last_export_dir,
@@ -81,6 +84,9 @@ class MainWindow(QMainWindow):
         self._thumb_lazy_timer: QTimer | None = None
         self._thumb_lazy_queue: list[int] = []
         self._thumb_lazy_token: int | None = None
+        self._tray: QSystemTrayIcon | None = None
+        self._tray_menu: QMenu | None = None
+        self._force_quit = False
 
         self.setAcceptDrops(True)
         self.setWindowTitle(self._app_title())
@@ -93,6 +99,7 @@ class MainWindow(QMainWindow):
 
         self._build_ui()
         self._build_menus()
+        self.apply_tray_setting()
         self._refresh_recent()
         self._refresh_recent_searches()
         self._update_license_status()
@@ -106,6 +113,21 @@ class MainWindow(QMainWindow):
         if get_update_check_on_start():
             QTimer.singleShot(1500, lambda: self._check_updates(silent=True))
 
+    def changeEvent(self, event):
+        from PySide6.QtCore import QEvent
+
+        if (
+            event.type() == QEvent.WindowStateChange
+            and self.isMinimized()
+            and get_minimize_to_tray()
+            and self._tray is not None
+            and self._tray.isVisible()
+        ):
+            QTimer.singleShot(0, self.hide)
+            event.accept()
+            return
+        super().changeEvent(event)
+
     def closeEvent(self, event):
         if not self._confirm_close_current(allow_discard=True, quitting=True):
             event.ignore()
@@ -114,7 +136,55 @@ class MainWindow(QMainWindow):
             self._save_session()
         except Exception:
             pass
+        if self._tray is not None:
+            self._tray.hide()
         super().closeEvent(event)
+
+    def apply_tray_setting(self) -> None:
+        """System-Tray gemäß Einstellung ein-/ausschalten."""
+        enabled = get_minimize_to_tray()
+        if not enabled:
+            if self._tray is not None:
+                self._tray.hide()
+                self._tray.setParent(None)
+                self._tray.deleteLater()
+                self._tray = None
+                self._tray_menu = None
+            return
+        if not QSystemTrayIcon.isSystemTrayAvailable():
+            return
+        if self._tray is None:
+            icon = self.windowIcon()
+            if icon.isNull():
+                icon = QIcon()
+                for p in icon_paths_for_qt():
+                    icon.addFile(str(p))
+            self._tray = QSystemTrayIcon(icon, self)
+            self._tray.setToolTip(self._app_title())
+            menu = QMenu(self)
+            act_show = QAction("Anzeigen", self)
+            act_show.triggered.connect(self._tray_restore)
+            menu.addAction(act_show)
+            act_quit = QAction("Beenden", self)
+            act_quit.triggered.connect(self._tray_quit)
+            menu.addAction(act_quit)
+            self._tray_menu = menu
+            self._tray.setContextMenu(menu)
+            self._tray.activated.connect(self._tray_activated)
+        self._tray.show()
+
+    def _tray_activated(self, reason):
+        if reason in (QSystemTrayIcon.Trigger, QSystemTrayIcon.DoubleClick):
+            self._tray_restore()
+
+    def _tray_restore(self):
+        self.showNormal()
+        self.raise_()
+        self.activateWindow()
+
+    def _tray_quit(self):
+        self._force_quit = True
+        self.close()
 
     def _session_paths(self) -> list[str]:
         paths: list[str] = []
@@ -347,6 +417,11 @@ class MainWindow(QMainWindow):
         act_find_repl.setToolTip("Find/Replace im Texteditor")
         act_find_repl.triggered.connect(self._find_replace)
         m_edit.addAction(act_find_repl)
+        act_goto = QAction("Gehe zu Zeile…", self)
+        act_goto.setShortcut(QKeySequence("Ctrl+G"))
+        act_goto.setToolTip("Cursor auf Zeilennummer setzen")
+        act_goto.triggered.connect(self._goto_line)
+        m_edit.addAction(act_goto)
         act_mark = QAction("Auswahl markieren", self)
         act_mark.setShortcut(QKeySequence("Ctrl+H"))
         act_mark.triggered.connect(self._mark_selection)
@@ -380,6 +455,11 @@ class MainWindow(QMainWindow):
         act_edit_ann.setToolTip("Notiz/Kommentar/Overlay der Auswahl bearbeiten (auch Doppelklick)")
         act_edit_ann.triggered.connect(self._edit_annotation_text)
         m_edit.addAction(act_edit_ann)
+        act_dup_ann = QAction("Annotation duplizieren", self)
+        act_dup_ann.setShortcut(QKeySequence("Ctrl+Shift+D"))
+        act_dup_ann.setToolTip("Ausgewählte Annotation kopieren (leicht versetzt)")
+        act_dup_ann.triggered.connect(self._duplicate_annotation)
+        m_edit.addAction(act_dup_ann)
 
         m_view = mb.addMenu("&Ansicht")
         a = QAction("Seitenleiste", self)
@@ -539,6 +619,8 @@ class MainWindow(QMainWindow):
         for title, slot in [
             ("PDF-Text → Overlay…", lambda: self.pdf_view.import_text_overlays()),
             ("Text-Overlays einbrennen…", lambda: self.pdf_view.bake_overlays()),
+            ("Text dieser Seite → Editor", self._extract_page_text_to_editor),
+            ("Gesamten PDF-Text → Editor", self._extract_all_text_to_editor),
             ("Schwärzung einbrennen…", lambda: self.pdf_view.bake_redactions()),
             ("Schwärzungs-Annotationen löschen…", lambda: self.pdf_view.clear_redactions()),
             ("Signaturfeld setzen…", lambda: self.pdf_view.place_signature_field()),
@@ -714,6 +796,15 @@ class MainWindow(QMainWindow):
             self._set_status("Keine Annotation ausgewählt (Auswahl-Werkzeug / Doppelklick)")
             return
         self.pdf_view.edit_selected_annotation_text()
+
+    def _duplicate_annotation(self):
+        if self.stack.currentWidget() is not self.pdf_view or not self.pdf_view.pdf_path:
+            self._set_status("Annotation duplizieren nur im PDF-Modus")
+            return
+        if not self.pdf_view._selected_ann_id:
+            self._set_status("Keine Annotation ausgewählt")
+            return
+        self.pdf_view.duplicate_selected_annotation()
 
     def _toggle_line_numbers(self, checked: bool):
         from instantlensdoc.core.app_settings import set_editor_line_numbers
@@ -948,6 +1039,65 @@ class MainWindow(QMainWindow):
             self.doc.text = self.editor.toPlainText()
             self.doc.dirty = True
         self._on_text_changed()
+
+    def _goto_line(self):
+        if self.stack.currentWidget() is not self.editor_pane:
+            QMessageBox.information(
+                self,
+                "Gehe zu Zeile",
+                "Gehe zu Zeile ist im Texteditor verfügbar.",
+            )
+            return
+        from instantlensdoc.ui.goto_line_dialog import GotoLineDialog
+
+        GotoLineDialog(self.editor, self).exec()
+
+    def _extract_page_text_to_editor(self):
+        if not self.pdf_view.pdf_path:
+            self._set_status("Kein PDF geladen")
+            return
+        from ild_pdf import extract_page_plain_text
+
+        try:
+            text = extract_page_plain_text(
+                self.pdf_view.pdf_path,
+                self.pdf_view.page_index,
+                password=self.pdf_view.password,
+            )
+        except Exception as e:
+            QMessageBox.warning(self, "Text extrahieren", str(e))
+            return
+        self.editor.setPlainText(text)
+        self.stack.setCurrentWidget(self.editor_pane)
+        self._on_text_changed()
+        words = len(text.split()) if text.strip() else 0
+        self._set_status(
+            f"Seite {self.pdf_view.page_index + 1}: Text → Editor ({words} Wörter)"
+        )
+
+    def _extract_all_text_to_editor(self):
+        if not self.pdf_view.pdf_path:
+            self._set_status("Kein PDF geladen")
+            return
+        from ild_pdf import extract_all_plain_text
+
+        try:
+            text = extract_all_plain_text(
+                self.pdf_view.pdf_path,
+                password=self.pdf_view.password,
+                page_headers=True,
+            )
+        except Exception as e:
+            QMessageBox.warning(self, "Text extrahieren", str(e))
+            return
+        self.editor.setPlainText(text)
+        self.stack.setCurrentWidget(self.editor_pane)
+        self._on_text_changed()
+        words = len(text.split()) if text.strip() else 0
+        self._set_status(
+            f"Gesamter PDF-Text ({self.pdf_view.page_count} Seite(n)) → Editor ({words} Wörter)"
+        )
+
     def _undo(self):
         if self.stack.currentWidget() is self.pdf_view:
             self.pdf_view.undo_annotation()

@@ -1,7 +1,7 @@
 # ild_pdf — auskoppelbares PDF-Modul
 
 Lizenzfreundliche PDF-Engine auf **pypdfium2 / PDFium** (kein Poppler/GPL).  
-Version **0.3.3**.
+Version **0.3.4**.
 
 ## Installation
 
@@ -60,6 +60,7 @@ python examples/ild_pdf_demo.py pfad/zu/datei.pdf
 | `list_form_fields` / `set_form_values` / `has_acroform` | AcroForm lesen/schreiben |
 | `list_attachments` / `extract_attachment` / `has_attachments` | PDF-Anhänge auflisten/extrahieren |
 | `extract_text_blocks` | Sichtbaren Text grob als Blöcke lesen |
+| `extract_page_plain_text` / `extract_all_plain_text` | Plaintext Seite / gesamtes PDF → Editor |
 | `import_page_text_as_overlays` | Blöcke → `TEXT_OVERLAY` im Store |
 | `bake_text_overlays` | Overlays als PDF-Content (Helvetica) einbrennen |
 | `extract_page_image` / `extract_pages_as_images` / `insert_image_as_page` | Seite(n)→PNG/JPEG / Bild→Seite |

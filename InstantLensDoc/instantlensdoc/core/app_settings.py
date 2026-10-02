@@ -36,6 +36,7 @@ DEFAULTS: dict[str, Any] = {
     "editor_markdown_preview": False,
     "editor_soft_wrap": True,
     "annotations_visible": True,
+    "minimize_to_tray": False,
 }
 
 
@@ -349,3 +350,11 @@ def get_annotations_visible() -> bool:
 
 def set_annotations_visible(visible: bool) -> None:
     save_settings({"annotations_visible": bool(visible)})
+
+
+def get_minimize_to_tray() -> bool:
+    return bool(load_settings().get("minimize_to_tray", False))
+
+
+def set_minimize_to_tray(enabled: bool) -> None:
+    save_settings({"minimize_to_tray": bool(enabled)})

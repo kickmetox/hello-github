@@ -1,5 +1,23 @@
 # Changelog — InstantLens Doc
 
+## 0.3.4 — PDF-Text→Editor, Ann.-Duplikat, Goto Line, Tray
+
+Fokus auf sinnvolle Ausbauten nach 0.3.3. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### PDF
+- **Text extrahieren → Editor**: aktuelle Seite oder gesamtes PDF (mit Seitenköpfen) in den Editor-Tab (`extract_page_plain_text` / `extract_all_plain_text`)
+- **Annotation duplizieren** (Auswahl; leicht versetzt, neue ID; Ctrl+Shift+D)
+
+### Editor / UX
+- **Gehe zu Zeile** Dialog (Ctrl+G)
+- **Minimieren in System-Tray** optional in Einstellungen
+
+### Packaging / Docs
+- Version **0.3.4** (App, `ild_pdf`, ISS, Smoke, INFO/FEATURES/README)
+
+---
+
+
 ## 0.3.3 — Einzel-PDFs, Ann.-Flatten, Soft-Wrap, Lizenz
 
 Fokus auf sinnvolle Ausbauten nach 0.3.2. Stubs KI/Cloud/Stylus/3D bleiben Stubs.

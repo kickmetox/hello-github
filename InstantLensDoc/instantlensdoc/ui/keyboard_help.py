@@ -20,6 +20,7 @@ SHORTCUTS_HTML = """
 <tr><td>Wiederholen</td><td><code>Ctrl+Y</code> / <code>Ctrl+Shift+Z</code></td></tr>
 <tr><td>Suchen</td><td><code>Ctrl+F</code></td></tr>
 <tr><td>Suchen und Ersetzen</td><td><code>Ctrl+R</code></td></tr>
+<tr><td>Gehe zu Zeile</td><td><code>Ctrl+G</code></td></tr>
 <tr><td>Auswahl markieren</td><td><code>Ctrl+H</code></td></tr>
 <tr><td>Groß-/Kleinschreibung umschalten</td><td><code>Ctrl+Shift+U</code></td></tr>
 <tr><td>Einrückung erhöhen</td><td><code>Ctrl+]</code> / <code>Tab</code> (Auswahl)</td></tr>
@@ -34,6 +35,7 @@ SHORTCUTS_HTML = """
 <tr><td>Overlay / Notiz bearbeiten</td><td>Doppelklick / <code>Ctrl</code>+Klick / <code>Ctrl+E</code></td></tr>
 <tr><td>Annotation auswählen</td><td>Werkzeug Auswahl / Shift+Klick / Rechtsklick</td></tr>
 <tr><td>Annotation löschen</td><td><code>Entf</code> / <code>Backspace</code> (Auswahl oder letzte)</td></tr>
+<tr><td>Annotation duplizieren</td><td><code>Ctrl+Shift+D</code> (Auswahl)</td></tr>
 <tr><td>Diese Hilfe</td><td><code>F1</code></td></tr>
 </table>
 <p><b>Speichern unter (PDF):</b> speichert die Annotationen als Sidecar
@@ -56,6 +58,7 @@ Filter-Dropdown nach Typ; <b>Textsuche in der Liste</b>; Text nachträglich edit
 <p><b>Seitenbereich:</b> PDF → Seitenbereich extrahieren… (von–bis → neues PDF)
 bzw. Dialog „zusammenführen / teilen / Bereich“.</p>
 <p><b>Suchen und Ersetzen:</b> Bearbeiten → Ctrl+R (nur Texteditor).</p>
+<p><b>Gehe zu Zeile:</b> Bearbeiten → Ctrl+G (nur Texteditor).</p>
 <p><b>Groß-/Kleinschreibung:</b> Bearbeiten → Ctrl+Shift+U (Auswahl).</p>
 <p><b>Einrückung:</b> Bearbeiten → Ctrl+] / Ctrl+[ bzw. Tab / Shift+Tab bei Auswahl.</p>
 <p><b>Zeilennummern:</b> Ansicht → Zeilennummern (optional, auch in Einstellungen).</p>

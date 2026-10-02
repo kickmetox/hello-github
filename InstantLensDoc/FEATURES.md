@@ -32,6 +32,7 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | PDF-Annotationen (Highlight, Underline, Sticky, Text) | fertig | Sidecar `*.ildann.json` **v3**; Farben-Picker Highlight/Stift 0.2.2; Löschen Auswahl/letzte 0.2.3; **JSON Export/Import** 0.2.5; **Sidebar-Filter nach Typ** 0.2.6; **Text nachträglich editierbar** 0.2.7; **Deckkraft/Opacity** 0.2.8; **Sidebar-Textsuche** 0.3.0 |
 | Annotation Undo/Redo | fertig | Ctrl+Z/Y inkl. Overlay-Text |
 | Annotation löschen | fertig | Auswahl oder letzte; Entf / Menü 0.2.3 |
+| Annotation duplizieren | fertig | Auswahl leicht versetzt; Ctrl+Shift+D 0.3.4 |
 | Annotation-Text editieren | fertig | Notiz/Kommentar/Overlay nachträglich; Doppelklick / Ctrl+E 0.2.7 |
 | Annotation-Deckkraft | fertig | `opacity` Sidecar + Toolbar α + Dialog 0.2.8 |
 | Annotation-Suche Sidebar | fertig | Textfilter in Annotationsliste 0.3.0 |
@@ -41,6 +42,7 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | Annotation-Layer Toggle | fertig | Ansicht + Toolbar; Ctrl+Shift+A 0.3.2 |
 | Annotationen flatten/bake Export | fertig | Alle Seiten mit Ann. → neues PDF 0.3.3 |
 | PDF Seiten als Einzel-PDFs | fertig | Eine Datei pro Seite; Menü + `split_into_single_page_pdfs` 0.3.3 |
+| PDF-Text → Editor | fertig | Seite oder gesamtes PDF; Menü PDF 0.3.4 |
 | Tab schließen (dirty) | fertig | Speichern-Dialog; Datei → Schließen / Ctrl+W; Beenden 0.3.1 |
 | PDF Signaturfeld / Signatur (Bild) | fertig | Sidecar; Menü PDF + Werkzeug |
 | Theme Hell/Dunkel | fertig | Ansicht-Menü, persistiert |
@@ -66,6 +68,7 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | Editor Einrückung | fertig | Erhöhen/Verringern Ctrl+]/[ bzw. Tab/Shift+Tab 0.3.0 |
 | Editor Markdown-Vorschau | fertig | Optional Split (Ansicht); Ctrl+Shift+M 0.3.2 |
 | Editor Soft-Wrap | fertig | Toggle Ansicht/Einstellungen; Ctrl+Shift+W 0.3.3 |
+| Editor Gehe zu Zeile | fertig | Dialog Ctrl+G 0.3.4 |
 | Zuletzt verwendete Ordner | fertig | Datei-Dialoge merken `recent_dirs` 0.3.2 |
 | Alles speichern (Tabs) | fertig | Datei → Alles speichern; aktuelles Doc + PDF-Sidecars 0.2.7 |
 | Volltextsuche geöffnete Docs | fertig | Sidebar „Alle Docs“ |
@@ -74,7 +77,7 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | Editor Wortzählung | fertig | Statusleiste Wörter · Zeichen 0.2.5 |
 | Batch-Konvertierung Ordner | fertig | Bilder→PDF, OCR-Ordner, PDF-OCR-Text; Fortschrittsbalken 0.2.1 |
 | PDF zusammenführen / teilen | fertig | Dialog unter Menü PDF |
-| Einstellungen-Dialog | fertig | OCR, Theme, Sprache, Export-Q, Standard-Zoom, Autosave, Pfade, Update |
+| Einstellungen-Dialog | fertig | OCR, Theme, Sprache, Export-Q, Standard-Zoom, Autosave, optional Tray-Minimize, Pfade, Update |
 | Markieren im Editor | fertig | Ctrl+H |
 | Bilder JPEG/PNG anzeigen | fertig | |
 | OCR Bild/PDF-Seite | teilweise | Presets + Modi; Tabellen-Heuristik; Fortschrittsdialog 0.2.1 |
@@ -88,25 +91,25 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | PyInstaller Build Windows | fertig | `build-windows.ps1`, Icon `assets/app.ico` |
 | Inno-Installer | fertig | Icon, Desktop, Uninstaller, Keygen optional (`InstantLensKeygen.exe`) 0.2.1 |
 | Sync-Skript Windows | fertig | Repo `scripts/sync-ild.ps1`; Store `docs/sync-ild.ps1` |
-| In-App Hilfe / About | fertig | Version 0.3.3; Fenstertitel + Splash; Logordner-Button |
-| CHANGELOG | fertig | **0.3.3** Einzel-PDFs / Ann.-Flatten / Soft-Wrap / Lizenz |
+| In-App Hilfe / About | fertig | Version 0.3.4; Fenstertitel + Splash; Logordner-Button |
+| CHANGELOG | fertig | **0.3.4** PDF-Text→Editor / Ann.-Duplikat / Goto Line / Tray |
 | FEATURES.md / INFO.md | fertig | |
-| `ild_pdf` Modul + Beispielskript | fertig | metadata / page size / watermark / redact / acroform / attachments / **flatten** |
+| `ild_pdf` Modul + Beispielskript | fertig | metadata / page size / watermark / redact / acroform / attachments / flatten / **plain text** |
 | Font-Matching | geplant | |
 | Objekt-/Bildbearbeitung | geplant | |
 | Layout-Erhaltung (Scan→edit) | geplant | |
 | Freihand | geplant | |
-| KI-Assistent | Stub | Menü „Geplant“ 0.3.3 (keine Fake-KI) |
+| KI-Assistent | Stub | Menü „Geplant“ 0.3.4 (keine Fake-KI) |
 | Signieren (rechtssicher) | Stub | |
-| Cloud-Sync | Stub | Menü „Geplant“ 0.3.3 (keine Fake-Cloud) |
+| Cloud-Sync | Stub | Menü „Geplant“ 0.3.4 (keine Fake-Cloud) |
 | Text on Path / Text zu Pfaden | geplant | |
 | Envelope Distort / Text Wrap / Area Type | Stub/geplant | |
 | Schnittmasken | geplant | |
 | Füllungen / Live-Effekte | geplant | |
-| 3D-Extrusion | Stub | Menü „Geplant“ 0.3.3 |
+| 3D-Extrusion | Stub | Menü „Geplant“ 0.3.4 |
 | Variable Fonts (voll) | Stub | |
 | Glyphen-Palette | geplant | |
-| Stylus / Palm Rejection | Stub | Menü „Geplant“ 0.3.3 |
-| Intelligente Formerkennung | Stub | Menü „Geplant“ 0.3.3 |
+| Stylus / Palm Rejection | Stub | Menü „Geplant“ 0.3.4 |
+| Intelligente Formerkennung | Stub | Menü „Geplant“ 0.3.4 |
 
 Nicht behauptet als fertig: Cloud, KI, Stylus, 3D — nur Menü-Stubs + dieser Status.
