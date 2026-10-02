@@ -39,6 +39,8 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | PDF AcroForm-Felder | fertig | Bestehende Felder lesen/schreiben (pikepdf) 0.3.1 |
 | PDF-Anhänge | fertig | Auflisten/extrahieren (pikepdf Attachments) 0.3.2 |
 | Annotation-Layer Toggle | fertig | Ansicht + Toolbar; Ctrl+Shift+A 0.3.2 |
+| Annotationen flatten/bake Export | fertig | Alle Seiten mit Ann. → neues PDF 0.3.3 |
+| PDF Seiten als Einzel-PDFs | fertig | Eine Datei pro Seite; Menü + `split_into_single_page_pdfs` 0.3.3 |
 | Tab schließen (dirty) | fertig | Speichern-Dialog; Datei → Schließen / Ctrl+W; Beenden 0.3.1 |
 | PDF Signaturfeld / Signatur (Bild) | fertig | Sidecar; Menü PDF + Werkzeug |
 | Theme Hell/Dunkel | fertig | Ansicht-Menü, persistiert |
@@ -63,6 +65,7 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | Editor Groß-/Kleinschreibung | fertig | Auswahl umschalten Ctrl+Shift+U 0.2.8 |
 | Editor Einrückung | fertig | Erhöhen/Verringern Ctrl+]/[ bzw. Tab/Shift+Tab 0.3.0 |
 | Editor Markdown-Vorschau | fertig | Optional Split (Ansicht); Ctrl+Shift+M 0.3.2 |
+| Editor Soft-Wrap | fertig | Toggle Ansicht/Einstellungen; Ctrl+Shift+W 0.3.3 |
 | Zuletzt verwendete Ordner | fertig | Datei-Dialoge merken `recent_dirs` 0.3.2 |
 | Alles speichern (Tabs) | fertig | Datei → Alles speichern; aktuelles Doc + PDF-Sidecars 0.2.7 |
 | Volltextsuche geöffnete Docs | fertig | Sidebar „Alle Docs“ |
@@ -80,30 +83,30 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | Formulargenerator → HTML/PDF | fertig | Mehr Feldtypen; Definition speichern/laden |
 | Layout: Textrahmen + Verkettung | teilweise | `flow_text_chain` |
 | Layout: einfacher Umbruch | fertig | Wortgrenzen |
-| Lizenz Trial 28d / Keys 32d | fertig | Statusleiste farbig + Tooltip; **<7 Tage prominent** 0.2.6 |
+| Lizenz Trial 28d / Keys 32d | fertig | Statusleiste farbig + Tooltip; **<7 Tage prominent** 0.2.6; Dialog Resttage/Ablauf 0.3.3 |
 | Keygenerator (CLI/GUI) | fertig | `run-keygen.bat` |
 | PyInstaller Build Windows | fertig | `build-windows.ps1`, Icon `assets/app.ico` |
 | Inno-Installer | fertig | Icon, Desktop, Uninstaller, Keygen optional (`InstantLensKeygen.exe`) 0.2.1 |
 | Sync-Skript Windows | fertig | Repo `scripts/sync-ild.ps1`; Store `docs/sync-ild.ps1` |
-| In-App Hilfe / About | fertig | Version 0.3.2; Fenstertitel + Splash; Logordner-Button |
-| CHANGELOG | fertig | **0.3.2** Anhänge/Ann.-Layer/MD-Preview/Ordner |
+| In-App Hilfe / About | fertig | Version 0.3.3; Fenstertitel + Splash; Logordner-Button |
+| CHANGELOG | fertig | **0.3.3** Einzel-PDFs / Ann.-Flatten / Soft-Wrap / Lizenz |
 | FEATURES.md / INFO.md | fertig | |
-| `ild_pdf` Modul + Beispielskript | fertig | metadata / page size / watermark / redact / acroform / **attachments** |
+| `ild_pdf` Modul + Beispielskript | fertig | metadata / page size / watermark / redact / acroform / attachments / **flatten** |
 | Font-Matching | geplant | |
 | Objekt-/Bildbearbeitung | geplant | |
 | Layout-Erhaltung (Scan→edit) | geplant | |
 | Freihand | geplant | |
-| KI-Assistent | Stub | Menü „Geplant“ 0.3.2 (keine Fake-KI) |
+| KI-Assistent | Stub | Menü „Geplant“ 0.3.3 (keine Fake-KI) |
 | Signieren (rechtssicher) | Stub | |
-| Cloud-Sync | Stub | Menü „Geplant“ 0.3.2 (keine Fake-Cloud) |
+| Cloud-Sync | Stub | Menü „Geplant“ 0.3.3 (keine Fake-Cloud) |
 | Text on Path / Text zu Pfaden | geplant | |
 | Envelope Distort / Text Wrap / Area Type | Stub/geplant | |
 | Schnittmasken | geplant | |
 | Füllungen / Live-Effekte | geplant | |
-| 3D-Extrusion | Stub | Menü „Geplant“ 0.3.2 |
+| 3D-Extrusion | Stub | Menü „Geplant“ 0.3.3 |
 | Variable Fonts (voll) | Stub | |
 | Glyphen-Palette | geplant | |
-| Stylus / Palm Rejection | Stub | Menü „Geplant“ 0.3.2 |
-| Intelligente Formerkennung | Stub | Menü „Geplant“ 0.3.2 |
+| Stylus / Palm Rejection | Stub | Menü „Geplant“ 0.3.3 |
+| Intelligente Formerkennung | Stub | Menü „Geplant“ 0.3.3 |
 
 Nicht behauptet als fertig: Cloud, KI, Stylus, 3D — nur Menü-Stubs + dieser Status.

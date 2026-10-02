@@ -34,6 +34,7 @@ DEFAULTS: dict[str, Any] = {
     "ann_default_opacity": 1.0,
     "recent_dirs": [],
     "editor_markdown_preview": False,
+    "editor_soft_wrap": True,
     "annotations_visible": True,
 }
 
@@ -332,6 +333,14 @@ def get_editor_markdown_preview() -> bool:
 
 def set_editor_markdown_preview(enabled: bool) -> None:
     save_settings({"editor_markdown_preview": bool(enabled)})
+
+
+def get_editor_soft_wrap() -> bool:
+    return bool(load_settings().get("editor_soft_wrap", True))
+
+
+def set_editor_soft_wrap(enabled: bool) -> None:
+    save_settings({"editor_soft_wrap": bool(enabled)})
 
 
 def get_annotations_visible() -> bool:

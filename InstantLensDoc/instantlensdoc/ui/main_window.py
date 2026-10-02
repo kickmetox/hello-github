@@ -41,6 +41,7 @@ from instantlensdoc.core.app_settings import (
     get_autosave_interval_sec,
     get_default_open_dir,
     get_editor_markdown_preview,
+    get_editor_soft_wrap,
     get_last_export_dir,
     get_update_check_on_start,
     remember_recent_dir,
@@ -405,6 +406,13 @@ class MainWindow(QMainWindow):
         self._md_preview_action.setShortcut(QKeySequence("Ctrl+Shift+M"))
         self._md_preview_action.toggled.connect(self._toggle_markdown_preview)
         m_view.addAction(self._md_preview_action)
+        self._soft_wrap_action = QAction("Soft-Wrap", self)
+        self._soft_wrap_action.setCheckable(True)
+        self._soft_wrap_action.setChecked(get_editor_soft_wrap())
+        self._soft_wrap_action.setToolTip("Zeilenumbruch am Fensterrand im Texteditor")
+        self._soft_wrap_action.setShortcut(QKeySequence("Ctrl+Shift+W"))
+        self._soft_wrap_action.toggled.connect(self._toggle_soft_wrap)
+        m_view.addAction(self._soft_wrap_action)
         self._grayscale_action = QAction("PDF Graustufen", self)
         self._grayscale_action.setCheckable(True)
         self._grayscale_action.setChecked(get_pdf_grayscale())
@@ -462,6 +470,10 @@ class MainWindow(QMainWindow):
         act_extract.setToolTip("Seiten von–bis in neues PDF")
         act_extract.triggered.connect(self._extract_page_range)
         m_pdf.addAction(act_extract)
+        act_split_pages = QAction("Seiten als Einzel-PDFs…", self)
+        act_split_pages.setToolTip("Jede Seite als eigene PDF-Datei in einen Ordner")
+        act_split_pages.triggered.connect(self._split_into_single_page_pdfs)
+        m_pdf.addAction(act_split_pages)
         act_wm = QAction("Wasserzeichen / Seitennummern…", self)
         act_wm.triggered.connect(self._watermark_tools)
         m_pdf.addAction(act_wm)
@@ -494,6 +506,7 @@ class MainWindow(QMainWindow):
             ("Annotationen speichern unter…", lambda: self.pdf_view.save_annotations_as()),
             ("Annotationen laden", lambda: self.pdf_view.reload_annotations()),
             ("Annotationen als JSON exportieren…", lambda: self.pdf_view.export_annotations_json()),
+            ("Annotationen flatten/bake exportieren…", lambda: self.pdf_view.export_annotations_flattened()),
             ("Annotationen aus JSON importieren…", lambda: self.pdf_view.import_annotations_json()),
         ]:
             a = QAction(title, self)
@@ -712,6 +725,13 @@ class MainWindow(QMainWindow):
     def _toggle_markdown_preview(self, checked: bool):
         self.editor_pane.set_preview_visible(bool(checked))
         self._set_status("Markdown-Vorschau an" if checked else "Markdown-Vorschau aus")
+
+    def _toggle_soft_wrap(self, checked: bool):
+        from instantlensdoc.core.app_settings import set_editor_soft_wrap
+
+        set_editor_soft_wrap(bool(checked))
+        self.editor.set_soft_wrap(bool(checked))
+        self._set_status("Soft-Wrap an" if checked else "Soft-Wrap aus")
 
     def _toggle_grayscale(self, checked: bool):
         self.pdf_view.set_grayscale(bool(checked))
@@ -1353,6 +1373,8 @@ class MainWindow(QMainWindow):
             self._sync_theme_menu()
             from instantlensdoc.core.app_settings import (
                 get_editor_line_numbers,
+                get_editor_markdown_preview,
+                get_editor_soft_wrap,
                 get_pdf_grayscale,
                 get_pdf_night_mode,
             )
@@ -1363,6 +1385,18 @@ class MainWindow(QMainWindow):
                 self._line_numbers_action.blockSignals(True)
                 self._line_numbers_action.setChecked(show_ln)
                 self._line_numbers_action.blockSignals(False)
+            soft = get_editor_soft_wrap()
+            self.editor.set_soft_wrap(soft)
+            if hasattr(self, "_soft_wrap_action") and self._soft_wrap_action is not None:
+                self._soft_wrap_action.blockSignals(True)
+                self._soft_wrap_action.setChecked(soft)
+                self._soft_wrap_action.blockSignals(False)
+            md = get_editor_markdown_preview()
+            self.editor_pane.set_preview_visible(md)
+            if hasattr(self, "_md_preview_action") and self._md_preview_action is not None:
+                self._md_preview_action.blockSignals(True)
+                self._md_preview_action.setChecked(md)
+                self._md_preview_action.blockSignals(False)
             gray = get_pdf_grayscale()
             self.pdf_view.set_grayscale(gray)
             if hasattr(self, "_grayscale_action") and self._grayscale_action is not None:
@@ -1574,6 +1608,40 @@ class MainWindow(QMainWindow):
             QMessageBox.information(self, "Seitenbereich", f"Gespeichert:\n{out}")
         except Exception as e:
             QMessageBox.critical(self, "Seitenbereich", str(e))
+
+    def _split_into_single_page_pdfs(self):
+        """Jede Seite des aktuellen PDFs als eigene Datei exportieren."""
+        if not self.pdf_view.pdf_path:
+            QMessageBox.information(
+                self,
+                "Einzel-PDFs",
+                "Bitte zuerst ein PDF öffnen — oder PDF → zusammenführen / teilen.",
+            )
+            self._pdf_tools()
+            return
+        from ild_pdf.pages import split_into_single_page_pdfs
+
+        n = self.pdf_view.page_count
+        src = Path(self.pdf_view.pdf_path)
+        out_dir = QFileDialog.getExistingDirectory(
+            self,
+            f"Ausgabeordner ({n} Einzel-PDF(s))",
+            dialog_start_dir(src.parent),
+        )
+        if not out_dir:
+            return
+        remember_recent_dir(out_dir)
+        try:
+            written = split_into_single_page_pdfs(src, out_dir)
+            set_last_export_dir(out_dir)
+            self._set_status(f"{len(written)} Einzel-PDF(s) → {out_dir}")
+            QMessageBox.information(
+                self,
+                "Einzel-PDFs",
+                f"{len(written)} Datei(en) erstellt in:\n{out_dir}",
+            )
+        except Exception as e:
+            QMessageBox.critical(self, "Einzel-PDFs", str(e))
 
     def _watermark_tools(self):
         initial = str(self.pdf_view.pdf_path) if self.pdf_view.pdf_path else None

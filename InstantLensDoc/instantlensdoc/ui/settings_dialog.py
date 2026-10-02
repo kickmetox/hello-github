@@ -40,6 +40,7 @@ from instantlensdoc.core.app_settings import (
     set_default_open_dir,
     set_default_zoom_percent,
     set_editor_line_numbers,
+    set_editor_soft_wrap,
     set_ocr_lang,
     set_pdf_grayscale,
     set_pdf_night_mode,
@@ -102,11 +103,16 @@ class SettingsDialog(QDialog):
         form.addRow(tr("autosave_interval"), self.autosave_sec)
 
         self.line_numbers = QCheckBox("Zeilennummern im Editor")
-        from instantlensdoc.core.app_settings import get_editor_line_numbers
+        from instantlensdoc.core.app_settings import get_editor_line_numbers, get_editor_soft_wrap
 
         self.line_numbers.setChecked(get_editor_line_numbers())
         self.line_numbers.setToolTip("Optionale Zeilennummern im Texteditor")
         form.addRow(self.line_numbers)
+
+        self.soft_wrap = QCheckBox("Soft-Wrap (Zeilenumbruch) im Editor")
+        self.soft_wrap.setChecked(get_editor_soft_wrap())
+        self.soft_wrap.setToolTip("Lange Zeilen am Fensterrand umbrechen")
+        form.addRow(self.soft_wrap)
 
         self.pdf_grayscale = QCheckBox("PDF in Graustufen rendern/exportieren")
         self.pdf_grayscale.setChecked(get_pdf_grayscale())
@@ -187,6 +193,7 @@ class SettingsDialog(QDialog):
         set_default_zoom_percent(int(self.zoom_pct.value()))
         set_autosave_interval_sec(int(self.autosave_sec.value()))
         set_editor_line_numbers(self.line_numbers.isChecked())
+        set_editor_soft_wrap(self.soft_wrap.isChecked())
         set_pdf_grayscale(self.pdf_grayscale.isChecked())
         set_pdf_night_mode(self.pdf_night.isChecked())
         save_settings(

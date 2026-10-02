@@ -1,5 +1,5 @@
 """InstantLens Doc — Paket."""
 
-__version__ = "0.3.2"
+__version__ = "0.3.3"
 __author__ = "Andreas Meyer <ame@sellerbach.de>"
 APP_NAME = "InstantLens Doc"

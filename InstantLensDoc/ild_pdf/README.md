@@ -1,7 +1,7 @@
 # ild_pdf — auskoppelbares PDF-Modul
 
 Lizenzfreundliche PDF-Engine auf **pypdfium2 / PDFium** (kein Poppler/GPL).  
-Version **0.3.2**.
+Version **0.3.3**.
 
 ## Installation
 
@@ -65,7 +65,8 @@ python examples/ild_pdf_demo.py pfad/zu/datei.pdf
 | `extract_page_image` / `extract_pages_as_images` / `insert_image_as_page` | Seite(n)→PNG/JPEG / Bild→Seite |
 | `extract_embedded_images` / `insert_image_stamp_overlay` | Extraktion / Stempel-Hook |
 | `rotate_page` / `flip_page` / `delete_pages` / `reorder_pages` | pikepdf-Seitenops |
-| `merge_pdfs` / `split_pdf` / `extract_page_range` | Zusammenführen / Teilen / Seitenbereich → neues PDF |
+| `merge_pdfs` / `split_pdf` / `split_into_single_page_pdfs` / `extract_page_range` | Zusammenführen / Teilen / 1-Seite-PDFs / Seitenbereich |
+| `flatten_annotations_to_pdf` / `bake_annotations` | Annotationen flatten/bake → neues PDF (alle Seiten) |
 | `extract_outline` / `add_outline_item` / `delete_outline_item` | Lesezeichen lesen / hinzufügen / löschen |
 | `apply_watermark` / `apply_page_numbers` | Wasserzeichen / Seitenzahlen |
 | `inspect_pdf` / `clamp_render_scale` | Große-PDF-Diagnose / Zoom-Cap |

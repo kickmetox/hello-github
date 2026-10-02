@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Smoke-Test 0.3.2 (CLI + optional offscreen Qt). Kernpfade: open/annotate/export/license."""
+"""Smoke-Test 0.3.3 (CLI + optional offscreen Qt). Kernpfade: open/annotate/export/license."""
 
 from __future__ import annotations
 
@@ -57,6 +57,7 @@ def main() -> int:
         merge_pdfs,
         reorder_pages,
         rotate_page,
+        split_into_single_page_pdfs,
         split_pdf,
     )
     from ild_pdf.outline import add_outline_item, delete_outline_item, extract_outline
@@ -109,8 +110,8 @@ def main() -> int:
     from instantlensdoc.core.update_check import check_for_updates
     from instantlensdoc.license import KEY_DAYS, TRIAL_DAYS, generate_key, verify_key
 
-    assert __version__ == "0.3.2", __version__
-    assert ild_ver == "0.3.2", ild_ver
+    assert __version__ == "0.3.3", __version__
+    assert ild_ver == "0.3.3", ild_ver
     assert TRIAL_DAYS == 28 and KEY_DAYS == 32
     key = generate_key("ame@sellerbach.de")
     ok, msg, _ = verify_key(key)
@@ -128,7 +129,7 @@ def main() -> int:
     assert "Settings" in tr("settings")
     set_lang("de")
     upd = check_for_updates(allow_network=False)
-    assert upd.local_version == "0.3.2" and not upd.online
+    assert upd.local_version == "0.3.3" and not upd.online
     assert get_export_jpeg_quality() >= 10
     assert get_ui_lang() in ("de", "en")
     assert 25 <= get_default_zoom_percent() <= 500
@@ -169,8 +170,8 @@ def main() -> int:
     assert get_ann_pen_color() == "#112233"
     assert (ROOT / "CHANGELOG.md").is_file()
     cl = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-    assert "0.3.2" in cl
-    assert "## 0.3.2" in cl
+    assert "0.3.3" in cl
+    assert "## 0.3.3" in cl
     assert "## 0.3.1" in cl
     assert "## 0.3.0" in cl
     assert "0.2.0 → 0.3.0" in cl or "0.2.0→0.3.0" in cl
@@ -182,7 +183,7 @@ def main() -> int:
     # Kompakt: Einzel-Header 0.2.1–0.2.9 entfernt (nur Kurz-Tabelle)
     assert "## 0.2.9" not in cl and "## 0.2.8" not in cl
     assert "0.2.9" in cl  # noch in Kurz-Tabelle
-    assert "0.3.2" in (ROOT / "README.md").read_text(encoding="utf-8")
+    assert "0.3.3" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "run.bat" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "sync-ild.ps1" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "scripts/sync-ild.ps1" in (ROOT / "FEATURES.md").read_text(encoding="utf-8")
@@ -526,13 +527,13 @@ def main() -> int:
 
         assert (ROOT / "installer" / "installer-hinweis.txt").exists()
         iss = (ROOT / "installer" / "instantlensdoc.iss").read_text(encoding="utf-8")
-        assert "0.3.2" in iss and "desktopicon" in iss and "DisableProgramGroupPage=no" in iss
+        assert "0.3.3" in iss and "desktopicon" in iss and "DisableProgramGroupPage=no" in iss
         assert "UninstallDisplayName" in iss and "Uninstallable=yes" in iss
         assert "IncludeKeygen" in iss and "SetupIconFile" in iss
         assert "InstantLensKeygen.exe" in iss
         assert "uninstallexe" in iss
         bw = (ROOT / "build-windows.ps1").read_text(encoding="utf-8")
-        assert "0.3.2" in bw and "NoKeygenInApp" in bw and "--icon" in bw
+        assert "0.3.3" in bw and "NoKeygenInApp" in bw and "--icon" in bw
         assert "InstantLensKeygen.exe" in bw
         bi = (ROOT / "installer" / "build-installer.ps1").read_text(encoding="utf-8")
         assert "InstantLensKeygen.exe" in bi and "IncludeKeygen" in bi
@@ -551,7 +552,7 @@ def main() -> int:
         assert "QProgressDialog" in (ROOT / "instantlensdoc" / "ui" / "main_window.py").read_text(encoding="utf-8")
 
         assert (ROOT / "examples" / "ild_pdf_demo.py").exists()
-        assert "0.3.2" in (ROOT / "INFO.md").read_text(encoding="utf-8")
+        assert "0.3.3" in (ROOT / "INFO.md").read_text(encoding="utf-8")
         assert (ROOT / "assets" / "app.ico").is_file()
 
         # --- Kernpfade: open / annotate / export / license ---
@@ -714,7 +715,7 @@ def main() -> int:
         win._add_chained_frame()
         assert len(win.layout_doc.text_frames) >= 2
         assert "Lizenz:" in win.license_label.text() or "⚠" in win.license_label.text()
-        assert "v0.3.2" in win.version_label.text()
+        assert "v0.3.3" in win.version_label.text()
         # Lizenz <7 Tage: Style prominent
         st_lic = win.license_manager.status()
         if st_lic.allowed and st_lic.days_remaining < 7:
@@ -889,11 +890,11 @@ def main() -> int:
             assert win.editor.outdent_selection(4)
             assert win.editor.toPlainText().splitlines()[0] == "alpha"
             # Fenstertitel mit Version
-            assert "0.3.2" in win.windowTitle()
+            assert "0.3.3" in win.windowTitle()
             from instantlensdoc.ui.help_dialog import AboutDialog, HelpDialog, open_log_folder
 
             about = AboutDialog(win)
-            assert "0.3.2" in about.windowTitle()
+            assert "0.3.3" in about.windowTitle()
             help_dlg = HelpDialog(win)
             assert help_dlg.windowTitle() == "Hilfe"
             assert callable(open_log_folder)
@@ -1115,6 +1116,57 @@ def main() -> int:
             assert dirs and str(dirs[0]) == str(Path(td2))
             assert dialog_start_dir() == str(Path(td2))
             print("0.3.2 attachments/layer/md/dirs: OK")
+            # 0.3.3: Einzel-PDFs / Flatten / Soft-Wrap / Lizenz-Dialog
+            from ild_pdf import flatten_annotations_to_pdf
+            from instantlensdoc.core.app_settings import get_editor_soft_wrap, set_editor_soft_wrap
+            from instantlensdoc.ui.license_dialog import LicenseDialog
+
+            multi_split = Path(td2) / "split_src.pdf"
+            with pikepdf.Pdf.new() as _sp:
+                _sp.add_blank_page(page_size=(200, 280))
+                _sp.add_blank_page(page_size=(200, 280))
+                _sp.add_blank_page(page_size=(200, 280))
+                _sp.save(multi_split)
+            split_out = Path(td2) / "single_pages"
+            singles = split_into_single_page_pdfs(multi_split, split_out)
+            assert len(singles) == 3
+            assert all(p.is_file() and p.suffix.lower() == ".pdf" for p in singles)
+            assert callable(win._split_into_single_page_pdfs)
+
+            store_flat = AnnotationStore(str(multi_split))
+            store_flat.add(
+                Annotation(0, AnnotationType.HIGHLIGHT, 10, 10, width=40, height=12, color="#FFE066")
+            )
+            store_flat.add(
+                Annotation(1, AnnotationType.STICKY, 20, 20, width=60, height=40, text="Notiz")
+            )
+            store_flat.add(
+                Annotation(2, AnnotationType.REDACTION, 5, 5, width=30, height=20, color="#000000")
+            )
+            flat_out = Path(td2) / "flattened.pdf"
+            written_flat = flatten_annotations_to_pdf(
+                multi_split, store_flat, scale=1.5, out_path=flat_out
+            )
+            assert written_flat.is_file() and written_flat.stat().st_size > 0
+            with pikepdf.open(written_flat) as _fpdf:
+                assert len(_fpdf.pages) == 3
+            assert callable(win.pdf_view.export_annotations_flattened)
+
+            set_editor_soft_wrap(True)
+            win._soft_wrap_action.setChecked(True)
+            assert win.editor.soft_wrap_enabled()
+            assert win._soft_wrap_action.isChecked()
+            win._soft_wrap_action.setChecked(False)
+            assert not win.editor.soft_wrap_enabled()
+            assert get_editor_soft_wrap() is False
+            win._soft_wrap_action.setChecked(True)
+            assert win.editor.soft_wrap_enabled()
+
+            dlg_lic = LicenseDialog(win.license_manager)
+            assert "Resttage" in dlg_lic.info.text()
+            assert "Ablaufdatum" in dlg_lic.info.text()
+            dlg_lic.close()
+            print("0.3.3 single-pdf/flatten/softwrap/license: OK")
             win.pdf_view.store.add(
                 Annotation(0, AnnotationType.REDACTION, 5, 5, width=30, height=20, color="#000000", text="REDACT")
             )
@@ -1124,9 +1176,9 @@ def main() -> int:
             from instantlensdoc.ui.password_dialog import CompressPdfDialog, SetPasswordDialog
             from instantlensdoc.ui.stubs import PLANNED
             assert KeyboardHelpDialog and SetPasswordDialog and CompressPdfDialog
-            assert "0.3.2" in PLANNED["ki"]
+            assert "0.3.3" in PLANNED["ki"]
             assert "Coming soon" in PLANNED["cloud"]
-            assert "0.3.2" in PLANNED["stylus"] and "0.3.2" in PLANNED["extrude3d"]
+            assert "0.3.3" in PLANNED["stylus"] and "0.3.3" in PLANNED["extrude3d"]
             # Toolbar ↔ Menü Sync Graustufen/Nacht
             win.pdf_view.set_grayscale(True)
             assert win._grayscale_action.isChecked()
@@ -1161,9 +1213,9 @@ def main() -> int:
             assert win.editor.toPlainText().splitlines() == ["one", "two"]
             from instantlensdoc.ui.help_dialog import HELP_HTML
 
-            assert "Stub 0.3.2" in HELP_HTML
+            assert "Stub 0.3.3" in HELP_HTML
             assert "scripts/sync-ild.ps1" in HELP_HTML
-            print("0.3.2 review + attachments/layer/md/dirs: OK")
+            print("0.3.3 review + single-pdf/flatten/softwrap/license: OK")
             assert callable(win.pdf_view.bake_redactions)
             assert callable(win.pdf_view.clear_redactions)
             assert callable(win._set_pdf_password)

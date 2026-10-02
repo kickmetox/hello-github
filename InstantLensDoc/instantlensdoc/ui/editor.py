@@ -6,10 +6,10 @@ import tempfile
 from pathlib import Path
 
 from PySide6.QtCore import QRect, QSize, Qt
-from PySide6.QtGui import QColor, QFont, QImage, QPainter, QTextCharFormat, QTextCursor, QTextDocument
+from PySide6.QtGui import QColor, QFont, QImage, QPainter, QTextCharFormat, QTextCursor, QTextDocument, QTextOption
 from PySide6.QtWidgets import QApplication, QPlainTextEdit, QTextEdit, QWidget
 
-from instantlensdoc.core.app_settings import get_editor_line_numbers
+from instantlensdoc.core.app_settings import get_editor_line_numbers, get_editor_soft_wrap
 
 
 class _LineNumberArea(QWidget):
@@ -35,11 +35,13 @@ class TextEditor(QPlainTextEdit):
         self._paste_image_dir: Path | None = None
         self._last_case_sensitive = False
         self._line_numbers = bool(get_editor_line_numbers())
+        self._soft_wrap = bool(get_editor_soft_wrap())
         self._line_number_area = _LineNumberArea(self)
         self.blockCountChanged.connect(self._update_line_number_area_width)
         self.updateRequest.connect(self._update_line_number_area)
         self._update_line_number_area_width(0)
         self.set_line_numbers_visible(self._line_numbers)
+        self.set_soft_wrap(self._soft_wrap)
 
     def line_number_area_width(self) -> int:
         if not self._line_numbers:
@@ -55,6 +57,18 @@ class TextEditor(QPlainTextEdit):
 
     def line_numbers_visible(self) -> bool:
         return self._line_numbers
+
+    def set_soft_wrap(self, enabled: bool) -> None:
+        """Zeilenumbruch am Fensterrand (Soft-Wrap) ein/aus."""
+        self._soft_wrap = bool(enabled)
+        if self._soft_wrap:
+            self.setLineWrapMode(QPlainTextEdit.WidgetWidth)
+            self.setWordWrapMode(QTextOption.WrapAtWordBoundaryOrAnywhere)
+        else:
+            self.setLineWrapMode(QPlainTextEdit.NoWrap)
+
+    def soft_wrap_enabled(self) -> bool:
+        return bool(self._soft_wrap)
 
     def _update_line_number_area_width(self, _new_block_count: int = 0) -> None:
         self.setViewportMargins(self.line_number_area_width(), 0, 0, 0)

@@ -20,6 +20,7 @@ from .pages import (
     PAGE_SIZE_PRESETS,
     extract_page_range,
     merge_pdfs,
+    split_into_single_page_pdfs,
     split_pdf,
     rotate_page,
     flip_page,
@@ -31,6 +32,7 @@ from .pages import (
     set_page_size,
     set_crop_box,
 )
+from .flatten import bake_annotations, draw_annotations_on_image, flatten_annotations_to_pdf
 from .outline import OutlineItem, add_outline_item, delete_outline_item, extract_outline
 from .images import (
     compress_image_for_pdf,
@@ -88,7 +90,11 @@ __all__ = [
     "PAGE_SIZE_PRESETS",
     "extract_page_range",
     "merge_pdfs",
+    "split_into_single_page_pdfs",
     "split_pdf",
+    "flatten_annotations_to_pdf",
+    "bake_annotations",
+    "draw_annotations_on_image",
     "rotate_page",
     "flip_page",
     "insert_blank_page",
@@ -142,4 +148,4 @@ __all__ = [
     "extract_all_attachments",
 ]
 
-__version__ = "0.3.2"
+__version__ = "0.3.3"

@@ -1,5 +1,22 @@
 # Changelog — InstantLens Doc
 
+## 0.3.3 — Einzel-PDFs, Ann.-Flatten, Soft-Wrap, Lizenz
+
+Fokus auf sinnvolle Ausbauten nach 0.3.2. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### PDF
+- **Seiten als Einzel-PDFs** (PDF → Seiten als Einzel-PDFs…; `split_into_single_page_pdfs`)
+- **Annotationen flatten/bake** Export: alle Seiten mit eingezeichneten Annotationen → neues PDF (`flatten_annotations_to_pdf`)
+
+### Editor / UX
+- **Soft-Wrap Toggle** (Ansicht + Einstellungen; Ctrl+Shift+W)
+- **Lizenz-Dialog**: Resttage und Ablaufdatum klarer dargestellt
+
+### Packaging / Docs
+- Version **0.3.3** (App, `ild_pdf`, ISS, Smoke, INFO/FEATURES/README)
+
+---
+
 ## 0.3.2 — Anhänge, Ann.-Layer, MD-Preview, Ordner
 
 Fokus auf sinnvolle Ausbauten nach 0.3.1. Stubs KI/Cloud/Stylus/3D bleiben Stubs.

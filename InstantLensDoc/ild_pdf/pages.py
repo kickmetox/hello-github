@@ -189,6 +189,17 @@ def extract_page_range(
     return dest
 
 
+def split_into_single_page_pdfs(
+    path: str | Path,
+    dest_dir: str | Path,
+) -> List[Path]:
+    """
+    Jede Seite als eigene PDF-Datei in dest_dir speichern.
+    Dateinamen: ``{stem}_p{N}.pdf`` (1-basiert). Quell-PDF unverändert.
+    """
+    return split_pdf(path, dest_dir, single_pages=True)
+
+
 def split_pdf(
     path: str | Path,
     dest_dir: str | Path,

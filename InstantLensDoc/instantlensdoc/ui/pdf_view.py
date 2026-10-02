@@ -1662,6 +1662,79 @@ class PdfViewer(QWidget):
             QMessageBox.warning(self, "Annotationen exportieren", str(e))
             return False
 
+    def export_annotations_flattened(self) -> bool:
+        """
+        Alle Annotationen flatten/bake: Seiten rendern + Annotationen einzeichnen → neues PDF.
+        Original und Sidecar bleiben unverändert.
+        """
+        if not self.store or not self.pdf_path:
+            QMessageBox.information(self, "Flatten/Bake", "Kein PDF geladen.")
+            return False
+        n = len(self.store.annotations)
+        if n == 0:
+            reply = QMessageBox.question(
+                self,
+                "Flatten/Bake",
+                "Keine Annotationen vorhanden.\nTrotzdem Seiten als PDF exportieren (ohne Overlay)?",
+            )
+            if reply != QMessageBox.Yes:
+                return False
+        from PySide6.QtWidgets import QFileDialog
+        from ild_pdf import flatten_annotations_to_pdf
+        from instantlensdoc.core.app_settings import (
+            dialog_start_dir,
+            remember_recent_dir,
+            set_last_export_dir,
+        )
+
+        default = str(
+            Path(dialog_start_dir(self.pdf_path.parent))
+            / f"{self.pdf_path.stem}_flattened.pdf"
+        )
+        path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Annotationen flatten/bake exportieren",
+            default,
+            "PDF (*.pdf);;Alle (*.*)",
+        )
+        if not path:
+            return False
+        dest = Path(path)
+        if dest.suffix.lower() != ".pdf":
+            dest = dest.with_suffix(".pdf")
+        if dest.resolve() == self.pdf_path.resolve():
+            QMessageBox.warning(
+                self,
+                "Flatten/Bake",
+                "Ziel darf nicht die aktuelle Datei sein.\nBitte anderen Namen wählen.",
+            )
+            return False
+        try:
+            if self.store.dirty:
+                self.store.save(force=True)
+            bake_scale = max(float(self.scale), 1.5)
+            out = flatten_annotations_to_pdf(
+                self.pdf_path,
+                self.store,
+                scale=bake_scale,
+                out_path=dest,
+                password=self.password,
+                grayscale=self._grayscale,
+            )
+            set_last_export_dir(out.parent)
+            remember_recent_dir(out.parent)
+            self.status.emit(f"Flatten/Bake: {out.name} ({n} Ann., {self.page_count} Seite(n))")
+            QMessageBox.information(
+                self,
+                "Flatten/Bake",
+                f"Annotationen eingebrannt (alle Seiten):\n{out}\n\n"
+                f"{n} Annotation(en) · Original unverändert.",
+            )
+            return True
+        except Exception as e:
+            QMessageBox.warning(self, "Flatten/Bake", str(e))
+            return False
+
     def import_annotations_json(self) -> bool:
         """Annotationen aus JSON importieren (ersetzen oder anhängen)."""
         if not self.store or not self.pdf_path:

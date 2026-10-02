@@ -2,7 +2,7 @@
 
 Moderne Textverarbeitung mit PDF-Annotator, OCR-Bridge und Formulargenerator.
 
-**Version:** 0.3.2  
+**Version:** 0.3.3  
 **Hersteller:** Andreas Meyer · ame@sellerbach.de
 
 ## Quickstart (Windows)
@@ -29,8 +29,8 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)
 
-## Neu in 0.3.2
+## Neu in 0.3.3
 
-PDF-Anhänge auflisten/extrahieren, Annotation-Layer Toggle, Markdown-Vorschau Split, zuletzt verwendete Ordner in Dialogen. Stubs KI/Cloud/Stylus/3D unverändert.
+PDF-Seiten als Einzel-PDFs, Annotationen flatten/bake Export, Soft-Wrap Toggle, Lizenz-Dialog mit Resttage/Ablaufdatum. Stubs KI/Cloud/Stylus/3D unverändert.
 
 Siehe [CHANGELOG.md](CHANGELOG.md), [FEATURES.md](FEATURES.md) und [INFO.md](INFO.md).
