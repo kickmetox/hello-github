@@ -37,8 +37,10 @@ def main(argv: list[str] | None = None) -> int:
     from instantlensdoc.config import DISPLAY_NAME
     from instantlensdoc.license import LicenseManager
     from instantlensdoc.ui.main_window import MainWindow
+    from instantlensdoc.ui.theme import apply_theme
 
     app = QApplication(argv)
+    apply_theme(app)
     app.setApplicationName(DISPLAY_NAME)
     app.setOrganizationName("Andreas Meyer")
     app.setOrganizationDomain("sellerbach.de")

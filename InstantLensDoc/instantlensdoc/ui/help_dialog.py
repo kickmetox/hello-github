@@ -21,18 +21,24 @@ HELP_HTML = """
 <li><b>Seitenleiste</b>: Suche, Zuletzt geöffnet, Dokumente, Annotationen/Markierungen</li>
 <li><b>Bearbeiten → Rückgängig/Wiederholen</b>: Editor-Text <i>oder</i> PDF-Annotationen/Overlay-Text (Ctrl+Z / Ctrl+Y)</li>
 <li><b>Bearbeiten → Auswahl markieren</b> (Ctrl+H): Markierung im Editor + Eintrag in der Seitenleiste</li>
-<li><b>Ansicht</b>: Zoom +/−, Seite einpassen (Ctrl+0), Breite (Ctrl+9), 100&nbsp;% (Ctrl+1)</li>
+<li><b>Ansicht</b>: Zoom +/−, Seite einpassen (Ctrl+0), Breite (Ctrl+9), 100&nbsp;% (Ctrl+1);
+    <b>Hell/Dunkel</b>-Design umschalten</li>
+<li><b>Drag &amp; Drop</b>: Dateien auf das Fenster ziehen zum Öffnen</li>
+<li><b>Autosave</b>: Textdokumente (mit Pfad) und PDF-Annotationen ca. jede Minute</li>
 <li><b>PDF</b>: Blättern, Zoom/Fit, 90°-Drehen, Seite löschen, Seiten neu anordnen;
     Annotationen: Highlight (Drag), Unterstreichen, Notiz, <b>Text-Overlay</b>, Stempel, Callout,
     <b>Rechteck / Linie / Pfeil / Lineal</b> —
     Sidecar <code>*.ildann.json</code> (v3, Auto-Save, Undo/Redo);
     Doppelklick oder Strg+Klick auf Overlay zum Bearbeiten;
     PDF → Text→Overlay / Overlay einbrennen;
+    <b>Signaturfeld</b> (Platzhalter) und <b>Signatur (Bild)</b> einfügen;
     Seite als Bild / Bild als neue Seite / Seite drucken</li>
 <li><b>Einfügen → Verketteter Textrahmen</b>: Overflow fließt in den Folgeahmen</li>
 <li><b>OCR</b>: Extras → OCR — Sprach-Presets + Modus „editierbarer Text“ oder
-    „durchsuchbares Bild“ (PDF + <code>*.ildocr.txt</code>). Ohne Tesseract: Install-Hinweis
-    (<code>winget install UB-Mannheim.TesseractOCR</code>)</li>
+    „durchsuchbares Bild“ (PDF + <code>*.ildocr.txt</code>); Tabellen-Heuristik als Markdown wo möglich.
+    Ohne Tesseract: Install-Hinweis mit Link
+    (<a href="https://github.com/UB-Mannheim/tesseract/wiki">UB-Mannheim Wiki</a>,
+    <code>winget install UB-Mannheim.TesseractOCR</code>)</li>
 <li><b>Formulare</b>: Extras → Formulargenerator — mehr Feldtypen, Definition speichern/laden
     (<code>*.ildform.json</code>), Live-Vorschau, Export HTML/PDF</li>
 <li><b>Build (Windows)</b>: <code>build-windows.ps1</code> — PyInstaller App + Keygen</li>

@@ -210,11 +210,43 @@ class PdfCanvas(QLabel):
             painter.drawRect(x, y, max(w, 40), max(h, 18))
             painter.setPen(QColor(ann.color))
             painter.drawText(x + 2, y + int(max(ann.font_size, 12)), (ann.text or "")[:80])
-        elif ann.type == AnnotationType.STAMP:
+        elif ann.type in (AnnotationType.STAMP, AnnotationType.SIGNATURE):
+            if ann.text.startswith("img:"):
+                img_path = Path(ann.text[4:])
+                if img_path.is_file():
+                    pm = QPixmap(str(img_path))
+                    if not pm.isNull():
+                        painter.drawPixmap(
+                            x,
+                            y,
+                            max(int(w), 40),
+                            max(int(h), 24),
+                            pm.scaled(
+                                max(int(w), 40),
+                                max(int(h), 24),
+                                Qt.KeepAspectRatio,
+                                Qt.SmoothTransformation,
+                            ),
+                        )
+                        return
+            if ann.type == AnnotationType.SIGNATURE:
+                painter.setPen(QPen(QColor("#2C3E50"), 2, Qt.DashLine))
+                painter.drawRect(x, y, max(w, 80), max(h, 32))
+                painter.drawText(x + 4, y + 16, "Signatur")
+                return
             stamp_color = QColor(ann.color if ann.color != "#FFFF00" else "#C0392B")
             painter.setPen(QPen(stamp_color, 3))
             painter.drawRect(x, y, max(w, 100), max(h, 36))
             painter.drawText(x + 8, y + max(h, 36) // 2 + 4, (ann.text or "STEMPEL")[:24])
+        elif ann.type == AnnotationType.SIGNATURE_FIELD:
+            painter.setPen(QPen(QColor(ann.color or "#7F8C8D"), 2, Qt.DashLine))
+            painter.setBrush(QColor(255, 255, 255, 30))
+            fh = max(int(h), 48)
+            fw = max(int(w), 160)
+            painter.drawRect(x, y, fw, fh)
+            painter.drawLine(x + 8, y + fh - 10, x + fw - 8, y + fh - 10)
+            painter.setPen(QColor(ann.color or "#7F8C8D"))
+            painter.drawText(x + 8, y + 18, (ann.text or "Unterschrift")[:40])
         elif ann.type == AnnotationType.CALLOUT:
             box_w, box_h = max(w, 100), max(h, 40)
             painter.setBrush(QColor(255, 255, 220, 220))
@@ -421,6 +453,7 @@ class PdfViewer(QWidget):
             (AnnotationType.LINE, "Linie"),
             (AnnotationType.ARROW, "Pfeil"),
             (AnnotationType.MEASURE, "Lineal"),
+            (AnnotationType.SIGNATURE_FIELD, "Signaturfeld"),
         ]:
             b = QToolButton()
             b.setText(label)
@@ -475,6 +508,7 @@ class PdfViewer(QWidget):
             AnnotationType.LINE: "Linie",
             AnnotationType.ARROW: "Pfeil",
             AnnotationType.MEASURE: "Lineal",
+            AnnotationType.SIGNATURE_FIELD: "Signaturfeld",
         }.get(tool, tool.value)
 
     def _set_tool(self, tool: AnnotationType):
@@ -795,6 +829,49 @@ class PdfViewer(QWidget):
         except Exception as e:
             QMessageBox.warning(self, "Extrahieren", str(e))
 
+    def place_signature_field(self):
+        """Signaturfeld-Platzhalter per Klick (Werkzeug Signaturfeld)."""
+        self._set_tool(AnnotationType.SIGNATURE_FIELD)
+        self.status.emit("Signaturfeld: auf die Seite klicken")
+
+    def insert_signature_image(self):
+        """Bild-Signatur auf aktuelle Seite setzen (Datei wählen, dann Klickposition)."""
+        if not self.store or not self.pdf_path:
+            QMessageBox.information(self, "Signatur", "Kein PDF geladen.")
+            return
+        from PySide6.QtWidgets import QFileDialog
+        from ild_pdf import insert_signature_image
+
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Signatur-Bild", "", "Bilder (*.png *.jpg *.jpeg *.bmp)"
+        )
+        if not path:
+            return
+        # Mitte-unten der Seite als Default
+        try:
+            from ild_pdf import PdfDocument
+
+            with PdfDocument(self.pdf_path) as doc:
+                pw, ph = doc.page_size(self.page_index)
+            x = max(40.0, pw * 0.15)
+            y = max(40.0, ph * 0.78)
+        except Exception:
+            x, y = 80.0, 520.0
+        try:
+            insert_signature_image(
+                self.pdf_path,
+                path,
+                page_index=self.page_index,
+                x=x,
+                y=y,
+            )
+            self.store.load()
+            self.refresh()
+            self.annotations_changed.emit()
+            self.status.emit("Signatur-Bild platziert")
+        except Exception as e:
+            QMessageBox.warning(self, "Signatur", str(e))
+
     def insert_image_page(self):
         if not self.pdf_path:
             return
@@ -927,6 +1004,12 @@ class PdfViewer(QWidget):
                 return
         elif self.tool == AnnotationType.UNDERLINE:
             width = 180.0
+        elif self.tool == AnnotationType.SIGNATURE_FIELD:
+            text, ok = QInputDialog.getText(self, "Signaturfeld", "Beschriftung:", text="Unterschrift")
+            if not ok:
+                return
+            color = "#7F8C8D"
+            width, height = 220.0, 56.0
         else:
             return
 

@@ -16,6 +16,10 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | PDF-Annotationen (Highlight, Underline, Sticky, Text) | fertig | Sidecar `*.ildann.json` **v3** |
 | Annotation Undo/Redo | fertig | Ctrl+Z/Y inkl. Overlay-Text |
 | Stempel / Callouts | teilweise | Stempel-Presets + Callout (2-Klick) |
+| PDF Signaturfeld / Signatur (Bild) | fertig | Sidecar; Menü PDF + Werkzeug |
+| Theme Hell/Dunkel | fertig | Ansicht-Menü, persistiert |
+| Autosave Editor / Annotationen | fertig | ~60 s, nur mit Pfad |
+| Drag-Drop Datei öffnen | fertig | Hauptfenster |
 | Formen (Rechteck / Linie / Pfeil) | fertig | Drag-Zeichnung |
 | Messwerkzeug (Lineal) | fertig | Distanz in pt (Scale-bewusst) |
 | Text-Overlay-Editor | fertig | Sidecar; Doppelklick/Strg+Klick; Bake optional |
@@ -26,7 +30,7 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | Textsuche Seitenleiste | fertig | Editor: alle Treffer; PDF: Annotationen filtern |
 | Markieren im Editor | fertig | Ctrl+H |
 | Bilder JPEG/PNG anzeigen | fertig | |
-| OCR Bild/PDF-Seite | teilweise | Presets + Modi; klare UX ohne Tesseract |
+| OCR Bild/PDF-Seite | teilweise | Presets + Modi; Tabellen-Heuristik; Tesseract-Link |
 | OCR Ausgabe: editierbarer Text | fertig | → Editor |
 | OCR Ausgabe: durchsuchbares Bild | teilweise | PDF + `*.ildocr.txt` Sidecar |
 | Formulargenerator → HTML/PDF | fertig | Mehr Feldtypen; Definition speichern/laden |
@@ -35,9 +39,9 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | Lizenz Trial 28d / Keys 32d | fertig | Statusleiste farbig + Tooltip |
 | Keygenerator (CLI/GUI) | fertig | `run-keygen.bat` |
 | PyInstaller Build Windows | fertig | `build-windows.ps1` |
-| Inno-Installer | fertig | Desktop + Startmenü-Hinweis 0.1.4 |
+| Inno-Installer | fertig | Desktop + Startmenü-Hinweis 0.1.5 |
 | Sync-Skript Windows | fertig | Store `docs/sync-ild.ps1` |
-| In-App Hilfe / About | fertig | Version 0.1.4 |
+| In-App Hilfe / About | fertig | Version 0.1.5 |
 | FEATURES.md / INFO.md | fertig | |
 | `ild_pdf` Modul + Beispielskript | fertig | `examples/ild_pdf_demo.py` |
 | Font-Matching | geplant | |

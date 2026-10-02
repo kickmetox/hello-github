@@ -128,6 +128,75 @@ def insert_image_as_page(
     return pdf_path
 
 
+def insert_signature_field(
+    pdf_path: str | Path,
+    page_index: int = 0,
+    *,
+    x: float = 40.0,
+    y: float = 520.0,
+    width: float = 220.0,
+    height: float = 56.0,
+    label: str = "Unterschrift",
+) -> None:
+    """Signaturfeld-Platzhalter als Sidecar-Annotation."""
+    from .annotate import Annotation, AnnotationStore, AnnotationType
+
+    store = AnnotationStore(Path(pdf_path))
+    store.add(
+        Annotation(
+            page=page_index,
+            type=AnnotationType.SIGNATURE_FIELD,
+            x=x,
+            y=y,
+            width=width,
+            height=height,
+            text=label,
+            color="#7F8C8D",
+        )
+    )
+    store.save(force=True)
+
+
+def insert_signature_image(
+    pdf_path: str | Path,
+    image: Union[str, Path, Image.Image],
+    page_index: int = 0,
+    *,
+    x: float = 40.0,
+    y: float = 520.0,
+    width: float = 180.0,
+    height: float = 64.0,
+) -> Path:
+    """Einfache Signatur: Bild als Annotation (Sidecar, img:…)."""
+    from .annotate import Annotation, AnnotationStore, AnnotationType
+
+    pdf_path = Path(pdf_path)
+    if isinstance(image, Image.Image):
+        assets = pdf_path.parent / f"{pdf_path.stem}_signatures"
+        assets.mkdir(parents=True, exist_ok=True)
+        dest = assets / f"sig_{page_index}_{int(x)}_{int(y)}.png"
+        image.convert("RGBA").save(dest)
+        img_path = dest
+    else:
+        img_path = Path(image)
+
+    store = AnnotationStore(pdf_path)
+    store.add(
+        Annotation(
+            page=page_index,
+            type=AnnotationType.SIGNATURE,
+            x=x,
+            y=y,
+            width=width,
+            height=height,
+            text=f"img:{img_path}",
+            color="#2C3E50",
+        )
+    )
+    store.save(force=True)
+    return img_path
+
+
 def insert_image_stamp_overlay(
     pdf_path: str | Path,
     image: Union[str, Path, Image.Image],

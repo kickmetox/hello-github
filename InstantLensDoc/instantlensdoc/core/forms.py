@@ -191,8 +191,10 @@ def export_pdf_form(form: FormDefinition, path: str | Path) -> Path:
         draw.text((40, y), f"[{f.type.value}] {label}", fill="black", font=font_sm)
         y += 18
         if f.type == FieldType.SIGNATURE:
-            draw.line([40, y + 28, w - 40, y + 28], fill="black", width=1)
-            y += 40
+            draw.rectangle([40, y, w - 40, y + 36], outline="#888", width=1)
+            draw.line([48, y + 28, w - 48, y + 28], fill="black", width=1)
+            draw.text((44, y + 4), "Signatur (Platzhalter)", fill="#666", font=font_sm)
+            y += 44
         elif f.type == FieldType.CHECKBOX:
             draw.rectangle([40, y, 54, y + 14], outline="black")
             y += 28

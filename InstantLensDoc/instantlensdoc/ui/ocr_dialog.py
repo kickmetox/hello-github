@@ -13,10 +13,18 @@ from PySide6.QtWidgets import (
     QFormLayout,
     QLabel,
     QRadioButton,
+    QTextBrowser,
     QVBoxLayout,
 )
 
-from instantlensdoc.core.ocr import LANG_PRESETS, OcrOutputMode, list_installed_languages, tesseract_available
+from instantlensdoc.core.ocr import (
+    INSTALL_HINT_HTML,
+    LANG_PRESETS,
+    OcrOutputMode,
+    TESSERACT_WIKI_URL,
+    list_installed_languages,
+    tesseract_available,
+)
 
 
 class OcrDialog(QDialog):
@@ -31,9 +39,20 @@ class OcrDialog(QDialog):
 
         layout = QVBoxLayout(self)
         ok, msg = tesseract_available()
-        status = QLabel(msg if ok else f"Hinweis: {msg.splitlines()[0]}")
-        status.setWordWrap(True)
-        layout.addWidget(status)
+        if ok:
+            status = QLabel(msg)
+            status.setWordWrap(True)
+            layout.addWidget(status)
+        else:
+            hint = QTextBrowser()
+            hint.setOpenExternalLinks(True)
+            hint.setMaximumHeight(140)
+            hint.setHtml(
+                INSTALL_HINT_HTML
+                + f"<p><small>{msg.splitlines()[0] if msg else 'Tesseract fehlt'}</small></p>"
+            )
+            hint.setToolTip(TESSERACT_WIKI_URL)
+            layout.addWidget(hint)
 
         form = QFormLayout()
         self.lang_combo = QComboBox()

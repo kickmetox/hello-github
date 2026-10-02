@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QAction, QIcon, QKeySequence
 from PySide6.QtWidgets import (
     QFileDialog,
@@ -33,6 +33,7 @@ from instantlensdoc.ui.ocr_dialog import OcrDialog
 from instantlensdoc.ui.pdf_view import PdfViewer
 from instantlensdoc.ui.sidebar import Sidebar
 from instantlensdoc.ui.stubs import show_planned
+from instantlensdoc.ui.theme import apply_theme, load_theme_mode, toggle_theme
 
 
 class MainWindow(QMainWindow):
@@ -43,7 +44,10 @@ class MainWindow(QMainWindow):
         self.layout_doc = LayoutDocument()
         self._editor_marks: list[str] = []
         self._recent_menu = None
+        self._theme_action: QAction | None = None
+        self._autosave_enabled = True
 
+        self.setAcceptDrops(True)
         self.setWindowTitle(DISPLAY_NAME)
         self.resize(1200, 800)
         icon = QIcon()
@@ -56,6 +60,12 @@ class MainWindow(QMainWindow):
         self._build_menus()
         self._refresh_recent()
         self._update_license_status()
+        apply_theme()
+        self._sync_theme_menu()
+        self._autosave_timer = QTimer(self)
+        self._autosave_timer.setInterval(60_000)
+        self._autosave_timer.timeout.connect(self._autosave_tick)
+        self._autosave_timer.start()
 
     def _build_ui(self):
         central = QWidget()
@@ -198,6 +208,12 @@ class MainWindow(QMainWindow):
         act_z100.setShortcut(QKeySequence("Ctrl+1"))
         act_z100.triggered.connect(self._zoom_100)
         m_view.addAction(act_z100)
+        m_view.addSeparator()
+        self._theme_action = QAction("Dunkles Design", self)
+        self._theme_action.setCheckable(True)
+        self._theme_action.setChecked(load_theme_mode() == "dark")
+        self._theme_action.triggered.connect(self._toggle_theme)
+        m_view.addAction(self._theme_action)
 
         m_pdf = mb.addMenu("&PDF")
         for title, slot in [
@@ -211,6 +227,8 @@ class MainWindow(QMainWindow):
             ("PDF-Text → Overlay…", lambda: self.pdf_view.import_text_overlays()),
             ("Text-Overlays einbrennen…", lambda: self.pdf_view.bake_overlays()),
             ("Seite drucken…", lambda: self.pdf_view.print_current_page()),
+            ("Signaturfeld setzen…", lambda: self.pdf_view.place_signature_field()),
+            ("Signatur (Bild) einfügen…", lambda: self.pdf_view.insert_signature_image()),
         ]:
             a = QAction(title, self)
             a.triggered.connect(slot)
@@ -295,6 +313,62 @@ class MainWindow(QMainWindow):
 
     def _set_status(self, msg: str):
         self.statusBar().showMessage(msg, 5000)
+
+    def _sync_theme_menu(self):
+        if self._theme_action is not None:
+            dark = load_theme_mode() == "dark"
+            self._theme_action.setChecked(dark)
+            self._theme_action.setText("Helles Design" if dark else "Dunkles Design")
+
+    def _toggle_theme(self):
+        mode = toggle_theme(self)
+        self._sync_theme_menu()
+        self._set_status("Dunkles Design" if mode == "dark" else "Helles Design")
+
+    def dragEnterEvent(self, event):
+        if event.mimeData().hasUrls():
+            for url in event.mimeData().urls():
+                if url.isLocalFile():
+                    event.acceptProposedAction()
+                    return
+        super().dragEnterEvent(event)
+
+    def dropEvent(self, event):
+        for url in event.mimeData().urls():
+            if not url.isLocalFile():
+                continue
+            path = url.toLocalFile()
+            if path:
+                self.open_path(path)
+                event.acceptProposedAction()
+                return
+        super().dropEvent(event)
+
+    def _autosave_tick(self):
+        if not self._autosave_enabled:
+            return
+        st = self.license_manager.status()
+        if not st.allowed:
+            return
+        if not self.doc or not self.doc.dirty or not self.doc.path:
+            return
+        if self.doc.kind == DocKind.PDF:
+            if self.pdf_view.store and self.pdf_view.store.dirty:
+                try:
+                    self.pdf_view.store.save(force=True)
+                    self._set_status(f"Autosave: Annotationen ({self.doc.display_name})")
+                except Exception:
+                    pass
+            return
+        if self.doc.kind not in (DocKind.TEXT, DocKind.MARKDOWN, DocKind.HTML, DocKind.DOCX):
+            return
+        self.doc.text = self.editor.toPlainText()
+        try:
+            save_document(self.doc)
+            self.doc.dirty = False
+            self._set_status(f"Autosave: {self.doc.display_name}")
+        except Exception:
+            pass
 
     def _update_license_status(self):
         st = self.license_manager.status()

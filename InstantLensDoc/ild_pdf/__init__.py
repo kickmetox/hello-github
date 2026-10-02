@@ -19,6 +19,8 @@ from .images import (
     extract_embedded_images,
     insert_image_as_page,
     insert_image_stamp_overlay,
+    insert_signature_field,
+    insert_signature_image,
 )
 from .overlay import (
     TextBlock,
@@ -43,10 +45,12 @@ __all__ = [
     "extract_embedded_images",
     "insert_image_as_page",
     "insert_image_stamp_overlay",
+    "insert_signature_field",
+    "insert_signature_image",
     "TextBlock",
     "extract_text_blocks",
     "import_page_text_as_overlays",
     "bake_text_overlays",
 ]
 
-__version__ = "0.1.4"
+__version__ = "0.1.5"

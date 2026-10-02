@@ -36,14 +36,25 @@ LANG_PRESETS: Dict[str, str] = {
 }
 
 
+TESSERACT_WIKI_URL = "https://github.com/UB-Mannheim/tesseract/wiki"
+
 INSTALL_HINT_DE = (
     "OCR benötigt die Tesseract-Runtime.\n\n"
     "Windows:\n"
     "  winget install UB-Mannheim.TesseractOCR\n"
-    "  oder Installer von https://github.com/UB-Mannheim/tesseract/wiki\n\n"
+    f"  oder Installer: {TESSERACT_WIKI_URL}\n\n"
     "Danach Python-Paket (falls fehlen):\n"
     "  pip install pytesseract\n\n"
     "Sprachen: deu + eng empfohlen (im Tesseract-Installer anhaken)."
+)
+
+INSTALL_HINT_HTML = (
+    "<p>OCR benötigt die Tesseract-Runtime.</p>"
+    "<p><b>Windows:</b><br>"
+    "<code>winget install UB-Mannheim.TesseractOCR</code><br>"
+    f'oder <a href="{TESSERACT_WIKI_URL}">UB-Mannheim Tesseract (Wiki)</a></p>'
+    "<p>Python: <code>pip install pytesseract</code></p>"
+    "<p>Sprachen <code>deu</code> + <code>eng</code> im Installer anhaken.</p>"
 )
 
 
@@ -86,9 +97,110 @@ def list_installed_languages() -> List[str]:
         return []
 
 
+def _load_image(source: Union[str, Path, Image.Image]) -> Image.Image:
+    if isinstance(source, (str, Path)):
+        return Image.open(source)
+    return source
+
+
+def format_text_as_table(lines: List[List[str]]) -> str:
+    """Zeilen/Spalten als Markdown-Tabelle formatieren (einfach)."""
+    if not lines:
+        return ""
+    col_count = max(len(r) for r in lines)
+    if col_count < 2:
+        return "\n".join(" ".join(r) for r in lines)
+    widths = [0] * col_count
+    padded: List[List[str]] = []
+    for row in lines:
+        cells = row + [""] * (col_count - len(row))
+        padded.append(cells)
+        for i, c in enumerate(cells):
+            widths[i] = max(widths[i], len(c))
+    header = padded[0]
+    sep = "| " + " | ".join("-" * max(1, w) for w in widths) + " |"
+    out = ["| " + " | ".join(c.ljust(widths[i]) for i, c in enumerate(header)) + " |", sep]
+    for row in padded[1:]:
+        out.append("| " + " | ".join(row[i].ljust(widths[i]) for i in range(col_count)) + " |")
+    return "\n".join(out)
+
+
+def ocr_image_structured(
+    source: Union[str, Path, Image.Image],
+    lang: str = "deu+eng",
+) -> tuple[str, bool]:
+    """
+    OCR mit Tabellen-Heuristik über Tesseract image_to_data.
+    Liefert (Text, used_table_layout).
+    """
+    ok, msg = tesseract_available()
+    if not ok:
+        raise OcrUnavailable(msg)
+
+    import pytesseract
+
+    img = _load_image(source)
+    try:
+        data = pytesseract.image_to_data(img, lang=lang, output_type=pytesseract.Output.DICT)
+    except Exception:
+        plain = pytesseract.image_to_string(img, lang="eng")
+        return plain, False
+
+    n = len(data["text"])
+    rows: dict[tuple[int, int], list[tuple[int, str]]] = {}
+    for i in range(n):
+        word = (data["text"][i] or "").strip()
+        if not word:
+            continue
+        conf = int(float(data["conf"][i])) if data["conf"][i] not in ("-1", "") else -1
+        if conf >= 0 and conf < 40:
+            continue
+        key = (int(data["block_num"][i]), int(data["line_num"][i]))
+        left = int(data["left"][i])
+        rows.setdefault(key, []).append((left, word))
+
+    if not rows:
+        plain = pytesseract.image_to_string(img, lang=lang)
+        return plain, False
+
+    line_rows: List[List[str]] = []
+    table_like = False
+    for _key in sorted(rows.keys()):
+        words = sorted(rows[_key], key=lambda t: t[0])
+        if len(words) >= 2:
+            # Spalten anhand horizontaler Lücken gruppieren
+            cols: List[str] = []
+            col_words: List[str] = []
+            prev_x = words[0][0]
+            gap_threshold = 28
+            for left, w in words:
+                if col_words and left - prev_x > gap_threshold:
+                    cols.append(" ".join(col_words))
+                    col_words = [w]
+                else:
+                    col_words.append(w)
+                prev_x = left + len(w) * 8
+            if col_words:
+                cols.append(" ".join(col_words))
+            if len(cols) >= 2:
+                table_like = True
+                line_rows.append(cols)
+            else:
+                line_rows.append([" ".join(w for _, w in words)])
+        else:
+            line_rows.append([words[0][1]])
+
+    if table_like and len(line_rows) >= 2:
+        return format_text_as_table(line_rows), True
+    plain_lines = [" ".join(r) for r in line_rows]
+    return "\n".join(plain_lines), table_like
+
+
 def ocr_image(
     source: Union[str, Path, Image.Image],
     lang: str = "deu+eng",
+    *,
+    table_layout: bool = True,
 ) -> str:
     ok, msg = tesseract_available()
     if not ok:
@@ -96,14 +208,17 @@ def ocr_image(
 
     import pytesseract
 
-    if isinstance(source, (str, Path)):
-        img = Image.open(source)
-    else:
-        img = source
+    img = _load_image(source)
+    if table_layout:
+        try:
+            text, used = ocr_image_structured(img, lang=lang)
+            if used or text.strip():
+                return text
+        except Exception:
+            pass
     try:
         return pytesseract.image_to_string(img, lang=lang)
     except Exception:
-        # Fallback ohne Sprachpaket
         return pytesseract.image_to_string(img, lang="eng")
 
 

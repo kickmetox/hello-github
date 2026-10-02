@@ -28,6 +28,8 @@ class AnnotationType(str, Enum):
     ARROW = "arrow"
     MEASURE = "measure"
     TEXT_OVERLAY = "text_overlay"
+    SIGNATURE_FIELD = "signature_field"  # Platzhalter-Rahmen
+    SIGNATURE = "signature"  # Bild-Unterschrift (text: img:…)
 
 
 # Vordefinierte Stempel-Texte (UI kann erweitern)

@@ -1,59 +1,26 @@
-# InstantLens Doc — Info
+# InstantLens Doc — Kurzinfo
 
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | 0.1.4 |
+| Version | 0.1.5 |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
-| Plattform | Windows-first (Python 3.12 + PySide6), Linux/macOS lauffähig |
-| PDF | pypdfium2 / PDFium — **kein** Poppler/GPL im Standard |
-| Zielordner | `D:\AI_Temp\InstantLensDoc` |
+| PDF | pypdfium2 / PDFium |
+| GUI | Python 3.12 + PySide6 |
 
-## Lizenzmodell
+## Lizenz
 
-1. **Trial:** 28 Tage (4 Wochen) ab erstem Start, voll nutzbar  
-2. **Key:** Format `ILD1.<payload>.<sig>`, Laufzeit **32 Tage (30+2)** ab Ausstellung  
-3. Nach Ablauf: neuen Key per Mail an **ame@sellerbach.de** anfordern  
-4. Keygenerator: `run-keygen.bat` oder `python -m keygen --gui` (separates Extra)
+- Trial: **28 Tage** ab Erststart  
+- Keys: **32 Tage (30+2)**, Format `ILD1.…`  
+- Neu anfordern: **ame@sellerbach.de**
 
-Lizenzdaten lokal unter `%APPDATA%\InstantLensDoc\license.json` (Windows) bzw. `~/.config/InstantLensDoc/`.  
-Statusleiste zeigt klar: **Aktiviert** (grün) / **Testversion** (amber) / **Abgelaufen** (rot).
+## Start
 
-## Icon
-
-Die App sucht automatisch (Reihenfolge): `assets/app.ico`, `assets/icon.png`, JPG-Varianten, CWD, `D:\AI_Temp\InstantLensDoc`.  
-Eigenes Icon dort ablegen — Sync-Skript überschreibt vorhandene Nutzer-Icons nicht.
-
-## OCR
-
-Optional. `pip install pytesseract` + Tesseract-OCR Runtime (`winget install UB-Mannheim.TesseractOCR`).  
-Sprach-Presets in der UI; Modi: editierbarer Text oder durchsuchbares Bild (PDF + Sidecar).  
-Fehlt die Runtime, zeigt Extras → OCR eine klare Installationsanleitung.
-
-## Neu in 0.1.4
-
-- Undo/Redo für PDF-Annotationen und Overlay-Text (Ctrl+Z / Ctrl+Y)  
-- Zoom: Seite/Breite einpassen + Tastaturkürzel (Ctrl+0 / Ctrl+9 / Ctrl+1)  
-- Zuletzt geöffnete Dateien (Menü + Sidebar)  
-- Drucken (Qt) für Editor und PDF-Seite  
-- Klarerer Lizenz-Status in der Statusleiste; About 0.1.4  
-
-## Neu in 0.1.3
-
-- Text-Overlay-Editor (Sidecar v3) + optional Einbrennen  
-- Formen (Rechteck/Linie/Pfeil) + Lineal/Messung  
-- Editor-Export HTML/DOCX/PDF  
-- Installer: Desktop- und Startmenü-Hinweise  
-- `examples/ild_pdf_demo.py` + erweiterte API-Doku  
-
-## Build (Windows, eine Zeile)
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
+```bat
+pip install -r requirements.txt
+run.bat
 ```
-
-Erzeugt per PyInstaller `dist/InstantLensDoc/` und `dist/InstantLensKeygen/`. Optional Inno: `installer/build-installer.ps1`.
 
 ## Sync (Windows)
 
@@ -61,6 +28,23 @@ Erzeugt per PyInstaller `dist/InstantLensDoc/` und `dist/InstantLensKeygen/`. Op
 powershell -ExecutionPolicy Bypass -File "D:\AI_Temp\sync-ild.ps1"
 ```
 
-## Auskoppelbares PDF-Modul
+## Build
 
-Siehe `ild_pdf/README.md` und `examples/ild_pdf_demo.py`.
+```powershell
+powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
+```
+
+## Neu in 0.1.5
+
+- PDF Signaturfeld + Signatur (Bild einfügen)  
+- OCR Tabellen-Export (Heuristik)  
+- Dark/Light Theme, Autosave, Drag-Drop  
+- Tesseract-Install-Hinweis mit Link  
+
+## Neu in 0.1.4
+
+- Undo/Redo für Annotationen und Overlay-Text  
+- Zoom: Seite/Breite einpassen + Shortcuts  
+- Zuletzt geöffnete Dateien (Menü + Sidebar)  
+- Drucken (Qt) für Editor und PDF-Seite  
+- Klarerer Lizenz-Status; About 0.1.4  

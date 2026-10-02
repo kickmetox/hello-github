@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Smoke-Test 0.1.4 (CLI + optional offscreen Qt)."""
+"""Smoke-Test 0.1.5 (CLI + optional offscreen Qt)."""
 
 from __future__ import annotations
 
@@ -25,6 +25,8 @@ def main() -> int:
         extract_text_blocks,
         import_page_text_as_overlays,
         insert_image_as_page,
+        insert_signature_field,
+        insert_signature_image,
         render_page,
         __version__ as ild_ver,
     )
@@ -40,8 +42,8 @@ def main() -> int:
     from instantlensdoc.core import recent as recent_mod
     from instantlensdoc.license import KEY_DAYS, TRIAL_DAYS, generate_key, verify_key
 
-    assert __version__ == "0.1.4", __version__
-    assert ild_ver == "0.1.4", ild_ver
+    assert __version__ == "0.1.5", __version__
+    assert ild_ver == "0.1.5", ild_ver
     assert TRIAL_DAYS == 28 and KEY_DAYS == 32
     key = generate_key("ame@sellerbach.de")
     ok, msg, _ = verify_key(key)
@@ -320,12 +322,25 @@ def main() -> int:
         # Installer-Hinweis vorhanden
         assert (ROOT / "installer" / "installer-hinweis.txt").exists()
         iss = (ROOT / "installer" / "instantlensdoc.iss").read_text(encoding="utf-8")
-        assert "0.1.4" in iss and "desktopicon" in iss and "DisableProgramGroupPage=no" in iss
+        assert "0.1.5" in iss and "desktopicon" in iss and "DisableProgramGroupPage=no" in iss
 
         # Beispielskript vorhanden
         assert (ROOT / "examples" / "ild_pdf_demo.py").exists()
-        assert "0.1.4" in (ROOT / "INFO.md").read_text(encoding="utf-8")
-        assert "Undo" in (ROOT / "FEATURES.md").read_text(encoding="utf-8")
+        assert "0.1.5" in (ROOT / "INFO.md").read_text(encoding="utf-8")
+        assert "Signatur" in (ROOT / "FEATURES.md").read_text(encoding="utf-8")
+
+        # Signaturfeld + Bild-Signatur
+        insert_signature_field(pdf, 0, x=50, y=50, label="Test")
+        insert_signature_image(pdf, Image.new("RGBA", (80, 30), (0, 0, 0, 0)), 0, x=60, y=120)
+        store_sig = AnnotationStore(pdf)
+        types = {a.type for a in store_sig.annotations}
+        assert AnnotationType.SIGNATURE_FIELD in types
+        assert AnnotationType.SIGNATURE in types
+
+        # OCR Tabellen-Format (ohne Runtime ok)
+        tbl = ocr_mod.format_text_as_table([["A", "B"], ["1", "2"]])
+        assert "| A" in tbl and "| 1" in tbl
+        assert ocr_mod.TESSERACT_WIKI_URL.startswith("https://")
 
     if os.environ.get("ILD_SMOKE_QT", "1") == "1":
         os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
@@ -351,7 +366,14 @@ def main() -> int:
         assert len(win.layout_doc.text_frames) >= 2
         # Lizenz-Label vorhanden
         assert "Lizenz:" in win.license_label.text()
-        assert "v0.1.4" in win.version_label.text()
+        assert "v0.1.5" in win.version_label.text()
+        from instantlensdoc.ui.theme import load_theme_mode, toggle_theme
+
+        mode_before = load_theme_mode()
+        mode_after = toggle_theme(win)
+        assert mode_after != mode_before or mode_before in ("light", "dark")
+        toggle_theme(win)  # zurück
+        assert win.acceptDrops()
         # Export-Menü-Pfad (ohne Dialog): direkt core.export
         from instantlensdoc.core.export import export_html as eh
 
