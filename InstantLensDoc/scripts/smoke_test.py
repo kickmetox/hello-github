@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Smoke-Test (CLI + optional offscreen Qt)."""
+"""Smoke-Test 0.1.3 (CLI + optional offscreen Qt)."""
 
 from __future__ import annotations
 
@@ -20,21 +20,27 @@ def main() -> int:
         AnnotationStore,
         AnnotationType,
         PdfDocument,
+        bake_text_overlays,
         extract_page_image,
+        extract_text_blocks,
+        import_page_text_as_overlays,
         insert_image_as_page,
         render_page,
+        __version__ as ild_ver,
     )
     from ild_pdf.pages import reorder_pages, rotate_page
     from instantlensdoc import __version__
     from instantlensdoc.config import icon_path, icon_paths_for_qt
     from instantlensdoc.core.documents import open_document, save_document
-    from instantlensdoc.core.forms import FieldType, FormDefinition, FormField, export_html, export_pdf_form
+    from instantlensdoc.core.export import export_docx, export_html, export_pdf
+    from instantlensdoc.core.forms import FieldType, FormDefinition, FormField, export_html as form_html, export_pdf_form
     from instantlensdoc.core.layout import LayoutDocument
     from instantlensdoc.core import ocr as ocr_mod
     from instantlensdoc.core.ocr import LANG_PRESETS, OcrOutputMode
     from instantlensdoc.license import KEY_DAYS, TRIAL_DAYS, generate_key, verify_key
 
-    assert __version__ == "0.1.2", __version__
+    assert __version__ == "0.1.3", __version__
+    assert ild_ver == "0.1.3", ild_ver
     assert TRIAL_DAYS == 28 and KEY_DAYS == 32
     key = generate_key("ame@sellerbach.de")
     ok, msg, _ = verify_key(key)
@@ -57,18 +63,30 @@ def main() -> int:
         Image.new("RGB", (200, 200), "white").save(p1, "PDF")
         Image.new("RGB", (200, 200), "gray").save(p2, "PDF")
         import pikepdf
+        from pikepdf import Dictionary, Name, Stream
 
+        # PDF mit sichtbarem Text für Overlay-Extraktion
         with pikepdf.Pdf.new() as out:
             for src in (p1, p2):
                 with pikepdf.open(src) as src_pdf:
                     out.pages.append(src_pdf.pages[0])
+            # Text auf Seite 0 einfügen
+            page = out.pages[0]
+            font = Dictionary(Type=Name.Font, Subtype=Name.Type1, BaseFont=Name.Helvetica)
+            page[Name.Resources] = Dictionary(Font=Dictionary(F1=font))
+            content = b"BT /F1 18 Tf 50 150 Td (Hello InstantLens Overlay) Tj ET"
+            if Name.Contents in page:
+                existing = page[Name.Contents]
+                page[Name.Contents] = pikepdf.Array([existing, Stream(out, content)])
+            else:
+                page[Name.Contents] = Stream(out, content)
             out.save(pdf)
 
         with PdfDocument(pdf) as doc:
             assert len(doc) == 2
         render_page(pdf, 0)
 
-        # Annotation Persistenz v2 + Stempel/Callout
+        # Annotation Persistenz v3 + Formen/Messung/Overlay
         store = AnnotationStore(pdf)
         store.add(Annotation(0, AnnotationType.HIGHLIGHT, 10, 10, text="mark"))
         store.add(Annotation(1, AnnotationType.STICKY, 20, 20, text="note"))
@@ -84,14 +102,85 @@ def main() -> int:
                 callout_y=120,
             )
         )
+        store.add(
+            Annotation(
+                0,
+                AnnotationType.RECTANGLE,
+                15,
+                15,
+                width=60,
+                height=40,
+                color="#27AE60",
+            )
+        )
+        store.add(
+            Annotation(
+                0,
+                AnnotationType.LINE,
+                10,
+                10,
+                callout_x=90,
+                callout_y=50,
+                color="#2C3E50",
+            )
+        )
+        store.add(
+            Annotation(
+                0,
+                AnnotationType.ARROW,
+                20,
+                80,
+                callout_x=100,
+                callout_y=40,
+                color="#8E44AD",
+            )
+        )
+        meas = Annotation(
+            0,
+            AnnotationType.MEASURE,
+            5,
+            5,
+            callout_x=5 + 72 * 1.5,  # ~72pt bei scale 1.5
+            callout_y=5,
+            color="#E67E22",
+        )
+        meas.text = meas.measure_label(scale=1.5)
+        store.add(meas)
+        store.add(
+            Annotation(
+                0,
+                AnnotationType.TEXT_OVERLAY,
+                40,
+                40,
+                width=180,
+                height=28,
+                text="Overlay-Edit",
+                font_size=14,
+                color="#1A5276",
+            )
+        )
         sid = store.save(force=True)
         assert sid.exists()
         raw = sid.read_text(encoding="utf-8")
-        assert '"version": 2' in raw
+        assert '"version": 3' in raw
         store2 = AnnotationStore(pdf)
-        assert len(store2.annotations) == 4
+        assert len(store2.annotations) == 9
         types = {a.type for a in store2.annotations}
         assert AnnotationType.STAMP in types and AnnotationType.CALLOUT in types
+        assert AnnotationType.RECTANGLE in types and AnnotationType.MEASURE in types
+        assert AnnotationType.TEXT_OVERLAY in types
+        assert store2.update(store2.annotations[-1].id, text="Overlay-Updated")
+        assert store2.get(store2.annotations[-1].id).text == "Overlay-Updated"
+
+        # Textblöcke + Import + Bake
+        blocks = extract_text_blocks(pdf, 0)
+        assert isinstance(blocks, list)
+        print(f"Textblöcke Seite 0: {len(blocks)}")
+        created = import_page_text_as_overlays(store2, pdf, 0, scale=1.5)
+        assert isinstance(created, list)
+        store2.save(force=True)
+        bake_text_overlays(pdf, store2, scale=1.5, out_path=td / "baked.pdf")
+        assert (td / "baked.pdf").exists()
 
         # Bild-Hooks
         img_out = extract_page_image(pdf, 0, td / "seite.png", scale=1.0)
@@ -132,20 +221,40 @@ def main() -> int:
         form.save(def_path)
         form2 = FormDefinition.load(def_path)
         assert form2.title == "F" and len(form2.fields) == 6
-        export_html(form2, td / "f.html")
+        form_html(form2, td / "f.html")
         export_pdf_form(form2, td / "f.pdf")
         assert (td / "f.html").exists() and (td / "f.pdf").exists()
         html = (td / "f.html").read_text(encoding="utf-8")
         assert "type='email'" in html and "sig" in html
 
-        # OCR searchable image ohne Tesseract: nur make_ wenn verfügbar
+        # Editor-Export HTML/DOCX/PDF
+        sample = "# Titel\n\nAbsatz eins.\n\n## Unter\n\n- Punkt A\n- Punkt B\n"
+        export_html(sample, td / "e.html", title="ExportTest")
+        export_docx(sample, td / "e.docx", title="ExportTest")
+        export_pdf(sample, td / "e.pdf", title="ExportTest")
+        assert (td / "e.html").exists() and "<h1>" in (td / "e.html").read_text(encoding="utf-8")
+        assert (td / "e.docx").exists() and (td / "e.pdf").stat().st_size > 100
+        with PdfDocument(td / "e.pdf") as doc:
+            assert len(doc) >= 1
+
+        # save_document HTML/DOCX Pfad
+        txt = td / "a.txt"
+        txt.write_text("hello InstantLens Suche", encoding="utf-8")
+        doc = open_document(txt)
+        doc.text = "# Hello\n\nWelt export"
+        save_document(doc, td / "out.html")
+        assert "<h1>" in (td / "out.html").read_text(encoding="utf-8")
+        doc.text = "# Docx\n\nInhalt"
+        save_document(doc, td / "out.docx")
+        assert (td / "out.docx").exists()
+
+        # OCR searchable image ohne Tesseract
         if ok_ocr:
-            sample = td / "ocr.png"
-            Image.new("RGB", (200, 60), "white").save(sample)
-            # darf scheitern wenn kein Text — trotzdem Modus testen
+            sample_img = td / "ocr.png"
+            Image.new("RGB", (200, 60), "white").save(sample_img)
             try:
                 r = ocr_mod.run_ocr(
-                    sample,
+                    sample_img,
                     lang="eng",
                     mode=OcrOutputMode.SEARCHABLE_IMAGE,
                     out_dir=td,
@@ -156,17 +265,18 @@ def main() -> int:
             except Exception as e:
                 print(f"OCR run (optional): {e}")
         else:
-            # Sidecar-Logik ohne Runtime: make_searchable mit Dummy-Text
-            sample = td / "ocr.png"
-            Image.new("RGB", (200, 60), "white").save(sample)
-            pdf_s, side = ocr_mod.make_searchable_image_pdf(sample, "dummy text", td / "s.pdf")
+            sample_img = td / "ocr.png"
+            Image.new("RGB", (200, 60), "white").save(sample_img)
+            pdf_s, side = ocr_mod.make_searchable_image_pdf(sample_img, "dummy text", td / "s.pdf")
             assert pdf_s.exists() and side.exists()
 
-        txt = td / "a.txt"
-        txt.write_text("hello InstantLens Suche", encoding="utf-8")
-        doc = open_document(txt)
-        doc.text = "hello InstantLens Suche markieren"
-        save_document(doc)
+        # Installer-Hinweis vorhanden
+        assert (ROOT / "installer" / "installer-hinweis.txt").exists()
+        iss = (ROOT / "installer" / "instantlensdoc.iss").read_text(encoding="utf-8")
+        assert "0.1.3" in iss and "desktopicon" in iss and "DisableProgramGroupPage=no" in iss
+
+        # Beispielskript vorhanden
+        assert (ROOT / "examples" / "ild_pdf_demo.py").exists()
 
     if os.environ.get("ILD_SMOKE_QT", "1") == "1":
         os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
@@ -188,9 +298,14 @@ def main() -> int:
         cur.movePosition(QTextCursor.End, QTextCursor.KeepAnchor)
         win.editor.setTextCursor(cur)
         assert win.editor.highlight_selection()
-        # Verkettete Rahmen
         win._add_chained_frame()
         assert len(win.layout_doc.text_frames) >= 2
+        # Export-Menü-Pfad (ohne Dialog): direkt core.export
+        from instantlensdoc.core.export import export_html as eh
+
+        eh(win.editor.toPlainText(), ROOT / ".smoke_export.html", title="smoke")
+        assert (ROOT / ".smoke_export.html").exists()
+        (ROOT / ".smoke_export.html").unlink(missing_ok=True)
         win.close()
         print("Qt: OK")
 

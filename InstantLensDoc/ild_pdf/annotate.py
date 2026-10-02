@@ -1,8 +1,9 @@
-"""Basis-Annotationen inkl. Stempel/Callout; Sidecar-Persistenz."""
+"""Basis-Annotationen inkl. Stempel/Callout/Formen/Messung/Text-Overlay; Sidecar-Persistenz."""
 
 from __future__ import annotations
 
 import json
+import math
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
@@ -10,7 +11,7 @@ from pathlib import Path
 from typing import List, Optional
 from uuid import uuid4
 
-SIDECAR_VERSION = 2
+SIDECAR_VERSION = 3
 
 
 class AnnotationType(str, Enum):
@@ -20,6 +21,11 @@ class AnnotationType(str, Enum):
     TEXT = "text"
     STAMP = "stamp"
     CALLOUT = "callout"
+    RECTANGLE = "rectangle"
+    LINE = "line"
+    ARROW = "arrow"
+    MEASURE = "measure"
+    TEXT_OVERLAY = "text_overlay"
 
 
 # Vordefinierte Stempel-Texte (UI kann erweitern)
@@ -30,6 +36,17 @@ STAMP_PRESETS = (
     "VERTRAULICH",
     "KOPIE",
     "ERLEDIGT",
+)
+
+# Werkzeuge die per Drag (Press→Release) gezeichnet werden
+DRAG_TYPES = frozenset(
+    {
+        AnnotationType.RECTANGLE,
+        AnnotationType.LINE,
+        AnnotationType.ARROW,
+        AnnotationType.MEASURE,
+        AnnotationType.HIGHLIGHT,
+    }
 )
 
 
@@ -43,9 +60,10 @@ class Annotation:
     height: float = 24.0
     text: str = ""
     color: str = "#FFFF00"
-    # Callout: Zielpunkt der Linie (relativ zur Seite/Pixel)
+    # Callout / Linie / Pfeil / Messung: zweiter Punkt
     callout_x: float = 0.0
     callout_y: float = 0.0
+    font_size: float = 12.0
     id: str = field(default_factory=lambda: uuid4().hex)
     created: str = field(
         default_factory=lambda: datetime.now(timezone.utc).isoformat(timespec="seconds")
@@ -57,6 +75,26 @@ class Annotation:
     def touch(self) -> None:
         self.modified = datetime.now(timezone.utc).isoformat(timespec="seconds")
 
+    def end_point(self) -> tuple[float, float]:
+        """Endpunkt für Linien-artige Annotationen."""
+        if self.callout_x or self.callout_y:
+            return float(self.callout_x), float(self.callout_y)
+        return float(self.x + self.width), float(self.y + self.height)
+
+    def length_px(self) -> float:
+        x2, y2 = self.end_point()
+        return math.hypot(x2 - self.x, y2 - self.y)
+
+    def measure_label(self, scale: float = 1.0, unit: str = "pt") -> str:
+        """Distanzlabel: Pixel → PDF-Punkte (bei bekanntem Render-Scale)."""
+        px = self.length_px()
+        pts = px / max(scale, 0.01)
+        if unit == "mm":
+            return f"{pts * 25.4 / 72:.1f} mm"
+        if unit == "px":
+            return f"{px:.0f} px"
+        return f"{pts:.1f} pt"
+
     def to_dict(self) -> dict:
         d = asdict(self)
         d["type"] = self.type.value
@@ -66,12 +104,11 @@ class Annotation:
     def from_dict(cls, data: dict) -> "Annotation":
         data = dict(data)
         data["type"] = AnnotationType(data["type"])
-        # Abwärtskompatibel: alte Sidecars ohne neue Felder
         data.setdefault("callout_x", 0.0)
         data.setdefault("callout_y", 0.0)
+        data.setdefault("font_size", 12.0)
         data.setdefault("created", datetime.now(timezone.utc).isoformat(timespec="seconds"))
         data.setdefault("modified", data["created"])
-        # Unbekannte Keys verwerfen
         known = {f.name for f in cls.__dataclass_fields__.values()}  # type: ignore[attr-defined]
         data = {k: v for k, v in data.items() if k in known}
         return cls(**data)
@@ -99,6 +136,12 @@ class AnnotationStore:
         self.dirty = True
         return ann
 
+    def get(self, ann_id: str) -> Optional[Annotation]:
+        for a in self.annotations:
+            if a.id == ann_id:
+                return a
+        return None
+
     def update(self, ann_id: str, **kwargs) -> Optional[Annotation]:
         for a in self.annotations:
             if a.id == ann_id:
@@ -120,6 +163,16 @@ class AnnotationStore:
 
     def for_page(self, page: int) -> List[Annotation]:
         return [a for a in self.annotations if a.page == page]
+
+    def text_overlays(self, page: int | None = None) -> List[Annotation]:
+        items = [
+            a
+            for a in self.annotations
+            if a.type in (AnnotationType.TEXT_OVERLAY, AnnotationType.TEXT)
+        ]
+        if page is not None:
+            items = [a for a in items if a.page == page]
+        return items
 
     def remap_pages(self, mapping: dict[int, int]) -> None:
         """Seitenindizes nach reorder/delete anpassen; fehlende Keys = Seite entfernt."""

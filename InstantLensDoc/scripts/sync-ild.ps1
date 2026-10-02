@@ -6,14 +6,14 @@
 #   powershell -ExecutionPolicy Bypass -File .\sync-ild.ps1
 #
 # Optionen:
-#   -Branch cursor/instantlensdoc-30dc
+#   -Branch cursor/instantlensdoc-2108
 #   -LocalPack C:\path\to\InstantLensDoc
 #   -NoStart
 #   -SkipPip
 
 param(
     [string]$Destination = "D:\AI_Temp\InstantLensDoc",
-    [string]$Branch = "cursor/instantlensdoc-30dc",
+    [string]$Branch = "cursor/instantlensdoc-2108",
     [string]$RepoUrl = "https://github.com/kickmetox/hello-github.git",
     [string]$LocalPack = "",
     [string]$WorkDir = "D:\AI_Temp\InstantLensDoc-src",

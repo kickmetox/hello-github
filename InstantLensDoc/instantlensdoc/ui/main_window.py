@@ -109,6 +109,15 @@ class MainWindow(QMainWindow):
         act_save_as = QAction("Speichern unter…", self)
         act_save_as.triggered.connect(self.save_as)
         m_file.addAction(act_save_as)
+        m_export = m_file.addMenu("Exportieren")
+        for title, fmt in [
+            ("Als HTML…", "html"),
+            ("Als DOCX…", "docx"),
+            ("Als PDF…", "pdf"),
+        ]:
+            a = QAction(title, self)
+            a.triggered.connect(lambda checked=False, f=fmt: self._export_editor(f))
+            m_export.addAction(a)
         m_file.addSeparator()
         act_quit = QAction("Beenden", self)
         act_quit.setShortcut(QKeySequence.Quit)
@@ -155,6 +164,8 @@ class MainWindow(QMainWindow):
             ("Seiten neu anordnen…", lambda: self.pdf_view.reorder_dialog()),
             ("Seite als Bild extrahieren…", lambda: self.pdf_view.extract_page_as_image()),
             ("Bild als neue Seite…", lambda: self.pdf_view.insert_image_page()),
+            ("PDF-Text → Overlay…", lambda: self.pdf_view.import_text_overlays()),
+            ("Text-Overlays einbrennen…", lambda: self.pdf_view.bake_overlays()),
         ]:
             a = QAction(title, self)
             a.triggered.connect(slot)
@@ -397,6 +408,49 @@ class MainWindow(QMainWindow):
             self._set_status(f"Gespeichert: {path}")
         except Exception as e:
             QMessageBox.critical(self, "Speichern", str(e))
+
+    def _export_editor(self, fmt: str):
+        """Editor-Inhalt nach HTML / DOCX / PDF exportieren."""
+        text = ""
+        title = "InstantLens Doc"
+        if self.stack.currentWidget() is self.editor:
+            text = self.editor.toPlainText()
+            if self.doc:
+                title = self.doc.title or self.doc.display_name
+        elif self.doc and self.doc.kind in (DocKind.TEXT, DocKind.MARKDOWN, DocKind.HTML, DocKind.DOCX):
+            text = self.doc.text or self.editor.toPlainText()
+            title = self.doc.display_name
+        else:
+            QMessageBox.information(
+                self,
+                "Export",
+                "Export gilt für den Texteditor.\nBitte TXT/MD/HTML/DOCX öffnen oder Text eingeben.",
+            )
+            return
+        filters = {
+            "html": ("HTML (*.html)", ".html"),
+            "docx": ("DOCX (*.docx)", ".docx"),
+            "pdf": ("PDF (*.pdf)", ".pdf"),
+        }
+        filt, ext = filters[fmt]
+        default = (self.doc.display_name if self.doc else "export") + ext
+        if "." in default and not default.lower().endswith(ext):
+            default = Path(default).stem + ext
+        path, _ = QFileDialog.getSaveFileName(self, f"Export {fmt.upper()}", default, filt)
+        if not path:
+            return
+        try:
+            from instantlensdoc.core import export as exp
+
+            if fmt == "html":
+                exp.export_html(text, path, title=title)
+            elif fmt == "docx":
+                exp.export_docx(text, path, title=title)
+            else:
+                exp.export_pdf(text, path, title=title)
+            self._set_status(f"Exportiert: {path}")
+        except Exception as e:
+            QMessageBox.critical(self, "Export", str(e))
 
     def _add_text_frame(self):
         text = self.editor.toPlainText() if self.stack.currentWidget() is self.editor else ""

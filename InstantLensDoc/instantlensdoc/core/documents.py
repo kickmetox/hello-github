@@ -84,15 +84,17 @@ def save_document(doc: Document, path: Optional[Path] = None) -> Path:
     kind = detect_kind(target) if path else doc.kind
 
     if kind == DocKind.DOCX:
-        try:
-            from docx import Document as DocxDocument
+        from instantlensdoc.core.export import export_docx
 
-            d = DocxDocument()
-            for line in doc.text.splitlines() or [""]:
-                d.add_paragraph(line)
-            d.save(str(target))
-        except ImportError as e:
-            raise RuntimeError("python-docx fehlt zum Speichern von DOCX") from e
+        export_docx(doc.text, target, title=doc.title)
+    elif kind == DocKind.HTML:
+        stripped = (doc.text or "").lstrip().lower()
+        if stripped.startswith("<!doctype") or stripped.startswith("<html"):
+            target.write_text(doc.text, encoding="utf-8")
+        else:
+            from instantlensdoc.core.export import export_html
+
+            export_html(doc.text, target, title=doc.title or target.stem)
     elif kind == DocKind.PDF:
         # PDF-Inhalt wird über Annotation-Sidecar / pikepdf verwaltet
         if doc.path and doc.path.resolve() != target.resolve():

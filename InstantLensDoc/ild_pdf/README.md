@@ -1,41 +1,49 @@
 # ild_pdf — auskoppelbares PDF-Modul
 
-Lizenzfreundliche PDF-Engine auf **pypdfium2 / PDFium** (kein Poppler/GPL).
+Lizenzfreundliche PDF-Engine auf **pypdfium2 / PDFium** (kein Poppler/GPL).  
+Version **0.1.3**.
 
 ## Installation
 
 ```bash
 pip install pypdfium2 Pillow pikepdf
-# Modul-Pfad zum Python-Path hinzufügen oder InstantLensDoc als Root nutzen
+# Modul-Pfad: InstantLensDoc-Root auf PYTHONPATH oder:
+cd InstantLensDoc && python -c "import ild_pdf; print(ild_pdf.__version__)"
 ```
 
 ## Schnellstart
 
 ```python
-from pathlib import Path
-from ild_pdf import PdfDocument, render_page, Annotation, AnnotationStore, AnnotationType
-from ild_pdf import rotate_page, delete_pages, reorder_pages
-from ild_pdf import extract_page_image, insert_image_as_page
+from ild_pdf import (
+    PdfDocument, render_page,
+    Annotation, AnnotationStore, AnnotationType,
+    rotate_page, delete_pages, reorder_pages,
+    extract_page_image, insert_image_as_page,
+    extract_text_blocks, import_page_text_as_overlays, bake_text_overlays,
+)
 
-# Rendern
 img = render_page("dokument.pdf", page_index=0, scale=2.0)
 img.save("seite0.png")
 
-# Annotationen (Sidecar JSON v2 neben dem PDF)
 store = AnnotationStore("dokument.pdf")
-store.add(Annotation(page=0, type=AnnotationType.HIGHLIGHT, x=40, y=100, width=200, text="Wichtig"))
-store.add(Annotation(page=0, type=AnnotationType.STAMP, x=200, y=40, width=120, height=40, text="GEPRÜFT"))
-store.add(Annotation(page=0, type=AnnotationType.CALLOUT, x=100, y=200, text="Hinweis", callout_x=60, callout_y=260))
-store.save()
+store.add(Annotation(0, AnnotationType.HIGHLIGHT, 40, 100, width=200, text="Wichtig"))
+store.add(Annotation(0, AnnotationType.RECTANGLE, 50, 150, width=80, height=40, color="#27AE60"))
+store.add(Annotation(0, AnnotationType.ARROW, 60, 200, callout_x=160, callout_y=120, color="#8E44AD"))
+store.add(Annotation(0, AnnotationType.MEASURE, 20, 250, callout_x=200, callout_y=250, text="Messung"))
+store.add(Annotation(0, AnnotationType.TEXT_OVERLAY, 40, 40, width=180, height=28, text="Editierbar", font_size=14))
+store.save()  # → dokument.pdf.ildann.json (Sidecar v3)
 
-# Bild-Hooks
-extract_page_image("dokument.pdf", 0, "seite0.png")
-insert_image_as_page("dokument.pdf", "foto.jpg")
+# PDF-Text → Overlay (nicht natives Editieren — Overlay-Editor)
+blocks = extract_text_blocks("dokument.pdf", 0)
+import_page_text_as_overlays(store, "dokument.pdf", 0, scale=1.5)
+bake_text_overlays("dokument.pdf", store, scale=1.5)  # Helvetica-Content ergänzen
+```
 
-# Seitenoperationen
-rotate_page("dokument.pdf", 0, 90)
-# delete_pages("dokument.pdf", [2])
-# reorder_pages("dokument.pdf", [1, 0, 2])
+## Beispielskript
+
+```bash
+python examples/ild_pdf_demo.py
+python examples/ild_pdf_demo.py pfad/zu/datei.pdf
 ```
 
 ## API
@@ -44,11 +52,44 @@ rotate_page("dokument.pdf", 0, 90)
 |--------|--------|
 | `PdfDocument` | Öffnen / Seitenzahl / Größe |
 | `render_page` / `render_pages` | Seite(n) → PIL.Image |
-| `convert_from_path` | pdf2image-ähnlicher Drop-in |
-| `Annotation` / `AnnotationStore` | Highlight, Underline, Sticky, Text, Stempel, Callout |
+| `convert_from_path` | pdf2image-ähnlicher Drop-in (`ild_pdf.render`) |
+| `Annotation` / `AnnotationStore` | Sidecar `*.ildann.json` **v3** |
+| `AnnotationType` | highlight, underline, sticky, text, stamp, callout, **rectangle, line, arrow, measure, text_overlay** |
+| `DRAG_TYPES` | Typen für Drag-Zeichnung (UI) |
+| `STAMP_PRESETS` | Stempel-Texte |
+| `extract_text_blocks` | Sichtbaren Text grob als Blöcke lesen |
+| `import_page_text_as_overlays` | Blöcke → `TEXT_OVERLAY` im Store |
+| `bake_text_overlays` | Overlays als PDF-Content (Helvetica) einbrennen |
 | `extract_page_image` / `insert_image_as_page` | Seite↔Bild |
 | `extract_embedded_images` / `insert_image_stamp_overlay` | Extraktion / Stempel-Hook |
 | `rotate_page` / `delete_pages` / `reorder_pages` | pikepdf-Seitenops |
+
+### Sidecar-Schema (Auszug)
+
+```json
+{
+  "version": 3,
+  "pdf": "dokument.pdf",
+  "annotations": [
+    {
+      "page": 0,
+      "type": "text_overlay",
+      "x": 40, "y": 40, "width": 180, "height": 28,
+      "text": "Editierbar",
+      "font_size": 14,
+      "color": "#1A5276"
+    }
+  ]
+}
+```
+
+Koordinaten: Render-Pixel bei dem Scale, mit dem die UI/Overlays erzeugt wurden (Standard oft 1.5).  
+Linien/Pfeile/Messung: Start `(x,y)`, Ende `(callout_x, callout_y)`.
+
+### Hinweis Textbearbeitung
+
+Echtes natives PDF-Text-Rewrite ist mit pypdfium2/pikepdf nicht zuverlässig möglich.  
+InstantLens Doc nutzt deshalb einen **Overlay-Editor** (Sidecar) und optional `bake_text_overlays`.
 
 ## Hinweis Poppler
 

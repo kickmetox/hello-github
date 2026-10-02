@@ -3,7 +3,7 @@
 Moderne Textverarbeitung mit PDF-Annotator, Layout-Basics, OCR-Bridge und Formulargenerator.
 
 **Hersteller:** Andreas Meyer · ame@sellerbach.de  
-**Version:** 0.1.2  
+**Version:** 0.1.3  
 **PDF-Engine:** pypdfium2 / PDFium (lizenzfreundlich — **kein** Poppler/GPL als Standard)
 
 ## Zielordner (Windows)
@@ -68,6 +68,7 @@ powershell -ExecutionPolicy Bypass -File .\installer\build-installer.ps1
 |------|--------|
 | `instantlensdoc/` | Desktop-App (PySide6) |
 | `ild_pdf/` | Auskoppelbares PDF-Modul |
+| `examples/ild_pdf_demo.py` | API-Beispiel für andere Programme |
 | `keygen/` | Separater Keygenerator |
 | `build-windows.ps1` | PyInstaller App + Keygen |
 | `run-keygen.bat` | Keygen-Start Windows |

@@ -1,0 +1,9 @@
+InstantLens Doc — Installation
+
+Startmenü: Gruppe „InstantLens Doc“ mit Programm, Keygenerator und INFO.md.
+Desktop: Verknüpfung (falls bei der Installation gewählt — Standard: ja).
+
+Nach dem Sync/Update aus dem Entwicklerordner:
+  powershell -ExecutionPolicy Bypass -File "D:\AI_Temp\sync-ild.ps1"
+
+Lizenz: Trial 28 Tage; Keys 32 Tage (30+2) — ame@sellerbach.de
