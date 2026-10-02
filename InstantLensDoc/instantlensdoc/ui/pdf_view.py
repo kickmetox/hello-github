@@ -4704,8 +4704,13 @@ class PdfViewer(QWidget):
         self.status.emit(f"Kopiert ({len(text)} Z.): {preview}")
         return True
 
-    def sticky_from_text_selection(self, *, edit: bool = True) -> bool:
-        """Auswahl → Sticky/Notiz mit vorausgefülltem Text (optional Dialog zum Anpassen)."""
+    def sticky_from_text_selection(
+        self,
+        *,
+        edit: bool = True,
+        with_highlight: bool | None = None,
+    ) -> bool:
+        """Auswahl → Sticky/Notiz; optional zusätzlich Highlight (Checkbox / Setting)."""
         if not self.store or not self.pdf_path:
             self.status.emit("Notiz aus Auswahl nur bei geöffnetem PDF")
             return False
@@ -4719,19 +4724,69 @@ class PdfViewer(QWidget):
             rx, ry, rw, rh = self._text_selection_rects[0]
             x = float(rx)
             y = float(ry) + max(float(rh), 8.0) + 4.0
+        from instantlensdoc.core.app_settings import (
+            get_selection_note_with_highlight,
+            set_selection_note_with_highlight,
+        )
+
+        also_hl = (
+            bool(with_highlight)
+            if with_highlight is not None
+            else bool(get_selection_note_with_highlight())
+        )
         if edit:
-            text, ok = QInputDialog.getMultiLineText(
-                self,
-                "Notiz aus Auswahl",
-                "Inhalt (vorausgefüllt aus Textauswahl):",
-                text,
+            from PySide6.QtWidgets import QCheckBox, QDialog, QDialogButtonBox, QVBoxLayout
+
+            dlg = QDialog(self)
+            dlg.setWindowTitle("Notiz aus Auswahl")
+            lay = QVBoxLayout(dlg)
+            lay.addWidget(QLabel("Inhalt (vorausgefüllt aus Textauswahl):"))
+            edit_box = QPlainTextEdit()
+            edit_box.setPlainText(text)
+            edit_box.setMinimumHeight(120)
+            lay.addWidget(edit_box)
+            chk = QCheckBox("Zusätzlich Highlight aus Auswahl anlegen")
+            chk.setChecked(also_hl)
+            chk.setToolTip(
+                "In einem Schritt Sticky/Notiz und Text-Highlight speichern (Einstellung bleibt erhalten)"
             )
-            if not ok:
+            lay.addWidget(chk)
+            buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+            buttons.accepted.connect(dlg.accept)
+            buttons.rejected.connect(dlg.reject)
+            lay.addWidget(buttons)
+            if dlg.exec() != QDialog.Accepted:
                 return False
-            text = (text or "").strip()
+            text = (edit_box.toPlainText() or "").strip()
+            also_hl = bool(chk.isChecked())
+            set_selection_note_with_highlight(also_hl)
             if not text:
                 self.status.emit("Notiz abgebrochen — leerer Text")
                 return False
+        elif with_highlight is None:
+            also_hl = bool(get_selection_note_with_highlight())
+
+        hl_created = False
+        if also_hl and self._text_selection_rects:
+            # Highlight aus gespeicherten Auswahl-Rechtecken
+            with self.store.atomic():
+                for i, (rx, ry, rw, rh) in enumerate(self._text_selection_rects):
+                    snippet = text if i == 0 else ""
+                    self.store.add(
+                        Annotation(
+                            page=page,
+                            type=AnnotationType.HIGHLIGHT,
+                            x=float(rx),
+                            y=float(ry),
+                            width=max(float(rw), 4.0),
+                            height=max(float(rh), 6.0),
+                            color=self._highlight_color,
+                            text=snippet,
+                            opacity=self._default_opacity,
+                        )
+                    )
+            hl_created = True
+
         height = 70.0 if "\n" not in text else min(160.0, 24.0 + 18.0 * (text.count("\n") + 1))
         ann = Annotation(
             page=page,
@@ -4751,7 +4806,10 @@ class PdfViewer(QWidget):
         preview = text.replace("\n", " ")
         if len(preview) > 48:
             preview = preview[:45] + "…"
-        self.status.emit(f"Notiz aus Auswahl: {preview}")
+        if hl_created:
+            self.status.emit(f"Highlight + Notiz aus Auswahl: {preview}")
+        else:
+            self.status.emit(f"Notiz aus Auswahl: {preview}")
         return True
 
     def _on_drag(self, x0: float, y0: float, x1: float, y1: float):

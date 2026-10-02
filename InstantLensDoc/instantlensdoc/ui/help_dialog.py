@@ -101,8 +101,8 @@ HELP_HTML = f"""
     JSON Import mit Schema-v4-Validierung (klare Fehlermeldung);
     <b>Textsuche</b> highlightet Treffer auf der aktuellen Seite;
     Doppelklick / Strg+Klick / <b>Ctrl+E</b> auf Notiz/Overlay zum Bearbeiten;
-    <b>Ctrl+Alt+T</b> Annotation-Tags (frei, Sidebar Multi-Select-Filter);
-    <b>Ctrl+Alt+N</b> Auswahl→Notiz (Sticky vorausgefüllt);
+    <b>Ctrl+Alt+T</b> Annotation-Tags (frei, Sidebar Multi-Select-Filter / Tag-Cloud);
+    <b>Ctrl+Alt+N</b> Auswahl→Notiz (Sticky vorausgefüllt, optional +Highlight);
     <b>Ctrl+Shift+D</b> Auswahl duplizieren; <b>Ctrl+Alt+C/V</b> Annotationen kopieren/einfügen (auch seitenübergreifend);
     Auswahl-Werkzeug: Annotationen per Drag verschieben (wenn nicht gesperrt);
     PDF → Text→Overlay / Overlay einbrennen / <b>Text Seite/alles → Editor</b> /
@@ -122,7 +122,8 @@ HELP_HTML = f"""
     <b>Seiten-Thumbnails</b> in der Sidebar</li>
 <li><b>Datei → Schließen</b>: Speichern-Dialog bei ungespeicherten Änderungen;
     <b>Andere Tabs schließen</b> (Ctrl+Shift+W)</li>
-<li><b>Bearbeiten → Auswahl → Notiz</b> (Ctrl+Alt+N): PDF-Textauswahl als Sticky mit vorausgefülltem Text</li>
+<li><b>Bearbeiten → Auswahl → Notiz</b> (Ctrl+Alt+N): PDF-Textauswahl als Sticky; optional Checkbox zusätzlich Highlight</li>
+<li><b>Ansicht → Fenster teilen (zwei Docs)</b> (Ctrl+\\): horizontal zwei Dokumente; Statusleiste zählt ungespeicherte Tabs</li>
 <li><b>Hilfe → Auf Updates prüfen</b>: lokal immer; Online optional (offline OK)</li>
 <li><b>Hilfe → Über InstantLens Doc</b>: Feature-Kurzliste + Link zu FEATURES.md;
     Datenschutz-Hinweis (lokal, keine Telemetrie, keine Cloud)</li>

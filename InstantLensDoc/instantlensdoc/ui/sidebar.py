@@ -339,6 +339,16 @@ class Sidebar(QWidget):
         self.ann_tag_filter.setMaximumHeight(72)
         self.ann_tag_filter.itemSelectionChanged.connect(self._on_ann_tag_filter_changed)
         layout.addWidget(self.ann_tag_filter)
+        layout.addWidget(QLabel("Tag-Cloud (häufigste)"))
+        self.ann_tag_cloud = QWidget()
+        self.ann_tag_cloud.setObjectName("annTagCloud")
+        self.ann_tag_cloud.setToolTip(
+            "Häufigste Tags — Klick filtert (Multi-Select ODER); aktiver Tag hervorgehoben"
+        )
+        self.ann_tag_cloud_layout = QHBoxLayout(self.ann_tag_cloud)
+        self.ann_tag_cloud_layout.setContentsMargins(0, 2, 0, 2)
+        self.ann_tag_cloud_layout.setSpacing(4)
+        layout.addWidget(self.ann_tag_cloud)
         self.ann_search = QLineEdit()
         self.ann_search.setPlaceholderText("Annotationen suchen… Tag-Vorschläge")
         self.ann_search.setClearButtonEnabled(True)
@@ -876,6 +886,7 @@ class Sidebar(QWidget):
             self.ann_tag_filter.blockSignals(False)
             self._ann_tag_updating = False
         self._apply_annotation_filter()
+        self._update_ann_tag_cloud(getattr(self, "_ann_all_payloads", None))
         self.annotation_tag_filter_changed.emit(self.annotation_filter_tags())
 
     def _on_ann_tag_filter_changed(self, *_args):
@@ -889,6 +900,7 @@ class Sidebar(QWidget):
                 selected.append(s)
         self._ann_tag_filter = selected
         self._apply_annotation_filter()
+        self._update_ann_tag_cloud(getattr(self, "_ann_all_payloads", None))
         self.annotation_tag_filter_changed.emit(self.annotation_filter_tags())
 
     def set_annotation_current_page(self, page_index: int | None):
@@ -1043,6 +1055,72 @@ class Sidebar(QWidget):
         self._ann_tag_filter = kept
         self.ann_tag_filter.blockSignals(False)
         self._ann_tag_updating = False
+        self._update_ann_tag_cloud(payloads)
+
+    def _clear_tag_cloud_buttons(self) -> None:
+        layout = getattr(self, "ann_tag_cloud_layout", None)
+        if layout is None:
+            return
+        while layout.count():
+            item = layout.takeAt(0)
+            w = item.widget()
+            if w is not None:
+                w.deleteLater()
+
+    def _on_tag_cloud_clicked(self, tag: str):
+        """Tag-Cloud-Klick: Tag im Multi-Select umschalten."""
+        current = list(self.annotation_filter_tags())
+        cf = tag.casefold()
+        if any(t.casefold() == cf for t in current):
+            nxt = [t for t in current if t.casefold() != cf]
+        else:
+            nxt = current + [tag]
+        self.set_annotation_tag_filter(nxt)
+
+    def _update_ann_tag_cloud(self, payloads: list | None):
+        """Häufigste Tags als klickbare Chips (max. 10)."""
+        if not hasattr(self, "ann_tag_cloud_layout"):
+            return
+        counts: dict[str, int] = {}
+        labels: dict[str, str] = {}
+        for p in payloads or []:
+            raw = getattr(p, "tags", None) if p is not None else None
+            if not raw:
+                continue
+            for t in raw if isinstance(raw, (list, tuple)) else [raw]:
+                s = str(t).strip()
+                if not s:
+                    continue
+                key = s.casefold()
+                counts[key] = counts.get(key, 0) + 1
+                labels.setdefault(key, s)
+        self._clear_tag_cloud_buttons()
+        if not counts:
+            if hasattr(self, "ann_tag_cloud"):
+                self.ann_tag_cloud.setVisible(False)
+            return
+        if hasattr(self, "ann_tag_cloud"):
+            self.ann_tag_cloud.setVisible(True)
+        active = {t.casefold() for t in self.annotation_filter_tags()}
+        ranked = sorted(counts.keys(), key=lambda k: (-counts[k], labels[k].casefold()))[:10]
+        for key in ranked:
+            tag = labels[key]
+            n = counts[key]
+            btn = QToolButton()
+            btn.setText(f"{tag} · {n}")
+            btn.setToolTip(f"Tag „{tag}“ filtern ({n}×) — Klick schaltet um")
+            btn.setCursor(Qt.PointingHandCursor)
+            btn.setAutoRaise(True)
+            is_on = key in active
+            border = "2px solid #1a5276" if is_on else "1px solid #999"
+            bg = "#d4e6f1" if is_on else "#eee"
+            btn.setStyleSheet(
+                f"QToolButton {{ background: {bg}; border: {border}; border-radius: 3px; "
+                f"padding: 1px 5px; font-size: 10px; }}"
+            )
+            btn.clicked.connect(lambda checked=False, t=tag: self._on_tag_cloud_clicked(t))
+            self.ann_tag_cloud_layout.addWidget(btn)
+        self.ann_tag_cloud_layout.addStretch(1)
 
     def _apply_annotation_filter(self):
         want = self.annotation_filter_type()
@@ -1319,6 +1397,9 @@ class Sidebar(QWidget):
             self.ann_tag_filter.clear()
             self.ann_tag_filter.blockSignals(False)
             self._ann_tag_updating = False
+        self._clear_tag_cloud_buttons()
+        if hasattr(self, "ann_tag_cloud"):
+            self.ann_tag_cloud.setVisible(False)
         if hasattr(self, "_ann_tag_completer_model"):
             self._ann_tag_completer_model.setStringList([])
         self._ann_filter_updating = True

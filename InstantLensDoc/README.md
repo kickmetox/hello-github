@@ -2,7 +2,7 @@
 
 Moderne Textverarbeitung mit PDF-Annotator, OCR-Bridge und Formulargenerator.
 
-**Version:** 0.6.2  
+**Version:** 0.6.3  
 **Hersteller:** Andreas Meyer · ame@sellerbach.de
 
 ## Quickstart (Windows)
@@ -32,8 +32,8 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an).
 
-## Neu in 0.6.2
+## Neu in 0.6.3
 
-Auswahl→Notiz (vorausgefüllt); Tag-Filter Multi-Select; andere Tabs schließen; Sync `-SkipStart` + Exit-Codes. Stubs KI/Cloud/Stylus/3D unverändert.
+Auswahl→Highlight+Notiz (Checkbox); Tag-Cloud Sidebar; Fenster teilen (zwei Docs); Statusleiste ungespeicherte Tabs. Stubs KI/Cloud/Stylus/3D unverändert.
 
 Siehe [CHANGELOG.md](CHANGELOG.md), [FEATURES.md](FEATURES.md) und [INFO.md](INFO.md).

@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
     QStackedWidget,
     QStatusBar,
     QSystemTrayIcon,
+    QVBoxLayout,
     QWidget,
 )
 
@@ -48,6 +49,7 @@ from instantlensdoc.core.app_settings import (
     get_annotations_visible,
     get_autosave_interval_sec,
     get_default_open_dir,
+    get_editor_doc_split,
     get_editor_markdown_preview,
     get_editor_soft_wrap,
     get_last_export_dir,
@@ -109,6 +111,8 @@ class MainWindow(QMainWindow):
         self._force_quit = False
         self._presentation_active = False
         self._presentation_prev: dict | None = None
+        self._unsaved_paths: set[str] = set()
+        self._secondary_path: str | None = None
 
         self.setAcceptDrops(True)
         self.setWindowTitle(self._app_title())
@@ -376,7 +380,29 @@ class MainWindow(QMainWindow):
         self.stack.addWidget(self.editor_pane)  # 0
         self.stack.addWidget(self.pdf_view)  # 1
         self.stack.addWidget(self.image_label)  # 2
-        splitter.addWidget(self.stack)
+        # Horizontaler Doc-Split: Hauptansicht | zweites Dokument
+        self.doc_splitter = QSplitter(Qt.Horizontal)
+        self.doc_splitter.addWidget(self.stack)
+        self.secondary_wrap = QWidget()
+        sec_lay = QVBoxLayout(self.secondary_wrap)
+        sec_lay.setContentsMargins(4, 4, 4, 4)
+        sec_lay.setSpacing(2)
+        self.secondary_title = QLabel("Zweites Dokument")
+        self.secondary_title.setStyleSheet("color: #555; font-size: 11px; padding: 2px 0;")
+        self.secondary_title.setToolTip("Zweites Dokument im geteilten Fenster (nur Anzeige)")
+        sec_lay.addWidget(self.secondary_title)
+        self.secondary_pane = EditorPane()
+        self.secondary_editor = self.secondary_pane.editor
+        self.secondary_editor.setReadOnly(True)
+        # Vorschau aus, ohne globale Markdown-Einstellung zu überschreiben
+        self.secondary_pane._preview_visible = False
+        self.secondary_pane.preview.setVisible(False)
+        sec_lay.addWidget(self.secondary_pane, 1)
+        self.doc_splitter.addWidget(self.secondary_wrap)
+        self.doc_splitter.setStretchFactor(0, 3)
+        self.doc_splitter.setStretchFactor(1, 2)
+        self.secondary_wrap.setVisible(bool(get_editor_doc_split()))
+        splitter.addWidget(self.doc_splitter)
         splitter.setStretchFactor(1, 3)
         root.addWidget(splitter)
 
@@ -404,6 +430,10 @@ class MainWindow(QMainWindow):
         self.word_status_label.setStyleSheet("padding-right: 10px;")
         self.word_status_label.setToolTip("Wörter / Zeichen (Editor)")
         sb.addPermanentWidget(self.word_status_label)
+        self.unsaved_status_label = QLabel("0 ungespeichert")
+        self.unsaved_status_label.setStyleSheet("padding-right: 10px; color: #555;")
+        self.unsaved_status_label.setToolTip("Anzahl ungespeicherter Tabs (aktuell + markierte)")
+        sb.addPermanentWidget(self.unsaved_status_label)
         self.undo_hint_label = QLabel("Ctrl+Z · Letzte Aktion rückgängig")
         self.undo_hint_label.setObjectName("undoHint")
         self.undo_hint_label.setStyleSheet(
@@ -720,7 +750,7 @@ class MainWindow(QMainWindow):
         act_sel_note = QAction("Auswahl → Notiz…", self)
         act_sel_note.setShortcut(QKeySequence("Ctrl+Alt+N"))
         act_sel_note.setToolTip(
-            "PDF-Textauswahl als Sticky/Notiz mit vorausgefülltem Text anlegen"
+            "PDF-Textauswahl als Sticky/Notiz; optional zusätzlich Highlight (Checkbox)"
         )
         act_sel_note.triggered.connect(self._sticky_from_selection)
         m_edit.addAction(act_sel_note)
@@ -808,6 +838,19 @@ class MainWindow(QMainWindow):
         self._md_preview_action.setShortcut(QKeySequence("Ctrl+Shift+M"))
         self._md_preview_action.toggled.connect(self._toggle_markdown_preview)
         m_view.addAction(self._md_preview_action)
+        self._doc_split_action = QAction("Fenster teilen (zwei Docs)", self)
+        self._doc_split_action.setCheckable(True)
+        self._doc_split_action.setChecked(get_editor_doc_split())
+        self._doc_split_action.setToolTip(
+            "Hauptfenster horizontal teilen: aktuelles Dokument links, zweites Tab rechts"
+        )
+        self._doc_split_action.setShortcut(QKeySequence("Ctrl+\\"))
+        self._doc_split_action.toggled.connect(self._toggle_doc_split)
+        m_view.addAction(self._doc_split_action)
+        act_sec_doc = QAction("Zweites Dokument wählen…", self)
+        act_sec_doc.setToolTip("Datei für die rechte Split-Ansicht aus offenen Tabs wählen")
+        act_sec_doc.triggered.connect(self._pick_secondary_document)
+        m_view.addAction(act_sec_doc)
         self._soft_wrap_action = QAction("Soft-Wrap", self)
         self._soft_wrap_action.setCheckable(True)
         self._soft_wrap_action.setChecked(get_editor_soft_wrap())
@@ -1338,6 +1381,51 @@ class MainWindow(QMainWindow):
             )
         self.zoom_status_label.setText(zoom_txt)
         self.word_status_label.setText(word_txt)
+        self._update_unsaved_status()
+
+    def _path_key(self, path: str | Path | None) -> str | None:
+        if not path:
+            return None
+        try:
+            return str(Path(path).resolve())
+        except Exception:
+            return str(path)
+
+    def _mark_unsaved(self, path: str | Path | None, dirty: bool = True) -> None:
+        key = self._path_key(path)
+        if not key:
+            return
+        if dirty:
+            self._unsaved_paths.add(key)
+        else:
+            self._unsaved_paths.discard(key)
+        self._update_unsaved_status()
+
+    def count_unsaved_tabs(self) -> int:
+        """Ungespeicherte Tabs: aktuelles Doc + markierte offene Sidebar-Pfade."""
+        open_keys = {self._path_key(p) for p in self.sidebar.document_paths()}
+        open_keys.discard(None)
+        tracked = {k for k in self._unsaved_paths if k in open_keys}
+        untitled = 0
+        if self._current_is_dirty():
+            cur = self._path_key(self.doc.path) if self.doc and self.doc.path else None
+            if cur:
+                tracked.add(cur)
+            else:
+                untitled = 1
+        return len(tracked) + untitled
+
+    def _update_unsaved_status(self) -> None:
+        if not hasattr(self, "unsaved_status_label"):
+            return
+        n = self.count_unsaved_tabs()
+        self.unsaved_status_label.setText(f"{n} ungespeichert")
+        if n > 0:
+            self.unsaved_status_label.setStyleSheet(
+                "padding-right: 10px; color: #B9770E; font-weight: 600;"
+            )
+        else:
+            self.unsaved_status_label.setStyleSheet("padding-right: 10px; color: #555;")
 
     def _format_current_page_size(self) -> str:
         """Aktuelle PDF-Seitengröße formatiert (mm/inch laut Einstellung)."""
@@ -1793,12 +1881,104 @@ class MainWindow(QMainWindow):
         self.editor.copy()
 
     def _sticky_from_selection(self):
-        """PDF-Textauswahl → Sticky/Notiz mit vorausgefülltem Text."""
+        """PDF-Textauswahl → Sticky/Notiz; optional zusätzlich Highlight."""
         if self.stack.currentWidget() is not self.pdf_view or not self.pdf_view.pdf_path:
             self._set_status("Auswahl → Notiz nur im PDF-Modus")
             return
         if self.pdf_view.sticky_from_text_selection(edit=True):
             self._refresh_pdf_marks()
+            if self.doc and self.doc.path:
+                self._mark_unsaved(self.doc.path, True)
+
+    def _toggle_doc_split(self, checked: bool):
+        from instantlensdoc.core.app_settings import set_editor_doc_split
+
+        set_editor_doc_split(bool(checked))
+        if hasattr(self, "secondary_wrap"):
+            self.secondary_wrap.setVisible(bool(checked))
+        if checked:
+            self._load_secondary_document()
+            self._set_status("Fenster teilen an — zwei Docs horizontal")
+        else:
+            self._set_status("Fenster teilen aus")
+
+    def _pick_secondary_document(self):
+        paths = list(self.sidebar.document_paths()) if hasattr(self.sidebar, "document_paths") else []
+        if not paths:
+            self._set_status("Keine offenen Tabs für zweites Dokument")
+            return
+        from PySide6.QtWidgets import QInputDialog
+
+        labels = [Path(p).name for p in paths]
+        choice, ok = QInputDialog.getItem(
+            self,
+            "Zweites Dokument",
+            "Dokument für rechte Split-Ansicht:",
+            labels,
+            0,
+            False,
+        )
+        if not ok or not choice:
+            return
+        idx = labels.index(choice) if choice in labels else 0
+        self._load_secondary_document(paths[idx])
+        if hasattr(self, "_doc_split_action") and not self._doc_split_action.isChecked():
+            self._doc_split_action.setChecked(True)
+
+    def _load_secondary_document(self, path: str | None = None):
+        """Rechtes Split-Pane mit Text eines anderen Tabs füllen (read-only)."""
+        if not hasattr(self, "secondary_editor"):
+            return
+        paths = list(self.sidebar.document_paths()) if hasattr(self.sidebar, "document_paths") else []
+        current = self._path_key(self.doc.path) if self.doc and self.doc.path else None
+        pick = path
+        text_ext = {".txt", ".md", ".markdown", ".html", ".htm", ".csv", ".json", ".log", ".py"}
+        if not pick:
+            for p in paths:
+                if self._path_key(p) != current and Path(p).suffix.lower() in text_ext:
+                    pick = p
+                    break
+            if not pick:
+                for p in paths:
+                    if self._path_key(p) != current:
+                        pick = p
+                        break
+        if not pick or not Path(pick).is_file():
+            self._secondary_path = None
+            self.secondary_title.setText("Kein zweites Dokument")
+            self.secondary_editor.blockSignals(True)
+            self.secondary_editor.setPlainText("")
+            self.secondary_editor.blockSignals(False)
+            return
+        self._secondary_path = str(pick)
+        name = Path(pick).name
+        suffix = Path(pick).suffix.lower()
+        try:
+            if suffix in text_ext or suffix == ".docx":
+                doc = open_document(pick)
+                body = doc.text or ""
+                self.secondary_title.setText(f"Rechts: {name}")
+                self.secondary_editor.blockSignals(True)
+                self.secondary_editor.setPlainText(body)
+                self.secondary_editor.blockSignals(False)
+            elif suffix == ".pdf":
+                self.secondary_title.setText(f"Rechts: {name} (PDF)")
+                self.secondary_editor.blockSignals(True)
+                self.secondary_editor.setPlainText(
+                    f"[PDF] {name}\n\nZum Bearbeiten/Annotieren im Hauptbereich öffnen "
+                    f"(Doppelklick in der Dokumentliste).\nPfad: {pick}"
+                )
+                self.secondary_editor.blockSignals(False)
+            else:
+                self.secondary_title.setText(f"Rechts: {name}")
+                self.secondary_editor.blockSignals(True)
+                self.secondary_editor.setPlainText(f"[Datei] {pick}")
+                self.secondary_editor.blockSignals(False)
+        except Exception as e:
+            self.secondary_title.setText(f"Rechts: {name} (Fehler)")
+            self.secondary_editor.blockSignals(True)
+            self.secondary_editor.setPlainText(f"Laden fehlgeschlagen:\n{e}")
+            self.secondary_editor.blockSignals(False)
 
     def _copy_annotations(self):
         if self.stack.currentWidget() is not self.pdf_view or not self.pdf_view.pdf_path:
@@ -2099,6 +2279,8 @@ class MainWindow(QMainWindow):
             if self.pdf_view.store and self.pdf_view.store.dirty:
                 try:
                     self.pdf_view.store.save(force=True)
+                    if self.doc.path:
+                        self._mark_unsaved(self.doc.path, False)
                     self._set_status(f"Autosave: Annotationen ({self.doc.display_name})")
                 except Exception:
                     pass
@@ -2110,6 +2292,8 @@ class MainWindow(QMainWindow):
         try:
             save_document(self.doc)
             self.doc.dirty = False
+            if self.doc.path:
+                self._mark_unsaved(self.doc.path, False)
             self._set_status(f"Autosave: {self.doc.display_name}")
         except Exception:
             pass
@@ -2159,6 +2343,10 @@ class MainWindow(QMainWindow):
         if self.doc and self.doc.kind in (DocKind.TEXT, DocKind.MARKDOWN, DocKind.HTML, DocKind.DOCX):
             self.doc.text = self.editor.toPlainText()
             self.doc.dirty = True
+            if self.doc.path:
+                self._mark_unsaved(self.doc.path, True)
+            else:
+                self._update_unsaved_status()
         if self.stack.currentWidget() is self.editor_pane:
             words, chars = self.editor.word_stats()
             self.word_status_label.setText(f"{words} Wörter · {chars} Z.")
@@ -2660,6 +2848,10 @@ class MainWindow(QMainWindow):
         )
         n = len(self.pdf_view.store.annotations) if self.pdf_view.store else 0
         self.word_status_label.setText(f"{n} Ann.")
+        if self.doc and self.doc.path and self.pdf_view.store is not None:
+            self._mark_unsaved(self.doc.path, bool(self.pdf_view.store.dirty))
+        else:
+            self._update_unsaved_status()
 
     def _on_annotation_activated(self, payload):
         if self.stack.currentWidget() is not self.pdf_view:
@@ -3033,8 +3225,11 @@ class MainWindow(QMainWindow):
         if result == QMessageBox.Discard:
             if self.doc:
                 self.doc.dirty = False
+                if self.doc.path:
+                    self._mark_unsaved(self.doc.path, False)
             if self.pdf_view.store:
                 self.pdf_view.store.dirty = False
+            self._update_unsaved_status()
             return True
         try:
             self.save_doc()
@@ -3503,6 +3698,8 @@ class MainWindow(QMainWindow):
                     if self.pdf_view.store
                     else "*.ildann.json"
                 )
+                if self.doc.path:
+                    self._mark_unsaved(self.doc.path, False)
                 self._set_status(f"PDF-Annotationen (Sidecar) gespeichert: {side}")
             return
         if not self.doc.path:
@@ -3514,6 +3711,7 @@ class MainWindow(QMainWindow):
         try:
             save_document(self.doc)
             self._remember_path(self.doc.path)
+            self._mark_unsaved(self.doc.path, False)
             enc = self.doc.meta.get("encoding")
             suffix = f" [{enc}]" if enc else ""
             self._set_status(f"Gespeichert: {self.doc.path}{suffix}")

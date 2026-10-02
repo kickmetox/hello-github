@@ -1,5 +1,22 @@
 # Changelog — InstantLens Doc
 
+## 0.6.3 — Highlight+Notiz, Tag-Cloud, Doc-Split, Unsaved-Count
+
+Nach 0.6.2: PDF-Auswahl kann Highlight und Notiz in einem Schritt anlegen; Annotation-Tag-Cloud in der Sidebar; Editor-Fenster horizontal für zwei Docs teilen; Statusleiste zählt ungespeicherte Tabs. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### PDF / Annotationen
+- **Auswahl → Highlight + Notiz**: Dialog-Checkbox „Zusätzlich Highlight“ (Einstellung persistent); ein Schritt für Sticky und Text-Highlight
+- Annotation-**Tag-Cloud**: häufigste Tags als klickbare Chips in der Sidebar (Filter umschalten)
+
+### Editor / UX
+- **Fenster teilen (zwei Docs)**: horizontaler Split (Ctrl+\); rechtes Pane zeigt weiteres offenes Tab (read-only); „Zweites Dokument wählen…“
+- Statusleiste: **ungespeicherte Tabs** zählen (`N ungespeichert`)
+
+### Packaging / Docs
+- Version **0.6.3**; Smoke um 0.6.3-Pfade erweitert
+
+---
+
 ## 0.6.2 — Selection→Notiz, Tag-Multi-Select, Close-Others, Sync-Exit
 
 Nach 0.6.1: PDF-Textauswahl als Sticky/Notiz mit vorausgefülltem Text; Annotation-Tag-Filter Multi-Select (ODER); andere Tabs schließen; Sync-Skript `-SkipStart` und klare Exit-Codes. Stubs KI/Cloud/Stylus/3D bleiben Stubs.

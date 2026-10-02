@@ -42,6 +42,8 @@ DEFAULTS: dict[str, Any] = {
     "project_workspaces": [],
     "active_project_workspace": "",
     "editor_markdown_preview": False,
+    "editor_doc_split": False,
+    "selection_note_with_highlight": False,
     "editor_soft_wrap": True,
     "editor_show_special_chars": False,
     "annotations_visible": True,
@@ -570,6 +572,22 @@ def get_editor_markdown_preview() -> bool:
 
 def set_editor_markdown_preview(enabled: bool) -> None:
     save_settings({"editor_markdown_preview": bool(enabled)})
+
+
+def get_editor_doc_split() -> bool:
+    return bool(load_settings().get("editor_doc_split", False))
+
+
+def set_editor_doc_split(enabled: bool) -> None:
+    save_settings({"editor_doc_split": bool(enabled)})
+
+
+def get_selection_note_with_highlight() -> bool:
+    return bool(load_settings().get("selection_note_with_highlight", False))
+
+
+def set_selection_note_with_highlight(enabled: bool) -> None:
+    save_settings({"selection_note_with_highlight": bool(enabled)})
 
 
 def get_editor_soft_wrap() -> bool:
