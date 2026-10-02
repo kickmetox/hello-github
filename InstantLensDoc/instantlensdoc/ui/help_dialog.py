@@ -51,7 +51,8 @@ HELP_HTML = f"""
 <li><b>PDF</b>: Blättern, Zoom/Fit (debounced + Cache), <b>⟲/⟳ drehen</b> / <b>↔/↕ spiegeln</b> (speichert),
     <b>Graustufen</b> (Ansicht + Bild-Export), <b>Nachtmodus</b> (nur Ansicht, nicht speichern),
     <b>leere Seite / duplizieren</b>, Seite löschen, Seiten neu anordnen;
-    Annotationen: Highlight (Drag) + <b>Farben-Picker HL/Stift</b> + <b>Deckkraft α</b>, <b>Schwärzen/Redaction</b> (Drag + Preview „REDACT“ + Einbrennen-Dialog), Unterstreichen, Notiz, <b>Text-Overlay</b>, Stempel, Callout,
+    Annotationen: Highlight (Drag) + <b>Farben-Picker HL/Stift</b> + <b>Deckkraft α</b>, <b>Schwärzen/Redaction</b> (Drag + Preview „REDACT“ + Einbrennen-Dialog), Unterstreichen, Notiz, <b>Text-Overlay</b>,
+    <b>Stempel-Bibliothek</b> (GENEHMIGT/ENTWURF/VERTRAULICH + Datum), Callout,
     <b>Rechteck / Linie / Pfeil / Lineal</b> —
     Sidecar <code>*.ildann.json</code> (v3, Auto-Save, Undo/Redo); JSON Export/Import;
     <b>Textsuche</b> highlightet Treffer auf der aktuellen Seite;
@@ -62,11 +63,12 @@ HELP_HTML = f"""
     <b>Wasserzeichen / Seitennummern</b>;
     <b>Zwei PDFs vergleichen</b> (Seite neben Seite);
     <b>Passwort setzen/öffnen</b>; <b>Bildkompression</b> (Seiten neu als JPEG);
-    <b>Metadaten bearbeiten</b>; <b>Seitengröße / Zuschneiden</b>;
-    Seite/Seiten als PNG/JPEG exportieren / Bild als neue Seite / Seite drucken; Annotation löschen (Auswahl/letzte, Entf); Statusleiste Seite/Zoom/Dateiname/Wörter; Thumbnails per Drag neu ordnen;
+    <b>Metadaten bearbeiten</b>; <b>AcroForm-Formularfelder ausfüllen</b>; <b>Seitengröße / Zuschneiden</b>;
+    Seite/Seiten als PNG/JPEG exportieren / Bild als neue Seite / Seite drucken; Annotation löschen (Auswahl/letzte, Entf); Statusleiste Seite/Zoom/Dateiname/Wörter; Thumbnails per Drag neu ordnen (<b>Lazy-Load</b>);
     PDF als Kopie speichern; <b>Seitenbereich extrahieren</b> (von–bis → neues PDF);
     große PDFs: Warnung / Limits;
     <b>Seiten-Thumbnails</b> in der Sidebar</li>
+<li><b>Datei → Schließen</b>: Speichern-Dialog bei ungespeicherten Änderungen</li>
 <li><b>Hilfe → Auf Updates prüfen</b>: lokal immer; Online optional (offline OK)</li>
 <li><b>Hilfe → Logordner öffnen</b>: Crash-/App-Logs im Dateimanager</li>
 <li><b>Zwischenablage</b>: Bild einfügen (Editor Ctrl+Shift+V / PDF Strg+V) — Stempel oder neue Seite</li>

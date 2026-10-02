@@ -11,7 +11,10 @@ from .annotate import (
     AnnotationStore,
     AnnotationType,
     DRAG_TYPES,
+    STAMP_LIBRARY,
     STAMP_PRESETS,
+    stamp_library_items,
+    stamp_with_date,
 )
 from .pages import (
     PAGE_SIZE_PRESETS,
@@ -54,6 +57,13 @@ from .render import clear_render_cache
 from .security import needs_password, remove_password, set_password, try_open_password
 from .redact import bake_redactions
 from .metadata import PdfMetadata, get_metadata, set_metadata
+from .acroform import (
+    FormFieldInfo,
+    get_form_values,
+    has_acroform,
+    list_form_fields,
+    set_form_values,
+)
 
 __all__ = [
     "PdfDocument",
@@ -65,6 +75,9 @@ __all__ = [
     "AnnotationType",
     "DRAG_TYPES",
     "STAMP_PRESETS",
+    "STAMP_LIBRARY",
+    "stamp_with_date",
+    "stamp_library_items",
     "PAGE_SIZE_PRESETS",
     "extract_page_range",
     "merge_pdfs",
@@ -110,6 +123,11 @@ __all__ = [
     "PdfMetadata",
     "get_metadata",
     "set_metadata",
+    "FormFieldInfo",
+    "has_acroform",
+    "list_form_fields",
+    "get_form_values",
+    "set_form_values",
 ]
 
-__version__ = "0.3.0"
+__version__ = "0.3.1"

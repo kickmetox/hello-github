@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | 0.3.0 |
+| Version | 0.3.1 |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -32,8 +32,9 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)
 
-## Neu in 0.3.0
+## Neu in 0.3.1
 
-- Release-Konsolidierung 0.2.0→0.3.0 (Version/Docs/ISS/Smoke)  
-- Review-Fixes: Opacity, Ann.-Suche, Toolbar↔Menü, Einrückung, Sync-Pfade  
-- Stubs KI/Cloud/Stylus/3D unverändert  
+- AcroForm-Formularfelder lesen/schreiben (PDF-Menü)
+- Stempel-Bibliothek GENEHMIGT/ENTWURF/VERTRAULICH + Datum
+- Tab schließen mit Speichern-Dialog (dirty); Thumbnail-Lazy-Load
+- Stubs KI/Cloud/Stylus/3D unverändert

@@ -280,6 +280,19 @@ class Sidebar(QWidget):
     def clear_documents(self):
         self.files.clear()
 
+    def remove_document(self, path: str) -> bool:
+        """Entfernt Pfad aus der Dokumentliste. True wenn gefunden."""
+        target = str(Path(path))
+        for i in range(self.files.count()):
+            it = self.files.item(i)
+            if not it:
+                continue
+            p = it.data(256) or it.toolTip() or it.text()
+            if p and str(Path(str(p))) == target:
+                self.files.takeItem(i)
+                return True
+        return False
+
     def document_paths(self) -> list[str]:
         out: list[str] = []
         for i in range(self.files.count()):
@@ -290,10 +303,44 @@ class Sidebar(QWidget):
 
     def clear_thumbs(self):
         self.thumbs.clear()
+        self._thumb_token = getattr(self, "_thumb_token", 0) + 1
+
+    def prepare_lazy_thumbs(self, page_count: int, *, current: int = 0, max_pages: int = 40):
+        """Platzhalter-Einträge ohne Render — Icons kommen per update_thumb."""
+        self.thumbs.clear()
+        self._thumb_token = getattr(self, "_thumb_token", 0) + 1
+        n = max(0, min(int(page_count), int(max_pages)))
+        for i in range(n):
+            item = QListWidgetItem(f"S. {i + 1}")
+            item.setData(Qt.UserRole, i)
+            item.setToolTip(f"Seite {i + 1} — laden…")
+            # hellgraues Platzhalter-Icon
+            pm = QPixmap(72, 96)
+            pm.fill(Qt.lightGray)
+            item.setIcon(QIcon(pm))
+            self.thumbs.addItem(item)
+        self.select_thumb(current)
+        return self._thumb_token
+
+    def update_thumb(self, page_index: int, image, *, token: int | None = None) -> bool:
+        """Setzt Icon für eine Seite; ignoriert veraltete Lazy-Batches (token)."""
+        if token is not None and token != getattr(self, "_thumb_token", None):
+            return False
+        if page_index < 0 or page_index >= self.thumbs.count():
+            return False
+        item = self.thumbs.item(page_index)
+        if item is None:
+            return False
+        pm = self._to_pixmap(image)
+        if not pm.isNull():
+            item.setIcon(QIcon(pm))
+        item.setToolTip(f"Seite {page_index + 1} — ziehen zum Neuordnen")
+        return True
 
     def set_page_thumbs(self, images: list, *, current: int = 0):
         """images: Liste von PIL.Image oder QPixmap/QImage."""
         self.thumbs.clear()
+        self._thumb_token = getattr(self, "_thumb_token", 0) + 1
         for i, img in enumerate(images):
             pm = self._to_pixmap(img)
             item = QListWidgetItem(f"S. {i + 1}")

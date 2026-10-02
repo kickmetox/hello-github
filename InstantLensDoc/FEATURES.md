@@ -26,7 +26,7 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | Export-Qualitätseinstellungen | fertig | JPEG-Q, Max-Kante, PDF-Seitenformat |
 | Mehrsprach-UI DE/EN | teilweise | Einstellungen + Dialoge/Stubs (Minimal) |
 | Update-Check-Hinweis | fertig | Hilfe-Menü; optional Start; offline OK |
-| Sidebar Seiten-Thumbnails | fertig | Vorschaubilder, Klick → Seite; **Drag-Reorder** 0.2.3 |
+| Sidebar Seiten-Thumbnails | fertig | Vorschaubilder, Klick → Seite; Drag-Reorder 0.2.3; **Lazy-Load** 0.3.1 |
 | Tastaturhilfe-Dialog | fertig | Hilfe → F1 |
 | App-Logging | fertig | %APPDATA%/InstantLensDoc/logs; **Hilfe → Logordner öffnen** 0.3.0 |
 | PDF-Annotationen (Highlight, Underline, Sticky, Text) | fertig | Sidecar `*.ildann.json` **v3**; Farben-Picker Highlight/Stift 0.2.2; Löschen Auswahl/letzte 0.2.3; **JSON Export/Import** 0.2.5; **Sidebar-Filter nach Typ** 0.2.6; **Text nachträglich editierbar** 0.2.7; **Deckkraft/Opacity** 0.2.8; **Sidebar-Textsuche** 0.3.0 |
@@ -35,7 +35,9 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | Annotation-Text editieren | fertig | Notiz/Kommentar/Overlay nachträglich; Doppelklick / Ctrl+E 0.2.7 |
 | Annotation-Deckkraft | fertig | `opacity` Sidecar + Toolbar α + Dialog 0.2.8 |
 | Annotation-Suche Sidebar | fertig | Textfilter in Annotationsliste 0.3.0 |
-| Stempel / Callouts | teilweise | Stempel-Presets + Callout (2-Klick) |
+| Stempel / Callouts | fertig | Bibliothek GENEHMIGT/ENTWURF/VERTRAULICH + Datum 0.3.1; Callout (2-Klick) |
+| PDF AcroForm-Felder | fertig | Bestehende Felder lesen/schreiben (pikepdf) 0.3.1 |
+| Tab schließen (dirty) | fertig | Speichern-Dialog; Datei → Schließen / Ctrl+W; Beenden 0.3.1 |
 | PDF Signaturfeld / Signatur (Bild) | fertig | Sidecar; Menü PDF + Werkzeug |
 | Theme Hell/Dunkel | fertig | Ansicht-Menü, persistiert |
 | Autosave Editor / Annotationen | fertig | Intervall in Einstellungen (Default 60 s), nur mit Pfad |
@@ -79,25 +81,25 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | PyInstaller Build Windows | fertig | `build-windows.ps1`, Icon `assets/app.ico` |
 | Inno-Installer | fertig | Icon, Desktop, Uninstaller, Keygen optional (`InstantLensKeygen.exe`) 0.2.1 |
 | Sync-Skript Windows | fertig | Repo `scripts/sync-ild.ps1`; Store `docs/sync-ild.ps1` |
-| In-App Hilfe / About | fertig | Version 0.3.0; Fenstertitel + Splash; Logordner-Button |
-| CHANGELOG | fertig | **0.3.0** Konsolidierung 0.2.0→0.3.0 |
+| In-App Hilfe / About | fertig | Version 0.3.1; Fenstertitel + Splash; Logordner-Button |
+| CHANGELOG | fertig | **0.3.1** Formulare/Stempel/Close/Thumbs |
 | FEATURES.md / INFO.md | fertig | |
-| `ild_pdf` Modul + Beispielskript | fertig | metadata / page size / watermark / redact |
+| `ild_pdf` Modul + Beispielskript | fertig | metadata / page size / watermark / redact / **acroform** |
 | Font-Matching | geplant | |
 | Objekt-/Bildbearbeitung | geplant | |
 | Layout-Erhaltung (Scan→edit) | geplant | |
 | Freihand | geplant | |
-| KI-Assistent | Stub | Menü „Geplant“ 0.3.0 (keine Fake-KI) |
+| KI-Assistent | Stub | Menü „Geplant“ 0.3.1 (keine Fake-KI) |
 | Signieren (rechtssicher) | Stub | |
-| Cloud-Sync | Stub | Menü „Geplant“ 0.3.0 (keine Fake-Cloud) |
+| Cloud-Sync | Stub | Menü „Geplant“ 0.3.1 (keine Fake-Cloud) |
 | Text on Path / Text zu Pfaden | geplant | |
 | Envelope Distort / Text Wrap / Area Type | Stub/geplant | |
 | Schnittmasken | geplant | |
 | Füllungen / Live-Effekte | geplant | |
-| 3D-Extrusion | Stub | Menü „Geplant“ 0.3.0 |
+| 3D-Extrusion | Stub | Menü „Geplant“ 0.3.1 |
 | Variable Fonts (voll) | Stub | |
 | Glyphen-Palette | geplant | |
-| Stylus / Palm Rejection | Stub | Menü „Geplant“ 0.3.0 |
-| Intelligente Formerkennung | Stub | Menü „Geplant“ 0.3.0 |
+| Stylus / Palm Rejection | Stub | Menü „Geplant“ 0.3.1 |
+| Intelligente Formerkennung | Stub | Menü „Geplant“ 0.3.1 |
 
 Nicht behauptet als fertig: Cloud, KI, Stylus, 3D — nur Menü-Stubs + dieser Status.

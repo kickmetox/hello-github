@@ -51,6 +51,7 @@ from instantlensdoc.ui.theme import apply_theme, load_theme_mode, toggle_theme
 from instantlensdoc.ui.keyboard_help import KeyboardHelpDialog
 from instantlensdoc.ui.password_dialog import CompressPdfDialog, SetPasswordDialog
 from instantlensdoc.ui.metadata_dialog import MetadataDialog
+from instantlensdoc.ui.form_fields_dialog import FormFieldsDialog
 from instantlensdoc.ui.page_size_dialog import PageSizeDialog
 from instantlensdoc.core import session as session_mod
 from instantlensdoc.core.i18n import sync_from_settings
@@ -71,6 +72,9 @@ class MainWindow(QMainWindow):
         self._recent_menu = None
         self._theme_action: QAction | None = None
         self._autosave_enabled = True
+        self._thumb_lazy_timer: QTimer | None = None
+        self._thumb_lazy_queue: list[int] = []
+        self._thumb_lazy_token: int | None = None
 
         self.setAcceptDrops(True)
         self.setWindowTitle(self._app_title())
@@ -97,6 +101,9 @@ class MainWindow(QMainWindow):
             QTimer.singleShot(1500, lambda: self._check_updates(silent=True))
 
     def closeEvent(self, event):
+        if not self._confirm_close_current(allow_discard=True, quitting=True):
+            event.ignore()
+            return
         try:
             self._save_session()
         except Exception:
@@ -274,6 +281,12 @@ class MainWindow(QMainWindow):
         act_save_copy.setToolTip("PDF: Datei (+ Sidecar) als Kopie; Editor: Speichern unter")
         act_save_copy.triggered.connect(self.save_as_copy)
         m_file.addAction(act_save_copy)
+        m_file.addSeparator()
+        act_close = QAction("Schließen", self)
+        act_close.setShortcut(QKeySequence.Close)
+        act_close.setToolTip("Aktuelles Dokument schließen (Speichern-Dialog bei Änderungen)")
+        act_close.triggered.connect(self.close_current_tab)
+        m_file.addAction(act_close)
         m_export = m_file.addMenu("Exportieren")
         for title, fmt in [
             ("Als HTML…", "html"),
@@ -443,6 +456,10 @@ class MainWindow(QMainWindow):
         act_meta = QAction("Metadaten bearbeiten…", self)
         act_meta.triggered.connect(self._edit_pdf_metadata)
         m_pdf.addAction(act_meta)
+        act_forms = QAction("Formularfelder ausfüllen…", self)
+        act_forms.setToolTip("Bestehende AcroForm-Felder lesen und schreiben")
+        act_forms.triggered.connect(self._edit_pdf_form_fields)
+        m_pdf.addAction(act_forms)
         act_psize = QAction("Seitengröße / Zuschneiden…", self)
         act_psize.triggered.connect(self._pdf_page_size)
         m_pdf.addAction(act_psize)
@@ -1157,14 +1174,63 @@ class MainWindow(QMainWindow):
 
     def _refresh_thumbs(self):
         if not self.pdf_view.pdf_path:
+            self._stop_thumb_lazy()
             self.sidebar.clear_thumbs()
             return
+        # Lazy: Platzhalter sofort, Seiten einzeln nachladen (UI bleibt responsiv)
         try:
-            imgs = self.pdf_view.render_thumbnails()
-            self.sidebar.set_page_thumbs(imgs, current=self.pdf_view.page_index)
+            page_count = int(self.pdf_view.page_count or 0)
+            current = int(self.pdf_view.page_index or 0)
+            token = self.sidebar.prepare_lazy_thumbs(page_count, current=current, max_pages=40)
+            self._start_thumb_lazy(token, page_count=min(page_count, 40), prefer=current)
         except Exception as e:
             _log.warning("Thumbnails: %s", e)
+            self._stop_thumb_lazy()
             self.sidebar.clear_thumbs()
+
+    def _stop_thumb_lazy(self):
+        if self._thumb_lazy_timer is not None:
+            try:
+                self._thumb_lazy_timer.stop()
+            except Exception:
+                pass
+            self._thumb_lazy_timer = None
+        self._thumb_lazy_queue = []
+        self._thumb_lazy_token = None
+
+    def _start_thumb_lazy(self, token: int, *, page_count: int, prefer: int = 0):
+        self._stop_thumb_lazy()
+        if page_count <= 0:
+            return
+        # Aktuelle Seite zuerst, dann Nachbarn, dann Rest
+        order: list[int] = []
+        seen: set[int] = set()
+        for i in [prefer, prefer - 1, prefer + 1] + list(range(page_count)):
+            if 0 <= i < page_count and i not in seen:
+                seen.add(i)
+                order.append(i)
+        self._thumb_lazy_queue = order
+        self._thumb_lazy_token = token
+        self._thumb_lazy_timer = QTimer(self)
+        self._thumb_lazy_timer.setInterval(16)
+        self._thumb_lazy_timer.timeout.connect(self._thumb_lazy_tick)
+        self._thumb_lazy_timer.start()
+
+    def _thumb_lazy_tick(self):
+        if not self._thumb_lazy_queue or self._thumb_lazy_token is None:
+            self._stop_thumb_lazy()
+            return
+        if not self.pdf_view.pdf_path:
+            self._stop_thumb_lazy()
+            return
+        idx = self._thumb_lazy_queue.pop(0)
+        try:
+            img = self.pdf_view.render_thumbnail(idx, scale=0.18)
+            self.sidebar.update_thumb(idx, img, token=self._thumb_lazy_token)
+        except Exception as e:
+            _log.debug("Thumb lazy %s: %s", idx, e)
+        if not self._thumb_lazy_queue:
+            self._stop_thumb_lazy()
 
     def _on_thumb_jump(self, page_index: int):
         if self.stack.currentWidget() is not self.pdf_view:
@@ -1282,6 +1348,105 @@ class MainWindow(QMainWindow):
             return
         if MetadataDialog(self.pdf_view.pdf_path, self).exec():
             self._set_status("PDF-Metadaten gespeichert")
+
+    def _edit_pdf_form_fields(self):
+        if not self.pdf_view.pdf_path:
+            QMessageBox.information(self, "Formularfelder", "Bitte zuerst ein PDF öffnen.")
+            return
+        from ild_pdf import has_acroform
+
+        if not has_acroform(self.pdf_view.pdf_path):
+            QMessageBox.information(
+                self,
+                "Formularfelder",
+                "Dieses PDF enthält keine AcroForm-Felder.\n"
+                "Nur bestehende Formularfelder können ausgefüllt werden.",
+            )
+            return
+        if FormFieldsDialog(self.pdf_view.pdf_path, self).exec():
+            from ild_pdf.render import clear_render_cache
+
+            clear_render_cache(self.pdf_view.pdf_path)
+            self.pdf_view.refresh()
+            self._set_status("Formularfelder gespeichert")
+
+    def _current_is_dirty(self) -> bool:
+        if not self.doc:
+            return False
+        if self.doc.kind == DocKind.PDF:
+            return bool(self.pdf_view.store and self.pdf_view.store.dirty)
+        if self.doc.kind in (DocKind.TEXT, DocKind.MARKDOWN, DocKind.HTML, DocKind.DOCX):
+            current = self.editor.toPlainText()
+            if current != (self.doc.text or ""):
+                self.doc.dirty = True
+                return True
+        return bool(self.doc.dirty)
+
+    def _confirm_close_current(self, *, allow_discard: bool = True, quitting: bool = False) -> bool:
+        """Speichern-Dialog wenn dirty. True = fortfahren, False = abbrechen."""
+        if not self._current_is_dirty():
+            return True
+        name = self.doc.display_name if self.doc else "Dokument"
+        buttons = QMessageBox.Save | QMessageBox.Cancel
+        if allow_discard:
+            buttons |= QMessageBox.Discard
+        title = "Beenden" if quitting else "Schließen"
+        box = QMessageBox(self)
+        box.setWindowTitle(title)
+        box.setIcon(QMessageBox.Warning)
+        box.setText(f"„{name}“ wurde geändert.")
+        box.setInformativeText("Änderungen speichern?")
+        box.setStandardButtons(buttons)
+        box.setDefaultButton(QMessageBox.Save)
+        result = box.exec()
+        if result == QMessageBox.Cancel:
+            return False
+        if result == QMessageBox.Discard:
+            if self.doc:
+                self.doc.dirty = False
+            if self.pdf_view.store:
+                self.pdf_view.store.dirty = False
+            return True
+        try:
+            self.save_doc()
+        except Exception as e:
+            QMessageBox.warning(self, title, f"Speichern fehlgeschlagen:\n{e}")
+            return False
+        return not self._current_is_dirty()
+
+    def close_current_tab(self):
+        """Aktuelles Dokument schließen; Speichern-Dialog bei dirty."""
+        if not self.doc:
+            self._set_status("Kein Dokument geöffnet")
+            return
+        if not self._confirm_close_current(allow_discard=True):
+            return
+        path = str(self.doc.path) if self.doc.path else None
+        if path:
+            self.sidebar.remove_document(path)
+        remaining = self.sidebar.document_paths()
+        self.doc = None
+        try:
+            self.pdf_view.pdf_path = None
+            self.pdf_view.store = None
+            self.pdf_view.page_count = 0
+        except Exception:
+            pass
+        self.editor.blockSignals(True)
+        self.editor.setPlainText("")
+        self.editor.blockSignals(False)
+        self.sidebar.clear_thumbs()
+        self.sidebar.clear_annotations()
+        self.sidebar.set_marks([])
+        self.stack.setCurrentWidget(self.editor)
+        self.setWindowTitle(self._app_title())
+        self._update_doc_status()
+        if remaining:
+            nxt = remaining[0]
+            self.open_path(nxt)
+            self._set_status(f"Geschlossen — gewechselt zu {Path(nxt).name}")
+        else:
+            self._set_status("Dokument geschlossen")
 
     def _pdf_page_size(self):
         if not self.pdf_view.pdf_path:

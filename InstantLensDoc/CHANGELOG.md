@@ -1,5 +1,22 @@
 # Changelog — InstantLens Doc
 
+## 0.3.1 — Formulare, Stempel, Close, Thumbs
+
+Fokus auf sinnvolle Ausbauten nach dem 0.3.0-Meilenstein. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### PDF
+- **AcroForm-Formularfelder** lesen/schreiben (pikepdf `Form`): Text, Checkbox, Choice, Radio — Menü PDF → Formularfelder ausfüllen…
+- **Stempel-Bibliothek** GENEHMIGT / ENTWURF / VERTRAULICH mit optionalem Datum; Dialog statt einfacher Liste
+
+### UX / Performance
+- **Tab schließen** (Datei → Schließen / Ctrl+W) mit Speichern-Dialog wenn dirty; auch beim Beenden
+- **Thumbnail-Lazy-Load**: Platzhalter sofort, Seiten einzeln nachladen (aktuelle Seite zuerst)
+
+### Packaging / Docs
+- Version **0.3.1** (App, `ild_pdf`, ISS, Smoke, INFO/FEATURES/README)
+
+---
+
 ## 0.3.0 — Release-Konsolidierung (0.2.0 → 0.3.0)
 
 Meilenstein: alle 0.2.x-Inkremente gebündelt, Version einheitlich **0.3.0**, Smoke um Kernpfade erweitert, kleine Review-Fixes. Stubs KI/Cloud/Stylus/3D bleiben Stubs (keine Fake-Features).

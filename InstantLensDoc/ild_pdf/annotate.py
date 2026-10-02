@@ -35,13 +35,49 @@ class AnnotationType(str, Enum):
 
 # Vordefinierte Stempel-Texte (UI kann erweitern)
 STAMP_PRESETS = (
-    "GEPRÜFT",
-    "FREIGEGEBEN",
+    "GENEHMIGT",
     "ENTWURF",
     "VERTRAULICH",
+    "GEPRÜFT",
+    "FREIGEGEBEN",
     "KOPIE",
     "ERLEDIGT",
 )
+
+# Kern-Bibliothek: Genehmigt / Entwurf / Vertraulich (+ optionales Datum)
+STAMP_LIBRARY = (
+    ("GENEHMIGT", "#1E8449"),
+    ("ENTWURF", "#D68910"),
+    ("VERTRAULICH", "#C0392B"),
+)
+
+
+def stamp_with_date(
+    label: str,
+    *,
+    include_date: bool = True,
+    when: datetime | None = None,
+    date_fmt: str = "%d.%m.%Y",
+) -> str:
+    """Stempeltext, optional mit Datum (lokal, Default heute)."""
+    base = (label or "STEMPEL").strip() or "STEMPEL"
+    if not include_date:
+        return base
+    dt = when or datetime.now()
+    # naive lokal ok für Stempelanzeige
+    return f"{base}\n{dt.strftime(date_fmt)}"
+
+
+def stamp_library_items(*, include_date: bool = True) -> list[tuple[str, str, str]]:
+    """
+    Stempel-Bibliothek als (anzeige, text, farbe).
+    Anzeige enthält Datum wenn include_date; text = Annotationstext.
+    """
+    items: list[tuple[str, str, str]] = []
+    for label, color in STAMP_LIBRARY:
+        text = stamp_with_date(label, include_date=include_date)
+        items.append((text.replace("\n", " · "), text, color))
+    return items
 
 # Werkzeuge die per Drag (Press→Release) gezeichnet werden
 DRAG_TYPES = frozenset(

@@ -43,7 +43,10 @@ from ild_pdf import (
     Annotation,
     AnnotationStore,
     AnnotationType,
+    STAMP_LIBRARY,
     STAMP_PRESETS,
+    stamp_library_items,
+    stamp_with_date,
     bake_text_overlays,
     find_text_rects,
     import_page_text_as_overlays,
@@ -120,6 +123,64 @@ class PageReorderDialog(QDialog):
         for i in range(self.list.count()):
             order.append(int(self.list.item(i).data(256)))
         return order
+
+
+class StampPickDialog(QDialog):
+    """Stempel-Bibliothek: Genehmigt/Entwurf/Vertraulich (+ Datum) und weitere Presets."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Stempel")
+        self.resize(380, 320)
+        from PySide6.QtWidgets import QCheckBox, QListWidget
+
+        layout = QVBoxLayout(self)
+        layout.addWidget(QLabel("Bibliothek / Preset wählen:"))
+        self.with_date = QCheckBox("Datum anhängen")
+        self.with_date.setChecked(True)
+        self.with_date.toggled.connect(self._rebuild)
+        layout.addWidget(self.with_date)
+        self.list = QListWidget()
+        self.list.itemDoubleClicked.connect(lambda _i: self.accept())
+        layout.addWidget(self.list)
+        self.custom = QLineEdit()
+        self.custom.setPlaceholderText("Oder eigenen Text…")
+        layout.addWidget(self.custom)
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+        self._items: list[tuple[str, str]] = []  # display, (text, color) encoded
+        self._rebuild()
+
+    def _rebuild(self):
+        include = self.with_date.isChecked()
+        self.list.clear()
+        self._items = []
+        for display, text, color in stamp_library_items(include_date=include):
+            self._items.append((text, color))
+            self.list.addItem(display)
+        # weitere Presets ohne Duplikat der Library-Labels
+        lib_labels = {lab for lab, _ in STAMP_LIBRARY}
+        for preset in STAMP_PRESETS:
+            if preset in lib_labels:
+                continue
+            text = stamp_with_date(preset, include_date=include)
+            self._items.append((text, "#C0392B"))
+            self.list.addItem(text.replace("\n", " · "))
+        if self.list.count():
+            self.list.setCurrentRow(0)
+
+    def result_stamp(self) -> tuple[str, str] | None:
+        """(text, color) oder None."""
+        custom = self.custom.text().strip()
+        if custom:
+            text = stamp_with_date(custom, include_date=self.with_date.isChecked())
+            return text, "#C0392B"
+        row = self.list.currentRow()
+        if 0 <= row < len(self._items):
+            return self._items[row]
+        return None
 
 
 class TextOverlayEditDialog(QDialog):
@@ -381,8 +442,14 @@ class PdfCanvas(QLabel):
                 return
             stamp_color = QColor(ann.color if ann.color != "#FFFF00" else "#C0392B")
             painter.setPen(QPen(stamp_color, 3))
-            painter.drawRect(x, y, max(w, 100), max(h, 36))
-            painter.drawText(x + 8, y + max(h, 36) // 2 + 4, (ann.text or "STEMPEL")[:24])
+            box_h = max(h, 48 if "\n" in (ann.text or "") else 36)
+            painter.drawRect(x, y, max(w, 120), box_h)
+            painter.setPen(stamp_color)
+            lines = (ann.text or "STEMPEL").splitlines()[:3]
+            ty = y + 16
+            for line in lines:
+                painter.drawText(x + 8, ty, line[:28])
+                ty += 16
         elif ann.type == AnnotationType.SIGNATURE_FIELD:
             painter.setPen(QPen(QColor(ann.color or "#7F8C8D"), 2, Qt.DashLine))
             painter.setBrush(QColor(255, 255, 255, _a(30)))
@@ -1772,29 +1839,33 @@ class PdfViewer(QWidget):
             QMessageBox.warning(self, "Schwärzung", str(e))
 
     def render_thumbnails(self, *, max_pages: int = 40, scale: float = 0.18):
-        """Kleine Seitenvorschauen (PIL). Begrenzt auf max_pages."""
+        """Kleine Seitenvorschauen (PIL). Begrenzt auf max_pages — bevorzugt lazy via render_thumbnail."""
         if not self.pdf_path or self.page_count <= 0:
             return []
         out = []
         n = min(self.page_count, max_pages)
         for i in range(n):
-            try:
-                out.append(
-                    render_page(
-                        self.pdf_path,
-                        i,
-                        scale=scale,
-                        password=self.password,
-                        use_cache=True,
-                        grayscale=self._grayscale,
-                        invert=self._night_mode,
-                    )
-                )
-            except Exception:
-                from PIL import Image
-
-                out.append(Image.new("RGB", (72, 96), (220, 220, 220)))
+            out.append(self.render_thumbnail(i, scale=scale))
         return out
+
+    def render_thumbnail(self, page_index: int, *, scale: float = 0.18):
+        """Eine Thumbnail-Seite rendern (für Lazy-Load)."""
+        from PIL import Image
+
+        if not self.pdf_path or page_index < 0 or page_index >= self.page_count:
+            return Image.new("RGB", (72, 96), (220, 220, 220))
+        try:
+            return render_page(
+                self.pdf_path,
+                page_index,
+                scale=scale,
+                password=self.password,
+                use_cache=True,
+                grayscale=self._grayscale,
+                invert=self._night_mode,
+            )
+        except Exception:
+            return Image.new("RGB", (72, 96), (220, 220, 220))
 
     def _edit_overlay(self, ann_id: str):
         """Notiz-/Kommentar-/Overlay-Text nachträglich bearbeiten."""
@@ -2122,14 +2193,14 @@ class PdfViewer(QWidget):
         font_size = 12.0
 
         if self.tool == AnnotationType.STAMP:
-            stamp, ok = QInputDialog.getItem(
-                self, "Stempel", "Text:", list(STAMP_PRESETS), 0, True
-            )
-            if not ok or not stamp:
+            dlg = StampPickDialog(self)
+            if dlg.exec() != QDialog.Accepted:
                 return
-            text = stamp
-            color = "#C0392B"
-            width, height = 140.0, 40.0
+            picked = dlg.result_stamp()
+            if not picked:
+                return
+            text, color = picked
+            width, height = 150.0, 52.0 if "\n" in text else 40.0
         elif self.tool == AnnotationType.STICKY:
             text, ok = QInputDialog.getText(self, "Notiz", "Inhalt:")
             if not ok:

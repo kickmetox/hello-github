@@ -2,7 +2,7 @@
 
 Moderne Textverarbeitung mit PDF-Annotator, OCR-Bridge und Formulargenerator.
 
-**Version:** 0.3.0  
+**Version:** 0.3.1  
 **Hersteller:** Andreas Meyer · ame@sellerbach.de
 
 ## Quickstart (Windows)
@@ -29,8 +29,8 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)
 
-## Neu in 0.3.0
+## Neu in 0.3.1
 
-Release-Konsolidierung der 0.2.x-Serie: einheitliche Version, kompakter CHANGELOG, erweiterter Smoke, Review-Fixes (Opacity, Ann.-Suche DE-Labels, Toolbar↔Menü Graustufen/Nacht, Einrückung-Auswahl, Sync-Pfade). Stubs KI/Cloud/Stylus/3D unverändert.
+AcroForm-Felder ausfüllen, Stempel-Bibliothek mit Datum, Tab schließen mit Speichern-Dialog, Thumbnail-Lazy-Load. Stubs KI/Cloud/Stylus/3D unverändert.
 
 Siehe [CHANGELOG.md](CHANGELOG.md), [FEATURES.md](FEATURES.md) und [INFO.md](INFO.md).
