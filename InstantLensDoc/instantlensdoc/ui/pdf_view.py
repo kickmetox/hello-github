@@ -988,6 +988,12 @@ class PdfViewer(QWidget):
         self._zoom_timer.setInterval(120)
         self._zoom_timer.timeout.connect(self._apply_pending_zoom)
         self._pending_scale: float | None = None
+        # Sidecar-Save Debounce: schnelle Ann.-Edits bündeln (Performance)
+        self._sidecar_save_timer = QTimer(self)
+        self._sidecar_save_timer.setSingleShot(True)
+        self._sidecar_save_timer.setInterval(400)
+        self._sidecar_save_timer.timeout.connect(self._flush_sidecar_save)
+        self._sidecar_save_pending = False
         self._highlight_color = get_ann_highlight_color()
         self._pen_color = get_ann_pen_color()
         self._note_color = get_ann_note_color()
@@ -1589,7 +1595,7 @@ class PdfViewer(QWidget):
             n = self.store.set_opacities(ids, self._default_opacity)
             if n > 0:
                 try:
-                    self.store.save(force=True)
+                    self.schedule_sidecar_save(force=True)
                 except Exception:
                     pass
                 self.refresh()
@@ -1985,7 +1991,7 @@ class PdfViewer(QWidget):
         n = self.store.move_by(ids, dx, dy)
         if n:
             try:
-                self.store.save(force=True)
+                self.schedule_sidecar_save(force=True)
             except Exception as e:
                 QMessageBox.warning(self, "Annotation verschieben", str(e))
             self.refresh()
@@ -2168,7 +2174,7 @@ class PdfViewer(QWidget):
         self._selected_ann_ids = set()
         self.canvas.set_selected_id(None)
         try:
-            self.store.save(force=True)
+            self.schedule_sidecar_save(force=True)
         except Exception as e:
             QMessageBox.warning(self, "Annotation löschen", str(e))
             return False
@@ -2185,6 +2191,40 @@ class PdfViewer(QWidget):
         self._selected_ann_ids = set()
         self.canvas.set_selected_id(None)
 
+    def schedule_sidecar_save(self, *, force: bool = False) -> None:
+        """
+        Sidecar speichern — ohne force verzögert (Debounce 400 ms).
+        force=True: ausstehendes Debounce abbrechen und sofort schreiben.
+        """
+        if not self.store:
+            return
+        if force:
+            self._sidecar_save_timer.stop()
+            self._sidecar_save_pending = False
+            try:
+                self.store.save(force=True)
+            except Exception as e:
+                QMessageBox.warning(self, "Annotationen", f"Speichern fehlgeschlagen: {e}")
+            return
+        self._sidecar_save_pending = True
+        self._sidecar_save_timer.start()
+
+    def _flush_sidecar_save(self) -> None:
+        if not self.store or not self._sidecar_save_pending:
+            self._sidecar_save_pending = False
+            return
+        self._sidecar_save_pending = False
+        try:
+            self.store.save()
+        except Exception as e:
+            QMessageBox.warning(self, "Annotationen", f"Speichern fehlgeschlagen: {e}")
+
+    def flush_sidecar_save(self) -> None:
+        """Ausstehendes Debounce sofort ausführen (vor PDF-Wechsel / Close)."""
+        if self._sidecar_save_timer.isActive() or self._sidecar_save_pending:
+            self._sidecar_save_timer.stop()
+            self._flush_sidecar_save()
+
     def load(self, path: str | Path, password: str | None = None) -> bool:
         from PySide6.QtWidgets import QApplication
 
@@ -2193,6 +2233,8 @@ class PdfViewer(QWidget):
         from ild_pdf.security import needs_password
         from instantlensdoc.ui.password_dialog import ask_pdf_password
 
+        # Vorheriges Sidecar flushen bevor Store gewechselt wird
+        self.flush_sidecar_save()
         QApplication.setOverrideCursor(Qt.WaitCursor)
         try:
             path = Path(path)
@@ -2797,7 +2839,7 @@ class PdfViewer(QWidget):
         try:
             label = self.store.peek_undo_label() or "Annotation"
             self.store.undo()
-            self.store.save(force=True)
+            self.schedule_sidecar_save(force=True)
             self.refresh()
             self.annotations_changed.emit()
             self.status.emit(f"{label} rückgängig")
@@ -2890,7 +2932,7 @@ class PdfViewer(QWidget):
                 self.store.undo()
                 ok_any = True
             if ok_any:
-                self.store.save(force=True)
+                self.schedule_sidecar_save(force=True)
                 self.refresh()
                 self.annotations_changed.emit()
                 self.status.emit(f"{last_label} rückgängig (Undo-Stack)")
@@ -3024,7 +3066,7 @@ class PdfViewer(QWidget):
             return False
         now_fav = self.store.toggle_page_favorite(self.page_index)
         try:
-            self.store.save(force=True)
+            self.schedule_sidecar_save(force=True)
         except Exception as e:
             QMessageBox.warning(self, "Seiten-Favorit", str(e))
             return False
@@ -3139,7 +3181,7 @@ class PdfViewer(QWidget):
             favs_now = [p for p in self.store.list_page_favorites() if p != int(idx)]
             self.store.set_page_favorites(favs_now)
             try:
-                self.store.save(force=True)
+                self.schedule_sidecar_save(force=True)
             except Exception as e:
                 QMessageBox.warning(self, "Favoriten", str(e))
                 return
@@ -3187,7 +3229,7 @@ class PdfViewer(QWidget):
             self.status.emit("Farbe nicht geändert")
             return 0
         try:
-            self.store.save()
+            self.schedule_sidecar_save()
         except Exception as e:
             QMessageBox.warning(self, "Annotation-Farbe", str(e))
             return 0
@@ -3236,7 +3278,7 @@ class PdfViewer(QWidget):
             return 0
         try:
             # Force-Schreiben: Opacity muss im Sidecar zuverlässig landen
-            self.store.save(force=True)
+            self.schedule_sidecar_save(force=True)
         except Exception as e:
             QMessageBox.warning(self, "Annotation-Deckkraft", str(e))
             return 0
@@ -3251,7 +3293,7 @@ class PdfViewer(QWidget):
             return []
         cleaned = self.store.reorder_page_favorites(pages)
         try:
-            self.store.save(force=True)
+            self.schedule_sidecar_save(force=True)
         except Exception as e:
             QMessageBox.warning(self, "Favoriten", str(e))
             return []
@@ -3325,7 +3367,7 @@ class PdfViewer(QWidget):
                 merge=merge,
                 max_page=int(self.page_count or 0) or None,
             )
-            self.store.save(force=True)
+            self.schedule_sidecar_save(force=True)
         except FavoritesImportError as e:
             QMessageBox.warning(self, "Favoriten importieren", str(e))
             return False
@@ -3357,7 +3399,7 @@ class PdfViewer(QWidget):
                     self.store._meta["page_groups"] = dict(entry["page_groups"] or {})
                     self.store.dirty = True
                     try:
-                        self.store.save(force=True)
+                        self.schedule_sidecar_save(force=True)
                     except Exception:
                         pass
                 from ild_pdf import PdfDocument
@@ -3395,7 +3437,7 @@ class PdfViewer(QWidget):
             return False
         try:
             self.store.redo()
-            self.store.save(force=True)
+            self.schedule_sidecar_save(force=True)
             self.refresh()
             self.annotations_changed.emit()
             self.status.emit("Annotation wiederholt")
@@ -3497,6 +3539,8 @@ class PdfViewer(QWidget):
             QMessageBox.information(self, "Annotationen", "Kein PDF geladen.")
             return False
         try:
+            self._sidecar_save_timer.stop()
+            self._sidecar_save_pending = False
             path = self.store.save(force=True)
             self.status.emit(
                 f"Sidecar gespeichert: {path.name} ({len(self.store.annotations)})"
@@ -3506,6 +3550,43 @@ class PdfViewer(QWidget):
         except Exception as e:
             QMessageBox.warning(self, "Annotationen speichern", str(e))
             return False
+
+    def merge_duplicate_annotations(self) -> int:
+        """Duplikate (gleiche Seite+BBox) finden und optional zusammenführen."""
+        if not self.store or not self.pdf_path:
+            QMessageBox.information(self, "Duplikate", "Kein PDF geladen.")
+            return 0
+        groups = self.store.find_duplicate_groups(tol=2.0, same_type=True)
+        if not groups:
+            QMessageBox.information(
+                self,
+                "Duplikate",
+                "Keine Annotation-Duplikate (gleiche Seite + BBox) gefunden.",
+            )
+            self.status.emit("Keine Annotation-Duplikate")
+            return 0
+        n_groups = len(groups)
+        n_extra = sum(len(g) - 1 for g in groups)
+        r = QMessageBox.question(
+            self,
+            "Duplikate zusammenführen",
+            f"{n_groups} Duplikat-Gruppe(n), {n_extra} überzählige Annotation(en).\n\n"
+            "Zusammenführen? (älteste behalten, Text/Tags mergen)",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.Yes,
+        )
+        if r != QMessageBox.Yes:
+            self.status.emit(f"{n_groups} Duplikat-Gruppe(n) — nicht zusammengeführt")
+            return 0
+        removed = self.store.merge_duplicates(
+            tol=2.0, same_type=True, keep="oldest", merge_text=True, merge_tags=True
+        )
+        if removed:
+            self.schedule_sidecar_save(force=True)
+            self.refresh()
+            self.annotations_changed.emit()
+        self.status.emit(f"{removed} Duplikat(e) zusammengeführt")
+        return removed
 
     def save_annotations_as(self) -> bool:
         """Speichern unter: Sidecar *.ildann.json an gewähltem Pfad (PDF bleibt unverändert)."""
@@ -3741,7 +3822,7 @@ class PdfViewer(QWidget):
 
         try:
             if self.store.dirty:
-                self.store.save(force=True)
+                self.schedule_sidecar_save(force=True)
             bake_scale = max(float(self.scale), 1.5)
             total_pages = max(1, int(self.page_count or 1))
             prog = QProgressDialog("Flatten/Bake…", "Abbrechen", 0, total_pages + 1, self)
@@ -3826,7 +3907,7 @@ class PdfViewer(QWidget):
         replace = reply == QMessageBox.Yes
         try:
             n = self.store.import_json(path, replace=replace)
-            self.store.save(force=True)
+            self.schedule_sidecar_save(force=True)
             self.refresh()
             self.annotations_changed.emit()
             mode = "ersetzt" if replace else "angehängt"
@@ -3878,7 +3959,7 @@ class PdfViewer(QWidget):
         try:
             # Offene Annotationen zuerst in Sidecar schreiben
             if self.store and self.store.dirty:
-                self.store.save(force=True)
+                self.schedule_sidecar_save(force=True)
             shutil.copy2(self.pdf_path, dest)
             side_src = self.pdf_path.with_suffix(self.pdf_path.suffix + ".ildann.json")
             side_dst = dest.with_suffix(dest.suffix + ".ildann.json")
@@ -3905,7 +3986,7 @@ class PdfViewer(QWidget):
             created = import_page_text_as_overlays(
                 self.store, self.pdf_path, self.page_index, scale=self.scale
             )
-            self.store.save()
+            self.schedule_sidecar_save()
             self.refresh()
             self.annotations_changed.emit()
             self.status.emit(f"{len(created)} Text-Overlay(s) aus PDF-Text")
@@ -3972,7 +4053,7 @@ class PdfViewer(QWidget):
             ]
             self.store.dirty = True
         try:
-            self.store.save(force=True)
+            self.schedule_sidecar_save(force=True)
         except Exception as e:
             QMessageBox.warning(self, "Schwärzung", str(e))
             return
@@ -4092,7 +4173,7 @@ class PdfViewer(QWidget):
         vals = dlg.values()
         self.store.update(ann_id, **vals)
         try:
-            self.store.save()
+            self.schedule_sidecar_save()
         except Exception as e:
             QMessageBox.warning(self, "Annotation", str(e))
         self.refresh()
@@ -4132,7 +4213,7 @@ class PdfViewer(QWidget):
         tags = normalize_tags(text)
         self.store.update(ann.id, tags=tags)
         try:
-            self.store.save()
+            self.schedule_sidecar_save()
         except Exception as e:
             QMessageBox.warning(self, "Annotation-Tags", str(e))
             return False
@@ -4153,7 +4234,7 @@ class PdfViewer(QWidget):
             self.status.emit("Duplizieren fehlgeschlagen")
             return False
         try:
-            self.store.save()
+            self.schedule_sidecar_save()
         except Exception as e:
             QMessageBox.warning(self, "Annotation duplizieren", str(e))
             return False
@@ -4205,7 +4286,7 @@ class PdfViewer(QWidget):
             self.status.emit("Einfügen fehlgeschlagen")
             return 0
         try:
-            self.store.save()
+            self.schedule_sidecar_save()
         except Exception as e:
             QMessageBox.warning(self, "Annotationen einfügen", str(e))
             return 0
@@ -4236,7 +4317,7 @@ class PdfViewer(QWidget):
         new_rot = float(int(round((cur + float(degrees)) / 90.0)) % 4 * 90)
         self.store.update(ann.id, rotation=new_rot)
         try:
-            self.store.save()
+            self.schedule_sidecar_save()
         except Exception as e:
             QMessageBox.warning(self, "Stempel drehen", str(e))
             return False
@@ -4649,7 +4730,7 @@ class PdfViewer(QWidget):
         if not created:
             return False
         try:
-            self.store.save()
+            self.schedule_sidecar_save()
         except Exception as e:
             QMessageBox.warning(self, "Annotationen", f"Speichern fehlgeschlagen: {e}")
         self._selected_ann_id = created[0].id
@@ -5033,7 +5114,7 @@ class PdfViewer(QWidget):
             ann.opacity = 1.0
         self.store.add(ann)
         try:
-            self.store.save()
+            self.schedule_sidecar_save()
         except Exception as e:
             QMessageBox.warning(self, "Annotationen", f"Speichern fehlgeschlagen: {e}")
         self.refresh()
@@ -5048,7 +5129,7 @@ class PdfViewer(QWidget):
         for i in range(self.page_count):
             mapping[i] = i if i < insert_at else i + 1
         self.store.remap_pages(mapping)
-        self.store.save(force=True)
+        self.schedule_sidecar_save(force=True)
 
     def insert_blank_after_current(self):
         """Leere Seite nach der aktuellen einfügen und speichern."""
@@ -5211,7 +5292,7 @@ class PdfViewer(QWidget):
                             else:
                                 self.store._meta.pop("page_favorites", None)
                         self.store.dirty = True
-                self.store.save(force=True)
+                self.schedule_sidecar_save(force=True)
             self.page_count -= 1
             self.page_index = min(self.page_index, self.page_count - 1)
             from ild_pdf.render import clear_render_cache
@@ -5261,7 +5342,7 @@ class PdfViewer(QWidget):
                 color = ""
         self.store.set_page_group(idx, title=title, color=color)
         try:
-            self.store.save(force=True)
+            self.schedule_sidecar_save(force=True)
         except Exception as e:
             QMessageBox.warning(self, "Gruppe", str(e))
             return False
@@ -5296,7 +5377,7 @@ class PdfViewer(QWidget):
             if self.store:
                 mapping = {old: new for new, old in enumerate(order)}
                 self.store.remap_pages(mapping)
-                self.store.save(force=True)
+                self.schedule_sidecar_save(force=True)
             self.page_index = 0
             self._selected_ann_id = None
             self._selected_ann_ids = set()
@@ -5317,6 +5398,7 @@ class PdfViewer(QWidget):
             return False
 
     def clear(self):
+        self.flush_sidecar_save()
         self.pdf_path = None
         self.store = None
         self.page_count = 0

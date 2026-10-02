@@ -243,22 +243,31 @@ class Sidebar(QWidget):
         self.search.setInsertPolicy(QComboBox.NoInsert)
         self.search.setMaxCount(20)
         self.search.setSizeAdjustPolicy(QComboBox.AdjustToMinimumContentsLengthWithIcon)
-        self.search.lineEdit().setPlaceholderText("Im Dokument oder allen geöffneten…")
+        self.search.lineEdit().setPlaceholderText("Im Dokument · Alle Docs · Alle PDFs…")
         self.search.lineEdit().returnPressed.connect(self._emit_search)
         self.search.activated.connect(lambda _i: self._emit_search())
         layout.addWidget(self.search)
 
         btn_row = QHBoxLayout()
         self.btn_search = QPushButton("Suchen")
+        self.btn_search.setToolTip("Suche im aktuellen Dokument")
         self.btn_search.clicked.connect(self._emit_search)
         self.btn_next = QPushButton("Weiter")
+        self.btn_next.setToolTip("Nächster Treffer auf der aktuellen Seite / im Editor")
         self.btn_next.clicked.connect(self.search_next_requested.emit)
         self.btn_full = QPushButton("Alle Docs")
         self.btn_full.setToolTip("Volltextsuche über alle Dokumente in der Liste")
         self.btn_full.clicked.connect(self._emit_fulltext)
+        self.btn_pdfs = QPushButton("Alle PDFs")
+        self.btn_pdfs.setToolTip(
+            "PDF-Schnellsuche: Volltext nur über geöffnete / gelistete PDFs "
+            "(eine PDF-Öffnung pro Datei, Sprung + Highlight)"
+        )
+        self.btn_pdfs.clicked.connect(self._emit_pdf_fulltext)
         btn_row.addWidget(self.btn_search)
         btn_row.addWidget(self.btn_next)
         btn_row.addWidget(self.btn_full)
+        btn_row.addWidget(self.btn_pdfs)
         layout.addLayout(btn_row)
 
         layout.addWidget(QLabel("Zuletzt geöffnet"))
@@ -407,6 +416,7 @@ class Sidebar(QWidget):
 
         self.setMinimumWidth(240)
         self._fulltext_mode = False
+        self._pdf_fulltext_mode = False
         self._ann_all_lines: list[str] = []
         self._ann_all_payloads: list = []
         self._ann_filter_updating = False
@@ -438,15 +448,26 @@ class Sidebar(QWidget):
 
     def _emit_search(self):
         self._fulltext_mode = False
+        self._pdf_fulltext_mode = False
         self.search_requested.emit(self.search_text())
 
     def _emit_fulltext(self):
         self._fulltext_mode = True
+        self._pdf_fulltext_mode = False
+        self.search_requested.emit(self.search_text())
+
+    def _emit_pdf_fulltext(self):
+        self._fulltext_mode = True
+        self._pdf_fulltext_mode = True
         self.search_requested.emit(self.search_text())
 
     @property
     def fulltext_mode(self) -> bool:
         return self._fulltext_mode
+
+    @property
+    def pdf_fulltext_mode(self) -> bool:
+        return bool(self._pdf_fulltext_mode)
 
     def _activate(self, item: QListWidgetItem):
         path = item.data(256)
@@ -461,8 +482,8 @@ class Sidebar(QWidget):
     def _activate_mark(self, item: QListWidgetItem):
         row = self.marks.row(item)
         payload = item.data(256)
-        if isinstance(payload, tuple) and len(payload) == 2:
-            path, page = payload
+        if isinstance(payload, tuple) and len(payload) >= 2:
+            path, page = payload[0], payload[1]
             self.fulltext_hit_activated.emit(str(path), page)
             return
         self.mark_activated.emit(row)

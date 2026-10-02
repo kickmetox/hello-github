@@ -43,6 +43,7 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | Annotation Undo/Redo | fertig | Ctrl+Z/Y inkl. Overlay-Text; **benannte Stufen** (z. B. Tag umbenennen) im PDF-Undo-Stack 0.6.7 |
 | Annotation löschen | fertig | Auswahl oder letzte; Entf / Menü 0.2.3 |
 | Annotation duplizieren | fertig | Auswahl leicht versetzt; Ctrl+Shift+D 0.3.4 |
+| Annotation-Duplikate zusammenführen | fertig | Gleiche Seite+BBox (±2px) + Typ erkennen; optional mergen (Text/Tags); Menü PDF 0.7.1 |
 | Annotation kopieren/einfügen | fertig | Zwischen Seiten; Ctrl+Alt+C / Ctrl+Alt+V 0.4.2 |
 | Annotation Select-All Seite | fertig | Alle Ann. der aktuellen Seite; Ctrl+A im PDF 0.3.6 |
 | Annotation verschieben / Lock | fertig | Drag im Auswahl-Werkzeug; **Sperre-Toggle** (nicht verschiebbar) 0.4.3 |
@@ -110,12 +111,13 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | Editor Zwischenablage-Verlauf | fertig | Letzte 3 Paste-Texte; Menü Bearbeiten 0.4.9 |
 | Editor Kommentar/Unkommentar | fertig | Ctrl+/ für # und // (einfache Sprachen) 0.3.6 |
 | Editor Textbausteine | fertig | 3 gespeicherte Snippets; Einfügen Ctrl+Alt+1..3; Auswahl→Slot 0.4.3 |
-| Neues Dokument Vorlagen | fertig | Leer / Brief / Notiz unter Datei → Neu 0.4.3 |
+| Neues Dokument Vorlagen | fertig | Leer / Brief / Notiz unter Datei → Neu 0.4.3; **Als Vorlage speichern** + Meine Vorlagen 0.7.1 |
 | Backup .bak beim Speichern | fertig | Optional in Einstellungen 0.3.5 |
 | Zuletzt verwendete Ordner | fertig | Datei-Dialoge merken `recent_dirs` 0.3.2 |
 | Projekt-Ordner / Workspace | fertig | Datei → Projekt-Ordner; letzte 5; Dialog-Startpfad 0.5.1 |
 | Alles speichern (Tabs) | fertig | Datei → Alles speichern; aktuelles Doc + PDF-Sidecars 0.2.7 |
-| Volltextsuche geöffnete Docs | fertig | Sidebar „Alle Docs“ |
+| Volltextsuche geöffnete Docs | fertig | Sidebar „Alle Docs“; **PDF-Schnellsuche „Alle PDFs“** (eine Open/Datei, Snippet, Sprung+Highlight) 0.7.1 |
+| Sidecar-Save Debounce | fertig | Annotation-Sidecar verzögert speichern (400 ms); Flush bei Wechsel/Close/Autosave 0.7.1 |
 | Lesezeichen / PDF-Outline | fertig | Baum in Sidebar; Doppelklick/Enter → Seite; **Destination via objgen gehärtet** 0.4.2; hinzufügen/löschen 0.2.5 |
 | PDF als Kopie speichern | fertig | Datei + Sidecar; aktuelles Doc bleibt offen 0.2.5 |
 | Editor Wortzählung | fertig | Statusleiste Wörter · Zeichen 0.2.5 |
@@ -137,27 +139,27 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | Inno-Installer | fertig | Icon, **optionale Desktop-Checkbox** (`desktopicon`/`checkedonce`) 0.6.1, Uninstaller, Keygen optional (`InstantLensKeygen.exe`) 0.2.1 |
 | Sync-Skript Windows | fertig | Repo `scripts/sync-ild.ps1`; Store `docs/sync-ild.ps1`; **-SkipStart** + Exit-Codes 0/1/2 **0.6.2** |
 | Arbeitsverzeichnis öffnen | fertig | Datei-Menü Ctrl+Shift+E; Ordner der Datei bzw. CWD 0.4.8 |
-| In-App Hilfe / About | fertig | Version 0.7.0; Fenstertitel + Splash; Logordner-Button; **Feature-Kurzliste + FEATURES.md** 0.4.9; **Keygen-Hinweis bei Trial** 0.5.3; **Splash überspringbar** 0.5.5; **Privacy: lokal, keine Telemetrie** 0.5.6; **Crash-Report ZIP** 0.5.7; **Screenshot-Pfad optional** 0.5.8; **Erste-Schritte-Wizard (4 Seiten inkl. 0.6 / 0.6.8-Hinweise)** 0.6.9; **skip-once Checkbox + Auto-Show** 0.6.6; **Nicht mehr zeigen (dauerhaft)** 0.6.7; **Reset in Einstellungen** 0.6.8 |
+| In-App Hilfe / About | fertig | Version 0.7.1; Fenstertitel + Splash; Logordner-Button; **Feature-Kurzliste + FEATURES.md** 0.4.9; **Keygen-Hinweis bei Trial** 0.5.3; **Splash überspringbar** 0.5.5; **Privacy: lokal, keine Telemetrie** 0.5.6; **Crash-Report ZIP** 0.5.7; **Screenshot-Pfad optional** 0.5.8; **Erste-Schritte-Wizard (4 Seiten inkl. 0.6 / 0.6.8-Hinweise)** 0.6.9; **skip-once Checkbox + Auto-Show** 0.6.6; **Nicht mehr zeigen (dauerhaft)** 0.6.7; **Reset in Einstellungen** 0.6.8 |
 | Startup-Abhängigkeiten-Check | fertig | pypdfium2 kritisch + Tesseract optional; Dialog bei Problemen 0.5.4 |
 | Quiet Startup / Splash | fertig | Einstellungen: Splash überspringen 0.5.5 |
-| CHANGELOG | fertig | **0.7.0** Release-Konsolidierung 0.6.0→0.7.0; 0.6.x Kurz-Tabelle |
+| CHANGELOG | fertig | **0.7.1** PDF-Schnellsuche / Ann.-Duplikate / Vorlagen / Sidecar-Debounce; **0.7.0** Konsolidierung 0.6.x |
 | FEATURES.md / INFO.md | fertig | |
 | `ild_pdf` Modul + Beispielskript | fertig | metadata / page size / watermark / redact / acroform / attachments / flatten / **plain text** / **selection_to_highlight_rects** / **selection_to_plain_text** / **export_report** / **page_favorites JSON** |
 | Font-Matching | geplant | |
 | Objekt-/Bildbearbeitung | geplant | |
 | Layout-Erhaltung (Scan→edit) | geplant | |
 | Freihand | geplant | |
-| KI-Assistent | Stub | Menü „Geplant“ 0.7.0 (keine Fake-KI) |
+| KI-Assistent | Stub | Menü „Geplant“ 0.7.1 (keine Fake-KI) |
 | Signieren (rechtssicher) | Stub | |
-| Cloud-Sync | Stub | Menü „Geplant“ 0.7.0 (keine Fake-Cloud) |
+| Cloud-Sync | Stub | Menü „Geplant“ 0.7.1 (keine Fake-Cloud) |
 | Text on Path / Text zu Pfaden | geplant | |
 | Envelope Distort / Text Wrap / Area Type | Stub/geplant | |
 | Schnittmasken | geplant | |
 | Füllungen / Live-Effekte | geplant | |
-| 3D-Extrusion | Stub | Menü „Geplant“ 0.7.0 |
+| 3D-Extrusion | Stub | Menü „Geplant“ 0.7.1 |
 | Variable Fonts (voll) | Stub | |
 | Glyphen-Palette | geplant | |
-| Stylus / Palm Rejection | Stub | Menü „Geplant“ 0.7.0 |
-| Intelligente Formerkennung | Stub | Menü „Geplant“ 0.7.0 |
+| Stylus / Palm Rejection | Stub | Menü „Geplant“ 0.7.1 |
+| Intelligente Formerkennung | Stub | Menü „Geplant“ 0.7.1 |
 
 Nicht behauptet als fertig: Cloud, KI, Stylus, 3D — nur Menü-Stubs + dieser Status.

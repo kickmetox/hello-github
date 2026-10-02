@@ -547,6 +547,14 @@ class MainWindow(QMainWindow):
         act_new_notiz.setToolTip("Neues Dokument aus Notiz-Vorlage")
         act_new_notiz.triggered.connect(lambda: self.new_doc("notiz"))
         m_new.addAction(act_new_notiz)
+        self._m_user_templates = m_new.addMenu("Meine Vorlagen")
+        self._refresh_user_template_menu()
+        act_save_tpl = QAction("Als Vorlage speichern…", self)
+        act_save_tpl.setToolTip(
+            "Aktuelles Editor-Dokument als wiederverwendbare Vorlage speichern"
+        )
+        act_save_tpl.triggered.connect(self._save_doc_as_template)
+        m_file.addAction(act_save_tpl)
 
         act_open = QAction("Öffnen…", self)
         act_open.setShortcut(QKeySequence.Open)
@@ -1153,6 +1161,10 @@ class MainWindow(QMainWindow):
             ),
             ("Annotationen flatten/bake exportieren…", lambda: self.pdf_view.export_annotations_flattened()),
             ("Annotationen aus JSON importieren…", lambda: self.pdf_view.import_annotations_json()),
+            (
+                "Annotation-Duplikate finden / zusammenführen…",
+                lambda: self.pdf_view.merge_duplicate_annotations(),
+            ),
         ]:
             a = QAction(title, self)
             a.triggered.connect(slot)
@@ -2848,9 +2860,12 @@ class MainWindow(QMainWindow):
         if not self.doc or not self.doc.dirty or not self.doc.path:
             return
         if self.doc.kind == DocKind.PDF:
-            if self.pdf_view.store and self.pdf_view.store.dirty:
+            if self.pdf_view.store and (
+                self.pdf_view.store.dirty
+                or getattr(self.pdf_view, "_sidecar_save_pending", False)
+            ):
                 try:
-                    self.pdf_view.store.save(force=True)
+                    self.pdf_view.schedule_sidecar_save(force=True)
                     if self.doc.path:
                         self._mark_unsaved(self.doc.path, False)
                     self._set_status(f"Autosave: Annotationen ({self.doc.display_name})")
@@ -3307,22 +3322,38 @@ class MainWindow(QMainWindow):
             paths = self.sidebar.document_paths()
             if self.doc and self.doc.path and str(self.doc.path) not in paths:
                 paths.append(str(self.doc.path))
-            if not paths:
-                self._set_status("Keine Dokumente in der Liste für Volltextsuche")
-                return
-            hits = fulltext_mod.search_paths(paths, query)
+            pdf_only = bool(getattr(self.sidebar, "pdf_fulltext_mode", False))
+            if pdf_only:
+                paths = fulltext_mod.filter_pdf_paths(paths)
+                if not paths:
+                    self._set_status("Keine PDFs in der Liste für PDF-Schnellsuche")
+                    self.sidebar.set_marks([f"Keine PDFs für „{query}“"])
+                    return
+                hits = fulltext_mod.search_open_pdfs(paths, query)
+                scope_label = f"{len(paths)} PDF(s)"
+            else:
+                if not paths:
+                    self._set_status("Keine Dokumente in der Liste für Volltextsuche")
+                    return
+                hits = fulltext_mod.search_paths(paths, query)
+                scope_label = f"{len(paths)} Dokument(en)"
             if not hits:
                 self.sidebar.set_marks([f"Keine Treffer für „{query}“"])
-                self._set_status(f"0 Treffer in {len(paths)} Dokument(en)")
+                self._set_status(f"0 Treffer in {scope_label}")
                 return
             lines = []
             payloads = []
-            for h in hits[:80]:
+            pdf_names: set[str] = set()
+            for h in hits[:100]:
                 loc = f"S.{h.page + 1}" if h.page is not None else f"Z.{h.line}"
-                lines.append(f"{Path(h.path).name} {loc}: {h.snippet[:60]}")
-                payloads.append((h.path, h.page))
+                kind_mark = "·OCR " if h.kind == "sidecar" else ""
+                snip = (h.snippet or "")[:72]
+                lines.append(f"{Path(h.path).name} {loc}: {kind_mark}{snip}")
+                payloads.append((h.path, h.page, query))
+                pdf_names.add(Path(h.path).name)
             self.sidebar.set_marks(lines, payloads)
-            self._set_status(f"{len(hits)} Treffer in {len(paths)} Dokument(en)")
+            extra = f" · {len(pdf_names)} Datei(en)" if pdf_only else ""
+            self._set_status(f"{len(hits)} Treffer in {scope_label}{extra}")
             return
         if self.stack.currentWidget() is self.editor_pane:
             n = self.editor.find_and_highlight(query)
@@ -3459,19 +3490,33 @@ class MainWindow(QMainWindow):
 
     def _on_mark_activated(self, index: int):
         payload = self.sidebar.mark_payload(index)
-        if isinstance(payload, tuple) and len(payload) == 2:
-            self._on_fulltext_hit(str(payload[0]), payload[1])
+        if isinstance(payload, tuple) and len(payload) >= 2:
+            q = payload[2] if len(payload) >= 3 else self.sidebar.search_text()
+            self._on_fulltext_hit(str(payload[0]), payload[1], query=q)
             return
         if payload is not None and hasattr(payload, "page"):
             self.stack.setCurrentWidget(self.pdf_view)
             self.pdf_view.focus_annotation(payload)
             self._set_status(f"Annotation Seite {payload.page + 1}")
 
-    def _on_fulltext_hit(self, path: str, page):
+    def _on_fulltext_hit(self, path: str, page, query: str | None = None):
         self.open_path(path)
+        q = (query or self.sidebar.search_text() or "").strip()
         if page is not None and self.stack.currentWidget() is self.pdf_view:
             self.pdf_view.goto_page(int(page))
-            self._set_status(f"Treffer: {Path(path).name} Seite {int(page) + 1}")
+            n = 0
+            if q:
+                n = self.pdf_view.highlight_search(q)
+            if n:
+                self._set_status(
+                    f"Treffer: {Path(path).name} Seite {int(page) + 1} · {n} hervorgehoben"
+                )
+            else:
+                self._set_status(f"Treffer: {Path(path).name} Seite {int(page) + 1}")
+            return
+        if q and self.stack.currentWidget() is self.editor_pane:
+            self.editor.find_and_highlight(q)
+            self._set_status(f"Treffer: {Path(path).name}")
 
     def _on_outline_jump(self, page_index: int):
         if self.stack.currentWidget() is not self.pdf_view or not self.pdf_view.pdf_path:
@@ -4165,9 +4210,78 @@ class MainWindow(QMainWindow):
             "Strg+V im PDF-Viewer fügt ebenfalls Bilder ein.",
         )
 
+    def _refresh_user_template_menu(self):
+        from instantlensdoc.core.app_settings import get_user_doc_templates
+
+        menu = getattr(self, "_m_user_templates", None)
+        if menu is None:
+            return
+        menu.clear()
+        templates = get_user_doc_templates()
+        if not templates:
+            empty = QAction("(keine gespeichert)", self)
+            empty.setEnabled(False)
+            menu.addAction(empty)
+            return
+        for t in templates:
+            tid = t["id"]
+            title = t["title"]
+            act = QAction(title, self)
+            act.setToolTip(f"Neues Dokument aus Vorlage „{title}“")
+            act.triggered.connect(
+                lambda checked=False, i=tid: self.new_doc(f"user:{i}")
+            )
+            menu.addAction(act)
+
+    def _save_doc_as_template(self):
+        """Aktuelles Editor-Dokument als Nutzer-Vorlage speichern."""
+        from instantlensdoc.core.app_settings import save_user_doc_template
+        from PySide6.QtWidgets import QInputDialog
+
+        if self.stack.currentWidget() is not self.editor_pane:
+            QMessageBox.information(
+                self,
+                "Als Vorlage speichern",
+                "Bitte zuerst ein Textdokument im Editor öffnen.",
+            )
+            return
+        self._sync_editor_text_before_save()
+        body = self.editor.toPlainText()
+        if not body.strip():
+            QMessageBox.information(
+                self,
+                "Als Vorlage speichern",
+                "Das Dokument ist leer — nichts zu speichern.",
+            )
+            return
+        default = ""
+        if self.doc:
+            default = (self.doc.title or "").strip()
+            if self.doc.path and (not default or default == "Unbenannt"):
+                default = Path(self.doc.path).stem
+        name, ok = QInputDialog.getText(
+            self,
+            "Als Vorlage speichern",
+            "Name der Vorlage:",
+            text=default or "Meine Vorlage",
+        )
+        if not ok:
+            return
+        name = (name or "").strip()
+        if not name:
+            self._set_status("Vorlage: Name fehlt")
+            return
+        entry = save_user_doc_template(title=name, body=body)
+        self._refresh_user_template_menu()
+        self._set_status(f"Vorlage gespeichert: {entry['title']}")
+
     def new_doc(self, template_id: str = "empty"):
         title, text = render_doc_template(template_id)
-        kind = DocKind.MARKDOWN if template_id == "notiz" else DocKind.TEXT
+        tid = (template_id or "empty").strip().lower()
+        kind = DocKind.MARKDOWN if tid == "notiz" or tid.startswith("user:") else DocKind.TEXT
+        # Nutzer-Vorlagen: Markdown wenn Titel/Body wie Notiz aussieht
+        if tid.startswith("user:") and text.lstrip().startswith("#"):
+            kind = DocKind.MARKDOWN
         self.doc = Document(kind=kind, title=title, text=text)
         self.editor.setPlainText(text)
         self.editor.clear_extra_selections()
@@ -4180,7 +4294,7 @@ class MainWindow(QMainWindow):
         label = {
             "brief": "Neues Dokument (Brief)",
             "notiz": "Neues Dokument (Notiz)",
-        }.get((template_id or "empty").lower(), "Neues Dokument")
+        }.get(tid, f"Neues Dokument ({title})" if tid.startswith("user:") else "Neues Dokument")
         self._set_status(label)
 
     def open_dialog(self):

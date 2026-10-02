@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Smoke-Test 0.7.0 (CLI + optional offscreen Qt). Kernpfade: open/annotate/export/license + ausgewählte 0.6.x-Pfade."""
+"""Smoke-Test 0.7.1 (CLI + optional offscreen Qt). Kernpfade: open/annotate/export/license + ausgewählte 0.6.x-Pfade."""
 
 from __future__ import annotations
 
@@ -122,8 +122,8 @@ def main() -> int:
     from instantlensdoc.core.update_check import check_for_updates
     from instantlensdoc.license import KEY_DAYS, TRIAL_DAYS, generate_key, verify_key
 
-    assert __version__ == "0.7.0", __version__
-    assert ild_ver == "0.7.0", ild_ver
+    assert __version__ == "0.7.1", __version__
+    assert ild_ver == "0.7.1", ild_ver
     assert TRIAL_DAYS == 28 and KEY_DAYS == 32
     key = generate_key("ame@sellerbach.de")
     ok, msg, _ = verify_key(key)
@@ -141,7 +141,7 @@ def main() -> int:
     assert "Settings" in tr("settings")
     set_lang("de")
     upd = check_for_updates(allow_network=False)
-    assert upd.local_version == "0.7.0" and not upd.online
+    assert upd.local_version == "0.7.1" and not upd.online
     assert get_export_jpeg_quality() >= 10
     assert get_ui_lang() in ("de", "en")
     assert 25 <= get_default_zoom_percent() <= 500
@@ -182,7 +182,8 @@ def main() -> int:
     assert get_ann_pen_color() == "#112233"
     assert (ROOT / "CHANGELOG.md").is_file()
     cl = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-    assert "0.7.0" in cl
+    assert "0.7.1" in cl
+    assert "## 0.7.1" in cl
     assert "## 0.7.0" in cl
     assert "0.6.0 → 0.7.0" in cl or "0.6.0→0.7.0" in cl
     assert "## 0.6.0" in cl
@@ -232,7 +233,7 @@ def main() -> int:
     assert "0.4.9" in cl  # noch in Kurz-Tabelle
     assert "0.3.9" in cl  # noch in Kurz-Tabelle
     assert "0.2.9" in cl  # noch in Kurz-Tabelle
-    assert "0.7.0" in (ROOT / "README.md").read_text(encoding="utf-8")
+    assert "0.7.1" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "run.bat" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "sync-ild.ps1" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "scripts/sync-ild.ps1" in (ROOT / "FEATURES.md").read_text(encoding="utf-8")
@@ -581,13 +582,13 @@ def main() -> int:
 
         assert (ROOT / "installer" / "installer-hinweis.txt").exists()
         iss = (ROOT / "installer" / "instantlensdoc.iss").read_text(encoding="utf-8")
-        assert "0.7.0" in iss and "desktopicon" in iss and "DisableProgramGroupPage=no" in iss
+        assert "0.7.1" in iss and "desktopicon" in iss and "DisableProgramGroupPage=no" in iss
         assert "UninstallDisplayName" in iss and "Uninstallable=yes" in iss
         assert "IncludeKeygen" in iss and "SetupIconFile" in iss
         assert "InstantLensKeygen.exe" in iss
         assert "uninstallexe" in iss
         bw = (ROOT / "build-windows.ps1").read_text(encoding="utf-8")
-        assert "0.7.0" in bw and "NoKeygenInApp" in bw and "--icon" in bw
+        assert "0.7.1" in bw and "NoKeygenInApp" in bw and "--icon" in bw
         assert "InstantLensKeygen.exe" in bw
         bi = (ROOT / "installer" / "build-installer.ps1").read_text(encoding="utf-8")
         assert "InstantLensKeygen.exe" in bi and "IncludeKeygen" in bi
@@ -596,7 +597,7 @@ def main() -> int:
         assert "Installer" in kg_readme
         hinweis = (ROOT / "installer" / "installer-hinweis.txt").read_text(encoding="utf-8")
         assert "InstantLensKeygen.exe" in hinweis or "run-keygen.bat" in hinweis
-        assert "0.7.0" in hinweis
+        assert "0.7.1" in hinweis
         assert "checkedonce" in iss and "Desktop-Verknüpfung" in hinweis
         from ild_pdf.limits import OPEN_TIMEOUT_HINT, OPEN_TIMEOUT_HINT_SEC
 
@@ -608,7 +609,7 @@ def main() -> int:
         assert "QProgressDialog" in (ROOT / "instantlensdoc" / "ui" / "main_window.py").read_text(encoding="utf-8")
 
         assert (ROOT / "examples" / "ild_pdf_demo.py").exists()
-        assert "0.7.0" in (ROOT / "INFO.md").read_text(encoding="utf-8")
+        assert "0.7.1" in (ROOT / "INFO.md").read_text(encoding="utf-8")
         assert (ROOT / "assets" / "app.ico").is_file()
 
         # --- Kernpfade: open / annotate / export / license ---
@@ -741,7 +742,7 @@ def main() -> int:
         assert "| A" in tbl and "| 1" in tbl
         assert ocr_mod.TESSERACT_WIKI_URL.startswith("https://")
 
-        # --- Ausgewählte 0.3.x-/0.4.x-/0.5.x-/0.6.x-Pfade (CLI, Konsolidierung 0.7.0) ---
+        # --- Ausgewählte 0.3.x-/0.4.x-/0.5.x-/0.6.x-Pfade (CLI, Konsolidierung 0.7.0) + 0.7.1 ---
         from ild_pdf.annotate import stamp_library_items
         from ild_pdf.attachments import has_attachments, list_attachments
         from ild_pdf.flatten import flatten_annotations_to_pdf
@@ -799,7 +800,7 @@ def main() -> int:
         set_backup_on_save(False)
         assert get_page_size_unit() in ("mm", "inch")
         assert isinstance(get_minimize_to_tray(), bool)
-        assert "0.7.0" in feat and "0.6.9" in feat and "0.5.9" in feat and "0.4.9" in feat  # Release + Zeitraum-Feature-Hinweise
+        assert "0.7.1" in feat and "0.6.9" in feat and "0.5.9" in feat and "0.4.9" in feat  # Release + Zeitraum-Feature-Hinweise
         assert "Batch-OCR" in feat or "OCR gesamtes PDF" in feat
         assert "Tag" in feat
         assert "Projekt-Ordner" in feat or "Workspace" in feat
@@ -1579,6 +1580,67 @@ def main() -> int:
         assert "0.6.9" in cl069 and "## 0.6.9" not in cl069
         print("0.6.9 CLI sync-session/tag-threshold/save-errors/f1-wizard: OK")
 
+        # 0.7.1 CLI: PDF-Schnellsuche, Ann.-Duplikate, Nutzer-Vorlagen, Sidecar-Debounce
+        from instantlensdoc.core.app_settings import (
+            delete_user_doc_template,
+            get_user_doc_templates,
+            save_user_doc_template,
+        )
+        from instantlensdoc.core.documents import render_doc_template as render_tpl071
+        from instantlensdoc.core import fulltext as ft071
+
+        pdf_b = td / "search_b.pdf"
+        import pikepdf as _pike071
+
+        with _pike071.Pdf.new() as _doc071:
+            _doc071.add_blank_page(page_size=(200, 280))
+            _doc071.save(pdf_b)
+        # Text in PDF via AnnotationStore / extract — use a text file + pdf filter
+        hits_pdf = ft071.search_open_pdfs([str(pdf), str(txt), str(pdf_b)], "FINDME")
+        assert all(Path(h.path).suffix.lower() == ".pdf" for h in hits_pdf)
+        # text-only query may yield 0 on blank PDFs — filter_pdf_paths still works
+        assert ft071.filter_pdf_paths([str(pdf), str(txt), str(pdf_b)]) == [str(pdf), str(pdf_b)]
+        # Duplikate
+        store_dup = AnnotationStore(pdf)
+        store_dup.annotations = []
+        store_dup.clear_history()
+        store_dup.add(
+            Annotation(0, AnnotationType.HIGHLIGHT, 40, 50, width=30, height=10, text="dup-a", tags=["x"])
+        )
+        store_dup.add(
+            Annotation(0, AnnotationType.HIGHLIGHT, 41, 51, width=30, height=10, text="dup-b", tags=["y"])
+        )
+        store_dup.add(
+            Annotation(0, AnnotationType.STICKY, 40, 50, width=30, height=10, text="other-type")
+        )
+        groups = store_dup.find_duplicate_groups(tol=2.0, same_type=True)
+        assert len(groups) == 1 and len(groups[0]) == 2
+        removed = store_dup.merge_duplicates(tol=2.0, keep="oldest", merge_text=True, merge_tags=True)
+        assert removed == 1
+        assert len(store_dup.annotations) == 2
+        kept = [a for a in store_dup.annotations if a.type == AnnotationType.HIGHLIGHT][0]
+        assert "dup-a" in kept.text and "dup-b" in kept.text
+        assert store_dup.count_tag("x") == 1 and store_dup.count_tag("y") == 1
+        # Nutzer-Vorlagen
+        for old in list(get_user_doc_templates()):
+            delete_user_doc_template(old["id"])
+        entry = save_user_doc_template(title="SmokeVorlage071", body="Hallo {date}\n")
+        assert entry["id"] and get_user_doc_templates()
+        t_title, t_body = render_tpl071(f"user:{entry['id']}")
+        assert t_title == "SmokeVorlage071" and "Hallo" in t_body
+        delete_user_doc_template(entry["id"])
+        # Sidecar debounce helpers in pdf_view source
+        pv071 = (ROOT / "instantlensdoc" / "ui" / "pdf_view.py").read_text(encoding="utf-8")
+        assert "schedule_sidecar_save" in pv071 and "_sidecar_save_timer" in pv071
+        assert "merge_duplicate_annotations" in pv071
+        sb071 = (ROOT / "instantlensdoc" / "ui" / "sidebar.py").read_text(encoding="utf-8")
+        assert "Alle PDFs" in sb071 and "pdf_fulltext_mode" in sb071
+        feat071 = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
+        assert "0.7.1" in feat071 and "Duplikate" in feat071 and "Debounce" in feat071
+        cl071 = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+        assert "## 0.7.1" in cl071 and "Vorlage" in cl071
+        print("0.7.1 CLI pdf-search/dup-merge/templates/debounce: OK")
+
         set_show_printer_marks(True)
         assert get_show_printer_marks() is True
         set_show_printer_marks(False)
@@ -1711,7 +1773,7 @@ def main() -> int:
         assert "Continuous Scroll" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
         assert "Seitenlabel" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8") or "Seitenlabels" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
         assert "Zwischenablage-Verlauf" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8") or "Clipboard" in (ROOT / "FEATURES.md").read_text(encoding="utf-8")
-        assert "0.7.0" in feat and "0.6.9" in feat and "0.5.9" in feat and "0.4.9" in feat
+        assert "0.7.1" in feat and "0.6.9" in feat and "0.5.9" in feat and "0.4.9" in feat
         # --- 0.4.2 CLI: Outline Goto, Ann Copy/Paste, Flatten Progress ---
         import pikepdf as _pike_ol
 
@@ -1836,7 +1898,7 @@ def main() -> int:
         win._add_chained_frame()
         assert len(win.layout_doc.text_frames) >= 2
         assert "Lizenz:" in win.license_label.text() or "⚠" in win.license_label.text()
-        assert "v0.7.0" in win.version_label.text()
+        assert "v0.7.1" in win.version_label.text()
         # Lizenz <7 Tage: Style prominent
         st_lic = win.license_manager.status()
         if st_lic.allowed and st_lic.days_remaining < 7:
@@ -2017,11 +2079,11 @@ def main() -> int:
             assert win.editor.outdent_selection(4)
             assert win.editor.toPlainText().splitlines()[0] == "alpha"
             # Fenstertitel mit Version
-            assert "0.7.0" in win.windowTitle()
+            assert "0.7.1" in win.windowTitle()
             from instantlensdoc.ui.help_dialog import AboutDialog, HelpDialog, open_log_folder
 
             about = AboutDialog(win)
-            assert "0.7.0" in about.windowTitle()
+            assert "0.7.1" in about.windowTitle()
             help_dlg = HelpDialog(win)
             assert help_dlg.windowTitle() == "Hilfe"
             assert callable(open_log_folder)
@@ -2681,7 +2743,7 @@ def main() -> int:
             win.apply_tray_setting()
             if win._tray is not None:
                 tip = win._tray.toolTip()
-                assert "0.7.0" in tip and "InstantLens Doc" in tip
+                assert "0.7.1" in tip and "InstantLens Doc" in tip
             set_minimize_to_tray(False)
             win.apply_tray_setting()
             print("0.3.9 fit-h/ann-stats/special/tray: OK")
@@ -2694,9 +2756,9 @@ def main() -> int:
             from instantlensdoc.ui.password_dialog import CompressPdfDialog, SetPasswordDialog
             from instantlensdoc.ui.stubs import PLANNED
             assert KeyboardHelpDialog and SetPasswordDialog and CompressPdfDialog
-            assert "0.7.0" in PLANNED["ki"]
+            assert "0.7.1" in PLANNED["ki"]
             assert "Coming soon" in PLANNED["cloud"]
-            assert "0.7.0" in PLANNED["stylus"] and "0.7.0" in PLANNED["extrude3d"]
+            assert "0.7.1" in PLANNED["stylus"] and "0.7.1" in PLANNED["extrude3d"]
             # Toolbar ↔ Menü Sync Graustufen/Nacht
             win.pdf_view.set_grayscale(True)
             assert win._grayscale_action.isChecked()
@@ -2731,7 +2793,7 @@ def main() -> int:
             assert win.editor.toPlainText().splitlines() == ["one", "two"]
             from instantlensdoc.ui.help_dialog import HELP_HTML
 
-            assert "Stub 0.7.0" in HELP_HTML
+            assert "Stub 0.7.1" in HELP_HTML
             assert "scripts/sync-ild.ps1" in HELP_HTML
             assert "Präsentationsmodus" in HELP_HTML or "F5" in (
                 ROOT / "instantlensdoc" / "ui" / "keyboard_help.py"
@@ -4272,10 +4334,70 @@ def main() -> int:
             assert "0.6.9" in cl069q and "## 0.6.9" not in cl069q
             print("0.6.9 Qt sync-session/tag-threshold/save-errors: OK")
 
+            # --- 0.7.1 Qt: Alle PDFs, Duplikate, Vorlage speichern, Sidecar-Debounce ---
+            from instantlensdoc.core.app_settings import (
+                delete_user_doc_template as del_tpl071,
+                get_user_doc_templates as get_tpl071,
+                save_user_doc_template as save_tpl071,
+            )
+
+            assert hasattr(win.sidebar, "btn_pdfs")
+            assert hasattr(win.sidebar, "pdf_fulltext_mode")
+            win.sidebar._emit_pdf_fulltext()
+            assert win.sidebar.fulltext_mode and win.sidebar.pdf_fulltext_mode
+            win.sidebar._emit_search()
+            assert not win.sidebar.pdf_fulltext_mode
+            assert callable(win.pdf_view.schedule_sidecar_save)
+            assert callable(win.pdf_view.flush_sidecar_save)
+            assert callable(win.pdf_view.merge_duplicate_annotations)
+            assert callable(win._save_doc_as_template)
+            win.open_path(str(smoke_pdf))
+            store071 = win.pdf_view.store
+            assert store071 is not None
+            store071.annotations = []
+            store071.clear_history()
+            from ild_pdf import Annotation as Ann071, AnnotationType as AT071
+
+            store071.add(Ann071(0, AT071.HIGHLIGHT, 12, 12, width=20, height=8, text="a071", tags=["t1"]))
+            store071.add(Ann071(0, AT071.HIGHLIGHT, 12, 13, width=20, height=8, text="b071", tags=["t2"]))
+            with patch("instantlensdoc.ui.pdf_view.QMessageBox.question", return_value=QMessageBox.Yes):
+                n_rm = win.pdf_view.merge_duplicate_annotations()
+            assert n_rm == 1
+            assert len(store071.annotations) == 1
+            # Debounce: schedule ohne force setzt pending
+            store071.dirty = True
+            win.pdf_view._sidecar_save_pending = False
+            win.pdf_view.schedule_sidecar_save(force=False)
+            assert win.pdf_view._sidecar_save_pending is True
+            win.pdf_view.flush_sidecar_save()
+            assert win.pdf_view._sidecar_save_pending is False
+            # Vorlage speichern
+            for old in list(get_tpl071()):
+                del_tpl071(old["id"])
+            from instantlensdoc.core.documents import Document as Doc071, DocKind as DK071
+
+            win.doc = Doc071(kind=DK071.TEXT, title="Tpl071", text="Vorlage-Inhalt 071\n")
+            win.editor.setPlainText("Vorlage-Inhalt 071\n")
+            win.stack.setCurrentWidget(win.editor_pane)
+            with patch(
+                "PySide6.QtWidgets.QInputDialog.getText",
+                return_value=("MeineSmoke071", True),
+            ):
+                win._save_doc_as_template()
+            tpls = get_tpl071()
+            assert any(t["title"] == "MeineSmoke071" for t in tpls)
+            for t in list(tpls):
+                del_tpl071(t["id"])
+            feat071q = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
+            assert "0.7.1" in feat071q
+            cl071q = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+            assert "## 0.7.1" in cl071q
+            print("0.7.1 Qt pdf-search/dup-merge/templates/debounce: OK")
+
             print("0.4.x selected Qt marks/schema/sort/reset: OK")
             print("0.4.2 Qt outline/copy-paste/case/progress: OK")
             print("0.4.1 Qt links/stamp/encoding/drop: OK")
-            print("0.3.x–0.7.0 review OK")
+            print("0.3.x–0.7.1 review OK")
             assert callable(win.pdf_view.bake_redactions)
             assert callable(win.pdf_view.clear_redactions)
             assert callable(win._set_pdf_password)

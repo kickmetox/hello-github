@@ -108,19 +108,48 @@ def render_doc_template(template_id: str = "empty") -> tuple[str, str]:
     """
     Dokument-Vorlage rendern.
     Rückgabe: (Titel, Text). Unbekannte ID → leeres Dokument.
+    Unterstützt eingebaute IDs und Nutzer-Vorlagen (user:… / UUID).
     """
     from datetime import date
 
-    key = (template_id or "empty").strip().lower()
-    title, body = DOC_TEMPLATES.get(key, DOC_TEMPLATES["empty"])
+    key = (template_id or "empty").strip()
+    key_l = key.lower()
+    title: str
+    body: str
+    if key_l in DOC_TEMPLATES:
+        title, body = DOC_TEMPLATES[key_l]
+    else:
+        # Nutzer-Vorlage aus Einstellungen
+        try:
+            from instantlensdoc.core.app_settings import get_user_doc_template
+
+            ut = get_user_doc_template(key)
+        except Exception:
+            ut = None
+        if ut:
+            title = str(ut.get("title") or "Vorlage")
+            body = str(ut.get("body") or "")
+        else:
+            title, body = DOC_TEMPLATES["empty"]
     today = date.today().strftime("%d.%m.%Y")
-    text = body.format(
-        name="[Name]",
-        street="[Straße Nr.]",
-        city="[PLZ Ort]",
-        date=today,
-    )
+    try:
+        text = body.format(
+            name="[Name]",
+            street="[Straße Nr.]",
+            city="[PLZ Ort]",
+            date=today,
+        )
+    except (KeyError, ValueError, IndexError):
+        # Nutzer-Vorlagen dürfen geschweifte Klammern enthalten
+        text = body.replace("{date}", today)
     return title, text
+
+
+def save_current_as_template(title: str, body: str) -> dict:
+    """Aktuellen Editor-Text als Nutzer-Vorlage speichern."""
+    from instantlensdoc.core.app_settings import save_user_doc_template
+
+    return save_user_doc_template(title=title, body=body)
 
 
 class DocKind(str, Enum):

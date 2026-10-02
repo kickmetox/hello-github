@@ -770,6 +770,152 @@ class AnnotationStore:
             self.dirty = True
         return changed
 
+    @staticmethod
+    def bbox_key(
+        ann: Annotation,
+        *,
+        tol: float = 2.0,
+        same_type: bool = True,
+    ) -> tuple:
+        """
+        Signatur Seite+BBox (gerundet auf tol Pixel) — optional inkl. Typ.
+        Gleiche Keys = Duplikat-Kandidaten.
+        """
+        t = max(0.5, float(tol))
+
+        def _r(v: float) -> float:
+            # Stabil quantisieren (kein Banker's Rounding von round())
+            return math.floor(float(v) / t + 0.5) * t
+
+        key = (
+            int(ann.page),
+            _r(ann.x),
+            _r(ann.y),
+            _r(ann.width),
+            _r(ann.height),
+        )
+        if same_type:
+            key = key + (ann.type.value,)  # type: ignore[assignment]
+        return key
+
+    def find_duplicate_groups(
+        self,
+        *,
+        tol: float = 2.0,
+        same_type: bool = True,
+    ) -> List[List[Annotation]]:
+        """
+        Gruppen mit gleicher Seite+BBox (mind. 2 Annotationen).
+        Paarweise: |Δx|,|Δy|,|Δw|,|Δh| ≤ tol (zuverlässiger als Raster-Buckets).
+        """
+        t = max(0.0, float(tol))
+        anns = list(self.annotations)
+        used: set[str] = set()
+        groups: List[List[Annotation]] = []
+        for i, a in enumerate(anns):
+            if a.id in used:
+                continue
+            group = [a]
+            for b in anns[i + 1 :]:
+                if b.id in used:
+                    continue
+                if int(a.page) != int(b.page):
+                    continue
+                if same_type and a.type != b.type:
+                    continue
+                if (
+                    abs(float(a.x) - float(b.x)) <= t
+                    and abs(float(a.y) - float(b.y)) <= t
+                    and abs(float(a.width) - float(b.width)) <= t
+                    and abs(float(a.height) - float(b.height)) <= t
+                ):
+                    group.append(b)
+            if len(group) >= 2:
+                for g in group:
+                    used.add(g.id)
+                groups.append(group)
+        return groups
+
+    def merge_duplicates(
+        self,
+        *,
+        tol: float = 2.0,
+        same_type: bool = True,
+        keep: str = "oldest",
+        merge_text: bool = True,
+        merge_tags: bool = True,
+    ) -> int:
+        """
+        Duplikate (gleiche Seite+BBox) optional zusammenführen.
+        keep: oldest | newest | first — welche Annotation behalten wird.
+        Rückgabe: Anzahl entfernter Annotationen.
+        """
+        groups = self.find_duplicate_groups(tol=tol, same_type=same_type)
+        if not groups:
+            return 0
+        remove_ids: list[str] = []
+        keep_updates: list[tuple[str, dict]] = []
+        for group in groups:
+            if keep == "newest":
+                ordered = sorted(
+                    group,
+                    key=lambda a: (str(getattr(a, "modified", "") or ""), a.id),
+                    reverse=True,
+                )
+            elif keep == "first":
+                ordered = list(group)
+            else:  # oldest
+                ordered = sorted(
+                    group,
+                    key=lambda a: (str(getattr(a, "created", "") or ""), a.id),
+                )
+            keeper = ordered[0]
+            drops = ordered[1:]
+            updates: dict = {}
+            if merge_tags:
+                tags: list[str] = list(normalize_tags(getattr(keeper, "tags", None)))
+                for d in drops:
+                    tags.extend(normalize_tags(getattr(d, "tags", None)))
+                merged_tags = normalize_tags(tags)
+                if merged_tags != normalize_tags(getattr(keeper, "tags", None)):
+                    updates["tags"] = merged_tags
+            if merge_text:
+                texts: list[str] = []
+                for a in [keeper] + drops:
+                    t = str(getattr(a, "text", "") or "").strip()
+                    if t and t not in texts:
+                        texts.append(t)
+                if len(texts) > 1:
+                    updates["text"] = " | ".join(texts)
+                elif texts and texts[0] != str(getattr(keeper, "text", "") or "").strip():
+                    updates["text"] = texts[0]
+            if updates:
+                keep_updates.append((keeper.id, updates))
+            remove_ids.extend(d.id for d in drops)
+        if not remove_ids and not keep_updates:
+            return 0
+        self._push_undo("Duplikate zusammenführen")
+        recording = self._recording
+        self._recording = False
+        try:
+            for kid, updates in keep_updates:
+                a = self.get(kid)
+                if a is None:
+                    continue
+                for k, v in updates.items():
+                    if k == "tags":
+                        a.tags = normalize_tags(v)
+                    else:
+                        setattr(a, k, v)
+                a.touch()
+            if remove_ids:
+                drop = set(remove_ids)
+                self.annotations = [a for a in self.annotations if a.id not in drop]
+            self.dirty = True
+        finally:
+            self._recording = recording
+        return len(remove_ids)
+
     def remove_last(self, page: int | None = None) -> Optional[Annotation]:
         """Löscht die letzte Annotation (optional nur auf page). Undo-fähig."""
         candidates = self.annotations if page is None else self.for_page(page)

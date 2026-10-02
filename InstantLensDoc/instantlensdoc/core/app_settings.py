@@ -74,6 +74,7 @@ DEFAULTS: dict[str, Any] = {
         "Mit freundlichen Grüßen\n",
         "— Notiz —\n",
     ],
+    "user_doc_templates": [],
     "editor_trim_trailing_whitespace": False,
     "editor_trim_whitespace_on_paste": False,
     "pdf_toolbar_groups": {
@@ -750,6 +751,99 @@ def set_editor_snippet(index: int, text: str) -> list[str]:
     i = max(0, min(EDITOR_SNIPPET_COUNT - 1, int(index)))
     snippets[i] = str(text if text is not None else "")
     return set_editor_snippets(snippets)
+
+
+USER_DOC_TEMPLATE_LIMIT = 20
+
+
+def get_user_doc_templates() -> list[dict]:
+    """Gespeicherte Nutzer-Dokumentvorlagen: [{id, title, body}, …]."""
+    raw = load_settings().get("user_doc_templates")
+    if not isinstance(raw, list):
+        return []
+    out: list[dict] = []
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        tid = str(item.get("id") or "").strip()
+        title = str(item.get("title") or "").strip()
+        body = str(item.get("body") if item.get("body") is not None else "")
+        if not tid or not title:
+            continue
+        out.append({"id": tid, "title": title, "body": body})
+        if len(out) >= USER_DOC_TEMPLATE_LIMIT:
+            break
+    return out
+
+
+def get_user_doc_template(template_id: str) -> dict | None:
+    needle = str(template_id or "").strip()
+    if not needle:
+        return None
+    # Prefixe user: optional
+    if needle.lower().startswith("user:"):
+        needle = needle[5:]
+    for t in get_user_doc_templates():
+        if t["id"] == needle or t["id"].casefold() == needle.casefold():
+            return t
+        if t["title"].casefold() == needle.casefold():
+            return t
+    return None
+
+
+def save_user_doc_template(
+    title: str,
+    body: str,
+    *,
+    template_id: str | None = None,
+) -> dict:
+    """
+    Nutzer-Vorlage speichern / überschreiben (gleicher Titel → Update).
+    Rückgabe: gespeicherter Eintrag {id, title, body}.
+    """
+    from uuid import uuid4
+
+    title_s = str(title or "").strip() or "Vorlage"
+    body_s = str(body if body is not None else "")
+    items = get_user_doc_templates()
+    tid = str(template_id or "").strip()
+    if tid and tid.lower().startswith("user:"):
+        tid = tid[5:]
+    # Update by id or same title
+    updated = False
+    for item in items:
+        if tid and item["id"] == tid:
+            item["title"] = title_s
+            item["body"] = body_s
+            updated = True
+            tid = item["id"]
+            break
+        if not tid and item["title"].casefold() == title_s.casefold():
+            item["body"] = body_s
+            tid = item["id"]
+            updated = True
+            break
+    if not updated:
+        if len(items) >= USER_DOC_TEMPLATE_LIMIT:
+            items.pop(0)
+        tid = tid or uuid4().hex[:12]
+        items.append({"id": tid, "title": title_s, "body": body_s})
+    save_settings({"user_doc_templates": items})
+    return {"id": tid, "title": title_s, "body": body_s}
+
+
+def delete_user_doc_template(template_id: str) -> bool:
+    needle = str(template_id or "").strip()
+    if not needle:
+        return False
+    if needle.lower().startswith("user:"):
+        needle = needle[5:]
+    items = get_user_doc_templates()
+    new_items = [t for t in items if t["id"] != needle]
+    if len(new_items) == len(items):
+        return False
+    save_settings({"user_doc_templates": new_items})
+    return True
 
 
 def get_minimize_to_tray() -> bool:
