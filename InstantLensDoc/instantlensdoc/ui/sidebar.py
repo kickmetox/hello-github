@@ -1,4 +1,4 @@
-"""Seitenleiste: Suche, Dokumente, Thumbnails, Lesezeichen, Markierungen."""
+"""Seitenleiste: Suche, Dokumente, Thumbnails, Lesezeichen, Annotationen, Markierungen."""
 
 from __future__ import annotations
 
@@ -8,9 +8,9 @@ from PySide6.QtCore import Signal, Qt
 from PySide6.QtGui import QIcon, QImage, QPixmap
 from PySide6.QtWidgets import (
     QAbstractItemView,
+    QComboBox,
     QHBoxLayout,
     QLabel,
-    QLineEdit,
     QListWidget,
     QListWidgetItem,
     QPushButton,
@@ -68,6 +68,7 @@ class Sidebar(QWidget):
     search_requested = Signal(str)
     search_next_requested = Signal()
     mark_activated = Signal(int)  # Index in Markierungsliste
+    annotation_activated = Signal(object)  # Annotation oder id
     outline_activated = Signal(int)  # PDF-Seite 0-basiert
     fulltext_hit_activated = Signal(str, object)  # path, page_index|None
     page_thumb_activated = Signal(int)  # PDF-Seite 0-basiert
@@ -79,9 +80,14 @@ class Sidebar(QWidget):
         layout.setContentsMargins(4, 4, 4, 4)
 
         layout.addWidget(QLabel("Suche / Volltext"))
-        self.search = QLineEdit()
-        self.search.setPlaceholderText("Im Dokument oder allen geöffneten…")
-        self.search.returnPressed.connect(self._emit_search)
+        self.search = QComboBox()
+        self.search.setEditable(True)
+        self.search.setInsertPolicy(QComboBox.NoInsert)
+        self.search.setMaxCount(20)
+        self.search.setSizeAdjustPolicy(QComboBox.AdjustToMinimumContentsLengthWithIcon)
+        self.search.lineEdit().setPlaceholderText("Im Dokument oder allen geöffneten…")
+        self.search.lineEdit().returnPressed.connect(self._emit_search)
+        self.search.activated.connect(lambda _i: self._emit_search())
         layout.addWidget(self.search)
 
         btn_row = QHBoxLayout()
@@ -122,6 +128,13 @@ class Sidebar(QWidget):
         self.outline.itemDoubleClicked.connect(self._activate_outline)
         layout.addWidget(self.outline)
 
+        layout.addWidget(QLabel("Annotationen"))
+        self.annotations = QListWidget()
+        self.annotations.setMaximumHeight(140)
+        self.annotations.setToolTip("Klick → zur Annotation springen")
+        self.annotations.itemClicked.connect(self._activate_annotation)
+        layout.addWidget(self.annotations)
+
         layout.addWidget(QLabel("Treffer / Markierungen"))
         self.marks = QListWidget()
         self.marks.itemDoubleClicked.connect(self._activate_mark)
@@ -130,13 +143,30 @@ class Sidebar(QWidget):
         self.setMinimumWidth(240)
         self._fulltext_mode = False
 
+    def search_text(self) -> str:
+        return self.search.currentText().strip()
+
+    def set_search_text(self, text: str):
+        self.search.setEditText(text or "")
+
+    def set_recent_searches(self, queries: list[str]):
+        """Füllt Dropdown mit letzten Suchbegriffen; aktueller Text bleibt."""
+        current = self.search.currentText()
+        self.search.blockSignals(True)
+        self.search.clear()
+        for q in queries:
+            if q:
+                self.search.addItem(str(q))
+        self.search.setEditText(current)
+        self.search.blockSignals(False)
+
     def _emit_search(self):
         self._fulltext_mode = False
-        self.search_requested.emit(self.search.text().strip())
+        self.search_requested.emit(self.search_text())
 
     def _emit_fulltext(self):
         self._fulltext_mode = True
-        self.search_requested.emit(self.search.text().strip())
+        self.search_requested.emit(self.search_text())
 
     @property
     def fulltext_mode(self) -> bool:
@@ -160,6 +190,11 @@ class Sidebar(QWidget):
             self.fulltext_hit_activated.emit(str(path), page)
             return
         self.mark_activated.emit(row)
+
+    def _activate_annotation(self, item: QListWidgetItem):
+        payload = item.data(256)
+        if payload is not None:
+            self.annotation_activated.emit(payload)
 
     def _activate_outline(self, item: QTreeWidgetItem, _column: int):
         page = item.data(0, Qt.UserRole)
@@ -267,6 +302,17 @@ class Sidebar(QWidget):
 
         add_nodes(None, items)
         self.outline.expandToDepth(1)
+
+    def set_annotations(self, lines: list[str], payloads: list | None = None):
+        self.annotations.clear()
+        for i, line in enumerate(lines):
+            item = QListWidgetItem(line)
+            if payloads and i < len(payloads):
+                item.setData(256, payloads[i])
+            self.annotations.addItem(item)
+
+    def clear_annotations(self):
+        self.annotations.clear()
 
     def set_marks(self, lines: list[str], payloads: list | None = None):
         self.marks.clear()

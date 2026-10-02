@@ -24,6 +24,7 @@ from instantlensdoc.core.documents import DocKind, Document, open_document, save
 from instantlensdoc.core import ocr as ocr_mod
 from instantlensdoc.core.layout import LayoutDocument
 from instantlensdoc.core import recent as recent_mod
+from instantlensdoc.core import recent_searches as recent_searches_mod
 from instantlensdoc.license import LicenseManager
 from instantlensdoc.ui.editor import TextEditor
 from instantlensdoc.ui.form_builder import FormBuilderDialog
@@ -83,6 +84,7 @@ class MainWindow(QMainWindow):
         self._build_ui()
         self._build_menus()
         self._refresh_recent()
+        self._refresh_recent_searches()
         self._update_license_status()
         apply_theme()
         self._sync_theme_menu()
@@ -180,6 +182,7 @@ class MainWindow(QMainWindow):
         self.sidebar.file_activated.connect(self.open_path)
         self.sidebar.recent_activated.connect(self.open_path)
         self.sidebar.mark_activated.connect(self._on_mark_activated)
+        self.sidebar.annotation_activated.connect(self._on_annotation_activated)
         self.sidebar.outline_activated.connect(self._on_outline_jump)
         self.sidebar.fulltext_hit_activated.connect(self._on_fulltext_hit)
         self.sidebar.page_thumb_activated.connect(self._on_thumb_jump)
@@ -194,7 +197,7 @@ class MainWindow(QMainWindow):
         self.pdf_view.annotations_changed.connect(self._refresh_pdf_marks)
         self.pdf_view.page_changed.connect(self._on_pdf_page_changed)
         self.pdf_view.zoom_changed.connect(self._on_pdf_zoom_changed)
-        self.pdf_view.document_changed.connect(self._update_doc_status)
+        self.pdf_view.document_changed.connect(self._on_pdf_document_changed)
         self.image_label = QLabel(alignment=Qt.AlignCenter)
         self.image_label.setText("Bildvorschau")
         self.stack.addWidget(self.editor)  # 0
@@ -380,7 +383,10 @@ class MainWindow(QMainWindow):
             m_pdf.addAction(a)
         m_pdf.addSeparator()
         for title, slot in [
-            ("Seite drehen (90°)", lambda: self.pdf_view.rotate_current()),
+            ("Seite drehen 90° ⟳", lambda: self.pdf_view.rotate_current(90)),
+            ("Seite drehen −90° ⟲", lambda: self.pdf_view.rotate_current(-90)),
+            ("Leere Seite einfügen", lambda: self.pdf_view.insert_blank_after_current()),
+            ("Seite duplizieren", lambda: self.pdf_view.duplicate_current()),
             ("Seite löschen…", lambda: self.pdf_view.delete_current()),
             ("Seiten neu anordnen…", lambda: self.pdf_view.reorder_dialog()),
             ("Seite als Bild exportieren…", lambda: self.pdf_view.extract_page_as_image()),
@@ -483,6 +489,24 @@ class MainWindow(QMainWindow):
             clear = QAction("Liste leeren", self)
             clear.triggered.connect(self._clear_recent)
             self._recent_menu.addAction(clear)
+
+    def _refresh_recent_searches(self):
+        try:
+            queries = recent_searches_mod.load_recent_searches()
+            self.sidebar.set_recent_searches(queries)
+        except Exception:
+            pass
+
+    def _remember_search(self, query: str):
+        q = (query or "").strip()
+        if not q:
+            return
+        try:
+            recent_searches_mod.add_recent_search(q)
+            self._refresh_recent_searches()
+            self.sidebar.set_search_text(q)
+        except Exception:
+            pass
 
     def _clear_recent(self):
         recent_mod.clear_recent()
@@ -616,10 +640,22 @@ class MainWindow(QMainWindow):
             self.doc.text = self.editor.toPlainText()
             self.doc.dirty = True
 
+    def _on_pdf_document_changed(self):
+        self._update_doc_status()
+        if self.pdf_view.pdf_path:
+            self._refresh_thumbs()
+        else:
+            self.sidebar.clear_thumbs()
+            self.sidebar.clear_annotations()
+
     def _focus_search(self):
         self.sidebar.setVisible(True)
-        self.sidebar.search.setFocus()
-        self.sidebar.search.selectAll()
+        le = self.sidebar.search.lineEdit()
+        if le is not None:
+            le.setFocus()
+            le.selectAll()
+        else:
+            self.sidebar.search.setFocus()
 
     def _undo(self):
         if self.stack.currentWidget() is self.pdf_view:
@@ -691,6 +727,7 @@ class MainWindow(QMainWindow):
         if not query:
             self._set_status("Leere Suche")
             return
+        self._remember_search(query)
         if self.sidebar.fulltext_mode:
             paths = self.sidebar.document_paths()
             if self.doc and self.doc.path and str(self.doc.path) not in paths:
@@ -767,7 +804,7 @@ class MainWindow(QMainWindow):
         self._set_status("Suche: Editor oder PDF öffnen")
 
     def _on_search_next(self):
-        q = self.sidebar.search.text().strip()
+        q = self.sidebar.search_text()
         if self.stack.currentWidget() is self.editor:
             if self.editor.find_next(q or None):
                 self._set_status("Nächster Treffer")
@@ -820,7 +857,16 @@ class MainWindow(QMainWindow):
         if self.stack.currentWidget() is not self.pdf_view:
             return
         pairs = self.pdf_view.annotation_summaries()
-        self.sidebar.set_marks([p[0] for p in pairs], [p[1] for p in pairs])
+        self.sidebar.set_annotations([p[0] for p in pairs], [p[1] for p in pairs])
+
+    def _on_annotation_activated(self, payload):
+        if self.stack.currentWidget() is not self.pdf_view:
+            self.stack.setCurrentWidget(self.pdf_view)
+        if self.pdf_view.focus_annotation(payload):
+            return
+        if payload is not None and hasattr(payload, "page"):
+            self.pdf_view.goto_page(int(payload.page))
+            self._set_status(f"Annotation Seite {payload.page + 1}")
 
     def _on_mark_activated(self, index: int):
         payload = self.sidebar.mark_payload(index)
@@ -829,7 +875,7 @@ class MainWindow(QMainWindow):
             return
         if payload is not None and hasattr(payload, "page"):
             self.stack.setCurrentWidget(self.pdf_view)
-            self.pdf_view.goto_page(int(payload.page))
+            self.pdf_view.focus_annotation(payload)
             self._set_status(f"Annotation Seite {payload.page + 1}")
 
     def _on_fulltext_hit(self, path: str, page):
@@ -1032,6 +1078,7 @@ class MainWindow(QMainWindow):
         self.editor.clear_extra_selections()
         self._editor_marks.clear()
         self.sidebar.set_marks([])
+        self.sidebar.clear_annotations()
         self.stack.setCurrentWidget(self.editor)
         self.setWindowTitle(f"{DISPLAY_NAME} — Unbenannt")
         self._update_doc_status()
@@ -1082,6 +1129,7 @@ class MainWindow(QMainWindow):
                 )
                 self.sidebar.set_marks([f"Bild: {Path(path).name}"])
                 self.sidebar.clear_thumbs()
+                self.sidebar.clear_annotations()
             else:
                 self.stack.setCurrentWidget(self.editor)
                 self.editor.blockSignals(True)
@@ -1091,6 +1139,7 @@ class MainWindow(QMainWindow):
                 self._editor_marks.clear()
                 self.sidebar.set_marks([])
                 self.sidebar.clear_thumbs()
+                self.sidebar.clear_annotations()
             self._update_doc_status()
             self._set_status(f"Geöffnet: {path}")
         except Exception as e:

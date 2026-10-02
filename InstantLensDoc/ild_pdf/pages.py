@@ -18,9 +18,9 @@ PAGE_SIZE_PRESETS: dict[str, Tuple[float, float]] = {
 
 
 def rotate_page(path: str | Path, page_index: int, degrees: int = 90) -> None:
-    """Seite um degrees drehen (90/180/270) und speichern."""
+    """Seite um degrees drehen (90/180/270/−90) und speichern."""
     path = Path(path)
-    degrees = degrees % 360
+    degrees = int(degrees) % 360
     with pikepdf.open(path, allow_overwriting_input=True) as pdf:
         if page_index < 0 or page_index >= len(pdf.pages):
             raise IndexError(f"Seite {page_index} existiert nicht")
@@ -28,6 +28,67 @@ def rotate_page(path: str | Path, page_index: int, degrees: int = 90) -> None:
         current = int(page.get("/Rotate", 0) or 0)
         page["/Rotate"] = (current + degrees) % 360
         pdf.save(path)
+
+
+def insert_blank_page(
+    path: str | Path,
+    at_index: int | None = None,
+    *,
+    width: float | None = None,
+    height: float | None = None,
+) -> int:
+    """
+    Leere Seite einfügen und speichern.
+    at_index: Einfügeposition (0-basiert); None = Ans Ende.
+    Größe: width/height oder MediaBox der Nachbarseite bzw. A4.
+    Rückgabe: Index der neuen Seite.
+    """
+    path = Path(path)
+    with pikepdf.open(path, allow_overwriting_input=True) as pdf:
+        n = len(pdf.pages)
+        insert_at = n if at_index is None else int(at_index)
+        if insert_at < 0 or insert_at > n:
+            raise IndexError(f"Einfügeposition {insert_at} ungültig (0..{n})")
+        ref_idx = min(insert_at, n - 1) if n else None
+        if width is None or height is None:
+            if ref_idx is not None:
+                box = pdf.pages[ref_idx].mediabox
+                w = float(box[2] - box[0])
+                h = float(box[3] - box[1])
+            else:
+                w, h = PAGE_SIZE_PRESETS["A4"]
+            width = float(width) if width is not None else w
+            height = float(height) if height is not None else h
+        if width <= 1 or height <= 1:
+            raise ValueError("Seitengröße muss > 1 pt sein")
+        tmp = pikepdf.Pdf.new()
+        tmp.add_blank_page(page_size=(float(width), float(height)))
+        if insert_at >= n:
+            pdf.pages.append(tmp.pages[0])
+            insert_at = len(pdf.pages) - 1
+        else:
+            pdf.pages.insert(insert_at, tmp.pages[0])
+        pdf.save(path)
+        return insert_at
+
+
+def duplicate_page(path: str | Path, page_index: int, *, after: bool = True) -> int:
+    """
+    Seite duplizieren und speichern.
+    after=True: Kopie direkt hinter dem Original; sonst davor.
+    Rückgabe: Index der neuen Seite.
+    """
+    path = Path(path)
+    with pikepdf.open(path, allow_overwriting_input=True) as pdf:
+        n = len(pdf.pages)
+        if page_index < 0 or page_index >= n:
+            raise IndexError(f"Seite {page_index} existiert nicht")
+        tmp = pikepdf.Pdf.new()
+        tmp.pages.append(pdf.pages[page_index])
+        insert_at = page_index + 1 if after else page_index
+        pdf.pages.insert(insert_at, tmp.pages[0])
+        pdf.save(path)
+        return insert_at
 
 
 def delete_pages(path: str | Path, indices: Sequence[int]) -> None:

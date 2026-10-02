@@ -49,7 +49,13 @@ from ild_pdf import (
     import_page_text_as_overlays,
     render_page,
 )
-from ild_pdf.pages import delete_pages, reorder_pages, rotate_page
+from ild_pdf.pages import (
+    delete_pages,
+    duplicate_page,
+    insert_blank_page,
+    reorder_pages,
+    rotate_page,
+)
 from instantlensdoc.core.app_settings import (
     get_ann_highlight_color,
     get_ann_pen_color,
@@ -549,9 +555,18 @@ class PdfViewer(QWidget):
         btn_del_ann = QPushButton("Ann. löschen")
         btn_del_ann.setToolTip("Ausgewählte Annotation löschen, sonst die letzte (Entf)")
         btn_del_ann.clicked.connect(self.delete_annotation)
-        btn_rot = QPushButton("90°")
-        btn_rot.setToolTip("Aktuelle Seite um 90° drehen")
-        btn_rot.clicked.connect(self.rotate_current)
+        btn_rot_ccw = QPushButton("⟲")
+        btn_rot_ccw.setToolTip("Aktuelle Seite 90° gegen den Uhrzeigersinn drehen (−90°) und speichern")
+        btn_rot_ccw.clicked.connect(lambda: self.rotate_current(-90))
+        btn_rot = QPushButton("⟳")
+        btn_rot.setToolTip("Aktuelle Seite 90° im Uhrzeigersinn drehen und speichern")
+        btn_rot.clicked.connect(lambda: self.rotate_current(90))
+        btn_blank = QPushButton("Leere Seite")
+        btn_blank.setToolTip("Leere Seite nach der aktuellen einfügen und speichern")
+        btn_blank.clicked.connect(self.insert_blank_after_current)
+        btn_dup = QPushButton("Duplizieren")
+        btn_dup.setToolTip("Aktuelle Seite duplizieren und speichern")
+        btn_dup.clicked.connect(self.duplicate_current)
         btn_del = QPushButton("Seite löschen")
         btn_del.clicked.connect(self.delete_current)
         btn_reorder = QPushButton("Neu anordnen…")
@@ -633,7 +648,10 @@ class PdfViewer(QWidget):
         toolbar.addWidget(btn_zoom_in)
         toolbar.addWidget(btn_fit)
         toolbar.addWidget(btn_fit_w)
+        toolbar.addWidget(btn_rot_ccw)
         toolbar.addWidget(btn_rot)
+        toolbar.addWidget(btn_blank)
+        toolbar.addWidget(btn_dup)
         toolbar.addWidget(btn_del)
         toolbar.addWidget(btn_reorder)
         toolbar.addWidget(btn_save_ann)
@@ -1806,15 +1824,100 @@ class PdfViewer(QWidget):
         self.annotations_changed.emit()
         self.status.emit(f"Annotation gespeichert ({ann.type.value})")
 
-    def rotate_current(self):
+    def rotate_current(self, degrees: int = 90):
+        """Aktuelle Seite drehen (−90/90/180/270) und PDF speichern."""
         if not self.pdf_path:
             return
         try:
-            rotate_page(self.pdf_path, self.page_index, 90)
+            rotate_page(self.pdf_path, self.page_index, int(degrees))
+            from ild_pdf.render import clear_render_cache
+
+            clear_render_cache(self.pdf_path)
             self.refresh()
-            self.status.emit("Seite gedreht")
+            self.document_changed.emit()
+            deg = int(degrees) % 360
+            self.status.emit(f"Seite {self.page_index + 1} gedreht ({deg}°) und gespeichert")
         except Exception as e:
             QMessageBox.warning(self, "Drehen", str(e))
+
+    def _remap_insert(self, insert_at: int) -> None:
+        """Annotation-Seitenindizes nach Einfügen einer Seite bei insert_at anpassen."""
+        if not self.store:
+            return
+        mapping = {}
+        for i in range(self.page_count):
+            mapping[i] = i if i < insert_at else i + 1
+        self.store.remap_pages(mapping)
+        self.store.save(force=True)
+
+    def insert_blank_after_current(self):
+        """Leere Seite nach der aktuellen einfügen und speichern."""
+        if not self.pdf_path:
+            return
+        try:
+            at = self.page_index + 1
+            new_idx = insert_blank_page(self.pdf_path, at)
+            self._remap_insert(new_idx)
+            from ild_pdf import PdfDocument
+            from ild_pdf.render import clear_render_cache
+
+            clear_render_cache(self.pdf_path)
+            with PdfDocument(self.pdf_path, password=self.password) as doc:
+                self.page_count = len(doc)
+            self.page_index = new_idx
+            self._selected_ann_id = None
+            self.canvas.set_selected_id(None)
+            self.refresh()
+            self.annotations_changed.emit()
+            self.page_changed.emit(self.page_index)
+            self.document_changed.emit()
+            self.status.emit(f"Leere Seite {new_idx + 1} eingefügt und gespeichert")
+        except Exception as e:
+            QMessageBox.warning(self, "Leere Seite", str(e))
+
+    def duplicate_current(self):
+        """Aktuelle Seite duplizieren (Kopie danach) und speichern."""
+        if not self.pdf_path:
+            return
+        try:
+            new_idx = duplicate_page(self.pdf_path, self.page_index, after=True)
+            self._remap_insert(new_idx)
+            from ild_pdf import PdfDocument
+            from ild_pdf.render import clear_render_cache
+
+            clear_render_cache(self.pdf_path)
+            with PdfDocument(self.pdf_path, password=self.password) as doc:
+                self.page_count = len(doc)
+            self.page_index = new_idx
+            self._selected_ann_id = None
+            self.canvas.set_selected_id(None)
+            self.refresh()
+            self.annotations_changed.emit()
+            self.page_changed.emit(self.page_index)
+            self.document_changed.emit()
+            self.status.emit(f"Seite {new_idx} dupliziert → S. {new_idx + 1} gespeichert")
+        except Exception as e:
+            QMessageBox.warning(self, "Duplizieren", str(e))
+
+    def focus_annotation(self, ann) -> bool:
+        """Zur Annotation springen und auswählen (Sidebar-Klick)."""
+        if ann is None or not self.store:
+            return False
+        aid = getattr(ann, "id", None) or (ann if isinstance(ann, str) else None)
+        target = self.store.get(aid) if aid else None
+        if target is None and hasattr(ann, "page"):
+            target = ann
+            aid = getattr(ann, "id", None)
+        if target is None:
+            return False
+        page = int(target.page)
+        if page != self.page_index:
+            self.goto_page(page)
+        self._selected_ann_id = aid
+        self.canvas.set_selected_id(aid)
+        self.refresh()
+        self.status.emit(f"Annotation: {target.type.value} (S. {page + 1})")
+        return True
 
     def delete_current(self):
         if not self.pdf_path or self.page_count <= 1:
@@ -1841,8 +1944,13 @@ class PdfViewer(QWidget):
                 self.store.save(force=True)
             self.page_count -= 1
             self.page_index = min(self.page_index, self.page_count - 1)
+            from ild_pdf.render import clear_render_cache
+
+            clear_render_cache(self.pdf_path)
             self.refresh()
             self.annotations_changed.emit()
+            self.page_changed.emit(self.page_index)
+            self.document_changed.emit()
             self.status.emit("Seite gelöscht")
         except Exception as e:
             QMessageBox.warning(self, "Löschen", str(e))

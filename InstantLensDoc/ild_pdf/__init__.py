@@ -18,6 +18,8 @@ from .pages import (
     merge_pdfs,
     split_pdf,
     rotate_page,
+    insert_blank_page,
+    duplicate_page,
     delete_pages,
     reorder_pages,
     get_page_boxes,
@@ -65,6 +67,8 @@ __all__ = [
     "merge_pdfs",
     "split_pdf",
     "rotate_page",
+    "insert_blank_page",
+    "duplicate_page",
     "delete_pages",
     "reorder_pages",
     "get_page_boxes",
@@ -102,4 +106,4 @@ __all__ = [
     "set_metadata",
 ]
 
-__version__ = "0.2.3"
+__version__ = "0.2.4"

@@ -1,5 +1,23 @@
 # Changelog — InstantLens Doc
 
+## 0.2.4 — Seiten drehen, leere/duplizieren, Ann.-Liste, Suchhistorie
+
+Fokus: PDF-Seiten-Ops in der Toolbar, Annotation-Navigation, Suchbegriffe merken.
+
+### PDF / Seiten
+- **Seite drehen**: Toolbar ⟲ (−90°) / ⟳ (+90°), speichert sofort; Menü PDF; Thumbnails aktualisieren
+- **Leere Seite einfügen** / **Seite duplizieren** (Toolbar + Menü), Annotation-Remap, speichern
+
+### UX
+- **Annotation-Liste** in der Sidebar (klickbar → Seite + Auswahl)
+- **Letzte Suchbegriffe** merken (Dropdown, persistiert)
+
+### Docs / Packaging
+- Version **0.2.4**; Stubs KI/Cloud/Stylus/3D unverändert (keine Fake-Features)
+- Docs/CHANGELOG/ISS/Smoke auf 0.2.4
+
+---
+
 ## 0.2.3 — Seitenbilder, Annotation löschen, Statusleiste, Thumb-Reorder
 
 Fokus: PDF-Seiten→Bild, Annotation-Löschen, Statusinfo, Thumbnail-Drag.

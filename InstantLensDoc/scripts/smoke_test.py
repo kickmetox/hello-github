@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Smoke-Test 0.2.3 (CLI + optional offscreen Qt). Kernpfade: open/annotate/export/license."""
+"""Smoke-Test 0.2.4 (CLI + optional offscreen Qt). Kernpfade: open/annotate/export/license."""
 
 from __future__ import annotations
 
@@ -49,7 +49,14 @@ def main() -> int:
         try_open_password,
         __version__ as ild_ver,
     )
-    from ild_pdf.pages import merge_pdfs, reorder_pages, rotate_page, split_pdf
+    from ild_pdf.pages import (
+        duplicate_page,
+        insert_blank_page,
+        merge_pdfs,
+        reorder_pages,
+        rotate_page,
+        split_pdf,
+    )
     from ild_pdf.outline import extract_outline
     from instantlensdoc import __version__
     from instantlensdoc.config import icon_path, icon_paths_for_qt
@@ -60,6 +67,7 @@ def main() -> int:
     from instantlensdoc.core import ocr as ocr_mod
     from instantlensdoc.core.ocr import LANG_PRESETS, OcrOutputMode
     from instantlensdoc.core import recent as recent_mod
+    from instantlensdoc.core import recent_searches as recent_searches_mod
     from instantlensdoc.core import batch as batch_mod
     from instantlensdoc.core import fulltext as ft_mod
     from instantlensdoc.core import session as session_mod
@@ -84,8 +92,8 @@ def main() -> int:
     from instantlensdoc.core.update_check import check_for_updates
     from instantlensdoc.license import KEY_DAYS, TRIAL_DAYS, generate_key, verify_key
 
-    assert __version__ == "0.2.3", __version__
-    assert ild_ver == "0.2.3", ild_ver
+    assert __version__ == "0.2.4", __version__
+    assert ild_ver == "0.2.4", ild_ver
     assert TRIAL_DAYS == 28 and KEY_DAYS == 32
     key = generate_key("ame@sellerbach.de")
     ok, msg, _ = verify_key(key)
@@ -103,7 +111,7 @@ def main() -> int:
     assert "Settings" in tr("settings")
     set_lang("de")
     upd = check_for_updates(allow_network=False)
-    assert upd.local_version == "0.2.3" and not upd.online
+    assert upd.local_version == "0.2.4" and not upd.online
     assert get_export_jpeg_quality() >= 10
     assert get_ui_lang() in ("de", "en")
     assert 25 <= get_default_zoom_percent() <= 500
@@ -119,8 +127,8 @@ def main() -> int:
     assert get_ann_highlight_color() == "#FFCC00"
     assert get_ann_pen_color() == "#112233"
     assert (ROOT / "CHANGELOG.md").is_file()
-    assert "0.2.3" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-    assert "0.2.3" in (ROOT / "README.md").read_text(encoding="utf-8")
+    assert "0.2.4" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    assert "0.2.4" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "run.bat" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "sync-ild.ps1" in (ROOT / "README.md").read_text(encoding="utf-8")
 
@@ -314,9 +322,18 @@ def main() -> int:
             assert len(doc) == 3
 
         rotate_page(pdf, 0, 90)
-        reorder_pages(pdf, [1, 0, 2])
+        rotate_page(pdf, 0, -90)
+        blank_idx = insert_blank_page(pdf, 1)
+        assert blank_idx == 1
         with PdfDocument(pdf) as doc:
-            assert len(doc) == 3
+            assert len(doc) == 4
+        dup_idx = duplicate_page(pdf, 0, after=True)
+        assert dup_idx == 1
+        with PdfDocument(pdf) as doc:
+            assert len(doc) == 5
+        reorder_pages(pdf, [1, 0, 2, 3, 4])
+        with PdfDocument(pdf) as doc:
+            assert len(doc) == 5
 
         layout = LayoutDocument()
         f1 = layout.add_text_frame(x=40, y=40, width=120, height=60, font_size=12)
@@ -420,13 +437,13 @@ def main() -> int:
 
         assert (ROOT / "installer" / "installer-hinweis.txt").exists()
         iss = (ROOT / "installer" / "instantlensdoc.iss").read_text(encoding="utf-8")
-        assert "0.2.3" in iss and "desktopicon" in iss and "DisableProgramGroupPage=no" in iss
+        assert "0.2.4" in iss and "desktopicon" in iss and "DisableProgramGroupPage=no" in iss
         assert "UninstallDisplayName" in iss and "Uninstallable=yes" in iss
         assert "IncludeKeygen" in iss and "SetupIconFile" in iss
         assert "InstantLensKeygen.exe" in iss
         assert "uninstallexe" in iss
         bw = (ROOT / "build-windows.ps1").read_text(encoding="utf-8")
-        assert "0.2.3" in bw and "NoKeygenInApp" in bw and "--icon" in bw
+        assert "0.2.4" in bw and "NoKeygenInApp" in bw and "--icon" in bw
         assert "InstantLensKeygen.exe" in bw
         bi = (ROOT / "installer" / "build-installer.ps1").read_text(encoding="utf-8")
         assert "InstantLensKeygen.exe" in bi and "IncludeKeygen" in bi
@@ -445,7 +462,7 @@ def main() -> int:
         assert "QProgressDialog" in (ROOT / "instantlensdoc" / "ui" / "main_window.py").read_text(encoding="utf-8")
 
         assert (ROOT / "examples" / "ild_pdf_demo.py").exists()
-        assert "0.2.3" in (ROOT / "INFO.md").read_text(encoding="utf-8")
+        assert "0.2.4" in (ROOT / "INFO.md").read_text(encoding="utf-8")
         assert (ROOT / "assets" / "app.ico").is_file()
 
         # --- Kernpfade: open / annotate / export / license ---
@@ -557,7 +574,7 @@ def main() -> int:
         win._add_chained_frame()
         assert len(win.layout_doc.text_frames) >= 2
         assert "Lizenz:" in win.license_label.text()
-        assert "v0.2.3" in win.version_label.text()
+        assert "v0.2.4" in win.version_label.text()
         from instantlensdoc.ui.settings_dialog import SettingsDialog
         from instantlensdoc.ui.batch_dialog import BatchConvertDialog
         from instantlensdoc.ui.pdf_tools_dialog import PdfToolsDialog
@@ -639,6 +656,34 @@ def main() -> int:
             assert jpg_written and jpg_written[0].suffix.lower() in (".jpg", ".jpeg")
             assert callable(win.pdf_view.export_pages_as_images)
             assert callable(win.pdf_view.apply_page_order)
+            assert callable(win.pdf_view.insert_blank_after_current)
+            assert callable(win.pdf_view.duplicate_current)
+            assert callable(win.pdf_view.focus_annotation)
+            assert callable(win.pdf_view.rotate_current)
+            # Seite drehen / leere / duplizieren
+            n0 = win.pdf_view.page_count
+            win.pdf_view.rotate_current(90)
+            win.pdf_view.rotate_current(-90)
+            win.pdf_view.insert_blank_after_current()
+            assert win.pdf_view.page_count == n0 + 1
+            win.pdf_view.page_index = 0
+            win.pdf_view.duplicate_current()
+            assert win.pdf_view.page_count == n0 + 2
+            # Annotation-Liste Sidebar
+            win.pdf_view.store.add(
+                Annotation(0, AnnotationType.HIGHLIGHT, 8, 8, width=30, height=10, text="ann-list")
+            )
+            win._refresh_pdf_marks()
+            assert win.sidebar.annotations.count() >= 1
+            win.pdf_view.focus_annotation(win.pdf_view.store.annotations[-1])
+            assert win.pdf_view._selected_ann_id
+            # Suchhistorie
+            win._remember_search("smoke-query-024")
+            assert "smoke-query-024" in recent_searches_mod.load_recent_searches()
+            win.sidebar.set_recent_searches(recent_searches_mod.load_recent_searches())
+            assert "smoke-query-024" in [
+                win.sidebar.search.itemText(i) for i in range(win.sidebar.search.count())
+            ]
             assert hasattr(win, "file_status_label") and hasattr(win, "page_status_label")
             assert hasattr(win, "zoom_status_label")
             win._update_doc_status()
@@ -667,7 +712,7 @@ def main() -> int:
             from instantlensdoc.ui.password_dialog import CompressPdfDialog, SetPasswordDialog
             from instantlensdoc.ui.stubs import PLANNED
             assert KeyboardHelpDialog and SetPasswordDialog and CompressPdfDialog
-            assert "0.2.3" in PLANNED["ki"]
+            assert "0.2.4" in PLANNED["ki"]
             assert "Coming soon" in PLANNED["cloud"]
             assert callable(win.pdf_view.bake_redactions)
             assert callable(win.pdf_view.clear_redactions)
