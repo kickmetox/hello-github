@@ -329,6 +329,28 @@ class AnnotationStore:
                 return a
         return None
 
+    def move_by(self, ann_ids: Sequence[str], dx: float, dy: float) -> int:
+        """
+        Annotationen um dx/dy verschieben (eine Undo-Stufe).
+        Callout-/Linien-Endpunkte wandern mit. Rückgabe: Anzahl bewegter Ann.
+        """
+        ids = {str(i) for i in ann_ids if i}
+        if not ids or (abs(float(dx)) < 1e-9 and abs(float(dy)) < 1e-9):
+            return 0
+        targets = [a for a in self.annotations if a.id in ids]
+        if not targets:
+            return 0
+        self._push_undo()
+        for a in targets:
+            a.x = float(a.x) + float(dx)
+            a.y = float(a.y) + float(dy)
+            if a.callout_x or a.callout_y:
+                a.callout_x = float(a.callout_x) + float(dx)
+                a.callout_y = float(a.callout_y) + float(dy)
+            a.touch()
+        self.dirty = True
+        return len(targets)
+
     def update(self, ann_id: str, **kwargs) -> Optional[Annotation]:
         for a in self.annotations:
             if a.id == ann_id:

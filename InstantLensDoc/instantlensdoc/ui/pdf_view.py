@@ -69,17 +69,21 @@ from instantlensdoc.core.app_settings import (
     get_ann_default_opacity,
     get_ann_highlight_color,
     get_ann_pen_color,
+    get_annotations_locked,
     get_annotations_visible,
     get_default_zoom_scale,
     get_pdf_grayscale,
     get_pdf_night_mode,
+    get_show_page_boxes,
     set_ann_color_preset,
     set_ann_default_opacity,
     set_ann_highlight_color,
     set_ann_pen_color,
+    set_annotations_locked,
     set_annotations_visible,
     set_pdf_grayscale,
     set_pdf_night_mode,
+    set_show_page_boxes,
 )
 
 
@@ -271,6 +275,7 @@ class PdfCanvas(QLabel):
     overlay_edit_requested = Signal(str)  # ann id
     annotation_selected = Signal(str)  # ann id (leer = Auswahl aufheben)
     uri_link_clicked = Signal(str)  # externe http(s)-URL
+    annotations_moved = Signal(list, float, float)  # ids, dx, dy
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -289,6 +294,14 @@ class PdfCanvas(QLabel):
         self._selected_id: str | None = None
         self._selected_ids: set[str] = set()
         self._annotations_visible = True
+        self._annotations_locked = False
+        self._show_page_boxes = False
+        # Pixel-Rects (x,y,w,h) für MediaBox / CropBox
+        self._mediabox_rect: tuple[float, float, float, float] | None = None
+        self._cropbox_rect: tuple[float, float, float, float] | None = None
+        self._move_ids: set[str] = set()
+        self._move_origin: tuple[float, float] | None = None
+        self._move_delta: tuple[float, float] = (0.0, 0.0)
         self.setMouseTracking(True)
         self.setFocusPolicy(Qt.StrongFocus)
 
@@ -308,9 +321,46 @@ class PdfCanvas(QLabel):
     def annotations_visible(self) -> bool:
         return bool(self._annotations_visible)
 
+    def set_annotations_locked(self, locked: bool):
+        self._annotations_locked = bool(locked)
+        if self._annotations_locked and self._move_origin is not None:
+            self._move_ids = set()
+            self._move_origin = None
+            self._move_delta = (0.0, 0.0)
+            self._repaint_overlay()
+
+    def annotations_locked(self) -> bool:
+        return bool(self._annotations_locked)
+
+    def set_show_page_boxes(self, enabled: bool):
+        self._show_page_boxes = bool(enabled)
+        self._repaint_overlay()
+
+    def show_page_boxes(self) -> bool:
+        return bool(self._show_page_boxes)
+
+    def set_page_box_rects(
+        self,
+        mediabox: tuple[float, float, float, float] | None = None,
+        cropbox: tuple[float, float, float, float] | None = None,
+    ):
+        """Pixel-Rechtecke (x, y, w, h) für Seitenrahmen-Overlay."""
+        self._mediabox_rect = mediabox
+        self._cropbox_rect = cropbox
+        self._repaint_overlay()
+
+    def clear_page_box_rects(self):
+        self._mediabox_rect = None
+        self._cropbox_rect = None
+        self._repaint_overlay()
+
     def set_drag_tool(self, tool: AnnotationType | None, *, select_mode: bool = False):
         self._select_mode = bool(select_mode)
         self._drag_tool = tool if (tool in DRAG_TYPES and not select_mode) else None
+        if not self._select_mode and self._move_origin is not None:
+            self._move_ids = set()
+            self._move_origin = None
+            self._move_delta = (0.0, 0.0)
 
     def set_selected_id(self, ann_id: str | None):
         self._selected_id = ann_id
@@ -420,7 +470,7 @@ class PdfCanvas(QLabel):
                 return ann
         return None
 
-    def _draw_ann(self, painter: QPainter, ann: Annotation):
+    def _draw_ann(self, painter: QPainter, ann: Annotation, *, dx: float = 0.0, dy: float = 0.0):
         try:
             opacity = float(getattr(ann, "opacity", 1.0) or 1.0)
         except (TypeError, ValueError):
@@ -439,7 +489,7 @@ class PdfCanvas(QLabel):
         pen = QPen(pen_c)
         pen.setWidth(2)
         painter.setPen(pen)
-        x, y = int(ann.x), int(ann.y)
+        x, y = int(ann.x + dx), int(ann.y + dy)
         w, h = int(ann.width), int(ann.height)
 
         if ann.type == AnnotationType.HIGHLIGHT:
@@ -535,8 +585,8 @@ class PdfCanvas(QLabel):
             painter.setBrush(QColor(255, 255, 220, _a(220)))
             painter.drawRect(x, y, box_w, box_h)
             painter.drawText(x + 4, y + 16, (ann.text or "Callout")[:40])
-            cx = int(ann.callout_x) if ann.callout_x else x - 40
-            cy = int(ann.callout_y) if ann.callout_y else y + box_h + 30
+            cx = int(ann.callout_x + dx) if ann.callout_x else x - 40
+            cy = int(ann.callout_y + dy) if ann.callout_y else y + box_h + 30
             painter.drawLine(x, y + box_h, cx, cy)
             painter.drawEllipse(cx - 3, cy - 3, 6, 6)
         elif ann.type == AnnotationType.RECTANGLE:
@@ -547,12 +597,13 @@ class PdfCanvas(QLabel):
             painter.drawRect(x, y, w, h)
         elif ann.type in (AnnotationType.LINE, AnnotationType.ARROW, AnnotationType.MEASURE):
             x2, y2 = ann.end_point()
-            painter.drawLine(int(ann.x), int(ann.y), int(x2), int(y2))
+            x2, y2 = x2 + dx, y2 + dy
+            painter.drawLine(x, y, int(x2), int(y2))
             if ann.type == AnnotationType.ARROW:
-                self._draw_arrow_head(painter, ann.x, ann.y, x2, y2)
+                self._draw_arrow_head(painter, float(x), float(y), x2, y2)
             if ann.type == AnnotationType.MEASURE:
-                mid_x = (ann.x + x2) / 2
-                mid_y = (ann.y + y2) / 2
+                mid_x = (x + x2) / 2
+                mid_y = (y + y2) / 2
                 label = ann.text or ann.measure_label(self._scale)
                 painter.drawText(int(mid_x) + 4, int(mid_y) - 4, label)
         painter.setOpacity(1.0)
@@ -584,13 +635,29 @@ class PdfCanvas(QLabel):
             painter.fillRect(int(sx), int(sy), max(int(sw), 2), max(int(sh), 2), fill)
             painter.setPen(pen)
             painter.drawRect(int(sx), int(sy), max(int(sw), 2), max(int(sh), 2))
+        # Optional: MediaBox / CropBox Rahmen
+        if self._show_page_boxes:
+            if self._mediabox_rect:
+                mx, my, mw, mh = self._mediabox_rect
+                painter.setPen(QPen(QColor(40, 110, 220, 180), 2, Qt.SolidLine))
+                painter.setBrush(Qt.NoBrush)
+                painter.drawRect(int(mx), int(my), max(int(mw) - 1, 1), max(int(mh) - 1, 1))
+            if self._cropbox_rect:
+                cx, cy, cw, ch = self._cropbox_rect
+                painter.setPen(QPen(QColor(220, 60, 40, 200), 2, Qt.DashLine))
+                painter.setBrush(Qt.NoBrush)
+                painter.drawRect(int(cx), int(cy), max(int(cw) - 1, 1), max(int(ch) - 1, 1))
+        move_dx, move_dy = self._move_delta if self._move_origin is not None else (0.0, 0.0)
         if self._annotations_visible:
             for ann in self._annotations:
-                self._draw_ann(painter, ann)
+                dx = move_dx if ann.id in self._move_ids else 0.0
+                dy = move_dy if ann.id in self._move_ids else 0.0
+                self._draw_ann(painter, ann, dx=dx, dy=dy)
                 if ann.id in self._selected_ids or (
                     self._selected_id and ann.id == self._selected_id
                 ):
                     x0, y0, x1, y1 = self._ann_bounds(ann)
+                    x0, y0, x1, y1 = x0 + dx, y0 + dy, x1 + dx, y1 + dy
                     sel = QPen(QColor(30, 144, 255), 2, Qt.DashLine)
                     painter.setPen(sel)
                     painter.setBrush(Qt.NoBrush)
@@ -650,6 +717,19 @@ class PdfCanvas(QLabel):
                 return
             hit_any = self._hit_annotation(x, y)
             self.annotation_selected.emit(hit_any.id if hit_any else "")
+            # Verschieben starten wenn nicht gesperrt
+            if (
+                hit_any
+                and not self._annotations_locked
+                and not (event.modifiers() & Qt.ShiftModifier)
+            ):
+                ids = set(self._selected_ids) if self._selected_ids else set()
+                if hit_any.id not in ids:
+                    ids = {hit_any.id}
+                self._move_ids = ids
+                self._move_origin = (x, y)
+                self._move_delta = (0.0, 0.0)
+                self.setCursor(QCursor(Qt.ClosedHandCursor))
             return
         if event.button() == Qt.LeftButton and event.modifiers() & Qt.ShiftModifier:
             hit_any = self._hit_annotation(x, y)
@@ -665,6 +745,13 @@ class PdfCanvas(QLabel):
         super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event):
+        if self._move_origin is not None:
+            pt = self._map_to_page(event)
+            if pt:
+                ox, oy = self._move_origin
+                self._move_delta = (pt[0] - ox, pt[1] - oy)
+                self._repaint_overlay()
+            return
         if self._drag_start is not None:
             pt = self._map_to_page(event)
             if pt:
@@ -674,11 +761,30 @@ class PdfCanvas(QLabel):
             pt = self._map_to_page(event)
             if pt and self._hit_uri_link(*pt):
                 self.setCursor(QCursor(Qt.PointingHandCursor))
+            elif (
+                pt
+                and self._select_mode
+                and not self._annotations_locked
+                and self._hit_annotation(*pt)
+            ):
+                self.setCursor(QCursor(Qt.OpenHandCursor))
             else:
                 self.unsetCursor()
         super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event):
+        if self._move_origin is not None and event.button() == Qt.LeftButton:
+            dx, dy = self._move_delta
+            ids = list(self._move_ids)
+            self._move_ids = set()
+            self._move_origin = None
+            self._move_delta = (0.0, 0.0)
+            self.unsetCursor()
+            if ids and (abs(dx) > 2 or abs(dy) > 2):
+                self.annotations_moved.emit(ids, float(dx), float(dy))
+            else:
+                self._repaint_overlay()
+            return
         if self._drag_start is not None and event.button() == Qt.LeftButton:
             pt = self._map_to_page(event) or self._drag_current
             if pt:
@@ -716,6 +822,8 @@ class PdfViewer(QWidget):
     grayscale_changed = Signal(bool)  # Toolbar ↔ Menü sync
     night_mode_changed = Signal(bool)
     annotations_layer_changed = Signal(bool)
+    annotations_lock_changed = Signal(bool)
+    page_boxes_changed = Signal(bool)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -739,6 +847,8 @@ class PdfViewer(QWidget):
         self._night_mode = get_pdf_night_mode()
         self._default_opacity = get_ann_default_opacity()
         self._annotations_visible = get_annotations_visible()
+        self._annotations_locked = get_annotations_locked()
+        self._show_page_boxes = get_show_page_boxes()
         self._search_query = ""
         self._search_rects: list[tuple[float, float, float, float]] = []
         self._search_index = -1
@@ -899,6 +1009,20 @@ class PdfViewer(QWidget):
         self.btn_ann_layer.setChecked(self._annotations_visible)
         self.btn_ann_layer.setToolTip("Annotation-Layer ein-/ausblenden")
         self.btn_ann_layer.toggled.connect(self.set_annotations_visible)
+        self.btn_ann_lock = QToolButton()
+        self.btn_ann_lock.setText("Sperre")
+        self.btn_ann_lock.setCheckable(True)
+        self.btn_ann_lock.setChecked(self._annotations_locked)
+        self.btn_ann_lock.setToolTip(
+            "Annotationen sperren (nicht verschiebbar) — Auswahl-Werkzeug + Ziehen"
+        )
+        self.btn_ann_lock.toggled.connect(self.set_annotations_locked)
+        self.btn_page_boxes = QToolButton()
+        self.btn_page_boxes.setText("Rahmen")
+        self.btn_page_boxes.setCheckable(True)
+        self.btn_page_boxes.setChecked(self._show_page_boxes)
+        self.btn_page_boxes.setToolTip("MediaBox/CropBox-Seitenrahmen als Overlay anzeigen")
+        self.btn_page_boxes.toggled.connect(self.set_show_page_boxes)
         toolbar.addWidget(self.btn_hl_color)
         toolbar.addWidget(self.btn_pen_color)
         self._preset_btns: list[QPushButton] = []
@@ -921,6 +1045,8 @@ class PdfViewer(QWidget):
         toolbar.addWidget(self.btn_grayscale)
         toolbar.addWidget(self.btn_night)
         toolbar.addWidget(self.btn_ann_layer)
+        toolbar.addWidget(self.btn_ann_lock)
+        toolbar.addWidget(self.btn_page_boxes)
 
         toolbar.addWidget(btn_prev)
         toolbar.addWidget(self.lbl_page)
@@ -957,11 +1083,14 @@ class PdfViewer(QWidget):
         self.scroll.setWidgetResizable(True)
         self.canvas = PdfCanvas()
         self.canvas.set_annotations_visible(self._annotations_visible)
+        self.canvas.set_annotations_locked(self._annotations_locked)
+        self.canvas.set_show_page_boxes(self._show_page_boxes)
         self.canvas.annotation_placed.connect(self._on_place)
         self.canvas.drag_finished.connect(self._on_drag)
         self.canvas.overlay_edit_requested.connect(self._edit_overlay)
         self.canvas.annotation_selected.connect(self._on_annotation_selected)
         self.canvas.uri_link_clicked.connect(self._open_uri_link)
+        self.canvas.annotations_moved.connect(self._on_annotations_moved)
         self.scroll.setWidget(self.canvas)
         layout.addWidget(self.scroll)
         self.canvas.set_drag_tool(AnnotationType.HIGHLIGHT, select_mode=False)
@@ -1111,6 +1240,102 @@ class PdfViewer(QWidget):
     def annotations_visible(self) -> bool:
         return bool(self._annotations_visible)
 
+    def set_annotations_locked(self, locked: bool):
+        """Annotationen sperren — nicht per Drag verschiebbar."""
+        enabled = bool(locked)
+        changed = self._annotations_locked != enabled
+        self._annotations_locked = enabled
+        set_annotations_locked(enabled)
+        if hasattr(self, "btn_ann_lock"):
+            self.btn_ann_lock.blockSignals(True)
+            self.btn_ann_lock.setChecked(enabled)
+            self.btn_ann_lock.blockSignals(False)
+        self.canvas.set_annotations_locked(enabled)
+        if changed:
+            self.annotations_lock_changed.emit(enabled)
+            self.status.emit(
+                "Annotationen gesperrt (nicht verschiebbar)"
+                if enabled
+                else "Annotationen entsperrt — Auswahl + Ziehen verschiebt"
+            )
+
+    def annotations_locked(self) -> bool:
+        return bool(self._annotations_locked)
+
+    def set_show_page_boxes(self, enabled: bool):
+        """MediaBox/CropBox-Rahmen als Overlay ein-/ausblenden."""
+        on = bool(enabled)
+        changed = self._show_page_boxes != on
+        self._show_page_boxes = on
+        set_show_page_boxes(on)
+        if hasattr(self, "btn_page_boxes"):
+            self.btn_page_boxes.blockSignals(True)
+            self.btn_page_boxes.setChecked(on)
+            self.btn_page_boxes.blockSignals(False)
+        self.canvas.set_show_page_boxes(on)
+        if on:
+            self._update_page_box_overlay()
+        else:
+            self.canvas.clear_page_box_rects()
+        if changed:
+            self.page_boxes_changed.emit(on)
+            self.status.emit(
+                "Seitenrahmen/CropBox-Overlay an" if on else "Seitenrahmen-Overlay aus"
+            )
+
+    def show_page_boxes(self) -> bool:
+        return bool(self._show_page_boxes)
+
+    @staticmethod
+    def _pdf_box_to_pixel_rect(
+        box: tuple[float, float, float, float],
+        page_h_pt: float,
+        scale: float,
+    ) -> tuple[float, float, float, float]:
+        """PDF-Box (l,b,r,t) → Pixel-Rect (x,y,w,h), Y von oben."""
+        left, bottom, right, top = box
+        s = max(float(scale), 0.01)
+        x0 = float(left) * s
+        x1 = float(right) * s
+        y0 = (float(page_h_pt) - float(top)) * s
+        y1 = (float(page_h_pt) - float(bottom)) * s
+        return x0, y0, max(x1 - x0, 1.0), max(y1 - y0, 1.0)
+
+    def _update_page_box_overlay(self):
+        if not self.pdf_path or not self._show_page_boxes:
+            self.canvas.clear_page_box_rects()
+            return
+        try:
+            from ild_pdf.pages import get_page_boxes
+
+            boxes = get_page_boxes(self.pdf_path, self.page_index)
+            mb = boxes["mediabox"]
+            cb = boxes["cropbox"]
+            page_h = float(mb[3] - mb[1]) if mb[3] > mb[1] else float(mb[3])
+            media_r = self._pdf_box_to_pixel_rect(mb, page_h, self.scale)
+            crop_r = self._pdf_box_to_pixel_rect(cb, page_h, self.scale)
+            # Crop nur zeichnen wenn abweichend
+            same = all(abs(a - b) < 0.5 for a, b in zip(media_r, crop_r))
+            self.canvas.set_page_box_rects(media_r, None if same else crop_r)
+        except Exception:
+            self.canvas.clear_page_box_rects()
+
+    def _on_annotations_moved(self, ids: list, dx: float, dy: float):
+        if not self.store or self._annotations_locked:
+            self.refresh()
+            return
+        n = self.store.move_by(ids, dx, dy)
+        if n:
+            try:
+                self.store.save(force=True)
+            except Exception as e:
+                QMessageBox.warning(self, "Annotation verschieben", str(e))
+            self.refresh()
+            self.annotations_changed.emit()
+            self.status.emit(f"{n} Annotation(en) verschoben")
+        else:
+            self.refresh()
+
     def apply_settings_colors(self):
         self._highlight_color = get_ann_highlight_color()
         self._pen_color = get_ann_pen_color()
@@ -1138,6 +1363,22 @@ class PdfViewer(QWidget):
             self.btn_ann_layer.setChecked(self._annotations_visible)
             self.btn_ann_layer.blockSignals(False)
         self.canvas.set_annotations_visible(self._annotations_visible)
+        self._annotations_locked = get_annotations_locked()
+        if hasattr(self, "btn_ann_lock"):
+            self.btn_ann_lock.blockSignals(True)
+            self.btn_ann_lock.setChecked(self._annotations_locked)
+            self.btn_ann_lock.blockSignals(False)
+        self.canvas.set_annotations_locked(self._annotations_locked)
+        self._show_page_boxes = get_show_page_boxes()
+        if hasattr(self, "btn_page_boxes"):
+            self.btn_page_boxes.blockSignals(True)
+            self.btn_page_boxes.setChecked(self._show_page_boxes)
+            self.btn_page_boxes.blockSignals(False)
+        self.canvas.set_show_page_boxes(self._show_page_boxes)
+        if self._show_page_boxes:
+            self._update_page_box_overlay()
+        else:
+            self.canvas.clear_page_box_rects()
 
     def apply_default_zoom(self):
         self.set_scale(get_default_zoom_scale(), immediate=True)
@@ -1412,6 +1653,7 @@ class PdfViewer(QWidget):
             except Exception:
                 links = []
             self.canvas.set_uri_links(links)
+            self._update_page_box_overlay()
             if self._search_rects:
                 self.canvas.set_search_highlights(self._search_rects, self._search_index)
             self.lbl_page.setText(f"{self.page_index + 1} / {self.page_count}")

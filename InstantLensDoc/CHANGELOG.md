@@ -1,5 +1,23 @@
 # Changelog — InstantLens Doc
 
+## 0.4.3 — CropBox-Overlay, Ann.-Lock, Snippets, Templates
+
+Fokus: Seitenrahmen-Overlay, Annotation-Sperre, Editor-Textbausteine, Dokument-Vorlagen. Stubs KI/Cloud/Stylus/3D unverändert.
+
+### PDF
+- **Seitenrahmen / CropBox-Overlay** optional (Ansicht + Toolbar „Rahmen“; MediaBox durchgezogen, CropBox gestrichelt wenn abweichend)
+- **Annotation-Lock**: Toggle sperrt Verschieben per Drag (Auswahl-Werkzeug + Ziehen wenn entsperrt); Persistenz in Settings
+
+### Editor / UX
+- **Textbausteine**: 3 gespeicherte Snippets (Einfügen Ctrl+Alt+1..3; Auswahl → Slot)
+- **Neues Dokument**: Vorlagen Leer / Brief / Notiz (Datei → Neu)
+
+### Packaging / Docs
+- Version **0.4.3** (App, `ild_pdf`, ISS, Build, Docs, Smoke)
+- FEATURES / INFO / CHANGELOG / Hilfe aktualisiert
+
+---
+
 ## 0.4.2 — Outline-Goto, Ann.-Copy/Paste, Case-Datei, Progress
 
 Fokus: Navigation/Clipboard/Editor-Batch-Härte. Stubs KI/Cloud/Stylus/3D unverändert.

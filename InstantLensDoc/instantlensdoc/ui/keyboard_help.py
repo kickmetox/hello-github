@@ -8,7 +8,10 @@ SHORTCUTS_HTML = """
 <h2>Tastaturhilfe — InstantLens Doc</h2>
 <table cellpadding="4" cellspacing="0">
 <tr><th align="left">Aktion</th><th align="left">Kürzel</th></tr>
-<tr><td>Neu</td><td><code>Ctrl+N</code></td></tr>
+<tr><td>Neu (leer)</td><td><code>Ctrl+N</code></td></tr>
+<tr><td>Textbaustein 1–3 einfügen</td><td><code>Ctrl+Alt+1</code> … <code>3</code></td></tr>
+<tr><td>Annotationen sperren</td><td><code>Ctrl+Shift+L</code></td></tr>
+<tr><td>Seitenrahmen / CropBox</td><td><code>Ctrl+Shift+B</code></td></tr>
 <tr><td>Öffnen</td><td><code>Ctrl+O</code></td></tr>
 <tr><td>Speichern</td><td><code>Ctrl+S</code></td></tr>
 <tr><td>Alles speichern</td><td><code>Ctrl+Alt+Shift+S</code></td></tr>
@@ -55,9 +58,9 @@ PDF → Annotationen speichern unter…</p>
 aktuelles Dokument bleibt geöffnet (<code>Ctrl+Alt+S</code> / Datei / PDF).</p>
 <p><b>Lesezeichen:</b> Sidebar +/− oder PDF → Lesezeichen hinzufügen/löschen.</p>
 <p><b>Annotationen JSON/CSV:</b> PDF → als JSON oder CSV exportieren / JSON importieren (ersetzen oder anhängen).</p>
-<p><b>PDF-Werkzeuge</b> (Toolbar): Auswahl (auch PDF-Links öffnen), Highlight, Schwärzen (REDACT-Preview), Formen per Drag;
+<p><b>PDF-Werkzeuge</b> (Toolbar): Auswahl (auch PDF-Links öffnen / Ann. verschieben wenn entsperrt), Highlight, Schwärzen (REDACT-Preview), Formen per Drag;
 Notiz/Stempel/Callout/Overlay per Klick; <b>Stempel ↻</b> drehen; <b>HL</b>/<b>Stift</b>-Farben-Picker; <b>α Deckkraft</b>;
-<b>Grau</b>-Toggle; <b>Nacht</b>-Toggle (nur Ansicht); Ann. löschen;
+<b>Grau</b>-Toggle; <b>Nacht</b>-Toggle (nur Ansicht); <b>Sperre</b>; <b>Rahmen</b> (CropBox); Ann. löschen;
 Seite <b>⟲/⟳ drehen</b>, <b>↔/↕ spiegeln</b>, <b>leere Seite</b>, <b>duplizieren</b>.</p>
 <p><b>Editor-Encoding:</b> Datei → Öffnen/Speichern mit Encoding (UTF-8 / Latin-1); Standard in Einstellungen.</p>
 <p><b>Drag &amp; Drop:</b> mehrere Dateien → mehrere Tabs in der Sidebar.</p>

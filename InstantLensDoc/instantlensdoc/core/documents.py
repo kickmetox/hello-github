@@ -27,6 +27,49 @@ def normalize_text_encoding(encoding: str | None) -> str:
     return "utf-8"
 
 
+# Vorlagen für „Neues leeres Dokument“ (id → Titel, Text)
+DOC_TEMPLATES: dict[str, tuple[str, str]] = {
+    "empty": ("Unbenannt", ""),
+    "brief": (
+        "Brief",
+        "{name}\n{street}\n{city}\n\n"
+        "{date}\n\n"
+        "Sehr geehrte Damen und Herren,\n\n"
+        "[Text]\n\n"
+        "Mit freundlichen Grüßen\n\n"
+        "[Unterschrift]\n"
+    ),
+    "notiz": (
+        "Notiz",
+        "# Notiz\n\n"
+        "Datum: {date}\n"
+        "Thema: \n\n"
+        "- \n"
+        "- \n\n"
+        "———\n",
+    ),
+}
+
+
+def render_doc_template(template_id: str = "empty") -> tuple[str, str]:
+    """
+    Dokument-Vorlage rendern.
+    Rückgabe: (Titel, Text). Unbekannte ID → leeres Dokument.
+    """
+    from datetime import date
+
+    key = (template_id or "empty").strip().lower()
+    title, body = DOC_TEMPLATES.get(key, DOC_TEMPLATES["empty"])
+    today = date.today().strftime("%d.%m.%Y")
+    text = body.format(
+        name="[Name]",
+        street="[Straße Nr.]",
+        city="[PLZ Ort]",
+        date=today,
+    )
+    return title, text
+
+
 class DocKind(str, Enum):
     TEXT = "text"
     MARKDOWN = "markdown"

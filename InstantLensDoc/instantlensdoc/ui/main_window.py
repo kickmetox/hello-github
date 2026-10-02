@@ -22,7 +22,13 @@ from PySide6.QtWidgets import (
 
 from instantlensdoc import __version__
 from instantlensdoc.config import DISPLAY_NAME, icon_paths_for_qt
-from instantlensdoc.core.documents import DocKind, Document, open_document, save_document
+from instantlensdoc.core.documents import (
+    DocKind,
+    Document,
+    open_document,
+    render_doc_template,
+    save_document,
+)
 from instantlensdoc.core import ocr as ocr_mod
 from instantlensdoc.core.layout import LayoutDocument
 from instantlensdoc.core import recent as recent_mod
@@ -337,6 +343,8 @@ class MainWindow(QMainWindow):
         self.pdf_view.grayscale_changed.connect(self._sync_grayscale_action)
         self.pdf_view.night_mode_changed.connect(self._sync_night_action)
         self.pdf_view.annotations_layer_changed.connect(self._sync_ann_layer_action)
+        self.pdf_view.annotations_lock_changed.connect(self._sync_ann_lock_action)
+        self.pdf_view.page_boxes_changed.connect(self._sync_page_boxes_action)
         self.image_label = QLabel(alignment=Qt.AlignCenter)
         self.image_label.setText("Bildvorschau")
         self.stack.addWidget(self.editor_pane)  # 0
@@ -381,10 +389,20 @@ class MainWindow(QMainWindow):
         mb = self.menuBar()
 
         m_file = mb.addMenu("&Datei")
-        act_new = QAction("Neu", self)
+        m_new = m_file.addMenu("Neu")
+        act_new = QAction("Leeres Dokument", self)
         act_new.setShortcut(QKeySequence.New)
-        act_new.triggered.connect(self.new_doc)
-        m_file.addAction(act_new)
+        act_new.setToolTip("Neues leeres Textdokument")
+        act_new.triggered.connect(lambda: self.new_doc("empty"))
+        m_new.addAction(act_new)
+        act_new_brief = QAction("Brief…", self)
+        act_new_brief.setToolTip("Neues Dokument aus Brief-Vorlage")
+        act_new_brief.triggered.connect(lambda: self.new_doc("brief"))
+        m_new.addAction(act_new_brief)
+        act_new_notiz = QAction("Notiz…", self)
+        act_new_notiz.setToolTip("Neues Dokument aus Notiz-Vorlage")
+        act_new_notiz.triggered.connect(lambda: self.new_doc("notiz"))
+        m_new.addAction(act_new_notiz)
 
         act_open = QAction("Öffnen…", self)
         act_open.setShortcut(QKeySequence.Open)
@@ -526,6 +544,19 @@ class MainWindow(QMainWindow):
         act_all_lower.setToolTip("Gesamten Editor-Text in Kleinbuchstaben")
         act_all_lower.triggered.connect(lambda: self._transform_document_case("lower"))
         m_edit.addAction(act_all_lower)
+        m_snippets = m_edit.addMenu("Textbausteine")
+        for i in range(3):
+            a_ins = QAction(f"Einfügen {i + 1}", self)
+            a_ins.setShortcut(QKeySequence(f"Ctrl+Alt+{i + 1}"))
+            a_ins.setToolTip(f"Gespeicherten Textbaustein {i + 1} an Cursor einfügen")
+            a_ins.triggered.connect(lambda checked=False, idx=i: self._insert_snippet(idx))
+            m_snippets.addAction(a_ins)
+        m_snippets.addSeparator()
+        for i in range(3):
+            a_save = QAction(f"Auswahl → Slot {i + 1}", self)
+            a_save.setToolTip(f"Aktuelle Auswahl (oder Zeile) als Textbaustein {i + 1} speichern")
+            a_save.triggered.connect(lambda checked=False, idx=i: self._save_snippet(idx))
+            m_snippets.addAction(a_save)
         act_indent = QAction("Einrückung erhöhen", self)
         act_indent.setShortcut(QKeySequence("Ctrl+]"))
         act_indent.setToolTip("Zeilen/Block einrücken (auch Tab)")
@@ -637,6 +668,26 @@ class MainWindow(QMainWindow):
         self._ann_layer_action.setShortcut(QKeySequence("Ctrl+Shift+A"))
         self._ann_layer_action.toggled.connect(self._toggle_ann_layer)
         m_view.addAction(self._ann_layer_action)
+        from instantlensdoc.core.app_settings import get_annotations_locked, get_show_page_boxes
+
+        self._ann_lock_action = QAction("Annotationen sperren", self)
+        self._ann_lock_action.setCheckable(True)
+        self._ann_lock_action.setChecked(get_annotations_locked())
+        self._ann_lock_action.setToolTip(
+            "Gesperrt: Annotationen nicht per Drag verschiebbar (Auswahl-Werkzeug)"
+        )
+        self._ann_lock_action.setShortcut(QKeySequence("Ctrl+Shift+L"))
+        self._ann_lock_action.toggled.connect(self._toggle_ann_lock)
+        m_view.addAction(self._ann_lock_action)
+        self._page_boxes_action = QAction("Seitenrahmen / CropBox", self)
+        self._page_boxes_action.setCheckable(True)
+        self._page_boxes_action.setChecked(get_show_page_boxes())
+        self._page_boxes_action.setToolTip(
+            "MediaBox- und CropBox-Rahmen als Overlay auf der PDF-Seite"
+        )
+        self._page_boxes_action.setShortcut(QKeySequence("Ctrl+Shift+B"))
+        self._page_boxes_action.toggled.connect(self._toggle_page_boxes)
+        m_view.addAction(self._page_boxes_action)
         act_size_unit = QAction("Seitengröße mm/inch umschalten", self)
         act_size_unit.setShortcut(QKeySequence("Ctrl+Alt+U"))
         act_size_unit.setToolTip("Einheit der PDF-Seitengröße in der Statusleiste (mm ↔ inch)")
@@ -1229,6 +1280,14 @@ class MainWindow(QMainWindow):
         self.pdf_view.set_annotations_visible(bool(checked))
         self._sync_ann_layer_action(bool(checked))
 
+    def _toggle_ann_lock(self, checked: bool):
+        self.pdf_view.set_annotations_locked(bool(checked))
+        self._sync_ann_lock_action(bool(checked))
+
+    def _toggle_page_boxes(self, checked: bool):
+        self.pdf_view.set_show_page_boxes(bool(checked))
+        self._sync_page_boxes_action(bool(checked))
+
     def _sync_grayscale_action(self, enabled: bool):
         if hasattr(self, "_grayscale_action") and self._grayscale_action is not None:
             self._grayscale_action.blockSignals(True)
@@ -1246,6 +1305,52 @@ class MainWindow(QMainWindow):
             self._ann_layer_action.blockSignals(True)
             self._ann_layer_action.setChecked(bool(enabled))
             self._ann_layer_action.blockSignals(False)
+
+    def _sync_ann_lock_action(self, enabled: bool):
+        if hasattr(self, "_ann_lock_action") and self._ann_lock_action is not None:
+            self._ann_lock_action.blockSignals(True)
+            self._ann_lock_action.setChecked(bool(enabled))
+            self._ann_lock_action.blockSignals(False)
+
+    def _sync_page_boxes_action(self, enabled: bool):
+        if hasattr(self, "_page_boxes_action") and self._page_boxes_action is not None:
+            self._page_boxes_action.blockSignals(True)
+            self._page_boxes_action.setChecked(bool(enabled))
+            self._page_boxes_action.blockSignals(False)
+
+    def _insert_snippet(self, index: int):
+        if self.stack.currentWidget() is not self.editor_pane:
+            self._set_status("Textbausteine nur im Editor")
+            return
+        from instantlensdoc.core.app_settings import get_editor_snippets
+
+        snippets = get_editor_snippets()
+        i = max(0, min(2, int(index)))
+        text = snippets[i] if i < len(snippets) else ""
+        if not text:
+            self._set_status(f"Textbaustein {i + 1} ist leer")
+            return
+        self.editor.insertPlainText(text)
+        self._set_status(f"Textbaustein {i + 1} eingefügt")
+
+    def _save_snippet(self, index: int):
+        if self.stack.currentWidget() is not self.editor_pane:
+            self._set_status("Textbausteine nur im Editor")
+            return
+        from instantlensdoc.core.app_settings import set_editor_snippet
+
+        cur = self.editor.textCursor()
+        text = cur.selectedText().replace("\u2029", "\n")
+        if not text.strip():
+            # aktuelle Zeile
+            from PySide6.QtGui import QTextCursor
+
+            cur.select(QTextCursor.LineUnderCursor)
+            text = cur.selectedText().replace("\u2029", "\n")
+        i = max(0, min(2, int(index)))
+        set_editor_snippet(i, text)
+        preview = (text[:40] + "…") if len(text) > 40 else text.replace("\n", "⏎")
+        self._set_status(f"Textbaustein {i + 1} gespeichert: {preview}")
 
     def _toggle_case_selection(self):
         if self.stack.currentWidget() is not self.editor_pane:
@@ -2272,17 +2377,23 @@ class MainWindow(QMainWindow):
             "Strg+V im PDF-Viewer fügt ebenfalls Bilder ein.",
         )
 
-    def new_doc(self):
-        self.doc = Document(kind=DocKind.TEXT, title="Unbenannt")
-        self.editor.setPlainText("")
+    def new_doc(self, template_id: str = "empty"):
+        title, text = render_doc_template(template_id)
+        kind = DocKind.MARKDOWN if template_id == "notiz" else DocKind.TEXT
+        self.doc = Document(kind=kind, title=title, text=text)
+        self.editor.setPlainText(text)
         self.editor.clear_extra_selections()
         self._editor_marks.clear()
         self.sidebar.set_marks([])
         self.sidebar.clear_annotations()
         self.stack.setCurrentWidget(self.editor_pane)
-        self.setWindowTitle(self._app_title("Unbenannt"))
+        self.setWindowTitle(self._app_title(title))
         self._update_doc_status()
-        self._set_status("Neues Dokument")
+        label = {
+            "brief": "Neues Dokument (Brief)",
+            "notiz": "Neues Dokument (Notiz)",
+        }.get((template_id or "empty").lower(), "Neues Dokument")
+        self._set_status(label)
 
     def open_dialog(self):
         start = dialog_start_dir(get_default_open_dir())

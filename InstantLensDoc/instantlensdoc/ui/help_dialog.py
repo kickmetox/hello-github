@@ -49,12 +49,16 @@ HELP_HTML = f"""
 <li><b>Bearbeiten → Auswahl markieren</b> (Ctrl+H): Markierung im Editor + Eintrag in der Seitenleiste</li>
 <li><b>Bearbeiten → Groß-/Kleinschreibung umschalten</b> (Ctrl+Shift+U): Auswahl GROSS → klein → Titel</li>
 <li><b>Bearbeiten → Alles groß-/kleinschreiben</b> (Ctrl+Alt+Shift+U / L): gesamte Datei</li>
+<li><b>Bearbeiten → Textbausteine</b>: 3 gespeicherte Snippets (Einfügen Ctrl+Alt+1..3; Auswahl → Slot)</li>
+<li><b>Datei → Neu</b>: leeres Dokument oder Vorlage <b>Brief</b> / <b>Notiz</b></li>
 <li><b>Bearbeiten → Einrückung erhöhen/verringern</b> (Ctrl+] / Ctrl+[; Tab / Shift+Tab Block)</li>
 <li><b>Ansicht</b>: Zoom +/−, Seite einpassen (Ctrl+0), Breite (Ctrl+9), Höhe (Ctrl+8), 100&nbsp;% (Ctrl+1);
     <b>Präsentationsmodus</b> (F5 Vollbild, Pfeiltasten); <b>Hell/Dunkel</b>-Design umschalten; optionale <b>Zeilennummern</b>; <b>Markdown-Vorschau</b> (Split, Ctrl+Shift+M);
     <b>Soft-Wrap</b>; <b>Sonderzeichen anzeigen</b> (Ctrl+Shift+.);
     <b>PDF Graustufen</b>; <b>PDF Nachtmodus</b> (Invert-Ansicht, nur Darstellung);
-    <b>Annotation-Layer</b> ein/aus (Ctrl+Shift+A)</li>
+    <b>Annotation-Layer</b> ein/aus (Ctrl+Shift+A);
+    <b>Annotationen sperren</b> (Ctrl+Shift+L — nicht verschiebbar);
+    <b>Seitenrahmen / CropBox</b> Overlay (Ctrl+Shift+B)</li>
 <li><b>Datei → Öffnen/Speichern mit Encoding</b>: UTF-8 oder Latin-1 für Textdateien (Standard in Einstellungen)</li>
 <li><b>Drag &amp; Drop</b>: eine oder mehrere Dateien auf das Fenster ziehen → mehrere Tabs</li>
 <li><b>Autosave</b>: Textdokumente (mit Pfad) und PDF-Annotationen — Intervall in Einstellungen</li>
@@ -69,6 +73,7 @@ HELP_HTML = f"""
     <b>Textsuche</b> highlightet Treffer auf der aktuellen Seite;
     Doppelklick / Strg+Klick / <b>Ctrl+E</b> auf Notiz/Overlay zum Bearbeiten;
     <b>Ctrl+Shift+D</b> Auswahl duplizieren; <b>Ctrl+Alt+C/V</b> Annotationen kopieren/einfügen (auch seitenübergreifend);
+    Auswahl-Werkzeug: Annotationen per Drag verschieben (wenn nicht gesperrt);
     PDF → Text→Overlay / Overlay einbrennen / <b>Text Seite/alles → Editor</b>;
     Flatten/Bake mit Fortschrittsdialog (Abbrechen);
     <b>Signaturfeld</b> (Platzhalter) und <b>Signatur (Bild)</b> einfügen;

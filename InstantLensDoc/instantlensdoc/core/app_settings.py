@@ -47,6 +47,13 @@ DEFAULTS: dict[str, Any] = {
     "restore_session_on_start": True,
     "pdf_thumbnail_scale": 0.18,
     "editor_text_encoding": "utf-8",
+    "show_page_boxes": False,
+    "annotations_locked": False,
+    "editor_snippets": [
+        "Sehr geehrte Damen und Herren,\n\n",
+        "Mit freundlichen Grüßen\n",
+        "— Notiz —\n",
+    ],
 }
 
 
@@ -368,6 +375,67 @@ def get_annotations_visible() -> bool:
 
 def set_annotations_visible(visible: bool) -> None:
     save_settings({"annotations_visible": bool(visible)})
+
+
+def get_show_page_boxes() -> bool:
+    """Optional: MediaBox/CropBox-Rahmen als Overlay auf der PDF-Seite."""
+    return bool(load_settings().get("show_page_boxes", False))
+
+
+def set_show_page_boxes(enabled: bool) -> None:
+    save_settings({"show_page_boxes": bool(enabled)})
+
+
+def get_annotations_locked() -> bool:
+    """Annotationen gesperrt (nicht per Drag verschiebbar)."""
+    return bool(load_settings().get("annotations_locked", False))
+
+
+def set_annotations_locked(locked: bool) -> None:
+    save_settings({"annotations_locked": bool(locked)})
+
+
+EDITOR_SNIPPET_COUNT = 3
+_DEFAULT_EDITOR_SNIPPETS = [
+    "Sehr geehrte Damen und Herren,\n\n",
+    "Mit freundlichen Grüßen\n",
+    "— Notiz —\n",
+]
+
+
+def get_editor_snippets() -> list[str]:
+    """Drei gespeicherte Textbausteine für den Editor."""
+    raw = load_settings().get("editor_snippets")
+    defaults = list(_DEFAULT_EDITOR_SNIPPETS)
+    if not isinstance(raw, list):
+        return defaults
+    out: list[str] = []
+    for i in range(EDITOR_SNIPPET_COUNT):
+        if i < len(raw):
+            out.append(str(raw[i] if raw[i] is not None else defaults[i]))
+        else:
+            out.append(defaults[i])
+    return out
+
+
+def set_editor_snippets(snippets: list[str]) -> list[str]:
+    defaults = list(_DEFAULT_EDITOR_SNIPPETS)
+    cleaned: list[str] = []
+    for i in range(EDITOR_SNIPPET_COUNT):
+        if i < len(snippets) and snippets[i] is not None:
+            cleaned.append(str(snippets[i]))
+        else:
+            cleaned.append(defaults[i])
+    save_settings({"editor_snippets": cleaned})
+    return cleaned
+
+
+def set_editor_snippet(index: int, text: str) -> list[str]:
+    """Einzelnen Textbaustein-Slot (0..2) setzen."""
+    snippets = get_editor_snippets()
+    i = max(0, min(EDITOR_SNIPPET_COUNT - 1, int(index)))
+    snippets[i] = str(text if text is not None else "")
+    return set_editor_snippets(snippets)
 
 
 def get_minimize_to_tray() -> bool:
