@@ -12,8 +12,8 @@ import pypdfium2 as pdfium
 from .document import PdfDocument
 from .limits import clamp_render_scale
 
-# LRU: (path_str, mtime_ns, page, scale_key) → PIL Image
-_CACHE: "OrderedDict[Tuple[str, int, int, float], Image.Image]" = OrderedDict()
+# LRU: (path_str, mtime_ns, page, scale_key, grayscale) → PIL Image
+_CACHE: "OrderedDict[Tuple[str, int, int, float, bool], Image.Image]" = OrderedDict()
 _CACHE_MAX = 24
 
 
@@ -35,7 +35,7 @@ def _mtime_ns(path: Path) -> int:
         return 0
 
 
-def _cache_get(key: Tuple[str, int, int, float]) -> Optional[Image.Image]:
+def _cache_get(key: Tuple[str, int, int, float, bool]) -> Optional[Image.Image]:
     img = _CACHE.get(key)
     if img is None:
         return None
@@ -43,11 +43,23 @@ def _cache_get(key: Tuple[str, int, int, float]) -> Optional[Image.Image]:
     return img.copy()
 
 
-def _cache_put(key: Tuple[str, int, int, float], img: Image.Image) -> None:
+def _cache_put(key: Tuple[str, int, int, float, bool], img: Image.Image) -> None:
     _CACHE[key] = img.copy()
     _CACHE.move_to_end(key)
     while len(_CACHE) > _CACHE_MAX:
         _CACHE.popitem(last=False)
+
+
+def _to_grayscale(img: Image.Image) -> Image.Image:
+    """Farbe → Graustufen (RGBA beibehalten wenn vorhanden)."""
+    if img.mode == "RGBA":
+        rgb = img.convert("RGB").convert("L").convert("RGB")
+        r, g, b, a = img.split()
+        gray = rgb.convert("L")
+        return Image.merge("RGBA", (gray, gray, gray, a))
+    if img.mode == "L":
+        return img
+    return img.convert("L").convert("RGB")
 
 
 def render_page(
@@ -57,8 +69,9 @@ def render_page(
     *,
     use_cache: bool = True,
     password: Optional[str] = None,
+    grayscale: bool = False,
 ) -> Image.Image:
-    """Eine Seite als PIL-Image rendern (optional LRU-Cache)."""
+    """Eine Seite als PIL-Image rendern (optional LRU-Cache, optional Graustufen)."""
     own = False
     path_for_cache: Optional[Path] = None
     if isinstance(source, (str, Path)):
@@ -78,18 +91,21 @@ def render_page(
             pw, ph = page.get_size()
             eff_scale, _ = clamp_render_scale(float(pw), float(ph), scale)
             scale_key = round(eff_scale, 3)
-            cache_key: Optional[Tuple[str, int, int, float]] = None
+            gray = bool(grayscale)
+            cache_key: Optional[Tuple[str, int, int, float, bool]] = None
             if use_cache and path_for_cache is not None:
                 try:
                     resolved = str(path_for_cache.resolve())
                 except OSError:
                     resolved = str(path_for_cache)
-                cache_key = (resolved, _mtime_ns(path_for_cache), page_index, scale_key)
+                cache_key = (resolved, _mtime_ns(path_for_cache), page_index, scale_key, gray)
                 hit = _cache_get(cache_key)
                 if hit is not None:
                     return hit
             bitmap = page.render(scale=eff_scale)
             img = bitmap.to_pil()
+            if gray:
+                img = _to_grayscale(img)
             if cache_key is not None:
                 _cache_put(cache_key, img)
             return img
@@ -106,6 +122,7 @@ def render_pages(
     scale: float = 2.0,
     *,
     password: Optional[str] = None,
+    grayscale: bool = False,
 ) -> List[Image.Image]:
     """Mehrere Seiten rendern. Ohne indices: alle Seiten."""
     own = False
@@ -119,15 +136,21 @@ def render_pages(
 
     try:
         pages = list(indices) if indices is not None else list(range(len(doc)))
-        return [render_page(doc, i, scale=scale) for i in pages]
+        return [
+            render_page(doc, i, scale=scale, grayscale=grayscale) for i in pages
+        ]
     finally:
         if own:
             doc.close()
 
 
 def convert_from_path(
-    path: str | Path, dpi: int = 150, *, password: Optional[str] = None
+    path: str | Path,
+    dpi: int = 150,
+    *,
+    password: Optional[str] = None,
+    grayscale: bool = False,
 ) -> List[Image.Image]:
     """pdf2image-ähnliche API für Drop-in-Ersatz."""
     scale = dpi / 72.0
-    return render_pages(path, scale=scale, password=password)
+    return render_pages(path, scale=scale, password=password, grayscale=grayscale)

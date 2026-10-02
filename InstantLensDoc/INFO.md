@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | 0.2.7 |
+| Version | 0.2.8 |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -32,9 +32,9 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)
 
-## Neu in 0.2.7
+## Neu in 0.2.8
 
-- PDF-Seiten horizontal/vertikal spiegeln  
-- Annotation-Notiz/Kommentar nachträglich editierbar  
-- Editor: optionale Zeilennummern  
-- Alles speichern für offene Tabs  
+- PDF-Seiten Graustufen rendern/exportieren (Toggle)  
+- Annotation-Deckkraft (Opacity)  
+- Editor: Groß-/Kleinschreibung der Auswahl umschalten  
+- Start-Splash / Fenstertitel „InstantLens Doc 0.2.8“  

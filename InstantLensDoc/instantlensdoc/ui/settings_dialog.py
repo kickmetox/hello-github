@@ -29,6 +29,7 @@ from instantlensdoc.core.app_settings import (
     get_export_jpeg_quality,
     get_export_pdf_page,
     get_ocr_lang,
+    get_pdf_grayscale,
     get_theme,
     get_ui_lang,
     get_update_check_on_start,
@@ -39,6 +40,7 @@ from instantlensdoc.core.app_settings import (
     set_default_zoom_percent,
     set_editor_line_numbers,
     set_ocr_lang,
+    set_pdf_grayscale,
     set_theme,
     set_ui_lang,
     set_update_check_on_start,
@@ -103,6 +105,11 @@ class SettingsDialog(QDialog):
         self.line_numbers.setChecked(get_editor_line_numbers())
         self.line_numbers.setToolTip("Optionale Zeilennummern im Texteditor")
         form.addRow(self.line_numbers)
+
+        self.pdf_grayscale = QCheckBox("PDF in Graustufen rendern/exportieren")
+        self.pdf_grayscale.setChecked(get_pdf_grayscale())
+        self.pdf_grayscale.setToolTip("Seitenansicht und Bild-Export monochrom")
+        form.addRow(self.pdf_grayscale)
 
         self.jpeg_q = QSpinBox()
         self.jpeg_q.setRange(10, 100)
@@ -173,6 +180,7 @@ class SettingsDialog(QDialog):
         set_default_zoom_percent(int(self.zoom_pct.value()))
         set_autosave_interval_sec(int(self.autosave_sec.value()))
         set_editor_line_numbers(self.line_numbers.isChecked())
+        set_pdf_grayscale(self.pdf_grayscale.isChecked())
         save_settings(
             {
                 "export_jpeg_quality": int(self.jpeg_q.value()),

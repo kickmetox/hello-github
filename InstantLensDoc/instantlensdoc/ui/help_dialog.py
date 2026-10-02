@@ -28,13 +28,15 @@ HELP_HTML = """
 <li><b>Bearbeiten → Rückgängig/Wiederholen</b>: Editor-Text <i>oder</i> PDF-Annotationen/Overlay-Text (Ctrl+Z / Ctrl+Y)</li>
 <li><b>Bearbeiten → Suchen und Ersetzen</b> (Ctrl+R): Find/Replace im Texteditor</li>
 <li><b>Bearbeiten → Auswahl markieren</b> (Ctrl+H): Markierung im Editor + Eintrag in der Seitenleiste</li>
+<li><b>Bearbeiten → Groß-/Kleinschreibung umschalten</b> (Ctrl+Shift+U): Auswahl GROSS → klein → Titel</li>
 <li><b>Ansicht</b>: Zoom +/−, Seite einpassen (Ctrl+0), Breite (Ctrl+9), 100&nbsp;% (Ctrl+1);
-    <b>Hell/Dunkel</b>-Design umschalten; optionale <b>Zeilennummern</b></li>
+    <b>Hell/Dunkel</b>-Design umschalten; optionale <b>Zeilennummern</b>; <b>PDF Graustufen</b></li>
 <li><b>Drag &amp; Drop</b>: Dateien auf das Fenster ziehen zum Öffnen</li>
 <li><b>Autosave</b>: Textdokumente (mit Pfad) und PDF-Annotationen — Intervall in Einstellungen</li>
 <li><b>PDF</b>: Blättern, Zoom/Fit (debounced + Cache), <b>⟲/⟳ drehen</b> / <b>↔/↕ spiegeln</b> (speichert),
+    <b>Graustufen</b> (Ansicht + Bild-Export),
     <b>leere Seite / duplizieren</b>, Seite löschen, Seiten neu anordnen;
-    Annotationen: Highlight (Drag) + <b>Farben-Picker HL/Stift</b>, <b>Schwärzen/Redaction</b> (Drag + Preview „REDACT“ + Einbrennen-Dialog), Unterstreichen, Notiz, <b>Text-Overlay</b>, Stempel, Callout,
+    Annotationen: Highlight (Drag) + <b>Farben-Picker HL/Stift</b> + <b>Deckkraft α</b>, <b>Schwärzen/Redaction</b> (Drag + Preview „REDACT“ + Einbrennen-Dialog), Unterstreichen, Notiz, <b>Text-Overlay</b>, Stempel, Callout,
     <b>Rechteck / Linie / Pfeil / Lineal</b> —
     Sidecar <code>*.ildann.json</code> (v3, Auto-Save, Undo/Redo); JSON Export/Import;
     <b>Textsuche</b> highlightet Treffer auf der aktuellen Seite;
@@ -78,7 +80,7 @@ Beispiel: <code>examples/ild_pdf_demo.py</code>. API: <code>ild_pdf/README.md</c
 <code>D:\\AI_Temp\\InstantLensDoc</code>, pip, optional Start. Eigenes Icon in <code>assets</code> bleibt erhalten.</p>
 <h3>Geplante Features</h3>
 <p>KI-Assistent, Cloud-Sync, Stylus/Palm Rejection, 3D u. a. sind im Menü als „Geplant“ markiert
-(Stub 0.2.7) — siehe FEATURES.md.</p>
+(Stub 0.2.8) — siehe FEATURES.md.</p>
 """
 
 
@@ -112,7 +114,7 @@ class HelpDialog(QDialog):
 class AboutDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Info")
+        self.setWindowTitle(f"{DISPLAY_NAME} {__version__}")
         icon = QIcon()
         for p in icon_paths_for_qt():
             icon.addFile(str(p))
@@ -125,7 +127,7 @@ class AboutDialog(QDialog):
             layout.addWidget(icon_lbl)
         layout.addWidget(
             QLabel(
-                f"<h2>{DISPLAY_NAME}</h2>"
+                f"<h2>{DISPLAY_NAME} {__version__}</h2>"
                 f"<p>Version {__version__}<br>"
                 f"Hersteller: {VENDOR}<br>"
                 f"Kontakt: {CONTACT_EMAIL}</p>"

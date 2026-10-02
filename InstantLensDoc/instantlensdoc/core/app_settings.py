@@ -29,6 +29,8 @@ DEFAULTS: dict[str, Any] = {
     "ann_highlight_color": "#FFE066",
     "ann_pen_color": "#2C3E50",
     "editor_line_numbers": False,
+    "pdf_grayscale": False,
+    "ann_default_opacity": 1.0,
 }
 
 
@@ -217,3 +219,27 @@ def get_editor_line_numbers() -> bool:
 
 def set_editor_line_numbers(enabled: bool) -> None:
     save_settings({"editor_line_numbers": bool(enabled)})
+
+
+def get_pdf_grayscale() -> bool:
+    return bool(load_settings().get("pdf_grayscale", False))
+
+
+def set_pdf_grayscale(enabled: bool) -> None:
+    save_settings({"pdf_grayscale": bool(enabled)})
+
+
+def get_ann_default_opacity() -> float:
+    try:
+        v = float(load_settings().get("ann_default_opacity", 1.0))
+    except (TypeError, ValueError):
+        v = 1.0
+    return max(0.05, min(1.0, v))
+
+
+def set_ann_default_opacity(opacity: float) -> None:
+    try:
+        v = float(opacity)
+    except (TypeError, ValueError):
+        v = 1.0
+    save_settings({"ann_default_opacity": max(0.05, min(1.0, v))})

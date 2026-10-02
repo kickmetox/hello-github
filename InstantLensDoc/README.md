@@ -2,7 +2,7 @@
 
 Moderne Textverarbeitung mit PDF-Annotator, OCR-Bridge und Formulargenerator.
 
-**Version:** 0.2.7  
+**Version:** 0.2.8  
 **Hersteller:** Andreas Meyer · ame@sellerbach.de
 
 ## Quickstart (Windows)
@@ -21,11 +21,11 @@ cd /d D:\AI_Temp\InstantLensDoc && pip install -r requirements.txt && run.bat
 
 Nur starten (nach Sync/pip): `run.bat`
 
-## Neu in 0.2.7
+## Neu in 0.2.8
 
-- PDF-Seiten horizontal/vertikal spiegeln
-- Annotation-Notiz/Kommentar nachträglich editierbar
-- Editor: optionale Zeilennummern
-- Alles speichern für offene Tabs
+- PDF-Seiten Graustufen rendern/exportieren (Toggle)
+- Annotation-Deckkraft (Opacity)
+- Editor: Groß-/Kleinschreibung der Auswahl umschalten
+- Start-Splash / Fenstertitel „InstantLens Doc 0.2.8“
 
 Siehe [CHANGELOG.md](CHANGELOG.md), [FEATURES.md](FEATURES.md) und [INFO.md](INFO.md).

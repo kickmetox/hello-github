@@ -105,6 +105,7 @@ def extract_page_image(
     *,
     jpeg_quality: int = 90,
     password: str | None = None,
+    grayscale: bool = False,
 ) -> Path:
     """
     Rendert eine PDF-Seite und speichert sie als Bild.
@@ -113,7 +114,13 @@ def extract_page_image(
     from .render import render_page
 
     pdf_path = Path(pdf_path)
-    img = render_page(pdf_path, page_index=page_index, scale=scale, password=password)
+    img = render_page(
+        pdf_path,
+        page_index=page_index,
+        scale=scale,
+        password=password,
+        grayscale=grayscale,
+    )
     if out_path is None:
         ext = ".jpg" if format.upper() in ("JPEG", "JPG") else ".png"
         out_path = pdf_path.with_name(f"{pdf_path.stem}_p{page_index + 1}{ext}")
@@ -141,6 +148,7 @@ def extract_pages_as_images(
     format: str = "PNG",
     jpeg_quality: int = 90,
     password: str | None = None,
+    grayscale: bool = False,
 ) -> List[Path]:
     """
     Exportiert eine oder mehrere PDF-Seiten als PNG/JPEG in out_dir.
@@ -172,6 +180,7 @@ def extract_pages_as_images(
                 format=fmt,
                 jpeg_quality=jpeg_quality,
                 password=password,
+                grayscale=grayscale,
             )
         )
     return written

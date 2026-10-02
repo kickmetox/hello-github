@@ -283,6 +283,32 @@ class TextEditor(QPlainTextEdit):
         text = cur.selectedText().replace("\u2029", " ")
         return text[:max_len]
 
+    def toggle_case_selection(self) -> bool:
+        """
+        Groß-/Kleinschreibung der Auswahl umschalten.
+        Zyklus: GROSS → klein → Titel → GROSS.
+        """
+        cur = self.textCursor()
+        if not cur.hasSelection():
+            return False
+        text = cur.selectedText().replace("\u2029", "\n")
+        if not text:
+            return False
+        letters = [c for c in text if c.isalpha()]
+        if letters and all(c.isupper() for c in letters):
+            new = text.lower()
+        elif letters and all(c.islower() for c in letters):
+            new = text.title()
+        else:
+            new = text.upper()
+        start = cur.selectionStart()
+        cur.insertText(new)
+        # Auswahl wiederherstellen
+        cur.setPosition(start)
+        cur.setPosition(start + len(new), QTextCursor.KeepAnchor)
+        self.setTextCursor(cur)
+        return True
+
     def word_stats(self) -> tuple[int, int]:
         """(Wörter, Zeichen inkl. Whitespace) des aktuellen Texts."""
         text = self.toPlainText()

@@ -73,7 +73,7 @@ class MainWindow(QMainWindow):
         self._autosave_enabled = True
 
         self.setAcceptDrops(True)
-        self.setWindowTitle(DISPLAY_NAME)
+        self.setWindowTitle(self._app_title())
         self.resize(1200, 800)
         icon = QIcon()
         for p in icon_paths_for_qt():
@@ -328,6 +328,11 @@ class MainWindow(QMainWindow):
         act_mark.setShortcut(QKeySequence("Ctrl+H"))
         act_mark.triggered.connect(self._mark_selection)
         m_edit.addAction(act_mark)
+        act_toggle_case = QAction("Groß-/Kleinschreibung umschalten", self)
+        act_toggle_case.setShortcut(QKeySequence("Ctrl+Shift+U"))
+        act_toggle_case.setToolTip("Auswahl: GROSS → klein → Titel → GROSS")
+        act_toggle_case.triggered.connect(self._toggle_case_selection)
+        m_edit.addAction(act_toggle_case)
         act_clear_marks = QAction("Markierungen löschen", self)
         act_clear_marks.triggered.connect(self._clear_editor_marks)
         m_edit.addAction(act_clear_marks)
@@ -351,12 +356,18 @@ class MainWindow(QMainWindow):
         m_view.addAction(a)
         self._line_numbers_action = QAction("Zeilennummern", self)
         self._line_numbers_action.setCheckable(True)
-        from instantlensdoc.core.app_settings import get_editor_line_numbers
+        from instantlensdoc.core.app_settings import get_editor_line_numbers, get_pdf_grayscale
 
         self._line_numbers_action.setChecked(get_editor_line_numbers())
         self._line_numbers_action.setToolTip("Zeilennummern im Texteditor anzeigen")
         self._line_numbers_action.toggled.connect(self._toggle_line_numbers)
         m_view.addAction(self._line_numbers_action)
+        self._grayscale_action = QAction("PDF Graustufen", self)
+        self._grayscale_action.setCheckable(True)
+        self._grayscale_action.setChecked(get_pdf_grayscale())
+        self._grayscale_action.setToolTip("PDF-Seiten in Graustufen rendern und exportieren")
+        self._grayscale_action.toggled.connect(self._toggle_grayscale)
+        m_view.addAction(self._grayscale_action)
         m_view.addSeparator()
         act_zi = QAction("Vergrößern", self)
         act_zi.setShortcut(QKeySequence.ZoomIn)
@@ -430,6 +441,7 @@ class MainWindow(QMainWindow):
             ("Seite drehen −90° ⟲", lambda: self.pdf_view.rotate_current(-90)),
             ("Seite horizontal spiegeln ↔", lambda: self.pdf_view.flip_current(horizontal=True)),
             ("Seite vertikal spiegeln ↕", lambda: self.pdf_view.flip_current(vertical=True)),
+            ("Graustufen umschalten", lambda: self._toggle_grayscale(not self.pdf_view.grayscale_enabled())),
             ("Leere Seite einfügen", lambda: self.pdf_view.insert_blank_after_current()),
             ("Seite duplizieren", lambda: self.pdf_view.duplicate_current()),
             ("Seite löschen…", lambda: self.pdf_view.delete_current()),
@@ -625,6 +637,28 @@ class MainWindow(QMainWindow):
         set_editor_line_numbers(bool(checked))
         self.editor.set_line_numbers_visible(bool(checked))
         self._set_status("Zeilennummern an" if checked else "Zeilennummern aus")
+
+    def _toggle_grayscale(self, checked: bool):
+        self.pdf_view.set_grayscale(bool(checked))
+        if hasattr(self, "_grayscale_action") and self._grayscale_action is not None:
+            self._grayscale_action.blockSignals(True)
+            self._grayscale_action.setChecked(bool(checked))
+            self._grayscale_action.blockSignals(False)
+
+    def _toggle_case_selection(self):
+        if self.stack.currentWidget() is not self.editor:
+            self._set_status("Groß-/Kleinschreibung nur im Texteditor")
+            return
+        if self.editor.toggle_case_selection():
+            self._set_status("Schreibweise umgeschaltet")
+        else:
+            self._set_status("Keine Textauswahl")
+
+    def _app_title(self, suffix: str | None = None) -> str:
+        base = f"{DISPLAY_NAME} {__version__}"
+        if suffix:
+            return f"{base} — {suffix}"
+        return base
 
     def _sync_theme_menu(self):
         if self._theme_action is not None:
@@ -1144,7 +1178,7 @@ class MainWindow(QMainWindow):
         if SettingsDialog(self).exec():
             sync_from_settings()
             self._sync_theme_menu()
-            from instantlensdoc.core.app_settings import get_editor_line_numbers
+            from instantlensdoc.core.app_settings import get_editor_line_numbers, get_pdf_grayscale
 
             show_ln = get_editor_line_numbers()
             self.editor.set_line_numbers_visible(show_ln)
@@ -1152,6 +1186,12 @@ class MainWindow(QMainWindow):
                 self._line_numbers_action.blockSignals(True)
                 self._line_numbers_action.setChecked(show_ln)
                 self._line_numbers_action.blockSignals(False)
+            gray = get_pdf_grayscale()
+            self.pdf_view.set_grayscale(gray)
+            if hasattr(self, "_grayscale_action") and self._grayscale_action is not None:
+                self._grayscale_action.blockSignals(True)
+                self._grayscale_action.setChecked(gray)
+                self._grayscale_action.blockSignals(False)
             self._autosave_timer.setInterval(get_autosave_interval_sec() * 1000)
             self.pdf_view.apply_settings_colors()
             self._set_status(
@@ -1285,7 +1325,7 @@ class MainWindow(QMainWindow):
         self.sidebar.set_marks([])
         self.sidebar.clear_annotations()
         self.stack.setCurrentWidget(self.editor)
-        self.setWindowTitle(f"{DISPLAY_NAME} — Unbenannt")
+        self.setWindowTitle(self._app_title("Unbenannt"))
         self._update_doc_status()
         self._set_status("Neues Dokument")
 
@@ -1312,7 +1352,7 @@ class MainWindow(QMainWindow):
 
         self.sidebar.add_document(path)
         self._remember_path(path)
-        self.setWindowTitle(f"{DISPLAY_NAME} — {self.doc.display_name}")
+        self.setWindowTitle(self._app_title(self.doc.display_name))
 
         try:
             if self.doc.kind == DocKind.PDF:
@@ -1455,7 +1495,7 @@ class MainWindow(QMainWindow):
             save_document(self.doc, Path(path))
             self.sidebar.add_document(path)
             self._remember_path(path)
-            self.setWindowTitle(f"{DISPLAY_NAME} — {self.doc.display_name}")
+            self.setWindowTitle(self._app_title(self.doc.display_name))
             self._set_status(f"Gespeichert: {path}")
         except Exception as e:
             QMessageBox.critical(self, "Speichern", f"Speichern fehlgeschlagen:\n{e}")
@@ -1691,7 +1731,7 @@ class MainWindow(QMainWindow):
         self.stack.setCurrentWidget(self.editor)
         self.editor.setPlainText(result.text)
         self.doc = Document(kind=DocKind.TEXT, title=f"OCR — {source_label}", text=result.text)
-        self.setWindowTitle(f"{DISPLAY_NAME} — OCR — {source_label}")
+        self.setWindowTitle(self._app_title(f"OCR — {source_label}"))
         extra = ""
         if result.searchable_pdf:
             extra = f" · PDF {result.searchable_pdf.name}"

@@ -1,5 +1,25 @@
 # Changelog — InstantLens Doc
 
+## 0.2.8 — Graustufen, Ann.-Deckkraft, Case-Toggle, Splash/Titel
+
+Fokus: PDF-Graustufen, Annotation-Opacity, Editor Schreibweise, Splash/Fenstertitel.
+
+### PDF
+- **Graustufen-Toggle**: Seitenansicht und Bild-Export monochrom (Toolbar „Grau“, Ansicht-Menü, Einstellungen; `render_page(..., grayscale=True)`)
+
+### Annotationen
+- **Deckkraft/Opacity** pro Annotation (`opacity` im Sidecar; α-Spinner in Toolbar; Bearbeiten-Dialog)
+
+### Editor / UX
+- **Groß-/Kleinschreibung umschalten** für Auswahl (Ctrl+Shift+U; Zyklus GROSS → klein → Titel)
+- **Start-Splash** + Fenstertitel / About: **InstantLens Doc 0.2.8**
+
+### Docs / Packaging
+- Version **0.2.8**; Stubs KI/Cloud/Stylus/3D unverändert (keine Fake-Features)
+- Docs/CHANGELOG/ISS/Smoke auf 0.2.8
+
+---
+
 ## 0.2.7 — Spiegeln, Ann.-Edit, Zeilennummern, Alles speichern
 
 Fokus: PDF-Spiegeln, Annotation-Text nachträglich, Editor-Zeilennummern, Speichern aller Tabs.

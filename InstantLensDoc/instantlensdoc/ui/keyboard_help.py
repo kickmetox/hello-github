@@ -21,6 +21,7 @@ SHORTCUTS_HTML = """
 <tr><td>Suchen</td><td><code>Ctrl+F</code></td></tr>
 <tr><td>Suchen und Ersetzen</td><td><code>Ctrl+R</code></td></tr>
 <tr><td>Auswahl markieren</td><td><code>Ctrl+H</code></td></tr>
+<tr><td>Groß-/Kleinschreibung umschalten</td><td><code>Ctrl+Shift+U</code></td></tr>
 <tr><td>Bild aus Zwischenablage</td><td><code>Ctrl+Shift+V</code></td></tr>
 <tr><td>PDF: Bild einfügen (Viewer)</td><td><code>Ctrl+V</code></td></tr>
 <tr><td>Zoom +</td><td><code>Ctrl++</code></td></tr>
@@ -43,16 +44,19 @@ aktuelles Dokument bleibt geöffnet (<code>Ctrl+Alt+S</code> / Datei / PDF).</p>
 <p><b>Lesezeichen:</b> Sidebar +/− oder PDF → Lesezeichen hinzufügen/löschen.</p>
 <p><b>Annotationen JSON:</b> PDF → exportieren / importieren (ersetzen oder anhängen).</p>
 <p><b>PDF-Werkzeuge</b> (Toolbar): Auswahl, Highlight, Schwärzen (REDACT-Preview), Formen per Drag;
-Notiz/Stempel/Callout/Overlay per Klick; <b>HL</b>/<b>Stift</b>-Farben-Picker; Ann. löschen;
+Notiz/Stempel/Callout/Overlay per Klick; <b>HL</b>/<b>Stift</b>-Farben-Picker; <b>α Deckkraft</b>;
+<b>Grau</b>-Toggle; Ann. löschen;
 Seite <b>⟲/⟳ drehen</b>, <b>↔/↕ spiegeln</b>, <b>leere Seite</b>, <b>duplizieren</b>.</p>
 <p><b>PDF-Suche:</b> Sidebar-Suche highlightet Treffer auf der aktuellen Seite;
 „Weiter“ springt zum nächsten Treffer; <b>letzte Suchbegriffe</b> im Dropdown.</p>
 <p><b>Annotationen:</b> eigene Liste in der Sidebar — Klick springt zur Annotation;
-Filter-Dropdown nach Typ; Text nachträglich editierbar.</p>
+Filter-Dropdown nach Typ; Text nachträglich editierbar; Deckkraft pro Annotation.</p>
 <p><b>Seitenbereich:</b> PDF → Seitenbereich extrahieren… (von–bis → neues PDF)
 bzw. Dialog „zusammenführen / teilen / Bereich“.</p>
 <p><b>Suchen und Ersetzen:</b> Bearbeiten → Ctrl+R (nur Texteditor).</p>
+<p><b>Groß-/Kleinschreibung:</b> Bearbeiten → Ctrl+Shift+U (Auswahl).</p>
 <p><b>Zeilennummern:</b> Ansicht → Zeilennummern (optional, auch in Einstellungen).</p>
+<p><b>PDF Graustufen:</b> Ansicht → PDF Graustufen / Toolbar „Grau“ (Ansicht + Export).</p>
 <p><b>Lizenz:</b> bei weniger als 7 Resttagen prominent in der Statusleiste.</p>
 <p><b>Seiten als Bilder:</b> PDF → Seite/Seiten als PNG/JPEG exportieren (aktuell oder alle).</p>
 <p><b>Thumbnails:</b> in der Sidebar ziehen zum Neuordnen der Seiten.</p>

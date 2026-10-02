@@ -58,11 +58,15 @@ from ild_pdf.pages import (
     rotate_page,
 )
 from instantlensdoc.core.app_settings import (
+    get_ann_default_opacity,
     get_ann_highlight_color,
     get_ann_pen_color,
     get_default_zoom_scale,
+    get_pdf_grayscale,
+    set_ann_default_opacity,
     set_ann_highlight_color,
     set_ann_pen_color,
+    set_pdf_grayscale,
 )
 
 
@@ -141,9 +145,20 @@ class TextOverlayEditDialog(QDialog):
         self.font_size.setRange(6, 96)
         self.font_size.setValue(float(ann.font_size or 12))
         self.color = QLineEdit(ann.color or "#1A5276")
+        self.opacity = QDoubleSpinBox()
+        self.opacity.setRange(0.05, 1.0)
+        self.opacity.setSingleStep(0.05)
+        self.opacity.setDecimals(2)
+        try:
+            op = float(getattr(ann, "opacity", 1.0) or 1.0)
+        except (TypeError, ValueError):
+            op = 1.0
+        self.opacity.setValue(max(0.05, min(1.0, op)))
+        self.opacity.setToolTip("Deckkraft der Annotation (0.05–1.0)")
         if self._show_style:
             form.addRow("Schriftgröße (px):", self.font_size)
             form.addRow("Farbe:", self.color)
+        form.addRow("Deckkraft:", self.opacity)
         layout.addLayout(form)
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         buttons.accepted.connect(self.accept)
@@ -151,7 +166,10 @@ class TextOverlayEditDialog(QDialog):
         layout.addWidget(buttons)
 
     def values(self) -> dict:
-        out = {"text": self.text.toPlainText()}
+        out = {
+            "text": self.text.toPlainText(),
+            "opacity": float(self.opacity.value()),
+        }
         if self._show_style:
             out["font_size"] = float(self.font_size.value())
             out["color"] = self.color.text().strip() or "#1A5276"
@@ -287,11 +305,21 @@ class PdfCanvas(QLabel):
         return None
 
     def _draw_ann(self, painter: QPainter, ann: Annotation):
+        try:
+            opacity = float(getattr(ann, "opacity", 1.0) or 1.0)
+        except (TypeError, ValueError):
+            opacity = 1.0
+        opacity = max(0.05, min(1.0, opacity))
+
+        def _a(base: int) -> int:
+            return max(0, min(255, int(round(base * opacity))))
+
         color = QColor(ann.color)
-        color.setAlpha(90 if ann.type == AnnotationType.HIGHLIGHT else 200)
+        color.setAlpha(_a(90 if ann.type == AnnotationType.HIGHLIGHT else 200))
         pen = QPen(QColor(ann.color))
         pen.setWidth(2)
         painter.setPen(pen)
+        painter.setOpacity(opacity)
         x, y = int(ann.x), int(ann.y)
         w, h = int(ann.width), int(ann.height)
 
@@ -299,7 +327,7 @@ class PdfCanvas(QLabel):
             painter.fillRect(x, y, w, h, color)
         elif ann.type == AnnotationType.REDACTION:
             rw, rh = max(w, 4), max(h, 4)
-            painter.fillRect(x, y, rw, rh, QColor(0, 0, 0, 230))
+            painter.fillRect(x, y, rw, rh, QColor(0, 0, 0, _a(230)))
             # Sichtbarer Hinweisrahmen (besserer UX vor Einbrennen)
             painter.setPen(QPen(QColor(220, 50, 50), 2, Qt.DashLine))
             painter.drawRect(x, y, rw, rh)
@@ -309,13 +337,13 @@ class PdfCanvas(QLabel):
         elif ann.type == AnnotationType.UNDERLINE:
             painter.drawLine(x, y + h, x + w, y + h)
         elif ann.type == AnnotationType.STICKY:
-            painter.fillRect(x, y, max(w, 80), max(h, 60), QColor(255, 255, 150, 200))
+            painter.fillRect(x, y, max(w, 80), max(h, 60), QColor(255, 255, 150, _a(200)))
             painter.drawText(x + 4, y + 16, (ann.text or "Notiz")[:40])
         elif ann.type == AnnotationType.TEXT:
             painter.drawRect(x, y, w, h)
             painter.drawText(x + 4, y + 16, (ann.text or "")[:60])
         elif ann.type == AnnotationType.TEXT_OVERLAY:
-            painter.fillRect(x, y, max(w, 40), max(h, 18), QColor(255, 255, 255, 160))
+            painter.fillRect(x, y, max(w, 40), max(h, 18), QColor(255, 255, 255, _a(160)))
             painter.setPen(QPen(QColor(ann.color), 1, Qt.DashLine))
             painter.drawRect(x, y, max(w, 40), max(h, 18))
             painter.setPen(QColor(ann.color))
@@ -338,11 +366,13 @@ class PdfCanvas(QLabel):
                                 Qt.SmoothTransformation,
                             ),
                         )
+                        painter.setOpacity(1.0)
                         return
             if ann.type == AnnotationType.SIGNATURE:
                 painter.setPen(QPen(QColor("#2C3E50"), 2, Qt.DashLine))
                 painter.drawRect(x, y, max(w, 80), max(h, 32))
                 painter.drawText(x + 4, y + 16, "Signatur")
+                painter.setOpacity(1.0)
                 return
             stamp_color = QColor(ann.color if ann.color != "#FFFF00" else "#C0392B")
             painter.setPen(QPen(stamp_color, 3))
@@ -350,7 +380,7 @@ class PdfCanvas(QLabel):
             painter.drawText(x + 8, y + max(h, 36) // 2 + 4, (ann.text or "STEMPEL")[:24])
         elif ann.type == AnnotationType.SIGNATURE_FIELD:
             painter.setPen(QPen(QColor(ann.color or "#7F8C8D"), 2, Qt.DashLine))
-            painter.setBrush(QColor(255, 255, 255, 30))
+            painter.setBrush(QColor(255, 255, 255, _a(30)))
             fh = max(int(h), 48)
             fw = max(int(w), 160)
             painter.drawRect(x, y, fw, fh)
@@ -359,7 +389,7 @@ class PdfCanvas(QLabel):
             painter.drawText(x + 8, y + 18, (ann.text or "Unterschrift")[:40])
         elif ann.type == AnnotationType.CALLOUT:
             box_w, box_h = max(w, 100), max(h, 40)
-            painter.setBrush(QColor(255, 255, 220, 220))
+            painter.setBrush(QColor(255, 255, 220, _a(220)))
             painter.drawRect(x, y, box_w, box_h)
             painter.drawText(x + 4, y + 16, (ann.text or "Callout")[:40])
             cx = int(ann.callout_x) if ann.callout_x else x - 40
@@ -369,7 +399,7 @@ class PdfCanvas(QLabel):
         elif ann.type == AnnotationType.RECTANGLE:
             painter.setBrush(QColor(ann.color))
             c = QColor(ann.color)
-            c.setAlpha(40)
+            c.setAlpha(_a(40))
             painter.fillRect(x, y, w, h, c)
             painter.drawRect(x, y, w, h)
         elif ann.type in (AnnotationType.LINE, AnnotationType.ARROW, AnnotationType.MEASURE):
@@ -382,6 +412,7 @@ class PdfCanvas(QLabel):
                 mid_y = (ann.y + y2) / 2
                 label = ann.text or ann.measure_label(self._scale)
                 painter.drawText(int(mid_x) + 4, int(mid_y) - 4, label)
+        painter.setOpacity(1.0)
 
     def _draw_arrow_head(self, painter: QPainter, x0: float, y0: float, x1: float, y1: float):
         import math
@@ -539,6 +570,8 @@ class PdfViewer(QWidget):
         self._pending_scale: float | None = None
         self._highlight_color = get_ann_highlight_color()
         self._pen_color = get_ann_pen_color()
+        self._grayscale = get_pdf_grayscale()
+        self._default_opacity = get_ann_default_opacity()
         self._search_query = ""
         self._search_rects: list[tuple[float, float, float, float]] = []
         self._search_index = -1
@@ -660,8 +693,25 @@ class PdfViewer(QWidget):
         self.btn_pen_color.setFixedWidth(44)
         self.btn_pen_color.clicked.connect(self._pick_pen_color)
         self._style_color_btn(self.btn_pen_color, self._pen_color)
+        self.spin_opacity = QDoubleSpinBox()
+        self.spin_opacity.setRange(0.05, 1.0)
+        self.spin_opacity.setSingleStep(0.05)
+        self.spin_opacity.setDecimals(2)
+        self.spin_opacity.setValue(self._default_opacity)
+        self.spin_opacity.setPrefix("α ")
+        self.spin_opacity.setFixedWidth(78)
+        self.spin_opacity.setToolTip("Standard-Deckkraft neuer Annotationen")
+        self.spin_opacity.valueChanged.connect(self._on_default_opacity_changed)
+        self.btn_grayscale = QToolButton()
+        self.btn_grayscale.setText("Grau")
+        self.btn_grayscale.setCheckable(True)
+        self.btn_grayscale.setChecked(self._grayscale)
+        self.btn_grayscale.setToolTip("PDF-Seiten in Graustufen rendern/exportieren")
+        self.btn_grayscale.toggled.connect(self.set_grayscale)
         toolbar.addWidget(self.btn_hl_color)
         toolbar.addWidget(self.btn_pen_color)
+        toolbar.addWidget(self.spin_opacity)
+        toolbar.addWidget(self.btn_grayscale)
 
         toolbar.addWidget(btn_prev)
         toolbar.addWidget(self.lbl_page)
@@ -739,11 +789,55 @@ class PdfViewer(QWidget):
             self._style_color_btn(self.btn_pen_color, self._pen_color)
             self.status.emit(f"Stift-Farbe: {self._pen_color}")
 
+    def _on_default_opacity_changed(self, value: float):
+        self._default_opacity = max(0.05, min(1.0, float(value)))
+        set_ann_default_opacity(self._default_opacity)
+        if self.store and self._selected_ann_id:
+            ann = self.store.get(self._selected_ann_id)
+            if ann is not None:
+                self.store.update(self._selected_ann_id, opacity=self._default_opacity)
+                try:
+                    self.store.save()
+                except Exception:
+                    pass
+                self.refresh()
+                self.annotations_changed.emit()
+
+    def set_grayscale(self, enabled: bool):
+        enabled = bool(enabled)
+        changed = self._grayscale != enabled
+        self._grayscale = enabled
+        set_pdf_grayscale(enabled)
+        if hasattr(self, "btn_grayscale"):
+            self.btn_grayscale.blockSignals(True)
+            self.btn_grayscale.setChecked(enabled)
+            self.btn_grayscale.blockSignals(False)
+        if changed and self.pdf_path:
+            from ild_pdf.render import clear_render_cache
+
+            clear_render_cache(self.pdf_path)
+            self.refresh()
+        if changed:
+            self.status.emit("Graustufen an" if enabled else "Graustufen aus")
+
+    def grayscale_enabled(self) -> bool:
+        return bool(self._grayscale)
+
     def apply_settings_colors(self):
         self._highlight_color = get_ann_highlight_color()
         self._pen_color = get_ann_pen_color()
         self._style_color_btn(self.btn_hl_color, self._highlight_color)
         self._style_color_btn(self.btn_pen_color, self._pen_color)
+        self._default_opacity = get_ann_default_opacity()
+        if hasattr(self, "spin_opacity"):
+            self.spin_opacity.blockSignals(True)
+            self.spin_opacity.setValue(self._default_opacity)
+            self.spin_opacity.blockSignals(False)
+        self._grayscale = get_pdf_grayscale()
+        if hasattr(self, "btn_grayscale"):
+            self.btn_grayscale.blockSignals(True)
+            self.btn_grayscale.setChecked(self._grayscale)
+            self.btn_grayscale.blockSignals(False)
 
     def apply_default_zoom(self):
         self.set_scale(get_default_zoom_scale(), immediate=True)
@@ -978,6 +1072,7 @@ class PdfViewer(QWidget):
                 self.page_index,
                 scale=self.scale,
                 password=self.password,
+                grayscale=self._grayscale,
             )
             anns = self.store.for_page(self.page_index) if self.store else []
             self.canvas.set_page_image(img, anns, scale=self.scale)
@@ -1642,6 +1737,7 @@ class PdfViewer(QWidget):
                         scale=scale,
                         password=self.password,
                         use_cache=True,
+                        grayscale=self._grayscale,
                     )
                 )
             except Exception:
@@ -1760,6 +1856,7 @@ class PdfViewer(QWidget):
                 scale=max(self.scale, 1.5),
                 format=fmt,
                 password=self.password,
+                grayscale=self._grayscale,
             )
             set_last_export_dir(Path(out).parent)
             self.status.emit(f"Seite exportiert: {out.name}")
@@ -1808,6 +1905,7 @@ class PdfViewer(QWidget):
                 scale=max(self.scale, 1.5),
                 format=fmt,
                 password=self.password,
+                grayscale=self._grayscale,
             )
             set_last_export_dir(out_dir)
             self.status.emit(f"{len(written)} Bild(er) → {Path(out_dir).name}")
@@ -2026,6 +2124,10 @@ class PdfViewer(QWidget):
 
     def _commit_ann(self, ann: Annotation):
         assert self.store is not None
+        try:
+            ann.opacity = max(0.05, min(1.0, float(self._default_opacity)))
+        except (TypeError, ValueError):
+            ann.opacity = 1.0
         self.store.add(ann)
         try:
             self.store.save()
