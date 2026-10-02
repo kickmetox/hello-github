@@ -44,6 +44,7 @@ DEFAULTS: dict[str, Any] = {
     "editor_markdown_preview": False,
     "editor_doc_split": False,
     "editor_doc_split_sync_scroll": False,
+    "editor_doc_split_vertical": False,
     "selection_note_with_highlight": False,
     "editor_soft_wrap": True,
     "editor_show_special_chars": False,
@@ -589,6 +590,15 @@ def get_editor_doc_split_sync_scroll() -> bool:
 
 def set_editor_doc_split_sync_scroll(enabled: bool) -> None:
     save_settings({"editor_doc_split_sync_scroll": bool(enabled)})
+
+
+def get_editor_doc_split_vertical() -> bool:
+    """True = Doc-Split vertikal (übereinander), False = horizontal (nebeneinander)."""
+    return bool(load_settings().get("editor_doc_split_vertical", False))
+
+
+def set_editor_doc_split_vertical(enabled: bool) -> None:
+    save_settings({"editor_doc_split_vertical": bool(enabled)})
 
 
 def get_selection_note_with_highlight() -> bool:

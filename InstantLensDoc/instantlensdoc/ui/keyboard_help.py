@@ -59,10 +59,12 @@ SHORTCUTS_HTML = """
 <tr><td>PDF-Text kopieren (Auswahl)</td><td><code>Ctrl+C</code> (Auswahl-Werkzeug + Text aufziehen) — 0.6.1</td></tr>
 <tr><td>Auswahl → Notiz (Sticky)</td><td><code>Ctrl+Alt+N</code> (Text vorausgefüllt; optional +Highlight) — 0.6.2/0.6.3</td></tr>
 <tr><td>Andere Tabs schließen</td><td><code>Ctrl+Shift+W</code> (Datei) — 0.6.2</td></tr>
-<tr><td>Fenster teilen (zwei Docs)</td><td><code>Ctrl+\\</code> (horizontal) — 0.6.3</td></tr>
+<tr><td>Fenster teilen (zwei Docs)</td><td><code>Ctrl+\\</code> — 0.6.3</td></tr>
+<tr><td>Vertikaler Split (übereinander)</td><td><code>Ctrl+Shift+\\</code> (Toggle) — 0.6.5</td></tr>
 <tr><td>Sync-Scroll (geteilte Docs)</td><td><code>Ctrl+Alt+\\</code> (optional) — 0.6.4</td></tr>
 <tr><td>Tag-Cloud Filter</td><td>Klick setzt Filter; <code>Ctrl</code>+Klick Multi-Select — 0.6.4</td></tr>
-<tr><td>Ungespeicherte Tabs</td><td>Statusleiste „N ungespeichert“ Klick → Liste — 0.6.4</td></tr>
+<tr><td>Tag-Cloud umbenennen</td><td>Rechtsklick → Tag umbenennen (global) — 0.6.5</td></tr>
+<tr><td>Ungespeicherte Tabs</td><td>Statusleiste „N ungespeichert“ Klick → Liste + Speichern — 0.6.4/0.6.5</td></tr>
 <tr><td>PDF: Bild einfügen (Viewer)</td><td><code>Ctrl+V</code></td></tr>
 <tr><td>Zoom +</td><td><code>Ctrl++</code></td></tr>
 <tr><td>Zoom −</td><td><code>Ctrl+-</code></td></tr>
@@ -104,7 +106,7 @@ Ctrl+Alt+F Dialog; Sidecar-Meta <code>page_favorites</code>; <b>JSON Export/Impo
 <p><b>Editor-Zeilenfavoriten:</b> Marker in der Zeilennummernleiste; <b>Sidebar-Liste</b>; Labels per Doppelklick/Rechtsklick;
 Ctrl+F2 umschalten; F2 / Shift+F2 springen.</p>
 <p><b>Auswahl-Deckkraft:</b> Annotation(en) auswählen → <b>Toolbar-Slider</b> oder Ctrl+Alt+Shift+O / „α…“.</p>
-<p><b>Erste Schritte:</b> Hilfe → Erste Schritte… (Kurz-Wizard, 3 Seiten).</p>
+<p><b>Erste Schritte:</b> Hilfe → Erste Schritte… (Kurz-Wizard, 4 Seiten inkl. 0.6-Highlights).</p>
 <p><b>Crash-Report:</b> Hilfe → Crash-Report erstellen… (Logordner als ZIP; optional Screenshot-Pfad-Hinweis).</p>
 <p><b>Annotationen JSON/CSV/Bericht:</b> PDF → als JSON oder CSV exportieren / JSON importieren;
 <strong>Kommentar-Bericht</strong> als zusammenhängendes TXT oder Markdown (nach Seite gruppiert).</p>
@@ -125,9 +127,9 @@ Highlight-Drag über Text = <b>Selection→Highlight</b> (Annotation mit Inhalt)
 Auswahl-Werkzeug + Text aufziehen + <code>Ctrl+C</code> = <b>Text in Zwischenablage</b> (ohne Annotation).
 <code>Ctrl+Alt+N</code> = <b>Auswahl→Notiz</b> (Sticky mit vorausgefülltem Text; Checkbox <b>+Highlight</b>).
 Annotation-Suche: Tag-<b>Autocomplete</b>. Session-Tabs: ziehen → Reihenfolge; <b>Andere Tabs schließen</b> (Ctrl+Shift+W).
-<b>Fenster teilen</b> (Ctrl+\\) zwei Docs horizontal; optional <b>Sync-Scroll</b> (Ctrl+Alt+\\).
-<b>Tag-Cloud</b>: Klick setzt Filter (exklusiv), Ctrl+Klick Multi-Select.
-Statusleiste <b>ungespeicherte Tabs</b>: Klick öffnet Liste zum Wechseln.</p>
+<b>Fenster teilen</b> (Ctrl+\\); optional <b>vertikal</b> (Ctrl+Shift+\\); optional <b>Sync-Scroll</b> (Ctrl+Alt+\\).
+<b>Tag-Cloud</b>: Klick setzt Filter (exklusiv), Ctrl+Klick Multi-Select; <b>Rechtsklick → umbenennen</b> (global).
+Statusleiste <b>ungespeicherte Tabs</b>: Klick öffnet Liste zum Wechseln + <b>Speichern je Datei</b>.</p>
 <p><b>PDF-Seitenlabels:</b> römische/arabische Labels aus dem PDF werden in Statusleiste und Toolbar angezeigt, wenn vorhanden.</p>
 <p><b>Zwischenablage-Verlauf:</b> Bearbeiten → letzte 3 eingefügten Textschnipsel erneut einfügen.</p>
 <p><b>About:</b> Hilfe → Über… — Feature-Kurzliste + FEATURES.md öffnen;
@@ -169,7 +171,7 @@ Export CSV/Bericht enthält Tags und Gruppen.</p>
 <p><b>Auswahl-Deckkraft:</b> Annotation(en) auswählen → <b>Toolbar-Slider</b> / Ctrl+Alt+Shift+O / α… (Sidecar force-save).</p>
 <p><b>Editor-Zeilenfavoriten:</b> Ctrl+F2 oder Klick auf Zeilennummer; F2 / Shift+F2 springen; <b>Sidebar-Liste</b>;
 Labels editierbar (Doppelklick/Rechtsklick).</p>
-<p><b>Erste Schritte:</b> Hilfe → Erste Schritte… (Kurz-Wizard, 3 Seiten).</p>
+<p><b>Erste Schritte:</b> Hilfe → Erste Schritte… (Kurz-Wizard, 4 Seiten inkl. 0.6-Highlights).</p>
 <p><b>Rechtschreibung:</b> Einstellungen → Rechtschreibwörterbuch (Wortliste) → F7 prüft ohne Spell-Lib;
 About: Datenschutz-Hinweis (lokal, keine Telemetrie).</p>
 <p><b>Startup-Deps:</b> beim Start Prüfung pypdfium2 / Tesseract; Dialog wenn etwas fehlt.</p>

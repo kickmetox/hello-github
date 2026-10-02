@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **0.6.4** |
+| Version | **0.6.5** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -38,10 +38,10 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Installer-Task: optionale **Desktop-Verknüpfung** (Checkbox, Standard an / `checkedonce`)
 
-## Neu in 0.6.4
+## Neu in 0.6.5
 
-- Tag-Cloud: Klick **setzt Filter** (exklusiv; Ctrl+Klick Multi-Select)
-- Doc-Split: optionaler **Sync-Scroll** (`Ctrl+Alt+\`)
-- Statusleiste: Klick auf „ungespeichert“ → Liste dirty Tabs
-- Shortcut-Übersicht um 0.6.x-Keys erweitert
+- Tag-Cloud: **Rechtsklick → Tag umbenennen** (global im Dokument)
+- Doc-Split: optional **vertikal** (`Ctrl+Shift+\`)
+- Dirty-Tabs-Menü: **Speichern** je Datei
+- Erste-Schritte-Wizard: 4. Seite mit 0.6-Highlights
 - Stubs KI/Cloud/Stylus/3D unverändert

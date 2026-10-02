@@ -1,5 +1,22 @@
 # Changelog — InstantLens Doc
 
+## 0.6.5 — Tag-Rename, Vertikal-Split, Dirty-Save, Wizard-0.6
+
+Nach 0.6.4: Tag-Cloud Rechtsklick benennt Tags global um; Doc-Split optional vertikal; Dirty-Tabs-Menü mit Speichern je Datei; Erste-Schritte-Wizard um 0.6-Highlights erweitert. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### PDF / Annotationen
+- **Tag-Cloud Rechtsklick → umbenennen**: Tag global in allen Annotationen des Dokuments umbenennen (`AnnotationStore.rename_tag`)
+
+### Editor / UX
+- **Vertikaler Doc-Split**: Toggle übereinander (`Ctrl+Shift+\` / Ansicht); Setting `editor_doc_split_vertical`
+- Dirty-Tabs-Menü: zusätzlich **Speichern: Dateiname** je ungespeicherter Datei
+- **Erste-Schritte-Wizard**: 4. Seite mit 0.6-Highlights (Tag-Cloud, Split, Dirty-Save)
+
+### Packaging / Docs
+- Version **0.6.5**; Smoke um 0.6.5-Pfade erweitert
+
+---
+
 ## 0.6.4 — Tag-Cloud-Filter, Sync-Scroll, Dirty-Tabs, Shortcuts
 
 Nach 0.6.3: Tag-Cloud-Klick setzt den Annotation-Filter; optionaler Sync-Scroll im Doc-Split; Klick auf „ungespeichert“ öffnet die Liste dirty Tabs; Shortcut-Übersicht um 0.6.x-Keys erweitert. Stubs KI/Cloud/Stylus/3D bleiben Stubs.

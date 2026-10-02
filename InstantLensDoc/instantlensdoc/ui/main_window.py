@@ -51,6 +51,7 @@ from instantlensdoc.core.app_settings import (
     get_default_open_dir,
     get_editor_doc_split,
     get_editor_doc_split_sync_scroll,
+    get_editor_doc_split_vertical,
     get_editor_markdown_preview,
     get_editor_soft_wrap,
     get_last_export_dir,
@@ -347,6 +348,7 @@ class MainWindow(QMainWindow):
         self.sidebar.outline_add_requested.connect(self._outline_add)
         self.sidebar.outline_delete_requested.connect(self._outline_delete)
         self.sidebar.annotation_filter_changed.connect(lambda _t: None)
+        self.sidebar.annotation_tag_rename_requested.connect(self._rename_annotation_tag_global)
         self.sidebar.annotation_group_edit_requested.connect(self._edit_annotation_group)
         self.sidebar.fulltext_hit_activated.connect(self._on_fulltext_hit)
         self.sidebar.page_thumb_activated.connect(self._on_thumb_jump)
@@ -384,8 +386,11 @@ class MainWindow(QMainWindow):
         self.stack.addWidget(self.pdf_view)  # 1
         self.stack.addWidget(self.image_label)  # 2
         self.stack.currentChanged.connect(lambda *_: self._apply_doc_split_sync_scroll())
-        # Horizontaler Doc-Split: Hauptansicht | zweites Dokument
-        self.doc_splitter = QSplitter(Qt.Horizontal)
+        # Doc-Split: horizontal (nebeneinander) oder vertikal (übereinander)
+        split_orient = (
+            Qt.Vertical if get_editor_doc_split_vertical() else Qt.Horizontal
+        )
+        self.doc_splitter = QSplitter(split_orient)
         self.doc_splitter.addWidget(self.stack)
         self.secondary_wrap = QWidget()
         sec_lay = QVBoxLayout(self.secondary_wrap)
@@ -853,16 +858,26 @@ class MainWindow(QMainWindow):
         self._doc_split_action.setCheckable(True)
         self._doc_split_action.setChecked(get_editor_doc_split())
         self._doc_split_action.setToolTip(
-            "Hauptfenster horizontal teilen: aktuelles Dokument links, zweites Tab rechts"
+            "Hauptfenster teilen: aktuelles Dokument + zweites Tab "
+            "(horizontal nebeneinander oder vertikal übereinander)"
         )
         self._doc_split_action.setShortcut(QKeySequence("Ctrl+\\"))
         self._doc_split_action.toggled.connect(self._toggle_doc_split)
         m_view.addAction(self._doc_split_action)
+        self._doc_split_vertical_action = QAction("Vertikaler Split (übereinander)", self)
+        self._doc_split_vertical_action.setCheckable(True)
+        self._doc_split_vertical_action.setChecked(get_editor_doc_split_vertical())
+        self._doc_split_vertical_action.setToolTip(
+            "Doc-Split vertikal (übereinander) statt horizontal (nebeneinander)"
+        )
+        self._doc_split_vertical_action.setShortcut(QKeySequence("Ctrl+Shift+\\"))
+        self._doc_split_vertical_action.toggled.connect(self._toggle_doc_split_vertical)
+        m_view.addAction(self._doc_split_vertical_action)
         self._doc_split_sync_action = QAction("Sync-Scroll (geteilte Docs)", self)
         self._doc_split_sync_action.setCheckable(True)
         self._doc_split_sync_action.setChecked(get_editor_doc_split_sync_scroll())
         self._doc_split_sync_action.setToolTip(
-            "Vertikales Scrollen links↔rechts im Doc-Split synchronisieren (optional)"
+            "Vertikales Scrollen in beiden Split-Panes synchronisieren (optional)"
         )
         self._doc_split_sync_action.setShortcut(QKeySequence("Ctrl+Alt+\\"))
         self._doc_split_sync_action.toggled.connect(self._toggle_doc_split_sync_scroll)
@@ -1203,7 +1218,7 @@ class MainWindow(QMainWindow):
 
         m_help = mb.addMenu("&Hilfe")
         a = QAction("Erste Schritte…", self)
-        a.setToolTip("Kurz-Wizard: Öffnen, Annotieren, Editor (3 Seiten)")
+        a.setToolTip("Kurz-Wizard: Öffnen, Annotieren, Editor, 0.6-Highlights (4 Seiten)")
         a.triggered.connect(lambda: GettingStartedWizard(self).exec())
         m_help.addAction(a)
         a = QAction("Tastaturhilfe…", self)
@@ -1472,7 +1487,7 @@ class MainWindow(QMainWindow):
         return items
 
     def _on_unsaved_status_clicked(self, event) -> None:
-        """Statusleiste „ungespeichert“: Menü mit dirty Tabs → öffnen/wechseln."""
+        """Statusleiste „ungespeichert“: Menü mit dirty Tabs → öffnen/wechseln + Speichern je Datei."""
         if event.button() != Qt.LeftButton:
             return
         entries = self.list_unsaved_tabs()
@@ -1486,10 +1501,29 @@ class MainWindow(QMainWindow):
                 if path:
                     act.setToolTip(path)
                     act.triggered.connect(lambda checked=False, p=path: self.open_path(p))
+                    act_save = menu.addAction(f"Speichern: {label}")
+                    act_save.setToolTip(f"„{label}“ speichern")
+                    act_save.triggered.connect(
+                        lambda checked=False, p=path: self._save_unsaved_tab(p)
+                    )
                 else:
                     act.setEnabled(False)
                     act.setToolTip("Aktuelles unbenanntes Dokument (bereits aktiv)")
+                    act_save = menu.addAction("Speichern: Unbenannt")
+                    act_save.setToolTip("Unbenanntes Dokument speichern (Speichern unter…)")
+                    act_save.triggered.connect(lambda checked=False: self.save_doc())
         menu.exec(self.unsaved_status_label.mapToGlobal(event.pos()))
+
+    def _save_unsaved_tab(self, path: str | None) -> None:
+        """Dirty-Tab speichern: bei Bedarf wechseln, dann Speichern."""
+        if not path:
+            self.save_doc()
+            return
+        cur = self._path_key(self.doc.path) if self.doc and self.doc.path else None
+        key = self._path_key(path)
+        if cur != key:
+            self.open_path(path)
+        self.save_doc()
 
     def _format_current_page_size(self) -> str:
         """Aktuelle PDF-Seitengröße formatiert (mm/inch laut Einstellung)."""
@@ -1961,12 +1995,32 @@ class MainWindow(QMainWindow):
         if hasattr(self, "secondary_wrap"):
             self.secondary_wrap.setVisible(bool(checked))
         if checked:
+            self._apply_doc_split_orientation()
             self._load_secondary_document()
             self._apply_doc_split_sync_scroll()
-            self._set_status("Fenster teilen an — zwei Docs horizontal")
+            orient = "vertikal" if get_editor_doc_split_vertical() else "horizontal"
+            self._set_status(f"Fenster teilen an — zwei Docs {orient}")
         else:
             self._disconnect_doc_split_sync_scroll()
             self._set_status("Fenster teilen aus")
+
+    def _toggle_doc_split_vertical(self, checked: bool):
+        from instantlensdoc.core.app_settings import set_editor_doc_split_vertical
+
+        set_editor_doc_split_vertical(bool(checked))
+        self._apply_doc_split_orientation()
+        self._set_status(
+            "Doc-Split vertikal (übereinander)"
+            if checked
+            else "Doc-Split horizontal (nebeneinander)"
+        )
+
+    def _apply_doc_split_orientation(self) -> None:
+        if not hasattr(self, "doc_splitter"):
+            return
+        self.doc_splitter.setOrientation(
+            Qt.Vertical if get_editor_doc_split_vertical() else Qt.Horizontal
+        )
 
     def _toggle_doc_split_sync_scroll(self, checked: bool):
         from instantlensdoc.core.app_settings import set_editor_doc_split_sync_scroll
@@ -1976,6 +2030,40 @@ class MainWindow(QMainWindow):
         self._set_status(
             "Sync-Scroll an (geteilte Docs)" if checked else "Sync-Scroll aus"
         )
+
+    def _rename_annotation_tag_global(self, old_tag: str, new_tag: str) -> None:
+        """Tag-Cloud: Tag in allen Annotationen des aktuellen PDFs umbenennen."""
+        store = getattr(self.pdf_view, "store", None)
+        if store is None:
+            self._set_status("Tag umbenennen nur bei geöffnetem PDF")
+            return
+        n = store.rename_tag(old_tag, new_tag)
+        if n <= 0:
+            self._set_status(f"Kein Tag „{old_tag}“ gefunden")
+            return
+        try:
+            store.save()
+        except Exception as e:
+            QMessageBox.warning(self, "Tag umbenennen", str(e))
+            return
+        # Aktiven Filter mitziehen
+        old_cf = old_tag.casefold()
+        filt = list(self.sidebar.annotation_filter_tags())
+        nxt: list[str] = []
+        seen: set[str] = set()
+        for t in filt:
+            s = new_tag if t.casefold() == old_cf else t
+            key = s.casefold()
+            if key in seen:
+                continue
+            seen.add(key)
+            nxt.append(s)
+        self.sidebar.set_annotation_tag_filter(nxt)
+        self.pdf_view.refresh()
+        self._refresh_pdf_marks()
+        if self.doc and self.doc.path:
+            self._mark_unsaved(self.doc.path, bool(store.dirty))
+        self._set_status(f"Tag „{old_tag}“ → „{new_tag}“ ({n} Annotationen)")
 
     def _primary_scroll_bar(self):
         """Vertikale Scrollbar der aktuellen Hauptansicht (Editor/PDF)."""

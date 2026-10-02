@@ -221,6 +221,7 @@ class Sidebar(QWidget):
     annotation_color_filter_changed = Signal(str)  # #RRGGBB oder "" für alle
     annotation_page_filter_changed = Signal(bool)  # nur aktuelle Seite
     annotation_tag_filter_changed = Signal(object)  # list[str] Tags oder [] für alle
+    annotation_tag_rename_requested = Signal(str, str)  # old_tag, new_tag (global)
     annotation_group_edit_requested = Signal(int)  # Seitenindex der Gruppe
     fulltext_hit_activated = Signal(str, object)  # path, page_index|None
     page_thumb_activated = Signal(int)  # PDF-Seite 0-basiert
@@ -344,7 +345,7 @@ class Sidebar(QWidget):
         self.ann_tag_cloud.setObjectName("annTagCloud")
         self.ann_tag_cloud.setToolTip(
             "Häufigste Tags — Klick setzt Filter (exklusiv); Ctrl+Klick Multi-Select (ODER); "
-            "erneut Klick auf allein aktiven Tag löscht Filter"
+            "erneut Klick auf allein aktiven Tag löscht Filter; Rechtsklick → Tag umbenennen (global)"
         )
         self.ann_tag_cloud_layout = QHBoxLayout(self.ann_tag_cloud)
         self.ann_tag_cloud_layout.setContentsMargins(0, 2, 0, 2)
@@ -1089,6 +1090,28 @@ class Sidebar(QWidget):
                 nxt = [tag]
         self.set_annotation_tag_filter(nxt)
 
+    def _on_tag_cloud_context_menu(self, tag: str, pos) -> None:
+        """Rechtsklick auf Tag-Cloud-Chip: global umbenennen."""
+        from PySide6.QtWidgets import QInputDialog
+
+        menu = QMenu(self)
+        act = menu.addAction(f"Tag „{tag}“ umbenennen…")
+        chosen = menu.exec(pos)
+        if chosen is not act:
+            return
+        text, ok = QInputDialog.getText(
+            self,
+            "Tag umbenennen",
+            f"Neuer Name für Tag „{tag}“ (global in diesem Dokument):",
+            text=tag,
+        )
+        if not ok:
+            return
+        new_tag = str(text or "").strip()
+        if not new_tag or new_tag.casefold() == tag.casefold() and new_tag == tag:
+            return
+        self.annotation_tag_rename_requested.emit(tag, new_tag)
+
     def _update_ann_tag_cloud(self, payloads: list | None):
         """Häufigste Tags als klickbare Chips (max. 10)."""
         if not hasattr(self, "ann_tag_cloud_layout"):
@@ -1121,10 +1144,12 @@ class Sidebar(QWidget):
             btn = QToolButton()
             btn.setText(f"{tag} · {n}")
             btn.setToolTip(
-                f"Tag „{tag}“ filtern ({n}×) — Klick setzt Filter; Ctrl+Klick Multi-Select"
+                f"Tag „{tag}“ filtern ({n}×) — Klick setzt Filter; Ctrl+Klick Multi-Select; "
+                f"Rechtsklick → umbenennen (global)"
             )
             btn.setCursor(Qt.PointingHandCursor)
             btn.setAutoRaise(True)
+            btn.setContextMenuPolicy(Qt.CustomContextMenu)
             is_on = key in active
             border = "2px solid #1a5276" if is_on else "1px solid #999"
             bg = "#d4e6f1" if is_on else "#eee"
@@ -1133,6 +1158,11 @@ class Sidebar(QWidget):
                 f"padding: 1px 5px; font-size: 10px; }}"
             )
             btn.clicked.connect(lambda checked=False, t=tag: self._on_tag_cloud_clicked(t))
+            btn.customContextMenuRequested.connect(
+                lambda pos, t=tag, b=btn: self._on_tag_cloud_context_menu(
+                    t, b.mapToGlobal(pos)
+                )
+            )
             self.ann_tag_cloud_layout.addWidget(btn)
         self.ann_tag_cloud_layout.addStretch(1)
 

@@ -25,7 +25,7 @@ from instantlensdoc.core.logging_setup import log_dir
 HELP_HTML = f"""
 <h2>InstantLens Doc — Hilfe</h2>
 <p>Moderne Textverarbeitung mit PDF-Annotator, OCR-Bridge und Formulargenerator.</p>
-<p><b>Kurz-Wizard:</b> Hilfe → Erste Schritte… (3 Seiten).</p>
+<p><b>Kurz-Wizard:</b> Hilfe → Erste Schritte… (4 Seiten, inkl. 0.6-Highlights).</p>
 <h3>Erste Schritte</h3>
 <ul>
 <li><b>Datei → Öffnen</b>: TXT, MD, HTML, DOCX, PDF, Bilder</li>
@@ -123,7 +123,7 @@ HELP_HTML = f"""
 <li><b>Datei → Schließen</b>: Speichern-Dialog bei ungespeicherten Änderungen;
     <b>Andere Tabs schließen</b> (Ctrl+Shift+W)</li>
 <li><b>Bearbeiten → Auswahl → Notiz</b> (Ctrl+Alt+N): PDF-Textauswahl als Sticky; optional Checkbox zusätzlich Highlight</li>
-<li><b>Ansicht → Fenster teilen (zwei Docs)</b> (Ctrl+\\): horizontal zwei Dokumente; Statusleiste zählt ungespeicherte Tabs</li>
+<li><b>Ansicht → Fenster teilen (zwei Docs)</b> (Ctrl+\\): zwei Dokumente; optional <b>vertikal</b> (Ctrl+Shift+\\); Sync-Scroll; Statusleiste dirty Tabs inkl. Speichern</li>
 <li><b>Hilfe → Auf Updates prüfen</b>: lokal immer; Online optional (offline OK)</li>
 <li><b>Hilfe → Über InstantLens Doc</b>: Feature-Kurzliste + Link zu FEATURES.md;
     Datenschutz-Hinweis (lokal, keine Telemetrie, keine Cloud)</li>
@@ -166,7 +166,7 @@ Exit-Codes: 0 OK, 1 allgemein, 2 Git-Fehler. Eigenes Icon in <code>assets</code>
 
 WIZARD_PAGES = (
     (
-        "1 / 3 — Dokument öffnen",
+        "1 / 4 — Dokument öffnen",
         "<h3>Dokument öffnen</h3>"
         "<p><b>Datei → Öffnen</b> (Ctrl+O): TXT, Markdown, HTML, DOCX, PDF oder Bild.</p>"
         "<ul>"
@@ -176,7 +176,7 @@ WIZARD_PAGES = (
         "</ul>",
     ),
     (
-        "2 / 3 — PDF annotieren",
+        "2 / 4 — PDF annotieren",
         "<h3>PDF annotieren</h3>"
         "<p>Werkzeuge in der PDF-Toolbar: Highlight, Notiz, Stempel, Formen …</p>"
         "<ul>"
@@ -186,12 +186,22 @@ WIZARD_PAGES = (
         "</ul>",
     ),
     (
-        "3 / 3 — Editor &amp; Hilfe",
+        "3 / 4 — Editor &amp; Hilfe",
         "<h3>Editor &amp; weiter</h3>"
         "<ul>"
         "<li>Ctrl+F2: Zeile favorisieren; Sidebar-Liste; Doppelklick → <b>Label</b></li>"
         "<li>F1: Tastaturhilfe · Hilfe…: ausführliche Bedienung</li>"
         "<li>Lokal, ohne Telemetrie — Stubs KI/Cloud/Stylus/3D bewusst ohne Funktion</li>"
+        "</ul>",
+    ),
+    (
+        "4 / 4 — Neu in 0.6",
+        "<h3>Highlights 0.6</h3>"
+        "<ul>"
+        "<li><b>Tag-Cloud</b>: Klick filtert; Ctrl+Klick Multi; <b>Rechtsklick → Tag umbenennen</b> (global)</li>"
+        "<li><b>Fenster teilen</b> (Ctrl+\\): zwei Docs; <b>vertikal</b> Ctrl+Shift+\\; Sync-Scroll Ctrl+Alt+\\</li>"
+        "<li>Statusleiste <b>ungespeichert</b>: Dirty-Liste + <b>Speichern je Datei</b></li>"
+        "<li>Auswahl → Text kopieren / Notiz / Highlight+Notiz; Andere Tabs schließen</li>"
         "</ul>"
         "<p>Fertig — viel Erfolg mit InstantLens Doc.</p>",
     ),
@@ -199,7 +209,7 @@ WIZARD_PAGES = (
 
 
 class GettingStartedWizard(QDialog):
-    """Kurz-Wizard „Erste Schritte“ — drei Seiten."""
+    """Kurz-Wizard „Erste Schritte“ — vier Seiten (inkl. 0.6-Highlights)."""
 
     def __init__(self, parent=None):
         super().__init__(parent)

@@ -642,6 +642,43 @@ class AnnotationStore:
         self.dirty = True
         return len(targets)
 
+    def rename_tag(self, old_tag: str, new_tag: str) -> int:
+        """
+        Tag global in allen Annotationen umbenennen (case-insensitive Match).
+        Rückgabe: Anzahl geänderter Annotationen.
+        """
+        old = str(old_tag or "").strip()
+        new_raw = str(new_tag or "").strip()
+        if not old or not new_raw:
+            return 0
+        new_list = normalize_tags(new_raw)
+        if not new_list:
+            return 0
+        new_s = new_list[0]
+        old_cf = old.casefold()
+        targets = [
+            a
+            for a in self.annotations
+            if any(str(t).casefold() == old_cf for t in (getattr(a, "tags", None) or []))
+        ]
+        if not targets:
+            return 0
+        self._push_undo()
+        for a in targets:
+            seen: set[str] = set()
+            nxt: list[str] = []
+            for t in a.tags or []:
+                s = new_s if str(t).casefold() == old_cf else str(t)
+                key = s.casefold()
+                if key in seen:
+                    continue
+                seen.add(key)
+                nxt.append(s)
+            a.tags = nxt
+            a.touch()
+        self.dirty = True
+        return len(targets)
+
     def set_colors(self, ann_ids: Sequence[str], color: str) -> int:
         """Batch-Farbe für Auswahl setzen (#RRGGBB)."""
         c = str(color or "").strip()
