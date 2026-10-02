@@ -1,5 +1,23 @@
 # Changelog — InstantLens Doc
 
+## 0.4.7 — Spread, Notizfarbe, Paste-Trim, Cheat-Sheet-PDF
+
+Fokus: optionale PDF-Zwei-Seiten-Ansicht, Annotation-Notizfarbe unabhängig von Highlight, optionales Whitespace-Trim beim Einfügen, Keyboard-Cheat-Sheet als PDF aus F1. Stubs KI/Cloud/Stylus/3D unverändert.
+
+### PDF / Annotationen
+- **Zwei-Seiten-Ansicht (Spread)** optional (Ansicht / Toolbar „2S“ / Ctrl+2): aktuelle + nächste Seite nebeneinander; Blättern springt um 2 Seiten
+- **Notizfarbe unabhängig von Highlight**: eigener Picker „Notiz“ + Setting `ann_note_color`; Sticky nutzt diese Farbe (nicht mehr fest bzw. HL)
+
+### Editor / UX
+- **Whitespace trim on paste** optional (Einstellungen): Trailing Spaces/Tabs pro Zeile beim Einfügen entfernen
+- **Tastaturhilfe → PDF**: F1-Dialog „Als PDF exportieren…“ schreibt das Cheat-Sheet
+
+### Packaging / Docs
+- Version **0.4.7** (App, `ild_pdf`, ISS, Build, Docs, Smoke)
+- FEATURES / INFO / CHANGELOG / Hilfe aktualisiert
+
+---
+
 ## 0.4.6 — Goto Page, Ann.-Farben-Filter, Duplikat-Tab, Undo-Hint
 
 Fokus: PDF-Seitensprung per Dialog, klickbare Annotation-Farben in der Sidebar-Statistik, Editor-Tab duplizieren, Statusleisten-Hinweis „Letzte Aktion rückgängig“. Stubs KI/Cloud/Stylus/3D unverändert.

@@ -1,8 +1,22 @@
-"""Tastaturhilfe-Dialog."""
+"""Tastaturhilfe-Dialog inkl. optionalem PDF-Export des Cheat-Sheets."""
 
 from __future__ import annotations
 
-from PySide6.QtWidgets import QDialog, QDialogButtonBox, QTextBrowser, QVBoxLayout
+from pathlib import Path
+
+from PySide6.QtGui import QTextDocument
+from PySide6.QtPrintSupport import QPrinter
+from PySide6.QtWidgets import (
+    QDialog,
+    QDialogButtonBox,
+    QFileDialog,
+    QMessageBox,
+    QPushButton,
+    QTextBrowser,
+    QVBoxLayout,
+)
+
+from instantlensdoc.core.app_settings import dialog_start_dir, get_last_export_dir, remember_recent_dir, set_last_export_dir
 
 SHORTCUTS_HTML = """
 <h2>Tastaturhilfe — InstantLens Doc</h2>
@@ -13,6 +27,7 @@ SHORTCUTS_HTML = """
 <tr><td>Annotationen sperren</td><td><code>Ctrl+Shift+L</code></td></tr>
 <tr><td>Seitenrahmen / CropBox</td><td><code>Ctrl+Shift+B</code></td></tr>
 <tr><td>Druckermarken</td><td><code>Ctrl+Alt+M</code></td></tr>
+<tr><td>Zwei-Seiten-Ansicht (Spread)</td><td><code>Ctrl+2</code> / Toolbar „2S“</td></tr>
 <tr><td>Zeilen sortieren (A–Z)</td><td><code>Ctrl+Shift+O</code></td></tr>
 <tr><td>Öffnen</td><td><code>Ctrl+O</code></td></tr>
 <tr><td>Speichern</td><td><code>Ctrl+S</code></td></tr>
@@ -53,6 +68,7 @@ SHORTCUTS_HTML = """
 <tr><td>Alle Annotationen auf Seite</td><td><code>Ctrl+A</code> (PDF-Modus)</td></tr>
 <tr><td>Seitengröße mm/inch</td><td><code>Ctrl+Alt+U</code> / Klick Status</td></tr>
 <tr><td>Diese Hilfe</td><td><code>F1</code></td></tr>
+<tr><td>Cheat-Sheet als PDF</td><td>F1 → „Als PDF exportieren…“</td></tr>
 </table>
 <p><b>Speichern unter (PDF):</b> speichert die Annotationen als Sidecar
 <code>*.ildann.json</code> (PDF-Datei bleibt unverändert). Auch unter
@@ -64,8 +80,8 @@ aktuelles Dokument bleibt geöffnet (<code>Ctrl+Alt+S</code> / Datei / PDF).</p>
 <p><b>Lesezeichen:</b> Sidebar +/− oder PDF → Lesezeichen hinzufügen/löschen.</p>
 <p><b>Annotationen JSON/CSV:</b> PDF → als JSON oder CSV exportieren / JSON importieren (ersetzen oder anhängen).</p>
 <p><b>PDF-Werkzeuge</b> (Toolbar): Auswahl (auch PDF-Links öffnen / Ann. verschieben wenn entsperrt), Highlight, Schwärzen (REDACT-Preview), Formen per Drag;
-Notiz/Stempel/Callout/Overlay per Klick; <b>Stempel ↻</b> drehen; <b>HL</b>/<b>Stift</b>-Farben-Picker; <b>α Deckkraft</b>;
-<b>Grau</b>-Toggle; <b>Nacht</b>-Toggle (nur Ansicht); <b>Sperre</b>; <b>Rahmen</b> (CropBox); Ann. löschen;
+Notiz/Stempel/Callout/Overlay per Klick; <b>Stempel ↻</b> drehen; <b>HL</b>/<b>Stift</b>/<b>Notiz</b>-Farben-Picker; <b>α Deckkraft</b>;
+<b>Grau</b>-Toggle; <b>Nacht</b>-Toggle; <b>2S</b> Zwei-Seiten-Spread; <b>Sperre</b>; <b>Rahmen</b> (CropBox); Ann. löschen;
 Seite <b>⟲/⟳ drehen</b>, <b>↔/↕ spiegeln</b>, <b>leere Seite</b>, <b>duplizieren</b>.</p>
 <p><b>Editor-Encoding:</b> Datei → Öffnen/Speichern mit Encoding (UTF-8 / Latin-1); Standard in Einstellungen.</p>
 <p><b>Drag &amp; Drop:</b> mehrere Dateien → mehrere Tabs in der Sidebar.</p>
@@ -73,7 +89,8 @@ Seite <b>⟲/⟳ drehen</b>, <b>↔/↕ spiegeln</b>, <b>leere Seite</b>, <b>dup
 „Weiter“ springt zum nächsten Treffer; <b>letzte Suchbegriffe</b> im Dropdown.</p>
 <p><b>Annotationen:</b> eigene Liste in der Sidebar — <b>gruppiert nach Seite</b>; Klick springt zur Annotation;
 Filter-Dropdown nach Typ; <b>Farben-Chips in der Statistik klickbar</b>; <b>Textsuche in der Liste</b>;
-Text nachträglich editierbar; Deckkraft pro Annotation.</p>
+Text nachträglich editierbar; Deckkraft pro Annotation; <b>Notizfarbe unabhängig von Highlight</b>.</p>
+<p><b>Zwei-Seiten-Ansicht:</b> Ansicht → Zwei-Seiten-Ansicht / Toolbar „2S“ / Ctrl+2 — aktuelle und nächste Seite nebeneinander; Blättern springt um 2 Seiten.</p>
 <p><b>Seitenbereich:</b> PDF → Seitenbereich extrahieren… (von–bis → neues PDF)
 bzw. Dialog „zusammenführen / teilen / Bereich“.</p>
 <p><b>Suchen und Ersetzen:</b> Bearbeiten → Ctrl+R (nur Texteditor).</p>
@@ -87,11 +104,12 @@ Erneut öffnen: Ctrl+Alt+Shift+O.</p>
 <p><b>Zeile verschieben:</b> Bearbeiten → Alt+Up / Alt+Down (aktuelle Zeile oder Auswahl).</p>
 <p><b>Zeilen sortieren (A–Z):</b> Bearbeiten → Ctrl+Shift+O (Auswahl; ohne Auswahl ganze Datei).</p>
 <p><b>Sonderzeichen:</b> Ansicht → Sonderzeichen anzeigen (Ctrl+Shift+.) — Tabs/Leerzeichen/Absätze.</p>
+<p><b>Whitespace trim on paste:</b> optional in Einstellungen — Trailing Spaces beim Einfügen entfernen.</p>
 <p><b>Kommentieren:</b> Bearbeiten → Ctrl+/ (# oder // je nach Dateityp).</p>
 <p><b>Groß-/Kleinschreibung:</b> Bearbeiten → Ctrl+Shift+U (Auswahl).</p>
 <p><b>Einrückung:</b> Bearbeiten → Ctrl+] / Ctrl+[ bzw. Tab / Shift+Tab (Block, aktuelle Zeile oder Auswahl).</p>
 <p><b>Präsentation:</b> Ansicht → Präsentationsmodus (F5): Vollbild-PDF; Pfeiltasten/Leertaste; Esc beendet.</p>
-<p><b>Farben-Favoriten:</b> Toolbar 1/2/3 — Klick = Highlight, Shift+Klick = Stift, Rechtsklick = speichern.</p>
+<p><b>Farben-Favoriten:</b> Toolbar 1/2/3 — Klick = Highlight, Shift+Klick = Stift, Ctrl+Klick = Notiz, Rechtsklick = speichern.</p>
 <p><b>Zeilennummern:</b> Ansicht → Zeilennummern (optional, auch in Einstellungen).</p>
 <p><b>PDF Graustufen:</b> Ansicht → PDF Graustufen / Toolbar „Grau“ (Ansicht + Export).</p>
 <p><b>PDF Nachtmodus:</b> Ansicht → PDF Nachtmodus / Toolbar „Nacht“ (nur Invert-Ansicht, nicht speichern).</p>
@@ -110,17 +128,72 @@ bzw. Schwärzungs-Annotationen löschen…</p>
 """
 
 
+def export_shortcuts_pdf(path: str | Path) -> Path:
+    """Schreibe das Keyboard-Cheat-Sheet als PDF (Qt QTextDocument)."""
+    from PySide6.QtCore import QMarginsF
+    from PySide6.QtGui import QPageLayout
+
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    doc = QTextDocument()
+    doc.setHtml(SHORTCUTS_HTML)
+    printer = QPrinter(QPrinter.HighResolution)
+    printer.setOutputFormat(QPrinter.PdfFormat)
+    printer.setOutputFileName(str(path))
+    layout = printer.pageLayout()
+    layout.setUnits(QPageLayout.Millimeter)
+    layout.setMargins(QMarginsF(12, 12, 12, 12))
+    printer.setPageLayout(layout)
+    doc.print_(printer)
+    return path
+
+
 class KeyboardHelpDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Tastaturhilfe")
-        self.resize(520, 520)
+        self.resize(520, 560)
         layout = QVBoxLayout(self)
         browser = QTextBrowser()
         browser.setHtml(SHORTCUTS_HTML)
         layout.addWidget(browser)
         buttons = QDialogButtonBox(QDialogButtonBox.Close)
+        btn_pdf = QPushButton("Als PDF exportieren…")
+        btn_pdf.setToolTip("Keyboard-Cheat-Sheet als PDF speichern")
+        btn_pdf.clicked.connect(self._export_pdf)
+        buttons.addButton(btn_pdf, QDialogButtonBox.ActionRole)
         buttons.rejected.connect(self.reject)
         buttons.accepted.connect(self.accept)
         buttons.clicked.connect(self.accept)
         layout.addWidget(buttons)
+
+    def _export_pdf(self):
+        start = get_last_export_dir() or dialog_start_dir()
+        path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Tastaturhilfe als PDF",
+            str(Path(start) / "InstantLensDoc-Tastaturhilfe.pdf"),
+            "PDF (*.pdf)",
+        )
+        if not path:
+            return
+        if not path.lower().endswith(".pdf"):
+            path += ".pdf"
+        out = Path(path)
+        if out.exists():
+            reply = QMessageBox.question(
+                self,
+                "Überschreiben?",
+                f"{out.name} existiert bereits. Überschreiben?",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No,
+            )
+            if reply != QMessageBox.Yes:
+                return
+        try:
+            export_shortcuts_pdf(out)
+            remember_recent_dir(out)
+            set_last_export_dir(out.parent)
+            QMessageBox.information(self, "Tastaturhilfe", f"PDF gespeichert:\n{out}")
+        except Exception as e:
+            QMessageBox.warning(self, "Tastaturhilfe", f"PDF-Export fehlgeschlagen:\n{e}")

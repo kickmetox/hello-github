@@ -28,9 +28,11 @@ DEFAULTS: dict[str, Any] = {
     "autosave_interval_sec": 60,
     "ann_highlight_color": "#FFE066",
     "ann_pen_color": "#2C3E50",
+    "ann_note_color": "#FFEB3B",
     "editor_line_numbers": False,
     "pdf_grayscale": False,
     "pdf_night_mode": False,
+    "pdf_two_page_spread": False,
     "ann_default_opacity": 1.0,
     "recent_dirs": [],
     "editor_markdown_preview": False,
@@ -56,6 +58,7 @@ DEFAULTS: dict[str, Any] = {
         "— Notiz —\n",
     ],
     "editor_trim_trailing_whitespace": False,
+    "editor_trim_whitespace_on_paste": False,
     "pdf_toolbar_groups": {
         "tools": True,
         "colors": True,
@@ -266,6 +269,26 @@ def set_ann_pen_color(color: str) -> None:
     if not c.startswith("#"):
         c = "#" + c
     save_settings({"ann_pen_color": c})
+
+
+def get_ann_note_color() -> str:
+    c = str(load_settings().get("ann_note_color") or DEFAULTS["ann_note_color"]).strip()
+    return c if c.startswith("#") and len(c) >= 4 else DEFAULTS["ann_note_color"]
+
+
+def set_ann_note_color(color: str) -> None:
+    c = (color or "").strip() or DEFAULTS["ann_note_color"]
+    if not c.startswith("#"):
+        c = "#" + c
+    save_settings({"ann_note_color": c})
+
+
+def get_pdf_two_page_spread() -> bool:
+    return bool(load_settings().get("pdf_two_page_spread", False))
+
+
+def set_pdf_two_page_spread(enabled: bool) -> None:
+    save_settings({"pdf_two_page_spread": bool(enabled)})
 
 
 def get_editor_line_numbers() -> bool:
@@ -672,6 +695,14 @@ def get_editor_trim_trailing_whitespace() -> bool:
 
 def set_editor_trim_trailing_whitespace(enabled: bool) -> None:
     save_settings({"editor_trim_trailing_whitespace": bool(enabled)})
+
+
+def get_editor_trim_whitespace_on_paste() -> bool:
+    return bool(load_settings().get("editor_trim_whitespace_on_paste", False))
+
+
+def set_editor_trim_whitespace_on_paste(enabled: bool) -> None:
+    save_settings({"editor_trim_whitespace_on_paste": bool(enabled)})
 
 
 def _default_toolbar_groups() -> dict[str, bool]:

@@ -31,6 +31,7 @@ from instantlensdoc.core.app_settings import (
     PDF_TOOLBAR_GROUP_LABELS,
     get_editor_text_encoding,
     get_editor_trim_trailing_whitespace,
+    get_editor_trim_whitespace_on_paste,
     get_export_image_max_edge,
     get_pdf_toolbar_groups,
     get_export_jpeg_quality,
@@ -41,6 +42,7 @@ from instantlensdoc.core.app_settings import (
     get_pdf_grayscale,
     get_pdf_night_mode,
     get_pdf_thumbnail_scale,
+    get_pdf_two_page_spread,
     get_restore_session_on_start,
     get_theme,
     get_ui_lang,
@@ -58,6 +60,7 @@ from instantlensdoc.core.app_settings import (
     set_editor_soft_wrap,
     set_editor_text_encoding,
     set_editor_trim_trailing_whitespace,
+    set_editor_trim_whitespace_on_paste,
     set_minimize_to_tray,
     set_pdf_toolbar_groups,
     set_ocr_lang,
@@ -65,6 +68,7 @@ from instantlensdoc.core.app_settings import (
     set_pdf_grayscale,
     set_pdf_night_mode,
     set_pdf_thumbnail_scale,
+    set_pdf_two_page_spread,
     set_restore_session_on_start,
     set_theme,
     set_ui_lang,
@@ -169,6 +173,13 @@ class SettingsDialog(QDialog):
         )
         form.addRow(self.trim_trailing)
 
+        self.trim_paste = QCheckBox("Whitespace trim on paste")
+        self.trim_paste.setChecked(get_editor_trim_whitespace_on_paste())
+        self.trim_paste.setToolTip(
+            "Beim Einfügen aus der Zwischenablage Trailing Whitespace pro Zeile entfernen (optional)"
+        )
+        form.addRow(self.trim_paste)
+
         self.minimize_tray = QCheckBox("Beim Minimieren in den System-Tray")
         self.minimize_tray.setChecked(get_minimize_to_tray())
         self.minimize_tray.setToolTip(
@@ -206,6 +217,13 @@ class SettingsDialog(QDialog):
         self.pdf_night.setChecked(get_pdf_night_mode())
         self.pdf_night.setToolTip("Dunkle Invert-Ansicht — nur Darstellung, nicht speichern/exportieren")
         form.addRow(self.pdf_night)
+
+        self.pdf_spread = QCheckBox("PDF Zwei-Seiten-Ansicht (Spread)")
+        self.pdf_spread.setChecked(get_pdf_two_page_spread())
+        self.pdf_spread.setToolTip(
+            "Aktuelle und nächste Seite nebeneinander (Ansicht/Toolbar „2S“, Ctrl+2)"
+        )
+        form.addRow(self.pdf_spread)
 
         self.jpeg_q = QSpinBox()
         self.jpeg_q.setRange(10, 100)
@@ -338,6 +356,7 @@ class SettingsDialog(QDialog):
         set_editor_show_special_chars(self.special_chars.isChecked())
         set_editor_text_encoding(str(self.enc_combo.currentData() or "utf-8"))
         set_editor_trim_trailing_whitespace(self.trim_trailing.isChecked())
+        set_editor_trim_whitespace_on_paste(self.trim_paste.isChecked())
         set_pdf_toolbar_groups(
             {k: cb.isChecked() for k, cb in self._toolbar_group_checks.items()}
         )
@@ -347,6 +366,7 @@ class SettingsDialog(QDialog):
         set_page_size_unit(str(self.page_unit.currentData() or "mm"))
         set_pdf_grayscale(self.pdf_grayscale.isChecked())
         set_pdf_night_mode(self.pdf_night.isChecked())
+        set_pdf_two_page_spread(self.pdf_spread.isChecked())
         save_settings(
             {
                 "export_jpeg_quality": int(self.jpeg_q.value()),
@@ -378,7 +398,13 @@ class SettingsDialog(QDialog):
                 pass
         if parent is not None and hasattr(parent, "pdf_view"):
             try:
+                parent.pdf_view.apply_settings_colors()
                 parent.pdf_view.apply_toolbar_groups()
+            except Exception:
+                pass
+        if parent is not None and hasattr(parent, "_sync_spread_action"):
+            try:
+                parent._sync_spread_action()
             except Exception:
                 pass
         self.accept()

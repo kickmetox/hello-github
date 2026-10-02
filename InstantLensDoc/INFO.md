@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **0.4.6** |
+| Version | **0.4.7** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -33,10 +33,10 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)
 
-## Neu in 0.4.6
+## Neu in 0.4.7
 
-- PDF: Gehe zu Seite (Ctrl+G / Dialog)
-- Annotation-Farben in Sidebar-Statistik klickbar filtern
-- Editor: Tab duplizieren / Datei erneut öffnen
-- Statusleiste: Hint „Letzte Aktion rückgängig“
+- PDF: Zwei-Seiten-Ansicht (Spread) optional
+- Annotation: Notizfarbe unabhängig von Highlight
+- Editor: Whitespace trim on paste optional
+- F1: Keyboard-Cheat-Sheet als PDF exportieren
 - Stubs KI/Cloud/Stylus/3D unverändert

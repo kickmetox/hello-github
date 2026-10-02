@@ -29,9 +29,11 @@ HELP_HTML = f"""
 <li><b>Datei → Öffnen</b>: TXT, MD, HTML, DOCX, PDF, Bilder</li>
 <li><b>Extras → Einstellungen</b>: Theme, <b>UI-Sprache DE/EN</b>, OCR, Export-Qualität,
     <b>Standard-Zoom</b>, <b>Autosave-Intervall</b>, Soft-Wrap, <b>Sonderzeichen anzeigen</b>,
-    optional <b>Trailing Whitespace trimmen</b>, optional <b>Minimieren in System-Tray</b>,
+    optional <b>Trailing Whitespace trimmen</b>, optional <b>Whitespace trim on paste</b>,
+    optional <b>Minimieren in System-Tray</b>,
     optional <b>Backup .bak beim Speichern</b>, <b>Seitengröße-Einheit mm/inch</b>,
     optional <b>letzte Session beim Start</b>, <b>PDF-Toolbar-Gruppen</b> ein-/ausblenden,
+    optional <b>PDF Zwei-Seiten-Ansicht (Spread)</b>,
     Update-Hinweis (nur wenn aktiv), Pfade;
     <b>Auf Standard zurücksetzen</b></li>
 <li><b>Datei → Zuletzt geöffnet</b>: Menü + Seitenleiste (persistiert)</li>
@@ -63,6 +65,7 @@ HELP_HTML = f"""
     <b>Präsentationsmodus</b> (F5 Vollbild, Pfeiltasten); <b>Hell/Dunkel</b>-Design umschalten; optionale <b>Zeilennummern</b>; <b>Markdown-Vorschau</b> (Split, Ctrl+Shift+M);
     <b>Soft-Wrap</b>; <b>Sonderzeichen anzeigen</b> (Ctrl+Shift+.);
     <b>PDF Graustufen</b>; <b>PDF Nachtmodus</b> (Invert-Ansicht, nur Darstellung);
+    <b>Zwei-Seiten-Ansicht (Spread)</b> (Ctrl+2 / Toolbar 2S);
     <b>Annotation-Layer</b> ein/aus (Ctrl+Shift+A);
     <b>Annotationen sperren</b> (Ctrl+Shift+L — nicht verschiebbar);
     <b>Seitenrahmen / CropBox</b> Overlay (Ctrl+Shift+B);
@@ -105,7 +108,7 @@ HELP_HTML = f"""
 <li><b>Session</b>: Offene Dokumente (Sidebar-Liste) werden beim Beenden gespeichert;
     Wiederherstellung beim Start optional in den Einstellungen</li>
 <li><b>Logging</b>: Datei unter <code>%APPDATA%/InstantLensDoc/logs/</code> (Windows) bzw. <code>~/.config/InstantLensDoc/logs/</code></li>
-<li><b>Tastaturhilfe</b>: Hilfe → Tastaturhilfe (F1)</li>
+<li><b>Tastaturhilfe</b>: Hilfe → Tastaturhilfe (F1); Cheat-Sheet als PDF exportieren</li>
 <li><b>Extras → Batch-Konvertierung</b>: Ordner → PDF oder OCR</li>
 <li><b>Einfügen → Verketteter Textrahmen</b>: Overflow fließt in den Folgeahmen</li>
 <li><b>OCR</b>: Extras → OCR — Sprach-Presets + Modus „editierbarer Text“ oder

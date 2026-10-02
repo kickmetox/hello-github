@@ -342,6 +342,7 @@ class MainWindow(QMainWindow):
         self.pdf_view.document_changed.connect(self._on_pdf_document_changed)
         self.pdf_view.grayscale_changed.connect(self._sync_grayscale_action)
         self.pdf_view.night_mode_changed.connect(self._sync_night_action)
+        self.pdf_view.two_page_spread_changed.connect(self._sync_spread_action)
         self.pdf_view.annotations_layer_changed.connect(self._sync_ann_layer_action)
         self.pdf_view.annotations_lock_changed.connect(self._sync_ann_lock_action)
         self.pdf_view.page_boxes_changed.connect(self._sync_page_boxes_action)
@@ -688,6 +689,17 @@ class MainWindow(QMainWindow):
         )
         self._night_action.toggled.connect(self._toggle_night_mode)
         m_view.addAction(self._night_action)
+        from instantlensdoc.core.app_settings import get_pdf_two_page_spread
+
+        self._spread_action = QAction("Zwei-Seiten-Ansicht (Spread)", self)
+        self._spread_action.setCheckable(True)
+        self._spread_action.setChecked(get_pdf_two_page_spread())
+        self._spread_action.setToolTip(
+            "Aktuelle und nächste PDF-Seite nebeneinander (Ctrl+2 / Toolbar 2S)"
+        )
+        self._spread_action.setShortcut(QKeySequence("Ctrl+2"))
+        self._spread_action.toggled.connect(self._toggle_two_page_spread)
+        m_view.addAction(self._spread_action)
         self._ann_layer_action = QAction("Annotation-Layer", self)
         self._ann_layer_action.setCheckable(True)
         self._ann_layer_action.setChecked(get_annotations_visible())
@@ -1341,6 +1353,10 @@ class MainWindow(QMainWindow):
         self.pdf_view.set_night_mode(bool(checked))
         self._sync_night_action(bool(checked))
 
+    def _toggle_two_page_spread(self, checked: bool):
+        self.pdf_view.set_two_page_spread(bool(checked))
+        self._sync_spread_action(bool(checked))
+
     def _toggle_ann_layer(self, checked: bool):
         self.pdf_view.set_annotations_visible(bool(checked))
         self._sync_ann_layer_action(bool(checked))
@@ -1368,6 +1384,14 @@ class MainWindow(QMainWindow):
             self._night_action.blockSignals(True)
             self._night_action.setChecked(bool(enabled))
             self._night_action.blockSignals(False)
+
+    def _sync_spread_action(self, enabled: bool | None = None):
+        if enabled is None:
+            enabled = self.pdf_view.two_page_spread_enabled()
+        if hasattr(self, "_spread_action") and self._spread_action is not None:
+            self._spread_action.blockSignals(True)
+            self._spread_action.setChecked(bool(enabled))
+            self._spread_action.blockSignals(False)
 
     def _sync_ann_layer_action(self, enabled: bool):
         if hasattr(self, "_ann_layer_action") and self._ann_layer_action is not None:

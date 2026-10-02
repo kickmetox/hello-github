@@ -9,7 +9,7 @@ from PySide6.QtCore import QRect, QSize, Qt
 from PySide6.QtGui import QColor, QFont, QImage, QPainter, QTextCharFormat, QTextCursor, QTextDocument, QTextOption
 from PySide6.QtWidgets import QApplication, QPlainTextEdit, QTextEdit, QWidget
 
-from instantlensdoc.core.app_settings import get_editor_line_numbers, get_editor_soft_wrap, get_editor_show_special_chars
+from instantlensdoc.core.app_settings import get_editor_line_numbers, get_editor_soft_wrap, get_editor_show_special_chars, get_editor_trim_whitespace_on_paste
 
 
 class _LineNumberArea(QWidget):
@@ -505,6 +505,22 @@ class TextEditor(QPlainTextEdit):
                 # Zwischenablage kann schon das Image halten — paste_clipboard_image
                 if self.paste_clipboard_image():
                     return
+        if (
+            source is not None
+            and source.hasText()
+            and get_editor_trim_whitespace_on_paste()
+        ):
+            text = source.text()
+            # Trailing Whitespace pro Zeile entfernen (nicht führend)
+            lines = text.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+            trimmed = "\n".join(line.rstrip(" \t") for line in lines)
+            if trimmed != text:
+                from PySide6.QtCore import QMimeData
+
+                md = QMimeData()
+                md.setText(trimmed)
+                super().insertFromMimeData(md)
+                return
         super().insertFromMimeData(source)
 
     def clear_extra_selections(self) -> None:

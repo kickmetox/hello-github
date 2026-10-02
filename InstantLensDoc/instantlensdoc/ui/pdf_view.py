@@ -68,22 +68,26 @@ from instantlensdoc.core.app_settings import (
     get_ann_color_presets,
     get_ann_default_opacity,
     get_ann_highlight_color,
+    get_ann_note_color,
     get_ann_pen_color,
     get_annotations_locked,
     get_annotations_visible,
     get_default_zoom_scale,
     get_pdf_grayscale,
     get_pdf_night_mode,
+    get_pdf_two_page_spread,
     get_show_page_boxes,
     get_show_printer_marks,
     set_ann_color_preset,
     set_ann_default_opacity,
     set_ann_highlight_color,
+    set_ann_note_color,
     set_ann_pen_color,
     set_annotations_locked,
     set_annotations_visible,
     set_pdf_grayscale,
     set_pdf_night_mode,
+    set_pdf_two_page_spread,
     set_show_page_boxes,
     set_show_printer_marks,
 )
@@ -565,7 +569,11 @@ class PdfCanvas(QLabel):
         elif ann.type == AnnotationType.UNDERLINE:
             painter.drawLine(x, y + h, x + w, y + h)
         elif ann.type == AnnotationType.STICKY:
-            painter.fillRect(x, y, max(w, 80), max(h, 60), QColor(255, 255, 150, _a(200)))
+            fill = QColor(ann.color if ann.color else "#FFEB3B")
+            fill.setAlpha(_a(200))
+            painter.fillRect(x, y, max(w, 80), max(h, 60), fill)
+            # Textkontrast je nach Helligkeit der Notizfarbe
+            painter.setPen(QColor("#111111" if fill.lightness() > 140 else "#FFFFFF"))
             painter.drawText(x + 4, y + 16, (ann.text or "Notiz")[:40])
         elif ann.type == AnnotationType.TEXT:
             painter.drawRect(x, y, w, h)
@@ -887,6 +895,7 @@ class PdfViewer(QWidget):
     annotations_lock_changed = Signal(bool)
     page_boxes_changed = Signal(bool)
     printer_marks_changed = Signal(bool)
+    two_page_spread_changed = Signal(bool)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -899,6 +908,7 @@ class PdfViewer(QWidget):
         self.password: Optional[str] = None
         self._tool_buttons: list[QToolButton] = []
         self._pending_callout_anchor: tuple[float, float] | None = None
+        self._pending_callout_page: int = 0
         self._zoom_timer = QTimer(self)
         self._zoom_timer.setSingleShot(True)
         self._zoom_timer.setInterval(120)
@@ -906,8 +916,12 @@ class PdfViewer(QWidget):
         self._pending_scale: float | None = None
         self._highlight_color = get_ann_highlight_color()
         self._pen_color = get_ann_pen_color()
+        self._note_color = get_ann_note_color()
         self._grayscale = get_pdf_grayscale()
         self._night_mode = get_pdf_night_mode()
+        self._two_page_spread = get_pdf_two_page_spread()
+        self._spread_left_width = 0.0
+        self._spread_gap = 12
         self._default_opacity = get_ann_default_opacity()
         self._annotations_visible = get_annotations_visible()
         self._annotations_locked = get_annotations_locked()
@@ -1044,6 +1058,11 @@ class PdfViewer(QWidget):
         self.btn_pen_color.setFixedWidth(44)
         self.btn_pen_color.clicked.connect(self._pick_pen_color)
         self._style_color_btn(self.btn_pen_color, self._pen_color)
+        self.btn_note_color = QPushButton("Notiz")
+        self.btn_note_color.setToolTip("Notizfarbe (Sticky) — unabhängig von Highlight")
+        self.btn_note_color.setFixedWidth(48)
+        self.btn_note_color.clicked.connect(self._pick_note_color)
+        self._style_color_btn(self.btn_note_color, self._note_color)
         self.spin_opacity = QDoubleSpinBox()
         self.spin_opacity.setRange(0.05, 1.0)
         self.spin_opacity.setSingleStep(0.05)
@@ -1067,6 +1086,14 @@ class PdfViewer(QWidget):
             "Nachtmodus: dunkle Invert-Ansicht (nur Darstellung, nicht speichern/exportieren)"
         )
         self.btn_night.toggled.connect(self.set_night_mode)
+        self.btn_spread = QToolButton()
+        self.btn_spread.setText("2S")
+        self.btn_spread.setCheckable(True)
+        self.btn_spread.setChecked(self._two_page_spread)
+        self.btn_spread.setToolTip(
+            "Zwei-Seiten-Ansicht (Spread): aktuelle + nächste Seite nebeneinander"
+        )
+        self.btn_spread.toggled.connect(self.set_two_page_spread)
         self.btn_ann_layer = QToolButton()
         self.btn_ann_layer.setText("Ann.")
         self.btn_ann_layer.setCheckable(True)
@@ -1097,6 +1124,7 @@ class PdfViewer(QWidget):
         self.btn_printer_marks.toggled.connect(self.set_show_printer_marks)
         toolbar.addWidget(self.btn_hl_color)
         toolbar.addWidget(self.btn_pen_color)
+        toolbar.addWidget(self.btn_note_color)
         self._preset_btns: list[QPushButton] = []
         for i in range(3):
             pb = QPushButton(str(i + 1))
@@ -1116,6 +1144,7 @@ class PdfViewer(QWidget):
         toolbar.addWidget(self.spin_opacity)
         toolbar.addWidget(self.btn_grayscale)
         toolbar.addWidget(self.btn_night)
+        toolbar.addWidget(self.btn_spread)
         toolbar.addWidget(self.btn_ann_layer)
         toolbar.addWidget(self.btn_ann_lock)
         toolbar.addWidget(self.btn_page_boxes)
@@ -1156,12 +1185,14 @@ class PdfViewer(QWidget):
             "colors": [
                 self.btn_hl_color,
                 self.btn_pen_color,
+                self.btn_note_color,
                 *self._preset_btns,
                 self.spin_opacity,
             ],
             "view": [
                 self.btn_grayscale,
                 self.btn_night,
+                self.btn_spread,
                 self.btn_ann_layer,
                 self.btn_ann_lock,
                 self.btn_page_boxes,
@@ -1265,6 +1296,15 @@ class PdfViewer(QWidget):
             self._style_color_btn(self.btn_pen_color, self._pen_color)
             self.status.emit(f"Stift-Farbe: {self._pen_color}")
 
+    def _pick_note_color(self):
+        initial = QColor(self._note_color)
+        color = QColorDialog.getColor(initial, self, "Notizfarbe")
+        if color.isValid():
+            self._note_color = color.name()
+            set_ann_note_color(self._note_color)
+            self._style_color_btn(self.btn_note_color, self._note_color)
+            self.status.emit(f"Notizfarbe: {self._note_color}")
+
     def _refresh_preset_btns(self):
         presets = get_ann_color_presets()
         for i, btn in enumerate(getattr(self, "_preset_btns", []) or []):
@@ -1272,7 +1312,7 @@ class PdfViewer(QWidget):
             self._style_color_btn(btn, c)
             btn.setToolTip(
                 f"Favorit {i + 1}: {c} — Klick = Highlight · Shift+Klick = Stift · "
-                "Rechtsklick = HL speichern"
+                "Ctrl+Klick = Notiz · Rechtsklick = HL speichern"
             )
 
     def _apply_color_preset(self, index: int):
@@ -1281,7 +1321,12 @@ class PdfViewer(QWidget):
             return
         color = presets[index]
         mods = QApplication.keyboardModifiers()
-        if mods & Qt.ShiftModifier:
+        if mods & Qt.ControlModifier:
+            self._note_color = color
+            set_ann_note_color(color)
+            self._style_color_btn(self.btn_note_color, color)
+            self.status.emit(f"Notizfarbe (Favorit {index + 1}): {color}")
+        elif mods & Qt.ShiftModifier:
             self._pen_color = color
             set_ann_pen_color(color)
             self._style_color_btn(self.btn_pen_color, color)
@@ -1353,6 +1398,44 @@ class PdfViewer(QWidget):
 
     def night_mode_enabled(self) -> bool:
         return bool(self._night_mode)
+
+    def set_two_page_spread(self, enabled: bool):
+        """Zwei-Seiten-Ansicht (Spread): aktuelle + nächste Seite nebeneinander."""
+        enabled = bool(enabled)
+        changed = self._two_page_spread != enabled
+        self._two_page_spread = enabled
+        set_pdf_two_page_spread(enabled)
+        if hasattr(self, "btn_spread"):
+            self.btn_spread.blockSignals(True)
+            self.btn_spread.setChecked(enabled)
+            self.btn_spread.blockSignals(False)
+        if not enabled:
+            self._spread_left_width = 0.0
+        if changed and self.pdf_path:
+            self.refresh()
+        if changed:
+            self.two_page_spread_changed.emit(enabled)
+            self.status.emit(
+                "Zwei-Seiten-Ansicht an" if enabled else "Zwei-Seiten-Ansicht aus"
+            )
+
+    def two_page_spread_enabled(self) -> bool:
+        return bool(self._two_page_spread)
+
+    def _spread_resolve(self, x: float, y: float) -> tuple[int, float, float]:
+        """Display-Koordinaten → (page_index, lokale_x, lokale_y)."""
+        if (
+            self._two_page_spread
+            and self._spread_left_width > 0
+            and self.page_index + 1 < self.page_count
+            and x >= self._spread_left_width + self._spread_gap
+        ):
+            return (
+                self.page_index + 1,
+                x - self._spread_left_width - self._spread_gap,
+                y,
+            )
+        return self.page_index, x, y
 
     def set_annotations_visible(self, visible: bool):
         """Annotation-Layer ein-/ausblenden (nur Darstellung)."""
@@ -1515,8 +1598,11 @@ class PdfViewer(QWidget):
     def apply_settings_colors(self):
         self._highlight_color = get_ann_highlight_color()
         self._pen_color = get_ann_pen_color()
+        self._note_color = get_ann_note_color()
         self._style_color_btn(self.btn_hl_color, self._highlight_color)
         self._style_color_btn(self.btn_pen_color, self._pen_color)
+        if hasattr(self, "btn_note_color"):
+            self._style_color_btn(self.btn_note_color, self._note_color)
         self._refresh_preset_btns()
         self._default_opacity = get_ann_default_opacity()
         if hasattr(self, "spin_opacity"):
@@ -1533,6 +1619,11 @@ class PdfViewer(QWidget):
             self.btn_night.blockSignals(True)
             self.btn_night.setChecked(self._night_mode)
             self.btn_night.blockSignals(False)
+        self._two_page_spread = get_pdf_two_page_spread()
+        if hasattr(self, "btn_spread"):
+            self.btn_spread.blockSignals(True)
+            self.btn_spread.setChecked(self._two_page_spread)
+            self.btn_spread.blockSignals(False)
         self._annotations_visible = get_annotations_visible()
         if hasattr(self, "btn_ann_layer"):
             self.btn_ann_layer.blockSignals(True)
@@ -1565,6 +1656,8 @@ class PdfViewer(QWidget):
             self._update_printer_marks_overlay()
         else:
             self.canvas.clear_printer_marks_rect()
+        if self.pdf_path:
+            self.refresh()
 
     def apply_default_zoom(self):
         self.set_scale(get_default_zoom_scale(), immediate=True)
@@ -1589,6 +1682,7 @@ class PdfViewer(QWidget):
     def _set_tool(self, tool: AnnotationType | None):
         self.tool = tool
         self._pending_callout_anchor = None
+        self._pending_callout_page = self.page_index
         if tool is None:
             want = "Auswahl"
             for b in self._tool_buttons:
@@ -1810,8 +1904,13 @@ class PdfViewer(QWidget):
         if not self.pdf_path:
             return
         try:
+            from copy import copy
+
+            from PIL import Image
+
             from ild_pdf.limits import clamp_render_scale
             from ild_pdf import PdfDocument
+            from ild_pdf.links import UriLink
 
             with PdfDocument(self.pdf_path, password=self.password) as doc:
                 pw, ph = doc.page_size(self.page_index)
@@ -1827,23 +1926,89 @@ class PdfViewer(QWidget):
                 grayscale=self._grayscale,
                 invert=self._night_mode,
             )
-            anns = self.store.for_page(self.page_index) if self.store else []
-            self.canvas.set_page_image(img, anns, scale=self.scale)
+            anns = list(self.store.for_page(self.page_index) if self.store else [])
+            links: list = []
             try:
-                links = list_page_uri_links(
-                    self.pdf_path,
-                    self.page_index,
-                    scale=self.scale,
-                    password=self.password,
+                links = list(
+                    list_page_uri_links(
+                        self.pdf_path,
+                        self.page_index,
+                        scale=self.scale,
+                        password=self.password,
+                    )
                 )
             except Exception:
                 links = []
+
+            self._spread_left_width = 0.0
+            facing = self.page_index + 1
+            use_spread = (
+                self._two_page_spread
+                and facing < self.page_count
+            )
+            if use_spread:
+                gap = int(self._spread_gap)
+                img2 = render_page(
+                    self.pdf_path,
+                    facing,
+                    scale=self.scale,
+                    password=self.password,
+                    grayscale=self._grayscale,
+                    invert=self._night_mode,
+                )
+                if img.mode != "RGBA":
+                    img = img.convert("RGBA")
+                if img2.mode != "RGBA":
+                    img2 = img2.convert("RGBA")
+                left_w, left_h = img.size
+                right_w, right_h = img2.size
+                self._spread_left_width = float(left_w)
+                combo_w = left_w + gap + right_w
+                combo_h = max(left_h, right_h)
+                combined = Image.new("RGBA", (combo_w, combo_h), (240, 240, 240, 255))
+                combined.paste(img, (0, 0))
+                combined.paste(img2, (left_w + gap, 0))
+                img = combined
+                ox = float(left_w + gap)
+                if self.store:
+                    for ann in self.store.for_page(facing):
+                        disp = copy(ann)
+                        disp.x = float(ann.x) + ox
+                        if ann.callout_x or ann.callout_y:
+                            disp.callout_x = float(ann.callout_x) + ox
+                        anns.append(disp)
+                try:
+                    right_links = list_page_uri_links(
+                        self.pdf_path,
+                        facing,
+                        scale=self.scale,
+                        password=self.password,
+                    )
+                    for link in right_links:
+                        links.append(
+                            UriLink(
+                                page=link.page,
+                                x=link.x + ox,
+                                y=link.y,
+                                width=link.width,
+                                height=link.height,
+                                uri=link.uri,
+                            )
+                        )
+                except Exception:
+                    pass
+                self.lbl_page.setText(
+                    f"{self.page_index + 1}–{facing + 1} / {self.page_count}"
+                )
+            else:
+                self.lbl_page.setText(f"{self.page_index + 1} / {self.page_count}")
+
+            self.canvas.set_page_image(img, anns, scale=self.scale)
             self.canvas.set_uri_links(links)
             self._update_page_box_overlay()
             self._update_printer_marks_overlay()
             if self._search_rects:
                 self.canvas.set_search_highlights(self._search_rects, self._search_index)
-            self.lbl_page.setText(f"{self.page_index + 1} / {self.page_count}")
             self.lbl_zoom.setText(f"{int(round(self.scale * 100))}%")
             dirty = " *" if self.store and self.store.dirty else ""
             self.status.emit(f"PDF: {self.pdf_path.name}{dirty}")
@@ -1865,20 +2030,29 @@ class PdfViewer(QWidget):
             self.page_changed.emit(self.page_index)
 
     def prev_page(self):
-        if self.page_index > 0:
-            self.page_index -= 1
-            if self._search_query:
-                self._rebuild_search_rects(keep_index=False)
-            self.refresh()
-            self.page_changed.emit(self.page_index)
+        if self.page_index <= 0:
+            return
+        step = 2 if self._two_page_spread else 1
+        self.page_index = max(0, self.page_index - step)
+        if self._search_query:
+            self._rebuild_search_rects(keep_index=False)
+        self.refresh()
+        self.page_changed.emit(self.page_index)
 
     def next_page(self):
-        if self.page_index + 1 < self.page_count:
-            self.page_index += 1
-            if self._search_query:
-                self._rebuild_search_rects(keep_index=False)
-            self.refresh()
-            self.page_changed.emit(self.page_index)
+        if self.page_index + 1 >= self.page_count:
+            return
+        step = 2 if self._two_page_spread else 1
+        target = self.page_index + step
+        if target >= self.page_count:
+            target = self.page_index + 1
+        if target >= self.page_count:
+            return
+        self.page_index = target
+        if self._search_query:
+            self._rebuild_search_rects(keep_index=False)
+        self.refresh()
+        self.page_changed.emit(self.page_index)
 
     def clear_search_highlights(self):
         self._search_query = ""
@@ -3125,9 +3299,16 @@ class PdfViewer(QWidget):
     def _on_drag(self, x0: float, y0: float, x1: float, y1: float):
         if not self.store or self.tool is None or self.tool not in DRAG_TYPES:
             return
+        page0, lx0, ly0 = self._spread_resolve(x0, y0)
+        _page1, lx1, ly1 = self._spread_resolve(x1, y1)
+        page = page0
+        # Endpunkt relativ zum Start halten (kein Seitenwechsel mitten im Drag)
+        lx1 = lx0 + (x1 - x0)
+        ly1 = ly0 + (y1 - y0)
+        x0, y0, x1, y1 = lx0, ly0, lx1, ly1
         if self.tool == AnnotationType.HIGHLIGHT:
             ann = Annotation(
-                page=self.page_index,
+                page=page,
                 type=AnnotationType.HIGHLIGHT,
                 x=min(x0, x1),
                 y=min(y0, y1),
@@ -3137,7 +3318,7 @@ class PdfViewer(QWidget):
             )
         elif self.tool == AnnotationType.REDACTION:
             ann = Annotation(
-                page=self.page_index,
+                page=page,
                 type=AnnotationType.REDACTION,
                 x=min(x0, x1),
                 y=min(y0, y1),
@@ -3148,7 +3329,7 @@ class PdfViewer(QWidget):
             )
         elif self.tool == AnnotationType.RECTANGLE:
             ann = Annotation(
-                page=self.page_index,
+                page=page,
                 type=AnnotationType.RECTANGLE,
                 x=min(x0, x1),
                 y=min(y0, y1),
@@ -3158,7 +3339,7 @@ class PdfViewer(QWidget):
             )
         elif self.tool in (AnnotationType.LINE, AnnotationType.ARROW, AnnotationType.MEASURE):
             ann = Annotation(
-                page=self.page_index,
+                page=page,
                 type=self.tool,
                 x=x0,
                 y=y0,
@@ -3180,18 +3361,22 @@ class PdfViewer(QWidget):
         if self.tool in DRAG_TYPES:
             return  # Drag-Werkzeuge
 
+        page, x, y = self._spread_resolve(x, y)
+
         if self.tool == AnnotationType.CALLOUT:
             if self._pending_callout_anchor is None:
                 self._pending_callout_anchor = (x, y)
+                self._pending_callout_page = page
                 self.status.emit("Callout: zweiten Klick für Textbox setzen")
                 return
             ax, ay = self._pending_callout_anchor
             self._pending_callout_anchor = None
+            page = getattr(self, "_pending_callout_page", page)
             text, ok = QInputDialog.getText(self, "Callout", "Text:")
             if not ok:
                 return
             ann = Annotation(
-                page=self.page_index,
+                page=page,
                 type=AnnotationType.CALLOUT,
                 x=x,
                 y=y,
@@ -3224,7 +3409,7 @@ class PdfViewer(QWidget):
             if not ok:
                 return
             height = 70.0
-            color = "#FF6B6B"
+            color = self._note_color
         elif self.tool == AnnotationType.TEXT_OVERLAY:
             text, ok = QInputDialog.getMultiLineText(self, "Text-Overlay", "Text:")
             if not ok:
@@ -3249,7 +3434,7 @@ class PdfViewer(QWidget):
             return
 
         ann = Annotation(
-            page=self.page_index,
+            page=page,
             type=self.tool,
             x=x,
             y=y,
