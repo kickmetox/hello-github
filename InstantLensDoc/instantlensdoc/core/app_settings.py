@@ -43,6 +43,7 @@ DEFAULTS: dict[str, Any] = {
     "active_project_workspace": "",
     "editor_markdown_preview": False,
     "editor_doc_split": False,
+    "editor_doc_split_sync_scroll": False,
     "selection_note_with_highlight": False,
     "editor_soft_wrap": True,
     "editor_show_special_chars": False,
@@ -580,6 +581,14 @@ def get_editor_doc_split() -> bool:
 
 def set_editor_doc_split(enabled: bool) -> None:
     save_settings({"editor_doc_split": bool(enabled)})
+
+
+def get_editor_doc_split_sync_scroll() -> bool:
+    return bool(load_settings().get("editor_doc_split_sync_scroll", False))
+
+
+def set_editor_doc_split_sync_scroll(enabled: bool) -> None:
+    save_settings({"editor_doc_split_sync_scroll": bool(enabled)})
 
 
 def get_selection_note_with_highlight() -> bool:

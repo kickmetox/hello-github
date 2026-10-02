@@ -50,6 +50,7 @@ from instantlensdoc.core.app_settings import (
     get_autosave_interval_sec,
     get_default_open_dir,
     get_editor_doc_split,
+    get_editor_doc_split_sync_scroll,
     get_editor_markdown_preview,
     get_editor_soft_wrap,
     get_last_export_dir,
@@ -133,6 +134,8 @@ class MainWindow(QMainWindow):
         self._update_license_status()
         apply_theme()
         self._sync_theme_menu()
+        if get_editor_doc_split() and get_editor_doc_split_sync_scroll():
+            self._apply_doc_split_sync_scroll()
         self._autosave_timer = QTimer(self)
         self._autosave_timer.setInterval(get_autosave_interval_sec() * 1000)
         self._autosave_timer.timeout.connect(self._autosave_tick)
@@ -380,6 +383,7 @@ class MainWindow(QMainWindow):
         self.stack.addWidget(self.editor_pane)  # 0
         self.stack.addWidget(self.pdf_view)  # 1
         self.stack.addWidget(self.image_label)  # 2
+        self.stack.currentChanged.connect(lambda *_: self._apply_doc_split_sync_scroll())
         # Horizontaler Doc-Split: Hauptansicht | zweites Dokument
         self.doc_splitter = QSplitter(Qt.Horizontal)
         self.doc_splitter.addWidget(self.stack)
@@ -432,8 +436,15 @@ class MainWindow(QMainWindow):
         sb.addPermanentWidget(self.word_status_label)
         self.unsaved_status_label = QLabel("0 ungespeichert")
         self.unsaved_status_label.setStyleSheet("padding-right: 10px; color: #555;")
-        self.unsaved_status_label.setToolTip("Anzahl ungespeicherter Tabs (aktuell + markierte)")
+        self.unsaved_status_label.setToolTip(
+            "Ungespeicherte Tabs — Klick öffnet Liste zum Wechseln"
+        )
+        self.unsaved_status_label.setCursor(Qt.PointingHandCursor)
+        self.unsaved_status_label.mousePressEvent = (  # type: ignore[method-assign]
+            lambda e: self._on_unsaved_status_clicked(e)
+        )
         sb.addPermanentWidget(self.unsaved_status_label)
+        self._split_scroll_syncing = False
         self.undo_hint_label = QLabel("Ctrl+Z · Letzte Aktion rückgängig")
         self.undo_hint_label.setObjectName("undoHint")
         self.undo_hint_label.setStyleSheet(
@@ -847,6 +858,15 @@ class MainWindow(QMainWindow):
         self._doc_split_action.setShortcut(QKeySequence("Ctrl+\\"))
         self._doc_split_action.toggled.connect(self._toggle_doc_split)
         m_view.addAction(self._doc_split_action)
+        self._doc_split_sync_action = QAction("Sync-Scroll (geteilte Docs)", self)
+        self._doc_split_sync_action.setCheckable(True)
+        self._doc_split_sync_action.setChecked(get_editor_doc_split_sync_scroll())
+        self._doc_split_sync_action.setToolTip(
+            "Vertikales Scrollen links↔rechts im Doc-Split synchronisieren (optional)"
+        )
+        self._doc_split_sync_action.setShortcut(QKeySequence("Ctrl+Alt+\\"))
+        self._doc_split_sync_action.toggled.connect(self._toggle_doc_split_sync_scroll)
+        m_view.addAction(self._doc_split_sync_action)
         act_sec_doc = QAction("Zweites Dokument wählen…", self)
         act_sec_doc.setToolTip("Datei für die rechte Split-Ansicht aus offenen Tabs wählen")
         act_sec_doc.triggered.connect(self._pick_secondary_document)
@@ -1427,6 +1447,50 @@ class MainWindow(QMainWindow):
         else:
             self.unsaved_status_label.setStyleSheet("padding-right: 10px; color: #555;")
 
+    def list_unsaved_tabs(self) -> list[tuple[str | None, str]]:
+        """Ungespeicherte Tabs als (Pfad|None, Anzeigename). Untitled → path=None."""
+        items: list[tuple[str | None, str]] = []
+        seen: set[str] = set()
+        open_map = {
+            self._path_key(p): p
+            for p in self.sidebar.document_paths()
+            if self._path_key(p)
+        }
+        for key in sorted(self._unsaved_paths):
+            path = open_map.get(key)
+            if not path:
+                continue
+            seen.add(key)
+            items.append((path, Path(path).name))
+        if self._current_is_dirty():
+            cur = self._path_key(self.doc.path) if self.doc and self.doc.path else None
+            if cur and cur not in seen and cur in open_map:
+                path = open_map[cur]
+                items.append((path, Path(path).name))
+            elif not cur:
+                items.insert(0, (None, "Unbenannt *"))
+        return items
+
+    def _on_unsaved_status_clicked(self, event) -> None:
+        """Statusleiste „ungespeichert“: Menü mit dirty Tabs → öffnen/wechseln."""
+        if event.button() != Qt.LeftButton:
+            return
+        entries = self.list_unsaved_tabs()
+        menu = QMenu(self)
+        if not entries:
+            act = menu.addAction("(keine ungespeicherten Tabs)")
+            act.setEnabled(False)
+        else:
+            for path, label in entries:
+                act = menu.addAction(label)
+                if path:
+                    act.setToolTip(path)
+                    act.triggered.connect(lambda checked=False, p=path: self.open_path(p))
+                else:
+                    act.setEnabled(False)
+                    act.setToolTip("Aktuelles unbenanntes Dokument (bereits aktiv)")
+        menu.exec(self.unsaved_status_label.mapToGlobal(event.pos()))
+
     def _format_current_page_size(self) -> str:
         """Aktuelle PDF-Seitengröße formatiert (mm/inch laut Einstellung)."""
         if not self.pdf_view.pdf_path or self.pdf_view.page_count <= 0:
@@ -1898,9 +1962,105 @@ class MainWindow(QMainWindow):
             self.secondary_wrap.setVisible(bool(checked))
         if checked:
             self._load_secondary_document()
+            self._apply_doc_split_sync_scroll()
             self._set_status("Fenster teilen an — zwei Docs horizontal")
         else:
+            self._disconnect_doc_split_sync_scroll()
             self._set_status("Fenster teilen aus")
+
+    def _toggle_doc_split_sync_scroll(self, checked: bool):
+        from instantlensdoc.core.app_settings import set_editor_doc_split_sync_scroll
+
+        set_editor_doc_split_sync_scroll(bool(checked))
+        self._apply_doc_split_sync_scroll()
+        self._set_status(
+            "Sync-Scroll an (geteilte Docs)" if checked else "Sync-Scroll aus"
+        )
+
+    def _primary_scroll_bar(self):
+        """Vertikale Scrollbar der aktuellen Hauptansicht (Editor/PDF)."""
+        w = self.stack.currentWidget()
+        if w is self.editor_pane and hasattr(self, "editor"):
+            return self.editor.verticalScrollBar()
+        if w is self.pdf_view:
+            scroll = getattr(self.pdf_view, "scroll", None)
+            if scroll is not None:
+                return scroll.verticalScrollBar()
+        return None
+
+    def _secondary_scroll_bar(self):
+        if hasattr(self, "secondary_editor"):
+            return self.secondary_editor.verticalScrollBar()
+        return None
+
+    def _disconnect_doc_split_sync_scroll(self) -> None:
+        primary = getattr(self, "_sync_primary_bar", None)
+        secondary = getattr(self, "_sync_secondary_bar", None)
+        if primary is not None:
+            try:
+                primary.valueChanged.disconnect(self._on_primary_scroll_sync)
+            except (TypeError, RuntimeError):
+                pass
+        if secondary is not None:
+            try:
+                secondary.valueChanged.disconnect(self._on_secondary_scroll_sync)
+            except (TypeError, RuntimeError):
+                pass
+        self._sync_primary_bar = None
+        self._sync_secondary_bar = None
+
+    def _apply_doc_split_sync_scroll(self) -> None:
+        """Sync-Scroll verbinden wenn Split sichtbar und Einstellung an."""
+        self._disconnect_doc_split_sync_scroll()
+        if not hasattr(self, "secondary_wrap") or not self.secondary_wrap.isVisible():
+            return
+        if not get_editor_doc_split_sync_scroll():
+            return
+        primary = self._primary_scroll_bar()
+        secondary = self._secondary_scroll_bar()
+        if primary is None or secondary is None:
+            return
+        self._sync_primary_bar = primary
+        self._sync_secondary_bar = secondary
+        primary.valueChanged.connect(self._on_primary_scroll_sync)
+        secondary.valueChanged.connect(self._on_secondary_scroll_sync)
+
+    def _sync_scroll_ratio(self, source, target) -> None:
+        if source is None or target is None or source is target:
+            return
+        s_max = source.maximum()
+        t_max = target.maximum()
+        if s_max <= 0:
+            target.setValue(0)
+            return
+        if t_max <= 0:
+            return
+        ratio = source.value() / s_max
+        target.setValue(int(round(ratio * t_max)))
+
+    def _on_primary_scroll_sync(self, _value: int = 0) -> None:
+        if getattr(self, "_split_scroll_syncing", False):
+            return
+        self._split_scroll_syncing = True
+        try:
+            self._sync_scroll_ratio(
+                getattr(self, "_sync_primary_bar", None),
+                getattr(self, "_sync_secondary_bar", None),
+            )
+        finally:
+            self._split_scroll_syncing = False
+
+    def _on_secondary_scroll_sync(self, _value: int = 0) -> None:
+        if getattr(self, "_split_scroll_syncing", False):
+            return
+        self._split_scroll_syncing = True
+        try:
+            self._sync_scroll_ratio(
+                getattr(self, "_sync_secondary_bar", None),
+                getattr(self, "_sync_primary_bar", None),
+            )
+        finally:
+            self._split_scroll_syncing = False
 
     def _pick_secondary_document(self):
         paths = list(self.sidebar.document_paths()) if hasattr(self.sidebar, "document_paths") else []
@@ -1979,6 +2139,7 @@ class MainWindow(QMainWindow):
             self.secondary_editor.blockSignals(True)
             self.secondary_editor.setPlainText(f"Laden fehlgeschlagen:\n{e}")
             self.secondary_editor.blockSignals(False)
+        self._apply_doc_split_sync_scroll()
 
     def _copy_annotations(self):
         if self.stack.currentWidget() is not self.pdf_view or not self.pdf_view.pdf_path:

@@ -1,5 +1,22 @@
 # Changelog — InstantLens Doc
 
+## 0.6.4 — Tag-Cloud-Filter, Sync-Scroll, Dirty-Tabs, Shortcuts
+
+Nach 0.6.3: Tag-Cloud-Klick setzt den Annotation-Filter; optionaler Sync-Scroll im Doc-Split; Klick auf „ungespeichert“ öffnet die Liste dirty Tabs; Shortcut-Übersicht um 0.6.x-Keys erweitert. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### PDF / Annotationen
+- **Tag-Cloud Klick setzt Filter**: exklusiv auf den gewählten Tag; erneuter Klick löscht; **Ctrl+Klick** Multi-Select (ODER)
+
+### Editor / UX
+- **Sync-Scroll** (optional): vertikales Scrollen links↔rechts im Doc-Split (`Ctrl+Alt+\` / Ansicht)
+- Statusleiste **„N ungespeichert“**: Klick öffnet Menü mit dirty Tabs → Wechseln
+- **Shortcut-Übersicht (F1)**: 0.6.x-Keys (Copy/Notiz/Close-Others/Doc-Split/Sync-Scroll/Tag-Cloud/Dirty-Tabs)
+
+### Packaging / Docs
+- Version **0.6.4**; Smoke um 0.6.4-Pfade erweitert
+
+---
+
 ## 0.6.3 — Highlight+Notiz, Tag-Cloud, Doc-Split, Unsaved-Count
 
 Nach 0.6.2: PDF-Auswahl kann Highlight und Notiz in einem Schritt anlegen; Annotation-Tag-Cloud in der Sidebar; Editor-Fenster horizontal für zwei Docs teilen; Statusleiste zählt ungespeicherte Tabs. Stubs KI/Cloud/Stylus/3D bleiben Stubs.

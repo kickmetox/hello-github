@@ -343,7 +343,8 @@ class Sidebar(QWidget):
         self.ann_tag_cloud = QWidget()
         self.ann_tag_cloud.setObjectName("annTagCloud")
         self.ann_tag_cloud.setToolTip(
-            "Häufigste Tags — Klick filtert (Multi-Select ODER); aktiver Tag hervorgehoben"
+            "Häufigste Tags — Klick setzt Filter (exklusiv); Ctrl+Klick Multi-Select (ODER); "
+            "erneut Klick auf allein aktiven Tag löscht Filter"
         )
         self.ann_tag_cloud_layout = QHBoxLayout(self.ann_tag_cloud)
         self.ann_tag_cloud_layout.setContentsMargins(0, 2, 0, 2)
@@ -1068,13 +1069,24 @@ class Sidebar(QWidget):
                 w.deleteLater()
 
     def _on_tag_cloud_clicked(self, tag: str):
-        """Tag-Cloud-Klick: Tag im Multi-Select umschalten."""
+        """Tag-Cloud-Klick: Filter setzen (exklusiv); Ctrl+Klick = Multi-Select umschalten."""
+        from PySide6.QtWidgets import QApplication
+
         current = list(self.annotation_filter_tags())
         cf = tag.casefold()
-        if any(t.casefold() == cf for t in current):
-            nxt = [t for t in current if t.casefold() != cf]
+        mods = QApplication.keyboardModifiers()
+        if mods & Qt.ControlModifier:
+            # Multi-Select: Tag umschalten
+            if any(t.casefold() == cf for t in current):
+                nxt = [t for t in current if t.casefold() != cf]
+            else:
+                nxt = current + [tag]
         else:
-            nxt = current + [tag]
+            # Exklusiv: Filter auf diesen Tag setzen; erneuter Klick löscht
+            if len(current) == 1 and current[0].casefold() == cf:
+                nxt = []
+            else:
+                nxt = [tag]
         self.set_annotation_tag_filter(nxt)
 
     def _update_ann_tag_cloud(self, payloads: list | None):
@@ -1108,7 +1120,9 @@ class Sidebar(QWidget):
             n = counts[key]
             btn = QToolButton()
             btn.setText(f"{tag} · {n}")
-            btn.setToolTip(f"Tag „{tag}“ filtern ({n}×) — Klick schaltet um")
+            btn.setToolTip(
+                f"Tag „{tag}“ filtern ({n}×) — Klick setzt Filter; Ctrl+Klick Multi-Select"
+            )
             btn.setCursor(Qt.PointingHandCursor)
             btn.setAutoRaise(True)
             is_on = key in active

@@ -46,7 +46,6 @@ SHORTCUTS_HTML = """
 <tr><td>Gehe zu Zeile / Seite</td><td><code>Ctrl+G</code> (Editor / PDF)</td></tr>
 <tr><td>Gehe zu Seite (PDF-Menü)</td><td><code>Ctrl+Shift+G</code></td></tr>
 <tr><td>Tab duplizieren</td><td><code>Ctrl+Shift+T</code></td></tr>
-<tr><td>Andere Tabs schließen</td><td><code>Ctrl+Shift+W</code></td></tr>
 <tr><td>Dateien vergleichen (Side-by-Side)</td><td><code>Ctrl+Alt+D</code></td></tr>
 <tr><td>Erneut öffnen</td><td><code>Ctrl+Alt+Shift+O</code></td></tr>
 <tr><td>Zeile duplizieren</td><td><code>Ctrl+D</code></td></tr>
@@ -57,9 +56,13 @@ SHORTCUTS_HTML = """
 <tr><td>Einrückung verringern</td><td><code>Ctrl+[</code> / <code>Shift+Tab</code></td></tr>
 <tr><td>Präsentationsmodus</td><td><code>F5</code> (Vollbild; ←/→ Esc)</td></tr>
 <tr><td>Bild aus Zwischenablage</td><td><code>Ctrl+Shift+V</code></td></tr>
-<tr><td>PDF-Text kopieren (Auswahl)</td><td><code>Ctrl+C</code> (Auswahl-Werkzeug + Text aufziehen)</td></tr>
-<tr><td>Auswahl → Notiz (Sticky)</td><td><code>Ctrl+Alt+N</code> (Text vorausgefüllt; optional +Highlight)</td></tr>
-<tr><td>Fenster teilen (zwei Docs)</td><td><code>Ctrl+\\</code> (horizontal)</td></tr>
+<tr><td>PDF-Text kopieren (Auswahl)</td><td><code>Ctrl+C</code> (Auswahl-Werkzeug + Text aufziehen) — 0.6.1</td></tr>
+<tr><td>Auswahl → Notiz (Sticky)</td><td><code>Ctrl+Alt+N</code> (Text vorausgefüllt; optional +Highlight) — 0.6.2/0.6.3</td></tr>
+<tr><td>Andere Tabs schließen</td><td><code>Ctrl+Shift+W</code> (Datei) — 0.6.2</td></tr>
+<tr><td>Fenster teilen (zwei Docs)</td><td><code>Ctrl+\\</code> (horizontal) — 0.6.3</td></tr>
+<tr><td>Sync-Scroll (geteilte Docs)</td><td><code>Ctrl+Alt+\\</code> (optional) — 0.6.4</td></tr>
+<tr><td>Tag-Cloud Filter</td><td>Klick setzt Filter; <code>Ctrl</code>+Klick Multi-Select — 0.6.4</td></tr>
+<tr><td>Ungespeicherte Tabs</td><td>Statusleiste „N ungespeichert“ Klick → Liste — 0.6.4</td></tr>
 <tr><td>PDF: Bild einfügen (Viewer)</td><td><code>Ctrl+V</code></td></tr>
 <tr><td>Zoom +</td><td><code>Ctrl++</code></td></tr>
 <tr><td>Zoom −</td><td><code>Ctrl+-</code></td></tr>
@@ -122,7 +125,9 @@ Highlight-Drag über Text = <b>Selection→Highlight</b> (Annotation mit Inhalt)
 Auswahl-Werkzeug + Text aufziehen + <code>Ctrl+C</code> = <b>Text in Zwischenablage</b> (ohne Annotation).
 <code>Ctrl+Alt+N</code> = <b>Auswahl→Notiz</b> (Sticky mit vorausgefülltem Text; Checkbox <b>+Highlight</b>).
 Annotation-Suche: Tag-<b>Autocomplete</b>. Session-Tabs: ziehen → Reihenfolge; <b>Andere Tabs schließen</b> (Ctrl+Shift+W).
-<b>Fenster teilen</b> (Ctrl+\\) zwei Docs horizontal; Statusleiste <b>ungespeicherte Tabs</b>.</p>
+<b>Fenster teilen</b> (Ctrl+\\) zwei Docs horizontal; optional <b>Sync-Scroll</b> (Ctrl+Alt+\\).
+<b>Tag-Cloud</b>: Klick setzt Filter (exklusiv), Ctrl+Klick Multi-Select.
+Statusleiste <b>ungespeicherte Tabs</b>: Klick öffnet Liste zum Wechseln.</p>
 <p><b>PDF-Seitenlabels:</b> römische/arabische Labels aus dem PDF werden in Statusleiste und Toolbar angezeigt, wenn vorhanden.</p>
 <p><b>Zwischenablage-Verlauf:</b> Bearbeiten → letzte 3 eingefügten Textschnipsel erneut einfügen.</p>
 <p><b>About:</b> Hilfe → Über… — Feature-Kurzliste + FEATURES.md öffnen;

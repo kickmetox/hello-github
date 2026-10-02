@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Smoke-Test 0.6.3 (CLI + optional offscreen Qt). Kernpfade: open/annotate/export/license + ausgewählte 0.5.x-Pfade."""
+"""Smoke-Test 0.6.4 (CLI + optional offscreen Qt). Kernpfade: open/annotate/export/license + ausgewählte 0.5.x-Pfade."""
 
 from __future__ import annotations
 
@@ -122,8 +122,8 @@ def main() -> int:
     from instantlensdoc.core.update_check import check_for_updates
     from instantlensdoc.license import KEY_DAYS, TRIAL_DAYS, generate_key, verify_key
 
-    assert __version__ == "0.6.3", __version__
-    assert ild_ver == "0.6.3", ild_ver
+    assert __version__ == "0.6.4", __version__
+    assert ild_ver == "0.6.4", ild_ver
     assert TRIAL_DAYS == 28 and KEY_DAYS == 32
     key = generate_key("ame@sellerbach.de")
     ok, msg, _ = verify_key(key)
@@ -141,7 +141,7 @@ def main() -> int:
     assert "Settings" in tr("settings")
     set_lang("de")
     upd = check_for_updates(allow_network=False)
-    assert upd.local_version == "0.6.3" and not upd.online
+    assert upd.local_version == "0.6.4" and not upd.online
     assert get_export_jpeg_quality() >= 10
     assert get_ui_lang() in ("de", "en")
     assert 25 <= get_default_zoom_percent() <= 500
@@ -182,8 +182,9 @@ def main() -> int:
     assert get_ann_pen_color() == "#112233"
     assert (ROOT / "CHANGELOG.md").is_file()
     cl = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-    assert "0.6.3" in cl
+    assert "0.6.4" in cl
     assert "0.6.0" in cl
+    assert "## 0.6.4" in cl
     assert "## 0.6.3" in cl
     assert "## 0.6.2" in cl
     assert "## 0.6.1" in cl
@@ -224,7 +225,7 @@ def main() -> int:
     assert "0.4.9" in cl  # noch in Kurz-Tabelle
     assert "0.3.9" in cl  # noch in Kurz-Tabelle
     assert "0.2.9" in cl  # noch in Kurz-Tabelle
-    assert "0.6.3" in (ROOT / "README.md").read_text(encoding="utf-8")
+    assert "0.6.4" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "run.bat" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "sync-ild.ps1" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "scripts/sync-ild.ps1" in (ROOT / "FEATURES.md").read_text(encoding="utf-8")
@@ -573,13 +574,13 @@ def main() -> int:
 
         assert (ROOT / "installer" / "installer-hinweis.txt").exists()
         iss = (ROOT / "installer" / "instantlensdoc.iss").read_text(encoding="utf-8")
-        assert "0.6.3" in iss and "desktopicon" in iss and "DisableProgramGroupPage=no" in iss
+        assert "0.6.4" in iss and "desktopicon" in iss and "DisableProgramGroupPage=no" in iss
         assert "UninstallDisplayName" in iss and "Uninstallable=yes" in iss
         assert "IncludeKeygen" in iss and "SetupIconFile" in iss
         assert "InstantLensKeygen.exe" in iss
         assert "uninstallexe" in iss
         bw = (ROOT / "build-windows.ps1").read_text(encoding="utf-8")
-        assert "0.6.3" in bw and "NoKeygenInApp" in bw and "--icon" in bw
+        assert "0.6.4" in bw and "NoKeygenInApp" in bw and "--icon" in bw
         assert "InstantLensKeygen.exe" in bw
         bi = (ROOT / "installer" / "build-installer.ps1").read_text(encoding="utf-8")
         assert "InstantLensKeygen.exe" in bi and "IncludeKeygen" in bi
@@ -588,7 +589,7 @@ def main() -> int:
         assert "Installer" in kg_readme
         hinweis = (ROOT / "installer" / "installer-hinweis.txt").read_text(encoding="utf-8")
         assert "InstantLensKeygen.exe" in hinweis or "run-keygen.bat" in hinweis
-        assert "0.6.3" in hinweis
+        assert "0.6.4" in hinweis
         assert "checkedonce" in iss and "Desktop-Verknüpfung" in hinweis
         from ild_pdf.limits import OPEN_TIMEOUT_HINT, OPEN_TIMEOUT_HINT_SEC
 
@@ -600,7 +601,7 @@ def main() -> int:
         assert "QProgressDialog" in (ROOT / "instantlensdoc" / "ui" / "main_window.py").read_text(encoding="utf-8")
 
         assert (ROOT / "examples" / "ild_pdf_demo.py").exists()
-        assert "0.6.3" in (ROOT / "INFO.md").read_text(encoding="utf-8")
+        assert "0.6.4" in (ROOT / "INFO.md").read_text(encoding="utf-8")
         assert (ROOT / "assets" / "app.ico").is_file()
 
         # --- Kernpfade: open / annotate / export / license ---
@@ -791,7 +792,7 @@ def main() -> int:
         set_backup_on_save(False)
         assert get_page_size_unit() in ("mm", "inch")
         assert isinstance(get_minimize_to_tray(), bool)
-        assert "0.6.3" in feat and "0.5.9" in feat and "0.4.9" in feat  # Release + Zeitraum-Feature-Hinweise
+        assert "0.6.4" in feat and "0.5.9" in feat and "0.4.9" in feat  # Release + Zeitraum-Feature-Hinweise
         assert "Batch-OCR" in feat or "OCR gesamtes PDF" in feat
         assert "Tag" in feat
         assert "Projekt-Ordner" in feat or "Workspace" in feat
@@ -1328,6 +1329,31 @@ def main() -> int:
         assert "_update_ann_tag_cloud" in sb063
         print("0.6.3 CLI highlight-note/tag-cloud/doc-split/unsaved: OK")
 
+        # 0.6.4 CLI: tag-cloud sets filter, sync-scroll, dirty tabs list, shortcuts
+        from instantlensdoc.core.app_settings import (
+            get_editor_doc_split_sync_scroll,
+            set_editor_doc_split_sync_scroll,
+        )
+        set_editor_doc_split_sync_scroll(True)
+        assert get_editor_doc_split_sync_scroll() is True
+        set_editor_doc_split_sync_scroll(False)
+        assert get_editor_doc_split_sync_scroll() is False
+        feat064 = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
+        assert "0.6.4" in feat064
+        assert "Sync-Scroll" in feat064 or "setzt Filter" in feat064 or "Dirty" in feat064
+        cl064 = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+        assert "## 0.6.4" in cl064
+        mw064 = (ROOT / "instantlensdoc" / "ui" / "main_window.py").read_text(encoding="utf-8")
+        assert "list_unsaved_tabs" in mw064
+        assert "_toggle_doc_split_sync_scroll" in mw064
+        assert "_on_unsaved_status_clicked" in mw064
+        sb064 = (ROOT / "instantlensdoc" / "ui" / "sidebar.py").read_text(encoding="utf-8")
+        assert "ControlModifier" in sb064 or "setzt Filter" in sb064
+        kh064 = (ROOT / "instantlensdoc" / "ui" / "keyboard_help.py").read_text(encoding="utf-8")
+        assert "Sync-Scroll" in kh064
+        assert "0.6.4" in kh064 or "Ctrl+Alt+\\\\" in kh064 or "ungespeichert" in kh064
+        print("0.6.4 CLI tag-filter/sync-scroll/dirty-tabs/shortcuts: OK")
+
         set_show_printer_marks(True)
         assert get_show_printer_marks() is True
         set_show_printer_marks(False)
@@ -1460,7 +1486,7 @@ def main() -> int:
         assert "Continuous Scroll" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
         assert "Seitenlabel" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8") or "Seitenlabels" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
         assert "Zwischenablage-Verlauf" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8") or "Clipboard" in (ROOT / "FEATURES.md").read_text(encoding="utf-8")
-        assert "0.6.3" in feat and "0.5.9" in feat and "0.4.9" in feat
+        assert "0.6.4" in feat and "0.5.9" in feat and "0.4.9" in feat
         # --- 0.4.2 CLI: Outline Goto, Ann Copy/Paste, Flatten Progress ---
         import pikepdf as _pike_ol
 
@@ -1585,7 +1611,7 @@ def main() -> int:
         win._add_chained_frame()
         assert len(win.layout_doc.text_frames) >= 2
         assert "Lizenz:" in win.license_label.text() or "⚠" in win.license_label.text()
-        assert "v0.6.3" in win.version_label.text()
+        assert "v0.6.4" in win.version_label.text()
         # Lizenz <7 Tage: Style prominent
         st_lic = win.license_manager.status()
         if st_lic.allowed and st_lic.days_remaining < 7:
@@ -1766,11 +1792,11 @@ def main() -> int:
             assert win.editor.outdent_selection(4)
             assert win.editor.toPlainText().splitlines()[0] == "alpha"
             # Fenstertitel mit Version
-            assert "0.6.3" in win.windowTitle()
+            assert "0.6.4" in win.windowTitle()
             from instantlensdoc.ui.help_dialog import AboutDialog, HelpDialog, open_log_folder
 
             about = AboutDialog(win)
-            assert "0.6.3" in about.windowTitle()
+            assert "0.6.4" in about.windowTitle()
             help_dlg = HelpDialog(win)
             assert help_dlg.windowTitle() == "Hilfe"
             assert callable(open_log_folder)
@@ -2430,7 +2456,7 @@ def main() -> int:
             win.apply_tray_setting()
             if win._tray is not None:
                 tip = win._tray.toolTip()
-                assert "0.6.3" in tip and "InstantLens Doc" in tip
+                assert "0.6.4" in tip and "InstantLens Doc" in tip
             set_minimize_to_tray(False)
             win.apply_tray_setting()
             print("0.3.9 fit-h/ann-stats/special/tray: OK")
@@ -2443,9 +2469,9 @@ def main() -> int:
             from instantlensdoc.ui.password_dialog import CompressPdfDialog, SetPasswordDialog
             from instantlensdoc.ui.stubs import PLANNED
             assert KeyboardHelpDialog and SetPasswordDialog and CompressPdfDialog
-            assert "0.6.3" in PLANNED["ki"]
+            assert "0.6.4" in PLANNED["ki"]
             assert "Coming soon" in PLANNED["cloud"]
-            assert "0.6.3" in PLANNED["stylus"] and "0.6.3" in PLANNED["extrude3d"]
+            assert "0.6.4" in PLANNED["stylus"] and "0.6.4" in PLANNED["extrude3d"]
             # Toolbar ↔ Menü Sync Graustufen/Nacht
             win.pdf_view.set_grayscale(True)
             assert win._grayscale_action.isChecked()
@@ -2480,7 +2506,7 @@ def main() -> int:
             assert win.editor.toPlainText().splitlines() == ["one", "two"]
             from instantlensdoc.ui.help_dialog import HELP_HTML
 
-            assert "Stub 0.6.3" in HELP_HTML
+            assert "Stub 0.6.4" in HELP_HTML
             assert "scripts/sync-ild.ps1" in HELP_HTML
             assert "Präsentationsmodus" in HELP_HTML or "F5" in (
                 ROOT / "instantlensdoc" / "ui" / "keyboard_help.py"
@@ -3651,10 +3677,61 @@ def main() -> int:
             assert "## 0.6.3" in cl063q
             print("0.6.3 Qt highlight-note/tag-cloud/doc-split/unsaved: OK")
 
+            # --- 0.6.4 Qt: Tag-Cloud setzt Filter, Sync-Scroll, Dirty-Tabs ---
+            from instantlensdoc.core.app_settings import (
+                get_editor_doc_split_sync_scroll as g_sync064,
+                set_editor_doc_split_sync_scroll as s_sync064,
+            )
+            assert callable(getattr(win, "list_unsaved_tabs", None))
+            assert callable(getattr(win, "_toggle_doc_split_sync_scroll", None))
+            assert callable(getattr(win, "_on_unsaved_status_clicked", None))
+            assert callable(getattr(win.sidebar, "_on_tag_cloud_clicked", None))
+            # Tag-Cloud: Klick setzt exklusiven Filter
+            win.sidebar._sync_ann_tag_filter_options(payloads062)
+            win.sidebar.set_annotation_tag_filter(["Alpha062", "Beta062"])
+            assert len(win.sidebar.annotation_filter_tags()) == 2
+            win.sidebar._on_tag_cloud_clicked("Alpha062")
+            tags064 = [t.casefold() for t in win.sidebar.annotation_filter_tags()]
+            assert tags064 == ["alpha062"]
+            win.sidebar._on_tag_cloud_clicked("Alpha062")  # erneut → clear
+            assert win.sidebar.annotation_filter_tags() == []
+            # Sync-Scroll
+            s_sync064(True)
+            assert g_sync064() is True
+            win._toggle_doc_split(True)
+            assert hasattr(win, "_doc_split_sync_action")
+            win._doc_split_sync_action.setChecked(True)
+            assert win._doc_split_sync_action.isChecked()
+            assert g_sync064() is True
+            win._apply_doc_split_sync_scroll()
+            assert win._sync_secondary_bar is not None or win.secondary_wrap.isVisible()
+            # Dirty tabs list
+            t_e = Path(td2) / "dirty_e.txt"
+            t_e.write_text("clean-e", encoding="utf-8")
+            win.sidebar.add_document(str(t_e))
+            win.open_path(str(t_e))
+            win.editor.setPlainText("dirty-e-064")
+            win._on_text_changed()
+            dirty064 = win.list_unsaved_tabs()
+            assert any(Path(p).name == "dirty_e.txt" for p, _ in dirty064 if p)
+            assert "ungespeichert" in win.unsaved_status_label.text()
+            win._toggle_doc_split_sync_scroll(False)
+            win._toggle_doc_split(False)
+            s_sync064(False)
+            win.open_path(str(smoke_pdf))
+            kh064q = (ROOT / "instantlensdoc" / "ui" / "keyboard_help.py").read_text(encoding="utf-8")
+            assert "Sync-Scroll" in kh064q
+            assert "Tag-Cloud Filter" in kh064q or "setzt Filter" in kh064q
+            feat064q = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
+            assert "0.6.4" in feat064q
+            cl064q = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+            assert "## 0.6.4" in cl064q
+            print("0.6.4 Qt tag-filter/sync-scroll/dirty-tabs/shortcuts: OK")
+
             print("0.4.x selected Qt marks/schema/sort/reset: OK")
             print("0.4.2 Qt outline/copy-paste/case/progress: OK")
             print("0.4.1 Qt links/stamp/encoding/drop: OK")
-            print("0.3.x–0.6.3 review OK")
+            print("0.3.x–0.6.4 review OK")
             assert callable(win.pdf_view.bake_redactions)
             assert callable(win.pdf_view.clear_redactions)
             assert callable(win._set_pdf_password)

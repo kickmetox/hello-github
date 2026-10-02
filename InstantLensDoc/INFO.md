@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **0.6.3** |
+| Version | **0.6.4** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -38,10 +38,10 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Installer-Task: optionale **Desktop-Verknüpfung** (Checkbox, Standard an / `checkedonce`)
 
-## Neu in 0.6.3
+## Neu in 0.6.4
 
-- PDF-Auswahl → Highlight **und** Notiz in einem Schritt (optionale Checkbox, persistent)
-- Annotation-Tag-Cloud in der Sidebar (häufigste Tags, klickbar)
-- Editor: Fenster teilen horizontal für zwei Docs (`Ctrl+\`)
-- Statusleiste: ungespeicherte Tabs zählen
+- Tag-Cloud: Klick **setzt Filter** (exklusiv; Ctrl+Klick Multi-Select)
+- Doc-Split: optionaler **Sync-Scroll** (`Ctrl+Alt+\`)
+- Statusleiste: Klick auf „ungespeichert“ → Liste dirty Tabs
+- Shortcut-Übersicht um 0.6.x-Keys erweitert
 - Stubs KI/Cloud/Stylus/3D unverändert
