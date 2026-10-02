@@ -63,10 +63,10 @@ SHORTCUTS_HTML = """
 <tr><td>Vertikaler Split (übereinander)</td><td><code>Ctrl+Shift+\\</code> (Toggle) — 0.6.5</td></tr>
 <tr><td>Sync-Scroll (geteilte Docs)</td><td><code>Ctrl+Alt+\\</code> (optional) — 0.6.4</td></tr>
 <tr><td>Tag-Cloud Filter</td><td>Klick setzt Filter; <code>Ctrl</code>+Klick Multi-Select — 0.6.4</td></tr>
-<tr><td>Tag-Cloud umbenennen</td><td>Rechtsklick → Tag umbenennen (global); Ctrl+Z = ein Undo-Schritt — 0.6.5/0.6.6</td></tr>
-<tr><td>Ungespeicherte Tabs</td><td>Statusleiste „N ungespeichert“ Klick → Liste + Speichern / Alle speichern — 0.6.4–0.6.6</td></tr>
-<tr><td>Doc-Split Layout H/V</td><td>Einstellungen oder <code>Ctrl+Shift+\\</code> — 0.6.5/0.6.6</td></tr>
-<tr><td>Wizard skip-once</td><td>Erste Schritte: Checkbox „Dieses Mal überspringen“ — 0.6.6</td></tr>
+<tr><td>Tag-Cloud umbenennen</td><td>Rechtsklick → Tag umbenennen (global); Ctrl+Z / PDF-Undo-Stack als „Tag umbenennen“ — 0.6.5–0.6.7</td></tr>
+<tr><td>Ungespeicherte Tabs</td><td>Statusleiste „N ungespeichert“ → Speichern / Alle speichern (Fortschritt &gt;3) — 0.6.4–0.6.7</td></tr>
+<tr><td>Doc-Split PDF+Editor</td><td>Zwei Docs: zweites Panel PDF oder Editor (Mischung); H/V Ctrl+Shift+\\ — 0.6.3–0.6.7</td></tr>
+<tr><td>Wizard skip / dauerhaft</td><td>„Dieses Mal überspringen“ oder „Nicht mehr zeigen“ — 0.6.6/0.6.7</td></tr>
 <tr><td>PDF: Bild einfügen (Viewer)</td><td><code>Ctrl+V</code></td></tr>
 <tr><td>Zoom +</td><td><code>Ctrl++</code></td></tr>
 <tr><td>Zoom −</td><td><code>Ctrl+-</code></td></tr>

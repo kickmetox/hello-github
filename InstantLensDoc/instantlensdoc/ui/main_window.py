@@ -377,6 +377,7 @@ class MainWindow(QMainWindow):
             ok = bool(_pdf_undo())
             if ok:
                 self._revert_tag_filter_after_rename_undo()
+                self._refresh_undo_hint()
             return ok
 
         self.pdf_view.undo_annotation = _undo_annotation_with_tag_revert  # type: ignore[method-assign]
@@ -410,15 +411,27 @@ class MainWindow(QMainWindow):
         sec_lay.setSpacing(2)
         self.secondary_title = QLabel("Zweites Dokument")
         self.secondary_title.setStyleSheet("color: #555; font-size: 11px; padding: 2px 0;")
-        self.secondary_title.setToolTip("Zweites Dokument im geteilten Fenster (nur Anzeige)")
+        self.secondary_title.setToolTip(
+            "Zweites Dokument im geteilten Fenster (Anzeige): PDF oder Editor — Mischung erlaubt"
+        )
         sec_lay.addWidget(self.secondary_title)
+        self.secondary_stack = QStackedWidget()
         self.secondary_pane = EditorPane()
         self.secondary_editor = self.secondary_pane.editor
         self.secondary_editor.setReadOnly(True)
         # Vorschau aus, ohne globale Markdown-Einstellung zu überschreiben
         self.secondary_pane._preview_visible = False
         self.secondary_pane.preview.setVisible(False)
-        sec_lay.addWidget(self.secondary_pane, 1)
+        self.secondary_pdf = PdfViewer()
+        self.secondary_pdf.status.connect(self._set_status)
+        # Zweit-Panel: nur Anzeige (Annotationen gesperrt)
+        try:
+            self.secondary_pdf.set_annotations_locked(True)
+        except Exception:
+            pass
+        self.secondary_stack.addWidget(self.secondary_pane)  # 0 Editor
+        self.secondary_stack.addWidget(self.secondary_pdf)  # 1 PDF
+        sec_lay.addWidget(self.secondary_stack, 1)
         self.doc_splitter.addWidget(self.secondary_wrap)
         self.doc_splitter.setStretchFactor(0, 3)
         self.doc_splitter.setStretchFactor(1, 2)
@@ -468,7 +481,7 @@ class MainWindow(QMainWindow):
             "QLabel#undoHint { color: #777; padding-right: 8px; font-size: 11px; }"
         )
         self.undo_hint_label.setToolTip(
-            "Rückgängig: Editor · PDF-Annotationen · Seiten löschen/drehen (Ctrl+Z)"
+            "Rückgängig: Editor · PDF-Annotationen (benannt, z. B. Tag umbenennen) · Seiten (Ctrl+Z)"
         )
         sb.addPermanentWidget(self.undo_hint_label)
         self.version_label = QLabel(f"v{__version__}")
@@ -1542,29 +1555,67 @@ class MainWindow(QMainWindow):
         self.save_doc()
 
     def _save_all_unsaved_tabs(self) -> None:
-        """Alle dirty Tabs aus der Statusleisten-Liste speichern."""
+        """Alle dirty Tabs aus der Statusleisten-Liste speichern (Fortschritt bei >3)."""
+        from PySide6.QtWidgets import QApplication, QProgressDialog
+
         entries = list(self.list_unsaved_tabs())
         if not entries:
             self._set_status("Keine ungespeicherten Tabs")
             return
-        n = 0
         # Aktuelles Doc zuerst — sonst verliert open_path den Editor-Inhalt
         cur_key = self._path_key(self.doc.path) if self.doc and self.doc.path else None
+        work: list[tuple[str | None, str]] = []
+        seen: set[str] = set()
         if self._current_is_dirty():
-            self.save_doc()
-            n += 1
-        for path, _label in entries:
+            if cur_key and self.doc and self.doc.path:
+                work.append((str(self.doc.path), Path(self.doc.path).name))
+                seen.add(cur_key)
+            else:
+                work.append((None, "Unbenannt"))
+                seen.add("__unnamed__")
+        for path, label in entries:
             if path is None:
-                if self._current_is_dirty():
-                    self.save_doc()
-                    n += 1
                 continue
-            if cur_key and self._path_key(path) == cur_key:
+            key = self._path_key(path)
+            if key in seen:
                 continue
-            self._save_unsaved_tab(path)
+            seen.add(key)
+            work.append((path, label))
+        total = len(work)
+        if total == 0:
+            self._set_status("Keine ungespeicherten Tabs")
+            return
+        use_progress = total > 3
+        prog: QProgressDialog | None = None
+        if use_progress:
+            prog = QProgressDialog("Alle speichern…", None, 0, total, self)
+            prog.setWindowTitle("Alle speichern")
+            prog.setWindowModality(Qt.WindowModal)
+            prog.setMinimumDuration(0)
+            prog.setValue(0)
+            prog.setLabelText(f"0 / {total} Dateien…")
+            QApplication.processEvents()
+        n = 0
+        for path, label in work:
+            if prog is not None:
+                prog.setLabelText(f"Speichern {n + 1}/{total}: {label}")
+                prog.setValue(n)
+                QApplication.processEvents()
+            if path is None:
+                self.save_doc()
+            elif cur_key and self._path_key(path) == cur_key:
+                self.save_doc()
+            else:
+                self._save_unsaved_tab(path)
             n += 1
+        if prog is not None:
+            prog.setValue(total)
+            prog.close()
         self._update_unsaved_status()
-        self._set_status(f"Alle speichern: {n} Tab(s)")
+        if use_progress:
+            self._set_status(f"Alle speichern: {n}/{total} Datei(en) fertig")
+        else:
+            self._set_status(f"Alle speichern: {n} Tab(s)")
 
     def _format_current_page_size(self) -> str:
         """Aktuelle PDF-Seitengröße formatiert (mm/inch laut Einstellung)."""
@@ -2115,9 +2166,32 @@ class MainWindow(QMainWindow):
         self._refresh_pdf_marks()
         if self.doc and self.doc.path:
             self._mark_unsaved(self.doc.path, bool(store.dirty))
+        self._refresh_undo_hint()
         self._set_status(
-            f"Tag „{old_tag}“ → „{new_tag}“ ({n} Annotationen) — Ctrl+Z rückgängig (ein Schritt)"
+            f"Tag „{old_tag}“ → „{new_tag}“ ({n} Annotationen) — Ctrl+Z: Tag umbenennen rückgängig"
         )
+
+    def _refresh_undo_hint(self) -> None:
+        """Statusleisten-Hint: nächstes PDF-Undo sichtbar benennen (z. B. Tag umbenennen)."""
+        if not hasattr(self, "undo_hint_label"):
+            return
+        store = getattr(self.pdf_view, "store", None)
+        label = None
+        if store is not None and hasattr(store, "peek_undo_label"):
+            try:
+                label = store.peek_undo_label()
+            except Exception:
+                label = None
+        if label:
+            self.undo_hint_label.setText(f"Ctrl+Z · {label} rückgängig")
+            self.undo_hint_label.setToolTip(
+                f"Nächste Undo-Stufe: {label} (PDF-Undo-Stack / Ctrl+Z)"
+            )
+        else:
+            self.undo_hint_label.setText("Ctrl+Z · Letzte Aktion rückgängig")
+            self.undo_hint_label.setToolTip(
+                "Rückgängig: Editor · PDF-Annotationen (benannt) · Seiten (Ctrl+Z)"
+            )
 
     def _revert_tag_filter_after_rename_undo(self) -> None:
         """Nach Undo des globalen Tag-Rename: Filter old←new zurücksetzen."""
@@ -2167,6 +2241,11 @@ class MainWindow(QMainWindow):
         return None
 
     def _secondary_scroll_bar(self):
+        if hasattr(self, "secondary_stack") and hasattr(self, "secondary_pdf"):
+            if self.secondary_stack.currentWidget() is self.secondary_pdf:
+                scroll = getattr(self.secondary_pdf, "scroll", None)
+                if scroll is not None:
+                    return scroll.verticalScrollBar()
         if hasattr(self, "secondary_editor"):
             return self.secondary_editor.verticalScrollBar()
         return None
@@ -2264,7 +2343,7 @@ class MainWindow(QMainWindow):
             self._doc_split_action.setChecked(True)
 
     def _load_secondary_document(self, path: str | None = None):
-        """Rechtes Split-Pane mit Text eines anderen Tabs füllen (read-only)."""
+        """Zweites Split-Pane: Editor oder PDF (Mischung mit Hauptbereich erlaubt)."""
         if not hasattr(self, "secondary_editor"):
             return
         paths = list(self.sidebar.document_paths()) if hasattr(self.sidebar, "document_paths") else []
@@ -2272,8 +2351,18 @@ class MainWindow(QMainWindow):
         pick = path
         text_ext = {".txt", ".md", ".markdown", ".html", ".htm", ".csv", ".json", ".log", ".py"}
         if not pick:
+            # Bevorzugt anderen Typ als das aktuelle Doc (PDF↔Editor-Mischung)
+            cur_suf = Path(self.doc.path).suffix.lower() if self.doc and self.doc.path else ""
+            prefer_pdf = cur_suf in text_ext or cur_suf == ".docx" or cur_suf == ""
+            prefer_text = cur_suf == ".pdf"
             for p in paths:
-                if self._path_key(p) != current and Path(p).suffix.lower() in text_ext:
+                if self._path_key(p) == current:
+                    continue
+                suf = Path(p).suffix.lower()
+                if prefer_pdf and suf == ".pdf":
+                    pick = p
+                    break
+                if prefer_text and (suf in text_ext or suf == ".docx"):
                     pick = p
                     break
             if not pick:
@@ -2284,6 +2373,8 @@ class MainWindow(QMainWindow):
         if not pick or not Path(pick).is_file():
             self._secondary_path = None
             self.secondary_title.setText("Kein zweites Dokument")
+            if hasattr(self, "secondary_stack"):
+                self.secondary_stack.setCurrentWidget(self.secondary_pane)
             self.secondary_editor.blockSignals(True)
             self.secondary_editor.setPlainText("")
             self.secondary_editor.blockSignals(False)
@@ -2292,28 +2383,41 @@ class MainWindow(QMainWindow):
         name = Path(pick).name
         suffix = Path(pick).suffix.lower()
         try:
-            if suffix in text_ext or suffix == ".docx":
+            if suffix == ".pdf" and hasattr(self, "secondary_pdf"):
+                ok = bool(self.secondary_pdf.load(pick))
+                if ok:
+                    try:
+                        self.secondary_pdf.set_annotations_locked(True)
+                    except Exception:
+                        pass
+                    self.secondary_title.setText(f"Rechts: {name} (PDF)")
+                    self.secondary_stack.setCurrentWidget(self.secondary_pdf)
+                else:
+                    self.secondary_title.setText(f"Rechts: {name} (PDF-Fehler)")
+                    self.secondary_stack.setCurrentWidget(self.secondary_pane)
+                    self.secondary_editor.blockSignals(True)
+                    self.secondary_editor.setPlainText(
+                        f"[PDF] {name}\nLaden fehlgeschlagen.\nPfad: {pick}"
+                    )
+                    self.secondary_editor.blockSignals(False)
+            elif suffix in text_ext or suffix == ".docx":
                 doc = open_document(pick)
                 body = doc.text or ""
                 self.secondary_title.setText(f"Rechts: {name}")
+                self.secondary_stack.setCurrentWidget(self.secondary_pane)
                 self.secondary_editor.blockSignals(True)
                 self.secondary_editor.setPlainText(body)
                 self.secondary_editor.blockSignals(False)
-            elif suffix == ".pdf":
-                self.secondary_title.setText(f"Rechts: {name} (PDF)")
-                self.secondary_editor.blockSignals(True)
-                self.secondary_editor.setPlainText(
-                    f"[PDF] {name}\n\nZum Bearbeiten/Annotieren im Hauptbereich öffnen "
-                    f"(Doppelklick in der Dokumentliste).\nPfad: {pick}"
-                )
-                self.secondary_editor.blockSignals(False)
             else:
                 self.secondary_title.setText(f"Rechts: {name}")
+                self.secondary_stack.setCurrentWidget(self.secondary_pane)
                 self.secondary_editor.blockSignals(True)
                 self.secondary_editor.setPlainText(f"[Datei] {pick}")
                 self.secondary_editor.blockSignals(False)
         except Exception as e:
             self.secondary_title.setText(f"Rechts: {name} (Fehler)")
+            if hasattr(self, "secondary_stack"):
+                self.secondary_stack.setCurrentWidget(self.secondary_pane)
             self.secondary_editor.blockSignals(True)
             self.secondary_editor.setPlainText(f"Laden fehlgeschlagen:\n{e}")
             self.secondary_editor.blockSignals(False)

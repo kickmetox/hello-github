@@ -56,7 +56,7 @@ HELP_HTML = f"""
     <b>Farben-Chips klickbar filtern</b>, <b>Zeitstempel</b>,
     <b>Filter nur aktuelle Seite</b>), Markierungen/Treffer</li>
 <li><b>Bearbeiten → Rückgängig/Wiederholen</b>: Editor-Text <i>oder</i> PDF-Annotationen/Overlay-Text (Ctrl+Z / Ctrl+Y);
-    Statusleisten-Hint „Ctrl+Z · Letzte Aktion rückgängig“</li>
+    Statusleisten-Hint „Ctrl+Z · … rückgängig“ (benannt, z. B. Tag umbenennen)</li>
 <li><b>Bearbeiten → Suchen und Ersetzen</b> (Ctrl+R): Find/Replace im Texteditor</li>
 <li><b>Bearbeiten → Gehe zu Zeile / Seite</b> (Ctrl+G): Editor → Zeile; PDF → Seite (auch PDF → Gehe zu Seite…, Ctrl+Shift+G)</li>
 <li><b>Datei → Tab duplizieren</b> (Ctrl+Shift+T): Editor-Inhalt als neues Dokument klonen;
@@ -201,11 +201,12 @@ WIZARD_PAGES = (
         "<h3>Highlights 0.6</h3>"
         "<ul>"
         "<li><b>Tag-Cloud</b>: Klick filtert; Ctrl+Klick Multi; <b>Rechtsklick → Tag umbenennen</b> "
-        "(global, <b>Ctrl+Z = ein Undo-Schritt</b>)</li>"
-        "<li><b>Fenster teilen</b> (Ctrl+\\): zwei Docs; <b>vertikal</b> Ctrl+Shift+\\ "
-        "(auch in Einstellungen H/V); Sync-Scroll Ctrl+Alt+\\</li>"
-        "<li>Statusleiste <b>ungespeichert</b>: Dirty-Liste + Speichern je Datei + <b>Alle speichern</b></li>"
-        "<li>Auswahl → Text kopieren / Notiz / Highlight+Notiz; Andere Tabs schließen</li>"
+        "(global, <b>Ctrl+Z = Tag umbenennen</b> im PDF-Undo-Stack)</li>"
+        "<li><b>Fenster teilen</b> (Ctrl+\\): zwei Docs; PDF+Editor-Mischung; "
+        "<b>vertikal</b> Ctrl+Shift+\\; Sync-Scroll Ctrl+Alt+\\</li>"
+        "<li>Statusleiste <b>ungespeichert</b>: Dirty-Liste + Speichern / <b>Alle speichern</b> "
+        "(Fortschritt bei &gt;3 Dateien)</li>"
+        "<li>Wizard: <b>Dieses Mal überspringen</b> oder <b>Nicht mehr zeigen</b></li>"
         "</ul>"
         "<p>Fertig — viel Erfolg mit InstantLens Doc.</p>",
     ),
@@ -238,6 +239,14 @@ class GettingStartedWizard(QDialog):
             "Wizard für diesen Start ausblenden — erscheint beim nächsten App-Start erneut"
         )
         layout.addWidget(self.skip_once_cb)
+        self.dont_show_cb = QCheckBox("Nicht mehr zeigen")
+        self.dont_show_cb.setToolTip(
+            "Wizard dauerhaft ausblenden (Hilfe → Erste Schritte öffnet ihn weiterhin manuell)"
+        )
+        layout.addWidget(self.dont_show_cb)
+        # Mutual exclusive UX: dauerhaft vs. einmal überspringen
+        self.skip_once_cb.toggled.connect(self._on_skip_once_toggled)
+        self.dont_show_cb.toggled.connect(self._on_dont_show_toggled)
         nav = QHBoxLayout()
         self._btn_back = QPushButton("Zurück")
         self._btn_back.clicked.connect(self._back)
@@ -253,10 +262,28 @@ class GettingStartedWizard(QDialog):
         layout.addLayout(nav)
         self._show_page(0)
 
+    def _on_skip_once_toggled(self, checked: bool) -> None:
+        if checked and self.dont_show_cb.isChecked():
+            self.dont_show_cb.blockSignals(True)
+            self.dont_show_cb.setChecked(False)
+            self.dont_show_cb.blockSignals(False)
+
+    def _on_dont_show_toggled(self, checked: bool) -> None:
+        if checked and self.skip_once_cb.isChecked():
+            self.skip_once_cb.blockSignals(True)
+            self.skip_once_cb.setChecked(False)
+            self.skip_once_cb.blockSignals(False)
+
     def _apply_outcome(self, *, complete: bool) -> None:
-        """Skip-once oder dauerhaft abgeschlossen in Settings schreiben."""
+        """Skip-once, „Nicht mehr zeigen“ oder Fertig → Settings schreiben."""
         from instantlensdoc.core.app_settings import set_wizard_completed, set_wizard_skip_once
 
+        if self.dont_show_cb.isChecked():
+            set_wizard_completed(True)
+            set_wizard_skip_once(False)
+            self.completed = True
+            self.skipped_once = False
+            return
         if self.skip_once_cb.isChecked():
             set_wizard_skip_once(True)
             set_wizard_completed(False)

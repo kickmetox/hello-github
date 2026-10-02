@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **0.6.6** |
+| Version | **0.6.7** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -38,10 +38,10 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Installer-Task: optionale **Desktop-Verknüpfung** (Checkbox, Standard an / `checkedonce`)
 
-## Neu in 0.6.6
+## Neu in 0.6.7
 
-- Tag umbenennen: **Undo in einem Schritt** (Ctrl+Z, inkl. Filter)
-- Doc-Split Layout **H/V in Einstellungen** merken
-- Dirty-Tabs-Menü: **Alle speichern**
-- Erste-Schritte-Wizard: Checkbox **Dieses Mal überspringen**
+- Tag umbenennen: **sichtbar benannt** im PDF-Undo-Stack / Hint
+- Doc-Split: **PDF+Editor-Mischung** im zweiten Panel
+- Dirty-Tabs **Alle speichern**: Fortschritt bei **>3 Dateien**
+- Wizard: **Nicht mehr zeigen** (dauerhaft) zusätzlich zu skip-once
 - Stubs KI/Cloud/Stylus/3D unverändert

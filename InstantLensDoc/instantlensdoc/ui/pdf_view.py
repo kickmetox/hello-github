@@ -1048,7 +1048,9 @@ class PdfViewer(QWidget):
         btn_redo.setToolTip("Annotation wiederholen (Ctrl+Y)")
         btn_redo.clicked.connect(self.redo_annotation)
         btn_hist = QPushButton("Historie…")
-        btn_hist.setToolTip("Seiten-Undo-Historie: gelöschte/gedrehte Seiten wiederherstellen")
+        btn_hist.setToolTip(
+            "PDF-Undo-Stack: Seiten-Ops + Annotationen (z. B. Tag umbenennen) wiederherstellen"
+        )
         btn_hist.clicked.connect(self.show_page_ops_history)
         self.btn_fav = QPushButton("★")
         self.btn_fav.setFixedWidth(28)
@@ -2793,11 +2795,12 @@ class PdfViewer(QWidget):
             self.status.emit("Nichts rückgängig zu machen")
             return False
         try:
+            label = self.store.peek_undo_label() or "Annotation"
             self.store.undo()
             self.store.save(force=True)
             self.refresh()
             self.annotations_changed.emit()
-            self.status.emit("Annotation rückgängig")
+            self.status.emit(f"{label} rückgängig")
             return True
         except Exception as e:
             QMessageBox.warning(self, "Rückgängig", str(e))
@@ -2858,8 +2861,46 @@ class PdfViewer(QWidget):
             self.status.emit("Seiten-Historie: Eintrag wiederhergestellt")
         return ok_any
 
+    def annotation_undo_history_items(self) -> list[dict]:
+        """Annotation-Undo-Stack mit sichtbaren Labels (älteste zuerst)."""
+        if not self.store:
+            return []
+        try:
+            return list(self.store.undo_history_items())
+        except Exception:
+            return []
+
+    def restore_annotation_undo_at(self, stack_index: int) -> bool:
+        """Annotation-Undo vom neuesten Eintrag bis einschließlich stack_index."""
+        if not self.store or not self.store.can_undo():
+            self.status.emit("Annotation-Undo-Stack leer")
+            return False
+        n = len(getattr(self.store, "_undo", []) or [])
+        if n <= 0:
+            return False
+        target = max(0, min(int(stack_index), n - 1))
+        times = n - target
+        last_label = "Annotation"
+        ok_any = False
+        try:
+            for _ in range(times):
+                if not self.store.can_undo():
+                    break
+                last_label = self.store.peek_undo_label() or "Annotation"
+                self.store.undo()
+                ok_any = True
+            if ok_any:
+                self.store.save(force=True)
+                self.refresh()
+                self.annotations_changed.emit()
+                self.status.emit(f"{last_label} rückgängig (Undo-Stack)")
+            return ok_any
+        except Exception as e:
+            QMessageBox.warning(self, "Rückgängig", str(e))
+            return False
+
     def show_page_ops_history(self) -> bool:
-        """Dialog: Seiten-Undo-Historie mit Wiederherstellen."""
+        """Dialog: PDF-Undo-Stack (Seiten-Ops + benannte Annotation-Undos)."""
         from PySide6.QtWidgets import (
             QDialog,
             QHBoxLayout,
@@ -2870,31 +2911,41 @@ class PdfViewer(QWidget):
             QVBoxLayout,
         )
 
-        items = self.page_ops_history_items()
+        page_items = self.page_ops_history_items()
+        ann_items = self.annotation_undo_history_items()
         dlg = QDialog(self)
-        dlg.setWindowTitle("Seiten-Historie (Undo)")
-        dlg.resize(420, 320)
+        dlg.setWindowTitle("PDF-Undo-Stack")
+        dlg.resize(460, 380)
         layout = QVBoxLayout(dlg)
         layout.addWidget(
             QLabel(
-                "Gelöschte oder gedrehte Seiten aus dem Undo-Stack.\n"
+                "Seiten-Ops und Annotation-Undos (sichtbar benannt, z. B. „Tag umbenennen“).\n"
                 "Neueste Einträge unten — „Wiederherstellen“ macht bis zum gewählten Eintrag rückgängig."
             )
         )
         lst = QListWidget()
-        for it in items:
-            row = QListWidgetItem(it["label"])
-            row.setData(Qt.UserRole, int(it["stack_index"]))
-            lst.addItem(row)
-        if items:
-            lst.setCurrentRow(len(items) - 1)
+
+        def _refill() -> None:
+            lst.clear()
+            for it in self.page_ops_history_items():
+                row = QListWidgetItem(f"[Seite] {it['label']}")
+                row.setData(Qt.UserRole, ("page", int(it["stack_index"])))
+                lst.addItem(row)
+            for it in self.annotation_undo_history_items():
+                row = QListWidgetItem(f"[Ann.] {it['label']}")
+                row.setData(Qt.UserRole, ("annotation", int(it["stack_index"])))
+                lst.addItem(row)
+            if lst.count() > 0:
+                lst.setCurrentRow(lst.count() - 1)
+
+        _refill()
         layout.addWidget(lst)
-        if not items:
-            layout.addWidget(QLabel("Keine Seiten-Aktionen zum Rückgängigmachen."))
+        if lst.count() == 0:
+            layout.addWidget(QLabel("Keine Einträge im PDF-Undo-Stack."))
 
         btns = QHBoxLayout()
         btn_restore = QPushButton("Wiederherstellen")
-        btn_restore.setEnabled(bool(items))
+        btn_restore.setEnabled(lst.count() > 0)
         btn_restore.setDefault(True)
         btn_close = QPushButton("Schließen")
         btns.addWidget(btn_restore)
@@ -2908,24 +2959,27 @@ class PdfViewer(QWidget):
             cur = lst.currentItem()
             if cur is None:
                 return
-            idx = cur.data(Qt.UserRole)
-            if idx is None:
+            data = cur.data(Qt.UserRole)
+            if not data:
                 return
-            if self.restore_page_op_at(int(idx)):
+            source, idx = data
+            ok = False
+            if source == "page":
+                ok = self.restore_page_op_at(int(idx))
+            elif source == "annotation":
+                ok = self.restore_annotation_undo_at(int(idx))
+            if ok:
                 restored["ok"] = True
-                lst.clear()
-                fresh = self.page_ops_history_items()
-                for it2 in fresh:
-                    row2 = QListWidgetItem(it2["label"])
-                    row2.setData(Qt.UserRole, int(it2["stack_index"]))
-                    lst.addItem(row2)
-                btn_restore.setEnabled(bool(fresh))
-                if not fresh:
+                _refill()
+                btn_restore.setEnabled(lst.count() > 0)
+                if lst.count() == 0:
                     dlg.accept()
 
         btn_restore.clicked.connect(_do_restore)
         lst.itemDoubleClicked.connect(lambda _item: _do_restore())
         btn_close.clicked.connect(dlg.reject)
+        # page_items/ann_items nur für Initial-Enable — Liste via _refill
+        _ = (page_items, ann_items)
         dlg.exec()
         return bool(restored["ok"])
 

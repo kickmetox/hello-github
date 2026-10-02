@@ -421,6 +421,8 @@ class AnnotationStore:
         self._meta: dict = {}
         self._undo: List[List[dict]] = []
         self._redo: List[List[dict]] = []
+        self._undo_labels: List[str] = []
+        self._redo_labels: List[str] = []
         self._recording = True
         if self.pdf_path and self.sidecar_path.exists():
             try:
@@ -441,12 +443,43 @@ class AnnotationStore:
     def clear_history(self) -> None:
         self._undo.clear()
         self._redo.clear()
+        self._undo_labels.clear()
+        self._redo_labels.clear()
 
     def can_undo(self) -> bool:
         return bool(self._undo)
 
     def can_redo(self) -> bool:
         return bool(self._redo)
+
+    def peek_undo_label(self) -> str | None:
+        """Label der nächsten Undo-Stufe (z. B. „Tag umbenennen“), oder None."""
+        if not self._undo:
+            return None
+        if self._undo_labels:
+            return str(self._undo_labels[-1] or "Annotation")
+        return "Annotation"
+
+    def undo_history_items(self) -> List[dict]:
+        """
+        Lesbare Annotation-Undo-Historie (älteste zuerst).
+        Jeder Eintrag: stack_index, label, kind=\"annotation\".
+        """
+        items: List[dict] = []
+        n = len(self._undo)
+        for i in range(n):
+            if i < len(self._undo_labels):
+                label = str(self._undo_labels[i] or "Annotation")
+            else:
+                label = "Annotation"
+            items.append(
+                {
+                    "stack_index": i,
+                    "label": label,
+                    "kind": "annotation",
+                }
+            )
+        return items
 
     def _snapshot(self) -> List[dict]:
         return [a.to_dict() for a in self.annotations]
@@ -455,18 +488,22 @@ class AnnotationStore:
         self.annotations = [Annotation.from_dict(a) for a in snap]
         self.dirty = True
 
-    def _push_undo(self) -> None:
+    def _push_undo(self, label: str = "Annotation") -> None:
         if not self._recording:
             return
         self._undo.append(self._snapshot())
+        self._undo_labels.append(str(label or "Annotation"))
         if len(self._undo) > HISTORY_LIMIT:
             self._undo.pop(0)
+            if self._undo_labels:
+                self._undo_labels.pop(0)
         self._redo.clear()
+        self._redo_labels.clear()
 
     @contextmanager
-    def atomic(self) -> Iterator[None]:
-        """Mehrere Mutationen als eine Undo-Stufe."""
-        self._push_undo()
+    def atomic(self, label: str = "Annotation") -> Iterator[None]:
+        """Mehrere Mutationen als eine Undo-Stufe (optional benannt)."""
+        self._push_undo(label)
         prev = self._recording
         self._recording = False
         try:
@@ -477,14 +514,18 @@ class AnnotationStore:
     def undo(self) -> bool:
         if not self._undo:
             return False
+        label = self._undo_labels.pop() if self._undo_labels else "Annotation"
         self._redo.append(self._snapshot())
+        self._redo_labels.append(label)
         self._restore(self._undo.pop())
         return True
 
     def redo(self) -> bool:
         if not self._redo:
             return False
+        label = self._redo_labels.pop() if self._redo_labels else "Annotation"
         self._undo.append(self._snapshot())
+        self._undo_labels.append(label)
         self._restore(self._redo.pop())
         return True
 
@@ -664,7 +705,7 @@ class AnnotationStore:
         ]
         if not targets:
             return 0
-        with self.atomic():
+        with self.atomic("Tag umbenennen"):
             for a in targets:
                 seen: set[str] = set()
                 nxt: list[str] = []

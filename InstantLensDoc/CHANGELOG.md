@@ -1,5 +1,22 @@
 # Changelog — InstantLens Doc
 
+## 0.6.7 — Tag-Undo-Label, Split-PDF+Editor, Save-Progress, Wizard-Dauerhaft
+
+Nach 0.6.6: Tag-Umbenennen erscheint benannt im PDF-Undo-Stack; Doc-Split zweites Panel zeigt PDF oder Editor (Mischung); „Alle speichern“ mit Fortschritt bei >3 Dateien; Wizard „Nicht mehr zeigen“ dauerhaft (zusätzlich zu skip-once). Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### PDF / Annotationen
+- **Tag umbenennen im Undo-Stack**: Undo-Stufen mit Label (`Tag umbenennen`); Historie-Dialog = **PDF-Undo-Stack** (Seiten + Ann.); Status/Hint zeigen den Namen
+
+### Editor / UX
+- **Doc-Split PDF+Editor-Mischung**: zweites Panel lädt PDF-Viewer oder Editor je nach Dateityp (bei zwei offenen Docs)
+- Dirty-Tabs **Alle speichern**: Fortschrittsdialog bei mehr als 3 Dateien (`n/total`)
+- **Erste-Schritte-Wizard**: Checkbox **Nicht mehr zeigen** (`wizard_completed`) zusätzlich zu skip-once
+
+### Packaging / Docs
+- Version **0.6.7**; Smoke um 0.6.7-Pfade erweitert
+
+---
+
 ## 0.6.6 — Tag-Rename-Undo, Split-Settings, Alle-Speichern, Wizard-Skip
 
 Nach 0.6.5: Tag-Umbenennen ist mit Ctrl+Z ein Undo-Schritt (Filter mit); Doc-Split H/V zusätzlich in Einstellungen; Dirty-Tabs-Menü mit „Alle speichern“; Wizard mit skip-once-Checkbox. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
