@@ -8,11 +8,13 @@ from .document import PdfDocument
 from .render import render_page, render_pages
 from .annotate import (
     Annotation,
+    AnnotationImportError,
     AnnotationStore,
     AnnotationType,
     DRAG_TYPES,
     SCHEMA_ID,
     SIDECAR_VERSION,
+    validate_annotation_import_data,
     STAMP_LIBRARY,
     STAMP_PRESETS,
     stamp_library_items,
@@ -92,8 +94,10 @@ __all__ = [
     "render_pages",
     "clear_render_cache",
     "Annotation",
+    "AnnotationImportError",
     "AnnotationStore",
     "AnnotationType",
+    "validate_annotation_import_data",
     "DRAG_TYPES",
     "SCHEMA_ID",
     "SIDECAR_VERSION",
@@ -175,4 +179,4 @@ __all__ = [
     "uri_link_at",
 ]
 
-__version__ = "0.4.4"
+__version__ = "0.4.5"

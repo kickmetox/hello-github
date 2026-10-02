@@ -1,5 +1,23 @@
 # Changelog — InstantLens Doc
 
+## 0.4.5 — PDF-Seitenbild Editor, Ann.-Import v4, Trim, Toolbar
+
+Fokus: gerenderte PDF-Seiten als Bildreferenz in den Editor, strikte Schema-v4-Validierung beim Annotation-JSON-Import, optionales Trailing-Whitespace-Trim beim Speichern, anpassbare PDF-Toolbar-Gruppen. Stubs KI/Cloud/Stylus/3D unverändert.
+
+### PDF / Editor
+- **PDF-Seitenbild → Editor**: aktuelle Seite oder alle Seiten als PNG neben dem PDF + Verweiszeile im Editor (Menü PDF)
+- **Annotation-Import Schema v4**: JSON-Import prüft `version`/`schema` und Annotation-Struktur; klare Fehlermeldung bei Abweichung (`AnnotationImportError`)
+
+### Editor / UX
+- **Trailing Whitespace beim Speichern** optional (Einstellungen; gilt für Speichern/Autosave)
+- **PDF-Toolbar anpassbar**: Gruppen (Werkzeuge, Farben, Ansicht, …) in Einstellungen ein-/ausblenden
+
+### Packaging / Docs
+- Version **0.4.5** (App, `ild_pdf`, ISS, Build, Docs, Smoke)
+- FEATURES / INFO / CHANGELOG / Hilfe aktualisiert
+
+---
+
 ## 0.4.4 — Druckermarken, Ann.-Schema v4, Zeilen sortieren, Settings-Reset
 
 Fokus: Seitenrand-Druckermarken, PDF-Highlight-kompatibler Annotation-Export (Schema v4), Editor-Sortierung, Einstellungen zurücksetzen. Stubs KI/Cloud/Stylus/3D unverändert.

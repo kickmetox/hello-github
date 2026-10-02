@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | 0.4.4 |
+| Version | **0.4.5** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -33,10 +33,10 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)
 
-## Neu in 0.4.4
+## Neu in 0.4.5
 
-- Seitenrand-Druckermarken optional
-- Annotation-Export Schema v4 (PDF-Highlight-kompatibel)
-- Editor: Zeilen sortieren A–Z
-- Einstellungen: Auf Standard zurücksetzen
+- PDF-Seitenbild → Editor (Seite / alle Seiten)
+- Annotation-Import Schema v4 mit Validierung
+- Editor: Trailing Whitespace trimmen (optional)
+- PDF-Toolbar-Gruppen anpassbar
 - Stubs KI/Cloud/Stylus/3D unverändert

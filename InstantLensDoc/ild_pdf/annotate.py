@@ -19,6 +19,84 @@ SCHEMA_ID = "ildann-v4"
 HISTORY_LIMIT = 40
 
 
+class AnnotationImportError(ValueError):
+    """Annotation-JSON-Import abgebrochen (Schema/Struktur ungültig)."""
+
+
+def validate_annotation_import_data(data: object) -> dict:
+    """
+    Import-Payload prüfen (Schema v4). Wirft AnnotationImportError mit lesbarer Meldung.
+    Sidecar ohne version/schema bleibt importierbar (Abwärtskompatibilität).
+    """
+    if not isinstance(data, dict):
+        raise AnnotationImportError("Ungültige Datei: Wurzel muss ein JSON-Objekt sein.")
+    anns = data.get("annotations")
+    if anns is None:
+        raise AnnotationImportError("Feld „annotations“ fehlt.")
+    if not isinstance(anns, list):
+        raise AnnotationImportError("Feld „annotations“ muss eine Liste sein.")
+
+    ver = data.get("version")
+    schema = data.get("schema")
+    if ver is not None:
+        try:
+            ver_i = int(ver)
+        except (TypeError, ValueError) as e:
+            raise AnnotationImportError(f"Feld „version“ ist keine Zahl: {ver!r}") from e
+        if ver_i != SIDECAR_VERSION:
+            raise AnnotationImportError(
+                f"Inkompatible Version {ver_i} — erwartet Schema v{SIDECAR_VERSION} ({SCHEMA_ID})."
+            )
+    if schema is not None and str(schema) != SCHEMA_ID:
+        raise AnnotationImportError(
+            f"Inkompatibles Schema „{schema}“ — erwartet „{SCHEMA_ID}“ (Version {SIDECAR_VERSION})."
+        )
+    if ver is not None and schema is None:
+        raise AnnotationImportError(
+            f"Schema v{SIDECAR_VERSION} erfordert Feld „schema“: „{SCHEMA_ID}“."
+        )
+    if schema is not None and ver is None:
+        raise AnnotationImportError(
+            f"Feld „schema“ „{schema}“ erfordert „version“: {SIDECAR_VERSION}."
+        )
+
+    for idx, raw in enumerate(anns):
+        if not isinstance(raw, dict):
+            raise AnnotationImportError(
+                f"Annotation [{idx}]: Eintrag muss ein Objekt sein (ist {type(raw).__name__})."
+            )
+        if "type" not in raw and not isinstance(raw.get("pdf_highlight"), dict):
+            raise AnnotationImportError(f"Annotation [{idx}]: Feld „type“ fehlt.")
+        try:
+            t_raw = raw.get("type")
+            if t_raw is None and isinstance(raw.get("pdf_highlight"), dict):
+                ph = raw["pdf_highlight"]
+                subtype = str(ph.get("subtype") or "Highlight").lower()
+                t_raw = "highlight" if "under" not in subtype else "underline"
+            AnnotationType(str(t_raw))
+        except (ValueError, KeyError) as e:
+            raise AnnotationImportError(
+                f"Annotation [{idx}]: unbekannter Typ „{raw.get('type')}“."
+            ) from e
+        if "page" not in raw:
+            raise AnnotationImportError(f"Annotation [{idx}]: Feld „page“ fehlt.")
+        try:
+            page_i = int(raw["page"])
+        except (TypeError, ValueError) as e:
+            raise AnnotationImportError(f"Annotation [{idx}]: „page“ muss eine Ganzzahl sein.") from e
+        if page_i < 0:
+            raise AnnotationImportError(f"Annotation [{idx}]: „page“ darf nicht negativ sein ({page_i}).")
+        has_xy = "x" in raw and "y" in raw
+        has_rects = isinstance(raw.get("rects"), list) and raw["rects"]
+        ph = raw.get("pdf_highlight")
+        has_ph_rects = isinstance(ph, dict) and isinstance(ph.get("rects"), list) and ph["rects"]
+        if not has_xy and not has_rects and not has_ph_rects:
+            raise AnnotationImportError(
+                f"Annotation [{idx}]: Position fehlt (x/y oder rects/pdf_highlight.rects)."
+            )
+    return data
+
+
 class AnnotationType(str, Enum):
     HIGHLIGHT = "highlight"
     UNDERLINE = "underline"
@@ -601,7 +679,11 @@ class AnnotationStore:
         Rückgabe: Anzahl importierter Annotationen.
         """
         path = Path(path)
-        data = json.loads(path.read_text(encoding="utf-8"))
+        try:
+            raw = json.loads(path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as e:
+            raise AnnotationImportError(f"Kein gültiges JSON: {e}") from e
+        data = validate_annotation_import_data(raw)
         imported = [Annotation.from_dict(a) for a in data.get("annotations", [])]
         self._push_undo()
         if replace:

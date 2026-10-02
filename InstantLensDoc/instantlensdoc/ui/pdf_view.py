@@ -1151,6 +1151,53 @@ class PdfViewer(QWidget):
         toolbar.addWidget(btn_bake)
         toolbar.addStretch()
         layout.addLayout(toolbar)
+        self._toolbar_group_widgets: dict[str, list] = {
+            "tools": list(self._tool_buttons),
+            "colors": [
+                self.btn_hl_color,
+                self.btn_pen_color,
+                *self._preset_btns,
+                self.spin_opacity,
+            ],
+            "view": [
+                self.btn_grayscale,
+                self.btn_night,
+                self.btn_ann_layer,
+                self.btn_ann_lock,
+                self.btn_page_boxes,
+                self.btn_printer_marks,
+            ],
+            "nav": [btn_prev, self.lbl_page, btn_next],
+            "history": [btn_undo, btn_redo, btn_del_ann, btn_stamp_rot],
+            "zoom": [
+                btn_zoom_out,
+                self.lbl_zoom,
+                btn_zoom_in,
+                btn_fit,
+                btn_fit_w,
+                btn_fit_h,
+            ],
+            "pages": [
+                btn_rot_ccw,
+                btn_rot,
+                btn_flip_h,
+                btn_flip_v,
+                btn_blank,
+                btn_dup,
+                btn_del,
+                btn_reorder,
+            ],
+            "io": [
+                btn_save_ann,
+                btn_reload_ann,
+                btn_extract,
+                btn_extract_all,
+                btn_img_page,
+                btn_import_text,
+                btn_bake,
+            ],
+        }
+        self.apply_toolbar_groups()
 
         self.scroll = QScrollArea()
         self.scroll.setWidgetResizable(True)
@@ -1174,6 +1221,19 @@ class PdfViewer(QWidget):
         del_sc.activated.connect(self.delete_annotation)
         back_sc = QShortcut(QKeySequence(Qt.Key_Backspace), self)
         back_sc.activated.connect(self.delete_annotation)
+
+    def apply_toolbar_groups(self) -> None:
+        """Sichtbarkeit der PDF-Toolbar-Gruppen aus den Einstellungen anwenden."""
+        from instantlensdoc.core.app_settings import get_pdf_toolbar_groups
+
+        groups = get_pdf_toolbar_groups()
+        mapping = getattr(self, "_toolbar_group_widgets", None)
+        if not isinstance(mapping, dict):
+            return
+        for name, widgets in mapping.items():
+            visible = bool(groups.get(name, True))
+            for w in widgets:
+                w.setVisible(visible)
 
     @staticmethod
     def _style_color_btn(btn: QPushButton, color: str):
@@ -2410,7 +2470,13 @@ class PdfViewer(QWidget):
             self.status.emit(f"{n} Annotation(en) {mode} aus {Path(path).name}")
             return True
         except Exception as e:
-            QMessageBox.warning(self, "Annotationen importieren", str(e))
+            from ild_pdf.annotate import AnnotationImportError
+
+            title = "Annotationen importieren"
+            if isinstance(e, AnnotationImportError):
+                QMessageBox.warning(self, title, f"Schema v4 / Struktur ungültig:\n\n{e}")
+            else:
+                QMessageBox.warning(self, title, str(e))
             return False
 
     def save_pdf_as_copy(self) -> bool:

@@ -223,6 +223,40 @@ class TextEditor(QPlainTextEdit):
     def move_line_down(self) -> bool:
         return self.move_line(1)
 
+    def trim_trailing_whitespace(self) -> bool:
+        """Trailing Whitespace pro Zeile entfernen; True wenn Text geändert wurde."""
+        text = self.toPlainText()
+        if not text:
+            return False
+        lines = text.split("\n")
+        trimmed = [line.rstrip(" \t") for line in lines]
+        if trimmed == lines:
+            return False
+        new_text = "\n".join(trimmed)
+        cur = self.textCursor()
+        pos = cur.position()
+        anchor = cur.anchor()
+        cur.beginEditBlock()
+        cur.select(QTextCursor.Document)
+        cur.insertText(new_text)
+        cur.endEditBlock()
+        cur.setPosition(min(pos, len(new_text)))
+        if anchor != pos:
+            cur.setPosition(min(anchor, len(new_text)), QTextCursor.KeepAnchor)
+        self.setTextCursor(cur)
+        return True
+
+    def insert_pdf_page_image_reference(self, image_path: Path | str, *, page_label: str) -> None:
+        """Verweis auf gerenderte PDF-Seite als Bilddatei einfügen."""
+        path = Path(image_path)
+        line = f"\n[PDF-Seitenbild {page_label}: {path}]\n"
+        cur = self.textCursor()
+        if cur.hasSelection():
+            cur.removeSelectedText()
+        cur.insertText(line)
+        self.setTextCursor(cur)
+        self.ensureCursorVisible()
+
     def sort_lines_az(self) -> bool:
         """Ausgewählte Zeilen alphabetisch (A–Z, case-insensitive) sortieren."""
         cur = self.textCursor()

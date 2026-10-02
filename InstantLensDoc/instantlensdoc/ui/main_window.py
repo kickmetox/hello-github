@@ -833,6 +833,8 @@ class MainWindow(QMainWindow):
             ("Text-Overlays einbrennen…", lambda: self.pdf_view.bake_overlays()),
             ("Text dieser Seite → Editor", self._extract_page_text_to_editor),
             ("Gesamten PDF-Text → Editor", self._extract_all_text_to_editor),
+            ("Seitenbild → Editor", self._insert_page_image_to_editor),
+            ("Alle Seitenbilder → Editor", self._insert_all_page_images_to_editor),
             ("Schwärzung einbrennen…", lambda: self.pdf_view.bake_redactions()),
             ("Schwärzungs-Annotationen löschen…", lambda: self.pdf_view.clear_redactions()),
             ("Signaturfeld setzen…", lambda: self.pdf_view.place_signature_field()),
@@ -1504,6 +1506,7 @@ class MainWindow(QMainWindow):
             return
         if self.doc.kind not in (DocKind.TEXT, DocKind.MARKDOWN, DocKind.HTML, DocKind.DOCX):
             return
+        self._sync_editor_text_before_save()
         self.doc.text = self.editor.toPlainText()
         try:
             save_document(self.doc)
@@ -1612,6 +1615,67 @@ class MainWindow(QMainWindow):
         from instantlensdoc.ui.goto_line_dialog import GotoLineDialog
 
         GotoLineDialog(self.editor, self).exec()
+
+    def _sync_editor_text_before_save(self) -> None:
+        """Editor-Text für Speichern vorbereiten (optional Trailing-Whitespace trimmen)."""
+        from instantlensdoc.core.app_settings import get_editor_trim_trailing_whitespace
+
+        if get_editor_trim_trailing_whitespace():
+            if self.editor.trim_trailing_whitespace():
+                self._on_text_changed()
+
+    def _render_pdf_page_image_path(self, page_index: int, *, scale: float = 2.0) -> Path:
+        from ild_pdf import render_page
+
+        if not self.pdf_view.pdf_path:
+            raise ValueError("Kein PDF geladen")
+        pdf_path = Path(self.pdf_view.pdf_path)
+        out_dir = pdf_path.parent
+        stem = pdf_path.stem
+        out = out_dir / f"{stem}_page_{page_index + 1}.png"
+        img = render_page(
+            pdf_path,
+            page_index,
+            scale=scale,
+            password=self.pdf_view.password,
+        )
+        img.save(out, "PNG")
+        return out
+
+    def _insert_page_image_to_editor(self):
+        if not self.pdf_view.pdf_path:
+            self._set_status("Kein PDF geladen")
+            return
+        idx = self.pdf_view.page_index
+        try:
+            out = self._render_pdf_page_image_path(idx)
+        except Exception as e:
+            QMessageBox.warning(self, "Seitenbild", str(e))
+            return
+        self.stack.setCurrentWidget(self.editor_pane)
+        self.editor.insert_pdf_page_image_reference(out, page_label=f"Seite {idx + 1}")
+        self._on_text_changed()
+        self._set_status(f"Seitenbild Seite {idx + 1} → Editor ({out.name})")
+
+    def _insert_all_page_images_to_editor(self):
+        if not self.pdf_view.pdf_path:
+            self._set_status("Kein PDF geladen")
+            return
+        n_pages = self.pdf_view.page_count
+        if n_pages < 1:
+            return
+        paths: list[Path] = []
+        try:
+            for i in range(n_pages):
+                paths.append(self._render_pdf_page_image_path(i))
+        except Exception as e:
+            QMessageBox.warning(self, "Seitenbilder", str(e))
+            return
+        self.stack.setCurrentWidget(self.editor_pane)
+        for i, out in enumerate(paths):
+            self.editor.insert_pdf_page_image_reference(out, page_label=f"Seite {i + 1}")
+        self._on_text_changed()
+        self._set_status(f"{len(paths)} Seitenbild(er) → Editor")
 
     def _extract_page_text_to_editor(self):
         if not self.pdf_view.pdf_path:
@@ -2147,6 +2211,7 @@ class MainWindow(QMainWindow):
                 self._night_action.blockSignals(False)
             self._autosave_timer.setInterval(get_autosave_interval_sec() * 1000)
             self.pdf_view.apply_settings_colors()
+            self.pdf_view.apply_toolbar_groups()
             if self.pdf_view.pdf_path:
                 self._refresh_thumbs()
             self._set_status(
@@ -2557,7 +2622,8 @@ class MainWindow(QMainWindow):
             self.save_as()
             return
         if self.doc.kind in (DocKind.TEXT, DocKind.MARKDOWN, DocKind.HTML, DocKind.DOCX):
-            self.doc.text = self.editor.toPlainText()
+            self._sync_editor_text_before_save()
+        self.doc.text = self.editor.toPlainText()
         try:
             save_document(self.doc)
             self._remember_path(self.doc.path)
@@ -2589,6 +2655,7 @@ class MainWindow(QMainWindow):
         )
         if not enc:
             return
+        self._sync_editor_text_before_save()
         self.doc.text = self.editor.toPlainText()
         if not self.doc.path:
             self.save_as()
@@ -2619,6 +2686,7 @@ class MainWindow(QMainWindow):
                         saved += 1
                 elif self.doc.path:
                     if self.doc.kind in (DocKind.TEXT, DocKind.MARKDOWN, DocKind.HTML, DocKind.DOCX):
+                        self._sync_editor_text_before_save()
                         self.doc.text = self.editor.toPlainText()
                     save_document(self.doc)
                     saved += 1
@@ -2673,6 +2741,7 @@ class MainWindow(QMainWindow):
             return
         remember_recent_dir(path)
         if self.doc.kind in (DocKind.TEXT, DocKind.MARKDOWN, DocKind.HTML, DocKind.DOCX):
+            self._sync_editor_text_before_save()
             self.doc.text = self.editor.toPlainText()
         try:
             save_document(self.doc, Path(path))

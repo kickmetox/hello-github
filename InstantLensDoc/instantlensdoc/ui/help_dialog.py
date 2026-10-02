@@ -28,9 +28,10 @@ HELP_HTML = f"""
 <ul>
 <li><b>Datei → Öffnen</b>: TXT, MD, HTML, DOCX, PDF, Bilder</li>
 <li><b>Extras → Einstellungen</b>: Theme, <b>UI-Sprache DE/EN</b>, OCR, Export-Qualität,
-    <b>Standard-Zoom</b>, <b>Autosave-Intervall</b>,     Soft-Wrap, <b>Sonderzeichen anzeigen</b>, optional <b>Minimieren in System-Tray</b>,
+    <b>Standard-Zoom</b>, <b>Autosave-Intervall</b>, Soft-Wrap, <b>Sonderzeichen anzeigen</b>,
+    optional <b>Trailing Whitespace trimmen</b>, optional <b>Minimieren in System-Tray</b>,
     optional <b>Backup .bak beim Speichern</b>, <b>Seitengröße-Einheit mm/inch</b>,
-    optional <b>letzte Session beim Start</b>,
+    optional <b>letzte Session beim Start</b>, <b>PDF-Toolbar-Gruppen</b> ein-/ausblenden,
     Update-Hinweis (nur wenn aktiv), Pfade;
     <b>Auf Standard zurücksetzen</b></li>
 <li><b>Datei → Zuletzt geöffnet</b>: Menü + Seitenleiste (persistiert)</li>
@@ -73,12 +74,14 @@ HELP_HTML = f"""
     <b>Stempel-Bibliothek</b> (GENEHMIGT/ENTWURF/VERTRAULICH + Datum, <b>Rotation 90°</b>), Callout,
     <b>Rechteck / Linie / Pfeil / Lineal</b> —
     Sidecar <code>*.ildann.json</code> (v4 / <code>ildann-v4</code>, Auto-Save, Undo/Redo);
-    JSON-Export PDF-Highlight-kompatibel (rects/quadPoints/colorRGB); CSV Export, JSON Import;
+    JSON-Export PDF-Highlight-kompatibel (rects/quadPoints/colorRGB); CSV Export;
+    JSON Import mit Schema-v4-Validierung (klare Fehlermeldung);
     <b>Textsuche</b> highlightet Treffer auf der aktuellen Seite;
     Doppelklick / Strg+Klick / <b>Ctrl+E</b> auf Notiz/Overlay zum Bearbeiten;
     <b>Ctrl+Shift+D</b> Auswahl duplizieren; <b>Ctrl+Alt+C/V</b> Annotationen kopieren/einfügen (auch seitenübergreifend);
     Auswahl-Werkzeug: Annotationen per Drag verschieben (wenn nicht gesperrt);
-    PDF → Text→Overlay / Overlay einbrennen / <b>Text Seite/alles → Editor</b>;
+    PDF → Text→Overlay / Overlay einbrennen / <b>Text Seite/alles → Editor</b> /
+    <b>Seitenbild(er) → Editor</b>;
     Flatten/Bake mit Fortschrittsdialog (Abbrechen);
     <b>Signaturfeld</b> (Platzhalter) und <b>Signatur (Bild)</b> einfügen;
     <b>PDFs zusammenführen / teilen / Seitenbereich</b>;

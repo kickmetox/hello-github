@@ -55,6 +55,28 @@ DEFAULTS: dict[str, Any] = {
         "Mit freundlichen Grüßen\n",
         "— Notiz —\n",
     ],
+    "editor_trim_trailing_whitespace": False,
+    "pdf_toolbar_groups": {
+        "tools": True,
+        "colors": True,
+        "view": True,
+        "nav": True,
+        "history": True,
+        "zoom": True,
+        "pages": True,
+        "io": True,
+    },
+}
+
+PDF_TOOLBAR_GROUP_LABELS: dict[str, str] = {
+    "tools": "Werkzeuge",
+    "colors": "Farben & Deckkraft",
+    "view": "Ansicht (Grau/Nacht/Ann./Rahmen)",
+    "nav": "Seitenblättern",
+    "history": "Undo & Annotation",
+    "zoom": "Zoom & Einpassen",
+    "pages": "Seitenoperationen",
+    "io": "Export / Import / Bake",
 }
 
 
@@ -642,3 +664,36 @@ def set_editor_text_encoding(encoding: str) -> str:
     enc = normalize_text_encoding(encoding)
     save_settings({"editor_text_encoding": enc})
     return enc
+
+
+def get_editor_trim_trailing_whitespace() -> bool:
+    return bool(load_settings().get("editor_trim_trailing_whitespace", False))
+
+
+def set_editor_trim_trailing_whitespace(enabled: bool) -> None:
+    save_settings({"editor_trim_trailing_whitespace": bool(enabled)})
+
+
+def _default_toolbar_groups() -> dict[str, bool]:
+    raw = DEFAULTS.get("pdf_toolbar_groups") or {}
+    return {k: bool(raw.get(k, True)) for k in PDF_TOOLBAR_GROUP_LABELS}
+
+
+def get_pdf_toolbar_groups() -> dict[str, bool]:
+    raw = load_settings().get("pdf_toolbar_groups")
+    out = _default_toolbar_groups()
+    if isinstance(raw, dict):
+        for key in out:
+            if key in raw:
+                out[key] = bool(raw[key])
+    return out
+
+
+def set_pdf_toolbar_groups(groups: dict[str, bool]) -> dict[str, bool]:
+    base = _default_toolbar_groups()
+    if isinstance(groups, dict):
+        for key in base:
+            if key in groups:
+                base[key] = bool(groups[key])
+    save_settings({"pdf_toolbar_groups": base})
+    return base

@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (
     QDialogButtonBox,
     QFileDialog,
     QFormLayout,
+    QGroupBox,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -27,8 +28,11 @@ from instantlensdoc.core.app_settings import (
     get_batch_output_dir,
     get_default_open_dir,
     get_default_zoom_percent,
+    PDF_TOOLBAR_GROUP_LABELS,
     get_editor_text_encoding,
+    get_editor_trim_trailing_whitespace,
     get_export_image_max_edge,
+    get_pdf_toolbar_groups,
     get_export_jpeg_quality,
     get_export_pdf_page,
     get_minimize_to_tray,
@@ -53,7 +57,9 @@ from instantlensdoc.core.app_settings import (
     set_editor_show_special_chars,
     set_editor_soft_wrap,
     set_editor_text_encoding,
+    set_editor_trim_trailing_whitespace,
     set_minimize_to_tray,
+    set_pdf_toolbar_groups,
     set_ocr_lang,
     set_page_size_unit,
     set_pdf_grayscale,
@@ -74,7 +80,7 @@ class SettingsDialog(QDialog):
         super().__init__(parent)
         sync_from_settings()
         self.setWindowTitle(tr("settings"))
-        self.resize(540, 440)
+        self.resize(560, 520)
         layout = QVBoxLayout(self)
         layout.addWidget(QLabel(tr("settings_title")))
 
@@ -155,6 +161,13 @@ class SettingsDialog(QDialog):
         self.enc_combo.setCurrentIndex(1 if cur_enc == "latin-1" else 0)
         self.enc_combo.setToolTip("Standard-Encoding beim Öffnen/Speichern von Textdateien")
         form.addRow("Editor-Encoding", self.enc_combo)
+
+        self.trim_trailing = QCheckBox("Trailing Whitespace beim Speichern entfernen")
+        self.trim_trailing.setChecked(get_editor_trim_trailing_whitespace())
+        self.trim_trailing.setToolTip(
+            "Leerzeichen und Tabs am Zeilenende vor Speichern/Autosave entfernen (optional)"
+        )
+        form.addRow(self.trim_trailing)
 
         self.minimize_tray = QCheckBox("Beim Minimieren in den System-Tray")
         self.minimize_tray.setChecked(get_minimize_to_tray())
@@ -241,6 +254,17 @@ class SettingsDialog(QDialog):
 
         layout.addLayout(form)
 
+        tb_group = QGroupBox("PDF-Toolbar — Gruppen ein-/ausblenden")
+        tb_layout = QVBoxLayout(tb_group)
+        self._toolbar_group_checks: dict[str, QCheckBox] = {}
+        cur_tb = get_pdf_toolbar_groups()
+        for key, label in PDF_TOOLBAR_GROUP_LABELS.items():
+            cb = QCheckBox(label)
+            cb.setChecked(bool(cur_tb.get(key, True)))
+            self._toolbar_group_checks[key] = cb
+            tb_layout.addWidget(cb)
+        layout.addWidget(tb_group)
+
         reset_row = QHBoxLayout()
         self.btn_reset = QPushButton("Auf Standard zurücksetzen…")
         self.btn_reset.setToolTip("Alle Einstellungen auf Werkseinstellungen zurücksetzen")
@@ -288,6 +312,7 @@ class SettingsDialog(QDialog):
         if parent is not None and hasattr(parent, "pdf_view"):
             try:
                 parent.pdf_view.apply_settings_colors()
+                parent.pdf_view.apply_toolbar_groups()
             except Exception:
                 pass
         QMessageBox.information(
@@ -312,6 +337,10 @@ class SettingsDialog(QDialog):
         set_editor_soft_wrap(self.soft_wrap.isChecked())
         set_editor_show_special_chars(self.special_chars.isChecked())
         set_editor_text_encoding(str(self.enc_combo.currentData() or "utf-8"))
+        set_editor_trim_trailing_whitespace(self.trim_trailing.isChecked())
+        set_pdf_toolbar_groups(
+            {k: cb.isChecked() for k, cb in self._toolbar_group_checks.items()}
+        )
         set_minimize_to_tray(self.minimize_tray.isChecked())
         set_backup_on_save(self.backup_on_save.isChecked())
         set_restore_session_on_start(self.restore_session.isChecked())
@@ -345,6 +374,11 @@ class SettingsDialog(QDialog):
         if parent is not None and hasattr(parent, "_update_doc_status"):
             try:
                 parent._update_doc_status()
+            except Exception:
+                pass
+        if parent is not None and hasattr(parent, "pdf_view"):
+            try:
+                parent.pdf_view.apply_toolbar_groups()
             except Exception:
                 pass
         self.accept()

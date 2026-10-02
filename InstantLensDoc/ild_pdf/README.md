@@ -1,7 +1,7 @@
 # ild_pdf — auskoppelbares PDF-Modul
 
 Lizenzfreundliche PDF-Engine auf **pypdfium2 / PDFium** (kein Poppler/GPL).  
-Version **0.4.4**.
+Version **0.4.5**.
 
 ## Installation
 
@@ -113,7 +113,7 @@ python examples/ild_pdf_demo.py pfad/zu/datei.pdf
 
 - **Export** (`export_json`): Schema v4 inkl. `rects` / `quadPoints` / `colorRGB` / `pdf_highlight` für Highlight & Underline.
 - **Sidecar-Save**: Kernfelder + `version: 4` / `schema` (Interop-Felder beim Export).
-- Import akzeptiert v3 und v4 (auch `pdf_highlight`-Blöcke).
+- **Import** (`import_json`): Schema v4 wird validiert (`version`/`schema` + Annotation-Struktur); bei Fehler `AnnotationImportError`. Sidecar ohne version/schema bleibt importierbar.
 - Koordinaten: Render-Pixel; `meta.y_origin=top` (UI). Linien: Start `(x,y)`, Ende `(callout_x, callout_y)`.
 
 ### Hinweis Textbearbeitung

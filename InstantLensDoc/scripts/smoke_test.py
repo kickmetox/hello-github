@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Smoke-Test 0.4.4 (CLI + optional offscreen Qt). Kernpfade: open/annotate/export/license + 0.3.x."""
+"""Smoke-Test 0.4.5 (CLI + optional offscreen Qt). Kernpfade: open/annotate/export/license + 0.3.x."""
 
 from __future__ import annotations
 
 import os
+import json
 import sys
 import tempfile
 from pathlib import Path
@@ -112,8 +113,8 @@ def main() -> int:
     from instantlensdoc.core.update_check import check_for_updates
     from instantlensdoc.license import KEY_DAYS, TRIAL_DAYS, generate_key, verify_key
 
-    assert __version__ == "0.4.4", __version__
-    assert ild_ver == "0.4.4", ild_ver
+    assert __version__ == "0.4.5", __version__
+    assert ild_ver == "0.4.5", ild_ver
     assert TRIAL_DAYS == 28 and KEY_DAYS == 32
     key = generate_key("ame@sellerbach.de")
     ok, msg, _ = verify_key(key)
@@ -131,7 +132,7 @@ def main() -> int:
     assert "Settings" in tr("settings")
     set_lang("de")
     upd = check_for_updates(allow_network=False)
-    assert upd.local_version == "0.4.4" and not upd.online
+    assert upd.local_version == "0.4.5" and not upd.online
     assert get_export_jpeg_quality() >= 10
     assert get_ui_lang() in ("de", "en")
     assert 25 <= get_default_zoom_percent() <= 500
@@ -172,8 +173,8 @@ def main() -> int:
     assert get_ann_pen_color() == "#112233"
     assert (ROOT / "CHANGELOG.md").is_file()
     cl = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-    assert "0.4.4" in cl
-    assert "## 0.4.4" in cl
+    assert "0.4.5" in cl
+    assert "## 0.4.5" in cl
     assert "## 0.4.0" in cl
     assert "0.3.0 → 0.4.0" in cl or "0.3.0→0.4.0" in cl
     assert "## 0.3.0" in cl
@@ -190,7 +191,7 @@ def main() -> int:
     assert "## 0.3.1" not in cl and "## 0.2.9" not in cl
     assert "0.3.9" in cl  # noch in Kurz-Tabelle
     assert "0.2.9" in cl  # noch in Kurz-Tabelle
-    assert "0.4.4" in (ROOT / "README.md").read_text(encoding="utf-8")
+    assert "0.4.5" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "run.bat" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "sync-ild.ps1" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "scripts/sync-ild.ps1" in (ROOT / "FEATURES.md").read_text(encoding="utf-8")
@@ -539,13 +540,13 @@ def main() -> int:
 
         assert (ROOT / "installer" / "installer-hinweis.txt").exists()
         iss = (ROOT / "installer" / "instantlensdoc.iss").read_text(encoding="utf-8")
-        assert "0.4.4" in iss and "desktopicon" in iss and "DisableProgramGroupPage=no" in iss
+        assert "0.4.5" in iss and "desktopicon" in iss and "DisableProgramGroupPage=no" in iss
         assert "UninstallDisplayName" in iss and "Uninstallable=yes" in iss
         assert "IncludeKeygen" in iss and "SetupIconFile" in iss
         assert "InstantLensKeygen.exe" in iss
         assert "uninstallexe" in iss
         bw = (ROOT / "build-windows.ps1").read_text(encoding="utf-8")
-        assert "0.4.4" in bw and "NoKeygenInApp" in bw and "--icon" in bw
+        assert "0.4.5" in bw and "NoKeygenInApp" in bw and "--icon" in bw
         assert "InstantLensKeygen.exe" in bw
         bi = (ROOT / "installer" / "build-installer.ps1").read_text(encoding="utf-8")
         assert "InstantLensKeygen.exe" in bi and "IncludeKeygen" in bi
@@ -554,7 +555,7 @@ def main() -> int:
         assert "Installer" in kg_readme
         hinweis = (ROOT / "installer" / "installer-hinweis.txt").read_text(encoding="utf-8")
         assert "InstantLensKeygen.exe" in hinweis or "run-keygen.bat" in hinweis
-        assert "0.4.4" in hinweis
+        assert "0.4.5" in hinweis
         from ild_pdf.limits import OPEN_TIMEOUT_HINT, OPEN_TIMEOUT_HINT_SEC
 
         assert OPEN_TIMEOUT_HINT_SEC >= 15 and "teilen" in OPEN_TIMEOUT_HINT.lower()
@@ -565,7 +566,7 @@ def main() -> int:
         assert "QProgressDialog" in (ROOT / "instantlensdoc" / "ui" / "main_window.py").read_text(encoding="utf-8")
 
         assert (ROOT / "examples" / "ild_pdf_demo.py").exists()
-        assert "0.4.4" in (ROOT / "INFO.md").read_text(encoding="utf-8")
+        assert "0.4.5" in (ROOT / "INFO.md").read_text(encoding="utf-8")
         assert (ROOT / "assets" / "app.ico").is_file()
 
         # --- Kernpfade: open / annotate / export / license ---
@@ -698,7 +699,7 @@ def main() -> int:
         assert "| A" in tbl and "| 1" in tbl
         assert ocr_mod.TESSERACT_WIKI_URL.startswith("https://")
 
-        # --- Ausgewählte 0.3.x-Pfade (CLI) + 0.4.4 ---
+        # --- Ausgewählte 0.3.x-Pfade (CLI) + 0.4.5 ---
         from ild_pdf.annotate import stamp_library_items
         from ild_pdf.attachments import has_attachments, list_attachments
         from ild_pdf.flatten import flatten_annotations_to_pdf
@@ -757,7 +758,7 @@ def main() -> int:
         assert get_page_size_unit() in ("mm", "inch")
         assert isinstance(get_minimize_to_tray(), bool)
         assert "0.4.2" in feat and "0.4.0" in feat  # Release + Herkunft-Feature-Hinweise
-        # --- 0.4.4 CLI: CropBox settings, Ann Lock/Move, Snippets, Templates ---
+        # --- 0.4.5 CLI: CropBox settings, Ann Lock/Move, Snippets, Templates ---
         from instantlensdoc.core.app_settings import (
             get_annotations_locked,
             get_editor_snippets,
@@ -800,7 +801,7 @@ def main() -> int:
         assert "CropBox" in feat or "Seitenrahmen" in feat
         assert "Textbausteine" in feat or "Snippets" in feat
         assert "Brief" in feat or "Vorlagen" in feat
-        # --- 0.4.4 CLI: Printer marks, Schema v4, sort lines, reset defaults ---
+        # --- 0.4.5 CLI: Printer marks, Schema v4, sort lines, reset defaults ---
         from ild_pdf.annotate import SCHEMA_ID, SIDECAR_VERSION
         from instantlensdoc.core.app_settings import (
             DEFAULTS,
@@ -836,6 +837,49 @@ def main() -> int:
         store_imp4.clear_history()
         assert store_imp4.import_json(v4path, replace=True) == 1
         assert store_imp4.annotations[0].type == AnnotationType.HIGHLIGHT
+        # 0.4.5: Schema-Validierung ablehnen + Trim + Toolbar-Gruppen
+        from ild_pdf.annotate import AnnotationImportError
+
+        bad_v = td / "ann-bad-ver.json"
+        bad_v.write_text(
+            json.dumps({"version": 99, "schema": "ildann-v4", "annotations": []}),
+            encoding="utf-8",
+        )
+        store_bad = AnnotationStore(pdf)
+        store_bad.annotations = []
+        store_bad.clear_history()
+        try:
+            store_bad.import_json(bad_v, replace=True)
+            raise AssertionError("expected AnnotationImportError")
+        except AnnotationImportError as err:
+            assert "99" in str(err) or "Inkompatible" in str(err)
+        bad_schema = td / "ann-bad-schema.json"
+        bad_schema.write_text(
+            json.dumps({"version": 4, "schema": "wrong", "annotations": []}),
+            encoding="utf-8",
+        )
+        try:
+            store_bad.import_json(bad_schema, replace=True)
+            raise AssertionError("expected AnnotationImportError")
+        except AnnotationImportError as err:
+            assert "wrong" in str(err) or "Schema" in str(err)
+        from instantlensdoc.core.app_settings import (
+            get_editor_trim_trailing_whitespace,
+            get_pdf_toolbar_groups,
+            set_editor_trim_trailing_whitespace,
+            set_pdf_toolbar_groups,
+        )
+
+        set_editor_trim_trailing_whitespace(True)
+        assert get_editor_trim_trailing_whitespace() is True
+        set_editor_trim_trailing_whitespace(False)
+        assert get_editor_trim_trailing_whitespace() is False
+        groups = get_pdf_toolbar_groups()
+        assert "tools" in groups and "io" in groups
+        set_pdf_toolbar_groups({**groups, "io": False})
+        assert get_pdf_toolbar_groups()["io"] is False
+        set_pdf_toolbar_groups(groups)
+        assert "Seitenbild" in feat or "Toolbar" in feat or "Whitespace" in feat
         # Reset-to-defaults
         set_theme("dark")
         assert load_settings()["theme"] == "dark"
@@ -845,6 +889,7 @@ def main() -> int:
         assert "Schema v4" in feat or "ildann-v4" in feat or "PDF-Highlight" in feat
         assert "sortieren" in feat.lower() or "Zeilen sortieren" in feat
         assert "Reset" in feat or "zurücksetzen" in feat.lower()
+        assert "Seitenbild" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8") or "0.4.5" in feat
         # --- 0.4.2 CLI: Outline Goto, Ann Copy/Paste, Flatten Progress ---
         import pikepdf as _pike_ol
 
@@ -929,7 +974,7 @@ def main() -> int:
         assert "Encoding" in feat or "Latin-1" in feat
         assert "mehrere Dateien" in feat or "Tabs" in feat
         assert "kopieren/einfügen" in feat or "Ctrl+Alt+C" in feat
-        print("0.4.3–0.4.4 cropbox/lock/snippets + marks/schema/sort/reset (CLI): OK")
+        print("0.4.3–0.4.5 cropbox/lock/snippets + marks/schema/sort/reset (CLI): OK")
         print("0.4.2 outline/copy-paste/progress (CLI): OK")
         print("0.4.1 links/encoding/stamp-rotation (CLI): OK")
         print("0.3.x selected paths (CLI): OK")
@@ -969,7 +1014,7 @@ def main() -> int:
         win._add_chained_frame()
         assert len(win.layout_doc.text_frames) >= 2
         assert "Lizenz:" in win.license_label.text() or "⚠" in win.license_label.text()
-        assert "v0.4.4" in win.version_label.text()
+        assert "v0.4.5" in win.version_label.text()
         # Lizenz <7 Tage: Style prominent
         st_lic = win.license_manager.status()
         if st_lic.allowed and st_lic.days_remaining < 7:
@@ -1150,11 +1195,11 @@ def main() -> int:
             assert win.editor.outdent_selection(4)
             assert win.editor.toPlainText().splitlines()[0] == "alpha"
             # Fenstertitel mit Version
-            assert "0.4.4" in win.windowTitle()
+            assert "0.4.5" in win.windowTitle()
             from instantlensdoc.ui.help_dialog import AboutDialog, HelpDialog, open_log_folder
 
             about = AboutDialog(win)
-            assert "0.4.4" in about.windowTitle()
+            assert "0.4.5" in about.windowTitle()
             help_dlg = HelpDialog(win)
             assert help_dlg.windowTitle() == "Hilfe"
             assert callable(open_log_folder)
@@ -1814,7 +1859,7 @@ def main() -> int:
             win.apply_tray_setting()
             if win._tray is not None:
                 tip = win._tray.toolTip()
-                assert "0.4.4" in tip and "InstantLens Doc" in tip
+                assert "0.4.5" in tip and "InstantLens Doc" in tip
             set_minimize_to_tray(False)
             win.apply_tray_setting()
             print("0.3.9 fit-h/ann-stats/special/tray: OK")
@@ -1827,9 +1872,9 @@ def main() -> int:
             from instantlensdoc.ui.password_dialog import CompressPdfDialog, SetPasswordDialog
             from instantlensdoc.ui.stubs import PLANNED
             assert KeyboardHelpDialog and SetPasswordDialog and CompressPdfDialog
-            assert "0.4.4" in PLANNED["ki"]
+            assert "0.4.5" in PLANNED["ki"]
             assert "Coming soon" in PLANNED["cloud"]
-            assert "0.4.4" in PLANNED["stylus"] and "0.4.4" in PLANNED["extrude3d"]
+            assert "0.4.5" in PLANNED["stylus"] and "0.4.5" in PLANNED["extrude3d"]
             # Toolbar ↔ Menü Sync Graustufen/Nacht
             win.pdf_view.set_grayscale(True)
             assert win._grayscale_action.isChecked()
@@ -1864,12 +1909,12 @@ def main() -> int:
             assert win.editor.toPlainText().splitlines() == ["one", "two"]
             from instantlensdoc.ui.help_dialog import HELP_HTML
 
-            assert "Stub 0.4.4" in HELP_HTML
+            assert "Stub 0.4.5" in HELP_HTML
             assert "scripts/sync-ild.ps1" in HELP_HTML
             assert "Präsentationsmodus" in HELP_HTML or "F5" in (
                 ROOT / "instantlensdoc" / "ui" / "keyboard_help.py"
             ).read_text(encoding="utf-8")
-            # 0.4.4 Qt: page boxes, ann lock/move, snippets, templates
+            # 0.4.5 Qt: page boxes, ann lock/move, snippets, templates
             assert callable(win.pdf_view.set_show_page_boxes)
             assert callable(win.pdf_view.set_annotations_locked)
             from ild_pdf.annotate import AnnotationStore as _AS043
@@ -1897,7 +1942,7 @@ def main() -> int:
             assert win.pdf_view.annotations_locked() is True
             win.pdf_view.set_annotations_locked(False)
             assert hasattr(win.pdf_view.canvas, "annotations_moved")
-            # 0.4.4 Qt: printer marks, sort lines, schema v4, reset defaults
+            # 0.4.5 Qt: printer marks, sort lines, schema v4, reset defaults
             assert callable(win.pdf_view.set_show_printer_marks)
             win.pdf_view.set_show_printer_marks(True)
             assert win.pdf_view.show_printer_marks() is True
@@ -1919,6 +1964,31 @@ def main() -> int:
 
             assert callable(_rtd044)
             assert "Auf Standard zurücksetzen" in (
+                ROOT / "instantlensdoc" / "ui" / "settings_dialog.py"
+            ).read_text(encoding="utf-8")
+            # 0.4.5 Qt: trim trailing, toolbar groups, page image → editor
+            assert callable(win.editor.trim_trailing_whitespace)
+            win.editor.setPlainText("abc  \ndef\t\n")
+            assert win.editor.trim_trailing_whitespace()
+            assert win.editor.toPlainText() == "abc\ndef\n"
+            assert callable(win.pdf_view.apply_toolbar_groups)
+            from instantlensdoc.core.app_settings import (
+                get_pdf_toolbar_groups as _gtb045,
+                set_pdf_toolbar_groups as _stb045,
+            )
+
+            _g0 = _gtb045()
+            _stb045({**_g0, "io": False})
+            win.pdf_view.apply_toolbar_groups()
+            assert not win.pdf_view._toolbar_group_widgets["io"][0].isVisible()
+            _stb045(_g0)
+            win.pdf_view.apply_toolbar_groups()
+            assert callable(win._insert_page_image_to_editor)
+            assert callable(win._insert_all_page_images_to_editor)
+            assert "PDF-Toolbar" in (
+                ROOT / "instantlensdoc" / "ui" / "settings_dialog.py"
+            ).read_text(encoding="utf-8")
+            assert "Trailing Whitespace" in (
                 ROOT / "instantlensdoc" / "ui" / "settings_dialog.py"
             ).read_text(encoding="utf-8")
             assert "Druckermarken" in HELP_HTML or "Ctrl+Alt+M" in (
@@ -1992,10 +2062,10 @@ def main() -> int:
                     win.pdf_view.goto_page(1)
                     n_paste = win.pdf_view.paste_annotations_on_page()
                     assert n_paste == 1
-            print("0.4.3–0.4.4 Qt marks/schema/sort/reset: OK")
+            print("0.4.3–0.4.5 Qt marks/schema/sort/reset: OK")
             print("0.4.2 Qt outline/copy-paste/case/progress: OK")
             print("0.4.1 Qt links/stamp/encoding/drop: OK")
-            print("0.3.x–0.4.4 review OK")
+            print("0.3.x–0.4.5 review OK")
             assert callable(win.pdf_view.bake_redactions)
             assert callable(win.pdf_view.clear_redactions)
             assert callable(win._set_pdf_password)
