@@ -2,7 +2,7 @@
 
 Moderne Textverarbeitung mit PDF-Annotator, OCR-Bridge und Formulargenerator.
 
-**Version:** 0.1.6  
+**Version:** 0.1.7  
 **Hersteller:** Andreas Meyer · ame@sellerbach.de
 
 ## Schnellstart
@@ -13,6 +13,14 @@ run.bat
 ```
 
 Windows-Sync (Store): `powershell -ExecutionPolicy Bypass -File "D:\AI_Temp\sync-ild.ps1"`
+
+## Neu in 0.1.7
+
+- PDF-Wasserzeichen + Seitennummer-Stempel
+- PDF-Vergleich (Seite neben Seite)
+- Clipboard-Paste Bild → Editor/PDF
+- Session-Restore offener Dokumente
+- Große-PDF-Warnungen/Limits + Zoom-Cache/Debounce
 
 ## Neu in 0.1.6
 

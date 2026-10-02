@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Smoke-Test 0.1.6 (CLI + optional offscreen Qt)."""
+"""Smoke-Test 0.1.7 (CLI + optional offscreen Qt)."""
 
 from __future__ import annotations
 
@@ -20,13 +20,17 @@ def main() -> int:
         AnnotationStore,
         AnnotationType,
         PdfDocument,
+        apply_page_numbers,
+        apply_watermark,
         bake_text_overlays,
+        clear_render_cache,
         extract_page_image,
         extract_text_blocks,
         import_page_text_as_overlays,
         insert_image_as_page,
         insert_signature_field,
         insert_signature_image,
+        inspect_pdf,
         render_page,
         __version__ as ild_ver,
     )
@@ -43,11 +47,12 @@ def main() -> int:
     from instantlensdoc.core import recent as recent_mod
     from instantlensdoc.core import batch as batch_mod
     from instantlensdoc.core import fulltext as ft_mod
+    from instantlensdoc.core import session as session_mod
     from instantlensdoc.core.app_settings import get_ocr_lang, load_settings, save_settings
     from instantlensdoc.license import KEY_DAYS, TRIAL_DAYS, generate_key, verify_key
 
-    assert __version__ == "0.1.6", __version__
-    assert ild_ver == "0.1.6", ild_ver
+    assert __version__ == "0.1.7", __version__
+    assert ild_ver == "0.1.7", ild_ver
     assert TRIAL_DAYS == 28 and KEY_DAYS == 32
     key = generate_key("ame@sellerbach.de")
     ok, msg, _ = verify_key(key)
@@ -72,12 +77,10 @@ def main() -> int:
         import pikepdf
         from pikepdf import Dictionary, Name, Stream
 
-        # PDF mit sichtbarem Text für Overlay-Extraktion
         with pikepdf.Pdf.new() as out:
             for src in (p1, p2):
                 with pikepdf.open(src) as src_pdf:
                     out.pages.append(src_pdf.pages[0])
-            # Text auf Seite 0 einfügen
             page = out.pages[0]
             font = Dictionary(Type=Name.Font, Subtype=Name.Type1, BaseFont=Name.Helvetica)
             page[Name.Resources] = Dictionary(Font=Dictionary(F1=font))
@@ -94,80 +97,33 @@ def main() -> int:
             w, h = doc.page_size(0)
             assert w > 0 and h > 0
         render_page(pdf, 0)
+        clear_render_cache(pdf)
+        render_page(pdf, 0)
+        render_page(pdf, 0)
 
-        # Annotation Persistenz v3 + Formen/Messung/Overlay
+        health = inspect_pdf(pdf)
+        assert health.ok_to_open and health.page_count == 2
+
+        wm_out = td / "wm.pdf"
+        apply_watermark(pdf, "TEST-WM", out_path=wm_out, opacity=0.3, font_size=36)
+        assert wm_out.is_file() and wm_out.stat().st_size > 100
+        num_out = td / "num.pdf"
+        apply_page_numbers(pdf, out_path=num_out, template="S.{n}/{total}")
+        assert num_out.is_file()
+        print("Watermark/PageNumbers: OK")
+
         store = AnnotationStore(pdf)
         store.add(Annotation(0, AnnotationType.HIGHLIGHT, 10, 10, text="mark"))
         store.add(Annotation(1, AnnotationType.STICKY, 20, 20, text="note"))
         store.add(Annotation(0, AnnotationType.STAMP, 30, 30, text="GEPRÜFT", width=120, height=40))
-        store.add(
-            Annotation(
-                0,
-                AnnotationType.CALLOUT,
-                80,
-                80,
-                text="Hinweis",
-                callout_x=40,
-                callout_y=120,
-            )
-        )
-        store.add(
-            Annotation(
-                0,
-                AnnotationType.RECTANGLE,
-                15,
-                15,
-                width=60,
-                height=40,
-                color="#27AE60",
-            )
-        )
-        store.add(
-            Annotation(
-                0,
-                AnnotationType.LINE,
-                10,
-                10,
-                callout_x=90,
-                callout_y=50,
-                color="#2C3E50",
-            )
-        )
-        store.add(
-            Annotation(
-                0,
-                AnnotationType.ARROW,
-                20,
-                80,
-                callout_x=100,
-                callout_y=40,
-                color="#8E44AD",
-            )
-        )
-        meas = Annotation(
-            0,
-            AnnotationType.MEASURE,
-            5,
-            5,
-            callout_x=5 + 72 * 1.5,  # ~72pt bei scale 1.5
-            callout_y=5,
-            color="#E67E22",
-        )
+        store.add(Annotation(0, AnnotationType.CALLOUT, 80, 80, text="Hinweis", callout_x=40, callout_y=120))
+        store.add(Annotation(0, AnnotationType.RECTANGLE, 15, 15, width=60, height=40, color="#27AE60"))
+        store.add(Annotation(0, AnnotationType.LINE, 10, 10, callout_x=90, callout_y=50, color="#2C3E50"))
+        store.add(Annotation(0, AnnotationType.ARROW, 20, 80, callout_x=100, callout_y=40, color="#8E44AD"))
+        meas = Annotation(0, AnnotationType.MEASURE, 5, 5, callout_x=5 + 72 * 1.5, callout_y=5, color="#E67E22")
         meas.text = meas.measure_label(scale=1.5)
         store.add(meas)
-        store.add(
-            Annotation(
-                0,
-                AnnotationType.TEXT_OVERLAY,
-                40,
-                40,
-                width=180,
-                height=28,
-                text="Overlay-Edit",
-                font_size=14,
-                color="#1A5276",
-            )
-        )
+        store.add(Annotation(0, AnnotationType.TEXT_OVERLAY, 40, 40, width=180, height=28, text="Overlay-Edit", font_size=14, color="#1A5276"))
         sid = store.save(force=True)
         assert sid.exists()
         raw = sid.read_text(encoding="utf-8")
@@ -182,10 +138,9 @@ def main() -> int:
         assert store2.update(last_id, text="Overlay-Updated")
         assert store2.get(last_id).text == "Overlay-Updated"
 
-        # Undo/Redo Annotation + Overlay-Text
         assert store2.can_undo()
         n_before_undo = len(store2.annotations)
-        assert store2.undo()  # undo update → text zurück
+        assert store2.undo()
         assert store2.get(last_id).text == "Overlay-Edit"
         assert store2.redo()
         assert store2.get(last_id).text == "Overlay-Updated"
@@ -195,10 +150,9 @@ def main() -> int:
         assert len(store2.annotations) == n_before_undo
         assert store2.redo()
         assert len(store2.annotations) == n_before_undo + 1
-        store2.undo()  # wieder ohne temp
+        store2.undo()
         print("Undo/Redo: OK")
 
-        # Textblöcke + Import (atomic = 1 Undo) + Bake
         blocks = extract_text_blocks(pdf, 0)
         assert isinstance(blocks, list)
         print(f"Textblöcke Seite 0: {len(blocks)}")
@@ -215,7 +169,6 @@ def main() -> int:
         bake_text_overlays(pdf, store2, scale=1.5, out_path=td / "baked.pdf")
         assert (td / "baked.pdf").exists()
 
-        # Bild-Hooks
         img_out = extract_page_image(pdf, 0, td / "seite.png", scale=1.0)
         assert img_out.exists()
         img_page = td / "extra.png"
@@ -229,7 +182,6 @@ def main() -> int:
         with PdfDocument(pdf) as doc:
             assert len(doc) == 3
 
-        # Layout Verkettung
         layout = LayoutDocument()
         f1 = layout.add_text_frame(x=40, y=40, width=120, height=60, font_size=12)
         f2 = layout.chain_new_frame(f1)
@@ -242,7 +194,6 @@ def main() -> int:
         layout2 = LayoutDocument.load(layout_path)
         assert len(layout2.text_frames) == 2
 
-        # Formular Definition speichern/laden + neue Typen
         form = FormDefinition("F", description="Test")
         form.add_field(FormField("Name", type=FieldType.TEXT, required=True))
         form.add_field(FormField("Art", type=FieldType.DROPDOWN, options=["A", "B"]))
@@ -260,7 +211,6 @@ def main() -> int:
         html = (td / "f.html").read_text(encoding="utf-8")
         assert "type='email'" in html and "sig" in html
 
-        # Editor-Export HTML/DOCX/PDF
         sample = "# Titel\n\nAbsatz eins.\n\n## Unter\n\n- Punkt A\n- Punkt B\n"
         export_html(sample, td / "e.html", title="ExportTest")
         export_docx(sample, td / "e.docx", title="ExportTest")
@@ -270,7 +220,6 @@ def main() -> int:
         with PdfDocument(td / "e.pdf") as doc:
             assert len(doc) >= 1
 
-        # save_document HTML/DOCX Pfad
         txt = td / "a.txt"
         txt.write_text("hello InstantLens Suche", encoding="utf-8")
         doc = open_document(txt)
@@ -281,27 +230,37 @@ def main() -> int:
         save_document(doc, td / "out.docx")
         assert (td / "out.docx").exists()
 
-        # Recent-Files Persistenz (isolierter Config-Pfad via Env nicht nötig —
-        # wir schreiben direkt in temp und prüfen API mit monkeypatch path)
         recent_file = td / "recent.json"
         orig_path = recent_mod.recent_path
         recent_mod.recent_path = lambda: recent_file  # type: ignore
         try:
             recent_mod.clear_recent()
             assert recent_mod.load_recent() == []
-            # existierende Datei
             recent_mod.add_recent(txt)
             recent_mod.add_recent(pdf)
             files = recent_mod.load_recent()
             assert str(pdf) in files and str(txt) in files
-            assert files[0] == str(pdf)  # zuletzt zuerst
+            assert files[0] == str(pdf)
             recent_mod.clear_recent()
             assert recent_mod.load_recent() == []
             print("Recent: OK")
         finally:
             recent_mod.recent_path = orig_path  # type: ignore
 
-        # OCR searchable image ohne Tesseract
+        sess_file = td / "session.json"
+        orig_sess = session_mod.session_path
+        session_mod.session_path = lambda: sess_file  # type: ignore
+        try:
+            st = session_mod.build_session([str(txt), str(pdf)], active_path=str(pdf), page=1, scale=1.25)
+            session_mod.save_session(st)
+            loaded = session_mod.load_session()
+            assert len(loaded.tabs) == 2
+            assert loaded.tabs[loaded.active].path == str(pdf)
+            assert loaded.tabs[loaded.active].page == 1
+            print("Session: OK")
+        finally:
+            session_mod.session_path = orig_sess  # type: ignore
+
         if ok_ocr:
             sample_img = td / "ocr.png"
             Image.new("RGB", (200, 60), "white").save(sample_img)
@@ -323,30 +282,25 @@ def main() -> int:
             pdf_s, side = ocr_mod.make_searchable_image_pdf(sample_img, "dummy text", td / "s.pdf")
             assert pdf_s.exists() and side.exists()
 
-        # Installer-Hinweis vorhanden
         assert (ROOT / "installer" / "installer-hinweis.txt").exists()
         iss = (ROOT / "installer" / "instantlensdoc.iss").read_text(encoding="utf-8")
-        assert "0.1.6" in iss and "desktopicon" in iss and "DisableProgramGroupPage=no" in iss
+        assert "0.1.7" in iss and "desktopicon" in iss and "DisableProgramGroupPage=no" in iss
 
-        # Beispielskript vorhanden
         assert (ROOT / "examples" / "ild_pdf_demo.py").exists()
-        assert "0.1.6" in (ROOT / "INFO.md").read_text(encoding="utf-8")
+        assert "0.1.7" in (ROOT / "INFO.md").read_text(encoding="utf-8")
         assert (ROOT / "assets" / "app.ico").is_file()
 
-        # Merge / Split
         merge_pdfs([p1, p2], td / "merged.pdf")
         assert (td / "merged.pdf").is_file()
         parts = split_pdf(pdf, td / "split", single_pages=True)
         assert len(parts) >= 2
 
-        # Volltext + Settings
         txt = td / "findme.txt"
         txt.write_text("alpha beta FINDME gamma", encoding="utf-8")
         hits = ft_mod.search_paths([str(txt), str(pdf)], "FINDME")
         assert any("FINDME" in h.snippet for h in hits)
         save_settings({"ocr_lang": get_ocr_lang(), "theme": load_settings().get("theme", "light")})
 
-        # Batch (Bilder → PDF)
         img_dir = td / "imgs"
         img_dir.mkdir()
         Image.new("RGB", (100, 100), "white").save(img_dir / "a.png")
@@ -354,11 +308,9 @@ def main() -> int:
         br = batch_mod.run_batch(img_dir, td / "bout", batch_mod.BatchMode.IMAGES_TO_ONE_PDF)
         assert br.ok_count >= 1 and br.items[0].output and br.items[0].output.exists()
 
-        # Outline API (leer ok)
         assert isinstance(extract_outline(pdf), list)
-        assert "Signatur" in (ROOT / "FEATURES.md").read_text(encoding="utf-8")
+        assert "Wasserzeichen" in (ROOT / "FEATURES.md").read_text(encoding="utf-8")
 
-        # Signaturfeld + Bild-Signatur
         insert_signature_field(pdf, 0, x=50, y=50, label="Test")
         insert_signature_image(pdf, Image.new("RGBA", (80, 30), (0, 0, 0, 0)), 0, x=60, y=120)
         store_sig = AnnotationStore(pdf)
@@ -366,13 +318,14 @@ def main() -> int:
         assert AnnotationType.SIGNATURE_FIELD in types
         assert AnnotationType.SIGNATURE in types
 
-        # OCR Tabellen-Format (ohne Runtime ok)
         tbl = ocr_mod.format_text_as_table([["A", "B"], ["1", "2"]])
         assert "| A" in tbl and "| 1" in tbl
         assert ocr_mod.TESSERACT_WIKI_URL.startswith("https://")
 
     if os.environ.get("ILD_SMOKE_QT", "1") == "1":
         os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+        os.environ["ILD_SMOKE_QT"] = "1"
+        os.environ["ILD_NO_SESSION"] = "1"
         from PySide6.QtWidgets import QApplication
 
         from instantlensdoc.license import LicenseManager
@@ -393,30 +346,30 @@ def main() -> int:
         assert win.editor.highlight_selection()
         win._add_chained_frame()
         assert len(win.layout_doc.text_frames) >= 2
-        # Lizenz-Label vorhanden
         assert "Lizenz:" in win.license_label.text()
-        assert "v0.1.6" in win.version_label.text()
+        assert "v0.1.7" in win.version_label.text()
         from instantlensdoc.ui.settings_dialog import SettingsDialog
         from instantlensdoc.ui.batch_dialog import BatchConvertDialog
         from instantlensdoc.ui.pdf_tools_dialog import PdfToolsDialog
+        from instantlensdoc.ui.watermark_dialog import WatermarkDialog
+        from instantlensdoc.ui.compare_dialog import PdfCompareDialog
 
         assert SettingsDialog and BatchConvertDialog and PdfToolsDialog
+        assert WatermarkDialog and PdfCompareDialog
         assert win.sidebar.outline is not None
         from instantlensdoc.ui.theme import load_theme_mode, toggle_theme
 
         mode_before = load_theme_mode()
         mode_after = toggle_theme(win)
         assert mode_after != mode_before or mode_before in ("light", "dark")
-        toggle_theme(win)  # zurück
+        toggle_theme(win)
         assert win.acceptDrops()
-        # Export-Menü-Pfad (ohne Dialog): direkt core.export
         from instantlensdoc.core.export import export_html as eh
 
         eh(win.editor.toPlainText(), ROOT / ".smoke_export.html", title="smoke")
         assert (ROOT / ".smoke_export.html").exists()
         (ROOT / ".smoke_export.html").unlink(missing_ok=True)
 
-        # PDF laden + Zoom/Undo
         with tempfile.TemporaryDirectory() as td2:
             td2 = Path(td2)
             smoke_pdf = td2 / "smoke.pdf"
@@ -425,12 +378,12 @@ def main() -> int:
             assert win.stack.currentWidget() is win.pdf_view
             old_scale = win.pdf_view.scale
             win.pdf_view.zoom_in()
+            win.pdf_view._apply_pending_zoom()
             assert win.pdf_view.scale > old_scale
             win.pdf_view.zoom_100()
             assert abs(win.pdf_view.scale - 1.0) < 0.01
             win.pdf_view.fit_page()
             assert win.pdf_view.scale > 0
-            # Annotation + Undo
             from ild_pdf import Annotation, AnnotationType
 
             assert win.pdf_view.store is not None
@@ -442,11 +395,13 @@ def main() -> int:
             assert not any(a.text == "u" for a in win.pdf_view.store.annotations)
             assert win.pdf_view.redo_annotation()
             assert any(a.text == "u" for a in win.pdf_view.store.annotations)
-            # Print-API erreichbar (Dialog wird offscreen ggf. abgelehnt — Methode existiert)
             assert callable(win.pdf_view.print_current_page)
             assert callable(win._print)
-            # Recent in Sidebar
+            assert callable(win.pdf_view.paste_clipboard_image)
+            assert callable(win._paste_clipboard_image)
+            assert callable(win._save_session)
             assert win.sidebar.recent.count() >= 1
+            win._save_session()
 
         win.close()
         print("Qt: OK")

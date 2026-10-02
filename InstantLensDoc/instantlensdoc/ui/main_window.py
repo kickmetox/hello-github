@@ -36,9 +36,12 @@ from instantlensdoc.core import fulltext as fulltext_mod
 from instantlensdoc.core.app_settings import get_default_open_dir
 from instantlensdoc.ui.batch_dialog import BatchConvertDialog
 from instantlensdoc.ui.pdf_tools_dialog import PdfToolsDialog
+from instantlensdoc.ui.watermark_dialog import WatermarkDialog
+from instantlensdoc.ui.compare_dialog import PdfCompareDialog
 from instantlensdoc.ui.settings_dialog import SettingsDialog
 from instantlensdoc.ui.stubs import show_planned
 from instantlensdoc.ui.theme import apply_theme, load_theme_mode, toggle_theme
+from instantlensdoc.core import session as session_mod
 from ild_pdf.outline import extract_outline
 
 
@@ -72,6 +75,80 @@ class MainWindow(QMainWindow):
         self._autosave_timer.setInterval(60_000)
         self._autosave_timer.timeout.connect(self._autosave_tick)
         self._autosave_timer.start()
+        QTimer.singleShot(200, self._restore_session)
+
+    def closeEvent(self, event):
+        try:
+            self._save_session()
+        except Exception:
+            pass
+        super().closeEvent(event)
+
+    def _session_paths(self) -> list[str]:
+        paths: list[str] = []
+        # Sidebar-Dokumente = „offene Tabs“
+        try:
+            for i in range(self.sidebar.files.count()):
+                item = self.sidebar.files.item(i)
+                if item is None:
+                    continue
+                p = item.data(Qt.UserRole) or item.toolTip() or item.text()
+                if p and Path(str(p)).is_file():
+                    paths.append(str(Path(str(p))))
+        except Exception:
+            pass
+        if self.doc and self.doc.path and Path(self.doc.path).is_file():
+            paths.append(str(Path(self.doc.path)))
+        # dedupe preserve order
+        out: list[str] = []
+        seen: set[str] = set()
+        for p in paths:
+            if p not in seen:
+                seen.add(p)
+                out.append(p)
+        return out
+
+    def _save_session(self):
+        paths = self._session_paths()
+        active = str(Path(self.doc.path)) if self.doc and self.doc.path else None
+        page = self.pdf_view.page_index if self.pdf_view.pdf_path else 0
+        scale = self.pdf_view.scale if self.pdf_view.pdf_path else 1.5
+        state = session_mod.build_session(
+            paths,
+            active_path=active,
+            page=page,
+            scale=scale,
+            restore=True,
+        )
+        session_mod.save_session(state)
+
+    def _restore_session(self):
+        import os
+
+        if os.environ.get("ILD_NO_SESSION") == "1" or os.environ.get("ILD_SMOKE_QT"):
+            return
+        # CLI-Argument hat Vorrang (app.py öffnet danach) — nur wenn noch kein Doc
+        if self.doc and self.doc.path:
+            return
+        state = session_mod.load_session()
+        if not state.restore or not state.tabs:
+            return
+        # Alle Tabs in Sidebar laden, aktives Dokument anzeigen
+        for tab in state.tabs:
+            if Path(tab.path).is_file():
+                self.sidebar.add_document(tab.path)
+        active = state.tabs[state.active] if 0 <= state.active < len(state.tabs) else state.tabs[-1]
+        if not Path(active.path).is_file():
+            return
+        self.open_path(active.path)
+        if self.pdf_view.pdf_path and self.doc and self.doc.kind == DocKind.PDF:
+            if 0 <= active.page < self.pdf_view.page_count:
+                self.pdf_view.page_index = active.page
+            if active.scale > 0:
+                self.pdf_view.set_scale(active.scale, immediate=True)
+            else:
+                self.pdf_view.refresh()
+        self._set_status(f"Session wiederhergestellt ({len(state.tabs)} Tab(s))")
 
     def _build_ui(self):
         central = QWidget()
@@ -179,6 +256,10 @@ class MainWindow(QMainWindow):
             a = QAction(name, self)
             a.triggered.connect(slot)
             m_edit.addAction(a)
+        act_paste_img = QAction("Bild aus Zwischenablage…", self)
+        act_paste_img.setShortcut(QKeySequence("Ctrl+Shift+V"))
+        act_paste_img.triggered.connect(self._paste_clipboard_image)
+        m_edit.addAction(act_paste_img)
         m_edit.addSeparator()
         act_find = QAction("Suchen…", self)
         act_find.setShortcut(QKeySequence.Find)
@@ -230,6 +311,12 @@ class MainWindow(QMainWindow):
         act_merge = QAction("PDFs zusammenführen / teilen…", self)
         act_merge.triggered.connect(self._pdf_tools)
         m_pdf.addAction(act_merge)
+        act_wm = QAction("Wasserzeichen / Seitennummern…", self)
+        act_wm.triggered.connect(self._watermark_tools)
+        m_pdf.addAction(act_wm)
+        act_cmp = QAction("Zwei PDFs vergleichen…", self)
+        act_cmp.triggered.connect(self._compare_pdfs)
+        m_pdf.addAction(act_cmp)
         m_pdf.addSeparator()
         for title, slot in [
             ("Annotationen speichern", lambda: self.pdf_view.save_annotations()),
@@ -635,6 +722,47 @@ class MainWindow(QMainWindow):
     def _pdf_tools(self):
         initial = str(self.pdf_view.pdf_path) if self.pdf_view.pdf_path else None
         PdfToolsDialog(self, initial_pdf=initial).exec()
+
+    def _watermark_tools(self):
+        initial = str(self.pdf_view.pdf_path) if self.pdf_view.pdf_path else None
+        dlg = WatermarkDialog(
+            self,
+            pdf_path=initial,
+            page_index=self.pdf_view.page_index,
+            page_count=self.pdf_view.page_count or 1,
+        )
+        dlg.exec()
+        if dlg.result_path and self.pdf_view.pdf_path:
+            # Neu laden wenn gleiches/verwandtes PDF
+            try:
+                from ild_pdf.render import clear_render_cache
+
+                clear_render_cache(self.pdf_view.pdf_path)
+                self.pdf_view.load(self.pdf_view.pdf_path)
+                self._set_status(f"PDF aktualisiert: {dlg.result_path}")
+            except Exception:
+                pass
+
+    def _compare_pdfs(self):
+        left = str(self.pdf_view.pdf_path) if self.pdf_view.pdf_path else None
+        PdfCompareDialog(self, left_pdf=left).exec()
+
+    def _paste_clipboard_image(self):
+        if self.stack.currentWidget() is self.pdf_view and self.pdf_view.pdf_path:
+            if self.pdf_view.paste_clipboard_image():
+                return
+        if self.doc and self.doc.path:
+            self.editor.set_paste_image_dir(Path(self.doc.path).parent)
+        if self.editor.paste_clipboard_image():
+            self.stack.setCurrentWidget(self.editor)
+            self._set_status("Bild aus Zwischenablage in Editor eingefügt")
+            return
+        QMessageBox.information(
+            self,
+            "Einfügen",
+            "Kein Bild in der Zwischenablage.\n"
+            "Strg+V im PDF-Viewer fügt ebenfalls Bilder ein.",
+        )
 
     def new_doc(self):
         self.doc = Document(kind=DocKind.TEXT, title="Unbenannt")

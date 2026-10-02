@@ -27,7 +27,7 @@ HELP_HTML = """
     <b>Hell/Dunkel</b>-Design umschalten</li>
 <li><b>Drag &amp; Drop</b>: Dateien auf das Fenster ziehen zum Öffnen</li>
 <li><b>Autosave</b>: Textdokumente (mit Pfad) und PDF-Annotationen ca. jede Minute</li>
-<li><b>PDF</b>: Blättern, Zoom/Fit, 90°-Drehen, Seite löschen, Seiten neu anordnen;
+<li><b>PDF</b>: Blättern, Zoom/Fit (debounced + Cache), 90°-Drehen, Seite löschen, Seiten neu anordnen;
     Annotationen: Highlight (Drag), Unterstreichen, Notiz, <b>Text-Overlay</b>, Stempel, Callout,
     <b>Rechteck / Linie / Pfeil / Lineal</b> —
     Sidecar <code>*.ildann.json</code> (v3, Auto-Save, Undo/Redo);
@@ -35,7 +35,12 @@ HELP_HTML = """
     PDF → Text→Overlay / Overlay einbrennen;
     <b>Signaturfeld</b> (Platzhalter) und <b>Signatur (Bild)</b> einfügen;
     <b>PDFs zusammenführen / teilen</b>;
-    Seite als Bild / Bild als neue Seite / Seite drucken</li>
+    <b>Wasserzeichen / Seitennummern</b>;
+    <b>Zwei PDFs vergleichen</b> (Seite neben Seite);
+    Seite als Bild / Bild als neue Seite / Seite drucken;
+    große PDFs: Warnung / Limits</li>
+<li><b>Zwischenablage</b>: Bild einfügen (Editor Ctrl+Shift+V / PDF Strg+V) — Stempel oder neue Seite</li>
+<li><b>Session</b>: Offene Dokumente (Sidebar-Liste) werden beim Beenden gespeichert und beim Start wiederhergestellt</li>
 <li><b>Extras → Batch-Konvertierung</b>: Ordner → PDF oder OCR</li>
 <li><b>Einfügen → Verketteter Textrahmen</b>: Overflow fließt in den Folgeahmen</li>
 <li><b>OCR</b>: Extras → OCR — Sprach-Presets + Modus „editierbarer Text“ oder
@@ -57,8 +62,8 @@ Beispiel: <code>examples/ild_pdf_demo.py</code>. API: <code>ild_pdf/README.md</c
 <p>Windows: Store-Skript <code>docs/sync-ild.ps1</code> — Branch oder Zip nach
 <code>D:\\AI_Temp\\InstantLensDoc</code>, pip, optional Start. Eigenes Icon in <code>assets</code> bleibt erhalten.</p>
 <h3>Geplante Features</h3>
-<p>KI-Assistent, Cloud-Sync, Stylus/Palm Rejection, 3D u. a. sind im Menü als „Geplant“ markiert —
-siehe FEATURES.md.</p>
+<p>KI-Assistent, Cloud-Sync, Stylus/Palm Rejection, 3D u. a. sind im Menü als „Geplant“ markiert
+(Stub 0.1.7) — siehe FEATURES.md.</p>
 """
 
 

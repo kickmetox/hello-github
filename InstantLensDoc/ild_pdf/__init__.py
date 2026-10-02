@@ -29,11 +29,15 @@ from .overlay import (
     extract_text_blocks,
     import_page_text_as_overlays,
 )
+from .watermark import apply_page_numbers, apply_watermark
+from .limits import PdfHealth, clamp_render_scale, inspect_pdf
+from .render import clear_render_cache
 
 __all__ = [
     "PdfDocument",
     "render_page",
     "render_pages",
+    "clear_render_cache",
     "Annotation",
     "AnnotationStore",
     "AnnotationType",
@@ -56,6 +60,11 @@ __all__ = [
     "extract_text_blocks",
     "import_page_text_as_overlays",
     "bake_text_overlays",
+    "apply_watermark",
+    "apply_page_numbers",
+    "PdfHealth",
+    "inspect_pdf",
+    "clamp_render_scale",
 ]
 
-__version__ = "0.1.6"
+__version__ = "0.1.7"

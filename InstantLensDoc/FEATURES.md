@@ -6,13 +6,18 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 |---------|--------|---------|
 | Hauptfenster (Menü, Sidebar, Editor, Status) | fertig | PySide6 |
 | App-Icon Fenster/Taskleiste/About | fertig | Robuste Pfade: `assets/`, CWD, `D:\AI_Temp\InstantLensDoc` |
+| Session-Restore (offene Docs) | fertig | `session.json`, Sidebar-Liste |
+| Clipboard-Paste Bild | fertig | Editor + PDF (Stempel/Seite) |
 | TXT / MD / HTML öffnen & speichern | fertig | HTML-Export mit einfachem Markdownish |
 | DOCX öffnen & speichern | teilweise | python-docx; Headings/Listen beim Export |
 | Editor → HTML / DOCX / PDF Export | fertig | Datei → Exportieren |
 | Drucken (Editor / PDF-Seite) | fertig | Qt PrintDialog (Ctrl+P) |
 | Zuletzt geöffnete Dateien | fertig | Menü + Sidebar, `recent.json` |
-| PDF lesen / rendern | fertig | pypdfium2 |
-| PDF Zoom / Seite einpassen | fertig | +/−, Fit Page/Width, Ctrl+0/9/1 |
+| PDF lesen / rendern | fertig | pypdfium2; große-PDF-Limits |
+| PDF Zoom / Seite einpassen | fertig | Debounce + Render-LRU-Cache |
+| PDF-Wasserzeichen | fertig | Text diagonal, Deckkraft |
+| PDF Seitennummer-Stempel | fertig | Vorlage `{n} / {total}` |
+| PDF-Vergleich Seite-nebeneinander | fertig | Dialog |
 | PDF-Annotationen (Highlight, Underline, Sticky, Text) | fertig | Sidecar `*.ildann.json` **v3** |
 | Annotation Undo/Redo | fertig | Ctrl+Z/Y inkl. Overlay-Text |
 | Stempel / Callouts | teilweise | Stempel-Presets + Callout (2-Klick) |
@@ -39,21 +44,21 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | OCR Ausgabe: editierbarer Text | fertig | → Editor |
 | OCR Ausgabe: durchsuchbares Bild | teilweise | PDF + `*.ildocr.txt` Sidecar |
 | Formulargenerator → HTML/PDF | fertig | Mehr Feldtypen; Definition speichern/laden |
-| Layout: Textrahmen + Verkettung | teilweise | `flow_text_chain` Overflow real |
+| Layout: Textrahmen + Verkettung | teilweise | `flow_text_chain` |
 | Layout: einfacher Umbruch | fertig | Wortgrenzen |
 | Lizenz Trial 28d / Keys 32d | fertig | Statusleiste farbig + Tooltip |
 | Keygenerator (CLI/GUI) | fertig | `run-keygen.bat` |
 | PyInstaller Build Windows | fertig | `build-windows.ps1`, Icon `assets/app.ico` |
-| Inno-Installer | fertig | Desktop + Startmenü-Hinweis 0.1.6 |
+| Inno-Installer | fertig | Desktop + Startmenü-Hinweis 0.1.7 |
 | Sync-Skript Windows | fertig | Store `docs/sync-ild.ps1` |
-| In-App Hilfe / About | fertig | Version 0.1.6 |
+| In-App Hilfe / About | fertig | Version 0.1.7 |
 | FEATURES.md / INFO.md | fertig | |
-| `ild_pdf` Modul + Beispielskript | fertig | `examples/ild_pdf_demo.py` |
+| `ild_pdf` Modul + Beispielskript | fertig | watermark / compare / limits |
 | Font-Matching | geplant | |
 | Objekt-/Bildbearbeitung | geplant | |
 | Layout-Erhaltung (Scan→edit) | geplant | |
 | Freihand | geplant | |
-| KI-Assistent | Stub | Menü „Geplant“ |
+| KI-Assistent | Stub | Menü „Geplant“ 0.1.7 |
 | Signieren (rechtssicher) | Stub | |
 | Cloud-Sync | Stub | |
 | Text on Path / Text zu Pfaden | geplant | |

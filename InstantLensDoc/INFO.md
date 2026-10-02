@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | 0.1.6 |
+| Version | 0.1.7 |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -33,6 +33,16 @@ powershell -ExecutionPolicy Bypass -File "D:\AI_Temp\sync-ild.ps1"
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 ```
+
+## Neu in 0.1.7
+
+- **PDF-Wasserzeichen** + **Seitennummer-Stempel**  
+- **PDF-Vergleich** Seite-nebeneinander  
+- **Clipboard-Paste** Bild → Editor / PDF (Stempel oder neue Seite)  
+- **Session-Restore** offener Dokumente (Sidebar-Tabs)  
+- Bessere Fehlerbehandlung **große PDFs** (Warnung/Limits)  
+- **Zoom-Performance** (Debounce + Render-Cache)  
+- Stubs: KI / Cloud / Stylus / 3D (0.1.7)
 
 ## Neu in 0.1.6
 

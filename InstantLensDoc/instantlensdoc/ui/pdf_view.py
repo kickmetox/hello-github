@@ -5,12 +5,22 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Optional
 
-from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QColor, QImage, QPainter, QPen, QPixmap, QPolygonF
-from PySide6.QtCore import QPointF
+from PySide6.QtCore import QPointF, Qt, QTimer, Signal
+from PySide6.QtGui import (
+    QColor,
+    QImage,
+    QKeySequence,
+    QPainter,
+    QPen,
+    QPixmap,
+    QPolygonF,
+    QShortcut,
+)
 from PySide6.QtWidgets import (
+    QApplication,
     QDialog,
     QDialogButtonBox,
+    QDoubleSpinBox,
     QFormLayout,
     QHBoxLayout,
     QInputDialog,
@@ -19,7 +29,6 @@ from PySide6.QtWidgets import (
     QListWidget,
     QListWidgetItem,
     QMessageBox,
-    QDoubleSpinBox,
     QPlainTextEdit,
     QPushButton,
     QScrollArea,
@@ -387,6 +396,11 @@ class PdfViewer(QWidget):
         self.store: Optional[AnnotationStore] = None
         self._tool_buttons: list[QToolButton] = []
         self._pending_callout_anchor: tuple[float, float] | None = None
+        self._zoom_timer = QTimer(self)
+        self._zoom_timer.setSingleShot(True)
+        self._zoom_timer.setInterval(120)
+        self._zoom_timer.timeout.connect(self._apply_pending_zoom)
+        self._pending_scale: float | None = None
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -494,6 +508,8 @@ class PdfViewer(QWidget):
         self.scroll.setWidget(self.canvas)
         layout.addWidget(self.scroll)
         self.canvas.set_drag_tool(AnnotationType.HIGHLIGHT)
+        paste_sc = QShortcut(QKeySequence.Paste, self)
+        paste_sc.activated.connect(self.paste_clipboard_image)
 
     def _tool_label(self, tool: AnnotationType) -> str:
         return {
@@ -522,7 +538,33 @@ class PdfViewer(QWidget):
 
     def load(self, path: str | Path) -> bool:
         try:
-            self.pdf_path = Path(path)
+            from ild_pdf.limits import inspect_pdf
+            from ild_pdf.render import clear_render_cache
+
+            path = Path(path)
+            health = inspect_pdf(path)
+            if health.errors:
+                QMessageBox.critical(
+                    self,
+                    "PDF öffnen",
+                    "PDF kann nicht geöffnet werden:\n\n" + "\n".join(health.errors),
+                )
+                self.pdf_path = None
+                self.store = None
+                return False
+            if health.warnings:
+                r = QMessageBox.warning(
+                    self,
+                    "Großes PDF",
+                    "\n".join(health.warnings) + "\n\nTrotzdem öffnen?",
+                    QMessageBox.Yes | QMessageBox.No,
+                    QMessageBox.Yes,
+                )
+                if r != QMessageBox.Yes:
+                    return False
+
+            clear_render_cache(path)
+            self.pdf_path = path
             self.store = AnnotationStore(self.pdf_path)
             self.store.clear_history()
             from ild_pdf import PdfDocument
@@ -531,9 +573,21 @@ class PdfViewer(QWidget):
                 self.page_count = len(doc)
             self.page_index = 0
             self._pending_callout_anchor = None
+            self._pending_scale = None
+            self._zoom_timer.stop()
             self.refresh()
             self.annotations_changed.emit()
             return True
+        except MemoryError:
+            QMessageBox.critical(
+                self,
+                "PDF öffnen",
+                "Nicht genug Speicher für dieses PDF.\n"
+                "Tipp: Datei teilen (PDF → zusammenführen/teilen) oder Zoom reduzieren.",
+            )
+            self.pdf_path = None
+            self.store = None
+            return False
         except Exception as e:
             QMessageBox.critical(self, "PDF öffnen", f"PDF konnte nicht geladen werden:\n{e}")
             self.pdf_path = None
@@ -544,6 +598,15 @@ class PdfViewer(QWidget):
         if not self.pdf_path:
             return
         try:
+            from ild_pdf.limits import clamp_render_scale
+            from ild_pdf import PdfDocument
+
+            with PdfDocument(self.pdf_path) as doc:
+                pw, ph = doc.page_size(self.page_index)
+            eff, warn = clamp_render_scale(pw, ph, self.scale)
+            if warn and abs(eff - self.scale) > 0.01:
+                self.scale = eff
+                self.status.emit(warn)
             img = render_page(self.pdf_path, self.page_index, scale=self.scale)
             anns = self.store.for_page(self.page_index) if self.store else []
             self.canvas.set_page_image(img, anns, scale=self.scale)
@@ -551,6 +614,12 @@ class PdfViewer(QWidget):
             self.lbl_zoom.setText(f"{int(round(self.scale * 100))}%")
             dirty = " *" if self.store and self.store.dirty else ""
             self.status.emit(f"PDF: {self.pdf_path.name}{dirty}")
+        except MemoryError:
+            QMessageBox.warning(
+                self,
+                "PDF-Ansicht",
+                "Render fehlgeschlagen (Speicher).\nZoom verringern oder Seite überspringen.",
+            )
         except Exception as e:
             QMessageBox.warning(self, "PDF-Ansicht", f"Seite konnte nicht gerendert werden:\n{e}")
 
@@ -569,18 +638,97 @@ class PdfViewer(QWidget):
             self.page_index += 1
             self.refresh()
 
-    def set_scale(self, scale: float):
-        self.scale = max(0.25, min(5.0, float(scale)))
+    def set_scale(self, scale: float, *, immediate: bool = False):
+        scale = max(0.25, min(5.0, float(scale)))
+        self.lbl_zoom.setText(f"{int(round(scale * 100))}%")
+        if immediate:
+            self._pending_scale = None
+            self._zoom_timer.stop()
+            self.scale = scale
+            self.refresh()
+            return
+        # Debounce: schnelle Zoom-Schritte nur Label, Render verzögert
+        self._pending_scale = scale
+        self._zoom_timer.start()
+
+    def _apply_pending_zoom(self):
+        if self._pending_scale is None:
+            return
+        self.scale = self._pending_scale
+        self._pending_scale = None
         self.refresh()
 
     def zoom_in(self):
-        self.set_scale(self.scale + 0.25)
+        base = self._pending_scale if self._pending_scale is not None else self.scale
+        self.set_scale(base + 0.25)
 
     def zoom_out(self):
-        self.set_scale(self.scale - 0.25)
+        base = self._pending_scale if self._pending_scale is not None else self.scale
+        self.set_scale(base - 0.25)
 
     def zoom_100(self):
-        self.set_scale(1.0)
+        self.set_scale(1.0, immediate=True)
+
+    def paste_clipboard_image(self) -> bool:
+        """Bild aus Zwischenablage als Stempel-Annotation oder neue Seite."""
+        if not self.pdf_path:
+            return False
+        clip = QApplication.clipboard()
+        if clip is None:
+            return False
+        md = clip.mimeData()
+        qimg = None
+        if md and md.hasImage():
+            raw = md.imageData()
+            if isinstance(raw, QImage) and not raw.isNull():
+                qimg = raw
+        if qimg is None:
+            pm = clip.pixmap()
+            if pm is not None and not pm.isNull():
+                qimg = pm.toImage()
+        if qimg is None or qimg.isNull():
+            self.status.emit("Zwischenablage enthält kein Bild")
+            return False
+        import tempfile
+
+        from ild_pdf import insert_image_as_page, insert_image_stamp_overlay
+        from ild_pdf.render import clear_render_cache
+
+        tmp = Path(tempfile.gettempdir()) / "ild_clipboard_paste.png"
+        if not qimg.save(str(tmp), "PNG"):
+            QMessageBox.warning(self, "Einfügen", "Bild konnte nicht gespeichert werden.")
+            return False
+        choice, ok = QInputDialog.getItem(
+            self,
+            "Bild einfügen",
+            "Zwischenablage-Bild:",
+            ["Als Stempel-Annotation (aktuelle Seite)", "Als neue PDF-Seite"],
+            0,
+            False,
+        )
+        if not ok:
+            return False
+        try:
+            if choice.startswith("Als neue"):
+                insert_image_as_page(self.pdf_path, tmp)
+                from ild_pdf import PdfDocument
+
+                clear_render_cache(self.pdf_path)
+                with PdfDocument(self.pdf_path) as doc:
+                    self.page_count = len(doc)
+                self.page_index = self.page_count - 1
+                self.refresh()
+                self.status.emit("Zwischenablage-Bild als neue Seite")
+            else:
+                insert_image_stamp_overlay(
+                    self.pdf_path, tmp, page_index=self.page_index
+                )
+                self.reload_annotations()
+                self.status.emit("Zwischenablage-Bild als Stempel")
+            return True
+        except Exception as e:
+            QMessageBox.warning(self, "Einfügen", str(e))
+            return False
 
     def _viewport_size(self) -> tuple[int, int]:
         vp = self.scroll.viewport()
@@ -599,7 +747,7 @@ class PdfViewer(QWidget):
             if pw <= 0 or ph <= 0:
                 return
             scale = min(vw / pw, vh / ph)
-            self.set_scale(scale)
+            self.set_scale(scale, immediate=True)
             self.status.emit(f"Seite einpassen ({int(round(scale * 100))}%)")
         except Exception as e:
             QMessageBox.warning(self, "Zoom", str(e))
@@ -617,7 +765,7 @@ class PdfViewer(QWidget):
             if pw <= 0:
                 return
             scale = vw / pw
-            self.set_scale(scale)
+            self.set_scale(scale, immediate=True)
             self.status.emit(f"Breite einpassen ({int(round(scale * 100))}%)")
         except Exception as e:
             QMessageBox.warning(self, "Zoom", str(e))

@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
-from PySide6.QtGui import QColor, QFont, QTextCharFormat, QTextCursor
-from PySide6.QtWidgets import QPlainTextEdit, QTextEdit
+import tempfile
+from pathlib import Path
+
+from PySide6.QtGui import QColor, QFont, QImage, QTextCharFormat, QTextCursor
+from PySide6.QtWidgets import QApplication, QPlainTextEdit, QTextEdit
 
 
 class TextEditor(QPlainTextEdit):
@@ -14,6 +17,48 @@ class TextEditor(QPlainTextEdit):
         self.setFont(font)
         self.setPlaceholderText("Dokumententext…")
         self._last_query = ""
+        self._paste_image_dir: Path | None = None
+
+    def set_paste_image_dir(self, path: Path | None) -> None:
+        self._paste_image_dir = Path(path) if path else None
+
+    def paste_clipboard_image(self) -> bool:
+        """Bild aus Zwischenablage speichern und Pfad einfügen."""
+        clip = QApplication.clipboard()
+        if clip is None:
+            return False
+        md = clip.mimeData()
+        img: QImage | None = None
+        if md and md.hasImage():
+            raw = md.imageData()
+            if isinstance(raw, QImage) and not raw.isNull():
+                img = raw
+        if img is None:
+            pm = clip.pixmap()
+            if pm is not None and not pm.isNull():
+                img = pm.toImage()
+        if img is None or img.isNull():
+            return False
+        out_dir = self._paste_image_dir
+        if out_dir is None or not out_dir.is_dir():
+            out_dir = Path(tempfile.gettempdir()) / "InstantLensDoc_paste"
+            out_dir.mkdir(parents=True, exist_ok=True)
+        out = out_dir / f"clipboard_{Path(tempfile.mktemp()).name}.png"
+        if not img.save(str(out), "PNG"):
+            return False
+        cur = self.textCursor()
+        cur.insertText(f"\n[Bild aus Zwischenablage: {out}]\n")
+        self.setTextCursor(cur)
+        return True
+
+    def insertFromMimeData(self, source) -> None:  # noqa: N802
+        if source is not None and source.hasImage():
+            clip = QApplication.clipboard()
+            if clip is not None:
+                # Zwischenablage kann schon das Image halten — paste_clipboard_image
+                if self.paste_clipboard_image():
+                    return
+        super().insertFromMimeData(source)
 
     def clear_extra_selections(self) -> None:
         self.setExtraSelections([])
