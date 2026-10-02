@@ -648,6 +648,16 @@ class MainWindow(QMainWindow):
         )
         act_nbsp.triggered.connect(self._insert_nbsp)
         m_specialchars.addAction(act_nbsp)
+        act_spell = QAction("Rechtschreibung prüfen…", self)
+        act_spell.setShortcut(QKeySequence("F7"))
+        act_spell.setToolTip(
+            "Wortliste aus Einstellungen laden und unbekannte Wörter markieren (ohne Spell-Lib)"
+        )
+        act_spell.triggered.connect(self._check_spelling)
+        m_edit.addAction(act_spell)
+        act_spell_clear = QAction("Rechtschreibmarkierungen löschen", self)
+        act_spell_clear.triggered.connect(self._clear_spelling)
+        m_edit.addAction(act_spell_clear)
         m_edit.addSeparator()
         act_del_ann = QAction("Annotation löschen", self)
         act_del_ann.setShortcut(QKeySequence.Delete)
@@ -671,6 +681,13 @@ class MainWindow(QMainWindow):
         )
         act_edit_group.triggered.connect(self._edit_annotation_group)
         m_edit.addAction(act_edit_group)
+        act_recolor_ann = QAction("Auswahl-Farbe ändern…", self)
+        act_recolor_ann.setShortcut(QKeySequence("Ctrl+Alt+Shift+F"))
+        act_recolor_ann.setToolTip(
+            "Farbe aller ausgewählten Annotationen auf einmal ändern (Batch)"
+        )
+        act_recolor_ann.triggered.connect(self._recolor_selected_annotations)
+        m_edit.addAction(act_recolor_ann)
         act_dup_ann = QAction("Annotation duplizieren", self)
         act_dup_ann.setShortcut(QKeySequence("Ctrl+Shift+D"))
         act_dup_ann.setToolTip("Ausgewählte Annotation kopieren (leicht versetzt)")
@@ -980,6 +997,16 @@ class MainWindow(QMainWindow):
         act_page_hist.setToolTip("Gelöschte/gedrehte Seiten aus dem Undo-Stack wiederherstellen")
         act_page_hist.triggered.connect(lambda: self.pdf_view.show_page_ops_history())
         m_pdf.addAction(act_page_hist)
+        act_page_fav = QAction("Seite als Favorit umschalten", self)
+        act_page_fav.setShortcut(QKeySequence("Ctrl+Shift+F"))
+        act_page_fav.setToolTip("Aktuelle PDF-Seite als Favorit markieren/entfernen")
+        act_page_fav.triggered.connect(lambda: self.pdf_view.toggle_page_favorite())
+        m_pdf.addAction(act_page_fav)
+        act_page_fav_jump = QAction("Seiten-Favoriten…", self)
+        act_page_fav_jump.setShortcut(QKeySequence("Ctrl+Alt+F"))
+        act_page_fav_jump.setToolTip("Zu markierten Favoriten-Seiten springen")
+        act_page_fav_jump.triggered.connect(lambda: self.pdf_view.show_page_favorites())
+        m_pdf.addAction(act_page_fav_jump)
         m_pdf.addSeparator()
         for title, slot in [
             ("PDF-Text → Overlay…", lambda: self.pdf_view.import_text_overlays()),
@@ -1515,6 +1542,54 @@ class MainWindow(QMainWindow):
         idx = None if page is None or isinstance(page, bool) else int(page)
         self.pdf_view.edit_page_annotation_group(idx)
         self._refresh_pdf_marks()
+
+    def _recolor_selected_annotations(self):
+        if self.stack.currentWidget() is not self.pdf_view or not self.pdf_view.pdf_path:
+            self._set_status("Auswahl-Farbe nur im PDF-Modus")
+            return
+        n = self.pdf_view.recolor_selected_annotations()
+        if n:
+            self._refresh_pdf_marks()
+
+    def _check_spelling(self):
+        if self.stack.currentWidget() is not self.editor_pane:
+            self.stack.setCurrentWidget(self.editor_pane)
+        from instantlensdoc.core.app_settings import get_spellcheck_dict_path
+
+        path = get_spellcheck_dict_path()
+        if not path:
+            from PySide6.QtWidgets import QMessageBox
+
+            QMessageBox.information(
+                self,
+                "Rechtschreibung",
+                "Kein Wörterbuch-Pfad gesetzt.\n"
+                "Extras → Einstellungen → Rechtschreibwörterbuch (Wortliste).",
+            )
+            self._set_status("Rechtschreibung: kein Wörterbuch-Pfad")
+            return
+        try:
+            n = self.editor.check_spelling(path)
+        except FileNotFoundError as e:
+            from PySide6.QtWidgets import QMessageBox
+
+            QMessageBox.warning(self, "Rechtschreibung", str(e))
+            self._set_status("Rechtschreibung: Wörterbuch fehlt")
+            return
+        except Exception as e:
+            from PySide6.QtWidgets import QMessageBox
+
+            QMessageBox.warning(self, "Rechtschreibung", str(e))
+            return
+        self._set_status(
+            f"Rechtschreibung: {n} unbekannt(e) Wort(e)"
+            if n
+            else "Rechtschreibung: keine unbekannten Wörter"
+        )
+
+    def _clear_spelling(self):
+        self.editor.clear_spelling()
+        self._set_status("Rechtschreibmarkierungen gelöscht")
 
     def _insert_soft_hyphen(self):
         if self.stack.currentWidget() is not self.editor_pane:

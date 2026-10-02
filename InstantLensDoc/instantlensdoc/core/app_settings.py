@@ -58,6 +58,7 @@ DEFAULTS: dict[str, Any] = {
     "pdf_thumbnail_scale": 0.18,
     "editor_text_encoding": "auto",
     "skip_splash": False,
+    "spellcheck_dict_path": "",
     "show_page_boxes": False,
     "show_printer_marks": False,
     "annotations_locked": False,
@@ -985,6 +986,23 @@ def get_skip_splash() -> bool:
 
 def set_skip_splash(enabled: bool) -> None:
     save_settings({"skip_splash": bool(enabled)})
+
+
+def get_spellcheck_dict_path() -> str:
+    """Pfad zur lokalen Rechtschreib-Wortliste (eine Zeile = ein Wort)."""
+    return str(load_settings().get("spellcheck_dict_path", "") or "").strip()
+
+
+def set_spellcheck_dict_path(path: str | Path | None) -> str:
+    raw = str(path or "").strip()
+    save_settings({"spellcheck_dict_path": raw})
+    try:
+        from instantlensdoc.core.spellcheck import clear_wordlist_cache
+
+        clear_wordlist_cache()
+    except Exception:
+        pass
+    return raw
 
 
 def get_editor_trim_trailing_whitespace() -> bool:

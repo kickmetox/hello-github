@@ -998,9 +998,25 @@ class PdfViewer(QWidget):
         btn_hist = QPushButton("Historie…")
         btn_hist.setToolTip("Seiten-Undo-Historie: gelöschte/gedrehte Seiten wiederherstellen")
         btn_hist.clicked.connect(self.show_page_ops_history)
+        self.btn_fav = QPushButton("★")
+        self.btn_fav.setFixedWidth(28)
+        self.btn_fav.setCheckable(True)
+        self.btn_fav.setToolTip(
+            "Aktuelle Seite als Favorit markieren/entfernen (Ctrl+Shift+F) — schnell springen"
+        )
+        self.btn_fav.clicked.connect(self.toggle_page_favorite)
+        self.btn_fav_jump = QPushButton("★…")
+        self.btn_fav_jump.setFixedWidth(36)
+        self.btn_fav_jump.setToolTip("Zu Favoriten-Seite springen (Ctrl+Alt+F)")
+        self.btn_fav_jump.clicked.connect(self.show_page_favorites)
         btn_del_ann = QPushButton("Ann. löschen")
         btn_del_ann.setToolTip("Ausgewählte Annotation löschen, sonst die letzte (Entf)")
         btn_del_ann.clicked.connect(self.delete_annotation)
+        btn_ann_color = QPushButton("Farbe…")
+        btn_ann_color.setToolTip(
+            "Farbe der ausgewählten Annotation(en) ändern (Batch, Ctrl+Alt+Shift+F)"
+        )
+        btn_ann_color.clicked.connect(self.recolor_selected_annotations)
         btn_stamp_rot = QPushButton("Stempel ↻")
         btn_stamp_rot.setToolTip("Ausgewählten Stempel um 90° drehen")
         btn_stamp_rot.clicked.connect(lambda: self.rotate_selected_stamp(90))
@@ -1203,7 +1219,10 @@ class PdfViewer(QWidget):
         toolbar.addWidget(btn_undo)
         toolbar.addWidget(btn_redo)
         toolbar.addWidget(btn_hist)
+        toolbar.addWidget(self.btn_fav)
+        toolbar.addWidget(self.btn_fav_jump)
         toolbar.addWidget(btn_del_ann)
+        toolbar.addWidget(btn_ann_color)
         toolbar.addWidget(btn_stamp_rot)
         toolbar.addWidget(btn_zoom_out)
         toolbar.addWidget(self.lbl_zoom)
@@ -1248,7 +1267,16 @@ class PdfViewer(QWidget):
                 self.btn_printer_marks,
             ],
             "nav": [btn_prev, self.lbl_page, btn_next],
-            "history": [btn_undo, btn_redo, btn_hist, btn_del_ann, btn_stamp_rot],
+            "history": [
+                btn_undo,
+                btn_redo,
+                btn_hist,
+                self.btn_fav,
+                self.btn_fav_jump,
+                btn_del_ann,
+                btn_ann_color,
+                btn_stamp_rot,
+            ],
             "zoom": [
                 btn_zoom_out,
                 self.lbl_zoom,
@@ -1308,6 +1336,15 @@ class PdfViewer(QWidget):
         rand_sc = QShortcut(QKeySequence("Ctrl+Alt+Shift+C"), self)
         rand_sc.setContext(Qt.WidgetWithChildrenShortcut)
         rand_sc.activated.connect(self.randomize_annotation_color)
+        fav_sc = QShortcut(QKeySequence("Ctrl+Shift+F"), self)
+        fav_sc.setContext(Qt.WidgetWithChildrenShortcut)
+        fav_sc.activated.connect(self.toggle_page_favorite)
+        fav_jump_sc = QShortcut(QKeySequence("Ctrl+Alt+F"), self)
+        fav_jump_sc.setContext(Qt.WidgetWithChildrenShortcut)
+        fav_jump_sc.activated.connect(self.show_page_favorites)
+        recolor_sc = QShortcut(QKeySequence("Ctrl+Alt+Shift+F"), self)
+        recolor_sc.setContext(Qt.WidgetWithChildrenShortcut)
+        recolor_sc.activated.connect(self.recolor_selected_annotations)
 
     def apply_toolbar_groups(self) -> None:
         """Sichtbarkeit der PDF-Toolbar-Gruppen aus den Einstellungen anwenden."""
@@ -2354,6 +2391,7 @@ class PdfViewer(QWidget):
             self.lbl_zoom.setText(f"{int(round(self.scale * 100))}%")
             dirty = " *" if self.store and self.store.dirty else ""
             self.status.emit(f"PDF: {self.pdf_path.name}{dirty}")
+            self._refresh_fav_btn()
         except MemoryError:
             QMessageBox.warning(
                 self,
@@ -2773,6 +2811,216 @@ class PdfViewer(QWidget):
         btn_close.clicked.connect(dlg.reject)
         dlg.exec()
         return bool(restored["ok"])
+
+    def _refresh_fav_btn(self) -> None:
+        """Toolbar-Stern: Zustand der aktuellen Seite."""
+        btn = getattr(self, "btn_fav", None)
+        if btn is None:
+            return
+        is_fav = False
+        if self.store is not None and self.pdf_path:
+            try:
+                is_fav = self.store.is_page_favorite(self.page_index)
+            except Exception:
+                is_fav = False
+        btn.blockSignals(True)
+        btn.setChecked(is_fav)
+        btn.blockSignals(False)
+        n = 0
+        if self.store is not None:
+            try:
+                n = len(self.store.list_page_favorites())
+            except Exception:
+                n = 0
+        btn.setToolTip(
+            f"{'Favorit entfernen' if is_fav else 'Seite als Favorit markieren'} "
+            f"(Ctrl+Shift+F) — {n} Favorit(en)"
+        )
+
+    def list_page_favorites(self) -> list[int]:
+        if not self.store:
+            return []
+        return [
+            p
+            for p in self.store.list_page_favorites()
+            if 0 <= int(p) < int(self.page_count or 0)
+        ]
+
+    def toggle_page_favorite(self) -> bool:
+        """Aktuelle PDF-Seite als Favorit markieren/entfernen (Sidecar-Meta)."""
+        if not self.store or not self.pdf_path:
+            self.status.emit("Kein PDF geladen")
+            return False
+        now_fav = self.store.toggle_page_favorite(self.page_index)
+        try:
+            self.store.save(force=True)
+        except Exception as e:
+            QMessageBox.warning(self, "Seiten-Favorit", str(e))
+            return False
+        self._refresh_fav_btn()
+        page_h = self.page_index + 1
+        self.status.emit(
+            f"Seite {page_h} als Favorit markiert"
+            if now_fav
+            else f"Seite {page_h} aus Favoriten entfernt"
+        )
+        return now_fav
+
+    def show_page_favorites(self) -> bool:
+        """Dialog: Favoriten-Seiten auflisten und springen."""
+        from PySide6.QtWidgets import (
+            QDialog,
+            QHBoxLayout,
+            QLabel,
+            QListWidget,
+            QListWidgetItem,
+            QPushButton,
+            QVBoxLayout,
+        )
+
+        if not self.store or not self.pdf_path:
+            QMessageBox.information(self, "Favoriten", "Kein PDF geladen.")
+            return False
+        favs = self.list_page_favorites()
+        dlg = QDialog(self)
+        dlg.setWindowTitle("Seiten-Favoriten")
+        dlg.resize(360, 280)
+        layout = QVBoxLayout(dlg)
+        layout.addWidget(
+            QLabel(
+                "Favoriten-Seiten dieses PDFs (schnell springen).\n"
+                "★ in der Toolbar markiert die aktuelle Seite."
+            )
+        )
+        lst = QListWidget()
+        for p in favs:
+            label = self.page_label(p) if self.has_page_labels() else ""
+            text = f"Seite {p + 1}" + (f" ({label})" if label else "")
+            row = QListWidgetItem(text)
+            row.setData(Qt.UserRole, int(p))
+            lst.addItem(row)
+        if favs and 0 <= self.page_index:
+            # aktuelle Favoriten-Seite vorselektieren falls vorhanden
+            for i, p in enumerate(favs):
+                if p == self.page_index:
+                    lst.setCurrentRow(i)
+                    break
+            else:
+                lst.setCurrentRow(0)
+        layout.addWidget(lst)
+        if not favs:
+            layout.addWidget(QLabel("Keine Favoriten — aktuelle Seite mit ★ markieren."))
+
+        btns = QHBoxLayout()
+        btn_goto = QPushButton("Springen")
+        btn_goto.setEnabled(bool(favs))
+        btn_goto.setDefault(True)
+        btn_toggle = QPushButton("Aktuelle ★ umschalten")
+        btn_remove = QPushButton("Entfernen")
+        btn_remove.setEnabled(bool(favs))
+        btn_close = QPushButton("Schließen")
+        btns.addWidget(btn_goto)
+        btns.addWidget(btn_toggle)
+        btns.addWidget(btn_remove)
+        btns.addStretch()
+        btns.addWidget(btn_close)
+        layout.addLayout(btns)
+
+        jumped = {"ok": False}
+
+        def _refresh_list():
+            lst.clear()
+            fresh = self.list_page_favorites()
+            for p2 in fresh:
+                label2 = self.page_label(p2) if self.has_page_labels() else ""
+                text2 = f"Seite {p2 + 1}" + (f" ({label2})" if label2 else "")
+                row2 = QListWidgetItem(text2)
+                row2.setData(Qt.UserRole, int(p2))
+                lst.addItem(row2)
+            btn_goto.setEnabled(bool(fresh))
+            btn_remove.setEnabled(bool(fresh))
+            self._refresh_fav_btn()
+
+        def _do_goto():
+            cur = lst.currentItem()
+            if cur is None:
+                return
+            idx = cur.data(Qt.UserRole)
+            if idx is None:
+                return
+            self.goto_page(int(idx))
+            jumped["ok"] = True
+            dlg.accept()
+
+        def _do_toggle():
+            self.toggle_page_favorite()
+            _refresh_list()
+
+        def _do_remove():
+            cur = lst.currentItem()
+            if cur is None or not self.store:
+                return
+            idx = cur.data(Qt.UserRole)
+            if idx is None:
+                return
+            favs_now = [p for p in self.store.list_page_favorites() if p != int(idx)]
+            self.store.set_page_favorites(favs_now)
+            try:
+                self.store.save(force=True)
+            except Exception as e:
+                QMessageBox.warning(self, "Favoriten", str(e))
+                return
+            _refresh_list()
+            self.status.emit(f"Seite {int(idx) + 1} aus Favoriten entfernt")
+
+        btn_goto.clicked.connect(_do_goto)
+        lst.itemDoubleClicked.connect(lambda _item: _do_goto())
+        btn_toggle.clicked.connect(_do_toggle)
+        btn_remove.clicked.connect(_do_remove)
+        btn_close.clicked.connect(dlg.reject)
+        dlg.exec()
+        return bool(jumped["ok"])
+
+    def recolor_selected_annotations(self) -> int:
+        """Batch-Farbe für ausgewählte Annotation(en) ändern."""
+        if not self.store:
+            self.status.emit("Kein PDF geladen")
+            return 0
+        ids = list(self._selected_ann_ids) if self._selected_ann_ids else (
+            [self._selected_ann_id] if self._selected_ann_id else []
+        )
+        ids = [i for i in ids if i]
+        if not ids:
+            self.status.emit("Keine Annotation ausgewählt")
+            return 0
+        # Startfarbe: erste Auswahl oder aktuelle Highlight-Farbe
+        initial = QColor(self._highlight_color or "#FFE066")
+        first = self.store.get(ids[0])
+        if first and first.color:
+            c0 = QColor(first.color)
+            if c0.isValid():
+                initial = c0
+        chosen = QColorDialog.getColor(
+            initial,
+            self,
+            f"Farbe für {len(ids)} Annotation(en)",
+        )
+        if not chosen.isValid():
+            return 0
+        color = chosen.name().upper()
+        n = self.store.set_colors(ids, color)
+        if n <= 0:
+            self.status.emit("Farbe nicht geändert")
+            return 0
+        try:
+            self.store.save()
+        except Exception as e:
+            QMessageBox.warning(self, "Annotation-Farbe", str(e))
+            return 0
+        self.refresh()
+        self.annotations_changed.emit()
+        self.status.emit(f"Farbe {color} für {n} Annotation(en)")
+        return n
 
     def undo_page_op(self) -> bool:
         """Letzte Seiten-Operation (Löschen oder Drehen) rückgängig."""
@@ -4420,6 +4668,26 @@ class PdfViewer(QWidget):
                                 if old_p in mapping:
                                     new_groups[str(mapping[old_p])] = val
                             self.store._meta["page_groups"] = new_groups
+                        favs = list(self.store._meta.get("page_favorites") or [])
+                        if favs:
+                            remapped = []
+                            seen = set()
+                            for raw in favs:
+                                try:
+                                    old_p = int(raw)
+                                except (TypeError, ValueError):
+                                    continue
+                                if old_p not in mapping:
+                                    continue
+                                new_p = int(mapping[old_p])
+                                if new_p not in seen:
+                                    seen.add(new_p)
+                                    remapped.append(new_p)
+                            remapped.sort()
+                            if remapped:
+                                self.store._meta["page_favorites"] = remapped
+                            else:
+                                self.store._meta.pop("page_favorites", None)
                         self.store.dirty = True
                 self.store.save(force=True)
             self.page_count -= 1

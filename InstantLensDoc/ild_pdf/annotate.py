@@ -594,6 +594,39 @@ class AnnotationStore:
                 return a
         return None
 
+    def update_many(self, ann_ids: Sequence[str], **kwargs) -> int:
+        """
+        Mehrere Annotationen in einer Undo-Stufe aktualisieren (z. B. Batch-Farbe).
+        Rückgabe: Anzahl geänderter Annotationen.
+        """
+        ids = {str(i) for i in ann_ids if i}
+        if not ids or not kwargs:
+            return 0
+        targets = [a for a in self.annotations if a.id in ids]
+        if not targets:
+            return 0
+        self._push_undo()
+        for a in targets:
+            for k, v in kwargs.items():
+                if hasattr(a, k):
+                    if k == "tags":
+                        setattr(a, k, normalize_tags(v))
+                    else:
+                        setattr(a, k, v)
+            a.touch()
+        self.dirty = True
+        return len(targets)
+
+    def set_colors(self, ann_ids: Sequence[str], color: str) -> int:
+        """Batch-Farbe für Auswahl setzen (#RRGGBB)."""
+        c = str(color or "").strip()
+        if not c:
+            return 0
+        if not c.startswith("#"):
+            c = "#" + c
+        c = c.upper()
+        return self.update_many(ann_ids, color=c)
+
     def remove(self, ann_id: str) -> bool:
         before = len(self.annotations)
         if not any(a.id == ann_id for a in self.annotations):
@@ -640,16 +673,16 @@ class AnnotationStore:
                 planned.append((ann, new_page))
             else:
                 changed = True
-        if not changed and len(planned) == len(self.annotations):
-            return
-        self._push_undo()
-        kept: List[Annotation] = []
-        for ann, new_page in planned:
-            if ann.page != new_page:
-                ann.page = new_page
-                ann.touch()
-            kept.append(ann)
-        self.annotations = kept
+        anns_changed = changed or len(planned) != len(self.annotations)
+        if anns_changed:
+            self._push_undo()
+            kept: List[Annotation] = []
+            for ann, new_page in planned:
+                if ann.page != new_page:
+                    ann.page = new_page
+                    ann.touch()
+                kept.append(ann)
+            self.annotations = kept
         # Seitengruppen-Meta mit-remappen
         groups = dict(self._meta.get("page_groups") or {})
         if groups:
@@ -662,7 +695,87 @@ class AnnotationStore:
                 if old_p in mapping:
                     new_groups[str(mapping[old_p])] = val
             self._meta["page_groups"] = new_groups
+        # Seiten-Favoriten mit-remappen
+        favs = list(self._meta.get("page_favorites") or [])
+        if favs:
+            remapped: list[int] = []
+            seen: set[int] = set()
+            for raw in favs:
+                try:
+                    old_p = int(raw)
+                except (TypeError, ValueError):
+                    continue
+                if old_p not in mapping:
+                    continue
+                new_p = int(mapping[old_p])
+                if new_p not in seen:
+                    seen.add(new_p)
+                    remapped.append(new_p)
+            remapped.sort()
+            if remapped:
+                self._meta["page_favorites"] = remapped
+            else:
+                self._meta.pop("page_favorites", None)
+        if anns_changed or groups or favs:
+            self.dirty = True
+
+    def list_page_favorites(self) -> list[int]:
+        """Favoriten-Seitenindizes (0-basiert, sortiert, dedupliziert)."""
+        raw = self._meta.get("page_favorites") or []
+        out: list[int] = []
+        seen: set[int] = set()
+        if not isinstance(raw, (list, tuple)):
+            return out
+        for item in raw:
+            try:
+                p = int(item)
+            except (TypeError, ValueError):
+                continue
+            if p < 0 or p in seen:
+                continue
+            seen.add(p)
+            out.append(p)
+        out.sort()
+        return out
+
+    def is_page_favorite(self, page: int) -> bool:
+        return int(page) in self.list_page_favorites()
+
+    def set_page_favorites(self, pages: Sequence[int]) -> list[int]:
+        """Favoritenliste setzen (sortiert/dedupliziert); leere Liste löscht Meta."""
+        cleaned: list[int] = []
+        seen: set[int] = set()
+        for item in pages or []:
+            try:
+                p = int(item)
+            except (TypeError, ValueError):
+                continue
+            if p < 0 or p in seen:
+                continue
+            seen.add(p)
+            cleaned.append(p)
+        cleaned.sort()
+        if cleaned:
+            self._meta["page_favorites"] = cleaned
+        else:
+            self._meta.pop("page_favorites", None)
         self.dirty = True
+        return cleaned
+
+    def toggle_page_favorite(self, page: int) -> bool:
+        """
+        Seite als Favorit markieren/entfernen.
+        Rückgabe: True wenn danach Favorit, sonst False.
+        """
+        p = int(page)
+        favs = self.list_page_favorites()
+        if p in favs:
+            favs = [x for x in favs if x != p]
+            self.set_page_favorites(favs)
+            return False
+        favs.append(p)
+        self.set_page_favorites(favs)
+        return True
 
     def get_page_group(self, page: int) -> dict:
         """Gruppen-Metadaten für eine Seite: {title, color} (fehlende Keys leer)."""

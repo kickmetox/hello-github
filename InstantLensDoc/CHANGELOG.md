@@ -1,5 +1,23 @@
 # Changelog — InstantLens Doc
 
+## 0.5.6 — Seiten-Favoriten, Ann.-Batch-Farbe, Wortlisten-Rechtschreibung, Privacy-About
+
+Nach 0.5.5: vier sinnvolle Ausbauten. Stubs KI/Cloud/Stylus/3D bleiben Stubs. **Keine Telemetrie** — Privacy-Hinweis in About.
+
+### PDF / Annotationen
+- **Seiten-Favoriten**: aktuelle Seite als Favorit markieren (★ / Ctrl+Shift+F); Liste zum Schnellspringen (Ctrl+Alt+F); Sidecar-Meta `page_favorites` inkl. Remap bei Löschen/Neuordnen
+- **Annotation-Batch-Farbe**: Farbe für Auswahl auf einmal ändern (Ctrl+Alt+Shift+F / Toolbar „Farbe…“ / Bearbeiten)
+
+### Editor / About
+- **Rechtschreibwörterbuch-Pfad**: Einstellung für lokale Wortliste (ohne Spell-Lib); F7 prüft und markiert unbekannte Wörter wellig
+- **Privacy in About**: klarer Hinweis — lokal, keine Telemetrie, kein Cloud-Upload (statt Telemetrie-Feature)
+
+### Packaging / Docs
+- Version **0.5.6** (App / ild_pdf / ISS / Smoke / Docs)
+- Stubs KI/Cloud/Stylus/3D unverändert
+
+---
+
 ## 0.5.5 — Seiten-Historie-UI, Ann.-Export Tags/Gruppen, Encoding-Auto, Quiet Splash
 
 Nach 0.5.4: vier sinnvolle Ausbauten. Stubs KI/Cloud/Stylus/3D bleiben Stubs.

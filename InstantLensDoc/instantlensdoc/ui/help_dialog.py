@@ -85,8 +85,10 @@ HELP_HTML = f"""
 <li><b>PDF</b>: Blättern, Zoom/Fit (debounced + Cache), <b>⟲/⟳ drehen</b> / <b>↔/↕ spiegeln</b> (speichert),
     <b>Graustufen</b> (Ansicht + Bild-Export), <b>Nachtmodus</b> (nur Ansicht, nicht speichern),
     <b>leere Seite / duplizieren</b>, Seite löschen (<b>Undo Ctrl+Z</b> / <b>Historie-Liste</b>), Seiten neu anordnen;
-    <b>Annotationsgruppen</b> umbenennen/Farbe (Ctrl+Alt+G); Export CSV/Bericht inkl. Tags+Gruppen;
-    Soft-Hyphen / NBSP im Editor; Startup-Check pypdfium2/Tesseract; Splash optional überspringbar;
+    <b>Annotationsgruppen</b> umbenennen/Farbe (Ctrl+Alt+G); <b>Seiten-Favoriten</b> (★ / Ctrl+Shift+F, springen Ctrl+Alt+F);
+    <b>Auswahl-Farbe Batch</b> (Ctrl+Alt+Shift+F); Export CSV/Bericht inkl. Tags+Gruppen;
+    Soft-Hyphen / NBSP im Editor; <b>Rechtschreibung</b> per lokaler Wortliste (F7, Pfad in Einstellungen);
+    Startup-Check pypdfium2/Tesseract; Splash optional überspringbar;
     <b>PDF-Links (http/https)</b> per Auswahl-Werkzeug / Ctrl+Klick öffnen;
     Annotationen: Highlight (Drag, <b>Selection→Highlight</b> über Text) + <b>Farben-Picker HL/Stift</b> + <b>3 Favoriten</b> + <b>Deckkraft α</b>, <b>Schwärzen/Redaction</b> (Drag + Preview „REDACT“ + Einbrennen-Dialog), Unterstreichen, Notiz, <b>Text-Overlay</b>,
     <b>Stempel-Bibliothek</b> (GENEHMIGT/ENTWURF/VERTRAULICH + Datum, <b>Rotation 90°</b>), Callout,
@@ -116,7 +118,8 @@ HELP_HTML = f"""
     <b>Seiten-Thumbnails</b> in der Sidebar</li>
 <li><b>Datei → Schließen</b>: Speichern-Dialog bei ungespeicherten Änderungen</li>
 <li><b>Hilfe → Auf Updates prüfen</b>: lokal immer; Online optional (offline OK)</li>
-<li><b>Hilfe → Über InstantLens Doc</b>: Feature-Kurzliste + Link zu FEATURES.md</li>
+<li><b>Hilfe → Über InstantLens Doc</b>: Feature-Kurzliste + Link zu FEATURES.md;
+    Datenschutz-Hinweis (lokal, keine Telemetrie, keine Cloud)</li>
 <li><b>Hilfe → Logordner öffnen</b>: Crash-/App-Logs im Dateimanager</li>
 <li><b>Zwischenablage</b>: Bild einfügen (Editor Ctrl+Shift+V / PDF Strg+V) — Stempel oder neue Seite</li>
 <li><b>Session</b>: Offene Dokumente (Sidebar-Liste) werden beim Beenden gespeichert;
@@ -247,16 +250,27 @@ class AboutDialog(QDialog):
             hint_lbl.setWordWrap(True)
             hint_lbl.setOpenExternalLinks(True)
             layout.addWidget(hint_lbl)
+        privacy = QLabel(
+            "<p style='background:#E8F5E9;padding:8px;border:1px solid #81C784;'>"
+            "<b>Datenschutz / Privacy</b><br>"
+            "InstantLens Doc arbeitet <b>lokal</b> auf diesem Rechner. "
+            "Es gibt <b>keine Telemetrie</b>, kein Nutzungs-Tracking und "
+            "<b>keinen Cloud-Upload</b> von Dokumenten oder Annotationen. "
+            "Optionale Online-Update-Prüfung nur wenn in den Einstellungen aktiviert "
+            "(sonst offline). Stubs KI/Cloud bleiben bewusst ohne Funktion."
+            "</p>"
+        )
+        privacy.setWordWrap(True)
+        layout.addWidget(privacy)
         features_short = QLabel(
             "<h3>Features (Kurz)</h3>"
             "<ul>"
             "<li>PDF lesen/annotieren (Highlight, Notiz, Stempel, Formen) · Sidecar v4</li>"
-            "<li>Seitenlabels (römisch/arabisch), Continuous Scroll, Spread, CropBox</li>"
-            "<li>Editor: Find/Replace, Snippets, Bracket-Match, Zwischenablage-Verlauf, Minimap</li>"
-            "<li>OCR-Bridge (Seite + gesamtes PDF), Formulargenerator, Batch, Export</li>"
-            "<li>Annotation-Tags, Kommentar-Bericht TXT/MD, Farbe Palette-Zyklus</li>"
-            "<li>Selection→Highlight, Ann.-Regex, Datei-Vergleich, Export-Profil</li>"
-            "<li>Lizenz Trial/Keys · Stubs: KI, Cloud, Stylus, 3D</li>"
+            "<li>Seitenlabels, Continuous Scroll, Spread, CropBox · Seiten-Favoriten</li>"
+            "<li>Editor: Find/Replace, Snippets, Bracket-Match, Minimap, Wortlisten-Rechtschreibung</li>"
+            "<li>OCR-Bridge, Formulargenerator, Batch, Export · Ann.-Batch-Farbe</li>"
+            "<li>Annotation-Tags, Kommentar-Bericht, Farbe Palette-Zyklus</li>"
+            "<li>Lizenz Trial/Keys · lokal, ohne Telemetrie · Stubs: KI, Cloud, Stylus, 3D</li>"
             "</ul>"
             "<p>Vollständige Liste: FEATURES.md</p>"
         )

@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **0.5.5** |
+| Version | **0.5.6** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -34,10 +34,10 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)
 
-## Neu in 0.5.5
+## Neu in 0.5.6
 
-- Seiten-Historie: gelöschte/gedrehte Seiten aus Undo-Stack in Liste wiederherstellen
-- Annotation-Export inkl. Tags und Gruppen (CSV/Bericht/JSON)
-- Editor: Encoding automatisch erkennen (BOM / optional chardet)
-- Quiet Startup: Splash in Einstellungen überspringbar
+- Seiten-Favoriten: markieren + schnell springen (Sidecar-Meta)
+- Annotation-Batch-Farbe für Auswahl
+- Editor: Rechtschreibwörterbuch-Pfad (Wortliste, F7)
+- About: Privacy-Hinweis (lokal, keine Telemetrie)
 - Stubs KI/Cloud/Stylus/3D unverändert

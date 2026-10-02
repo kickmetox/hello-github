@@ -34,6 +34,7 @@ from instantlensdoc.core.app_settings import (
     get_editor_trim_trailing_whitespace,
     get_editor_trim_whitespace_on_paste,
     get_skip_splash,
+    get_spellcheck_dict_path,
     get_export_image_max_edge,
     get_pdf_toolbar_groups,
     get_export_jpeg_quality,
@@ -67,6 +68,7 @@ from instantlensdoc.core.app_settings import (
     set_editor_trim_trailing_whitespace,
     set_editor_trim_whitespace_on_paste,
     set_skip_splash,
+    set_spellcheck_dict_path,
     set_minimize_to_tray,
     set_pdf_toolbar_groups,
     set_ocr_lang,
@@ -195,6 +197,21 @@ class SettingsDialog(QDialog):
             "Kein Splash-Screen beim App-Start — schneller/ruhiger Start"
         )
         form.addRow(self.skip_splash)
+
+        self.spell_dict = QLineEdit()
+        self.spell_dict.setText(get_spellcheck_dict_path())
+        self.spell_dict.setPlaceholderText("Pfad zur Wortliste (.txt, eine Zeile = ein Wort)")
+        self.spell_dict.setToolTip(
+            "Lokales Rechtschreibwörterbuch ohne externe Lib — "
+            "UTF-8-Wortliste; Bearbeiten → Rechtschreibung prüfen (F7)"
+        )
+        spell_row = QHBoxLayout()
+        spell_row.addWidget(self.spell_dict)
+        btn_spell = QPushButton("…")
+        btn_spell.setToolTip("Wortliste auswählen")
+        btn_spell.clicked.connect(self._pick_spell_dict)
+        spell_row.addWidget(btn_spell)
+        form.addRow("Rechtschreibwörterbuch", spell_row)
 
         self.trim_trailing = QCheckBox("Trailing Whitespace beim Speichern entfernen")
         self.trim_trailing.setChecked(get_editor_trim_trailing_whitespace())
@@ -347,6 +364,17 @@ class SettingsDialog(QDialog):
         if path:
             field.setText(path)
 
+    def _pick_spell_dict(self):
+        start = self.spell_dict.text().strip() or str(Path.home())
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Rechtschreibwörterbuch (Wortliste)",
+            start,
+            "Text / Wortliste (*.txt *.dic *.wordlist *);;Alle Dateien (*)",
+        )
+        if path:
+            self.spell_dict.setText(path)
+
     def _reset_defaults(self):
         reply = QMessageBox.question(
             self,
@@ -402,6 +430,7 @@ class SettingsDialog(QDialog):
         set_editor_show_special_chars(self.special_chars.isChecked())
         set_editor_text_encoding(str(self.enc_combo.currentData() or "auto"))
         set_skip_splash(self.skip_splash.isChecked())
+        set_spellcheck_dict_path(self.spell_dict.text().strip())
         set_editor_trim_trailing_whitespace(self.trim_trailing.isChecked())
         set_editor_trim_whitespace_on_paste(self.trim_paste.isChecked())
         set_editor_bracket_match(self.bracket_match.isChecked())

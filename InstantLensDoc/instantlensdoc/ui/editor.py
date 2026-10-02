@@ -80,6 +80,7 @@ class TextEditor(QPlainTextEdit):
         self._find_selections: list = []
         self._mark_selections: list = []
         self._bracket_selections: list = []
+        self._spell_selections: list = []
         self._line_number_area = _LineNumberArea(self)
         self._minimap_area = _MinimapArea(self)
         self.blockCountChanged.connect(self._update_side_areas)
@@ -199,8 +200,11 @@ class TextEditor(QPlainTextEdit):
         return bool(self._bracket_match)
 
     def _apply_extra_selections(self) -> None:
-        merged = list(self._find_selections) + list(self._mark_selections) + list(
-            self._bracket_selections
+        merged = (
+            list(self._find_selections)
+            + list(self._mark_selections)
+            + list(self._bracket_selections)
+            + list(getattr(self, "_spell_selections", []) or [])
         )
         self.setExtraSelections(merged)
 
@@ -812,7 +816,49 @@ class TextEditor(QPlainTextEdit):
     def clear_extra_selections(self) -> None:
         self._find_selections = []
         self._mark_selections = []
+        self._spell_selections = []
         self.setExtraSelections(list(self._bracket_selections))
+
+    def clear_spelling(self) -> None:
+        """Nur Rechtschreibmarkierungen entfernen."""
+        self._spell_selections = []
+        self._apply_extra_selections()
+
+    def check_spelling(self, dict_path: str | None = None) -> int:
+        """
+        Lokale Wortliste laden und unbekannte Wörter wellig markieren.
+        Ohne Spell-Lib — reine Wortlisten-Prüfung. Rückgabe: Anzahl Markierungen.
+        """
+        from pathlib import Path
+
+        from instantlensdoc.core.app_settings import get_spellcheck_dict_path
+        from instantlensdoc.core.spellcheck import spellcheck_text
+
+        path = (dict_path or get_spellcheck_dict_path() or "").strip()
+        if not path:
+            self.clear_spelling()
+            raise FileNotFoundError("Kein Wörterbuch-Pfad gesetzt")
+        if not Path(path).is_file():
+            self.clear_spelling()
+            raise FileNotFoundError(f"Wörterbuch nicht gefunden: {path}")
+        text = self.toPlainText()
+        spans = spellcheck_text(text, path)
+        fmt = QTextCharFormat()
+        fmt.setUnderlineColor(QColor("#C0392B"))
+        fmt.setUnderlineStyle(QTextCharFormat.WaveUnderline)
+        fmt.setToolTip("Unbekanntes Wort (lokale Wortliste)")
+        selections: list = []
+        for start, end, _word in spans:
+            sel = QTextEdit.ExtraSelection()
+            c = QTextCursor(self.document())
+            c.setPosition(start)
+            c.setPosition(end, QTextCursor.KeepAnchor)
+            sel.cursor = c
+            sel.format = fmt
+            selections.append(sel)
+        self._spell_selections = selections
+        self._apply_extra_selections()
+        return len(selections)
 
     @staticmethod
     def _find_flags(*, case_sensitive: bool = False) -> QTextDocument.FindFlag:
