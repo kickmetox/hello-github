@@ -254,6 +254,11 @@ class MainWindow(QMainWindow):
         act_save.setShortcut(QKeySequence.Save)
         act_save.triggered.connect(self.save_doc)
         m_file.addAction(act_save)
+        act_save_all = QAction("Alles speichern", self)
+        act_save_all.setShortcut(QKeySequence("Ctrl+Alt+Shift+S"))
+        act_save_all.setToolTip("Aktuelles Dokument + Annotation-Sidecars aller offenen PDF-Tabs")
+        act_save_all.triggered.connect(self.save_all_docs)
+        m_file.addAction(act_save_all)
 
         act_save_as = QAction("Speichern unter…", self)
         act_save_as.setShortcut(QKeySequence("Ctrl+Shift+S"))
@@ -332,6 +337,11 @@ class MainWindow(QMainWindow):
         act_del_ann.setToolTip("Ausgewählte Annotation oder letzte auf der Seite")
         act_del_ann.triggered.connect(self._delete_annotation)
         m_edit.addAction(act_del_ann)
+        act_edit_ann = QAction("Annotationstext bearbeiten…", self)
+        act_edit_ann.setShortcut(QKeySequence("Ctrl+E"))
+        act_edit_ann.setToolTip("Notiz/Kommentar/Overlay der Auswahl bearbeiten (auch Doppelklick)")
+        act_edit_ann.triggered.connect(self._edit_annotation_text)
+        m_edit.addAction(act_edit_ann)
 
         m_view = mb.addMenu("&Ansicht")
         a = QAction("Seitenleiste", self)
@@ -339,6 +349,14 @@ class MainWindow(QMainWindow):
         a.setChecked(True)
         a.toggled.connect(self.sidebar.setVisible)
         m_view.addAction(a)
+        self._line_numbers_action = QAction("Zeilennummern", self)
+        self._line_numbers_action.setCheckable(True)
+        from instantlensdoc.core.app_settings import get_editor_line_numbers
+
+        self._line_numbers_action.setChecked(get_editor_line_numbers())
+        self._line_numbers_action.setToolTip("Zeilennummern im Texteditor anzeigen")
+        self._line_numbers_action.toggled.connect(self._toggle_line_numbers)
+        m_view.addAction(self._line_numbers_action)
         m_view.addSeparator()
         act_zi = QAction("Vergrößern", self)
         act_zi.setShortcut(QKeySequence.ZoomIn)
@@ -410,6 +428,8 @@ class MainWindow(QMainWindow):
             ("Lesezeichen löschen", self._outline_delete),
             ("Seite drehen 90° ⟳", lambda: self.pdf_view.rotate_current(90)),
             ("Seite drehen −90° ⟲", lambda: self.pdf_view.rotate_current(-90)),
+            ("Seite horizontal spiegeln ↔", lambda: self.pdf_view.flip_current(horizontal=True)),
+            ("Seite vertikal spiegeln ↕", lambda: self.pdf_view.flip_current(vertical=True)),
             ("Leere Seite einfügen", lambda: self.pdf_view.insert_blank_after_current()),
             ("Seite duplizieren", lambda: self.pdf_view.duplicate_current()),
             ("Seite löschen…", lambda: self.pdf_view.delete_current()),
@@ -589,6 +609,22 @@ class MainWindow(QMainWindow):
             self.pdf_view.delete_annotation()
         else:
             self._set_status("Annotation löschen nur im PDF-Modus")
+
+    def _edit_annotation_text(self):
+        if self.stack.currentWidget() is not self.pdf_view or not self.pdf_view.pdf_path:
+            self._set_status("Annotation bearbeiten nur im PDF-Modus")
+            return
+        if not self.pdf_view._selected_ann_id:
+            self._set_status("Keine Annotation ausgewählt (Auswahl-Werkzeug / Doppelklick)")
+            return
+        self.pdf_view.edit_selected_annotation_text()
+
+    def _toggle_line_numbers(self, checked: bool):
+        from instantlensdoc.core.app_settings import set_editor_line_numbers
+
+        set_editor_line_numbers(bool(checked))
+        self.editor.set_line_numbers_visible(bool(checked))
+        self._set_status("Zeilennummern an" if checked else "Zeilennummern aus")
 
     def _sync_theme_menu(self):
         if self._theme_action is not None:
@@ -1108,6 +1144,14 @@ class MainWindow(QMainWindow):
         if SettingsDialog(self).exec():
             sync_from_settings()
             self._sync_theme_menu()
+            from instantlensdoc.core.app_settings import get_editor_line_numbers
+
+            show_ln = get_editor_line_numbers()
+            self.editor.set_line_numbers_visible(show_ln)
+            if hasattr(self, "_line_numbers_action") and self._line_numbers_action is not None:
+                self._line_numbers_action.blockSignals(True)
+                self._line_numbers_action.setChecked(show_ln)
+                self._line_numbers_action.blockSignals(False)
             self._autosave_timer.setInterval(get_autosave_interval_sec() * 1000)
             self.pdf_view.apply_settings_colors()
             self._set_status(
@@ -1334,6 +1378,60 @@ class MainWindow(QMainWindow):
             self._set_status(f"Gespeichert: {self.doc.path}")
         except Exception as e:
             QMessageBox.critical(self, "Speichern", f"Speichern fehlgeschlagen:\n{e}")
+
+    def save_all_docs(self):
+        """Aktuelles Dokument speichern und Annotation-Sidecars aller offenen PDF-Tabs flushen."""
+        st = self.license_manager.status()
+        if not st.allowed:
+            QMessageBox.warning(self, "Lizenz", "Speichern nicht möglich — Lizenz/Trial abgelaufen.")
+            return
+        saved = 0
+        errors: list[str] = []
+        current = str(self.doc.path) if self.doc and self.doc.path else ""
+        # Aktuelles Doc zuerst
+        if self.doc:
+            try:
+                if self.doc.kind == DocKind.PDF:
+                    if self.pdf_view.store is not None:
+                        self.pdf_view.store.save(force=True)
+                        saved += 1
+                elif self.doc.path:
+                    if self.doc.kind in (DocKind.TEXT, DocKind.MARKDOWN, DocKind.HTML, DocKind.DOCX):
+                        self.doc.text = self.editor.toPlainText()
+                    save_document(self.doc)
+                    saved += 1
+                elif self.doc.dirty:
+                    self.save_as()
+                    if self.doc.path:
+                        saved += 1
+            except Exception as e:
+                errors.append(str(e))
+        # Andere offene PDF-Tabs: Sidecar neu schreiben (bereits auf Disk = no-op bei clean)
+        from ild_pdf import AnnotationStore
+
+        for path in self.sidebar.document_paths():
+            p = Path(path)
+            if str(p.resolve()) == (str(Path(current).resolve()) if current else ""):
+                continue
+            if p.suffix.lower() != ".pdf" or not p.is_file():
+                continue
+            try:
+                store = AnnotationStore(p)
+                if store.annotations and store.sidecar_path.is_file():
+                    # Sidecar existiert → erneut speichern (garantiert Flush)
+                    store.dirty = True
+                    store.save(force=True)
+                    saved += 1
+            except Exception as e:
+                errors.append(f"{p.name}: {e}")
+        if errors:
+            QMessageBox.warning(
+                self,
+                "Alles speichern",
+                f"Gespeichert: {saved}\nFehler:\n" + "\n".join(errors[:8]),
+            )
+        else:
+            self._set_status(f"Alles speichern: {saved} Datei(en)/Sidecar(s)")
 
     def save_as(self):
         if not self.doc:

@@ -11,6 +11,7 @@ SHORTCUTS_HTML = """
 <tr><td>Neu</td><td><code>Ctrl+N</code></td></tr>
 <tr><td>Öffnen</td><td><code>Ctrl+O</code></td></tr>
 <tr><td>Speichern</td><td><code>Ctrl+S</code></td></tr>
+<tr><td>Alles speichern</td><td><code>Ctrl+Alt+Shift+S</code></td></tr>
 <tr><td>Speichern unter…</td><td><code>Ctrl+Shift+S</code></td></tr>
 <tr><td>Als Kopie speichern…</td><td><code>Ctrl+Alt+S</code></td></tr>
 <tr><td>Drucken</td><td><code>Ctrl+P</code></td></tr>
@@ -27,7 +28,7 @@ SHORTCUTS_HTML = """
 <tr><td>Seite einpassen</td><td><code>Ctrl+0</code></td></tr>
 <tr><td>Breite einpassen</td><td><code>Ctrl+9</code></td></tr>
 <tr><td>Zoom 100&nbsp;%</td><td><code>Ctrl+1</code></td></tr>
-<tr><td>Overlay bearbeiten</td><td>Doppelklick / <code>Ctrl</code>+Klick</td></tr>
+<tr><td>Overlay / Notiz bearbeiten</td><td>Doppelklick / <code>Ctrl</code>+Klick / <code>Ctrl+E</code></td></tr>
 <tr><td>Annotation auswählen</td><td>Werkzeug Auswahl / Shift+Klick / Rechtsklick</td></tr>
 <tr><td>Annotation löschen</td><td><code>Entf</code> / <code>Backspace</code> (Auswahl oder letzte)</td></tr>
 <tr><td>Diese Hilfe</td><td><code>F1</code></td></tr>
@@ -35,20 +36,23 @@ SHORTCUTS_HTML = """
 <p><b>Speichern unter (PDF):</b> speichert die Annotationen als Sidecar
 <code>*.ildann.json</code> (PDF-Datei bleibt unverändert). Auch unter
 PDF → Annotationen speichern unter…</p>
+<p><b>Alles speichern:</b> aktuelles Dokument sowie Annotation-Sidecars der offenen PDF-Tabs
+(<code>Ctrl+Alt+Shift+S</code> / Datei).</p>
 <p><b>Als Kopie speichern (PDF):</b> schreibt PDF + Sidecar an neuen Pfad;
 aktuelles Dokument bleibt geöffnet (<code>Ctrl+Alt+S</code> / Datei / PDF).</p>
 <p><b>Lesezeichen:</b> Sidebar +/− oder PDF → Lesezeichen hinzufügen/löschen.</p>
 <p><b>Annotationen JSON:</b> PDF → exportieren / importieren (ersetzen oder anhängen).</p>
 <p><b>PDF-Werkzeuge</b> (Toolbar): Auswahl, Highlight, Schwärzen (REDACT-Preview), Formen per Drag;
 Notiz/Stempel/Callout/Overlay per Klick; <b>HL</b>/<b>Stift</b>-Farben-Picker; Ann. löschen;
-Seite <b>⟲/⟳ drehen</b>, <b>leere Seite</b>, <b>duplizieren</b>.</p>
+Seite <b>⟲/⟳ drehen</b>, <b>↔/↕ spiegeln</b>, <b>leere Seite</b>, <b>duplizieren</b>.</p>
 <p><b>PDF-Suche:</b> Sidebar-Suche highlightet Treffer auf der aktuellen Seite;
 „Weiter“ springt zum nächsten Treffer; <b>letzte Suchbegriffe</b> im Dropdown.</p>
 <p><b>Annotationen:</b> eigene Liste in der Sidebar — Klick springt zur Annotation;
-Filter-Dropdown nach Typ.</p>
+Filter-Dropdown nach Typ; Text nachträglich editierbar.</p>
 <p><b>Seitenbereich:</b> PDF → Seitenbereich extrahieren… (von–bis → neues PDF)
 bzw. Dialog „zusammenführen / teilen / Bereich“.</p>
 <p><b>Suchen und Ersetzen:</b> Bearbeiten → Ctrl+R (nur Texteditor).</p>
+<p><b>Zeilennummern:</b> Ansicht → Zeilennummern (optional, auch in Einstellungen).</p>
 <p><b>Lizenz:</b> bei weniger als 7 Resttagen prominent in der Statusleiste.</p>
 <p><b>Seiten als Bilder:</b> PDF → Seite/Seiten als PNG/JPEG exportieren (aktuell oder alle).</p>
 <p><b>Thumbnails:</b> in der Sidebar ziehen zum Neuordnen der Seiten.</p>

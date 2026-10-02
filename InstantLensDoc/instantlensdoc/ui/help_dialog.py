@@ -19,6 +19,7 @@ HELP_HTML = """
     <b>Standard-Zoom</b>, <b>Autosave-Intervall</b>, Update-Hinweis, Pfade</li>
 <li><b>Datei → Zuletzt geöffnet</b>: Menü + Seitenleiste (persistiert)</li>
 <li><b>Datei → Speichern unter</b> (Ctrl+Shift+S): Text → Dokument; PDF → Annotation-Sidecar wählen (PDF unverändert)</li>
+<li><b>Datei → Alles speichern</b> (Ctrl+Alt+Shift+S): aktuelles Doc + PDF-Sidecars offener Tabs</li>
 <li><b>Datei → Als Kopie speichern</b> (Ctrl+Alt+S): PDF + Sidecar kopieren (Doc bleibt offen); Editor → Speichern unter</li>
 <li><b>Datei → Exportieren</b>: Editor-Inhalt als HTML, DOCX oder PDF (zuletzt genutzter Ordner wird gemerkt)</li>
 <li><b>Datei → Drucken</b> (Ctrl+P): Editor oder aktuelle PDF-Seite (Qt Print)</li>
@@ -28,16 +29,16 @@ HELP_HTML = """
 <li><b>Bearbeiten → Suchen und Ersetzen</b> (Ctrl+R): Find/Replace im Texteditor</li>
 <li><b>Bearbeiten → Auswahl markieren</b> (Ctrl+H): Markierung im Editor + Eintrag in der Seitenleiste</li>
 <li><b>Ansicht</b>: Zoom +/−, Seite einpassen (Ctrl+0), Breite (Ctrl+9), 100&nbsp;% (Ctrl+1);
-    <b>Hell/Dunkel</b>-Design umschalten</li>
+    <b>Hell/Dunkel</b>-Design umschalten; optionale <b>Zeilennummern</b></li>
 <li><b>Drag &amp; Drop</b>: Dateien auf das Fenster ziehen zum Öffnen</li>
 <li><b>Autosave</b>: Textdokumente (mit Pfad) und PDF-Annotationen — Intervall in Einstellungen</li>
-<li><b>PDF</b>: Blättern, Zoom/Fit (debounced + Cache), <b>⟲/⟳ drehen</b> (speichert),
+<li><b>PDF</b>: Blättern, Zoom/Fit (debounced + Cache), <b>⟲/⟳ drehen</b> / <b>↔/↕ spiegeln</b> (speichert),
     <b>leere Seite / duplizieren</b>, Seite löschen, Seiten neu anordnen;
     Annotationen: Highlight (Drag) + <b>Farben-Picker HL/Stift</b>, <b>Schwärzen/Redaction</b> (Drag + Preview „REDACT“ + Einbrennen-Dialog), Unterstreichen, Notiz, <b>Text-Overlay</b>, Stempel, Callout,
     <b>Rechteck / Linie / Pfeil / Lineal</b> —
     Sidecar <code>*.ildann.json</code> (v3, Auto-Save, Undo/Redo); JSON Export/Import;
     <b>Textsuche</b> highlightet Treffer auf der aktuellen Seite;
-    Doppelklick oder Strg+Klick auf Overlay zum Bearbeiten;
+    Doppelklick / Strg+Klick / <b>Ctrl+E</b> auf Notiz/Overlay zum Bearbeiten;
     PDF → Text→Overlay / Overlay einbrennen;
     <b>Signaturfeld</b> (Platzhalter) und <b>Signatur (Bild)</b> einfügen;
     <b>PDFs zusammenführen / teilen / Seitenbereich</b>;
@@ -77,7 +78,7 @@ Beispiel: <code>examples/ild_pdf_demo.py</code>. API: <code>ild_pdf/README.md</c
 <code>D:\\AI_Temp\\InstantLensDoc</code>, pip, optional Start. Eigenes Icon in <code>assets</code> bleibt erhalten.</p>
 <h3>Geplante Features</h3>
 <p>KI-Assistent, Cloud-Sync, Stylus/Palm Rejection, 3D u. a. sind im Menü als „Geplant“ markiert
-(Stub 0.2.6) — siehe FEATURES.md.</p>
+(Stub 0.2.7) — siehe FEATURES.md.</p>
 """
 
 

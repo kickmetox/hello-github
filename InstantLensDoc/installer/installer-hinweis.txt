@@ -1,4 +1,4 @@
-InstantLens Doc 0.2.6 — Installation
+InstantLens Doc 0.2.7 — Installation
 
 Startmenü: Gruppe „InstantLens Doc“ mit Programm, optional Keygenerator, INFO und Deinstallieren.
 Desktop-Verknüpfung: optional (Standard an).

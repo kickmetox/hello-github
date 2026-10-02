@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | 0.2.6 |
+| Version | 0.2.7 |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -32,12 +32,9 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)
 
-## Neu in 0.2.6
+## Neu in 0.2.7
 
-- PDF-Seitenbereich extrahieren (von–bis → neues PDF)  
-- Annotation-Filter nach Typ in der Sidebar  
-- Editor: Suchen und Ersetzen (Ctrl+R)  
-- Lizenz-Resttage prominent bei <7 Tagen  
-- Stubs KI/Cloud/Stylus/3D unverändert  
-
-Details: [CHANGELOG.md](CHANGELOG.md)
+- PDF-Seiten horizontal/vertikal spiegeln  
+- Annotation-Notiz/Kommentar nachträglich editierbar  
+- Editor: optionale Zeilennummern  
+- Alles speichern für offene Tabs  

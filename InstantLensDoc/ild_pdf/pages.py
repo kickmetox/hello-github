@@ -30,6 +30,41 @@ def rotate_page(path: str | Path, page_index: int, degrees: int = 90) -> None:
         pdf.save(path)
 
 
+def flip_page(
+    path: str | Path,
+    page_index: int,
+    *,
+    horizontal: bool = False,
+    vertical: bool = False,
+) -> None:
+    """
+    Seite horizontal (links↔rechts) und/oder vertikal (oben↔unten) spiegeln und speichern.
+    Transformation wird um den Content-Stream gelegt (MediaBox).
+    """
+    if not horizontal and not vertical:
+        raise ValueError("horizontal und/oder vertical muss True sein")
+    path = Path(path)
+    with pikepdf.open(path, allow_overwriting_input=True) as pdf:
+        if page_index < 0 or page_index >= len(pdf.pages):
+            raise IndexError(f"Seite {page_index} existiert nicht")
+        page = pdf.pages[page_index]
+        mb = page.mediabox
+        llx, lly = float(mb[0]), float(mb[1])
+        urx, ury = float(mb[2]), float(mb[3])
+        # PDF-Koordinaten: Ursprung unten links
+        a, b, c, d, e, f = 1.0, 0.0, 0.0, 1.0, 0.0, 0.0
+        if horizontal:
+            # x' = -x + (llx+urx)
+            a, e = -1.0, llx + urx
+        if vertical:
+            # y' = -y + (lly+ury)
+            d, f = -1.0, lly + ury
+        prefix = f"q {a:g} {b:g} {c:g} {d:g} {e:g} {f:g} cm\n".encode("ascii")
+        page.contents_add(prefix, prepend=True)
+        page.contents_add(b"\nQ\n", prepend=False)
+        pdf.save(path)
+
+
 def insert_blank_page(
     path: str | Path,
     at_index: int | None = None,

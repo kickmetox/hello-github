@@ -37,6 +37,7 @@ from instantlensdoc.core.app_settings import (
     set_batch_output_dir,
     set_default_open_dir,
     set_default_zoom_percent,
+    set_editor_line_numbers,
     set_ocr_lang,
     set_theme,
     set_ui_lang,
@@ -95,6 +96,13 @@ class SettingsDialog(QDialog):
         self.autosave_sec.setValue(get_autosave_interval_sec())
         self.autosave_sec.setToolTip("Intervall für Autosave (Editor + Annotationen)")
         form.addRow(tr("autosave_interval"), self.autosave_sec)
+
+        self.line_numbers = QCheckBox("Zeilennummern im Editor")
+        from instantlensdoc.core.app_settings import get_editor_line_numbers
+
+        self.line_numbers.setChecked(get_editor_line_numbers())
+        self.line_numbers.setToolTip("Optionale Zeilennummern im Texteditor")
+        form.addRow(self.line_numbers)
 
         self.jpeg_q = QSpinBox()
         self.jpeg_q.setRange(10, 100)
@@ -164,6 +172,7 @@ class SettingsDialog(QDialog):
         set_update_check_on_start(self.update_chk.isChecked())
         set_default_zoom_percent(int(self.zoom_pct.value()))
         set_autosave_interval_sec(int(self.autosave_sec.value()))
+        set_editor_line_numbers(self.line_numbers.isChecked())
         save_settings(
             {
                 "export_jpeg_quality": int(self.jpeg_q.value()),

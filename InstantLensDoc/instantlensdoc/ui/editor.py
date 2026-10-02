@@ -1,12 +1,27 @@
-"""Text-/Layout-Editor-Fläche mit Suche und Markieren."""
+"""Text-/Layout-Editor-Fläche mit Suche, Markieren und optionalen Zeilennummern."""
 
 from __future__ import annotations
 
 import tempfile
 from pathlib import Path
 
-from PySide6.QtGui import QColor, QFont, QImage, QTextCharFormat, QTextCursor, QTextDocument
-from PySide6.QtWidgets import QApplication, QPlainTextEdit, QTextEdit
+from PySide6.QtCore import QRect, QSize, Qt
+from PySide6.QtGui import QColor, QFont, QImage, QPainter, QTextCharFormat, QTextCursor, QTextDocument
+from PySide6.QtWidgets import QApplication, QPlainTextEdit, QTextEdit, QWidget
+
+from instantlensdoc.core.app_settings import get_editor_line_numbers
+
+
+class _LineNumberArea(QWidget):
+    def __init__(self, editor: "TextEditor"):
+        super().__init__(editor)
+        self._editor = editor
+
+    def sizeHint(self) -> QSize:  # noqa: N802
+        return QSize(self._editor.line_number_area_width(), 0)
+
+    def paintEvent(self, event):  # noqa: N802
+        self._editor.paint_line_number_area(event)
 
 
 class TextEditor(QPlainTextEdit):
@@ -19,6 +34,70 @@ class TextEditor(QPlainTextEdit):
         self._last_query = ""
         self._paste_image_dir: Path | None = None
         self._last_case_sensitive = False
+        self._line_numbers = bool(get_editor_line_numbers())
+        self._line_number_area = _LineNumberArea(self)
+        self.blockCountChanged.connect(self._update_line_number_area_width)
+        self.updateRequest.connect(self._update_line_number_area)
+        self._update_line_number_area_width(0)
+        self.set_line_numbers_visible(self._line_numbers)
+
+    def line_number_area_width(self) -> int:
+        if not self._line_numbers:
+            return 0
+        digits = max(2, len(str(max(1, self.blockCount()))))
+        return 8 + self.fontMetrics().horizontalAdvance("9") * digits
+
+    def set_line_numbers_visible(self, visible: bool) -> None:
+        self._line_numbers = bool(visible)
+        self._line_number_area.setVisible(self._line_numbers)
+        self._update_line_number_area_width(0)
+        self.viewport().update()
+
+    def line_numbers_visible(self) -> bool:
+        return self._line_numbers
+
+    def _update_line_number_area_width(self, _new_block_count: int = 0) -> None:
+        self.setViewportMargins(self.line_number_area_width(), 0, 0, 0)
+
+    def _update_line_number_area(self, rect: QRect, dy: int) -> None:
+        if dy:
+            self._line_number_area.scroll(0, dy)
+        else:
+            self._line_number_area.update(0, rect.y(), self._line_number_area.width(), rect.height())
+        if rect.contains(self.viewport().rect()):
+            self._update_line_number_area_width(0)
+
+    def resizeEvent(self, event):  # noqa: N802
+        super().resizeEvent(event)
+        cr = self.contentsRect()
+        self._line_number_area.setGeometry(
+            QRect(cr.left(), cr.top(), self.line_number_area_width(), cr.height())
+        )
+
+    def paint_line_number_area(self, event) -> None:
+        if not self._line_numbers:
+            return
+        painter = QPainter(self._line_number_area)
+        painter.fillRect(event.rect(), QColor("#E8ECF0"))
+        block = self.firstVisibleBlock()
+        block_number = block.blockNumber()
+        top = int(self.blockBoundingGeometry(block).translated(self.contentOffset()).top())
+        bottom = top + int(self.blockBoundingRect(block).height())
+        while block.isValid() and top <= event.rect().bottom():
+            if block.isVisible() and bottom >= event.rect().top():
+                painter.setPen(QColor("#5A6A7A"))
+                painter.drawText(
+                    0,
+                    top,
+                    self._line_number_area.width() - 4,
+                    self.fontMetrics().height(),
+                    Qt.AlignRight,
+                    str(block_number + 1),
+                )
+            block = block.next()
+            top = bottom
+            bottom = top + int(self.blockBoundingRect(block).height())
+            block_number += 1
 
     def set_paste_image_dir(self, path: Path | None) -> None:
         self._paste_image_dir = Path(path) if path else None

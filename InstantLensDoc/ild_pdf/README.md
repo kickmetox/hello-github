@@ -1,7 +1,7 @@
 # ild_pdf — auskoppelbares PDF-Modul
 
 Lizenzfreundliche PDF-Engine auf **pypdfium2 / PDFium** (kein Poppler/GPL).  
-Version **0.2.6**.
+Version **0.2.7**.
 
 ## Installation
 
@@ -17,7 +17,7 @@ cd InstantLensDoc && python -c "import ild_pdf; print(ild_pdf.__version__)"
 from ild_pdf import (
     PdfDocument, render_page,
     Annotation, AnnotationStore, AnnotationType,
-    rotate_page, delete_pages, reorder_pages,
+    rotate_page, flip_page, delete_pages, reorder_pages,
     extract_page_image, insert_image_as_page,
     extract_text_blocks, import_page_text_as_overlays, bake_text_overlays,
 )
@@ -62,7 +62,7 @@ python examples/ild_pdf_demo.py pfad/zu/datei.pdf
 | `bake_text_overlays` | Overlays als PDF-Content (Helvetica) einbrennen |
 | `extract_page_image` / `extract_pages_as_images` / `insert_image_as_page` | Seite(n)→PNG/JPEG / Bild→Seite |
 | `extract_embedded_images` / `insert_image_stamp_overlay` | Extraktion / Stempel-Hook |
-| `rotate_page` / `delete_pages` / `reorder_pages` | pikepdf-Seitenops |
+| `rotate_page` / `flip_page` / `delete_pages` / `reorder_pages` | pikepdf-Seitenops |
 | `merge_pdfs` / `split_pdf` / `extract_page_range` | Zusammenführen / Teilen / Seitenbereich → neues PDF |
 | `extract_outline` / `add_outline_item` / `delete_outline_item` | Lesezeichen lesen / hinzufügen / löschen |
 | `apply_watermark` / `apply_page_numbers` | Wasserzeichen / Seitenzahlen |

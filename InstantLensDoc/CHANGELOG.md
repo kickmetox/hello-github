@@ -1,5 +1,25 @@
 # Changelog — InstantLens Doc
 
+## 0.2.7 — Spiegeln, Ann.-Edit, Zeilennummern, Alles speichern
+
+Fokus: PDF-Spiegeln, Annotation-Text nachträglich, Editor-Zeilennummern, Speichern aller Tabs.
+
+### PDF
+- **Seite spiegeln**: horizontal (↔) und vertikal (↕) (`ild_pdf.flip_page`; Toolbar + Menü PDF)
+
+### Annotationen
+- **Notiz/Kommentar/Overlay-Text nachträglich editierbar** (Doppelklick / Ctrl+Klick / Bearbeiten → Ctrl+E)
+
+### Editor / UX
+- **Zeilennummern optional** (Ansicht-Menü + Einstellungen)
+- **Alles speichern** für offene Tabs (Ctrl+Alt+Shift+S; aktuelles Doc + PDF-Sidecars)
+
+### Docs / Packaging
+- Version **0.2.7**; Stubs KI/Cloud/Stylus/3D unverändert (keine Fake-Features)
+- Docs/CHANGELOG/ISS/Smoke auf 0.2.7
+
+---
+
 ## 0.2.6 — Seitenbereich, Ann.-Filter, Find/Replace, Lizenz-Warnung
 
 Fokus: PDF-Seitenbereich, Annotation-Filter, Editor Ersetzen, Lizenz <7 Tage.

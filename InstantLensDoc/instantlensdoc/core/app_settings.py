@@ -28,6 +28,7 @@ DEFAULTS: dict[str, Any] = {
     "autosave_interval_sec": 60,
     "ann_highlight_color": "#FFE066",
     "ann_pen_color": "#2C3E50",
+    "editor_line_numbers": False,
 }
 
 
@@ -208,3 +209,11 @@ def set_ann_pen_color(color: str) -> None:
     if not c.startswith("#"):
         c = "#" + c
     save_settings({"ann_pen_color": c})
+
+
+def get_editor_line_numbers() -> bool:
+    return bool(load_settings().get("editor_line_numbers", False))
+
+
+def set_editor_line_numbers(enabled: bool) -> None:
+    save_settings({"editor_line_numbers": bool(enabled)})

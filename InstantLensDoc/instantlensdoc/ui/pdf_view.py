@@ -52,6 +52,7 @@ from ild_pdf import (
 from ild_pdf.pages import (
     delete_pages,
     duplicate_page,
+    flip_page,
     insert_blank_page,
     reorder_pages,
     rotate_page,
@@ -116,23 +117,33 @@ class PageReorderDialog(QDialog):
 
 
 class TextOverlayEditDialog(QDialog):
-    """Overlay-Textblock bearbeiten (Sidecar, kein natives PDF-Rewrite)."""
+    """Annotation-Text bearbeiten (Notiz/Kommentar/Overlay; Sidecar)."""
 
     def __init__(self, ann: Annotation, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Text-Overlay bearbeiten")
+        kind = {
+            AnnotationType.STICKY: "Notiz",
+            AnnotationType.TEXT: "Text",
+            AnnotationType.TEXT_OVERLAY: "Text-Overlay",
+            AnnotationType.CALLOUT: "Callout",
+            AnnotationType.STAMP: "Stempel",
+            AnnotationType.SIGNATURE_FIELD: "Signaturfeld",
+        }.get(ann.type, "Annotation")
+        self.setWindowTitle(f"{kind} bearbeiten")
         self.resize(420, 280)
+        self._show_style = ann.type == AnnotationType.TEXT_OVERLAY
         layout = QVBoxLayout(self)
         form = QFormLayout()
         self.text = QPlainTextEdit()
         self.text.setPlainText(ann.text or "")
+        form.addRow("Text:", self.text)
         self.font_size = QDoubleSpinBox()
         self.font_size.setRange(6, 96)
         self.font_size.setValue(float(ann.font_size or 12))
         self.color = QLineEdit(ann.color or "#1A5276")
-        form.addRow("Text:", self.text)
-        form.addRow("Schriftgröße (px):", self.font_size)
-        form.addRow("Farbe:", self.color)
+        if self._show_style:
+            form.addRow("Schriftgröße (px):", self.font_size)
+            form.addRow("Farbe:", self.color)
         layout.addLayout(form)
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         buttons.accepted.connect(self.accept)
@@ -140,11 +151,11 @@ class TextOverlayEditDialog(QDialog):
         layout.addWidget(buttons)
 
     def values(self) -> dict:
-        return {
-            "text": self.text.toPlainText(),
-            "font_size": float(self.font_size.value()),
-            "color": self.color.text().strip() or "#1A5276",
-        }
+        out = {"text": self.text.toPlainText()}
+        if self._show_style:
+            out["font_size"] = float(self.font_size.value())
+            out["color"] = self.color.text().strip() or "#1A5276"
+        return out
 
 
 class PdfCanvas(QLabel):
@@ -228,10 +239,19 @@ class PdfCanvas(QLabel):
         return None
 
     def _hit_overlay(self, x: float, y: float) -> Annotation | None:
+        editable = (
+            AnnotationType.TEXT_OVERLAY,
+            AnnotationType.TEXT,
+            AnnotationType.STICKY,
+            AnnotationType.CALLOUT,
+            AnnotationType.STAMP,
+            AnnotationType.SIGNATURE_FIELD,
+        )
         for ann in reversed(self._annotations):
-            if ann.type not in (AnnotationType.TEXT_OVERLAY, AnnotationType.TEXT, AnnotationType.STICKY):
+            if ann.type not in editable:
                 continue
-            if ann.x <= x <= ann.x + max(ann.width, 40) and ann.y <= y <= ann.y + max(ann.height, 20):
+            x0, y0, x1, y1 = self._ann_bounds(ann)
+            if x0 <= x <= x1 and y0 <= y <= y1:
                 return ann
         return None
 
@@ -561,6 +581,12 @@ class PdfViewer(QWidget):
         btn_rot = QPushButton("⟳")
         btn_rot.setToolTip("Aktuelle Seite 90° im Uhrzeigersinn drehen und speichern")
         btn_rot.clicked.connect(lambda: self.rotate_current(90))
+        btn_flip_h = QPushButton("↔")
+        btn_flip_h.setToolTip("Aktuelle Seite horizontal spiegeln (links↔rechts) und speichern")
+        btn_flip_h.clicked.connect(lambda: self.flip_current(horizontal=True))
+        btn_flip_v = QPushButton("↕")
+        btn_flip_v.setToolTip("Aktuelle Seite vertikal spiegeln (oben↔unten) und speichern")
+        btn_flip_v.clicked.connect(lambda: self.flip_current(vertical=True))
         btn_blank = QPushButton("Leere Seite")
         btn_blank.setToolTip("Leere Seite nach der aktuellen einfügen und speichern")
         btn_blank.clicked.connect(self.insert_blank_after_current)
@@ -650,6 +676,8 @@ class PdfViewer(QWidget):
         toolbar.addWidget(btn_fit_w)
         toolbar.addWidget(btn_rot_ccw)
         toolbar.addWidget(btn_rot)
+        toolbar.addWidget(btn_flip_h)
+        toolbar.addWidget(btn_flip_v)
         toolbar.addWidget(btn_blank)
         toolbar.addWidget(btn_dup)
         toolbar.addWidget(btn_del)
@@ -1623,10 +1651,21 @@ class PdfViewer(QWidget):
         return out
 
     def _edit_overlay(self, ann_id: str):
+        """Notiz-/Kommentar-/Overlay-Text nachträglich bearbeiten."""
         if not self.store:
             return
         ann = self.store.get(ann_id)
         if not ann:
+            return
+        editable = {
+            AnnotationType.TEXT_OVERLAY,
+            AnnotationType.TEXT,
+            AnnotationType.STICKY,
+            AnnotationType.CALLOUT,
+            AnnotationType.STAMP,
+            AnnotationType.SIGNATURE_FIELD,
+        }
+        if ann.type not in editable:
             return
         dlg = TextOverlayEditDialog(ann, self)
         if dlg.exec() != QDialog.Accepted:
@@ -1636,10 +1675,65 @@ class PdfViewer(QWidget):
         try:
             self.store.save()
         except Exception as e:
-            QMessageBox.warning(self, "Overlay", str(e))
+            QMessageBox.warning(self, "Annotation", str(e))
         self.refresh()
         self.annotations_changed.emit()
-        self.status.emit("Text-Overlay aktualisiert")
+        self.status.emit(f"{ann.type.value} aktualisiert")
+
+    def edit_selected_annotation_text(self) -> bool:
+        """Ausgewählte Annotation (Notiz/Text/…) bearbeiten."""
+        if not self.store or not self._selected_ann_id:
+            return False
+        ann = self.store.get(self._selected_ann_id)
+        if not ann:
+            return False
+        self._edit_overlay(ann.id)
+        return True
+
+    def rotate_current(self, degrees: int = 90):
+        """Aktuelle Seite drehen (−90/90/180/270) und PDF speichern."""
+        if not self.pdf_path:
+            return
+        try:
+            rotate_page(self.pdf_path, self.page_index, int(degrees))
+            from ild_pdf.render import clear_render_cache
+
+            clear_render_cache(self.pdf_path)
+            self.refresh()
+            self.document_changed.emit()
+            deg = int(degrees) % 360
+            self.status.emit(f"Seite {self.page_index + 1} gedreht ({deg}°) und gespeichert")
+        except Exception as e:
+            QMessageBox.warning(self, "Drehen", str(e))
+
+    def flip_current(self, *, horizontal: bool = False, vertical: bool = False):
+        """Aktuelle Seite spiegeln (horizontal und/oder vertikal) und speichern."""
+        if not self.pdf_path:
+            return
+        if not horizontal and not vertical:
+            return
+        try:
+            flip_page(
+                self.pdf_path,
+                self.page_index,
+                horizontal=horizontal,
+                vertical=vertical,
+            )
+            from ild_pdf.render import clear_render_cache
+
+            clear_render_cache(self.pdf_path)
+            self.refresh()
+            self.document_changed.emit()
+            parts = []
+            if horizontal:
+                parts.append("horizontal")
+            if vertical:
+                parts.append("vertikal")
+            self.status.emit(
+                f"Seite {self.page_index + 1} gespiegelt ({'/'.join(parts)}) und gespeichert"
+            )
+        except Exception as e:
+            QMessageBox.warning(self, "Spiegeln", str(e))
 
     def extract_page_as_image(self):
         if not self.pdf_path:
@@ -1940,22 +2034,6 @@ class PdfViewer(QWidget):
         self.refresh()
         self.annotations_changed.emit()
         self.status.emit(f"Annotation gespeichert ({ann.type.value})")
-
-    def rotate_current(self, degrees: int = 90):
-        """Aktuelle Seite drehen (−90/90/180/270) und PDF speichern."""
-        if not self.pdf_path:
-            return
-        try:
-            rotate_page(self.pdf_path, self.page_index, int(degrees))
-            from ild_pdf.render import clear_render_cache
-
-            clear_render_cache(self.pdf_path)
-            self.refresh()
-            self.document_changed.emit()
-            deg = int(degrees) % 360
-            self.status.emit(f"Seite {self.page_index + 1} gedreht ({deg}°) und gespeichert")
-        except Exception as e:
-            QMessageBox.warning(self, "Drehen", str(e))
 
     def _remap_insert(self, insert_at: int) -> None:
         """Annotation-Seitenindizes nach Einfügen einer Seite bei insert_at anpassen."""
