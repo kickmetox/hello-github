@@ -15,10 +15,12 @@ HELP_HTML = """
 <h3>Erste Schritte</h3>
 <ul>
 <li><b>Datei → Öffnen</b>: TXT, MD, HTML, DOCX, PDF, Bilder</li>
+<li><b>Datei → Einstellungen</b>: OCR-Standardsprache, Theme, Batch-/Öffnen-Pfade</li>
 <li><b>Datei → Zuletzt geöffnet</b>: Menü + Seitenleiste (persistiert)</li>
 <li><b>Datei → Exportieren</b>: Editor-Inhalt als HTML, DOCX oder PDF</li>
 <li><b>Datei → Drucken</b> (Ctrl+P): Editor oder aktuelle PDF-Seite (Qt Print)</li>
-<li><b>Seitenleiste</b>: Suche, Zuletzt geöffnet, Dokumente, Annotationen/Markierungen</li>
+<li><b>Seitenleiste</b>: Suche, „Alle Docs“-Volltext, Zuletzt geöffnet, Dokumente,
+    Lesezeichen/Outline, Annotationen/Markierungen</li>
 <li><b>Bearbeiten → Rückgängig/Wiederholen</b>: Editor-Text <i>oder</i> PDF-Annotationen/Overlay-Text (Ctrl+Z / Ctrl+Y)</li>
 <li><b>Bearbeiten → Auswahl markieren</b> (Ctrl+H): Markierung im Editor + Eintrag in der Seitenleiste</li>
 <li><b>Ansicht</b>: Zoom +/−, Seite einpassen (Ctrl+0), Breite (Ctrl+9), 100&nbsp;% (Ctrl+1);
@@ -32,7 +34,9 @@ HELP_HTML = """
     Doppelklick oder Strg+Klick auf Overlay zum Bearbeiten;
     PDF → Text→Overlay / Overlay einbrennen;
     <b>Signaturfeld</b> (Platzhalter) und <b>Signatur (Bild)</b> einfügen;
+    <b>PDFs zusammenführen / teilen</b>;
     Seite als Bild / Bild als neue Seite / Seite drucken</li>
+<li><b>Extras → Batch-Konvertierung</b>: Ordner → PDF oder OCR</li>
 <li><b>Einfügen → Verketteter Textrahmen</b>: Overflow fließt in den Folgeahmen</li>
 <li><b>OCR</b>: Extras → OCR — Sprach-Presets + Modus „editierbarer Text“ oder
     „durchsuchbares Bild“ (PDF + <code>*.ildocr.txt</code>); Tabellen-Heuristik als Markdown wo möglich.

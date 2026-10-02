@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
+from instantlensdoc.core.app_settings import get_ocr_lang
 from instantlensdoc.core.ocr import (
     INSTALL_HINT_HTML,
     LANG_PRESETS,
@@ -56,8 +57,13 @@ class OcrDialog(QDialog):
 
         form = QFormLayout()
         self.lang_combo = QComboBox()
-        for name, code in LANG_PRESETS.items():
+        default_lang = get_ocr_lang()
+        pick = 0
+        for i, (name, code) in enumerate(LANG_PRESETS.items()):
             self.lang_combo.addItem(name, code)
+            if code == default_lang:
+                pick = i
+        self.lang_combo.setCurrentIndex(pick)
         # Installierte Sprachen als Zusatzinfo
         installed = list_installed_languages()
         if installed:

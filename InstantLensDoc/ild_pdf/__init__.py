@@ -13,7 +13,8 @@ from .annotate import (
     DRAG_TYPES,
     STAMP_PRESETS,
 )
-from .pages import rotate_page, delete_pages, reorder_pages
+from .pages import merge_pdfs, split_pdf, rotate_page, delete_pages, reorder_pages
+from .outline import OutlineItem, extract_outline
 from .images import (
     extract_page_image,
     extract_embedded_images,
@@ -38,9 +39,13 @@ __all__ = [
     "AnnotationType",
     "DRAG_TYPES",
     "STAMP_PRESETS",
+    "merge_pdfs",
+    "split_pdf",
     "rotate_page",
     "delete_pages",
     "reorder_pages",
+    "OutlineItem",
+    "extract_outline",
     "extract_page_image",
     "extract_embedded_images",
     "insert_image_as_page",
@@ -53,4 +58,4 @@ __all__ = [
     "bake_text_overlays",
 ]
 
-__version__ = "0.1.5"
+__version__ = "0.1.6"

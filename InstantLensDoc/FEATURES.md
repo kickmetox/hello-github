@@ -27,7 +27,12 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | PDF Seite↔Bild Hooks | fertig | Extrahieren / Bild als Seite / Bildstempel |
 | PDF drehen / Seite löschen | fertig | pikepdf; Annotation-Remap |
 | PDF neu anordnen | fertig | Dialog + Annotation-Remap |
-| Textsuche Seitenleiste | fertig | Editor: alle Treffer; PDF: Annotationen filtern |
+| Textsuche Seitenleiste | fertig | Editor + PDF-Text + Annotationen |
+| Volltextsuche geöffnete Docs | fertig | Sidebar „Alle Docs“ |
+| Lesezeichen / PDF-Outline | fertig | Baum in Sidebar, Doppelklick → Seite |
+| Batch-Konvertierung Ordner | fertig | Bilder→PDF, OCR-Ordner, PDF-OCR-Text |
+| PDF zusammenführen / teilen | fertig | Dialog unter Menü PDF |
+| Einstellungen-Dialog | fertig | OCR-Sprache, Theme, Pfade |
 | Markieren im Editor | fertig | Ctrl+H |
 | Bilder JPEG/PNG anzeigen | fertig | |
 | OCR Bild/PDF-Seite | teilweise | Presets + Modi; Tabellen-Heuristik; Tesseract-Link |
@@ -38,10 +43,10 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | Layout: einfacher Umbruch | fertig | Wortgrenzen |
 | Lizenz Trial 28d / Keys 32d | fertig | Statusleiste farbig + Tooltip |
 | Keygenerator (CLI/GUI) | fertig | `run-keygen.bat` |
-| PyInstaller Build Windows | fertig | `build-windows.ps1` |
-| Inno-Installer | fertig | Desktop + Startmenü-Hinweis 0.1.5 |
+| PyInstaller Build Windows | fertig | `build-windows.ps1`, Icon `assets/app.ico` |
+| Inno-Installer | fertig | Desktop + Startmenü-Hinweis 0.1.6 |
 | Sync-Skript Windows | fertig | Store `docs/sync-ild.ps1` |
-| In-App Hilfe / About | fertig | Version 0.1.5 |
+| In-App Hilfe / About | fertig | Version 0.1.6 |
 | FEATURES.md / INFO.md | fertig | |
 | `ild_pdf` Modul + Beispielskript | fertig | `examples/ild_pdf_demo.py` |
 | Font-Matching | geplant | |

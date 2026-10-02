@@ -2,16 +2,13 @@
 
 from __future__ import annotations
 
-import json
 from typing import Literal
 
 from PySide6.QtWidgets import QApplication, QWidget
 
-from instantlensdoc.config import config_dir
+from instantlensdoc.core.app_settings import get_theme, set_theme
 
 ThemeMode = Literal["light", "dark"]
-
-SETTINGS_NAME = "ui_settings.json"
 
 LIGHT_STYLE = """
 QMainWindow, QWidget { background: #f5f5f5; color: #1a1a1a; }
@@ -43,32 +40,12 @@ QLabel { color: #e8e8e8; }
 """
 
 
-def settings_path():
-    return config_dir() / SETTINGS_NAME
-
-
 def load_theme_mode() -> ThemeMode:
-    path = settings_path()
-    if not path.is_file():
-        return "light"
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-        mode = data.get("theme", "light")
-        return "dark" if mode == "dark" else "light"
-    except Exception:
-        return "light"
+    return get_theme()
 
 
 def save_theme_mode(mode: ThemeMode) -> None:
-    path = settings_path()
-    data: dict = {}
-    if path.is_file():
-        try:
-            data = json.loads(path.read_text(encoding="utf-8"))
-        except Exception:
-            data = {}
-    data["theme"] = mode
-    path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+    set_theme(mode)
 
 
 def apply_theme(app: QApplication | None = None, *, mode: ThemeMode | None = None) -> ThemeMode:

@@ -32,8 +32,14 @@ from instantlensdoc.ui.license_dialog import LicenseDialog
 from instantlensdoc.ui.ocr_dialog import OcrDialog
 from instantlensdoc.ui.pdf_view import PdfViewer
 from instantlensdoc.ui.sidebar import Sidebar
+from instantlensdoc.core import fulltext as fulltext_mod
+from instantlensdoc.core.app_settings import get_default_open_dir
+from instantlensdoc.ui.batch_dialog import BatchConvertDialog
+from instantlensdoc.ui.pdf_tools_dialog import PdfToolsDialog
+from instantlensdoc.ui.settings_dialog import SettingsDialog
 from instantlensdoc.ui.stubs import show_planned
 from instantlensdoc.ui.theme import apply_theme, load_theme_mode, toggle_theme
+from ild_pdf.outline import extract_outline
 
 
 class MainWindow(QMainWindow):
@@ -80,6 +86,8 @@ class MainWindow(QMainWindow):
         self.sidebar.file_activated.connect(self.open_path)
         self.sidebar.recent_activated.connect(self.open_path)
         self.sidebar.mark_activated.connect(self._on_mark_activated)
+        self.sidebar.outline_activated.connect(self._on_outline_jump)
+        self.sidebar.fulltext_hit_activated.connect(self._on_fulltext_hit)
         splitter.addWidget(self.sidebar)
 
         self.stack = QStackedWidget()
@@ -144,6 +152,9 @@ class MainWindow(QMainWindow):
         act_print.setShortcut(QKeySequence.Print)
         act_print.triggered.connect(self._print)
         m_file.addAction(act_print)
+        act_settings = QAction("Einstellungen…", self)
+        act_settings.triggered.connect(self._settings)
+        m_file.addAction(act_settings)
         m_file.addSeparator()
         act_quit = QAction("Beenden", self)
         act_quit.setShortcut(QKeySequence.Quit)
@@ -216,6 +227,10 @@ class MainWindow(QMainWindow):
         m_view.addAction(self._theme_action)
 
         m_pdf = mb.addMenu("&PDF")
+        act_merge = QAction("PDFs zusammenführen / teilen…", self)
+        act_merge.triggered.connect(self._pdf_tools)
+        m_pdf.addAction(act_merge)
+        m_pdf.addSeparator()
         for title, slot in [
             ("Annotationen speichern", lambda: self.pdf_view.save_annotations()),
             ("Annotationen laden", lambda: self.pdf_view.reload_annotations()),
@@ -246,6 +261,10 @@ class MainWindow(QMainWindow):
         m_ins.addAction(a)
 
         m_extra = mb.addMenu("E&xtras")
+        a = QAction("Batch-Konvertierung (Ordner)…", self)
+        a.triggered.connect(self._batch_convert)
+        m_extra.addAction(a)
+        m_extra.addSeparator()
         a = QAction("OCR (Bild/PDF-Seite)…", self)
         a.triggered.connect(self._run_ocr)
         m_extra.addAction(a)
@@ -473,6 +492,27 @@ class MainWindow(QMainWindow):
         if not query:
             self._set_status("Leere Suche")
             return
+        if self.sidebar.fulltext_mode:
+            paths = self.sidebar.document_paths()
+            if self.doc and self.doc.path and str(self.doc.path) not in paths:
+                paths.append(str(self.doc.path))
+            if not paths:
+                self._set_status("Keine Dokumente in der Liste für Volltextsuche")
+                return
+            hits = fulltext_mod.search_paths(paths, query)
+            if not hits:
+                self.sidebar.set_marks([f"Keine Treffer für „{query}“"])
+                self._set_status(f"0 Treffer in {len(paths)} Dokument(en)")
+                return
+            lines = []
+            payloads = []
+            for h in hits[:80]:
+                loc = f"S.{h.page + 1}" if h.page is not None else f"Z.{h.line}"
+                lines.append(f"{Path(h.path).name} {loc}: {h.snippet[:60]}")
+                payloads.append((h.path, h.page))
+            self.sidebar.set_marks(lines, payloads)
+            self._set_status(f"{len(hits)} Treffer in {len(paths)} Dokument(en)")
+            return
         if self.stack.currentWidget() is self.editor:
             n = self.editor.find_and_highlight(query)
             self._set_status(f"{n} Treffer für „{query}“")
@@ -480,21 +520,41 @@ class MainWindow(QMainWindow):
             self.sidebar.set_marks(lines)
             return
         if self.stack.currentWidget() is self.pdf_view:
-            # Annotationen nach Text filtern + Hinweis
             hits = []
             if self.pdf_view.store:
                 for a in self.pdf_view.store.annotations:
                     blob = f"{a.type.value} {a.text}".lower()
                     if query.lower() in blob:
                         hits.append(a)
+            pdf_path = self.pdf_view.pdf_path
+            page_hits: list[tuple[int, str]] = []
+            if pdf_path:
+                for page_idx, blob in fulltext_mod.extract_document_text(pdf_path):
+                    if page_idx is None:
+                        continue
+                    if query.lower() in blob.lower():
+                        page_hits.append((page_idx, blob))
+            if page_hits:
+                for pi, blob in page_hits:
+                    for line in blob.splitlines():
+                        if query.lower() in line.lower():
+                            hits.append(("page", pi, line.strip()[:80]))
+                            break
             if hits:
-                lines = [f"S{a.page + 1}: {a.type.value} {a.text[:40]}" for a in hits]
-                self.sidebar.set_marks(lines, hits)
-                self._set_status(f"{len(hits)} Annotation(en) zu „{query}“")
+                lines = []
+                payloads = []
+                for h in hits:
+                    if isinstance(h, tuple) and h[0] == "page":
+                        _, pi, snip = h
+                        lines.append(f"S.{pi + 1} Text: {snip}")
+                        payloads.append((str(pdf_path), pi))
+                    else:
+                        lines.append(f"S{h.page + 1}: {h.type.value} {h.text[:40]}")
+                        payloads.append(h)
+                self.sidebar.set_marks(lines, payloads)
+                self._set_status(f"{len(lines)} Treffer (PDF-Text/Annotationen)")
             else:
-                self._set_status(
-                    f"Keine Annotation zu „{query}“ — PDF-Volltextsuche benötigt OCR/eingebetteten Text"
-                )
+                self._set_status("Kein Treffer — „Alle Docs“ oder OCR für gescannte PDFs")
             return
         self._set_status("Suche: Editor oder PDF öffnen")
 
@@ -536,10 +596,45 @@ class MainWindow(QMainWindow):
 
     def _on_mark_activated(self, index: int):
         payload = self.sidebar.mark_payload(index)
+        if isinstance(payload, tuple) and len(payload) == 2:
+            self._on_fulltext_hit(str(payload[0]), payload[1])
+            return
         if payload is not None and hasattr(payload, "page"):
             self.stack.setCurrentWidget(self.pdf_view)
             self.pdf_view.goto_page(int(payload.page))
             self._set_status(f"Annotation Seite {payload.page + 1}")
+
+    def _on_fulltext_hit(self, path: str, page):
+        self.open_path(path)
+        if page is not None and self.stack.currentWidget() is self.pdf_view:
+            self.pdf_view.goto_page(int(page))
+            self._set_status(f"Treffer: {Path(path).name} Seite {int(page) + 1}")
+
+    def _on_outline_jump(self, page_index: int):
+        if self.stack.currentWidget() is not self.pdf_view:
+            self._set_status("Lesezeichen: PDF öffnen")
+            return
+        self.pdf_view.goto_page(page_index)
+        self._set_status(f"Lesezeichen → Seite {page_index + 1}")
+
+    def _refresh_outline(self, path: str | Path):
+        try:
+            items = extract_outline(path)
+        except Exception:
+            items = []
+        self.sidebar.set_outline(items)
+
+    def _settings(self):
+        if SettingsDialog(self).exec():
+            self._sync_theme_menu()
+            self._set_status("Einstellungen gespeichert")
+
+    def _batch_convert(self):
+        BatchConvertDialog(self).exec()
+
+    def _pdf_tools(self):
+        initial = str(self.pdf_view.pdf_path) if self.pdf_view.pdf_path else None
+        PdfToolsDialog(self, initial_pdf=initial).exec()
 
     def new_doc(self):
         self.doc = Document(kind=DocKind.TEXT, title="Unbenannt")
@@ -552,10 +647,14 @@ class MainWindow(QMainWindow):
         self._set_status("Neues Dokument")
 
     def open_dialog(self):
+        start = ""
+        d = get_default_open_dir()
+        if d:
+            start = str(d)
         path, _ = QFileDialog.getOpenFileName(
             self,
             "Öffnen",
-            "",
+            start,
             "Dokumente (*.txt *.md *.html *.htm *.docx *.pdf *.png *.jpg *.jpeg);;Alle (*.*)",
         )
         if path:
@@ -578,6 +677,7 @@ class MainWindow(QMainWindow):
                 if not self.pdf_view.load(path):
                     return
                 self._refresh_pdf_marks()
+                self._refresh_outline(path)
             elif self.doc.kind == DocKind.IMAGE:
                 from PySide6.QtGui import QPixmap
 

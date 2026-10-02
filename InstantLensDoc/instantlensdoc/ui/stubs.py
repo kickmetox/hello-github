@@ -5,11 +5,11 @@ from __future__ import annotations
 from PySide6.QtWidgets import QMessageBox, QWidget
 
 PLANNED = {
-    "ki": "KI-Assistent — geplant (Coming soon)",
-    "cloud": "Cloud-Sync — geplant (Coming soon)",
-    "stylus": "Drucksensitiver Stylus / Palm Rejection — geplant",
-    "shapes_ai": "Intelligente Formerkennung — geplant",
-    "extrude3d": "3D-Extrusion — geplant",
+    "ki": "KI-Assistent — Stub 0.1.6 (Coming soon)",
+    "cloud": "Cloud-Sync — Stub 0.1.6 (Coming soon)",
+    "stylus": "Drucksensitiver Stylus / Palm Rejection — Stub 0.1.6",
+    "shapes_ai": "Intelligente Formerkennung — Stub 0.1.6",
+    "extrude3d": "3D-Extrusion — Stub 0.1.6",
     "varfonts": "Variable Fonts (voll) — geplant",
     "envelope": "Envelope Distort (voll) — geplant",
     "esign": "E-Signatur (rechtssicher) — geplant",

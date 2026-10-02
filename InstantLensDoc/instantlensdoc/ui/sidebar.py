@@ -1,10 +1,10 @@
-"""Seitenleiste: Dokumentenbaum, Zuletzt geöffnet, Suche, Annotationen/Markierungen."""
+"""Seitenleiste: Suche, Dokumente, Lesezeichen, Markierungen."""
 
 from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import Signal
+from PySide6.QtCore import Signal, Qt
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
@@ -12,6 +12,8 @@ from PySide6.QtWidgets import (
     QListWidget,
     QListWidgetItem,
     QPushButton,
+    QTreeWidget,
+    QTreeWidgetItem,
     QVBoxLayout,
     QWidget,
 )
@@ -23,15 +25,17 @@ class Sidebar(QWidget):
     search_requested = Signal(str)
     search_next_requested = Signal()
     mark_activated = Signal(int)  # Index in Markierungsliste
+    outline_activated = Signal(int)  # PDF-Seite 0-basiert
+    fulltext_hit_activated = Signal(str, object)  # path, page_index|None
 
     def __init__(self, parent=None):
         super().__init__(parent)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(4, 4, 4, 4)
 
-        layout.addWidget(QLabel("Suche / Markieren"))
+        layout.addWidget(QLabel("Suche / Volltext"))
         self.search = QLineEdit()
-        self.search.setPlaceholderText("Im Dokument suchen…")
+        self.search.setPlaceholderText("Im Dokument oder allen geöffneten…")
         self.search.returnPressed.connect(self._emit_search)
         layout.addWidget(self.search)
 
@@ -40,33 +44,55 @@ class Sidebar(QWidget):
         self.btn_search.clicked.connect(self._emit_search)
         self.btn_next = QPushButton("Weiter")
         self.btn_next.clicked.connect(self.search_next_requested.emit)
+        self.btn_full = QPushButton("Alle Docs")
+        self.btn_full.setToolTip("Volltextsuche über alle Dokumente in der Liste")
+        self.btn_full.clicked.connect(self._emit_fulltext)
         btn_row.addWidget(self.btn_search)
         btn_row.addWidget(self.btn_next)
+        btn_row.addWidget(self.btn_full)
         layout.addLayout(btn_row)
 
         layout.addWidget(QLabel("Zuletzt geöffnet"))
         self.recent = QListWidget()
-        self.recent.setMaximumHeight(120)
+        self.recent.setMaximumHeight(90)
         self.recent.itemDoubleClicked.connect(self._activate_recent)
         layout.addWidget(self.recent)
 
         layout.addWidget(QLabel("Dokumente"))
         self.files = QListWidget()
+        self.files.setMaximumHeight(100)
         self.files.itemDoubleClicked.connect(self._activate)
         layout.addWidget(self.files)
 
-        layout.addWidget(QLabel("Annotationen / Markierungen"))
+        layout.addWidget(QLabel("Lesezeichen / Outline"))
+        self.outline = QTreeWidget()
+        self.outline.setHeaderHidden(True)
+        self.outline.setMaximumHeight(120)
+        self.outline.itemDoubleClicked.connect(self._activate_outline)
+        layout.addWidget(self.outline)
+
+        layout.addWidget(QLabel("Treffer / Markierungen"))
         self.marks = QListWidget()
         self.marks.itemDoubleClicked.connect(self._activate_mark)
         layout.addWidget(self.marks)
 
-        self.setMinimumWidth(220)
+        self.setMinimumWidth(240)
+        self._fulltext_mode = False
 
     def _emit_search(self):
+        self._fulltext_mode = False
         self.search_requested.emit(self.search.text().strip())
 
+    def _emit_fulltext(self):
+        self._fulltext_mode = True
+        self.search_requested.emit(self.search.text().strip())
+
+    @property
+    def fulltext_mode(self) -> bool:
+        return self._fulltext_mode
+
     def _activate(self, item: QListWidgetItem):
-        path = item.data(256)  # Qt.UserRole
+        path = item.data(256)
         if path:
             self.file_activated.emit(str(path))
 
@@ -77,7 +103,17 @@ class Sidebar(QWidget):
 
     def _activate_mark(self, item: QListWidgetItem):
         row = self.marks.row(item)
+        payload = item.data(256)
+        if isinstance(payload, tuple) and len(payload) == 2:
+            path, page = payload
+            self.fulltext_hit_activated.emit(str(path), page)
+            return
         self.mark_activated.emit(row)
+
+    def _activate_outline(self, item: QTreeWidgetItem, _column: int):
+        page = item.data(0, Qt.UserRole)
+        if page is not None:
+            self.outline_activated.emit(int(page))
 
     def set_recent(self, paths: list[str]):
         self.recent.clear()
@@ -90,7 +126,6 @@ class Sidebar(QWidget):
 
     def add_document(self, path: str | Path, title: str | None = None):
         path = Path(path)
-        # Duplikate vermeiden
         for i in range(self.files.count()):
             it = self.files.item(i)
             if it and it.data(256) == str(path):
@@ -102,8 +137,45 @@ class Sidebar(QWidget):
     def clear_documents(self):
         self.files.clear()
 
+    def document_paths(self) -> list[str]:
+        out: list[str] = []
+        for i in range(self.files.count()):
+            it = self.files.item(i)
+            if it and it.data(256):
+                out.append(str(it.data(256)))
+        return out
+
+    def set_outline(self, items, *, _add=None):
+        """items: Liste von OutlineItem (ild_pdf) oder leer."""
+        self.outline.clear()
+        if not items:
+            empty = QTreeWidgetItem("(kein Outline)")
+            empty.setDisabled(True)
+            self.outline.addTopLevelItem(empty)
+            return
+
+        def add_nodes(parent_item: QTreeWidgetItem | None, nodes):
+            from ild_pdf.outline import OutlineItem
+
+            for node in nodes:
+                if not isinstance(node, OutlineItem):
+                    continue
+                label = node.title
+                if node.page_index is not None:
+                    label += f"  (S. {node.page_index + 1})"
+                twi = QTreeWidgetItem([label])
+                twi.setData(0, Qt.UserRole, node.page_index)
+                if parent_item is None:
+                    self.outline.addTopLevelItem(twi)
+                else:
+                    parent_item.addChild(twi)
+                if node.children:
+                    add_nodes(twi, node.children)
+
+        add_nodes(None, items)
+        self.outline.expandToDepth(1)
+
     def set_marks(self, lines: list[str], payloads: list | None = None):
-        """Markierungsliste setzen. payloads[i] optional (z.B. Annotation-Objekt)."""
         self.marks.clear()
         for i, line in enumerate(lines):
             item = QListWidgetItem(line)

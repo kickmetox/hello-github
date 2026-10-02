@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | 0.1.5 |
+| Version | 0.1.6 |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -33,6 +33,15 @@ powershell -ExecutionPolicy Bypass -File "D:\AI_Temp\sync-ild.ps1"
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 ```
+
+## Neu in 0.1.6
+
+- **Batch-Konvertierung** (Ordner → PDF / OCR)  
+- **PDF zusammenführen & teilen** (Dialog)  
+- **Lesezeichen / Outline** in der Seitenleiste  
+- **Volltextsuche** über alle geöffneten Dokumente  
+- **Einstellungen** (OCR-Sprache, Theme, Pfade)  
+- PyInstaller-Icon aus `assets/app.ico`  
 
 ## Neu in 0.1.5
 

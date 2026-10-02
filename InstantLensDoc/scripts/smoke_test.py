@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Smoke-Test 0.1.5 (CLI + optional offscreen Qt)."""
+"""Smoke-Test 0.1.6 (CLI + optional offscreen Qt)."""
 
 from __future__ import annotations
 
@@ -30,7 +30,8 @@ def main() -> int:
         render_page,
         __version__ as ild_ver,
     )
-    from ild_pdf.pages import reorder_pages, rotate_page
+    from ild_pdf.pages import merge_pdfs, reorder_pages, rotate_page, split_pdf
+    from ild_pdf.outline import extract_outline
     from instantlensdoc import __version__
     from instantlensdoc.config import icon_path, icon_paths_for_qt
     from instantlensdoc.core.documents import open_document, save_document
@@ -40,10 +41,13 @@ def main() -> int:
     from instantlensdoc.core import ocr as ocr_mod
     from instantlensdoc.core.ocr import LANG_PRESETS, OcrOutputMode
     from instantlensdoc.core import recent as recent_mod
+    from instantlensdoc.core import batch as batch_mod
+    from instantlensdoc.core import fulltext as ft_mod
+    from instantlensdoc.core.app_settings import get_ocr_lang, load_settings, save_settings
     from instantlensdoc.license import KEY_DAYS, TRIAL_DAYS, generate_key, verify_key
 
-    assert __version__ == "0.1.5", __version__
-    assert ild_ver == "0.1.5", ild_ver
+    assert __version__ == "0.1.6", __version__
+    assert ild_ver == "0.1.6", ild_ver
     assert TRIAL_DAYS == 28 and KEY_DAYS == 32
     key = generate_key("ame@sellerbach.de")
     ok, msg, _ = verify_key(key)
@@ -322,11 +326,36 @@ def main() -> int:
         # Installer-Hinweis vorhanden
         assert (ROOT / "installer" / "installer-hinweis.txt").exists()
         iss = (ROOT / "installer" / "instantlensdoc.iss").read_text(encoding="utf-8")
-        assert "0.1.5" in iss and "desktopicon" in iss and "DisableProgramGroupPage=no" in iss
+        assert "0.1.6" in iss and "desktopicon" in iss and "DisableProgramGroupPage=no" in iss
 
         # Beispielskript vorhanden
         assert (ROOT / "examples" / "ild_pdf_demo.py").exists()
-        assert "0.1.5" in (ROOT / "INFO.md").read_text(encoding="utf-8")
+        assert "0.1.6" in (ROOT / "INFO.md").read_text(encoding="utf-8")
+        assert (ROOT / "assets" / "app.ico").is_file()
+
+        # Merge / Split
+        merge_pdfs([p1, p2], td / "merged.pdf")
+        assert (td / "merged.pdf").is_file()
+        parts = split_pdf(pdf, td / "split", single_pages=True)
+        assert len(parts) >= 2
+
+        # Volltext + Settings
+        txt = td / "findme.txt"
+        txt.write_text("alpha beta FINDME gamma", encoding="utf-8")
+        hits = ft_mod.search_paths([str(txt), str(pdf)], "FINDME")
+        assert any("FINDME" in h.snippet for h in hits)
+        save_settings({"ocr_lang": get_ocr_lang(), "theme": load_settings().get("theme", "light")})
+
+        # Batch (Bilder → PDF)
+        img_dir = td / "imgs"
+        img_dir.mkdir()
+        Image.new("RGB", (100, 100), "white").save(img_dir / "a.png")
+        Image.new("RGB", (100, 100), "black").save(img_dir / "b.png")
+        br = batch_mod.run_batch(img_dir, td / "bout", batch_mod.BatchMode.IMAGES_TO_ONE_PDF)
+        assert br.ok_count >= 1 and br.items[0].output and br.items[0].output.exists()
+
+        # Outline API (leer ok)
+        assert isinstance(extract_outline(pdf), list)
         assert "Signatur" in (ROOT / "FEATURES.md").read_text(encoding="utf-8")
 
         # Signaturfeld + Bild-Signatur
@@ -366,7 +395,13 @@ def main() -> int:
         assert len(win.layout_doc.text_frames) >= 2
         # Lizenz-Label vorhanden
         assert "Lizenz:" in win.license_label.text()
-        assert "v0.1.5" in win.version_label.text()
+        assert "v0.1.6" in win.version_label.text()
+        from instantlensdoc.ui.settings_dialog import SettingsDialog
+        from instantlensdoc.ui.batch_dialog import BatchConvertDialog
+        from instantlensdoc.ui.pdf_tools_dialog import PdfToolsDialog
+
+        assert SettingsDialog and BatchConvertDialog and PdfToolsDialog
+        assert win.sidebar.outline is not None
         from instantlensdoc.ui.theme import load_theme_mode, toggle_theme
 
         mode_before = load_theme_mode()

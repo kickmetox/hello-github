@@ -27,9 +27,13 @@ a = Analysis(
 )
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
-icon = root / "assets" / "app.ico"
-if not icon.exists():
-    icon = root / "assets" / "icon.png"
+_icon_candidates = [
+    root / "assets" / "app.ico",
+    root / "assets" / "icon.ico",
+    root / "assets" / "icon.png",
+    root / "assets" / "app.png",
+]
+icon = next((p for p in _icon_candidates if p.is_file()), None)
 
 exe = EXE(
     pyz,
@@ -42,7 +46,7 @@ exe = EXE(
     strip=False,
     upx=True,
     console=False,
-    icon=str(icon) if icon.exists() else None,
+    icon=str(icon) if icon is not None else None,
 )
 coll = COLLECT(
     exe,
