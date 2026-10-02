@@ -25,7 +25,10 @@ SHORTCUTS_HTML = """
 <tr><td>Wiederholen</td><td><code>Ctrl+Y</code> / <code>Ctrl+Shift+Z</code></td></tr>
 <tr><td>Suchen</td><td><code>Ctrl+F</code></td></tr>
 <tr><td>Suchen und Ersetzen</td><td><code>Ctrl+R</code></td></tr>
-<tr><td>Gehe zu Zeile</td><td><code>Ctrl+G</code></td></tr>
+<tr><td>Gehe zu Zeile / Seite</td><td><code>Ctrl+G</code> (Editor / PDF)</td></tr>
+<tr><td>Gehe zu Seite (PDF-Menü)</td><td><code>Ctrl+Shift+G</code></td></tr>
+<tr><td>Tab duplizieren</td><td><code>Ctrl+Shift+T</code></td></tr>
+<tr><td>Erneut öffnen</td><td><code>Ctrl+Alt+Shift+O</code></td></tr>
 <tr><td>Zeile duplizieren</td><td><code>Ctrl+D</code></td></tr>
 <tr><td>Zeile kommentieren/auskommentieren</td><td><code>Ctrl+/</code> (# oder //)</td></tr>
 <tr><td>Auswahl markieren</td><td><code>Ctrl+H</code></td></tr>
@@ -69,11 +72,17 @@ Seite <b>⟲/⟳ drehen</b>, <b>↔/↕ spiegeln</b>, <b>leere Seite</b>, <b>dup
 <p><b>PDF-Suche:</b> Sidebar-Suche highlightet Treffer auf der aktuellen Seite;
 „Weiter“ springt zum nächsten Treffer; <b>letzte Suchbegriffe</b> im Dropdown.</p>
 <p><b>Annotationen:</b> eigene Liste in der Sidebar — <b>gruppiert nach Seite</b>; Klick springt zur Annotation;
-Filter-Dropdown nach Typ; <b>Textsuche in der Liste</b>; Text nachträglich editierbar; Deckkraft pro Annotation.</p>
+Filter-Dropdown nach Typ; <b>Farben-Chips in der Statistik klickbar</b>; <b>Textsuche in der Liste</b>;
+Text nachträglich editierbar; Deckkraft pro Annotation.</p>
 <p><b>Seitenbereich:</b> PDF → Seitenbereich extrahieren… (von–bis → neues PDF)
 bzw. Dialog „zusammenführen / teilen / Bereich“.</p>
 <p><b>Suchen und Ersetzen:</b> Bearbeiten → Ctrl+R (nur Texteditor).</p>
-<p><b>Gehe zu Zeile:</b> Bearbeiten → Ctrl+G (nur Texteditor).</p>
+<p><b>Gehe zu Zeile / Seite:</b> Bearbeiten → Ctrl+G (Editor: Zeile; PDF: Seite);
+PDF → Gehe zu Seite… (Ctrl+Shift+G).</p>
+<p><b>Tab duplizieren:</b> Datei → Ctrl+Shift+T (Editor-Inhalt klonen);
+Erneut öffnen: Ctrl+Alt+Shift+O.</p>
+<p><b>Annotation-Farben:</b> Sidebar-Statistik-Chips klicken → Liste nach Farbe filtern.</p>
+<p><b>Statusleiste:</b> Hint „Ctrl+Z · Letzte Aktion rückgängig“.</p>
 <p><b>Zeile duplizieren:</b> Bearbeiten → Ctrl+D (aktuelle Zeile oder Auswahl).</p>
 <p><b>Zeile verschieben:</b> Bearbeiten → Alt+Up / Alt+Down (aktuelle Zeile oder Auswahl).</p>
 <p><b>Zeilen sortieren (A–Z):</b> Bearbeiten → Ctrl+Shift+O (Auswahl; ohne Auswahl ganze Datei).</p>

@@ -2,7 +2,7 @@
 
 Moderne Textverarbeitung mit PDF-Annotator, OCR-Bridge und Formulargenerator.
 
-**Version:** 0.4.5  
+**Version:** 0.4.6  
 **Hersteller:** Andreas Meyer · ame@sellerbach.de
 
 ## Quickstart (Windows)
@@ -29,12 +29,12 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)
 
-## Neu in 0.4.5
+## Neu in 0.4.6
 
-- PDF-Seitenbild(er) → Editor (PNG + Verweis)
-- Annotation-JSON-Import: Schema v4 validiert mit Fehlermeldung
-- Editor: Trailing Whitespace beim Speichern optional
-- PDF-Toolbar-Gruppen in Einstellungen ein-/ausblenden
+- PDF: Gehe zu Seite (Ctrl+G im PDF / Ctrl+Shift+G)
+- Annotation-Farben-Chips in Sidebar-Statistik klickbar filtern
+- Editor: Tab duplizieren (Inhalt klonen) / Erneut öffnen
+- Statusleiste: Hint „Ctrl+Z · Letzte Aktion rückgängig“
 - Stubs KI/Cloud/Stylus/3D unverändert
 
 Siehe [CHANGELOG.md](CHANGELOG.md), [FEATURES.md](FEATURES.md) und [INFO.md](INFO.md).

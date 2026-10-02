@@ -1,5 +1,23 @@
 # Changelog — InstantLens Doc
 
+## 0.4.6 — Goto Page, Ann.-Farben-Filter, Duplikat-Tab, Undo-Hint
+
+Fokus: PDF-Seitensprung per Dialog, klickbare Annotation-Farben in der Sidebar-Statistik, Editor-Tab duplizieren, Statusleisten-Hinweis „Letzte Aktion rückgängig“. Stubs KI/Cloud/Stylus/3D unverändert.
+
+### PDF / Annotationen
+- **Gehe zu Seite** (Ctrl+G im PDF / Ctrl+Shift+G / Menü PDF): Dialog mit Seitennummer → Sprung
+- **Annotation-Farben-Filter**: Farben-Chips in der Sidebar-Statistik klickbar; erneuter Klick / „Alle“ hebt Filter auf
+
+### Editor / UX
+- **Tab duplizieren** (Ctrl+Shift+T): Editor-Inhalt als neues Dokument klonen; **Erneut öffnen** (Ctrl+Alt+Shift+O) lädt Datei vom Datenträger neu
+- **Statusleiste**: Hint „Ctrl+Z · Letzte Aktion rückgängig“ (statt Quiet-Hours)
+
+### Packaging / Docs
+- Version **0.4.6** (App, `ild_pdf`, ISS, Build, Docs, Smoke)
+- FEATURES / INFO / CHANGELOG / Hilfe aktualisiert
+
+---
+
 ## 0.4.5 — PDF-Seitenbild Editor, Ann.-Import v4, Trim, Toolbar
 
 Fokus: gerenderte PDF-Seiten als Bildreferenz in den Editor, strikte Schema-v4-Validierung beim Annotation-JSON-Import, optionales Trailing-Whitespace-Trim beim Speichern, anpassbare PDF-Toolbar-Gruppen. Stubs KI/Cloud/Stylus/3D unverändert.

@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from PySide6.QtCore import Signal, Qt
-from PySide6.QtGui import QIcon, QImage, QPixmap
+from PySide6.QtGui import QColor, QIcon, QImage, QPixmap
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QComboBox,
@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
     QListWidget,
     QListWidgetItem,
     QPushButton,
+    QToolButton,
     QTreeWidget,
     QTreeWidgetItem,
     QVBoxLayout,
@@ -22,6 +23,19 @@ from PySide6.QtWidgets import (
 )
 
 from instantlensdoc.core.app_settings import pdf_thumbnail_icon_size
+
+
+def normalize_ann_color(value: object) -> str:
+    """Farbe als #RRGGBB normalisieren; leer → ''."""
+    raw = str(value or "").strip()
+    if not raw:
+        return ""
+    if not raw.startswith("#"):
+        raw = "#" + raw
+    c = QColor(raw)
+    if not c.isValid():
+        return raw.upper()
+    return c.name().upper()
 
 
 # Deutsche Typ-Labels (Filter-Dropdown + Annotation-Suche)
@@ -101,6 +115,7 @@ class Sidebar(QWidget):
     outline_add_requested = Signal()
     outline_delete_requested = Signal()
     annotation_filter_changed = Signal(str)  # Typ-Wert oder "" für alle
+    annotation_color_filter_changed = Signal(str)  # #RRGGBB oder "" für alle
     fulltext_hit_activated = Signal(str, object)  # path, page_index|None
     page_thumb_activated = Signal(int)  # PDF-Seite 0-basiert
     pages_reordered = Signal(list)  # alte Indizes in neuer Reihenfolge
@@ -206,6 +221,15 @@ class Sidebar(QWidget):
         )
         self.ann_stats_label.setToolTip("Anzahl Annotationen je Typ (unabhängig vom Filter)")
         layout.addWidget(self.ann_stats_label)
+        self.ann_color_stats = QWidget()
+        self.ann_color_stats.setObjectName("annColorStats")
+        self.ann_color_stats.setToolTip(
+            "Farben-Statistik — Klick filtert die Annotationsliste nach Farbe"
+        )
+        self.ann_color_layout = QHBoxLayout(self.ann_color_stats)
+        self.ann_color_layout.setContentsMargins(0, 2, 0, 0)
+        self.ann_color_layout.setSpacing(4)
+        layout.addWidget(self.ann_color_stats)
 
         self.setMinimumWidth(240)
         self._fulltext_mode = False
@@ -213,6 +237,7 @@ class Sidebar(QWidget):
         self._ann_all_payloads: list = []
         self._ann_filter_updating = False
         self._ann_search_query = ""
+        self._ann_color_filter = ""
 
     def search_text(self) -> str:
         return self.search.currentText().strip()
@@ -455,6 +480,30 @@ class Sidebar(QWidget):
         data = self.ann_filter.currentData()
         return str(data) if data else ""
 
+    def annotation_filter_color(self) -> str:
+        """Aktueller Farben-Filter (#RRGGBB) oder '' für alle."""
+        return getattr(self, "_ann_color_filter", "") or ""
+
+    def set_annotation_color_filter(self, color: str | None):
+        """Farben-Filter setzen; leerer String / None = alle Farben."""
+        want = normalize_ann_color(color) if color else ""
+        if want == self.annotation_filter_color():
+            # erneuter Klick auf aktive Farbe → Filter aufheben
+            if want:
+                want = ""
+            else:
+                return
+        self._ann_color_filter = want
+        self._apply_annotation_filter()
+        self.annotation_color_filter_changed.emit(self._ann_color_filter)
+
+    def clear_annotation_color_filter(self):
+        if not self.annotation_filter_color():
+            return
+        self._ann_color_filter = ""
+        self._apply_annotation_filter()
+        self.annotation_color_filter_changed.emit("")
+
     def _on_ann_filter_changed(self, _index: int = 0):
         if self._ann_filter_updating:
             return
@@ -492,6 +541,7 @@ class Sidebar(QWidget):
 
     def _apply_annotation_filter(self):
         want = self.annotation_filter_type()
+        want_color = self.annotation_filter_color()
         query = self._ann_search_query
         self.annotations.clear()
         # Gefilterte Paare sammeln, dann nach Seite gruppieren
@@ -504,6 +554,10 @@ class Sidebar(QWidget):
                 )
                 if str(t) != want:
                     continue
+            if want_color:
+                c = normalize_ann_color(getattr(payload, "color", None) if payload else None)
+                if c != want_color:
+                    continue
             if query:
                 hay = line.lower()
                 extra = ""
@@ -515,13 +569,16 @@ class Sidebar(QWidget):
                     )
                     type_label = ANN_TYPE_LABELS.get(str(t), str(t or "")).lower()
                     type_val = str(t or "").lower()
+                    color_val = normalize_ann_color(getattr(payload, "color", None)).lower()
                 else:
                     type_val = ""
+                    color_val = ""
                 if (
                     query not in hay
                     and query not in extra
                     and query not in type_label
                     and query not in type_val
+                    and query not in color_val
                 ):
                     continue
             filtered.append((line, payload))
@@ -558,11 +615,25 @@ class Sidebar(QWidget):
                 self.annotations.addItem(item)
         self._update_ann_stats()
 
+    def _clear_color_stats_buttons(self) -> None:
+        layout = getattr(self, "ann_color_layout", None)
+        if layout is None:
+            return
+        while layout.count():
+            item = layout.takeAt(0)
+            w = item.widget()
+            if w is not None:
+                w.deleteLater()
+
+    def _on_color_chip_clicked(self, color: str):
+        self.set_annotation_color_filter(color)
+
     def _update_ann_stats(self) -> None:
-        """Footer: Anzahl je Annotationstyp (über alle, nicht nur gefiltert)."""
+        """Footer: Anzahl je Typ + klickbare Farben-Chips."""
         if not hasattr(self, "ann_stats_label"):
             return
         counts: dict[str, int] = {}
+        color_counts: dict[str, int] = {}
         for payload in self._ann_all_payloads:
             if payload is None:
                 continue
@@ -571,15 +642,55 @@ class Sidebar(QWidget):
             )
             key = str(t) if t else "?"
             counts[key] = counts.get(key, 0) + 1
+            c = normalize_ann_color(getattr(payload, "color", None))
+            if c:
+                color_counts[c] = color_counts.get(c, 0) + 1
         total = sum(counts.values())
+        active_color = self.annotation_filter_color()
         if total == 0:
             self.ann_stats_label.setText("Ann.: —")
+            self._clear_color_stats_buttons()
+            if hasattr(self, "ann_color_stats"):
+                self.ann_color_stats.setVisible(False)
             return
         parts = [
             f"{ANN_TYPE_LABELS.get(k, k)} {counts[k]}"
             for k in sorted(counts.keys(), key=lambda x: (-counts[x], x))
         ]
-        self.ann_stats_label.setText(f"Ann. {total}: " + " · ".join(parts))
+        suffix = f" · Farbe {active_color}" if active_color else ""
+        self.ann_stats_label.setText(f"Ann. {total}: " + " · ".join(parts) + suffix)
+
+        self._clear_color_stats_buttons()
+        if hasattr(self, "ann_color_stats"):
+            self.ann_color_stats.setVisible(True)
+        # Alle-Farben-Chip wenn Filter aktiv
+        if active_color:
+            btn_all = QToolButton()
+            btn_all.setText("Alle")
+            btn_all.setToolTip("Farben-Filter aufheben")
+            btn_all.setAutoRaise(True)
+            btn_all.clicked.connect(self.clear_annotation_color_filter)
+            self.ann_color_layout.addWidget(btn_all)
+        for color in sorted(color_counts.keys(), key=lambda x: (-color_counts[x], x)):
+            n = color_counts[color]
+            btn = QToolButton()
+            btn.setText(str(n))
+            btn.setToolTip(f"Nach Farbe {color} filtern ({n})")
+            btn.setCursor(Qt.PointingHandCursor)
+            btn.setAutoRaise(True)
+            btn.setMinimumSize(22, 18)
+            active = color == active_color
+            border = "2px solid #222" if active else "1px solid #888"
+            # Kontrastschrift je nach Helligkeit
+            qc = QColor(color)
+            fg = "#000" if qc.lightness() > 140 else "#fff"
+            btn.setStyleSheet(
+                f"QToolButton {{ background: {color}; color: {fg}; border: {border}; "
+                f"border-radius: 3px; padding: 1px 4px; font-size: 10px; }}"
+            )
+            btn.clicked.connect(lambda checked=False, c=color: self._on_color_chip_clicked(c))
+            self.ann_color_layout.addWidget(btn)
+        self.ann_color_layout.addStretch(1)
 
     def set_annotations(self, lines: list[str], payloads: list | None = None):
         self._ann_all_lines = list(lines)
@@ -591,6 +702,7 @@ class Sidebar(QWidget):
         self._ann_all_lines = []
         self._ann_all_payloads = []
         self._ann_search_query = ""
+        self._ann_color_filter = ""
         self.annotations.clear()
         if hasattr(self, "ann_search"):
             self.ann_search.blockSignals(True)

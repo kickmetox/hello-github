@@ -42,10 +42,14 @@ HELP_HTML = f"""
 <li><b>Datei → Drucken</b> (Ctrl+P): Editor oder aktuelle PDF-Seite (Qt Print)</li>
 <li><b>Seitenleiste</b>: Suche (inkl. letzte Suchbegriffe), „Alle Docs“-Volltext, Zuletzt geöffnet, Dokumente,
     Lesezeichen/Outline (+/− hinzufügen/löschen), <b>Annotationen</b> (klickbar, <b>nach Seite gruppiert</b>,
-    <b>Filter nach Typ</b>, <b>Textsuche in der Liste</b>, <b>Statistik je Typ im Footer</b>), Markierungen/Treffer</li>
-<li><b>Bearbeiten → Rückgängig/Wiederholen</b>: Editor-Text <i>oder</i> PDF-Annotationen/Overlay-Text (Ctrl+Z / Ctrl+Y)</li>
+    <b>Filter nach Typ</b>, <b>Textsuche in der Liste</b>, <b>Statistik je Typ</b>,
+    <b>Farben-Chips klickbar filtern</b>), Markierungen/Treffer</li>
+<li><b>Bearbeiten → Rückgängig/Wiederholen</b>: Editor-Text <i>oder</i> PDF-Annotationen/Overlay-Text (Ctrl+Z / Ctrl+Y);
+    Statusleisten-Hint „Ctrl+Z · Letzte Aktion rückgängig“</li>
 <li><b>Bearbeiten → Suchen und Ersetzen</b> (Ctrl+R): Find/Replace im Texteditor</li>
-<li><b>Bearbeiten → Gehe zu Zeile</b> (Ctrl+G): Sprung zur Zeilennummer</li>
+<li><b>Bearbeiten → Gehe zu Zeile / Seite</b> (Ctrl+G): Editor → Zeile; PDF → Seite (auch PDF → Gehe zu Seite…, Ctrl+Shift+G)</li>
+<li><b>Datei → Tab duplizieren</b> (Ctrl+Shift+T): Editor-Inhalt als neues Dokument klonen;
+    <b>Erneut öffnen</b> (Ctrl+Alt+Shift+O): Datei vom Datenträger neu laden</li>
 <li><b>Bearbeiten → Zeile duplizieren</b> (Ctrl+D): aktuelle Zeile / Auswahl darunter kopieren</li>
 <li><b>Bearbeiten → Zeile verschieben</b> (Alt+Up / Alt+Down)</li>
 <li><b>Bearbeiten → Zeilen sortieren (A–Z)</b> (Ctrl+Shift+O): Auswahl alphabetisch</li>

@@ -379,6 +379,15 @@ class MainWindow(QMainWindow):
         self.word_status_label.setStyleSheet("padding-right: 10px;")
         self.word_status_label.setToolTip("Wörter / Zeichen (Editor)")
         sb.addPermanentWidget(self.word_status_label)
+        self.undo_hint_label = QLabel("Ctrl+Z · Letzte Aktion rückgängig")
+        self.undo_hint_label.setObjectName("undoHint")
+        self.undo_hint_label.setStyleSheet(
+            "QLabel#undoHint { color: #777; padding-right: 8px; font-size: 11px; }"
+        )
+        self.undo_hint_label.setToolTip(
+            "Rückgängig: Editor-Text oder PDF-Annotationen (Ctrl+Z)"
+        )
+        sb.addPermanentWidget(self.undo_hint_label)
         self.version_label = QLabel(f"v{__version__}")
         self.version_label.setStyleSheet("color: #666; padding-right: 8px;")
         sb.addPermanentWidget(self.version_label)
@@ -449,6 +458,18 @@ class MainWindow(QMainWindow):
         act_close.setToolTip("Aktuelles Dokument schließen (Speichern-Dialog bei Änderungen)")
         act_close.triggered.connect(self.close_current_tab)
         m_file.addAction(act_close)
+        act_dup_tab = QAction("Tab duplizieren", self)
+        act_dup_tab.setShortcut(QKeySequence("Ctrl+Shift+T"))
+        act_dup_tab.setToolTip(
+            "Editor: Inhalt als neues Dokument klonen · Datei mit Pfad: optional erneut öffnen"
+        )
+        act_dup_tab.triggered.connect(self.duplicate_tab)
+        m_file.addAction(act_dup_tab)
+        act_reopen = QAction("Erneut öffnen", self)
+        act_reopen.setShortcut(QKeySequence("Ctrl+Alt+Shift+O"))
+        act_reopen.setToolTip("Aktuelle Datei vom Datenträger neu laden")
+        act_reopen.triggered.connect(self.reopen_current)
+        m_file.addAction(act_reopen)
         m_export = m_file.addMenu("Exportieren")
         for title, fmt in [
             ("Als HTML…", "html"),
@@ -503,8 +524,8 @@ class MainWindow(QMainWindow):
         m_edit.addAction(act_find_repl)
         act_goto = QAction("Gehe zu Zeile…", self)
         act_goto.setShortcut(QKeySequence("Ctrl+G"))
-        act_goto.setToolTip("Cursor auf Zeilennummer setzen")
-        act_goto.triggered.connect(self._goto_line)
+        act_goto.setToolTip("Editor: Zeile · PDF: Seite (Ctrl+G)")
+        act_goto.triggered.connect(self._goto_line_or_page)
         m_edit.addAction(act_goto)
         act_dup_line = QAction("Zeile duplizieren", self)
         act_dup_line.setShortcut(QKeySequence("Ctrl+D"))
@@ -790,6 +811,11 @@ class MainWindow(QMainWindow):
         act_psize = QAction("Seitengröße / Zuschneiden…", self)
         act_psize.triggered.connect(self._pdf_page_size)
         m_pdf.addAction(act_psize)
+        act_goto_page = QAction("Gehe zu Seite…", self)
+        act_goto_page.setShortcut(QKeySequence("Ctrl+Shift+G"))
+        act_goto_page.setToolTip("Seitennummer eingeben und springen (auch Ctrl+G im PDF)")
+        act_goto_page.triggered.connect(self._goto_page)
+        m_pdf.addAction(act_goto_page)
         m_pdf.addSeparator()
         for title, slot in [
             ("Annotationen speichern (Sidecar)", lambda: self.pdf_view.save_annotations()),
@@ -1604,8 +1630,18 @@ class MainWindow(QMainWindow):
             self.doc.dirty = True
         self._on_text_changed()
 
+    def _goto_line_or_page(self):
+        """Ctrl+G: Editor → Zeile, PDF → Seite."""
+        if self.stack.currentWidget() is self.pdf_view and self.pdf_view.pdf_path:
+            self._goto_page()
+        else:
+            self._goto_line()
+
     def _goto_line(self):
         if self.stack.currentWidget() is not self.editor_pane:
+            if self.stack.currentWidget() is self.pdf_view and self.pdf_view.pdf_path:
+                self._goto_page()
+                return
             QMessageBox.information(
                 self,
                 "Gehe zu Zeile",
@@ -1615,6 +1651,71 @@ class MainWindow(QMainWindow):
         from instantlensdoc.ui.goto_line_dialog import GotoLineDialog
 
         GotoLineDialog(self.editor, self).exec()
+
+    def _goto_page(self):
+        if not self.pdf_view.pdf_path or self.pdf_view.page_count < 1:
+            QMessageBox.information(
+                self,
+                "Gehe zu Seite",
+                "Bitte zuerst ein PDF öffnen.",
+            )
+            return
+        self.stack.setCurrentWidget(self.pdf_view)
+        from instantlensdoc.ui.goto_page_dialog import GotoPageDialog
+
+        GotoPageDialog(self.pdf_view, self).exec()
+        self._update_doc_status()
+
+    def duplicate_tab(self):
+        """Editor: Inhalt als neues unbenanntes Dokument klonen; PDF: Datei erneut öffnen."""
+        if not self.doc:
+            self._set_status("Kein Dokument zum Duplizieren")
+            return
+        if self.doc.kind in (DocKind.TEXT, DocKind.MARKDOWN, DocKind.HTML, DocKind.DOCX):
+            text = self.editor.toPlainText()
+            src_name = self.doc.display_name
+            enc = self.doc.meta.get("encoding")
+            if self.doc.path:
+                self.sidebar.add_document(self.doc.path)
+            title = f"{src_name} (Kopie)"
+            meta = {}
+            if enc:
+                meta["encoding"] = enc
+            self.doc = Document(kind=self.doc.kind, title=title, text=text, dirty=True, meta=meta)
+            self.editor.blockSignals(True)
+            self.editor.setPlainText(text)
+            self.editor.blockSignals(False)
+            self.editor.clear_extra_selections()
+            self._editor_marks.clear()
+            self.sidebar.set_marks([])
+            self.sidebar.clear_thumbs()
+            self.sidebar.clear_annotations()
+            self.stack.setCurrentWidget(self.editor_pane)
+            self.setWindowTitle(self._app_title(title))
+            self._update_doc_status()
+            self._set_status(f"Tab dupliziert: {title}")
+            return
+        if self.doc.path:
+            self.reopen_current()
+            return
+        self._set_status("Tab duplizieren: nur Editor-Inhalt oder gespeicherte Datei")
+
+    def reopen_current(self):
+        """Aktuelle Datei vom Datenträger neu laden."""
+        if not self.doc or not self.doc.path:
+            self._set_status("Erneut öffnen: keine gespeicherte Datei")
+            return
+        path = str(self.doc.path)
+        if self._current_is_dirty():
+            if not self._confirm_close_current(allow_discard=True):
+                return
+        enc = self.doc.meta.get("encoding") if self.doc.kind in (
+            DocKind.TEXT,
+            DocKind.MARKDOWN,
+            DocKind.HTML,
+        ) else None
+        self.open_path(path, encoding=enc)
+        self._set_status(f"Erneut geöffnet: {Path(path).name}")
 
     def _sync_editor_text_before_save(self) -> None:
         """Editor-Text für Speichern vorbereiten (optional Trailing-Whitespace trimmen)."""
