@@ -45,6 +45,7 @@ DEFAULTS: dict[str, Any] = {
     "editor_doc_split": False,
     "editor_doc_split_sync_scroll": False,
     "editor_doc_split_vertical": False,
+    "tag_rename_confirm_threshold": 20,
     "wizard_completed": False,
     "wizard_skip_once": False,
     "selection_note_with_highlight": False,
@@ -601,6 +602,23 @@ def get_editor_doc_split_vertical() -> bool:
 
 def set_editor_doc_split_vertical(enabled: bool) -> None:
     save_settings({"editor_doc_split_vertical": bool(enabled)})
+
+
+def get_tag_rename_confirm_threshold() -> int:
+    """Bestätigung beim Tag-Rename wenn Treffer > Schwelle (Default 20)."""
+    try:
+        n = int(load_settings().get("tag_rename_confirm_threshold", 20))
+    except (TypeError, ValueError):
+        n = 20
+    return max(0, min(n, 99999))
+
+
+def set_tag_rename_confirm_threshold(n: int) -> None:
+    try:
+        val = int(n)
+    except (TypeError, ValueError):
+        val = 20
+    save_settings({"tag_rename_confirm_threshold": max(0, min(val, 99999))})
 
 
 def get_wizard_completed() -> bool:

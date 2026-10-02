@@ -117,6 +117,7 @@ class MainWindow(QMainWindow):
         self._secondary_path: str | None = None
         self._secondary_kind: str = ""  # "pdf" | "editor" | "" — Panel-Typ je Session
         self._last_tag_rename: tuple[str, str] | None = None  # (old, new) für einstufiges Undo
+        self._batch_save_quiet: bool = False  # Alle-speichern: Einzeldialoge unterdrücken
 
         self.setAcceptDrops(True)
         self.setWindowTitle(self._app_title())
@@ -309,6 +310,7 @@ class MainWindow(QMainWindow):
             restore=True,
             secondary_path=sec_path or None,
             secondary_kind=sec_kind or None,
+            sync_scroll=get_editor_doc_split_sync_scroll(),
         )
         session_mod.save_session(state)
 
@@ -356,6 +358,16 @@ class MainWindow(QMainWindow):
                 if hasattr(self, "secondary_wrap"):
                     self.secondary_wrap.setVisible(True)
                 self._load_secondary_document(self._secondary_path)
+        # Sync-Scroll-Zustand aus Session wiederherstellen (0.6.9)
+        from instantlensdoc.core.app_settings import set_editor_doc_split_sync_scroll
+
+        want_sync = bool(getattr(state, "sync_scroll", False))
+        set_editor_doc_split_sync_scroll(want_sync)
+        if hasattr(self, "_doc_split_sync_action"):
+            self._doc_split_sync_action.blockSignals(True)
+            self._doc_split_sync_action.setChecked(want_sync)
+            self._doc_split_sync_action.blockSignals(False)
+        self._apply_doc_split_sync_scroll()
         self._set_status(f"Session wiederhergestellt ({len(state.tabs)} Tab(s))")
 
     def _build_ui(self):
@@ -1581,7 +1593,7 @@ class MainWindow(QMainWindow):
         self.save_doc()
 
     def _save_all_unsaved_tabs(self) -> None:
-        """Alle dirty Tabs aus der Statusleisten-Liste speichern (Fortschritt bei >3)."""
+        """Alle dirty Tabs speichern; Fortschritt bei >3; Fehlerliste am Ende (0.6.9)."""
         from PySide6.QtWidgets import QApplication, QProgressDialog
 
         entries = list(self.list_unsaved_tabs())
@@ -1624,31 +1636,58 @@ class MainWindow(QMainWindow):
             QApplication.processEvents()
         n = 0
         cancelled = False
-        for path, label in work:
-            if prog is not None:
-                if prog.wasCanceled():
-                    cancelled = True
-                    break
-                prog.setLabelText(f"Speichern {n + 1}/{total}: {label}")
-                prog.setValue(n)
-                QApplication.processEvents()
-                if prog.wasCanceled():
-                    cancelled = True
-                    break
-            if path is None:
-                self.save_doc()
-            elif cur_key and self._path_key(path) == cur_key:
-                self.save_doc()
-            else:
-                self._save_unsaved_tab(path)
-            n += 1
+        errors: list[str] = []
+        self._batch_save_quiet = True
+        try:
+            for path, label in work:
+                if prog is not None:
+                    if prog.wasCanceled():
+                        cancelled = True
+                        break
+                    prog.setLabelText(f"Speichern {n + 1}/{total}: {label}")
+                    prog.setValue(n)
+                    QApplication.processEvents()
+                    if prog.wasCanceled():
+                        cancelled = True
+                        break
+                try:
+                    ok = True
+                    if path is None:
+                        ok = self.save_doc()
+                    elif cur_key and self._path_key(path) == cur_key:
+                        ok = self.save_doc()
+                    else:
+                        self._save_unsaved_tab(path)
+                        key = self._path_key(path)
+                        ok = not (key and key in self._unsaved_paths)
+                    if not ok:
+                        errors.append(f"{label}: Speichern fehlgeschlagen")
+                except Exception as e:
+                    errors.append(f"{label}: {e}")
+                n += 1
+        finally:
+            self._batch_save_quiet = False
         if prog is not None:
             if not cancelled:
                 prog.setValue(total)
             prog.close()
         self._update_unsaved_status()
+        if errors:
+            detail = "\n".join(f"• {e}" for e in errors[:40])
+            if len(errors) > 40:
+                detail += f"\n… und {len(errors) - 40} weitere"
+            QMessageBox.warning(
+                self,
+                "Alle speichern — Fehler",
+                f"{len(errors)} Datei(en) konnten nicht gespeichert werden:\n\n{detail}",
+            )
         if cancelled:
-            self._set_status(f"Alle speichern abgebrochen ({n}/{total})")
+            self._set_status(
+                f"Alle speichern abgebrochen ({n}/{total}"
+                + (f", {len(errors)} Fehler)" if errors else ")")
+            )
+        elif errors:
+            self._set_status(f"Alle speichern: {n - len(errors)}/{total} OK, {len(errors)} Fehler")
         elif use_progress:
             self._set_status(f"Alle speichern: {n}/{total} Datei(en) fertig")
         else:
@@ -2171,17 +2210,20 @@ class MainWindow(QMainWindow):
 
         set_editor_doc_split_sync_scroll(bool(checked))
         self._apply_doc_split_sync_scroll()
+        self._save_session()
         self._set_status(
             "Sync-Scroll an (geteilte Docs)" if checked else "Sync-Scroll aus"
         )
 
     def _rename_annotation_tag_global(self, old_tag: str, new_tag: str) -> None:
         """Tag-Cloud: Tag in allen Annotationen des aktuellen PDFs umbenennen (eine Undo-Stufe)."""
+        from instantlensdoc.core.app_settings import get_tag_rename_confirm_threshold
+
         store = getattr(self.pdf_view, "store", None)
         if store is None:
             self._set_status("Tag umbenennen nur bei geöffnetem PDF")
             return
-        # Bestätigung bei vielen Treffern (>20)
+        # Bestätigung bei vielen Treffern (Schwelle in Einstellungen, Default 20)
         hit_count = 0
         if hasattr(store, "count_tag"):
             try:
@@ -2191,11 +2233,13 @@ class MainWindow(QMainWindow):
         if hit_count <= 0:
             self._set_status(f"Kein Tag „{old_tag}“ gefunden")
             return
-        if hit_count > 20:
+        threshold = get_tag_rename_confirm_threshold()
+        if hit_count > threshold:
             reply = QMessageBox.question(
                 self,
                 "Tag umbenennen",
-                f"Tag „{old_tag}“ → „{new_tag}“ betrifft {hit_count} Annotationen.\n"
+                f"Tag „{old_tag}“ → „{new_tag}“ betrifft {hit_count} Annotationen "
+                f"(Schwelle {threshold}).\n"
                 "Wirklich alle umbenennen?",
                 QMessageBox.Yes | QMessageBox.No,
                 QMessageBox.No,
@@ -4235,13 +4279,16 @@ class MainWindow(QMainWindow):
             _log.exception("Anzeige fehlgeschlagen: %s", path)
             QMessageBox.critical(self, "Öffnen", f"Anzeige fehlgeschlagen:\n{e}")
 
-    def save_doc(self):
+    def save_doc(self) -> bool:
+        """Dokument speichern. Rückgabe True bei Erfolg (für Alle-speichern-Fehlerliste)."""
+        quiet = bool(getattr(self, "_batch_save_quiet", False))
         st = self.license_manager.status()
         if not st.allowed:
-            QMessageBox.warning(self, "Lizenz", "Speichern nicht möglich — Lizenz/Trial abgelaufen.")
-            return
+            if not quiet:
+                QMessageBox.warning(self, "Lizenz", "Speichern nicht möglich — Lizenz/Trial abgelaufen.")
+            return False
         if not self.doc:
-            return
+            return False
         if self.doc.kind == DocKind.PDF:
             if self.pdf_view.save_annotations():
                 side = (
@@ -4252,10 +4299,11 @@ class MainWindow(QMainWindow):
                 if self.doc.path:
                     self._mark_unsaved(self.doc.path, False)
                 self._set_status(f"PDF-Annotationen (Sidecar) gespeichert: {side}")
-            return
+                return True
+            return False
         if not self.doc.path:
             self.save_as()
-            return
+            return not self._current_is_dirty()
         if self.doc.kind in (DocKind.TEXT, DocKind.MARKDOWN, DocKind.HTML, DocKind.DOCX):
             self._sync_editor_text_before_save()
         self.doc.text = self.editor.toPlainText()
@@ -4266,8 +4314,11 @@ class MainWindow(QMainWindow):
             enc = self.doc.meta.get("encoding")
             suffix = f" [{enc}]" if enc else ""
             self._set_status(f"Gespeichert: {self.doc.path}{suffix}")
+            return True
         except Exception as e:
-            QMessageBox.critical(self, "Speichern", f"Speichern fehlgeschlagen:\n{e}")
+            if not quiet:
+                QMessageBox.critical(self, "Speichern", f"Speichern fehlgeschlagen:\n{e}")
+            return False
 
     def save_doc_with_encoding(self):
         st = self.license_manager.status()

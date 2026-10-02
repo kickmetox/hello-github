@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **0.6.8** |
+| Version | **0.6.9** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -38,10 +38,10 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Installer-Task: optionale **Desktop-Verknüpfung** (Checkbox, Standard an / `checkedonce`)
 
-## Neu in 0.6.8
+## Neu in 0.6.9
 
-- Doc-Split: **Panel-Typ (PDF/Editor) je Session** gemerkt
-- Dirty-Tabs **Alle speichern**: Fortschritt mit **Abbrechen**
-- Wizard dauerhaft aus → **Reset in Einstellungen**
-- Tag umbenennen: **Bestätigung bei >20 Treffern**
+- Session: **Sync-Scroll-Zustand** in `session.json` gemerkt
+- Tag-Rename: **Bestätigungs-Schwelle** in Einstellungen (Default 20)
+- Dirty-Tabs **Alle speichern**: **Fehlerliste** am Ende bei Teilfehlern
+- F1 / Wizard: kurze **0.6.8-Hinweise**
 - Stubs KI/Cloud/Stylus/3D unverändert

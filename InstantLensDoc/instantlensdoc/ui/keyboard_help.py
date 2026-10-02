@@ -61,12 +61,12 @@ SHORTCUTS_HTML = """
 <tr><td>Andere Tabs schließen</td><td><code>Ctrl+Shift+W</code> (Datei) — 0.6.2</td></tr>
 <tr><td>Fenster teilen (zwei Docs)</td><td><code>Ctrl+\\</code> — 0.6.3</td></tr>
 <tr><td>Vertikaler Split (übereinander)</td><td><code>Ctrl+Shift+\\</code> (Toggle) — 0.6.5</td></tr>
-<tr><td>Sync-Scroll (geteilte Docs)</td><td><code>Ctrl+Alt+\\</code> (optional) — 0.6.4</td></tr>
+<tr><td>Sync-Scroll (geteilte Docs)</td><td><code>Ctrl+Alt+\\</code>; Zustand je Session gemerkt — 0.6.4 / 0.6.9</td></tr>
 <tr><td>Tag-Cloud Filter</td><td>Klick setzt Filter; <code>Ctrl</code>+Klick Multi-Select — 0.6.4</td></tr>
-<tr><td>Tag-Cloud umbenennen</td><td>Rechtsklick → Tag umbenennen (global); Ctrl+Z / PDF-Undo-Stack; Bestätigung bei &gt;20 Treffern — 0.6.5–0.6.8</td></tr>
-<tr><td>Ungespeicherte Tabs</td><td>Statusleiste „N ungespeichert“ → Speichern / Alle speichern (Fortschritt &gt;3, Abbrechen) — 0.6.4–0.6.8</td></tr>
-<tr><td>Doc-Split PDF+Editor</td><td>Zwei Docs: Panel-Typ je Session gemerkt; H/V Ctrl+Shift+\\ — 0.6.3–0.6.8</td></tr>
-<tr><td>Wizard skip / dauerhaft / Reset</td><td>„Nicht mehr zeigen“; Reset in Einstellungen — 0.6.6–0.6.8</td></tr>
+<tr><td>Tag-Cloud umbenennen</td><td>Rechtsklick → Tag umbenennen; Ctrl+Z; Bestätigung ab Schwelle (Einstellung, Default 20) — 0.6.5–0.6.9</td></tr>
+<tr><td>Ungespeicherte Tabs</td><td>Alle speichern: Fortschritt &gt;3, Abbrechen, Fehlerliste am Ende — 0.6.4–0.6.9</td></tr>
+<tr><td>Doc-Split PDF+Editor</td><td>Panel-Typ + Sync-Scroll je Session; H/V Ctrl+Shift+\\ — 0.6.3–0.6.9</td></tr>
+<tr><td>Wizard / 0.6.8</td><td>Nicht mehr zeigen; Reset; Panel-Session; Save-Abbrechen; Tag-Confirm — 0.6.6–0.6.8</td></tr>
 <tr><td>PDF: Bild einfügen (Viewer)</td><td><code>Ctrl+V</code></td></tr>
 <tr><td>Zoom +</td><td><code>Ctrl++</code></td></tr>
 <tr><td>Zoom −</td><td><code>Ctrl+-</code></td></tr>

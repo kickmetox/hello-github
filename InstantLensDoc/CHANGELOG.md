@@ -1,5 +1,22 @@
 # Changelog — InstantLens Doc
 
+## 0.6.9 — Sync-Scroll-Session, Tag-Schwelle, Save-Fehlerliste, F1-0.6.8
+
+Nach 0.6.8: Doc-Split Sync-Scroll wird je Session gemerkt; Tag-Rename-Bestätigungsschwelle konfigurierbar (Default 20); „Alle speichern“ zeigt Fehlerliste bei Teilfehlern; F1/Wizard mit kurzen 0.6.8-Hinweisen. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### PDF / Annotationen
+- **Tag-Rename-Schwelle**: Bestätigung wenn Treffer > Einstellungswert (`tag_rename_confirm_threshold`, Default 20)
+
+### Editor / UX
+- **Sync-Scroll je Session**: `sync_scroll` in `session.json`; Toggle speichert/stellt wieder her
+- Dirty-Tabs **Alle speichern**: am Ende **Fehlerliste** wenn einzelne Dateien scheitern (Einzeldialoge unterdrückt)
+- **F1 / Wizard**: kurze Hinweise zu 0.6.8 (Panel-Session, Save-Abbrechen, Wizard-Reset, Tag-Confirm)
+
+### Packaging / Docs
+- Version **0.6.9**; Smoke um 0.6.9-Pfade erweitert
+
+---
+
 ## 0.6.8 — Split-Panel-Session, Save-Abbrechen, Wizard-Reset, Tag-Confirm
 
 Nach 0.6.7: Doc-Split merkt Panel-Typ (PDF/Editor) und Zweit-Doc je Session; „Alle speichern“-Fortschritt mit Abbrechen; Wizard dauerhaft aus → Reset in Einstellungen; Tag-Umbenennen fragt bei >20 Treffern nach. Stubs KI/Cloud/Stylus/3D bleiben Stubs.

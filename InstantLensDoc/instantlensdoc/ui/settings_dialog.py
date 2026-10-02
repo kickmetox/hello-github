@@ -49,6 +49,7 @@ from instantlensdoc.core.app_settings import (
     get_pdf_thumbnail_scale,
     get_pdf_two_page_spread,
     get_restore_session_on_start,
+    get_tag_rename_confirm_threshold,
     get_theme,
     get_ui_lang,
     get_update_check_on_start,
@@ -84,6 +85,7 @@ from instantlensdoc.core.app_settings import (
     set_pdf_thumbnail_scale,
     set_pdf_two_page_spread,
     set_restore_session_on_start,
+    set_tag_rename_confirm_threshold,
     set_theme,
     set_ui_lang,
     set_update_check_on_start,
@@ -302,6 +304,15 @@ class SettingsDialog(QDialog):
         )
         form.addRow("Doc-Split Layout", self.doc_split_orient)
 
+        self.tag_rename_confirm = QSpinBox()
+        self.tag_rename_confirm.setRange(0, 99999)
+        self.tag_rename_confirm.setValue(get_tag_rename_confirm_threshold())
+        self.tag_rename_confirm.setToolTip(
+            "Tag umbenennen: Bestätigung wenn mehr Treffer als dieser Wert "
+            "(0 = immer nachfragen; Standard 20)"
+        )
+        form.addRow("Tag-Rename Bestätigung ab", self.tag_rename_confirm)
+
         self.jpeg_q = QSpinBox()
         self.jpeg_q.setRange(10, 100)
         self.jpeg_q.setValue(get_export_jpeg_quality())
@@ -512,6 +523,7 @@ class SettingsDialog(QDialog):
         set_pdf_two_page_spread(self.pdf_spread.isChecked())
         set_pdf_continuous_scroll(self.pdf_continuous.isChecked())
         set_editor_doc_split_vertical(bool(self.doc_split_orient.currentData()))
+        set_tag_rename_confirm_threshold(int(self.tag_rename_confirm.value()))
         save_settings(
             {
                 "export_jpeg_quality": int(self.jpeg_q.value()),

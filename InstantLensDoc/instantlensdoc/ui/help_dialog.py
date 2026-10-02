@@ -201,12 +201,12 @@ WIZARD_PAGES = (
         "<h3>Highlights 0.6</h3>"
         "<ul>"
         "<li><b>Tag-Cloud</b>: Klick filtert; Ctrl+Klick Multi; <b>Rechtsklick → Tag umbenennen</b> "
-        "(global, <b>Ctrl+Z = Tag umbenennen</b> im PDF-Undo-Stack)</li>"
-        "<li><b>Fenster teilen</b> (Ctrl+\\): zwei Docs; PDF+Editor-Mischung; "
-        "<b>vertikal</b> Ctrl+Shift+\\; Sync-Scroll Ctrl+Alt+\\</li>"
-        "<li>Statusleiste <b>ungespeichert</b>: Dirty-Liste + Speichern / <b>Alle speichern</b> "
-        "(Fortschritt bei &gt;3 Dateien, <b>Abbrechen</b>)</li>"
-        "<li>Wizard: <b>Nicht mehr zeigen</b>; Reset in Einstellungen; Tag-Rename Bestätigung &gt;20</li>"
+        "(global, <b>Ctrl+Z</b>; Bestätigung ab Schwelle in Einstellungen)</li>"
+        "<li><b>Fenster teilen</b> (Ctrl+\\): PDF+Editor; Sync-Scroll; Panel-Typ + Sync-Scroll "
+        "<b>je Session</b> gemerkt</li>"
+        "<li>Statusleiste <b>ungespeichert</b>: <b>Alle speichern</b> mit Fortschritt, Abbrechen, "
+        "<b>Fehlerliste</b> am Ende</li>"
+        "<li><b>0.6.8 kurz:</b> Panel-Typ Session · Save-Abbrechen · Wizard-Reset · Tag-Confirm &gt;20</li>"
         "</ul>"
         "<p>Fertig — viel Erfolg mit InstantLens Doc.</p>",
     ),

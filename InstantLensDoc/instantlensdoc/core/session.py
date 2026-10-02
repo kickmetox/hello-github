@@ -29,6 +29,8 @@ class SessionState:
     # Doc-Split Zweit-Panel (0.6.8): Pfad + Typ pdf|editor — je Session gemerkt
     secondary_path: str = ""
     secondary_kind: str = ""
+    # Doc-Split Sync-Scroll (0.6.9): Zustand je Session gemerkt
+    sync_scroll: bool = False
 
 
 def session_path() -> Path:
@@ -86,12 +88,14 @@ def load_session() -> SessionState:
     secondary_kind = _normalize_secondary_kind(raw.get("secondary_kind"))
     if secondary_path and not secondary_kind:
         secondary_kind = "pdf" if Path(secondary_path).suffix.lower() == ".pdf" else "editor"
+    sync_scroll = bool(raw.get("sync_scroll", False))
     return SessionState(
         tabs=tabs,
         active=active,
         restore=restore,
         secondary_path=secondary_path,
         secondary_kind=secondary_kind,
+        sync_scroll=sync_scroll,
     )
 
 
@@ -112,6 +116,7 @@ def save_session(state: SessionState) -> None:
         "tabs": tabs_payload,
         "secondary_path": sec_path,
         "secondary_kind": _normalize_secondary_kind(state.secondary_kind),
+        "sync_scroll": bool(state.sync_scroll),
     }
     path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
 
@@ -129,6 +134,7 @@ def build_session(
     restore: bool = True,
     secondary_path: Optional[str] = None,
     secondary_kind: Optional[str] = None,
+    sync_scroll: bool = False,
 ) -> SessionState:
     tabs: List[SessionTab] = []
     seen: set[str] = set()
@@ -167,4 +173,5 @@ def build_session(
         restore=restore,
         secondary_path=sec,
         secondary_kind=kind,
+        sync_scroll=bool(sync_scroll),
     )

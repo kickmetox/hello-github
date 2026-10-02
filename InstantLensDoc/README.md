@@ -2,7 +2,7 @@
 
 Moderne Textverarbeitung mit PDF-Annotator, OCR-Bridge und Formulargenerator.
 
-**Version:** 0.6.8  
+**Version:** 0.6.9  
 **Hersteller:** Andreas Meyer · ame@sellerbach.de
 
 ## Quickstart (Windows)
@@ -32,8 +32,8 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an).
 
-## Neu in 0.6.8
+## Neu in 0.6.9
 
-Doc-Split Panel-Typ je Session; Alle-speichern Abbrechen; Wizard-Reset in Einstellungen; Tag-Rename-Bestätigung (>20). Stubs KI/Cloud/Stylus/3D unverändert.
+Session merkt Sync-Scroll; Tag-Rename-Schwelle in Einstellungen (Default 20); Alle-speichern mit Fehlerliste; F1/Wizard kurz zu 0.6.8. Stubs KI/Cloud/Stylus/3D unverändert.
 
 Siehe [CHANGELOG.md](CHANGELOG.md), [FEATURES.md](FEATURES.md) und [INFO.md](INFO.md).
