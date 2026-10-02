@@ -9,8 +9,12 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | TXT / MD / HTML öffnen & speichern | fertig | HTML-Export mit einfachem Markdownish |
 | DOCX öffnen & speichern | teilweise | python-docx; Headings/Listen beim Export |
 | Editor → HTML / DOCX / PDF Export | fertig | Datei → Exportieren |
+| Drucken (Editor / PDF-Seite) | fertig | Qt PrintDialog (Ctrl+P) |
+| Zuletzt geöffnete Dateien | fertig | Menü + Sidebar, `recent.json` |
 | PDF lesen / rendern | fertig | pypdfium2 |
+| PDF Zoom / Seite einpassen | fertig | +/−, Fit Page/Width, Ctrl+0/9/1 |
 | PDF-Annotationen (Highlight, Underline, Sticky, Text) | fertig | Sidecar `*.ildann.json` **v3** |
+| Annotation Undo/Redo | fertig | Ctrl+Z/Y inkl. Overlay-Text |
 | Stempel / Callouts | teilweise | Stempel-Presets + Callout (2-Klick) |
 | Formen (Rechteck / Linie / Pfeil) | fertig | Drag-Zeichnung |
 | Messwerkzeug (Lineal) | fertig | Distanz in pt (Scale-bewusst) |
@@ -28,12 +32,12 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | Formulargenerator → HTML/PDF | fertig | Mehr Feldtypen; Definition speichern/laden |
 | Layout: Textrahmen + Verkettung | teilweise | `flow_text_chain` Overflow real |
 | Layout: einfacher Umbruch | fertig | Wortgrenzen |
-| Lizenz Trial 28d / Keys 32d | fertig | |
+| Lizenz Trial 28d / Keys 32d | fertig | Statusleiste farbig + Tooltip |
 | Keygenerator (CLI/GUI) | fertig | `run-keygen.bat` |
 | PyInstaller Build Windows | fertig | `build-windows.ps1` |
-| Inno-Installer | fertig | Desktop + Startmenü-Hinweis 0.1.3 |
+| Inno-Installer | fertig | Desktop + Startmenü-Hinweis 0.1.4 |
 | Sync-Skript Windows | fertig | Store `docs/sync-ild.ps1` |
-| In-App Hilfe / About | fertig | |
+| In-App Hilfe / About | fertig | Version 0.1.4 |
 | FEATURES.md / INFO.md | fertig | |
 | `ild_pdf` Modul + Beispielskript | fertig | `examples/ild_pdf_demo.py` |
 | Font-Matching | geplant | |

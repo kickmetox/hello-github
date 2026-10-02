@@ -361,14 +361,29 @@ class PdfViewer(QWidget):
 
         toolbar = QHBoxLayout()
         self.lbl_page = QLabel("—")
+        self.lbl_zoom = QLabel("150%")
         btn_prev = QPushButton("◀")
         btn_next = QPushButton("▶")
         btn_prev.clicked.connect(self.prev_page)
         btn_next.clicked.connect(self.next_page)
         btn_zoom_in = QPushButton("+")
         btn_zoom_out = QPushButton("−")
-        btn_zoom_in.clicked.connect(lambda: self.set_scale(self.scale + 0.25))
-        btn_zoom_out.clicked.connect(lambda: self.set_scale(max(0.5, self.scale - 0.25)))
+        btn_zoom_in.setToolTip("Vergrößern (Ctrl++)")
+        btn_zoom_out.setToolTip("Verkleinern (Ctrl+-)")
+        btn_zoom_in.clicked.connect(self.zoom_in)
+        btn_zoom_out.clicked.connect(self.zoom_out)
+        btn_fit = QPushButton("Seite")
+        btn_fit.setToolTip("Seite einpassen (Ctrl+0)")
+        btn_fit.clicked.connect(self.fit_page)
+        btn_fit_w = QPushButton("Breite")
+        btn_fit_w.setToolTip("Seitenbreite einpassen (Ctrl+9)")
+        btn_fit_w.clicked.connect(self.fit_width)
+        btn_undo = QPushButton("↶")
+        btn_undo.setToolTip("Annotation rückgängig (Ctrl+Z)")
+        btn_undo.clicked.connect(self.undo_annotation)
+        btn_redo = QPushButton("↷")
+        btn_redo.setToolTip("Annotation wiederholen (Ctrl+Y)")
+        btn_redo.clicked.connect(self.redo_annotation)
         btn_rot = QPushButton("90°")
         btn_rot.setToolTip("Aktuelle Seite um 90° drehen")
         btn_rot.clicked.connect(self.rotate_current)
@@ -418,8 +433,13 @@ class PdfViewer(QWidget):
         toolbar.addWidget(btn_prev)
         toolbar.addWidget(self.lbl_page)
         toolbar.addWidget(btn_next)
+        toolbar.addWidget(btn_undo)
+        toolbar.addWidget(btn_redo)
         toolbar.addWidget(btn_zoom_out)
+        toolbar.addWidget(self.lbl_zoom)
         toolbar.addWidget(btn_zoom_in)
+        toolbar.addWidget(btn_fit)
+        toolbar.addWidget(btn_fit_w)
         toolbar.addWidget(btn_rot)
         toolbar.addWidget(btn_del)
         toolbar.addWidget(btn_reorder)
@@ -466,27 +486,39 @@ class PdfViewer(QWidget):
         self.canvas.set_drag_tool(tool if tool in DRAG_TYPES else None)
         self.status.emit(f"Werkzeug: {tool.value}")
 
-    def load(self, path: str | Path):
-        self.pdf_path = Path(path)
-        self.store = AnnotationStore(self.pdf_path)
-        from ild_pdf import PdfDocument
+    def load(self, path: str | Path) -> bool:
+        try:
+            self.pdf_path = Path(path)
+            self.store = AnnotationStore(self.pdf_path)
+            self.store.clear_history()
+            from ild_pdf import PdfDocument
 
-        with PdfDocument(self.pdf_path) as doc:
-            self.page_count = len(doc)
-        self.page_index = 0
-        self._pending_callout_anchor = None
-        self.refresh()
-        self.annotations_changed.emit()
+            with PdfDocument(self.pdf_path) as doc:
+                self.page_count = len(doc)
+            self.page_index = 0
+            self._pending_callout_anchor = None
+            self.refresh()
+            self.annotations_changed.emit()
+            return True
+        except Exception as e:
+            QMessageBox.critical(self, "PDF öffnen", f"PDF konnte nicht geladen werden:\n{e}")
+            self.pdf_path = None
+            self.store = None
+            return False
 
     def refresh(self):
         if not self.pdf_path:
             return
-        img = render_page(self.pdf_path, self.page_index, scale=self.scale)
-        anns = self.store.for_page(self.page_index) if self.store else []
-        self.canvas.set_page_image(img, anns, scale=self.scale)
-        self.lbl_page.setText(f"Seite {self.page_index + 1} / {self.page_count}")
-        dirty = " *" if self.store and self.store.dirty else ""
-        self.status.emit(f"PDF: {self.pdf_path.name}{dirty}")
+        try:
+            img = render_page(self.pdf_path, self.page_index, scale=self.scale)
+            anns = self.store.for_page(self.page_index) if self.store else []
+            self.canvas.set_page_image(img, anns, scale=self.scale)
+            self.lbl_page.setText(f"Seite {self.page_index + 1} / {self.page_count}")
+            self.lbl_zoom.setText(f"{int(round(self.scale * 100))}%")
+            dirty = " *" if self.store and self.store.dirty else ""
+            self.status.emit(f"PDF: {self.pdf_path.name}{dirty}")
+        except Exception as e:
+            QMessageBox.warning(self, "PDF-Ansicht", f"Seite konnte nicht gerendert werden:\n{e}")
 
     def goto_page(self, page_index: int):
         if 0 <= page_index < self.page_count:
@@ -504,8 +536,139 @@ class PdfViewer(QWidget):
             self.refresh()
 
     def set_scale(self, scale: float):
-        self.scale = scale
+        self.scale = max(0.25, min(5.0, float(scale)))
         self.refresh()
+
+    def zoom_in(self):
+        self.set_scale(self.scale + 0.25)
+
+    def zoom_out(self):
+        self.set_scale(self.scale - 0.25)
+
+    def zoom_100(self):
+        self.set_scale(1.0)
+
+    def _viewport_size(self) -> tuple[int, int]:
+        vp = self.scroll.viewport()
+        return max(vp.width() - 16, 80), max(vp.height() - 16, 80)
+
+    def fit_page(self):
+        """Aktuelle Seite in die Viewport-Fläche einpassen."""
+        if not self.pdf_path:
+            return
+        try:
+            from ild_pdf import PdfDocument
+
+            with PdfDocument(self.pdf_path) as doc:
+                pw, ph = doc.page_size(self.page_index)
+            vw, vh = self._viewport_size()
+            if pw <= 0 or ph <= 0:
+                return
+            scale = min(vw / pw, vh / ph)
+            self.set_scale(scale)
+            self.status.emit(f"Seite einpassen ({int(round(scale * 100))}%)")
+        except Exception as e:
+            QMessageBox.warning(self, "Zoom", str(e))
+
+    def fit_width(self):
+        """Seitenbreite an Viewport anpassen."""
+        if not self.pdf_path:
+            return
+        try:
+            from ild_pdf import PdfDocument
+
+            with PdfDocument(self.pdf_path) as doc:
+                pw, _ph = doc.page_size(self.page_index)
+            vw, _vh = self._viewport_size()
+            if pw <= 0:
+                return
+            scale = vw / pw
+            self.set_scale(scale)
+            self.status.emit(f"Breite einpassen ({int(round(scale * 100))}%)")
+        except Exception as e:
+            QMessageBox.warning(self, "Zoom", str(e))
+
+    def undo_annotation(self) -> bool:
+        if not self.store or not self.store.can_undo():
+            self.status.emit("Nichts rückgängig zu machen")
+            return False
+        try:
+            self.store.undo()
+            self.store.save(force=True)
+            self.refresh()
+            self.annotations_changed.emit()
+            self.status.emit("Annotation rückgängig")
+            return True
+        except Exception as e:
+            QMessageBox.warning(self, "Rückgängig", str(e))
+            return False
+
+    def redo_annotation(self) -> bool:
+        if not self.store or not self.store.can_redo():
+            self.status.emit("Nichts zu wiederholen")
+            return False
+        try:
+            self.store.redo()
+            self.store.save(force=True)
+            self.refresh()
+            self.annotations_changed.emit()
+            self.status.emit("Annotation wiederholt")
+            return True
+        except Exception as e:
+            QMessageBox.warning(self, "Wiederholen", str(e))
+            return False
+
+    def print_current_page(self) -> bool:
+        """Aktuelle PDF-Seite (mit Annotationen) über Qt PrintDialog drucken."""
+        if not self.pdf_path:
+            QMessageBox.information(self, "Drucken", "Kein PDF geladen.")
+            return False
+        try:
+            from PySide6.QtGui import QPainter
+            from PySide6.QtPrintSupport import QPrintDialog, QPrinter
+
+            # Frisch rendern für Druckqualität
+            img = render_page(self.pdf_path, self.page_index, scale=max(self.scale, 2.0))
+            anns = self.store.for_page(self.page_index) if self.store else []
+            # Temporäres Canvas-Pixmap nutzen
+            self.canvas.set_page_image(img, anns, scale=max(self.scale, 2.0))
+            pm = self.canvas.pixmap()
+            if pm is None or pm.isNull():
+                QMessageBox.warning(self, "Drucken", "Keine Seitenvorschau verfügbar.")
+                self.refresh()
+                return False
+
+            printer = QPrinter(QPrinter.HighResolution)
+            printer.setDocName(f"{self.pdf_path.stem} — Seite {self.page_index + 1}")
+            dlg = QPrintDialog(printer, self)
+            dlg.setWindowTitle("PDF-Seite drucken")
+            if dlg.exec() != QPrintDialog.Accepted:
+                self.refresh()
+                return False
+            painter = QPainter(printer)
+            try:
+                page_rect = printer.pageRect(QPrinter.DevicePixel)
+                scaled = pm.scaled(
+                    int(page_rect.width()),
+                    int(page_rect.height()),
+                    Qt.KeepAspectRatio,
+                    Qt.SmoothTransformation,
+                )
+                x = int((page_rect.width() - scaled.width()) / 2)
+                y = int((page_rect.height() - scaled.height()) / 2)
+                painter.drawPixmap(x, y, scaled)
+            finally:
+                painter.end()
+            self.refresh()
+            self.status.emit("PDF-Seite gedruckt")
+            return True
+        except Exception as e:
+            QMessageBox.critical(self, "Drucken", f"Druck fehlgeschlagen:\n{e}")
+            try:
+                self.refresh()
+            except Exception:
+                pass
+            return False
 
     def annotation_summaries(self) -> list[tuple[str, Annotation]]:
         if not self.store:

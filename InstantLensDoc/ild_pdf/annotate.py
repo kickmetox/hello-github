@@ -4,14 +4,16 @@ from __future__ import annotations
 
 import json
 import math
+from contextlib import contextmanager
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
-from typing import List, Optional
+from typing import Iterator, List, Optional
 from uuid import uuid4
 
 SIDECAR_VERSION = 3
+HISTORY_LIMIT = 40
 
 
 class AnnotationType(str, Enum):
@@ -122,6 +124,9 @@ class AnnotationStore:
         self.annotations: List[Annotation] = []
         self.dirty = False
         self._meta: dict = {}
+        self._undo: List[List[dict]] = []
+        self._redo: List[List[dict]] = []
+        self._recording = True
         if self.pdf_path and self.sidecar_path.exists():
             self.load()
 
@@ -131,7 +136,58 @@ class AnnotationStore:
             raise RuntimeError("Kein PDF-Pfad gesetzt")
         return self.pdf_path.with_suffix(self.pdf_path.suffix + ".ildann.json")
 
+    def clear_history(self) -> None:
+        self._undo.clear()
+        self._redo.clear()
+
+    def can_undo(self) -> bool:
+        return bool(self._undo)
+
+    def can_redo(self) -> bool:
+        return bool(self._redo)
+
+    def _snapshot(self) -> List[dict]:
+        return [a.to_dict() for a in self.annotations]
+
+    def _restore(self, snap: List[dict]) -> None:
+        self.annotations = [Annotation.from_dict(a) for a in snap]
+        self.dirty = True
+
+    def _push_undo(self) -> None:
+        if not self._recording:
+            return
+        self._undo.append(self._snapshot())
+        if len(self._undo) > HISTORY_LIMIT:
+            self._undo.pop(0)
+        self._redo.clear()
+
+    @contextmanager
+    def atomic(self) -> Iterator[None]:
+        """Mehrere Mutationen als eine Undo-Stufe."""
+        self._push_undo()
+        prev = self._recording
+        self._recording = False
+        try:
+            yield
+        finally:
+            self._recording = prev
+
+    def undo(self) -> bool:
+        if not self._undo:
+            return False
+        self._redo.append(self._snapshot())
+        self._restore(self._undo.pop())
+        return True
+
+    def redo(self) -> bool:
+        if not self._redo:
+            return False
+        self._undo.append(self._snapshot())
+        self._restore(self._redo.pop())
+        return True
+
     def add(self, ann: Annotation) -> Annotation:
+        self._push_undo()
         self.annotations.append(ann)
         self.dirty = True
         return ann
@@ -145,6 +201,7 @@ class AnnotationStore:
     def update(self, ann_id: str, **kwargs) -> Optional[Annotation]:
         for a in self.annotations:
             if a.id == ann_id:
+                self._push_undo()
                 for k, v in kwargs.items():
                     if hasattr(a, k):
                         setattr(a, k, v)
@@ -155,6 +212,9 @@ class AnnotationStore:
 
     def remove(self, ann_id: str) -> bool:
         before = len(self.annotations)
+        if not any(a.id == ann_id for a in self.annotations):
+            return False
+        self._push_undo()
         self.annotations = [a for a in self.annotations if a.id != ann_id]
         changed = len(self.annotations) < before
         if changed:
@@ -176,21 +236,27 @@ class AnnotationStore:
 
     def remap_pages(self, mapping: dict[int, int]) -> None:
         """Seitenindizes nach reorder/delete anpassen; fehlende Keys = Seite entfernt."""
-        kept: List[Annotation] = []
+        planned: List[tuple[Annotation, int]] = []
         changed = False
         for ann in self.annotations:
             if ann.page in mapping:
                 new_page = mapping[ann.page]
                 if new_page != ann.page:
-                    ann.page = new_page
-                    ann.touch()
                     changed = True
-                kept.append(ann)
+                planned.append((ann, new_page))
             else:
                 changed = True
-        if changed or len(kept) != len(self.annotations):
-            self.annotations = kept
-            self.dirty = True
+        if not changed and len(planned) == len(self.annotations):
+            return
+        self._push_undo()
+        kept: List[Annotation] = []
+        for ann, new_page in planned:
+            if ann.page != new_page:
+                ann.page = new_page
+                ann.touch()
+            kept.append(ann)
+        self.annotations = kept
+        self.dirty = True
 
     def save(self, path: Optional[Path] = None, force: bool = False) -> Path:
         target = path or self.sidecar_path
@@ -215,6 +281,7 @@ class AnnotationStore:
         self._meta = dict(data.get("meta") or {})
         self.annotations = [Annotation.from_dict(a) for a in data.get("annotations", [])]
         self.dirty = False
+        self.clear_history()
 
     def export_backup(self, path: str | Path) -> Path:
         """Kopie der Sidecar unter anderem Namen (Backup)."""

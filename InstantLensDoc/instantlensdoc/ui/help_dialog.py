@@ -15,16 +15,20 @@ HELP_HTML = """
 <h3>Erste Schritte</h3>
 <ul>
 <li><b>Datei → Öffnen</b>: TXT, MD, HTML, DOCX, PDF, Bilder</li>
+<li><b>Datei → Zuletzt geöffnet</b>: Menü + Seitenleiste (persistiert)</li>
 <li><b>Datei → Exportieren</b>: Editor-Inhalt als HTML, DOCX oder PDF</li>
-<li><b>Seitenleiste</b>: Suche (Enter/Suchen), Weiter, Dokumente, Annotationen/Markierungen</li>
+<li><b>Datei → Drucken</b> (Ctrl+P): Editor oder aktuelle PDF-Seite (Qt Print)</li>
+<li><b>Seitenleiste</b>: Suche, Zuletzt geöffnet, Dokumente, Annotationen/Markierungen</li>
+<li><b>Bearbeiten → Rückgängig/Wiederholen</b>: Editor-Text <i>oder</i> PDF-Annotationen/Overlay-Text (Ctrl+Z / Ctrl+Y)</li>
 <li><b>Bearbeiten → Auswahl markieren</b> (Ctrl+H): Markierung im Editor + Eintrag in der Seitenleiste</li>
-<li><b>PDF</b>: Blättern, Zoom, 90°-Drehen, Seite löschen, Seiten neu anordnen;
+<li><b>Ansicht</b>: Zoom +/−, Seite einpassen (Ctrl+0), Breite (Ctrl+9), 100&nbsp;% (Ctrl+1)</li>
+<li><b>PDF</b>: Blättern, Zoom/Fit, 90°-Drehen, Seite löschen, Seiten neu anordnen;
     Annotationen: Highlight (Drag), Unterstreichen, Notiz, <b>Text-Overlay</b>, Stempel, Callout,
     <b>Rechteck / Linie / Pfeil / Lineal</b> —
-    Sidecar <code>*.ildann.json</code> (v3, Auto-Save);
+    Sidecar <code>*.ildann.json</code> (v3, Auto-Save, Undo/Redo);
     Doppelklick oder Strg+Klick auf Overlay zum Bearbeiten;
     PDF → Text→Overlay / Overlay einbrennen;
-    Seite als Bild / Bild als neue Seite</li>
+    Seite als Bild / Bild als neue Seite / Seite drucken</li>
 <li><b>Einfügen → Verketteter Textrahmen</b>: Overflow fließt in den Folgeahmen</li>
 <li><b>OCR</b>: Extras → OCR — Sprach-Presets + Modus „editierbarer Text“ oder
     „durchsuchbares Bild“ (PDF + <code>*.ildocr.txt</code>). Ohne Tesseract: Install-Hinweis
@@ -33,7 +37,7 @@ HELP_HTML = """
     (<code>*.ildform.json</code>), Live-Vorschau, Export HTML/PDF</li>
 <li><b>Build (Windows)</b>: <code>build-windows.ps1</code> — PyInstaller App + Keygen</li>
 <li><b>Installer</b>: Desktop-Verknüpfung + Startmenü-Gruppe (siehe Inno-Hinweis)</li>
-<li><b>Lizenz</b>: Hilfe → Lizenz — Trial 4 Wochen, Keys 30+2 Tage</li>
+<li><b>Lizenz</b>: Statusleiste (farbig) + Hilfe → Lizenz — Trial 4 Wochen, Keys 30+2 Tage</li>
 <li><b>Keygen</b>: <code>run-keygen.bat</code> bzw. <code>python -m keygen --gui</code></li>
 </ul>
 <h3>PDF-Modul</h3>

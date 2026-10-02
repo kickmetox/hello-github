@@ -3,7 +3,7 @@
 Moderne Textverarbeitung mit PDF-Annotator, Layout-Basics, OCR-Bridge und Formulargenerator.
 
 **Hersteller:** Andreas Meyer · ame@sellerbach.de  
-**Version:** 0.1.3  
+**Version:** 0.1.4  
 **PDF-Engine:** pypdfium2 / PDFium (lizenzfreundlich — **kein** Poppler/GPL als Standard)
 
 ## Zielordner (Windows)

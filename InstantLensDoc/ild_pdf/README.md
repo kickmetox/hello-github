@@ -1,7 +1,7 @@
 # ild_pdf — auskoppelbares PDF-Modul
 
 Lizenzfreundliche PDF-Engine auf **pypdfium2 / PDFium** (kein Poppler/GPL).  
-Version **0.1.3**.
+Version **0.1.4**.
 
 ## Installation
 
@@ -53,7 +53,7 @@ python examples/ild_pdf_demo.py pfad/zu/datei.pdf
 | `PdfDocument` | Öffnen / Seitenzahl / Größe |
 | `render_page` / `render_pages` | Seite(n) → PIL.Image |
 | `convert_from_path` | pdf2image-ähnlicher Drop-in (`ild_pdf.render`) |
-| `Annotation` / `AnnotationStore` | Sidecar `*.ildann.json` **v3** |
+| `Annotation` / `AnnotationStore` | Sidecar `*.ildann.json` **v3**; `undo()` / `redo()` / `atomic()` |
 | `AnnotationType` | highlight, underline, sticky, text, stamp, callout, **rectangle, line, arrow, measure, text_overlay** |
 | `DRAG_TYPES` | Typen für Drag-Zeichnung (UI) |
 | `STAMP_PRESETS` | Stempel-Texte |

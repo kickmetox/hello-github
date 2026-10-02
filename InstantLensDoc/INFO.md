@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | 0.1.3 |
+| Version | 0.1.4 |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | Plattform | Windows-first (Python 3.12 + PySide6), Linux/macOS lauffähig |
@@ -17,7 +17,8 @@
 3. Nach Ablauf: neuen Key per Mail an **ame@sellerbach.de** anfordern  
 4. Keygenerator: `run-keygen.bat` oder `python -m keygen --gui` (separates Extra)
 
-Lizenzdaten lokal unter `%APPDATA%\InstantLensDoc\license.json` (Windows) bzw. `~/.config/InstantLensDoc/`.
+Lizenzdaten lokal unter `%APPDATA%\InstantLensDoc\license.json` (Windows) bzw. `~/.config/InstantLensDoc/`.  
+Statusleiste zeigt klar: **Aktiviert** (grün) / **Testversion** (amber) / **Abgelaufen** (rot).
 
 ## Icon
 
@@ -29,6 +30,14 @@ Eigenes Icon dort ablegen — Sync-Skript überschreibt vorhandene Nutzer-Icons 
 Optional. `pip install pytesseract` + Tesseract-OCR Runtime (`winget install UB-Mannheim.TesseractOCR`).  
 Sprach-Presets in der UI; Modi: editierbarer Text oder durchsuchbares Bild (PDF + Sidecar).  
 Fehlt die Runtime, zeigt Extras → OCR eine klare Installationsanleitung.
+
+## Neu in 0.1.4
+
+- Undo/Redo für PDF-Annotationen und Overlay-Text (Ctrl+Z / Ctrl+Y)  
+- Zoom: Seite/Breite einpassen + Tastaturkürzel (Ctrl+0 / Ctrl+9 / Ctrl+1)  
+- Zuletzt geöffnete Dateien (Menü + Sidebar)  
+- Drucken (Qt) für Editor und PDF-Seite  
+- Klarerer Lizenz-Status in der Statusleiste; About 0.1.4  
 
 ## Neu in 0.1.3
 

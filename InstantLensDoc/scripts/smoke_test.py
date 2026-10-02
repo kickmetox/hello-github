@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Smoke-Test 0.1.3 (CLI + optional offscreen Qt)."""
+"""Smoke-Test 0.1.4 (CLI + optional offscreen Qt)."""
 
 from __future__ import annotations
 
@@ -37,10 +37,11 @@ def main() -> int:
     from instantlensdoc.core.layout import LayoutDocument
     from instantlensdoc.core import ocr as ocr_mod
     from instantlensdoc.core.ocr import LANG_PRESETS, OcrOutputMode
+    from instantlensdoc.core import recent as recent_mod
     from instantlensdoc.license import KEY_DAYS, TRIAL_DAYS, generate_key, verify_key
 
-    assert __version__ == "0.1.3", __version__
-    assert ild_ver == "0.1.3", ild_ver
+    assert __version__ == "0.1.4", __version__
+    assert ild_ver == "0.1.4", ild_ver
     assert TRIAL_DAYS == 28 and KEY_DAYS == 32
     key = generate_key("ame@sellerbach.de")
     ok, msg, _ = verify_key(key)
@@ -84,6 +85,8 @@ def main() -> int:
 
         with PdfDocument(pdf) as doc:
             assert len(doc) == 2
+            w, h = doc.page_size(0)
+            assert w > 0 and h > 0
         render_page(pdf, 0)
 
         # Annotation Persistenz v3 + Formen/Messung/Overlay
@@ -169,15 +172,39 @@ def main() -> int:
         assert AnnotationType.STAMP in types and AnnotationType.CALLOUT in types
         assert AnnotationType.RECTANGLE in types and AnnotationType.MEASURE in types
         assert AnnotationType.TEXT_OVERLAY in types
-        assert store2.update(store2.annotations[-1].id, text="Overlay-Updated")
-        assert store2.get(store2.annotations[-1].id).text == "Overlay-Updated"
+        last_id = store2.annotations[-1].id
+        assert store2.update(last_id, text="Overlay-Updated")
+        assert store2.get(last_id).text == "Overlay-Updated"
 
-        # Textblöcke + Import + Bake
+        # Undo/Redo Annotation + Overlay-Text
+        assert store2.can_undo()
+        n_before_undo = len(store2.annotations)
+        assert store2.undo()  # undo update → text zurück
+        assert store2.get(last_id).text == "Overlay-Edit"
+        assert store2.redo()
+        assert store2.get(last_id).text == "Overlay-Updated"
+        store2.add(Annotation(0, AnnotationType.HIGHLIGHT, 1, 1, text="temp"))
+        assert len(store2.annotations) == n_before_undo + 1
+        assert store2.undo()
+        assert len(store2.annotations) == n_before_undo
+        assert store2.redo()
+        assert len(store2.annotations) == n_before_undo + 1
+        store2.undo()  # wieder ohne temp
+        print("Undo/Redo: OK")
+
+        # Textblöcke + Import (atomic = 1 Undo) + Bake
         blocks = extract_text_blocks(pdf, 0)
         assert isinstance(blocks, list)
         print(f"Textblöcke Seite 0: {len(blocks)}")
+        n0 = len(store2.annotations)
         created = import_page_text_as_overlays(store2, pdf, 0, scale=1.5)
         assert isinstance(created, list)
+        if created:
+            assert store2.can_undo()
+            store2.undo()
+            assert len(store2.annotations) == n0
+            store2.redo()
+            assert len(store2.annotations) == n0 + len(created)
         store2.save(force=True)
         bake_text_overlays(pdf, store2, scale=1.5, out_path=td / "baked.pdf")
         assert (td / "baked.pdf").exists()
@@ -248,6 +275,26 @@ def main() -> int:
         save_document(doc, td / "out.docx")
         assert (td / "out.docx").exists()
 
+        # Recent-Files Persistenz (isolierter Config-Pfad via Env nicht nötig —
+        # wir schreiben direkt in temp und prüfen API mit monkeypatch path)
+        recent_file = td / "recent.json"
+        orig_path = recent_mod.recent_path
+        recent_mod.recent_path = lambda: recent_file  # type: ignore
+        try:
+            recent_mod.clear_recent()
+            assert recent_mod.load_recent() == []
+            # existierende Datei
+            recent_mod.add_recent(txt)
+            recent_mod.add_recent(pdf)
+            files = recent_mod.load_recent()
+            assert str(pdf) in files and str(txt) in files
+            assert files[0] == str(pdf)  # zuletzt zuerst
+            recent_mod.clear_recent()
+            assert recent_mod.load_recent() == []
+            print("Recent: OK")
+        finally:
+            recent_mod.recent_path = orig_path  # type: ignore
+
         # OCR searchable image ohne Tesseract
         if ok_ocr:
             sample_img = td / "ocr.png"
@@ -273,10 +320,12 @@ def main() -> int:
         # Installer-Hinweis vorhanden
         assert (ROOT / "installer" / "installer-hinweis.txt").exists()
         iss = (ROOT / "installer" / "instantlensdoc.iss").read_text(encoding="utf-8")
-        assert "0.1.3" in iss and "desktopicon" in iss and "DisableProgramGroupPage=no" in iss
+        assert "0.1.4" in iss and "desktopicon" in iss and "DisableProgramGroupPage=no" in iss
 
         # Beispielskript vorhanden
         assert (ROOT / "examples" / "ild_pdf_demo.py").exists()
+        assert "0.1.4" in (ROOT / "INFO.md").read_text(encoding="utf-8")
+        assert "Undo" in (ROOT / "FEATURES.md").read_text(encoding="utf-8")
 
     if os.environ.get("ILD_SMOKE_QT", "1") == "1":
         os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
@@ -300,12 +349,48 @@ def main() -> int:
         assert win.editor.highlight_selection()
         win._add_chained_frame()
         assert len(win.layout_doc.text_frames) >= 2
+        # Lizenz-Label vorhanden
+        assert "Lizenz:" in win.license_label.text()
+        assert "v0.1.4" in win.version_label.text()
         # Export-Menü-Pfad (ohne Dialog): direkt core.export
         from instantlensdoc.core.export import export_html as eh
 
         eh(win.editor.toPlainText(), ROOT / ".smoke_export.html", title="smoke")
         assert (ROOT / ".smoke_export.html").exists()
         (ROOT / ".smoke_export.html").unlink(missing_ok=True)
+
+        # PDF laden + Zoom/Undo
+        with tempfile.TemporaryDirectory() as td2:
+            td2 = Path(td2)
+            smoke_pdf = td2 / "smoke.pdf"
+            Image.new("RGB", (300, 400), "white").save(smoke_pdf, "PDF")
+            win.open_path(str(smoke_pdf))
+            assert win.stack.currentWidget() is win.pdf_view
+            old_scale = win.pdf_view.scale
+            win.pdf_view.zoom_in()
+            assert win.pdf_view.scale > old_scale
+            win.pdf_view.zoom_100()
+            assert abs(win.pdf_view.scale - 1.0) < 0.01
+            win.pdf_view.fit_page()
+            assert win.pdf_view.scale > 0
+            # Annotation + Undo
+            from ild_pdf import Annotation, AnnotationType
+
+            assert win.pdf_view.store is not None
+            win.pdf_view.store.add(
+                Annotation(0, AnnotationType.HIGHLIGHT, 10, 10, width=40, height=12, text="u")
+            )
+            assert win.pdf_view.store.can_undo()
+            assert win.pdf_view.undo_annotation()
+            assert not any(a.text == "u" for a in win.pdf_view.store.annotations)
+            assert win.pdf_view.redo_annotation()
+            assert any(a.text == "u" for a in win.pdf_view.store.annotations)
+            # Print-API erreichbar (Dialog wird offscreen ggf. abgelehnt — Methode existiert)
+            assert callable(win.pdf_view.print_current_page)
+            assert callable(win._print)
+            # Recent in Sidebar
+            assert win.sidebar.recent.count() >= 1
+
         win.close()
         print("Qt: OK")
 

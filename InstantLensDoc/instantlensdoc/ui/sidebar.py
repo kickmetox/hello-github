@@ -1,4 +1,4 @@
-"""Seitenleiste: Dokumentenbaum, Suche, Annotationen/Markierungen."""
+"""Seitenleiste: Dokumentenbaum, Zuletzt geöffnet, Suche, Annotationen/Markierungen."""
 
 from __future__ import annotations
 
@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
 
 class Sidebar(QWidget):
     file_activated = Signal(str)
+    recent_activated = Signal(str)
     search_requested = Signal(str)
     search_next_requested = Signal()
     mark_activated = Signal(int)  # Index in Markierungsliste
@@ -43,6 +44,12 @@ class Sidebar(QWidget):
         btn_row.addWidget(self.btn_next)
         layout.addLayout(btn_row)
 
+        layout.addWidget(QLabel("Zuletzt geöffnet"))
+        self.recent = QListWidget()
+        self.recent.setMaximumHeight(120)
+        self.recent.itemDoubleClicked.connect(self._activate_recent)
+        layout.addWidget(self.recent)
+
         layout.addWidget(QLabel("Dokumente"))
         self.files = QListWidget()
         self.files.itemDoubleClicked.connect(self._activate)
@@ -63,9 +70,23 @@ class Sidebar(QWidget):
         if path:
             self.file_activated.emit(str(path))
 
+    def _activate_recent(self, item: QListWidgetItem):
+        path = item.data(256)
+        if path:
+            self.recent_activated.emit(str(path))
+
     def _activate_mark(self, item: QListWidgetItem):
         row = self.marks.row(item)
         self.mark_activated.emit(row)
+
+    def set_recent(self, paths: list[str]):
+        self.recent.clear()
+        for p in paths:
+            path = Path(p)
+            item = QListWidgetItem(path.name)
+            item.setToolTip(str(path))
+            item.setData(256, str(path))
+            self.recent.addItem(item)
 
     def add_document(self, path: str | Path, title: str | None = None):
         path = Path(path)

@@ -154,20 +154,21 @@ def import_page_text_as_overlays(
 ) -> List[Annotation]:
     """Extrahiert Textblöcke und legt sie als TEXT_OVERLAY in den Store."""
     blocks = extract_text_blocks(pdf_path, page_index)
-    if replace_page_overlays:
-        keep = [
-            a
-            for a in store.annotations
-            if not (a.page == page_index and a.type == AnnotationType.TEXT_OVERLAY)
-        ]
-        if len(keep) != len(store.annotations):
-            store.annotations = keep
-            store.dirty = True
     created: List[Annotation] = []
-    for b in blocks:
-        ann = b.to_overlay(scale=scale)
-        store.add(ann)
-        created.append(ann)
+    with store.atomic():
+        if replace_page_overlays:
+            keep = [
+                a
+                for a in store.annotations
+                if not (a.page == page_index and a.type == AnnotationType.TEXT_OVERLAY)
+            ]
+            if len(keep) != len(store.annotations):
+                store.annotations = keep
+                store.dirty = True
+        for b in blocks:
+            ann = b.to_overlay(scale=scale)
+            store.add(ann)
+            created.append(ann)
     return created
 
 

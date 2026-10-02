@@ -18,10 +18,12 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from instantlensdoc import __version__
 from instantlensdoc.config import DISPLAY_NAME, icon_paths_for_qt
 from instantlensdoc.core.documents import DocKind, Document, open_document, save_document
 from instantlensdoc.core import ocr as ocr_mod
 from instantlensdoc.core.layout import LayoutDocument
+from instantlensdoc.core import recent as recent_mod
 from instantlensdoc.license import LicenseManager
 from instantlensdoc.ui.editor import TextEditor
 from instantlensdoc.ui.form_builder import FormBuilderDialog
@@ -40,6 +42,7 @@ class MainWindow(QMainWindow):
         self.doc: Document | None = None
         self.layout_doc = LayoutDocument()
         self._editor_marks: list[str] = []
+        self._recent_menu = None
 
         self.setWindowTitle(DISPLAY_NAME)
         self.resize(1200, 800)
@@ -51,6 +54,7 @@ class MainWindow(QMainWindow):
 
         self._build_ui()
         self._build_menus()
+        self._refresh_recent()
         self._update_license_status()
 
     def _build_ui(self):
@@ -64,6 +68,7 @@ class MainWindow(QMainWindow):
         self.sidebar.search_requested.connect(self._on_search)
         self.sidebar.search_next_requested.connect(self._on_search_next)
         self.sidebar.file_activated.connect(self.open_path)
+        self.sidebar.recent_activated.connect(self.open_path)
         self.sidebar.mark_activated.connect(self._on_mark_activated)
         splitter.addWidget(self.sidebar)
 
@@ -84,6 +89,9 @@ class MainWindow(QMainWindow):
 
         sb = QStatusBar()
         self.setStatusBar(sb)
+        self.version_label = QLabel(f"v{__version__}")
+        self.version_label.setStyleSheet("color: #666; padding-right: 8px;")
+        sb.addPermanentWidget(self.version_label)
         self.license_label = QLabel()
         sb.addPermanentWidget(self.license_label)
 
@@ -100,6 +108,9 @@ class MainWindow(QMainWindow):
         act_open.setShortcut(QKeySequence.Open)
         act_open.triggered.connect(self.open_dialog)
         m_file.addAction(act_open)
+
+        self._recent_menu = m_file.addMenu("Zuletzt geöffnet")
+        m_file.addSeparator()
 
         act_save = QAction("Speichern", self)
         act_save.setShortcut(QKeySequence.Save)
@@ -119,15 +130,27 @@ class MainWindow(QMainWindow):
             a.triggered.connect(lambda checked=False, f=fmt: self._export_editor(f))
             m_export.addAction(a)
         m_file.addSeparator()
+        act_print = QAction("Drucken…", self)
+        act_print.setShortcut(QKeySequence.Print)
+        act_print.triggered.connect(self._print)
+        m_file.addAction(act_print)
+        m_file.addSeparator()
         act_quit = QAction("Beenden", self)
         act_quit.setShortcut(QKeySequence.Quit)
         act_quit.triggered.connect(self.close)
         m_file.addAction(act_quit)
 
         m_edit = mb.addMenu("&Bearbeiten")
+        act_undo = QAction("Rückgängig", self)
+        act_undo.setShortcut(QKeySequence.Undo)
+        act_undo.triggered.connect(self._undo)
+        m_edit.addAction(act_undo)
+        act_redo = QAction("Wiederholen", self)
+        act_redo.setShortcut(QKeySequence.Redo)
+        act_redo.triggered.connect(self._redo)
+        m_edit.addAction(act_redo)
+        m_edit.addSeparator()
         for name, slot in [
-            ("Rückgängig", self.editor.undo),
-            ("Wiederholen", self.editor.redo),
             ("Ausschneiden", self.editor.cut),
             ("Kopieren", self.editor.copy),
             ("Einfügen", self.editor.paste),
@@ -154,6 +177,27 @@ class MainWindow(QMainWindow):
         a.setChecked(True)
         a.toggled.connect(self.sidebar.setVisible)
         m_view.addAction(a)
+        m_view.addSeparator()
+        act_zi = QAction("Vergrößern", self)
+        act_zi.setShortcut(QKeySequence.ZoomIn)
+        act_zi.triggered.connect(self._zoom_in)
+        m_view.addAction(act_zi)
+        act_zo = QAction("Verkleinern", self)
+        act_zo.setShortcut(QKeySequence.ZoomOut)
+        act_zo.triggered.connect(self._zoom_out)
+        m_view.addAction(act_zo)
+        act_fit = QAction("Seite einpassen", self)
+        act_fit.setShortcut(QKeySequence("Ctrl+0"))
+        act_fit.triggered.connect(self._fit_page)
+        m_view.addAction(act_fit)
+        act_fit_w = QAction("Breite einpassen", self)
+        act_fit_w.setShortcut(QKeySequence("Ctrl+9"))
+        act_fit_w.triggered.connect(self._fit_width)
+        m_view.addAction(act_fit_w)
+        act_z100 = QAction("Zoom 100 %", self)
+        act_z100.setShortcut(QKeySequence("Ctrl+1"))
+        act_z100.triggered.connect(self._zoom_100)
+        m_view.addAction(act_z100)
 
         m_pdf = mb.addMenu("&PDF")
         for title, slot in [
@@ -166,6 +210,7 @@ class MainWindow(QMainWindow):
             ("Bild als neue Seite…", lambda: self.pdf_view.insert_image_page()),
             ("PDF-Text → Overlay…", lambda: self.pdf_view.import_text_overlays()),
             ("Text-Overlays einbrennen…", lambda: self.pdf_view.bake_overlays()),
+            ("Seite drucken…", lambda: self.pdf_view.print_current_page()),
         ]:
             a = QAction(title, self)
             a.triggered.connect(slot)
@@ -215,12 +260,58 @@ class MainWindow(QMainWindow):
         a.triggered.connect(lambda: AboutDialog(self).exec())
         m_help.addAction(a)
 
+    def _refresh_recent(self):
+        files = recent_mod.load_recent()
+        self.sidebar.set_recent(files)
+        if self._recent_menu is None:
+            return
+        self._recent_menu.clear()
+        if not files:
+            empty = QAction("(keine)", self)
+            empty.setEnabled(False)
+            self._recent_menu.addAction(empty)
+        else:
+            for path in files:
+                a = QAction(Path(path).name, self)
+                a.setToolTip(path)
+                a.triggered.connect(lambda checked=False, p=path: self.open_path(p))
+                self._recent_menu.addAction(a)
+            self._recent_menu.addSeparator()
+            clear = QAction("Liste leeren", self)
+            clear.triggered.connect(self._clear_recent)
+            self._recent_menu.addAction(clear)
+
+    def _clear_recent(self):
+        recent_mod.clear_recent()
+        self._refresh_recent()
+        self._set_status("Zuletzt geöffnet geleert")
+
+    def _remember_path(self, path: str | Path):
+        try:
+            recent_mod.add_recent(path)
+            self._refresh_recent()
+        except Exception:
+            pass
+
     def _set_status(self, msg: str):
         self.statusBar().showMessage(msg, 5000)
 
     def _update_license_status(self):
         st = self.license_manager.status()
-        self.license_label.setText(f"Lizenz: {st.mode} ({st.days_remaining}d)")
+        self.version_label.setText(f"v{__version__}")
+        if st.mode == "licensed":
+            who = f" · {st.email}" if st.email else ""
+            text = f"Lizenz: Aktiviert{who} · noch {st.days_remaining} Tag(e)"
+            style = "color: #1B7A3D; font-weight: 600; padding-right: 6px;"
+        elif st.mode == "trial":
+            text = f"Lizenz: Testversion · noch {st.days_remaining} Tag(e) — Hilfe → Lizenz"
+            style = "color: #B9770E; font-weight: 600; padding-right: 6px;"
+        else:
+            text = "Lizenz: Abgelaufen — Hilfe → Lizenz · ame@sellerbach.de"
+            style = "color: #C0392B; font-weight: 700; padding-right: 6px;"
+        self.license_label.setText(text)
+        self.license_label.setStyleSheet(style)
+        self.license_label.setToolTip(st.message)
         if not st.allowed:
             QMessageBox.warning(
                 self,
@@ -237,6 +328,72 @@ class MainWindow(QMainWindow):
         self.sidebar.setVisible(True)
         self.sidebar.search.setFocus()
         self.sidebar.search.selectAll()
+
+    def _undo(self):
+        if self.stack.currentWidget() is self.pdf_view:
+            self.pdf_view.undo_annotation()
+        else:
+            self.editor.undo()
+
+    def _redo(self):
+        if self.stack.currentWidget() is self.pdf_view:
+            self.pdf_view.redo_annotation()
+        else:
+            self.editor.redo()
+
+    def _zoom_in(self):
+        if self.stack.currentWidget() is self.pdf_view:
+            self.pdf_view.zoom_in()
+        else:
+            self._set_status("Zoom gilt für die PDF-Ansicht")
+
+    def _zoom_out(self):
+        if self.stack.currentWidget() is self.pdf_view:
+            self.pdf_view.zoom_out()
+        else:
+            self._set_status("Zoom gilt für die PDF-Ansicht")
+
+    def _fit_page(self):
+        if self.stack.currentWidget() is self.pdf_view:
+            self.pdf_view.fit_page()
+        else:
+            self._set_status("Seite einpassen: PDF öffnen")
+
+    def _fit_width(self):
+        if self.stack.currentWidget() is self.pdf_view:
+            self.pdf_view.fit_width()
+        else:
+            self._set_status("Breite einpassen: PDF öffnen")
+
+    def _zoom_100(self):
+        if self.stack.currentWidget() is self.pdf_view:
+            self.pdf_view.zoom_100()
+        else:
+            self._set_status("Zoom 100 %: PDF öffnen")
+
+    def _print(self):
+        try:
+            if self.stack.currentWidget() is self.pdf_view:
+                self.pdf_view.print_current_page()
+                return
+            if self.stack.currentWidget() is self.editor:
+                from PySide6.QtPrintSupport import QPrintDialog, QPrinter
+
+                printer = QPrinter(QPrinter.HighResolution)
+                printer.setDocName(self.doc.display_name if self.doc else "InstantLens Doc")
+                dlg = QPrintDialog(printer, self)
+                dlg.setWindowTitle("Editor drucken")
+                if dlg.exec() == QPrintDialog.Accepted:
+                    self.editor.print_(printer)
+                    self._set_status("Editor gedruckt")
+                return
+            QMessageBox.information(
+                self,
+                "Drucken",
+                "Drucken ist für Texteditor und PDF-Seite verfügbar.",
+            )
+        except Exception as e:
+            QMessageBox.critical(self, "Drucken", f"Druck fehlgeschlagen:\n{e}")
 
     def _on_search(self, query: str):
         if not query:
@@ -334,34 +491,39 @@ class MainWindow(QMainWindow):
         try:
             self.doc = open_document(path)
         except Exception as e:
-            QMessageBox.critical(self, "Öffnen", str(e))
+            QMessageBox.critical(self, "Öffnen", f"Datei konnte nicht geöffnet werden:\n{e}")
             return
 
         self.sidebar.add_document(path)
+        self._remember_path(path)
         self.setWindowTitle(f"{DISPLAY_NAME} — {self.doc.display_name}")
 
-        if self.doc.kind == DocKind.PDF:
-            self.stack.setCurrentWidget(self.pdf_view)
-            self.pdf_view.load(path)
-            self._refresh_pdf_marks()
-        elif self.doc.kind == DocKind.IMAGE:
-            from PySide6.QtGui import QPixmap
+        try:
+            if self.doc.kind == DocKind.PDF:
+                self.stack.setCurrentWidget(self.pdf_view)
+                if not self.pdf_view.load(path):
+                    return
+                self._refresh_pdf_marks()
+            elif self.doc.kind == DocKind.IMAGE:
+                from PySide6.QtGui import QPixmap
 
-            self.stack.setCurrentWidget(self.image_label)
-            pm = QPixmap(path)
-            self.image_label.setPixmap(
-                pm.scaled(900, 700, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-            )
-            self.sidebar.set_marks([f"Bild: {Path(path).name}"])
-        else:
-            self.stack.setCurrentWidget(self.editor)
-            self.editor.blockSignals(True)
-            self.editor.setPlainText(self.doc.text)
-            self.editor.blockSignals(False)
-            self.editor.clear_extra_selections()
-            self._editor_marks.clear()
-            self.sidebar.set_marks([])
-        self._set_status(f"Geöffnet: {path}")
+                self.stack.setCurrentWidget(self.image_label)
+                pm = QPixmap(path)
+                self.image_label.setPixmap(
+                    pm.scaled(900, 700, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                )
+                self.sidebar.set_marks([f"Bild: {Path(path).name}"])
+            else:
+                self.stack.setCurrentWidget(self.editor)
+                self.editor.blockSignals(True)
+                self.editor.setPlainText(self.doc.text)
+                self.editor.blockSignals(False)
+                self.editor.clear_extra_selections()
+                self._editor_marks.clear()
+                self.sidebar.set_marks([])
+            self._set_status(f"Geöffnet: {path}")
+        except Exception as e:
+            QMessageBox.critical(self, "Öffnen", f"Anzeige fehlgeschlagen:\n{e}")
 
     def save_doc(self):
         st = self.license_manager.status()
@@ -381,9 +543,10 @@ class MainWindow(QMainWindow):
             self.doc.text = self.editor.toPlainText()
         try:
             save_document(self.doc)
+            self._remember_path(self.doc.path)
             self._set_status(f"Gespeichert: {self.doc.path}")
         except Exception as e:
-            QMessageBox.critical(self, "Speichern", str(e))
+            QMessageBox.critical(self, "Speichern", f"Speichern fehlgeschlagen:\n{e}")
 
     def save_as(self):
         if not self.doc:
@@ -404,10 +567,11 @@ class MainWindow(QMainWindow):
         try:
             save_document(self.doc, Path(path))
             self.sidebar.add_document(path)
+            self._remember_path(path)
             self.setWindowTitle(f"{DISPLAY_NAME} — {self.doc.display_name}")
             self._set_status(f"Gespeichert: {path}")
         except Exception as e:
-            QMessageBox.critical(self, "Speichern", str(e))
+            QMessageBox.critical(self, "Speichern", f"Speichern fehlgeschlagen:\n{e}")
 
     def _export_editor(self, fmt: str):
         """Editor-Inhalt nach HTML / DOCX / PDF exportieren."""
@@ -450,7 +614,7 @@ class MainWindow(QMainWindow):
                 exp.export_pdf(text, path, title=title)
             self._set_status(f"Exportiert: {path}")
         except Exception as e:
-            QMessageBox.critical(self, "Export", str(e))
+            QMessageBox.critical(self, "Export", f"Export fehlgeschlagen:\n{e}")
 
     def _add_text_frame(self):
         text = self.editor.toPlainText() if self.stack.currentWidget() is self.editor else ""
@@ -606,7 +770,7 @@ class MainWindow(QMainWindow):
             QMessageBox.information(self, "OCR — Tesseract fehlt", str(e))
             return
         except Exception as e:
-            QMessageBox.warning(self, "OCR", str(e))
+            QMessageBox.warning(self, "OCR", f"OCR fehlgeschlagen:\n{e}")
             return
 
         self.stack.setCurrentWidget(self.editor)
@@ -621,7 +785,10 @@ class MainWindow(QMainWindow):
         self._set_status(f"OCR ({result.lang}, {result.mode.value}){extra}")
 
     def _forms(self):
-        FormBuilderDialog(self).exec()
+        try:
+            FormBuilderDialog(self).exec()
+        except Exception as e:
+            QMessageBox.critical(self, "Formulare", f"Formulargenerator fehlgeschlagen:\n{e}")
 
     def _license(self):
         if LicenseDialog(self.license_manager, self).exec():
