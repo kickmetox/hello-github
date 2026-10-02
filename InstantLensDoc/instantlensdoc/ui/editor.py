@@ -9,7 +9,13 @@ from PySide6.QtCore import QRect, QSize, Qt
 from PySide6.QtGui import QColor, QFont, QImage, QPainter, QTextCharFormat, QTextCursor, QTextDocument, QTextOption
 from PySide6.QtWidgets import QApplication, QPlainTextEdit, QTextEdit, QWidget
 
-from instantlensdoc.core.app_settings import get_editor_line_numbers, get_editor_soft_wrap, get_editor_show_special_chars, get_editor_trim_whitespace_on_paste
+from instantlensdoc.core.app_settings import (
+    get_editor_bracket_match,
+    get_editor_line_numbers,
+    get_editor_soft_wrap,
+    get_editor_show_special_chars,
+    get_editor_trim_whitespace_on_paste,
+)
 
 
 class _LineNumberArea(QWidget):
@@ -37,9 +43,14 @@ class TextEditor(QPlainTextEdit):
         self._line_numbers = bool(get_editor_line_numbers())
         self._soft_wrap = bool(get_editor_soft_wrap())
         self._show_special = bool(get_editor_show_special_chars())
+        self._bracket_match = bool(get_editor_bracket_match())
+        self._find_selections: list = []
+        self._mark_selections: list = []
+        self._bracket_selections: list = []
         self._line_number_area = _LineNumberArea(self)
         self.blockCountChanged.connect(self._update_line_number_area_width)
         self.updateRequest.connect(self._update_line_number_area)
+        self.cursorPositionChanged.connect(self._update_bracket_match)
         self._update_line_number_area_width(0)
         self.set_line_numbers_visible(self._line_numbers)
         self.set_soft_wrap(self._soft_wrap)
@@ -94,6 +105,99 @@ class TextEditor(QPlainTextEdit):
 
     def special_chars_visible(self) -> bool:
         return bool(self._show_special)
+
+    def set_bracket_match_enabled(self, enabled: bool) -> None:
+        """Bracket-Match Highlight ein/aus."""
+        self._bracket_match = bool(enabled)
+        if not self._bracket_match:
+            self._bracket_selections = []
+            self._apply_extra_selections()
+        else:
+            self._update_bracket_match()
+
+    def bracket_match_enabled(self) -> bool:
+        return bool(self._bracket_match)
+
+    def _apply_extra_selections(self) -> None:
+        merged = list(self._find_selections) + list(self._mark_selections) + list(
+            self._bracket_selections
+        )
+        self.setExtraSelections(merged)
+
+    _BRACKET_PAIRS = {"(": ")", "[": "]", "{": "}", ")": "(", "]": "[", "}": "{"}
+    _BRACKET_OPEN = frozenset("([{")
+    _BRACKET_CLOSE = frozenset(")]}")
+
+    def _update_bracket_match(self) -> None:
+        self._bracket_selections = []
+        if not self._bracket_match:
+            self._apply_extra_selections()
+            return
+        cur = self.textCursor()
+        if cur.hasSelection():
+            self._apply_extra_selections()
+            return
+        pos = cur.position()
+        text = self.toPlainText()
+        if not text:
+            self._apply_extra_selections()
+            return
+        # Klammer links vom Cursor oder unter dem Cursor
+        ch_left = text[pos - 1] if pos > 0 else ""
+        ch_at = text[pos] if pos < len(text) else ""
+        match_pos = -1
+        origin = -1
+        if ch_left in self._BRACKET_PAIRS:
+            origin = pos - 1
+            match_pos = self._find_matching_bracket(text, origin)
+        elif ch_at in self._BRACKET_PAIRS:
+            origin = pos
+            match_pos = self._find_matching_bracket(text, origin)
+        if origin < 0 or match_pos < 0:
+            self._apply_extra_selections()
+            return
+        fmt = QTextCharFormat()
+        fmt.setBackground(QColor("#B4D7FF"))
+        for p in (origin, match_pos):
+            sel = QTextEdit.ExtraSelection()
+            c = QTextCursor(self.document())
+            c.setPosition(p)
+            c.setPosition(p + 1, QTextCursor.KeepAnchor)
+            sel.cursor = c
+            sel.format = fmt
+            self._bracket_selections.append(sel)
+        self._apply_extra_selections()
+
+    def _find_matching_bracket(self, text: str, pos: int) -> int:
+        """Index der passenden Klammer oder -1."""
+        if pos < 0 or pos >= len(text):
+            return -1
+        ch = text[pos]
+        other = self._BRACKET_PAIRS.get(ch)
+        if other is None:
+            return -1
+        if ch in self._BRACKET_OPEN:
+            depth = 0
+            for i in range(pos, len(text)):
+                c = text[i]
+                if c == ch:
+                    depth += 1
+                elif c == other:
+                    depth -= 1
+                    if depth == 0:
+                        return i
+            return -1
+        # closing → rückwärts
+        depth = 0
+        for i in range(pos, -1, -1):
+            c = text[i]
+            if c == ch:
+                depth += 1
+            elif c == other:
+                depth -= 1
+                if depth == 0:
+                    return i
+        return -1
 
     def goto_line(self, line: int) -> bool:
         """Cursor auf 1-basierte Zeilennummer setzen; True bei Erfolg."""
@@ -524,7 +628,9 @@ class TextEditor(QPlainTextEdit):
         super().insertFromMimeData(source)
 
     def clear_extra_selections(self) -> None:
-        self.setExtraSelections([])
+        self._find_selections = []
+        self._mark_selections = []
+        self.setExtraSelections(list(self._bracket_selections))
 
     @staticmethod
     def _find_flags(*, case_sensitive: bool = False) -> QTextDocument.FindFlag:
@@ -535,10 +641,11 @@ class TextEditor(QPlainTextEdit):
 
     def find_and_highlight(self, query: str, *, case_sensitive: bool = False) -> int:
         """Alle Vorkommen suchen und gelb markieren; Cursor auf ersten Treffer."""
-        self.clear_extra_selections()
+        self._find_selections = []
         self._last_query = query or ""
         self._last_case_sensitive = case_sensitive
         if not query:
+            self._apply_extra_selections()
             return 0
 
         fmt = QTextCharFormat()
@@ -564,7 +671,8 @@ class TextEditor(QPlainTextEdit):
             if count > 500:
                 break
 
-        self.setExtraSelections(selections)
+        self._find_selections = selections
+        self._apply_extra_selections()
         if first is not None:
             self.setTextCursor(first)
             self.ensureCursorVisible()
@@ -654,9 +762,8 @@ class TextEditor(QPlainTextEdit):
         sel = QTextEdit.ExtraSelection()
         sel.cursor = QTextCursor(cur)
         sel.format = fmt
-        existing = list(self.extraSelections())
-        existing.append(sel)
-        self.setExtraSelections(existing)
+        self._mark_selections.append(sel)
+        self._apply_extra_selections()
         return True
 
     def selected_snippet(self, max_len: int = 80) -> str:

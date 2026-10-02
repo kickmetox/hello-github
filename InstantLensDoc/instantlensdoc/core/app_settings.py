@@ -33,6 +33,8 @@ DEFAULTS: dict[str, Any] = {
     "pdf_grayscale": False,
     "pdf_night_mode": False,
     "pdf_two_page_spread": False,
+    "pdf_continuous_scroll": False,
+    "editor_bracket_match": True,
     "ann_default_opacity": 1.0,
     "recent_dirs": [],
     "editor_markdown_preview": False,
@@ -289,6 +291,22 @@ def get_pdf_two_page_spread() -> bool:
 
 def set_pdf_two_page_spread(enabled: bool) -> None:
     save_settings({"pdf_two_page_spread": bool(enabled)})
+
+
+def get_pdf_continuous_scroll() -> bool:
+    return bool(load_settings().get("pdf_continuous_scroll", False))
+
+
+def set_pdf_continuous_scroll(enabled: bool) -> None:
+    save_settings({"pdf_continuous_scroll": bool(enabled)})
+
+
+def get_editor_bracket_match() -> bool:
+    return bool(load_settings().get("editor_bracket_match", True))
+
+
+def set_editor_bracket_match(enabled: bool) -> None:
+    save_settings({"editor_bracket_match": bool(enabled)})
 
 
 def get_editor_line_numbers() -> bool:

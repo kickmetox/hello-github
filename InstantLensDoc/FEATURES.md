@@ -18,6 +18,7 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | PDF lesen / rendern | fertig | pypdfium2; große-PDF-Limits; Timeout-Hinweis 0.2.1 |
 | PDF Gehe zu Seite | fertig | Dialog Ctrl+G (PDF) / Ctrl+Shift+G; Menü PDF 0.4.6 |
 | PDF Zwei-Seiten-Ansicht (Spread) | fertig | Optional; Ctrl+2 / Toolbar 2S; aktuelle+nächste Seite 0.4.7 |
+| PDF Continuous Scroll | fertig | Optional; Ctrl+3 / Toolbar CS; Seiten untereinander; schließt Spread aus 0.4.8 |
 | PDF Zoom / Seite einpassen | fertig | Debounce + Cache; Standard-Zoom in Einstellungen 0.2.2; **Fit-Width Ctrl+9** / **Fit-Height Ctrl+8** 0.3.9 |
 | PDF-Wasserzeichen | fertig | Text diagonal, Deckkraft |
 | PDF Seitennummer-Stempel | fertig | Vorlage `{n} / {total}` |
@@ -33,7 +34,7 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | Sidebar Seiten-Thumbnails | fertig | Vorschaubilder, Klick → Seite; Drag-Reorder 0.2.3; **Lazy-Load** 0.3.1; **Größe in Einstellungen** 0.3.8 |
 | Tastaturhilfe-Dialog | fertig | Hilfe → F1; **Cheat-Sheet als PDF exportieren** 0.4.7 |
 | App-Logging | fertig | %APPDATA%/InstantLensDoc/logs; **Hilfe → Logordner öffnen** 0.3.0 |
-| PDF-Annotationen (Highlight, Underline, Sticky, Text) | fertig | Sidecar `*.ildann.json` **v4** (`ildann-v4`); Farben-Picker Highlight/Stift 0.2.2; **Notizfarbe unabhängig** 0.4.7; Löschen Auswahl/letzte 0.2.3; **JSON Export/Import** 0.2.5; **PDF-Highlight Schema v4** 0.4.4; **Import-Validierung Schema v4** 0.4.5; **CSV Export** 0.3.8; **Sidebar-Filter nach Typ** 0.2.6; **Text nachträglich editierbar** 0.2.7; **Deckkraft/Opacity** 0.2.8; **Sidebar-Textsuche** 0.3.0; **Farben-Chips klickbar filtern** 0.4.6 |
+| PDF-Annotationen (Highlight, Underline, Sticky, Text) | fertig | Sidecar `*.ildann.json` **v4** (`ildann-v4`); Farben-Picker Highlight/Stift 0.2.2; **Notizfarbe unabhängig** 0.4.7; Löschen Auswahl/letzte 0.2.3; **JSON Export/Import** 0.2.5; **PDF-Highlight Schema v4** 0.4.4; **Import-Validierung Schema v4** 0.4.5; **CSV Export** 0.3.8; **Sidebar-Filter nach Typ** 0.2.6; **Text nachträglich editierbar** 0.2.7; **Deckkraft/Opacity** 0.2.8; **Sidebar-Textsuche** 0.3.0; **Farben-Chips klickbar filtern** 0.4.6; **Zeitstempel in Liste** 0.4.8 |
 | Annotation Undo/Redo | fertig | Ctrl+Z/Y inkl. Overlay-Text |
 | Annotation löschen | fertig | Auswahl oder letzte; Entf / Menü 0.2.3 |
 | Annotation duplizieren | fertig | Auswahl leicht versetzt; Ctrl+Shift+D 0.3.4 |
@@ -89,6 +90,7 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | Editor Zeilen sortieren | fertig | A–Z Auswahl (ohne Auswahl: Datei); Ctrl+Shift+O 0.4.4 |
 | Editor Trim trailing whitespace | fertig | Optional beim Speichern/Autosave; Einstellung 0.4.5 |
 | Editor Whitespace trim on paste | fertig | Optional Trailing-Spaces beim Einfügen; Einstellung 0.4.7 |
+| Editor Bracket-Match Highlight | fertig | Passende Klammern ()[]{} am Cursor; Einstellung (Standard an) 0.4.8 |
 | Editor Kommentar/Unkommentar | fertig | Ctrl+/ für # und // (einfache Sprachen) 0.3.6 |
 | Editor Textbausteine | fertig | 3 gespeicherte Snippets; Einfügen Ctrl+Alt+1..3; Auswahl→Slot 0.4.3 |
 | Neues Dokument Vorlagen | fertig | Leer / Brief / Notiz unter Datei → Neu 0.4.3 |
@@ -115,25 +117,26 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | PyInstaller Build Windows | fertig | `build-windows.ps1`, Icon `assets/app.ico` |
 | Inno-Installer | fertig | Icon, Desktop, Uninstaller, Keygen optional (`InstantLensKeygen.exe`) 0.2.1 |
 | Sync-Skript Windows | fertig | Repo `scripts/sync-ild.ps1`; Store `docs/sync-ild.ps1` |
-| In-App Hilfe / About | fertig | Version 0.4.7; Fenstertitel + Splash; Logordner-Button |
-| CHANGELOG | fertig | **0.4.7** Spread, Notizfarbe, Paste-Trim, Cheat-Sheet-PDF (nach **0.4.6** / **0.4.5** / **0.4.4** / **0.4.3** / **0.4.2** / **0.4.1** / **0.4.0**) |
+| Arbeitsverzeichnis öffnen | fertig | Datei-Menü Ctrl+Shift+E; Ordner der Datei bzw. CWD 0.4.8 |
+| In-App Hilfe / About | fertig | Version 0.4.8; Fenstertitel + Splash; Logordner-Button |
+| CHANGELOG | fertig | **0.4.8** Continuous Scroll, Ann.-Zeitstempel, Bracket-Match, Arbeitsverzeichnis (nach **0.4.7** / **0.4.6** / **0.4.5** / **0.4.4** / **0.4.3** / **0.4.2** / **0.4.1** / **0.4.0**) |
 | FEATURES.md / INFO.md | fertig | |
 | `ild_pdf` Modul + Beispielskript | fertig | metadata / page size / watermark / redact / acroform / attachments / flatten / **plain text** |
 | Font-Matching | geplant | |
 | Objekt-/Bildbearbeitung | geplant | |
 | Layout-Erhaltung (Scan→edit) | geplant | |
 | Freihand | geplant | |
-| KI-Assistent | Stub | Menü „Geplant“ 0.4.7 (keine Fake-KI) |
+| KI-Assistent | Stub | Menü „Geplant“ 0.4.8 (keine Fake-KI) |
 | Signieren (rechtssicher) | Stub | |
-| Cloud-Sync | Stub | Menü „Geplant“ 0.4.7 (keine Fake-Cloud) |
+| Cloud-Sync | Stub | Menü „Geplant“ 0.4.8 (keine Fake-Cloud) |
 | Text on Path / Text zu Pfaden | geplant | |
 | Envelope Distort / Text Wrap / Area Type | Stub/geplant | |
 | Schnittmasken | geplant | |
 | Füllungen / Live-Effekte | geplant | |
-| 3D-Extrusion | Stub | Menü „Geplant“ 0.4.7 |
+| 3D-Extrusion | Stub | Menü „Geplant“ 0.4.8 |
 | Variable Fonts (voll) | Stub | |
 | Glyphen-Palette | geplant | |
-| Stylus / Palm Rejection | Stub | Menü „Geplant“ 0.4.7 |
-| Intelligente Formerkennung | Stub | Menü „Geplant“ 0.4.7 |
+| Stylus / Palm Rejection | Stub | Menü „Geplant“ 0.4.8 |
+| Intelligente Formerkennung | Stub | Menü „Geplant“ 0.4.8 |
 
 Nicht behauptet als fertig: Cloud, KI, Stylus, 3D — nur Menü-Stubs + dieser Status.

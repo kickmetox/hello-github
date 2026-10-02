@@ -343,6 +343,7 @@ class MainWindow(QMainWindow):
         self.pdf_view.grayscale_changed.connect(self._sync_grayscale_action)
         self.pdf_view.night_mode_changed.connect(self._sync_night_action)
         self.pdf_view.two_page_spread_changed.connect(self._sync_spread_action)
+        self.pdf_view.continuous_scroll_changed.connect(self._sync_continuous_action)
         self.pdf_view.annotations_layer_changed.connect(self._sync_ann_layer_action)
         self.pdf_view.annotations_lock_changed.connect(self._sync_ann_lock_action)
         self.pdf_view.page_boxes_changed.connect(self._sync_page_boxes_action)
@@ -471,6 +472,13 @@ class MainWindow(QMainWindow):
         act_reopen.setToolTip("Aktuelle Datei vom Datenträger neu laden")
         act_reopen.triggered.connect(self.reopen_current)
         m_file.addAction(act_reopen)
+        act_workdir = QAction("Arbeitsverzeichnis öffnen", self)
+        act_workdir.setShortcut(QKeySequence("Ctrl+Shift+E"))
+        act_workdir.setToolTip(
+            "Ordner der aktuellen Datei (sonst Prozess-CWD) im Dateimanager öffnen"
+        )
+        act_workdir.triggered.connect(self._open_workdir)
+        m_file.addAction(act_workdir)
         m_export = m_file.addMenu("Exportieren")
         for title, fmt in [
             ("Als HTML…", "html"),
@@ -689,7 +697,10 @@ class MainWindow(QMainWindow):
         )
         self._night_action.toggled.connect(self._toggle_night_mode)
         m_view.addAction(self._night_action)
-        from instantlensdoc.core.app_settings import get_pdf_two_page_spread
+        from instantlensdoc.core.app_settings import (
+            get_pdf_continuous_scroll,
+            get_pdf_two_page_spread,
+        )
 
         self._spread_action = QAction("Zwei-Seiten-Ansicht (Spread)", self)
         self._spread_action.setCheckable(True)
@@ -700,6 +711,15 @@ class MainWindow(QMainWindow):
         self._spread_action.setShortcut(QKeySequence("Ctrl+2"))
         self._spread_action.toggled.connect(self._toggle_two_page_spread)
         m_view.addAction(self._spread_action)
+        self._continuous_action = QAction("Continuous Scroll", self)
+        self._continuous_action.setCheckable(True)
+        self._continuous_action.setChecked(get_pdf_continuous_scroll())
+        self._continuous_action.setToolTip(
+            "Seiten untereinander scrollen statt Einzelseite (Ctrl+3 / Toolbar CS); schließt Spread aus"
+        )
+        self._continuous_action.setShortcut(QKeySequence("Ctrl+3"))
+        self._continuous_action.toggled.connect(self._toggle_continuous_scroll)
+        m_view.addAction(self._continuous_action)
         self._ann_layer_action = QAction("Annotation-Layer", self)
         self._ann_layer_action.setCheckable(True)
         self._ann_layer_action.setChecked(get_annotations_visible())
@@ -1356,6 +1376,12 @@ class MainWindow(QMainWindow):
     def _toggle_two_page_spread(self, checked: bool):
         self.pdf_view.set_two_page_spread(bool(checked))
         self._sync_spread_action(bool(checked))
+        self._sync_continuous_action()
+
+    def _toggle_continuous_scroll(self, checked: bool):
+        self.pdf_view.set_continuous_scroll(bool(checked))
+        self._sync_continuous_action(bool(checked))
+        self._sync_spread_action()
 
     def _toggle_ann_layer(self, checked: bool):
         self.pdf_view.set_annotations_visible(bool(checked))
@@ -1392,6 +1418,14 @@ class MainWindow(QMainWindow):
             self._spread_action.blockSignals(True)
             self._spread_action.setChecked(bool(enabled))
             self._spread_action.blockSignals(False)
+
+    def _sync_continuous_action(self, enabled: bool | None = None):
+        if enabled is None:
+            enabled = self.pdf_view.continuous_scroll_enabled()
+        if hasattr(self, "_continuous_action") and self._continuous_action is not None:
+            self._continuous_action.blockSignals(True)
+            self._continuous_action.setChecked(bool(enabled))
+            self._continuous_action.blockSignals(False)
 
     def _sync_ann_layer_action(self, enabled: bool):
         if hasattr(self, "_ann_layer_action") and self._ann_layer_action is not None:
@@ -1495,6 +1529,30 @@ class MainWindow(QMainWindow):
             from instantlensdoc.core.logging_setup import log_dir
 
             self._set_status(f"Logordner: {log_dir()}")
+
+    def _open_workdir(self):
+        """Ordner der aktuellen Datei bzw. Prozess-CWD im Dateimanager öffnen."""
+        from PySide6.QtCore import QUrl
+        from PySide6.QtGui import QDesktopServices
+
+        folder: Path | None = None
+        if self.doc and self.doc.path:
+            p = Path(self.doc.path)
+            folder = p.parent if p.exists() else None
+        if folder is None and self.pdf_view.pdf_path:
+            p = Path(self.pdf_view.pdf_path)
+            folder = p.parent if p.exists() else None
+        if folder is None or not folder.is_dir():
+            folder = Path.cwd()
+        ok = QDesktopServices.openUrl(QUrl.fromLocalFile(str(folder)))
+        if ok:
+            self._set_status(f"Arbeitsverzeichnis: {folder}")
+        else:
+            QMessageBox.information(
+                self,
+                "Arbeitsverzeichnis",
+                f"Ordner konnte nicht geöffnet werden.\nPfad:\n{folder}",
+            )
 
     def _app_title(self, suffix: str | None = None) -> str:
         base = f"{DISPLAY_NAME} {__version__}"

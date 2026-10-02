@@ -1,6 +1,25 @@
 # Changelog — InstantLens Doc
 
+## 0.4.8 — Continuous Scroll, Ann.-Zeitstempel, Bracket-Match, Arbeitsverzeichnis
+
+Fokus: optionaler PDF Continuous Scroll statt Einzelseite, Annotation-Zeitstempel in der Sidebar-Liste, Editor Bracket-Match Highlight, Menü „Arbeitsverzeichnis öffnen“. Stubs KI/Cloud/Stylus/3D unverändert.
+
+### PDF / Annotationen
+- **Continuous Scroll** optional (Ansicht / Toolbar „CS“ / Ctrl+3): Seiten untereinander scrollen; schließt Zwei-Seiten-Ansicht aus; Fenster bis 40 Seiten
+- **Annotation-Zeitstempel** in der Sidebar-Liste (modified/created, lokal formatiert)
+
+### Editor / UX
+- **Bracket-Match Highlight** (Einstellungen, Standard an): passende Klammern `()[]{}` am Cursor hervorheben
+- **Arbeitsverzeichnis öffnen** (Datei / Ctrl+Shift+E): Ordner der aktuellen Datei bzw. Prozess-CWD im Dateimanager
+
+### Packaging / Docs
+- Version **0.4.8** (App, `ild_pdf`, ISS, Build, Docs, Smoke)
+- FEATURES / INFO / CHANGELOG / Hilfe aktualisiert
+
+---
+
 ## 0.4.7 — Spread, Notizfarbe, Paste-Trim, Cheat-Sheet-PDF
+
 
 Fokus: optionale PDF-Zwei-Seiten-Ansicht, Annotation-Notizfarbe unabhängig von Highlight, optionales Whitespace-Trim beim Einfügen, Keyboard-Cheat-Sheet als PDF aus F1. Stubs KI/Cloud/Stylus/3D unverändert.
 

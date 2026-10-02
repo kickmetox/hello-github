@@ -30,6 +30,7 @@ from instantlensdoc.core.app_settings import (
     get_default_zoom_percent,
     PDF_TOOLBAR_GROUP_LABELS,
     get_editor_text_encoding,
+    get_editor_bracket_match,
     get_editor_trim_trailing_whitespace,
     get_editor_trim_whitespace_on_paste,
     get_export_image_max_edge,
@@ -39,6 +40,7 @@ from instantlensdoc.core.app_settings import (
     get_minimize_to_tray,
     get_ocr_lang,
     get_page_size_unit,
+    get_pdf_continuous_scroll,
     get_pdf_grayscale,
     get_pdf_night_mode,
     get_pdf_thumbnail_scale,
@@ -55,6 +57,7 @@ from instantlensdoc.core.app_settings import (
     set_batch_output_dir,
     set_default_open_dir,
     set_default_zoom_percent,
+    set_editor_bracket_match,
     set_editor_line_numbers,
     set_editor_show_special_chars,
     set_editor_soft_wrap,
@@ -65,6 +68,7 @@ from instantlensdoc.core.app_settings import (
     set_pdf_toolbar_groups,
     set_ocr_lang,
     set_page_size_unit,
+    set_pdf_continuous_scroll,
     set_pdf_grayscale,
     set_pdf_night_mode,
     set_pdf_thumbnail_scale,
@@ -180,6 +184,13 @@ class SettingsDialog(QDialog):
         )
         form.addRow(self.trim_paste)
 
+        self.bracket_match = QCheckBox("Bracket-Match Highlight")
+        self.bracket_match.setChecked(get_editor_bracket_match())
+        self.bracket_match.setToolTip(
+            "Passende Klammern ()[]{} im Editor hervorheben (Cursor-Position)"
+        )
+        form.addRow(self.bracket_match)
+
         self.minimize_tray = QCheckBox("Beim Minimieren in den System-Tray")
         self.minimize_tray.setChecked(get_minimize_to_tray())
         self.minimize_tray.setToolTip(
@@ -224,6 +235,14 @@ class SettingsDialog(QDialog):
             "Aktuelle und nächste Seite nebeneinander (Ansicht/Toolbar „2S“, Ctrl+2)"
         )
         form.addRow(self.pdf_spread)
+
+        self.pdf_continuous = QCheckBox("PDF Continuous Scroll")
+        self.pdf_continuous.setChecked(get_pdf_continuous_scroll())
+        self.pdf_continuous.setToolTip(
+            "Seiten untereinander scrollen statt Einzelseite (Ansicht/Toolbar „CS“, Ctrl+3); "
+            "schließt Zwei-Seiten-Ansicht aus"
+        )
+        form.addRow(self.pdf_continuous)
 
         self.jpeg_q = QSpinBox()
         self.jpeg_q.setRange(10, 100)
@@ -357,6 +376,7 @@ class SettingsDialog(QDialog):
         set_editor_text_encoding(str(self.enc_combo.currentData() or "utf-8"))
         set_editor_trim_trailing_whitespace(self.trim_trailing.isChecked())
         set_editor_trim_whitespace_on_paste(self.trim_paste.isChecked())
+        set_editor_bracket_match(self.bracket_match.isChecked())
         set_pdf_toolbar_groups(
             {k: cb.isChecked() for k, cb in self._toolbar_group_checks.items()}
         )
@@ -367,6 +387,7 @@ class SettingsDialog(QDialog):
         set_pdf_grayscale(self.pdf_grayscale.isChecked())
         set_pdf_night_mode(self.pdf_night.isChecked())
         set_pdf_two_page_spread(self.pdf_spread.isChecked())
+        set_pdf_continuous_scroll(self.pdf_continuous.isChecked())
         save_settings(
             {
                 "export_jpeg_quality": int(self.jpeg_q.value()),
@@ -396,6 +417,13 @@ class SettingsDialog(QDialog):
                 parent._update_doc_status()
             except Exception:
                 pass
+        if parent is not None and hasattr(parent, "editor") and hasattr(
+            parent.editor, "set_bracket_match_enabled"
+        ):
+            try:
+                parent.editor.set_bracket_match_enabled(self.bracket_match.isChecked())
+            except Exception:
+                pass
         if parent is not None and hasattr(parent, "pdf_view"):
             try:
                 parent.pdf_view.apply_settings_colors()
@@ -405,6 +433,11 @@ class SettingsDialog(QDialog):
         if parent is not None and hasattr(parent, "_sync_spread_action"):
             try:
                 parent._sync_spread_action()
+            except Exception:
+                pass
+        if parent is not None and hasattr(parent, "_sync_continuous_action"):
+            try:
+                parent._sync_continuous_action()
             except Exception:
                 pass
         self.accept()

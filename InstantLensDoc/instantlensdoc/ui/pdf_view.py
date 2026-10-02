@@ -73,6 +73,7 @@ from instantlensdoc.core.app_settings import (
     get_annotations_locked,
     get_annotations_visible,
     get_default_zoom_scale,
+    get_pdf_continuous_scroll,
     get_pdf_grayscale,
     get_pdf_night_mode,
     get_pdf_two_page_spread,
@@ -85,12 +86,17 @@ from instantlensdoc.core.app_settings import (
     set_ann_pen_color,
     set_annotations_locked,
     set_annotations_visible,
+    set_pdf_continuous_scroll,
     set_pdf_grayscale,
     set_pdf_night_mode,
     set_pdf_two_page_spread,
     set_show_page_boxes,
     set_show_printer_marks,
 )
+
+# Continuous-Scroll: max. gerenderte Seiten (Speicher)
+CONTINUOUS_MAX_PAGES = 40
+CONTINUOUS_PAGE_GAP = 12
 
 
 class PageReorderDialog(QDialog):
@@ -896,6 +902,7 @@ class PdfViewer(QWidget):
     page_boxes_changed = Signal(bool)
     printer_marks_changed = Signal(bool)
     two_page_spread_changed = Signal(bool)
+    continuous_scroll_changed = Signal(bool)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -920,8 +927,16 @@ class PdfViewer(QWidget):
         self._grayscale = get_pdf_grayscale()
         self._night_mode = get_pdf_night_mode()
         self._two_page_spread = get_pdf_two_page_spread()
+        self._continuous_scroll = get_pdf_continuous_scroll()
+        if self._continuous_scroll and self._two_page_spread:
+            # Mutual exclusive: Continuous bevorzugt wenn beide gesetzt
+            self._two_page_spread = False
+            set_pdf_two_page_spread(False)
         self._spread_left_width = 0.0
         self._spread_gap = 12
+        self._continuous_offsets: list[tuple[int, float, float]] = []  # page, y0, height
+        self._continuous_gap = CONTINUOUS_PAGE_GAP
+        self._continuous_scroll_syncing = False
         self._default_opacity = get_ann_default_opacity()
         self._annotations_visible = get_annotations_visible()
         self._annotations_locked = get_annotations_locked()
@@ -1094,6 +1109,14 @@ class PdfViewer(QWidget):
             "Zwei-Seiten-Ansicht (Spread): aktuelle + nächste Seite nebeneinander"
         )
         self.btn_spread.toggled.connect(self.set_two_page_spread)
+        self.btn_continuous = QToolButton()
+        self.btn_continuous.setText("CS")
+        self.btn_continuous.setCheckable(True)
+        self.btn_continuous.setChecked(self._continuous_scroll)
+        self.btn_continuous.setToolTip(
+            "Continuous Scroll: Seiten untereinander (statt Einzelseite; schließt Spread aus)"
+        )
+        self.btn_continuous.toggled.connect(self.set_continuous_scroll)
         self.btn_ann_layer = QToolButton()
         self.btn_ann_layer.setText("Ann.")
         self.btn_ann_layer.setCheckable(True)
@@ -1145,6 +1168,7 @@ class PdfViewer(QWidget):
         toolbar.addWidget(self.btn_grayscale)
         toolbar.addWidget(self.btn_night)
         toolbar.addWidget(self.btn_spread)
+        toolbar.addWidget(self.btn_continuous)
         toolbar.addWidget(self.btn_ann_layer)
         toolbar.addWidget(self.btn_ann_lock)
         toolbar.addWidget(self.btn_page_boxes)
@@ -1193,6 +1217,7 @@ class PdfViewer(QWidget):
                 self.btn_grayscale,
                 self.btn_night,
                 self.btn_spread,
+                self.btn_continuous,
                 self.btn_ann_layer,
                 self.btn_ann_lock,
                 self.btn_page_boxes,
@@ -1244,6 +1269,7 @@ class PdfViewer(QWidget):
         self.canvas.uri_link_clicked.connect(self._open_uri_link)
         self.canvas.annotations_moved.connect(self._on_annotations_moved)
         self.scroll.setWidget(self.canvas)
+        self.scroll.verticalScrollBar().valueChanged.connect(self._on_continuous_scroll)
         layout.addWidget(self.scroll)
         self.canvas.set_drag_tool(AnnotationType.HIGHLIGHT, select_mode=False)
         paste_sc = QShortcut(QKeySequence.Paste, self)
@@ -1402,6 +1428,8 @@ class PdfViewer(QWidget):
     def set_two_page_spread(self, enabled: bool):
         """Zwei-Seiten-Ansicht (Spread): aktuelle + nächste Seite nebeneinander."""
         enabled = bool(enabled)
+        if enabled and self._continuous_scroll:
+            self.set_continuous_scroll(False)
         changed = self._two_page_spread != enabled
         self._two_page_spread = enabled
         set_pdf_two_page_spread(enabled)
@@ -1422,8 +1450,55 @@ class PdfViewer(QWidget):
     def two_page_spread_enabled(self) -> bool:
         return bool(self._two_page_spread)
 
+    def set_continuous_scroll(self, enabled: bool):
+        """Continuous Scroll: Seiten untereinander statt Einzelseite."""
+        enabled = bool(enabled)
+        if enabled and self._two_page_spread:
+            self.set_two_page_spread(False)
+        changed = self._continuous_scroll != enabled
+        self._continuous_scroll = enabled
+        set_pdf_continuous_scroll(enabled)
+        if hasattr(self, "btn_continuous"):
+            self.btn_continuous.blockSignals(True)
+            self.btn_continuous.setChecked(enabled)
+            self.btn_continuous.blockSignals(False)
+        if not enabled:
+            self._continuous_offsets = []
+        if changed and self.pdf_path:
+            self.refresh()
+            if enabled:
+                self._scroll_to_continuous_page(self.page_index)
+        if changed:
+            self.continuous_scroll_changed.emit(enabled)
+            self.status.emit(
+                "Continuous Scroll an" if enabled else "Continuous Scroll aus"
+            )
+
+    def continuous_scroll_enabled(self) -> bool:
+        return bool(self._continuous_scroll)
+
+    def _continuous_page_range(self) -> tuple[int, int]:
+        """(start, end) exklusiv end — Fenster um aktuelle Seite."""
+        n = int(self.page_count or 0)
+        if n <= 0:
+            return 0, 0
+        if n <= CONTINUOUS_MAX_PAGES:
+            return 0, n
+        half = CONTINUOUS_MAX_PAGES // 2
+        start = max(0, int(self.page_index) - half // 2)
+        end = min(n, start + CONTINUOUS_MAX_PAGES)
+        start = max(0, end - CONTINUOUS_MAX_PAGES)
+        return start, end
+
     def _spread_resolve(self, x: float, y: float) -> tuple[int, float, float]:
         """Display-Koordinaten → (page_index, lokale_x, lokale_y)."""
+        if self._continuous_scroll and self._continuous_offsets:
+            gap = float(self._continuous_gap)
+            for page, y0, h in self._continuous_offsets:
+                if y < y0 + h + gap:
+                    return page, x, max(0.0, y - y0)
+            page, y0, h = self._continuous_offsets[-1]
+            return page, x, max(0.0, y - y0)
         if (
             self._two_page_spread
             and self._spread_left_width > 0
@@ -1436,6 +1511,49 @@ class PdfViewer(QWidget):
                 y,
             )
         return self.page_index, x, y
+
+    def _on_continuous_scroll(self, value: int):
+        """Aktuelle Seite aus Viewport-Mitte ableiten (ohne re-render)."""
+        if (
+            self._continuous_scroll_syncing
+            or not self._continuous_scroll
+            or not self._continuous_offsets
+        ):
+            return
+        vp = self.scroll.viewport()
+        center_y = float(value) + float(vp.height()) * 0.35
+        new_page = self.page_index
+        for page, y0, h in self._continuous_offsets:
+            if y0 <= center_y < y0 + h + self._continuous_gap:
+                new_page = page
+                break
+        else:
+            if self._continuous_offsets:
+                new_page = self._continuous_offsets[-1][0]
+        if new_page != self.page_index:
+            self.page_index = new_page
+            self.lbl_page.setText(
+                f"{self.page_index + 1} / {self.page_count} (Scroll)"
+            )
+            self.page_changed.emit(self.page_index)
+
+    def _scroll_to_continuous_page(self, page_index: int):
+        """Viewport auf Seite in Continuous-Ansicht setzen."""
+        if not self._continuous_offsets:
+            return
+        target = None
+        for page, y0, _h in self._continuous_offsets:
+            if page == page_index:
+                target = y0
+                break
+        if target is None:
+            return
+        self._continuous_scroll_syncing = True
+        try:
+            bar = self.scroll.verticalScrollBar()
+            bar.setValue(int(max(0, target - 8)))
+        finally:
+            self._continuous_scroll_syncing = False
 
     def set_annotations_visible(self, visible: bool):
         """Annotation-Layer ein-/ausblenden (nur Darstellung)."""
@@ -1620,10 +1738,18 @@ class PdfViewer(QWidget):
             self.btn_night.setChecked(self._night_mode)
             self.btn_night.blockSignals(False)
         self._two_page_spread = get_pdf_two_page_spread()
+        self._continuous_scroll = get_pdf_continuous_scroll()
+        if self._continuous_scroll and self._two_page_spread:
+            self._two_page_spread = False
+            set_pdf_two_page_spread(False)
         if hasattr(self, "btn_spread"):
             self.btn_spread.blockSignals(True)
             self.btn_spread.setChecked(self._two_page_spread)
             self.btn_spread.blockSignals(False)
+        if hasattr(self, "btn_continuous"):
+            self.btn_continuous.blockSignals(True)
+            self.btn_continuous.setChecked(self._continuous_scroll)
+            self.btn_continuous.blockSignals(False)
         self._annotations_visible = get_annotations_visible()
         if hasattr(self, "btn_ann_layer"):
             self.btn_ann_layer.blockSignals(True)
@@ -1941,12 +2067,99 @@ class PdfViewer(QWidget):
                 links = []
 
             self._spread_left_width = 0.0
+            self._continuous_offsets = []
             facing = self.page_index + 1
+            use_continuous = bool(self._continuous_scroll)
             use_spread = (
-                self._two_page_spread
+                (not use_continuous)
+                and self._two_page_spread
                 and facing < self.page_count
             )
-            if use_spread:
+            if use_continuous:
+                from ild_pdf.limits import MAX_RENDER_PIXELS
+
+                gap = int(self._continuous_gap)
+                start, end = self._continuous_page_range()
+                pages_imgs: list[tuple[int, object]] = []
+                for pi in range(start, end):
+                    if pi == self.page_index:
+                        pages_imgs.append((pi, img))
+                    else:
+                        try:
+                            pi_img = render_page(
+                                self.pdf_path,
+                                pi,
+                                scale=self.scale,
+                                password=self.password,
+                                grayscale=self._grayscale,
+                                invert=self._night_mode,
+                            )
+                        except Exception:
+                            continue
+                        pages_imgs.append((pi, pi_img))
+                if not pages_imgs:
+                    pages_imgs = [(self.page_index, img)]
+                max_w = max(im.size[0] for _, im in pages_imgs)
+                total_h = sum(im.size[1] for _, im in pages_imgs) + gap * max(
+                    0, len(pages_imgs) - 1
+                )
+                if max_w * total_h > MAX_RENDER_PIXELS:
+                    self.status.emit(
+                        "Continuous Scroll: zu groß — Zoom verringern oder weniger Seiten"
+                    )
+                    self.lbl_page.setText(f"{self.page_index + 1} / {self.page_count}")
+                    self._continuous_offsets = []
+                else:
+                    combined = Image.new(
+                        "RGBA", (max_w, total_h), (240, 240, 240, 255)
+                    )
+                    y_off = 0.0
+                    all_anns: list = []
+                    all_links: list = []
+                    for pi, pimg in pages_imgs:
+                        if pimg.mode != "RGBA":
+                            pimg = pimg.convert("RGBA")
+                        combined.paste(pimg, (0, int(y_off)))
+                        ph = float(pimg.size[1])
+                        self._continuous_offsets.append((pi, y_off, ph))
+                        if self.store:
+                            for ann in self.store.for_page(pi):
+                                disp = copy(ann)
+                                disp.y = float(ann.y) + y_off
+                                if ann.callout_x or ann.callout_y:
+                                    disp.callout_y = float(ann.callout_y) + y_off
+                                all_anns.append(disp)
+                        try:
+                            page_links = list_page_uri_links(
+                                self.pdf_path,
+                                pi,
+                                scale=self.scale,
+                                password=self.password,
+                            )
+                            for link in page_links:
+                                all_links.append(
+                                    UriLink(
+                                        page=link.page,
+                                        x=link.x,
+                                        y=link.y + y_off,
+                                        width=link.width,
+                                        height=link.height,
+                                        uri=link.uri,
+                                    )
+                                )
+                        except Exception:
+                            pass
+                        y_off += ph + gap
+                    img = combined
+                    anns = all_anns
+                    links = all_links
+                    trunc = ""
+                    if end - start < self.page_count:
+                        trunc = f" · {start + 1}–{end}"
+                    self.lbl_page.setText(
+                        f"{self.page_index + 1} / {self.page_count} (Scroll{trunc})"
+                    )
+            elif use_spread:
                 gap = int(self._spread_gap)
                 img2 = render_page(
                     self.pdf_path,
@@ -2023,14 +2236,35 @@ class PdfViewer(QWidget):
 
     def goto_page(self, page_index: int):
         if 0 <= page_index < self.page_count:
+            old = self.page_index
             self.page_index = page_index
             if self._search_query:
                 self._rebuild_search_rects(keep_index=False)
-            self.refresh()
+            need_refresh = True
+            if self._continuous_scroll and self._continuous_offsets:
+                in_window = any(p == page_index for p, _, _ in self._continuous_offsets)
+                # Fenster neu, wenn Seite außerhalb oder Range sich ändern würde
+                start, end = self._continuous_page_range()
+                if in_window and start <= old < end and start <= page_index < end:
+                    # Nur scrollen, wenn Range gleich bleibt
+                    old_start, old_end = self._continuous_offsets[0][0], self._continuous_offsets[-1][0] + 1
+                    if old_start == start and old_end == end:
+                        need_refresh = False
+                        self.lbl_page.setText(
+                            f"{self.page_index + 1} / {self.page_count} (Scroll)"
+                        )
+                        self._scroll_to_continuous_page(page_index)
+            if need_refresh:
+                self.refresh()
+                if self._continuous_scroll:
+                    self._scroll_to_continuous_page(page_index)
             self.page_changed.emit(self.page_index)
 
     def prev_page(self):
         if self.page_index <= 0:
+            return
+        if self._continuous_scroll:
+            self.goto_page(self.page_index - 1)
             return
         step = 2 if self._two_page_spread else 1
         self.page_index = max(0, self.page_index - step)
@@ -2041,6 +2275,9 @@ class PdfViewer(QWidget):
 
     def next_page(self):
         if self.page_index + 1 >= self.page_count:
+            return
+        if self._continuous_scroll:
+            self.goto_page(self.page_index + 1)
             return
         step = 2 if self._two_page_spread else 1
         target = self.page_index + step
@@ -2348,7 +2585,19 @@ class PdfViewer(QWidget):
     def annotation_summaries(self) -> list[tuple[str, Annotation]]:
         if not self.store:
             return []
+        from datetime import datetime
+
         from instantlensdoc.ui.sidebar import ANN_TYPE_LABELS
+
+        def _fmt_ts(iso: str) -> str:
+            raw = (iso or "").strip()
+            if not raw:
+                return ""
+            try:
+                dt = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+                return dt.astimezone().strftime("%d.%m. %H:%M")
+            except Exception:
+                return raw[:16]
 
         out: list[tuple[str, Annotation]] = []
         for a in self.store.annotations:
@@ -2358,6 +2607,9 @@ class PdfViewer(QWidget):
                 label += f" — {a.text[:40]}"
             elif a.type == AnnotationType.MEASURE:
                 label += f" — {a.measure_label(self.scale)}"
+            ts = _fmt_ts(getattr(a, "modified", "") or getattr(a, "created", ""))
+            if ts:
+                label += f" · {ts}"
             out.append((label, a))
         return out
 

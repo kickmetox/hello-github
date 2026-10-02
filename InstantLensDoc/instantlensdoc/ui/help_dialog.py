@@ -30,22 +30,24 @@ HELP_HTML = f"""
 <li><b>Extras → Einstellungen</b>: Theme, <b>UI-Sprache DE/EN</b>, OCR, Export-Qualität,
     <b>Standard-Zoom</b>, <b>Autosave-Intervall</b>, Soft-Wrap, <b>Sonderzeichen anzeigen</b>,
     optional <b>Trailing Whitespace trimmen</b>, optional <b>Whitespace trim on paste</b>,
+    optional <b>Bracket-Match Highlight</b>,
     optional <b>Minimieren in System-Tray</b>,
     optional <b>Backup .bak beim Speichern</b>, <b>Seitengröße-Einheit mm/inch</b>,
     optional <b>letzte Session beim Start</b>, <b>PDF-Toolbar-Gruppen</b> ein-/ausblenden,
-    optional <b>PDF Zwei-Seiten-Ansicht (Spread)</b>,
+    optional <b>PDF Zwei-Seiten-Ansicht (Spread)</b>, optional <b>PDF Continuous Scroll</b>,
     Update-Hinweis (nur wenn aktiv), Pfade;
     <b>Auf Standard zurücksetzen</b></li>
 <li><b>Datei → Zuletzt geöffnet</b>: Menü + Seitenleiste (persistiert)</li>
 <li><b>Datei → Speichern unter</b> (Ctrl+Shift+S): Text → Dokument; PDF → Annotation-Sidecar wählen (PDF unverändert)</li>
 <li><b>Datei → Alles speichern</b> (Ctrl+Alt+Shift+S): aktuelles Doc + PDF-Sidecars offener Tabs</li>
 <li><b>Datei → Als Kopie speichern</b> (Ctrl+Alt+S): PDF + Sidecar kopieren (Doc bleibt offen); Editor → Speichern unter</li>
+<li><b>Datei → Arbeitsverzeichnis öffnen</b> (Ctrl+Shift+E): Ordner der aktuellen Datei bzw. Prozess-CWD</li>
 <li><b>Datei → Exportieren</b>: Editor-Inhalt als HTML, DOCX oder PDF (zuletzt genutzter Ordner wird gemerkt)</li>
 <li><b>Datei → Drucken</b> (Ctrl+P): Editor oder aktuelle PDF-Seite (Qt Print)</li>
 <li><b>Seitenleiste</b>: Suche (inkl. letzte Suchbegriffe), „Alle Docs“-Volltext, Zuletzt geöffnet, Dokumente,
     Lesezeichen/Outline (+/− hinzufügen/löschen), <b>Annotationen</b> (klickbar, <b>nach Seite gruppiert</b>,
     <b>Filter nach Typ</b>, <b>Textsuche in der Liste</b>, <b>Statistik je Typ</b>,
-    <b>Farben-Chips klickbar filtern</b>), Markierungen/Treffer</li>
+    <b>Farben-Chips klickbar filtern</b>, <b>Zeitstempel</b>), Markierungen/Treffer</li>
 <li><b>Bearbeiten → Rückgängig/Wiederholen</b>: Editor-Text <i>oder</i> PDF-Annotationen/Overlay-Text (Ctrl+Z / Ctrl+Y);
     Statusleisten-Hint „Ctrl+Z · Letzte Aktion rückgängig“</li>
 <li><b>Bearbeiten → Suchen und Ersetzen</b> (Ctrl+R): Find/Replace im Texteditor</li>
@@ -66,6 +68,7 @@ HELP_HTML = f"""
     <b>Soft-Wrap</b>; <b>Sonderzeichen anzeigen</b> (Ctrl+Shift+.);
     <b>PDF Graustufen</b>; <b>PDF Nachtmodus</b> (Invert-Ansicht, nur Darstellung);
     <b>Zwei-Seiten-Ansicht (Spread)</b> (Ctrl+2 / Toolbar 2S);
+    <b>Continuous Scroll</b> (Ctrl+3 / Toolbar CS — Seiten untereinander, schließt Spread aus);
     <b>Annotation-Layer</b> ein/aus (Ctrl+Shift+A);
     <b>Annotationen sperren</b> (Ctrl+Shift+L — nicht verschiebbar);
     <b>Seitenrahmen / CropBox</b> Overlay (Ctrl+Shift+B);
