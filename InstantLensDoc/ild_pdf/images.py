@@ -1,0 +1,176 @@
+"""Bild in PDF einfügen / aus Seite extrahieren (Hooks über pikepdf + Pillow)."""
+
+from __future__ import annotations
+
+from pathlib import Path
+from typing import List, Optional, Union
+
+from PIL import Image
+
+
+def extract_page_image(
+    pdf_path: str | Path,
+    page_index: int = 0,
+    out_path: str | Path | None = None,
+    scale: float = 2.0,
+    format: str = "PNG",
+) -> Path:
+    """
+    Rendert eine PDF-Seite und speichert sie als Bild.
+    out_path default: <pdf>_p{N}.png
+    """
+    from .render import render_page
+
+    pdf_path = Path(pdf_path)
+    img = render_page(pdf_path, page_index=page_index, scale=scale)
+    if out_path is None:
+        out_path = pdf_path.with_name(f"{pdf_path.stem}_p{page_index + 1}.png")
+    else:
+        out_path = Path(out_path)
+    fmt = format.upper()
+    if fmt == "JPG":
+        fmt = "JPEG"
+    if fmt == "JPEG" and img.mode == "RGBA":
+        img = img.convert("RGB")
+    img.save(out_path, fmt)
+    return out_path
+
+
+def extract_embedded_images(
+    pdf_path: str | Path,
+    out_dir: str | Path | None = None,
+    page_index: Optional[int] = None,
+) -> List[Path]:
+    """
+    Extrahiert eingebettete XObject-Bilder via pikepdf (soweit möglich).
+    page_index=None → alle Seiten. Liefert Liste geschriebener Dateipfade.
+    """
+    import pikepdf
+
+    pdf_path = Path(pdf_path)
+    out_dir = Path(out_dir) if out_dir else pdf_path.parent / f"{pdf_path.stem}_images"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    written: List[Path] = []
+
+    with pikepdf.open(pdf_path) as pdf:
+        pages = list(enumerate(pdf.pages))
+        if page_index is not None:
+            pages = [(page_index, pdf.pages[page_index])]
+        for pi, page in pages:
+            try:
+                images = list(page.images.keys()) if hasattr(page, "images") else []
+            except Exception:
+                images = []
+            for n, name in enumerate(images):
+                try:
+                    raw = page.images[name]
+                    pdfimg = pikepdf.PdfImage(raw)
+                    out = out_dir / f"p{pi + 1}_{n + 1}_{_safe(str(name))}.png"
+                    pdfimg.extract_to(fileprefix=str(out.with_suffix("")))
+                    # extract_to schreibt ggf. .ppm/.jpg — normalisieren auf gefundenes File
+                    candidates = list(out_dir.glob(f"p{pi + 1}_{n + 1}_{_safe(str(name))}*"))
+                    if candidates:
+                        written.append(candidates[0])
+                except Exception:
+                    continue
+    return written
+
+
+def insert_image_as_page(
+    pdf_path: str | Path,
+    image: Union[str, Path, Image.Image],
+    *,
+    at_index: Optional[int] = None,
+    page_size: tuple[float, float] = (595.0, 842.0),
+) -> Path:
+    """
+    Hängt ein Bild als neue PDF-Seite an (oder fügt an at_index ein).
+    Erzeugt bei Bedarf das PDF neu.
+    """
+    import io
+    import pikepdf
+
+    pdf_path = Path(pdf_path)
+    if isinstance(image, (str, Path)):
+        img = Image.open(image)
+    else:
+        img = image
+    if img.mode not in ("RGB", "L"):
+        img = img.convert("RGB")
+
+    buf = io.BytesIO()
+    # Zwischen-PDF mit einer Bildseite
+    img_pdf = io.BytesIO()
+    # A4-Bereich: Bild skalieren in Seite
+    canvas = Image.new("RGB", (int(page_size[0]), int(page_size[1])), "white")
+    iw, ih = img.size
+    scale = min(page_size[0] / iw, page_size[1] / ih, 1.0)
+    nw, nh = max(1, int(iw * scale)), max(1, int(ih * scale))
+    resized = img.resize((nw, nh), Image.Resampling.LANCZOS)
+    ox = int((page_size[0] - nw) / 2)
+    oy = int((page_size[1] - nh) / 2)
+    canvas.paste(resized, (ox, oy))
+    canvas.save(img_pdf, "PDF", resolution=72.0)
+    img_pdf.seek(0)
+
+    if not pdf_path.exists():
+        # Neues Einzelseiten-PDF
+        pdf_path.write_bytes(img_pdf.getvalue())
+        return pdf_path
+
+    with pikepdf.open(pdf_path, allow_overwriting_input=True) as dst:
+        with pikepdf.open(img_pdf) as src:
+            if at_index is None:
+                dst.pages.append(src.pages[0])
+            else:
+                dst.pages.insert(at_index, src.pages[0])
+        dst.save(pdf_path)
+    return pdf_path
+
+
+def insert_image_stamp_overlay(
+    pdf_path: str | Path,
+    image: Union[str, Path, Image.Image],
+    page_index: int = 0,
+    *,
+    x: float = 40.0,
+    y: float = 40.0,
+    width: float = 120.0,
+    height: float = 80.0,
+) -> Path:
+    """
+    Einfacher Hook: speichert Bildstempel-Metadaten in Sidecar und optional
+    als Annotation vom Typ STAMP (Pfad im text-Feld als file://…).
+    Kein vollständiges PDF-Embed (bewusst leichtgewichtig) — Persistenz über AnnotationStore.
+    """
+    from .annotate import Annotation, AnnotationStore, AnnotationType
+
+    pdf_path = Path(pdf_path)
+    if isinstance(image, Image.Image):
+        assets = pdf_path.parent / f"{pdf_path.stem}_stamps"
+        assets.mkdir(parents=True, exist_ok=True)
+        dest = assets / f"stamp_{page_index}_{int(x)}_{int(y)}.png"
+        image.convert("RGBA").save(dest)
+        img_path = dest
+    else:
+        img_path = Path(image)
+
+    store = AnnotationStore(pdf_path)
+    store.add(
+        Annotation(
+            page=page_index,
+            type=AnnotationType.STAMP,
+            x=x,
+            y=y,
+            width=width,
+            height=height,
+            text=f"img:{img_path}",
+            color="#CCCCCC",
+        )
+    )
+    store.save(force=True)
+    return img_path
+
+
+def _safe(name: str) -> str:
+    return "".join(c if c.isalnum() or c in "-_" else "_" for c in name)[:40]
