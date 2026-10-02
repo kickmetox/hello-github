@@ -1,156 +1,28 @@
 # Changelog — InstantLens Doc
 
-## 0.6.9 — Sync-Scroll-Session, Tag-Schwelle, Save-Fehlerliste, F1-0.6.8
+## 0.7.0 — Release-Konsolidierung (0.6.0 → 0.7.0)
 
-Nach 0.6.8: Doc-Split Sync-Scroll wird je Session gemerkt; Tag-Rename-Bestätigungsschwelle konfigurierbar (Default 20); „Alle speichern“ zeigt Fehlerliste bei Teilfehlern; F1/Wizard mit kurzen 0.6.8-Hinweisen. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
-
-### PDF / Annotationen
-- **Tag-Rename-Schwelle**: Bestätigung wenn Treffer > Einstellungswert (`tag_rename_confirm_threshold`, Default 20)
-
-### Editor / UX
-- **Sync-Scroll je Session**: `sync_scroll` in `session.json`; Toggle speichert/stellt wieder her
-- Dirty-Tabs **Alle speichern**: am Ende **Fehlerliste** wenn einzelne Dateien scheitern (Einzeldialoge unterdrückt)
-- **F1 / Wizard**: kurze Hinweise zu 0.6.8 (Panel-Session, Save-Abbrechen, Wizard-Reset, Tag-Confirm)
-
-### Packaging / Docs
-- Version **0.6.9**; Smoke um 0.6.9-Pfade erweitert
-
----
-
-## 0.6.8 — Split-Panel-Session, Save-Abbrechen, Wizard-Reset, Tag-Confirm
-
-Nach 0.6.7: Doc-Split merkt Panel-Typ (PDF/Editor) und Zweit-Doc je Session; „Alle speichern“-Fortschritt mit Abbrechen; Wizard dauerhaft aus → Reset in Einstellungen; Tag-Umbenennen fragt bei >20 Treffern nach. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+Meilenstein: alle 0.6.x-Inkremente gebündelt, Version einheitlich **0.7.0**, Smoke um ausgewählte 0.6.x-Pfade erweitert, kleine Review-Fixes. Stubs KI/Cloud/Stylus/3D bleiben Stubs (keine Fake-Features).
 
 ### PDF / Annotationen
-- **Tag umbenennen Bestätigung**: bei mehr als 20 betroffenen Annotationen Rückfrage vor dem globalen Rename (`count_tag`)
+- Selection→**Copy**/Notiz/Highlight+Notiz; Tag-**Autocomplete**/Multi-Select/**Cloud**/Rename (+ Undo, Confirm, Schwelle)
+- Annotation-**Tag-Cloud** (Filter-Klick, Rechtsklick umbenennen); Sidecar-Tags unverändert
 
-### Editor / UX
-- **Doc-Split Panel-Typ je Session**: `secondary_path` + `secondary_kind` (pdf|editor) in `session.json`; Split erneut an → gemerktes Zweit-Panel
-- Dirty-Tabs **Alle speichern**: Fortschrittsdialog mit Button **Abbrechen** (Teilergebnis bleibt)
-- **Wizard-Reset in Einstellungen**: „Nicht mehr zeigen“ aufheben (`wizard_completed` / skip-once zurücksetzen)
-
-### Packaging / Docs
-- Version **0.6.8**; Smoke um 0.6.8-Pfade erweitert
-
----
-
-## 0.6.7 — Tag-Undo-Label, Split-PDF+Editor, Save-Progress, Wizard-Dauerhaft
-
-Nach 0.6.6: Tag-Umbenennen erscheint benannt im PDF-Undo-Stack; Doc-Split zweites Panel zeigt PDF oder Editor (Mischung); „Alle speichern“ mit Fortschritt bei >3 Dateien; Wizard „Nicht mehr zeigen“ dauerhaft (zusätzlich zu skip-once). Stubs KI/Cloud/Stylus/3D bleiben Stubs.
-
-### PDF / Annotationen
-- **Tag umbenennen im Undo-Stack**: Undo-Stufen mit Label (`Tag umbenennen`); Historie-Dialog = **PDF-Undo-Stack** (Seiten + Ann.); Status/Hint zeigen den Namen
-
-### Editor / UX
-- **Doc-Split PDF+Editor-Mischung**: zweites Panel lädt PDF-Viewer oder Editor je nach Dateityp (bei zwei offenen Docs)
-- Dirty-Tabs **Alle speichern**: Fortschrittsdialog bei mehr als 3 Dateien (`n/total`)
-- **Erste-Schritte-Wizard**: Checkbox **Nicht mehr zeigen** (`wizard_completed`) zusätzlich zu skip-once
+### Editor / Session / UX
+- Session-**Tab-Order** Drag; **Andere Tabs schließen**; **Doc-Split** H/V (PDF+Editor, Panel-Session)
+- **Sync-Scroll** optional + je Session; Dirty-Tabs Liste / Speichern / Alle speichern (Fortschritt, Abbrechen, **Fehlerliste**)
+- Erste-Schritte-**Wizard** (0.6-Highlights, skip-once, dauerhaft, Reset); F1 Shortcuts + 0.6.8-Hinweise
+- Sync: `-SkipStart`, Exit-Codes 0/1/2; Installer Desktopicon-Docs
 
 ### Packaging / Docs
-- Version **0.6.7**; Smoke um 0.6.7-Pfade erweitert
+- Inno Setup / Build / INFO / FEATURES / README auf **0.7.0**
+- Sync: `scripts/sync-ild.ps1` (Repo) bzw. Store `docs/sync-ild.ps1`
+- Smoke: open / annotate / export / license + ausgewählte 0.6.x-Pfade (CLI + offscreen Qt)
 
----
-
-## 0.6.6 — Tag-Rename-Undo, Split-Settings, Alle-Speichern, Wizard-Skip
-
-Nach 0.6.5: Tag-Umbenennen ist mit Ctrl+Z ein Undo-Schritt (Filter mit); Doc-Split H/V zusätzlich in Einstellungen; Dirty-Tabs-Menü mit „Alle speichern“; Wizard mit skip-once-Checkbox. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
-
-### PDF / Annotationen
-- **Tag umbenennen Undo**: globale Umbenennung als eine Undo-Stufe (`AnnotationStore.rename_tag` via `atomic`); Filter wird beim Undo zurückgesetzt
-
-### Editor / UX
-- **Doc-Split Layout in Einstellungen**: Combo Horizontal/Vertikal (Setting `editor_doc_split_vertical`, sync mit Ansicht-Menü)
-- Dirty-Tabs-Menü: **Alle speichern** für alle ungespeicherten Tabs
-- **Erste-Schritte-Wizard**: Checkbox „Dieses Mal überspringen“; Auto-Show bis abgeschlossen (`wizard_completed` / `wizard_skip_once`)
-
-### Packaging / Docs
-- Version **0.6.6**; Smoke um 0.6.6-Pfade erweitert
-
----
-
-## 0.6.5 — Tag-Rename, Vertikal-Split, Dirty-Save, Wizard-0.6
-
-Nach 0.6.4: Tag-Cloud Rechtsklick benennt Tags global um; Doc-Split optional vertikal; Dirty-Tabs-Menü mit Speichern je Datei; Erste-Schritte-Wizard um 0.6-Highlights erweitert. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
-
-### PDF / Annotationen
-- **Tag-Cloud Rechtsklick → umbenennen**: Tag global in allen Annotationen des Dokuments umbenennen (`AnnotationStore.rename_tag`)
-
-### Editor / UX
-- **Vertikaler Doc-Split**: Toggle übereinander (`Ctrl+Shift+\` / Ansicht); Setting `editor_doc_split_vertical`
-- Dirty-Tabs-Menü: zusätzlich **Speichern: Dateiname** je ungespeicherter Datei
-- **Erste-Schritte-Wizard**: 4. Seite mit 0.6-Highlights (Tag-Cloud, Split, Dirty-Save)
-
-### Packaging / Docs
-- Version **0.6.5**; Smoke um 0.6.5-Pfade erweitert
-
----
-
-## 0.6.4 — Tag-Cloud-Filter, Sync-Scroll, Dirty-Tabs, Shortcuts
-
-Nach 0.6.3: Tag-Cloud-Klick setzt den Annotation-Filter; optionaler Sync-Scroll im Doc-Split; Klick auf „ungespeichert“ öffnet die Liste dirty Tabs; Shortcut-Übersicht um 0.6.x-Keys erweitert. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
-
-### PDF / Annotationen
-- **Tag-Cloud Klick setzt Filter**: exklusiv auf den gewählten Tag; erneuter Klick löscht; **Ctrl+Klick** Multi-Select (ODER)
-
-### Editor / UX
-- **Sync-Scroll** (optional): vertikales Scrollen links↔rechts im Doc-Split (`Ctrl+Alt+\` / Ansicht)
-- Statusleiste **„N ungespeichert“**: Klick öffnet Menü mit dirty Tabs → Wechseln
-- **Shortcut-Übersicht (F1)**: 0.6.x-Keys (Copy/Notiz/Close-Others/Doc-Split/Sync-Scroll/Tag-Cloud/Dirty-Tabs)
-
-### Packaging / Docs
-- Version **0.6.4**; Smoke um 0.6.4-Pfade erweitert
-
----
-
-## 0.6.3 — Highlight+Notiz, Tag-Cloud, Doc-Split, Unsaved-Count
-
-Nach 0.6.2: PDF-Auswahl kann Highlight und Notiz in einem Schritt anlegen; Annotation-Tag-Cloud in der Sidebar; Editor-Fenster horizontal für zwei Docs teilen; Statusleiste zählt ungespeicherte Tabs. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
-
-### PDF / Annotationen
-- **Auswahl → Highlight + Notiz**: Dialog-Checkbox „Zusätzlich Highlight“ (Einstellung persistent); ein Schritt für Sticky und Text-Highlight
-- Annotation-**Tag-Cloud**: häufigste Tags als klickbare Chips in der Sidebar (Filter umschalten)
-
-### Editor / UX
-- **Fenster teilen (zwei Docs)**: horizontaler Split (Ctrl+\); rechtes Pane zeigt weiteres offenes Tab (read-only); „Zweites Dokument wählen…“
-- Statusleiste: **ungespeicherte Tabs** zählen (`N ungespeichert`)
-
-### Packaging / Docs
-- Version **0.6.3**; Smoke um 0.6.3-Pfade erweitert
-
----
-
-## 0.6.2 — Selection→Notiz, Tag-Multi-Select, Close-Others, Sync-Exit
-
-Nach 0.6.1: PDF-Textauswahl als Sticky/Notiz mit vorausgefülltem Text; Annotation-Tag-Filter Multi-Select (ODER); andere Tabs schließen; Sync-Skript `-SkipStart` und klare Exit-Codes. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
-
-### PDF / Annotationen
-- **Auswahl → Notiz**: Textauswahl → Sticky mit vorausgefülltem Inhalt (`Ctrl+Alt+N` / Notiz-Werkzeug); Dialog editierbar
-- Annotation-Tag-Filter: **Multi-Select** (mehrere Tags, ODER-Match); leere Auswahl = alle
-
-### Editor / Session
-- **Andere Tabs schließen**: Datei → Ctrl+Shift+W — Sidebar-Dokumente außer aktuellem entfernen
-
-### Packaging / Docs
-- Sync: `-SkipStart` (= `-NoStart`); Exit-Codes **0** OK / **1** allgemein / **2** Git-Fehler dokumentiert
-- Version **0.6.2**; Smoke um 0.6.2-Pfade erweitert
-
----
-
-## 0.6.1 — Selection-Copy, Tag-Autocomplete, Session-Order, Installer-Docs
-
-Nach 0.6.0: PDF-Text aus Auswahl in die Zwischenablage; Annotation-Suche mit Tag-Autocomplete; Session-Tab-Reihenfolge per Drag speichern; Installer-Desktop-Shortcut dokumentiert/geprüft. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
-
-### PDF / Annotationen
-- **PDF-Text kopieren**: Auswahl-Werkzeug → Text aufziehen → **Ctrl+C** / Bearbeiten→Kopieren (ohne Highlight-Annotation)
-- API `selection_to_plain_text` (ergänzt Selection→Highlight)
-- Annotation-Suche: **Tag-Autocomplete** (Completer aus vorhandenen Tags)
-
-### Editor / Session
-- Dokument-/Session-Tabs: **Drag-Reihenfolge** in der Sidebar; `session.json` speichert `order`
-
-### Packaging / Docs
-- Inno: Task `desktopicon` — Checkbox dokumentiert (`checkedonce`, Standard an); Hinweistext erweitert
-- Version **0.6.1**; Smoke um 0.6.1-Pfade erweitert
+### Review-Fixes (0.7.0)
+- Versionsstrings App / `ild_pdf` / ISS / Smoke / Docs vereinheitlicht
+- CHANGELOG 0.6.1–0.6.9 zu Kurz-Tabelle verdichtet (wie zuvor 0.5.x)
+- `ild_pdf/README.md` und `installer/build-installer.ps1` Versionshinweise auf aktuelle Release gebracht
 
 ---
 
@@ -178,6 +50,22 @@ Meilenstein: alle 0.5.x-Inkremente gebündelt, Version einheitlich **0.6.0**, Sm
 - Versionsstrings App / `ild_pdf` / ISS / Smoke / Docs vereinheitlicht
 - CHANGELOG 0.5.1–0.5.9 zu Kurz-Tabelle verdichtet (wie zuvor 0.4.x)
 - `ild_pdf/README.md` und `installer/build-installer.ps1` Versionshinweise auf aktuelle Release gebracht
+
+### 0.6.x-Inkremente (Kurz)
+
+| Ver. | Kern |
+|------|------|
+| **0.6.1** | Selection-Copy, Tag-Autocomplete, Session-Order, Installer-Docs |
+| **0.6.2** | Selection→Notiz, Tag-Multi-Select, Close-Others, Sync-Exit |
+| **0.6.3** | Highlight+Notiz, Tag-Cloud, Doc-Split, Unsaved-Count |
+| **0.6.4** | Tag-Cloud-Filter, Sync-Scroll, Dirty-Tabs, Shortcuts |
+| **0.6.5** | Tag-Rename, Vertikal-Split, Dirty-Save, Wizard-0.6 |
+| **0.6.6** | Tag-Rename-Undo, Split-Settings, Alle-Speichern, Wizard-Skip |
+| **0.6.7** | Tag-Undo-Label, Split-PDF+Editor, Save-Progress, Wizard-Dauerhaft |
+| **0.6.8** | Split-Panel-Session, Save-Abbrechen, Wizard-Reset, Tag-Confirm |
+| **0.6.9** | Sync-Scroll-Session, Tag-Schwelle, Save-Fehlerliste, F1-0.6.8 |
+
+→ zusammengeführt in **0.7.0**.
 
 ---
 

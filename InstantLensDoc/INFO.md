@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **0.6.9** |
+| Version | **0.7.0** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -38,10 +38,10 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Installer-Task: optionale **Desktop-Verknüpfung** (Checkbox, Standard an / `checkedonce`)
 
-## Neu in 0.6.9
+## Neu in 0.7.0
 
-- Session: **Sync-Scroll-Zustand** in `session.json` gemerkt
-- Tag-Rename: **Bestätigungs-Schwelle** in Einstellungen (Default 20)
-- Dirty-Tabs **Alle speichern**: **Fehlerliste** am Ende bei Teilfehlern
-- F1 / Wizard: kurze **0.6.8-Hinweise**
+- Release-Konsolidierung 0.6.0→0.7.0 (Version überall 0.7.0)
+- CHANGELOG: 0.6.1–0.6.9 zu Kurz-Tabelle verdichtet
+- Smoke: ausgewählte 0.6.x-Pfade (CLI + Qt)
+- Review: Versionsstrings / Docs / ISS vereinheitlicht
 - Stubs KI/Cloud/Stylus/3D unverändert

@@ -137,27 +137,27 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | Inno-Installer | fertig | Icon, **optionale Desktop-Checkbox** (`desktopicon`/`checkedonce`) 0.6.1, Uninstaller, Keygen optional (`InstantLensKeygen.exe`) 0.2.1 |
 | Sync-Skript Windows | fertig | Repo `scripts/sync-ild.ps1`; Store `docs/sync-ild.ps1`; **-SkipStart** + Exit-Codes 0/1/2 **0.6.2** |
 | Arbeitsverzeichnis öffnen | fertig | Datei-Menü Ctrl+Shift+E; Ordner der Datei bzw. CWD 0.4.8 |
-| In-App Hilfe / About | fertig | Version 0.6.9; Fenstertitel + Splash; Logordner-Button; **Feature-Kurzliste + FEATURES.md** 0.4.9; **Keygen-Hinweis bei Trial** 0.5.3; **Splash überspringbar** 0.5.5; **Privacy: lokal, keine Telemetrie** 0.5.6; **Crash-Report ZIP** 0.5.7; **Screenshot-Pfad optional** 0.5.8; **Erste-Schritte-Wizard (4 Seiten inkl. 0.6 / 0.6.8-Hinweise)** 0.6.9; **skip-once Checkbox + Auto-Show** 0.6.6; **Nicht mehr zeigen (dauerhaft)** 0.6.7; **Reset in Einstellungen** 0.6.8 |
+| In-App Hilfe / About | fertig | Version 0.7.0; Fenstertitel + Splash; Logordner-Button; **Feature-Kurzliste + FEATURES.md** 0.4.9; **Keygen-Hinweis bei Trial** 0.5.3; **Splash überspringbar** 0.5.5; **Privacy: lokal, keine Telemetrie** 0.5.6; **Crash-Report ZIP** 0.5.7; **Screenshot-Pfad optional** 0.5.8; **Erste-Schritte-Wizard (4 Seiten inkl. 0.6 / 0.6.8-Hinweise)** 0.6.9; **skip-once Checkbox + Auto-Show** 0.6.6; **Nicht mehr zeigen (dauerhaft)** 0.6.7; **Reset in Einstellungen** 0.6.8 |
 | Startup-Abhängigkeiten-Check | fertig | pypdfium2 kritisch + Tesseract optional; Dialog bei Problemen 0.5.4 |
 | Quiet Startup / Splash | fertig | Einstellungen: Splash überspringen 0.5.5 |
-| CHANGELOG | fertig | **0.6.9** Sync-Scroll-Session / Tag-Schwelle / Save-Fehlerliste / F1-0.6.8; **0.6.8** Split-Panel-Session / Save-Abbrechen / Wizard-Reset / Tag-Confirm; **0.6.7** Tag-Undo-Label / Split-PDF+Editor / Save-Progress / Wizard-Dauerhaft; **0.6.6** Tag-Rename-Undo / Split-Settings / Alle-Speichern / Wizard-Skip; **0.6.5** Tag-Rename / Vertikal-Split / Dirty-Save / Wizard-0.6; **0.6.4** Tag-Cloud-Filter / Sync-Scroll / Dirty-Tabs / Shortcuts; **0.6.3** Highlight+Notiz / Tag-Cloud / Doc-Split / Unsaved-Count; **0.6.2** Selection→Notiz / Tag-Multi-Select / Close-Others / Sync-Exit; **0.6.1** Selection-Copy / Tag-Autocomplete / Session-Order; **0.6.0** Release-Konsolidierung |
+| CHANGELOG | fertig | **0.7.0** Release-Konsolidierung 0.6.0→0.7.0; 0.6.x Kurz-Tabelle |
 | FEATURES.md / INFO.md | fertig | |
 | `ild_pdf` Modul + Beispielskript | fertig | metadata / page size / watermark / redact / acroform / attachments / flatten / **plain text** / **selection_to_highlight_rects** / **selection_to_plain_text** / **export_report** / **page_favorites JSON** |
 | Font-Matching | geplant | |
 | Objekt-/Bildbearbeitung | geplant | |
 | Layout-Erhaltung (Scan→edit) | geplant | |
 | Freihand | geplant | |
-| KI-Assistent | Stub | Menü „Geplant“ 0.6.9 (keine Fake-KI) |
+| KI-Assistent | Stub | Menü „Geplant“ 0.7.0 (keine Fake-KI) |
 | Signieren (rechtssicher) | Stub | |
-| Cloud-Sync | Stub | Menü „Geplant“ 0.6.9 (keine Fake-Cloud) |
+| Cloud-Sync | Stub | Menü „Geplant“ 0.7.0 (keine Fake-Cloud) |
 | Text on Path / Text zu Pfaden | geplant | |
 | Envelope Distort / Text Wrap / Area Type | Stub/geplant | |
 | Schnittmasken | geplant | |
 | Füllungen / Live-Effekte | geplant | |
-| 3D-Extrusion | Stub | Menü „Geplant“ 0.6.9 |
+| 3D-Extrusion | Stub | Menü „Geplant“ 0.7.0 |
 | Variable Fonts (voll) | Stub | |
 | Glyphen-Palette | geplant | |
-| Stylus / Palm Rejection | Stub | Menü „Geplant“ 0.6.9 |
-| Intelligente Formerkennung | Stub | Menü „Geplant“ 0.6.9 |
+| Stylus / Palm Rejection | Stub | Menü „Geplant“ 0.7.0 |
+| Intelligente Formerkennung | Stub | Menü „Geplant“ 0.7.0 |
 
 Nicht behauptet als fertig: Cloud, KI, Stylus, 3D — nur Menü-Stubs + dieser Status.

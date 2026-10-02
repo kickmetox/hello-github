@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Smoke-Test 0.6.9 (CLI + optional offscreen Qt). Kernpfade: open/annotate/export/license + ausgewählte 0.5.x-Pfade."""
+"""Smoke-Test 0.7.0 (CLI + optional offscreen Qt). Kernpfade: open/annotate/export/license + ausgewählte 0.6.x-Pfade."""
 
 from __future__ import annotations
 
@@ -122,8 +122,8 @@ def main() -> int:
     from instantlensdoc.core.update_check import check_for_updates
     from instantlensdoc.license import KEY_DAYS, TRIAL_DAYS, generate_key, verify_key
 
-    assert __version__ == "0.6.9", __version__
-    assert ild_ver == "0.6.9", ild_ver
+    assert __version__ == "0.7.0", __version__
+    assert ild_ver == "0.7.0", ild_ver
     assert TRIAL_DAYS == 28 and KEY_DAYS == 32
     key = generate_key("ame@sellerbach.de")
     ok, msg, _ = verify_key(key)
@@ -141,7 +141,7 @@ def main() -> int:
     assert "Settings" in tr("settings")
     set_lang("de")
     upd = check_for_updates(allow_network=False)
-    assert upd.local_version == "0.6.9" and not upd.online
+    assert upd.local_version == "0.7.0" and not upd.online
     assert get_export_jpeg_quality() >= 10
     assert get_ui_lang() in ("de", "en")
     assert 25 <= get_default_zoom_percent() <= 500
@@ -182,20 +182,15 @@ def main() -> int:
     assert get_ann_pen_color() == "#112233"
     assert (ROOT / "CHANGELOG.md").is_file()
     cl = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-    assert "0.6.9" in cl
-    assert "0.6.5" in cl
-    assert "0.6.0" in cl
-    assert "## 0.6.7" in cl
-    assert "## 0.6.9" in cl
-    assert "## 0.6.8" in cl
-    assert "## 0.6.5" in cl
-    assert "## 0.6.4" in cl
-    assert "## 0.6.3" in cl
-    assert "## 0.6.2" in cl
-    assert "## 0.6.1" in cl
+    assert "0.7.0" in cl
+    assert "## 0.7.0" in cl
+    assert "0.6.0 → 0.7.0" in cl or "0.6.0→0.7.0" in cl
     assert "## 0.6.0" in cl
     assert "0.5.0 → 0.6.0" in cl or "0.5.0→0.6.0" in cl
     assert "## 0.5.0" in cl
+    assert "0.6.9" in cl
+    assert "0.6.5" in cl
+    assert "0.6.1" in cl
     assert "0.4.0 → 0.5.0" in cl or "0.4.0→0.5.0" in cl
     assert "## 0.4.0" in cl
     assert "0.3.0 → 0.4.0" in cl or "0.3.0→0.4.0" in cl
@@ -219,18 +214,25 @@ def main() -> int:
     assert "ildfav" in cl or "Favoriten JSON" in cl or "Seiten-Favoriten" in cl
     assert "Toolbar-Slider" in cl or "Opacity" in cl
     assert "Erste-Schritte" in cl or "Wizard" in cl
-    # Kompakt: Einzel-Header 0.5.1–0.5.9, 0.4.1–0.4.9, 0.3.1–0.3.9 und 0.2.1–0.2.9 entfernt (nur Kurz-Tabelle)
+    assert "Tag-Cloud" in cl or "Sync-Scroll" in cl
+    assert "Doc-Split" in cl or "Fenster teilen" in cl
+    assert "Fehlerliste" in cl or "Alle speichern" in cl
+    assert "Wizard" in cl or "Erste-Schritte" in cl
+    # Kompakt: Einzel-Header 0.6.1–0.6.9, 0.5.1–0.5.9, 0.4.1–0.4.9, 0.3.1–0.3.9 und 0.2.1–0.2.9 entfernt (nur Kurz-Tabelle)
+    assert "## 0.6.9" not in cl and "## 0.6.8" not in cl
+    assert "## 0.6.1" not in cl and "## 0.6.5" not in cl
     assert "## 0.5.9" not in cl and "## 0.5.8" not in cl
     assert "## 0.5.1" not in cl and "## 0.5.5" not in cl
     assert "## 0.4.9" not in cl and "## 0.4.8" not in cl
     assert "## 0.4.1" not in cl and "## 0.4.6" not in cl
     assert "## 0.3.9" not in cl and "## 0.3.8" not in cl
     assert "## 0.3.1" not in cl and "## 0.2.9" not in cl
+    assert "0.6.9" in cl  # noch in Kurz-Tabelle
     assert "0.5.9" in cl  # noch in Kurz-Tabelle
     assert "0.4.9" in cl  # noch in Kurz-Tabelle
     assert "0.3.9" in cl  # noch in Kurz-Tabelle
     assert "0.2.9" in cl  # noch in Kurz-Tabelle
-    assert "0.6.9" in (ROOT / "README.md").read_text(encoding="utf-8")
+    assert "0.7.0" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "run.bat" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "sync-ild.ps1" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "scripts/sync-ild.ps1" in (ROOT / "FEATURES.md").read_text(encoding="utf-8")
@@ -579,13 +581,13 @@ def main() -> int:
 
         assert (ROOT / "installer" / "installer-hinweis.txt").exists()
         iss = (ROOT / "installer" / "instantlensdoc.iss").read_text(encoding="utf-8")
-        assert "0.6.9" in iss and "desktopicon" in iss and "DisableProgramGroupPage=no" in iss
+        assert "0.7.0" in iss and "desktopicon" in iss and "DisableProgramGroupPage=no" in iss
         assert "UninstallDisplayName" in iss and "Uninstallable=yes" in iss
         assert "IncludeKeygen" in iss and "SetupIconFile" in iss
         assert "InstantLensKeygen.exe" in iss
         assert "uninstallexe" in iss
         bw = (ROOT / "build-windows.ps1").read_text(encoding="utf-8")
-        assert "0.6.9" in bw and "NoKeygenInApp" in bw and "--icon" in bw
+        assert "0.7.0" in bw and "NoKeygenInApp" in bw and "--icon" in bw
         assert "InstantLensKeygen.exe" in bw
         bi = (ROOT / "installer" / "build-installer.ps1").read_text(encoding="utf-8")
         assert "InstantLensKeygen.exe" in bi and "IncludeKeygen" in bi
@@ -594,7 +596,7 @@ def main() -> int:
         assert "Installer" in kg_readme
         hinweis = (ROOT / "installer" / "installer-hinweis.txt").read_text(encoding="utf-8")
         assert "InstantLensKeygen.exe" in hinweis or "run-keygen.bat" in hinweis
-        assert "0.6.9" in hinweis
+        assert "0.7.0" in hinweis
         assert "checkedonce" in iss and "Desktop-Verknüpfung" in hinweis
         from ild_pdf.limits import OPEN_TIMEOUT_HINT, OPEN_TIMEOUT_HINT_SEC
 
@@ -606,7 +608,7 @@ def main() -> int:
         assert "QProgressDialog" in (ROOT / "instantlensdoc" / "ui" / "main_window.py").read_text(encoding="utf-8")
 
         assert (ROOT / "examples" / "ild_pdf_demo.py").exists()
-        assert "0.6.9" in (ROOT / "INFO.md").read_text(encoding="utf-8")
+        assert "0.7.0" in (ROOT / "INFO.md").read_text(encoding="utf-8")
         assert (ROOT / "assets" / "app.ico").is_file()
 
         # --- Kernpfade: open / annotate / export / license ---
@@ -739,7 +741,7 @@ def main() -> int:
         assert "| A" in tbl and "| 1" in tbl
         assert ocr_mod.TESSERACT_WIKI_URL.startswith("https://")
 
-        # --- Ausgewählte 0.3.x-/0.4.x-/0.5.x-Pfade (CLI, Konsolidierung 0.6.x) ---
+        # --- Ausgewählte 0.3.x-/0.4.x-/0.5.x-/0.6.x-Pfade (CLI, Konsolidierung 0.7.0) ---
         from ild_pdf.annotate import stamp_library_items
         from ild_pdf.attachments import has_attachments, list_attachments
         from ild_pdf.flatten import flatten_annotations_to_pdf
@@ -797,7 +799,7 @@ def main() -> int:
         set_backup_on_save(False)
         assert get_page_size_unit() in ("mm", "inch")
         assert isinstance(get_minimize_to_tray(), bool)
-        assert "0.6.9" in feat and "0.5.9" in feat and "0.4.9" in feat  # Release + Zeitraum-Feature-Hinweise
+        assert "0.7.0" in feat and "0.6.9" in feat and "0.5.9" in feat and "0.4.9" in feat  # Release + Zeitraum-Feature-Hinweise
         assert "Batch-OCR" in feat or "OCR gesamtes PDF" in feat
         assert "Tag" in feat
         assert "Projekt-Ordner" in feat or "Workspace" in feat
@@ -1280,7 +1282,7 @@ def main() -> int:
         assert "0.6.1" in feat061 and "Tag-Autocomplete" in feat061
         assert "selection_to_plain_text" in feat061 or "Clipboard" in feat061
         cl061 = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-        assert "## 0.6.1" in cl061 and "Tag-Autocomplete" in cl061
+        assert "0.6.1" in cl061 and "## 0.6.1" not in cl061 and "Tag-Autocomplete" in cl061
         assert "selection_to_plain_text" in (ROOT / "ild_pdf" / "__init__.py").read_text(encoding="utf-8")
         print("0.6.1 CLI copy-text/session-order/desktopicon: OK")
 
@@ -1293,7 +1295,7 @@ def main() -> int:
         assert "0.6.2" in feat062
         assert "Multi-Select" in feat062 or "Selection→Notiz" in feat062 or "Andere Tabs" in feat062
         cl062 = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-        assert "## 0.6.2" in cl062
+        assert "0.6.2" in cl062 and "## 0.6.2" not in cl062
         assert "SkipStart" in cl062 or "Multi-Select" in cl062 or "Notiz" in cl062
         mw062 = (ROOT / "instantlensdoc" / "ui" / "main_window.py").read_text(encoding="utf-8")
         assert "close_other_tabs" in mw062
@@ -1324,7 +1326,7 @@ def main() -> int:
         assert "0.6.3" in feat063
         assert "Tag-Cloud" in feat063 or "Highlight+Notiz" in feat063 or "Fenster teilen" in feat063
         cl063 = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-        assert "## 0.6.3" in cl063
+        assert "0.6.3" in cl063 and "## 0.6.3" not in cl063
         mw063 = (ROOT / "instantlensdoc" / "ui" / "main_window.py").read_text(encoding="utf-8")
         assert "count_unsaved_tabs" in mw063
         assert "_toggle_doc_split" in mw063
@@ -1347,7 +1349,7 @@ def main() -> int:
         assert "0.6.4" in feat064
         assert "Sync-Scroll" in feat064 or "setzt Filter" in feat064 or "Dirty" in feat064
         cl064 = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-        assert "## 0.6.4" in cl064
+        assert "0.6.4" in cl064 and "## 0.6.4" not in cl064
         mw064 = (ROOT / "instantlensdoc" / "ui" / "main_window.py").read_text(encoding="utf-8")
         assert "list_unsaved_tabs" in mw064
         assert "_toggle_doc_split_sync_scroll" in mw064
@@ -1383,7 +1385,7 @@ def main() -> int:
         assert "0.6.5" in feat065
         assert "umbenennen" in feat065 or "Vertikal" in feat065 or "Dirty-Save" in feat065
         cl065 = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-        assert "## 0.6.5" in cl065
+        assert "0.6.5" in cl065 and "## 0.6.5" not in cl065
         mw065 = (ROOT / "instantlensdoc" / "ui" / "main_window.py").read_text(encoding="utf-8")
         assert "_toggle_doc_split_vertical" in mw065
         assert "_save_unsaved_tab" in mw065
@@ -1439,7 +1441,7 @@ def main() -> int:
         assert "0.6.6" in feat066
         assert "Alle speichern" in feat066 or "skip-once" in feat066 or "Rename-Undo" in feat066
         cl066 = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-        assert "## 0.6.6" in cl066
+        assert "0.6.6" in cl066 and "## 0.6.6" not in cl066
         mw066 = (ROOT / "instantlensdoc" / "ui" / "main_window.py").read_text(encoding="utf-8")
         assert "_save_all_unsaved_tabs" in mw066
         assert "_sync_doc_split_orientation" in mw066
@@ -1484,7 +1486,7 @@ def main() -> int:
         feat067 = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
         assert "0.6.7" in feat067
         cl067 = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-        assert "## 0.6.7" in cl067
+        assert "0.6.7" in cl067 and "## 0.6.7" not in cl067
         kh067 = (ROOT / "instantlensdoc" / "ui" / "keyboard_help.py").read_text(encoding="utf-8")
         assert "Nicht mehr zeigen" in kh067 or "PDF+Editor" in kh067 or "Tag umbenennen" in kh067
         print("0.6.7 CLI undo-label/split-mix/save-progress/wizard-dont-show: OK")
@@ -1531,7 +1533,7 @@ def main() -> int:
         feat068 = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
         assert "0.6.8" in feat068
         cl068 = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-        assert "## 0.6.8" in cl068
+        assert "0.6.8" in cl068 and "## 0.6.8" not in cl068
         kh068 = (ROOT / "instantlensdoc" / "ui" / "keyboard_help.py").read_text(encoding="utf-8")
         assert "Abbrechen" in kh068 or "Wizard" in kh068 or ">20" in kh068 or "&gt;20" in kh068
         print("0.6.8 CLI panel-session/save-cancel/wizard-reset/tag-confirm: OK")
@@ -1574,7 +1576,7 @@ def main() -> int:
         feat069 = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
         assert "0.6.9" in feat069
         cl069 = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-        assert "## 0.6.9" in cl069
+        assert "0.6.9" in cl069 and "## 0.6.9" not in cl069
         print("0.6.9 CLI sync-session/tag-threshold/save-errors/f1-wizard: OK")
 
         set_show_printer_marks(True)
@@ -1709,7 +1711,7 @@ def main() -> int:
         assert "Continuous Scroll" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
         assert "Seitenlabel" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8") or "Seitenlabels" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
         assert "Zwischenablage-Verlauf" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8") or "Clipboard" in (ROOT / "FEATURES.md").read_text(encoding="utf-8")
-        assert "0.6.9" in feat and "0.5.9" in feat and "0.4.9" in feat
+        assert "0.7.0" in feat and "0.6.9" in feat and "0.5.9" in feat and "0.4.9" in feat
         # --- 0.4.2 CLI: Outline Goto, Ann Copy/Paste, Flatten Progress ---
         import pikepdf as _pike_ol
 
@@ -1834,7 +1836,7 @@ def main() -> int:
         win._add_chained_frame()
         assert len(win.layout_doc.text_frames) >= 2
         assert "Lizenz:" in win.license_label.text() or "⚠" in win.license_label.text()
-        assert "v0.6.9" in win.version_label.text()
+        assert "v0.7.0" in win.version_label.text()
         # Lizenz <7 Tage: Style prominent
         st_lic = win.license_manager.status()
         if st_lic.allowed and st_lic.days_remaining < 7:
@@ -2015,11 +2017,11 @@ def main() -> int:
             assert win.editor.outdent_selection(4)
             assert win.editor.toPlainText().splitlines()[0] == "alpha"
             # Fenstertitel mit Version
-            assert "0.6.9" in win.windowTitle()
+            assert "0.7.0" in win.windowTitle()
             from instantlensdoc.ui.help_dialog import AboutDialog, HelpDialog, open_log_folder
 
             about = AboutDialog(win)
-            assert "0.6.9" in about.windowTitle()
+            assert "0.7.0" in about.windowTitle()
             help_dlg = HelpDialog(win)
             assert help_dlg.windowTitle() == "Hilfe"
             assert callable(open_log_folder)
@@ -2679,7 +2681,7 @@ def main() -> int:
             win.apply_tray_setting()
             if win._tray is not None:
                 tip = win._tray.toolTip()
-                assert "0.6.9" in tip and "InstantLens Doc" in tip
+                assert "0.7.0" in tip and "InstantLens Doc" in tip
             set_minimize_to_tray(False)
             win.apply_tray_setting()
             print("0.3.9 fit-h/ann-stats/special/tray: OK")
@@ -2692,9 +2694,9 @@ def main() -> int:
             from instantlensdoc.ui.password_dialog import CompressPdfDialog, SetPasswordDialog
             from instantlensdoc.ui.stubs import PLANNED
             assert KeyboardHelpDialog and SetPasswordDialog and CompressPdfDialog
-            assert "0.6.9" in PLANNED["ki"]
+            assert "0.7.0" in PLANNED["ki"]
             assert "Coming soon" in PLANNED["cloud"]
-            assert "0.6.9" in PLANNED["stylus"] and "0.6.9" in PLANNED["extrude3d"]
+            assert "0.7.0" in PLANNED["stylus"] and "0.7.0" in PLANNED["extrude3d"]
             # Toolbar ↔ Menü Sync Graustufen/Nacht
             win.pdf_view.set_grayscale(True)
             assert win._grayscale_action.isChecked()
@@ -2729,7 +2731,7 @@ def main() -> int:
             assert win.editor.toPlainText().splitlines() == ["one", "two"]
             from instantlensdoc.ui.help_dialog import HELP_HTML
 
-            assert "Stub 0.6.9" in HELP_HTML
+            assert "Stub 0.7.0" in HELP_HTML
             assert "scripts/sync-ild.ps1" in HELP_HTML
             assert "Präsentationsmodus" in HELP_HTML or "F5" in (
                 ROOT / "instantlensdoc" / "ui" / "keyboard_help.py"
@@ -3792,7 +3794,7 @@ def main() -> int:
             feat061q = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
             assert "0.6.1" in feat061q
             cl061q = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-            assert "## 0.6.1" in cl061q
+            assert "0.6.1" in cl061q and "## 0.6.1" not in cl061q
             print("0.6.1 Qt copy-text/tag-completer/session-tabs: OK")
 
             # --- 0.6.2 Qt: Selection→Notiz, Tag Multi-Select, Close-Others ---
@@ -3847,7 +3849,7 @@ def main() -> int:
             feat062q = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
             assert "0.6.2" in feat062q
             cl062q = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-            assert "## 0.6.2" in cl062q
+            assert "0.6.2" in cl062q and "## 0.6.2" not in cl062q
             print("0.6.2 Qt note/multi-tag/close-others: OK")
 
             # --- 0.6.3 Qt: Highlight+Notiz, Tag-Cloud, Doc-Split, Unsaved ---
@@ -3899,7 +3901,7 @@ def main() -> int:
             feat063q = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
             assert "0.6.3" in feat063q
             cl063q = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-            assert "## 0.6.3" in cl063q
+            assert "0.6.3" in cl063q and "## 0.6.3" not in cl063q
             print("0.6.3 Qt highlight-note/tag-cloud/doc-split/unsaved: OK")
 
             # --- 0.6.4 Qt: Tag-Cloud setzt Filter, Sync-Scroll, Dirty-Tabs ---
@@ -3950,7 +3952,7 @@ def main() -> int:
             feat064q = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
             assert "0.6.4" in feat064q
             cl064q = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-            assert "## 0.6.4" in cl064q
+            assert "0.6.4" in cl064q and "## 0.6.4" not in cl064q
             print("0.6.4 Qt tag-filter/sync-scroll/dirty-tabs/shortcuts: OK")
 
             # --- 0.6.5 Qt: Tag-Rename, Vertikal-Split, Dirty-Save, Wizard ---
@@ -4011,7 +4013,7 @@ def main() -> int:
             feat065q = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
             assert "0.6.5" in feat065q
             cl065q = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-            assert "## 0.6.5" in cl065q
+            assert "0.6.5" in cl065q and "## 0.6.5" not in cl065q
             print("0.6.5 Qt tag-rename/vertical-split/dirty-save/wizard: OK")
 
             # --- 0.6.6 Qt: Rename-Undo, Split-Settings, Alle speichern, Wizard skip-once ---
@@ -4089,7 +4091,7 @@ def main() -> int:
             feat066q = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
             assert "0.6.6" in feat066q
             cl066q = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-            assert "## 0.6.6" in cl066q
+            assert "0.6.6" in cl066q and "## 0.6.6" not in cl066q
             print("0.6.6 Qt rename-undo/split-settings/save-all/wizard-skip: OK")
 
             # --- 0.6.7 Qt: Undo-Label, Split PDF+Editor, Save-Progress, Wizard dont-show ---
@@ -4145,7 +4147,7 @@ def main() -> int:
             feat067q = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
             assert "0.6.7" in feat067q
             cl067q = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-            assert "## 0.6.7" in cl067q
+            assert "0.6.7" in cl067q and "## 0.6.7" not in cl067q
             print("0.6.7 Qt undo-label/split-mix/save-progress/wizard-dont-show: OK")
 
             # --- 0.6.8 Qt: panel session, save cancel, wizard reset, tag confirm ---
@@ -4208,7 +4210,7 @@ def main() -> int:
             feat068q = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
             assert "0.6.8" in feat068q
             cl068q = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-            assert "## 0.6.8" in cl068q
+            assert "0.6.8" in cl068q and "## 0.6.8" not in cl068q
             print("0.6.8 Qt panel-session/save-cancel/wizard-reset/tag-confirm: OK")
 
             # --- 0.6.9 Qt: sync_scroll session, tag threshold, save error list ---
@@ -4267,13 +4269,13 @@ def main() -> int:
             feat069q = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
             assert "0.6.9" in feat069q
             cl069q = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-            assert "## 0.6.9" in cl069q
+            assert "0.6.9" in cl069q and "## 0.6.9" not in cl069q
             print("0.6.9 Qt sync-session/tag-threshold/save-errors: OK")
 
             print("0.4.x selected Qt marks/schema/sort/reset: OK")
             print("0.4.2 Qt outline/copy-paste/case/progress: OK")
             print("0.4.1 Qt links/stamp/encoding/drop: OK")
-            print("0.3.x–0.6.9 review OK")
+            print("0.3.x–0.7.0 review OK")
             assert callable(win.pdf_view.bake_redactions)
             assert callable(win.pdf_view.clear_redactions)
             assert callable(win._set_pdf_password)
