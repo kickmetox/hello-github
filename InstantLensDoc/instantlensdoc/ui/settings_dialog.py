@@ -34,10 +34,12 @@ from instantlensdoc.core.app_settings import (
     get_page_size_unit,
     get_pdf_grayscale,
     get_pdf_night_mode,
+    get_pdf_thumbnail_scale,
     get_restore_session_on_start,
     get_theme,
     get_ui_lang,
     get_update_check_on_start,
+    PDF_THUMBNAIL_SCALE_CHOICES,
     save_settings,
     set_autosave_interval_sec,
     set_backup_on_save,
@@ -51,6 +53,7 @@ from instantlensdoc.core.app_settings import (
     set_page_size_unit,
     set_pdf_grayscale,
     set_pdf_night_mode,
+    set_pdf_thumbnail_scale,
     set_restore_session_on_start,
     set_theme,
     set_ui_lang,
@@ -101,6 +104,18 @@ class SettingsDialog(QDialog):
         self.zoom_pct.setValue(get_default_zoom_percent())
         self.zoom_pct.setToolTip("Standard-Zoom beim Öffnen von PDFs")
         form.addRow(tr("default_zoom"), self.zoom_pct)
+
+        self.thumb_scale = QComboBox()
+        cur_thumb = get_pdf_thumbnail_scale()
+        thumb_pick = 0
+        labels = {0.12: "Klein (0.12)", 0.18: "Normal (0.18)", 0.24: "Groß (0.24)"}
+        for i, s in enumerate(PDF_THUMBNAIL_SCALE_CHOICES):
+            self.thumb_scale.addItem(labels.get(s, f"{s}"), s)
+            if abs(s - cur_thumb) < 1e-9:
+                thumb_pick = i
+        self.thumb_scale.setCurrentIndex(thumb_pick)
+        self.thumb_scale.setToolTip("Größe der PDF-Seitenvorschau in der Sidebar")
+        form.addRow("PDF-Thumbnail-Größe", self.thumb_scale)
 
         self.autosave_sec = QSpinBox()
         self.autosave_sec.setRange(10, 600)
@@ -227,6 +242,7 @@ class SettingsDialog(QDialog):
         sync_from_settings()
         set_update_check_on_start(self.update_chk.isChecked())
         set_default_zoom_percent(int(self.zoom_pct.value()))
+        set_pdf_thumbnail_scale(float(self.thumb_scale.currentData() or 0.18))
         set_autosave_interval_sec(int(self.autosave_sec.value()))
         set_editor_line_numbers(self.line_numbers.isChecked())
         set_editor_soft_wrap(self.soft_wrap.isChecked())

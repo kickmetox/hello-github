@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Smoke-Test 0.3.7 (CLI + optional offscreen Qt). Kernpfade: open/annotate/export/license."""
+"""Smoke-Test 0.3.8 (CLI + optional offscreen Qt). Kernpfade: open/annotate/export/license."""
 
 from __future__ import annotations
 
@@ -112,8 +112,8 @@ def main() -> int:
     from instantlensdoc.core.update_check import check_for_updates
     from instantlensdoc.license import KEY_DAYS, TRIAL_DAYS, generate_key, verify_key
 
-    assert __version__ == "0.3.7", __version__
-    assert ild_ver == "0.3.7", ild_ver
+    assert __version__ == "0.3.8", __version__
+    assert ild_ver == "0.3.8", ild_ver
     assert TRIAL_DAYS == 28 and KEY_DAYS == 32
     key = generate_key("ame@sellerbach.de")
     ok, msg, _ = verify_key(key)
@@ -131,7 +131,7 @@ def main() -> int:
     assert "Settings" in tr("settings")
     set_lang("de")
     upd = check_for_updates(allow_network=False)
-    assert upd.local_version == "0.3.7" and not upd.online
+    assert upd.local_version == "0.3.8" and not upd.online
     assert get_export_jpeg_quality() >= 10
     assert get_ui_lang() in ("de", "en")
     assert 25 <= get_default_zoom_percent() <= 500
@@ -172,7 +172,8 @@ def main() -> int:
     assert get_ann_pen_color() == "#112233"
     assert (ROOT / "CHANGELOG.md").is_file()
     cl = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-    assert "0.3.7" in cl
+    assert "0.3.8" in cl
+    assert "## 0.3.8" in cl
     assert "## 0.3.7" in cl
     assert "## 0.3.1" in cl
     assert "## 0.3.0" in cl
@@ -185,7 +186,7 @@ def main() -> int:
     # Kompakt: Einzel-Header 0.2.1–0.2.9 entfernt (nur Kurz-Tabelle)
     assert "## 0.2.9" not in cl and "## 0.2.8" not in cl
     assert "0.2.9" in cl  # noch in Kurz-Tabelle
-    assert "0.3.7" in (ROOT / "README.md").read_text(encoding="utf-8")
+    assert "0.3.8" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "run.bat" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "sync-ild.ps1" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "scripts/sync-ild.ps1" in (ROOT / "FEATURES.md").read_text(encoding="utf-8")
@@ -534,13 +535,13 @@ def main() -> int:
 
         assert (ROOT / "installer" / "installer-hinweis.txt").exists()
         iss = (ROOT / "installer" / "instantlensdoc.iss").read_text(encoding="utf-8")
-        assert "0.3.7" in iss and "desktopicon" in iss and "DisableProgramGroupPage=no" in iss
+        assert "0.3.8" in iss and "desktopicon" in iss and "DisableProgramGroupPage=no" in iss
         assert "UninstallDisplayName" in iss and "Uninstallable=yes" in iss
         assert "IncludeKeygen" in iss and "SetupIconFile" in iss
         assert "InstantLensKeygen.exe" in iss
         assert "uninstallexe" in iss
         bw = (ROOT / "build-windows.ps1").read_text(encoding="utf-8")
-        assert "0.3.7" in bw and "NoKeygenInApp" in bw and "--icon" in bw
+        assert "0.3.8" in bw and "NoKeygenInApp" in bw and "--icon" in bw
         assert "InstantLensKeygen.exe" in bw
         bi = (ROOT / "installer" / "build-installer.ps1").read_text(encoding="utf-8")
         assert "InstantLensKeygen.exe" in bi and "IncludeKeygen" in bi
@@ -559,7 +560,7 @@ def main() -> int:
         assert "QProgressDialog" in (ROOT / "instantlensdoc" / "ui" / "main_window.py").read_text(encoding="utf-8")
 
         assert (ROOT / "examples" / "ild_pdf_demo.py").exists()
-        assert "0.3.7" in (ROOT / "INFO.md").read_text(encoding="utf-8")
+        assert "0.3.8" in (ROOT / "INFO.md").read_text(encoding="utf-8")
         assert (ROOT / "assets" / "app.ico").is_file()
 
         # --- Kernpfade: open / annotate / export / license ---
@@ -662,6 +663,11 @@ def main() -> int:
         store_imp.clear_history()
         n_imp = store_imp.import_json(jpath, replace=True)
         assert n_imp == 1 and any(a.text == "json-ex" for a in store_imp.annotations)
+        csv_path = td / "ann-export.csv"
+        store_json.export_csv(csv_path)
+        assert csv_path.is_file()
+        csv_txt = csv_path.read_text(encoding="utf-8")
+        assert "json-ex" in csv_txt and "page" in csv_txt.splitlines()[0]
         assert "Wasserzeichen" in (ROOT / "FEATURES.md").read_text(encoding="utf-8")
         assert "Schwärzung" in (ROOT / "FEATURES.md").read_text(encoding="utf-8")
         assert "Metadaten" in (ROOT / "FEATURES.md").read_text(encoding="utf-8")
@@ -722,7 +728,7 @@ def main() -> int:
         win._add_chained_frame()
         assert len(win.layout_doc.text_frames) >= 2
         assert "Lizenz:" in win.license_label.text() or "⚠" in win.license_label.text()
-        assert "v0.3.7" in win.version_label.text()
+        assert "v0.3.8" in win.version_label.text()
         # Lizenz <7 Tage: Style prominent
         st_lic = win.license_manager.status()
         if st_lic.allowed and st_lic.days_remaining < 7:
@@ -823,6 +829,7 @@ def main() -> int:
             assert callable(win.pdf_view.flip_current)
             assert callable(win.pdf_view.edit_selected_annotation_text)
             assert callable(win.pdf_view.export_annotations_json)
+            assert callable(win.pdf_view.export_annotations_csv)
             assert callable(win.pdf_view.import_annotations_json)
             assert callable(win.pdf_view.save_pdf_as_copy)
             assert callable(win._outline_add)
@@ -897,11 +904,11 @@ def main() -> int:
             assert win.editor.outdent_selection(4)
             assert win.editor.toPlainText().splitlines()[0] == "alpha"
             # Fenstertitel mit Version
-            assert "0.3.7" in win.windowTitle()
+            assert "0.3.8" in win.windowTitle()
             from instantlensdoc.ui.help_dialog import AboutDialog, HelpDialog, open_log_folder
 
             about = AboutDialog(win)
-            assert "0.3.7" in about.windowTitle()
+            assert "0.3.8" in about.windowTitle()
             help_dlg = HelpDialog(win)
             assert help_dlg.windowTitle() == "Hilfe"
             assert callable(open_log_folder)
@@ -1464,6 +1471,56 @@ def main() -> int:
             win.editor.keyPressEvent(ev_shift)
             assert win.editor.toPlainText().splitlines()[0] == "block"
             print("0.3.7 present/presets/block-tab/session: OK")
+            # 0.3.8: Thumbnail-Größe, Ann.-CSV, Zeile verschieben, Overwrite-Schutz
+            from instantlensdoc.core.app_settings import (
+                PDF_THUMBNAIL_SCALE_CHOICES,
+                get_pdf_thumbnail_scale,
+                pdf_thumbnail_icon_size,
+                set_pdf_thumbnail_scale,
+            )
+            from instantlensdoc.ui.file_dialogs import confirm_overwrite_export
+
+            assert PDF_THUMBNAIL_SCALE_CHOICES == (0.12, 0.18, 0.24)
+            set_pdf_thumbnail_scale(0.18)
+            assert get_pdf_thumbnail_scale() == 0.18
+            assert set_pdf_thumbnail_scale(0.24) == 0.24
+            assert get_pdf_thumbnail_scale() == 0.24
+            assert pdf_thumbnail_icon_size(0.18) == (72, 96)
+            w24, h24 = pdf_thumbnail_icon_size(0.24)
+            assert w24 > 72 and h24 > 96
+            set_pdf_thumbnail_scale(0.12)
+            assert get_pdf_thumbnail_scale() == 0.12
+            set_pdf_thumbnail_scale(0.18)
+
+            csv_ui = Path(td2) / "ann-ui.csv"
+            n_csv = win.pdf_view.store.export_csv(csv_ui)
+            assert Path(n_csv).is_file()
+            assert "id,page,type" in Path(n_csv).read_text(encoding="utf-8").splitlines()[0]
+            assert callable(win.pdf_view.export_annotations_csv)
+
+            win.stack.setCurrentWidget(win.editor_pane)
+            win.editor.setPlainText("one\ntwo\nthree")
+            from PySide6.QtGui import QTextCursor as _TC_MV
+
+            cur_m = win.editor.textCursor()
+            cur_m.movePosition(_TC_MV.Start)
+            cur_m.movePosition(_TC_MV.Down)
+            win.editor.setTextCursor(cur_m)
+            assert win.editor.move_line_up()
+            assert win.editor.toPlainText().splitlines() == ["two", "one", "three"]
+            assert win.editor.move_line_down()
+            assert win.editor.toPlainText().splitlines() == ["one", "two", "three"]
+            assert callable(win._move_line_up) and callable(win._move_line_down)
+            win._move_line_down()
+
+            missing = Path(td2) / "no-such-export.bin"
+            assert confirm_overwrite_export(missing, win) is True
+            existing = Path(td2) / "exists-export.bin"
+            existing.write_text("keep", encoding="utf-8")
+            # Ohne Dialog-Antwort: Helper muss Datei nicht löschen wenn No — hier nur Existenz-Pfad
+            assert existing.is_file() and existing.read_text(encoding="utf-8") == "keep"
+            assert callable(confirm_overwrite_export)
+            print("0.3.8 thumb/csv/move-line/overwrite: OK")
             win.pdf_view.store.add(
                 Annotation(0, AnnotationType.REDACTION, 5, 5, width=30, height=20, color="#000000", text="REDACT")
             )
@@ -1473,9 +1530,9 @@ def main() -> int:
             from instantlensdoc.ui.password_dialog import CompressPdfDialog, SetPasswordDialog
             from instantlensdoc.ui.stubs import PLANNED
             assert KeyboardHelpDialog and SetPasswordDialog and CompressPdfDialog
-            assert "0.3.7" in PLANNED["ki"]
+            assert "0.3.8" in PLANNED["ki"]
             assert "Coming soon" in PLANNED["cloud"]
-            assert "0.3.7" in PLANNED["stylus"] and "0.3.7" in PLANNED["extrude3d"]
+            assert "0.3.8" in PLANNED["stylus"] and "0.3.8" in PLANNED["extrude3d"]
             # Toolbar ↔ Menü Sync Graustufen/Nacht
             win.pdf_view.set_grayscale(True)
             assert win._grayscale_action.isChecked()
@@ -1510,12 +1567,12 @@ def main() -> int:
             assert win.editor.toPlainText().splitlines() == ["one", "two"]
             from instantlensdoc.ui.help_dialog import HELP_HTML
 
-            assert "Stub 0.3.7" in HELP_HTML
+            assert "Stub 0.3.8" in HELP_HTML
             assert "scripts/sync-ild.ps1" in HELP_HTML
             assert "Präsentationsmodus" in HELP_HTML or "F5" in (
                 ROOT / "instantlensdoc" / "ui" / "keyboard_help.py"
             ).read_text(encoding="utf-8")
-            print("0.3.4–0.3.7 review OK")
+            print("0.3.4–0.3.8 review OK")
             assert callable(win.pdf_view.bake_redactions)
             assert callable(win.pdf_view.clear_redactions)
             assert callable(win._set_pdf_password)

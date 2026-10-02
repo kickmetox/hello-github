@@ -124,6 +124,80 @@ class TextEditor(QPlainTextEdit):
         self.ensureCursorVisible()
         return True
 
+    def move_line(self, delta: int) -> bool:
+        """Aktuelle Zeile(n) um delta (−1 hoch / +1 runter) verschieben."""
+        if delta not in (-1, 1):
+            return False
+        cur = self.textCursor()
+        doc = self.document()
+        if cur.hasSelection():
+            start = cur.selectionStart()
+            end = cur.selectionEnd()
+            start_block = doc.findBlock(start)
+            end_block = doc.findBlock(end if end > start else start)
+            if end > start and doc.findBlock(end).position() == end:
+                end_block = end_block.previous()
+                if not end_block.isValid():
+                    end_block = start_block
+        else:
+            start_block = end_block = cur.block()
+
+        if not start_block.isValid() or not end_block.isValid():
+            return False
+
+        first = start_block.blockNumber()
+        last = end_block.blockNumber()
+        if first > last:
+            first, last = last, first
+
+        lines = self.toPlainText().split("\n")
+        n = len(lines)
+        if delta < 0:
+            if first <= 0:
+                return False
+            block = lines[first : last + 1]
+            neighbor = lines[first - 1]
+            lines[first - 1 : last + 1] = block + [neighbor]
+            new_first = first - 1
+            new_last = last - 1
+        else:
+            if last >= n - 1:
+                return False
+            block = lines[first : last + 1]
+            neighbor = lines[last + 1]
+            lines[first : last + 2] = [neighbor] + block
+            new_first = first + 1
+            new_last = last + 1
+
+        new_text = "\n".join(lines)
+        # Absolute Zeichenpositionen der neuen Auswahl
+        pos = 0
+        sel_start = 0
+        sel_end = 0
+        for i, line in enumerate(lines):
+            if i == new_first:
+                sel_start = pos
+            if i == new_last:
+                sel_end = pos + len(line)
+                break
+            pos += len(line) + 1
+
+        cur.beginEditBlock()
+        cur.select(QTextCursor.Document)
+        cur.insertText(new_text)
+        cur.setPosition(sel_start)
+        cur.setPosition(sel_end, QTextCursor.KeepAnchor)
+        cur.endEditBlock()
+        self.setTextCursor(cur)
+        self.ensureCursorVisible()
+        return True
+
+    def move_line_up(self) -> bool:
+        return self.move_line(-1)
+
+    def move_line_down(self) -> bool:
+        return self.move_line(1)
+
     def comment_prefix_for_path(self, path: Path | str | None = None) -> str:
         """Kommentarpräfix für einfache Sprachen: # oder //."""
         ext = ""

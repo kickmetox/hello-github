@@ -1,5 +1,5 @@
 # InstantLens Doc — Sync nach D:\AI_Temp\InstantLensDoc (eine Datei)
-# Lädt Branch von GitHub oder nutzt lokales Pack, kopiert, pip, optional Start.
+# Lädt Branch von GitHub oder nutzt lokales Pack / Pack-Zip, kopiert, pip, optional Start.
 # Eigenes Nutzer-Icon in assets wird NICHT überschrieben (neuer/local bleibt).
 #
 # Eine Zeile:
@@ -7,9 +7,16 @@
 #
 # Optionen:
 #   -Branch cursor/instantlensdoc-2108
-#   -LocalPack C:\path\to\InstantLensDoc
+#   -LocalPack C:\path\to\InstantLensDoc          # Ordner mit App-Quellen
+#   -LocalPack C:\path\to\InstantLensDoc-pack.zip # Pack-Zip (wird nach WorkDir entpackt)
 #   -NoStart
 #   -SkipPip
+#
+# Fallback wenn Git-Clone/Fetch fehlschlägt (z. B. 401/Auth):
+#   1) -LocalPack auf entpackten Ordner oder InstantLensDoc-pack.zip setzen
+#   2) oder Zip neben dem Skript ablegen: InstantLensDoc-pack.zip
+#   Beispiel:
+#     powershell -ExecutionPolicy Bypass -File .\sync-ild.ps1 -LocalPack D:\AI_Temp\InstantLensDoc-pack.zip
 
 param(
     [string]$Destination = "D:\AI_Temp\InstantLensDoc",
@@ -58,6 +65,40 @@ function Restore-UserIcons {
     Remove-Item -Recurse -Force $BackupInfo.Dir -ErrorAction SilentlyContinue
 }
 
+function Resolve-PackSource {
+    param([string]$PackPath, [string]$UnpackRoot)
+    if (-not $PackPath -or -not (Test-Path $PackPath)) { return $null }
+    $item = Get-Item $PackPath
+    if ($item.PSIsContainer) {
+        return (Resolve-Path $PackPath).Path
+    }
+    if ($item.Extension -ieq ".zip") {
+        $unpack = Join-Path $UnpackRoot ("pack-" + [guid]::NewGuid().ToString("N").Substring(0, 8))
+        New-Item -ItemType Directory -Force -Path $unpack | Out-Null
+        Write-Host "Entpacke Pack-Zip: $($item.FullName) → $unpack"
+        Expand-Archive -Force -Path $item.FullName -DestinationPath $unpack
+        $nested = Join-Path $unpack "InstantLensDoc"
+        if (Test-Path $nested) { return (Resolve-Path $nested).Path }
+        if (Test-Path (Join-Path $unpack "instantlensdoc")) { return (Resolve-Path $unpack).Path }
+        # Zip enthält Dateien direkt
+        return (Resolve-Path $unpack).Path
+    }
+    Write-Warning "LocalPack ist weder Ordner noch .zip: $PackPath"
+    return $null
+}
+
+function Write-LocalPackHint {
+    param([string]$Reason)
+    Write-Host ""
+    Write-Host "=== Git-Sync fehlgeschlagen ($Reason) ===" -ForegroundColor Yellow
+    Write-Host "Fallback: lokales Pack nutzen:"
+    Write-Host '  powershell -ExecutionPolicy Bypass -File .\sync-ild.ps1 -LocalPack D:\AI_Temp\InstantLensDoc-pack.zip'
+    Write-Host "oder entpackten Ordner:"
+    Write-Host '  powershell -ExecutionPolicy Bypass -File .\sync-ild.ps1 -LocalPack D:\AI_Temp\InstantLensDoc-pack'
+    Write-Host "Pack-Zip: InstantLensDoc-pack.zip (Store artifacts / Agent-Ausgabe)."
+    Write-Host ""
+}
+
 Write-Host "=== InstantLens Doc Sync ==="
 Write-Host "Ziel: $Destination"
 
@@ -65,28 +106,57 @@ New-Item -ItemType Directory -Force -Path $Destination | Out-Null
 $iconBackup = Backup-UserIcons -Dest $Destination
 
 $appSrc = $null
-if ($LocalPack -and (Test-Path $LocalPack)) {
-    $appSrc = (Resolve-Path $LocalPack).Path
-    Write-Host "Lokal: $appSrc"
-} else {
-    if (-not (Test-Path $WorkDir)) {
-        Write-Host "Clone $RepoUrl ($Branch) → $WorkDir"
-        git clone --branch $Branch --single-branch $RepoUrl $WorkDir
-    } else {
-        Write-Host "Fetch/Reset $WorkDir @ $Branch"
-        Push-Location $WorkDir
-        git fetch origin $Branch
-        git checkout $Branch
-        git reset --hard "origin/$Branch"
-        Pop-Location
+
+# 1) Explizites -LocalPack (Ordner oder Zip)
+if ($LocalPack) {
+    $appSrc = Resolve-PackSource -PackPath $LocalPack -UnpackRoot (Split-Path $WorkDir -Parent)
+    if (-not $appSrc) {
+        Write-Error "LocalPack nicht nutzbar: $LocalPack"
     }
-    $candidate = Join-Path $WorkDir "InstantLensDoc"
-    if (Test-Path $candidate) {
-        $appSrc = $candidate
-    } elseif (Test-Path (Join-Path $WorkDir "instantlensdoc")) {
-        $appSrc = $WorkDir
-    } else {
-        Write-Error "App-Quellordner nicht gefunden unter $WorkDir"
+    Write-Host "Lokal: $appSrc"
+}
+
+# 2) Zip neben dem Skript (Fallback ohne Parameter)
+if (-not $appSrc) {
+    $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+    $sideZip = Join-Path $scriptDir "InstantLensDoc-pack.zip"
+    $sideZipAlt = Join-Path (Split-Path $scriptDir -Parent) "InstantLensDoc-pack.zip"
+    foreach ($z in @($sideZip, $sideZipAlt, "D:\AI_Temp\InstantLensDoc-pack.zip")) {
+        if (Test-Path $z) {
+            Write-Host "Pack-Zip gefunden: $z"
+            $appSrc = Resolve-PackSource -PackPath $z -UnpackRoot (Split-Path $WorkDir -Parent)
+            if ($appSrc) { break }
+        }
+    }
+}
+
+# 3) Git clone/fetch
+if (-not $appSrc) {
+    try {
+        if (-not (Test-Path $WorkDir)) {
+            Write-Host "Clone $RepoUrl ($Branch) → $WorkDir"
+            git clone --branch $Branch --single-branch $RepoUrl $WorkDir
+            if ($LASTEXITCODE -ne 0) { throw "git clone exit $LASTEXITCODE" }
+        } else {
+            Write-Host "Fetch/Reset $WorkDir @ $Branch"
+            Push-Location $WorkDir
+            git fetch origin $Branch
+            if ($LASTEXITCODE -ne 0) { Pop-Location; throw "git fetch exit $LASTEXITCODE" }
+            git checkout $Branch
+            git reset --hard "origin/$Branch"
+            Pop-Location
+        }
+        $candidate = Join-Path $WorkDir "InstantLensDoc"
+        if (Test-Path $candidate) {
+            $appSrc = $candidate
+        } elseif (Test-Path (Join-Path $WorkDir "instantlensdoc")) {
+            $appSrc = $WorkDir
+        } else {
+            throw "App-Quellordner nicht gefunden unter $WorkDir"
+        }
+    } catch {
+        Write-LocalPackHint -Reason $_.Exception.Message
+        throw
     }
 }
 

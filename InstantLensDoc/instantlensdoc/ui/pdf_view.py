@@ -1686,6 +1686,10 @@ class PdfViewer(QWidget):
         dest = Path(path)
         if dest.suffix.lower() != ".json" and not dest.name.endswith(".ildann.json"):
             dest = Path(str(dest) + ".ildann.json")
+        from instantlensdoc.ui.file_dialogs import confirm_overwrite_export
+
+        if not confirm_overwrite_export(dest, self):
+            return False
         try:
             saved = self.store.export_backup(dest)
             QMessageBox.information(
@@ -1741,12 +1745,46 @@ class PdfViewer(QWidget):
         dest = Path(path)
         if dest.suffix.lower() != ".json":
             dest = dest.with_suffix(dest.suffix + ".json") if dest.suffix else Path(str(dest) + ".json")
+        from instantlensdoc.ui.file_dialogs import confirm_overwrite_export
+
+        if not confirm_overwrite_export(dest, self):
+            return False
         try:
             saved = self.store.export_json(dest)
             self.status.emit(f"Annotationen exportiert: {saved.name} ({len(self.store.annotations)})")
             return True
         except Exception as e:
             QMessageBox.warning(self, "Annotationen exportieren", str(e))
+            return False
+
+    def export_annotations_csv(self) -> bool:
+        """Annotationen als CSV-Datei exportieren (Dialog)."""
+        if not self.store or not self.pdf_path:
+            QMessageBox.information(self, "Annotationen", "Kein PDF geladen.")
+            return False
+        from PySide6.QtWidgets import QFileDialog
+        from instantlensdoc.ui.file_dialogs import confirm_overwrite_export
+
+        default = str(self.pdf_path.with_suffix(self.pdf_path.suffix + ".annotations.csv"))
+        path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Annotationen als CSV exportieren",
+            default,
+            "CSV (*.csv);;Alle (*.*)",
+        )
+        if not path:
+            return False
+        dest = Path(path)
+        if dest.suffix.lower() != ".csv":
+            dest = dest.with_suffix(".csv")
+        if not confirm_overwrite_export(dest, self):
+            return False
+        try:
+            saved = self.store.export_csv(dest)
+            self.status.emit(f"Annotationen CSV: {saved.name} ({len(self.store.annotations)})")
+            return True
+        except Exception as e:
+            QMessageBox.warning(self, "Annotationen CSV exportieren", str(e))
             return False
 
     def export_annotations_flattened(self) -> bool:
@@ -1795,6 +1833,10 @@ class PdfViewer(QWidget):
                 "Flatten/Bake",
                 "Ziel darf nicht die aktuelle Datei sein.\nBitte anderen Namen wählen.",
             )
+            return False
+        from instantlensdoc.ui.file_dialogs import confirm_overwrite_export
+
+        if not confirm_overwrite_export(dest, self):
             return False
         try:
             if self.store.dirty:
@@ -1888,6 +1930,10 @@ class PdfViewer(QWidget):
                 "Als Kopie speichern",
                 "Ziel darf nicht die aktuelle Datei sein.\nBitte anderen Namen wählen.",
             )
+            return False
+        from instantlensdoc.ui.file_dialogs import confirm_overwrite_export
+
+        if not confirm_overwrite_export(dest, self):
             return False
         try:
             # Offene Annotationen zuerst in Sidecar schreiben
@@ -2046,22 +2092,30 @@ class PdfViewer(QWidget):
         except Exception as e:
             QMessageBox.warning(self, "Schwärzung", str(e))
 
-    def render_thumbnails(self, *, max_pages: int = 40, scale: float = 0.18):
+    def render_thumbnails(self, *, max_pages: int = 40, scale: float | None = None):
         """Kleine Seitenvorschauen (PIL). Begrenzt auf max_pages — bevorzugt lazy via render_thumbnail."""
         if not self.pdf_path or self.page_count <= 0:
             return []
+        if scale is None:
+            from instantlensdoc.core.app_settings import get_pdf_thumbnail_scale
+
+            scale = get_pdf_thumbnail_scale()
         out = []
         n = min(self.page_count, max_pages)
         for i in range(n):
             out.append(self.render_thumbnail(i, scale=scale))
         return out
 
-    def render_thumbnail(self, page_index: int, *, scale: float = 0.18):
+    def render_thumbnail(self, page_index: int, *, scale: float | None = None):
         """Eine Thumbnail-Seite rendern (für Lazy-Load)."""
         from PIL import Image
+        from instantlensdoc.core.app_settings import get_pdf_thumbnail_scale, pdf_thumbnail_icon_size
 
+        if scale is None:
+            scale = get_pdf_thumbnail_scale()
+        iw, ih = pdf_thumbnail_icon_size(scale)
         if not self.pdf_path or page_index < 0 or page_index >= self.page_count:
-            return Image.new("RGB", (72, 96), (220, 220, 220))
+            return Image.new("RGB", (iw, ih), (220, 220, 220))
         try:
             return render_page(
                 self.pdf_path,
@@ -2073,7 +2127,7 @@ class PdfViewer(QWidget):
                 invert=self._night_mode,
             )
         except Exception:
-            return Image.new("RGB", (72, 96), (220, 220, 220))
+            return Image.new("RGB", (iw, ih), (220, 220, 220))
 
     def _edit_overlay(self, ann_id: str):
         """Notiz-/Kommentar-/Overlay-Text nachträglich bearbeiten."""
@@ -2219,10 +2273,16 @@ class PdfViewer(QWidget):
         )
         if not path:
             return
+        from instantlensdoc.ui.file_dialogs import confirm_overwrite_export
+
+        if not confirm_overwrite_export(path, self):
+            return
         try:
             fmt = "JPEG" if path.lower().endswith((".jpg", ".jpeg")) or "JPEG" in selected else "PNG"
             if fmt == "JPEG" and not path.lower().endswith((".jpg", ".jpeg")):
                 path = path + ".jpg"
+                if not confirm_overwrite_export(path, self):
+                    return
             out = extract_page_image(
                 self.pdf_path,
                 self.page_index,

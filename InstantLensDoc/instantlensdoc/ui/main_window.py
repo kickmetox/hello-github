@@ -47,6 +47,7 @@ from instantlensdoc.core.app_settings import (
     get_last_export_dir,
     get_minimize_to_tray,
     get_page_size_unit,
+    get_pdf_thumbnail_scale,
     get_restore_session_on_start,
     get_update_check_on_start,
     get_window_geometry_b64,
@@ -58,6 +59,7 @@ from instantlensdoc.core.app_settings import (
     toggle_page_size_unit,
 )
 from instantlensdoc.ui.batch_dialog import BatchConvertDialog
+from instantlensdoc.ui.file_dialogs import confirm_overwrite_export
 from instantlensdoc.ui.pdf_tools_dialog import PdfToolsDialog
 from instantlensdoc.ui.watermark_dialog import WatermarkDialog
 from instantlensdoc.ui.compare_dialog import PdfCompareDialog
@@ -482,6 +484,16 @@ class MainWindow(QMainWindow):
         act_dup_line.setToolTip("Aktuelle Zeile / Auswahl darunter duplizieren")
         act_dup_line.triggered.connect(self._duplicate_line)
         m_edit.addAction(act_dup_line)
+        act_move_up = QAction("Zeile nach oben", self)
+        act_move_up.setShortcut(QKeySequence("Alt+Up"))
+        act_move_up.setToolTip("Aktuelle Zeile / Auswahl nach oben verschieben")
+        act_move_up.triggered.connect(self._move_line_up)
+        m_edit.addAction(act_move_up)
+        act_move_down = QAction("Zeile nach unten", self)
+        act_move_down.setShortcut(QKeySequence("Alt+Down"))
+        act_move_down.setToolTip("Aktuelle Zeile / Auswahl nach unten verschieben")
+        act_move_down.triggered.connect(self._move_line_down)
+        m_edit.addAction(act_move_down)
         act_comment = QAction("Zeile kommentieren/auskommentieren", self)
         act_comment.setShortcut(QKeySequence("Ctrl+/"))
         act_comment.setToolTip("Kommentarpräfix # oder // je nach Dateityp umschalten")
@@ -670,6 +682,7 @@ class MainWindow(QMainWindow):
             ("Annotationen speichern unter…", lambda: self.pdf_view.save_annotations_as()),
             ("Annotationen laden", lambda: self.pdf_view.reload_annotations()),
             ("Annotationen als JSON exportieren…", lambda: self.pdf_view.export_annotations_json()),
+            ("Annotationen als CSV exportieren…", lambda: self.pdf_view.export_annotations_csv()),
             ("Annotationen flatten/bake exportieren…", lambda: self.pdf_view.export_annotations_flattened()),
             ("Annotationen aus JSON importieren…", lambda: self.pdf_view.import_annotations_json()),
         ]:
@@ -1025,6 +1038,31 @@ class MainWindow(QMainWindow):
             self._set_status("Zeile dupliziert")
         else:
             self._set_status("Zeile duplizieren nicht möglich")
+
+    def _move_line_up(self):
+        self._move_line(-1)
+
+    def _move_line_down(self):
+        self._move_line(1)
+
+    def _move_line(self, delta: int):
+        if self.stack.currentWidget() is not self.editor_pane:
+            self._set_status("Zeile verschieben nur im Texteditor")
+            return
+        ok = self.editor.move_line_up() if delta < 0 else self.editor.move_line_down()
+        if ok:
+            if self.doc and self.doc.kind in (
+                DocKind.TEXT,
+                DocKind.MARKDOWN,
+                DocKind.HTML,
+                DocKind.DOCX,
+            ):
+                self.doc.text = self.editor.toPlainText()
+                self.doc.dirty = True
+            self._on_text_changed()
+            self._set_status("Zeile nach oben" if delta < 0 else "Zeile nach unten")
+        else:
+            self._set_status("Zeile verschieben nicht möglich")
 
     def _toggle_line_comment(self):
         if self.stack.currentWidget() is not self.editor_pane:
@@ -1720,7 +1758,7 @@ class MainWindow(QMainWindow):
             return
         idx = self._thumb_lazy_queue.pop(0)
         try:
-            img = self.pdf_view.render_thumbnail(idx, scale=0.18)
+            img = self.pdf_view.render_thumbnail(idx, scale=get_pdf_thumbnail_scale())
             self.sidebar.update_thumb(idx, img, token=self._thumb_lazy_token)
         except Exception as e:
             _log.debug("Thumb lazy %s: %s", idx, e)
@@ -1847,6 +1885,8 @@ class MainWindow(QMainWindow):
                 self._night_action.blockSignals(False)
             self._autosave_timer.setInterval(get_autosave_interval_sec() * 1000)
             self.pdf_view.apply_settings_colors()
+            if self.pdf_view.pdf_path:
+                self._refresh_thumbs()
             self._set_status(
                 f"Einstellungen gespeichert · Autosave {get_autosave_interval_sec()}s"
             )
@@ -2038,6 +2078,8 @@ class MainWindow(QMainWindow):
         remember_recent_dir(dest)
         if not dest.lower().endswith(".pdf"):
             dest += ".pdf"
+        if not confirm_overwrite_export(dest, self):
+            return
         try:
             out = extract_page_range(src, dest, start, end, one_based=True)
             self._set_status(f"Seitenbereich {start}–{end} → {Path(out).name}")
@@ -2343,6 +2385,8 @@ class MainWindow(QMainWindow):
         start = str(Path(dialog_start_dir(last_dir)) / default_name)
         path, _ = QFileDialog.getSaveFileName(self, f"Export {fmt.upper()}", start, filt)
         if not path:
+            return
+        if not confirm_overwrite_export(path, self):
             return
         try:
             from instantlensdoc.core import export as exp

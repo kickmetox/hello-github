@@ -21,6 +21,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from instantlensdoc.core.app_settings import pdf_thumbnail_icon_size
+
 
 # Deutsche Typ-Labels (Filter-Dropdown + Annotation-Suche)
 ANN_TYPE_LABELS = {
@@ -49,7 +51,8 @@ class ThumbnailList(QListWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setViewMode(QListWidget.IconMode)
-        self.setIconSize(QPixmap(72, 96).size())
+        w, h = pdf_thumbnail_icon_size()
+        self.setIconSize(QPixmap(w, h).size())
         self.setResizeMode(QListWidget.Adjust)
         self.setMovement(QListWidget.Snap)
         self.setDragDropMode(QAbstractItemView.InternalMove)
@@ -59,6 +62,11 @@ class ThumbnailList(QListWidget):
         self.setMinimumHeight(100)
         self.setToolTip("Ziehen zum Neuordnen der PDF-Seiten")
         self._reorder_enabled = True
+
+    def apply_icon_size(self, width: int | None = None, height: int | None = None):
+        if width is None or height is None:
+            width, height = pdf_thumbnail_icon_size()
+        self.setIconSize(QPixmap(int(width), int(height)).size())
 
     def set_reorder_enabled(self, enabled: bool):
         self._reorder_enabled = bool(enabled)
@@ -309,13 +317,15 @@ class Sidebar(QWidget):
         """Platzhalter-Einträge ohne Render — Icons kommen per update_thumb."""
         self.thumbs.clear()
         self._thumb_token = getattr(self, "_thumb_token", 0) + 1
+        w, h = pdf_thumbnail_icon_size()
+        self.thumbs.apply_icon_size(w, h)
         n = max(0, min(int(page_count), int(max_pages)))
         for i in range(n):
             item = QListWidgetItem(f"S. {i + 1}")
             item.setData(Qt.UserRole, i)
             item.setToolTip(f"Seite {i + 1} — laden…")
             # hellgraues Platzhalter-Icon
-            pm = QPixmap(72, 96)
+            pm = QPixmap(w, h)
             pm.fill(Qt.lightGray)
             item.setIcon(QIcon(pm))
             self.thumbs.addItem(item)
@@ -341,6 +351,8 @@ class Sidebar(QWidget):
         """images: Liste von PIL.Image oder QPixmap/QImage."""
         self.thumbs.clear()
         self._thumb_token = getattr(self, "_thumb_token", 0) + 1
+        w, h = pdf_thumbnail_icon_size()
+        self.thumbs.apply_icon_size(w, h)
         for i, img in enumerate(images):
             pm = self._to_pixmap(img)
             item = QListWidgetItem(f"S. {i + 1}")
@@ -357,17 +369,18 @@ class Sidebar(QWidget):
 
     @staticmethod
     def _to_pixmap(img) -> QPixmap:
+        w, h = pdf_thumbnail_icon_size()
         if isinstance(img, QPixmap):
-            return img
+            return img.scaled(w, h, Qt.KeepAspectRatio, Qt.SmoothTransformation)
         if isinstance(img, QImage):
-            return QPixmap.fromImage(img)
+            return QPixmap.fromImage(img).scaled(w, h, Qt.KeepAspectRatio, Qt.SmoothTransformation)
         try:
             if img.mode != "RGBA":
                 img = img.convert("RGBA")
             data = img.tobytes("raw", "RGBA")
             qimg = QImage(data, img.width, img.height, QImage.Format_RGBA8888)
             return QPixmap.fromImage(qimg.copy()).scaled(
-                72, 96, Qt.KeepAspectRatio, Qt.SmoothTransformation
+                w, h, Qt.KeepAspectRatio, Qt.SmoothTransformation
             )
         except Exception:
             return QPixmap()

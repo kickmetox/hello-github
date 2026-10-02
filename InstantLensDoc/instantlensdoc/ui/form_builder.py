@@ -203,6 +203,10 @@ class FormBuilderDialog(QDialog):
         path, _ = QFileDialog.getSaveFileName(self, "HTML speichern", "formular.html", "HTML (*.html)")
         if not path:
             return
+        from instantlensdoc.ui.file_dialogs import confirm_overwrite_export
+
+        if not confirm_overwrite_export(path, self):
+            return
         export_html(self.form, path)
         QMessageBox.information(self, "Export", f"HTML gespeichert:\n{path}")
 
@@ -213,6 +217,10 @@ class FormBuilderDialog(QDialog):
             return
         path, _ = QFileDialog.getSaveFileName(self, "PDF speichern", "formular.pdf", "PDF (*.pdf)")
         if not path:
+            return
+        from instantlensdoc.ui.file_dialogs import confirm_overwrite_export
+
+        if not confirm_overwrite_export(path, self):
             return
         try:
             export_pdf_form(self.form, path)

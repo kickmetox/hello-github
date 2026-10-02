@@ -44,6 +44,7 @@ DEFAULTS: dict[str, Any] = {
     "window_state": "",
     "ann_color_presets": ["#FFE066", "#FF6B6B", "#4ECDC4"],
     "restore_session_on_start": True,
+    "pdf_thumbnail_scale": 0.18,
 }
 
 
@@ -491,3 +492,37 @@ def get_restore_session_on_start() -> bool:
 
 def set_restore_session_on_start(enabled: bool) -> None:
     save_settings({"restore_session_on_start": bool(enabled)})
+
+
+PDF_THUMBNAIL_SCALE_CHOICES = (0.12, 0.18, 0.24)
+
+
+def get_pdf_thumbnail_scale() -> float:
+    """Render-Scale für Sidebar-Thumbnails (Default 0.18)."""
+    try:
+        v = float(load_settings().get("pdf_thumbnail_scale", 0.18))
+    except (TypeError, ValueError):
+        v = 0.18
+    if v not in PDF_THUMBNAIL_SCALE_CHOICES:
+        return min(PDF_THUMBNAIL_SCALE_CHOICES, key=lambda x: abs(x - v))
+    return v
+
+
+def set_pdf_thumbnail_scale(scale: float) -> float:
+    try:
+        v = float(scale)
+    except (TypeError, ValueError):
+        v = 0.18
+    if v not in PDF_THUMBNAIL_SCALE_CHOICES:
+        v = min(PDF_THUMBNAIL_SCALE_CHOICES, key=lambda x: abs(x - v))
+    save_settings({"pdf_thumbnail_scale": v})
+    return v
+
+
+def pdf_thumbnail_icon_size(scale: float | None = None) -> tuple[int, int]:
+    """Icon-Breite/-Höhe aus Thumbnail-Scale (Basis 72×96 bei 0.18)."""
+    s = float(scale if scale is not None else get_pdf_thumbnail_scale())
+    factor = s / 0.18
+    w = max(48, min(160, int(round(72 * factor))))
+    h = max(64, min(214, int(round(96 * factor))))
+    return w, h

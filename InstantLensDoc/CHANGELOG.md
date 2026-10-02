@@ -1,5 +1,22 @@
 # Changelog — InstantLens Doc
 
+## 0.3.8 — Thumbnail-Größe, Ann.-CSV, Zeile verschieben, Overwrite-Schutz
+
+Fokus auf sinnvolle Ausbauten nach 0.3.7. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### PDF
+- **Thumbnail-Größe** in Einstellungen (klein 0.12 / normal 0.18 / groß 0.24); Sidebar-Icons skalieren mit
+- **Annotationen als CSV exportieren** (flache Tabelle, Menü PDF)
+
+### Editor / UX
+- **Zeile verschieben** Alt+Up / Alt+Down (aktuelle Zeile oder Auswahl)
+- **Overwrite-Schutz** beim Export: Dialog wenn Zieldatei existiert (Default: Nein)
+
+### Packaging / Docs
+- Version **0.3.8** (App, `ild_pdf`, ISS, Smoke, INFO/FEATURES/README)
+
+---
+
 ## 0.3.7 — Präsentation, Ann.-Favoriten, Block-Tab, Session-Toggle
 
 Fokus auf sinnvolle Ausbauten nach 0.3.6. Stubs KI/Cloud/Stylus/3D bleiben Stubs.

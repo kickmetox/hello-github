@@ -195,6 +195,10 @@ class PdfToolsDialog(QDialog):
         if len(sources) < 1 or not dest:
             QMessageBox.warning(self, "Zusammenführen", "Mindestens eine PDF und Ziel angeben.")
             return
+        from instantlensdoc.ui.file_dialogs import confirm_overwrite_export
+
+        if not confirm_overwrite_export(dest, self):
+            return
         try:
             merge_pdfs(sources, dest)
             QMessageBox.information(self, "Zusammenführen", f"Gespeichert:\n{dest}")
@@ -278,6 +282,10 @@ class PdfToolsDialog(QDialog):
         dest = self.ex_dest.text().strip()
         if not src or not dest:
             QMessageBox.warning(self, "Seitenbereich", "Quelle und Ziel-PDF angeben.")
+            return
+        from instantlensdoc.ui.file_dialogs import confirm_overwrite_export
+
+        if not confirm_overwrite_export(dest, self):
             return
         try:
             out = extract_page_range(

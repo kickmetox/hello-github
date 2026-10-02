@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import csv
 import json
 import math
 from contextlib import contextmanager
@@ -380,6 +381,36 @@ class AnnotationStore:
     def export_json(self, path: str | Path) -> Path:
         """Annotationen als JSON exportieren (gleiche Sidecar-Struktur)."""
         return self.export_backup(path)
+
+    CSV_FIELDS = (
+        "id",
+        "page",
+        "type",
+        "x",
+        "y",
+        "width",
+        "height",
+        "text",
+        "color",
+        "callout_x",
+        "callout_y",
+        "font_size",
+        "opacity",
+        "created",
+        "modified",
+    )
+
+    def export_csv(self, path: str | Path) -> Path:
+        """Annotationen als flache CSV (eine Zeile pro Annotation)."""
+        path = Path(path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("w", encoding="utf-8", newline="") as fh:
+            writer = csv.DictWriter(fh, fieldnames=list(self.CSV_FIELDS), extrasaction="ignore")
+            writer.writeheader()
+            for ann in self.annotations:
+                row = ann.to_dict()
+                writer.writerow({k: row.get(k, "") for k in self.CSV_FIELDS})
+        return path
 
     def import_json(self, path: str | Path, *, replace: bool = True) -> int:
         """
