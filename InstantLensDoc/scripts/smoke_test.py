@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Smoke-Test 0.1.8 (CLI + optional offscreen Qt)."""
+"""Smoke-Test 0.1.9 (CLI + optional offscreen Qt)."""
 
 from __future__ import annotations
 
@@ -19,7 +19,9 @@ def main() -> int:
         Annotation,
         AnnotationStore,
         AnnotationType,
+        PAGE_SIZE_PRESETS,
         PdfDocument,
+        PdfMetadata,
         apply_page_numbers,
         apply_watermark,
         bake_redactions,
@@ -29,6 +31,8 @@ def main() -> int:
         compress_pdf_as_images,
         extract_page_image,
         extract_text_blocks,
+        get_metadata,
+        get_page_boxes,
         import_page_text_as_overlays,
         insert_image_as_page,
         insert_signature_field,
@@ -36,6 +40,9 @@ def main() -> int:
         inspect_pdf,
         needs_password,
         render_page,
+        set_crop_box,
+        set_metadata,
+        set_page_size,
         set_password,
         try_open_password,
         __version__ as ild_ver,
@@ -45,7 +52,7 @@ def main() -> int:
     from instantlensdoc import __version__
     from instantlensdoc.config import icon_path, icon_paths_for_qt
     from instantlensdoc.core.documents import open_document, save_document
-    from instantlensdoc.core.export import export_docx, export_html, export_pdf
+    from instantlensdoc.core.export import export_docx, export_html, export_pdf, resolve_page_size
     from instantlensdoc.core.forms import FieldType, FormDefinition, FormField, export_html as form_html, export_pdf_form
     from instantlensdoc.core.layout import LayoutDocument
     from instantlensdoc.core import ocr as ocr_mod
@@ -54,11 +61,19 @@ def main() -> int:
     from instantlensdoc.core import batch as batch_mod
     from instantlensdoc.core import fulltext as ft_mod
     from instantlensdoc.core import session as session_mod
-    from instantlensdoc.core.app_settings import get_ocr_lang, load_settings, save_settings
+    from instantlensdoc.core.app_settings import (
+        get_export_jpeg_quality,
+        get_ocr_lang,
+        get_ui_lang,
+        load_settings,
+        save_settings,
+    )
+    from instantlensdoc.core.i18n import set_lang, tr
+    from instantlensdoc.core.update_check import check_for_updates
     from instantlensdoc.license import KEY_DAYS, TRIAL_DAYS, generate_key, verify_key
 
-    assert __version__ == "0.1.8", __version__
-    assert ild_ver == "0.1.8", ild_ver
+    assert __version__ == "0.1.9", __version__
+    assert ild_ver == "0.1.9", ild_ver
     assert TRIAL_DAYS == 28 and KEY_DAYS == 32
     key = generate_key("ame@sellerbach.de")
     ok, msg, _ = verify_key(key)
@@ -68,6 +83,17 @@ def main() -> int:
     _ = list(icon_paths_for_qt())
     assert "Deutsch + Englisch" in LANG_PRESETS
     assert OcrOutputMode.EDITABLE_TEXT.value == "editable_text"
+    assert "A4" in PAGE_SIZE_PRESETS
+    assert resolve_page_size("A4")[0] > 500
+    set_lang("de")
+    assert "Einstellungen" in tr("settings")
+    set_lang("en")
+    assert "Settings" in tr("settings")
+    set_lang("de")
+    upd = check_for_updates(allow_network=False)
+    assert upd.local_version == "0.1.9" and not upd.online
+    assert get_export_jpeg_quality() >= 10
+    assert get_ui_lang() in ("de", "en")
 
     ok_ocr, ocr_msg = ocr_mod.tesseract_available()
     assert isinstance(ocr_msg, str) and len(ocr_msg) > 5
@@ -110,6 +136,22 @@ def main() -> int:
         health = inspect_pdf(pdf)
         assert health.ok_to_open and health.page_count == 2
 
+        set_metadata(pdf, PdfMetadata(title="ILD Test", author="Andreas", subject="Smoke", keywords="a,b"))
+        meta = get_metadata(pdf)
+        assert "ILD" in meta.title and meta.author == "Andreas"
+        print("Metadata: OK")
+
+        boxes = get_page_boxes(pdf, 0)
+        assert "mediabox" in boxes and "cropbox" in boxes
+        a4w, a4h = PAGE_SIZE_PRESETS["A4"]
+        set_page_size(pdf, 0, a4w, a4h)
+        boxes2 = get_page_boxes(pdf, 0)
+        assert abs((boxes2["mediabox"][2] - boxes2["mediabox"][0]) - a4w) < 0.5
+        set_crop_box(pdf, 0, 10, 10, a4w - 10, a4h - 10)
+        boxes3 = get_page_boxes(pdf, 0)
+        assert boxes3["cropbox"][0] == 10
+        print("PageSize/Crop: OK")
+
         wm_out = td / "wm.pdf"
         apply_watermark(pdf, "TEST-WM", out_path=wm_out, opacity=0.3, font_size=36)
         assert wm_out.is_file() and wm_out.stat().st_size > 100
@@ -124,12 +166,13 @@ def main() -> int:
         store_r = AnnotationStore(pdf_red)
         store_r.annotations = []
         store_r.dirty = True
-        store_r.add(Annotation(0, AnnotationType.REDACTION, 20, 20, width=50, height=30, color="#000000"))
+        store_r.add(Annotation(0, AnnotationType.REDACTION, 20, 20, width=50, height=30, color="#000000", text="REDACT"))
         store_r.save(force=True)
         assert any(a.type == AnnotationType.REDACTION for a in AnnotationStore(pdf_red).annotations)
         red_out = td / "redacted.pdf"
-        bake_redactions(pdf_red, store_r, scale=1.5, out_path=red_out)
+        bake_redactions(pdf_red, store_r, scale=1.5, out_path=red_out, remove_from_store=True)
         assert red_out.is_file() and red_out.stat().st_size > 50
+        assert not any(a.type == AnnotationType.REDACTION for a in store_r.annotations)
         print("Redaction: OK")
 
         # Password
@@ -269,7 +312,7 @@ def main() -> int:
         sample = "# Titel\n\nAbsatz eins.\n\n## Unter\n\n- Punkt A\n- Punkt B\n"
         export_html(sample, td / "e.html", title="ExportTest")
         export_docx(sample, td / "e.docx", title="ExportTest")
-        export_pdf(sample, td / "e.pdf", title="ExportTest")
+        export_pdf(sample, td / "e.pdf", title="ExportTest", page_size="A4")
         assert (td / "e.html").exists() and "<h1>" in (td / "e.html").read_text(encoding="utf-8")
         assert (td / "e.docx").exists() and (td / "e.pdf").stat().st_size > 100
         with PdfDocument(td / "e.pdf") as doc:
@@ -339,10 +382,10 @@ def main() -> int:
 
         assert (ROOT / "installer" / "installer-hinweis.txt").exists()
         iss = (ROOT / "installer" / "instantlensdoc.iss").read_text(encoding="utf-8")
-        assert "0.1.8" in iss and "desktopicon" in iss and "DisableProgramGroupPage=no" in iss
+        assert "0.1.9" in iss and "desktopicon" in iss and "DisableProgramGroupPage=no" in iss
 
         assert (ROOT / "examples" / "ild_pdf_demo.py").exists()
-        assert "0.1.8" in (ROOT / "INFO.md").read_text(encoding="utf-8")
+        assert "0.1.9" in (ROOT / "INFO.md").read_text(encoding="utf-8")
         assert (ROOT / "assets" / "app.ico").is_file()
 
         merge_pdfs([p1, p2], td / "merged.pdf")
@@ -366,6 +409,7 @@ def main() -> int:
         assert isinstance(extract_outline(pdf), list)
         assert "Wasserzeichen" in (ROOT / "FEATURES.md").read_text(encoding="utf-8")
         assert "Schwärzung" in (ROOT / "FEATURES.md").read_text(encoding="utf-8")
+        assert "Metadaten" in (ROOT / "FEATURES.md").read_text(encoding="utf-8")
 
         insert_signature_field(pdf, 0, x=50, y=50, label="Test")
         insert_signature_image(pdf, Image.new("RGBA", (80, 30), (0, 0, 0, 0)), 0, x=60, y=120)
@@ -403,15 +447,17 @@ def main() -> int:
         win._add_chained_frame()
         assert len(win.layout_doc.text_frames) >= 2
         assert "Lizenz:" in win.license_label.text()
-        assert "v0.1.8" in win.version_label.text()
+        assert "v0.1.9" in win.version_label.text()
         from instantlensdoc.ui.settings_dialog import SettingsDialog
         from instantlensdoc.ui.batch_dialog import BatchConvertDialog
         from instantlensdoc.ui.pdf_tools_dialog import PdfToolsDialog
         from instantlensdoc.ui.watermark_dialog import WatermarkDialog
         from instantlensdoc.ui.compare_dialog import PdfCompareDialog
+        from instantlensdoc.ui.metadata_dialog import MetadataDialog
+        from instantlensdoc.ui.page_size_dialog import PageSizeDialog
 
         assert SettingsDialog and BatchConvertDialog and PdfToolsDialog
-        assert WatermarkDialog and PdfCompareDialog
+        assert WatermarkDialog and PdfCompareDialog and MetadataDialog and PageSizeDialog
         assert win.sidebar.outline is not None
         from instantlensdoc.ui.theme import load_theme_mode, toggle_theme
 
@@ -464,17 +510,25 @@ def main() -> int:
             win.sidebar.set_page_thumbs(thumbs, current=0)
             assert win.sidebar.thumbs.count() >= 1
             win.pdf_view.store.add(
-                Annotation(0, AnnotationType.REDACTION, 5, 5, width=30, height=20, color="#000000")
+                Annotation(0, AnnotationType.REDACTION, 5, 5, width=30, height=20, color="#000000", text="REDACT")
             )
             assert any(a.type == AnnotationType.REDACTION for a in win.pdf_view.store.annotations)
+            assert win.pdf_view.redaction_count() >= 1
             from instantlensdoc.ui.keyboard_help import KeyboardHelpDialog
             from instantlensdoc.ui.password_dialog import CompressPdfDialog, SetPasswordDialog
             from instantlensdoc.ui.stubs import PLANNED
             assert KeyboardHelpDialog and SetPasswordDialog and CompressPdfDialog
-            assert "0.1.8" in PLANNED["ki"]
+            assert "0.1.9" in PLANNED["ki"]
             assert callable(win.pdf_view.bake_redactions)
+            assert callable(win.pdf_view.clear_redactions)
             assert callable(win._set_pdf_password)
             assert callable(win._compress_pdf_images)
+            assert callable(win._edit_pdf_metadata)
+            assert callable(win._pdf_page_size)
+            assert callable(win._check_updates)
+            set_metadata(smoke_pdf, PdfMetadata(title="SmokeMeta"))
+            assert "Smoke" in get_metadata(smoke_pdf).title
+            set_page_size(smoke_pdf, 0, *PAGE_SIZE_PRESETS["Letter"])
 
         win.close()
         print("Qt: OK")

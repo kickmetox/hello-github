@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | 0.1.8 |
+| Version | 0.1.9 |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -33,6 +33,16 @@ powershell -ExecutionPolicy Bypass -File "D:\AI_Temp\sync-ild.ps1"
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 ```
+
+## Neu in 0.1.9
+
+- **PDF-Metadaten-Editor** (Titel, Autor, Thema, Keywords, …)  
+- **Seitengröße / Zuschneiden** (MediaBox-Presets + CropBox)  
+- **Export-Qualität** in Einstellungen (JPEG-Q, Max-Kante, Seitenformat)  
+- **Mehrsprach-UI DE/EN** (Minimal: Einstellungen + Dialoge/Stubs)  
+- **Update-Check** (Hilfe-Menü; optional beim Start; offline OK)  
+- **Redaction-UX**: Preview-Label, Einbrennen-Dialog mit Sidecar-Option, Löschen  
+- Stubs: KI / Cloud / Stylus / 3D (0.1.9)
 
 ## Neu in 0.1.8
 

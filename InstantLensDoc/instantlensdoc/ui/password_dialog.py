@@ -97,14 +97,15 @@ class CompressPdfDialog(QDialog):
         )
         form = QFormLayout()
         from PySide6.QtWidgets import QSpinBox
+        from instantlensdoc.core.app_settings import get_export_image_max_edge, get_export_jpeg_quality
 
         self.quality = QSpinBox()
         self.quality.setRange(20, 95)
-        self.quality.setValue(70)
+        self.quality.setValue(min(95, max(20, get_export_jpeg_quality())))
         self.max_edge = QSpinBox()
         self.max_edge.setRange(400, 4000)
         self.max_edge.setSingleStep(100)
-        self.max_edge.setValue(2000)
+        self.max_edge.setValue(min(4000, max(400, get_export_image_max_edge())))
         form.addRow("JPEG-Qualität:", self.quality)
         form.addRow("Max. Kante (px):", self.max_edge)
         layout.addLayout(form)

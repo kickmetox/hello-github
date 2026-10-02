@@ -206,9 +206,14 @@ class PdfCanvas(QLabel):
         if ann.type == AnnotationType.HIGHLIGHT:
             painter.fillRect(x, y, w, h, color)
         elif ann.type == AnnotationType.REDACTION:
-            painter.fillRect(x, y, max(w, 4), max(h, 4), QColor(0, 0, 0, 255))
-            painter.setPen(QPen(QColor(40, 40, 40), 1))
-            painter.drawRect(x, y, max(w, 4), max(h, 4))
+            rw, rh = max(w, 4), max(h, 4)
+            painter.fillRect(x, y, rw, rh, QColor(0, 0, 0, 230))
+            # Sichtbarer Hinweisrahmen (besserer UX vor Einbrennen)
+            painter.setPen(QPen(QColor(220, 50, 50), 2, Qt.DashLine))
+            painter.drawRect(x, y, rw, rh)
+            painter.setPen(QColor(255, 220, 220))
+            if rw >= 36 and rh >= 14:
+                painter.drawText(x + 3, y + min(14, rh - 2), "REDACT")
         elif ann.type == AnnotationType.UNDERLINE:
             painter.drawLine(x, y + h, x + w, y + h)
         elif ann.type == AnnotationType.STICKY:
@@ -542,7 +547,14 @@ class PdfViewer(QWidget):
         for b in self._tool_buttons:
             b.setChecked(b.text() == want)
         self.canvas.set_drag_tool(tool if tool in DRAG_TYPES else None)
-        self.status.emit(f"Werkzeug: {tool.value}")
+        if tool == AnnotationType.REDACTION:
+            n = self.redaction_count()
+            self.status.emit(
+                f"Werkzeug: Schwärzen — Rechteck ziehen · {n} offen · "
+                "PDF → Schwärzung einbrennen"
+            )
+        else:
+            self.status.emit(f"Werkzeug: {tool.value}")
 
     def load(self, path: str | Path, password: str | None = None) -> bool:
         try:
@@ -980,21 +992,80 @@ class PdfViewer(QWidget):
         except Exception as e:
             QMessageBox.warning(self, "Einbrennen", str(e))
 
-    def bake_redactions(self, *, remove_sidecar: bool = False):
+    def redaction_count(self) -> int:
+        if not self.store:
+            return 0
+        return sum(1 for a in self.store.annotations if a.type == AnnotationType.REDACTION)
+
+    def clear_redactions(self):
+        """Entfernt nur REDACTION-Annotationen aus dem Sidecar (PDF unverändert)."""
+        if not self.store:
+            return
+        reds = [a for a in self.store.annotations if a.type == AnnotationType.REDACTION]
+        if not reds:
+            QMessageBox.information(self, "Schwärzung", "Keine Schwärzungs-Annotationen.")
+            return
+        by_page: dict[int, int] = {}
+        for a in reds:
+            by_page[a.page] = by_page.get(a.page, 0) + 1
+        pages = ", ".join(f"S.{p + 1}:{n}" for p, n in sorted(by_page.items()))
+        reply = QMessageBox.question(
+            self,
+            "Schwärzungs-Annotationen löschen",
+            f"{len(reds)} Schwärzung(en) aus dem Sidecar entfernen?\n({pages})\n"
+            "Bereits eingebrannte Flächen bleiben im PDF.",
+        )
+        if reply != QMessageBox.Yes:
+            return
+        with self.store.atomic():
+            self.store.annotations = [
+                a for a in self.store.annotations if a.type != AnnotationType.REDACTION
+            ]
+            self.store.dirty = True
+        try:
+            self.store.save(force=True)
+        except Exception as e:
+            QMessageBox.warning(self, "Schwärzung", str(e))
+            return
+        self.refresh()
+        self.annotations_changed.emit()
+        self.status.emit(f"{len(reds)} Schwärzungs-Annotation(en) gelöscht")
+
+    def bake_redactions(self, *, remove_sidecar: bool | None = None):
         if not self.store or not self.pdf_path:
             return
         reds = [a for a in self.store.annotations if a.type == AnnotationType.REDACTION]
         if not reds:
             QMessageBox.information(self, "Schwärzung", "Keine Schwärzungs-Annotationen.")
             return
-        reply = QMessageBox.question(
-            self,
-            "Schwärzung einbrennen",
-            f"{len(reds)} Schwärzung(en) dauerhaft als schwarze Flächen in die PDF schreiben?\n"
-            "Hinweis: Das entfernt den Inhalt nicht aus der Textschicht — Basis-Redaction.",
+        by_page: dict[int, int] = {}
+        for a in reds:
+            by_page[a.page] = by_page.get(a.page, 0) + 1
+        pages = ", ".join(f"S.{p + 1}:{n}" for p, n in sorted(by_page.items()))
+
+        from PySide6.QtWidgets import QCheckBox, QDialog, QDialogButtonBox, QLabel, QVBoxLayout
+
+        dlg = QDialog(self)
+        dlg.setWindowTitle("Schwärzung einbrennen")
+        lay = QVBoxLayout(dlg)
+        lay.addWidget(
+            QLabel(
+                f"{len(reds)} Schwärzung(en) dauerhaft als schwarze Flächen schreiben?\n"
+                f"Verteilung: {pages}\n\n"
+                "Hinweis: Basis-Redaction — Text unter der Fläche kann in der\n"
+                "PDF-Textschicht noch selektierbar sein."
+            )
         )
-        if reply != QMessageBox.Yes:
+        chk = QCheckBox("Annotationen nach Einbrennen aus Sidecar entfernen")
+        chk.setChecked(True if remove_sidecar is None else bool(remove_sidecar))
+        lay.addWidget(chk)
+        buttons = QDialogButtonBox(QDialogButtonBox.Yes | QDialogButtonBox.No)
+        buttons.accepted.connect(dlg.accept)
+        buttons.rejected.connect(dlg.reject)
+        lay.addWidget(buttons)
+        if dlg.exec() != QDialog.Accepted:
             return
+        remove = chk.isChecked()
         try:
             from ild_pdf.redact import bake_redactions as apply_redactions
             from ild_pdf.render import clear_render_cache
@@ -1003,7 +1074,7 @@ class PdfViewer(QWidget):
                 self.pdf_path,
                 self.store,
                 scale=self.scale,
-                remove_from_store=remove_sidecar,
+                remove_from_store=remove,
             )
             clear_render_cache(self.pdf_path)
             self.refresh()

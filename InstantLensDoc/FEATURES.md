@@ -10,7 +10,7 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | Clipboard-Paste Bild | fertig | Editor + PDF (Stempel/Seite) |
 | TXT / MD / HTML öffnen & speichern | fertig | HTML-Export mit einfachem Markdownish |
 | DOCX öffnen & speichern | teilweise | python-docx; Headings/Listen beim Export |
-| Editor → HTML / DOCX / PDF Export | fertig | Datei → Exportieren |
+| Editor → HTML / DOCX / PDF Export | fertig | Datei → Exportieren; Qualität/Format in Einstellungen |
 | Drucken (Editor / PDF-Seite) | fertig | Qt PrintDialog (Ctrl+P) |
 | Zuletzt geöffnete Dateien | fertig | Menü + Sidebar, `recent.json` |
 | PDF lesen / rendern | fertig | pypdfium2; große-PDF-Limits |
@@ -18,9 +18,14 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | PDF-Wasserzeichen | fertig | Text diagonal, Deckkraft |
 | PDF Seitennummer-Stempel | fertig | Vorlage `{n} / {total}` |
 | PDF-Vergleich Seite-nebeneinander | fertig | Dialog |
-| PDF-Schwärzung (Redaction) | teilweise | Drag-Annotation + Einbrennen (Basis) |
+| PDF-Metadaten-Editor | fertig | Titel/Autor/Thema/Keywords (DocInfo+XMP) |
+| PDF Seitengröße / Zuschneiden | fertig | MediaBox-Presets + CropBox |
+| PDF-Schwärzung (Redaction) | teilweise | Drag + Preview-Label + Einbrennen-Dialog (Basis) |
 | PDF-Passwort setzen/öffnen | fertig | pikepdf Encryption / pypdfium2 |
 | Bildkompression vor/als PDF | fertig | JPEG vor Einfügen; Seiten neu einbetten |
+| Export-Qualitätseinstellungen | fertig | JPEG-Q, Max-Kante, PDF-Seitenformat |
+| Mehrsprach-UI DE/EN | teilweise | Einstellungen + Dialoge/Stubs (Minimal) |
+| Update-Check-Hinweis | fertig | Hilfe-Menü; optional Start; offline OK |
 | Sidebar Seiten-Thumbnails | fertig | Vorschaubilder, Klick → Seite |
 | Tastaturhilfe-Dialog | fertig | Hilfe → F1 |
 | App-Logging | fertig | %APPDATA%/InstantLensDoc/logs |
@@ -43,7 +48,7 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | Lesezeichen / PDF-Outline | fertig | Baum in Sidebar, Doppelklick → Seite |
 | Batch-Konvertierung Ordner | fertig | Bilder→PDF, OCR-Ordner, PDF-OCR-Text |
 | PDF zusammenführen / teilen | fertig | Dialog unter Menü PDF |
-| Einstellungen-Dialog | fertig | OCR-Sprache, Theme, Pfade |
+| Einstellungen-Dialog | fertig | OCR, Theme, Sprache, Export-Q, Pfade, Update |
 | Markieren im Editor | fertig | Ctrl+H |
 | Bilder JPEG/PNG anzeigen | fertig | |
 | OCR Bild/PDF-Seite | teilweise | Presets + Modi; Tabellen-Heuristik; Tesseract-Link |
@@ -55,16 +60,16 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | Lizenz Trial 28d / Keys 32d | fertig | Statusleiste farbig + Tooltip |
 | Keygenerator (CLI/GUI) | fertig | `run-keygen.bat` |
 | PyInstaller Build Windows | fertig | `build-windows.ps1`, Icon `assets/app.ico` |
-| Inno-Installer | fertig | Desktop + Startmenü-Hinweis 0.1.8 |
+| Inno-Installer | fertig | Desktop + Startmenü-Hinweis 0.1.9 |
 | Sync-Skript Windows | fertig | Store `docs/sync-ild.ps1` |
-| In-App Hilfe / About | fertig | Version 0.1.8 |
+| In-App Hilfe / About | fertig | Version 0.1.9 |
 | FEATURES.md / INFO.md | fertig | |
-| `ild_pdf` Modul + Beispielskript | fertig | watermark / compare / limits |
+| `ild_pdf` Modul + Beispielskript | fertig | metadata / page size / watermark / redact |
 | Font-Matching | geplant | |
 | Objekt-/Bildbearbeitung | geplant | |
 | Layout-Erhaltung (Scan→edit) | geplant | |
 | Freihand | geplant | |
-| KI-Assistent | Stub | Menü „Geplant“ 0.1.8 |
+| KI-Assistent | Stub | Menü „Geplant“ 0.1.9 |
 | Signieren (rechtssicher) | Stub | |
 | Cloud-Sync | Stub | |
 | Text on Path / Text zu Pfaden | geplant | |

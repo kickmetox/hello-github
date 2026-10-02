@@ -13,7 +13,17 @@ from .annotate import (
     DRAG_TYPES,
     STAMP_PRESETS,
 )
-from .pages import merge_pdfs, split_pdf, rotate_page, delete_pages, reorder_pages
+from .pages import (
+    PAGE_SIZE_PRESETS,
+    merge_pdfs,
+    split_pdf,
+    rotate_page,
+    delete_pages,
+    reorder_pages,
+    get_page_boxes,
+    set_page_size,
+    set_crop_box,
+)
 from .outline import OutlineItem, extract_outline
 from .images import (
     compress_image_for_pdf,
@@ -36,6 +46,7 @@ from .limits import PdfHealth, clamp_render_scale, inspect_pdf
 from .render import clear_render_cache
 from .security import needs_password, remove_password, set_password, try_open_password
 from .redact import bake_redactions
+from .metadata import PdfMetadata, get_metadata, set_metadata
 
 __all__ = [
     "PdfDocument",
@@ -47,11 +58,15 @@ __all__ = [
     "AnnotationType",
     "DRAG_TYPES",
     "STAMP_PRESETS",
+    "PAGE_SIZE_PRESETS",
     "merge_pdfs",
     "split_pdf",
     "rotate_page",
     "delete_pages",
     "reorder_pages",
+    "get_page_boxes",
+    "set_page_size",
+    "set_crop_box",
     "OutlineItem",
     "extract_outline",
     "compress_image_for_pdf",
@@ -76,6 +91,9 @@ __all__ = [
     "set_password",
     "remove_password",
     "bake_redactions",
+    "PdfMetadata",
+    "get_metadata",
+    "set_metadata",
 ]
 
-__version__ = "0.1.8"
+__version__ = "0.1.9"

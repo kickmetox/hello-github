@@ -1,7 +1,7 @@
 # ild_pdf — auskoppelbares PDF-Modul
 
 Lizenzfreundliche PDF-Engine auf **pypdfium2 / PDFium** (kein Poppler/GPL).  
-Version **0.1.8**.
+Version **0.1.9**.
 
 ## Installation
 
@@ -71,6 +71,8 @@ python examples/ild_pdf_demo.py pfad/zu/datei.pdf
 | `set_password` / `needs_password` | PDF verschlüsseln / prüfen |
 | `bake_redactions` | Schwärzungen einbrennen |
 | `compress_image_for_pdf` / `compress_pdf_as_images` | Bildkompression |
+| `get_metadata` / `set_metadata` / `PdfMetadata` | Dokument-Metadaten |
+| `PAGE_SIZE_PRESETS` / `get_page_boxes` / `set_page_size` / `set_crop_box` | Seitengröße / Crop |
 
 ### Sidecar-Schema (Auszug)
 

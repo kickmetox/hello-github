@@ -43,7 +43,11 @@ from instantlensdoc.ui.stubs import show_planned
 from instantlensdoc.ui.theme import apply_theme, load_theme_mode, toggle_theme
 from instantlensdoc.ui.keyboard_help import KeyboardHelpDialog
 from instantlensdoc.ui.password_dialog import CompressPdfDialog, SetPasswordDialog
+from instantlensdoc.ui.metadata_dialog import MetadataDialog
+from instantlensdoc.ui.page_size_dialog import PageSizeDialog
 from instantlensdoc.core import session as session_mod
+from instantlensdoc.core.i18n import sync_from_settings
+from instantlensdoc.core.app_settings import get_update_check_on_start
 from ild_pdf.outline import extract_outline
 import logging
 
@@ -53,6 +57,7 @@ _log = logging.getLogger("instantlensdoc.ui.main")
 class MainWindow(QMainWindow):
     def __init__(self, license_manager: LicenseManager):
         super().__init__()
+        sync_from_settings()
         self.license_manager = license_manager
         self.doc: Document | None = None
         self.layout_doc = LayoutDocument()
@@ -81,6 +86,8 @@ class MainWindow(QMainWindow):
         self._autosave_timer.timeout.connect(self._autosave_tick)
         self._autosave_timer.start()
         QTimer.singleShot(200, self._restore_session)
+        if get_update_check_on_start():
+            QTimer.singleShot(1500, lambda: self._check_updates(silent=True))
 
     def closeEvent(self, event):
         try:
@@ -330,6 +337,12 @@ class MainWindow(QMainWindow):
         act_compress = QAction("Bildkompression (Seiten neu)…", self)
         act_compress.triggered.connect(self._compress_pdf_images)
         m_pdf.addAction(act_compress)
+        act_meta = QAction("Metadaten bearbeiten…", self)
+        act_meta.triggered.connect(self._edit_pdf_metadata)
+        m_pdf.addAction(act_meta)
+        act_psize = QAction("Seitengröße / Zuschneiden…", self)
+        act_psize.triggered.connect(self._pdf_page_size)
+        m_pdf.addAction(act_psize)
         m_pdf.addSeparator()
         for title, slot in [
             ("Annotationen speichern", lambda: self.pdf_view.save_annotations()),
@@ -342,6 +355,7 @@ class MainWindow(QMainWindow):
             ("PDF-Text → Overlay…", lambda: self.pdf_view.import_text_overlays()),
             ("Text-Overlays einbrennen…", lambda: self.pdf_view.bake_overlays()),
             ("Schwärzung einbrennen…", lambda: self.pdf_view.bake_redactions()),
+            ("Schwärzungs-Annotationen löschen…", lambda: self.pdf_view.clear_redactions()),
             ("Seite drucken…", lambda: self.pdf_view.print_current_page()),
             ("Signaturfeld setzen…", lambda: self.pdf_view.place_signature_field()),
             ("Signatur (Bild) einfügen…", lambda: self.pdf_view.insert_signature_image()),
@@ -394,6 +408,9 @@ class MainWindow(QMainWindow):
         a = QAction("Tastaturhilfe…", self)
         a.setShortcut(QKeySequence("F1"))
         a.triggered.connect(lambda: KeyboardHelpDialog(self).exec())
+        m_help.addAction(a)
+        a = QAction("Auf Updates prüfen…", self)
+        a.triggered.connect(lambda: self._check_updates(silent=False))
         m_help.addAction(a)
         a = QAction("Lizenz…", self)
         a.triggered.connect(self._license)
@@ -809,8 +826,38 @@ class MainWindow(QMainWindow):
 
     def _settings(self):
         if SettingsDialog(self).exec():
+            sync_from_settings()
             self._sync_theme_menu()
             self._set_status("Einstellungen gespeichert")
+
+    def _edit_pdf_metadata(self):
+        if not self.pdf_view.pdf_path:
+            QMessageBox.information(self, "Metadaten", "Bitte zuerst ein PDF öffnen.")
+            return
+        if MetadataDialog(self.pdf_view.pdf_path, self).exec():
+            self._set_status("PDF-Metadaten gespeichert")
+
+    def _pdf_page_size(self):
+        if not self.pdf_view.pdf_path:
+            QMessageBox.information(self, "Seitengröße", "Bitte zuerst ein PDF öffnen.")
+            return
+        if PageSizeDialog(self.pdf_view.pdf_path, self.pdf_view.page_index, self).exec():
+            from ild_pdf.render import clear_render_cache
+
+            clear_render_cache(self.pdf_view.pdf_path)
+            self.pdf_view.refresh()
+            self._set_status("Seitengröße/Crop aktualisiert")
+
+    def _check_updates(self, *, silent: bool = False):
+        from instantlensdoc.core.i18n import get_lang
+        from instantlensdoc.core.update_check import check_for_updates
+
+        result = check_for_updates(allow_network=True)
+        msg = result.message(get_lang())
+        self._set_status(msg)
+        if silent and not result.newer_available:
+            return
+        QMessageBox.information(self, "Update-Check", msg)
 
     def _batch_convert(self):
         BatchConvertDialog(self).exec()

@@ -133,22 +133,40 @@ def export_docx(text: str, path: str | Path, *, title: Optional[str] = None) -> 
     return path
 
 
+def resolve_page_size(name_or_size: str | tuple[float, float] | None = None) -> tuple[float, float]:
+    """Seitenformat aus Preset-Name oder Tupel; Default aus Einstellungen."""
+    if isinstance(name_or_size, tuple) and len(name_or_size) == 2:
+        return float(name_or_size[0]), float(name_or_size[1])
+    from ild_pdf.pages import PAGE_SIZE_PRESETS
+
+    name = name_or_size
+    if not name:
+        try:
+            from instantlensdoc.core.app_settings import get_export_pdf_page
+
+            name = get_export_pdf_page()
+        except Exception:
+            name = "A4"
+    return PAGE_SIZE_PRESETS.get(str(name), PAGE_SIZE_PRESETS["A4"])
+
+
 def export_pdf(
     text: str,
     path: str | Path,
     *,
     title: str = "InstantLens Doc",
-    page_size: tuple[float, float] = (595.0, 842.0),  # A4
+    page_size: tuple[float, float] | str | None = None,
 ) -> Path:
     """
     Einfaches Mehrseiten-PDF aus Plaintext (Helvetica via pikepdf).
     Kein Layout-Engine — Zeilenumbruch nach Zeichenzahl.
+    page_size: Tupel, Preset-Name oder None (= Einstellung/A4).
     """
     import pikepdf
     from pikepdf import Dictionary, Name, Stream
 
     path = Path(path)
-    page_w, page_h = page_size
+    page_w, page_h = resolve_page_size(page_size)
     margin = 50.0
     font_size = 11.0
     line_h = font_size * 1.35

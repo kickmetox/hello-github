@@ -15,7 +15,7 @@ HELP_HTML = """
 <h3>Erste Schritte</h3>
 <ul>
 <li><b>Datei → Öffnen</b>: TXT, MD, HTML, DOCX, PDF, Bilder</li>
-<li><b>Datei → Einstellungen</b>: OCR-Standardsprache, Theme, Batch-/Öffnen-Pfade</li>
+<li><b>Datei → Einstellungen</b>: Theme, <b>UI-Sprache DE/EN</b>, OCR, Export-Qualität, Update-Hinweis, Pfade</li>
 <li><b>Datei → Zuletzt geöffnet</b>: Menü + Seitenleiste (persistiert)</li>
 <li><b>Datei → Exportieren</b>: Editor-Inhalt als HTML, DOCX oder PDF</li>
 <li><b>Datei → Drucken</b> (Ctrl+P): Editor oder aktuelle PDF-Seite (Qt Print)</li>
@@ -28,7 +28,7 @@ HELP_HTML = """
 <li><b>Drag &amp; Drop</b>: Dateien auf das Fenster ziehen zum Öffnen</li>
 <li><b>Autosave</b>: Textdokumente (mit Pfad) und PDF-Annotationen ca. jede Minute</li>
 <li><b>PDF</b>: Blättern, Zoom/Fit (debounced + Cache), 90°-Drehen, Seite löschen, Seiten neu anordnen;
-    Annotationen: Highlight (Drag), <b>Schwärzen/Redaction</b> (Drag + optional Einbrennen), Unterstreichen, Notiz, <b>Text-Overlay</b>, Stempel, Callout,
+    Annotationen: Highlight (Drag), <b>Schwärzen/Redaction</b> (Drag + Preview „REDACT“ + Einbrennen-Dialog), Unterstreichen, Notiz, <b>Text-Overlay</b>, Stempel, Callout,
     <b>Rechteck / Linie / Pfeil / Lineal</b> —
     Sidecar <code>*.ildann.json</code> (v3, Auto-Save, Undo/Redo);
     Doppelklick oder Strg+Klick auf Overlay zum Bearbeiten;
@@ -38,9 +38,11 @@ HELP_HTML = """
     <b>Wasserzeichen / Seitennummern</b>;
     <b>Zwei PDFs vergleichen</b> (Seite neben Seite);
     <b>Passwort setzen/öffnen</b>; <b>Bildkompression</b> (Seiten neu als JPEG);
+    <b>Metadaten bearbeiten</b>; <b>Seitengröße / Zuschneiden</b>;
     Seite als Bild / Bild als neue Seite (komprimiert) / Seite drucken;
     große PDFs: Warnung / Limits;
     <b>Seiten-Thumbnails</b> in der Sidebar</li>
+<li><b>Hilfe → Auf Updates prüfen</b>: lokal immer; Online optional (offline OK)</li>
 <li><b>Zwischenablage</b>: Bild einfügen (Editor Ctrl+Shift+V / PDF Strg+V) — Stempel oder neue Seite</li>
 <li><b>Session</b>: Offene Dokumente (Sidebar-Liste) werden beim Beenden gespeichert und beim Start wiederhergestellt</li>
 <li><b>Logging</b>: Datei unter <code>%APPDATA%/InstantLensDoc/logs/</code> (Windows) bzw. <code>~/.config/InstantLensDoc/logs/</code></li>
@@ -67,7 +69,7 @@ Beispiel: <code>examples/ild_pdf_demo.py</code>. API: <code>ild_pdf/README.md</c
 <code>D:\\AI_Temp\\InstantLensDoc</code>, pip, optional Start. Eigenes Icon in <code>assets</code> bleibt erhalten.</p>
 <h3>Geplante Features</h3>
 <p>KI-Assistent, Cloud-Sync, Stylus/Palm Rejection, 3D u. a. sind im Menü als „Geplant“ markiert
-(Stub 0.1.8) — siehe FEATURES.md.</p>
+(Stub 0.1.9) — siehe FEATURES.md.</p>
 """
 
 

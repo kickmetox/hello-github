@@ -1,4 +1,4 @@
-"""Persistente App-Einstellungen (Theme, OCR, Pfade)."""
+"""Persistente App-Einstellungen (Theme, OCR, Pfade, Export, Sprache)."""
 
 from __future__ import annotations
 
@@ -11,12 +11,18 @@ from instantlensdoc.config import config_dir
 SETTINGS_NAME = "ui_settings.json"
 
 ThemeMode = Literal["light", "dark"]
+UiLang = Literal["de", "en"]
 
 DEFAULTS: dict[str, Any] = {
     "theme": "light",
     "ocr_lang": "deu+eng",
     "batch_output_dir": "",
     "default_open_dir": "",
+    "ui_lang": "de",
+    "export_jpeg_quality": 85,
+    "export_pdf_page": "A4",
+    "export_image_max_edge": 2000,
+    "update_check_on_start": False,
 }
 
 
@@ -92,3 +98,41 @@ def get_default_open_dir() -> Path | None:
 
 def set_default_open_dir(path: str | Path) -> None:
     save_settings({"default_open_dir": str(path)})
+
+
+def get_ui_lang() -> UiLang:
+    lang = str(load_settings().get("ui_lang", "de")).lower()
+    return "en" if lang.startswith("en") else "de"
+
+
+def set_ui_lang(lang: str) -> None:
+    save_settings({"ui_lang": "en" if str(lang).lower().startswith("en") else "de"})
+
+
+def get_export_jpeg_quality() -> int:
+    try:
+        q = int(load_settings().get("export_jpeg_quality", 85))
+    except (TypeError, ValueError):
+        q = 85
+    return max(10, min(100, q))
+
+
+def get_export_pdf_page() -> str:
+    name = str(load_settings().get("export_pdf_page", "A4") or "A4")
+    return name
+
+
+def get_export_image_max_edge() -> int:
+    try:
+        v = int(load_settings().get("export_image_max_edge", 2000))
+    except (TypeError, ValueError):
+        v = 2000
+    return max(200, min(8000, v))
+
+
+def get_update_check_on_start() -> bool:
+    return bool(load_settings().get("update_check_on_start", False))
+
+
+def set_update_check_on_start(enabled: bool) -> None:
+    save_settings({"update_check_on_start": bool(enabled)})

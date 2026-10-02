@@ -27,8 +27,10 @@ SHORTCUTS_HTML = """
 <tr><td>Overlay bearbeiten</td><td>Doppelklick / <code>Ctrl</code>+Klick</td></tr>
 <tr><td>Diese Hilfe</td><td><code>F1</code> (Hilfe-Menü)</td></tr>
 </table>
-<p><b>PDF-Werkzeuge</b> (Toolbar): Highlight, Schwärzen, Formen per Drag;
+<p><b>PDF-Werkzeuge</b> (Toolbar): Highlight, Schwärzen (REDACT-Preview), Formen per Drag;
 Notiz/Stempel/Callout/Overlay per Klick.</p>
+<p><b>Schwärzung:</b> Rechteck ziehen → PDF → Schwärzung einbrennen… (Sidecar optional leeren)
+bzw. Schwärzungs-Annotationen löschen…</p>
 <p>Vollständige Bedienung: Hilfe → Hilfe…</p>
 """
 
