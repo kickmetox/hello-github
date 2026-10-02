@@ -221,14 +221,38 @@ class AboutDialog(QDialog):
                 f"<p>Icon: assets/app.ico · assets/icon.png</p>"
             )
         )
+        # Keygen-Hinweis bei aktiver Trial-Lizenz
+        trial_hint = ""
+        try:
+            from instantlensdoc.license import LicenseManager
+
+            st = LicenseManager().status()
+            if st.mode == "trial":
+                rem = st.days_remaining
+                trial_hint = (
+                    f"<p style='background:#FFF3CD;padding:8px;border:1px solid #E0C36A;'>"
+                    f"<b>Testversion</b> — noch {rem} Tag(e).<br>"
+                    f"Lizenzschlüssel erzeugen: <code>run-keygen.bat</code> bzw. "
+                    f"<code>python -m keygen --gui</code> "
+                    f"(Installer: <code>InstantLensKeygen.exe</code>).<br>"
+                    f"Neuen Key anfordern: <a href='mailto:{CONTACT_EMAIL}'>{CONTACT_EMAIL}</a>"
+                    f"</p>"
+                )
+        except Exception:
+            trial_hint = ""
+        if trial_hint:
+            hint_lbl = QLabel(trial_hint)
+            hint_lbl.setWordWrap(True)
+            hint_lbl.setOpenExternalLinks(True)
+            layout.addWidget(hint_lbl)
         features_short = QLabel(
             "<h3>Features (Kurz)</h3>"
             "<ul>"
             "<li>PDF lesen/annotieren (Highlight, Notiz, Stempel, Formen) · Sidecar v4</li>"
             "<li>Seitenlabels (römisch/arabisch), Continuous Scroll, Spread, CropBox</li>"
-            "<li>Editor: Find/Replace, Snippets, Bracket-Match, Zwischenablage-Verlauf</li>"
+            "<li>Editor: Find/Replace, Snippets, Bracket-Match, Zwischenablage-Verlauf, Minimap</li>"
             "<li>OCR-Bridge (Seite + gesamtes PDF), Formulargenerator, Batch, Export</li>"
-            "<li>Annotation-Tags, Projekt-Ordner-Workspace, PDF bereinigen</li>"
+            "<li>Annotation-Tags, Kommentar-Bericht TXT/MD, Farbe Palette-Zyklus</li>"
             "<li>Selection→Highlight, Ann.-Regex, Datei-Vergleich, Export-Profil</li>"
             "<li>Lizenz Trial/Keys · Stubs: KI, Cloud, Stylus, 3D</li>"
             "</ul>"

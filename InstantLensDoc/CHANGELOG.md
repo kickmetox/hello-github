@@ -1,5 +1,23 @@
 # Changelog — InstantLens Doc
 
+## 0.5.3 — Kommentar-Bericht, Farbe-Zyklus, Minimap, About-Keygen
+
+Nach 0.5.2: vier sinnvolle Ausbauten. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### PDF / Annotationen
+- **Kommentar-Bericht**: Annotationen als zusammenhängenden TXT- oder Markdown-Bericht exportieren (nach Seite gruppiert)
+- **Farbe Palette-Zyklus / Randomizer**: Ctrl+Shift+C bzw. Ctrl+Alt+Shift+C für Highlight-Farbe
+
+### Editor / Lizenz
+- **Editor-Minimap** optional (Linien-Übersicht rechts + dickere Scrollbar); Ansicht / Einstellungen / Ctrl+Shift+I
+- **About**: Keygen-Hinweis (`run-keygen.bat` / `InstantLensKeygen.exe`) wenn Trial aktiv
+
+### Packaging / Docs
+- Version **0.5.3** (App / ild_pdf / ISS / Smoke / Docs)
+- Stubs KI/Cloud/Stylus/3D unverändert
+
+---
+
 ## 0.5.2 — Selection→Highlight, Ann.-Regex, Text-Diff, Export-Profil
 
 Nach 0.5.1: vier sinnvolle Ausbauten. Stubs KI/Cloud/Stylus/3D bleiben Stubs.

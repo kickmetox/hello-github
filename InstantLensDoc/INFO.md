@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **0.5.2** |
+| Version | **0.5.3** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -15,7 +15,8 @@
 - Keys: **32 Tage (30+2)**, Format `ILD1.…`  
 - Neu anfordern: **ame@sellerbach.de**  
 - Statusleiste: bei **<7 Tagen** Restlaufzeit prominent hervorgehoben  
-- Lizenz-Dialog: Resttage + Ablaufdatum klar
+- Lizenz-Dialog: Resttage + Ablaufdatum klar  
+- About: bei Trial zusätzlicher Keygen-Hinweis
 
 ## Quickstart (Windows)
 
@@ -33,10 +34,10 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)
 
-## Neu in 0.5.2
+## Neu in 0.5.3
 
-- Selection→Highlight (Text-Drag → Annotation inkl. Inhalt)
-- Annotation-Suche: optionales Regex
-- Dateien vergleichen (zwei Tabs Side-by-Side, Zeilen-Diff)
-- Export-Profil speichern (DPI / Format / Ziel)
+- Kommentar-Bericht: PDF-Annotationen als zusammenhängendes TXT/MD
+- Annotation-Farbe: Palette-Zyklus (Ctrl+Shift+C) / Random (Ctrl+Alt+Shift+C)
+- Editor-Minimap optional (Linien-Übersicht + dickere Scrollbar)
+- About: Keygen-Hinweis wenn Trial aktiv
 - Stubs KI/Cloud/Stylus/3D unverändert

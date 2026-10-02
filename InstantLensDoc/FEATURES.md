@@ -46,6 +46,7 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | Annotation Select-All Seite | fertig | Alle Ann. der aktuellen Seite; Ctrl+A im PDF 0.3.6 |
 | Annotation verschieben / Lock | fertig | Drag im Auswahl-Werkzeug; **Sperre-Toggle** (nicht verschiebbar) 0.4.3 |
 | Annotation-Farben-Favoriten | fertig | 3 Presets speichern/anwenden (Toolbar 1/2/3) 0.3.7 |
+| Annotation-Farbe Palette-Zyklus | fertig | Ctrl+Shift+C Zyklus / Ctrl+Alt+Shift+C Random aus fester Palette 0.5.3 |
 | Annotation-Text editieren | fertig | Notiz/Kommentar/Overlay nachträglich; Doppelklick / Ctrl+E 0.2.7 |
 | Annotation-Tags/Labels | fertig | Freie Tags; Sidecar+CSV; Sidebar-Filter; Ctrl+Alt+T 0.5.1 |
 | Annotation-Deckkraft | fertig | `opacity` Sidecar + Toolbar α + Dialog 0.2.8 |
@@ -56,6 +57,7 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | PDF-Anhänge | fertig | Auflisten/extrahieren (pikepdf Attachments) 0.3.2 |
 | Annotation-Layer Toggle | fertig | Ansicht + Toolbar; Ctrl+Shift+A 0.3.2 |
 | Annotationen flatten/bake Export | fertig | Alle Seiten mit Ann. → neues PDF; **Fortschrittsdialog + Abbrechen** 0.4.2 |
+| Annotation Kommentar-Bericht | fertig | Zusammenhängender TXT/MD-Export (nach Seite gruppiert) 0.5.3 |
 | PDF Seiten als Einzel-PDFs | fertig | Eine Datei pro Seite; Menü + `split_into_single_page_pdfs` 0.3.3 |
 | PDF-Text → Editor | fertig | Seite oder gesamtes PDF; Menü PDF 0.3.4 |
 | PDF-Seitenbild → Editor | fertig | Seite/alle Seiten als PNG + Verweiszeile; Menü PDF 0.4.5 |
@@ -83,6 +85,7 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | PDF Seitenbereich extrahieren | fertig | von–bis → neues PDF; Menü + Dialog-Tab 0.2.6 |
 | Editor Find/Replace | fertig | Ctrl+R Dialog 0.2.6 |
 | Editor Zeilennummern | fertig | Optional (Ansicht + Einstellungen) 0.2.7 |
+| Editor Minimap | fertig | Optional Linien-Übersicht + dickere Scrollbar; Ansicht/Einstellungen; Ctrl+Shift+I 0.5.3 |
 | Editor Groß-/Kleinschreibung | fertig | Auswahl umschalten Ctrl+Shift+U 0.2.8; **Alles groß/klein ganze Datei** 0.4.2 |
 | Editor Einrückung | fertig | Erhöhen/Verringern Ctrl+]/[ bzw. **Tab/Shift+Tab Block** 0.3.7 |
 | Editor Markdown-Vorschau | fertig | Optional Split (Ansicht); Ctrl+Shift+M 0.3.2 |
@@ -126,25 +129,25 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | Inno-Installer | fertig | Icon, Desktop, Uninstaller, Keygen optional (`InstantLensKeygen.exe`) 0.2.1 |
 | Sync-Skript Windows | fertig | Repo `scripts/sync-ild.ps1`; Store `docs/sync-ild.ps1` |
 | Arbeitsverzeichnis öffnen | fertig | Datei-Menü Ctrl+Shift+E; Ordner der Datei bzw. CWD 0.4.8 |
-| In-App Hilfe / About | fertig | Version 0.5.2; Fenstertitel + Splash; Logordner-Button; **Feature-Kurzliste + FEATURES.md** 0.4.9 |
-| CHANGELOG | fertig | **0.5.2** Selection→Highlight, Ann.-Regex, Text-Diff, Export-Profil |
+| In-App Hilfe / About | fertig | Version 0.5.3; Fenstertitel + Splash; Logordner-Button; **Feature-Kurzliste + FEATURES.md** 0.4.9; **Keygen-Hinweis bei Trial** 0.5.3 |
+| CHANGELOG | fertig | **0.5.3** Kommentar-Bericht, Farbe-Zyklus, Minimap, About-Keygen |
 | FEATURES.md / INFO.md | fertig | |
-| `ild_pdf` Modul + Beispielskript | fertig | metadata / page size / watermark / redact / acroform / attachments / flatten / **plain text** / **selection_to_highlight_rects** |
+| `ild_pdf` Modul + Beispielskript | fertig | metadata / page size / watermark / redact / acroform / attachments / flatten / **plain text** / **selection_to_highlight_rects** / **export_report** |
 | Font-Matching | geplant | |
 | Objekt-/Bildbearbeitung | geplant | |
 | Layout-Erhaltung (Scan→edit) | geplant | |
 | Freihand | geplant | |
-| KI-Assistent | Stub | Menü „Geplant“ 0.5.2 (keine Fake-KI) |
+| KI-Assistent | Stub | Menü „Geplant“ 0.5.3 (keine Fake-KI) |
 | Signieren (rechtssicher) | Stub | |
-| Cloud-Sync | Stub | Menü „Geplant“ 0.5.2 (keine Fake-Cloud) |
+| Cloud-Sync | Stub | Menü „Geplant“ 0.5.3 (keine Fake-Cloud) |
 | Text on Path / Text zu Pfaden | geplant | |
 | Envelope Distort / Text Wrap / Area Type | Stub/geplant | |
 | Schnittmasken | geplant | |
 | Füllungen / Live-Effekte | geplant | |
-| 3D-Extrusion | Stub | Menü „Geplant“ 0.5.2 |
+| 3D-Extrusion | Stub | Menü „Geplant“ 0.5.3 |
 | Variable Fonts (voll) | Stub | |
 | Glyphen-Palette | geplant | |
-| Stylus / Palm Rejection | Stub | Menü „Geplant“ 0.5.2 |
-| Intelligente Formerkennung | Stub | Menü „Geplant“ 0.5.2 |
+| Stylus / Palm Rejection | Stub | Menü „Geplant“ 0.5.3 |
+| Intelligente Formerkennung | Stub | Menü „Geplant“ 0.5.3 |
 
 Nicht behauptet als fertig: Cloud, KI, Stylus, 3D — nur Menü-Stubs + dieser Status.

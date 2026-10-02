@@ -683,6 +683,7 @@ class MainWindow(QMainWindow):
         self._line_numbers_action.setCheckable(True)
         from instantlensdoc.core.app_settings import (
             get_editor_line_numbers,
+            get_editor_minimap,
             get_pdf_grayscale,
             get_pdf_night_mode,
         )
@@ -691,6 +692,15 @@ class MainWindow(QMainWindow):
         self._line_numbers_action.setToolTip("Zeilennummern im Texteditor anzeigen")
         self._line_numbers_action.toggled.connect(self._toggle_line_numbers)
         m_view.addAction(self._line_numbers_action)
+        self._minimap_action = QAction("Editor-Minimap", self)
+        self._minimap_action.setCheckable(True)
+        self._minimap_action.setChecked(get_editor_minimap())
+        self._minimap_action.setToolTip(
+            "Einfache Linien-Übersicht rechts + dickere Scrollbar (optional)"
+        )
+        self._minimap_action.setShortcut(QKeySequence("Ctrl+Shift+I"))
+        self._minimap_action.toggled.connect(self._toggle_minimap)
+        m_view.addAction(self._minimap_action)
         self._md_preview_action = QAction("Markdown-Vorschau", self)
         self._md_preview_action.setCheckable(True)
         self._md_preview_action.setChecked(get_editor_markdown_preview())
@@ -892,12 +902,30 @@ class MainWindow(QMainWindow):
             ("Annotationen laden", lambda: self.pdf_view.reload_annotations()),
             ("Annotationen als JSON exportieren…", lambda: self.pdf_view.export_annotations_json()),
             ("Annotationen als CSV exportieren…", lambda: self.pdf_view.export_annotations_csv()),
+            (
+                "Kommentar-Bericht (Markdown)…",
+                lambda: self.pdf_view.export_annotations_report(default_fmt="md"),
+            ),
+            (
+                "Kommentar-Bericht (Text)…",
+                lambda: self.pdf_view.export_annotations_report(default_fmt="txt"),
+            ),
             ("Annotationen flatten/bake exportieren…", lambda: self.pdf_view.export_annotations_flattened()),
             ("Annotationen aus JSON importieren…", lambda: self.pdf_view.import_annotations_json()),
         ]:
             a = QAction(title, self)
             a.triggered.connect(slot)
             m_pdf.addAction(a)
+        act_cycle_color = QAction("Annotation-Farbe Palette-Zyklus", self)
+        act_cycle_color.setShortcut(QKeySequence("Ctrl+Shift+C"))
+        act_cycle_color.setToolTip("Nächste Highlight-Farbe aus der festen Palette")
+        act_cycle_color.triggered.connect(lambda: self.pdf_view.cycle_annotation_color())
+        m_pdf.addAction(act_cycle_color)
+        act_rand_color = QAction("Annotation-Farbe randomisieren", self)
+        act_rand_color.setShortcut(QKeySequence("Ctrl+Alt+Shift+C"))
+        act_rand_color.setToolTip("Zufällige Highlight-Farbe aus der Palette")
+        act_rand_color.triggered.connect(lambda: self.pdf_view.randomize_annotation_color())
+        m_pdf.addAction(act_rand_color)
         m_pdf.addSeparator()
         for title, slot in [
             ("Lesezeichen hinzufügen…", self._outline_add),
@@ -1482,6 +1510,13 @@ class MainWindow(QMainWindow):
         set_editor_line_numbers(bool(checked))
         self.editor.set_line_numbers_visible(bool(checked))
         self._set_status("Zeilennummern an" if checked else "Zeilennummern aus")
+
+    def _toggle_minimap(self, checked: bool):
+        from instantlensdoc.core.app_settings import set_editor_minimap
+
+        set_editor_minimap(bool(checked))
+        self.editor.set_minimap_visible(bool(checked))
+        self._set_status("Minimap an" if checked else "Minimap aus")
 
     def _toggle_markdown_preview(self, checked: bool):
         self.editor_pane.set_preview_visible(bool(checked))
@@ -2488,6 +2523,7 @@ class MainWindow(QMainWindow):
             from instantlensdoc.core.app_settings import (
                 get_editor_line_numbers,
                 get_editor_markdown_preview,
+                get_editor_minimap,
                 get_editor_show_special_chars,
                 get_editor_soft_wrap,
                 get_pdf_grayscale,
@@ -2500,6 +2536,12 @@ class MainWindow(QMainWindow):
                 self._line_numbers_action.blockSignals(True)
                 self._line_numbers_action.setChecked(show_ln)
                 self._line_numbers_action.blockSignals(False)
+            show_mm = get_editor_minimap()
+            self.editor.set_minimap_visible(show_mm)
+            if hasattr(self, "_minimap_action") and self._minimap_action is not None:
+                self._minimap_action.blockSignals(True)
+                self._minimap_action.setChecked(show_mm)
+                self._minimap_action.blockSignals(False)
             soft = get_editor_soft_wrap()
             self.editor.set_soft_wrap(soft)
             if hasattr(self, "_soft_wrap_action") and self._soft_wrap_action is not None:

@@ -59,6 +59,7 @@ from instantlensdoc.core.app_settings import (
     set_default_zoom_percent,
     set_editor_bracket_match,
     set_editor_line_numbers,
+    set_editor_minimap,
     set_editor_show_special_chars,
     set_editor_soft_wrap,
     set_editor_text_encoding,
@@ -145,11 +146,22 @@ class SettingsDialog(QDialog):
         form.addRow(tr("autosave_interval"), self.autosave_sec)
 
         self.line_numbers = QCheckBox("Zeilennummern im Editor")
-        from instantlensdoc.core.app_settings import get_editor_line_numbers, get_editor_soft_wrap
+        from instantlensdoc.core.app_settings import (
+            get_editor_line_numbers,
+            get_editor_minimap,
+            get_editor_soft_wrap,
+        )
 
         self.line_numbers.setChecked(get_editor_line_numbers())
         self.line_numbers.setToolTip("Optionale Zeilennummern im Texteditor")
         form.addRow(self.line_numbers)
+
+        self.minimap = QCheckBox("Editor-Minimap (Linien-Übersicht)")
+        self.minimap.setChecked(get_editor_minimap())
+        self.minimap.setToolTip(
+            "Einfache Minimap rechts + dickere Scrollbar (optional)"
+        )
+        form.addRow(self.minimap)
 
         self.soft_wrap = QCheckBox("Soft-Wrap (Zeilenumbruch) im Editor")
         self.soft_wrap.setChecked(get_editor_soft_wrap())
@@ -371,6 +383,7 @@ class SettingsDialog(QDialog):
         set_pdf_thumbnail_scale(float(self.thumb_scale.currentData() or 0.18))
         set_autosave_interval_sec(int(self.autosave_sec.value()))
         set_editor_line_numbers(self.line_numbers.isChecked())
+        set_editor_minimap(self.minimap.isChecked())
         set_editor_soft_wrap(self.soft_wrap.isChecked())
         set_editor_show_special_chars(self.special_chars.isChecked())
         set_editor_text_encoding(str(self.enc_combo.currentData() or "utf-8"))
@@ -422,6 +435,32 @@ class SettingsDialog(QDialog):
         ):
             try:
                 parent.editor.set_bracket_match_enabled(self.bracket_match.isChecked())
+            except Exception:
+                pass
+        if parent is not None and hasattr(parent, "editor"):
+            try:
+                if hasattr(parent.editor, "set_line_numbers_visible"):
+                    parent.editor.set_line_numbers_visible(self.line_numbers.isChecked())
+                if hasattr(parent.editor, "set_minimap_visible"):
+                    parent.editor.set_minimap_visible(self.minimap.isChecked())
+                if hasattr(parent.editor, "set_soft_wrap"):
+                    parent.editor.set_soft_wrap(self.soft_wrap.isChecked())
+                if hasattr(parent.editor, "set_special_chars_visible"):
+                    parent.editor.set_special_chars_visible(self.special_chars.isChecked())
+            except Exception:
+                pass
+        if parent is not None and hasattr(parent, "_minimap_action"):
+            try:
+                parent._minimap_action.blockSignals(True)
+                parent._minimap_action.setChecked(self.minimap.isChecked())
+                parent._minimap_action.blockSignals(False)
+            except Exception:
+                pass
+        if parent is not None and hasattr(parent, "_line_numbers_action"):
+            try:
+                parent._line_numbers_action.blockSignals(True)
+                parent._line_numbers_action.setChecked(self.line_numbers.isChecked())
+                parent._line_numbers_action.blockSignals(False)
             except Exception:
                 pass
         if parent is not None and hasattr(parent, "pdf_view"):

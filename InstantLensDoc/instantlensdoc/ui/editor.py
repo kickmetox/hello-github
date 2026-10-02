@@ -12,12 +12,15 @@ from PySide6.QtWidgets import QApplication, QPlainTextEdit, QTextEdit, QWidget
 from instantlensdoc.core.app_settings import (
     get_editor_bracket_match,
     get_editor_line_numbers,
+    get_editor_minimap,
     get_editor_soft_wrap,
     get_editor_show_special_chars,
     get_editor_trim_whitespace_on_paste,
 )
 
 CLIPBOARD_HISTORY_MAX = 3
+MINIMAP_WIDTH = 56
+MINIMAP_SCROLLBAR_WIDTH = 14
 
 
 class _LineNumberArea(QWidget):
@@ -32,6 +35,32 @@ class _LineNumberArea(QWidget):
         self._editor.paint_line_number_area(event)
 
 
+class _MinimapArea(QWidget):
+    """Einfache Linien-Übersicht (Minimap) rechts neben dem Editor."""
+
+    def __init__(self, editor: "TextEditor"):
+        super().__init__(editor)
+        self._editor = editor
+        self.setCursor(Qt.PointingHandCursor)
+        self.setToolTip("Minimap — Klick springt zur Position")
+
+    def sizeHint(self) -> QSize:  # noqa: N802
+        return QSize(self._editor.minimap_width(), 0)
+
+    def paintEvent(self, event):  # noqa: N802
+        self._editor.paint_minimap_area(event)
+
+    def mousePressEvent(self, event):  # noqa: N802
+        if event.button() == Qt.LeftButton:
+            self._editor.minimap_goto_y(event.position().y())
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):  # noqa: N802
+        if event.buttons() & Qt.LeftButton:
+            self._editor.minimap_goto_y(event.position().y())
+        super().mouseMoveEvent(event)
+
+
 class TextEditor(QPlainTextEdit):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -43,6 +72,7 @@ class TextEditor(QPlainTextEdit):
         self._paste_image_dir: Path | None = None
         self._last_case_sensitive = False
         self._line_numbers = bool(get_editor_line_numbers())
+        self._minimap = bool(get_editor_minimap())
         self._soft_wrap = bool(get_editor_soft_wrap())
         self._show_special = bool(get_editor_show_special_chars())
         self._bracket_match = bool(get_editor_bracket_match())
@@ -51,11 +81,15 @@ class TextEditor(QPlainTextEdit):
         self._mark_selections: list = []
         self._bracket_selections: list = []
         self._line_number_area = _LineNumberArea(self)
-        self.blockCountChanged.connect(self._update_line_number_area_width)
+        self._minimap_area = _MinimapArea(self)
+        self.blockCountChanged.connect(self._update_side_areas)
         self.updateRequest.connect(self._update_line_number_area)
+        self.updateRequest.connect(self._update_minimap_area)
         self.cursorPositionChanged.connect(self._update_bracket_match)
-        self._update_line_number_area_width(0)
+        self.verticalScrollBar().valueChanged.connect(lambda _v: self._minimap_area.update())
+        self._update_side_areas()
         self.set_line_numbers_visible(self._line_numbers)
+        self.set_minimap_visible(self._minimap)
         self.set_soft_wrap(self._soft_wrap)
         self.set_special_chars_visible(self._show_special)
 
@@ -65,14 +99,35 @@ class TextEditor(QPlainTextEdit):
         digits = max(2, len(str(max(1, self.blockCount()))))
         return 8 + self.fontMetrics().horizontalAdvance("9") * digits
 
+    def minimap_width(self) -> int:
+        return MINIMAP_WIDTH if self._minimap else 0
+
     def set_line_numbers_visible(self, visible: bool) -> None:
         self._line_numbers = bool(visible)
         self._line_number_area.setVisible(self._line_numbers)
-        self._update_line_number_area_width(0)
+        self._update_side_areas()
         self.viewport().update()
 
     def line_numbers_visible(self) -> bool:
         return self._line_numbers
+
+    def set_minimap_visible(self, visible: bool) -> None:
+        """Optionale Minimap (Linien-Übersicht) + dickere Scrollbar."""
+        self._minimap = bool(visible)
+        self._minimap_area.setVisible(self._minimap)
+        sb = self.verticalScrollBar()
+        if self._minimap:
+            sb.setStyleSheet(
+                f"QScrollBar:vertical {{ width: {MINIMAP_SCROLLBAR_WIDTH}px; min-width: {MINIMAP_SCROLLBAR_WIDTH}px; }}"
+            )
+        else:
+            sb.setStyleSheet("")
+        self._update_side_areas()
+        self._minimap_area.update()
+        self.viewport().update()
+
+    def minimap_visible(self) -> bool:
+        return bool(self._minimap)
 
     def set_soft_wrap(self, enabled: bool) -> None:
         """Zeilenumbruch am Fensterrand (Soft-Wrap) ein/aus."""
@@ -531,7 +586,13 @@ class TextEditor(QPlainTextEdit):
         return True
 
     def _update_line_number_area_width(self, _new_block_count: int = 0) -> None:
-        self.setViewportMargins(self.line_number_area_width(), 0, 0, 0)
+        self._update_side_areas()
+
+    def _update_side_areas(self, _new_block_count: int = 0) -> None:
+        left = self.line_number_area_width()
+        right = self.minimap_width()
+        self.setViewportMargins(left, 0, right, 0)
+        self._layout_side_areas()
 
     def _update_line_number_area(self, rect: QRect, dy: int) -> None:
         if dy:
@@ -539,13 +600,29 @@ class TextEditor(QPlainTextEdit):
         else:
             self._line_number_area.update(0, rect.y(), self._line_number_area.width(), rect.height())
         if rect.contains(self.viewport().rect()):
-            self._update_line_number_area_width(0)
+            self._update_side_areas()
+
+    def _update_minimap_area(self, rect: QRect, dy: int) -> None:
+        if not self._minimap:
+            return
+        if dy:
+            self._minimap_area.scroll(0, dy)
+        else:
+            self._minimap_area.update()
+        if rect.contains(self.viewport().rect()):
+            self._update_side_areas()
 
     def resizeEvent(self, event):  # noqa: N802
         super().resizeEvent(event)
+        self._layout_side_areas()
+
+    def _layout_side_areas(self) -> None:
         cr = self.contentsRect()
-        self._line_number_area.setGeometry(
-            QRect(cr.left(), cr.top(), self.line_number_area_width(), cr.height())
+        ln_w = self.line_number_area_width()
+        mm_w = self.minimap_width()
+        self._line_number_area.setGeometry(QRect(cr.left(), cr.top(), ln_w, cr.height()))
+        self._minimap_area.setGeometry(
+            QRect(cr.right() - mm_w + 1, cr.top(), mm_w, cr.height())
         )
 
     def paint_line_number_area(self, event) -> None:
@@ -572,6 +649,57 @@ class TextEditor(QPlainTextEdit):
             top = bottom
             bottom = top + int(self.blockBoundingRect(block).height())
             block_number += 1
+
+    def paint_minimap_area(self, event) -> None:
+        if not self._minimap:
+            return
+        painter = QPainter(self._minimap_area)
+        painter.fillRect(event.rect(), QColor("#F0F3F6"))
+        h = max(1, self._minimap_area.height())
+        w = max(1, self._minimap_area.width())
+        doc = self.document()
+        n = max(1, doc.blockCount())
+        # Sichtbarer Bereich
+        sb = self.verticalScrollBar()
+        vmax = max(1, sb.maximum())
+        vval = sb.value()
+        vpage = max(1, sb.pageStep())
+        vis_top = int(h * (vval / (vmax + vpage)))
+        vis_h = max(4, int(h * (vpage / (vmax + vpage))))
+        painter.fillRect(0, vis_top, w, vis_h, QColor(70, 130, 180, 55))
+        painter.setPen(QColor(70, 130, 180, 120))
+        painter.drawRect(0, vis_top, w - 1, vis_h)
+        # Linien-Übersicht: Inhalt → Strichbreite
+        painter.setPen(Qt.NoPen)
+        block = doc.firstBlock()
+        i = 0
+        while block.isValid():
+            text = block.text().rstrip()
+            if text:
+                dens = min(1.0, len(text) / 80.0)
+                bar_w = max(2, int((w - 6) * dens))
+                y = int(i * h / n)
+                yh = max(1, int(h / n))
+                painter.fillRect(3, y, bar_w, yh, QColor("#6A7A8A"))
+            block = block.next()
+            i += 1
+
+    def minimap_goto_y(self, y: float) -> None:
+        """Minimap-Klick → relative Dokumentposition."""
+        if not self._minimap:
+            return
+        h = max(1, self._minimap_area.height())
+        ratio = max(0.0, min(1.0, float(y) / float(h)))
+        n = max(1, self.blockCount())
+        line = int(ratio * (n - 1))
+        block = self.document().findBlockByNumber(line)
+        if not block.isValid():
+            return
+        cur = self.textCursor()
+        cur.setPosition(block.position())
+        self.setTextCursor(cur)
+        self.centerCursor()
+        self._minimap_area.update()
 
     def clipboard_history(self) -> list[str]:
         """Letzte eingefügte Textschnipsel (max. 3, neueste zuerst)."""

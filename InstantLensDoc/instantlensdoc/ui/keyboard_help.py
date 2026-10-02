@@ -83,7 +83,8 @@ PDF → Annotationen speichern unter…</p>
 <p><b>Als Kopie speichern (PDF):</b> schreibt PDF + Sidecar an neuen Pfad;
 aktuelles Dokument bleibt geöffnet (<code>Ctrl+Alt+S</code> / Datei / PDF).</p>
 <p><b>Lesezeichen:</b> Sidebar +/− oder PDF → Lesezeichen hinzufügen/löschen.</p>
-<p><b>Annotationen JSON/CSV:</b> PDF → als JSON oder CSV exportieren / JSON importieren (ersetzen oder anhängen).</p>
+<p><b>Annotationen JSON/CSV/Bericht:</b> PDF → als JSON oder CSV exportieren / JSON importieren;
+<strong>Kommentar-Bericht</strong> als zusammenhängendes TXT oder Markdown (nach Seite gruppiert).</p>
 <p><b>PDF-Werkzeuge</b> (Toolbar): Auswahl (auch PDF-Links öffnen / Ann. verschieben wenn entsperrt), Highlight, Schwärzen (REDACT-Preview), Formen per Drag;
 Notiz/Stempel/Callout/Overlay per Klick; <b>Stempel ↻</b> drehen; <b>HL</b>/<b>Stift</b>/<b>Notiz</b>-Farben-Picker; <b>α Deckkraft</b>;
 <b>Grau</b>-Toggle; <b>Nacht</b>-Toggle; <b>2S</b> Zwei-Seiten-Spread; <b>CS</b> Continuous Scroll; <b>Sperre</b>; <b>Rahmen</b> (CropBox); Ann. löschen;
@@ -100,7 +101,8 @@ freie <b>Tags/Labels</b> (Ctrl+Alt+T) filterbar in der Sidebar;
 Highlight-Drag über Text = <b>Selection→Highlight</b> (Annotation mit Inhalt).</p>
 <p><b>PDF-Seitenlabels:</b> römische/arabische Labels aus dem PDF werden in Statusleiste und Toolbar angezeigt, wenn vorhanden.</p>
 <p><b>Zwischenablage-Verlauf:</b> Bearbeiten → letzte 3 eingefügten Textschnipsel erneut einfügen.</p>
-<p><b>About:</b> Hilfe → Über… — Feature-Kurzliste + FEATURES.md öffnen.</p>
+<p><b>About:</b> Hilfe → Über… — Feature-Kurzliste + FEATURES.md öffnen;
+bei <b>Trial</b> zusätzlicher Keygen-Hinweis (run-keygen.bat / InstantLensKeygen.exe).</p>
 <p><b>Zwei-Seiten-Ansicht:</b> Ansicht → Zwei-Seiten-Ansicht / Toolbar „2S“ / Ctrl+2 — aktuelle und nächste Seite nebeneinander; Blättern springt um 2 Seiten.</p>
 <p><b>Continuous Scroll:</b> Ansicht → Continuous Scroll / Toolbar „CS“ / Ctrl+3 — Seiten untereinander scrollen (schließt Spread aus).</p>
 <p><b>Arbeitsverzeichnis öffnen:</b> Datei → Ctrl+Shift+E — Ordner der aktuellen Datei (sonst CWD) im Dateimanager.</p>
@@ -130,7 +132,9 @@ Vorbefüllung beim Seiten-Bild-Export.</p>
 <p><b>Einrückung:</b> Bearbeiten → Ctrl+] / Ctrl+[ bzw. Tab / Shift+Tab (Block, aktuelle Zeile oder Auswahl).</p>
 <p><b>Präsentation:</b> Ansicht → Präsentationsmodus (F5): Vollbild-PDF; Pfeiltasten/Leertaste; Esc beendet.</p>
 <p><b>Farben-Favoriten:</b> Toolbar 1/2/3 — Klick = Highlight, Shift+Klick = Stift, Ctrl+Klick = Notiz, Rechtsklick = speichern.</p>
+<p><b>Farbe Palette-Zyklus / Random:</b> Ctrl+Shift+C = nächste Palette-Farbe; Ctrl+Alt+Shift+C = zufällig.</p>
 <p><b>Zeilennummern:</b> Ansicht → Zeilennummern (optional, auch in Einstellungen).</p>
+<p><b>Editor-Minimap:</b> Ansicht → Editor-Minimap (Ctrl+Shift+I) — Linien-Übersicht + dickere Scrollbar.</p>
 <p><b>PDF Graustufen:</b> Ansicht → PDF Graustufen / Toolbar „Grau“ (Ansicht + Export).</p>
 <p><b>PDF Nachtmodus:</b> Ansicht → PDF Nachtmodus / Toolbar „Nacht“ (nur Invert-Ansicht, nicht speichern).</p>
 <p><b>Logordner:</b> Hilfe → Logordner öffnen (Crash-/App-Logs).</p>

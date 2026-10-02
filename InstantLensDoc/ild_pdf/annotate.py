@@ -210,6 +210,24 @@ DRAG_TYPES = frozenset(
     }
 )
 
+# Deutsche Typ-Labels für Kommentar-Berichte (TXT/MD)
+REPORT_TYPE_LABELS: dict[str, str] = {
+    "highlight": "Markierung",
+    "underline": "Unterstreichung",
+    "sticky": "Notiz",
+    "text": "Text",
+    "stamp": "Stempel",
+    "callout": "Callout",
+    "rectangle": "Rechteck",
+    "line": "Linie",
+    "arrow": "Pfeil",
+    "measure": "Messung",
+    "text_overlay": "Text-Overlay",
+    "signature_field": "Signaturfeld",
+    "signature": "Signatur",
+    "redaction": "Schwärzung",
+}
+
 
 @dataclass
 class Annotation:
@@ -716,6 +734,155 @@ class AnnotationStore:
                 row = ann.to_dict()
                 row["tags"] = tags_to_str(row.get("tags"))
                 writer.writerow({k: row.get(k, "") for k in self.CSV_FIELDS})
+        return path
+
+    def build_report(
+        self,
+        *,
+        fmt: str = "md",
+        title: str | None = None,
+        source: str | Path | None = None,
+    ) -> str:
+        """
+        Zusammenhängender Kommentar-/Annotationsbericht (TXT oder Markdown).
+        Gruppiert nach Seite, nummeriert, mit Typ/Text/Tags/Zeit.
+        """
+        fmt_l = (fmt or "md").strip().lower()
+        if fmt_l in ("markdown", "mdown", "mkd"):
+            fmt_l = "md"
+        if fmt_l not in ("md", "txt"):
+            fmt_l = "md"
+        src_name = ""
+        if source is not None:
+            src_name = Path(source).name
+        elif self.pdf_path is not None:
+            src_name = Path(self.pdf_path).name
+        heading = (title or "").strip() or (
+            f"Annotationsbericht — {src_name}" if src_name else "Annotationsbericht"
+        )
+        now = datetime.now().strftime("%Y-%m-%d %H:%M")
+        anns = sorted(
+            list(self.annotations),
+            key=lambda a: (int(a.page), float(a.y), float(a.x), a.created or "", a.id),
+        )
+        lines: list[str] = []
+        if fmt_l == "md":
+            lines.append(f"# {heading}")
+            lines.append("")
+            meta_bits = [f"**Erstellt:** {now}", f"**Anzahl:** {len(anns)}"]
+            if src_name:
+                meta_bits.insert(0, f"**Quelle:** `{src_name}`")
+            lines.append(" · ".join(meta_bits))
+            lines.append("")
+        else:
+            lines.append(heading)
+            lines.append("=" * max(8, len(heading)))
+            if src_name:
+                lines.append(f"Quelle: {src_name}")
+            lines.append(f"Erstellt: {now}")
+            lines.append(f"Anzahl: {len(anns)}")
+            lines.append("")
+
+        if not anns:
+            lines.append("Keine Annotationen vorhanden." if fmt_l == "txt" else "*Keine Annotationen vorhanden.*")
+            lines.append("")
+            return "\n".join(lines).rstrip() + "\n"
+
+        by_page: dict[int, list[Annotation]] = {}
+        for ann in anns:
+            by_page.setdefault(int(ann.page), []).append(ann)
+
+        global_idx = 0
+        for page in sorted(by_page.keys()):
+            page_anns = by_page[page]
+            page_label = page + 1  # 1-basiert für Menschen
+            if fmt_l == "md":
+                lines.append(f"## Seite {page_label}")
+                lines.append("")
+            else:
+                lines.append(f"Seite {page_label}")
+                lines.append("-" * (7 + len(str(page_label))))
+            for ann in page_anns:
+                global_idx += 1
+                t = ann.type.value if isinstance(ann.type, AnnotationType) else str(ann.type)
+                type_de = REPORT_TYPE_LABELS.get(t, t)
+                text = (ann.text or "").strip()
+                tags = tags_to_str(ann.tags)
+                created = (ann.created or "").strip()
+                if fmt_l == "md":
+                    head = f"{global_idx}. **{type_de}**"
+                    if text:
+                        # Einzeiler oder Block
+                        if "\n" in text:
+                            lines.append(f"{head}")
+                            lines.append("")
+                            for tl in text.splitlines():
+                                lines.append(f"   > {tl}")
+                            lines.append("")
+                        else:
+                            lines.append(f"{head} — {text}")
+                    else:
+                        lines.append(f"{head}")
+                    extras: list[str] = []
+                    if tags:
+                        extras.append(f"Tags: `{tags}`")
+                    if created:
+                        extras.append(f"Zeit: {created}")
+                    if ann.color:
+                        extras.append(f"Farbe: `{ann.color}`")
+                    if extras:
+                        lines.append(f"   - {' · '.join(extras)}")
+                    lines.append("")
+                else:
+                    head = f"{global_idx}. [{type_de}]"
+                    if text:
+                        if "\n" in text:
+                            lines.append(head)
+                            for tl in text.splitlines():
+                                lines.append(f"   | {tl}")
+                        else:
+                            lines.append(f"{head} {text}")
+                    else:
+                        lines.append(head)
+                    extras_t: list[str] = []
+                    if tags:
+                        extras_t.append(f"Tags: {tags}")
+                    if created:
+                        extras_t.append(f"Zeit: {created}")
+                    if ann.color:
+                        extras_t.append(f"Farbe: {ann.color}")
+                    if extras_t:
+                        lines.append(f"   ({' · '.join(extras_t)})")
+                    lines.append("")
+            if fmt_l == "txt":
+                lines.append("")
+        return "\n".join(lines).rstrip() + "\n"
+
+    def export_report(
+        self,
+        path: str | Path,
+        *,
+        fmt: str | None = None,
+        title: str | None = None,
+        source: str | Path | None = None,
+    ) -> Path:
+        """Kommentar-Bericht als TXT oder Markdown speichern."""
+        path = Path(path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        suffix = path.suffix.lower()
+        use_fmt = (fmt or "").strip().lower()
+        if not use_fmt:
+            use_fmt = "txt" if suffix == ".txt" else "md"
+        if use_fmt in ("markdown", "mdown", "mkd"):
+            use_fmt = "md"
+        if use_fmt not in ("md", "txt"):
+            use_fmt = "md"
+        if use_fmt == "txt" and suffix != ".txt":
+            path = path.with_suffix(".txt")
+        elif use_fmt == "md" and suffix not in (".md", ".markdown"):
+            path = path.with_suffix(".md")
+        text = self.build_report(fmt=use_fmt, title=title, source=source)
+        path.write_text(text, encoding="utf-8")
         return path
 
     def import_json(self, path: str | Path, *, replace: bool = True) -> int:

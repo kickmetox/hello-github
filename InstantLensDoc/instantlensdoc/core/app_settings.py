@@ -30,6 +30,8 @@ DEFAULTS: dict[str, Any] = {
     "ann_pen_color": "#2C3E50",
     "ann_note_color": "#FFEB3B",
     "editor_line_numbers": False,
+    "editor_minimap": False,
+    "ann_palette_index": 0,
     "pdf_grayscale": False,
     "pdf_night_mode": False,
     "pdf_two_page_spread": False,
@@ -319,6 +321,79 @@ def get_editor_line_numbers() -> bool:
 
 def set_editor_line_numbers(enabled: bool) -> None:
     save_settings({"editor_line_numbers": bool(enabled)})
+
+
+def get_editor_minimap() -> bool:
+    """Optionale Editor-Minimap (Linien-Übersicht + dickere Scrollbar)."""
+    return bool(load_settings().get("editor_minimap", False))
+
+
+def set_editor_minimap(enabled: bool) -> None:
+    save_settings({"editor_minimap": bool(enabled)})
+
+
+# Feste Annotation-Palette für Zyklus/Randomizer (Highlight/Stift/Notiz)
+ANN_COLOR_PALETTE: tuple[str, ...] = (
+    "#FFE066",
+    "#FF6B6B",
+    "#4ECDC4",
+    "#95E1D3",
+    "#F38181",
+    "#AA96DA",
+    "#FCBAD3",
+    "#A8D8EA",
+    "#FF9F43",
+    "#2ECC71",
+    "#3498DB",
+    "#9B59B6",
+)
+
+
+def get_ann_color_palette() -> list[str]:
+    return list(ANN_COLOR_PALETTE)
+
+
+def get_ann_palette_index() -> int:
+    try:
+        idx = int(load_settings().get("ann_palette_index", 0))
+    except (TypeError, ValueError):
+        idx = 0
+    n = len(ANN_COLOR_PALETTE)
+    if n <= 0:
+        return 0
+    return idx % n
+
+
+def set_ann_palette_index(index: int) -> int:
+    n = len(ANN_COLOR_PALETTE)
+    if n <= 0:
+        save_settings({"ann_palette_index": 0})
+        return 0
+    idx = int(index) % n
+    save_settings({"ann_palette_index": idx})
+    return idx
+
+
+def cycle_ann_palette_color() -> str:
+    """Nächste Palette-Farbe (Zyklus); Index persistieren."""
+    n = len(ANN_COLOR_PALETTE)
+    if n <= 0:
+        return get_ann_highlight_color()
+    nxt = (get_ann_palette_index() + 1) % n
+    set_ann_palette_index(nxt)
+    return ANN_COLOR_PALETTE[nxt]
+
+
+def random_ann_palette_color() -> str:
+    """Zufällige Palette-Farbe; Index auf Treffer setzen."""
+    import random
+
+    n = len(ANN_COLOR_PALETTE)
+    if n <= 0:
+        return get_ann_highlight_color()
+    idx = random.randrange(n)
+    set_ann_palette_index(idx)
+    return ANN_COLOR_PALETTE[idx]
 
 
 def get_pdf_grayscale() -> bool:

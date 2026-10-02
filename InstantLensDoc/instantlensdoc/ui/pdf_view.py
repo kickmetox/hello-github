@@ -66,6 +66,7 @@ from ild_pdf.pages import (
     rotate_page,
 )
 from instantlensdoc.core.app_settings import (
+    cycle_ann_palette_color,
     get_ann_color_presets,
     get_ann_default_opacity,
     get_ann_highlight_color,
@@ -80,6 +81,7 @@ from instantlensdoc.core.app_settings import (
     get_pdf_two_page_spread,
     get_show_page_boxes,
     get_show_printer_marks,
+    random_ann_palette_color,
     set_ann_color_preset,
     set_ann_default_opacity,
     set_ann_highlight_color,
@@ -1293,6 +1295,12 @@ class PdfViewer(QWidget):
         del_sc.activated.connect(self.delete_annotation)
         back_sc = QShortcut(QKeySequence(Qt.Key_Backspace), self)
         back_sc.activated.connect(self.delete_annotation)
+        cycle_sc = QShortcut(QKeySequence("Ctrl+Shift+C"), self)
+        cycle_sc.setContext(Qt.WidgetWithChildrenShortcut)
+        cycle_sc.activated.connect(self.cycle_annotation_color)
+        rand_sc = QShortcut(QKeySequence("Ctrl+Alt+Shift+C"), self)
+        rand_sc.setContext(Qt.WidgetWithChildrenShortcut)
+        rand_sc.activated.connect(self.randomize_annotation_color)
 
     def apply_toolbar_groups(self) -> None:
         """Sichtbarkeit der PDF-Toolbar-Gruppen aus den Einstellungen anwenden."""
@@ -1382,6 +1390,47 @@ class PdfViewer(QWidget):
         set_ann_color_preset(index, self._highlight_color)
         self._refresh_preset_btns()
         self.status.emit(f"Favorit {index + 1} = {self._highlight_color}")
+
+    def _apply_active_color(self, color: str, *, label: str) -> None:
+        """Aktive Farbe setzen (Highlight; Shift=Stift; Ctrl=Notiz)."""
+        color = (color or "").strip()
+        if not color:
+            return
+        mods = QApplication.keyboardModifiers()
+        if mods & Qt.ControlModifier:
+            self._note_color = color
+            set_ann_note_color(color)
+            self._style_color_btn(self.btn_note_color, color)
+            self.status.emit(f"Notizfarbe ({label}): {color}")
+        elif mods & Qt.ShiftModifier:
+            self._pen_color = color
+            set_ann_pen_color(color)
+            self._style_color_btn(self.btn_pen_color, color)
+            self.status.emit(f"Stift-Farbe ({label}): {color}")
+        else:
+            self._highlight_color = color
+            set_ann_highlight_color(color)
+            self._style_color_btn(self.btn_hl_color, color)
+            self.status.emit(f"Highlight-Farbe ({label}): {color}")
+
+    def cycle_annotation_color(self) -> str:
+        """Nächste Farbe aus der festen Palette (Ctrl+Shift+C)."""
+        color = cycle_ann_palette_color()
+        # Modifier beim Shortcut oft schon Shift/Ctrl — hier nur Highlight setzen
+        self._highlight_color = color
+        set_ann_highlight_color(color)
+        self._style_color_btn(self.btn_hl_color, color)
+        self.status.emit(f"Palette-Zyklus: {color}")
+        return color
+
+    def randomize_annotation_color(self) -> str:
+        """Zufällige Palette-Farbe (Ctrl+Alt+Shift+C)."""
+        color = random_ann_palette_color()
+        self._highlight_color = color
+        set_ann_highlight_color(color)
+        self._style_color_btn(self.btn_hl_color, color)
+        self.status.emit(f"Farbe random: {color}")
+        return color
 
     def _on_default_opacity_changed(self, value: float):
         self._default_opacity = max(0.05, min(1.0, float(value)))
@@ -2824,6 +2873,64 @@ class PdfViewer(QWidget):
             return True
         except Exception as e:
             QMessageBox.warning(self, "Annotationen CSV exportieren", str(e))
+            return False
+
+    def export_annotations_report(self, *, default_fmt: str = "md") -> bool:
+        """PDF-Kommentare als zusammenhängenden TXT/MD-Bericht exportieren."""
+        if not self.store or not self.pdf_path:
+            QMessageBox.information(self, "Kommentar-Bericht", "Kein PDF geladen.")
+            return False
+        from PySide6.QtWidgets import QFileDialog
+        from instantlensdoc.ui.file_dialogs import confirm_overwrite_export
+
+        fmt = (default_fmt or "md").strip().lower()
+        if fmt not in ("md", "txt"):
+            fmt = "md"
+        suffix = ".md" if fmt == "md" else ".txt"
+        default = str(self.pdf_path.with_suffix(self.pdf_path.suffix + f".kommentare{suffix}"))
+        filt = (
+            "Markdown (*.md);;Text (*.txt);;Alle (*.*)"
+            if fmt == "md"
+            else "Text (*.txt);;Markdown (*.md);;Alle (*.*)"
+        )
+        path, selected = QFileDialog.getSaveFileName(
+            self,
+            "Kommentar-Bericht exportieren",
+            default,
+            filt,
+        )
+        if not path:
+            return False
+        dest = Path(path)
+        sel = (selected or "").lower()
+        if "txt" in sel and "markdown" not in sel:
+            use_fmt = "txt"
+            if dest.suffix.lower() != ".txt":
+                dest = dest.with_suffix(".txt")
+        elif "markdown" in sel or dest.suffix.lower() in (".md", ".markdown"):
+            use_fmt = "md"
+            if dest.suffix.lower() not in (".md", ".markdown"):
+                dest = dest.with_suffix(".md")
+        elif dest.suffix.lower() == ".txt":
+            use_fmt = "txt"
+        else:
+            use_fmt = "md"
+            if dest.suffix.lower() not in (".md", ".markdown"):
+                dest = dest.with_suffix(".md")
+        if not confirm_overwrite_export(dest, self):
+            return False
+        try:
+            saved = self.store.export_report(
+                dest,
+                fmt=use_fmt,
+                source=self.pdf_path,
+            )
+            self.status.emit(
+                f"Kommentar-Bericht: {saved.name} ({len(self.store.annotations)} Einträge)"
+            )
+            return True
+        except Exception as e:
+            QMessageBox.warning(self, "Kommentar-Bericht", str(e))
             return False
 
     def export_annotations_flattened(self) -> bool:
