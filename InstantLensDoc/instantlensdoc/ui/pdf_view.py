@@ -246,6 +246,12 @@ class TextOverlayEditDialog(QDialog):
             form.addRow("Schriftgröße (px):", self.font_size)
             form.addRow("Farbe:", self.color)
         form.addRow("Deckkraft:", self.opacity)
+        from ild_pdf.annotate import tags_to_str
+
+        self.tags_edit = QLineEdit(tags_to_str(getattr(ann, "tags", None)))
+        self.tags_edit.setPlaceholderText("Tags, komma-getrennt…")
+        self.tags_edit.setToolTip("Freie Labels (z. B. Review, TODO) — filterbar in der Sidebar")
+        form.addRow("Tags:", self.tags_edit)
         self.rotation = None
         if ann.type == AnnotationType.STAMP:
             self.rotation = QDoubleSpinBox()
@@ -266,9 +272,12 @@ class TextOverlayEditDialog(QDialog):
         layout.addWidget(buttons)
 
     def values(self) -> dict:
+        from ild_pdf.annotate import normalize_tags
+
         out = {
             "text": self.text.toPlainText(),
             "opacity": float(self.opacity.value()),
+            "tags": normalize_tags(self.tags_edit.text()),
         }
         if self._show_style:
             out["font_size"] = float(self.font_size.value())
@@ -2666,6 +2675,11 @@ class PdfViewer(QWidget):
                 label += f" — {a.text[:40]}"
             elif a.type == AnnotationType.MEASURE:
                 label += f" — {a.measure_label(self.scale)}"
+            tags = getattr(a, "tags", None) or []
+            if tags:
+                from ild_pdf.annotate import tags_to_str
+
+                label += f" [{tags_to_str(tags)}]"
             ts = _fmt_ts(getattr(a, "modified", "") or getattr(a, "created", ""))
             if ts:
                 label += f" · {ts}"
@@ -3229,6 +3243,40 @@ class PdfViewer(QWidget):
         if not ann:
             return False
         self._edit_overlay(ann.id)
+        return True
+
+    def edit_selected_annotation_tags(self) -> bool:
+        """Freie Tags/Labels der Auswahl bearbeiten (alle Annotationstypen)."""
+        if not self.store or not self._selected_ann_id:
+            self.status.emit("Keine Annotation ausgewählt")
+            return False
+        ann = self.store.get(self._selected_ann_id)
+        if not ann:
+            return False
+        from ild_pdf.annotate import normalize_tags, tags_to_str
+        from PySide6.QtWidgets import QInputDialog
+
+        current = tags_to_str(getattr(ann, "tags", None))
+        text, ok = QInputDialog.getText(
+            self,
+            "Annotation-Tags",
+            "Tags (komma-getrennt):",
+            text=current,
+        )
+        if not ok:
+            return False
+        tags = normalize_tags(text)
+        self.store.update(ann.id, tags=tags)
+        try:
+            self.store.save()
+        except Exception as e:
+            QMessageBox.warning(self, "Annotation-Tags", str(e))
+            return False
+        self.refresh()
+        self.annotations_changed.emit()
+        self.status.emit(
+            f"Tags: {tags_to_str(tags)}" if tags else "Tags entfernt"
+        )
         return True
 
     def duplicate_selected_annotation(self) -> bool:

@@ -118,6 +118,7 @@ class Sidebar(QWidget):
     annotation_filter_changed = Signal(str)  # Typ-Wert oder "" für alle
     annotation_color_filter_changed = Signal(str)  # #RRGGBB oder "" für alle
     annotation_page_filter_changed = Signal(bool)  # nur aktuelle Seite
+    annotation_tag_filter_changed = Signal(str)  # Tag oder "" für alle
     fulltext_hit_activated = Signal(str, object)  # path, page_index|None
     page_thumb_activated = Signal(int)  # PDF-Seite 0-basiert
     pages_reordered = Signal(list)  # alte Indizes in neuer Reihenfolge
@@ -203,6 +204,11 @@ class Sidebar(QWidget):
         )
         self.ann_current_page.toggled.connect(self._on_ann_current_page_toggled)
         layout.addWidget(self.ann_current_page)
+        self.ann_tag_filter = QComboBox()
+        self.ann_tag_filter.setToolTip("Nach freiem Annotation-Tag/Label filtern")
+        self.ann_tag_filter.addItem("Alle Tags", "")
+        self.ann_tag_filter.currentIndexChanged.connect(self._on_ann_tag_filter_changed)
+        layout.addWidget(self.ann_tag_filter)
         self.ann_search = QLineEdit()
         self.ann_search.setPlaceholderText("Annotationen suchen…")
         self.ann_search.setClearButtonEnabled(True)
@@ -246,8 +252,10 @@ class Sidebar(QWidget):
         self._ann_filter_updating = False
         self._ann_search_query = ""
         self._ann_color_filter = ""
+        self._ann_tag_filter = ""
         self._ann_current_page_index: int | None = None
         self._ann_filter_current_page = False
+        self._ann_tag_updating = False
 
     def search_text(self) -> str:
         return self.search.currentText().strip()
@@ -498,6 +506,41 @@ class Sidebar(QWidget):
         """True wenn nur Annotationen der aktuellen Seite gezeigt werden."""
         return bool(getattr(self, "_ann_filter_current_page", False))
 
+    def annotation_filter_tag(self) -> str:
+        """Aktueller Tag-Filter oder '' für alle."""
+        data = None
+        if hasattr(self, "ann_tag_filter"):
+            data = self.ann_tag_filter.currentData()
+        return str(data) if data else (getattr(self, "_ann_tag_filter", "") or "")
+
+    def set_annotation_tag_filter(self, tag: str | None):
+        """Tag-Filter setzen; leer = alle."""
+        want = (tag or "").strip()
+        if want == self.annotation_filter_tag():
+            return
+        self._ann_tag_filter = want
+        if hasattr(self, "ann_tag_filter"):
+            self._ann_tag_updating = True
+            self.ann_tag_filter.blockSignals(True)
+            idx = self.ann_tag_filter.findData(want)
+            self.ann_tag_filter.setCurrentIndex(idx if idx >= 0 else 0)
+            if idx < 0 and want:
+                # Tag noch nicht in Liste — temporär hinzufügen
+                self.ann_tag_filter.addItem(want, want)
+                self.ann_tag_filter.setCurrentIndex(self.ann_tag_filter.count() - 1)
+            self.ann_tag_filter.blockSignals(False)
+            self._ann_tag_updating = False
+        self._apply_annotation_filter()
+        self.annotation_tag_filter_changed.emit(self.annotation_filter_tag())
+
+    def _on_ann_tag_filter_changed(self, _index: int = 0):
+        if getattr(self, "_ann_tag_updating", False):
+            return
+        data = self.ann_tag_filter.currentData()
+        self._ann_tag_filter = str(data) if data else ""
+        self._apply_annotation_filter()
+        self.annotation_tag_filter_changed.emit(self.annotation_filter_tag())
+
     def set_annotation_current_page(self, page_index: int | None):
         """Aktuelle PDF-Seite für den Seitenfilter setzen (0-basiert)."""
         if page_index is None:
@@ -586,10 +629,46 @@ class Sidebar(QWidget):
         self.ann_filter.setCurrentIndex(idx if idx >= 0 else 0)
         self.ann_filter.blockSignals(False)
         self._ann_filter_updating = False
+        self._sync_ann_tag_filter_options(payloads)
+
+    def _sync_ann_tag_filter_options(self, payloads: list | None):
+        """Tag-Dropdown aus vorkommenden Tags (Auswahl behalten)."""
+        if not hasattr(self, "ann_tag_filter"):
+            return
+        current = self.annotation_filter_tag()
+        tags: list[str] = []
+        seen: set[str] = set()
+        for p in payloads or []:
+            raw = getattr(p, "tags", None) if p is not None else None
+            if not raw:
+                continue
+            for t in raw if isinstance(raw, (list, tuple)) else [raw]:
+                s = str(t).strip()
+                if not s:
+                    continue
+                key = s.casefold()
+                if key in seen:
+                    continue
+                seen.add(key)
+                tags.append(s)
+        tags.sort(key=lambda x: x.casefold())
+        self._ann_tag_updating = True
+        self.ann_tag_filter.blockSignals(True)
+        self.ann_tag_filter.clear()
+        self.ann_tag_filter.addItem("Alle Tags", "")
+        for t in tags:
+            self.ann_tag_filter.addItem(t, t)
+        idx = self.ann_tag_filter.findData(current)
+        self.ann_tag_filter.setCurrentIndex(idx if idx >= 0 else 0)
+        if idx < 0:
+            self._ann_tag_filter = ""
+        self.ann_tag_filter.blockSignals(False)
+        self._ann_tag_updating = False
 
     def _apply_annotation_filter(self):
         want = self.annotation_filter_type()
         want_color = self.annotation_filter_color()
+        want_tag = self.annotation_filter_tag()
         query = self._ann_search_query
         page_only = self.annotation_filter_current_page()
         current_page = getattr(self, "_ann_current_page_index", None)
@@ -617,10 +696,20 @@ class Sidebar(QWidget):
                 c = normalize_ann_color(getattr(payload, "color", None) if payload else None)
                 if c != want_color:
                     continue
+            if want_tag:
+                tags = getattr(payload, "tags", None) if payload is not None else None
+                tag_list = []
+                if isinstance(tags, (list, tuple)):
+                    tag_list = [str(x).strip() for x in tags if str(x).strip()]
+                elif tags:
+                    tag_list = [str(tags).strip()]
+                if want_tag.casefold() not in {t.casefold() for t in tag_list}:
+                    continue
             if query:
                 hay = line.lower()
                 extra = ""
                 type_label = ""
+                tags_hay = ""
                 if payload is not None:
                     extra = str(getattr(payload, "text", "") or "").lower()
                     t = getattr(getattr(payload, "type", None), "value", None) or getattr(
@@ -629,6 +718,11 @@ class Sidebar(QWidget):
                     type_label = ANN_TYPE_LABELS.get(str(t), str(t or "")).lower()
                     type_val = str(t or "").lower()
                     color_val = normalize_ann_color(getattr(payload, "color", None)).lower()
+                    tags_raw = getattr(payload, "tags", None) or []
+                    if isinstance(tags_raw, (list, tuple)):
+                        tags_hay = " ".join(str(x) for x in tags_raw).lower()
+                    else:
+                        tags_hay = str(tags_raw).lower()
                 else:
                     type_val = ""
                     color_val = ""
@@ -638,6 +732,7 @@ class Sidebar(QWidget):
                     and query not in type_label
                     and query not in type_val
                     and query not in color_val
+                    and query not in tags_hay
                 ):
                     continue
             filtered.append((line, payload))
@@ -762,6 +857,7 @@ class Sidebar(QWidget):
         self._ann_all_payloads = []
         self._ann_search_query = ""
         self._ann_color_filter = ""
+        self._ann_tag_filter = ""
         self._ann_filter_current_page = False
         self.annotations.clear()
         if hasattr(self, "ann_search"):
@@ -772,6 +868,13 @@ class Sidebar(QWidget):
             self.ann_current_page.blockSignals(True)
             self.ann_current_page.setChecked(False)
             self.ann_current_page.blockSignals(False)
+        if hasattr(self, "ann_tag_filter"):
+            self._ann_tag_updating = True
+            self.ann_tag_filter.blockSignals(True)
+            self.ann_tag_filter.clear()
+            self.ann_tag_filter.addItem("Alle Tags", "")
+            self.ann_tag_filter.blockSignals(False)
+            self._ann_tag_updating = False
         self._ann_filter_updating = True
         self.ann_filter.blockSignals(True)
         self.ann_filter.clear()

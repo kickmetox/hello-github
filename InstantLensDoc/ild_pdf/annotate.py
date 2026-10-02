@@ -19,6 +19,44 @@ SCHEMA_ID = "ildann-v4"
 HISTORY_LIMIT = 40
 
 
+def normalize_tags(value: object) -> list[str]:
+    """Freie Tags normalisieren: Liste oder Komma-/Semikolon-String → unique, getrimmt."""
+    raw: list[str] = []
+    if value is None:
+        return []
+    if isinstance(value, str):
+        parts = value.replace(";", ",").split(",")
+        raw = [p.strip() for p in parts]
+    elif isinstance(value, (list, tuple, set)):
+        for item in value:
+            if item is None:
+                continue
+            s = str(item).strip()
+            if "," in s or ";" in s:
+                raw.extend(normalize_tags(s))
+            else:
+                raw.append(s)
+    else:
+        s = str(value).strip()
+        if s:
+            raw.append(s)
+    out: list[str] = []
+    seen: set[str] = set()
+    for t in raw:
+        if not t:
+            continue
+        key = t.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(t)
+    return out
+
+
+def tags_to_str(tags: object) -> str:
+    return ", ".join(normalize_tags(tags))
+
+
 class AnnotationImportError(ValueError):
     """Annotation-JSON-Import abgebrochen (Schema/Struktur ungültig)."""
 
@@ -189,6 +227,7 @@ class Annotation:
     font_size: float = 12.0
     opacity: float = 1.0  # Deckkraft 0.05–1.0
     rotation: float = 0.0  # Stempel-Drehung in Grad (0/90/180/270)
+    tags: List[str] = field(default_factory=list)  # freie Labels, filterbar
     id: str = field(default_factory=lambda: uuid4().hex)
     created: str = field(
         default_factory=lambda: datetime.now(timezone.utc).isoformat(timespec="seconds")
@@ -223,6 +262,7 @@ class Annotation:
     def to_dict(self) -> dict:
         d = asdict(self)
         d["type"] = self.type.value
+        d["tags"] = normalize_tags(d.get("tags"))
         return d
 
     def color_rgb(self) -> list[float]:
@@ -332,6 +372,7 @@ class Annotation:
             rot = 0.0
         # Einfache Stempel-Rotation: auf 0/90/180/270 normalisieren
         data["rotation"] = float(int(round(rot / 90.0)) % 4 * 90)
+        data["tags"] = normalize_tags(data.get("tags"))
         data.setdefault("created", datetime.now(timezone.utc).isoformat(timespec="seconds"))
         data.setdefault("modified", data["created"])
         known = {f.name for f in cls.__dataclass_fields__.values()}  # type: ignore[attr-defined]
@@ -526,7 +567,10 @@ class AnnotationStore:
                 self._push_undo()
                 for k, v in kwargs.items():
                     if hasattr(a, k):
-                        setattr(a, k, v)
+                        if k == "tags":
+                            setattr(a, k, normalize_tags(v))
+                        else:
+                            setattr(a, k, v)
                 a.touch()
                 self.dirty = True
                 return a
@@ -656,6 +700,7 @@ class AnnotationStore:
         "callout_y",
         "font_size",
         "opacity",
+        "tags",
         "created",
         "modified",
     )
@@ -669,6 +714,7 @@ class AnnotationStore:
             writer.writeheader()
             for ann in self.annotations:
                 row = ann.to_dict()
+                row["tags"] = tags_to_str(row.get("tags"))
                 writer.writerow({k: row.get(k, "") for k in self.CSV_FIELDS})
         return path
 

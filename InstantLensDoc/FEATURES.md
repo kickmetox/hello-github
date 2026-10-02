@@ -4,7 +4,7 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 
 | Feature | Status | Hinweis |
 |---------|--------|---------|
-| Hauptfenster (Menü, Sidebar, Editor, Status) | fertig | PySide6; Status: Dateiname, Seite x/y (**Seitenlabels** 0.4.9), **Seitengröße mm/inch** 0.3.5, Zoom %, Wörter/Ann.; **Undo-Hint** 0.4.6; Ann.-Liste Sidebar 0.2.4; **Ann.-Filter Typ** 0.2.6; **Ann.-Farben-Filter klickbar** 0.4.6; **Ann. nur aktuelle Seite** 0.4.9 |
+| Hauptfenster (Menü, Sidebar, Editor, Status) | fertig | PySide6; Status: Dateiname, Seite x/y (**Seitenlabels** 0.4.9), **Seitengröße mm/inch** 0.3.5, Zoom %, Wörter/Ann.; **Undo-Hint** 0.4.6; Ann.-Liste Sidebar 0.2.4; **Ann.-Filter Typ** 0.2.6; **Ann.-Farben-Filter klickbar** 0.4.6; **Ann. nur aktuelle Seite** 0.4.9; **Ann.-Tag-Filter** 0.5.1 |
 | App-Icon Fenster/Taskleiste/About | fertig | Robuste Pfade: `assets/`, CWD, `D:\AI_Temp\InstantLensDoc` |
 | Session-Restore (offene Docs) | fertig | `session.json`, Sidebar-Liste; **optional Toggle in Einstellungen** 0.3.7 |
 | Fenster-Geometrie speichern | fertig | Größe/Position/State in Settings 0.3.6 |
@@ -25,6 +25,7 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | PDF Seitennummer-Stempel | fertig | Vorlage `{n} / {total}` |
 | PDF-Vergleich Seite-nebeneinander | fertig | Dialog |
 | PDF-Metadaten-Editor | fertig | Titel/Autor/Thema/Keywords (DocInfo+XMP) |
+| PDF bereinigen | fertig | Neuschreiben; optional Metadaten strippen; Menü PDF 0.5.1 |
 | PDF Seitengröße / Zuschneiden | fertig | MediaBox-Presets + CropBox; **Anzeige mm/inch Toggle** 0.3.5; **Seitenrahmen/CropBox-Overlay** optional 0.4.3 |
 | PDF-Schwärzung (Redaction) | teilweise | Drag + Preview-Label + Einbrennen-Dialog (Basis) |
 | PDF-Passwort setzen/öffnen | fertig | pikepdf Encryption / pypdfium2 |
@@ -35,7 +36,7 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | Sidebar Seiten-Thumbnails | fertig | Vorschaubilder, Klick → Seite; Drag-Reorder 0.2.3; **Lazy-Load** 0.3.1; **Größe in Einstellungen** 0.3.8 |
 | Tastaturhilfe-Dialog | fertig | Hilfe → F1; **Cheat-Sheet als PDF exportieren** 0.4.7 |
 | App-Logging | fertig | %APPDATA%/InstantLensDoc/logs; **Hilfe → Logordner öffnen** 0.3.0 |
-| PDF-Annotationen (Highlight, Underline, Sticky, Text) | fertig | Sidecar `*.ildann.json` **v4** (`ildann-v4`); Farben-Picker Highlight/Stift 0.2.2; **Notizfarbe unabhängig** 0.4.7; Löschen Auswahl/letzte 0.2.3; **JSON Export/Import** 0.2.5; **PDF-Highlight Schema v4** 0.4.4; **Import-Validierung Schema v4** 0.4.5; **CSV Export** 0.3.8; **Sidebar-Filter nach Typ** 0.2.6; **Text nachträglich editierbar** 0.2.7; **Deckkraft/Opacity** 0.2.8; **Sidebar-Textsuche** 0.3.0; **Farben-Chips klickbar filtern** 0.4.6; **Zeitstempel in Liste** 0.4.8; **Filter nur aktuelle Seite** 0.4.9 |
+| PDF-Annotationen (Highlight, Underline, Sticky, Text) | fertig | Sidecar `*.ildann.json` **v4** (`ildann-v4`); Farben-Picker Highlight/Stift 0.2.2; **Notizfarbe unabhängig** 0.4.7; Löschen Auswahl/letzte 0.2.3; **JSON Export/Import** 0.2.5; **PDF-Highlight Schema v4** 0.4.4; **Import-Validierung Schema v4** 0.4.5; **CSV Export** 0.3.8; **Sidebar-Filter nach Typ** 0.2.6; **Text nachträglich editierbar** 0.2.7; **Deckkraft/Opacity** 0.2.8; **Sidebar-Textsuche** 0.3.0; **Farben-Chips klickbar filtern** 0.4.6; **Zeitstempel in Liste** 0.4.8; **Filter nur aktuelle Seite** 0.4.9; **freie Tags/Labels filterbar** 0.5.1 |
 | Annotation Undo/Redo | fertig | Ctrl+Z/Y inkl. Overlay-Text |
 | Annotation löschen | fertig | Auswahl oder letzte; Entf / Menü 0.2.3 |
 | Annotation duplizieren | fertig | Auswahl leicht versetzt; Ctrl+Shift+D 0.3.4 |
@@ -44,6 +45,7 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | Annotation verschieben / Lock | fertig | Drag im Auswahl-Werkzeug; **Sperre-Toggle** (nicht verschiebbar) 0.4.3 |
 | Annotation-Farben-Favoriten | fertig | 3 Presets speichern/anwenden (Toolbar 1/2/3) 0.3.7 |
 | Annotation-Text editieren | fertig | Notiz/Kommentar/Overlay nachträglich; Doppelklick / Ctrl+E 0.2.7 |
+| Annotation-Tags/Labels | fertig | Freie Tags; Sidecar+CSV; Sidebar-Filter; Ctrl+Alt+T 0.5.1 |
 | Annotation-Deckkraft | fertig | `opacity` Sidecar + Toolbar α + Dialog 0.2.8 |
 | Annotation-Suche Sidebar | fertig | Textfilter in Annotationsliste 0.3.0 |
 | Stempel / Callouts | fertig | Bibliothek GENEHMIGT/ENTWURF/VERTRAULICH + Datum 0.3.1; Callout (2-Klick); **Rotation 90°** 0.4.1 |
@@ -75,7 +77,7 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | PDF leere Seite / duplizieren | fertig | Toolbar + Menü; Annotation-Remap 0.2.4 |
 | PDF neu anordnen | fertig | Dialog + Thumbnail-Drag + Annotation-Remap |
 | Textsuche Seitenleiste | fertig | Editor + PDF-Text + Annotationen; Highlight 0.2.2; **letzte Suchbegriffe** merken 0.2.4 |
-| Annotation-Liste Sidebar | fertig | Klick → Seite + Auswahl 0.2.4; **Filter nach Typ** 0.2.6; **Textsuche** 0.3.0; **Gruppierung nach Seite** 0.3.5; **Statistik je Typ (Footer)** 0.3.9; **Nur aktuelle Seite** 0.4.9 |
+| Annotation-Liste Sidebar | fertig | Klick → Seite + Auswahl 0.2.4; **Filter nach Typ** 0.2.6; **Textsuche** 0.3.0; **Gruppierung nach Seite** 0.3.5; **Statistik je Typ (Footer)** 0.3.9; **Nur aktuelle Seite** 0.4.9; **Tag-Filter** 0.5.1 |
 | PDF Seitenbereich extrahieren | fertig | von–bis → neues PDF; Menü + Dialog-Tab 0.2.6 |
 | Editor Find/Replace | fertig | Ctrl+R Dialog 0.2.6 |
 | Editor Zeilennummern | fertig | Optional (Ansicht + Einstellungen) 0.2.7 |
@@ -98,6 +100,7 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | Neues Dokument Vorlagen | fertig | Leer / Brief / Notiz unter Datei → Neu 0.4.3 |
 | Backup .bak beim Speichern | fertig | Optional in Einstellungen 0.3.5 |
 | Zuletzt verwendete Ordner | fertig | Datei-Dialoge merken `recent_dirs` 0.3.2 |
+| Projekt-Ordner / Workspace | fertig | Datei → Projekt-Ordner; letzte 5; Dialog-Startpfad 0.5.1 |
 | Alles speichern (Tabs) | fertig | Datei → Alles speichern; aktuelles Doc + PDF-Sidecars 0.2.7 |
 | Volltextsuche geöffnete Docs | fertig | Sidebar „Alle Docs“ |
 | Lesezeichen / PDF-Outline | fertig | Baum in Sidebar; Doppelklick/Enter → Seite; **Destination via objgen gehärtet** 0.4.2; hinzufügen/löschen 0.2.5 |
@@ -109,6 +112,7 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | Markieren im Editor | fertig | Ctrl+H |
 | Bilder JPEG/PNG anzeigen | fertig | |
 | OCR Bild/PDF-Seite | teilweise | Presets + Modi; Tabellen-Heuristik; Fortschrittsdialog 0.2.1 |
+| OCR gesamtes PDF (Batch) | fertig | Alle Seiten mit Fortschritt/Abbrechen → Editor 0.5.1 |
 | OCR Ausgabe: editierbarer Text | fertig | → Editor |
 | OCR Ausgabe: durchsuchbares Bild | teilweise | PDF + `*.ildocr.txt` Sidecar |
 | Formulargenerator → HTML/PDF | fertig | Mehr Feldtypen; Definition speichern/laden |
@@ -120,25 +124,25 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | Inno-Installer | fertig | Icon, Desktop, Uninstaller, Keygen optional (`InstantLensKeygen.exe`) 0.2.1 |
 | Sync-Skript Windows | fertig | Repo `scripts/sync-ild.ps1`; Store `docs/sync-ild.ps1` |
 | Arbeitsverzeichnis öffnen | fertig | Datei-Menü Ctrl+Shift+E; Ordner der Datei bzw. CWD 0.4.8 |
-| In-App Hilfe / About | fertig | Version 0.5.0; Fenstertitel + Splash; Logordner-Button; **Feature-Kurzliste + FEATURES.md** 0.4.9 |
-| CHANGELOG | fertig | **0.5.0** Release-Konsolidierung 0.4.0→0.5.0 |
+| In-App Hilfe / About | fertig | Version 0.5.1; Fenstertitel + Splash; Logordner-Button; **Feature-Kurzliste + FEATURES.md** 0.4.9 |
+| CHANGELOG | fertig | **0.5.1** Batch-OCR, Tags, Workspace, PDF bereinigen |
 | FEATURES.md / INFO.md | fertig | |
 | `ild_pdf` Modul + Beispielskript | fertig | metadata / page size / watermark / redact / acroform / attachments / flatten / **plain text** |
 | Font-Matching | geplant | |
 | Objekt-/Bildbearbeitung | geplant | |
 | Layout-Erhaltung (Scan→edit) | geplant | |
 | Freihand | geplant | |
-| KI-Assistent | Stub | Menü „Geplant“ 0.5.0 (keine Fake-KI) |
+| KI-Assistent | Stub | Menü „Geplant“ 0.5.1 (keine Fake-KI) |
 | Signieren (rechtssicher) | Stub | |
-| Cloud-Sync | Stub | Menü „Geplant“ 0.5.0 (keine Fake-Cloud) |
+| Cloud-Sync | Stub | Menü „Geplant“ 0.5.1 (keine Fake-Cloud) |
 | Text on Path / Text zu Pfaden | geplant | |
 | Envelope Distort / Text Wrap / Area Type | Stub/geplant | |
 | Schnittmasken | geplant | |
 | Füllungen / Live-Effekte | geplant | |
-| 3D-Extrusion | Stub | Menü „Geplant“ 0.5.0 |
+| 3D-Extrusion | Stub | Menü „Geplant“ 0.5.1 |
 | Variable Fonts (voll) | Stub | |
 | Glyphen-Palette | geplant | |
-| Stylus / Palm Rejection | Stub | Menü „Geplant“ 0.5.0 |
-| Intelligente Formerkennung | Stub | Menü „Geplant“ 0.5.0 |
+| Stylus / Palm Rejection | Stub | Menü „Geplant“ 0.5.1 |
+| Intelligente Formerkennung | Stub | Menü „Geplant“ 0.5.1 |
 
 Nicht behauptet als fertig: Cloud, KI, Stylus, 3D — nur Menü-Stubs + dieser Status.

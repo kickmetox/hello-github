@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Dict, List, Tuple, Union
+from typing import Callable, Dict, List, Optional, Tuple, Union
 
 from PIL import Image, ImageDraw, ImageFont
 
@@ -227,6 +227,71 @@ def ocr_pdf_page(pdf_path: str | Path, page_index: int = 0, lang: str = "deu+eng
 
     img = render_page(pdf_path, page_index=page_index, scale=2.0)
     return ocr_image(img, lang=lang)
+
+
+@dataclass
+class OcrDocumentResult:
+    """Ergebnis einer Batch-OCR über alle PDF-Seiten."""
+
+    text: str
+    lang: str
+    pages_done: int
+    pages_total: int
+    cancelled: bool = False
+    page_texts: List[str] = field(default_factory=list)
+
+
+def ocr_pdf_document(
+    pdf_path: str | Path,
+    *,
+    lang: str = "deu+eng",
+    scale: float = 2.0,
+    progress: Optional[Callable[[int, int, str], Optional[bool]]] = None,
+) -> OcrDocumentResult:
+    """
+    OCR über alle Seiten eines PDFs.
+    progress(page_1based, total, preview) → False zum Abbrechen, sonst True/None.
+    """
+    from ild_pdf import render_page
+
+    ok, msg = tesseract_available()
+    if not ok:
+        raise OcrUnavailable(msg)
+
+    pdf_path = Path(pdf_path)
+    import pypdfium2 as pdfium
+
+    doc = pdfium.PdfDocument(str(pdf_path))
+    try:
+        total = len(doc)
+    finally:
+        doc.close()
+
+    page_texts: List[str] = []
+    cancelled = False
+    for page in range(total):
+        if progress is not None:
+            cont = progress(page + 1, total, f"Seite {page + 1}/{total}")
+            if cont is False:
+                cancelled = True
+                break
+        img = render_page(pdf_path, page_index=page, scale=scale)
+        page_texts.append(ocr_image(img, lang=lang))
+
+    parts: List[str] = []
+    for i, t in enumerate(page_texts):
+        header = f"--- Seite {i + 1}/{total} ---"
+        body = (t or "").rstrip()
+        parts.append(f"{header}\n{body}" if body else header)
+    combined = "\n\n".join(parts).strip() + ("\n" if parts else "")
+    return OcrDocumentResult(
+        text=combined,
+        lang=lang,
+        pages_done=len(page_texts),
+        pages_total=total,
+        cancelled=cancelled,
+        page_texts=page_texts,
+    )
 
 
 def make_searchable_image_pdf(

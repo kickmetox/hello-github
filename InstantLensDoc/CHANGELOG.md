@@ -1,5 +1,23 @@
 # Changelog — InstantLens Doc
 
+## 0.5.1 — Batch-OCR, Tags, Workspace, PDF bereinigen
+
+Nach dem Meilenstein 0.5.0: vier sinnvolle Ausbauten. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### PDF / OCR / Annotationen
+- **Batch-OCR gesamtes PDF** mit Fortschrittsdialog (Seite x/y, Abbrechen) → Editor
+- Annotation-**Tags/Labels** (frei, komma-getrennt); Sidecar + CSV; Sidebar-Filter; Ctrl+Alt+T
+- Schnellaktion **PDF bereinigen** (Neuschreiben, optional Metadaten strippen)
+
+### Editor / UX
+- **Projekt-Ordner als Workspace** (letzte 5); Datei → Projekt-Ordner; Dialog-Startpfad bevorzugt aktiv
+
+### Packaging / Docs
+- Version **0.5.1** (App / ild_pdf / ISS / Smoke / Docs)
+- Stubs KI/Cloud/Stylus/3D unverändert
+
+---
+
 ## 0.5.0 — Release-Konsolidierung (0.4.0 → 0.5.0)
 
 Meilenstein: alle 0.4.x-Inkremente gebündelt, Version einheitlich **0.5.0**, Smoke um ausgewählte 0.4.x-Pfade erweitert, kleine Review-Fixes. Stubs KI/Cloud/Stylus/3D bleiben Stubs (keine Fake-Features).

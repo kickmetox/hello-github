@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Smoke-Test 0.5.0 (CLI + optional offscreen Qt). Kernpfade: open/annotate/export/license + 0.4.x."""
+"""Smoke-Test 0.5.1 (CLI + optional offscreen Qt). Kernpfade: open/annotate/export/license + 0.5.1-Features."""
 
 from __future__ import annotations
 
@@ -38,6 +38,10 @@ def main() -> int:
         find_text_rects,
         get_metadata,
         get_page_boxes,
+        sanitize_pdf,
+        strip_metadata,
+        normalize_tags,
+        tags_to_str,
         import_page_text_as_overlays,
         insert_image_as_page,
         insert_signature_field,
@@ -93,6 +97,9 @@ def main() -> int:
         get_pdf_grayscale,
         get_pdf_night_mode,
         get_recent_dirs,
+        get_project_workspaces,
+        get_active_project_workspace,
+        remember_project_workspace,
         get_ui_lang,
         load_settings,
         remember_recent_dir,
@@ -113,8 +120,8 @@ def main() -> int:
     from instantlensdoc.core.update_check import check_for_updates
     from instantlensdoc.license import KEY_DAYS, TRIAL_DAYS, generate_key, verify_key
 
-    assert __version__ == "0.5.0", __version__
-    assert ild_ver == "0.5.0", ild_ver
+    assert __version__ == "0.5.1", __version__
+    assert ild_ver == "0.5.1", ild_ver
     assert TRIAL_DAYS == 28 and KEY_DAYS == 32
     key = generate_key("ame@sellerbach.de")
     ok, msg, _ = verify_key(key)
@@ -132,7 +139,7 @@ def main() -> int:
     assert "Settings" in tr("settings")
     set_lang("de")
     upd = check_for_updates(allow_network=False)
-    assert upd.local_version == "0.5.0" and not upd.online
+    assert upd.local_version == "0.5.1" and not upd.online
     assert get_export_jpeg_quality() >= 10
     assert get_ui_lang() in ("de", "en")
     assert 25 <= get_default_zoom_percent() <= 500
@@ -173,8 +180,8 @@ def main() -> int:
     assert get_ann_pen_color() == "#112233"
     assert (ROOT / "CHANGELOG.md").is_file()
     cl = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-    assert "0.5.0" in cl
-    assert "## 0.5.0" in cl
+    assert "0.5.1" in cl
+    assert "## 0.5.1" in cl
     assert "0.4.0 → 0.5.0" in cl or "0.4.0→0.5.0" in cl
     assert "## 0.4.0" in cl
     assert "0.3.0 → 0.4.0" in cl or "0.3.0→0.4.0" in cl
@@ -191,6 +198,10 @@ def main() -> int:
     assert "Continuous Scroll" in cl
     assert "Schema v4" in cl or "ildann-v4" in cl
     assert "Spread" in cl or "Zwei-Seiten" in cl
+    assert "Batch-OCR" in cl or "OCR gesamtes PDF" in cl
+    assert "Tags" in cl or "Labels" in cl
+    assert "Projekt-Ordner" in cl or "Workspace" in cl
+    assert "bereinigen" in cl or "Metadaten" in cl
     # Kompakt: Einzel-Header 0.4.1–0.4.9, 0.3.1–0.3.9 und 0.2.1–0.2.9 entfernt (nur Kurz-Tabelle)
     assert "## 0.4.9" not in cl and "## 0.4.8" not in cl
     assert "## 0.4.1" not in cl and "## 0.4.6" not in cl
@@ -199,7 +210,7 @@ def main() -> int:
     assert "0.4.9" in cl  # noch in Kurz-Tabelle
     assert "0.3.9" in cl  # noch in Kurz-Tabelle
     assert "0.2.9" in cl  # noch in Kurz-Tabelle
-    assert "0.5.0" in (ROOT / "README.md").read_text(encoding="utf-8")
+    assert "0.5.1" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "run.bat" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "sync-ild.ps1" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "scripts/sync-ild.ps1" in (ROOT / "FEATURES.md").read_text(encoding="utf-8")
@@ -548,13 +559,13 @@ def main() -> int:
 
         assert (ROOT / "installer" / "installer-hinweis.txt").exists()
         iss = (ROOT / "installer" / "instantlensdoc.iss").read_text(encoding="utf-8")
-        assert "0.5.0" in iss and "desktopicon" in iss and "DisableProgramGroupPage=no" in iss
+        assert "0.5.1" in iss and "desktopicon" in iss and "DisableProgramGroupPage=no" in iss
         assert "UninstallDisplayName" in iss and "Uninstallable=yes" in iss
         assert "IncludeKeygen" in iss and "SetupIconFile" in iss
         assert "InstantLensKeygen.exe" in iss
         assert "uninstallexe" in iss
         bw = (ROOT / "build-windows.ps1").read_text(encoding="utf-8")
-        assert "0.5.0" in bw and "NoKeygenInApp" in bw and "--icon" in bw
+        assert "0.5.1" in bw and "NoKeygenInApp" in bw and "--icon" in bw
         assert "InstantLensKeygen.exe" in bw
         bi = (ROOT / "installer" / "build-installer.ps1").read_text(encoding="utf-8")
         assert "InstantLensKeygen.exe" in bi and "IncludeKeygen" in bi
@@ -563,7 +574,7 @@ def main() -> int:
         assert "Installer" in kg_readme
         hinweis = (ROOT / "installer" / "installer-hinweis.txt").read_text(encoding="utf-8")
         assert "InstantLensKeygen.exe" in hinweis or "run-keygen.bat" in hinweis
-        assert "0.5.0" in hinweis
+        assert "0.5.1" in hinweis
         from ild_pdf.limits import OPEN_TIMEOUT_HINT, OPEN_TIMEOUT_HINT_SEC
 
         assert OPEN_TIMEOUT_HINT_SEC >= 15 and "teilen" in OPEN_TIMEOUT_HINT.lower()
@@ -574,7 +585,7 @@ def main() -> int:
         assert "QProgressDialog" in (ROOT / "instantlensdoc" / "ui" / "main_window.py").read_text(encoding="utf-8")
 
         assert (ROOT / "examples" / "ild_pdf_demo.py").exists()
-        assert "0.5.0" in (ROOT / "INFO.md").read_text(encoding="utf-8")
+        assert "0.5.1" in (ROOT / "INFO.md").read_text(encoding="utf-8")
         assert (ROOT / "assets" / "app.ico").is_file()
 
         # --- Kernpfade: open / annotate / export / license ---
@@ -765,7 +776,10 @@ def main() -> int:
         set_backup_on_save(False)
         assert get_page_size_unit() in ("mm", "inch")
         assert isinstance(get_minimize_to_tray(), bool)
-        assert "0.5.0" in feat and "0.4.9" in feat and "0.4.0" in feat  # Release + Herkunft-Feature-Hinweise
+        assert "0.5.1" in feat and "0.4.9" in feat  # Release + Zeitraum-Feature-Hinweise
+        assert "Batch-OCR" in feat or "OCR gesamtes PDF" in feat
+        assert "Tag" in feat
+        assert "Projekt-Ordner" in feat or "Workspace" in feat
         # --- 0.4.5 CLI: CropBox settings, Ann Lock/Move, Snippets, Templates ---
         from instantlensdoc.core.app_settings import (
             get_annotations_locked,
@@ -821,6 +835,28 @@ def main() -> int:
         )
 
         assert SIDECAR_VERSION == 4 and SCHEMA_ID == "ildann-v4"
+        # 0.5.1 CLI: Tags, sanitize, workspaces, batch-OCR API
+        assert normalize_tags("A, b; A") == ["A", "b"]
+        assert tags_to_str(["x", "y"]) == "x, y"
+        tagged = Annotation(
+            0,
+            AnnotationType.STICKY,
+            1,
+            1,
+            width=10,
+            height=10,
+            text="t",
+            tags=["Alpha", "Beta"],
+        )
+        assert tagged.to_dict()["tags"] == ["Alpha", "Beta"]
+        assert Annotation.from_dict(tagged.to_dict()).tags == ["Alpha", "Beta"]
+        tmp_ws = td / "proj_workspace_051"
+        tmp_ws.mkdir(exist_ok=True)
+        remember_project_workspace(tmp_ws, activate=True)
+        assert get_active_project_workspace() is not None
+        assert len(get_project_workspaces()) >= 1
+        assert callable(ocr_mod.ocr_pdf_document)
+        assert hasattr(ocr_mod, "OcrDocumentResult")
         set_show_printer_marks(True)
         assert get_show_printer_marks() is True
         set_show_printer_marks(False)
@@ -941,7 +977,7 @@ def main() -> int:
         assert "Schema v4" in feat or "ildann-v4" in feat or "PDF-Highlight" in feat
         assert "sortieren" in feat.lower() or "Zeilen sortieren" in feat
         assert "Reset" in feat or "zurücksetzen" in feat.lower()
-        # Ausgewählte 0.4.x-Inhalte (kompakt in 0.5.0, Kurz-Tabelle + Konsolidierung)
+        # Ausgewählte 0.4.x-Inhalte (kompakt in 0.5.1, Kurz-Tabelle + Konsolidierung)
         assert "Seitenbild" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8") or "0.4.5" in feat
         assert "Gehe zu Seite" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8") or "0.4.6" in feat
         assert "0.4.6" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
@@ -953,7 +989,7 @@ def main() -> int:
         assert "Continuous Scroll" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
         assert "Seitenlabel" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8") or "Seitenlabels" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
         assert "Zwischenablage-Verlauf" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8") or "Clipboard" in (ROOT / "FEATURES.md").read_text(encoding="utf-8")
-        assert "0.5.0" in feat and "0.4.9" in feat
+        assert "0.5.1" in feat and "0.4.9" in feat
         # --- 0.4.2 CLI: Outline Goto, Ann Copy/Paste, Flatten Progress ---
         import pikepdf as _pike_ol
 
@@ -1078,7 +1114,7 @@ def main() -> int:
         win._add_chained_frame()
         assert len(win.layout_doc.text_frames) >= 2
         assert "Lizenz:" in win.license_label.text() or "⚠" in win.license_label.text()
-        assert "v0.5.0" in win.version_label.text()
+        assert "v0.5.1" in win.version_label.text()
         # Lizenz <7 Tage: Style prominent
         st_lic = win.license_manager.status()
         if st_lic.allowed and st_lic.days_remaining < 7:
@@ -1259,11 +1295,11 @@ def main() -> int:
             assert win.editor.outdent_selection(4)
             assert win.editor.toPlainText().splitlines()[0] == "alpha"
             # Fenstertitel mit Version
-            assert "0.5.0" in win.windowTitle()
+            assert "0.5.1" in win.windowTitle()
             from instantlensdoc.ui.help_dialog import AboutDialog, HelpDialog, open_log_folder
 
             about = AboutDialog(win)
-            assert "0.5.0" in about.windowTitle()
+            assert "0.5.1" in about.windowTitle()
             help_dlg = HelpDialog(win)
             assert help_dlg.windowTitle() == "Hilfe"
             assert callable(open_log_folder)
@@ -1923,7 +1959,7 @@ def main() -> int:
             win.apply_tray_setting()
             if win._tray is not None:
                 tip = win._tray.toolTip()
-                assert "0.5.0" in tip and "InstantLens Doc" in tip
+                assert "0.5.1" in tip and "InstantLens Doc" in tip
             set_minimize_to_tray(False)
             win.apply_tray_setting()
             print("0.3.9 fit-h/ann-stats/special/tray: OK")
@@ -1936,9 +1972,9 @@ def main() -> int:
             from instantlensdoc.ui.password_dialog import CompressPdfDialog, SetPasswordDialog
             from instantlensdoc.ui.stubs import PLANNED
             assert KeyboardHelpDialog and SetPasswordDialog and CompressPdfDialog
-            assert "0.5.0" in PLANNED["ki"]
+            assert "0.5.1" in PLANNED["ki"]
             assert "Coming soon" in PLANNED["cloud"]
-            assert "0.5.0" in PLANNED["stylus"] and "0.5.0" in PLANNED["extrude3d"]
+            assert "0.5.1" in PLANNED["stylus"] and "0.5.1" in PLANNED["extrude3d"]
             # Toolbar ↔ Menü Sync Graustufen/Nacht
             win.pdf_view.set_grayscale(True)
             assert win._grayscale_action.isChecked()
@@ -1973,7 +2009,7 @@ def main() -> int:
             assert win.editor.toPlainText().splitlines() == ["one", "two"]
             from instantlensdoc.ui.help_dialog import HELP_HTML
 
-            assert "Stub 0.5.0" in HELP_HTML
+            assert "Stub 0.5.1" in HELP_HTML
             assert "scripts/sync-ild.ps1" in HELP_HTML
             assert "Präsentationsmodus" in HELP_HTML or "F5" in (
                 ROOT / "instantlensdoc" / "ui" / "keyboard_help.py"
@@ -2295,12 +2331,12 @@ def main() -> int:
             ).read_text(encoding="utf-8")
             assert "Zwei-Seiten" in (
                 ROOT / "CHANGELOG.md"
-            ).read_text(encoding="utf-8") or "0.5.0" in (
+            ).read_text(encoding="utf-8") or "0.5.1" in (
                 ROOT / "FEATURES.md"
             ).read_text(encoding="utf-8")
             assert "Gehe zu Seite" in (
                 ROOT / "CHANGELOG.md"
-            ).read_text(encoding="utf-8") or "0.5.0" in (
+            ).read_text(encoding="utf-8") or "0.5.1" in (
                 ROOT / "FEATURES.md"
             ).read_text(encoding="utf-8")
             assert "PDF-Toolbar" in (
@@ -2382,10 +2418,83 @@ def main() -> int:
                     win.pdf_view.goto_page(1)
                     n_paste = win.pdf_view.paste_annotations_on_page()
                     assert n_paste == 1
+
+            # --- 0.5.1 Qt: Batch-OCR API, Tags-Filter, Workspace, PDF bereinigen ---
+            assert callable(getattr(win, "_run_ocr_document", None))
+            assert callable(getattr(win, "_sanitize_pdf", None))
+            assert callable(getattr(win, "_choose_project_workspace", None))
+            assert callable(getattr(win, "_activate_project_workspace", None))
+            assert callable(getattr(win, "_edit_annotation_tags", None))
+            assert hasattr(win.sidebar, "ann_tag_filter")
+            assert callable(win.sidebar.set_annotation_tag_filter)
+            assert callable(win.pdf_view.edit_selected_annotation_tags)
+            from ild_pdf import Annotation as Ann051, AnnotationType as AT051, normalize_tags as nt051
+
+            store051 = win.pdf_view.store
+            assert store051 is not None
+            a051 = Ann051(
+                0,
+                AT051.STICKY,
+                5,
+                5,
+                width=40,
+                height=20,
+                text="tagged",
+                tags=["Review", "TODO"],
+            )
+            store051.add(a051)
+            win._refresh_pdf_marks()
+            win.sidebar.set_annotation_tag_filter("Review")
+            texts051 = [
+                win.sidebar.annotations.item(i).text()
+                for i in range(win.sidebar.annotations.count())
+            ]
+            assert "tagged" in " ".join(texts051)
+            win.sidebar.set_annotation_tag_filter("MissingTagXYZ")
+            texts_empty = [
+                win.sidebar.annotations.item(i).text()
+                for i in range(win.sidebar.annotations.count())
+            ]
+            assert "tagged" not in " ".join(texts_empty)
+            win.sidebar.set_annotation_tag_filter("")
+            win.pdf_view._selected_ann_id = a051.id
+            # Tags via store update (ohne Dialog)
+            store051.update(a051.id, tags=nt051("done, Review"))
+            assert "done" in (store051.get(a051.id).tags or [])
+            assert callable(ocr_mod.ocr_pdf_document)
+            # Workspace merken
+            ws = Path(td2) / "workspace051"
+            ws.mkdir(exist_ok=True)
+            remember_project_workspace(ws, activate=True)
+            assert get_active_project_workspace() is not None
+            assert any(p.resolve() == ws.resolve() for p in get_project_workspaces())
+            assert dialog_start_dir().startswith(str(ws)) or str(ws) in dialog_start_dir()
+            win._refresh_workspaces()
+            # PDF bereinigen / Metadaten strip
+            dirty_pdf = Path(td2) / "dirty_meta.pdf"
+            import shutil as _shutil
+
+            _shutil.copy2(smoke_pdf, dirty_pdf)
+            set_metadata(dirty_pdf, PdfMetadata(title="StripMe", author="Smoke"))
+            assert "StripMe" in get_metadata(dirty_pdf).title
+            clean_pdf = Path(td2) / "clean_meta.pdf"
+            sanitize_pdf(dirty_pdf, strip_meta=True, out_path=clean_pdf)
+            meta_clean = get_metadata(clean_pdf)
+            assert not (meta_clean.title or "").strip() or "StripMe" not in meta_clean.title
+            feat051 = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
+            assert "Batch-OCR" in feat051 or "OCR gesamtes PDF" in feat051
+            assert "Tags" in feat051 or "Tag-Filter" in feat051
+            assert "Projekt-Ordner" in feat051 or "Workspace" in feat051
+            assert "bereinigen" in feat051.lower()
+            kh051 = (ROOT / "instantlensdoc" / "ui" / "keyboard_help.py").read_text(encoding="utf-8")
+            assert "Ctrl+Alt+T" in kh051
+            assert "Projekt-Ordner" in kh051 or "Workspace" in kh051
+            print("0.5.1 Qt batch-ocr/tags/workspace/sanitize: OK")
+
             print("0.4.x selected Qt marks/schema/sort/reset: OK")
             print("0.4.2 Qt outline/copy-paste/case/progress: OK")
             print("0.4.1 Qt links/stamp/encoding/drop: OK")
-            print("0.3.x–0.5.0 review OK")
+            print("0.3.x–0.5.1 review OK")
             assert callable(win.pdf_view.bake_redactions)
             assert callable(win.pdf_view.clear_redactions)
             assert callable(win._set_pdf_password)

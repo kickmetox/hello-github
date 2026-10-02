@@ -108,3 +108,72 @@ def set_metadata(
         out_path.parent.mkdir(parents=True, exist_ok=True)
         pdf.save(out_path)
     return out_path
+
+
+def strip_metadata(
+    path: str | Path,
+    *,
+    out_path: str | Path | None = None,
+) -> Path:
+    """
+    Entfernt DocInfo- und XMP-Metadaten (Titel/Autor/Thema/Keywords/…).
+    Speichert unter out_path oder überschreibt die Quelldatei.
+    """
+    import pikepdf
+
+    path = Path(path)
+    out_path = Path(out_path) if out_path else path
+    overwrite = out_path.resolve() == path.resolve()
+    with pikepdf.open(path, allow_overwriting_input=overwrite) as pdf:
+        try:
+            with pdf.open_metadata(set_pikepdf_as_editor=False) as xmp:
+                keys = list(xmp.keys())
+                for key in keys:
+                    try:
+                        del xmp[key]
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+        try:
+            # DocInfo leeren
+            info = pdf.docinfo
+            for key in list(info.keys()):
+                try:
+                    del info[key]
+                except Exception:
+                    pass
+        except Exception:
+            pass
+        # Optional: /Info-Eintrag im Trailer entfernen falls möglich
+        try:
+            if "/Info" in pdf.trailer:
+                del pdf.trailer["/Info"]
+        except Exception:
+            pass
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        pdf.save(out_path)
+    return out_path
+
+
+def sanitize_pdf(
+    path: str | Path,
+    *,
+    strip_meta: bool = True,
+    out_path: str | Path | None = None,
+) -> Path:
+    """
+    PDF bereinigen: optional Metadaten strippen, Datei neu speichern
+    (pikepdf rewrite — entfernt typischerweise ungültige/verwaiste Objekte).
+    """
+    import pikepdf
+
+    path = Path(path)
+    out_path = Path(out_path) if out_path else path
+    if strip_meta:
+        return strip_metadata(path, out_path=out_path)
+    overwrite = out_path.resolve() == path.resolve()
+    with pikepdf.open(path, allow_overwriting_input=overwrite) as pdf:
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        pdf.save(out_path)
+    return out_path

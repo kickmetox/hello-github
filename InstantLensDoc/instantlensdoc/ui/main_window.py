@@ -59,6 +59,9 @@ from instantlensdoc.core.app_settings import (
     get_window_geometry_b64,
     get_window_state_b64,
     remember_recent_dir,
+    remember_project_workspace,
+    get_project_workspaces,
+    get_active_project_workspace,
     set_last_export_dir,
     set_window_geometry_b64,
     set_window_state_b64,
@@ -94,6 +97,7 @@ class MainWindow(QMainWindow):
         self.layout_doc = LayoutDocument()
         self._editor_marks: list[str] = []
         self._recent_menu = None
+        self._workspace_menu = None
         self._theme_action: QAction | None = None
         self._autosave_enabled = True
         self._thumb_lazy_timer: QTimer | None = None
@@ -119,6 +123,7 @@ class MainWindow(QMainWindow):
         self._restore_window_geometry()
         self.apply_tray_setting()
         self._refresh_recent()
+        self._refresh_workspaces()
         self._refresh_recent_searches()
         self._update_license_status()
         apply_theme()
@@ -426,6 +431,7 @@ class MainWindow(QMainWindow):
         m_file.addAction(act_open_enc)
 
         self._recent_menu = m_file.addMenu("Zuletzt geöffnet")
+        self._workspace_menu = m_file.addMenu("Projekt-Ordner")
         m_file.addSeparator()
 
         act_save = QAction("Speichern", self)
@@ -622,6 +628,11 @@ class MainWindow(QMainWindow):
         act_edit_ann.setToolTip("Notiz/Kommentar/Overlay der Auswahl bearbeiten (auch Doppelklick)")
         act_edit_ann.triggered.connect(self._edit_annotation_text)
         m_edit.addAction(act_edit_ann)
+        act_edit_tags = QAction("Annotation-Tags bearbeiten…", self)
+        act_edit_tags.setShortcut(QKeySequence("Ctrl+Alt+T"))
+        act_edit_tags.setToolTip("Freie Tags/Labels der ausgewählten Annotation (filterbar)")
+        act_edit_tags.triggered.connect(self._edit_annotation_tags)
+        m_edit.addAction(act_edit_tags)
         act_dup_ann = QAction("Annotation duplizieren", self)
         act_dup_ann.setShortcut(QKeySequence("Ctrl+Shift+D"))
         act_dup_ann.setToolTip("Ausgewählte Annotation kopieren (leicht versetzt)")
@@ -837,6 +848,10 @@ class MainWindow(QMainWindow):
         act_meta = QAction("Metadaten bearbeiten…", self)
         act_meta.triggered.connect(self._edit_pdf_metadata)
         m_pdf.addAction(act_meta)
+        act_sanitize = QAction("PDF bereinigen…", self)
+        act_sanitize.setToolTip("PDF neu speichern; optional Metadaten entfernen")
+        act_sanitize.triggered.connect(self._sanitize_pdf)
+        m_pdf.addAction(act_sanitize)
         act_forms = QAction("Formularfelder ausfüllen…", self)
         act_forms.setToolTip("Bestehende AcroForm-Felder lesen und schreiben")
         act_forms.triggered.connect(self._edit_pdf_form_fields)
@@ -929,6 +944,10 @@ class MainWindow(QMainWindow):
         a = QAction("OCR (Bild/PDF-Seite)…", self)
         a.triggered.connect(self._run_ocr)
         m_extra.addAction(a)
+        a = QAction("OCR gesamtes PDF…", self)
+        a.setToolTip("Batch-OCR aller Seiten mit Fortschrittsanzeige")
+        a.triggered.connect(self._run_ocr_document)
+        m_extra.addAction(a)
         a = QAction("Formulargenerator…", self)
         a.triggered.connect(self._forms)
         m_extra.addAction(a)
@@ -977,19 +996,93 @@ class MainWindow(QMainWindow):
             return
         self._recent_menu.clear()
         if not files:
-            empty = QAction("(keine)", self)
+            empty = QAction("(leer)", self)
             empty.setEnabled(False)
             self._recent_menu.addAction(empty)
         else:
             for path in files:
-                a = QAction(Path(path).name, self)
-                a.setToolTip(path)
+                a = QAction(str(path), self)
                 a.triggered.connect(lambda checked=False, p=path: self.open_path(p))
                 self._recent_menu.addAction(a)
-            self._recent_menu.addSeparator()
-            clear = QAction("Liste leeren", self)
-            clear.triggered.connect(self._clear_recent)
-            self._recent_menu.addAction(clear)
+        self._recent_menu.addSeparator()
+        clear = QAction("Liste leeren", self)
+        clear.triggered.connect(self._clear_recent)
+        self._recent_menu.addAction(clear)
+
+    def _refresh_workspaces(self):
+        """Projekt-Ordner-Menü (letzte 5 Workspaces) neu aufbauen."""
+        if self._workspace_menu is None:
+            return
+        self._workspace_menu.clear()
+        act_choose = QAction("Projekt-Ordner wählen…", self)
+        act_choose.setToolTip("Ordner als Workspace setzen (letzte 5 merken)")
+        act_choose.triggered.connect(self._choose_project_workspace)
+        self._workspace_menu.addAction(act_choose)
+        act_open = QAction("Aktiven Projekt-Ordner öffnen", self)
+        act_open.setToolTip("Aktiven Workspace im Dateimanager öffnen")
+        act_open.triggered.connect(self._open_active_project_workspace)
+        self._workspace_menu.addAction(act_open)
+        self._workspace_menu.addSeparator()
+        workspaces = get_project_workspaces()
+        active = get_active_project_workspace()
+        active_key = str(active.resolve()) if active else ""
+        if not workspaces:
+            empty = QAction("(keine Projekt-Ordner)", self)
+            empty.setEnabled(False)
+            self._workspace_menu.addAction(empty)
+        else:
+            for folder in workspaces:
+                label = str(folder)
+                try:
+                    key = str(folder.resolve())
+                except Exception:
+                    key = str(folder)
+                if key == active_key:
+                    label = f"● {label}"
+                a = QAction(label, self)
+                a.setToolTip(f"Workspace aktivieren:\n{folder}")
+                a.triggered.connect(
+                    lambda checked=False, p=folder: self._activate_project_workspace(p)
+                )
+                self._workspace_menu.addAction(a)
+
+    def _choose_project_workspace(self):
+        from PySide6.QtWidgets import QFileDialog
+
+        start = dialog_start_dir()
+        folder = QFileDialog.getExistingDirectory(self, "Projekt-Ordner wählen", start)
+        if not folder:
+            return
+        self._activate_project_workspace(folder)
+
+    def _activate_project_workspace(self, folder: str | Path):
+        path = Path(folder)
+        if not path.is_dir():
+            QMessageBox.warning(self, "Projekt-Ordner", f"Ordner existiert nicht:\n{path}")
+            return
+        remember_project_workspace(path, activate=True)
+        self._refresh_workspaces()
+        self._set_status(f"Projekt-Ordner: {path}")
+
+    def _open_active_project_workspace(self):
+        from PySide6.QtCore import QUrl
+        from PySide6.QtGui import QDesktopServices
+
+        folder = get_active_project_workspace()
+        if folder is None:
+            self._choose_project_workspace()
+            folder = get_active_project_workspace()
+        if folder is None:
+            return
+        ok = QDesktopServices.openUrl(QUrl.fromLocalFile(str(folder)))
+        if ok:
+            self._set_status(f"Projekt-Ordner: {folder}")
+        else:
+            QMessageBox.information(
+                self,
+                "Projekt-Ordner",
+                f"Ordner konnte nicht geöffnet werden.\nPfad:\n{folder}",
+            )
 
     def _refresh_recent_searches(self):
         try:
@@ -1330,6 +1423,15 @@ class MainWindow(QMainWindow):
             self._set_status("Keine Annotation ausgewählt (Auswahl-Werkzeug / Doppelklick)")
             return
         self.pdf_view.edit_selected_annotation_text()
+
+    def _edit_annotation_tags(self):
+        if self.stack.currentWidget() is not self.pdf_view or not self.pdf_view.pdf_path:
+            self._set_status("Annotation-Tags nur im PDF-Modus")
+            return
+        if not self.pdf_view._selected_ann_id:
+            self._set_status("Keine Annotation ausgewählt")
+            return
+        self.pdf_view.edit_selected_annotation_tags()
 
     def _duplicate_annotation(self):
         if self.stack.currentWidget() is not self.pdf_view or not self.pdf_view.pdf_path:
@@ -3232,6 +3334,168 @@ class MainWindow(QMainWindow):
             if result.sidecar:
                 extra += f" + {result.sidecar.name}"
         self._set_status(f"OCR ({result.lang}, {result.mode.value}){extra}")
+
+    def _run_ocr_document(self):
+        """Batch-OCR aller PDF-Seiten mit Fortschrittsdialog."""
+        from PySide6.QtWidgets import QApplication, QDialog, QProgressDialog
+
+        if not self.doc or self.doc.kind != DocKind.PDF or not self.doc.path:
+            QMessageBox.information(
+                self,
+                "OCR gesamtes PDF",
+                "Bitte zuerst ein PDF öffnen.",
+            )
+            return
+
+        ok, msg = ocr_mod.tesseract_available()
+        dlg = OcrDialog(
+            self,
+            need_file=False,
+            default_label=f"{Path(self.doc.path).name} (alle Seiten)",
+        )
+        # Batch-OCR liefert immer editierbaren Text
+        dlg.rb_editable.setChecked(True)
+        dlg.rb_searchable.setEnabled(False)
+        if dlg.exec() != QDialog.Accepted:
+            return
+        if not ok:
+            QMessageBox.information(self, "OCR — Tesseract fehlt", msg)
+            self._set_status("OCR nicht verfügbar")
+            return
+
+        lang = dlg.lang_code()
+        pdf_path = Path(self.doc.path)
+        cancelled = {"flag": False}
+
+        # Seitenzahl vorab für Dialog
+        try:
+            import pypdfium2 as pdfium
+
+            _doc = pdfium.PdfDocument(str(pdf_path))
+            total = len(_doc)
+            _doc.close()
+        except Exception:
+            total = max(1, int(self.pdf_view.page_count or 1))
+
+        prog = QProgressDialog("OCR gesamtes PDF…", "Abbrechen", 0, total, self)
+        prog.setWindowTitle("Batch-OCR")
+        prog.setWindowModality(Qt.WindowModal)
+        prog.setMinimumDuration(0)
+        prog.setValue(0)
+        prog.show()
+        QApplication.processEvents()
+
+        def on_progress(page: int, n: int, label: str) -> bool:
+            if prog.wasCanceled():
+                cancelled["flag"] = True
+                return False
+            prog.setMaximum(max(1, n))
+            prog.setValue(page)
+            prog.setLabelText(f"OCR: {pdf_path.name} — {label}")
+            QApplication.processEvents()
+            return True
+
+        try:
+            result = ocr_mod.ocr_pdf_document(
+                pdf_path,
+                lang=lang,
+                progress=on_progress,
+            )
+        except ocr_mod.OcrUnavailable as e:
+            QMessageBox.information(self, "OCR — Tesseract fehlt", str(e))
+            return
+        except Exception as e:
+            QMessageBox.warning(self, "OCR gesamtes PDF", f"OCR fehlgeschlagen:\n{e}")
+            return
+        finally:
+            prog.close()
+
+        if result.cancelled or cancelled["flag"]:
+            self._set_status(
+                f"Batch-OCR abgebrochen ({result.pages_done}/{result.pages_total})"
+            )
+            if not result.text.strip():
+                return
+
+        title = f"OCR — {pdf_path.name} ({result.pages_done}/{result.pages_total})"
+        self.stack.setCurrentWidget(self.editor_pane)
+        self.editor.setPlainText(result.text)
+        self.doc = Document(kind=DocKind.TEXT, title=title, text=result.text)
+        self.setWindowTitle(self._app_title(title))
+        status = (
+            f"Batch-OCR ({result.lang}): {result.pages_done}/{result.pages_total} Seiten"
+        )
+        if result.cancelled:
+            status += " (abgebrochen)"
+        self._set_status(status)
+
+    def _sanitize_pdf(self):
+        """Schnellaktion: PDF bereinigen, optional Metadaten strippen."""
+        from PySide6.QtWidgets import (
+            QCheckBox,
+            QDialog,
+            QDialogButtonBox,
+            QFileDialog,
+            QLabel,
+            QVBoxLayout,
+        )
+
+        if not self.pdf_view.pdf_path:
+            QMessageBox.information(self, "PDF bereinigen", "Bitte zuerst ein PDF öffnen.")
+            return
+        src = Path(self.pdf_view.pdf_path)
+
+        dlg = QDialog(self)
+        dlg.setWindowTitle("PDF bereinigen")
+        dlg.resize(420, 160)
+        layout = QVBoxLayout(dlg)
+        layout.addWidget(
+            QLabel(
+                f"„{src.name}“ neu speichern.\n"
+                "Entfernt verwaiste Objekte; Metadaten optional strippen."
+            )
+        )
+        cb_meta = QCheckBox("Metadaten entfernen (Titel, Autor, XMP, …)")
+        cb_meta.setChecked(True)
+        layout.addWidget(cb_meta)
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        buttons.accepted.connect(dlg.accept)
+        buttons.rejected.connect(dlg.reject)
+        layout.addWidget(buttons)
+        if dlg.exec() != QDialog.Accepted:
+            return
+
+        default = str(Path(dialog_start_dir(src.parent)) / f"{src.stem}_clean.pdf")
+        out, _ = QFileDialog.getSaveFileName(
+            self,
+            "Bereinigtes PDF speichern",
+            default,
+            "PDF (*.pdf)",
+        )
+        if not out:
+            return
+        dest = Path(out)
+        if dest.suffix.lower() != ".pdf":
+            dest = dest.with_suffix(".pdf")
+        if not confirm_overwrite_export(dest, self):
+            return
+        try:
+            from ild_pdf import sanitize_pdf
+
+            sanitize_pdf(src, strip_meta=cb_meta.isChecked(), out_path=dest)
+        except Exception as e:
+            QMessageBox.warning(self, "PDF bereinigen", str(e))
+            return
+        remember_recent_dir(dest)
+        self._set_status(
+            f"PDF bereinigt: {dest.name}"
+            + (" (ohne Metadaten)" if cb_meta.isChecked() else "")
+        )
+        QMessageBox.information(
+            self,
+            "PDF bereinigen",
+            f"Gespeichert:\n{dest}",
+        )
 
     def _forms(self):
         try:

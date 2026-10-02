@@ -14,6 +14,8 @@ from .annotate import (
     DRAG_TYPES,
     SCHEMA_ID,
     SIDECAR_VERSION,
+    normalize_tags,
+    tags_to_str,
     validate_annotation_import_data,
     STAMP_LIBRARY,
     STAMP_PRESETS,
@@ -71,7 +73,7 @@ from .limits import PdfHealth, clamp_render_scale, inspect_pdf
 from .render import clear_render_cache
 from .security import needs_password, remove_password, set_password, try_open_password
 from .redact import bake_redactions
-from .metadata import PdfMetadata, get_metadata, set_metadata
+from .metadata import PdfMetadata, get_metadata, sanitize_pdf, set_metadata, strip_metadata
 from .acroform import (
     FormFieldInfo,
     get_form_values,
@@ -102,6 +104,8 @@ __all__ = [
     "DRAG_TYPES",
     "SCHEMA_ID",
     "SIDECAR_VERSION",
+    "normalize_tags",
+    "tags_to_str",
     "STAMP_PRESETS",
     "STAMP_LIBRARY",
     "stamp_with_date",
@@ -164,6 +168,8 @@ __all__ = [
     "PdfMetadata",
     "get_metadata",
     "set_metadata",
+    "strip_metadata",
+    "sanitize_pdf",
     "FormFieldInfo",
     "has_acroform",
     "list_form_fields",
@@ -180,4 +186,4 @@ __all__ = [
     "uri_link_at",
 ]
 
-__version__ = "0.5.0"
+__version__ = "0.5.1"

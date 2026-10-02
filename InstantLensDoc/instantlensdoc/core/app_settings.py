@@ -37,6 +37,8 @@ DEFAULTS: dict[str, Any] = {
     "editor_bracket_match": True,
     "ann_default_opacity": 1.0,
     "recent_dirs": [],
+    "project_workspaces": [],
+    "active_project_workspace": "",
     "editor_markdown_preview": False,
     "editor_soft_wrap": True,
     "editor_show_special_chars": False,
@@ -351,6 +353,7 @@ def set_ann_default_opacity(opacity: float) -> None:
 
 
 RECENT_DIRS_MAX = 8
+PROJECT_WORKSPACES_MAX = 5
 
 
 def get_recent_dirs(max_items: int = RECENT_DIRS_MAX) -> list[Path]:
@@ -395,8 +398,72 @@ def remember_recent_dir(path: str | Path | None, max_items: int = RECENT_DIRS_MA
     return get_recent_dirs(max_items=max_items)
 
 
+def get_project_workspaces(max_items: int = PROJECT_WORKSPACES_MAX) -> list[Path]:
+    """Letzte Projekt-Ordner / Workspaces (nur existierende), max. 5."""
+    raw = load_settings().get("project_workspaces") or []
+    if not isinstance(raw, list):
+        return []
+    out: list[Path] = []
+    seen: set[str] = set()
+    for item in raw:
+        p = Path(str(item)).expanduser()
+        key = str(p.resolve()) if p.exists() else str(p)
+        if key in seen:
+            continue
+        seen.add(key)
+        if p.is_dir():
+            out.append(p)
+        if len(out) >= max_items:
+            break
+    return out
+
+
+def remember_project_workspace(
+    path: str | Path | None,
+    max_items: int = PROJECT_WORKSPACES_MAX,
+    *,
+    activate: bool = True,
+) -> list[Path]:
+    """Projekt-Ordner als Workspace merken (letzte 5) und optional aktiv setzen."""
+    if path is None or str(path).strip() == "":
+        return get_project_workspaces(max_items=max_items)
+    p = Path(path).expanduser()
+    if not p.is_dir():
+        return get_project_workspaces(max_items=max_items)
+    key = str(p.resolve() if p.exists() else p)
+    prev = [str(x) for x in get_project_workspaces(max_items=max_items * 2)]
+    cleaned = [key] + [x for x in prev if x != key]
+    cleaned = cleaned[:max_items]
+    payload: dict[str, Any] = {"project_workspaces": cleaned}
+    if activate:
+        payload["active_project_workspace"] = key
+        payload["default_open_dir"] = key
+    save_settings(payload)
+    remember_recent_dir(p)
+    return get_project_workspaces(max_items=max_items)
+
+
+def get_active_project_workspace() -> Path | None:
+    """Aktiver Projekt-Ordner, falls vorhanden und existent."""
+    raw = str(load_settings().get("active_project_workspace") or "").strip()
+    if raw:
+        p = Path(raw).expanduser()
+        if p.is_dir():
+            return p
+    for d in get_project_workspaces():
+        return d
+    return None
+
+
+def clear_active_project_workspace() -> None:
+    save_settings({"active_project_workspace": ""})
+
+
 def dialog_start_dir(*fallbacks: str | Path | None) -> str:
-    """Startpfad für QFileDialog: zuletzt verwendeter existierender Ordner, sonst Fallbacks."""
+    """Startpfad für QFileDialog: aktiver Workspace, zuletzt verwendeter Ordner, sonst Fallbacks."""
+    active = get_active_project_workspace()
+    if active is not None and active.is_dir():
+        return str(active)
     for d in get_recent_dirs():
         if d.is_dir():
             return str(d)

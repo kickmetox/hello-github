@@ -30,6 +30,7 @@ SHORTCUTS_HTML = """
 <tr><td>Zwei-Seiten-Ansicht (Spread)</td><td><code>Ctrl+2</code> / Toolbar „2S“</td></tr>
 <tr><td>Continuous Scroll</td><td><code>Ctrl+3</code> / Toolbar „CS“</td></tr>
 <tr><td>Arbeitsverzeichnis öffnen</td><td><code>Ctrl+Shift+E</code></td></tr>
+<tr><td>Projekt-Ordner / Workspace</td><td>Datei → Projekt-Ordner (letzte 5)</td></tr>
 <tr><td>Zeilen sortieren (A–Z)</td><td><code>Ctrl+Shift+O</code></td></tr>
 <tr><td>Öffnen</td><td><code>Ctrl+O</code></td></tr>
 <tr><td>Speichern</td><td><code>Ctrl+S</code></td></tr>
@@ -66,6 +67,7 @@ SHORTCUTS_HTML = """
 <tr><td>PDF-Link (http/https) öffnen</td><td>Auswahl + Klick / <code>Ctrl</code>+Klick</td></tr>
 <tr><td>Stempel drehen 90°</td><td>Toolbar „Stempel ↻“ / PDF-Menü (Auswahl)</td></tr>
 <tr><td>Annotation löschen</td><td><code>Entf</code> / <code>Backspace</code> (Auswahl oder letzte)</td></tr>
+<tr><td>Annotation-Tags bearbeiten</td><td><code>Ctrl+Alt+T</code></td></tr>
 <tr><td>Annotation duplizieren</td><td><code>Ctrl+Shift+D</code> (Auswahl)</td></tr>
 <tr><td>Alle Annotationen auf Seite</td><td><code>Ctrl+A</code> (PDF-Modus)</td></tr>
 <tr><td>Seitengröße mm/inch</td><td><code>Ctrl+Alt+U</code> / Klick Status</td></tr>
@@ -90,8 +92,9 @@ Seite <b>⟲/⟳ drehen</b>, <b>↔/↕ spiegeln</b>, <b>leere Seite</b>, <b>dup
 <p><b>PDF-Suche:</b> Sidebar-Suche highlightet Treffer auf der aktuellen Seite;
 „Weiter“ springt zum nächsten Treffer; <b>letzte Suchbegriffe</b> im Dropdown.</p>
 <p><b>Annotationen:</b> eigene Liste in der Sidebar — <b>gruppiert nach Seite</b>; Klick springt zur Annotation;
-Filter-Dropdown nach Typ; <b>Nur aktuelle Seite</b>-Checkbox; <b>Farben-Chips in der Statistik klickbar</b>; <b>Textsuche in der Liste</b>;
+Filter-Dropdown nach Typ; <b>Nur aktuelle Seite</b>-Checkbox; <b>Tag-Filter</b>; <b>Farben-Chips in der Statistik klickbar</b>; <b>Textsuche in der Liste</b>;
 Text nachträglich editierbar; Deckkraft pro Annotation; <b>Notizfarbe unabhängig von Highlight</b>;
+freie <b>Tags/Labels</b> (Ctrl+Alt+T) filterbar in der Sidebar;
 <b>Zeitstempel (modified/created) in der Liste</b>.</p>
 <p><b>PDF-Seitenlabels:</b> römische/arabische Labels aus dem PDF werden in Statusleiste und Toolbar angezeigt, wenn vorhanden.</p>
 <p><b>Zwischenablage-Verlauf:</b> Bearbeiten → letzte 3 eingefügten Textschnipsel erneut einfügen.</p>
@@ -99,6 +102,9 @@ Text nachträglich editierbar; Deckkraft pro Annotation; <b>Notizfarbe unabhäng
 <p><b>Zwei-Seiten-Ansicht:</b> Ansicht → Zwei-Seiten-Ansicht / Toolbar „2S“ / Ctrl+2 — aktuelle und nächste Seite nebeneinander; Blättern springt um 2 Seiten.</p>
 <p><b>Continuous Scroll:</b> Ansicht → Continuous Scroll / Toolbar „CS“ / Ctrl+3 — Seiten untereinander scrollen (schließt Spread aus).</p>
 <p><b>Arbeitsverzeichnis öffnen:</b> Datei → Ctrl+Shift+E — Ordner der aktuellen Datei (sonst CWD) im Dateimanager.</p>
+<p><b>Projekt-Ordner:</b> Datei → Projekt-Ordner — Workspace wählen (letzte 5); Dialoge starten dort.</p>
+<p><b>OCR gesamtes PDF:</b> Extras → OCR gesamtes PDF — Batch mit Fortschritt/Abbrechen → Editor.</p>
+<p><b>PDF bereinigen:</b> PDF → PDF bereinigen — optional Metadaten entfernen, neu speichern.</p>
 <p><b>Seitenbereich:</b> PDF → Seitenbereich extrahieren… (von–bis → neues PDF)
 bzw. Dialog „zusammenführen / teilen / Bereich“.</p>
 <p><b>Suchen und Ersetzen:</b> Bearbeiten → Ctrl+R (nur Texteditor).</p>
@@ -132,7 +138,7 @@ bzw. Schwärzungs-Annotationen löschen…</p>
 <p><b>Export-Overwrite:</b> Existiert die Zieldatei schon, Nachfrage (Default: Nein).</p>
 <p><b>Ann.-Statistik:</b> Sidebar-Footer zeigt Anzahl je Annotationstyp.</p>
 <p><b>Tray:</b> Tooltip enthält App-Version; Update-Hinweis beim Start nur wenn in Einstellungen aktiv.</p>
-<p><b>Extras:</b> Einstellungen (Standard-Zoom, Thumbnail-Größe, Autosave-Intervall), Batch (Fortschrittsbalken), OCR (Fortschrittsdialog).</p>
+<p><b>Extras:</b> Einstellungen (Standard-Zoom, Thumbnail-Größe, Autosave-Intervall), Batch (Fortschrittsbalken), OCR Seite/Bild und OCR gesamtes PDF (Fortschrittsdialog).</p>
 <p>Vollständige Bedienung: Hilfe → Hilfe…</p>
 """
 

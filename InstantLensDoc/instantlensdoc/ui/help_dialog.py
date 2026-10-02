@@ -42,6 +42,7 @@ HELP_HTML = f"""
 <li><b>Datei → Alles speichern</b> (Ctrl+Alt+Shift+S): aktuelles Doc + PDF-Sidecars offener Tabs</li>
 <li><b>Datei → Als Kopie speichern</b> (Ctrl+Alt+S): PDF + Sidecar kopieren (Doc bleibt offen); Editor → Speichern unter</li>
 <li><b>Datei → Arbeitsverzeichnis öffnen</b> (Ctrl+Shift+E): Ordner der aktuellen Datei bzw. Prozess-CWD</li>
+<li><b>Datei → Projekt-Ordner</b>: Workspace wählen (letzte 5); Dialoge starten im aktiven Ordner</li>
 <li><b>Datei → Exportieren</b>: Editor-Inhalt als HTML, DOCX oder PDF (zuletzt genutzter Ordner wird gemerkt)</li>
 <li><b>Datei → Drucken</b> (Ctrl+P): Editor oder aktuelle PDF-Seite (Qt Print)</li>
 <li><b>Seitenleiste</b>: Suche (inkl. letzte Suchbegriffe), „Alle Docs“-Volltext, Zuletzt geöffnet, Dokumente,
@@ -91,6 +92,7 @@ HELP_HTML = f"""
     JSON Import mit Schema-v4-Validierung (klare Fehlermeldung);
     <b>Textsuche</b> highlightet Treffer auf der aktuellen Seite;
     Doppelklick / Strg+Klick / <b>Ctrl+E</b> auf Notiz/Overlay zum Bearbeiten;
+    <b>Ctrl+Alt+T</b> Annotation-Tags (frei, Sidebar-Filter);
     <b>Ctrl+Shift+D</b> Auswahl duplizieren; <b>Ctrl+Alt+C/V</b> Annotationen kopieren/einfügen (auch seitenübergreifend);
     Auswahl-Werkzeug: Annotationen per Drag verschieben (wenn nicht gesperrt);
     PDF → Text→Overlay / Overlay einbrennen / <b>Text Seite/alles → Editor</b> /
@@ -101,7 +103,8 @@ HELP_HTML = f"""
     <b>Wasserzeichen / Seitennummern</b>;
     <b>Zwei PDFs vergleichen</b> (Seite neben Seite);
     <b>Passwort setzen/öffnen</b>; <b>Bildkompression</b> (Seiten neu als JPEG);
-    <b>Metadaten bearbeiten</b>; <b>AcroForm-Formularfelder ausfüllen</b>; <b>Anhänge</b> auflisten/extrahieren;
+    <b>Metadaten bearbeiten</b>; <b>PDF bereinigen</b> (optional Metadaten strippen);
+    <b>AcroForm-Formularfelder ausfüllen</b>; <b>Anhänge</b> auflisten/extrahieren;
     <b>Seitengröße / Zuschneiden</b> (Anzeige mm/inch, Statusleiste klickbar / Ctrl+Alt+U);
     Seite/Seiten als PNG/JPEG exportieren / Bild als neue Seite / Seite drucken; Annotation löschen (Auswahl/letzte, Entf); Statusleiste Seite/Größe/Zoom/Dateiname/Wörter; Thumbnails per Drag neu ordnen (<b>Lazy-Load</b>, Größe in Einstellungen);
     PDF als Kopie speichern; <b>Seitenbereich extrahieren</b> (von–bis → neues PDF);
@@ -118,7 +121,8 @@ HELP_HTML = f"""
 <li><b>Tastaturhilfe</b>: Hilfe → Tastaturhilfe (F1); Cheat-Sheet als PDF exportieren</li>
 <li><b>Extras → Batch-Konvertierung</b>: Ordner → PDF oder OCR</li>
 <li><b>Einfügen → Verketteter Textrahmen</b>: Overflow fließt in den Folgeahmen</li>
-<li><b>OCR</b>: Extras → OCR — Sprach-Presets + Modus „editierbarer Text“ oder
+<li><b>OCR</b>: Extras → OCR (Seite/Bild) oder <b>OCR gesamtes PDF</b> (Batch mit Fortschritt/Abbrechen) —
+    Sprach-Presets + Modus „editierbarer Text“ oder
     „durchsuchbares Bild“ (PDF + <code>*.ildocr.txt</code>); Tabellen-Heuristik als Markdown wo möglich.
     Ohne Tesseract: Install-Hinweis mit Link
     (<a href="https://github.com/UB-Mannheim/tesseract/wiki">UB-Mannheim Wiki</a>,
@@ -221,7 +225,8 @@ class AboutDialog(QDialog):
             "<li>PDF lesen/annotieren (Highlight, Notiz, Stempel, Formen) · Sidecar v4</li>"
             "<li>Seitenlabels (römisch/arabisch), Continuous Scroll, Spread, CropBox</li>"
             "<li>Editor: Find/Replace, Snippets, Bracket-Match, Zwischenablage-Verlauf</li>"
-            "<li>OCR-Bridge, Formulargenerator, Batch, Export HTML/DOCX/PDF</li>"
+            "<li>OCR-Bridge (Seite + gesamtes PDF), Formulargenerator, Batch, Export</li>"
+            "<li>Annotation-Tags, Projekt-Ordner-Workspace, PDF bereinigen</li>"
             "<li>Lizenz Trial/Keys · Stubs: KI, Cloud, Stylus, 3D</li>"
             "</ul>"
             "<p>Vollständige Liste: FEATURES.md</p>"
