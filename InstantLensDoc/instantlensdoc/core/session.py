@@ -1,4 +1,4 @@
-"""Session: offene Dokument-Tabs wiederherstellen."""
+"""Session: offene Dokument-Tabs wiederherstellen (Reihenfolge = Sidebar-Drag)."""
 
 from __future__ import annotations
 
@@ -41,9 +41,19 @@ def load_session() -> SessionState:
     except Exception:
         return SessionState()
     tabs: List[SessionTab] = []
-    for item in raw.get("tabs") or []:
+    # Explizite order-Indizes (0.6.1+) oder Listenreihenfolge
+    items = list(raw.get("tabs") or [])
+    ordered: list[tuple[int, dict]] = []
+    for i, item in enumerate(items):
         if not isinstance(item, dict):
             continue
+        try:
+            ord_i = int(item.get("order", i))
+        except (TypeError, ValueError):
+            ord_i = i
+        ordered.append((ord_i, item))
+    ordered.sort(key=lambda t: t[0])
+    for _ord, item in ordered:
         p = str(item.get("path") or "").strip()
         if not p or not Path(p).is_file():
             continue
@@ -67,10 +77,15 @@ def load_session() -> SessionState:
 def save_session(state: SessionState) -> None:
     path = session_path()
     path.parent.mkdir(parents=True, exist_ok=True)
+    tabs_payload = []
+    for i, t in enumerate(state.tabs[:SESSION_MAX_TABS]):
+        d = asdict(t)
+        d["order"] = i  # Reihenfolge der Session-Tabs (Drag in Sidebar)
+        tabs_payload.append(d)
     payload = {
         "restore": state.restore,
         "active": state.active,
-        "tabs": [asdict(t) for t in state.tabs[:SESSION_MAX_TABS]],
+        "tabs": tabs_payload,
     }
     path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
 

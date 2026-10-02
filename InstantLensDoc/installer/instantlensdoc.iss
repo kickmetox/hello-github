@@ -1,4 +1,4 @@
-; Inno Setup — InstantLens Doc 0.6.0
+; Inno Setup — InstantLens Doc 0.6.1
 ; Voraussetzung: Inno Setup 6 (iscc.exe im PATH oder ISCC_PATH setzen)
 ;
 ; Build-Varianten:
@@ -15,13 +15,14 @@
 ;   /DIncludeKeygen=1  — Keygen mitpacken (run-keygen.bat bzw. InstantLensKeygen.exe)
 ;   /DIncludeKeygen=0  — ohne Keygen-Shortcuts/Dateien
 ;
-; Desktop: Task „Desktop-Verknüpfung“ (Standard: aktiv)
+; Desktop: Task „Desktop-Verknüpfung erstellen“ — optional Checkbox (Flags: checkedonce,
+;   Standard beim ersten Install aktiv; Nutzer kann abwählen). Shortcuts nur bei Tasks: desktopicon.
 ; Uninstaller: Startmenü + Systemsteuerung (UninstallDisplay*)
 ;
 ; Siehe: build-installer.ps1
 
 #define MyAppName "InstantLens Doc"
-#define MyAppVersion "0.6.0"
+#define MyAppVersion "0.6.1"
 #define MyAppPublisher "Andreas Meyer"
 #define MyAppURL "mailto:ame@sellerbach.de"
 #ifndef SourceRoot

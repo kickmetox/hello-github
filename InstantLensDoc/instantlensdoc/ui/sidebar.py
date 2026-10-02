@@ -4,12 +4,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import Signal, Qt
-from PySide6.QtGui import QColor, QBrush, QIcon, QImage, QPixmap
+from PySide6.QtCore import QStringListModel, Qt, Signal
+from PySide6.QtGui import QBrush, QColor, QIcon, QImage, QPixmap
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QCheckBox,
     QComboBox,
+    QCompleter,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -57,6 +58,32 @@ ANN_TYPE_LABELS = {
     "signature": "Signatur",
     "redaction": "Schwärzung",
 }
+
+
+class DocumentList(QListWidget):
+    """Dokument-/Session-Tabs; Drag InternalMove → Reihenfolge speichern."""
+
+    documents_reordered = Signal()
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setMaximumHeight(100)
+        self.setDragDropMode(QAbstractItemView.InternalMove)
+        self.setDefaultDropAction(Qt.MoveAction)
+        self.setToolTip("Ziehen zum Neuordnen — Reihenfolge wird in der Session gespeichert")
+        self._reorder_enabled = True
+
+    def set_reorder_enabled(self, enabled: bool):
+        self._reorder_enabled = bool(enabled)
+        mode = QAbstractItemView.InternalMove if enabled else QAbstractItemView.NoDragDrop
+        self.setDragDropMode(mode)
+
+    def dropEvent(self, event):
+        if not self._reorder_enabled:
+            event.ignore()
+            return
+        super().dropEvent(event)
+        self.documents_reordered.emit()
 
 
 class ThumbnailList(QListWidget):
@@ -199,6 +226,7 @@ class Sidebar(QWidget):
     page_thumb_activated = Signal(int)  # PDF-Seite 0-basiert
     page_favorite_activated = Signal(int)  # PDF-Seite 0-basiert (Favoriten-Liste)
     page_favorites_reordered = Signal(list)  # Seiten 0-basiert neue Reihenfolge
+    documents_reordered = Signal()  # Dokument-/Session-Tab-Reihenfolge geändert
     line_favorite_activated = Signal(int)  # Editor-Zeile 1-basiert
     line_favorite_label_edit = Signal(int)  # Editor-Zeile 1-basiert → Label bearbeiten
     pages_reordered = Signal(list)  # alte Indizes in neuer Reihenfolge
@@ -238,10 +266,10 @@ class Sidebar(QWidget):
         self.recent.itemDoubleClicked.connect(self._activate_recent)
         layout.addWidget(self.recent)
 
-        layout.addWidget(QLabel("Dokumente"))
-        self.files = QListWidget()
-        self.files.setMaximumHeight(100)
+        layout.addWidget(QLabel("Dokumente — ziehen zum Ordnen"))
+        self.files = DocumentList()
         self.files.itemDoubleClicked.connect(self._activate)
+        self.files.documents_reordered.connect(self.documents_reordered.emit)
         layout.addWidget(self.files)
 
         layout.addWidget(QLabel("Seiten (Vorschaubilder) — ziehen zum Ordnen"))
@@ -309,10 +337,18 @@ class Sidebar(QWidget):
         self.ann_tag_filter.currentIndexChanged.connect(self._on_ann_tag_filter_changed)
         layout.addWidget(self.ann_tag_filter)
         self.ann_search = QLineEdit()
-        self.ann_search.setPlaceholderText("Annotationen suchen…")
+        self.ann_search.setPlaceholderText("Annotationen suchen… Tag-Vorschläge")
         self.ann_search.setClearButtonEnabled(True)
-        self.ann_search.setToolTip("Filtert die Annotationsliste nach Text (optional Regex)")
+        self.ann_search.setToolTip(
+            "Filtert die Annotationsliste nach Text/Tags (optional Regex); Tag-Autocomplete"
+        )
         self.ann_search.textChanged.connect(self._on_ann_search_changed)
+        self._ann_tag_completer_model = QStringListModel(self)
+        self._ann_tag_completer = QCompleter(self._ann_tag_completer_model, self)
+        self._ann_tag_completer.setCaseSensitivity(Qt.CaseInsensitive)
+        self._ann_tag_completer.setFilterMode(Qt.MatchContains)
+        self._ann_tag_completer.setCompletionMode(QCompleter.PopupCompletion)
+        self.ann_search.setCompleter(self._ann_tag_completer)
         search_row = QHBoxLayout()
         search_row.addWidget(self.ann_search, 1)
         self.ann_search_regex = QCheckBox("Regex")
@@ -598,6 +634,18 @@ class Sidebar(QWidget):
             item.setToolTip(str(path))
             item.setData(256, str(path))
             self.recent.addItem(item)
+
+    def document_paths(self) -> list[str]:
+        """Aktuelle Dokument-Reihenfolge (Session-Tabs), absolute Pfade."""
+        out: list[str] = []
+        for i in range(self.files.count()):
+            it = self.files.item(i)
+            if it is None:
+                continue
+            p = it.data(256) or it.data(Qt.UserRole) or it.toolTip() or it.text()
+            if p and Path(str(p)).is_file():
+                out.append(str(Path(str(p))))
+        return out
 
     def add_document(self, path: str | Path, title: str | None = None):
         path = Path(path)
@@ -939,6 +987,8 @@ class Sidebar(QWidget):
                 seen.add(key)
                 tags.append(s)
         tags.sort(key=lambda x: x.casefold())
+        if hasattr(self, "_ann_tag_completer_model"):
+            self._ann_tag_completer_model.setStringList(tags)
         self._ann_tag_updating = True
         self.ann_tag_filter.blockSignals(True)
         self.ann_tag_filter.clear()
@@ -1226,6 +1276,8 @@ class Sidebar(QWidget):
             self.ann_tag_filter.addItem("Alle Tags", "")
             self.ann_tag_filter.blockSignals(False)
             self._ann_tag_updating = False
+        if hasattr(self, "_ann_tag_completer_model"):
+            self._ann_tag_completer_model.setStringList([])
         self._ann_filter_updating = True
         self.ann_filter.blockSignals(True)
         self.ann_filter.clear()

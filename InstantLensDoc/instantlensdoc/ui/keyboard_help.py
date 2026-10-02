@@ -56,6 +56,7 @@ SHORTCUTS_HTML = """
 <tr><td>Einrückung verringern</td><td><code>Ctrl+[</code> / <code>Shift+Tab</code></td></tr>
 <tr><td>Präsentationsmodus</td><td><code>F5</code> (Vollbild; ←/→ Esc)</td></tr>
 <tr><td>Bild aus Zwischenablage</td><td><code>Ctrl+Shift+V</code></td></tr>
+<tr><td>PDF-Text kopieren (Auswahl)</td><td><code>Ctrl+C</code> (Auswahl-Werkzeug + Text aufziehen)</td></tr>
 <tr><td>PDF: Bild einfügen (Viewer)</td><td><code>Ctrl+V</code></td></tr>
 <tr><td>Zoom +</td><td><code>Ctrl++</code></td></tr>
 <tr><td>Zoom −</td><td><code>Ctrl+-</code></td></tr>
@@ -114,7 +115,9 @@ Filter-Dropdown nach Typ; <b>Nur aktuelle Seite</b>-Checkbox; <b>Tag-Filter</b>;
 Text nachträglich editierbar; Deckkraft pro Annotation; <b>Notizfarbe unabhängig von Highlight</b>;
 freie <b>Tags/Labels</b> (Ctrl+Alt+T) filterbar in der Sidebar;
 <b>Zeitstempel (modified/created) in der Liste</b>;
-Highlight-Drag über Text = <b>Selection→Highlight</b> (Annotation mit Inhalt).</p>
+Highlight-Drag über Text = <b>Selection→Highlight</b> (Annotation mit Inhalt).
+Auswahl-Werkzeug + Text aufziehen + <code>Ctrl+C</code> = <b>Text in Zwischenablage</b> (ohne Annotation).
+Annotation-Suche: Tag-<b>Autocomplete</b>. Session-Tabs: Dokumentliste ziehen → Reihenfolge speichern.</p>
 <p><b>PDF-Seitenlabels:</b> römische/arabische Labels aus dem PDF werden in Statusleiste und Toolbar angezeigt, wenn vorhanden.</p>
 <p><b>Zwischenablage-Verlauf:</b> Bearbeiten → letzte 3 eingefügten Textschnipsel erneut einfügen.</p>
 <p><b>About:</b> Hilfe → Über… — Feature-Kurzliste + FEATURES.md öffnen;

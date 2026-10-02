@@ -53,6 +53,7 @@ from ild_pdf import (
     bake_text_overlays,
     find_text_rects,
     selection_to_highlight_rects,
+    selection_to_plain_text,
     import_page_text_as_overlays,
     list_page_uri_links,
     render_page,
@@ -299,6 +300,7 @@ class PdfCanvas(QLabel):
 
     annotation_placed = Signal(float, float)
     drag_finished = Signal(float, float, float, float)  # x0,y0,x1,y1
+    text_selection_finished = Signal(float, float, float, float)  # Text-Marquee (Auswahl-Modus)
     overlay_edit_requested = Signal(str)  # ann id
     annotation_selected = Signal(str)  # ann id (leer = Auswahl aufheben)
     uri_link_clicked = Signal(str)  # externe http(s)-URL
@@ -315,6 +317,8 @@ class PdfCanvas(QLabel):
         self._select_mode = False
         self._drag_start: tuple[float, float] | None = None
         self._drag_current: tuple[float, float] | None = None
+        self._text_sel_start: tuple[float, float] | None = None
+        self._text_sel_current: tuple[float, float] | None = None
         self._scale = 1.5
         self._search_rects: list[tuple[float, float, float, float]] = []
         self._search_active: int = -1
@@ -445,6 +449,10 @@ class PdfCanvas(QLabel):
             self._move_ids = set()
             self._move_origin = None
             self._move_delta = (0.0, 0.0)
+        if not self._select_mode:
+            self._text_sel_start = None
+            self._text_sel_current = None
+            self._repaint_overlay()
 
     def set_selected_id(self, ann_id: str | None):
         self._selected_id = ann_id
@@ -774,6 +782,18 @@ class PdfCanvas(QLabel):
             if self._drag_tool == AnnotationType.MEASURE:
                 preview.text = preview.measure_label(self._scale)
             self._draw_ann(painter, preview)
+        # Text-Auswahl-Marquee (Auswahl-Modus → Zwischenablage)
+        if self._text_sel_start and self._text_sel_current:
+            tx0, ty0 = self._text_sel_start
+            tx1, ty1 = self._text_sel_current
+            rx, ry = min(tx0, tx1), min(ty0, ty1)
+            rw, rh = abs(tx1 - tx0), abs(ty1 - ty0)
+            painter.fillRect(
+                int(rx), int(ry), max(int(rw), 2), max(int(rh), 2), QColor(70, 130, 230, 70)
+            )
+            painter.setPen(QPen(QColor(40, 90, 200), 1, Qt.DashLine))
+            painter.setBrush(Qt.NoBrush)
+            painter.drawRect(int(rx), int(ry), max(int(rw), 2), max(int(rh), 2))
         painter.end()
         self.setPixmap(pm)
         self.adjustSize()
@@ -807,20 +827,28 @@ class PdfCanvas(QLabel):
                 self.uri_link_clicked.emit(link.uri)
                 return
             hit_any = self._hit_annotation(x, y)
-            self.annotation_selected.emit(hit_any.id if hit_any else "")
-            # Verschieben starten wenn nicht gesperrt
-            if (
-                hit_any
-                and not self._annotations_locked
-                and not (event.modifiers() & Qt.ShiftModifier)
-            ):
-                ids = set(self._selected_ids) if self._selected_ids else set()
-                if hit_any.id not in ids:
-                    ids = {hit_any.id}
-                self._move_ids = ids
-                self._move_origin = (x, y)
-                self._move_delta = (0.0, 0.0)
-                self.setCursor(QCursor(Qt.ClosedHandCursor))
+            if hit_any:
+                self.annotation_selected.emit(hit_any.id if hit_any else "")
+                # Verschieben starten wenn nicht gesperrt
+                if (
+                    hit_any
+                    and not self._annotations_locked
+                    and not (event.modifiers() & Qt.ShiftModifier)
+                ):
+                    ids = set(self._selected_ids) if self._selected_ids else set()
+                    if hit_any.id not in ids:
+                        ids = {hit_any.id}
+                    self._move_ids = ids
+                    self._move_origin = (x, y)
+                    self._move_delta = (0.0, 0.0)
+                    self.setCursor(QCursor(Qt.ClosedHandCursor))
+                return
+            # Leere Fläche → Text-Auswahl-Marquee (Kopieren in Zwischenablage)
+            if not (event.modifiers() & Qt.ShiftModifier):
+                self.annotation_selected.emit("")
+                self._text_sel_start = (x, y)
+                self._text_sel_current = (x, y)
+                self._repaint_overlay()
             return
         if event.button() == Qt.LeftButton and event.modifiers() & Qt.ShiftModifier:
             hit_any = self._hit_annotation(x, y)
@@ -841,6 +869,12 @@ class PdfCanvas(QLabel):
             if pt:
                 ox, oy = self._move_origin
                 self._move_delta = (pt[0] - ox, pt[1] - oy)
+                self._repaint_overlay()
+            return
+        if self._text_sel_start is not None:
+            pt = self._map_to_page(event)
+            if pt:
+                self._text_sel_current = pt
                 self._repaint_overlay()
             return
         if self._drag_start is not None:
@@ -874,6 +908,22 @@ class PdfCanvas(QLabel):
             if ids and (abs(dx) > 2 or abs(dy) > 2):
                 self.annotations_moved.emit(ids, float(dx), float(dy))
             else:
+                self._repaint_overlay()
+            return
+        if self._text_sel_start is not None and event.button() == Qt.LeftButton:
+            pt = self._map_to_page(event) or self._text_sel_current
+            if pt:
+                x0, y0 = self._text_sel_start
+                x1, y1 = pt
+                self._text_sel_start = None
+                self._text_sel_current = None
+                if abs(x1 - x0) > 3 or abs(y1 - y0) > 3:
+                    self.text_selection_finished.emit(x0, y0, x1, y1)
+                else:
+                    self._repaint_overlay()
+            else:
+                self._text_sel_start = None
+                self._text_sel_current = None
                 self._repaint_overlay()
             return
         if self._drag_start is not None and event.button() == Qt.LeftButton:
@@ -1340,6 +1390,7 @@ class PdfViewer(QWidget):
         self.canvas.set_show_printer_marks(self._show_printer_marks)
         self.canvas.annotation_placed.connect(self._on_place)
         self.canvas.drag_finished.connect(self._on_drag)
+        self.canvas.text_selection_finished.connect(self._on_text_selection)
         self.canvas.overlay_edit_requested.connect(self._edit_overlay)
         self.canvas.annotation_selected.connect(self._on_annotation_selected)
         self.canvas.uri_link_clicked.connect(self._open_uri_link)
@@ -1348,8 +1399,13 @@ class PdfViewer(QWidget):
         self.scroll.verticalScrollBar().valueChanged.connect(self._on_continuous_scroll)
         layout.addWidget(self.scroll)
         self.canvas.set_drag_tool(AnnotationType.HIGHLIGHT, select_mode=False)
+        self._text_selection_text = ""
+        self._text_selection_rects: list[tuple[float, float, float, float]] = []
         paste_sc = QShortcut(QKeySequence.Paste, self)
         paste_sc.activated.connect(self.paste_clipboard_image)
+        copy_sc = QShortcut(QKeySequence.Copy, self)
+        copy_sc.setContext(Qt.WidgetWithChildrenShortcut)
+        copy_sc.activated.connect(self.copy_text_selection)
         del_sc = QShortcut(QKeySequence.Delete, self)
         del_sc.activated.connect(self.delete_annotation)
         back_sc = QShortcut(QKeySequence(Qt.Key_Backspace), self)
@@ -2034,7 +2090,7 @@ class PdfViewer(QWidget):
             for b in self._tool_buttons:
                 b.setChecked(b.text() == want)
             self.canvas.set_drag_tool(None, select_mode=True)
-            self.status.emit("Werkzeug: Auswahl — Annotation anklicken, Entf löschen")
+            self.status.emit("Werkzeug: Auswahl — Text aufziehen + Ctrl+C kopieren; Annotation anklicken")
             return
         want = self._tool_label(tool)
         for b in self._tool_buttons:
@@ -4554,6 +4610,98 @@ class PdfViewer(QWidget):
         self.status.emit(
             f"Text-Highlight ({n}): {preview}" if preview else f"Text-Highlight ({n})"
         )
+        return True
+
+    def _on_text_selection(self, x0: float, y0: float, x1: float, y1: float):
+        """Auswahl-Modus: Text unter Marquee extrahieren (ohne Annotation)."""
+        if not self.pdf_path:
+            self._text_selection_text = ""
+            self._text_selection_rects = []
+            return
+        page0, lx0, ly0 = self._spread_resolve(x0, y0)
+        lx1 = lx0 + (x1 - x0)
+        ly1 = ly0 + (y1 - y0)
+        try:
+            rects, text = selection_to_highlight_rects(
+                self.pdf_path,
+                page0,
+                lx0,
+                ly0,
+                lx1,
+                ly1,
+                scale=self.scale,
+                password=self.password,
+            )
+        except Exception:
+            rects, text = [], ""
+        if not text:
+            # Fallback nur Plaintext-API
+            try:
+                text = selection_to_plain_text(
+                    self.pdf_path,
+                    page0,
+                    lx0,
+                    ly0,
+                    lx1,
+                    ly1,
+                    scale=self.scale,
+                    password=self.password,
+                )
+            except Exception:
+                text = ""
+        self._text_selection_text = text or ""
+        self._text_selection_rects = [
+            (float(r.x), float(r.y), float(r.width), float(r.height)) for r in (rects or [])
+        ]
+        if self._text_selection_rects:
+            self.canvas.set_search_highlights(self._text_selection_rects, active=0)
+        else:
+            # gesamtes Marquee als Vorschau
+            self.canvas.set_search_highlights(
+                [(min(lx0, lx1), min(ly0, ly1), abs(lx1 - lx0), abs(ly1 - ly0))],
+                active=0,
+            )
+        if self._text_selection_text:
+            preview = self._text_selection_text.replace("\n", " ")
+            if len(preview) > 56:
+                preview = preview[:53] + "…"
+            self.status.emit(f"Text ausgewählt — Ctrl+C kopiert: {preview}")
+        else:
+            self.status.emit("Kein Text in der Auswahl — erneut aufziehen")
+
+    def selection_text(self) -> str:
+        """Zuletzt ausgewählter PDF-Text (Marquee) oder Text der ausgewählten Annotationen."""
+        if (self._text_selection_text or "").strip():
+            return self._text_selection_text
+        if not self.store:
+            return ""
+        parts: list[str] = []
+        ids = list(self._selected_ann_ids) if self._selected_ann_ids else []
+        if not ids and self._selected_ann_id:
+            ids = [self._selected_ann_id]
+        for aid in ids:
+            ann = self.store.get(aid)
+            if ann is None:
+                continue
+            t = (getattr(ann, "text", None) or "").strip()
+            if t:
+                parts.append(t)
+        return "\n".join(parts)
+
+    def copy_text_selection(self) -> bool:
+        """Ausgewählten PDF-Text in die System-Zwischenablage kopieren (nicht nur Highlight)."""
+        text = self.selection_text()
+        if not text:
+            self.status.emit("Nichts zu kopieren — Text im Auswahl-Modus aufziehen")
+            return False
+        clip = QApplication.clipboard()
+        if clip is None:
+            return False
+        clip.setText(text)
+        preview = text.replace("\n", " ")
+        if len(preview) > 48:
+            preview = preview[:45] + "…"
+        self.status.emit(f"Kopiert ({len(text)} Z.): {preview}")
         return True
 
     def _on_drag(self, x0: float, y0: float, x1: float, y1: float):

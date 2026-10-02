@@ -1,7 +1,10 @@
-InstantLens Doc 0.6.0 — Installation
+InstantLens Doc 0.6.1 — Installation
 
 Startmenü: Gruppe „InstantLens Doc“ mit Programm, optional Keygenerator, INFO und Deinstallieren.
-Desktop-Verknüpfung: optional (Standard an).
+
+Desktop-Verknüpfung: optionale Checkbox im Installer-Assistenten
+  (Task „desktopicon“, Flags checkedonce — Standard beim ersten Install aktiv, abwählbar).
+  Ohne Haken: kein Desktop-Icon; Startmenü unabhängig über Task „startmenu“.
 
 Keygenerator (wenn IncludeKeygen=1):
 - Python-Layout: Startmenü → Keygenerator → {app}\run-keygen.bat

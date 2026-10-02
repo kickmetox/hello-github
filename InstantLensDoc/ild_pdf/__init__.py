@@ -73,6 +73,7 @@ from .overlay import (
     find_text_rects,
     import_page_text_as_overlays,
     selection_to_highlight_rects,
+    selection_to_plain_text,
 )
 from .watermark import apply_page_numbers, apply_watermark
 from .limits import PdfHealth, clamp_render_scale, inspect_pdf
@@ -166,6 +167,7 @@ __all__ = [
     "find_text_rects",
     "import_page_text_as_overlays",
     "selection_to_highlight_rects",
+    "selection_to_plain_text",
     "bake_text_overlays",
     "apply_watermark",
     "apply_page_numbers",
@@ -198,4 +200,4 @@ __all__ = [
     "uri_link_at",
 ]
 
-__version__ = "0.6.0"
+__version__ = "0.6.1"

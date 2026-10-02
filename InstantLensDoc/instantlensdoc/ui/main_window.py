@@ -247,15 +247,18 @@ class MainWindow(QMainWindow):
 
     def _session_paths(self) -> list[str]:
         paths: list[str] = []
-        # Sidebar-Dokumente = „offene Tabs“
+        # Sidebar-Dokumente = „offene Tabs“ (Drag-Reihenfolge)
         try:
-            for i in range(self.sidebar.files.count()):
-                item = self.sidebar.files.item(i)
-                if item is None:
-                    continue
-                p = item.data(256) or item.data(Qt.UserRole) or item.toolTip() or item.text()
-                if p and Path(str(p)).is_file():
-                    paths.append(str(Path(str(p))))
+            if hasattr(self.sidebar, "document_paths"):
+                paths.extend(self.sidebar.document_paths())
+            else:
+                for i in range(self.sidebar.files.count()):
+                    item = self.sidebar.files.item(i)
+                    if item is None:
+                        continue
+                    p = item.data(256) or item.data(Qt.UserRole) or item.toolTip() or item.text()
+                    if p and Path(str(p)).is_file():
+                        paths.append(str(Path(str(p))))
         except Exception:
             pass
         if self.doc and self.doc.path and Path(self.doc.path).is_file():
@@ -268,6 +271,12 @@ class MainWindow(QMainWindow):
                 seen.add(p)
                 out.append(p)
         return out
+
+    def _on_documents_reordered(self):
+        """Session-Tab-Reihenfolge nach Drag in der Dokumentliste speichern."""
+        self._save_session()
+        n = len(self._session_paths())
+        self._set_status(f"Dokument-Reihenfolge gespeichert ({n} Tab(s))")
 
     def _save_session(self):
         paths = self._session_paths()
@@ -336,6 +345,7 @@ class MainWindow(QMainWindow):
         self.sidebar.page_thumb_activated.connect(self._on_thumb_jump)
         self.sidebar.page_favorite_activated.connect(self._on_page_favorite_jump)
         self.sidebar.page_favorites_reordered.connect(self._on_page_favorites_reordered)
+        self.sidebar.documents_reordered.connect(self._on_documents_reordered)
         self.sidebar.line_favorite_activated.connect(self._on_line_favorite_jump)
         self.sidebar.line_favorite_label_edit.connect(self._edit_line_favorite_label)
         self.sidebar.pages_reordered.connect(self._on_thumbs_reordered)
@@ -541,10 +551,14 @@ class MainWindow(QMainWindow):
         m_edit.addSeparator()
         for name, slot in [
             ("Ausschneiden", self.editor.cut),
-            ("Kopieren", self.editor.copy),
+            ("Kopieren", self._copy),
             ("Einfügen", self.editor.paste),
         ]:
             a = QAction(name, self)
+            if name == "Kopieren":
+                a.setToolTip(
+                    "Editor-Auswahl oder PDF-Textauswahl (Auswahl-Werkzeug + Aufziehen) → Zwischenablage"
+                )
             a.triggered.connect(slot)
             m_edit.addAction(a)
         act_paste_img = QAction("Bild aus Zwischenablage…", self)
@@ -1756,6 +1770,13 @@ class MainWindow(QMainWindow):
             self._set_status("Keine Annotation ausgewählt")
             return
         self.pdf_view.duplicate_selected_annotation()
+
+    def _copy(self):
+        """Kopieren: PDF-Textauswahl bevorzugt, sonst Editor."""
+        if self.stack.currentWidget() is self.pdf_view and self.pdf_view.pdf_path:
+            if self.pdf_view.copy_text_selection():
+                return
+        self.editor.copy()
 
     def _copy_annotations(self):
         if self.stack.currentWidget() is not self.pdf_view or not self.pdf_view.pdf_path:

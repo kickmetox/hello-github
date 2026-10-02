@@ -141,7 +141,8 @@ HELP_HTML = f"""
 <li><b>Formulare</b>: Extras → Formulargenerator — mehr Feldtypen, Definition speichern/laden
     (<code>*.ildform.json</code>), Live-Vorschau, Export HTML/PDF</li>
 <li><b>Build (Windows)</b>: <code>build-windows.ps1</code> — PyInstaller App + Keygen</li>
-<li><b>Installer</b>: Desktop-Verknüpfung + Startmenü-Gruppe (siehe Inno-Hinweis)</li>
+<li><b>Installer</b>: optionale Desktop-Verknüpfung (Checkbox, Standard an, <code>checkedonce</code>)
+    + Startmenü-Gruppe (siehe Inno-Hinweis)</li>
 <li><b>Lizenz</b>: Statusleiste (farbig; bei &lt;7 Tagen Restlaufzeit prominent) + Hilfe → Lizenz — Trial 4 Wochen, Keys 30+2 Tage</li>
 <li><b>Keygen</b>: <code>run-keygen.bat</code> / <code>python -m keygen --gui</code>;
     Installer-EXE: <code>{{app}}/InstantLensKeygen.exe</code> (siehe <code>keygen/README.md</code>)</li>

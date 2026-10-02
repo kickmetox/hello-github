@@ -429,6 +429,33 @@ def selection_to_highlight_rects(
     return rects, combined
 
 
+def selection_to_plain_text(
+    pdf_path: str | Path,
+    page_index: int,
+    x0: float,
+    y0: float,
+    x1: float,
+    y1: float,
+    *,
+    scale: float = 1.0,
+    password: str | None = None,
+    min_overlap: float = 0.35,
+) -> str:
+    """Text unter dem Auswahlrechteck als Plaintext (ohne Highlight-Annotation)."""
+    _rects, text = selection_to_highlight_rects(
+        pdf_path,
+        page_index,
+        x0,
+        y0,
+        x1,
+        y1,
+        scale=scale,
+        password=password,
+        min_overlap=min_overlap,
+    )
+    return text or ""
+
+
 def import_page_text_as_overlays(
     store: AnnotationStore,
     pdf_path: str | Path,

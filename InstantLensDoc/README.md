@@ -2,7 +2,7 @@
 
 Moderne Textverarbeitung mit PDF-Annotator, OCR-Bridge und Formulargenerator.
 
-**Version:** 0.6.0  
+**Version:** 0.6.1  
 **Hersteller:** Andreas Meyer · ame@sellerbach.de
 
 ## Quickstart (Windows)
@@ -27,10 +27,11 @@ Nur starten (nach Sync/pip): `run.bat`
 powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 ```
 
-Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)
+Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
+Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an).
 
-## Neu in 0.6.0
+## Neu in 0.6.1
 
-Release-Konsolidierung 0.5.0→0.6.0: Version einheitlich, CHANGELOG kompakt (0.5.1–0.5.9 Kurz-Tabelle), Smoke um ausgewählte 0.5.x-Pfade erweitert. Stubs KI/Cloud/Stylus/3D unverändert.
+PDF-Text kopieren aus Auswahl; Annotation-Suche mit Tag-Autocomplete; Session-Tab-Reihenfolge speichern; Installer Desktop-Shortcut dokumentiert. Stubs KI/Cloud/Stylus/3D unverändert.
 
 Siehe [CHANGELOG.md](CHANGELOG.md), [FEATURES.md](FEATURES.md) und [INFO.md](INFO.md).

@@ -1,5 +1,23 @@
 # Changelog — InstantLens Doc
 
+## 0.6.1 — Selection-Copy, Tag-Autocomplete, Session-Order, Installer-Docs
+
+Nach 0.6.0: PDF-Text aus Auswahl in die Zwischenablage; Annotation-Suche mit Tag-Autocomplete; Session-Tab-Reihenfolge per Drag speichern; Installer-Desktop-Shortcut dokumentiert/geprüft. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### PDF / Annotationen
+- **PDF-Text kopieren**: Auswahl-Werkzeug → Text aufziehen → **Ctrl+C** / Bearbeiten→Kopieren (ohne Highlight-Annotation)
+- API `selection_to_plain_text` (ergänzt Selection→Highlight)
+- Annotation-Suche: **Tag-Autocomplete** (Completer aus vorhandenen Tags)
+
+### Editor / Session
+- Dokument-/Session-Tabs: **Drag-Reihenfolge** in der Sidebar; `session.json` speichert `order`
+
+### Packaging / Docs
+- Inno: Task `desktopicon` — Checkbox dokumentiert (`checkedonce`, Standard an); Hinweistext erweitert
+- Version **0.6.1**; Smoke um 0.6.1-Pfade erweitert
+
+---
+
 ## 0.6.0 — Release-Konsolidierung (0.5.0 → 0.6.0)
 
 Meilenstein: alle 0.5.x-Inkremente gebündelt, Version einheitlich **0.6.0**, Smoke um ausgewählte 0.5.x-Pfade erweitert, kleine Review-Fixes. Stubs KI/Cloud/Stylus/3D bleiben Stubs (keine Fake-Features).

@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **0.6.0** |
+| Version | **0.6.1** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -16,7 +16,7 @@
 - Neu anfordern: **ame@sellerbach.de**  
 - Statusleiste: bei **<7 Tagen** Restlaufzeit prominent hervorgehoben  
 - Lizenz-Dialog: Resttage + Ablaufdatum klar  
-- About: bei Trial zusätzlicher Keygen-Hinweis
+- About: bei Trial zusätzlicher Keygen-Hinweis; **Privacy: lokal, keine Telemetrie**
 
 ## Quickstart (Windows)
 
@@ -32,12 +32,13 @@ Oder: `cd D:\AI_Temp\InstantLensDoc` → `run.bat`
 powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 ```
 
-Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)
+Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
+Installer-Task: optionale **Desktop-Verknüpfung** (Checkbox, Standard an / `checkedonce`)
 
-## Neu in 0.6.0
+## Neu in 0.6.1
 
-- Release-Konsolidierung 0.5.0→0.6.0 (Version überall 0.6.0)
-- CHANGELOG: 0.5.1–0.5.9 zu Kurz-Tabelle verdichtet
-- Smoke: ausgewählte 0.5.x-Pfade (CLI + Qt)
-- Review: Versionsstrings / Docs / ISS vereinheitlicht
+- PDF-Text aus Auswahl in Zwischenablage (Auswahl-Werkzeug + Ctrl+C)
+- Annotation-Suche: Tag-Autocomplete
+- Session-Tabs: Dokumentliste per Drag neu ordnen → Reihenfolge speichern
+- Installer: Desktop-Shortcut-Checkbox dokumentiert/geprüft
 - Stubs KI/Cloud/Stylus/3D unverändert
