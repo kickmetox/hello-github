@@ -988,10 +988,12 @@ class PdfViewer(QWidget):
         self._zoom_timer.setInterval(120)
         self._zoom_timer.timeout.connect(self._apply_pending_zoom)
         self._pending_scale: float | None = None
-        # Sidecar-Save Debounce: schnelle Ann.-Edits bündeln (Performance)
+        # Sidecar-Save Debounce: schnelle Ann.-Edits bündeln (Intervall in Settings)
+        from instantlensdoc.core.app_settings import get_sidecar_save_debounce_ms
+
         self._sidecar_save_timer = QTimer(self)
         self._sidecar_save_timer.setSingleShot(True)
-        self._sidecar_save_timer.setInterval(400)
+        self._sidecar_save_timer.setInterval(get_sidecar_save_debounce_ms())
         self._sidecar_save_timer.timeout.connect(self._flush_sidecar_save)
         self._sidecar_save_pending = False
         self._highlight_color = get_ann_highlight_color()
@@ -2191,9 +2193,18 @@ class PdfViewer(QWidget):
         self._selected_ann_ids = set()
         self.canvas.set_selected_id(None)
 
+    def apply_sidecar_debounce_ms(self, ms: int | None = None) -> int:
+        """Debounce-Intervall aus Settings übernehmen (200–1000 ms)."""
+        from instantlensdoc.core.app_settings import get_sidecar_save_debounce_ms
+
+        val = int(ms) if ms is not None else get_sidecar_save_debounce_ms()
+        val = max(200, min(1000, val))
+        self._sidecar_save_timer.setInterval(val)
+        return val
+
     def schedule_sidecar_save(self, *, force: bool = False) -> None:
         """
-        Sidecar speichern — ohne force verzögert (Debounce 400 ms).
+        Sidecar speichern — ohne force verzögert (Debounce laut Settings, 200–1000 ms).
         force=True: ausstehendes Debounce abbrechen und sofort schreiben.
         """
         if not self.store:
@@ -2666,6 +2677,19 @@ class PdfViewer(QWidget):
         if not self._search_rects:
             return False
         self._search_index = (self._search_index + 1) % len(self._search_rects)
+        self.canvas.set_search_highlights(self._search_rects, self._search_index)
+        return True
+
+    def search_prev(self) -> bool:
+        """Vorheriger Treffer auf aktueller Seite; wrappt. False wenn keine Treffer."""
+        if not self._search_query:
+            return False
+        if not self._search_rects:
+            self._rebuild_search_rects(keep_index=False)
+        if not self._search_rects:
+            return False
+        n = len(self._search_rects)
+        self._search_index = (self._search_index - 1) % n if self._search_index >= 0 else n - 1
         self.canvas.set_search_highlights(self._search_rects, self._search_index)
         return True
 
@@ -3585,7 +3609,16 @@ class PdfViewer(QWidget):
             self.schedule_sidecar_save(force=True)
             self.refresh()
             self.annotations_changed.emit()
-        self.status.emit(f"{removed} Duplikat(e) zusammengeführt")
+            undo_label = (
+                self.store.peek_undo_label()
+                if hasattr(self.store, "peek_undo_label")
+                else None
+            ) or "Duplikate zusammenführen"
+            self.status.emit(
+                f"{removed} Duplikat(e) zusammengeführt — Ctrl+Z: {undo_label}"
+            )
+        else:
+            self.status.emit("Keine Duplikate entfernt")
         return removed
 
     def save_annotations_as(self) -> bool:

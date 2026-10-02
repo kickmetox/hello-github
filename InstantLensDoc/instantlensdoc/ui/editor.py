@@ -1046,6 +1046,23 @@ class TextEditor(QPlainTextEdit):
             found = self.find(q, flags)
         return found
 
+    def find_prev(self, query: str | None = None, *, case_sensitive: bool | None = None) -> bool:
+        q = query if query is not None else self._last_query
+        if not q:
+            return False
+        if case_sensitive is None:
+            case_sensitive = self._last_case_sensitive
+        self._last_query = q
+        self._last_case_sensitive = case_sensitive
+        flags = self._find_flags(case_sensitive=case_sensitive) | QTextDocument.FindBackward
+        found = self.find(q, flags)
+        if not found:
+            cur = self.textCursor()
+            cur.movePosition(QTextCursor.End)
+            self.setTextCursor(cur)
+            found = self.find(q, flags)
+        return found
+
     def replace_one(
         self,
         find: str,

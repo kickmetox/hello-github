@@ -49,11 +49,14 @@ from instantlensdoc.core.app_settings import (
     get_pdf_thumbnail_scale,
     get_pdf_two_page_spread,
     get_restore_session_on_start,
+    get_sidecar_save_debounce_ms,
     get_tag_rename_confirm_threshold,
     get_theme,
     get_ui_lang,
     get_update_check_on_start,
     get_wizard_completed,
+    SIDECAR_SAVE_DEBOUNCE_MAX_MS,
+    SIDECAR_SAVE_DEBOUNCE_MIN_MS,
     PDF_THUMBNAIL_SCALE_CHOICES,
     reset_to_defaults,
     save_settings,
@@ -85,6 +88,7 @@ from instantlensdoc.core.app_settings import (
     set_pdf_thumbnail_scale,
     set_pdf_two_page_spread,
     set_restore_session_on_start,
+    set_sidecar_save_debounce_ms,
     set_tag_rename_confirm_threshold,
     set_theme,
     set_ui_lang,
@@ -313,6 +317,19 @@ class SettingsDialog(QDialog):
         )
         form.addRow("Tag-Rename Bestätigung ab", self.tag_rename_confirm)
 
+        self.sidecar_debounce = QSpinBox()
+        self.sidecar_debounce.setRange(
+            SIDECAR_SAVE_DEBOUNCE_MIN_MS, SIDECAR_SAVE_DEBOUNCE_MAX_MS
+        )
+        self.sidecar_debounce.setSingleStep(50)
+        self.sidecar_debounce.setSuffix(" ms")
+        self.sidecar_debounce.setValue(get_sidecar_save_debounce_ms())
+        self.sidecar_debounce.setToolTip(
+            "Sidecar-Save Debounce: Annotation-Speichern bündeln "
+            f"({SIDECAR_SAVE_DEBOUNCE_MIN_MS}–{SIDECAR_SAVE_DEBOUNCE_MAX_MS} ms, Standard 400)"
+        )
+        form.addRow("Sidecar-Debounce", self.sidecar_debounce)
+
         self.jpeg_q = QSpinBox()
         self.jpeg_q.setRange(10, 100)
         self.jpeg_q.setValue(get_export_jpeg_quality())
@@ -524,6 +541,7 @@ class SettingsDialog(QDialog):
         set_pdf_continuous_scroll(self.pdf_continuous.isChecked())
         set_editor_doc_split_vertical(bool(self.doc_split_orient.currentData()))
         set_tag_rename_confirm_threshold(int(self.tag_rename_confirm.value()))
+        set_sidecar_save_debounce_ms(int(self.sidecar_debounce.value()))
         save_settings(
             {
                 "export_jpeg_quality": int(self.jpeg_q.value()),

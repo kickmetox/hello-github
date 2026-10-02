@@ -380,6 +380,7 @@ class MainWindow(QMainWindow):
         self.sidebar = Sidebar()
         self.sidebar.search_requested.connect(self._on_search)
         self.sidebar.search_next_requested.connect(self._on_search_next)
+        self.sidebar.search_prev_requested.connect(self._on_search_prev)
         self.sidebar.file_activated.connect(self.open_path)
         self.sidebar.recent_activated.connect(self.open_path)
         self.sidebar.mark_activated.connect(self._on_mark_activated)
@@ -408,6 +409,7 @@ class MainWindow(QMainWindow):
         self.pdf_view = PdfViewer()
         self.pdf_view.status.connect(self._set_status)
         self.pdf_view.annotations_changed.connect(self._refresh_pdf_marks)
+        self.pdf_view.annotations_changed.connect(self._refresh_undo_hint)
         # Toolbar-Undo und Ctrl+Z: Tag-Rename-Filter nach einstufigem Undo mitziehen
         _pdf_undo = self.pdf_view.undo_annotation
 
@@ -3339,6 +3341,7 @@ class MainWindow(QMainWindow):
                 scope_label = f"{len(paths)} Dokument(en)"
             if not hits:
                 self.sidebar.set_marks([f"Keine Treffer für „{query}“"])
+                self.sidebar.clear_search_hit_status()
                 self._set_status(f"0 Treffer in {scope_label}")
                 return
             lines = []
@@ -3352,14 +3355,19 @@ class MainWindow(QMainWindow):
                 payloads.append((h.path, h.page, query))
                 pdf_names.add(Path(h.path).name)
             self.sidebar.set_marks(lines, payloads)
+            self.sidebar.set_search_hit_status(0, len(payloads))
             extra = f" · {len(pdf_names)} Datei(en)" if pdf_only else ""
-            self._set_status(f"{len(hits)} Treffer in {scope_label}{extra}")
+            self._set_status(
+                f"{len(hits)} Treffer in {scope_label}{extra} — Weiter/Zurück navigiert"
+            )
             return
         if self.stack.currentWidget() is self.editor_pane:
             n = self.editor.find_and_highlight(query)
+            self.sidebar.set_search_hit_status(1 if n else 0, n)
             self._set_status(f"{n} Treffer für „{query}“")
             lines = [f"Suche: {query} → {n} Treffer"] + self._editor_marks
             self.sidebar.set_marks(lines)
+            self.sidebar.set_search_hit_status(1 if n else 0, n)
             return
         if self.stack.currentWidget() is self.pdf_view:
             hits = []
@@ -3399,17 +3407,40 @@ class MainWindow(QMainWindow):
                         lines.append(f"S{h.page + 1}: {h.type.value} {h.text[:40]}")
                         payloads.append(h)
                 self.sidebar.set_marks(lines, payloads)
+                if n_page:
+                    self.sidebar.set_search_hit_status(1, n_page)
                 self._set_status(
                     f"{n_page} Treffer auf Seite {self.pdf_view.page_index + 1} · "
                     f"{len(lines)} Einträge (PDF-Text/Annotationen)"
                 )
             else:
                 self.pdf_view.clear_search_highlights()
+                self.sidebar.clear_search_hit_status()
                 self._set_status("Kein Treffer — „Alle Docs“ oder OCR für gescannte PDFs")
             return
         self._set_status("Suche: Editor oder PDF öffnen")
 
+    def _activate_search_hit_payload(self, payload) -> bool:
+        """Doc-Treffer-Payload öffnen/hervorheben. True wenn verarbeitet."""
+        if not (isinstance(payload, tuple) and len(payload) >= 2):
+            return False
+        if payload[0] in (None, "", "__search__"):
+            return False
+        q = payload[2] if len(payload) >= 3 else self.sidebar.search_text()
+        self._on_fulltext_hit(str(payload[0]), payload[1], query=q)
+        total = int(getattr(self.sidebar, "_search_hit_total", 0) or 0)
+        cur = int(getattr(self.sidebar, "_search_hit_index", -1)) + 1
+        if total > 0 and cur > 0:
+            self._set_status(f"Treffer {cur}/{total} · {Path(str(payload[0])).name}")
+        return True
+
     def _on_search_next(self):
+        # Zuerst über Doc-Trefferliste (Alle Docs / Alle PDFs)
+        adv = self.sidebar.advance_search_hit(delta=1)
+        if adv is not None:
+            _idx, payload = adv
+            if self._activate_search_hit_payload(payload):
+                return
         q = self.sidebar.search_text()
         if self.stack.currentWidget() is self.editor_pane:
             if self.editor.find_next(q or None):
@@ -3424,13 +3455,56 @@ class MainWindow(QMainWindow):
             if self.pdf_view._search_query != q:
                 n = self.pdf_view.highlight_search(q)
                 if n:
+                    self.sidebar.set_search_hit_status(1, n)
                     self._set_status(f"{n} Treffer auf aktueller Seite (1/{n})")
                 else:
+                    self.sidebar.clear_search_hit_status()
                     self._set_status("Kein Texttreffer auf aktueller Seite")
                 return
             if self.pdf_view.search_next():
                 i = self.pdf_view._search_index + 1
                 n = self.pdf_view.search_hit_count()
+                self.sidebar.set_search_hit_status(i, n)
+                self._set_status(f"Treffer {i}/{n} auf Seite {self.pdf_view.page_index + 1}")
+            else:
+                self._set_status("Keine weiteren Treffer auf aktueller Seite")
+            return
+        self._set_status("Suche: Editor oder PDF öffnen")
+
+    def _on_search_prev(self):
+        adv = self.sidebar.advance_search_hit(delta=-1)
+        if adv is not None:
+            _idx, payload = adv
+            if self._activate_search_hit_payload(payload):
+                return
+        q = self.sidebar.search_text()
+        if self.stack.currentWidget() is self.editor_pane:
+            if self.editor.find_prev(q or None):
+                self._set_status("Vorheriger Treffer")
+            else:
+                self._set_status("Keine weiteren Treffer")
+            return
+        if self.stack.currentWidget() is self.pdf_view:
+            if not q:
+                self._set_status("Keine Suche aktiv")
+                return
+            if self.pdf_view._search_query != q:
+                n = self.pdf_view.highlight_search(q)
+                if n:
+                    self.pdf_view._search_index = n - 1
+                    self.pdf_view.canvas.set_search_highlights(
+                        self.pdf_view._search_rects, self.pdf_view._search_index
+                    )
+                    self.sidebar.set_search_hit_status(n, n)
+                    self._set_status(f"{n} Treffer auf aktueller Seite ({n}/{n})")
+                else:
+                    self.sidebar.clear_search_hit_status()
+                    self._set_status("Kein Texttreffer auf aktueller Seite")
+                return
+            if self.pdf_view.search_prev():
+                i = self.pdf_view._search_index + 1
+                n = self.pdf_view.search_hit_count()
+                self.sidebar.set_search_hit_status(i, n)
                 self._set_status(f"Treffer {i}/{n} auf Seite {self.pdf_view.page_index + 1}")
             else:
                 self._set_status("Keine weiteren Treffer auf aktueller Seite")
@@ -3734,6 +3808,7 @@ class MainWindow(QMainWindow):
                 get_editor_soft_wrap,
                 get_pdf_grayscale,
                 get_pdf_night_mode,
+                get_sidecar_save_debounce_ms,
             )
 
             show_ln = get_editor_line_numbers()
@@ -3779,12 +3854,16 @@ class MainWindow(QMainWindow):
                 self._night_action.setChecked(night)
                 self._night_action.blockSignals(False)
             self._autosave_timer.setInterval(get_autosave_interval_sec() * 1000)
+            debounce_ms = self.pdf_view.apply_sidecar_debounce_ms(
+                get_sidecar_save_debounce_ms()
+            )
             self.pdf_view.apply_settings_colors()
             self.pdf_view.apply_toolbar_groups()
             if self.pdf_view.pdf_path:
                 self._refresh_thumbs()
             self._set_status(
-                f"Einstellungen gespeichert · Autosave {get_autosave_interval_sec()}s"
+                f"Einstellungen gespeichert · Autosave {get_autosave_interval_sec()}s · "
+                f"Sidecar-Debounce {debounce_ms} ms"
             )
 
     def _edit_pdf_metadata(self):
@@ -4226,12 +4305,66 @@ class MainWindow(QMainWindow):
         for t in templates:
             tid = t["id"]
             title = t["title"]
-            act = QAction(title, self)
-            act.setToolTip(f"Neues Dokument aus Vorlage „{title}“")
-            act.triggered.connect(
+            sub = menu.addMenu(title)
+            sub.setToolTip(f"Vorlage „{title}“")
+            act_open = QAction("Öffnen", self)
+            act_open.setToolTip(f"Neues Dokument aus Vorlage „{title}“")
+            act_open.triggered.connect(
                 lambda checked=False, i=tid: self.new_doc(f"user:{i}")
             )
-            menu.addAction(act)
+            sub.addAction(act_open)
+            act_ren = QAction("Umbenennen…", self)
+            act_ren.triggered.connect(
+                lambda checked=False, i=tid, n=title: self._rename_user_template(i, n)
+            )
+            sub.addAction(act_ren)
+            act_del = QAction("Löschen…", self)
+            act_del.triggered.connect(
+                lambda checked=False, i=tid, n=title: self._delete_user_template(i, n)
+            )
+            sub.addAction(act_del)
+
+    def _rename_user_template(self, template_id: str, current_title: str = "") -> None:
+        from instantlensdoc.core.app_settings import rename_user_doc_template
+        from PySide6.QtWidgets import QInputDialog
+
+        name, ok = QInputDialog.getText(
+            self,
+            "Vorlage umbenennen",
+            "Neuer Name:",
+            text=current_title or "Vorlage",
+        )
+        if not ok:
+            return
+        name = (name or "").strip()
+        if not name:
+            self._set_status("Vorlage: Name fehlt")
+            return
+        entry = rename_user_doc_template(template_id, name)
+        if not entry:
+            QMessageBox.warning(self, "Vorlage", "Vorlage nicht gefunden.")
+            return
+        self._refresh_user_template_menu()
+        self._set_status(f"Vorlage umbenannt: {entry['title']}")
+
+    def _delete_user_template(self, template_id: str, title: str = "") -> None:
+        from instantlensdoc.core.app_settings import delete_user_doc_template
+
+        label = title or template_id
+        r = QMessageBox.question(
+            self,
+            "Vorlage löschen",
+            f"Vorlage „{label}“ wirklich löschen?",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
+        )
+        if r != QMessageBox.Yes:
+            return
+        if delete_user_doc_template(template_id):
+            self._refresh_user_template_menu()
+            self._set_status(f"Vorlage gelöscht: {label}")
+        else:
+            QMessageBox.warning(self, "Vorlage", "Vorlage nicht gefunden.")
 
     def _save_doc_as_template(self):
         """Aktuelles Editor-Dokument als Nutzer-Vorlage speichern."""

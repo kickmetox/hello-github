@@ -119,7 +119,8 @@ Seite <b>⟲/⟳ drehen</b>, <b>↔/↕ spiegeln</b>, <b>leere Seite</b>, <b>dup
 <p><b>Editor-Encoding:</b> Datei → Öffnen/Speichern mit Encoding (UTF-8 / Latin-1); Standard in Einstellungen.</p>
 <p><b>Drag &amp; Drop:</b> mehrere Dateien → mehrere Tabs in der Sidebar.</p>
 <p><b>PDF-Suche:</b> Sidebar-Suche highlightet Treffer auf der aktuellen Seite;
-„Weiter“ springt zum nächsten Treffer; <b>letzte Suchbegriffe</b> im Dropdown.</p>
+„Weiter/Zurück“ springt zum nächsten/vorherigen Treffer (auch über Docs bei Alle Docs/PDFs);
+Trefferanzahl in der Sidebar; <b>letzte Suchbegriffe</b> im Dropdown.</p>
 <p><b>Annotationen:</b> eigene Liste in der Sidebar — <b>gruppiert nach Seite</b>; Klick springt zur Annotation;
 Filter-Dropdown nach Typ; <b>Nur aktuelle Seite</b>-Checkbox; <b>Tag-Filter Multi-Select</b> (ODER); <b>Tag-Cloud</b> (häufigste Tags); <b>Farben-Chips in der Statistik klickbar</b>; <b>Textsuche in der Liste</b> (optional <b>Regex</b>);
 Text nachträglich editierbar; Deckkraft pro Annotation; <b>Notizfarbe unabhängig von Highlight</b>;

@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **0.7.1** |
+| Version | **0.7.2** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -38,10 +38,10 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Installer-Task: optionale **Desktop-Verknüpfung** (Checkbox, Standard an / `checkedonce`)
 
-## Neu in 0.7.1
+## Neu in 0.7.2
 
-- PDF-Schnellsuche „Alle PDFs“ (Volltext gehärtet, Sprung+Highlight)
-- Annotation-Duplikate (Seite+BBox) finden / optional zusammenführen
-- Editor: Als Vorlage speichern → Meine Vorlagen
-- Sidecar-Save Debounce (400 ms)
+- Schnellsuche: Trefferanzahl + Weiter/Zurück über Docs
+- Ann.-Merge Undo als benannter Stack-Eintrag
+- Vorlagen: Umbenennen/Löschen in der UI
+- Sidecar-Debounce Intervall in Einstellungen (200–1000 ms)
 - Stubs KI/Cloud/Stylus/3D unverändert

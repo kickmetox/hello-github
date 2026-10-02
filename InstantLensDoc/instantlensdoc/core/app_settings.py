@@ -75,6 +75,7 @@ DEFAULTS: dict[str, Any] = {
         "— Notiz —\n",
     ],
     "user_doc_templates": [],
+    "sidecar_save_debounce_ms": 400,
     "editor_trim_trailing_whitespace": False,
     "editor_trim_whitespace_on_paste": False,
     "pdf_toolbar_groups": {
@@ -844,6 +845,48 @@ def delete_user_doc_template(template_id: str) -> bool:
         return False
     save_settings({"user_doc_templates": new_items})
     return True
+
+
+def rename_user_doc_template(template_id: str, new_title: str) -> dict | None:
+    """Nutzer-Vorlage umbenennen. Rückgabe: aktualisierter Eintrag oder None."""
+    needle = str(template_id or "").strip()
+    if not needle:
+        return None
+    if needle.lower().startswith("user:"):
+        needle = needle[5:]
+    title_s = str(new_title or "").strip()
+    if not title_s:
+        return None
+    items = get_user_doc_templates()
+    for item in items:
+        if item["id"] == needle:
+            item["title"] = title_s
+            save_settings({"user_doc_templates": items})
+            return dict(item)
+    return None
+
+
+SIDECAR_SAVE_DEBOUNCE_MIN_MS = 200
+SIDECAR_SAVE_DEBOUNCE_MAX_MS = 1000
+SIDECAR_SAVE_DEBOUNCE_DEFAULT_MS = 400
+
+
+def get_sidecar_save_debounce_ms() -> int:
+    """Sidecar-Save Debounce in ms (200–1000, Default 400)."""
+    try:
+        v = int(load_settings().get("sidecar_save_debounce_ms", SIDECAR_SAVE_DEBOUNCE_DEFAULT_MS))
+    except (TypeError, ValueError):
+        v = SIDECAR_SAVE_DEBOUNCE_DEFAULT_MS
+    return max(SIDECAR_SAVE_DEBOUNCE_MIN_MS, min(SIDECAR_SAVE_DEBOUNCE_MAX_MS, v))
+
+
+def set_sidecar_save_debounce_ms(ms: int) -> int:
+    val = max(
+        SIDECAR_SAVE_DEBOUNCE_MIN_MS,
+        min(SIDECAR_SAVE_DEBOUNCE_MAX_MS, int(ms)),
+    )
+    save_settings({"sidecar_save_debounce_ms": val})
+    return val
 
 
 def get_minimize_to_tray() -> bool:

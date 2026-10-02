@@ -212,6 +212,7 @@ class Sidebar(QWidget):
     recent_activated = Signal(str)
     search_requested = Signal(str)
     search_next_requested = Signal()
+    search_prev_requested = Signal()
     mark_activated = Signal(int)  # Index in Markierungsliste
     annotation_activated = Signal(object)  # Annotation oder id
     outline_activated = Signal(int)  # PDF-Seite 0-basiert
@@ -252,8 +253,15 @@ class Sidebar(QWidget):
         self.btn_search = QPushButton("Suchen")
         self.btn_search.setToolTip("Suche im aktuellen Dokument")
         self.btn_search.clicked.connect(self._emit_search)
+        self.btn_prev = QPushButton("Zurück")
+        self.btn_prev.setToolTip(
+            "Vorheriger Treffer — über Docs (Alle Docs/PDFs) oder Seite/Editor"
+        )
+        self.btn_prev.clicked.connect(self.search_prev_requested.emit)
         self.btn_next = QPushButton("Weiter")
-        self.btn_next.setToolTip("Nächster Treffer auf der aktuellen Seite / im Editor")
+        self.btn_next.setToolTip(
+            "Nächster Treffer — über Docs (Alle Docs/PDFs) oder Seite/Editor"
+        )
         self.btn_next.clicked.connect(self.search_next_requested.emit)
         self.btn_full = QPushButton("Alle Docs")
         self.btn_full.setToolTip("Volltextsuche über alle Dokumente in der Liste")
@@ -265,10 +273,18 @@ class Sidebar(QWidget):
         )
         self.btn_pdfs.clicked.connect(self._emit_pdf_fulltext)
         btn_row.addWidget(self.btn_search)
+        btn_row.addWidget(self.btn_prev)
         btn_row.addWidget(self.btn_next)
         btn_row.addWidget(self.btn_full)
         btn_row.addWidget(self.btn_pdfs)
         layout.addLayout(btn_row)
+        self.search_hits_label = QLabel("")
+        self.search_hits_label.setObjectName("searchHitsLabel")
+        self.search_hits_label.setStyleSheet(
+            "QLabel#searchHitsLabel { color: #555; font-size: 11px; }"
+        )
+        self.search_hits_label.setToolTip("Trefferanzahl der letzten Schnellsuche")
+        layout.addWidget(self.search_hits_label)
 
         layout.addWidget(QLabel("Zuletzt geöffnet"))
         self.recent = QListWidget()
@@ -417,6 +433,8 @@ class Sidebar(QWidget):
         self.setMinimumWidth(240)
         self._fulltext_mode = False
         self._pdf_fulltext_mode = False
+        self._search_hit_index: int = -1
+        self._search_hit_total: int = 0
         self._ann_all_lines: list[str] = []
         self._ann_all_payloads: list = []
         self._ann_filter_updating = False
@@ -1482,6 +1500,20 @@ class Sidebar(QWidget):
             if payloads and i < len(payloads):
                 item.setData(256, payloads[i])
             self.marks.addItem(item)
+        # Navigierbare Doc-Treffer = Einträge mit (path, page[, query])-Payload
+        nav = 0
+        if payloads:
+            for p in payloads:
+                if isinstance(p, tuple) and len(p) >= 2 and p[0] not in (None, "", "__search__"):
+                    nav += 1
+        self._search_hit_index = -1
+        if nav > 0:
+            self._search_hit_total = nav
+        elif lines:
+            self._search_hit_total = len(lines)
+        else:
+            self._search_hit_total = 0
+        self._refresh_search_hits_label()
 
     def append_mark(self, line: str, payload=None):
         item = QListWidgetItem(line)
@@ -1494,3 +1526,71 @@ class Sidebar(QWidget):
         if item is None:
             return None
         return item.data(256)
+
+    def set_search_hit_status(self, current: int, total: int) -> None:
+        """Trefferanzeige setzen (current 1-basiert oder 0; total >= 0)."""
+        self._search_hit_total = max(0, int(total))
+        if self._search_hit_total <= 0:
+            self._search_hit_index = -1
+        else:
+            cur = int(current)
+            if cur <= 0:
+                self._search_hit_index = -1
+            else:
+                self._search_hit_index = max(0, min(cur - 1, self._search_hit_total - 1))
+        self._refresh_search_hits_label()
+
+    def clear_search_hit_status(self) -> None:
+        self._search_hit_index = -1
+        self._search_hit_total = 0
+        self._refresh_search_hits_label()
+
+    def _refresh_search_hits_label(self) -> None:
+        lbl = getattr(self, "search_hits_label", None)
+        if lbl is None:
+            return
+        total = int(getattr(self, "_search_hit_total", 0) or 0)
+        idx = int(getattr(self, "_search_hit_index", -1))
+        if total <= 0:
+            lbl.setText("")
+            return
+        if idx < 0:
+            lbl.setText(f"{total} Treffer")
+        else:
+            lbl.setText(f"Treffer {idx + 1}/{total}")
+
+    def navigable_mark_indices(self) -> list[int]:
+        """Indizes in der Markierungsliste mit Doc-Pfad-Payload."""
+        out: list[int] = []
+        for i in range(self.marks.count()):
+            item = self.marks.item(i)
+            if item is None:
+                continue
+            p = item.data(256)
+            if isinstance(p, tuple) and len(p) >= 2 and p[0] not in (None, "", "__search__"):
+                out.append(i)
+        return out
+
+    def advance_search_hit(self, *, delta: int = 1) -> tuple[int, object] | None:
+        """
+        Nächsten/vorherigen Doc-Treffer in der Markierungsliste wählen.
+        Rückgabe: (listen_index, payload) oder None.
+        """
+        indices = self.navigable_mark_indices()
+        if not indices:
+            return None
+        n = len(indices)
+        self._search_hit_total = n
+        cur = int(getattr(self, "_search_hit_index", -1))
+        if cur < 0:
+            pos = 0 if delta >= 0 else n - 1
+        else:
+            pos = (cur + int(delta)) % n
+        self._search_hit_index = pos
+        list_i = indices[pos]
+        item = self.marks.item(list_i)
+        if item is None:
+            return None
+        self.marks.setCurrentRow(list_i)
+        self._refresh_search_hits_label()
+        return list_i, item.data(256)
