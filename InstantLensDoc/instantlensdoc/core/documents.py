@@ -53,6 +53,10 @@ def detect_kind(path: Path) -> DocKind:
 
 def open_document(path: str | Path) -> Document:
     path = Path(path)
+    if not path.exists():
+        raise FileNotFoundError(f"Datei nicht gefunden: {path}")
+    if not path.is_file():
+        raise IsADirectoryError(f"Kein Dateipfad: {path}")
     kind = detect_kind(path)
     doc = Document(path=path, kind=kind, title=path.name)
 

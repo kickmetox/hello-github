@@ -60,18 +60,19 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | Lizenz Trial 28d / Keys 32d | fertig | Statusleiste farbig + Tooltip |
 | Keygenerator (CLI/GUI) | fertig | `run-keygen.bat` |
 | PyInstaller Build Windows | fertig | `build-windows.ps1`, Icon `assets/app.ico` |
-| Inno-Installer | fertig | Desktop + Startmenü-Hinweis 0.1.9 |
+| Inno-Installer | fertig | Icon, Desktop, Uninstaller, Keygen optional 0.2.0 |
 | Sync-Skript Windows | fertig | Store `docs/sync-ild.ps1` |
-| In-App Hilfe / About | fertig | Version 0.1.9 |
+| In-App Hilfe / About | fertig | Version 0.2.0 |
+| CHANGELOG | fertig | 0.1.x → 0.2.0 kompakt |
 | FEATURES.md / INFO.md | fertig | |
 | `ild_pdf` Modul + Beispielskript | fertig | metadata / page size / watermark / redact |
 | Font-Matching | geplant | |
 | Objekt-/Bildbearbeitung | geplant | |
 | Layout-Erhaltung (Scan→edit) | geplant | |
 | Freihand | geplant | |
-| KI-Assistent | Stub | Menü „Geplant“ 0.1.9 |
+| KI-Assistent | Stub | Menü „Geplant“ 0.2.0 (keine Fake-KI) |
 | Signieren (rechtssicher) | Stub | |
-| Cloud-Sync | Stub | |
+| Cloud-Sync | Stub | Menü „Geplant“ 0.2.0 (keine Fake-Cloud) |
 | Text on Path / Text zu Pfaden | geplant | |
 | Envelope Distort / Text Wrap / Area Type | Stub/geplant | |
 | Schnittmasken | geplant | |

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Smoke-Test 0.1.9 (CLI + optional offscreen Qt)."""
+"""Smoke-Test 0.2.0 (CLI + optional offscreen Qt). Kernpfade: open/annotate/export/license."""
 
 from __future__ import annotations
 
@@ -72,8 +72,8 @@ def main() -> int:
     from instantlensdoc.core.update_check import check_for_updates
     from instantlensdoc.license import KEY_DAYS, TRIAL_DAYS, generate_key, verify_key
 
-    assert __version__ == "0.1.9", __version__
-    assert ild_ver == "0.1.9", ild_ver
+    assert __version__ == "0.2.0", __version__
+    assert ild_ver == "0.2.0", ild_ver
     assert TRIAL_DAYS == 28 and KEY_DAYS == 32
     key = generate_key("ame@sellerbach.de")
     ok, msg, _ = verify_key(key)
@@ -91,9 +91,14 @@ def main() -> int:
     assert "Settings" in tr("settings")
     set_lang("de")
     upd = check_for_updates(allow_network=False)
-    assert upd.local_version == "0.1.9" and not upd.online
+    assert upd.local_version == "0.2.0" and not upd.online
     assert get_export_jpeg_quality() >= 10
     assert get_ui_lang() in ("de", "en")
+    assert (ROOT / "CHANGELOG.md").is_file()
+    assert "0.2.0" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    assert "0.2.0" in (ROOT / "README.md").read_text(encoding="utf-8")
+    assert "run.bat" in (ROOT / "README.md").read_text(encoding="utf-8")
+    assert "sync-ild.ps1" in (ROOT / "README.md").read_text(encoding="utf-8")
 
     ok_ocr, ocr_msg = ocr_mod.tesseract_available()
     assert isinstance(ocr_msg, str) and len(ocr_msg) > 5
@@ -382,11 +387,66 @@ def main() -> int:
 
         assert (ROOT / "installer" / "installer-hinweis.txt").exists()
         iss = (ROOT / "installer" / "instantlensdoc.iss").read_text(encoding="utf-8")
-        assert "0.1.9" in iss and "desktopicon" in iss and "DisableProgramGroupPage=no" in iss
+        assert "0.2.0" in iss and "desktopicon" in iss and "DisableProgramGroupPage=no" in iss
+        assert "UninstallDisplayName" in iss and "Uninstallable=yes" in iss
+        assert "IncludeKeygen" in iss and "SetupIconFile" in iss
+        assert "uninstallexe" in iss
+        bw = (ROOT / "build-windows.ps1").read_text(encoding="utf-8")
+        assert "0.2.0" in bw and "NoKeygenInApp" in bw and "--icon" in bw
 
         assert (ROOT / "examples" / "ild_pdf_demo.py").exists()
-        assert "0.1.9" in (ROOT / "INFO.md").read_text(encoding="utf-8")
+        assert "0.2.0" in (ROOT / "INFO.md").read_text(encoding="utf-8")
         assert (ROOT / "assets" / "app.ico").is_file()
+
+        # --- Kernpfade: open / annotate / export / license ---
+        core_txt = td / "core_open.txt"
+        core_txt.write_text("Kernpfad Open Annotate Export License", encoding="utf-8")
+        opened = open_document(core_txt)
+        assert opened.kind.value in ("text", "markdown") or opened.text
+        assert "Kernpfad" in opened.text
+        try:
+            open_document(td / "fehlt_nicht_da.txt")
+            raise AssertionError("fehlende Datei hätte FileNotFoundError werfen müssen")
+        except FileNotFoundError:
+            pass
+
+        core_pdf = td / "core_ann.pdf"
+        Image.new("RGB", (240, 320), "white").save(core_pdf, "PDF")
+        store_core = AnnotationStore(core_pdf)
+        store_core.add(
+            Annotation(0, AnnotationType.HIGHLIGHT, 20, 40, width=80, height=14, text="core-ann")
+        )
+        store_core.add(
+            Annotation(0, AnnotationType.STICKY, 30, 60, width=40, height=40, text="note")
+        )
+        store_core.save()
+        store_reload = AnnotationStore(core_pdf)
+        assert any(a.text == "core-ann" for a in store_reload.annotations)
+        assert store_reload.can_undo() or len(store_reload.annotations) >= 2
+
+        exp_html = td / "core_export.html"
+        exp_docx = td / "core_export.docx"
+        exp_pdf = td / "core_export.pdf"
+        export_html(opened.text, exp_html, title="Core")
+        export_docx(opened.text, exp_docx, title="Core")
+        export_pdf(opened.text, exp_pdf, title="Core")
+        assert exp_html.is_file() and exp_html.stat().st_size > 20
+        assert exp_docx.is_file() and exp_docx.stat().st_size > 20
+        assert exp_pdf.is_file() and exp_pdf.stat().st_size > 20
+
+        from instantlensdoc.license import LicenseManager
+
+        lic_path = td / "core_license.json"
+        lm = LicenseManager(path=lic_path)
+        st0 = lm.status()
+        assert st0.allowed and st0.mode in ("trial", "licensed")
+        ok_act, act_msg = lm.activate(key)
+        assert ok_act, act_msg
+        st1 = lm.status()
+        assert st1.mode == "licensed" and st1.days_remaining > 0
+        bad_ok, bad_msg, _ = verify_key("ILD1.bad.payload")
+        assert not bad_ok and bad_msg
+        print("CorePaths open/annotate/export/license: OK")
 
         merge_pdfs([p1, p2], td / "merged.pdf")
         assert (td / "merged.pdf").is_file()
@@ -447,7 +507,7 @@ def main() -> int:
         win._add_chained_frame()
         assert len(win.layout_doc.text_frames) >= 2
         assert "Lizenz:" in win.license_label.text()
-        assert "v0.1.9" in win.version_label.text()
+        assert "v0.2.0" in win.version_label.text()
         from instantlensdoc.ui.settings_dialog import SettingsDialog
         from instantlensdoc.ui.batch_dialog import BatchConvertDialog
         from instantlensdoc.ui.pdf_tools_dialog import PdfToolsDialog
@@ -518,7 +578,8 @@ def main() -> int:
             from instantlensdoc.ui.password_dialog import CompressPdfDialog, SetPasswordDialog
             from instantlensdoc.ui.stubs import PLANNED
             assert KeyboardHelpDialog and SetPasswordDialog and CompressPdfDialog
-            assert "0.1.9" in PLANNED["ki"]
+            assert "0.2.0" in PLANNED["ki"]
+            assert "Coming soon" in PLANNED["cloud"]
             assert callable(win.pdf_view.bake_redactions)
             assert callable(win.pdf_view.clear_redactions)
             assert callable(win._set_pdf_password)
@@ -529,6 +590,21 @@ def main() -> int:
             set_metadata(smoke_pdf, PdfMetadata(title="SmokeMeta"))
             assert "Smoke" in get_metadata(smoke_pdf).title
             set_page_size(smoke_pdf, 0, *PAGE_SIZE_PRESETS["Letter"])
+
+            # Qt-Kern: annotate speichern + Editor-Export + Lizenzlabel
+            assert win.pdf_view.store is not None
+            win.pdf_view.store.add(
+                Annotation(0, AnnotationType.UNDERLINE, 12, 12, width=50, height=10, text="qt-core")
+            )
+            assert win.pdf_view.save_annotations()
+            assert win.pdf_view.store.sidecar_path.exists()
+            assert "Lizenz:" in win.license_label.text()
+            qt_html = Path(td2) / "qt_core.html"
+            from instantlensdoc.core.export import export_html as eh2
+
+            eh2("qt core export", qt_html, title="qt")
+            assert qt_html.is_file()
+            print("Qt core open/annotate/export/license: OK")
 
         win.close()
         print("Qt: OK")

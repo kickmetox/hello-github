@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | 0.1.9 |
+| Version | 0.2.0 |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -15,18 +15,13 @@
 - Keys: **32 Tage (30+2)**, Format `ILD1.…`  
 - Neu anfordern: **ame@sellerbach.de**
 
-## Start
-
-```bat
-pip install -r requirements.txt
-run.bat
-```
-
-## Sync (Windows)
+## Quickstart (Windows)
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File "D:\AI_Temp\sync-ild.ps1"
 ```
+
+Oder: `cd D:\AI_Temp\InstantLensDoc` → `run.bat`
 
 ## Build
 
@@ -34,55 +29,22 @@ powershell -ExecutionPolicy Bypass -File "D:\AI_Temp\sync-ild.ps1"
 powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 ```
 
-## Neu in 0.1.9
+Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)
 
-- **PDF-Metadaten-Editor** (Titel, Autor, Thema, Keywords, …)  
-- **Seitengröße / Zuschneiden** (MediaBox-Presets + CropBox)  
-- **Export-Qualität** in Einstellungen (JPEG-Q, Max-Kante, Seitenformat)  
-- **Mehrsprach-UI DE/EN** (Minimal: Einstellungen + Dialoge/Stubs)  
-- **Update-Check** (Hilfe-Menü; optional beim Start; offline OK)  
-- **Redaction-UX**: Preview-Label, Einbrennen-Dialog mit Sidecar-Option, Löschen  
-- Stubs: KI / Cloud / Stylus / 3D (0.1.9)
+## Neu in 0.2.0
 
-## Neu in 0.1.8
+- **Release-Meilenstein**: Version überall 0.2.0  
+- **Installer** gehärtet (Icon, Desktop-Shortcut, Uninstaller, Keygen optional)  
+- **CHANGELOG** 0.1.x → 0.2.0  
+- **Smoke** Kernpfade open / annotate / export / license  
+- Stabilität: fehlende Dateien klar gemeldet; Stubs ohne Fake-KI/Cloud  
 
-- **Schwärzung (Redaction)** Basis: Drag + optional Einbrennen  
-- **PDF-Passwort** setzen / öffnen  
-- **Bildkompression** vor PDF / Seiten als JPEG neu  
-- **Sidebar-Thumbnails** für PDF-Seiten  
-- **Tastaturhilfe** (F1)  
-- **Logging** unter `%APPDATA%/InstantLensDoc/logs`  
-- Stubs: KI / Cloud / Stylus / 3D (0.1.8)
+Details: [CHANGELOG.md](CHANGELOG.md)
 
-## Neu in 0.1.7
+## Aus 0.1.x (Auswahl)
 
-- **PDF-Wasserzeichen** + **Seitennummer-Stempel**  
-- **PDF-Vergleich** Seite-nebeneinander  
-- **Clipboard-Paste** Bild → Editor / PDF (Stempel oder neue Seite)  
-- **Session-Restore** offener Dokumente (Sidebar-Tabs)  
-- Bessere Fehlerbehandlung **große PDFs** (Warnung/Limits)  
-- **Zoom-Performance** (Debounce + Render-Cache)  
-
-## Neu in 0.1.6
-
-- **Batch-Konvertierung** (Ordner → PDF / OCR)  
-- **PDF zusammenführen & teilen** (Dialog)  
-- **Lesezeichen / Outline** in der Seitenleiste  
-- **Volltextsuche** über alle geöffneten Dokumente  
-- **Einstellungen** (OCR-Sprache, Theme, Pfade)  
-- PyInstaller-Icon aus `assets/app.ico`  
-
-## Neu in 0.1.5
-
-- PDF Signaturfeld + Signatur (Bild einfügen)  
-- OCR Tabellen-Export (Heuristik)  
-- Dark/Light Theme, Autosave, Drag-Drop  
-- Tesseract-Install-Hinweis mit Link  
-
-## Neu in 0.1.4
-
-- Undo/Redo für Annotationen und Overlay-Text  
-- Zoom: Seite/Breite einpassen + Shortcuts  
-- Zuletzt geöffnete Dateien (Menü + Sidebar)  
-- Drucken (Qt) für Editor und PDF-Seite  
-- Klarerer Lizenz-Status; About 0.1.4  
+- Metadaten, Seitengröße/Crop, Export-Qualität, i18n DE/EN, Update-Check  
+- Redaction, Passwort, Kompression, Thumbnails, Logging  
+- Wasserzeichen, Vergleich, Session, Undo/Redo, Zoom, Recent, Druck  
+- Batch, merge/split, Outline, Volltext, Einstellungen  
+- Annotationen, Overlay, Formen, OCR-Bridge, Formulare, Lizenz/Keygen  

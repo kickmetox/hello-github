@@ -1,7 +1,7 @@
 # ild_pdf — auskoppelbares PDF-Modul
 
 Lizenzfreundliche PDF-Engine auf **pypdfium2 / PDFium** (kein Poppler/GPL).  
-Version **0.1.9**.
+Version **0.2.0**.
 
 ## Installation
 

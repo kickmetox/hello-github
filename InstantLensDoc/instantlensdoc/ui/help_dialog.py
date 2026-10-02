@@ -69,7 +69,7 @@ Beispiel: <code>examples/ild_pdf_demo.py</code>. API: <code>ild_pdf/README.md</c
 <code>D:\\AI_Temp\\InstantLensDoc</code>, pip, optional Start. Eigenes Icon in <code>assets</code> bleibt erhalten.</p>
 <h3>Geplante Features</h3>
 <p>KI-Assistent, Cloud-Sync, Stylus/Palm Rejection, 3D u. a. sind im Menü als „Geplant“ markiert
-(Stub 0.1.9) — siehe FEATURES.md.</p>
+(Stub 0.2.0) — siehe FEATURES.md.</p>
 """
 
 

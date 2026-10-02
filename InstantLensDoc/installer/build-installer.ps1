@@ -1,14 +1,16 @@
-# InstantLens Doc — Inno-Setup-Installer bauen (eine Datei)
+# InstantLens Doc — Inno-Setup-Installer bauen (eine Datei) 0.2.0
 # Voraussetzung: Inno Setup 6 (iscc.exe)
 # Aufruf:
 #   powershell -ExecutionPolicy Bypass -File .\installer\build-installer.ps1
 # Optional:
 #   -SourceRoot D:\path\to\pack
 #   -PythonLauncher   # Shortcuts auf run.bat statt InstantLensDoc.exe
+#   -NoKeygen         # IncludeKeygen=0 (keine Keygen-Shortcuts)
 
 param(
     [string]$SourceRoot = "",
     [switch]$PythonLauncher,
+    [switch]$NoKeygen,
     [string]$IsccPath = ""
 )
 
@@ -21,6 +23,12 @@ $Pack = Join-Path $Dist "InstantLensDoc"
 
 if (-not (Test-Path $Iss)) {
     Write-Error "ISS fehlt: $Iss"
+}
+
+# Icon prüfen (SetupIconFile)
+$Icon = Join-Path $Root "assets\app.ico"
+if (-not (Test-Path $Icon)) {
+    Write-Host "WARNUNG: assets\app.ico fehlt — Inno SetupIconFile kann fehlschlagen."
 }
 
 # iscc finden
@@ -54,13 +62,22 @@ if (-not $SourceRoot) {
     $copyItems = @(
         "instantlensdoc", "ild_pdf", "keygen", "assets", "scripts",
         "requirements.txt", "run.bat", "run.ps1", "run-keygen.bat",
-        "FEATURES.md", "INFO.md", "README.md"
+        "FEATURES.md", "INFO.md", "README.md", "CHANGELOG.md"
     )
     foreach ($name in $copyItems) {
         $src = Join-Path $Root $name
         if (Test-Path $src) {
             Copy-Item -Recurse -Force $src $Pack
         }
+    }
+    # Optional: gebauter Keygen aus dist mitnehmen
+    $kgExe = Join-Path $Root "dist\InstantLensKeygen\InstantLensKeygen.exe"
+    if (-not (Test-Path $kgExe)) {
+        $kgExe = Join-Path $Root "dist\InstantLensDoc\InstantLensKeygen.exe"
+    }
+    if ((-not $NoKeygen) -and (Test-Path $kgExe)) {
+        Copy-Item -Force $kgExe (Join-Path $Pack "InstantLensKeygen.exe")
+        Write-Host "Keygen EXE mitgepackt."
     }
     $SourceRoot = $Pack
     if (-not $PSBoundParameters.ContainsKey("PythonLauncher")) {
@@ -78,10 +95,16 @@ $defs = @("/DSourceRoot=$SourceRoot")
 if ($PythonLauncher) {
     $defs += "/DUsePythonLauncher=1"
 }
+if ($NoKeygen) {
+    $defs += "/DIncludeKeygen=0"
+} else {
+    $defs += "/DIncludeKeygen=1"
+}
 
 Write-Host "ISCC: $iscc"
 Write-Host "SourceRoot: $SourceRoot"
 Write-Host "PythonLauncher: $PythonLauncher"
+Write-Host "IncludeKeygen: $(-not $NoKeygen)"
 & $iscc @defs $Iss
 if ($LASTEXITCODE -ne 0) {
     exit $LASTEXITCODE

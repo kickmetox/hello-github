@@ -1,9 +1,14 @@
-InstantLens Doc — Installation
+InstantLens Doc 0.2.0 — Installation
 
-Startmenü: Gruppe „InstantLens Doc“ mit Programm, Keygenerator und INFO.md.
+Startmenü: Gruppe „InstantLens Doc“ mit Programm, optional Keygenerator, INFO und Deinstallieren.
 Desktop: Verknüpfung (falls bei der Installation gewählt — Standard: ja).
 
 Nach dem Sync/Update aus dem Entwicklerordner:
   powershell -ExecutionPolicy Bypass -File "D:\AI_Temp\sync-ild.ps1"
 
+Schnellstart ohne Installer:
+  cd D:\AI_Temp\InstantLensDoc
+  run.bat
+
 Lizenz: Trial 28 Tage; Keys 32 Tage (30+2) — ame@sellerbach.de
+Deinstallation: Startmenü → InstantLens Doc deinstallieren (oder Systemeinstellungen).
