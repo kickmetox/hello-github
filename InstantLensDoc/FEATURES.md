@@ -58,6 +58,7 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | Annotation-Layer Toggle | fertig | Ansicht + Toolbar; Ctrl+Shift+A 0.3.2 |
 | Annotationen flatten/bake Export | fertig | Alle Seiten mit Ann. → neues PDF; **Fortschrittsdialog + Abbrechen** 0.4.2 |
 | Annotation Kommentar-Bericht | fertig | Zusammenhängender TXT/MD-Export (nach Seite gruppiert) 0.5.3 |
+| Annotation-Gruppen Name/Farbe | fertig | Seitengruppen umbenennen + Farbe; Sidebar/Ctrl+Alt+G 0.5.4 |
 | PDF Seiten als Einzel-PDFs | fertig | Eine Datei pro Seite; Menü + `split_into_single_page_pdfs` 0.3.3 |
 | PDF-Text → Editor | fertig | Seite oder gesamtes PDF; Menü PDF 0.3.4 |
 | PDF-Seitenbild → Editor | fertig | Seite/alle Seiten als PNG + Verweiszeile; Menü PDF 0.4.5 |
@@ -73,7 +74,7 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | Text-Overlay-Editor | fertig | Sidecar; Doppelklick/Strg+Klick; Bake optional |
 | PDF-Text → Overlay | teilweise | Extraktion via pypdfium2; kein natives Rewrite |
 | PDF Seite↔Bild Hooks | fertig | Seite/Seiten → PNG/JPEG Export 0.2.3; **DPI 72/150/300** 0.3.6; Bild als Seite / Bildstempel |
-| PDF drehen / Seite löschen | fertig | Toolbar ⟲/⟳ (−90°/+90°) speichert; Annotation-Remap |
+| PDF drehen / Seite löschen | fertig | Toolbar ⟲/⟳ (−90°/+90°) speichert; **Seite löschen Undo (Ctrl+Z)** 0.5.4; Annotation-Remap |
 | PDF spiegeln (H/V) | fertig | Toolbar ↔/↕ + Menü; `ild_pdf.flip_page` 0.2.7 |
 | PDF Druckermarken | fertig | Seitenrand Crop/Registration-Overlay optional; Toolbar „Marken“; Ctrl+Alt+M 0.4.4 |
 | PDF Graustufen | fertig | Toggle Ansicht/Export; `render_page(..., grayscale=True)` 0.2.8 |
@@ -81,16 +82,17 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | PDF leere Seite / duplizieren | fertig | Toolbar + Menü; Annotation-Remap 0.2.4 |
 | PDF neu anordnen | fertig | Dialog + Thumbnail-Drag + Annotation-Remap |
 | Textsuche Seitenleiste | fertig | Editor + PDF-Text + Annotationen; Highlight 0.2.2; **letzte Suchbegriffe** merken 0.2.4 |
-| Annotation-Liste Sidebar | fertig | Klick → Seite + Auswahl 0.2.4; **Filter nach Typ** 0.2.6; **Textsuche** 0.3.0; **Gruppierung nach Seite** 0.3.5; **Statistik je Typ (Footer)** 0.3.9; **Nur aktuelle Seite** 0.4.9; **Tag-Filter** 0.5.1; **Regex optional** 0.5.2 |
+| Annotation-Liste Sidebar | fertig | Klick → Seite + Auswahl 0.2.4; **Filter nach Typ** 0.2.6; **Textsuche** 0.3.0; **Gruppierung nach Seite** 0.3.5; **Statistik je Typ (Footer)** 0.3.9; **Nur aktuelle Seite** 0.4.9; **Tag-Filter** 0.5.1; **Regex optional** 0.5.2; **Gruppen Name/Farbe** 0.5.4 |
 | PDF Seitenbereich extrahieren | fertig | von–bis → neues PDF; Menü + Dialog-Tab 0.2.6 |
 | Editor Find/Replace | fertig | Ctrl+R Dialog 0.2.6 |
 | Editor Zeilennummern | fertig | Optional (Ansicht + Einstellungen) 0.2.7 |
 | Editor Minimap | fertig | Optional Linien-Übersicht + dickere Scrollbar; Ansicht/Einstellungen; Ctrl+Shift+I 0.5.3 |
+| Editor Soft-Hyphen / NBSP | fertig | Einfügen Ctrl+Shift+- / Ctrl+Shift+Space; Menü Bearbeiten 0.5.4 |
 | Editor Groß-/Kleinschreibung | fertig | Auswahl umschalten Ctrl+Shift+U 0.2.8; **Alles groß/klein ganze Datei** 0.4.2 |
 | Editor Einrückung | fertig | Erhöhen/Verringern Ctrl+]/[ bzw. **Tab/Shift+Tab Block** 0.3.7 |
 | Editor Markdown-Vorschau | fertig | Optional Split (Ansicht); Ctrl+Shift+M 0.3.2 |
 | Editor Soft-Wrap | fertig | Toggle Ansicht/Einstellungen; Ctrl+Shift+W 0.3.3 |
-| Editor Sonderzeichen | fertig | Tabs/Leerzeichen/Absätze sichtbar; Ansicht/Einstellungen; Ctrl+Shift+. 0.3.9 |
+| Editor Sonderzeichen | fertig | Tabs/Leerzeichen/Absätze sichtbar; Ansicht/Einstellungen; Ctrl+Shift+. 0.3.9; **Soft-Hyphen/NBSP einfügen** 0.5.4 |
 | Editor Gehe zu Zeile | fertig | Dialog Ctrl+G (Editor; PDF → Seite) 0.3.4/0.4.6 |
 | Editor Tab duplizieren | fertig | Inhalt klonen Ctrl+Shift+T; Erneut öffnen Ctrl+Alt+Shift+O 0.4.6 |
 | Editor Zeile duplizieren | fertig | Ctrl+D (aktuelle/Auswahl) 0.3.5 |
@@ -129,25 +131,26 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | Inno-Installer | fertig | Icon, Desktop, Uninstaller, Keygen optional (`InstantLensKeygen.exe`) 0.2.1 |
 | Sync-Skript Windows | fertig | Repo `scripts/sync-ild.ps1`; Store `docs/sync-ild.ps1` |
 | Arbeitsverzeichnis öffnen | fertig | Datei-Menü Ctrl+Shift+E; Ordner der Datei bzw. CWD 0.4.8 |
-| In-App Hilfe / About | fertig | Version 0.5.3; Fenstertitel + Splash; Logordner-Button; **Feature-Kurzliste + FEATURES.md** 0.4.9; **Keygen-Hinweis bei Trial** 0.5.3 |
-| CHANGELOG | fertig | **0.5.3** Kommentar-Bericht, Farbe-Zyklus, Minimap, About-Keygen |
+| In-App Hilfe / About | fertig | Version 0.5.4; Fenstertitel + Splash; Logordner-Button; **Feature-Kurzliste + FEATURES.md** 0.4.9; **Keygen-Hinweis bei Trial** 0.5.3 |
+| Startup-Abhängigkeiten-Check | fertig | pypdfium2 kritisch + Tesseract optional; Dialog bei Problemen 0.5.4 |
+| CHANGELOG | fertig | **0.5.4** Seiten-Löschen-Undo, Ann.-Gruppen, Soft-Hyphen/NBSP, Startup-Deps |
 | FEATURES.md / INFO.md | fertig | |
 | `ild_pdf` Modul + Beispielskript | fertig | metadata / page size / watermark / redact / acroform / attachments / flatten / **plain text** / **selection_to_highlight_rects** / **export_report** |
 | Font-Matching | geplant | |
 | Objekt-/Bildbearbeitung | geplant | |
 | Layout-Erhaltung (Scan→edit) | geplant | |
 | Freihand | geplant | |
-| KI-Assistent | Stub | Menü „Geplant“ 0.5.3 (keine Fake-KI) |
+| KI-Assistent | Stub | Menü „Geplant“ 0.5.4 (keine Fake-KI) |
 | Signieren (rechtssicher) | Stub | |
-| Cloud-Sync | Stub | Menü „Geplant“ 0.5.3 (keine Fake-Cloud) |
+| Cloud-Sync | Stub | Menü „Geplant“ 0.5.4 (keine Fake-Cloud) |
 | Text on Path / Text zu Pfaden | geplant | |
 | Envelope Distort / Text Wrap / Area Type | Stub/geplant | |
 | Schnittmasken | geplant | |
 | Füllungen / Live-Effekte | geplant | |
-| 3D-Extrusion | Stub | Menü „Geplant“ 0.5.3 |
+| 3D-Extrusion | Stub | Menü „Geplant“ 0.5.4 |
 | Variable Fonts (voll) | Stub | |
 | Glyphen-Palette | geplant | |
-| Stylus / Palm Rejection | Stub | Menü „Geplant“ 0.5.3 |
-| Intelligente Formerkennung | Stub | Menü „Geplant“ 0.5.3 |
+| Stylus / Palm Rejection | Stub | Menü „Geplant“ 0.5.4 |
+| Intelligente Formerkennung | Stub | Menü „Geplant“ 0.5.4 |
 
 Nicht behauptet als fertig: Cloud, KI, Stylus, 3D — nur Menü-Stubs + dieser Status.

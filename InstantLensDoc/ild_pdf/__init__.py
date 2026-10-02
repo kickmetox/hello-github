@@ -25,6 +25,8 @@ from .annotate import (
 from .pages import (
     PAGE_SIZE_PRESETS,
     extract_page_range,
+    extract_page_bytes,
+    insert_page_from_bytes,
     merge_pdfs,
     split_into_single_page_pdfs,
     split_pdf,
@@ -124,6 +126,8 @@ __all__ = [
     "insert_blank_page",
     "duplicate_page",
     "delete_pages",
+    "extract_page_bytes",
+    "insert_page_from_bytes",
     "reorder_pages",
     "get_page_boxes",
     "set_page_size",
@@ -188,4 +192,4 @@ __all__ = [
     "uri_link_at",
 ]
 
-__version__ = "0.5.3"
+__version__ = "0.5.4"

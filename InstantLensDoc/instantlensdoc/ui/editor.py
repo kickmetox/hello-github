@@ -164,6 +164,28 @@ class TextEditor(QPlainTextEdit):
     def special_chars_visible(self) -> bool:
         return bool(self._show_special)
 
+    def insert_soft_hyphen(self) -> bool:
+        """Weiches Trennzeichen U+00AD an der Cursor-Position einfügen."""
+        cur = self.textCursor()
+        cur.insertText("\u00ad")
+        self.setTextCursor(cur)
+        return True
+
+    def insert_nbsp(self) -> bool:
+        """
+        Geschütztes Leerzeichen einfügen.
+        Qt/QTextDocument normalisiert U+00A0 → U+0020; daher U+202F (Narrow NBSP).
+        """
+        cur = self.textCursor()
+        # U+202F Narrow No-Break Space — bricht nicht, bleibt in QPlainTextEdit erhalten
+        cur.insertText("\u202f")
+        self.setTextCursor(cur)
+        return True
+
+    # Alias / Konstante für Tests und Doku
+    NBSP_CHAR = "\u202f"
+    SOFT_HYPHEN_CHAR = "\u00ad"
+
     def set_bracket_match_enabled(self, enabled: bool) -> None:
         """Bracket-Match Highlight ein/aus."""
         self._bracket_match = bool(enabled)

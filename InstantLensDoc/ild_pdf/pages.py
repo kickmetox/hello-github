@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import io
 from pathlib import Path
 from typing import List, Sequence, Tuple
 
@@ -190,6 +191,49 @@ def delete_pages(path: str | Path, indices: Sequence[int]) -> None:
         if len(pdf.pages) == 0:
             raise ValueError("PDF darf nicht leer werden")
         pdf.save(path)
+
+
+def extract_page_bytes(path: str | Path, page_index: int) -> bytes:
+    """Einzelne Seite als eigenständiges PDF (Bytes) extrahieren — für Undo."""
+    path = Path(path)
+    with pikepdf.open(path) as pdf:
+        if page_index < 0 or page_index >= len(pdf.pages):
+            raise IndexError(f"Seite {page_index} existiert nicht")
+        out = pikepdf.Pdf.new()
+        out.pages.append(pdf.pages[page_index])
+        buf = io.BytesIO()
+        out.save(buf)
+        return buf.getvalue()
+
+
+def insert_page_from_bytes(
+    path: str | Path,
+    at_index: int,
+    page_bytes: bytes,
+) -> int:
+    """
+    Seite aus PDF-Bytes an at_index einfügen und speichern.
+    Rückgabe: Index der eingefügten Seite.
+    """
+    path = Path(path)
+    raw = bytes(page_bytes)
+    if not raw:
+        raise ValueError("page_bytes leer")
+    with pikepdf.open(path, allow_overwriting_input=True) as pdf:
+        n = len(pdf.pages)
+        insert_at = int(at_index)
+        if insert_at < 0 or insert_at > n:
+            raise IndexError(f"Einfügeposition {insert_at} ungültig (0..{n})")
+        with pikepdf.open(io.BytesIO(raw)) as src:
+            if len(src.pages) < 1:
+                raise ValueError("Quell-PDF hat keine Seiten")
+            if insert_at >= n:
+                pdf.pages.append(src.pages[0])
+                insert_at = len(pdf.pages) - 1
+            else:
+                pdf.pages.insert(insert_at, src.pages[0])
+        pdf.save(path)
+        return insert_at
 
 
 def merge_pdfs(sources: Sequence[str | Path], dest: str | Path) -> None:

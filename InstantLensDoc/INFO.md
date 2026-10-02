@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **0.5.3** |
+| Version | **0.5.4** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -34,10 +34,10 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)
 
-## Neu in 0.5.3
+## Neu in 0.5.4
 
-- Kommentar-Bericht: PDF-Annotationen als zusammenhängendes TXT/MD
-- Annotation-Farbe: Palette-Zyklus (Ctrl+Shift+C) / Random (Ctrl+Alt+Shift+C)
-- Editor-Minimap optional (Linien-Übersicht + dickere Scrollbar)
-- About: Keygen-Hinweis wenn Trial aktiv
+- Seite löschen mit Undo (Ctrl+Z); Seitendrehung ebenfalls undo-fähig
+- Annotation-Gruppen: umbenennen + farblich markieren (Ctrl+Alt+G)
+- Editor: Soft-Hyphen und geschütztes Leerzeichen einfügen
+- Startup-Check pypdfium2/Tesseract mit Dialog
 - Stubs KI/Cloud/Stylus/3D unverändert

@@ -2,7 +2,7 @@
 
 Moderne Textverarbeitung mit PDF-Annotator, OCR-Bridge und Formulargenerator.
 
-**Version:** 0.5.3  
+**Version:** 0.5.4  
 **Hersteller:** Andreas Meyer · ame@sellerbach.de
 
 ## Quickstart (Windows)
@@ -29,8 +29,8 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)
 
-## Neu in 0.5.3
+## Neu in 0.5.4
 
-Kommentar-Bericht TXT/MD, Annotation-Farbe Palette-Zyklus/Random, optionale Editor-Minimap, About-Keygen-Hinweis bei Trial. Stubs KI/Cloud/Stylus/3D unverändert.
+Seite löschen mit Undo, Annotation-Gruppen Name/Farbe, Soft-Hyphen/NBSP im Editor, Startup-Check pypdfium2/Tesseract. Stubs KI/Cloud/Stylus/3D unverändert.
 
 Siehe [CHANGELOG.md](CHANGELOG.md), [FEATURES.md](FEATURES.md) und [INFO.md](INFO.md).

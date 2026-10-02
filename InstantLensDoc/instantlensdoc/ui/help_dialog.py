@@ -84,7 +84,9 @@ HELP_HTML = f"""
 <li><b>Autosave</b>: Textdokumente (mit Pfad) und PDF-Annotationen — Intervall in Einstellungen</li>
 <li><b>PDF</b>: Blättern, Zoom/Fit (debounced + Cache), <b>⟲/⟳ drehen</b> / <b>↔/↕ spiegeln</b> (speichert),
     <b>Graustufen</b> (Ansicht + Bild-Export), <b>Nachtmodus</b> (nur Ansicht, nicht speichern),
-    <b>leere Seite / duplizieren</b>, Seite löschen, Seiten neu anordnen;
+    <b>leere Seite / duplizieren</b>, Seite löschen (<b>Undo Ctrl+Z</b>), Seiten neu anordnen;
+    <b>Annotationsgruppen</b> umbenennen/Farbe (Ctrl+Alt+G);
+    Soft-Hyphen / NBSP im Editor; Startup-Check pypdfium2/Tesseract;
     <b>PDF-Links (http/https)</b> per Auswahl-Werkzeug / Ctrl+Klick öffnen;
     Annotationen: Highlight (Drag, <b>Selection→Highlight</b> über Text) + <b>Farben-Picker HL/Stift</b> + <b>3 Favoriten</b> + <b>Deckkraft α</b>, <b>Schwärzen/Redaction</b> (Drag + Preview „REDACT“ + Einbrennen-Dialog), Unterstreichen, Notiz, <b>Text-Overlay</b>,
     <b>Stempel-Bibliothek</b> (GENEHMIGT/ENTWURF/VERTRAULICH + Datum, <b>Rotation 90°</b>), Callout,

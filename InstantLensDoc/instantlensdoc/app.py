@@ -87,8 +87,10 @@ def main(argv: list[str] | None = None) -> int:
 
     from instantlensdoc import __version__
     from instantlensdoc.config import DISPLAY_NAME
+    from instantlensdoc.core.deps_check import check_runtime_dependencies, has_any_failure
     from instantlensdoc.core.logging_setup import setup_logging
     from instantlensdoc.license import LicenseManager
+    from instantlensdoc.ui.deps_dialog import show_startup_dependency_dialog
     from instantlensdoc.ui.main_window import MainWindow
     from instantlensdoc.ui.theme import apply_theme
 
@@ -106,7 +108,8 @@ def main(argv: list[str] | None = None) -> int:
     # Kein Splash in Smoke/Headless-Tests
     import os
 
-    if os.environ.get("ILD_SMOKE_QT") != "1" and os.environ.get("ILD_NO_SPLASH") != "1":
+    smoke = os.environ.get("ILD_SMOKE_QT") == "1"
+    if not smoke and os.environ.get("ILD_NO_SPLASH") != "1":
         try:
             splash = _make_splash(app)
         except Exception:
@@ -115,12 +118,26 @@ def main(argv: list[str] | None = None) -> int:
     lm = LicenseManager()
     lm.ensure_trial_started()
 
+    # Startup-Check Abhängigkeiten (pypdfium2 kritisch, Tesseract optional)
+    dep_statuses = check_runtime_dependencies()
+    skip_deps_dialog = smoke or os.environ.get("ILD_SKIP_DEPS_CHECK") == "1"
+
     win = MainWindow(lm)
     win.show()
     if splash is not None:
         splash.finish(win)
         QTimer.singleShot(50, splash.close)
     win.statusBar().showMessage(f"Log: {log_path}", 4000)
+
+    if not skip_deps_dialog and has_any_failure(dep_statuses):
+        def _show_deps():
+            show_startup_dependency_dialog(win, only_if_issues=True, statuses=dep_statuses)
+
+        QTimer.singleShot(200, _show_deps)
+    elif not has_any_failure(dep_statuses):
+        # Kurzer Statushinweis wenn alles OK (nicht im Smoke)
+        if not smoke:
+            win.statusBar().showMessage("Abhängigkeiten OK (pypdfium2 / OCR-Check)", 3500)
 
     # Optionale Datei als Argument
     if len(argv) > 1 and not argv[1].startswith("-"):

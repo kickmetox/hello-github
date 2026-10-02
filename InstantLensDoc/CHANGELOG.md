@@ -1,5 +1,23 @@
 # Changelog — InstantLens Doc
 
+## 0.5.4 — Seiten-Löschen-Undo, Ann.-Gruppen, Soft-Hyphen/NBSP, Startup-Deps
+
+Nach 0.5.3: vier sinnvolle Ausbauten. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### PDF / Annotationen
+- **Seite löschen mit Undo**: gelöschte Seite inkl. Annotationen per Ctrl+Z wiederherstellen (auch Seitendrehung undo-fähig)
+- **Annotation-Gruppen**: Seitengruppen in der Sidebar umbenennen und farblich markieren (Ctrl+Alt+G / Rechtsklick)
+
+### Editor / Startup
+- **Soft-Hyphen / NBSP**: Bearbeiten → Sonderzeichen einfügen (Ctrl+Shift+- / Ctrl+Shift+Space)
+- **Startup-Check**: pypdfium2 (kritisch) und Tesseract (optional) mit Dialog bei Problemen
+
+### Packaging / Docs
+- Version **0.5.4** (App / ild_pdf / ISS / Smoke / Docs)
+- Stubs KI/Cloud/Stylus/3D unverändert
+
+---
+
 ## 0.5.3 — Kommentar-Bericht, Farbe-Zyklus, Minimap, About-Keygen
 
 Nach 0.5.2: vier sinnvolle Ausbauten. Stubs KI/Cloud/Stylus/3D bleiben Stubs.

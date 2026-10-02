@@ -331,6 +331,7 @@ class MainWindow(QMainWindow):
         self.sidebar.outline_add_requested.connect(self._outline_add)
         self.sidebar.outline_delete_requested.connect(self._outline_delete)
         self.sidebar.annotation_filter_changed.connect(lambda _t: None)
+        self.sidebar.annotation_group_edit_requested.connect(self._edit_annotation_group)
         self.sidebar.fulltext_hit_activated.connect(self._on_fulltext_hit)
         self.sidebar.page_thumb_activated.connect(self._on_thumb_jump)
         self.sidebar.pages_reordered.connect(self._on_thumbs_reordered)
@@ -393,7 +394,7 @@ class MainWindow(QMainWindow):
             "QLabel#undoHint { color: #777; padding-right: 8px; font-size: 11px; }"
         )
         self.undo_hint_label.setToolTip(
-            "Rückgängig: Editor-Text oder PDF-Annotationen (Ctrl+Z)"
+            "Rückgängig: Editor · PDF-Annotationen · Seiten löschen/drehen (Ctrl+Z)"
         )
         sb.addPermanentWidget(self.undo_hint_label)
         self.version_label = QLabel(f"v{__version__}")
@@ -634,6 +635,19 @@ class MainWindow(QMainWindow):
         act_clear_marks = QAction("Markierungen löschen", self)
         act_clear_marks.triggered.connect(self._clear_editor_marks)
         m_edit.addAction(act_clear_marks)
+        m_specialchars = m_edit.addMenu("Sonderzeichen einfügen")
+        act_shy = QAction("Weiches Trennzeichen (Soft-Hyphen)", self)
+        act_shy.setShortcut(QKeySequence("Ctrl+Shift+-"))
+        act_shy.setToolTip("U+00AD Soft Hyphen an Cursor einfügen")
+        act_shy.triggered.connect(self._insert_soft_hyphen)
+        m_specialchars.addAction(act_shy)
+        act_nbsp = QAction("Geschütztes Leerzeichen (NBSP)", self)
+        act_nbsp.setShortcut(QKeySequence("Ctrl+Shift+Space"))
+        act_nbsp.setToolTip(
+            "U+202F Narrow No-Break Space an Cursor (Qt behält U+00A0 nicht)"
+        )
+        act_nbsp.triggered.connect(self._insert_nbsp)
+        m_specialchars.addAction(act_nbsp)
         m_edit.addSeparator()
         act_del_ann = QAction("Annotation löschen", self)
         act_del_ann.setShortcut(QKeySequence.Delete)
@@ -650,6 +664,13 @@ class MainWindow(QMainWindow):
         act_edit_tags.setToolTip("Freie Tags/Labels der ausgewählten Annotation (filterbar)")
         act_edit_tags.triggered.connect(self._edit_annotation_tags)
         m_edit.addAction(act_edit_tags)
+        act_edit_group = QAction("Annotationsgruppe umbenennen/Farbe…", self)
+        act_edit_group.setShortcut(QKeySequence("Ctrl+Alt+G"))
+        act_edit_group.setToolTip(
+            "Seiten-Gruppe in der Annotationsliste umbenennen und farblich markieren"
+        )
+        act_edit_group.triggered.connect(self._edit_annotation_group)
+        m_edit.addAction(act_edit_group)
         act_dup_ann = QAction("Annotation duplizieren", self)
         act_dup_ann.setShortcut(QKeySequence("Ctrl+Shift+D"))
         act_dup_ann.setToolTip("Ausgewählte Annotation kopieren (leicht versetzt)")
@@ -940,6 +961,10 @@ class MainWindow(QMainWindow):
             ("Leere Seite einfügen", lambda: self.pdf_view.insert_blank_after_current()),
             ("Seite duplizieren", lambda: self.pdf_view.duplicate_current()),
             ("Seite löschen…", lambda: self.pdf_view.delete_current()),
+            (
+                "Annotationsgruppe umbenennen/Farbe…",
+                lambda: self._edit_annotation_group(),
+            ),
             ("Seiten neu anordnen…", lambda: self.pdf_view.reorder_dialog()),
             ("Seite als Bild exportieren…", lambda: self.pdf_view.extract_page_as_image()),
             ("Seiten als Bilder exportieren…", lambda: self.pdf_view.export_pages_as_images()),
@@ -1477,6 +1502,26 @@ class MainWindow(QMainWindow):
             self._set_status("Keine Annotation ausgewählt")
             return
         self.pdf_view.edit_selected_annotation_tags()
+
+    def _edit_annotation_group(self, page: int | None = None):
+        if self.stack.currentWidget() is not self.pdf_view or not self.pdf_view.pdf_path:
+            self._set_status("Annotationsgruppe nur im PDF-Modus")
+            return
+        idx = None if page is None or isinstance(page, bool) else int(page)
+        self.pdf_view.edit_page_annotation_group(idx)
+        self._refresh_pdf_marks()
+
+    def _insert_soft_hyphen(self):
+        if self.stack.currentWidget() is not self.editor_pane:
+            self.stack.setCurrentWidget(self.editor_pane)
+        if self.editor.insert_soft_hyphen():
+            self._set_status("Soft-Hyphen eingefügt (U+00AD)")
+
+    def _insert_nbsp(self):
+        if self.stack.currentWidget() is not self.editor_pane:
+            self.stack.setCurrentWidget(self.editor_pane)
+        if self.editor.insert_nbsp():
+            self._set_status("Geschütztes Leerzeichen eingefügt (U+202F)")
 
     def _duplicate_annotation(self):
         if self.stack.currentWidget() is not self.pdf_view or not self.pdf_view.pdf_path:
@@ -2284,7 +2329,14 @@ class MainWindow(QMainWindow):
             return
         pairs = self.pdf_view.annotation_summaries()
         self.sidebar.set_annotation_current_page(self.pdf_view.page_index)
-        self.sidebar.set_annotations([p[0] for p in pairs], [p[1] for p in pairs])
+        groups = None
+        if self.pdf_view.store is not None:
+            groups = self.pdf_view.store.list_page_groups()
+        self.sidebar.set_annotations(
+            [p[0] for p in pairs],
+            [p[1] for p in pairs],
+            page_groups=groups,
+        )
         n = len(self.pdf_view.store.annotations) if self.pdf_view.store else 0
         self.word_status_label.setText(f"{n} Ann.")
 

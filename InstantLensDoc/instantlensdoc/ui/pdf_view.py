@@ -60,8 +60,10 @@ from ild_pdf import (
 from ild_pdf.pages import (
     delete_pages,
     duplicate_page,
+    extract_page_bytes,
     flip_page,
     insert_blank_page,
+    insert_page_from_bytes,
     reorder_pages,
     rotate_page,
 )
@@ -961,6 +963,7 @@ class PdfViewer(QWidget):
         self._selected_ann_id: str | None = None
         self._selected_ann_ids: set[str] = set()
         self._ann_clipboard: list[dict] = []
+        self._page_ops_undo: list[dict] = []  # Seiten-Löschen/Drehen rückgängig
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
 
@@ -2105,6 +2108,7 @@ class PdfViewer(QWidget):
             self.password = pw
             self.store = AnnotationStore(self.pdf_path)
             self.store.clear_history()
+            self.clear_page_ops_undo()
             from ild_pdf import PdfDocument
 
             with PdfDocument(self.pdf_path, password=self.password) as doc:
@@ -2623,6 +2627,9 @@ class PdfViewer(QWidget):
             QMessageBox.warning(self, "Zoom", str(e))
 
     def undo_annotation(self) -> bool:
+        # Zuerst Seiten-Ops (Löschen/Drehen), danach Annotation-History
+        if self.can_undo_page_op():
+            return self.undo_page_op()
         if not self.store or not self.store.can_undo():
             self.status.emit("Nichts rückgängig zu machen")
             return False
@@ -2635,6 +2642,63 @@ class PdfViewer(QWidget):
             return True
         except Exception as e:
             QMessageBox.warning(self, "Rückgängig", str(e))
+            return False
+
+    def can_undo_page_op(self) -> bool:
+        return bool(getattr(self, "_page_ops_undo", None))
+
+    def clear_page_ops_undo(self) -> None:
+        self._page_ops_undo = []
+
+    def undo_page_op(self) -> bool:
+        """Letzte Seiten-Operation (Löschen oder Drehen) rückgängig."""
+        stack = getattr(self, "_page_ops_undo", None)
+        if not stack or not self.pdf_path:
+            return False
+        entry = stack.pop()
+        kind = entry.get("kind")
+        try:
+            from ild_pdf.render import clear_render_cache
+
+            if kind == "delete":
+                idx = int(entry["index"])
+                insert_page_from_bytes(self.pdf_path, idx, entry["page_bytes"])
+                if self.store and self.store.can_undo():
+                    self.store.undo()
+                if self.store is not None and "page_groups" in entry:
+                    self.store._meta["page_groups"] = dict(entry["page_groups"] or {})
+                    self.store.dirty = True
+                    try:
+                        self.store.save(force=True)
+                    except Exception:
+                        pass
+                from ild_pdf import PdfDocument
+
+                with PdfDocument(self.pdf_path, password=self.password) as doc:
+                    self.page_count = len(doc)
+                self.page_index = min(max(0, idx), max(0, self.page_count - 1))
+                clear_render_cache(self.pdf_path)
+                self.refresh()
+                self.annotations_changed.emit()
+                self.page_changed.emit(self.page_index)
+                self.document_changed.emit()
+                self.status.emit(f"Seite {idx + 1} wiederhergestellt (Undo)")
+                return True
+            if kind == "rotate":
+                idx = int(entry["index"])
+                deg = int(entry.get("degrees", 90))
+                rotate_page(self.pdf_path, idx, -int(deg))
+                clear_render_cache(self.pdf_path)
+                if idx != self.page_index:
+                    self.page_index = idx
+                self.refresh()
+                self.document_changed.emit()
+                self.status.emit(f"Seitendrehung rückgängig (S. {idx + 1})")
+                return True
+            self.status.emit("Unbekannte Seiten-Undo-Aktion")
+            return False
+        except Exception as e:
+            QMessageBox.warning(self, "Seiten-Undo", str(e))
             return False
 
     def redo_annotation(self) -> bool:
@@ -3508,19 +3572,29 @@ class PdfViewer(QWidget):
             QMessageBox.warning(self, "Link", f"URL konnte nicht geöffnet werden:\n{raw}")
 
     def rotate_current(self, degrees: int = 90):
-        """Aktuelle Seite drehen (−90/90/180/270) und PDF speichern."""
+        """Aktuelle Seite drehen (−90/90/180/270) und PDF speichern (Undo-fähig)."""
         if not self.pdf_path:
             return
         try:
-            rotate_page(self.pdf_path, self.page_index, int(degrees))
+            deg = int(degrees)
+            self._page_ops_undo.append(
+                {"kind": "rotate", "index": int(self.page_index), "degrees": deg}
+            )
+            if len(self._page_ops_undo) > 20:
+                self._page_ops_undo.pop(0)
+            rotate_page(self.pdf_path, self.page_index, deg)
             from ild_pdf.render import clear_render_cache
 
             clear_render_cache(self.pdf_path)
             self.refresh()
             self.document_changed.emit()
-            deg = int(degrees) % 360
-            self.status.emit(f"Seite {self.page_index + 1} gedreht ({deg}°) und gespeichert")
+            shown = deg % 360
+            self.status.emit(
+                f"Seite {self.page_index + 1} gedreht ({shown}°) — Ctrl+Z rückgängig"
+            )
         except Exception as e:
+            if self._page_ops_undo and self._page_ops_undo[-1].get("kind") == "rotate":
+                self._page_ops_undo.pop()
             QMessageBox.warning(self, "Drehen", str(e))
 
     def flip_current(self, *, horizontal: bool = False, vertical: bool = False):
@@ -4163,12 +4237,26 @@ class PdfViewer(QWidget):
         reply = QMessageBox.question(
             self,
             "Seite löschen",
-            f"Seite {self.page_index + 1} wirklich löschen?",
+            f"Seite {self.page_index + 1} wirklich löschen?\n(Rückgängig: Ctrl+Z)",
         )
         if reply != QMessageBox.Yes:
             return
         try:
             deleted = self.page_index
+            page_bytes = extract_page_bytes(self.pdf_path, deleted)
+            groups_before = {}
+            if self.store is not None:
+                groups_before = dict(self.store._meta.get("page_groups") or {})
+            self._page_ops_undo.append(
+                {
+                    "kind": "delete",
+                    "index": deleted,
+                    "page_bytes": page_bytes,
+                    "page_groups": groups_before,
+                }
+            )
+            if len(self._page_ops_undo) > 20:
+                self._page_ops_undo.pop(0)
             delete_pages(self.pdf_path, [deleted])
             if self.store:
                 mapping = {}
@@ -4177,7 +4265,38 @@ class PdfViewer(QWidget):
                         mapping[i] = i
                     elif i > deleted:
                         mapping[i] = i - 1
-                self.store.remap_pages(mapping)
+                # Eine Undo-Stufe für Annotation-Remap (wird bei Seiten-Undo mit restored)
+                with self.store.atomic():
+                    planned = []
+                    changed = False
+                    for ann in list(self.store.annotations):
+                        if ann.page in mapping:
+                            new_page = mapping[ann.page]
+                            if new_page != ann.page:
+                                changed = True
+                            planned.append((ann, new_page))
+                        else:
+                            changed = True
+                    if changed or len(planned) != len(self.store.annotations):
+                        kept = []
+                        for ann, new_page in planned:
+                            if ann.page != new_page:
+                                ann.page = new_page
+                                ann.touch()
+                            kept.append(ann)
+                        self.store.annotations = kept
+                        groups = dict(self.store._meta.get("page_groups") or {})
+                        if groups:
+                            new_groups = {}
+                            for key, val in groups.items():
+                                try:
+                                    old_p = int(key)
+                                except (TypeError, ValueError):
+                                    continue
+                                if old_p in mapping:
+                                    new_groups[str(mapping[old_p])] = val
+                            self.store._meta["page_groups"] = new_groups
+                        self.store.dirty = True
                 self.store.save(force=True)
             self.page_count -= 1
             self.page_index = min(self.page_index, self.page_count - 1)
@@ -4188,9 +4307,54 @@ class PdfViewer(QWidget):
             self.annotations_changed.emit()
             self.page_changed.emit(self.page_index)
             self.document_changed.emit()
-            self.status.emit("Seite gelöscht")
+            self.status.emit("Seite gelöscht — Ctrl+Z stellt sie wieder her")
         except Exception as e:
+            if self._page_ops_undo and self._page_ops_undo[-1].get("kind") == "delete":
+                self._page_ops_undo.pop()
             QMessageBox.warning(self, "Löschen", str(e))
+
+    def edit_page_annotation_group(self, page: int | None = None) -> bool:
+        """Seiten-Annotationsgruppe umbenennen und farblich markieren."""
+        if not self.store:
+            QMessageBox.information(self, "Gruppe", "Kein PDF mit Annotationen geladen.")
+            return False
+        idx = self.page_index if page is None else int(page)
+        cur = self.store.get_page_group(idx)
+        title, ok = QInputDialog.getText(
+            self,
+            "Annotationsgruppe",
+            f"Name für Gruppe Seite {idx + 1}:",
+            text=cur.get("title") or "",
+        )
+        if not ok:
+            return False
+        color = cur.get("color") or ""
+        pick = QMessageBox.question(
+            self,
+            "Gruppenfarbe",
+            "Farbe für die Gruppe wählen?",
+            QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel,
+            QMessageBox.Yes,
+        )
+        if pick == QMessageBox.Cancel:
+            return False
+        if pick == QMessageBox.Yes:
+            initial = QColor(color) if color else QColor("#90CAF9")
+            chosen = QColorDialog.getColor(initial, self, "Gruppenfarbe")
+            if chosen.isValid():
+                color = chosen.name().upper()
+            elif not color:
+                color = ""
+        self.store.set_page_group(idx, title=title, color=color)
+        try:
+            self.store.save(force=True)
+        except Exception as e:
+            QMessageBox.warning(self, "Gruppe", str(e))
+            return False
+        self.annotations_changed.emit()
+        label = title.strip() or f"Seite {idx + 1}"
+        self.status.emit(f"Gruppe „{label}“ aktualisiert")
+        return True
 
     def reorder_dialog(self):
         if not self.pdf_path or self.page_count < 2:

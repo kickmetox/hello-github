@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from PySide6.QtCore import Signal, Qt
-from PySide6.QtGui import QColor, QIcon, QImage, QPixmap
+from PySide6.QtGui import QColor, QBrush, QIcon, QImage, QPixmap
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QCheckBox,
@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QListWidget,
     QListWidgetItem,
+    QMenu,
     QPushButton,
     QToolButton,
     QTreeWidget,
@@ -119,6 +120,7 @@ class Sidebar(QWidget):
     annotation_color_filter_changed = Signal(str)  # #RRGGBB oder "" für alle
     annotation_page_filter_changed = Signal(bool)  # nur aktuelle Seite
     annotation_tag_filter_changed = Signal(str)  # Tag oder "" für alle
+    annotation_group_edit_requested = Signal(int)  # Seitenindex der Gruppe
     fulltext_hit_activated = Signal(str, object)  # path, page_index|None
     page_thumb_activated = Signal(int)  # PDF-Seite 0-basiert
     pages_reordered = Signal(list)  # alte Indizes in neuer Reihenfolge
@@ -223,8 +225,12 @@ class Sidebar(QWidget):
         layout.addLayout(search_row)
         self.annotations = QListWidget()
         self.annotations.setMaximumHeight(160)
-        self.annotations.setToolTip("Gruppiert nach Seite — Klick → zur Annotation springen")
+        self.annotations.setToolTip(
+            "Gruppiert nach Seite — Klick → Annotation; Rechtsklick auf Gruppe → umbenennen/Farbe"
+        )
         self.annotations.itemClicked.connect(self._activate_annotation)
+        self.annotations.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.annotations.customContextMenuRequested.connect(self._ann_context_menu)
         layout.addWidget(self.annotations)
 
         layout.addWidget(QLabel("Treffer / Markierungen"))
@@ -263,6 +269,7 @@ class Sidebar(QWidget):
         self._ann_current_page_index: int | None = None
         self._ann_filter_current_page = False
         self._ann_tag_updating = False
+        self._ann_page_groups: dict[int, dict] = {}
 
     def search_text(self) -> str:
         return self.search.currentText().strip()
@@ -793,8 +800,15 @@ class Sidebar(QWidget):
 
         for page in sorted(by_page.keys()):
             items = by_page[page]
+            group_meta = {}
+            if page >= 0:
+                group_meta = (getattr(self, "_ann_page_groups", None) or {}).get(page) or {}
+            custom_title = str(group_meta.get("title") or "").strip()
+            group_color = normalize_ann_color(group_meta.get("color"))
             if page < 0:
                 header_txt = "Ohne Seite"
+            elif custom_title:
+                header_txt = f"{custom_title} (S. {page + 1}, {len(items)})"
             else:
                 header_txt = f"Seite {page + 1} ({len(items)})"
             header = QListWidgetItem(header_txt)
@@ -804,6 +818,13 @@ class Sidebar(QWidget):
             header.setFont(font)
             header.setData(256, None)
             header.setData(Qt.UserRole + 2, "group")
+            header.setData(Qt.UserRole + 3, page)
+            if group_color:
+                qc = QColor(group_color)
+                if qc.isValid():
+                    header.setBackground(QBrush(qc))
+                    fg = QColor("#000000") if qc.lightness() > 140 else QColor("#FFFFFF")
+                    header.setForeground(QBrush(fg))
             self.annotations.addItem(header)
             for line, payload in items:
                 item = QListWidgetItem(f"  {line}")
@@ -811,6 +832,25 @@ class Sidebar(QWidget):
                     item.setData(256, payload)
                 self.annotations.addItem(item)
         self._update_ann_stats()
+
+    def _ann_context_menu(self, pos) -> None:
+        item = self.annotations.itemAt(pos)
+        if item is None:
+            return
+        if item.data(Qt.UserRole + 2) != "group":
+            return
+        page = item.data(Qt.UserRole + 3)
+        try:
+            page_i = int(page)
+        except (TypeError, ValueError):
+            return
+        if page_i < 0:
+            return
+        menu = QMenu(self)
+        act = menu.addAction("Gruppe umbenennen / Farbe…")
+        chosen = menu.exec(self.annotations.mapToGlobal(pos))
+        if chosen is act:
+            self.annotation_group_edit_requested.emit(page_i)
 
     def _clear_color_stats_buttons(self) -> None:
         layout = getattr(self, "ann_color_layout", None)
@@ -889,15 +929,30 @@ class Sidebar(QWidget):
             self.ann_color_layout.addWidget(btn)
         self.ann_color_layout.addStretch(1)
 
-    def set_annotations(self, lines: list[str], payloads: list | None = None):
+    def set_annotations(
+        self,
+        lines: list[str],
+        payloads: list | None = None,
+        *,
+        page_groups: dict | None = None,
+    ):
         self._ann_all_lines = list(lines)
         self._ann_all_payloads = list(payloads) if payloads else [None] * len(lines)
+        groups: dict[int, dict] = {}
+        if isinstance(page_groups, dict):
+            for k, v in page_groups.items():
+                try:
+                    groups[int(k)] = dict(v) if isinstance(v, dict) else {}
+                except (TypeError, ValueError):
+                    continue
+        self._ann_page_groups = groups
         self._sync_ann_filter_options(self._ann_all_payloads)
         self._apply_annotation_filter()
 
     def clear_annotations(self):
         self._ann_all_lines = []
         self._ann_all_payloads = []
+        self._ann_page_groups = {}
         self._ann_search_query = ""
         self._ann_search_regex = False
         self._ann_color_filter = ""

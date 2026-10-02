@@ -650,7 +650,78 @@ class AnnotationStore:
                 ann.touch()
             kept.append(ann)
         self.annotations = kept
+        # Seitengruppen-Meta mit-remappen
+        groups = dict(self._meta.get("page_groups") or {})
+        if groups:
+            new_groups: dict = {}
+            for key, val in groups.items():
+                try:
+                    old_p = int(key)
+                except (TypeError, ValueError):
+                    continue
+                if old_p in mapping:
+                    new_groups[str(mapping[old_p])] = val
+            self._meta["page_groups"] = new_groups
         self.dirty = True
+
+    def get_page_group(self, page: int) -> dict:
+        """Gruppen-Metadaten für eine Seite: {title, color} (fehlende Keys leer)."""
+        groups = self._meta.get("page_groups") or {}
+        raw = groups.get(str(int(page))) or groups.get(int(page)) or {}
+        if not isinstance(raw, dict):
+            return {"title": "", "color": ""}
+        title = str(raw.get("title") or "").strip()
+        color = str(raw.get("color") or "").strip()
+        if color and not color.startswith("#"):
+            color = "#" + color
+        return {"title": title, "color": color.upper() if color else ""}
+
+    def set_page_group(
+        self,
+        page: int,
+        *,
+        title: str | None = None,
+        color: str | None = None,
+    ) -> dict:
+        """
+        Annotation-Seitengruppe umbenennen und/oder farblich markieren.
+        title/color=None → unverändert; leerer String → zurücksetzen.
+        """
+        groups = dict(self._meta.get("page_groups") or {})
+        cur = dict(self.get_page_group(page))
+        if title is not None:
+            cur["title"] = str(title).strip()
+        if color is not None:
+            c = str(color).strip()
+            if c and not c.startswith("#"):
+                c = "#" + c
+            cur["color"] = c.upper() if c else ""
+        key = str(int(page))
+        if not cur.get("title") and not cur.get("color"):
+            groups.pop(key, None)
+        else:
+            groups[key] = {"title": cur.get("title") or "", "color": cur.get("color") or ""}
+        self._meta["page_groups"] = groups
+        self.dirty = True
+        return self.get_page_group(page)
+
+    def list_page_groups(self) -> dict[int, dict]:
+        """Alle Seitengruppen als {page_index: {title, color}}."""
+        groups = self._meta.get("page_groups") or {}
+        out: dict[int, dict] = {}
+        for key, val in groups.items():
+            try:
+                p = int(key)
+            except (TypeError, ValueError):
+                continue
+            if isinstance(val, dict):
+                title = str(val.get("title") or "").strip()
+                color = str(val.get("color") or "").strip()
+                if color and not color.startswith("#"):
+                    color = "#" + color
+                if title or color:
+                    out[p] = {"title": title, "color": color.upper() if color else ""}
+        return out
 
     def _payload(self, *, export: bool = False) -> dict:
         now = datetime.now(timezone.utc).isoformat(timespec="seconds")

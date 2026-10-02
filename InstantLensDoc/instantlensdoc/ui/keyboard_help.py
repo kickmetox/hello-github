@@ -125,6 +125,12 @@ Vorbefüllung beim Seiten-Bild-Export.</p>
 <p><b>Zeile verschieben:</b> Bearbeiten → Alt+Up / Alt+Down (aktuelle Zeile oder Auswahl).</p>
 <p><b>Zeilen sortieren (A–Z):</b> Bearbeiten → Ctrl+Shift+O (Auswahl; ohne Auswahl ganze Datei).</p>
 <p><b>Sonderzeichen:</b> Ansicht → Sonderzeichen anzeigen (Ctrl+Shift+.) — Tabs/Leerzeichen/Absätze.</p>
+<p><b>Soft-Hyphen / NBSP:</b> Bearbeiten → Sonderzeichen einfügen — Soft-Hyphen (Ctrl+Shift+-) /
+geschütztes Leerzeichen (Ctrl+Shift+Space).</p>
+<p><b>Seite löschen Undo:</b> PDF → Seite löschen… — Ctrl+Z stellt Seite (+ Annotationen) wieder her;
+auch Seitendrehung ist undo-fähig.</p>
+<p><b>Annotationsgruppe:</b> Ctrl+Alt+G oder Rechtsklick auf Gruppenkopf — Name + Farbe.</p>
+<p><b>Startup-Deps:</b> beim Start Prüfung pypdfium2 / Tesseract; Dialog wenn etwas fehlt.</p>
 <p><b>Whitespace trim on paste:</b> optional in Einstellungen — Trailing Spaces beim Einfügen entfernen.</p>
 <p><b>Bracket-Match Highlight:</b> passende Klammern ()[]{} am Cursor (Einstellungen, Standard an).</p>
 <p><b>Kommentieren:</b> Bearbeiten → Ctrl+/ (# oder // je nach Dateityp).</p>
