@@ -1,10 +1,11 @@
-"""Seitenleiste: Suche, Dokumente, Lesezeichen, Markierungen."""
+"""Seitenleiste: Suche, Dokumente, Thumbnails, Lesezeichen, Markierungen."""
 
 from __future__ import annotations
 
 from pathlib import Path
 
 from PySide6.QtCore import Signal, Qt
+from PySide6.QtGui import QIcon, QImage, QPixmap
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
@@ -27,6 +28,7 @@ class Sidebar(QWidget):
     mark_activated = Signal(int)  # Index in Markierungsliste
     outline_activated = Signal(int)  # PDF-Seite 0-basiert
     fulltext_hit_activated = Signal(str, object)  # path, page_index|None
+    page_thumb_activated = Signal(int)  # PDF-Seite 0-basiert
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -63,6 +65,18 @@ class Sidebar(QWidget):
         self.files.setMaximumHeight(100)
         self.files.itemDoubleClicked.connect(self._activate)
         layout.addWidget(self.files)
+
+        layout.addWidget(QLabel("Seiten (Vorschaubilder)"))
+        self.thumbs = QListWidget()
+        self.thumbs.setViewMode(QListWidget.IconMode)
+        self.thumbs.setIconSize(QPixmap(72, 96).size())
+        self.thumbs.setResizeMode(QListWidget.Adjust)
+        self.thumbs.setMovement(QListWidget.Static)
+        self.thumbs.setSpacing(4)
+        self.thumbs.setMaximumHeight(200)
+        self.thumbs.setMinimumHeight(100)
+        self.thumbs.itemClicked.connect(self._activate_thumb)
+        layout.addWidget(self.thumbs)
 
         layout.addWidget(QLabel("Lesezeichen / Outline"))
         self.outline = QTreeWidget()
@@ -115,6 +129,11 @@ class Sidebar(QWidget):
         if page is not None:
             self.outline_activated.emit(int(page))
 
+    def _activate_thumb(self, item: QListWidgetItem):
+        page = item.data(Qt.UserRole)
+        if page is not None:
+            self.page_thumb_activated.emit(int(page))
+
     def set_recent(self, paths: list[str]):
         self.recent.clear()
         for p in paths:
@@ -144,6 +163,43 @@ class Sidebar(QWidget):
             if it and it.data(256):
                 out.append(str(it.data(256)))
         return out
+
+    def clear_thumbs(self):
+        self.thumbs.clear()
+
+    def set_page_thumbs(self, images: list, *, current: int = 0):
+        """images: Liste von PIL.Image oder QPixmap/QImage."""
+        self.thumbs.clear()
+        for i, img in enumerate(images):
+            pm = self._to_pixmap(img)
+            item = QListWidgetItem(f"S. {i + 1}")
+            if not pm.isNull():
+                item.setIcon(QIcon(pm))
+            item.setData(Qt.UserRole, i)
+            item.setToolTip(f"Seite {i + 1}")
+            self.thumbs.addItem(item)
+        self.select_thumb(current)
+
+    def select_thumb(self, page_index: int):
+        if 0 <= page_index < self.thumbs.count():
+            self.thumbs.setCurrentRow(page_index)
+
+    @staticmethod
+    def _to_pixmap(img) -> QPixmap:
+        if isinstance(img, QPixmap):
+            return img
+        if isinstance(img, QImage):
+            return QPixmap.fromImage(img)
+        try:
+            if img.mode != "RGBA":
+                img = img.convert("RGBA")
+            data = img.tobytes("raw", "RGBA")
+            qimg = QImage(data, img.width, img.height, QImage.Format_RGBA8888)
+            return QPixmap.fromImage(qimg.copy()).scaled(
+                72, 96, Qt.KeepAspectRatio, Qt.SmoothTransformation
+            )
+        except Exception:
+            return QPixmap()
 
     def set_outline(self, items, *, _add=None):
         """items: Liste von OutlineItem (ild_pdf) oder leer."""

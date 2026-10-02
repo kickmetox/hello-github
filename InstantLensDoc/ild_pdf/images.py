@@ -2,10 +2,98 @@
 
 from __future__ import annotations
 
+import io
 from pathlib import Path
 from typing import List, Optional, Union
 
 from PIL import Image
+
+
+def compress_image_for_pdf(
+    image: Union[str, Path, Image.Image],
+    *,
+    max_edge: int = 2000,
+    quality: int = 75,
+    to_jpeg: bool = True,
+) -> Image.Image:
+    """
+    Verkleinert/komprimiert ein Bild vor dem Einfügen als PDF-Seite.
+    max_edge: längste Kante in Pixel. quality: JPEG 1–95.
+    """
+    if isinstance(image, (str, Path)):
+        img = Image.open(image)
+    else:
+        img = image.copy() if hasattr(image, "copy") else image
+    img.load()
+    max_edge = max(64, int(max_edge))
+    quality = max(1, min(95, int(quality)))
+    w, h = img.size
+    longest = max(w, h)
+    if longest > max_edge:
+        scale = max_edge / float(longest)
+        nw, nh = max(1, int(w * scale)), max(1, int(h * scale))
+        img = img.resize((nw, nh), Image.Resampling.LANCZOS)
+    if to_jpeg:
+        if img.mode not in ("RGB", "L"):
+            img = img.convert("RGB")
+        buf = io.BytesIO()
+        img.save(buf, format="JPEG", quality=quality, optimize=True)
+        buf.seek(0)
+        img = Image.open(buf)
+        img.load()
+        return img.convert("RGB")
+    if img.mode not in ("RGB", "L", "RGBA"):
+        img = img.convert("RGB")
+    return img
+
+
+def compress_pdf_as_images(
+    pdf_path: str | Path,
+    *,
+    out_path: str | Path | None = None,
+    jpeg_quality: int = 70,
+    render_scale: float = 1.5,
+    max_edge: int = 2000,
+) -> Path:
+    """
+    Rendert jede Seite, komprimiert als JPEG und baut ein neues PDF
+    (verlustbehaftet — gut für Scan-PDFs / Dateigröße).
+    """
+    from .render import render_page
+    from .document import PdfDocument
+
+    pdf_path = Path(pdf_path)
+    out_path = Path(out_path) if out_path else pdf_path.with_name(f"{pdf_path.stem}_compressed.pdf")
+    pages: list[Image.Image] = []
+    with PdfDocument(pdf_path) as doc:
+        n = len(doc)
+        sizes = [doc.page_size(i) for i in range(n)]
+    for i in range(n):
+        raw = render_page(pdf_path, i, scale=render_scale, use_cache=False)
+        pages.append(
+            compress_image_for_pdf(raw, max_edge=max_edge, quality=jpeg_quality, to_jpeg=True)
+        )
+
+    # Einzelseiten zusammenführen
+    import pikepdf
+
+    with pikepdf.Pdf.new() as dst:
+        for img, (pw, ph) in zip(pages, sizes):
+            img_pdf = io.BytesIO()
+            canvas = Image.new("RGB", (max(1, int(pw)), max(1, int(ph))), "white")
+            iw, ih = img.size
+            scale = min(pw / iw, ph / ih)
+            nw, nh = max(1, int(iw * scale)), max(1, int(ih * scale))
+            resized = img.resize((nw, nh), Image.Resampling.LANCZOS)
+            ox = int((pw - nw) / 2)
+            oy = int((ph - nh) / 2)
+            canvas.paste(resized, (ox, oy))
+            canvas.save(img_pdf, "PDF", resolution=72.0)
+            img_pdf.seek(0)
+            with pikepdf.open(img_pdf) as src:
+                dst.pages.append(src.pages[0])
+        dst.save(out_path)
+    return out_path
 
 
 def extract_page_image(
@@ -82,23 +170,29 @@ def insert_image_as_page(
     *,
     at_index: Optional[int] = None,
     page_size: tuple[float, float] = (595.0, 842.0),
+    compress: bool = True,
+    max_edge: int = 2000,
+    jpeg_quality: int = 75,
 ) -> Path:
     """
     Hängt ein Bild als neue PDF-Seite an (oder fügt an at_index ein).
-    Erzeugt bei Bedarf das PDF neu.
+    Erzeugt bei Bedarf das PDF neu. Standard: Bild vorher komprimieren.
     """
-    import io
     import pikepdf
 
     pdf_path = Path(pdf_path)
-    if isinstance(image, (str, Path)):
-        img = Image.open(image)
+    if compress:
+        img = compress_image_for_pdf(
+            image, max_edge=max_edge, quality=jpeg_quality, to_jpeg=True
+        )
     else:
-        img = image
-    if img.mode not in ("RGB", "L"):
-        img = img.convert("RGB")
+        if isinstance(image, (str, Path)):
+            img = Image.open(image)
+        else:
+            img = image
+        if img.mode not in ("RGB", "L"):
+            img = img.convert("RGB")
 
-    buf = io.BytesIO()
     # Zwischen-PDF mit einer Bildseite
     img_pdf = io.BytesIO()
     # A4-Bereich: Bild skalieren in Seite

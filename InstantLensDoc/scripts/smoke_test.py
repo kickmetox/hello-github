@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Smoke-Test 0.1.7 (CLI + optional offscreen Qt)."""
+"""Smoke-Test 0.1.8 (CLI + optional offscreen Qt)."""
 
 from __future__ import annotations
 
@@ -22,8 +22,11 @@ def main() -> int:
         PdfDocument,
         apply_page_numbers,
         apply_watermark,
+        bake_redactions,
         bake_text_overlays,
         clear_render_cache,
+        compress_image_for_pdf,
+        compress_pdf_as_images,
         extract_page_image,
         extract_text_blocks,
         import_page_text_as_overlays,
@@ -31,7 +34,10 @@ def main() -> int:
         insert_signature_field,
         insert_signature_image,
         inspect_pdf,
+        needs_password,
         render_page,
+        set_password,
+        try_open_password,
         __version__ as ild_ver,
     )
     from ild_pdf.pages import merge_pdfs, reorder_pages, rotate_page, split_pdf
@@ -51,8 +57,8 @@ def main() -> int:
     from instantlensdoc.core.app_settings import get_ocr_lang, load_settings, save_settings
     from instantlensdoc.license import KEY_DAYS, TRIAL_DAYS, generate_key, verify_key
 
-    assert __version__ == "0.1.7", __version__
-    assert ild_ver == "0.1.7", ild_ver
+    assert __version__ == "0.1.8", __version__
+    assert ild_ver == "0.1.8", ild_ver
     assert TRIAL_DAYS == 28 and KEY_DAYS == 32
     key = generate_key("ame@sellerbach.de")
     ok, msg, _ = verify_key(key)
@@ -112,7 +118,56 @@ def main() -> int:
         assert num_out.is_file()
         print("Watermark/PageNumbers: OK")
 
+        # Redaction + bake (eigenes PDF, Sidecar nicht mit Haupttest vermischen)
+        pdf_red = td / "red_src.pdf"
+        pdf_red.write_bytes(pdf.read_bytes())
+        store_r = AnnotationStore(pdf_red)
+        store_r.annotations = []
+        store_r.dirty = True
+        store_r.add(Annotation(0, AnnotationType.REDACTION, 20, 20, width=50, height=30, color="#000000"))
+        store_r.save(force=True)
+        assert any(a.type == AnnotationType.REDACTION for a in AnnotationStore(pdf_red).annotations)
+        red_out = td / "redacted.pdf"
+        bake_redactions(pdf_red, store_r, scale=1.5, out_path=red_out)
+        assert red_out.is_file() and red_out.stat().st_size > 50
+        print("Redaction: OK")
+
+        # Password
+        enc = td / "enc.pdf"
+        set_password(pdf, user_password="secret", out_path=enc)
+        assert needs_password(enc)
+        ok_pw, msg_pw = try_open_password(enc, "secret")
+        assert ok_pw, msg_pw
+        ok_bad, _ = try_open_password(enc, "wrong")
+        assert not ok_bad
+        with PdfDocument(enc, password="secret") as doc:
+            assert len(doc) >= 1
+        render_page(enc, 0, scale=0.5, password="secret")
+        print("Password: OK")
+
+        # Image compression
+        big = Image.new("RGB", (800, 600), "red")
+        small = compress_image_for_pdf(big, max_edge=200, quality=50)
+        assert max(small.size) <= 200
+        comp = compress_pdf_as_images(pdf, out_path=td / "comp.pdf", jpeg_quality=60, max_edge=400, render_scale=1.0)
+        assert comp.is_file() and comp.stat().st_size > 50
+        print("Compress: OK")
+
+        # Logging
+        from instantlensdoc.core.logging_setup import setup_logging
+        lp = setup_logging(force=True)
+        assert lp.exists()
+        assert "InstantLensDoc" in str(lp) or "instantlensdoc" in lp.name.lower()
+        print(f"Logging: OK → {lp}")
+
+        # Saubere Annotationen für Undo/Redo-Tests
         store = AnnotationStore(pdf)
+        store.annotations = []
+        store.dirty = True
+        store.clear_history()
+        sid_old = store.sidecar_path
+        if sid_old.exists():
+            sid_old.unlink()
         store.add(Annotation(0, AnnotationType.HIGHLIGHT, 10, 10, text="mark"))
         store.add(Annotation(1, AnnotationType.STICKY, 20, 20, text="note"))
         store.add(Annotation(0, AnnotationType.STAMP, 30, 30, text="GEPRÜFT", width=120, height=40))
@@ -284,10 +339,10 @@ def main() -> int:
 
         assert (ROOT / "installer" / "installer-hinweis.txt").exists()
         iss = (ROOT / "installer" / "instantlensdoc.iss").read_text(encoding="utf-8")
-        assert "0.1.7" in iss and "desktopicon" in iss and "DisableProgramGroupPage=no" in iss
+        assert "0.1.8" in iss and "desktopicon" in iss and "DisableProgramGroupPage=no" in iss
 
         assert (ROOT / "examples" / "ild_pdf_demo.py").exists()
-        assert "0.1.7" in (ROOT / "INFO.md").read_text(encoding="utf-8")
+        assert "0.1.8" in (ROOT / "INFO.md").read_text(encoding="utf-8")
         assert (ROOT / "assets" / "app.ico").is_file()
 
         merge_pdfs([p1, p2], td / "merged.pdf")
@@ -310,6 +365,7 @@ def main() -> int:
 
         assert isinstance(extract_outline(pdf), list)
         assert "Wasserzeichen" in (ROOT / "FEATURES.md").read_text(encoding="utf-8")
+        assert "Schwärzung" in (ROOT / "FEATURES.md").read_text(encoding="utf-8")
 
         insert_signature_field(pdf, 0, x=50, y=50, label="Test")
         insert_signature_image(pdf, Image.new("RGBA", (80, 30), (0, 0, 0, 0)), 0, x=60, y=120)
@@ -347,7 +403,7 @@ def main() -> int:
         win._add_chained_frame()
         assert len(win.layout_doc.text_frames) >= 2
         assert "Lizenz:" in win.license_label.text()
-        assert "v0.1.7" in win.version_label.text()
+        assert "v0.1.8" in win.version_label.text()
         from instantlensdoc.ui.settings_dialog import SettingsDialog
         from instantlensdoc.ui.batch_dialog import BatchConvertDialog
         from instantlensdoc.ui.pdf_tools_dialog import PdfToolsDialog
@@ -402,6 +458,23 @@ def main() -> int:
             assert callable(win._save_session)
             assert win.sidebar.recent.count() >= 1
             win._save_session()
+            # Thumbnails + redaction + keyboard/stubs
+            thumbs = win.pdf_view.render_thumbnails(max_pages=5, scale=0.15)
+            assert len(thumbs) >= 1
+            win.sidebar.set_page_thumbs(thumbs, current=0)
+            assert win.sidebar.thumbs.count() >= 1
+            win.pdf_view.store.add(
+                Annotation(0, AnnotationType.REDACTION, 5, 5, width=30, height=20, color="#000000")
+            )
+            assert any(a.type == AnnotationType.REDACTION for a in win.pdf_view.store.annotations)
+            from instantlensdoc.ui.keyboard_help import KeyboardHelpDialog
+            from instantlensdoc.ui.password_dialog import CompressPdfDialog, SetPasswordDialog
+            from instantlensdoc.ui.stubs import PLANNED
+            assert KeyboardHelpDialog and SetPasswordDialog and CompressPdfDialog
+            assert "0.1.8" in PLANNED["ki"]
+            assert callable(win.pdf_view.bake_redactions)
+            assert callable(win._set_pdf_password)
+            assert callable(win._compress_pdf_images)
 
         win.close()
         print("Qt: OK")

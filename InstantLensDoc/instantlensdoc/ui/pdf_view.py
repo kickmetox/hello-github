@@ -205,6 +205,10 @@ class PdfCanvas(QLabel):
 
         if ann.type == AnnotationType.HIGHLIGHT:
             painter.fillRect(x, y, w, h, color)
+        elif ann.type == AnnotationType.REDACTION:
+            painter.fillRect(x, y, max(w, 4), max(h, 4), QColor(0, 0, 0, 255))
+            painter.setPen(QPen(QColor(40, 40, 40), 1))
+            painter.drawRect(x, y, max(w, 4), max(h, 4))
         elif ann.type == AnnotationType.UNDERLINE:
             painter.drawLine(x, y + h, x + w, y + h)
         elif ann.type == AnnotationType.STICKY:
@@ -385,6 +389,7 @@ class PdfCanvas(QLabel):
 class PdfViewer(QWidget):
     status = Signal(str)
     annotations_changed = Signal()
+    page_changed = Signal(int)  # 0-basiert
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -394,6 +399,7 @@ class PdfViewer(QWidget):
         self.scale = 1.5
         self.tool: AnnotationType | None = AnnotationType.HIGHLIGHT
         self.store: Optional[AnnotationStore] = None
+        self.password: Optional[str] = None
         self._tool_buttons: list[QToolButton] = []
         self._pending_callout_anchor: tuple[float, float] | None = None
         self._zoom_timer = QTimer(self)
@@ -458,6 +464,7 @@ class PdfViewer(QWidget):
 
         for t, label in [
             (AnnotationType.HIGHLIGHT, "Highlight"),
+            (AnnotationType.REDACTION, "Schwärzen"),
             (AnnotationType.UNDERLINE, "Unterstreichen"),
             (AnnotationType.STICKY, "Notiz"),
             (AnnotationType.TEXT_OVERLAY, "Text-Overlay"),
@@ -514,6 +521,7 @@ class PdfViewer(QWidget):
     def _tool_label(self, tool: AnnotationType) -> str:
         return {
             AnnotationType.HIGHLIGHT: "Highlight",
+            AnnotationType.REDACTION: "Schwärzen",
             AnnotationType.UNDERLINE: "Unterstreichen",
             AnnotationType.STICKY: "Notiz",
             AnnotationType.TEXT: "Textfeld",
@@ -536,22 +544,41 @@ class PdfViewer(QWidget):
         self.canvas.set_drag_tool(tool if tool in DRAG_TYPES else None)
         self.status.emit(f"Werkzeug: {tool.value}")
 
-    def load(self, path: str | Path) -> bool:
+    def load(self, path: str | Path, password: str | None = None) -> bool:
         try:
             from ild_pdf.limits import inspect_pdf
             from ild_pdf.render import clear_render_cache
+            from ild_pdf.security import needs_password
+            from instantlensdoc.ui.password_dialog import ask_pdf_password
 
             path = Path(path)
-            health = inspect_pdf(path)
+            pw = password if password is not None else self.password
+
+            # Passwort nachfragen wenn nötig
+            if pw is None and needs_password(path):
+                pw = ask_pdf_password(self, path)
+                if pw is None:
+                    return False
+
+            health = inspect_pdf(path, password=pw)
             if health.errors:
-                QMessageBox.critical(
-                    self,
-                    "PDF öffnen",
-                    "PDF kann nicht geöffnet werden:\n\n" + "\n".join(health.errors),
-                )
-                self.pdf_path = None
-                self.store = None
-                return False
+                # ggf. nochmal Passwort versuchen
+                if any("passwort" in e.lower() or "password" in e.lower() for e in health.errors):
+                    pw2 = ask_pdf_password(self, path)
+                    if pw2 is None:
+                        return False
+                    pw = pw2
+                    health = inspect_pdf(path, password=pw)
+                if health.errors:
+                    QMessageBox.critical(
+                        self,
+                        "PDF öffnen",
+                        "PDF kann nicht geöffnet werden:\n\n" + "\n".join(health.errors),
+                    )
+                    self.pdf_path = None
+                    self.store = None
+                    self.password = None
+                    return False
             if health.warnings:
                 r = QMessageBox.warning(
                     self,
@@ -565,11 +592,12 @@ class PdfViewer(QWidget):
 
             clear_render_cache(path)
             self.pdf_path = path
+            self.password = pw
             self.store = AnnotationStore(self.pdf_path)
             self.store.clear_history()
             from ild_pdf import PdfDocument
 
-            with PdfDocument(self.pdf_path) as doc:
+            with PdfDocument(self.pdf_path, password=self.password) as doc:
                 self.page_count = len(doc)
             self.page_index = 0
             self._pending_callout_anchor = None
@@ -577,6 +605,7 @@ class PdfViewer(QWidget):
             self._zoom_timer.stop()
             self.refresh()
             self.annotations_changed.emit()
+            self.page_changed.emit(self.page_index)
             return True
         except MemoryError:
             QMessageBox.critical(
@@ -587,11 +616,13 @@ class PdfViewer(QWidget):
             )
             self.pdf_path = None
             self.store = None
+            self.password = None
             return False
         except Exception as e:
             QMessageBox.critical(self, "PDF öffnen", f"PDF konnte nicht geladen werden:\n{e}")
             self.pdf_path = None
             self.store = None
+            self.password = None
             return False
 
     def refresh(self):
@@ -601,16 +632,21 @@ class PdfViewer(QWidget):
             from ild_pdf.limits import clamp_render_scale
             from ild_pdf import PdfDocument
 
-            with PdfDocument(self.pdf_path) as doc:
+            with PdfDocument(self.pdf_path, password=self.password) as doc:
                 pw, ph = doc.page_size(self.page_index)
             eff, warn = clamp_render_scale(pw, ph, self.scale)
             if warn and abs(eff - self.scale) > 0.01:
                 self.scale = eff
                 self.status.emit(warn)
-            img = render_page(self.pdf_path, self.page_index, scale=self.scale)
+            img = render_page(
+                self.pdf_path,
+                self.page_index,
+                scale=self.scale,
+                password=self.password,
+            )
             anns = self.store.for_page(self.page_index) if self.store else []
             self.canvas.set_page_image(img, anns, scale=self.scale)
-            self.lbl_page.setText(f"Seite {self.page_index + 1} / {self.page_count}")
+            self.lbl_page.setText(f"{self.page_index + 1} / {self.page_count}")
             self.lbl_zoom.setText(f"{int(round(self.scale * 100))}%")
             dirty = " *" if self.store and self.store.dirty else ""
             self.status.emit(f"PDF: {self.pdf_path.name}{dirty}")
@@ -627,16 +663,19 @@ class PdfViewer(QWidget):
         if 0 <= page_index < self.page_count:
             self.page_index = page_index
             self.refresh()
+            self.page_changed.emit(self.page_index)
 
     def prev_page(self):
         if self.page_index > 0:
             self.page_index -= 1
             self.refresh()
+            self.page_changed.emit(self.page_index)
 
     def next_page(self):
         if self.page_index + 1 < self.page_count:
             self.page_index += 1
             self.refresh()
+            self.page_changed.emit(self.page_index)
 
     def set_scale(self, scale: float, *, immediate: bool = False):
         scale = max(0.25, min(5.0, float(scale)))
@@ -714,7 +753,7 @@ class PdfViewer(QWidget):
                 from ild_pdf import PdfDocument
 
                 clear_render_cache(self.pdf_path)
-                with PdfDocument(self.pdf_path) as doc:
+                with PdfDocument(self.pdf_path, password=self.password) as doc:
                     self.page_count = len(doc)
                 self.page_index = self.page_count - 1
                 self.refresh()
@@ -741,7 +780,7 @@ class PdfViewer(QWidget):
         try:
             from ild_pdf import PdfDocument
 
-            with PdfDocument(self.pdf_path) as doc:
+            with PdfDocument(self.pdf_path, password=self.password) as doc:
                 pw, ph = doc.page_size(self.page_index)
             vw, vh = self._viewport_size()
             if pw <= 0 or ph <= 0:
@@ -759,7 +798,7 @@ class PdfViewer(QWidget):
         try:
             from ild_pdf import PdfDocument
 
-            with PdfDocument(self.pdf_path) as doc:
+            with PdfDocument(self.pdf_path, password=self.password) as doc:
                 pw, _ph = doc.page_size(self.page_index)
             vw, _vh = self._viewport_size()
             if pw <= 0:
@@ -941,6 +980,61 @@ class PdfViewer(QWidget):
         except Exception as e:
             QMessageBox.warning(self, "Einbrennen", str(e))
 
+    def bake_redactions(self, *, remove_sidecar: bool = False):
+        if not self.store or not self.pdf_path:
+            return
+        reds = [a for a in self.store.annotations if a.type == AnnotationType.REDACTION]
+        if not reds:
+            QMessageBox.information(self, "Schwärzung", "Keine Schwärzungs-Annotationen.")
+            return
+        reply = QMessageBox.question(
+            self,
+            "Schwärzung einbrennen",
+            f"{len(reds)} Schwärzung(en) dauerhaft als schwarze Flächen in die PDF schreiben?\n"
+            "Hinweis: Das entfernt den Inhalt nicht aus der Textschicht — Basis-Redaction.",
+        )
+        if reply != QMessageBox.Yes:
+            return
+        try:
+            from ild_pdf.redact import bake_redactions as apply_redactions
+            from ild_pdf.render import clear_render_cache
+
+            apply_redactions(
+                self.pdf_path,
+                self.store,
+                scale=self.scale,
+                remove_from_store=remove_sidecar,
+            )
+            clear_render_cache(self.pdf_path)
+            self.refresh()
+            self.annotations_changed.emit()
+            self.status.emit(f"{len(reds)} Schwärzung(en) eingebrannt")
+        except Exception as e:
+            QMessageBox.warning(self, "Schwärzung", str(e))
+
+    def render_thumbnails(self, *, max_pages: int = 40, scale: float = 0.18):
+        """Kleine Seitenvorschauen (PIL). Begrenzt auf max_pages."""
+        if not self.pdf_path or self.page_count <= 0:
+            return []
+        out = []
+        n = min(self.page_count, max_pages)
+        for i in range(n):
+            try:
+                out.append(
+                    render_page(
+                        self.pdf_path,
+                        i,
+                        scale=scale,
+                        password=self.password,
+                        use_cache=True,
+                    )
+                )
+            except Exception:
+                from PIL import Image
+
+                out.append(Image.new("RGB", (72, 96), (220, 220, 220)))
+        return out
+
     def _edit_overlay(self, ann_id: str):
         if not self.store:
             return
@@ -999,7 +1093,7 @@ class PdfViewer(QWidget):
         try:
             from ild_pdf import PdfDocument
 
-            with PdfDocument(self.pdf_path) as doc:
+            with PdfDocument(self.pdf_path, password=self.password) as doc:
                 pw, ph = doc.page_size(self.page_index)
             x = max(40.0, pw * 0.15)
             y = max(40.0, ph * 0.78)
@@ -1035,7 +1129,7 @@ class PdfViewer(QWidget):
             insert_image_as_page(self.pdf_path, path)
             from ild_pdf import PdfDocument
 
-            with PdfDocument(self.pdf_path) as doc:
+            with PdfDocument(self.pdf_path, password=self.password) as doc:
                 self.page_count = len(doc)
             self.page_index = self.page_count - 1
             self.refresh()
@@ -1055,6 +1149,17 @@ class PdfViewer(QWidget):
                 width=max(abs(x1 - x0), 8),
                 height=max(abs(y1 - y0), 8),
                 color="#FFE066",
+            )
+        elif self.tool == AnnotationType.REDACTION:
+            ann = Annotation(
+                page=self.page_index,
+                type=AnnotationType.REDACTION,
+                x=min(x0, x1),
+                y=min(y0, y1),
+                width=max(abs(x1 - x0), 8),
+                height=max(abs(y1 - y0), 8),
+                color="#000000",
+                text="REDACT",
             )
         elif self.tool == AnnotationType.RECTANGLE:
             ann = Annotation(
@@ -1245,7 +1350,7 @@ class PdfViewer(QWidget):
             self.page_index = 0
             from ild_pdf import PdfDocument
 
-            with PdfDocument(self.pdf_path) as doc:
+            with PdfDocument(self.pdf_path, password=self.password) as doc:
                 self.page_count = len(doc)
             self.refresh()
             self.annotations_changed.emit()

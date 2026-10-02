@@ -30,6 +30,7 @@ class AnnotationType(str, Enum):
     TEXT_OVERLAY = "text_overlay"
     SIGNATURE_FIELD = "signature_field"  # Platzhalter-Rahmen
     SIGNATURE = "signature"  # Bild-Unterschrift (text: img:…)
+    REDACTION = "redaction"  # Schwärzung (opakes Rechteck)
 
 
 # Vordefinierte Stempel-Texte (UI kann erweitern)
@@ -50,6 +51,7 @@ DRAG_TYPES = frozenset(
         AnnotationType.ARROW,
         AnnotationType.MEASURE,
         AnnotationType.HIGHLIGHT,
+        AnnotationType.REDACTION,
     }
 )
 

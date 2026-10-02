@@ -16,6 +16,8 @@ from .annotate import (
 from .pages import merge_pdfs, split_pdf, rotate_page, delete_pages, reorder_pages
 from .outline import OutlineItem, extract_outline
 from .images import (
+    compress_image_for_pdf,
+    compress_pdf_as_images,
     extract_page_image,
     extract_embedded_images,
     insert_image_as_page,
@@ -32,6 +34,8 @@ from .overlay import (
 from .watermark import apply_page_numbers, apply_watermark
 from .limits import PdfHealth, clamp_render_scale, inspect_pdf
 from .render import clear_render_cache
+from .security import needs_password, remove_password, set_password, try_open_password
+from .redact import bake_redactions
 
 __all__ = [
     "PdfDocument",
@@ -50,6 +54,8 @@ __all__ = [
     "reorder_pages",
     "OutlineItem",
     "extract_outline",
+    "compress_image_for_pdf",
+    "compress_pdf_as_images",
     "extract_page_image",
     "extract_embedded_images",
     "insert_image_as_page",
@@ -65,6 +71,11 @@ __all__ = [
     "PdfHealth",
     "inspect_pdf",
     "clamp_render_scale",
+    "needs_password",
+    "try_open_password",
+    "set_password",
+    "remove_password",
+    "bake_redactions",
 ]
 
-__version__ = "0.1.7"
+__version__ = "0.1.8"

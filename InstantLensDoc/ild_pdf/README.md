@@ -1,7 +1,7 @@
 # ild_pdf — auskoppelbares PDF-Modul
 
 Lizenzfreundliche PDF-Engine auf **pypdfium2 / PDFium** (kein Poppler/GPL).  
-Version **0.1.7**.
+Version **0.1.8**.
 
 ## Installation
 
@@ -54,7 +54,7 @@ python examples/ild_pdf_demo.py pfad/zu/datei.pdf
 | `render_page` / `render_pages` | Seite(n) → PIL.Image |
 | `convert_from_path` | pdf2image-ähnlicher Drop-in (`ild_pdf.render`) |
 | `Annotation` / `AnnotationStore` | Sidecar `*.ildann.json` **v3**; `undo()` / `redo()` / `atomic()` |
-| `AnnotationType` | highlight, underline, sticky, text, stamp, callout, **rectangle, line, arrow, measure, text_overlay** |
+| `AnnotationType` | + **redaction**, signature*, rectangle/line/arrow/measure, text_overlay |
 | `DRAG_TYPES` | Typen für Drag-Zeichnung (UI) |
 | `STAMP_PRESETS` | Stempel-Texte |
 | `extract_text_blocks` | Sichtbaren Text grob als Blöcke lesen |
@@ -68,6 +68,9 @@ python examples/ild_pdf_demo.py pfad/zu/datei.pdf
 | `apply_watermark` / `apply_page_numbers` | Wasserzeichen / Seitenzahlen |
 | `inspect_pdf` / `clamp_render_scale` | Große-PDF-Diagnose / Zoom-Cap |
 | `clear_render_cache` | Render-LRU leeren |
+| `set_password` / `needs_password` | PDF verschlüsseln / prüfen |
+| `bake_redactions` | Schwärzungen einbrennen |
+| `compress_image_for_pdf` / `compress_pdf_as_images` | Bildkompression |
 
 ### Sidecar-Schema (Auszug)
 

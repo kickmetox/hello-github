@@ -36,7 +36,7 @@ class PdfHealth:
         return bool(self.warnings) and self.ok_to_open
 
 
-def inspect_pdf(path: str | Path) -> PdfHealth:
+def inspect_pdf(path: str | Path, *, password: Optional[str] = None) -> PdfHealth:
     """Seitenanzahl / Dateigröße prüfen, ohne volles Rendering."""
     path = Path(path)
     warnings: List[str] = []
@@ -62,13 +62,18 @@ def inspect_pdf(path: str | Path) -> PdfHealth:
     try:
         import pypdfium2 as pdfium
 
-        doc = pdfium.PdfDocument(str(path))
+        doc = pdfium.PdfDocument(str(path), password=password)
         try:
             pages = len(doc)
         finally:
             doc.close()
     except Exception as e:
-        errors.append(f"PDF konnte nicht geöffnet werden: {e}")
+        msg = str(e)
+        low = msg.lower()
+        if "password" in low or "passwd" in low:
+            errors.append(f"PDF ist passwortgeschützt: {msg}")
+        else:
+            errors.append(f"PDF konnte nicht geöffnet werden: {msg}")
         return PdfHealth(path, 0, size, warnings, errors)
 
     if pages <= 0:

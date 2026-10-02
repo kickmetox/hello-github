@@ -35,9 +35,12 @@ def main(argv: list[str] | None = None) -> int:
     from PySide6.QtWidgets import QApplication
 
     from instantlensdoc.config import DISPLAY_NAME
+    from instantlensdoc.core.logging_setup import setup_logging
     from instantlensdoc.license import LicenseManager
     from instantlensdoc.ui.main_window import MainWindow
     from instantlensdoc.ui.theme import apply_theme
+
+    log_path = setup_logging()
 
     app = QApplication(argv)
     apply_theme(app)
@@ -51,6 +54,7 @@ def main(argv: list[str] | None = None) -> int:
 
     win = MainWindow(lm)
     win.show()
+    win.statusBar().showMessage(f"Log: {log_path}", 4000)
 
     # Optionale Datei als Argument
     if len(argv) > 1 and not argv[1].startswith("-"):

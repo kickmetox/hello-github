@@ -18,6 +18,12 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | PDF-Wasserzeichen | fertig | Text diagonal, Deckkraft |
 | PDF Seitennummer-Stempel | fertig | Vorlage `{n} / {total}` |
 | PDF-Vergleich Seite-nebeneinander | fertig | Dialog |
+| PDF-Schwärzung (Redaction) | teilweise | Drag-Annotation + Einbrennen (Basis) |
+| PDF-Passwort setzen/öffnen | fertig | pikepdf Encryption / pypdfium2 |
+| Bildkompression vor/als PDF | fertig | JPEG vor Einfügen; Seiten neu einbetten |
+| Sidebar Seiten-Thumbnails | fertig | Vorschaubilder, Klick → Seite |
+| Tastaturhilfe-Dialog | fertig | Hilfe → F1 |
+| App-Logging | fertig | %APPDATA%/InstantLensDoc/logs |
 | PDF-Annotationen (Highlight, Underline, Sticky, Text) | fertig | Sidecar `*.ildann.json` **v3** |
 | Annotation Undo/Redo | fertig | Ctrl+Z/Y inkl. Overlay-Text |
 | Stempel / Callouts | teilweise | Stempel-Presets + Callout (2-Klick) |
@@ -49,16 +55,16 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | Lizenz Trial 28d / Keys 32d | fertig | Statusleiste farbig + Tooltip |
 | Keygenerator (CLI/GUI) | fertig | `run-keygen.bat` |
 | PyInstaller Build Windows | fertig | `build-windows.ps1`, Icon `assets/app.ico` |
-| Inno-Installer | fertig | Desktop + Startmenü-Hinweis 0.1.7 |
+| Inno-Installer | fertig | Desktop + Startmenü-Hinweis 0.1.8 |
 | Sync-Skript Windows | fertig | Store `docs/sync-ild.ps1` |
-| In-App Hilfe / About | fertig | Version 0.1.7 |
+| In-App Hilfe / About | fertig | Version 0.1.8 |
 | FEATURES.md / INFO.md | fertig | |
 | `ild_pdf` Modul + Beispielskript | fertig | watermark / compare / limits |
 | Font-Matching | geplant | |
 | Objekt-/Bildbearbeitung | geplant | |
 | Layout-Erhaltung (Scan→edit) | geplant | |
 | Freihand | geplant | |
-| KI-Assistent | Stub | Menü „Geplant“ 0.1.7 |
+| KI-Assistent | Stub | Menü „Geplant“ 0.1.8 |
 | Signieren (rechtssicher) | Stub | |
 | Cloud-Sync | Stub | |
 | Text on Path / Text zu Pfaden | geplant | |

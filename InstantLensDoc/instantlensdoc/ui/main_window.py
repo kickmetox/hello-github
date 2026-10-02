@@ -41,8 +41,13 @@ from instantlensdoc.ui.compare_dialog import PdfCompareDialog
 from instantlensdoc.ui.settings_dialog import SettingsDialog
 from instantlensdoc.ui.stubs import show_planned
 from instantlensdoc.ui.theme import apply_theme, load_theme_mode, toggle_theme
+from instantlensdoc.ui.keyboard_help import KeyboardHelpDialog
+from instantlensdoc.ui.password_dialog import CompressPdfDialog, SetPasswordDialog
 from instantlensdoc.core import session as session_mod
 from ild_pdf.outline import extract_outline
+import logging
+
+_log = logging.getLogger("instantlensdoc.ui.main")
 
 
 class MainWindow(QMainWindow):
@@ -92,7 +97,7 @@ class MainWindow(QMainWindow):
                 item = self.sidebar.files.item(i)
                 if item is None:
                     continue
-                p = item.data(Qt.UserRole) or item.toolTip() or item.text()
+                p = item.data(256) or item.data(Qt.UserRole) or item.toolTip() or item.text()
                 if p and Path(str(p)).is_file():
                     paths.append(str(Path(str(p))))
         except Exception:
@@ -165,6 +170,7 @@ class MainWindow(QMainWindow):
         self.sidebar.mark_activated.connect(self._on_mark_activated)
         self.sidebar.outline_activated.connect(self._on_outline_jump)
         self.sidebar.fulltext_hit_activated.connect(self._on_fulltext_hit)
+        self.sidebar.page_thumb_activated.connect(self._on_thumb_jump)
         splitter.addWidget(self.sidebar)
 
         self.stack = QStackedWidget()
@@ -173,6 +179,7 @@ class MainWindow(QMainWindow):
         self.pdf_view = PdfViewer()
         self.pdf_view.status.connect(self._set_status)
         self.pdf_view.annotations_changed.connect(self._refresh_pdf_marks)
+        self.pdf_view.page_changed.connect(self._on_pdf_page_changed)
         self.image_label = QLabel(alignment=Qt.AlignCenter)
         self.image_label.setText("Bildvorschau")
         self.stack.addWidget(self.editor)  # 0
@@ -317,6 +324,12 @@ class MainWindow(QMainWindow):
         act_cmp = QAction("Zwei PDFs vergleichen…", self)
         act_cmp.triggered.connect(self._compare_pdfs)
         m_pdf.addAction(act_cmp)
+        act_pw = QAction("Passwort setzen…", self)
+        act_pw.triggered.connect(self._set_pdf_password)
+        m_pdf.addAction(act_pw)
+        act_compress = QAction("Bildkompression (Seiten neu)…", self)
+        act_compress.triggered.connect(self._compress_pdf_images)
+        m_pdf.addAction(act_compress)
         m_pdf.addSeparator()
         for title, slot in [
             ("Annotationen speichern", lambda: self.pdf_view.save_annotations()),
@@ -328,6 +341,7 @@ class MainWindow(QMainWindow):
             ("Bild als neue Seite…", lambda: self.pdf_view.insert_image_page()),
             ("PDF-Text → Overlay…", lambda: self.pdf_view.import_text_overlays()),
             ("Text-Overlays einbrennen…", lambda: self.pdf_view.bake_overlays()),
+            ("Schwärzung einbrennen…", lambda: self.pdf_view.bake_redactions()),
             ("Seite drucken…", lambda: self.pdf_view.print_current_page()),
             ("Signaturfeld setzen…", lambda: self.pdf_view.place_signature_field()),
             ("Signatur (Bild) einfügen…", lambda: self.pdf_view.insert_signature_image()),
@@ -376,6 +390,10 @@ class MainWindow(QMainWindow):
         m_help = mb.addMenu("&Hilfe")
         a = QAction("Hilfe…", self)
         a.triggered.connect(lambda: HelpDialog(self).exec())
+        m_help.addAction(a)
+        a = QAction("Tastaturhilfe…", self)
+        a.setShortcut(QKeySequence("F1"))
+        a.triggered.connect(lambda: KeyboardHelpDialog(self).exec())
         m_help.addAction(a)
         a = QAction("Lizenz…", self)
         a.triggered.connect(self._license)
@@ -711,6 +729,84 @@ class MainWindow(QMainWindow):
             items = []
         self.sidebar.set_outline(items)
 
+    def _refresh_thumbs(self):
+        if not self.pdf_view.pdf_path:
+            self.sidebar.clear_thumbs()
+            return
+        try:
+            imgs = self.pdf_view.render_thumbnails()
+            self.sidebar.set_page_thumbs(imgs, current=self.pdf_view.page_index)
+        except Exception as e:
+            _log.warning("Thumbnails: %s", e)
+            self.sidebar.clear_thumbs()
+
+    def _on_thumb_jump(self, page_index: int):
+        if self.stack.currentWidget() is not self.pdf_view:
+            return
+        self.pdf_view.goto_page(page_index)
+
+    def _on_pdf_page_changed(self, page_index: int):
+        self.sidebar.select_thumb(page_index)
+
+    def _set_pdf_password(self):
+        if not self.pdf_view.pdf_path:
+            QMessageBox.information(self, "Passwort", "Bitte zuerst ein PDF öffnen.")
+            return
+        dlg = SetPasswordDialog(self, pdf_name=self.pdf_view.pdf_path.name)
+        if not dlg.exec():
+            return
+        vals = dlg.values()
+        try:
+            from ild_pdf import set_password
+            from ild_pdf.render import clear_render_cache
+
+            out = self.pdf_view.pdf_path.with_name(
+                f"{self.pdf_view.pdf_path.stem}_locked.pdf"
+            )
+            set_password(self.pdf_view.pdf_path, out_path=out, **vals)
+            clear_render_cache(self.pdf_view.pdf_path)
+            self._set_status(f"Passwort gesetzt → {out.name}")
+            QMessageBox.information(
+                self,
+                "Passwort",
+                f"Geschütztes PDF gespeichert:\n{out}\n\n"
+                "Öffnen Sie die Datei und geben Sie das User-Passwort ein.",
+            )
+            _log.info("PDF encrypted: %s", out)
+        except Exception as e:
+            _log.exception("Passwort setzen fehlgeschlagen")
+            QMessageBox.warning(self, "Passwort", str(e))
+
+    def _compress_pdf_images(self):
+        if not self.pdf_view.pdf_path:
+            QMessageBox.information(self, "Kompression", "Bitte zuerst ein PDF öffnen.")
+            return
+        dlg = CompressPdfDialog(self)
+        if not dlg.exec():
+            return
+        vals = dlg.values()
+        try:
+            from ild_pdf import compress_pdf_as_images
+            from ild_pdf.render import clear_render_cache
+
+            out = self.pdf_view.pdf_path.with_name(
+                f"{self.pdf_view.pdf_path.stem}_compressed.pdf"
+            )
+            compress_pdf_as_images(
+                self.pdf_view.pdf_path,
+                out_path=out,
+                jpeg_quality=vals["jpeg_quality"],
+                max_edge=vals["max_edge"],
+                render_scale=1.5,
+            )
+            clear_render_cache(self.pdf_view.pdf_path)
+            self._set_status(f"Komprimiert → {out.name}")
+            QMessageBox.information(self, "Kompression", f"Gespeichert:\n{out}")
+            _log.info("PDF compressed: %s", out)
+        except Exception as e:
+            _log.exception("Kompression fehlgeschlagen")
+            QMessageBox.warning(self, "Kompression", str(e))
+
     def _settings(self):
         if SettingsDialog(self).exec():
             self._sync_theme_menu()
@@ -803,9 +899,12 @@ class MainWindow(QMainWindow):
             if self.doc.kind == DocKind.PDF:
                 self.stack.setCurrentWidget(self.pdf_view)
                 if not self.pdf_view.load(path):
+                    self.sidebar.clear_thumbs()
                     return
                 self._refresh_pdf_marks()
                 self._refresh_outline(path)
+                self._refresh_thumbs()
+                _log.info("PDF geöffnet: %s", path)
             elif self.doc.kind == DocKind.IMAGE:
                 from PySide6.QtGui import QPixmap
 
@@ -815,6 +914,7 @@ class MainWindow(QMainWindow):
                     pm.scaled(900, 700, Qt.KeepAspectRatio, Qt.SmoothTransformation)
                 )
                 self.sidebar.set_marks([f"Bild: {Path(path).name}"])
+                self.sidebar.clear_thumbs()
             else:
                 self.stack.setCurrentWidget(self.editor)
                 self.editor.blockSignals(True)
@@ -823,8 +923,10 @@ class MainWindow(QMainWindow):
                 self.editor.clear_extra_selections()
                 self._editor_marks.clear()
                 self.sidebar.set_marks([])
+                self.sidebar.clear_thumbs()
             self._set_status(f"Geöffnet: {path}")
         except Exception as e:
+            _log.exception("Anzeige fehlgeschlagen: %s", path)
             QMessageBox.critical(self, "Öffnen", f"Anzeige fehlgeschlagen:\n{e}")
 
     def save_doc(self):

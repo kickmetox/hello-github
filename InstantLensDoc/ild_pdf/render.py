@@ -56,13 +56,15 @@ def render_page(
     scale: float = 2.0,
     *,
     use_cache: bool = True,
+    password: Optional[str] = None,
 ) -> Image.Image:
     """Eine Seite als PIL-Image rendern (optional LRU-Cache)."""
     own = False
     path_for_cache: Optional[Path] = None
     if isinstance(source, (str, Path)):
         path_for_cache = Path(source)
-        doc = pdfium.PdfDocument(str(source))
+        pw = password
+        doc = pdfium.PdfDocument(str(source), password=pw)
         own = True
     elif isinstance(source, PdfDocument):
         doc = source.raw
@@ -102,11 +104,13 @@ def render_pages(
     source: Union[str, Path, PdfDocument],
     indices: Iterable[int] | None = None,
     scale: float = 2.0,
+    *,
+    password: Optional[str] = None,
 ) -> List[Image.Image]:
     """Mehrere Seiten rendern. Ohne indices: alle Seiten."""
     own = False
     if isinstance(source, (str, Path)):
-        doc = PdfDocument(source)
+        doc = PdfDocument(source, password=password)
         own = True
     elif isinstance(source, PdfDocument):
         doc = source
@@ -121,7 +125,9 @@ def render_pages(
             doc.close()
 
 
-def convert_from_path(path: str | Path, dpi: int = 150) -> List[Image.Image]:
+def convert_from_path(
+    path: str | Path, dpi: int = 150, *, password: Optional[str] = None
+) -> List[Image.Image]:
     """pdf2image-ähnliche API für Drop-in-Ersatz."""
     scale = dpi / 72.0
-    return render_pages(path, scale=scale)
+    return render_pages(path, scale=scale, password=password)

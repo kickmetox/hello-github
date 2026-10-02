@@ -11,16 +11,19 @@ import pypdfium2 as pdfium
 class PdfDocument:
     """Dünne Hülle um pypdfium2.PdfDocument."""
 
-    def __init__(self, path: str | Path | None = None):
+    def __init__(self, path: str | Path | None = None, *, password: str | None = None):
         self.path: Optional[Path] = Path(path) if path else None
+        self.password: Optional[str] = password
         self._doc: Optional[pdfium.PdfDocument] = None
         if self.path is not None:
-            self.open(self.path)
+            self.open(self.path, password=password)
 
-    def open(self, path: str | Path) -> None:
+    def open(self, path: str | Path, password: str | None = None) -> None:
         self.close()
         self.path = Path(path)
-        self._doc = pdfium.PdfDocument(str(self.path))
+        if password is not None:
+            self.password = password
+        self._doc = pdfium.PdfDocument(str(self.path), password=self.password)
 
     def close(self) -> None:
         if self._doc is not None:
