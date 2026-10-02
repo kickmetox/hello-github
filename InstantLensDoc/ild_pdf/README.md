@@ -60,7 +60,7 @@ python examples/ild_pdf_demo.py pfad/zu/datei.pdf
 | `extract_text_blocks` | Sichtbaren Text grob als Blöcke lesen |
 | `import_page_text_as_overlays` | Blöcke → `TEXT_OVERLAY` im Store |
 | `bake_text_overlays` | Overlays als PDF-Content (Helvetica) einbrennen |
-| `extract_page_image` / `insert_image_as_page` | Seite↔Bild |
+| `extract_page_image` / `extract_pages_as_images` / `insert_image_as_page` | Seite(n)→PNG/JPEG / Bild→Seite |
 | `extract_embedded_images` / `insert_image_stamp_overlay` | Extraktion / Stempel-Hook |
 | `rotate_page` / `delete_pages` / `reorder_pages` | pikepdf-Seitenops |
 | `merge_pdfs` / `split_pdf` | Zusammenführen / Teilen |
