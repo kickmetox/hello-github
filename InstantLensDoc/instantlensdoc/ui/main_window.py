@@ -227,6 +227,10 @@ class MainWindow(QMainWindow):
         m_file.addAction(act_save)
 
         act_save_as = QAction("Speichern unter…", self)
+        act_save_as.setShortcut(QKeySequence("Ctrl+Shift+S"))
+        act_save_as.setToolTip(
+            "Text: Dokument speichern unter… · PDF: Annotation-Sidecar speichern unter…"
+        )
         act_save_as.triggered.connect(self.save_as)
         m_file.addAction(act_save_as)
         m_export = m_file.addMenu("Exportieren")
@@ -243,9 +247,6 @@ class MainWindow(QMainWindow):
         act_print.setShortcut(QKeySequence.Print)
         act_print.triggered.connect(self._print)
         m_file.addAction(act_print)
-        act_settings = QAction("Einstellungen…", self)
-        act_settings.triggered.connect(self._settings)
-        m_file.addAction(act_settings)
         m_file.addSeparator()
         act_quit = QAction("Beenden", self)
         act_quit.setShortcut(QKeySequence.Quit)
@@ -345,18 +346,31 @@ class MainWindow(QMainWindow):
         m_pdf.addAction(act_psize)
         m_pdf.addSeparator()
         for title, slot in [
-            ("Annotationen speichern", lambda: self.pdf_view.save_annotations()),
+            ("Annotationen speichern (Sidecar)", lambda: self.pdf_view.save_annotations()),
+            ("Annotationen speichern unter…", lambda: self.pdf_view.save_annotations_as()),
             ("Annotationen laden", lambda: self.pdf_view.reload_annotations()),
+        ]:
+            a = QAction(title, self)
+            a.triggered.connect(slot)
+            m_pdf.addAction(a)
+        m_pdf.addSeparator()
+        for title, slot in [
             ("Seite drehen (90°)", lambda: self.pdf_view.rotate_current()),
             ("Seite löschen…", lambda: self.pdf_view.delete_current()),
             ("Seiten neu anordnen…", lambda: self.pdf_view.reorder_dialog()),
             ("Seite als Bild extrahieren…", lambda: self.pdf_view.extract_page_as_image()),
             ("Bild als neue Seite…", lambda: self.pdf_view.insert_image_page()),
+            ("Seite drucken…", lambda: self.pdf_view.print_current_page()),
+        ]:
+            a = QAction(title, self)
+            a.triggered.connect(slot)
+            m_pdf.addAction(a)
+        m_pdf.addSeparator()
+        for title, slot in [
             ("PDF-Text → Overlay…", lambda: self.pdf_view.import_text_overlays()),
             ("Text-Overlays einbrennen…", lambda: self.pdf_view.bake_overlays()),
             ("Schwärzung einbrennen…", lambda: self.pdf_view.bake_redactions()),
             ("Schwärzungs-Annotationen löschen…", lambda: self.pdf_view.clear_redactions()),
-            ("Seite drucken…", lambda: self.pdf_view.print_current_page()),
             ("Signaturfeld setzen…", lambda: self.pdf_view.place_signature_field()),
             ("Signatur (Bild) einfügen…", lambda: self.pdf_view.insert_signature_image()),
         ]:
@@ -376,10 +390,13 @@ class MainWindow(QMainWindow):
         m_ins.addAction(a)
 
         m_extra = mb.addMenu("E&xtras")
+        a = QAction("Einstellungen…", self)
+        a.triggered.connect(self._settings)
+        m_extra.addAction(a)
+        m_extra.addSeparator()
         a = QAction("Batch-Konvertierung (Ordner)…", self)
         a.triggered.connect(self._batch_convert)
         m_extra.addAction(a)
-        m_extra.addSeparator()
         a = QAction("OCR (Bild/PDF-Seite)…", self)
         a.triggered.connect(self._run_ocr)
         m_extra.addAction(a)
@@ -402,13 +419,14 @@ class MainWindow(QMainWindow):
             m_extra.addAction(a)
 
         m_help = mb.addMenu("&Hilfe")
-        a = QAction("Hilfe…", self)
-        a.triggered.connect(lambda: HelpDialog(self).exec())
-        m_help.addAction(a)
         a = QAction("Tastaturhilfe…", self)
         a.setShortcut(QKeySequence("F1"))
         a.triggered.connect(lambda: KeyboardHelpDialog(self).exec())
         m_help.addAction(a)
+        a = QAction("Hilfe…", self)
+        a.triggered.connect(lambda: HelpDialog(self).exec())
+        m_help.addAction(a)
+        m_help.addSeparator()
         a = QAction("Auf Updates prüfen…", self)
         a.triggered.connect(lambda: self._check_updates(silent=False))
         m_help.addAction(a)
@@ -985,7 +1003,12 @@ class MainWindow(QMainWindow):
             return
         if self.doc.kind == DocKind.PDF:
             if self.pdf_view.save_annotations():
-                self._set_status("PDF-Annotationen gespeichert")
+                side = (
+                    self.pdf_view.store.sidecar_path.name
+                    if self.pdf_view.store
+                    else "*.ildann.json"
+                )
+                self._set_status(f"PDF-Annotationen (Sidecar) gespeichert: {side}")
             return
         if not self.doc.path:
             self.save_as()
@@ -1003,7 +1026,9 @@ class MainWindow(QMainWindow):
         if not self.doc:
             return
         if self.doc.kind == DocKind.PDF:
-            self.pdf_view.save_annotations()
+            # Klar: Speichern-unter bei PDF = Sidecar-Annotationen, nicht die PDF-Datei
+            if self.pdf_view.save_annotations_as():
+                self._set_status("Annotation-Sidecar gespeichert unter…")
             return
         path, _ = QFileDialog.getSaveFileName(
             self,
@@ -1158,7 +1183,7 @@ class MainWindow(QMainWindow):
         self._set_status(f"Bild eingefügt: {Path(path).name}")
 
     def _run_ocr(self):
-        from PySide6.QtWidgets import QDialog
+        from PySide6.QtWidgets import QApplication, QDialog, QProgressDialog
 
         ok, msg = ocr_mod.tesseract_available()
         need_file = not (
@@ -1179,9 +1204,18 @@ class MainWindow(QMainWindow):
 
         lang = dlg.lang_code()
         mode = dlg.output_mode()
+        prog = QProgressDialog("OCR läuft…", None, 0, 0, self)
+        prog.setWindowTitle("OCR")
+        prog.setWindowModality(Qt.WindowModal)
+        prog.setMinimumDuration(0)
+        prog.setValue(0)
+        prog.show()
+        QApplication.processEvents()
         try:
             if self.doc and self.doc.kind == DocKind.IMAGE and self.doc.path:
                 source_label = Path(self.doc.path).name
+                prog.setLabelText(f"OCR: {source_label}")
+                QApplication.processEvents()
                 result = ocr_mod.run_ocr(
                     self.doc.path,
                     lang=lang,
@@ -1193,6 +1227,8 @@ class MainWindow(QMainWindow):
                 from ild_pdf import render_page
 
                 source_label = f"{Path(self.doc.path).name} Seite {self.pdf_view.page_index + 1}"
+                prog.setLabelText(f"OCR: {source_label}")
+                QApplication.processEvents()
                 img = render_page(self.doc.path, self.pdf_view.page_index, scale=2.0)
                 result = ocr_mod.run_ocr(
                     img,
@@ -1210,6 +1246,8 @@ class MainWindow(QMainWindow):
                 if not path:
                     return
                 source_label = Path(path).name
+                prog.setLabelText(f"OCR: {source_label}")
+                QApplication.processEvents()
                 result = ocr_mod.run_ocr(
                     path,
                     lang=lang,
@@ -1223,6 +1261,8 @@ class MainWindow(QMainWindow):
         except Exception as e:
             QMessageBox.warning(self, "OCR", f"OCR fehlgeschlagen:\n{e}")
             return
+        finally:
+            prog.close()
 
         self.stack.setCurrentWidget(self.editor)
         self.editor.setPlainText(result.text)

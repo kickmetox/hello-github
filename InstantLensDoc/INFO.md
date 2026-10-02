@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | 0.2.0 |
+| Version | 0.2.1 |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -31,20 +31,11 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)
 
-## Neu in 0.2.0
+## Neu in 0.2.1
 
-- **Release-Meilenstein**: Version überall 0.2.0  
-- **Installer** gehärtet (Icon, Desktop-Shortcut, Uninstaller, Keygen optional)  
-- **CHANGELOG** 0.1.x → 0.2.0  
-- **Smoke** Kernpfade open / annotate / export / license  
-- Stabilität: fehlende Dateien klar gemeldet; Stubs ohne Fake-KI/Cloud  
+- Speichern-unter für PDF-Sidecar klar; Batch/OCR-Fortschritt  
+- Crash-sichere PDF-Öffnung + Timeout-Hinweis  
+- Keygen-EXE im Installer-Pfad dokumentiert; Menü-/F1-Polishes  
+- Stubs KI/Cloud/Stylus/3D unverändert  
 
 Details: [CHANGELOG.md](CHANGELOG.md)
-
-## Aus 0.1.x (Auswahl)
-
-- Metadaten, Seitengröße/Crop, Export-Qualität, i18n DE/EN, Update-Check  
-- Redaction, Passwort, Kompression, Thumbnails, Logging  
-- Wasserzeichen, Vergleich, Session, Undo/Redo, Zoom, Recent, Druck  
-- Batch, merge/split, Outline, Volltext, Einstellungen  
-- Annotationen, Overlay, Formen, OCR-Bridge, Formulare, Lizenz/Keygen  

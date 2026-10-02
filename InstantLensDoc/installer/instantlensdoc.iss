@@ -1,12 +1,15 @@
-; Inno Setup — InstantLens Doc 0.2.0
+; Inno Setup — InstantLens Doc 0.2.1
 ; Voraussetzung: Inno Setup 6 (iscc.exe im PATH oder ISCC_PATH setzen)
 ;
 ; Build-Varianten:
 ;   A) Python-Portable-Layout (empfohlen für Dev):
 ;      SourceRoot = Ordner mit run.bat, instantlensdoc\, assets\, …
 ;      ISCC mit /DSourceRoot=...\InstantLensDoc /DUsePythonLauncher=1
+;      Keygen-Shortcut → {app}\run-keygen.bat
 ;   B) Gebündelte EXE (PyInstaller):
 ;      SourceRoot = dist\InstantLensDoc mit InstantLensDoc.exe
+;      Keygen-EXE-Pfad: {app}\InstantLensKeygen.exe
+;      (build-windows.ps1 kopiert Keygen dorthin; build-installer.ps1 ebenfalls)
 ;
 ; Optionen:
 ;   /DIncludeKeygen=1  — Keygen mitpacken (run-keygen.bat bzw. InstantLensKeygen.exe)
@@ -18,7 +21,7 @@
 ; Siehe: build-installer.ps1
 
 #define MyAppName "InstantLens Doc"
-#define MyAppVersion "0.2.0"
+#define MyAppVersion "0.2.1"
 #define MyAppPublisher "Andreas Meyer"
 #define MyAppURL "mailto:ame@sellerbach.de"
 #ifndef SourceRoot

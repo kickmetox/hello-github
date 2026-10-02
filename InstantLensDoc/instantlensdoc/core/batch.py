@@ -15,6 +15,8 @@ from instantlensdoc.core.ocr import OcrOutputMode
 _IMAGE_GLOB = ("*.png", "*.jpg", "*.jpeg", "*.bmp", "*.tif", "*.tiff")
 _PDF_GLOB = ("*.pdf",)
 
+ProgressCb = Callable[..., None]
+
 
 class BatchMode(str, Enum):
     IMAGES_TO_ONE_PDF = "images_one_pdf"
@@ -86,15 +88,20 @@ def run_batch(
     *,
     lang: str = "deu+eng",
     ocr_mode: OcrOutputMode = OcrOutputMode.SEARCHABLE_IMAGE,
-    progress: Callable[[str], None] | None = None,
+    progress: ProgressCb | None = None,
 ) -> BatchResult:
+    """progress(msg, current=i, total=n) — current/total optional (0 = unbekannt)."""
     folder = Path(folder)
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     items: List[BatchItemResult] = []
 
-    def log(msg: str) -> None:
-        if progress:
+    def log(msg: str, current: int = 0, total: int = 0) -> None:
+        if not progress:
+            return
+        try:
+            progress(msg, current, total)
+        except TypeError:
             progress(msg)
 
     if mode == BatchMode.IMAGES_TO_ONE_PDF:
@@ -103,8 +110,9 @@ def run_batch(
             return BatchResult([BatchItemResult(folder, None, False, "Keine Bilder im Ordner")])
         dest = out_dir / f"{folder.name}_batch.pdf"
         try:
-            log(f"PDF aus {len(imgs)} Bildern…")
+            log(f"PDF aus {len(imgs)} Bildern…", 0, 1)
             _images_to_pdf(imgs, dest)
+            log(f"Fertig: {dest.name}", 1, 1)
             items.append(BatchItemResult(folder, dest, True, f"{len(imgs)} Bilder"))
         except Exception as e:
             items.append(BatchItemResult(folder, None, False, str(e)))
@@ -112,12 +120,16 @@ def run_batch(
 
     if mode == BatchMode.IMAGES_TO_PDF_EACH:
         imgs = _collect_files(folder, _IMAGE_GLOB)
-        for src in imgs:
+        total = len(imgs)
+        for i, src in enumerate(imgs, start=1):
             dest = out_dir / f"{src.stem}.pdf"
             try:
+                log(f"PDF {src.name}…", i - 1, total)
                 _images_to_pdf([src], dest)
+                log(f"OK {src.name}", i, total)
                 items.append(BatchItemResult(src, dest, True))
             except Exception as e:
+                log(f"Fehler {src.name}: {e}", i, total)
                 items.append(BatchItemResult(src, None, False, str(e)))
         if not imgs:
             items.append(BatchItemResult(folder, None, False, "Keine Bilder"))
@@ -128,9 +140,10 @@ def run_batch(
         ok_ocr, msg = ocr_mod.tesseract_available()
         if not ok_ocr:
             return BatchResult([BatchItemResult(folder, None, False, msg)])
-        for src in targets:
+        total = len(targets)
+        for i, src in enumerate(targets, start=1):
             try:
-                log(f"OCR {src.name}…")
+                log(f"OCR {src.name}…", i - 1, total)
                 r = ocr_mod.run_ocr(
                     src,
                     lang=lang,
@@ -139,8 +152,10 @@ def run_batch(
                     source_label=src.name,
                 )
                 out = r.searchable_pdf or out_dir / f"{src.stem}.ocr.txt"
+                log(f"OK OCR {src.name}", i, total)
                 items.append(BatchItemResult(src, out, True))
             except Exception as e:
+                log(f"Fehler OCR {src.name}: {e}", i, total)
                 items.append(BatchItemResult(src, None, False, str(e)))
         if not targets:
             items.append(BatchItemResult(folder, None, False, "Keine Bilder"))
@@ -153,9 +168,10 @@ def run_batch(
             return BatchResult([BatchItemResult(folder, None, False, msg)])
         from ild_pdf import render_page
 
-        for pdf_path in pdfs:
+        total = len(pdfs)
+        for i, pdf_path in enumerate(pdfs, start=1):
             try:
-                log(f"PDF OCR {pdf_path.name}…")
+                log(f"PDF OCR {pdf_path.name}…", i - 1, total)
                 import pypdfium2 as pdfium
 
                 doc = pdfium.PdfDocument(str(pdf_path))
@@ -163,6 +179,7 @@ def run_batch(
                 doc.close()
                 combined: List[str] = []
                 for page in range(n):
+                    log(f"OCR {pdf_path.name} Seite {page + 1}/{n}", i - 1, total)
                     img = render_page(pdf_path, page, scale=2.0)
                     r = ocr_mod.run_ocr(
                         img,
@@ -174,8 +191,10 @@ def run_batch(
                     combined.append(r.text)
                 out_txt = out_dir / f"{pdf_path.stem}.batch-ocr.txt"
                 out_txt.write_text("\n\n---\n\n".join(combined), encoding="utf-8")
+                log(f"OK PDF OCR {pdf_path.name}", i, total)
                 items.append(BatchItemResult(pdf_path, out_txt, True, f"{n} Seiten"))
             except Exception as e:
+                log(f"Fehler PDF OCR {pdf_path.name}: {e}", i, total)
                 items.append(BatchItemResult(pdf_path, None, False, str(e)))
         if not pdfs:
             items.append(BatchItemResult(folder, None, False, "Keine PDFs"))

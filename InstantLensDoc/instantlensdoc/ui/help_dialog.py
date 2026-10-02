@@ -15,8 +15,9 @@ HELP_HTML = """
 <h3>Erste Schritte</h3>
 <ul>
 <li><b>Datei → Öffnen</b>: TXT, MD, HTML, DOCX, PDF, Bilder</li>
-<li><b>Datei → Einstellungen</b>: Theme, <b>UI-Sprache DE/EN</b>, OCR, Export-Qualität, Update-Hinweis, Pfade</li>
+<li><b>Extras → Einstellungen</b>: Theme, <b>UI-Sprache DE/EN</b>, OCR, Export-Qualität, Update-Hinweis, Pfade</li>
 <li><b>Datei → Zuletzt geöffnet</b>: Menü + Seitenleiste (persistiert)</li>
+<li><b>Datei → Speichern unter</b> (Ctrl+Shift+S): Text → Dokument; PDF → Annotation-Sidecar wählen (PDF unverändert)</li>
 <li><b>Datei → Exportieren</b>: Editor-Inhalt als HTML, DOCX oder PDF</li>
 <li><b>Datei → Drucken</b> (Ctrl+P): Editor oder aktuelle PDF-Seite (Qt Print)</li>
 <li><b>Seitenleiste</b>: Suche, „Alle Docs“-Volltext, Zuletzt geöffnet, Dokumente,
@@ -59,7 +60,8 @@ HELP_HTML = """
 <li><b>Build (Windows)</b>: <code>build-windows.ps1</code> — PyInstaller App + Keygen</li>
 <li><b>Installer</b>: Desktop-Verknüpfung + Startmenü-Gruppe (siehe Inno-Hinweis)</li>
 <li><b>Lizenz</b>: Statusleiste (farbig) + Hilfe → Lizenz — Trial 4 Wochen, Keys 30+2 Tage</li>
-<li><b>Keygen</b>: <code>run-keygen.bat</code> bzw. <code>python -m keygen --gui</code></li>
+<li><b>Keygen</b>: <code>run-keygen.bat</code> / <code>python -m keygen --gui</code>;
+    Installer-EXE: <code>{app}/InstantLensKeygen.exe</code> (siehe <code>keygen/README.md</code>)</li>
 </ul>
 <h3>PDF-Modul</h3>
 <p>Das Paket <code>ild_pdf</code> kann von anderen Programmen genutzt werden (pypdfium2, kein Poppler).
@@ -69,7 +71,7 @@ Beispiel: <code>examples/ild_pdf_demo.py</code>. API: <code>ild_pdf/README.md</c
 <code>D:\\AI_Temp\\InstantLensDoc</code>, pip, optional Start. Eigenes Icon in <code>assets</code> bleibt erhalten.</p>
 <h3>Geplante Features</h3>
 <p>KI-Assistent, Cloud-Sync, Stylus/Palm Rejection, 3D u. a. sind im Menü als „Geplant“ markiert
-(Stub 0.2.0) — siehe FEATURES.md.</p>
+(Stub 0.2.1) — siehe FEATURES.md.</p>
 """
 
 

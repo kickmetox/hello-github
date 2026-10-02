@@ -6,6 +6,7 @@ from pathlib import Path
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
+    QApplication,
     QComboBox,
     QDialog,
     QDialogButtonBox,
@@ -14,6 +15,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QPlainTextEdit,
+    QProgressBar,
     QPushButton,
     QVBoxLayout,
 )
@@ -27,7 +29,7 @@ class BatchConvertDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Batch-Konvertierung")
-        self.resize(520, 420)
+        self.resize(520, 460)
         layout = QVBoxLayout(self)
 
         form = QFormLayout()
@@ -62,6 +64,18 @@ class BatchConvertDialog(QDialog):
         layout.addLayout(form)
 
         layout.addWidget(QLabel(f"OCR-Sprache (Einstellungen): {get_ocr_lang()}"))
+
+        self.progress = QProgressBar()
+        self.progress.setMinimum(0)
+        self.progress.setMaximum(100)
+        self.progress.setValue(0)
+        self.progress.setFormat("%p % — %v/%m")
+        self.progress.setTextVisible(True)
+        layout.addWidget(self.progress)
+        self.progress_label = QLabel("Bereit")
+        self.progress_label.setWordWrap(True)
+        layout.addWidget(self.progress_label)
+
         self.log = QPlainTextEdit()
         self.log.setReadOnly(True)
         self.log.setMaximumBlockCount(500)
@@ -86,6 +100,18 @@ class BatchConvertDialog(QDialog):
         if path:
             self.out_edit.setText(path)
 
+    def _on_progress(self, msg: str, current: int = 0, total: int = 0) -> None:
+        self.log.appendPlainText(msg)
+        self.progress_label.setText(msg)
+        if total > 0:
+            self.progress.setMaximum(total)
+            self.progress.setValue(min(current, total))
+            self.progress.setFormat(f"%v/%m — {msg[:48]}")
+        else:
+            self.progress.setMaximum(0)  # busy
+            self.progress.setFormat(msg[:64] or "…")
+        QApplication.processEvents()
+
     def _run(self):
         src = self.src_edit.text().strip()
         out = self.out_edit.text().strip()
@@ -93,17 +119,30 @@ class BatchConvertDialog(QDialog):
             self.log.appendPlainText("Quell- und Ausgabeordner angeben.")
             return
         mode = self.mode_combo.currentData()
+        self.progress.setValue(0)
+        self.progress.setMaximum(100)
+        self.progress_label.setText("Start…")
         self.log.appendPlainText(f"Start: {mode.value} …")
         ocr_mode = OcrOutputMode.SEARCHABLE_IMAGE
         if mode == BatchMode.PDF_OCR_PAGES:
             ocr_mode = OcrOutputMode.EDITABLE_TEXT
-        result = run_batch(
-            src,
-            out,
-            mode,
-            lang=get_ocr_lang(),
-            ocr_mode=ocr_mode,
-            progress=lambda m: self.log.appendPlainText(m),
+        QApplication.setOverrideCursor(Qt.WaitCursor)
+        try:
+            result = run_batch(
+                src,
+                out,
+                mode,
+                lang=get_ocr_lang(),
+                ocr_mode=ocr_mode,
+                progress=self._on_progress,
+            )
+        finally:
+            QApplication.restoreOverrideCursor()
+        self.progress.setMaximum(max(1, result.ok_count + result.fail_count))
+        self.progress.setValue(result.ok_count + result.fail_count)
+        self.progress.setFormat("%v/%m fertig")
+        self.progress_label.setText(
+            f"Fertig: {result.ok_count} OK, {result.fail_count} Fehler"
         )
         self.log.appendPlainText(f"Fertig: {result.ok_count} OK, {result.fail_count} Fehler")
         for item in result.items:

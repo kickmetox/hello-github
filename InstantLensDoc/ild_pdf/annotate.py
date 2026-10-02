@@ -132,7 +132,14 @@ class AnnotationStore:
         self._redo: List[List[dict]] = []
         self._recording = True
         if self.pdf_path and self.sidecar_path.exists():
-            self.load()
+            try:
+                self.load()
+            except Exception:
+                # Kaputte Sidecar darf Öffnen nicht crashen
+                self.annotations = []
+                self.dirty = False
+                self._meta = {}
+                self.clear_history()
 
     @property
     def sidecar_path(self) -> Path:

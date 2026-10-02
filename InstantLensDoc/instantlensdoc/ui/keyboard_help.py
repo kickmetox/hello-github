@@ -11,6 +11,7 @@ SHORTCUTS_HTML = """
 <tr><td>Neu</td><td><code>Ctrl+N</code></td></tr>
 <tr><td>Öffnen</td><td><code>Ctrl+O</code></td></tr>
 <tr><td>Speichern</td><td><code>Ctrl+S</code></td></tr>
+<tr><td>Speichern unter…</td><td><code>Ctrl+Shift+S</code></td></tr>
 <tr><td>Drucken</td><td><code>Ctrl+P</code></td></tr>
 <tr><td>Beenden</td><td><code>Ctrl+Q</code></td></tr>
 <tr><td>Rückgängig</td><td><code>Ctrl+Z</code></td></tr>
@@ -25,12 +26,16 @@ SHORTCUTS_HTML = """
 <tr><td>Breite einpassen</td><td><code>Ctrl+9</code></td></tr>
 <tr><td>Zoom 100&nbsp;%</td><td><code>Ctrl+1</code></td></tr>
 <tr><td>Overlay bearbeiten</td><td>Doppelklick / <code>Ctrl</code>+Klick</td></tr>
-<tr><td>Diese Hilfe</td><td><code>F1</code> (Hilfe-Menü)</td></tr>
+<tr><td>Diese Hilfe</td><td><code>F1</code></td></tr>
 </table>
+<p><b>Speichern unter (PDF):</b> speichert die Annotationen als Sidecar
+<code>*.ildann.json</code> (PDF-Datei bleibt unverändert). Auch unter
+PDF → Annotationen speichern unter…</p>
 <p><b>PDF-Werkzeuge</b> (Toolbar): Highlight, Schwärzen (REDACT-Preview), Formen per Drag;
 Notiz/Stempel/Callout/Overlay per Klick.</p>
 <p><b>Schwärzung:</b> Rechteck ziehen → PDF → Schwärzung einbrennen… (Sidecar optional leeren)
 bzw. Schwärzungs-Annotationen löschen…</p>
+<p><b>Extras:</b> Einstellungen, Batch (Fortschrittsbalken), OCR (Fortschrittsdialog).</p>
 <p>Vollständige Bedienung: Hilfe → Hilfe…</p>
 """
 
@@ -39,7 +44,7 @@ class KeyboardHelpDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Tastaturhilfe")
-        self.resize(520, 480)
+        self.resize(520, 520)
         layout = QVBoxLayout(self)
         browser = QTextBrowser()
         browser.setHtml(SHORTCUTS_HTML)

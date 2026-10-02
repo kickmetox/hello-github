@@ -557,22 +557,45 @@ class PdfViewer(QWidget):
             self.status.emit(f"Werkzeug: {tool.value}")
 
     def load(self, path: str | Path, password: str | None = None) -> bool:
-        try:
-            from ild_pdf.limits import inspect_pdf
-            from ild_pdf.render import clear_render_cache
-            from ild_pdf.security import needs_password
-            from instantlensdoc.ui.password_dialog import ask_pdf_password
+        from PySide6.QtWidgets import QApplication
 
+        from ild_pdf.limits import OPEN_TIMEOUT_HINT, inspect_pdf
+        from ild_pdf.render import clear_render_cache
+        from ild_pdf.security import needs_password
+        from instantlensdoc.ui.password_dialog import ask_pdf_password
+
+        QApplication.setOverrideCursor(Qt.WaitCursor)
+        try:
             path = Path(path)
+            if not path.is_file():
+                QMessageBox.critical(self, "PDF öffnen", f"Datei nicht gefunden:\n{path}")
+                return False
             pw = password if password is not None else self.password
 
             # Passwort nachfragen wenn nötig
-            if pw is None and needs_password(path):
-                pw = ask_pdf_password(self, path)
-                if pw is None:
-                    return False
+            try:
+                if pw is None and needs_password(path):
+                    pw = ask_pdf_password(self, path)
+                    if pw is None:
+                        return False
+            except Exception as e:
+                QMessageBox.critical(
+                    self,
+                    "PDF öffnen",
+                    f"Passwort-Prüfung fehlgeschlagen:\n{e}\n\n{OPEN_TIMEOUT_HINT}",
+                )
+                return False
 
-            health = inspect_pdf(path, password=pw)
+            try:
+                health = inspect_pdf(path, password=pw)
+            except Exception as e:
+                QMessageBox.critical(
+                    self,
+                    "PDF öffnen",
+                    f"PDF-Diagnose fehlgeschlagen:\n{e}\n\n{OPEN_TIMEOUT_HINT}",
+                )
+                return False
+
             if health.errors:
                 # ggf. nochmal Passwort versuchen
                 if any("passwort" in e.lower() or "password" in e.lower() for e in health.errors):
@@ -580,12 +603,21 @@ class PdfViewer(QWidget):
                     if pw2 is None:
                         return False
                     pw = pw2
-                    health = inspect_pdf(path, password=pw)
+                    try:
+                        health = inspect_pdf(path, password=pw)
+                    except Exception as e:
+                        QMessageBox.critical(
+                            self,
+                            "PDF öffnen",
+                            f"PDF-Diagnose fehlgeschlagen:\n{e}\n\n{OPEN_TIMEOUT_HINT}",
+                        )
+                        return False
                 if health.errors:
                     QMessageBox.critical(
                         self,
                         "PDF öffnen",
-                        "PDF kann nicht geöffnet werden:\n\n" + "\n".join(health.errors),
+                        "PDF kann nicht geöffnet werden:\n\n"
+                        + "\n".join(health.errors),
                     )
                     self.pdf_path = None
                     self.store = None
@@ -624,18 +656,25 @@ class PdfViewer(QWidget):
                 self,
                 "PDF öffnen",
                 "Nicht genug Speicher für dieses PDF.\n"
-                "Tipp: Datei teilen (PDF → zusammenführen/teilen) oder Zoom reduzieren.",
+                "Tipp: Datei teilen (PDF → zusammenführen/teilen) oder Zoom reduzieren.\n\n"
+                + OPEN_TIMEOUT_HINT,
             )
             self.pdf_path = None
             self.store = None
             self.password = None
             return False
         except Exception as e:
-            QMessageBox.critical(self, "PDF öffnen", f"PDF konnte nicht geladen werden:\n{e}")
+            QMessageBox.critical(
+                self,
+                "PDF öffnen",
+                f"PDF konnte nicht geladen werden:\n{e}\n\n{OPEN_TIMEOUT_HINT}",
+            )
             self.pdf_path = None
             self.store = None
             self.password = None
             return False
+        finally:
+            QApplication.restoreOverrideCursor()
 
     def refresh(self):
         if not self.pdf_path:
@@ -922,11 +961,48 @@ class PdfViewer(QWidget):
             return False
         try:
             path = self.store.save(force=True)
-            self.status.emit(f"Annotationen gespeichert: {path.name} ({len(self.store.annotations)})")
+            self.status.emit(
+                f"Sidecar gespeichert: {path.name} ({len(self.store.annotations)})"
+            )
             self.annotations_changed.emit()
             return True
         except Exception as e:
             QMessageBox.warning(self, "Annotationen speichern", str(e))
+            return False
+
+    def save_annotations_as(self) -> bool:
+        """Speichern unter: Sidecar *.ildann.json an gewähltem Pfad (PDF bleibt unverändert)."""
+        if not self.store or not self.pdf_path:
+            QMessageBox.information(self, "Annotationen", "Kein PDF geladen.")
+            return False
+        from PySide6.QtWidgets import QFileDialog
+
+        default = str(self.store.sidecar_path)
+        path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Annotationen speichern unter (Sidecar)",
+            default,
+            "Annotation-Sidecar (*.ildann.json);;JSON (*.json);;Alle (*.*)",
+        )
+        if not path:
+            return False
+        dest = Path(path)
+        if dest.suffix.lower() != ".json" and not dest.name.endswith(".ildann.json"):
+            dest = Path(str(dest) + ".ildann.json")
+        try:
+            saved = self.store.export_backup(dest)
+            QMessageBox.information(
+                self,
+                "Annotationen speichern unter",
+                "Sidecar gespeichert (PDF unverändert):\n"
+                f"{saved}\n\n"
+                f"Standard-Sidecar neben der PDF:\n{self.store.sidecar_path.name}",
+            )
+            self.status.emit(f"Sidecar gespeichert unter: {saved.name}")
+            self.annotations_changed.emit()
+            return True
+        except Exception as e:
+            QMessageBox.warning(self, "Annotationen speichern unter", str(e))
             return False
 
     def reload_annotations(self) -> bool:

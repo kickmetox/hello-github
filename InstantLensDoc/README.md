@@ -2,7 +2,7 @@
 
 Moderne Textverarbeitung mit PDF-Annotator, OCR-Bridge und Formulargenerator.
 
-**Version:** 0.2.0  
+**Version:** 0.2.1  
 **Hersteller:** Andreas Meyer · ame@sellerbach.de
 
 ## Quickstart (Windows)
@@ -21,11 +21,10 @@ cd /d D:\AI_Temp\InstantLensDoc && pip install -r requirements.txt && run.bat
 
 Nur starten (nach Sync/pip): `run.bat`
 
-## Neu in 0.2.0
+## Neu in 0.2.1
 
-- Release-Meilenstein: einheitliche Version, Installer/Uninstaller gehärtet
-- Keygen optional im Build/Installer, Desktop-Shortcut + Setup-Icon
-- Regression-Smoke für open / annotate / export / license
-- CHANGELOG kompakt 0.1.x → 0.2.0
+- Speichern-unter (PDF) = Sidecar-Annotationen klar wählbar
+- Batch-/OCR-Fortschrittsanzeige; crash-sichere PDF-Öffnung + Timeout-Hinweis
+- Keygen-EXE-Installer-Pfad dokumentiert; Menü-/F1-Polishes
 
 Siehe [CHANGELOG.md](CHANGELOG.md), [FEATURES.md](FEATURES.md) und [INFO.md](INFO.md).

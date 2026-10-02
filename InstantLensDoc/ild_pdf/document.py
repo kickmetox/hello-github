@@ -21,9 +21,18 @@ class PdfDocument:
     def open(self, path: str | Path, password: str | None = None) -> None:
         self.close()
         self.path = Path(path)
+        if not self.path.is_file():
+            raise FileNotFoundError(f"PDF nicht gefunden: {self.path}")
         if password is not None:
             self.password = password
-        self._doc = pdfium.PdfDocument(str(self.path), password=self.password)
+        try:
+            self._doc = pdfium.PdfDocument(str(self.path), password=self.password)
+        except MemoryError:
+            self._doc = None
+            raise
+        except Exception as e:
+            self._doc = None
+            raise RuntimeError(f"PDF-Öffnung fehlgeschlagen: {e}") from e
 
     def close(self) -> None:
         if self._doc is not None:

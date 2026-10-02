@@ -1,4 +1,4 @@
-# InstantLens Doc — Inno-Setup-Installer bauen (eine Datei) 0.2.0
+# InstantLens Doc — Inno-Setup-Installer bauen (eine Datei) 0.2.1
 # Voraussetzung: Inno Setup 6 (iscc.exe)
 # Aufruf:
 #   powershell -ExecutionPolicy Bypass -File .\installer\build-installer.ps1
@@ -6,6 +6,10 @@
 #   -SourceRoot D:\path\to\pack
 #   -PythonLauncher   # Shortcuts auf run.bat statt InstantLensDoc.exe
 #   -NoKeygen         # IncludeKeygen=0 (keine Keygen-Shortcuts)
+#
+# Keygen-EXE: Prefer dist\InstantLensKeygen\InstantLensKeygen.exe,
+# Fallback dist\InstantLensDoc\InstantLensKeygen.exe → Pack als InstantLensKeygen.exe
+# Installiert: {app}\InstantLensKeygen.exe (+ Startmenü, wenn IncludeKeygen=1)
 
 param(
     [string]$SourceRoot = "",

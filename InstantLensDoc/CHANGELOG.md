@@ -1,5 +1,26 @@
 # Changelog — InstantLens Doc
 
+## 0.2.1 — Qualitäts-Patch
+
+Fokus: UX-Lücken und Stabilität, keine Feature-Spam.
+
+### UX
+- **Speichern unter (PDF)**: klar Sidecar-Annotationen (`*.ildann.json`) wählen — PDF bleibt unverändert; Menü PDF → Annotationen speichern unter…; Shortcut `Ctrl+Shift+S`
+- **Batch**: Fortschrittsbalken + Statuszeile (Datei i/n)
+- **OCR**: Fortschrittsdialog während der Erkennung
+
+### Stabilität
+- Crash-sichere PDF-Öffnung (Datei-Check, Sidecar-Fehler isoliert, Busy-Cursor)
+- Timeout-/Hang-Hinweis (~30s) bei großen/problematischen PDFs
+
+### Packaging / Docs
+- Keygen-EXE-Pfad im Installer dokumentiert (`InstantLensKeygen.exe` neben App bzw. `run-keygen.bat`)
+- Menü-Ordnung: Einstellungen → Extras; PDF-Gruppen; Hilfe (F1 zuerst)
+- F1-Tastaturhilfe um fehlende Shortcuts ergänzt
+- Version **0.2.1**; Stubs KI/Cloud/Stylus/3D unverändert (keine Fake-Features)
+
+---
+
 ## 0.2.0 — Release-Meilenstein
 
 Fokus: Release-Reife (Versioning, Installer, Smoke, Docs) statt neuer Micro-Features.

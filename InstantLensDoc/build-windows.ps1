@@ -1,4 +1,4 @@
-# InstantLens Doc — Windows-Build (PyInstaller App + Keygen) 0.2.0
+# InstantLens Doc — Windows-Build (PyInstaller App + Keygen) 0.2.1
 # Eine Zeile:
 #   powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 #
@@ -8,6 +8,9 @@
 #   -SkipApp
 #   -NoKeygenInApp       # Keygen nicht nach dist\InstantLensDoc kopieren
 #   -Python python
+#
+# Keygen-EXE: dist\InstantLensKeygen\ + optional dist\InstantLensDoc\InstantLensKeygen.exe
+# (= Installer-Pfad {app}\InstantLensKeygen.exe)
 
 param(
     [switch]$Clean,
@@ -21,7 +24,7 @@ $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $Root
 
-Write-Host "=== InstantLens Doc Build 0.2.0 ==="
+Write-Host "=== InstantLens Doc Build 0.2.1 ==="
 Write-Host "Root: $Root"
 
 # Icon Pflicht für Release-Build (Fallback PNG)

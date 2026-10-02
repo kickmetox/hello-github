@@ -13,7 +13,7 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | Editor → HTML / DOCX / PDF Export | fertig | Datei → Exportieren; Qualität/Format in Einstellungen |
 | Drucken (Editor / PDF-Seite) | fertig | Qt PrintDialog (Ctrl+P) |
 | Zuletzt geöffnete Dateien | fertig | Menü + Sidebar, `recent.json` |
-| PDF lesen / rendern | fertig | pypdfium2; große-PDF-Limits |
+| PDF lesen / rendern | fertig | pypdfium2; große-PDF-Limits; Timeout-Hinweis 0.2.1 |
 | PDF Zoom / Seite einpassen | fertig | Debounce + Render-LRU-Cache |
 | PDF-Wasserzeichen | fertig | Text diagonal, Deckkraft |
 | PDF Seitennummer-Stempel | fertig | Vorlage `{n} / {total}` |
@@ -29,7 +29,7 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | Sidebar Seiten-Thumbnails | fertig | Vorschaubilder, Klick → Seite |
 | Tastaturhilfe-Dialog | fertig | Hilfe → F1 |
 | App-Logging | fertig | %APPDATA%/InstantLensDoc/logs |
-| PDF-Annotationen (Highlight, Underline, Sticky, Text) | fertig | Sidecar `*.ildann.json` **v3** |
+| PDF-Annotationen (Highlight, Underline, Sticky, Text) | fertig | Sidecar `*.ildann.json` **v3**; Speichern unter klar 0.2.1 |
 | Annotation Undo/Redo | fertig | Ctrl+Z/Y inkl. Overlay-Text |
 | Stempel / Callouts | teilweise | Stempel-Presets + Callout (2-Klick) |
 | PDF Signaturfeld / Signatur (Bild) | fertig | Sidecar; Menü PDF + Werkzeug |
@@ -46,12 +46,12 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | Textsuche Seitenleiste | fertig | Editor + PDF-Text + Annotationen |
 | Volltextsuche geöffnete Docs | fertig | Sidebar „Alle Docs“ |
 | Lesezeichen / PDF-Outline | fertig | Baum in Sidebar, Doppelklick → Seite |
-| Batch-Konvertierung Ordner | fertig | Bilder→PDF, OCR-Ordner, PDF-OCR-Text |
+| Batch-Konvertierung Ordner | fertig | Bilder→PDF, OCR-Ordner, PDF-OCR-Text; Fortschrittsbalken 0.2.1 |
 | PDF zusammenführen / teilen | fertig | Dialog unter Menü PDF |
 | Einstellungen-Dialog | fertig | OCR, Theme, Sprache, Export-Q, Pfade, Update |
 | Markieren im Editor | fertig | Ctrl+H |
 | Bilder JPEG/PNG anzeigen | fertig | |
-| OCR Bild/PDF-Seite | teilweise | Presets + Modi; Tabellen-Heuristik; Tesseract-Link |
+| OCR Bild/PDF-Seite | teilweise | Presets + Modi; Tabellen-Heuristik; Fortschrittsdialog 0.2.1 |
 | OCR Ausgabe: editierbarer Text | fertig | → Editor |
 | OCR Ausgabe: durchsuchbares Bild | teilweise | PDF + `*.ildocr.txt` Sidecar |
 | Formulargenerator → HTML/PDF | fertig | Mehr Feldtypen; Definition speichern/laden |
@@ -60,19 +60,19 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | Lizenz Trial 28d / Keys 32d | fertig | Statusleiste farbig + Tooltip |
 | Keygenerator (CLI/GUI) | fertig | `run-keygen.bat` |
 | PyInstaller Build Windows | fertig | `build-windows.ps1`, Icon `assets/app.ico` |
-| Inno-Installer | fertig | Icon, Desktop, Uninstaller, Keygen optional 0.2.0 |
+| Inno-Installer | fertig | Icon, Desktop, Uninstaller, Keygen optional (`InstantLensKeygen.exe`) 0.2.1 |
 | Sync-Skript Windows | fertig | Store `docs/sync-ild.ps1` |
-| In-App Hilfe / About | fertig | Version 0.2.0 |
-| CHANGELOG | fertig | 0.1.x → 0.2.0 kompakt |
+| In-App Hilfe / About | fertig | Version 0.2.1 |
+| CHANGELOG | fertig | 0.2.1 Qualitäts-Patch |
 | FEATURES.md / INFO.md | fertig | |
 | `ild_pdf` Modul + Beispielskript | fertig | metadata / page size / watermark / redact |
 | Font-Matching | geplant | |
 | Objekt-/Bildbearbeitung | geplant | |
 | Layout-Erhaltung (Scan→edit) | geplant | |
 | Freihand | geplant | |
-| KI-Assistent | Stub | Menü „Geplant“ 0.2.0 (keine Fake-KI) |
+| KI-Assistent | Stub | Menü „Geplant“ 0.2.1 (keine Fake-KI) |
 | Signieren (rechtssicher) | Stub | |
-| Cloud-Sync | Stub | Menü „Geplant“ 0.2.0 (keine Fake-Cloud) |
+| Cloud-Sync | Stub | Menü „Geplant“ 0.2.1 (keine Fake-Cloud) |
 | Text on Path / Text zu Pfaden | geplant | |
 | Envelope Distort / Text Wrap / Area Type | Stub/geplant | |
 | Schnittmasken | geplant | |

@@ -11,6 +11,12 @@ SOFT_PAGE_WARN = 200
 HARD_PAGE_LIMIT = 2500
 SOFT_SIZE_MB = 80.0
 HARD_SIZE_MB = 512.0
+# Hinweis für langsame/hängende Öffnungen (kein harter Kill — nur UX)
+OPEN_TIMEOUT_HINT_SEC = 30
+OPEN_TIMEOUT_HINT = (
+    f"Hinweis: Bleibt das Öffnen länger als ~{OPEN_TIMEOUT_HINT_SEC}s stehen oder "
+    "bricht ab, PDF teilen/verkleinern (PDF → zusammenführen/teilen) oder Passwort prüfen."
+)
 # Zoom-Render: Pixel-Obergrenze (Breite×Höhe der Bitmap)
 MAX_RENDER_PIXELS = 40_000_000
 
@@ -56,7 +62,8 @@ def inspect_pdf(path: str | Path, *, password: Optional[str] = None) -> PdfHealt
         )
     elif size_mb >= SOFT_SIZE_MB:
         warnings.append(
-            f"Große Datei ({size_mb:.0f} MB). Laden und Zoomen kann langsam sein."
+            f"Große Datei ({size_mb:.0f} MB). Laden und Zoomen kann langsam sein.\n"
+            + OPEN_TIMEOUT_HINT
         )
 
     try:
@@ -67,13 +74,20 @@ def inspect_pdf(path: str | Path, *, password: Optional[str] = None) -> PdfHealt
             pages = len(doc)
         finally:
             doc.close()
+    except MemoryError:
+        errors.append(
+            "Nicht genug Speicher beim Öffnen.\n" + OPEN_TIMEOUT_HINT
+        )
+        return PdfHealth(path, 0, size, warnings, errors)
     except Exception as e:
         msg = str(e)
         low = msg.lower()
         if "password" in low or "passwd" in low:
             errors.append(f"PDF ist passwortgeschützt: {msg}")
         else:
-            errors.append(f"PDF konnte nicht geöffnet werden: {msg}")
+            errors.append(
+                f"PDF konnte nicht geöffnet werden: {msg}\n{OPEN_TIMEOUT_HINT}"
+            )
         return PdfHealth(path, 0, size, warnings, errors)
 
     if pages <= 0:
@@ -86,7 +100,8 @@ def inspect_pdf(path: str | Path, *, password: Optional[str] = None) -> PdfHealt
     elif pages >= SOFT_PAGE_WARN:
         warnings.append(
             f"Viele Seiten ({pages}). Nur die aktuelle Seite wird gerendert; "
-            "Blättern/Zoom kann verzögert reagieren."
+            "Blättern/Zoom kann verzögert reagieren.\n"
+            + OPEN_TIMEOUT_HINT
         )
 
     return PdfHealth(path, pages, size, warnings, errors)

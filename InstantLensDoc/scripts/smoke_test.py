@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Smoke-Test 0.2.0 (CLI + optional offscreen Qt). Kernpfade: open/annotate/export/license."""
+"""Smoke-Test 0.2.1 (CLI + optional offscreen Qt). Kernpfade: open/annotate/export/license."""
 
 from __future__ import annotations
 
@@ -72,8 +72,8 @@ def main() -> int:
     from instantlensdoc.core.update_check import check_for_updates
     from instantlensdoc.license import KEY_DAYS, TRIAL_DAYS, generate_key, verify_key
 
-    assert __version__ == "0.2.0", __version__
-    assert ild_ver == "0.2.0", ild_ver
+    assert __version__ == "0.2.1", __version__
+    assert ild_ver == "0.2.1", ild_ver
     assert TRIAL_DAYS == 28 and KEY_DAYS == 32
     key = generate_key("ame@sellerbach.de")
     ok, msg, _ = verify_key(key)
@@ -91,12 +91,12 @@ def main() -> int:
     assert "Settings" in tr("settings")
     set_lang("de")
     upd = check_for_updates(allow_network=False)
-    assert upd.local_version == "0.2.0" and not upd.online
+    assert upd.local_version == "0.2.1" and not upd.online
     assert get_export_jpeg_quality() >= 10
     assert get_ui_lang() in ("de", "en")
     assert (ROOT / "CHANGELOG.md").is_file()
-    assert "0.2.0" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-    assert "0.2.0" in (ROOT / "README.md").read_text(encoding="utf-8")
+    assert "0.2.1" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    assert "0.2.1" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "run.bat" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "sync-ild.ps1" in (ROOT / "README.md").read_text(encoding="utf-8")
 
@@ -387,15 +387,32 @@ def main() -> int:
 
         assert (ROOT / "installer" / "installer-hinweis.txt").exists()
         iss = (ROOT / "installer" / "instantlensdoc.iss").read_text(encoding="utf-8")
-        assert "0.2.0" in iss and "desktopicon" in iss and "DisableProgramGroupPage=no" in iss
+        assert "0.2.1" in iss and "desktopicon" in iss and "DisableProgramGroupPage=no" in iss
         assert "UninstallDisplayName" in iss and "Uninstallable=yes" in iss
         assert "IncludeKeygen" in iss and "SetupIconFile" in iss
+        assert "InstantLensKeygen.exe" in iss
         assert "uninstallexe" in iss
         bw = (ROOT / "build-windows.ps1").read_text(encoding="utf-8")
-        assert "0.2.0" in bw and "NoKeygenInApp" in bw and "--icon" in bw
+        assert "0.2.1" in bw and "NoKeygenInApp" in bw and "--icon" in bw
+        assert "InstantLensKeygen.exe" in bw
+        bi = (ROOT / "installer" / "build-installer.ps1").read_text(encoding="utf-8")
+        assert "InstantLensKeygen.exe" in bi and "IncludeKeygen" in bi
+        kg_readme = (ROOT / "keygen" / "README.md").read_text(encoding="utf-8")
+        assert "InstantLensKeygen.exe" in kg_readme
+        assert "Installer" in kg_readme
+        hinweis = (ROOT / "installer" / "installer-hinweis.txt").read_text(encoding="utf-8")
+        assert "InstantLensKeygen.exe" in hinweis or "run-keygen.bat" in hinweis
+        from ild_pdf.limits import OPEN_TIMEOUT_HINT, OPEN_TIMEOUT_HINT_SEC
+
+        assert OPEN_TIMEOUT_HINT_SEC >= 15 and "teilen" in OPEN_TIMEOUT_HINT.lower()
+        kb = (ROOT / "instantlensdoc" / "ui" / "keyboard_help.py").read_text(encoding="utf-8")
+        assert "Ctrl+Shift+S" in kb and "Sidecar" in kb
+        assert "save_annotations_as" in (ROOT / "instantlensdoc" / "ui" / "pdf_view.py").read_text(encoding="utf-8")
+        assert "QProgressBar" in (ROOT / "instantlensdoc" / "ui" / "batch_dialog.py").read_text(encoding="utf-8")
+        assert "QProgressDialog" in (ROOT / "instantlensdoc" / "ui" / "main_window.py").read_text(encoding="utf-8")
 
         assert (ROOT / "examples" / "ild_pdf_demo.py").exists()
-        assert "0.2.0" in (ROOT / "INFO.md").read_text(encoding="utf-8")
+        assert "0.2.1" in (ROOT / "INFO.md").read_text(encoding="utf-8")
         assert (ROOT / "assets" / "app.ico").is_file()
 
         # --- Kernpfade: open / annotate / export / license ---
@@ -507,7 +524,7 @@ def main() -> int:
         win._add_chained_frame()
         assert len(win.layout_doc.text_frames) >= 2
         assert "Lizenz:" in win.license_label.text()
-        assert "v0.2.0" in win.version_label.text()
+        assert "v0.2.1" in win.version_label.text()
         from instantlensdoc.ui.settings_dialog import SettingsDialog
         from instantlensdoc.ui.batch_dialog import BatchConvertDialog
         from instantlensdoc.ui.pdf_tools_dialog import PdfToolsDialog
@@ -578,7 +595,7 @@ def main() -> int:
             from instantlensdoc.ui.password_dialog import CompressPdfDialog, SetPasswordDialog
             from instantlensdoc.ui.stubs import PLANNED
             assert KeyboardHelpDialog and SetPasswordDialog and CompressPdfDialog
-            assert "0.2.0" in PLANNED["ki"]
+            assert "0.2.1" in PLANNED["ki"]
             assert "Coming soon" in PLANNED["cloud"]
             assert callable(win.pdf_view.bake_redactions)
             assert callable(win.pdf_view.clear_redactions)
@@ -598,7 +615,26 @@ def main() -> int:
             )
             assert win.pdf_view.save_annotations()
             assert win.pdf_view.store.sidecar_path.exists()
+            assert callable(win.pdf_view.save_annotations_as)
+            backup = Path(td2) / "ann-backup.ildann.json"
+            assert win.pdf_view.store.export_backup(backup).exists()
             assert "Lizenz:" in win.license_label.text()
+            # Batch-Fortschritt Callback (current/total)
+            from instantlensdoc.core import batch as batch_mod2
+
+            imgs = Path(td2) / "batch_imgs"
+            imgs.mkdir()
+            Image.new("RGB", (40, 40), "white").save(imgs / "a.png")
+            Image.new("RGB", (40, 40), "black").save(imgs / "b.png")
+            seen: list[tuple] = []
+
+            def _prog(msg, current=0, total=0):
+                seen.append((msg, current, total))
+
+            br2 = batch_mod2.run_batch(
+                imgs, Path(td2) / "bout2", batch_mod2.BatchMode.IMAGES_TO_PDF_EACH, progress=_prog
+            )
+            assert br2.ok_count == 2 and seen and any(t > 0 for _, _, t in seen)
             qt_html = Path(td2) / "qt_core.html"
             from instantlensdoc.core.export import export_html as eh2
 
