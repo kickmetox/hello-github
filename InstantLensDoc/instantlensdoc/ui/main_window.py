@@ -186,6 +186,7 @@ class MainWindow(QMainWindow):
         self.sidebar.outline_activated.connect(self._on_outline_jump)
         self.sidebar.outline_add_requested.connect(self._outline_add)
         self.sidebar.outline_delete_requested.connect(self._outline_delete)
+        self.sidebar.annotation_filter_changed.connect(lambda _t: None)
         self.sidebar.fulltext_hit_activated.connect(self._on_fulltext_hit)
         self.sidebar.page_thumb_activated.connect(self._on_thumb_jump)
         self.sidebar.pages_reordered.connect(self._on_thumbs_reordered)
@@ -313,6 +314,11 @@ class MainWindow(QMainWindow):
         act_find.setShortcut(QKeySequence.Find)
         act_find.triggered.connect(self._focus_search)
         m_edit.addAction(act_find)
+        act_find_repl = QAction("Suchen und Ersetzen…", self)
+        act_find_repl.setShortcut(QKeySequence("Ctrl+R"))
+        act_find_repl.setToolTip("Find/Replace im Texteditor")
+        act_find_repl.triggered.connect(self._find_replace)
+        m_edit.addAction(act_find_repl)
         act_mark = QAction("Auswahl markieren", self)
         act_mark.setShortcut(QKeySequence("Ctrl+H"))
         act_mark.triggered.connect(self._mark_selection)
@@ -365,6 +371,10 @@ class MainWindow(QMainWindow):
         act_merge = QAction("PDFs zusammenführen / teilen…", self)
         act_merge.triggered.connect(self._pdf_tools)
         m_pdf.addAction(act_merge)
+        act_extract = QAction("Seitenbereich extrahieren…", self)
+        act_extract.setToolTip("Seiten von–bis in neues PDF")
+        act_extract.triggered.connect(self._extract_page_range)
+        m_pdf.addAction(act_extract)
         act_wm = QAction("Wasserzeichen / Seitennummern…", self)
         act_wm.triggered.connect(self._watermark_tools)
         m_pdf.addAction(act_wm)
@@ -639,19 +649,37 @@ class MainWindow(QMainWindow):
     def _update_license_status(self):
         st = self.license_manager.status()
         self.version_label.setText(f"v{__version__}")
+        urgent = st.allowed and st.days_remaining < 7
         if st.mode == "licensed":
             who = f" · {st.email}" if st.email else ""
-            text = f"Lizenz: Aktiviert{who} · noch {st.days_remaining} Tag(e)"
-            style = "color: #1B7A3D; font-weight: 600; padding-right: 6px;"
+            if urgent:
+                text = f"⚠ Lizenz: noch {st.days_remaining} Tag(e)!{who}"
+                style = (
+                    "color: #7B241C; background: #F5B7B1; font-weight: 800; "
+                    "font-size: 12px; padding: 3px 8px; border-radius: 3px;"
+                )
+            else:
+                text = f"Lizenz: Aktiviert{who} · noch {st.days_remaining} Tag(e)"
+                style = "color: #1B7A3D; font-weight: 600; padding-right: 6px;"
         elif st.mode == "trial":
-            text = f"Lizenz: Testversion · noch {st.days_remaining} Tag(e) — Hilfe → Lizenz"
-            style = "color: #B9770E; font-weight: 600; padding-right: 6px;"
+            if urgent:
+                text = f"⚠ Testversion: noch {st.days_remaining} Tag(e)! — Hilfe → Lizenz"
+                style = (
+                    "color: #7B241C; background: #F9E79F; font-weight: 800; "
+                    "font-size: 12px; padding: 3px 8px; border-radius: 3px;"
+                )
+            else:
+                text = f"Lizenz: Testversion · noch {st.days_remaining} Tag(e) — Hilfe → Lizenz"
+                style = "color: #B9770E; font-weight: 600; padding-right: 6px;"
         else:
             text = "Lizenz: Abgelaufen — Hilfe → Lizenz · ame@sellerbach.de"
             style = "color: #C0392B; font-weight: 700; padding-right: 6px;"
         self.license_label.setText(text)
         self.license_label.setStyleSheet(style)
-        self.license_label.setToolTip(st.message)
+        tip = st.message
+        if urgent:
+            tip = f"Restlaufzeit unter 7 Tagen — {st.message}"
+        self.license_label.setToolTip(tip)
         if not st.allowed:
             QMessageBox.warning(
                 self,
@@ -686,6 +714,26 @@ class MainWindow(QMainWindow):
         else:
             self.sidebar.search.setFocus()
 
+    def _find_replace(self):
+        if self.stack.currentWidget() is not self.editor:
+            QMessageBox.information(
+                self,
+                "Suchen und Ersetzen",
+                "Find/Replace ist im Texteditor verfügbar.",
+            )
+            return
+        from instantlensdoc.ui.find_replace_dialog import FindReplaceDialog
+
+        initial = ""
+        cur = self.editor.textCursor()
+        if cur.hasSelection():
+            initial = cur.selectedText().replace("\u2029", " ")
+        dlg = FindReplaceDialog(self.editor, self, initial_find=initial)
+        dlg.exec()
+        if self.doc and self.doc.kind in (DocKind.TEXT, DocKind.MARKDOWN, DocKind.HTML, DocKind.DOCX):
+            self.doc.text = self.editor.toPlainText()
+            self.doc.dirty = True
+        self._on_text_changed()
     def _undo(self):
         if self.stack.currentWidget() is self.pdf_view:
             self.pdf_view.undo_annotation()
@@ -1100,7 +1148,49 @@ class MainWindow(QMainWindow):
 
     def _pdf_tools(self):
         initial = str(self.pdf_view.pdf_path) if self.pdf_view.pdf_path else None
-        PdfToolsDialog(self, initial_pdf=initial).exec()
+        pc = self.pdf_view.page_count if self.pdf_view.pdf_path else None
+        PdfToolsDialog(
+            self,
+            initial_pdf=initial,
+            page_count=pc,
+            current_page=self.pdf_view.page_index if self.pdf_view.pdf_path else 0,
+        ).exec()
+
+    def _extract_page_range(self):
+        """Schnelldialog: Seiten von–bis → neues PDF (aktuelles Dokument vorausgefüllt)."""
+        if not self.pdf_view.pdf_path:
+            QMessageBox.information(
+                self,
+                "Seitenbereich",
+                "Bitte zuerst ein PDF öffnen — oder PDF → zusammenführen / teilen → Seitenbereich.",
+            )
+            self._pdf_tools()
+            return
+        from PySide6.QtWidgets import QInputDialog
+        from ild_pdf.pages import extract_page_range
+
+        n = self.pdf_view.page_count
+        start, ok1 = QInputDialog.getInt(
+            self, "Seitenbereich", "Von Seite (1-basiert):", self.pdf_view.page_index + 1, 1, n
+        )
+        if not ok1:
+            return
+        end, ok2 = QInputDialog.getInt(self, "Seitenbereich", "Bis Seite (inklusive):", n, start, n)
+        if not ok2:
+            return
+        src = Path(self.pdf_view.pdf_path)
+        default = str(src.with_name(f"{src.stem}_p{start}-{end}.pdf"))
+        dest, _ = QFileDialog.getSaveFileName(self, "Ziel-PDF", default, "PDF (*.pdf)")
+        if not dest:
+            return
+        if not dest.lower().endswith(".pdf"):
+            dest += ".pdf"
+        try:
+            out = extract_page_range(src, dest, start, end, one_based=True)
+            self._set_status(f"Seitenbereich {start}–{end} → {Path(out).name}")
+            QMessageBox.information(self, "Seitenbereich", f"Gespeichert:\n{out}")
+        except Exception as e:
+            QMessageBox.critical(self, "Seitenbereich", str(e))
 
     def _watermark_tools(self):
         initial = str(self.pdf_view.pdf_path) if self.pdf_view.pdf_path else None

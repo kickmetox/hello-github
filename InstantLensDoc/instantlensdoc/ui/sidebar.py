@@ -72,6 +72,7 @@ class Sidebar(QWidget):
     outline_activated = Signal(int)  # PDF-Seite 0-basiert
     outline_add_requested = Signal()
     outline_delete_requested = Signal()
+    annotation_filter_changed = Signal(str)  # Typ-Wert oder "" für alle
     fulltext_hit_activated = Signal(str, object)  # path, page_index|None
     page_thumb_activated = Signal(int)  # PDF-Seite 0-basiert
     pages_reordered = Signal(list)  # alte Indizes in neuer Reihenfolge
@@ -145,6 +146,11 @@ class Sidebar(QWidget):
         layout.addLayout(ol_btns)
 
         layout.addWidget(QLabel("Annotationen"))
+        self.ann_filter = QComboBox()
+        self.ann_filter.setToolTip("Nach Annotationstyp filtern")
+        self.ann_filter.addItem("Alle Typen", "")
+        self.ann_filter.currentIndexChanged.connect(self._on_ann_filter_changed)
+        layout.addWidget(self.ann_filter)
         self.annotations = QListWidget()
         self.annotations.setMaximumHeight(140)
         self.annotations.setToolTip("Klick → zur Annotation springen")
@@ -158,6 +164,9 @@ class Sidebar(QWidget):
 
         self.setMinimumWidth(240)
         self._fulltext_mode = False
+        self._ann_all_lines: list[str] = []
+        self._ann_all_payloads: list = []
+        self._ann_filter_updating = False
 
     def search_text(self) -> str:
         return self.search.currentText().strip()
@@ -331,16 +340,87 @@ class Sidebar(QWidget):
             return None
         return tuple(int(i) for i in path)
 
-    def set_annotations(self, lines: list[str], payloads: list | None = None):
+    def annotation_filter_type(self) -> str:
+        """Aktueller Filter: AnnotationType.value oder '' für alle."""
+        data = self.ann_filter.currentData()
+        return str(data) if data else ""
+
+    def _on_ann_filter_changed(self, _index: int = 0):
+        if self._ann_filter_updating:
+            return
+        self._apply_annotation_filter()
+        self.annotation_filter_changed.emit(self.annotation_filter_type())
+
+    def _sync_ann_filter_options(self, payloads: list | None):
+        """Filter-Dropdown mit vorkommenden Typen aktualisieren (Auswahl behalten)."""
+        current = self.annotation_filter_type()
+        types: list[str] = []
+        seen: set[str] = set()
+        for p in payloads or []:
+            t = getattr(getattr(p, "type", None), "value", None) or getattr(p, "type", None)
+            if t and str(t) not in seen:
+                seen.add(str(t))
+                types.append(str(t))
+        types.sort()
+        self._ann_filter_updating = True
+        self.ann_filter.blockSignals(True)
+        self.ann_filter.clear()
+        self.ann_filter.addItem("Alle Typen", "")
+        labels = {
+            "highlight": "Highlight",
+            "underline": "Unterstreichen",
+            "sticky": "Notiz",
+            "text": "Text",
+            "stamp": "Stempel",
+            "callout": "Callout",
+            "rectangle": "Rechteck",
+            "line": "Linie",
+            "arrow": "Pfeil",
+            "measure": "Messung",
+            "text_overlay": "Text-Overlay",
+            "signature_field": "Signaturfeld",
+            "signature": "Signatur",
+            "redaction": "Schwärzung",
+        }
+        for t in types:
+            self.ann_filter.addItem(labels.get(t, t), t)
+        idx = self.ann_filter.findData(current)
+        self.ann_filter.setCurrentIndex(idx if idx >= 0 else 0)
+        self.ann_filter.blockSignals(False)
+        self._ann_filter_updating = False
+
+    def _apply_annotation_filter(self):
+        want = self.annotation_filter_type()
         self.annotations.clear()
-        for i, line in enumerate(lines):
+        for i, line in enumerate(self._ann_all_lines):
+            payload = self._ann_all_payloads[i] if i < len(self._ann_all_payloads) else None
+            if want:
+                t = getattr(getattr(payload, "type", None), "value", None) or getattr(
+                    payload, "type", None
+                )
+                if str(t) != want:
+                    continue
             item = QListWidgetItem(line)
-            if payloads and i < len(payloads):
-                item.setData(256, payloads[i])
+            if payload is not None:
+                item.setData(256, payload)
             self.annotations.addItem(item)
 
+    def set_annotations(self, lines: list[str], payloads: list | None = None):
+        self._ann_all_lines = list(lines)
+        self._ann_all_payloads = list(payloads) if payloads else [None] * len(lines)
+        self._sync_ann_filter_options(self._ann_all_payloads)
+        self._apply_annotation_filter()
+
     def clear_annotations(self):
+        self._ann_all_lines = []
+        self._ann_all_payloads = []
         self.annotations.clear()
+        self._ann_filter_updating = True
+        self.ann_filter.blockSignals(True)
+        self.ann_filter.clear()
+        self.ann_filter.addItem("Alle Typen", "")
+        self.ann_filter.blockSignals(False)
+        self._ann_filter_updating = False
 
     def set_marks(self, lines: list[str], payloads: list | None = None):
         self.marks.clear()

@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | 0.2.5 |
+| Version | 0.2.6 |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -13,7 +13,8 @@
 
 - Trial: **28 Tage** ab Erststart  
 - Keys: **32 Tage (30+2)**, Format `ILD1.…`  
-- Neu anfordern: **ame@sellerbach.de**
+- Neu anfordern: **ame@sellerbach.de**  
+- Statusleiste: bei **<7 Tagen** Restlaufzeit prominent hervorgehoben
 
 ## Quickstart (Windows)
 
@@ -31,12 +32,12 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)
 
-## Neu in 0.2.5
+## Neu in 0.2.6
 
-- PDF-Lesezeichen hinzufügen/löschen (Outline)  
-- Annotationen als JSON exportieren/importieren  
-- Editor: Wortzählung in der Statusleiste  
-- PDF „Als Kopie speichern“  
+- PDF-Seitenbereich extrahieren (von–bis → neues PDF)  
+- Annotation-Filter nach Typ in der Sidebar  
+- Editor: Suchen und Ersetzen (Ctrl+R)  
+- Lizenz-Resttage prominent bei <7 Tagen  
 - Stubs KI/Cloud/Stylus/3D unverändert  
 
 Details: [CHANGELOG.md](CHANGELOG.md)

@@ -119,6 +119,41 @@ def merge_pdfs(sources: Sequence[str | Path], dest: str | Path) -> None:
     out.save(dest)
 
 
+def extract_page_range(
+    path: str | Path,
+    dest: str | Path,
+    start: int,
+    end: int,
+    *,
+    one_based: bool = False,
+) -> Path:
+    """
+    Seitenbereich von–bis in ein neues PDF extrahieren (inklusive Endseite).
+    start/end: 0-basiert, oder 1-basiert wenn one_based=True.
+    Quell-PDF bleibt unverändert.
+    """
+    path = Path(path)
+    dest = Path(dest)
+    if one_based:
+        start = int(start) - 1
+        end = int(end) - 1
+    else:
+        start = int(start)
+        end = int(end)
+    with pikepdf.open(path) as pdf:
+        n = len(pdf.pages)
+        if n == 0:
+            raise ValueError("PDF hat keine Seiten")
+        if start < 0 or end >= n or start > end:
+            raise ValueError(f"Ungültiger Bereich {start + 1}–{end + 1} (1..{n})")
+        out = pikepdf.Pdf.new()
+        for p in range(start, end + 1):
+            out.pages.append(pdf.pages[p])
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        out.save(dest)
+    return dest
+
+
 def split_pdf(
     path: str | Path,
     dest_dir: str | Path,

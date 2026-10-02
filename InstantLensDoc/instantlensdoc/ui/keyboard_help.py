@@ -18,6 +18,7 @@ SHORTCUTS_HTML = """
 <tr><td>Rückgängig</td><td><code>Ctrl+Z</code></td></tr>
 <tr><td>Wiederholen</td><td><code>Ctrl+Y</code> / <code>Ctrl+Shift+Z</code></td></tr>
 <tr><td>Suchen</td><td><code>Ctrl+F</code></td></tr>
+<tr><td>Suchen und Ersetzen</td><td><code>Ctrl+R</code></td></tr>
 <tr><td>Auswahl markieren</td><td><code>Ctrl+H</code></td></tr>
 <tr><td>Bild aus Zwischenablage</td><td><code>Ctrl+Shift+V</code></td></tr>
 <tr><td>PDF: Bild einfügen (Viewer)</td><td><code>Ctrl+V</code></td></tr>
@@ -43,7 +44,12 @@ Notiz/Stempel/Callout/Overlay per Klick; <b>HL</b>/<b>Stift</b>-Farben-Picker; A
 Seite <b>⟲/⟳ drehen</b>, <b>leere Seite</b>, <b>duplizieren</b>.</p>
 <p><b>PDF-Suche:</b> Sidebar-Suche highlightet Treffer auf der aktuellen Seite;
 „Weiter“ springt zum nächsten Treffer; <b>letzte Suchbegriffe</b> im Dropdown.</p>
-<p><b>Annotationen:</b> eigene Liste in der Sidebar — Klick springt zur Annotation.</p>
+<p><b>Annotationen:</b> eigene Liste in der Sidebar — Klick springt zur Annotation;
+Filter-Dropdown nach Typ.</p>
+<p><b>Seitenbereich:</b> PDF → Seitenbereich extrahieren… (von–bis → neues PDF)
+bzw. Dialog „zusammenführen / teilen / Bereich“.</p>
+<p><b>Suchen und Ersetzen:</b> Bearbeiten → Ctrl+R (nur Texteditor).</p>
+<p><b>Lizenz:</b> bei weniger als 7 Resttagen prominent in der Statusleiste.</p>
 <p><b>Seiten als Bilder:</b> PDF → Seite/Seiten als PNG/JPEG exportieren (aktuell oder alle).</p>
 <p><b>Thumbnails:</b> in der Sidebar ziehen zum Neuordnen der Seiten.</p>
 <p><b>Statusleiste:</b> Dateiname · Seite x/y · Zoom % · Wörter/Ann. · Version · Lizenz.</p>

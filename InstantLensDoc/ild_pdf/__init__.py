@@ -15,6 +15,7 @@ from .annotate import (
 )
 from .pages import (
     PAGE_SIZE_PRESETS,
+    extract_page_range,
     merge_pdfs,
     split_pdf,
     rotate_page,
@@ -64,6 +65,7 @@ __all__ = [
     "DRAG_TYPES",
     "STAMP_PRESETS",
     "PAGE_SIZE_PRESETS",
+    "extract_page_range",
     "merge_pdfs",
     "split_pdf",
     "rotate_page",
@@ -108,4 +110,4 @@ __all__ = [
     "set_metadata",
 ]
 
-__version__ = "0.2.5"
+__version__ = "0.2.6"

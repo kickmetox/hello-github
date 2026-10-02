@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Smoke-Test 0.2.5 (CLI + optional offscreen Qt). Kernpfade: open/annotate/export/license."""
+"""Smoke-Test 0.2.6 (CLI + optional offscreen Qt). Kernpfade: open/annotate/export/license."""
 
 from __future__ import annotations
 
@@ -51,6 +51,7 @@ def main() -> int:
     )
     from ild_pdf.pages import (
         duplicate_page,
+        extract_page_range,
         insert_blank_page,
         merge_pdfs,
         reorder_pages,
@@ -92,8 +93,8 @@ def main() -> int:
     from instantlensdoc.core.update_check import check_for_updates
     from instantlensdoc.license import KEY_DAYS, TRIAL_DAYS, generate_key, verify_key
 
-    assert __version__ == "0.2.5", __version__
-    assert ild_ver == "0.2.5", ild_ver
+    assert __version__ == "0.2.6", __version__
+    assert ild_ver == "0.2.6", ild_ver
     assert TRIAL_DAYS == 28 and KEY_DAYS == 32
     key = generate_key("ame@sellerbach.de")
     ok, msg, _ = verify_key(key)
@@ -111,7 +112,7 @@ def main() -> int:
     assert "Settings" in tr("settings")
     set_lang("de")
     upd = check_for_updates(allow_network=False)
-    assert upd.local_version == "0.2.5" and not upd.online
+    assert upd.local_version == "0.2.6" and not upd.online
     assert get_export_jpeg_quality() >= 10
     assert get_ui_lang() in ("de", "en")
     assert 25 <= get_default_zoom_percent() <= 500
@@ -127,8 +128,8 @@ def main() -> int:
     assert get_ann_highlight_color() == "#FFCC00"
     assert get_ann_pen_color() == "#112233"
     assert (ROOT / "CHANGELOG.md").is_file()
-    assert "0.2.5" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-    assert "0.2.5" in (ROOT / "README.md").read_text(encoding="utf-8")
+    assert "0.2.6" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    assert "0.2.6" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "run.bat" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "sync-ild.ps1" in (ROOT / "README.md").read_text(encoding="utf-8")
 
@@ -437,13 +438,13 @@ def main() -> int:
 
         assert (ROOT / "installer" / "installer-hinweis.txt").exists()
         iss = (ROOT / "installer" / "instantlensdoc.iss").read_text(encoding="utf-8")
-        assert "0.2.5" in iss and "desktopicon" in iss and "DisableProgramGroupPage=no" in iss
+        assert "0.2.6" in iss and "desktopicon" in iss and "DisableProgramGroupPage=no" in iss
         assert "UninstallDisplayName" in iss and "Uninstallable=yes" in iss
         assert "IncludeKeygen" in iss and "SetupIconFile" in iss
         assert "InstantLensKeygen.exe" in iss
         assert "uninstallexe" in iss
         bw = (ROOT / "build-windows.ps1").read_text(encoding="utf-8")
-        assert "0.2.5" in bw and "NoKeygenInApp" in bw and "--icon" in bw
+        assert "0.2.6" in bw and "NoKeygenInApp" in bw and "--icon" in bw
         assert "InstantLensKeygen.exe" in bw
         bi = (ROOT / "installer" / "build-installer.ps1").read_text(encoding="utf-8")
         assert "InstantLensKeygen.exe" in bi and "IncludeKeygen" in bi
@@ -462,7 +463,7 @@ def main() -> int:
         assert "QProgressDialog" in (ROOT / "instantlensdoc" / "ui" / "main_window.py").read_text(encoding="utf-8")
 
         assert (ROOT / "examples" / "ild_pdf_demo.py").exists()
-        assert "0.2.5" in (ROOT / "INFO.md").read_text(encoding="utf-8")
+        assert "0.2.6" in (ROOT / "INFO.md").read_text(encoding="utf-8")
         assert (ROOT / "assets" / "app.ico").is_file()
 
         # --- Kernpfade: open / annotate / export / license ---
@@ -519,6 +520,13 @@ def main() -> int:
         assert (td / "merged.pdf").is_file()
         parts = split_pdf(pdf, td / "split", single_pages=True)
         assert len(parts) >= 2
+        range_out = td / "range.pdf"
+        extract_page_range(pdf, range_out, 1, 2, one_based=True)
+        assert range_out.is_file() and range_out.stat().st_size > 0
+        import pikepdf as _pike
+
+        with _pike.open(range_out) as _rpdf:
+            assert len(_rpdf.pages) == 2
 
         txt = td / "findme.txt"
         txt.write_text("alpha beta FINDME gamma", encoding="utf-8")
@@ -567,6 +575,10 @@ def main() -> int:
         assert "Wortzählung" in (ROOT / "FEATURES.md").read_text(encoding="utf-8") or "Wörter" in (
             ROOT / "FEATURES.md"
         ).read_text(encoding="utf-8")
+        feat = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
+        assert "Seitenbereich" in feat or "extract_page_range" in feat
+        assert "Find/Replace" in feat or "Ersetzen" in feat
+        assert "Filter" in feat
 
         insert_signature_field(pdf, 0, x=50, y=50, label="Test")
         insert_signature_image(pdf, Image.new("RGBA", (80, 30), (0, 0, 0, 0)), 0, x=60, y=120)
@@ -597,6 +609,13 @@ def main() -> int:
         assert "Wörter" in win.word_status_label.text()
         n = win.editor.find_and_highlight("alpha")
         assert n == 2
+        assert win.editor.replace_all("alpha", "ALPHA") == 2
+        assert "ALPHA" in win.editor.toPlainText() and "alpha" not in win.editor.toPlainText()
+        assert win.editor.replace_one("beta", "BETA") == 1
+        assert "BETA" in win.editor.toPlainText()
+        from instantlensdoc.ui.find_replace_dialog import FindReplaceDialog
+
+        assert FindReplaceDialog
         from PySide6.QtGui import QTextCursor
 
         cur = win.editor.textCursor()
@@ -606,8 +625,15 @@ def main() -> int:
         assert win.editor.highlight_selection()
         win._add_chained_frame()
         assert len(win.layout_doc.text_frames) >= 2
-        assert "Lizenz:" in win.license_label.text()
-        assert "v0.2.5" in win.version_label.text()
+        assert "Lizenz:" in win.license_label.text() or "⚠" in win.license_label.text()
+        assert "v0.2.6" in win.version_label.text()
+        # Lizenz <7 Tage: Style prominent
+        st_lic = win.license_manager.status()
+        if st_lic.allowed and st_lic.days_remaining < 7:
+            assert "⚠" in win.license_label.text() or "font-weight: 800" in win.license_label.styleSheet()
+        assert callable(win._find_replace)
+        assert callable(win._extract_page_range)
+        assert hasattr(win.sidebar, "ann_filter")
         from instantlensdoc.ui.settings_dialog import SettingsDialog
         from instantlensdoc.ui.batch_dialog import BatchConvertDialog
         from instantlensdoc.ui.pdf_tools_dialog import PdfToolsDialog
@@ -636,6 +662,11 @@ def main() -> int:
             td2 = Path(td2)
             smoke_pdf = td2 / "smoke.pdf"
             Image.new("RGB", (300, 400), "white").save(smoke_pdf, "PDF")
+            # Mehrseitiges PDF für extract_page_range
+            from ild_pdf.pages import insert_blank_page as _ins_blank
+
+            _ins_blank(smoke_pdf, at_index=1)
+            _ins_blank(smoke_pdf, at_index=2)
             win.open_path(str(smoke_pdf))
             assert win.stack.currentWidget() is win.pdf_view
             old_scale = win.pdf_view.scale
@@ -737,19 +768,38 @@ def main() -> int:
             win.pdf_view.page_index = 0
             win.pdf_view.duplicate_current()
             assert win.pdf_view.page_count == n0 + 2
-            # Annotation-Liste Sidebar
+            # Annotation-Liste Sidebar + Filter
             win.pdf_view.store.add(
                 Annotation(0, AnnotationType.HIGHLIGHT, 8, 8, width=30, height=10, text="ann-list")
             )
+            win.pdf_view.store.add(
+                Annotation(0, AnnotationType.STICKY, 9, 9, width=20, height=20, text="sticky-f")
+            )
             win._refresh_pdf_marks()
+            assert win.sidebar.annotations.count() >= 2
+            # Filter sticky
+            idx = win.sidebar.ann_filter.findData("sticky")
+            assert idx >= 0
+            win.sidebar.ann_filter.setCurrentIndex(idx)
             assert win.sidebar.annotations.count() >= 1
+            assert all(
+                "sticky" in (win.sidebar.annotations.item(i).text().lower())
+                for i in range(win.sidebar.annotations.count())
+            )
+            win.sidebar.ann_filter.setCurrentIndex(0)  # Alle
             win.pdf_view.focus_annotation(win.pdf_view.store.annotations[-1])
             assert win.pdf_view._selected_ann_id
+            # extract_page_range API
+            from ild_pdf import extract_page_range as epr
+
+            er_out = Path(td2) / "extracted.pdf"
+            epr(smoke_pdf, er_out, 1, min(2, win.pdf_view.page_count), one_based=True)
+            assert er_out.is_file()
             # Suchhistorie
-            win._remember_search("smoke-query-025")
-            assert "smoke-query-025" in recent_searches_mod.load_recent_searches()
+            win._remember_search("smoke-query-026")
+            assert "smoke-query-026" in recent_searches_mod.load_recent_searches()
             win.sidebar.set_recent_searches(recent_searches_mod.load_recent_searches())
-            assert "smoke-query-025" in [
+            assert "smoke-query-026" in [
                 win.sidebar.search.itemText(i) for i in range(win.sidebar.search.count())
             ]
             assert hasattr(win, "file_status_label") and hasattr(win, "page_status_label")
@@ -780,7 +830,7 @@ def main() -> int:
             from instantlensdoc.ui.password_dialog import CompressPdfDialog, SetPasswordDialog
             from instantlensdoc.ui.stubs import PLANNED
             assert KeyboardHelpDialog and SetPasswordDialog and CompressPdfDialog
-            assert "0.2.5" in PLANNED["ki"]
+            assert "0.2.6" in PLANNED["ki"]
             assert "Coming soon" in PLANNED["cloud"]
             assert callable(win.pdf_view.bake_redactions)
             assert callable(win.pdf_view.clear_redactions)
@@ -803,7 +853,7 @@ def main() -> int:
             assert callable(win.pdf_view.save_annotations_as)
             backup = Path(td2) / "ann-backup.ildann.json"
             assert win.pdf_view.store.export_backup(backup).exists()
-            assert "Lizenz:" in win.license_label.text()
+            assert "Lizenz:" in win.license_label.text() or "⚠" in win.license_label.text()
             # Batch-Fortschritt Callback (current/total)
             from instantlensdoc.core import batch as batch_mod2
 

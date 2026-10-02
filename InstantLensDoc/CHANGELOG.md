@@ -1,5 +1,25 @@
 # Changelog — InstantLens Doc
 
+## 0.2.6 — Seitenbereich, Ann.-Filter, Find/Replace, Lizenz-Warnung
+
+Fokus: PDF-Seitenbereich, Annotation-Filter, Editor Ersetzen, Lizenz <7 Tage.
+
+### PDF
+- **Seitenbereich extrahieren**: von–bis → neues PDF (`ild_pdf.extract_page_range`; Menü PDF + Dialog-Tab)
+
+### Annotationen / Sidebar
+- **Filter nach Typ** in der Annotationen-Liste (Dropdown)
+
+### Editor / UX
+- **Suchen und Ersetzen** (Ctrl+R, Dialog Find/Replace/Alle)
+- **Lizenz-Resttage** bei <7 Tagen prominent (Hintergrund + Warnung in Statusleiste)
+
+### Docs / Packaging
+- Version **0.2.6**; Stubs KI/Cloud/Stylus/3D unverändert (keine Fake-Features)
+- Docs/CHANGELOG/ISS/Smoke auf 0.2.6
+
+---
+
 ## 0.2.5 — Outline editieren, Ann.-JSON, Wortzählung, PDF-Kopie
 
 Fokus: Lesezeichen bearbeiten, Annotation-Austausch, Editor-Status, PDF-Kopie.

@@ -23,8 +23,9 @@ HELP_HTML = """
 <li><b>Datei → Exportieren</b>: Editor-Inhalt als HTML, DOCX oder PDF (zuletzt genutzter Ordner wird gemerkt)</li>
 <li><b>Datei → Drucken</b> (Ctrl+P): Editor oder aktuelle PDF-Seite (Qt Print)</li>
 <li><b>Seitenleiste</b>: Suche (inkl. letzte Suchbegriffe), „Alle Docs“-Volltext, Zuletzt geöffnet, Dokumente,
-    Lesezeichen/Outline (+/− hinzufügen/löschen), <b>Annotationen</b> (klickbar), Markierungen/Treffer</li>
+    Lesezeichen/Outline (+/− hinzufügen/löschen), <b>Annotationen</b> (klickbar, <b>Filter nach Typ</b>), Markierungen/Treffer</li>
 <li><b>Bearbeiten → Rückgängig/Wiederholen</b>: Editor-Text <i>oder</i> PDF-Annotationen/Overlay-Text (Ctrl+Z / Ctrl+Y)</li>
+<li><b>Bearbeiten → Suchen und Ersetzen</b> (Ctrl+R): Find/Replace im Texteditor</li>
 <li><b>Bearbeiten → Auswahl markieren</b> (Ctrl+H): Markierung im Editor + Eintrag in der Seitenleiste</li>
 <li><b>Ansicht</b>: Zoom +/−, Seite einpassen (Ctrl+0), Breite (Ctrl+9), 100&nbsp;% (Ctrl+1);
     <b>Hell/Dunkel</b>-Design umschalten</li>
@@ -39,13 +40,13 @@ HELP_HTML = """
     Doppelklick oder Strg+Klick auf Overlay zum Bearbeiten;
     PDF → Text→Overlay / Overlay einbrennen;
     <b>Signaturfeld</b> (Platzhalter) und <b>Signatur (Bild)</b> einfügen;
-    <b>PDFs zusammenführen / teilen</b>;
+    <b>PDFs zusammenführen / teilen / Seitenbereich</b>;
     <b>Wasserzeichen / Seitennummern</b>;
     <b>Zwei PDFs vergleichen</b> (Seite neben Seite);
     <b>Passwort setzen/öffnen</b>; <b>Bildkompression</b> (Seiten neu als JPEG);
     <b>Metadaten bearbeiten</b>; <b>Seitengröße / Zuschneiden</b>;
     Seite/Seiten als PNG/JPEG exportieren / Bild als neue Seite / Seite drucken; Annotation löschen (Auswahl/letzte, Entf); Statusleiste Seite/Zoom/Dateiname/Wörter; Thumbnails per Drag neu ordnen;
-    PDF als Kopie speichern;
+    PDF als Kopie speichern; <b>Seitenbereich extrahieren</b> (von–bis → neues PDF);
     große PDFs: Warnung / Limits;
     <b>Seiten-Thumbnails</b> in der Sidebar</li>
 <li><b>Hilfe → Auf Updates prüfen</b>: lokal immer; Online optional (offline OK)</li>
@@ -64,7 +65,7 @@ HELP_HTML = """
     (<code>*.ildform.json</code>), Live-Vorschau, Export HTML/PDF</li>
 <li><b>Build (Windows)</b>: <code>build-windows.ps1</code> — PyInstaller App + Keygen</li>
 <li><b>Installer</b>: Desktop-Verknüpfung + Startmenü-Gruppe (siehe Inno-Hinweis)</li>
-<li><b>Lizenz</b>: Statusleiste (farbig) + Hilfe → Lizenz — Trial 4 Wochen, Keys 30+2 Tage</li>
+<li><b>Lizenz</b>: Statusleiste (farbig; bei &lt;7 Tagen Restlaufzeit prominent) + Hilfe → Lizenz — Trial 4 Wochen, Keys 30+2 Tage</li>
 <li><b>Keygen</b>: <code>run-keygen.bat</code> / <code>python -m keygen --gui</code>;
     Installer-EXE: <code>{app}/InstantLensKeygen.exe</code> (siehe <code>keygen/README.md</code>)</li>
 </ul>
@@ -76,7 +77,7 @@ Beispiel: <code>examples/ild_pdf_demo.py</code>. API: <code>ild_pdf/README.md</c
 <code>D:\\AI_Temp\\InstantLensDoc</code>, pip, optional Start. Eigenes Icon in <code>assets</code> bleibt erhalten.</p>
 <h3>Geplante Features</h3>
 <p>KI-Assistent, Cloud-Sync, Stylus/Palm Rejection, 3D u. a. sind im Menü als „Geplant“ markiert
-(Stub 0.2.5) — siehe FEATURES.md.</p>
+(Stub 0.2.6) — siehe FEATURES.md.</p>
 """
 
 

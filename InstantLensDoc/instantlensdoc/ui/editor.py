@@ -5,7 +5,7 @@ from __future__ import annotations
 import tempfile
 from pathlib import Path
 
-from PySide6.QtGui import QColor, QFont, QImage, QTextCharFormat, QTextCursor
+from PySide6.QtGui import QColor, QFont, QImage, QTextCharFormat, QTextCursor, QTextDocument
 from PySide6.QtWidgets import QApplication, QPlainTextEdit, QTextEdit
 
 
@@ -18,6 +18,7 @@ class TextEditor(QPlainTextEdit):
         self.setPlaceholderText("Dokumententext…")
         self._last_query = ""
         self._paste_image_dir: Path | None = None
+        self._last_case_sensitive = False
 
     def set_paste_image_dir(self, path: Path | None) -> None:
         self._paste_image_dir = Path(path) if path else None
@@ -63,10 +64,18 @@ class TextEditor(QPlainTextEdit):
     def clear_extra_selections(self) -> None:
         self.setExtraSelections([])
 
-    def find_and_highlight(self, query: str) -> int:
+    @staticmethod
+    def _find_flags(*, case_sensitive: bool = False) -> QTextDocument.FindFlag:
+        flags = QTextDocument.FindFlag(0)
+        if case_sensitive:
+            flags |= QTextDocument.FindCaseSensitively
+        return flags
+
+    def find_and_highlight(self, query: str, *, case_sensitive: bool = False) -> int:
         """Alle Vorkommen suchen und gelb markieren; Cursor auf ersten Treffer."""
         self.clear_extra_selections()
         self._last_query = query or ""
+        self._last_case_sensitive = case_sensitive
         if not query:
             return 0
 
@@ -77,9 +86,10 @@ class TextEditor(QPlainTextEdit):
         cursor = QTextCursor(doc)
         count = 0
         first: QTextCursor | None = None
+        flags = self._find_flags(case_sensitive=case_sensitive)
 
         while True:
-            cursor = doc.find(query, cursor)
+            cursor = doc.find(query, cursor, flags)
             if cursor.isNull():
                 break
             sel = QTextEdit.ExtraSelection()
@@ -98,18 +108,79 @@ class TextEditor(QPlainTextEdit):
             self.ensureCursorVisible()
         return count
 
-    def find_next(self, query: str | None = None) -> bool:
+    def find_next(self, query: str | None = None, *, case_sensitive: bool | None = None) -> bool:
         q = query if query is not None else self._last_query
         if not q:
             return False
-        found = self.find(q)
+        if case_sensitive is None:
+            case_sensitive = self._last_case_sensitive
+        self._last_query = q
+        self._last_case_sensitive = case_sensitive
+        flags = self._find_flags(case_sensitive=case_sensitive)
+        found = self.find(q, flags)
         if not found:
             # von vorn
             cur = self.textCursor()
             cur.movePosition(QTextCursor.Start)
             self.setTextCursor(cur)
-            found = self.find(q)
+            found = self.find(q, flags)
         return found
+
+    def replace_one(
+        self,
+        find: str,
+        replace: str,
+        *,
+        case_sensitive: bool = False,
+    ) -> int:
+        """Aktuelle Auswahl ersetzen, wenn sie dem Suchbegriff entspricht; sonst nächsten Treffer suchen."""
+        if not find:
+            return 0
+        cur = self.textCursor()
+        selected = cur.selectedText().replace("\u2029", "\n")
+        match = selected == find if case_sensitive else selected.casefold() == find.casefold()
+        if cur.hasSelection() and match:
+            cur.insertText(replace)
+            self.setTextCursor(cur)
+            self._last_query = find
+            self._last_case_sensitive = case_sensitive
+            return 1
+        if self.find_next(find, case_sensitive=case_sensitive):
+            cur = self.textCursor()
+            if cur.hasSelection():
+                cur.insertText(replace)
+                self.setTextCursor(cur)
+                return 1
+        return 0
+
+    def replace_all(
+        self,
+        find: str,
+        replace: str,
+        *,
+        case_sensitive: bool = False,
+    ) -> int:
+        """Alle Vorkommen ersetzen. Rückgabe: Anzahl."""
+        if not find:
+            return 0
+        self._last_query = find
+        self._last_case_sensitive = case_sensitive
+        flags = self._find_flags(case_sensitive=case_sensitive)
+        doc = self.document()
+        cursor = QTextCursor(doc)
+        cursor.beginEditBlock()
+        count = 0
+        search = QTextCursor(doc)
+        while True:
+            search = doc.find(find, search, flags)
+            if search.isNull():
+                break
+            search.insertText(replace)
+            count += 1
+            if count > 50_000:
+                break
+        cursor.endEditBlock()
+        return count
 
     def highlight_selection(self, color: str = "#FFE066") -> bool:
         """Aktuelle Auswahl dauerhaft (als ExtraSelection) markieren."""
