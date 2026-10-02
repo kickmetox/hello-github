@@ -1,0 +1,8 @@
+# VERALTET für den Standard-Pfad (lizenzfrei)
+
+Dieses Skript lädt Poppler-Windows-Binaries (GPL).  
+Nutzerentscheidung: **nicht** für Installer / Distribution verwenden.
+
+Nur für lokalen Notfall-Fallback / Debugging von Alt-Code (pdf2image).
+
+Standard: pypdfium2 — siehe README.md und docs/PYINSTALLER-PDFIUM.txt.

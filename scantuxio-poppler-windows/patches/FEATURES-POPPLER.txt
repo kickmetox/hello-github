@@ -1,0 +1,8 @@
+# FEATURES.txt — Ergänzung
+
+PDF (Windows, lizenzfreundlich)
+  - Rasterung über pypdfium2 / PDFium (Apache/BSD-ähnlich)
+  - Kein Poppler-Bundle im Installer
+  - Dev: pip install pypdfium2 pillow; Frozen: --collect-all pypdfium2
+  - API-Hilfe: python/pdf_render.py (convert_from_path)
+  - Optionaler Legacy-Fallback Poppler nur lokal / nicht ausliefern

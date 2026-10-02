@@ -1,0 +1,1 @@
+Siehe INSTALL-NOTICE.txt (pypdfium2). Poppler-Installer-Hinweis entfernt.

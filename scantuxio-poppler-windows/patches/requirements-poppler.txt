@@ -1,0 +1,4 @@
+# VERALTET — siehe requirements-pdfium.txt
+
+# pdf2image + Poppler (GPL) — nicht für lizenzfreien Installer
+# pdf2image>=1.17.0

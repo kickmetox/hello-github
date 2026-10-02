@@ -1,0 +1,29 @@
+Drittanbieter / Third-party — ScanTuxio Windows (lizenzfreundlicher PDF-Pfad)
+
+==============================================================================
+PYPDFIUM2 / PDFIUM  (Standard)
+==============================================================================
+Name:        pypdfium2 (Python-Bindings) + PDFium (Chromium PDF-Engine)
+PyPI:        https://pypi.org/project/pypdfium2/
+PDFium:      https://pdfium.googlesource.com/pdfium/
+
+Lizenz:      pypdfium2 typisch Apache-2.0 / BSD-3-Clause-kompatibel;
+             PDFium unter BSD-ähnlichen Bedingungen (Chromium/Google).
+             Kein GPL-Zwang durch PDF-Rasterung.
+
+Einbindung:  Als Python-Paket; Frozen-Build sammelt native DLL/SO via
+             PyInstaller --collect-all pypdfium2.
+             Installer liefert KEINE separaten Poppler-EXE.
+
+==============================================================================
+POPPLER  (nicht Standard, nicht im Installer)
+==============================================================================
+Nur optionaler lokaler Fallback für Entwickler, die noch pdf2image nutzen.
+Lizenz: GNU GPL. Wird von diesem Installer NICHT mitgeliefert.
+Siehe poppler_paths.py und frühere Hinweise — Nutzerentscheidung: lizenzfrei.
+
+==============================================================================
+WEITERE
+==============================================================================
+Pillow, Python-Runtime, PyInstaller-Artefakte: jeweilige Upstream-Lizenzen.
+Original-requirements.txt / Build-Manifest des vollständigen Quellbaums beachten.
