@@ -51,6 +51,7 @@ from ild_pdf import (
     stamp_with_date,
     bake_text_overlays,
     find_text_rects,
+    selection_to_highlight_rects,
     import_page_text_as_overlays,
     list_page_uri_links,
     render_page,
@@ -1069,6 +1070,10 @@ class PdfViewer(QWidget):
             b.setText(label)
             b.setCheckable(True)
             b.setChecked(t == AnnotationType.HIGHLIGHT)
+            if t == AnnotationType.HIGHLIGHT:
+                b.setToolTip(
+                    "Highlight: Text aufziehen (Selection→Highlight) oder freies Rechteck — speichert Annotation"
+                )
             b.clicked.connect(lambda checked, tool=t: self._set_tool(tool))
             self._tool_buttons.append(b)
             toolbar.addWidget(b)
@@ -3447,15 +3452,45 @@ class PdfViewer(QWidget):
         from ild_pdf import extract_page_image
         from instantlensdoc.core.app_settings import (
             EXPORT_RASTER_DPI_CHOICES,
+            apply_export_profile,
             dialog_start_dir,
+            get_active_export_profile_name,
+            get_export_profile,
+            get_export_profiles,
             get_export_raster_dpi,
             remember_recent_dir,
             set_export_raster_dpi,
             set_last_export_dir,
         )
 
+        profiles = get_export_profiles()
+        active_name = get_active_export_profile_name()
+        profile = get_export_profile(active_name) if active_name else None
+        if profiles:
+            names = ["(kein Profil)"] + [str(p["name"]) for p in profiles]
+            default_idx = 0
+            if profile:
+                try:
+                    default_idx = names.index(str(profile["name"]))
+                except ValueError:
+                    default_idx = 0
+            chosen, ok = QInputDialog.getItem(
+                self,
+                "Seite als Bild",
+                "Export-Profil (DPI/Format/Ziel):",
+                names,
+                default_idx,
+                False,
+            )
+            if not ok:
+                return
+            if chosen and chosen != "(kein Profil)":
+                profile = apply_export_profile(chosen)
+            else:
+                profile = None
+
         dpi_items = [str(d) for d in EXPORT_RASTER_DPI_CHOICES]
-        default_dpi = str(get_export_raster_dpi())
+        default_dpi = str(int(profile["dpi"]) if profile else get_export_raster_dpi())
         dpi_idx = dpi_items.index(default_dpi) if default_dpi in dpi_items else 1
         dpi_str, ok = QInputDialog.getItem(
             self,
@@ -3470,10 +3505,18 @@ class PdfViewer(QWidget):
         dpi = int(dpi_str)
         set_export_raster_dpi(dpi)
 
-        start_dir = dialog_start_dir(self.pdf_path.parent)
-        default = str(Path(start_dir) / f"{self.pdf_path.stem}_p{self.page_index + 1}.png")
+        prefer_jpeg = bool(profile and str(profile.get("format")) == "JPEG")
+        start_dir = dialog_start_dir(
+            str(profile["target"]) if profile and profile.get("target") else None,
+            self.pdf_path.parent,
+        )
+        ext = "jpg" if prefer_jpeg else "png"
+        default = str(Path(start_dir) / f"{self.pdf_path.stem}_p{self.page_index + 1}.{ext}")
+        filters = (
+            "JPEG (*.jpg *.jpeg);;PNG (*.png)" if prefer_jpeg else "PNG (*.png);;JPEG (*.jpg *.jpeg)"
+        )
         path, selected = QFileDialog.getSaveFileName(
-            self, "Seite als Bild", default, "PNG (*.png);;JPEG (*.jpg *.jpeg)"
+            self, "Seite als Bild", default, filters
         )
         if not path:
             return
@@ -3511,12 +3554,42 @@ class PdfViewer(QWidget):
         from ild_pdf import extract_pages_as_images
         from instantlensdoc.core.app_settings import (
             EXPORT_RASTER_DPI_CHOICES,
+            apply_export_profile,
             dialog_start_dir,
+            get_active_export_profile_name,
+            get_export_profile,
+            get_export_profiles,
             get_export_raster_dpi,
             remember_recent_dir,
             set_export_raster_dpi,
             set_last_export_dir,
         )
+
+        profiles = get_export_profiles()
+        active_name = get_active_export_profile_name()
+        profile = get_export_profile(active_name) if active_name else None
+        if profiles:
+            names = ["(kein Profil)"] + [str(p["name"]) for p in profiles]
+            default_idx = 0
+            if profile:
+                try:
+                    default_idx = names.index(str(profile["name"]))
+                except ValueError:
+                    default_idx = 0
+            chosen, ok = QInputDialog.getItem(
+                self,
+                "Seiten als Bilder",
+                "Export-Profil (DPI/Format/Ziel):",
+                names,
+                default_idx,
+                False,
+            )
+            if not ok:
+                return
+            if chosen and chosen != "(kein Profil)":
+                profile = apply_export_profile(chosen)
+            else:
+                profile = None
 
         scope, ok = QInputDialog.getItem(
             self,
@@ -3528,18 +3601,20 @@ class PdfViewer(QWidget):
         )
         if not ok:
             return
+        fmt_items = ["PNG", "JPEG"]
+        fmt_idx = 1 if profile and str(profile.get("format")) == "JPEG" else 0
         fmt, ok = QInputDialog.getItem(
             self,
             "Seiten als Bilder",
             "Format:",
-            ["PNG", "JPEG"],
-            0,
+            fmt_items,
+            fmt_idx,
             False,
         )
         if not ok:
             return
         dpi_items = [str(d) for d in EXPORT_RASTER_DPI_CHOICES]
-        default_dpi = str(get_export_raster_dpi())
+        default_dpi = str(int(profile["dpi"]) if profile else get_export_raster_dpi())
         dpi_idx = dpi_items.index(default_dpi) if default_dpi in dpi_items else 1
         dpi_str, ok = QInputDialog.getItem(
             self,
@@ -3553,7 +3628,10 @@ class PdfViewer(QWidget):
             return
         dpi = int(dpi_str)
         set_export_raster_dpi(dpi)
-        start_dir = dialog_start_dir(self.pdf_path.parent)
+        start_dir = dialog_start_dir(
+            str(profile["target"]) if profile and profile.get("target") else None,
+            self.pdf_path.parent,
+        )
         out_dir = QFileDialog.getExistingDirectory(self, "Zielordner für Bilder", start_dir)
         if not out_dir:
             return
@@ -3656,6 +3734,69 @@ class PdfViewer(QWidget):
         except Exception as e:
             QMessageBox.warning(self, "Bild einfügen", str(e))
 
+    def _highlight_from_text_selection(
+        self,
+        page: int,
+        x0: float,
+        y0: float,
+        x1: float,
+        y1: float,
+    ) -> bool:
+        """Selection→Highlight: Text unter Drag als Highlight-Annotation(en) speichern."""
+        if not self.store or not self.pdf_path:
+            return False
+        try:
+            rects, text = selection_to_highlight_rects(
+                self.pdf_path,
+                page,
+                x0,
+                y0,
+                x1,
+                y1,
+                scale=self.scale,
+                password=self.password,
+            )
+        except Exception:
+            return False
+        if not rects:
+            return False
+        created: list[Annotation] = []
+        with self.store.atomic():
+            for i, r in enumerate(rects):
+                snippet = (r.text or "").strip() or (text if i == 0 else "")
+                ann = Annotation(
+                    page=page,
+                    type=AnnotationType.HIGHLIGHT,
+                    x=r.x,
+                    y=r.y,
+                    width=max(r.width, 4.0),
+                    height=max(r.height, 6.0),
+                    color=self._highlight_color,
+                    text=snippet,
+                    opacity=self._default_opacity,
+                )
+                self.store.add(ann)
+                created.append(ann)
+        if not created:
+            return False
+        try:
+            self.store.save()
+        except Exception as e:
+            QMessageBox.warning(self, "Annotationen", f"Speichern fehlgeschlagen: {e}")
+        self._selected_ann_id = created[0].id
+        self._selected_ann_ids = {a.id for a in created}
+        self.canvas.set_selected_ids(self._selected_ann_ids)
+        self.refresh()
+        self.annotations_changed.emit()
+        preview = (text or created[0].text or "").replace("\n", " ")
+        if len(preview) > 48:
+            preview = preview[:45] + "…"
+        n = len(created)
+        self.status.emit(
+            f"Text-Highlight ({n}): {preview}" if preview else f"Text-Highlight ({n})"
+        )
+        return True
+
     def _on_drag(self, x0: float, y0: float, x1: float, y1: float):
         if not self.store or self.tool is None or self.tool not in DRAG_TYPES:
             return
@@ -3667,6 +3808,9 @@ class PdfViewer(QWidget):
         ly1 = ly0 + (y1 - y0)
         x0, y0, x1, y1 = lx0, ly0, lx1, ly1
         if self.tool == AnnotationType.HIGHLIGHT:
+            # Selection→Highlight: Text unter dem Drag-Rechteck als Annotation(en)
+            if self.pdf_path and self._highlight_from_text_selection(page, x0, y0, x1, y1):
+                return
             ann = Annotation(
                 page=page,
                 type=AnnotationType.HIGHLIGHT,

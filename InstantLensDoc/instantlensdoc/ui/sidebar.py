@@ -212,9 +212,15 @@ class Sidebar(QWidget):
         self.ann_search = QLineEdit()
         self.ann_search.setPlaceholderText("Annotationen suchen…")
         self.ann_search.setClearButtonEnabled(True)
-        self.ann_search.setToolTip("Filtert die Annotationsliste nach Text")
+        self.ann_search.setToolTip("Filtert die Annotationsliste nach Text (optional Regex)")
         self.ann_search.textChanged.connect(self._on_ann_search_changed)
-        layout.addWidget(self.ann_search)
+        search_row = QHBoxLayout()
+        search_row.addWidget(self.ann_search, 1)
+        self.ann_search_regex = QCheckBox("Regex")
+        self.ann_search_regex.setToolTip("Suchbegriff als regulären Ausdruck (case-insensitive)")
+        self.ann_search_regex.toggled.connect(self._on_ann_search_regex_toggled)
+        search_row.addWidget(self.ann_search_regex)
+        layout.addLayout(search_row)
         self.annotations = QListWidget()
         self.annotations.setMaximumHeight(160)
         self.annotations.setToolTip("Gruppiert nach Seite — Klick → zur Annotation springen")
@@ -251,6 +257,7 @@ class Sidebar(QWidget):
         self._ann_all_payloads: list = []
         self._ann_filter_updating = False
         self._ann_search_query = ""
+        self._ann_search_regex = False
         self._ann_color_filter = ""
         self._ann_tag_filter = ""
         self._ann_current_page_index: int | None = None
@@ -602,7 +609,32 @@ class Sidebar(QWidget):
         self.annotation_filter_changed.emit(self.annotation_filter_type())
 
     def _on_ann_search_changed(self, text: str = ""):
-        self._ann_search_query = (text or "").strip().lower()
+        self._ann_search_query = (text or "").strip()
+        if not self.annotation_search_regex():
+            self._ann_search_query = self._ann_search_query.lower()
+        self._apply_annotation_filter()
+
+    def _on_ann_search_regex_toggled(self, checked: bool = False):
+        self._ann_search_regex = bool(checked)
+        # Query-Normalisierung anpassen
+        raw = self.annotation_search_text()
+        self._ann_search_query = raw if self._ann_search_regex else raw.lower()
+        self._apply_annotation_filter()
+
+    def annotation_search_regex(self) -> bool:
+        if hasattr(self, "ann_search_regex"):
+            return bool(self.ann_search_regex.isChecked())
+        return bool(getattr(self, "_ann_search_regex", False))
+
+    def set_annotation_search_regex(self, enabled: bool) -> None:
+        want = bool(enabled)
+        self._ann_search_regex = want
+        if hasattr(self, "ann_search_regex"):
+            self.ann_search_regex.blockSignals(True)
+            self.ann_search_regex.setChecked(want)
+            self.ann_search_regex.blockSignals(False)
+        raw = self.annotation_search_text()
+        self._ann_search_query = raw if want else raw.lower()
         self._apply_annotation_filter()
 
     def annotation_search_text(self) -> str:
@@ -726,7 +758,18 @@ class Sidebar(QWidget):
                 else:
                     type_val = ""
                     color_val = ""
-                if (
+                fields = (hay, extra, type_label, type_val, color_val, tags_hay)
+                if self.annotation_search_regex():
+                    import re
+
+                    try:
+                        rx = re.compile(query, re.IGNORECASE)
+                    except re.error:
+                        # Ungültiges Regex → kein Treffer (Filter leer)
+                        continue
+                    if not any(rx.search(f or "") for f in fields):
+                        continue
+                elif (
                     query not in hay
                     and query not in extra
                     and query not in type_label
@@ -856,6 +899,7 @@ class Sidebar(QWidget):
         self._ann_all_lines = []
         self._ann_all_payloads = []
         self._ann_search_query = ""
+        self._ann_search_regex = False
         self._ann_color_filter = ""
         self._ann_tag_filter = ""
         self._ann_filter_current_page = False
@@ -864,6 +908,10 @@ class Sidebar(QWidget):
             self.ann_search.blockSignals(True)
             self.ann_search.clear()
             self.ann_search.blockSignals(False)
+        if hasattr(self, "ann_search_regex"):
+            self.ann_search_regex.blockSignals(True)
+            self.ann_search_regex.setChecked(False)
+            self.ann_search_regex.blockSignals(False)
         if hasattr(self, "ann_current_page"):
             self.ann_current_page.blockSignals(True)
             self.ann_current_page.setChecked(False)

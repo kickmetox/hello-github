@@ -2,7 +2,7 @@
 
 Moderne Textverarbeitung mit PDF-Annotator, OCR-Bridge und Formulargenerator.
 
-**Version:** 0.5.1  
+**Version:** 0.5.2  
 **Hersteller:** Andreas Meyer · ame@sellerbach.de
 
 ## Quickstart (Windows)
@@ -29,8 +29,8 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)
 
-## Neu in 0.5.1
+## Neu in 0.5.2
 
-Batch-OCR gesamtes PDF (Fortschritt), Annotation-Tags (filterbar), Projekt-Ordner-Workspace (letzte 5), PDF bereinigen (Metadaten optional). Stubs KI/Cloud/Stylus/3D unverändert.
+Selection→Highlight (PDF-Text→Annotation), Annotation-Suche Regex optional, Dateien vergleichen (Side-by-Side Zeilen-Diff), Export-Profil (DPI/Format/Ziel). Stubs KI/Cloud/Stylus/3D unverändert.
 
 Siehe [CHANGELOG.md](CHANGELOG.md), [FEATURES.md](FEATURES.md) und [INFO.md](INFO.md).

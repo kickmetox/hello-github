@@ -343,6 +343,92 @@ def find_text_rects(
     return hits
 
 
+def selection_to_highlight_rects(
+    pdf_path: str | Path,
+    page_index: int,
+    x0: float,
+    y0: float,
+    x1: float,
+    y1: float,
+    *,
+    scale: float = 1.0,
+    password: str | None = None,
+    min_overlap: float = 0.35,
+) -> tuple[List[TextMatchRect], str]:
+    """
+    Selection→Highlight: Zeichen im Auswahlrechteck (Render-Pixel bei scale)
+    zu Zeilen-Highlight-Rechtecken + ausgewähltem Text zusammenfassen.
+    """
+    s = float(scale) if scale else 1.0
+    if s <= 0:
+        s = 1.0
+    # Render-Pixel → PDF-Punkte
+    rx0, rx1 = sorted((float(x0) / s, float(x1) / s))
+    ry0, ry1 = sorted((float(y0) / s, float(y1) / s))
+    if rx1 - rx0 < 1.0 and ry1 - ry0 < 1.0:
+        return [], ""
+    try:
+        chars, _w, _h = _page_chars(pdf_path, page_index, password=password)
+    except Exception:
+        return [], ""
+    if not chars:
+        return [], ""
+
+    selected: list[tuple[float, float, float, float, str]] = []
+    for cx, cy, cw, ch, text in chars:
+        if cw <= 0 or ch <= 0:
+            continue
+        # Überlappung Zeichenvs. Auswahl
+        ox0 = max(cx, rx0)
+        oy0 = max(cy, ry0)
+        ox1 = min(cx + cw, rx1)
+        oy1 = min(cy + ch, ry1)
+        if ox1 <= ox0 or oy1 <= oy0:
+            continue
+        overlap = (ox1 - ox0) * (oy1 - oy0)
+        area = cw * ch
+        if area <= 0 or (overlap / area) < min_overlap:
+            # Zentrum im Rechteck zählt trotzdem
+            midx = cx + cw * 0.5
+            midy = cy + ch * 0.5
+            if not (rx0 <= midx <= rx1 and ry0 <= midy <= ry1):
+                continue
+        selected.append((cx, cy, cw, ch, text or " "))
+
+    if not selected:
+        return [], ""
+
+    # Lesereihenfolge: Y-Band, dann X
+    selected.sort(key=lambda c: (round(c[1] / 2.0) * 2, c[0]))
+    bands: dict[int, list[tuple[float, float, float, float, str]]] = {}
+    for c in selected:
+        key = int(round(c[1] / 2.0) * 2)
+        bands.setdefault(key, []).append(c)
+
+    rects: List[TextMatchRect] = []
+    text_parts: list[str] = []
+    for key in sorted(bands.keys()):
+        band = sorted(bands[key], key=lambda c: c[0])
+        bx0 = min(c[0] for c in band)
+        by0 = min(c[1] for c in band)
+        bx1 = max(c[0] + c[2] for c in band)
+        by1 = max(c[1] + c[3] for c in band)
+        snippet = "".join(c[4] for c in band)
+        text_parts.append(snippet)
+        rect = TextMatchRect(
+            page=page_index,
+            x=bx0,
+            y=by0,
+            width=max(bx1 - bx0, 4.0),
+            height=max(by1 - by0, 6.0),
+            text=snippet.strip(),
+        )
+        rects.append(rect.scaled(s) if s != 1.0 else rect)
+
+    combined = "\n".join(p.rstrip() for p in text_parts).strip()
+    return rects, combined
+
+
 def import_page_text_as_overlays(
     store: AnnotationStore,
     pdf_path: str | Path,

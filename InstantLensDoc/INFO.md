@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **0.5.1** |
+| Version | **0.5.2** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -33,10 +33,10 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)
 
-## Neu in 0.5.1
+## Neu in 0.5.2
 
-- Batch-OCR gesamtes PDF mit Fortschritt (Seite x/y, Abbrechen)
-- Annotation-Tags/Labels (frei, Sidebar-Filter, Ctrl+Alt+T)
-- Projekt-Ordner als Workspace (letzte 5)
-- PDF bereinigen (optional Metadaten strippen)
+- Selection→Highlight (Text-Drag → Annotation inkl. Inhalt)
+- Annotation-Suche: optionales Regex
+- Dateien vergleichen (zwei Tabs Side-by-Side, Zeilen-Diff)
+- Export-Profil speichern (DPI / Format / Ziel)
 - Stubs KI/Cloud/Stylus/3D unverändert

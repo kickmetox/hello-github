@@ -47,6 +47,8 @@ DEFAULTS: dict[str, Any] = {
     "page_size_unit": "mm",
     "backup_on_save": False,
     "export_raster_dpi": 150,
+    "export_profiles": [],
+    "active_export_profile": "",
     "window_geometry": "",
     "window_state": "",
     "ann_color_presets": ["#FFE066", "#FF6B6B", "#4ECDC4"],
@@ -645,6 +647,132 @@ def set_export_raster_dpi(dpi: int) -> int:
         v = min(EXPORT_RASTER_DPI_CHOICES, key=lambda x: abs(x - v))
     save_settings({"export_raster_dpi": v})
     return v
+
+
+EXPORT_PROFILE_FORMATS = ("PNG", "JPEG")
+EXPORT_PROFILES_MAX = 12
+
+
+def _normalize_export_profile(raw: object) -> dict[str, object] | None:
+    if not isinstance(raw, dict):
+        return None
+    name = str(raw.get("name") or "").strip()
+    if not name:
+        return None
+    try:
+        dpi = int(raw.get("dpi", 150))
+    except (TypeError, ValueError):
+        dpi = 150
+    if dpi not in EXPORT_RASTER_DPI_CHOICES:
+        dpi = min(EXPORT_RASTER_DPI_CHOICES, key=lambda x: abs(x - dpi))
+    fmt = str(raw.get("format") or "PNG").strip().upper()
+    if fmt in ("JPG", "JPEG"):
+        fmt = "JPEG"
+    if fmt not in EXPORT_PROFILE_FORMATS:
+        fmt = "PNG"
+    target = str(raw.get("target") or "").strip()
+    return {"name": name, "dpi": dpi, "format": fmt, "target": target}
+
+
+def get_export_profiles() -> list[dict[str, object]]:
+    """Gespeicherte Export-Profile (Name, DPI, Format, Zielordner)."""
+    raw = load_settings().get("export_profiles") or []
+    if not isinstance(raw, list):
+        return []
+    out: list[dict[str, object]] = []
+    seen: set[str] = set()
+    for item in raw:
+        p = _normalize_export_profile(item)
+        if not p:
+            continue
+        key = str(p["name"]).casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(p)
+        if len(out) >= EXPORT_PROFILES_MAX:
+            break
+    return out
+
+
+def get_export_profile(name: str) -> dict[str, object] | None:
+    want = (name or "").strip().casefold()
+    if not want:
+        return None
+    for p in get_export_profiles():
+        if str(p["name"]).casefold() == want:
+            return p
+    return None
+
+
+def save_export_profile(
+    name: str,
+    *,
+    dpi: int | None = None,
+    format: str | None = None,
+    target: str | Path | None = None,
+) -> dict[str, object]:
+    """Profil speichern/überschreiben (DPI/Format/Ziel)."""
+    clean_name = (name or "").strip()
+    if not clean_name:
+        raise ValueError("Profilname fehlt")
+    if dpi is None:
+        dpi = get_export_raster_dpi()
+    if format is None:
+        format = "PNG"
+    fmt = str(format).strip().upper()
+    if fmt in ("JPG", "JPEG"):
+        fmt = "JPEG"
+    if fmt not in EXPORT_PROFILE_FORMATS:
+        fmt = "PNG"
+    target_s = ""
+    if target is not None and str(target).strip():
+        t = Path(target).expanduser()
+        if t.is_file():
+            t = t.parent
+        target_s = str(t)
+    profile = _normalize_export_profile(
+        {"name": clean_name, "dpi": dpi, "format": fmt, "target": target_s}
+    )
+    assert profile is not None
+    profiles = [p for p in get_export_profiles() if str(p["name"]).casefold() != clean_name.casefold()]
+    profiles.insert(0, profile)
+    profiles = profiles[:EXPORT_PROFILES_MAX]
+    save_settings({"export_profiles": profiles, "active_export_profile": clean_name})
+    return profile
+
+
+def delete_export_profile(name: str) -> bool:
+    want = (name or "").strip().casefold()
+    if not want:
+        return False
+    profiles = get_export_profiles()
+    kept = [p for p in profiles if str(p["name"]).casefold() != want]
+    if len(kept) == len(profiles):
+        return False
+    active = str(load_settings().get("active_export_profile") or "").strip()
+    payload: dict[str, Any] = {"export_profiles": kept}
+    if active.casefold() == want:
+        payload["active_export_profile"] = str(kept[0]["name"]) if kept else ""
+    save_settings(payload)
+    return True
+
+
+def get_active_export_profile_name() -> str:
+    return str(load_settings().get("active_export_profile") or "").strip()
+
+
+def apply_export_profile(name: str) -> dict[str, object] | None:
+    """Profil anwenden: DPI setzen, Zielordner als last_export_dir merken."""
+    profile = get_export_profile(name)
+    if not profile:
+        return None
+    set_export_raster_dpi(int(profile["dpi"]))
+    target = str(profile.get("target") or "").strip()
+    if target and Path(target).is_dir():
+        set_last_export_dir(target)
+    save_settings({"active_export_profile": str(profile["name"])})
+    return profile
 
 
 def get_window_geometry_b64() -> str:

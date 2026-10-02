@@ -1,5 +1,23 @@
 # Changelog — InstantLens Doc
 
+## 0.5.2 — Selection→Highlight, Ann.-Regex, Text-Diff, Export-Profil
+
+Nach 0.5.1: vier sinnvolle Ausbauten. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### PDF / Annotationen
+- **Selection→Highlight**: Highlight-Drag über PDF-Text erzeugt textgenaue Annotation(en) inkl. Inhalt; sonst freies Rechteck
+- Annotation-Suche: optionales **Regex** (Checkbox neben Suchfeld, case-insensitive)
+
+### Editor / Export
+- **Dateien vergleichen** (zwei Tabs Side-by-Side, einfacher Zeilen-Diff); Datei → Ctrl+Alt+D
+- **Export-Profil speichern** (DPI / Format / Zielordner); Anwenden + Vorbefüllung beim Seiten-Export
+
+### Packaging / Docs
+- Version **0.5.2** (App / ild_pdf / ISS / Smoke / Docs)
+- Stubs KI/Cloud/Stylus/3D unverändert
+
+---
+
 ## 0.5.1 — Batch-OCR, Tags, Workspace, PDF bereinigen
 
 Nach dem Meilenstein 0.5.0: vier sinnvolle Ausbauten. Stubs KI/Cloud/Stylus/3D bleiben Stubs.

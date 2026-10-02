@@ -72,6 +72,7 @@ from instantlensdoc.ui.file_dialogs import confirm_overwrite_export
 from instantlensdoc.ui.pdf_tools_dialog import PdfToolsDialog
 from instantlensdoc.ui.watermark_dialog import WatermarkDialog
 from instantlensdoc.ui.compare_dialog import PdfCompareDialog
+from instantlensdoc.ui.text_compare_dialog import TextCompareDialog
 from instantlensdoc.ui.settings_dialog import SettingsDialog
 from instantlensdoc.ui.stubs import show_planned
 from instantlensdoc.ui.theme import apply_theme, load_theme_mode, toggle_theme
@@ -473,6 +474,13 @@ class MainWindow(QMainWindow):
         )
         act_dup_tab.triggered.connect(self.duplicate_tab)
         m_file.addAction(act_dup_tab)
+        act_compare_tabs = QAction("Dateien vergleichen…", self)
+        act_compare_tabs.setShortcut(QKeySequence("Ctrl+Alt+D"))
+        act_compare_tabs.setToolTip(
+            "Zwei Tabs/Dateien Side-by-Side vergleichen (einfacher Zeilen-Diff)"
+        )
+        act_compare_tabs.triggered.connect(self._compare_text_tabs)
+        m_file.addAction(act_compare_tabs)
         act_reopen = QAction("Erneut öffnen", self)
         act_reopen.setShortcut(QKeySequence("Ctrl+Alt+Shift+O"))
         act_reopen.setToolTip("Aktuelle Datei vom Datenträger neu laden")
@@ -494,6 +502,15 @@ class MainWindow(QMainWindow):
             a = QAction(title, self)
             a.triggered.connect(lambda checked=False, f=fmt: self._export_editor(f))
             m_export.addAction(a)
+        m_export.addSeparator()
+        act_exp_prof_save = QAction("Export-Profil speichern…", self)
+        act_exp_prof_save.setToolTip("DPI / Format / Zielordner als Profil speichern")
+        act_exp_prof_save.triggered.connect(self._save_export_profile)
+        m_export.addAction(act_exp_prof_save)
+        act_exp_prof_apply = QAction("Export-Profil anwenden…", self)
+        act_exp_prof_apply.setToolTip("Gespeichertes Profil (DPI/Format/Ziel) aktivieren")
+        act_exp_prof_apply.triggered.connect(self._apply_export_profile)
+        m_export.addAction(act_exp_prof_apply)
         m_file.addSeparator()
         act_print = QAction("Drucken…", self)
         act_print.setShortcut(QKeySequence.Print)
@@ -2775,6 +2792,101 @@ class MainWindow(QMainWindow):
     def _compare_pdfs(self):
         left = str(self.pdf_view.pdf_path) if self.pdf_view.pdf_path else None
         PdfCompareDialog(self, left_pdf=left).exec()
+
+    def _compare_text_tabs(self):
+        """Zwei Sidebar-Tabs / Dateien Side-by-Side (Zeilen-Diff)."""
+        tabs = self.sidebar.document_paths() if hasattr(self.sidebar, "document_paths") else []
+        left_text = None
+        left_label = None
+        right_text = None
+        right_label = None
+        if self.doc and self.doc.kind != DocKind.PDF:
+            left_text = self.editor.toPlainText()
+            left_label = self.doc.display_name or "Aktuell"
+        TextCompareDialog(
+            self,
+            tab_paths=tabs,
+            left_path=str(self.doc.path) if self.doc and self.doc.path else None,
+            left_text=left_text,
+            left_label=left_label,
+            right_text=right_text,
+            right_label=right_label,
+        ).exec()
+
+    def _save_export_profile(self):
+        from PySide6.QtWidgets import QFileDialog, QInputDialog
+        from instantlensdoc.core.app_settings import (
+            EXPORT_PROFILE_FORMATS,
+            EXPORT_RASTER_DPI_CHOICES,
+            dialog_start_dir,
+            get_export_raster_dpi,
+            get_last_export_dir,
+            save_export_profile,
+        )
+
+        name, ok = QInputDialog.getText(self, "Export-Profil", "Name:")
+        if not ok or not (name or "").strip():
+            return
+        dpi_items = [str(d) for d in EXPORT_RASTER_DPI_CHOICES]
+        default_dpi = str(get_export_raster_dpi())
+        dpi_idx = dpi_items.index(default_dpi) if default_dpi in dpi_items else 1
+        dpi_str, ok = QInputDialog.getItem(
+            self, "Export-Profil", "DPI:", dpi_items, dpi_idx, False
+        )
+        if not ok:
+            return
+        fmt_items = list(EXPORT_PROFILE_FORMATS)
+        fmt, ok = QInputDialog.getItem(self, "Export-Profil", "Format:", fmt_items, 0, False)
+        if not ok:
+            return
+        start = dialog_start_dir(get_last_export_dir())
+        target = QFileDialog.getExistingDirectory(self, "Zielordner für Profil", start)
+        if not target:
+            # Leer erlauben — nur DPI/Format speichern
+            target = ""
+        try:
+            profile = save_export_profile(
+                name.strip(), dpi=int(dpi_str), format=fmt, target=target or None
+            )
+            tip = f"{profile['dpi']} DPI · {profile['format']}"
+            if profile.get("target"):
+                tip += f" · {Path(str(profile['target'])).name}"
+            self._set_status(f"Export-Profil gespeichert: {profile['name']} ({tip})")
+        except Exception as e:
+            QMessageBox.warning(self, "Export-Profil", str(e))
+
+    def _apply_export_profile(self):
+        from PySide6.QtWidgets import QInputDialog
+        from instantlensdoc.core.app_settings import (
+            apply_export_profile,
+            get_active_export_profile_name,
+            get_export_profiles,
+        )
+
+        profiles = get_export_profiles()
+        if not profiles:
+            QMessageBox.information(
+                self,
+                "Export-Profil",
+                "Keine Profile gespeichert.\nDatei → Exportieren → Export-Profil speichern…",
+            )
+            return
+        names = [str(p["name"]) for p in profiles]
+        active = get_active_export_profile_name()
+        idx = names.index(active) if active in names else 0
+        chosen, ok = QInputDialog.getItem(
+            self, "Export-Profil", "Profil anwenden:", names, idx, False
+        )
+        if not ok or not chosen:
+            return
+        profile = apply_export_profile(chosen)
+        if not profile:
+            self._set_status("Export-Profil nicht gefunden")
+            return
+        tip = f"{profile['dpi']} DPI · {profile['format']}"
+        if profile.get("target"):
+            tip += f" · {profile['target']}"
+        self._set_status(f"Export-Profil aktiv: {profile['name']} ({tip})")
 
     def _rebuild_clipboard_history_menu(self):
         menu = getattr(self, "_clipboard_history_menu", None)

@@ -43,11 +43,12 @@ HELP_HTML = f"""
 <li><b>Datei → Als Kopie speichern</b> (Ctrl+Alt+S): PDF + Sidecar kopieren (Doc bleibt offen); Editor → Speichern unter</li>
 <li><b>Datei → Arbeitsverzeichnis öffnen</b> (Ctrl+Shift+E): Ordner der aktuellen Datei bzw. Prozess-CWD</li>
 <li><b>Datei → Projekt-Ordner</b>: Workspace wählen (letzte 5); Dialoge starten im aktiven Ordner</li>
-<li><b>Datei → Exportieren</b>: Editor-Inhalt als HTML, DOCX oder PDF (zuletzt genutzter Ordner wird gemerkt)</li>
+<li><b>Datei → Exportieren</b>: Editor-Inhalt als HTML, DOCX oder PDF (zuletzt genutzter Ordner wird gemerkt);
+    <b>Export-Profil</b> speichern/anwenden (DPI / Format / Ziel)</li>
 <li><b>Datei → Drucken</b> (Ctrl+P): Editor oder aktuelle PDF-Seite (Qt Print)</li>
 <li><b>Seitenleiste</b>: Suche (inkl. letzte Suchbegriffe), „Alle Docs“-Volltext, Zuletzt geöffnet, Dokumente,
     Lesezeichen/Outline (+/− hinzufügen/löschen), <b>Annotationen</b> (klickbar, <b>nach Seite gruppiert</b>,
-    <b>Filter nach Typ</b>, <b>Textsuche in der Liste</b>, <b>Statistik je Typ</b>,
+    <b>Filter nach Typ</b>, <b>Textsuche in der Liste</b> (optional <b>Regex</b>), <b>Statistik je Typ</b>,
     <b>Farben-Chips klickbar filtern</b>, <b>Zeitstempel</b>,
     <b>Filter nur aktuelle Seite</b>), Markierungen/Treffer</li>
 <li><b>Bearbeiten → Rückgängig/Wiederholen</b>: Editor-Text <i>oder</i> PDF-Annotationen/Overlay-Text (Ctrl+Z / Ctrl+Y);
@@ -55,6 +56,7 @@ HELP_HTML = f"""
 <li><b>Bearbeiten → Suchen und Ersetzen</b> (Ctrl+R): Find/Replace im Texteditor</li>
 <li><b>Bearbeiten → Gehe zu Zeile / Seite</b> (Ctrl+G): Editor → Zeile; PDF → Seite (auch PDF → Gehe zu Seite…, Ctrl+Shift+G)</li>
 <li><b>Datei → Tab duplizieren</b> (Ctrl+Shift+T): Editor-Inhalt als neues Dokument klonen;
+    <b>Dateien vergleichen</b> (Ctrl+Alt+D): zwei Tabs Side-by-Side (Zeilen-Diff);
     <b>Erneut öffnen</b> (Ctrl+Alt+Shift+O): Datei vom Datenträger neu laden</li>
 <li><b>Bearbeiten → Zeile duplizieren</b> (Ctrl+D): aktuelle Zeile / Auswahl darunter kopieren</li>
 <li><b>Bearbeiten → Zeile verschieben</b> (Alt+Up / Alt+Down)</li>
@@ -84,7 +86,7 @@ HELP_HTML = f"""
     <b>Graustufen</b> (Ansicht + Bild-Export), <b>Nachtmodus</b> (nur Ansicht, nicht speichern),
     <b>leere Seite / duplizieren</b>, Seite löschen, Seiten neu anordnen;
     <b>PDF-Links (http/https)</b> per Auswahl-Werkzeug / Ctrl+Klick öffnen;
-    Annotationen: Highlight (Drag) + <b>Farben-Picker HL/Stift</b> + <b>3 Favoriten</b> + <b>Deckkraft α</b>, <b>Schwärzen/Redaction</b> (Drag + Preview „REDACT“ + Einbrennen-Dialog), Unterstreichen, Notiz, <b>Text-Overlay</b>,
+    Annotationen: Highlight (Drag, <b>Selection→Highlight</b> über Text) + <b>Farben-Picker HL/Stift</b> + <b>3 Favoriten</b> + <b>Deckkraft α</b>, <b>Schwärzen/Redaction</b> (Drag + Preview „REDACT“ + Einbrennen-Dialog), Unterstreichen, Notiz, <b>Text-Overlay</b>,
     <b>Stempel-Bibliothek</b> (GENEHMIGT/ENTWURF/VERTRAULICH + Datum, <b>Rotation 90°</b>), Callout,
     <b>Rechteck / Linie / Pfeil / Lineal</b> —
     Sidecar <code>*.ildann.json</code> (v4 / <code>ildann-v4</code>, Auto-Save, Undo/Redo);
@@ -227,6 +229,7 @@ class AboutDialog(QDialog):
             "<li>Editor: Find/Replace, Snippets, Bracket-Match, Zwischenablage-Verlauf</li>"
             "<li>OCR-Bridge (Seite + gesamtes PDF), Formulargenerator, Batch, Export</li>"
             "<li>Annotation-Tags, Projekt-Ordner-Workspace, PDF bereinigen</li>"
+            "<li>Selection→Highlight, Ann.-Regex, Datei-Vergleich, Export-Profil</li>"
             "<li>Lizenz Trial/Keys · Stubs: KI, Cloud, Stylus, 3D</li>"
             "</ul>"
             "<p>Vollständige Liste: FEATURES.md</p>"
