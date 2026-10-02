@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Smoke-Test 0.6.1 (CLI + optional offscreen Qt). Kernpfade: open/annotate/export/license + ausgewählte 0.5.x-Pfade."""
+"""Smoke-Test 0.6.2 (CLI + optional offscreen Qt). Kernpfade: open/annotate/export/license + ausgewählte 0.5.x-Pfade."""
 
 from __future__ import annotations
 
@@ -122,8 +122,8 @@ def main() -> int:
     from instantlensdoc.core.update_check import check_for_updates
     from instantlensdoc.license import KEY_DAYS, TRIAL_DAYS, generate_key, verify_key
 
-    assert __version__ == "0.6.1", __version__
-    assert ild_ver == "0.6.1", ild_ver
+    assert __version__ == "0.6.2", __version__
+    assert ild_ver == "0.6.2", ild_ver
     assert TRIAL_DAYS == 28 and KEY_DAYS == 32
     key = generate_key("ame@sellerbach.de")
     ok, msg, _ = verify_key(key)
@@ -141,7 +141,7 @@ def main() -> int:
     assert "Settings" in tr("settings")
     set_lang("de")
     upd = check_for_updates(allow_network=False)
-    assert upd.local_version == "0.6.1" and not upd.online
+    assert upd.local_version == "0.6.2" and not upd.online
     assert get_export_jpeg_quality() >= 10
     assert get_ui_lang() in ("de", "en")
     assert 25 <= get_default_zoom_percent() <= 500
@@ -182,8 +182,9 @@ def main() -> int:
     assert get_ann_pen_color() == "#112233"
     assert (ROOT / "CHANGELOG.md").is_file()
     cl = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-    assert "0.6.1" in cl
+    assert "0.6.2" in cl
     assert "0.6.0" in cl
+    assert "## 0.6.2" in cl
     assert "## 0.6.1" in cl
     assert "## 0.6.0" in cl
     assert "0.5.0 → 0.6.0" in cl or "0.5.0→0.6.0" in cl
@@ -222,7 +223,7 @@ def main() -> int:
     assert "0.4.9" in cl  # noch in Kurz-Tabelle
     assert "0.3.9" in cl  # noch in Kurz-Tabelle
     assert "0.2.9" in cl  # noch in Kurz-Tabelle
-    assert "0.6.1" in (ROOT / "README.md").read_text(encoding="utf-8")
+    assert "0.6.2" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "run.bat" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "sync-ild.ps1" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "scripts/sync-ild.ps1" in (ROOT / "FEATURES.md").read_text(encoding="utf-8")
@@ -571,13 +572,13 @@ def main() -> int:
 
         assert (ROOT / "installer" / "installer-hinweis.txt").exists()
         iss = (ROOT / "installer" / "instantlensdoc.iss").read_text(encoding="utf-8")
-        assert "0.6.1" in iss and "desktopicon" in iss and "DisableProgramGroupPage=no" in iss
+        assert "0.6.2" in iss and "desktopicon" in iss and "DisableProgramGroupPage=no" in iss
         assert "UninstallDisplayName" in iss and "Uninstallable=yes" in iss
         assert "IncludeKeygen" in iss and "SetupIconFile" in iss
         assert "InstantLensKeygen.exe" in iss
         assert "uninstallexe" in iss
         bw = (ROOT / "build-windows.ps1").read_text(encoding="utf-8")
-        assert "0.6.1" in bw and "NoKeygenInApp" in bw and "--icon" in bw
+        assert "0.6.2" in bw and "NoKeygenInApp" in bw and "--icon" in bw
         assert "InstantLensKeygen.exe" in bw
         bi = (ROOT / "installer" / "build-installer.ps1").read_text(encoding="utf-8")
         assert "InstantLensKeygen.exe" in bi and "IncludeKeygen" in bi
@@ -586,7 +587,7 @@ def main() -> int:
         assert "Installer" in kg_readme
         hinweis = (ROOT / "installer" / "installer-hinweis.txt").read_text(encoding="utf-8")
         assert "InstantLensKeygen.exe" in hinweis or "run-keygen.bat" in hinweis
-        assert "0.6.1" in hinweis
+        assert "0.6.2" in hinweis
         assert "checkedonce" in iss and "Desktop-Verknüpfung" in hinweis
         from ild_pdf.limits import OPEN_TIMEOUT_HINT, OPEN_TIMEOUT_HINT_SEC
 
@@ -598,7 +599,7 @@ def main() -> int:
         assert "QProgressDialog" in (ROOT / "instantlensdoc" / "ui" / "main_window.py").read_text(encoding="utf-8")
 
         assert (ROOT / "examples" / "ild_pdf_demo.py").exists()
-        assert "0.6.1" in (ROOT / "INFO.md").read_text(encoding="utf-8")
+        assert "0.6.2" in (ROOT / "INFO.md").read_text(encoding="utf-8")
         assert (ROOT / "assets" / "app.ico").is_file()
 
         # --- Kernpfade: open / annotate / export / license ---
@@ -789,7 +790,7 @@ def main() -> int:
         set_backup_on_save(False)
         assert get_page_size_unit() in ("mm", "inch")
         assert isinstance(get_minimize_to_tray(), bool)
-        assert "0.6.1" in feat and "0.5.9" in feat and "0.4.9" in feat  # Release + Zeitraum-Feature-Hinweise
+        assert "0.6.2" in feat and "0.5.9" in feat and "0.4.9" in feat  # Release + Zeitraum-Feature-Hinweise
         assert "Batch-OCR" in feat or "OCR gesamtes PDF" in feat
         assert "Tag" in feat
         assert "Projekt-Ordner" in feat or "Workspace" in feat
@@ -1276,6 +1277,27 @@ def main() -> int:
         assert "selection_to_plain_text" in (ROOT / "ild_pdf" / "__init__.py").read_text(encoding="utf-8")
         print("0.6.1 CLI copy-text/session-order/desktopicon: OK")
 
+        # 0.6.2 CLI: sticky_from_text_selection API, tag multi-select helpers, sync SkipStart/exit codes
+        sync062 = (ROOT / "scripts" / "sync-ild.ps1").read_text(encoding="utf-8")
+        assert "SkipStart" in sync062
+        assert "Exit-Codes" in sync062 or "exit 2" in sync062
+        assert "exit 0" in sync062 and "exit 1" in sync062 and "exit 2" in sync062
+        feat062 = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
+        assert "0.6.2" in feat062
+        assert "Multi-Select" in feat062 or "Selection→Notiz" in feat062 or "Andere Tabs" in feat062
+        cl062 = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+        assert "## 0.6.2" in cl062
+        assert "SkipStart" in cl062 or "Multi-Select" in cl062 or "Notiz" in cl062
+        mw062 = (ROOT / "instantlensdoc" / "ui" / "main_window.py").read_text(encoding="utf-8")
+        assert "close_other_tabs" in mw062
+        assert "_sticky_from_selection" in mw062
+        pv062 = (ROOT / "instantlensdoc" / "ui" / "pdf_view.py").read_text(encoding="utf-8")
+        assert "sticky_from_text_selection" in pv062
+        sb062 = (ROOT / "instantlensdoc" / "ui" / "sidebar.py").read_text(encoding="utf-8")
+        assert "annotation_filter_tags" in sb062
+        assert "MultiSelection" in sb062 or "Multi-Select" in sb062
+        print("0.6.2 CLI note/multi-tag/close-others/sync: OK")
+
         set_show_printer_marks(True)
         assert get_show_printer_marks() is True
         set_show_printer_marks(False)
@@ -1408,7 +1430,7 @@ def main() -> int:
         assert "Continuous Scroll" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
         assert "Seitenlabel" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8") or "Seitenlabels" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
         assert "Zwischenablage-Verlauf" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8") or "Clipboard" in (ROOT / "FEATURES.md").read_text(encoding="utf-8")
-        assert "0.6.1" in feat and "0.5.9" in feat and "0.4.9" in feat
+        assert "0.6.2" in feat and "0.5.9" in feat and "0.4.9" in feat
         # --- 0.4.2 CLI: Outline Goto, Ann Copy/Paste, Flatten Progress ---
         import pikepdf as _pike_ol
 
@@ -1533,7 +1555,7 @@ def main() -> int:
         win._add_chained_frame()
         assert len(win.layout_doc.text_frames) >= 2
         assert "Lizenz:" in win.license_label.text() or "⚠" in win.license_label.text()
-        assert "v0.6.1" in win.version_label.text()
+        assert "v0.6.2" in win.version_label.text()
         # Lizenz <7 Tage: Style prominent
         st_lic = win.license_manager.status()
         if st_lic.allowed and st_lic.days_remaining < 7:
@@ -1714,11 +1736,11 @@ def main() -> int:
             assert win.editor.outdent_selection(4)
             assert win.editor.toPlainText().splitlines()[0] == "alpha"
             # Fenstertitel mit Version
-            assert "0.6.1" in win.windowTitle()
+            assert "0.6.2" in win.windowTitle()
             from instantlensdoc.ui.help_dialog import AboutDialog, HelpDialog, open_log_folder
 
             about = AboutDialog(win)
-            assert "0.6.1" in about.windowTitle()
+            assert "0.6.2" in about.windowTitle()
             help_dlg = HelpDialog(win)
             assert help_dlg.windowTitle() == "Hilfe"
             assert callable(open_log_folder)
@@ -2378,7 +2400,7 @@ def main() -> int:
             win.apply_tray_setting()
             if win._tray is not None:
                 tip = win._tray.toolTip()
-                assert "0.6.1" in tip and "InstantLens Doc" in tip
+                assert "0.6.2" in tip and "InstantLens Doc" in tip
             set_minimize_to_tray(False)
             win.apply_tray_setting()
             print("0.3.9 fit-h/ann-stats/special/tray: OK")
@@ -2391,9 +2413,9 @@ def main() -> int:
             from instantlensdoc.ui.password_dialog import CompressPdfDialog, SetPasswordDialog
             from instantlensdoc.ui.stubs import PLANNED
             assert KeyboardHelpDialog and SetPasswordDialog and CompressPdfDialog
-            assert "0.6.1" in PLANNED["ki"]
+            assert "0.6.2" in PLANNED["ki"]
             assert "Coming soon" in PLANNED["cloud"]
-            assert "0.6.1" in PLANNED["stylus"] and "0.6.1" in PLANNED["extrude3d"]
+            assert "0.6.2" in PLANNED["stylus"] and "0.6.2" in PLANNED["extrude3d"]
             # Toolbar ↔ Menü Sync Graustufen/Nacht
             win.pdf_view.set_grayscale(True)
             assert win._grayscale_action.isChecked()
@@ -2428,7 +2450,7 @@ def main() -> int:
             assert win.editor.toPlainText().splitlines() == ["one", "two"]
             from instantlensdoc.ui.help_dialog import HELP_HTML
 
-            assert "Stub 0.6.1" in HELP_HTML
+            assert "Stub 0.6.2" in HELP_HTML
             assert "scripts/sync-ild.ps1" in HELP_HTML
             assert "Präsentationsmodus" in HELP_HTML or "F5" in (
                 ROOT / "instantlensdoc" / "ui" / "keyboard_help.py"
@@ -3492,10 +3514,65 @@ def main() -> int:
             assert "## 0.6.1" in cl061q
             print("0.6.1 Qt copy-text/tag-completer/session-tabs: OK")
 
+            # --- 0.6.2 Qt: Selection→Notiz, Tag Multi-Select, Close-Others ---
+            assert callable(getattr(win.pdf_view, "sticky_from_text_selection", None))
+            assert callable(getattr(win, "close_other_tabs", None))
+            assert callable(getattr(win, "_sticky_from_selection", None))
+            assert callable(getattr(win.sidebar, "annotation_filter_tags", None))
+            from ild_pdf import Annotation as Ann062, AnnotationType as AT062
+
+            win.pdf_view.store.add(
+                Ann062(0, AT062.STICKY, 8, 8, width=30, height=20, text="t1", tags=["Alpha062", "Shared"])
+            )
+            win.pdf_view.store.add(
+                Ann062(0, AT062.STICKY, 18, 18, width=30, height=20, text="t2", tags=["Beta062", "Shared"])
+            )
+            win.stack.setCurrentWidget(win.pdf_view)
+            win._refresh_pdf_marks()
+            payloads062 = [p[1] for p in win.pdf_view.annotation_summaries()]
+            win.sidebar._sync_ann_tag_filter_options(payloads062)
+            win.sidebar.set_annotation_tag_filter(["Alpha062", "Beta062"])
+            assert set(t.casefold() for t in win.sidebar.annotation_filter_tags()) == {
+                "alpha062",
+                "beta062",
+            }
+            win.sidebar.set_annotation_tag_filter("Alpha062")
+            assert win.sidebar.annotation_filter_tag().casefold() == "alpha062"
+            win.sidebar.set_annotation_tag_filter("")
+            assert win.sidebar.annotation_filter_tags() == []
+            win.pdf_view._text_selection_text = "Sticky Prefill 062"
+            win.pdf_view._text_selection_rects = [(12.0, 12.0, 40.0, 10.0)]
+            assert win.pdf_view.sticky_from_text_selection(edit=False) is True
+            texts062 = [a.text for a in win.pdf_view.store.annotations if a.type == AT062.STICKY]
+            assert any("Sticky Prefill 062" in (t or "") for t in texts062)
+            # Close-others: Sidebar-Pfade außer aktuellem
+            t_a = Path(td2) / "close_a.txt"
+            t_b = Path(td2) / "close_b.txt"
+            t_a.write_text("a", encoding="utf-8")
+            t_b.write_text("b", encoding="utf-8")
+            win.sidebar.add_document(str(t_a))
+            win.sidebar.add_document(str(t_b))
+            win.open_path(str(t_a))
+            assert str(t_b) in win.sidebar.document_paths()
+            win.close_other_tabs()
+            remaining062 = win.sidebar.document_paths()
+            assert str(t_a) in remaining062
+            assert str(t_b) not in remaining062
+            # PDF wieder öffnen für nachfolgende Qt-Kernpfade
+            win.open_path(str(smoke_pdf))
+            kh062 = (ROOT / "instantlensdoc" / "ui" / "keyboard_help.py").read_text(encoding="utf-8")
+            assert "Auswahl → Notiz" in kh062 or "Ctrl+Alt+N" in kh062
+            assert "Andere Tabs schließen" in kh062 or "Ctrl+Shift+W" in kh062
+            feat062q = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
+            assert "0.6.2" in feat062q
+            cl062q = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+            assert "## 0.6.2" in cl062q
+            print("0.6.2 Qt note/multi-tag/close-others: OK")
+
             print("0.4.x selected Qt marks/schema/sort/reset: OK")
             print("0.4.2 Qt outline/copy-paste/case/progress: OK")
             print("0.4.1 Qt links/stamp/encoding/drop: OK")
-            print("0.3.x–0.6.1 review OK")
+            print("0.3.x–0.6.2 review OK")
             assert callable(win.pdf_view.bake_redactions)
             assert callable(win.pdf_view.clear_redactions)
             assert callable(win._set_pdf_password)

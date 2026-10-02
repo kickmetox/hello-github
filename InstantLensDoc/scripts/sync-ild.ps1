@@ -9,14 +9,19 @@
 #   -Branch cursor/instantlensdoc-2108
 #   -LocalPack C:\path\to\InstantLensDoc          # Ordner mit App-Quellen
 #   -LocalPack C:\path\to\InstantLensDoc-pack.zip # Pack-Zip (wird nach WorkDir entpackt)
-#   -NoStart
+#   -NoStart / -SkipStart   # App nach Sync nicht starten (synonym)
 #   -SkipPip
+#
+# Exit-Codes:
+#   0  Erfolg (Sync fertig; optional App gestartet)
+#   1  Allgemeiner Fehler (LocalPack ungültig, Ziel/requirements fehlen, pip-Fehler)
+#   2  Git-Sync fehlgeschlagen (Clone/Fetch/Checkout) — Fallback: -LocalPack nutzen
 #
 # Fallback wenn Git-Clone/Fetch fehlschlägt (z. B. 401/Auth):
 #   1) -LocalPack auf entpackten Ordner oder InstantLensDoc-pack.zip setzen
 #   2) oder Zip neben dem Skript ablegen: InstantLensDoc-pack.zip
 #   Beispiel:
-#     powershell -ExecutionPolicy Bypass -File .\sync-ild.ps1 -LocalPack D:\AI_Temp\InstantLensDoc-pack.zip
+#     powershell -ExecutionPolicy Bypass -File .\sync-ild.ps1 -LocalPack D:\AI_Temp\InstantLensDoc-pack.zip -SkipStart
 
 param(
     [string]$Destination = "D:\AI_Temp\InstantLensDoc",
@@ -25,10 +30,13 @@ param(
     [string]$LocalPack = "",
     [string]$WorkDir = "D:\AI_Temp\InstantLensDoc-src",
     [switch]$NoStart,
+    [switch]$SkipStart,
     [switch]$SkipPip
 )
 
 $ErrorActionPreference = "Stop"
+# -SkipStart ist Alias für -NoStart (beide unterdrücken den App-Start)
+if ($SkipStart) { $NoStart = $true }
 
 function Backup-UserIcons {
     param([string]$Dest)
@@ -92,116 +100,130 @@ function Write-LocalPackHint {
     Write-Host ""
     Write-Host "=== Git-Sync fehlgeschlagen ($Reason) ===" -ForegroundColor Yellow
     Write-Host "Fallback: lokales Pack nutzen:"
-    Write-Host '  powershell -ExecutionPolicy Bypass -File .\sync-ild.ps1 -LocalPack D:\AI_Temp\InstantLensDoc-pack.zip'
+    Write-Host '  powershell -ExecutionPolicy Bypass -File .\sync-ild.ps1 -LocalPack D:\AI_Temp\InstantLensDoc-pack.zip -SkipStart'
     Write-Host "oder entpackten Ordner:"
-    Write-Host '  powershell -ExecutionPolicy Bypass -File .\sync-ild.ps1 -LocalPack D:\AI_Temp\InstantLensDoc-pack'
+    Write-Host '  powershell -ExecutionPolicy Bypass -File .\sync-ild.ps1 -LocalPack D:\AI_Temp\InstantLensDoc-pack -SkipStart'
     Write-Host "Pack-Zip: InstantLensDoc-pack.zip (Store artifacts / Agent-Ausgabe)."
+    Write-Host "Exit-Code 2 = Git-Fehler; Exit-Code 1 = sonstiger Fehler; 0 = OK."
     Write-Host ""
 }
 
-Write-Host "=== InstantLens Doc Sync ==="
-Write-Host "Ziel: $Destination"
+try {
+    Write-Host "=== InstantLens Doc Sync ==="
+    Write-Host "Ziel: $Destination"
+    if ($NoStart) { Write-Host "Start: übersprungen (-NoStart/-SkipStart)" }
 
-New-Item -ItemType Directory -Force -Path $Destination | Out-Null
-$iconBackup = Backup-UserIcons -Dest $Destination
+    New-Item -ItemType Directory -Force -Path $Destination | Out-Null
+    $iconBackup = Backup-UserIcons -Dest $Destination
 
-$appSrc = $null
+    $appSrc = $null
 
-# 1) Explizites -LocalPack (Ordner oder Zip)
-if ($LocalPack) {
-    $appSrc = Resolve-PackSource -PackPath $LocalPack -UnpackRoot (Split-Path $WorkDir -Parent)
+    # 1) Explizites -LocalPack (Ordner oder Zip)
+    if ($LocalPack) {
+        $appSrc = Resolve-PackSource -PackPath $LocalPack -UnpackRoot (Split-Path $WorkDir -Parent)
+        if (-not $appSrc) {
+            Write-Error "LocalPack nicht nutzbar: $LocalPack"
+            exit 1
+        }
+        Write-Host "Lokal: $appSrc"
+    }
+
+    # 2) Zip neben dem Skript (Fallback ohne Parameter)
     if (-not $appSrc) {
-        Write-Error "LocalPack nicht nutzbar: $LocalPack"
-    }
-    Write-Host "Lokal: $appSrc"
-}
-
-# 2) Zip neben dem Skript (Fallback ohne Parameter)
-if (-not $appSrc) {
-    $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-    $sideZip = Join-Path $scriptDir "InstantLensDoc-pack.zip"
-    $sideZipAlt = Join-Path (Split-Path $scriptDir -Parent) "InstantLensDoc-pack.zip"
-    foreach ($z in @($sideZip, $sideZipAlt, "D:\AI_Temp\InstantLensDoc-pack.zip")) {
-        if (Test-Path $z) {
-            Write-Host "Pack-Zip gefunden: $z"
-            $appSrc = Resolve-PackSource -PackPath $z -UnpackRoot (Split-Path $WorkDir -Parent)
-            if ($appSrc) { break }
+        $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+        $sideZip = Join-Path $scriptDir "InstantLensDoc-pack.zip"
+        $sideZipAlt = Join-Path (Split-Path $scriptDir -Parent) "InstantLensDoc-pack.zip"
+        foreach ($z in @($sideZip, $sideZipAlt, "D:\AI_Temp\InstantLensDoc-pack.zip")) {
+            if (Test-Path $z) {
+                Write-Host "Pack-Zip gefunden: $z"
+                $appSrc = Resolve-PackSource -PackPath $z -UnpackRoot (Split-Path $WorkDir -Parent)
+                if ($appSrc) { break }
+            }
         }
     }
-}
 
-# 3) Git clone/fetch
-if (-not $appSrc) {
-    try {
-        if (-not (Test-Path $WorkDir)) {
-            Write-Host "Clone $RepoUrl ($Branch) → $WorkDir"
-            git clone --branch $Branch --single-branch $RepoUrl $WorkDir
-            if ($LASTEXITCODE -ne 0) { throw "git clone exit $LASTEXITCODE" }
+    # 3) Git clone/fetch
+    if (-not $appSrc) {
+        try {
+            if (-not (Test-Path $WorkDir)) {
+                Write-Host "Clone $RepoUrl ($Branch) → $WorkDir"
+                git clone --branch $Branch --single-branch $RepoUrl $WorkDir
+                if ($LASTEXITCODE -ne 0) { throw "git clone exit $LASTEXITCODE" }
+            } else {
+                Write-Host "Fetch/Reset $WorkDir @ $Branch"
+                Push-Location $WorkDir
+                git fetch origin $Branch
+                if ($LASTEXITCODE -ne 0) { Pop-Location; throw "git fetch exit $LASTEXITCODE" }
+                git checkout $Branch
+                git reset --hard "origin/$Branch"
+                Pop-Location
+            }
+            $candidate = Join-Path $WorkDir "InstantLensDoc"
+            if (Test-Path $candidate) {
+                $appSrc = $candidate
+            } elseif (Test-Path (Join-Path $WorkDir "instantlensdoc")) {
+                $appSrc = $WorkDir
+            } else {
+                throw "App-Quellordner nicht gefunden unter $WorkDir"
+            }
+        } catch {
+            Write-LocalPackHint -Reason $_.Exception.Message
+            exit 2
+        }
+    }
+
+    Write-Host "Kopiere von $appSrc → $Destination"
+    # Inhalt kopieren; .venv und Nutzer-Caches nicht anfassen wenn möglich
+    Get-ChildItem $appSrc -Force | ForEach-Object {
+        if ($_.Name -in @(".venv", "__pycache__", ".git", ".smoke_license.json")) {
+            return
+        }
+        Copy-Item -Recurse -Force $_.FullName $Destination
+    }
+
+    Restore-UserIcons -BackupInfo $iconBackup -Dest $Destination
+
+    # Falls Nutzer-Icon im Root liegt → nach assets spiegeln (ohne vorhandenes neueres assets zu zerstören — Restore schon gemacht)
+    $rootJpg = Join-Path $Destination "lensDoc.jpg"
+    $assetsIco = Join-Path $Destination "assets\app.ico"
+    $assetsPng = Join-Path $Destination "assets\icon.png"
+    New-Item -ItemType Directory -Force -Path (Join-Path $Destination "assets") | Out-Null
+    if ((Test-Path $rootJpg) -and -not (Test-Path $assetsPng)) {
+        Copy-Item -Force $rootJpg $assetsPng
+        Write-Host "Icon aus lensDoc.jpg → assets\icon.png"
+    }
+
+    Set-Location $Destination
+    Write-Host "=== Inhalt ==="
+    Get-ChildItem $Destination | Select-Object Name, Length | Format-Table -AutoSize
+
+    if (-not (Test-Path (Join-Path $Destination "requirements.txt"))) {
+        Write-Error "requirements.txt fehlt nach Sync."
+        exit 1
+    }
+
+    if (-not $SkipPip) {
+        Write-Host "pip install -r requirements.txt …"
+        python -m pip install -r requirements.txt
+        if ($LASTEXITCODE -ne 0) {
+            Write-Error "pip install fehlgeschlagen (exit $LASTEXITCODE)"
+            exit 1
+        }
+    }
+
+    if (-not $NoStart) {
+        Write-Host "Starte InstantLens Doc…"
+        $run = Join-Path $Destination "run.bat"
+        if (Test-Path $run) {
+            & $run
         } else {
-            Write-Host "Fetch/Reset $WorkDir @ $Branch"
-            Push-Location $WorkDir
-            git fetch origin $Branch
-            if ($LASTEXITCODE -ne 0) { Pop-Location; throw "git fetch exit $LASTEXITCODE" }
-            git checkout $Branch
-            git reset --hard "origin/$Branch"
-            Pop-Location
+            python -m instantlensdoc
         }
-        $candidate = Join-Path $WorkDir "InstantLensDoc"
-        if (Test-Path $candidate) {
-            $appSrc = $candidate
-        } elseif (Test-Path (Join-Path $WorkDir "instantlensdoc")) {
-            $appSrc = $WorkDir
-        } else {
-            throw "App-Quellordner nicht gefunden unter $WorkDir"
-        }
-    } catch {
-        Write-LocalPackHint -Reason $_.Exception.Message
-        throw
     }
+
+    Write-Host "Sync fertig. (exit 0)"
+    exit 0
+} catch {
+    Write-Host "Sync-Fehler: $($_.Exception.Message)" -ForegroundColor Red
+    exit 1
 }
-
-Write-Host "Kopiere von $appSrc → $Destination"
-# Inhalt kopieren; .venv und Nutzer-Caches nicht anfassen wenn möglich
-Get-ChildItem $appSrc -Force | ForEach-Object {
-    if ($_.Name -in @(".venv", "__pycache__", ".git", ".smoke_license.json")) {
-        return
-    }
-    Copy-Item -Recurse -Force $_.FullName $Destination
-}
-
-Restore-UserIcons -BackupInfo $iconBackup -Dest $Destination
-
-# Falls Nutzer-Icon im Root liegt → nach assets spiegeln (ohne vorhandenes neueres assets zu zerstören — Restore schon gemacht)
-$rootJpg = Join-Path $Destination "lensDoc.jpg"
-$assetsIco = Join-Path $Destination "assets\app.ico"
-$assetsPng = Join-Path $Destination "assets\icon.png"
-New-Item -ItemType Directory -Force -Path (Join-Path $Destination "assets") | Out-Null
-if ((Test-Path $rootJpg) -and -not (Test-Path $assetsPng)) {
-    Copy-Item -Force $rootJpg $assetsPng
-    Write-Host "Icon aus lensDoc.jpg → assets\icon.png"
-}
-
-Set-Location $Destination
-Write-Host "=== Inhalt ==="
-Get-ChildItem $Destination | Select-Object Name, Length | Format-Table -AutoSize
-
-if (-not (Test-Path (Join-Path $Destination "requirements.txt"))) {
-    Write-Error "requirements.txt fehlt nach Sync."
-}
-
-if (-not $SkipPip) {
-    Write-Host "pip install -r requirements.txt …"
-    python -m pip install -r requirements.txt
-}
-
-if (-not $NoStart) {
-    Write-Host "Starte InstantLens Doc…"
-    $run = Join-Path $Destination "run.bat"
-    if (Test-Path $run) {
-        & $run
-    } else {
-        python -m instantlensdoc
-    }
-}
-
-Write-Host "Sync fertig."

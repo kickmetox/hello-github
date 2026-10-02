@@ -2,7 +2,7 @@
 
 Moderne Textverarbeitung mit PDF-Annotator, OCR-Bridge und Formulargenerator.
 
-**Version:** 0.6.1  
+**Version:** 0.6.2  
 **Hersteller:** Andreas Meyer · ame@sellerbach.de
 
 ## Quickstart (Windows)
@@ -12,6 +12,8 @@ Eine Sync-Zeile (Branch → `D:\AI_Temp\InstantLensDoc`, pip, Start):
 ```powershell
 powershell -ExecutionPolicy Bypass -File "D:\AI_Temp\sync-ild.ps1"
 ```
+
+Ohne Start: `…\sync-ild.ps1 -SkipStart` (Exit **0**/OK, **1**/Fehler, **2**/Git).
 
 Oder lokal im App-Ordner:
 
@@ -30,8 +32,8 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an).
 
-## Neu in 0.6.1
+## Neu in 0.6.2
 
-PDF-Text kopieren aus Auswahl; Annotation-Suche mit Tag-Autocomplete; Session-Tab-Reihenfolge speichern; Installer Desktop-Shortcut dokumentiert. Stubs KI/Cloud/Stylus/3D unverändert.
+Auswahl→Notiz (vorausgefüllt); Tag-Filter Multi-Select; andere Tabs schließen; Sync `-SkipStart` + Exit-Codes. Stubs KI/Cloud/Stylus/3D unverändert.
 
 Siehe [CHANGELOG.md](CHANGELOG.md), [FEATURES.md](FEATURES.md) und [INFO.md](INFO.md).

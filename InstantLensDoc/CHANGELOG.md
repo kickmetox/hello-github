@@ -1,5 +1,22 @@
 # Changelog — InstantLens Doc
 
+## 0.6.2 — Selection→Notiz, Tag-Multi-Select, Close-Others, Sync-Exit
+
+Nach 0.6.1: PDF-Textauswahl als Sticky/Notiz mit vorausgefülltem Text; Annotation-Tag-Filter Multi-Select (ODER); andere Tabs schließen; Sync-Skript `-SkipStart` und klare Exit-Codes. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### PDF / Annotationen
+- **Auswahl → Notiz**: Textauswahl → Sticky mit vorausgefülltem Inhalt (`Ctrl+Alt+N` / Notiz-Werkzeug); Dialog editierbar
+- Annotation-Tag-Filter: **Multi-Select** (mehrere Tags, ODER-Match); leere Auswahl = alle
+
+### Editor / Session
+- **Andere Tabs schließen**: Datei → Ctrl+Shift+W — Sidebar-Dokumente außer aktuellem entfernen
+
+### Packaging / Docs
+- Sync: `-SkipStart` (= `-NoStart`); Exit-Codes **0** OK / **1** allgemein / **2** Git-Fehler dokumentiert
+- Version **0.6.2**; Smoke um 0.6.2-Pfade erweitert
+
+---
+
 ## 0.6.1 — Selection-Copy, Tag-Autocomplete, Session-Order, Installer-Docs
 
 Nach 0.6.0: PDF-Text aus Auswahl in die Zwischenablage; Annotation-Suche mit Tag-Autocomplete; Session-Tab-Reihenfolge per Drag speichern; Installer-Desktop-Shortcut dokumentiert/geprüft. Stubs KI/Cloud/Stylus/3D bleiben Stubs.

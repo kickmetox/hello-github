@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **0.6.1** |
+| Version | **0.6.2** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -24,6 +24,9 @@
 powershell -ExecutionPolicy Bypass -File "D:\AI_Temp\sync-ild.ps1"
 ```
 
+Ohne App-Start: `…\sync-ild.ps1 -SkipStart`  
+Exit-Codes: **0** OK · **1** allgemein · **2** Git-Fehler  
+
 Oder: `cd D:\AI_Temp\InstantLensDoc` → `run.bat`
 
 ## Build
@@ -35,10 +38,10 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Installer-Task: optionale **Desktop-Verknüpfung** (Checkbox, Standard an / `checkedonce`)
 
-## Neu in 0.6.1
+## Neu in 0.6.2
 
-- PDF-Text aus Auswahl in Zwischenablage (Auswahl-Werkzeug + Ctrl+C)
-- Annotation-Suche: Tag-Autocomplete
-- Session-Tabs: Dokumentliste per Drag neu ordnen → Reihenfolge speichern
-- Installer: Desktop-Shortcut-Checkbox dokumentiert/geprüft
+- PDF-Textauswahl → Sticky/Notiz mit vorausgefülltem Text (`Ctrl+Alt+N`)
+- Annotation-Tag-Filter Multi-Select (ODER)
+- Andere Tabs schließen (`Ctrl+Shift+W`)
+- Sync: `-SkipStart` + Exit-Codes 0/1/2
 - Stubs KI/Cloud/Stylus/3D unverändert

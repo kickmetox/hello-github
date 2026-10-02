@@ -4704,6 +4704,56 @@ class PdfViewer(QWidget):
         self.status.emit(f"Kopiert ({len(text)} Z.): {preview}")
         return True
 
+    def sticky_from_text_selection(self, *, edit: bool = True) -> bool:
+        """Auswahl → Sticky/Notiz mit vorausgefülltem Text (optional Dialog zum Anpassen)."""
+        if not self.store or not self.pdf_path:
+            self.status.emit("Notiz aus Auswahl nur bei geöffnetem PDF")
+            return False
+        text = (self.selection_text() or "").strip()
+        if not text:
+            self.status.emit("Kein Text ausgewählt — Auswahl-Werkzeug: Text aufziehen")
+            return False
+        page = int(self.page_index)
+        x, y = 40.0, 40.0
+        if self._text_selection_rects:
+            rx, ry, rw, rh = self._text_selection_rects[0]
+            x = float(rx)
+            y = float(ry) + max(float(rh), 8.0) + 4.0
+        if edit:
+            text, ok = QInputDialog.getMultiLineText(
+                self,
+                "Notiz aus Auswahl",
+                "Inhalt (vorausgefüllt aus Textauswahl):",
+                text,
+            )
+            if not ok:
+                return False
+            text = (text or "").strip()
+            if not text:
+                self.status.emit("Notiz abgebrochen — leerer Text")
+                return False
+        height = 70.0 if "\n" not in text else min(160.0, 24.0 + 18.0 * (text.count("\n") + 1))
+        ann = Annotation(
+            page=page,
+            type=AnnotationType.STICKY,
+            x=x,
+            y=y,
+            width=160.0,
+            height=height,
+            text=text,
+            color=self._note_color,
+            opacity=self._default_opacity,
+        )
+        self._commit_ann(ann)
+        self._selected_ann_id = ann.id
+        self._selected_ann_ids = {ann.id}
+        self.canvas.set_selected_ids(self._selected_ann_ids)
+        preview = text.replace("\n", " ")
+        if len(preview) > 48:
+            preview = preview[:45] + "…"
+        self.status.emit(f"Notiz aus Auswahl: {preview}")
+        return True
+
     def _on_drag(self, x0: float, y0: float, x1: float, y1: float):
         if not self.store or self.tool is None or self.tool not in DRAG_TYPES:
             return
@@ -4816,10 +4866,16 @@ class PdfViewer(QWidget):
             text, color = picked
             width, height = 150.0, 52.0 if "\n" in text else 40.0
         elif self.tool == AnnotationType.STICKY:
-            text, ok = QInputDialog.getText(self, "Notiz", "Inhalt:")
+            prefill = (self.selection_text() or "").strip()
+            text, ok = QInputDialog.getMultiLineText(
+                self,
+                "Notiz",
+                "Inhalt:" + (" (aus Textauswahl)" if prefill else ""),
+                prefill,
+            )
             if not ok:
                 return
-            height = 70.0
+            height = 70.0 if "\n" not in (text or "") else min(160.0, 24.0 + 18.0 * (text.count("\n") + 1))
             color = self._note_color
         elif self.tool == AnnotationType.TEXT_OVERLAY:
             text, ok = QInputDialog.getMultiLineText(self, "Text-Overlay", "Text:")

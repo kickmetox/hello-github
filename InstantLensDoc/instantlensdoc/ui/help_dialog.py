@@ -101,7 +101,8 @@ HELP_HTML = f"""
     JSON Import mit Schema-v4-Validierung (klare Fehlermeldung);
     <b>Textsuche</b> highlightet Treffer auf der aktuellen Seite;
     Doppelklick / Strg+Klick / <b>Ctrl+E</b> auf Notiz/Overlay zum Bearbeiten;
-    <b>Ctrl+Alt+T</b> Annotation-Tags (frei, Sidebar-Filter);
+    <b>Ctrl+Alt+T</b> Annotation-Tags (frei, Sidebar Multi-Select-Filter);
+    <b>Ctrl+Alt+N</b> Auswahl→Notiz (Sticky vorausgefüllt);
     <b>Ctrl+Shift+D</b> Auswahl duplizieren; <b>Ctrl+Alt+C/V</b> Annotationen kopieren/einfügen (auch seitenübergreifend);
     Auswahl-Werkzeug: Annotationen per Drag verschieben (wenn nicht gesperrt);
     PDF → Text→Overlay / Overlay einbrennen / <b>Text Seite/alles → Editor</b> /
@@ -119,7 +120,9 @@ HELP_HTML = f"""
     PDF als Kopie speichern; <b>Seitenbereich extrahieren</b> (von–bis → neues PDF);
     große PDFs: Warnung / Limits;
     <b>Seiten-Thumbnails</b> in der Sidebar</li>
-<li><b>Datei → Schließen</b>: Speichern-Dialog bei ungespeicherten Änderungen</li>
+<li><b>Datei → Schließen</b>: Speichern-Dialog bei ungespeicherten Änderungen;
+    <b>Andere Tabs schließen</b> (Ctrl+Shift+W)</li>
+<li><b>Bearbeiten → Auswahl → Notiz</b> (Ctrl+Alt+N): PDF-Textauswahl als Sticky mit vorausgefülltem Text</li>
 <li><b>Hilfe → Auf Updates prüfen</b>: lokal immer; Online optional (offline OK)</li>
 <li><b>Hilfe → Über InstantLens Doc</b>: Feature-Kurzliste + Link zu FEATURES.md;
     Datenschutz-Hinweis (lokal, keine Telemetrie, keine Cloud)</li>
@@ -152,7 +155,8 @@ HELP_HTML = f"""
 Beispiel: <code>examples/ild_pdf_demo.py</code>. API: <code>ild_pdf/README.md</code>.</p>
 <h3>Sync / Update</h3>
 <p>Windows: Repo-Skript <code>scripts/sync-ild.ps1</code> bzw. Store <code>docs/sync-ild.ps1</code> — Branch oder Zip nach
-<code>D:\\AI_Temp\\InstantLensDoc</code>, pip, optional Start. Eigenes Icon in <code>assets</code> bleibt erhalten.</p>
+<code>D:\\AI_Temp\\InstantLensDoc</code>, pip, optional Start (<code>-SkipStart</code>/<code>-NoStart</code> unterdrückt Start).
+Exit-Codes: 0 OK, 1 allgemein, 2 Git-Fehler. Eigenes Icon in <code>assets</code> bleibt erhalten.</p>
 <h3>Geplante Features</h3>
 <p>KI-Assistent, Cloud-Sync, Stylus/Palm Rejection, 3D u. a. sind im Menü als „Geplant“ markiert
 (Stub {__version__}) — siehe FEATURES.md.</p>

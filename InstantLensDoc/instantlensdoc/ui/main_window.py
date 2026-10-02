@@ -484,6 +484,13 @@ class MainWindow(QMainWindow):
         act_close.setToolTip("Aktuelles Dokument schließen (Speichern-Dialog bei Änderungen)")
         act_close.triggered.connect(self.close_current_tab)
         m_file.addAction(act_close)
+        act_close_others = QAction("Andere Tabs schließen", self)
+        act_close_others.setShortcut(QKeySequence("Ctrl+Shift+W"))
+        act_close_others.setToolTip(
+            "Alle Dokumente in der Sidebar schließen außer dem aktuellen"
+        )
+        act_close_others.triggered.connect(self.close_other_tabs)
+        m_file.addAction(act_close_others)
         act_dup_tab = QAction("Tab duplizieren", self)
         act_dup_tab.setShortcut(QKeySequence("Ctrl+Shift+T"))
         act_dup_tab.setToolTip(
@@ -710,6 +717,13 @@ class MainWindow(QMainWindow):
         act_edit_ann.setToolTip("Notiz/Kommentar/Overlay der Auswahl bearbeiten (auch Doppelklick)")
         act_edit_ann.triggered.connect(self._edit_annotation_text)
         m_edit.addAction(act_edit_ann)
+        act_sel_note = QAction("Auswahl → Notiz…", self)
+        act_sel_note.setShortcut(QKeySequence("Ctrl+Alt+N"))
+        act_sel_note.setToolTip(
+            "PDF-Textauswahl als Sticky/Notiz mit vorausgefülltem Text anlegen"
+        )
+        act_sel_note.triggered.connect(self._sticky_from_selection)
+        m_edit.addAction(act_sel_note)
         act_edit_tags = QAction("Annotation-Tags bearbeiten…", self)
         act_edit_tags.setShortcut(QKeySequence("Ctrl+Alt+T"))
         act_edit_tags.setToolTip("Freie Tags/Labels der ausgewählten Annotation (filterbar)")
@@ -1777,6 +1791,14 @@ class MainWindow(QMainWindow):
             if self.pdf_view.copy_text_selection():
                 return
         self.editor.copy()
+
+    def _sticky_from_selection(self):
+        """PDF-Textauswahl → Sticky/Notiz mit vorausgefülltem Text."""
+        if self.stack.currentWidget() is not self.pdf_view or not self.pdf_view.pdf_path:
+            self._set_status("Auswahl → Notiz nur im PDF-Modus")
+            return
+        if self.pdf_view.sticky_from_text_selection(edit=True):
+            self._refresh_pdf_marks()
 
     def _copy_annotations(self):
         if self.stack.currentWidget() is not self.pdf_view or not self.pdf_view.pdf_path:
@@ -3054,6 +3076,31 @@ class MainWindow(QMainWindow):
             self._set_status(f"Geschlossen — gewechselt zu {Path(nxt).name}")
         else:
             self._set_status("Dokument geschlossen")
+
+    def close_other_tabs(self):
+        """Alle Sidebar-Dokumente schließen außer dem aktuellen."""
+        if not self.doc:
+            self._set_status("Kein Dokument geöffnet")
+            return
+        keep = str(self.doc.path) if self.doc.path else None
+        paths = list(self.sidebar.document_paths()) if hasattr(self.sidebar, "document_paths") else []
+        if not paths:
+            self._set_status("Keine weiteren Tabs")
+            return
+        closed = 0
+        for p in paths:
+            if keep and str(p) == keep:
+                continue
+            self.sidebar.remove_document(p)
+            closed += 1
+        if closed == 0:
+            self._set_status("Keine anderen Tabs zum Schließen")
+            return
+        try:
+            self._save_session()
+        except Exception:
+            pass
+        self._set_status(f"{closed} andere Tab(s) geschlossen — aktuell bleibt offen")
 
     def _pdf_page_size(self):
         if not self.pdf_view.pdf_path:
