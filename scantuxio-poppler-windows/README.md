@@ -1,51 +1,52 @@
-# ScanTuxio — Poppler für Windows (Integrationspaket)
+# ScanTuxio — PDF Windows (lizenzfreundlich: pypdfium2)
 
-Dieses Verzeichnis enthält Patches, Launcher, Download-Skript und Inno-Setup-
-Vorlage, um Poppler neben ScanTuxio zu bündeln.
+Standard: **pypdfium2 / PDFium** (Apache/BSD-ähnlich).  
+**Kein Poppler-GPL-Bundle** im Installer.
 
-## Ausgangslage (dieser Cloud-Lauf)
+## Grenzen dieses Pakets
 
-- Nutzerpfad `D:\AI_Temp\ScanTuxio Win` war **nicht gemountet**.
-- Genannte Upload-Dateien (FEATURES.txt, README.md, requirements.txt, run.*,
-  scantuxio_entry.py, ScanTuxio.exe, `_*.pyd`) waren **nur als Namen** bekannt —
-  **keine Dateiinhalte** im Worker-VM.
-- Workspace-Repo ist `hello-github` (kein ScanTuxio-Quellbaum).
-- Erkennbar aus Namen: **Python 3.12 / win_amd64**, **PyInstaller-frozen** Artefakte,
-  Dev-Launcher, **kein** Inno/NSIS/WiX im Dateilisten-Ausschnitt.
+- `D:\AI_Temp\ScanTuxio Win` und Upload-Inhalte waren in der Cloud-VM nicht verfügbar.
+- Frozen `ScanTuxio.exe` muss **lokal neu gebaut** werden, damit pypdfium2 drin ist.
+- Bis dahin: Dev mit `pip install -r patches/requirements-pdfium.txt` + Entry-Snippet.
 
-## Schnellstart auf dem Windows-Build-Rechner
+## Dev
 
 ```powershell
-cd "D:\AI_Temp\ScanTuxio Win"
-# Dieses Paket daneben oder hinein kopieren, dann:
-.\scantuxio-poppler-windows\scripts\download-poppler.ps1 -DestRoot .
-# Launcher überschreiben/mergen:
-copy .\scantuxio-poppler-windows\run\run.bat .\run.bat
-copy .\scantuxio-poppler-windows\run\run.ps1 .\run.ps1
-copy .\scantuxio-poppler-windows\python\poppler_paths.py .\python\poppler_paths.py
-# Entry: Snippet einfügen oder patches\scantuxio_entry.py mergen
+pip install -r .\scantuxio-poppler-windows\patches\requirements-pdfium.txt
+# Entry: patches\ENTRY_SNIPPET.py einfügen
+# PDF-Aufrufe: from pdf_render import convert_from_path
 ```
 
-Installer (Inno Setup 6): `installer\scantuxio-poppler.iss` — `SourceRoot` /
-`PopplerRoot` anpassen, dann ISCC.
+## Frozen-Build (PyInstaller)
 
-## Lizenz (kurz)
+```text
+pyinstaller --noconfirm --collect-all pypdfium2 --collect-all PIL ^
+  scantuxio_entry.py
+```
 
-| Komponente | Lizenz | Für „lizenzfrei“? |
-|---|---|---|
-| Poppler-Tools | **GPL** | Nein — mitliefern = GPL-Pflichten für Poppler |
-| poppler-windows Packaging | MIT | Nur Verpackung |
-| pypdfium2 / PDFium | Apache-2.0 / BSD-ähnlich | Ja, deutlich freundlicher — braucht Quellcode-API-Umbau |
+Oder in der `.spec`: `from PyInstaller.utils.hooks import collect_all` und
+`datas/binaries/hiddenimports` für `pypdfium2` ergänzen. Siehe
+`docs/PYINSTALLER-PDFIUM.txt`.
 
-Empfehlung: Poppler bundlen (wie gewünscht) + GPL klar dokumentieren.
-Wenn wirklich permissive PDF-Raster nötig: auf **pypdfium2** umstellen
-(sobald vollständiger Quellbaum da ist).
+## Installer (Inno Setup 6)
+
+1. App mit pypdfium2 bauen → Output nach `SourceRoot`
+2. `installer\scantuxio.iss` → `#define SourceRoot` / Version anpassen
+3. `ISCC.exe scantuxio.iss` → `dist\ScanTuxio-Setup-*.exe`
+
+`scantuxio-poppler.iss` ist **veraltet** (bricht absichtlich ab).
+
+## Poppler?
+
+Nur optionaler lokaler Fallback (`poppler_paths.py`, download-Skript).  
+**Nicht** mit ausliefern, wenn „lizenzfrei“ gilt.
 
 ## Inhalt
 
-- `python/poppler_paths.py` — Suche Bundle/Env/PATH, setzt `POPPLER_PATH`
-- `patches/` — Entry-Snippet + Vorlage `scantuxio_entry.py`
-- `run/` — run.bat / run.ps1 / run.sh mit Poppler-PATH
-- `scripts/download-poppler.ps1` — holt Release-Zip nach `vendor/poppler`
-- `installer/scantuxio-poppler.iss` — Inno inkl. vendor\poppler
-- `docs/LICENSE-THIRD-PARTY.txt` — GPL-Hinweis
+| Pfad | Zweck |
+|---|---|
+| `python/pdf_render.py` | PDF→PIL via pypdfium2 |
+| `python/poppler_paths.py` | Legacy-Fallback (nicht Installer) |
+| `installer/scantuxio.iss` | Inno **ohne** Poppler |
+| `patches/` | Entry, requirements, FEATURES/README |
+| `run/` | Launcher |

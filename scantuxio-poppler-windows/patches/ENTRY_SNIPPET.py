@@ -3,15 +3,17 @@
 import sys
 from pathlib import Path
 
-# poppler_paths.py nach: <app>/python/ oder <app>/
 _root = Path(__file__).resolve().parent
 for _p in (_root / "python", _root):
     if str(_p) not in sys.path:
         sys.path.insert(0, str(_p))
 
-from poppler_paths import ensure_poppler
+from pdf_render import bootstrap_for_entry, convert_from_path, ensure_pdf_backend
 
-_poppler = ensure_poppler(required=False)
-if not _poppler.ok:
-    sys.stderr.write(f"[ScanTuxio] {_poppler.message}\n")
-# Danach unverändert: restlicher Entry / App-Start
+_pdf = bootstrap_for_entry()
+# Optional hart: ensure_pdf_backend(required=True)
+
+# PDF-Stellen im restlichen Code ersetzen:
+#   alt: from pdf2image import convert_from_path
+#   neu: from pdf_render import convert_from_path
+# (Signatur: convert_from_path(path, dpi=200, first_page=…, last_page=…))

@@ -1,11 +1,5 @@
-Poppler Windows binaries go here after running:
+Poppler wird für den Standard-Installer NICHT mehr gebündelt (GPL).
 
-  scripts\download-poppler.ps1
-
-Expected layout:
-
-  vendor/poppler/Library/bin/pdftoppm.exe
-  vendor/poppler/Library/bin/pdfinfo.exe
-  vendor/poppler/LICENSE-POPPLER.txt
-
-Do not commit large binary zips unless intentionally vendoring for offline builds.
+Standard: pypdfium2 in der Frozen-App.
+Dieses Verzeichnis nur für optionalen lokalen Legacy-Fallback.
+Nicht in Inno Setup aufnehmen.

@@ -1,33 +1,29 @@
-Drittanbieter / Third-party components in ScanTuxio (Windows)
+Drittanbieter / Third-party — ScanTuxio Windows (lizenzfreundlicher PDF-Pfad)
 
 ==============================================================================
-POPPLER
+PYPDFIUM2 / PDFIUM  (Standard)
 ==============================================================================
-Name:        Poppler (PDF rendering tools: pdftoppm, pdfinfo, pdftocairo, …)
-Upstream:    https://poppler.freedesktop.org/
-Windows zip: https://github.com/oschwartz10612/poppler-windows
-             (Packaging-Skripte dieses Repos: MIT; die Binaries sind Poppler)
+Name:        pypdfium2 (Python-Bindings) + PDFium (Chromium PDF-Engine)
+PyPI:        https://pypi.org/project/pypdfium2/
+PDFium:      https://pdfium.googlesource.com/pdfium/
 
-Lizenz:      GNU GPL (typisch GPL-2.0 oder GPL-3.0 — siehe COPYING im Upstream-
-             Quellcode des jeweiligen Releases)
+Lizenz:      pypdfium2 typisch Apache-2.0 / BSD-3-Clause-kompatibel;
+             PDFium unter BSD-ähnlichen Bedingungen (Chromium/Google).
+             Kein GPL-Zwang durch PDF-Rasterung.
 
-Einbindung:  ScanTuxio startet Poppler-Werkzeuge als separate Prozesse
-             (Subprocess / PATH). Es erfolgt keine Link-Einbindung der
-             Poppler-Bibliothek in die ScanTuxio-EXE.
-
-Weitergabe:  Wenn Poppler-Binaries mitgeliefert werden, müssen GPL-Hinweise
-             erhalten bleiben. Quellcode zu den verwendeten Poppler-Binaries
-             ist über den Upstream bzw. das conda-forge poppler-feedstock
-             des entsprechenden Releases erhältlich.
-
-Hinweis:     Poppler ist NICHT „lizenzfrei“. Wer eine permissive Stack-
-             Alternative für PDF→Bild braucht, siehe pypdfium2 / PDFium
-             (docs/poppler-windows.md). Das erfordert Quellcode-Anpassung
-             und ist in diesem Frozen-Bestand nicht umsetzbar.
+Einbindung:  Als Python-Paket; Frozen-Build sammelt native DLL/SO via
+             PyInstaller --collect-all pypdfium2.
+             Installer liefert KEINE separaten Poppler-EXE.
 
 ==============================================================================
-Weitere Komponenten
+POPPLER  (nicht Standard, nicht im Installer)
 ==============================================================================
-Python-Runtime / PyInstaller-Artefakte (_*.pyd, ScanTuxio.exe): eigenen
-Lizenzen der jeweiligen Bibliotheken unterworfen — Original-requirements.txt
-und Build-Manifest des vollständigen Quellbaums beachten.
+Nur optionaler lokaler Fallback für Entwickler, die noch pdf2image nutzen.
+Lizenz: GNU GPL. Wird von diesem Installer NICHT mitgeliefert.
+Siehe poppler_paths.py und frühere Hinweise — Nutzerentscheidung: lizenzfrei.
+
+==============================================================================
+WEITERE
+==============================================================================
+Pillow, Python-Runtime, PyInstaller-Artefakte: jeweilige Upstream-Lizenzen.
+Original-requirements.txt / Build-Manifest des vollständigen Quellbaums beachten.

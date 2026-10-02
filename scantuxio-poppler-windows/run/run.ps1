@@ -1,4 +1,4 @@
-# ScanTuxio Launcher (Windows PowerShell) — Poppler-Bundle in PATH
+# ScanTuxio Launcher — PDF via pypdfium2 (Frozen), Poppler nur optionaler lokaler Fallback
 [CmdletBinding()]
 param(
     [Parameter(ValueFromRemainingArguments = $true)]
@@ -9,39 +9,12 @@ $ErrorActionPreference = "Continue"
 $AppDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 if (-not $AppDir) { $AppDir = Get-Location }
 
-function Find-PopplerBin {
-    param([string]$Root)
-    $candidates = @(
-        (Join-Path $Root "vendor\poppler\Library\bin"),
-        (Join-Path $Root "vendor\poppler\bin"),
-        (Join-Path $Root "poppler\Library\bin"),
-        (Join-Path $Root "poppler\bin")
-    )
-    foreach ($dir in $candidates) {
-        if (Test-Path (Join-Path $dir "pdftoppm.exe")) { return $dir }
-    }
-    # Release-* Unterordner
-    $vendor = Join-Path $Root "vendor\poppler"
-    if (Test-Path $vendor) {
-        Get-ChildItem -Path $vendor -Directory -Filter "Release-*" -ErrorAction SilentlyContinue |
-            ForEach-Object {
-                foreach ($sub in @("Library\bin", "bin")) {
-                    $bin = Join-Path $_.FullName $sub
-                    if (Test-Path (Join-Path $bin "pdftoppm.exe")) { return $bin }
-                }
-            }
-    }
-    return $null
-}
-
-$popplerBin = Find-PopplerBin -Root $AppDir
-if ($popplerBin) {
-    $env:PATH = "$popplerBin;$env:PATH"
-    $env:SCANTUXIO_POPPLER = $popplerBin
-    $env:POPPLER_PATH = $popplerBin
-    Write-Host "[ScanTuxio] Poppler: $popplerBin"
-} else {
-    Write-Warning "[ScanTuxio] Poppler nicht unter vendor\poppler gefunden. scripts\download-poppler.ps1 ausführen."
+$legacyPoppler = Join-Path $AppDir "vendor\poppler\Library\bin\pdftoppm.exe"
+if (Test-Path $legacyPoppler) {
+    $bin = Split-Path $legacyPoppler -Parent
+    $env:PATH = "$bin;$env:PATH"
+    $env:SCANTUXIO_POPPLER = $bin
+    Write-Warning "[ScanTuxio] Legacy-Poppler im PATH (nicht Installer-Standard; GPL)."
 }
 
 $exe = Join-Path $AppDir "ScanTuxio.exe"

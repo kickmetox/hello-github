@@ -1,0 +1,6 @@
+# PDF via pypdfium2 (Standard — lizenzfreundlich)
+pypdfium2>=4.30.0
+Pillow>=10.0.0
+
+# NICHT für den Windows-Installer / „lizenzfrei“-Ziel:
+# pdf2image>=1.17.0   # braucht Poppler (GPL)

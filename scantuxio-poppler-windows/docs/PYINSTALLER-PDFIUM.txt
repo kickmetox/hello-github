@@ -1,0 +1,48 @@
+# PyInstaller — pypdfium2 / PDFium mitpacken
+
+pypdfium2 bringt eine native Bibliothek mit (Windows: z. B. `pdfium.dll`
+unter dem Paketverzeichnis). Ohne Collect landet die Frozen-EXE oft bei
+Import-/DLL-Fehlern zur Laufzeit.
+
+## Empfohlen (CLI)
+
+```bat
+pyinstaller --noconfirm --windowed --name ScanTuxio ^
+  --collect-all pypdfium2 ^
+  --collect-all PIL ^
+  scantuxio_entry.py
+```
+
+Zusätzlich vorhandene Hidden-Imports / Datas aus dem Original-Build beibehalten
+(Original-.spec war in der Cloud-VM nicht vorhanden).
+
+## .spec-Snippet
+
+```python
+from PyInstaller.utils.hooks import collect_all
+
+datas, binaries, hiddenimports = [], [], []
+for pkg in ("pypdfium2", "PIL"):
+    d, b, h = collect_all(pkg)
+    datas += d
+    binaries += b
+    hiddenimports += h
+
+a = Analysis(
+    ["scantuxio_entry.py"],
+    pathex=[],
+    binaries=binaries,
+    datas=datas,
+    hiddenimports=hiddenimports + ["pdf_render"],
+    # ... Rest aus Original-Spec ...
+)
+```
+
+`pdf_render.py` nach `python/` legen oder als Top-Level-Modul im Analysis-Pfad.
+
+## Installer
+
+Nach erfolgreichem Build: Inno `installer\scantuxio.iss` mit `SourceRoot` =
+PyInstaller-Output (onedir: Ordner mit exe + `_internal`).
+
+Keine `vendor\poppler`-Dateien in den Setup-Output kopieren.

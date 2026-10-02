@@ -1,12 +1,4 @@
-# requirements.txt — optionale Ergänzungen (Dev / Rebuild)
+# VERALTET — siehe requirements-pdfium.txt
 
-# PDF→Bild über Poppler (Runtime: Poppler-Binaries separat bundlen!)
+# pdf2image + Poppler (GPL) — nicht für lizenzfreien Installer
 # pdf2image>=1.17.0
-
-# Lizenzfreundlichere Alternative (kein Poppler, PDFium):
-# pypdfium2>=4.30.0
-# pillow>=10.0.0
-
-# Hinweis: Ob die frozen ScanTuxio.exe pdf2image bereits enthält, ist ohne
-# Original-requirements / PyInstaller-Spec nicht verifizierbar. Poppler-Tools
-# müssen trotzdem als native EXE mitgeliefert oder im PATH sein.

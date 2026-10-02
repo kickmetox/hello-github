@@ -1,0 +1,11 @@
+ScanTuxio Setup — PDF ohne Poppler/GPL
+
+Dieses Setup installiert ScanTuxio mit PDF-Unterstützung über
+pypdfium2 / PDFium (Apache/BSD-ähnlich).
+
+Es werden KEINE Poppler-Binaries (GPL) mitgeliefert.
+
+Voraussetzung: Die mitgelieferte ScanTuxio.exe wurde mit pypdfium2
+gebaut (PyInstaller: --collect-all pypdfium2).
+
+Details: LICENSE-THIRD-PARTY.txt

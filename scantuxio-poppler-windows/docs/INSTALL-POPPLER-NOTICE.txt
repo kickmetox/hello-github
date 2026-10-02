@@ -1,15 +1,1 @@
-ScanTuxio Setup — Hinweis zu Poppler
-
-Dieses Setup kann Poppler-Werkzeuge (pdftoppm, pdfinfo, …) unter
-  <Installationsordner>\vendor\poppler\
-mitinstallieren.
-
-Poppler steht unter der GNU GPL. Die Packaging-Hilfen von
-„poppler-windows“ sind MIT-lizenziert; die mitgelieferten Binaries
-unterliegen weiterhin der Poppler-GPL.
-
-ScanTuxio nutzt diese Programme über den Systempfad / gebündelten
-bin-Ordner (keine Bibliotheksverlinkung).
-
-Details und Alternativen (u. a. pypdfium2/PDFium, permissiver):
-siehe LICENSE-THIRD-PARTY.txt und die Projektdoku poppler-windows.md.
+Siehe INSTALL-NOTICE.txt (pypdfium2). Poppler-Installer-Hinweis entfernt.

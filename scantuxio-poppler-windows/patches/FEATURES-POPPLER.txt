@@ -1,9 +1,8 @@
-# FEATURES.txt — Ergänzung (an bestehende Datei anhängen / mergen)
+# FEATURES.txt — Ergänzung
 
-Poppler (Windows)
-  - PDF-Seitenrasterung über pdftoppm/pdfinfo (gebündelt unter vendor\poppler)
-  - Launcher (run.bat / run.ps1) setzen PATH automatisch
-  - Override: Umgebungsvariable SCANTUXIO_POPPLER oder POPPLER_PATH = ...\bin
-  - Fehlt Poppler: App startet weiter; PDF→Bild meldet klaren Fehler
-  - Lizenz: Poppler = GPL (siehe LICENSE-THIRD-PARTY.txt) — nicht lizenzfrei
-  - Alternative (permissiv, Quellcode nötig): pypdfium2 / PDFium
+PDF (Windows, lizenzfreundlich)
+  - Rasterung über pypdfium2 / PDFium (Apache/BSD-ähnlich)
+  - Kein Poppler-Bundle im Installer
+  - Dev: pip install pypdfium2 pillow; Frozen: --collect-all pypdfium2
+  - API-Hilfe: python/pdf_render.py (convert_from_path)
+  - Optionaler Legacy-Fallback Poppler nur lokal / nicht ausliefern
