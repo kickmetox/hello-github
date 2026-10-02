@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **0.4.9** |
+| Version | **0.5.0** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -33,10 +33,9 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)
 
-## Neu in 0.4.9
+## Neu in 0.5.0
 
-- PDF: Seitenlabels (römisch/arabisch) in Status/Toolbar wenn vorhanden
-- Annotation: Filter „nur aktuelle Seite“
-- Editor: Zwischenablage-Verlauf (3 Einträge)
-- About: Feature-Kurzliste + FEATURES.md
+- Release-Konsolidierung aller 0.4.x-Inkremente (Version einheitlich **0.5.0**)
+- Smoke um ausgewählte 0.4.x-Pfade erweitert; CHANGELOG kompakt
+- Review: Versionsstrings vereinheitlicht; Changelog 0.4.1–0.4.9 verdichtet
 - Stubs KI/Cloud/Stylus/3D unverändert

@@ -120,25 +120,25 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | Inno-Installer | fertig | Icon, Desktop, Uninstaller, Keygen optional (`InstantLensKeygen.exe`) 0.2.1 |
 | Sync-Skript Windows | fertig | Repo `scripts/sync-ild.ps1`; Store `docs/sync-ild.ps1` |
 | Arbeitsverzeichnis öffnen | fertig | Datei-Menü Ctrl+Shift+E; Ordner der Datei bzw. CWD 0.4.8 |
-| In-App Hilfe / About | fertig | Version 0.4.9; Fenstertitel + Splash; Logordner-Button; **Feature-Kurzliste + FEATURES.md** 0.4.9 |
-| CHANGELOG | fertig | **0.4.9** Seitenlabels, Ann.-Seitenfilter, Clipboard-Verlauf, About-Features (nach **0.4.8** / **0.4.7** / **0.4.6** / **0.4.5** / **0.4.4** / **0.4.3** / **0.4.2** / **0.4.1** / **0.4.0**) |
+| In-App Hilfe / About | fertig | Version 0.5.0; Fenstertitel + Splash; Logordner-Button; **Feature-Kurzliste + FEATURES.md** 0.4.9 |
+| CHANGELOG | fertig | **0.5.0** Release-Konsolidierung 0.4.0→0.5.0 |
 | FEATURES.md / INFO.md | fertig | |
 | `ild_pdf` Modul + Beispielskript | fertig | metadata / page size / watermark / redact / acroform / attachments / flatten / **plain text** |
 | Font-Matching | geplant | |
 | Objekt-/Bildbearbeitung | geplant | |
 | Layout-Erhaltung (Scan→edit) | geplant | |
 | Freihand | geplant | |
-| KI-Assistent | Stub | Menü „Geplant“ 0.4.9 (keine Fake-KI) |
+| KI-Assistent | Stub | Menü „Geplant“ 0.5.0 (keine Fake-KI) |
 | Signieren (rechtssicher) | Stub | |
-| Cloud-Sync | Stub | Menü „Geplant“ 0.4.9 (keine Fake-Cloud) |
+| Cloud-Sync | Stub | Menü „Geplant“ 0.5.0 (keine Fake-Cloud) |
 | Text on Path / Text zu Pfaden | geplant | |
 | Envelope Distort / Text Wrap / Area Type | Stub/geplant | |
 | Schnittmasken | geplant | |
 | Füllungen / Live-Effekte | geplant | |
-| 3D-Extrusion | Stub | Menü „Geplant“ 0.4.9 |
+| 3D-Extrusion | Stub | Menü „Geplant“ 0.5.0 |
 | Variable Fonts (voll) | Stub | |
 | Glyphen-Palette | geplant | |
-| Stylus / Palm Rejection | Stub | Menü „Geplant“ 0.4.9 |
-| Intelligente Formerkennung | Stub | Menü „Geplant“ 0.4.9 |
+| Stylus / Palm Rejection | Stub | Menü „Geplant“ 0.5.0 |
+| Intelligente Formerkennung | Stub | Menü „Geplant“ 0.5.0 |
 
 Nicht behauptet als fertig: Cloud, KI, Stylus, 3D — nur Menü-Stubs + dieser Status.
