@@ -1,4 +1,4 @@
-"""Einstellungen: Theme, OCR, Sprache, Export-Qualität, Update-Hinweis."""
+"""Einstellungen: Theme, OCR, Sprache, Export, Zoom, Autosave, Pfade."""
 
 from __future__ import annotations
 
@@ -21,8 +21,10 @@ from PySide6.QtWidgets import (
 
 from ild_pdf.pages import PAGE_SIZE_PRESETS
 from instantlensdoc.core.app_settings import (
+    get_autosave_interval_sec,
     get_batch_output_dir,
     get_default_open_dir,
+    get_default_zoom_percent,
     get_export_image_max_edge,
     get_export_jpeg_quality,
     get_export_pdf_page,
@@ -31,8 +33,10 @@ from instantlensdoc.core.app_settings import (
     get_ui_lang,
     get_update_check_on_start,
     save_settings,
+    set_autosave_interval_sec,
     set_batch_output_dir,
     set_default_open_dir,
+    set_default_zoom_percent,
     set_ocr_lang,
     set_theme,
     set_ui_lang,
@@ -48,7 +52,7 @@ class SettingsDialog(QDialog):
         super().__init__(parent)
         sync_from_settings()
         self.setWindowTitle(tr("settings"))
-        self.resize(520, 380)
+        self.resize(540, 440)
         layout = QVBoxLayout(self)
         layout.addWidget(QLabel(tr("settings_title")))
 
@@ -75,6 +79,22 @@ class SettingsDialog(QDialog):
                 pick = i
         self.lang_combo.setCurrentIndex(pick)
         form.addRow(tr("ocr_lang"), self.lang_combo)
+
+        self.zoom_pct = QSpinBox()
+        self.zoom_pct.setRange(25, 500)
+        self.zoom_pct.setSingleStep(10)
+        self.zoom_pct.setSuffix(" %")
+        self.zoom_pct.setValue(get_default_zoom_percent())
+        self.zoom_pct.setToolTip("Standard-Zoom beim Öffnen von PDFs")
+        form.addRow(tr("default_zoom"), self.zoom_pct)
+
+        self.autosave_sec = QSpinBox()
+        self.autosave_sec.setRange(10, 600)
+        self.autosave_sec.setSingleStep(10)
+        self.autosave_sec.setSuffix(" s")
+        self.autosave_sec.setValue(get_autosave_interval_sec())
+        self.autosave_sec.setToolTip("Intervall für Autosave (Editor + Annotationen)")
+        form.addRow(tr("autosave_interval"), self.autosave_sec)
 
         self.jpeg_q = QSpinBox()
         self.jpeg_q.setRange(10, 100)
@@ -142,6 +162,8 @@ class SettingsDialog(QDialog):
         set_ui_lang(str(self.ui_lang.currentData() or "de"))
         sync_from_settings()
         set_update_check_on_start(self.update_chk.isChecked())
+        set_default_zoom_percent(int(self.zoom_pct.value()))
+        set_autosave_interval_sec(int(self.autosave_sec.value()))
         save_settings(
             {
                 "export_jpeg_quality": int(self.jpeg_q.value()),

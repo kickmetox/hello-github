@@ -18,6 +18,7 @@ from PySide6.QtGui import (
 )
 from PySide6.QtWidgets import (
     QApplication,
+    QColorDialog,
     QDialog,
     QDialogButtonBox,
     QDoubleSpinBox,
@@ -44,10 +45,18 @@ from ild_pdf import (
     AnnotationType,
     STAMP_PRESETS,
     bake_text_overlays,
+    find_text_rects,
     import_page_text_as_overlays,
     render_page,
 )
 from ild_pdf.pages import delete_pages, reorder_pages, rotate_page
+from instantlensdoc.core.app_settings import (
+    get_ann_highlight_color,
+    get_ann_pen_color,
+    get_default_zoom_scale,
+    set_ann_highlight_color,
+    set_ann_pen_color,
+)
 
 
 class PageReorderDialog(QDialog):
@@ -149,10 +158,27 @@ class PdfCanvas(QLabel):
         self._drag_start: tuple[float, float] | None = None
         self._drag_current: tuple[float, float] | None = None
         self._scale = 1.5
+        self._search_rects: list[tuple[float, float, float, float]] = []
+        self._search_active: int = -1
         self.setMouseTracking(True)
 
     def set_drag_tool(self, tool: AnnotationType | None):
         self._drag_tool = tool if tool in DRAG_TYPES else None
+
+    def set_search_highlights(
+        self,
+        rects: list[tuple[float, float, float, float]] | None,
+        active: int = -1,
+    ):
+        self._search_rects = list(rects or [])
+        self._search_active = active if 0 <= active < len(self._search_rects) else -1
+        self._repaint_overlay()
+
+    def clear_search_highlights(self):
+        if self._search_rects or self._search_active >= 0:
+            self._search_rects = []
+            self._search_active = -1
+            self._repaint_overlay()
 
     def set_page_image(
         self,
@@ -307,6 +333,17 @@ class PdfCanvas(QLabel):
             return
         pm = QPixmap(self._pixmap)
         painter = QPainter(pm)
+        # Temporäre Textsuche-Highlights (unter Annotationen)
+        for i, (sx, sy, sw, sh) in enumerate(self._search_rects):
+            if i == self._search_active:
+                fill = QColor(255, 140, 0, 140)
+                pen = QPen(QColor(230, 90, 0), 2)
+            else:
+                fill = QColor(255, 230, 80, 110)
+                pen = QPen(QColor(200, 160, 0), 1)
+            painter.fillRect(int(sx), int(sy), max(int(sw), 2), max(int(sh), 2), fill)
+            painter.setPen(pen)
+            painter.drawRect(int(sx), int(sy), max(int(sw), 2), max(int(sh), 2))
         for ann in self._annotations:
             self._draw_ann(painter, ann)
         # Drag-Vorschau
@@ -401,7 +438,7 @@ class PdfViewer(QWidget):
         self.pdf_path: Optional[Path] = None
         self.page_index = 0
         self.page_count = 0
-        self.scale = 1.5
+        self.scale = get_default_zoom_scale()
         self.tool: AnnotationType | None = AnnotationType.HIGHLIGHT
         self.store: Optional[AnnotationStore] = None
         self.password: Optional[str] = None
@@ -412,13 +449,18 @@ class PdfViewer(QWidget):
         self._zoom_timer.setInterval(120)
         self._zoom_timer.timeout.connect(self._apply_pending_zoom)
         self._pending_scale: float | None = None
+        self._highlight_color = get_ann_highlight_color()
+        self._pen_color = get_ann_pen_color()
+        self._search_query = ""
+        self._search_rects: list[tuple[float, float, float, float]] = []
+        self._search_index = -1
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
 
         toolbar = QHBoxLayout()
         self.lbl_page = QLabel("—")
-        self.lbl_zoom = QLabel("150%")
+        self.lbl_zoom = QLabel(f"{int(round(self.scale * 100))}%")
         btn_prev = QPushButton("◀")
         btn_next = QPushButton("▶")
         btn_prev.clicked.connect(self.prev_page)
@@ -489,6 +531,19 @@ class PdfViewer(QWidget):
             self._tool_buttons.append(b)
             toolbar.addWidget(b)
 
+        self.btn_hl_color = QPushButton("HL")
+        self.btn_hl_color.setToolTip("Highlight-Farbe")
+        self.btn_hl_color.setFixedWidth(36)
+        self.btn_hl_color.clicked.connect(self._pick_highlight_color)
+        self._style_color_btn(self.btn_hl_color, self._highlight_color)
+        self.btn_pen_color = QPushButton("Stift")
+        self.btn_pen_color.setToolTip("Stift-Farbe (Linie/Pfeil/Rechteck/Unterstreichen)")
+        self.btn_pen_color.setFixedWidth(44)
+        self.btn_pen_color.clicked.connect(self._pick_pen_color)
+        self._style_color_btn(self.btn_pen_color, self._pen_color)
+        toolbar.addWidget(self.btn_hl_color)
+        toolbar.addWidget(self.btn_pen_color)
+
         toolbar.addWidget(btn_prev)
         toolbar.addWidget(self.lbl_page)
         toolbar.addWidget(btn_next)
@@ -522,6 +577,45 @@ class PdfViewer(QWidget):
         self.canvas.set_drag_tool(AnnotationType.HIGHLIGHT)
         paste_sc = QShortcut(QKeySequence.Paste, self)
         paste_sc.activated.connect(self.paste_clipboard_image)
+
+    @staticmethod
+    def _style_color_btn(btn: QPushButton, color: str):
+        c = QColor(color)
+        if not c.isValid():
+            c = QColor("#888888")
+        # Kontrasttext
+        text = "#111" if c.lightness() > 140 else "#fff"
+        btn.setStyleSheet(
+            f"QPushButton {{ background:{c.name()}; color:{text}; "
+            f"border:1px solid #555; padding:2px 4px; }}"
+        )
+
+    def _pick_highlight_color(self):
+        initial = QColor(self._highlight_color)
+        color = QColorDialog.getColor(initial, self, "Highlight-Farbe")
+        if color.isValid():
+            self._highlight_color = color.name()
+            set_ann_highlight_color(self._highlight_color)
+            self._style_color_btn(self.btn_hl_color, self._highlight_color)
+            self.status.emit(f"Highlight-Farbe: {self._highlight_color}")
+
+    def _pick_pen_color(self):
+        initial = QColor(self._pen_color)
+        color = QColorDialog.getColor(initial, self, "Stift-Farbe")
+        if color.isValid():
+            self._pen_color = color.name()
+            set_ann_pen_color(self._pen_color)
+            self._style_color_btn(self.btn_pen_color, self._pen_color)
+            self.status.emit(f"Stift-Farbe: {self._pen_color}")
+
+    def apply_settings_colors(self):
+        self._highlight_color = get_ann_highlight_color()
+        self._pen_color = get_ann_pen_color()
+        self._style_color_btn(self.btn_hl_color, self._highlight_color)
+        self._style_color_btn(self.btn_pen_color, self._pen_color)
+
+    def apply_default_zoom(self):
+        self.set_scale(get_default_zoom_scale(), immediate=True)
 
     def _tool_label(self, tool: AnnotationType) -> str:
         return {
@@ -647,6 +741,8 @@ class PdfViewer(QWidget):
             self._pending_callout_anchor = None
             self._pending_scale = None
             self._zoom_timer.stop()
+            self.scale = get_default_zoom_scale()
+            self.clear_search_highlights()
             self.refresh()
             self.annotations_changed.emit()
             self.page_changed.emit(self.page_index)
@@ -697,6 +793,8 @@ class PdfViewer(QWidget):
             )
             anns = self.store.for_page(self.page_index) if self.store else []
             self.canvas.set_page_image(img, anns, scale=self.scale)
+            if self._search_rects:
+                self.canvas.set_search_highlights(self._search_rects, self._search_index)
             self.lbl_page.setText(f"{self.page_index + 1} / {self.page_count}")
             self.lbl_zoom.setText(f"{int(round(self.scale * 100))}%")
             dirty = " *" if self.store and self.store.dirty else ""
@@ -713,20 +811,79 @@ class PdfViewer(QWidget):
     def goto_page(self, page_index: int):
         if 0 <= page_index < self.page_count:
             self.page_index = page_index
+            if self._search_query:
+                self._rebuild_search_rects(keep_index=False)
             self.refresh()
             self.page_changed.emit(self.page_index)
 
     def prev_page(self):
         if self.page_index > 0:
             self.page_index -= 1
+            if self._search_query:
+                self._rebuild_search_rects(keep_index=False)
             self.refresh()
             self.page_changed.emit(self.page_index)
 
     def next_page(self):
         if self.page_index + 1 < self.page_count:
             self.page_index += 1
+            if self._search_query:
+                self._rebuild_search_rects(keep_index=False)
             self.refresh()
             self.page_changed.emit(self.page_index)
+
+    def clear_search_highlights(self):
+        self._search_query = ""
+        self._search_rects = []
+        self._search_index = -1
+        self.canvas.clear_search_highlights()
+
+    def _rebuild_search_rects(self, *, keep_index: bool = True) -> int:
+        """Aktualisiert Treffer-Rechtecke der aktuellen Seite für _search_query."""
+        q = self._search_query
+        if not q or not self.pdf_path:
+            self._search_rects = []
+            self._search_index = -1
+            return 0
+        matches = find_text_rects(
+            self.pdf_path,
+            self.page_index,
+            q,
+            scale=self.scale,
+            password=self.password,
+        )
+        self._search_rects = [(m.x, m.y, m.width, m.height) for m in matches]
+        if keep_index and self._search_rects:
+            self._search_index = max(0, min(self._search_index, len(self._search_rects) - 1))
+        else:
+            self._search_index = 0 if self._search_rects else -1
+        return len(self._search_rects)
+
+    def highlight_search(self, query: str) -> int:
+        """Highlightet Query-Treffer auf der aktuellen Seite. Liefert Trefferzahl."""
+        q = (query or "").strip()
+        if not q or not self.pdf_path:
+            self.clear_search_highlights()
+            return 0
+        self._search_query = q
+        n = self._rebuild_search_rects(keep_index=False)
+        self.canvas.set_search_highlights(self._search_rects, self._search_index)
+        return n
+
+    def search_next(self) -> bool:
+        """Nächster Treffer auf aktueller Seite; wrappt. False wenn keine Treffer."""
+        if not self._search_query:
+            return False
+        if not self._search_rects:
+            self._rebuild_search_rects(keep_index=False)
+        if not self._search_rects:
+            return False
+        self._search_index = (self._search_index + 1) % len(self._search_rects)
+        self.canvas.set_search_highlights(self._search_rects, self._search_index)
+        return True
+
+    def search_hit_count(self) -> int:
+        return len(self._search_rects)
 
     def set_scale(self, scale: float, *, immediate: bool = False):
         scale = max(0.25, min(5.0, float(scale)))
@@ -735,6 +892,8 @@ class PdfViewer(QWidget):
             self._pending_scale = None
             self._zoom_timer.stop()
             self.scale = scale
+            if self._search_query:
+                self._rebuild_search_rects(keep_index=True)
             self.refresh()
             return
         # Debounce: schnelle Zoom-Schritte nur Label, Render verzögert
@@ -746,6 +905,8 @@ class PdfViewer(QWidget):
             return
         self.scale = self._pending_scale
         self._pending_scale = None
+        if self._search_query:
+            self._rebuild_search_rects(keep_index=True)
         self.refresh()
 
     def zoom_in(self):
@@ -1295,7 +1456,7 @@ class PdfViewer(QWidget):
                 y=min(y0, y1),
                 width=max(abs(x1 - x0), 8),
                 height=max(abs(y1 - y0), 8),
-                color="#FFE066",
+                color=self._highlight_color,
             )
         elif self.tool == AnnotationType.REDACTION:
             ann = Annotation(
@@ -1316,14 +1477,9 @@ class PdfViewer(QWidget):
                 y=min(y0, y1),
                 width=max(abs(x1 - x0), 8),
                 height=max(abs(y1 - y0), 8),
-                color="#27AE60",
+                color=self._pen_color,
             )
         elif self.tool in (AnnotationType.LINE, AnnotationType.ARROW, AnnotationType.MEASURE):
-            color = {
-                AnnotationType.LINE: "#2C3E50",
-                AnnotationType.ARROW: "#8E44AD",
-                AnnotationType.MEASURE: "#E67E22",
-            }[self.tool]
             ann = Annotation(
                 page=self.page_index,
                 type=self.tool,
@@ -1333,7 +1489,7 @@ class PdfViewer(QWidget):
                 height=abs(y1 - y0),
                 callout_x=x1,
                 callout_y=y1,
-                color=color,
+                color=self._pen_color,
             )
             if self.tool == AnnotationType.MEASURE:
                 ann.text = ann.measure_label(self.scale)
@@ -1365,7 +1521,7 @@ class PdfViewer(QWidget):
                 width=140,
                 height=48,
                 text=text,
-                color="#2980B9",
+                color=self._pen_color,
                 callout_x=ax,
                 callout_y=ay,
             )
@@ -1373,7 +1529,7 @@ class PdfViewer(QWidget):
             return
 
         text = ""
-        color = "#FF6B6B"
+        color = self._pen_color
         width, height = 160.0, 24.0
         font_size = 12.0
 
@@ -1391,6 +1547,7 @@ class PdfViewer(QWidget):
             if not ok:
                 return
             height = 70.0
+            color = "#FF6B6B"
         elif self.tool == AnnotationType.TEXT_OVERLAY:
             text, ok = QInputDialog.getMultiLineText(self, "Text-Overlay", "Text:")
             if not ok:
@@ -1404,6 +1561,7 @@ class PdfViewer(QWidget):
                 return
         elif self.tool == AnnotationType.UNDERLINE:
             width = 180.0
+            color = self._pen_color
         elif self.tool == AnnotationType.SIGNATURE_FIELD:
             text, ok = QInputDialog.getText(self, "Signaturfeld", "Beschriftung:", text="Unterschrift")
             if not ok:

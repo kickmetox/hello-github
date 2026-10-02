@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Smoke-Test 0.2.1 (CLI + optional offscreen Qt). Kernpfade: open/annotate/export/license."""
+"""Smoke-Test 0.2.2 (CLI + optional offscreen Qt). Kernpfade: open/annotate/export/license."""
 
 from __future__ import annotations
 
@@ -31,6 +31,7 @@ def main() -> int:
         compress_pdf_as_images,
         extract_page_image,
         extract_text_blocks,
+        find_text_rects,
         get_metadata,
         get_page_boxes,
         import_page_text_as_overlays,
@@ -62,18 +63,28 @@ def main() -> int:
     from instantlensdoc.core import fulltext as ft_mod
     from instantlensdoc.core import session as session_mod
     from instantlensdoc.core.app_settings import (
+        get_ann_highlight_color,
+        get_ann_pen_color,
+        get_autosave_interval_sec,
+        get_default_zoom_percent,
         get_export_jpeg_quality,
+        get_last_export_dir,
         get_ocr_lang,
         get_ui_lang,
         load_settings,
         save_settings,
+        set_ann_highlight_color,
+        set_ann_pen_color,
+        set_autosave_interval_sec,
+        set_default_zoom_percent,
+        set_last_export_dir,
     )
     from instantlensdoc.core.i18n import set_lang, tr
     from instantlensdoc.core.update_check import check_for_updates
     from instantlensdoc.license import KEY_DAYS, TRIAL_DAYS, generate_key, verify_key
 
-    assert __version__ == "0.2.1", __version__
-    assert ild_ver == "0.2.1", ild_ver
+    assert __version__ == "0.2.2", __version__
+    assert ild_ver == "0.2.2", ild_ver
     assert TRIAL_DAYS == 28 and KEY_DAYS == 32
     key = generate_key("ame@sellerbach.de")
     ok, msg, _ = verify_key(key)
@@ -91,12 +102,24 @@ def main() -> int:
     assert "Settings" in tr("settings")
     set_lang("de")
     upd = check_for_updates(allow_network=False)
-    assert upd.local_version == "0.2.1" and not upd.online
+    assert upd.local_version == "0.2.2" and not upd.online
     assert get_export_jpeg_quality() >= 10
     assert get_ui_lang() in ("de", "en")
+    assert 25 <= get_default_zoom_percent() <= 500
+    assert 10 <= get_autosave_interval_sec() <= 600
+    assert get_ann_highlight_color().startswith("#")
+    assert get_ann_pen_color().startswith("#")
+    set_default_zoom_percent(175)
+    assert get_default_zoom_percent() == 175
+    set_autosave_interval_sec(45)
+    assert get_autosave_interval_sec() == 45
+    set_ann_highlight_color("#FFCC00")
+    set_ann_pen_color("#112233")
+    assert get_ann_highlight_color() == "#FFCC00"
+    assert get_ann_pen_color() == "#112233"
     assert (ROOT / "CHANGELOG.md").is_file()
-    assert "0.2.1" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-    assert "0.2.1" in (ROOT / "README.md").read_text(encoding="utf-8")
+    assert "0.2.2" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    assert "0.2.2" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "run.bat" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "sync-ild.ps1" in (ROOT / "README.md").read_text(encoding="utf-8")
 
@@ -137,6 +160,13 @@ def main() -> int:
         clear_render_cache(pdf)
         render_page(pdf, 0)
         render_page(pdf, 0)
+
+        # Textsuche-Rechtecke (aktuelle Seite)
+        rects = find_text_rects(pdf, 0, "InstantLens", scale=1.5)
+        assert len(rects) >= 1
+        assert rects[0].width > 0 and rects[0].height > 0
+        assert find_text_rects(pdf, 0, "ZZZNOMATCH") == []
+        print("TextSearchRects: OK")
 
         health = inspect_pdf(pdf)
         assert health.ok_to_open and health.page_count == 2
@@ -387,13 +417,13 @@ def main() -> int:
 
         assert (ROOT / "installer" / "installer-hinweis.txt").exists()
         iss = (ROOT / "installer" / "instantlensdoc.iss").read_text(encoding="utf-8")
-        assert "0.2.1" in iss and "desktopicon" in iss and "DisableProgramGroupPage=no" in iss
+        assert "0.2.2" in iss and "desktopicon" in iss and "DisableProgramGroupPage=no" in iss
         assert "UninstallDisplayName" in iss and "Uninstallable=yes" in iss
         assert "IncludeKeygen" in iss and "SetupIconFile" in iss
         assert "InstantLensKeygen.exe" in iss
         assert "uninstallexe" in iss
         bw = (ROOT / "build-windows.ps1").read_text(encoding="utf-8")
-        assert "0.2.1" in bw and "NoKeygenInApp" in bw and "--icon" in bw
+        assert "0.2.2" in bw and "NoKeygenInApp" in bw and "--icon" in bw
         assert "InstantLensKeygen.exe" in bw
         bi = (ROOT / "installer" / "build-installer.ps1").read_text(encoding="utf-8")
         assert "InstantLensKeygen.exe" in bi and "IncludeKeygen" in bi
@@ -412,7 +442,7 @@ def main() -> int:
         assert "QProgressDialog" in (ROOT / "instantlensdoc" / "ui" / "main_window.py").read_text(encoding="utf-8")
 
         assert (ROOT / "examples" / "ild_pdf_demo.py").exists()
-        assert "0.2.1" in (ROOT / "INFO.md").read_text(encoding="utf-8")
+        assert "0.2.2" in (ROOT / "INFO.md").read_text(encoding="utf-8")
         assert (ROOT / "assets" / "app.ico").is_file()
 
         # --- Kernpfade: open / annotate / export / license ---
@@ -524,7 +554,7 @@ def main() -> int:
         win._add_chained_frame()
         assert len(win.layout_doc.text_frames) >= 2
         assert "Lizenz:" in win.license_label.text()
-        assert "v0.2.1" in win.version_label.text()
+        assert "v0.2.2" in win.version_label.text()
         from instantlensdoc.ui.settings_dialog import SettingsDialog
         from instantlensdoc.ui.batch_dialog import BatchConvertDialog
         from instantlensdoc.ui.pdf_tools_dialog import PdfToolsDialog
@@ -563,11 +593,23 @@ def main() -> int:
             assert abs(win.pdf_view.scale - 1.0) < 0.01
             win.pdf_view.fit_page()
             assert win.pdf_view.scale > 0
+            assert callable(win.pdf_view.highlight_search)
+            assert callable(win.pdf_view.search_next)
+            assert hasattr(win.pdf_view, "btn_hl_color") and hasattr(win.pdf_view, "btn_pen_color")
+            # Textsuche-Highlight braucht Text-PDF — Image-PDF → 0 Treffer OK
+            assert win.pdf_view.highlight_search("nothing") == 0
+            win.pdf_view.clear_search_highlights()
+            exp_dir = Path(td2) / "exports"
+            exp_dir.mkdir()
+            set_last_export_dir(exp_dir)
+            assert get_last_export_dir() == exp_dir
+            assert get_autosave_interval_sec() >= 10
+            assert get_default_zoom_percent() >= 25
             from ild_pdf import Annotation, AnnotationType
 
             assert win.pdf_view.store is not None
             win.pdf_view.store.add(
-                Annotation(0, AnnotationType.HIGHLIGHT, 10, 10, width=40, height=12, text="u")
+                Annotation(0, AnnotationType.HIGHLIGHT, 10, 10, width=40, height=12, text="u", color=get_ann_highlight_color())
             )
             assert win.pdf_view.store.can_undo()
             assert win.pdf_view.undo_annotation()
@@ -595,7 +637,7 @@ def main() -> int:
             from instantlensdoc.ui.password_dialog import CompressPdfDialog, SetPasswordDialog
             from instantlensdoc.ui.stubs import PLANNED
             assert KeyboardHelpDialog and SetPasswordDialog and CompressPdfDialog
-            assert "0.2.1" in PLANNED["ki"]
+            assert "0.2.2" in PLANNED["ki"]
             assert "Coming soon" in PLANNED["cloud"]
             assert callable(win.pdf_view.bake_redactions)
             assert callable(win.pdf_view.clear_redactions)

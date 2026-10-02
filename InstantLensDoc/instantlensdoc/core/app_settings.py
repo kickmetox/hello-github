@@ -1,4 +1,4 @@
-"""Persistente App-Einstellungen (Theme, OCR, Pfade, Export, Sprache)."""
+"""Persistente App-Einstellungen (Theme, OCR, Pfade, Export, Zoom, Autosave)."""
 
 from __future__ import annotations
 
@@ -23,6 +23,11 @@ DEFAULTS: dict[str, Any] = {
     "export_pdf_page": "A4",
     "export_image_max_edge": 2000,
     "update_check_on_start": False,
+    "last_export_dir": "",
+    "default_zoom_percent": 150,
+    "autosave_interval_sec": 60,
+    "ann_highlight_color": "#FFE066",
+    "ann_pen_color": "#2C3E50",
 }
 
 
@@ -136,3 +141,70 @@ def get_update_check_on_start() -> bool:
 
 def set_update_check_on_start(enabled: bool) -> None:
     save_settings({"update_check_on_start": bool(enabled)})
+
+
+def get_last_export_dir() -> Path | None:
+    raw = str(load_settings().get("last_export_dir") or "").strip()
+    if not raw:
+        return None
+    p = Path(raw)
+    return p if p.is_dir() else None
+
+
+def set_last_export_dir(path: str | Path) -> None:
+    p = Path(path)
+    if p.is_file():
+        p = p.parent
+    save_settings({"last_export_dir": str(p)})
+
+
+def get_default_zoom_percent() -> int:
+    try:
+        v = int(load_settings().get("default_zoom_percent", 150))
+    except (TypeError, ValueError):
+        v = 150
+    return max(25, min(500, v))
+
+
+def set_default_zoom_percent(percent: int) -> None:
+    save_settings({"default_zoom_percent": max(25, min(500, int(percent)))})
+
+
+def get_default_zoom_scale() -> float:
+    return get_default_zoom_percent() / 100.0
+
+
+def get_autosave_interval_sec() -> int:
+    try:
+        v = int(load_settings().get("autosave_interval_sec", 60))
+    except (TypeError, ValueError):
+        v = 60
+    return max(10, min(600, v))
+
+
+def set_autosave_interval_sec(seconds: int) -> None:
+    save_settings({"autosave_interval_sec": max(10, min(600, int(seconds)))})
+
+
+def get_ann_highlight_color() -> str:
+    c = str(load_settings().get("ann_highlight_color") or DEFAULTS["ann_highlight_color"]).strip()
+    return c if c.startswith("#") and len(c) >= 4 else DEFAULTS["ann_highlight_color"]
+
+
+def set_ann_highlight_color(color: str) -> None:
+    c = (color or "").strip() or DEFAULTS["ann_highlight_color"]
+    if not c.startswith("#"):
+        c = "#" + c
+    save_settings({"ann_highlight_color": c})
+
+
+def get_ann_pen_color() -> str:
+    c = str(load_settings().get("ann_pen_color") or DEFAULTS["ann_pen_color"]).strip()
+    return c if c.startswith("#") and len(c) >= 4 else DEFAULTS["ann_pen_color"]
+
+
+def set_ann_pen_color(color: str) -> None:
+    c = (color or "").strip() or DEFAULTS["ann_pen_color"]
+    if not c.startswith("#"):
+        c = "#" + c
+    save_settings({"ann_pen_color": c})

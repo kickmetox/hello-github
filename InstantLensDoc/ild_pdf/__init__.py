@@ -37,8 +37,10 @@ from .images import (
 )
 from .overlay import (
     TextBlock,
+    TextMatchRect,
     bake_text_overlays,
     extract_text_blocks,
+    find_text_rects,
     import_page_text_as_overlays,
 )
 from .watermark import apply_page_numbers, apply_watermark
@@ -78,7 +80,9 @@ __all__ = [
     "insert_signature_field",
     "insert_signature_image",
     "TextBlock",
+    "TextMatchRect",
     "extract_text_blocks",
+    "find_text_rects",
     "import_page_text_as_overlays",
     "bake_text_overlays",
     "apply_watermark",
@@ -96,4 +100,4 @@ __all__ = [
     "set_metadata",
 ]
 
-__version__ = "0.2.1"
+__version__ = "0.2.2"

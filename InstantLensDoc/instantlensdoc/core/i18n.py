@@ -18,6 +18,8 @@ _STRINGS: dict[str, dict[UiLang, str]] = {
     "open_dir": {"de": "Standard-Ordner (Öffnen)", "en": "Default folder (Open)"},
     "export_jpeg_q": {"de": "Export JPEG-Qualität", "en": "Export JPEG quality"},
     "export_page": {"de": "Export PDF-Seitenformat", "en": "Export PDF page size"},
+    "default_zoom": {"de": "Standard-Zoom (PDF)", "en": "Default zoom (PDF)"},
+    "autosave_interval": {"de": "Autosave-Intervall", "en": "Autosave interval"},
     "update_check": {"de": "Update-Hinweis beim Start", "en": "Update notice on start"},
     "pick_dir": {"de": "Ordner wählen", "en": "Choose folder"},
     "meta_title": {"de": "PDF-Metadaten", "en": "PDF metadata"},

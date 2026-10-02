@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | 0.2.1 |
+| Version | 0.2.2 |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -31,11 +31,11 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)
 
-## Neu in 0.2.1
+## Neu in 0.2.2
 
-- Speichern-unter für PDF-Sidecar klar; Batch/OCR-Fortschritt  
-- Crash-sichere PDF-Öffnung + Timeout-Hinweis  
-- Keygen-EXE im Installer-Pfad dokumentiert; Menü-/F1-Polishes  
+- PDF-Textsuche Highlight auf aktueller Seite; Weiter-Navigation  
+- Annotation-Farben-Picker (Highlight/Stift); Export-Zielpfad merken  
+- Einstellungen: Standard-Zoom, Autosave-Intervall  
 - Stubs KI/Cloud/Stylus/3D unverändert  
 
 Details: [CHANGELOG.md](CHANGELOG.md)

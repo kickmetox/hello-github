@@ -33,7 +33,13 @@ from instantlensdoc.ui.ocr_dialog import OcrDialog
 from instantlensdoc.ui.pdf_view import PdfViewer
 from instantlensdoc.ui.sidebar import Sidebar
 from instantlensdoc.core import fulltext as fulltext_mod
-from instantlensdoc.core.app_settings import get_default_open_dir
+from instantlensdoc.core.app_settings import (
+    get_autosave_interval_sec,
+    get_default_open_dir,
+    get_last_export_dir,
+    get_update_check_on_start,
+    set_last_export_dir,
+)
 from instantlensdoc.ui.batch_dialog import BatchConvertDialog
 from instantlensdoc.ui.pdf_tools_dialog import PdfToolsDialog
 from instantlensdoc.ui.watermark_dialog import WatermarkDialog
@@ -47,7 +53,6 @@ from instantlensdoc.ui.metadata_dialog import MetadataDialog
 from instantlensdoc.ui.page_size_dialog import PageSizeDialog
 from instantlensdoc.core import session as session_mod
 from instantlensdoc.core.i18n import sync_from_settings
-from instantlensdoc.core.app_settings import get_update_check_on_start
 from ild_pdf.outline import extract_outline
 import logging
 
@@ -82,7 +87,7 @@ class MainWindow(QMainWindow):
         apply_theme()
         self._sync_theme_menu()
         self._autosave_timer = QTimer(self)
-        self._autosave_timer.setInterval(60_000)
+        self._autosave_timer.setInterval(get_autosave_interval_sec() * 1000)
         self._autosave_timer.timeout.connect(self._autosave_tick)
         self._autosave_timer.start()
         QTimer.singleShot(200, self._restore_session)
@@ -674,15 +679,20 @@ class MainWindow(QMainWindow):
                         continue
                     if query.lower() in blob.lower():
                         page_hits.append((page_idx, blob))
+            # Aktuelle Seite: Texttreffer highlighten
+            n_page = self.pdf_view.highlight_search(query)
             if page_hits:
                 for pi, blob in page_hits:
                     for line in blob.splitlines():
                         if query.lower() in line.lower():
                             hits.append(("page", pi, line.strip()[:80]))
                             break
-            if hits:
+            if hits or n_page:
                 lines = []
                 payloads = []
+                if n_page:
+                    lines.append(f"Seite {self.pdf_view.page_index + 1}: {n_page} Texttreffer (hervorgehoben)")
+                    payloads.append(("__search__", self.pdf_view.page_index))
                 for h in hits:
                     if isinstance(h, tuple) and h[0] == "page":
                         _, pi, snip = h
@@ -692,8 +702,12 @@ class MainWindow(QMainWindow):
                         lines.append(f"S{h.page + 1}: {h.type.value} {h.text[:40]}")
                         payloads.append(h)
                 self.sidebar.set_marks(lines, payloads)
-                self._set_status(f"{len(lines)} Treffer (PDF-Text/Annotationen)")
+                self._set_status(
+                    f"{n_page} Treffer auf Seite {self.pdf_view.page_index + 1} · "
+                    f"{len(lines)} Einträge (PDF-Text/Annotationen)"
+                )
             else:
+                self.pdf_view.clear_search_highlights()
                 self._set_status("Kein Treffer — „Alle Docs“ oder OCR für gescannte PDFs")
             return
         self._set_status("Suche: Editor oder PDF öffnen")
@@ -705,6 +719,26 @@ class MainWindow(QMainWindow):
                 self._set_status("Nächster Treffer")
             else:
                 self._set_status("Keine weiteren Treffer")
+            return
+        if self.stack.currentWidget() is self.pdf_view:
+            if not q:
+                self._set_status("Keine Suche aktiv")
+                return
+            if self.pdf_view._search_query != q:
+                n = self.pdf_view.highlight_search(q)
+                if n:
+                    self._set_status(f"{n} Treffer auf aktueller Seite (1/{n})")
+                else:
+                    self._set_status("Kein Texttreffer auf aktueller Seite")
+                return
+            if self.pdf_view.search_next():
+                i = self.pdf_view._search_index + 1
+                n = self.pdf_view.search_hit_count()
+                self._set_status(f"Treffer {i}/{n} auf Seite {self.pdf_view.page_index + 1}")
+            else:
+                self._set_status("Keine weiteren Treffer auf aktueller Seite")
+            return
+        self._set_status("Suche: Editor oder PDF öffnen")
 
     def _mark_selection(self):
         if self.stack.currentWidget() is not self.editor:
@@ -846,7 +880,11 @@ class MainWindow(QMainWindow):
         if SettingsDialog(self).exec():
             sync_from_settings()
             self._sync_theme_menu()
-            self._set_status("Einstellungen gespeichert")
+            self._autosave_timer.setInterval(get_autosave_interval_sec() * 1000)
+            self.pdf_view.apply_settings_colors()
+            self._set_status(
+                f"Einstellungen gespeichert · Autosave {get_autosave_interval_sec()}s"
+            )
 
     def _edit_pdf_metadata(self):
         if not self.pdf_view.pdf_path:
@@ -1073,10 +1111,12 @@ class MainWindow(QMainWindow):
             "pdf": ("PDF (*.pdf)", ".pdf"),
         }
         filt, ext = filters[fmt]
-        default = (self.doc.display_name if self.doc else "export") + ext
-        if "." in default and not default.lower().endswith(ext):
-            default = Path(default).stem + ext
-        path, _ = QFileDialog.getSaveFileName(self, f"Export {fmt.upper()}", default, filt)
+        default_name = (self.doc.display_name if self.doc else "export") + ext
+        if "." in default_name and not default_name.lower().endswith(ext):
+            default_name = Path(default_name).stem + ext
+        last_dir = get_last_export_dir()
+        start = str((last_dir / default_name) if last_dir else Path(default_name))
+        path, _ = QFileDialog.getSaveFileName(self, f"Export {fmt.upper()}", start, filt)
         if not path:
             return
         try:
@@ -1088,6 +1128,7 @@ class MainWindow(QMainWindow):
                 exp.export_docx(text, path, title=title)
             else:
                 exp.export_pdf(text, path, title=title)
+            set_last_export_dir(path)
             self._set_status(f"Exportiert: {path}")
         except Exception as e:
             QMessageBox.critical(self, "Export", f"Export fehlgeschlagen:\n{e}")

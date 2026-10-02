@@ -32,10 +32,12 @@ SHORTCUTS_HTML = """
 <code>*.ildann.json</code> (PDF-Datei bleibt unverändert). Auch unter
 PDF → Annotationen speichern unter…</p>
 <p><b>PDF-Werkzeuge</b> (Toolbar): Highlight, Schwärzen (REDACT-Preview), Formen per Drag;
-Notiz/Stempel/Callout/Overlay per Klick.</p>
+Notiz/Stempel/Callout/Overlay per Klick; <b>HL</b>/<b>Stift</b>-Farben-Picker.</p>
+<p><b>PDF-Suche:</b> Sidebar-Suche highlightet Treffer auf der aktuellen Seite;
+„Weiter“ springt zum nächsten Treffer.</p>
 <p><b>Schwärzung:</b> Rechteck ziehen → PDF → Schwärzung einbrennen… (Sidecar optional leeren)
 bzw. Schwärzungs-Annotationen löschen…</p>
-<p><b>Extras:</b> Einstellungen, Batch (Fortschrittsbalken), OCR (Fortschrittsdialog).</p>
+<p><b>Extras:</b> Einstellungen (Standard-Zoom, Autosave-Intervall), Batch (Fortschrittsbalken), OCR (Fortschrittsdialog).</p>
 <p>Vollständige Bedienung: Hilfe → Hilfe…</p>
 """
 

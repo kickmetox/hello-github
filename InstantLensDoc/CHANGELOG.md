@@ -1,5 +1,24 @@
 # Changelog — InstantLens Doc
 
+## 0.2.2 — Suche, Farben, Export, Einstellungen
+
+Fokus: PDF-Textsuche sichtbar machen, Annotation-Farben, Export/Settings-UX.
+
+### PDF / Annotationen
+- **Textsuche Highlight**: Treffer auf der aktuellen Seite werden hervorgehoben; „Weiter“ springt zum nächsten Treffer
+- **Farben-Picker**: Highlight- und Stift-Farbe (Linie/Pfeil/Rechteck/Unterstreichen) in der Toolbar; persistiert
+
+### Export / Einstellungen
+- **Export-Dialog**: zuletzt genutzter Zielordner wird gemerkt (`last_export_dir`)
+- **Standard-Zoom** und **Autosave-Intervall** in Einstellungen (persistiert, live übernommen)
+
+### Bugfixes / Docs
+- PDF-Suche „Weiter“ funktioniert jetzt (vorher ohne Wirkung)
+- Version **0.2.2**; Stubs KI/Cloud/Stylus/3D unverändert (keine Fake-Features)
+- Docs/CHANGELOG/ISS/Smoke auf 0.2.2
+
+---
+
 ## 0.2.1 — Qualitäts-Patch
 
 Fokus: UX-Lücken und Stabilität, keine Feature-Spam.

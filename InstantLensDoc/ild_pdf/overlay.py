@@ -144,6 +144,137 @@ def extract_text_blocks(
     return blocks
 
 
+@dataclass
+class TextMatchRect:
+    """Treffer-Rechteck einer Textsuche (PDF-Punkte, Y von oben; optional skaliert)."""
+
+    page: int
+    x: float
+    y: float
+    width: float
+    height: float
+    text: str = ""
+
+    def scaled(self, scale: float) -> "TextMatchRect":
+        s = float(scale)
+        return TextMatchRect(
+            page=self.page,
+            x=self.x * s,
+            y=self.y * s,
+            width=self.width * s,
+            height=self.height * s,
+            text=self.text,
+        )
+
+
+def _page_chars(
+    pdf_path: str | Path,
+    page_index: int,
+    *,
+    password: str | None = None,
+) -> tuple[list[tuple[float, float, float, float, str]], float, float]:
+    """Zeichen mit Boxen (Y oben) + Seitengröße."""
+    import pypdfium2 as pdfium
+
+    pdf_path = Path(pdf_path)
+    kwargs = {}
+    if password:
+        kwargs["password"] = password
+    doc = pdfium.PdfDocument(str(pdf_path), **kwargs)
+    try:
+        if page_index < 0 or page_index >= len(doc):
+            raise IndexError(f"Seite {page_index} existiert nicht")
+        page = doc[page_index]
+        try:
+            width, height = page.get_size()
+            textpage = page.get_textpage()
+            try:
+                chars: list[tuple[float, float, float, float, str]] = []
+                n = textpage.count_chars()
+                for i in range(n):
+                    ch = textpage.get_text_range(i, 1)
+                    box = textpage.get_charbox(i)
+                    if box is None:
+                        continue
+                    l, b, r, t = box
+                    chars.append((float(l), float(height - t), float(r - l), float(t - b), ch or " "))
+                return chars, float(width), float(height)
+            finally:
+                textpage.close()
+        finally:
+            page.close()
+    finally:
+        doc.close()
+
+
+def find_text_rects(
+    pdf_path: str | Path,
+    page_index: int,
+    query: str,
+    *,
+    scale: float = 1.0,
+    password: str | None = None,
+    max_hits: int = 200,
+) -> List[TextMatchRect]:
+    """
+    Findet Query-Treffer auf einer PDF-Seite und liefert Highlight-Rechtecke
+    (Render-Pixel bei scale, Y von oben). Case-insensitive.
+    """
+    q = (query or "").strip()
+    if not q:
+        return []
+    try:
+        chars, _w, _h = _page_chars(pdf_path, page_index, password=password)
+    except Exception:
+        return []
+    if not chars:
+        return []
+
+    # Volltext + Index-Mapping (inkl. Whitespace für Wortgrenzen)
+    text_chars = [(c[4] or " ") for c in chars]
+    hay = "".join(text_chars)
+    hay_l = hay.lower()
+    needle = q.lower()
+    if not needle or needle not in hay_l:
+        return []
+
+    hits: List[TextMatchRect] = []
+    start = 0
+    while len(hits) < max_hits:
+        pos = hay_l.find(needle, start)
+        if pos < 0:
+            break
+        end = pos + len(needle)
+        slice_chars = chars[pos:end]
+        if not slice_chars:
+            start = pos + 1
+            continue
+        # Mehrzeilige Treffer → pro Y-Band ein Rechteck
+        bands: dict[int, list[tuple[float, float, float, float, str]]] = {}
+        for c in slice_chars:
+            key = int(round(c[1] / 2.0) * 2)
+            bands.setdefault(key, []).append(c)
+        for band in bands.values():
+            x0 = min(c[0] for c in band)
+            y0 = min(c[1] for c in band)
+            x1 = max(c[0] + c[2] for c in band)
+            y1 = max(c[1] + c[3] for c in band)
+            snippet = "".join(c[4] for c in band)
+            rect = TextMatchRect(
+                page=page_index,
+                x=x0,
+                y=y0,
+                width=max(x1 - x0, 4.0),
+                height=max(y1 - y0, 6.0),
+                text=snippet,
+            )
+            hits.append(rect.scaled(scale) if scale != 1.0 else rect)
+            if len(hits) >= max_hits:
+                break
+        start = pos + max(len(needle), 1)
+    return hits
+
+
 def import_page_text_as_overlays(
     store: AnnotationStore,
     pdf_path: str | Path,

@@ -10,11 +10,11 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | Clipboard-Paste Bild | fertig | Editor + PDF (Stempel/Seite) |
 | TXT / MD / HTML öffnen & speichern | fertig | HTML-Export mit einfachem Markdownish |
 | DOCX öffnen & speichern | teilweise | python-docx; Headings/Listen beim Export |
-| Editor → HTML / DOCX / PDF Export | fertig | Datei → Exportieren; Qualität/Format in Einstellungen |
+| Editor → HTML / DOCX / PDF Export | fertig | Datei → Exportieren; Zielordner merken; Qualität/Format in Einstellungen |
 | Drucken (Editor / PDF-Seite) | fertig | Qt PrintDialog (Ctrl+P) |
 | Zuletzt geöffnete Dateien | fertig | Menü + Sidebar, `recent.json` |
 | PDF lesen / rendern | fertig | pypdfium2; große-PDF-Limits; Timeout-Hinweis 0.2.1 |
-| PDF Zoom / Seite einpassen | fertig | Debounce + Render-LRU-Cache |
+| PDF Zoom / Seite einpassen | fertig | Debounce + Cache; Standard-Zoom in Einstellungen 0.2.2 |
 | PDF-Wasserzeichen | fertig | Text diagonal, Deckkraft |
 | PDF Seitennummer-Stempel | fertig | Vorlage `{n} / {total}` |
 | PDF-Vergleich Seite-nebeneinander | fertig | Dialog |
@@ -29,12 +29,12 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | Sidebar Seiten-Thumbnails | fertig | Vorschaubilder, Klick → Seite |
 | Tastaturhilfe-Dialog | fertig | Hilfe → F1 |
 | App-Logging | fertig | %APPDATA%/InstantLensDoc/logs |
-| PDF-Annotationen (Highlight, Underline, Sticky, Text) | fertig | Sidecar `*.ildann.json` **v3**; Speichern unter klar 0.2.1 |
+| PDF-Annotationen (Highlight, Underline, Sticky, Text) | fertig | Sidecar `*.ildann.json` **v3**; Farben-Picker Highlight/Stift 0.2.2 |
 | Annotation Undo/Redo | fertig | Ctrl+Z/Y inkl. Overlay-Text |
 | Stempel / Callouts | teilweise | Stempel-Presets + Callout (2-Klick) |
 | PDF Signaturfeld / Signatur (Bild) | fertig | Sidecar; Menü PDF + Werkzeug |
 | Theme Hell/Dunkel | fertig | Ansicht-Menü, persistiert |
-| Autosave Editor / Annotationen | fertig | ~60 s, nur mit Pfad |
+| Autosave Editor / Annotationen | fertig | Intervall in Einstellungen (Default 60 s), nur mit Pfad |
 | Drag-Drop Datei öffnen | fertig | Hauptfenster |
 | Formen (Rechteck / Linie / Pfeil) | fertig | Drag-Zeichnung |
 | Messwerkzeug (Lineal) | fertig | Distanz in pt (Scale-bewusst) |
@@ -43,12 +43,12 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | PDF Seite↔Bild Hooks | fertig | Extrahieren / Bild als Seite / Bildstempel |
 | PDF drehen / Seite löschen | fertig | pikepdf; Annotation-Remap |
 | PDF neu anordnen | fertig | Dialog + Annotation-Remap |
-| Textsuche Seitenleiste | fertig | Editor + PDF-Text + Annotationen |
+| Textsuche Seitenleiste | fertig | Editor + PDF-Text + Annotationen; PDF-Treffer on-page Highlight 0.2.2 |
 | Volltextsuche geöffnete Docs | fertig | Sidebar „Alle Docs“ |
 | Lesezeichen / PDF-Outline | fertig | Baum in Sidebar, Doppelklick → Seite |
 | Batch-Konvertierung Ordner | fertig | Bilder→PDF, OCR-Ordner, PDF-OCR-Text; Fortschrittsbalken 0.2.1 |
 | PDF zusammenführen / teilen | fertig | Dialog unter Menü PDF |
-| Einstellungen-Dialog | fertig | OCR, Theme, Sprache, Export-Q, Pfade, Update |
+| Einstellungen-Dialog | fertig | OCR, Theme, Sprache, Export-Q, Standard-Zoom, Autosave, Pfade, Update |
 | Markieren im Editor | fertig | Ctrl+H |
 | Bilder JPEG/PNG anzeigen | fertig | |
 | OCR Bild/PDF-Seite | teilweise | Presets + Modi; Tabellen-Heuristik; Fortschrittsdialog 0.2.1 |
@@ -62,17 +62,17 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | PyInstaller Build Windows | fertig | `build-windows.ps1`, Icon `assets/app.ico` |
 | Inno-Installer | fertig | Icon, Desktop, Uninstaller, Keygen optional (`InstantLensKeygen.exe`) 0.2.1 |
 | Sync-Skript Windows | fertig | Store `docs/sync-ild.ps1` |
-| In-App Hilfe / About | fertig | Version 0.2.1 |
-| CHANGELOG | fertig | 0.2.1 Qualitäts-Patch |
+| In-App Hilfe / About | fertig | Version 0.2.2 |
+| CHANGELOG | fertig | 0.2.2 Suche/Farben/Export/Settings |
 | FEATURES.md / INFO.md | fertig | |
 | `ild_pdf` Modul + Beispielskript | fertig | metadata / page size / watermark / redact |
 | Font-Matching | geplant | |
 | Objekt-/Bildbearbeitung | geplant | |
 | Layout-Erhaltung (Scan→edit) | geplant | |
 | Freihand | geplant | |
-| KI-Assistent | Stub | Menü „Geplant“ 0.2.1 (keine Fake-KI) |
+| KI-Assistent | Stub | Menü „Geplant“ 0.2.2 (keine Fake-KI) |
 | Signieren (rechtssicher) | Stub | |
-| Cloud-Sync | Stub | Menü „Geplant“ 0.2.1 (keine Fake-Cloud) |
+| Cloud-Sync | Stub | Menü „Geplant“ 0.2.2 (keine Fake-Cloud) |
 | Text on Path / Text zu Pfaden | geplant | |
 | Envelope Distort / Text Wrap / Area Type | Stub/geplant | |
 | Schnittmasken | geplant | |
