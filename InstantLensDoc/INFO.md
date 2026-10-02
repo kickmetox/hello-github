@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | 0.1.1 |
+| Version | 0.1.2 |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | Plattform | Windows-first (Python 3.12 + PySide6), Linux/macOS lauffähig |
@@ -27,15 +27,16 @@ Eigenes Icon dort ablegen — Sync-Skript überschreibt vorhandene Nutzer-Icons 
 ## OCR
 
 Optional. `pip install pytesseract` + Tesseract-OCR Runtime (`winget install UB-Mannheim.TesseractOCR`).  
+Sprach-Presets in der UI; Modi: editierbarer Text oder durchsuchbares Bild (PDF + Sidecar).  
 Fehlt die Runtime, zeigt Extras → OCR eine klare Installationsanleitung.
 
-## Installer
+## Build (Windows, eine Zeile)
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\installer\build-installer.ps1
+powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 ```
 
-Benötigt Inno Setup 6. Details: `installer/instantlensdoc.iss`.
+Erzeugt per PyInstaller `dist/InstantLensDoc/` und `dist/InstantLensKeygen/`. Optional Inno: `installer/build-installer.ps1`.
 
 ## Sync (Windows)
 
@@ -43,4 +44,4 @@ Siehe Store-Skript bzw. Repo-Kopie — eine Zeile nach `D:\AI_Temp\InstantLensDo
 
 ## Auskoppelbares PDF-Modul
 
-Siehe `ild_pdf/README.md` — Rendern, Annotationen, Seitenoperationen ohne Poppler.
+Siehe `ild_pdf/README.md` — Rendern, Annotationen (Stempel/Callout), Seitenoperationen, Bild-Hooks ohne Poppler.

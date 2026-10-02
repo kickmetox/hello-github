@@ -1,13 +1,16 @@
-"""Basis-Annotationen (Highlight, Underline, Sticky Note, Textfeld)."""
+"""Basis-Annotationen inkl. Stempel/Callout; Sidecar-Persistenz."""
 
 from __future__ import annotations
 
 import json
 from dataclasses import asdict, dataclass, field
+from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
 from typing import List, Optional
 from uuid import uuid4
+
+SIDECAR_VERSION = 2
 
 
 class AnnotationType(str, Enum):
@@ -15,6 +18,19 @@ class AnnotationType(str, Enum):
     UNDERLINE = "underline"
     STICKY = "sticky"
     TEXT = "text"
+    STAMP = "stamp"
+    CALLOUT = "callout"
+
+
+# Vordefinierte Stempel-Texte (UI kann erweitern)
+STAMP_PRESETS = (
+    "GEPRÜFT",
+    "FREIGEGEBEN",
+    "ENTWURF",
+    "VERTRAULICH",
+    "KOPIE",
+    "ERLEDIGT",
+)
 
 
 @dataclass
@@ -27,7 +43,19 @@ class Annotation:
     height: float = 24.0
     text: str = ""
     color: str = "#FFFF00"
+    # Callout: Zielpunkt der Linie (relativ zur Seite/Pixel)
+    callout_x: float = 0.0
+    callout_y: float = 0.0
     id: str = field(default_factory=lambda: uuid4().hex)
+    created: str = field(
+        default_factory=lambda: datetime.now(timezone.utc).isoformat(timespec="seconds")
+    )
+    modified: str = field(
+        default_factory=lambda: datetime.now(timezone.utc).isoformat(timespec="seconds")
+    )
+
+    def touch(self) -> None:
+        self.modified = datetime.now(timezone.utc).isoformat(timespec="seconds")
 
     def to_dict(self) -> dict:
         d = asdict(self)
@@ -38,15 +66,25 @@ class Annotation:
     def from_dict(cls, data: dict) -> "Annotation":
         data = dict(data)
         data["type"] = AnnotationType(data["type"])
+        # Abwärtskompatibel: alte Sidecars ohne neue Felder
+        data.setdefault("callout_x", 0.0)
+        data.setdefault("callout_y", 0.0)
+        data.setdefault("created", datetime.now(timezone.utc).isoformat(timespec="seconds"))
+        data.setdefault("modified", data["created"])
+        # Unbekannte Keys verwerfen
+        known = {f.name for f in cls.__dataclass_fields__.values()}  # type: ignore[attr-defined]
+        data = {k: v for k, v in data.items() if k in known}
         return cls(**data)
 
 
 class AnnotationStore:
-    """Annotationen neben dem PDF als JSON speichern."""
+    """Annotationen neben dem PDF als JSON speichern (*.ildann.json)."""
 
     def __init__(self, pdf_path: str | Path | None = None):
         self.pdf_path = Path(pdf_path) if pdf_path else None
         self.annotations: List[Annotation] = []
+        self.dirty = False
+        self._meta: dict = {}
         if self.pdf_path and self.sidecar_path.exists():
             self.load()
 
@@ -58,27 +96,74 @@ class AnnotationStore:
 
     def add(self, ann: Annotation) -> Annotation:
         self.annotations.append(ann)
+        self.dirty = True
         return ann
+
+    def update(self, ann_id: str, **kwargs) -> Optional[Annotation]:
+        for a in self.annotations:
+            if a.id == ann_id:
+                for k, v in kwargs.items():
+                    if hasattr(a, k):
+                        setattr(a, k, v)
+                a.touch()
+                self.dirty = True
+                return a
+        return None
 
     def remove(self, ann_id: str) -> bool:
         before = len(self.annotations)
         self.annotations = [a for a in self.annotations if a.id != ann_id]
-        return len(self.annotations) < before
+        changed = len(self.annotations) < before
+        if changed:
+            self.dirty = True
+        return changed
 
     def for_page(self, page: int) -> List[Annotation]:
         return [a for a in self.annotations if a.page == page]
 
-    def save(self, path: Optional[Path] = None) -> Path:
+    def remap_pages(self, mapping: dict[int, int]) -> None:
+        """Seitenindizes nach reorder/delete anpassen; fehlende Keys = Seite entfernt."""
+        kept: List[Annotation] = []
+        changed = False
+        for ann in self.annotations:
+            if ann.page in mapping:
+                new_page = mapping[ann.page]
+                if new_page != ann.page:
+                    ann.page = new_page
+                    ann.touch()
+                    changed = True
+                kept.append(ann)
+            else:
+                changed = True
+        if changed or len(kept) != len(self.annotations):
+            self.annotations = kept
+            self.dirty = True
+
+    def save(self, path: Optional[Path] = None, force: bool = False) -> Path:
         target = path or self.sidecar_path
+        if not force and not self.dirty and target.exists() and path is None:
+            return target
+        now = datetime.now(timezone.utc).isoformat(timespec="seconds")
         payload = {
-            "version": 1,
+            "version": SIDECAR_VERSION,
             "pdf": str(self.pdf_path) if self.pdf_path else None,
+            "saved_at": now,
+            "count": len(self.annotations),
+            "meta": self._meta,
             "annotations": [a.to_dict() for a in self.annotations],
         }
         target.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
+        self.dirty = False
         return target
 
     def load(self, path: Optional[Path] = None) -> None:
         target = path or self.sidecar_path
         data = json.loads(target.read_text(encoding="utf-8"))
+        self._meta = dict(data.get("meta") or {})
         self.annotations = [Annotation.from_dict(a) for a in data.get("annotations", [])]
+        self.dirty = False
+
+    def export_backup(self, path: str | Path) -> Path:
+        """Kopie der Sidecar unter anderem Namen (Backup)."""
+        path = Path(path)
+        return self.save(path, force=True)

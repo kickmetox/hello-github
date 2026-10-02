@@ -27,6 +27,7 @@ from instantlensdoc.ui.editor import TextEditor
 from instantlensdoc.ui.form_builder import FormBuilderDialog
 from instantlensdoc.ui.help_dialog import AboutDialog, HelpDialog
 from instantlensdoc.ui.license_dialog import LicenseDialog
+from instantlensdoc.ui.ocr_dialog import OcrDialog
 from instantlensdoc.ui.pdf_view import PdfViewer
 from instantlensdoc.ui.sidebar import Sidebar
 from instantlensdoc.ui.stubs import show_planned
@@ -152,6 +153,8 @@ class MainWindow(QMainWindow):
             ("Seite drehen (90°)", lambda: self.pdf_view.rotate_current()),
             ("Seite löschen…", lambda: self.pdf_view.delete_current()),
             ("Seiten neu anordnen…", lambda: self.pdf_view.reorder_dialog()),
+            ("Seite als Bild extrahieren…", lambda: self.pdf_view.extract_page_as_image()),
+            ("Bild als neue Seite…", lambda: self.pdf_view.insert_image_page()),
         ]:
             a = QAction(title, self)
             a.triggered.connect(slot)
@@ -160,6 +163,9 @@ class MainWindow(QMainWindow):
         m_ins = mb.addMenu("&Einfügen")
         a = QAction("Textrahmen", self)
         a.triggered.connect(self._add_text_frame)
+        m_ins.addAction(a)
+        a = QAction("Verketteten Textrahmen…", self)
+        a.triggered.connect(self._add_chained_frame)
         m_ins.addAction(a)
         a = QAction("Bild einfügen…", self)
         a.triggered.connect(self._insert_image)
@@ -400,6 +406,35 @@ class MainWindow(QMainWindow):
             self.editor.appendPlainText(f"\n--- Textrahmen {frame.id} ---\n{flowed}")
         self._set_status(f"Textrahmen {frame.id} hinzugefügt")
 
+    def _add_chained_frame(self):
+        """Verkettete Textrahmen: Overflow fließt in den nächsten Rahmen."""
+        source = self.editor.toPlainText() if self.stack.currentWidget() is self.editor else ""
+        if not source.strip():
+            source = (
+                "Dies ist ein Beispieltext für verkettete Textrahmen in InstantLens Doc. "
+                "Der Text fließt automatisch in den nächsten Rahmen, sobald die Kapazität "
+                "des ersten Rahmens erreicht ist. Weitere Wörter landen im Folgeahmen. "
+            ) * 4
+        # Zwei schmale Rahmen verkettet
+        f1 = self.layout_doc.add_text_frame(
+            text="", x=40, y=40, width=240, height=120, font_size=12
+        )
+        f2 = self.layout_doc.chain_new_frame(f1, x=40, y=180, width=240, height=120)
+        filled = self.layout_doc.flow_text_chain(source, f1)
+        overflow = filled.pop("__overflow__", "")
+        if self.stack.currentWidget() is self.editor:
+            lines = [
+                f"\n=== Verkettete Rahmen {f1.id} → {f2.id} ===",
+                f"--- Rahmen {f1.id} ---",
+                f1.text,
+                f"--- Rahmen {f2.id} (Fortsetzung) ---",
+                f2.text,
+            ]
+            if overflow:
+                lines.append(f"--- Overflow (kein weiterer Rahmen) ---\n{overflow[:400]}")
+            self.editor.appendPlainText("\n".join(lines))
+        self._set_status(f"Verkettung {f1.id}→{f2.id} ({len(filled)} Rahmen gefüllt)")
+
     def _insert_image(self):
         path, _ = QFileDialog.getOpenFileName(
             self, "Bild einfügen", "", "Bilder (*.png *.jpg *.jpeg *.bmp)"
@@ -407,6 +442,46 @@ class MainWindow(QMainWindow):
         if not path:
             return
         frame = self.layout_doc.add_image(path)
+        if self.stack.currentWidget() is self.pdf_view and self.pdf_view.pdf_path:
+            from PySide6.QtWidgets import QInputDialog
+
+            choice, ok = QInputDialog.getItem(
+                self,
+                "Bild einfügen",
+                "Ziel:",
+                ["Layout-Rahmen (Editor-Hinweis)", "Als neue PDF-Seite", "Als Stempel-Annotation"],
+                0,
+                False,
+            )
+            if ok and choice == "Als neue PDF-Seite":
+                try:
+                    from ild_pdf import PdfDocument, insert_image_as_page
+
+                    insert_image_as_page(self.pdf_view.pdf_path, path)
+                    with PdfDocument(self.pdf_view.pdf_path) as doc:
+                        self.pdf_view.page_count = len(doc)
+                    self.pdf_view.page_index = self.pdf_view.page_count - 1
+                    self.pdf_view.refresh()
+                    self._set_status("Bild als PDF-Seite eingefügt")
+                    return
+                except Exception as e:
+                    QMessageBox.warning(self, "Bild", str(e))
+                    return
+            if ok and choice == "Als Stempel-Annotation":
+                try:
+                    from ild_pdf import insert_image_stamp_overlay
+
+                    insert_image_stamp_overlay(
+                        self.pdf_view.pdf_path,
+                        path,
+                        page_index=self.pdf_view.page_index,
+                    )
+                    self.pdf_view.reload_annotations()
+                    self._set_status("Bildstempel-Annotation gesetzt")
+                    return
+                except Exception as e:
+                    QMessageBox.warning(self, "Bild", str(e))
+                    return
         if self.stack.currentWidget() is self.editor:
             self.editor.appendPlainText(
                 f"\n[Bild: {path} @ {frame.x},{frame.y} {frame.width}x{frame.height}]\n"
@@ -414,32 +489,65 @@ class MainWindow(QMainWindow):
         self._set_status(f"Bild eingefügt: {Path(path).name}")
 
     def _run_ocr(self):
+        from PySide6.QtWidgets import QDialog
+
         ok, msg = ocr_mod.tesseract_available()
+        need_file = not (
+            self.doc and self.doc.path and self.doc.kind in (DocKind.IMAGE, DocKind.PDF)
+        )
+        dlg = OcrDialog(
+            self,
+            need_file=need_file,
+            default_label=Path(self.doc.path).name if self.doc and self.doc.path else "",
+        )
+        if dlg.exec() != QDialog.Accepted:
+            return
+
         if not ok:
-            QMessageBox.information(
-                self,
-                "OCR — Tesseract fehlt",
-                msg,
-            )
+            QMessageBox.information(self, "OCR — Tesseract fehlt", msg)
             self._set_status("OCR nicht verfügbar")
             return
 
-        source_label = ""
+        lang = dlg.lang_code()
+        mode = dlg.output_mode()
         try:
             if self.doc and self.doc.kind == DocKind.IMAGE and self.doc.path:
                 source_label = Path(self.doc.path).name
-                text = ocr_mod.ocr_image(self.doc.path)
-            elif self.doc and self.doc.kind == DocKind.PDF and self.doc.path:
-                source_label = f"{Path(self.doc.path).name} Seite {self.pdf_view.page_index + 1}"
-                text = ocr_mod.ocr_pdf_page(self.doc.path, self.pdf_view.page_index)
-            else:
-                path, _ = QFileDialog.getOpenFileName(
-                    self, "Bild für OCR", "", "Bilder (*.png *.jpg *.jpeg *.tif *.tiff)"
+                result = ocr_mod.run_ocr(
+                    self.doc.path,
+                    lang=lang,
+                    mode=mode,
+                    out_dir=Path(self.doc.path).parent,
+                    source_label=source_label,
                 )
+            elif self.doc and self.doc.kind == DocKind.PDF and self.doc.path:
+                from ild_pdf import render_page
+
+                source_label = f"{Path(self.doc.path).name} Seite {self.pdf_view.page_index + 1}"
+                img = render_page(self.doc.path, self.pdf_view.page_index, scale=2.0)
+                result = ocr_mod.run_ocr(
+                    img,
+                    lang=lang,
+                    mode=mode,
+                    out_dir=Path(self.doc.path).parent,
+                    source_label=source_label,
+                )
+            else:
+                path = dlg.selected_path
+                if not path:
+                    path, _ = QFileDialog.getOpenFileName(
+                        self, "Bild für OCR", "", "Bilder (*.png *.jpg *.jpeg *.tif *.tiff)"
+                    )
                 if not path:
                     return
                 source_label = Path(path).name
-                text = ocr_mod.ocr_image(path)
+                result = ocr_mod.run_ocr(
+                    path,
+                    lang=lang,
+                    mode=mode,
+                    out_dir=Path(path).parent,
+                    source_label=source_label,
+                )
         except ocr_mod.OcrUnavailable as e:
             QMessageBox.information(self, "OCR — Tesseract fehlt", str(e))
             return
@@ -448,10 +556,15 @@ class MainWindow(QMainWindow):
             return
 
         self.stack.setCurrentWidget(self.editor)
-        self.editor.setPlainText(text)
-        self.doc = Document(kind=DocKind.TEXT, title=f"OCR — {source_label}", text=text)
+        self.editor.setPlainText(result.text)
+        self.doc = Document(kind=DocKind.TEXT, title=f"OCR — {source_label}", text=result.text)
         self.setWindowTitle(f"{DISPLAY_NAME} — OCR — {source_label}")
-        self._set_status(f"OCR abgeschlossen ({source_label})")
+        extra = ""
+        if result.searchable_pdf:
+            extra = f" · PDF {result.searchable_pdf.name}"
+            if result.sidecar:
+                extra += f" + {result.sidecar.name}"
+        self._set_status(f"OCR ({result.lang}, {result.mode.value}){extra}")
 
     def _forms(self):
         FormBuilderDialog(self).exec()

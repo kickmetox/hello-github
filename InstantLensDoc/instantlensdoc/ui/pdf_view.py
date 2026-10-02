@@ -1,4 +1,4 @@
-"""PDF-Ansicht mit Zoom, Annotationen und Seitenoperationen."""
+"""PDF-Ansicht mit Zoom, Annotationen (inkl. Stempel/Callout) und Seitenoperationen."""
 
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ild_pdf import Annotation, AnnotationStore, AnnotationType, render_page
+from ild_pdf import Annotation, AnnotationStore, AnnotationType, STAMP_PRESETS, render_page
 from ild_pdf.pages import delete_pages, reorder_pages, rotate_page
 
 
@@ -80,7 +80,7 @@ class PageReorderDialog(QDialog):
 class PdfCanvas(QLabel):
     """Zeigt eine gerenderte PDF-Seite; Klick setzt Annotation je nach Werkzeug."""
 
-    annotation_placed = Signal(float, float)  # Pixel-Koordinaten im Pixmap
+    annotation_placed = Signal(float, float)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -122,6 +122,20 @@ class PdfCanvas(QLabel):
             elif ann.type == AnnotationType.TEXT:
                 painter.drawRect(x, y, w, h)
                 painter.drawText(x + 4, y + 16, (ann.text or "")[:60])
+            elif ann.type == AnnotationType.STAMP:
+                stamp_color = QColor(ann.color if ann.color != "#FFFF00" else "#C0392B")
+                painter.setPen(QPen(stamp_color, 3))
+                painter.drawRect(x, y, max(w, 100), max(h, 36))
+                painter.drawText(x + 8, y + max(h, 36) // 2 + 4, (ann.text or "STEMPEL")[:24])
+            elif ann.type == AnnotationType.CALLOUT:
+                box_w, box_h = max(w, 100), max(h, 40)
+                painter.setBrush(QColor(255, 255, 220, 220))
+                painter.drawRect(x, y, box_w, box_h)
+                painter.drawText(x + 4, y + 16, (ann.text or "Callout")[:40])
+                cx = int(ann.callout_x) if ann.callout_x else x - 40
+                cy = int(ann.callout_y) if ann.callout_y else y + box_h + 30
+                painter.drawLine(x, y + box_h, cx, cy)
+                painter.drawEllipse(cx - 3, cy - 3, 6, 6)
         painter.end()
         self.setPixmap(pm)
         self.adjustSize()
@@ -155,6 +169,7 @@ class PdfViewer(QWidget):
         self.tool: AnnotationType | None = AnnotationType.HIGHLIGHT
         self.store: Optional[AnnotationStore] = None
         self._tool_buttons: list[QToolButton] = []
+        self._pending_callout_anchor: tuple[float, float] | None = None
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -182,12 +197,20 @@ class PdfViewer(QWidget):
         btn_save_ann.clicked.connect(self.save_annotations)
         btn_reload_ann = QPushButton("Annot. laden")
         btn_reload_ann.clicked.connect(self.reload_annotations)
+        btn_extract = QPushButton("Seite→Bild")
+        btn_extract.setToolTip("Aktuelle Seite als PNG extrahieren")
+        btn_extract.clicked.connect(self.extract_page_as_image)
+        btn_img_page = QPushButton("Bild→Seite")
+        btn_img_page.setToolTip("Bild als neue PDF-Seite anhängen")
+        btn_img_page.clicked.connect(self.insert_image_page)
 
         for t, label in [
             (AnnotationType.HIGHLIGHT, "Highlight"),
             (AnnotationType.UNDERLINE, "Unterstreichen"),
             (AnnotationType.STICKY, "Notiz"),
             (AnnotationType.TEXT, "Textfeld"),
+            (AnnotationType.STAMP, "Stempel"),
+            (AnnotationType.CALLOUT, "Callout"),
         ]:
             b = QToolButton()
             b.setText(label)
@@ -207,6 +230,8 @@ class PdfViewer(QWidget):
         toolbar.addWidget(btn_reorder)
         toolbar.addWidget(btn_save_ann)
         toolbar.addWidget(btn_reload_ann)
+        toolbar.addWidget(btn_extract)
+        toolbar.addWidget(btn_img_page)
         toolbar.addStretch()
         layout.addLayout(toolbar)
 
@@ -219,11 +244,14 @@ class PdfViewer(QWidget):
 
     def _set_tool(self, tool: AnnotationType):
         self.tool = tool
+        self._pending_callout_anchor = None
         mapping = {
             AnnotationType.HIGHLIGHT: "Highlight",
             AnnotationType.UNDERLINE: "Unterstreichen",
             AnnotationType.STICKY: "Notiz",
             AnnotationType.TEXT: "Textfeld",
+            AnnotationType.STAMP: "Stempel",
+            AnnotationType.CALLOUT: "Callout",
         }
         want = mapping[tool]
         for b in self._tool_buttons:
@@ -238,6 +266,7 @@ class PdfViewer(QWidget):
         with PdfDocument(self.pdf_path) as doc:
             self.page_count = len(doc)
         self.page_index = 0
+        self._pending_callout_anchor = None
         self.refresh()
         self.annotations_changed.emit()
 
@@ -248,7 +277,8 @@ class PdfViewer(QWidget):
         anns = self.store.for_page(self.page_index) if self.store else []
         self.canvas.set_page_image(img, anns)
         self.lbl_page.setText(f"Seite {self.page_index + 1} / {self.page_count}")
-        self.status.emit(f"PDF: {self.pdf_path.name}")
+        dirty = " *" if self.store and self.store.dirty else ""
+        self.status.emit(f"PDF: {self.pdf_path.name}{dirty}")
 
     def goto_page(self, page_index: int):
         if 0 <= page_index < self.page_count:
@@ -285,8 +315,8 @@ class PdfViewer(QWidget):
             QMessageBox.information(self, "Annotationen", "Kein PDF geladen.")
             return False
         try:
-            path = self.store.save()
-            self.status.emit(f"Annotationen gespeichert: {path.name}")
+            path = self.store.save(force=True)
+            self.status.emit(f"Annotationen gespeichert: {path.name} ({len(self.store.annotations)})")
             self.annotations_changed.emit()
             return True
         except Exception as e:
@@ -301,7 +331,7 @@ class PdfViewer(QWidget):
                 self.store.load()
                 self.refresh()
                 self.annotations_changed.emit()
-                self.status.emit("Annotationen geladen")
+                self.status.emit(f"Annotationen geladen ({len(self.store.annotations)})")
                 return True
             QMessageBox.information(
                 self,
@@ -313,24 +343,114 @@ class PdfViewer(QWidget):
             QMessageBox.warning(self, "Annotationen laden", str(e))
             return False
 
+    def extract_page_as_image(self):
+        if not self.pdf_path:
+            return
+        from PySide6.QtWidgets import QFileDialog
+        from ild_pdf import extract_page_image
+
+        default = str(self.pdf_path.with_name(f"{self.pdf_path.stem}_p{self.page_index + 1}.png"))
+        path, _ = QFileDialog.getSaveFileName(self, "Seite als Bild", default, "PNG (*.png);;JPEG (*.jpg)")
+        if not path:
+            return
+        try:
+            fmt = "JPEG" if path.lower().endswith((".jpg", ".jpeg")) else "PNG"
+            out = extract_page_image(self.pdf_path, self.page_index, path, scale=self.scale, format=fmt)
+            self.status.emit(f"Seite exportiert: {out.name}")
+        except Exception as e:
+            QMessageBox.warning(self, "Extrahieren", str(e))
+
+    def insert_image_page(self):
+        if not self.pdf_path:
+            return
+        from PySide6.QtWidgets import QFileDialog
+        from ild_pdf import insert_image_as_page
+
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Bild als neue Seite", "", "Bilder (*.png *.jpg *.jpeg *.bmp)"
+        )
+        if not path:
+            return
+        try:
+            insert_image_as_page(self.pdf_path, path)
+            from ild_pdf import PdfDocument
+
+            with PdfDocument(self.pdf_path) as doc:
+                self.page_count = len(doc)
+            self.page_index = self.page_count - 1
+            self.refresh()
+            self.status.emit("Bildseite angehängt")
+        except Exception as e:
+            QMessageBox.warning(self, "Bild einfügen", str(e))
+
     def _on_place(self, x: float, y: float):
         if not self.store or self.tool is None:
             return
+
+        # Callout: 1. Klick = Anker, 2. Klick = Box
+        if self.tool == AnnotationType.CALLOUT:
+            if self._pending_callout_anchor is None:
+                self._pending_callout_anchor = (x, y)
+                self.status.emit("Callout: zweiten Klick für Textbox setzen")
+                return
+            ax, ay = self._pending_callout_anchor
+            self._pending_callout_anchor = None
+            text, ok = QInputDialog.getText(self, "Callout", "Text:")
+            if not ok:
+                return
+            ann = Annotation(
+                page=self.page_index,
+                type=AnnotationType.CALLOUT,
+                x=x,
+                y=y,
+                width=140,
+                height=48,
+                text=text,
+                color="#2980B9",
+                callout_x=ax,
+                callout_y=ay,
+            )
+            self._commit_ann(ann)
+            return
+
         text = ""
-        if self.tool in (AnnotationType.STICKY, AnnotationType.TEXT):
+        color = "#FF6B6B"
+        width, height = 160.0, 24.0
+
+        if self.tool == AnnotationType.STAMP:
+            stamp, ok = QInputDialog.getItem(
+                self, "Stempel", "Text:", list(STAMP_PRESETS), 0, True
+            )
+            if not ok or not stamp:
+                return
+            text = stamp
+            color = "#C0392B"
+            width, height = 140.0, 40.0
+        elif self.tool in (AnnotationType.STICKY, AnnotationType.TEXT):
             text, ok = QInputDialog.getText(self, "Text", "Inhalt:")
             if not ok:
                 return
+            height = 70.0 if self.tool == AnnotationType.STICKY else 24.0
+        elif self.tool == AnnotationType.HIGHLIGHT:
+            color = "#FFE066"
+            width = 160.0
+        elif self.tool == AnnotationType.UNDERLINE:
+            width = 180.0
+
         ann = Annotation(
             page=self.page_index,
             type=self.tool,
             x=x,
             y=y,
-            width=160 if self.tool != AnnotationType.UNDERLINE else 180,
-            height=24 if self.tool != AnnotationType.STICKY else 70,
+            width=width,
+            height=height,
             text=text,
-            color="#FFE066" if self.tool == AnnotationType.HIGHLIGHT else "#FF6B6B",
+            color=color,
         )
+        self._commit_ann(ann)
+
+    def _commit_ann(self, ann: Annotation):
+        assert self.store is not None
         self.store.add(ann)
         try:
             self.store.save()
@@ -338,7 +458,7 @@ class PdfViewer(QWidget):
             QMessageBox.warning(self, "Annotationen", f"Speichern fehlgeschlagen: {e}")
         self.refresh()
         self.annotations_changed.emit()
-        self.status.emit("Annotation gespeichert")
+        self.status.emit(f"Annotation gespeichert ({ann.type.value})")
 
     def rotate_current(self):
         if not self.pdf_path:
@@ -362,10 +482,23 @@ class PdfViewer(QWidget):
         if reply != QMessageBox.Yes:
             return
         try:
-            delete_pages(self.pdf_path, [self.page_index])
+            deleted = self.page_index
+            delete_pages(self.pdf_path, [deleted])
+            if self.store:
+                # Seiten > deleted um 1 nach unten
+                mapping = {}
+                for i in range(self.page_count):
+                    if i < deleted:
+                        mapping[i] = i
+                    elif i > deleted:
+                        mapping[i] = i - 1
+                    # i == deleted: weggelassen
+                self.store.remap_pages(mapping)
+                self.store.save(force=True)
             self.page_count -= 1
             self.page_index = min(self.page_index, self.page_count - 1)
             self.refresh()
+            self.annotations_changed.emit()
             self.status.emit("Seite gelöscht")
         except Exception as e:
             QMessageBox.warning(self, "Löschen", str(e))
@@ -382,12 +515,10 @@ class PdfViewer(QWidget):
             return
         try:
             reorder_pages(self.pdf_path, order)
-            # Annotation-Seitenindizes anpassen
             if self.store:
                 mapping = {old: new for new, old in enumerate(order)}
-                for ann in self.store.annotations:
-                    ann.page = mapping.get(ann.page, ann.page)
-                self.store.save()
+                self.store.remap_pages(mapping)
+                self.store.save(force=True)
             self.page_index = 0
             from ild_pdf import PdfDocument
 
