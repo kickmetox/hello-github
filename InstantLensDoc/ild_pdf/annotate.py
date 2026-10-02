@@ -683,6 +683,18 @@ class AnnotationStore:
         self.dirty = True
         return len(targets)
 
+    def count_tag(self, tag: str) -> int:
+        """Anzahl Annotationen mit diesem Tag (case-insensitive)."""
+        needle = str(tag or "").strip()
+        if not needle:
+            return 0
+        cf = needle.casefold()
+        return sum(
+            1
+            for a in self.annotations
+            if any(str(t).casefold() == cf for t in (getattr(a, "tags", None) or []))
+        )
+
     def rename_tag(self, old_tag: str, new_tag: str) -> int:
         """
         Tag global in allen Annotationen umbenennen (case-insensitive Match).

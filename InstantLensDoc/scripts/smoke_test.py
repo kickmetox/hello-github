@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Smoke-Test 0.6.7 (CLI + optional offscreen Qt). Kernpfade: open/annotate/export/license + ausgewählte 0.5.x-Pfade."""
+"""Smoke-Test 0.6.8 (CLI + optional offscreen Qt). Kernpfade: open/annotate/export/license + ausgewählte 0.5.x-Pfade."""
 
 from __future__ import annotations
 
@@ -122,8 +122,8 @@ def main() -> int:
     from instantlensdoc.core.update_check import check_for_updates
     from instantlensdoc.license import KEY_DAYS, TRIAL_DAYS, generate_key, verify_key
 
-    assert __version__ == "0.6.7", __version__
-    assert ild_ver == "0.6.7", ild_ver
+    assert __version__ == "0.6.8", __version__
+    assert ild_ver == "0.6.8", ild_ver
     assert TRIAL_DAYS == 28 and KEY_DAYS == 32
     key = generate_key("ame@sellerbach.de")
     ok, msg, _ = verify_key(key)
@@ -141,7 +141,7 @@ def main() -> int:
     assert "Settings" in tr("settings")
     set_lang("de")
     upd = check_for_updates(allow_network=False)
-    assert upd.local_version == "0.6.7" and not upd.online
+    assert upd.local_version == "0.6.8" and not upd.online
     assert get_export_jpeg_quality() >= 10
     assert get_ui_lang() in ("de", "en")
     assert 25 <= get_default_zoom_percent() <= 500
@@ -182,10 +182,11 @@ def main() -> int:
     assert get_ann_pen_color() == "#112233"
     assert (ROOT / "CHANGELOG.md").is_file()
     cl = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-    assert "0.6.7" in cl
+    assert "0.6.8" in cl
     assert "0.6.5" in cl
     assert "0.6.0" in cl
     assert "## 0.6.7" in cl
+    assert "## 0.6.8" in cl
     assert "## 0.6.5" in cl
     assert "## 0.6.4" in cl
     assert "## 0.6.3" in cl
@@ -228,7 +229,7 @@ def main() -> int:
     assert "0.4.9" in cl  # noch in Kurz-Tabelle
     assert "0.3.9" in cl  # noch in Kurz-Tabelle
     assert "0.2.9" in cl  # noch in Kurz-Tabelle
-    assert "0.6.7" in (ROOT / "README.md").read_text(encoding="utf-8")
+    assert "0.6.8" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "run.bat" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "sync-ild.ps1" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "scripts/sync-ild.ps1" in (ROOT / "FEATURES.md").read_text(encoding="utf-8")
@@ -577,13 +578,13 @@ def main() -> int:
 
         assert (ROOT / "installer" / "installer-hinweis.txt").exists()
         iss = (ROOT / "installer" / "instantlensdoc.iss").read_text(encoding="utf-8")
-        assert "0.6.7" in iss and "desktopicon" in iss and "DisableProgramGroupPage=no" in iss
+        assert "0.6.8" in iss and "desktopicon" in iss and "DisableProgramGroupPage=no" in iss
         assert "UninstallDisplayName" in iss and "Uninstallable=yes" in iss
         assert "IncludeKeygen" in iss and "SetupIconFile" in iss
         assert "InstantLensKeygen.exe" in iss
         assert "uninstallexe" in iss
         bw = (ROOT / "build-windows.ps1").read_text(encoding="utf-8")
-        assert "0.6.7" in bw and "NoKeygenInApp" in bw and "--icon" in bw
+        assert "0.6.8" in bw and "NoKeygenInApp" in bw and "--icon" in bw
         assert "InstantLensKeygen.exe" in bw
         bi = (ROOT / "installer" / "build-installer.ps1").read_text(encoding="utf-8")
         assert "InstantLensKeygen.exe" in bi and "IncludeKeygen" in bi
@@ -592,7 +593,7 @@ def main() -> int:
         assert "Installer" in kg_readme
         hinweis = (ROOT / "installer" / "installer-hinweis.txt").read_text(encoding="utf-8")
         assert "InstantLensKeygen.exe" in hinweis or "run-keygen.bat" in hinweis
-        assert "0.6.7" in hinweis
+        assert "0.6.8" in hinweis
         assert "checkedonce" in iss and "Desktop-Verknüpfung" in hinweis
         from ild_pdf.limits import OPEN_TIMEOUT_HINT, OPEN_TIMEOUT_HINT_SEC
 
@@ -604,7 +605,7 @@ def main() -> int:
         assert "QProgressDialog" in (ROOT / "instantlensdoc" / "ui" / "main_window.py").read_text(encoding="utf-8")
 
         assert (ROOT / "examples" / "ild_pdf_demo.py").exists()
-        assert "0.6.7" in (ROOT / "INFO.md").read_text(encoding="utf-8")
+        assert "0.6.8" in (ROOT / "INFO.md").read_text(encoding="utf-8")
         assert (ROOT / "assets" / "app.ico").is_file()
 
         # --- Kernpfade: open / annotate / export / license ---
@@ -795,7 +796,7 @@ def main() -> int:
         set_backup_on_save(False)
         assert get_page_size_unit() in ("mm", "inch")
         assert isinstance(get_minimize_to_tray(), bool)
-        assert "0.6.7" in feat and "0.5.9" in feat and "0.4.9" in feat  # Release + Zeitraum-Feature-Hinweise
+        assert "0.6.8" in feat and "0.5.9" in feat and "0.4.9" in feat  # Release + Zeitraum-Feature-Hinweise
         assert "Batch-OCR" in feat or "OCR gesamtes PDF" in feat
         assert "Tag" in feat
         assert "Projekt-Ordner" in feat or "Workspace" in feat
@@ -1487,6 +1488,53 @@ def main() -> int:
         assert "Nicht mehr zeigen" in kh067 or "PDF+Editor" in kh067 or "Tag umbenennen" in kh067
         print("0.6.7 CLI undo-label/split-mix/save-progress/wizard-dont-show: OK")
 
+        # 0.6.8 CLI: session panel kind, save cancel, wizard reset, tag confirm >20
+        from instantlensdoc.core import session as session_mod068
+        store_ct = AnnotationStore(pdf)
+        store_ct.annotations = []
+        store_ct.clear_history()
+        for i in range(21):
+            store_ct.add(
+                Annotation(
+                    0,
+                    AnnotationType.HIGHLIGHT,
+                    float(i),
+                    float(i),
+                    width=8,
+                    height=8,
+                    text=f"c{i}",
+                    tags=["Bulk068"],
+                )
+            )
+        assert store_ct.count_tag("Bulk068") == 21
+        assert store_ct.count_tag("missing") == 0
+        sess068 = session_mod068.build_session(
+            [str(pdf)],
+            active_path=str(pdf),
+            secondary_path=str(pdf),
+            secondary_kind="pdf",
+        )
+        assert sess068.secondary_kind == "pdf"
+        assert sess068.secondary_path
+        session_mod068.save_session(sess068)
+        loaded068 = session_mod068.load_session()
+        assert loaded068.secondary_kind == "pdf"
+        assert loaded068.secondary_path
+        mw068 = (ROOT / "instantlensdoc" / "ui" / "main_window.py").read_text(encoding="utf-8")
+        assert "_secondary_kind" in mw068
+        assert "setCancelButtonText" in mw068 or '"Abbrechen"' in mw068
+        assert "hit_count > 20" in mw068
+        sd068 = (ROOT / "instantlensdoc" / "ui" / "settings_dialog.py").read_text(encoding="utf-8")
+        assert "_reset_wizard" in sd068
+        assert "btn_wizard_reset" in sd068
+        feat068 = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
+        assert "0.6.8" in feat068
+        cl068 = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+        assert "## 0.6.8" in cl068
+        kh068 = (ROOT / "instantlensdoc" / "ui" / "keyboard_help.py").read_text(encoding="utf-8")
+        assert "Abbrechen" in kh068 or "Wizard" in kh068 or ">20" in kh068 or "&gt;20" in kh068
+        print("0.6.8 CLI panel-session/save-cancel/wizard-reset/tag-confirm: OK")
+
         set_show_printer_marks(True)
         assert get_show_printer_marks() is True
         set_show_printer_marks(False)
@@ -1619,7 +1667,7 @@ def main() -> int:
         assert "Continuous Scroll" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
         assert "Seitenlabel" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8") or "Seitenlabels" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
         assert "Zwischenablage-Verlauf" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8") or "Clipboard" in (ROOT / "FEATURES.md").read_text(encoding="utf-8")
-        assert "0.6.7" in feat and "0.5.9" in feat and "0.4.9" in feat
+        assert "0.6.8" in feat and "0.5.9" in feat and "0.4.9" in feat
         # --- 0.4.2 CLI: Outline Goto, Ann Copy/Paste, Flatten Progress ---
         import pikepdf as _pike_ol
 
@@ -1744,7 +1792,7 @@ def main() -> int:
         win._add_chained_frame()
         assert len(win.layout_doc.text_frames) >= 2
         assert "Lizenz:" in win.license_label.text() or "⚠" in win.license_label.text()
-        assert "v0.6.7" in win.version_label.text()
+        assert "v0.6.8" in win.version_label.text()
         # Lizenz <7 Tage: Style prominent
         st_lic = win.license_manager.status()
         if st_lic.allowed and st_lic.days_remaining < 7:
@@ -1925,11 +1973,11 @@ def main() -> int:
             assert win.editor.outdent_selection(4)
             assert win.editor.toPlainText().splitlines()[0] == "alpha"
             # Fenstertitel mit Version
-            assert "0.6.7" in win.windowTitle()
+            assert "0.6.8" in win.windowTitle()
             from instantlensdoc.ui.help_dialog import AboutDialog, HelpDialog, open_log_folder
 
             about = AboutDialog(win)
-            assert "0.6.7" in about.windowTitle()
+            assert "0.6.8" in about.windowTitle()
             help_dlg = HelpDialog(win)
             assert help_dlg.windowTitle() == "Hilfe"
             assert callable(open_log_folder)
@@ -2589,7 +2637,7 @@ def main() -> int:
             win.apply_tray_setting()
             if win._tray is not None:
                 tip = win._tray.toolTip()
-                assert "0.6.7" in tip and "InstantLens Doc" in tip
+                assert "0.6.8" in tip and "InstantLens Doc" in tip
             set_minimize_to_tray(False)
             win.apply_tray_setting()
             print("0.3.9 fit-h/ann-stats/special/tray: OK")
@@ -2602,9 +2650,9 @@ def main() -> int:
             from instantlensdoc.ui.password_dialog import CompressPdfDialog, SetPasswordDialog
             from instantlensdoc.ui.stubs import PLANNED
             assert KeyboardHelpDialog and SetPasswordDialog and CompressPdfDialog
-            assert "0.6.7" in PLANNED["ki"]
+            assert "0.6.8" in PLANNED["ki"]
             assert "Coming soon" in PLANNED["cloud"]
-            assert "0.6.7" in PLANNED["stylus"] and "0.6.7" in PLANNED["extrude3d"]
+            assert "0.6.8" in PLANNED["stylus"] and "0.6.8" in PLANNED["extrude3d"]
             # Toolbar ↔ Menü Sync Graustufen/Nacht
             win.pdf_view.set_grayscale(True)
             assert win._grayscale_action.isChecked()
@@ -2639,7 +2687,7 @@ def main() -> int:
             assert win.editor.toPlainText().splitlines() == ["one", "two"]
             from instantlensdoc.ui.help_dialog import HELP_HTML
 
-            assert "Stub 0.6.7" in HELP_HTML
+            assert "Stub 0.6.8" in HELP_HTML
             assert "scripts/sync-ild.ps1" in HELP_HTML
             assert "Präsentationsmodus" in HELP_HTML or "F5" in (
                 ROOT / "instantlensdoc" / "ui" / "keyboard_help.py"
@@ -4058,10 +4106,73 @@ def main() -> int:
             assert "## 0.6.7" in cl067q
             print("0.6.7 Qt undo-label/split-mix/save-progress/wizard-dont-show: OK")
 
+            # --- 0.6.8 Qt: panel session, save cancel, wizard reset, tag confirm ---
+            from unittest.mock import patch
+
+            from PySide6.QtWidgets import QMessageBox
+
+            from instantlensdoc.core.app_settings import (
+                get_wizard_completed as g_wiz068,
+                get_wizard_skip_once as g_skip068,
+                set_wizard_completed as s_wiz068,
+                set_wizard_skip_once as s_skip068,
+            )
+            from instantlensdoc.ui.settings_dialog import SettingsDialog as SD068
+            assert hasattr(win, "_secondary_kind")
+            t_mix068 = Path(td2) / "mix068.txt"
+            t_mix068.write_text("mix-editor-068", encoding="utf-8")
+            win.sidebar.add_document(str(t_mix068))
+            win.sidebar.add_document(str(smoke_pdf))
+            win.open_path(str(t_mix068))
+            win._toggle_doc_split(True)
+            win._load_secondary_document(str(smoke_pdf))
+            assert win._secondary_kind == "pdf"
+            assert win._secondary_path and Path(win._secondary_path).suffix.lower() == ".pdf"
+            win._toggle_doc_split(False)
+            win._toggle_doc_split(True)
+            assert win._secondary_kind == "pdf"
+            assert win.secondary_stack.currentWidget() is win.secondary_pdf
+            win._toggle_doc_split(False)
+            # Tag-Rename Bestätigung >20: Abbruch ohne Rename
+            win.open_path(str(smoke_pdf))
+            store068 = win.pdf_view.store
+            assert store068 is not None
+            store068.annotations = []
+            store068.clear_history()
+            from ild_pdf import Annotation as Ann068, AnnotationType as AT068
+            for i in range(21):
+                store068.add(
+                    Ann068(0, AT068.HIGHLIGHT, float(i), float(i), width=8, height=8, text=f"b{i}", tags=["Bulk068"])
+                )
+            assert store068.count_tag("Bulk068") == 21
+            with patch("instantlensdoc.ui.main_window.QMessageBox.question", return_value=QMessageBox.No):
+                win._rename_annotation_tag_global("Bulk068", "Other068")
+            assert store068.count_tag("Bulk068") == 21
+            assert store068.count_tag("Other068") == 0
+            # Wizard-Reset in Einstellungen
+            s_wiz068(True)
+            s_skip068(True)
+            sd068 = SD068(win)
+            assert hasattr(sd068, "btn_wizard_reset")
+            assert callable(getattr(sd068, "_reset_wizard", None))
+            with patch("instantlensdoc.ui.settings_dialog.QMessageBox.question", return_value=QMessageBox.Yes):
+                with patch("instantlensdoc.ui.settings_dialog.QMessageBox.information"):
+                    sd068._reset_wizard()
+            assert g_wiz068() is False
+            assert g_skip068() is False
+            sd068.close()
+            # Save-All Progress Cancel-Button Text
+            assert "Abbrechen" in (ROOT / "instantlensdoc" / "ui" / "main_window.py").read_text(encoding="utf-8")
+            feat068q = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
+            assert "0.6.8" in feat068q
+            cl068q = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+            assert "## 0.6.8" in cl068q
+            print("0.6.8 Qt panel-session/save-cancel/wizard-reset/tag-confirm: OK")
+
             print("0.4.x selected Qt marks/schema/sort/reset: OK")
             print("0.4.2 Qt outline/copy-paste/case/progress: OK")
             print("0.4.1 Qt links/stamp/encoding/drop: OK")
-            print("0.3.x–0.6.7 review OK")
+            print("0.3.x–0.6.8 review OK")
             assert callable(win.pdf_view.bake_redactions)
             assert callable(win.pdf_view.clear_redactions)
             assert callable(win._set_pdf_password)

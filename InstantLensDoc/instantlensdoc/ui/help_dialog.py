@@ -205,8 +205,8 @@ WIZARD_PAGES = (
         "<li><b>Fenster teilen</b> (Ctrl+\\): zwei Docs; PDF+Editor-Mischung; "
         "<b>vertikal</b> Ctrl+Shift+\\; Sync-Scroll Ctrl+Alt+\\</li>"
         "<li>Statusleiste <b>ungespeichert</b>: Dirty-Liste + Speichern / <b>Alle speichern</b> "
-        "(Fortschritt bei &gt;3 Dateien)</li>"
-        "<li>Wizard: <b>Dieses Mal überspringen</b> oder <b>Nicht mehr zeigen</b></li>"
+        "(Fortschritt bei &gt;3 Dateien, <b>Abbrechen</b>)</li>"
+        "<li>Wizard: <b>Nicht mehr zeigen</b>; Reset in Einstellungen; Tag-Rename Bestätigung &gt;20</li>"
         "</ul>"
         "<p>Fertig — viel Erfolg mit InstantLens Doc.</p>",
     ),

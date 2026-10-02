@@ -26,10 +26,20 @@ class SessionState:
     tabs: List[SessionTab] = field(default_factory=list)
     active: int = 0
     restore: bool = True
+    # Doc-Split Zweit-Panel (0.6.8): Pfad + Typ pdf|editor — je Session gemerkt
+    secondary_path: str = ""
+    secondary_kind: str = ""
 
 
 def session_path() -> Path:
     return config_dir() / SESSION_NAME
+
+
+def _normalize_secondary_kind(kind: str | None) -> str:
+    k = str(kind or "").strip().lower()
+    if k in ("pdf", "editor"):
+        return k
+    return ""
 
 
 def load_session() -> SessionState:
@@ -71,7 +81,18 @@ def load_session() -> SessionState:
     if active < 0 or active >= len(tabs):
         active = max(0, len(tabs) - 1) if tabs else 0
     restore = bool(raw.get("restore", True))
-    return SessionState(tabs=tabs, active=active, restore=restore)
+    sec_raw = str(raw.get("secondary_path") or "").strip()
+    secondary_path = str(Path(sec_raw)) if sec_raw and Path(sec_raw).is_file() else ""
+    secondary_kind = _normalize_secondary_kind(raw.get("secondary_kind"))
+    if secondary_path and not secondary_kind:
+        secondary_kind = "pdf" if Path(secondary_path).suffix.lower() == ".pdf" else "editor"
+    return SessionState(
+        tabs=tabs,
+        active=active,
+        restore=restore,
+        secondary_path=secondary_path,
+        secondary_kind=secondary_kind,
+    )
 
 
 def save_session(state: SessionState) -> None:
@@ -82,10 +103,15 @@ def save_session(state: SessionState) -> None:
         d = asdict(t)
         d["order"] = i  # Reihenfolge der Session-Tabs (Drag in Sidebar)
         tabs_payload.append(d)
+    sec_path = str(state.secondary_path or "").strip()
+    if sec_path and not Path(sec_path).is_file():
+        sec_path = ""
     payload = {
         "restore": state.restore,
         "active": state.active,
         "tabs": tabs_payload,
+        "secondary_path": sec_path,
+        "secondary_kind": _normalize_secondary_kind(state.secondary_kind),
     }
     path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
 
@@ -101,6 +127,8 @@ def build_session(
     page: int = 0,
     scale: float = 1.5,
     restore: bool = True,
+    secondary_path: Optional[str] = None,
+    secondary_kind: Optional[str] = None,
 ) -> SessionState:
     tabs: List[SessionTab] = []
     seen: set[str] = set()
@@ -125,4 +153,18 @@ def build_session(
             if Path(ap).is_file():
                 tabs.append(SessionTab(path=ap, page=max(0, int(page)), scale=float(scale)))
                 active = len(tabs) - 1
-    return SessionState(tabs=tabs, active=active, restore=restore)
+    sec = str(secondary_path or "").strip()
+    if sec and Path(sec).is_file():
+        sec = str(Path(sec))
+    else:
+        sec = ""
+    kind = _normalize_secondary_kind(secondary_kind)
+    if sec and not kind:
+        kind = "pdf" if Path(sec).suffix.lower() == ".pdf" else "editor"
+    return SessionState(
+        tabs=tabs,
+        active=active,
+        restore=restore,
+        secondary_path=sec,
+        secondary_kind=kind,
+    )

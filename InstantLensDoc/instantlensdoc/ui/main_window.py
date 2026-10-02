@@ -115,6 +115,7 @@ class MainWindow(QMainWindow):
         self._presentation_prev: dict | None = None
         self._unsaved_paths: set[str] = set()
         self._secondary_path: str | None = None
+        self._secondary_kind: str = ""  # "pdf" | "editor" | "" — Panel-Typ je Session
         self._last_tag_rename: tuple[str, str] | None = None  # (old, new) für einstufiges Undo
 
         self.setAcceptDrops(True)
@@ -293,12 +294,21 @@ class MainWindow(QMainWindow):
         active = str(Path(self.doc.path)) if self.doc and self.doc.path else None
         page = self.pdf_view.page_index if self.pdf_view.pdf_path else 0
         scale = self.pdf_view.scale if self.pdf_view.pdf_path else 1.5
+        sec_path = ""
+        sec_kind = ""
+        if getattr(self, "_secondary_path", None) and Path(self._secondary_path).is_file():
+            sec_path = str(Path(self._secondary_path))
+            sec_kind = str(getattr(self, "_secondary_kind", "") or "")
+            if not sec_kind:
+                sec_kind = "pdf" if Path(sec_path).suffix.lower() == ".pdf" else "editor"
         state = session_mod.build_session(
             paths,
             active_path=active,
             page=page,
             scale=scale,
             restore=True,
+            secondary_path=sec_path or None,
+            secondary_kind=sec_kind or None,
         )
         session_mod.save_session(state)
 
@@ -330,6 +340,22 @@ class MainWindow(QMainWindow):
                 self.pdf_view.set_scale(active.scale, immediate=True)
             else:
                 self.pdf_view.refresh()
+        # Doc-Split Panel-Typ / Zweit-Doc aus Session wiederherstellen
+        sec = str(getattr(state, "secondary_path", "") or "").strip()
+        kind = str(getattr(state, "secondary_kind", "") or "").strip().lower()
+        if sec and Path(sec).is_file():
+            self._secondary_path = str(Path(sec))
+            self._secondary_kind = kind if kind in ("pdf", "editor") else (
+                "pdf" if Path(sec).suffix.lower() == ".pdf" else "editor"
+            )
+            if get_editor_doc_split():
+                if hasattr(self, "_doc_split_action"):
+                    self._doc_split_action.blockSignals(True)
+                    self._doc_split_action.setChecked(True)
+                    self._doc_split_action.blockSignals(False)
+                if hasattr(self, "secondary_wrap"):
+                    self.secondary_wrap.setVisible(True)
+                self._load_secondary_document(self._secondary_path)
         self._set_status(f"Session wiederhergestellt ({len(state.tabs)} Tab(s))")
 
     def _build_ui(self):
@@ -1588,19 +1614,27 @@ class MainWindow(QMainWindow):
         use_progress = total > 3
         prog: QProgressDialog | None = None
         if use_progress:
-            prog = QProgressDialog("Alle speichern…", None, 0, total, self)
+            prog = QProgressDialog("Alle speichern…", "Abbrechen", 0, total, self)
             prog.setWindowTitle("Alle speichern")
             prog.setWindowModality(Qt.WindowModal)
             prog.setMinimumDuration(0)
+            prog.setCancelButtonText("Abbrechen")
             prog.setValue(0)
             prog.setLabelText(f"0 / {total} Dateien…")
             QApplication.processEvents()
         n = 0
+        cancelled = False
         for path, label in work:
             if prog is not None:
+                if prog.wasCanceled():
+                    cancelled = True
+                    break
                 prog.setLabelText(f"Speichern {n + 1}/{total}: {label}")
                 prog.setValue(n)
                 QApplication.processEvents()
+                if prog.wasCanceled():
+                    cancelled = True
+                    break
             if path is None:
                 self.save_doc()
             elif cur_key and self._path_key(path) == cur_key:
@@ -1609,10 +1643,13 @@ class MainWindow(QMainWindow):
                 self._save_unsaved_tab(path)
             n += 1
         if prog is not None:
-            prog.setValue(total)
+            if not cancelled:
+                prog.setValue(total)
             prog.close()
         self._update_unsaved_status()
-        if use_progress:
+        if cancelled:
+            self._set_status(f"Alle speichern abgebrochen ({n}/{total})")
+        elif use_progress:
             self._set_status(f"Alle speichern: {n}/{total} Datei(en) fertig")
         else:
             self._set_status(f"Alle speichern: {n} Tab(s)")
@@ -2088,10 +2125,16 @@ class MainWindow(QMainWindow):
             self.secondary_wrap.setVisible(bool(checked))
         if checked:
             self._apply_doc_split_orientation()
-            self._load_secondary_document()
+            # Panel-Typ / Zweit-Doc aus Session merken — nicht jedes Mal neu wählen
+            remembered = getattr(self, "_secondary_path", None)
+            if remembered and Path(remembered).is_file():
+                self._load_secondary_document(remembered)
+            else:
+                self._load_secondary_document()
             self._apply_doc_split_sync_scroll()
             orient = "vertikal" if get_editor_doc_split_vertical() else "horizontal"
-            self._set_status(f"Fenster teilen an — zwei Docs {orient}")
+            kind = getattr(self, "_secondary_kind", "") or "?"
+            self._set_status(f"Fenster teilen an — zwei Docs {orient} (Panel: {kind})")
         else:
             self._disconnect_doc_split_sync_scroll()
             self._set_status("Fenster teilen aus")
@@ -2138,6 +2181,28 @@ class MainWindow(QMainWindow):
         if store is None:
             self._set_status("Tag umbenennen nur bei geöffnetem PDF")
             return
+        # Bestätigung bei vielen Treffern (>20)
+        hit_count = 0
+        if hasattr(store, "count_tag"):
+            try:
+                hit_count = int(store.count_tag(old_tag))
+            except Exception:
+                hit_count = 0
+        if hit_count <= 0:
+            self._set_status(f"Kein Tag „{old_tag}“ gefunden")
+            return
+        if hit_count > 20:
+            reply = QMessageBox.question(
+                self,
+                "Tag umbenennen",
+                f"Tag „{old_tag}“ → „{new_tag}“ betrifft {hit_count} Annotationen.\n"
+                "Wirklich alle umbenennen?",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No,
+            )
+            if reply != QMessageBox.Yes:
+                self._set_status(f"Tag umbenennen abgebrochen ({hit_count} Treffer)")
+                return
         n = store.rename_tag(old_tag, new_tag)
         if n <= 0:
             self._set_status(f"Kein Tag „{old_tag}“ gefunden")
@@ -2350,21 +2415,33 @@ class MainWindow(QMainWindow):
         current = self._path_key(self.doc.path) if self.doc and self.doc.path else None
         pick = path
         text_ext = {".txt", ".md", ".markdown", ".html", ".htm", ".csv", ".json", ".log", ".py"}
+        remembered_kind = str(getattr(self, "_secondary_kind", "") or "").strip().lower()
         if not pick:
-            # Bevorzugt anderen Typ als das aktuelle Doc (PDF↔Editor-Mischung)
-            cur_suf = Path(self.doc.path).suffix.lower() if self.doc and self.doc.path else ""
-            prefer_pdf = cur_suf in text_ext or cur_suf == ".docx" or cur_suf == ""
-            prefer_text = cur_suf == ".pdf"
-            for p in paths:
-                if self._path_key(p) == current:
-                    continue
-                suf = Path(p).suffix.lower()
-                if prefer_pdf and suf == ".pdf":
-                    pick = p
-                    break
-                if prefer_text and (suf in text_ext or suf == ".docx"):
-                    pick = p
-                    break
+            # Session-gemerktes Zweit-Doc bevorzugen, sonst Typ-Mischung
+            remembered = getattr(self, "_secondary_path", None)
+            if remembered and Path(remembered).is_file():
+                if self._path_key(remembered) != current:
+                    pick = remembered
+            if not pick:
+                # Bevorzugt gemerkten Panel-Typ, sonst anderen Typ als aktuelles Doc
+                cur_suf = Path(self.doc.path).suffix.lower() if self.doc and self.doc.path else ""
+                prefer_pdf = remembered_kind == "pdf" or (
+                    not remembered_kind
+                    and (cur_suf in text_ext or cur_suf == ".docx" or cur_suf == "")
+                )
+                prefer_text = remembered_kind == "editor" or (
+                    not remembered_kind and cur_suf == ".pdf"
+                )
+                for p in paths:
+                    if self._path_key(p) == current:
+                        continue
+                    suf = Path(p).suffix.lower()
+                    if prefer_pdf and suf == ".pdf":
+                        pick = p
+                        break
+                    if prefer_text and (suf in text_ext or suf == ".docx"):
+                        pick = p
+                        break
             if not pick:
                 for p in paths:
                     if self._path_key(p) != current:
@@ -2372,12 +2449,14 @@ class MainWindow(QMainWindow):
                         break
         if not pick or not Path(pick).is_file():
             self._secondary_path = None
+            self._secondary_kind = ""
             self.secondary_title.setText("Kein zweites Dokument")
             if hasattr(self, "secondary_stack"):
                 self.secondary_stack.setCurrentWidget(self.secondary_pane)
             self.secondary_editor.blockSignals(True)
             self.secondary_editor.setPlainText("")
             self.secondary_editor.blockSignals(False)
+            self._save_session()
             return
         self._secondary_path = str(pick)
         name = Path(pick).name
@@ -2392,9 +2471,11 @@ class MainWindow(QMainWindow):
                         pass
                     self.secondary_title.setText(f"Rechts: {name} (PDF)")
                     self.secondary_stack.setCurrentWidget(self.secondary_pdf)
+                    self._secondary_kind = "pdf"
                 else:
                     self.secondary_title.setText(f"Rechts: {name} (PDF-Fehler)")
                     self.secondary_stack.setCurrentWidget(self.secondary_pane)
+                    self._secondary_kind = "editor"
                     self.secondary_editor.blockSignals(True)
                     self.secondary_editor.setPlainText(
                         f"[PDF] {name}\nLaden fehlgeschlagen.\nPfad: {pick}"
@@ -2405,12 +2486,14 @@ class MainWindow(QMainWindow):
                 body = doc.text or ""
                 self.secondary_title.setText(f"Rechts: {name}")
                 self.secondary_stack.setCurrentWidget(self.secondary_pane)
+                self._secondary_kind = "editor"
                 self.secondary_editor.blockSignals(True)
                 self.secondary_editor.setPlainText(body)
                 self.secondary_editor.blockSignals(False)
             else:
                 self.secondary_title.setText(f"Rechts: {name}")
                 self.secondary_stack.setCurrentWidget(self.secondary_pane)
+                self._secondary_kind = "editor"
                 self.secondary_editor.blockSignals(True)
                 self.secondary_editor.setPlainText(f"[Datei] {pick}")
                 self.secondary_editor.blockSignals(False)
@@ -2418,9 +2501,11 @@ class MainWindow(QMainWindow):
             self.secondary_title.setText(f"Rechts: {name} (Fehler)")
             if hasattr(self, "secondary_stack"):
                 self.secondary_stack.setCurrentWidget(self.secondary_pane)
+            self._secondary_kind = "editor"
             self.secondary_editor.blockSignals(True)
             self.secondary_editor.setPlainText(f"Laden fehlgeschlagen:\n{e}")
             self.secondary_editor.blockSignals(False)
+        self._save_session()
         self._apply_doc_split_sync_scroll()
 
     def _copy_annotations(self):

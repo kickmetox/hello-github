@@ -1,5 +1,22 @@
 # Changelog — InstantLens Doc
 
+## 0.6.8 — Split-Panel-Session, Save-Abbrechen, Wizard-Reset, Tag-Confirm
+
+Nach 0.6.7: Doc-Split merkt Panel-Typ (PDF/Editor) und Zweit-Doc je Session; „Alle speichern“-Fortschritt mit Abbrechen; Wizard dauerhaft aus → Reset in Einstellungen; Tag-Umbenennen fragt bei >20 Treffern nach. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### PDF / Annotationen
+- **Tag umbenennen Bestätigung**: bei mehr als 20 betroffenen Annotationen Rückfrage vor dem globalen Rename (`count_tag`)
+
+### Editor / UX
+- **Doc-Split Panel-Typ je Session**: `secondary_path` + `secondary_kind` (pdf|editor) in `session.json`; Split erneut an → gemerktes Zweit-Panel
+- Dirty-Tabs **Alle speichern**: Fortschrittsdialog mit Button **Abbrechen** (Teilergebnis bleibt)
+- **Wizard-Reset in Einstellungen**: „Nicht mehr zeigen“ aufheben (`wizard_completed` / skip-once zurücksetzen)
+
+### Packaging / Docs
+- Version **0.6.8**; Smoke um 0.6.8-Pfade erweitert
+
+---
+
 ## 0.6.7 — Tag-Undo-Label, Split-PDF+Editor, Save-Progress, Wizard-Dauerhaft
 
 Nach 0.6.6: Tag-Umbenennen erscheint benannt im PDF-Undo-Stack; Doc-Split zweites Panel zeigt PDF oder Editor (Mischung); „Alle speichern“ mit Fortschritt bei >3 Dateien; Wizard „Nicht mehr zeigen“ dauerhaft (zusätzlich zu skip-once). Stubs KI/Cloud/Stylus/3D bleiben Stubs.

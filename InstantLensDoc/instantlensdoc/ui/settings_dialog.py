@@ -52,9 +52,12 @@ from instantlensdoc.core.app_settings import (
     get_theme,
     get_ui_lang,
     get_update_check_on_start,
+    get_wizard_completed,
     PDF_THUMBNAIL_SCALE_CHOICES,
     reset_to_defaults,
     save_settings,
+    set_wizard_completed,
+    set_wizard_skip_once,
     set_autosave_interval_sec,
     set_backup_on_save,
     set_batch_output_dir,
@@ -357,6 +360,19 @@ class SettingsDialog(QDialog):
             tb_layout.addWidget(cb)
         layout.addWidget(tb_group)
 
+        wiz_row = QHBoxLayout()
+        self.wizard_status = QLabel()
+        self._refresh_wizard_status()
+        wiz_row.addWidget(self.wizard_status, 1)
+        self.btn_wizard_reset = QPushButton("Wizard zurücksetzen")
+        self.btn_wizard_reset.setToolTip(
+            "Erste-Schritte-Wizard wieder beim Start zeigen "
+            "(hebt „Nicht mehr zeigen“ / wizard_completed auf)"
+        )
+        self.btn_wizard_reset.clicked.connect(self._reset_wizard)
+        wiz_row.addWidget(self.btn_wizard_reset)
+        layout.addLayout(wiz_row)
+
         reset_row = QHBoxLayout()
         self.btn_reset = QPushButton("Auf Standard zurücksetzen…")
         self.btn_reset.setToolTip("Alle Einstellungen auf Werkseinstellungen zurücksetzen")
@@ -386,6 +402,44 @@ class SettingsDialog(QDialog):
         )
         if path:
             self.spell_dict.setText(path)
+
+    def _refresh_wizard_status(self) -> None:
+        if get_wizard_completed():
+            self.wizard_status.setText("Erste-Schritte-Wizard: dauerhaft aus")
+            self.wizard_status.setStyleSheet("color: #666;")
+        else:
+            self.wizard_status.setText("Erste-Schritte-Wizard: beim Start aktiv")
+            self.wizard_status.setStyleSheet("color: #444;")
+
+    def _reset_wizard(self) -> None:
+        """„Nicht mehr zeigen“ aufheben — Wizard erscheint wieder beim Start."""
+        if not get_wizard_completed():
+            set_wizard_skip_once(False)
+            self._refresh_wizard_status()
+            QMessageBox.information(
+                self,
+                "Wizard",
+                "Wizard ist bereits aktiv (wird beim nächsten Start gezeigt).",
+            )
+            return
+        reply = QMessageBox.question(
+            self,
+            "Wizard zurücksetzen",
+            "Erste-Schritte-Wizard wieder beim App-Start zeigen?\n"
+            "(„Nicht mehr zeigen“ wird aufgehoben)",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.Yes,
+        )
+        if reply != QMessageBox.Yes:
+            return
+        set_wizard_completed(False)
+        set_wizard_skip_once(False)
+        self._refresh_wizard_status()
+        QMessageBox.information(
+            self,
+            "Wizard",
+            "Wizard zurückgesetzt — erscheint beim nächsten App-Start erneut.",
+        )
 
     def _reset_defaults(self):
         reply = QMessageBox.question(
