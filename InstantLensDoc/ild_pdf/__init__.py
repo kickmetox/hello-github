@@ -166,4 +166,4 @@ __all__ = [
     "extract_all_attachments",
 ]
 
-__version__ = "0.3.6"
+__version__ = "0.3.7"

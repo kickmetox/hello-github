@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Smoke-Test 0.3.6 (CLI + optional offscreen Qt). Kernpfade: open/annotate/export/license."""
+"""Smoke-Test 0.3.7 (CLI + optional offscreen Qt). Kernpfade: open/annotate/export/license."""
 
 from __future__ import annotations
 
@@ -112,8 +112,8 @@ def main() -> int:
     from instantlensdoc.core.update_check import check_for_updates
     from instantlensdoc.license import KEY_DAYS, TRIAL_DAYS, generate_key, verify_key
 
-    assert __version__ == "0.3.6", __version__
-    assert ild_ver == "0.3.6", ild_ver
+    assert __version__ == "0.3.7", __version__
+    assert ild_ver == "0.3.7", ild_ver
     assert TRIAL_DAYS == 28 and KEY_DAYS == 32
     key = generate_key("ame@sellerbach.de")
     ok, msg, _ = verify_key(key)
@@ -131,7 +131,7 @@ def main() -> int:
     assert "Settings" in tr("settings")
     set_lang("de")
     upd = check_for_updates(allow_network=False)
-    assert upd.local_version == "0.3.6" and not upd.online
+    assert upd.local_version == "0.3.7" and not upd.online
     assert get_export_jpeg_quality() >= 10
     assert get_ui_lang() in ("de", "en")
     assert 25 <= get_default_zoom_percent() <= 500
@@ -172,8 +172,8 @@ def main() -> int:
     assert get_ann_pen_color() == "#112233"
     assert (ROOT / "CHANGELOG.md").is_file()
     cl = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-    assert "0.3.6" in cl
-    assert "## 0.3.6" in cl
+    assert "0.3.7" in cl
+    assert "## 0.3.7" in cl
     assert "## 0.3.1" in cl
     assert "## 0.3.0" in cl
     assert "0.2.0 → 0.3.0" in cl or "0.2.0→0.3.0" in cl
@@ -185,7 +185,7 @@ def main() -> int:
     # Kompakt: Einzel-Header 0.2.1–0.2.9 entfernt (nur Kurz-Tabelle)
     assert "## 0.2.9" not in cl and "## 0.2.8" not in cl
     assert "0.2.9" in cl  # noch in Kurz-Tabelle
-    assert "0.3.6" in (ROOT / "README.md").read_text(encoding="utf-8")
+    assert "0.3.7" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "run.bat" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "sync-ild.ps1" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "scripts/sync-ild.ps1" in (ROOT / "FEATURES.md").read_text(encoding="utf-8")
@@ -534,13 +534,13 @@ def main() -> int:
 
         assert (ROOT / "installer" / "installer-hinweis.txt").exists()
         iss = (ROOT / "installer" / "instantlensdoc.iss").read_text(encoding="utf-8")
-        assert "0.3.6" in iss and "desktopicon" in iss and "DisableProgramGroupPage=no" in iss
+        assert "0.3.7" in iss and "desktopicon" in iss and "DisableProgramGroupPage=no" in iss
         assert "UninstallDisplayName" in iss and "Uninstallable=yes" in iss
         assert "IncludeKeygen" in iss and "SetupIconFile" in iss
         assert "InstantLensKeygen.exe" in iss
         assert "uninstallexe" in iss
         bw = (ROOT / "build-windows.ps1").read_text(encoding="utf-8")
-        assert "0.3.6" in bw and "NoKeygenInApp" in bw and "--icon" in bw
+        assert "0.3.7" in bw and "NoKeygenInApp" in bw and "--icon" in bw
         assert "InstantLensKeygen.exe" in bw
         bi = (ROOT / "installer" / "build-installer.ps1").read_text(encoding="utf-8")
         assert "InstantLensKeygen.exe" in bi and "IncludeKeygen" in bi
@@ -559,7 +559,7 @@ def main() -> int:
         assert "QProgressDialog" in (ROOT / "instantlensdoc" / "ui" / "main_window.py").read_text(encoding="utf-8")
 
         assert (ROOT / "examples" / "ild_pdf_demo.py").exists()
-        assert "0.3.6" in (ROOT / "INFO.md").read_text(encoding="utf-8")
+        assert "0.3.7" in (ROOT / "INFO.md").read_text(encoding="utf-8")
         assert (ROOT / "assets" / "app.ico").is_file()
 
         # --- Kernpfade: open / annotate / export / license ---
@@ -722,7 +722,7 @@ def main() -> int:
         win._add_chained_frame()
         assert len(win.layout_doc.text_frames) >= 2
         assert "Lizenz:" in win.license_label.text() or "⚠" in win.license_label.text()
-        assert "v0.3.6" in win.version_label.text()
+        assert "v0.3.7" in win.version_label.text()
         # Lizenz <7 Tage: Style prominent
         st_lic = win.license_manager.status()
         if st_lic.allowed and st_lic.days_remaining < 7:
@@ -897,11 +897,11 @@ def main() -> int:
             assert win.editor.outdent_selection(4)
             assert win.editor.toPlainText().splitlines()[0] == "alpha"
             # Fenstertitel mit Version
-            assert "0.3.6" in win.windowTitle()
+            assert "0.3.7" in win.windowTitle()
             from instantlensdoc.ui.help_dialog import AboutDialog, HelpDialog, open_log_folder
 
             about = AboutDialog(win)
-            assert "0.3.6" in about.windowTitle()
+            assert "0.3.7" in about.windowTitle()
             help_dlg = HelpDialog(win)
             assert help_dlg.windowTitle() == "Hilfe"
             assert callable(open_log_folder)
@@ -1393,6 +1393,77 @@ def main() -> int:
             set_window_geometry_b64("")
             set_window_state_b64("")
             print("0.3.6 dpi/select-all/comment/geometry: OK")
+            # 0.3.7: Präsentation, Ann.-Favoriten, Block-Tab, Session-Toggle
+            from instantlensdoc.core.app_settings import (
+                get_ann_color_presets,
+                get_restore_session_on_start,
+                set_ann_color_preset,
+                set_ann_color_presets,
+                set_restore_session_on_start,
+            )
+
+            presets = get_ann_color_presets()
+            assert len(presets) == 3
+            assert all(c.startswith("#") for c in presets)
+            set_ann_color_presets(["#AABBCC", "#112233", "#FFE066"])
+            assert get_ann_color_presets()[0] == "#AABBCC"
+            set_ann_color_preset(1, "#99AA00")
+            assert get_ann_color_presets()[1] == "#99AA00"
+            win.pdf_view._refresh_preset_btns()
+            assert len(win.pdf_view._preset_btns) == 3
+            win.pdf_view._apply_color_preset(0)
+            assert win.pdf_view._highlight_color == "#AABBCC"
+            win.pdf_view._save_color_preset(2)
+            assert get_ann_color_presets()[2] == win.pdf_view._highlight_color
+
+            set_restore_session_on_start(False)
+            assert get_restore_session_on_start() is False
+            set_restore_session_on_start(True)
+            assert get_restore_session_on_start() is True
+            assert callable(win._toggle_presentation)
+            assert callable(win._enter_presentation)
+            assert callable(win._exit_presentation)
+            assert win._presentation_active is False
+            # ohne PDF: Enter bleibt inaktiv (kein Dialog im Smoke)
+            win.pdf_view.pdf_path = None
+            # _enter_presentation zeigt sonst QMessageBox — direkt Guard prüfen
+            assert not win.pdf_view.pdf_path
+            # mit PDF: Enter/Exit (ohne showFullScreen-Probleme: Flag-Pfad)
+            win.open_path(smoke_pdf)
+            assert win.pdf_view.pdf_path
+            win._presentation_active = True
+            win._presentation_prev = {
+                "menu": True,
+                "status": True,
+                "sidebar": True,
+                "was_fullscreen": False,
+                "stack": win.stack.currentWidget(),
+                "toolbar_layout": None,
+            }
+            win._exit_presentation()
+            assert win._presentation_active is False
+
+            # Block-Tab: Tab ohne Auswahl rückt aktuelle Zeile ein
+            win.stack.setCurrentWidget(win.editor_pane)
+            win.editor.setPlainText("block\nline")
+            from PySide6.QtGui import QTextCursor as _TC_BLK
+            from PySide6.QtGui import QKeyEvent
+            from PySide6.QtCore import QEvent, Qt
+
+            cur_b = win.editor.textCursor()
+            cur_b.movePosition(_TC_BLK.Start)
+            win.editor.setTextCursor(cur_b)
+            assert win.editor.indent_selection(4)
+            assert win.editor.toPlainText().splitlines()[0].startswith("    ")
+            assert win.editor.outdent_selection(4)
+            assert win.editor.toPlainText().splitlines()[0] == "block"
+            ev_tab = QKeyEvent(QEvent.KeyPress, Qt.Key_Tab, Qt.NoModifier)
+            win.editor.keyPressEvent(ev_tab)
+            assert win.editor.toPlainText().splitlines()[0].startswith("    ")
+            ev_shift = QKeyEvent(QEvent.KeyPress, Qt.Key_Backtab, Qt.ShiftModifier)
+            win.editor.keyPressEvent(ev_shift)
+            assert win.editor.toPlainText().splitlines()[0] == "block"
+            print("0.3.7 present/presets/block-tab/session: OK")
             win.pdf_view.store.add(
                 Annotation(0, AnnotationType.REDACTION, 5, 5, width=30, height=20, color="#000000", text="REDACT")
             )
@@ -1402,9 +1473,9 @@ def main() -> int:
             from instantlensdoc.ui.password_dialog import CompressPdfDialog, SetPasswordDialog
             from instantlensdoc.ui.stubs import PLANNED
             assert KeyboardHelpDialog and SetPasswordDialog and CompressPdfDialog
-            assert "0.3.6" in PLANNED["ki"]
+            assert "0.3.7" in PLANNED["ki"]
             assert "Coming soon" in PLANNED["cloud"]
-            assert "0.3.6" in PLANNED["stylus"] and "0.3.6" in PLANNED["extrude3d"]
+            assert "0.3.7" in PLANNED["stylus"] and "0.3.7" in PLANNED["extrude3d"]
             # Toolbar ↔ Menü Sync Graustufen/Nacht
             win.pdf_view.set_grayscale(True)
             assert win._grayscale_action.isChecked()
@@ -1439,9 +1510,12 @@ def main() -> int:
             assert win.editor.toPlainText().splitlines() == ["one", "two"]
             from instantlensdoc.ui.help_dialog import HELP_HTML
 
-            assert "Stub 0.3.6" in HELP_HTML
+            assert "Stub 0.3.7" in HELP_HTML
             assert "scripts/sync-ild.ps1" in HELP_HTML
-            print("0.3.4 review + text/dup/goto/tray + 0.3.5 size/group/dup/bak + 0.3.6 dpi/sel/comment/geo: OK")
+            assert "Präsentationsmodus" in HELP_HTML or "F5" in (
+                ROOT / "instantlensdoc" / "ui" / "keyboard_help.py"
+            ).read_text(encoding="utf-8")
+            print("0.3.4–0.3.7 review OK")
             assert callable(win.pdf_view.bake_redactions)
             assert callable(win.pdf_view.clear_redactions)
             assert callable(win._set_pdf_password)

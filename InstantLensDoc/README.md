@@ -2,7 +2,7 @@
 
 Moderne Textverarbeitung mit PDF-Annotator, OCR-Bridge und Formulargenerator.
 
-**Version:** 0.3.6  
+**Version:** 0.3.7  
 **Hersteller:** Andreas Meyer · ame@sellerbach.de
 
 ## Quickstart (Windows)
@@ -29,9 +29,9 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)
 
-## Neu in 0.3.6
+## Neu in 0.3.7
 
-PDF-Raster-Export mit DPI 72/150/300, Annotation Select-All auf Seite (Ctrl+A), Editor Kommentar/Unkommentar (Ctrl+/ für # //), Fenster-Geometrie speichern/wiederherstellen. Stubs KI/Cloud/Stylus/3D unverändert.
+PDF-Präsentationsmodus (Vollbild F5, Pfeiltasten), Annotation-Farben-Favoriten (3 Presets), Editor Block ein-/ausrücken (Tab/Shift+Tab), optional Session-Restore beim Start. Stubs KI/Cloud/Stylus/3D unverändert.
 
 
 Siehe [CHANGELOG.md](CHANGELOG.md), [FEATURES.md](FEATURES.md) und [INFO.md](INFO.md).

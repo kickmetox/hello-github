@@ -554,13 +554,15 @@ class TextEditor(QPlainTextEdit):
         return True
 
     def keyPressEvent(self, event):  # noqa: N802
+        # Block ein-/ausrücken: Tab / Shift+Tab (aktuelle Zeile oder Auswahl)
         if event.key() == Qt.Key_Tab and not (event.modifiers() & Qt.ControlModifier):
             if event.modifiers() & Qt.ShiftModifier:
                 self.outdent_selection()
-            elif self.textCursor().hasSelection():
-                self.indent_selection()
             else:
-                super().keyPressEvent(event)
+                self.indent_selection()
+            return
+        if event.key() == Qt.Key_Backtab:
+            self.outdent_selection()
             return
         super().keyPressEvent(event)
 

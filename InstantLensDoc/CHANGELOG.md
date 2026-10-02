@@ -1,5 +1,22 @@
 # Changelog — InstantLens Doc
 
+## 0.3.7 — Präsentation, Ann.-Favoriten, Block-Tab, Session-Toggle
+
+Fokus auf sinnvolle Ausbauten nach 0.3.6. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### PDF
+- **Präsentationsmodus** (Ansicht → F5): Vollbild, PDF-Seite; ←/→/↑/↓/Leertaste/Page±; Esc beendet
+- **Annotation-Farben-Favoriten**: 3 Presets in Toolbar (Klick = Highlight, Shift+Klick = Stift, Rechtsklick = speichern)
+
+### Editor / UX
+- **Block ein-/ausrücken** mit Tab / Shift+Tab (aktuelle Zeile oder Auswahl)
+- **Start mit letzter Session** optional (Einstellungen-Toggle `restore_session_on_start`)
+
+### Packaging / Docs
+- Version **0.3.7** (App, `ild_pdf`, ISS, Smoke, INFO/FEATURES/README)
+
+---
+
 ## 0.3.6 — Raster-DPI, Ann. Select-All, Kommentar, Fenstergeometrie
 
 Fokus auf sinnvolle Ausbauten nach 0.3.5. Stubs KI/Cloud/Stylus/3D bleiben Stubs.

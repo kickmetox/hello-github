@@ -6,8 +6,9 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 |---------|--------|---------|
 | Hauptfenster (Menü, Sidebar, Editor, Status) | fertig | PySide6; Status: Dateiname, Seite x/y, **Seitengröße mm/inch** 0.3.5, Zoom %, Wörter/Ann.; Ann.-Liste Sidebar 0.2.4; **Ann.-Filter Typ** 0.2.6 |
 | App-Icon Fenster/Taskleiste/About | fertig | Robuste Pfade: `assets/`, CWD, `D:\AI_Temp\InstantLensDoc` |
-| Session-Restore (offene Docs) | fertig | `session.json`, Sidebar-Liste |
+| Session-Restore (offene Docs) | fertig | `session.json`, Sidebar-Liste; **optional Toggle in Einstellungen** 0.3.7 |
 | Fenster-Geometrie speichern | fertig | Größe/Position/State in Settings 0.3.6 |
+| PDF Präsentationsmodus | fertig | Vollbild F5; Pfeiltasten/Leertaste; Esc beendet 0.3.7 |
 | Clipboard-Paste Bild | fertig | Editor + PDF (Stempel/Seite) |
 | TXT / MD / HTML öffnen & speichern | fertig | HTML-Export mit einfachem Markdownish |
 | DOCX öffnen & speichern | teilweise | python-docx; Headings/Listen beim Export |
@@ -35,6 +36,7 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | Annotation löschen | fertig | Auswahl oder letzte; Entf / Menü 0.2.3 |
 | Annotation duplizieren | fertig | Auswahl leicht versetzt; Ctrl+Shift+D 0.3.4 |
 | Annotation Select-All Seite | fertig | Alle Ann. der aktuellen Seite; Ctrl+A im PDF 0.3.6 |
+| Annotation-Farben-Favoriten | fertig | 3 Presets speichern/anwenden (Toolbar 1/2/3) 0.3.7 |
 | Annotation-Text editieren | fertig | Notiz/Kommentar/Overlay nachträglich; Doppelklick / Ctrl+E 0.2.7 |
 | Annotation-Deckkraft | fertig | `opacity` Sidecar + Toolbar α + Dialog 0.2.8 |
 | Annotation-Suche Sidebar | fertig | Textfilter in Annotationsliste 0.3.0 |
@@ -67,7 +69,7 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | Editor Find/Replace | fertig | Ctrl+R Dialog 0.2.6 |
 | Editor Zeilennummern | fertig | Optional (Ansicht + Einstellungen) 0.2.7 |
 | Editor Groß-/Kleinschreibung | fertig | Auswahl umschalten Ctrl+Shift+U 0.2.8 |
-| Editor Einrückung | fertig | Erhöhen/Verringern Ctrl+]/[ bzw. Tab/Shift+Tab 0.3.0 |
+| Editor Einrückung | fertig | Erhöhen/Verringern Ctrl+]/[ bzw. **Tab/Shift+Tab Block** 0.3.7 |
 | Editor Markdown-Vorschau | fertig | Optional Split (Ansicht); Ctrl+Shift+M 0.3.2 |
 | Editor Soft-Wrap | fertig | Toggle Ansicht/Einstellungen; Ctrl+Shift+W 0.3.3 |
 | Editor Gehe zu Zeile | fertig | Dialog Ctrl+G 0.3.4 |
@@ -82,7 +84,7 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | Editor Wortzählung | fertig | Statusleiste Wörter · Zeichen 0.2.5 |
 | Batch-Konvertierung Ordner | fertig | Bilder→PDF, OCR-Ordner, PDF-OCR-Text; Fortschrittsbalken 0.2.1 |
 | PDF zusammenführen / teilen | fertig | Dialog unter Menü PDF |
-| Einstellungen-Dialog | fertig | OCR, Theme, Sprache, Export-Q, Standard-Zoom, Autosave, optional Tray-Minimize, **Backup .bak**, **Seitengröße-Einheit**, Pfade, Update |
+| Einstellungen-Dialog | fertig | OCR, Theme, Sprache, Export-Q, Standard-Zoom, Autosave, optional Tray-Minimize, **Backup .bak**, **Seitengröße-Einheit**, **Session-Restore Toggle**, Pfade, Update |
 | Markieren im Editor | fertig | Ctrl+H |
 | Bilder JPEG/PNG anzeigen | fertig | |
 | OCR Bild/PDF-Seite | teilweise | Presets + Modi; Tabellen-Heuristik; Fortschrittsdialog 0.2.1 |
@@ -96,25 +98,25 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | PyInstaller Build Windows | fertig | `build-windows.ps1`, Icon `assets/app.ico` |
 | Inno-Installer | fertig | Icon, Desktop, Uninstaller, Keygen optional (`InstantLensKeygen.exe`) 0.2.1 |
 | Sync-Skript Windows | fertig | Repo `scripts/sync-ild.ps1`; Store `docs/sync-ild.ps1` |
-| In-App Hilfe / About | fertig | Version 0.3.6; Fenstertitel + Splash; Logordner-Button |
-| CHANGELOG | fertig | **0.3.6** Raster-DPI / Ann. Select-All / Kommentar / Fenstergeometrie |
+| In-App Hilfe / About | fertig | Version 0.3.7; Fenstertitel + Splash; Logordner-Button |
+| CHANGELOG | fertig | **0.3.7** Präsentation / Ann.-Favoriten / Block-Tab / Session-Toggle |
 | FEATURES.md / INFO.md | fertig | |
 | `ild_pdf` Modul + Beispielskript | fertig | metadata / page size / watermark / redact / acroform / attachments / flatten / **plain text** |
 | Font-Matching | geplant | |
 | Objekt-/Bildbearbeitung | geplant | |
 | Layout-Erhaltung (Scan→edit) | geplant | |
 | Freihand | geplant | |
-| KI-Assistent | Stub | Menü „Geplant“ 0.3.6 (keine Fake-KI) |
+| KI-Assistent | Stub | Menü „Geplant“ 0.3.7 (keine Fake-KI) |
 | Signieren (rechtssicher) | Stub | |
-| Cloud-Sync | Stub | Menü „Geplant“ 0.3.6 (keine Fake-Cloud) |
+| Cloud-Sync | Stub | Menü „Geplant“ 0.3.7 (keine Fake-Cloud) |
 | Text on Path / Text zu Pfaden | geplant | |
 | Envelope Distort / Text Wrap / Area Type | Stub/geplant | |
 | Schnittmasken | geplant | |
 | Füllungen / Live-Effekte | geplant | |
-| 3D-Extrusion | Stub | Menü „Geplant“ 0.3.6 |
+| 3D-Extrusion | Stub | Menü „Geplant“ 0.3.7 |
 | Variable Fonts (voll) | Stub | |
 | Glyphen-Palette | geplant | |
-| Stylus / Palm Rejection | Stub | Menü „Geplant“ 0.3.6 |
-| Intelligente Formerkennung | Stub | Menü „Geplant“ 0.3.6 |
+| Stylus / Palm Rejection | Stub | Menü „Geplant“ 0.3.7 |
+| Intelligente Formerkennung | Stub | Menü „Geplant“ 0.3.7 |
 
 Nicht behauptet als fertig: Cloud, KI, Stylus, 3D — nur Menü-Stubs + dieser Status.

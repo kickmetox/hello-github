@@ -42,6 +42,8 @@ DEFAULTS: dict[str, Any] = {
     "export_raster_dpi": 150,
     "window_geometry": "",
     "window_state": "",
+    "ann_color_presets": ["#FFE066", "#FF6B6B", "#4ECDC4"],
+    "restore_session_on_start": True,
 }
 
 
@@ -431,3 +433,61 @@ def get_window_state_b64() -> str:
 
 def set_window_state_b64(data: str) -> None:
     save_settings({"window_state": str(data or "")})
+
+
+ANN_COLOR_PRESET_COUNT = 3
+_DEFAULT_ANN_PRESETS = ["#FFE066", "#FF6B6B", "#4ECDC4"]
+
+
+def _normalize_hex_color(color: str, fallback: str = "#888888") -> str:
+    c = (color or "").strip()
+    if not c:
+        return fallback
+    if not c.startswith("#"):
+        c = "#" + c
+    if len(c) < 4:
+        return fallback
+    return c
+
+
+def get_ann_color_presets() -> list[str]:
+    """Drei Favoriten-Farben für Annotationen (Highlight/Stift)."""
+    raw = load_settings().get("ann_color_presets")
+    defaults = list(_DEFAULT_ANN_PRESETS)
+    if not isinstance(raw, list):
+        return defaults
+    out: list[str] = []
+    for i in range(ANN_COLOR_PRESET_COUNT):
+        if i < len(raw):
+            out.append(_normalize_hex_color(str(raw[i]), defaults[i]))
+        else:
+            out.append(defaults[i])
+    return out
+
+
+def set_ann_color_presets(colors: list[str]) -> list[str]:
+    defaults = list(_DEFAULT_ANN_PRESETS)
+    cleaned: list[str] = []
+    for i in range(ANN_COLOR_PRESET_COUNT):
+        if i < len(colors):
+            cleaned.append(_normalize_hex_color(str(colors[i]), defaults[i]))
+        else:
+            cleaned.append(defaults[i])
+    save_settings({"ann_color_presets": cleaned})
+    return cleaned
+
+
+def set_ann_color_preset(index: int, color: str) -> list[str]:
+    """Einzelnen Favoriten-Slot (0..2) setzen."""
+    presets = get_ann_color_presets()
+    i = max(0, min(ANN_COLOR_PRESET_COUNT - 1, int(index)))
+    presets[i] = _normalize_hex_color(color, presets[i])
+    return set_ann_color_presets(presets)
+
+
+def get_restore_session_on_start() -> bool:
+    return bool(load_settings().get("restore_session_on_start", True))
+
+
+def set_restore_session_on_start(enabled: bool) -> None:
+    save_settings({"restore_session_on_start": bool(enabled)})

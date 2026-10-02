@@ -34,6 +34,7 @@ from instantlensdoc.core.app_settings import (
     get_page_size_unit,
     get_pdf_grayscale,
     get_pdf_night_mode,
+    get_restore_session_on_start,
     get_theme,
     get_ui_lang,
     get_update_check_on_start,
@@ -50,6 +51,7 @@ from instantlensdoc.core.app_settings import (
     set_page_size_unit,
     set_pdf_grayscale,
     set_pdf_night_mode,
+    set_restore_session_on_start,
     set_theme,
     set_ui_lang,
     set_update_check_on_start,
@@ -133,6 +135,13 @@ class SettingsDialog(QDialog):
             "Vor dem Überschreiben eine Kopie dateiname.ext.bak anlegen (optional)"
         )
         form.addRow(self.backup_on_save)
+
+        self.restore_session = QCheckBox("Beim Start letzte Session wiederherstellen")
+        self.restore_session.setChecked(get_restore_session_on_start())
+        self.restore_session.setToolTip(
+            "Offene Dokumente der letzten Sitzung beim Start laden (optional)"
+        )
+        form.addRow(self.restore_session)
 
         self.page_unit = QComboBox()
         self.page_unit.addItem("mm", "mm")
@@ -223,6 +232,7 @@ class SettingsDialog(QDialog):
         set_editor_soft_wrap(self.soft_wrap.isChecked())
         set_minimize_to_tray(self.minimize_tray.isChecked())
         set_backup_on_save(self.backup_on_save.isChecked())
+        set_restore_session_on_start(self.restore_session.isChecked())
         set_page_size_unit(str(self.page_unit.currentData() or "mm"))
         set_pdf_grayscale(self.pdf_grayscale.isChecked())
         set_pdf_night_mode(self.pdf_night.isChecked())

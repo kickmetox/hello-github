@@ -47,6 +47,7 @@ from instantlensdoc.core.app_settings import (
     get_last_export_dir,
     get_minimize_to_tray,
     get_page_size_unit,
+    get_restore_session_on_start,
     get_update_check_on_start,
     get_window_geometry_b64,
     get_window_state_b64,
@@ -93,6 +94,8 @@ class MainWindow(QMainWindow):
         self._tray: QSystemTrayIcon | None = None
         self._tray_menu: QMenu | None = None
         self._force_quit = False
+        self._presentation_active = False
+        self._presentation_prev: dict | None = None
 
         self.setAcceptDrops(True)
         self.setWindowTitle(self._app_title())
@@ -165,6 +168,8 @@ class MainWindow(QMainWindow):
         super().changeEvent(event)
 
     def closeEvent(self, event):
+        if self._presentation_active:
+            self._exit_presentation()
         if not self._confirm_close_current(allow_discard=True, quitting=True):
             event.ignore()
             return
@@ -268,6 +273,8 @@ class MainWindow(QMainWindow):
         import os
 
         if os.environ.get("ILD_NO_SESSION") == "1" or os.environ.get("ILD_SMOKE_QT"):
+            return
+        if not get_restore_session_on_start():
             return
         # CLI-Argument hat Vorrang (app.py öffnet danach) — nur wenn noch kein Doc
         if self.doc and self.doc.path:
@@ -491,12 +498,12 @@ class MainWindow(QMainWindow):
         m_edit.addAction(act_toggle_case)
         act_indent = QAction("Einrückung erhöhen", self)
         act_indent.setShortcut(QKeySequence("Ctrl+]"))
-        act_indent.setToolTip("Ausgewählte Zeilen einrücken (auch Tab bei Auswahl)")
+        act_indent.setToolTip("Zeilen/Block einrücken (auch Tab)")
         act_indent.triggered.connect(self._indent_selection)
         m_edit.addAction(act_indent)
         act_outdent = QAction("Einrückung verringern", self)
         act_outdent.setShortcut(QKeySequence("Ctrl+["))
-        act_outdent.setToolTip("Ausgewählte Zeilen ausrücken (auch Shift+Tab)")
+        act_outdent.setToolTip("Zeilen/Block ausrücken (auch Shift+Tab)")
         act_outdent.triggered.connect(self._outdent_selection)
         m_edit.addAction(act_outdent)
         act_clear_marks = QAction("Markierungen löschen", self)
@@ -584,6 +591,13 @@ class MainWindow(QMainWindow):
         act_size_unit.setToolTip("Einheit der PDF-Seitengröße in der Statusleiste (mm ↔ inch)")
         act_size_unit.triggered.connect(self._toggle_page_size_unit)
         m_view.addAction(act_size_unit)
+        act_present = QAction("Präsentationsmodus", self)
+        act_present.setShortcut(QKeySequence("F5"))
+        act_present.setToolTip(
+            "PDF Vollbild-Präsentation (Pfeiltasten/Leertaste weiter, Esc beendet)"
+        )
+        act_present.triggered.connect(self._toggle_presentation)
+        m_view.addAction(act_present)
         m_view.addSeparator()
         act_zi = QAction("Vergrößern", self)
         act_zi.setShortcut(QKeySequence.ZoomIn)
@@ -881,6 +895,118 @@ class MainWindow(QMainWindow):
         new_unit = toggle_page_size_unit()
         self._update_doc_status()
         self._set_status(f"Seitengröße in {'inch' if new_unit == 'inch' else 'mm'}")
+
+    def _toggle_presentation(self):
+        if self._presentation_active:
+            self._exit_presentation()
+        else:
+            self._enter_presentation()
+
+    def _enter_presentation(self):
+        if not self.pdf_view.pdf_path:
+            self._set_status("Präsentationsmodus: bitte zuerst ein PDF öffnen")
+            QMessageBox.information(
+                self,
+                "Präsentationsmodus",
+                "Bitte zuerst ein PDF öffnen.",
+            )
+            return
+        self._presentation_prev = {
+            "menu": self.menuBar().isVisible(),
+            "status": self.statusBar().isVisible(),
+            "sidebar": self.sidebar.isVisible(),
+            "was_fullscreen": self.isFullScreen(),
+            "stack": self.stack.currentWidget(),
+        }
+        # PDF-Toolbar ausblenden (erste Layout-Zeile)
+        try:
+            tb = self.pdf_view.layout().itemAt(0).layout() if self.pdf_view.layout() else None
+            if tb is not None:
+                for i in range(tb.count()):
+                    item = tb.itemAt(i)
+                    w = item.widget() if item else None
+                    if w is not None:
+                        w.setVisible(False)
+                self._presentation_prev["toolbar_layout"] = tb
+        except Exception:
+            self._presentation_prev["toolbar_layout"] = None
+        self.stack.setCurrentWidget(self.pdf_view)
+        self.menuBar().setVisible(False)
+        self.statusBar().setVisible(False)
+        self.sidebar.setVisible(False)
+        self._presentation_active = True
+        self.showFullScreen()
+        try:
+            self.pdf_view.fit_page()
+        except Exception:
+            pass
+        self.pdf_view.setFocus(Qt.OtherFocusReason)
+        self._set_status(
+            f"Präsentation — Seite {self.pdf_view.page_index + 1}/{self.pdf_view.page_count} "
+            "(←/→ Esc)"
+        )
+
+    def _exit_presentation(self):
+        if not self._presentation_active:
+            return
+        prev = self._presentation_prev or {}
+        self._presentation_active = False
+        # Toolbar wieder ein
+        tb = prev.get("toolbar_layout")
+        if tb is not None:
+            try:
+                for i in range(tb.count()):
+                    item = tb.itemAt(i)
+                    w = item.widget() if item else None
+                    if w is not None:
+                        w.setVisible(True)
+            except Exception:
+                pass
+        self.menuBar().setVisible(bool(prev.get("menu", True)))
+        self.statusBar().setVisible(bool(prev.get("status", True)))
+        self.sidebar.setVisible(bool(prev.get("sidebar", True)))
+        stack_w = prev.get("stack")
+        if stack_w is not None:
+            self.stack.setCurrentWidget(stack_w)
+        if prev.get("was_fullscreen"):
+            self.showFullScreen()
+        else:
+            self.showNormal()
+        self._presentation_prev = None
+        self._set_status("Präsentationsmodus beendet")
+
+    def keyPressEvent(self, event):  # noqa: N802
+        if self._presentation_active:
+            key = event.key()
+            if key in (Qt.Key_Escape, Qt.Key_F5, Qt.Key_Q):
+                self._exit_presentation()
+                event.accept()
+                return
+            if key in (Qt.Key_Right, Qt.Key_Down, Qt.Key_PageDown, Qt.Key_Space, Qt.Key_Return):
+                self.pdf_view.next_page()
+                self._set_status(
+                    f"Präsentation — Seite {self.pdf_view.page_index + 1}/{self.pdf_view.page_count}"
+                )
+                event.accept()
+                return
+            if key in (Qt.Key_Left, Qt.Key_Up, Qt.Key_PageUp, Qt.Key_Backspace):
+                self.pdf_view.prev_page()
+                self._set_status(
+                    f"Präsentation — Seite {self.pdf_view.page_index + 1}/{self.pdf_view.page_count}"
+                )
+                event.accept()
+                return
+            if key == Qt.Key_Home:
+                self.pdf_view.goto_page(0)
+                event.accept()
+                return
+            if key == Qt.Key_End and self.pdf_view.page_count > 0:
+                self.pdf_view.goto_page(self.pdf_view.page_count - 1)
+                event.accept()
+                return
+            event.accept()
+            return
+        super().keyPressEvent(event)
 
     def _duplicate_line(self):
         if self.stack.currentWidget() is not self.editor_pane:

@@ -61,6 +61,7 @@ from ild_pdf.pages import (
     rotate_page,
 )
 from instantlensdoc.core.app_settings import (
+    get_ann_color_presets,
     get_ann_default_opacity,
     get_ann_highlight_color,
     get_ann_pen_color,
@@ -68,6 +69,7 @@ from instantlensdoc.core.app_settings import (
     get_default_zoom_scale,
     get_pdf_grayscale,
     get_pdf_night_mode,
+    set_ann_color_preset,
     set_ann_default_opacity,
     set_ann_highlight_color,
     set_ann_pen_color,
@@ -824,6 +826,22 @@ class PdfViewer(QWidget):
         self.btn_ann_layer.toggled.connect(self.set_annotations_visible)
         toolbar.addWidget(self.btn_hl_color)
         toolbar.addWidget(self.btn_pen_color)
+        self._preset_btns: list[QPushButton] = []
+        for i in range(3):
+            pb = QPushButton(str(i + 1))
+            pb.setFixedWidth(22)
+            pb.setToolTip(
+                f"Favorit {i + 1}: Klick = Highlight-Farbe · Shift+Klick = Stift · "
+                "Rechtsklick = aktuellen HL speichern"
+            )
+            pb.clicked.connect(lambda checked=False, idx=i: self._apply_color_preset(idx))
+            pb.setContextMenuPolicy(Qt.CustomContextMenu)
+            pb.customContextMenuRequested.connect(
+                lambda pos, idx=i, btn=pb: self._save_color_preset(idx)
+            )
+            self._preset_btns.append(pb)
+            toolbar.addWidget(pb)
+        self._refresh_preset_btns()
         toolbar.addWidget(self.spin_opacity)
         toolbar.addWidget(self.btn_grayscale)
         toolbar.addWidget(self.btn_night)
@@ -905,6 +923,38 @@ class PdfViewer(QWidget):
             set_ann_pen_color(self._pen_color)
             self._style_color_btn(self.btn_pen_color, self._pen_color)
             self.status.emit(f"Stift-Farbe: {self._pen_color}")
+
+    def _refresh_preset_btns(self):
+        presets = get_ann_color_presets()
+        for i, btn in enumerate(getattr(self, "_preset_btns", []) or []):
+            c = presets[i] if i < len(presets) else "#888888"
+            self._style_color_btn(btn, c)
+            btn.setToolTip(
+                f"Favorit {i + 1}: {c} — Klick = Highlight · Shift+Klick = Stift · "
+                "Rechtsklick = HL speichern"
+            )
+
+    def _apply_color_preset(self, index: int):
+        presets = get_ann_color_presets()
+        if index < 0 or index >= len(presets):
+            return
+        color = presets[index]
+        mods = QApplication.keyboardModifiers()
+        if mods & Qt.ShiftModifier:
+            self._pen_color = color
+            set_ann_pen_color(color)
+            self._style_color_btn(self.btn_pen_color, color)
+            self.status.emit(f"Stift-Farbe (Favorit {index + 1}): {color}")
+        else:
+            self._highlight_color = color
+            set_ann_highlight_color(color)
+            self._style_color_btn(self.btn_hl_color, color)
+            self.status.emit(f"Highlight-Farbe (Favorit {index + 1}): {color}")
+
+    def _save_color_preset(self, index: int):
+        set_ann_color_preset(index, self._highlight_color)
+        self._refresh_preset_btns()
+        self.status.emit(f"Favorit {index + 1} = {self._highlight_color}")
 
     def _on_default_opacity_changed(self, value: float):
         self._default_opacity = max(0.05, min(1.0, float(value)))
@@ -988,6 +1038,7 @@ class PdfViewer(QWidget):
         self._pen_color = get_ann_pen_color()
         self._style_color_btn(self.btn_hl_color, self._highlight_color)
         self._style_color_btn(self.btn_pen_color, self._pen_color)
+        self._refresh_preset_btns()
         self._default_opacity = get_ann_default_opacity()
         if hasattr(self, "spin_opacity"):
             self.spin_opacity.blockSignals(True)
