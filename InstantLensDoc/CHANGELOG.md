@@ -1,5 +1,23 @@
 # Changelog — InstantLens Doc
 
+## 0.4.9 — Seitenlabels, Ann.-Seitenfilter, Clipboard-Verlauf, About-Features
+
+Fokus (letzte 0.4.x vor 0.5.0): PDF-Seitenlabels (römisch/arabisch) anzeigen wenn vorhanden, Annotation-Filter „nur aktuelle Seite“, Editor Zwischenablage-Verlauf (3 Einträge), About-Dialog mit Feature-Kurzliste + FEATURES.md. Stubs KI/Cloud/Stylus/3D unverändert.
+
+### PDF / Annotationen
+- **PDF-Seitenlabels**: römische/arabische Labels aus dem PDF in Statusleiste und Toolbar, wenn PageLabels vorhanden (`ild_pdf.PdfDocument.page_label` / `format_page_status`)
+- **Annotation-Filter „nur aktuelle Seite“**: Checkbox in der Sidebar; Liste folgt der aktuellen PDF-Seite
+
+### Editor / UX
+- **Zwischenablage-Verlauf**: letzte 3 eingefügten Textschnipsel (Bearbeiten-Menü); erneutes Einfügen
+- **About-Dialog**: Feature-Kurzliste + Button „FEATURES.md öffnen…“
+
+### Packaging / Docs
+- Version **0.4.9** (App, `ild_pdf`, ISS, Build, Docs, Smoke)
+- FEATURES / INFO / CHANGELOG / Hilfe aktualisiert
+
+---
+
 ## 0.4.8 — Continuous Scroll, Ann.-Zeitstempel, Bracket-Match, Arbeitsverzeichnis
 
 Fokus: optionaler PDF Continuous Scroll statt Einzelseite, Annotation-Zeitstempel in der Sidebar-Liste, Editor Bracket-Match Highlight, Menü „Arbeitsverzeichnis öffnen“. Stubs KI/Cloud/Stylus/3D unverändert.

@@ -4,7 +4,7 @@ ild_pdf — auskoppelbares PDF-Modul für InstantLens Doc und andere Apps.
 Basiert auf pypdfium2 (PDFium, lizenzfreundlich). Kein Poppler/GPL.
 """
 
-from .document import PdfDocument
+from .document import PdfDocument, format_page_status
 from .render import render_page, render_pages
 from .annotate import (
     Annotation,
@@ -90,6 +90,7 @@ from .links import UriLink, is_external_http_uri, list_page_uri_links, uri_link_
 
 __all__ = [
     "PdfDocument",
+    "format_page_status",
     "render_page",
     "render_pages",
     "clear_render_cache",
@@ -179,4 +180,4 @@ __all__ = [
     "uri_link_at",
 ]
 
-__version__ = "0.4.8"
+__version__ = "0.4.9"

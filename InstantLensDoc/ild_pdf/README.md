@@ -1,7 +1,7 @@
 # ild_pdf — auskoppelbares PDF-Modul
 
 Lizenzfreundliche PDF-Engine auf **pypdfium2 / PDFium** (kein Poppler/GPL).  
-Version **0.4.8**.
+Version **0.4.9**.
 
 ## Installation
 
@@ -78,6 +78,7 @@ python examples/ild_pdf_demo.py pfad/zu/datei.pdf
 | `get_metadata` / `set_metadata` / `PdfMetadata` | Dokument-Metadaten |
 | `PAGE_SIZE_PRESETS` / `get_page_boxes` / `set_page_size` / `set_crop_box` | Seitengröße / Crop |
 | `format_size_pair` / `pt_to_mm` / `pt_to_inch` / `to_pt` | Seitengröße mm/inch formatieren |
+| `PdfDocument.page_label` / `page_labels` / `format_page_status` | PDF-Seitenlabels (römisch/arabisch) |
 
 ### Sidecar-Schema v4 (`ildann-v4`) — PDF-Highlight-kompatibel
 

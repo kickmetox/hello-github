@@ -8,6 +8,7 @@ from PySide6.QtCore import Signal, Qt
 from PySide6.QtGui import QColor, QIcon, QImage, QPixmap
 from PySide6.QtWidgets import (
     QAbstractItemView,
+    QCheckBox,
     QComboBox,
     QHBoxLayout,
     QLabel,
@@ -116,6 +117,7 @@ class Sidebar(QWidget):
     outline_delete_requested = Signal()
     annotation_filter_changed = Signal(str)  # Typ-Wert oder "" für alle
     annotation_color_filter_changed = Signal(str)  # #RRGGBB oder "" für alle
+    annotation_page_filter_changed = Signal(bool)  # nur aktuelle Seite
     fulltext_hit_activated = Signal(str, object)  # path, page_index|None
     page_thumb_activated = Signal(int)  # PDF-Seite 0-basiert
     pages_reordered = Signal(list)  # alte Indizes in neuer Reihenfolge
@@ -195,6 +197,12 @@ class Sidebar(QWidget):
         self.ann_filter.addItem("Alle Typen", "")
         self.ann_filter.currentIndexChanged.connect(self._on_ann_filter_changed)
         layout.addWidget(self.ann_filter)
+        self.ann_current_page = QCheckBox("Nur aktuelle Seite")
+        self.ann_current_page.setToolTip(
+            "Annotationsliste auf die aktuelle PDF-Seite beschränken"
+        )
+        self.ann_current_page.toggled.connect(self._on_ann_current_page_toggled)
+        layout.addWidget(self.ann_current_page)
         self.ann_search = QLineEdit()
         self.ann_search.setPlaceholderText("Annotationen suchen…")
         self.ann_search.setClearButtonEnabled(True)
@@ -238,6 +246,8 @@ class Sidebar(QWidget):
         self._ann_filter_updating = False
         self._ann_search_query = ""
         self._ann_color_filter = ""
+        self._ann_current_page_index: int | None = None
+        self._ann_filter_current_page = False
 
     def search_text(self) -> str:
         return self.search.currentText().strip()
@@ -484,6 +494,44 @@ class Sidebar(QWidget):
         """Aktueller Farben-Filter (#RRGGBB) oder '' für alle."""
         return getattr(self, "_ann_color_filter", "") or ""
 
+    def annotation_filter_current_page(self) -> bool:
+        """True wenn nur Annotationen der aktuellen Seite gezeigt werden."""
+        return bool(getattr(self, "_ann_filter_current_page", False))
+
+    def set_annotation_current_page(self, page_index: int | None):
+        """Aktuelle PDF-Seite für den Seitenfilter setzen (0-basiert)."""
+        if page_index is None:
+            self._ann_current_page_index = None
+        else:
+            try:
+                self._ann_current_page_index = int(page_index)
+            except (TypeError, ValueError):
+                self._ann_current_page_index = None
+        if self.annotation_filter_current_page():
+            self._apply_annotation_filter()
+
+    def set_annotation_filter_current_page(self, enabled: bool):
+        """Filter ‚nur aktuelle Seite‘ ein-/ausschalten."""
+        want = bool(enabled)
+        if want == self.annotation_filter_current_page():
+            if hasattr(self, "ann_current_page"):
+                self.ann_current_page.blockSignals(True)
+                self.ann_current_page.setChecked(want)
+                self.ann_current_page.blockSignals(False)
+            return
+        self._ann_filter_current_page = want
+        if hasattr(self, "ann_current_page"):
+            self.ann_current_page.blockSignals(True)
+            self.ann_current_page.setChecked(want)
+            self.ann_current_page.blockSignals(False)
+        self._apply_annotation_filter()
+        self.annotation_page_filter_changed.emit(want)
+
+    def _on_ann_current_page_toggled(self, checked: bool):
+        self._ann_filter_current_page = bool(checked)
+        self._apply_annotation_filter()
+        self.annotation_page_filter_changed.emit(bool(checked))
+
     def set_annotation_color_filter(self, color: str | None):
         """Farben-Filter setzen; leerer String / None = alle Farben."""
         want = normalize_ann_color(color) if color else ""
@@ -543,11 +591,22 @@ class Sidebar(QWidget):
         want = self.annotation_filter_type()
         want_color = self.annotation_filter_color()
         query = self._ann_search_query
+        page_only = self.annotation_filter_current_page()
+        current_page = getattr(self, "_ann_current_page_index", None)
         self.annotations.clear()
         # Gefilterte Paare sammeln, dann nach Seite gruppieren
         filtered: list[tuple[str, object | None]] = []
         for i, line in enumerate(self._ann_all_lines):
             payload = self._ann_all_payloads[i] if i < len(self._ann_all_payloads) else None
+            if page_only and current_page is not None:
+                page = -1
+                if payload is not None and hasattr(payload, "page"):
+                    try:
+                        page = int(payload.page)
+                    except (TypeError, ValueError):
+                        page = -1
+                if page != int(current_page):
+                    continue
             if want:
                 t = getattr(getattr(payload, "type", None), "value", None) or getattr(
                     payload, "type", None
@@ -703,11 +762,16 @@ class Sidebar(QWidget):
         self._ann_all_payloads = []
         self._ann_search_query = ""
         self._ann_color_filter = ""
+        self._ann_filter_current_page = False
         self.annotations.clear()
         if hasattr(self, "ann_search"):
             self.ann_search.blockSignals(True)
             self.ann_search.clear()
             self.ann_search.blockSignals(False)
+        if hasattr(self, "ann_current_page"):
+            self.ann_current_page.blockSignals(True)
+            self.ann_current_page.setChecked(False)
+            self.ann_current_page.blockSignals(False)
         self._ann_filter_updating = True
         self.ann_filter.blockSignals(True)
         self.ann_filter.clear()

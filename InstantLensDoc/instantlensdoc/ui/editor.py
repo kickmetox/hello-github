@@ -17,6 +17,8 @@ from instantlensdoc.core.app_settings import (
     get_editor_trim_whitespace_on_paste,
 )
 
+CLIPBOARD_HISTORY_MAX = 3
+
 
 class _LineNumberArea(QWidget):
     def __init__(self, editor: "TextEditor"):
@@ -44,6 +46,7 @@ class TextEditor(QPlainTextEdit):
         self._soft_wrap = bool(get_editor_soft_wrap())
         self._show_special = bool(get_editor_show_special_chars())
         self._bracket_match = bool(get_editor_bracket_match())
+        self._clipboard_history: list[str] = []
         self._find_selections: list = []
         self._mark_selections: list = []
         self._bracket_selections: list = []
@@ -570,6 +573,34 @@ class TextEditor(QPlainTextEdit):
             bottom = top + int(self.blockBoundingRect(block).height())
             block_number += 1
 
+    def clipboard_history(self) -> list[str]:
+        """Letzte eingefügte Textschnipsel (max. 3, neueste zuerst)."""
+        return list(self._clipboard_history)
+
+    def push_clipboard_history(self, text: str) -> list[str]:
+        """Text in den Clipboard-Verlauf aufnehmen (Deduplizierung, max. 3)."""
+        raw = text if text is not None else ""
+        if not str(raw):
+            return self.clipboard_history()
+        entry = str(raw)
+        hist = [entry] + [t for t in self._clipboard_history if t != entry]
+        self._clipboard_history = hist[:CLIPBOARD_HISTORY_MAX]
+        return self.clipboard_history()
+
+    def paste_clipboard_history(self, index: int) -> bool:
+        """Eintrag aus dem Verlauf an der Cursor-Position einfügen."""
+        hist = self.clipboard_history()
+        i = int(index)
+        if i < 0 or i >= len(hist):
+            return False
+        text = hist[i]
+        # erneut an den Anfang (zuletzt genutzt)
+        self.push_clipboard_history(text)
+        cur = self.textCursor()
+        cur.insertText(text)
+        self.setTextCursor(cur)
+        return True
+
     def set_paste_image_dir(self, path: Path | None) -> None:
         self._paste_image_dir = Path(path) if path else None
 
@@ -609,22 +640,23 @@ class TextEditor(QPlainTextEdit):
                 # Zwischenablage kann schon das Image halten — paste_clipboard_image
                 if self.paste_clipboard_image():
                     return
-        if (
-            source is not None
-            and source.hasText()
-            and get_editor_trim_whitespace_on_paste()
-        ):
+        if source is not None and source.hasText():
             text = source.text()
-            # Trailing Whitespace pro Zeile entfernen (nicht führend)
-            lines = text.replace("\r\n", "\n").replace("\r", "\n").split("\n")
-            trimmed = "\n".join(line.rstrip(" \t") for line in lines)
-            if trimmed != text:
-                from PySide6.QtCore import QMimeData
+            if (
+                get_editor_trim_whitespace_on_paste()
+            ):
+                # Trailing Whitespace pro Zeile entfernen (nicht führend)
+                lines = text.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+                trimmed = "\n".join(line.rstrip(" \t") for line in lines)
+                if trimmed != text:
+                    from PySide6.QtCore import QMimeData
 
-                md = QMimeData()
-                md.setText(trimmed)
-                super().insertFromMimeData(md)
-                return
+                    md = QMimeData()
+                    md.setText(trimmed)
+                    self.push_clipboard_history(trimmed)
+                    super().insertFromMimeData(md)
+                    return
+            self.push_clipboard_history(text)
         super().insertFromMimeData(source)
 
     def clear_extra_selections(self) -> None:

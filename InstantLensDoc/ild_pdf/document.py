@@ -57,6 +57,20 @@ class PdfDocument:
         finally:
             page.close()
 
+    def page_label(self, index: int) -> str:
+        """PDF-Seitenlabel (römisch/arabisch/Präfix) oder '' wenn keines gesetzt."""
+        if index < 0 or index >= self.page_count:
+            return ""
+        try:
+            label = self.raw.get_page_label(index)
+        except Exception:
+            return ""
+        return str(label or "").strip()
+
+    def page_labels(self) -> list[str]:
+        """Alle Seitenlabels (leere Strings wenn keine PageLabels-Dict im PDF)."""
+        return [self.page_label(i) for i in range(self.page_count)]
+
     def __enter__(self) -> "PdfDocument":
         return self
 
@@ -65,3 +79,19 @@ class PdfDocument:
 
     def __len__(self) -> int:
         return self.page_count
+
+
+def format_page_status(
+    page_index: int,
+    page_count: int,
+    label: str | None = None,
+    *,
+    prefix: str = "Seite",
+) -> str:
+    """Status-/Anzeigetext: 'Seite iii (3/10)' wenn Label, sonst 'Seite 3/10'."""
+    n = max(0, int(page_index)) + 1
+    total = max(0, int(page_count))
+    lab = (label or "").strip()
+    if lab:
+        return f"{prefix} {lab} ({n}/{total})"
+    return f"{prefix} {n}/{total}"

@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **0.4.8** |
+| Version | **0.4.9** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -33,10 +33,10 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)
 
-## Neu in 0.4.8
+## Neu in 0.4.9
 
-- PDF: Continuous Scroll optional (statt Einzelseite; Ctrl+3 / CS)
-- Annotation: Zeitstempel in der Sidebar-Liste
-- Editor: Bracket-Match Highlight
-- Datei: Arbeitsverzeichnis öffnen (Ctrl+Shift+E)
+- PDF: Seitenlabels (römisch/arabisch) in Status/Toolbar wenn vorhanden
+- Annotation: Filter „nur aktuelle Seite“
+- Editor: Zwischenablage-Verlauf (3 Einträge)
+- About: Feature-Kurzliste + FEATURES.md
 - Stubs KI/Cloud/Stylus/3D unverändert

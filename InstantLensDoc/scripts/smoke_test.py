@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Smoke-Test 0.4.8 (CLI + optional offscreen Qt). Kernpfade: open/annotate/export/license + 0.3.x."""
+"""Smoke-Test 0.4.9 (CLI + optional offscreen Qt). Kernpfade: open/annotate/export/license + 0.3.x."""
 
 from __future__ import annotations
 
@@ -113,8 +113,8 @@ def main() -> int:
     from instantlensdoc.core.update_check import check_for_updates
     from instantlensdoc.license import KEY_DAYS, TRIAL_DAYS, generate_key, verify_key
 
-    assert __version__ == "0.4.8", __version__
-    assert ild_ver == "0.4.8", ild_ver
+    assert __version__ == "0.4.9", __version__
+    assert ild_ver == "0.4.9", ild_ver
     assert TRIAL_DAYS == 28 and KEY_DAYS == 32
     key = generate_key("ame@sellerbach.de")
     ok, msg, _ = verify_key(key)
@@ -132,7 +132,7 @@ def main() -> int:
     assert "Settings" in tr("settings")
     set_lang("de")
     upd = check_for_updates(allow_network=False)
-    assert upd.local_version == "0.4.8" and not upd.online
+    assert upd.local_version == "0.4.9" and not upd.online
     assert get_export_jpeg_quality() >= 10
     assert get_ui_lang() in ("de", "en")
     assert 25 <= get_default_zoom_percent() <= 500
@@ -173,8 +173,8 @@ def main() -> int:
     assert get_ann_pen_color() == "#112233"
     assert (ROOT / "CHANGELOG.md").is_file()
     cl = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-    assert "0.4.8" in cl
-    assert "## 0.4.8" in cl
+    assert "0.4.9" in cl
+    assert "## 0.4.9" in cl
     assert "## 0.4.0" in cl
     assert "0.3.0 → 0.4.0" in cl or "0.3.0→0.4.0" in cl
     assert "## 0.3.0" in cl
@@ -191,7 +191,7 @@ def main() -> int:
     assert "## 0.3.1" not in cl and "## 0.2.9" not in cl
     assert "0.3.9" in cl  # noch in Kurz-Tabelle
     assert "0.2.9" in cl  # noch in Kurz-Tabelle
-    assert "0.4.8" in (ROOT / "README.md").read_text(encoding="utf-8")
+    assert "0.4.9" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "run.bat" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "sync-ild.ps1" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "scripts/sync-ild.ps1" in (ROOT / "FEATURES.md").read_text(encoding="utf-8")
@@ -540,13 +540,13 @@ def main() -> int:
 
         assert (ROOT / "installer" / "installer-hinweis.txt").exists()
         iss = (ROOT / "installer" / "instantlensdoc.iss").read_text(encoding="utf-8")
-        assert "0.4.8" in iss and "desktopicon" in iss and "DisableProgramGroupPage=no" in iss
+        assert "0.4.9" in iss and "desktopicon" in iss and "DisableProgramGroupPage=no" in iss
         assert "UninstallDisplayName" in iss and "Uninstallable=yes" in iss
         assert "IncludeKeygen" in iss and "SetupIconFile" in iss
         assert "InstantLensKeygen.exe" in iss
         assert "uninstallexe" in iss
         bw = (ROOT / "build-windows.ps1").read_text(encoding="utf-8")
-        assert "0.4.8" in bw and "NoKeygenInApp" in bw and "--icon" in bw
+        assert "0.4.9" in bw and "NoKeygenInApp" in bw and "--icon" in bw
         assert "InstantLensKeygen.exe" in bw
         bi = (ROOT / "installer" / "build-installer.ps1").read_text(encoding="utf-8")
         assert "InstantLensKeygen.exe" in bi and "IncludeKeygen" in bi
@@ -555,7 +555,7 @@ def main() -> int:
         assert "Installer" in kg_readme
         hinweis = (ROOT / "installer" / "installer-hinweis.txt").read_text(encoding="utf-8")
         assert "InstantLensKeygen.exe" in hinweis or "run-keygen.bat" in hinweis
-        assert "0.4.8" in hinweis
+        assert "0.4.9" in hinweis
         from ild_pdf.limits import OPEN_TIMEOUT_HINT, OPEN_TIMEOUT_HINT_SEC
 
         assert OPEN_TIMEOUT_HINT_SEC >= 15 and "teilen" in OPEN_TIMEOUT_HINT.lower()
@@ -566,7 +566,7 @@ def main() -> int:
         assert "QProgressDialog" in (ROOT / "instantlensdoc" / "ui" / "main_window.py").read_text(encoding="utf-8")
 
         assert (ROOT / "examples" / "ild_pdf_demo.py").exists()
-        assert "0.4.8" in (ROOT / "INFO.md").read_text(encoding="utf-8")
+        assert "0.4.9" in (ROOT / "INFO.md").read_text(encoding="utf-8")
         assert (ROOT / "assets" / "app.ico").is_file()
 
         # --- Kernpfade: open / annotate / export / license ---
@@ -933,12 +933,15 @@ def main() -> int:
         assert "Schema v4" in feat or "ildann-v4" in feat or "PDF-Highlight" in feat
         assert "sortieren" in feat.lower() or "Zeilen sortieren" in feat
         assert "Reset" in feat or "zurücksetzen" in feat.lower()
-        assert "Seitenbild" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8") or "0.4.8" in feat
-        assert "Gehe zu Seite" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8") or "0.4.8" in feat
+        assert "Seitenbild" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8") or "0.4.9" in feat
+        assert "Gehe zu Seite" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8") or "0.4.9" in feat
         assert "## 0.4.6" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
         assert "## 0.4.7" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
         assert "## 0.4.8" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+        assert "## 0.4.9" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
         assert "Continuous Scroll" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+        assert "Seitenlabel" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8") or "Seitenlabels" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+        assert "Zwischenablage-Verlauf" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8") or "Clipboard" in (ROOT / "FEATURES.md").read_text(encoding="utf-8")
         # --- 0.4.2 CLI: Outline Goto, Ann Copy/Paste, Flatten Progress ---
         import pikepdf as _pike_ol
 
@@ -1023,7 +1026,7 @@ def main() -> int:
         assert "Encoding" in feat or "Latin-1" in feat
         assert "mehrere Dateien" in feat or "Tabs" in feat
         assert "kopieren/einfügen" in feat or "Ctrl+Alt+C" in feat
-        print("0.4.3–0.4.8 cropbox/lock/snippets + marks/schema/sort/reset (CLI): OK")
+        print("0.4.3–0.4.9 cropbox/lock/snippets + marks/schema/sort/reset (CLI): OK")
         print("0.4.2 outline/copy-paste/progress (CLI): OK")
         print("0.4.1 links/encoding/stamp-rotation (CLI): OK")
         print("0.3.x selected paths (CLI): OK")
@@ -1063,7 +1066,7 @@ def main() -> int:
         win._add_chained_frame()
         assert len(win.layout_doc.text_frames) >= 2
         assert "Lizenz:" in win.license_label.text() or "⚠" in win.license_label.text()
-        assert "v0.4.8" in win.version_label.text()
+        assert "v0.4.9" in win.version_label.text()
         # Lizenz <7 Tage: Style prominent
         st_lic = win.license_manager.status()
         if st_lic.allowed and st_lic.days_remaining < 7:
@@ -1244,11 +1247,11 @@ def main() -> int:
             assert win.editor.outdent_selection(4)
             assert win.editor.toPlainText().splitlines()[0] == "alpha"
             # Fenstertitel mit Version
-            assert "0.4.8" in win.windowTitle()
+            assert "0.4.9" in win.windowTitle()
             from instantlensdoc.ui.help_dialog import AboutDialog, HelpDialog, open_log_folder
 
             about = AboutDialog(win)
-            assert "0.4.8" in about.windowTitle()
+            assert "0.4.9" in about.windowTitle()
             help_dlg = HelpDialog(win)
             assert help_dlg.windowTitle() == "Hilfe"
             assert callable(open_log_folder)
@@ -1908,7 +1911,7 @@ def main() -> int:
             win.apply_tray_setting()
             if win._tray is not None:
                 tip = win._tray.toolTip()
-                assert "0.4.8" in tip and "InstantLens Doc" in tip
+                assert "0.4.9" in tip and "InstantLens Doc" in tip
             set_minimize_to_tray(False)
             win.apply_tray_setting()
             print("0.3.9 fit-h/ann-stats/special/tray: OK")
@@ -1921,9 +1924,9 @@ def main() -> int:
             from instantlensdoc.ui.password_dialog import CompressPdfDialog, SetPasswordDialog
             from instantlensdoc.ui.stubs import PLANNED
             assert KeyboardHelpDialog and SetPasswordDialog and CompressPdfDialog
-            assert "0.4.8" in PLANNED["ki"]
+            assert "0.4.9" in PLANNED["ki"]
             assert "Coming soon" in PLANNED["cloud"]
-            assert "0.4.8" in PLANNED["stylus"] and "0.4.8" in PLANNED["extrude3d"]
+            assert "0.4.9" in PLANNED["stylus"] and "0.4.9" in PLANNED["extrude3d"]
             # Toolbar ↔ Menü Sync Graustufen/Nacht
             win.pdf_view.set_grayscale(True)
             assert win._grayscale_action.isChecked()
@@ -1958,7 +1961,7 @@ def main() -> int:
             assert win.editor.toPlainText().splitlines() == ["one", "two"]
             from instantlensdoc.ui.help_dialog import HELP_HTML
 
-            assert "Stub 0.4.8" in HELP_HTML
+            assert "Stub 0.4.9" in HELP_HTML
             assert "scripts/sync-ild.ps1" in HELP_HTML
             assert "Präsentationsmodus" in HELP_HTML or "F5" in (
                 ROOT / "instantlensdoc" / "ui" / "keyboard_help.py"
@@ -2082,7 +2085,7 @@ def main() -> int:
             # Undo hint present
             assert hasattr(win, "undo_hint_label")
             assert "rückgängig" in win.undo_hint_label.text().lower() or "Ctrl+Z" in win.undo_hint_label.text()
-            # 0.4.8 Qt: continuous scroll, ann timestamps, bracket-match, workdir
+            # 0.4.8/0.4.9 Qt: continuous scroll + labels/filter/clipboard/about, ann timestamps, bracket-match, workdir
             from instantlensdoc.core.app_settings import (
                 get_ann_note_color,
                 get_editor_bracket_match,
@@ -2158,12 +2161,117 @@ def main() -> int:
             win.editor.insertFromMimeData(md)
             assert "line\nfoo\n" in win.editor.toPlainText() or win.editor.toPlainText().endswith("line\nfoo\n") or "line\nfoo" in win.editor.toPlainText()
             set_editor_trim_whitespace_on_paste(False)
+            # --- 0.4.9: page labels, ann current-page filter, clipboard history, about ---
+            from ild_pdf import format_page_status
+            from ild_pdf.document import PdfDocument as DocLabels
+            import pikepdf as _pike_lab
+            from pikepdf import Name, Dictionary, Array
+            from instantlensdoc.ui.help_dialog import HELP_HTML as HELP_HTML_049
+
+            kh_src = (ROOT / "instantlensdoc" / "ui" / "keyboard_help.py").read_text(
+                encoding="utf-8"
+            )
+
+            lab_pdf = td2 / "page_labels_049.pdf"
+            with _pike_lab.Pdf.new() as _ldoc:
+                for _ in range(4):
+                    _ldoc.add_blank_page(page_size=(200, 280))
+                _ldoc.Root.PageLabels = Dictionary(
+                    Nums=Array(
+                        [
+                            0,
+                            Dictionary(S=Name.r),
+                            2,
+                            Dictionary(S=Name.D, St=1),
+                        ]
+                    )
+                )
+                _ldoc.save(lab_pdf)
+            with DocLabels(lab_pdf) as _dlab:
+                assert _dlab.page_label(0) == "i"
+                assert _dlab.page_label(1) == "ii"
+                assert _dlab.page_label(2) == "1"
+                assert format_page_status(0, 4, "i") == "Seite i (1/4)"
+                assert format_page_status(2, 4, "") == "Seite 3/4"
+            win.open_path(str(lab_pdf))
+            assert win.pdf_view.pdf_path is not None
+            assert win.pdf_view.has_page_labels()
+            assert win.pdf_view.page_label(0) == "i"
+            win.pdf_view.goto_page(0)
+            win._update_doc_status()
+            assert "i" in win.page_status_label.text()
+            assert "(" in win.page_status_label.text()
+            # Annotation current-page filter
+            from ild_pdf import Annotation as Ann049, AnnotationType as AT049
+
+            win.pdf_view.store.add(
+                Ann049(0, AT049.STICKY, 10, 10, width=20, height=20, text="p0-only")
+            )
+            win.pdf_view.store.add(
+                Ann049(1, AT049.STICKY, 10, 10, width=20, height=20, text="p1-only")
+            )
+            win.pdf_view.goto_page(0)
+            win._refresh_pdf_marks()
+            assert hasattr(win.sidebar, "ann_current_page")
+            win.sidebar.set_annotation_filter_current_page(True)
+            texts = [
+                win.sidebar.annotations.item(i).text()
+                for i in range(win.sidebar.annotations.count())
+            ]
+            joined = " ".join(texts)
+            assert "p0-only" in joined
+            assert "p1-only" not in joined
+            win.sidebar.set_annotation_filter_current_page(False)
+            win._refresh_pdf_marks()
+            texts2 = [
+                win.sidebar.annotations.item(i).text()
+                for i in range(win.sidebar.annotations.count())
+            ]
+            assert "p1-only" in " ".join(texts2)
+            # Clipboard history (3 entries)
+            assert callable(win.editor.push_clipboard_history)
+            assert callable(win.editor.paste_clipboard_history)
+            win.editor._clipboard_history.clear()
+            win.editor.setPlainText("")
+            win.stack.setCurrentWidget(win.editor_pane)
+            for frag in ("alpha", "beta", "gamma", "delta"):
+                mdh = QMimeData()
+                mdh.setText(frag)
+                win.editor.insertFromMimeData(mdh)
+            hist = win.editor.clipboard_history()
+            assert len(hist) == 3
+            assert hist == ["delta", "gamma", "beta"]
+            win.editor.setPlainText("")
+            assert win.editor.paste_clipboard_history(1)  # gamma
+            assert "gamma" in win.editor.toPlainText()
+            assert win.editor.clipboard_history()[0] == "gamma"
+            assert hasattr(win, "_clipboard_history_menu")
+            win._rebuild_clipboard_history_menu()
+            # About feature shortlist + FEATURES.md
+            from instantlensdoc.ui.help_dialog import AboutDialog as About049
+
+            about049 = About049(win)
+            assert hasattr(about049, "_open_features_md")
+            assert callable(about049._open_features_md)
+            about_src = (ROOT / "instantlensdoc" / "ui" / "help_dialog.py").read_text(
+                encoding="utf-8"
+            )
+            assert "FEATURES.md" in about_src
+            assert "Feature-Kurzliste" in about_src or "Features (Kurz)" in about_src
+            assert (
+                "Zwischenablage-Verlauf" in kh_src
+                or "Zwischenablage-Verlauf" in HELP_HTML_049
+            )
+            feat049 = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
+            assert "Seitenlabel" in feat049 or "Seitenlabels" in feat049
+            assert "Nur aktuelle Seite" in feat049 or "nur aktuelle Seite" in feat049.lower()
             assert callable(export_shortcuts_pdf)
             assert KeyboardHelpDialog
-            kh_src = (ROOT / "instantlensdoc" / "ui" / "keyboard_help.py").read_text(encoding="utf-8")
             assert "Als PDF exportieren" in kh_src
             assert "Continuous Scroll" in kh_src
             assert "Arbeitsverzeichnis" in kh_src
+            # Restore smoke PDF for remaining tests
+            win.open_path(str(smoke_pdf))
             assert "Whitespace trim on paste" in (
                 ROOT / "instantlensdoc" / "ui" / "settings_dialog.py"
             ).read_text(encoding="utf-8")
@@ -2175,12 +2283,12 @@ def main() -> int:
             ).read_text(encoding="utf-8")
             assert "Zwei-Seiten" in (
                 ROOT / "CHANGELOG.md"
-            ).read_text(encoding="utf-8") or "0.4.8" in (
+            ).read_text(encoding="utf-8") or "0.4.9" in (
                 ROOT / "FEATURES.md"
             ).read_text(encoding="utf-8")
             assert "Gehe zu Seite" in (
                 ROOT / "CHANGELOG.md"
-            ).read_text(encoding="utf-8") or "0.4.8" in (
+            ).read_text(encoding="utf-8") or "0.4.9" in (
                 ROOT / "FEATURES.md"
             ).read_text(encoding="utf-8")
             assert "PDF-Toolbar" in (
@@ -2262,10 +2370,10 @@ def main() -> int:
                     win.pdf_view.goto_page(1)
                     n_paste = win.pdf_view.paste_annotations_on_page()
                     assert n_paste == 1
-            print("0.4.3–0.4.8 Qt marks/schema/sort/reset: OK")
+            print("0.4.3–0.4.9 Qt marks/schema/sort/reset: OK")
             print("0.4.2 Qt outline/copy-paste/case/progress: OK")
             print("0.4.1 Qt links/stamp/encoding/drop: OK")
-            print("0.3.x–0.4.8 review OK")
+            print("0.3.x–0.4.9 review OK")
             assert callable(win.pdf_view.bake_redactions)
             assert callable(win.pdf_view.clear_redactions)
             assert callable(win._set_pdf_password)

@@ -521,6 +521,11 @@ class MainWindow(QMainWindow):
         act_paste_img.setShortcut(QKeySequence("Ctrl+Shift+V"))
         act_paste_img.triggered.connect(self._paste_clipboard_image)
         m_edit.addAction(act_paste_img)
+        self._clipboard_history_menu = m_edit.addMenu("Zwischenablage-Verlauf")
+        self._clipboard_history_menu.setToolTip(
+            "Letzte 3 eingefügten Textschnipsel erneut einfügen"
+        )
+        self._clipboard_history_menu.aboutToShow.connect(self._rebuild_clipboard_history_menu)
         m_edit.addSeparator()
         act_find = QAction("Suchen…", self)
         act_find.setShortcut(QKeySequence.Find)
@@ -1031,7 +1036,13 @@ class MainWindow(QMainWindow):
         elif self.pdf_view.pdf_path:
             name = self.pdf_view.pdf_path.name
         if self.pdf_view.pdf_path and self.pdf_view.page_count > 0:
-            page_txt = f"Seite {self.pdf_view.page_index + 1}/{self.pdf_view.page_count}"
+            from ild_pdf import format_page_status
+
+            page_txt = format_page_status(
+                self.pdf_view.page_index,
+                self.pdf_view.page_count,
+                self.pdf_view.page_label(),
+            )
             zoom_txt = f"{int(round(self.pdf_view.scale * 100))} %"
             word_txt = f"{len(self.pdf_view.store.annotations) if self.pdf_view.store else 0} Ann."
             size_txt = self._format_current_page_size() or "—"
@@ -1293,8 +1304,14 @@ class MainWindow(QMainWindow):
     def _on_pdf_zoom_changed(self, scale: float):
         self.zoom_status_label.setText(f"{int(round(float(scale) * 100))} %")
         if self.pdf_view.pdf_path and self.pdf_view.page_count > 0:
+            from ild_pdf import format_page_status
+
             self.page_status_label.setText(
-                f"Seite {self.pdf_view.page_index + 1}/{self.pdf_view.page_count}"
+                format_page_status(
+                    self.pdf_view.page_index,
+                    self.pdf_view.page_count,
+                    self.pdf_view.page_label(),
+                )
             )
             if hasattr(self, "size_status_label"):
                 self.size_status_label.setText(self._format_current_page_size() or "—")
@@ -2112,6 +2129,7 @@ class MainWindow(QMainWindow):
         if self.stack.currentWidget() is not self.pdf_view:
             return
         pairs = self.pdf_view.annotation_summaries()
+        self.sidebar.set_annotation_current_page(self.pdf_view.page_index)
         self.sidebar.set_annotations([p[0] for p in pairs], [p[1] for p in pairs])
         n = len(self.pdf_view.store.annotations) if self.pdf_view.store else 0
         self.word_status_label.setText(f"{n} Ann.")
@@ -2283,6 +2301,7 @@ class MainWindow(QMainWindow):
 
     def _on_pdf_page_changed(self, page_index: int):
         self.sidebar.select_thumb(page_index)
+        self.sidebar.set_annotation_current_page(page_index)
         self._update_doc_status()
     def _set_pdf_password(self):
         if not self.pdf_view.pdf_path:
@@ -2654,6 +2673,35 @@ class MainWindow(QMainWindow):
     def _compare_pdfs(self):
         left = str(self.pdf_view.pdf_path) if self.pdf_view.pdf_path else None
         PdfCompareDialog(self, left_pdf=left).exec()
+
+    def _rebuild_clipboard_history_menu(self):
+        menu = getattr(self, "_clipboard_history_menu", None)
+        if menu is None:
+            return
+        menu.clear()
+        hist = self.editor.clipboard_history() if hasattr(self.editor, "clipboard_history") else []
+        if not hist:
+            empty = QAction("(leer)", self)
+            empty.setEnabled(False)
+            menu.addAction(empty)
+            return
+        for i, text in enumerate(hist):
+            preview = text.replace("\n", "⏎").replace("\t", "→")
+            if len(preview) > 48:
+                preview = preview[:45] + "…"
+            a = QAction(f"{i + 1}: {preview}", self)
+            a.setToolTip(text[:500])
+            a.triggered.connect(lambda checked=False, idx=i: self._paste_clipboard_history(idx))
+            menu.addAction(a)
+
+    def _paste_clipboard_history(self, index: int):
+        if self.stack.currentWidget() is not self.editor_pane:
+            self._set_status("Zwischenablage-Verlauf nur im Editor")
+            return
+        if self.editor.paste_clipboard_history(index):
+            self._set_status(f"Verlauf #{index + 1} eingefügt")
+        else:
+            self._set_status("Verlaufseintrag leer / ungültig")
 
     def _paste_clipboard_image(self):
         if self.stack.currentWidget() is self.pdf_view and self.pdf_view.pdf_path:

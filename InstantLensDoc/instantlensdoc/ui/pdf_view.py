@@ -909,6 +909,7 @@ class PdfViewer(QWidget):
         self.pdf_path: Optional[Path] = None
         self.page_index = 0
         self.page_count = 0
+        self._page_labels: list[str] = []
         self.scale = get_default_zoom_scale()
         self.tool: AnnotationType | None = AnnotationType.HIGHLIGHT
         self.store: Optional[AnnotationStore] = None
@@ -1477,6 +1478,62 @@ class PdfViewer(QWidget):
     def continuous_scroll_enabled(self) -> bool:
         return bool(self._continuous_scroll)
 
+    def page_label(self, page_index: int | None = None) -> str:
+        """Seitenlabel der Seite ('' wenn keines / Index ungültig)."""
+        idx = self.page_index if page_index is None else int(page_index)
+        labels = getattr(self, "_page_labels", None) or []
+        if 0 <= idx < len(labels):
+            return str(labels[idx] or "")
+        return ""
+
+    def has_page_labels(self) -> bool:
+        """True wenn mindestens ein nicht-leeres PDF-Seitenlabel vorhanden."""
+        return any(bool(x) for x in (getattr(self, "_page_labels", None) or []))
+
+    def _reload_page_labels(self) -> None:
+        """PageLabels aus dem geöffneten PDF laden (Cache)."""
+        self._page_labels = []
+        if not self.pdf_path or self.page_count <= 0:
+            return
+        try:
+            from ild_pdf import PdfDocument
+
+            with PdfDocument(self.pdf_path, password=self.password) as doc:
+                self._page_labels = list(doc.page_labels())
+        except Exception:
+            self._page_labels = [""] * int(self.page_count or 0)
+
+    def format_page_label_text(
+        self,
+        page_index: int | None = None,
+        *,
+        suffix: str = "",
+        range_end: int | None = None,
+    ) -> str:
+        """Anzeigetext für Toolbar-Seitenzeile inkl. optionalem Label."""
+        idx = self.page_index if page_index is None else int(page_index)
+        total = int(self.page_count or 0)
+        if range_end is not None and int(range_end) != idx:
+            left = self.page_label(idx)
+            right = self.page_label(int(range_end))
+            n0, n1 = idx + 1, int(range_end) + 1
+            if left or right:
+                lpart = left or str(n0)
+                rpart = right or str(n1)
+                base = f"{lpart}–{rpart} ({n0}–{n1}/{total})"
+            else:
+                base = f"{n0}–{n1} / {total}"
+        else:
+            lab = self.page_label(idx)
+            n = idx + 1
+            if lab:
+                base = f"{lab} ({n}/{total})"
+            else:
+                base = f"{n} / {total}"
+        if suffix:
+            return f"{base}{suffix}"
+        return base
+
     def _continuous_page_range(self) -> tuple[int, int]:
         """(start, end) exklusiv end — Fenster um aktuelle Seite."""
         n = int(self.page_count or 0)
@@ -1533,7 +1590,7 @@ class PdfViewer(QWidget):
         if new_page != self.page_index:
             self.page_index = new_page
             self.lbl_page.setText(
-                f"{self.page_index + 1} / {self.page_count} (Scroll)"
+                self.format_page_label_text(suffix=" (Scroll)")
             )
             self.page_changed.emit(self.page_index)
 
@@ -1989,6 +2046,7 @@ class PdfViewer(QWidget):
 
             with PdfDocument(self.pdf_path, password=self.password) as doc:
                 self.page_count = len(doc)
+            self._reload_page_labels()
             self.page_index = 0
             self._pending_callout_anchor = None
             self._pending_scale = None
@@ -2107,7 +2165,7 @@ class PdfViewer(QWidget):
                     self.status.emit(
                         "Continuous Scroll: zu groß — Zoom verringern oder weniger Seiten"
                     )
-                    self.lbl_page.setText(f"{self.page_index + 1} / {self.page_count}")
+                    self.lbl_page.setText(self.format_page_label_text())
                     self._continuous_offsets = []
                 else:
                     combined = Image.new(
@@ -2157,7 +2215,7 @@ class PdfViewer(QWidget):
                     if end - start < self.page_count:
                         trunc = f" · {start + 1}–{end}"
                     self.lbl_page.setText(
-                        f"{self.page_index + 1} / {self.page_count} (Scroll{trunc})"
+                        self.format_page_label_text(suffix=f" (Scroll{trunc})")
                     )
             elif use_spread:
                 gap = int(self._spread_gap)
@@ -2211,10 +2269,10 @@ class PdfViewer(QWidget):
                 except Exception:
                     pass
                 self.lbl_page.setText(
-                    f"{self.page_index + 1}–{facing + 1} / {self.page_count}"
+                    self.format_page_label_text(range_end=facing)
                 )
             else:
-                self.lbl_page.setText(f"{self.page_index + 1} / {self.page_count}")
+                self.lbl_page.setText(self.format_page_label_text())
 
             self.canvas.set_page_image(img, anns, scale=self.scale)
             self.canvas.set_uri_links(links)
@@ -2251,7 +2309,7 @@ class PdfViewer(QWidget):
                     if old_start == start and old_end == end:
                         need_refresh = False
                         self.lbl_page.setText(
-                            f"{self.page_index + 1} / {self.page_count} (Scroll)"
+                            self.format_page_label_text(suffix=" (Scroll)")
                         )
                         self._scroll_to_continuous_page(page_index)
             if need_refresh:
@@ -2428,6 +2486,7 @@ class PdfViewer(QWidget):
                 clear_render_cache(self.pdf_path)
                 with PdfDocument(self.pdf_path, password=self.password) as doc:
                     self.page_count = len(doc)
+                    self._reload_page_labels()
                 self.page_index = self.page_count - 1
                 self.refresh()
                 self.status.emit("Zwischenablage-Bild als neue Seite")
@@ -3542,6 +3601,7 @@ class PdfViewer(QWidget):
 
             with PdfDocument(self.pdf_path, password=self.password) as doc:
                 self.page_count = len(doc)
+                self._reload_page_labels()
             self.page_index = self.page_count - 1
             self.refresh()
             self.status.emit("Bildseite angehängt")
@@ -3737,6 +3797,7 @@ class PdfViewer(QWidget):
             clear_render_cache(self.pdf_path)
             with PdfDocument(self.pdf_path, password=self.password) as doc:
                 self.page_count = len(doc)
+                self._reload_page_labels()
             self.page_index = new_idx
             self._selected_ann_id = None
             self._selected_ann_ids = set()
@@ -3762,6 +3823,7 @@ class PdfViewer(QWidget):
             clear_render_cache(self.pdf_path)
             with PdfDocument(self.pdf_path, password=self.password) as doc:
                 self.page_count = len(doc)
+                self._reload_page_labels()
             self.page_index = new_idx
             self._selected_ann_id = None
             self._selected_ann_ids = set()
@@ -3866,6 +3928,7 @@ class PdfViewer(QWidget):
 
             with PdfDocument(self.pdf_path, password=self.password) as doc:
                 self.page_count = len(doc)
+                self._reload_page_labels()
             self.refresh()
             self.annotations_changed.emit()
             self.page_changed.emit(self.page_index)
@@ -3879,6 +3942,9 @@ class PdfViewer(QWidget):
     def clear(self):
         self.pdf_path = None
         self.store = None
+        self.page_count = 0
+        self.page_index = 0
+        self._page_labels = []
         self._selected_ann_id = None
         self._selected_ann_ids = set()
         self.canvas.set_selected_id(None)
