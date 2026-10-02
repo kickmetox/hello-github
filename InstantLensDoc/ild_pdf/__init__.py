@@ -26,7 +26,7 @@ from .pages import (
     set_page_size,
     set_crop_box,
 )
-from .outline import OutlineItem, extract_outline
+from .outline import OutlineItem, add_outline_item, delete_outline_item, extract_outline
 from .images import (
     compress_image_for_pdf,
     compress_pdf_as_images,
@@ -76,6 +76,8 @@ __all__ = [
     "set_crop_box",
     "OutlineItem",
     "extract_outline",
+    "add_outline_item",
+    "delete_outline_item",
     "compress_image_for_pdf",
     "compress_pdf_as_images",
     "extract_page_image",
@@ -106,4 +108,4 @@ __all__ = [
     "set_metadata",
 ]
 
-__version__ = "0.2.4"
+__version__ = "0.2.5"

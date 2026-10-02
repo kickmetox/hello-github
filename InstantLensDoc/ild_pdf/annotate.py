@@ -308,3 +308,26 @@ class AnnotationStore:
         """Kopie der Sidecar unter anderem Namen (Backup)."""
         path = Path(path)
         return self.save(path, force=True)
+
+    def export_json(self, path: str | Path) -> Path:
+        """Annotationen als JSON exportieren (gleiche Sidecar-Struktur)."""
+        return self.export_backup(path)
+
+    def import_json(self, path: str | Path, *, replace: bool = True) -> int:
+        """
+        Annotationen aus JSON importieren.
+        replace=True: ersetzen; False: anhängen (neue IDs behalten, Duplikate möglich).
+        Rückgabe: Anzahl importierter Annotationen.
+        """
+        path = Path(path)
+        data = json.loads(path.read_text(encoding="utf-8"))
+        imported = [Annotation.from_dict(a) for a in data.get("annotations", [])]
+        self._push_undo()
+        if replace:
+            self.annotations = imported
+            if "meta" in data and isinstance(data["meta"], dict):
+                self._meta = dict(data["meta"])
+        else:
+            self.annotations.extend(imported)
+        self.dirty = True
+        return len(imported)

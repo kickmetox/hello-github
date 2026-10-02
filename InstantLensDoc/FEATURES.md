@@ -4,7 +4,7 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 
 | Feature | Status | Hinweis |
 |---------|--------|---------|
-| Hauptfenster (Menü, Sidebar, Editor, Status) | fertig | PySide6; Status: Dateiname, Seite x/y, Zoom %; Ann.-Liste Sidebar 0.2.4 |
+| Hauptfenster (Menü, Sidebar, Editor, Status) | fertig | PySide6; Status: Dateiname, Seite x/y, Zoom %, Wörter/Ann.; Ann.-Liste Sidebar 0.2.4 |
 | App-Icon Fenster/Taskleiste/About | fertig | Robuste Pfade: `assets/`, CWD, `D:\AI_Temp\InstantLensDoc` |
 | Session-Restore (offene Docs) | fertig | `session.json`, Sidebar-Liste |
 | Clipboard-Paste Bild | fertig | Editor + PDF (Stempel/Seite) |
@@ -29,7 +29,7 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | Sidebar Seiten-Thumbnails | fertig | Vorschaubilder, Klick → Seite; **Drag-Reorder** 0.2.3 |
 | Tastaturhilfe-Dialog | fertig | Hilfe → F1 |
 | App-Logging | fertig | %APPDATA%/InstantLensDoc/logs |
-| PDF-Annotationen (Highlight, Underline, Sticky, Text) | fertig | Sidecar `*.ildann.json` **v3**; Farben-Picker Highlight/Stift 0.2.2; Löschen Auswahl/letzte 0.2.3 |
+| PDF-Annotationen (Highlight, Underline, Sticky, Text) | fertig | Sidecar `*.ildann.json` **v3**; Farben-Picker Highlight/Stift 0.2.2; Löschen Auswahl/letzte 0.2.3; **JSON Export/Import** 0.2.5 |
 | Annotation Undo/Redo | fertig | Ctrl+Z/Y inkl. Overlay-Text |
 | Annotation löschen | fertig | Auswahl oder letzte; Entf / Menü 0.2.3 |
 | Stempel / Callouts | teilweise | Stempel-Presets + Callout (2-Klick) |
@@ -48,7 +48,9 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | Textsuche Seitenleiste | fertig | Editor + PDF-Text + Annotationen; Highlight 0.2.2; **letzte Suchbegriffe** merken 0.2.4 |
 | Annotation-Liste Sidebar | fertig | Klick → Seite + Auswahl 0.2.4 |
 | Volltextsuche geöffnete Docs | fertig | Sidebar „Alle Docs“ |
-| Lesezeichen / PDF-Outline | fertig | Baum in Sidebar, Doppelklick → Seite |
+| Lesezeichen / PDF-Outline | fertig | Baum in Sidebar; Doppelklick → Seite; **hinzufügen/löschen** 0.2.5 |
+| PDF als Kopie speichern | fertig | Datei + Sidecar; aktuelles Doc bleibt offen 0.2.5 |
+| Editor Wortzählung | fertig | Statusleiste Wörter · Zeichen 0.2.5 |
 | Batch-Konvertierung Ordner | fertig | Bilder→PDF, OCR-Ordner, PDF-OCR-Text; Fortschrittsbalken 0.2.1 |
 | PDF zusammenführen / teilen | fertig | Dialog unter Menü PDF |
 | Einstellungen-Dialog | fertig | OCR, Theme, Sprache, Export-Q, Standard-Zoom, Autosave, Pfade, Update |
@@ -65,17 +67,17 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | PyInstaller Build Windows | fertig | `build-windows.ps1`, Icon `assets/app.ico` |
 | Inno-Installer | fertig | Icon, Desktop, Uninstaller, Keygen optional (`InstantLensKeygen.exe`) 0.2.1 |
 | Sync-Skript Windows | fertig | Store `docs/sync-ild.ps1` |
-| In-App Hilfe / About | fertig | Version 0.2.4 |
-| CHANGELOG | fertig | 0.2.4 Drehen / Leere+Duplizieren / Ann.-Liste / Suchhistorie |
+| In-App Hilfe / About | fertig | Version 0.2.5 |
+| CHANGELOG | fertig | 0.2.5 Outline edit / Ann.-JSON / Wortzählung / PDF-Kopie |
 | FEATURES.md / INFO.md | fertig | |
 | `ild_pdf` Modul + Beispielskript | fertig | metadata / page size / watermark / redact |
 | Font-Matching | geplant | |
 | Objekt-/Bildbearbeitung | geplant | |
 | Layout-Erhaltung (Scan→edit) | geplant | |
 | Freihand | geplant | |
-| KI-Assistent | Stub | Menü „Geplant“ 0.2.4 (keine Fake-KI) |
+| KI-Assistent | Stub | Menü „Geplant“ 0.2.5 (keine Fake-KI) |
 | Signieren (rechtssicher) | Stub | |
-| Cloud-Sync | Stub | Menü „Geplant“ 0.2.4 (keine Fake-Cloud) |
+| Cloud-Sync | Stub | Menü „Geplant“ 0.2.5 (keine Fake-Cloud) |
 | Text on Path / Text zu Pfaden | geplant | |
 | Envelope Distort / Text Wrap / Area Type | Stub/geplant | |
 | Schnittmasken | geplant | |

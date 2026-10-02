@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | 0.2.4 |
+| Version | 0.2.5 |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -31,12 +31,12 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)
 
-## Neu in 0.2.4
+## Neu in 0.2.5
 
-- PDF-Seite einzeln drehen (⟲/⟳ Toolbar) + speichern  
-- Leere Seite einfügen / Seite duplizieren  
-- Annotation-Liste in Sidebar (Klick → springen)  
-- Letzte Suchbegriffe merken  
+- PDF-Lesezeichen hinzufügen/löschen (Outline)  
+- Annotationen als JSON exportieren/importieren  
+- Editor: Wortzählung in der Statusleiste  
+- PDF „Als Kopie speichern“  
 - Stubs KI/Cloud/Stylus/3D unverändert  
 
 Details: [CHANGELOG.md](CHANGELOG.md)

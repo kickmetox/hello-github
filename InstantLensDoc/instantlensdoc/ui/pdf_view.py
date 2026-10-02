@@ -1348,6 +1348,123 @@ class PdfViewer(QWidget):
             QMessageBox.warning(self, "Annotationen laden", str(e))
             return False
 
+    def export_annotations_json(self) -> bool:
+        """Annotationen als JSON-Datei exportieren (Dialog)."""
+        if not self.store or not self.pdf_path:
+            QMessageBox.information(self, "Annotationen", "Kein PDF geladen.")
+            return False
+        from PySide6.QtWidgets import QFileDialog
+
+        default = str(self.pdf_path.with_suffix(self.pdf_path.suffix + ".annotations.json"))
+        path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Annotationen als JSON exportieren",
+            default,
+            "JSON (*.json);;Annotation-Sidecar (*.ildann.json);;Alle (*.*)",
+        )
+        if not path:
+            return False
+        dest = Path(path)
+        if dest.suffix.lower() != ".json":
+            dest = dest.with_suffix(dest.suffix + ".json") if dest.suffix else Path(str(dest) + ".json")
+        try:
+            saved = self.store.export_json(dest)
+            self.status.emit(f"Annotationen exportiert: {saved.name} ({len(self.store.annotations)})")
+            return True
+        except Exception as e:
+            QMessageBox.warning(self, "Annotationen exportieren", str(e))
+            return False
+
+    def import_annotations_json(self) -> bool:
+        """Annotationen aus JSON importieren (ersetzen oder anhängen)."""
+        if not self.store or not self.pdf_path:
+            QMessageBox.information(self, "Annotationen", "Kein PDF geladen.")
+            return False
+        from PySide6.QtWidgets import QFileDialog
+
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Annotationen aus JSON importieren",
+            str(self.pdf_path.parent),
+            "JSON (*.json *.ildann.json);;Alle (*.*)",
+        )
+        if not path:
+            return False
+        reply = QMessageBox.question(
+            self,
+            "Annotationen importieren",
+            "Bestehende Annotationen ersetzen?\n\n"
+            "Ja = ersetzen · Nein = anhängen · Abbrechen = nichts",
+            QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel,
+            QMessageBox.Yes,
+        )
+        if reply == QMessageBox.Cancel:
+            return False
+        replace = reply == QMessageBox.Yes
+        try:
+            n = self.store.import_json(path, replace=replace)
+            self.store.save(force=True)
+            self.refresh()
+            self.annotations_changed.emit()
+            mode = "ersetzt" if replace else "angehängt"
+            self.status.emit(f"{n} Annotation(en) {mode} aus {Path(path).name}")
+            return True
+        except Exception as e:
+            QMessageBox.warning(self, "Annotationen importieren", str(e))
+            return False
+
+    def save_pdf_as_copy(self) -> bool:
+        """PDF (und Sidecar falls vorhanden) als Kopie speichern; aktuelles Dokument bleibt geöffnet."""
+        if not self.pdf_path:
+            QMessageBox.information(self, "Als Kopie speichern", "Kein PDF geladen.")
+            return False
+        from PySide6.QtWidgets import QFileDialog
+        import shutil
+
+        default = str(
+            self.pdf_path.with_name(f"{self.pdf_path.stem}_Kopie{self.pdf_path.suffix}")
+        )
+        path, _ = QFileDialog.getSaveFileName(
+            self,
+            "PDF als Kopie speichern",
+            default,
+            "PDF (*.pdf);;Alle (*.*)",
+        )
+        if not path:
+            return False
+        dest = Path(path)
+        if dest.suffix.lower() != ".pdf":
+            dest = dest.with_suffix(".pdf")
+        if dest.resolve() == self.pdf_path.resolve():
+            QMessageBox.warning(
+                self,
+                "Als Kopie speichern",
+                "Ziel darf nicht die aktuelle Datei sein.\nBitte anderen Namen wählen.",
+            )
+            return False
+        try:
+            # Offene Annotationen zuerst in Sidecar schreiben
+            if self.store and self.store.dirty:
+                self.store.save(force=True)
+            shutil.copy2(self.pdf_path, dest)
+            side_src = self.pdf_path.with_suffix(self.pdf_path.suffix + ".ildann.json")
+            side_dst = dest.with_suffix(dest.suffix + ".ildann.json")
+            if side_src.is_file():
+                shutil.copy2(side_src, side_dst)
+            msg = f"Kopie gespeichert: {dest.name}"
+            if side_src.is_file():
+                msg += f" (+ {side_dst.name})"
+            self.status.emit(msg)
+            QMessageBox.information(
+                self,
+                "Als Kopie speichern",
+                f"PDF-Kopie geschrieben (aktuelles Dokument bleibt geöffnet):\n{dest}",
+            )
+            return True
+        except Exception as e:
+            QMessageBox.warning(self, "Als Kopie speichern", str(e))
+            return False
+
     def import_text_overlays(self):
         if not self.store or not self.pdf_path:
             return

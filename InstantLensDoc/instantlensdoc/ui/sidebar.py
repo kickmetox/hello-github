@@ -70,6 +70,8 @@ class Sidebar(QWidget):
     mark_activated = Signal(int)  # Index in Markierungsliste
     annotation_activated = Signal(object)  # Annotation oder id
     outline_activated = Signal(int)  # PDF-Seite 0-basiert
+    outline_add_requested = Signal()
+    outline_delete_requested = Signal()
     fulltext_hit_activated = Signal(str, object)  # path, page_index|None
     page_thumb_activated = Signal(int)  # PDF-Seite 0-basiert
     pages_reordered = Signal(list)  # alte Indizes in neuer Reihenfolge
@@ -125,8 +127,22 @@ class Sidebar(QWidget):
         self.outline = QTreeWidget()
         self.outline.setHeaderHidden(True)
         self.outline.setMaximumHeight(120)
+        self.outline.setToolTip("Doppelklick → Seite; +/− zum Bearbeiten")
         self.outline.itemDoubleClicked.connect(self._activate_outline)
         layout.addWidget(self.outline)
+        ol_btns = QHBoxLayout()
+        self.btn_outline_add = QPushButton("+")
+        self.btn_outline_add.setFixedWidth(28)
+        self.btn_outline_add.setToolTip("Lesezeichen für aktuelle Seite hinzufügen")
+        self.btn_outline_add.clicked.connect(self.outline_add_requested.emit)
+        self.btn_outline_del = QPushButton("−")
+        self.btn_outline_del.setFixedWidth(28)
+        self.btn_outline_del.setToolTip("Ausgewähltes Lesezeichen löschen")
+        self.btn_outline_del.clicked.connect(self.outline_delete_requested.emit)
+        ol_btns.addWidget(self.btn_outline_add)
+        ol_btns.addWidget(self.btn_outline_del)
+        ol_btns.addStretch(1)
+        layout.addLayout(ol_btns)
 
         layout.addWidget(QLabel("Annotationen"))
         self.annotations = QListWidget()
@@ -282,26 +298,38 @@ class Sidebar(QWidget):
             self.outline.addTopLevelItem(empty)
             return
 
-        def add_nodes(parent_item: QTreeWidgetItem | None, nodes):
+        def add_nodes(parent_item: QTreeWidgetItem | None, nodes, path: tuple[int, ...] = ()):
             from ild_pdf.outline import OutlineItem
 
-            for node in nodes:
+            for i, node in enumerate(nodes):
                 if not isinstance(node, OutlineItem):
                     continue
+                item_path = path + (i,)
                 label = node.title
                 if node.page_index is not None:
                     label += f"  (S. {node.page_index + 1})"
                 twi = QTreeWidgetItem([label])
                 twi.setData(0, Qt.UserRole, node.page_index)
+                twi.setData(0, Qt.UserRole + 1, item_path)
                 if parent_item is None:
                     self.outline.addTopLevelItem(twi)
                 else:
                     parent_item.addChild(twi)
                 if node.children:
-                    add_nodes(twi, node.children)
+                    add_nodes(twi, node.children, item_path)
 
         add_nodes(None, items)
         self.outline.expandToDepth(1)
+
+    def selected_outline_path(self) -> tuple[int, ...] | None:
+        """Pfad (Indizes) des ausgewählten Lesezeichens, sonst None."""
+        item = self.outline.currentItem()
+        if item is None or item.isDisabled():
+            return None
+        path = item.data(0, Qt.UserRole + 1)
+        if path is None:
+            return None
+        return tuple(int(i) for i in path)
 
     def set_annotations(self, lines: list[str], payloads: list | None = None):
         self.annotations.clear()

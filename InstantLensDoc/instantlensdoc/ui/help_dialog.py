@@ -19,10 +19,11 @@ HELP_HTML = """
     <b>Standard-Zoom</b>, <b>Autosave-Intervall</b>, Update-Hinweis, Pfade</li>
 <li><b>Datei → Zuletzt geöffnet</b>: Menü + Seitenleiste (persistiert)</li>
 <li><b>Datei → Speichern unter</b> (Ctrl+Shift+S): Text → Dokument; PDF → Annotation-Sidecar wählen (PDF unverändert)</li>
+<li><b>Datei → Als Kopie speichern</b> (Ctrl+Alt+S): PDF + Sidecar kopieren (Doc bleibt offen); Editor → Speichern unter</li>
 <li><b>Datei → Exportieren</b>: Editor-Inhalt als HTML, DOCX oder PDF (zuletzt genutzter Ordner wird gemerkt)</li>
 <li><b>Datei → Drucken</b> (Ctrl+P): Editor oder aktuelle PDF-Seite (Qt Print)</li>
 <li><b>Seitenleiste</b>: Suche (inkl. letzte Suchbegriffe), „Alle Docs“-Volltext, Zuletzt geöffnet, Dokumente,
-    Lesezeichen/Outline, <b>Annotationen</b> (klickbar), Markierungen/Treffer</li>
+    Lesezeichen/Outline (+/− hinzufügen/löschen), <b>Annotationen</b> (klickbar), Markierungen/Treffer</li>
 <li><b>Bearbeiten → Rückgängig/Wiederholen</b>: Editor-Text <i>oder</i> PDF-Annotationen/Overlay-Text (Ctrl+Z / Ctrl+Y)</li>
 <li><b>Bearbeiten → Auswahl markieren</b> (Ctrl+H): Markierung im Editor + Eintrag in der Seitenleiste</li>
 <li><b>Ansicht</b>: Zoom +/−, Seite einpassen (Ctrl+0), Breite (Ctrl+9), 100&nbsp;% (Ctrl+1);
@@ -33,7 +34,7 @@ HELP_HTML = """
     <b>leere Seite / duplizieren</b>, Seite löschen, Seiten neu anordnen;
     Annotationen: Highlight (Drag) + <b>Farben-Picker HL/Stift</b>, <b>Schwärzen/Redaction</b> (Drag + Preview „REDACT“ + Einbrennen-Dialog), Unterstreichen, Notiz, <b>Text-Overlay</b>, Stempel, Callout,
     <b>Rechteck / Linie / Pfeil / Lineal</b> —
-    Sidecar <code>*.ildann.json</code> (v3, Auto-Save, Undo/Redo);
+    Sidecar <code>*.ildann.json</code> (v3, Auto-Save, Undo/Redo); JSON Export/Import;
     <b>Textsuche</b> highlightet Treffer auf der aktuellen Seite;
     Doppelklick oder Strg+Klick auf Overlay zum Bearbeiten;
     PDF → Text→Overlay / Overlay einbrennen;
@@ -43,7 +44,8 @@ HELP_HTML = """
     <b>Zwei PDFs vergleichen</b> (Seite neben Seite);
     <b>Passwort setzen/öffnen</b>; <b>Bildkompression</b> (Seiten neu als JPEG);
     <b>Metadaten bearbeiten</b>; <b>Seitengröße / Zuschneiden</b>;
-    Seite/Seiten als PNG/JPEG exportieren / Bild als neue Seite / Seite drucken; Annotation löschen (Auswahl/letzte, Entf); Statusleiste Seite/Zoom/Dateiname; Thumbnails per Drag neu ordnen;
+    Seite/Seiten als PNG/JPEG exportieren / Bild als neue Seite / Seite drucken; Annotation löschen (Auswahl/letzte, Entf); Statusleiste Seite/Zoom/Dateiname/Wörter; Thumbnails per Drag neu ordnen;
+    PDF als Kopie speichern;
     große PDFs: Warnung / Limits;
     <b>Seiten-Thumbnails</b> in der Sidebar</li>
 <li><b>Hilfe → Auf Updates prüfen</b>: lokal immer; Online optional (offline OK)</li>
@@ -74,7 +76,7 @@ Beispiel: <code>examples/ild_pdf_demo.py</code>. API: <code>ild_pdf/README.md</c
 <code>D:\\AI_Temp\\InstantLensDoc</code>, pip, optional Start. Eigenes Icon in <code>assets</code> bleibt erhalten.</p>
 <h3>Geplante Features</h3>
 <p>KI-Assistent, Cloud-Sync, Stylus/Palm Rejection, 3D u. a. sind im Menü als „Geplant“ markiert
-(Stub 0.2.4) — siehe FEATURES.md.</p>
+(Stub 0.2.5) — siehe FEATURES.md.</p>
 """
 
 

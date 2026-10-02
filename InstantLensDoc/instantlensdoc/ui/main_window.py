@@ -184,6 +184,8 @@ class MainWindow(QMainWindow):
         self.sidebar.mark_activated.connect(self._on_mark_activated)
         self.sidebar.annotation_activated.connect(self._on_annotation_activated)
         self.sidebar.outline_activated.connect(self._on_outline_jump)
+        self.sidebar.outline_add_requested.connect(self._outline_add)
+        self.sidebar.outline_delete_requested.connect(self._outline_delete)
         self.sidebar.fulltext_hit_activated.connect(self._on_fulltext_hit)
         self.sidebar.page_thumb_activated.connect(self._on_thumb_jump)
         self.sidebar.pages_reordered.connect(self._on_thumbs_reordered)
@@ -219,6 +221,10 @@ class MainWindow(QMainWindow):
         self.zoom_status_label = QLabel("— %")
         self.zoom_status_label.setStyleSheet("padding-right: 10px;")
         sb.addPermanentWidget(self.zoom_status_label)
+        self.word_status_label = QLabel("— Wörter")
+        self.word_status_label.setStyleSheet("padding-right: 10px;")
+        self.word_status_label.setToolTip("Wörter / Zeichen (Editor)")
+        sb.addPermanentWidget(self.word_status_label)
         self.version_label = QLabel(f"v{__version__}")
         self.version_label.setStyleSheet("color: #666; padding-right: 8px;")
         sb.addPermanentWidget(self.version_label)
@@ -255,6 +261,11 @@ class MainWindow(QMainWindow):
         )
         act_save_as.triggered.connect(self.save_as)
         m_file.addAction(act_save_as)
+        act_save_copy = QAction("Als Kopie speichern…", self)
+        act_save_copy.setShortcut(QKeySequence("Ctrl+Alt+S"))
+        act_save_copy.setToolTip("PDF: Datei (+ Sidecar) als Kopie; Editor: Speichern unter")
+        act_save_copy.triggered.connect(self.save_as_copy)
+        m_file.addAction(act_save_copy)
         m_export = m_file.addMenu("Exportieren")
         for title, fmt in [
             ("Als HTML…", "html"),
@@ -377,12 +388,16 @@ class MainWindow(QMainWindow):
             ("Annotationen speichern (Sidecar)", lambda: self.pdf_view.save_annotations()),
             ("Annotationen speichern unter…", lambda: self.pdf_view.save_annotations_as()),
             ("Annotationen laden", lambda: self.pdf_view.reload_annotations()),
+            ("Annotationen als JSON exportieren…", lambda: self.pdf_view.export_annotations_json()),
+            ("Annotationen aus JSON importieren…", lambda: self.pdf_view.import_annotations_json()),
         ]:
             a = QAction(title, self)
             a.triggered.connect(slot)
             m_pdf.addAction(a)
         m_pdf.addSeparator()
         for title, slot in [
+            ("Lesezeichen hinzufügen…", self._outline_add),
+            ("Lesezeichen löschen", self._outline_delete),
             ("Seite drehen 90° ⟳", lambda: self.pdf_view.rotate_current(90)),
             ("Seite drehen −90° ⟲", lambda: self.pdf_view.rotate_current(-90)),
             ("Leere Seite einfügen", lambda: self.pdf_view.insert_blank_after_current()),
@@ -393,6 +408,7 @@ class MainWindow(QMainWindow):
             ("Seiten als Bilder exportieren…", lambda: self.pdf_view.export_pages_as_images()),
             ("Bild als neue Seite…", lambda: self.pdf_view.insert_image_page()),
             ("Seite drucken…", lambda: self.pdf_view.print_current_page()),
+            ("PDF als Kopie speichern…", lambda: self.pdf_view.save_pdf_as_copy()),
         ]:
             a = QAction(title, self)
             a.triggered.connect(slot)
@@ -524,10 +540,11 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage(msg, 5000)
 
     def _update_doc_status(self):
-        """Statusleiste: Dateiname, Seite x/y, Zoom %."""
+        """Statusleiste: Dateiname, Seite x/y, Zoom %, Wörter (Editor)."""
         name = "—"
         page_txt = "Seite —"
         zoom_txt = "— %"
+        word_txt = "— Wörter"
         if self.doc and self.doc.path:
             name = Path(self.doc.path).name
         elif self.pdf_view.pdf_path:
@@ -535,6 +552,12 @@ class MainWindow(QMainWindow):
         if self.pdf_view.pdf_path and self.pdf_view.page_count > 0:
             page_txt = f"Seite {self.pdf_view.page_index + 1}/{self.pdf_view.page_count}"
             zoom_txt = f"{int(round(self.pdf_view.scale * 100))} %"
+            word_txt = f"{len(self.pdf_view.store.annotations) if self.pdf_view.store else 0} Ann."
+        elif self.stack.currentWidget() is self.editor:
+            page_txt = "Editor"
+            zoom_txt = "—"
+            words, chars = self.editor.word_stats()
+            word_txt = f"{words} Wörter · {chars} Z."
         elif self.doc and self.doc.path:
             page_txt = "Editor"
             zoom_txt = "—"
@@ -542,6 +565,7 @@ class MainWindow(QMainWindow):
         self.file_status_label.setToolTip(str(self.doc.path) if self.doc and self.doc.path else name)
         self.page_status_label.setText(page_txt)
         self.zoom_status_label.setText(zoom_txt)
+        self.word_status_label.setText(word_txt)
 
     def _on_pdf_zoom_changed(self, scale: float):
         self.zoom_status_label.setText(f"{int(round(float(scale) * 100))} %")
@@ -639,14 +663,19 @@ class MainWindow(QMainWindow):
         if self.doc and self.doc.kind in (DocKind.TEXT, DocKind.MARKDOWN, DocKind.HTML, DocKind.DOCX):
             self.doc.text = self.editor.toPlainText()
             self.doc.dirty = True
+        if self.stack.currentWidget() is self.editor:
+            words, chars = self.editor.word_stats()
+            self.word_status_label.setText(f"{words} Wörter · {chars} Z.")
 
     def _on_pdf_document_changed(self):
         self._update_doc_status()
         if self.pdf_view.pdf_path:
             self._refresh_thumbs()
+            self._refresh_outline(self.pdf_view.pdf_path)
         else:
             self.sidebar.clear_thumbs()
             self.sidebar.clear_annotations()
+            self.sidebar.set_outline([])
 
     def _focus_search(self):
         self.sidebar.setVisible(True)
@@ -858,6 +887,8 @@ class MainWindow(QMainWindow):
             return
         pairs = self.pdf_view.annotation_summaries()
         self.sidebar.set_annotations([p[0] for p in pairs], [p[1] for p in pairs])
+        n = len(self.pdf_view.store.annotations) if self.pdf_view.store else 0
+        self.word_status_label.setText(f"{n} Ann.")
 
     def _on_annotation_activated(self, payload):
         if self.stack.currentWidget() is not self.pdf_view:
@@ -890,6 +921,46 @@ class MainWindow(QMainWindow):
             return
         self.pdf_view.goto_page(page_index)
         self._set_status(f"Lesezeichen → Seite {page_index + 1}")
+
+    def _outline_add(self):
+        if self.stack.currentWidget() is not self.pdf_view or not self.pdf_view.pdf_path:
+            self._set_status("Lesezeichen hinzufügen: PDF öffnen")
+            return
+        from PySide6.QtWidgets import QInputDialog
+        from ild_pdf.outline import add_outline_item
+
+        page = self.pdf_view.page_index
+        title, ok = QInputDialog.getText(
+            self,
+            "Lesezeichen hinzufügen",
+            f"Titel (Seite {page + 1}):",
+            text=f"Seite {page + 1}",
+        )
+        if not ok:
+            return
+        try:
+            add_outline_item(self.pdf_view.pdf_path, title, page)
+            self._refresh_outline(self.pdf_view.pdf_path)
+            self._set_status(f"Lesezeichen „{(title or '').strip() or 'Lesezeichen'}“ → S. {page + 1}")
+        except Exception as e:
+            QMessageBox.warning(self, "Lesezeichen", str(e))
+
+    def _outline_delete(self):
+        if self.stack.currentWidget() is not self.pdf_view or not self.pdf_view.pdf_path:
+            self._set_status("Lesezeichen löschen: PDF öffnen")
+            return
+        path = self.sidebar.selected_outline_path()
+        if path is None:
+            self._set_status("Kein Lesezeichen ausgewählt")
+            return
+        from ild_pdf.outline import delete_outline_item
+
+        try:
+            delete_outline_item(self.pdf_view.pdf_path, path)
+            self._refresh_outline(self.pdf_view.pdf_path)
+            self._set_status("Lesezeichen gelöscht")
+        except Exception as e:
+            QMessageBox.warning(self, "Lesezeichen löschen", str(e))
 
     def _refresh_outline(self, path: str | Path):
         try:
@@ -1200,6 +1271,16 @@ class MainWindow(QMainWindow):
             self._set_status(f"Gespeichert: {path}")
         except Exception as e:
             QMessageBox.critical(self, "Speichern", f"Speichern fehlgeschlagen:\n{e}")
+
+    def save_as_copy(self):
+        """PDF: Dateikopie (+ Sidecar); Editor: Speichern unter."""
+        if not self.doc:
+            return
+        if self.doc.kind == DocKind.PDF:
+            if self.pdf_view.save_pdf_as_copy():
+                self._set_status("PDF-Kopie gespeichert")
+            return
+        self.save_as()
 
     def _export_editor(self, fmt: str):
         """Editor-Inhalt nach HTML / DOCX / PDF exportieren."""

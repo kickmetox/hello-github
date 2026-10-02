@@ -1,5 +1,25 @@
 # Changelog — InstantLens Doc
 
+## 0.2.5 — Outline editieren, Ann.-JSON, Wortzählung, PDF-Kopie
+
+Fokus: Lesezeichen bearbeiten, Annotation-Austausch, Editor-Status, PDF-Kopie.
+
+### PDF / Outline
+- **Lesezeichen hinzufügen/löschen**: Sidebar +/− und Menü PDF; `ild_pdf.add_outline_item` / `delete_outline_item`
+- **PDF als Kopie speichern**: Datei + Sidecar kopieren, aktuelles Dokument bleibt geöffnet (Datei / Menü PDF)
+
+### Annotationen
+- **JSON exportieren/importieren**: Menü PDF; Import ersetzen oder anhängen (`AnnotationStore.export_json` / `import_json`)
+
+### UX
+- **Wortzählung Statusleiste** (Editor: Wörter · Zeichen; PDF: Annotation-Anzahl); keine schwere Spellcheck-Lib
+
+### Docs / Packaging
+- Version **0.2.5**; Stubs KI/Cloud/Stylus/3D unverändert (keine Fake-Features)
+- Docs/CHANGELOG/ISS/Smoke auf 0.2.5
+
+---
+
 ## 0.2.4 — Seiten drehen, leere/duplizieren, Ann.-Liste, Suchhistorie
 
 Fokus: PDF-Seiten-Ops in der Toolbar, Annotation-Navigation, Suchbegriffe merken.

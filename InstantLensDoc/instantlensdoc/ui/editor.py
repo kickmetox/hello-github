@@ -133,6 +133,12 @@ class TextEditor(QPlainTextEdit):
         text = cur.selectedText().replace("\u2029", " ")
         return text[:max_len]
 
+    def word_stats(self) -> tuple[int, int]:
+        """(Wörter, Zeichen inkl. Whitespace) des aktuellen Texts."""
+        text = self.toPlainText()
+        words = len(text.split()) if text.strip() else 0
+        return words, len(text)
+
 
 class RichPreview(QTextEdit):
     """Einfache HTML-Vorschau / Layout-Notizfläche."""

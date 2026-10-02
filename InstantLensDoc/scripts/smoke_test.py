@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Smoke-Test 0.2.4 (CLI + optional offscreen Qt). Kernpfade: open/annotate/export/license."""
+"""Smoke-Test 0.2.5 (CLI + optional offscreen Qt). Kernpfade: open/annotate/export/license."""
 
 from __future__ import annotations
 
@@ -57,7 +57,7 @@ def main() -> int:
         rotate_page,
         split_pdf,
     )
-    from ild_pdf.outline import extract_outline
+    from ild_pdf.outline import add_outline_item, delete_outline_item, extract_outline
     from instantlensdoc import __version__
     from instantlensdoc.config import icon_path, icon_paths_for_qt
     from instantlensdoc.core.documents import open_document, save_document
@@ -92,8 +92,8 @@ def main() -> int:
     from instantlensdoc.core.update_check import check_for_updates
     from instantlensdoc.license import KEY_DAYS, TRIAL_DAYS, generate_key, verify_key
 
-    assert __version__ == "0.2.4", __version__
-    assert ild_ver == "0.2.4", ild_ver
+    assert __version__ == "0.2.5", __version__
+    assert ild_ver == "0.2.5", ild_ver
     assert TRIAL_DAYS == 28 and KEY_DAYS == 32
     key = generate_key("ame@sellerbach.de")
     ok, msg, _ = verify_key(key)
@@ -111,7 +111,7 @@ def main() -> int:
     assert "Settings" in tr("settings")
     set_lang("de")
     upd = check_for_updates(allow_network=False)
-    assert upd.local_version == "0.2.4" and not upd.online
+    assert upd.local_version == "0.2.5" and not upd.online
     assert get_export_jpeg_quality() >= 10
     assert get_ui_lang() in ("de", "en")
     assert 25 <= get_default_zoom_percent() <= 500
@@ -127,8 +127,8 @@ def main() -> int:
     assert get_ann_highlight_color() == "#FFCC00"
     assert get_ann_pen_color() == "#112233"
     assert (ROOT / "CHANGELOG.md").is_file()
-    assert "0.2.4" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-    assert "0.2.4" in (ROOT / "README.md").read_text(encoding="utf-8")
+    assert "0.2.5" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    assert "0.2.5" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "run.bat" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "sync-ild.ps1" in (ROOT / "README.md").read_text(encoding="utf-8")
 
@@ -437,13 +437,13 @@ def main() -> int:
 
         assert (ROOT / "installer" / "installer-hinweis.txt").exists()
         iss = (ROOT / "installer" / "instantlensdoc.iss").read_text(encoding="utf-8")
-        assert "0.2.4" in iss and "desktopicon" in iss and "DisableProgramGroupPage=no" in iss
+        assert "0.2.5" in iss and "desktopicon" in iss and "DisableProgramGroupPage=no" in iss
         assert "UninstallDisplayName" in iss and "Uninstallable=yes" in iss
         assert "IncludeKeygen" in iss and "SetupIconFile" in iss
         assert "InstantLensKeygen.exe" in iss
         assert "uninstallexe" in iss
         bw = (ROOT / "build-windows.ps1").read_text(encoding="utf-8")
-        assert "0.2.4" in bw and "NoKeygenInApp" in bw and "--icon" in bw
+        assert "0.2.5" in bw and "NoKeygenInApp" in bw and "--icon" in bw
         assert "InstantLensKeygen.exe" in bw
         bi = (ROOT / "installer" / "build-installer.ps1").read_text(encoding="utf-8")
         assert "InstantLensKeygen.exe" in bi and "IncludeKeygen" in bi
@@ -462,7 +462,7 @@ def main() -> int:
         assert "QProgressDialog" in (ROOT / "instantlensdoc" / "ui" / "main_window.py").read_text(encoding="utf-8")
 
         assert (ROOT / "examples" / "ild_pdf_demo.py").exists()
-        assert "0.2.4" in (ROOT / "INFO.md").read_text(encoding="utf-8")
+        assert "0.2.5" in (ROOT / "INFO.md").read_text(encoding="utf-8")
         assert (ROOT / "assets" / "app.ico").is_file()
 
         # --- Kernpfade: open / annotate / export / license ---
@@ -534,9 +534,39 @@ def main() -> int:
         assert br.ok_count >= 1 and br.items[0].output and br.items[0].output.exists()
 
         assert isinstance(extract_outline(pdf), list)
+        add_outline_item(pdf, "Smoke Cap", 0)
+        ol = extract_outline(pdf)
+        assert ol and ol[0].title == "Smoke Cap" and ol[0].page_index == 0
+        add_outline_item(pdf, "Child", 1, parent_path=(0,))
+        ol = extract_outline(pdf)
+        assert ol[0].children and ol[0].children[0].title == "Child"
+        delete_outline_item(pdf, (0, 0))
+        ol = extract_outline(pdf)
+        assert ol and not ol[0].children
+        delete_outline_item(pdf, (0,))
+        assert extract_outline(pdf) == []
+        # Annotation JSON export/import
+        store_json = AnnotationStore(pdf)
+        store_json.annotations = []
+        store_json.clear_history()
+        store_json.add(Annotation(0, AnnotationType.HIGHLIGHT, 5, 5, width=20, height=8, text="json-ex"))
+        jpath = td / "ann-export.json"
+        store_json.export_json(jpath)
+        assert jpath.is_file()
+        store_imp = AnnotationStore(pdf)
+        store_imp.annotations = []
+        store_imp.clear_history()
+        n_imp = store_imp.import_json(jpath, replace=True)
+        assert n_imp == 1 and any(a.text == "json-ex" for a in store_imp.annotations)
         assert "Wasserzeichen" in (ROOT / "FEATURES.md").read_text(encoding="utf-8")
         assert "Schwärzung" in (ROOT / "FEATURES.md").read_text(encoding="utf-8")
         assert "Metadaten" in (ROOT / "FEATURES.md").read_text(encoding="utf-8")
+        assert "Als Kopie" in (ROOT / "FEATURES.md").read_text(encoding="utf-8") or "Kopie" in (
+            ROOT / "FEATURES.md"
+        ).read_text(encoding="utf-8")
+        assert "Wortzählung" in (ROOT / "FEATURES.md").read_text(encoding="utf-8") or "Wörter" in (
+            ROOT / "FEATURES.md"
+        ).read_text(encoding="utf-8")
 
         insert_signature_field(pdf, 0, x=50, y=50, label="Test")
         insert_signature_image(pdf, Image.new("RGBA", (80, 30), (0, 0, 0, 0)), 0, x=60, y=120)
@@ -562,6 +592,9 @@ def main() -> int:
         win = MainWindow(LicenseManager(path=ROOT / ".smoke_license.json"))
         win.new_doc()
         win.editor.setPlainText("alpha beta alpha gamma")
+        assert win.editor.word_stats() == (4, len("alpha beta alpha gamma"))
+        win._update_doc_status()
+        assert "Wörter" in win.word_status_label.text()
         n = win.editor.find_and_highlight("alpha")
         assert n == 2
         from PySide6.QtGui import QTextCursor
@@ -574,7 +607,7 @@ def main() -> int:
         win._add_chained_frame()
         assert len(win.layout_doc.text_frames) >= 2
         assert "Lizenz:" in win.license_label.text()
-        assert "v0.2.4" in win.version_label.text()
+        assert "v0.2.5" in win.version_label.text()
         from instantlensdoc.ui.settings_dialog import SettingsDialog
         from instantlensdoc.ui.batch_dialog import BatchConvertDialog
         from instantlensdoc.ui.pdf_tools_dialog import PdfToolsDialog
@@ -660,6 +693,41 @@ def main() -> int:
             assert callable(win.pdf_view.duplicate_current)
             assert callable(win.pdf_view.focus_annotation)
             assert callable(win.pdf_view.rotate_current)
+            assert callable(win.pdf_view.export_annotations_json)
+            assert callable(win.pdf_view.import_annotations_json)
+            assert callable(win.pdf_view.save_pdf_as_copy)
+            assert callable(win._outline_add)
+            assert callable(win._outline_delete)
+            assert callable(win.save_as_copy)
+            assert hasattr(win, "word_status_label")
+            assert hasattr(win.sidebar, "btn_outline_add")
+            # Outline add/delete API + refresh
+            from ild_pdf.outline import add_outline_item, delete_outline_item, extract_outline
+
+            add_outline_item(smoke_pdf, "Qt-Bookmark", 0)
+            win._refresh_outline(smoke_pdf)
+            assert win.sidebar.outline.topLevelItemCount() >= 1
+            assert extract_outline(smoke_pdf)
+            delete_outline_item(smoke_pdf, (0,))
+            win._refresh_outline(smoke_pdf)
+            # Ann JSON roundtrip via store
+            win.pdf_view.store.add(
+                Annotation(0, AnnotationType.STICKY, 4, 4, width=30, height=20, text="json-qt")
+            )
+            jexp = Path(td2) / "qt-ann.json"
+            assert win.pdf_view.store.export_json(jexp).is_file()
+            win.pdf_view.store.annotations = []
+            assert win.pdf_view.store.import_json(jexp, replace=True) >= 1
+            # PDF als Kopie
+            copy_pdf = Path(td2) / "smoke_Kopie.pdf"
+            import shutil
+
+            shutil.copy2(smoke_pdf, copy_pdf)
+            side = smoke_pdf.with_suffix(smoke_pdf.suffix + ".ildann.json")
+            if side.is_file():
+                shutil.copy2(side, copy_pdf.with_suffix(copy_pdf.suffix + ".ildann.json"))
+            assert copy_pdf.is_file()
+            assert win.pdf_view.pdf_path == smoke_pdf  # unverändert
             # Seite drehen / leere / duplizieren
             n0 = win.pdf_view.page_count
             win.pdf_view.rotate_current(90)
@@ -678,10 +746,10 @@ def main() -> int:
             win.pdf_view.focus_annotation(win.pdf_view.store.annotations[-1])
             assert win.pdf_view._selected_ann_id
             # Suchhistorie
-            win._remember_search("smoke-query-024")
-            assert "smoke-query-024" in recent_searches_mod.load_recent_searches()
+            win._remember_search("smoke-query-025")
+            assert "smoke-query-025" in recent_searches_mod.load_recent_searches()
             win.sidebar.set_recent_searches(recent_searches_mod.load_recent_searches())
-            assert "smoke-query-024" in [
+            assert "smoke-query-025" in [
                 win.sidebar.search.itemText(i) for i in range(win.sidebar.search.count())
             ]
             assert hasattr(win, "file_status_label") and hasattr(win, "page_status_label")
@@ -712,7 +780,7 @@ def main() -> int:
             from instantlensdoc.ui.password_dialog import CompressPdfDialog, SetPasswordDialog
             from instantlensdoc.ui.stubs import PLANNED
             assert KeyboardHelpDialog and SetPasswordDialog and CompressPdfDialog
-            assert "0.2.4" in PLANNED["ki"]
+            assert "0.2.5" in PLANNED["ki"]
             assert "Coming soon" in PLANNED["cloud"]
             assert callable(win.pdf_view.bake_redactions)
             assert callable(win.pdf_view.clear_redactions)

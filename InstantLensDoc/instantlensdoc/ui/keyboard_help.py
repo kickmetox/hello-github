@@ -12,6 +12,7 @@ SHORTCUTS_HTML = """
 <tr><td>Öffnen</td><td><code>Ctrl+O</code></td></tr>
 <tr><td>Speichern</td><td><code>Ctrl+S</code></td></tr>
 <tr><td>Speichern unter…</td><td><code>Ctrl+Shift+S</code></td></tr>
+<tr><td>Als Kopie speichern…</td><td><code>Ctrl+Alt+S</code></td></tr>
 <tr><td>Drucken</td><td><code>Ctrl+P</code></td></tr>
 <tr><td>Beenden</td><td><code>Ctrl+Q</code></td></tr>
 <tr><td>Rückgängig</td><td><code>Ctrl+Z</code></td></tr>
@@ -33,6 +34,10 @@ SHORTCUTS_HTML = """
 <p><b>Speichern unter (PDF):</b> speichert die Annotationen als Sidecar
 <code>*.ildann.json</code> (PDF-Datei bleibt unverändert). Auch unter
 PDF → Annotationen speichern unter…</p>
+<p><b>Als Kopie speichern (PDF):</b> schreibt PDF + Sidecar an neuen Pfad;
+aktuelles Dokument bleibt geöffnet (<code>Ctrl+Alt+S</code> / Datei / PDF).</p>
+<p><b>Lesezeichen:</b> Sidebar +/− oder PDF → Lesezeichen hinzufügen/löschen.</p>
+<p><b>Annotationen JSON:</b> PDF → exportieren / importieren (ersetzen oder anhängen).</p>
 <p><b>PDF-Werkzeuge</b> (Toolbar): Auswahl, Highlight, Schwärzen (REDACT-Preview), Formen per Drag;
 Notiz/Stempel/Callout/Overlay per Klick; <b>HL</b>/<b>Stift</b>-Farben-Picker; Ann. löschen;
 Seite <b>⟲/⟳ drehen</b>, <b>leere Seite</b>, <b>duplizieren</b>.</p>
@@ -41,7 +46,7 @@ Seite <b>⟲/⟳ drehen</b>, <b>leere Seite</b>, <b>duplizieren</b>.</p>
 <p><b>Annotationen:</b> eigene Liste in der Sidebar — Klick springt zur Annotation.</p>
 <p><b>Seiten als Bilder:</b> PDF → Seite/Seiten als PNG/JPEG exportieren (aktuell oder alle).</p>
 <p><b>Thumbnails:</b> in der Sidebar ziehen zum Neuordnen der Seiten.</p>
-<p><b>Statusleiste:</b> Dateiname · Seite x/y · Zoom % · Version · Lizenz.</p>
+<p><b>Statusleiste:</b> Dateiname · Seite x/y · Zoom % · Wörter/Ann. · Version · Lizenz.</p>
 <p><b>Schwärzung:</b> Rechteck ziehen → PDF → Schwärzung einbrennen… (Sidecar optional leeren)
 bzw. Schwärzungs-Annotationen löschen…</p>
 <p><b>Extras:</b> Einstellungen (Standard-Zoom, Autosave-Intervall), Batch (Fortschrittsbalken), OCR (Fortschrittsdialog).</p>
