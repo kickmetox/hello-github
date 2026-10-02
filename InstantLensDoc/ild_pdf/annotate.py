@@ -627,6 +627,15 @@ class AnnotationStore:
         c = c.upper()
         return self.update_many(ann_ids, color=c)
 
+    def set_opacities(self, ann_ids: Sequence[str], opacity: float) -> int:
+        """Batch-Deckkraft für Auswahl setzen (0.05–1.0)."""
+        try:
+            op = float(opacity)
+        except (TypeError, ValueError):
+            return 0
+        op = max(0.05, min(1.0, op))
+        return self.update_many(ann_ids, opacity=op)
+
     def remove(self, ann_id: str) -> bool:
         before = len(self.annotations)
         if not any(a.id == ann_id for a in self.annotations):

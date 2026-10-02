@@ -34,6 +34,11 @@ class _LineNumberArea(QWidget):
     def paintEvent(self, event):  # noqa: N802
         self._editor.paint_line_number_area(event)
 
+    def mousePressEvent(self, event):  # noqa: N802
+        if event.button() == Qt.LeftButton:
+            self._editor.toggle_bookmark_at_y(event.position().y())
+        super().mousePressEvent(event)
+
 
 class _MinimapArea(QWidget):
     """Einfache Linien-Übersicht (Minimap) rechts neben dem Editor."""
@@ -81,6 +86,7 @@ class TextEditor(QPlainTextEdit):
         self._mark_selections: list = []
         self._bracket_selections: list = []
         self._spell_selections: list = []
+        self._line_bookmarks: set[int] = set()  # 0-basierte Blocknummern
         self._line_number_area = _LineNumberArea(self)
         self._minimap_area = _MinimapArea(self)
         self.blockCountChanged.connect(self._update_side_areas)
@@ -98,7 +104,82 @@ class TextEditor(QPlainTextEdit):
         if not self._line_numbers:
             return 0
         digits = max(2, len(str(max(1, self.blockCount()))))
-        return 8 + self.fontMetrics().horizontalAdvance("9") * digits
+        # Extra Platz für Lesezeichen-Marker links
+        return 14 + self.fontMetrics().horizontalAdvance("9") * digits
+
+    def list_line_bookmarks(self) -> list[int]:
+        """1-basierte Zeilennummern der Lesezeichen (sortiert)."""
+        n = self.blockCount()
+        return sorted(b + 1 for b in self._line_bookmarks if 0 <= b < n)
+
+    def clear_line_bookmarks(self) -> None:
+        self._line_bookmarks.clear()
+        self._line_number_area.update()
+
+    def is_line_bookmarked(self, line: int) -> bool:
+        """line: 1-basiert."""
+        return int(line) - 1 in self._line_bookmarks
+
+    def toggle_line_bookmark(self, line: int | None = None) -> bool:
+        """
+        Zeile als Favorit/Lesezeichen umschalten.
+        line: 1-basiert; None = Cursor-Zeile.
+        Rückgabe: True wenn danach Lesezeichen.
+        """
+        if line is None:
+            block_no = self.textCursor().blockNumber()
+        else:
+            block_no = int(line) - 1
+        if block_no < 0 or block_no >= self.blockCount():
+            return False
+        if block_no in self._line_bookmarks:
+            self._line_bookmarks.discard(block_no)
+            now = False
+        else:
+            self._line_bookmarks.add(block_no)
+            now = True
+        self._line_number_area.update()
+        return now
+
+    def goto_next_line_bookmark(self) -> int:
+        """Nächstes Lesezeichen ab Cursor; Rückgabe 1-basierte Zeile oder 0."""
+        marks = self.list_line_bookmarks()
+        if not marks:
+            return 0
+        cur = self.textCursor().blockNumber() + 1
+        for m in marks:
+            if m > cur:
+                self.goto_line(m)
+                return m
+        self.goto_line(marks[0])
+        return marks[0]
+
+    def goto_prev_line_bookmark(self) -> int:
+        """Vorheriges Lesezeichen; Rückgabe 1-basierte Zeile oder 0."""
+        marks = self.list_line_bookmarks()
+        if not marks:
+            return 0
+        cur = self.textCursor().blockNumber() + 1
+        for m in reversed(marks):
+            if m < cur:
+                self.goto_line(m)
+                return m
+        self.goto_line(marks[-1])
+        return marks[-1]
+
+    def toggle_bookmark_at_y(self, y: float) -> bool:
+        """Klick in Zeilennummernleiste → Lesezeichen der sichtbaren Zeile."""
+        if not self._line_numbers:
+            return False
+        block = self.firstVisibleBlock()
+        top = int(self.blockBoundingGeometry(block).translated(self.contentOffset()).top())
+        while block.isValid():
+            bottom = top + int(self.blockBoundingRect(block).height())
+            if top <= y < bottom:
+                return self.toggle_line_bookmark(block.blockNumber() + 1)
+            block = block.next()
+            top = bottom
+        return False
 
     def minimap_width(self) -> int:
         return MINIMAP_WIDTH if self._minimap else 0
@@ -660,8 +741,15 @@ class TextEditor(QPlainTextEdit):
         block_number = block.blockNumber()
         top = int(self.blockBoundingGeometry(block).translated(self.contentOffset()).top())
         bottom = top + int(self.blockBoundingRect(block).height())
+        mark_color = QColor("#C45C26")
         while block.isValid() and top <= event.rect().bottom():
             if block.isVisible() and bottom >= event.rect().top():
+                if block_number in self._line_bookmarks:
+                    fh = self.fontMetrics().height()
+                    cy = top + fh // 2
+                    painter.setPen(Qt.NoPen)
+                    painter.setBrush(mark_color)
+                    painter.drawEllipse(3, cy - 4, 8, 8)
                 painter.setPen(QColor("#5A6A7A"))
                 painter.drawText(
                     0,

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Smoke-Test 0.5.6 (CLI + optional offscreen Qt). Kernpfade: open/annotate/export/license + 0.5.6-Features."""
+"""Smoke-Test 0.5.7 (CLI + optional offscreen Qt). Kernpfade: open/annotate/export/license + 0.5.7-Features."""
 
 from __future__ import annotations
 
@@ -121,8 +121,8 @@ def main() -> int:
     from instantlensdoc.core.update_check import check_for_updates
     from instantlensdoc.license import KEY_DAYS, TRIAL_DAYS, generate_key, verify_key
 
-    assert __version__ == "0.5.6", __version__
-    assert ild_ver == "0.5.6", ild_ver
+    assert __version__ == "0.5.7", __version__
+    assert ild_ver == "0.5.7", ild_ver
     assert TRIAL_DAYS == 28 and KEY_DAYS == 32
     key = generate_key("ame@sellerbach.de")
     ok, msg, _ = verify_key(key)
@@ -140,7 +140,7 @@ def main() -> int:
     assert "Settings" in tr("settings")
     set_lang("de")
     upd = check_for_updates(allow_network=False)
-    assert upd.local_version == "0.5.6" and not upd.online
+    assert upd.local_version == "0.5.7" and not upd.online
     assert get_export_jpeg_quality() >= 10
     assert get_ui_lang() in ("de", "en")
     assert 25 <= get_default_zoom_percent() <= 500
@@ -181,8 +181,8 @@ def main() -> int:
     assert get_ann_pen_color() == "#112233"
     assert (ROOT / "CHANGELOG.md").is_file()
     cl = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-    assert "0.5.6" in cl
-    assert "## 0.5.6" in cl
+    assert "0.5.7" in cl
+    assert "## 0.5.7" in cl
     assert "0.4.0 → 0.5.0" in cl or "0.4.0→0.5.0" in cl
     assert "## 0.4.0" in cl
     assert "0.3.0 → 0.4.0" in cl or "0.3.0→0.4.0" in cl
@@ -211,7 +211,7 @@ def main() -> int:
     assert "0.4.9" in cl  # noch in Kurz-Tabelle
     assert "0.3.9" in cl  # noch in Kurz-Tabelle
     assert "0.2.9" in cl  # noch in Kurz-Tabelle
-    assert "0.5.6" in (ROOT / "README.md").read_text(encoding="utf-8")
+    assert "0.5.7" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "run.bat" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "sync-ild.ps1" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "scripts/sync-ild.ps1" in (ROOT / "FEATURES.md").read_text(encoding="utf-8")
@@ -560,13 +560,13 @@ def main() -> int:
 
         assert (ROOT / "installer" / "installer-hinweis.txt").exists()
         iss = (ROOT / "installer" / "instantlensdoc.iss").read_text(encoding="utf-8")
-        assert "0.5.6" in iss and "desktopicon" in iss and "DisableProgramGroupPage=no" in iss
+        assert "0.5.7" in iss and "desktopicon" in iss and "DisableProgramGroupPage=no" in iss
         assert "UninstallDisplayName" in iss and "Uninstallable=yes" in iss
         assert "IncludeKeygen" in iss and "SetupIconFile" in iss
         assert "InstantLensKeygen.exe" in iss
         assert "uninstallexe" in iss
         bw = (ROOT / "build-windows.ps1").read_text(encoding="utf-8")
-        assert "0.5.6" in bw and "NoKeygenInApp" in bw and "--icon" in bw
+        assert "0.5.7" in bw and "NoKeygenInApp" in bw and "--icon" in bw
         assert "InstantLensKeygen.exe" in bw
         bi = (ROOT / "installer" / "build-installer.ps1").read_text(encoding="utf-8")
         assert "InstantLensKeygen.exe" in bi and "IncludeKeygen" in bi
@@ -575,7 +575,7 @@ def main() -> int:
         assert "Installer" in kg_readme
         hinweis = (ROOT / "installer" / "installer-hinweis.txt").read_text(encoding="utf-8")
         assert "InstantLensKeygen.exe" in hinweis or "run-keygen.bat" in hinweis
-        assert "0.5.6" in hinweis
+        assert "0.5.7" in hinweis
         from ild_pdf.limits import OPEN_TIMEOUT_HINT, OPEN_TIMEOUT_HINT_SEC
 
         assert OPEN_TIMEOUT_HINT_SEC >= 15 and "teilen" in OPEN_TIMEOUT_HINT.lower()
@@ -586,7 +586,7 @@ def main() -> int:
         assert "QProgressDialog" in (ROOT / "instantlensdoc" / "ui" / "main_window.py").read_text(encoding="utf-8")
 
         assert (ROOT / "examples" / "ild_pdf_demo.py").exists()
-        assert "0.5.6" in (ROOT / "INFO.md").read_text(encoding="utf-8")
+        assert "0.5.7" in (ROOT / "INFO.md").read_text(encoding="utf-8")
         assert (ROOT / "assets" / "app.ico").is_file()
 
         # --- Kernpfade: open / annotate / export / license ---
@@ -777,7 +777,7 @@ def main() -> int:
         set_backup_on_save(False)
         assert get_page_size_unit() in ("mm", "inch")
         assert isinstance(get_minimize_to_tray(), bool)
-        assert "0.5.6" in feat and "0.4.9" in feat  # Release + Zeitraum-Feature-Hinweise
+        assert "0.5.7" in feat and "0.4.9" in feat  # Release + Zeitraum-Feature-Hinweise
         assert "Batch-OCR" in feat or "OCR gesamtes PDF" in feat
         assert "Tag" in feat
         assert "Projekt-Ordner" in feat or "Workspace" in feat
@@ -1093,6 +1093,41 @@ def main() -> int:
         assert "## 0.5.6" in cl056
         print("0.5.6 CLI favorites/batch-color/spellcheck/privacy: OK")
 
+        # 0.5.7 CLI: Favoriten-Sidebar-Nummern, Opacity-Batch, Editor-Bookmarks, Crash-ZIP
+        from instantlensdoc.core.logging_setup import create_crash_report_zip, log_dir, setup_logging
+
+        setup_logging(force=True)
+        (log_dir() / "smoke057.log").write_text("smoke-057\n", encoding="utf-8")
+        zip057 = td / "crash057.zip"
+        out057 = create_crash_report_zip(zip057)
+        assert out057.exists() and out057.stat().st_size > 0
+        import zipfile
+
+        with zipfile.ZipFile(out057, "r") as zf:
+            names = zf.namelist()
+            assert "REPORT.txt" in names
+            assert any(n.endswith(".log") for n in names)
+        store_op = AnnotationStore(pdf)
+        store_op.annotations = []
+        store_op.clear_history()
+        o1 = Annotation(0, AnnotationType.HIGHLIGHT, 3, 3, width=10, height=5, opacity=1.0)
+        o2 = Annotation(0, AnnotationType.STICKY, 4, 4, width=10, height=5, opacity=0.9)
+        store_op.add(o1)
+        store_op.add(o2)
+        n_op = store_op.set_opacities([o1.id, o2.id], 0.42)
+        assert n_op == 2
+        assert abs(store_op.get(o1.id).opacity - 0.42) < 0.001
+        assert abs(store_op.get(o2.id).opacity - 0.42) < 0.001
+        feat057 = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
+        assert "0.5.7" in feat057
+        assert "Deckkraft Batch" in feat057 or "Opacity" in feat057 or "Zeilen-Lesezeichen" in feat057
+        assert "Crash-Report" in feat057 or "Sidebar-Liste" in feat057
+        cl057 = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+        assert "## 0.5.7" in cl057
+        help057 = (ROOT / "instantlensdoc" / "ui" / "help_dialog.py").read_text(encoding="utf-8")
+        assert "Crash-Report" in help057
+        print("0.5.7 CLI favorites-sidebar/opacity-batch/bookmarks/crash-zip: OK")
+
         set_show_printer_marks(True)
         assert get_show_printer_marks() is True
         set_show_printer_marks(False)
@@ -1213,7 +1248,7 @@ def main() -> int:
         assert "Schema v4" in feat or "ildann-v4" in feat or "PDF-Highlight" in feat
         assert "sortieren" in feat.lower() or "Zeilen sortieren" in feat
         assert "Reset" in feat or "zurücksetzen" in feat.lower()
-        # Ausgewählte 0.4.x-Inhalte (kompakt in 0.5.6, Kurz-Tabelle + Konsolidierung)
+        # Ausgewählte 0.4.x-Inhalte (kompakt in 0.5.7, Kurz-Tabelle + Konsolidierung)
         assert "Seitenbild" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8") or "0.4.5" in feat
         assert "Gehe zu Seite" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8") or "0.4.6" in feat
         assert "0.4.6" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
@@ -1225,7 +1260,7 @@ def main() -> int:
         assert "Continuous Scroll" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
         assert "Seitenlabel" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8") or "Seitenlabels" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
         assert "Zwischenablage-Verlauf" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8") or "Clipboard" in (ROOT / "FEATURES.md").read_text(encoding="utf-8")
-        assert "0.5.6" in feat and "0.4.9" in feat
+        assert "0.5.7" in feat and "0.4.9" in feat
         # --- 0.4.2 CLI: Outline Goto, Ann Copy/Paste, Flatten Progress ---
         import pikepdf as _pike_ol
 
@@ -1350,7 +1385,7 @@ def main() -> int:
         win._add_chained_frame()
         assert len(win.layout_doc.text_frames) >= 2
         assert "Lizenz:" in win.license_label.text() or "⚠" in win.license_label.text()
-        assert "v0.5.6" in win.version_label.text()
+        assert "v0.5.7" in win.version_label.text()
         # Lizenz <7 Tage: Style prominent
         st_lic = win.license_manager.status()
         if st_lic.allowed and st_lic.days_remaining < 7:
@@ -1531,11 +1566,11 @@ def main() -> int:
             assert win.editor.outdent_selection(4)
             assert win.editor.toPlainText().splitlines()[0] == "alpha"
             # Fenstertitel mit Version
-            assert "0.5.6" in win.windowTitle()
+            assert "0.5.7" in win.windowTitle()
             from instantlensdoc.ui.help_dialog import AboutDialog, HelpDialog, open_log_folder
 
             about = AboutDialog(win)
-            assert "0.5.6" in about.windowTitle()
+            assert "0.5.7" in about.windowTitle()
             help_dlg = HelpDialog(win)
             assert help_dlg.windowTitle() == "Hilfe"
             assert callable(open_log_folder)
@@ -2195,7 +2230,7 @@ def main() -> int:
             win.apply_tray_setting()
             if win._tray is not None:
                 tip = win._tray.toolTip()
-                assert "0.5.6" in tip and "InstantLens Doc" in tip
+                assert "0.5.7" in tip and "InstantLens Doc" in tip
             set_minimize_to_tray(False)
             win.apply_tray_setting()
             print("0.3.9 fit-h/ann-stats/special/tray: OK")
@@ -2208,9 +2243,9 @@ def main() -> int:
             from instantlensdoc.ui.password_dialog import CompressPdfDialog, SetPasswordDialog
             from instantlensdoc.ui.stubs import PLANNED
             assert KeyboardHelpDialog and SetPasswordDialog and CompressPdfDialog
-            assert "0.5.6" in PLANNED["ki"]
+            assert "0.5.7" in PLANNED["ki"]
             assert "Coming soon" in PLANNED["cloud"]
-            assert "0.5.6" in PLANNED["stylus"] and "0.5.6" in PLANNED["extrude3d"]
+            assert "0.5.7" in PLANNED["stylus"] and "0.5.7" in PLANNED["extrude3d"]
             # Toolbar ↔ Menü Sync Graustufen/Nacht
             win.pdf_view.set_grayscale(True)
             assert win._grayscale_action.isChecked()
@@ -2245,7 +2280,7 @@ def main() -> int:
             assert win.editor.toPlainText().splitlines() == ["one", "two"]
             from instantlensdoc.ui.help_dialog import HELP_HTML
 
-            assert "Stub 0.5.6" in HELP_HTML
+            assert "Stub 0.5.7" in HELP_HTML
             assert "scripts/sync-ild.ps1" in HELP_HTML
             assert "Präsentationsmodus" in HELP_HTML or "F5" in (
                 ROOT / "instantlensdoc" / "ui" / "keyboard_help.py"
@@ -2567,12 +2602,12 @@ def main() -> int:
             ).read_text(encoding="utf-8")
             assert "Zwei-Seiten" in (
                 ROOT / "CHANGELOG.md"
-            ).read_text(encoding="utf-8") or "0.5.6" in (
+            ).read_text(encoding="utf-8") or "0.5.7" in (
                 ROOT / "FEATURES.md"
             ).read_text(encoding="utf-8")
             assert "Gehe zu Seite" in (
                 ROOT / "CHANGELOG.md"
-            ).read_text(encoding="utf-8") or "0.5.6" in (
+            ).read_text(encoding="utf-8") or "0.5.7" in (
                 ROOT / "FEATURES.md"
             ).read_text(encoding="utf-8")
             assert "PDF-Toolbar" in (
@@ -3088,10 +3123,66 @@ def main() -> int:
             assert "## 0.5.6" in cl056q
             print("0.5.6 Qt favorites/batch-color/spellcheck/privacy: OK")
 
+            # --- 0.5.7 Qt: Favoriten-Sidebar, Opacity-Batch, Zeilen-Lesezeichen, Crash-ZIP ---
+            assert hasattr(win.sidebar, "set_page_favorites")
+            assert hasattr(win.sidebar, "page_favorite_activated")
+            assert callable(getattr(win.pdf_view, "set_opacity_selected_annotations", None))
+            assert callable(getattr(win, "_refresh_page_favorites", None))
+            assert callable(getattr(win, "_create_crash_report", None))
+            assert callable(getattr(win.editor, "toggle_line_bookmark", None))
+            assert callable(getattr(win.editor, "list_line_bookmarks", None))
+            win.pdf_view.store.set_page_favorites([0])
+            win._refresh_page_favorites()
+            assert win.sidebar.page_favorites.count() >= 1
+            txt0 = win.sidebar.page_favorites.item(0).text()
+            assert txt0.startswith("1.") and "Seite" in txt0
+            ann057 = Annotation(
+                win.pdf_view.page_index,
+                AnnotationType.HIGHLIGHT,
+                8,
+                8,
+                width=20,
+                height=6,
+                text="op057",
+                opacity=1.0,
+            )
+            win.pdf_view.store.add(ann057)
+            n057 = win.pdf_view.store.set_opacities([ann057.id], 0.33)
+            assert n057 == 1 and abs(win.pdf_view.store.get(ann057.id).opacity - 0.33) < 0.001
+            win.stack.setCurrentWidget(win.editor_pane)
+            win.editor.set_line_numbers_visible(True)
+            win.editor.setPlainText("alpha\nbeta\ngamma\ndelta\n")
+            win.editor.clear_line_bookmarks()
+            assert win.editor.toggle_line_bookmark(2) is True
+            assert win.editor.toggle_line_bookmark(4) is True
+            assert win.editor.list_line_bookmarks() == [2, 4]
+            assert win.editor.is_line_bookmarked(2)
+            assert win.editor.goto_next_line_bookmark() in (2, 4)
+            assert win.editor.toggle_line_bookmark(2) is False
+            assert win.editor.list_line_bookmarks() == [4]
+            win.editor.clear_line_bookmarks()
+            assert win.editor.list_line_bookmarks() == []
+            from instantlensdoc.core.logging_setup import create_crash_report_zip as _crz057
+            from instantlensdoc.core.logging_setup import log_dir as _ld057
+            from instantlensdoc.core.logging_setup import setup_logging as _sl057
+
+            _sl057(force=True)
+            z057 = Path(td2) / "qt-crash057.zip"
+            assert _crz057(z057).exists()
+            kh057 = (ROOT / "instantlensdoc" / "ui" / "keyboard_help.py").read_text(encoding="utf-8")
+            assert "Ctrl+Alt+Shift+O" in kh057 or "Deckkraft" in kh057
+            assert "Ctrl+F2" in kh057 or "Zeilenfavorit" in kh057 or "Lesezeichen" in kh057
+            assert "Crash-Report" in kh057
+            feat057q = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
+            assert "0.5.7" in feat057q
+            cl057q = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+            assert "## 0.5.7" in cl057q
+            print("0.5.7 Qt favorites-sidebar/opacity/bookmarks/crash-zip: OK")
+
             print("0.4.x selected Qt marks/schema/sort/reset: OK")
             print("0.4.2 Qt outline/copy-paste/case/progress: OK")
             print("0.4.1 Qt links/stamp/encoding/drop: OK")
-            print("0.3.x–0.5.6 review OK")
+            print("0.3.x–0.5.7 review OK")
             assert callable(win.pdf_view.bake_redactions)
             assert callable(win.pdf_view.clear_redactions)
             assert callable(win._set_pdf_password)

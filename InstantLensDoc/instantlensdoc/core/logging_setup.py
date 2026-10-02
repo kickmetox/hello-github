@@ -23,6 +23,45 @@ def log_file() -> Path:
     return log_dir() / "instantlensdoc.log"
 
 
+def create_crash_report_zip(dest: Path | str | None = None) -> Path:
+    """
+    Packt den Logordner (Crash-/App-Logs) als ZIP.
+    dest: Zielpfad (.zip); wenn None → Logordner/InstantLensDoc-crash-report-YYYYMMDD-HHMMSS.zip
+    """
+    import zipfile
+    from datetime import datetime
+
+    src = log_dir()
+    if dest is None:
+        stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+        dest_path = src / f"InstantLensDoc-crash-report-{stamp}.zip"
+    else:
+        dest_path = Path(dest)
+    dest_path.parent.mkdir(parents=True, exist_ok=True)
+    with zipfile.ZipFile(dest_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        # Manifest kurz
+        files = sorted(p for p in src.iterdir() if p.is_file() and p.suffix.lower() != ".zip")
+        manifest = [
+            f"InstantLens Doc crash report",
+            f"created: {datetime.now().isoformat(timespec='seconds')}",
+            f"log_dir: {src}",
+            f"files: {len(files)}",
+            "",
+        ]
+        for p in files:
+            try:
+                manifest.append(f"- {p.name} ({p.stat().st_size} bytes)")
+            except OSError:
+                manifest.append(f"- {p.name}")
+        zf.writestr("REPORT.txt", "\n".join(manifest) + "\n")
+        for p in files:
+            try:
+                zf.write(p, arcname=p.name)
+            except OSError:
+                continue
+    return dest_path
+
+
 def setup_logging(*, level: int = logging.INFO, force: bool = False) -> Path:
     """
     Konfiguriert Root-Logger einmalig:

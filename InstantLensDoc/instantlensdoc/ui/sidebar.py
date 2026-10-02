@@ -123,6 +123,7 @@ class Sidebar(QWidget):
     annotation_group_edit_requested = Signal(int)  # Seitenindex der Gruppe
     fulltext_hit_activated = Signal(str, object)  # path, page_index|None
     page_thumb_activated = Signal(int)  # PDF-Seite 0-basiert
+    page_favorite_activated = Signal(int)  # PDF-Seite 0-basiert (Favoriten-Liste)
     pages_reordered = Signal(list)  # alte Indizes in neuer Reihenfolge
 
     def __init__(self, parent=None):
@@ -193,6 +194,16 @@ class Sidebar(QWidget):
         ol_btns.addWidget(self.btn_outline_del)
         ol_btns.addStretch(1)
         layout.addLayout(ol_btns)
+
+        layout.addWidget(QLabel("PDF-Favoriten"))
+        self.page_favorites = QListWidget()
+        self.page_favorites.setMaximumHeight(100)
+        self.page_favorites.setToolTip(
+            "Nummerierte Favoriten-Seiten — Klick springt zur Seite (★ / Ctrl+Shift+F)"
+        )
+        self.page_favorites.itemClicked.connect(self._activate_page_favorite)
+        self.page_favorites.itemDoubleClicked.connect(self._activate_page_favorite)
+        layout.addWidget(self.page_favorites)
 
         layout.addWidget(QLabel("Annotationen (gruppiert nach Seite)"))
         self.ann_filter = QComboBox()
@@ -336,6 +347,59 @@ class Sidebar(QWidget):
             self.outline_activated.emit(int(page))
         except (TypeError, ValueError):
             self.outline_activated.emit(-1)
+
+    def _activate_page_favorite(self, item: QListWidgetItem):
+        if item is None:
+            return
+        page = item.data(Qt.UserRole)
+        if page is None:
+            page = item.data(256)
+        if page is not None:
+            try:
+                self.page_favorite_activated.emit(int(page))
+            except (TypeError, ValueError):
+                pass
+
+    def set_page_favorites(
+        self,
+        pages: list[int] | None,
+        *,
+        labels: list[str] | None = None,
+        current: int | None = None,
+    ):
+        """Nummerierte Favoriten-Seiten in der Sidebar (1. Seite N …)."""
+        self.page_favorites.clear()
+        pages = list(pages or [])
+        for i, p in enumerate(pages):
+            try:
+                idx = int(p)
+            except (TypeError, ValueError):
+                continue
+            label = ""
+            if labels is not None and i < len(labels) and labels[i]:
+                label = str(labels[i])
+            text = f"{i + 1}. Seite {idx + 1}"
+            if label:
+                text = f"{text} ({label})"
+            item = QListWidgetItem(text)
+            item.setData(Qt.UserRole, idx)
+            item.setData(256, idx)
+            item.setToolTip(f"Favorit #{i + 1} → Seite {idx + 1}")
+            self.page_favorites.addItem(item)
+        if not pages:
+            empty = QListWidgetItem("(keine — ★ markieren)")
+            empty.setFlags(Qt.NoItemFlags)
+            self.page_favorites.addItem(empty)
+            return
+        if current is not None:
+            for row in range(self.page_favorites.count()):
+                it = self.page_favorites.item(row)
+                if it and it.data(Qt.UserRole) == int(current):
+                    self.page_favorites.setCurrentRow(row)
+                    break
+
+    def clear_page_favorites(self):
+        self.set_page_favorites([])
 
     def _activate_thumb(self, item: QListWidgetItem):
         page = item.data(Qt.UserRole)

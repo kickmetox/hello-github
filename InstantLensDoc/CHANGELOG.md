@@ -1,5 +1,23 @@
 # Changelog — InstantLens Doc
 
+## 0.5.7 — PDF-Favoriten-Sidebar, Ann.-Opacity-Batch, Editor-Zeilenfavoriten, Crash-Report-ZIP
+
+Nach 0.5.6: vier sinnvolle Ausbauten. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### PDF / Annotationen
+- **PDF-Favoriten in Sidebar**: nummerierte Liste (1. Seite N …) neben Outline; Klick springt; Dialog ebenfalls nummeriert
+- **Annotation-Deckkraft Batch**: Opacity für Auswahl auf einmal (Ctrl+Alt+Shift+O / Toolbar „α…“ / Bearbeiten)
+
+### Editor / Hilfe
+- **Zeilen favorisieren / Lesezeichen**: Marker in der Zeilennummernleiste; Ctrl+F2 umschalten; F2 / Shift+F2 springen; Klick auf Zeilennummer
+- **Crash-Report ZIP**: Hilfe → Crash-Report erstellen… packt den Logordner als ZIP (Support/Diagnose)
+
+### Packaging / Docs
+- Version **0.5.7** (App / ild_pdf / ISS / Smoke / Docs)
+- Stubs KI/Cloud/Stylus/3D unverändert
+
+---
+
 ## 0.5.6 — Seiten-Favoriten, Ann.-Batch-Farbe, Wortlisten-Rechtschreibung, Privacy-About
 
 Nach 0.5.5: vier sinnvolle Ausbauten. Stubs KI/Cloud/Stylus/3D bleiben Stubs. **Keine Telemetrie** — Privacy-Hinweis in About.

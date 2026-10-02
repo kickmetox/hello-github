@@ -906,6 +906,7 @@ class PdfCanvas(QLabel):
 class PdfViewer(QWidget):
     status = Signal(str)
     annotations_changed = Signal()
+    page_favorites_changed = Signal()
     page_changed = Signal(int)  # 0-basiert
     zoom_changed = Signal(float)  # scale (1.0 = 100%)
     document_changed = Signal()  # Pfad/Seiten geändert (Statusleiste)
@@ -1017,6 +1018,11 @@ class PdfViewer(QWidget):
             "Farbe der ausgewählten Annotation(en) ändern (Batch, Ctrl+Alt+Shift+F)"
         )
         btn_ann_color.clicked.connect(self.recolor_selected_annotations)
+        btn_ann_opacity = QPushButton("α…")
+        btn_ann_opacity.setToolTip(
+            "Deckkraft der ausgewählten Annotation(en) ändern (Batch, Ctrl+Alt+Shift+O)"
+        )
+        btn_ann_opacity.clicked.connect(self.set_opacity_selected_annotations)
         btn_stamp_rot = QPushButton("Stempel ↻")
         btn_stamp_rot.setToolTip("Ausgewählten Stempel um 90° drehen")
         btn_stamp_rot.clicked.connect(lambda: self.rotate_selected_stamp(90))
@@ -1223,6 +1229,7 @@ class PdfViewer(QWidget):
         toolbar.addWidget(self.btn_fav_jump)
         toolbar.addWidget(btn_del_ann)
         toolbar.addWidget(btn_ann_color)
+        toolbar.addWidget(btn_ann_opacity)
         toolbar.addWidget(btn_stamp_rot)
         toolbar.addWidget(btn_zoom_out)
         toolbar.addWidget(self.lbl_zoom)
@@ -1275,6 +1282,7 @@ class PdfViewer(QWidget):
                 self.btn_fav_jump,
                 btn_del_ann,
                 btn_ann_color,
+                btn_ann_opacity,
                 btn_stamp_rot,
             ],
             "zoom": [
@@ -1345,6 +1353,9 @@ class PdfViewer(QWidget):
         recolor_sc = QShortcut(QKeySequence("Ctrl+Alt+Shift+F"), self)
         recolor_sc.setContext(Qt.WidgetWithChildrenShortcut)
         recolor_sc.activated.connect(self.recolor_selected_annotations)
+        opacity_sc = QShortcut(QKeySequence("Ctrl+Alt+Shift+O"), self)
+        opacity_sc.setContext(Qt.WidgetWithChildrenShortcut)
+        opacity_sc.activated.connect(self.set_opacity_selected_annotations)
 
     def apply_toolbar_groups(self) -> None:
         """Sichtbarkeit der PDF-Toolbar-Gruppen aus den Einstellungen anwenden."""
@@ -2864,6 +2875,7 @@ class PdfViewer(QWidget):
             if now_fav
             else f"Seite {page_h} aus Favoriten entfernt"
         )
+        self.page_favorites_changed.emit()
         return now_fav
 
     def show_page_favorites(self) -> bool:
@@ -2893,9 +2905,9 @@ class PdfViewer(QWidget):
             )
         )
         lst = QListWidget()
-        for p in favs:
+        for i, p in enumerate(favs):
             label = self.page_label(p) if self.has_page_labels() else ""
-            text = f"Seite {p + 1}" + (f" ({label})" if label else "")
+            text = f"{i + 1}. Seite {p + 1}" + (f" ({label})" if label else "")
             row = QListWidgetItem(text)
             row.setData(Qt.UserRole, int(p))
             lst.addItem(row)
@@ -2931,15 +2943,16 @@ class PdfViewer(QWidget):
         def _refresh_list():
             lst.clear()
             fresh = self.list_page_favorites()
-            for p2 in fresh:
+            for i2, p2 in enumerate(fresh):
                 label2 = self.page_label(p2) if self.has_page_labels() else ""
-                text2 = f"Seite {p2 + 1}" + (f" ({label2})" if label2 else "")
+                text2 = f"{i2 + 1}. Seite {p2 + 1}" + (f" ({label2})" if label2 else "")
                 row2 = QListWidgetItem(text2)
                 row2.setData(Qt.UserRole, int(p2))
                 lst.addItem(row2)
             btn_goto.setEnabled(bool(fresh))
             btn_remove.setEnabled(bool(fresh))
             self._refresh_fav_btn()
+            self.page_favorites_changed.emit()
 
         def _do_goto():
             cur = lst.currentItem()
@@ -2972,6 +2985,7 @@ class PdfViewer(QWidget):
                 return
             _refresh_list()
             self.status.emit(f"Seite {int(idx) + 1} aus Favoriten entfernt")
+            self.page_favorites_changed.emit()
 
         btn_goto.clicked.connect(_do_goto)
         lst.itemDoubleClicked.connect(lambda _item: _do_goto())
@@ -3020,6 +3034,54 @@ class PdfViewer(QWidget):
         self.refresh()
         self.annotations_changed.emit()
         self.status.emit(f"Farbe {color} für {n} Annotation(en)")
+        return n
+
+    def set_opacity_selected_annotations(self) -> int:
+        """Batch-Deckkraft für ausgewählte Annotation(en) ändern."""
+        from PySide6.QtWidgets import QInputDialog
+
+        if not self.store:
+            self.status.emit("Kein PDF geladen")
+            return 0
+        ids = list(self._selected_ann_ids) if self._selected_ann_ids else (
+            [self._selected_ann_id] if self._selected_ann_id else []
+        )
+        ids = [i for i in ids if i]
+        if not ids:
+            self.status.emit("Keine Annotation ausgewählt")
+            return 0
+        initial = float(self._default_opacity)
+        first = self.store.get(ids[0])
+        if first is not None:
+            try:
+                initial = float(getattr(first, "opacity", initial) or initial)
+            except (TypeError, ValueError):
+                pass
+        initial = max(0.05, min(1.0, initial))
+        value, ok = QInputDialog.getDouble(
+            self,
+            "Deckkraft (Batch)",
+            f"Deckkraft für {len(ids)} Annotation(en) (0.05–1.0):",
+            initial,
+            0.05,
+            1.0,
+            2,
+            step=0.05,
+        )
+        if not ok:
+            return 0
+        n = self.store.set_opacities(ids, float(value))
+        if n <= 0:
+            self.status.emit("Deckkraft nicht geändert")
+            return 0
+        try:
+            self.store.save()
+        except Exception as e:
+            QMessageBox.warning(self, "Annotation-Deckkraft", str(e))
+            return 0
+        self.refresh()
+        self.annotations_changed.emit()
+        self.status.emit(f"Deckkraft {float(value):.2f} für {n} Annotation(en)")
         return n
 
     def undo_page_op(self) -> bool:

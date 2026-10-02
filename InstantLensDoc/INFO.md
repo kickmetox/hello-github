@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **0.5.6** |
+| Version | **0.5.7** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -34,10 +34,10 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)
 
-## Neu in 0.5.6
+## Neu in 0.5.7
 
-- Seiten-Favoriten: markieren + schnell springen (Sidecar-Meta)
-- Annotation-Batch-Farbe für Auswahl
-- Editor: Rechtschreibwörterbuch-Pfad (Wortliste, F7)
-- About: Privacy-Hinweis (lokal, keine Telemetrie)
+- PDF-Favoriten in der Sidebar-Liste mit Nummern (1. Seite N …)
+- Annotation-Deckkraft Batch für Auswahl (Ctrl+Alt+Shift+O / α…)
+- Editor: Zeilen favorisieren / Lesezeichen (Zeilennummern, Ctrl+F2 / F2)
+- Crash-Report ZIP aus Logordner (Hilfe-Menü)
 - Stubs KI/Cloud/Stylus/3D unverändert

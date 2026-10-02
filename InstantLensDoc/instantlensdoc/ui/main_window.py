@@ -334,6 +334,7 @@ class MainWindow(QMainWindow):
         self.sidebar.annotation_group_edit_requested.connect(self._edit_annotation_group)
         self.sidebar.fulltext_hit_activated.connect(self._on_fulltext_hit)
         self.sidebar.page_thumb_activated.connect(self._on_thumb_jump)
+        self.sidebar.page_favorite_activated.connect(self._on_page_favorite_jump)
         self.sidebar.pages_reordered.connect(self._on_thumbs_reordered)
         splitter.addWidget(self.sidebar)
 
@@ -344,6 +345,7 @@ class MainWindow(QMainWindow):
         self.pdf_view = PdfViewer()
         self.pdf_view.status.connect(self._set_status)
         self.pdf_view.annotations_changed.connect(self._refresh_pdf_marks)
+        self.pdf_view.page_favorites_changed.connect(self._refresh_page_favorites)
         self.pdf_view.page_changed.connect(self._on_pdf_page_changed)
         self.pdf_view.zoom_changed.connect(self._on_pdf_zoom_changed)
         self.pdf_view.document_changed.connect(self._on_pdf_document_changed)
@@ -565,6 +567,27 @@ class MainWindow(QMainWindow):
         act_goto.setToolTip("Editor: Zeile · PDF: Seite (Ctrl+G)")
         act_goto.triggered.connect(self._goto_line_or_page)
         m_edit.addAction(act_goto)
+        act_bookmark = QAction("Zeile favorisieren / Lesezeichen", self)
+        act_bookmark.setShortcut(QKeySequence("Ctrl+F2"))
+        act_bookmark.setToolTip(
+            "Editor: aktuelle Zeile als Lesezeichen (Klick auf Zeilennummer)"
+        )
+        act_bookmark.triggered.connect(self._toggle_line_bookmark)
+        m_edit.addAction(act_bookmark)
+        act_bm_next = QAction("Nächstes Zeilen-Lesezeichen", self)
+        act_bm_next.setShortcut(QKeySequence("F2"))
+        act_bm_next.setToolTip("Zum nächsten Editor-Lesezeichen springen")
+        act_bm_next.triggered.connect(self._goto_next_line_bookmark)
+        m_edit.addAction(act_bm_next)
+        act_bm_prev = QAction("Vorheriges Zeilen-Lesezeichen", self)
+        act_bm_prev.setShortcut(QKeySequence("Shift+F2"))
+        act_bm_prev.setToolTip("Zum vorherigen Editor-Lesezeichen springen")
+        act_bm_prev.triggered.connect(self._goto_prev_line_bookmark)
+        m_edit.addAction(act_bm_prev)
+        act_bm_clear = QAction("Alle Zeilen-Lesezeichen löschen", self)
+        act_bm_clear.setToolTip("Alle Editor-Zeilenfavoriten entfernen")
+        act_bm_clear.triggered.connect(self._clear_line_bookmarks)
+        m_edit.addAction(act_bm_clear)
         act_dup_line = QAction("Zeile duplizieren", self)
         act_dup_line.setShortcut(QKeySequence("Ctrl+D"))
         act_dup_line.setToolTip("Aktuelle Zeile / Auswahl darunter duplizieren")
@@ -688,6 +711,13 @@ class MainWindow(QMainWindow):
         )
         act_recolor_ann.triggered.connect(self._recolor_selected_annotations)
         m_edit.addAction(act_recolor_ann)
+        act_opacity_ann = QAction("Auswahl-Deckkraft ändern…", self)
+        act_opacity_ann.setShortcut(QKeySequence("Ctrl+Alt+Shift+O"))
+        act_opacity_ann.setToolTip(
+            "Deckkraft aller ausgewählten Annotationen auf einmal ändern (Batch)"
+        )
+        act_opacity_ann.triggered.connect(self._opacity_selected_annotations)
+        m_edit.addAction(act_opacity_ann)
         act_dup_ann = QAction("Annotation duplizieren", self)
         act_dup_ann.setShortcut(QKeySequence("Ctrl+Shift+D"))
         act_dup_ann.setToolTip("Ausgewählte Annotation kopieren (leicht versetzt)")
@@ -1079,6 +1109,10 @@ class MainWindow(QMainWindow):
         a = QAction("Logordner öffnen", self)
         a.setToolTip("Crash-/App-Logordner im Dateimanager öffnen")
         a.triggered.connect(self._open_log_folder)
+        m_help.addAction(a)
+        a = QAction("Crash-Report erstellen…", self)
+        a.setToolTip("Logordner als ZIP speichern (Support / Diagnose)")
+        a.triggered.connect(self._create_crash_report)
         m_help.addAction(a)
         m_help.addSeparator()
         a = QAction("Auf Updates prüfen…", self)
@@ -1551,6 +1585,49 @@ class MainWindow(QMainWindow):
         if n:
             self._refresh_pdf_marks()
 
+    def _opacity_selected_annotations(self):
+        if self.stack.currentWidget() is not self.pdf_view or not self.pdf_view.pdf_path:
+            self._set_status("Auswahl-Deckkraft nur im PDF-Modus")
+            return
+        n = self.pdf_view.set_opacity_selected_annotations()
+        if n:
+            self._refresh_pdf_marks()
+
+    def _toggle_line_bookmark(self):
+        if self.stack.currentWidget() is not self.editor_pane:
+            self.stack.setCurrentWidget(self.editor_pane)
+        now = self.editor.toggle_line_bookmark()
+        line = self.editor.textCursor().blockNumber() + 1
+        self._set_status(
+            f"Zeile {line} als Lesezeichen markiert"
+            if now
+            else f"Zeile {line} Lesezeichen entfernt"
+        )
+
+    def _goto_next_line_bookmark(self):
+        if self.stack.currentWidget() is not self.editor_pane:
+            self.stack.setCurrentWidget(self.editor_pane)
+        line = self.editor.goto_next_line_bookmark()
+        if line:
+            self._set_status(f"Lesezeichen → Zeile {line}")
+        else:
+            self._set_status("Keine Zeilen-Lesezeichen")
+
+    def _goto_prev_line_bookmark(self):
+        if self.stack.currentWidget() is not self.editor_pane:
+            self.stack.setCurrentWidget(self.editor_pane)
+        line = self.editor.goto_prev_line_bookmark()
+        if line:
+            self._set_status(f"Lesezeichen → Zeile {line}")
+        else:
+            self._set_status("Keine Zeilen-Lesezeichen")
+
+    def _clear_line_bookmarks(self):
+        if self.stack.currentWidget() is not self.editor_pane:
+            self.stack.setCurrentWidget(self.editor_pane)
+        self.editor.clear_line_bookmarks()
+        self._set_status("Zeilen-Lesezeichen gelöscht")
+
     def _check_spelling(self):
         if self.stack.currentWidget() is not self.editor_pane:
             self.stack.setCurrentWidget(self.editor_pane)
@@ -1826,6 +1903,13 @@ class MainWindow(QMainWindow):
 
             self._set_status(f"Logordner: {log_dir()}")
 
+    def _create_crash_report(self):
+        from instantlensdoc.ui.help_dialog import create_crash_report_zip_dialog
+
+        path = create_crash_report_zip_dialog(self)
+        if path is not None:
+            self._set_status(f"Crash-Report: {path}")
+
     def _open_workdir(self):
         """Ordner der aktuellen Datei bzw. Prozess-CWD im Dateimanager öffnen."""
         from PySide6.QtCore import QUrl
@@ -1973,10 +2057,40 @@ class MainWindow(QMainWindow):
         if self.pdf_view.pdf_path:
             self._refresh_thumbs()
             self._refresh_outline(self.pdf_view.pdf_path)
+            self._refresh_page_favorites()
         else:
             self.sidebar.clear_thumbs()
             self.sidebar.clear_annotations()
             self.sidebar.set_outline([])
+            self.sidebar.clear_page_favorites()
+
+    def _refresh_page_favorites(self):
+        """Sidebar-Liste der nummerierten PDF-Favoriten aktualisieren."""
+        if not self.pdf_view.pdf_path or self.pdf_view.store is None:
+            self.sidebar.clear_page_favorites()
+            return
+        favs = self.pdf_view.list_page_favorites()
+        labels: list[str] = []
+        for p in favs:
+            try:
+                labels.append(
+                    self.pdf_view.page_label(p) if self.pdf_view.has_page_labels() else ""
+                )
+            except Exception:
+                labels.append("")
+        self.sidebar.set_page_favorites(
+            favs, labels=labels, current=self.pdf_view.page_index
+        )
+
+    def _on_page_favorite_jump(self, page_index: int):
+        if self.stack.currentWidget() is not self.pdf_view:
+            self.stack.setCurrentWidget(self.pdf_view)
+        if not self.pdf_view.pdf_path:
+            self._set_status("Favorit: PDF öffnen")
+            return
+        self.pdf_view.goto_page(int(page_index))
+        self.sidebar.select_thumb(int(page_index))
+        self._set_status(f"Favorit → Seite {int(page_index) + 1}")
 
     def _focus_search(self):
         self.sidebar.setVisible(True)
@@ -2064,6 +2178,7 @@ class MainWindow(QMainWindow):
             self.editor.setPlainText(text)
             self.editor.blockSignals(False)
             self.editor.clear_extra_selections()
+            self.editor.clear_line_bookmarks()
             self._editor_marks.clear()
             self.sidebar.set_marks([])
             self.sidebar.clear_thumbs()
@@ -2588,6 +2703,7 @@ class MainWindow(QMainWindow):
     def _on_pdf_page_changed(self, page_index: int):
         self.sidebar.select_thumb(page_index)
         self.sidebar.set_annotation_current_page(page_index)
+        self._refresh_page_favorites()
         self._update_doc_status()
     def _set_pdf_password(self):
         if not self.pdf_view.pdf_path:
@@ -3207,6 +3323,7 @@ class MainWindow(QMainWindow):
                 self.editor.setPlainText(self.doc.text)
                 self.editor.blockSignals(False)
                 self.editor.clear_extra_selections()
+                self.editor.clear_line_bookmarks()
                 self._editor_marks.clear()
                 self.sidebar.set_marks([])
                 self.sidebar.clear_thumbs()

@@ -73,8 +73,11 @@ SHORTCUTS_HTML = """
 <tr><td>Alle Annotationen auf Seite</td><td><code>Ctrl+A</code> (PDF-Modus)</td></tr>
 <tr><td>Seitengröße mm/inch</td><td><code>Ctrl+Alt+U</code> / Klick Status</td></tr>
 <tr><td>Seite als Favorit umschalten</td><td><code>Ctrl+Shift+F</code> / Toolbar ★</td></tr>
-<tr><td>Seiten-Favoriten springen</td><td><code>Ctrl+Alt+F</code> / Toolbar ★…</td></tr>
+<tr><td>Seiten-Favoriten springen</td><td><code>Ctrl+Alt+F</code> / Toolbar ★… / Sidebar-Liste</td></tr>
 <tr><td>Auswahl-Farbe ändern (Batch)</td><td><code>Ctrl+Alt+Shift+F</code></td></tr>
+<tr><td>Auswahl-Deckkraft ändern (Batch)</td><td><code>Ctrl+Alt+Shift+O</code> / Toolbar α…</td></tr>
+<tr><td>Zeile favorisieren (Editor)</td><td><code>Ctrl+F2</code> / Klick Zeilennummer</td></tr>
+<tr><td>Nächstes / vorheriges Zeilen-Lesezeichen</td><td><code>F2</code> / <code>Shift+F2</code></td></tr>
 <tr><td>Rechtschreibung prüfen</td><td><code>F7</code></td></tr>
 <tr><td>Diese Hilfe</td><td><code>F1</code></td></tr>
 <tr><td>Cheat-Sheet als PDF</td><td>F1 → „Als PDF exportieren…“</td></tr>
@@ -87,6 +90,12 @@ PDF → Annotationen speichern unter…</p>
 <p><b>Als Kopie speichern (PDF):</b> schreibt PDF + Sidecar an neuen Pfad;
 aktuelles Dokument bleibt geöffnet (<code>Ctrl+Alt+S</code> / Datei / PDF).</p>
 <p><b>Lesezeichen:</b> Sidebar +/− oder PDF → Lesezeichen hinzufügen/löschen.</p>
+<p><b>PDF-Favoriten:</b> Sidebar-Liste mit Nummern (1. Seite N …); ★ / Ctrl+Shift+F markiert;
+Ctrl+Alt+F Dialog; Sidecar-Meta <code>page_favorites</code>.</p>
+<p><b>Editor-Zeilenfavoriten:</b> Marker in der Zeilennummernleiste; Ctrl+F2 umschalten;
+F2 / Shift+F2 springen.</p>
+<p><b>Auswahl-Deckkraft Batch:</b> Annotation(en) auswählen → Ctrl+Alt+Shift+O oder Toolbar „α…“.</p>
+<p><b>Crash-Report:</b> Hilfe → Crash-Report erstellen… (Logordner als ZIP).</p>
 <p><b>Annotationen JSON/CSV/Bericht:</b> PDF → als JSON oder CSV exportieren / JSON importieren;
 <strong>Kommentar-Bericht</strong> als zusammenhängendes TXT oder Markdown (nach Seite gruppiert).</p>
 <p><b>PDF-Werkzeuge</b> (Toolbar): Auswahl (auch PDF-Links öffnen / Ann. verschieben wenn entsperrt), Highlight, Schwärzen (REDACT-Preview), Formen per Drag;
@@ -138,8 +147,10 @@ Export CSV/Bericht enthält Tags und Gruppen.</p>
 <p><b>Encoding Auto:</b> Einstellungen → Editor-Encoding „Automatisch“ (BOM; optional chardet).</p>
 <p><b>Quiet Startup:</b> Einstellungen → Splash beim Start überspringen.</p>
 <p><b>Seiten-Favoriten:</b> PDF → ★ / Ctrl+Shift+F markiert die aktuelle Seite; Ctrl+Alt+F springt zu Favoriten
-(gespeichert in Sidecar-Meta <code>page_favorites</code>).</p>
+(gespeichert in Sidecar-Meta <code>page_favorites</code>); <b>Sidebar-Liste mit Nummern</b>.</p>
 <p><b>Auswahl-Farbe Batch:</b> Annotation(en) auswählen → Ctrl+Alt+Shift+F oder Bearbeiten → Auswahl-Farbe ändern…</p>
+<p><b>Auswahl-Deckkraft Batch:</b> Annotation(en) auswählen → Ctrl+Alt+Shift+O / Toolbar α…</p>
+<p><b>Editor-Zeilenfavoriten:</b> Ctrl+F2 oder Klick auf Zeilennummer; F2 / Shift+F2 springen.</p>
 <p><b>Rechtschreibung:</b> Einstellungen → Rechtschreibwörterbuch (Wortliste) → F7 prüft ohne Spell-Lib;
 About: Datenschutz-Hinweis (lokal, keine Telemetrie).</p>
 <p><b>Startup-Deps:</b> beim Start Prüfung pypdfium2 / Tesseract; Dialog wenn etwas fehlt.</p>
@@ -156,6 +167,7 @@ About: Datenschutz-Hinweis (lokal, keine Telemetrie).</p>
 <p><b>PDF Graustufen:</b> Ansicht → PDF Graustufen / Toolbar „Grau“ (Ansicht + Export).</p>
 <p><b>PDF Nachtmodus:</b> Ansicht → PDF Nachtmodus / Toolbar „Nacht“ (nur Invert-Ansicht, nicht speichern).</p>
 <p><b>Logordner:</b> Hilfe → Logordner öffnen (Crash-/App-Logs).</p>
+<p><b>Crash-Report:</b> Hilfe → Crash-Report erstellen… (ZIP aus Logordner).</p>
 <p><b>Lizenz:</b> bei weniger als 7 Resttagen prominent in der Statusleiste.</p>
 <p><b>Seiten als Bilder:</b> PDF → Seite/Seiten als PNG/JPEG exportieren (aktuell oder alle; DPI 72/150/300).</p>
 <p><b>Thumbnails:</b> in der Sidebar ziehen zum Neuordnen der Seiten; Größe in Einstellungen (klein/normal/groß).</p>

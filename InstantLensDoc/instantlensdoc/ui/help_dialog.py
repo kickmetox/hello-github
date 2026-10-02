@@ -85,9 +85,10 @@ HELP_HTML = f"""
 <li><b>PDF</b>: Blättern, Zoom/Fit (debounced + Cache), <b>⟲/⟳ drehen</b> / <b>↔/↕ spiegeln</b> (speichert),
     <b>Graustufen</b> (Ansicht + Bild-Export), <b>Nachtmodus</b> (nur Ansicht, nicht speichern),
     <b>leere Seite / duplizieren</b>, Seite löschen (<b>Undo Ctrl+Z</b> / <b>Historie-Liste</b>), Seiten neu anordnen;
-    <b>Annotationsgruppen</b> umbenennen/Farbe (Ctrl+Alt+G); <b>Seiten-Favoriten</b> (★ / Ctrl+Shift+F, springen Ctrl+Alt+F);
-    <b>Auswahl-Farbe Batch</b> (Ctrl+Alt+Shift+F); Export CSV/Bericht inkl. Tags+Gruppen;
-    Soft-Hyphen / NBSP im Editor; <b>Rechtschreibung</b> per lokaler Wortliste (F7, Pfad in Einstellungen);
+    <b>Annotationsgruppen</b> umbenennen/Farbe (Ctrl+Alt+G); <b>Seiten-Favoriten</b> (★ / Ctrl+Shift+F, springen Ctrl+Alt+F, <b>Sidebar-Liste mit Nummern</b>);
+    <b>Auswahl-Farbe Batch</b> (Ctrl+Alt+Shift+F); <b>Auswahl-Deckkraft Batch</b> (Ctrl+Alt+Shift+O / α…);
+    Soft-Hyphen / NBSP im Editor; <b>Zeilen-Lesezeichen</b> (Ctrl+F2 / Klick Zeilennummer, F2/Shift+F2);
+    <b>Rechtschreibung</b> per lokaler Wortliste (F7, Pfad in Einstellungen);
     Startup-Check pypdfium2/Tesseract; Splash optional überspringbar;
     <b>PDF-Links (http/https)</b> per Auswahl-Werkzeug / Ctrl+Klick öffnen;
     Annotationen: Highlight (Drag, <b>Selection→Highlight</b> über Text) + <b>Farben-Picker HL/Stift</b> + <b>3 Favoriten</b> + <b>Deckkraft α</b>, <b>Schwärzen/Redaction</b> (Drag + Preview „REDACT“ + Einbrennen-Dialog), Unterstreichen, Notiz, <b>Text-Overlay</b>,
@@ -121,6 +122,7 @@ HELP_HTML = f"""
 <li><b>Hilfe → Über InstantLens Doc</b>: Feature-Kurzliste + Link zu FEATURES.md;
     Datenschutz-Hinweis (lokal, keine Telemetrie, keine Cloud)</li>
 <li><b>Hilfe → Logordner öffnen</b>: Crash-/App-Logs im Dateimanager</li>
+<li><b>Hilfe → Crash-Report erstellen</b>: Logordner als ZIP speichern (Support)</li>
 <li><b>Zwischenablage</b>: Bild einfügen (Editor Ctrl+Shift+V / PDF Strg+V) — Stempel oder neue Seite</li>
 <li><b>Session</b>: Offene Dokumente (Sidebar-Liste) werden beim Beenden gespeichert;
     Wiederherstellung beim Start optional in den Einstellungen</li>
@@ -167,6 +169,60 @@ def open_log_folder(parent=None) -> bool:
     return bool(ok)
 
 
+def create_crash_report_zip_dialog(parent=None):
+    """
+    Logordner als Crash-Report-ZIP speichern (Dateidialog).
+    Rückgabe: Path bei Erfolg, sonst None.
+    """
+    from datetime import datetime
+    from pathlib import Path
+
+    from PySide6.QtWidgets import QFileDialog
+
+    from instantlensdoc.core.app_settings import (
+        get_last_export_dir,
+        remember_recent_dir,
+        set_last_export_dir,
+    )
+    from instantlensdoc.core.logging_setup import create_crash_report_zip
+
+    stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    default_name = f"InstantLensDoc-crash-report-{stamp}.zip"
+    last = get_last_export_dir()
+    start_dir = Path(last) if last else log_dir()
+    start = str(start_dir / default_name)
+    path, _ = QFileDialog.getSaveFileName(
+        parent,
+        "Crash-Report speichern",
+        start,
+        "ZIP-Archiv (*.zip)",
+    )
+    if not path:
+        return None
+    dest = Path(path)
+    if dest.suffix.lower() != ".zip":
+        dest = dest.with_suffix(".zip")
+    try:
+        out = create_crash_report_zip(dest)
+    except Exception as e:
+        if parent is not None:
+            QMessageBox.warning(parent, "Crash-Report", str(e))
+        return None
+    try:
+        set_last_export_dir(str(out.parent))
+        remember_recent_dir(str(out))
+    except Exception:
+        pass
+    if parent is not None:
+        QMessageBox.information(
+            parent,
+            "Crash-Report",
+            f"Crash-Report gespeichert:\n{out}\n\n"
+            "Enthält die Dateien aus dem Logordner (keine Dokumente).",
+        )
+    return out
+
+
 class HelpDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -192,6 +248,10 @@ class HelpDialog(QDialog):
         btn_logs.setToolTip("Crash-/App-Logordner im Dateimanager öffnen")
         btn_logs.clicked.connect(lambda: open_log_folder(self))
         btn_row.addWidget(btn_logs)
+        btn_crash = QPushButton("Crash-Report…")
+        btn_crash.setToolTip("Logordner als ZIP speichern (Support / Diagnose)")
+        btn_crash.clicked.connect(lambda: create_crash_report_zip_dialog(self))
+        btn_row.addWidget(btn_crash)
         btn_row.addStretch(1)
         layout.addLayout(btn_row)
 
@@ -266,10 +326,10 @@ class AboutDialog(QDialog):
             "<h3>Features (Kurz)</h3>"
             "<ul>"
             "<li>PDF lesen/annotieren (Highlight, Notiz, Stempel, Formen) · Sidecar v4</li>"
-            "<li>Seitenlabels, Continuous Scroll, Spread, CropBox · Seiten-Favoriten</li>"
-            "<li>Editor: Find/Replace, Snippets, Bracket-Match, Minimap, Wortlisten-Rechtschreibung</li>"
-            "<li>OCR-Bridge, Formulargenerator, Batch, Export · Ann.-Batch-Farbe</li>"
-            "<li>Annotation-Tags, Kommentar-Bericht, Farbe Palette-Zyklus</li>"
+            "<li>Seitenlabels, Continuous Scroll, Spread, CropBox · Seiten-Favoriten (Sidebar)</li>"
+            "<li>Editor: Find/Replace, Snippets, Bracket-Match, Minimap, Zeilen-Lesezeichen, Wortlisten-Rechtschreibung</li>"
+            "<li>OCR-Bridge, Formulargenerator, Batch, Export · Ann.-Batch-Farbe/Deckkraft</li>"
+            "<li>Annotation-Tags, Kommentar-Bericht, Farbe Palette-Zyklus · Crash-Report-ZIP</li>"
             "<li>Lizenz Trial/Keys · lokal, ohne Telemetrie · Stubs: KI, Cloud, Stylus, 3D</li>"
             "</ul>"
             "<p>Vollständige Liste: FEATURES.md</p>"

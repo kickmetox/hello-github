@@ -2,7 +2,7 @@
 
 Moderne Textverarbeitung mit PDF-Annotator, OCR-Bridge und Formulargenerator.
 
-**Version:** 0.5.6  
+**Version:** 0.5.7  
 **Hersteller:** Andreas Meyer · ame@sellerbach.de
 
 ## Quickstart (Windows)
@@ -29,8 +29,8 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)
 
-## Neu in 0.5.6
+## Neu in 0.5.7
 
-Seiten-Favoriten (schnell springen), Annotation-Batch-Farbe für Auswahl, Editor-Rechtschreibwörterbuch (Wortliste/F7), About-Privacy (lokal, keine Telemetrie). Stubs KI/Cloud/Stylus/3D unverändert.
+PDF-Favoriten in Sidebar mit Nummern, Annotation-Deckkraft-Batch für Auswahl, Editor-Zeilenfavoriten/Lesezeichen, Crash-Report-ZIP aus Logordner. Stubs KI/Cloud/Stylus/3D unverändert.
 
 Siehe [CHANGELOG.md](CHANGELOG.md), [FEATURES.md](FEATURES.md) und [INFO.md](INFO.md).
