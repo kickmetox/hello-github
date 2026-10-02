@@ -106,6 +106,80 @@ class ThumbnailList(QListWidget):
             self.pages_reordered.emit(order)
 
 
+class PageFavoriteList(QListWidget):
+    """Nummerierte PDF-Favoriten; Drag InternalMove → neue Reihenfolge."""
+
+    favorites_reordered = Signal(list)  # list[int] Seiten 0-basiert in neuer Reihenfolge
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setMaximumHeight(100)
+        self.setDragDropMode(QAbstractItemView.InternalMove)
+        self.setDefaultDropAction(Qt.MoveAction)
+        self.setMovement(QListWidget.Snap)
+        self.setToolTip(
+            "Nummerierte Favoriten — Klick springt; ziehen zum Umsortieren (★ / Ctrl+Shift+F)"
+        )
+        self._reorder_enabled = True
+        self._renumbering = False
+
+    def set_reorder_enabled(self, enabled: bool):
+        self._reorder_enabled = bool(enabled)
+        mode = QAbstractItemView.InternalMove if enabled else QAbstractItemView.NoDragDrop
+        self.setDragDropMode(mode)
+
+    def dropEvent(self, event):
+        if not self._reorder_enabled or self._renumbering:
+            event.ignore()
+            return
+        super().dropEvent(event)
+        order: list[int] = []
+        for i in range(self.count()):
+            item = self.item(i)
+            if item is None:
+                continue
+            page = item.data(Qt.UserRole)
+            if page is None:
+                page = item.data(256)
+            if page is not None:
+                try:
+                    order.append(int(page))
+                except (TypeError, ValueError):
+                    continue
+        if order:
+            self._renumber_items()
+            self.favorites_reordered.emit(order)
+
+    def _renumber_items(self):
+        """Anzeige-Nummern nach Drag anpassen (1. Seite N …)."""
+        self._renumbering = True
+        try:
+            for i in range(self.count()):
+                item = self.item(i)
+                if item is None:
+                    continue
+                page = item.data(Qt.UserRole)
+                if page is None:
+                    continue
+                tip_extra = ""
+                tip = item.toolTip() or ""
+                if "(" in tip and tip.endswith(")"):
+                    # Label in Tooltip beibehalten falls vorhanden
+                    pass
+                label = ""
+                text = item.text()
+                if "(" in text and text.endswith(")"):
+                    label = text[text.rfind("(") + 1 : -1]
+                idx = int(page)
+                new_text = f"{i + 1}. Seite {idx + 1}"
+                if label:
+                    new_text = f"{new_text} ({label})"
+                item.setText(new_text)
+                item.setToolTip(f"Favorit #{i + 1} → Seite {idx + 1}")
+        finally:
+            self._renumbering = False
+
+
 class Sidebar(QWidget):
     file_activated = Signal(str)
     recent_activated = Signal(str)
@@ -124,6 +198,8 @@ class Sidebar(QWidget):
     fulltext_hit_activated = Signal(str, object)  # path, page_index|None
     page_thumb_activated = Signal(int)  # PDF-Seite 0-basiert
     page_favorite_activated = Signal(int)  # PDF-Seite 0-basiert (Favoriten-Liste)
+    page_favorites_reordered = Signal(list)  # Seiten 0-basiert neue Reihenfolge
+    line_favorite_activated = Signal(int)  # Editor-Zeile 1-basiert
     pages_reordered = Signal(list)  # alte Indizes in neuer Reihenfolge
 
     def __init__(self, parent=None):
@@ -195,15 +271,22 @@ class Sidebar(QWidget):
         ol_btns.addStretch(1)
         layout.addLayout(ol_btns)
 
-        layout.addWidget(QLabel("PDF-Favoriten"))
-        self.page_favorites = QListWidget()
-        self.page_favorites.setMaximumHeight(100)
-        self.page_favorites.setToolTip(
-            "Nummerierte Favoriten-Seiten — Klick springt zur Seite (★ / Ctrl+Shift+F)"
-        )
+        layout.addWidget(QLabel("PDF-Favoriten — ziehen zum Ordnen"))
+        self.page_favorites = PageFavoriteList()
         self.page_favorites.itemClicked.connect(self._activate_page_favorite)
         self.page_favorites.itemDoubleClicked.connect(self._activate_page_favorite)
+        self.page_favorites.favorites_reordered.connect(self.page_favorites_reordered.emit)
         layout.addWidget(self.page_favorites)
+
+        layout.addWidget(QLabel("Editor-Zeilenfavoriten"))
+        self.line_favorites = QListWidget()
+        self.line_favorites.setMaximumHeight(100)
+        self.line_favorites.setToolTip(
+            "Alle Zeilen-Lesezeichen — Klick springt zur Zeile (Ctrl+F2 / F2)"
+        )
+        self.line_favorites.itemClicked.connect(self._activate_line_favorite)
+        self.line_favorites.itemDoubleClicked.connect(self._activate_line_favorite)
+        layout.addWidget(self.line_favorites)
 
         layout.addWidget(QLabel("Annotationen (gruppiert nach Seite)"))
         self.ann_filter = QComboBox()
@@ -367,9 +450,12 @@ class Sidebar(QWidget):
         labels: list[str] | None = None,
         current: int | None = None,
     ):
-        """Nummerierte Favoriten-Seiten in der Sidebar (1. Seite N …)."""
+        """Nummerierte Favoriten-Seiten in der Sidebar (1. Seite N …); Drag zum Umsortieren."""
         self.page_favorites.clear()
         pages = list(pages or [])
+        enable_drag = bool(pages)
+        if hasattr(self.page_favorites, "set_reorder_enabled"):
+            self.page_favorites.set_reorder_enabled(enable_drag)
         for i, p in enumerate(pages):
             try:
                 idx = int(p)
@@ -384,7 +470,7 @@ class Sidebar(QWidget):
             item = QListWidgetItem(text)
             item.setData(Qt.UserRole, idx)
             item.setData(256, idx)
-            item.setToolTip(f"Favorit #{i + 1} → Seite {idx + 1}")
+            item.setToolTip(f"Favorit #{i + 1} → Seite {idx + 1} — ziehen zum Umsortieren")
             self.page_favorites.addItem(item)
         if not pages:
             empty = QListWidgetItem("(keine — ★ markieren)")
@@ -400,6 +486,50 @@ class Sidebar(QWidget):
 
     def clear_page_favorites(self):
         self.set_page_favorites([])
+
+    def _activate_line_favorite(self, item: QListWidgetItem):
+        if item is None:
+            return
+        line = item.data(Qt.UserRole)
+        if line is None:
+            line = item.data(256)
+        if line is not None:
+            try:
+                self.line_favorite_activated.emit(int(line))
+            except (TypeError, ValueError):
+                pass
+
+    def set_line_favorites(self, lines: list[int] | None, *, current: int | None = None):
+        """Alle Editor-Zeilenfavoriten als nummerierte Liste (1-basierte Zeilen)."""
+        self.line_favorites.clear()
+        lines = list(lines or [])
+        for i, ln in enumerate(lines):
+            try:
+                line = int(ln)
+            except (TypeError, ValueError):
+                continue
+            if line < 1:
+                continue
+            text = f"{i + 1}. Zeile {line}"
+            item = QListWidgetItem(text)
+            item.setData(Qt.UserRole, line)
+            item.setData(256, line)
+            item.setToolTip(f"Zeilenfavorit #{i + 1} → Zeile {line}")
+            self.line_favorites.addItem(item)
+        if not lines:
+            empty = QListWidgetItem("(keine — Ctrl+F2)")
+            empty.setFlags(Qt.NoItemFlags)
+            self.line_favorites.addItem(empty)
+            return
+        if current is not None:
+            for row in range(self.line_favorites.count()):
+                it = self.line_favorites.item(row)
+                if it and it.data(Qt.UserRole) == int(current):
+                    self.line_favorites.setCurrentRow(row)
+                    break
+
+    def clear_line_favorites(self):
+        self.set_line_favorites([])
 
     def _activate_thumb(self, item: QListWidgetItem):
         page = item.data(Qt.UserRole)

@@ -281,6 +281,12 @@ class Annotation:
         d = asdict(self)
         d["type"] = self.type.value
         d["tags"] = normalize_tags(d.get("tags"))
+        # Opacity immer explizit und geklemmt persistieren (Sidecar-Robustheit)
+        try:
+            op = float(d.get("opacity", 1.0))
+        except (TypeError, ValueError):
+            op = 1.0
+        d["opacity"] = round(max(0.05, min(1.0, op)), 4)
         return d
 
     def color_rgb(self) -> list[float]:
@@ -579,6 +585,14 @@ class AnnotationStore:
         self.dirty = True
         return len(targets)
 
+    @staticmethod
+    def _normalize_opacity(value: object) -> float:
+        try:
+            op = float(value)  # type: ignore[arg-type]
+        except (TypeError, ValueError):
+            op = 1.0
+        return round(max(0.05, min(1.0, op)), 4)
+
     def update(self, ann_id: str, **kwargs) -> Optional[Annotation]:
         for a in self.annotations:
             if a.id == ann_id:
@@ -587,6 +601,8 @@ class AnnotationStore:
                     if hasattr(a, k):
                         if k == "tags":
                             setattr(a, k, normalize_tags(v))
+                        elif k == "opacity":
+                            setattr(a, k, self._normalize_opacity(v))
                         else:
                             setattr(a, k, v)
                 a.touch()
@@ -611,6 +627,8 @@ class AnnotationStore:
                 if hasattr(a, k):
                     if k == "tags":
                         setattr(a, k, normalize_tags(v))
+                    elif k == "opacity":
+                        setattr(a, k, self._normalize_opacity(v))
                     else:
                         setattr(a, k, v)
             a.touch()
@@ -628,13 +646,20 @@ class AnnotationStore:
         return self.update_many(ann_ids, color=c)
 
     def set_opacities(self, ann_ids: Sequence[str], opacity: float) -> int:
-        """Batch-Deckkraft für Auswahl setzen (0.05–1.0)."""
-        try:
-            op = float(opacity)
-        except (TypeError, ValueError):
-            return 0
-        op = max(0.05, min(1.0, op))
+        """Batch-Deckkraft für Auswahl setzen (0.05–1.0); Sidecar-Feld opacity."""
+        op = self._normalize_opacity(opacity)
         return self.update_many(ann_ids, opacity=op)
+
+    def save_opacities(self, ann_ids: Sequence[str], opacity: float) -> int:
+        """
+        Batch-Deckkraft setzen und Sidecar sofort force-schreiben.
+        Rückgabe: Anzahl geänderter Annotationen (0 bei Fehler/keine Änderung).
+        """
+        n = self.set_opacities(ann_ids, opacity)
+        if n <= 0:
+            return 0
+        self.save(force=True)
+        return n
 
     def remove(self, ann_id: str) -> bool:
         before = len(self.annotations)
@@ -704,7 +729,7 @@ class AnnotationStore:
                 if old_p in mapping:
                     new_groups[str(mapping[old_p])] = val
             self._meta["page_groups"] = new_groups
-        # Seiten-Favoriten mit-remappen
+        # Seiten-Favoriten mit-remappen (Reihenfolge beibehalten)
         favs = list(self._meta.get("page_favorites") or [])
         if favs:
             remapped: list[int] = []
@@ -720,7 +745,6 @@ class AnnotationStore:
                 if new_p not in seen:
                     seen.add(new_p)
                     remapped.append(new_p)
-            remapped.sort()
             if remapped:
                 self._meta["page_favorites"] = remapped
             else:
@@ -729,7 +753,7 @@ class AnnotationStore:
             self.dirty = True
 
     def list_page_favorites(self) -> list[int]:
-        """Favoriten-Seitenindizes (0-basiert, sortiert, dedupliziert)."""
+        """Favoriten-Seitenindizes (0-basiert, Reihenfolge wie gespeichert, dedupliziert)."""
         raw = self._meta.get("page_favorites") or []
         out: list[int] = []
         seen: set[int] = set()
@@ -744,14 +768,13 @@ class AnnotationStore:
                 continue
             seen.add(p)
             out.append(p)
-        out.sort()
         return out
 
     def is_page_favorite(self, page: int) -> bool:
         return int(page) in self.list_page_favorites()
 
     def set_page_favorites(self, pages: Sequence[int]) -> list[int]:
-        """Favoritenliste setzen (sortiert/dedupliziert); leere Liste löscht Meta."""
+        """Favoritenliste setzen (Reihenfolge beibehalten, dedupliziert); leere Liste löscht Meta."""
         cleaned: list[int] = []
         seen: set[int] = set()
         for item in pages or []:
@@ -763,7 +786,6 @@ class AnnotationStore:
                 continue
             seen.add(p)
             cleaned.append(p)
-        cleaned.sort()
         if cleaned:
             self._meta["page_favorites"] = cleaned
         else:
@@ -771,9 +793,14 @@ class AnnotationStore:
         self.dirty = True
         return cleaned
 
+    def reorder_page_favorites(self, pages: Sequence[int]) -> list[int]:
+        """Favoriten-Reihenfolge setzen (Drag in Sidebar); nur bekannte Seiten behalten."""
+        return self.set_page_favorites(pages)
+
     def toggle_page_favorite(self, page: int) -> bool:
         """
         Seite als Favorit markieren/entfernen.
+        Neue Favoriten werden am Ende angehängt (Drag-Reihenfolge bleibt).
         Rückgabe: True wenn danach Favorit, sonst False.
         """
         p = int(page)

@@ -17,7 +17,7 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | Zuletzt geöffnete Dateien | fertig | Menü + Sidebar, `recent.json` |
 | PDF lesen / rendern | fertig | pypdfium2; große-PDF-Limits; Timeout-Hinweis 0.2.1 |
 | PDF Gehe zu Seite | fertig | Dialog Ctrl+G (PDF) / Ctrl+Shift+G; Menü PDF 0.4.6 |
-| PDF Seiten-Favoriten | fertig | ★ markieren (Ctrl+Shift+F); Liste springen (Ctrl+Alt+F); **Sidebar-Liste mit Nummern** 0.5.7; Sidecar `page_favorites` 0.5.6 |
+| PDF Seiten-Favoriten | fertig | ★ markieren (Ctrl+Shift+F); Liste springen (Ctrl+Alt+F); **Sidebar-Liste mit Nummern** 0.5.7; **Drag-Umsortieren** 0.5.8; Sidecar `page_favorites` 0.5.6 |
 | PDF Zwei-Seiten-Ansicht (Spread) | fertig | Optional; Ctrl+2 / Toolbar 2S; aktuelle+nächste Seite 0.4.7 |
 | PDF Continuous Scroll | fertig | Optional; Ctrl+3 / Toolbar CS; Seiten untereinander; schließt Spread aus 0.4.8 |
 | PDF Seitenlabels (römisch/arabisch) | fertig | Anzeige in Status/Toolbar wenn PageLabels vorhanden 0.4.9 |
@@ -38,7 +38,7 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | Update-Check-Hinweis | fertig | Hilfe-Menü; optional Start (nur wenn Einstellung aktiv); offline OK; Tray-Tooltip mit Version 0.3.9 |
 | Sidebar Seiten-Thumbnails | fertig | Vorschaubilder, Klick → Seite; Drag-Reorder 0.2.3; **Lazy-Load** 0.3.1; **Größe in Einstellungen** 0.3.8 |
 | Tastaturhilfe-Dialog | fertig | Hilfe → F1; **Cheat-Sheet als PDF exportieren** 0.4.7 |
-| App-Logging | fertig | %APPDATA%/InstantLensDoc/logs; **Hilfe → Logordner öffnen** 0.3.0; **Crash-Report ZIP** 0.5.7 |
+| App-Logging | fertig | %APPDATA%/InstantLensDoc/logs; **Hilfe → Logordner öffnen** 0.3.0; **Crash-Report ZIP** 0.5.7; **optional Screenshot-Pfad-Hinweis** 0.5.8 |
 | PDF-Annotationen (Highlight, Underline, Sticky, Text) | fertig | Sidecar `*.ildann.json` **v4** (`ildann-v4`); Farben-Picker Highlight/Stift 0.2.2; **Notizfarbe unabhängig** 0.4.7; Löschen Auswahl/letzte 0.2.3; **JSON Export/Import** 0.2.5; **PDF-Highlight Schema v4** 0.4.4; **Import-Validierung Schema v4** 0.4.5; **CSV Export** 0.3.8; **Sidebar-Filter nach Typ** 0.2.6; **Text nachträglich editierbar** 0.2.7; **Deckkraft/Opacity** 0.2.8; **Sidebar-Textsuche** 0.3.0; **Farben-Chips klickbar filtern** 0.4.6; **Zeitstempel in Liste** 0.4.8; **Filter nur aktuelle Seite** 0.4.9; **freie Tags/Labels filterbar** 0.5.1; **Selection→Highlight** 0.5.2 |
 | Annotation Undo/Redo | fertig | Ctrl+Z/Y inkl. Overlay-Text |
 | Annotation löschen | fertig | Auswahl oder letzte; Entf / Menü 0.2.3 |
@@ -49,10 +49,10 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | Annotation-Farben-Favoriten | fertig | 3 Presets speichern/anwenden (Toolbar 1/2/3) 0.3.7 |
 | Annotation-Farbe Palette-Zyklus | fertig | Ctrl+Shift+C Zyklus / Ctrl+Alt+Shift+C Random aus fester Palette 0.5.3 |
 | Annotation-Batch-Farbe (Auswahl) | fertig | Farbe für alle ausgewählten Ann. ändern; Ctrl+Alt+Shift+F 0.5.6 |
-| Annotation-Deckkraft Batch (Auswahl) | fertig | Opacity für Auswahl; Ctrl+Alt+Shift+O / Toolbar α… 0.5.7 |
+| Annotation-Deckkraft Batch (Auswahl) | fertig | Opacity für Auswahl; Ctrl+Alt+Shift+O / Toolbar α… 0.5.7; **Sidecar Force-Save / Clamp** 0.5.8 |
 | Annotation-Text editieren | fertig | Notiz/Kommentar/Overlay nachträglich; Doppelklick / Ctrl+E 0.2.7 |
 | Annotation-Tags/Labels | fertig | Freie Tags; Sidecar+CSV; Sidebar-Filter; Ctrl+Alt+T 0.5.1 |
-| Annotation-Deckkraft | fertig | `opacity` Sidecar + Toolbar α + Dialog 0.2.8 |
+| Annotation-Deckkraft | fertig | `opacity` Sidecar + Toolbar α + Dialog 0.2.8; **persistenter Force-Save** 0.5.8 |
 | Annotation-Suche Sidebar | fertig | Textfilter in Annotationsliste 0.3.0; **optional Regex** 0.5.2 |
 | Stempel / Callouts | fertig | Bibliothek GENEHMIGT/ENTWURF/VERTRAULICH + Datum 0.3.1; Callout (2-Klick); **Rotation 90°** 0.4.1 |
 | PDF URI-Links öffnen | fertig | Native Link-Annotationen http/https; Auswahl-Klick / Ctrl+Klick 0.4.1 |
@@ -89,7 +89,7 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | Annotation-Liste Sidebar | fertig | Klick → Seite + Auswahl 0.2.4; **Filter nach Typ** 0.2.6; **Textsuche** 0.3.0; **Gruppierung nach Seite** 0.3.5; **Statistik je Typ (Footer)** 0.3.9; **Nur aktuelle Seite** 0.4.9; **Tag-Filter** 0.5.1; **Regex optional** 0.5.2; **Gruppen Name/Farbe** 0.5.4 |
 | PDF Seitenbereich extrahieren | fertig | von–bis → neues PDF; Menü + Dialog-Tab 0.2.6 |
 | Editor Find/Replace | fertig | Ctrl+R Dialog 0.2.6 |
-| Editor Zeilennummern | fertig | Optional (Ansicht + Einstellungen) 0.2.7; **Zeilen-Lesezeichen/Favoriten** Ctrl+F2 / F2 0.5.7 |
+| Editor Zeilennummern | fertig | Optional (Ansicht + Einstellungen) 0.2.7; **Zeilen-Lesezeichen/Favoriten** Ctrl+F2 / F2 0.5.7; **Sidebar-Liste aller Zeilenfavoriten** 0.5.8 |
 | Editor Minimap | fertig | Optional Linien-Übersicht + dickere Scrollbar; Ansicht/Einstellungen; Ctrl+Shift+I 0.5.3 |
 | Editor Soft-Hyphen / NBSP | fertig | Einfügen Ctrl+Shift+- / Ctrl+Shift+Space; Menü Bearbeiten 0.5.4 |
 | Editor Groß-/Kleinschreibung | fertig | Auswahl umschalten Ctrl+Shift+U 0.2.8; **Alles groß/klein ganze Datei** 0.4.2 |
@@ -136,27 +136,27 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | Inno-Installer | fertig | Icon, Desktop, Uninstaller, Keygen optional (`InstantLensKeygen.exe`) 0.2.1 |
 | Sync-Skript Windows | fertig | Repo `scripts/sync-ild.ps1`; Store `docs/sync-ild.ps1` |
 | Arbeitsverzeichnis öffnen | fertig | Datei-Menü Ctrl+Shift+E; Ordner der Datei bzw. CWD 0.4.8 |
-| In-App Hilfe / About | fertig | Version 0.5.7; Fenstertitel + Splash; Logordner-Button; **Feature-Kurzliste + FEATURES.md** 0.4.9; **Keygen-Hinweis bei Trial** 0.5.3; **Splash überspringbar** 0.5.5; **Privacy: lokal, keine Telemetrie** 0.5.6; **Crash-Report ZIP** 0.5.7 |
+| In-App Hilfe / About | fertig | Version 0.5.8; Fenstertitel + Splash; Logordner-Button; **Feature-Kurzliste + FEATURES.md** 0.4.9; **Keygen-Hinweis bei Trial** 0.5.3; **Splash überspringbar** 0.5.5; **Privacy: lokal, keine Telemetrie** 0.5.6; **Crash-Report ZIP** 0.5.7; **Screenshot-Pfad optional** 0.5.8 |
 | Startup-Abhängigkeiten-Check | fertig | pypdfium2 kritisch + Tesseract optional; Dialog bei Problemen 0.5.4 |
 | Quiet Startup / Splash | fertig | Einstellungen: Splash überspringen 0.5.5 |
-| CHANGELOG | fertig | **0.5.7** PDF-Favoriten-Sidebar, Ann.-Opacity-Batch, Editor-Zeilenfavoriten, Crash-Report-ZIP |
+| CHANGELOG | fertig | **0.5.8** PDF-Favoriten Drag, Opacity Sidecar-Force, Zeilenfavoriten-Liste, Crash-Screenshot-Hinweis |
 | FEATURES.md / INFO.md | fertig | |
 | `ild_pdf` Modul + Beispielskript | fertig | metadata / page size / watermark / redact / acroform / attachments / flatten / **plain text** / **selection_to_highlight_rects** / **export_report** |
 | Font-Matching | geplant | |
 | Objekt-/Bildbearbeitung | geplant | |
 | Layout-Erhaltung (Scan→edit) | geplant | |
 | Freihand | geplant | |
-| KI-Assistent | Stub | Menü „Geplant“ 0.5.7 (keine Fake-KI) |
+| KI-Assistent | Stub | Menü „Geplant“ 0.5.8 (keine Fake-KI) |
 | Signieren (rechtssicher) | Stub | |
-| Cloud-Sync | Stub | Menü „Geplant“ 0.5.7 (keine Fake-Cloud) |
+| Cloud-Sync | Stub | Menü „Geplant“ 0.5.8 (keine Fake-Cloud) |
 | Text on Path / Text zu Pfaden | geplant | |
 | Envelope Distort / Text Wrap / Area Type | Stub/geplant | |
 | Schnittmasken | geplant | |
 | Füllungen / Live-Effekte | geplant | |
-| 3D-Extrusion | Stub | Menü „Geplant“ 0.5.7 |
+| 3D-Extrusion | Stub | Menü „Geplant“ 0.5.8 |
 | Variable Fonts (voll) | Stub | |
 | Glyphen-Palette | geplant | |
-| Stylus / Palm Rejection | Stub | Menü „Geplant“ 0.5.7 |
-| Intelligente Formerkennung | Stub | Menü „Geplant“ 0.5.7 |
+| Stylus / Palm Rejection | Stub | Menü „Geplant“ 0.5.8 |
+| Intelligente Formerkennung | Stub | Menü „Geplant“ 0.5.8 |
 
 Nicht behauptet als fertig: Cloud, KI, Stylus, 3D — nur Menü-Stubs + dieser Status.

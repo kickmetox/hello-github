@@ -1,5 +1,23 @@
 # Changelog — InstantLens Doc
 
+## 0.5.8 — PDF-Favoriten Drag-Reorder, Opacity Sidecar-Force, Zeilenfavoriten-Liste, Crash-Screenshot-Hinweis
+
+Nach 0.5.7: vier sinnvolle Ausbauten. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### PDF / Annotationen
+- **PDF-Favoriten umsortieren**: Drag in der Sidebar; Reihenfolge in Sidecar-Meta `page_favorites` (nicht mehr nur sortiert)
+- **Annotation-Opacity persistenter**: geklemmte/gerundete `opacity` im Sidecar; Batch speichert mit `force=True` / `save_opacities`
+
+### Editor / Hilfe
+- **Zeilenfavoriten-Liste**: alle Editor-Zeilenlesezeichen nummeriert in der Sidebar; Klick springt
+- **Crash-Report optional Screenshot**: Dialog fragt nach Screenshot-Pfad-Hinweis; REPORT.txt + optional `screenshots/` im ZIP
+
+### Packaging / Docs
+- Version **0.5.8** (App / ild_pdf / ISS / Smoke / Docs)
+- Stubs KI/Cloud/Stylus/3D unverändert
+
+---
+
 ## 0.5.7 — PDF-Favoriten-Sidebar, Ann.-Opacity-Batch, Editor-Zeilenfavoriten, Crash-Report-ZIP
 
 Nach 0.5.6: vier sinnvolle Ausbauten. Stubs KI/Cloud/Stylus/3D bleiben Stubs.

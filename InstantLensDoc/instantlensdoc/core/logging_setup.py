@@ -23,10 +23,16 @@ def log_file() -> Path:
     return log_dir() / "instantlensdoc.log"
 
 
-def create_crash_report_zip(dest: Path | str | None = None) -> Path:
+def create_crash_report_zip(
+    dest: Path | str | None = None,
+    *,
+    screenshot_path: Path | str | None = None,
+) -> Path:
     """
     Packt den Logordner (Crash-/App-Logs) als ZIP.
     dest: Zielpfad (.zip); wenn None → Logordner/InstantLensDoc-crash-report-YYYYMMDD-HHMMSS.zip
+    screenshot_path: optionaler Hinweis/Pfad zu einem Screenshot — wird in REPORT.txt
+      vermerkt und, falls die Datei existiert, ins ZIP unter screenshots/ kopiert.
     """
     import zipfile
     from datetime import datetime
@@ -38,16 +44,40 @@ def create_crash_report_zip(dest: Path | str | None = None) -> Path:
     else:
         dest_path = Path(dest)
     dest_path.parent.mkdir(parents=True, exist_ok=True)
+
+    shot: Path | None = None
+    shot_hint = ""
+    if screenshot_path is not None:
+        raw = str(screenshot_path).strip()
+        if raw:
+            shot_hint = raw
+            cand = Path(raw)
+            if cand.is_file():
+                shot = cand
+
     with zipfile.ZipFile(dest_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
         # Manifest kurz
         files = sorted(p for p in src.iterdir() if p.is_file() and p.suffix.lower() != ".zip")
         manifest = [
-            f"InstantLens Doc crash report",
+            "InstantLens Doc crash report",
             f"created: {datetime.now().isoformat(timespec='seconds')}",
             f"log_dir: {src}",
             f"files: {len(files)}",
             "",
         ]
+        if shot_hint:
+            manifest.append(f"screenshot_path_hint: {shot_hint}")
+            if shot is not None:
+                manifest.append(f"screenshot_included: screenshots/{shot.name}")
+            else:
+                manifest.append(
+                    "screenshot_included: no (Pfad nur als Hinweis — Datei nicht gefunden "
+                    "oder nicht angegeben)"
+                )
+            manifest.append("")
+        else:
+            manifest.append("screenshot_path_hint: (none)")
+            manifest.append("")
         for p in files:
             try:
                 manifest.append(f"- {p.name} ({p.stat().st_size} bytes)")
@@ -59,6 +89,11 @@ def create_crash_report_zip(dest: Path | str | None = None) -> Path:
                 zf.write(p, arcname=p.name)
             except OSError:
                 continue
+        if shot is not None:
+            try:
+                zf.write(shot, arcname=f"screenshots/{shot.name}")
+            except OSError:
+                pass
     return dest_path
 
 

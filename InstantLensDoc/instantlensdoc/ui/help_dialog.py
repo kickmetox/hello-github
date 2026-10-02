@@ -122,7 +122,7 @@ HELP_HTML = f"""
 <li><b>Hilfe → Über InstantLens Doc</b>: Feature-Kurzliste + Link zu FEATURES.md;
     Datenschutz-Hinweis (lokal, keine Telemetrie, keine Cloud)</li>
 <li><b>Hilfe → Logordner öffnen</b>: Crash-/App-Logs im Dateimanager</li>
-<li><b>Hilfe → Crash-Report erstellen</b>: Logordner als ZIP speichern (Support)</li>
+<li><b>Hilfe → Crash-Report erstellen</b>: Logordner als ZIP speichern (optional Screenshot-Pfad-Hinweis)</li>
 <li><b>Zwischenablage</b>: Bild einfügen (Editor Ctrl+Shift+V / PDF Strg+V) — Stempel oder neue Seite</li>
 <li><b>Session</b>: Offene Dokumente (Sidebar-Liste) werden beim Beenden gespeichert;
     Wiederherstellung beim Start optional in den Einstellungen</li>
@@ -172,12 +172,13 @@ def open_log_folder(parent=None) -> bool:
 def create_crash_report_zip_dialog(parent=None):
     """
     Logordner als Crash-Report-ZIP speichern (Dateidialog).
+    Optional: Screenshot-Pfad als Hinweis (und Datei ins ZIP, falls vorhanden).
     Rückgabe: Path bei Erfolg, sonst None.
     """
     from datetime import datetime
     from pathlib import Path
 
-    from PySide6.QtWidgets import QFileDialog
+    from PySide6.QtWidgets import QFileDialog, QMessageBox
 
     from instantlensdoc.core.app_settings import (
         get_last_export_dir,
@@ -202,8 +203,42 @@ def create_crash_report_zip_dialog(parent=None):
     dest = Path(path)
     if dest.suffix.lower() != ".zip":
         dest = dest.with_suffix(".zip")
+
+    screenshot_path: Path | str | None = None
+    if parent is not None:
+        reply = QMessageBox.question(
+            parent,
+            "Crash-Report — Screenshot",
+            "Optional: Screenshot-Pfad als Hinweis hinzufügen?\n\n"
+            "Ja → Datei wählen (wird in REPORT.txt vermerkt und, falls vorhanden, "
+            "unter screenshots/ ins ZIP kopiert).\n"
+            "Nein → nur Logordner.",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
+        )
+        if reply == QMessageBox.Yes:
+            shot, _ = QFileDialog.getOpenFileName(
+                parent,
+                "Screenshot auswählen (optional)",
+                str(start_dir),
+                "Bilder (*.png *.jpg *.jpeg *.bmp *.webp);;Alle Dateien (*)",
+            )
+            if shot:
+                screenshot_path = shot
+            else:
+                # Nutzer hat Dialog abgebrochen — trotzdem Pfad-Hinweis leer lassen,
+                # aber erlauben, einen manuellen Hinweis zu setzen
+                from PySide6.QtWidgets import QInputDialog
+
+                hint, ok = QInputDialog.getText(
+                    parent,
+                    "Screenshot-Pfad-Hinweis",
+                    "Pfad-Hinweis (optional, auch ohne vorhandene Datei):",
+                )
+                if ok and str(hint).strip():
+                    screenshot_path = str(hint).strip()
     try:
-        out = create_crash_report_zip(dest)
+        out = create_crash_report_zip(dest, screenshot_path=screenshot_path)
     except Exception as e:
         if parent is not None:
             QMessageBox.warning(parent, "Crash-Report", str(e))
@@ -214,11 +249,15 @@ def create_crash_report_zip_dialog(parent=None):
     except Exception:
         pass
     if parent is not None:
+        extra = ""
+        if screenshot_path:
+            extra = f"\n\nScreenshot-Hinweis:\n{screenshot_path}"
         QMessageBox.information(
             parent,
             "Crash-Report",
             f"Crash-Report gespeichert:\n{out}\n\n"
-            "Enthält die Dateien aus dem Logordner (keine Dokumente).",
+            "Enthält die Dateien aus dem Logordner (keine Dokumente)."
+            f"{extra}",
         )
     return out
 
@@ -326,10 +365,10 @@ class AboutDialog(QDialog):
             "<h3>Features (Kurz)</h3>"
             "<ul>"
             "<li>PDF lesen/annotieren (Highlight, Notiz, Stempel, Formen) · Sidecar v4</li>"
-            "<li>Seitenlabels, Continuous Scroll, Spread, CropBox · Seiten-Favoriten (Sidebar)</li>"
-            "<li>Editor: Find/Replace, Snippets, Bracket-Match, Minimap, Zeilen-Lesezeichen, Wortlisten-Rechtschreibung</li>"
-            "<li>OCR-Bridge, Formulargenerator, Batch, Export · Ann.-Batch-Farbe/Deckkraft</li>"
-            "<li>Annotation-Tags, Kommentar-Bericht, Farbe Palette-Zyklus · Crash-Report-ZIP</li>"
+            "<li>Seitenlabels, Continuous Scroll, Spread, CropBox · Seiten-Favoriten (Drag-Umsortieren)</li>"
+            "<li>Editor: Find/Replace, Snippets, Bracket-Match, Minimap, Zeilen-Lesezeichen (Sidebar-Liste), Wortlisten-Rechtschreibung</li>"
+            "<li>OCR-Bridge, Formulargenerator, Batch, Export · Ann.-Batch-Farbe/Deckkraft (Sidecar)</li>"
+            "<li>Annotation-Tags, Kommentar-Bericht, Farbe Palette-Zyklus · Crash-Report-ZIP (+ Screenshot optional)</li>"
             "<li>Lizenz Trial/Keys · lokal, ohne Telemetrie · Stubs: KI, Cloud, Stylus, 3D</li>"
             "</ul>"
             "<p>Vollständige Liste: FEATURES.md</p>"

@@ -335,6 +335,8 @@ class MainWindow(QMainWindow):
         self.sidebar.fulltext_hit_activated.connect(self._on_fulltext_hit)
         self.sidebar.page_thumb_activated.connect(self._on_thumb_jump)
         self.sidebar.page_favorite_activated.connect(self._on_page_favorite_jump)
+        self.sidebar.page_favorites_reordered.connect(self._on_page_favorites_reordered)
+        self.sidebar.line_favorite_activated.connect(self._on_line_favorite_jump)
         self.sidebar.pages_reordered.connect(self._on_thumbs_reordered)
         splitter.addWidget(self.sidebar)
 
@@ -342,6 +344,7 @@ class MainWindow(QMainWindow):
         self.editor_pane = EditorPane()
         self.editor = self.editor_pane.editor
         self.editor.textChanged.connect(self._on_text_changed)
+        self.editor.line_bookmarks_changed.connect(self._refresh_line_favorites)
         self.pdf_view = PdfViewer()
         self.pdf_view.status.connect(self._set_status)
         self.pdf_view.annotations_changed.connect(self._refresh_pdf_marks)
@@ -1598,6 +1601,7 @@ class MainWindow(QMainWindow):
             self.stack.setCurrentWidget(self.editor_pane)
         now = self.editor.toggle_line_bookmark()
         line = self.editor.textCursor().blockNumber() + 1
+        self._refresh_line_favorites()
         self._set_status(
             f"Zeile {line} als Lesezeichen markiert"
             if now
@@ -1609,6 +1613,7 @@ class MainWindow(QMainWindow):
             self.stack.setCurrentWidget(self.editor_pane)
         line = self.editor.goto_next_line_bookmark()
         if line:
+            self._refresh_line_favorites()
             self._set_status(f"Lesezeichen → Zeile {line}")
         else:
             self._set_status("Keine Zeilen-Lesezeichen")
@@ -1618,6 +1623,7 @@ class MainWindow(QMainWindow):
             self.stack.setCurrentWidget(self.editor_pane)
         line = self.editor.goto_prev_line_bookmark()
         if line:
+            self._refresh_line_favorites()
             self._set_status(f"Lesezeichen → Zeile {line}")
         else:
             self._set_status("Keine Zeilen-Lesezeichen")
@@ -1626,7 +1632,27 @@ class MainWindow(QMainWindow):
         if self.stack.currentWidget() is not self.editor_pane:
             self.stack.setCurrentWidget(self.editor_pane)
         self.editor.clear_line_bookmarks()
+        self._refresh_line_favorites()
         self._set_status("Zeilen-Lesezeichen gelöscht")
+
+    def _refresh_line_favorites(self):
+        """Sidebar-Liste aller Editor-Zeilenfavoriten aktualisieren."""
+        marks = self.editor.list_line_bookmarks()
+        cur = self.editor.textCursor().blockNumber() + 1
+        self.sidebar.set_line_favorites(marks, current=cur if cur in marks else None)
+
+    def _on_line_favorite_jump(self, line: int):
+        if self.stack.currentWidget() is not self.editor_pane:
+            self.stack.setCurrentWidget(self.editor_pane)
+        try:
+            ln = int(line)
+        except (TypeError, ValueError):
+            return
+        if ln < 1:
+            return
+        self.editor.goto_line(ln)
+        self._refresh_line_favorites()
+        self._set_status(f"Zeilenfavorit → Zeile {ln}")
 
     def _check_spelling(self):
         if self.stack.currentWidget() is not self.editor_pane:
@@ -2063,6 +2089,7 @@ class MainWindow(QMainWindow):
             self.sidebar.clear_annotations()
             self.sidebar.set_outline([])
             self.sidebar.clear_page_favorites()
+            self.sidebar.clear_line_favorites()
 
     def _refresh_page_favorites(self):
         """Sidebar-Liste der nummerierten PDF-Favoriten aktualisieren."""
@@ -2081,6 +2108,20 @@ class MainWindow(QMainWindow):
         self.sidebar.set_page_favorites(
             favs, labels=labels, current=self.pdf_view.page_index
         )
+
+    def _on_page_favorites_reordered(self, pages: list):
+        """Drag-Drop in der Favoriten-Sidebar → Sidecar-Reihenfolge speichern."""
+        if not self.pdf_view.pdf_path or self.pdf_view.store is None:
+            return
+        order = []
+        for p in pages or []:
+            try:
+                order.append(int(p))
+            except (TypeError, ValueError):
+                continue
+        self.pdf_view.reorder_page_favorites(order)
+        self._refresh_page_favorites()
+        self._set_status(f"PDF-Favoriten umsortiert ({len(order)})")
 
     def _on_page_favorite_jump(self, page_index: int):
         if self.stack.currentWidget() is not self.pdf_view:

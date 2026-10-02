@@ -3075,7 +3075,8 @@ class PdfViewer(QWidget):
             self.status.emit("Deckkraft nicht geändert")
             return 0
         try:
-            self.store.save()
+            # Force-Schreiben: Opacity muss im Sidecar zuverlässig landen
+            self.store.save(force=True)
         except Exception as e:
             QMessageBox.warning(self, "Annotation-Deckkraft", str(e))
             return 0
@@ -3083,6 +3084,21 @@ class PdfViewer(QWidget):
         self.annotations_changed.emit()
         self.status.emit(f"Deckkraft {float(value):.2f} für {n} Annotation(en)")
         return n
+
+    def reorder_page_favorites(self, pages: list[int]) -> list[int]:
+        """PDF-Favoriten-Reihenfolge aus Sidebar-Drag speichern."""
+        if not self.store or not self.pdf_path:
+            return []
+        cleaned = self.store.reorder_page_favorites(pages)
+        try:
+            self.store.save(force=True)
+        except Exception as e:
+            QMessageBox.warning(self, "Favoriten", str(e))
+            return []
+        self._refresh_fav_btn()
+        self.page_favorites_changed.emit()
+        self.status.emit(f"Favoriten umsortiert ({len(cleaned)})")
+        return cleaned
 
     def undo_page_op(self) -> bool:
         """Letzte Seiten-Operation (Löschen oder Drehen) rückgängig."""

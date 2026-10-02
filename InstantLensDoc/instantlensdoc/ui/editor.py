@@ -5,7 +5,7 @@ from __future__ import annotations
 import tempfile
 from pathlib import Path
 
-from PySide6.QtCore import QRect, QSize, Qt
+from PySide6.QtCore import QRect, QSize, Qt, Signal
 from PySide6.QtGui import QColor, QFont, QImage, QPainter, QTextCharFormat, QTextCursor, QTextDocument, QTextOption
 from PySide6.QtWidgets import QApplication, QPlainTextEdit, QTextEdit, QWidget
 
@@ -67,6 +67,8 @@ class _MinimapArea(QWidget):
 
 
 class TextEditor(QPlainTextEdit):
+    line_bookmarks_changed = Signal()  # Zeilenfavoriten geändert → Sidebar-Liste
+
     def __init__(self, parent=None):
         super().__init__(parent)
         font = QFont("Consolas", 11)
@@ -115,6 +117,7 @@ class TextEditor(QPlainTextEdit):
     def clear_line_bookmarks(self) -> None:
         self._line_bookmarks.clear()
         self._line_number_area.update()
+        self.line_bookmarks_changed.emit()
 
     def is_line_bookmarked(self, line: int) -> bool:
         """line: 1-basiert."""
@@ -139,6 +142,7 @@ class TextEditor(QPlainTextEdit):
             self._line_bookmarks.add(block_no)
             now = True
         self._line_number_area.update()
+        self.line_bookmarks_changed.emit()
         return now
 
     def goto_next_line_bookmark(self) -> int:
