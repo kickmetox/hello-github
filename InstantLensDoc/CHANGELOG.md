@@ -1,164 +1,29 @@
 # Changelog — InstantLens Doc
 
-## 0.5.9 — Favoriten JSON Export/Import, Opacity-Toolbar-Slider, Zeilenfavoriten-Labels, Erste-Schritte-Wizard
+## 0.6.0 — Release-Konsolidierung (0.5.0 → 0.6.0)
 
-Nach 0.5.8: vier sinnvolle Ausbauten. Stubs KI/Cloud/Stylus/3D bleiben Stubs. **Letzte 0.5.x vor 0.6.0.**
+Meilenstein: alle 0.5.x-Inkremente gebündelt, Version einheitlich **0.6.0**, Smoke um ausgewählte 0.5.x-Pfade erweitert, kleine Review-Fixes. Stubs KI/Cloud/Stylus/3D bleiben Stubs (keine Fake-Features).
 
-### PDF / Annotationen
-- **PDF-Favoriten Export/Import JSON**: Schema `ildfav-v1`; PDF-Menü; ersetzen oder zusammenführen
-- **Annotation-Opacity Toolbar-Slider**: QSlider neben α — Deckkraft der Auswahl ohne Dialog
-
-### Editor / Hilfe
-- **Zeilenfavoriten-Labels**: editierbare Namen in der Sidebar (Doppelklick / Rechtsklick)
-- **Erste Schritte**: Kurz-Wizard mit 3 Seiten (Hilfe → Erste Schritte…)
-
-### Packaging / Docs
-- Version **0.5.9** (App / ild_pdf / ISS / Smoke / Docs)
-- Stubs KI/Cloud/Stylus/3D unverändert
-
----
-
-## 0.5.8 — PDF-Favoriten Drag-Reorder, Opacity Sidecar-Force, Zeilenfavoriten-Liste, Crash-Screenshot-Hinweis
-
-Nach 0.5.7: vier sinnvolle Ausbauten. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
-
-### PDF / Annotationen
-- **PDF-Favoriten umsortieren**: Drag in der Sidebar; Reihenfolge in Sidecar-Meta `page_favorites` (nicht mehr nur sortiert)
-- **Annotation-Opacity persistenter**: geklemmte/gerundete `opacity` im Sidecar; Batch speichert mit `force=True` / `save_opacities`
-
-### Editor / Hilfe
-- **Zeilenfavoriten-Liste**: alle Editor-Zeilenlesezeichen nummeriert in der Sidebar; Klick springt
-- **Crash-Report optional Screenshot**: Dialog fragt nach Screenshot-Pfad-Hinweis; REPORT.txt + optional `screenshots/` im ZIP
-
-### Packaging / Docs
-- Version **0.5.8** (App / ild_pdf / ISS / Smoke / Docs)
-- Stubs KI/Cloud/Stylus/3D unverändert
-
----
-
-## 0.5.7 — PDF-Favoriten-Sidebar, Ann.-Opacity-Batch, Editor-Zeilenfavoriten, Crash-Report-ZIP
-
-Nach 0.5.6: vier sinnvolle Ausbauten. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
-
-### PDF / Annotationen
-- **PDF-Favoriten in Sidebar**: nummerierte Liste (1. Seite N …) neben Outline; Klick springt; Dialog ebenfalls nummeriert
-- **Annotation-Deckkraft Batch**: Opacity für Auswahl auf einmal (Ctrl+Alt+Shift+O / Toolbar „α…“ / Bearbeiten)
-
-### Editor / Hilfe
-- **Zeilen favorisieren / Lesezeichen**: Marker in der Zeilennummernleiste; Ctrl+F2 umschalten; F2 / Shift+F2 springen; Klick auf Zeilennummer
-- **Crash-Report ZIP**: Hilfe → Crash-Report erstellen… packt den Logordner als ZIP (Support/Diagnose)
-
-### Packaging / Docs
-- Version **0.5.7** (App / ild_pdf / ISS / Smoke / Docs)
-- Stubs KI/Cloud/Stylus/3D unverändert
-
----
-
-## 0.5.6 — Seiten-Favoriten, Ann.-Batch-Farbe, Wortlisten-Rechtschreibung, Privacy-About
-
-Nach 0.5.5: vier sinnvolle Ausbauten. Stubs KI/Cloud/Stylus/3D bleiben Stubs. **Keine Telemetrie** — Privacy-Hinweis in About.
-
-### PDF / Annotationen
-- **Seiten-Favoriten**: aktuelle Seite als Favorit markieren (★ / Ctrl+Shift+F); Liste zum Schnellspringen (Ctrl+Alt+F); Sidecar-Meta `page_favorites` inkl. Remap bei Löschen/Neuordnen
-- **Annotation-Batch-Farbe**: Farbe für Auswahl auf einmal ändern (Ctrl+Alt+Shift+F / Toolbar „Farbe…“ / Bearbeiten)
-
-### Editor / About
-- **Rechtschreibwörterbuch-Pfad**: Einstellung für lokale Wortliste (ohne Spell-Lib); F7 prüft und markiert unbekannte Wörter wellig
-- **Privacy in About**: klarer Hinweis — lokal, keine Telemetrie, kein Cloud-Upload (statt Telemetrie-Feature)
-
-### Packaging / Docs
-- Version **0.5.6** (App / ild_pdf / ISS / Smoke / Docs)
-- Stubs KI/Cloud/Stylus/3D unverändert
-
----
-
-## 0.5.5 — Seiten-Historie-UI, Ann.-Export Tags/Gruppen, Encoding-Auto, Quiet Splash
-
-Nach 0.5.4: vier sinnvolle Ausbauten. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
-
-### PDF / Annotationen
-- **Seiten-Historie-Liste**: Undo-Stack (gelöschte/gedrehte Seiten) klar in UI — Toolbar „Historie…“ / PDF-Menü; Wiederherstellen bis zum gewählten Eintrag
-- **Annotation-Export Tags + Gruppen**: CSV mit `tags`/`group_title`/`group_color`; Bericht mit Gruppenkopf; JSON weiter mit `meta.page_groups`
-
-### Editor / Startup
-- **Encoding automatisch**: BOM-Erkennung, optional chardet; Einstellung „Automatisch“ (Default)
-- **Quiet Startup**: Splash in Einstellungen überspringbar (`skip_splash`)
-
-### Packaging / Docs
-- Version **0.5.5** (App / ild_pdf / ISS / Smoke / Docs)
-- Stubs KI/Cloud/Stylus/3D unverändert
-
----
-
-## 0.5.4 — Seiten-Löschen-Undo, Ann.-Gruppen, Soft-Hyphen/NBSP, Startup-Deps
-
-Nach 0.5.3: vier sinnvolle Ausbauten. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
-
-### PDF / Annotationen
-- **Seite löschen mit Undo**: gelöschte Seite inkl. Annotationen per Ctrl+Z wiederherstellen (auch Seitendrehung undo-fähig)
-- **Annotation-Gruppen**: Seitengruppen in der Sidebar umbenennen und farblich markieren (Ctrl+Alt+G / Rechtsklick)
-
-### Editor / Startup
-- **Soft-Hyphen / NBSP**: Bearbeiten → Sonderzeichen einfügen (Ctrl+Shift+- / Ctrl+Shift+Space)
-- **Startup-Check**: pypdfium2 (kritisch) und Tesseract (optional) mit Dialog bei Problemen
-
-### Packaging / Docs
-- Version **0.5.4** (App / ild_pdf / ISS / Smoke / Docs)
-- Stubs KI/Cloud/Stylus/3D unverändert
-
----
-
-## 0.5.3 — Kommentar-Bericht, Farbe-Zyklus, Minimap, About-Keygen
-
-Nach 0.5.2: vier sinnvolle Ausbauten. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
-
-### PDF / Annotationen
-- **Kommentar-Bericht**: Annotationen als zusammenhängenden TXT- oder Markdown-Bericht exportieren (nach Seite gruppiert)
-- **Farbe Palette-Zyklus / Randomizer**: Ctrl+Shift+C bzw. Ctrl+Alt+Shift+C für Highlight-Farbe
-
-### Editor / Lizenz
-- **Editor-Minimap** optional (Linien-Übersicht rechts + dickere Scrollbar); Ansicht / Einstellungen / Ctrl+Shift+I
-- **About**: Keygen-Hinweis (`run-keygen.bat` / `InstantLensKeygen.exe`) wenn Trial aktiv
-
-### Packaging / Docs
-- Version **0.5.3** (App / ild_pdf / ISS / Smoke / Docs)
-- Stubs KI/Cloud/Stylus/3D unverändert
-
----
-
-## 0.5.2 — Selection→Highlight, Ann.-Regex, Text-Diff, Export-Profil
-
-Nach 0.5.1: vier sinnvolle Ausbauten. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
-
-### PDF / Annotationen
-- **Selection→Highlight**: Highlight-Drag über PDF-Text erzeugt textgenaue Annotation(en) inkl. Inhalt; sonst freies Rechteck
-- Annotation-Suche: optionales **Regex** (Checkbox neben Suchfeld, case-insensitive)
-
-### Editor / Export
-- **Dateien vergleichen** (zwei Tabs Side-by-Side, einfacher Zeilen-Diff); Datei → Ctrl+Alt+D
-- **Export-Profil speichern** (DPI / Format / Zielordner); Anwenden + Vorbefüllung beim Seiten-Export
-
-### Packaging / Docs
-- Version **0.5.2** (App / ild_pdf / ISS / Smoke / Docs)
-- Stubs KI/Cloud/Stylus/3D unverändert
-
----
-
-## 0.5.1 — Batch-OCR, Tags, Workspace, PDF bereinigen
-
-Nach dem Meilenstein 0.5.0: vier sinnvolle Ausbauten. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
-
-### PDF / OCR / Annotationen
-- **Batch-OCR gesamtes PDF** mit Fortschrittsdialog (Seite x/y, Abbrechen) → Editor
-- Annotation-**Tags/Labels** (frei, komma-getrennt); Sidecar + CSV; Sidebar-Filter; Ctrl+Alt+T
-- Schnellaktion **PDF bereinigen** (Neuschreiben, optional Metadaten strippen)
+### PDF / Annotationen / OCR
+- **Batch-OCR** gesamtes PDF; Annotation-**Tags**; **PDF bereinigen**; Selection→Highlight; Ann.-**Regex**
+- Kommentar-**Bericht**; Farbe Palette-Zyklus; Seite löschen **Undo**; Annotation-**Gruppen**
+- Seiten-**Historie**; Ann.-Export Tags/Gruppen; **Seiten-Favoriten** (Sidebar, Drag, JSON `ildfav-v1`)
+- Ann.-Batch-**Farbe**/Opacity; Opacity Force-Save + **Toolbar-Slider**
 
 ### Editor / UX
-- **Projekt-Ordner als Workspace** (letzte 5); Datei → Projekt-Ordner; Dialog-Startpfad bevorzugt aktiv
+- Projekt-**Workspace**; Dateien vergleichen; **Export-Profil**; Editor-**Minimap**; Soft-Hyphen/NBSP
+- Startup-Deps-Check; Encoding **Auto**; Quiet Splash; Wortlisten-**Rechtschreibung**; Privacy-About
+- Zeilenfavoriten (+ **Labels**); Crash-Report **ZIP** (+ optional Screenshot); **Erste-Schritte**-Wizard
 
 ### Packaging / Docs
-- Version **0.5.1** (App / ild_pdf / ISS / Smoke / Docs)
-- Stubs KI/Cloud/Stylus/3D unverändert
+- Inno Setup / Build / INFO / FEATURES / README auf **0.6.0**
+- Sync: `scripts/sync-ild.ps1` (Repo) bzw. Store `docs/sync-ild.ps1`
+- Smoke: open / annotate / export / license + ausgewählte 0.5.x-Pfade (CLI + offscreen Qt)
+
+### Review-Fixes (0.6.0)
+- Versionsstrings App / `ild_pdf` / ISS / Smoke / Docs vereinheitlicht
+- CHANGELOG 0.5.1–0.5.9 zu Kurz-Tabelle verdichtet (wie zuvor 0.4.x)
+- `ild_pdf/README.md` und `installer/build-installer.ps1` Versionshinweise auf aktuelle Release gebracht
 
 ---
 
@@ -190,6 +55,22 @@ Meilenstein: alle 0.4.x-Inkremente gebündelt, Version einheitlich **0.5.0**, Sm
 - Versionsstrings App / `ild_pdf` / ISS / Smoke / Docs vereinheitlicht
 - CHANGELOG 0.4.1–0.4.9 zu Kurz-Tabelle verdichtet (wie zuvor 0.3.x)
 - Doppelte Leerzeile im Changelog-Abschnitt 0.4.7 entfernt (Kompaktierung)
+
+### 0.5.x-Inkremente (Kurz)
+
+| Ver. | Kern |
+|------|------|
+| **0.5.1** | Batch-OCR, Ann.-Tags, Projekt-Workspace, PDF bereinigen |
+| **0.5.2** | Selection→Highlight, Ann.-Regex, Text-Diff, Export-Profil |
+| **0.5.3** | Kommentar-Bericht, Farbe-Zyklus, Minimap, About-Keygen |
+| **0.5.4** | Seiten-Löschen-Undo, Ann.-Gruppen, Soft-Hyphen/NBSP, Startup-Deps |
+| **0.5.5** | Seiten-Historie-UI, Ann.-Export Tags/Gruppen, Encoding-Auto, Quiet Splash |
+| **0.5.6** | Seiten-Favoriten, Ann.-Batch-Farbe, Wortlisten-Rechtschreibung, Privacy-About |
+| **0.5.7** | Favoriten-Sidebar, Ann.-Opacity-Batch, Zeilenfavoriten, Crash-ZIP |
+| **0.5.8** | Favoriten-Drag, Opacity-Force-Save, Zeilenfavoriten-Liste, Crash-Screenshot |
+| **0.5.9** | Favoriten JSON, Opacity-Slider, Zeilenfavoriten-Labels, Erste-Schritte-Wizard |
+
+→ zusammengeführt in **0.6.0**.
 
 ---
 

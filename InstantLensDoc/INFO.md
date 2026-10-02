@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **0.5.9** |
+| Version | **0.6.0** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -34,10 +34,10 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)
 
-## Neu in 0.5.9
+## Neu in 0.6.0
 
-- PDF-Favoriten als JSON exportieren/importieren (`ildfav-v1`)
-- Annotation-Deckkraft per Toolbar-Slider (Auswahl, ohne Dialog)
-- Editor: Zeilenfavoriten-Labels editierbar (Sidebar)
-- Hilfe → Erste Schritte… (Kurz-Wizard, 3 Seiten)
-- Stubs KI/Cloud/Stylus/3D unverändert — letzte 0.5.x vor 0.6.0
+- Release-Konsolidierung 0.5.0→0.6.0 (Version überall 0.6.0)
+- CHANGELOG: 0.5.1–0.5.9 zu Kurz-Tabelle verdichtet
+- Smoke: ausgewählte 0.5.x-Pfade (CLI + Qt)
+- Review: Versionsstrings / Docs / ISS vereinheitlicht
+- Stubs KI/Cloud/Stylus/3D unverändert
