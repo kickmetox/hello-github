@@ -790,12 +790,14 @@ class AnnotationStore:
         "font_size",
         "opacity",
         "tags",
+        "group_title",
+        "group_color",
         "created",
         "modified",
     )
 
     def export_csv(self, path: str | Path) -> Path:
-        """Annotationen als flache CSV (eine Zeile pro Annotation)."""
+        """Annotationen als flache CSV inkl. Tags und Seitengruppen."""
         path = Path(path)
         path.parent.mkdir(parents=True, exist_ok=True)
         with path.open("w", encoding="utf-8", newline="") as fh:
@@ -804,6 +806,9 @@ class AnnotationStore:
             for ann in self.annotations:
                 row = ann.to_dict()
                 row["tags"] = tags_to_str(row.get("tags"))
+                grp = self.get_page_group(int(ann.page))
+                row["group_title"] = grp.get("title") or ""
+                row["group_color"] = grp.get("color") or ""
                 writer.writerow({k: row.get(k, "") for k in self.CSV_FIELDS})
         return path
 
@@ -867,12 +872,36 @@ class AnnotationStore:
         for page in sorted(by_page.keys()):
             page_anns = by_page[page]
             page_label = page + 1  # 1-basiert für Menschen
+            grp = self.get_page_group(page)
+            grp_title = (grp.get("title") or "").strip()
+            grp_color = (grp.get("color") or "").strip()
             if fmt_l == "md":
-                lines.append(f"## Seite {page_label}")
+                if grp_title:
+                    lines.append(f"## Seite {page_label} — {grp_title}")
+                else:
+                    lines.append(f"## Seite {page_label}")
                 lines.append("")
+                if grp_title or grp_color:
+                    gbits = []
+                    if grp_title:
+                        gbits.append(f"Gruppe: **{grp_title}**")
+                    if grp_color:
+                        gbits.append(f"Gruppenfarbe: `{grp_color}`")
+                    lines.append(" · ".join(gbits))
+                    lines.append("")
             else:
-                lines.append(f"Seite {page_label}")
-                lines.append("-" * (7 + len(str(page_label))))
+                if grp_title:
+                    lines.append(f"Seite {page_label} — {grp_title}")
+                else:
+                    lines.append(f"Seite {page_label}")
+                lines.append("-" * (7 + len(str(page_label)) + (3 + len(grp_title) if grp_title else 0)))
+                if grp_title or grp_color:
+                    gbits_t = []
+                    if grp_title:
+                        gbits_t.append(f"Gruppe: {grp_title}")
+                    if grp_color:
+                        gbits_t.append(f"Farbe: {grp_color}")
+                    lines.append(" · ".join(gbits_t))
             for ann in page_anns:
                 global_idx += 1
                 t = ann.type.value if isinstance(ann.type, AnnotationType) else str(ann.type)

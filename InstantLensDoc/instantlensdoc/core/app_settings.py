@@ -56,7 +56,8 @@ DEFAULTS: dict[str, Any] = {
     "ann_color_presets": ["#FFE066", "#FF6B6B", "#4ECDC4"],
     "restore_session_on_start": True,
     "pdf_thumbnail_scale": 0.18,
-    "editor_text_encoding": "utf-8",
+    "editor_text_encoding": "auto",
+    "skip_splash": False,
     "show_page_boxes": False,
     "show_printer_marks": False,
     "annotations_locked": False,
@@ -958,14 +959,14 @@ def pdf_thumbnail_icon_size(scale: float | None = None) -> tuple[int, int]:
     return w, h
 
 
-TEXT_ENCODING_CHOICES = ("utf-8", "latin-1")
+TEXT_ENCODING_CHOICES = ("auto", "utf-8", "latin-1")
 
 
 def get_editor_text_encoding() -> str:
-    """Standard-Encoding für Editor-Öffnen/Speichern (utf-8 | latin-1)."""
+    """Standard-Encoding für Editor-Öffnen/Speichern (auto | utf-8 | latin-1)."""
     from instantlensdoc.core.documents import normalize_text_encoding
 
-    raw = str(load_settings().get("editor_text_encoding", "utf-8") or "utf-8")
+    raw = str(load_settings().get("editor_text_encoding", "auto") or "auto")
     return normalize_text_encoding(raw)
 
 
@@ -975,6 +976,15 @@ def set_editor_text_encoding(encoding: str) -> str:
     enc = normalize_text_encoding(encoding)
     save_settings({"editor_text_encoding": enc})
     return enc
+
+
+def get_skip_splash() -> bool:
+    """Quiet startup: Splash-Screen überspringen."""
+    return bool(load_settings().get("skip_splash", False))
+
+
+def set_skip_splash(enabled: bool) -> None:
+    save_settings({"skip_splash": bool(enabled)})
 
 
 def get_editor_trim_trailing_whitespace() -> bool:

@@ -105,11 +105,22 @@ def main(argv: list[str] | None = None) -> int:
     _apply_icon(app)
 
     splash = None
-    # Kein Splash in Smoke/Headless-Tests
+    # Kein Splash in Smoke/Headless-Tests; optional Quiet-Startup (Einstellungen)
     import os
 
     smoke = os.environ.get("ILD_SMOKE_QT") == "1"
-    if not smoke and os.environ.get("ILD_NO_SPLASH") != "1":
+    skip_splash = False
+    try:
+        from instantlensdoc.core.app_settings import get_skip_splash
+
+        skip_splash = get_skip_splash()
+    except Exception:
+        skip_splash = False
+    if (
+        not smoke
+        and os.environ.get("ILD_NO_SPLASH") != "1"
+        and not skip_splash
+    ):
         try:
             splash = _make_splash(app)
         except Exception:

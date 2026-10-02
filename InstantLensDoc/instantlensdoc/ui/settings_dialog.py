@@ -33,6 +33,7 @@ from instantlensdoc.core.app_settings import (
     get_editor_bracket_match,
     get_editor_trim_trailing_whitespace,
     get_editor_trim_whitespace_on_paste,
+    get_skip_splash,
     get_export_image_max_edge,
     get_pdf_toolbar_groups,
     get_export_jpeg_quality,
@@ -65,6 +66,7 @@ from instantlensdoc.core.app_settings import (
     set_editor_text_encoding,
     set_editor_trim_trailing_whitespace,
     set_editor_trim_whitespace_on_paste,
+    set_skip_splash,
     set_minimize_to_tray,
     set_pdf_toolbar_groups,
     set_ocr_lang,
@@ -175,12 +177,24 @@ class SettingsDialog(QDialog):
         form.addRow(self.special_chars)
 
         self.enc_combo = QComboBox()
+        self.enc_combo.addItem("Automatisch (BOM / chardet)", "auto")
         self.enc_combo.addItem("UTF-8", "utf-8")
         self.enc_combo.addItem("Latin-1 (ISO-8859-1)", "latin-1")
         cur_enc = get_editor_text_encoding()
-        self.enc_combo.setCurrentIndex(1 if cur_enc == "latin-1" else 0)
-        self.enc_combo.setToolTip("Standard-Encoding beim Öffnen/Speichern von Textdateien")
+        enc_idx = {"auto": 0, "utf-8": 1, "latin-1": 2}.get(cur_enc, 0)
+        self.enc_combo.setCurrentIndex(enc_idx)
+        self.enc_combo.setToolTip(
+            "Encoding beim Öffnen: Automatisch erkennt BOM und optional chardet; "
+            "sonst UTF-8 oder Latin-1"
+        )
         form.addRow("Editor-Encoding", self.enc_combo)
+
+        self.skip_splash = QCheckBox("Splash beim Start überspringen (Quiet Startup)")
+        self.skip_splash.setChecked(get_skip_splash())
+        self.skip_splash.setToolTip(
+            "Kein Splash-Screen beim App-Start — schneller/ruhiger Start"
+        )
+        form.addRow(self.skip_splash)
 
         self.trim_trailing = QCheckBox("Trailing Whitespace beim Speichern entfernen")
         self.trim_trailing.setChecked(get_editor_trim_trailing_whitespace())
@@ -386,7 +400,8 @@ class SettingsDialog(QDialog):
         set_editor_minimap(self.minimap.isChecked())
         set_editor_soft_wrap(self.soft_wrap.isChecked())
         set_editor_show_special_chars(self.special_chars.isChecked())
-        set_editor_text_encoding(str(self.enc_combo.currentData() or "utf-8"))
+        set_editor_text_encoding(str(self.enc_combo.currentData() or "auto"))
+        set_skip_splash(self.skip_splash.isChecked())
         set_editor_trim_trailing_whitespace(self.trim_trailing.isChecked())
         set_editor_trim_whitespace_on_paste(self.trim_paste.isChecked())
         set_editor_bracket_match(self.bracket_match.isChecked())

@@ -8,23 +8,76 @@ from enum import Enum
 from pathlib import Path
 from typing import Optional
 
-# Editor-Textcodierungen (Öffnen/Speichern)
-TEXT_ENCODINGS = ("utf-8", "latin-1")
+# Editor-Textcodierungen (Öffnen/Speichern); "auto" = BOM/chardet-Erkennung
+TEXT_ENCODINGS = ("auto", "utf-8", "latin-1")
 ENCODING_LABELS = {
+    "auto": "Automatisch (BOM / chardet)",
     "utf-8": "UTF-8",
     "latin-1": "Latin-1 (ISO-8859-1)",
 }
 
 
 def normalize_text_encoding(encoding: str | None) -> str:
-    """Nur utf-8 / latin-1; Default utf-8."""
+    """utf-8 / latin-1 / auto; Default utf-8."""
     enc = (encoding or "utf-8").strip().lower().replace("_", "-")
+    if enc in ("auto", "detect", "automatic"):
+        return "auto"
     if enc in ("utf8", "utf-8", "utf"):
         return "utf-8"
-    if enc in ("latin-1", "latin1", "iso-8859-1", "iso8859-1", "cp1252"):
+    if enc in ("latin-1", "latin1", "iso-8859-1", "iso8859-1", "cp1252", "windows-1252"):
         # cp1252-ähnlich bewusst auf latin-1 mappen (Aufgabenumfang)
         return "latin-1"
     return "utf-8"
+
+
+def detect_file_encoding(path: str | Path, sample_size: int = 65536) -> str:
+    """
+    Datei-Encoding erkennen: BOM → UTF-8-Probe → optional chardet → latin-1.
+    Rückgabe immer normalisiert (utf-8 oder latin-1), nie auto.
+    """
+    path = Path(path)
+    try:
+        raw = path.read_bytes()[: max(1024, int(sample_size))]
+    except Exception:
+        return "utf-8"
+    if not raw:
+        return "utf-8"
+    # BOM
+    if raw.startswith(b"\xef\xbb\xbf"):
+        return "utf-8"
+    if raw.startswith(b"\xff\xfe") or raw.startswith(b"\xfe\xff"):
+        # UTF-16 nicht nativ unterstützt → als latin-1-Fallback vermeiden; utf-8 lesen mit replace
+        return "utf-8"
+    # Strikte UTF-8-Probe
+    try:
+        raw.decode("utf-8")
+        return "utf-8"
+    except UnicodeDecodeError:
+        pass
+    # Optional chardet
+    try:
+        import chardet  # type: ignore
+
+        guess = chardet.detect(raw) or {}
+        enc = normalize_text_encoding(guess.get("encoding"))
+        if enc == "auto":
+            enc = "utf-8"
+        # chardet liefert oft windows-1252 → latin-1
+        if enc in ("utf-8", "latin-1"):
+            return enc
+    except Exception:
+        pass
+    return "latin-1"
+
+
+def resolve_text_encoding(path: str | Path | None, encoding: str | None) -> str:
+    """Encoding auflösen: auto → detect_file_encoding, sonst normalize."""
+    enc = normalize_text_encoding(encoding)
+    if enc == "auto":
+        if path is None:
+            return "utf-8"
+        return detect_file_encoding(path)
+    return enc
 
 
 # Vorlagen für „Neues leeres Dokument“ (id → Titel, Text)
@@ -97,7 +150,8 @@ class Document:
 
     @property
     def encoding(self) -> str:
-        return normalize_text_encoding(self.meta.get("encoding"))
+        enc = normalize_text_encoding(self.meta.get("encoding"))
+        return "utf-8" if enc == "auto" else enc
 
 
 def detect_kind(path: Path) -> DocKind:
@@ -133,7 +187,10 @@ def open_document(path: str | Path, *, encoding: str | None = None) -> Document:
             encoding = get_editor_text_encoding()
         except Exception:
             encoding = "utf-8"
-    enc = normalize_text_encoding(encoding)
+    enc = resolve_text_encoding(path, encoding)
+    requested = normalize_text_encoding(encoding)
+    if requested == "auto":
+        doc.meta["encoding_detected"] = True
 
     if kind in (DocKind.TEXT, DocKind.MARKDOWN, DocKind.HTML):
         doc.text = path.read_text(encoding=enc, errors="replace")
@@ -197,7 +254,10 @@ def save_document(
             encoding = get_editor_text_encoding()
         except Exception:
             encoding = "utf-8"
-    enc = normalize_text_encoding(encoding)
+    # Beim Speichern nie "auto" schreiben — erkanntes/gewähltes Encoding nutzen
+    enc = resolve_text_encoding(target if normalize_text_encoding(encoding) == "auto" else None, encoding)
+    if normalize_text_encoding(encoding) == "auto" and doc.meta.get("encoding") in ("utf-8", "latin-1"):
+        enc = normalize_text_encoding(doc.meta.get("encoding"))
 
     if kind == DocKind.DOCX:
         from instantlensdoc.core.export import export_docx

@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **0.5.4** |
+| Version | **0.5.5** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -34,10 +34,10 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)
 
-## Neu in 0.5.4
+## Neu in 0.5.5
 
-- Seite löschen mit Undo (Ctrl+Z); Seitendrehung ebenfalls undo-fähig
-- Annotation-Gruppen: umbenennen + farblich markieren (Ctrl+Alt+G)
-- Editor: Soft-Hyphen und geschütztes Leerzeichen einfügen
-- Startup-Check pypdfium2/Tesseract mit Dialog
+- Seiten-Historie: gelöschte/gedrehte Seiten aus Undo-Stack in Liste wiederherstellen
+- Annotation-Export inkl. Tags und Gruppen (CSV/Bericht/JSON)
+- Editor: Encoding automatisch erkennen (BOM / optional chardet)
+- Quiet Startup: Splash in Einstellungen überspringbar
 - Stubs KI/Cloud/Stylus/3D unverändert

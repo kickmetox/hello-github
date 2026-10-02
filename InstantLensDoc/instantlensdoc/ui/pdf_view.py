@@ -990,11 +990,14 @@ class PdfViewer(QWidget):
         btn_fit_h.setToolTip("Seitenhöhe einpassen (Ctrl+8)")
         btn_fit_h.clicked.connect(self.fit_height)
         btn_undo = QPushButton("↶")
-        btn_undo.setToolTip("Annotation rückgängig (Ctrl+Z)")
+        btn_undo.setToolTip("Annotation / Seite rückgängig (Ctrl+Z)")
         btn_undo.clicked.connect(self.undo_annotation)
         btn_redo = QPushButton("↷")
         btn_redo.setToolTip("Annotation wiederholen (Ctrl+Y)")
         btn_redo.clicked.connect(self.redo_annotation)
+        btn_hist = QPushButton("Historie…")
+        btn_hist.setToolTip("Seiten-Undo-Historie: gelöschte/gedrehte Seiten wiederherstellen")
+        btn_hist.clicked.connect(self.show_page_ops_history)
         btn_del_ann = QPushButton("Ann. löschen")
         btn_del_ann.setToolTip("Ausgewählte Annotation löschen, sonst die letzte (Entf)")
         btn_del_ann.clicked.connect(self.delete_annotation)
@@ -1199,6 +1202,7 @@ class PdfViewer(QWidget):
         toolbar.addWidget(btn_next)
         toolbar.addWidget(btn_undo)
         toolbar.addWidget(btn_redo)
+        toolbar.addWidget(btn_hist)
         toolbar.addWidget(btn_del_ann)
         toolbar.addWidget(btn_stamp_rot)
         toolbar.addWidget(btn_zoom_out)
@@ -1244,7 +1248,7 @@ class PdfViewer(QWidget):
                 self.btn_printer_marks,
             ],
             "nav": [btn_prev, self.lbl_page, btn_next],
-            "history": [btn_undo, btn_redo, btn_del_ann, btn_stamp_rot],
+            "history": [btn_undo, btn_redo, btn_hist, btn_del_ann, btn_stamp_rot],
             "zoom": [
                 btn_zoom_out,
                 self.lbl_zoom,
@@ -2649,6 +2653,126 @@ class PdfViewer(QWidget):
 
     def clear_page_ops_undo(self) -> None:
         self._page_ops_undo = []
+
+    def page_ops_history_items(self) -> list[dict]:
+        """
+        Lesbare Historie des Seiten-Undo-Stacks (älteste zuerst).
+        Jeder Eintrag: stack_index, kind, page (0-basiert), label.
+        """
+        stack = list(getattr(self, "_page_ops_undo", None) or [])
+        items: list[dict] = []
+        for i, entry in enumerate(stack):
+            kind = entry.get("kind") or "?"
+            idx = int(entry.get("index", 0))
+            page_h = idx + 1
+            if kind == "delete":
+                label = f"Seite {page_h} gelöscht — wiederherstellbar"
+            elif kind == "rotate":
+                deg = int(entry.get("degrees", 90))
+                label = f"Seite {page_h} gedreht ({deg:+d}°) — rückgängig"
+            else:
+                label = f"Aktion „{kind}“ (S. {page_h})"
+            items.append(
+                {
+                    "stack_index": i,
+                    "kind": kind,
+                    "page": idx,
+                    "label": label,
+                    "entry": entry,
+                }
+            )
+        return items
+
+    def restore_page_op_at(self, stack_index: int) -> bool:
+        """
+        Ausgewählten Historie-Eintrag wiederherstellen:
+        Undo vom neuesten Eintrag bis einschließlich dem gewählten.
+        """
+        stack = getattr(self, "_page_ops_undo", None) or []
+        if not stack:
+            self.status.emit("Seiten-Historie leer")
+            return False
+        target = max(0, min(int(stack_index), len(stack) - 1))
+        times = len(stack) - target
+        ok_any = False
+        for _ in range(times):
+            if not self.undo_page_op():
+                break
+            ok_any = True
+        if ok_any:
+            self.status.emit("Seiten-Historie: Eintrag wiederhergestellt")
+        return ok_any
+
+    def show_page_ops_history(self) -> bool:
+        """Dialog: Seiten-Undo-Historie mit Wiederherstellen."""
+        from PySide6.QtWidgets import (
+            QDialog,
+            QHBoxLayout,
+            QLabel,
+            QListWidget,
+            QListWidgetItem,
+            QPushButton,
+            QVBoxLayout,
+        )
+
+        items = self.page_ops_history_items()
+        dlg = QDialog(self)
+        dlg.setWindowTitle("Seiten-Historie (Undo)")
+        dlg.resize(420, 320)
+        layout = QVBoxLayout(dlg)
+        layout.addWidget(
+            QLabel(
+                "Gelöschte oder gedrehte Seiten aus dem Undo-Stack.\n"
+                "Neueste Einträge unten — „Wiederherstellen“ macht bis zum gewählten Eintrag rückgängig."
+            )
+        )
+        lst = QListWidget()
+        for it in items:
+            row = QListWidgetItem(it["label"])
+            row.setData(Qt.UserRole, int(it["stack_index"]))
+            lst.addItem(row)
+        if items:
+            lst.setCurrentRow(len(items) - 1)
+        layout.addWidget(lst)
+        if not items:
+            layout.addWidget(QLabel("Keine Seiten-Aktionen zum Rückgängigmachen."))
+
+        btns = QHBoxLayout()
+        btn_restore = QPushButton("Wiederherstellen")
+        btn_restore.setEnabled(bool(items))
+        btn_restore.setDefault(True)
+        btn_close = QPushButton("Schließen")
+        btns.addWidget(btn_restore)
+        btns.addStretch()
+        btns.addWidget(btn_close)
+        layout.addLayout(btns)
+
+        restored = {"ok": False}
+
+        def _do_restore():
+            cur = lst.currentItem()
+            if cur is None:
+                return
+            idx = cur.data(Qt.UserRole)
+            if idx is None:
+                return
+            if self.restore_page_op_at(int(idx)):
+                restored["ok"] = True
+                lst.clear()
+                fresh = self.page_ops_history_items()
+                for it2 in fresh:
+                    row2 = QListWidgetItem(it2["label"])
+                    row2.setData(Qt.UserRole, int(it2["stack_index"]))
+                    lst.addItem(row2)
+                btn_restore.setEnabled(bool(fresh))
+                if not fresh:
+                    dlg.accept()
+
+        btn_restore.clicked.connect(_do_restore)
+        lst.itemDoubleClicked.connect(lambda _item: _do_restore())
+        btn_close.clicked.connect(dlg.reject)
+        dlg.exec()
+        return bool(restored["ok"])
 
     def undo_page_op(self) -> bool:
         """Letzte Seiten-Operation (Löschen oder Drehen) rückgängig."""

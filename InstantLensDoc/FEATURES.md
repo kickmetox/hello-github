@@ -10,7 +10,7 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | Fenster-Geometrie speichern | fertig | Größe/Position/State in Settings 0.3.6 |
 | PDF Präsentationsmodus | fertig | Vollbild F5; Pfeiltasten/Leertaste; Esc beendet 0.3.7 |
 | Clipboard-Paste Bild | fertig | Editor + PDF (Stempel/Seite) |
-| TXT / MD / HTML öffnen & speichern | fertig | HTML-Export mit einfachem Markdownish; **Encoding UTF-8/Latin-1** 0.4.1 |
+| TXT / MD / HTML öffnen & speichern | fertig | HTML-Export mit einfachem Markdownish; **Encoding UTF-8/Latin-1** 0.4.1; **Auto-Erkennung BOM/chardet** 0.5.5 |
 | DOCX öffnen & speichern | teilweise | python-docx; Headings/Listen beim Export |
 | Editor → HTML / DOCX / PDF Export | fertig | Datei → Exportieren; Zielordner merken; Qualität/Format in Einstellungen; **Overwrite-Schutz** 0.3.8 |
 | Drucken (Editor / PDF-Seite) | fertig | Qt PrintDialog (Ctrl+P) |
@@ -57,8 +57,9 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | PDF-Anhänge | fertig | Auflisten/extrahieren (pikepdf Attachments) 0.3.2 |
 | Annotation-Layer Toggle | fertig | Ansicht + Toolbar; Ctrl+Shift+A 0.3.2 |
 | Annotationen flatten/bake Export | fertig | Alle Seiten mit Ann. → neues PDF; **Fortschrittsdialog + Abbrechen** 0.4.2 |
-| Annotation Kommentar-Bericht | fertig | Zusammenhängender TXT/MD-Export (nach Seite gruppiert) 0.5.3 |
+| Annotation Kommentar-Bericht | fertig | Zusammenhängender TXT/MD-Export (nach Seite gruppiert) 0.5.3; **Tags + Gruppen im Export** 0.5.5 |
 | Annotation-Gruppen Name/Farbe | fertig | Seitengruppen umbenennen + Farbe; Sidebar/Ctrl+Alt+G 0.5.4 |
+| Annotation CSV/JSON Export | fertig | CSV inkl. **tags/group_title/group_color**; JSON meta.page_groups 0.5.5 |
 | PDF Seiten als Einzel-PDFs | fertig | Eine Datei pro Seite; Menü + `split_into_single_page_pdfs` 0.3.3 |
 | PDF-Text → Editor | fertig | Seite oder gesamtes PDF; Menü PDF 0.3.4 |
 | PDF-Seitenbild → Editor | fertig | Seite/alle Seiten als PNG + Verweiszeile; Menü PDF 0.4.5 |
@@ -74,7 +75,7 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | Text-Overlay-Editor | fertig | Sidecar; Doppelklick/Strg+Klick; Bake optional |
 | PDF-Text → Overlay | teilweise | Extraktion via pypdfium2; kein natives Rewrite |
 | PDF Seite↔Bild Hooks | fertig | Seite/Seiten → PNG/JPEG Export 0.2.3; **DPI 72/150/300** 0.3.6; Bild als Seite / Bildstempel |
-| PDF drehen / Seite löschen | fertig | Toolbar ⟲/⟳ (−90°/+90°) speichert; **Seite löschen Undo (Ctrl+Z)** 0.5.4; Annotation-Remap |
+| PDF drehen / Seite löschen | fertig | Toolbar ⟲/⟳ (−90°/+90°) speichert; **Seite löschen Undo (Ctrl+Z)** 0.5.4; **Historie-Liste Wiederherstellen** 0.5.5; Annotation-Remap |
 | PDF spiegeln (H/V) | fertig | Toolbar ↔/↕ + Menü; `ild_pdf.flip_page` 0.2.7 |
 | PDF Druckermarken | fertig | Seitenrand Crop/Registration-Overlay optional; Toolbar „Marken“; Ctrl+Alt+M 0.4.4 |
 | PDF Graustufen | fertig | Toggle Ansicht/Export; `render_page(..., grayscale=True)` 0.2.8 |
@@ -131,26 +132,27 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | Inno-Installer | fertig | Icon, Desktop, Uninstaller, Keygen optional (`InstantLensKeygen.exe`) 0.2.1 |
 | Sync-Skript Windows | fertig | Repo `scripts/sync-ild.ps1`; Store `docs/sync-ild.ps1` |
 | Arbeitsverzeichnis öffnen | fertig | Datei-Menü Ctrl+Shift+E; Ordner der Datei bzw. CWD 0.4.8 |
-| In-App Hilfe / About | fertig | Version 0.5.4; Fenstertitel + Splash; Logordner-Button; **Feature-Kurzliste + FEATURES.md** 0.4.9; **Keygen-Hinweis bei Trial** 0.5.3 |
+| In-App Hilfe / About | fertig | Version 0.5.5; Fenstertitel + Splash; Logordner-Button; **Feature-Kurzliste + FEATURES.md** 0.4.9; **Keygen-Hinweis bei Trial** 0.5.3; **Splash überspringbar** 0.5.5 |
 | Startup-Abhängigkeiten-Check | fertig | pypdfium2 kritisch + Tesseract optional; Dialog bei Problemen 0.5.4 |
-| CHANGELOG | fertig | **0.5.4** Seiten-Löschen-Undo, Ann.-Gruppen, Soft-Hyphen/NBSP, Startup-Deps |
+| Quiet Startup / Splash | fertig | Einstellungen: Splash überspringen 0.5.5 |
+| CHANGELOG | fertig | **0.5.5** Seiten-Historie-UI, Ann.-Export Tags/Gruppen, Encoding-Auto, Quiet Splash |
 | FEATURES.md / INFO.md | fertig | |
 | `ild_pdf` Modul + Beispielskript | fertig | metadata / page size / watermark / redact / acroform / attachments / flatten / **plain text** / **selection_to_highlight_rects** / **export_report** |
 | Font-Matching | geplant | |
 | Objekt-/Bildbearbeitung | geplant | |
 | Layout-Erhaltung (Scan→edit) | geplant | |
 | Freihand | geplant | |
-| KI-Assistent | Stub | Menü „Geplant“ 0.5.4 (keine Fake-KI) |
+| KI-Assistent | Stub | Menü „Geplant“ 0.5.5 (keine Fake-KI) |
 | Signieren (rechtssicher) | Stub | |
-| Cloud-Sync | Stub | Menü „Geplant“ 0.5.4 (keine Fake-Cloud) |
+| Cloud-Sync | Stub | Menü „Geplant“ 0.5.5 (keine Fake-Cloud) |
 | Text on Path / Text zu Pfaden | geplant | |
 | Envelope Distort / Text Wrap / Area Type | Stub/geplant | |
 | Schnittmasken | geplant | |
 | Füllungen / Live-Effekte | geplant | |
-| 3D-Extrusion | Stub | Menü „Geplant“ 0.5.4 |
+| 3D-Extrusion | Stub | Menü „Geplant“ 0.5.5 |
 | Variable Fonts (voll) | Stub | |
 | Glyphen-Palette | geplant | |
-| Stylus / Palm Rejection | Stub | Menü „Geplant“ 0.5.4 |
-| Intelligente Formerkennung | Stub | Menü „Geplant“ 0.5.4 |
+| Stylus / Palm Rejection | Stub | Menü „Geplant“ 0.5.5 |
+| Intelligente Formerkennung | Stub | Menü „Geplant“ 0.5.5 |
 
 Nicht behauptet als fertig: Cloud, KI, Stylus, 3D — nur Menü-Stubs + dieser Status.

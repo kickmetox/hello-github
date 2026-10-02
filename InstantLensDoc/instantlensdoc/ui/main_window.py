@@ -975,6 +975,11 @@ class MainWindow(QMainWindow):
             a = QAction(title, self)
             a.triggered.connect(slot)
             m_pdf.addAction(a)
+        act_page_hist = QAction("Seiten-Historie (Undo)…", self)
+        act_page_hist.setShortcut(QKeySequence("Ctrl+Shift+H"))
+        act_page_hist.setToolTip("Gelöschte/gedrehte Seiten aus dem Undo-Stack wiederherstellen")
+        act_page_hist.triggered.connect(lambda: self.pdf_view.show_page_ops_history())
+        m_pdf.addAction(act_page_hist)
         m_pdf.addSeparator()
         for title, slot in [
             ("PDF-Text → Overlay…", lambda: self.pdf_view.import_text_overlays()),

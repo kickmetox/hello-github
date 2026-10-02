@@ -1,5 +1,23 @@
 # Changelog — InstantLens Doc
 
+## 0.5.5 — Seiten-Historie-UI, Ann.-Export Tags/Gruppen, Encoding-Auto, Quiet Splash
+
+Nach 0.5.4: vier sinnvolle Ausbauten. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### PDF / Annotationen
+- **Seiten-Historie-Liste**: Undo-Stack (gelöschte/gedrehte Seiten) klar in UI — Toolbar „Historie…“ / PDF-Menü; Wiederherstellen bis zum gewählten Eintrag
+- **Annotation-Export Tags + Gruppen**: CSV mit `tags`/`group_title`/`group_color`; Bericht mit Gruppenkopf; JSON weiter mit `meta.page_groups`
+
+### Editor / Startup
+- **Encoding automatisch**: BOM-Erkennung, optional chardet; Einstellung „Automatisch“ (Default)
+- **Quiet Startup**: Splash in Einstellungen überspringbar (`skip_splash`)
+
+### Packaging / Docs
+- Version **0.5.5** (App / ild_pdf / ISS / Smoke / Docs)
+- Stubs KI/Cloud/Stylus/3D unverändert
+
+---
+
 ## 0.5.4 — Seiten-Löschen-Undo, Ann.-Gruppen, Soft-Hyphen/NBSP, Startup-Deps
 
 Nach 0.5.3: vier sinnvolle Ausbauten. Stubs KI/Cloud/Stylus/3D bleiben Stubs.

@@ -6,3 +6,4 @@ pikepdf>=9.0.0
 python-docx>=1.1.0
 pytesseract>=0.3.10
 # Optional: Tesseract-OCR Runtime separat installieren
+# Optional: chardet>=5.0.0  — Encoding-Auto-Erkennung (BOM reicht ohne chardet)

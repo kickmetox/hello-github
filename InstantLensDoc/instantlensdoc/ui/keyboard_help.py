@@ -128,8 +128,11 @@ Vorbefüllung beim Seiten-Bild-Export.</p>
 <p><b>Soft-Hyphen / NBSP:</b> Bearbeiten → Sonderzeichen einfügen — Soft-Hyphen (Ctrl+Shift+-) /
 geschütztes Leerzeichen (Ctrl+Shift+Space).</p>
 <p><b>Seite löschen Undo:</b> PDF → Seite löschen… — Ctrl+Z stellt Seite (+ Annotationen) wieder her;
-auch Seitendrehung ist undo-fähig.</p>
-<p><b>Annotationsgruppe:</b> Ctrl+Alt+G oder Rechtsklick auf Gruppenkopf — Name + Farbe.</p>
+auch Seitendrehung ist undo-fähig. Toolbar/Menü „Seiten-Historie (Undo)…“ zeigt die Liste.</p>
+<p><b>Annotationsgruppe:</b> Ctrl+Alt+G oder Rechtsklick auf Gruppenkopf — Name + Farbe.
+Export CSV/Bericht enthält Tags und Gruppen.</p>
+<p><b>Encoding Auto:</b> Einstellungen → Editor-Encoding „Automatisch“ (BOM; optional chardet).</p>
+<p><b>Quiet Startup:</b> Einstellungen → Splash beim Start überspringen.</p>
 <p><b>Startup-Deps:</b> beim Start Prüfung pypdfium2 / Tesseract; Dialog wenn etwas fehlt.</p>
 <p><b>Whitespace trim on paste:</b> optional in Einstellungen — Trailing Spaces beim Einfügen entfernen.</p>
 <p><b>Bracket-Match Highlight:</b> passende Klammern ()[]{} am Cursor (Einstellungen, Standard an).</p>
