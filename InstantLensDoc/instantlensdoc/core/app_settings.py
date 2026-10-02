@@ -45,6 +45,8 @@ DEFAULTS: dict[str, Any] = {
     "editor_doc_split": False,
     "editor_doc_split_sync_scroll": False,
     "editor_doc_split_vertical": False,
+    "wizard_completed": False,
+    "wizard_skip_once": False,
     "selection_note_with_highlight": False,
     "editor_soft_wrap": True,
     "editor_show_special_chars": False,
@@ -599,6 +601,35 @@ def get_editor_doc_split_vertical() -> bool:
 
 def set_editor_doc_split_vertical(enabled: bool) -> None:
     save_settings({"editor_doc_split_vertical": bool(enabled)})
+
+
+def get_wizard_completed() -> bool:
+    """True = Erste-Schritte-Wizard dauerhaft abgeschlossen."""
+    return bool(load_settings().get("wizard_completed", False))
+
+
+def set_wizard_completed(done: bool) -> None:
+    save_settings({"wizard_completed": bool(done)})
+
+
+def get_wizard_skip_once() -> bool:
+    """True = Wizard beim nächsten Start einmal überspringen."""
+    return bool(load_settings().get("wizard_skip_once", False))
+
+
+def set_wizard_skip_once(skip: bool) -> None:
+    save_settings({"wizard_skip_once": bool(skip)})
+
+
+def consume_wizard_skip_once() -> bool:
+    """
+    Einmaliges Überspringen abfragen und Flag zurücksetzen.
+    Rückgabe: True wenn dieser Start übersprungen werden soll.
+    """
+    if not get_wizard_skip_once():
+        return False
+    set_wizard_skip_once(False)
+    return True
 
 
 def get_selection_note_with_highlight() -> bool:

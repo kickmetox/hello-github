@@ -29,6 +29,7 @@ from instantlensdoc.core.app_settings import (
     get_default_open_dir,
     get_default_zoom_percent,
     PDF_TOOLBAR_GROUP_LABELS,
+    get_editor_doc_split_vertical,
     get_editor_text_encoding,
     get_editor_bracket_match,
     get_editor_trim_trailing_whitespace,
@@ -60,6 +61,7 @@ from instantlensdoc.core.app_settings import (
     set_default_open_dir,
     set_default_zoom_percent,
     set_editor_bracket_match,
+    set_editor_doc_split_vertical,
     set_editor_line_numbers,
     set_editor_minimap,
     set_editor_show_special_chars,
@@ -287,6 +289,16 @@ class SettingsDialog(QDialog):
         )
         form.addRow(self.pdf_continuous)
 
+        self.doc_split_orient = QComboBox()
+        self.doc_split_orient.addItem("Horizontal (nebeneinander)", False)
+        self.doc_split_orient.addItem("Vertikal (übereinander)", True)
+        self.doc_split_orient.setCurrentIndex(1 if get_editor_doc_split_vertical() else 0)
+        self.doc_split_orient.setToolTip(
+            "Layout für Fenster teilen (zwei Docs): horizontal oder vertikal — wird gemerkt "
+            "(gleicher Schalter wie Ansicht → Vertikaler Split / Ctrl+Shift+\\)"
+        )
+        form.addRow("Doc-Split Layout", self.doc_split_orient)
+
         self.jpeg_q = QSpinBox()
         self.jpeg_q.setRange(10, 100)
         self.jpeg_q.setValue(get_export_jpeg_quality())
@@ -445,6 +457,7 @@ class SettingsDialog(QDialog):
         set_pdf_night_mode(self.pdf_night.isChecked())
         set_pdf_two_page_spread(self.pdf_spread.isChecked())
         set_pdf_continuous_scroll(self.pdf_continuous.isChecked())
+        set_editor_doc_split_vertical(bool(self.doc_split_orient.currentData()))
         save_settings(
             {
                 "export_jpeg_quality": int(self.jpeg_q.value()),
@@ -521,6 +534,11 @@ class SettingsDialog(QDialog):
         if parent is not None and hasattr(parent, "_sync_continuous_action"):
             try:
                 parent._sync_continuous_action()
+            except Exception:
+                pass
+        if parent is not None and hasattr(parent, "_sync_doc_split_orientation"):
+            try:
+                parent._sync_doc_split_orientation()
             except Exception:
                 pass
         self.accept()

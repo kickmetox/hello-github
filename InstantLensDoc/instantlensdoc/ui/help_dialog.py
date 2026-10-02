@@ -5,6 +5,7 @@ from __future__ import annotations
 from PySide6.QtCore import QUrl
 from PySide6.QtGui import QDesktopServices, QIcon
 from PySide6.QtWidgets import (
+    QCheckBox,
     QDialog,
     QDialogButtonBox,
     QHBoxLayout,
@@ -37,6 +38,7 @@ HELP_HTML = f"""
     optional <b>Backup .bak beim Speichern</b>, <b>Seitengröße-Einheit mm/inch</b>,
     optional <b>letzte Session beim Start</b>, <b>PDF-Toolbar-Gruppen</b> ein-/ausblenden,
     optional <b>PDF Zwei-Seiten-Ansicht (Spread)</b>, optional <b>PDF Continuous Scroll</b>,
+    <b>Doc-Split Layout horizontal/vertikal</b>,
     Update-Hinweis (nur wenn aktiv), Pfade;
     <b>Auf Standard zurücksetzen</b></li>
 <li><b>Datei → Zuletzt geöffnet</b>: Menü + Seitenleiste (persistiert)</li>
@@ -198,9 +200,11 @@ WIZARD_PAGES = (
         "4 / 4 — Neu in 0.6",
         "<h3>Highlights 0.6</h3>"
         "<ul>"
-        "<li><b>Tag-Cloud</b>: Klick filtert; Ctrl+Klick Multi; <b>Rechtsklick → Tag umbenennen</b> (global)</li>"
-        "<li><b>Fenster teilen</b> (Ctrl+\\): zwei Docs; <b>vertikal</b> Ctrl+Shift+\\; Sync-Scroll Ctrl+Alt+\\</li>"
-        "<li>Statusleiste <b>ungespeichert</b>: Dirty-Liste + <b>Speichern je Datei</b></li>"
+        "<li><b>Tag-Cloud</b>: Klick filtert; Ctrl+Klick Multi; <b>Rechtsklick → Tag umbenennen</b> "
+        "(global, <b>Ctrl+Z = ein Undo-Schritt</b>)</li>"
+        "<li><b>Fenster teilen</b> (Ctrl+\\): zwei Docs; <b>vertikal</b> Ctrl+Shift+\\ "
+        "(auch in Einstellungen H/V); Sync-Scroll Ctrl+Alt+\\</li>"
+        "<li>Statusleiste <b>ungespeichert</b>: Dirty-Liste + Speichern je Datei + <b>Alle speichern</b></li>"
         "<li>Auswahl → Text kopieren / Notiz / Highlight+Notiz; Andere Tabs schließen</li>"
         "</ul>"
         "<p>Fertig — viel Erfolg mit InstantLens Doc.</p>",
@@ -214,8 +218,10 @@ class GettingStartedWizard(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Erste Schritte")
-        self.resize(480, 340)
+        self.resize(480, 360)
         self._index = 0
+        self.skipped_once = False
+        self.completed = False
         layout = QVBoxLayout(self)
         self._title = QLabel()
         self._title.setStyleSheet("font-weight: 600; font-size: 13px;")
@@ -227,6 +233,11 @@ class GettingStartedWizard(QDialog):
             page.setHtml(html)
             self._stack.addWidget(page)
         layout.addWidget(self._stack, 1)
+        self.skip_once_cb = QCheckBox("Dieses Mal überspringen (beim nächsten Start wieder zeigen)")
+        self.skip_once_cb.setToolTip(
+            "Wizard für diesen Start ausblenden — erscheint beim nächsten App-Start erneut"
+        )
+        layout.addWidget(self.skip_once_cb)
         nav = QHBoxLayout()
         self._btn_back = QPushButton("Zurück")
         self._btn_back.clicked.connect(self._back)
@@ -234,13 +245,33 @@ class GettingStartedWizard(QDialog):
         self._btn_next.setDefault(True)
         self._btn_next.clicked.connect(self._next)
         self._btn_close = QPushButton("Schließen")
-        self._btn_close.clicked.connect(self.accept)
+        self._btn_close.clicked.connect(self._close_clicked)
         nav.addWidget(self._btn_back)
         nav.addStretch(1)
         nav.addWidget(self._btn_close)
         nav.addWidget(self._btn_next)
         layout.addLayout(nav)
         self._show_page(0)
+
+    def _apply_outcome(self, *, complete: bool) -> None:
+        """Skip-once oder dauerhaft abgeschlossen in Settings schreiben."""
+        from instantlensdoc.core.app_settings import set_wizard_completed, set_wizard_skip_once
+
+        if self.skip_once_cb.isChecked():
+            set_wizard_skip_once(True)
+            set_wizard_completed(False)
+            self.skipped_once = True
+            self.completed = False
+            return
+        if complete:
+            set_wizard_completed(True)
+            set_wizard_skip_once(False)
+            self.completed = True
+            self.skipped_once = False
+
+    def _close_clicked(self):
+        self._apply_outcome(complete=False)
+        self.accept()
 
     def _show_page(self, index: int):
         n = len(WIZARD_PAGES)
@@ -259,6 +290,7 @@ class GettingStartedWizard(QDialog):
 
     def _next(self):
         if self._index >= len(WIZARD_PAGES) - 1:
+            self._apply_outcome(complete=True)
             self.accept()
             return
         self._show_page(self._index + 1)

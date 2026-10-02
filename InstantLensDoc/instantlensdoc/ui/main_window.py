@@ -115,6 +115,7 @@ class MainWindow(QMainWindow):
         self._presentation_prev: dict | None = None
         self._unsaved_paths: set[str] = set()
         self._secondary_path: str | None = None
+        self._last_tag_rename: tuple[str, str] | None = None  # (old, new) für einstufiges Undo
 
         self.setAcceptDrops(True)
         self.setWindowTitle(self._app_title())
@@ -142,6 +143,7 @@ class MainWindow(QMainWindow):
         self._autosave_timer.timeout.connect(self._autosave_tick)
         self._autosave_timer.start()
         QTimer.singleShot(200, self._restore_session)
+        QTimer.singleShot(600, self._maybe_show_getting_started_wizard)
         if get_update_check_on_start():
             QTimer.singleShot(1500, lambda: self._check_updates(silent=True))
 
@@ -368,6 +370,16 @@ class MainWindow(QMainWindow):
         self.pdf_view = PdfViewer()
         self.pdf_view.status.connect(self._set_status)
         self.pdf_view.annotations_changed.connect(self._refresh_pdf_marks)
+        # Toolbar-Undo und Ctrl+Z: Tag-Rename-Filter nach einstufigem Undo mitziehen
+        _pdf_undo = self.pdf_view.undo_annotation
+
+        def _undo_annotation_with_tag_revert() -> bool:
+            ok = bool(_pdf_undo())
+            if ok:
+                self._revert_tag_filter_after_rename_undo()
+            return ok
+
+        self.pdf_view.undo_annotation = _undo_annotation_with_tag_revert  # type: ignore[method-assign]
         self.pdf_view.page_favorites_changed.connect(self._refresh_page_favorites)
         self.pdf_view.page_changed.connect(self._on_pdf_page_changed)
         self.pdf_view.zoom_changed.connect(self._on_pdf_zoom_changed)
@@ -1219,7 +1231,7 @@ class MainWindow(QMainWindow):
         m_help = mb.addMenu("&Hilfe")
         a = QAction("Erste Schritte…", self)
         a.setToolTip("Kurz-Wizard: Öffnen, Annotieren, Editor, 0.6-Highlights (4 Seiten)")
-        a.triggered.connect(lambda: GettingStartedWizard(self).exec())
+        a.triggered.connect(self._show_getting_started_wizard)
         m_help.addAction(a)
         a = QAction("Tastaturhilfe…", self)
         a.setShortcut(QKeySequence("F1"))
@@ -1487,7 +1499,7 @@ class MainWindow(QMainWindow):
         return items
 
     def _on_unsaved_status_clicked(self, event) -> None:
-        """Statusleiste „ungespeichert“: Menü mit dirty Tabs → öffnen/wechseln + Speichern je Datei."""
+        """Statusleiste „ungespeichert“: Menü mit dirty Tabs → öffnen/wechseln + Speichern / Alle speichern."""
         if event.button() != Qt.LeftButton:
             return
         entries = self.list_unsaved_tabs()
@@ -1496,6 +1508,10 @@ class MainWindow(QMainWindow):
             act = menu.addAction("(keine ungespeicherten Tabs)")
             act.setEnabled(False)
         else:
+            act_all = menu.addAction("Alle speichern")
+            act_all.setToolTip("Alle ungespeicherten Tabs speichern")
+            act_all.triggered.connect(self._save_all_unsaved_tabs)
+            menu.addSeparator()
             for path, label in entries:
                 act = menu.addAction(label)
                 if path:
@@ -1524,6 +1540,31 @@ class MainWindow(QMainWindow):
         if cur != key:
             self.open_path(path)
         self.save_doc()
+
+    def _save_all_unsaved_tabs(self) -> None:
+        """Alle dirty Tabs aus der Statusleisten-Liste speichern."""
+        entries = list(self.list_unsaved_tabs())
+        if not entries:
+            self._set_status("Keine ungespeicherten Tabs")
+            return
+        n = 0
+        # Aktuelles Doc zuerst — sonst verliert open_path den Editor-Inhalt
+        cur_key = self._path_key(self.doc.path) if self.doc and self.doc.path else None
+        if self._current_is_dirty():
+            self.save_doc()
+            n += 1
+        for path, _label in entries:
+            if path is None:
+                if self._current_is_dirty():
+                    self.save_doc()
+                    n += 1
+                continue
+            if cur_key and self._path_key(path) == cur_key:
+                continue
+            self._save_unsaved_tab(path)
+            n += 1
+        self._update_unsaved_status()
+        self._set_status(f"Alle speichern: {n} Tab(s)")
 
     def _format_current_page_size(self) -> str:
         """Aktuelle PDF-Seitengröße formatiert (mm/inch laut Einstellung)."""
@@ -2022,6 +2063,15 @@ class MainWindow(QMainWindow):
             Qt.Vertical if get_editor_doc_split_vertical() else Qt.Horizontal
         )
 
+    def _sync_doc_split_orientation(self) -> None:
+        """Einstellungen → Doc-Split H/V auf Menüaktion + Splitter anwenden."""
+        vertical = get_editor_doc_split_vertical()
+        if hasattr(self, "_doc_split_vertical_action") and self._doc_split_vertical_action is not None:
+            self._doc_split_vertical_action.blockSignals(True)
+            self._doc_split_vertical_action.setChecked(bool(vertical))
+            self._doc_split_vertical_action.blockSignals(False)
+        self._apply_doc_split_orientation()
+
     def _toggle_doc_split_sync_scroll(self, checked: bool):
         from instantlensdoc.core.app_settings import set_editor_doc_split_sync_scroll
 
@@ -2032,7 +2082,7 @@ class MainWindow(QMainWindow):
         )
 
     def _rename_annotation_tag_global(self, old_tag: str, new_tag: str) -> None:
-        """Tag-Cloud: Tag in allen Annotationen des aktuellen PDFs umbenennen."""
+        """Tag-Cloud: Tag in allen Annotationen des aktuellen PDFs umbenennen (eine Undo-Stufe)."""
         store = getattr(self.pdf_view, "store", None)
         if store is None:
             self._set_status("Tag umbenennen nur bei geöffnetem PDF")
@@ -2041,11 +2091,13 @@ class MainWindow(QMainWindow):
         if n <= 0:
             self._set_status(f"Kein Tag „{old_tag}“ gefunden")
             return
+        # Sidecar schreiben, Undo-History bleibt erhalten → Ctrl+Z = ein Schritt für alle Ann.
         try:
             store.save()
         except Exception as e:
             QMessageBox.warning(self, "Tag umbenennen", str(e))
             return
+        self._last_tag_rename = (str(old_tag), str(new_tag))
         # Aktiven Filter mitziehen
         old_cf = old_tag.casefold()
         filt = list(self.sidebar.annotation_filter_tags())
@@ -2063,7 +2115,45 @@ class MainWindow(QMainWindow):
         self._refresh_pdf_marks()
         if self.doc and self.doc.path:
             self._mark_unsaved(self.doc.path, bool(store.dirty))
-        self._set_status(f"Tag „{old_tag}“ → „{new_tag}“ ({n} Annotationen)")
+        self._set_status(
+            f"Tag „{old_tag}“ → „{new_tag}“ ({n} Annotationen) — Ctrl+Z rückgängig (ein Schritt)"
+        )
+
+    def _revert_tag_filter_after_rename_undo(self) -> None:
+        """Nach Undo des globalen Tag-Rename: Filter old←new zurücksetzen."""
+        if not self._last_tag_rename:
+            return
+        old_tag, new_tag = self._last_tag_rename
+        store = getattr(self.pdf_view, "store", None)
+        old_cf = old_tag.casefold()
+        has_old = False
+        if store is not None:
+            has_old = any(
+                any(str(t).casefold() == old_cf for t in (a.tags or []))
+                for a in store.annotations
+            )
+        if not has_old:
+            # Undo betraf eine andere Aktion — Rename-Merker behalten
+            return
+        self._last_tag_rename = None
+        new_cf = new_tag.casefold()
+        filt = list(self.sidebar.annotation_filter_tags())
+        # Nach Undo kann der Filter leer sein (neuer Tag existiert nicht mehr)
+        if not filt or all(t.casefold() == new_cf for t in filt):
+            self.sidebar.set_annotation_tag_filter([old_tag])
+            self._refresh_pdf_marks()
+            return
+        nxt: list[str] = []
+        seen: set[str] = set()
+        for t in filt:
+            s = old_tag if t.casefold() == new_cf else t
+            key = s.casefold()
+            if key in seen:
+                continue
+            seen.add(key)
+            nxt.append(s)
+        self.sidebar.set_annotation_tag_filter(nxt)
+        self._refresh_pdf_marks()
 
     def _primary_scroll_bar(self):
         """Vertikale Scrollbar der aktuellen Hauptansicht (Editor/PDF)."""
@@ -2889,8 +2979,31 @@ class MainWindow(QMainWindow):
     def _redo(self):
         if self.stack.currentWidget() is self.pdf_view:
             self.pdf_view.redo_annotation()
+            self._last_tag_rename = None
         else:
             self.editor.redo()
+
+    def _show_getting_started_wizard(self) -> None:
+        """Wizard manuell öffnen (Hilfe-Menü)."""
+        GettingStartedWizard(self).exec()
+
+    def _maybe_show_getting_started_wizard(self) -> None:
+        """Beim Start: Wizard zeigen, sofern nicht abgeschlossen / skip-once."""
+        import os
+
+        if os.environ.get("ILD_SMOKE_QT") == "1":
+            return
+        from instantlensdoc.core.app_settings import (
+            consume_wizard_skip_once,
+            get_wizard_completed,
+        )
+
+        if get_wizard_completed():
+            return
+        if consume_wizard_skip_once():
+            self._set_status("Erste-Schritte-Wizard: dieses Mal übersprungen")
+            return
+        GettingStartedWizard(self).exec()
 
     def _zoom_in(self):
         if self.stack.currentWidget() is self.pdf_view:

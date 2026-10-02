@@ -1,5 +1,22 @@
 # Changelog — InstantLens Doc
 
+## 0.6.6 — Tag-Rename-Undo, Split-Settings, Alle-Speichern, Wizard-Skip
+
+Nach 0.6.5: Tag-Umbenennen ist mit Ctrl+Z ein Undo-Schritt (Filter mit); Doc-Split H/V zusätzlich in Einstellungen; Dirty-Tabs-Menü mit „Alle speichern“; Wizard mit skip-once-Checkbox. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### PDF / Annotationen
+- **Tag umbenennen Undo**: globale Umbenennung als eine Undo-Stufe (`AnnotationStore.rename_tag` via `atomic`); Filter wird beim Undo zurückgesetzt
+
+### Editor / UX
+- **Doc-Split Layout in Einstellungen**: Combo Horizontal/Vertikal (Setting `editor_doc_split_vertical`, sync mit Ansicht-Menü)
+- Dirty-Tabs-Menü: **Alle speichern** für alle ungespeicherten Tabs
+- **Erste-Schritte-Wizard**: Checkbox „Dieses Mal überspringen“; Auto-Show bis abgeschlossen (`wizard_completed` / `wizard_skip_once`)
+
+### Packaging / Docs
+- Version **0.6.6**; Smoke um 0.6.6-Pfade erweitert
+
+---
+
 ## 0.6.5 — Tag-Rename, Vertikal-Split, Dirty-Save, Wizard-0.6
 
 Nach 0.6.4: Tag-Cloud Rechtsklick benennt Tags global um; Doc-Split optional vertikal; Dirty-Tabs-Menü mit Speichern je Datei; Erste-Schritte-Wizard um 0.6-Highlights erweitert. Stubs KI/Cloud/Stylus/3D bleiben Stubs.

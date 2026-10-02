@@ -645,6 +645,7 @@ class AnnotationStore:
     def rename_tag(self, old_tag: str, new_tag: str) -> int:
         """
         Tag global in allen Annotationen umbenennen (case-insensitive Match).
+        Eine Undo-Stufe für alle betroffenen Annotationen (Ctrl+Z stellt alles zurück).
         Rückgabe: Anzahl geänderter Annotationen.
         """
         old = str(old_tag or "").strip()
@@ -663,20 +664,20 @@ class AnnotationStore:
         ]
         if not targets:
             return 0
-        self._push_undo()
-        for a in targets:
-            seen: set[str] = set()
-            nxt: list[str] = []
-            for t in a.tags or []:
-                s = new_s if str(t).casefold() == old_cf else str(t)
-                key = s.casefold()
-                if key in seen:
-                    continue
-                seen.add(key)
-                nxt.append(s)
-            a.tags = nxt
-            a.touch()
-        self.dirty = True
+        with self.atomic():
+            for a in targets:
+                seen: set[str] = set()
+                nxt: list[str] = []
+                for t in a.tags or []:
+                    s = new_s if str(t).casefold() == old_cf else str(t)
+                    key = s.casefold()
+                    if key in seen:
+                        continue
+                    seen.add(key)
+                    nxt.append(s)
+                a.tags = nxt
+                a.touch()
+            self.dirty = True
         return len(targets)
 
     def set_colors(self, ann_ids: Sequence[str], color: str) -> int:

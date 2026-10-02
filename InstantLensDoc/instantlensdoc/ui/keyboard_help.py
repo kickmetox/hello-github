@@ -63,8 +63,10 @@ SHORTCUTS_HTML = """
 <tr><td>Vertikaler Split (übereinander)</td><td><code>Ctrl+Shift+\\</code> (Toggle) — 0.6.5</td></tr>
 <tr><td>Sync-Scroll (geteilte Docs)</td><td><code>Ctrl+Alt+\\</code> (optional) — 0.6.4</td></tr>
 <tr><td>Tag-Cloud Filter</td><td>Klick setzt Filter; <code>Ctrl</code>+Klick Multi-Select — 0.6.4</td></tr>
-<tr><td>Tag-Cloud umbenennen</td><td>Rechtsklick → Tag umbenennen (global) — 0.6.5</td></tr>
-<tr><td>Ungespeicherte Tabs</td><td>Statusleiste „N ungespeichert“ Klick → Liste + Speichern — 0.6.4/0.6.5</td></tr>
+<tr><td>Tag-Cloud umbenennen</td><td>Rechtsklick → Tag umbenennen (global); Ctrl+Z = ein Undo-Schritt — 0.6.5/0.6.6</td></tr>
+<tr><td>Ungespeicherte Tabs</td><td>Statusleiste „N ungespeichert“ Klick → Liste + Speichern / Alle speichern — 0.6.4–0.6.6</td></tr>
+<tr><td>Doc-Split Layout H/V</td><td>Einstellungen oder <code>Ctrl+Shift+\\</code> — 0.6.5/0.6.6</td></tr>
+<tr><td>Wizard skip-once</td><td>Erste Schritte: Checkbox „Dieses Mal überspringen“ — 0.6.6</td></tr>
 <tr><td>PDF: Bild einfügen (Viewer)</td><td><code>Ctrl+V</code></td></tr>
 <tr><td>Zoom +</td><td><code>Ctrl++</code></td></tr>
 <tr><td>Zoom −</td><td><code>Ctrl+-</code></td></tr>
