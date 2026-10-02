@@ -4,7 +4,7 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 
 | Feature | Status | Hinweis |
 |---------|--------|---------|
-| Hauptfenster (Menü, Sidebar, Editor, Status) | fertig | PySide6 |
+| Hauptfenster (Menü, Sidebar, Editor, Status) | fertig | PySide6; Status: Dateiname, Seite x/y, Zoom % 0.2.3 |
 | App-Icon Fenster/Taskleiste/About | fertig | Robuste Pfade: `assets/`, CWD, `D:\AI_Temp\InstantLensDoc` |
 | Session-Restore (offene Docs) | fertig | `session.json`, Sidebar-Liste |
 | Clipboard-Paste Bild | fertig | Editor + PDF (Stempel/Seite) |
@@ -26,11 +26,12 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | Export-Qualitätseinstellungen | fertig | JPEG-Q, Max-Kante, PDF-Seitenformat |
 | Mehrsprach-UI DE/EN | teilweise | Einstellungen + Dialoge/Stubs (Minimal) |
 | Update-Check-Hinweis | fertig | Hilfe-Menü; optional Start; offline OK |
-| Sidebar Seiten-Thumbnails | fertig | Vorschaubilder, Klick → Seite |
+| Sidebar Seiten-Thumbnails | fertig | Vorschaubilder, Klick → Seite; **Drag-Reorder** 0.2.3 |
 | Tastaturhilfe-Dialog | fertig | Hilfe → F1 |
 | App-Logging | fertig | %APPDATA%/InstantLensDoc/logs |
-| PDF-Annotationen (Highlight, Underline, Sticky, Text) | fertig | Sidecar `*.ildann.json` **v3**; Farben-Picker Highlight/Stift 0.2.2 |
+| PDF-Annotationen (Highlight, Underline, Sticky, Text) | fertig | Sidecar `*.ildann.json` **v3**; Farben-Picker Highlight/Stift 0.2.2; Löschen Auswahl/letzte 0.2.3 |
 | Annotation Undo/Redo | fertig | Ctrl+Z/Y inkl. Overlay-Text |
+| Annotation löschen | fertig | Auswahl oder letzte; Entf / Menü 0.2.3 |
 | Stempel / Callouts | teilweise | Stempel-Presets + Callout (2-Klick) |
 | PDF Signaturfeld / Signatur (Bild) | fertig | Sidecar; Menü PDF + Werkzeug |
 | Theme Hell/Dunkel | fertig | Ansicht-Menü, persistiert |
@@ -40,9 +41,9 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | Messwerkzeug (Lineal) | fertig | Distanz in pt (Scale-bewusst) |
 | Text-Overlay-Editor | fertig | Sidecar; Doppelklick/Strg+Klick; Bake optional |
 | PDF-Text → Overlay | teilweise | Extraktion via pypdfium2; kein natives Rewrite |
-| PDF Seite↔Bild Hooks | fertig | Extrahieren / Bild als Seite / Bildstempel |
+| PDF Seite↔Bild Hooks | fertig | Seite/Seiten → PNG/JPEG Export 0.2.3; Bild als Seite / Bildstempel |
 | PDF drehen / Seite löschen | fertig | pikepdf; Annotation-Remap |
-| PDF neu anordnen | fertig | Dialog + Annotation-Remap |
+| PDF neu anordnen | fertig | Dialog + Thumbnail-Drag + Annotation-Remap |
 | Textsuche Seitenleiste | fertig | Editor + PDF-Text + Annotationen; PDF-Treffer on-page Highlight 0.2.2 |
 | Volltextsuche geöffnete Docs | fertig | Sidebar „Alle Docs“ |
 | Lesezeichen / PDF-Outline | fertig | Baum in Sidebar, Doppelklick → Seite |
@@ -62,17 +63,17 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | PyInstaller Build Windows | fertig | `build-windows.ps1`, Icon `assets/app.ico` |
 | Inno-Installer | fertig | Icon, Desktop, Uninstaller, Keygen optional (`InstantLensKeygen.exe`) 0.2.1 |
 | Sync-Skript Windows | fertig | Store `docs/sync-ild.ps1` |
-| In-App Hilfe / About | fertig | Version 0.2.2 |
-| CHANGELOG | fertig | 0.2.2 Suche/Farben/Export/Settings |
+| In-App Hilfe / About | fertig | Version 0.2.3 |
+| CHANGELOG | fertig | 0.2.3 Seitenbilder / Ann. löschen / Status / Thumb-Reorder |
 | FEATURES.md / INFO.md | fertig | |
 | `ild_pdf` Modul + Beispielskript | fertig | metadata / page size / watermark / redact |
 | Font-Matching | geplant | |
 | Objekt-/Bildbearbeitung | geplant | |
 | Layout-Erhaltung (Scan→edit) | geplant | |
 | Freihand | geplant | |
-| KI-Assistent | Stub | Menü „Geplant“ 0.2.2 (keine Fake-KI) |
+| KI-Assistent | Stub | Menü „Geplant“ 0.2.3 (keine Fake-KI) |
 | Signieren (rechtssicher) | Stub | |
-| Cloud-Sync | Stub | Menü „Geplant“ 0.2.2 (keine Fake-Cloud) |
+| Cloud-Sync | Stub | Menü „Geplant“ 0.2.3 (keine Fake-Cloud) |
 | Text on Path / Text zu Pfaden | geplant | |
 | Envelope Distort / Text Wrap / Area Type | Stub/geplant | |
 | Schnittmasken | geplant | |

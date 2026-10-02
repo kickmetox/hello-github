@@ -1,5 +1,23 @@
 # Changelog — InstantLens Doc
 
+## 0.2.3 — Seitenbilder, Annotation löschen, Statusleiste, Thumb-Reorder
+
+Fokus: PDF-Seiten→Bild, Annotation-Löschen, Statusinfo, Thumbnail-Drag.
+
+### PDF / Export
+- **Seiten als Bild**: aktuelle oder alle Seiten als PNG/JPEG exportieren (Menü + Toolbar); Zielordner merken
+- **Annotation löschen**: Auswahl (Werkzeug Auswahl / Shift-Klick / Rechtsklick) oder letzte Annotation; Entf / Menü Bearbeiten
+
+### UX
+- **Statusleiste**: Dateiname, Seite x/y, Zoom % (permanent neben Version/Lizenz)
+- **Thumbnail-Sidebar**: Drag-Reorder der Seiten (wie Dialog „Neu anordnen“), Annotation-Remap
+
+### Docs / Packaging
+- Version **0.2.3**; Stubs KI/Cloud/Stylus/3D unverändert (keine Fake-Features)
+- Docs/CHANGELOG/ISS/Smoke auf 0.2.3
+
+---
+
 ## 0.2.2 — Suche, Farben, Export, Einstellungen
 
 Fokus: PDF-Textsuche sichtbar machen, Annotation-Farben, Export/Settings-UX.
@@ -72,7 +90,7 @@ Fokus: Release-Reife (Versioning, Installer, Smoke, Docs) statt neuer Micro-Feat
 | **0.1.5** | Signatur, Theme, OCR-Tabellen, Autosave, Drag-Drop |
 | **0.1.4** | Undo/Redo, Zoom/Fit, Recent, Druck, Lizenz-Statusleiste |
 | **0.1.3** | Overlay-Editor, Formen/Lineal, Export HTML/DOCX/PDF, Installer-Basis |
-| **0.1.2** | Stempel/Callout, Rahmen-Kette, OCR-Modi, Formular-Typen, build-windows |
+| **0.1.2** | Stempel/Callout, Rahmen-Kette, OCR-Modi, Formulare, build-windows |
 | **0.1.1** | Icon-Auflösung, Inno + Sync, Annotation speichern, Seiten neu anordnen |
 | **0.1.0** | MVP: UI, PDF/Annotationen, OCR-Bridge, Formulare, Lizenz Trial/Keys, Keygen |
 

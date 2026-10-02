@@ -183,6 +183,7 @@ class MainWindow(QMainWindow):
         self.sidebar.outline_activated.connect(self._on_outline_jump)
         self.sidebar.fulltext_hit_activated.connect(self._on_fulltext_hit)
         self.sidebar.page_thumb_activated.connect(self._on_thumb_jump)
+        self.sidebar.pages_reordered.connect(self._on_thumbs_reordered)
         splitter.addWidget(self.sidebar)
 
         self.stack = QStackedWidget()
@@ -192,6 +193,8 @@ class MainWindow(QMainWindow):
         self.pdf_view.status.connect(self._set_status)
         self.pdf_view.annotations_changed.connect(self._refresh_pdf_marks)
         self.pdf_view.page_changed.connect(self._on_pdf_page_changed)
+        self.pdf_view.zoom_changed.connect(self._on_pdf_zoom_changed)
+        self.pdf_view.document_changed.connect(self._update_doc_status)
         self.image_label = QLabel(alignment=Qt.AlignCenter)
         self.image_label.setText("Bildvorschau")
         self.stack.addWidget(self.editor)  # 0
@@ -203,11 +206,22 @@ class MainWindow(QMainWindow):
 
         sb = QStatusBar()
         self.setStatusBar(sb)
+        self.file_status_label = QLabel("—")
+        self.file_status_label.setMinimumWidth(120)
+        self.file_status_label.setStyleSheet("padding-left: 6px; padding-right: 8px;")
+        sb.addWidget(self.file_status_label, 1)
+        self.page_status_label = QLabel("Seite —")
+        self.page_status_label.setStyleSheet("padding-right: 10px;")
+        sb.addPermanentWidget(self.page_status_label)
+        self.zoom_status_label = QLabel("— %")
+        self.zoom_status_label.setStyleSheet("padding-right: 10px;")
+        sb.addPermanentWidget(self.zoom_status_label)
         self.version_label = QLabel(f"v{__version__}")
         self.version_label.setStyleSheet("color: #666; padding-right: 8px;")
         sb.addPermanentWidget(self.version_label)
         self.license_label = QLabel()
         sb.addPermanentWidget(self.license_label)
+        self._update_doc_status()
 
     def _build_menus(self):
         mb = self.menuBar()
@@ -292,6 +306,12 @@ class MainWindow(QMainWindow):
         act_clear_marks = QAction("Markierungen löschen", self)
         act_clear_marks.triggered.connect(self._clear_editor_marks)
         m_edit.addAction(act_clear_marks)
+        m_edit.addSeparator()
+        act_del_ann = QAction("Annotation löschen", self)
+        act_del_ann.setShortcut(QKeySequence.Delete)
+        act_del_ann.setToolTip("Ausgewählte Annotation oder letzte auf der Seite")
+        act_del_ann.triggered.connect(self._delete_annotation)
+        m_edit.addAction(act_del_ann)
 
         m_view = mb.addMenu("&Ansicht")
         a = QAction("Seitenleiste", self)
@@ -363,7 +383,8 @@ class MainWindow(QMainWindow):
             ("Seite drehen (90°)", lambda: self.pdf_view.rotate_current()),
             ("Seite löschen…", lambda: self.pdf_view.delete_current()),
             ("Seiten neu anordnen…", lambda: self.pdf_view.reorder_dialog()),
-            ("Seite als Bild extrahieren…", lambda: self.pdf_view.extract_page_as_image()),
+            ("Seite als Bild exportieren…", lambda: self.pdf_view.extract_page_as_image()),
+            ("Seiten als Bilder exportieren…", lambda: self.pdf_view.export_pages_as_images()),
             ("Bild als neue Seite…", lambda: self.pdf_view.insert_image_page()),
             ("Seite drucken…", lambda: self.pdf_view.print_current_page()),
         ]:
@@ -477,6 +498,39 @@ class MainWindow(QMainWindow):
 
     def _set_status(self, msg: str):
         self.statusBar().showMessage(msg, 5000)
+
+    def _update_doc_status(self):
+        """Statusleiste: Dateiname, Seite x/y, Zoom %."""
+        name = "—"
+        page_txt = "Seite —"
+        zoom_txt = "— %"
+        if self.doc and self.doc.path:
+            name = Path(self.doc.path).name
+        elif self.pdf_view.pdf_path:
+            name = self.pdf_view.pdf_path.name
+        if self.pdf_view.pdf_path and self.pdf_view.page_count > 0:
+            page_txt = f"Seite {self.pdf_view.page_index + 1}/{self.pdf_view.page_count}"
+            zoom_txt = f"{int(round(self.pdf_view.scale * 100))} %"
+        elif self.doc and self.doc.path:
+            page_txt = "Editor"
+            zoom_txt = "—"
+        self.file_status_label.setText(name)
+        self.file_status_label.setToolTip(str(self.doc.path) if self.doc and self.doc.path else name)
+        self.page_status_label.setText(page_txt)
+        self.zoom_status_label.setText(zoom_txt)
+
+    def _on_pdf_zoom_changed(self, scale: float):
+        self.zoom_status_label.setText(f"{int(round(float(scale) * 100))} %")
+        if self.pdf_view.pdf_path and self.pdf_view.page_count > 0:
+            self.page_status_label.setText(
+                f"Seite {self.pdf_view.page_index + 1}/{self.pdf_view.page_count}"
+            )
+
+    def _delete_annotation(self):
+        if self.stack.currentWidget() is self.pdf_view and self.pdf_view.pdf_path:
+            self.pdf_view.delete_annotation()
+        else:
+            self._set_status("Annotation löschen nur im PDF-Modus")
 
     def _sync_theme_menu(self):
         if self._theme_action is not None:
@@ -814,9 +868,18 @@ class MainWindow(QMainWindow):
             return
         self.pdf_view.goto_page(page_index)
 
+    def _on_thumbs_reordered(self, order: list):
+        if self.stack.currentWidget() is not self.pdf_view:
+            return
+        if not self.pdf_view.pdf_path:
+            return
+        if self.pdf_view.apply_page_order([int(i) for i in order]):
+            self._refresh_thumbs()
+            self._update_doc_status()
+
     def _on_pdf_page_changed(self, page_index: int):
         self.sidebar.select_thumb(page_index)
-
+        self._update_doc_status()
     def _set_pdf_password(self):
         if not self.pdf_view.pdf_path:
             QMessageBox.information(self, "Passwort", "Bitte zuerst ein PDF öffnen.")
@@ -971,6 +1034,7 @@ class MainWindow(QMainWindow):
         self.sidebar.set_marks([])
         self.stack.setCurrentWidget(self.editor)
         self.setWindowTitle(f"{DISPLAY_NAME} — Unbenannt")
+        self._update_doc_status()
         self._set_status("Neues Dokument")
 
     def open_dialog(self):
@@ -1027,6 +1091,7 @@ class MainWindow(QMainWindow):
                 self._editor_marks.clear()
                 self.sidebar.set_marks([])
                 self.sidebar.clear_thumbs()
+            self._update_doc_status()
             self._set_status(f"Geöffnet: {path}")
         except Exception as e:
             _log.exception("Anzeige fehlgeschlagen: %s", path)

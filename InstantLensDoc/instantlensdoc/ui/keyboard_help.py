@@ -26,15 +26,20 @@ SHORTCUTS_HTML = """
 <tr><td>Breite einpassen</td><td><code>Ctrl+9</code></td></tr>
 <tr><td>Zoom 100&nbsp;%</td><td><code>Ctrl+1</code></td></tr>
 <tr><td>Overlay bearbeiten</td><td>Doppelklick / <code>Ctrl</code>+Klick</td></tr>
+<tr><td>Annotation auswählen</td><td>Werkzeug Auswahl / Shift+Klick / Rechtsklick</td></tr>
+<tr><td>Annotation löschen</td><td><code>Entf</code> / <code>Backspace</code> (Auswahl oder letzte)</td></tr>
 <tr><td>Diese Hilfe</td><td><code>F1</code></td></tr>
 </table>
 <p><b>Speichern unter (PDF):</b> speichert die Annotationen als Sidecar
 <code>*.ildann.json</code> (PDF-Datei bleibt unverändert). Auch unter
 PDF → Annotationen speichern unter…</p>
-<p><b>PDF-Werkzeuge</b> (Toolbar): Highlight, Schwärzen (REDACT-Preview), Formen per Drag;
-Notiz/Stempel/Callout/Overlay per Klick; <b>HL</b>/<b>Stift</b>-Farben-Picker.</p>
+<p><b>PDF-Werkzeuge</b> (Toolbar): Auswahl, Highlight, Schwärzen (REDACT-Preview), Formen per Drag;
+Notiz/Stempel/Callout/Overlay per Klick; <b>HL</b>/<b>Stift</b>-Farben-Picker; Ann. löschen.</p>
 <p><b>PDF-Suche:</b> Sidebar-Suche highlightet Treffer auf der aktuellen Seite;
 „Weiter“ springt zum nächsten Treffer.</p>
+<p><b>Seiten als Bilder:</b> PDF → Seite/Seiten als PNG/JPEG exportieren (aktuell oder alle).</p>
+<p><b>Thumbnails:</b> in der Sidebar ziehen zum Neuordnen der Seiten.</p>
+<p><b>Statusleiste:</b> Dateiname · Seite x/y · Zoom % · Version · Lizenz.</p>
 <p><b>Schwärzung:</b> Rechteck ziehen → PDF → Schwärzung einbrennen… (Sidecar optional leeren)
 bzw. Schwärzungs-Annotationen löschen…</p>
 <p><b>Extras:</b> Einstellungen (Standard-Zoom, Autosave-Intervall), Batch (Fortschrittsbalken), OCR (Fortschrittsdialog).</p>

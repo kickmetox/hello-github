@@ -7,6 +7,7 @@ from pathlib import Path
 from PySide6.QtCore import Signal, Qt
 from PySide6.QtGui import QIcon, QImage, QPixmap
 from PySide6.QtWidgets import (
+    QAbstractItemView,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -20,6 +21,47 @@ from PySide6.QtWidgets import (
 )
 
 
+class ThumbnailList(QListWidget):
+    """Icon-Liste mit InternalMove; meldet neue Seitenreihenfolge nach Drop."""
+
+    pages_reordered = Signal(list)  # list[int] alte Indizes in neuer Reihenfolge
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setViewMode(QListWidget.IconMode)
+        self.setIconSize(QPixmap(72, 96).size())
+        self.setResizeMode(QListWidget.Adjust)
+        self.setMovement(QListWidget.Snap)
+        self.setDragDropMode(QAbstractItemView.InternalMove)
+        self.setDefaultDropAction(Qt.MoveAction)
+        self.setSpacing(4)
+        self.setMaximumHeight(200)
+        self.setMinimumHeight(100)
+        self.setToolTip("Ziehen zum Neuordnen der PDF-Seiten")
+        self._reorder_enabled = True
+
+    def set_reorder_enabled(self, enabled: bool):
+        self._reorder_enabled = bool(enabled)
+        mode = QAbstractItemView.InternalMove if enabled else QAbstractItemView.NoDragDrop
+        self.setDragDropMode(mode)
+
+    def dropEvent(self, event):
+        if not self._reorder_enabled:
+            event.ignore()
+            return
+        super().dropEvent(event)
+        order: list[int] = []
+        for i in range(self.count()):
+            item = self.item(i)
+            if item is None:
+                continue
+            page = item.data(Qt.UserRole)
+            if page is not None:
+                order.append(int(page))
+        if order:
+            self.pages_reordered.emit(order)
+
+
 class Sidebar(QWidget):
     file_activated = Signal(str)
     recent_activated = Signal(str)
@@ -29,6 +71,7 @@ class Sidebar(QWidget):
     outline_activated = Signal(int)  # PDF-Seite 0-basiert
     fulltext_hit_activated = Signal(str, object)  # path, page_index|None
     page_thumb_activated = Signal(int)  # PDF-Seite 0-basiert
+    pages_reordered = Signal(list)  # alte Indizes in neuer Reihenfolge
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -66,16 +109,10 @@ class Sidebar(QWidget):
         self.files.itemDoubleClicked.connect(self._activate)
         layout.addWidget(self.files)
 
-        layout.addWidget(QLabel("Seiten (Vorschaubilder)"))
-        self.thumbs = QListWidget()
-        self.thumbs.setViewMode(QListWidget.IconMode)
-        self.thumbs.setIconSize(QPixmap(72, 96).size())
-        self.thumbs.setResizeMode(QListWidget.Adjust)
-        self.thumbs.setMovement(QListWidget.Static)
-        self.thumbs.setSpacing(4)
-        self.thumbs.setMaximumHeight(200)
-        self.thumbs.setMinimumHeight(100)
+        layout.addWidget(QLabel("Seiten (Vorschaubilder) — ziehen zum Ordnen"))
+        self.thumbs = ThumbnailList()
         self.thumbs.itemClicked.connect(self._activate_thumb)
+        self.thumbs.pages_reordered.connect(self.pages_reordered.emit)
         layout.addWidget(self.thumbs)
 
         layout.addWidget(QLabel("Lesezeichen / Outline"))
@@ -176,7 +213,7 @@ class Sidebar(QWidget):
             if not pm.isNull():
                 item.setIcon(QIcon(pm))
             item.setData(Qt.UserRole, i)
-            item.setToolTip(f"Seite {i + 1}")
+            item.setToolTip(f"Seite {i + 1} — ziehen zum Neuordnen")
             self.thumbs.addItem(item)
         self.select_thumb(current)
 

@@ -232,6 +232,16 @@ class AnnotationStore:
             self.dirty = True
         return changed
 
+    def remove_last(self, page: int | None = None) -> Optional[Annotation]:
+        """Löscht die letzte Annotation (optional nur auf page). Undo-fähig."""
+        candidates = self.annotations if page is None else self.for_page(page)
+        if not candidates:
+            return None
+        target = candidates[-1]
+        if self.remove(target.id):
+            return target
+        return None
+
     def for_page(self, page: int) -> List[Annotation]:
         return [a for a in self.annotations if a.page == page]
 

@@ -29,6 +29,7 @@ from .images import (
     compress_image_for_pdf,
     compress_pdf_as_images,
     extract_page_image,
+    extract_pages_as_images,
     extract_embedded_images,
     insert_image_as_page,
     insert_image_stamp_overlay,
@@ -74,6 +75,7 @@ __all__ = [
     "compress_image_for_pdf",
     "compress_pdf_as_images",
     "extract_page_image",
+    "extract_pages_as_images",
     "extract_embedded_images",
     "insert_image_as_page",
     "insert_image_stamp_overlay",
@@ -100,4 +102,4 @@ __all__ = [
     "set_metadata",
 ]
 
-__version__ = "0.2.2"
+__version__ = "0.2.3"

@@ -42,7 +42,7 @@ HELP_HTML = """
     <b>Zwei PDFs vergleichen</b> (Seite neben Seite);
     <b>Passwort setzen/öffnen</b>; <b>Bildkompression</b> (Seiten neu als JPEG);
     <b>Metadaten bearbeiten</b>; <b>Seitengröße / Zuschneiden</b>;
-    Seite als Bild / Bild als neue Seite (komprimiert) / Seite drucken;
+    Seite/Seiten als PNG/JPEG exportieren / Bild als neue Seite / Seite drucken; Annotation löschen (Auswahl/letzte, Entf); Statusleiste Seite/Zoom/Dateiname; Thumbnails per Drag neu ordnen;
     große PDFs: Warnung / Limits;
     <b>Seiten-Thumbnails</b> in der Sidebar</li>
 <li><b>Hilfe → Auf Updates prüfen</b>: lokal immer; Online optional (offline OK)</li>
@@ -73,7 +73,7 @@ Beispiel: <code>examples/ild_pdf_demo.py</code>. API: <code>ild_pdf/README.md</c
 <code>D:\\AI_Temp\\InstantLensDoc</code>, pip, optional Start. Eigenes Icon in <code>assets</code> bleibt erhalten.</p>
 <h3>Geplante Features</h3>
 <p>KI-Assistent, Cloud-Sync, Stylus/Palm Rejection, 3D u. a. sind im Menü als „Geplant“ markiert
-(Stub 0.2.2) — siehe FEATURES.md.</p>
+(Stub 0.2.3) — siehe FEATURES.md.</p>
 """
 
 

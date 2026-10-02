@@ -102,6 +102,9 @@ def extract_page_image(
     out_path: str | Path | None = None,
     scale: float = 2.0,
     format: str = "PNG",
+    *,
+    jpeg_quality: int = 90,
+    password: str | None = None,
 ) -> Path:
     """
     Rendert eine PDF-Seite und speichert sie als Bild.
@@ -110,9 +113,10 @@ def extract_page_image(
     from .render import render_page
 
     pdf_path = Path(pdf_path)
-    img = render_page(pdf_path, page_index=page_index, scale=scale)
+    img = render_page(pdf_path, page_index=page_index, scale=scale, password=password)
     if out_path is None:
-        out_path = pdf_path.with_name(f"{pdf_path.stem}_p{page_index + 1}.png")
+        ext = ".jpg" if format.upper() in ("JPEG", "JPG") else ".png"
+        out_path = pdf_path.with_name(f"{pdf_path.stem}_p{page_index + 1}{ext}")
     else:
         out_path = Path(out_path)
     fmt = format.upper()
@@ -120,8 +124,57 @@ def extract_page_image(
         fmt = "JPEG"
     if fmt == "JPEG" and img.mode == "RGBA":
         img = img.convert("RGB")
-    img.save(out_path, fmt)
+    save_kw: dict = {}
+    if fmt == "JPEG":
+        save_kw["quality"] = max(1, min(95, int(jpeg_quality)))
+        save_kw["optimize"] = True
+    img.save(out_path, fmt, **save_kw)
     return out_path
+
+
+def extract_pages_as_images(
+    pdf_path: str | Path,
+    out_dir: str | Path,
+    *,
+    pages: list[int] | None = None,
+    scale: float = 2.0,
+    format: str = "PNG",
+    jpeg_quality: int = 90,
+    password: str | None = None,
+) -> List[Path]:
+    """
+    Exportiert eine oder mehrere PDF-Seiten als PNG/JPEG in out_dir.
+    pages=None → alle Seiten. Rückgabe: Liste geschriebener Pfade.
+    """
+    from .document import PdfDocument
+
+    pdf_path = Path(pdf_path)
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    fmt = format.upper()
+    if fmt == "JPG":
+        fmt = "JPEG"
+    ext = ".jpg" if fmt == "JPEG" else ".png"
+    with PdfDocument(pdf_path, password=password) as doc:
+        n = len(doc)
+    indices = list(pages) if pages is not None else list(range(n))
+    written: List[Path] = []
+    for i in indices:
+        if i < 0 or i >= n:
+            continue
+        out = out_dir / f"{pdf_path.stem}_p{i + 1}{ext}"
+        written.append(
+            extract_page_image(
+                pdf_path,
+                i,
+                out,
+                scale=scale,
+                format=fmt,
+                jpeg_quality=jpeg_quality,
+                password=password,
+            )
+        )
+    return written
 
 
 def extract_embedded_images(
