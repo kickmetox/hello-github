@@ -2,7 +2,7 @@
 
 Moderne Textverarbeitung mit PDF-Annotator, OCR-Bridge und Formulargenerator.
 
-**Version:** 0.3.9  
+**Version:** 0.4.0  
 **Hersteller:** Andreas Meyer · ame@sellerbach.de
 
 ## Quickstart (Windows)
@@ -29,9 +29,8 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)
 
-## Neu in 0.3.9
+## Neu in 0.4.0
 
-PDF Höhe/Breite einpassen (Ctrl+8/9), Ann.-Statistik Sidebar-Footer, Editor Sonderzeichen-Toggle, Tray-Tooltip mit Version. Stubs KI/Cloud/Stylus/3D unverändert.
-
+Release-Konsolidierung 0.3.0→0.4.0: Fit-Height, Ann.-Statistik/CSV/Favoriten, Präsentation, Editor-Sonderzeichen/Zeilen-Ops, Overwrite-Schutz, Tray-Version u. a. Stubs KI/Cloud/Stylus/3D unverändert.
 
 Siehe [CHANGELOG.md](CHANGELOG.md), [FEATURES.md](FEATURES.md) und [INFO.md](INFO.md).

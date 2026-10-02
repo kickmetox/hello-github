@@ -1,194 +1,58 @@
 # Changelog — InstantLens Doc
 
-## 0.3.9 — Fit-Height, Ann.-Statistik, Sonderzeichen, Tray-Version
+## 0.4.0 — Release-Konsolidierung (0.3.0 → 0.4.0)
 
-Fokus auf sinnvolle Ausbauten nach 0.3.8. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
-
-### PDF
-- **Höhe einpassen** Ctrl+8 (Menü Ansicht + Toolbar „Höhe“); Breite bleibt Ctrl+9
-- **Annotation-Statistik** im Sidebar-Footer (Anzahl je Typ, unabhängig vom Filter)
-
-### Editor / UX
-- **Sonderzeichen anzeigen** Toggle (Ansicht / Einstellungen / Ctrl+Shift+.) — Tabs, Leerzeichen, Absatzenden
-- **Tray-Tooltip** mit App-Version (`InstantLens Doc v…`); Auto-Update-Hinweis beim Start nur wenn Einstellung aktiv (unverändert)
-
-### Packaging / Docs
-- Version **0.3.9** (App, `ild_pdf`, ISS, Smoke, INFO/FEATURES/README)
-
----
-
-## 0.3.8 — Thumbnail-Größe, Ann.-CSV, Zeile verschieben, Overwrite-Schutz
-
-Fokus auf sinnvolle Ausbauten nach 0.3.7. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
-
-### PDF
-- **Thumbnail-Größe** in Einstellungen (klein 0.12 / normal 0.18 / groß 0.24); Sidebar-Icons skalieren mit
-- **Annotationen als CSV exportieren** (flache Tabelle, Menü PDF)
-
-### Editor / UX
-- **Zeile verschieben** Alt+Up / Alt+Down (aktuelle Zeile oder Auswahl)
-- **Overwrite-Schutz** beim Export: Dialog wenn Zieldatei existiert (Default: Nein)
-
-### Packaging / Docs
-- Version **0.3.8** (App, `ild_pdf`, ISS, Smoke, INFO/FEATURES/README)
-
----
-
-## 0.3.7 — Präsentation, Ann.-Favoriten, Block-Tab, Session-Toggle
-
-Fokus auf sinnvolle Ausbauten nach 0.3.6. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
-
-### PDF
-- **Präsentationsmodus** (Ansicht → F5): Vollbild, PDF-Seite; ←/→/↑/↓/Leertaste/Page±; Esc beendet
-- **Annotation-Farben-Favoriten**: 3 Presets in Toolbar (Klick = Highlight, Shift+Klick = Stift, Rechtsklick = speichern)
-
-### Editor / UX
-- **Block ein-/ausrücken** mit Tab / Shift+Tab (aktuelle Zeile oder Auswahl)
-- **Start mit letzter Session** optional (Einstellungen-Toggle `restore_session_on_start`)
-
-### Packaging / Docs
-- Version **0.3.7** (App, `ild_pdf`, ISS, Smoke, INFO/FEATURES/README)
-
----
-
-## 0.3.6 — Raster-DPI, Ann. Select-All, Kommentar, Fenstergeometrie
-
-Fokus auf sinnvolle Ausbauten nach 0.3.5. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
-
-### PDF
-- **Raster-Export DPI wählbar** (72 / 150 / 300) beim Export Seite/Seiten als Bild; Einstellung merken
-- **Alle Annotationen auf Seite auswählen** (Ctrl+A im PDF-Modus; Mehrfachauswahl + Löschen)
-
-### Editor / UX
-- **Zeile kommentieren/auskommentieren** (Ctrl+/; Präfix `#` oder `//` je nach Dateityp)
-- **Fenster-Geometrie** speichern/wiederherstellen (Größe, Position, Window-State)
-
-### Packaging / Docs
-- Version **0.3.6** (App, `ild_pdf`, ISS, Smoke, INFO/FEATURES/README)
-
----
-
-## 0.3.5 — Seitengröße, Ann.-Gruppen, Zeile duplizieren, Backup
-
-Fokus auf sinnvolle Ausbauten nach 0.3.4. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
-
-### PDF
-- **Seitengröße in Statusleiste** (MediaBox mm/inch; Klick oder Ctrl+Alt+U zum Umschalten)
-- **Seitengröße-Dialog**: Einheit mm/inch Toggle (persistiert)
-- **Annotationen in Sidebar nach Seite gruppiert** (Überschriften „Seite n“)
-
-### Editor / UX
-- **Zeile duplizieren** (Ctrl+D; Auswahl mehrerer Zeilen möglich)
-- **Backup-Kopie (.bak) beim Speichern** optional in Einstellungen
-
-### Packaging / Docs
-- Version **0.3.5** (App, `ild_pdf`, ISS, Smoke, INFO/FEATURES/README)
-
----
-
-## 0.3.4 — PDF-Text→Editor, Ann.-Duplikat, Goto Line, Tray
-
-Fokus auf sinnvolle Ausbauten nach 0.3.3. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
-
-### PDF
-- **Text extrahieren → Editor**: aktuelle Seite oder gesamtes PDF (mit Seitenköpfen) in den Editor-Tab (`extract_page_plain_text` / `extract_all_plain_text`)
-- **Annotation duplizieren** (Auswahl; leicht versetzt, neue ID; Ctrl+Shift+D)
-
-### Editor / UX
-- **Gehe zu Zeile** Dialog (Ctrl+G)
-- **Minimieren in System-Tray** optional in Einstellungen
-
-### Packaging / Docs
-- Version **0.3.4** (App, `ild_pdf`, ISS, Smoke, INFO/FEATURES/README)
-
----
-
-
-## 0.3.3 — Einzel-PDFs, Ann.-Flatten, Soft-Wrap, Lizenz
-
-Fokus auf sinnvolle Ausbauten nach 0.3.2. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
-
-### PDF
-- **Seiten als Einzel-PDFs** (PDF → Seiten als Einzel-PDFs…; `split_into_single_page_pdfs`)
-- **Annotationen flatten/bake** Export: alle Seiten mit eingezeichneten Annotationen → neues PDF (`flatten_annotations_to_pdf`)
-
-### Editor / UX
-- **Soft-Wrap Toggle** (Ansicht + Einstellungen; Ctrl+Shift+W)
-- **Lizenz-Dialog**: Resttage und Ablaufdatum klarer dargestellt
-
-### Packaging / Docs
-- Version **0.3.3** (App, `ild_pdf`, ISS, Smoke, INFO/FEATURES/README)
-
----
-
-## 0.3.2 — Anhänge, Ann.-Layer, MD-Preview, Ordner
-
-Fokus auf sinnvolle Ausbauten nach 0.3.1. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
-
-### PDF
-- **Anhänge** auflisten/extrahieren wenn vorhanden (PDF → Anhänge…; `ild_pdf.attachments`)
-- **Annotation-Layer** ein-/ausblenden (Ansicht + Toolbar „Ann.“; Ctrl+Shift+A)
-
-### Editor / UX
-- **Markdown-Vorschau** optional als Split (Ansicht → Markdown-Vorschau; Ctrl+Shift+M)
-- **Zuletzt verwendete Ordner** in Datei-Dialogen merken (`recent_dirs` in Settings)
-
-### Packaging / Docs
-- Version **0.3.2** (App, `ild_pdf`, ISS, Smoke, INFO/FEATURES/README)
-
----
-
-## 0.3.1 — Formulare, Stempel, Close, Thumbs
-
-Fokus auf sinnvolle Ausbauten nach dem 0.3.0-Meilenstein. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
-
-### PDF
-- **AcroForm-Formularfelder** lesen/schreiben (pikepdf `Form`): Text, Checkbox, Choice, Radio — Menü PDF → Formularfelder ausfüllen…
-- **Stempel-Bibliothek** GENEHMIGT / ENTWURF / VERTRAULICH mit optionalem Datum; Dialog statt einfacher Liste
-
-### UX / Performance
-- **Tab schließen** (Datei → Schließen / Ctrl+W) mit Speichern-Dialog wenn dirty; auch beim Beenden
-- **Thumbnail-Lazy-Load**: Platzhalter sofort, Seiten einzeln nachladen (aktuelle Seite zuerst)
-
-### Packaging / Docs
-- Version **0.3.1** (App, `ild_pdf`, ISS, Smoke, INFO/FEATURES/README)
-
----
-
-## 0.3.0 — Release-Konsolidierung (0.2.0 → 0.3.0)
-
-Meilenstein: alle 0.2.x-Inkremente gebündelt, Version einheitlich **0.3.0**, Smoke um Kernpfade erweitert, kleine Review-Fixes. Stubs KI/Cloud/Stylus/3D bleiben Stubs (keine Fake-Features).
+Meilenstein: alle 0.3.x-Inkremente gebündelt, Version einheitlich **0.4.0**, Smoke um ausgewählte 0.3.x-Pfade erweitert, kleine Review-Fixes. Stubs KI/Cloud/Stylus/3D bleiben Stubs (keine Fake-Features).
 
 ### PDF / Seiten
-- Drehen, spiegeln (H/V), leere Seite, duplizieren, Thumb-Reorder
-- Seitenbereich extrahieren, Seite(n) → PNG/JPEG, Graustufen (Ansicht + Export)
-- **Nachtmodus** (Invert-Ansicht, nur Darstellung — nicht speichern/exportieren)
-- Outline hinzufügen/löschen, PDF als Kopie, Wasserzeichen/Seitennummern, Metadaten, Seitengröße/Crop
-- Passwort, Bildkompression, Redaction einbrennen, Signaturfeld/-bild
+- AcroForm-Felder lesen/schreiben; Stempel-Bibliothek GENEHMIGT/ENTWURF/VERTRAULICH
+- Anhänge auflisten/extrahieren; Seiten als Einzel-PDFs; Text → Editor (Seite/gesamt)
+- Raster-Export DPI 72/150/300; Thumbnail-Größe klein/normal/groß; Lazy-Load
+- Fit-Width Ctrl+9 / **Fit-Height Ctrl+8**; Präsentationsmodus F5
+- Seitengröße Statusleiste mm/inch; Fenster-Geometrie speichern
 
 ### Annotationen
-- Sidecar `*.ildann.json` v3; Farben-Picker; Löschen Auswahl/letzte; Undo/Redo
-- Sidebar-Liste mit Typ-Filter + **Textsuche** (inkl. DE-Typ-Labels)
-- Text nachträglich editierbar; Deckkraft/Opacity (ohne doppelte α-Multiplikation)
-- JSON Export/Import
+- Layer ein-/ausblenden; Flatten/Bake → PDF; Duplizieren; Select-All Seite
+- Sidebar: Typ-Filter, Textsuche, Gruppierung nach Seite, **Statistik je Typ**
+- Farben-Favoriten (3 Presets); CSV-Export; Sidecar v3
 
 ### Editor / UX
-- Find/Replace, Zeilennummern, Groß-/Kleinschreibung, **Einrückung** +/-
-- Wortzählung Statusleiste; Alles speichern; Lizenz <7 Tage prominent
-- Splash + Fenstertitel/About; **Hilfe → Logordner öffnen**
-- Suchhistorie, Session, Theme, i18n DE/EN (teilweise)
+- Soft-Wrap; Markdown-Vorschau; Sonderzeichen; Gehe zu Zeile; Zeile duplizieren/verschieben
+- Block Tab/Shift+Tab; Kommentar Ctrl+/; Backup `.bak`; Overwrite-Schutz Export
+- Session-Restore Toggle; Tray-Minimize + Tray-Tooltip mit Version
+- Tab schließen (dirty); Lizenz Resttage/Ablauf klar; Zuletzt verwendete Ordner
 
 ### Packaging / Docs
-- Inno Setup / Build / INFO / FEATURES / README Quickstart auf **0.3.0**
+- Inno Setup / Build / INFO / FEATURES / README auf **0.4.0**
 - Sync: `scripts/sync-ild.ps1` (Repo) bzw. Store `docs/sync-ild.ps1`
-- Smoke: open / annotate / export / license + 0.2.x-Kernpfade (CLI + offscreen Qt)
+- Smoke: open / annotate / export / license + ausgewählte 0.3.x-Pfade (CLI + offscreen Qt)
 
-### Review-Fixes (0.3.0)
-- Toolbar Graustufen/Nacht sync mit Ansicht-Menü
-- Annotation-Opacity nicht doppelt angewandt
-- Annotation-Suche findet deutsche Typ-Labels
-- Einrückung: Auswahl über Blocknummern wiederherstellen
-- Sync-Pfad-Hinweise korrigiert
+### Review-Fixes (0.4.0)
+- `installer/installer-hinweis.txt` Version auf aktuelle Release gebracht (war 0.3.3)
+- Versionsstrings App / `ild_pdf` / ISS / Smoke / Docs vereinheitlicht
+- CHANGELOG 0.3.1–0.3.9 zu Kurz-Tabelle verdichtet (wie zuvor 0.2.x)
+
+---
+
+## 0.3.0 — Release-Meilenstein
+
+Fokus: Konsolidierung 0.2.x → 0.3.0 (Versioning, Smoke, Docs, Review-Fixes Opacity/Ann-Suche/Toolbar/Indent/Sync). Inno gehärtet, Stubs ohne Fake-Features.
+
+### 0.3.x-Inkremente (Kurz)
+
+| Ver. | Kern |
+|------|------|
+| **0.3.1** | AcroForm, Stempel-Bibliothek, Tab schließen, Thumb Lazy-Load |
+| **0.3.2** | Anhänge, Ann.-Layer, Markdown-Vorschau, recent_dirs |
+| **0.3.3** | Einzel-PDFs, Ann.-Flatten, Soft-Wrap, Lizenz Resttage |
+| **0.3.4** | PDF-Text→Editor, Ann.-Duplikat, Goto Line, Tray-Minimize |
+| **0.3.5** | Seitengröße Status, Ann.-Gruppen, Zeile duplizieren, Backup .bak |
+| **0.3.6** | Raster-DPI, Ann. Select-All, Kommentar Ctrl+/, Fenstergeometrie |
+| **0.3.7** | Präsentation F5, Ann.-Favoriten, Block-Tab, Session-Toggle |
+| **0.3.8** | Thumbnail-Größe, Ann.-CSV, Zeile verschieben, Overwrite-Schutz |
+| **0.3.9** | Fit-Height, Ann.-Statistik, Sonderzeichen, Tray-Version |
+
+→ zusammengeführt in **0.4.0**.
 
 ---
 
