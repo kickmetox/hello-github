@@ -201,6 +201,8 @@ class MainWindow(QMainWindow):
         self.pdf_view.page_changed.connect(self._on_pdf_page_changed)
         self.pdf_view.zoom_changed.connect(self._on_pdf_zoom_changed)
         self.pdf_view.document_changed.connect(self._on_pdf_document_changed)
+        self.pdf_view.grayscale_changed.connect(self._sync_grayscale_action)
+        self.pdf_view.night_mode_changed.connect(self._sync_night_action)
         self.image_label = QLabel(alignment=Qt.AlignCenter)
         self.image_label.setText("Bildvorschau")
         self.stack.addWidget(self.editor)  # 0
@@ -667,16 +669,22 @@ class MainWindow(QMainWindow):
 
     def _toggle_grayscale(self, checked: bool):
         self.pdf_view.set_grayscale(bool(checked))
-        if hasattr(self, "_grayscale_action") and self._grayscale_action is not None:
-            self._grayscale_action.blockSignals(True)
-            self._grayscale_action.setChecked(bool(checked))
-            self._grayscale_action.blockSignals(False)
+        self._sync_grayscale_action(bool(checked))
 
     def _toggle_night_mode(self, checked: bool):
         self.pdf_view.set_night_mode(bool(checked))
+        self._sync_night_action(bool(checked))
+
+    def _sync_grayscale_action(self, enabled: bool):
+        if hasattr(self, "_grayscale_action") and self._grayscale_action is not None:
+            self._grayscale_action.blockSignals(True)
+            self._grayscale_action.setChecked(bool(enabled))
+            self._grayscale_action.blockSignals(False)
+
+    def _sync_night_action(self, enabled: bool):
         if hasattr(self, "_night_action") and self._night_action is not None:
             self._night_action.blockSignals(True)
-            self._night_action.setChecked(bool(checked))
+            self._night_action.setChecked(bool(enabled))
             self._night_action.blockSignals(False)
 
     def _toggle_case_selection(self):

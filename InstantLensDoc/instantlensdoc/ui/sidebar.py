@@ -22,6 +22,25 @@ from PySide6.QtWidgets import (
 )
 
 
+# Deutsche Typ-Labels (Filter-Dropdown + Annotation-Suche)
+ANN_TYPE_LABELS = {
+    "highlight": "Highlight",
+    "underline": "Unterstreichen",
+    "sticky": "Notiz",
+    "text": "Text",
+    "stamp": "Stempel",
+    "callout": "Callout",
+    "rectangle": "Rechteck",
+    "line": "Linie",
+    "arrow": "Pfeil",
+    "measure": "Messung",
+    "text_overlay": "Text-Overlay",
+    "signature_field": "Signaturfeld",
+    "signature": "Signatur",
+    "redaction": "Schwärzung",
+}
+
+
 class ThumbnailList(QListWidget):
     """Icon-Liste mit InternalMove; meldet neue Seitenreihenfolge nach Drop."""
 
@@ -381,24 +400,8 @@ class Sidebar(QWidget):
         self.ann_filter.blockSignals(True)
         self.ann_filter.clear()
         self.ann_filter.addItem("Alle Typen", "")
-        labels = {
-            "highlight": "Highlight",
-            "underline": "Unterstreichen",
-            "sticky": "Notiz",
-            "text": "Text",
-            "stamp": "Stempel",
-            "callout": "Callout",
-            "rectangle": "Rechteck",
-            "line": "Linie",
-            "arrow": "Pfeil",
-            "measure": "Messung",
-            "text_overlay": "Text-Overlay",
-            "signature_field": "Signaturfeld",
-            "signature": "Signatur",
-            "redaction": "Schwärzung",
-        }
         for t in types:
-            self.ann_filter.addItem(labels.get(t, t), t)
+            self.ann_filter.addItem(ANN_TYPE_LABELS.get(t, t), t)
         idx = self.ann_filter.findData(current)
         self.ann_filter.setCurrentIndex(idx if idx >= 0 else 0)
         self.ann_filter.blockSignals(False)
@@ -419,9 +422,22 @@ class Sidebar(QWidget):
             if query:
                 hay = line.lower()
                 extra = ""
+                type_label = ""
                 if payload is not None:
                     extra = str(getattr(payload, "text", "") or "").lower()
-                if query not in hay and query not in extra:
+                    t = getattr(getattr(payload, "type", None), "value", None) or getattr(
+                        payload, "type", None
+                    )
+                    type_label = ANN_TYPE_LABELS.get(str(t), str(t or "")).lower()
+                    type_val = str(t or "").lower()
+                else:
+                    type_val = ""
+                if (
+                    query not in hay
+                    and query not in extra
+                    and query not in type_label
+                    and query not in type_val
+                ):
                     continue
             item = QListWidgetItem(line)
             if payload is not None:

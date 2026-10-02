@@ -21,7 +21,7 @@ from instantlensdoc.config import CONTACT_EMAIL, DISPLAY_NAME, ROOT, VENDOR, ico
 from instantlensdoc.core.logging_setup import log_dir
 
 
-HELP_HTML = """
+HELP_HTML = f"""
 <h2>InstantLens Doc — Hilfe</h2>
 <p>Moderne Textverarbeitung mit PDF-Annotator, OCR-Bridge und Formulargenerator.</p>
 <h3>Erste Schritte</h3>
@@ -86,17 +86,17 @@ HELP_HTML = """
 <li><b>Installer</b>: Desktop-Verknüpfung + Startmenü-Gruppe (siehe Inno-Hinweis)</li>
 <li><b>Lizenz</b>: Statusleiste (farbig; bei &lt;7 Tagen Restlaufzeit prominent) + Hilfe → Lizenz — Trial 4 Wochen, Keys 30+2 Tage</li>
 <li><b>Keygen</b>: <code>run-keygen.bat</code> / <code>python -m keygen --gui</code>;
-    Installer-EXE: <code>{app}/InstantLensKeygen.exe</code> (siehe <code>keygen/README.md</code>)</li>
+    Installer-EXE: <code>{{app}}/InstantLensKeygen.exe</code> (siehe <code>keygen/README.md</code>)</li>
 </ul>
 <h3>PDF-Modul</h3>
 <p>Das Paket <code>ild_pdf</code> kann von anderen Programmen genutzt werden (pypdfium2, kein Poppler).
 Beispiel: <code>examples/ild_pdf_demo.py</code>. API: <code>ild_pdf/README.md</code>.</p>
 <h3>Sync / Update</h3>
-<p>Windows: Store-Skript <code>docs/sync-ild.ps1</code> — Branch oder Zip nach
+<p>Windows: Repo-Skript <code>scripts/sync-ild.ps1</code> bzw. Store <code>docs/sync-ild.ps1</code> — Branch oder Zip nach
 <code>D:\\AI_Temp\\InstantLensDoc</code>, pip, optional Start. Eigenes Icon in <code>assets</code> bleibt erhalten.</p>
 <h3>Geplante Features</h3>
 <p>KI-Assistent, Cloud-Sync, Stylus/Palm Rejection, 3D u. a. sind im Menü als „Geplant“ markiert
-(Stub 0.2.9) — siehe FEATURES.md.</p>
+(Stub {__version__}) — siehe FEATURES.md.</p>
 """
 
 

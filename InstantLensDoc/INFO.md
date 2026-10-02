@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | 0.2.9 |
+| Version | 0.3.0 |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -32,9 +32,8 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)
 
-## Neu in 0.2.9
+## Neu in 0.3.0
 
-- PDF-Nachtmodus (Invert-Ansicht, nur Darstellung)  
-- Annotation-Suche in Sidebar-Liste  
-- Editor: Einrückung erhöhen/verringern  
-- Hilfe: Logordner öffnen  
+- Release-Konsolidierung 0.2.0→0.3.0 (Version/Docs/ISS/Smoke)  
+- Review-Fixes: Opacity, Ann.-Suche, Toolbar↔Menü, Einrückung, Sync-Pfade  
+- Stubs KI/Cloud/Stylus/3D unverändert  

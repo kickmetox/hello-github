@@ -34,7 +34,7 @@ def _parse_version_from_init(text: str) -> Optional[str]:
     for line in text.splitlines():
         line = line.strip()
         if line.startswith("__version__"):
-            # __version__ = "0.2.0"
+            # __version__ = "0.3.0"
             parts = line.split("=", 1)
             if len(parts) == 2:
                 return parts[1].strip().strip("\"'")

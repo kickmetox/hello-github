@@ -2,7 +2,7 @@
 
 Moderne Textverarbeitung mit PDF-Annotator, OCR-Bridge und Formulargenerator.
 
-**Version:** 0.2.9  
+**Version:** 0.3.0  
 **Hersteller:** Andreas Meyer · ame@sellerbach.de
 
 ## Quickstart (Windows)
@@ -21,11 +21,16 @@ cd /d D:\AI_Temp\InstantLensDoc && pip install -r requirements.txt && run.bat
 
 Nur starten (nach Sync/pip): `run.bat`
 
-## Neu in 0.2.9
+## Build
 
-- PDF-Nachtmodus (dunkle Invert-Ansicht, nicht speichern/exportieren)
-- Annotation-Suche in der Sidebar-Liste
-- Editor: Einrückung erhöhen/verringern (Auswahl)
-- Hilfe: Logordner öffnen (Crash-/App-Logs)
+```powershell
+powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
+```
+
+Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)
+
+## Neu in 0.3.0
+
+Release-Konsolidierung der 0.2.x-Serie: einheitliche Version, kompakter CHANGELOG, erweiterter Smoke, Review-Fixes (Opacity, Ann.-Suche DE-Labels, Toolbar↔Menü Graustufen/Nacht, Einrückung-Auswahl, Sync-Pfade). Stubs KI/Cloud/Stylus/3D unverändert.
 
 Siehe [CHANGELOG.md](CHANGELOG.md), [FEATURES.md](FEATURES.md) und [INFO.md](INFO.md).

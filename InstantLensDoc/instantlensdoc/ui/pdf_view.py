@@ -318,10 +318,13 @@ class PdfCanvas(QLabel):
 
         color = QColor(ann.color)
         color.setAlpha(_a(90 if ann.type == AnnotationType.HIGHLIGHT else 200))
-        pen = QPen(QColor(ann.color))
+        # Deckkraft nur über α der Farben — kein zusätzliches painter.setOpacity
+        # (sonst doppelte Multiplikation bei Fills mit _a(...)).
+        pen_c = QColor(ann.color)
+        pen_c.setAlpha(_a(255))
+        pen = QPen(pen_c)
         pen.setWidth(2)
         painter.setPen(pen)
-        painter.setOpacity(opacity)
         x, y = int(ann.x), int(ann.y)
         w, h = int(ann.width), int(ann.height)
 
@@ -553,6 +556,8 @@ class PdfViewer(QWidget):
     page_changed = Signal(int)  # 0-basiert
     zoom_changed = Signal(float)  # scale (1.0 = 100%)
     document_changed = Signal()  # Pfad/Seiten geändert (Statusleiste)
+    grayscale_changed = Signal(bool)  # Toolbar ↔ Menü sync
+    night_mode_changed = Signal(bool)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -830,6 +835,7 @@ class PdfViewer(QWidget):
             clear_render_cache(self.pdf_path)
             self.refresh()
         if changed:
+            self.grayscale_changed.emit(enabled)
             self.status.emit("Graustufen an" if enabled else "Graustufen aus")
 
     def grayscale_enabled(self) -> bool:
@@ -851,6 +857,7 @@ class PdfViewer(QWidget):
             clear_render_cache(self.pdf_path)
             self.refresh()
         if changed:
+            self.night_mode_changed.emit(enabled)
             self.status.emit("Nachtmodus an" if enabled else "Nachtmodus aus")
 
     def night_mode_enabled(self) -> bool:
@@ -1430,9 +1437,12 @@ class PdfViewer(QWidget):
     def annotation_summaries(self) -> list[tuple[str, Annotation]]:
         if not self.store:
             return []
+        from instantlensdoc.ui.sidebar import ANN_TYPE_LABELS
+
         out: list[tuple[str, Annotation]] = []
         for a in self.store.annotations:
-            label = f"S{a.page + 1}: {a.type.value}"
+            kind = ANN_TYPE_LABELS.get(a.type.value, a.type.value)
+            label = f"S{a.page + 1}: {kind}"
             if a.text:
                 label += f" — {a.text[:40]}"
             elif a.type == AnnotationType.MEASURE:

@@ -336,10 +336,10 @@ class TextEditor(QPlainTextEdit):
 
         pad = " " * abs(delta)
         cur.beginEditBlock()
+        start_bn = start_block.blockNumber()
+        end_bn = end_block.blockNumber()
         block = start_block
-        first_pos = start_block.position()
-        last_pos = end_block.position() + end_block.length() - 1
-        while block.isValid() and block.position() <= end_block.position():
+        while block.isValid() and block.blockNumber() <= end_bn:
             bcur = QTextCursor(block)
             bcur.movePosition(QTextCursor.StartOfBlock)
             text = block.text()
@@ -360,12 +360,15 @@ class TextEditor(QPlainTextEdit):
                     bcur.removeSelectedText()
             block = block.next()
         cur.endEditBlock()
-        # Auswahl über die betroffenen Zeilen wiederherstellen
+        # Auswahl über die betroffenen Zeilen wiederherstellen (Blocknummern, nicht stale Pos)
         new_cur = self.textCursor()
-        new_cur.setPosition(first_pos)
-        end_blk = doc.findBlock(last_pos)
+        start_blk = doc.findBlockByNumber(start_bn)
+        end_blk = doc.findBlockByNumber(end_bn)
+        if not start_blk.isValid():
+            start_blk = doc.firstBlock()
         if not end_blk.isValid():
             end_blk = doc.lastBlock()
+        new_cur.setPosition(start_blk.position())
         new_cur.setPosition(
             end_blk.position() + max(0, end_blk.length() - 1),
             QTextCursor.KeepAnchor,
