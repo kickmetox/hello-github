@@ -744,6 +744,7 @@ class PdfViewer(QWidget):
         self._search_index = -1
         self._selected_ann_id: str | None = None
         self._selected_ann_ids: set[str] = set()
+        self._ann_clipboard: list[dict] = []
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
 
@@ -1943,10 +1944,31 @@ class PdfViewer(QWidget):
 
         if not confirm_overwrite_export(dest, self):
             return False
+        from PySide6.QtCore import Qt
+        from PySide6.QtWidgets import QApplication, QProgressDialog
+
         try:
             if self.store.dirty:
                 self.store.save(force=True)
             bake_scale = max(float(self.scale), 1.5)
+            total_pages = max(1, int(self.page_count or 1))
+            prog = QProgressDialog("Flatten/Bake…", "Abbrechen", 0, total_pages + 1, self)
+            prog.setWindowTitle("Flatten/Bake")
+            prog.setWindowModality(Qt.WindowModal)
+            prog.setMinimumDuration(0)
+            prog.setValue(0)
+            prog.setAutoClose(False)
+            prog.setAutoReset(False)
+            prog.show()
+            QApplication.processEvents()
+
+            def _on_prog(msg: str, current: int = 0, total: int = 0) -> None:
+                if total and total > 0:
+                    prog.setMaximum(total)
+                    prog.setValue(min(max(0, current), total))
+                prog.setLabelText(msg or "…")
+                QApplication.processEvents()
+
             out = flatten_annotations_to_pdf(
                 self.pdf_path,
                 self.store,
@@ -1954,7 +1976,11 @@ class PdfViewer(QWidget):
                 out_path=dest,
                 password=self.password,
                 grayscale=self._grayscale,
+                progress=_on_prog,
+                should_cancel=prog.wasCanceled,
             )
+            prog.setValue(prog.maximum())
+            prog.close()
             set_last_export_dir(out.parent)
             remember_recent_dir(out.parent)
             self.status.emit(f"Flatten/Bake: {out.name} ({n} Ann., {self.page_count} Seite(n))")
@@ -1965,7 +1991,18 @@ class PdfViewer(QWidget):
                 f"{n} Annotation(en) · Original unverändert.",
             )
             return True
+        except InterruptedError:
+            try:
+                prog.close()
+            except Exception:
+                pass
+            self.status.emit("Flatten/Bake abgebrochen")
+            return False
         except Exception as e:
+            try:
+                prog.close()
+            except Exception:
+                pass
             QMessageBox.warning(self, "Flatten/Bake", str(e))
             return False
 
@@ -2295,6 +2332,61 @@ class PdfViewer(QWidget):
         self.annotations_changed.emit()
         self.status.emit(f"Annotation dupliziert ({dup.type.value})")
         return True
+
+    def copy_selected_annotations(self) -> int:
+        """
+        Ausgewählte Annotation(en) in internes Clipboard kopieren
+        (Einfügen auf anderer Seite möglich).
+        """
+        if not self.store:
+            self.status.emit("Kein PDF geladen")
+            return 0
+        ids = list(self._selected_ann_ids) if self._selected_ann_ids else (
+            [self._selected_ann_id] if self._selected_ann_id else []
+        )
+        payloads: list[dict] = []
+        for aid in ids:
+            ann = self.store.get(aid)
+            if ann is not None:
+                payloads.append(ann.to_dict())
+        if not payloads:
+            self.status.emit("Keine Annotation ausgewählt")
+            return 0
+        self._ann_clipboard = payloads
+        self.status.emit(f"{len(payloads)} Annotation(en) kopiert")
+        return len(payloads)
+
+    def paste_annotations_on_page(self, page_index: int | None = None) -> int:
+        """Kopierte Annotationen auf Zielseite einfügen (Default: aktuelle Seite)."""
+        if not self.store or not self.pdf_path:
+            self.status.emit("Kein PDF geladen")
+            return 0
+        if not self._ann_clipboard:
+            self.status.emit("Zwischenablage leer (Annotationen zuerst kopieren)")
+            return 0
+        target = self.page_index if page_index is None else int(page_index)
+        if target < 0 or target >= max(1, int(self.page_count or 0)):
+            self.status.emit("Ungültige Zielseite")
+            return 0
+        created = self.store.paste_dicts(self._ann_clipboard, page=target)
+        if not created:
+            self.status.emit("Einfügen fehlgeschlagen")
+            return 0
+        try:
+            self.store.save()
+        except Exception as e:
+            QMessageBox.warning(self, "Annotationen einfügen", str(e))
+            return 0
+        self._selected_ann_ids = {a.id for a in created}
+        self._selected_ann_id = created[0].id
+        self.canvas.set_selected_id(self._selected_ann_id)
+        if target != self.page_index:
+            self.goto_page(target)
+        else:
+            self.refresh()
+        self.annotations_changed.emit()
+        self.status.emit(f"{len(created)} Annotation(en) auf Seite {target + 1} eingefügt")
+        return len(created)
 
     def rotate_selected_stamp(self, degrees: int = 90) -> bool:
         """Ausgewählten Stempel um 90°-Schritte drehen (Sidecar)."""

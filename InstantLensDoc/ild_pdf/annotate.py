@@ -10,7 +10,7 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
-from typing import Iterator, List, Optional
+from typing import Iterator, List, Optional, Sequence
 from uuid import uuid4
 
 SIDECAR_VERSION = 3
@@ -259,9 +259,11 @@ class AnnotationStore:
         *,
         dx: float = 12.0,
         dy: float = 12.0,
+        page: int | None = None,
     ) -> Optional[Annotation]:
         """
         Auswahl duplizieren: Kopie mit neuer ID, leicht versetzt (inkl. Callout-Endpunkt).
+        page: Zielseite (None = gleiche Seite wie Quelle).
         """
         src = self.get(ann_id)
         if src is None:
@@ -270,6 +272,8 @@ class AnnotationStore:
         data.pop("id", None)
         data.pop("created", None)
         data.pop("modified", None)
+        if page is not None:
+            data["page"] = int(page)
         data["x"] = float(data.get("x", 0.0)) + float(dx)
         data["y"] = float(data.get("y", 0.0)) + float(dy)
         cx = float(data.get("callout_x", 0.0) or 0.0)
@@ -278,6 +282,46 @@ class AnnotationStore:
             data["callout_x"] = cx + float(dx)
             data["callout_y"] = cy + float(dy)
         return self.add(Annotation.from_dict(data))
+
+    def paste_dicts(
+        self,
+        payloads: Sequence[dict],
+        *,
+        page: int,
+        dx: float = 8.0,
+        dy: float = 8.0,
+    ) -> List[Annotation]:
+        """
+        Annotation-Dicts (Clipboard) auf Zielseite einfügen — neue IDs, optional versetzt.
+        """
+        created: List[Annotation] = []
+        if not payloads:
+            return created
+        self._push_undo()
+        recording = self._recording
+        self._recording = False
+        try:
+            for raw in payloads:
+                data = dict(raw)
+                data.pop("id", None)
+                data.pop("created", None)
+                data.pop("modified", None)
+                data["page"] = int(page)
+                data["x"] = float(data.get("x", 0.0)) + float(dx)
+                data["y"] = float(data.get("y", 0.0)) + float(dy)
+                cx = float(data.get("callout_x", 0.0) or 0.0)
+                cy = float(data.get("callout_y", 0.0) or 0.0)
+                if cx or cy:
+                    data["callout_x"] = cx + float(dx)
+                    data["callout_y"] = cy + float(dy)
+                ann = Annotation.from_dict(data)
+                self.annotations.append(ann)
+                created.append(ann)
+            if created:
+                self.dirty = True
+        finally:
+            self._recording = recording
+        return created
 
     def get(self, ann_id: str) -> Optional[Annotation]:
         for a in self.annotations:

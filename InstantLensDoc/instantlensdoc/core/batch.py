@@ -103,6 +103,7 @@ def run_batch(
             progress(msg, current, total)
         except TypeError:
             progress(msg)
+        # InterruptedError aus progress durchlassen (kein TypeError)
 
     if mode == BatchMode.IMAGES_TO_ONE_PDF:
         imgs = _collect_files(folder, _IMAGE_GLOB)
@@ -114,6 +115,8 @@ def run_batch(
             _images_to_pdf(imgs, dest)
             log(f"Fertig: {dest.name}", 1, 1)
             items.append(BatchItemResult(folder, dest, True, f"{len(imgs)} Bilder"))
+        except InterruptedError:
+            raise
         except Exception as e:
             items.append(BatchItemResult(folder, None, False, str(e)))
         return BatchResult(items)
@@ -128,6 +131,8 @@ def run_batch(
                 _images_to_pdf([src], dest)
                 log(f"OK {src.name}", i, total)
                 items.append(BatchItemResult(src, dest, True))
+            except InterruptedError:
+                raise
             except Exception as e:
                 log(f"Fehler {src.name}: {e}", i, total)
                 items.append(BatchItemResult(src, None, False, str(e)))
@@ -154,6 +159,8 @@ def run_batch(
                 out = r.searchable_pdf or out_dir / f"{src.stem}.ocr.txt"
                 log(f"OK OCR {src.name}", i, total)
                 items.append(BatchItemResult(src, out, True))
+            except InterruptedError:
+                raise
             except Exception as e:
                 log(f"Fehler OCR {src.name}: {e}", i, total)
                 items.append(BatchItemResult(src, None, False, str(e)))
@@ -193,6 +200,8 @@ def run_batch(
                 out_txt.write_text("\n\n---\n\n".join(combined), encoding="utf-8")
                 log(f"OK PDF OCR {pdf_path.name}", i, total)
                 items.append(BatchItemResult(pdf_path, out_txt, True, f"{n} Seiten"))
+            except InterruptedError:
+                raise
             except Exception as e:
                 log(f"Fehler PDF OCR {pdf_path.name}: {e}", i, total)
                 items.append(BatchItemResult(pdf_path, None, False, str(e)))

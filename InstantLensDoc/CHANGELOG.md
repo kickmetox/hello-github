@@ -1,5 +1,24 @@
 # Changelog — InstantLens Doc
 
+## 0.4.2 — Outline-Goto, Ann.-Copy/Paste, Case-Datei, Progress
+
+Fokus: Navigation/Clipboard/Editor-Batch-Härte. Stubs KI/Cloud/Stylus/3D unverändert.
+
+### PDF
+- **Lesezeichen-Goto gehärtet**: Destination-Auflösung über `objgen` (nicht `==` — Blank-Pages trafen sonst immer Seite 1); `resolved_destination` / GoTo-Action; Doppelklick + Enter; Status bei fehlendem Ziel
+- **Annotationen kopieren/einfügen** zwischen Seiten (Ctrl+Alt+C / Ctrl+Alt+V; internes Clipboard)
+- **Flatten/Bake**: QProgressDialog mit Seitenfortschritt und Abbrechen
+
+### Editor / UX
+- **Alles großschreiben / Alles kleinschreiben** für die gesamte Datei (Ctrl+Alt+Shift+U / L)
+- **Batch**: Abbrechen-Lauf, Fehlerdialog, UI während Lauf gesperrt; `InterruptedError` nicht als Item-Fehler geschluckt
+
+### Packaging / Docs
+- Version **0.4.2** (App, `ild_pdf`, ISS, Build, Docs, Smoke)
+- FEATURES / INFO / CHANGELOG / Hilfe aktualisiert
+
+---
+
 ## 0.4.1 — PDF-Links, Stempel-Rotation, Encoding, Multi-Drop
 
 Fokus: sinnvolle UX-Inkremente ohne Feature-Spam. Stubs KI/Cloud/Stylus/3D unverändert.

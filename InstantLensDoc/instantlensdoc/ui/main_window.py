@@ -516,6 +516,16 @@ class MainWindow(QMainWindow):
         act_toggle_case.setToolTip("Auswahl: GROSS → klein → Titel → GROSS")
         act_toggle_case.triggered.connect(self._toggle_case_selection)
         m_edit.addAction(act_toggle_case)
+        act_all_upper = QAction("Alles großschreiben", self)
+        act_all_upper.setShortcut(QKeySequence("Ctrl+Alt+Shift+U"))
+        act_all_upper.setToolTip("Gesamten Editor-Text in Großbuchstaben")
+        act_all_upper.triggered.connect(lambda: self._transform_document_case("upper"))
+        m_edit.addAction(act_all_upper)
+        act_all_lower = QAction("Alles kleinschreiben", self)
+        act_all_lower.setShortcut(QKeySequence("Ctrl+Alt+Shift+L"))
+        act_all_lower.setToolTip("Gesamten Editor-Text in Kleinbuchstaben")
+        act_all_lower.triggered.connect(lambda: self._transform_document_case("lower"))
+        m_edit.addAction(act_all_lower)
         act_indent = QAction("Einrückung erhöhen", self)
         act_indent.setShortcut(QKeySequence("Ctrl+]"))
         act_indent.setToolTip("Zeilen/Block einrücken (auch Tab)")
@@ -545,6 +555,16 @@ class MainWindow(QMainWindow):
         act_dup_ann.setToolTip("Ausgewählte Annotation kopieren (leicht versetzt)")
         act_dup_ann.triggered.connect(self._duplicate_annotation)
         m_edit.addAction(act_dup_ann)
+        act_copy_ann = QAction("Annotationen kopieren", self)
+        act_copy_ann.setShortcut(QKeySequence("Ctrl+Alt+C"))
+        act_copy_ann.setToolTip("Auswahl in Zwischenablage (Einfügen auf anderer Seite)")
+        act_copy_ann.triggered.connect(self._copy_annotations)
+        m_edit.addAction(act_copy_ann)
+        act_paste_ann = QAction("Annotationen einfügen", self)
+        act_paste_ann.setShortcut(QKeySequence("Ctrl+Alt+V"))
+        act_paste_ann.setToolTip("Kopierte Annotationen auf aktueller Seite einfügen")
+        act_paste_ann.triggered.connect(self._paste_annotations)
+        m_edit.addAction(act_paste_ann)
         act_sel_all_ann = QAction("Alle Annotationen auf Seite auswählen", self)
         act_sel_all_ann.setShortcut(QKeySequence.SelectAll)  # Ctrl+A
         act_sel_all_ann.setToolTip(
@@ -1155,6 +1175,23 @@ class MainWindow(QMainWindow):
             return
         self.pdf_view.duplicate_selected_annotation()
 
+    def _copy_annotations(self):
+        if self.stack.currentWidget() is not self.pdf_view or not self.pdf_view.pdf_path:
+            self._set_status("Annotationen kopieren nur im PDF-Modus")
+            return
+        n = self.pdf_view.copy_selected_annotations()
+        if n:
+            self._set_status(f"{n} Annotation(en) kopiert — Einfügen: Ctrl+Alt+V")
+
+    def _paste_annotations(self):
+        if self.stack.currentWidget() is not self.pdf_view or not self.pdf_view.pdf_path:
+            self._set_status("Annotationen einfügen nur im PDF-Modus")
+            return
+        n = self.pdf_view.paste_annotations_on_page()
+        if n:
+            self._refresh_pdf_marks()
+            self._set_status(f"{n} Annotation(en) eingefügt")
+
     def _toggle_line_numbers(self, checked: bool):
         from instantlensdoc.core.app_settings import set_editor_line_numbers
 
@@ -1218,6 +1255,16 @@ class MainWindow(QMainWindow):
             self._set_status("Schreibweise umgeschaltet")
         else:
             self._set_status("Keine Textauswahl")
+
+    def _transform_document_case(self, mode: str):
+        if self.stack.currentWidget() is not self.editor_pane:
+            self._set_status("Alles groß/klein nur im Texteditor")
+            return
+        if self.editor.transform_document_case(mode):
+            label = "GROSS" if mode == "upper" else "klein"
+            self._set_status(f"Datei → {label}")
+        else:
+            self._set_status("Keine Änderung (leer oder schon umgewandelt)")
 
     def _indent_selection(self):
         if self.stack.currentWidget() is not self.editor_pane:
@@ -1696,11 +1743,23 @@ class MainWindow(QMainWindow):
             self._set_status(f"Treffer: {Path(path).name} Seite {int(page) + 1}")
 
     def _on_outline_jump(self, page_index: int):
-        if self.stack.currentWidget() is not self.pdf_view:
+        if self.stack.currentWidget() is not self.pdf_view or not self.pdf_view.pdf_path:
             self._set_status("Lesezeichen: PDF öffnen")
             return
-        self.pdf_view.goto_page(page_index)
-        self._set_status(f"Lesezeichen → Seite {page_index + 1}")
+        if page_index is None or int(page_index) < 0:
+            self._set_status("Lesezeichen ohne Seiten-Ziel")
+            return
+        n = int(self.pdf_view.page_count or 0)
+        idx = int(page_index)
+        if n <= 0:
+            self._set_status("Lesezeichen: keine Seiten")
+            return
+        if idx >= n:
+            self._set_status(f"Lesezeichen-Ziel S. {idx + 1} außerhalb (1–{n})")
+            return
+        self.pdf_view.goto_page(idx)
+        self.sidebar.select_thumb(idx)
+        self._set_status(f"Lesezeichen → Seite {idx + 1}")
 
     def _outline_add(self):
         if self.stack.currentWidget() is not self.pdf_view or not self.pdf_view.pdf_path:

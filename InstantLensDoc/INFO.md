@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | 0.4.1 |
+| Version | 0.4.2 |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -33,10 +33,10 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)
 
-## Neu in 0.4.1
+## Neu in 0.4.2
 
-- PDF-Link-Annotationen (externe http/https) klickbar öffnen
-- Einfache Stempel-Rotation (90°)
-- Editor: Encoding UTF-8 / Latin-1 beim Öffnen/Speichern
-- Drag & Drop mehrerer Dateien → mehrere Tabs
+- Lesezeichen-Goto gehärtet (Doppelklick/Enter → korrekte Seite)
+- Annotationen kopieren/einfügen zwischen Seiten (Ctrl+Alt+C/V)
+- Editor: Alles groß-/kleinschreiben für ganze Datei
+- Flatten/Batch: robusterer Fortschritt inkl. Abbrechen
 - Stubs KI/Cloud/Stylus/3D unverändert

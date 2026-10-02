@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Smoke-Test 0.4.1 (CLI + optional offscreen Qt). Kernpfade: open/annotate/export/license + 0.3.x."""
+"""Smoke-Test 0.4.2 (CLI + optional offscreen Qt). Kernpfade: open/annotate/export/license + 0.3.x."""
 
 from __future__ import annotations
 
@@ -112,8 +112,8 @@ def main() -> int:
     from instantlensdoc.core.update_check import check_for_updates
     from instantlensdoc.license import KEY_DAYS, TRIAL_DAYS, generate_key, verify_key
 
-    assert __version__ == "0.4.1", __version__
-    assert ild_ver == "0.4.1", ild_ver
+    assert __version__ == "0.4.2", __version__
+    assert ild_ver == "0.4.2", ild_ver
     assert TRIAL_DAYS == 28 and KEY_DAYS == 32
     key = generate_key("ame@sellerbach.de")
     ok, msg, _ = verify_key(key)
@@ -131,7 +131,7 @@ def main() -> int:
     assert "Settings" in tr("settings")
     set_lang("de")
     upd = check_for_updates(allow_network=False)
-    assert upd.local_version == "0.4.1" and not upd.online
+    assert upd.local_version == "0.4.2" and not upd.online
     assert get_export_jpeg_quality() >= 10
     assert get_ui_lang() in ("de", "en")
     assert 25 <= get_default_zoom_percent() <= 500
@@ -172,8 +172,8 @@ def main() -> int:
     assert get_ann_pen_color() == "#112233"
     assert (ROOT / "CHANGELOG.md").is_file()
     cl = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-    assert "0.4.1" in cl
-    assert "## 0.4.1" in cl
+    assert "0.4.2" in cl
+    assert "## 0.4.2" in cl
     assert "## 0.4.0" in cl
     assert "0.3.0 → 0.4.0" in cl or "0.3.0→0.4.0" in cl
     assert "## 0.3.0" in cl
@@ -190,7 +190,7 @@ def main() -> int:
     assert "## 0.3.1" not in cl and "## 0.2.9" not in cl
     assert "0.3.9" in cl  # noch in Kurz-Tabelle
     assert "0.2.9" in cl  # noch in Kurz-Tabelle
-    assert "0.4.1" in (ROOT / "README.md").read_text(encoding="utf-8")
+    assert "0.4.2" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "run.bat" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "sync-ild.ps1" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "scripts/sync-ild.ps1" in (ROOT / "FEATURES.md").read_text(encoding="utf-8")
@@ -539,13 +539,13 @@ def main() -> int:
 
         assert (ROOT / "installer" / "installer-hinweis.txt").exists()
         iss = (ROOT / "installer" / "instantlensdoc.iss").read_text(encoding="utf-8")
-        assert "0.4.1" in iss and "desktopicon" in iss and "DisableProgramGroupPage=no" in iss
+        assert "0.4.2" in iss and "desktopicon" in iss and "DisableProgramGroupPage=no" in iss
         assert "UninstallDisplayName" in iss and "Uninstallable=yes" in iss
         assert "IncludeKeygen" in iss and "SetupIconFile" in iss
         assert "InstantLensKeygen.exe" in iss
         assert "uninstallexe" in iss
         bw = (ROOT / "build-windows.ps1").read_text(encoding="utf-8")
-        assert "0.4.1" in bw and "NoKeygenInApp" in bw and "--icon" in bw
+        assert "0.4.2" in bw and "NoKeygenInApp" in bw and "--icon" in bw
         assert "InstantLensKeygen.exe" in bw
         bi = (ROOT / "installer" / "build-installer.ps1").read_text(encoding="utf-8")
         assert "InstantLensKeygen.exe" in bi and "IncludeKeygen" in bi
@@ -554,7 +554,7 @@ def main() -> int:
         assert "Installer" in kg_readme
         hinweis = (ROOT / "installer" / "installer-hinweis.txt").read_text(encoding="utf-8")
         assert "InstantLensKeygen.exe" in hinweis or "run-keygen.bat" in hinweis
-        assert "0.4.1" in hinweis
+        assert "0.4.2" in hinweis
         from ild_pdf.limits import OPEN_TIMEOUT_HINT, OPEN_TIMEOUT_HINT_SEC
 
         assert OPEN_TIMEOUT_HINT_SEC >= 15 and "teilen" in OPEN_TIMEOUT_HINT.lower()
@@ -565,7 +565,7 @@ def main() -> int:
         assert "QProgressDialog" in (ROOT / "instantlensdoc" / "ui" / "main_window.py").read_text(encoding="utf-8")
 
         assert (ROOT / "examples" / "ild_pdf_demo.py").exists()
-        assert "0.4.1" in (ROOT / "INFO.md").read_text(encoding="utf-8")
+        assert "0.4.2" in (ROOT / "INFO.md").read_text(encoding="utf-8")
         assert (ROOT / "assets" / "app.ico").is_file()
 
         # --- Kernpfade: open / annotate / export / license ---
@@ -698,7 +698,7 @@ def main() -> int:
         assert "| A" in tbl and "| 1" in tbl
         assert ocr_mod.TESSERACT_WIKI_URL.startswith("https://")
 
-        # --- Ausgewählte 0.3.x-Pfade (CLI) + 0.4.1 ---
+        # --- Ausgewählte 0.3.x-Pfade (CLI) + 0.4.2 ---
         from ild_pdf.annotate import stamp_library_items
         from ild_pdf.attachments import has_attachments, list_attachments
         from ild_pdf.flatten import flatten_annotations_to_pdf
@@ -756,8 +756,38 @@ def main() -> int:
         set_backup_on_save(False)
         assert get_page_size_unit() in ("mm", "inch")
         assert isinstance(get_minimize_to_tray(), bool)
-        assert "0.4.1" in feat and "0.4.0" in feat  # Release + Herkunft-Feature-Hinweise
-        # --- 0.4.1 CLI ---
+        assert "0.4.2" in feat and "0.4.0" in feat  # Release + Herkunft-Feature-Hinweise
+        # --- 0.4.2 CLI: Outline Goto, Ann Copy/Paste, Flatten Progress ---
+        import pikepdf as _pike_ol
+
+        ol_pdf = td / "outline_goto.pdf"
+        with _pike_ol.Pdf.new() as _odoc:
+            for _ in range(3):
+                _odoc.add_blank_page(page_size=(200, 300))
+            with _odoc.open_outline() as _ool:
+                _ool.root.append(_pike_ol.OutlineItem("Seite3", 2))
+            _odoc.save(ol_pdf)
+        ol_items = extract_outline(ol_pdf)
+        assert ol_items and ol_items[0].page_index == 2, getattr(ol_items[0], "page_index", None)
+        store_cp = AnnotationStore(pdf)
+        store_cp.annotations = []
+        store_cp.clear_history()
+        a0 = store_cp.add(
+            Annotation(0, AnnotationType.STICKY, 10, 10, width=40, height=20, text="cp-src")
+        )
+        pasted = store_cp.paste_dicts([a0.to_dict()], page=1, dx=4, dy=4)
+        assert len(pasted) == 1 and pasted[0].page == 1 and pasted[0].id != a0.id
+        assert store_cp.duplicate(a0.id, page=1, dx=1, dy=1) is not None
+        flat_prog: list = []
+        flatten_annotations_to_pdf(
+            pdf,
+            AnnotationStore(pdf),
+            out_path=td / "flat_prog.pdf",
+            scale=1.0,
+            progress=lambda m, c=0, t=0: flat_prog.append((m, c, t)),
+        )
+        assert (td / "flat_prog.pdf").is_file() and flat_prog
+        # --- 0.4.1 CLI retained ---
         from ild_pdf import list_page_uri_links, uri_link_at, is_external_http_uri
         from instantlensdoc.core.documents import (
             normalize_text_encoding,
@@ -810,6 +840,8 @@ def main() -> int:
         assert "URI-Links" in feat or "Link" in feat
         assert "Encoding" in feat or "Latin-1" in feat
         assert "mehrere Dateien" in feat or "Tabs" in feat
+        assert "kopieren/einfügen" in feat or "Ctrl+Alt+C" in feat
+        print("0.4.2 outline/copy-paste/progress (CLI): OK")
         print("0.4.1 links/encoding/stamp-rotation (CLI): OK")
         print("0.3.x selected paths (CLI): OK")
 
@@ -848,7 +880,7 @@ def main() -> int:
         win._add_chained_frame()
         assert len(win.layout_doc.text_frames) >= 2
         assert "Lizenz:" in win.license_label.text() or "⚠" in win.license_label.text()
-        assert "v0.4.1" in win.version_label.text()
+        assert "v0.4.2" in win.version_label.text()
         # Lizenz <7 Tage: Style prominent
         st_lic = win.license_manager.status()
         if st_lic.allowed and st_lic.days_remaining < 7:
@@ -985,6 +1017,11 @@ def main() -> int:
             assert win.editor.toggle_case_selection()
             assert win.editor.toPlainText() == "HELLO WORLD"
             assert callable(win._toggle_case_selection)
+            assert win.editor.transform_document_case("lower")
+            assert win.editor.toPlainText() == "hello world"
+            assert win.editor.transform_document_case("upper")
+            assert win.editor.toPlainText() == "HELLO WORLD"
+            assert callable(win._transform_document_case)
             assert callable(win._toggle_grayscale)
             assert callable(win._toggle_night_mode)
             assert callable(win._indent_selection)
@@ -1024,11 +1061,11 @@ def main() -> int:
             assert win.editor.outdent_selection(4)
             assert win.editor.toPlainText().splitlines()[0] == "alpha"
             # Fenstertitel mit Version
-            assert "0.4.1" in win.windowTitle()
+            assert "0.4.2" in win.windowTitle()
             from instantlensdoc.ui.help_dialog import AboutDialog, HelpDialog, open_log_folder
 
             about = AboutDialog(win)
-            assert "0.4.1" in about.windowTitle()
+            assert "0.4.2" in about.windowTitle()
             help_dlg = HelpDialog(win)
             assert help_dlg.windowTitle() == "Hilfe"
             assert callable(open_log_folder)
@@ -1049,6 +1086,12 @@ def main() -> int:
             win._refresh_outline(smoke_pdf)
             assert win.sidebar.outline.topLevelItemCount() >= 1
             assert extract_outline(smoke_pdf)
+            # 0.4.2: Goto auf Seite 2 (Index 1) über Outline-Jump
+            add_outline_item(smoke_pdf, "Seite2", 1)
+            win._refresh_outline(smoke_pdf)
+            win._on_outline_jump(1)
+            assert win.pdf_view.page_index == 1
+            win._on_outline_jump(-1)  # kein Ziel → Status, kein Crash
             delete_outline_item(smoke_pdf, (0,))
             win._refresh_outline(smoke_pdf)
             # Ann JSON roundtrip via store
@@ -1682,7 +1725,7 @@ def main() -> int:
             win.apply_tray_setting()
             if win._tray is not None:
                 tip = win._tray.toolTip()
-                assert "0.4.1" in tip and "InstantLens Doc" in tip
+                assert "0.4.2" in tip and "InstantLens Doc" in tip
             set_minimize_to_tray(False)
             win.apply_tray_setting()
             print("0.3.9 fit-h/ann-stats/special/tray: OK")
@@ -1695,9 +1738,9 @@ def main() -> int:
             from instantlensdoc.ui.password_dialog import CompressPdfDialog, SetPasswordDialog
             from instantlensdoc.ui.stubs import PLANNED
             assert KeyboardHelpDialog and SetPasswordDialog and CompressPdfDialog
-            assert "0.4.1" in PLANNED["ki"]
+            assert "0.4.2" in PLANNED["ki"]
             assert "Coming soon" in PLANNED["cloud"]
-            assert "0.4.1" in PLANNED["stylus"] and "0.4.1" in PLANNED["extrude3d"]
+            assert "0.4.2" in PLANNED["stylus"] and "0.4.2" in PLANNED["extrude3d"]
             # Toolbar ↔ Menü Sync Graustufen/Nacht
             win.pdf_view.set_grayscale(True)
             assert win._grayscale_action.isChecked()
@@ -1732,12 +1775,24 @@ def main() -> int:
             assert win.editor.toPlainText().splitlines() == ["one", "two"]
             from instantlensdoc.ui.help_dialog import HELP_HTML
 
-            assert "Stub 0.4.1" in HELP_HTML
+            assert "Stub 0.4.2" in HELP_HTML
             assert "scripts/sync-ild.ps1" in HELP_HTML
             assert "Präsentationsmodus" in HELP_HTML or "F5" in (
                 ROOT / "instantlensdoc" / "ui" / "keyboard_help.py"
             ).read_text(encoding="utf-8")
-            # 0.4.1 Qt: Links, Stempel-Rotation, Encoding-Menü, Multi-Drop
+            # 0.4.2 Qt: Outline jump, Ann copy/paste, document case, progress APIs
+            assert callable(win._on_outline_jump)
+            assert callable(win.pdf_view.copy_selected_annotations)
+            assert callable(win.pdf_view.paste_annotations_on_page)
+            assert callable(win._copy_annotations)
+            assert callable(win._paste_annotations)
+            assert "QProgressDialog" in (
+                ROOT / "instantlensdoc" / "ui" / "pdf_view.py"
+            ).read_text(encoding="utf-8")
+            assert "Abbrechen Lauf" in (
+                ROOT / "instantlensdoc" / "ui" / "batch_dialog.py"
+            ).read_text(encoding="utf-8")
+            # 0.4.1 Qt retained: Links, Stempel-Rotation, Encoding-Menü, Multi-Drop
             assert callable(win.pdf_view.rotate_selected_stamp)
             assert callable(getattr(win, "open_dialog_with_encoding", None))
             assert callable(getattr(win, "save_doc_with_encoding", None))
@@ -1761,10 +1816,18 @@ def main() -> int:
                 )
                 store.add(s)
                 win.pdf_view._selected_ann_id = s.id
+                win.pdf_view._selected_ann_ids = {s.id}
                 assert win.pdf_view.rotate_selected_stamp(90)
                 assert store.get(s.id).rotation == 90
+                assert win.pdf_view.copy_selected_annotations() == 1
+                assert len(win.pdf_view._ann_clipboard) == 1
+                if win.pdf_view.page_count > 1:
+                    win.pdf_view.goto_page(1)
+                    n_paste = win.pdf_view.paste_annotations_on_page()
+                    assert n_paste == 1
+            print("0.4.2 Qt outline/copy-paste/case/progress: OK")
             print("0.4.1 Qt links/stamp/encoding/drop: OK")
-            print("0.3.x–0.4.1 review OK")
+            print("0.3.x–0.4.2 review OK")
             assert callable(win.pdf_view.bake_redactions)
             assert callable(win.pdf_view.clear_redactions)
             assert callable(win._set_pdf_password)

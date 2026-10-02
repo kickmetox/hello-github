@@ -585,6 +585,32 @@ class TextEditor(QPlainTextEdit):
         self.setTextCursor(cur)
         return True
 
+    def transform_document_case(self, mode: str) -> bool:
+        """
+        Gesamten Dokumenttext umwandeln.
+        mode: 'upper' | 'lower'
+        """
+        mode = (mode or "").strip().lower()
+        if mode not in ("upper", "lower"):
+            return False
+        text = self.toPlainText()
+        if not text:
+            return False
+        new = text.upper() if mode == "upper" else text.lower()
+        if new == text:
+            return False
+        cur = self.textCursor()
+        pos = cur.position()
+        cur.beginEditBlock()
+        cur.select(QTextCursor.Document)
+        cur.insertText(new)
+        cur.endEditBlock()
+        # Cursor-Position soweit möglich erhalten
+        new_cur = self.textCursor()
+        new_cur.setPosition(min(pos, len(new)))
+        self.setTextCursor(new_cur)
+        return True
+
     def indent_selection(self, spaces: int = 4) -> bool:
         """Einrückung der ausgewählten Zeilen erhöhen (Leerzeichen voranstellen)."""
         return self._adjust_indent(+max(1, int(spaces)))

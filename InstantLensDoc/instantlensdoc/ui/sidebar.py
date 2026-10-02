@@ -156,8 +156,9 @@ class Sidebar(QWidget):
         self.outline = QTreeWidget()
         self.outline.setHeaderHidden(True)
         self.outline.setMaximumHeight(120)
-        self.outline.setToolTip("Doppelklick → Seite; +/− zum Bearbeiten")
+        self.outline.setToolTip("Doppelklick oder Enter → Seite; +/− zum Bearbeiten")
         self.outline.itemDoubleClicked.connect(self._activate_outline)
+        self.outline.itemActivated.connect(self._activate_outline)
         layout.addWidget(self.outline)
         ol_btns = QHBoxLayout()
         self.btn_outline_add = QPushButton("+")
@@ -266,10 +267,18 @@ class Sidebar(QWidget):
         if payload is not None:
             self.annotation_activated.emit(payload)
 
-    def _activate_outline(self, item: QTreeWidgetItem, _column: int):
+    def _activate_outline(self, item: QTreeWidgetItem, _column: int = 0):
+        if item is None or item.isDisabled():
+            return
         page = item.data(0, Qt.UserRole)
-        if page is not None:
+        if page is None:
+            # Kein auflösbares Ziel — Signal mit -1 für Statusmeldung in MainWindow
+            self.outline_activated.emit(-1)
+            return
+        try:
             self.outline_activated.emit(int(page))
+        except (TypeError, ValueError):
+            self.outline_activated.emit(-1)
 
     def _activate_thumb(self, item: QListWidgetItem):
         page = item.data(Qt.UserRole)
@@ -417,6 +426,10 @@ class Sidebar(QWidget):
                 twi = QTreeWidgetItem([label])
                 twi.setData(0, Qt.UserRole, node.page_index)
                 twi.setData(0, Qt.UserRole + 1, item_path)
+                if node.page_index is None:
+                    twi.setToolTip(0, "Kein Seiten-Ziel (Destination nicht auflösbar)")
+                else:
+                    twi.setToolTip(0, f"Doppelklick → Seite {node.page_index + 1}")
                 if parent_item is None:
                     self.outline.addTopLevelItem(twi)
                 else:

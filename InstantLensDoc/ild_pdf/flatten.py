@@ -196,10 +196,15 @@ def flatten_annotations_to_pdf(
     out_path: str | Path | None = None,
     password: str | None = None,
     grayscale: bool = False,
+    progress=None,
+    should_cancel=None,
 ) -> Path:
     """
     Alle Seiten rendern, Annotationen einzeichnen (flatten/bake) und als neues PDF speichern.
     Original und Sidecar bleiben unverändert. Koordinaten = Render-Pixel bei `scale`.
+
+    progress(msg, current=i, total=n) — optional.
+    should_cancel() → True bricht ab (raises InterruptedError).
     """
     import pikepdf
 
@@ -224,7 +229,25 @@ def flatten_annotations_to_pdf(
         n = len(doc)
         sizes = [doc.page_size(i) for i in range(n)]
 
+    def _prog(msg: str, current: int = 0, total: int = 0) -> None:
+        if progress:
+            try:
+                progress(msg, current, total)
+            except TypeError:
+                progress(msg)
+
+    def _cancelled() -> bool:
+        if should_cancel is None:
+            return False
+        try:
+            return bool(should_cancel())
+        except Exception:
+            return False
+
     for i in range(n):
+        if _cancelled():
+            raise InterruptedError("Flatten abgebrochen")
+        _prog(f"Seite {i + 1}/{n} rendern…", i, n)
         raw = render_page(
             pdf_path,
             i,
@@ -240,9 +263,14 @@ def flatten_annotations_to_pdf(
             raw = raw.convert("RGB")
         pages_out.append(raw)
 
+    if _cancelled():
+        raise InterruptedError("Flatten abgebrochen")
+    _prog("PDF schreiben…", n, n + 1)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with pikepdf.Pdf.new() as dst:
         for img, (pw, ph) in zip(pages_out, sizes):
+            if _cancelled():
+                raise InterruptedError("Flatten abgebrochen")
             buf = io.BytesIO()
             # Seitengröße in PDF-Punkten beibehalten
             canvas = Image.new("RGB", (max(1, int(pw)), max(1, int(ph))), "white")
@@ -258,6 +286,7 @@ def flatten_annotations_to_pdf(
             with pikepdf.open(buf) as src:
                 dst.pages.append(src.pages[0])
         dst.save(out_path)
+    _prog("Fertig", n + 1, n + 1)
     return out_path
 
 

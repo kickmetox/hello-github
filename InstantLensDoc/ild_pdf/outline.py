@@ -16,29 +16,99 @@ class OutlineItem:
     children: List["OutlineItem"] = field(default_factory=list)
 
 
-def _page_index_from_dest(pdf: pikepdf.Pdf, dest) -> Optional[int]:
-    if dest is None:
+def _page_index_from_page_obj(pdf: pikepdf.Pdf, page_obj) -> Optional[int]:
+    """Seitenindex über objgen (nicht ==) — strukturell gleiche Blank-Pages sonst immer 0."""
+    if page_obj is None:
         return None
     try:
-        page_obj = None
-        if isinstance(dest, pikepdf.Array) and len(dest) > 0:
-            page_obj = dest[0]
-        if page_obj is None:
+        target = getattr(page_obj, "objgen", None)
+        if target is None:
             return None
         for i, page in enumerate(pdf.pages):
-            if page.obj == page_obj:
+            if getattr(page.obj, "objgen", None) == target:
                 return i
     except Exception:
         return None
     return None
 
 
+def _page_index_from_dest(pdf: pikepdf.Pdf, dest) -> Optional[int]:
+    if dest is None:
+        return None
+    try:
+        # Explizites Array [page, /Fit, …] oder Integer-Seitenzahl
+        if isinstance(dest, int):
+            n = len(pdf.pages)
+            return dest if 0 <= dest < n else None
+        try:
+            # pikepdf.Integer / Number
+            if hasattr(dest, "as_int"):
+                idx = int(dest.as_int())
+                n = len(pdf.pages)
+                return idx if 0 <= idx < n else None
+        except Exception:
+            pass
+        if isinstance(dest, pikepdf.Array) and len(dest) > 0:
+            return _page_index_from_page_obj(pdf, dest[0])
+        # Dictionary mit /D oder /Page
+        if isinstance(dest, pikepdf.Dictionary):
+            if "/D" in dest:
+                return _page_index_from_dest(pdf, dest["/D"])
+            if "/Page" in dest:
+                return _page_index_from_page_obj(pdf, dest["/Page"])
+    except Exception:
+        return None
+    return None
+
+
+def _page_index_from_outline_item(pdf: pikepdf.Pdf, ol) -> Optional[int]:
+    """
+    Zielfseite eines OutlineItems robust auflösen.
+    Bevorzugt resolved_destination (Array/int/named), sonst Destination/Action /GoTo.
+    """
+    # 1) resolved_destination — deckt Array, int und Named Dest ab
+    try:
+        resolver = getattr(ol, "resolved_destination", None)
+        if callable(resolver):
+            rd = resolver(pdf)
+            if rd is not None:
+                page = getattr(rd, "page", None)
+                idx = _page_index_from_page_obj(pdf, page)
+                if idx is not None:
+                    return idx
+    except Exception:
+        pass
+
+    # 2) Roh-Destination
+    dest = getattr(ol, "destination", None)
+    idx = _page_index_from_dest(pdf, dest)
+    if idx is not None:
+        return idx
+
+    # 3) GoTo-Action (/S /GoTo, /D …)
+    try:
+        action = getattr(ol, "action", None)
+        if action is None and hasattr(ol, "obj"):
+            action = ol.obj.get("/A") if hasattr(ol.obj, "get") else None
+        if action is not None:
+            subtype = None
+            try:
+                subtype = str(action.get("/S", "")) if hasattr(action, "get") else None
+            except Exception:
+                subtype = None
+            if subtype in (None, "/GoTo", "GoTo", "/Goto"):
+                d = action.get("/D") if hasattr(action, "get") else None
+                idx = _page_index_from_dest(pdf, d)
+                if idx is not None:
+                    return idx
+    except Exception:
+        pass
+    return None
+
+
 def _from_pike_item(pdf: pikepdf.Pdf, ol) -> OutlineItem:
     title = str(getattr(ol, "title", "") or "(ohne Titel)")
-    page_idx: Optional[int] = None
-    dest = getattr(ol, "destination", None)
-    if dest is not None:
-        page_idx = _page_index_from_dest(pdf, dest)
+    page_idx = _page_index_from_outline_item(pdf, ol)
     children: List[OutlineItem] = []
     for child in getattr(ol, "children", []) or []:
         children.append(_from_pike_item(pdf, child))
