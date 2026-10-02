@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
 from ild_pdf.pages import PAGE_SIZE_PRESETS
 from instantlensdoc.core.app_settings import (
     get_autosave_interval_sec,
+    get_backup_on_save,
     get_batch_output_dir,
     get_default_open_dir,
     get_default_zoom_percent,
@@ -30,6 +31,7 @@ from instantlensdoc.core.app_settings import (
     get_export_pdf_page,
     get_minimize_to_tray,
     get_ocr_lang,
+    get_page_size_unit,
     get_pdf_grayscale,
     get_pdf_night_mode,
     get_theme,
@@ -37,6 +39,7 @@ from instantlensdoc.core.app_settings import (
     get_update_check_on_start,
     save_settings,
     set_autosave_interval_sec,
+    set_backup_on_save,
     set_batch_output_dir,
     set_default_open_dir,
     set_default_zoom_percent,
@@ -44,6 +47,7 @@ from instantlensdoc.core.app_settings import (
     set_editor_soft_wrap,
     set_minimize_to_tray,
     set_ocr_lang,
+    set_page_size_unit,
     set_pdf_grayscale,
     set_pdf_night_mode,
     set_theme,
@@ -122,6 +126,20 @@ class SettingsDialog(QDialog):
             "Fenster in den Infobereich legen statt Taskleisten-Minimierung (optional)"
         )
         form.addRow(self.minimize_tray)
+
+        self.backup_on_save = QCheckBox("Backup-Kopie (.bak) beim Speichern")
+        self.backup_on_save.setChecked(get_backup_on_save())
+        self.backup_on_save.setToolTip(
+            "Vor dem Überschreiben eine Kopie dateiname.ext.bak anlegen (optional)"
+        )
+        form.addRow(self.backup_on_save)
+
+        self.page_unit = QComboBox()
+        self.page_unit.addItem("mm", "mm")
+        self.page_unit.addItem("inch", "inch")
+        self.page_unit.setCurrentIndex(1 if get_page_size_unit() == "inch" else 0)
+        self.page_unit.setToolTip("Einheit für PDF-Seitengröße in Statusleiste und Dialog")
+        form.addRow("Seitengröße Einheit", self.page_unit)
 
         self.pdf_grayscale = QCheckBox("PDF in Graustufen rendern/exportieren")
         self.pdf_grayscale.setChecked(get_pdf_grayscale())
@@ -204,6 +222,8 @@ class SettingsDialog(QDialog):
         set_editor_line_numbers(self.line_numbers.isChecked())
         set_editor_soft_wrap(self.soft_wrap.isChecked())
         set_minimize_to_tray(self.minimize_tray.isChecked())
+        set_backup_on_save(self.backup_on_save.isChecked())
+        set_page_size_unit(str(self.page_unit.currentData() or "mm"))
         set_pdf_grayscale(self.pdf_grayscale.isChecked())
         set_pdf_night_mode(self.pdf_night.isChecked())
         save_settings(
@@ -228,6 +248,11 @@ class SettingsDialog(QDialog):
         if parent is not None and hasattr(parent, "apply_tray_setting"):
             try:
                 parent.apply_tray_setting()
+            except Exception:
+                pass
+        if parent is not None and hasattr(parent, "_update_doc_status"):
+            try:
+                parent._update_doc_status()
             except Exception:
                 pass
         self.accept()

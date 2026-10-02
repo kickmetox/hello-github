@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import shutil
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
@@ -83,9 +84,28 @@ def open_document(path: str | Path) -> Document:
     return doc
 
 
+def backup_existing(path: Path) -> Path | None:
+    """Kopiert vorhandene Datei nach path.bak (überschreibt älteres .bak)."""
+    path = Path(path)
+    if not path.is_file():
+        return None
+    bak = Path(str(path) + ".bak")
+    shutil.copy2(path, bak)
+    return bak
+
+
 def save_document(doc: Document, path: Optional[Path] = None) -> Path:
     target = Path(path or doc.path or "unbenannt.txt")
     kind = detect_kind(target) if path else doc.kind
+
+    # Optionale Backup-Kopie vor Überschreiben (Einstellungen → Backup .bak)
+    try:
+        from instantlensdoc.core.app_settings import get_backup_on_save
+
+        if get_backup_on_save() and target.is_file():
+            backup_existing(target)
+    except Exception:
+        pass
 
     if kind == DocKind.DOCX:
         from instantlensdoc.core.export import export_docx
@@ -102,13 +122,9 @@ def save_document(doc: Document, path: Optional[Path] = None) -> Path:
     elif kind == DocKind.PDF:
         # PDF-Inhalt wird über Annotation-Sidecar / pikepdf verwaltet
         if doc.path and doc.path.resolve() != target.resolve():
-            import shutil
-
             shutil.copy2(doc.path, target)
     elif kind == DocKind.IMAGE:
         if doc.path and doc.path.resolve() != target.resolve():
-            import shutil
-
             shutil.copy2(doc.path, target)
     else:
         target.write_text(doc.text, encoding="utf-8")

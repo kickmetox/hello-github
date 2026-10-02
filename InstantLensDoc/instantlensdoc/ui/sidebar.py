@@ -165,7 +165,7 @@ class Sidebar(QWidget):
         ol_btns.addStretch(1)
         layout.addLayout(ol_btns)
 
-        layout.addWidget(QLabel("Annotationen"))
+        layout.addWidget(QLabel("Annotationen (gruppiert nach Seite)"))
         self.ann_filter = QComboBox()
         self.ann_filter.setToolTip("Nach Annotationstyp filtern")
         self.ann_filter.addItem("Alle Typen", "")
@@ -178,8 +178,8 @@ class Sidebar(QWidget):
         self.ann_search.textChanged.connect(self._on_ann_search_changed)
         layout.addWidget(self.ann_search)
         self.annotations = QListWidget()
-        self.annotations.setMaximumHeight(140)
-        self.annotations.setToolTip("Klick → zur Annotation springen")
+        self.annotations.setMaximumHeight(160)
+        self.annotations.setToolTip("Gruppiert nach Seite — Klick → zur Annotation springen")
         self.annotations.itemClicked.connect(self._activate_annotation)
         layout.addWidget(self.annotations)
 
@@ -458,6 +458,8 @@ class Sidebar(QWidget):
         want = self.annotation_filter_type()
         query = self._ann_search_query
         self.annotations.clear()
+        # Gefilterte Paare sammeln, dann nach Seite gruppieren
+        filtered: list[tuple[str, object | None]] = []
         for i, line in enumerate(self._ann_all_lines):
             payload = self._ann_all_payloads[i] if i < len(self._ann_all_payloads) else None
             if want:
@@ -486,10 +488,38 @@ class Sidebar(QWidget):
                     and query not in type_val
                 ):
                     continue
-            item = QListWidgetItem(line)
-            if payload is not None:
-                item.setData(256, payload)
-            self.annotations.addItem(item)
+            filtered.append((line, payload))
+
+        # Nach Seite gruppieren (None/fehlend → Gruppe -1)
+        by_page: dict[int, list[tuple[str, object | None]]] = {}
+        for line, payload in filtered:
+            page = -1
+            if payload is not None and hasattr(payload, "page"):
+                try:
+                    page = int(payload.page)
+                except (TypeError, ValueError):
+                    page = -1
+            by_page.setdefault(page, []).append((line, payload))
+
+        for page in sorted(by_page.keys()):
+            items = by_page[page]
+            if page < 0:
+                header_txt = "Ohne Seite"
+            else:
+                header_txt = f"Seite {page + 1} ({len(items)})"
+            header = QListWidgetItem(header_txt)
+            header.setFlags(Qt.ItemIsEnabled)  # nicht auswählbar
+            font = header.font()
+            font.setBold(True)
+            header.setFont(font)
+            header.setData(256, None)
+            header.setData(Qt.UserRole + 2, "group")
+            self.annotations.addItem(header)
+            for line, payload in items:
+                item = QListWidgetItem(f"  {line}")
+                if payload is not None:
+                    item.setData(256, payload)
+                self.annotations.addItem(item)
 
     def set_annotations(self, lines: list[str], payloads: list | None = None):
         self._ann_all_lines = list(lines)

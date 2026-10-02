@@ -21,6 +21,7 @@ SHORTCUTS_HTML = """
 <tr><td>Suchen</td><td><code>Ctrl+F</code></td></tr>
 <tr><td>Suchen und Ersetzen</td><td><code>Ctrl+R</code></td></tr>
 <tr><td>Gehe zu Zeile</td><td><code>Ctrl+G</code></td></tr>
+<tr><td>Zeile duplizieren</td><td><code>Ctrl+D</code></td></tr>
 <tr><td>Auswahl markieren</td><td><code>Ctrl+H</code></td></tr>
 <tr><td>Groß-/Kleinschreibung umschalten</td><td><code>Ctrl+Shift+U</code></td></tr>
 <tr><td>Einrückung erhöhen</td><td><code>Ctrl+]</code> / <code>Tab</code> (Auswahl)</td></tr>
@@ -36,6 +37,7 @@ SHORTCUTS_HTML = """
 <tr><td>Annotation auswählen</td><td>Werkzeug Auswahl / Shift+Klick / Rechtsklick</td></tr>
 <tr><td>Annotation löschen</td><td><code>Entf</code> / <code>Backspace</code> (Auswahl oder letzte)</td></tr>
 <tr><td>Annotation duplizieren</td><td><code>Ctrl+Shift+D</code> (Auswahl)</td></tr>
+<tr><td>Seitengröße mm/inch</td><td><code>Ctrl+Alt+U</code> / Klick Status</td></tr>
 <tr><td>Diese Hilfe</td><td><code>F1</code></td></tr>
 </table>
 <p><b>Speichern unter (PDF):</b> speichert die Annotationen als Sidecar
@@ -53,12 +55,13 @@ Notiz/Stempel/Callout/Overlay per Klick; <b>HL</b>/<b>Stift</b>-Farben-Picker; <
 Seite <b>⟲/⟳ drehen</b>, <b>↔/↕ spiegeln</b>, <b>leere Seite</b>, <b>duplizieren</b>.</p>
 <p><b>PDF-Suche:</b> Sidebar-Suche highlightet Treffer auf der aktuellen Seite;
 „Weiter“ springt zum nächsten Treffer; <b>letzte Suchbegriffe</b> im Dropdown.</p>
-<p><b>Annotationen:</b> eigene Liste in der Sidebar — Klick springt zur Annotation;
+<p><b>Annotationen:</b> eigene Liste in der Sidebar — <b>gruppiert nach Seite</b>; Klick springt zur Annotation;
 Filter-Dropdown nach Typ; <b>Textsuche in der Liste</b>; Text nachträglich editierbar; Deckkraft pro Annotation.</p>
 <p><b>Seitenbereich:</b> PDF → Seitenbereich extrahieren… (von–bis → neues PDF)
 bzw. Dialog „zusammenführen / teilen / Bereich“.</p>
 <p><b>Suchen und Ersetzen:</b> Bearbeiten → Ctrl+R (nur Texteditor).</p>
 <p><b>Gehe zu Zeile:</b> Bearbeiten → Ctrl+G (nur Texteditor).</p>
+<p><b>Zeile duplizieren:</b> Bearbeiten → Ctrl+D (aktuelle Zeile oder Auswahl).</p>
 <p><b>Groß-/Kleinschreibung:</b> Bearbeiten → Ctrl+Shift+U (Auswahl).</p>
 <p><b>Einrückung:</b> Bearbeiten → Ctrl+] / Ctrl+[ bzw. Tab / Shift+Tab bei Auswahl.</p>
 <p><b>Zeilennummern:</b> Ansicht → Zeilennummern (optional, auch in Einstellungen).</p>
@@ -68,7 +71,7 @@ bzw. Dialog „zusammenführen / teilen / Bereich“.</p>
 <p><b>Lizenz:</b> bei weniger als 7 Resttagen prominent in der Statusleiste.</p>
 <p><b>Seiten als Bilder:</b> PDF → Seite/Seiten als PNG/JPEG exportieren (aktuell oder alle).</p>
 <p><b>Thumbnails:</b> in der Sidebar ziehen zum Neuordnen der Seiten.</p>
-<p><b>Statusleiste:</b> Dateiname · Seite x/y · Zoom % · Wörter/Ann. · Version · Lizenz.</p>
+<p><b>Statusleiste:</b> Dateiname · Seite x/y · Seitengröße (mm/inch, klickbar) · Zoom % · Wörter/Ann. · Version · Lizenz.</p>
 <p><b>Schwärzung:</b> Rechteck ziehen → PDF → Schwärzung einbrennen… (Sidecar optional leeren)
 bzw. Schwärzungs-Annotationen löschen…</p>
 <p><b>Extras:</b> Einstellungen (Standard-Zoom, Autosave-Intervall), Batch (Fortschrittsbalken), OCR (Fortschrittsdialog).</p>

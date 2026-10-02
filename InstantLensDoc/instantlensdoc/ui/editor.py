@@ -85,6 +85,45 @@ class TextEditor(QPlainTextEdit):
         self.setFocus()
         return True
 
+    def duplicate_line(self) -> bool:
+        """Aktuelle Zeile (bzw. ausgewählte Zeilen) direkt darunter duplizieren."""
+        cur = self.textCursor()
+        doc = self.document()
+        if cur.hasSelection():
+            start = cur.selectionStart()
+            end = cur.selectionEnd()
+            start_block = doc.findBlock(start)
+            end_block = doc.findBlock(end if end > start else start)
+            if end > start and doc.findBlock(end).position() == end:
+                end_block = end_block.previous()
+                if not end_block.isValid():
+                    end_block = start_block
+        else:
+            start_block = end_block = cur.block()
+
+        lines: list[str] = []
+        block = start_block
+        while block.isValid() and block.blockNumber() <= end_block.blockNumber():
+            lines.append(block.text())
+            block = block.next()
+        if not lines:
+            return False
+
+        insert_at = end_block.position() + len(end_block.text())
+        text = "\n" + "\n".join(lines)
+        cur.beginEditBlock()
+        cur.setPosition(insert_at)
+        cur.insertText(text)
+        # Neue Duplikat-Zeilen auswählen
+        sel_start = insert_at + 1
+        sel_end = insert_at + len(text)
+        cur.setPosition(sel_start)
+        cur.setPosition(sel_end, QTextCursor.KeepAnchor)
+        cur.endEditBlock()
+        self.setTextCursor(cur)
+        self.ensureCursorVisible()
+        return True
+
     def _update_line_number_area_width(self, _new_block_count: int = 0) -> None:
         self.setViewportMargins(self.line_number_area_width(), 0, 0, 0)
 

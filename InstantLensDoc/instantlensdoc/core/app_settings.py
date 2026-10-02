@@ -37,6 +37,8 @@ DEFAULTS: dict[str, Any] = {
     "editor_soft_wrap": True,
     "annotations_visible": True,
     "minimize_to_tray": False,
+    "page_size_unit": "mm",
+    "backup_on_save": False,
 }
 
 
@@ -358,3 +360,30 @@ def get_minimize_to_tray() -> bool:
 
 def set_minimize_to_tray(enabled: bool) -> None:
     save_settings({"minimize_to_tray": bool(enabled)})
+
+
+def get_page_size_unit() -> str:
+    """'mm' oder 'inch' für Seitengrößenanzeige."""
+    raw = str(load_settings().get("page_size_unit", "mm") or "mm").lower().strip()
+    if raw in ("in", "inch", "inches", '"'):
+        return "inch"
+    return "mm"
+
+
+def set_page_size_unit(unit: str) -> str:
+    u = "inch" if str(unit or "").lower().strip() in ("in", "inch", "inches", '"') else "mm"
+    save_settings({"page_size_unit": u})
+    return u
+
+
+def toggle_page_size_unit() -> str:
+    """Wechselt mm ↔ inch und speichert; Rückgabe: neue Einheit."""
+    return set_page_size_unit("inch" if get_page_size_unit() == "mm" else "mm")
+
+
+def get_backup_on_save() -> bool:
+    return bool(load_settings().get("backup_on_save", False))
+
+
+def set_backup_on_save(enabled: bool) -> None:
+    save_settings({"backup_on_save": bool(enabled)})

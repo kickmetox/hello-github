@@ -28,8 +28,15 @@ from .pages import (
     duplicate_page,
     delete_pages,
     reorder_pages,
+    format_size_pair,
     get_page_boxes,
     set_page_size,
+    convert_pt,
+    to_pt,
+    pt_to_inch,
+    pt_to_mm,
+    mm_to_pt,
+    inch_to_pt,
     set_crop_box,
 )
 from .flatten import bake_annotations, draw_annotations_on_image, flatten_annotations_to_pdf
@@ -106,6 +113,13 @@ __all__ = [
     "get_page_boxes",
     "set_page_size",
     "set_crop_box",
+    "format_size_pair",
+    "convert_pt",
+    "to_pt",
+    "pt_to_mm",
+    "pt_to_inch",
+    "mm_to_pt",
+    "inch_to_pt",
     "OutlineItem",
     "extract_outline",
     "add_outline_item",
@@ -152,4 +166,4 @@ __all__ = [
     "extract_all_attachments",
 ]
 
-__version__ = "0.3.4"
+__version__ = "0.3.5"

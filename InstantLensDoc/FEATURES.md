@@ -4,7 +4,7 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 
 | Feature | Status | Hinweis |
 |---------|--------|---------|
-| Hauptfenster (Menü, Sidebar, Editor, Status) | fertig | PySide6; Status: Dateiname, Seite x/y, Zoom %, Wörter/Ann.; Ann.-Liste Sidebar 0.2.4; **Ann.-Filter Typ** 0.2.6 |
+| Hauptfenster (Menü, Sidebar, Editor, Status) | fertig | PySide6; Status: Dateiname, Seite x/y, **Seitengröße mm/inch** 0.3.5, Zoom %, Wörter/Ann.; Ann.-Liste Sidebar 0.2.4; **Ann.-Filter Typ** 0.2.6 |
 | App-Icon Fenster/Taskleiste/About | fertig | Robuste Pfade: `assets/`, CWD, `D:\AI_Temp\InstantLensDoc` |
 | Session-Restore (offene Docs) | fertig | `session.json`, Sidebar-Liste |
 | Clipboard-Paste Bild | fertig | Editor + PDF (Stempel/Seite) |
@@ -19,7 +19,7 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | PDF Seitennummer-Stempel | fertig | Vorlage `{n} / {total}` |
 | PDF-Vergleich Seite-nebeneinander | fertig | Dialog |
 | PDF-Metadaten-Editor | fertig | Titel/Autor/Thema/Keywords (DocInfo+XMP) |
-| PDF Seitengröße / Zuschneiden | fertig | MediaBox-Presets + CropBox |
+| PDF Seitengröße / Zuschneiden | fertig | MediaBox-Presets + CropBox; **Anzeige mm/inch Toggle** 0.3.5 |
 | PDF-Schwärzung (Redaction) | teilweise | Drag + Preview-Label + Einbrennen-Dialog (Basis) |
 | PDF-Passwort setzen/öffnen | fertig | pikepdf Encryption / pypdfium2 |
 | Bildkompression vor/als PDF | fertig | JPEG vor Einfügen; Seiten neu einbetten |
@@ -60,7 +60,7 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | PDF leere Seite / duplizieren | fertig | Toolbar + Menü; Annotation-Remap 0.2.4 |
 | PDF neu anordnen | fertig | Dialog + Thumbnail-Drag + Annotation-Remap |
 | Textsuche Seitenleiste | fertig | Editor + PDF-Text + Annotationen; Highlight 0.2.2; **letzte Suchbegriffe** merken 0.2.4 |
-| Annotation-Liste Sidebar | fertig | Klick → Seite + Auswahl 0.2.4; **Filter nach Typ** 0.2.6; **Textsuche** 0.3.0 |
+| Annotation-Liste Sidebar | fertig | Klick → Seite + Auswahl 0.2.4; **Filter nach Typ** 0.2.6; **Textsuche** 0.3.0; **Gruppierung nach Seite** 0.3.5 |
 | PDF Seitenbereich extrahieren | fertig | von–bis → neues PDF; Menü + Dialog-Tab 0.2.6 |
 | Editor Find/Replace | fertig | Ctrl+R Dialog 0.2.6 |
 | Editor Zeilennummern | fertig | Optional (Ansicht + Einstellungen) 0.2.7 |
@@ -69,6 +69,8 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | Editor Markdown-Vorschau | fertig | Optional Split (Ansicht); Ctrl+Shift+M 0.3.2 |
 | Editor Soft-Wrap | fertig | Toggle Ansicht/Einstellungen; Ctrl+Shift+W 0.3.3 |
 | Editor Gehe zu Zeile | fertig | Dialog Ctrl+G 0.3.4 |
+| Editor Zeile duplizieren | fertig | Ctrl+D (aktuelle/Auswahl) 0.3.5 |
+| Backup .bak beim Speichern | fertig | Optional in Einstellungen 0.3.5 |
 | Zuletzt verwendete Ordner | fertig | Datei-Dialoge merken `recent_dirs` 0.3.2 |
 | Alles speichern (Tabs) | fertig | Datei → Alles speichern; aktuelles Doc + PDF-Sidecars 0.2.7 |
 | Volltextsuche geöffnete Docs | fertig | Sidebar „Alle Docs“ |
@@ -77,7 +79,7 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | Editor Wortzählung | fertig | Statusleiste Wörter · Zeichen 0.2.5 |
 | Batch-Konvertierung Ordner | fertig | Bilder→PDF, OCR-Ordner, PDF-OCR-Text; Fortschrittsbalken 0.2.1 |
 | PDF zusammenführen / teilen | fertig | Dialog unter Menü PDF |
-| Einstellungen-Dialog | fertig | OCR, Theme, Sprache, Export-Q, Standard-Zoom, Autosave, optional Tray-Minimize, Pfade, Update |
+| Einstellungen-Dialog | fertig | OCR, Theme, Sprache, Export-Q, Standard-Zoom, Autosave, optional Tray-Minimize, **Backup .bak**, **Seitengröße-Einheit**, Pfade, Update |
 | Markieren im Editor | fertig | Ctrl+H |
 | Bilder JPEG/PNG anzeigen | fertig | |
 | OCR Bild/PDF-Seite | teilweise | Presets + Modi; Tabellen-Heuristik; Fortschrittsdialog 0.2.1 |
@@ -91,25 +93,25 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | PyInstaller Build Windows | fertig | `build-windows.ps1`, Icon `assets/app.ico` |
 | Inno-Installer | fertig | Icon, Desktop, Uninstaller, Keygen optional (`InstantLensKeygen.exe`) 0.2.1 |
 | Sync-Skript Windows | fertig | Repo `scripts/sync-ild.ps1`; Store `docs/sync-ild.ps1` |
-| In-App Hilfe / About | fertig | Version 0.3.4; Fenstertitel + Splash; Logordner-Button |
-| CHANGELOG | fertig | **0.3.4** PDF-Text→Editor / Ann.-Duplikat / Goto Line / Tray |
+| In-App Hilfe / About | fertig | Version 0.3.5; Fenstertitel + Splash; Logordner-Button |
+| CHANGELOG | fertig | **0.3.5** Seitengröße mm/inch / Ann.-Gruppen / Zeile duplizieren / Backup .bak |
 | FEATURES.md / INFO.md | fertig | |
 | `ild_pdf` Modul + Beispielskript | fertig | metadata / page size / watermark / redact / acroform / attachments / flatten / **plain text** |
 | Font-Matching | geplant | |
 | Objekt-/Bildbearbeitung | geplant | |
 | Layout-Erhaltung (Scan→edit) | geplant | |
 | Freihand | geplant | |
-| KI-Assistent | Stub | Menü „Geplant“ 0.3.4 (keine Fake-KI) |
+| KI-Assistent | Stub | Menü „Geplant“ 0.3.5 (keine Fake-KI) |
 | Signieren (rechtssicher) | Stub | |
-| Cloud-Sync | Stub | Menü „Geplant“ 0.3.4 (keine Fake-Cloud) |
+| Cloud-Sync | Stub | Menü „Geplant“ 0.3.5 (keine Fake-Cloud) |
 | Text on Path / Text zu Pfaden | geplant | |
 | Envelope Distort / Text Wrap / Area Type | Stub/geplant | |
 | Schnittmasken | geplant | |
 | Füllungen / Live-Effekte | geplant | |
-| 3D-Extrusion | Stub | Menü „Geplant“ 0.3.4 |
+| 3D-Extrusion | Stub | Menü „Geplant“ 0.3.5 |
 | Variable Fonts (voll) | Stub | |
 | Glyphen-Palette | geplant | |
-| Stylus / Palm Rejection | Stub | Menü „Geplant“ 0.3.4 |
-| Intelligente Formerkennung | Stub | Menü „Geplant“ 0.3.4 |
+| Stylus / Palm Rejection | Stub | Menü „Geplant“ 0.3.5 |
+| Intelligente Formerkennung | Stub | Menü „Geplant“ 0.3.5 |
 
 Nicht behauptet als fertig: Cloud, KI, Stylus, 3D — nur Menü-Stubs + dieser Status.

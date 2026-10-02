@@ -16,6 +16,59 @@ PAGE_SIZE_PRESETS: dict[str, Tuple[float, float]] = {
     "A3": (841.89, 1190.55),
 }
 
+PT_PER_INCH = 72.0
+MM_PER_INCH = 25.4
+
+
+def pt_to_mm(pt: float) -> float:
+    return float(pt) / PT_PER_INCH * MM_PER_INCH
+
+
+def pt_to_inch(pt: float) -> float:
+    return float(pt) / PT_PER_INCH
+
+
+def mm_to_pt(mm: float) -> float:
+    return float(mm) / MM_PER_INCH * PT_PER_INCH
+
+
+def inch_to_pt(inch: float) -> float:
+    return float(inch) * PT_PER_INCH
+
+
+def format_size_pair(
+    width_pt: float,
+    height_pt: float,
+    unit: str = "mm",
+    *,
+    decimals: int | None = None,
+) -> str:
+    """Format width×height in mm or inch (from PDF points)."""
+    u = (unit or "mm").lower().strip()
+    if u in ("in", "inch", "inches", '"'):
+        w, h = pt_to_inch(width_pt), pt_to_inch(height_pt)
+        d = 2 if decimals is None else decimals
+        return f"{w:.{d}f}×{h:.{d}f} in"
+    w, h = pt_to_mm(width_pt), pt_to_mm(height_pt)
+    d = 1 if decimals is None else decimals
+    return f"{w:.{d}f}×{h:.{d}f} mm"
+
+
+def convert_pt(value_pt: float, unit: str = "mm") -> float:
+    """Punktwert in mm oder inch umrechnen."""
+    u = (unit or "mm").lower().strip()
+    if u in ("in", "inch", "inches", '"'):
+        return pt_to_inch(value_pt)
+    return pt_to_mm(value_pt)
+
+
+def to_pt(value: float, unit: str = "mm") -> float:
+    """mm oder inch → PDF-Punkte."""
+    u = (unit or "mm").lower().strip()
+    if u in ("in", "inch", "inches", '"'):
+        return inch_to_pt(value)
+    return mm_to_pt(value)
+
 
 def rotate_page(path: str | Path, page_index: int, degrees: int = 90) -> None:
     """Seite um degrees drehen (90/180/270/−90) und speichern."""

@@ -46,9 +46,11 @@ from instantlensdoc.core.app_settings import (
     get_editor_soft_wrap,
     get_last_export_dir,
     get_minimize_to_tray,
+    get_page_size_unit,
     get_update_check_on_start,
     remember_recent_dir,
     set_last_export_dir,
+    toggle_page_size_unit,
 )
 from instantlensdoc.ui.batch_dialog import BatchConvertDialog
 from instantlensdoc.ui.pdf_tools_dialog import PdfToolsDialog
@@ -306,6 +308,14 @@ class MainWindow(QMainWindow):
         self.page_status_label = QLabel("Seite —")
         self.page_status_label.setStyleSheet("padding-right: 10px;")
         sb.addPermanentWidget(self.page_status_label)
+        self.size_status_label = QLabel("—")
+        self.size_status_label.setStyleSheet("padding-right: 10px; color: #555;")
+        self.size_status_label.setToolTip("Seitengröße — Klick wechselt mm ↔ inch")
+        self.size_status_label.setCursor(Qt.PointingHandCursor)
+        self.size_status_label.mousePressEvent = (  # type: ignore[method-assign]
+            lambda _e: self._toggle_page_size_unit()
+        )
+        sb.addPermanentWidget(self.size_status_label)
         self.zoom_status_label = QLabel("— %")
         self.zoom_status_label.setStyleSheet("padding-right: 10px;")
         sb.addPermanentWidget(self.zoom_status_label)
@@ -422,6 +432,11 @@ class MainWindow(QMainWindow):
         act_goto.setToolTip("Cursor auf Zeilennummer setzen")
         act_goto.triggered.connect(self._goto_line)
         m_edit.addAction(act_goto)
+        act_dup_line = QAction("Zeile duplizieren", self)
+        act_dup_line.setShortcut(QKeySequence("Ctrl+D"))
+        act_dup_line.setToolTip("Aktuelle Zeile / Auswahl darunter duplizieren")
+        act_dup_line.triggered.connect(self._duplicate_line)
+        m_edit.addAction(act_dup_line)
         act_mark = QAction("Auswahl markieren", self)
         act_mark.setShortcut(QKeySequence("Ctrl+H"))
         act_mark.triggered.connect(self._mark_selection)
@@ -514,6 +529,11 @@ class MainWindow(QMainWindow):
         self._ann_layer_action.setShortcut(QKeySequence("Ctrl+Shift+A"))
         self._ann_layer_action.toggled.connect(self._toggle_ann_layer)
         m_view.addAction(self._ann_layer_action)
+        act_size_unit = QAction("Seitengröße mm/inch umschalten", self)
+        act_size_unit.setShortcut(QKeySequence("Ctrl+Alt+U"))
+        act_size_unit.setToolTip("Einheit der PDF-Seitengröße in der Statusleiste (mm ↔ inch)")
+        act_size_unit.triggered.connect(self._toggle_page_size_unit)
+        m_view.addAction(act_size_unit)
         m_view.addSeparator()
         act_zi = QAction("Vergrößern", self)
         act_zi.setShortcut(QKeySequence.ZoomIn)
@@ -748,9 +768,10 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage(msg, 5000)
 
     def _update_doc_status(self):
-        """Statusleiste: Dateiname, Seite x/y, Zoom %, Wörter (Editor)."""
+        """Statusleiste: Dateiname, Seite x/y, Seitengröße, Zoom %, Wörter (Editor)."""
         name = "—"
         page_txt = "Seite —"
+        size_txt = "—"
         zoom_txt = "— %"
         word_txt = "— Wörter"
         if self.doc and self.doc.path:
@@ -761,6 +782,7 @@ class MainWindow(QMainWindow):
             page_txt = f"Seite {self.pdf_view.page_index + 1}/{self.pdf_view.page_count}"
             zoom_txt = f"{int(round(self.pdf_view.scale * 100))} %"
             word_txt = f"{len(self.pdf_view.store.annotations) if self.pdf_view.store else 0} Ann."
+            size_txt = self._format_current_page_size() or "—"
         elif self.stack.currentWidget() is self.editor_pane:
             page_txt = "Editor"
             zoom_txt = "—"
@@ -772,8 +794,61 @@ class MainWindow(QMainWindow):
         self.file_status_label.setText(name)
         self.file_status_label.setToolTip(str(self.doc.path) if self.doc and self.doc.path else name)
         self.page_status_label.setText(page_txt)
+        if hasattr(self, "size_status_label"):
+            self.size_status_label.setText(size_txt)
+            unit = get_page_size_unit()
+            self.size_status_label.setToolTip(
+                f"Seitengröße ({unit}) — Klick wechselt mm ↔ inch"
+            )
         self.zoom_status_label.setText(zoom_txt)
         self.word_status_label.setText(word_txt)
+
+    def _format_current_page_size(self) -> str:
+        """Aktuelle PDF-Seitengröße formatiert (mm/inch laut Einstellung)."""
+        if not self.pdf_view.pdf_path or self.pdf_view.page_count <= 0:
+            return ""
+        try:
+            from ild_pdf.pages import format_size_pair, get_page_boxes
+
+            boxes = get_page_boxes(self.pdf_view.pdf_path, self.pdf_view.page_index)
+            mb = boxes["mediabox"]
+            w = mb[2] - mb[0]
+            h = mb[3] - mb[1]
+            return format_size_pair(w, h, get_page_size_unit())
+        except Exception:
+            try:
+                from ild_pdf import PdfDocument
+
+                with PdfDocument(self.pdf_view.pdf_path) as doc:
+                    w, h = doc.page_size(self.pdf_view.page_index)
+                from ild_pdf.pages import format_size_pair
+
+                return format_size_pair(w, h, get_page_size_unit())
+            except Exception:
+                return ""
+
+    def _toggle_page_size_unit(self):
+        new_unit = toggle_page_size_unit()
+        self._update_doc_status()
+        self._set_status(f"Seitengröße in {'inch' if new_unit == 'inch' else 'mm'}")
+
+    def _duplicate_line(self):
+        if self.stack.currentWidget() is not self.editor_pane:
+            self._set_status("Zeile duplizieren nur im Texteditor")
+            return
+        if self.editor.duplicate_line():
+            if self.doc and self.doc.kind in (
+                DocKind.TEXT,
+                DocKind.MARKDOWN,
+                DocKind.HTML,
+                DocKind.DOCX,
+            ):
+                self.doc.text = self.editor.toPlainText()
+                self.doc.dirty = True
+            self._on_text_changed()
+            self._set_status("Zeile dupliziert")
+        else:
+            self._set_status("Zeile duplizieren nicht möglich")
 
     def _on_pdf_zoom_changed(self, scale: float):
         self.zoom_status_label.setText(f"{int(round(float(scale) * 100))} %")
@@ -781,6 +856,8 @@ class MainWindow(QMainWindow):
             self.page_status_label.setText(
                 f"Seite {self.pdf_view.page_index + 1}/{self.pdf_view.page_count}"
             )
+            if hasattr(self, "size_status_label"):
+                self.size_status_label.setText(self._format_current_page_size() or "—")
 
     def _delete_annotation(self):
         if self.stack.currentWidget() is self.pdf_view and self.pdf_view.pdf_path:

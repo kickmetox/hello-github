@@ -1,5 +1,23 @@
 # Changelog — InstantLens Doc
 
+## 0.3.5 — Seitengröße, Ann.-Gruppen, Zeile duplizieren, Backup
+
+Fokus auf sinnvolle Ausbauten nach 0.3.4. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### PDF
+- **Seitengröße in Statusleiste** (MediaBox mm/inch; Klick oder Ctrl+Alt+U zum Umschalten)
+- **Seitengröße-Dialog**: Einheit mm/inch Toggle (persistiert)
+- **Annotationen in Sidebar nach Seite gruppiert** (Überschriften „Seite n“)
+
+### Editor / UX
+- **Zeile duplizieren** (Ctrl+D; Auswahl mehrerer Zeilen möglich)
+- **Backup-Kopie (.bak) beim Speichern** optional in Einstellungen
+
+### Packaging / Docs
+- Version **0.3.5** (App, `ild_pdf`, ISS, Smoke, INFO/FEATURES/README)
+
+---
+
 ## 0.3.4 — PDF-Text→Editor, Ann.-Duplikat, Goto Line, Tray
 
 Fokus auf sinnvolle Ausbauten nach 0.3.3. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
