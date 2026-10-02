@@ -37,7 +37,7 @@ from instantlensdoc.license import LicenseManager
 from instantlensdoc.ui.editor import EditorPane
 from instantlensdoc.ui.form_builder import FormBuilderDialog
 from instantlensdoc.ui.attachments_dialog import AttachmentsDialog
-from instantlensdoc.ui.help_dialog import AboutDialog, HelpDialog
+from instantlensdoc.ui.help_dialog import AboutDialog, GettingStartedWizard, HelpDialog
 from instantlensdoc.ui.license_dialog import LicenseDialog
 from instantlensdoc.ui.ocr_dialog import OcrDialog
 from instantlensdoc.ui.pdf_view import PdfViewer
@@ -337,6 +337,7 @@ class MainWindow(QMainWindow):
         self.sidebar.page_favorite_activated.connect(self._on_page_favorite_jump)
         self.sidebar.page_favorites_reordered.connect(self._on_page_favorites_reordered)
         self.sidebar.line_favorite_activated.connect(self._on_line_favorite_jump)
+        self.sidebar.line_favorite_label_edit.connect(self._edit_line_favorite_label)
         self.sidebar.pages_reordered.connect(self._on_thumbs_reordered)
         splitter.addWidget(self.sidebar)
 
@@ -1040,6 +1041,14 @@ class MainWindow(QMainWindow):
         act_page_fav_jump.setToolTip("Zu markierten Favoriten-Seiten springen")
         act_page_fav_jump.triggered.connect(lambda: self.pdf_view.show_page_favorites())
         m_pdf.addAction(act_page_fav_jump)
+        act_fav_export = QAction("Seiten-Favoriten als JSON exportieren…", self)
+        act_fav_export.setToolTip("Favoritenliste als ildfav-v1 JSON speichern")
+        act_fav_export.triggered.connect(lambda: self.pdf_view.export_page_favorites_json())
+        m_pdf.addAction(act_fav_export)
+        act_fav_import = QAction("Seiten-Favoriten aus JSON importieren…", self)
+        act_fav_import.setToolTip("Favoritenliste aus JSON laden (ersetzen oder zusammenführen)")
+        act_fav_import.triggered.connect(lambda: self.pdf_view.import_page_favorites_json())
+        m_pdf.addAction(act_fav_import)
         m_pdf.addSeparator()
         for title, slot in [
             ("PDF-Text → Overlay…", lambda: self.pdf_view.import_text_overlays()),
@@ -1102,6 +1111,10 @@ class MainWindow(QMainWindow):
             m_extra.addAction(a)
 
         m_help = mb.addMenu("&Hilfe")
+        a = QAction("Erste Schritte…", self)
+        a.setToolTip("Kurz-Wizard: Öffnen, Annotieren, Editor (3 Seiten)")
+        a.triggered.connect(lambda: GettingStartedWizard(self).exec())
+        m_help.addAction(a)
         a = QAction("Tastaturhilfe…", self)
         a.setShortcut(QKeySequence("F1"))
         a.triggered.connect(lambda: KeyboardHelpDialog(self).exec())
@@ -1636,10 +1649,39 @@ class MainWindow(QMainWindow):
         self._set_status("Zeilen-Lesezeichen gelöscht")
 
     def _refresh_line_favorites(self):
-        """Sidebar-Liste aller Editor-Zeilenfavoriten aktualisieren."""
-        marks = self.editor.list_line_bookmarks()
+        """Sidebar-Liste aller Editor-Zeilenfavoriten aktualisieren (inkl. Labels)."""
+        marks = self.editor.list_line_bookmarks_with_labels()
+        lines = [ln for ln, _lab in marks]
         cur = self.editor.textCursor().blockNumber() + 1
-        self.sidebar.set_line_favorites(marks, current=cur if cur in marks else None)
+        self.sidebar.set_line_favorites(marks, current=cur if cur in lines else None)
+
+    def _edit_line_favorite_label(self, line: int):
+        """Label eines Editor-Zeilenfavoriten bearbeiten (Sidebar Doppelklick/Menü)."""
+        from PySide6.QtWidgets import QInputDialog
+
+        if self.stack.currentWidget() is not self.editor_pane:
+            self.stack.setCurrentWidget(self.editor_pane)
+        try:
+            ln = int(line)
+        except (TypeError, ValueError):
+            return
+        if ln < 1 or not self.editor.is_line_bookmarked(ln):
+            return
+        current = self.editor.get_line_bookmark_label(ln)
+        text, ok = QInputDialog.getText(
+            self,
+            "Zeilenfavorit-Label",
+            f"Label für Zeile {ln}:",
+            text=current,
+        )
+        if not ok:
+            return
+        if self.editor.set_line_bookmark_label(ln, text):
+            self._refresh_line_favorites()
+            label = self.editor.get_line_bookmark_label(ln)
+            self._set_status(
+                f"Zeilenfavorit Zeile {ln}: „{label}“" if label else f"Label Zeile {ln} entfernt"
+            )
 
     def _on_line_favorite_jump(self, line: int):
         if self.stack.currentWidget() is not self.editor_pane:

@@ -2,7 +2,7 @@
 
 Moderne Textverarbeitung mit PDF-Annotator, OCR-Bridge und Formulargenerator.
 
-**Version:** 0.5.8  
+**Version:** 0.5.9  
 **Hersteller:** Andreas Meyer · ame@sellerbach.de
 
 ## Quickstart (Windows)
@@ -29,8 +29,8 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)
 
-## Neu in 0.5.8
+## Neu in 0.5.9
 
-PDF-Favoriten per Drag umsortieren, Annotation-Opacity robuster im Sidecar, Editor-Zeilenfavoriten als Sidebar-Liste, Crash-Report optional mit Screenshot-Pfad-Hinweis. Stubs KI/Cloud/Stylus/3D unverändert.
+PDF-Favoriten JSON Export/Import, Annotation-Opacity per Toolbar-Slider, editierbare Zeilenfavoriten-Labels, Hilfe-Kurz-Wizard „Erste Schritte“ (3 Seiten). Stubs KI/Cloud/Stylus/3D unverändert. Letzte 0.5.x vor 0.6.0.
 
 Siehe [CHANGELOG.md](CHANGELOG.md), [FEATURES.md](FEATURES.md) und [INFO.md](INFO.md).

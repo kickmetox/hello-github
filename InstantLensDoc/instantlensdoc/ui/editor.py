@@ -89,6 +89,7 @@ class TextEditor(QPlainTextEdit):
         self._bracket_selections: list = []
         self._spell_selections: list = []
         self._line_bookmarks: set[int] = set()  # 0-basierte Blocknummern
+        self._line_bookmark_labels: dict[int, str] = {}  # Block → editierbares Label
         self._line_number_area = _LineNumberArea(self)
         self._minimap_area = _MinimapArea(self)
         self.blockCountChanged.connect(self._update_side_areas)
@@ -114,14 +115,42 @@ class TextEditor(QPlainTextEdit):
         n = self.blockCount()
         return sorted(b + 1 for b in self._line_bookmarks if 0 <= b < n)
 
+    def list_line_bookmarks_with_labels(self) -> list[tuple[int, str]]:
+        """[(1-basierte Zeile, Label), …] sortiert; Label kann leer sein."""
+        out: list[tuple[int, str]] = []
+        for line in self.list_line_bookmarks():
+            out.append((line, self.get_line_bookmark_label(line)))
+        return out
+
     def clear_line_bookmarks(self) -> None:
         self._line_bookmarks.clear()
+        self._line_bookmark_labels.clear()
         self._line_number_area.update()
         self.line_bookmarks_changed.emit()
 
     def is_line_bookmarked(self, line: int) -> bool:
         """line: 1-basiert."""
         return int(line) - 1 in self._line_bookmarks
+
+    def get_line_bookmark_label(self, line: int) -> str:
+        """Editierbares Label für Zeilenfavorit (1-basiert); leer wenn keines."""
+        return str(self._line_bookmark_labels.get(int(line) - 1, "") or "")
+
+    def set_line_bookmark_label(self, line: int, label: str) -> bool:
+        """
+        Label für vorhandenen Zeilenfavorit setzen (1-basiert).
+        Leeres Label entfernt den Text. Rückgabe False wenn Zeile kein Favorit.
+        """
+        block_no = int(line) - 1
+        if block_no not in self._line_bookmarks:
+            return False
+        text = str(label or "").strip()
+        if text:
+            self._line_bookmark_labels[block_no] = text[:80]
+        else:
+            self._line_bookmark_labels.pop(block_no, None)
+        self.line_bookmarks_changed.emit()
+        return True
 
     def toggle_line_bookmark(self, line: int | None = None) -> bool:
         """
@@ -137,6 +166,7 @@ class TextEditor(QPlainTextEdit):
             return False
         if block_no in self._line_bookmarks:
             self._line_bookmarks.discard(block_no)
+            self._line_bookmark_labels.pop(block_no, None)
             now = False
         else:
             self._line_bookmarks.add(block_no)

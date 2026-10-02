@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QMessageBox,
     QPushButton,
+    QStackedWidget,
     QTabWidget,
     QTextBrowser,
     QVBoxLayout,
@@ -24,6 +25,7 @@ from instantlensdoc.core.logging_setup import log_dir
 HELP_HTML = f"""
 <h2>InstantLens Doc — Hilfe</h2>
 <p>Moderne Textverarbeitung mit PDF-Annotator, OCR-Bridge und Formulargenerator.</p>
+<p><b>Kurz-Wizard:</b> Hilfe → Erste Schritte… (3 Seiten).</p>
 <h3>Erste Schritte</h3>
 <ul>
 <li><b>Datei → Öffnen</b>: TXT, MD, HTML, DOCX, PDF, Bilder</li>
@@ -85,13 +87,13 @@ HELP_HTML = f"""
 <li><b>PDF</b>: Blättern, Zoom/Fit (debounced + Cache), <b>⟲/⟳ drehen</b> / <b>↔/↕ spiegeln</b> (speichert),
     <b>Graustufen</b> (Ansicht + Bild-Export), <b>Nachtmodus</b> (nur Ansicht, nicht speichern),
     <b>leere Seite / duplizieren</b>, Seite löschen (<b>Undo Ctrl+Z</b> / <b>Historie-Liste</b>), Seiten neu anordnen;
-    <b>Annotationsgruppen</b> umbenennen/Farbe (Ctrl+Alt+G); <b>Seiten-Favoriten</b> (★ / Ctrl+Shift+F, springen Ctrl+Alt+F, <b>Sidebar-Liste mit Nummern</b>);
-    <b>Auswahl-Farbe Batch</b> (Ctrl+Alt+Shift+F); <b>Auswahl-Deckkraft Batch</b> (Ctrl+Alt+Shift+O / α…);
-    Soft-Hyphen / NBSP im Editor; <b>Zeilen-Lesezeichen</b> (Ctrl+F2 / Klick Zeilennummer, F2/Shift+F2);
+    <b>Annotationsgruppen</b> umbenennen/Farbe (Ctrl+Alt+G); <b>Seiten-Favoriten</b> (★ / Ctrl+Shift+F, springen Ctrl+Alt+F, <b>Sidebar-Liste mit Nummern</b>, <b>Export/Import JSON</b>);
+    <b>Auswahl-Farbe Batch</b> (Ctrl+Alt+Shift+F); <b>Auswahl-Deckkraft</b> (Toolbar-Slider / Ctrl+Alt+Shift+O / α…);
+    Soft-Hyphen / NBSP im Editor; <b>Zeilen-Lesezeichen</b> (Ctrl+F2 / Klick Zeilennummer, F2/Shift+F2, <b>Labels editierbar</b>);
     <b>Rechtschreibung</b> per lokaler Wortliste (F7, Pfad in Einstellungen);
     Startup-Check pypdfium2/Tesseract; Splash optional überspringbar;
     <b>PDF-Links (http/https)</b> per Auswahl-Werkzeug / Ctrl+Klick öffnen;
-    Annotationen: Highlight (Drag, <b>Selection→Highlight</b> über Text) + <b>Farben-Picker HL/Stift</b> + <b>3 Favoriten</b> + <b>Deckkraft α</b>, <b>Schwärzen/Redaction</b> (Drag + Preview „REDACT“ + Einbrennen-Dialog), Unterstreichen, Notiz, <b>Text-Overlay</b>,
+    Annotationen: Highlight (Drag, <b>Selection→Highlight</b> über Text) + <b>Farben-Picker HL/Stift</b> + <b>3 Favoriten</b> + <b>Deckkraft α + Toolbar-Slider</b>, <b>Schwärzen/Redaction</b> (Drag + Preview „REDACT“ + Einbrennen-Dialog), Unterstreichen, Notiz, <b>Text-Overlay</b>,
     <b>Stempel-Bibliothek</b> (GENEHMIGT/ENTWURF/VERTRAULICH + Datum, <b>Rotation 90°</b>), Callout,
     <b>Rechteck / Linie / Pfeil / Lineal</b> —
     Sidecar <code>*.ildann.json</code> (v4 / <code>ildann-v4</code>, Auto-Save, Undo/Redo);
@@ -154,6 +156,96 @@ Beispiel: <code>examples/ild_pdf_demo.py</code>. API: <code>ild_pdf/README.md</c
 <p>KI-Assistent, Cloud-Sync, Stylus/Palm Rejection, 3D u. a. sind im Menü als „Geplant“ markiert
 (Stub {__version__}) — siehe FEATURES.md.</p>
 """
+
+
+WIZARD_PAGES = (
+    (
+        "1 / 3 — Dokument öffnen",
+        "<h3>Dokument öffnen</h3>"
+        "<p><b>Datei → Öffnen</b> (Ctrl+O): TXT, Markdown, HTML, DOCX, PDF oder Bild.</p>"
+        "<ul>"
+        "<li>Mehrere Dateien per Drag &amp; Drop → mehrere Tabs</li>"
+        "<li><b>Zuletzt geöffnet</b> in Menü und Seitenleiste</li>"
+        "<li>PDF: Annotationen liegen im Sidecar <code>*.ildann.json</code> (PDF unverändert)</li>"
+        "</ul>",
+    ),
+    (
+        "2 / 3 — PDF annotieren",
+        "<h3>PDF annotieren</h3>"
+        "<p>Werkzeuge in der PDF-Toolbar: Highlight, Notiz, Stempel, Formen …</p>"
+        "<ul>"
+        "<li><b>★</b> / Ctrl+Shift+F: Seite als Favorit; Sidebar zum Springen/Umsortieren</li>"
+        "<li>Favoriten <b>JSON Export/Import</b> unter PDF-Menü</li>"
+        "<li><b>α-Slider</b> in der Toolbar: Deckkraft der Auswahl (ohne Dialog)</li>"
+        "</ul>",
+    ),
+    (
+        "3 / 3 — Editor &amp; Hilfe",
+        "<h3>Editor &amp; weiter</h3>"
+        "<ul>"
+        "<li>Ctrl+F2: Zeile favorisieren; Sidebar-Liste; Doppelklick → <b>Label</b></li>"
+        "<li>F1: Tastaturhilfe · Hilfe…: ausführliche Bedienung</li>"
+        "<li>Lokal, ohne Telemetrie — Stubs KI/Cloud/Stylus/3D bewusst ohne Funktion</li>"
+        "</ul>"
+        "<p>Fertig — viel Erfolg mit InstantLens Doc.</p>",
+    ),
+)
+
+
+class GettingStartedWizard(QDialog):
+    """Kurz-Wizard „Erste Schritte“ — drei Seiten."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Erste Schritte")
+        self.resize(480, 340)
+        self._index = 0
+        layout = QVBoxLayout(self)
+        self._title = QLabel()
+        self._title.setStyleSheet("font-weight: 600; font-size: 13px;")
+        layout.addWidget(self._title)
+        self._stack = QStackedWidget()
+        for _caption, html in WIZARD_PAGES:
+            page = QTextBrowser()
+            page.setOpenExternalLinks(False)
+            page.setHtml(html)
+            self._stack.addWidget(page)
+        layout.addWidget(self._stack, 1)
+        nav = QHBoxLayout()
+        self._btn_back = QPushButton("Zurück")
+        self._btn_back.clicked.connect(self._back)
+        self._btn_next = QPushButton("Weiter")
+        self._btn_next.setDefault(True)
+        self._btn_next.clicked.connect(self._next)
+        self._btn_close = QPushButton("Schließen")
+        self._btn_close.clicked.connect(self.accept)
+        nav.addWidget(self._btn_back)
+        nav.addStretch(1)
+        nav.addWidget(self._btn_close)
+        nav.addWidget(self._btn_next)
+        layout.addLayout(nav)
+        self._show_page(0)
+
+    def _show_page(self, index: int):
+        n = len(WIZARD_PAGES)
+        self._index = max(0, min(int(index), n - 1))
+        self._stack.setCurrentIndex(self._index)
+        caption, _html = WIZARD_PAGES[self._index]
+        self._title.setText(caption)
+        self._btn_back.setEnabled(self._index > 0)
+        if self._index >= n - 1:
+            self._btn_next.setText("Fertig")
+        else:
+            self._btn_next.setText("Weiter")
+
+    def _back(self):
+        self._show_page(self._index - 1)
+
+    def _next(self):
+        if self._index >= len(WIZARD_PAGES) - 1:
+            self.accept()
+            return
+        self._show_page(self._index + 1)
 
 
 def open_log_folder(parent=None) -> bool:

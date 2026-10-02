@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **0.5.8** |
+| Version | **0.5.9** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -34,10 +34,10 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)
 
-## Neu in 0.5.8
+## Neu in 0.5.9
 
-- PDF-Favoriten in der Sidebar per Drag umsortieren (Sidecar-Reihenfolge)
-- Annotation-Deckkraft robuster im Sidecar (Force-Save / Clamp)
-- Editor: alle Zeilenfavoriten als Liste in der Sidebar
-- Crash-Report optional mit Screenshot-Pfad-Hinweis
-- Stubs KI/Cloud/Stylus/3D unverändert
+- PDF-Favoriten als JSON exportieren/importieren (`ildfav-v1`)
+- Annotation-Deckkraft per Toolbar-Slider (Auswahl, ohne Dialog)
+- Editor: Zeilenfavoriten-Labels editierbar (Sidebar)
+- Hilfe → Erste Schritte… (Kurz-Wizard, 3 Seiten)
+- Stubs KI/Cloud/Stylus/3D unverändert — letzte 0.5.x vor 0.6.0

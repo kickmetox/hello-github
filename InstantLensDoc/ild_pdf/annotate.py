@@ -17,6 +17,13 @@ SIDECAR_VERSION = 4
 SCHEMA_ID = "ildann-v4"
 # v4: PDF-Highlight-kompatibel (rects/quadPoints + colorRGB/opacity für Interop)
 HISTORY_LIMIT = 40
+# Seiten-Favoriten Export/Import (eigenes JSON, unabhängig vom Sidecar)
+FAV_SCHEMA_ID = "ildfav-v1"
+FAV_VERSION = 1
+
+
+class FavoritesImportError(ValueError):
+    """Ungültiges Favoriten-JSON (Schema/Version/Felder)."""
 
 
 def normalize_tags(value: object) -> list[str]:
@@ -796,6 +803,105 @@ class AnnotationStore:
     def reorder_page_favorites(self, pages: Sequence[int]) -> list[int]:
         """Favoriten-Reihenfolge setzen (Drag in Sidebar); nur bekannte Seiten behalten."""
         return self.set_page_favorites(pages)
+
+    def export_page_favorites_dict(self) -> dict:
+        """Favoriten als exportierbares Dict (Schema ildfav-v1)."""
+        src = ""
+        try:
+            if self.pdf_path is not None:
+                src = Path(self.pdf_path).name
+        except Exception:
+            src = ""
+        return {
+            "version": FAV_VERSION,
+            "schema": FAV_SCHEMA_ID,
+            "page_favorites": self.list_page_favorites(),
+            "source": src,
+        }
+
+    def export_page_favorites_json(self, path: str | Path) -> Path:
+        """Seiten-Favoriten als JSON-Datei schreiben (ildfav-v1)."""
+        dest = Path(path)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        data = self.export_page_favorites_dict()
+        dest.write_text(
+            json.dumps(data, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        return dest
+
+    def import_page_favorites_dict(
+        self,
+        data: dict,
+        *,
+        merge: bool = False,
+        max_page: int | None = None,
+    ) -> list[int]:
+        """
+        Favoriten aus Dict übernehmen.
+        merge=True: bestehende behalten und neue anhängen (Reihenfolge).
+        max_page: optional obere Grenze (exklusiv) zum Filtern ungültiger Indizes.
+        """
+        if not isinstance(data, dict):
+            raise FavoritesImportError("Favoriten-JSON muss ein Objekt sein.")
+        ver = data.get("version")
+        schema = data.get("schema")
+        try:
+            ver_i = int(ver)
+        except (TypeError, ValueError):
+            raise FavoritesImportError(
+                f"Ungültige Version {ver!r} — erwartet {FAV_VERSION} ({FAV_SCHEMA_ID})."
+            ) from None
+        if ver_i != FAV_VERSION:
+            raise FavoritesImportError(
+                f"Inkompatible Version {ver_i} — erwartet {FAV_VERSION} ({FAV_SCHEMA_ID})."
+            )
+        if schema is not None and str(schema) != FAV_SCHEMA_ID:
+            raise FavoritesImportError(
+                f"Inkompatibles Schema „{schema}“ — erwartet „{FAV_SCHEMA_ID}“."
+            )
+        if "page_favorites" not in data:
+            raise FavoritesImportError("Feld „page_favorites“ fehlt.")
+        raw = data.get("page_favorites")
+        if not isinstance(raw, (list, tuple)):
+            raise FavoritesImportError("„page_favorites“ muss eine Liste sein.")
+        incoming: list[int] = []
+        seen: set[int] = set()
+        for item in raw:
+            try:
+                p = int(item)
+            except (TypeError, ValueError):
+                continue
+            if p < 0 or p in seen:
+                continue
+            if max_page is not None and p >= int(max_page):
+                continue
+            seen.add(p)
+            incoming.append(p)
+        if merge:
+            combined = self.list_page_favorites()
+            for p in incoming:
+                if p not in combined:
+                    combined.append(p)
+            return self.set_page_favorites(combined)
+        return self.set_page_favorites(incoming)
+
+    def import_page_favorites_json(
+        self,
+        path: str | Path,
+        *,
+        merge: bool = False,
+        max_page: int | None = None,
+    ) -> list[int]:
+        """Favoriten aus JSON-Datei laden (ersetzt oder merge)."""
+        src = Path(path)
+        try:
+            data = json.loads(src.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as e:
+            raise FavoritesImportError(f"Ungültiges JSON: {e}") from e
+        except OSError as e:
+            raise FavoritesImportError(str(e)) from e
+        return self.import_page_favorites_dict(data, merge=merge, max_page=max_page)
 
     def toggle_page_favorite(self, page: int) -> bool:
         """

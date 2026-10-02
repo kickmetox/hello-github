@@ -1,5 +1,23 @@
 # Changelog — InstantLens Doc
 
+## 0.5.9 — Favoriten JSON Export/Import, Opacity-Toolbar-Slider, Zeilenfavoriten-Labels, Erste-Schritte-Wizard
+
+Nach 0.5.8: vier sinnvolle Ausbauten. Stubs KI/Cloud/Stylus/3D bleiben Stubs. **Letzte 0.5.x vor 0.6.0.**
+
+### PDF / Annotationen
+- **PDF-Favoriten Export/Import JSON**: Schema `ildfav-v1`; PDF-Menü; ersetzen oder zusammenführen
+- **Annotation-Opacity Toolbar-Slider**: QSlider neben α — Deckkraft der Auswahl ohne Dialog
+
+### Editor / Hilfe
+- **Zeilenfavoriten-Labels**: editierbare Namen in der Sidebar (Doppelklick / Rechtsklick)
+- **Erste Schritte**: Kurz-Wizard mit 3 Seiten (Hilfe → Erste Schritte…)
+
+### Packaging / Docs
+- Version **0.5.9** (App / ild_pdf / ISS / Smoke / Docs)
+- Stubs KI/Cloud/Stylus/3D unverändert
+
+---
+
 ## 0.5.8 — PDF-Favoriten Drag-Reorder, Opacity Sidecar-Force, Zeilenfavoriten-Liste, Crash-Screenshot-Hinweis
 
 Nach 0.5.7: vier sinnvolle Ausbauten. Stubs KI/Cloud/Stylus/3D bleiben Stubs.

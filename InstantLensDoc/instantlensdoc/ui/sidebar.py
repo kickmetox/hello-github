@@ -200,6 +200,7 @@ class Sidebar(QWidget):
     page_favorite_activated = Signal(int)  # PDF-Seite 0-basiert (Favoriten-Liste)
     page_favorites_reordered = Signal(list)  # Seiten 0-basiert neue Reihenfolge
     line_favorite_activated = Signal(int)  # Editor-Zeile 1-basiert
+    line_favorite_label_edit = Signal(int)  # Editor-Zeile 1-basiert → Label bearbeiten
     pages_reordered = Signal(list)  # alte Indizes in neuer Reihenfolge
 
     def __init__(self, parent=None):
@@ -282,10 +283,12 @@ class Sidebar(QWidget):
         self.line_favorites = QListWidget()
         self.line_favorites.setMaximumHeight(100)
         self.line_favorites.setToolTip(
-            "Alle Zeilen-Lesezeichen — Klick springt zur Zeile (Ctrl+F2 / F2)"
+            "Zeilen-Lesezeichen — Klick springt; Doppelklick / Rechtsklick → Label bearbeiten"
         )
+        self.line_favorites.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.line_favorites.customContextMenuRequested.connect(self._line_fav_context_menu)
         self.line_favorites.itemClicked.connect(self._activate_line_favorite)
-        self.line_favorites.itemDoubleClicked.connect(self._activate_line_favorite)
+        self.line_favorites.itemDoubleClicked.connect(self._edit_line_favorite_label)
         layout.addWidget(self.line_favorites)
 
         layout.addWidget(QLabel("Annotationen (gruppiert nach Seite)"))
@@ -499,24 +502,75 @@ class Sidebar(QWidget):
             except (TypeError, ValueError):
                 pass
 
-    def set_line_favorites(self, lines: list[int] | None, *, current: int | None = None):
-        """Alle Editor-Zeilenfavoriten als nummerierte Liste (1-basierte Zeilen)."""
+    def _edit_line_favorite_label(self, item: QListWidgetItem):
+        if item is None or not (item.flags() & Qt.ItemIsEnabled):
+            return
+        line = item.data(Qt.UserRole)
+        if line is None:
+            line = item.data(256)
+        if line is None:
+            return
+        try:
+            self.line_favorite_label_edit.emit(int(line))
+        except (TypeError, ValueError):
+            pass
+
+    def _line_fav_context_menu(self, pos):
+        item = self.line_favorites.itemAt(pos)
+        if item is None or not (item.flags() & Qt.ItemIsEnabled):
+            return
+        menu = QMenu(self)
+        act = menu.addAction("Label bearbeiten…")
+        chosen = menu.exec(self.line_favorites.mapToGlobal(pos))
+        if chosen is act:
+            self._edit_line_favorite_label(item)
+
+    def set_line_favorites(
+        self,
+        lines: list[int] | list[tuple[int, str]] | None,
+        *,
+        current: int | None = None,
+        labels: list[str] | None = None,
+    ):
+        """
+        Alle Editor-Zeilenfavoriten als nummerierte Liste (1-basierte Zeilen).
+        lines: [Zeile, …] oder [(Zeile, Label), …]; labels optional parallel.
+        """
         self.line_favorites.clear()
-        lines = list(lines or [])
-        for i, ln in enumerate(lines):
-            try:
-                line = int(ln)
-            except (TypeError, ValueError):
-                continue
+        entries: list[tuple[int, str]] = []
+        for i, ln in enumerate(list(lines or [])):
+            label = ""
+            if isinstance(ln, (tuple, list)) and len(ln) >= 1:
+                try:
+                    line = int(ln[0])
+                except (TypeError, ValueError):
+                    continue
+                if len(ln) >= 2 and ln[1]:
+                    label = str(ln[1]).strip()
+            else:
+                try:
+                    line = int(ln)
+                except (TypeError, ValueError):
+                    continue
             if line < 1:
                 continue
+            if not label and labels is not None and i < len(labels) and labels[i]:
+                label = str(labels[i]).strip()
+            entries.append((line, label))
+        for i, (line, label) in enumerate(entries):
             text = f"{i + 1}. Zeile {line}"
+            if label:
+                text = f"{text} — {label}"
             item = QListWidgetItem(text)
             item.setData(Qt.UserRole, line)
             item.setData(256, line)
-            item.setToolTip(f"Zeilenfavorit #{i + 1} → Zeile {line}")
+            tip = f"Zeilenfavorit #{i + 1} → Zeile {line}"
+            if label:
+                tip = f"{tip} ({label})"
+            tip += " — Doppelklick/Rechtsklick: Label"
+            item.setToolTip(tip)
             self.line_favorites.addItem(item)
-        if not lines:
+        if not entries:
             empty = QListWidgetItem("(keine — Ctrl+F2)")
             empty.setFlags(Qt.NoItemFlags)
             self.line_favorites.addItem(empty)

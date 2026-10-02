@@ -75,9 +75,11 @@ SHORTCUTS_HTML = """
 <tr><td>Seite als Favorit umschalten</td><td><code>Ctrl+Shift+F</code> / Toolbar ★</td></tr>
 <tr><td>Seiten-Favoriten springen</td><td><code>Ctrl+Alt+F</code> / Toolbar ★… / Sidebar-Liste</td></tr>
 <tr><td>Auswahl-Farbe ändern (Batch)</td><td><code>Ctrl+Alt+Shift+F</code></td></tr>
-<tr><td>Auswahl-Deckkraft ändern (Batch)</td><td><code>Ctrl+Alt+Shift+O</code> / Toolbar α…</td></tr>
+<tr><td>Auswahl-Deckkraft ändern</td><td><code>Ctrl+Alt+Shift+O</code> / Toolbar α-Slider / α…</td></tr>
 <tr><td>Zeile favorisieren (Editor)</td><td><code>Ctrl+F2</code> / Klick Zeilennummer</td></tr>
+<tr><td>Zeilenfavorit-Label</td><td>Sidebar Doppelklick / Rechtsklick</td></tr>
 <tr><td>Nächstes / vorheriges Zeilen-Lesezeichen</td><td><code>F2</code> / <code>Shift+F2</code></td></tr>
+<tr><td>Erste Schritte (Wizard)</td><td>Hilfe → Erste Schritte…</td></tr>
 <tr><td>Rechtschreibung prüfen</td><td><code>F7</code></td></tr>
 <tr><td>Diese Hilfe</td><td><code>F1</code></td></tr>
 <tr><td>Cheat-Sheet als PDF</td><td>F1 → „Als PDF exportieren…“</td></tr>
@@ -91,10 +93,11 @@ PDF → Annotationen speichern unter…</p>
 aktuelles Dokument bleibt geöffnet (<code>Ctrl+Alt+S</code> / Datei / PDF).</p>
 <p><b>Lesezeichen:</b> Sidebar +/− oder PDF → Lesezeichen hinzufügen/löschen.</p>
 <p><b>PDF-Favoriten:</b> Sidebar-Liste mit Nummern (1. Seite N …); <b>ziehen zum Umsortieren</b>; ★ / Ctrl+Shift+F markiert;
-Ctrl+Alt+F Dialog; Sidecar-Meta <code>page_favorites</code> (Reihenfolge).</p>
-<p><b>Editor-Zeilenfavoriten:</b> Marker in der Zeilennummernleiste; <b>Sidebar-Liste aller Zeilen</b>; Ctrl+F2 umschalten;
-F2 / Shift+F2 springen.</p>
-<p><b>Auswahl-Deckkraft Batch:</b> Annotation(en) auswählen → Ctrl+Alt+Shift+O oder Toolbar „α…“ (Sidecar force-save).</p>
+Ctrl+Alt+F Dialog; Sidecar-Meta <code>page_favorites</code>; <b>JSON Export/Import</b> (ildfav-v1).</p>
+<p><b>Editor-Zeilenfavoriten:</b> Marker in der Zeilennummernleiste; <b>Sidebar-Liste</b>; Labels per Doppelklick/Rechtsklick;
+Ctrl+F2 umschalten; F2 / Shift+F2 springen.</p>
+<p><b>Auswahl-Deckkraft:</b> Annotation(en) auswählen → <b>Toolbar-Slider</b> oder Ctrl+Alt+Shift+O / „α…“.</p>
+<p><b>Erste Schritte:</b> Hilfe → Erste Schritte… (Kurz-Wizard, 3 Seiten).</p>
 <p><b>Crash-Report:</b> Hilfe → Crash-Report erstellen… (Logordner als ZIP; optional Screenshot-Pfad-Hinweis).</p>
 <p><b>Annotationen JSON/CSV/Bericht:</b> PDF → als JSON oder CSV exportieren / JSON importieren;
 <strong>Kommentar-Bericht</strong> als zusammenhängendes TXT oder Markdown (nach Seite gruppiert).</p>
@@ -147,10 +150,13 @@ Export CSV/Bericht enthält Tags und Gruppen.</p>
 <p><b>Encoding Auto:</b> Einstellungen → Editor-Encoding „Automatisch“ (BOM; optional chardet).</p>
 <p><b>Quiet Startup:</b> Einstellungen → Splash beim Start überspringen.</p>
 <p><b>Seiten-Favoriten:</b> PDF → ★ / Ctrl+Shift+F markiert die aktuelle Seite; Ctrl+Alt+F springt zu Favoriten
-(gespeichert in Sidecar-Meta <code>page_favorites</code>); <b>Sidebar-Liste mit Nummern</b>; <b>ziehen zum Umsortieren</b>.</p>
+(gespeichert in Sidecar-Meta <code>page_favorites</code>); <b>Sidebar-Liste mit Nummern</b>; <b>ziehen zum Umsortieren</b>;
+<b>JSON Export/Import</b>.</p>
 <p><b>Auswahl-Farbe Batch:</b> Annotation(en) auswählen → Ctrl+Alt+Shift+F oder Bearbeiten → Auswahl-Farbe ändern…</p>
-<p><b>Auswahl-Deckkraft Batch:</b> Annotation(en) auswählen → Ctrl+Alt+Shift+O / Toolbar α… (Sidecar force-save).</p>
-<p><b>Editor-Zeilenfavoriten:</b> Ctrl+F2 oder Klick auf Zeilennummer; F2 / Shift+F2 springen; <b>Sidebar-Liste</b>.</p>
+<p><b>Auswahl-Deckkraft:</b> Annotation(en) auswählen → <b>Toolbar-Slider</b> / Ctrl+Alt+Shift+O / α… (Sidecar force-save).</p>
+<p><b>Editor-Zeilenfavoriten:</b> Ctrl+F2 oder Klick auf Zeilennummer; F2 / Shift+F2 springen; <b>Sidebar-Liste</b>;
+Labels editierbar (Doppelklick/Rechtsklick).</p>
+<p><b>Erste Schritte:</b> Hilfe → Erste Schritte… (Kurz-Wizard, 3 Seiten).</p>
 <p><b>Rechtschreibung:</b> Einstellungen → Rechtschreibwörterbuch (Wortliste) → F7 prüft ohne Spell-Lib;
 About: Datenschutz-Hinweis (lokal, keine Telemetrie).</p>
 <p><b>Startup-Deps:</b> beim Start Prüfung pypdfium2 / Tesseract; Dialog wenn etwas fehlt.</p>

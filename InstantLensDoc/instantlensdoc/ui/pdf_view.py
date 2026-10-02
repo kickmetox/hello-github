@@ -35,6 +35,7 @@ from PySide6.QtWidgets import (
     QPlainTextEdit,
     QPushButton,
     QScrollArea,
+    QSlider,
     QToolButton,
     QVBoxLayout,
     QWidget,
@@ -1130,8 +1131,21 @@ class PdfViewer(QWidget):
         self.spin_opacity.setValue(self._default_opacity)
         self.spin_opacity.setPrefix("α ")
         self.spin_opacity.setFixedWidth(78)
-        self.spin_opacity.setToolTip("Standard-Deckkraft neuer Annotationen")
+        self.spin_opacity.setToolTip(
+            "Deckkraft: Standard für neue Annotationen; bei Auswahl → ausgewählte Ann."
+        )
         self.spin_opacity.valueChanged.connect(self._on_default_opacity_changed)
+        # Toolbar-Slider (0.05–1.0 als 5–100 %) — nicht nur Dialog α…
+        self.slider_opacity = QSlider(Qt.Horizontal)
+        self.slider_opacity.setRange(5, 100)
+        self.slider_opacity.setSingleStep(5)
+        self.slider_opacity.setPageStep(10)
+        self.slider_opacity.setFixedWidth(88)
+        self.slider_opacity.setValue(int(round(self._default_opacity * 100)))
+        self.slider_opacity.setToolTip(
+            "Annotation-Deckkraft per Slider (Auswahl oder Standard) — ohne Dialog"
+        )
+        self.slider_opacity.valueChanged.connect(self._on_opacity_slider_changed)
         self.btn_grayscale = QToolButton()
         self.btn_grayscale.setText("Grau")
         self.btn_grayscale.setCheckable(True)
@@ -1210,6 +1224,7 @@ class PdfViewer(QWidget):
             toolbar.addWidget(pb)
         self._refresh_preset_btns()
         toolbar.addWidget(self.spin_opacity)
+        toolbar.addWidget(self.slider_opacity)
         toolbar.addWidget(self.btn_grayscale)
         toolbar.addWidget(self.btn_night)
         toolbar.addWidget(self.btn_spread)
@@ -1262,6 +1277,7 @@ class PdfViewer(QWidget):
                 self.btn_note_color,
                 *self._preset_btns,
                 self.spin_opacity,
+                self.slider_opacity,
             ],
             "view": [
                 self.btn_grayscale,
@@ -1487,19 +1503,51 @@ class PdfViewer(QWidget):
         self.status.emit(f"Farbe random: {color}")
         return color
 
-    def _on_default_opacity_changed(self, value: float):
+    def _sync_opacity_controls(self, value: float, *, from_slider: bool = False):
+        """Spin und Slider ohne Feedback-Schleife synchronisieren."""
+        op = max(0.05, min(1.0, float(value)))
+        if hasattr(self, "spin_opacity") and not from_slider:
+            self.spin_opacity.blockSignals(True)
+            self.spin_opacity.setValue(op)
+            self.spin_opacity.blockSignals(False)
+        if hasattr(self, "slider_opacity"):
+            self.slider_opacity.blockSignals(True)
+            self.slider_opacity.setValue(int(round(op * 100)))
+            self.slider_opacity.blockSignals(False)
+        if from_slider and hasattr(self, "spin_opacity"):
+            self.spin_opacity.blockSignals(True)
+            self.spin_opacity.setValue(op)
+            self.spin_opacity.blockSignals(False)
+
+    def _apply_toolbar_opacity(self, value: float) -> None:
+        """Standard-Deckkraft setzen; bei Auswahl alle ausgewählten Ann. aktualisieren."""
         self._default_opacity = max(0.05, min(1.0, float(value)))
         set_ann_default_opacity(self._default_opacity)
-        if self.store and self._selected_ann_id:
-            ann = self.store.get(self._selected_ann_id)
-            if ann is not None:
-                self.store.update(self._selected_ann_id, opacity=self._default_opacity)
+        ids = list(self._selected_ann_ids) if self._selected_ann_ids else (
+            [self._selected_ann_id] if self._selected_ann_id else []
+        )
+        ids = [i for i in ids if i]
+        if self.store and ids:
+            n = self.store.set_opacities(ids, self._default_opacity)
+            if n > 0:
                 try:
-                    self.store.save()
+                    self.store.save(force=True)
                 except Exception:
                     pass
                 self.refresh()
                 self.annotations_changed.emit()
+                self.status.emit(
+                    f"Deckkraft {self._default_opacity:.2f} für {n} Annotation(en)"
+                )
+
+    def _on_default_opacity_changed(self, value: float):
+        self._sync_opacity_controls(value, from_slider=False)
+        self._apply_toolbar_opacity(value)
+
+    def _on_opacity_slider_changed(self, percent: int):
+        value = max(0.05, min(1.0, float(percent) / 100.0))
+        self._sync_opacity_controls(value, from_slider=True)
+        self._apply_toolbar_opacity(value)
 
     def set_grayscale(self, enabled: bool):
         enabled = bool(enabled)
@@ -1898,10 +1946,7 @@ class PdfViewer(QWidget):
             self._style_color_btn(self.btn_note_color, self._note_color)
         self._refresh_preset_btns()
         self._default_opacity = get_ann_default_opacity()
-        if hasattr(self, "spin_opacity"):
-            self.spin_opacity.blockSignals(True)
-            self.spin_opacity.setValue(self._default_opacity)
-            self.spin_opacity.blockSignals(False)
+        self._sync_opacity_controls(self._default_opacity)
         self._grayscale = get_pdf_grayscale()
         if hasattr(self, "btn_grayscale"):
             self.btn_grayscale.blockSignals(True)
@@ -2013,6 +2058,11 @@ class PdfViewer(QWidget):
         if self._selected_ann_id and self.store:
             ann = self.store.get(self._selected_ann_id)
             if ann:
+                try:
+                    op = float(getattr(ann, "opacity", self._default_opacity) or self._default_opacity)
+                except (TypeError, ValueError):
+                    op = self._default_opacity
+                self._sync_opacity_controls(op)
                 self.status.emit(f"Auswahl: {ann.type.value} (S. {ann.page + 1})")
             else:
                 self.status.emit("Auswahl aufgehoben")
@@ -3099,6 +3149,84 @@ class PdfViewer(QWidget):
         self.page_favorites_changed.emit()
         self.status.emit(f"Favoriten umsortiert ({len(cleaned)})")
         return cleaned
+
+    def export_page_favorites_json(self) -> bool:
+        """Seiten-Favoriten als JSON (ildfav-v1) exportieren."""
+        if not self.store or not self.pdf_path:
+            QMessageBox.information(self, "Favoriten", "Kein PDF geladen.")
+            return False
+        from PySide6.QtWidgets import QFileDialog
+        from instantlensdoc.ui.file_dialogs import confirm_overwrite_export
+
+        default = str(self.pdf_path.with_suffix(self.pdf_path.suffix + ".favorites.json"))
+        path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Seiten-Favoriten als JSON exportieren",
+            default,
+            "Favoriten JSON (*.favorites.json *.json);;Alle (*.*)",
+        )
+        if not path:
+            return False
+        dest = Path(path)
+        if dest.suffix.lower() != ".json":
+            dest = dest.with_suffix(".json")
+        if not confirm_overwrite_export(dest, self):
+            return False
+        try:
+            saved = self.store.export_page_favorites_json(dest)
+            n = len(self.store.list_page_favorites())
+            self.status.emit(f"Favoriten exportiert: {saved.name} ({n})")
+            return True
+        except Exception as e:
+            QMessageBox.warning(self, "Favoriten exportieren", str(e))
+            return False
+
+    def import_page_favorites_json(self) -> bool:
+        """Seiten-Favoriten aus JSON importieren (ersetzen oder zusammenführen)."""
+        if not self.store or not self.pdf_path:
+            QMessageBox.information(self, "Favoriten", "Kein PDF geladen.")
+            return False
+        from PySide6.QtWidgets import QFileDialog
+        from ild_pdf import FavoritesImportError
+
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Seiten-Favoriten aus JSON importieren",
+            str(self.pdf_path.parent),
+            "Favoriten JSON (*.favorites.json *.json);;Alle (*.*)",
+        )
+        if not path:
+            return False
+        merge = False
+        reply = QMessageBox.question(
+            self,
+            "Favoriten importieren",
+            "Bestehende Favoriten behalten und neue anhängen?\n\n"
+            "Ja = zusammenführen · Nein = ersetzen · Abbrechen = abbrechen",
+            QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel,
+            QMessageBox.Yes,
+        )
+        if reply == QMessageBox.Cancel:
+            return False
+        merge = reply == QMessageBox.Yes
+        try:
+            favs = self.store.import_page_favorites_json(
+                path,
+                merge=merge,
+                max_page=int(self.page_count or 0) or None,
+            )
+            self.store.save(force=True)
+        except FavoritesImportError as e:
+            QMessageBox.warning(self, "Favoriten importieren", str(e))
+            return False
+        except Exception as e:
+            QMessageBox.warning(self, "Favoriten importieren", str(e))
+            return False
+        self._refresh_fav_btn()
+        self.page_favorites_changed.emit()
+        mode = "zusammengeführt" if merge else "ersetzt"
+        self.status.emit(f"Favoriten {mode}: {len(favs)} Seite(n)")
+        return True
 
     def undo_page_op(self) -> bool:
         """Letzte Seiten-Operation (Löschen oder Drehen) rückgängig."""

@@ -12,6 +12,9 @@ from .annotate import (
     AnnotationStore,
     AnnotationType,
     DRAG_TYPES,
+    FAV_SCHEMA_ID,
+    FAV_VERSION,
+    FavoritesImportError,
     SCHEMA_ID,
     SIDECAR_VERSION,
     normalize_tags,
@@ -105,6 +108,9 @@ __all__ = [
     "AnnotationType",
     "validate_annotation_import_data",
     "DRAG_TYPES",
+    "FAV_SCHEMA_ID",
+    "FAV_VERSION",
+    "FavoritesImportError",
     "SCHEMA_ID",
     "SIDECAR_VERSION",
     "normalize_tags",
@@ -192,4 +198,4 @@ __all__ = [
     "uri_link_at",
 ]
 
-__version__ = "0.5.8"
+__version__ = "0.5.9"
