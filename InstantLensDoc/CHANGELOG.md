@@ -1,5 +1,22 @@
 # Changelog — InstantLens Doc
 
+## 0.3.2 — Anhänge, Ann.-Layer, MD-Preview, Ordner
+
+Fokus auf sinnvolle Ausbauten nach 0.3.1. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### PDF
+- **Anhänge** auflisten/extrahieren wenn vorhanden (PDF → Anhänge…; `ild_pdf.attachments`)
+- **Annotation-Layer** ein-/ausblenden (Ansicht + Toolbar „Ann.“; Ctrl+Shift+A)
+
+### Editor / UX
+- **Markdown-Vorschau** optional als Split (Ansicht → Markdown-Vorschau; Ctrl+Shift+M)
+- **Zuletzt verwendete Ordner** in Datei-Dialogen merken (`recent_dirs` in Settings)
+
+### Packaging / Docs
+- Version **0.3.2** (App, `ild_pdf`, ISS, Smoke, INFO/FEATURES/README)
+
+---
+
 ## 0.3.1 — Formulare, Stempel, Close, Thumbs
 
 Fokus auf sinnvolle Ausbauten nach dem 0.3.0-Meilenstein. Stubs KI/Cloud/Stylus/3D bleiben Stubs.

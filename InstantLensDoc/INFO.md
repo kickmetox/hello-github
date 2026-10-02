@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | 0.3.1 |
+| Version | 0.3.2 |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -32,9 +32,10 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)
 
-## Neu in 0.3.1
+## Neu in 0.3.2
 
-- AcroForm-Formularfelder lesen/schreiben (PDF-Menü)
-- Stempel-Bibliothek GENEHMIGT/ENTWURF/VERTRAULICH + Datum
-- Tab schließen mit Speichern-Dialog (dirty); Thumbnail-Lazy-Load
+- PDF-Anhänge auflisten/extrahieren (wenn vorhanden)
+- Annotation-Layer ein-/ausblenden
+- Editor: Markdown-Vorschau Split (optional)
+- Zuletzt verwendete Ordner in Datei-Dialogen
 - Stubs KI/Cloud/Stylus/3D unverändert

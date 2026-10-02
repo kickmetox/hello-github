@@ -401,3 +401,55 @@ class RichPreview(QTextEdit):
         super().__init__(parent)
         self.setReadOnly(False)
         self.setAcceptRichText(True)
+
+
+class EditorPane(QWidget):
+    """Texteditor mit optionaler Markdown-Vorschau (Split)."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        from PySide6.QtWidgets import QSplitter, QTextBrowser, QVBoxLayout
+
+        from instantlensdoc.core.app_settings import get_editor_markdown_preview
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        self.splitter = QSplitter(Qt.Horizontal)
+        self.editor = TextEditor()
+        self.preview = QTextBrowser()
+        self.preview.setOpenExternalLinks(True)
+        self.preview.setPlaceholderText("Markdown-Vorschau…")
+        font = QFont("Georgia", 11)
+        font.setStyleHint(QFont.Serif)
+        self.preview.setFont(font)
+        self.splitter.addWidget(self.editor)
+        self.splitter.addWidget(self.preview)
+        self.splitter.setStretchFactor(0, 3)
+        self.splitter.setStretchFactor(1, 2)
+        layout.addWidget(self.splitter)
+        self._preview_visible = bool(get_editor_markdown_preview())
+        self.preview.setVisible(self._preview_visible)
+        self.editor.textChanged.connect(self._sync_preview)
+        self._sync_preview()
+
+    def set_preview_visible(self, visible: bool) -> None:
+        from instantlensdoc.core.app_settings import set_editor_markdown_preview
+
+        self._preview_visible = bool(visible)
+        self.preview.setVisible(self._preview_visible)
+        set_editor_markdown_preview(self._preview_visible)
+        if self._preview_visible:
+            self._sync_preview()
+
+    def preview_visible(self) -> bool:
+        return bool(self._preview_visible)
+
+    def _sync_preview(self) -> None:
+        if not self._preview_visible:
+            return
+        text = self.editor.toPlainText()
+        try:
+            # Qt Markdown (CommonMark-ähnlich)
+            self.preview.setMarkdown(text)
+        except Exception:
+            self.preview.setPlainText(text)

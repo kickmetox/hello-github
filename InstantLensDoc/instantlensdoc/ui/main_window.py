@@ -26,8 +26,9 @@ from instantlensdoc.core.layout import LayoutDocument
 from instantlensdoc.core import recent as recent_mod
 from instantlensdoc.core import recent_searches as recent_searches_mod
 from instantlensdoc.license import LicenseManager
-from instantlensdoc.ui.editor import TextEditor
+from instantlensdoc.ui.editor import EditorPane
 from instantlensdoc.ui.form_builder import FormBuilderDialog
+from instantlensdoc.ui.attachments_dialog import AttachmentsDialog
 from instantlensdoc.ui.help_dialog import AboutDialog, HelpDialog
 from instantlensdoc.ui.license_dialog import LicenseDialog
 from instantlensdoc.ui.ocr_dialog import OcrDialog
@@ -35,10 +36,14 @@ from instantlensdoc.ui.pdf_view import PdfViewer
 from instantlensdoc.ui.sidebar import Sidebar
 from instantlensdoc.core import fulltext as fulltext_mod
 from instantlensdoc.core.app_settings import (
+    dialog_start_dir,
+    get_annotations_visible,
     get_autosave_interval_sec,
     get_default_open_dir,
+    get_editor_markdown_preview,
     get_last_export_dir,
     get_update_check_on_start,
+    remember_recent_dir,
     set_last_export_dir,
 )
 from instantlensdoc.ui.batch_dialog import BatchConvertDialog
@@ -200,7 +205,8 @@ class MainWindow(QMainWindow):
         splitter.addWidget(self.sidebar)
 
         self.stack = QStackedWidget()
-        self.editor = TextEditor()
+        self.editor_pane = EditorPane()
+        self.editor = self.editor_pane.editor
         self.editor.textChanged.connect(self._on_text_changed)
         self.pdf_view = PdfViewer()
         self.pdf_view.status.connect(self._set_status)
@@ -210,9 +216,10 @@ class MainWindow(QMainWindow):
         self.pdf_view.document_changed.connect(self._on_pdf_document_changed)
         self.pdf_view.grayscale_changed.connect(self._sync_grayscale_action)
         self.pdf_view.night_mode_changed.connect(self._sync_night_action)
+        self.pdf_view.annotations_layer_changed.connect(self._sync_ann_layer_action)
         self.image_label = QLabel(alignment=Qt.AlignCenter)
         self.image_label.setText("Bildvorschau")
-        self.stack.addWidget(self.editor)  # 0
+        self.stack.addWidget(self.editor_pane)  # 0
         self.stack.addWidget(self.pdf_view)  # 1
         self.stack.addWidget(self.image_label)  # 2
         splitter.addWidget(self.stack)
@@ -391,6 +398,13 @@ class MainWindow(QMainWindow):
         self._line_numbers_action.setToolTip("Zeilennummern im Texteditor anzeigen")
         self._line_numbers_action.toggled.connect(self._toggle_line_numbers)
         m_view.addAction(self._line_numbers_action)
+        self._md_preview_action = QAction("Markdown-Vorschau", self)
+        self._md_preview_action.setCheckable(True)
+        self._md_preview_action.setChecked(get_editor_markdown_preview())
+        self._md_preview_action.setToolTip("Editor-Split: Markdown-Vorschau ein/aus")
+        self._md_preview_action.setShortcut(QKeySequence("Ctrl+Shift+M"))
+        self._md_preview_action.toggled.connect(self._toggle_markdown_preview)
+        m_view.addAction(self._md_preview_action)
         self._grayscale_action = QAction("PDF Graustufen", self)
         self._grayscale_action.setCheckable(True)
         self._grayscale_action.setChecked(get_pdf_grayscale())
@@ -405,6 +419,13 @@ class MainWindow(QMainWindow):
         )
         self._night_action.toggled.connect(self._toggle_night_mode)
         m_view.addAction(self._night_action)
+        self._ann_layer_action = QAction("Annotation-Layer", self)
+        self._ann_layer_action.setCheckable(True)
+        self._ann_layer_action.setChecked(get_annotations_visible())
+        self._ann_layer_action.setToolTip("Annotationen auf der PDF-Seite ein-/ausblenden")
+        self._ann_layer_action.setShortcut(QKeySequence("Ctrl+Shift+A"))
+        self._ann_layer_action.toggled.connect(self._toggle_ann_layer)
+        m_view.addAction(self._ann_layer_action)
         m_view.addSeparator()
         act_zi = QAction("Vergrößern", self)
         act_zi.setShortcut(QKeySequence.ZoomIn)
@@ -460,6 +481,10 @@ class MainWindow(QMainWindow):
         act_forms.setToolTip("Bestehende AcroForm-Felder lesen und schreiben")
         act_forms.triggered.connect(self._edit_pdf_form_fields)
         m_pdf.addAction(act_forms)
+        act_attach = QAction("Anhänge…", self)
+        act_attach.setToolTip("Eingebettete PDF-Anhänge auflisten und extrahieren")
+        act_attach.triggered.connect(self._pdf_attachments)
+        m_pdf.addAction(act_attach)
         act_psize = QAction("Seitengröße / Zuschneiden…", self)
         act_psize.triggered.connect(self._pdf_page_size)
         m_pdf.addAction(act_psize)
@@ -641,7 +666,7 @@ class MainWindow(QMainWindow):
             page_txt = f"Seite {self.pdf_view.page_index + 1}/{self.pdf_view.page_count}"
             zoom_txt = f"{int(round(self.pdf_view.scale * 100))} %"
             word_txt = f"{len(self.pdf_view.store.annotations) if self.pdf_view.store else 0} Ann."
-        elif self.stack.currentWidget() is self.editor:
+        elif self.stack.currentWidget() is self.editor_pane:
             page_txt = "Editor"
             zoom_txt = "—"
             words, chars = self.editor.word_stats()
@@ -684,6 +709,10 @@ class MainWindow(QMainWindow):
         self.editor.set_line_numbers_visible(bool(checked))
         self._set_status("Zeilennummern an" if checked else "Zeilennummern aus")
 
+    def _toggle_markdown_preview(self, checked: bool):
+        self.editor_pane.set_preview_visible(bool(checked))
+        self._set_status("Markdown-Vorschau an" if checked else "Markdown-Vorschau aus")
+
     def _toggle_grayscale(self, checked: bool):
         self.pdf_view.set_grayscale(bool(checked))
         self._sync_grayscale_action(bool(checked))
@@ -691,6 +720,10 @@ class MainWindow(QMainWindow):
     def _toggle_night_mode(self, checked: bool):
         self.pdf_view.set_night_mode(bool(checked))
         self._sync_night_action(bool(checked))
+
+    def _toggle_ann_layer(self, checked: bool):
+        self.pdf_view.set_annotations_visible(bool(checked))
+        self._sync_ann_layer_action(bool(checked))
 
     def _sync_grayscale_action(self, enabled: bool):
         if hasattr(self, "_grayscale_action") and self._grayscale_action is not None:
@@ -704,8 +737,14 @@ class MainWindow(QMainWindow):
             self._night_action.setChecked(bool(enabled))
             self._night_action.blockSignals(False)
 
+    def _sync_ann_layer_action(self, enabled: bool):
+        if hasattr(self, "_ann_layer_action") and self._ann_layer_action is not None:
+            self._ann_layer_action.blockSignals(True)
+            self._ann_layer_action.setChecked(bool(enabled))
+            self._ann_layer_action.blockSignals(False)
+
     def _toggle_case_selection(self):
-        if self.stack.currentWidget() is not self.editor:
+        if self.stack.currentWidget() is not self.editor_pane:
             self._set_status("Groß-/Kleinschreibung nur im Texteditor")
             return
         if self.editor.toggle_case_selection():
@@ -714,7 +753,7 @@ class MainWindow(QMainWindow):
             self._set_status("Keine Textauswahl")
 
     def _indent_selection(self):
-        if self.stack.currentWidget() is not self.editor:
+        if self.stack.currentWidget() is not self.editor_pane:
             self._set_status("Einrückung nur im Texteditor")
             return
         if self.editor.indent_selection():
@@ -723,7 +762,7 @@ class MainWindow(QMainWindow):
             self._set_status("Einrückung nicht möglich")
 
     def _outdent_selection(self):
-        if self.stack.currentWidget() is not self.editor:
+        if self.stack.currentWidget() is not self.editor_pane:
             self._set_status("Einrückung nur im Texteditor")
             return
         if self.editor.outdent_selection():
@@ -846,7 +885,7 @@ class MainWindow(QMainWindow):
         if self.doc and self.doc.kind in (DocKind.TEXT, DocKind.MARKDOWN, DocKind.HTML, DocKind.DOCX):
             self.doc.text = self.editor.toPlainText()
             self.doc.dirty = True
-        if self.stack.currentWidget() is self.editor:
+        if self.stack.currentWidget() is self.editor_pane:
             words, chars = self.editor.word_stats()
             self.word_status_label.setText(f"{words} Wörter · {chars} Z.")
 
@@ -870,7 +909,7 @@ class MainWindow(QMainWindow):
             self.sidebar.search.setFocus()
 
     def _find_replace(self):
-        if self.stack.currentWidget() is not self.editor:
+        if self.stack.currentWidget() is not self.editor_pane:
             QMessageBox.information(
                 self,
                 "Suchen und Ersetzen",
@@ -936,7 +975,7 @@ class MainWindow(QMainWindow):
             if self.stack.currentWidget() is self.pdf_view:
                 self.pdf_view.print_current_page()
                 return
-            if self.stack.currentWidget() is self.editor:
+            if self.stack.currentWidget() is self.editor_pane:
                 from PySide6.QtPrintSupport import QPrintDialog, QPrinter
 
                 printer = QPrinter(QPrinter.HighResolution)
@@ -981,7 +1020,7 @@ class MainWindow(QMainWindow):
             self.sidebar.set_marks(lines, payloads)
             self._set_status(f"{len(hits)} Treffer in {len(paths)} Dokument(en)")
             return
-        if self.stack.currentWidget() is self.editor:
+        if self.stack.currentWidget() is self.editor_pane:
             n = self.editor.find_and_highlight(query)
             self._set_status(f"{n} Treffer für „{query}“")
             lines = [f"Suche: {query} → {n} Treffer"] + self._editor_marks
@@ -1037,7 +1076,7 @@ class MainWindow(QMainWindow):
 
     def _on_search_next(self):
         q = self.sidebar.search_text()
-        if self.stack.currentWidget() is self.editor:
+        if self.stack.currentWidget() is self.editor_pane:
             if self.editor.find_next(q or None):
                 self._set_status("Nächster Treffer")
             else:
@@ -1064,7 +1103,7 @@ class MainWindow(QMainWindow):
         self._set_status("Suche: Editor oder PDF öffnen")
 
     def _mark_selection(self):
-        if self.stack.currentWidget() is not self.editor:
+        if self.stack.currentWidget() is not self.editor_pane:
             QMessageBox.information(self, "Markieren", "Markieren funktioniert im Texteditor.")
             return
         if not self.editor.highlight_selection():
@@ -1370,6 +1409,22 @@ class MainWindow(QMainWindow):
             self.pdf_view.refresh()
             self._set_status("Formularfelder gespeichert")
 
+    def _pdf_attachments(self):
+        if not self.pdf_view.pdf_path:
+            QMessageBox.information(self, "Anhänge", "Bitte zuerst ein PDF öffnen.")
+            return
+        from ild_pdf import list_attachments
+
+        try:
+            items = list_attachments(self.pdf_view.pdf_path)
+        except Exception as e:
+            QMessageBox.warning(self, "Anhänge", str(e))
+            return
+        if not items:
+            QMessageBox.information(self, "Anhänge", "Dieses PDF enthält keine Anhänge.")
+            return
+        AttachmentsDialog(self.pdf_view.pdf_path, self).exec()
+
     def _current_is_dirty(self) -> bool:
         if not self.doc:
             return False
@@ -1438,7 +1493,7 @@ class MainWindow(QMainWindow):
         self.sidebar.clear_thumbs()
         self.sidebar.clear_annotations()
         self.sidebar.set_marks([])
-        self.stack.setCurrentWidget(self.editor)
+        self.stack.setCurrentWidget(self.editor_pane)
         self.setWindowTitle(self._app_title())
         self._update_doc_status()
         if remaining:
@@ -1506,10 +1561,11 @@ class MainWindow(QMainWindow):
         if not ok2:
             return
         src = Path(self.pdf_view.pdf_path)
-        default = str(src.with_name(f"{src.stem}_p{start}-{end}.pdf"))
+        default = str(Path(dialog_start_dir(src.parent)) / f"{src.stem}_p{start}-{end}.pdf")
         dest, _ = QFileDialog.getSaveFileName(self, "Ziel-PDF", default, "PDF (*.pdf)")
         if not dest:
             return
+        remember_recent_dir(dest)
         if not dest.lower().endswith(".pdf"):
             dest += ".pdf"
         try:
@@ -1550,7 +1606,7 @@ class MainWindow(QMainWindow):
         if self.doc and self.doc.path:
             self.editor.set_paste_image_dir(Path(self.doc.path).parent)
         if self.editor.paste_clipboard_image():
-            self.stack.setCurrentWidget(self.editor)
+            self.stack.setCurrentWidget(self.editor_pane)
             self._set_status("Bild aus Zwischenablage in Editor eingefügt")
             return
         QMessageBox.information(
@@ -1567,16 +1623,13 @@ class MainWindow(QMainWindow):
         self._editor_marks.clear()
         self.sidebar.set_marks([])
         self.sidebar.clear_annotations()
-        self.stack.setCurrentWidget(self.editor)
+        self.stack.setCurrentWidget(self.editor_pane)
         self.setWindowTitle(self._app_title("Unbenannt"))
         self._update_doc_status()
         self._set_status("Neues Dokument")
 
     def open_dialog(self):
-        start = ""
-        d = get_default_open_dir()
-        if d:
-            start = str(d)
+        start = dialog_start_dir(get_default_open_dir())
         path, _ = QFileDialog.getOpenFileName(
             self,
             "Öffnen",
@@ -1584,6 +1637,7 @@ class MainWindow(QMainWindow):
             "Dokumente (*.txt *.md *.html *.htm *.docx *.pdf *.png *.jpg *.jpeg);;Alle (*.*)",
         )
         if path:
+            remember_recent_dir(path)
             self.open_path(path)
 
     def open_path(self, path: str):
@@ -1619,7 +1673,7 @@ class MainWindow(QMainWindow):
                 self.sidebar.clear_thumbs()
                 self.sidebar.clear_annotations()
             else:
-                self.stack.setCurrentWidget(self.editor)
+                self.stack.setCurrentWidget(self.editor_pane)
                 self.editor.blockSignals(True)
                 self.editor.setPlainText(self.doc.text)
                 self.editor.blockSignals(False)
@@ -1727,11 +1781,12 @@ class MainWindow(QMainWindow):
         path, _ = QFileDialog.getSaveFileName(
             self,
             "Speichern unter",
-            self.doc.display_name,
+            str(Path(dialog_start_dir()) / self.doc.display_name),
             "Text (*.txt);;Markdown (*.md);;HTML (*.html);;DOCX (*.docx);;Alle (*.*)",
         )
         if not path:
             return
+        remember_recent_dir(path)
         if self.doc.kind in (DocKind.TEXT, DocKind.MARKDOWN, DocKind.HTML, DocKind.DOCX):
             self.doc.text = self.editor.toPlainText()
         try:
@@ -1757,7 +1812,7 @@ class MainWindow(QMainWindow):
         """Editor-Inhalt nach HTML / DOCX / PDF exportieren."""
         text = ""
         title = "InstantLens Doc"
-        if self.stack.currentWidget() is self.editor:
+        if self.stack.currentWidget() is self.editor_pane:
             text = self.editor.toPlainText()
             if self.doc:
                 title = self.doc.title or self.doc.display_name
@@ -1781,7 +1836,7 @@ class MainWindow(QMainWindow):
         if "." in default_name and not default_name.lower().endswith(ext):
             default_name = Path(default_name).stem + ext
         last_dir = get_last_export_dir()
-        start = str((last_dir / default_name) if last_dir else Path(default_name))
+        start = str(Path(dialog_start_dir(last_dir)) / default_name)
         path, _ = QFileDialog.getSaveFileName(self, f"Export {fmt.upper()}", start, filt)
         if not path:
             return
@@ -1795,21 +1850,22 @@ class MainWindow(QMainWindow):
             else:
                 exp.export_pdf(text, path, title=title)
             set_last_export_dir(path)
+            remember_recent_dir(path)
             self._set_status(f"Exportiert: {path}")
         except Exception as e:
             QMessageBox.critical(self, "Export", f"Export fehlgeschlagen:\n{e}")
 
     def _add_text_frame(self):
-        text = self.editor.toPlainText() if self.stack.currentWidget() is self.editor else ""
+        text = self.editor.toPlainText() if self.stack.currentWidget() is self.editor_pane else ""
         frame = self.layout_doc.add_text_frame(text=text)
         flowed = self.layout_doc.flow_text(text or "Neuer Textrahmen", frame)
-        if self.stack.currentWidget() is self.editor:
+        if self.stack.currentWidget() is self.editor_pane:
             self.editor.appendPlainText(f"\n--- Textrahmen {frame.id} ---\n{flowed}")
         self._set_status(f"Textrahmen {frame.id} hinzugefügt")
 
     def _add_chained_frame(self):
         """Verkettete Textrahmen: Overflow fließt in den nächsten Rahmen."""
-        source = self.editor.toPlainText() if self.stack.currentWidget() is self.editor else ""
+        source = self.editor.toPlainText() if self.stack.currentWidget() is self.editor_pane else ""
         if not source.strip():
             source = (
                 "Dies ist ein Beispieltext für verkettete Textrahmen in InstantLens Doc. "
@@ -1823,7 +1879,7 @@ class MainWindow(QMainWindow):
         f2 = self.layout_doc.chain_new_frame(f1, x=40, y=180, width=240, height=120)
         filled = self.layout_doc.flow_text_chain(source, f1)
         overflow = filled.pop("__overflow__", "")
-        if self.stack.currentWidget() is self.editor:
+        if self.stack.currentWidget() is self.editor_pane:
             lines = [
                 f"\n=== Verkettete Rahmen {f1.id} → {f2.id} ===",
                 f"--- Rahmen {f1.id} ---",
@@ -1838,10 +1894,14 @@ class MainWindow(QMainWindow):
 
     def _insert_image(self):
         path, _ = QFileDialog.getOpenFileName(
-            self, "Bild einfügen", "", "Bilder (*.png *.jpg *.jpeg *.bmp)"
+            self,
+            "Bild einfügen",
+            dialog_start_dir(),
+            "Bilder (*.png *.jpg *.jpeg *.bmp)",
         )
         if not path:
             return
+        remember_recent_dir(path)
         frame = self.layout_doc.add_image(path)
         if self.stack.currentWidget() is self.pdf_view and self.pdf_view.pdf_path:
             from PySide6.QtWidgets import QInputDialog
@@ -1883,7 +1943,7 @@ class MainWindow(QMainWindow):
                 except Exception as e:
                     QMessageBox.warning(self, "Bild", str(e))
                     return
-        if self.stack.currentWidget() is self.editor:
+        if self.stack.currentWidget() is self.editor_pane:
             self.editor.appendPlainText(
                 f"\n[Bild: {path} @ {frame.x},{frame.y} {frame.width}x{frame.height}]\n"
             )
@@ -1948,10 +2008,14 @@ class MainWindow(QMainWindow):
                 path = dlg.selected_path
                 if not path:
                     path, _ = QFileDialog.getOpenFileName(
-                        self, "Bild für OCR", "", "Bilder (*.png *.jpg *.jpeg *.tif *.tiff)"
+                        self,
+                        "Bild für OCR",
+                        dialog_start_dir(),
+                        "Bilder (*.png *.jpg *.jpeg *.tif *.tiff)",
                     )
                 if not path:
                     return
+                remember_recent_dir(path)
                 source_label = Path(path).name
                 prog.setLabelText(f"OCR: {source_label}")
                 QApplication.processEvents()
@@ -1971,7 +2035,7 @@ class MainWindow(QMainWindow):
         finally:
             prog.close()
 
-        self.stack.setCurrentWidget(self.editor)
+        self.stack.setCurrentWidget(self.editor_pane)
         self.editor.setPlainText(result.text)
         self.doc = Document(kind=DocKind.TEXT, title=f"OCR — {source_label}", text=result.text)
         self.setWindowTitle(self._app_title(f"OCR — {source_label}"))

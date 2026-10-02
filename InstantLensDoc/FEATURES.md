@@ -37,6 +37,8 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | Annotation-Suche Sidebar | fertig | Textfilter in Annotationsliste 0.3.0 |
 | Stempel / Callouts | fertig | Bibliothek GENEHMIGT/ENTWURF/VERTRAULICH + Datum 0.3.1; Callout (2-Klick) |
 | PDF AcroForm-Felder | fertig | Bestehende Felder lesen/schreiben (pikepdf) 0.3.1 |
+| PDF-Anhänge | fertig | Auflisten/extrahieren (pikepdf Attachments) 0.3.2 |
+| Annotation-Layer Toggle | fertig | Ansicht + Toolbar; Ctrl+Shift+A 0.3.2 |
 | Tab schließen (dirty) | fertig | Speichern-Dialog; Datei → Schließen / Ctrl+W; Beenden 0.3.1 |
 | PDF Signaturfeld / Signatur (Bild) | fertig | Sidecar; Menü PDF + Werkzeug |
 | Theme Hell/Dunkel | fertig | Ansicht-Menü, persistiert |
@@ -60,6 +62,8 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | Editor Zeilennummern | fertig | Optional (Ansicht + Einstellungen) 0.2.7 |
 | Editor Groß-/Kleinschreibung | fertig | Auswahl umschalten Ctrl+Shift+U 0.2.8 |
 | Editor Einrückung | fertig | Erhöhen/Verringern Ctrl+]/[ bzw. Tab/Shift+Tab 0.3.0 |
+| Editor Markdown-Vorschau | fertig | Optional Split (Ansicht); Ctrl+Shift+M 0.3.2 |
+| Zuletzt verwendete Ordner | fertig | Datei-Dialoge merken `recent_dirs` 0.3.2 |
 | Alles speichern (Tabs) | fertig | Datei → Alles speichern; aktuelles Doc + PDF-Sidecars 0.2.7 |
 | Volltextsuche geöffnete Docs | fertig | Sidebar „Alle Docs“ |
 | Lesezeichen / PDF-Outline | fertig | Baum in Sidebar; Doppelklick → Seite; **hinzufügen/löschen** 0.2.5 |
@@ -81,25 +85,25 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | PyInstaller Build Windows | fertig | `build-windows.ps1`, Icon `assets/app.ico` |
 | Inno-Installer | fertig | Icon, Desktop, Uninstaller, Keygen optional (`InstantLensKeygen.exe`) 0.2.1 |
 | Sync-Skript Windows | fertig | Repo `scripts/sync-ild.ps1`; Store `docs/sync-ild.ps1` |
-| In-App Hilfe / About | fertig | Version 0.3.1; Fenstertitel + Splash; Logordner-Button |
-| CHANGELOG | fertig | **0.3.1** Formulare/Stempel/Close/Thumbs |
+| In-App Hilfe / About | fertig | Version 0.3.2; Fenstertitel + Splash; Logordner-Button |
+| CHANGELOG | fertig | **0.3.2** Anhänge/Ann.-Layer/MD-Preview/Ordner |
 | FEATURES.md / INFO.md | fertig | |
-| `ild_pdf` Modul + Beispielskript | fertig | metadata / page size / watermark / redact / **acroform** |
+| `ild_pdf` Modul + Beispielskript | fertig | metadata / page size / watermark / redact / acroform / **attachments** |
 | Font-Matching | geplant | |
 | Objekt-/Bildbearbeitung | geplant | |
 | Layout-Erhaltung (Scan→edit) | geplant | |
 | Freihand | geplant | |
-| KI-Assistent | Stub | Menü „Geplant“ 0.3.1 (keine Fake-KI) |
+| KI-Assistent | Stub | Menü „Geplant“ 0.3.2 (keine Fake-KI) |
 | Signieren (rechtssicher) | Stub | |
-| Cloud-Sync | Stub | Menü „Geplant“ 0.3.1 (keine Fake-Cloud) |
+| Cloud-Sync | Stub | Menü „Geplant“ 0.3.2 (keine Fake-Cloud) |
 | Text on Path / Text zu Pfaden | geplant | |
 | Envelope Distort / Text Wrap / Area Type | Stub/geplant | |
 | Schnittmasken | geplant | |
 | Füllungen / Live-Effekte | geplant | |
-| 3D-Extrusion | Stub | Menü „Geplant“ 0.3.1 |
+| 3D-Extrusion | Stub | Menü „Geplant“ 0.3.2 |
 | Variable Fonts (voll) | Stub | |
 | Glyphen-Palette | geplant | |
-| Stylus / Palm Rejection | Stub | Menü „Geplant“ 0.3.1 |
-| Intelligente Formerkennung | Stub | Menü „Geplant“ 0.3.1 |
+| Stylus / Palm Rejection | Stub | Menü „Geplant“ 0.3.2 |
+| Intelligente Formerkennung | Stub | Menü „Geplant“ 0.3.2 |
 
 Nicht behauptet als fertig: Cloud, KI, Stylus, 3D — nur Menü-Stubs + dieser Status.

@@ -64,12 +64,14 @@ from instantlensdoc.core.app_settings import (
     get_ann_default_opacity,
     get_ann_highlight_color,
     get_ann_pen_color,
+    get_annotations_visible,
     get_default_zoom_scale,
     get_pdf_grayscale,
     get_pdf_night_mode,
     set_ann_default_opacity,
     set_ann_highlight_color,
     set_ann_pen_color,
+    set_annotations_visible,
     set_pdf_grayscale,
     set_pdf_night_mode,
 )
@@ -261,8 +263,16 @@ class PdfCanvas(QLabel):
         self._search_rects: list[tuple[float, float, float, float]] = []
         self._search_active: int = -1
         self._selected_id: str | None = None
+        self._annotations_visible = True
         self.setMouseTracking(True)
         self.setFocusPolicy(Qt.StrongFocus)
+
+    def set_annotations_visible(self, visible: bool):
+        self._annotations_visible = bool(visible)
+        self._repaint_overlay()
+
+    def annotations_visible(self) -> bool:
+        return bool(self._annotations_visible)
 
     def set_drag_tool(self, tool: AnnotationType | None, *, select_mode: bool = False):
         self._select_mode = bool(select_mode)
@@ -320,6 +330,8 @@ class PdfCanvas(QLabel):
         return None
 
     def _hit_overlay(self, x: float, y: float) -> Annotation | None:
+        if not self._annotations_visible:
+            return None
         editable = (
             AnnotationType.TEXT_OVERLAY,
             AnnotationType.TEXT,
@@ -513,15 +525,16 @@ class PdfCanvas(QLabel):
             painter.fillRect(int(sx), int(sy), max(int(sw), 2), max(int(sh), 2), fill)
             painter.setPen(pen)
             painter.drawRect(int(sx), int(sy), max(int(sw), 2), max(int(sh), 2))
-        for ann in self._annotations:
-            self._draw_ann(painter, ann)
-            if self._selected_id and ann.id == self._selected_id:
-                x0, y0, x1, y1 = self._ann_bounds(ann)
-                sel = QPen(QColor(30, 144, 255), 2, Qt.DashLine)
-                painter.setPen(sel)
-                painter.setBrush(Qt.NoBrush)
-                painter.drawRect(int(x0) - 2, int(y0) - 2, int(x1 - x0) + 4, int(y1 - y0) + 4)
-        # Drag-Vorschau
+        if self._annotations_visible:
+            for ann in self._annotations:
+                self._draw_ann(painter, ann)
+                if self._selected_id and ann.id == self._selected_id:
+                    x0, y0, x1, y1 = self._ann_bounds(ann)
+                    sel = QPen(QColor(30, 144, 255), 2, Qt.DashLine)
+                    painter.setPen(sel)
+                    painter.setBrush(Qt.NoBrush)
+                    painter.drawRect(int(x0) - 2, int(y0) - 2, int(x1 - x0) + 4, int(y1 - y0) + 4)
+        # Drag-Vorschau (auch bei ausgeblendetem Layer sichtbar)
         if self._drag_start and self._drag_current and self._drag_tool:
             x0, y0 = self._drag_start
             x1, y1 = self._drag_current
@@ -625,6 +638,7 @@ class PdfViewer(QWidget):
     document_changed = Signal()  # Pfad/Seiten geändert (Statusleiste)
     grayscale_changed = Signal(bool)  # Toolbar ↔ Menü sync
     night_mode_changed = Signal(bool)
+    annotations_layer_changed = Signal(bool)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -647,11 +661,11 @@ class PdfViewer(QWidget):
         self._grayscale = get_pdf_grayscale()
         self._night_mode = get_pdf_night_mode()
         self._default_opacity = get_ann_default_opacity()
+        self._annotations_visible = get_annotations_visible()
         self._search_query = ""
         self._search_rects: list[tuple[float, float, float, float]] = []
         self._search_index = -1
         self._selected_ann_id: str | None = None
-
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
 
@@ -791,11 +805,18 @@ class PdfViewer(QWidget):
             "Nachtmodus: dunkle Invert-Ansicht (nur Darstellung, nicht speichern/exportieren)"
         )
         self.btn_night.toggled.connect(self.set_night_mode)
+        self.btn_ann_layer = QToolButton()
+        self.btn_ann_layer.setText("Ann.")
+        self.btn_ann_layer.setCheckable(True)
+        self.btn_ann_layer.setChecked(self._annotations_visible)
+        self.btn_ann_layer.setToolTip("Annotation-Layer ein-/ausblenden")
+        self.btn_ann_layer.toggled.connect(self.set_annotations_visible)
         toolbar.addWidget(self.btn_hl_color)
         toolbar.addWidget(self.btn_pen_color)
         toolbar.addWidget(self.spin_opacity)
         toolbar.addWidget(self.btn_grayscale)
         toolbar.addWidget(self.btn_night)
+        toolbar.addWidget(self.btn_ann_layer)
 
         toolbar.addWidget(btn_prev)
         toolbar.addWidget(self.lbl_page)
@@ -829,6 +850,7 @@ class PdfViewer(QWidget):
         self.scroll = QScrollArea()
         self.scroll.setWidgetResizable(True)
         self.canvas = PdfCanvas()
+        self.canvas.set_annotations_visible(self._annotations_visible)
         self.canvas.annotation_placed.connect(self._on_place)
         self.canvas.drag_finished.connect(self._on_drag)
         self.canvas.overlay_edit_requested.connect(self._edit_overlay)
@@ -930,6 +952,26 @@ class PdfViewer(QWidget):
     def night_mode_enabled(self) -> bool:
         return bool(self._night_mode)
 
+    def set_annotations_visible(self, visible: bool):
+        """Annotation-Layer ein-/ausblenden (nur Darstellung)."""
+        enabled = bool(visible)
+        changed = self._annotations_visible != enabled
+        self._annotations_visible = enabled
+        set_annotations_visible(enabled)
+        if hasattr(self, "btn_ann_layer"):
+            self.btn_ann_layer.blockSignals(True)
+            self.btn_ann_layer.setChecked(enabled)
+            self.btn_ann_layer.blockSignals(False)
+        self.canvas.set_annotations_visible(enabled)
+        if changed:
+            self.annotations_layer_changed.emit(enabled)
+            self.status.emit(
+                "Annotationen sichtbar" if enabled else "Annotation-Layer ausgeblendet"
+            )
+
+    def annotations_visible(self) -> bool:
+        return bool(self._annotations_visible)
+
     def apply_settings_colors(self):
         self._highlight_color = get_ann_highlight_color()
         self._pen_color = get_ann_pen_color()
@@ -950,6 +992,12 @@ class PdfViewer(QWidget):
             self.btn_night.blockSignals(True)
             self.btn_night.setChecked(self._night_mode)
             self.btn_night.blockSignals(False)
+        self._annotations_visible = get_annotations_visible()
+        if hasattr(self, "btn_ann_layer"):
+            self.btn_ann_layer.blockSignals(True)
+            self.btn_ann_layer.setChecked(self._annotations_visible)
+            self.btn_ann_layer.blockSignals(False)
+        self.canvas.set_annotations_visible(self._annotations_visible)
 
     def apply_default_zoom(self):
         self.set_scale(get_default_zoom_scale(), immediate=True)
@@ -1957,9 +2005,13 @@ class PdfViewer(QWidget):
             return
         from PySide6.QtWidgets import QFileDialog
         from ild_pdf import extract_page_image
-        from instantlensdoc.core.app_settings import get_last_export_dir, set_last_export_dir
+        from instantlensdoc.core.app_settings import (
+            dialog_start_dir,
+            remember_recent_dir,
+            set_last_export_dir,
+        )
 
-        start_dir = get_last_export_dir() or self.pdf_path.parent
+        start_dir = dialog_start_dir(self.pdf_path.parent)
         default = str(Path(start_dir) / f"{self.pdf_path.stem}_p{self.page_index + 1}.png")
         path, selected = QFileDialog.getSaveFileName(
             self, "Seite als Bild", default, "PNG (*.png);;JPEG (*.jpg *.jpeg)"
@@ -1980,6 +2032,7 @@ class PdfViewer(QWidget):
                 grayscale=self._grayscale,
             )
             set_last_export_dir(Path(out).parent)
+            remember_recent_dir(Path(out).parent)
             self.status.emit(f"Seite exportiert: {out.name}")
         except Exception as e:
             QMessageBox.warning(self, "Extrahieren", str(e))
@@ -1991,7 +2044,11 @@ class PdfViewer(QWidget):
             return
         from PySide6.QtWidgets import QFileDialog, QInputDialog
         from ild_pdf import extract_pages_as_images
-        from instantlensdoc.core.app_settings import get_last_export_dir, set_last_export_dir
+        from instantlensdoc.core.app_settings import (
+            dialog_start_dir,
+            remember_recent_dir,
+            set_last_export_dir,
+        )
 
         scope, ok = QInputDialog.getItem(
             self,
@@ -2013,7 +2070,7 @@ class PdfViewer(QWidget):
         )
         if not ok:
             return
-        start_dir = str(get_last_export_dir() or self.pdf_path.parent)
+        start_dir = dialog_start_dir(self.pdf_path.parent)
         out_dir = QFileDialog.getExistingDirectory(self, "Zielordner für Bilder", start_dir)
         if not out_dir:
             return
@@ -2029,6 +2086,7 @@ class PdfViewer(QWidget):
                 grayscale=self._grayscale,
             )
             set_last_export_dir(out_dir)
+            remember_recent_dir(out_dir)
             self.status.emit(f"{len(written)} Bild(er) → {Path(out_dir).name}")
             QMessageBox.information(
                 self,
@@ -2050,12 +2108,17 @@ class PdfViewer(QWidget):
             return
         from PySide6.QtWidgets import QFileDialog
         from ild_pdf import insert_signature_image
+        from instantlensdoc.core.app_settings import dialog_start_dir, remember_recent_dir
 
         path, _ = QFileDialog.getOpenFileName(
-            self, "Signatur-Bild", "", "Bilder (*.png *.jpg *.jpeg *.bmp)"
+            self,
+            "Signatur-Bild",
+            dialog_start_dir(self.pdf_path.parent if self.pdf_path else None),
+            "Bilder (*.png *.jpg *.jpeg *.bmp)",
         )
         if not path:
             return
+        remember_recent_dir(path)
         # Mitte-unten der Seite als Default
         try:
             from ild_pdf import PdfDocument
@@ -2086,12 +2149,17 @@ class PdfViewer(QWidget):
             return
         from PySide6.QtWidgets import QFileDialog
         from ild_pdf import insert_image_as_page
+        from instantlensdoc.core.app_settings import dialog_start_dir, remember_recent_dir
 
         path, _ = QFileDialog.getOpenFileName(
-            self, "Bild als neue Seite", "", "Bilder (*.png *.jpg *.jpeg *.bmp)"
+            self,
+            "Bild als neue Seite",
+            dialog_start_dir(self.pdf_path.parent if self.pdf_path else None),
+            "Bilder (*.png *.jpg *.jpeg *.bmp)",
         )
         if not path:
             return
+        remember_recent_dir(path)
         try:
             insert_image_as_page(self.pdf_path, path)
             from ild_pdf import PdfDocument

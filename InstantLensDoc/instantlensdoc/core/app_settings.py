@@ -32,6 +32,9 @@ DEFAULTS: dict[str, Any] = {
     "pdf_grayscale": False,
     "pdf_night_mode": False,
     "ann_default_opacity": 1.0,
+    "recent_dirs": [],
+    "editor_markdown_preview": False,
+    "annotations_visible": True,
 }
 
 
@@ -253,3 +256,87 @@ def set_ann_default_opacity(opacity: float) -> None:
     except (TypeError, ValueError):
         v = 1.0
     save_settings({"ann_default_opacity": max(0.05, min(1.0, v))})
+
+
+RECENT_DIRS_MAX = 8
+
+
+def get_recent_dirs(max_items: int = RECENT_DIRS_MAX) -> list[Path]:
+    """Zuletzt verwendete Ordner (nur existierende)."""
+    raw = load_settings().get("recent_dirs") or []
+    if not isinstance(raw, list):
+        return []
+    out: list[Path] = []
+    seen: set[str] = set()
+    for item in raw:
+        p = Path(str(item)).expanduser()
+        key = str(p)
+        if key in seen:
+            continue
+        seen.add(key)
+        if p.is_dir():
+            out.append(p)
+        if len(out) >= max_items:
+            break
+    return out
+
+
+def remember_recent_dir(path: str | Path | None, max_items: int = RECENT_DIRS_MAX) -> list[Path]:
+    """Ordner (oder Elternordner einer Datei) als zuletzt verwendet merken."""
+    if path is None or str(path).strip() == "":
+        return get_recent_dirs(max_items=max_items)
+    p = Path(path).expanduser()
+    if p.is_dir():
+        pass
+    elif p.is_file():
+        p = p.parent
+    elif p.parent.is_dir():
+        # Speichern-unter-Pfad o. ä. — Parent nutzen
+        p = p.parent
+    else:
+        return get_recent_dirs(max_items=max_items)
+    key = str(p)
+    prev = [str(x) for x in get_recent_dirs(max_items=max_items * 2)]
+    cleaned = [key] + [x for x in prev if x != key]
+    cleaned = cleaned[:max_items]
+    save_settings({"recent_dirs": cleaned})
+    return get_recent_dirs(max_items=max_items)
+
+
+def dialog_start_dir(*fallbacks: str | Path | None) -> str:
+    """Startpfad für QFileDialog: zuletzt verwendeter existierender Ordner, sonst Fallbacks."""
+    for d in get_recent_dirs():
+        if d.is_dir():
+            return str(d)
+    for fb in fallbacks:
+        if fb is None:
+            continue
+        p = Path(fb)
+        if p.is_file():
+            p = p.parent
+        if p.is_dir():
+            return str(p)
+        # default_open / last_export als String ohne Existenzcheck schon in get_*
+    d = get_default_open_dir()
+    if d:
+        return str(d)
+    d = get_last_export_dir()
+    if d:
+        return str(d)
+    return ""
+
+
+def get_editor_markdown_preview() -> bool:
+    return bool(load_settings().get("editor_markdown_preview", False))
+
+
+def set_editor_markdown_preview(enabled: bool) -> None:
+    save_settings({"editor_markdown_preview": bool(enabled)})
+
+
+def get_annotations_visible() -> bool:
+    return bool(load_settings().get("annotations_visible", True))
+
+
+def set_annotations_visible(visible: bool) -> None:
+    save_settings({"annotations_visible": bool(visible)})

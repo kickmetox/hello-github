@@ -64,6 +64,13 @@ from .acroform import (
     list_form_fields,
     set_form_values,
 )
+from .attachments import (
+    AttachmentInfo,
+    extract_all_attachments,
+    extract_attachment,
+    has_attachments,
+    list_attachments,
+)
 
 __all__ = [
     "PdfDocument",
@@ -128,6 +135,11 @@ __all__ = [
     "list_form_fields",
     "get_form_values",
     "set_form_values",
+    "AttachmentInfo",
+    "has_attachments",
+    "list_attachments",
+    "extract_attachment",
+    "extract_all_attachments",
 ]
 
-__version__ = "0.3.1"
+__version__ = "0.3.2"

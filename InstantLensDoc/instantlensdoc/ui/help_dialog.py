@@ -44,8 +44,9 @@ HELP_HTML = f"""
 <li><b>Bearbeiten → Groß-/Kleinschreibung umschalten</b> (Ctrl+Shift+U): Auswahl GROSS → klein → Titel</li>
 <li><b>Bearbeiten → Einrückung erhöhen/verringern</b> (Ctrl+] / Ctrl+[; Tab / Shift+Tab bei Auswahl)</li>
 <li><b>Ansicht</b>: Zoom +/−, Seite einpassen (Ctrl+0), Breite (Ctrl+9), 100&nbsp;% (Ctrl+1);
-    <b>Hell/Dunkel</b>-Design umschalten; optionale <b>Zeilennummern</b>; <b>PDF Graustufen</b>;
-    <b>PDF Nachtmodus</b> (Invert-Ansicht, nur Darstellung)</li>
+    <b>Hell/Dunkel</b>-Design umschalten; optionale <b>Zeilennummern</b>; <b>Markdown-Vorschau</b> (Split, Ctrl+Shift+M);
+    <b>PDF Graustufen</b>; <b>PDF Nachtmodus</b> (Invert-Ansicht, nur Darstellung);
+    <b>Annotation-Layer</b> ein/aus (Ctrl+Shift+A)</li>
 <li><b>Drag &amp; Drop</b>: Dateien auf das Fenster ziehen zum Öffnen</li>
 <li><b>Autosave</b>: Textdokumente (mit Pfad) und PDF-Annotationen — Intervall in Einstellungen</li>
 <li><b>PDF</b>: Blättern, Zoom/Fit (debounced + Cache), <b>⟲/⟳ drehen</b> / <b>↔/↕ spiegeln</b> (speichert),
@@ -63,7 +64,8 @@ HELP_HTML = f"""
     <b>Wasserzeichen / Seitennummern</b>;
     <b>Zwei PDFs vergleichen</b> (Seite neben Seite);
     <b>Passwort setzen/öffnen</b>; <b>Bildkompression</b> (Seiten neu als JPEG);
-    <b>Metadaten bearbeiten</b>; <b>AcroForm-Formularfelder ausfüllen</b>; <b>Seitengröße / Zuschneiden</b>;
+    <b>Metadaten bearbeiten</b>; <b>AcroForm-Formularfelder ausfüllen</b>; <b>Anhänge</b> auflisten/extrahieren;
+    <b>Seitengröße / Zuschneiden</b>;
     Seite/Seiten als PNG/JPEG exportieren / Bild als neue Seite / Seite drucken; Annotation löschen (Auswahl/letzte, Entf); Statusleiste Seite/Zoom/Dateiname/Wörter; Thumbnails per Drag neu ordnen (<b>Lazy-Load</b>);
     PDF als Kopie speichern; <b>Seitenbereich extrahieren</b> (von–bis → neues PDF);
     große PDFs: Warnung / Limits;
