@@ -196,6 +196,16 @@ class Sidebar(QWidget):
         self.marks.itemDoubleClicked.connect(self._activate_mark)
         layout.addWidget(self.marks)
 
+        layout.addStretch(1)
+        self.ann_stats_label = QLabel("Ann.: —")
+        self.ann_stats_label.setWordWrap(True)
+        self.ann_stats_label.setObjectName("annStatsFooter")
+        self.ann_stats_label.setStyleSheet(
+            "QLabel#annStatsFooter { color: #666; font-size: 11px; padding-top: 4px; }"
+        )
+        self.ann_stats_label.setToolTip("Anzahl Annotationen je Typ (unabhängig vom Filter)")
+        layout.addWidget(self.ann_stats_label)
+
         self.setMinimumWidth(240)
         self._fulltext_mode = False
         self._ann_all_lines: list[str] = []
@@ -533,6 +543,30 @@ class Sidebar(QWidget):
                 if payload is not None:
                     item.setData(256, payload)
                 self.annotations.addItem(item)
+        self._update_ann_stats()
+
+    def _update_ann_stats(self) -> None:
+        """Footer: Anzahl je Annotationstyp (über alle, nicht nur gefiltert)."""
+        if not hasattr(self, "ann_stats_label"):
+            return
+        counts: dict[str, int] = {}
+        for payload in self._ann_all_payloads:
+            if payload is None:
+                continue
+            t = getattr(getattr(payload, "type", None), "value", None) or getattr(
+                payload, "type", None
+            )
+            key = str(t) if t else "?"
+            counts[key] = counts.get(key, 0) + 1
+        total = sum(counts.values())
+        if total == 0:
+            self.ann_stats_label.setText("Ann.: —")
+            return
+        parts = [
+            f"{ANN_TYPE_LABELS.get(k, k)} {counts[k]}"
+            for k in sorted(counts.keys(), key=lambda x: (-counts[x], x))
+        ]
+        self.ann_stats_label.setText(f"Ann. {total}: " + " · ".join(parts))
 
     def set_annotations(self, lines: list[str], payloads: list | None = None):
         self._ann_all_lines = list(lines)
@@ -555,6 +589,7 @@ class Sidebar(QWidget):
         self.ann_filter.addItem("Alle Typen", "")
         self.ann_filter.blockSignals(False)
         self._ann_filter_updating = False
+        self._update_ann_stats()
 
     def set_marks(self, lines: list[str], payloads: list | None = None):
         self.marks.clear()

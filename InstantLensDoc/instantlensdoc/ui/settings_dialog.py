@@ -47,6 +47,7 @@ from instantlensdoc.core.app_settings import (
     set_default_open_dir,
     set_default_zoom_percent,
     set_editor_line_numbers,
+    set_editor_show_special_chars,
     set_editor_soft_wrap,
     set_minimize_to_tray,
     set_ocr_lang,
@@ -136,6 +137,12 @@ class SettingsDialog(QDialog):
         self.soft_wrap.setChecked(get_editor_soft_wrap())
         self.soft_wrap.setToolTip("Lange Zeilen am Fensterrand umbrechen")
         form.addRow(self.soft_wrap)
+        from instantlensdoc.core.app_settings import get_editor_show_special_chars
+
+        self.special_chars = QCheckBox("Sonderzeichen anzeigen (Tabs/Leerzeichen)")
+        self.special_chars.setChecked(get_editor_show_special_chars())
+        self.special_chars.setToolTip("Tabs, Leerzeichen und Absatzenden im Editor sichtbar")
+        form.addRow(self.special_chars)
 
         self.minimize_tray = QCheckBox("Beim Minimieren in den System-Tray")
         self.minimize_tray.setChecked(get_minimize_to_tray())
@@ -246,6 +253,7 @@ class SettingsDialog(QDialog):
         set_autosave_interval_sec(int(self.autosave_sec.value()))
         set_editor_line_numbers(self.line_numbers.isChecked())
         set_editor_soft_wrap(self.soft_wrap.isChecked())
+        set_editor_show_special_chars(self.special_chars.isChecked())
         set_minimize_to_tray(self.minimize_tray.isChecked())
         set_backup_on_save(self.backup_on_save.isChecked())
         set_restore_session_on_start(self.restore_session.isChecked())

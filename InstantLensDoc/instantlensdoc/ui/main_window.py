@@ -207,7 +207,6 @@ class MainWindow(QMainWindow):
                 for p in icon_paths_for_qt():
                     icon.addFile(str(p))
             self._tray = QSystemTrayIcon(icon, self)
-            self._tray.setToolTip(self._app_title())
             menu = QMenu(self)
             act_show = QAction("Anzeigen", self)
             act_show.triggered.connect(self._tray_restore)
@@ -218,6 +217,7 @@ class MainWindow(QMainWindow):
             self._tray_menu = menu
             self._tray.setContextMenu(menu)
             self._tray.activated.connect(self._tray_activated)
+        self._tray.setToolTip(f"{DISPLAY_NAME} v{__version__}")
         self._tray.show()
 
     def _tray_activated(self, reason):
@@ -577,6 +577,17 @@ class MainWindow(QMainWindow):
         self._soft_wrap_action.setShortcut(QKeySequence("Ctrl+Shift+W"))
         self._soft_wrap_action.toggled.connect(self._toggle_soft_wrap)
         m_view.addAction(self._soft_wrap_action)
+        self._special_chars_action = QAction("Sonderzeichen anzeigen", self)
+        self._special_chars_action.setCheckable(True)
+        from instantlensdoc.core.app_settings import get_editor_show_special_chars
+
+        self._special_chars_action.setChecked(get_editor_show_special_chars())
+        self._special_chars_action.setToolTip(
+            "Tabs, Leerzeichen und Absatzenden im Editor sichtbar machen"
+        )
+        self._special_chars_action.setShortcut(QKeySequence("Ctrl+Shift+."))
+        self._special_chars_action.toggled.connect(self._toggle_special_chars)
+        m_view.addAction(self._special_chars_action)
         self._grayscale_action = QAction("PDF Graustufen", self)
         self._grayscale_action.setCheckable(True)
         self._grayscale_action.setChecked(get_pdf_grayscale())
@@ -627,6 +638,11 @@ class MainWindow(QMainWindow):
         act_fit_w.setShortcut(QKeySequence("Ctrl+9"))
         act_fit_w.triggered.connect(self._fit_width)
         m_view.addAction(act_fit_w)
+        act_fit_h = QAction("Höhe einpassen", self)
+        act_fit_h.setShortcut(QKeySequence("Ctrl+8"))
+        act_fit_h.setToolTip("Seitenhöhe an Viewport anpassen")
+        act_fit_h.triggered.connect(self._fit_height)
+        m_view.addAction(act_fit_h)
         act_z100 = QAction("Zoom 100 %", self)
         act_z100.setShortcut(QKeySequence("Ctrl+1"))
         act_z100.triggered.connect(self._zoom_100)
@@ -1148,6 +1164,13 @@ class MainWindow(QMainWindow):
         self.editor.set_soft_wrap(bool(checked))
         self._set_status("Soft-Wrap an" if checked else "Soft-Wrap aus")
 
+    def _toggle_special_chars(self, checked: bool):
+        from instantlensdoc.core.app_settings import set_editor_show_special_chars
+
+        set_editor_show_special_chars(bool(checked))
+        self.editor.set_special_chars_visible(bool(checked))
+        self._set_status("Sonderzeichen an" if checked else "Sonderzeichen aus")
+
     def _toggle_grayscale(self, checked: bool):
         self.pdf_view.set_grayscale(bool(checked))
         self._sync_grayscale_action(bool(checked))
@@ -1457,6 +1480,12 @@ class MainWindow(QMainWindow):
             self.pdf_view.fit_width()
         else:
             self._set_status("Breite einpassen: PDF öffnen")
+
+    def _fit_height(self):
+        if self.stack.currentWidget() is self.pdf_view:
+            self.pdf_view.fit_height()
+        else:
+            self._set_status("Höhe einpassen: PDF öffnen")
 
     def _zoom_100(self):
         if self.stack.currentWidget() is self.pdf_view:
@@ -1848,6 +1877,7 @@ class MainWindow(QMainWindow):
             from instantlensdoc.core.app_settings import (
                 get_editor_line_numbers,
                 get_editor_markdown_preview,
+                get_editor_show_special_chars,
                 get_editor_soft_wrap,
                 get_pdf_grayscale,
                 get_pdf_night_mode,
@@ -1865,6 +1895,12 @@ class MainWindow(QMainWindow):
                 self._soft_wrap_action.blockSignals(True)
                 self._soft_wrap_action.setChecked(soft)
                 self._soft_wrap_action.blockSignals(False)
+            special = get_editor_show_special_chars()
+            self.editor.set_special_chars_visible(special)
+            if hasattr(self, "_special_chars_action") and self._special_chars_action is not None:
+                self._special_chars_action.blockSignals(True)
+                self._special_chars_action.setChecked(special)
+                self._special_chars_action.blockSignals(False)
             md = get_editor_markdown_preview()
             self.editor_pane.set_preview_visible(md)
             if hasattr(self, "_md_preview_action") and self._md_preview_action is not None:

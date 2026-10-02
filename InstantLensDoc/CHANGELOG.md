@@ -1,5 +1,22 @@
 # Changelog — InstantLens Doc
 
+## 0.3.9 — Fit-Height, Ann.-Statistik, Sonderzeichen, Tray-Version
+
+Fokus auf sinnvolle Ausbauten nach 0.3.8. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### PDF
+- **Höhe einpassen** Ctrl+8 (Menü Ansicht + Toolbar „Höhe“); Breite bleibt Ctrl+9
+- **Annotation-Statistik** im Sidebar-Footer (Anzahl je Typ, unabhängig vom Filter)
+
+### Editor / UX
+- **Sonderzeichen anzeigen** Toggle (Ansicht / Einstellungen / Ctrl+Shift+.) — Tabs, Leerzeichen, Absatzenden
+- **Tray-Tooltip** mit App-Version (`InstantLens Doc v…`); Auto-Update-Hinweis beim Start nur wenn Einstellung aktiv (unverändert)
+
+### Packaging / Docs
+- Version **0.3.9** (App, `ild_pdf`, ISS, Smoke, INFO/FEATURES/README)
+
+---
+
 ## 0.3.8 — Thumbnail-Größe, Ann.-CSV, Zeile verschieben, Overwrite-Schutz
 
 Fokus auf sinnvolle Ausbauten nach 0.3.7. Stubs KI/Cloud/Stylus/3D bleiben Stubs.

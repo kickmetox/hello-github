@@ -35,6 +35,7 @@ DEFAULTS: dict[str, Any] = {
     "recent_dirs": [],
     "editor_markdown_preview": False,
     "editor_soft_wrap": True,
+    "editor_show_special_chars": False,
     "annotations_visible": True,
     "minimize_to_tray": False,
     "page_size_unit": "mm",
@@ -350,6 +351,14 @@ def get_editor_soft_wrap() -> bool:
 
 def set_editor_soft_wrap(enabled: bool) -> None:
     save_settings({"editor_soft_wrap": bool(enabled)})
+
+
+def get_editor_show_special_chars() -> bool:
+    return bool(load_settings().get("editor_show_special_chars", False))
+
+
+def set_editor_show_special_chars(enabled: bool) -> None:
+    save_settings({"editor_show_special_chars": bool(enabled)})
 
 
 def get_annotations_visible() -> bool:

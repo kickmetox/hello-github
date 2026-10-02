@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Smoke-Test 0.3.8 (CLI + optional offscreen Qt). Kernpfade: open/annotate/export/license."""
+"""Smoke-Test 0.3.9 (CLI + optional offscreen Qt). Kernpfade: open/annotate/export/license."""
 
 from __future__ import annotations
 
@@ -112,8 +112,8 @@ def main() -> int:
     from instantlensdoc.core.update_check import check_for_updates
     from instantlensdoc.license import KEY_DAYS, TRIAL_DAYS, generate_key, verify_key
 
-    assert __version__ == "0.3.8", __version__
-    assert ild_ver == "0.3.8", ild_ver
+    assert __version__ == "0.3.9", __version__
+    assert ild_ver == "0.3.9", ild_ver
     assert TRIAL_DAYS == 28 and KEY_DAYS == 32
     key = generate_key("ame@sellerbach.de")
     ok, msg, _ = verify_key(key)
@@ -131,7 +131,7 @@ def main() -> int:
     assert "Settings" in tr("settings")
     set_lang("de")
     upd = check_for_updates(allow_network=False)
-    assert upd.local_version == "0.3.8" and not upd.online
+    assert upd.local_version == "0.3.9" and not upd.online
     assert get_export_jpeg_quality() >= 10
     assert get_ui_lang() in ("de", "en")
     assert 25 <= get_default_zoom_percent() <= 500
@@ -172,8 +172,8 @@ def main() -> int:
     assert get_ann_pen_color() == "#112233"
     assert (ROOT / "CHANGELOG.md").is_file()
     cl = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-    assert "0.3.8" in cl
-    assert "## 0.3.8" in cl
+    assert "0.3.9" in cl
+    assert "## 0.3.9" in cl
     assert "## 0.3.7" in cl
     assert "## 0.3.1" in cl
     assert "## 0.3.0" in cl
@@ -186,7 +186,7 @@ def main() -> int:
     # Kompakt: Einzel-Header 0.2.1–0.2.9 entfernt (nur Kurz-Tabelle)
     assert "## 0.2.9" not in cl and "## 0.2.8" not in cl
     assert "0.2.9" in cl  # noch in Kurz-Tabelle
-    assert "0.3.8" in (ROOT / "README.md").read_text(encoding="utf-8")
+    assert "0.3.9" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "run.bat" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "sync-ild.ps1" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "scripts/sync-ild.ps1" in (ROOT / "FEATURES.md").read_text(encoding="utf-8")
@@ -535,13 +535,13 @@ def main() -> int:
 
         assert (ROOT / "installer" / "installer-hinweis.txt").exists()
         iss = (ROOT / "installer" / "instantlensdoc.iss").read_text(encoding="utf-8")
-        assert "0.3.8" in iss and "desktopicon" in iss and "DisableProgramGroupPage=no" in iss
+        assert "0.3.9" in iss and "desktopicon" in iss and "DisableProgramGroupPage=no" in iss
         assert "UninstallDisplayName" in iss and "Uninstallable=yes" in iss
         assert "IncludeKeygen" in iss and "SetupIconFile" in iss
         assert "InstantLensKeygen.exe" in iss
         assert "uninstallexe" in iss
         bw = (ROOT / "build-windows.ps1").read_text(encoding="utf-8")
-        assert "0.3.8" in bw and "NoKeygenInApp" in bw and "--icon" in bw
+        assert "0.3.9" in bw and "NoKeygenInApp" in bw and "--icon" in bw
         assert "InstantLensKeygen.exe" in bw
         bi = (ROOT / "installer" / "build-installer.ps1").read_text(encoding="utf-8")
         assert "InstantLensKeygen.exe" in bi and "IncludeKeygen" in bi
@@ -560,7 +560,7 @@ def main() -> int:
         assert "QProgressDialog" in (ROOT / "instantlensdoc" / "ui" / "main_window.py").read_text(encoding="utf-8")
 
         assert (ROOT / "examples" / "ild_pdf_demo.py").exists()
-        assert "0.3.8" in (ROOT / "INFO.md").read_text(encoding="utf-8")
+        assert "0.3.9" in (ROOT / "INFO.md").read_text(encoding="utf-8")
         assert (ROOT / "assets" / "app.ico").is_file()
 
         # --- Kernpfade: open / annotate / export / license ---
@@ -728,7 +728,7 @@ def main() -> int:
         win._add_chained_frame()
         assert len(win.layout_doc.text_frames) >= 2
         assert "Lizenz:" in win.license_label.text() or "⚠" in win.license_label.text()
-        assert "v0.3.8" in win.version_label.text()
+        assert "v0.3.9" in win.version_label.text()
         # Lizenz <7 Tage: Style prominent
         st_lic = win.license_manager.status()
         if st_lic.allowed and st_lic.days_remaining < 7:
@@ -904,11 +904,11 @@ def main() -> int:
             assert win.editor.outdent_selection(4)
             assert win.editor.toPlainText().splitlines()[0] == "alpha"
             # Fenstertitel mit Version
-            assert "0.3.8" in win.windowTitle()
+            assert "0.3.9" in win.windowTitle()
             from instantlensdoc.ui.help_dialog import AboutDialog, HelpDialog, open_log_folder
 
             about = AboutDialog(win)
-            assert "0.3.8" in about.windowTitle()
+            assert "0.3.9" in about.windowTitle()
             help_dlg = HelpDialog(win)
             assert help_dlg.windowTitle() == "Hilfe"
             assert callable(open_log_folder)
@@ -1521,6 +1521,51 @@ def main() -> int:
             assert existing.is_file() and existing.read_text(encoding="utf-8") == "keep"
             assert callable(confirm_overwrite_export)
             print("0.3.8 thumb/csv/move-line/overwrite: OK")
+            # 0.3.9: Fit-Height, Ann.-Statistik, Sonderzeichen, Tray-Version
+            from instantlensdoc.core.app_settings import (
+                get_editor_show_special_chars,
+                get_update_check_on_start,
+                set_editor_show_special_chars,
+                set_update_check_on_start,
+            )
+
+            assert callable(win.pdf_view.fit_height)
+            assert callable(win._fit_height)
+            win.pdf_view.fit_height()
+            assert callable(win.pdf_view.fit_width)
+
+            win._refresh_pdf_marks()
+            stats = win.sidebar.ann_stats_label.text()
+            assert stats.startswith("Ann.")
+            assert "Highlight" in stats or "Notiz" in stats or "Ann. " in stats
+
+            set_editor_show_special_chars(False)
+            assert get_editor_show_special_chars() is False
+            win._special_chars_action.setChecked(True)
+            assert win.editor.special_chars_visible()
+            assert get_editor_show_special_chars() is True
+            win._special_chars_action.setChecked(False)
+            assert not win.editor.special_chars_visible()
+            assert get_editor_show_special_chars() is False
+            win.editor.set_special_chars_visible(True)
+            assert win.editor.special_chars_visible()
+            win.editor.set_special_chars_visible(False)
+
+            # Update-Check-on-Start: Setting muss abgefragt werden (silent nur wenn erlaubt)
+            set_update_check_on_start(False)
+            assert get_update_check_on_start() is False
+            set_update_check_on_start(True)
+            assert get_update_check_on_start() is True
+            set_update_check_on_start(False)
+
+            set_minimize_to_tray(True)
+            win.apply_tray_setting()
+            if win._tray is not None:
+                tip = win._tray.toolTip()
+                assert "0.3.9" in tip and "InstantLens Doc" in tip
+            set_minimize_to_tray(False)
+            win.apply_tray_setting()
+            print("0.3.9 fit-h/ann-stats/special/tray: OK")
             win.pdf_view.store.add(
                 Annotation(0, AnnotationType.REDACTION, 5, 5, width=30, height=20, color="#000000", text="REDACT")
             )
@@ -1530,9 +1575,9 @@ def main() -> int:
             from instantlensdoc.ui.password_dialog import CompressPdfDialog, SetPasswordDialog
             from instantlensdoc.ui.stubs import PLANNED
             assert KeyboardHelpDialog and SetPasswordDialog and CompressPdfDialog
-            assert "0.3.8" in PLANNED["ki"]
+            assert "0.3.9" in PLANNED["ki"]
             assert "Coming soon" in PLANNED["cloud"]
-            assert "0.3.8" in PLANNED["stylus"] and "0.3.8" in PLANNED["extrude3d"]
+            assert "0.3.9" in PLANNED["stylus"] and "0.3.9" in PLANNED["extrude3d"]
             # Toolbar ↔ Menü Sync Graustufen/Nacht
             win.pdf_view.set_grayscale(True)
             assert win._grayscale_action.isChecked()
@@ -1567,12 +1612,12 @@ def main() -> int:
             assert win.editor.toPlainText().splitlines() == ["one", "two"]
             from instantlensdoc.ui.help_dialog import HELP_HTML
 
-            assert "Stub 0.3.8" in HELP_HTML
+            assert "Stub 0.3.9" in HELP_HTML
             assert "scripts/sync-ild.ps1" in HELP_HTML
             assert "Präsentationsmodus" in HELP_HTML or "F5" in (
                 ROOT / "instantlensdoc" / "ui" / "keyboard_help.py"
             ).read_text(encoding="utf-8")
-            print("0.3.4–0.3.8 review OK")
+            print("0.3.4–0.3.9 review OK")
             assert callable(win.pdf_view.bake_redactions)
             assert callable(win.pdf_view.clear_redactions)
             assert callable(win._set_pdf_password)

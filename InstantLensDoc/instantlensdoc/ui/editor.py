@@ -9,7 +9,7 @@ from PySide6.QtCore import QRect, QSize, Qt
 from PySide6.QtGui import QColor, QFont, QImage, QPainter, QTextCharFormat, QTextCursor, QTextDocument, QTextOption
 from PySide6.QtWidgets import QApplication, QPlainTextEdit, QTextEdit, QWidget
 
-from instantlensdoc.core.app_settings import get_editor_line_numbers, get_editor_soft_wrap
+from instantlensdoc.core.app_settings import get_editor_line_numbers, get_editor_soft_wrap, get_editor_show_special_chars
 
 
 class _LineNumberArea(QWidget):
@@ -36,12 +36,14 @@ class TextEditor(QPlainTextEdit):
         self._last_case_sensitive = False
         self._line_numbers = bool(get_editor_line_numbers())
         self._soft_wrap = bool(get_editor_soft_wrap())
+        self._show_special = bool(get_editor_show_special_chars())
         self._line_number_area = _LineNumberArea(self)
         self.blockCountChanged.connect(self._update_line_number_area_width)
         self.updateRequest.connect(self._update_line_number_area)
         self._update_line_number_area_width(0)
         self.set_line_numbers_visible(self._line_numbers)
         self.set_soft_wrap(self._soft_wrap)
+        self.set_special_chars_visible(self._show_special)
 
     def line_number_area_width(self) -> int:
         if not self._line_numbers:
@@ -69,6 +71,29 @@ class TextEditor(QPlainTextEdit):
 
     def soft_wrap_enabled(self) -> bool:
         return bool(self._soft_wrap)
+
+    def set_special_chars_visible(self, visible: bool) -> None:
+        """Tabs/Leerzeichen/Absatzenden als sichtbare Sonderzeichen (ShowTabsAndSpaces)."""
+        self._show_special = bool(visible)
+        option = self.document().defaultTextOption()
+        flags = option.flags()
+        flag = QTextOption.ShowTabsAndSpaces
+        # Paragraph-Marken zusätzlich, falls verfügbar
+        para = getattr(QTextOption, "ShowLineAndParagraphSeparators", None)
+        if self._show_special:
+            flags |= flag
+            if para is not None:
+                flags |= para
+        else:
+            flags &= ~flag
+            if para is not None:
+                flags &= ~para
+        option.setFlags(flags)
+        self.document().setDefaultTextOption(option)
+        self.viewport().update()
+
+    def special_chars_visible(self) -> bool:
+        return bool(self._show_special)
 
     def goto_line(self, line: int) -> bool:
         """Cursor auf 1-basierte Zeilennummer setzen; True bei Erfolg."""

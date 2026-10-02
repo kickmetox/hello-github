@@ -701,6 +701,9 @@ class PdfViewer(QWidget):
         btn_fit_w = QPushButton("Breite")
         btn_fit_w.setToolTip("Seitenbreite einpassen (Ctrl+9)")
         btn_fit_w.clicked.connect(self.fit_width)
+        btn_fit_h = QPushButton("Höhe")
+        btn_fit_h.setToolTip("Seitenhöhe einpassen (Ctrl+8)")
+        btn_fit_h.clicked.connect(self.fit_height)
         btn_undo = QPushButton("↶")
         btn_undo.setToolTip("Annotation rückgängig (Ctrl+Z)")
         btn_undo.clicked.connect(self.undo_annotation)
@@ -858,6 +861,7 @@ class PdfViewer(QWidget):
         toolbar.addWidget(btn_zoom_in)
         toolbar.addWidget(btn_fit)
         toolbar.addWidget(btn_fit_w)
+        toolbar.addWidget(btn_fit_h)
         toolbar.addWidget(btn_rot_ccw)
         toolbar.addWidget(btn_rot)
         toolbar.addWidget(btn_flip_h)
@@ -1551,6 +1555,24 @@ class PdfViewer(QWidget):
             scale = vw / pw
             self.set_scale(scale, immediate=True)
             self.status.emit(f"Breite einpassen ({int(round(scale * 100))}%)")
+        except Exception as e:
+            QMessageBox.warning(self, "Zoom", str(e))
+
+    def fit_height(self):
+        """Seitenhöhe an Viewport anpassen."""
+        if not self.pdf_path:
+            return
+        try:
+            from ild_pdf import PdfDocument
+
+            with PdfDocument(self.pdf_path, password=self.password) as doc:
+                _pw, ph = doc.page_size(self.page_index)
+            _vw, vh = self._viewport_size()
+            if ph <= 0:
+                return
+            scale = vh / ph
+            self.set_scale(scale, immediate=True)
+            self.status.emit(f"Höhe einpassen ({int(round(scale * 100))}%)")
         except Exception as e:
             QMessageBox.warning(self, "Zoom", str(e))
 
