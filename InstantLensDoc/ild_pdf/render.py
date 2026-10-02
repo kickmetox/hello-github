@@ -12,8 +12,8 @@ import pypdfium2 as pdfium
 from .document import PdfDocument
 from .limits import clamp_render_scale
 
-# LRU: (path_str, mtime_ns, page, scale_key, grayscale) → PIL Image
-_CACHE: "OrderedDict[Tuple[str, int, int, float, bool], Image.Image]" = OrderedDict()
+# LRU: (path_str, mtime_ns, page, scale_key, grayscale, invert) → PIL Image
+_CACHE: "OrderedDict[Tuple[str, int, int, float, bool, bool], Image.Image]" = OrderedDict()
 _CACHE_MAX = 24
 
 
@@ -35,7 +35,7 @@ def _mtime_ns(path: Path) -> int:
         return 0
 
 
-def _cache_get(key: Tuple[str, int, int, float, bool]) -> Optional[Image.Image]:
+def _cache_get(key: Tuple[str, int, int, float, bool, bool]) -> Optional[Image.Image]:
     img = _CACHE.get(key)
     if img is None:
         return None
@@ -43,7 +43,7 @@ def _cache_get(key: Tuple[str, int, int, float, bool]) -> Optional[Image.Image]:
     return img.copy()
 
 
-def _cache_put(key: Tuple[str, int, int, float, bool], img: Image.Image) -> None:
+def _cache_put(key: Tuple[str, int, int, float, bool, bool], img: Image.Image) -> None:
     _CACHE[key] = img.copy()
     _CACHE.move_to_end(key)
     while len(_CACHE) > _CACHE_MAX:
@@ -62,6 +62,24 @@ def _to_grayscale(img: Image.Image) -> Image.Image:
     return img.convert("L").convert("RGB")
 
 
+def invert_for_display(img: Image.Image) -> Image.Image:
+    """
+    Dunkle Invert-Ansicht (Nachtmodus) — nur Darstellung, nicht zum Speichern/Export.
+    Alpha-Kanal bleibt erhalten.
+    """
+    from PIL import ImageOps
+
+    if img.mode == "RGBA":
+        r, g, b, a = img.split()
+        rgb = Image.merge("RGB", (r, g, b))
+        inv = ImageOps.invert(rgb)
+        ir, ig, ib = inv.split()
+        return Image.merge("RGBA", (ir, ig, ib, a))
+    if img.mode == "L":
+        return ImageOps.invert(img)
+    return ImageOps.invert(img.convert("RGB"))
+
+
 def render_page(
     source: Union[str, Path, PdfDocument, pdfium.PdfDocument],
     page_index: int = 0,
@@ -70,8 +88,14 @@ def render_page(
     use_cache: bool = True,
     password: Optional[str] = None,
     grayscale: bool = False,
+    invert: bool = False,
 ) -> Image.Image:
-    """Eine Seite als PIL-Image rendern (optional LRU-Cache, optional Graustufen)."""
+    """
+    Eine Seite als PIL-Image rendern (optional LRU-Cache, Graustufen, Invert).
+
+    ``invert`` ist für die Nachtmodus-Ansicht gedacht und sollte bei
+    Speichern/Export nicht gesetzt werden.
+    """
     own = False
     path_for_cache: Optional[Path] = None
     if isinstance(source, (str, Path)):
@@ -92,13 +116,21 @@ def render_page(
             eff_scale, _ = clamp_render_scale(float(pw), float(ph), scale)
             scale_key = round(eff_scale, 3)
             gray = bool(grayscale)
-            cache_key: Optional[Tuple[str, int, int, float, bool]] = None
+            inv = bool(invert)
+            cache_key: Optional[Tuple[str, int, int, float, bool, bool]] = None
             if use_cache and path_for_cache is not None:
                 try:
                     resolved = str(path_for_cache.resolve())
                 except OSError:
                     resolved = str(path_for_cache)
-                cache_key = (resolved, _mtime_ns(path_for_cache), page_index, scale_key, gray)
+                cache_key = (
+                    resolved,
+                    _mtime_ns(path_for_cache),
+                    page_index,
+                    scale_key,
+                    gray,
+                    inv,
+                )
                 hit = _cache_get(cache_key)
                 if hit is not None:
                     return hit
@@ -106,6 +138,8 @@ def render_page(
             img = bitmap.to_pil()
             if gray:
                 img = _to_grayscale(img)
+            if inv:
+                img = invert_for_display(img)
             if cache_key is not None:
                 _cache_put(cache_key, img)
             return img
@@ -123,6 +157,7 @@ def render_pages(
     *,
     password: Optional[str] = None,
     grayscale: bool = False,
+    invert: bool = False,
 ) -> List[Image.Image]:
     """Mehrere Seiten rendern. Ohne indices: alle Seiten."""
     own = False
@@ -137,7 +172,8 @@ def render_pages(
     try:
         pages = list(indices) if indices is not None else list(range(len(doc)))
         return [
-            render_page(doc, i, scale=scale, grayscale=grayscale) for i in pages
+            render_page(doc, i, scale=scale, grayscale=grayscale, invert=invert)
+            for i in pages
         ]
     finally:
         if own:
@@ -150,7 +186,10 @@ def convert_from_path(
     *,
     password: Optional[str] = None,
     grayscale: bool = False,
+    invert: bool = False,
 ) -> List[Image.Image]:
     """pdf2image-ähnliche API für Drop-in-Ersatz."""
     scale = dpi / 72.0
-    return render_pages(path, scale=scale, password=password, grayscale=grayscale)
+    return render_pages(
+        path, scale=scale, password=password, grayscale=grayscale, invert=invert
+    )

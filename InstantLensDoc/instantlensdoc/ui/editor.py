@@ -309,6 +309,81 @@ class TextEditor(QPlainTextEdit):
         self.setTextCursor(cur)
         return True
 
+    def indent_selection(self, spaces: int = 4) -> bool:
+        """Einrückung der ausgewählten Zeilen erhöhen (Leerzeichen voranstellen)."""
+        return self._adjust_indent(+max(1, int(spaces)))
+
+    def outdent_selection(self, spaces: int = 4) -> bool:
+        """Einrückung der ausgewählten Zeilen verringern."""
+        return self._adjust_indent(-max(1, int(spaces)))
+
+    def _adjust_indent(self, delta: int) -> bool:
+        """delta > 0: einrücken; delta < 0: ausrücken. Wirkt auf alle Zeilen der Auswahl."""
+        cur = self.textCursor()
+        doc = self.document()
+        if cur.hasSelection():
+            start = cur.selectionStart()
+            end = cur.selectionEnd()
+        else:
+            start = end = cur.position()
+        start_block = doc.findBlock(start)
+        end_block = doc.findBlock(end if end > start else start)
+        # Wenn Auswahl am Zeilenanfang endet, letzte Zeile nicht mitnehmen
+        if cur.hasSelection() and end > start and doc.findBlock(end).position() == end:
+            end_block = end_block.previous()
+            if not end_block.isValid():
+                end_block = start_block
+
+        pad = " " * abs(delta)
+        cur.beginEditBlock()
+        block = start_block
+        first_pos = start_block.position()
+        last_pos = end_block.position() + end_block.length() - 1
+        while block.isValid() and block.position() <= end_block.position():
+            bcur = QTextCursor(block)
+            bcur.movePosition(QTextCursor.StartOfBlock)
+            text = block.text()
+            if delta > 0:
+                bcur.insertText(pad)
+            else:
+                remove = 0
+                for ch in text[: abs(delta)]:
+                    if ch == " ":
+                        remove += 1
+                    elif ch == "\t":
+                        remove += 1
+                        break
+                    else:
+                        break
+                if remove:
+                    bcur.movePosition(QTextCursor.Right, QTextCursor.KeepAnchor, remove)
+                    bcur.removeSelectedText()
+            block = block.next()
+        cur.endEditBlock()
+        # Auswahl über die betroffenen Zeilen wiederherstellen
+        new_cur = self.textCursor()
+        new_cur.setPosition(first_pos)
+        end_blk = doc.findBlock(last_pos)
+        if not end_blk.isValid():
+            end_blk = doc.lastBlock()
+        new_cur.setPosition(
+            end_blk.position() + max(0, end_blk.length() - 1),
+            QTextCursor.KeepAnchor,
+        )
+        self.setTextCursor(new_cur)
+        return True
+
+    def keyPressEvent(self, event):  # noqa: N802
+        if event.key() == Qt.Key_Tab and not (event.modifiers() & Qt.ControlModifier):
+            if event.modifiers() & Qt.ShiftModifier:
+                self.outdent_selection()
+            elif self.textCursor().hasSelection():
+                self.indent_selection()
+            else:
+                super().keyPressEvent(event)
+            return
+        super().keyPressEvent(event)
+
     def word_stats(self) -> tuple[int, int]:
         """(Wörter, Zeichen inkl. Whitespace) des aktuellen Texts."""
         text = self.toPlainText()

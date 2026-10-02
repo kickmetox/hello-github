@@ -333,6 +333,16 @@ class MainWindow(QMainWindow):
         act_toggle_case.setToolTip("Auswahl: GROSS → klein → Titel → GROSS")
         act_toggle_case.triggered.connect(self._toggle_case_selection)
         m_edit.addAction(act_toggle_case)
+        act_indent = QAction("Einrückung erhöhen", self)
+        act_indent.setShortcut(QKeySequence("Ctrl+]"))
+        act_indent.setToolTip("Ausgewählte Zeilen einrücken (auch Tab bei Auswahl)")
+        act_indent.triggered.connect(self._indent_selection)
+        m_edit.addAction(act_indent)
+        act_outdent = QAction("Einrückung verringern", self)
+        act_outdent.setShortcut(QKeySequence("Ctrl+["))
+        act_outdent.setToolTip("Ausgewählte Zeilen ausrücken (auch Shift+Tab)")
+        act_outdent.triggered.connect(self._outdent_selection)
+        m_edit.addAction(act_outdent)
         act_clear_marks = QAction("Markierungen löschen", self)
         act_clear_marks.triggered.connect(self._clear_editor_marks)
         m_edit.addAction(act_clear_marks)
@@ -356,7 +366,11 @@ class MainWindow(QMainWindow):
         m_view.addAction(a)
         self._line_numbers_action = QAction("Zeilennummern", self)
         self._line_numbers_action.setCheckable(True)
-        from instantlensdoc.core.app_settings import get_editor_line_numbers, get_pdf_grayscale
+        from instantlensdoc.core.app_settings import (
+            get_editor_line_numbers,
+            get_pdf_grayscale,
+            get_pdf_night_mode,
+        )
 
         self._line_numbers_action.setChecked(get_editor_line_numbers())
         self._line_numbers_action.setToolTip("Zeilennummern im Texteditor anzeigen")
@@ -368,6 +382,14 @@ class MainWindow(QMainWindow):
         self._grayscale_action.setToolTip("PDF-Seiten in Graustufen rendern und exportieren")
         self._grayscale_action.toggled.connect(self._toggle_grayscale)
         m_view.addAction(self._grayscale_action)
+        self._night_action = QAction("PDF Nachtmodus", self)
+        self._night_action.setCheckable(True)
+        self._night_action.setChecked(get_pdf_night_mode())
+        self._night_action.setToolTip(
+            "Dunkle Invert-Ansicht (nur Darstellung, nicht speichern/exportieren)"
+        )
+        self._night_action.toggled.connect(self._toggle_night_mode)
+        m_view.addAction(self._night_action)
         m_view.addSeparator()
         act_zi = QAction("Vergrößern", self)
         act_zi.setShortcut(QKeySequence.ZoomIn)
@@ -442,6 +464,7 @@ class MainWindow(QMainWindow):
             ("Seite horizontal spiegeln ↔", lambda: self.pdf_view.flip_current(horizontal=True)),
             ("Seite vertikal spiegeln ↕", lambda: self.pdf_view.flip_current(vertical=True)),
             ("Graustufen umschalten", lambda: self._toggle_grayscale(not self.pdf_view.grayscale_enabled())),
+            ("Nachtmodus umschalten", lambda: self._toggle_night_mode(not self.pdf_view.night_mode_enabled())),
             ("Leere Seite einfügen", lambda: self.pdf_view.insert_blank_after_current()),
             ("Seite duplizieren", lambda: self.pdf_view.duplicate_current()),
             ("Seite löschen…", lambda: self.pdf_view.delete_current()),
@@ -515,6 +538,10 @@ class MainWindow(QMainWindow):
         m_help.addAction(a)
         a = QAction("Hilfe…", self)
         a.triggered.connect(lambda: HelpDialog(self).exec())
+        m_help.addAction(a)
+        a = QAction("Logordner öffnen", self)
+        a.setToolTip("Crash-/App-Logordner im Dateimanager öffnen")
+        a.triggered.connect(self._open_log_folder)
         m_help.addAction(a)
         m_help.addSeparator()
         a = QAction("Auf Updates prüfen…", self)
@@ -645,6 +672,13 @@ class MainWindow(QMainWindow):
             self._grayscale_action.setChecked(bool(checked))
             self._grayscale_action.blockSignals(False)
 
+    def _toggle_night_mode(self, checked: bool):
+        self.pdf_view.set_night_mode(bool(checked))
+        if hasattr(self, "_night_action") and self._night_action is not None:
+            self._night_action.blockSignals(True)
+            self._night_action.setChecked(bool(checked))
+            self._night_action.blockSignals(False)
+
     def _toggle_case_selection(self):
         if self.stack.currentWidget() is not self.editor:
             self._set_status("Groß-/Kleinschreibung nur im Texteditor")
@@ -653,6 +687,32 @@ class MainWindow(QMainWindow):
             self._set_status("Schreibweise umgeschaltet")
         else:
             self._set_status("Keine Textauswahl")
+
+    def _indent_selection(self):
+        if self.stack.currentWidget() is not self.editor:
+            self._set_status("Einrückung nur im Texteditor")
+            return
+        if self.editor.indent_selection():
+            self._set_status("Einrückung erhöht")
+        else:
+            self._set_status("Einrückung nicht möglich")
+
+    def _outdent_selection(self):
+        if self.stack.currentWidget() is not self.editor:
+            self._set_status("Einrückung nur im Texteditor")
+            return
+        if self.editor.outdent_selection():
+            self._set_status("Einrückung verringert")
+        else:
+            self._set_status("Einrückung nicht möglich")
+
+    def _open_log_folder(self):
+        from instantlensdoc.ui.help_dialog import open_log_folder
+
+        if open_log_folder(self):
+            from instantlensdoc.core.logging_setup import log_dir
+
+            self._set_status(f"Logordner: {log_dir()}")
 
     def _app_title(self, suffix: str | None = None) -> str:
         base = f"{DISPLAY_NAME} {__version__}"
@@ -1178,7 +1238,11 @@ class MainWindow(QMainWindow):
         if SettingsDialog(self).exec():
             sync_from_settings()
             self._sync_theme_menu()
-            from instantlensdoc.core.app_settings import get_editor_line_numbers, get_pdf_grayscale
+            from instantlensdoc.core.app_settings import (
+                get_editor_line_numbers,
+                get_pdf_grayscale,
+                get_pdf_night_mode,
+            )
 
             show_ln = get_editor_line_numbers()
             self.editor.set_line_numbers_visible(show_ln)
@@ -1192,6 +1256,12 @@ class MainWindow(QMainWindow):
                 self._grayscale_action.blockSignals(True)
                 self._grayscale_action.setChecked(gray)
                 self._grayscale_action.blockSignals(False)
+            night = get_pdf_night_mode()
+            self.pdf_view.set_night_mode(night)
+            if hasattr(self, "_night_action") and self._night_action is not None:
+                self._night_action.blockSignals(True)
+                self._night_action.setChecked(night)
+                self._night_action.blockSignals(False)
             self._autosave_timer.setInterval(get_autosave_interval_sec() * 1000)
             self.pdf_view.apply_settings_colors()
             self._set_status(

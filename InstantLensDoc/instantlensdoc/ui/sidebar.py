@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (
     QComboBox,
     QHBoxLayout,
     QLabel,
+    QLineEdit,
     QListWidget,
     QListWidgetItem,
     QPushButton,
@@ -151,6 +152,12 @@ class Sidebar(QWidget):
         self.ann_filter.addItem("Alle Typen", "")
         self.ann_filter.currentIndexChanged.connect(self._on_ann_filter_changed)
         layout.addWidget(self.ann_filter)
+        self.ann_search = QLineEdit()
+        self.ann_search.setPlaceholderText("Annotationen suchen…")
+        self.ann_search.setClearButtonEnabled(True)
+        self.ann_search.setToolTip("Filtert die Annotationsliste nach Text")
+        self.ann_search.textChanged.connect(self._on_ann_search_changed)
+        layout.addWidget(self.ann_search)
         self.annotations = QListWidget()
         self.annotations.setMaximumHeight(140)
         self.annotations.setToolTip("Klick → zur Annotation springen")
@@ -167,6 +174,7 @@ class Sidebar(QWidget):
         self._ann_all_lines: list[str] = []
         self._ann_all_payloads: list = []
         self._ann_filter_updating = False
+        self._ann_search_query = ""
 
     def search_text(self) -> str:
         return self.search.currentText().strip()
@@ -351,6 +359,13 @@ class Sidebar(QWidget):
         self._apply_annotation_filter()
         self.annotation_filter_changed.emit(self.annotation_filter_type())
 
+    def _on_ann_search_changed(self, text: str = ""):
+        self._ann_search_query = (text or "").strip().lower()
+        self._apply_annotation_filter()
+
+    def annotation_search_text(self) -> str:
+        return getattr(self, "ann_search", None) and self.ann_search.text().strip() or ""
+
     def _sync_ann_filter_options(self, payloads: list | None):
         """Filter-Dropdown mit vorkommenden Typen aktualisieren (Auswahl behalten)."""
         current = self.annotation_filter_type()
@@ -391,6 +406,7 @@ class Sidebar(QWidget):
 
     def _apply_annotation_filter(self):
         want = self.annotation_filter_type()
+        query = self._ann_search_query
         self.annotations.clear()
         for i, line in enumerate(self._ann_all_lines):
             payload = self._ann_all_payloads[i] if i < len(self._ann_all_payloads) else None
@@ -399,6 +415,13 @@ class Sidebar(QWidget):
                     payload, "type", None
                 )
                 if str(t) != want:
+                    continue
+            if query:
+                hay = line.lower()
+                extra = ""
+                if payload is not None:
+                    extra = str(getattr(payload, "text", "") or "").lower()
+                if query not in hay and query not in extra:
                     continue
             item = QListWidgetItem(line)
             if payload is not None:
@@ -414,7 +437,12 @@ class Sidebar(QWidget):
     def clear_annotations(self):
         self._ann_all_lines = []
         self._ann_all_payloads = []
+        self._ann_search_query = ""
         self.annotations.clear()
+        if hasattr(self, "ann_search"):
+            self.ann_search.blockSignals(True)
+            self.ann_search.clear()
+            self.ann_search.blockSignals(False)
         self._ann_filter_updating = True
         self.ann_filter.blockSignals(True)
         self.ann_filter.clear()

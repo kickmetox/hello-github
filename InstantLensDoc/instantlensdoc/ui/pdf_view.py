@@ -63,10 +63,12 @@ from instantlensdoc.core.app_settings import (
     get_ann_pen_color,
     get_default_zoom_scale,
     get_pdf_grayscale,
+    get_pdf_night_mode,
     set_ann_default_opacity,
     set_ann_highlight_color,
     set_ann_pen_color,
     set_pdf_grayscale,
+    set_pdf_night_mode,
 )
 
 
@@ -571,6 +573,7 @@ class PdfViewer(QWidget):
         self._highlight_color = get_ann_highlight_color()
         self._pen_color = get_ann_pen_color()
         self._grayscale = get_pdf_grayscale()
+        self._night_mode = get_pdf_night_mode()
         self._default_opacity = get_ann_default_opacity()
         self._search_query = ""
         self._search_rects: list[tuple[float, float, float, float]] = []
@@ -708,10 +711,19 @@ class PdfViewer(QWidget):
         self.btn_grayscale.setChecked(self._grayscale)
         self.btn_grayscale.setToolTip("PDF-Seiten in Graustufen rendern/exportieren")
         self.btn_grayscale.toggled.connect(self.set_grayscale)
+        self.btn_night = QToolButton()
+        self.btn_night.setText("Nacht")
+        self.btn_night.setCheckable(True)
+        self.btn_night.setChecked(self._night_mode)
+        self.btn_night.setToolTip(
+            "Nachtmodus: dunkle Invert-Ansicht (nur Darstellung, nicht speichern/exportieren)"
+        )
+        self.btn_night.toggled.connect(self.set_night_mode)
         toolbar.addWidget(self.btn_hl_color)
         toolbar.addWidget(self.btn_pen_color)
         toolbar.addWidget(self.spin_opacity)
         toolbar.addWidget(self.btn_grayscale)
+        toolbar.addWidget(self.btn_night)
 
         toolbar.addWidget(btn_prev)
         toolbar.addWidget(self.lbl_page)
@@ -823,6 +835,27 @@ class PdfViewer(QWidget):
     def grayscale_enabled(self) -> bool:
         return bool(self._grayscale)
 
+    def set_night_mode(self, enabled: bool):
+        """Dunkle Invert-Ansicht — nur Viewer/Thumbs, nie Export/Speichern."""
+        enabled = bool(enabled)
+        changed = self._night_mode != enabled
+        self._night_mode = enabled
+        set_pdf_night_mode(enabled)
+        if hasattr(self, "btn_night"):
+            self.btn_night.blockSignals(True)
+            self.btn_night.setChecked(enabled)
+            self.btn_night.blockSignals(False)
+        if changed and self.pdf_path:
+            from ild_pdf.render import clear_render_cache
+
+            clear_render_cache(self.pdf_path)
+            self.refresh()
+        if changed:
+            self.status.emit("Nachtmodus an" if enabled else "Nachtmodus aus")
+
+    def night_mode_enabled(self) -> bool:
+        return bool(self._night_mode)
+
     def apply_settings_colors(self):
         self._highlight_color = get_ann_highlight_color()
         self._pen_color = get_ann_pen_color()
@@ -838,6 +871,11 @@ class PdfViewer(QWidget):
             self.btn_grayscale.blockSignals(True)
             self.btn_grayscale.setChecked(self._grayscale)
             self.btn_grayscale.blockSignals(False)
+        self._night_mode = get_pdf_night_mode()
+        if hasattr(self, "btn_night"):
+            self.btn_night.blockSignals(True)
+            self.btn_night.setChecked(self._night_mode)
+            self.btn_night.blockSignals(False)
 
     def apply_default_zoom(self):
         self.set_scale(get_default_zoom_scale(), immediate=True)
@@ -1073,6 +1111,7 @@ class PdfViewer(QWidget):
                 scale=self.scale,
                 password=self.password,
                 grayscale=self._grayscale,
+                invert=self._night_mode,
             )
             anns = self.store.for_page(self.page_index) if self.store else []
             self.canvas.set_page_image(img, anns, scale=self.scale)
@@ -1738,6 +1777,7 @@ class PdfViewer(QWidget):
                         password=self.password,
                         use_cache=True,
                         grayscale=self._grayscale,
+                        invert=self._night_mode,
                     )
                 )
             except Exception:

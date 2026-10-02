@@ -1,5 +1,25 @@
 # Changelog — InstantLens Doc
 
+## 0.2.9 — Nachtmodus, Ann.-Suche, Einrückung, Logordner
+
+Fokus: PDF-Nachtmodus, Annotation-Suche, Editor-Einrückung, Crash-Log-Zugang.
+
+### PDF
+- **Nachtmodus**: dunkle Invert-Ansicht (Toolbar „Nacht“, Ansicht-Menü, Einstellungen); nur Darstellung — **nicht** speichern/exportieren (`render_page(..., invert=True)`)
+
+### Annotationen / Sidebar
+- **Textsuche in der Annotationsliste** (Filterfeld unter Typ-Dropdown)
+
+### Editor / UX
+- **Einrückung erhöhen/verringern** für Auswahl (Ctrl+] / Ctrl+[; Tab / Shift+Tab)
+- **Hilfe → Logordner öffnen** (+ Button im Hilfe-Dialog) für Crash-/App-Logs
+
+### Docs / Packaging
+- Version **0.2.9**; Stubs KI/Cloud/Stylus/3D unverändert (keine Fake-Features)
+- Docs/CHANGELOG/ISS/Smoke auf 0.2.9
+
+---
+
 ## 0.2.8 — Graustufen, Ann.-Deckkraft, Case-Toggle, Splash/Titel
 
 Fokus: PDF-Graustufen, Annotation-Opacity, Editor Schreibweise, Splash/Fenstertitel.

@@ -30,6 +30,7 @@ DEFAULTS: dict[str, Any] = {
     "ann_pen_color": "#2C3E50",
     "editor_line_numbers": False,
     "pdf_grayscale": False,
+    "pdf_night_mode": False,
     "ann_default_opacity": 1.0,
 }
 
@@ -227,6 +228,15 @@ def get_pdf_grayscale() -> bool:
 
 def set_pdf_grayscale(enabled: bool) -> None:
     save_settings({"pdf_grayscale": bool(enabled)})
+
+
+def get_pdf_night_mode() -> bool:
+    """Nachtmodus (Invert-Ansicht) — nur Darstellung, nicht Export/Speichern."""
+    return bool(load_settings().get("pdf_night_mode", False))
+
+
+def set_pdf_night_mode(enabled: bool) -> None:
+    save_settings({"pdf_night_mode": bool(enabled)})
 
 
 def get_ann_default_opacity() -> float:

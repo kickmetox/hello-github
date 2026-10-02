@@ -2,11 +2,23 @@
 
 from __future__ import annotations
 
-from PySide6.QtGui import QIcon
-from PySide6.QtWidgets import QDialog, QDialogButtonBox, QLabel, QTabWidget, QTextBrowser, QVBoxLayout
+from PySide6.QtCore import QUrl
+from PySide6.QtGui import QDesktopServices, QIcon
+from PySide6.QtWidgets import (
+    QDialog,
+    QDialogButtonBox,
+    QHBoxLayout,
+    QLabel,
+    QMessageBox,
+    QPushButton,
+    QTabWidget,
+    QTextBrowser,
+    QVBoxLayout,
+)
 
 from instantlensdoc import __version__
 from instantlensdoc.config import CONTACT_EMAIL, DISPLAY_NAME, ROOT, VENDOR, icon_paths_for_qt
+from instantlensdoc.core.logging_setup import log_dir
 
 
 HELP_HTML = """
@@ -24,17 +36,20 @@ HELP_HTML = """
 <li><b>Datei → Exportieren</b>: Editor-Inhalt als HTML, DOCX oder PDF (zuletzt genutzter Ordner wird gemerkt)</li>
 <li><b>Datei → Drucken</b> (Ctrl+P): Editor oder aktuelle PDF-Seite (Qt Print)</li>
 <li><b>Seitenleiste</b>: Suche (inkl. letzte Suchbegriffe), „Alle Docs“-Volltext, Zuletzt geöffnet, Dokumente,
-    Lesezeichen/Outline (+/− hinzufügen/löschen), <b>Annotationen</b> (klickbar, <b>Filter nach Typ</b>), Markierungen/Treffer</li>
+    Lesezeichen/Outline (+/− hinzufügen/löschen), <b>Annotationen</b> (klickbar, <b>Filter nach Typ</b>,
+    <b>Textsuche in der Liste</b>), Markierungen/Treffer</li>
 <li><b>Bearbeiten → Rückgängig/Wiederholen</b>: Editor-Text <i>oder</i> PDF-Annotationen/Overlay-Text (Ctrl+Z / Ctrl+Y)</li>
 <li><b>Bearbeiten → Suchen und Ersetzen</b> (Ctrl+R): Find/Replace im Texteditor</li>
 <li><b>Bearbeiten → Auswahl markieren</b> (Ctrl+H): Markierung im Editor + Eintrag in der Seitenleiste</li>
 <li><b>Bearbeiten → Groß-/Kleinschreibung umschalten</b> (Ctrl+Shift+U): Auswahl GROSS → klein → Titel</li>
+<li><b>Bearbeiten → Einrückung erhöhen/verringern</b> (Ctrl+] / Ctrl+[; Tab / Shift+Tab bei Auswahl)</li>
 <li><b>Ansicht</b>: Zoom +/−, Seite einpassen (Ctrl+0), Breite (Ctrl+9), 100&nbsp;% (Ctrl+1);
-    <b>Hell/Dunkel</b>-Design umschalten; optionale <b>Zeilennummern</b>; <b>PDF Graustufen</b></li>
+    <b>Hell/Dunkel</b>-Design umschalten; optionale <b>Zeilennummern</b>; <b>PDF Graustufen</b>;
+    <b>PDF Nachtmodus</b> (Invert-Ansicht, nur Darstellung)</li>
 <li><b>Drag &amp; Drop</b>: Dateien auf das Fenster ziehen zum Öffnen</li>
 <li><b>Autosave</b>: Textdokumente (mit Pfad) und PDF-Annotationen — Intervall in Einstellungen</li>
 <li><b>PDF</b>: Blättern, Zoom/Fit (debounced + Cache), <b>⟲/⟳ drehen</b> / <b>↔/↕ spiegeln</b> (speichert),
-    <b>Graustufen</b> (Ansicht + Bild-Export),
+    <b>Graustufen</b> (Ansicht + Bild-Export), <b>Nachtmodus</b> (nur Ansicht, nicht speichern),
     <b>leere Seite / duplizieren</b>, Seite löschen, Seiten neu anordnen;
     Annotationen: Highlight (Drag) + <b>Farben-Picker HL/Stift</b> + <b>Deckkraft α</b>, <b>Schwärzen/Redaction</b> (Drag + Preview „REDACT“ + Einbrennen-Dialog), Unterstreichen, Notiz, <b>Text-Overlay</b>, Stempel, Callout,
     <b>Rechteck / Linie / Pfeil / Lineal</b> —
@@ -53,6 +68,7 @@ HELP_HTML = """
     große PDFs: Warnung / Limits;
     <b>Seiten-Thumbnails</b> in der Sidebar</li>
 <li><b>Hilfe → Auf Updates prüfen</b>: lokal immer; Online optional (offline OK)</li>
+<li><b>Hilfe → Logordner öffnen</b>: Crash-/App-Logs im Dateimanager</li>
 <li><b>Zwischenablage</b>: Bild einfügen (Editor Ctrl+Shift+V / PDF Strg+V) — Stempel oder neue Seite</li>
 <li><b>Session</b>: Offene Dokumente (Sidebar-Liste) werden beim Beenden gespeichert und beim Start wiederhergestellt</li>
 <li><b>Logging</b>: Datei unter <code>%APPDATA%/InstantLensDoc/logs/</code> (Windows) bzw. <code>~/.config/InstantLensDoc/logs/</code></li>
@@ -80,8 +96,21 @@ Beispiel: <code>examples/ild_pdf_demo.py</code>. API: <code>ild_pdf/README.md</c
 <code>D:\\AI_Temp\\InstantLensDoc</code>, pip, optional Start. Eigenes Icon in <code>assets</code> bleibt erhalten.</p>
 <h3>Geplante Features</h3>
 <p>KI-Assistent, Cloud-Sync, Stylus/Palm Rejection, 3D u. a. sind im Menü als „Geplant“ markiert
-(Stub 0.2.8) — siehe FEATURES.md.</p>
+(Stub 0.2.9) — siehe FEATURES.md.</p>
 """
+
+
+def open_log_folder(parent=None) -> bool:
+    """Logordner im Dateimanager öffnen; True bei Erfolg."""
+    path = log_dir()
+    ok = QDesktopServices.openUrl(QUrl.fromLocalFile(str(path)))
+    if not ok and parent is not None:
+        QMessageBox.information(
+            parent,
+            "Logordner",
+            f"Logordner konnte nicht geöffnet werden.\nPfad:\n{path}",
+        )
+    return bool(ok)
 
 
 class HelpDialog(QDialog):
@@ -103,6 +132,14 @@ class HelpDialog(QDialog):
             feat.setPlainText("FEATURES.md nicht gefunden.")
         tabs.addTab(feat, "Features")
         layout.addWidget(tabs)
+
+        btn_row = QHBoxLayout()
+        btn_logs = QPushButton("Logordner öffnen")
+        btn_logs.setToolTip("Crash-/App-Logordner im Dateimanager öffnen")
+        btn_logs.clicked.connect(lambda: open_log_folder(self))
+        btn_row.addWidget(btn_logs)
+        btn_row.addStretch(1)
+        layout.addLayout(btn_row)
 
         buttons = QDialogButtonBox(QDialogButtonBox.Close)
         buttons.rejected.connect(self.reject)

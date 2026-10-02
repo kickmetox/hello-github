@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | 0.2.8 |
+| Version | 0.2.9 |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -32,9 +32,9 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)
 
-## Neu in 0.2.8
+## Neu in 0.2.9
 
-- PDF-Seiten Graustufen rendern/exportieren (Toggle)  
-- Annotation-Deckkraft (Opacity)  
-- Editor: Groß-/Kleinschreibung der Auswahl umschalten  
-- Start-Splash / Fenstertitel „InstantLens Doc 0.2.8“  
+- PDF-Nachtmodus (Invert-Ansicht, nur Darstellung)  
+- Annotation-Suche in Sidebar-Liste  
+- Editor: Einrückung erhöhen/verringern  
+- Hilfe: Logordner öffnen  

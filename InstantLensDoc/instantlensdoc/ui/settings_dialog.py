@@ -30,6 +30,7 @@ from instantlensdoc.core.app_settings import (
     get_export_pdf_page,
     get_ocr_lang,
     get_pdf_grayscale,
+    get_pdf_night_mode,
     get_theme,
     get_ui_lang,
     get_update_check_on_start,
@@ -41,6 +42,7 @@ from instantlensdoc.core.app_settings import (
     set_editor_line_numbers,
     set_ocr_lang,
     set_pdf_grayscale,
+    set_pdf_night_mode,
     set_theme,
     set_ui_lang,
     set_update_check_on_start,
@@ -110,6 +112,11 @@ class SettingsDialog(QDialog):
         self.pdf_grayscale.setChecked(get_pdf_grayscale())
         self.pdf_grayscale.setToolTip("Seitenansicht und Bild-Export monochrom")
         form.addRow(self.pdf_grayscale)
+
+        self.pdf_night = QCheckBox("PDF Nachtmodus (Invert-Ansicht)")
+        self.pdf_night.setChecked(get_pdf_night_mode())
+        self.pdf_night.setToolTip("Dunkle Invert-Ansicht — nur Darstellung, nicht speichern/exportieren")
+        form.addRow(self.pdf_night)
 
         self.jpeg_q = QSpinBox()
         self.jpeg_q.setRange(10, 100)
@@ -181,6 +188,7 @@ class SettingsDialog(QDialog):
         set_autosave_interval_sec(int(self.autosave_sec.value()))
         set_editor_line_numbers(self.line_numbers.isChecked())
         set_pdf_grayscale(self.pdf_grayscale.isChecked())
+        set_pdf_night_mode(self.pdf_night.isChecked())
         save_settings(
             {
                 "export_jpeg_quality": int(self.jpeg_q.value()),
