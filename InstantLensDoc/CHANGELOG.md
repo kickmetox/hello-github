@@ -1,5 +1,23 @@
 # Changelog — InstantLens Doc
 
+## 0.4.1 — PDF-Links, Stempel-Rotation, Encoding, Multi-Drop
+
+Fokus: sinnvolle UX-Inkremente ohne Feature-Spam. Stubs KI/Cloud/Stylus/3D unverändert.
+
+### PDF
+- Native **Link-Annotationen** (http/https) klickbar öffnen — Werkzeug Auswahl oder Ctrl+Klick; Hand-Cursor
+- Einfache **Stempel-Rotation** in 90°-Schritten (Toolbar „Stempel ↻“, Menü, Edit-Dialog; Sidecar-Feld `rotation`)
+
+### Editor / UX
+- **Encoding** UTF-8 / Latin-1 beim Öffnen und Speichern (Menü + Einstellungen-Standard)
+- **Drag & Drop** mehrerer Dateien öffnet mehrere Tabs (Sidebar)
+
+### Packaging / Docs
+- Version **0.4.1** (App, `ild_pdf`, ISS, Build, Docs, Smoke)
+- FEATURES / INFO / CHANGELOG / Hilfe aktualisiert
+
+---
+
 ## 0.4.0 — Release-Konsolidierung (0.3.0 → 0.4.0)
 
 Meilenstein: alle 0.3.x-Inkremente gebündelt, Version einheitlich **0.4.0**, Smoke um ausgewählte 0.3.x-Pfade erweitert, kleine Review-Fixes. Stubs KI/Cloud/Stylus/3D bleiben Stubs (keine Fake-Features).

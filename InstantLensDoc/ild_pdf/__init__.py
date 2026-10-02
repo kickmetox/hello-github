@@ -82,6 +82,7 @@ from .attachments import (
     has_attachments,
     list_attachments,
 )
+from .links import UriLink, is_external_http_uri, list_page_uri_links, uri_link_at
 
 __all__ = [
     "PdfDocument",
@@ -164,6 +165,10 @@ __all__ = [
     "list_attachments",
     "extract_attachment",
     "extract_all_attachments",
+    "UriLink",
+    "is_external_http_uri",
+    "list_page_uri_links",
+    "uri_link_at",
 ]
 
-__version__ = "0.4.0"
+__version__ = "0.4.1"

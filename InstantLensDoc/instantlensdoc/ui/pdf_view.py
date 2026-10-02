@@ -5,9 +5,11 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Optional
 
-from PySide6.QtCore import QPointF, Qt, QTimer, Signal
+from PySide6.QtCore import QPointF, Qt, QTimer, Signal, QUrl
 from PySide6.QtGui import (
     QColor,
+    QCursor,
+    QDesktopServices,
     QImage,
     QKeySequence,
     QPainter,
@@ -50,7 +52,9 @@ from ild_pdf import (
     bake_text_overlays,
     find_text_rects,
     import_page_text_as_overlays,
+    list_page_uri_links,
     render_page,
+    uri_link_at,
 )
 from ild_pdf.pages import (
     delete_pages,
@@ -226,6 +230,19 @@ class TextOverlayEditDialog(QDialog):
             form.addRow("Schriftgröße (px):", self.font_size)
             form.addRow("Farbe:", self.color)
         form.addRow("Deckkraft:", self.opacity)
+        self.rotation = None
+        if ann.type == AnnotationType.STAMP:
+            self.rotation = QDoubleSpinBox()
+            self.rotation.setRange(0, 270)
+            self.rotation.setSingleStep(90)
+            self.rotation.setDecimals(0)
+            try:
+                rot = float(getattr(ann, "rotation", 0.0) or 0.0)
+            except (TypeError, ValueError):
+                rot = 0.0
+            self.rotation.setValue(float(int(round(rot / 90.0)) % 4 * 90))
+            self.rotation.setToolTip("Stempel-Drehung in 90°-Schritten")
+            form.addRow("Drehung (°):", self.rotation)
         layout.addLayout(form)
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         buttons.accepted.connect(self.accept)
@@ -240,6 +257,9 @@ class TextOverlayEditDialog(QDialog):
         if self._show_style:
             out["font_size"] = float(self.font_size.value())
             out["color"] = self.color.text().strip() or "#1A5276"
+        if self.rotation is not None:
+            rot = float(self.rotation.value())
+            out["rotation"] = float(int(round(rot / 90.0)) % 4 * 90)
         return out
 
 
@@ -250,6 +270,7 @@ class PdfCanvas(QLabel):
     drag_finished = Signal(float, float, float, float)  # x0,y0,x1,y1
     overlay_edit_requested = Signal(str)  # ann id
     annotation_selected = Signal(str)  # ann id (leer = Auswahl aufheben)
+    uri_link_clicked = Signal(str)  # externe http(s)-URL
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -257,6 +278,7 @@ class PdfCanvas(QLabel):
         self.setMinimumSize(200, 200)
         self._pixmap: Optional[QPixmap] = None
         self._annotations: list[Annotation] = []
+        self._uri_links: list = []
         self._drag_tool: AnnotationType | None = None
         self._select_mode = False
         self._drag_start: tuple[float, float] | None = None
@@ -269,6 +291,15 @@ class PdfCanvas(QLabel):
         self._annotations_visible = True
         self.setMouseTracking(True)
         self.setFocusPolicy(Qt.StrongFocus)
+
+    def set_uri_links(self, links: list | None):
+        self._uri_links = list(links or [])
+
+    def _hit_uri_link(self, x: float, y: float):
+        for link in reversed(self._uri_links):
+            if link.contains(x, y):
+                return link
+        return None
 
     def set_annotations_visible(self, visible: bool):
         self._annotations_visible = bool(visible)
@@ -437,6 +468,22 @@ class PdfCanvas(QLabel):
             painter.setPen(QColor(ann.color))
             painter.drawText(x + 2, y + int(max(ann.font_size, 12)), (ann.text or "")[:80])
         elif ann.type in (AnnotationType.STAMP, AnnotationType.SIGNATURE):
+            try:
+                rot = float(getattr(ann, "rotation", 0.0) or 0.0)
+            except (TypeError, ValueError):
+                rot = 0.0
+            rot = float(int(round(rot / 90.0)) % 4 * 90)
+            box_h = max(h, 48 if "\n" in (ann.text or "") else 36)
+            box_w = max(w, 120)
+            if ann.type == AnnotationType.SIGNATURE and not (ann.text or "").startswith("img:"):
+                box_w, box_h = max(w, 80), max(h, 32)
+            cx = x + box_w / 2.0
+            cy = y + box_h / 2.0
+            painter.save()
+            if rot:
+                painter.translate(cx, cy)
+                painter.rotate(rot)
+                painter.translate(-cx, -cy)
             if ann.text.startswith("img:"):
                 img_path = Path(ann.text[4:])
                 if img_path.is_file():
@@ -454,24 +501,26 @@ class PdfCanvas(QLabel):
                                 Qt.SmoothTransformation,
                             ),
                         )
+                        painter.restore()
                         painter.setOpacity(1.0)
                         return
             if ann.type == AnnotationType.SIGNATURE:
                 painter.setPen(QPen(QColor("#2C3E50"), 2, Qt.DashLine))
                 painter.drawRect(x, y, max(w, 80), max(h, 32))
                 painter.drawText(x + 4, y + 16, "Signatur")
+                painter.restore()
                 painter.setOpacity(1.0)
                 return
             stamp_color = QColor(ann.color if ann.color != "#FFFF00" else "#C0392B")
             painter.setPen(QPen(stamp_color, 3))
-            box_h = max(h, 48 if "\n" in (ann.text or "") else 36)
-            painter.drawRect(x, y, max(w, 120), box_h)
+            painter.drawRect(x, y, box_w, box_h)
             painter.setPen(stamp_color)
             lines = (ann.text or "STEMPEL").splitlines()[:3]
             ty = y + 16
             for line in lines:
                 painter.drawText(x + 8, ty, line[:28])
                 ty += 16
+            painter.restore()
         elif ann.type == AnnotationType.SIGNATURE_FIELD:
             painter.setPen(QPen(QColor(ann.color or "#7F8C8D"), 2, Qt.DashLine))
             painter.setBrush(QColor(255, 255, 255, _a(30)))
@@ -579,6 +628,12 @@ class PdfCanvas(QLabel):
         if event.button() == Qt.RightButton or (
             event.button() == Qt.LeftButton and event.modifiers() & Qt.ControlModifier
         ):
+            # Ctrl+Klick: URI-Link öffnen wenn getroffen, sonst Overlay-Edit
+            if event.button() == Qt.LeftButton and event.modifiers() & Qt.ControlModifier:
+                link = self._hit_uri_link(x, y)
+                if link:
+                    self.uri_link_clicked.emit(link.uri)
+                    return
             hit = self._hit_overlay(x, y)
             if hit:
                 self.overlay_edit_requested.emit(hit.id)
@@ -589,6 +644,10 @@ class PdfCanvas(QLabel):
                 self.annotation_selected.emit(hit_any.id if hit_any else "")
                 return
         if self._select_mode and event.button() == Qt.LeftButton:
+            link = self._hit_uri_link(x, y)
+            if link and not (event.modifiers() & Qt.ShiftModifier):
+                self.uri_link_clicked.emit(link.uri)
+                return
             hit_any = self._hit_annotation(x, y)
             self.annotation_selected.emit(hit_any.id if hit_any else "")
             return
@@ -611,6 +670,12 @@ class PdfCanvas(QLabel):
             if pt:
                 self._drag_current = pt
                 self._repaint_overlay()
+        else:
+            pt = self._map_to_page(event)
+            if pt and self._hit_uri_link(*pt):
+                self.setCursor(QCursor(Qt.PointingHandCursor))
+            else:
+                self.unsetCursor()
         super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event):
@@ -713,6 +778,9 @@ class PdfViewer(QWidget):
         btn_del_ann = QPushButton("Ann. löschen")
         btn_del_ann.setToolTip("Ausgewählte Annotation löschen, sonst die letzte (Entf)")
         btn_del_ann.clicked.connect(self.delete_annotation)
+        btn_stamp_rot = QPushButton("Stempel ↻")
+        btn_stamp_rot.setToolTip("Ausgewählten Stempel um 90° drehen")
+        btn_stamp_rot.clicked.connect(lambda: self.rotate_selected_stamp(90))
         btn_rot_ccw = QPushButton("⟲")
         btn_rot_ccw.setToolTip("Aktuelle Seite 90° gegen den Uhrzeigersinn drehen (−90°) und speichern")
         btn_rot_ccw.clicked.connect(lambda: self.rotate_current(-90))
@@ -761,7 +829,10 @@ class PdfViewer(QWidget):
         btn_select = QToolButton()
         btn_select.setText("Auswahl")
         btn_select.setCheckable(True)
-        btn_select.setToolTip("Annotation anklicken zum Auswählen; Entf löscht")
+        btn_select.setToolTip(
+            "Annotation anklicken zum Auswählen; Entf löscht; "
+            "PDF-Links (http/https) öffnen; Ctrl+Klick öffnet Link auch mit anderem Werkzeug"
+        )
         btn_select.clicked.connect(lambda checked: self._set_tool(None))
         self._tool_buttons.append(btn_select)
         toolbar.addWidget(btn_select)
@@ -856,6 +927,7 @@ class PdfViewer(QWidget):
         toolbar.addWidget(btn_undo)
         toolbar.addWidget(btn_redo)
         toolbar.addWidget(btn_del_ann)
+        toolbar.addWidget(btn_stamp_rot)
         toolbar.addWidget(btn_zoom_out)
         toolbar.addWidget(self.lbl_zoom)
         toolbar.addWidget(btn_zoom_in)
@@ -888,6 +960,7 @@ class PdfViewer(QWidget):
         self.canvas.drag_finished.connect(self._on_drag)
         self.canvas.overlay_edit_requested.connect(self._edit_overlay)
         self.canvas.annotation_selected.connect(self._on_annotation_selected)
+        self.canvas.uri_link_clicked.connect(self._open_uri_link)
         self.scroll.setWidget(self.canvas)
         layout.addWidget(self.scroll)
         self.canvas.set_drag_tool(AnnotationType.HIGHLIGHT, select_mode=False)
@@ -1328,6 +1401,16 @@ class PdfViewer(QWidget):
             )
             anns = self.store.for_page(self.page_index) if self.store else []
             self.canvas.set_page_image(img, anns, scale=self.scale)
+            try:
+                links = list_page_uri_links(
+                    self.pdf_path,
+                    self.page_index,
+                    scale=self.scale,
+                    password=self.password,
+                )
+            except Exception:
+                links = []
+            self.canvas.set_uri_links(links)
             if self._search_rects:
                 self.canvas.set_search_highlights(self._search_rects, self._search_index)
             self.lbl_page.setText(f"{self.page_index + 1} / {self.page_count}")
@@ -2212,6 +2295,45 @@ class PdfViewer(QWidget):
         self.annotations_changed.emit()
         self.status.emit(f"Annotation dupliziert ({dup.type.value})")
         return True
+
+    def rotate_selected_stamp(self, degrees: int = 90) -> bool:
+        """Ausgewählten Stempel um 90°-Schritte drehen (Sidecar)."""
+        if not self.store or not self._selected_ann_id:
+            self.status.emit("Kein Stempel ausgewählt")
+            return False
+        ann = self.store.get(self._selected_ann_id)
+        if not ann or ann.type != AnnotationType.STAMP:
+            self.status.emit("Auswahl ist kein Stempel")
+            return False
+        try:
+            cur = float(getattr(ann, "rotation", 0.0) or 0.0)
+        except (TypeError, ValueError):
+            cur = 0.0
+        new_rot = float(int(round((cur + float(degrees)) / 90.0)) % 4 * 90)
+        self.store.update(ann.id, rotation=new_rot)
+        try:
+            self.store.save()
+        except Exception as e:
+            QMessageBox.warning(self, "Stempel drehen", str(e))
+            return False
+        self.refresh()
+        self.annotations_changed.emit()
+        self.status.emit(f"Stempel gedreht ({int(new_rot)}°)")
+        return True
+
+    def _open_uri_link(self, uri: str) -> None:
+        """Externe http(s)-URL im Systembrowser öffnen."""
+        from ild_pdf import is_external_http_uri
+
+        raw = (uri or "").strip()
+        if not is_external_http_uri(raw):
+            self.status.emit("Kein gültiger externer Link")
+            return
+        ok = QDesktopServices.openUrl(QUrl(raw))
+        if ok:
+            self.status.emit(f"Link geöffnet: {raw[:80]}")
+        else:
+            QMessageBox.warning(self, "Link", f"URL konnte nicht geöffnet werden:\n{raw}")
 
     def rotate_current(self, degrees: int = 90):
         """Aktuelle Seite drehen (−90/90/180/270) und PDF speichern."""

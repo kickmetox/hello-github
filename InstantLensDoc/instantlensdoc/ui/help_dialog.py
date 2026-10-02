@@ -54,13 +54,15 @@ HELP_HTML = f"""
     <b>Soft-Wrap</b>; <b>Sonderzeichen anzeigen</b> (Ctrl+Shift+.);
     <b>PDF Graustufen</b>; <b>PDF Nachtmodus</b> (Invert-Ansicht, nur Darstellung);
     <b>Annotation-Layer</b> ein/aus (Ctrl+Shift+A)</li>
-<li><b>Drag &amp; Drop</b>: Dateien auf das Fenster ziehen zum Öffnen</li>
+<li><b>Datei → Öffnen/Speichern mit Encoding</b>: UTF-8 oder Latin-1 für Textdateien (Standard in Einstellungen)</li>
+<li><b>Drag &amp; Drop</b>: eine oder mehrere Dateien auf das Fenster ziehen → mehrere Tabs</li>
 <li><b>Autosave</b>: Textdokumente (mit Pfad) und PDF-Annotationen — Intervall in Einstellungen</li>
 <li><b>PDF</b>: Blättern, Zoom/Fit (debounced + Cache), <b>⟲/⟳ drehen</b> / <b>↔/↕ spiegeln</b> (speichert),
     <b>Graustufen</b> (Ansicht + Bild-Export), <b>Nachtmodus</b> (nur Ansicht, nicht speichern),
     <b>leere Seite / duplizieren</b>, Seite löschen, Seiten neu anordnen;
+    <b>PDF-Links (http/https)</b> per Auswahl-Werkzeug / Ctrl+Klick öffnen;
     Annotationen: Highlight (Drag) + <b>Farben-Picker HL/Stift</b> + <b>3 Favoriten</b> + <b>Deckkraft α</b>, <b>Schwärzen/Redaction</b> (Drag + Preview „REDACT“ + Einbrennen-Dialog), Unterstreichen, Notiz, <b>Text-Overlay</b>,
-    <b>Stempel-Bibliothek</b> (GENEHMIGT/ENTWURF/VERTRAULICH + Datum), Callout,
+    <b>Stempel-Bibliothek</b> (GENEHMIGT/ENTWURF/VERTRAULICH + Datum, <b>Rotation 90°</b>), Callout,
     <b>Rechteck / Linie / Pfeil / Lineal</b> —
     Sidecar <code>*.ildann.json</code> (v3, Auto-Save, Undo/Redo); JSON/CSV Export, JSON Import;
     <b>Textsuche</b> highlightet Treffer auf der aktuellen Seite;

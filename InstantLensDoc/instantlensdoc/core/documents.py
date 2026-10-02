@@ -8,6 +8,24 @@ from enum import Enum
 from pathlib import Path
 from typing import Optional
 
+# Editor-Textcodierungen (Öffnen/Speichern)
+TEXT_ENCODINGS = ("utf-8", "latin-1")
+ENCODING_LABELS = {
+    "utf-8": "UTF-8",
+    "latin-1": "Latin-1 (ISO-8859-1)",
+}
+
+
+def normalize_text_encoding(encoding: str | None) -> str:
+    """Nur utf-8 / latin-1; Default utf-8."""
+    enc = (encoding or "utf-8").strip().lower().replace("_", "-")
+    if enc in ("utf8", "utf-8", "utf"):
+        return "utf-8"
+    if enc in ("latin-1", "latin1", "iso-8859-1", "iso8859-1", "cp1252"):
+        # cp1252-ähnlich bewusst auf latin-1 mappen (Aufgabenumfang)
+        return "latin-1"
+    return "utf-8"
+
 
 class DocKind(str, Enum):
     TEXT = "text"
@@ -34,6 +52,10 @@ class Document:
             return self.path.name
         return self.title
 
+    @property
+    def encoding(self) -> str:
+        return normalize_text_encoding(self.meta.get("encoding"))
+
 
 def detect_kind(path: Path) -> DocKind:
     ext = path.suffix.lower()
@@ -52,7 +74,7 @@ def detect_kind(path: Path) -> DocKind:
     return DocKind.UNKNOWN
 
 
-def open_document(path: str | Path) -> Document:
+def open_document(path: str | Path, *, encoding: str | None = None) -> Document:
     path = Path(path)
     if not path.exists():
         raise FileNotFoundError(f"Datei nicht gefunden: {path}")
@@ -61,8 +83,18 @@ def open_document(path: str | Path) -> Document:
     kind = detect_kind(path)
     doc = Document(path=path, kind=kind, title=path.name)
 
+    if encoding is None:
+        try:
+            from instantlensdoc.core.app_settings import get_editor_text_encoding
+
+            encoding = get_editor_text_encoding()
+        except Exception:
+            encoding = "utf-8"
+    enc = normalize_text_encoding(encoding)
+
     if kind in (DocKind.TEXT, DocKind.MARKDOWN, DocKind.HTML):
-        doc.text = path.read_text(encoding="utf-8", errors="replace")
+        doc.text = path.read_text(encoding=enc, errors="replace")
+        doc.meta["encoding"] = enc
     elif kind == DocKind.DOCX:
         try:
             from docx import Document as DocxDocument
@@ -79,8 +111,9 @@ def open_document(path: str | Path) -> Document:
         doc.text = ""
         doc.meta["image"] = str(path)
     else:
-        doc.text = path.read_text(encoding="utf-8", errors="replace")
+        doc.text = path.read_text(encoding=enc, errors="replace")
         doc.kind = DocKind.TEXT
+        doc.meta["encoding"] = enc
     return doc
 
 
@@ -94,7 +127,12 @@ def backup_existing(path: Path) -> Path | None:
     return bak
 
 
-def save_document(doc: Document, path: Optional[Path] = None) -> Path:
+def save_document(
+    doc: Document,
+    path: Optional[Path] = None,
+    *,
+    encoding: str | None = None,
+) -> Path:
     target = Path(path or doc.path or "unbenannt.txt")
     kind = detect_kind(target) if path else doc.kind
 
@@ -107,6 +145,17 @@ def save_document(doc: Document, path: Optional[Path] = None) -> Path:
     except Exception:
         pass
 
+    if encoding is None:
+        encoding = doc.meta.get("encoding")
+    if encoding is None:
+        try:
+            from instantlensdoc.core.app_settings import get_editor_text_encoding
+
+            encoding = get_editor_text_encoding()
+        except Exception:
+            encoding = "utf-8"
+    enc = normalize_text_encoding(encoding)
+
     if kind == DocKind.DOCX:
         from instantlensdoc.core.export import export_docx
 
@@ -114,7 +163,8 @@ def save_document(doc: Document, path: Optional[Path] = None) -> Path:
     elif kind == DocKind.HTML:
         stripped = (doc.text or "").lstrip().lower()
         if stripped.startswith("<!doctype") or stripped.startswith("<html"):
-            target.write_text(doc.text, encoding="utf-8")
+            target.write_text(doc.text, encoding=enc, errors="replace")
+            doc.meta["encoding"] = enc
         else:
             from instantlensdoc.core.export import export_html
 
@@ -127,7 +177,8 @@ def save_document(doc: Document, path: Optional[Path] = None) -> Path:
         if doc.path and doc.path.resolve() != target.resolve():
             shutil.copy2(doc.path, target)
     else:
-        target.write_text(doc.text, encoding="utf-8")
+        target.write_text(doc.text, encoding=enc, errors="replace")
+        doc.meta["encoding"] = enc
 
     doc.path = target
     doc.kind = kind

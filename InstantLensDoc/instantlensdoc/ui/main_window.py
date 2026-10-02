@@ -390,6 +390,10 @@ class MainWindow(QMainWindow):
         act_open.setShortcut(QKeySequence.Open)
         act_open.triggered.connect(self.open_dialog)
         m_file.addAction(act_open)
+        act_open_enc = QAction("Öffnen mit Encoding…", self)
+        act_open_enc.setToolTip("Textdatei mit UTF-8 oder Latin-1 öffnen")
+        act_open_enc.triggered.connect(self.open_dialog_with_encoding)
+        m_file.addAction(act_open_enc)
 
         self._recent_menu = m_file.addMenu("Zuletzt geöffnet")
         m_file.addSeparator()
@@ -398,6 +402,10 @@ class MainWindow(QMainWindow):
         act_save.setShortcut(QKeySequence.Save)
         act_save.triggered.connect(self.save_doc)
         m_file.addAction(act_save)
+        act_save_enc = QAction("Speichern mit Encoding…", self)
+        act_save_enc.setToolTip("Aktuelles Textdokument mit UTF-8 oder Latin-1 speichern")
+        act_save_enc.triggered.connect(self.save_doc_with_encoding)
+        m_file.addAction(act_save_enc)
         act_save_all = QAction("Alles speichern", self)
         act_save_all.setShortcut(QKeySequence("Ctrl+Alt+Shift+S"))
         act_save_all.setToolTip("Aktuelles Dokument + Annotation-Sidecars aller offenen PDF-Tabs")
@@ -711,6 +719,7 @@ class MainWindow(QMainWindow):
             ("Lesezeichen löschen", self._outline_delete),
             ("Seite drehen 90° ⟳", lambda: self.pdf_view.rotate_current(90)),
             ("Seite drehen −90° ⟲", lambda: self.pdf_view.rotate_current(-90)),
+            ("Stempel 90° drehen ↻", lambda: self.pdf_view.rotate_selected_stamp(90)),
             ("Seite horizontal spiegeln ↔", lambda: self.pdf_view.flip_current(horizontal=True)),
             ("Seite vertikal spiegeln ↕", lambda: self.pdf_view.flip_current(vertical=True)),
             ("Graustufen umschalten", lambda: self._toggle_grayscale(not self.pdf_view.grayscale_enabled())),
@@ -1262,14 +1271,20 @@ class MainWindow(QMainWindow):
         super().dragEnterEvent(event)
 
     def dropEvent(self, event):
+        paths: list[str] = []
         for url in event.mimeData().urls():
             if not url.isLocalFile():
                 continue
             path = url.toLocalFile()
             if path:
+                paths.append(path)
+        if paths:
+            for path in paths:
                 self.open_path(path)
-                event.acceptProposedAction()
-                return
+            event.acceptProposedAction()
+            n = len(paths)
+            self._set_status(f"{n} Datei(en) per Drag & Drop geöffnet")
+            return
         super().dropEvent(event)
 
     def _autosave_tick(self):
@@ -2222,9 +2237,40 @@ class MainWindow(QMainWindow):
             remember_recent_dir(path)
             self.open_path(path)
 
-    def open_path(self, path: str):
+    def _pick_text_encoding(self, title: str, current: str | None = None) -> str | None:
+        from instantlensdoc.core.app_settings import get_editor_text_encoding
+        from instantlensdoc.core.documents import ENCODING_LABELS, TEXT_ENCODINGS, normalize_text_encoding
+        from PySide6.QtWidgets import QInputDialog
+
+        cur = normalize_text_encoding(current or get_editor_text_encoding())
+        labels = [ENCODING_LABELS[e] for e in TEXT_ENCODINGS]
+        idx = list(TEXT_ENCODINGS).index(cur) if cur in TEXT_ENCODINGS else 0
+        choice, ok = QInputDialog.getItem(self, title, "Encoding:", labels, idx, False)
+        if not ok or not choice:
+            return None
+        for enc, lab in ENCODING_LABELS.items():
+            if lab == choice:
+                return enc
+        return cur
+
+    def open_dialog_with_encoding(self):
+        enc = self._pick_text_encoding("Öffnen mit Encoding")
+        if not enc:
+            return
+        start = dialog_start_dir(get_default_open_dir())
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            f"Öffnen ({enc})",
+            start,
+            "Textdokumente (*.txt *.md *.html *.htm *.log *.csv);;Alle (*.*)",
+        )
+        if path:
+            remember_recent_dir(path)
+            self.open_path(path, encoding=enc)
+
+    def open_path(self, path: str, *, encoding: str | None = None):
         try:
-            self.doc = open_document(path)
+            self.doc = open_document(path, encoding=encoding)
         except Exception as e:
             QMessageBox.critical(self, "Öffnen", f"Datei konnte nicht geöffnet werden:\n{e}")
             return
@@ -2265,7 +2311,11 @@ class MainWindow(QMainWindow):
                 self.sidebar.clear_thumbs()
                 self.sidebar.clear_annotations()
             self._update_doc_status()
-            self._set_status(f"Geöffnet: {path}")
+            enc = self.doc.meta.get("encoding")
+            if enc:
+                self._set_status(f"Geöffnet: {path} [{enc}]")
+            else:
+                self._set_status(f"Geöffnet: {path}")
         except Exception as e:
             _log.exception("Anzeige fehlgeschlagen: %s", path)
             QMessageBox.critical(self, "Öffnen", f"Anzeige fehlgeschlagen:\n{e}")
@@ -2294,7 +2344,43 @@ class MainWindow(QMainWindow):
         try:
             save_document(self.doc)
             self._remember_path(self.doc.path)
-            self._set_status(f"Gespeichert: {self.doc.path}")
+            enc = self.doc.meta.get("encoding")
+            suffix = f" [{enc}]" if enc else ""
+            self._set_status(f"Gespeichert: {self.doc.path}{suffix}")
+        except Exception as e:
+            QMessageBox.critical(self, "Speichern", f"Speichern fehlgeschlagen:\n{e}")
+
+    def save_doc_with_encoding(self):
+        st = self.license_manager.status()
+        if not st.allowed:
+            QMessageBox.warning(self, "Lizenz", "Speichern nicht möglich — Lizenz/Trial abgelaufen.")
+            return
+        if not self.doc or self.doc.kind not in (
+            DocKind.TEXT,
+            DocKind.MARKDOWN,
+            DocKind.HTML,
+        ):
+            QMessageBox.information(
+                self,
+                "Encoding",
+                "Encoding gilt für Textdokumente (TXT/MD/HTML).",
+            )
+            return
+        enc = self._pick_text_encoding(
+            "Speichern mit Encoding",
+            self.doc.meta.get("encoding"),
+        )
+        if not enc:
+            return
+        self.doc.text = self.editor.toPlainText()
+        if not self.doc.path:
+            self.save_as()
+            if not self.doc.path:
+                return
+        try:
+            save_document(self.doc, encoding=enc)
+            self._remember_path(self.doc.path)
+            self._set_status(f"Gespeichert ({enc}): {self.doc.path}")
         except Exception as e:
             QMessageBox.critical(self, "Speichern", f"Speichern fehlgeschlagen:\n{e}")
 

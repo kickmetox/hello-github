@@ -108,6 +108,7 @@ class Annotation:
     callout_y: float = 0.0
     font_size: float = 12.0
     opacity: float = 1.0  # Deckkraft 0.05–1.0
+    rotation: float = 0.0  # Stempel-Drehung in Grad (0/90/180/270)
     id: str = field(default_factory=lambda: uuid4().hex)
     created: str = field(
         default_factory=lambda: datetime.now(timezone.utc).isoformat(timespec="seconds")
@@ -156,6 +157,12 @@ class Annotation:
         except (TypeError, ValueError):
             op = 1.0
         data["opacity"] = max(0.05, min(1.0, op))
+        try:
+            rot = float(data.get("rotation", 0.0) or 0.0)
+        except (TypeError, ValueError):
+            rot = 0.0
+        # Einfache Stempel-Rotation: auf 0/90/180/270 normalisieren
+        data["rotation"] = float(int(round(rot / 90.0)) % 4 * 90)
         data.setdefault("created", datetime.now(timezone.utc).isoformat(timespec="seconds"))
         data.setdefault("modified", data["created"])
         known = {f.name for f in cls.__dataclass_fields__.values()}  # type: ignore[attr-defined]

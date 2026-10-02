@@ -10,7 +10,7 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | Fenster-Geometrie speichern | fertig | Größe/Position/State in Settings 0.3.6 |
 | PDF Präsentationsmodus | fertig | Vollbild F5; Pfeiltasten/Leertaste; Esc beendet 0.3.7 |
 | Clipboard-Paste Bild | fertig | Editor + PDF (Stempel/Seite) |
-| TXT / MD / HTML öffnen & speichern | fertig | HTML-Export mit einfachem Markdownish |
+| TXT / MD / HTML öffnen & speichern | fertig | HTML-Export mit einfachem Markdownish; **Encoding UTF-8/Latin-1** 0.4.1 |
 | DOCX öffnen & speichern | teilweise | python-docx; Headings/Listen beim Export |
 | Editor → HTML / DOCX / PDF Export | fertig | Datei → Exportieren; Zielordner merken; Qualität/Format in Einstellungen; **Overwrite-Schutz** 0.3.8 |
 | Drucken (Editor / PDF-Seite) | fertig | Qt PrintDialog (Ctrl+P) |
@@ -40,7 +40,8 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | Annotation-Text editieren | fertig | Notiz/Kommentar/Overlay nachträglich; Doppelklick / Ctrl+E 0.2.7 |
 | Annotation-Deckkraft | fertig | `opacity` Sidecar + Toolbar α + Dialog 0.2.8 |
 | Annotation-Suche Sidebar | fertig | Textfilter in Annotationsliste 0.3.0 |
-| Stempel / Callouts | fertig | Bibliothek GENEHMIGT/ENTWURF/VERTRAULICH + Datum 0.3.1; Callout (2-Klick) |
+| Stempel / Callouts | fertig | Bibliothek GENEHMIGT/ENTWURF/VERTRAULICH + Datum 0.3.1; Callout (2-Klick); **Rotation 90°** 0.4.1 |
+| PDF URI-Links öffnen | fertig | Native Link-Annotationen http/https; Auswahl-Klick / Ctrl+Klick 0.4.1 |
 | PDF AcroForm-Felder | fertig | Bestehende Felder lesen/schreiben (pikepdf) 0.3.1 |
 | PDF-Anhänge | fertig | Auflisten/extrahieren (pikepdf Attachments) 0.3.2 |
 | Annotation-Layer Toggle | fertig | Ansicht + Toolbar; Ctrl+Shift+A 0.3.2 |
@@ -51,7 +52,7 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | PDF Signaturfeld / Signatur (Bild) | fertig | Sidecar; Menü PDF + Werkzeug |
 | Theme Hell/Dunkel | fertig | Ansicht-Menü, persistiert |
 | Autosave Editor / Annotationen | fertig | Intervall in Einstellungen (Default 60 s), nur mit Pfad |
-| Drag-Drop Datei öffnen | fertig | Hauptfenster |
+| Drag-Drop Datei öffnen | fertig | Hauptfenster; **mehrere Dateien → Tabs** 0.4.1 |
 | Formen (Rechteck / Linie / Pfeil) | fertig | Drag-Zeichnung |
 | Messwerkzeug (Lineal) | fertig | Distanz in pt (Scale-bewusst) |
 | Text-Overlay-Editor | fertig | Sidecar; Doppelklick/Strg+Klick; Bake optional |
@@ -100,25 +101,25 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | PyInstaller Build Windows | fertig | `build-windows.ps1`, Icon `assets/app.ico` |
 | Inno-Installer | fertig | Icon, Desktop, Uninstaller, Keygen optional (`InstantLensKeygen.exe`) 0.2.1 |
 | Sync-Skript Windows | fertig | Repo `scripts/sync-ild.ps1`; Store `docs/sync-ild.ps1` |
-| In-App Hilfe / About | fertig | Version 0.4.0; Fenstertitel + Splash; Logordner-Button |
-| CHANGELOG | fertig | **0.4.0** Release-Konsolidierung 0.3.0→0.4.0 |
+| In-App Hilfe / About | fertig | Version 0.4.1; Fenstertitel + Splash; Logordner-Button |
+| CHANGELOG | fertig | **0.4.1** PDF-Links, Stempel-Rotation, Encoding, Multi-Drop (nach **0.4.0** Konsolidierung) |
 | FEATURES.md / INFO.md | fertig | |
 | `ild_pdf` Modul + Beispielskript | fertig | metadata / page size / watermark / redact / acroform / attachments / flatten / **plain text** |
 | Font-Matching | geplant | |
 | Objekt-/Bildbearbeitung | geplant | |
 | Layout-Erhaltung (Scan→edit) | geplant | |
 | Freihand | geplant | |
-| KI-Assistent | Stub | Menü „Geplant“ 0.4.0 (keine Fake-KI) |
+| KI-Assistent | Stub | Menü „Geplant“ 0.4.1 (keine Fake-KI) |
 | Signieren (rechtssicher) | Stub | |
-| Cloud-Sync | Stub | Menü „Geplant“ 0.4.0 (keine Fake-Cloud) |
+| Cloud-Sync | Stub | Menü „Geplant“ 0.4.1 (keine Fake-Cloud) |
 | Text on Path / Text zu Pfaden | geplant | |
 | Envelope Distort / Text Wrap / Area Type | Stub/geplant | |
 | Schnittmasken | geplant | |
 | Füllungen / Live-Effekte | geplant | |
-| 3D-Extrusion | Stub | Menü „Geplant“ 0.4.0 |
+| 3D-Extrusion | Stub | Menü „Geplant“ 0.4.1 |
 | Variable Fonts (voll) | Stub | |
 | Glyphen-Palette | geplant | |
-| Stylus / Palm Rejection | Stub | Menü „Geplant“ 0.4.0 |
-| Intelligente Formerkennung | Stub | Menü „Geplant“ 0.4.0 |
+| Stylus / Palm Rejection | Stub | Menü „Geplant“ 0.4.1 |
+| Intelligente Formerkennung | Stub | Menü „Geplant“ 0.4.1 |
 
 Nicht behauptet als fertig: Cloud, KI, Stylus, 3D — nur Menü-Stubs + dieser Status.

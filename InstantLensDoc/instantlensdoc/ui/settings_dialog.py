@@ -26,6 +26,7 @@ from instantlensdoc.core.app_settings import (
     get_batch_output_dir,
     get_default_open_dir,
     get_default_zoom_percent,
+    get_editor_text_encoding,
     get_export_image_max_edge,
     get_export_jpeg_quality,
     get_export_pdf_page,
@@ -49,6 +50,7 @@ from instantlensdoc.core.app_settings import (
     set_editor_line_numbers,
     set_editor_show_special_chars,
     set_editor_soft_wrap,
+    set_editor_text_encoding,
     set_minimize_to_tray,
     set_ocr_lang,
     set_page_size_unit,
@@ -143,6 +145,14 @@ class SettingsDialog(QDialog):
         self.special_chars.setChecked(get_editor_show_special_chars())
         self.special_chars.setToolTip("Tabs, Leerzeichen und Absatzenden im Editor sichtbar")
         form.addRow(self.special_chars)
+
+        self.enc_combo = QComboBox()
+        self.enc_combo.addItem("UTF-8", "utf-8")
+        self.enc_combo.addItem("Latin-1 (ISO-8859-1)", "latin-1")
+        cur_enc = get_editor_text_encoding()
+        self.enc_combo.setCurrentIndex(1 if cur_enc == "latin-1" else 0)
+        self.enc_combo.setToolTip("Standard-Encoding beim Öffnen/Speichern von Textdateien")
+        form.addRow("Editor-Encoding", self.enc_combo)
 
         self.minimize_tray = QCheckBox("Beim Minimieren in den System-Tray")
         self.minimize_tray.setChecked(get_minimize_to_tray())
@@ -254,6 +264,7 @@ class SettingsDialog(QDialog):
         set_editor_line_numbers(self.line_numbers.isChecked())
         set_editor_soft_wrap(self.soft_wrap.isChecked())
         set_editor_show_special_chars(self.special_chars.isChecked())
+        set_editor_text_encoding(str(self.enc_combo.currentData() or "utf-8"))
         set_minimize_to_tray(self.minimize_tray.isChecked())
         set_backup_on_save(self.backup_on_save.isChecked())
         set_restore_session_on_start(self.restore_session.isChecked())

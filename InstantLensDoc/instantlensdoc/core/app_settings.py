@@ -46,6 +46,7 @@ DEFAULTS: dict[str, Any] = {
     "ann_color_presets": ["#FFE066", "#FF6B6B", "#4ECDC4"],
     "restore_session_on_start": True,
     "pdf_thumbnail_scale": 0.18,
+    "editor_text_encoding": "utf-8",
 }
 
 
@@ -535,3 +536,22 @@ def pdf_thumbnail_icon_size(scale: float | None = None) -> tuple[int, int]:
     w = max(48, min(160, int(round(72 * factor))))
     h = max(64, min(214, int(round(96 * factor))))
     return w, h
+
+
+TEXT_ENCODING_CHOICES = ("utf-8", "latin-1")
+
+
+def get_editor_text_encoding() -> str:
+    """Standard-Encoding für Editor-Öffnen/Speichern (utf-8 | latin-1)."""
+    from instantlensdoc.core.documents import normalize_text_encoding
+
+    raw = str(load_settings().get("editor_text_encoding", "utf-8") or "utf-8")
+    return normalize_text_encoding(raw)
+
+
+def set_editor_text_encoding(encoding: str) -> str:
+    from instantlensdoc.core.documents import normalize_text_encoding
+
+    enc = normalize_text_encoding(encoding)
+    save_settings({"editor_text_encoding": enc})
+    return enc

@@ -94,6 +94,11 @@ def draw_annotations_on_image(
             font = _font(max(ann.font_size, 12))
             draw.text((x + 2, y + 2), (ann.text or "")[:80], fill=stroke, font=font)
         elif ann.type in (AnnotationType.STAMP, AnnotationType.SIGNATURE):
+            try:
+                rot = float(getattr(ann, "rotation", 0.0) or 0.0)
+            except (TypeError, ValueError):
+                rot = 0.0
+            rot = float(int(round(rot / 90.0)) % 4 * 90)
             if (ann.text or "").startswith("img:"):
                 img_path = Path(ann.text[4:])
                 if img_path.is_file():
@@ -101,12 +106,36 @@ def draw_annotations_on_image(
                         stamp = Image.open(img_path).convert("RGBA")
                         tw, th = max(int(w), 40), max(int(h), 24)
                         stamp = stamp.resize((tw, th), Image.Resampling.LANCZOS)
-                        overlay.paste(stamp, (int(x), int(y)), stamp)
+                        if rot:
+                            stamp = stamp.rotate(-rot, expand=True, resample=Image.Resampling.BICUBIC)
+                            tw, th = stamp.size
+                            cx = int(x + max(w, 40) / 2)
+                            cy = int(y + max(h, 24) / 2)
+                            overlay.paste(stamp, (cx - tw // 2, cy - th // 2), stamp)
+                        else:
+                            overlay.paste(stamp, (int(x), int(y)), stamp)
                         continue
                     except Exception:
                         pass
             box_h = max(h, 48 if "\n" in (ann.text or "") else 36)
             bw = max(w, 120)
+            if rot:
+                cx = int(x + bw / 2)
+                cy = int(y + box_h / 2)
+                pad = int(max(bw, box_h) * 1.5) + 8
+                tile = Image.new("RGBA", (pad * 2, pad * 2), (0, 0, 0, 0))
+                td = ImageDraw.Draw(tile)
+                ox, oy = pad - int(bw / 2), pad - int(box_h / 2)
+                td.rectangle([ox, oy, ox + bw, oy + box_h], outline=stroke, width=3)
+                font = _font(14)
+                ty = oy + 6
+                for line in (ann.text or "STEMPEL").splitlines()[:3]:
+                    td.text((ox + 8, ty), line[:28], fill=stroke, font=font)
+                    ty += 16
+                tile = tile.rotate(-rot, expand=True, resample=Image.Resampling.BICUBIC)
+                tw, th = tile.size
+                overlay.paste(tile, (cx - tw // 2, cy - th // 2), tile)
+                continue
             draw.rectangle([x, y, x + bw, y + box_h], outline=stroke, width=3)
             font = _font(14)
             ty = y + 6
