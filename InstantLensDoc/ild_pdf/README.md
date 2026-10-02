@@ -1,7 +1,7 @@
 # ild_pdf — auskoppelbares PDF-Modul
 
 Lizenzfreundliche PDF-Engine auf **pypdfium2 / PDFium** (kein Poppler/GPL).  
-Version **0.4.3**.
+Version **0.4.4**.
 
 ## Installation
 
@@ -79,27 +79,42 @@ python examples/ild_pdf_demo.py pfad/zu/datei.pdf
 | `PAGE_SIZE_PRESETS` / `get_page_boxes` / `set_page_size` / `set_crop_box` | Seitengröße / Crop |
 | `format_size_pair` / `pt_to_mm` / `pt_to_inch` / `to_pt` | Seitengröße mm/inch formatieren |
 
-### Sidecar-Schema (Auszug)
+### Sidecar-Schema v4 (`ildann-v4`) — PDF-Highlight-kompatibel
 
 ```json
 {
-  "version": 3,
+  "version": 4,
+  "schema": "ildann-v4",
   "pdf": "dokument.pdf",
+  "meta": { "y_origin": "top", "coord_space": "render_pixels" },
   "annotations": [
     {
       "page": 0,
-      "type": "text_overlay",
-      "x": 40, "y": 40, "width": 180, "height": 28,
-      "text": "Editierbar",
-      "font_size": 14,
-      "color": "#1A5276"
+      "type": "highlight",
+      "x": 40, "y": 80, "width": 120, "height": 14,
+      "text": "markierter Text",
+      "color": "#FFE066",
+      "opacity": 0.5,
+      "rects": [[40, 80, 120, 14]],
+      "quadPoints": [40, 80, 160, 80, 40, 94, 160, 94],
+      "colorRGB": [1.0, 0.8784, 0.4],
+      "pdf_highlight": {
+        "subtype": "Highlight",
+        "rects": [[40, 80, 120, 14]],
+        "quadPoints": [40, 80, 160, 80, 40, 94, 160, 94],
+        "colorRGB": [1.0, 0.8784, 0.4],
+        "opacity": 0.5,
+        "contents": "markierter Text"
+      }
     }
   ]
 }
 ```
 
-Koordinaten: Render-Pixel bei dem Scale, mit dem die UI/Overlays erzeugt wurden (Standard oft 1.5).  
-Linien/Pfeile/Messung: Start `(x,y)`, Ende `(callout_x, callout_y)`.
+- **Export** (`export_json`): Schema v4 inkl. `rects` / `quadPoints` / `colorRGB` / `pdf_highlight` für Highlight & Underline.
+- **Sidecar-Save**: Kernfelder + `version: 4` / `schema` (Interop-Felder beim Export).
+- Import akzeptiert v3 und v4 (auch `pdf_highlight`-Blöcke).
+- Koordinaten: Render-Pixel; `meta.y_origin=top` (UI). Linien: Start `(x,y)`, Ende `(callout_x, callout_y)`.
 
 ### Hinweis Textbearbeitung
 

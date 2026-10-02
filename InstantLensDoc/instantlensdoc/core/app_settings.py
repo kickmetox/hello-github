@@ -48,6 +48,7 @@ DEFAULTS: dict[str, Any] = {
     "pdf_thumbnail_scale": 0.18,
     "editor_text_encoding": "utf-8",
     "show_page_boxes": False,
+    "show_printer_marks": False,
     "annotations_locked": False,
     "editor_snippets": [
         "Sehr geehrte Damen und Herren,\n\n",
@@ -83,6 +84,15 @@ def load_settings() -> dict[str, Any]:
 def save_settings(updates: dict[str, Any]) -> dict[str, Any]:
     data = load_settings()
     data.update(updates)
+    path = settings_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+    return data
+
+
+def reset_to_defaults() -> dict[str, Any]:
+    """Alle UI-Einstellungen auf Werkseinstellungen (DEFAULTS) zurücksetzen."""
+    data = dict(DEFAULTS)
     path = settings_path()
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(data, indent=2), encoding="utf-8")
@@ -384,6 +394,15 @@ def get_show_page_boxes() -> bool:
 
 def set_show_page_boxes(enabled: bool) -> None:
     save_settings({"show_page_boxes": bool(enabled)})
+
+
+def get_show_printer_marks() -> bool:
+    """Optional: Seitenrand-Druckermarken (Crop/Registration) als Overlay."""
+    return bool(load_settings().get("show_printer_marks", False))
+
+
+def set_show_printer_marks(enabled: bool) -> None:
+    save_settings({"show_printer_marks": bool(enabled)})
 
 
 def get_annotations_locked() -> bool:

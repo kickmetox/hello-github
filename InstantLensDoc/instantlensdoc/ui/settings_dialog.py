@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QMessageBox,
     QPushButton,
     QSpinBox,
     QVBoxLayout,
@@ -41,6 +42,7 @@ from instantlensdoc.core.app_settings import (
     get_ui_lang,
     get_update_check_on_start,
     PDF_THUMBNAIL_SCALE_CHOICES,
+    reset_to_defaults,
     save_settings,
     set_autosave_interval_sec,
     set_backup_on_save,
@@ -239,6 +241,14 @@ class SettingsDialog(QDialog):
 
         layout.addLayout(form)
 
+        reset_row = QHBoxLayout()
+        self.btn_reset = QPushButton("Auf Standard zurücksetzen…")
+        self.btn_reset.setToolTip("Alle Einstellungen auf Werkseinstellungen zurücksetzen")
+        self.btn_reset.clicked.connect(self._reset_defaults)
+        reset_row.addWidget(self.btn_reset)
+        reset_row.addStretch()
+        layout.addLayout(reset_row)
+
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         buttons.accepted.connect(self._save)
         buttons.rejected.connect(self.reject)
@@ -249,6 +259,43 @@ class SettingsDialog(QDialog):
         path = QFileDialog.getExistingDirectory(self, tr("pick_dir"), start)
         if path:
             field.setText(path)
+
+    def _reset_defaults(self):
+        reply = QMessageBox.question(
+            self,
+            "Einstellungen zurücksetzen",
+            "Alle Einstellungen auf Werkseinstellungen zurücksetzen?\n"
+            "(Theme, Zoom, Pfade, Editor-Optionen, Annotation-Farben, …)",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
+        )
+        if reply != QMessageBox.Yes:
+            return
+        reset_to_defaults()
+        sync_from_settings()
+        apply_theme(mode=get_theme())
+        parent = self.parent()
+        if parent is not None and hasattr(parent, "apply_tray_setting"):
+            try:
+                parent.apply_tray_setting()
+            except Exception:
+                pass
+        if parent is not None and hasattr(parent, "_update_doc_status"):
+            try:
+                parent._update_doc_status()
+            except Exception:
+                pass
+        if parent is not None and hasattr(parent, "pdf_view"):
+            try:
+                parent.pdf_view.apply_settings_colors()
+            except Exception:
+                pass
+        QMessageBox.information(
+            self,
+            "Einstellungen",
+            "Werkseinstellungen wiederhergestellt.\nDialog wird geschlossen — Werte sind gespeichert.",
+        )
+        self.accept()
 
     def _save(self):
         theme = self.theme_combo.currentData() or "light"

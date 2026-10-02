@@ -12,6 +12,8 @@ SHORTCUTS_HTML = """
 <tr><td>Textbaustein 1–3 einfügen</td><td><code>Ctrl+Alt+1</code> … <code>3</code></td></tr>
 <tr><td>Annotationen sperren</td><td><code>Ctrl+Shift+L</code></td></tr>
 <tr><td>Seitenrahmen / CropBox</td><td><code>Ctrl+Shift+B</code></td></tr>
+<tr><td>Druckermarken</td><td><code>Ctrl+Alt+M</code></td></tr>
+<tr><td>Zeilen sortieren (A–Z)</td><td><code>Ctrl+Shift+O</code></td></tr>
 <tr><td>Öffnen</td><td><code>Ctrl+O</code></td></tr>
 <tr><td>Speichern</td><td><code>Ctrl+S</code></td></tr>
 <tr><td>Alles speichern</td><td><code>Ctrl+Alt+Shift+S</code></td></tr>
@@ -74,6 +76,7 @@ bzw. Dialog „zusammenführen / teilen / Bereich“.</p>
 <p><b>Gehe zu Zeile:</b> Bearbeiten → Ctrl+G (nur Texteditor).</p>
 <p><b>Zeile duplizieren:</b> Bearbeiten → Ctrl+D (aktuelle Zeile oder Auswahl).</p>
 <p><b>Zeile verschieben:</b> Bearbeiten → Alt+Up / Alt+Down (aktuelle Zeile oder Auswahl).</p>
+<p><b>Zeilen sortieren (A–Z):</b> Bearbeiten → Ctrl+Shift+O (Auswahl; ohne Auswahl ganze Datei).</p>
 <p><b>Sonderzeichen:</b> Ansicht → Sonderzeichen anzeigen (Ctrl+Shift+.) — Tabs/Leerzeichen/Absätze.</p>
 <p><b>Kommentieren:</b> Bearbeiten → Ctrl+/ (# oder // je nach Dateityp).</p>
 <p><b>Groß-/Kleinschreibung:</b> Bearbeiten → Ctrl+Shift+U (Auswahl).</p>

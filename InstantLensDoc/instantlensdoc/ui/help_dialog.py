@@ -31,7 +31,8 @@ HELP_HTML = f"""
     <b>Standard-Zoom</b>, <b>Autosave-Intervall</b>,     Soft-Wrap, <b>Sonderzeichen anzeigen</b>, optional <b>Minimieren in System-Tray</b>,
     optional <b>Backup .bak beim Speichern</b>, <b>Seitengröße-Einheit mm/inch</b>,
     optional <b>letzte Session beim Start</b>,
-    Update-Hinweis (nur wenn aktiv), Pfade</li>
+    Update-Hinweis (nur wenn aktiv), Pfade;
+    <b>Auf Standard zurücksetzen</b></li>
 <li><b>Datei → Zuletzt geöffnet</b>: Menü + Seitenleiste (persistiert)</li>
 <li><b>Datei → Speichern unter</b> (Ctrl+Shift+S): Text → Dokument; PDF → Annotation-Sidecar wählen (PDF unverändert)</li>
 <li><b>Datei → Alles speichern</b> (Ctrl+Alt+Shift+S): aktuelles Doc + PDF-Sidecars offener Tabs</li>
@@ -46,6 +47,7 @@ HELP_HTML = f"""
 <li><b>Bearbeiten → Gehe zu Zeile</b> (Ctrl+G): Sprung zur Zeilennummer</li>
 <li><b>Bearbeiten → Zeile duplizieren</b> (Ctrl+D): aktuelle Zeile / Auswahl darunter kopieren</li>
 <li><b>Bearbeiten → Zeile verschieben</b> (Alt+Up / Alt+Down)</li>
+<li><b>Bearbeiten → Zeilen sortieren (A–Z)</b> (Ctrl+Shift+O): Auswahl alphabetisch</li>
 <li><b>Bearbeiten → Auswahl markieren</b> (Ctrl+H): Markierung im Editor + Eintrag in der Seitenleiste</li>
 <li><b>Bearbeiten → Groß-/Kleinschreibung umschalten</b> (Ctrl+Shift+U): Auswahl GROSS → klein → Titel</li>
 <li><b>Bearbeiten → Alles groß-/kleinschreiben</b> (Ctrl+Alt+Shift+U / L): gesamte Datei</li>
@@ -58,7 +60,8 @@ HELP_HTML = f"""
     <b>PDF Graustufen</b>; <b>PDF Nachtmodus</b> (Invert-Ansicht, nur Darstellung);
     <b>Annotation-Layer</b> ein/aus (Ctrl+Shift+A);
     <b>Annotationen sperren</b> (Ctrl+Shift+L — nicht verschiebbar);
-    <b>Seitenrahmen / CropBox</b> Overlay (Ctrl+Shift+B)</li>
+    <b>Seitenrahmen / CropBox</b> Overlay (Ctrl+Shift+B);
+    <b>Druckermarken</b> Overlay (Ctrl+Alt+M)</li>
 <li><b>Datei → Öffnen/Speichern mit Encoding</b>: UTF-8 oder Latin-1 für Textdateien (Standard in Einstellungen)</li>
 <li><b>Drag &amp; Drop</b>: eine oder mehrere Dateien auf das Fenster ziehen → mehrere Tabs</li>
 <li><b>Autosave</b>: Textdokumente (mit Pfad) und PDF-Annotationen — Intervall in Einstellungen</li>
@@ -69,7 +72,8 @@ HELP_HTML = f"""
     Annotationen: Highlight (Drag) + <b>Farben-Picker HL/Stift</b> + <b>3 Favoriten</b> + <b>Deckkraft α</b>, <b>Schwärzen/Redaction</b> (Drag + Preview „REDACT“ + Einbrennen-Dialog), Unterstreichen, Notiz, <b>Text-Overlay</b>,
     <b>Stempel-Bibliothek</b> (GENEHMIGT/ENTWURF/VERTRAULICH + Datum, <b>Rotation 90°</b>), Callout,
     <b>Rechteck / Linie / Pfeil / Lineal</b> —
-    Sidecar <code>*.ildann.json</code> (v3, Auto-Save, Undo/Redo); JSON/CSV Export, JSON Import;
+    Sidecar <code>*.ildann.json</code> (v4 / <code>ildann-v4</code>, Auto-Save, Undo/Redo);
+    JSON-Export PDF-Highlight-kompatibel (rects/quadPoints/colorRGB); CSV Export, JSON Import;
     <b>Textsuche</b> highlightet Treffer auf der aktuellen Seite;
     Doppelklick / Strg+Klick / <b>Ctrl+E</b> auf Notiz/Overlay zum Bearbeiten;
     <b>Ctrl+Shift+D</b> Auswahl duplizieren; <b>Ctrl+Alt+C/V</b> Annotationen kopieren/einfügen (auch seitenübergreifend);

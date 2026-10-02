@@ -75,6 +75,7 @@ from instantlensdoc.core.app_settings import (
     get_pdf_grayscale,
     get_pdf_night_mode,
     get_show_page_boxes,
+    get_show_printer_marks,
     set_ann_color_preset,
     set_ann_default_opacity,
     set_ann_highlight_color,
@@ -84,6 +85,7 @@ from instantlensdoc.core.app_settings import (
     set_pdf_grayscale,
     set_pdf_night_mode,
     set_show_page_boxes,
+    set_show_printer_marks,
 )
 
 
@@ -296,9 +298,11 @@ class PdfCanvas(QLabel):
         self._annotations_visible = True
         self._annotations_locked = False
         self._show_page_boxes = False
-        # Pixel-Rects (x,y,w,h) für MediaBox / CropBox
+        self._show_printer_marks = False
+        # Pixel-Rects (x,y,w,h) für MediaBox / CropBox / Druckermarken
         self._mediabox_rect: tuple[float, float, float, float] | None = None
         self._cropbox_rect: tuple[float, float, float, float] | None = None
+        self._printer_marks_rect: tuple[float, float, float, float] | None = None
         self._move_ids: set[str] = set()
         self._move_origin: tuple[float, float] | None = None
         self._move_delta: tuple[float, float] = (0.0, 0.0)
@@ -339,6 +343,13 @@ class PdfCanvas(QLabel):
     def show_page_boxes(self) -> bool:
         return bool(self._show_page_boxes)
 
+    def set_show_printer_marks(self, enabled: bool):
+        self._show_printer_marks = bool(enabled)
+        self._repaint_overlay()
+
+    def show_printer_marks(self) -> bool:
+        return bool(self._show_printer_marks)
+
     def set_page_box_rects(
         self,
         mediabox: tuple[float, float, float, float] | None = None,
@@ -353,6 +364,54 @@ class PdfCanvas(QLabel):
         self._mediabox_rect = None
         self._cropbox_rect = None
         self._repaint_overlay()
+
+    def set_printer_marks_rect(
+        self, rect: tuple[float, float, float, float] | None = None
+    ):
+        """Pixel-Rechteck (x, y, w, h) für Seitenrand-Druckermarken."""
+        self._printer_marks_rect = rect
+        self._repaint_overlay()
+
+    def clear_printer_marks_rect(self):
+        self._printer_marks_rect = None
+        self._repaint_overlay()
+
+    def _draw_printer_marks(
+        self, painter: QPainter, rect: tuple[float, float, float, float]
+    ):
+        """Crop-/Registration-Marken an den Ecken des Rechtecks."""
+        x, y, w, h = rect
+        mark = max(8.0, min(18.0, min(w, h) * 0.04))
+        gap = 2.0
+        pen = QPen(QColor(20, 20, 20, 220), 1.5, Qt.SolidLine)
+        painter.setPen(pen)
+        painter.setBrush(Qt.NoBrush)
+        # Vier Ecken: L-förmige Crop-Marks etwas außerhalb
+        corners = [
+            (x, y, -1, -1),  # TL
+            (x + w, y, 1, -1),  # TR
+            (x, y + h, -1, 1),  # BL
+            (x + w, y + h, 1, 1),  # BR
+        ]
+        for cx, cy, sx, sy in corners:
+            # horizontal
+            hx0 = cx + sx * gap
+            hx1 = cx + sx * (gap + mark)
+            hy = cy + sy * gap
+            painter.drawLine(QPointF(hx0, hy), QPointF(hx1, hy))
+            # vertikal
+            vx = cx + sx * gap
+            vy0 = cy + sy * gap
+            vy1 = cy + sy * (gap + mark)
+            painter.drawLine(QPointF(vx, vy0), QPointF(vx, vy1))
+        # Registrierkreuz in der Mitte der oberen Kante
+        mx = x + w / 2.0
+        my = y - gap - mark * 0.6
+        if my > 2:
+            r = mark * 0.35
+            painter.drawLine(QPointF(mx - r, my), QPointF(mx + r, my))
+            painter.drawLine(QPointF(mx, my - r), QPointF(mx, my + r))
+            painter.drawEllipse(QPointF(mx, my), r * 0.45, r * 0.45)
 
     def set_drag_tool(self, tool: AnnotationType | None, *, select_mode: bool = False):
         self._select_mode = bool(select_mode)
@@ -647,6 +706,9 @@ class PdfCanvas(QLabel):
                 painter.setPen(QPen(QColor(220, 60, 40, 200), 2, Qt.DashLine))
                 painter.setBrush(Qt.NoBrush)
                 painter.drawRect(int(cx), int(cy), max(int(cw) - 1, 1), max(int(ch) - 1, 1))
+        # Optional: Seitenrand-Druckermarken (Crop/Registration)
+        if self._show_printer_marks and self._printer_marks_rect:
+            self._draw_printer_marks(painter, self._printer_marks_rect)
         move_dx, move_dy = self._move_delta if self._move_origin is not None else (0.0, 0.0)
         if self._annotations_visible:
             for ann in self._annotations:
@@ -824,6 +886,7 @@ class PdfViewer(QWidget):
     annotations_layer_changed = Signal(bool)
     annotations_lock_changed = Signal(bool)
     page_boxes_changed = Signal(bool)
+    printer_marks_changed = Signal(bool)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -849,6 +912,7 @@ class PdfViewer(QWidget):
         self._annotations_visible = get_annotations_visible()
         self._annotations_locked = get_annotations_locked()
         self._show_page_boxes = get_show_page_boxes()
+        self._show_printer_marks = get_show_printer_marks()
         self._search_query = ""
         self._search_rects: list[tuple[float, float, float, float]] = []
         self._search_index = -1
@@ -1023,6 +1087,14 @@ class PdfViewer(QWidget):
         self.btn_page_boxes.setChecked(self._show_page_boxes)
         self.btn_page_boxes.setToolTip("MediaBox/CropBox-Seitenrahmen als Overlay anzeigen")
         self.btn_page_boxes.toggled.connect(self.set_show_page_boxes)
+        self.btn_printer_marks = QToolButton()
+        self.btn_printer_marks.setText("Marken")
+        self.btn_printer_marks.setCheckable(True)
+        self.btn_printer_marks.setChecked(self._show_printer_marks)
+        self.btn_printer_marks.setToolTip(
+            "Seitenrand-Druckermarken (Crop/Registration) als Overlay anzeigen"
+        )
+        self.btn_printer_marks.toggled.connect(self.set_show_printer_marks)
         toolbar.addWidget(self.btn_hl_color)
         toolbar.addWidget(self.btn_pen_color)
         self._preset_btns: list[QPushButton] = []
@@ -1047,6 +1119,7 @@ class PdfViewer(QWidget):
         toolbar.addWidget(self.btn_ann_layer)
         toolbar.addWidget(self.btn_ann_lock)
         toolbar.addWidget(self.btn_page_boxes)
+        toolbar.addWidget(self.btn_printer_marks)
 
         toolbar.addWidget(btn_prev)
         toolbar.addWidget(self.lbl_page)
@@ -1085,6 +1158,7 @@ class PdfViewer(QWidget):
         self.canvas.set_annotations_visible(self._annotations_visible)
         self.canvas.set_annotations_locked(self._annotations_locked)
         self.canvas.set_show_page_boxes(self._show_page_boxes)
+        self.canvas.set_show_printer_marks(self._show_printer_marks)
         self.canvas.annotation_placed.connect(self._on_place)
         self.canvas.drag_finished.connect(self._on_drag)
         self.canvas.overlay_edit_requested.connect(self._edit_overlay)
@@ -1286,6 +1360,30 @@ class PdfViewer(QWidget):
     def show_page_boxes(self) -> bool:
         return bool(self._show_page_boxes)
 
+    def set_show_printer_marks(self, enabled: bool):
+        """Seitenrand-Druckermarken als Overlay ein-/ausblenden."""
+        on = bool(enabled)
+        changed = self._show_printer_marks != on
+        self._show_printer_marks = on
+        set_show_printer_marks(on)
+        if hasattr(self, "btn_printer_marks"):
+            self.btn_printer_marks.blockSignals(True)
+            self.btn_printer_marks.setChecked(on)
+            self.btn_printer_marks.blockSignals(False)
+        self.canvas.set_show_printer_marks(on)
+        if on:
+            self._update_printer_marks_overlay()
+        else:
+            self.canvas.clear_printer_marks_rect()
+        if changed:
+            self.printer_marks_changed.emit(on)
+            self.status.emit(
+                "Druckermarken-Overlay an" if on else "Druckermarken-Overlay aus"
+            )
+
+    def show_printer_marks(self) -> bool:
+        return bool(self._show_printer_marks)
+
     @staticmethod
     def _pdf_box_to_pixel_rect(
         box: tuple[float, float, float, float],
@@ -1319,6 +1417,24 @@ class PdfViewer(QWidget):
             self.canvas.set_page_box_rects(media_r, None if same else crop_r)
         except Exception:
             self.canvas.clear_page_box_rects()
+
+    def _update_printer_marks_overlay(self):
+        if not self.pdf_path or not self._show_printer_marks:
+            self.canvas.clear_printer_marks_rect()
+            return
+        try:
+            from ild_pdf.pages import get_page_boxes
+
+            boxes = get_page_boxes(self.pdf_path, self.page_index)
+            mb = boxes["mediabox"]
+            cb = boxes["cropbox"]
+            page_h = float(mb[3] - mb[1]) if mb[3] > mb[1] else float(mb[3])
+            # Marken am CropBox (sonst MediaBox)
+            target = cb if cb else mb
+            rect = self._pdf_box_to_pixel_rect(target, page_h, self.scale)
+            self.canvas.set_printer_marks_rect(rect)
+        except Exception:
+            self.canvas.clear_printer_marks_rect()
 
     def _on_annotations_moved(self, ids: list, dx: float, dy: float):
         if not self.store or self._annotations_locked:
@@ -1379,6 +1495,16 @@ class PdfViewer(QWidget):
             self._update_page_box_overlay()
         else:
             self.canvas.clear_page_box_rects()
+        self._show_printer_marks = get_show_printer_marks()
+        if hasattr(self, "btn_printer_marks"):
+            self.btn_printer_marks.blockSignals(True)
+            self.btn_printer_marks.setChecked(self._show_printer_marks)
+            self.btn_printer_marks.blockSignals(False)
+        self.canvas.set_show_printer_marks(self._show_printer_marks)
+        if self._show_printer_marks:
+            self._update_printer_marks_overlay()
+        else:
+            self.canvas.clear_printer_marks_rect()
 
     def apply_default_zoom(self):
         self.set_scale(get_default_zoom_scale(), immediate=True)
@@ -1654,6 +1780,7 @@ class PdfViewer(QWidget):
                 links = []
             self.canvas.set_uri_links(links)
             self._update_page_box_overlay()
+            self._update_printer_marks_overlay()
             if self._search_rects:
                 self.canvas.set_search_highlights(self._search_rects, self._search_index)
             self.lbl_page.setText(f"{self.page_index + 1} / {self.page_count}")

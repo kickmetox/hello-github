@@ -13,7 +13,9 @@ from pathlib import Path
 from typing import Iterator, List, Optional, Sequence
 from uuid import uuid4
 
-SIDECAR_VERSION = 3
+SIDECAR_VERSION = 4
+SCHEMA_ID = "ildann-v4"
+# v4: PDF-Highlight-kompatibel (rects/quadPoints + colorRGB/opacity für Interop)
 HISTORY_LIMIT = 40
 
 
@@ -145,9 +147,98 @@ class Annotation:
         d["type"] = self.type.value
         return d
 
+    def color_rgb(self) -> list[float]:
+        """Farbe als RGB 0..1 (PDF-Highlight / PDF.js kompatibel)."""
+        c = (self.color or "#FFFF00").strip().lstrip("#")
+        if len(c) == 3:
+            c = "".join(ch * 2 for ch in c)
+        try:
+            r = int(c[0:2], 16) / 255.0
+            g = int(c[2:4], 16) / 255.0
+            b = int(c[4:6], 16) / 255.0
+            return [round(r, 4), round(g, 4), round(b, 4)]
+        except Exception:
+            return [1.0, 1.0, 0.0]
+
+    def highlight_rects(self) -> list[list[float]]:
+        """Ein Rechteck [x, y, width, height] im Sidecar-Koordinatensystem."""
+        return [
+            [
+                float(self.x),
+                float(self.y),
+                float(self.width),
+                float(self.height),
+            ]
+        ]
+
+    def highlight_quad_points(self) -> list[float]:
+        """
+        PDF-ähnliche QuadPoints (8 Zahlen): TL, TR, BL, BR in Sidecar-Pixeln.
+        Y wächst nach unten (UI); für PDF-Y-Spiegelung siehe Export-Meta `y_origin`.
+        """
+        x0, y0 = float(self.x), float(self.y)
+        x1, y1 = x0 + float(self.width), y0 + float(self.height)
+        # TL, TR, BL, BR
+        return [x0, y0, x1, y0, x0, y1, x1, y1]
+
+    def to_export_dict(self) -> dict:
+        """Sidecar-Feld + PDF-Highlight-Interop (Schema v4)."""
+        d = self.to_dict()
+        if self.type in (AnnotationType.HIGHLIGHT, AnnotationType.UNDERLINE):
+            d["rects"] = self.highlight_rects()
+            d["quadPoints"] = self.highlight_quad_points()
+            d["colorRGB"] = self.color_rgb()
+            d["pdf_highlight"] = {
+                "subtype": "Highlight" if self.type == AnnotationType.HIGHLIGHT else "Underline",
+                "rects": self.highlight_rects(),
+                "quadPoints": self.highlight_quad_points(),
+                "colorRGB": self.color_rgb(),
+                "opacity": float(self.opacity),
+                "contents": self.text or "",
+            }
+        return d
+
     @classmethod
     def from_dict(cls, data: dict) -> "Annotation":
         data = dict(data)
+        # v4 Interop: rects/quadPoints → x,y,width,height falls fehlend
+        if "type" not in data and isinstance(data.get("pdf_highlight"), dict):
+            ph = data["pdf_highlight"]
+            subtype = str(ph.get("subtype") or "Highlight").lower()
+            data["type"] = "highlight" if "under" not in subtype else "underline"
+            if "text" not in data and "contents" in ph:
+                data["text"] = ph.get("contents") or ""
+            if "color" not in data and ph.get("colorRGB"):
+                rgb = ph["colorRGB"]
+                try:
+                    data["color"] = "#{:02X}{:02X}{:02X}".format(
+                        int(float(rgb[0]) * 255),
+                        int(float(rgb[1]) * 255),
+                        int(float(rgb[2]) * 255),
+                    )
+                except Exception:
+                    pass
+            if "opacity" not in data and "opacity" in ph:
+                data["opacity"] = ph["opacity"]
+            rects = ph.get("rects") or data.get("rects")
+            if rects and isinstance(rects, list) and rects and "x" not in data:
+                r0 = rects[0]
+                if isinstance(r0, (list, tuple)) and len(r0) >= 4:
+                    data["x"], data["y"], data["width"], data["height"] = (
+                        float(r0[0]),
+                        float(r0[1]),
+                        float(r0[2]),
+                        float(r0[3]),
+                    )
+        if "x" not in data and isinstance(data.get("rects"), list) and data["rects"]:
+            r0 = data["rects"][0]
+            if isinstance(r0, (list, tuple)) and len(r0) >= 4:
+                data["x"], data["y"], data["width"], data["height"] = (
+                    float(r0[0]),
+                    float(r0[1]),
+                    float(r0[2]),
+                    float(r0[3]),
+                )
         data["type"] = AnnotationType(data["type"])
         data.setdefault("callout_x", 0.0)
         data.setdefault("callout_y", 0.0)
@@ -421,19 +512,30 @@ class AnnotationStore:
         self.annotations = kept
         self.dirty = True
 
+    def _payload(self, *, export: bool = False) -> dict:
+        now = datetime.now(timezone.utc).isoformat(timespec="seconds")
+        meta = dict(self._meta)
+        meta.setdefault("y_origin", "top")  # Sidecar-Y: oben; PDF-Y: unten
+        meta.setdefault("coord_space", "render_pixels")
+        anns = [
+            (a.to_export_dict() if export else a.to_dict()) for a in self.annotations
+        ]
+        return {
+            "version": SIDECAR_VERSION,
+            "schema": SCHEMA_ID,
+            "pdf": str(self.pdf_path) if self.pdf_path else None,
+            "saved_at": now,
+            "count": len(self.annotations),
+            "meta": meta,
+            "annotations": anns,
+        }
+
     def save(self, path: Optional[Path] = None, force: bool = False) -> Path:
         target = path or self.sidecar_path
         if not force and not self.dirty and target.exists() and path is None:
             return target
-        now = datetime.now(timezone.utc).isoformat(timespec="seconds")
-        payload = {
-            "version": SIDECAR_VERSION,
-            "pdf": str(self.pdf_path) if self.pdf_path else None,
-            "saved_at": now,
-            "count": len(self.annotations),
-            "meta": self._meta,
-            "annotations": [a.to_dict() for a in self.annotations],
-        }
+        # Sidecar speichert Kernfelder; Export ergänzt Highlight-Interop
+        payload = self._payload(export=False)
         target.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
         self.dirty = False
         return target
@@ -452,8 +554,15 @@ class AnnotationStore:
         return self.save(path, force=True)
 
     def export_json(self, path: str | Path) -> Path:
-        """Annotationen als JSON exportieren (gleiche Sidecar-Struktur)."""
-        return self.export_backup(path)
+        """
+        Annotationen als JSON Schema v4 exportieren (PDF-Highlight-kompatibel).
+        Highlights/Underlines enthalten rects, quadPoints, colorRGB, pdf_highlight.
+        """
+        path = Path(path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        payload = self._payload(export=True)
+        path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
+        return path
 
     CSV_FIELDS = (
         "id",

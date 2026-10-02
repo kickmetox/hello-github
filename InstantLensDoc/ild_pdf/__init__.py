@@ -11,6 +11,8 @@ from .annotate import (
     AnnotationStore,
     AnnotationType,
     DRAG_TYPES,
+    SCHEMA_ID,
+    SIDECAR_VERSION,
     STAMP_LIBRARY,
     STAMP_PRESETS,
     stamp_library_items,
@@ -93,6 +95,8 @@ __all__ = [
     "AnnotationStore",
     "AnnotationType",
     "DRAG_TYPES",
+    "SCHEMA_ID",
+    "SIDECAR_VERSION",
     "STAMP_PRESETS",
     "STAMP_LIBRARY",
     "stamp_with_date",
@@ -171,4 +175,4 @@ __all__ = [
     "uri_link_at",
 ]
 
-__version__ = "0.4.3"
+__version__ = "0.4.4"

@@ -345,6 +345,7 @@ class MainWindow(QMainWindow):
         self.pdf_view.annotations_layer_changed.connect(self._sync_ann_layer_action)
         self.pdf_view.annotations_lock_changed.connect(self._sync_ann_lock_action)
         self.pdf_view.page_boxes_changed.connect(self._sync_page_boxes_action)
+        self.pdf_view.printer_marks_changed.connect(self._sync_printer_marks_action)
         self.image_label = QLabel(alignment=Qt.AlignCenter)
         self.image_label.setText("Bildvorschau")
         self.stack.addWidget(self.editor_pane)  # 0
@@ -520,6 +521,11 @@ class MainWindow(QMainWindow):
         act_move_down.setToolTip("Aktuelle Zeile / Auswahl nach unten verschieben")
         act_move_down.triggered.connect(self._move_line_down)
         m_edit.addAction(act_move_down)
+        act_sort_az = QAction("Zeilen sortieren (A–Z)", self)
+        act_sort_az.setShortcut(QKeySequence("Ctrl+Shift+O"))
+        act_sort_az.setToolTip("Ausgewählte Zeilen alphabetisch sortieren (ohne Auswahl: gesamte Datei)")
+        act_sort_az.triggered.connect(self._sort_lines_az)
+        m_edit.addAction(act_sort_az)
         act_comment = QAction("Zeile kommentieren/auskommentieren", self)
         act_comment.setShortcut(QKeySequence("Ctrl+/"))
         act_comment.setToolTip("Kommentarpräfix # oder // je nach Dateityp umschalten")
@@ -668,7 +674,11 @@ class MainWindow(QMainWindow):
         self._ann_layer_action.setShortcut(QKeySequence("Ctrl+Shift+A"))
         self._ann_layer_action.toggled.connect(self._toggle_ann_layer)
         m_view.addAction(self._ann_layer_action)
-        from instantlensdoc.core.app_settings import get_annotations_locked, get_show_page_boxes
+        from instantlensdoc.core.app_settings import (
+            get_annotations_locked,
+            get_show_page_boxes,
+            get_show_printer_marks,
+        )
 
         self._ann_lock_action = QAction("Annotationen sperren", self)
         self._ann_lock_action.setCheckable(True)
@@ -688,6 +698,15 @@ class MainWindow(QMainWindow):
         self._page_boxes_action.setShortcut(QKeySequence("Ctrl+Shift+B"))
         self._page_boxes_action.toggled.connect(self._toggle_page_boxes)
         m_view.addAction(self._page_boxes_action)
+        self._printer_marks_action = QAction("Druckermarken", self)
+        self._printer_marks_action.setCheckable(True)
+        self._printer_marks_action.setChecked(get_show_printer_marks())
+        self._printer_marks_action.setToolTip(
+            "Seitenrand-Druckermarken (Crop/Registration) als Overlay"
+        )
+        self._printer_marks_action.setShortcut(QKeySequence("Ctrl+Alt+M"))
+        self._printer_marks_action.toggled.connect(self._toggle_printer_marks)
+        m_view.addAction(self._printer_marks_action)
         act_size_unit = QAction("Seitengröße mm/inch umschalten", self)
         act_size_unit.setShortcut(QKeySequence("Ctrl+Alt+U"))
         act_size_unit.setToolTip("Einheit der PDF-Seitengröße in der Statusleiste (mm ↔ inch)")
@@ -1160,6 +1179,24 @@ class MainWindow(QMainWindow):
         else:
             self._set_status("Zeile verschieben nicht möglich")
 
+    def _sort_lines_az(self):
+        if self.stack.currentWidget() is not self.editor_pane:
+            self._set_status("Zeilen sortieren nur im Texteditor")
+            return
+        if self.editor.sort_lines_az():
+            if self.doc and self.doc.kind in (
+                DocKind.TEXT,
+                DocKind.MARKDOWN,
+                DocKind.HTML,
+                DocKind.DOCX,
+            ):
+                self.doc.text = self.editor.toPlainText()
+                self.doc.dirty = True
+            self._on_text_changed()
+            self._set_status("Zeilen A–Z sortiert")
+        else:
+            self._set_status("Zeilen sortieren nicht möglich")
+
     def _toggle_line_comment(self):
         if self.stack.currentWidget() is not self.editor_pane:
             self._set_status("Kommentieren nur im Texteditor")
@@ -1288,6 +1325,10 @@ class MainWindow(QMainWindow):
         self.pdf_view.set_show_page_boxes(bool(checked))
         self._sync_page_boxes_action(bool(checked))
 
+    def _toggle_printer_marks(self, checked: bool):
+        self.pdf_view.set_show_printer_marks(bool(checked))
+        self._sync_printer_marks_action(bool(checked))
+
     def _sync_grayscale_action(self, enabled: bool):
         if hasattr(self, "_grayscale_action") and self._grayscale_action is not None:
             self._grayscale_action.blockSignals(True)
@@ -1317,6 +1358,12 @@ class MainWindow(QMainWindow):
             self._page_boxes_action.blockSignals(True)
             self._page_boxes_action.setChecked(bool(enabled))
             self._page_boxes_action.blockSignals(False)
+
+    def _sync_printer_marks_action(self, enabled: bool):
+        if hasattr(self, "_printer_marks_action") and self._printer_marks_action is not None:
+            self._printer_marks_action.blockSignals(True)
+            self._printer_marks_action.setChecked(bool(enabled))
+            self._printer_marks_action.blockSignals(False)
 
     def _insert_snippet(self, index: int):
         if self.stack.currentWidget() is not self.editor_pane:

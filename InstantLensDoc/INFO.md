@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | 0.4.3 |
+| Version | 0.4.4 |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -33,10 +33,10 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)
 
-## Neu in 0.4.3
+## Neu in 0.4.4
 
-- Seitenrahmen/CropBox-Overlay optional
-- Annotation-Lock (nicht verschiebbar) + Drag-Verschieben
-- Editor: 3 Textbausteine
-- Neues Dokument: Vorlagen Brief / Notiz
+- Seitenrand-Druckermarken optional
+- Annotation-Export Schema v4 (PDF-Highlight-kompatibel)
+- Editor: Zeilen sortieren A–Z
+- Einstellungen: Auf Standard zurücksetzen
 - Stubs KI/Cloud/Stylus/3D unverändert

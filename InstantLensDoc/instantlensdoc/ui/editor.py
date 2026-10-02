@@ -223,6 +223,63 @@ class TextEditor(QPlainTextEdit):
     def move_line_down(self) -> bool:
         return self.move_line(1)
 
+    def sort_lines_az(self) -> bool:
+        """Ausgewählte Zeilen alphabetisch (A–Z, case-insensitive) sortieren."""
+        cur = self.textCursor()
+        doc = self.document()
+        if cur.hasSelection():
+            start = cur.selectionStart()
+            end = cur.selectionEnd()
+            start_block = doc.findBlock(start)
+            end_block = doc.findBlock(end if end > start else start)
+            if end > start and doc.findBlock(end).position() == end:
+                end_block = end_block.previous()
+                if not end_block.isValid():
+                    end_block = start_block
+        else:
+            # Keine Auswahl: gesamte Datei sortieren
+            start_block = doc.firstBlock()
+            end_block = doc.lastBlock()
+
+        if not start_block.isValid() or not end_block.isValid():
+            return False
+
+        first = start_block.blockNumber()
+        last = end_block.blockNumber()
+        if first > last:
+            first, last = last, first
+
+        lines = self.toPlainText().split("\n")
+        block = lines[first : last + 1]
+        if len(block) < 2:
+            return False
+        sorted_block = sorted(block, key=lambda s: s.casefold())
+        if sorted_block == block:
+            return True  # bereits sortiert
+        lines[first : last + 1] = sorted_block
+        new_text = "\n".join(lines)
+
+        pos = 0
+        sel_start = 0
+        sel_end = 0
+        for i, line in enumerate(lines):
+            if i == first:
+                sel_start = pos
+            if i == last:
+                sel_end = pos + len(line)
+                break
+            pos += len(line) + 1
+
+        cur.beginEditBlock()
+        cur.select(QTextCursor.Document)
+        cur.insertText(new_text)
+        cur.setPosition(sel_start)
+        cur.setPosition(sel_end, QTextCursor.KeepAnchor)
+        cur.endEditBlock()
+        self.setTextCursor(cur)
+        self.ensureCursorVisible()
+        return True
+
     def comment_prefix_for_path(self, path: Path | str | None = None) -> str:
         """Kommentarpräfix für einfache Sprachen: # oder //."""
         ext = ""

@@ -1,5 +1,23 @@
 # Changelog — InstantLens Doc
 
+## 0.4.4 — Druckermarken, Ann.-Schema v4, Zeilen sortieren, Settings-Reset
+
+Fokus: Seitenrand-Druckermarken, PDF-Highlight-kompatibler Annotation-Export (Schema v4), Editor-Sortierung, Einstellungen zurücksetzen. Stubs KI/Cloud/Stylus/3D unverändert.
+
+### PDF
+- **Seitenrand-Druckermarken** optional (Ansicht + Toolbar „Marken“, Ctrl+Alt+M) — Crop-/Registration-Marks am CropBox/MediaBox (Spiegeln H/V bleibt wie in 0.2.7)
+- **Annotation-Export Schema v4** (`ildann-v4`): Highlights/Underlines mit `rects`, `quadPoints`, `colorRGB`, `pdf_highlight` — PDF-Highlight-Interop; Sidecar speichert Kernfelder mit `version: 4` / `schema`
+
+### Editor / UX
+- **Zeilen sortieren (A–Z)**: Auswahl alphabetisch (ohne Auswahl: gesamte Datei); Ctrl+Shift+O
+- **Einstellungen → Auf Standard zurücksetzen**: alle UI-Settings auf Werkseinstellungen
+
+### Packaging / Docs
+- Version **0.4.4** (App, `ild_pdf`, ISS, Build, Docs, Smoke)
+- FEATURES / INFO / CHANGELOG / Hilfe / Schema-Doku aktualisiert
+
+---
+
 ## 0.4.3 — CropBox-Overlay, Ann.-Lock, Snippets, Templates
 
 Fokus: Seitenrahmen-Overlay, Annotation-Sperre, Editor-Textbausteine, Dokument-Vorlagen. Stubs KI/Cloud/Stylus/3D unverändert.

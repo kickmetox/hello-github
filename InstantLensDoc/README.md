@@ -2,7 +2,7 @@
 
 Moderne Textverarbeitung mit PDF-Annotator, OCR-Bridge und Formulargenerator.
 
-**Version:** 0.4.3  
+**Version:** 0.4.4  
 **Hersteller:** Andreas Meyer · ame@sellerbach.de
 
 ## Quickstart (Windows)
@@ -29,12 +29,12 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)
 
-## Neu in 0.4.3
+## Neu in 0.4.4
 
-- Seitenrahmen/CropBox-Overlay optional (Ansicht + Toolbar)
-- Annotation-Lock (nicht verschiebbar) + Drag-Verschieben im Auswahl-Werkzeug
-- Editor: 3 Textbausteine (Einfügen / Speichern)
-- Neues Dokument: Vorlagen Brief / Notiz
+- Seitenrand-Druckermarken optional (Ansicht + Toolbar „Marken“)
+- Annotation-Export JSON Schema v4 (PDF-Highlight-kompatibel)
+- Editor: Zeilen sortieren A–Z (Auswahl)
+- Einstellungen: Auf Standard zurücksetzen
 - Stubs KI/Cloud/Stylus/3D unverändert
 
 Siehe [CHANGELOG.md](CHANGELOG.md), [FEATURES.md](FEATURES.md) und [INFO.md](INFO.md).
