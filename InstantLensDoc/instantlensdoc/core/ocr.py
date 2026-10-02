@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Optional, Union
+from typing import Union
 
 from PIL import Image
 
@@ -12,19 +12,30 @@ class OcrUnavailable(RuntimeError):
     """Tesseract oder pytesseract nicht verfügbar."""
 
 
+INSTALL_HINT_DE = (
+    "OCR benötigt die Tesseract-Runtime.\n\n"
+    "Windows:\n"
+    "  winget install UB-Mannheim.TesseractOCR\n"
+    "  oder Installer von https://github.com/UB-Mannheim/tesseract/wiki\n\n"
+    "Danach Python-Paket (falls fehlen):\n"
+    "  pip install pytesseract\n\n"
+    "Sprachen: deu + eng empfohlen (im Tesseract-Installer anhaken)."
+)
+
+
 def tesseract_available() -> tuple[bool, str]:
     try:
         import pytesseract
     except ImportError:
-        return False, "pytesseract nicht installiert (pip install pytesseract)"
+        return False, "pytesseract nicht installiert (pip install pytesseract).\n\n" + INSTALL_HINT_DE
     try:
         ver = pytesseract.get_tesseract_version()
         return True, f"Tesseract {ver}"
     except Exception as e:
         return False, (
-            "Tesseract-Runtime fehlt. Unter Windows: UB-Mannheim-Installer oder "
-            "winget install UB-Mannheim.TesseractOCR. "
-            f"Detail: {e}"
+            "Tesseract-Runtime fehlt oder ist nicht im PATH.\n\n"
+            + INSTALL_HINT_DE
+            + f"\n\nTechnik-Detail: {e}"
         )
 
 
@@ -42,7 +53,11 @@ def ocr_image(
         img = Image.open(source)
     else:
         img = source
-    return pytesseract.image_to_string(img, lang=lang)
+    try:
+        return pytesseract.image_to_string(img, lang=lang)
+    except Exception:
+        # Fallback ohne Sprachpaket
+        return pytesseract.image_to_string(img, lang="eng")
 
 
 def ocr_pdf_page(pdf_path: str | Path, page_index: int = 0, lang: str = "deu+eng") -> str:
@@ -54,4 +69,4 @@ def ocr_pdf_page(pdf_path: str | Path, page_index: int = 0, lang: str = "deu+eng
 
 def status_message() -> str:
     ok, msg = tesseract_available()
-    return msg if ok else f"OCR nicht verfügbar: {msg}"
+    return msg if ok else f"OCR nicht verfügbar:\n{msg}"

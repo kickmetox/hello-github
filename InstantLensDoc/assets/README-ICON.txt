@@ -1,11 +1,10 @@
 Icon-Hinweis
 ============
-Lege hier ab:
-  assets/app.ico   (bevorzugt, Windows)
+Lege hier ab (Priorität):
+  assets/app.ico   (bevorzugt, Windows Fenster/Taskleiste)
   assets/icon.png  (optional)
+  assets/*.jpg     (z.B. lensDoc.jpg)
 
-Quelle beim Nutzer typischerweise:
-  D:\AI_Temp\InstantLensDoc\  (Icon-Datei dort vorhanden)
+Die App sucht zusätzlich im Repo-Root, CWD und D:\AI_Temp\InstantLensDoc.
 
-Kopieren z.B.:
-  copy D:\AI_Temp\InstantLensDoc\app.ico assets\app.ico
+Sync-Skript (docs/sync-ild.ps1) überschreibt vorhandene Nutzer-Icons nicht.

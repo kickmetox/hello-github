@@ -15,11 +15,10 @@ from PySide6.QtWidgets import (
     QSplitter,
     QStackedWidget,
     QStatusBar,
-    QVBoxLayout,
     QWidget,
 )
 
-from instantlensdoc.config import DISPLAY_NAME, icon_path
+from instantlensdoc.config import DISPLAY_NAME, icon_paths_for_qt
 from instantlensdoc.core.documents import DocKind, Document, open_document, save_document
 from instantlensdoc.core import ocr as ocr_mod
 from instantlensdoc.core.layout import LayoutDocument
@@ -39,12 +38,15 @@ class MainWindow(QMainWindow):
         self.license_manager = license_manager
         self.doc: Document | None = None
         self.layout_doc = LayoutDocument()
+        self._editor_marks: list[str] = []
 
         self.setWindowTitle(DISPLAY_NAME)
         self.resize(1200, 800)
-        ic = icon_path()
-        if ic:
-            self.setWindowIcon(QIcon(str(ic)))
+        icon = QIcon()
+        for p in icon_paths_for_qt():
+            icon.addFile(str(p))
+        if not icon.isNull():
+            self.setWindowIcon(icon)
 
         self._build_ui()
         self._build_menus()
@@ -59,7 +61,9 @@ class MainWindow(QMainWindow):
         splitter = QSplitter(Qt.Horizontal)
         self.sidebar = Sidebar()
         self.sidebar.search_requested.connect(self._on_search)
+        self.sidebar.search_next_requested.connect(self._on_search_next)
         self.sidebar.file_activated.connect(self.open_path)
+        self.sidebar.mark_activated.connect(self._on_mark_activated)
         splitter.addWidget(self.sidebar)
 
         self.stack = QStackedWidget()
@@ -67,6 +71,7 @@ class MainWindow(QMainWindow):
         self.editor.textChanged.connect(self._on_text_changed)
         self.pdf_view = PdfViewer()
         self.pdf_view.status.connect(self._set_status)
+        self.pdf_view.annotations_changed.connect(self._refresh_pdf_marks)
         self.image_label = QLabel(alignment=Qt.AlignCenter)
         self.image_label.setText("Bildvorschau")
         self.stack.addWidget(self.editor)  # 0
@@ -84,7 +89,6 @@ class MainWindow(QMainWindow):
     def _build_menus(self):
         mb = self.menuBar()
 
-        # Datei
         m_file = mb.addMenu("&Datei")
         act_new = QAction("Neu", self)
         act_new.setShortcut(QKeySequence.New)
@@ -110,7 +114,6 @@ class MainWindow(QMainWindow):
         act_quit.triggered.connect(self.close)
         m_file.addAction(act_quit)
 
-        # Bearbeiten
         m_edit = mb.addMenu("&Bearbeiten")
         for name, slot in [
             ("Rückgängig", self.editor.undo),
@@ -122,8 +125,19 @@ class MainWindow(QMainWindow):
             a = QAction(name, self)
             a.triggered.connect(slot)
             m_edit.addAction(a)
+        m_edit.addSeparator()
+        act_find = QAction("Suchen…", self)
+        act_find.setShortcut(QKeySequence.Find)
+        act_find.triggered.connect(self._focus_search)
+        m_edit.addAction(act_find)
+        act_mark = QAction("Auswahl markieren", self)
+        act_mark.setShortcut(QKeySequence("Ctrl+H"))
+        act_mark.triggered.connect(self._mark_selection)
+        m_edit.addAction(act_mark)
+        act_clear_marks = QAction("Markierungen löschen", self)
+        act_clear_marks.triggered.connect(self._clear_editor_marks)
+        m_edit.addAction(act_clear_marks)
 
-        # Ansicht
         m_view = mb.addMenu("&Ansicht")
         a = QAction("Seitenleiste", self)
         a.setCheckable(True)
@@ -131,7 +145,18 @@ class MainWindow(QMainWindow):
         a.toggled.connect(self.sidebar.setVisible)
         m_view.addAction(a)
 
-        # Einfügen / Layout
+        m_pdf = mb.addMenu("&PDF")
+        for title, slot in [
+            ("Annotationen speichern", lambda: self.pdf_view.save_annotations()),
+            ("Annotationen laden", lambda: self.pdf_view.reload_annotations()),
+            ("Seite drehen (90°)", lambda: self.pdf_view.rotate_current()),
+            ("Seite löschen…", lambda: self.pdf_view.delete_current()),
+            ("Seiten neu anordnen…", lambda: self.pdf_view.reorder_dialog()),
+        ]:
+            a = QAction(title, self)
+            a.triggered.connect(slot)
+            m_pdf.addAction(a)
+
         m_ins = mb.addMenu("&Einfügen")
         a = QAction("Textrahmen", self)
         a.triggered.connect(self._add_text_frame)
@@ -140,7 +165,6 @@ class MainWindow(QMainWindow):
         a.triggered.connect(self._insert_image)
         m_ins.addAction(a)
 
-        # Extras
         m_extra = mb.addMenu("E&xtras")
         a = QAction("OCR (Bild/PDF-Seite)…", self)
         a.triggered.connect(self._run_ocr)
@@ -163,7 +187,6 @@ class MainWindow(QMainWindow):
             a.triggered.connect(lambda checked=False, k=key: show_planned(self, k))
             m_extra.addAction(a)
 
-        # Hilfe
         m_help = mb.addMenu("&Hilfe")
         a = QAction("Hilfe…", self)
         a.triggered.connect(lambda: HelpDialog(self).exec())
@@ -193,15 +216,89 @@ class MainWindow(QMainWindow):
             self.doc.text = self.editor.toPlainText()
             self.doc.dirty = True
 
+    def _focus_search(self):
+        self.sidebar.setVisible(True)
+        self.sidebar.search.setFocus()
+        self.sidebar.search.selectAll()
+
     def _on_search(self, query: str):
+        if not query:
+            self._set_status("Leere Suche")
+            return
         if self.stack.currentWidget() is self.editor:
             n = self.editor.find_and_highlight(query)
             self._set_status(f"{n} Treffer für „{query}“")
-            self.sidebar.set_marks([f"Suche: {query} → {n} Treffer"])
+            lines = [f"Suche: {query} → {n} Treffer"] + self._editor_marks
+            self.sidebar.set_marks(lines)
+            return
+        if self.stack.currentWidget() is self.pdf_view:
+            # Annotationen nach Text filtern + Hinweis
+            hits = []
+            if self.pdf_view.store:
+                for a in self.pdf_view.store.annotations:
+                    blob = f"{a.type.value} {a.text}".lower()
+                    if query.lower() in blob:
+                        hits.append(a)
+            if hits:
+                lines = [f"S{a.page + 1}: {a.type.value} {a.text[:40]}" for a in hits]
+                self.sidebar.set_marks(lines, hits)
+                self._set_status(f"{len(hits)} Annotation(en) zu „{query}“")
+            else:
+                self._set_status(
+                    f"Keine Annotation zu „{query}“ — PDF-Volltextsuche benötigt OCR/eingebetteten Text"
+                )
+            return
+        self._set_status("Suche: Editor oder PDF öffnen")
+
+    def _on_search_next(self):
+        q = self.sidebar.search.text().strip()
+        if self.stack.currentWidget() is self.editor:
+            if self.editor.find_next(q or None):
+                self._set_status("Nächster Treffer")
+            else:
+                self._set_status("Keine weiteren Treffer")
+
+    def _mark_selection(self):
+        if self.stack.currentWidget() is not self.editor:
+            QMessageBox.information(self, "Markieren", "Markieren funktioniert im Texteditor.")
+            return
+        if not self.editor.highlight_selection():
+            QMessageBox.information(self, "Markieren", "Bitte Text auswählen.")
+            return
+        snip = self.editor.selected_snippet() or "Auswahl"
+        label = f"Markierung: {snip}"
+        self._editor_marks.append(label)
+        self.sidebar.append_mark(label)
+        self._set_status("Auswahl markiert")
+
+    def _clear_editor_marks(self):
+        self.editor.clear_extra_selections()
+        self._editor_marks.clear()
+        if self.stack.currentWidget() is self.pdf_view:
+            self._refresh_pdf_marks()
+        else:
+            self.sidebar.set_marks([])
+        self._set_status("Markierungen gelöscht")
+
+    def _refresh_pdf_marks(self):
+        if self.stack.currentWidget() is not self.pdf_view:
+            return
+        pairs = self.pdf_view.annotation_summaries()
+        self.sidebar.set_marks([p[0] for p in pairs], [p[1] for p in pairs])
+
+    def _on_mark_activated(self, index: int):
+        payload = self.sidebar.mark_payload(index)
+        if payload is not None and hasattr(payload, "page"):
+            self.stack.setCurrentWidget(self.pdf_view)
+            self.pdf_view.goto_page(int(payload.page))
+            self._set_status(f"Annotation Seite {payload.page + 1}")
 
     def new_doc(self):
         self.doc = Document(kind=DocKind.TEXT, title="Unbenannt")
         self.editor.setPlainText("")
+        self.editor.clear_extra_selections()
+        self._editor_marks.clear()
+        self.sidebar.set_marks([])
         self.stack.setCurrentWidget(self.editor)
         self.setWindowTitle(f"{DISPLAY_NAME} — Unbenannt")
         self._set_status("Neues Dokument")
@@ -229,23 +326,24 @@ class MainWindow(QMainWindow):
         if self.doc.kind == DocKind.PDF:
             self.stack.setCurrentWidget(self.pdf_view)
             self.pdf_view.load(path)
-            if self.pdf_view.store:
-                marks = [
-                    f"S{a.page + 1}: {a.type.value} {a.text[:30]}"
-                    for a in self.pdf_view.store.annotations
-                ]
-                self.sidebar.set_marks(marks)
+            self._refresh_pdf_marks()
         elif self.doc.kind == DocKind.IMAGE:
             from PySide6.QtGui import QPixmap
 
             self.stack.setCurrentWidget(self.image_label)
             pm = QPixmap(path)
-            self.image_label.setPixmap(pm.scaled(900, 700, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+            self.image_label.setPixmap(
+                pm.scaled(900, 700, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            )
+            self.sidebar.set_marks([f"Bild: {Path(path).name}"])
         else:
             self.stack.setCurrentWidget(self.editor)
             self.editor.blockSignals(True)
             self.editor.setPlainText(self.doc.text)
             self.editor.blockSignals(False)
+            self.editor.clear_extra_selections()
+            self._editor_marks.clear()
+            self.sidebar.set_marks([])
         self._set_status(f"Geöffnet: {path}")
 
     def save_doc(self):
@@ -254,6 +352,10 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Lizenz", "Speichern nicht möglich — Lizenz/Trial abgelaufen.")
             return
         if not self.doc:
+            return
+        if self.doc.kind == DocKind.PDF:
+            if self.pdf_view.save_annotations():
+                self._set_status("PDF-Annotationen gespeichert")
             return
         if not self.doc.path:
             self.save_as()
@@ -268,6 +370,9 @@ class MainWindow(QMainWindow):
 
     def save_as(self):
         if not self.doc:
+            return
+        if self.doc.kind == DocKind.PDF:
+            self.pdf_view.save_annotations()
             return
         path, _ = QFileDialog.getSaveFileName(
             self,
@@ -303,42 +408,50 @@ class MainWindow(QMainWindow):
             return
         frame = self.layout_doc.add_image(path)
         if self.stack.currentWidget() is self.editor:
-            self.editor.appendPlainText(f"\n[Bild: {path} @ {frame.x},{frame.y} {frame.width}x{frame.height}]\n")
+            self.editor.appendPlainText(
+                f"\n[Bild: {path} @ {frame.x},{frame.y} {frame.width}x{frame.height}]\n"
+            )
         self._set_status(f"Bild eingefügt: {Path(path).name}")
 
     def _run_ocr(self):
         ok, msg = ocr_mod.tesseract_available()
         if not ok:
-            QMessageBox.information(self, "OCR", msg)
+            QMessageBox.information(
+                self,
+                "OCR — Tesseract fehlt",
+                msg,
+            )
+            self._set_status("OCR nicht verfügbar")
             return
-        if self.doc and self.doc.kind == DocKind.IMAGE and self.doc.path:
-            try:
+
+        source_label = ""
+        try:
+            if self.doc and self.doc.kind == DocKind.IMAGE and self.doc.path:
+                source_label = Path(self.doc.path).name
                 text = ocr_mod.ocr_image(self.doc.path)
-                self.stack.setCurrentWidget(self.editor)
-                self.editor.setPlainText(text)
-                self._set_status("OCR abgeschlossen")
-            except Exception as e:
-                QMessageBox.warning(self, "OCR", str(e))
-            return
-        if self.doc and self.doc.kind == DocKind.PDF and self.doc.path:
-            try:
+            elif self.doc and self.doc.kind == DocKind.PDF and self.doc.path:
+                source_label = f"{Path(self.doc.path).name} Seite {self.pdf_view.page_index + 1}"
                 text = ocr_mod.ocr_pdf_page(self.doc.path, self.pdf_view.page_index)
-                self.stack.setCurrentWidget(self.editor)
-                self.editor.setPlainText(text)
-                self._set_status("OCR (PDF-Seite) abgeschlossen")
-            except Exception as e:
-                QMessageBox.warning(self, "OCR", str(e))
-            return
-        path, _ = QFileDialog.getOpenFileName(
-            self, "Bild für OCR", "", "Bilder (*.png *.jpg *.jpeg *.tif *.tiff)"
-        )
-        if path:
-            try:
+            else:
+                path, _ = QFileDialog.getOpenFileName(
+                    self, "Bild für OCR", "", "Bilder (*.png *.jpg *.jpeg *.tif *.tiff)"
+                )
+                if not path:
+                    return
+                source_label = Path(path).name
                 text = ocr_mod.ocr_image(path)
-                self.stack.setCurrentWidget(self.editor)
-                self.editor.setPlainText(text)
-            except Exception as e:
-                QMessageBox.warning(self, "OCR", str(e))
+        except ocr_mod.OcrUnavailable as e:
+            QMessageBox.information(self, "OCR — Tesseract fehlt", str(e))
+            return
+        except Exception as e:
+            QMessageBox.warning(self, "OCR", str(e))
+            return
+
+        self.stack.setCurrentWidget(self.editor)
+        self.editor.setPlainText(text)
+        self.doc = Document(kind=DocKind.TEXT, title=f"OCR — {source_label}", text=text)
+        self.setWindowTitle(f"{DISPLAY_NAME} — OCR — {source_label}")
+        self._set_status(f"OCR abgeschlossen ({source_label})")
 
     def _forms(self):
         FormBuilderDialog(self).exec()

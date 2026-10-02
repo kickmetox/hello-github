@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
+from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QDialog, QDialogButtonBox, QLabel, QTabWidget, QTextBrowser, QVBoxLayout
 
 from instantlensdoc import __version__
-from instantlensdoc.config import CONTACT_EMAIL, DISPLAY_NAME, ROOT, VENDOR
+from instantlensdoc.config import CONTACT_EMAIL, DISPLAY_NAME, ROOT, VENDOR, icon_paths_for_qt
 
 
 HELP_HTML = """
@@ -16,15 +15,25 @@ HELP_HTML = """
 <h3>Erste Schritte</h3>
 <ul>
 <li><b>Datei → Öffnen</b>: TXT, MD, HTML, DOCX, PDF, Bilder</li>
-<li><b>PDF</b>: Seiten blättern, zoomen, drehen; Annotationen per Klick (Highlight, Unterstreichen, Notiz, Textfeld)</li>
-<li><b>OCR</b>: Extras → OCR — benötigt installiertes Tesseract</li>
-<li><b>Formulare</b>: Extras → Formulargenerator</li>
+<li><b>Seitenleiste</b>: Suche (Enter/Suchen), Weiter, Dokumente, Annotationen/Markierungen</li>
+<li><b>Bearbeiten → Auswahl markieren</b> (Ctrl+H): Markierung im Editor + Eintrag in der Seitenleiste</li>
+<li><b>PDF</b>: Blättern, Zoom, 90°-Drehen, Seite löschen, Seiten neu anordnen;
+    Annotationen per Klick (Highlight, Unterstreichen, Notiz, Textfeld) —
+    Sidecar <code>*.ildann.json</code>; Menü PDF → speichern/laden</li>
+<li><b>OCR</b>: Extras → OCR — ohne Tesseract erscheint eine Installationsanleitung
+    (<code>winget install UB-Mannheim.TesseractOCR</code>)</li>
+<li><b>Formulare</b>: Extras → Formulargenerator — Felder, Live-Vorschau, Export HTML/PDF</li>
 <li><b>Lizenz</b>: Hilfe → Lizenz — Trial 4 Wochen, Keys 30+2 Tage</li>
+<li><b>Keygen</b>: <code>run-keygen.bat</code> bzw. <code>python -m keygen --gui</code></li>
 </ul>
 <h3>PDF-Modul</h3>
 <p>Das Paket <code>ild_pdf</code> kann von anderen Programmen genutzt werden (pypdfium2, kein Poppler).</p>
+<h3>Sync / Update</h3>
+<p>Windows: Store-Skript <code>docs/sync-ild.ps1</code> — Branch oder Zip nach
+<code>D:\\AI_Temp\\InstantLensDoc</code>, pip, optional Start. Eigenes Icon in <code>assets</code> bleibt erhalten.</p>
 <h3>Geplante Features</h3>
-<p>KI-Assistent, Cloud-Sync, Stylus/Palm Rejection u. a. sind im Menü als „Geplant“ markiert — siehe FEATURES.md.</p>
+<p>KI-Assistent, Cloud-Sync, Stylus/Palm Rejection u. a. sind im Menü als „Geplant“ markiert —
+siehe FEATURES.md.</p>
 """
 
 
@@ -32,7 +41,7 @@ class HelpDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Hilfe")
-        self.resize(560, 420)
+        self.resize(580, 460)
         layout = QVBoxLayout(self)
         tabs = QTabWidget()
         browser = QTextBrowser()
@@ -59,7 +68,16 @@ class AboutDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Info")
+        icon = QIcon()
+        for p in icon_paths_for_qt():
+            icon.addFile(str(p))
+        if not icon.isNull():
+            self.setWindowIcon(icon)
         layout = QVBoxLayout(self)
+        icon_lbl = QLabel()
+        if not icon.isNull():
+            icon_lbl.setPixmap(icon.pixmap(64, 64))
+            layout.addWidget(icon_lbl)
         layout.addWidget(
             QLabel(
                 f"<h2>{DISPLAY_NAME}</h2>"
@@ -67,6 +85,7 @@ class AboutDialog(QDialog):
                 f"Hersteller: {VENDOR}<br>"
                 f"Kontakt: {CONTACT_EMAIL}</p>"
                 f"<p>PDF-Engine: pypdfium2 / PDFium (lizenzfreundlich)</p>"
+                f"<p>Icon: assets/app.ico · assets/icon.png</p>"
             )
         )
         buttons = QDialogButtonBox(QDialogButtonBox.Ok)

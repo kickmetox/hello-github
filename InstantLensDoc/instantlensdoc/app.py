@@ -11,12 +11,30 @@ if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
 
+def _apply_icon(app) -> None:
+    """Fenster-/Taskleisten-Icon aus assets/ (robuste Pfadauflösung)."""
+    from PySide6.QtGui import QIcon
+
+    from instantlensdoc.config import icon_path, icon_paths_for_qt
+
+    icon = QIcon()
+    paths = icon_paths_for_qt()
+    if not paths:
+        single = icon_path()
+        if single:
+            paths = [single]
+    for p in paths:
+        icon.addFile(str(p))
+    if not icon.isNull():
+        app.setWindowIcon(icon)
+
+
 def main(argv: list[str] | None = None) -> int:
     argv = list(sys.argv if argv is None else argv)
 
     from PySide6.QtWidgets import QApplication
 
-    from instantlensdoc.config import DISPLAY_NAME, icon_path
+    from instantlensdoc.config import DISPLAY_NAME
     from instantlensdoc.license import LicenseManager
     from instantlensdoc.ui.main_window import MainWindow
 
@@ -24,12 +42,7 @@ def main(argv: list[str] | None = None) -> int:
     app.setApplicationName(DISPLAY_NAME)
     app.setOrganizationName("Andreas Meyer")
     app.setOrganizationDomain("sellerbach.de")
-
-    ic = icon_path()
-    if ic:
-        from PySide6.QtGui import QIcon
-
-        app.setWindowIcon(QIcon(str(ic)))
+    _apply_icon(app)
 
     lm = LicenseManager()
     lm.ensure_trial_started()

@@ -3,6 +3,7 @@
 Moderne Textverarbeitung mit PDF-Annotator, Layout-Basics, OCR-Bridge und Formulargenerator.
 
 **Hersteller:** Andreas Meyer · ame@sellerbach.de  
+**Version:** 0.1.1  
 **PDF-Engine:** pypdfium2 / PDFium (lizenzfreundlich — **kein** Poppler/GPL als Standard)
 
 ## Zielordner (Windows)
@@ -10,15 +11,6 @@ Moderne Textverarbeitung mit PDF-Annotator, Layout-Basics, OCR-Bridge und Formul
 ```
 D:\AI_Temp\InstantLensDoc
 ```
-
-Dieses Repo nach dorthin kopieren. Icon liegt im Nutzerordner — bitte nach `assets/app.ico` (optional auch `assets/icon.png`) übernehmen:
-
-```powershell
-Copy-Item "D:\AI_Temp\InstantLensDoc\app.ico" ".\assets\app.ico" -ErrorAction SilentlyContinue
-# bzw. falls Icon schon im Zielordner-Root liegt, vor dem Überschreiben sichern
-```
-
-Platzhalter: `assets/README-ICON.txt`.
 
 ## Start
 
@@ -29,8 +21,6 @@ python -m venv .venv
 pip install -r requirements.txt
 run.bat
 ```
-
-oder:
 
 ```powershell
 .\run.ps1
@@ -44,6 +34,10 @@ python -m instantlensdoc
 
 ## Keygenerator
 
+```bat
+run-keygen.bat
+```
+
 ```bash
 python -m keygen kunde@example.com
 python -m keygen --gui
@@ -52,16 +46,29 @@ python -m keygen --gui
 - Ohne Key: **4 Wochen** Trial ab Erststart  
 - Keys: **30+2 Tage** gültig, danach neu per Mail an **ame@sellerbach.de**
 
+## Icon
+
+`assets/app.ico` / `assets/icon.png` (auch JPG). Die App löst Pfade robust auf (assets, CWD, Zielordner).
+
+## Installer (Inno Setup 6)
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\installer\build-installer.ps1
+```
+
 ## Module
 
 | Pfad | Zweck |
 |------|--------|
 | `instantlensdoc/` | Desktop-App (PySide6) |
-| `ild_pdf/` | Auskoppelbares PDF-Modul (siehe `ild_pdf/README.md`) |
+| `ild_pdf/` | Auskoppelbares PDF-Modul |
 | `keygen/` | Separater Keygenerator |
+| `run-keygen.bat` | Keygen-Start Windows |
 | `FEATURES.md` / `INFO.md` | Feature-Status & Produktinfo |
-| `installer/instantlensdoc.iss` | Inno-Setup-Vorlage |
+| `installer/` | Inno `.iss` + `build-installer.ps1` |
 
-## Lizenzlaufzeit
+## Smoke-Test
 
-Lokal verifizierbarer HMAC-Key (`ILD1.…`). Details in `INFO.md`.
+```bash
+python scripts/smoke_test.py
+```

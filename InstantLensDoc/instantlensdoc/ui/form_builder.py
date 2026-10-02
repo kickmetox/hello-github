@@ -1,4 +1,4 @@
-"""Formulargenerator-Dialog."""
+"""Formulargenerator-Dialog mit Vorschau und Export."""
 
 from __future__ import annotations
 
@@ -10,13 +10,13 @@ from PySide6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
     QFileDialog,
-    QFormLayout,
     QHBoxLayout,
     QLabel,
     QLineEdit,
     QListWidget,
     QMessageBox,
     QPushButton,
+    QTextBrowser,
     QVBoxLayout,
 )
 
@@ -27,11 +27,12 @@ class FormBuilderDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Formulargenerator")
-        self.resize(520, 400)
+        self.resize(640, 520)
         self.form = FormDefinition(title="Neues Formular")
 
         layout = QVBoxLayout(self)
         self.title_edit = QLineEdit(self.form.title)
+        self.title_edit.textChanged.connect(self._update_preview)
         layout.addWidget(QLabel("Titel"))
         layout.addWidget(self.title_edit)
 
@@ -53,8 +54,22 @@ class FormBuilderDialog(QDialog):
         layout.addWidget(self.options_edit)
         layout.addWidget(add_btn)
 
+        mid = QHBoxLayout()
+        left = QVBoxLayout()
+        left.addWidget(QLabel("Felder"))
         self.list = QListWidget()
-        layout.addWidget(self.list)
+        left.addWidget(self.list)
+        btn_rm = QPushButton("Feld entfernen")
+        btn_rm.clicked.connect(self._remove_field)
+        left.addWidget(btn_rm)
+        mid.addLayout(left)
+
+        right = QVBoxLayout()
+        right.addWidget(QLabel("Vorschau"))
+        self.preview = QTextBrowser()
+        right.addWidget(self.preview)
+        mid.addLayout(right)
+        layout.addLayout(mid)
 
         export_row = QHBoxLayout()
         btn_html = QPushButton("Als HTML exportieren")
@@ -69,6 +84,7 @@ class FormBuilderDialog(QDialog):
         buttons.rejected.connect(self.reject)
         buttons.clicked.connect(self.accept)
         layout.addWidget(buttons)
+        self._update_preview()
 
     def _sync_title(self):
         self.form.title = self.title_edit.text().strip() or "Formular"
@@ -83,22 +99,49 @@ class FormBuilderDialog(QDialog):
         self.form.add_field(field)
         self.list.addItem(f"{field.type.value}: {field.label}")
         self.label_edit.clear()
+        self._update_preview()
+
+    def _remove_field(self):
+        row = self.list.currentRow()
+        if row < 0 or row >= len(self.form.fields):
+            return
+        del self.form.fields[row]
+        self.list.takeItem(row)
+        self._update_preview()
+
+    def _update_preview(self):
+        self._sync_title()
+        # HTML-Vorschau ohne Datei
+        from instantlensdoc.core.forms import export_html
+        import tempfile
+        from pathlib import Path as P
+
+        with tempfile.TemporaryDirectory() as td:
+            p = P(td) / "preview.html"
+            export_html(self.form, p)
+            self.preview.setHtml(p.read_text(encoding="utf-8"))
 
     def _export_html(self):
         self._sync_title()
+        if not self.form.fields:
+            QMessageBox.information(self, "Export", "Bitte zuerst Felder hinzufügen.")
+            return
         path, _ = QFileDialog.getSaveFileName(self, "HTML speichern", "formular.html", "HTML (*.html)")
         if not path:
             return
         export_html(self.form, path)
-        QMessageBox.information(self, "Export", f"Gespeichert: {path}")
+        QMessageBox.information(self, "Export", f"HTML gespeichert:\n{path}")
 
     def _export_pdf(self):
         self._sync_title()
+        if not self.form.fields:
+            QMessageBox.information(self, "Export", "Bitte zuerst Felder hinzufügen.")
+            return
         path, _ = QFileDialog.getSaveFileName(self, "PDF speichern", "formular.pdf", "PDF (*.pdf)")
         if not path:
             return
         try:
             export_pdf_form(self.form, path)
-            QMessageBox.information(self, "Export", f"Gespeichert: {path}")
+            QMessageBox.information(self, "Export", f"PDF gespeichert:\n{path}")
         except Exception as e:
             QMessageBox.warning(self, "Export", str(e))
