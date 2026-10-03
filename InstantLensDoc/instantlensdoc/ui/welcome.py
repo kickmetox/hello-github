@@ -1,4 +1,4 @@
-"""Willkommens-/Startseite wenn keine Dokument-Tabs offen sind — 1.0.1."""
+"""Willkommens-/Startseite wenn keine Dokument-Tabs offen sind — 1.0.2."""
 
 from __future__ import annotations
 
@@ -23,15 +23,18 @@ from instantlensdoc.core import recent as recent_mod
 
 
 class WelcomePage(QWidget):
-    """Startseite: Recent-Liste + Dokument öffnen / Leeres Text."""
+    """Startseite: Recent-Liste + Dokument öffnen / Leeres Text / Drag&Drop."""
 
     open_requested = Signal()
     new_text_requested = Signal()
     recent_activated = Signal(str)
     recent_remove_requested = Signal(str)
+    clear_recent_requested = Signal()
+    files_dropped = Signal(list)  # list[str] lokale Dateipfade
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.setAcceptDrops(True)
         lay = QVBoxLayout(self)
         lay.setContentsMargins(48, 40, 48, 40)
         lay.setSpacing(12)
@@ -41,7 +44,8 @@ class WelcomePage(QWidget):
         lay.addWidget(title)
         sub = QLabel(
             f"<p style='color:#555;'>Version {__version__} — Willkommen.<br>"
-            "Kein Dokument geöffnet. Wählen Sie eine Aktion oder einen Eintrag aus der Recent-Liste.</p>"
+            "Kein Dokument geöffnet. Dateien per Drag &amp; Drop hierher ziehen, "
+            "eine Aktion wählen oder einen Eintrag aus der Recent-Liste öffnen.</p>"
         )
         sub.setWordWrap(True)
         lay.addWidget(sub)
@@ -55,6 +59,10 @@ class WelcomePage(QWidget):
         self.btn_empty.setToolTip("Neues leeres Textdokument")
         self.btn_empty.clicked.connect(self.new_text_requested.emit)
         btn_row.addWidget(self.btn_empty)
+        self.btn_clear_recent = QPushButton("Recent leeren")
+        self.btn_clear_recent.setToolTip("Liste der zuletzt geöffneten Dateien leeren")
+        self.btn_clear_recent.clicked.connect(self.clear_recent_requested.emit)
+        btn_row.addWidget(self.btn_clear_recent)
         btn_row.addStretch(1)
         lay.addLayout(btn_row)
 
@@ -62,8 +70,10 @@ class WelcomePage(QWidget):
         self.recent_list = QListWidget()
         self.recent_list.setMinimumHeight(180)
         self.recent_list.setToolTip(
-            "Doppelklick öffnet den Eintrag; Rechtsklick: Entfernen / Ordner öffnen"
+            "Doppelklick öffnet den Eintrag; Rechtsklick: Entfernen / Ordner öffnen; "
+            "Drag & Drop öffnet Dateien"
         )
+        self.recent_list.setAcceptDrops(True)
         self.recent_list.setContextMenuPolicy(Qt.CustomContextMenu)
         self.recent_list.customContextMenuRequested.connect(self._recent_context_menu)
         self.recent_list.itemDoubleClicked.connect(self._on_recent_dbl)
@@ -74,6 +84,8 @@ class WelcomePage(QWidget):
     def refresh_recent(self) -> None:
         self.recent_list.clear()
         entries = recent_mod.load_recent_entries()
+        has_entries = bool(entries)
+        self.btn_clear_recent.setEnabled(has_entries)
         if not entries:
             item = QListWidgetItem("(keine zuletzt geöffneten Dateien)")
             item.setFlags(Qt.NoItemFlags)
@@ -118,3 +130,35 @@ class WelcomePage(QWidget):
         if not folder.is_dir():
             return
         QDesktopServices.openUrl(QUrl.fromLocalFile(str(folder)))
+
+    def _local_paths_from_mime(self, mime) -> list[str]:
+        paths: list[str] = []
+        if mime is None or not mime.hasUrls():
+            return paths
+        for url in mime.urls():
+            if not url.isLocalFile():
+                continue
+            path = url.toLocalFile()
+            if path:
+                paths.append(path)
+        return paths
+
+    def dragEnterEvent(self, event) -> None:
+        if self._local_paths_from_mime(event.mimeData()):
+            event.acceptProposedAction()
+            return
+        super().dragEnterEvent(event)
+
+    def dragMoveEvent(self, event) -> None:
+        if self._local_paths_from_mime(event.mimeData()):
+            event.acceptProposedAction()
+            return
+        super().dragMoveEvent(event)
+
+    def dropEvent(self, event) -> None:
+        paths = self._local_paths_from_mime(event.mimeData())
+        if paths:
+            self.files_dropped.emit(paths)
+            event.acceptProposedAction()
+            return
+        super().dropEvent(event)

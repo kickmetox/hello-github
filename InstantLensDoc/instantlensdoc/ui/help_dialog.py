@@ -100,10 +100,10 @@ HELP_HTML = f"""
 <li><b>Datei → Projekt-Ordner</b>: Workspace wählen (letzte 5); Dialoge starten im aktiven Ordner</li>
 <li><b>Datei → Exportieren</b>: Editor-Inhalt als HTML, DOCX oder PDF (zuletzt genutzter Ordner wird gemerkt);
     <b>Export-Profil</b> speichern/anwenden (DPI / Format / Ziel)</li>
-<li><b>Datei → Drucken</b> (Ctrl+P): Editor oder aktuelle PDF-Seite (Qt Print); <b>PDF → Dokument drucken…</b> Seitenbereich von–bis, dann QPrintDialog (Raster via pypdfium2) — 1.0.1</li>
-<li><b>Datei → Backup jetzt</b> / <b>Backup-Ordner öffnen…</b>: manuelles Backup nach App-Config/backups; Status zeigt Pfad der letzten Backup-Datei — 1.0.1</li>
-<li><b>Willkommen</b>: Startseite mit Recent (Rechtsklick Entfernen / Ordner öffnen; fehlende Pfade grau) + „Dokument öffnen“ / „Leeres Text“ — 1.0.1</li>
-<li><b>Hilfe → Info</b>: bei Trial/ungültig Button <b>Lizenz aktivieren…</b> — 1.0.1</li>
+<li><b>Datei → Drucken</b> (Ctrl+P): Editor oder aktuelle PDF-Seite (Qt Print); <b>PDF → Dokument drucken…</b> Seitenbereich von–bis + DPI 72/150/300, dann QPrintDialog (Raster via pypdfium2) — 1.0.2</li>
+<li><b>Datei → Backup jetzt</b> / <b>Backup-Ordner öffnen…</b>: manuelles Backup; bei Schreibfehler Dialog mit <b>Retry</b>; Status zeigt Pfad — 1.0.2</li>
+<li><b>Willkommen</b>: Drag&amp;Drop Dateien öffnen; Button <b>Recent leeren</b>; Recent Rechtsklick Entfernen/Ordner — 1.0.2</li>
+<li><b>Hilfe → Info</b>: Trial-Resttage konsistent mit Statusleiste („noch X Tage“); Lizenz aktivieren… — 1.0.2</li>
 <li><b>Seitenleiste</b>: Suche (inkl. letzte Suchbegriffe), „Alle Docs“-Volltext, Zuletzt geöffnet, Dokumente,
     Lesezeichen/Outline (+/− hinzufügen/löschen), <b>Annotationen</b> (klickbar, <b>nach Seite gruppiert</b>,
     <b>Filter nach Typ</b>, <b>Textsuche in der Liste</b> (optional <b>Regex</b>), <b>Statistik je Typ</b>,
@@ -558,12 +558,12 @@ class AboutDialog(QDialog):
                 f"<p>Icon: assets/app.ico · assets/icon.png</p>"
             )
         )
-        # Lizenzstatus immer anzeigen — 1.0.0 / Aktivieren-Button 1.0.1
+        # Lizenzstatus immer anzeigen — Resttage konsistent mit Statusleiste 1.0.2
         license_html = ""
         trial_hint = ""
         show_activate = False
         try:
-            from instantlensdoc.license import LicenseManager
+            from instantlensdoc.license import LicenseManager, resttage_phrase
 
             mgr = None
             if parent is not None and hasattr(parent, "license_manager"):
@@ -572,6 +572,7 @@ class AboutDialog(QDialog):
                 mgr = LicenseManager()
             self._license_mgr = mgr
             st = mgr.status()
+            rest = resttage_phrase(st.days_remaining)  # „noch X Tag(e)“ wie Statusleiste
             mode_lbl = {
                 "trial": "Testversion (Trial)",
                 "licensed": "Lizenziert",
@@ -593,7 +594,7 @@ class AboutDialog(QDialog):
             license_html = (
                 f"<p style='background:{bg};padding:8px;border:1px solid {border};'>"
                 f"<b>Lizenzstatus</b>: {mode_lbl}<br>"
-                f"Restlaufzeit: <b>{st.days_remaining}</b> Tag(e)"
+                f"Restlaufzeit: <b>{rest}</b>"
                 + (f"<br>Ablauf: {exp}" if exp else "")
                 + email_line
                 + f"<br>{st.message}<br>"
@@ -603,10 +604,9 @@ class AboutDialog(QDialog):
             # Button bei Trial / abgelaufen / ungültig — 1.0.1
             show_activate = st.mode != "licensed"
             if st.mode == "trial":
-                rem = st.days_remaining
                 trial_hint = (
                     f"<p style='background:#FFF3CD;padding:8px;border:1px solid #E0C36A;'>"
-                    f"<b>Testversion</b> — noch {rem} Tag(e).<br>"
+                    f"<b>Testversion</b> — {rest}.<br>"
                     f"Lizenzschlüssel erzeugen: <code>run-keygen.bat</code> bzw. "
                     f"<code>python -m keygen --gui</code> "
                     f"(Installer: <code>InstantLensKeygen.exe</code>).<br>"
@@ -658,7 +658,7 @@ class AboutDialog(QDialog):
             "<h3>Features (Kurz)</h3>"
             "<ul>"
             "<li>PDF lesen/annotieren (Highlight, Notiz, Stempel, Formen) · Sidecar v4</li>"
-            "<li>Willkommen Recent-Kontextmenü, Druck-Seitenbereich, Lizenz aktivieren, Backup-Pfad — 1.0.1</li>"
+            "<li>Willkommen Drag&amp;Drop/Clear-Recent, Druck-DPI 72/150/300, Trial-Resttage konsistent, Backup-Retry — 1.0.2</li>"
             "<li>Editor: Find/Replace, Snippets, Bracket-Match, Minimap, Zeilen-Lesezeichen</li>"
             "<li>OCR-Bridge, Formulargenerator, Batch, Export · Ann.-Batch-Farbe/Deckkraft</li>"
             "<li>Lizenz Trial/Keys · lokal, ohne Telemetrie · Stubs: KI, Cloud, Stylus, 3D</li>"

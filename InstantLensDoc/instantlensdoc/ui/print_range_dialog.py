@@ -1,9 +1,10 @@
-"""PDF-Dokumentdruck: Seitenbereich (von–bis) vor QPrintDialog — 1.0.1."""
+"""PDF-Dokumentdruck: Seitenbereich (von–bis) + DPI vor QPrintDialog — 1.0.2."""
 
 from __future__ import annotations
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
+    QComboBox,
     QDialog,
     QDialogButtonBox,
     QFormLayout,
@@ -12,15 +13,20 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
+from instantlensdoc.core.app_settings import (
+    EXPORT_RASTER_DPI_CHOICES,
+    get_export_raster_dpi,
+)
+
 
 class PrintRangeDialog(QDialog):
-    """Modaler Dialog: Seitenbereich von–bis (1-basiert) für Dokumentdruck."""
+    """Modaler Dialog: Seitenbereich von–bis (1-basiert) + Raster-DPI für Dokumentdruck."""
 
-    def __init__(self, page_count: int, parent=None):
+    def __init__(self, page_count: int, parent=None, *, default_dpi: int | None = None):
         super().__init__(parent)
         self.setWindowTitle("Seitenbereich drucken")
         self.setWindowModality(Qt.WindowModal)
-        self.resize(320, 140)
+        self.resize(340, 180)
         n = max(1, int(page_count or 1))
         layout = QVBoxLayout(self)
         layout.addWidget(QLabel(f"Seitenbereich wählen (1 … {n}):"))
@@ -35,6 +41,21 @@ class PrintRangeDialog(QDialog):
         self.to_spin.setToolTip("Letzte Seite (einschließlich)")
         form.addRow("Von Seite:", self.from_spin)
         form.addRow("Bis Seite:", self.to_spin)
+
+        self.dpi_combo = QComboBox()
+        self.dpi_combo.setToolTip("Rasterauflösung für den Dokumentdruck (72 / 150 / 300 DPI)")
+        for d in EXPORT_RASTER_DPI_CHOICES:
+            self.dpi_combo.addItem(f"{d} DPI", int(d))
+        try:
+            dpi = int(default_dpi) if default_dpi is not None else int(get_export_raster_dpi())
+        except Exception:
+            dpi = 150
+        if dpi not in EXPORT_RASTER_DPI_CHOICES:
+            dpi = min(EXPORT_RASTER_DPI_CHOICES, key=lambda x: abs(x - dpi))
+        idx = list(EXPORT_RASTER_DPI_CHOICES).index(dpi)
+        self.dpi_combo.setCurrentIndex(idx)
+        form.addRow("DPI (Raster):", self.dpi_combo)
+
         layout.addLayout(form)
         self.from_spin.valueChanged.connect(self._sync_from)
         self.to_spin.valueChanged.connect(self._sync_to)
@@ -61,3 +82,14 @@ class PrintRangeDialog(QDialog):
         if b <= a:
             b = a + 1
         return a, b
+
+    def dpi(self) -> int:
+        """Gewählte Raster-DPI (72 / 150 / 300)."""
+        data = self.dpi_combo.currentData()
+        try:
+            v = int(data)
+        except (TypeError, ValueError):
+            v = 150
+        if v not in EXPORT_RASTER_DPI_CHOICES:
+            v = min(EXPORT_RASTER_DPI_CHOICES, key=lambda x: abs(x - v))
+        return v

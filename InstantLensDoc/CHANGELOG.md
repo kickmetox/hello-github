@@ -1,5 +1,28 @@
 # Changelog — InstantLens Doc
 
+## 1.0.2 — Willkommen Drag&Drop/Clear-Recent, Druck-DPI, Trial-Resttage, Backup-Retry
+
+Post-Release-Polish nach 1.0.1: Willkommen mit Drag&Drop zum Öffnen und Button „Recent leeren“; PDF-Dokumentdruck mit DPI-Auswahl 72/150/300 für Raster; Trial-Resttage in Statusleiste und About einheitlich („noch X Tage“); Backup-Schreibfehler mit Retry-Dialog. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### Willkommen / Start
+- **Drag & Drop** Dateien auf die Startseite → öffnen
+- Button **Recent leeren** (wie Menü „Liste leeren“)
+
+### PDF / Druck
+- **Dokument drucken…**: DPI-Auswahl **72 / 150 / 300** im Seitenbereich-Dialog; Raster-Scale = DPI/72; zuletzt genutzte DPI wird gemerkt
+
+### About / Lizenz
+- Trial-/Lizenz-**Resttage** Statusleiste + About (+ Lizenzdialog) über gemeinsame `resttage_phrase()` / `format_resttage()`
+
+### Backup
+- Bei **Schreibfehler** (OSError): Fehlerdialog mit **Retry** / Abbrechen
+
+### Packaging / Docs
+- Version **1.0.2** (App / `ild_pdf` / ISS / Smoke / Docs)
+- Smoke: Welcome Drag&Drop/Clear-Recent, Print DPI, Resttage-Konsistenz, Backup-Retry (CLI + Qt)
+
+---
+
 ## 1.0.1 — Willkommen-Kontextmenü, Druck-Seitenbereich, Lizenz aktivieren, Backup-Pfad
 
 Post-Release-Polish nach 1.0.0: Willkommen-Recent mit Rechtsklick Entfernen/Ordner öffnen und grauen fehlenden Pfaden; PDF-Dokumentdruck mit Seitenbereich von–bis vor QPrintDialog; About mit „Lizenz aktivieren…“ bei Trial/ungültig; Backup-Statusmeldung mit Pfad der letzten Backup-Datei. Stubs KI/Cloud/Stylus/3D bleiben Stubs.

@@ -1,4 +1,4 @@
-InstantLens Doc 1.0.1 — Installation
+InstantLens Doc 1.0.2 — Installation
 
 Startmenü: Gruppe „InstantLens Doc“ mit Programm, optional Keygenerator, INFO und Deinstallieren.
 

@@ -5344,7 +5344,7 @@ class PdfViewer(QWidget):
             return False
 
     def print_document(self) -> bool:
-        """PDF-Dokument (Seitenbereich) gerastert über QPrintDialog drucken — 1.0.1."""
+        """PDF-Dokument (Seitenbereich + DPI) gerastert über QPrintDialog drucken — 1.0.2."""
         if not self.pdf_path:
             QMessageBox.information(self, "Drucken", "Kein PDF geladen.")
             return False
@@ -5353,6 +5353,7 @@ class PdfViewer(QWidget):
             from PySide6.QtPrintSupport import QPrintDialog, QPrinter
             from PySide6.QtWidgets import QProgressDialog
 
+            from instantlensdoc.core.app_settings import set_export_raster_dpi
             from instantlensdoc.ui.print_range_dialog import PrintRangeDialog
 
             n = int(self.page_count or 0)
@@ -5360,7 +5361,7 @@ class PdfViewer(QWidget):
                 QMessageBox.warning(self, "Drucken", "PDF hat keine Seiten.")
                 return False
 
-            # Seitenbereich (von–bis) vor dem Druckerdialog — 1.0.1
+            # Seitenbereich (von–bis) + DPI vor dem Druckerdialog — 1.0.2
             range_dlg = PrintRangeDialog(n, self)
             if range_dlg.exec() != PrintRangeDialog.Accepted:
                 return False
@@ -5370,6 +5371,12 @@ class PdfViewer(QWidget):
             pages = list(range(start, end))
             if not pages:
                 return False
+            dpi = int(range_dlg.dpi())
+            try:
+                set_export_raster_dpi(dpi)
+            except Exception:
+                pass
+            scale = max(dpi / 72.0, 1.0)
 
             printer = QPrinter(QPrinter.HighResolution)
             printer.setDocName(str(self.pdf_path.stem))
@@ -5378,7 +5385,6 @@ class PdfViewer(QWidget):
             if dlg.exec() != QPrintDialog.Accepted:
                 return False
 
-            scale = 2.0
             total = len(pages)
             progress = QProgressDialog("Drucke PDF…", "Abbrechen", 0, total, self)
             progress.setWindowModality(Qt.WindowModal)
@@ -5390,7 +5396,7 @@ class PdfViewer(QWidget):
                     if progress.wasCanceled():
                         break
                     progress.setValue(idx)
-                    progress.setLabelText(f"Drucke Seite {i + 1} / {n}…")
+                    progress.setLabelText(f"Drucke Seite {i + 1} / {n} ({dpi} DPI)…")
                     pm = self._pixmap_from_rendered_page(i, scale)
                     if pm is None or pm.isNull():
                         continue
@@ -5416,7 +5422,7 @@ class PdfViewer(QWidget):
                     pass
             self.refresh()
             self.status.emit(
-                f"PDF-Dokument gedruckt (Seiten {start + 1}–{end}, {printed} Seite(n))"
+                f"PDF-Dokument gedruckt (Seiten {start + 1}–{end}, {printed} Seite(n), {dpi} DPI)"
             )
             return True
         except Exception as e:

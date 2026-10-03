@@ -83,6 +83,19 @@ def verify_key(key: str) -> tuple[bool, str, Optional[dict]]:
     return True, "Schlüssel gültig", data
 
 
+def format_resttage(days: int) -> str:
+    """Einheitliche Resttage-Formulierung für Statusleiste / About / Dialog — 1.0.2."""
+    d = max(0, int(days))
+    if d == 1:
+        return "1 Tag"
+    return f"{d} Tage"
+
+
+def resttage_phrase(days: int, *, prefix: str = "noch") -> str:
+    """z. B. ``noch 12 Tage`` / ``noch 1 Tag`` — konsistent Status + About."""
+    return f"{prefix} {format_resttage(days)}"
+
+
 @dataclass
 class LicenseStatus:
     mode: str  # "trial" | "licensed" | "expired"
@@ -94,6 +107,10 @@ class LicenseStatus:
     @property
     def allowed(self) -> bool:
         return self.mode in ("trial", "licensed")
+
+    def resttage_text(self, *, prefix: str = "noch") -> str:
+        """Konsistente Resttage-Phrase aus dem Statusobjekt."""
+        return resttage_phrase(self.days_remaining, prefix=prefix)
 
 
 class LicenseManager:

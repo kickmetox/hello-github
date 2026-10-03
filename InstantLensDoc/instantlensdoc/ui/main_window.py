@@ -806,6 +806,8 @@ class MainWindow(QMainWindow):
         self.welcome_page.new_text_requested.connect(lambda: self.new_doc("empty"))
         self.welcome_page.recent_activated.connect(self.open_path)
         self.welcome_page.recent_remove_requested.connect(self._remove_recent_path)
+        self.welcome_page.clear_recent_requested.connect(self._clear_recent)
+        self.welcome_page.files_dropped.connect(self._welcome_files_dropped)
         self.stack.addWidget(self.editor_pane)  # 0
         self.stack.addWidget(self.pdf_view)  # 1
         self.stack.addWidget(self.image_label)  # 2
@@ -2082,6 +2084,20 @@ class MainWindow(QMainWindow):
         recent_mod.clear_recent()
         self._refresh_recent()
         self._set_status("Zuletzt geöffnet geleert")
+
+    def _welcome_files_dropped(self, paths) -> None:
+        """Dateien von der Willkommen-Seite per Drag & Drop öffnen — 1.0.2."""
+        opened = 0
+        for path in paths or []:
+            if not path:
+                continue
+            try:
+                self.open_path(path)
+                opened += 1
+            except Exception:
+                pass
+        if opened:
+            self._set_status(f"{opened} Datei(en) per Drag & Drop geöffnet")
 
     def _remember_path(self, path: str | Path):
         try:
@@ -3991,72 +4007,93 @@ class MainWindow(QMainWindow):
         return True
 
     def _manual_backup_now(self) -> None:
-        """Aktuelles Dokument manuell in den Backup-Ordner kopieren — 1.0.0."""
-        try:
-            if self.doc and self.doc.path and Path(self.doc.path).is_file():
-                dest = manual_backup_file(self.doc.path)
-                if dest is None:
-                    QMessageBox.warning(self, "Backup", "Backup fehlgeschlagen.")
-                    return
-                self._last_backup_path = dest
-                self._set_status(f"Backup erstellt: {dest}")
-                QMessageBox.information(
-                    self,
-                    "Backup jetzt",
-                    f"Backup gespeichert:\n{dest}\n\nOrdner:\n{backup_dir()}",
-                )
+        """Aktuelles Dokument manuell sichern; bei Schreibfehler Retry — 1.0.2."""
+        while True:
+            try:
+                self._manual_backup_once()
                 return
-            if (
-                self.stack.currentWidget() is self.pdf_view
-                and self.pdf_view.pdf_path
-                and Path(self.pdf_view.pdf_path).is_file()
-            ):
-                dest = manual_backup_file(self.pdf_view.pdf_path)
-                if dest is None:
-                    QMessageBox.warning(self, "Backup", "Backup fehlgeschlagen.")
+            except OSError as e:
+                box = QMessageBox(self)
+                box.setIcon(QMessageBox.Critical)
+                box.setWindowTitle("Backup")
+                box.setText("Backup-Schreibfehler")
+                box.setInformativeText(
+                    f"Die Backup-Datei konnte nicht geschrieben werden:\n{e}\n\n"
+                    "Erneut versuchen?"
+                )
+                box.setStandardButtons(QMessageBox.Retry | QMessageBox.Cancel)
+                box.setDefaultButton(QMessageBox.Retry)
+                if box.exec() != QMessageBox.Retry:
+                    self._set_status("Backup abgebrochen")
                     return
-                self._last_backup_path = dest
-                self._set_status(f"Backup erstellt: {dest}")
-                QMessageBox.information(
-                    self,
-                    "Backup jetzt",
-                    f"Backup gespeichert:\n{dest}\n\nOrdner:\n{backup_dir()}",
-                )
+            except Exception as e:
+                QMessageBox.critical(self, "Backup", f"Backup fehlgeschlagen:\n{e}")
                 return
-            if self.stack.currentWidget() is self.editor_pane or (
-                self.doc is not None and not self.doc.path
-            ):
-                text = self.editor.toPlainText() if hasattr(self, "editor") else ""
-                body = text or (self.doc.text if self.doc else "") or ""
-                if not body.strip():
-                    QMessageBox.information(
-                        self,
-                        "Backup jetzt",
-                        "Kein Dokument zum Sichern (leer / kein Pfad).",
-                    )
-                    return
-                title = (self.doc.title if self.doc else None) or "unbenannt"
-                suffix = (
-                    ".md"
-                    if self.doc and self.doc.kind == DocKind.MARKDOWN
-                    else ".txt"
-                )
-                dest = manual_backup_text(body, title=title, suffix=suffix)
-                self._last_backup_path = dest
-                self._set_status(f"Backup erstellt: {dest}")
-                QMessageBox.information(
-                    self,
-                    "Backup jetzt",
-                    f"Text-Backup gespeichert:\n{dest}\n\nOrdner:\n{backup_dir()}",
-                )
+
+    def _manual_backup_once(self) -> None:
+        """Ein Backup-Versuch; OSError bei Schreibfehlern durchreichen — 1.0.2."""
+        if self.doc and self.doc.path and Path(self.doc.path).is_file():
+            dest = manual_backup_file(self.doc.path)
+            if dest is None:
+                QMessageBox.warning(self, "Backup", "Backup fehlgeschlagen.")
                 return
+            self._last_backup_path = dest
+            self._set_status(f"Backup erstellt: {dest}")
             QMessageBox.information(
                 self,
                 "Backup jetzt",
-                "Kein Dokument zum Sichern geöffnet.",
+                f"Backup gespeichert:\n{dest}\n\nOrdner:\n{backup_dir()}",
             )
-        except Exception as e:
-            QMessageBox.critical(self, "Backup", f"Backup fehlgeschlagen:\n{e}")
+            return
+        if (
+            self.stack.currentWidget() is self.pdf_view
+            and self.pdf_view.pdf_path
+            and Path(self.pdf_view.pdf_path).is_file()
+        ):
+            dest = manual_backup_file(self.pdf_view.pdf_path)
+            if dest is None:
+                QMessageBox.warning(self, "Backup", "Backup fehlgeschlagen.")
+                return
+            self._last_backup_path = dest
+            self._set_status(f"Backup erstellt: {dest}")
+            QMessageBox.information(
+                self,
+                "Backup jetzt",
+                f"Backup gespeichert:\n{dest}\n\nOrdner:\n{backup_dir()}",
+            )
+            return
+        if self.stack.currentWidget() is self.editor_pane or (
+            self.doc is not None and not self.doc.path
+        ):
+            text = self.editor.toPlainText() if hasattr(self, "editor") else ""
+            body = text or (self.doc.text if self.doc else "") or ""
+            if not body.strip():
+                QMessageBox.information(
+                    self,
+                    "Backup jetzt",
+                    "Kein Dokument zum Sichern (leer / kein Pfad).",
+                )
+                return
+            title = (self.doc.title if self.doc else None) or "unbenannt"
+            suffix = (
+                ".md"
+                if self.doc and self.doc.kind == DocKind.MARKDOWN
+                else ".txt"
+            )
+            dest = manual_backup_text(body, title=title, suffix=suffix)
+            self._last_backup_path = dest
+            self._set_status(f"Backup erstellt: {dest}")
+            QMessageBox.information(
+                self,
+                "Backup jetzt",
+                f"Text-Backup gespeichert:\n{dest}\n\nOrdner:\n{backup_dir()}",
+            )
+            return
+        QMessageBox.information(
+            self,
+            "Backup jetzt",
+            "Kein Dokument zum Sichern geöffnet.",
+        )
 
     def _open_backup_folder(self) -> None:
         """Backup-Ordner im Dateimanager öffnen — 1.0.0."""
@@ -4268,29 +4305,32 @@ class MainWindow(QMainWindow):
             self._blink_autosave_error_status()
 
     def _update_license_status(self):
+        from instantlensdoc.license import resttage_phrase
+
         st = self.license_manager.status()
         self.version_label.setText(f"v{__version__}")
+        rest = resttage_phrase(st.days_remaining)  # „noch X Tag(e)“ — konsistent About 1.0.2
         urgent = st.allowed and st.days_remaining < 7
         if st.mode == "licensed":
             who = f" · {st.email}" if st.email else ""
             if urgent:
-                text = f"⚠ Lizenz: noch {st.days_remaining} Tag(e)!{who}"
+                text = f"⚠ Lizenz: {rest}!{who}"
                 style = (
                     "color: #7B241C; background: #F5B7B1; font-weight: 800; "
                     "font-size: 12px; padding: 3px 8px; border-radius: 3px;"
                 )
             else:
-                text = f"Lizenz: Aktiviert{who} · noch {st.days_remaining} Tag(e)"
+                text = f"Lizenz: Aktiviert{who} · {rest}"
                 style = "color: #1B7A3D; font-weight: 600; padding-right: 6px;"
         elif st.mode == "trial":
             if urgent:
-                text = f"⚠ Testversion: noch {st.days_remaining} Tag(e)! — Hilfe → Lizenz"
+                text = f"⚠ Testversion: {rest}! — Hilfe → Lizenz"
                 style = (
                     "color: #7B241C; background: #F9E79F; font-weight: 800; "
                     "font-size: 12px; padding: 3px 8px; border-radius: 3px;"
                 )
             else:
-                text = f"Lizenz: Testversion · noch {st.days_remaining} Tag(e) — Hilfe → Lizenz"
+                text = f"Lizenz: Testversion · {rest} — Hilfe → Lizenz"
                 style = "color: #B9770E; font-weight: 600; padding-right: 6px;"
         else:
             text = "Lizenz: Abgelaufen — Hilfe → Lizenz · ame@sellerbach.de"

@@ -16,7 +16,7 @@ from PySide6.QtWidgets import (
 )
 
 from instantlensdoc.config import CONTACT_EMAIL
-from instantlensdoc.license import LicenseManager
+from instantlensdoc.license import LicenseManager, format_resttage, resttage_phrase
 
 
 def _format_expiry(dt: datetime | None) -> str:
@@ -45,12 +45,11 @@ class LicenseDialog(QDialog):
         }.get(st.mode, st.mode)
         days = int(st.days_remaining)
         expiry = _format_expiry(st.expires_at)
+        # Gleiche Formulierung wie Statusleiste / About — 1.0.2
         if st.mode == "expired":
-            rest_line = "Resttage: 0"
-        elif days == 1:
-            rest_line = "Resttage: 1 Tag"
+            rest_line = f"Resttage: {format_resttage(0)} ({resttage_phrase(0)})"
         else:
-            rest_line = f"Resttage: {days} Tage"
+            rest_line = f"Resttage: {format_resttage(days)} ({resttage_phrase(days)})"
 
         lines = [
             f"Status: {mode_de}",
