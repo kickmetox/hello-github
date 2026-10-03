@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **1.0.2** |
+| Version | **1.0.3** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -18,6 +18,7 @@
 - Neu anfordern: **ame@sellerbach.de**  
 - Statusleiste: bei **<7 Tagen** Restlaufzeit prominent hervorgehoben  
 - Resttage Statusleiste + About **konsistent** („noch X Tage“ / „noch 1 Tag“)  
+- Ablaufdatum **TT.MM.JJJJ** in About + Status (+ Lizenzdialog)  
 - Lizenz-Dialog: Resttage + Ablaufdatum klar  
 - About: Version, **Lizenzstatus**, Kontakt, Changelog-Kurzliste; bei Trial/ungültig **Lizenz aktivieren…**; **Privacy: lokal, keine Telemetrie**
 
@@ -53,10 +54,10 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an / `checkedonce`)
 
-## Neu in 1.0.2
+## Neu in 1.0.3
 
-- Willkommen: **Drag&Drop** Dateien öffnen; Button **Recent leeren**
-- Drucken: **DPI 72/150/300** für Raster-Dokumentdruck
-- Lizenz: Trial-Resttage Statusleiste + About konsistent
-- Backup: Fehlerdialog mit **Retry** bei Schreibfehler
+- Willkommen: **Enter** öffnet Auswahl; **Entf** entfernt Recent-Eintrag
+- Drucken: **Graustufen-Toggle** in Settings + Druckdialog
+- Lizenz: Ablaufdatum **TT.MM.JJJJ** in About + Status
+- Backup: max. **3 Versuche**, dann Abbruch-Hinweis
 - Stubs KI/Cloud/Stylus/3D unverändert

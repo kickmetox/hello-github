@@ -1,9 +1,10 @@
-"""PDF-Dokumentdruck: Seitenbereich (von–bis) + DPI vor QPrintDialog — 1.0.2."""
+"""PDF-Dokumentdruck: Seitenbereich (von–bis) + DPI + Graustufen vor QPrintDialog — 1.0.3."""
 
 from __future__ import annotations
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
+    QCheckBox,
     QComboBox,
     QDialog,
     QDialogButtonBox,
@@ -16,17 +17,25 @@ from PySide6.QtWidgets import (
 from instantlensdoc.core.app_settings import (
     EXPORT_RASTER_DPI_CHOICES,
     get_export_raster_dpi,
+    get_print_grayscale,
 )
 
 
 class PrintRangeDialog(QDialog):
-    """Modaler Dialog: Seitenbereich von–bis (1-basiert) + Raster-DPI für Dokumentdruck."""
+    """Modaler Dialog: Seitenbereich von–bis (1-basiert) + Raster-DPI + Graustufen."""
 
-    def __init__(self, page_count: int, parent=None, *, default_dpi: int | None = None):
+    def __init__(
+        self,
+        page_count: int,
+        parent=None,
+        *,
+        default_dpi: int | None = None,
+        default_grayscale: bool | None = None,
+    ):
         super().__init__(parent)
         self.setWindowTitle("Seitenbereich drucken")
         self.setWindowModality(Qt.WindowModal)
-        self.resize(340, 180)
+        self.resize(340, 210)
         n = max(1, int(page_count or 1))
         layout = QVBoxLayout(self)
         layout.addWidget(QLabel(f"Seitenbereich wählen (1 … {n}):"))
@@ -55,6 +64,17 @@ class PrintRangeDialog(QDialog):
         idx = list(EXPORT_RASTER_DPI_CHOICES).index(dpi)
         self.dpi_combo.setCurrentIndex(idx)
         form.addRow("DPI (Raster):", self.dpi_combo)
+
+        if default_grayscale is None:
+            gray = bool(get_print_grayscale())
+        else:
+            gray = bool(default_grayscale)
+        self.grayscale_check = QCheckBox("Graustufen")
+        self.grayscale_check.setChecked(gray)
+        self.grayscale_check.setToolTip(
+            "Dokumentdruck monochrom (Graustufen) — Einstellung wird gemerkt — 1.0.3"
+        )
+        form.addRow("Farbe:", self.grayscale_check)
 
         layout.addLayout(form)
         self.from_spin.valueChanged.connect(self._sync_from)
@@ -93,3 +113,7 @@ class PrintRangeDialog(QDialog):
         if v not in EXPORT_RASTER_DPI_CHOICES:
             v = min(EXPORT_RASTER_DPI_CHOICES, key=lambda x: abs(x - v))
         return v
+
+    def grayscale(self) -> bool:
+        """Dokumentdruck in Graustufen — 1.0.3."""
+        return bool(self.grayscale_check.isChecked())

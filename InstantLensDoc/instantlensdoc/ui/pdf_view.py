@@ -5277,11 +5277,14 @@ class PdfViewer(QWidget):
             QMessageBox.warning(self, "Wiederholen", str(e))
             return False
 
-    def _pixmap_from_rendered_page(self, page_index: int, scale: float):
+    def _pixmap_from_rendered_page(
+        self, page_index: int, scale: float, *, grayscale: bool | None = None
+    ):
         """Seite via pypdfium2 rendern und als QPixmap (mit Ann.) zurückgeben."""
         from PySide6.QtGui import QImage, QPixmap
 
-        img = render_page(self.pdf_path, page_index, scale=scale)
+        gray = bool(self._grayscale if grayscale is None else grayscale)
+        img = render_page(self.pdf_path, page_index, scale=scale, grayscale=gray)
         anns = self.store.for_page(page_index) if self.store else []
         if img.mode != "RGBA":
             img = img.convert("RGBA")
@@ -5344,7 +5347,7 @@ class PdfViewer(QWidget):
             return False
 
     def print_document(self) -> bool:
-        """PDF-Dokument (Seitenbereich + DPI) gerastert über QPrintDialog drucken — 1.0.2."""
+        """PDF-Dokument (Seitenbereich + DPI + Graustufen) gerastert drucken — 1.0.3."""
         if not self.pdf_path:
             QMessageBox.information(self, "Drucken", "Kein PDF geladen.")
             return False
@@ -5353,7 +5356,10 @@ class PdfViewer(QWidget):
             from PySide6.QtPrintSupport import QPrintDialog, QPrinter
             from PySide6.QtWidgets import QProgressDialog
 
-            from instantlensdoc.core.app_settings import set_export_raster_dpi
+            from instantlensdoc.core.app_settings import (
+                set_export_raster_dpi,
+                set_print_grayscale,
+            )
             from instantlensdoc.ui.print_range_dialog import PrintRangeDialog
 
             n = int(self.page_count or 0)
@@ -5361,7 +5367,7 @@ class PdfViewer(QWidget):
                 QMessageBox.warning(self, "Drucken", "PDF hat keine Seiten.")
                 return False
 
-            # Seitenbereich (von–bis) + DPI vor dem Druckerdialog — 1.0.2
+            # Seitenbereich + DPI + Graustufen vor dem Druckerdialog — 1.0.3
             range_dlg = PrintRangeDialog(n, self)
             if range_dlg.exec() != PrintRangeDialog.Accepted:
                 return False
@@ -5372,8 +5378,10 @@ class PdfViewer(QWidget):
             if not pages:
                 return False
             dpi = int(range_dlg.dpi())
+            gray = bool(range_dlg.grayscale())
             try:
                 set_export_raster_dpi(dpi)
+                set_print_grayscale(gray)
             except Exception:
                 pass
             scale = max(dpi / 72.0, 1.0)
@@ -5391,13 +5399,16 @@ class PdfViewer(QWidget):
             progress.setMinimumDuration(0)
             painter = QPainter(printer)
             printed = 0
+            gray_lbl = ", Graustufen" if gray else ""
             try:
                 for idx, i in enumerate(pages):
                     if progress.wasCanceled():
                         break
                     progress.setValue(idx)
-                    progress.setLabelText(f"Drucke Seite {i + 1} / {n} ({dpi} DPI)…")
-                    pm = self._pixmap_from_rendered_page(i, scale)
+                    progress.setLabelText(
+                        f"Drucke Seite {i + 1} / {n} ({dpi} DPI{gray_lbl})…"
+                    )
+                    pm = self._pixmap_from_rendered_page(i, scale, grayscale=gray)
                     if pm is None or pm.isNull():
                         continue
                     if printed > 0:
@@ -5422,7 +5433,8 @@ class PdfViewer(QWidget):
                     pass
             self.refresh()
             self.status.emit(
-                f"PDF-Dokument gedruckt (Seiten {start + 1}–{end}, {printed} Seite(n), {dpi} DPI)"
+                f"PDF-Dokument gedruckt (Seiten {start + 1}–{end}, {printed} Seite(n), "
+                f"{dpi} DPI{gray_lbl})"
             )
             return True
         except Exception as e:

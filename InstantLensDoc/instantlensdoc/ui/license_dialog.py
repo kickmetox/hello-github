@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QDialog,
@@ -16,17 +14,12 @@ from PySide6.QtWidgets import (
 )
 
 from instantlensdoc.config import CONTACT_EMAIL
-from instantlensdoc.license import LicenseManager, format_resttage, resttage_phrase
-
-
-def _format_expiry(dt: datetime | None) -> str:
-    if dt is None:
-        return "—"
-    if dt.tzinfo is not None:
-        local = dt.astimezone()
-    else:
-        local = dt.replace(tzinfo=timezone.utc).astimezone()
-    return local.strftime("%d.%m.%Y %H:%M")
+from instantlensdoc.license import (
+    LicenseManager,
+    format_ablaufdatum,
+    format_resttage,
+    resttage_phrase,
+)
 
 
 class LicenseDialog(QDialog):
@@ -44,8 +37,8 @@ class LicenseDialog(QDialog):
             "expired": "Abgelaufen",
         }.get(st.mode, st.mode)
         days = int(st.days_remaining)
-        expiry = _format_expiry(st.expires_at)
-        # Gleiche Formulierung wie Statusleiste / About — 1.0.2
+        expiry = format_ablaufdatum(st.expires_at)  # TT.MM.JJJJ — 1.0.3
+        # Gleiche Formulierung wie Statusleiste / About — 1.0.2/1.0.3
         if st.mode == "expired":
             rest_line = f"Resttage: {format_resttage(0)} ({resttage_phrase(0)})"
         else:

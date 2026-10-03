@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Smoke-Test 1.0.2 (CLI + optional offscreen Qt). Kernpfade: open/annotate/export/license + ausgewählte 0.6.x-Pfade."""
+"""Smoke-Test 1.0.3 (CLI + optional offscreen Qt). Kernpfade: open/annotate/export/license + ausgewählte 0.6.x-Pfade."""
 
 from __future__ import annotations
 
@@ -122,8 +122,8 @@ def main() -> int:
     from instantlensdoc.core.update_check import check_for_updates
     from instantlensdoc.license import KEY_DAYS, TRIAL_DAYS, generate_key, verify_key
 
-    assert __version__ == "1.0.2", __version__
-    assert ild_ver == "1.0.2", ild_ver
+    assert __version__ == "1.0.3", __version__
+    assert ild_ver == "1.0.3", ild_ver
     assert TRIAL_DAYS == 28 and KEY_DAYS == 32
     key = generate_key("ame@sellerbach.de")
     ok, msg, _ = verify_key(key)
@@ -141,7 +141,7 @@ def main() -> int:
     assert "Settings" in tr("settings")
     set_lang("de")
     upd = check_for_updates(allow_network=False)
-    assert upd.local_version == "1.0.2" and not upd.online
+    assert upd.local_version == "1.0.3" and not upd.online
     assert get_export_jpeg_quality() >= 10
     assert get_ui_lang() in ("de", "en")
     assert 25 <= get_default_zoom_percent() <= 500
@@ -184,8 +184,8 @@ def main() -> int:
     assert get_ann_pen_color() == "#112233"
     assert (ROOT / "CHANGELOG.md").is_file()
     cl = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-    assert "1.0.2" in cl and "1.0.1" in cl and "1.0.0" in cl and "0.9.9" in cl and "0.9.8" in cl and "0.9.7" in cl and "0.9.6" in cl and "0.9.5" in cl and "0.9.4" in cl and "0.9.3" in cl and "0.9.2" in cl and "0.9.1" in cl and "0.9.0" in cl and "0.8.9" in cl and "0.8.8" in cl and "0.8.7" in cl and "0.8.6" in cl and "0.8.5" in cl and "0.8.4" in cl and "0.8.3" in cl and "0.8.2" in cl and "0.8.1" in cl and "0.8.0" in cl
-    assert "## 1.0.2" in cl and "## 1.0.1" in cl and "## 1.0.0" in cl and "## 0.9.9" in cl and "## 0.9.8" in cl and "## 0.9.7" in cl and "## 0.9.6" in cl and "## 0.9.5" in cl and "## 0.9.4" in cl and "## 0.9.3" in cl and "## 0.9.2" in cl and "## 0.9.1" in cl and "## 0.9.0" in cl and "## 0.8.9" in cl and "## 0.8.8" in cl and "## 0.8.7" in cl and "## 0.8.6" in cl and "## 0.8.5" in cl and "## 0.8.4" in cl and "## 0.8.3" in cl and "## 0.8.2" in cl and "## 0.8.1" in cl and "## 0.8.0" in cl
+    assert "1.0.3" in cl and "1.0.2" in cl and "1.0.1" in cl and "1.0.0" in cl and "0.9.9" in cl and "0.9.8" in cl and "0.9.7" in cl and "0.9.6" in cl and "0.9.5" in cl and "0.9.4" in cl and "0.9.3" in cl and "0.9.2" in cl and "0.9.1" in cl and "0.9.0" in cl and "0.8.9" in cl and "0.8.8" in cl and "0.8.7" in cl and "0.8.6" in cl and "0.8.5" in cl and "0.8.4" in cl and "0.8.3" in cl and "0.8.2" in cl and "0.8.1" in cl and "0.8.0" in cl
+    assert "## 1.0.3" in cl and "## 1.0.2" in cl and "## 1.0.1" in cl and "## 1.0.0" in cl and "## 0.9.9" in cl and "## 0.9.8" in cl and "## 0.9.7" in cl and "## 0.9.6" in cl and "## 0.9.5" in cl and "## 0.9.4" in cl and "## 0.9.3" in cl and "## 0.9.2" in cl and "## 0.9.1" in cl and "## 0.9.0" in cl and "## 0.8.9" in cl and "## 0.8.8" in cl and "## 0.8.7" in cl and "## 0.8.6" in cl and "## 0.8.5" in cl and "## 0.8.4" in cl and "## 0.8.3" in cl and "## 0.8.2" in cl and "## 0.8.1" in cl and "## 0.8.0" in cl
     assert "## 0.7.9" in cl
     assert "## 0.7.8" in cl
     assert "## 0.7.6" in cl
@@ -242,7 +242,7 @@ def main() -> int:
     assert "0.4.9" in cl  # noch in Kurz-Tabelle
     assert "0.3.9" in cl  # noch in Kurz-Tabelle
     assert "0.2.9" in cl  # noch in Kurz-Tabelle
-    assert "1.0.2" in (ROOT / "README.md").read_text(encoding="utf-8")
+    assert "1.0.3" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "run.bat" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "sync-ild.ps1" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "scripts/sync-ild.ps1" in (ROOT / "FEATURES.md").read_text(encoding="utf-8")
@@ -591,13 +591,13 @@ def main() -> int:
 
         assert (ROOT / "installer" / "installer-hinweis.txt").exists()
         iss = (ROOT / "installer" / "instantlensdoc.iss").read_text(encoding="utf-8")
-        assert "1.0.2" in iss and "desktopicon" in iss and "DisableProgramGroupPage=no" in iss
+        assert "1.0.3" in iss and "desktopicon" in iss and "DisableProgramGroupPage=no" in iss
         assert "UninstallDisplayName" in iss and "Uninstallable=yes" in iss
         assert "IncludeKeygen" in iss and "SetupIconFile" in iss
         assert "InstantLensKeygen.exe" in iss
         assert "uninstallexe" in iss
         bw = (ROOT / "build-windows.ps1").read_text(encoding="utf-8")
-        assert "1.0.2" in bw and "NoKeygenInApp" in bw and "--icon" in bw
+        assert "1.0.3" in bw and "NoKeygenInApp" in bw and "--icon" in bw
         assert "InstantLensKeygen.exe" in bw
         bi = (ROOT / "installer" / "build-installer.ps1").read_text(encoding="utf-8")
         assert "InstantLensKeygen.exe" in bi and "IncludeKeygen" in bi
@@ -606,7 +606,7 @@ def main() -> int:
         assert "Installer" in kg_readme
         hinweis = (ROOT / "installer" / "installer-hinweis.txt").read_text(encoding="utf-8")
         assert "InstantLensKeygen.exe" in hinweis or "run-keygen.bat" in hinweis
-        assert "1.0.2" in hinweis
+        assert "1.0.3" in hinweis
         assert "checkedonce" in iss and "Desktop-Verknüpfung" in hinweis
         from ild_pdf.limits import OPEN_TIMEOUT_HINT, OPEN_TIMEOUT_HINT_SEC
 
@@ -618,7 +618,7 @@ def main() -> int:
         assert "QProgressDialog" in (ROOT / "instantlensdoc" / "ui" / "main_window.py").read_text(encoding="utf-8")
 
         assert (ROOT / "examples" / "ild_pdf_demo.py").exists()
-        assert "1.0.2" in (ROOT / "INFO.md").read_text(encoding="utf-8")
+        assert "1.0.3" in (ROOT / "INFO.md").read_text(encoding="utf-8")
         assert (ROOT / "assets" / "app.ico").is_file()
 
         # --- Kernpfade: open / annotate / export / license ---
@@ -809,7 +809,7 @@ def main() -> int:
         set_backup_on_save(False)
         assert get_page_size_unit() in ("mm", "inch")
         assert isinstance(get_minimize_to_tray(), bool)
-        assert "1.0.2" in feat and "1.0.1" in feat and "1.0.0" in feat and "0.9.9" in feat and "0.9.8" in feat and "0.9.7" in feat and "0.9.6" in feat and "0.9.5" in feat and "0.9.4" in feat and "0.9.3" in feat and "0.9.2" in feat and "0.9.1" in feat and "0.9.0" in feat and "0.8.9" in feat and "0.8.8" in feat and "0.8.7" in feat and "0.8.6" in feat and "0.8.5" in feat and "0.8.4" in feat and "0.8.3" in feat and "0.8.2" in feat and "0.8.1" in feat and "0.8.0" in feat and "0.7.9" in feat and "0.7.8" in feat and "0.7.7" in feat and "0.7.6" in feat and "0.7.5" in feat and "0.7.4" in feat and "0.7.3" in feat and "0.7.2" in feat and "0.7.1" in feat and "0.6.9" in feat and "0.5.9" in feat and "0.4.9" in feat  # Release + Zeitraum-Feature-Hinweise
+        assert "1.0.3" in feat and "1.0.2" in feat and "1.0.1" in feat and "1.0.0" in feat and "0.9.9" in feat and "0.9.8" in feat and "0.9.7" in feat and "0.9.6" in feat and "0.9.5" in feat and "0.9.4" in feat and "0.9.3" in feat and "0.9.2" in feat and "0.9.1" in feat and "0.9.0" in feat and "0.8.9" in feat and "0.8.8" in feat and "0.8.7" in feat and "0.8.6" in feat and "0.8.5" in feat and "0.8.4" in feat and "0.8.3" in feat and "0.8.2" in feat and "0.8.1" in feat and "0.8.0" in feat and "0.7.9" in feat and "0.7.8" in feat and "0.7.7" in feat and "0.7.6" in feat and "0.7.5" in feat and "0.7.4" in feat and "0.7.3" in feat and "0.7.2" in feat and "0.7.1" in feat and "0.6.9" in feat and "0.5.9" in feat and "0.4.9" in feat  # Release + Zeitraum-Feature-Hinweise
         assert "Batch-OCR" in feat or "OCR gesamtes PDF" in feat
         assert "Tag" in feat
         assert "Projekt-Ordner" in feat or "Workspace" in feat
@@ -4000,10 +4000,74 @@ def main() -> int:
         cl102 = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
         assert "## 1.0.2" in cl102 and "## 1.0.1" in cl102
         kb102 = (ROOT / "instantlensdoc" / "ui" / "keyboard_help.py").read_text(encoding="utf-8")
-        assert "1.0.2" in kb102 and (
+        assert (
             "DPI" in kb102 or "Drag" in kb102 or "Retry" in kb102 or "Resttage" in kb102
         )
         print("1.0.2 CLI welcome-dnd/print-dpi/resttage/backup-retry: OK")
+
+        # 1.0.3 CLI: Welcome Enter/Delete, Print Graustufen, Ablauf TT.MM.JJJJ, Backup max-3
+        wel103 = (ROOT / "instantlensdoc" / "ui" / "welcome.py").read_text(encoding="utf-8")
+        assert "itemActivated" in wel103
+        assert "eventFilter" in wel103
+        assert "Key_Delete" in wel103
+        assert "Key_Return" in wel103 or "Key_Enter" in wel103
+        prd103 = (ROOT / "instantlensdoc" / "ui" / "print_range_dialog.py").read_text(
+            encoding="utf-8"
+        )
+        assert "grayscale_check" in prd103
+        assert "def grayscale" in prd103
+        assert "get_print_grayscale" in prd103
+        from instantlensdoc.core.app_settings import (
+            get_print_grayscale,
+            set_print_grayscale,
+        )
+
+        set_print_grayscale(True)
+        assert get_print_grayscale() is True
+        set_print_grayscale(False)
+        assert get_print_grayscale() is False
+        pv103 = (ROOT / "instantlensdoc" / "ui" / "pdf_view.py").read_text(encoding="utf-8")
+        assert "set_print_grayscale" in pv103
+        assert "range_dlg.grayscale" in pv103 or "grayscale()" in pv103
+        lic103 = (ROOT / "instantlensdoc" / "license.py").read_text(encoding="utf-8")
+        assert "def format_ablaufdatum" in lic103
+        from datetime import datetime, timezone
+
+        from instantlensdoc.license import format_ablaufdatum
+
+        dt103 = datetime(2026, 10, 3, 12, 0, tzinfo=timezone.utc)
+        assert format_ablaufdatum(dt103) == dt103.astimezone().strftime("%d.%m.%Y")
+        assert format_ablaufdatum(None) == "—"
+        hd103 = (ROOT / "instantlensdoc" / "ui" / "help_dialog.py").read_text(encoding="utf-8")
+        assert "format_ablaufdatum" in hd103
+        mw103 = (ROOT / "instantlensdoc" / "ui" / "main_window.py").read_text(encoding="utf-8")
+        assert "format_ablaufdatum" in mw103
+        assert "max_attempts" in mw103
+        assert "max_attempts = 3" in mw103
+        assert "Versuchen" in mw103 and "abgebrochen" in mw103
+        sd103 = (ROOT / "instantlensdoc" / "ui" / "settings_dialog.py").read_text(
+            encoding="utf-8"
+        )
+        assert "print_grayscale" in sd103
+        assert "Dokumentdruck in Graustufen" in sd103
+        feat103 = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
+        assert "1.0.3" in feat103 and (
+            "Graustufen" in feat103
+            or "Enter" in feat103
+            or "TT.MM.JJJJ" in feat103
+            or "3 Versuche" in feat103
+            or "Ablauf" in feat103
+        )
+        cl103 = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+        assert "## 1.0.3" in cl103 and "## 1.0.2" in cl103
+        kb103 = (ROOT / "instantlensdoc" / "ui" / "keyboard_help.py").read_text(encoding="utf-8")
+        assert "1.0.3" in kb103 and (
+            "Graustufen" in kb103
+            or "Enter" in kb103
+            or "TT.MM.JJJJ" in kb103
+            or "3 Versuche" in kb103
+        )
+        print("1.0.3 CLI welcome-keys/print-gray/ablauf/backup-max3: OK")
 
         set_show_printer_marks(True)
         assert get_show_printer_marks() is True
@@ -4137,7 +4201,7 @@ def main() -> int:
         assert "Continuous Scroll" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
         assert "Seitenlabel" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8") or "Seitenlabels" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
         assert "Zwischenablage-Verlauf" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8") or "Clipboard" in (ROOT / "FEATURES.md").read_text(encoding="utf-8")
-        assert "1.0.2" in feat and "1.0.1" in feat and "1.0.0" in feat and "0.9.9" in feat and "0.9.8" in feat and "0.9.7" in feat and "0.9.6" in feat and "0.9.5" in feat and "0.9.4" in feat and "0.9.3" in feat and "0.9.2" in feat and "0.9.1" in feat and "0.9.0" in feat and "0.8.9" in feat and "0.8.8" in feat and "0.8.7" in feat and "0.8.6" in feat and "0.8.5" in feat and "0.8.4" in feat and "0.8.3" in feat and "0.8.2" in feat and "0.8.1" in feat and "0.8.0" in feat and "0.7.9" in feat and "0.7.8" in feat and "0.7.7" in feat and "0.7.6" in feat and "0.7.5" in feat and "0.7.4" in feat and "0.7.3" in feat and "0.7.2" in feat and "0.7.1" in feat and "0.6.9" in feat and "0.5.9" in feat and "0.4.9" in feat
+        assert "1.0.3" in feat and "1.0.2" in feat and "1.0.1" in feat and "1.0.0" in feat and "0.9.9" in feat and "0.9.8" in feat and "0.9.7" in feat and "0.9.6" in feat and "0.9.5" in feat and "0.9.4" in feat and "0.9.3" in feat and "0.9.2" in feat and "0.9.1" in feat and "0.9.0" in feat and "0.8.9" in feat and "0.8.8" in feat and "0.8.7" in feat and "0.8.6" in feat and "0.8.5" in feat and "0.8.4" in feat and "0.8.3" in feat and "0.8.2" in feat and "0.8.1" in feat and "0.8.0" in feat and "0.7.9" in feat and "0.7.8" in feat and "0.7.7" in feat and "0.7.6" in feat and "0.7.5" in feat and "0.7.4" in feat and "0.7.3" in feat and "0.7.2" in feat and "0.7.1" in feat and "0.6.9" in feat and "0.5.9" in feat and "0.4.9" in feat
         # --- 0.4.2 CLI: Outline Goto, Ann Copy/Paste, Flatten Progress ---
         import pikepdf as _pike_ol
 
@@ -4262,7 +4326,7 @@ def main() -> int:
         win._add_chained_frame()
         assert len(win.layout_doc.text_frames) >= 2
         assert "Lizenz:" in win.license_label.text() or "⚠" in win.license_label.text()
-        assert "v1.0.2" in win.version_label.text()
+        assert "v1.0.3" in win.version_label.text()
         # Lizenz <7 Tage: Style prominent
         st_lic = win.license_manager.status()
         if st_lic.allowed and st_lic.days_remaining < 7:
@@ -4443,11 +4507,11 @@ def main() -> int:
             assert win.editor.outdent_selection(4)
             assert win.editor.toPlainText().splitlines()[0] == "alpha"
             # Fenstertitel mit Version
-            assert "1.0.2" in win.windowTitle()
+            assert "1.0.3" in win.windowTitle()
             from instantlensdoc.ui.help_dialog import AboutDialog, HelpDialog, open_log_folder
 
             about = AboutDialog(win)
-            assert "1.0.2" in about.windowTitle()
+            assert "1.0.3" in about.windowTitle()
             help_dlg = HelpDialog(win)
             assert help_dlg.windowTitle() == "Hilfe"
             assert callable(open_log_folder)
@@ -5124,7 +5188,7 @@ def main() -> int:
             win.apply_tray_setting()
             if win._tray is not None:
                 tip = win._tray.toolTip()
-                assert "1.0.2" in tip and "InstantLens Doc" in tip
+                assert "1.0.3" in tip and "InstantLens Doc" in tip
             set_minimize_to_tray(False)
             win.apply_tray_setting()
             print("0.3.9 fit-h/ann-stats/special/tray: OK")
@@ -5137,9 +5201,9 @@ def main() -> int:
             from instantlensdoc.ui.password_dialog import CompressPdfDialog, SetPasswordDialog
             from instantlensdoc.ui.stubs import PLANNED
             assert KeyboardHelpDialog and SetPasswordDialog and CompressPdfDialog
-            assert "1.0.2" in PLANNED["ki"]
+            assert "1.0.3" in PLANNED["ki"]
             assert "Coming soon" in PLANNED["cloud"]
-            assert "1.0.2" in PLANNED["stylus"] and "1.0.2" in PLANNED["extrude3d"]
+            assert "1.0.3" in PLANNED["stylus"] and "1.0.3" in PLANNED["extrude3d"]
             # Toolbar ↔ Menü Sync Graustufen/Nacht
             win.pdf_view.set_grayscale(True)
             assert win._grayscale_action.isChecked()
@@ -5174,7 +5238,7 @@ def main() -> int:
             assert win.editor.toPlainText().splitlines() == ["one", "two"]
             from instantlensdoc.ui.help_dialog import HELP_HTML
 
-            assert "Stub 1.0.2" in HELP_HTML
+            assert "Stub 1.0.3" in HELP_HTML
             assert "scripts/sync-ild.ps1" in HELP_HTML
             assert "Präsentationsmodus" in HELP_HTML or "F5" in (
                 ROOT / "instantlensdoc" / "ui" / "keyboard_help.py"
@@ -8874,7 +8938,7 @@ def main() -> int:
             assert win.welcome_page.btn_open is not None
             assert win.welcome_page.btn_empty is not None
             about100 = About100(win)
-            assert "1.0.2" in about100.windowTitle()
+            assert "1.0.3" in about100.windowTitle()
             # Lizenzstatus / Changelog / Kontakt im Dialog-Inhalt
             from PySide6.QtWidgets import QLabel as _QL100
 
@@ -8917,7 +8981,7 @@ def main() -> int:
             assert callable(getattr(win.welcome_page, "_recent_context_menu", None))
             win.welcome_page.refresh_recent()
             about101 = About101(win)
-            assert "1.0.2" in about101.windowTitle()
+            assert "1.0.3" in about101.windowTitle()
             assert getattr(about101, "_btn_activate", None) is not None or hasattr(
                 about101, "_activate_license"
             )
@@ -8974,7 +9038,7 @@ def main() -> int:
             assert prd102q.dpi() == 300
             prd102q.close()
             about102 = About102(win)
-            assert "1.0.2" in about102.windowTitle()
+            assert "1.0.3" in about102.windowTitle()
             # Resttage-Phrase konsistent Status ↔ About
             st102 = win.license_manager.status()
             phrase102 = rp102(st102.days_remaining)
@@ -8990,10 +9054,67 @@ def main() -> int:
             assert "## 1.0.2" in cl102q
             print("1.0.2 Qt welcome-dnd/print-dpi/resttage/backup-retry: OK")
 
+            # --- 1.0.3 Qt: Welcome Enter/Delete, Print Gray, Ablauf, Backup max-3 ---
+            from instantlensdoc.ui.help_dialog import AboutDialog as About103
+            from instantlensdoc.ui.print_range_dialog import PrintRangeDialog as PRD103q
+            from instantlensdoc.ui.welcome import WelcomePage as WP103
+            from instantlensdoc.license import format_ablaufdatum as fa103
+            from instantlensdoc.core.app_settings import (
+                get_print_grayscale as gpg103,
+                set_print_grayscale as spg103,
+            )
+            from instantlensdoc.ui.settings_dialog import SettingsDialog as SD103
+
+            assert isinstance(win.welcome_page, WP103)
+            assert hasattr(win.welcome_page, "eventFilter")
+            # Enter/Delete: EventFilter + itemActivated verdrahtet
+            assert "itemActivated" in (
+                ROOT / "instantlensdoc" / "ui" / "welcome.py"
+            ).read_text(encoding="utf-8")
+            spg103(True)
+            prd103q = PRD103q(2, win, default_dpi=150, default_grayscale=True)
+            assert prd103q.grayscale() is True
+            prd103q.grayscale_check.setChecked(False)
+            assert prd103q.grayscale() is False
+            prd103q.grayscale_check.setChecked(True)
+            assert prd103q.grayscale() is True
+            prd103q.close()
+            assert gpg103() is True
+            spg103(False)
+            sd103 = SD103(win)
+            assert hasattr(sd103, "print_grayscale")
+            assert sd103.print_grayscale.isChecked() is False
+            sd103.print_grayscale.setChecked(True)
+            sd103._save()
+            assert gpg103() is True
+            spg103(False)
+            sd103.close()
+            about103 = About103(win)
+            assert "1.0.3" in about103.windowTitle()
+            st103 = win.license_manager.status()
+            if st103.expires_at is not None:
+                ablauf103 = fa103(st103.expires_at)
+                assert ablauf103 in win.license_label.text() or ablauf103 in (
+                    win.license_label.toolTip() or ""
+                )
+                assert "." in ablauf103 and len(ablauf103) == 10
+            about103.close()
+            # Backup max-3
+            mw103q = (
+                ROOT / "instantlensdoc" / "ui" / "main_window.py"
+            ).read_text(encoding="utf-8")
+            assert "max_attempts = 3" in mw103q
+            assert "Versuchen" in mw103q and "abgebrochen" in mw103q
+            feat103q = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
+            assert "1.0.3" in feat103q
+            cl103q = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+            assert "## 1.0.3" in cl103q
+            print("1.0.3 Qt welcome-keys/print-gray/ablauf/backup-max3: OK")
+
             print("0.4.x selected Qt marks/schema/sort/reset: OK")
             print("0.4.2 Qt outline/copy-paste/case/progress: OK")
             print("0.4.1 Qt links/stamp/encoding/drop: OK")
-            print("0.3.x–1.0.2 review OK")
+            print("0.3.x–1.0.3 review OK")
             assert callable(win.pdf_view.bake_redactions)
             assert callable(win.pdf_view.clear_redactions)
             assert callable(win._set_pdf_password)

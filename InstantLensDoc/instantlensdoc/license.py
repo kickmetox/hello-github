@@ -96,6 +96,21 @@ def resttage_phrase(days: int, *, prefix: str = "noch") -> str:
     return f"{prefix} {format_resttage(days)}"
 
 
+def format_ablaufdatum(dt: Optional[datetime], *, empty: str = "—") -> str:
+    """Ablaufdatum als TT.MM.JJJJ für About / Status / Dialog — 1.0.3."""
+    if dt is None:
+        return empty
+    try:
+        if dt.tzinfo is not None:
+            local = dt.astimezone()
+        else:
+            local = dt.replace(tzinfo=timezone.utc).astimezone()
+        return local.strftime("%d.%m.%Y")
+    except Exception:
+        raw = str(dt)
+        return raw[:10] if raw else empty
+
+
 @dataclass
 class LicenseStatus:
     mode: str  # "trial" | "licensed" | "expired"

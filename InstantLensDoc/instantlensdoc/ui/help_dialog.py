@@ -558,12 +558,16 @@ class AboutDialog(QDialog):
                 f"<p>Icon: assets/app.ico · assets/icon.png</p>"
             )
         )
-        # Lizenzstatus immer anzeigen — Resttage konsistent mit Statusleiste 1.0.2
+        # Lizenzstatus: Resttage + Ablauf TT.MM.JJJJ konsistent Status — 1.0.3
         license_html = ""
         trial_hint = ""
         show_activate = False
         try:
-            from instantlensdoc.license import LicenseManager, resttage_phrase
+            from instantlensdoc.license import (
+                LicenseManager,
+                format_ablaufdatum,
+                resttage_phrase,
+            )
 
             mgr = None
             if parent is not None and hasattr(parent, "license_manager"):
@@ -578,12 +582,7 @@ class AboutDialog(QDialog):
                 "licensed": "Lizenziert",
                 "expired": "Abgelaufen",
             }.get(st.mode, st.mode)
-            exp = ""
-            if st.expires_at is not None:
-                try:
-                    exp = st.expires_at.astimezone().strftime("%d.%m.%Y")
-                except Exception:
-                    exp = str(st.expires_at)[:10]
+            exp = format_ablaufdatum(st.expires_at, empty="")
             email_line = f"<br>E-Mail: {st.email}" if st.email else ""
             bg = "#E3F2FD" if st.mode == "licensed" else (
                 "#FFF3CD" if st.mode == "trial" else "#FFEBEE"

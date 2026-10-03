@@ -70,6 +70,7 @@ DEFAULTS: dict[str, Any] = {
     "page_size_unit": "mm",
     "backup_on_save": False,
     "export_raster_dpi": 150,
+    "print_grayscale": False,
     "export_profiles": [],
     "active_export_profile": "",
     "window_geometry": "",
@@ -1858,6 +1859,15 @@ def set_export_raster_dpi(dpi: int) -> int:
         v = min(EXPORT_RASTER_DPI_CHOICES, key=lambda x: abs(x - v))
     save_settings({"export_raster_dpi": v})
     return v
+
+
+def get_print_grayscale() -> bool:
+    """Dokumentdruck in Graustufen — 1.0.3."""
+    return bool(load_settings().get("print_grayscale", False))
+
+
+def set_print_grayscale(enabled: bool) -> None:
+    save_settings({"print_grayscale": bool(enabled)})
 
 
 EXPORT_PROFILE_FORMATS = ("PNG", "JPEG")

@@ -65,6 +65,7 @@ from instantlensdoc.core.app_settings import (
     get_pdf_continuous_scroll,
     get_pdf_grayscale,
     get_pdf_night_mode,
+    get_print_grayscale,
     get_pdf_thumbnail_scale,
     get_pdf_two_page_spread,
     get_editor_current_line_highlight,
@@ -141,6 +142,7 @@ from instantlensdoc.core.app_settings import (
     set_pdf_continuous_scroll,
     set_pdf_grayscale,
     set_pdf_night_mode,
+    set_print_grayscale,
     set_pdf_thumbnail_scale,
     set_pdf_two_page_spread,
     set_page_number_overlay_font_size,
@@ -495,6 +497,13 @@ class SettingsDialog(QDialog):
         self.pdf_grayscale.setChecked(get_pdf_grayscale())
         self.pdf_grayscale.setToolTip("Seitenansicht und Bild-Export monochrom")
         form.addRow(self.pdf_grayscale)
+
+        self.print_grayscale = QCheckBox("Dokumentdruck in Graustufen")
+        self.print_grayscale.setChecked(get_print_grayscale())
+        self.print_grayscale.setToolTip(
+            "PDF → Dokument drucken… standardmäßig monochrom (auch im Druckdialog) — 1.0.3"
+        )
+        form.addRow(self.print_grayscale)
 
         self.pdf_night = QCheckBox("PDF Nachtmodus (Invert-Ansicht)")
         self.pdf_night.setChecked(get_pdf_night_mode())
@@ -1083,6 +1092,7 @@ class SettingsDialog(QDialog):
         set_restore_session_on_start(self.restore_session.isChecked())
         set_page_size_unit(str(self.page_unit.currentData() or "mm"))
         set_pdf_grayscale(self.pdf_grayscale.isChecked())
+        set_print_grayscale(self.print_grayscale.isChecked())
         set_pdf_night_mode(self.pdf_night.isChecked())
         set_pdf_two_page_spread(self.pdf_spread.isChecked())
         set_pdf_continuous_scroll(self.pdf_continuous.isChecked())

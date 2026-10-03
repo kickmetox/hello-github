@@ -1,11 +1,11 @@
-"""Willkommens-/Startseite wenn keine Dokument-Tabs offen sind — 1.0.2."""
+"""Willkommens-/Startseite wenn keine Dokument-Tabs offen sind — 1.0.3."""
 
 from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QUrl, Signal
-from PySide6.QtGui import QColor, QDesktopServices
+from PySide6.QtCore import QEvent, Qt, QUrl, Signal
+from PySide6.QtGui import QColor, QDesktopServices, QKeyEvent
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
@@ -70,16 +70,34 @@ class WelcomePage(QWidget):
         self.recent_list = QListWidget()
         self.recent_list.setMinimumHeight(180)
         self.recent_list.setToolTip(
-            "Doppelklick öffnet den Eintrag; Rechtsklick: Entfernen / Ordner öffnen; "
-            "Drag & Drop öffnet Dateien"
+            "Enter / Doppelklick öffnet; Entf entfernt den Eintrag; "
+            "Rechtsklick: Entfernen / Ordner öffnen; Drag & Drop öffnet Dateien"
         )
         self.recent_list.setAcceptDrops(True)
         self.recent_list.setContextMenuPolicy(Qt.CustomContextMenu)
         self.recent_list.customContextMenuRequested.connect(self._recent_context_menu)
-        self.recent_list.itemDoubleClicked.connect(self._on_recent_dbl)
+        # itemActivated: Enter/Return (+ Doppelklick) — 1.0.3
+        self.recent_list.itemActivated.connect(self._on_recent_dbl)
+        self.recent_list.installEventFilter(self)
         lay.addWidget(self.recent_list, 1)
 
         self.refresh_recent()
+
+    def eventFilter(self, obj, event):  # noqa: N802
+        """Delete entfernt Recent-Eintrag; Enter öffnet (Fallback) — 1.0.3."""
+        if obj is self.recent_list and event.type() == QEvent.KeyPress:
+            assert isinstance(event, QKeyEvent)
+            key = event.key()
+            item = self.recent_list.currentItem()
+            if item is not None and key in (Qt.Key_Return, Qt.Key_Enter):
+                self._on_recent_dbl(item)
+                return True
+            if item is not None and key in (Qt.Key_Delete, Qt.Key_Backspace):
+                path = item.data(Qt.UserRole)
+                if path:
+                    self.recent_remove_requested.emit(str(path))
+                    return True
+        return super().eventFilter(obj, event)
 
     def refresh_recent(self) -> None:
         self.recent_list.clear()

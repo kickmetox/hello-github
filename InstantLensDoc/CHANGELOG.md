@@ -1,5 +1,28 @@
 # Changelog — InstantLens Doc
 
+## 1.0.3 — Willkommen Enter/Delete, Druck-Graustufen, Ablauf TT.MM.JJJJ, Backup max. 3
+
+Post-Release-Polish nach 1.0.2: Willkommen-Recent per Enter öffnen und Delete entfernen; Dokumentdruck mit Graustufen-Toggle (Settings + Druckdialog); Lizenz-Ablaufdatum einheitlich TT.MM.JJJJ in About und Status; Backup-Retry max. 3 Versuche dann Abbruch-Hinweis. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### Willkommen / Start
+- **Enter** / Return öffnet den ausgewählten Recent-Eintrag
+- **Entf** / Backspace entfernt den ausgewählten Recent-Eintrag
+
+### PDF / Druck
+- **Dokument drucken…**: Graustufen-Toggle im Seitenbereich-Dialog; Einstellung auch in **Einstellungen** („Dokumentdruck in Graustufen“); wird gemerkt
+
+### About / Lizenz
+- Ablaufdatum als **TT.MM.JJJJ** in About, Statusleiste und Lizenzdialog (`format_ablaufdatum`)
+
+### Backup
+- Bei Schreibfehler: max. **3 Versuche**, danach Abbruch-Hinweis (kein weiteres Retry)
+
+### Packaging / Docs
+- Version **1.0.3** (App / `ild_pdf` / ISS / Smoke / Docs)
+- Smoke: Welcome Enter/Delete, Print Graustufen, Ablaufdatum, Backup max-3 (CLI + Qt)
+
+---
+
 ## 1.0.2 — Willkommen Drag&Drop/Clear-Recent, Druck-DPI, Trial-Resttage, Backup-Retry
 
 Post-Release-Polish nach 1.0.1: Willkommen mit Drag&Drop zum Öffnen und Button „Recent leeren“; PDF-Dokumentdruck mit DPI-Auswahl 72/150/300 für Raster; Trial-Resttage in Statusleiste und About einheitlich („noch X Tage“); Backup-Schreibfehler mit Retry-Dialog. Stubs KI/Cloud/Stylus/3D bleiben Stubs.

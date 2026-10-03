@@ -4007,19 +4007,33 @@ class MainWindow(QMainWindow):
         return True
 
     def _manual_backup_now(self) -> None:
-        """Aktuelles Dokument manuell sichern; bei Schreibfehler Retry — 1.0.2."""
-        while True:
+        """Aktuelles Dokument manuell sichern; bei Schreibfehler max. 3 Versuche — 1.0.3."""
+        max_attempts = 3
+        last_err: OSError | None = None
+        for attempt in range(1, max_attempts + 1):
             try:
                 self._manual_backup_once()
                 return
             except OSError as e:
+                last_err = e
+                if attempt >= max_attempts:
+                    QMessageBox.critical(
+                        self,
+                        "Backup",
+                        f"Backup nach {max_attempts} Versuchen abgebrochen.\n\n"
+                        f"Letzter Fehler:\n{e}",
+                    )
+                    self._set_status(
+                        f"Backup abgebrochen nach {max_attempts} Versuchen"
+                    )
+                    return
                 box = QMessageBox(self)
                 box.setIcon(QMessageBox.Critical)
                 box.setWindowTitle("Backup")
                 box.setText("Backup-Schreibfehler")
                 box.setInformativeText(
                     f"Die Backup-Datei konnte nicht geschrieben werden:\n{e}\n\n"
-                    "Erneut versuchen?"
+                    f"Versuch {attempt}/{max_attempts}. Erneut versuchen?"
                 )
                 box.setStandardButtons(QMessageBox.Retry | QMessageBox.Cancel)
                 box.setDefaultButton(QMessageBox.Retry)
@@ -4029,6 +4043,8 @@ class MainWindow(QMainWindow):
             except Exception as e:
                 QMessageBox.critical(self, "Backup", f"Backup fehlgeschlagen:\n{e}")
                 return
+        if last_err is not None:
+            self._set_status(f"Backup abgebrochen nach {max_attempts} Versuchen")
 
     def _manual_backup_once(self) -> None:
         """Ein Backup-Versuch; OSError bei Schreibfehlern durchreichen — 1.0.2."""
@@ -4305,41 +4321,49 @@ class MainWindow(QMainWindow):
             self._blink_autosave_error_status()
 
     def _update_license_status(self):
-        from instantlensdoc.license import resttage_phrase
+        from instantlensdoc.license import format_ablaufdatum, resttage_phrase
 
         st = self.license_manager.status()
         self.version_label.setText(f"v{__version__}")
-        rest = resttage_phrase(st.days_remaining)  # „noch X Tag(e)“ — konsistent About 1.0.2
+        rest = resttage_phrase(st.days_remaining)  # „noch X Tag(e)“ — konsistent About
+        ablauf = format_ablaufdatum(st.expires_at, empty="")  # TT.MM.JJJJ — 1.0.3
+        bis = f" · bis {ablauf}" if ablauf else ""
         urgent = st.allowed and st.days_remaining < 7
         if st.mode == "licensed":
             who = f" · {st.email}" if st.email else ""
             if urgent:
-                text = f"⚠ Lizenz: {rest}!{who}"
+                text = f"⚠ Lizenz: {rest}!{who}{bis}"
                 style = (
                     "color: #7B241C; background: #F5B7B1; font-weight: 800; "
                     "font-size: 12px; padding: 3px 8px; border-radius: 3px;"
                 )
             else:
-                text = f"Lizenz: Aktiviert{who} · {rest}"
+                text = f"Lizenz: Aktiviert{who} · {rest}{bis}"
                 style = "color: #1B7A3D; font-weight: 600; padding-right: 6px;"
         elif st.mode == "trial":
             if urgent:
-                text = f"⚠ Testversion: {rest}! — Hilfe → Lizenz"
+                text = f"⚠ Testversion: {rest}!{bis} — Hilfe → Lizenz"
                 style = (
                     "color: #7B241C; background: #F9E79F; font-weight: 800; "
                     "font-size: 12px; padding: 3px 8px; border-radius: 3px;"
                 )
             else:
-                text = f"Lizenz: Testversion · {rest} — Hilfe → Lizenz"
+                text = f"Lizenz: Testversion · {rest}{bis} — Hilfe → Lizenz"
                 style = "color: #B9770E; font-weight: 600; padding-right: 6px;"
         else:
-            text = "Lizenz: Abgelaufen — Hilfe → Lizenz · ame@sellerbach.de"
+            text = (
+                f"Lizenz: Abgelaufen{bis} — Hilfe → Lizenz · ame@sellerbach.de"
+                if bis
+                else "Lizenz: Abgelaufen — Hilfe → Lizenz · ame@sellerbach.de"
+            )
             style = "color: #C0392B; font-weight: 700; padding-right: 6px;"
         self.license_label.setText(text)
         self.license_label.setStyleSheet(style)
         tip = st.message
+        if ablauf:
+            tip = f"Ablauf: {ablauf} — {tip}"
         if urgent:
-            tip = f"Restlaufzeit unter 7 Tagen — {st.message}"
+            tip = f"Restlaufzeit unter 7 Tagen — {tip}"
         self.license_label.setToolTip(tip)
         if not st.allowed:
             QMessageBox.warning(
