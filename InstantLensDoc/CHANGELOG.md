@@ -1,5 +1,24 @@
 # Changelog — InstantLens Doc
 
+## 1.5.4 — Metadaten Toast Klick·A11y, Seiten→Bilder Footer-Filter, Signatur Esc-Status·Zoom, CLI --list-pages
+
+Post-Release-Polish nach 1.5.3: **Metadaten-Toast** per **Klick** öffnet den Dialog erneut inkl. **Accessibility-Announcement**; **Seiten→Bilder**-Footer filtert Log auf **übersprungene** (Toggle, analog Split-Log); **Signatur Esc** setzt Status **„Platzieren abgebrochen“** und merkt den **letzten Vorschau-Zoom**; **CLI** `--list-pages FILE` gibt die **Seitenzahl** headless aus (in `--help`). Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### PDF
+- Metadaten: Toast-Klick öffnet Dialog erneut; Accessibility-Announcement (wie OCR-Toast)
+- Seiten → Bilder: Footer klickbar → Log-Filter übersprungene (Toggle, analog Split-Log)
+- Signatur (Bild): Esc → Status „Platzieren abgebrochen“; letzter Vorschau-Zoom merken
+
+### CLI / Start
+- `python -m instantlensdoc --list-pages FILE` (Seitenzahl, headless); in `--help`
+- Exitcodes: **0** OK · **1** Fehler · **2** Datei fehlt
+
+### Packaging / Docs
+- Version **1.5.4** (App / `ild_pdf` / ISS / Smoke / Docs)
+- Smoke: Metadaten Toast-Klick·A11y, Seiten→Bilder Footer-Filter, Signatur Esc-Status·Zoom, CLI --list-pages (CLI + Qt)
+
+---
+
 ## 1.5.3 — Metadaten Toast Dauer·max3, Seiten→Bilder Footer·Ordner, Signatur Zoom·Esc, CLI --dpi/--format
 
 Post-Release-Polish nach 1.5.2: **Metadaten-Toast** nutzt **OCR-Toast-Dauer** aus Settings und zeigt **max. 3 Felder** + „…“; **Seiten→Bilder** zeigt Footer **„geschrieben X, übersprungen Y“** und Button **Ordner öffnen**; **Signatur-Vorschau** mit **Mausrad-Zoom** und **Esc bricht Platzieren ab**; **CLI** `--export-page` mit **`--dpi`** und **`--format png|jpeg`**, Exitcodes dokumentiert. Stubs KI/Cloud/Stylus/3D bleiben Stubs.

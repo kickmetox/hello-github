@@ -6903,15 +6903,22 @@ class PdfViewer(QWidget):
             QMessageBox.warning(self, "Extrahieren", str(e))
 
     def export_pages_as_images(self):
-        """Seiten→Bilder; Footer geschrieben/übersprungen + Ordner öffnen — 1.5.3."""
+        """Seiten→Bilder; Footer-Klick Filter übersprungene (Toggle) — 1.5.4."""
         if not self.pdf_path:
             QMessageBox.information(self, "Export", "Kein PDF geladen.")
             return
         from PySide6.QtWidgets import (
             QApplication,
+            QDialog,
+            QDialogButtonBox,
             QFileDialog,
+            QHBoxLayout,
             QInputDialog,
+            QLabel,
+            QPlainTextEdit,
             QProgressDialog,
+            QPushButton,
+            QVBoxLayout,
         )
         from ild_pdf import extract_pages_as_images
         from instantlensdoc.core.app_settings import (
@@ -7104,6 +7111,11 @@ class PdfViewer(QWidget):
             else:
                 _on_prog = None  # type: ignore[assignment]
 
+            # Geplante Seitenindizes für Skip-Log — 1.5.4
+            if pages is None:
+                planned = list(range(int(total_export)))
+            else:
+                planned = list(pages)
             written = extract_pages_as_images(
                 self.pdf_path,
                 out_dir,
@@ -7125,44 +7137,125 @@ class PdfViewer(QWidget):
             set_last_page_image_export_dir(out_dir)
             remember_recent_dir(out_dir)
             n_ok = len(written)
-            n_skip = max(0, int(total_export) - int(n_ok))
+            skipped_pages = planned[n_ok:]  # Rest bei Abbruch = übersprungen
+            n_skip = len(skipped_pages)
             footer = f"geschrieben {n_ok}, übersprungen {n_skip}"
             q_note = f", Q={jpeg_q}" if str(fmt).upper() in ("JPEG", "JPG") else ""
+            log_lines: list[str] = []
+            for i, wpath in enumerate(written):
+                pg = planned[i] + 1 if i < len(planned) else i + 1
+                log_lines.append(f"[ok] Seite {pg} → {wpath}")
+            for pi in skipped_pages:
+                log_lines.append(f"[skip] Seite {pi + 1} übersprungen")
+            header = (
+                f"Abgebrochen — behalten {n_ok}/{total_export}"
+                if cancelled["v"]
+                else f"Export {n_ok}/{total_export} @ {dpi} DPI{q_note}"
+            )
+            full_log = header + "\n" + "\n".join(log_lines) if log_lines else header
             if cancelled["v"]:
                 status_msg = (
                     f"Export abgebrochen — {footer} → {Path(out_dir).name}"
-                )
-                body = (
-                    f"Abgebrochen.\n"
-                    f"Bereits geschrieben und behalten: {n_ok} von {total_export} Seite(n).\n"
-                    f"{out_dir}\n\n"
-                    f"{footer}"
                 )
             else:
                 status_msg = (
                     f"{n_ok}/{total_export} Bild(er) @ {dpi} DPI{q_note} → "
                     f"{Path(out_dir).name} · {footer}"
                 )
-                body = (
-                    f"{n_ok} Seite(n) als {fmt} ({dpi} DPI"
-                    f"{q_note}) exportiert nach:\n{out_dir}\n\n"
-                    f"{footer}"
-                )
             self.status.emit(status_msg)
-            # Ergebnisdialog: Footer + Ordner öffnen — 1.5.3
-            box = QMessageBox(self)
-            box.setIcon(QMessageBox.Information)
-            box.setWindowTitle("Export")
-            box.setText(body)
-            btn_folder = box.addButton("Ordner öffnen", QMessageBox.ActionRole)
-            box.addButton(QMessageBox.Ok)
-            box.setDefaultButton(box.button(QMessageBox.Ok))
-            box.exec()
-            if box.clickedButton() is btn_folder:
-                try:
-                    QDesktopServices.openUrl(QUrl.fromLocalFile(str(out_dir)))
-                except Exception:
-                    pass
+            # Ergebnisdialog: Log + Footer-Toggle Filter übersprungene — 1.5.4
+            dlg = QDialog(self)
+            dlg.setWindowTitle("Export — Seiten als Bilder")
+            dlg.resize(560, 420)
+            lay = QVBoxLayout(dlg)
+            summary = QLabel(
+                f"{out_dir}\n{footer}"
+                + ("\n(Abbruch — geschriebene Dateien behalten)" if cancelled["v"] else "")
+            )
+            summary.setWordWrap(True)
+            lay.addWidget(summary)
+            log_edit = QPlainTextEdit()
+            log_edit.setReadOnly(True)
+            log_edit.setPlainText(full_log)
+            lay.addWidget(log_edit, 1)
+            state = {
+                "filter_skipped": False,
+                "full_log": full_log,
+                "skipped_pages": list(skipped_pages),
+            }
+            footer_lbl = QLabel(footer)
+            footer_lbl.setCursor(Qt.PointingHandCursor)
+            footer_lbl.setStyleSheet("color: #555; text-decoration: underline;")
+            footer_lbl.setToolTip(
+                "Klick: Log auf übersprungene Einträge filtern (Toggle), "
+                "analog Split-Log — 1.5.4"
+            )
+
+            def _update_footer_style() -> None:
+                if state["filter_skipped"]:
+                    footer_lbl.setStyleSheet(
+                        "color: #0d47a1; font-weight: bold; text-decoration: underline;"
+                    )
+                    footer_lbl.setToolTip(
+                        "Filter aktiv: nur übersprungene. Klick hebt auf — 1.5.4"
+                    )
+                else:
+                    footer_lbl.setStyleSheet(
+                        "color: #555; text-decoration: underline;"
+                    )
+                    footer_lbl.setToolTip(
+                        "Klick: Log auf übersprungene Einträge filtern (Toggle), "
+                        "analog Split-Log — 1.5.4"
+                    )
+
+            def _apply_filter() -> None:
+                if not state["filter_skipped"]:
+                    log_edit.setPlainText(state["full_log"])
+                    _update_footer_style()
+                    return
+                skip_lines = [
+                    ln
+                    for ln in state["full_log"].splitlines()
+                    if ln.startswith("[skip]")
+                ]
+                log_edit.setPlainText(
+                    f"Filter: übersprungen ({len(skip_lines)})"
+                    + ("\n" + "\n".join(skip_lines) if skip_lines else "")
+                )
+                _update_footer_style()
+
+            def _footer_clicked(event) -> None:
+                from PySide6.QtCore import Qt as _Qt
+
+                if (
+                    event is not None
+                    and getattr(event, "button", lambda: _Qt.LeftButton)()
+                    != _Qt.LeftButton
+                ):
+                    return
+                if not state["filter_skipped"] and not state["skipped_pages"]:
+                    return
+                state["filter_skipped"] = not state["filter_skipped"]
+                _apply_filter()
+
+            footer_lbl.mousePressEvent = (  # type: ignore[method-assign]
+                lambda event: _footer_clicked(event)
+            )
+            lay.addWidget(footer_lbl)
+            btn_row = QHBoxLayout()
+            btn_folder = QPushButton("Ordner öffnen")
+            btn_folder.clicked.connect(
+                lambda: QDesktopServices.openUrl(
+                    QUrl.fromLocalFile(str(out_dir))
+                )
+            )
+            btn_row.addWidget(btn_folder)
+            btn_row.addStretch(1)
+            btns = QDialogButtonBox(QDialogButtonBox.Ok)
+            btns.accepted.connect(dlg.accept)
+            btn_row.addWidget(btns)
+            lay.addLayout(btn_row)
+            dlg.exec()
         except Exception as e:
             QMessageBox.warning(self, "Export", str(e))
 
@@ -7172,7 +7265,7 @@ class PdfViewer(QWidget):
         self.status.emit("Signaturfeld: auf die Seite klicken")
 
     def insert_signature_image(self):
-        """Bildstempel-Signatur; Vorschau Mausrad-Zoom; Esc abbricht — 1.5.3."""
+        """Bildstempel-Signatur; Esc→Status abgebrochen; Zoom merken — 1.5.4."""
         if not self.store or not self.pdf_path:
             QMessageBox.information(self, "Signatur", "Kein PDF geladen.")
             return
@@ -7193,11 +7286,13 @@ class PdfViewer(QWidget):
             dialog_start_dir,
             get_last_signature_image,
             get_last_signature_opacity,
+            get_last_signature_preview_zoom,
             get_last_signature_size,
             get_signature_aspect_lock,
             remember_recent_dir,
             set_last_signature_image,
             set_last_signature_opacity,
+            set_last_signature_preview_zoom,
             set_last_signature_size,
             set_signature_aspect_lock,
         )
@@ -7242,15 +7337,16 @@ class PdfViewer(QWidget):
                 img_aspect = float(iw) / float(ih)
         except Exception:
             pass
-        # Option: Größe/Opacity/Aspect-Lock + Vorschau (Mausrad-Zoom) + Esc — 1.5.3
-        zoom_state = {"factor": 1.0}
+        # Option: Größe/Opacity/Aspect-Lock + Vorschau (Mausrad-Zoom) + Esc — 1.5.4
+        zoom_state = {"factor": float(get_last_signature_preview_zoom())}
         preview_holder: dict[str, object] = {}
 
         class _SigPreviewDialog(QDialog):
-            """Esc bricht Platzieren ab; Mausrad zoomt Vorschau — 1.5.3."""
+            """Esc → Status „Platzieren abgebrochen“; Zoom merken — 1.5.4."""
 
             def keyPressEvent(self, event: QKeyEvent) -> None:  # noqa: N802
                 if event.key() == _Qt.Key_Escape:
+                    set_last_signature_preview_zoom(zoom_state["factor"])
                     self.reject()
                     event.accept()
                     return
@@ -7267,6 +7363,7 @@ class PdfViewer(QWidget):
                         zoom_state["factor"] = min(3.0, zoom_state["factor"] * 1.15)
                     elif delta < 0:
                         zoom_state["factor"] = max(0.5, zoom_state["factor"] / 1.15)
+                    set_last_signature_preview_zoom(zoom_state["factor"])
                     updater = preview_holder.get("update")
                     if callable(updater):
                         updater()
@@ -7279,7 +7376,8 @@ class PdfViewer(QWidget):
         ol = QVBoxLayout(opt)
         ol.addWidget(QLabel(f"Bild: {Path(path).name}"))
         hint_lbl = QLabel(
-            "Vorschau: Mausrad zoomt · Esc bricht Platzieren ab · Bildstempel als Sidecar."
+            "Vorschau: Mausrad zoomt (letzter Zoom gemerkt) · "
+            "Esc → Platzieren abgebrochen · Bildstempel als Sidecar."
         )
         hint_lbl.setWordWrap(True)
         hint_lbl.setStyleSheet("color:#555;")
@@ -7385,7 +7483,11 @@ class PdfViewer(QWidget):
         btns.rejected.connect(opt.reject)
         ol.addWidget(btns)
         if opt.exec() != QDialog.Accepted:
+            # Esc/Abbrechen: Zoom merken + Status — 1.5.4
+            set_last_signature_preview_zoom(zoom_state["factor"])
+            self.status.emit("Platzieren abgebrochen")
             return
+        set_last_signature_preview_zoom(zoom_state["factor"])
         width, height = _calc_size()
         opacity = max(0.05, min(1.0, op_slider.value() / 100.0))
         set_last_signature_size(width, height)

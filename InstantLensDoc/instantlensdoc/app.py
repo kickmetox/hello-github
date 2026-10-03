@@ -22,9 +22,9 @@ class _GermanHelpFormatter(argparse.HelpFormatter):
 
 def parse_cli(argv: list[str] | None = None) -> argparse.Namespace:
     """
-    CLI für ``python -m instantlensdoc`` — 1.5.3.
-    ``--version`` / ``--open FILE`` / ``--export-page N --out PATH``
-    [``--dpi``] [``--format png|jpeg``] / ``--help`` DE.
+    CLI für ``python -m instantlensdoc`` — 1.5.4.
+    ``--version`` / ``--open FILE`` / ``--list-pages FILE`` /
+    ``--export-page N --out PATH`` [``--dpi``] [``--format png|jpeg``] / ``--help`` DE.
     """
     from instantlensdoc import __version__
 
@@ -33,21 +33,23 @@ def parse_cli(argv: list[str] | None = None) -> argparse.Namespace:
         description=(
             "InstantLens Doc — PDF-Annotator, OCR, Formulare.\n"
             "Startet die Desktop-Oberfläche; optional Dateien öffnen.\n"
-            "One-Shot ohne GUI: --export-page N --out PATH [--dpi DPI] [--format png|jpeg]."
+            "One-Shot ohne GUI: --list-pages FILE | "
+            "--export-page N --out PATH [--dpi DPI] [--format png|jpeg]."
         ),
         epilog=(
             "Beispiele:\n"
             "  python -m instantlensdoc --version\n"
             "  python -m instantlensdoc --open dokument.pdf\n"
             "  python -m instantlensdoc --open a.pdf --open b.pdf\n"
+            "  python -m instantlensdoc --list-pages dokument.pdf\n"
             "  python -m instantlensdoc dokument.pdf --export-page 1 --out seite.png\n"
             "  python -m instantlensdoc --open dokument.pdf --export-page 2 "
             "--out /tmp/p2.jpg --dpi 150 --format jpeg\n"
             "\n"
             "Exitcodes:\n"
-            "  0  OK (Export geschrieben / GUI beendet)\n"
+            "  0  OK (Export / Seitenzahl / GUI beendet)\n"
             "  1  allgemeiner Fehler (Argumente, Export, IO)\n"
-            "  2  Datei nicht gefunden (PDF / --open Ziel fehlt)"
+            "  2  Datei nicht gefunden (PDF / --open / --list-pages Ziel fehlt)"
         ),
         formatter_class=_GermanHelpFormatter,
         add_help=False,
@@ -72,6 +74,13 @@ def parse_cli(argv: list[str] | None = None) -> argparse.Namespace:
         action="append",
         default=None,
         help="Datei beim Start öffnen (mehrfach möglich)",
+    )
+    p.add_argument(
+        "--list-pages",
+        metavar="FILE",
+        dest="list_pages",
+        default=None,
+        help="Seitenzahl von FILE ausgeben (headless, ohne GUI) — 1.5.4",
     )
     p.add_argument(
         "--export-page",
@@ -136,6 +145,32 @@ def _collect_open_targets(cli: argparse.Namespace) -> list[Path]:
         seen.add(key)
         targets.append(p)
     return targets
+
+
+def _cli_list_pages(cli: argparse.Namespace) -> int:
+    """
+    One-Shot Seitenzahl ohne GUI — 1.5.4.
+    ``--list-pages FILE`` gibt die Seitenzahl auf stdout aus.
+    Headless ok (kein Qt nötig).
+    Exitcodes: 0 OK · 1 Fehler · 2 Datei fehlt · -1 nicht angefordert.
+    """
+    raw = getattr(cli, "list_pages", None)
+    if raw is None:
+        return -1
+    pdf = Path(raw)
+    if not pdf.is_file():
+        print(f"Datei nicht gefunden: {pdf}", file=sys.stderr)
+        return 2
+    try:
+        from ild_pdf.document import PdfDocument
+
+        with PdfDocument(pdf) as doc:
+            n = int(len(doc))
+    except Exception as e:
+        print(f"Seitenzahl fehlgeschlagen: {e}", file=sys.stderr)
+        return 1
+    print(n)
+    return 0
 
 
 def _cli_export_page(cli: argparse.Namespace) -> int:
@@ -315,7 +350,10 @@ def main(argv: list[str] | None = None) -> int:
         print(f"InstantLens Doc {cli.version_str}")
         return 0
 
-    # One-Shot Export ohne GUI (headless ok) — 1.5.3
+    # One-Shot: Seitenzahl / Export ohne GUI (headless ok) — 1.5.4
+    list_rc = _cli_list_pages(cli)
+    if list_rc >= 0:
+        return list_rc
     export_rc = _cli_export_page(cli)
     if export_rc >= 0:
         return export_rc

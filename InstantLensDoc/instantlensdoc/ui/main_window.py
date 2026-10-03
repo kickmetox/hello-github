@@ -2337,12 +2337,43 @@ class MainWindow(QMainWindow):
         except Exception:
             pass
 
+    def _announce_status_toast(self, msg: str) -> None:
+        """Accessibility-Announcement für Status-Toast (Metadaten) — 1.5.4."""
+        sb = self.statusBar()
+        try:
+            sb.setAccessibleName(msg)
+            sb.setAccessibleDescription(msg)
+        except Exception:
+            pass
+        try:
+            from PySide6.QtGui import QAccessible, QAccessibleAnnouncementEvent
+
+            ev = QAccessibleAnnouncementEvent(sb, msg)
+            QAccessible.updateAccessibility(ev)
+        except Exception:
+            try:
+                from PySide6.QtGui import QAccessible, QAccessibleEvent
+
+                ev = QAccessibleEvent(sb, QAccessible.Event.NameChanged)
+                QAccessible.updateAccessibility(ev)
+            except Exception:
+                pass
+
     def _set_status(self, msg: str):
-        self.statusBar().showMessage(msg, 5000)
+        text = msg or ""
+        # Metadaten-Toast-Klick-Flag nur bei Meta-Toast behalten — 1.5.4
+        if not getattr(self, "_meta_toast_active", False) or "Metadaten" not in text:
+            if "Metadaten gespeichert" not in text:
+                self._meta_toast_active = False
+        self.statusBar().showMessage(text, 5000)
         # Outlines-Export: Klick-Hinweis wenn Zielordner gemerkt — 1.3.4
-        if getattr(self, "_last_outline_export_dir", None) and "PDF-Outline" in (
-            msg or ""
-        ):
+        # Metadaten-Toast: Klick öffnet Dialog erneut — 1.5.4
+        if getattr(self, "_meta_toast_active", False) and "Metadaten gespeichert" in text:
+            self.statusBar().setToolTip(
+                "Klick öffnet Metadaten-Dialog erneut — 1.5.4"
+            )
+            self.statusBar().setCursor(Qt.PointingHandCursor)
+        elif getattr(self, "_last_outline_export_dir", None) and "PDF-Outline" in text:
             self.statusBar().setToolTip(
                 "Klick öffnet Export-Zielordner — 1.3.4"
             )
@@ -2352,12 +2383,22 @@ class MainWindow(QMainWindow):
             self.statusBar().unsetCursor()
 
     def _on_status_bar_clicked(self, event) -> None:
-        """Statusleisten-Klick: Outlines-Export-Zielordner öffnen — 1.3.4."""
+        """Statusleisten-Klick: Metadaten-Toast → Dialog / Outlines-Ordner — 1.5.4."""
         from PySide6.QtGui import QDesktopServices
         from PySide6.QtCore import QUrl
 
-        folder = getattr(self, "_last_outline_export_dir", None)
         cur = self.statusBar().currentMessage() or ""
+        if (
+            event.button() == Qt.LeftButton
+            and getattr(self, "_meta_toast_active", False)
+            and "Metadaten gespeichert" in cur
+        ):
+            self._meta_toast_active = False
+            self.statusBar().unsetCursor()
+            self.statusBar().setToolTip("")
+            self._edit_pdf_metadata()
+            return
+        folder = getattr(self, "_last_outline_export_dir", None)
         if (
             event.button() == Qt.LeftButton
             and folder is not None
@@ -7037,16 +7078,33 @@ class MainWindow(QMainWindow):
             return
         dlg = MetadataDialog(self.pdf_view.pdf_path, self)
         if dlg.exec():
-            # Erfolgs-Toast: Dauer wie OCR-Toast Settings (1/2/3 s) — 1.5.3
+            # Erfolgs-Toast: Dauer OCR-Settings; Klick→Dialog; A11y — 1.5.4
             from instantlensdoc.core.app_settings import get_ocr_defaults_toast_sec
 
-            toast = getattr(dlg, "last_toast", "") or "PDF-Metadaten gespeichert"
-            self._set_status(toast)
+            toast = getattr(dlg, "last_toast", "") or "Metadaten gespeichert"
+            self._meta_toast_active = True
+            self._announce_status_toast(toast)
             try:
                 ms = max(1, int(get_ocr_defaults_toast_sec())) * 1000
-                self.statusBar().showMessage(toast, ms)
             except Exception:
-                pass
+                ms = 2000
+            self.statusBar().showMessage(toast, ms)
+            self.statusBar().setToolTip(
+                "Klick öffnet Metadaten-Dialog erneut — 1.5.4"
+            )
+            self.statusBar().setCursor(Qt.PointingHandCursor)
+
+            def _clear_meta_toast_flag() -> None:
+                cur = self.statusBar().currentMessage() or ""
+                if "Metadaten gespeichert" not in cur:
+                    self._meta_toast_active = False
+                    if self.statusBar().toolTip().startswith("Klick öffnet Metadaten"):
+                        self.statusBar().setToolTip("")
+                        self.statusBar().unsetCursor()
+
+            from PySide6.QtCore import QTimer
+
+            QTimer.singleShot(ms + 50, _clear_meta_toast_flag)
 
     def _edit_pdf_form_fields(self):
         if not self.pdf_view.pdf_path:

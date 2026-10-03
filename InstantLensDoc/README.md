@@ -2,7 +2,7 @@
 
 Moderne Textverarbeitung mit PDF-Annotator, OCR-Bridge und Formulargenerator.
 
-**Version:** 1.5.3  
+**Version:** 1.5.4  
 **Hersteller:** Andreas Meyer · ame@sellerbach.de
 
 ## Quickstart (Windows)
@@ -33,8 +33,8 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an).
 
-## Neu in 1.5.3
+## Neu in 1.5.4
 
-Polish auf 1.5.2: Metadaten-Toast Dauer wie OCR-Settings, Felder-Kurzinfo max. 3 + „…“; Seiten→Bilder Footer „geschrieben X, übersprungen Y“ + Ordner öffnen; Signatur-Vorschau Mausrad-Zoom, Esc bricht Platzieren ab; CLI `--export-page` mit `--dpi` / `--format png|jpeg`, Exitcodes dokumentiert. Stubs KI/Cloud/Stylus/3D unverändert.
+Polish auf 1.5.3: Metadaten-Toast-Klick öffnet Dialog erneut + Accessibility-Announcement; Seiten→Bilder-Footer filtert Log auf übersprungene (Toggle, analog Split-Log); Signatur Esc → Status „Platzieren abgebrochen“, letzter Vorschau-Zoom merken; CLI `--list-pages FILE` Seitenzahl headless (in `--help`). Stubs KI/Cloud/Stylus/3D unverändert.
 
 Siehe [CHANGELOG.md](CHANGELOG.md), [FEATURES.md](FEATURES.md) und [INFO.md](INFO.md).

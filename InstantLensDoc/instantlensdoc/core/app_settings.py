@@ -800,6 +800,24 @@ def set_signature_aspect_lock(enabled: bool) -> None:
     save_settings({"signature_aspect_lock": bool(enabled)})
 
 
+def get_last_signature_preview_zoom() -> float:
+    """Zuletzt verwendeter Signatur-Vorschau-Zoom (0.5–3.0) — 1.5.4."""
+    try:
+        z = float(load_settings().get("last_signature_preview_zoom", 1.0) or 1.0)
+    except (TypeError, ValueError):
+        z = 1.0
+    return max(0.5, min(3.0, z))
+
+
+def set_last_signature_preview_zoom(zoom: float) -> None:
+    """Signatur-Vorschau-Zoom merken — 1.5.4."""
+    try:
+        z = float(zoom)
+    except (TypeError, ValueError):
+        z = 1.0
+    save_settings({"last_signature_preview_zoom": max(0.5, min(3.0, z))})
+
+
 def get_meta_backup_on_save() -> bool:
     """Toggle: .ildbak vor Metadaten-Speichern — 1.5.2."""
     return bool(load_settings().get("meta_backup_on_save", True))
