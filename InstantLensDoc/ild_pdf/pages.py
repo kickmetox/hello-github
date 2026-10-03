@@ -251,6 +251,110 @@ def merge_pdfs(sources: Sequence[str | Path], dest: str | Path) -> None:
     out.save(dest)
 
 
+def parse_page_ranges(
+    spec: str,
+    page_count: int,
+    *,
+    one_based: bool = True,
+) -> list[tuple[int, int]]:
+    """
+    Seitenbereiche aus String parsen, z. B. ``1-3,5,8-10``.
+    Rückgabe: Liste (start, end) 0-basiert inklusive Endseite.
+    ``one_based=True``: Eingabe 1..n; sonst 0..n-1.
+    """
+    text = (spec or "").strip()
+    if not text:
+        raise ValueError("Kein Seitenbereich angegeben")
+    n = int(page_count)
+    if n <= 0:
+        raise ValueError("PDF hat keine Seiten")
+    ranges: list[tuple[int, int]] = []
+    for raw_part in text.split(","):
+        part = raw_part.strip()
+        if not part:
+            continue
+        if "-" in part:
+            a_s, b_s = part.split("-", 1)
+            a_s, b_s = a_s.strip(), b_s.strip()
+            if not a_s or not b_s:
+                raise ValueError(f"Ungültiger Bereich: {part!r}")
+            try:
+                a_i, b_i = int(a_s), int(b_s)
+            except ValueError as e:
+                raise ValueError(f"Ungültiger Bereich: {part!r}") from e
+        else:
+            try:
+                a_i = b_i = int(part)
+            except ValueError as e:
+                raise ValueError(f"Ungültige Seite: {part!r}") from e
+        if one_based:
+            a_i -= 1
+            b_i -= 1
+        if a_i > b_i:
+            a_i, b_i = b_i, a_i
+        if a_i < 0 or b_i >= n:
+            lo = a_i + 1 if one_based else a_i
+            hi = b_i + 1 if one_based else b_i
+            raise ValueError(f"Ungültiger Bereich {lo}–{hi} (gültig: 1…{n})")
+        ranges.append((a_i, b_i))
+    if not ranges:
+        raise ValueError("Kein Seitenbereich angegeben")
+    return ranges
+
+
+def flatten_page_indices(ranges: Sequence[tuple[int, int]]) -> list[int]:
+    """Bereiche → flache Indexliste (Reihenfolge behalten, Duplikate streichen)."""
+    seen: set[int] = set()
+    out: list[int] = []
+    for start, end in ranges:
+        for p in range(int(start), int(end) + 1):
+            if p in seen:
+                continue
+            seen.add(p)
+            out.append(p)
+    return out
+
+
+def extract_by_page_spec(
+    path: str | Path,
+    dest: str | Path,
+    spec: str,
+    *,
+    one_based: bool = True,
+    one_file_per_range: bool = False,
+) -> list[Path]:
+    """
+    Seitenbereiche (z. B. ``1-3,5,8-10``) extrahieren.
+    - ``one_file_per_range=False``: eine Zieldatei mit allen Seiten (dest = Datei).
+    - ``one_file_per_range=True``: eine Datei pro Bereichstoken (dest = Ordner).
+    Quell-PDF bleibt unverändert. Rückgabe: Liste geschriebener Pfade.
+    """
+    path = Path(path)
+    dest = Path(dest)
+    with pikepdf.open(path) as pdf:
+        n = len(pdf.pages)
+    ranges = parse_page_ranges(spec, n, one_based=one_based)
+    written: list[Path] = []
+    stem = path.stem
+    if one_file_per_range:
+        dest.mkdir(parents=True, exist_ok=True)
+        for start, end in ranges:
+            label = f"{stem}_p{start + 1}-{end + 1}" if start != end else f"{stem}_p{start + 1}"
+            out_path = dest / f"{label}.pdf"
+            extract_page_range(path, out_path, start, end, one_based=False)
+            written.append(out_path)
+        return written
+    indices = flatten_page_indices(ranges)
+    if dest.suffix.lower() != ".pdf":
+        # Wenn Ordner/ohne Suffix: sinnvollen Dateinamen ableiten
+        if dest.exists() and dest.is_dir():
+            dest = dest / f"{stem}_extract.pdf"
+        else:
+            dest = dest.with_suffix(".pdf") if not dest.suffix else dest
+    out = extract_pages(path, dest, indices, one_based=False)
+    return [out]
+
+
 def extract_page_range(
     path: str | Path,
     dest: str | Path,

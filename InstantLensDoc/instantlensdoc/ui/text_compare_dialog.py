@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QFont, QTextCharFormat, QTextCursor
 from PySide6.QtWidgets import (
     QComboBox,
@@ -15,6 +16,7 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPlainTextEdit,
     QPushButton,
+    QTextEdit,
     QVBoxLayout,
 )
 
@@ -60,7 +62,7 @@ def _fill_pane(edit: QPlainTextEdit, lines: list[str], tags: list[str], side: st
         fmt.setBackground(color)
         cur = QTextCursor(block)
         cur.select(QTextCursor.LineUnderCursor)
-        sel = QPlainTextEdit.ExtraSelection()
+        sel = QTextEdit.ExtraSelection()
         sel.cursor = cur
         sel.format = fmt
         selections.append(sel)
@@ -81,9 +83,16 @@ class TextCompareDialog(QDialog):
         right_text: str | None = None,
         left_label: str | None = None,
         right_label: str | None = None,
+        panel_mode: bool = False,
     ):
         super().__init__(parent)
-        self.setWindowTitle("Dateien vergleichen (Side-by-Side)")
+        self._panel_mode = bool(panel_mode)
+        if self._panel_mode:
+            self.setWindowTitle("Text-Diff — offene Tabs (Zeilen-Diff)")
+            self.setWindowFlag(Qt.Tool, True)
+            self.setAttribute(Qt.WA_DeleteOnClose, True)
+        else:
+            self.setWindowTitle("Dateien vergleichen (Side-by-Side)")
         self.resize(1100, 700)
         self._tabs = [str(p) for p in (tab_paths or []) if p]
         self._left_path = left_path or ""
@@ -94,6 +103,10 @@ class TextCompareDialog(QDialog):
         self._right_label = right_label or ""
 
         root = QVBoxLayout(self)
+        if self._panel_mode:
+            root.addWidget(
+                QLabel("Einfaches Zeilen-Diff Panel: zwei offene Text-Tabs wählen — 1.2.0")
+            )
         pick = QHBoxLayout()
         self.cmb_left = QComboBox()
         self.cmb_right = QComboBox()

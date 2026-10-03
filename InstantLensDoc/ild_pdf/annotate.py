@@ -1747,14 +1747,33 @@ class AnnotationStore:
         path = Path(path)
         return self.save(path, force=True)
 
-    def export_json(self, path: str | Path) -> Path:
+    def export_json(
+        self,
+        path: str | Path,
+        *,
+        pages: Sequence[int] | None = None,
+    ) -> Path:
         """
         Annotationen als JSON Schema v4 exportieren (PDF-Highlight-kompatibel).
         Highlights/Underlines enthalten rects, quadPoints, colorRGB, pdf_highlight.
+        ``pages``: optional 0-basierte Seitenfilter (nur diese Seiten).
         """
         path = Path(path)
         path.parent.mkdir(parents=True, exist_ok=True)
         payload = self._payload(export=True)
+        if pages is not None:
+            want = {int(p) for p in pages}
+            anns = [
+                a
+                for a in payload.get("annotations") or []
+                if isinstance(a, dict) and int(a.get("page", -1)) in want
+            ]
+            payload = dict(payload)
+            payload["annotations"] = anns
+            payload["count"] = len(anns)
+            meta = dict(payload.get("meta") or {})
+            meta["export_pages"] = sorted(want)
+            payload["meta"] = meta
         path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
         return path
 

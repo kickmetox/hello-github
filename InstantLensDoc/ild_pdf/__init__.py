@@ -27,11 +27,14 @@ from .annotate import (
 )
 from .pages import (
     PAGE_SIZE_PRESETS,
+    extract_by_page_spec,
     extract_page_range,
     extract_pages,
     extract_page_bytes,
+    flatten_page_indices,
     insert_page_from_bytes,
     merge_pdfs,
+    parse_page_ranges,
     split_into_single_page_pdfs,
     split_pdf,
     rotate_page,
@@ -123,6 +126,9 @@ __all__ = [
     "stamp_with_date",
     "stamp_library_items",
     "PAGE_SIZE_PRESETS",
+    "parse_page_ranges",
+    "flatten_page_indices",
+    "extract_by_page_spec",
     "extract_page_range",
     "extract_pages",
     "merge_pdfs",
@@ -204,4 +210,4 @@ __all__ = [
     "uri_link_at",
 ]
 
-__version__ = "1.1.9"
+__version__ = "1.2.0"

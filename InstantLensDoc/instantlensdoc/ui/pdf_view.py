@@ -5726,6 +5726,71 @@ class PdfViewer(QWidget):
             QMessageBox.warning(self, "Annotationen exportieren", str(e))
             return False
 
+    def export_annotations_json_flatten(self) -> bool:
+        """
+        Annotation-Export Dialog: aktuelle Seite / Dokument als JSON (ildann-v4)
+        + optional Flatten-PDF — 1.2.0.
+        """
+        if not self.store or not self.pdf_path:
+            QMessageBox.information(self, "Annotationen", "Kein PDF geladen.")
+            return False
+        from instantlensdoc.ui.annotation_export_dialog import AnnotationExportDialog
+        from instantlensdoc.ui.file_dialogs import confirm_overwrite_export
+
+        page = int(self.page_index)
+        page_ann = sum(1 for a in self.store.annotations if int(a.page) == page)
+        dlg = AnnotationExportDialog(
+            self,
+            pdf_path=self.pdf_path,
+            current_page=page,
+            page_count=max(1, int(self.page_count or 1)),
+            ann_count=len(self.store.annotations),
+            page_ann_count=page_ann,
+        )
+        if dlg.exec() != AnnotationExportDialog.Accepted or not dlg.result_options:
+            return False
+        opts = dlg.result_options
+        pages = [page] if opts.scope == "page" else None
+        if not confirm_overwrite_export(opts.json_path, self):
+            return False
+        if opts.flatten and opts.flatten_path is not None:
+            if not confirm_overwrite_export(opts.flatten_path, self):
+                return False
+        try:
+            if self.store.dirty:
+                self.schedule_sidecar_save(force=True)
+            saved = self.store.export_json(opts.json_path, pages=pages)
+            n = opts.json_path
+            scope_lbl = f"Seite {page + 1}" if opts.scope == "page" else "Dokument"
+            msg = f"JSON {scope_lbl}: {saved.name}"
+            if opts.flatten and opts.flatten_path is not None:
+                from ild_pdf import flatten_annotations_to_pdf
+                from instantlensdoc.core.app_settings import (
+                    remember_recent_dir,
+                    set_last_export_dir,
+                )
+
+                bake_scale = max(float(self.scale), 1.5)
+                flat_pages = [page] if opts.scope == "page" else None
+                out_flat = flatten_annotations_to_pdf(
+                    self.pdf_path,
+                    self.store,
+                    scale=bake_scale,
+                    out_path=opts.flatten_path,
+                    password=self.password,
+                    grayscale=self._grayscale,
+                    page_indices=flat_pages,
+                )
+                set_last_export_dir(out_flat.parent)
+                remember_recent_dir(out_flat.parent)
+                msg += f" + Flatten {out_flat.name}"
+            self.status.emit(msg)
+            QMessageBox.information(self, "Annotationen exportieren", msg)
+            return True
+        except Exception as e:
+            QMessageBox.warning(self, "Annotationen exportieren", str(e))
+            return False
+
     def export_annotations_csv(self) -> bool:
         """Annotationen als CSV-Datei exportieren (Dialog)."""
         if not self.store or not self.pdf_path:

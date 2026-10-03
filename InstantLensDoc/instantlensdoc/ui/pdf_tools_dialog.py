@@ -25,7 +25,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ild_pdf.pages import extract_page_range, merge_pdfs, split_pdf
+from ild_pdf.pages import extract_by_page_spec, merge_pdfs, parse_page_ranges, split_pdf
 
 
 def _pil_to_qpixmap(img) -> QPixmap:
@@ -238,7 +238,11 @@ class PdfToolsDialog(QDialog):
         self.split_every.setValue(1)
         form.addRow("Alle N Seiten", self.split_every)
         self.split_ranges = QLineEdit()
-        self.split_ranges.setPlaceholderText("z.B. 0-2, 3-5 (0-basiert, optional)")
+        self.split_ranges.setPlaceholderText("z.B. 1-3,5,8-10 (1-basiert, optional) — 1.2.0")
+        self.split_ranges.setToolTip(
+            "Kommagetrennte Seiten/Bereiche (1-basiert), z. B. 1-3,5,8-10 — "
+            "überschreibt „Alle N Seiten“ — 1.2.0"
+        )
         form.addRow("Bereiche", self.split_ranges)
         self.split_single = QCheckBox("Jede Seite einzeln")
         form.addRow("", self.split_single)
@@ -250,7 +254,11 @@ class PdfToolsDialog(QDialog):
     def _build_extract_tab(self, initial_pdf: str | None) -> QWidget:
         w = QWidget()
         form = QFormLayout(w)
-        form.addRow(QLabel("Seiten von–bis in ein neues PDF (1-basiert, inklusive):"))
+        form.addRow(
+            QLabel(
+                "Seitenbereiche extrahieren (1-basiert), z. B. <b>1-3,5,8-10</b> — 1.2.0"
+            )
+        )
         self.ex_src = QLineEdit(initial_pdf or "")
         pick = QPushButton("PDF…")
         pick.clicked.connect(self._ex_pick_src)
@@ -258,11 +266,23 @@ class PdfToolsDialog(QDialog):
         src_row.addWidget(self.ex_src)
         src_row.addWidget(pick)
         form.addRow("Quelle", src_row)
+        self.ex_spec = QLineEdit()
+        n = self._page_count
+        if n and n > 0:
+            cur = min(self._current_page + 1, n)
+            self.ex_spec.setText(f"{cur}-{n}" if cur < n else str(cur))
+        else:
+            self.ex_spec.setText("1")
+        self.ex_spec.setPlaceholderText("z.B. 1-3,5,8-10")
+        self.ex_spec.setToolTip(
+            "Kommagetrennte Seiten und Bereiche (1-basiert, inklusive). "
+            "Leer = Von–Bis-Spinboxen nutzen — 1.2.0"
+        )
+        form.addRow("Seitenbereiche", self.ex_spec)
         self.ex_from = QSpinBox()
         self.ex_from.setRange(1, 99999)
         self.ex_to = QSpinBox()
         self.ex_to.setRange(1, 99999)
-        n = self._page_count
         if n and n > 0:
             self.ex_from.setMaximum(n)
             self.ex_to.setMaximum(n)
@@ -271,8 +291,13 @@ class PdfToolsDialog(QDialog):
         else:
             self.ex_from.setValue(1)
             self.ex_to.setValue(1)
-        form.addRow("Von Seite", self.ex_from)
-        form.addRow("Bis Seite", self.ex_to)
+        form.addRow("Von Seite (Fallback)", self.ex_from)
+        form.addRow("Bis Seite (Fallback)", self.ex_to)
+        self.ex_one_per_range = QCheckBox("Eine Datei pro Bereich")
+        self.ex_one_per_range.setToolTip(
+            "Aktiv: jeder Token (z. B. 1-3 und 5) → eigene PDF-Datei im Ordner — 1.2.0"
+        )
+        form.addRow("", self.ex_one_per_range)
         self.ex_dest = QLineEdit()
         if initial_pdf:
             p = Path(initial_pdf)
@@ -284,7 +309,7 @@ class PdfToolsDialog(QDialog):
         dest_row = QHBoxLayout()
         dest_row.addWidget(self.ex_dest)
         dest_row.addWidget(pick_d)
-        form.addRow("Ziel-PDF", dest_row)
+        form.addRow("Ziel-PDF / Ordner", dest_row)
         run = QPushButton("Extrahieren")
         run.clicked.connect(self._ex_run)
         form.addRow(run)
@@ -502,20 +527,12 @@ class PdfToolsDialog(QDialog):
         if path:
             self.split_out.setText(path)
 
-    def _parse_ranges(self, text: str) -> list[tuple[int, int]] | None:
+    def _parse_ranges(self, text: str, page_count: int) -> list[tuple[int, int]] | None:
+        """1-basierte Bereiche → 0-basiert für split_pdf — 1.2.0."""
         text = text.strip()
         if not text:
             return None
-        out: list[tuple[int, int]] = []
-        for part in text.split(","):
-            part = part.strip()
-            if "-" in part:
-                a, b = part.split("-", 1)
-                out.append((int(a.strip()), int(b.strip())))
-            else:
-                i = int(part)
-                out.append((i, i))
-        return out
+        return parse_page_ranges(text, page_count, one_based=True)
 
     def _split_run(self):
         src = self.split_src.text().strip()
@@ -524,7 +541,11 @@ class PdfToolsDialog(QDialog):
             QMessageBox.warning(self, "Teilen", "Quelle und Ausgabeordner angeben.")
             return
         try:
-            ranges = self._parse_ranges(self.split_ranges.text())
+            import pikepdf
+
+            with pikepdf.open(src) as pdf:
+                n = len(pdf.pages)
+            ranges = self._parse_ranges(self.split_ranges.text(), n)
             written = split_pdf(
                 src,
                 out,
@@ -558,6 +579,13 @@ class PdfToolsDialog(QDialog):
                 pass
 
     def _ex_pick_dest(self):
+        if self.ex_one_per_range.isChecked():
+            path = QFileDialog.getExistingDirectory(
+                self, "Ausgabeordner (eine Datei pro Bereich)"
+            )
+            if path:
+                self.ex_dest.setText(path)
+            return
         path, _ = QFileDialog.getSaveFileName(
             self, "Ziel-PDF", self.ex_dest.text(), "PDF (*.pdf)"
         )
@@ -570,24 +598,37 @@ class PdfToolsDialog(QDialog):
         src = self.ex_src.text().strip()
         dest = self.ex_dest.text().strip()
         if not src or not dest:
-            QMessageBox.warning(self, "Seitenbereich", "Quelle und Ziel-PDF angeben.")
+            QMessageBox.warning(
+                self, "Seitenbereich", "Quelle und Ziel-PDF bzw. Ordner angeben."
+            )
             return
         from instantlensdoc.ui.file_dialogs import confirm_overwrite_export
 
-        if not confirm_overwrite_export(dest, self):
-            return
+        spec = (self.ex_spec.text() or "").strip()
+        one_per = self.ex_one_per_range.isChecked()
+        if not spec:
+            spec = f"{self.ex_from.value()}-{self.ex_to.value()}"
         try:
-            out = extract_page_range(
-                src,
-                dest,
-                self.ex_from.value(),
-                self.ex_to.value(),
-                one_based=True,
-            )
-            QMessageBox.information(
-                self,
-                "Seitenbereich",
-                f"Extrahiert: Seiten {self.ex_from.value()}–{self.ex_to.value()}\n{out}",
-            )
+            if one_per:
+                written = extract_by_page_spec(
+                    src, dest, spec, one_based=True, one_file_per_range=True
+                )
+                QMessageBox.information(
+                    self,
+                    "Seitenbereich",
+                    f"{len(written)} Datei(en) aus „{spec}“:\n{dest}",
+                )
+            else:
+                if not confirm_overwrite_export(dest, self):
+                    return
+                written = extract_by_page_spec(
+                    src, dest, spec, one_based=True, one_file_per_range=False
+                )
+                out = written[0] if written else dest
+                QMessageBox.information(
+                    self,
+                    "Seitenbereich",
+                    f"Extrahiert: {spec}\n{out}",
+                )
         except Exception as e:
             QMessageBox.critical(self, "Seitenbereich", str(e))

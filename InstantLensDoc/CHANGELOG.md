@@ -1,5 +1,27 @@
 # Changelog — InstantLens Doc
 
+## 1.2.0 — PDF Split Bereiche, Ann.-Export JSON/Flatten, Text-Diff Panel, run.bat Deps
+
+Minor-Release nach 1.1.9: **PDF-Split/Extrakt** mit Seitenbereichen `1-3,5,8-10` → neue Datei(en); **Annotation-Export** aktuelle Seite oder Dokument als JSON (**ildann-v4**) inkl. optionalem **Flatten-PDF**; **Text-Diff Panel** vergleicht zwei offene Text-Tabs; Windows **`run.bat`** prüft Python/Abhängigkeiten mit klaren DE-Meldungen. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### PDF
+- Seitenbereiche **`1-3,5,8-10`** extrahieren (eine Datei oder eine Datei pro Bereich); Split-Tab Bereiche 1-basiert
+
+### Annotationen
+- Export-Dialog: **aktuelle Seite / Dokument** → JSON **ildann-v4** + optional **Flatten-PDF**
+
+### Editor
+- **Text-Diff Panel**: zwei offene Text-Tabs (Ctrl+Alt+D), nicht-modales Zeilen-Diff Panel
+
+### Packaging / Start
+- **`run.bat`**: Python ≥3.10 + PySide6/pypdfium2/pikepdf/Pillow prüfen, klare deutsche Fehlermeldungen
+
+### Packaging / Docs
+- Version **1.2.0** (App / `ild_pdf` / ISS / Smoke / Docs)
+- Smoke: PDF Split-Bereiche, Ann.-Export JSON/Flatten, Text-Diff Panel, run.bat Deps (CLI + Qt)
+
+---
+
 ## 1.1.9 — OCR Toast Dauer·A11y, Merge Tooltip Settings, Ann. Sticky Undo/Redo, Keygen Pause-Tooltip
 
 Post-Release-Polish nach 1.1.8: OCR-Toast **„OCR-Defaults gespeichert“** mit einstellbarer Dauer **1/2/3 s** und **Accessibility-Announcement**; Merge-**Readonly-schließen**-Checkbox in Settings trägt denselben Persistenz-Tooltip wie der Merge-Dialog; Annotationen-Sticky-Status wird zusätzlich bei **Undo/Redo** geleert; Keygen-Countdown-Tooltip bei Pause: **„Countdown pausiert (Fenster ohne Fokus)“**. Stubs KI/Cloud/Stylus/3D bleiben Stubs.

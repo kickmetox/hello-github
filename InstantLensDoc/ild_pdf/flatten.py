@@ -201,12 +201,14 @@ def flatten_annotations_to_pdf(
     out_path: str | Path | None = None,
     password: str | None = None,
     grayscale: bool = False,
+    page_indices: Sequence[int] | None = None,
     progress=None,
     should_cancel=None,
 ) -> Path:
     """
-    Alle Seiten rendern, Annotationen einzeichnen (flatten/bake) und als neues PDF speichern.
+    Seiten rendern, Annotationen einzeichnen (flatten/bake) und als neues PDF speichern.
     Original und Sidecar bleiben unverändert. Koordinaten = Render-Pixel bei `scale`.
+    ``page_indices``: optional 0-basiert — nur diese Seiten (Reihenfolge behalten).
 
     progress(msg, current=i, total=n) — optional.
     should_cancel() → True bricht ab (raises InterruptedError).
@@ -232,7 +234,22 @@ def flatten_annotations_to_pdf(
     pages_out: List[Image.Image] = []
     with PdfDocument(pdf_path, password=password) as doc:
         n = len(doc)
-        sizes = [doc.page_size(i) for i in range(n)]
+        if page_indices is None:
+            indices = list(range(n))
+        else:
+            indices = []
+            seen: set[int] = set()
+            for raw_i in page_indices:
+                i = int(raw_i)
+                if i in seen:
+                    continue
+                if i < 0 or i >= n:
+                    raise IndexError(f"Seite {i + 1} existiert nicht (1..{n})")
+                seen.add(i)
+                indices.append(i)
+            if not indices:
+                raise ValueError("Keine Seiten für Flatten ausgewählt")
+        sizes = [doc.page_size(i) for i in indices]
 
     def _prog(msg: str, current: int = 0, total: int = 0) -> None:
         if progress:
@@ -249,10 +266,11 @@ def flatten_annotations_to_pdf(
         except Exception:
             return False
 
-    for i in range(n):
+    total_pages = len(indices)
+    for pos, i in enumerate(indices):
         if _cancelled():
             raise InterruptedError("Flatten abgebrochen")
-        _prog(f"Seite {i + 1}/{n} rendern…", i, n)
+        _prog(f"Seite {i + 1} ({pos + 1}/{total_pages}) rendern…", pos, total_pages)
         raw = render_page(
             pdf_path,
             i,
@@ -270,7 +288,7 @@ def flatten_annotations_to_pdf(
 
     if _cancelled():
         raise InterruptedError("Flatten abgebrochen")
-    _prog("PDF schreiben…", n, n + 1)
+    _prog("PDF schreiben…", total_pages, total_pages + 1)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with pikepdf.Pdf.new() as dst:
         for img, (pw, ph) in zip(pages_out, sizes):
@@ -291,7 +309,7 @@ def flatten_annotations_to_pdf(
             with pikepdf.open(buf) as src:
                 dst.pages.append(src.pages[0])
         dst.save(out_path)
-    _prog("Fertig", n + 1, n + 1)
+    _prog("Fertig", total_pages + 1, total_pages + 1)
     return out_path
 
 

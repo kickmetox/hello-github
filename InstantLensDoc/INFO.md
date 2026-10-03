@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **1.1.9** |
+| Version | **1.2.0** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -50,6 +50,8 @@ pip install -r requirements.txt
 run.bat
 ```
 
+`run.bat` prüft Python ≥3.10 und Kern-Deps (PySide6, pypdfium2, pikepdf, Pillow) mit klaren DE-Meldungen.
+
 ## Build
 
 ```powershell
@@ -59,10 +61,10 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an / `checkedonce`)
 
-## Neu in 1.1.9
+## Neu in 1.2.0
 
-- OCR-Defaults-Toast: Dauer in Settings **1/2/3 s** + **Accessibility-Announcement**
-- Merge: Settings-Checkbox **Readonly schließen** mit **demselben Persistenz-Tooltip** wie Merge-Dialog
-- Ann. Sticky-Status: Clear zusätzlich bei Annotationen-**Undo/Redo**
-- Keygen-Countdown pausiert: Tooltip **„Countdown pausiert (Fenster ohne Fokus)“**
+- PDF: Seitenbereiche **`1-3,5,8-10`** extrahieren → neue Datei(en); Split-Bereiche 1-basiert
+- Annotationen: Export **Seite/Dokument** als JSON **ildann-v4** + optional **Flatten-PDF**
+- Editor: **Text-Diff Panel** für zwei offene Text-Tabs (Ctrl+Alt+D)
+- Start: **`run.bat`** Python/Deps-Check mit DE-Fehlermeldungen
 - Stubs KI/Cloud/Stylus/3D unverändert

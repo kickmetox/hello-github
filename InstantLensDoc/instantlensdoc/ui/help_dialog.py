@@ -102,6 +102,10 @@ HELP_HTML = f"""
     <b>Export-Profil</b> speichern/anwenden (DPI / Format / Ziel)</li>
 <li><b>OCR gesamtes PDF</b>: Button <b>„Als Defaults speichern“</b> → Toast <b>„OCR-Defaults gespeichert“</b> (Dauer Settings <b>1/2/3 s</b> + Accessibility-Announcement) + Feld-Highlight; Defaults vorbelegt; Toggle <b>„Fehler anhängen“</b> Settings-persistiert; Seitenfehler → Abschnitt im TXT; Abbruch behält Teilergebnis; optional <b>Seitenbereich von–bis</b>; Fortschritt → <b>Textdatei-Tab</b> — 1.1.9</li>
 <li><b>PDF zusammenführen</b>: Thumbnail-Klick → Readonly-Tab mit Banner <b>„Vorschau“</b> + <b>„Zum Bearbeiten öffnen“</b>; Toggle Readonly schließen <b>auch im Merge-Dialog</b> (gleicher Persistenz-Tooltip in Settings); Vorschau-Thumbnail; Drag&amp;Drop; Duplikat-Warnung; Doppelklick/Alle/Seiten-Summe — 1.1.9</li>
+<li><b>PDF Seitenbereich / Split</b>: Bereiche <b>1-3,5,8-10</b> → eine Datei oder eine Datei pro Bereich; Split-Tab 1-basiert — 1.2.0</li>
+<li><b>Annotationen exportieren (JSON / Flatten)</b>: aktuelle Seite oder Dokument als <b>ildann-v4</b> + optional Flatten-PDF — 1.2.0</li>
+<li><b>Text-Diff Panel</b>: Datei → Text-Diff (offene Tabs)… (Ctrl+Alt+D), nicht-modales Zeilen-Diff Panel — 1.2.0</li>
+<li><b>run.bat</b>: Python/Deps-Check mit klaren DE-Fehlermeldungen — 1.2.0</li>
 <li><b>Alle Annotationen auf Seite löschen</b>: bei <b>0 gefilterten Treffern</b> Sticky-Status in Statusleiste bis nächste Ann.-Aktion / Seiten-/Dokumentwechsel / <b>Undo/Redo</b> + i18n DE + Menü/Aktion no-op + Button disabled; Undo <b>„N Annotationen (gefiltert)“</b> — 1.1.9</li>
 <li><b>Keygen</b>: Reveal Auto-Hide <b>5/10/30 s</b> + <b>Countdown</b> (Label <b>„pausiert“</b>; Tooltip <b>„Countdown pausiert (Fenster ohne Fokus)“</b>) / <b>Esc</b> maskiert; History maskiert (letzte 4); Doppelklick kopiert; Clear History; .txt; --days — 1.1.9</li>
 <li><b>Datei → Drucken</b> (Ctrl+P): Editor oder aktuelle PDF-Seite (Qt Print); <b>PDF → Dokument drucken…</b> Seitenbereich + DPI + Graustufen; <b>Vorschau PageUp/Down·Home/End + +/- Zoom + Fit-Page + Mausrad + Seitenwahl</b> bei Mehrseiten; Fortschritt; Abbruch → Cleanup — 1.0.9</li>
@@ -118,7 +122,7 @@ HELP_HTML = f"""
 <li><b>Bearbeiten → Suchen und Ersetzen</b> (Ctrl+R): Find/Replace im Texteditor</li>
 <li><b>Bearbeiten → Gehe zu Zeile / Seite</b> (Ctrl+G): Editor → Zeile; PDF → Seite (auch PDF → Gehe zu Seite…, Ctrl+Shift+G)</li>
 <li><b>Datei → Tab duplizieren</b> (Ctrl+Shift+T): Editor-Inhalt als neues Dokument klonen;
-    <b>Dateien vergleichen</b> (Ctrl+Alt+D): zwei Tabs Side-by-Side (Zeilen-Diff);
+    <b>Text-Diff (offene Tabs)</b> (Ctrl+Alt+D): nicht-modales Zeilen-Diff Panel — 1.2.0;
     <b>Erneut öffnen</b> (Ctrl+Alt+Shift+O): Datei vom Datenträger neu laden</li>
 <li><b>Bearbeiten → Zeile / Annotation duplizieren</b> (Ctrl+D): Editor Zeile/Auswahl; PDF ausgewählte Annotation (auch Ctrl+Shift+D)</li>
 <li><b>Bearbeiten → Zeile verschieben</b> (Alt+Up / Alt+Down)</li>
@@ -180,7 +184,7 @@ HELP_HTML = f"""
     <b>AcroForm-Formularfelder ausfüllen</b>; <b>Anhänge</b> auflisten/extrahieren;
     <b>Seitengröße / Zuschneiden</b> (Anzeige mm/inch, Statusleiste klickbar / Ctrl+Alt+U);
     Seite/Seiten als PNG/JPEG exportieren / Bild als neue Seite / Seite drucken; Annotation löschen (Auswahl/letzte, Entf); Statusleiste Seite/Größe/Zoom/Dateiname/Wörter; Thumbnails per Drag neu ordnen (<b>Lazy-Load</b>, Größe in Einstellungen, <b>Ctrl+Z Undo</b>);
-    PDF als Kopie speichern; <b>Seitenbereich extrahieren</b> (von–bis → neues PDF);
+    PDF als Kopie speichern; <b>Seitenbereich extrahieren</b> (z. B. 1-3,5,8-10 → neue Datei(en) — 1.2.0);
     große PDFs: Warnung / Limits;
     <b>Seiten-Thumbnails</b> in der Sidebar</li>
 <li><b>Datei → Schließen</b>: Speichern-Dialog bei ungespeicherten Änderungen;
@@ -218,6 +222,10 @@ HELP_HTML = f"""
     Toggle „Fehler anhängen“ Settings-persistiert; Seitenfehler-Abschnitt + Teilergebnis — 1.1.9</li>
 <li><b>PDF zusammenführen</b>: Thumbnail-Klick → Readonly-Tab mit Banner „Vorschau“ +
     „Zum Bearbeiten öffnen“; Toggle Readonly schließen auch im Merge-Dialog (gleicher Persistenz-Tooltip in Settings); Drag&amp;Drop; Duplikat-Warnung — 1.1.9</li>
+<li><b>PDF Seitenbereich / Split</b>: Bereiche <b>1-3,5,8-10</b> → eine Datei oder eine Datei pro Bereich; Split-Tab 1-basiert — 1.2.0</li>
+<li><b>Annotationen exportieren (JSON / Flatten)</b>: aktuelle Seite oder Dokument als <b>ildann-v4</b> + optional Flatten-PDF — 1.2.0</li>
+<li><b>Text-Diff Panel</b>: Ctrl+Alt+D, zwei offene Text-Tabs, nicht-modales Zeilen-Diff Panel — 1.2.0</li>
+<li><b>run.bat</b>: Python/Deps-Check mit klaren DE-Fehlermeldungen — 1.2.0</li>
 <li><b>Alle Annotationen auf Seite löschen</b>: bei 0 Treffern Sticky-Status Statusleiste
     (Clear bei Seiten-/Dokumentwechsel / Undo/Redo) + i18n DE + Menü/Aktion no-op + Button disabled; Undo „N Annotationen (gefiltert)“ — 1.1.9</li>
 <li><b>Keygen</b>: Reveal Auto-Hide 5/10/30 s + Countdown (Label „pausiert“; Tooltip „Fenster ohne Fokus“) / Esc maskiert;

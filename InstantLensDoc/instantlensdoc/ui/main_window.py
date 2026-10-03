@@ -1164,10 +1164,10 @@ class MainWindow(QMainWindow):
         )
         act_dup_tab.triggered.connect(self.duplicate_tab)
         m_file.addAction(act_dup_tab)
-        act_compare_tabs = QAction("Dateien vergleichen…", self)
+        act_compare_tabs = QAction("Text-Diff (offene Tabs)…", self)
         act_compare_tabs.setShortcut(QKeySequence("Ctrl+Alt+D"))
         act_compare_tabs.setToolTip(
-            "Zwei Tabs/Dateien Side-by-Side vergleichen (einfacher Zeilen-Diff)"
+            "Zwei offene Text-Tabs vergleichen (einfaches Zeilen-Diff Panel) — 1.2.0"
         )
         act_compare_tabs.triggered.connect(self._compare_text_tabs)
         m_file.addAction(act_compare_tabs)
@@ -1861,7 +1861,9 @@ class MainWindow(QMainWindow):
         act_merge.triggered.connect(self._pdf_tools)
         m_pdf.addAction(act_merge)
         act_extract = QAction("Seitenbereich extrahieren…", self)
-        act_extract.setToolTip("Seiten von–bis in neues PDF")
+        act_extract.setToolTip(
+            "Seitenbereiche z. B. 1-3,5,8-10 → neue Datei(en) — 1.2.0"
+        )
         act_extract.triggered.connect(self._extract_page_range)
         m_pdf.addAction(act_extract)
         act_split_pages = QAction("Seiten als Einzel-PDFs…", self)
@@ -1909,6 +1911,10 @@ class MainWindow(QMainWindow):
             ("Annotationen speichern unter…", lambda: self.pdf_view.save_annotations_as()),
             ("Annotationen laden", lambda: self.pdf_view.reload_annotations()),
             ("Annotationen als JSON exportieren…", lambda: self.pdf_view.export_annotations_json()),
+            (
+                "Annotationen exportieren (JSON / Flatten)…",
+                lambda: self.pdf_view.export_annotations_json_flatten(),
+            ),
             ("Annotationen als CSV exportieren…", lambda: self.pdf_view.export_annotations_csv()),
             (
                 "Kommentar-Bericht (Markdown)…",
@@ -6682,7 +6688,7 @@ class MainWindow(QMainWindow):
         ).exec()
 
     def _extract_page_range(self):
-        """Schnelldialog: Seiten von–bis → neues PDF (aktuelles Dokument vorausgefüllt)."""
+        """Schnelldialog: Seitenbereiche z. B. 1-3,5,8-10 → neue Datei(en) — 1.2.0."""
         if not self.pdf_view.pdf_path:
             QMessageBox.information(
                 self,
@@ -6692,19 +6698,62 @@ class MainWindow(QMainWindow):
             self._pdf_tools()
             return
         from PySide6.QtWidgets import QInputDialog
-        from ild_pdf.pages import extract_page_range
+        from ild_pdf.pages import extract_by_page_spec
 
         n = self.pdf_view.page_count
-        start, ok1 = QInputDialog.getInt(
-            self, "Seitenbereich", "Von Seite (1-basiert):", self.pdf_view.page_index + 1, 1, n
+        cur = self.pdf_view.page_index + 1
+        default_spec = f"{cur}-{n}" if cur < n else str(cur)
+        spec, ok = QInputDialog.getText(
+            self,
+            "Seitenbereich extrahieren",
+            f"Seitenbereiche (1…{n}), z. B. 1-3,5,8-10:",
+            text=default_spec,
         )
-        if not ok1:
+        if not ok:
             return
-        end, ok2 = QInputDialog.getInt(self, "Seitenbereich", "Bis Seite (inklusive):", n, start, n)
-        if not ok2:
+        spec = (spec or "").strip()
+        if not spec:
             return
+        one_per = False
+        if "," in spec:
+            reply = QMessageBox.question(
+                self,
+                "Seitenbereich",
+                "Mehrere Bereiche erkannt.\n\n"
+                "Ja = eine Datei pro Bereich (Ordner wählen)\n"
+                "Nein = alle Seiten in eine Datei",
+                QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel,
+                QMessageBox.No,
+            )
+            if reply == QMessageBox.Cancel:
+                return
+            one_per = reply == QMessageBox.Yes
         src = Path(self.pdf_view.pdf_path)
-        default = str(Path(dialog_start_dir(src.parent)) / f"{src.stem}_p{start}-{end}.pdf")
+        if one_per:
+            out_dir = QFileDialog.getExistingDirectory(
+                self,
+                "Ausgabeordner (eine Datei pro Bereich)",
+                dialog_start_dir(src.parent),
+            )
+            if not out_dir:
+                return
+            remember_recent_dir(out_dir)
+            try:
+                written = extract_by_page_spec(
+                    src, out_dir, spec, one_based=True, one_file_per_range=True
+                )
+                self._set_status(f"{len(written)} Datei(en) aus „{spec}“ → {out_dir}")
+                QMessageBox.information(
+                    self,
+                    "Seitenbereich",
+                    f"{len(written)} Datei(en) erstellt in:\n{out_dir}",
+                )
+            except Exception as e:
+                QMessageBox.critical(self, "Seitenbereich", str(e))
+            return
+        default = str(
+            Path(dialog_start_dir(src.parent)) / f"{src.stem}_extract.pdf"
+        )
         dest, _ = QFileDialog.getSaveFileName(self, "Ziel-PDF", default, "PDF (*.pdf)")
         if not dest:
             return
@@ -6714,8 +6763,11 @@ class MainWindow(QMainWindow):
         if not confirm_overwrite_export(dest, self):
             return
         try:
-            out = extract_page_range(src, dest, start, end, one_based=True)
-            self._set_status(f"Seitenbereich {start}–{end} → {Path(out).name}")
+            written = extract_by_page_spec(
+                src, dest, spec, one_based=True, one_file_per_range=False
+            )
+            out = written[0] if written else dest
+            self._set_status(f"Seitenbereich {spec} → {Path(out).name}")
             QMessageBox.information(self, "Seitenbereich", f"Gespeichert:\n{out}")
         except Exception as e:
             QMessageBox.critical(self, "Seitenbereich", str(e))
@@ -6779,24 +6831,66 @@ class MainWindow(QMainWindow):
         PdfCompareDialog(self, left_pdf=left).exec()
 
     def _compare_text_tabs(self):
-        """Zwei Sidebar-Tabs / Dateien Side-by-Side (Zeilen-Diff)."""
-        tabs = self.sidebar.document_paths() if hasattr(self.sidebar, "document_paths") else []
-        left_text = None
-        left_label = None
-        right_text = None
-        right_label = None
-        if self.doc and self.doc.kind != DocKind.PDF:
-            left_text = self.editor.toPlainText()
-            left_label = self.doc.display_name or "Aktuell"
-        TextCompareDialog(
+        """Zwei offene Text-Tabs vergleichen (einfaches Zeilen-Diff Panel) — 1.2.0."""
+        _TEXT_EXT = {
+            ".txt",
+            ".md",
+            ".markdown",
+            ".html",
+            ".htm",
+            ".csv",
+            ".json",
+            ".py",
+            ".log",
+            ".docx",
+            ".xml",
+            ".yml",
+            ".yaml",
+            ".ini",
+            ".cfg",
+            ".toml",
+        }
+        all_paths = (
+            self.sidebar.document_paths() if hasattr(self.sidebar, "document_paths") else []
+        )
+        tabs = [
+            p
+            for p in all_paths
+            if Path(p).suffix.lower() in _TEXT_EXT
+        ]
+        open_tab_texts: list[tuple[str, str, str]] = []
+        # Live-Inhalt des aktuellen Editors als Tab-Eintrag
+        if self.doc and self.doc.kind not in (DocKind.PDF, DocKind.IMAGE):
+            label = self.doc.display_name or "Aktuell"
+            path_key = str(self.doc.path) if self.doc.path else ""
+            open_tab_texts.append((path_key or "__editor__", label, self.editor.toPlainText()))
+            if path_key and path_key not in tabs:
+                tabs.insert(0, path_key)
+        if len(tabs) < 2 and len(open_tab_texts) < 2:
+            QMessageBox.information(
+                self,
+                "Text-Diff",
+                "Bitte mindestens zwei Text-Tabs öffnen "
+                "(TXT/MD/HTML/…), dann erneut Datei → Text-Diff.",
+            )
+            return
+        left_text = open_tab_texts[0][2] if open_tab_texts else None
+        left_label = open_tab_texts[0][1] if open_tab_texts else None
+        left_path = (
+            str(self.doc.path)
+            if self.doc and self.doc.path and self.doc.kind not in (DocKind.PDF, DocKind.IMAGE)
+            else None
+        )
+        dlg = TextCompareDialog(
             self,
             tab_paths=tabs,
-            left_path=str(self.doc.path) if self.doc and self.doc.path else None,
+            left_path=left_path,
             left_text=left_text,
             left_label=left_label,
-            right_text=right_text,
-            right_label=right_label,
-        ).exec()
+            panel_mode=True,
+        )
+        dlg.show()  # nicht-modal Panel — 1.2.0
+        self._text_diff_panel = dlg
 
     def _save_export_profile(self):
         from PySide6.QtWidgets import QFileDialog, QInputDialog
