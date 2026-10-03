@@ -1,4 +1,4 @@
-"""PDF-Portfolio erstellen / öffnen (pikepdf Collection + Attachments) — 2.0.1."""
+"""PDF-Portfolio erstellen / öffnen (pikepdf Collection + Attachments) — 2.0.2."""
 
 from __future__ import annotations
 
@@ -8,6 +8,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QAbstractItemView,
+    QApplication,
     QDialog,
     QDialogButtonBox,
     QFileDialog,
@@ -18,13 +19,20 @@ from PySide6.QtWidgets import (
     QListWidget,
     QListWidgetItem,
     QMessageBox,
+    QProgressBar,
     QPushButton,
     QTabWidget,
     QVBoxLayout,
     QWidget,
 )
 
+from instantlensdoc.core.app_settings import (
+    dialog_start_dir,
+    get_last_portfolio_extract_dir,
+    set_last_portfolio_extract_dir,
+)
 from ild_pdf.portfolio import (
+    count_renamed_extracts,
     create_portfolio,
     extract_portfolio,
     extract_portfolio_entries,
@@ -40,7 +48,7 @@ class PortfolioDialog(QDialog):
         self.setObjectName("portfolioDialog")
         self.setWindowTitle("PDF-Portfolio — InstantLens Doc 2.0")
         self.setModal(True)
-        self.resize(560, 440)
+        self.resize(560, 480)
         self._start_dir = start_dir or ""
         self._created_path: str | None = None
         self._opened_path: str | None = None
@@ -63,6 +71,15 @@ class PortfolioDialog(QDialog):
         esc = QShortcut(QKeySequence(Qt.Key_Escape), self)
         esc.setContext(Qt.WindowShortcut)
         esc.activated.connect(self.reject)
+
+    def _extract_start_dir(self, path: str = "") -> str:
+        remembered = get_last_portfolio_extract_dir()
+        if remembered is not None:
+            return str(remembered)
+        return dialog_start_dir(
+            self._start_dir,
+            Path(path).parent if path else None,
+        )
 
     def _build_create_tab(self) -> QWidget:
         w = QWidget()
@@ -111,7 +128,8 @@ class PortfolioDialog(QDialog):
         layout.addWidget(
             QLabel(
                 "Bestehendes Portfolio öffnen: Collection/Attachments listen "
-                "und optional extrahieren (alle oder Auswahl)."
+                "und optional extrahieren (alle oder Auswahl). "
+                "Zielordner merken · Namenskollision umbenennen · Fortschritt — 2.0.2."
             )
         )
         row = QHBoxLayout()
@@ -141,6 +159,16 @@ class PortfolioDialog(QDialog):
         self.entries_list.setSelectionMode(QAbstractItemView.ExtendedSelection)
         layout.addWidget(self.entries_list, 1)
 
+        self.extract_progress = QProgressBar()
+        self.extract_progress.setObjectName("portfolioExtractProgress")
+        self.extract_progress.setAccessibleName("Portfolio-Extrakt Fortschritt")
+        self.extract_progress.setRange(0, 100)
+        self.extract_progress.setValue(0)
+        self.extract_progress.setTextVisible(True)
+        self.extract_progress.setFormat("%v / %m Dateien")
+        self.extract_progress.setVisible(False)
+        layout.addWidget(self.extract_progress)
+
         self.open_status = QLabel("")
         self.open_status.setObjectName("portfolioOpenStatus")
         layout.addWidget(self.open_status)
@@ -148,10 +176,15 @@ class PortfolioDialog(QDialog):
         ex_row = QHBoxLayout()
         btn_extract_sel = QPushButton("Auswahl extrahieren…")
         btn_extract_sel.setObjectName("portfolioExtractSelBtn")
-        btn_extract_sel.setToolTip("Nur ausgewählte Einträge extrahieren — 2.0.1")
+        btn_extract_sel.setToolTip(
+            "Nur ausgewählte Einträge extrahieren; Zielordner merken — 2.0.2"
+        )
         btn_extract_sel.clicked.connect(self._extract_selected)
         btn_extract = QPushButton("Alle extrahieren…")
         btn_extract.setObjectName("portfolioExtractBtn")
+        btn_extract.setToolTip(
+            "Alle Einträge extrahieren; Namenskollision → Umbenennen — 2.0.2"
+        )
         btn_extract.clicked.connect(self._extract)
         ex_row.addWidget(btn_extract_sel)
         ex_row.addWidget(btn_extract)
@@ -267,6 +300,59 @@ class PortfolioDialog(QDialog):
                 names.append(str(key))
         return names
 
+    def _on_extract_progress(self, current: int, total: int, name: str) -> None:
+        self.extract_progress.setMaximum(max(1, total))
+        self.extract_progress.setValue(current)
+        self.open_status.setText(f"Extrahiere… {current}/{total} · {name}")
+        QApplication.processEvents()
+
+    def _run_extract(
+        self,
+        path: str,
+        *,
+        names: list[str] | None = None,
+    ) -> None:
+        start = self._extract_start_dir(path)
+        out = QFileDialog.getExistingDirectory(
+            self, "Zielordner für Extraktion", start
+        )
+        if not out:
+            return
+        set_last_portfolio_extract_dir(out)
+        total = len(names) if names is not None else len(self._entry_names)
+        show_prog = total >= 2
+        self.extract_progress.setVisible(show_prog)
+        if show_prog:
+            self.extract_progress.setMaximum(max(1, total))
+            self.extract_progress.setValue(0)
+        try:
+            if names is not None:
+                written = extract_portfolio_entries(
+                    path,
+                    names,
+                    out_dir=out,
+                    on_progress=self._on_extract_progress if show_prog else None,
+                )
+            else:
+                written = extract_portfolio(
+                    path,
+                    out_dir=out,
+                    on_progress=self._on_extract_progress if show_prog else None,
+                )
+            renamed = count_renamed_extracts(written)
+            self.extract_progress.setVisible(False)
+            rename_s = f" · {renamed} umbenannt" if renamed else ""
+            self.open_status.setText(
+                f"{len(written)} Datei(en) extrahiert → {out}{rename_s}"
+            )
+            msg = f"{len(written)} Datei(en) extrahiert nach:\n{out}"
+            if renamed:
+                msg += f"\n{renamed} wegen Namenskollision umbenannt (_2, _3, …)."
+            QMessageBox.information(self, "Portfolio", msg)
+        except Exception as exc:
+            self.extract_progress.setVisible(False)
+            QMessageBox.critical(self, "Portfolio", f"Extraktion fehlgeschlagen:\n{exc}")
+
     def _extract_selected(self) -> None:
         path = self._opened_path or (self.open_path_edit.text() or "").strip()
         if not path:
@@ -278,23 +364,7 @@ class PortfolioDialog(QDialog):
                 self, "Portfolio", "Bitte mindestens einen Eintrag auswählen."
             )
             return
-        out = QFileDialog.getExistingDirectory(
-            self, "Zielordner für Extraktion", self._start_dir or str(Path(path).parent)
-        )
-        if not out:
-            return
-        try:
-            written = extract_portfolio_entries(path, names, out_dir=out)
-            self.open_status.setText(
-                f"{len(written)} Auswahl extrahiert → {out}"
-            )
-            QMessageBox.information(
-                self,
-                "Portfolio",
-                f"{len(written)} Datei(en) extrahiert nach:\n{out}",
-            )
-        except Exception as exc:
-            QMessageBox.critical(self, "Portfolio", f"Extraktion fehlgeschlagen:\n{exc}")
+        self._run_extract(path, names=names)
 
     def _extract(self) -> None:
         path = self._opened_path or (self.open_path_edit.text() or "").strip()
@@ -308,21 +378,7 @@ class PortfolioDialog(QDialog):
                 "Leere Collection — nichts zu extrahieren.",
             )
             return
-        out = QFileDialog.getExistingDirectory(
-            self, "Zielordner für Extraktion", self._start_dir or str(Path(path).parent)
-        )
-        if not out:
-            return
-        try:
-            written = extract_portfolio(path, out_dir=out)
-            self.open_status.setText(f"{len(written)} Datei(en) extrahiert → {out}")
-            QMessageBox.information(
-                self,
-                "Portfolio",
-                f"{len(written)} Datei(en) extrahiert nach:\n{out}",
-            )
-        except Exception as exc:
-            QMessageBox.critical(self, "Portfolio", f"Extraktion fehlgeschlagen:\n{exc}")
+        self._run_extract(path, names=None)
 
     @property
     def created_path(self) -> str | None:

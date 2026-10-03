@@ -127,8 +127,8 @@ def main() -> int:
     from instantlensdoc.core.update_check import check_for_updates, check_local_version
     from instantlensdoc.license import KEY_DAYS, TRIAL_DAYS, generate_key, verify_key
 
-    assert __version__ == "2.0.1", __version__
-    assert ild_ver == "2.0.1", ild_ver
+    assert __version__ == "2.0.2", __version__
+    assert ild_ver == "2.0.2", ild_ver
     assert TRIAL_DAYS == 28 and KEY_DAYS == 32
     key = generate_key("ame@sellerbach.de")
     ok, msg, _ = verify_key(key)
@@ -146,19 +146,19 @@ def main() -> int:
     assert "Settings" in tr("settings")
     set_lang("de")
     upd = check_for_updates(allow_network=False)
-    assert upd.local_version == "2.0.1" and not upd.online
+    assert upd.local_version == "2.0.2" and not upd.online
     assert upd.status == "offline"
     assert upd.status_label("de") == "offline / nicht geprüft"
     assert upd.checked_at
     loc = check_local_version()
-    assert loc.local_version == "2.0.1"
-    assert loc.remote_version == "2.0.1"
+    assert loc.local_version == "2.0.2"
+    assert loc.remote_version == "2.0.2"
     assert loc.reference_source in ("docs/VERSION", "VERSION.txt")
     assert loc.newer_available is False
     assert loc.status == "current"
     assert loc.status_label("de") == "aktuell"
-    assert (ROOT / "docs" / "VERSION").read_text(encoding="utf-8").strip().startswith("2.0.1")
-    assert (ROOT / "VERSION.txt").read_text(encoding="utf-8").strip().startswith("2.0.1")
+    assert (ROOT / "docs" / "VERSION").read_text(encoding="utf-8").strip().startswith("2.0.2")
+    assert (ROOT / "VERSION.txt").read_text(encoding="utf-8").strip().startswith("2.0.2")
     assert get_export_jpeg_quality() >= 10
     assert get_ui_lang() in ("de", "en")
     assert 25 <= get_default_zoom_percent() <= 500
@@ -201,8 +201,8 @@ def main() -> int:
     assert get_ann_pen_color() == "#112233"
     assert (ROOT / "CHANGELOG.md").is_file()
     cl = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-    assert "2.0.1" in cl and "2.0.0" in cl and "1.9.5" in cl and "1.9.4" in cl and "1.9.3" in cl and "1.9.2" in cl and "1.9.1" in cl and "1.9.0" in cl and "1.8.5" in cl and "1.8.4" in cl and "1.8.3" in cl and "1.8.2" in cl and "1.8.1" in cl and "1.8.0" in cl and "1.7.5" in cl and "1.7.4" in cl and "1.7.3" in cl and "1.7.2" in cl and "1.7.1" in cl and "1.7.0" in cl and "1.6.5" in cl and "1.6.4" in cl and "1.6.3" in cl and "1.6.2" in cl and "1.6.1" in cl and "1.6.0" in cl and "1.5.5" in cl and "1.5.4" in cl and "1.5.3" in cl and "1.5.2" in cl and "1.5.1" in cl and "1.5.0" in cl and "1.4.5" in cl and "1.4.4" in cl and "1.4.3" in cl and "1.4.2" in cl and "1.4.1" in cl and "1.4.0" in cl and "1.3.6" in cl and "1.3.5" in cl and "1.3.4" in cl and "1.3.3" in cl and "1.3.2" in cl and "1.3.1" in cl and "1.3.0" in cl and "1.2.9" in cl and "1.2.8" in cl and "1.2.7" in cl and "1.2.6" in cl and "1.2.5" in cl and "1.2.4" in cl and "1.2.3" in cl and "1.2.2" in cl and "1.2.1" in cl and "1.2.0" in cl and "1.1.9" in cl and "1.1.8" in cl and "1.1.7" in cl and "1.1.6" in cl and "1.1.5" in cl and "1.1.4" in cl and "1.1.3" in cl and "1.1.2" in cl and "1.1.1" in cl and "1.1.0" in cl and "1.0.9" in cl and "1.0.8" in cl and "1.0.7" in cl and "1.0.6" in cl and "1.0.5" in cl and "1.0.4" in cl and "1.0.3" in cl and "1.0.2" in cl and "1.0.1" in cl and "1.0.0" in cl and "0.9.9" in cl and "0.9.8" in cl and "0.9.7" in cl and "0.9.6" in cl and "0.9.5" in cl and "0.9.4" in cl and "0.9.3" in cl and "0.9.2" in cl and "0.9.1" in cl and "0.9.0" in cl and "0.8.9" in cl and "0.8.8" in cl and "0.8.7" in cl and "0.8.6" in cl and "0.8.5" in cl and "0.8.4" in cl and "0.8.3" in cl and "0.8.2" in cl and "0.8.1" in cl and "0.8.0" in cl
-    assert "## 2.0.1" in cl and "## 2.0.0" in cl and "## 1.9.5" in cl and "## 1.9.4" in cl and "## 1.9.3" in cl and "## 1.9.2" in cl and "## 1.9.1" in cl and "## 1.9.0" in cl and "## 1.8.5" in cl and "## 1.8.4" in cl and "## 1.8.3" in cl and "## 1.8.2" in cl and "## 1.8.1" in cl and "## 1.8.0" in cl and "## 1.7.5" in cl and "## 1.7.4" in cl and "## 1.7.3" in cl and "## 1.7.2" in cl and "## 1.7.1" in cl and "## 1.7.0" in cl and "## 1.6.5" in cl and "## 1.6.4" in cl and "## 1.6.3" in cl and "## 1.6.2" in cl and "## 1.6.1" in cl and "## 1.6.0" in cl and "## 1.5.5" in cl and "## 1.5.4" in cl and "## 1.5.3" in cl and "## 1.5.2" in cl and "## 1.5.1" in cl and "## 1.5.0" in cl and "## 1.4.5" in cl and "## 1.4.4" in cl and "## 1.4.3" in cl and "## 1.4.2" in cl and "## 1.4.1" in cl and "## 1.4.0" in cl and "## 1.3.6" in cl and "## 1.3.5" in cl and "## 1.3.4" in cl and "## 1.3.3" in cl and "## 1.3.2" in cl and "## 1.3.1" in cl and "## 1.3.0" in cl and "## 1.2.9" in cl and "## 1.2.8" in cl and "## 1.2.7" in cl and "## 1.2.6" in cl and "## 1.2.5" in cl and "## 1.2.4" in cl and "## 1.2.3" in cl and "## 1.2.2" in cl and "## 1.2.1" in cl and "## 1.2.0" in cl and "## 1.1.9" in cl and "## 1.1.8" in cl and "## 1.1.7" in cl and "## 1.1.6" in cl and "## 1.1.5" in cl and "## 1.1.4" in cl and "## 1.1.3" in cl and "## 1.1.2" in cl and "## 1.1.1" in cl and "## 1.1.0" in cl and "## 1.0.9" in cl and "## 1.0.8" in cl and "## 1.0.7" in cl and "## 1.0.6" in cl and "## 1.0.5" in cl and "## 1.0.4" in cl and "## 1.0.3" in cl and "## 1.0.2" in cl and "## 1.0.1" in cl and "## 1.0.0" in cl and "## 0.9.9" in cl and "## 0.9.8" in cl and "## 0.9.7" in cl and "## 0.9.6" in cl and "## 0.9.5" in cl and "## 0.9.4" in cl and "## 0.9.3" in cl and "## 0.9.2" in cl and "## 0.9.1" in cl and "## 0.9.0" in cl and "## 0.8.9" in cl and "## 0.8.8" in cl and "## 0.8.7" in cl and "## 0.8.6" in cl and "## 0.8.5" in cl and "## 0.8.4" in cl and "## 0.8.3" in cl and "## 0.8.2" in cl and "## 0.8.1" in cl and "## 0.8.0" in cl
+    assert "2.0.2" in cl and "2.0.1" in cl and "2.0.0" in cl and "1.9.5" in cl and "1.9.4" in cl and "1.9.3" in cl and "1.9.2" in cl and "1.9.1" in cl and "1.9.0" in cl and "1.8.5" in cl and "1.8.4" in cl and "1.8.3" in cl and "1.8.2" in cl and "1.8.1" in cl and "1.8.0" in cl and "1.7.5" in cl and "1.7.4" in cl and "1.7.3" in cl and "1.7.2" in cl and "1.7.1" in cl and "1.7.0" in cl and "1.6.5" in cl and "1.6.4" in cl and "1.6.3" in cl and "1.6.2" in cl and "1.6.1" in cl and "1.6.0" in cl and "1.5.5" in cl and "1.5.4" in cl and "1.5.3" in cl and "1.5.2" in cl and "1.5.1" in cl and "1.5.0" in cl and "1.4.5" in cl and "1.4.4" in cl and "1.4.3" in cl and "1.4.2" in cl and "1.4.1" in cl and "1.4.0" in cl and "1.3.6" in cl and "1.3.5" in cl and "1.3.4" in cl and "1.3.3" in cl and "1.3.2" in cl and "1.3.1" in cl and "1.3.0" in cl and "1.2.9" in cl and "1.2.8" in cl and "1.2.7" in cl and "1.2.6" in cl and "1.2.5" in cl and "1.2.4" in cl and "1.2.3" in cl and "1.2.2" in cl and "1.2.1" in cl and "1.2.0" in cl and "1.1.9" in cl and "1.1.8" in cl and "1.1.7" in cl and "1.1.6" in cl and "1.1.5" in cl and "1.1.4" in cl and "1.1.3" in cl and "1.1.2" in cl and "1.1.1" in cl and "1.1.0" in cl and "1.0.9" in cl and "1.0.8" in cl and "1.0.7" in cl and "1.0.6" in cl and "1.0.5" in cl and "1.0.4" in cl and "1.0.3" in cl and "1.0.2" in cl and "1.0.1" in cl and "1.0.0" in cl and "0.9.9" in cl and "0.9.8" in cl and "0.9.7" in cl and "0.9.6" in cl and "0.9.5" in cl and "0.9.4" in cl and "0.9.3" in cl and "0.9.2" in cl and "0.9.1" in cl and "0.9.0" in cl and "0.8.9" in cl and "0.8.8" in cl and "0.8.7" in cl and "0.8.6" in cl and "0.8.5" in cl and "0.8.4" in cl and "0.8.3" in cl and "0.8.2" in cl and "0.8.1" in cl and "0.8.0" in cl
+    assert "## 2.0.2" in cl and "## 2.0.1" in cl and "## 2.0.0" in cl and "## 1.9.5" in cl and "## 1.9.4" in cl and "## 1.9.3" in cl and "## 1.9.2" in cl and "## 1.9.1" in cl and "## 1.9.0" in cl and "## 1.8.5" in cl and "## 1.8.4" in cl and "## 1.8.3" in cl and "## 1.8.2" in cl and "## 1.8.1" in cl and "## 1.8.0" in cl and "## 1.7.5" in cl and "## 1.7.4" in cl and "## 1.7.3" in cl and "## 1.7.2" in cl and "## 1.7.1" in cl and "## 1.7.0" in cl and "## 1.6.5" in cl and "## 1.6.4" in cl and "## 1.6.3" in cl and "## 1.6.2" in cl and "## 1.6.1" in cl and "## 1.6.0" in cl and "## 1.5.5" in cl and "## 1.5.4" in cl and "## 1.5.3" in cl and "## 1.5.2" in cl and "## 1.5.1" in cl and "## 1.5.0" in cl and "## 1.4.5" in cl and "## 1.4.4" in cl and "## 1.4.3" in cl and "## 1.4.2" in cl and "## 1.4.1" in cl and "## 1.4.0" in cl and "## 1.3.6" in cl and "## 1.3.5" in cl and "## 1.3.4" in cl and "## 1.3.3" in cl and "## 1.3.2" in cl and "## 1.3.1" in cl and "## 1.3.0" in cl and "## 1.2.9" in cl and "## 1.2.8" in cl and "## 1.2.7" in cl and "## 1.2.6" in cl and "## 1.2.5" in cl and "## 1.2.4" in cl and "## 1.2.3" in cl and "## 1.2.2" in cl and "## 1.2.1" in cl and "## 1.2.0" in cl and "## 1.1.9" in cl and "## 1.1.8" in cl and "## 1.1.7" in cl and "## 1.1.6" in cl and "## 1.1.5" in cl and "## 1.1.4" in cl and "## 1.1.3" in cl and "## 1.1.2" in cl and "## 1.1.1" in cl and "## 1.1.0" in cl and "## 1.0.9" in cl and "## 1.0.8" in cl and "## 1.0.7" in cl and "## 1.0.6" in cl and "## 1.0.5" in cl and "## 1.0.4" in cl and "## 1.0.3" in cl and "## 1.0.2" in cl and "## 1.0.1" in cl and "## 1.0.0" in cl and "## 0.9.9" in cl and "## 0.9.8" in cl and "## 0.9.7" in cl and "## 0.9.6" in cl and "## 0.9.5" in cl and "## 0.9.4" in cl and "## 0.9.3" in cl and "## 0.9.2" in cl and "## 0.9.1" in cl and "## 0.9.0" in cl and "## 0.8.9" in cl and "## 0.8.8" in cl and "## 0.8.7" in cl and "## 0.8.6" in cl and "## 0.8.5" in cl and "## 0.8.4" in cl and "## 0.8.3" in cl and "## 0.8.2" in cl and "## 0.8.1" in cl and "## 0.8.0" in cl
     assert "## 0.7.9" in cl
     assert "## 0.7.8" in cl
     assert "## 0.7.6" in cl
@@ -260,7 +260,7 @@ def main() -> int:
     assert "0.3.9" in cl  # noch in Kurz-Tabelle
     assert "0.2.9" in cl  # noch in Kurz-Tabelle
     _rm = (ROOT / "README.md").read_text(encoding="utf-8")
-    assert "2.0.1" in _rm and "2.0.0" in _rm and "1.9.5" in _rm and "1.9.4" in _rm and "1.9.3" in _rm and "1.9.2" in _rm and "1.9.1" in _rm and "1.9.0" in _rm and "1.8.5" in _rm
+    assert "2.0.2" in _rm and "2.0.1" in _rm and "2.0.0" in _rm and "1.9.5" in _rm and "1.9.4" in _rm and "1.9.3" in _rm and "1.9.2" in _rm and "1.9.1" in _rm and "1.9.0" in _rm and "1.8.5" in _rm
     assert "run.bat" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "sync-ild.ps1" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "scripts/sync-ild.ps1" in (ROOT / "FEATURES.md").read_text(encoding="utf-8")
@@ -609,13 +609,13 @@ def main() -> int:
 
         assert (ROOT / "installer" / "installer-hinweis.txt").exists()
         iss = (ROOT / "installer" / "instantlensdoc.iss").read_text(encoding="utf-8")
-        assert "2.0.1" in iss and "desktopicon" in iss and "DisableProgramGroupPage=no" in iss
+        assert "2.0.2" in iss and "desktopicon" in iss and "DisableProgramGroupPage=no" in iss
         assert "UninstallDisplayName" in iss and "Uninstallable=yes" in iss
         assert "IncludeKeygen" in iss and "SetupIconFile" in iss
         assert "InstantLensKeygen.exe" in iss
         assert "uninstallexe" in iss
         bw = (ROOT / "build-windows.ps1").read_text(encoding="utf-8")
-        assert "2.0.1" in bw and "NoKeygenInApp" in bw and "--icon" in bw
+        assert "2.0.2" in bw and "NoKeygenInApp" in bw and "--icon" in bw
         assert "InstantLensKeygen.exe" in bw
         bi = (ROOT / "installer" / "build-installer.ps1").read_text(encoding="utf-8")
         assert "InstantLensKeygen.exe" in bi and "IncludeKeygen" in bi
@@ -624,7 +624,7 @@ def main() -> int:
         assert "Installer" in kg_readme
         hinweis = (ROOT / "installer" / "installer-hinweis.txt").read_text(encoding="utf-8")
         assert "InstantLensKeygen.exe" in hinweis or "run-keygen.bat" in hinweis
-        assert "2.0.1" in hinweis
+        assert "2.0.2" in hinweis
         assert "checkedonce" in iss and "Desktop-Verknüpfung" in hinweis
         from ild_pdf.limits import OPEN_TIMEOUT_HINT, OPEN_TIMEOUT_HINT_SEC
 
@@ -637,7 +637,7 @@ def main() -> int:
 
         assert (ROOT / "examples" / "ild_pdf_demo.py").exists()
         _info = (ROOT / "INFO.md").read_text(encoding="utf-8")
-        assert "2.0.1" in _info and "2.0.0" in _info and "1.9.5" in _info and "1.9.4" in _info and "1.9.3" in _info and "1.9.2" in _info and "1.9.1" in _info and "1.9.0" in _info and "1.8.5" in _info
+        assert "2.0.2" in _info and "2.0.1" in _info and "2.0.0" in _info and "1.9.5" in _info and "1.9.4" in _info and "1.9.3" in _info and "1.9.2" in _info and "1.9.1" in _info and "1.9.0" in _info and "1.8.5" in _info
         assert (ROOT / "assets" / "app.ico").is_file()
 
         # --- Kernpfade: open / annotate / export / license ---
@@ -828,7 +828,7 @@ def main() -> int:
         set_backup_on_save(False)
         assert get_page_size_unit() in ("mm", "inch")
         assert isinstance(get_minimize_to_tray(), bool)
-        assert "2.0.1" in feat and "2.0.0" in feat and "1.9.5" in feat and "1.9.4" in feat and "1.9.3" in feat and "1.9.2" in feat and "1.9.1" in feat and "1.9.0" in feat and "1.8.5" in feat and "1.8.4" in feat and "1.8.3" in feat and "1.8.2" in feat and "1.8.1" in feat and "1.8.0" in feat and "1.7.5" in feat and "1.7.4" in feat and "1.7.3" in feat and "1.7.2" in feat and "1.7.1" in feat and "1.7.0" in feat and "1.6.5" in feat and "1.6.4" in feat and "1.6.3" in feat and "1.6.2" in feat and "1.6.1" in feat and "1.6.0" in feat and "1.5.5" in feat and "1.5.4" in feat and "1.5.3" in feat and "1.5.2" in feat and "1.5.1" in feat and "1.5.0" in feat and "1.4.5" in feat and "1.4.4" in feat and "1.4.3" in feat and "1.4.2" in feat and "1.4.1" in feat and "1.4.0" in feat and "1.3.6" in feat and "1.3.5" in feat and "1.3.4" in feat and "1.3.3" in feat and "1.3.2" in feat and "1.3.1" in feat and "1.3.0" in feat and "1.2.9" in feat and "1.2.8" in feat and "1.2.7" in feat and "1.2.6" in feat and "1.2.5" in feat and "1.2.4" in feat and "1.2.3" in feat and "1.2.2" in feat and "1.2.1" in feat and "1.2.0" in feat and "1.1.9" in feat and "1.1.8" in feat and "1.1.7" in feat and "1.1.6" in feat and "1.1.5" in feat and "1.1.4" in feat and "1.1.3" in feat and "1.1.2" in feat and "1.1.1" in feat and "1.1.0" in feat and "1.0.9" in feat and "1.0.8" in feat and "1.0.7" in feat and "1.0.6" in feat and "1.0.5" in feat and "1.0.4" in feat and "1.0.3" in feat and "1.0.2" in feat and "1.0.1" in feat and "1.0.0" in feat and "0.9.9" in feat and "0.9.8" in feat and "0.9.7" in feat and "0.9.6" in feat and "0.9.5" in feat and "0.9.4" in feat and "0.9.3" in feat and "0.9.2" in feat and "0.9.1" in feat and "0.9.0" in feat and "0.8.9" in feat and "0.8.8" in feat and "0.8.7" in feat and "0.8.6" in feat and "0.8.5" in feat and "0.8.4" in feat and "0.8.3" in feat and "0.8.2" in feat and "0.8.1" in feat and "0.8.0" in feat and "0.7.9" in feat and "0.7.8" in feat and "0.7.7" in feat and "0.7.6" in feat and "0.7.5" in feat and "0.7.4" in feat and "0.7.3" in feat and "0.7.2" in feat and "0.7.1" in feat and "0.6.9" in feat and "0.5.9" in feat and "0.4.9" in feat  # Release + Zeitraum-Feature-Hinweise
+        assert "2.0.2" in feat and "2.0.1" in feat and "2.0.0" in feat and "1.9.5" in feat and "1.9.4" in feat and "1.9.3" in feat and "1.9.2" in feat and "1.9.1" in feat and "1.9.0" in feat and "1.8.5" in feat and "1.8.4" in feat and "1.8.3" in feat and "1.8.2" in feat and "1.8.1" in feat and "1.8.0" in feat and "1.7.5" in feat and "1.7.4" in feat and "1.7.3" in feat and "1.7.2" in feat and "1.7.1" in feat and "1.7.0" in feat and "1.6.5" in feat and "1.6.4" in feat and "1.6.3" in feat and "1.6.2" in feat and "1.6.1" in feat and "1.6.0" in feat and "1.5.5" in feat and "1.5.4" in feat and "1.5.3" in feat and "1.5.2" in feat and "1.5.1" in feat and "1.5.0" in feat and "1.4.5" in feat and "1.4.4" in feat and "1.4.3" in feat and "1.4.2" in feat and "1.4.1" in feat and "1.4.0" in feat and "1.3.6" in feat and "1.3.5" in feat and "1.3.4" in feat and "1.3.3" in feat and "1.3.2" in feat and "1.3.1" in feat and "1.3.0" in feat and "1.2.9" in feat and "1.2.8" in feat and "1.2.7" in feat and "1.2.6" in feat and "1.2.5" in feat and "1.2.4" in feat and "1.2.3" in feat and "1.2.2" in feat and "1.2.1" in feat and "1.2.0" in feat and "1.1.9" in feat and "1.1.8" in feat and "1.1.7" in feat and "1.1.6" in feat and "1.1.5" in feat and "1.1.4" in feat and "1.1.3" in feat and "1.1.2" in feat and "1.1.1" in feat and "1.1.0" in feat and "1.0.9" in feat and "1.0.8" in feat and "1.0.7" in feat and "1.0.6" in feat and "1.0.5" in feat and "1.0.4" in feat and "1.0.3" in feat and "1.0.2" in feat and "1.0.1" in feat and "1.0.0" in feat and "0.9.9" in feat and "0.9.8" in feat and "0.9.7" in feat and "0.9.6" in feat and "0.9.5" in feat and "0.9.4" in feat and "0.9.3" in feat and "0.9.2" in feat and "0.9.1" in feat and "0.9.0" in feat and "0.8.9" in feat and "0.8.8" in feat and "0.8.7" in feat and "0.8.6" in feat and "0.8.5" in feat and "0.8.4" in feat and "0.8.3" in feat and "0.8.2" in feat and "0.8.1" in feat and "0.8.0" in feat and "0.7.9" in feat and "0.7.8" in feat and "0.7.7" in feat and "0.7.6" in feat and "0.7.5" in feat and "0.7.4" in feat and "0.7.3" in feat and "0.7.2" in feat and "0.7.1" in feat and "0.6.9" in feat and "0.5.9" in feat and "0.4.9" in feat  # Release + Zeitraum-Feature-Hinweise
         assert "Batch-OCR" in feat or "OCR gesamtes PDF" in feat
         assert "Tag" in feat
         assert "Projekt-Ordner" in feat or "Workspace" in feat
@@ -6597,7 +6597,7 @@ def main() -> int:
             or "offene Docs" in feat140
         )
         cl140 = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-        assert "## 2.0.1" in cl140 and "## 2.0.0" in cl140 and "## 1.9.5" in cl140 and "## 1.9.4" in cl140 and "## 1.9.3" in cl140 and "## 1.9.2" in cl140 and "## 1.9.1" in cl140 and "## 1.9.0" in cl140 and "## 1.8.5" in cl140 and "## 1.8.4" in cl140 and "## 1.8.3" in cl140 and "## 1.8.2" in cl140 and "## 1.8.1" in cl140 and "## 1.8.0" in cl140 and "## 1.7.5" in cl140 and "## 1.7.4" in cl140 and "## 1.7.3" in cl140 and "## 1.7.2" in cl140 and "## 1.7.1" in cl140 and "## 1.7.0" in cl140 and "## 1.6.5" in cl140 and "## 1.6.4" in cl140 and "## 1.6.3" in cl140 and "## 1.6.2" in cl140 and "## 1.6.1" in cl140 and "## 1.6.0" in cl140 and "## 1.5.5" in cl140 and "## 1.5.4" in cl140 and "## 1.5.3" in cl140 and "## 1.5.2" in cl140 and "## 1.5.1" in cl140 and "## 1.5.0" in cl140 and "## 1.4.5" in cl140 and "## 1.4.4" in cl140 and "## 1.4.3" in cl140 and "## 1.4.2" in cl140 and "## 1.4.1" in cl140 and "## 1.4.0" in cl140 and "## 1.3.6" in cl140
+        assert "## 2.0.2" in cl140 and "## 2.0.1" in cl140 and "## 2.0.0" in cl140 and "## 1.9.5" in cl140 and "## 1.9.4" in cl140 and "## 1.9.3" in cl140 and "## 1.9.2" in cl140 and "## 1.9.1" in cl140 and "## 1.9.0" in cl140 and "## 1.8.5" in cl140 and "## 1.8.4" in cl140 and "## 1.8.3" in cl140 and "## 1.8.2" in cl140 and "## 1.8.1" in cl140 and "## 1.8.0" in cl140 and "## 1.7.5" in cl140 and "## 1.7.4" in cl140 and "## 1.7.3" in cl140 and "## 1.7.2" in cl140 and "## 1.7.1" in cl140 and "## 1.7.0" in cl140 and "## 1.6.5" in cl140 and "## 1.6.4" in cl140 and "## 1.6.3" in cl140 and "## 1.6.2" in cl140 and "## 1.6.1" in cl140 and "## 1.6.0" in cl140 and "## 1.5.5" in cl140 and "## 1.5.4" in cl140 and "## 1.5.3" in cl140 and "## 1.5.2" in cl140 and "## 1.5.1" in cl140 and "## 1.5.0" in cl140 and "## 1.4.5" in cl140 and "## 1.4.4" in cl140 and "## 1.4.3" in cl140 and "## 1.4.2" in cl140 and "## 1.4.1" in cl140 and "## 1.4.0" in cl140 and "## 1.3.6" in cl140
         kb140 = (
             ROOT / "instantlensdoc" / "ui" / "keyboard_help.py"
         ).read_text(encoding="utf-8")
@@ -7017,7 +7017,7 @@ def main() -> int:
             or "Ctrl+Shift+T" in feat144
         )
         cl144 = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-        assert "## 2.0.1" in cl144 and "## 2.0.0" in cl144 and "## 1.9.5" in cl144 and "## 1.9.4" in cl144 and "## 1.9.3" in cl144 and "## 1.9.2" in cl144 and "## 1.9.1" in cl144 and "## 1.9.0" in cl144 and "## 1.8.5" in cl144 and "## 1.8.4" in cl144 and "## 1.8.3" in cl144 and "## 1.8.2" in cl144 and "## 1.8.1" in cl144 and "## 1.8.0" in cl144 and "## 1.7.5" in cl144 and "## 1.7.4" in cl144 and "## 1.7.3" in cl144 and "## 1.7.2" in cl144 and "## 1.7.1" in cl144 and "## 1.7.0" in cl144 and "## 1.6.5" in cl144 and "## 1.6.4" in cl144 and "## 1.6.3" in cl144 and "## 1.6.2" in cl144 and "## 1.6.1" in cl144 and "## 1.6.0" in cl144 and "## 1.5.5" in cl144 and "## 1.5.4" in cl144 and "## 1.5.3" in cl144 and "## 1.5.2" in cl144 and "## 1.5.1" in cl144 and "## 1.5.0" in cl144 and "## 1.4.5" in cl144 and "## 1.4.4" in cl144
+        assert "## 2.0.2" in cl144 and "## 2.0.1" in cl144 and "## 2.0.0" in cl144 and "## 1.9.5" in cl144 and "## 1.9.4" in cl144 and "## 1.9.3" in cl144 and "## 1.9.2" in cl144 and "## 1.9.1" in cl144 and "## 1.9.0" in cl144 and "## 1.8.5" in cl144 and "## 1.8.4" in cl144 and "## 1.8.3" in cl144 and "## 1.8.2" in cl144 and "## 1.8.1" in cl144 and "## 1.8.0" in cl144 and "## 1.7.5" in cl144 and "## 1.7.4" in cl144 and "## 1.7.3" in cl144 and "## 1.7.2" in cl144 and "## 1.7.1" in cl144 and "## 1.7.0" in cl144 and "## 1.6.5" in cl144 and "## 1.6.4" in cl144 and "## 1.6.3" in cl144 and "## 1.6.2" in cl144 and "## 1.6.1" in cl144 and "## 1.6.0" in cl144 and "## 1.5.5" in cl144 and "## 1.5.4" in cl144 and "## 1.5.3" in cl144 and "## 1.5.2" in cl144 and "## 1.5.1" in cl144 and "## 1.5.0" in cl144 and "## 1.4.5" in cl144 and "## 1.4.4" in cl144
         kb144 = (ROOT / "instantlensdoc" / "ui" / "keyboard_help.py").read_text(
             encoding="utf-8"
         )
@@ -7162,7 +7162,7 @@ def main() -> int:
             env=_env150,
         )
         assert r_ver.returncode == 0, (r_ver.stdout, r_ver.stderr)
-        assert "2.0.1" in (r_ver.stdout or "")
+        assert "2.0.2" in (r_ver.stdout or "")
 
         sm150(pdf, PM150(title="T150", author="A150", subject="B150", keywords="k1,k2"))
         m150 = gm150(pdf)
@@ -7718,7 +7718,7 @@ def main() -> int:
             or "Footer-Klick" in feat154
         )
         cl154 = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-        assert "## 2.0.1" in cl154 and "## 2.0.0" in cl154 and "## 1.9.5" in cl154 and "## 1.9.4" in cl154 and "## 1.9.3" in cl154 and "## 1.9.2" in cl154 and "## 1.9.1" in cl154 and "## 1.9.0" in cl154 and "## 1.8.5" in cl154 and "## 1.8.4" in cl154 and "## 1.8.3" in cl154 and "## 1.8.2" in cl154 and "## 1.8.1" in cl154 and "## 1.8.0" in cl154 and "## 1.7.5" in cl154 and "## 1.7.4" in cl154 and "## 1.7.3" in cl154 and "## 1.7.2" in cl154 and "## 1.7.1" in cl154 and "## 1.7.0" in cl154 and "## 1.6.5" in cl154 and "## 1.6.4" in cl154 and "## 1.6.3" in cl154 and "## 1.6.2" in cl154 and "## 1.6.1" in cl154 and "## 1.6.0" in cl154 and "## 1.5.5" in cl154 and "## 1.5.4" in cl154 and "## 1.5.3" in cl154
+        assert "## 2.0.2" in cl154 and "## 2.0.1" in cl154 and "## 2.0.0" in cl154 and "## 1.9.5" in cl154 and "## 1.9.4" in cl154 and "## 1.9.3" in cl154 and "## 1.9.2" in cl154 and "## 1.9.1" in cl154 and "## 1.9.0" in cl154 and "## 1.8.5" in cl154 and "## 1.8.4" in cl154 and "## 1.8.3" in cl154 and "## 1.8.2" in cl154 and "## 1.8.1" in cl154 and "## 1.8.0" in cl154 and "## 1.7.5" in cl154 and "## 1.7.4" in cl154 and "## 1.7.3" in cl154 and "## 1.7.2" in cl154 and "## 1.7.1" in cl154 and "## 1.7.0" in cl154 and "## 1.6.5" in cl154 and "## 1.6.4" in cl154 and "## 1.6.3" in cl154 and "## 1.6.2" in cl154 and "## 1.6.1" in cl154 and "## 1.6.0" in cl154 and "## 1.5.5" in cl154 and "## 1.5.4" in cl154 and "## 1.5.3" in cl154
         kb154 = (ROOT / "instantlensdoc" / "ui" / "keyboard_help.py").read_text(
             encoding="utf-8"
         )
@@ -7818,7 +7818,7 @@ def main() -> int:
             or "--json" in feat155
         )
         cl155 = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-        assert "## 2.0.1" in cl155 and "## 2.0.0" in cl155 and "## 1.9.5" in cl155 and "## 1.9.4" in cl155 and "## 1.9.3" in cl155 and "## 1.9.2" in cl155 and "## 1.9.1" in cl155 and "## 1.9.0" in cl155 and "## 1.8.5" in cl155 and "## 1.8.4" in cl155 and "## 1.8.3" in cl155 and "## 1.8.2" in cl155 and "## 1.8.1" in cl155 and "## 1.8.0" in cl155 and "## 1.7.5" in cl155 and "## 1.7.4" in cl155 and "## 1.7.3" in cl155 and "## 1.7.2" in cl155 and "## 1.7.1" in cl155 and "## 1.7.0" in cl155 and "## 1.6.5" in cl155 and "## 1.6.4" in cl155 and "## 1.6.3" in cl155 and "## 1.6.2" in cl155 and "## 1.6.1" in cl155 and "## 1.6.0" in cl155 and "## 1.5.5" in cl155 and "## 1.5.4" in cl155
+        assert "## 2.0.2" in cl155 and "## 2.0.1" in cl155 and "## 2.0.0" in cl155 and "## 1.9.5" in cl155 and "## 1.9.4" in cl155 and "## 1.9.3" in cl155 and "## 1.9.2" in cl155 and "## 1.9.1" in cl155 and "## 1.9.0" in cl155 and "## 1.8.5" in cl155 and "## 1.8.4" in cl155 and "## 1.8.3" in cl155 and "## 1.8.2" in cl155 and "## 1.8.1" in cl155 and "## 1.8.0" in cl155 and "## 1.7.5" in cl155 and "## 1.7.4" in cl155 and "## 1.7.3" in cl155 and "## 1.7.2" in cl155 and "## 1.7.1" in cl155 and "## 1.7.0" in cl155 and "## 1.6.5" in cl155 and "## 1.6.4" in cl155 and "## 1.6.3" in cl155 and "## 1.6.2" in cl155 and "## 1.6.1" in cl155 and "## 1.6.0" in cl155 and "## 1.5.5" in cl155 and "## 1.5.4" in cl155
         kb155 = (ROOT / "instantlensdoc" / "ui" / "keyboard_help.py").read_text(
             encoding="utf-8"
         )
@@ -8456,7 +8456,7 @@ def main() -> int:
             or "Quick-Insert" in feat163
         )
         cl163 = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-        assert "## 2.0.1" in cl163 and "## 2.0.0" in cl163 and "## 1.9.5" in cl163 and "## 1.9.4" in cl163 and "## 1.9.3" in cl163 and "## 1.9.2" in cl163 and "## 1.9.1" in cl163 and "## 1.9.0" in cl163 and "## 1.8.5" in cl163 and "## 1.8.4" in cl163 and "## 1.8.3" in cl163 and "## 1.8.2" in cl163 and "## 1.8.1" in cl163 and "## 1.8.0" in cl163 and "## 1.7.5" in cl163 and "## 1.7.4" in cl163 and "## 1.7.3" in cl163 and "## 1.7.2" in cl163 and "## 1.7.1" in cl163 and "## 1.7.0" in cl163 and "## 1.6.5" in cl163 and "## 1.6.4" in cl163 and "## 1.6.3" in cl163 and "## 1.6.2" in cl163
+        assert "## 2.0.2" in cl163 and "## 2.0.1" in cl163 and "## 2.0.0" in cl163 and "## 1.9.5" in cl163 and "## 1.9.4" in cl163 and "## 1.9.3" in cl163 and "## 1.9.2" in cl163 and "## 1.9.1" in cl163 and "## 1.9.0" in cl163 and "## 1.8.5" in cl163 and "## 1.8.4" in cl163 and "## 1.8.3" in cl163 and "## 1.8.2" in cl163 and "## 1.8.1" in cl163 and "## 1.8.0" in cl163 and "## 1.7.5" in cl163 and "## 1.7.4" in cl163 and "## 1.7.3" in cl163 and "## 1.7.2" in cl163 and "## 1.7.1" in cl163 and "## 1.7.0" in cl163 and "## 1.6.5" in cl163 and "## 1.6.4" in cl163 and "## 1.6.3" in cl163 and "## 1.6.2" in cl163
         kb163 = (ROOT / "instantlensdoc" / "ui" / "keyboard_help.py").read_text(
             encoding="utf-8"
         )
@@ -8623,7 +8623,7 @@ def main() -> int:
             or "{stem}_stats.json" in feat164
         )
         cl164 = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-        assert "## 2.0.1" in cl164 and "## 2.0.0" in cl164 and "## 1.9.5" in cl164 and "## 1.9.4" in cl164 and "## 1.9.3" in cl164 and "## 1.9.2" in cl164 and "## 1.9.1" in cl164 and "## 1.9.0" in cl164 and "## 1.8.5" in cl164 and "## 1.8.4" in cl164 and "## 1.8.3" in cl164 and "## 1.8.2" in cl164 and "## 1.8.1" in cl164 and "## 1.8.0" in cl164 and "## 1.7.5" in cl164 and "## 1.7.4" in cl164 and "## 1.7.3" in cl164 and "## 1.7.2" in cl164 and "## 1.7.1" in cl164 and "## 1.7.0" in cl164 and "## 1.6.5" in cl164 and "## 1.6.4" in cl164 and "## 1.6.3" in cl164
+        assert "## 2.0.2" in cl164 and "## 2.0.1" in cl164 and "## 2.0.0" in cl164 and "## 1.9.5" in cl164 and "## 1.9.4" in cl164 and "## 1.9.3" in cl164 and "## 1.9.2" in cl164 and "## 1.9.1" in cl164 and "## 1.9.0" in cl164 and "## 1.8.5" in cl164 and "## 1.8.4" in cl164 and "## 1.8.3" in cl164 and "## 1.8.2" in cl164 and "## 1.8.1" in cl164 and "## 1.8.0" in cl164 and "## 1.7.5" in cl164 and "## 1.7.4" in cl164 and "## 1.7.3" in cl164 and "## 1.7.2" in cl164 and "## 1.7.1" in cl164 and "## 1.7.0" in cl164 and "## 1.6.5" in cl164 and "## 1.6.4" in cl164 and "## 1.6.3" in cl164
         kb164 = (ROOT / "instantlensdoc" / "ui" / "keyboard_help.py").read_text(
             encoding="utf-8"
         )
@@ -8717,7 +8717,7 @@ def main() -> int:
             or "Zusammenfassung" in feat165
         )
         cl165 = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-        assert "## 2.0.1" in cl165 and "## 2.0.0" in cl165 and "## 1.9.5" in cl165 and "## 1.9.4" in cl165 and "## 1.9.3" in cl165 and "## 1.9.2" in cl165 and "## 1.9.1" in cl165 and "## 1.9.0" in cl165 and "## 1.8.5" in cl165 and "## 1.8.4" in cl165 and "## 1.8.3" in cl165 and "## 1.8.2" in cl165 and "## 1.8.1" in cl165 and "## 1.8.0" in cl165 and "## 1.7.5" in cl165 and "## 1.7.4" in cl165 and "## 1.7.3" in cl165 and "## 1.7.2" in cl165 and "## 1.7.1" in cl165 and "## 1.7.0" in cl165 and "## 1.6.5" in cl165 and "## 1.6.4" in cl165
+        assert "## 2.0.2" in cl165 and "## 2.0.1" in cl165 and "## 2.0.0" in cl165 and "## 1.9.5" in cl165 and "## 1.9.4" in cl165 and "## 1.9.3" in cl165 and "## 1.9.2" in cl165 and "## 1.9.1" in cl165 and "## 1.9.0" in cl165 and "## 1.8.5" in cl165 and "## 1.8.4" in cl165 and "## 1.8.3" in cl165 and "## 1.8.2" in cl165 and "## 1.8.1" in cl165 and "## 1.8.0" in cl165 and "## 1.7.5" in cl165 and "## 1.7.4" in cl165 and "## 1.7.3" in cl165 and "## 1.7.2" in cl165 and "## 1.7.1" in cl165 and "## 1.7.0" in cl165 and "## 1.6.5" in cl165 and "## 1.6.4" in cl165
         kb165 = (ROOT / "instantlensdoc" / "ui" / "keyboard_help.py").read_text(
             encoding="utf-8"
         )
@@ -8787,13 +8787,13 @@ def main() -> int:
         assert page_count_for_text("a\n" * 80) >= 1
         from ild_pdf import __version__ as ild_ver170
 
-        assert ild_ver170 == "2.0.1"
+        assert ild_ver170 == "2.0.2"
         assert "text_to_pdf" in (ROOT / "ild_pdf" / "__init__.py").read_text(encoding="utf-8")
 
         ref_ver, ref_src = read_reference_version()
-        assert ref_ver == "2.0.1" and ref_src in ("docs/VERSION", "VERSION.txt")
+        assert ref_ver == "2.0.2" and ref_src in ("docs/VERSION", "VERSION.txt")
         loc170 = check_loc170()
-        assert loc170.local_version == "2.0.1" and loc170.newer_available is False
+        assert loc170.local_version == "2.0.2" and loc170.newer_available is False
         assert (
             "Auto-Download" in loc170.message_de
             or "Aktuell" in loc170.message_de
@@ -8822,7 +8822,7 @@ def main() -> int:
             or "docs/VERSION" in feat170
         )
         cl170 = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-        assert "## 2.0.1" in cl170 and "## 2.0.0" in cl170 and "## 1.9.5" in cl170 and "## 1.9.4" in cl170 and "## 1.9.3" in cl170 and "## 1.9.2" in cl170 and "## 1.9.1" in cl170 and "## 1.9.0" in cl170 and "## 1.8.5" in cl170 and "## 1.8.4" in cl170 and "## 1.8.3" in cl170 and "## 1.8.2" in cl170 and "## 1.8.1" in cl170 and "## 1.8.0" in cl170 and "## 1.7.5" in cl170 and "## 1.7.4" in cl170 and "## 1.7.3" in cl170 and "## 1.7.2" in cl170 and "## 1.7.1" in cl170 and "## 1.7.0" in cl170 and "## 1.6.5" in cl170
+        assert "## 2.0.2" in cl170 and "## 2.0.1" in cl170 and "## 2.0.0" in cl170 and "## 1.9.5" in cl170 and "## 1.9.4" in cl170 and "## 1.9.3" in cl170 and "## 1.9.2" in cl170 and "## 1.9.1" in cl170 and "## 1.9.0" in cl170 and "## 1.8.5" in cl170 and "## 1.8.4" in cl170 and "## 1.8.3" in cl170 and "## 1.8.2" in cl170 and "## 1.8.1" in cl170 and "## 1.8.0" in cl170 and "## 1.7.5" in cl170 and "## 1.7.4" in cl170 and "## 1.7.3" in cl170 and "## 1.7.2" in cl170 and "## 1.7.1" in cl170 and "## 1.7.0" in cl170 and "## 1.6.5" in cl170
         kb170 = (ROOT / "instantlensdoc" / "ui" / "keyboard_help.py").read_text(
             encoding="utf-8"
         )
@@ -8930,7 +8930,7 @@ def main() -> int:
         set_ud171("9.9.9")
         assert get_ud171() == "9.9.9"
         clear_ud171()
-        assert ild_ver171 == "2.0.1"
+        assert ild_ver171 == "2.0.2"
 
         mw171 = (ROOT / "instantlensdoc" / "ui" / "main_window.py").read_text(
             encoding="utf-8"
@@ -8958,7 +8958,7 @@ def main() -> int:
             or "Seitenvorschau" in feat171
         )
         cl171 = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-        assert "## 2.0.1" in cl171 and "## 2.0.0" in cl171 and "## 1.9.5" in cl171 and "## 1.9.4" in cl171 and "## 1.9.3" in cl171 and "## 1.9.2" in cl171 and "## 1.9.1" in cl171 and "## 1.9.0" in cl171 and "## 1.8.5" in cl171 and "## 1.8.4" in cl171 and "## 1.8.3" in cl171 and "## 1.8.2" in cl171 and "## 1.8.1" in cl171 and "## 1.8.0" in cl171 and "## 1.7.5" in cl171 and "## 1.7.4" in cl171 and "## 1.7.3" in cl171 and "## 1.7.2" in cl171 and "## 1.7.1" in cl171 and "## 1.7.0" in cl171
+        assert "## 2.0.2" in cl171 and "## 2.0.1" in cl171 and "## 2.0.0" in cl171 and "## 1.9.5" in cl171 and "## 1.9.4" in cl171 and "## 1.9.3" in cl171 and "## 1.9.2" in cl171 and "## 1.9.1" in cl171 and "## 1.9.0" in cl171 and "## 1.8.5" in cl171 and "## 1.8.4" in cl171 and "## 1.8.3" in cl171 and "## 1.8.2" in cl171 and "## 1.8.1" in cl171 and "## 1.8.0" in cl171 and "## 1.7.5" in cl171 and "## 1.7.4" in cl171 and "## 1.7.3" in cl171 and "## 1.7.2" in cl171 and "## 1.7.1" in cl171 and "## 1.7.0" in cl171
         kb171 = (ROOT / "instantlensdoc" / "ui" / "keyboard_help.py").read_text(
             encoding="utf-8"
         )
@@ -9032,7 +9032,7 @@ def main() -> int:
         assert get_ltpd172() == tpdf_dir
 
         loc172 = clv172()
-        assert loc172.local_version == "2.0.1"
+        assert loc172.local_version == "2.0.2"
         assert loc172.status == "current"
         assert loc172.status_label("de") == "aktuell"
         assert "aktuell" in loc172.message_de.lower() or "Status: aktuell" in loc172.message_de
@@ -9048,7 +9048,7 @@ def main() -> int:
             "docs/VERSION",
             "VERSION.txt",
         )
-        assert ild_ver172 == "2.0.1"
+        assert ild_ver172 == "2.0.2"
 
         mw172 = (ROOT / "instantlensdoc" / "ui" / "main_window.py").read_text(
             encoding="utf-8"
@@ -9075,7 +9075,7 @@ def main() -> int:
             or "Zielordner" in feat172
         )
         cl172 = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-        assert "## 2.0.1" in cl172 and "## 2.0.0" in cl172 and "## 1.9.5" in cl172 and "## 1.9.4" in cl172 and "## 1.9.3" in cl172 and "## 1.9.2" in cl172 and "## 1.9.1" in cl172 and "## 1.9.0" in cl172 and "## 1.8.5" in cl172 and "## 1.8.4" in cl172 and "## 1.8.3" in cl172 and "## 1.8.2" in cl172 and "## 1.8.1" in cl172 and "## 1.8.0" in cl172 and "## 1.7.5" in cl172 and "## 1.7.4" in cl172 and "## 1.7.3" in cl172 and "## 1.7.2" in cl172 and "## 1.7.1" in cl172
+        assert "## 2.0.2" in cl172 and "## 2.0.1" in cl172 and "## 2.0.0" in cl172 and "## 1.9.5" in cl172 and "## 1.9.4" in cl172 and "## 1.9.3" in cl172 and "## 1.9.2" in cl172 and "## 1.9.1" in cl172 and "## 1.9.0" in cl172 and "## 1.8.5" in cl172 and "## 1.8.4" in cl172 and "## 1.8.3" in cl172 and "## 1.8.2" in cl172 and "## 1.8.1" in cl172 and "## 1.8.0" in cl172 and "## 1.7.5" in cl172 and "## 1.7.4" in cl172 and "## 1.7.3" in cl172 and "## 1.7.2" in cl172 and "## 1.7.1" in cl172
         kb172 = (ROOT / "instantlensdoc" / "ui" / "keyboard_help.py").read_text(
             encoding="utf-8"
         )
@@ -9158,7 +9158,7 @@ def main() -> int:
         assert "Letzter Check" in off173.message_de or fca173(off173.checked_at) != "nie"
         off173b = cfu173(allow_network=False)
         assert off173b.status == "offline"
-        assert ild_ver173 == "2.0.1"
+        assert ild_ver173 == "2.0.2"
 
         mw173 = (ROOT / "instantlensdoc" / "ui" / "main_window.py").read_text(
             encoding="utf-8"
@@ -9181,7 +9181,7 @@ def main() -> int:
             or "nicht geprüft" in feat173
         )
         cl173 = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-        assert "## 2.0.1" in cl173 and "## 2.0.0" in cl173 and "## 1.9.5" in cl173 and "## 1.9.4" in cl173 and "## 1.9.3" in cl173 and "## 1.9.2" in cl173 and "## 1.9.1" in cl173 and "## 1.9.0" in cl173 and "## 1.8.5" in cl173 and "## 1.8.4" in cl173 and "## 1.8.3" in cl173 and "## 1.8.2" in cl173 and "## 1.8.1" in cl173 and "## 1.8.0" in cl173 and "## 1.7.5" in cl173 and "## 1.7.4" in cl173 and "## 1.7.3" in cl173 and "## 1.7.2" in cl173
+        assert "## 2.0.2" in cl173 and "## 2.0.1" in cl173 and "## 2.0.0" in cl173 and "## 1.9.5" in cl173 and "## 1.9.4" in cl173 and "## 1.9.3" in cl173 and "## 1.9.2" in cl173 and "## 1.9.1" in cl173 and "## 1.9.0" in cl173 and "## 1.8.5" in cl173 and "## 1.8.4" in cl173 and "## 1.8.3" in cl173 and "## 1.8.2" in cl173 and "## 1.8.1" in cl173 and "## 1.8.0" in cl173 and "## 1.7.5" in cl173 and "## 1.7.4" in cl173 and "## 1.7.3" in cl173 and "## 1.7.2" in cl173
         kb173 = (ROOT / "instantlensdoc" / "ui" / "keyboard_help.py").read_text(
             encoding="utf-8"
         )
@@ -9232,7 +9232,7 @@ def main() -> int:
         )
         tip174b = frst174("VERSION.txt")
         assert "VERSION.txt" in tip174b
-        assert ild_ver174 == "2.0.1"
+        assert ild_ver174 == "2.0.2"
 
         mw174 = (ROOT / "instantlensdoc" / "ui" / "main_window.py").read_text(
             encoding="utf-8"
@@ -9257,7 +9257,7 @@ def main() -> int:
             or "A11y" in feat174
         )
         cl174 = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-        assert "## 2.0.1" in cl174 and "## 2.0.0" in cl174 and "## 1.9.5" in cl174 and "## 1.9.4" in cl174 and "## 1.9.3" in cl174 and "## 1.9.2" in cl174 and "## 1.9.1" in cl174 and "## 1.9.0" in cl174 and "## 1.8.5" in cl174 and "## 1.8.4" in cl174 and "## 1.8.3" in cl174 and "## 1.8.2" in cl174 and "## 1.8.1" in cl174 and "## 1.8.0" in cl174 and "## 1.7.5" in cl174 and "## 1.7.4" in cl174 and "## 1.7.3" in cl174
+        assert "## 2.0.2" in cl174 and "## 2.0.1" in cl174 and "## 2.0.0" in cl174 and "## 1.9.5" in cl174 and "## 1.9.4" in cl174 and "## 1.9.3" in cl174 and "## 1.9.2" in cl174 and "## 1.9.1" in cl174 and "## 1.9.0" in cl174 and "## 1.8.5" in cl174 and "## 1.8.4" in cl174 and "## 1.8.3" in cl174 and "## 1.8.2" in cl174 and "## 1.8.1" in cl174 and "## 1.8.0" in cl174 and "## 1.7.5" in cl174 and "## 1.7.4" in cl174 and "## 1.7.3" in cl174
         kb174 = (ROOT / "instantlensdoc" / "ui" / "keyboard_help.py").read_text(
             encoding="utf-8"
         )
@@ -9319,7 +9319,7 @@ def main() -> int:
         ref_path175, ref_lbl175 = fevf175()
         assert ref_path175 is not None and ref_path175.is_file()
         assert ref_lbl175 in ("docs/VERSION", "VERSION.txt")
-        assert ild_ver175 == "2.0.1"
+        assert ild_ver175 == "2.0.2"
         feat175 = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
         assert "1.7.5" in feat175 and (
             "Bestätigung nur bei Abweichung" in feat175
@@ -9328,7 +9328,7 @@ def main() -> int:
             or "Status-Klick" in feat175
         )
         cl175 = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-        assert "## 2.0.1" in cl175 and "## 2.0.0" in cl175 and "## 1.9.5" in cl175 and "## 1.9.4" in cl175 and "## 1.9.3" in cl175 and "## 1.9.2" in cl175 and "## 1.9.1" in cl175 and "## 1.9.0" in cl175 and "## 1.8.5" in cl175 and "## 1.8.4" in cl175 and "## 1.8.3" in cl175 and "## 1.8.2" in cl175 and "## 1.8.1" in cl175 and "## 1.8.0" in cl175 and "## 1.7.5" in cl175 and "## 1.7.4" in cl175
+        assert "## 2.0.2" in cl175 and "## 2.0.1" in cl175 and "## 2.0.0" in cl175 and "## 1.9.5" in cl175 and "## 1.9.4" in cl175 and "## 1.9.3" in cl175 and "## 1.9.2" in cl175 and "## 1.9.1" in cl175 and "## 1.9.0" in cl175 and "## 1.8.5" in cl175 and "## 1.8.4" in cl175 and "## 1.8.3" in cl175 and "## 1.8.2" in cl175 and "## 1.8.1" in cl175 and "## 1.8.0" in cl175 and "## 1.7.5" in cl175 and "## 1.7.4" in cl175
         kb175 = (ROOT / "instantlensdoc" / "ui" / "keyboard_help.py").read_text(
             encoding="utf-8"
         )
@@ -9368,7 +9368,7 @@ def main() -> int:
             write_recovery_snapshot,
         )
 
-        assert ild_ver180 == "2.0.1"
+        assert ild_ver180 == "2.0.2"
         pdf180 = td / "hf180.pdf"
         pdf180.write_bytes(Path(pdf).read_bytes())
         out_hf = td / "hf180_out.pdf"
@@ -9448,18 +9448,18 @@ def main() -> int:
             ROOT / "instantlensdoc" / "ui" / "settings_dialog.py"
         ).read_text(encoding="utf-8")
         feat180 = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
-        assert "2.0.1" in feat180 and "2.0.0" in feat180 and "1.9.5" in feat180 and "1.9.4" in feat180 and "1.9.3" in feat180 and "1.9.2" in feat180 and "1.9.1" in feat180 and "1.9.0" in feat180 and "1.8.5" in feat180 and "1.8.4" in feat180 and "1.8.3" in feat180 and "1.8.2" in feat180 and "1.8.1" in feat180 and "1.8.0" in feat180 and (
+        assert "2.0.2" in feat180 and "2.0.1" in feat180 and "2.0.0" in feat180 and "1.9.5" in feat180 and "1.9.4" in feat180 and "1.9.3" in feat180 and "1.9.2" in feat180 and "1.9.1" in feat180 and "1.9.0" in feat180 and "1.8.5" in feat180 and "1.8.4" in feat180 and "1.8.3" in feat180 and "1.8.2" in feat180 and "1.8.1" in feat180 and "1.8.0" in feat180 and (
             "Kopf-/Fußzeile" in feat180
             or "Crash-Recovery" in feat180
             or "Typ-Toggles" in feat180
             or "Spiegeln" in feat180
         )
         cl180 = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-        assert "## 2.0.1" in cl180 and "## 2.0.0" in cl180 and "## 1.9.5" in cl180 and "## 1.9.4" in cl180 and "## 1.9.3" in cl180 and "## 1.9.2" in cl180 and "## 1.9.1" in cl180 and "## 1.9.0" in cl180 and "## 1.8.5" in cl180 and "## 1.8.4" in cl180 and "## 1.8.3" in cl180 and "## 1.8.2" in cl180 and "## 1.8.1" in cl180 and "## 1.8.0" in cl180 and "## 1.7.5" in cl180
+        assert "## 2.0.2" in cl180 and "## 2.0.1" in cl180 and "## 2.0.0" in cl180 and "## 1.9.5" in cl180 and "## 1.9.4" in cl180 and "## 1.9.3" in cl180 and "## 1.9.2" in cl180 and "## 1.9.1" in cl180 and "## 1.9.0" in cl180 and "## 1.8.5" in cl180 and "## 1.8.4" in cl180 and "## 1.8.3" in cl180 and "## 1.8.2" in cl180 and "## 1.8.1" in cl180 and "## 1.8.0" in cl180 and "## 1.7.5" in cl180
         kb180 = (ROOT / "instantlensdoc" / "ui" / "keyboard_help.py").read_text(
             encoding="utf-8"
         )
-        assert "2.0.1" in kb180 and "2.0.0" in kb180 and "1.9.5" in kb180 and "1.9.4" in kb180 and "1.9.3" in kb180 and "1.9.2" in kb180 and "1.9.1" in kb180 and "1.9.0" in kb180 and "1.8.5" in kb180 and "1.8.4" in kb180 and "1.8.3" in kb180 and "1.8.2" in kb180 and "1.8.1" in kb180 and "1.8.0" in kb180 and (
+        assert "2.0.2" in kb180 and "2.0.1" in kb180 and "2.0.0" in kb180 and "1.9.5" in kb180 and "1.9.4" in kb180 and "1.9.3" in kb180 and "1.9.2" in kb180 and "1.9.1" in kb180 and "1.9.0" in kb180 and "1.8.5" in kb180 and "1.8.4" in kb180 and "1.8.3" in kb180 and "1.8.2" in kb180 and "1.8.1" in kb180 and "1.8.0" in kb180 and (
             "Kopf-/Fußzeile" in kb180
             or "Crash-Recovery" in kb180
             or "Spiegeln" in kb180
@@ -9491,7 +9491,7 @@ def main() -> int:
             _normalize_ann_layer_types as norm_alt181,
         )
 
-        assert ild_ver181 == "2.0.1"
+        assert ild_ver181 == "2.0.2"
         # Ann coord remap 90/180
         store181 = AS181(None)
         a181 = Ann181(0, AT181.HIGHLIGHT, 10, 20, width=40, height=10, text="r")
@@ -9577,14 +9577,14 @@ def main() -> int:
             ROOT / "instantlensdoc" / "core" / "session.py"
         ).read_text(encoding="utf-8")
         feat181 = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
-        assert "2.0.1" in feat181 and "2.0.0" in feat181 and "1.9.5" in feat181 and "1.9.4" in feat181 and "1.9.3" in feat181 and "1.9.2" in feat181 and "1.9.1" in feat181 and "1.9.0" in feat181 and "1.8.5" in feat181 and "1.8.4" in feat181 and "1.8.3" in feat181 and "1.8.2" in feat181 and "1.8.1" in feat181 and (
+        assert "2.0.2" in feat181 and "2.0.1" in feat181 and "2.0.0" in feat181 and "1.9.5" in feat181 and "1.9.4" in feat181 and "1.9.3" in feat181 and "1.9.2" in feat181 and "1.9.1" in feat181 and "1.9.0" in feat181 and "1.8.5" in feat181 and "1.8.4" in feat181 and "1.8.3" in feat181 and "1.8.2" in feat181 and "1.8.1" in feat181 and (
             "Remap" in feat181
             or "Seitenbereich" in feat181
             or "Metadaten-Vorschau" in feat181
             or "Ctrl+Alt+1" in feat181
         )
         cl181 = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-        assert "## 2.0.1" in cl181 and "## 2.0.0" in cl181 and "## 1.9.5" in cl181 and "## 1.9.4" in cl181 and "## 1.9.3" in cl181 and "## 1.9.2" in cl181 and "## 1.9.1" in cl181 and "## 1.9.0" in cl181 and "## 1.8.5" in cl181 and "## 1.8.4" in cl181 and "## 1.8.3" in cl181 and "## 1.8.2" in cl181 and "## 1.8.1" in cl181 and "## 1.8.0" in cl181
+        assert "## 2.0.2" in cl181 and "## 2.0.1" in cl181 and "## 2.0.0" in cl181 and "## 1.9.5" in cl181 and "## 1.9.4" in cl181 and "## 1.9.3" in cl181 and "## 1.9.2" in cl181 and "## 1.9.1" in cl181 and "## 1.9.0" in cl181 and "## 1.8.5" in cl181 and "## 1.8.4" in cl181 and "## 1.8.3" in cl181 and "## 1.8.2" in cl181 and "## 1.8.1" in cl181 and "## 1.8.0" in cl181
         kb181 = (ROOT / "instantlensdoc" / "ui" / "keyboard_help.py").read_text(
             encoding="utf-8"
         )
@@ -9610,7 +9610,7 @@ def main() -> int:
             orphan_meta_preview as omp182,
         )
 
-        assert ild_ver182 == "2.0.1"
+        assert ild_ver182 == "2.0.2"
         store182 = AS182(None)
         a182 = Ann182(0, AT182.HIGHLIGHT, 10, 20, width=40, height=10, text="f")
         store182.annotations = [a182]
@@ -9681,7 +9681,7 @@ def main() -> int:
             or "Vorschau-Zoom" in feat182
         )
         cl182 = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-        assert "## 2.0.1" in cl182 and "## 2.0.0" in cl182 and "## 1.9.5" in cl182 and "## 1.9.4" in cl182 and "## 1.9.3" in cl182 and "## 1.9.2" in cl182 and "## 1.9.1" in cl182 and "## 1.9.0" in cl182 and "## 1.8.5" in cl182 and "## 1.8.4" in cl182 and "## 1.8.3" in cl182 and "## 1.8.2" in cl182 and "## 1.8.1" in cl182
+        assert "## 2.0.2" in cl182 and "## 2.0.1" in cl182 and "## 2.0.0" in cl182 and "## 1.9.5" in cl182 and "## 1.9.4" in cl182 and "## 1.9.3" in cl182 and "## 1.9.2" in cl182 and "## 1.9.1" in cl182 and "## 1.9.0" in cl182 and "## 1.8.5" in cl182 and "## 1.8.4" in cl182 and "## 1.8.3" in cl182 and "## 1.8.2" in cl182 and "## 1.8.1" in cl182
         kb182 = (ROOT / "instantlensdoc" / "ui" / "keyboard_help.py").read_text(
             encoding="utf-8"
         )
@@ -9711,7 +9711,7 @@ def main() -> int:
             ANN_LAYER_TYPE_KEYS as ALK183,
         )
 
-        assert ild_ver183 == "2.0.1"
+        assert ild_ver183 == "2.0.2"
         pv183 = (ROOT / "instantlensdoc" / "ui" / "pdf_view.py").read_text(encoding="utf-8")
         assert "Seiten gedreht" in pv183 or "gedreht (" in pv183
         assert "gespiegelt" in pv183
@@ -9749,11 +9749,11 @@ def main() -> int:
         assert all(galt183().get(k) for k in ALK183)
 
         feat183 = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
-        assert "2.0.1" in feat183 and "2.0.0" in feat183 and "1.9.5" in feat183 and "1.9.4" in feat183 and "1.9.3" in feat183 and "1.9.2" in feat183 and "1.9.1" in feat183 and "1.9.0" in feat183 and "1.8.5" in feat183 and "1.8.4" in feat183 and "1.8.3" in feat183 and ("_recovered" in feat183 or "Fit-Page" in feat183 or "Ctrl+Alt+0" in feat183)
+        assert "2.0.2" in feat183 and "2.0.1" in feat183 and "2.0.0" in feat183 and "1.9.5" in feat183 and "1.9.4" in feat183 and "1.9.3" in feat183 and "1.9.2" in feat183 and "1.9.1" in feat183 and "1.9.0" in feat183 and "1.8.5" in feat183 and "1.8.4" in feat183 and "1.8.3" in feat183 and ("_recovered" in feat183 or "Fit-Page" in feat183 or "Ctrl+Alt+0" in feat183)
         cl183 = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-        assert "## 2.0.1" in cl183 and "## 2.0.0" in cl183 and "## 1.9.5" in cl183 and "## 1.9.4" in cl183 and "## 1.9.3" in cl183 and "## 1.9.2" in cl183 and "## 1.9.1" in cl183 and "## 1.9.0" in cl183 and "## 1.8.5" in cl183 and "## 1.8.4" in cl183 and "## 1.8.3" in cl183 and "## 1.8.2" in cl183
+        assert "## 2.0.2" in cl183 and "## 2.0.1" in cl183 and "## 2.0.0" in cl183 and "## 1.9.5" in cl183 and "## 1.9.4" in cl183 and "## 1.9.3" in cl183 and "## 1.9.2" in cl183 and "## 1.9.1" in cl183 and "## 1.9.0" in cl183 and "## 1.8.5" in cl183 and "## 1.8.4" in cl183 and "## 1.8.3" in cl183 and "## 1.8.2" in cl183
         kb183 = (ROOT / "instantlensdoc" / "ui" / "keyboard_help.py").read_text(encoding="utf-8")
-        assert "2.0.1" in kb183 and "2.0.0" in kb183 and "1.9.5" in kb183 and "1.9.4" in kb183 and "1.9.3" in kb183 and "1.9.2" in kb183 and "1.9.1" in kb183 and "1.9.0" in kb183 and "1.8.5" in kb183 and "1.8.4" in kb183 and "1.8.3" in kb183 and ("Ctrl+Alt+0" in kb183 or "_recovered" in kb183 or "Fit-Page" in kb183)
+        assert "2.0.2" in kb183 and "2.0.1" in kb183 and "2.0.0" in kb183 and "1.9.5" in kb183 and "1.9.4" in kb183 and "1.9.3" in kb183 and "1.9.2" in kb183 and "1.9.1" in kb183 and "1.9.0" in kb183 and "1.8.5" in kb183 and "1.8.4" in kb183 and "1.8.3" in kb183 and ("Ctrl+Alt+0" in kb183 or "_recovered" in kb183 or "Fit-Page" in kb183)
         print(
             "1.8.3 CLI batch-de-verbs-blink/"
             "hf-fit-wheel-esc/"
@@ -9778,7 +9778,7 @@ def main() -> int:
             ANN_LAYER_TYPE_KEYS as ALK184,
         )
 
-        assert ild_ver184 == "2.0.1"
+        assert ild_ver184 == "2.0.2"
         mw184 = (ROOT / "instantlensdoc" / "ui" / "main_window.py").read_text(encoding="utf-8")
         assert "_blink_status_briefly" in mw184
         assert "get_status_blink_mode" in mw184
@@ -9832,16 +9832,16 @@ def main() -> int:
         assert all(galt184().get(k) for k in ALK184)
 
         feat184 = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
-        assert "2.0.1" in feat184 and "2.0.0" in feat184 and "1.9.5" in feat184 and "1.9.4" in feat184 and "1.9.3" in feat184 and "1.9.2" in feat184 and "1.9.1" in feat184 and "1.9.0" in feat184 and "1.8.5" in feat184 and (
+        assert "2.0.2" in feat184 and "2.0.1" in feat184 and "2.0.0" in feat184 and "1.9.5" in feat184 and "1.9.4" in feat184 and "1.9.3" in feat184 and "1.9.2" in feat184 and "1.9.1" in feat184 and "1.9.0" in feat184 and "1.8.5" in feat184 and (
             "Layer: alle" in feat184
             or "älteste zuerst" in feat184
             or "Esc → Fokus" in feat184
             or "Status-Blink folgt Settings" in feat184
         )
         cl184 = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-        assert "## 2.0.1" in cl184 and "## 2.0.0" in cl184 and "## 1.9.5" in cl184 and "## 1.9.4" in cl184 and "## 1.9.3" in cl184 and "## 1.9.2" in cl184 and "## 1.9.1" in cl184 and "## 1.9.0" in cl184 and "## 1.8.5" in cl184 and "## 1.8.4" in cl184 and "## 1.8.3" in cl184
+        assert "## 2.0.2" in cl184 and "## 2.0.1" in cl184 and "## 2.0.0" in cl184 and "## 1.9.5" in cl184 and "## 1.9.4" in cl184 and "## 1.9.3" in cl184 and "## 1.9.2" in cl184 and "## 1.9.1" in cl184 and "## 1.9.0" in cl184 and "## 1.8.5" in cl184 and "## 1.8.4" in cl184 and "## 1.8.3" in cl184
         kb184 = (ROOT / "instantlensdoc" / "ui" / "keyboard_help.py").read_text(encoding="utf-8")
-        assert "2.0.1" in kb184 and "2.0.0" in kb184 and "1.9.5" in kb184 and "1.9.4" in kb184 and "1.9.3" in kb184 and "1.9.2" in kb184 and "1.9.1" in kb184 and "1.9.0" in kb184 and "1.8.5" in kb184 and (
+        assert "2.0.2" in kb184 and "2.0.1" in kb184 and "2.0.0" in kb184 and "1.9.5" in kb184 and "1.9.4" in kb184 and "1.9.3" in kb184 and "1.9.2" in kb184 and "1.9.1" in kb184 and "1.9.0" in kb184 and "1.8.5" in kb184 and (
             "Layer: alle" in kb184 or "älteste zuerst" in kb184 or "Esc→Fokus" in kb184
         )
         print(
@@ -9867,7 +9867,7 @@ def main() -> int:
             ANN_LAYER_TYPE_KEYS as ALK185,
         )
 
-        assert ild_ver185 == "2.0.1"
+        assert ild_ver185 == "2.0.2"
         mw185 = (ROOT / "instantlensdoc" / "ui" / "main_window.py").read_text(encoding="utf-8")
         assert "_blink_status_briefly" in mw185
         assert "einmaliger Status-Hinweis" in mw185
@@ -9910,23 +9910,23 @@ def main() -> int:
             disc185(o)
 
         feat185 = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
-        assert "2.0.1" in feat185 and "2.0.0" in feat185 and "1.9.5" in feat185 and "1.9.4" in feat185 and "1.9.3" in feat185 and "1.9.2" in feat185 and "1.9.1" in feat185 and "1.9.0" in feat185 and "1.8.5" in feat185 and (
+        assert "2.0.2" in feat185 and "2.0.1" in feat185 and "2.0.0" in feat185 and "1.9.5" in feat185 and "1.9.4" in feat185 and "1.9.3" in feat185 and "1.9.2" in feat185 and "1.9.1" in feat185 and "1.9.0" in feat185 and "1.8.5" in feat185 and (
             "A11y" in feat185
             or "Mehrfachauswahl Verwerfen" in feat185
             or "nur Vorschau" in feat185
             or "einmaliger Status" in feat185
         )
         cl185 = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-        assert "## 2.0.1" in cl185 and "## 2.0.0" in cl185 and "## 1.9.5" in cl185 and "## 1.9.4" in cl185 and "## 1.9.3" in cl185 and "## 1.9.2" in cl185 and "## 1.9.1" in cl185 and "## 1.9.0" in cl185 and "## 1.8.5" in cl185 and "## 1.8.4" in cl185
+        assert "## 2.0.2" in cl185 and "## 2.0.1" in cl185 and "## 2.0.0" in cl185 and "## 1.9.5" in cl185 and "## 1.9.4" in cl185 and "## 1.9.3" in cl185 and "## 1.9.2" in cl185 and "## 1.9.1" in cl185 and "## 1.9.0" in cl185 and "## 1.8.5" in cl185 and "## 1.8.4" in cl185
         kb185 = (ROOT / "instantlensdoc" / "ui" / "keyboard_help.py").read_text(encoding="utf-8")
-        assert "2.0.1" in kb185 and "2.0.0" in kb185 and "1.9.5" in kb185 and "1.9.4" in kb185 and "1.9.3" in kb185 and "1.9.2" in kb185 and "1.9.1" in kb185 and "1.9.0" in kb185 and "1.8.5" in kb185 and (
+        assert "2.0.2" in kb185 and "2.0.1" in kb185 and "2.0.0" in kb185 and "1.9.5" in kb185 and "1.9.4" in kb185 and "1.9.3" in kb185 and "1.9.2" in kb185 and "1.9.1" in kb185 and "1.9.0" in kb185 and "1.8.5" in kb185 and (
             "A11y" in kb185
             or "Mehrfachauswahl" in kb185
             or "einmaliger Status" in kb185
             or "nur Vorschau" in kb185
         )
         info185 = (ROOT / "INFO.md").read_text(encoding="utf-8")
-        assert "2.0.1" in info185 and "2.0.0" in info185 and "1.9.5" in info185 and "1.9.4" in info185 and "1.9.3" in info185 and "1.9.2" in info185 and "1.9.1" in info185 and "1.9.0" in info185 and "1.8.5" in info185 and "1.8.4" in info185
+        assert "2.0.2" in info185 and "2.0.1" in info185 and "2.0.0" in info185 and "1.9.5" in info185 and "1.9.4" in info185 and "1.9.3" in info185 and "1.9.2" in info185 and "1.9.1" in info185 and "1.9.0" in info185 and "1.8.5" in info185 and "1.8.4" in info185
         print(
             "1.8.5 CLI batch-blink-aus-status/"
             "hf-fit-preview-only/"
@@ -9959,7 +9959,7 @@ def main() -> int:
         import pikepdf as pike190
         from PIL import Image as Image190, ImageDraw as ImageDraw190
 
-        assert ild_ver190 == "2.0.1"
+        assert ild_ver190 == "2.0.2"
         assert ph190.IS_STUB is True
         assert ph190.load_plugins() == []
         assert ph190.load_plugins("/tmp/no-plugins-ild") == []
@@ -9971,8 +9971,8 @@ def main() -> int:
         assert ph190.emit("app.started", version="2.0.0") >= 1
         assert seen190 and seen190[-1] == "2.0.0"
         ph190.get_event_bus().clear()
-        assert "2.0.1" in PLANNED190["plugins"] and "Stub" in PLANNED190["plugins"]
-        assert "2.0.1" in PLANNED190["ki"]
+        assert "2.0.2" in PLANNED190["plugins"] and "Stub" in PLANNED190["plugins"]
+        assert "2.0.2" in PLANNED190["ki"]
 
         # attachments add/remove
         att_src190 = td / "att_base190.pdf"
@@ -10035,13 +10035,13 @@ def main() -> int:
         assert (ROOT / "instantlensdoc" / "core" / "stamp_library.py").is_file()
 
         feat190 = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
-        assert "2.0.1" in feat190 and "2.0.0" in feat190 and "1.9.5" in feat190 and "1.9.4" in feat190 and "1.9.3" in feat190 and "1.9.2" in feat190 and "1.9.1" in feat190 and "1.9.0" in feat190 and ("Plugin-Hooks" in feat190 or "Tabelle" in feat190 or "Stempel-Bilder" in feat190)
+        assert "2.0.2" in feat190 and "2.0.1" in feat190 and "2.0.0" in feat190 and "1.9.5" in feat190 and "1.9.4" in feat190 and "1.9.3" in feat190 and "1.9.2" in feat190 and "1.9.1" in feat190 and "1.9.0" in feat190 and ("Plugin-Hooks" in feat190 or "Tabelle" in feat190 or "Stempel-Bilder" in feat190)
         cl190 = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-        assert "## 2.0.1" in cl190 and "## 2.0.0" in cl190 and "## 1.9.5" in cl190 and "## 1.9.4" in cl190 and "## 1.9.3" in cl190 and "## 1.9.2" in cl190 and "## 1.9.1" in cl190 and "## 1.9.0" in cl190 and "## 1.8.5" in cl190
+        assert "## 2.0.2" in cl190 and "## 2.0.1" in cl190 and "## 2.0.0" in cl190 and "## 1.9.5" in cl190 and "## 1.9.4" in cl190 and "## 1.9.3" in cl190 and "## 1.9.2" in cl190 and "## 1.9.1" in cl190 and "## 1.9.0" in cl190 and "## 1.8.5" in cl190
         kb190 = (ROOT / "instantlensdoc" / "ui" / "keyboard_help.py").read_text(encoding="utf-8")
-        assert "2.0.1" in kb190 and "2.0.0" in kb190 and "1.9.5" in kb190 and "1.9.4" in kb190 and "1.9.3" in kb190 and "1.9.2" in kb190 and "1.9.1" in kb190 and "1.9.0" in kb190 and ("Plugin-Hooks" in kb190 or "Tabellen-OCR" in kb190 or "Stempel-Bild" in kb190)
+        assert "2.0.2" in kb190 and "2.0.1" in kb190 and "2.0.0" in kb190 and "1.9.5" in kb190 and "1.9.4" in kb190 and "1.9.3" in kb190 and "1.9.2" in kb190 and "1.9.1" in kb190 and "1.9.0" in kb190 and ("Plugin-Hooks" in kb190 or "Tabellen-OCR" in kb190 or "Stempel-Bild" in kb190)
         info_md190 = (ROOT / "INFO.md").read_text(encoding="utf-8")
-        assert "2.0.1" in info_md190 and "2.0.0" in info_md190 and "1.9.5" in info_md190 and "1.9.4" in info_md190 and "1.9.3" in info_md190 and "1.9.2" in info_md190 and "1.9.1" in info_md190 and "1.9.0" in info_md190 and "1.8.5" in info_md190
+        assert "2.0.2" in info_md190 and "2.0.1" in info_md190 and "2.0.0" in info_md190 and "1.9.5" in info_md190 and "1.9.4" in info_md190 and "1.9.3" in info_md190 and "1.9.2" in info_md190 and "1.9.1" in info_md190 and "1.9.0" in info_md190 and "1.8.5" in info_md190
         print(
             "1.9.0 CLI attachments-add/"
             "stamp-library/"
@@ -10074,13 +10074,13 @@ def main() -> int:
         from instantlensdoc.core import plugin_hooks as ph191
         from instantlensdoc.ui.stubs import PLANNED as PLANNED191
 
-        assert ild_ver191 == "2.0.1"
+        assert ild_ver191 == "2.0.2"
         assert ph191.IS_STUB is True and ph191.NOT_PRODUCTION_READY is True
         assert "nicht produktiv" in ph191.STUB_MESSAGE
         assert "document.opened" in ph191.KNOWN_EVENTS
         assert "ocr.finished" in ph191.EVENT_DESCRIPTIONS
         info191 = ph191.plugin_stub_info()
-        assert info191["not_production_ready"] and info191["version_marker"] == "2.0.1"
+        assert info191["not_production_ready"] and info191["version_marker"] == "2.0.2"
         assert "nicht produktiv" in PLANNED191["plugins"] or "not production" in PLANNED191["plugins"]
 
         # CSV delimiter / BOM
@@ -10149,22 +10149,22 @@ def main() -> int:
         assert "app.started" in about_src191 and "ocr.finished" in about_src191
 
         feat191 = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
-        assert "2.0.1" in feat191 and "2.0.0" in feat191 and "1.9.5" in feat191 and "1.9.4" in feat191 and "1.9.3" in feat191 and "1.9.2" in feat191 and "1.9.1" in feat191 and (
+        assert "2.0.2" in feat191 and "2.0.1" in feat191 and "2.0.0" in feat191 and "1.9.5" in feat191 and "1.9.4" in feat191 and "1.9.3" in feat191 and "1.9.2" in feat191 and "1.9.1" in feat191 and (
             "Doppelklick" in feat191
             or "Drag" in feat191
             or "nicht produktiv" in feat191
             or "Trennzeichen" in feat191
         )
         cl191 = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-        assert "## 2.0.1" in cl191 and "## 2.0.0" in cl191 and "## 1.9.5" in cl191 and "## 1.9.4" in cl191 and "## 1.9.3" in cl191 and "## 1.9.2" in cl191 and "## 1.9.1" in cl191 and "## 1.9.0" in cl191
+        assert "## 2.0.2" in cl191 and "## 2.0.1" in cl191 and "## 2.0.0" in cl191 and "## 1.9.5" in cl191 and "## 1.9.4" in cl191 and "## 1.9.3" in cl191 and "## 1.9.2" in cl191 and "## 1.9.1" in cl191 and "## 1.9.0" in cl191
         kb191 = (ROOT / "instantlensdoc" / "ui" / "keyboard_help.py").read_text(
             encoding="utf-8"
         )
-        assert "2.0.1" in kb191 and "2.0.0" in kb191 and "1.9.5" in kb191 and "1.9.4" in kb191 and "1.9.3" in kb191 and "1.9.2" in kb191 and "1.9.1" in kb191 and (
+        assert "2.0.2" in kb191 and "2.0.1" in kb191 and "2.0.0" in kb191 and "1.9.5" in kb191 and "1.9.4" in kb191 and "1.9.3" in kb191 and "1.9.2" in kb191 and "1.9.1" in kb191 and (
             "Doppelklick" in kb191 or "Trennzeichen" in kb191 or "nicht produktiv" in kb191
         )
         info191md = (ROOT / "INFO.md").read_text(encoding="utf-8")
-        assert "2.0.1" in info191md and "2.0.0" in info191md and "1.9.5" in info191md and "1.9.4" in info191md and "1.9.3" in info191md and "1.9.2" in info191md and "1.9.1" in info191md and "1.9.0" in info191md
+        assert "2.0.2" in info191md and "2.0.1" in info191md and "2.0.0" in info191md and "1.9.5" in info191md and "1.9.4" in info191md and "1.9.3" in info191md and "1.9.2" in info191md and "1.9.1" in info191md and "1.9.0" in info191md
         print(
             "1.9.1 CLI attach-size-type-dnd/"
             "stamp-rename-default-preview/"
@@ -10201,9 +10201,9 @@ def main() -> int:
         from instantlensdoc.ui.stubs import PLANNED as PLANNED192
         import pikepdf as pike192
 
-        assert ild_ver192 == "2.0.1"
+        assert ild_ver192 == "2.0.2"
         assert ph192.IS_STUB and ph192.NOT_PRODUCTION_READY
-        assert ph192.plugin_stub_info()["version_marker"] == "2.0.1"
+        assert ph192.plugin_stub_info()["version_marker"] == "2.0.2"
         assert "nicht produktiv" in PLANNED192["plugins"]
         assert "Stub" in PLANNED192["ki"] and "Stub" in PLANNED192["cloud"]
 
@@ -10280,22 +10280,22 @@ def main() -> int:
         assert "stubs_table" in sd192src or "Stubs" in sd192src
 
         feat192 = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
-        assert "2.0.1" in feat192 and "2.0.0" in feat192 and "1.9.5" in feat192 and "1.9.4" in feat192 and "1.9.3" in feat192 and "1.9.2" in feat192 and (
+        assert "2.0.2" in feat192 and "2.0.1" in feat192 and "2.0.0" in feat192 and "1.9.5" in feat192 and "1.9.4" in feat192 and "1.9.3" in feat192 and "1.9.2" in feat192 and (
             "Quick-Stempel" in feat192
             or "Duplikat" in feat192
             or "Vorschau" in feat192
             or "Stubs" in feat192
         )
         cl192 = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-        assert "## 2.0.1" in cl192 and "## 2.0.0" in cl192 and "## 1.9.5" in cl192 and "## 1.9.4" in cl192 and "## 1.9.3" in cl192 and "## 1.9.2" in cl192 and "## 1.9.1" in cl192
+        assert "## 2.0.2" in cl192 and "## 2.0.1" in cl192 and "## 2.0.0" in cl192 and "## 1.9.5" in cl192 and "## 1.9.4" in cl192 and "## 1.9.3" in cl192 and "## 1.9.2" in cl192 and "## 1.9.1" in cl192
         kb192 = (ROOT / "instantlensdoc" / "ui" / "keyboard_help.py").read_text(
             encoding="utf-8"
         )
-        assert "2.0.1" in kb192 and "2.0.0" in kb192 and "1.9.5" in kb192 and "1.9.4" in kb192 and "1.9.3" in kb192 and "1.9.2" in kb192 and (
+        assert "2.0.2" in kb192 and "2.0.1" in kb192 and "2.0.0" in kb192 and "1.9.5" in kb192 and "1.9.4" in kb192 and "1.9.3" in kb192 and "1.9.2" in kb192 and (
             "Quick-Stempel" in kb192 or "Stubs" in kb192 or "Duplikat" in kb192
         )
         info192md = (ROOT / "INFO.md").read_text(encoding="utf-8")
-        assert "2.0.1" in info192md and "2.0.0" in info192md and "1.9.5" in info192md and "1.9.4" in info192md and "1.9.3" in info192md and "1.9.2" in info192md and "1.9.1" in info192md
+        assert "2.0.2" in info192md and "2.0.1" in info192md and "2.0.0" in info192md and "1.9.5" in info192md and "1.9.4" in info192md and "1.9.3" in info192md and "1.9.2" in info192md and "1.9.1" in info192md
         print(
             "1.9.2 CLI attach-multi-dup-rename/"
             "quick-stamp-last/"
@@ -10308,9 +10308,9 @@ def main() -> int:
         from instantlensdoc.core import plugin_hooks as ph193
         from instantlensdoc.ui.stubs import PLANNED as PLANNED193
 
-        assert ild_ver193 == "2.0.1"
+        assert ild_ver193 == "2.0.2"
         assert ph193.IS_STUB and ph193.NOT_PRODUCTION_READY
-        assert ph193.plugin_stub_info()["version_marker"] == "2.0.1"
+        assert ph193.plugin_stub_info()["version_marker"] == "2.0.2"
         assert "Stub" in PLANNED193["ki"] and "nicht produktiv" in PLANNED193["plugins"]
 
         ad193src = (ROOT / "instantlensdoc" / "ui" / "attachments_dialog.py").read_text(
@@ -10345,22 +10345,22 @@ def main() -> int:
         assert "btn_stubs_features" in sd193src
 
         feat193 = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
-        assert "2.0.1" in feat193 and "2.0.0" in feat193 and "1.9.5" in feat193 and "1.9.4" in feat193 and (
+        assert "2.0.2" in feat193 and "2.0.1" in feat193 and "2.0.0" in feat193 and "1.9.5" in feat193 and "1.9.4" in feat193 and (
             "Für alle" in feat193
             or "Rechtsklick" in feat193
             or "keine Aktion" in feat193
             or "Spalten" in feat193
         )
         cl193 = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-        assert "## 2.0.1" in cl193 and "## 2.0.0" in cl193 and "## 1.9.5" in cl193 and "## 1.9.4" in cl193 and "## 1.9.3" in cl193 and "## 1.9.2" in cl193
+        assert "## 2.0.2" in cl193 and "## 2.0.1" in cl193 and "## 2.0.0" in cl193 and "## 1.9.5" in cl193 and "## 1.9.4" in cl193 and "## 1.9.3" in cl193 and "## 1.9.2" in cl193
         kb193 = (ROOT / "instantlensdoc" / "ui" / "keyboard_help.py").read_text(
             encoding="utf-8"
         )
-        assert "2.0.1" in kb193 and "2.0.0" in kb193 and "1.9.5" in kb193 and "1.9.4" in kb193 and (
+        assert "2.0.2" in kb193 and "2.0.1" in kb193 and "2.0.0" in kb193 and "1.9.5" in kb193 and "1.9.4" in kb193 and (
             "Für alle" in kb193 or "Rechtsklick" in kb193 or "keine Aktion" in kb193
         )
         info193md = (ROOT / "INFO.md").read_text(encoding="utf-8")
-        assert "2.0.1" in info193md and "2.0.0" in info193md and "1.9.5" in info193md and "1.9.4" in info193md and "1.9.3" in info193md and "1.9.2" in info193md
+        assert "2.0.2" in info193md and "2.0.1" in info193md and "2.0.0" in info193md and "1.9.5" in info193md and "1.9.4" in info193md and "1.9.3" in info193md and "1.9.2" in info193md
         print(
             "1.9.3 CLI attach-apply-all-status/"
             "quick-stamp-ctx-esc/"
@@ -10380,9 +10380,9 @@ def main() -> int:
         from instantlensdoc.ui.attachments_dialog import format_attach_add_status as fmt194
         from instantlensdoc.ui.stubs import PLANNED as PLANNED194
 
-        assert ild_ver194 == "2.0.1"
+        assert ild_ver194 == "2.0.2"
         assert ph194.IS_STUB and ph194.NOT_PRODUCTION_READY
-        assert ph194.plugin_stub_info()["version_marker"] == "2.0.1"
+        assert ph194.plugin_stub_info()["version_marker"] == "2.0.2"
         assert "Stub" in PLANNED194["ki"] and "nicht produktiv" in PLANNED194["plugins"]
 
         assert fmt194({"added": 2, "renamed": 1, "skipped": 3}) == (
@@ -10426,23 +10426,23 @@ def main() -> int:
         assert "Statushinweis" in sd194src or "fehlt" in sd194src
 
         feat194 = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
-        assert "2.0.1" in feat194 and "2.0.0" in feat194 and "1.9.5" in feat194 and "1.9.4" in feat194 and (
+        assert "2.0.2" in feat194 and "2.0.1" in feat194 and "2.0.0" in feat194 and "1.9.5" in feat194 and "1.9.4" in feat194 and (
             "kopierbar" in feat194
             or "Zoom/Opacity" in feat194
             or "Persistenz" in feat194
             or "Doppelklick" in feat194
         )
         cl194 = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-        assert "## 2.0.1" in cl194 and "## 2.0.0" in cl194 and "## 1.9.5" in cl194 and "## 1.9.4" in cl194 and "## 1.9.3" in cl194
+        assert "## 2.0.2" in cl194 and "## 2.0.1" in cl194 and "## 2.0.0" in cl194 and "## 1.9.5" in cl194 and "## 1.9.4" in cl194 and "## 1.9.3" in cl194
         kb194 = (ROOT / "instantlensdoc" / "ui" / "keyboard_help.py").read_text(
             encoding="utf-8"
         )
-        assert "2.0.1" in kb194 and "2.0.0" in kb194 and "1.9.5" in kb194 and "1.9.4" in kb194 and (
+        assert "2.0.2" in kb194 and "2.0.1" in kb194 and "2.0.0" in kb194 and "1.9.5" in kb194 and "1.9.4" in kb194 and (
             "kopierbar" in kb194 or "Zoom/Opacity" in kb194 or "Doppelklick" in kb194
             or "Persistenz" in kb194 or "Statushinweis" in kb194
         )
         info194md = (ROOT / "INFO.md").read_text(encoding="utf-8")
-        assert "2.0.1" in info194md and "2.0.0" in info194md and "1.9.5" in info194md and "1.9.4" in info194md and "1.9.3" in info194md
+        assert "2.0.2" in info194md and "2.0.1" in info194md and "2.0.0" in info194md and "1.9.5" in info194md and "1.9.4" in info194md and "1.9.3" in info194md
         print(
             "1.9.4 CLI attach-footer-copyable/"
             "quick-stamp-esc-zoom-opacity/"
@@ -10461,9 +10461,9 @@ def main() -> int:
             StubInfoDialog as SID195,
         )
 
-        assert ild_ver195 == "2.0.1"
+        assert ild_ver195 == "2.0.2"
         assert ph195.IS_STUB and ph195.NOT_PRODUCTION_READY
-        assert ph195.plugin_stub_info()["version_marker"] == "2.0.1"
+        assert ph195.plugin_stub_info()["version_marker"] == "2.0.2"
         assert "Stub" in PLANNED195["ki"] and "nicht produktiv" in PLANNED195["plugins"]
         assert "ki" in STUB_SHORT195 and "Geplant" in SID195.__doc__
 
@@ -10520,7 +10520,7 @@ def main() -> int:
             or "A11y" in feat195
         )
         cl195 = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-        assert "## 2.0.1" in cl195 and "## 2.0.0" in cl195 and "## 1.9.5" in cl195 and "## 1.9.4" in cl195
+        assert "## 2.0.2" in cl195 and "## 2.0.1" in cl195 and "## 2.0.0" in cl195 and "## 1.9.5" in cl195 and "## 1.9.4" in cl195
         kb195 = (ROOT / "instantlensdoc" / "ui" / "keyboard_help.py").read_text(
             encoding="utf-8"
         )
@@ -10528,7 +10528,7 @@ def main() -> int:
             "Standard-Stempel" in kb195 or "Footer" in kb195 or "Geplant" in kb195
         )
         info195md = (ROOT / "INFO.md").read_text(encoding="utf-8")
-        assert "2.0.1" in info195md and "2.0.0" in info195md and "1.9.5" in info195md and "1.9.4" in info195md
+        assert "2.0.2" in info195md and "2.0.1" in info195md and "2.0.0" in info195md and "1.9.5" in info195md and "1.9.4" in info195md
         print(
             "1.9.5 CLI attach-footer-filter-empty/"
             "quick-stamp-esc-focus-ctrlshifts/"
@@ -10561,10 +10561,10 @@ def main() -> int:
         )
         import pikepdf as pike200
 
-        assert ild_ver200 == "2.0.1"
+        assert ild_ver200 == "2.0.2"
         assert series200 == "2.0"
         assert ph200.IS_STUB and ph200.NOT_PRODUCTION_READY
-        assert ph200.plugin_stub_info()["version_marker"] == "2.0.1"
+        assert ph200.plugin_stub_info()["version_marker"] == "2.0.2"
         assert "Stub" in PLANNED200["ki"] and "outline_read" in PLANNED200
         assert "Vorlesen" in PLANNED200["outline_read"] or "outline" in PLANNED200[
             "outline_read"
@@ -10619,7 +10619,7 @@ def main() -> int:
         inst200 = (ROOT / "scripts" / "install-ild.ps1").read_text(encoding="utf-8")
         assert "Start Menu" in inst200 or "Startmenü" in inst200 or "Start Menu" in inst200
         assert "Desktop" in inst200
-        assert "2.0.1" in inst200
+        assert "2.0.2" in inst200
         assert "WScript.Shell" in inst200 or "CreateShortcut" in inst200
 
         mds200 = (ROOT / "instantlensdoc" / "ui" / "multi_doc_search_dialog.py").read_text(
@@ -10637,19 +10637,19 @@ def main() -> int:
         assert "apply_ui_font" in th200
 
         feat200 = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
-        assert "2.0.1" in feat200 and "2.0.0" in feat200 and (
+        assert "2.0.2" in feat200 and "2.0.1" in feat200 and "2.0.0" in feat200 and (
             "Multi-Dokument" in feat200
             or "Portfolio" in feat200
             or "High-Contrast" in feat200
         )
         cl200 = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-        assert "## 2.0.1" in cl200 and "## 2.0.0" in cl200 and "## 1.9.5" in cl200
+        assert "## 2.0.2" in cl200 and "## 2.0.1" in cl200 and "## 2.0.0" in cl200 and "## 1.9.5" in cl200
         kb200 = (ROOT / "instantlensdoc" / "ui" / "keyboard_help.py").read_text(
             encoding="utf-8"
         )
-        assert "2.0.1" in kb200 and "2.0.0" in kb200 and "Ctrl+Shift+F" in kb200
+        assert "2.0.2" in kb200 and "2.0.1" in kb200 and "2.0.0" in kb200 and "Ctrl+Shift+F" in kb200
         info200md = (ROOT / "INFO.md").read_text(encoding="utf-8")
-        assert "2.0.1" in info200md and "2.0.0" in info200md and "1.9.5" in info200md
+        assert "2.0.2" in info200md and "2.0.1" in info200md and "2.0.0" in info200md and "1.9.5" in info200md
         about200 = (ROOT / "instantlensdoc" / "ui" / "help_dialog.py").read_text(
             encoding="utf-8"
         )
@@ -10685,8 +10685,8 @@ def main() -> int:
         )
         import pikepdf as pike201
 
-        assert ild_ver201 == "2.0.1"
-        assert __version__ == "2.0.1"
+        assert ild_ver201 == "2.0.2"
+        assert __version__ == "2.0.2"
 
         # Multi-doc search options + CSV + progress
         pdf_a201 = td / "search201a.pdf"
@@ -10787,18 +10787,143 @@ def main() -> int:
         assert "NoDesktop" in inst201
         assert "idempotent" in inst201.casefold() or "aktualisiert" in inst201
         assert "sync-ild.ps1" in inst201
-        assert "2.0.1" in inst201
+        assert "2.0.2" in inst201
 
         feat201 = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
         assert "2.0.1" in feat201 and (
             "100/125/150" in feat201 or "Auswahl extrahieren" in feat201 or "Aa/Wort/Regex" in feat201
         )
         cl201 = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-        assert "## 2.0.1" in cl201 and "## 2.0.0" in cl201
+        assert "## 2.0.2" in cl201 and "## 2.0.1" in cl201 and "## 2.0.0" in cl201
         print(
             "2.0.1 CLI multi-doc-opts-csv-progress/"
             "portfolio-sidebar-extract-empty/"
             "font-scale-hc-persist/install-ild: OK"
+        )
+
+        # 2.0.2 CLI: multi-doc CSV Doc/Seite/Snippet/Match·BOM·Regex-Status,
+        # portfolio extract dir/rename/progress, UI scale reset 100%, HC Ctrl+Alt+H,
+        # install-ild -Uninstall/Exitcodes
+        from ild_pdf import __version__ as ild_ver202
+        from ild_pdf.portfolio import (
+            count_renamed_extracts as cre202,
+            create_portfolio as cp202,
+            extract_portfolio as ep202,
+            extract_portfolio_entries as epe202,
+        )
+        from instantlensdoc.core.app_settings import (
+            get_last_portfolio_extract_dir as glped202,
+            get_ui_font_scale_percent as gufs202,
+            set_last_portfolio_extract_dir as slped202,
+            set_ui_font_scale_percent as sufs202,
+        )
+        from instantlensdoc.core.fulltext import (
+            MULTI_DOC_SEARCH_CSV_FIELDS as MDSCF202,
+            SearchHit as SH202,
+            export_multi_doc_hits_csv as emdc202,
+        )
+        import pikepdf as pike202
+
+        assert ild_ver202 == "2.0.2"
+        assert __version__ == "2.0.2"
+        assert MDSCF202 == ("Doc", "Seite", "Snippet", "Match")
+
+        hit202 = SH202(
+            path=str(td / "doc202.pdf"),
+            page=0,
+            line=1,
+            snippet="hello world",
+            kind="pdf",
+        )
+        csv202 = td / "multi202.csv"
+        dest202 = emdc202(csv202, [hit202], query="hello", utf8_bom=True)
+        raw202 = dest202.read_bytes()
+        assert raw202.startswith(b"\xef\xbb\xbf")
+        text202 = dest202.read_text(encoding="utf-8-sig")
+        assert text202.splitlines()[0] == "Doc,Seite,Snippet,Match"
+        assert "doc202.pdf" in text202 and ",1," in text202 and "hello" in text202
+        dest202b = emdc202(
+            td / "multi202_nobom.csv", [hit202], query="hello", utf8_bom=False
+        )
+        assert not dest202b.read_bytes().startswith(b"\xef\xbb\xbf")
+
+        mds202 = (ROOT / "instantlensdoc" / "ui" / "multi_doc_search_dialog.py").read_text(
+            encoding="utf-8"
+        )
+        assert "multiDocSearchBom" in mds202
+        assert "export_multi_doc_hits_csv" in mds202
+        assert "Regex-Fehler" in mds202 and "_set_regex_error" in mds202
+
+        # Portfolio extract: remember dir, rename on collision, progress
+        f202a = td / "port202a.txt"
+        f202a.write_text("alpha202", encoding="utf-8")
+        f202b = td / "port202b.txt"
+        f202b.write_text("beta202", encoding="utf-8")
+        port202 = td / "portfolio202.pdf"
+        info202 = cp202(port202, [f202a, f202b], title="Smoke202")
+        assert len(info202.entries or []) >= 2
+        out202 = td / "extract202"
+        out202.mkdir()
+        # seed collision
+        (out202 / "port202a.txt").write_text("exists", encoding="utf-8")
+        prog202: list[tuple[int, int]] = []
+
+        def _prog202(i, n, name):
+            prog202.append((i, n))
+
+        written202 = ep202(port202, out_dir=out202, on_progress=_prog202)
+        assert len(written202) >= 2
+        assert len(prog202) >= 2
+        renamed202 = cre202(written202)
+        assert renamed202 >= 1
+        slped202(out202)
+        assert glped202() == out202
+
+        pd202 = (ROOT / "instantlensdoc" / "ui" / "portfolio_dialog.py").read_text(
+            encoding="utf-8"
+        )
+        assert "portfolioExtractProgress" in pd202
+        assert "get_last_portfolio_extract_dir" in pd202
+        assert "count_renamed_extracts" in pd202
+
+        # UI scale reset + HC shortcut
+        sufs202(125)
+        assert gufs202() == 125
+        sufs202(100)
+        assert gufs202() == 100
+        sd202 = (ROOT / "instantlensdoc" / "ui" / "settings_dialog.py").read_text(
+            encoding="utf-8"
+        )
+        assert "settingsUiFontScaleReset" in sd202
+        assert "_reset_ui_font_scale_100" in sd202
+        mw202 = (ROOT / "instantlensdoc" / "ui" / "main_window.py").read_text(
+            encoding="utf-8"
+        )
+        assert 'QKeySequence("Ctrl+Alt+H")' in mw202
+        kb202 = (ROOT / "instantlensdoc" / "ui" / "keyboard_help.py").read_text(
+            encoding="utf-8"
+        )
+        assert "Ctrl+Alt+H" in kb202 and "2.0.2" in kb202
+
+        inst202 = (ROOT / "scripts" / "install-ild.ps1").read_text(encoding="utf-8")
+        assert "Uninstall" in inst202
+        assert "Exit-Code" in inst202 or "Exit-Codes" in inst202
+        assert "2.0.2" in inst202
+        assert "Shortcut entfernt" in inst202 or "entfernt" in inst202
+
+        feat202 = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
+        assert "2.0.2" in feat202 and (
+            "Doc,Seite,Snippet,Match" in feat202
+            or "Reset 100" in feat202
+            or "Ctrl+Alt+H" in feat202
+            or "-Uninstall" in feat202
+        )
+        cl202 = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+        assert "## 2.0.2" in cl202 and "## 2.0.1" in cl202
+        print(
+            "2.0.2 CLI multi-doc-csv-bom-regex/"
+            "portfolio-extract-dir-rename-progress/"
+            "ui-scale-reset/hc-ctrl-alt-h/install-uninstall: OK"
         )
 
         set_show_printer_marks(True)
@@ -11059,7 +11184,7 @@ def main() -> int:
         assert len(win.layout_doc.text_frames) >= 2
         assert "Lizenz:" in win.license_label.text() or "⚠" in win.license_label.text()
         _vl = win.version_label.text()
-        assert "v2.0.1" in _vl, repr(_vl)
+        assert "v2.0.2" in _vl, repr(_vl)
         # Lizenz <7 Tage: Style prominent
         st_lic = win.license_manager.status()
         if st_lic.allowed and st_lic.days_remaining < 7:
@@ -11240,7 +11365,7 @@ def main() -> int:
             assert win.editor.outdent_selection(4)
             assert win.editor.toPlainText().splitlines()[0] == "alpha"
             # Fenstertitel mit Version
-            assert "2.0.1" in win.windowTitle()
+            assert "2.0.2" in win.windowTitle()
             from instantlensdoc.ui.help_dialog import AboutDialog, HelpDialog, open_log_folder
 
             about = AboutDialog(win)
@@ -11934,11 +12059,11 @@ def main() -> int:
             from instantlensdoc.ui.password_dialog import CompressPdfDialog, SetPasswordDialog
             from instantlensdoc.ui.stubs import PLANNED
             assert KeyboardHelpDialog and SetPasswordDialog and CompressPdfDialog
-            assert "2.0.1" in PLANNED["ki"], PLANNED["ki"]
+            assert "2.0.2" in PLANNED["ki"], PLANNED["ki"]
             assert "Coming soon" in PLANNED["cloud"]
-            assert "2.0.1" in PLANNED["stylus"], PLANNED["stylus"]
-            assert "2.0.1" in PLANNED["extrude3d"], PLANNED["extrude3d"]
-            assert "2.0.1" in PLANNED["plugins"] and "Stub" in PLANNED["plugins"]
+            assert "2.0.2" in PLANNED["stylus"], PLANNED["stylus"]
+            assert "2.0.2" in PLANNED["extrude3d"], PLANNED["extrude3d"]
+            assert "2.0.2" in PLANNED["plugins"] and "Stub" in PLANNED["plugins"]
             # Toolbar ↔ Menü Sync Graustufen/Nacht
             win.pdf_view.set_grayscale(True)
             assert win._grayscale_action.isChecked()
@@ -19647,7 +19772,7 @@ def main() -> int:
             assert tpdf_q.is_file() and tpdf_q.stat().st_size > 100
 
             locq = clv170q()
-            assert locq.local_version == "2.0.1"
+            assert locq.local_version == "2.0.2"
             assert locq.newer_available is False
             assert locq.reference_source in ("docs/VERSION", "VERSION.txt")
 
@@ -20380,7 +20505,7 @@ def main() -> int:
             assert callable(getattr(win, "_pdf_attachments", None))
             assert ph190q.IS_STUB is True
             assert ph190q.load_plugins() == []
-            assert "2.0.1" in PLANNED190q["plugins"]
+            assert "2.0.2" in PLANNED190q["plugins"]
             assert "Stub" in PLANNED190q["plugins"]
 
             att_pdf190q = Path(td2) / "att190q.pdf"
@@ -20949,13 +21074,60 @@ def main() -> int:
                 "font-scale-live/hc-persist: OK"
             )
 
+            # 2.0.2 Qt: multi-doc BOM/CSV cols, portfolio progress, scale reset, HC shortcut
+            from instantlensdoc.core.app_settings import (
+                set_ui_font_scale_percent as sufs202q,
+            )
+            from instantlensdoc.ui.multi_doc_search_dialog import (
+                MultiDocSearchDialog as MDS202,
+            )
+            from instantlensdoc.ui.portfolio_dialog import PortfolioDialog as PD202
+            from instantlensdoc.ui.settings_dialog import SettingsDialog as SD202
+
+            mds202q = MDS202(win, paths=[str(smoke_pdf)], initial_query="")
+            assert hasattr(mds202q, "chk_bom")
+            assert mds202q.chk_bom.isChecked()
+            mds202q.chk_regex.setChecked(True)
+            mds202q.query_edit.setText("(")
+            mds202q.run_search()
+            assert "Regex-Fehler" in (mds202q.status.text() or "")
+            mds202q.reject()
+
+            pdlg202 = PD202(win)
+            assert hasattr(pdlg202, "extract_progress")
+            assert callable(getattr(pdlg202, "_run_extract", None))
+            pdlg202.reject()
+
+            sufs202q(150)
+            sdlg202 = SD202(win)
+            assert hasattr(sdlg202, "btn_ui_scale_reset")
+            sdlg202.btn_ui_scale_reset.click()
+            from instantlensdoc.core.app_settings import (
+                get_ui_font_scale_percent as gufs202q,
+            )
+
+            assert gufs202q() == 100
+            assert "100" in (sdlg202.ui_font_preview.text() or "")
+            sdlg202.reject()
+
+            act_hc = getattr(win, "_high_contrast_action", None)
+            assert act_hc is not None
+            sc_hc = act_hc.shortcut().toString()
+            assert "Ctrl" in sc_hc and "Alt" in sc_hc and "H" in sc_hc
+            assert "Shift" not in sc_hc
+            print(
+                "2.0.2 Qt multi-doc-bom-regex-status/"
+                "portfolio-extract-progress/"
+                "ui-scale-reset/hc-ctrl-alt-h: OK"
+            )
+
             print("0.4.x selected Qt marks/schema/sort/reset: OK")
             print("0.4.2 Qt outline/copy-paste/case/progress: OK")
             print("0.4.1 Qt links/stamp/encoding/drop: OK")
-            print("0.3.x–2.0.1 review OK")
+            print("0.3.x–2.0.2 review OK")
             from instantlensdoc.ui.stubs import PLANNED as PLANNED132
 
-            assert "2.0.1" in PLANNED132["ki"] and "Stub" in PLANNED132["plugins"]
+            assert "2.0.2" in PLANNED132["ki"] and "Stub" in PLANNED132["plugins"]
             assert callable(win.pdf_view.bake_redactions)
             assert callable(win.pdf_view.clear_redactions)
             assert callable(win._set_pdf_password)

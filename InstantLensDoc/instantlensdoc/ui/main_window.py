@@ -2184,9 +2184,9 @@ class MainWindow(QMainWindow):
         self._theme_cycle_action = act_theme_cycle
         self._high_contrast_action = QAction("High-Contrast Theme", self)
         self._high_contrast_action.setCheckable(True)
-        self._high_contrast_action.setShortcut(QKeySequence("Ctrl+Alt+Shift+H"))
+        self._high_contrast_action.setShortcut(QKeySequence("Ctrl+Alt+H"))
         self._high_contrast_action.setToolTip(
-            "High-Contrast Theme ein/aus (Accessibility) — 2.0.0"
+            "High-Contrast Theme ein/aus (Ctrl+Alt+H) — Accessibility — 2.0.2"
         )
         try:
             from instantlensdoc.core.app_settings import get_high_contrast
@@ -5760,7 +5760,7 @@ class MainWindow(QMainWindow):
             pass
 
     def _toggle_high_contrast(self, checked: bool = False) -> None:
-        """High-Contrast Theme Toggle — Accessibility 2.0.0."""
+        """High-Contrast Theme Toggle — Accessibility Ctrl+Alt+H — 2.0.2."""
         enabled = toggle_high_contrast(self)
         act = getattr(self, "_high_contrast_action", None)
         if act is not None:

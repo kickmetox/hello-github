@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **2.0.1** |
+| Version | **2.0.2** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -62,6 +62,16 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an / `checkedonce`)
+
+## Neu in 2.0.2
+
+Post-Release-Polish nach **2.0.1** (Basis **2.0.0** / **1.9.5**):
+
+- **Multi-Dokument-Suche:** CSV-Spalten **Doc,Seite,Snippet,Match** · **UTF-8 BOM** Option · **Regex-Fehlerstatus**
+- **PDF-Portfolios:** Extrakt **Zielordner merken** · **Namenskollision umbenennen** · **Fortschritt**
+- **Accessibility:** UI-Skala Button **Reset 100 %** · High-Contrast Shortcut **Ctrl+Alt+H**
+- **Installer:** `install-ild.ps1` **-Uninstall** entfernt Shortcuts · Exit-Codes **0/1** dokumentiert
+- Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen unverändert klar markiert
 
 ## Neu in 2.0.1
 

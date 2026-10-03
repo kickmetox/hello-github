@@ -46,7 +46,7 @@ SHORTCUTS_HTML = """
 <tr><td>Weitersuchen / Rückwärts</td><td><code>F3</code> / <code>Shift+F3</code> — PDF-Treffer-Highlight + Seiten-Nav — 0.9.0</td></tr>
 <tr><td>Suchen und Ersetzen</td><td><code>Ctrl+R</code></td></tr>
 <tr><td>Multi-Dokument-Suche</td><td><code>Ctrl+Shift+F</code> — zentrale Trefferliste alle offenen PDFs — 2.0.0</td></tr>
-<tr><td>High-Contrast Theme</td><td><code>Ctrl+Alt+Shift+H</code> — Accessibility Toggle — 2.0.0</td></tr>
+<tr><td>High-Contrast Theme</td><td><code>Ctrl+Alt+H</code> — Accessibility Toggle — 2.0.2</td></tr>
 <tr><td>Gehe zu Zeile / Seite</td><td><code>Ctrl+G</code> (Editor / PDF)</td></tr>
 <tr><td>Gehe zu Seite (PDF-Menü)</td><td><code>Ctrl+Shift+G</code></td></tr>
 <tr><td>Tab duplizieren</td><td><code>Ctrl+Alt+Shift+T</code> — 1.4.5 (früher Ctrl+Shift+T)</td></tr>
@@ -338,8 +338,9 @@ Status-Klick öffnet <code>docs/VERSION</code>/<code>VERSION.txt</code> im Edito
 <p><b>PDF verschlüsseln/entschlüsseln:</b> Prefill-Warnung + Button „jetzt ausschalten“ (sofort speichern + Toast) · Passwort nie in Logs · falsches PW klar DE — 1.6.5 (Basis 1.6.4/1.6.3/1.6.2/1.6.1/1.6.0).</p>
 <p><b>Dokument-Statistik:</b> JSON-Dateiname Quick-Insert <code>{stem}</code>/<code>{date}</code> · ungültige Platzhalter rot · Live-Vorschau · Copy · Zielordner · UTF-8 — 1.6.5 (Basis 1.6.4/1.6.3/1.6.2/1.6.1/1.6.0).</p>
 <p><b>Workspace-Layouts:</b> Import-Log Zusammenfassung importiert/übersprungen/umbenannt · kopieren/als TXT · Merge skip/rename · Schema DE — 1.6.5 (Basis 1.6.4/1.6.3/1.6.2/1.6.1/1.6.0).</p>
+<p><b>2.0.2:</b> Multi-Doc CSV Doc,Seite,Snippet,Match · BOM · Regex-Fehlerstatus · Portfolio Extrakt Zielordner/Rename/Fortschritt · UI-Skala Reset 100 % · High-Contrast Ctrl+Alt+H · install-ild -Uninstall/Exitcodes.</p>
 <p><b>2.0.1:</b> Multi-Doc Aa/Wort/Regex · Treffer-CSV · Fortschritt · Portfolio Sidebar/Auswahl/leer · High-Contrast Persistenz · UI-Skala 100/125/150 % Live · install-ild -NoDesktop/Idempotenz/sync-Hinweis.</p>
-<p><b>2.0.0:</b> Multi-Dokument-Suche Ctrl+Shift+F (Volltext alle offenen PDFs · zentrale Trefferliste) · PDF-Portfolio erstellen/öffnen · High-Contrast Theme Ctrl+Alt+Shift+H · UI-Schrift Settings · Outline Vorlesen Stub · install-ild.ps1 Startmenü/Desktop.</p>
+<p><b>2.0.0:</b> Multi-Dokument-Suche Ctrl+Shift+F (Volltext alle offenen PDFs · zentrale Trefferliste) · PDF-Portfolio erstellen/öffnen · High-Contrast Theme · UI-Schrift Settings · Outline Vorlesen Stub · install-ild.ps1 Startmenü/Desktop.</p>
 <p><b>1.9.5:</b> Anhänge Footer-Klick Filter umbenannt/übersprungen·leer bei 0 · Quick-Stempel Esc→Fokus Toolbar·Ctrl+Shift+S Standard ★ · Tabellen-CSV Combobox synchron zurück·A11y Speichern · Stubs Info Kurzbeschreibung+Badge „Geplant“·Esc.</p>
 <p><b>1.9.4:</b> Anhänge Status-Footer „hinzugefügt X, umbenannt Y, übersprungen Z“ kopierbar · Quick-Stempel Esc „Platzieren abgebrochen“·Zoom/Opacity merken · Tabellen-CSV Delim Persistenz erst Speichern·Vorschau-Reset Abbruch · Stubs FEATURES-Statushinweis·Doppelklick Info.</p>
 <p><b>1.9.3:</b> Anhänge „Für alle anwenden“·Statuszählung · Quick-Stempel Rechtsklick Bibliothek·Esc-Abbruch · Tabellen-CSV Zeilen/Spalten-Zähler·Trennzeichen live · Settings-Stubs A–Z·keine Aktion·FEATURES-Link.</p>

@@ -1,7 +1,8 @@
-"""PDF-Portfolios (Collection + Attachments) erstellen und öffnen — 2.0.0.
+"""PDF-Portfolios (Collection + Attachments) erstellen und öffnen — 2.0.2.
 
 Ein Portfolio ist ein Container-PDF mit eingebetteten Dateien (pikepdf attachments)
 und Catalog-/Collection-Eintrag (Adobe PDF Portfolio / PDF Collection).
+Extrakt: Fortschritt, Namenskollision → Umbenennen — 2.0.2.
 """
 
 from __future__ import annotations
@@ -9,7 +10,7 @@ from __future__ import annotations
 import mimetypes
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Any, Callable, Sequence
 
 
 @dataclass
@@ -230,30 +231,71 @@ def create_portfolio(
 def extract_portfolio(
     path: str | Path,
     out_dir: str | Path | None = None,
+    *,
+    on_progress: Callable[[int, int, str], None] | None = None,
 ) -> list[Path]:
-    """Alle Portfolio-Anhänge extrahieren (wie Attachments)."""
-    from ild_pdf.attachments import extract_all_attachments
+    """
+    Alle Portfolio-Anhänge extrahieren.
+    Namenskollision → Umbenennen (_2, _3, …); optional Fortschritt — 2.0.2.
+    """
+    from ild_pdf.attachments import extract_attachment, list_attachments
 
     path = Path(path)
     dest = Path(out_dir) if out_dir else path.parent / f"{path.stem}_portfolio"
-    return extract_all_attachments(path, out_dir=dest)
+    dest.mkdir(parents=True, exist_ok=True)
+    infos = list_attachments(path)
+    total = len(infos)
+    written: list[Path] = []
+    for i, info in enumerate(infos, start=1):
+        if on_progress is not None:
+            try:
+                on_progress(i, total, info.filename or info.name)
+            except Exception:
+                pass
+        written.append(extract_attachment(path, info.name, out_dir=dest))
+    return written
 
 
 def extract_portfolio_entries(
     path: str | Path,
     names: Sequence[str],
     out_dir: str | Path | None = None,
+    *,
+    on_progress: Callable[[int, int, str], None] | None = None,
 ) -> list[Path]:
-    """Ausgewählte Portfolio-Einträge extrahieren (nach Name/Dateiname) — 2.0.1."""
+    """
+    Ausgewählte Portfolio-Einträge extrahieren (nach Name/Dateiname).
+    Namenskollision → Umbenennen; optional Fortschritt — 2.0.2.
+    """
     from ild_pdf.attachments import extract_attachment
 
     path = Path(path)
     dest = Path(out_dir) if out_dir else path.parent / f"{path.stem}_portfolio"
     dest.mkdir(parents=True, exist_ok=True)
+    keys = [str(n or "").strip() for n in (names or []) if str(n or "").strip()]
+    total = len(keys)
     written: list[Path] = []
-    for name in names or []:
-        key = str(name or "").strip()
-        if not key:
-            continue
+    for i, key in enumerate(keys, start=1):
+        if on_progress is not None:
+            try:
+                on_progress(i, total, key)
+            except Exception:
+                pass
         written.append(extract_attachment(path, key, out_dir=dest))
     return written
+
+
+def count_renamed_extracts(written: Sequence[Path]) -> int:
+    """
+    Zählt Extrakte mit Kollisions-Suffix ``_2``, ``_3``, … — 2.0.2.
+    Entspricht der Umbenennung in ``extract_attachment``.
+    """
+    n = 0
+    for p in written or []:
+        stem = Path(p).stem
+        if "_" not in stem:
+            continue
+        base, suf = stem.rsplit("_", 1)
+        if base and suf.isdigit() and int(suf) >= 2:
+            n += 1
+    return n

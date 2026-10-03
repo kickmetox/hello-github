@@ -1,4 +1,4 @@
-"""Zentrale Multi-Dokument-Suche: Volltext über alle offenen PDFs — 2.0.1."""
+"""Zentrale Multi-Dokument-Suche: Volltext über alle offenen PDFs — 2.0.2."""
 
 from __future__ import annotations
 
@@ -31,7 +31,7 @@ from instantlensdoc.core.fulltext import SearchPatternError
 class MultiDocSearchDialog(QDialog):
     """
     Zentrale Trefferliste: Volltext (Textlayer) über alle offenen/gelisteten PDFs.
-    Case / Regex / Whole-word · CSV-Export · Fortschritt — 2.0.1.
+    Case / Regex / Whole-word · CSV Doc,Seite,Snippet,Match · BOM · Fortschritt — 2.0.2.
     Doppelklick / Enter → Treffer aktivieren (Signal hit_activated).
     """
 
@@ -56,7 +56,8 @@ class MultiDocSearchDialog(QDialog):
         layout = QVBoxLayout(self)
         intro = QLabel(
             "Volltextsuche über alle offenen PDFs (Textlayer). "
-            "Optionen Aa / Wort / Regex; Treffer CSV; Fortschritt bei vielen Docs."
+            "Optionen Aa / Wort / Regex; CSV Doc,Seite,Snippet,Match; BOM; "
+            "Regex-Fehler im Status."
         )
         intro.setWordWrap(True)
         intro.setObjectName("multiDocSearchIntro")
@@ -90,17 +91,22 @@ class MultiDocSearchDialog(QDialog):
         self.chk_regex = QCheckBox(".*")
         self.chk_regex.setObjectName("multiDocSearchRegex")
         self.chk_regex.setToolTip(
-            "Suchbegriff als regulärer Ausdruck — Fehler im Status — 2.0.1"
+            "Suchbegriff als regulärer Ausdruck — Fehler im Status — 2.0.2"
         )
         self.chk_regex.setChecked(False)
+        self.chk_bom = QCheckBox("UTF-8 BOM")
+        self.chk_bom.setObjectName("multiDocSearchBom")
+        self.chk_bom.setToolTip("CSV mit UTF-8 BOM schreiben (Excel) — 2.0.2")
+        self.chk_bom.setChecked(True)
         opt_row.addWidget(self.chk_case)
         opt_row.addWidget(self.chk_whole)
         opt_row.addWidget(self.chk_regex)
+        opt_row.addWidget(self.chk_bom)
         opt_row.addStretch(1)
         self.btn_export_csv = QPushButton("Treffer CSV…")
         self.btn_export_csv.setObjectName("multiDocSearchExportCsv")
         self.btn_export_csv.setToolTip(
-            "Zentrale Trefferliste als CSV exportieren (UTF-8) — 2.0.1"
+            "Trefferliste CSV: Spalten Doc,Seite,Snippet,Match — 2.0.2"
         )
         self.btn_export_csv.clicked.connect(self._export_csv)
         self.btn_export_csv.setEnabled(False)
@@ -146,6 +152,18 @@ class MultiDocSearchDialog(QDialog):
     def set_paths(self, paths: list[str]) -> None:
         self._paths = list(paths or [])
 
+    def _set_regex_error(self, message: str) -> None:
+        """Regex-Fehlerstatus sichtbar setzen — 2.0.2."""
+        self.status.setProperty("ildError", True)
+        self.status.setStyleSheet("color: #c0392b; font-weight: bold;")
+        self.status.setText(f"Regex-Fehler: {message}")
+        self.status.setToolTip(f"Ungültiger regulärer Ausdruck: {message}")
+
+    def _clear_status_error(self) -> None:
+        self.status.setProperty("ildError", False)
+        self.status.setStyleSheet("")
+        self.status.setToolTip("")
+
     def _on_progress(self, current: int, total: int, path: str) -> None:
         self.progress.setMaximum(max(1, total))
         self.progress.setValue(current)
@@ -159,6 +177,7 @@ class MultiDocSearchDialog(QDialog):
         self.hits_list.clear()
         self._hits = []
         self.btn_export_csv.setEnabled(False)
+        self._clear_status_error()
         if not query:
             self.status.setText("Leere Suche")
             self.progress.setVisible(False)
@@ -188,7 +207,7 @@ class MultiDocSearchDialog(QDialog):
             )
         except SearchPatternError as exc:
             self.progress.setVisible(False)
-            self.status.setText(f"Regex-Fehler: {exc}")
+            self._set_regex_error(str(exc))
             return
         self._hits = hits
         self.progress.setVisible(False)
@@ -235,28 +254,18 @@ class MultiDocSearchDialog(QDialog):
         )
         if not path:
             return
-        rows = [
-            {
-                "path": h.path,
-                "page": (h.page + 1) if h.page is not None else "",
-                "line": h.line if h.line is not None else "",
-                "kind": h.kind,
-                "query": self._query,
-                "snippet": h.snippet or "",
-                "label": fulltext_mod.format_hit_line(
-                    Path(h.path).name,
-                    page=h.page,
-                    line=h.line,
-                    snippet=h.snippet or self._query,
-                    kind=h.kind,
-                    query=self._query,
-                ),
-            }
-            for h in self._hits
-        ]
         try:
-            dest = fulltext_mod.export_search_hits_csv(path, rows, query=self._query)
-            self.status.setText(f"CSV exportiert: {dest.name} · {len(rows)} Zeile(n)")
+            dest = fulltext_mod.export_multi_doc_hits_csv(
+                path,
+                self._hits,
+                query=self._query,
+                utf8_bom=bool(self.chk_bom.isChecked()),
+            )
+            bom_s = "BOM" if self.chk_bom.isChecked() else "ohne BOM"
+            self.status.setText(
+                f"CSV exportiert: {dest.name} · {len(self._hits)} Zeile(n) · "
+                f"Doc,Seite,Snippet,Match · {bom_s}"
+            )
         except Exception as exc:
             QMessageBox.critical(self, "Multi-Dokument-Suche", f"CSV-Export fehlgeschlagen:\n{exc}")
 

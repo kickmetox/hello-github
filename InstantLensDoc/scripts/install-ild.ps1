@@ -1,33 +1,79 @@
-# InstantLens Doc 2.0.1 — Benutzer-Installer (ohne Admin wenn möglich)
+# InstantLens Doc 2.0.2 — Benutzer-Installer (ohne Admin wenn möglich)
 # Startmenü-Shortcut + optional Desktop-Link (User-Profil).
 # Idempotent: vorhandene Verknüpfungen werden aktualisiert.
+# -Uninstall entfernt Startmenü- und Desktop-Shortcuts.
 #
 # Beispiele:
 #   powershell -ExecutionPolicy Bypass -File .\scripts\install-ild.ps1
 #   powershell -ExecutionPolicy Bypass -File .\scripts\install-ild.ps1 -DesktopLink
 #   powershell -ExecutionPolicy Bypass -File .\scripts\install-ild.ps1 -AppDir "D:\AI_Temp\InstantLensDoc" -NoDesktop
+#   powershell -ExecutionPolicy Bypass -File .\scripts\install-ild.ps1 -Uninstall
 #
 # Hinweis Sync (Code aktualisieren):
 #   powershell -ExecutionPolicy Bypass -File "D:\AI_Temp\sync-ild.ps1"
 #   (oder .\scripts\sync-ild.ps1 neben der App / Store-Kopie)
 #
-# Exit: 0 OK · 1 Fehler
+# Exit-Codes:
+#   0  Erfolg (Install/Update/Uninstall OK; nichts zu entfernen bei -Uninstall = OK)
+#   1  Fehler (App-Ordner fehlt, Shortcut anlegen/entfernen fehlgeschlagen, Parameterkonflikt)
 
 [CmdletBinding()]
 param(
     [string]$AppDir = "",
     [switch]$DesktopLink,
     [switch]$NoDesktop,
-    [switch]$SkipStartMenu
+    [switch]$SkipStartMenu,
+    [switch]$Uninstall
 )
 
 $ErrorActionPreference = "Stop"
-$Version = "2.0.1"
+$Version = "2.0.2"
 $AppName = "InstantLens Doc"
 
 function Write-IldInfo([string]$msg) { Write-Host "[ILD $Version] $msg" }
 function Write-IldWarn([string]$msg) { Write-Host "[ILD $Version] Hinweis: $msg" -ForegroundColor Yellow }
 function Write-IldErr([string]$msg) { Write-Host "[ILD $Version] FEHLER: $msg" -ForegroundColor Red }
+
+function Get-IldShortcutPaths {
+    $paths = @()
+    $startPrograms = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs"
+    $paths += Join-Path $startPrograms "$AppName.lnk"
+    $desktop = [Environment]::GetFolderPath("Desktop")
+    if (-not $desktop) { $desktop = Join-Path $env:USERPROFILE "Desktop" }
+    $paths += Join-Path $desktop "$AppName.lnk"
+    return $paths
+}
+
+# --- Uninstall: Shortcuts entfernen ---
+if ($Uninstall) {
+    if ($DesktopLink -or $NoDesktop -or $SkipStartMenu) {
+        Write-IldWarn "-Uninstall ignoriert -DesktopLink/-NoDesktop/-SkipStartMenu (entfernt Startmenü + Desktop)."
+    }
+    $removed = @()
+    $missing = @()
+    $failed = @()
+    foreach ($link in Get-IldShortcutPaths) {
+        if (Test-Path -LiteralPath $link) {
+            try {
+                Remove-Item -LiteralPath $link -Force
+                $removed += $link
+                Write-IldInfo "Shortcut entfernt: $link"
+            } catch {
+                $failed += $link
+                Write-IldErr "Entfernen fehlgeschlagen: $link — $_"
+            }
+        } else {
+            $missing += $link
+            Write-IldInfo "Nicht vorhanden (ok): $link"
+        }
+    }
+    if ($failed.Count -gt 0) {
+        Write-IldErr "Uninstall unvollständig ($($failed.Count) Fehler)."
+        exit 1
+    }
+    Write-IldInfo "Uninstall fertig: $($removed.Count) entfernt, $($missing.Count) fehlten bereits. Exit 0."
+    exit 0
+}
 
 # App-Wurzel ermitteln (Skript liegt unter …/InstantLensDoc/scripts/)
 if (-not $AppDir) {
@@ -49,6 +95,7 @@ try {
 if (-not $AppDir -or -not (Test-Path (Join-Path $AppDir "run.bat"))) {
     Write-IldErr "App-Ordner mit run.bat nicht gefunden: $AppDir"
     Write-IldInfo "Tipp: -AppDir `"D:\AI_Temp\InstantLensDoc`" setzen oder zuerst sync-ild.ps1 ausführen."
+    Write-IldInfo "Exit-Code 1 = Fehler; 0 = OK. -Uninstall braucht keinen App-Ordner."
     exit 1
 }
 
@@ -144,4 +191,5 @@ $syncLocal = Join-Path $AppDir "scripts\sync-ild.ps1"
 if (Test-Path $syncLocal) {
     Write-Host ("  powershell -ExecutionPolicy Bypass -File `"{0}`"" -f $syncLocal)
 }
+Write-IldInfo "Exit-Codes: 0 OK · 1 Fehler. Deinstallieren: -Uninstall"
 exit 0

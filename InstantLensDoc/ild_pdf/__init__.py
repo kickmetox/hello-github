@@ -335,4 +335,4 @@ __all__ = [
     "page_count_for_text",
 ]
 
-__version__ = "2.0.1"
+__version__ = "2.0.2"

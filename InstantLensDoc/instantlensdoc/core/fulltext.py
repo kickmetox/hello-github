@@ -1,4 +1,4 @@
-"""Volltextsuche über mehrere geöffnete Dokumente / PDFs — 2.0.1: Case/Regex/Wort."""
+"""Volltextsuche über mehrere geöffnete Dokumente / PDFs — 2.0.2: CSV Doc/Seite/Snippet/Match·BOM."""
 
 from __future__ import annotations
 
@@ -489,6 +489,75 @@ def export_search_hits_csv(
         writer.writeheader()
         for row in rows:
             writer.writerow({k: row.get(k, "") for k in SEARCH_HIT_CSV_FIELDS})
+    return dest
+
+
+# Multi-Dokument-Suche CSV: Doc,Seite,Snippet,Match — optional UTF-8 BOM — 2.0.2
+MULTI_DOC_SEARCH_CSV_FIELDS = (
+    "Doc",
+    "Seite",
+    "Snippet",
+    "Match",
+)
+
+
+def export_multi_doc_hits_csv(
+    path: str | Path,
+    hits: Sequence[SearchHit | dict],
+    *,
+    query: str = "",
+    utf8_bom: bool = True,
+) -> Path:
+    """
+    Multi-Doc-Treffer als CSV: Spalten Doc,Seite,Snippet,Match.
+    SearchHit.page ist 0-basiert → CSV Seite 1-basiert.
+    Encoding UTF-8 mit optionalem BOM — 2.0.2.
+    """
+    import csv
+
+    dest = Path(path)
+    if dest.suffix.lower() != ".csv":
+        dest = dest.with_suffix(".csv")
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    enc = "utf-8-sig" if utf8_bom else "utf-8"
+    q = str(query or "")
+    with dest.open("w", encoding=enc, newline="") as fh:
+        writer = csv.DictWriter(
+            fh, fieldnames=list(MULTI_DOC_SEARCH_CSV_FIELDS), extrasaction="ignore"
+        )
+        writer.writeheader()
+        for h in hits or []:
+            if isinstance(h, SearchHit):
+                doc = Path(h.path).name if h.path else ""
+                page: int | str = (int(h.page) + 1) if h.page is not None else ""
+                snippet = str(h.snippet or "")
+                match = q
+            else:
+                src = dict(h or {})
+                p = str(src.get("path") or "")
+                doc = Path(p).name if p else str(src.get("Doc") or src.get("doc") or "")
+                if "Seite" in src and src.get("Seite") not in (None, ""):
+                    page = src["Seite"]
+                elif src.get("page") is None or src.get("page") == "":
+                    page = ""
+                else:
+                    try:
+                        # Dict mit 0-basiertem page (wie SearchHit)
+                        page = int(src["page"]) + 1
+                    except (TypeError, ValueError):
+                        page = str(src.get("page"))
+                snippet = str(src.get("snippet") or src.get("Snippet") or "")
+                match = str(
+                    src.get("Match") or src.get("query") or src.get("match") or q
+                )
+            writer.writerow(
+                {
+                    "Doc": doc,
+                    "Seite": page,
+                    "Snippet": snippet,
+                    "Match": match,
+                }
+            )
     return dest
 
 

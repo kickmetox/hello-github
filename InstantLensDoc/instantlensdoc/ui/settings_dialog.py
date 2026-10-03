@@ -386,7 +386,7 @@ class SettingsDialog(QDialog):
         self.high_contrast.setChecked(bool(get_high_contrast()))
         self.high_contrast.setToolTip(
             "Barrierefreiheit: High-Contrast Theme (schwarz/weiß) — "
-            "sofort speichern und anwenden — 2.0.1"
+            "sofort speichern und anwenden — Shortcut Ctrl+Alt+H — 2.0.2"
         )
         self.high_contrast.toggled.connect(self._on_high_contrast_live)
         form.addRow("Accessibility", self.high_contrast)
@@ -413,7 +413,18 @@ class SettingsDialog(QDialog):
             "UI-Schrift Skala 100 / 125 / 150 % — Live-Vorschau — 2.0.1"
         )
         self.ui_font_scale.currentIndexChanged.connect(self._on_ui_font_live)
-        form.addRow("UI-Schrift Skala", self.ui_font_scale)
+        scale_row = QHBoxLayout()
+        scale_row.addWidget(self.ui_font_scale, 1)
+        self.btn_ui_scale_reset = QPushButton("Reset 100 %")
+        self.btn_ui_scale_reset.setObjectName("settingsUiFontScaleReset")
+        self.btn_ui_scale_reset.setAutoDefault(False)
+        self.btn_ui_scale_reset.setDefault(False)
+        self.btn_ui_scale_reset.setToolTip(
+            "UI-Schrift Skala auf 100 % zurücksetzen — 2.0.2"
+        )
+        self.btn_ui_scale_reset.clicked.connect(self._reset_ui_font_scale_100)
+        scale_row.addWidget(self.btn_ui_scale_reset)
+        form.addRow("UI-Schrift Skala", scale_row)
 
         self.ui_font_preview = QLabel("Vorschau: InstantLens Doc Aa")
         self.ui_font_preview.setObjectName("settingsUiFontPreview")
@@ -1781,6 +1792,16 @@ class SettingsDialog(QDialog):
         except Exception:
             pass
         self._update_ui_font_preview_label()
+
+    def _reset_ui_font_scale_100(self) -> None:
+        """UI-Schrift Skala auf 100 % zurücksetzen — 2.0.2."""
+        idx = self.ui_font_scale.findData(100)
+        if idx < 0:
+            idx = 0
+        self.ui_font_scale.setCurrentIndex(idx)
+        # currentIndexChanged → _on_ui_font_live; falls schon 100 %: trotzdem anwenden
+        if int(self.ui_font_scale.currentData() or 100) == 100:
+            self._on_ui_font_live()
 
     def _on_high_contrast_live(self, checked: bool = False) -> None:
         """High-Contrast sofort persistieren und Theme anwenden — 2.0.1."""

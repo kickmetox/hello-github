@@ -172,6 +172,7 @@ DEFAULTS: dict[str, Any] = {
     "ocr_table_csv_delimiter": ";",  # Tabellen-OCR CSV: ; / , / Tab — 1.9.1
     "ocr_table_csv_utf8_bom": True,  # Tabellen-OCR CSV UTF-8 BOM — 1.9.1
     "last_ocr_table_csv_dir": "",  # Zielordner Tabellen-OCR CSV merken — 1.9.1
+    "last_portfolio_extract_dir": "",  # Zielordner Portfolio-Extrakt merken — 2.0.2
     "redaction_bake_continue_on_sidecar_skip": True,  # Bake fortsetzen merken — 1.3.6
     "redaction_preview_opacity": 0.90,
     "editor_text_encoding": "auto",
@@ -4196,6 +4197,23 @@ def set_last_ocr_table_csv_dir(path: str | Path) -> None:
     if p.is_file():
         p = p.parent
     save_settings({"last_ocr_table_csv_dir": str(p)})
+
+
+def get_last_portfolio_extract_dir() -> Path | None:
+    """Zuletzt genutzter Zielordner für Portfolio-Extrakt — 2.0.2."""
+    raw = str(load_settings().get("last_portfolio_extract_dir", "") or "").strip()
+    if not raw:
+        return None
+    p = Path(raw)
+    return p if p.is_dir() else None
+
+
+def set_last_portfolio_extract_dir(path: str | Path) -> None:
+    """Portfolio-Extrakt-Zielordner merken — 2.0.2."""
+    p = Path(path)
+    if p.is_file():
+        p = p.parent
+    save_settings({"last_portfolio_extract_dir": str(p)})
 
 
 def get_redaction_bake_continue_on_sidecar_skip() -> bool:

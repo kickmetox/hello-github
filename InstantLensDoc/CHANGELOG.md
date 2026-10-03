@@ -1,5 +1,22 @@
 # Changelog — InstantLens Doc
 
+## 2.0.2 — Multi-Doc CSV Doc/Seite/Snippet/Match·BOM·Regex-Status, Portfolio Extrakt Ordner/Rename/Fortschritt, UI-Skala Reset 100 %·HC Ctrl+Alt+H, install-ild -Uninstall
+
+Post-Release-Polish nach 2.0.1: **Multi-Dokument-Suche CSV** mit Spalten **Doc,Seite,Snippet,Match**, Option **UTF-8 BOM**, klarer **Regex-Fehlerstatus**; **Portfolio-Extrakt** merkt **Zielordner**, **Namenskollision → Umbenennen** (_2/_3), **Fortschrittsanzeige**; **UI-Schrift Skala** Button **Reset 100 %**; High-Contrast Shortcut **Ctrl+Alt+H**; **install-ild.ps1** Schalter **-Uninstall** entfernt Shortcuts, **Exit-Codes dokumentiert**. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen unverändert klar markiert / nicht produktiv.
+
+### Suche / Portfolio
+- Multi-Doc-CSV: Spalten Doc,Seite,Snippet,Match; BOM an/aus; Regex-Fehler im Status
+- Portfolio-Extrakt: letzter Zielordner; Kollision umbenennen; Fortschritt ≥2 Dateien
+
+### Accessibility / Installer
+- UI-Skala: Button „Reset 100 %“ (Settings, Live)
+- High-Contrast: Shortcut **Ctrl+Alt+H** (statt Ctrl+Alt+Shift+H)
+- `scripts/install-ild.ps1`: `-Uninstall` entfernt Startmenü+Desktop; Exit 0/1 dokumentiert
+
+### Version / Docs
+- Version **2.0.2** (App / `ild_pdf` / ISS / Smoke / Docs); `docs/VERSION` + `VERSION.txt`
+- About Serie **2.0**; Smoke: Multi-Doc CSV/BOM/Regex-Status, Portfolio Extrakt/Rename/Fortschritt, Scale-Reset, HC Ctrl+Alt+H, install-ild Uninstall (CLI + Qt)
+
 ## 2.0.1 — Multi-Doc Case/Regex/CSV·Fortschritt, Portfolio Sidebar·Auswahl·leer, High-Contrast Persistenz·UI-Skala live, install-ild Idempotenz
 
 Post-Release-Polish nach 2.0.0: **Multi-Dokument-Suche** Optionen **Aa / Wort / Regex**, **Treffer-CSV-Export**, **Fortschrittsanzeige** bei vielen Docs; **PDF-Portfolios** **Inhaltsliste in der Sidebar**, **Auswahl extrahieren**, Hinweis bei **leerer Collection**; **High-Contrast** sofort persistieren; **UI-Schrift Skala 100/125/150 %** mit **Live-Vorschau** in Settings; **install-ild.ps1** Schalter **-NoDesktop**, **Idempotenz** (Verknüpfungen aktualisieren), DE-Meldungen, Hinweis auf **sync-ild.ps1**. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen unverändert klar markiert / nicht produktiv.
