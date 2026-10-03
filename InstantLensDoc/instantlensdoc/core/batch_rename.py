@@ -1,4 +1,4 @@
-"""Batch-Umbenennen offener Tabs: Template {stem}_{n} + Undo-TXT — 1.4.3."""
+"""Batch-Umbenennen offener Tabs: Template {stem}_{n} + Undo-TXT — 1.4.4."""
 
 from __future__ import annotations
 
@@ -277,6 +277,51 @@ def entry_still_has_new_name(entry: RenameUndoEntry) -> bool:
 def eligible_undo_entries(log: RenameUndoLog) -> List[RenameUndoEntry]:
     """Einträge deren NEW-Datei noch dem neuen Namen entspricht — 1.4.3."""
     return [e for e in (log.entries or []) if entry_still_has_new_name(e)]
+
+
+def count_skipped_undo_entries(log: RenameUndoLog) -> int:
+    """Anzahl übersprungener Undo-Einträge (nicht mehr unter neuem Namen) — 1.4.4."""
+    total = len(log.entries or [])
+    return max(0, total - len(eligible_undo_entries(log)))
+
+
+def is_undo_log_invalidated(path: str | Path) -> bool:
+    """True wenn Undo-Log nach Rückgängig als ungültig markiert — 1.4.4."""
+    p = Path(path)
+    if not p.is_file():
+        return True
+    try:
+        head = p.read_text(encoding="utf-8")[:4000]
+    except Exception:
+        return False
+    for line in head.splitlines():
+        s = line.strip().lower()
+        if s.startswith("# invalidated"):
+            return True
+    return False
+
+
+def invalidate_undo_log(path: str | Path) -> Path:
+    """
+    Markiert Undo-Log als ungültig (nach Rückgängig), damit es nicht erneut
+    angewendet wird. Schreibt ``# INVALIDATED: …`` an den Anfang — 1.4.4.
+    """
+    p = Path(path)
+    if not p.is_file():
+        return p
+    if is_undo_log_invalidated(p):
+        return p
+    stamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    try:
+        raw = p.read_text(encoding="utf-8")
+    except Exception:
+        raw = ""
+    marker = (
+        f"# INVALIDATED: {stamp}\n"
+        "# Dieses Undo-Log wurde nach „Rückgängig letzte Batch“ ungültig.\n"
+    )
+    p.write_text(marker + raw, encoding="utf-8")
+    return p
 
 
 def apply_undo_log(

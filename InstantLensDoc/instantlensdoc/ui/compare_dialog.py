@@ -1,13 +1,14 @@
-"""Zwei PDFs Seite-nebeneinander vergleichen + Raster-Diff Overlay — 1.4.3."""
+"""Zwei PDFs Seite-nebeneinander vergleichen + Raster-Diff Overlay — 1.4.4."""
 
 from __future__ import annotations
 
 import html as _html
 import re
+from datetime import date as _date
 from pathlib import Path
 
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QImage, QPixmap
+from PySide6.QtCore import Qt, QTimer
+from PySide6.QtGui import QImage, QKeySequence, QPixmap
 from PySide6.QtWidgets import (
     QCheckBox,
     QDialog,
@@ -40,15 +41,53 @@ from instantlensdoc.core.app_settings import (
 
 
 DIFF_PNG_FILENAME_TEMPLATE = "{stemA}_vs_{stemB}_p{page}.png"
-DIFF_PNG_KNOWN_PLACEHOLDERS = frozenset({"stemA", "stemB", "page"})
-_DIFF_PNG_PLACEHOLDER_RE = re.compile(r"\{(stemA|stemB|page)\}")
+DIFF_PNG_KNOWN_PLACEHOLDERS = frozenset({"stemA", "stemB", "page", "date"})
+_DIFF_PNG_PLACEHOLDER_RE = re.compile(r"\{(stemA|stemB|page|date)\}")
 _DIFF_PNG_ANY_PLACEHOLDER_RE = re.compile(r"\{([^{}]+)\}")
+
+
+class DiffPngTemplateEdit(QLineEdit):
+    """Diff-PNG-Template: Cursor merken + lokales Undo — 1.4.4."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._saved_cursor = 0
+        self._saved_sel_start = -1
+        self._saved_sel_len = 0
+
+    def focusOutEvent(self, event):
+        self._saved_cursor = self.cursorPosition()
+        self._saved_sel_start = self.selectionStart()
+        self._saved_sel_len = self.selectionLength()
+        super().focusOutEvent(event)
+
+    def keyPressEvent(self, event):
+        if event.matches(QKeySequence.Undo):
+            if self.isUndoAvailable():
+                self.undo()
+            event.accept()
+            return
+        if event.matches(QKeySequence.Redo):
+            if self.isRedoAvailable():
+                self.redo()
+            event.accept()
+            return
+        super().keyPressEvent(event)
+
+    def restore_insert_position(self) -> None:
+        if self.hasFocus():
+            return
+        if self._saved_sel_start >= 0 and self._saved_sel_len > 0:
+            self.setSelection(self._saved_sel_start, self._saved_sel_len)
+        else:
+            pos = max(0, min(self._saved_cursor, len(self.text())))
+            self.setCursorPosition(pos)
 
 
 def find_invalid_diff_png_placeholders(template: str) -> list[str]:
     """
     Unbekannte ``{…}``-Platzhalter im Diff-PNG-Template (Reihenfolge, unique).
-    Bekannt: stemA, stemB, page. — 1.4.3
+    Bekannt: stemA, stemB, page, date. — 1.4.3/1.4.4
     """
     seen: set[str] = set()
     out: list[str] = []
@@ -86,16 +125,20 @@ def format_diff_png_filename(
     stem_b: str,
     page: int,
     template: str | None = None,
+    *,
+    date: str | None = None,
 ) -> str:
     """
     Dateiname aus Template ``{stemA}_vs_{stemB}_p{page}.png``.
-    Unbekannte Platzhalter bleiben unverändert (für Live-Vorschau) — 1.4.2/1.4.3.
+    Platzhalter: stemA, stemB, page, date (YYYY-MM-DD).
+    Unbekannte bleiben unverändert (Live-Vorschau) — 1.4.2/1.4.3/1.4.4.
     """
     a = (stem_a or "a").strip() or "a"
     b = (stem_b or "b").strip() or "b"
     p = max(1, int(page))
+    d = (date or "").strip() or _date.today().isoformat()
     tpl = (template or DIFF_PNG_FILENAME_TEMPLATE).strip() or DIFF_PNG_FILENAME_TEMPLATE
-    mapping = {"stemA": a, "stemB": b, "page": str(p)}
+    mapping = {"stemA": a, "stemB": b, "page": str(p), "date": d}
 
     def _sub(m: re.Match) -> str:
         return mapping.get(m.group(1), m.group(0))
@@ -173,7 +216,7 @@ class PdfCompareDialog(QDialog):
         btn_export.setToolTip(
             "Diff-Overlay als PNG: Zielordner merken; "
             f"Template {DIFF_PNG_FILENAME_TEMPLATE}; "
-            "Live-Vorschau + ungültige Platzhalter rot — 1.4.3"
+            "Quick-Insert {stemA}/{stemB}/{page}/{date}; Reset-Template — 1.4.4"
         )
         btn_export.clicked.connect(self._export_diff_png)
         self.btn_export_diff = btn_export
@@ -192,23 +235,48 @@ class PdfCompareDialog(QDialog):
         nav.addStretch()
         root.addLayout(nav)
 
-        # Diff-PNG Template: Live-Vorschau Dateiname; ungültige Platzhalter rot — 1.4.3
+        # Diff-PNG Template: Quick-Insert + Reset; Live-Vorschau — 1.4.3/1.4.4
         tpl_row = QHBoxLayout()
         tpl_row.addWidget(QLabel("PNG-Template"))
-        self.png_template_edit = QLineEdit(DIFF_PNG_FILENAME_TEMPLATE)
+        self.png_template_edit = DiffPngTemplateEdit(DIFF_PNG_FILENAME_TEMPLATE)
         self.png_template_edit.setPlaceholderText(DIFF_PNG_FILENAME_TEMPLATE)
         self.png_template_edit.setToolTip(
-            "Platzhalter: {stemA}, {stemB}, {page}. "
-            "Live-Vorschau darunter; ungültige rot — 1.4.3"
+            "Platzhalter: {stemA}, {stemB}, {page}, {date}. "
+            "Quick-Insert an Cursor; lokales Undo (Ctrl+Z); "
+            "Reset-Template auf Default — 1.4.4"
         )
         self.png_template_edit.textChanged.connect(self._update_png_template_preview)
         tpl_row.addWidget(self.png_template_edit, 1)
+        for token in ("{stemA}", "{stemB}", "{page}", "{date}"):
+            btn = QPushButton(token)
+            btn.setAutoDefault(False)
+            btn.setDefault(False)
+            btn.setFocusPolicy(Qt.TabFocus)
+            btn.setToolTip(
+                f"Platzhalter {token} an Cursor-Position einfügen "
+                "(lokales Undo: Ctrl+Z) — 1.4.4"
+            )
+            btn.clicked.connect(
+                lambda _checked=False, t=token: self._insert_png_template_placeholder(t)
+            )
+            tpl_row.addWidget(btn)
+        self.btn_reset_png_tpl = QPushButton("Reset-Template")
+        self.btn_reset_png_tpl.setAutoDefault(False)
+        self.btn_reset_png_tpl.setDefault(False)
+        self.btn_reset_png_tpl.setFocusPolicy(Qt.TabFocus)
+        self.btn_reset_png_tpl.setToolTip(
+            f"Template auf Default zurücksetzen "
+            f"({DIFF_PNG_FILENAME_TEMPLATE}); "
+            "Bestätigung nur wenn Feld vom Default abweicht — 1.4.4"
+        )
+        self.btn_reset_png_tpl.clicked.connect(self._reset_png_template)
+        tpl_row.addWidget(self.btn_reset_png_tpl)
         root.addLayout(tpl_row)
         self.png_template_preview = QLabel("")
         self.png_template_preview.setTextFormat(Qt.RichText)
         self.png_template_preview.setWordWrap(True)
         self.png_template_preview.setToolTip(
-            "Live-Vorschau Diff-PNG-Dateiname; ungültige Platzhalter rot — 1.4.3"
+            "Live-Vorschau Diff-PNG-Dateiname; ungültige Platzhalter rot — 1.4.3/1.4.4"
         )
         root.addWidget(self.png_template_preview)
 
@@ -263,8 +331,61 @@ class PdfCompareDialog(QDialog):
             self.png_template_edit.text().strip() or DIFF_PNG_FILENAME_TEMPLATE
         )
 
+    def _insert_png_template_placeholder(self, token: str) -> None:
+        """Quick-Insert {stemA}/{stemB}/{page}/{date} an Cursor — 1.4.4."""
+        edit = self.png_template_edit
+        if isinstance(edit, DiffPngTemplateEdit):
+            edit.restore_insert_position()
+        edit.insert(str(token or ""))
+        edit.setFocus()
+        if isinstance(edit, DiffPngTemplateEdit):
+            edit._saved_cursor = edit.cursorPosition()
+            edit._saved_sel_start = -1
+            edit._saved_sel_len = 0
+        self._update_png_template_preview()
+
+    def _focus_png_template_select_all(self) -> None:
+        """Fokus + Selektion ganzer Default-Text — 1.4.4."""
+        edit = self.png_template_edit
+        edit.setFocus()
+        edit.selectAll()
+        if isinstance(edit, DiffPngTemplateEdit):
+            edit._saved_cursor = 0
+            edit._saved_sel_start = 0
+            edit._saved_sel_len = len(edit.text() or "")
+
+    def _reset_png_template(self) -> None:
+        """Template auf Default; Live-Vorschau + Fokus mit Selektion — 1.4.4."""
+        edit = self.png_template_edit
+        default = DIFF_PNG_FILENAME_TEMPLATE
+        current = edit.text() or ""
+        if current == default:
+            self._update_png_template_preview()
+            QTimer.singleShot(0, self._focus_png_template_select_all)
+            return
+        reply = QMessageBox.question(
+            self,
+            "Reset-Template",
+            f"Diff-PNG-Template auf Default zurücksetzen?\n\n"
+            f"Aktuell: {current}\n"
+            f"Default: {default}",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
+        )
+        if reply != QMessageBox.Yes:
+            QTimer.singleShot(0, self._focus_png_template_select_all)
+            return
+        edit.selectAll()
+        edit.insert(default)
+        if isinstance(edit, DiffPngTemplateEdit):
+            edit._saved_cursor = edit.cursorPosition()
+            edit._saved_sel_start = -1
+            edit._saved_sel_len = 0
+        self._update_png_template_preview()
+        QTimer.singleShot(0, self._focus_png_template_select_all)
+
     def _update_png_template_preview(self, *_args) -> None:
-        """Live-Vorschau Dateiname; ungültige Platzhalter rot — 1.4.3."""
+        """Live-Vorschau Dateiname; ungültige Platzhalter rot — 1.4.3/1.4.4."""
         tpl = self._current_png_template()
         page = int(self.spin_left.value()) if hasattr(self, "spin_left") else 1
         stem_a = Path(self._left).stem if self._left else "a"

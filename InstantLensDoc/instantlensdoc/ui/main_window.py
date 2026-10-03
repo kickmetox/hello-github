@@ -98,6 +98,7 @@ from instantlensdoc.ui.settings_dialog import SettingsDialog
 from instantlensdoc.ui.stubs import show_planned
 from instantlensdoc.ui.theme import (
     apply_theme,
+    cycle_theme_mode,
     install_system_theme_watch,
     load_theme_mode,
     resolve_theme,
@@ -1054,7 +1055,7 @@ class MainWindow(QMainWindow):
         )
         self.ann_zero_status_label.setVisible(False)
         sb.addPermanentWidget(self.ann_zero_status_label)
-        # Theme: Indicator; Klick → Schnellmenü System/Hell/Dunkel — 1.4.3
+        # Theme: Indicator; Klick → Schnellmenü; Ctrl+Shift+T Zyklus — 1.4.4
         self.theme_status_label = QLabel(theme_status_text())
         self.theme_status_label.setObjectName("themeStatus")
         self.theme_status_label.setStyleSheet(
@@ -1062,7 +1063,8 @@ class MainWindow(QMainWindow):
         )
         self.theme_status_label.setCursor(Qt.PointingHandCursor)
         self.theme_status_label.setToolTip(
-            "Klick: Theme-Schnellmenü (System / Hell / Dunkel) — 1.4.3"
+            "Klick: Theme-Schnellmenü · Ctrl+Shift+T: "
+            "System → Hell → Dunkel → System — 1.4.4"
         )
         self.theme_status_label.mousePressEvent = (  # type: ignore[method-assign]
             self._on_theme_status_clicked
@@ -1199,9 +1201,11 @@ class MainWindow(QMainWindow):
         act_close_right.triggered.connect(self.close_tabs_right_of_current)
         m_file.addAction(act_close_right)
         act_dup_tab = QAction("Tab duplizieren", self)
-        act_dup_tab.setShortcut(QKeySequence("Ctrl+Shift+T"))
+        # Ctrl+Shift+T → Theme-Zyklus (1.4.4); Tab-Duplikat: Ctrl+Alt+Shift+T
+        act_dup_tab.setShortcut(QKeySequence("Ctrl+Alt+Shift+T"))
         act_dup_tab.setToolTip(
-            "Editor: Inhalt als neues Dokument klonen · Datei mit Pfad: optional erneut öffnen"
+            "Editor: Inhalt als neues Dokument klonen · Datei mit Pfad: optional erneut öffnen "
+            "(Ctrl+Alt+Shift+T; Ctrl+Shift+T = Theme-Zyklus) — 1.4.4"
         )
         act_dup_tab.triggered.connect(self.duplicate_tab)
         m_file.addAction(act_dup_tab)
@@ -1904,6 +1908,15 @@ class MainWindow(QMainWindow):
         self._theme_action.setToolTip("Manuell Hell/Dunkel umschalten (Override) — 1.4.0")
         self._theme_action.triggered.connect(self._toggle_theme)
         m_view.addAction(self._theme_action)
+        act_theme_cycle = QAction("Theme zyklisch (System→Hell→Dunkel)", self)
+        act_theme_cycle.setShortcut(QKeySequence("Ctrl+Shift+T"))
+        act_theme_cycle.setToolTip(
+            "Theme zyklisch: System → Hell → Dunkel → System "
+            "(Ctrl+Shift+T) — 1.4.4"
+        )
+        act_theme_cycle.triggered.connect(self._cycle_theme_mode)
+        m_view.addAction(act_theme_cycle)
+        self._theme_cycle_action = act_theme_cycle
         self._sync_theme_menu()
 
         m_pdf = mb.addMenu("&PDF")
@@ -4682,6 +4695,19 @@ class MainWindow(QMainWindow):
         apply_theme(mode=mode)  # type: ignore[arg-type]
         self._sync_theme_menu()
         self._set_status(theme_status_text(mode))  # type: ignore[arg-type]
+        try:
+            self._save_session()
+        except Exception:
+            pass
+
+    def _cycle_theme_mode(self) -> None:
+        """Ctrl+Shift+T: System → Hell → Dunkel → System — 1.4.4."""
+        mode = cycle_theme_mode(self)
+        self._sync_theme_menu()
+        labels = {"system": "System", "light": "Hell", "dark": "Dunkel"}
+        self._set_status(
+            f"{theme_status_text(mode)} (Zyklus → {labels.get(mode, mode)}) — 1.4.4"
+        )
         try:
             self._save_session()
         except Exception:

@@ -662,17 +662,31 @@ def set_last_pdf_diff_png_dir(path: str | Path) -> None:
 
 
 def get_last_rename_undo_log() -> Path | None:
-    """Pfad des letzten Batch-Rename Undo-Logs (TXT) — 1.4.2."""
+    """Pfad des letzten Batch-Rename Undo-Logs (TXT) — 1.4.2/1.4.4."""
     raw = str(load_settings().get("last_rename_undo_log") or "").strip()
     if not raw:
         return None
     p = Path(raw)
-    return p if p.is_file() else None
+    if not p.is_file():
+        return None
+    try:
+        from instantlensdoc.core.batch_rename import is_undo_log_invalidated
+
+        if is_undo_log_invalidated(p):
+            return None
+    except Exception:
+        pass
+    return p
 
 
 def set_last_rename_undo_log(path: str | Path) -> None:
     """Letztes Batch-Rename Undo-Log merken — 1.4.2."""
     save_settings({"last_rename_undo_log": str(Path(path))})
+
+
+def clear_last_rename_undo_log() -> None:
+    """Letztes Batch-Rename Undo-Log aus Settings entfernen — 1.4.4."""
+    save_settings({"last_rename_undo_log": ""})
 
 
 def get_ann_export_filename_template() -> str:

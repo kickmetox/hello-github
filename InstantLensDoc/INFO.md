@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **1.4.3** |
+| Version | **1.4.4** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -63,10 +63,10 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an / `checkedonce`)
 
-## Neu in 1.4.3
+## Neu in 1.4.4
 
-- Diff-PNG-Template: **Live-Vorschau** Dateiname; **ungültige Platzhalter rot**
-- Batch-Umbenennen Undo: **Bestätigung mit Anzahl**; greift nur Dateien unter dem **neuen Namen**
-- Annotation-Suche CSV: Spalten **Doc,Seite,Typ,Text,Snippet**; **UTF-8 BOM**
-- Theme-Indicator: **Klick → Schnellmenü** System / Hell / Dunkel
+- Diff-PNG-Template: **Quick-Insert** `{stemA}`/`{stemB}`/`{page}`/`{date}`; **Reset-Template**
+- Batch-Umbenennen Undo: **übersprungene zählen/melden**; **Log danach invalidieren**
+- Annotation-Suche CSV: **„nur aktuelle Trefferliste“** vs. **„alle Docs neu scannen“**
+- Theme: **Ctrl+Shift+T** zyklisch System→Hell→Dunkel→System
 - Stubs KI/Cloud/Stylus/3D unverändert

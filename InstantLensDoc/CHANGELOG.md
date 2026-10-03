@@ -1,5 +1,27 @@
 # Changelog — InstantLens Doc
 
+## 1.4.4 — Diff-PNG Quick-Insert·Reset, Rename-Undo Skip·Invalidate, Ann.-CSV Scope, Theme-Zyklus
+
+Post-Release-Polish nach 1.4.3: **Diff-PNG-Template** mit **Quick-Insert** `{stemA}`/`{stemB}`/`{page}`/`{date}` und **Reset-Template** auf Default; **Batch-Undo** zählt **übersprungene Dateien** und **invalidiert** das Undo-Log danach; **Annotation-Suche CSV** wählbar **„nur aktuelle Trefferliste“** vs. **„alle Docs neu scannen“**; **Theme-Schnellmenü** zusätzlich per **Ctrl+Shift+T** zyklisch System→Hell→Dunkel→System. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### PDF
+- Vergleich Diff-PNG: Quick-Insert-Buttons `{stemA}` `{stemB}` `{page}` `{date}`; Reset-Template auf Default
+
+### Dateien / Tabs
+- Batch-Umbenennen Undo: übersprungene Dateien zählen und melden; Log-Eintrag danach invalidieren
+
+### Annotationen
+- Suche-Treffer-CSV: Option „nur aktuelle Trefferliste“ vs. „alle Docs neu scannen“
+
+### UI / Theme
+- Theme-Schnellmenü: Shortcut Ctrl+Shift+T zyklisch System→Hell→Dunkel→System (Tab duplizieren → Ctrl+Alt+Shift+T)
+
+### Packaging / Docs
+- Version **1.4.4** (App / `ild_pdf` / ISS / Smoke / Docs)
+- Smoke: Diff-PNG Quick-Insert·Reset, Rename-Undo Skip·Invalidate, Ann.-CSV Scope, Theme-Zyklus (CLI + Qt)
+
+---
+
 ## 1.4.3 — Diff-PNG Live-Vorschau, Rename-Undo Bestätigung·Filter, Ann.-CSV Spalten+BOM, Theme-Schnellmenü
 
 Post-Release-Polish nach 1.4.2: **Diff-PNG-Template** mit **Live-Vorschau** des Dateinamens und **ungültigen Platzhaltern in Rot**; **Batch-Undo** mit **Bestätigung inkl. Anzahl** und greift **nur Dateien, die noch dem neuen Namen entsprechen**; **Annotation-Suche CSV** mit Spalten **Doc,Seite,Typ,Text,Snippet** und **UTF-8 BOM**; **Theme-Indicator** öffnet per Klick ein **Schnellmenü** (System / Hell / Dunkel). Stubs KI/Cloud/Stylus/3D bleiben Stubs.

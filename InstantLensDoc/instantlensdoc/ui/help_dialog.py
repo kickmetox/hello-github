@@ -130,7 +130,8 @@ HELP_HTML = f"""
     Statusleisten-Hint „Ctrl+Z · … rückgängig“ (benannt, z. B. Tag umbenennen)</li>
 <li><b>Bearbeiten → Suchen und Ersetzen</b> (Ctrl+R): Find/Replace im Texteditor</li>
 <li><b>Bearbeiten → Gehe zu Zeile / Seite</b> (Ctrl+G): Editor → Zeile; PDF → Seite (auch PDF → Gehe zu Seite…, Ctrl+Shift+G)</li>
-<li><b>Datei → Tab duplizieren</b> (Ctrl+Shift+T): Editor-Inhalt als neues Dokument klonen;
+<li><b>Datei → Tab duplizieren</b> (Ctrl+Alt+Shift+T): Editor-Inhalt als neues Dokument klonen — 1.4.4;
+    <b>Ansicht → Theme zyklisch</b> (Ctrl+Shift+T): System→Hell→Dunkel→System;
     <b>Text-Diff (offene Tabs)</b> (Ctrl+Alt+D): Wrap-Blink Dauer kurz/mittel/lang · System-Beep/stumm · Änderung i/n · Wrap-around · F7/Shift+F7 · Sync-Scroll · Ignore-Whitespace · Diff-TXT — 1.2.9;
     <b>Erneut öffnen</b> (Ctrl+Alt+Shift+O): Datei vom Datenträger neu laden</li>
 <li><b>Bearbeiten → Zeile / Annotation duplizieren</b> (Ctrl+D): Editor Zeile/Auswahl; PDF ausgewählte Annotation (auch Ctrl+Shift+D)</li>

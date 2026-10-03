@@ -1,4 +1,4 @@
-"""Batch-Umbenennen: Dry-Run, Kollision, Undo-TXT, Rückgängig letzte Batch — 1.4.3."""
+"""Batch-Umbenennen: Dry-Run, Kollision, Undo-TXT, Rückgängig letzte Batch — 1.4.4."""
 
 from __future__ import annotations
 
@@ -23,6 +23,7 @@ from PySide6.QtWidgets import (
 )
 
 from instantlensdoc.core.app_settings import (
+    clear_last_rename_undo_log,
     get_last_rename_undo_log,
     set_last_rename_undo_log,
 )
@@ -32,8 +33,11 @@ from instantlensdoc.core.batch_rename import (
     RenameUndoLog,
     apply_undo_log,
     count_collisions,
+    count_skipped_undo_entries,
     eligible_undo_entries,
     format_dry_run_list,
+    invalidate_undo_log,
+    is_undo_log_invalidated,
     preview_batch_rename,
     read_undo_log,
     rename_files,
@@ -200,10 +204,24 @@ class BatchRenameDialog(QDialog):
             return last
         return None
 
+    def _invalidate_used_undo_log(self, log_path: Path) -> None:
+        """Log nach Undo invalidieren + Settings/Dialog-Pfad leeren — 1.4.4."""
+        try:
+            invalidate_undo_log(log_path)
+        except Exception:
+            pass
+        try:
+            clear_last_rename_undo_log()
+        except Exception:
+            pass
+        if self.undo_log_path and Path(self.undo_log_path) == Path(log_path):
+            self.undo_log_path = ""
+        self._refresh_undo_button()
+
     def _undo_last_batch(self) -> None:
         """
-        Rückgängig letzte Batch: Bestätigung mit Anzahl;
-        nur Dateien die noch dem neuen Namen entsprechen — 1.4.3.
+        Rückgängig letzte Batch: übersprungene zählen/melden;
+        Log danach invalidieren — 1.4.3/1.4.4.
         """
         log_path = self._resolve_undo_log_path()
         if log_path is None:
@@ -216,6 +234,15 @@ class BatchRenameDialog(QDialog):
             if not path:
                 return
             log_path = Path(path)
+        if is_undo_log_invalidated(log_path):
+            QMessageBox.information(
+                self,
+                "Rückgängig letzte Batch",
+                f"Undo-Log ist bereits ungültig (nach vorherigem Rückgängig):\n"
+                f"{log_path}",
+            )
+            self._invalidate_used_undo_log(log_path)
+            return
         try:
             log = read_undo_log(log_path)
         except Exception as e:
@@ -227,14 +254,17 @@ class BatchRenameDialog(QDialog):
             )
             return
         eligible = eligible_undo_entries(log)
-        skipped = len(log.entries) - len(eligible)
+        skipped = count_skipped_undo_entries(log)
         if not eligible:
             QMessageBox.information(
                 self,
                 "Rückgängig letzte Batch",
                 f"Keine der {len(log.entries)} Datei(en) entspricht noch dem "
-                f"neuen Namen — nichts zurückzunehmen.\n{log_path}",
+                f"neuen Namen — nichts zurückzunehmen.\n"
+                f"Übersprungen: {skipped}\n{log_path}",
             )
+            # Auch ohne Undo: Log invalidieren (nicht erneut anbieten) — 1.4.4
+            self._invalidate_used_undo_log(log_path)
             return
         msg = (
             f"{len(eligible)} Datei(en) noch unter dem neuen Namen "
@@ -242,7 +272,7 @@ class BatchRenameDialog(QDialog):
         )
         if skipped:
             msg += (
-                f"\n\n{skipped} Eintrag/Einträge übersprungen "
+                f"\n\n{skipped} Datei(en) übersprungen "
                 "(nicht mehr unter neuem Namen)."
             )
         reply = QMessageBox.question(
@@ -269,22 +299,25 @@ class BatchRenameDialog(QDialog):
         path_map = {a: b for a, b in self.undone}
         self._paths = [path_map.get(p, p) for p in self._paths]
         self._refresh_preview()
+        # Log nach Undo invalidieren — 1.4.4
+        self._invalidate_used_undo_log(log_path)
+        summary = (
+            f"{len(self.undone)} Datei(en) zurückbenannt.\n"
+            f"Übersprungen: {skipped}"
+        )
         if errors:
             QMessageBox.warning(
                 self,
                 "Rückgängig",
-                f"{len(self.undone)} ok, {len(errors)} Fehler:\n"
-                + "\n".join(errors[:8]),
+                f"{summary}\n{len(errors)} Fehler:\n" + "\n".join(errors[:8]),
             )
-        if self.undone:
+        elif self.undone or skipped:
             QMessageBox.information(
                 self,
                 "Rückgängig letzte Batch",
-                f"{len(self.undone)} Datei(en) zurückbenannt.",
+                summary + "\nUndo-Log invalidiert.",
             )
-            # Log bleibt; Button weiter nutzbar für anderes Log
-            self._refresh_undo_button()
-        elif not errors:
+        else:
             QMessageBox.information(
                 self, "Rückgängig", "Keine Dateien zurückbenannt."
             )

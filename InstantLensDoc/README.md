@@ -2,7 +2,7 @@
 
 Moderne Textverarbeitung mit PDF-Annotator, OCR-Bridge und Formulargenerator.
 
-**Version:** 1.4.3  
+**Version:** 1.4.4  
 **Hersteller:** Andreas Meyer · ame@sellerbach.de
 
 ## Quickstart (Windows)
@@ -33,8 +33,8 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an).
 
-## Neu in 1.4.3
+## Neu in 1.4.4
 
-Diff-PNG-Template mit Live-Vorschau des Dateinamens und ungültigen Platzhaltern in Rot; Batch-Undo mit Bestätigung inkl. Anzahl und nur Dateien, die noch dem neuen Namen entsprechen; Annotation-Suche-CSV mit Spalten Doc,Seite,Typ,Text,Snippet und UTF-8 BOM; Theme-Indicator öffnet per Klick Schnellmenü System/Hell/Dunkel. Stubs KI/Cloud/Stylus/3D unverändert.
+Diff-PNG-Template mit Quick-Insert `{stemA}`/`{stemB}`/`{page}`/`{date}` und Reset auf Default; Batch-Undo zählt übersprungene Dateien und invalidiert das Log danach; Annotation-Suche-CSV wählbar aktuelle Trefferliste vs. alle Docs neu scannen; Theme per Ctrl+Shift+T zyklisch System→Hell→Dunkel→System. Stubs KI/Cloud/Stylus/3D unverändert.
 
 Siehe [CHANGELOG.md](CHANGELOG.md), [FEATURES.md](FEATURES.md) und [INFO.md](INFO.md).

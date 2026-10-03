@@ -1,4 +1,4 @@
-"""Hell/Dunkel/System-Theme für die Qt-Oberfläche — 1.4.3 Schnellmenü."""
+"""Hell/Dunkel/System-Theme für die Qt-Oberfläche — 1.4.4 Zyklus-Shortcut."""
 
 from __future__ import annotations
 
@@ -10,6 +10,9 @@ from instantlensdoc.core.app_settings import get_theme, set_theme
 
 ThemeMode = Literal["light", "dark", "system"]
 ResolvedTheme = Literal["light", "dark"]
+
+# Zyklische Reihenfolge: System → Hell → Dunkel → System — 1.4.4
+THEME_CYCLE_ORDER: tuple[ThemeMode, ...] = ("system", "light", "dark")
 
 LIGHT_STYLE = """
 QMainWindow, QWidget { background: #f5f5f5; color: #1a1a1a; }
@@ -128,6 +131,25 @@ def toggle_theme(parent: QWidget | None = None) -> ResolvedTheme:
     current = resolve_theme()
     new_mode: ThemeMode = "dark" if current == "light" else "light"
     return apply_theme(mode=new_mode)
+
+
+def next_theme_mode(mode: ThemeMode | None = None) -> ThemeMode:
+    """Nächster Modus im Zyklus System → Hell → Dunkel → System — 1.4.4."""
+    cur: ThemeMode = mode if mode in THEME_CYCLE_ORDER else load_theme_mode()
+    if cur not in THEME_CYCLE_ORDER:
+        cur = "system"
+    idx = THEME_CYCLE_ORDER.index(cur)
+    return THEME_CYCLE_ORDER[(idx + 1) % len(THEME_CYCLE_ORDER)]
+
+
+def cycle_theme_mode(parent: QWidget | None = None) -> ThemeMode:
+    """
+    Theme zyklisch umschalten: System → Hell → Dunkel → System.
+    Speichert und wendet an; liefert den neuen Preference-Modus — 1.4.4.
+    """
+    nxt = next_theme_mode()
+    apply_theme(mode=nxt)
+    return nxt
 
 
 def set_follow_system(follow: bool) -> ResolvedTheme:
