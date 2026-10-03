@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Smoke-Test 0.7.3 (CLI + optional offscreen Qt). Kernpfade: open/annotate/export/license + ausgewählte 0.6.x-Pfade."""
+"""Smoke-Test 0.7.4 (CLI + optional offscreen Qt). Kernpfade: open/annotate/export/license + ausgewählte 0.6.x-Pfade."""
 
 from __future__ import annotations
 
@@ -122,8 +122,8 @@ def main() -> int:
     from instantlensdoc.core.update_check import check_for_updates
     from instantlensdoc.license import KEY_DAYS, TRIAL_DAYS, generate_key, verify_key
 
-    assert __version__ == "0.7.3", __version__
-    assert ild_ver == "0.7.3", ild_ver
+    assert __version__ == "0.7.4", __version__
+    assert ild_ver == "0.7.4", ild_ver
     assert TRIAL_DAYS == 28 and KEY_DAYS == 32
     key = generate_key("ame@sellerbach.de")
     ok, msg, _ = verify_key(key)
@@ -141,7 +141,7 @@ def main() -> int:
     assert "Settings" in tr("settings")
     set_lang("de")
     upd = check_for_updates(allow_network=False)
-    assert upd.local_version == "0.7.3" and not upd.online
+    assert upd.local_version == "0.7.4" and not upd.online
     assert get_export_jpeg_quality() >= 10
     assert get_ui_lang() in ("de", "en")
     assert 25 <= get_default_zoom_percent() <= 500
@@ -182,7 +182,8 @@ def main() -> int:
     assert get_ann_pen_color() == "#112233"
     assert (ROOT / "CHANGELOG.md").is_file()
     cl = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-    assert "0.7.3" in cl
+    assert "0.7.4" in cl
+    assert "## 0.7.4" in cl
     assert "## 0.7.3" in cl
     assert "## 0.7.2" in cl
     assert "## 0.7.1" in cl
@@ -235,7 +236,7 @@ def main() -> int:
     assert "0.4.9" in cl  # noch in Kurz-Tabelle
     assert "0.3.9" in cl  # noch in Kurz-Tabelle
     assert "0.2.9" in cl  # noch in Kurz-Tabelle
-    assert "0.7.3" in (ROOT / "README.md").read_text(encoding="utf-8")
+    assert "0.7.4" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "run.bat" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "sync-ild.ps1" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "scripts/sync-ild.ps1" in (ROOT / "FEATURES.md").read_text(encoding="utf-8")
@@ -584,13 +585,13 @@ def main() -> int:
 
         assert (ROOT / "installer" / "installer-hinweis.txt").exists()
         iss = (ROOT / "installer" / "instantlensdoc.iss").read_text(encoding="utf-8")
-        assert "0.7.3" in iss and "desktopicon" in iss and "DisableProgramGroupPage=no" in iss
+        assert "0.7.4" in iss and "desktopicon" in iss and "DisableProgramGroupPage=no" in iss
         assert "UninstallDisplayName" in iss and "Uninstallable=yes" in iss
         assert "IncludeKeygen" in iss and "SetupIconFile" in iss
         assert "InstantLensKeygen.exe" in iss
         assert "uninstallexe" in iss
         bw = (ROOT / "build-windows.ps1").read_text(encoding="utf-8")
-        assert "0.7.3" in bw and "NoKeygenInApp" in bw and "--icon" in bw
+        assert "0.7.4" in bw and "NoKeygenInApp" in bw and "--icon" in bw
         assert "InstantLensKeygen.exe" in bw
         bi = (ROOT / "installer" / "build-installer.ps1").read_text(encoding="utf-8")
         assert "InstantLensKeygen.exe" in bi and "IncludeKeygen" in bi
@@ -599,7 +600,7 @@ def main() -> int:
         assert "Installer" in kg_readme
         hinweis = (ROOT / "installer" / "installer-hinweis.txt").read_text(encoding="utf-8")
         assert "InstantLensKeygen.exe" in hinweis or "run-keygen.bat" in hinweis
-        assert "0.7.3" in hinweis
+        assert "0.7.4" in hinweis
         assert "checkedonce" in iss and "Desktop-Verknüpfung" in hinweis
         from ild_pdf.limits import OPEN_TIMEOUT_HINT, OPEN_TIMEOUT_HINT_SEC
 
@@ -611,7 +612,7 @@ def main() -> int:
         assert "QProgressDialog" in (ROOT / "instantlensdoc" / "ui" / "main_window.py").read_text(encoding="utf-8")
 
         assert (ROOT / "examples" / "ild_pdf_demo.py").exists()
-        assert "0.7.3" in (ROOT / "INFO.md").read_text(encoding="utf-8")
+        assert "0.7.4" in (ROOT / "INFO.md").read_text(encoding="utf-8")
         assert (ROOT / "assets" / "app.ico").is_file()
 
         # --- Kernpfade: open / annotate / export / license ---
@@ -744,7 +745,7 @@ def main() -> int:
         assert "| A" in tbl and "| 1" in tbl
         assert ocr_mod.TESSERACT_WIKI_URL.startswith("https://")
 
-        # --- Ausgewählte 0.3.x-/0.4.x-/0.5.x-/0.6.x-Pfade (CLI, Konsolidierung 0.7.0) + 0.7.3 ---
+        # --- Ausgewählte 0.3.x-/0.4.x-/0.5.x-/0.6.x-Pfade (CLI, Konsolidierung 0.7.0) + 0.7.4 ---
         from ild_pdf.annotate import stamp_library_items
         from ild_pdf.attachments import has_attachments, list_attachments
         from ild_pdf.flatten import flatten_annotations_to_pdf
@@ -802,7 +803,7 @@ def main() -> int:
         set_backup_on_save(False)
         assert get_page_size_unit() in ("mm", "inch")
         assert isinstance(get_minimize_to_tray(), bool)
-        assert "0.7.3" in feat and "0.7.2" in feat and "0.7.1" in feat and "0.6.9" in feat and "0.5.9" in feat and "0.4.9" in feat  # Release + Zeitraum-Feature-Hinweise
+        assert "0.7.4" in feat and "0.7.3" in feat and "0.7.2" in feat and "0.7.1" in feat and "0.6.9" in feat and "0.5.9" in feat and "0.4.9" in feat  # Release + Zeitraum-Feature-Hinweise
         assert "Batch-OCR" in feat or "OCR gesamtes PDF" in feat
         assert "Tag" in feat
         assert "Projekt-Ordner" in feat or "Workspace" in feat
@@ -1746,6 +1747,72 @@ def main() -> int:
         assert "flush" in kb073.lower() or "Debounce" in kb073
         print("0.7.3 CLI hits-list/templates-folder/merge-preview/ctrl-s-flush: OK")
 
+        # 0.7.4 CLI: Kontext-Snippet, Merge je Paar, Vorlagen-Reorder, Dirty-Debounce
+        from instantlensdoc.core.app_settings import reorder_user_doc_templates
+        from instantlensdoc.core.fulltext import _snippet_around, format_hit_line
+
+        snip074 = _snippet_around(
+            "alpha FINDME omega und mehr Text drumherum",
+            "FINDME",
+            context_chars=6,
+            width=80,
+        )
+        assert "«FINDME»" in snip074
+        assert "alpha" in snip074 or "…" in snip074
+        line074 = format_hit_line(
+            "demo.pdf", page=0, line=None, snippet=snip074, kind="pdf", query="FINDME"
+        )
+        assert "demo.pdf" in line074 and "S.1" in line074 and "«FINDME»" in line074
+        # Vorlagen-Reorder persistiert
+        for old in list(get_user_doc_templates()):
+            delete_user_doc_template(old["id"])
+        e074a = save_user_doc_template(title="TplA074", body="A\n")
+        e074b = save_user_doc_template(title="TplB074", body="B\n")
+        reordered = reorder_user_doc_templates([e074b["id"], e074a["id"]])
+        assert [t["id"] for t in reordered] == [e074b["id"], e074a["id"]]
+        delete_user_doc_template(e074a["id"])
+        delete_user_doc_template(e074b["id"])
+        # Merge groups= nur ausgewählte Gruppe
+        store_dup.annotations = []
+        store_dup.clear_history()
+        a074 = Annotation(0, AnnotationType.HIGHLIGHT, 8, 8, width=12, height=5, text="g1a")
+        b074 = Annotation(0, AnnotationType.HIGHLIGHT, 8, 9, width=12, height=5, text="g1b")
+        c074 = Annotation(0, AnnotationType.STICKY, 40, 40, width=20, height=10, text="alone")
+        store_dup.add(a074)
+        store_dup.add(b074)
+        store_dup.add(c074)
+        groups074 = store_dup.find_duplicate_groups(tol=2.0, same_type=True)
+        assert groups074
+        removed074 = store_dup.merge_duplicates(
+            tol=2.0, same_type=True, keep="oldest", groups=groups074[:1]
+        )
+        assert removed074 >= 1
+        assert any(x.text == "alone" for x in store_dup.annotations)
+        dlg074_src = (
+            ROOT / "instantlensdoc" / "ui" / "merge_duplicates_dialog.py"
+        ).read_text(encoding="utf-8")
+        assert "groups_to_merge" in dlg074_src and "Alle behalten" in dlg074_src
+        tpl074_src = (
+            ROOT / "instantlensdoc" / "ui" / "templates_dialog.py"
+        ).read_text(encoding="utf-8")
+        assert "TemplatesOrderDialog" in tpl074_src and "ordered_ids" in tpl074_src
+        mw074 = (ROOT / "instantlensdoc" / "ui" / "main_window.py").read_text(encoding="utf-8")
+        assert "_reorder_user_templates_dialog" in mw074
+        assert "_refresh_document_dirty_labels" in mw074
+        assert "sidecar_save_pending" in mw074
+        pv074 = (ROOT / "instantlensdoc" / "ui" / "pdf_view.py").read_text(encoding="utf-8")
+        assert "sidecar_save_pending" in pv074 and "groups_to_merge" in pv074
+        assert "reorder_user_doc_templates" in (
+            ROOT / "instantlensdoc" / "core" / "app_settings.py"
+        ).read_text(encoding="utf-8")
+        feat074 = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
+        assert "0.7.4" in feat074 and "Kontext-Snippet" in feat074
+        cl074 = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+        assert "## 0.7.4" in cl074 and "Dirty" in cl074
+        kb074 = (ROOT / "instantlensdoc" / "ui" / "keyboard_help.py").read_text(encoding="utf-8")
+        assert "Kontext-Snippet" in kb074 or "Vorlagen-Reihenfolge" in kb074
+        print("0.7.4 CLI snippet/merge-pair/templates-drag/dirty-debounce: OK")
+
         set_show_printer_marks(True)
         assert get_show_printer_marks() is True
         set_show_printer_marks(False)
@@ -1878,7 +1945,7 @@ def main() -> int:
         assert "Continuous Scroll" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
         assert "Seitenlabel" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8") or "Seitenlabels" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
         assert "Zwischenablage-Verlauf" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8") or "Clipboard" in (ROOT / "FEATURES.md").read_text(encoding="utf-8")
-        assert "0.7.3" in feat and "0.7.2" in feat and "0.7.1" in feat and "0.6.9" in feat and "0.5.9" in feat and "0.4.9" in feat
+        assert "0.7.4" in feat and "0.7.3" in feat and "0.7.2" in feat and "0.7.1" in feat and "0.6.9" in feat and "0.5.9" in feat and "0.4.9" in feat
         # --- 0.4.2 CLI: Outline Goto, Ann Copy/Paste, Flatten Progress ---
         import pikepdf as _pike_ol
 
@@ -2003,7 +2070,7 @@ def main() -> int:
         win._add_chained_frame()
         assert len(win.layout_doc.text_frames) >= 2
         assert "Lizenz:" in win.license_label.text() or "⚠" in win.license_label.text()
-        assert "v0.7.3" in win.version_label.text()
+        assert "v0.7.4" in win.version_label.text()
         # Lizenz <7 Tage: Style prominent
         st_lic = win.license_manager.status()
         if st_lic.allowed and st_lic.days_remaining < 7:
@@ -2184,11 +2251,11 @@ def main() -> int:
             assert win.editor.outdent_selection(4)
             assert win.editor.toPlainText().splitlines()[0] == "alpha"
             # Fenstertitel mit Version
-            assert "0.7.3" in win.windowTitle()
+            assert "0.7.4" in win.windowTitle()
             from instantlensdoc.ui.help_dialog import AboutDialog, HelpDialog, open_log_folder
 
             about = AboutDialog(win)
-            assert "0.7.3" in about.windowTitle()
+            assert "0.7.4" in about.windowTitle()
             help_dlg = HelpDialog(win)
             assert help_dlg.windowTitle() == "Hilfe"
             assert callable(open_log_folder)
@@ -2848,7 +2915,7 @@ def main() -> int:
             win.apply_tray_setting()
             if win._tray is not None:
                 tip = win._tray.toolTip()
-                assert "0.7.3" in tip and "InstantLens Doc" in tip
+                assert "0.7.4" in tip and "InstantLens Doc" in tip
             set_minimize_to_tray(False)
             win.apply_tray_setting()
             print("0.3.9 fit-h/ann-stats/special/tray: OK")
@@ -2861,9 +2928,9 @@ def main() -> int:
             from instantlensdoc.ui.password_dialog import CompressPdfDialog, SetPasswordDialog
             from instantlensdoc.ui.stubs import PLANNED
             assert KeyboardHelpDialog and SetPasswordDialog and CompressPdfDialog
-            assert "0.7.3" in PLANNED["ki"]
+            assert "0.7.4" in PLANNED["ki"]
             assert "Coming soon" in PLANNED["cloud"]
-            assert "0.7.3" in PLANNED["stylus"] and "0.7.3" in PLANNED["extrude3d"]
+            assert "0.7.4" in PLANNED["stylus"] and "0.7.4" in PLANNED["extrude3d"]
             # Toolbar ↔ Menü Sync Graustufen/Nacht
             win.pdf_view.set_grayscale(True)
             assert win._grayscale_action.isChecked()
@@ -2898,7 +2965,7 @@ def main() -> int:
             assert win.editor.toPlainText().splitlines() == ["one", "two"]
             from instantlensdoc.ui.help_dialog import HELP_HTML
 
-            assert "Stub 0.7.3" in HELP_HTML
+            assert "Stub 0.7.4" in HELP_HTML
             assert "scripts/sync-ild.ps1" in HELP_HTML
             assert "Präsentationsmodus" in HELP_HTML or "F5" in (
                 ROOT / "instantlensdoc" / "ui" / "keyboard_help.py"
@@ -4642,10 +4709,92 @@ def main() -> int:
             assert "## 0.7.3" in cl073q
             print("0.7.3 Qt hits-list/templates-folder/merge-preview/ctrl-s-flush: OK")
 
+            # --- 0.7.4 Qt: Kontext-Snippet, Merge je Paar, Vorlagen-Drag, Dirty-Debounce ---
+            from instantlensdoc.core.app_settings import (
+                reorder_user_doc_templates as reorder_tpl074,
+            )
+            from instantlensdoc.core.fulltext import _snippet_around as snip_fn074
+            from instantlensdoc.ui.merge_duplicates_dialog import (
+                MergeDuplicatesPreviewDialog as MDP074,
+            )
+            from instantlensdoc.ui.templates_dialog import TemplatesOrderDialog as TOD074
+
+            assert "«" in snip_fn074("xx FINDME yy", "FINDME", context_chars=4)
+            assert callable(win._reorder_user_templates_dialog)
+            assert callable(win._refresh_document_dirty_labels)
+            assert callable(win.pdf_view.sidecar_save_pending)
+            for old in list(get_tpl071()):
+                del_tpl071(old["id"])
+            e074q1 = save_tpl071(title="QtTpl074a", body="a\n")
+            e074q2 = save_tpl071(title="QtTpl074b", body="b\n")
+            dlg_tpl = TOD074([e074q1, e074q2], parent=win)
+            assert dlg_tpl.list.count() == 2
+            # Drag-Simulation: IDs manuell umdrehen via ordered_ids nach Item-Swap
+            item0 = dlg_tpl.list.takeItem(0)
+            dlg_tpl.list.addItem(item0)
+            ids074 = dlg_tpl.ordered_ids()
+            assert ids074 == [e074q2["id"], e074q1["id"]]
+            reorder_tpl074(ids074)
+            assert [t["id"] for t in get_tpl071()] == ids074
+            del_tpl071(e074q1["id"])
+            del_tpl071(e074q2["id"])
+            dlg_tpl.close()
+            # Merge dialog: eine Gruppe abwählen → groups_to_merge leer / partial
+            win.open_path(str(smoke_pdf))
+            store074 = win.pdf_view.store
+            assert store074 is not None
+            store074.annotations = []
+            store074.clear_history()
+            store074.add(Ann071(0, AT071.HIGHLIGHT, 50, 50, width=14, height=6, text="m1"))
+            store074.add(Ann071(0, AT071.HIGHLIGHT, 51, 50, width=14, height=6, text="m2"))
+            g074 = store074.find_duplicate_groups(tol=2.0, same_type=True)
+            dlg_m = MDP074(g074, parent=win)
+            assert dlg_m.list.count() >= 2
+            assert len(dlg_m.groups_to_merge()) >= 1
+            dlg_m._set_all_checked(False)
+            assert dlg_m.groups_to_merge() == []
+            assert len(dlg_m.groups_to_keep()) >= 1
+            dlg_m._set_all_checked(True)
+            with patch(
+                "instantlensdoc.ui.merge_duplicates_dialog.MergeDuplicatesPreviewDialog.exec",
+                return_value=1,
+            ):
+                # real dialog would return selected; patch path uses groups_to_merge on real instance —
+                # call merge with selected groups directly
+                n_rm = store074.merge_duplicates(
+                    tol=2.0, keep="oldest", groups=dlg_m.groups_to_merge()
+                )
+                assert n_rm >= 1
+            dlg_m.close()
+            # Dirty indicator during pending sidecar debounce
+            store074.dirty = True
+            win.pdf_view._sidecar_save_pending = True
+            win.pdf_view._sidecar_save_timer.stop()
+            assert win.pdf_view.sidecar_save_pending() is True
+            assert win._current_is_dirty() is True
+            if win.doc and win.doc.path:
+                win._mark_unsaved(win.doc.path, True)
+                win._refresh_document_dirty_labels()
+                # Tab-Label mit *
+                found_star = False
+                for i in range(win.sidebar.files.count()):
+                    it = win.sidebar.files.item(i)
+                    if it and it.text().endswith(" *"):
+                        found_star = True
+                        break
+                assert found_star
+            win.pdf_view._sidecar_save_pending = False
+            store074.dirty = False
+            feat074q = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
+            assert "0.7.4" in feat074q and "Kontext-Snippet" in feat074q
+            cl074q = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+            assert "## 0.7.4" in cl074q
+            print("0.7.4 Qt snippet/merge-pair/templates-drag/dirty-debounce: OK")
+
             print("0.4.x selected Qt marks/schema/sort/reset: OK")
             print("0.4.2 Qt outline/copy-paste/case/progress: OK")
             print("0.4.1 Qt links/stamp/encoding/drop: OK")
-            print("0.3.x–0.7.3 review OK")
+            print("0.3.x–0.7.4 review OK")
             assert callable(win.pdf_view.bake_redactions)
             assert callable(win.pdf_view.clear_redactions)
             assert callable(win._set_pdf_password)

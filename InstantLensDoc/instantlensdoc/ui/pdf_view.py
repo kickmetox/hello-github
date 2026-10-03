@@ -2217,8 +2217,22 @@ class PdfViewer(QWidget):
             except Exception as e:
                 QMessageBox.warning(self, "Annotationen", f"Speichern fehlgeschlagen: {e}")
             return
+        was_pending = bool(getattr(self, "_sidecar_save_pending", False))
         self._sidecar_save_pending = True
         self._sidecar_save_timer.start()
+        # Dirty-Indikator (Tab) auch bei pending Debounce aktualisieren
+        if not was_pending:
+            self.annotations_changed.emit()
+
+    def sidecar_save_pending(self) -> bool:
+        """True wenn Sidecar-Debounce noch aussteht (Timer aktiv oder Flag)."""
+        return bool(
+            getattr(self, "_sidecar_save_pending", False)
+            or (
+                hasattr(self, "_sidecar_save_timer")
+                and self._sidecar_save_timer.isActive()
+            )
+        )
 
     def _flush_sidecar_save(self) -> None:
         if not self.store or not self._sidecar_save_pending:
@@ -2229,6 +2243,7 @@ class PdfViewer(QWidget):
             self.store.save()
         except Exception as e:
             QMessageBox.warning(self, "Annotationen", f"Speichern fehlgeschlagen: {e}")
+        self.annotations_changed.emit()
 
     def flush_sidecar_save(self) -> None:
         """Ausstehendes Debounce sofort ausführen (PDF-Wechsel / Close / Ctrl+S)."""
@@ -2243,6 +2258,7 @@ class PdfViewer(QWidget):
                     QMessageBox.warning(
                         self, "Annotationen", f"Speichern fehlgeschlagen: {e}"
                     )
+                self.annotations_changed.emit()
 
     def load(self, path: str | Path, password: str | None = None) -> bool:
         from PySide6.QtWidgets import QApplication
@@ -2569,7 +2585,12 @@ class PdfViewer(QWidget):
             if self._search_rects:
                 self.canvas.set_search_highlights(self._search_rects, self._search_index)
             self.lbl_zoom.setText(f"{int(round(self.scale * 100))}%")
-            dirty = " *" if self.store and self.store.dirty else ""
+            pending = bool(getattr(self, "_sidecar_save_pending", False))
+            dirty = (
+                " *"
+                if self.store and (self.store.dirty or pending)
+                else ""
+            )
             self.status.emit(f"PDF: {self.pdf_path.name}{dirty}")
             self._refresh_fav_btn()
         except MemoryError:
@@ -3606,8 +3627,20 @@ class PdfViewer(QWidget):
         if dlg.exec() != QDialog.Accepted:
             self.status.emit(f"{n_groups} Duplikat-Gruppe(n) — nicht zusammengeführt")
             return 0
+        selected = dlg.groups_to_merge()
+        if not selected:
+            kept = len(dlg.groups_to_keep())
+            self.status.emit(
+                f"Keine Gruppe zum Mergen gewählt — {kept} Gruppe(n) behalten"
+            )
+            return 0
         removed = self.store.merge_duplicates(
-            tol=2.0, same_type=True, keep="oldest", merge_text=True, merge_tags=True
+            tol=2.0,
+            same_type=True,
+            keep="oldest",
+            merge_text=True,
+            merge_tags=True,
+            groups=selected,
         )
         if removed:
             self.schedule_sidecar_save(force=True)

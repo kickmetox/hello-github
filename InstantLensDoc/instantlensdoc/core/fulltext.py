@@ -28,28 +28,79 @@ def _read_text_file(path: Path) -> str:
     return ""
 
 
-def _snippet_around(line: str, query: str, *, width: int = 120) -> str:
-    """Kompaktes Snippet um den Treffer herum (casefold-Match)."""
-    snippet = (line or "").strip()
+def _snippet_around(
+    line: str,
+    query: str,
+    *,
+    width: int = 120,
+    context_chars: int = 40,
+    mark_match: bool = True,
+) -> str:
+    """
+    Kompaktes Kontext-Snippet um den Treffer (casefold-Match).
+    context_chars: Zeichen links/rechts vom Match (wenn width groß genug).
+    mark_match: Match in «…» hervorheben.
+    """
+    snippet = (line or "").replace("\t", " ").strip()
     if not snippet:
         return ""
-    ql = (query or "").casefold()
+    q = (query or "").strip()
+    ql = q.casefold()
     ll = snippet.casefold()
     pos = ll.find(ql) if ql else -1
     if pos < 0:
-        return snippet[:width]
-    if len(snippet) <= width:
-        return snippet
-    start = max(0, pos - max(20, (width - len(query)) // 3))
-    end = min(len(snippet), start + width)
-    if end - start < width:
-        start = max(0, end - width)
-    out = snippet[start:end].strip()
+        out = snippet[:width]
+        return out + ("…" if len(snippet) > width else "")
+    qlen = len(q)
+    # Bevorzugt festen Kontext um Match; sonst width-Fenster
+    ctx = max(8, int(context_chars))
+    start = max(0, pos - ctx)
+    end = min(len(snippet), pos + qlen + ctx)
+    if end - start < min(width, len(snippet)):
+        # Auf width auffüllen falls Zeile länger
+        need = min(width, len(snippet)) - (end - start)
+        extra_left = need // 2
+        extra_right = need - extra_left
+        start = max(0, start - extra_left)
+        end = min(len(snippet), end + extra_right)
+        if end - start < need:
+            start = max(0, end - need)
+    match_raw = snippet[pos : pos + qlen]
+    before = snippet[start:pos]
+    after = snippet[pos + qlen : end]
+    if mark_match and q:
+        mid = f"«{match_raw}»"
+    else:
+        mid = match_raw
+    out = f"{before}{mid}{after}".strip()
     if start > 0:
         out = "…" + out
     if end < len(snippet):
         out = out + "…"
+    if len(out) > width + 8:
+        # harte Obergrenze (Markierung zählt mit)
+        out = out[: width + 5] + "…"
     return out
+
+
+def format_hit_line(
+    path_name: str,
+    *,
+    page: int | None,
+    line: int | None,
+    snippet: str,
+    kind: str = "text",
+    query: str = "",
+) -> str:
+    """Eine Trefferzeile für die Sidebar-Liste inkl. Kontext-Snippet."""
+    loc = f"S.{page + 1}" if page is not None else (f"Z.{line}" if line else "?")
+    kind_mark = "·OCR " if kind == "sidecar" else ""
+    snip = (snippet or "").strip()
+    if not snip and query:
+        snip = query
+    if len(snip) > 96:
+        snip = snip[:93] + "…"
+    return f"{path_name} {loc}: {kind_mark}{snip}"
 
 
 def _pdf_pages_text(pdf_path: Path) -> List[tuple[int, str]]:

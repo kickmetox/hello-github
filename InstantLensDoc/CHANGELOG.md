@@ -1,5 +1,23 @@
 # Changelog — InstantLens Doc
 
+## 0.7.4 — Kontext-Snippets, Merge je Paar, Vorlagen-Drag, Dirty-Debounce
+
+Nach 0.7.3: Trefferliste, Merge und Vorlagen/Dirty verfeinern. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### PDF / Suche / Annotationen
+- **Trefferliste**: Kontext-Snippet mit Zeichen um den Match (`«…»`)
+- Ann.-**Merge-Vorschau**: je Paar/Gruppe einzeln **mergen** oder **behalten**
+
+### Editor / Settings
+- Nutzer-Vorlagen: **Drag-Reihenfolge** speichern (Dialog + Menü)
+- Dirty-Indikator am Tab/`*` auch bei **pending Sidecar-Debounce**
+
+### Packaging / Docs
+- Version **0.7.4** (App / `ild_pdf` / ISS / Smoke / Docs)
+- Smoke: Kontext-Snippet, Merge je Paar, Vorlagen-Reorder, Dirty-Debounce (CLI + Qt)
+
+---
+
 ## 0.7.3 — Trefferliste, Vorlagen-Ordner, Merge-Vorschau, Ctrl+S-Flush
 
 Nach 0.7.2: Schnellsuche und Merge/Save-UX verfeinern. Stubs KI/Cloud/Stylus/3D bleiben Stubs.

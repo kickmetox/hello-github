@@ -866,6 +866,33 @@ def rename_user_doc_template(template_id: str, new_title: str) -> dict | None:
     return None
 
 
+def reorder_user_doc_templates(template_ids: list[str]) -> list[dict]:
+    """
+    Nutzer-Vorlagen in angegebene ID-Reihenfolge bringen (Drag-Persistenz).
+    Unbekannte IDs werden ignoriert; fehlende IDs am Ende angehängt.
+    Rückgabe: neue Liste.
+    """
+    items = get_user_doc_templates()
+    if not items:
+        return []
+    by_id = {t["id"]: t for t in items}
+    seen: set[str] = set()
+    ordered: list[dict] = []
+    for raw in template_ids or []:
+        tid = str(raw or "").strip()
+        if tid.lower().startswith("user:"):
+            tid = tid[5:]
+        if not tid or tid in seen or tid not in by_id:
+            continue
+        ordered.append(by_id[tid])
+        seen.add(tid)
+    for t in items:
+        if t["id"] not in seen:
+            ordered.append(t)
+    save_settings({"user_doc_templates": ordered})
+    return [dict(t) for t in ordered]
+
+
 def user_templates_dir() -> Path:
     """Ordner für gespiegelte Nutzer-Vorlagen (Explorer)."""
     d = config_dir() / "templates"

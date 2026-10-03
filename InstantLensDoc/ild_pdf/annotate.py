@@ -844,13 +844,18 @@ class AnnotationStore:
         keep: str = "oldest",
         merge_text: bool = True,
         merge_tags: bool = True,
+        groups: Optional[List[List[Annotation]]] = None,
     ) -> int:
         """
         Duplikate (gleiche Seite+BBox) optional zusammenführen.
         keep: oldest | newest | first — welche Annotation behalten wird.
+        groups: optional nur diese Gruppen mergen (sonst alle gefundenen).
         Rückgabe: Anzahl entfernter Annotationen.
         """
-        groups = self.find_duplicate_groups(tol=tol, same_type=same_type)
+        if groups is None:
+            groups = self.find_duplicate_groups(tol=tol, same_type=same_type)
+        else:
+            groups = [list(g) for g in groups if g and len(g) >= 2]
         if not groups:
             return 0
         remove_ids: list[str] = []

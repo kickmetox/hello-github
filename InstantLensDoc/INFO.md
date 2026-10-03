@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **0.7.3** |
+| Version | **0.7.4** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -38,10 +38,10 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Installer-Task: optionale **Desktop-Verknüpfung** (Checkbox, Standard an / `checkedonce`)
 
-## Neu in 0.7.3
+## Neu in 0.7.4
 
-- Schnellsuche: klickbare Trefferliste in der Sidebar
-- Vorlagen-Ordner im Explorer öffnen (Spiegel)
-- Ann.-Merge: Vorschau-Dialog vor Übernehmen
-- Ctrl+S flusht Sidecar-Debounce sofort
+- Trefferliste: Kontext-Snippet (Zeichen um Match, `«…»`)
+- Ann.-Merge: je Paar/Gruppe einzeln behalten oder mergen
+- Vorlagen: Drag-Reihenfolge speichern
+- Dirty-Indikator am Tab auch bei pending Sidecar-Debounce
 - Stubs KI/Cloud/Stylus/3D unverändert

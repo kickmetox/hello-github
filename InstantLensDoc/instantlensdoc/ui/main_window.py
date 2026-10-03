@@ -557,6 +557,12 @@ class MainWindow(QMainWindow):
         )
         act_tpl_folder.triggered.connect(self._open_user_templates_folder)
         m_new.addAction(act_tpl_folder)
+        act_tpl_order = QAction("Vorlagen-Reihenfolge…", self)
+        act_tpl_order.setToolTip(
+            "Nutzer-Vorlagen per Drag umsortieren und Reihenfolge speichern"
+        )
+        act_tpl_order.triggered.connect(self._reorder_user_templates_dialog)
+        m_new.addAction(act_tpl_order)
         act_save_tpl = QAction("Als Vorlage speichern…", self)
         act_save_tpl.setToolTip(
             "Aktuelles Editor-Dokument als wiederverwendbare Vorlage speichern"
@@ -1518,6 +1524,31 @@ class MainWindow(QMainWindow):
         else:
             self._unsaved_paths.discard(key)
         self._update_unsaved_status()
+        self._refresh_document_dirty_labels()
+
+    def _refresh_document_dirty_labels(self) -> None:
+        """Dirty-Indikator (*) an Sidebar-Dokument-Tabs inkl. pending Sidecar-Debounce."""
+        files = getattr(self.sidebar, "files", None)
+        if files is None:
+            return
+        dirty_keys = set(self._unsaved_paths)
+        if self._current_is_dirty() and self.doc and self.doc.path:
+            cur = self._path_key(self.doc.path)
+            if cur:
+                dirty_keys.add(cur)
+        for i in range(files.count()):
+            it = files.item(i)
+            if it is None:
+                continue
+            raw = it.data(256) or it.data(Qt.UserRole)
+            if not raw:
+                continue
+            key = self._path_key(raw)
+            base = Path(str(raw)).name
+            if key and key in dirty_keys:
+                it.setText(f"{base} *")
+            else:
+                it.setText(base)
 
     def count_unsaved_tabs(self) -> int:
         """Ungespeicherte Tabs: aktuelles Doc + markierte offene Sidebar-Pfade."""
@@ -3354,10 +3385,17 @@ class MainWindow(QMainWindow):
             payloads = []
             pdf_names: set[str] = set()
             for h in hits[:100]:
-                loc = f"S.{h.page + 1}" if h.page is not None else f"Z.{h.line}"
-                kind_mark = "·OCR " if h.kind == "sidecar" else ""
-                snip = (h.snippet or "")[:72]
-                lines.append(f"{Path(h.path).name} {loc}: {kind_mark}{snip}")
+                snip = (h.snippet or "").strip() or query
+                lines.append(
+                    fulltext_mod.format_hit_line(
+                        Path(h.path).name,
+                        page=h.page,
+                        line=h.line,
+                        snippet=snip,
+                        kind=h.kind,
+                        query=query,
+                    )
+                )
                 payloads.append((h.path, h.page, query))
                 pdf_names.add(Path(h.path).name)
             self.sidebar.set_marks(lines, payloads)
@@ -3396,7 +3434,10 @@ class MainWindow(QMainWindow):
                 for pi, blob in page_hits:
                     for line in blob.splitlines():
                         if query.lower() in line.lower():
-                            hits.append(("page", pi, line.strip()[:80]))
+                            snip = fulltext_mod._snippet_around(
+                                line, query, context_chars=40, width=96
+                            )
+                            hits.append(("page", pi, snip))
                             break
             if hits or n_page:
                 lines = []
@@ -3407,10 +3448,22 @@ class MainWindow(QMainWindow):
                 for h in hits:
                     if isinstance(h, tuple) and h[0] == "page":
                         _, pi, snip = h
-                        lines.append(f"S.{pi + 1} Text: {snip}")
-                        payloads.append((str(pdf_path), pi))
+                        lines.append(
+                            fulltext_mod.format_hit_line(
+                                Path(pdf_path).name if pdf_path else "PDF",
+                                page=pi,
+                                line=None,
+                                snippet=snip,
+                                kind="pdf",
+                                query=query,
+                            )
+                        )
+                        payloads.append((str(pdf_path), pi, query))
                     else:
-                        lines.append(f"S{h.page + 1}: {h.type.value} {h.text[:40]}")
+                        ann_snip = fulltext_mod._snippet_around(
+                            f"{h.type.value} {h.text}", query, context_chars=36, width=80
+                        )
+                        lines.append(f"S.{h.page + 1} Ann.: {ann_snip}")
                         payloads.append(h)
                 self.sidebar.set_marks(lines, payloads)
                 if n_page:
@@ -3555,9 +3608,17 @@ class MainWindow(QMainWindow):
         n = len(self.pdf_view.store.annotations) if self.pdf_view.store else 0
         self.word_status_label.setText(f"{n} Ann.")
         if self.doc and self.doc.path and self.pdf_view.store is not None:
-            self._mark_unsaved(self.doc.path, bool(self.pdf_view.store.dirty))
+            pending = False
+            if hasattr(self.pdf_view, "sidecar_save_pending"):
+                pending = bool(self.pdf_view.sidecar_save_pending())
+            else:
+                pending = bool(getattr(self.pdf_view, "_sidecar_save_pending", False))
+            self._mark_unsaved(
+                self.doc.path, bool(self.pdf_view.store.dirty or pending)
+            )
         else:
             self._update_unsaved_status()
+            self._refresh_document_dirty_labels()
 
     def _on_annotation_activated(self, payload):
         if self.stack.currentWidget() is not self.pdf_view:
@@ -3920,7 +3981,15 @@ class MainWindow(QMainWindow):
         if not self.doc:
             return False
         if self.doc.kind == DocKind.PDF:
-            return bool(self.pdf_view.store and self.pdf_view.store.dirty)
+            store = self.pdf_view.store
+            if not store:
+                return False
+            pending = False
+            if hasattr(self.pdf_view, "sidecar_save_pending"):
+                pending = bool(self.pdf_view.sidecar_save_pending())
+            else:
+                pending = bool(getattr(self.pdf_view, "_sidecar_save_pending", False))
+            return bool(store.dirty or pending)
         if self.doc.kind in (DocKind.TEXT, DocKind.MARKDOWN, DocKind.HTML, DocKind.DOCX):
             current = self.editor.toPlainText()
             if current != (self.doc.text or ""):
@@ -4330,10 +4399,39 @@ class MainWindow(QMainWindow):
                 )
                 sub.addAction(act_del)
         menu.addSeparator()
+        act_order = QAction("Reihenfolge…", self)
+        act_order.setToolTip("Vorlagen per Drag umsortieren und speichern")
+        act_order.triggered.connect(self._reorder_user_templates_dialog)
+        menu.addAction(act_order)
         act_folder = QAction("Vorlagen-Ordner öffnen…", self)
         act_folder.setToolTip("Spiegel-Ordner der Nutzer-Vorlagen im Explorer öffnen")
         act_folder.triggered.connect(self._open_user_templates_folder)
         menu.addAction(act_folder)
+
+    def _reorder_user_templates_dialog(self) -> None:
+        """Drag-Reihenfolge der Nutzer-Vorlagen speichern."""
+        from PySide6.QtWidgets import QDialog
+
+        from instantlensdoc.core.app_settings import (
+            get_user_doc_templates,
+            reorder_user_doc_templates,
+        )
+        from instantlensdoc.ui.templates_dialog import TemplatesOrderDialog
+
+        templates = get_user_doc_templates()
+        if not templates:
+            QMessageBox.information(
+                self,
+                "Vorlagen-Reihenfolge",
+                "Keine Nutzer-Vorlagen gespeichert.",
+            )
+            return
+        dlg = TemplatesOrderDialog(templates, parent=self)
+        if dlg.exec() != QDialog.Accepted:
+            return
+        ordered = reorder_user_doc_templates(dlg.ordered_ids())
+        self._refresh_user_template_menu()
+        self._set_status(f"Vorlagen-Reihenfolge gespeichert ({len(ordered)})")
 
     def _open_user_templates_folder(self) -> None:
         """Nutzer-Vorlagen spiegeln und Ordner im Dateimanager öffnen."""
