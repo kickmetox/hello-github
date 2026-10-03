@@ -1666,6 +1666,49 @@ class AnnotationStore:
         path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
         return path
 
+    def export_group_json(self, group_id: str, path: str | Path) -> Path:
+        """
+        Nur Mitglieder einer temporären Ann.-Gruppe als JSON Schema v4 exportieren.
+        Meta enthält die Gruppenmarkierung unter ann_groups.
+        """
+        gid = str(group_id or "").strip()
+        if not gid:
+            raise ValueError("Keine Gruppen-ID")
+        member_ids = set(self.ids_in_group(gid))
+        if not member_ids:
+            raise ValueError("Gruppe hat keine Mitglieder")
+        path = Path(path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        full = self._payload(export=True)
+        anns = [
+            a
+            for a in full.get("annotations") or []
+            if isinstance(a, dict) and str(a.get("id") or "") in member_ids
+        ]
+        # Fallback: group_id-Feld falls id-Filter leer (export dicts)
+        if not anns:
+            anns = [
+                a
+                for a in full.get("annotations") or []
+                if isinstance(a, dict)
+                and str(a.get("group_id") or "").strip() == gid
+            ]
+        meta = dict(full.get("meta") or {})
+        gmeta = self.get_ann_group(gid)
+        meta["ann_groups"] = {gid: {"title": gmeta.get("title") or "", "color": gmeta.get("color") or ""}}
+        payload = {
+            "version": full.get("version"),
+            "schema": full.get("schema"),
+            "pdf": full.get("pdf"),
+            "saved_at": full.get("saved_at"),
+            "count": len(anns),
+            "meta": meta,
+            "annotations": anns,
+            "export_group_id": gid,
+        }
+        path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
+        return path
+
     CSV_FIELDS = (
         "id",
         "page",

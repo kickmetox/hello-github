@@ -413,6 +413,8 @@ class MainWindow(QMainWindow):
         self.sidebar.pages_batch_delete_requested.connect(self._on_thumbs_batch_delete)
         self.sidebar.pages_batch_rotate_requested.connect(self._on_thumbs_batch_rotate)
         self.sidebar.pages_batch_extract_requested.connect(self._on_thumbs_batch_extract)
+        self.sidebar.pages_batch_open_requested.connect(self._on_thumbs_batch_open)
+        self.sidebar.annotation_group_export_requested.connect(self._on_ann_group_export)
         splitter.addWidget(self.sidebar)
 
         self.stack = QStackedWidget()
@@ -1060,7 +1062,10 @@ class MainWindow(QMainWindow):
         m_view.addAction(self._line_numbers_action)
         self._indent_guides_action = QAction("Einrückungs-Guides", self)
         self._indent_guides_action.setCheckable(True)
-        from instantlensdoc.core.app_settings import get_editor_indent_guides
+        from instantlensdoc.core.app_settings import (
+            get_editor_current_line_highlight,
+            get_editor_indent_guides,
+        )
 
         self._indent_guides_action.setChecked(get_editor_indent_guides())
         self._indent_guides_action.setToolTip(
@@ -1068,6 +1073,14 @@ class MainWindow(QMainWindow):
         )
         self._indent_guides_action.toggled.connect(self._toggle_indent_guides)
         m_view.addAction(self._indent_guides_action)
+        self._current_line_hl_action = QAction("Aktuelle Zeile hervorheben", self)
+        self._current_line_hl_action.setCheckable(True)
+        self._current_line_hl_action.setChecked(get_editor_current_line_highlight())
+        self._current_line_hl_action.setToolTip(
+            "Aktuelle Editorzeile farblich hervorheben (auch in Einstellungen)"
+        )
+        self._current_line_hl_action.toggled.connect(self._toggle_current_line_highlight)
+        m_view.addAction(self._current_line_hl_action)
         self._minimap_action = QAction("Editor-Minimap", self)
         self._minimap_action.setCheckable(True)
         self._minimap_action.setChecked(get_editor_minimap())
@@ -3225,6 +3238,29 @@ class MainWindow(QMainWindow):
             self._indent_guides_action.blockSignals(False)
         self._set_status("Einrückungs-Guides an" if persisted else "Einrückungs-Guides aus")
 
+    def _toggle_current_line_highlight(self, checked: bool):
+        """Ansicht-Toggle: aktuelle Zeile hervorheben, persistieren."""
+        from instantlensdoc.core.app_settings import (
+            get_editor_current_line_highlight,
+            set_editor_current_line_highlight,
+        )
+
+        on = bool(checked)
+        set_editor_current_line_highlight(on)
+        if hasattr(self.editor, "set_current_line_highlight"):
+            self.editor.set_current_line_highlight(on)
+        persisted = bool(get_editor_current_line_highlight())
+        if persisted != on:
+            set_editor_current_line_highlight(on)
+            persisted = bool(get_editor_current_line_highlight())
+        if hasattr(self, "_current_line_hl_action") and self._current_line_hl_action is not None:
+            self._current_line_hl_action.blockSignals(True)
+            self._current_line_hl_action.setChecked(persisted)
+            self._current_line_hl_action.blockSignals(False)
+        self._set_status(
+            "Aktuelle Zeile hervorheben an" if persisted else "Aktuelle Zeile hervorheben aus"
+        )
+
     def _toggle_minimap(self, checked: bool):
         from instantlensdoc.core.app_settings import set_editor_minimap
 
@@ -4554,6 +4590,30 @@ class MainWindow(QMainWindow):
         idxs = [int(p) for p in (pages or [])]
         self.pdf_view.extract_selected_pages_as_pdf(idxs)
 
+    def _on_thumbs_batch_open(self, pages: list):
+        """Thumbnail-Auswahl: Seiten als neues Dokument in neuem Tab öffnen."""
+        if self.stack.currentWidget() is not self.pdf_view:
+            self.stack.setCurrentWidget(self.pdf_view)
+        if not self.pdf_view.pdf_path:
+            return
+        idxs = [int(p) for p in (pages or [])]
+        dest = None
+        if hasattr(self.pdf_view, "open_selected_pages_as_document"):
+            dest = self.pdf_view.open_selected_pages_as_document(idxs)
+        else:
+            dest = self.pdf_view.extract_selected_pages_as_pdf(idxs)
+        if dest:
+            self.open_path(str(dest))
+
+    def _on_ann_group_export(self, group_id: str):
+        """Sidebar: Ann.-Gruppe als JSON exportieren."""
+        if self.stack.currentWidget() is not self.pdf_view:
+            self.stack.setCurrentWidget(self.pdf_view)
+        if not self.pdf_view.pdf_path:
+            return
+        if hasattr(self.pdf_view, "export_selected_ann_group_json"):
+            self.pdf_view.export_selected_ann_group_json(group_id)
+
     def _on_pdf_page_changed(self, page_index: int):
         self.sidebar.select_thumb(page_index)
         self.sidebar.set_annotation_current_page(page_index)
@@ -4623,6 +4683,8 @@ class MainWindow(QMainWindow):
             sync_from_settings()
             self._sync_theme_menu()
             from instantlensdoc.core.app_settings import (
+                get_editor_current_line_highlight,
+                get_editor_indent_guides,
                 get_editor_line_numbers,
                 get_editor_markdown_preview,
                 get_editor_minimap,
@@ -4656,6 +4718,20 @@ class MainWindow(QMainWindow):
             self.editor.set_tab_width(get_editor_tab_width())
             if hasattr(self.editor, "set_soft_tabs"):
                 self.editor.set_soft_tabs(get_editor_soft_tabs())
+            if hasattr(self.editor, "set_indent_guides_visible"):
+                ig = get_editor_indent_guides()
+                self.editor.set_indent_guides_visible(ig)
+                if hasattr(self, "_indent_guides_action") and self._indent_guides_action is not None:
+                    self._indent_guides_action.blockSignals(True)
+                    self._indent_guides_action.setChecked(ig)
+                    self._indent_guides_action.blockSignals(False)
+            if hasattr(self.editor, "set_current_line_highlight"):
+                clh = get_editor_current_line_highlight()
+                self.editor.set_current_line_highlight(clh)
+                if hasattr(self, "_current_line_hl_action") and self._current_line_hl_action is not None:
+                    self._current_line_hl_action.blockSignals(True)
+                    self._current_line_hl_action.setChecked(clh)
+                    self._current_line_hl_action.blockSignals(False)
             special = get_editor_show_special_chars()
             self.editor.set_special_chars_visible(special)
             if hasattr(self, "_special_chars_action") and self._special_chars_action is not None:

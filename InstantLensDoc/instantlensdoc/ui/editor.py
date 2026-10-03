@@ -12,6 +12,7 @@ from PySide6.QtWidgets import QApplication, QPlainTextEdit, QTextEdit, QWidget
 from instantlensdoc.core.app_settings import (
     get_editor_bracket_auto_close,
     get_editor_bracket_match,
+    get_editor_current_line_highlight,
     get_editor_indent_guides,
     get_editor_line_numbers,
     get_editor_minimap,
@@ -96,6 +97,7 @@ class TextEditor(QPlainTextEdit):
         self._tab_width = int(get_editor_tab_width())
         self._soft_tabs = bool(get_editor_soft_tabs())
         self._indent_guides = bool(get_editor_indent_guides())
+        self._current_line_highlight = bool(get_editor_current_line_highlight())
         self._show_special = bool(get_editor_show_special_chars())
         self._bracket_match = bool(get_editor_bracket_match())
         self._bracket_auto_close = bool(get_editor_bracket_auto_close())
@@ -104,6 +106,7 @@ class TextEditor(QPlainTextEdit):
         self._mark_selections: list = []
         self._bracket_selections: list = []
         self._spell_selections: list = []
+        self._current_line_selections: list = []
         self._line_bookmarks: set[int] = set()  # 0-basierte Blocknummern
         self._line_bookmark_order: list[int] = []  # Anzeige-/Persistenz-Reihenfolge (Blocks)
         self._line_bookmark_labels: dict[int, str] = {}  # Block → editierbares Label
@@ -113,6 +116,7 @@ class TextEditor(QPlainTextEdit):
         self.updateRequest.connect(self._update_line_number_area)
         self.updateRequest.connect(self._update_minimap_area)
         self.cursorPositionChanged.connect(self._update_bracket_match)
+        self.cursorPositionChanged.connect(self._update_current_line_highlight)
         self.verticalScrollBar().valueChanged.connect(lambda _v: self._minimap_area.update())
         self._update_side_areas()
         self.set_line_numbers_visible(self._line_numbers)
@@ -120,6 +124,7 @@ class TextEditor(QPlainTextEdit):
         self.set_soft_wrap(self._soft_wrap)
         self.set_tab_width(self._tab_width)
         self.set_indent_guides_visible(self._indent_guides)
+        self.set_current_line_highlight(self._current_line_highlight)
         self.set_special_chars_visible(self._show_special)
 
     def line_number_area_width(self) -> int:
@@ -426,6 +431,29 @@ class TextEditor(QPlainTextEdit):
     def indent_guides_visible(self) -> bool:
         return bool(self._indent_guides)
 
+    def set_current_line_highlight(self, enabled: bool) -> None:
+        """Aktuelle Zeile farblich hervorheben ein-/ausschalten."""
+        self._current_line_highlight = bool(enabled)
+        self._update_current_line_highlight()
+
+    def current_line_highlight_enabled(self) -> bool:
+        return bool(self._current_line_highlight)
+
+    def _update_current_line_highlight(self) -> None:
+        self._current_line_selections = []
+        if self._current_line_highlight:
+            sel = QTextEdit.ExtraSelection()
+            fmt = QTextCharFormat()
+            bg = QColor("#FFF3B0")
+            bg.setAlpha(110)
+            fmt.setBackground(bg)
+            fmt.setProperty(QTextCharFormat.FullWidthSelection, True)
+            sel.format = fmt
+            sel.cursor = self.textCursor()
+            sel.cursor.clearSelection()
+            self._current_line_selections = [sel]
+        self._apply_extra_selections()
+
     def paintEvent(self, event):  # noqa: N802
         super().paintEvent(event)
         if self._indent_guides:
@@ -542,7 +570,8 @@ class TextEditor(QPlainTextEdit):
 
     def _apply_extra_selections(self) -> None:
         merged = (
-            list(self._find_selections)
+            list(getattr(self, "_current_line_selections", []) or [])
+            + list(self._find_selections)
             + list(self._mark_selections)
             + list(self._bracket_selections)
             + list(getattr(self, "_spell_selections", []) or [])
@@ -1165,7 +1194,7 @@ class TextEditor(QPlainTextEdit):
         self._find_selections = []
         self._mark_selections = []
         self._spell_selections = []
-        self.setExtraSelections(list(self._bracket_selections))
+        self._apply_extra_selections()
 
     def clear_spelling(self) -> None:
         """Nur Rechtschreibmarkierungen entfernen."""

@@ -58,6 +58,7 @@ DEFAULTS: dict[str, Any] = {
     "editor_tab_width": 4,
     "editor_soft_tabs": True,
     "editor_indent_guides": True,
+    "editor_current_line_highlight": True,
     "editor_show_special_chars": False,
     "annotations_visible": True,
     "minimize_to_tray": False,
@@ -81,6 +82,7 @@ DEFAULTS: dict[str, Any] = {
     "page_number_overlay_position": "bottom-center",
     "page_number_overlay_format": "{page} / {pages}",
     "page_number_overlay_start": 1,
+    "page_number_overlay_skip_edges": False,
     "show_printer_marks": False,
     "annotations_locked": False,
     "editor_snippets": [
@@ -1022,6 +1024,15 @@ def set_page_number_overlay_start(start: int) -> None:
     save_settings({"page_number_overlay_start": max(0, min(9999, n))})
 
 
+def get_page_number_overlay_skip_edges() -> bool:
+    """True = Seitennummer-Overlay auf erster und letzter Seite ausblenden."""
+    return bool(load_settings().get("page_number_overlay_skip_edges", False))
+
+
+def set_page_number_overlay_skip_edges(enabled: bool) -> None:
+    save_settings({"page_number_overlay_skip_edges": bool(enabled)})
+
+
 def get_editor_tab_width() -> int:
     """Editor-Tab-Breite in Zeichen (2 / 4 / 8)."""
     try:
@@ -1059,6 +1070,15 @@ def get_editor_indent_guides() -> bool:
 
 def set_editor_indent_guides(enabled: bool) -> None:
     save_settings({"editor_indent_guides": bool(enabled)})
+
+
+def get_editor_current_line_highlight() -> bool:
+    """True = aktuelle Editorzeile hervorheben."""
+    return bool(load_settings().get("editor_current_line_highlight", True))
+
+
+def set_editor_current_line_highlight(enabled: bool) -> None:
+    save_settings({"editor_current_line_highlight": bool(enabled)})
 
 
 def get_show_printer_marks() -> bool:

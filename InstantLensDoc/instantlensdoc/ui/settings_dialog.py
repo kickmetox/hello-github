@@ -54,6 +54,7 @@ from instantlensdoc.core.app_settings import (
     get_pdf_night_mode,
     get_pdf_thumbnail_scale,
     get_pdf_two_page_spread,
+    get_editor_current_line_highlight,
     get_editor_indent_guides,
     get_editor_soft_tabs,
     get_editor_tab_width,
@@ -61,6 +62,7 @@ from instantlensdoc.core.app_settings import (
     get_page_number_overlay_format,
     get_page_number_overlay_opacity,
     get_page_number_overlay_position,
+    get_page_number_overlay_skip_edges,
     get_page_number_overlay_start,
     get_show_page_number_overlay,
     get_restore_session_on_start,
@@ -102,6 +104,7 @@ from instantlensdoc.core.app_settings import (
     set_editor_doc_split_vertical,
     set_editor_line_numbers,
     set_editor_minimap,
+    set_editor_current_line_highlight,
     set_editor_indent_guides,
     set_editor_show_special_chars,
     set_editor_soft_tabs,
@@ -125,6 +128,7 @@ from instantlensdoc.core.app_settings import (
     set_page_number_overlay_format,
     set_page_number_overlay_opacity,
     set_page_number_overlay_position,
+    set_page_number_overlay_skip_edges,
     set_page_number_overlay_start,
     set_show_page_number_overlay,
     set_restore_session_on_start,
@@ -278,6 +282,13 @@ class SettingsDialog(QDialog):
             "Vertikale Linien an Tab-Stops für führende Einrückung im Editor"
         )
         form.addRow(self.indent_guides)
+
+        self.current_line_hl = QCheckBox("Aktuelle Zeile hervorheben")
+        self.current_line_hl.setChecked(get_editor_current_line_highlight())
+        self.current_line_hl.setToolTip(
+            "Die Zeile mit dem Cursor im Editor farblich markieren (Ansicht ↔ Settings)"
+        )
+        form.addRow(self.current_line_hl)
 
         from instantlensdoc.core.app_settings import get_editor_show_special_chars
 
@@ -457,6 +468,13 @@ class SettingsDialog(QDialog):
             "Startnummer der ersten Seite im Overlay (z. B. 5 → erste Seite zeigt 5)"
         )
         form.addRow("Seitennummer-Overlay Start", self.page_num_start)
+
+        self.page_num_skip_edges = QCheckBox("Erste/letzte Seite ohne Overlay")
+        self.page_num_skip_edges.setChecked(get_page_number_overlay_skip_edges())
+        self.page_num_skip_edges.setToolTip(
+            "Seitennummer-Overlay auf der ersten und letzten PDF-Seite ausblenden"
+        )
+        form.addRow(self.page_num_skip_edges)
 
         self.doc_split_orient = QComboBox()
         self.doc_split_orient.addItem("Horizontal (nebeneinander)", False)
@@ -807,6 +825,7 @@ class SettingsDialog(QDialog):
         set_editor_tab_width(int(self.tab_width.currentData() or 4))
         set_editor_soft_tabs(self.soft_tabs.isChecked())
         set_editor_indent_guides(self.indent_guides.isChecked())
+        set_editor_current_line_highlight(self.current_line_hl.isChecked())
         set_editor_show_special_chars(self.special_chars.isChecked())
         set_editor_text_encoding(str(self.enc_combo.currentData() or "auto"))
         set_skip_splash(self.skip_splash.isChecked())
@@ -834,6 +853,7 @@ class SettingsDialog(QDialog):
         )
         set_page_number_overlay_format(self.page_num_format.text().strip())
         set_page_number_overlay_start(int(self.page_num_start.value()))
+        set_page_number_overlay_skip_edges(self.page_num_skip_edges.isChecked())
         set_editor_doc_split_vertical(bool(self.doc_split_orient.currentData()))
         set_tag_rename_confirm_threshold(int(self.tag_rename_confirm.value()))
         set_sidecar_save_debounce_ms(int(self.sidecar_debounce.value()))
@@ -909,6 +929,8 @@ class SettingsDialog(QDialog):
                     parent.editor.set_soft_tabs(self.soft_tabs.isChecked())
                 if hasattr(parent.editor, "set_indent_guides_visible"):
                     parent.editor.set_indent_guides_visible(self.indent_guides.isChecked())
+                if hasattr(parent.editor, "set_current_line_highlight"):
+                    parent.editor.set_current_line_highlight(self.current_line_hl.isChecked())
                 if hasattr(parent.editor, "set_special_chars_visible"):
                     parent.editor.set_special_chars_visible(self.special_chars.isChecked())
             except Exception:
@@ -962,6 +984,10 @@ class SettingsDialog(QDialog):
                     parent.pdf_view.set_page_number_overlay_start(
                         int(self.page_num_start.value())
                     )
+                if hasattr(parent.pdf_view, "set_page_number_overlay_skip_edges"):
+                    parent.pdf_view.set_page_number_overlay_skip_edges(
+                        self.page_num_skip_edges.isChecked()
+                    )
             except Exception:
                 pass
         if parent is not None and hasattr(parent, "_indent_guides_action"):
@@ -969,6 +995,13 @@ class SettingsDialog(QDialog):
                 parent._indent_guides_action.blockSignals(True)
                 parent._indent_guides_action.setChecked(self.indent_guides.isChecked())
                 parent._indent_guides_action.blockSignals(False)
+            except Exception:
+                pass
+        if parent is not None and hasattr(parent, "_current_line_hl_action"):
+            try:
+                parent._current_line_hl_action.blockSignals(True)
+                parent._current_line_hl_action.setChecked(self.current_line_hl.isChecked())
+                parent._current_line_hl_action.blockSignals(False)
             except Exception:
                 pass
         if parent is not None and hasattr(parent, "_sync_page_number_overlay_action"):

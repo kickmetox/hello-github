@@ -331,6 +331,9 @@ class Sidebar(QWidget):
     pages_batch_delete_requested = Signal(list)  # Mehrfachauswahl löschen
     pages_batch_rotate_requested = Signal(list, int)  # Mehrfachauswahl drehen (±90)
     pages_batch_extract_requested = Signal(list)  # Mehrfachauswahl als PDF extrahieren
+    pages_batch_open_requested = Signal(list)  # Auswahl → neues Dokument in Tab öffnen
+    annotation_group_filter_changed = Signal(str)  # group_id oder "" für alle
+    annotation_group_export_requested = Signal(str)  # group_id → JSON-Export
     search_export_requested = Signal(str)  # "csv" | "json"
 
     def __init__(self, parent=None):
@@ -528,6 +531,18 @@ class Sidebar(QWidget):
         )
         self.ann_current_page.toggled.connect(self._on_ann_current_page_toggled)
         layout.addWidget(self.ann_current_page)
+        self.ann_group_filter_label = QLabel("")
+        self.ann_group_filter_label.setWordWrap(True)
+        self.ann_group_filter_label.setStyleSheet("color: #1a5276; font-size: 11px;")
+        self.ann_group_filter_label.setVisible(False)
+        layout.addWidget(self.ann_group_filter_label)
+        self.btn_clear_ann_group_filter = QPushButton("Gruppenfilter aufheben")
+        self.btn_clear_ann_group_filter.setToolTip(
+            "Filter „nur diese Gruppe“ zurücksetzen (Rechtsklick auf Gruppenmitglied)"
+        )
+        self.btn_clear_ann_group_filter.setVisible(False)
+        self.btn_clear_ann_group_filter.clicked.connect(self.clear_annotation_group_filter)
+        layout.addWidget(self.btn_clear_ann_group_filter)
         self.ann_tag_filter = QListWidget()
         self.ann_tag_filter.setToolTip(
             "Tag-Filter Multi-Select: mehrere Tags wählen (ODER); leer = alle Tags"
@@ -623,6 +638,7 @@ class Sidebar(QWidget):
         self._ann_tag_filter: list[str] = []
         self._ann_current_page_index: int | None = None
         self._ann_filter_current_page = False
+        self._ann_group_filter = ""  # group_id oder ""
         self._ann_tag_updating = False
         self._ann_page_groups: dict[int, dict] = {}
         self._ann_sel_groups: dict[str, dict] = {}  # group_id → {title, color}
@@ -944,10 +960,12 @@ class Sidebar(QWidget):
             act_dup = menu.addAction(f"{len(selected)} Seiten duplizieren")
             act_del = menu.addAction(f"{len(selected)} Seiten löschen…")
             act_ext = menu.addAction(f"{len(selected)} Seiten als PDF extrahieren…")
+            act_open = menu.addAction(f"{len(selected)} Seiten als neues Dokument öffnen")
         else:
             act_dup = menu.addAction("Seite duplizieren")
             act_del = menu.addAction("Seite löschen…")
             act_ext = menu.addAction("Seite als PDF extrahieren…")
+            act_open = menu.addAction("Seite als neues Dokument öffnen")
         chosen = menu.exec(self.thumbs.mapToGlobal(pos))
         if chosen is act_r:
             if multi:
@@ -971,6 +989,8 @@ class Sidebar(QWidget):
                 self.page_delete_requested.emit(idx)
         elif chosen is act_ext:
             self.pages_batch_extract_requested.emit(list(selected))
+        elif chosen is act_open:
+            self.pages_batch_open_requested.emit(list(selected))
 
     def set_recent(
         self,
@@ -1236,6 +1256,7 @@ class Sidebar(QWidget):
             "color": self.annotation_filter_color(),
             "tags": list(self.annotation_filter_tags()),
             "current_page": bool(self.annotation_filter_current_page()),
+            "group_id": self.annotation_group_filter(),
             "search": self.annotation_search_text(),
             "regex": bool(self.annotation_search_regex()),
         }
@@ -1266,6 +1287,7 @@ class Sidebar(QWidget):
             self.ann_search.blockSignals(False)
             self._ann_search_query = str(data.get("search") or "").strip()
         self.set_annotation_search_regex(bool(data.get("regex", False)))
+        self.set_annotation_group_filter(str(data.get("group_id") or ""))
         self._apply_annotation_filter()
         self.annotation_filter_changed.emit(self.annotation_filter_type())
 
@@ -1353,6 +1375,44 @@ class Sidebar(QWidget):
     def annotation_filter_current_page(self) -> bool:
         """True wenn nur Annotationen der aktuellen Seite gezeigt werden."""
         return bool(getattr(self, "_ann_filter_current_page", False))
+
+    def annotation_group_filter(self) -> str:
+        """Aktiver Ann.-Gruppenfilter (group_id) oder '' für alle."""
+        return str(getattr(self, "_ann_group_filter", "") or "").strip()
+
+    def set_annotation_group_filter(self, group_id: str | None) -> None:
+        """Filter ‚nur diese Gruppe‘ setzen; leer = alle Gruppen."""
+        gid = str(group_id or "").strip()
+        if gid == self.annotation_group_filter():
+            self._update_ann_group_filter_ui()
+            return
+        self._ann_group_filter = gid
+        self._update_ann_group_filter_ui()
+        self._apply_annotation_filter()
+        self.annotation_group_filter_changed.emit(gid)
+
+    def clear_annotation_group_filter(self) -> None:
+        """Gruppenfilter aufheben."""
+        self.set_annotation_group_filter("")
+
+    def _update_ann_group_filter_ui(self) -> None:
+        gid = self.annotation_group_filter()
+        label = getattr(self, "ann_group_filter_label", None)
+        btn = getattr(self, "btn_clear_ann_group_filter", None)
+        if not gid:
+            if label is not None:
+                label.setText("")
+                label.setVisible(False)
+            if btn is not None:
+                btn.setVisible(False)
+            return
+        meta = (getattr(self, "_ann_sel_groups", None) or {}).get(gid) or {}
+        title = str(meta.get("title") or "").strip() or gid[:8]
+        if label is not None:
+            label.setText(f"Filter: nur Gruppe „{title}“")
+            label.setVisible(True)
+        if btn is not None:
+            btn.setVisible(True)
 
     def annotation_filter_tags(self) -> list[str]:
         """Aktuelle Tag-Filter (Multi-Select) oder [] für alle."""
@@ -1779,6 +1839,13 @@ class Sidebar(QWidget):
                 # ODER: Annotation behält mind. einen der gewählten Tags
                 if not (want_tags & ann_cf):
                     continue
+            want_group = self.annotation_group_filter()
+            if want_group:
+                gid = ""
+                if payload is not None:
+                    gid = str(getattr(payload, "group_id", "") or "").strip()
+                if gid != want_group:
+                    continue
             if query:
                 hay = line.lower()
                 extra = ""
@@ -1904,20 +1971,41 @@ class Sidebar(QWidget):
         item = self.annotations.itemAt(pos)
         if item is None:
             return
-        if item.data(Qt.UserRole + 2) != "group":
+        # Seitengruppen-Kopf
+        if item.data(Qt.UserRole + 2) == "group":
+            page = item.data(Qt.UserRole + 3)
+            try:
+                page_i = int(page)
+            except (TypeError, ValueError):
+                return
+            if page_i < 0:
+                return
+            menu = QMenu(self)
+            act = menu.addAction("Gruppe umbenennen / Farbe…")
+            chosen = menu.exec(self.annotations.mapToGlobal(pos))
+            if chosen is act:
+                self.annotation_group_edit_requested.emit(page_i)
             return
-        page = item.data(Qt.UserRole + 3)
-        try:
-            page_i = int(page)
-        except (TypeError, ValueError):
+        # Temporäre Ann.-Gruppe (group_id) auf Annotation-Eintrag
+        payload = item.data(256)
+        if payload is None:
             return
-        if page_i < 0:
+        gid = str(getattr(payload, "group_id", "") or "").strip()
+        if not gid:
             return
         menu = QMenu(self)
-        act = menu.addAction("Gruppe umbenennen / Farbe…")
+        act_filter = menu.addAction("Nur diese Gruppe")
+        act_clear = None
+        if self.annotation_group_filter():
+            act_clear = menu.addAction("Gruppenfilter aufheben")
+        act_export = menu.addAction("Gruppe als JSON exportieren…")
         chosen = menu.exec(self.annotations.mapToGlobal(pos))
-        if chosen is act:
-            self.annotation_group_edit_requested.emit(page_i)
+        if chosen is act_filter:
+            self.set_annotation_group_filter(gid)
+        elif act_clear is not None and chosen is act_clear:
+            self.clear_annotation_group_filter()
+        elif chosen is act_export:
+            self.annotation_group_export_requested.emit(gid)
 
     def _clear_color_stats_buttons(self) -> None:
         layout = getattr(self, "ann_color_layout", None)
@@ -2023,6 +2111,7 @@ class Sidebar(QWidget):
                 sel_groups[gid] = dict(v) if isinstance(v, dict) else {}
         self._ann_sel_groups = sel_groups
         self._sync_ann_filter_options(self._ann_all_payloads)
+        self._update_ann_group_filter_ui()
         self._apply_annotation_filter()
 
     def clear_annotations(self):
@@ -2035,6 +2124,7 @@ class Sidebar(QWidget):
         self._ann_color_filter = ""
         self._ann_tag_filter = []
         self._ann_filter_current_page = False
+        self._ann_group_filter = ""
         self.annotations.clear()
         if hasattr(self, "ann_search"):
             self.ann_search.blockSignals(True)
@@ -2048,6 +2138,7 @@ class Sidebar(QWidget):
             self.ann_current_page.blockSignals(True)
             self.ann_current_page.setChecked(False)
             self.ann_current_page.blockSignals(False)
+        self._update_ann_group_filter_ui()
         if hasattr(self, "ann_tag_filter"):
             self._ann_tag_updating = True
             self.ann_tag_filter.blockSignals(True)

@@ -90,6 +90,7 @@ from instantlensdoc.core.app_settings import (
     get_page_number_overlay_format,
     get_page_number_overlay_opacity,
     get_page_number_overlay_position,
+    get_page_number_overlay_skip_edges,
     get_page_number_overlay_start,
     get_show_page_boxes,
     get_show_page_number_overlay,
@@ -106,6 +107,7 @@ from instantlensdoc.core.app_settings import (
     set_page_number_overlay_format,
     set_page_number_overlay_opacity,
     set_page_number_overlay_position,
+    set_page_number_overlay_skip_edges,
     set_page_number_overlay_start,
     set_pdf_continuous_scroll,
     set_pdf_grayscale,
@@ -1147,6 +1149,7 @@ class PdfViewer(QWidget):
         self._page_number_overlay_position = get_page_number_overlay_position()
         self._page_number_overlay_format = get_page_number_overlay_format()
         self._page_number_overlay_start = get_page_number_overlay_start()
+        self._page_number_overlay_skip_edges = get_page_number_overlay_skip_edges()
         self._show_printer_marks = get_show_printer_marks()
         self._search_query = ""
         self._search_rects: list[tuple[float, float, float, float]] = []
@@ -2268,8 +2271,27 @@ class PdfViewer(QWidget):
     def page_number_overlay_start(self) -> int:
         return int(getattr(self, "_page_number_overlay_start", 1) or 1)
 
+    def set_page_number_overlay_skip_edges(self, enabled: bool):
+        """Erste und letzte Seite vom Seitennummer-Overlay ausschließen (persistiert)."""
+        on = bool(enabled)
+        changed = bool(getattr(self, "_page_number_overlay_skip_edges", False)) != on
+        self._page_number_overlay_skip_edges = on
+        set_page_number_overlay_skip_edges(on)
+        self._update_page_number_overlay()
+        if changed:
+            self.status.emit(
+                "Seitennummer-Overlay: erste/letzte Seite aus"
+                if on
+                else "Seitennummer-Overlay: alle Seiten"
+            )
+
+    def page_number_overlay_skip_edges(self) -> bool:
+        return bool(getattr(self, "_page_number_overlay_skip_edges", False))
+
     def format_page_number_overlay_text(self) -> str:
         """Overlay-Text aus Format-String ({page}/{pages}, Aliase {n}/{total}, {label})."""
+        if self._page_number_overlay_should_skip():
+            return ""
         start = int(getattr(self, "_page_number_overlay_start", 1) or 1)
         page = int(self.page_index) + start
         count = int(self.page_count or 0)
@@ -2286,6 +2308,23 @@ class PdfViewer(QWidget):
             )
         except Exception:
             return f"{page} / {pages}"
+
+    def _page_number_overlay_should_skip(self) -> bool:
+        """True wenn Overlay auf aktueller Seite wegen Edge-Ausschluss ausgeblendet wird."""
+        if not bool(getattr(self, "_page_number_overlay_skip_edges", False)):
+            return False
+        count = int(self.page_count or 0)
+        if count <= 0:
+            return False
+        idx = int(self.page_index)
+        if idx <= 0:
+            return True
+        if count >= 2 and idx >= count - 1:
+            return True
+        # Einzelseite: erste = letzte → ausschließen
+        if count == 1:
+            return True
+        return False
 
     def _update_page_number_overlay(self) -> None:
         """Aktuelle Seitennummer/Label an Canvas-Overlay übergeben."""
@@ -2451,6 +2490,7 @@ class PdfViewer(QWidget):
         self._page_number_overlay_position = get_page_number_overlay_position()
         self._page_number_overlay_format = get_page_number_overlay_format()
         self._page_number_overlay_start = get_page_number_overlay_start()
+        self._page_number_overlay_skip_edges = get_page_number_overlay_skip_edges()
         if hasattr(self, "btn_page_num"):
             self.btn_page_num.blockSignals(True)
             self.btn_page_num.setChecked(self._show_page_number_overlay)
@@ -4042,15 +4082,15 @@ class PdfViewer(QWidget):
 
     def extract_selected_pages_as_pdf(
         self, page_indices: list[int] | Sequence[int] | None = None
-    ) -> bool:
-        """Ausgewählte Seiten (Thumbnail-Batch) als neues PDF speichern."""
+    ) -> Path | None:
+        """Ausgewählte Seiten (Thumbnail-Batch) als neues PDF speichern. Rückgabe: Zielpfad."""
         if not self.pdf_path:
             QMessageBox.information(self, "Extrahieren", "Kein PDF geladen.")
-            return False
+            return None
         idxs = [int(p) for p in (page_indices or [])]
         if not idxs:
             self.status.emit("Extrahieren: keine Seiten ausgewählt")
-            return False
+            return None
         # Duplikate entfernen, Reihenfolge behalten
         seen: set[int] = set()
         clean: list[int] = []
@@ -4069,7 +4109,7 @@ class PdfViewer(QWidget):
             "PDF (*.pdf)",
         )
         if not path:
-            return False
+            return None
         dest = Path(path)
         if dest.suffix.lower() != ".pdf":
             dest = dest.with_suffix(".pdf")
@@ -4077,8 +4117,69 @@ class PdfViewer(QWidget):
             extract_pages(self.pdf_path, dest, clean)
         except Exception as e:
             QMessageBox.warning(self, "Extrahieren", str(e))
-            return False
+            return None
         self.status.emit(f"{len(clean)} Seite(n) → {dest.name}")
+        return dest
+
+    def open_selected_pages_as_document(
+        self, page_indices: list[int] | Sequence[int] | None = None
+    ) -> Path | None:
+        """
+        Ausgewählte Seiten als neues PDF speichern und Pfad für Tab-Öffnen liefern.
+        Speichern-Dialog wie beim Extrahieren; Rückgabe None bei Abbruch.
+        """
+        dest = self.extract_selected_pages_as_pdf(page_indices)
+        if dest is None:
+            return None
+        self.status.emit(f"{dest.name} — bereit zum Öffnen in neuem Tab")
+        return dest
+
+    def export_selected_ann_group_json(self, group_id: str | None = None) -> bool:
+        """Temporäre Ann.-Gruppe als JSON exportieren (Mitglieder + Meta)."""
+        if not self.store:
+            QMessageBox.information(self, "Gruppe exportieren", "Kein PDF mit Annotationen geladen.")
+            return False
+        gid = str(group_id or "").strip()
+        if not gid:
+            ids = self._selected_annotation_ids()
+            expanded = self.store.expand_group_ids(ids) if ids else []
+            for aid in expanded:
+                ann = self.store.get(aid)
+                if ann and str(getattr(ann, "group_id", "") or "").strip():
+                    gid = str(ann.group_id).strip()
+                    break
+        if not gid:
+            self.status.emit("Gruppe exportieren: keine Gruppe gewählt")
+            return False
+        members = self.store.ids_in_group(gid)
+        if not members:
+            QMessageBox.information(self, "Gruppe exportieren", "Gruppe hat keine Mitglieder.")
+            return False
+        from PySide6.QtWidgets import QFileDialog
+
+        meta = self.store.get_ann_group(gid)
+        label = str(meta.get("title") or "").strip() or gid[:8]
+        default_name = f"{(self.pdf_path.stem if self.pdf_path else 'ann')}_group_{label}.json"
+        # Dateiname säubern
+        safe = "".join(c if c.isalnum() or c in "-_." else "_" for c in default_name)
+        start_dir = str(self.pdf_path.with_name(safe)) if self.pdf_path else safe
+        path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Ann.-Gruppe als JSON exportieren",
+            start_dir,
+            "JSON (*.json)",
+        )
+        if not path:
+            return False
+        dest = Path(path)
+        if dest.suffix.lower() != ".json":
+            dest = dest.with_suffix(".json")
+        try:
+            self.store.export_group_json(gid, dest)
+        except Exception as e:
+            QMessageBox.warning(self, "Gruppe exportieren", str(e))
+            return False
+        self.status.emit(f"Gruppe „{label}“ → {dest.name} ({len(members)} Ann.)")
         return True
 
     def reorder_page_favorites(self, pages: list[int]) -> list[int]:

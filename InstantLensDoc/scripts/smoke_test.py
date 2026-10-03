@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Smoke-Test 0.8.8 (CLI + optional offscreen Qt). Kernpfade: open/annotate/export/license + ausgewählte 0.6.x-Pfade."""
+"""Smoke-Test 0.8.9 (CLI + optional offscreen Qt). Kernpfade: open/annotate/export/license + ausgewählte 0.6.x-Pfade."""
 
 from __future__ import annotations
 
@@ -122,8 +122,8 @@ def main() -> int:
     from instantlensdoc.core.update_check import check_for_updates
     from instantlensdoc.license import KEY_DAYS, TRIAL_DAYS, generate_key, verify_key
 
-    assert __version__ == "0.8.8", __version__
-    assert ild_ver == "0.8.8", ild_ver
+    assert __version__ == "0.8.9", __version__
+    assert ild_ver == "0.8.9", ild_ver
     assert TRIAL_DAYS == 28 and KEY_DAYS == 32
     key = generate_key("ame@sellerbach.de")
     ok, msg, _ = verify_key(key)
@@ -141,7 +141,7 @@ def main() -> int:
     assert "Settings" in tr("settings")
     set_lang("de")
     upd = check_for_updates(allow_network=False)
-    assert upd.local_version == "0.8.8" and not upd.online
+    assert upd.local_version == "0.8.9" and not upd.online
     assert get_export_jpeg_quality() >= 10
     assert get_ui_lang() in ("de", "en")
     assert 25 <= get_default_zoom_percent() <= 500
@@ -182,8 +182,8 @@ def main() -> int:
     assert get_ann_pen_color() == "#112233"
     assert (ROOT / "CHANGELOG.md").is_file()
     cl = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-    assert "0.8.8" in cl and "0.8.7" in cl and "0.8.6" in cl and "0.8.5" in cl and "0.8.4" in cl and "0.8.3" in cl and "0.8.2" in cl and "0.8.1" in cl and "0.8.0" in cl
-    assert "## 0.8.8" in cl and "## 0.8.7" in cl and "## 0.8.6" in cl and "## 0.8.5" in cl and "## 0.8.4" in cl and "## 0.8.3" in cl and "## 0.8.2" in cl and "## 0.8.1" in cl and "## 0.8.0" in cl
+    assert "0.8.9" in cl and "0.8.8" in cl and "0.8.7" in cl and "0.8.6" in cl and "0.8.5" in cl and "0.8.4" in cl and "0.8.3" in cl and "0.8.2" in cl and "0.8.1" in cl and "0.8.0" in cl
+    assert "## 0.8.9" in cl and "## 0.8.8" in cl and "## 0.8.7" in cl and "## 0.8.6" in cl and "## 0.8.5" in cl and "## 0.8.4" in cl and "## 0.8.3" in cl and "## 0.8.2" in cl and "## 0.8.1" in cl and "## 0.8.0" in cl
     assert "## 0.7.9" in cl
     assert "## 0.7.8" in cl
     assert "## 0.7.6" in cl
@@ -240,7 +240,7 @@ def main() -> int:
     assert "0.4.9" in cl  # noch in Kurz-Tabelle
     assert "0.3.9" in cl  # noch in Kurz-Tabelle
     assert "0.2.9" in cl  # noch in Kurz-Tabelle
-    assert "0.8.8" in (ROOT / "README.md").read_text(encoding="utf-8")
+    assert "0.8.9" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "run.bat" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "sync-ild.ps1" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "scripts/sync-ild.ps1" in (ROOT / "FEATURES.md").read_text(encoding="utf-8")
@@ -589,13 +589,13 @@ def main() -> int:
 
         assert (ROOT / "installer" / "installer-hinweis.txt").exists()
         iss = (ROOT / "installer" / "instantlensdoc.iss").read_text(encoding="utf-8")
-        assert "0.8.8" in iss and "desktopicon" in iss and "DisableProgramGroupPage=no" in iss
+        assert "0.8.9" in iss and "desktopicon" in iss and "DisableProgramGroupPage=no" in iss
         assert "UninstallDisplayName" in iss and "Uninstallable=yes" in iss
         assert "IncludeKeygen" in iss and "SetupIconFile" in iss
         assert "InstantLensKeygen.exe" in iss
         assert "uninstallexe" in iss
         bw = (ROOT / "build-windows.ps1").read_text(encoding="utf-8")
-        assert "0.8.8" in bw and "NoKeygenInApp" in bw and "--icon" in bw
+        assert "0.8.9" in bw and "NoKeygenInApp" in bw and "--icon" in bw
         assert "InstantLensKeygen.exe" in bw
         bi = (ROOT / "installer" / "build-installer.ps1").read_text(encoding="utf-8")
         assert "InstantLensKeygen.exe" in bi and "IncludeKeygen" in bi
@@ -604,7 +604,7 @@ def main() -> int:
         assert "Installer" in kg_readme
         hinweis = (ROOT / "installer" / "installer-hinweis.txt").read_text(encoding="utf-8")
         assert "InstantLensKeygen.exe" in hinweis or "run-keygen.bat" in hinweis
-        assert "0.8.8" in hinweis
+        assert "0.8.9" in hinweis
         assert "checkedonce" in iss and "Desktop-Verknüpfung" in hinweis
         from ild_pdf.limits import OPEN_TIMEOUT_HINT, OPEN_TIMEOUT_HINT_SEC
 
@@ -616,7 +616,7 @@ def main() -> int:
         assert "QProgressDialog" in (ROOT / "instantlensdoc" / "ui" / "main_window.py").read_text(encoding="utf-8")
 
         assert (ROOT / "examples" / "ild_pdf_demo.py").exists()
-        assert "0.8.8" in (ROOT / "INFO.md").read_text(encoding="utf-8")
+        assert "0.8.9" in (ROOT / "INFO.md").read_text(encoding="utf-8")
         assert (ROOT / "assets" / "app.ico").is_file()
 
         # --- Kernpfade: open / annotate / export / license ---
@@ -749,7 +749,7 @@ def main() -> int:
         assert "| A" in tbl and "| 1" in tbl
         assert ocr_mod.TESSERACT_WIKI_URL.startswith("https://")
 
-        # --- Ausgewählte 0.3.x-/0.4.x-/0.5.x-/0.6.x-Pfade (CLI, Konsolidierung 0.7.0) + 0.8.8 ---
+        # --- Ausgewählte 0.3.x-/0.4.x-/0.5.x-/0.6.x-Pfade (CLI, Konsolidierung 0.7.0) + 0.8.9 ---
         from ild_pdf.annotate import stamp_library_items
         from ild_pdf.attachments import has_attachments, list_attachments
         from ild_pdf.flatten import flatten_annotations_to_pdf
@@ -807,7 +807,7 @@ def main() -> int:
         set_backup_on_save(False)
         assert get_page_size_unit() in ("mm", "inch")
         assert isinstance(get_minimize_to_tray(), bool)
-        assert "0.8.8" in feat and "0.8.7" in feat and "0.8.6" in feat and "0.8.5" in feat and "0.8.4" in feat and "0.8.3" in feat and "0.8.2" in feat and "0.8.1" in feat and "0.8.0" in feat and "0.7.9" in feat and "0.7.8" in feat and "0.7.7" in feat and "0.7.6" in feat and "0.7.5" in feat and "0.7.4" in feat and "0.7.3" in feat and "0.7.2" in feat and "0.7.1" in feat and "0.6.9" in feat and "0.5.9" in feat and "0.4.9" in feat  # Release + Zeitraum-Feature-Hinweise
+        assert "0.8.9" in feat and "0.8.8" in feat and "0.8.7" in feat and "0.8.6" in feat and "0.8.5" in feat and "0.8.4" in feat and "0.8.3" in feat and "0.8.2" in feat and "0.8.1" in feat and "0.8.0" in feat and "0.7.9" in feat and "0.7.8" in feat and "0.7.7" in feat and "0.7.6" in feat and "0.7.5" in feat and "0.7.4" in feat and "0.7.3" in feat and "0.7.2" in feat and "0.7.1" in feat and "0.6.9" in feat and "0.5.9" in feat and "0.4.9" in feat  # Release + Zeitraum-Feature-Hinweise
         assert "Batch-OCR" in feat or "OCR gesamtes PDF" in feat
         assert "Tag" in feat
         assert "Projekt-Ordner" in feat or "Workspace" in feat
@@ -2873,6 +2873,85 @@ def main() -> int:
         )
         print("0.8.8 CLI group-rename/color/thumb-extract/overlay-start/indent-guides: OK")
 
+        # 0.8.9 CLI: Group Filter/JSON, Thumb Tab-Open, Overlay-Edges, Current-Line-HL
+        from instantlensdoc.core.app_settings import (
+            get_editor_current_line_highlight,
+            get_page_number_overlay_skip_edges,
+            set_editor_current_line_highlight,
+            set_page_number_overlay_skip_edges,
+        )
+        from ild_pdf import Annotation as Ann089, AnnotationStore as AS089, AnnotationType as AT089
+
+        set_page_number_overlay_skip_edges(True)
+        assert get_page_number_overlay_skip_edges() is True
+        set_page_number_overlay_skip_edges(False)
+        assert get_page_number_overlay_skip_edges() is False
+        set_editor_current_line_highlight(False)
+        assert get_editor_current_line_highlight() is False
+        set_editor_current_line_highlight(True)
+        assert get_editor_current_line_highlight() is True
+        store089 = AS089(pdf)
+        store089.annotations = []
+        store089.clear_history()
+        a089 = Ann089(0, AT089.HIGHLIGHT, 10, 10, width=20, height=10, text="g089a")
+        b089 = Ann089(0, AT089.HIGHLIGHT, 40, 20, width=20, height=10, text="g089b")
+        c089 = Ann089(0, AT089.HIGHLIGHT, 70, 30, width=20, height=10, text="solo089")
+        store089.add(a089)
+        store089.add(b089)
+        store089.add(c089)
+        n_g089, gid089 = store089.group([a089.id, b089.id])
+        assert n_g089 == 2 and gid089
+        store089.set_ann_group(gid089, title="ExportG", color="#CCDDEE")
+        j089 = td / "group_export.json"
+        out089 = store089.export_group_json(gid089, j089)
+        assert out089.is_file()
+        raw089 = j089.read_text(encoding="utf-8")
+        assert "ExportG" in raw089 and "g089a" in raw089 and "g089b" in raw089
+        assert "solo089" not in raw089
+        assert "export_group_id" in raw089
+        pv089 = (ROOT / "instantlensdoc" / "ui" / "pdf_view.py").read_text(encoding="utf-8")
+        assert "open_selected_pages_as_document" in pv089
+        assert "export_selected_ann_group_json" in pv089
+        assert "set_page_number_overlay_skip_edges" in pv089
+        assert "_page_number_overlay_should_skip" in pv089
+        mw089 = (ROOT / "instantlensdoc" / "ui" / "main_window.py").read_text(encoding="utf-8")
+        assert "_on_thumbs_batch_open" in mw089
+        assert "_on_ann_group_export" in mw089
+        assert "_toggle_current_line_highlight" in mw089
+        sb089 = (ROOT / "instantlensdoc" / "ui" / "sidebar.py").read_text(encoding="utf-8")
+        assert "pages_batch_open_requested" in sb089
+        assert "annotation_group_export_requested" in sb089
+        assert "set_annotation_group_filter" in sb089
+        assert "Nur diese Gruppe" in sb089
+        sd089 = (ROOT / "instantlensdoc" / "ui" / "settings_dialog.py").read_text(encoding="utf-8")
+        assert "page_num_skip_edges" in sd089
+        assert "current_line_hl" in sd089
+        assert "set_page_number_overlay_skip_edges" in sd089
+        assert "set_editor_current_line_highlight" in sd089
+        ed089 = (ROOT / "instantlensdoc" / "ui" / "editor.py").read_text(encoding="utf-8")
+        assert "set_current_line_highlight" in ed089
+        assert "_update_current_line_highlight" in ed089
+        ann089src = (ROOT / "ild_pdf" / "annotate.py").read_text(encoding="utf-8")
+        assert "def export_group_json(" in ann089src
+        feat089 = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
+        assert "0.8.9" in feat089 and (
+            "nur diese Gruppe" in feat089
+            or "JSON-Export" in feat089
+            or "neues Dokument" in feat089
+            or "Aktuelle Zeile" in feat089
+            or "erste/letzte" in feat089
+        )
+        cl089 = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+        assert "## 0.8.9" in cl089
+        kb089 = (ROOT / "instantlensdoc" / "ui" / "keyboard_help.py").read_text(encoding="utf-8")
+        assert "0.8.9" in kb089 and (
+            "Nur diese Gruppe" in kb089
+            or "neues Dokument" in kb089
+            or "Aktuelle Zeile" in kb089
+            or "erste/letzte" in kb089
+        )
+        print("0.8.9 CLI group-filter/json/thumb-open/overlay-edges/line-hl: OK")
+
         set_show_printer_marks(True)
         assert get_show_printer_marks() is True
         set_show_printer_marks(False)
@@ -3005,7 +3084,7 @@ def main() -> int:
         assert "Continuous Scroll" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
         assert "Seitenlabel" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8") or "Seitenlabels" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
         assert "Zwischenablage-Verlauf" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8") or "Clipboard" in (ROOT / "FEATURES.md").read_text(encoding="utf-8")
-        assert "0.8.8" in feat and "0.8.7" in feat and "0.8.6" in feat and "0.8.5" in feat and "0.8.4" in feat and "0.8.3" in feat and "0.8.2" in feat and "0.8.1" in feat and "0.8.0" in feat and "0.7.9" in feat and "0.7.8" in feat and "0.7.7" in feat and "0.7.6" in feat and "0.7.5" in feat and "0.7.4" in feat and "0.7.3" in feat and "0.7.2" in feat and "0.7.1" in feat and "0.6.9" in feat and "0.5.9" in feat and "0.4.9" in feat
+        assert "0.8.9" in feat and "0.8.8" in feat and "0.8.7" in feat and "0.8.6" in feat and "0.8.5" in feat and "0.8.4" in feat and "0.8.3" in feat and "0.8.2" in feat and "0.8.1" in feat and "0.8.0" in feat and "0.7.9" in feat and "0.7.8" in feat and "0.7.7" in feat and "0.7.6" in feat and "0.7.5" in feat and "0.7.4" in feat and "0.7.3" in feat and "0.7.2" in feat and "0.7.1" in feat and "0.6.9" in feat and "0.5.9" in feat and "0.4.9" in feat
         # --- 0.4.2 CLI: Outline Goto, Ann Copy/Paste, Flatten Progress ---
         import pikepdf as _pike_ol
 
@@ -3130,7 +3209,7 @@ def main() -> int:
         win._add_chained_frame()
         assert len(win.layout_doc.text_frames) >= 2
         assert "Lizenz:" in win.license_label.text() or "⚠" in win.license_label.text()
-        assert "v0.8.8" in win.version_label.text()
+        assert "v0.8.9" in win.version_label.text()
         # Lizenz <7 Tage: Style prominent
         st_lic = win.license_manager.status()
         if st_lic.allowed and st_lic.days_remaining < 7:
@@ -3311,11 +3390,11 @@ def main() -> int:
             assert win.editor.outdent_selection(4)
             assert win.editor.toPlainText().splitlines()[0] == "alpha"
             # Fenstertitel mit Version
-            assert "0.8.8" in win.windowTitle()
+            assert "0.8.9" in win.windowTitle()
             from instantlensdoc.ui.help_dialog import AboutDialog, HelpDialog, open_log_folder
 
             about = AboutDialog(win)
-            assert "0.8.8" in about.windowTitle()
+            assert "0.8.9" in about.windowTitle()
             help_dlg = HelpDialog(win)
             assert help_dlg.windowTitle() == "Hilfe"
             assert callable(open_log_folder)
@@ -3987,7 +4066,7 @@ def main() -> int:
             win.apply_tray_setting()
             if win._tray is not None:
                 tip = win._tray.toolTip()
-                assert "0.8.8" in tip and "InstantLens Doc" in tip
+                assert "0.8.9" in tip and "InstantLens Doc" in tip
             set_minimize_to_tray(False)
             win.apply_tray_setting()
             print("0.3.9 fit-h/ann-stats/special/tray: OK")
@@ -4000,9 +4079,9 @@ def main() -> int:
             from instantlensdoc.ui.password_dialog import CompressPdfDialog, SetPasswordDialog
             from instantlensdoc.ui.stubs import PLANNED
             assert KeyboardHelpDialog and SetPasswordDialog and CompressPdfDialog
-            assert "0.8.8" in PLANNED["ki"]
+            assert "0.8.9" in PLANNED["ki"]
             assert "Coming soon" in PLANNED["cloud"]
-            assert "0.8.8" in PLANNED["stylus"] and "0.8.8" in PLANNED["extrude3d"]
+            assert "0.8.9" in PLANNED["stylus"] and "0.8.9" in PLANNED["extrude3d"]
             # Toolbar ↔ Menü Sync Graustufen/Nacht
             win.pdf_view.set_grayscale(True)
             assert win._grayscale_action.isChecked()
@@ -4037,7 +4116,7 @@ def main() -> int:
             assert win.editor.toPlainText().splitlines() == ["one", "two"]
             from instantlensdoc.ui.help_dialog import HELP_HTML
 
-            assert "Stub 0.8.8" in HELP_HTML
+            assert "Stub 0.8.9" in HELP_HTML
             assert "scripts/sync-ild.ps1" in HELP_HTML
             assert "Präsentationsmodus" in HELP_HTML or "F5" in (
                 ROOT / "instantlensdoc" / "ui" / "keyboard_help.py"
@@ -6969,10 +7048,78 @@ def main() -> int:
             assert "## 0.8.8" in cl088q
             print("0.8.8 Qt group-rename/color/thumb-extract/overlay-start/indent-guides: OK")
 
+            # --- 0.8.9 Qt: Group Filter/JSON, Thumb Tab-Open, Overlay-Edges, Current-Line-HL ---
+            from instantlensdoc.core.app_settings import (
+                get_editor_current_line_highlight as get_clh089,
+                get_page_number_overlay_skip_edges as get_skip089,
+                set_editor_current_line_highlight as set_clh089,
+                set_page_number_overlay_skip_edges as set_skip089,
+            )
+            from instantlensdoc.ui.settings_dialog import SettingsDialog as SD089q
+
+            assert callable(getattr(win, "_on_thumbs_batch_open", None))
+            assert callable(getattr(win, "_on_ann_group_export", None))
+            assert callable(getattr(win, "_toggle_current_line_highlight", None))
+            assert callable(getattr(win.pdf_view, "open_selected_pages_as_document", None))
+            assert callable(getattr(win.pdf_view, "export_selected_ann_group_json", None))
+            assert callable(getattr(win.pdf_view, "set_page_number_overlay_skip_edges", None))
+            assert callable(getattr(win.editor, "set_current_line_highlight", None))
+            assert hasattr(win.sidebar, "pages_batch_open_requested")
+            assert hasattr(win.sidebar, "annotation_group_export_requested")
+            assert callable(getattr(win.sidebar, "set_annotation_group_filter", None))
+            sd089q = SD089q(win)
+            assert hasattr(sd089q, "page_num_skip_edges")
+            assert hasattr(sd089q, "current_line_hl")
+            set_skip089(True)
+            win.pdf_view.set_page_number_overlay_skip_edges(True)
+            assert win.pdf_view.page_number_overlay_skip_edges() is True
+            win.pdf_view.set_show_page_number_overlay(True)
+            n_pages089 = int(win.pdf_view.page_count or 0)
+            if n_pages089 >= 1:
+                win.pdf_view.page_index = 0
+                assert win.pdf_view.format_page_number_overlay_text() == ""
+            if n_pages089 >= 2:
+                win.pdf_view.page_index = n_pages089 - 1
+                assert win.pdf_view.format_page_number_overlay_text() == ""
+                win.pdf_view.page_index = 0
+            win.pdf_view.set_page_number_overlay_skip_edges(False)
+            set_skip089(False)
+            assert get_skip089() is False
+            set_clh089(False)
+            win.editor.set_current_line_highlight(False)
+            assert win.editor.current_line_highlight_enabled() is False
+            sd089q.current_line_hl.setChecked(True)
+            sd089q.page_num_skip_edges.setChecked(False)
+            sd089q._save()
+            assert get_clh089() is True
+            assert win.editor.current_line_highlight_enabled() is True
+            if win.pdf_view.store is not None:
+                from ild_pdf import Annotation as A089q, AnnotationType as T089q
+
+                g1 = A089q(0, T089q.HIGHLIGHT, 14, 14, width=22, height=10, text="g089qa")
+                g2 = A089q(0, T089q.HIGHLIGHT, 50, 24, width=22, height=10, text="g089qb")
+                win.pdf_view.store.add(g1)
+                win.pdf_view.store.add(g2)
+                _, gid_q089 = win.pdf_view.store.group([g1.id, g2.id])
+                win.pdf_view.store.set_ann_group(gid_q089, title="SmokeG089", color="#112233")
+                jpath089 = Path(tempfile.mkdtemp()) / "grp089.json"
+                win.pdf_view.store.export_group_json(gid_q089, jpath089)
+                assert jpath089.is_file() and "SmokeG089" in jpath089.read_text(encoding="utf-8")
+                win.sidebar.set_annotation_group_filter(gid_q089)
+                assert win.sidebar.annotation_group_filter() == gid_q089
+                win.sidebar.clear_annotation_group_filter()
+                assert win.sidebar.annotation_group_filter() == ""
+                win.pdf_view.store.ungroup([g1.id, g2.id])
+            feat089q = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
+            assert "0.8.9" in feat089q
+            cl089q = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+            assert "## 0.8.9" in cl089q
+            print("0.8.9 Qt group-filter/json/thumb-open/overlay-edges/line-hl: OK")
+
             print("0.4.x selected Qt marks/schema/sort/reset: OK")
             print("0.4.2 Qt outline/copy-paste/case/progress: OK")
             print("0.4.1 Qt links/stamp/encoding/drop: OK")
-            print("0.3.x–0.8.8 review OK")
+            print("0.3.x–0.8.9 review OK")
             assert callable(win.pdf_view.bake_redactions)
             assert callable(win.pdf_view.clear_redactions)
             assert callable(win._set_pdf_password)
