@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **2.1.4** |
+| Version | **2.1.5** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -35,6 +35,8 @@ powershell -ExecutionPolicy Bypass -File "D:\AI_Temp\sync-ild.ps1"
 
 Skript: [sync-ild.ps1](scripts/sync-ild.ps1) — Branch `cursor/instantlensdoc-2108` (oder `-LocalPack` / Pack-Zip) nach `D:\AI_Temp\InstantLensDoc`, pip, Start. **Nutzer-Icon in `assets` wird nicht überschrieben.**
 
+**FEATURES.md lokal sync:** Nach Sync liegt `FEATURES.md` lokal im App-Ordner (`D:\AI_Temp\InstantLensDoc\FEATURES.md`); About/Stubs öffnen diese lokale Datei — Version **2.1.5**.
+
 Ohne Start: `-SkipStart` (Alias `-NoStart`). Exit-Codes: **0** OK · **1** allgemein · **2** Git-Fehler.
 
 Fallback bei Git-Fehler:
@@ -63,14 +65,14 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an / `checkedonce`)
 
-## Neu in 2.1.4
+## Neu in 2.1.5
 
-Post-Release-Polish nach **2.1.3**:
+Post-Release-Polish nach **2.1.4**:
 
-- **PDF-Kommentar-Import:** Status kopieren → **Clipboard + Toast + A11y Announcement**
-- **Messung:** CSV-Template **Reset Default** · Bestätigung nur bei Abweichung · **Fokus+Selektion**
-- **PDF-Vergleich:** Diff-TXT **Quick-Insert-Buttons** · **Reset Default** (Bestätigung≠Default · Fokus+Selektion)
-- **Nightly-Smoke:** `smoke_ild.py --json` bei Fail **`checks[].error` Text** · **Exitcode spiegelt `ok`**
+- **PDF-Kommentar-Import:** Status-Copy-Toast **Dauer OCR-Settings** · **Klick fokussiert Statusleiste/Log** falls vorhanden
+- **Messung / Diff:** Reset Default über **gemeinsamen Helper** · **Esc im Feld verwirft Edit** (nicht speichern)
+- **Nightly-Smoke:** Fail-`error` **max 200 Zeichen truncated mit …** · Docs Fail-Beispiel
+- **FEATURES.md lokal sync** Hinweis (siehe Sync)
 - Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen unverändert klar markiert
 
 ## Nightly-Smoke
@@ -81,21 +83,31 @@ python scripts\smoke_ild.py --qt
 python scripts\smoke_ild.py --json
 ```
 
-Exit **0**/OK (`ok=true`) · **1**/Fehler (`ok=false`) · **2**/ungültige Option. `--json` liefert `ok`, `checks`, `duration_ms`, `version`; bei Fail enthält `checks[]` ein Objekt mit `error`.
+Exit **0**/OK (`ok=true`) · **1**/Fehler (`ok=false`) · **2**/ungültige Option. `--json` liefert `ok`, `checks`, `duration_ms`, `version`; bei Fail enthält `checks[]` ein Objekt mit `error` (max 200 Zeichen, Overflow `…`).
 
 Beispiel Erfolg:
 
 ```json
-{"ok": true, "version": "2.1.4", "duration_ms": 1234, "checks": ["version", "imports", "cli", "measure_diff_import", "changelog"]}
+{"ok": true, "version": "2.1.5", "duration_ms": 1234, "checks": ["version", "imports", "cli", "measure_diff_import", "changelog"]}
 ```
 
 Beispiel Fail:
 
 ```json
-{"ok": false, "version": "2.1.4", "duration_ms": 12, "checks": ["version", {"name": "imports", "error": "import x: …"}]}
+{"ok": false, "version": "2.1.5", "duration_ms": 12, "checks": ["version", {"name": "imports", "error": "import x: …"}]}
 ```
 
 Ende (ohne `--json`): `Laufzeit: N ms` · `smoke_ild: OK`.
+
+## Neu in 2.1.4
+
+Post-Release-Polish nach **2.1.3**:
+
+- **PDF-Kommentar-Import:** Status kopieren → **Clipboard + Toast + A11y Announcement**
+- **Messung:** CSV-Template **Reset Default** · Bestätigung nur bei Abweichung · **Fokus+Selektion**
+- **PDF-Vergleich:** Diff-TXT **Quick-Insert-Buttons** · **Reset Default** (Bestätigung≠Default · Fokus+Selektion)
+- **Nightly-Smoke:** `smoke_ild.py --json` bei Fail **`checks[].error` Text** · **Exitcode spiegelt `ok`**
+- Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen unverändert klar markiert
 
 ## Neu in 2.1.3
 

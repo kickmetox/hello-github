@@ -2,7 +2,7 @@
 
 Moderne Textverarbeitung mit PDF-Annotator, OCR-Bridge und Formulargenerator.
 
-**Version:** 2.1.4  
+**Version:** 2.1.5  
 **Hersteller:** Andreas Meyer · ame@sellerbach.de
 
 ## Quickstart (Windows)
@@ -34,7 +34,11 @@ Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)
 Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an).  
 User-Shortcuts: `.\scripts\install-ild.ps1` · Deinstallieren: `-Uninstall [-Quiet]` (Exit **0**/OK · **1**/Fehler; Quiet: Kurz-Summary, Exit 0 auch ohne Shortcuts).
 
-Nightly-Smoke: `python scripts\smoke_ild.py` · optional `--qt` · `--json` (Summary: `ok`, `checks[]`, `duration_ms`, `version`; Fail: `checks[].error`, Exit=ok).
+Nightly-Smoke: `python scripts\smoke_ild.py` · optional `--qt` · `--json` (Summary: `ok`, `checks[]`, `duration_ms`, `version`; Fail: `checks[].error` max 200…, Exit=ok).
+
+## Neu in 2.1.5
+
+Post-Release-Polish nach **2.1.4**: Import-Copy Toast **OCR-Dauer · Klick Status/Log**; Mess/Diff-Reset **gemeinsamer Helper · Esc verwirft Edit**; `smoke_ild.py` Fail-error **max 200…**; **FEATURES.md lokal sync** in Info. Stubs unverändert.
 
 ## Neu in 2.1.4
 

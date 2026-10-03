@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Nightly/CI Smoke: CLI + Import-Checks für InstantLens Doc — 2.1.0–2.1.4.
+"""Nightly/CI Smoke: CLI + Import-Checks für InstantLens Doc — 2.1.0–2.1.5.
 
 Leichtgewichtig. Exit-Codes:
   0  OK  (ok=true)
@@ -14,13 +14,13 @@ Aufruf:
   python scripts/smoke_ild.py -h
 
 JSON-Schema (--json), Erfolg:
-  {"ok": true, "version": "2.1.4", "duration_ms": 1234,
+  {"ok": true, "version": "2.1.5", "duration_ms": 1234,
    "checks": ["version", "imports", "cli", "measure_diff_import", "changelog"]}
 
-JSON bei Fail: checks[] enthält Objekt mit error-Text für den fehlgeschlagenen Check;
-Exitcode spiegelt ok (0↔true, 1↔false) — 2.1.4:
-  {"ok": false, "version": "2.1.4", "duration_ms": 12,
-   "checks": ["version", {"name": "imports", "error": "…"}]}
+JSON bei Fail: checks[] enthält Objekt mit error-Text (max 200 Zeichen, Truncate …);
+Exitcode spiegelt ok (0↔true, 1↔false) — 2.1.5:
+  {"ok": false, "version": "2.1.5", "duration_ms": 12,
+   "checks": ["version", {"name": "imports", "error": "import x: …"}]}
 """
 
 from __future__ import annotations
@@ -41,7 +41,8 @@ if str(ROOT) not in sys.path:
 # Headless/CI: Qt ohne Display
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-EXPECTED_VERSION = "2.1.4"
+EXPECTED_VERSION = "2.1.5"
+FAIL_ERROR_MAX_LEN = 200
 
 EXIT_OK = 0
 EXIT_FAIL = 1
@@ -101,6 +102,12 @@ def check_imports(*, with_qt: bool) -> None:
             _fail(f"import {name}: {e}")
     # UI-Module: Quelltext-Checks (Qt/EGL auf CI oft ohne Display-Libs)
     ui_checks = {
+        ROOT / "instantlensdoc" / "ui" / "template_reset.py": (
+            "reset_line_edit_template",
+            "focus_line_edit_select_all",
+            "EscapeDiscardEditFilter",
+            "Key_Escape",
+        ),
         ROOT / "instantlensdoc" / "ui" / "compare_dialog.py": (
             "chk_text_diff",
             "text_layer_diff",
@@ -115,6 +122,9 @@ def check_imports(*, with_qt: bool) -> None:
             "Reset Default",
             "_focus_txt_template_select_all",
             "_insert_txt_template_placeholder",
+            "reset_line_edit_template",
+            "EscapeDiscardEditFilter",
+            "Esc im Feld",
         ),
         ROOT / "instantlensdoc" / "ui" / "pdf_view.py": (
             "import_native_pdf_comments",
@@ -137,6 +147,15 @@ def check_imports(*, with_qt: bool) -> None:
             "get_last_measure_csv_dir",
             "format_measure_csv_filename",
             "DEFAULT_MEASURE_CSV_FILENAME_TEMPLATE",
+            "reset_line_edit_template",
+            "EscapeDiscardEditFilter",
+            "Klick fokussiert Statusleiste",
+            "get_ocr_defaults_toast_sec",
+        ),
+        ROOT / "instantlensdoc" / "ui" / "main_window.py": (
+            "_focus_import_status_toast_target",
+            "_import_status_toast_active",
+            "Klick fokussiert Statusleiste",
         ),
     }
     if with_qt:
@@ -358,6 +377,8 @@ def check_measure_and_diff() -> None:
 
 def check_changelog() -> None:
     cl = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    if "## 2.1.5" not in cl:
+        _fail("CHANGELOG fehlt ## 2.1.5")
     if "## 2.1.4" not in cl:
         _fail("CHANGELOG fehlt ## 2.1.4")
     if "## 2.1.3" not in cl:
@@ -369,8 +390,8 @@ def check_changelog() -> None:
     if "## 2.1.0" not in cl:
         _fail("CHANGELOG fehlt ## 2.1.0")
     feat = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
-    if "2.1.4" not in feat:
-        _fail("FEATURES.md fehlt 2.1.4")
+    if "2.1.5" not in feat:
+        _fail("FEATURES.md fehlt 2.1.5")
     info = (ROOT / "INFO.md").read_text(encoding="utf-8")
     if "smoke_ild" not in info or "--json" not in info:
         _fail("INFO.md fehlt smoke_ild/--json Hinweis")
@@ -378,7 +399,13 @@ def check_changelog() -> None:
         _fail("INFO.md fehlt smoke --json Beispiel-Felder")
     if "error" not in info:
         _fail("INFO.md fehlt smoke --json Fail checks[].error Hinweis")
-    _ok("changelog + features + info(smoke_ild --json error/exit)")
+    if "200" not in info and "…" not in info:
+        _fail("INFO.md fehlt Fail-error Truncate/… Hinweis")
+    if "FEATURES.md" not in info or (
+        "lokal" not in info.casefold() and "sync" not in info.casefold()
+    ):
+        _fail("INFO.md fehlt FEATURES.md lokal-sync Hinweis")
+    _ok("changelog + features + info(smoke_ild truncate/FEATURES lokal)")
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -412,7 +439,7 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help=(
             "Summary als JSON auf stdout "
-            "(ok/checks/duration_ms/version; Fail: checks[].error) — 2.1.4"
+            "(ok/checks/duration_ms/version; Fail: checks[].error max 200…) — 2.1.5"
         ),
     )
     return p
@@ -434,7 +461,7 @@ Optionen:
   --qt           UI-Quelltext-Checks (compare_dialog/pdf_view) ausführen
   --skip-qt      UI-Checks überspringen (Default ohne --qt)
   --json         Summary als JSON (ok/checks[]/duration_ms/version);
-                 bei Fail: checks[] mit {name,error}; Exitcode = ok — 2.1.4
+                 bei Fail: checks[] mit {name,error} (max 200…); Exitcode = ok — 2.1.5
 
 Exit-Codes:
   0  OK (ok=true)
@@ -444,21 +471,33 @@ Exit-Codes:
 Laufzeit: am Ende als „Laufzeit: N ms“ (oder duration_ms im JSON).
 
 Beispiel --json (Erfolg):
-  {"ok": true, "version": "2.1.4", "duration_ms": 1234,
+  {"ok": true, "version": "2.1.5", "duration_ms": 1234,
    "checks": ["version", "imports", "cli", "measure_diff_import", "changelog"]}
 
 Beispiel --json (Fail):
-  {"ok": false, "version": "2.1.4", "duration_ms": 12,
+  {"ok": false, "version": "2.1.5", "duration_ms": 12,
    "checks": ["version", {"name": "imports", "error": "import x: …"}]}
 """.rstrip()
     )
 
 
+def _truncate_fail_error(error: str | None, max_len: int = FAIL_ERROR_MAX_LEN) -> str:
+    """Fail-error auf max_len Zeichen kürzen, Overflow mit … — 2.1.5."""
+    err = (error or "FAIL").strip() or "FAIL"
+    limit = max(1, int(max_len))
+    if len(err) <= limit:
+        return err
+    # Platz für Ellipsis behalten
+    if limit <= 1:
+        return "…"
+    return err[: limit - 1] + "…"
+
+
 def _json_checks_on_fail(passed: list[str], *, check: str | None, error: str | None):
-    """checks[] bei Fail: bestandene Namen + Objekt mit error-Text — 2.1.4."""
+    """checks[] bei Fail: bestandene Namen + error (max 200, …) — 2.1.5."""
     out: list = list(passed)
     name = check or "unknown"
-    err = (error or "FAIL").strip() or "FAIL"
+    err = _truncate_fail_error(error)
     out.append({"name": name, "error": err})
     return out
 

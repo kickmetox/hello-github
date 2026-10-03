@@ -2752,6 +2752,9 @@ class MainWindow(QMainWindow):
         # Text→PDF-Toast nur behalten wenn Status dazu passt — 1.7.4
         if "Text → PDF" not in text:
             self._text_pdf_toast_active = False
+        # Import-Status-Toast nur behalten wenn Status dazu passt — 2.1.5
+        if "Import-Status" not in text:
+            self._import_status_toast_active = False
         # Update-Quellen-Tooltip nur bei Update-Status — 1.7.4/1.7.5
         if not text.startswith("Update:") and "Update —" not in text:
             if "Update:" not in text:
@@ -2762,9 +2765,15 @@ class MainWindow(QMainWindow):
         # Metadaten-Toast: Klick öffnet Dialog erneut — 1.5.4
         # Text→PDF: Klick öffnet Ordner — 1.7.4
         # Update: Klick öffnet VERSION.txt / docs/VERSION — 1.7.5
+        # Import-Status: Klick fokussiert Statusleiste/Log — 2.1.5
         if getattr(self, "_meta_toast_active", False) and "Metadaten gespeichert" in text:
             self.statusBar().setToolTip(
                 "Klick öffnet Metadaten-Dialog erneut — 1.5.5"
+            )
+            self.statusBar().setCursor(Qt.PointingHandCursor)
+        elif getattr(self, "_import_status_toast_active", False) and "Import-Status" in text:
+            self.statusBar().setToolTip(
+                "Klick fokussiert Statusleiste/Log falls vorhanden — 2.1.5"
             )
             self.statusBar().setCursor(Qt.PointingHandCursor)
         elif getattr(self, "_text_pdf_toast_active", False) and "Text → PDF" in text:
@@ -2840,8 +2849,49 @@ class MainWindow(QMainWindow):
         self._announce_status_toast(f"Version geöffnet: {path.name}")
         return True
 
+    def _focus_import_status_toast_target(self) -> bool:
+        """
+        Import-Status-Toast-Klick: Log-Widget fokussieren falls vorhanden,
+        sonst Statusleiste — 2.1.5.
+        """
+        target = None
+        for name in (
+            "log_view",
+            "status_log",
+            "activity_log",
+            "message_log",
+            "log_widget",
+        ):
+            w = getattr(self, name, None)
+            if w is not None and hasattr(w, "setFocus"):
+                try:
+                    if hasattr(w, "isVisible") and not w.isVisible():
+                        continue
+                except Exception:
+                    pass
+                target = w
+                break
+        if target is None:
+            target = self.statusBar()
+        try:
+            target.setFocus(Qt.OtherFocusReason)
+            if hasattr(target, "raise_"):
+                target.raise_()
+            if hasattr(target, "activateWindow"):
+                try:
+                    target.activateWindow()
+                except Exception:
+                    pass
+        except Exception:
+            return False
+        msg = getattr(self, "_import_status_toast_msg", "") or (
+            self.statusBar().currentMessage() or "Statusleiste"
+        )
+        self._announce_status_toast(msg)
+        return True
+
     def _on_status_bar_clicked(self, event) -> None:
-        """Statusleisten-Klick: Meta / Text→PDF-Ordner / Update-VERSION / Outlines — 1.7.5."""
+        """Statusleisten-Klick: Meta / Import-Status / Text→PDF / Update / Outlines — 2.1.5."""
         from PySide6.QtGui import QDesktopServices
         from PySide6.QtCore import QUrl
 
@@ -2862,6 +2912,14 @@ class MainWindow(QMainWindow):
             self.statusBar().setToolTip("")
             self._edit_pdf_metadata()
             return
+        # Import-Status: Klick fokussiert Statusleiste/Log — 2.1.5
+        if (
+            event.button() == Qt.LeftButton
+            and getattr(self, "_import_status_toast_active", False)
+            and "Import-Status" in cur
+        ):
+            if self._focus_import_status_toast_target():
+                return
         # Text → PDF: Klick öffnet Ordner; fehlt → Neu anlegen — 1.7.5
         if (
             event.button() == Qt.LeftButton

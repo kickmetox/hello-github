@@ -6281,7 +6281,7 @@ class PdfViewer(QWidget):
             return False
 
     def export_measures_csv(self) -> bool:
-        """Messwerte CSV · Live-Template · Quick-Insert · Reset Default Fokus — 2.1.4."""
+        """Messwerte CSV · Live-Template · Quick-Insert · Reset·Esc — 2.1.5."""
         if not self.store or not self.pdf_path:
             QMessageBox.information(self, "Messwerte", "Kein PDF geladen.")
             return False
@@ -6316,6 +6316,11 @@ class PdfViewer(QWidget):
             set_measure_csv_utf8_bom,
         )
         from instantlensdoc.ui.file_dialogs import confirm_overwrite_export
+        from instantlensdoc.ui.template_reset import (
+            EscapeDiscardEditFilter,
+            focus_line_edit_select_all,
+            reset_line_edit_template,
+        )
 
         opts = QDialog(self)
         opts.setWindowTitle("Messwerte als CSV")
@@ -6323,7 +6328,7 @@ class PdfViewer(QWidget):
         ol.addWidget(
             QLabel(
                 f"{len(measures)} Messwert(e) · Spalten Typ,Seite,Wert,Einheit · "
-                f"Template {DEFAULT_MEASURE_CSV_FILENAME_TEMPLATE} — 2.1.4"
+                f"Template {DEFAULT_MEASURE_CSV_FILENAME_TEMPLATE} — 2.1.5"
             )
         )
         chk_bom = QCheckBox("UTF-8 BOM (Excel)")
@@ -6338,39 +6343,15 @@ class PdfViewer(QWidget):
         tpl_edit.setToolTip(
             "Live-Dateiname-Template; Platzhalter {stem}/{date}; "
             "Quick-Insert; Reset Default (Bestätigung nur bei Abweichung · "
-            "Fokus+Selektion) — 2.1.4"
+            "Fokus+Selektion); Esc im Feld verwirft Edit (nicht speichern) — 2.1.5"
         )
         tpl_row.addWidget(tpl_edit, 1)
-        for token in ("{stem}", "{date}"):
-            btn = QPushButton(token)
-            btn.setAutoDefault(False)
-            btn.setDefault(False)
-            btn.setFocusPolicy(Qt.TabFocus)
-            btn.setToolTip(f"Platzhalter {token} an Cursor einfügen — 2.1.4")
-
-            def _insert(t=token) -> None:
-                tpl_edit.insert(t)
-                tpl_edit.setFocus()
-                _update_preview()
-
-            btn.clicked.connect(_insert)
-            tpl_row.addWidget(btn)
-        btn_reset_tpl = QPushButton("Reset Default")
-        btn_reset_tpl.setAutoDefault(False)
-        btn_reset_tpl.setDefault(False)
-        btn_reset_tpl.setFocusPolicy(Qt.TabFocus)
-        btn_reset_tpl.setToolTip(
-            f"Reset Default ({DEFAULT_MEASURE_CSV_FILENAME_TEMPLATE}) "
-            "Bestätigung nur bei Abweichung; danach Fokus+Selektion — 2.1.4"
-        )
-        ol.addLayout(tpl_row)
         preview = QLabel("")
         preview.setTextFormat(Qt.RichText)
         preview.setWordWrap(True)
         preview.setToolTip(
-            "Live-Vorschau Mess-CSV-Dateiname; ungültige Platzhalter rot — 2.1.3/2.1.4"
+            "Live-Vorschau Mess-CSV-Dateiname; ungültige Platzhalter rot — 2.1.5"
         )
-        ol.addWidget(preview)
 
         def _update_preview() -> None:
             import html as _html
@@ -6385,46 +6366,62 @@ class PdfViewer(QWidget):
                 note += f" · ungültig: {', '.join(invalid)}"
             preview.setText(f"CSV: {html}{note}")
 
+        tpl_esc = EscapeDiscardEditFilter(
+            tpl_edit, on_discard=_update_preview, parent=opts
+        )
+
+        for token in ("{stem}", "{date}"):
+            btn = QPushButton(token)
+            btn.setAutoDefault(False)
+            btn.setDefault(False)
+            btn.setFocusPolicy(Qt.TabFocus)
+            btn.setToolTip(f"Platzhalter {token} an Cursor einfügen — 2.1.5")
+
+            def _insert(t=token) -> None:
+                tpl_edit.insert(t)
+                tpl_edit.setFocus()
+                _update_preview()
+                tpl_esc.commit()
+
+            btn.clicked.connect(_insert)
+            tpl_row.addWidget(btn)
+        btn_reset_tpl = QPushButton("Reset Default")
+        btn_reset_tpl.setAutoDefault(False)
+        btn_reset_tpl.setDefault(False)
+        btn_reset_tpl.setFocusPolicy(Qt.TabFocus)
+        btn_reset_tpl.setToolTip(
+            f"Reset Default ({DEFAULT_MEASURE_CSV_FILENAME_TEMPLATE}) "
+            "Bestätigung nur bei Abweichung; danach Fokus+Selektion; "
+            "gemeinsamer Helper mit Diff-Reset — 2.1.5"
+        )
+
         def _focus_tpl_select_all() -> None:
-            """Fokus + Selektion ganzer Text (wie Ann./Multi-Doc) — 2.1.4."""
-            tpl_edit.setFocus(Qt.OtherFocusReason)
-            tpl_edit.selectAll()
+            """Fokus + Selektion (gemeinsamer Helper) — 2.1.5."""
+            focus_line_edit_select_all(tpl_edit)
 
         def _reset_tpl() -> None:
-            """
-            Template auf Default; Bestätigung nur bei Abweichung;
-            danach Live-Vorschau + Fokus mit Selektion — 2.1.4.
-            Leer/Whitespace gilt als Default (keine Bestätigung).
-            """
+            """Mess-CSV Reset Default — gemeinsamer Helper mit Diff — 2.1.5."""
             default = DEFAULT_MEASURE_CSV_FILENAME_TEMPLATE
-            current = tpl_edit.text() or ""
-            if current.strip() == "" or current == default:
-                if current != default:
-                    tpl_edit.selectAll()
-                    tpl_edit.insert(default)
+
+            def _after() -> None:
                 _update_preview()
-                QTimer.singleShot(0, _focus_tpl_select_all)
-                return
-            reply = QMessageBox.question(
+                tpl_esc.commit(default)
+
+            reset_line_edit_template(
                 opts,
-                "Reset Default",
-                f"Mess-CSV-Template auf Default zurücksetzen?\n\n"
-                f"Aktuell: {current}\n"
-                f"Default: {default}",
-                QMessageBox.Yes | QMessageBox.No,
-                QMessageBox.No,
+                tpl_edit,
+                default,
+                title="Reset Default",
+                body_prefix="Mess-CSV-Template auf Default zurücksetzen?",
+                on_updated=_after,
+                after_focus=False,
             )
-            if reply != QMessageBox.Yes:
-                QTimer.singleShot(0, _focus_tpl_select_all)
-                return
-            # selectAll + insert → ein Undo-Schritt
-            tpl_edit.selectAll()
-            tpl_edit.insert(default)
-            _update_preview()
             QTimer.singleShot(0, _focus_tpl_select_all)
 
         btn_reset_tpl.clicked.connect(_reset_tpl)
         tpl_row.addWidget(btn_reset_tpl)
+        ol.addLayout(tpl_row)
+        ol.addWidget(preview)
         tpl_edit.textChanged.connect(lambda _t: _update_preview())
         _update_preview()
 
@@ -6890,7 +6887,7 @@ class PdfViewer(QWidget):
         """
         Accessibility-Announcement für Import-Status-Toast —
         gleiche Pipeline wie OCR/HC (AccessibleName/Description +
-        AnnouncementEvent, Fallback NameChanged) — 2.1.4.
+        AnnouncementEvent, Fallback NameChanged) — 2.1.4/2.1.5.
         """
         target = self
         win = self.window()
@@ -6923,10 +6920,11 @@ class PdfViewer(QWidget):
 
     def _show_import_status_toast(self, msg: str) -> None:
         """
-        Import-Status Toast: Dauer aus OCR-Defaults-Toast-Settings,
-        Statusleiste + A11y Announcement (wie HC/OCR) — 2.1.4.
+        Import-Status Toast: Dauer aus OCR-Defaults-Toast-Settings;
+        Klick fokussiert Statusleiste/Log falls vorhanden; A11y — 2.1.5.
         """
         from PySide6.QtCore import QTimer
+        from PySide6.QtCore import Qt as _Qt
 
         try:
             from instantlensdoc.core.app_settings import get_ocr_defaults_toast_sec
@@ -6941,9 +6939,20 @@ class PdfViewer(QWidget):
         self._announce_import_status_toast(msg)
         self.status.emit(msg)
         win = self.window()
+        if win is not None:
+            try:
+                win._import_status_toast_active = True
+                win._import_status_toast_msg = msg
+            except Exception:
+                pass
         if win is not None and hasattr(win, "statusBar"):
             try:
-                win.statusBar().showMessage(msg, ms)
+                sb = win.statusBar()
+                sb.showMessage(msg, ms)
+                sb.setToolTip(
+                    "Klick fokussiert Statusleiste/Log falls vorhanden — 2.1.5"
+                )
+                sb.setCursor(_Qt.PointingHandCursor)
             except Exception:
                 pass
 
@@ -6956,6 +6965,14 @@ class PdfViewer(QWidget):
                     sb = win.statusBar()
                     if sb is not None:
                         target = sb
+                        cur = sb.currentMessage() or ""
+                        if msg in cur or "Import-Status" in cur:
+                            tip = sb.toolTip() or ""
+                            if tip.startswith("Klick fokussiert Statusleiste"):
+                                sb.setToolTip("")
+                                sb.unsetCursor()
+                        if getattr(win, "_import_status_toast_active", False):
+                            win._import_status_toast_active = False
                 except Exception:
                     pass
             try:
@@ -6974,7 +6991,7 @@ class PdfViewer(QWidget):
     def _copy_import_status_to_clipboard(
         self, copy_text: str, *, toast: str = "Import-Status kopiert"
     ) -> None:
-        """Clipboard + Toast + A11y Announcement — 2.1.4."""
+        """Clipboard + Toast (OCR-Dauer) + A11y · Klick→Status/Log — 2.1.5."""
         from PySide6.QtWidgets import QApplication
 
         clip = QApplication.clipboard()

@@ -1,4 +1,4 @@
-"""Native PDF-Markup-Annotationen (pikepdf) grob in Sidecar-Annotationen mappen — 2.1.0–2.1.4."""
+"""Native PDF-Markup-Annotationen (pikepdf) grob in Sidecar-Annotationen mappen — 2.1.0–2.1.5."""
 
 from __future__ import annotations
 

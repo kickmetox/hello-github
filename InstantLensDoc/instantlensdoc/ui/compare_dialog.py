@@ -54,6 +54,11 @@ from instantlensdoc.core.app_settings import (
     set_textlayer_diff_side_by_side,
     set_textlayer_diff_txt_template,
 )
+from instantlensdoc.ui.template_reset import (
+    EscapeDiscardEditFilter,
+    focus_line_edit_select_all,
+    reset_line_edit_template,
+)
 
 
 DIFF_PNG_FILENAME_TEMPLATE = "{stemA}_vs_{stemB}_p{page}.png"
@@ -345,9 +350,15 @@ class PdfCompareDialog(QDialog):
             "Dateiname-Template für Diff TXT: {stemA}, {stemB}, {mode}, "
             "{page}, {date}. Quick-Insert an Cursor; lokales Undo (Ctrl+Z); "
             "Reset Default (Bestätigung nur bei Abweichung · Fokus+Selektion); "
-            "ungültige Platzhalter rot — 2.1.4"
+            "Esc im Feld verwirft Edit (nicht speichern); "
+            "ungültige Platzhalter rot — 2.1.5"
         )
         self.txt_template_edit.textChanged.connect(self._update_txt_template_preview)
+        self._txt_tpl_esc = EscapeDiscardEditFilter(
+            self.txt_template_edit,
+            on_discard=self._on_txt_template_esc_discard,
+            parent=self,
+        )
         txt_tpl_row.addWidget(self.txt_template_edit, 1)
         for token in ("{stemA}", "{stemB}", "{mode}", "{page}", "{date}"):
             btn = QPushButton(token)
@@ -369,7 +380,7 @@ class PdfCompareDialog(QDialog):
         self.btn_reset_txt_tpl.setToolTip(
             f"Reset Default ({DIFF_TXT_FILENAME_TEMPLATE}); "
             "Bestätigung nur wenn Feld vom Default abweicht; "
-            "danach Fokus+Selektion — 2.1.4"
+            "danach Fokus+Selektion; gemeinsamer Helper mit Mess-Reset — 2.1.5"
         )
         self.btn_reset_txt_tpl.clicked.connect(self._reset_txt_template)
         txt_tpl_row.addWidget(self.btn_reset_txt_tpl)
@@ -378,7 +389,7 @@ class PdfCompareDialog(QDialog):
         self.txt_template_preview.setTextFormat(Qt.RichText)
         self.txt_template_preview.setWordWrap(True)
         self.txt_template_preview.setToolTip(
-            "Live-Vorschau Diff-TXT-Dateiname; ungültige Platzhalter rot — 2.1.4"
+            "Live-Vorschau Diff-TXT-Dateiname; ungültige Platzhalter rot — 2.1.5"
         )
         root.addWidget(self.txt_template_preview)
 
@@ -458,7 +469,7 @@ class PdfCompareDialog(QDialog):
         return "unified"
 
     def _insert_txt_template_placeholder(self, token: str) -> None:
-        """Quick-Insert Platzhalter an Cursor — 2.1.4."""
+        """Quick-Insert Platzhalter an Cursor — 2.1.4/2.1.5."""
         edit = self.txt_template_edit
         if isinstance(edit, DiffPngTemplateEdit):
             edit.restore_insert_position()
@@ -470,55 +481,49 @@ class PdfCompareDialog(QDialog):
             edit._saved_sel_len = 0
         set_textlayer_diff_txt_template(self._current_txt_template())
         self._update_txt_template_preview()
+        esc = getattr(self, "_txt_tpl_esc", None)
+        if esc is not None:
+            esc.commit()
 
     def _focus_txt_template_select_all(self) -> None:
-        """Fokus + Selektion ganzer Text (wie PNG/Ann.-Template) — 2.1.4."""
+        """Fokus + Selektion ganzer Text (gemeinsamer Helper) — 2.1.5."""
         edit = self.txt_template_edit
-        edit.setFocus()
-        edit.selectAll()
+        focus_line_edit_select_all(edit)
         if isinstance(edit, DiffPngTemplateEdit):
             edit._saved_cursor = 0
             edit._saved_sel_start = 0
             edit._saved_sel_len = len(edit.text() or "")
 
+    def _on_txt_template_esc_discard(self) -> None:
+        """Esc: Edit verwerfen, Settings wieder auf committed — 2.1.5."""
+        # Preview speichert aktuellen Feldinhalt (= restored committed)
+        self._update_txt_template_preview()
+
     def _reset_txt_template(self) -> None:
         """
         TXT-Template auf Default; Bestätigung nur bei Abweichung;
-        danach Live-Vorschau + Fokus mit Selektion — 2.1.4.
+        danach Live-Vorschau + Fokus mit Selektion — gemeinsamer Helper 2.1.5.
         Leer/Whitespace gilt als Default (keine Bestätigung).
         """
         edit = self.txt_template_edit
         default = DIFF_TXT_FILENAME_TEMPLATE
-        current = edit.text() or ""
-        if current.strip() == "" or current == default:
-            if current != default:
-                edit.selectAll()
-                edit.insert(default)
-            set_textlayer_diff_txt_template(default)
+
+        def _after() -> None:
+            set_textlayer_diff_txt_template(self._current_txt_template())
             self._update_txt_template_preview()
-            QTimer.singleShot(0, self._focus_txt_template_select_all)
-            return
-        reply = QMessageBox.question(
+            esc = getattr(self, "_txt_tpl_esc", None)
+            if esc is not None:
+                esc.commit(default)
+
+        reset_line_edit_template(
             self,
-            "Reset Default",
-            f"Diff-TXT-Template auf Default zurücksetzen?\n\n"
-            f"Aktuell: {current}\n"
-            f"Default: {default}",
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.No,
+            edit,
+            default,
+            title="Reset Default",
+            body_prefix="Diff-TXT-Template auf Default zurücksetzen?",
+            on_updated=_after,
+            after_focus=False,
         )
-        if reply != QMessageBox.Yes:
-            QTimer.singleShot(0, self._focus_txt_template_select_all)
-            return
-        # selectAll + insert → ein Undo-Schritt (Ctrl+Z)
-        edit.selectAll()
-        edit.insert(default)
-        if isinstance(edit, DiffPngTemplateEdit):
-            edit._saved_cursor = edit.cursorPosition()
-            edit._saved_sel_start = -1
-            edit._saved_sel_len = 0
-        set_textlayer_diff_txt_template(default)
-        self._update_txt_template_preview()
         QTimer.singleShot(0, self._focus_txt_template_select_all)
 
     def _update_txt_template_preview(self) -> None:

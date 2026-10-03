@@ -1,5 +1,20 @@
 # Changelog — InstantLens Doc
 
+## 2.1.5 — Import-Copy Toast OCR-Dauer·Klick Status/Log, Mess/Diff-Reset Helper·Esc verwirft, smoke Fail-error max 200…, FEATURES.md lokal Sync in Info
+
+Post-Release-Polish nach **2.1.4**: **Import-Status-Toast** Dauer aus **OCR-Toast-Settings**, **Klick fokussiert Statusleiste/Log** falls vorhanden; **Mess-CSV Reset** und **Diff-TXT Reset** nutzen **gemeinsamen Helper** (`template_reset`), **Esc im Feld verwirft Edit** (nicht speichern); **smoke_ild.py `--json`** Fail-`error` **max 200 Zeichen** mit **…**, Docs-Beispiel Fail; **INFO** Hinweis **FEATURES.md lokal sync**. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen unverändert klar markiert / nicht produktiv.
+
+### Neu / verbessert
+- Import-Copy Toast: Dauer OCR-Settings · Klick → Statusleiste/Log fokussieren
+- Mess-Reset + Diff-Reset: gemeinsamer Helper · Esc im Feld verwirft Edit
+- `scripts/smoke_ild.py`: Fail-`error` Truncate max 200… · Docs Fail-Beispiel
+- INFO: FEATURES.md lokal sync Hinweis (Version 2.1.5)
+
+### Tests / Qualität
+- Version **2.1.5** (App / `ild_pdf` / ISS / Smoke / Docs); Serie **2.1**; `docs/VERSION` + `VERSION.txt`
+- Smoke: 2.1.5 CLI + Qt (Import-Toast-Klick, Mess/Diff Esc+Helper, smoke_ild truncate, FEATURES lokal)
+- Stubs unverändert
+
 ## 2.1.4 — Import-Status Clipboard·Toast·A11y, Mess-Template Reset Bestätigung≠Default·Fokus+Selektion, Diff-TXT Quick-Insert·Reset Default, smoke_ild --json Fail checks[].error·Exit=ok
 
 Post-Release-Polish nach **2.1.3**: **PDF-Kommentar-Import** „Status kopieren“ schreibt in die **Zwischenablage** und zeigt **Toast + A11y Announcement** (OCR/HC-Pipeline); **Mess-CSV Reset Default** mit **Bestätigung nur bei Abweichung** und **Fokus+Selektion**; **Diff-TXT Template** mit **Quick-Insert-Buttons** und **Reset Default** (Bestätigung nur bei Abweichung · Fokus+Selektion); **smoke_ild.py `--json`** bei Fail liefert **`checks[].error` Text**, **Exitcode spiegelt `ok`**. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen unverändert klar markiert / nicht produktiv.
