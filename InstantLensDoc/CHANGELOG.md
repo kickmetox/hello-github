@@ -11,7 +11,7 @@ Nach 0.8.6: Gruppenauswahl klickt alle Mitglieder + Lock-Toggle, Thumbnail-Batch
 - **Seitennummer-Overlay Format**: Setting mit Platzhaltern `{page}` / `{pages}` (Aliase `{n}` / `{total}`, optional `{label}`)
 
 ### Editor / Settings
-- Editor-**Mehrzeilen-Indent**: Tab/Shift+Tab rückt Mehrzeilen-Auswahl ein/aus; sonst Tab einfügen (Soft-Tabs)
+- Editor-**Mehrzeilen-Indent**: Tab/Shift+Tab rückt Auswahl (ein-/mehrzeilig) ein/aus; ohne Auswahl Tab einfügen (Soft-Tabs)
 
 ### Packaging / Docs
 - Version **0.8.7** (App / `ild_pdf` / ISS / Smoke / Docs)
