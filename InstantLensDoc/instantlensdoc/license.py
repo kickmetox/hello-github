@@ -175,7 +175,7 @@ class LicenseManager:
         self._save()
 
     def should_show_expiry_warning(self, st: Optional[LicenseStatus] = None) -> bool:
-        """True wenn Resttage ≤3, noch gültig, und heute noch nicht gewarnt — 1.0.4."""
+        """True wenn Resttage ≤3, noch gültig, und heute noch nicht dismissed — 1.0.5."""
         status = st if st is not None else self.status()
         if not status.allowed:
             return False
@@ -185,9 +185,13 @@ class LicenseManager:
         return last != _today_iso()
 
     def mark_expiry_warning_shown(self) -> None:
-        """Merkt den heutigen Kalendertag als „Warnung gezeigt“ — 1.0.4."""
+        """Dismiss: speichert bis morgen (heutiger Kalendertag) — 1.0.5."""
         self.state["expiry_warn_day"] = _today_iso()
         self._save()
+
+    def dismiss_expiry_warning(self) -> None:
+        """Alias: Warnung bis morgen ausblenden — 1.0.5."""
+        self.mark_expiry_warning_shown()
 
     def status(self) -> LicenseStatus:
         self.ensure_trial_started()

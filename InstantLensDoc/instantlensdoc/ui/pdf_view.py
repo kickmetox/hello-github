@@ -5347,7 +5347,7 @@ class PdfViewer(QWidget):
             return False
 
     def print_document(self) -> bool:
-        """PDF-Dokument (Seitenbereich + DPI + Graustufen) gerastert drucken — 1.0.4."""
+        """PDF-Dokument (Seitenbereich + DPI + Graustufen) gerastert drucken — 1.0.5."""
         if not self.pdf_path:
             QMessageBox.information(self, "Drucken", "Kein PDF geladen.")
             return False
@@ -5394,7 +5394,7 @@ class PdfViewer(QWidget):
                 return False
 
             total = len(pages)
-            # Fortschrittsdialog nur bei Mehrseiten-Druck, abbrechenbar — 1.0.4
+            # Fortschrittsdialog nur bei Mehrseiten-Druck, abbrechenbar — 1.0.4/1.0.5
             progress: QProgressDialog | None = None
             if total > 1:
                 progress = QProgressDialog(
@@ -5425,6 +5425,8 @@ class PdfViewer(QWidget):
                         if progress.wasCanceled():
                             canceled = True
                             break
+                    if canceled:
+                        break
                     pm = self._pixmap_from_rendered_page(i, scale, grayscale=gray)
                     if pm is None or pm.isNull():
                         continue
@@ -5444,24 +5446,40 @@ class PdfViewer(QWidget):
                 if progress is not None and not canceled:
                     progress.setValue(total)
             finally:
-                painter.end()
+                # Abbruch: Job verwerfen (kein halber Druckauftrag) — 1.0.5
+                if canceled:
+                    try:
+                        if painter.isActive():
+                            painter.end()
+                    except Exception:
+                        pass
+                    try:
+                        printer.abort()
+                    except Exception:
+                        pass
+                else:
+                    try:
+                        if painter.isActive():
+                            painter.end()
+                    except Exception:
+                        pass
                 if progress is not None:
                     try:
                         progress.close()
                     except Exception:
                         pass
-            self.refresh()
+            try:
+                self.refresh()
+            except Exception:
+                pass
             if canceled:
-                self.status.emit(
-                    f"Dokumentdruck abgebrochen "
-                    f"({printed}/{total} Seite(n) gedruckt, {dpi} DPI{gray_lbl})"
-                )
-            else:
-                self.status.emit(
-                    f"PDF-Dokument gedruckt (Seiten {start + 1}–{end}, "
-                    f"{printed} Seite(n), {dpi} DPI{gray_lbl})"
-                )
-            return not canceled
+                self.status.emit("Druck abgebrochen")
+                return False
+            self.status.emit(
+                f"PDF-Dokument gedruckt (Seiten {start + 1}–{end}, "
+                f"{printed} Seite(n), {dpi} DPI{gray_lbl})"
+            )
+            return True
         except Exception as e:
             QMessageBox.critical(self, "Drucken", f"Dokumentdruck fehlgeschlagen:\n{e}")
             try:

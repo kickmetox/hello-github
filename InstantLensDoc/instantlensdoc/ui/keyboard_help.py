@@ -89,10 +89,10 @@ SHORTCUTS_HTML = """
 <tr><td>Session Ann.-Opacity / Stroke</td><td>Letzte Deckkraft und Strichstärke speichern/wiederherstellen — 0.9.8</td></tr>
 <tr><td>Session Fill-/Stroke-Color</td><td>Letzte Fill- und Stroke-Farb-Defaults speichern/wiederherstellen — 0.9.9</td></tr>
 <tr><td>About Lizenz / Changelog</td><td>Hilfe → Info: Version, Lizenzstatus, Kontakt ame@sellerbach.de, Changelog-Kurzliste — 1.0.0</td></tr>
-<tr><td>Backup jetzt / Ordner</td><td>Datei → Backup jetzt; bei Schreibfehler max. 3 Versuche; Log letzte 20 in Einstellungen; Status mit Pfad — 1.0.4</td></tr>
-<tr><td>PDF Dokument drucken</td><td>PDF → Dokument drucken… (Seitenbereich + DPI + Graustufen; Mehrseiten-Fortschritt abbrechenbar); Ctrl+P = Seite — 1.0.4</td></tr>
-<tr><td>Willkommen</td><td>Live-Suchfilter über Recent; Enter öffnet; Entf entfernt; Drag&amp;Drop; Recent leeren — 1.0.4</td></tr>
-<tr><td>About / Lizenz Ablauf</td><td>Warnung ≤3 Tage vor Ablauf (1×/Tag, Status/Tray, nicht modal); Ablauf TT.MM.JJJJ; Resttage konsistent — 1.0.4</td></tr>
+<tr><td>Backup jetzt / Ordner</td><td>Datei → Backup jetzt; bei Schreibfehler max. 3 Versuche; Log letzte 20; Eintrag kopieren + Log leeren in Einstellungen — 1.0.5</td></tr>
+<tr><td>PDF Dokument drucken</td><td>PDF → Dokument drucken… (Seitenbereich + DPI + Graustufen; Mehrseiten-Fortschritt; Abbruch → Cleanup, Status „Druck abgebrochen“); Ctrl+P = Seite — 1.0.5</td></tr>
+<tr><td>Willkommen</td><td>Live-Suchfilter mit Clear-Button + Trefferanzahl; Enter öffnet; Entf entfernt; Drag&amp;Drop; Recent leeren — 1.0.5</td></tr>
+<tr><td>About / Lizenz Ablauf</td><td>Warnung ≤3 Tage: Banner Klick → About/Aktivierung, Dismiss bis morgen; Ablauf TT.MM.JJJJ — 1.0.5</td></tr>
 <tr><td>Willkommen-Startseite</td><td>Ohne Tabs: Recent + Dokument öffnen / Leeres Text — 1.0.0</td></tr>
 <tr><td>PDF-Trefferliste</td><td>Sidebar Seite + Snippet klickbar → Sprung + Highlight — 0.9.1</td></tr>
 <tr><td>Fenster teilen (zwei Docs)</td><td><code>Ctrl+\\</code> — 0.6.3</td></tr>

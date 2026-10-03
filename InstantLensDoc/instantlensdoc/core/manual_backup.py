@@ -1,4 +1,4 @@
-"""Manuelles Backup aktueller Dokumente in den App-Backup-Ordner — 1.0.4."""
+"""Manuelles Backup aktueller Dokumente in den App-Backup-Ordner — 1.0.5."""
 
 from __future__ import annotations
 
@@ -73,6 +73,14 @@ def append_backup_log(
     payload = {"version": 1, "entries": items}
     path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
     return items
+
+
+def clear_backup_log() -> None:
+    """Backup-Log leeren (Datei zurücksetzen) — 1.0.5."""
+    path = backup_log_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {"version": 1, "entries": []}
+    path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
 
 
 def format_backup_log_line(entry: dict[str, Any]) -> str:

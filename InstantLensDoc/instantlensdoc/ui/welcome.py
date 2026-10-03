@@ -1,4 +1,4 @@
-"""Willkommens-/Startseite wenn keine Dokument-Tabs offen sind — 1.0.4."""
+"""Willkommens-/Startseite wenn keine Dokument-Tabs offen sind — 1.0.5."""
 
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ from instantlensdoc.core import recent as recent_mod
 
 
 class WelcomePage(QWidget):
-    """Startseite: Recent-Liste + Live-Filter + Dokument öffnen / Leeres Text / Drag&Drop."""
+    """Startseite: Recent-Liste + Live-Filter (Clear + Trefferanzahl) + Aktionen."""
 
     open_requested = Signal()
     new_text_requested = Signal()
@@ -69,20 +69,32 @@ class WelcomePage(QWidget):
         lay.addLayout(btn_row)
 
         lay.addWidget(QLabel("<b>Zuletzt geöffnet</b>"))
+        filter_row = QHBoxLayout()
         self.recent_filter = QLineEdit()
         self.recent_filter.setPlaceholderText("Recent filtern…")
         self.recent_filter.setClearButtonEnabled(True)
         self.recent_filter.setToolTip(
-            "Live-Filter über Dateiname/Pfad der Recent-Liste — 1.0.4"
+            "Live-Filter über Dateiname/Pfad der Recent-Liste — Clear leert den Filter"
         )
         self.recent_filter.textChanged.connect(self._apply_recent_filter)
-        lay.addWidget(self.recent_filter)
+        filter_row.addWidget(self.recent_filter, 1)
+        self.btn_clear_filter = QPushButton("Filter leeren")
+        self.btn_clear_filter.setToolTip("Suchfilter zurücksetzen — 1.0.5")
+        self.btn_clear_filter.clicked.connect(self._clear_recent_filter)
+        filter_row.addWidget(self.btn_clear_filter)
+        self.filter_hits_label = QLabel("0 Treffer")
+        self.filter_hits_label.setMinimumWidth(90)
+        self.filter_hits_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        self.filter_hits_label.setStyleSheet("color: #555; padding-left: 6px;")
+        self.filter_hits_label.setToolTip("Angezeigte Treffer / Einträge in der Recent-Liste")
+        filter_row.addWidget(self.filter_hits_label)
+        lay.addLayout(filter_row)
         self.recent_list = QListWidget()
         self.recent_list.setMinimumHeight(180)
         self.recent_list.setToolTip(
             "Enter / Doppelklick öffnet; Entf entfernt den Eintrag; "
             "Rechtsklick: Entfernen / Ordner öffnen; Drag & Drop öffnet Dateien; "
-            "Filter oben filtert live"
+            "Filter oben filtert live; Trefferanzahl rechts"
         )
         self.recent_list.setAcceptDrops(True)
         self.recent_list.setContextMenuPolicy(Qt.CustomContextMenu)
@@ -115,18 +127,28 @@ class WelcomePage(QWidget):
         has_entries = bool(self._recent_entries)
         self.btn_clear_recent.setEnabled(has_entries)
         self.recent_filter.setEnabled(has_entries)
+        self.btn_clear_filter.setEnabled(has_entries)
         self._apply_recent_filter()
 
+    def _clear_recent_filter(self) -> None:
+        """Filtertext leeren — 1.0.5."""
+        self.recent_filter.clear()
+        self.recent_filter.setFocus()
+
     def _apply_recent_filter(self, _text: str | None = None) -> None:
-        """Live-Filter der Recent-Liste nach Teilstring (Dateiname/Pfad) — 1.0.4."""
+        """Live-Filter der Recent-Liste; Trefferanzahl aktualisieren — 1.0.5."""
         self.recent_list.clear()
         entries = self._recent_entries
+        total = len(entries)
         if not entries:
             item = QListWidgetItem("(keine zuletzt geöffneten Dateien)")
             item.setFlags(Qt.NoItemFlags)
             self.recent_list.addItem(item)
+            self.filter_hits_label.setText("0 Treffer")
+            self.btn_clear_filter.setEnabled(False)
             return
         needle = (self.recent_filter.text() or "").strip().casefold()
+        self.btn_clear_filter.setEnabled(bool(needle) or total > 0)
         shown = 0
         for path, exists in entries:
             hay = str(path).casefold()
@@ -144,6 +166,12 @@ class WelcomePage(QWidget):
             item = QListWidgetItem("(keine Treffer für Filter)")
             item.setFlags(Qt.NoItemFlags)
             self.recent_list.addItem(item)
+        if needle:
+            self.filter_hits_label.setText(f"{shown} / {total} Treffer")
+        else:
+            self.filter_hits_label.setText(
+                f"{total} Treffer" if total != 1 else "1 Treffer"
+            )
 
     def _on_recent_dbl(self, item: QListWidgetItem) -> None:
         path = item.data(Qt.UserRole)

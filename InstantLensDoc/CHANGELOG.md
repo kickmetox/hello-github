@@ -1,5 +1,27 @@
 # Changelog — InstantLens Doc
 
+## 1.0.5 — Filter Clear/Treffer, Druck-Abbruch Cleanup, Warnung Klick/Dismiss, Backup-Log Copy/Clear
+
+Post-Release-Polish nach 1.0.4: Willkommen-Filter mit explizitem Clear-Button und Trefferanzahl-Label; Mehrseiten-Druck-Abbruch verwirft den Job sauber (`printer.abort`) mit Status „Druck abgebrochen“; Lizenz-Ablaufwarnung als Banner — Klick öffnet About/Aktivierung, Dismiss speichert bis morgen; Backup-Log Eintrag kopieren und Log leeren in Einstellungen. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### Willkommen / Start
+- Filter: **Clear-Button** („Filter leeren“) + **Trefferanzahl**-Label (`n Treffer` / `n / m Treffer`)
+
+### PDF / Druck
+- **Dokument drucken…**: Abbruch → **sauberes Cleanup** ohne halben Druckauftrag (`painter.end` + `printer.abort`); Status **„Druck abgebrochen“**
+
+### About / Lizenz
+- Ablaufwarnung ≤3 Tage: **Banner** (nicht modal); **Klick → Info/Aktivierung**; **Dismiss (×) speichert bis morgen**
+
+### Backup
+- Einstellungen: **Eintrag kopieren** (Zwischenablage) + **Log leeren** (`clear_backup_log`)
+
+### Packaging / Docs
+- Version **1.0.5** (App / `ild_pdf` / ISS / Smoke / Docs)
+- Smoke: Filter Clear/Hits, Print Abort Cleanup, Expiry Click/Dismiss, Backup-Log Copy/Clear (CLI + Qt)
+
+---
+
 ## 1.0.4 — Willkommen Recent-Filter, Druck-Fortschritt, Ablauf-Warnung 3d, Backup-Log
 
 Post-Release-Polish nach 1.0.3: Willkommen-Recent mit Live-Suchfilter; Mehrseiten-Dokumentdruck mit abbrechenbarem Fortschrittsdialog; Lizenz-Warnung ≤3 Tage vor Ablauf einmalig pro Tag (Status/Tray, nicht modal); Backup-Log der letzten 20 Vorgänge in den Einstellungen. Stubs KI/Cloud/Stylus/3D bleiben Stubs.

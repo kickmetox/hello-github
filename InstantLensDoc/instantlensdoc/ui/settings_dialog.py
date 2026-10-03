@@ -474,7 +474,7 @@ class SettingsDialog(QDialog):
         )
         form.addRow(self.backup_on_save)
 
-        # Letzte 20 manuellen Backup-Vorgänge — 1.0.4
+        # Letzte 20 manuellen Backup-Vorgänge; Kopieren + Leeren — 1.0.5
         from PySide6.QtCore import Qt as _Qt
 
         from instantlensdoc.core.manual_backup import (
@@ -487,16 +487,37 @@ class SettingsDialog(QDialog):
         self.backup_log_list.setMinimumHeight(120)
         self.backup_log_list.setMaximumHeight(180)
         self.backup_log_list.setToolTip(
-            f"Letzte {BACKUP_LOG_MAX} manuellen Backup-Vorgänge (neueste oben) — 1.0.4"
+            f"Letzte {BACKUP_LOG_MAX} manuellen Backup-Vorgänge (neueste oben); "
+            "Eintrag kopieren / Log leeren — 1.0.5"
         )
         self.backup_log_list.setAlternatingRowColors(True)
-        for entry in load_backup_log():
+        self._backup_log_entries: list = list(load_backup_log())
+        for entry in self._backup_log_entries:
             self.backup_log_list.addItem(QListWidgetItem(format_backup_log_line(entry)))
         if self.backup_log_list.count() == 0:
             empty = QListWidgetItem("(noch keine Backup-Vorgänge protokolliert)")
             empty.setFlags(_Qt.NoItemFlags)
             self.backup_log_list.addItem(empty)
-        form.addRow(f"Backup-Log (letzte {BACKUP_LOG_MAX})", self.backup_log_list)
+        bak_log_col = QVBoxLayout()
+        bak_log_col.setContentsMargins(0, 0, 0, 0)
+        bak_log_col.addWidget(self.backup_log_list)
+        bak_log_btns = QHBoxLayout()
+        self.btn_backup_log_copy = QPushButton("Eintrag kopieren")
+        self.btn_backup_log_copy.setToolTip(
+            "Ausgewählten Backup-Log-Eintrag in die Zwischenablage kopieren — 1.0.5"
+        )
+        self.btn_backup_log_copy.clicked.connect(self._copy_backup_log_entry)
+        bak_log_btns.addWidget(self.btn_backup_log_copy)
+        self.btn_backup_log_clear = QPushButton("Log leeren")
+        self.btn_backup_log_clear.setToolTip(
+            "Backup-Log zurücksetzen (alle Einträge löschen) — 1.0.5"
+        )
+        self.btn_backup_log_clear.clicked.connect(self._clear_backup_log)
+        bak_log_btns.addWidget(self.btn_backup_log_clear)
+        bak_log_btns.addStretch(1)
+        bak_log_col.addLayout(bak_log_btns)
+        self._sync_backup_log_buttons()
+        form.addRow(f"Backup-Log (letzte {BACKUP_LOG_MAX})", bak_log_col)
 
         self.restore_geometry = QCheckBox("Fenstergeometrie wiederherstellen")
         self.restore_geometry.setChecked(get_restore_window_geometry_on_start())
@@ -824,6 +845,86 @@ class SettingsDialog(QDialog):
             except Exception:
                 pass
         QMessageBox.information(self, "Zuletzt geöffnet", "Liste geleert.")
+
+    def _sync_backup_log_buttons(self) -> None:
+        """Buttons Eintrag kopieren / Log leeren je nach Inhalt — 1.0.5."""
+        entries = getattr(self, "_backup_log_entries", None) or []
+        has = bool(entries)
+        if hasattr(self, "btn_backup_log_copy"):
+            self.btn_backup_log_copy.setEnabled(has)
+        if hasattr(self, "btn_backup_log_clear"):
+            self.btn_backup_log_clear.setEnabled(has)
+
+    def _reload_backup_log_list(self) -> None:
+        from PySide6.QtCore import Qt as _Qt
+
+        from instantlensdoc.core.manual_backup import (
+            format_backup_log_line,
+            load_backup_log,
+        )
+
+        self._backup_log_entries = list(load_backup_log())
+        self.backup_log_list.clear()
+        for entry in self._backup_log_entries:
+            self.backup_log_list.addItem(QListWidgetItem(format_backup_log_line(entry)))
+        if self.backup_log_list.count() == 0:
+            empty = QListWidgetItem("(noch keine Backup-Vorgänge protokolliert)")
+            empty.setFlags(_Qt.NoItemFlags)
+            self.backup_log_list.addItem(empty)
+        self._sync_backup_log_buttons()
+
+    def _copy_backup_log_entry(self) -> None:
+        """Ausgewählten Backup-Log-Eintrag in die Zwischenablage — 1.0.5."""
+        from PySide6.QtWidgets import QApplication
+
+        from instantlensdoc.core.manual_backup import format_backup_log_line
+
+        item = self.backup_log_list.currentItem()
+        entries = getattr(self, "_backup_log_entries", None) or []
+        text = ""
+        if item is not None and item.flags() != 0:
+            row = self.backup_log_list.row(item)
+            if 0 <= row < len(entries):
+                text = format_backup_log_line(entries[row])
+            else:
+                text = item.text().strip()
+        elif entries:
+            text = format_backup_log_line(entries[0])
+            self.backup_log_list.setCurrentRow(0)
+        if not text or text.startswith("(noch keine"):
+            QMessageBox.information(
+                self, "Backup-Log", "Kein Eintrag zum Kopieren vorhanden."
+            )
+            return
+        QApplication.clipboard().setText(text)
+        parent = self.parent()
+        if parent is not None and hasattr(parent, "_set_status"):
+            try:
+                parent._set_status("Backup-Log-Eintrag kopiert")
+            except Exception:
+                pass
+
+    def _clear_backup_log(self) -> None:
+        """Backup-Log leeren — 1.0.5."""
+        from instantlensdoc.core.manual_backup import clear_backup_log
+
+        reply = QMessageBox.question(
+            self,
+            "Backup-Log",
+            "Backup-Log wirklich leeren? Alle protokollierten Einträge werden gelöscht.",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
+        )
+        if reply != QMessageBox.Yes:
+            return
+        clear_backup_log()
+        self._reload_backup_log_list()
+        parent = self.parent()
+        if parent is not None and hasattr(parent, "_set_status"):
+            try:
+                parent._set_status("Backup-Log geleert")
+            except Exception:
+                pass
 
     def _pick_dir(self, field: QLineEdit):
         start = field.text().strip() or str(Path.home())
