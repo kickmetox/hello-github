@@ -16,6 +16,8 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QListWidget,
+    QListWidgetItem,
     QMessageBox,
     QPushButton,
     QSpinBox,
@@ -471,6 +473,30 @@ class SettingsDialog(QDialog):
             "Vor dem Überschreiben eine Kopie dateiname.ext.bak anlegen (optional)"
         )
         form.addRow(self.backup_on_save)
+
+        # Letzte 20 manuellen Backup-Vorgänge — 1.0.4
+        from PySide6.QtCore import Qt as _Qt
+
+        from instantlensdoc.core.manual_backup import (
+            BACKUP_LOG_MAX,
+            format_backup_log_line,
+            load_backup_log,
+        )
+
+        self.backup_log_list = QListWidget()
+        self.backup_log_list.setMinimumHeight(120)
+        self.backup_log_list.setMaximumHeight(180)
+        self.backup_log_list.setToolTip(
+            f"Letzte {BACKUP_LOG_MAX} manuellen Backup-Vorgänge (neueste oben) — 1.0.4"
+        )
+        self.backup_log_list.setAlternatingRowColors(True)
+        for entry in load_backup_log():
+            self.backup_log_list.addItem(QListWidgetItem(format_backup_log_line(entry)))
+        if self.backup_log_list.count() == 0:
+            empty = QListWidgetItem("(noch keine Backup-Vorgänge protokolliert)")
+            empty.setFlags(_Qt.NoItemFlags)
+            self.backup_log_list.addItem(empty)
+        form.addRow(f"Backup-Log (letzte {BACKUP_LOG_MAX})", self.backup_log_list)
 
         self.restore_geometry = QCheckBox("Fenstergeometrie wiederherstellen")
         self.restore_geometry.setChecked(get_restore_window_geometry_on_start())

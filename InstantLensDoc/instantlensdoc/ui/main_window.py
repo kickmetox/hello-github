@@ -32,6 +32,7 @@ from instantlensdoc.core.documents import (
     save_document,
 )
 from instantlensdoc.core.manual_backup import (
+    append_backup_log,
     backup_dir,
     manual_backup_file,
     manual_backup_text,
@@ -4010,6 +4011,11 @@ class MainWindow(QMainWindow):
         """Aktuelles Dokument manuell sichern; bei Schreibfehler max. 3 Versuche — 1.0.3."""
         max_attempts = 3
         last_err: OSError | None = None
+        source_hint = ""
+        if self.doc and self.doc.path:
+            source_hint = str(self.doc.path)
+        elif self.pdf_view.pdf_path:
+            source_hint = str(self.pdf_view.pdf_path)
         for attempt in range(1, max_attempts + 1):
             try:
                 self._manual_backup_once()
@@ -4017,6 +4023,14 @@ class MainWindow(QMainWindow):
             except OSError as e:
                 last_err = e
                 if attempt >= max_attempts:
+                    try:
+                        append_backup_log(
+                            source=source_hint,
+                            ok=False,
+                            message=f"Abbruch nach {max_attempts} Versuchen: {e}",
+                        )
+                    except Exception:
+                        pass
                     QMessageBox.critical(
                         self,
                         "Backup",
@@ -4038,22 +4052,40 @@ class MainWindow(QMainWindow):
                 box.setStandardButtons(QMessageBox.Retry | QMessageBox.Cancel)
                 box.setDefaultButton(QMessageBox.Retry)
                 if box.exec() != QMessageBox.Retry:
+                    try:
+                        append_backup_log(
+                            source=source_hint,
+                            ok=False,
+                            message=f"Abgebrochen: {e}",
+                        )
+                    except Exception:
+                        pass
                     self._set_status("Backup abgebrochen")
                     return
             except Exception as e:
+                try:
+                    append_backup_log(
+                        source=source_hint, ok=False, message=str(e)
+                    )
+                except Exception:
+                    pass
                 QMessageBox.critical(self, "Backup", f"Backup fehlgeschlagen:\n{e}")
                 return
         if last_err is not None:
             self._set_status(f"Backup abgebrochen nach {max_attempts} Versuchen")
 
     def _manual_backup_once(self) -> None:
-        """Ein Backup-Versuch; OSError bei Schreibfehlern durchreichen — 1.0.2."""
+        """Ein Backup-Versuch; OSError bei Schreibfehlern durchreichen — 1.0.2/1.0.4."""
         if self.doc and self.doc.path and Path(self.doc.path).is_file():
             dest = manual_backup_file(self.doc.path)
             if dest is None:
+                append_backup_log(
+                    source=self.doc.path, ok=False, message="Quelle fehlt"
+                )
                 QMessageBox.warning(self, "Backup", "Backup fehlgeschlagen.")
                 return
             self._last_backup_path = dest
+            append_backup_log(dest=dest, source=self.doc.path, ok=True)
             self._set_status(f"Backup erstellt: {dest}")
             QMessageBox.information(
                 self,
@@ -4068,9 +4100,17 @@ class MainWindow(QMainWindow):
         ):
             dest = manual_backup_file(self.pdf_view.pdf_path)
             if dest is None:
+                append_backup_log(
+                    source=str(self.pdf_view.pdf_path),
+                    ok=False,
+                    message="Quelle fehlt",
+                )
                 QMessageBox.warning(self, "Backup", "Backup fehlgeschlagen.")
                 return
             self._last_backup_path = dest
+            append_backup_log(
+                dest=dest, source=str(self.pdf_view.pdf_path), ok=True
+            )
             self._set_status(f"Backup erstellt: {dest}")
             QMessageBox.information(
                 self,
@@ -4098,6 +4138,7 @@ class MainWindow(QMainWindow):
             )
             dest = manual_backup_text(body, title=title, suffix=suffix)
             self._last_backup_path = dest
+            append_backup_log(dest=dest, source=title, ok=True, message="Text")
             self._set_status(f"Backup erstellt: {dest}")
             QMessageBox.information(
                 self,
@@ -4321,7 +4362,11 @@ class MainWindow(QMainWindow):
             self._blink_autosave_error_status()
 
     def _update_license_status(self):
-        from instantlensdoc.license import format_ablaufdatum, resttage_phrase
+        from instantlensdoc.license import (
+            EXPIRY_WARN_DAYS,
+            format_ablaufdatum,
+            resttage_phrase,
+        )
 
         st = self.license_manager.status()
         self.version_label.setText(f"v{__version__}")
@@ -4365,6 +4410,32 @@ class MainWindow(QMainWindow):
         if urgent:
             tip = f"Restlaufzeit unter 7 Tagen — {tip}"
         self.license_label.setToolTip(tip)
+        # Ablaufwarnung ≤3 Tage: einmalig pro Tag, nicht modal — 1.0.4
+        try:
+            if self.license_manager.should_show_expiry_warning(st):
+                warn = (
+                    f"Hinweis: Lizenz/Trial läuft in {resttage_phrase(st.days_remaining)} ab"
+                    + (f" (bis {ablauf})" if ablauf else "")
+                    + " — Hilfe → Lizenz · ame@sellerbach.de"
+                )
+                self.statusBar().showMessage(warn, 12000)
+                if (
+                    getattr(self, "_tray", None) is not None
+                    and self._tray is not None
+                    and self._tray.isVisible()
+                ):
+                    try:
+                        self._tray.showMessage(
+                            f"{DISPLAY_NAME}: Ablauf in ≤{EXPIRY_WARN_DAYS} Tagen",
+                            warn,
+                            QSystemTrayIcon.Warning,
+                            8000,
+                        )
+                    except Exception:
+                        pass
+                self.license_manager.mark_expiry_warning_shown()
+        except Exception:
+            pass
         if not st.allowed:
             QMessageBox.warning(
                 self,

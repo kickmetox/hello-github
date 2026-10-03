@@ -100,10 +100,10 @@ HELP_HTML = f"""
 <li><b>Datei → Projekt-Ordner</b>: Workspace wählen (letzte 5); Dialoge starten im aktiven Ordner</li>
 <li><b>Datei → Exportieren</b>: Editor-Inhalt als HTML, DOCX oder PDF (zuletzt genutzter Ordner wird gemerkt);
     <b>Export-Profil</b> speichern/anwenden (DPI / Format / Ziel)</li>
-<li><b>Datei → Drucken</b> (Ctrl+P): Editor oder aktuelle PDF-Seite (Qt Print); <b>PDF → Dokument drucken…</b> Seitenbereich von–bis + DPI 72/150/300, dann QPrintDialog (Raster via pypdfium2) — 1.0.2</li>
-<li><b>Datei → Backup jetzt</b> / <b>Backup-Ordner öffnen…</b>: manuelles Backup; bei Schreibfehler Dialog mit <b>Retry</b>; Status zeigt Pfad — 1.0.2</li>
-<li><b>Willkommen</b>: Drag&amp;Drop Dateien öffnen; Button <b>Recent leeren</b>; Recent Rechtsklick Entfernen/Ordner — 1.0.2</li>
-<li><b>Hilfe → Info</b>: Trial-Resttage konsistent mit Statusleiste („noch X Tage“); Lizenz aktivieren… — 1.0.2</li>
+<li><b>Datei → Drucken</b> (Ctrl+P): Editor oder aktuelle PDF-Seite (Qt Print); <b>PDF → Dokument drucken…</b> Seitenbereich + DPI + Graustufen; bei Mehrseiten <b>Fortschrittsdialog abbrechenbar</b> — 1.0.4</li>
+<li><b>Datei → Backup jetzt</b> / <b>Backup-Ordner öffnen…</b>: manuelles Backup; max. 3 Versuche; <b>Log letzte 20</b> in Einstellungen — 1.0.4</li>
+<li><b>Willkommen</b>: <b>Live-Suchfilter</b> über Recent; Enter/Entf; Drag&amp;Drop; Recent leeren — 1.0.4</li>
+<li><b>Hilfe → Info / Lizenz</b>: Warnung <b>≤3 Tage</b> vor Ablauf (1×/Tag, Status/Tray, nicht modal); Ablauf TT.MM.JJJJ — 1.0.4</li>
 <li><b>Seitenleiste</b>: Suche (inkl. letzte Suchbegriffe), „Alle Docs“-Volltext, Zuletzt geöffnet, Dokumente,
     Lesezeichen/Outline (+/− hinzufügen/löschen), <b>Annotationen</b> (klickbar, <b>nach Seite gruppiert</b>,
     <b>Filter nach Typ</b>, <b>Textsuche in der Liste</b> (optional <b>Regex</b>), <b>Statistik je Typ</b>,

@@ -1,5 +1,27 @@
 # Changelog — InstantLens Doc
 
+## 1.0.4 — Willkommen Recent-Filter, Druck-Fortschritt, Ablauf-Warnung 3d, Backup-Log
+
+Post-Release-Polish nach 1.0.3: Willkommen-Recent mit Live-Suchfilter; Mehrseiten-Dokumentdruck mit abbrechenbarem Fortschrittsdialog; Lizenz-Warnung ≤3 Tage vor Ablauf einmalig pro Tag (Status/Tray, nicht modal); Backup-Log der letzten 20 Vorgänge in den Einstellungen. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### Willkommen / Start
+- **Live-Suchfilter** über die Recent-Liste (Dateiname/Pfad, sofort beim Tippen)
+
+### PDF / Druck
+- **Dokument drucken…**: bei **Mehrseiten**-Druck Fortschrittsdialog mit **Abbrechen** (`processEvents`); Einzelseite ohne Dialog
+
+### About / Lizenz
+- Warnung **≤3 Tage** vor Ablauf: einmalig pro Kalendertag, Statusleisten-Hinweis (+ Tray falls aktiv), **nicht modal**
+
+### Backup
+- Log der letzten **20** manuellen Backup-Vorgänge in **Einstellungen** lesbar (`backup_log.json`)
+
+### Packaging / Docs
+- Version **1.0.4** (App / `ild_pdf` / ISS / Smoke / Docs)
+- Smoke: Welcome-Filter, Print-Progress-Cancel, Expiry-Warn, Backup-Log (CLI + Qt)
+
+---
+
 ## 1.0.3 — Willkommen Enter/Delete, Druck-Graustufen, Ablauf TT.MM.JJJJ, Backup max. 3
 
 Post-Release-Polish nach 1.0.2: Willkommen-Recent per Enter öffnen und Delete entfernen; Dokumentdruck mit Graustufen-Toggle (Settings + Druckdialog); Lizenz-Ablaufdatum einheitlich TT.MM.JJJJ in About und Status; Backup-Retry max. 3 Versuche dann Abbruch-Hinweis. Stubs KI/Cloud/Stylus/3D bleiben Stubs.

@@ -111,6 +111,14 @@ def format_ablaufdatum(dt: Optional[datetime], *, empty: str = "—") -> str:
         return raw[:10] if raw else empty
 
 
+# Warnung ab diesem Resttage-Wert (inkl.), einmalig pro Kalendertag — 1.0.4
+EXPIRY_WARN_DAYS = 3
+
+
+def _today_iso() -> str:
+    return datetime.now().astimezone().date().isoformat()
+
+
 @dataclass
 class LicenseStatus:
     mode: str  # "trial" | "licensed" | "expired"
@@ -164,6 +172,21 @@ class LicenseManager:
         self.state.pop("key", None)
         self.state.pop("email", None)
         self.state.pop("activated_at", None)
+        self._save()
+
+    def should_show_expiry_warning(self, st: Optional[LicenseStatus] = None) -> bool:
+        """True wenn Resttage ≤3, noch gültig, und heute noch nicht gewarnt — 1.0.4."""
+        status = st if st is not None else self.status()
+        if not status.allowed:
+            return False
+        if int(status.days_remaining) > EXPIRY_WARN_DAYS:
+            return False
+        last = str(self.state.get("expiry_warn_day") or "")
+        return last != _today_iso()
+
+    def mark_expiry_warning_shown(self) -> None:
+        """Merkt den heutigen Kalendertag als „Warnung gezeigt“ — 1.0.4."""
+        self.state["expiry_warn_day"] = _today_iso()
         self._save()
 
     def status(self) -> LicenseStatus:

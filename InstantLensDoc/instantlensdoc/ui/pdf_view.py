@@ -5347,14 +5347,14 @@ class PdfViewer(QWidget):
             return False
 
     def print_document(self) -> bool:
-        """PDF-Dokument (Seitenbereich + DPI + Graustufen) gerastert drucken — 1.0.3."""
+        """PDF-Dokument (Seitenbereich + DPI + Graustufen) gerastert drucken — 1.0.4."""
         if not self.pdf_path:
             QMessageBox.information(self, "Drucken", "Kein PDF geladen.")
             return False
         try:
             from PySide6.QtGui import QPainter
             from PySide6.QtPrintSupport import QPrintDialog, QPrinter
-            from PySide6.QtWidgets import QProgressDialog
+            from PySide6.QtWidgets import QApplication, QProgressDialog
 
             from instantlensdoc.core.app_settings import (
                 set_export_raster_dpi,
@@ -5394,20 +5394,37 @@ class PdfViewer(QWidget):
                 return False
 
             total = len(pages)
-            progress = QProgressDialog("Drucke PDF…", "Abbrechen", 0, total, self)
-            progress.setWindowModality(Qt.WindowModal)
-            progress.setMinimumDuration(0)
+            # Fortschrittsdialog nur bei Mehrseiten-Druck, abbrechenbar — 1.0.4
+            progress: QProgressDialog | None = None
+            if total > 1:
+                progress = QProgressDialog(
+                    "Drucke PDF…", "Abbrechen", 0, total, self
+                )
+                progress.setWindowTitle("Dokumentdruck")
+                progress.setWindowModality(Qt.WindowModal)
+                progress.setMinimumDuration(0)
+                progress.setValue(0)
+                QApplication.processEvents()
             painter = QPainter(printer)
             printed = 0
+            canceled = False
             gray_lbl = ", Graustufen" if gray else ""
             try:
                 for idx, i in enumerate(pages):
-                    if progress.wasCanceled():
-                        break
-                    progress.setValue(idx)
-                    progress.setLabelText(
-                        f"Drucke Seite {i + 1} / {n} ({dpi} DPI{gray_lbl})…"
-                    )
+                    if progress is not None:
+                        QApplication.processEvents()
+                        if progress.wasCanceled():
+                            canceled = True
+                            break
+                        progress.setValue(idx)
+                        progress.setLabelText(
+                            f"Drucke Seite {i + 1} / {n} "
+                            f"({idx + 1}/{total}, {dpi} DPI{gray_lbl})…"
+                        )
+                        QApplication.processEvents()
+                        if progress.wasCanceled():
+                            canceled = True
+                            break
                     pm = self._pixmap_from_rendered_page(i, scale, grayscale=gray)
                     if pm is None or pm.isNull():
                         continue
@@ -5424,19 +5441,27 @@ class PdfViewer(QWidget):
                     y = int((page_rect.height() - scaled.height()) / 2)
                     painter.drawPixmap(x, y, scaled)
                     printed += 1
-                progress.setValue(total)
+                if progress is not None and not canceled:
+                    progress.setValue(total)
             finally:
                 painter.end()
-                try:
-                    progress.close()
-                except Exception:
-                    pass
+                if progress is not None:
+                    try:
+                        progress.close()
+                    except Exception:
+                        pass
             self.refresh()
-            self.status.emit(
-                f"PDF-Dokument gedruckt (Seiten {start + 1}–{end}, {printed} Seite(n), "
-                f"{dpi} DPI{gray_lbl})"
-            )
-            return True
+            if canceled:
+                self.status.emit(
+                    f"Dokumentdruck abgebrochen "
+                    f"({printed}/{total} Seite(n) gedruckt, {dpi} DPI{gray_lbl})"
+                )
+            else:
+                self.status.emit(
+                    f"PDF-Dokument gedruckt (Seiten {start + 1}–{end}, "
+                    f"{printed} Seite(n), {dpi} DPI{gray_lbl})"
+                )
+            return not canceled
         except Exception as e:
             QMessageBox.critical(self, "Drucken", f"Dokumentdruck fehlgeschlagen:\n{e}")
             try:

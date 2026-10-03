@@ -2,7 +2,7 @@
 
 Moderne Textverarbeitung mit PDF-Annotator, OCR-Bridge und Formulargenerator.
 
-**Version:** 1.0.3  
+**Version:** 1.0.4  
 **Hersteller:** Andreas Meyer · ame@sellerbach.de
 
 ## Quickstart (Windows)
@@ -32,8 +32,8 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an).
 
-## Neu in 1.0.3
+## Neu in 1.0.4
 
-Post-Release-Polish: Willkommen Enter/Delete auf Recent; Dokumentdruck Graustufen-Toggle (Settings); Ablaufdatum TT.MM.JJJJ About+Status; Backup max. 3 Versuche dann Abbruch. Stubs KI/Cloud/Stylus/3D unverändert.
+Post-Release-Polish: Willkommen Live-Suchfilter über Recent; Mehrseiten-Druck mit abbrechenbarem Fortschrittsdialog; Lizenz-Warnung ≤3 Tage vor Ablauf (1×/Tag, nicht modal); Backup-Log letzte 20 in Einstellungen. Stubs KI/Cloud/Stylus/3D unverändert.
 
 Siehe [CHANGELOG.md](CHANGELOG.md), [FEATURES.md](FEATURES.md) und [INFO.md](INFO.md).
