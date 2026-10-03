@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Smoke-Test 0.8.4 (CLI + optional offscreen Qt). Kernpfade: open/annotate/export/license + ausgewählte 0.6.x-Pfade."""
+"""Smoke-Test 0.8.5 (CLI + optional offscreen Qt). Kernpfade: open/annotate/export/license + ausgewählte 0.6.x-Pfade."""
 
 from __future__ import annotations
 
@@ -122,8 +122,8 @@ def main() -> int:
     from instantlensdoc.core.update_check import check_for_updates
     from instantlensdoc.license import KEY_DAYS, TRIAL_DAYS, generate_key, verify_key
 
-    assert __version__ == "0.8.4", __version__
-    assert ild_ver == "0.8.4", ild_ver
+    assert __version__ == "0.8.5", __version__
+    assert ild_ver == "0.8.5", ild_ver
     assert TRIAL_DAYS == 28 and KEY_DAYS == 32
     key = generate_key("ame@sellerbach.de")
     ok, msg, _ = verify_key(key)
@@ -141,7 +141,7 @@ def main() -> int:
     assert "Settings" in tr("settings")
     set_lang("de")
     upd = check_for_updates(allow_network=False)
-    assert upd.local_version == "0.8.4" and not upd.online
+    assert upd.local_version == "0.8.5" and not upd.online
     assert get_export_jpeg_quality() >= 10
     assert get_ui_lang() in ("de", "en")
     assert 25 <= get_default_zoom_percent() <= 500
@@ -182,8 +182,8 @@ def main() -> int:
     assert get_ann_pen_color() == "#112233"
     assert (ROOT / "CHANGELOG.md").is_file()
     cl = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-    assert "0.8.4" in cl and "0.8.3" in cl and "0.8.2" in cl and "0.8.1" in cl and "0.8.0" in cl
-    assert "## 0.8.4" in cl and "## 0.8.3" in cl and "## 0.8.2" in cl and "## 0.8.1" in cl and "## 0.8.0" in cl
+    assert "0.8.5" in cl and "0.8.4" in cl and "0.8.3" in cl and "0.8.2" in cl and "0.8.1" in cl and "0.8.0" in cl
+    assert "## 0.8.5" in cl and "## 0.8.4" in cl and "## 0.8.3" in cl and "## 0.8.2" in cl and "## 0.8.1" in cl and "## 0.8.0" in cl
     assert "## 0.7.9" in cl
     assert "## 0.7.8" in cl
     assert "## 0.7.6" in cl
@@ -240,7 +240,7 @@ def main() -> int:
     assert "0.4.9" in cl  # noch in Kurz-Tabelle
     assert "0.3.9" in cl  # noch in Kurz-Tabelle
     assert "0.2.9" in cl  # noch in Kurz-Tabelle
-    assert "0.8.4" in (ROOT / "README.md").read_text(encoding="utf-8")
+    assert "0.8.5" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "run.bat" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "sync-ild.ps1" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "scripts/sync-ild.ps1" in (ROOT / "FEATURES.md").read_text(encoding="utf-8")
@@ -589,13 +589,13 @@ def main() -> int:
 
         assert (ROOT / "installer" / "installer-hinweis.txt").exists()
         iss = (ROOT / "installer" / "instantlensdoc.iss").read_text(encoding="utf-8")
-        assert "0.8.4" in iss and "desktopicon" in iss and "DisableProgramGroupPage=no" in iss
+        assert "0.8.5" in iss and "desktopicon" in iss and "DisableProgramGroupPage=no" in iss
         assert "UninstallDisplayName" in iss and "Uninstallable=yes" in iss
         assert "IncludeKeygen" in iss and "SetupIconFile" in iss
         assert "InstantLensKeygen.exe" in iss
         assert "uninstallexe" in iss
         bw = (ROOT / "build-windows.ps1").read_text(encoding="utf-8")
-        assert "0.8.4" in bw and "NoKeygenInApp" in bw and "--icon" in bw
+        assert "0.8.5" in bw and "NoKeygenInApp" in bw and "--icon" in bw
         assert "InstantLensKeygen.exe" in bw
         bi = (ROOT / "installer" / "build-installer.ps1").read_text(encoding="utf-8")
         assert "InstantLensKeygen.exe" in bi and "IncludeKeygen" in bi
@@ -604,7 +604,7 @@ def main() -> int:
         assert "Installer" in kg_readme
         hinweis = (ROOT / "installer" / "installer-hinweis.txt").read_text(encoding="utf-8")
         assert "InstantLensKeygen.exe" in hinweis or "run-keygen.bat" in hinweis
-        assert "0.8.4" in hinweis
+        assert "0.8.5" in hinweis
         assert "checkedonce" in iss and "Desktop-Verknüpfung" in hinweis
         from ild_pdf.limits import OPEN_TIMEOUT_HINT, OPEN_TIMEOUT_HINT_SEC
 
@@ -616,7 +616,7 @@ def main() -> int:
         assert "QProgressDialog" in (ROOT / "instantlensdoc" / "ui" / "main_window.py").read_text(encoding="utf-8")
 
         assert (ROOT / "examples" / "ild_pdf_demo.py").exists()
-        assert "0.8.4" in (ROOT / "INFO.md").read_text(encoding="utf-8")
+        assert "0.8.5" in (ROOT / "INFO.md").read_text(encoding="utf-8")
         assert (ROOT / "assets" / "app.ico").is_file()
 
         # --- Kernpfade: open / annotate / export / license ---
@@ -749,7 +749,7 @@ def main() -> int:
         assert "| A" in tbl and "| 1" in tbl
         assert ocr_mod.TESSERACT_WIKI_URL.startswith("https://")
 
-        # --- Ausgewählte 0.3.x-/0.4.x-/0.5.x-/0.6.x-Pfade (CLI, Konsolidierung 0.7.0) + 0.8.4 ---
+        # --- Ausgewählte 0.3.x-/0.4.x-/0.5.x-/0.6.x-Pfade (CLI, Konsolidierung 0.7.0) + 0.8.5 ---
         from ild_pdf.annotate import stamp_library_items
         from ild_pdf.attachments import has_attachments, list_attachments
         from ild_pdf.flatten import flatten_annotations_to_pdf
@@ -807,7 +807,7 @@ def main() -> int:
         set_backup_on_save(False)
         assert get_page_size_unit() in ("mm", "inch")
         assert isinstance(get_minimize_to_tray(), bool)
-        assert "0.8.4" in feat and "0.8.3" in feat and "0.8.2" in feat and "0.8.1" in feat and "0.8.0" in feat and "0.7.9" in feat and "0.7.8" in feat and "0.7.7" in feat and "0.7.6" in feat and "0.7.5" in feat and "0.7.4" in feat and "0.7.3" in feat and "0.7.2" in feat and "0.7.1" in feat and "0.6.9" in feat and "0.5.9" in feat and "0.4.9" in feat  # Release + Zeitraum-Feature-Hinweise
+        assert "0.8.5" in feat and "0.8.4" in feat and "0.8.3" in feat and "0.8.2" in feat and "0.8.1" in feat and "0.8.0" in feat and "0.7.9" in feat and "0.7.8" in feat and "0.7.7" in feat and "0.7.6" in feat and "0.7.5" in feat and "0.7.4" in feat and "0.7.3" in feat and "0.7.2" in feat and "0.7.1" in feat and "0.6.9" in feat and "0.5.9" in feat and "0.4.9" in feat  # Release + Zeitraum-Feature-Hinweise
         assert "Batch-OCR" in feat or "OCR gesamtes PDF" in feat
         assert "Tag" in feat
         assert "Projekt-Ordner" in feat or "Workspace" in feat
@@ -2571,6 +2571,74 @@ def main() -> int:
         assert "0.8.4" in kb084 and ("Wortumbruch" in kb084 or "verteilen" in kb084 or "löschen" in kb084)
         print("0.8.4 CLI align/distribute/thumb-delete/overlay-opacity/word-wrap: OK")
 
+        # 0.8.5 CLI: Ann.-Align/Distribute V, Thumb-Duplizieren, Overlay-Font, Tab-Breite
+        from instantlensdoc.core.app_settings import (
+            get_page_number_overlay_font_size,
+            set_page_number_overlay_font_size,
+            get_editor_tab_width as get_tw085,
+            set_editor_tab_width as set_tw085,
+        )
+        from ild_pdf import Annotation as Ann085, AnnotationStore as AS085, AnnotationType as AT085
+
+        set_page_number_overlay_font_size(14)
+        assert get_page_number_overlay_font_size() == 14
+        set_page_number_overlay_font_size(11)
+        assert get_page_number_overlay_font_size() == 11
+        set_tw085(2)
+        assert get_tw085() == 2
+        set_tw085(8)
+        assert get_tw085() == 8
+        set_tw085(4)
+        assert get_tw085() == 4
+        store085 = AS085(pdf)
+        store085.annotations = []
+        store085.clear_history()
+        a085 = Ann085(0, AT085.HIGHLIGHT, 10, 10, width=20, height=10, text="av")
+        b085 = Ann085(0, AT085.HIGHLIGHT, 20, 50, width=20, height=10, text="bv")
+        c085 = Ann085(0, AT085.HIGHLIGHT, 30, 100, width=20, height=10, text="cv")
+        store085.add(a085); store085.add(b085); store085.add(c085)
+        n_top = store085.align([a085.id, b085.id, c085.id], vertical="top")
+        assert n_top >= 1
+        assert abs(float(store085.get(a085.id).y) - float(store085.get(b085.id).y)) < 0.01
+        store085.align([a085.id, b085.id, c085.id], vertical="bottom")
+        store085.align([a085.id, b085.id, c085.id], vertical="middle")
+        store085.update(a085.id, y=10.0)
+        store085.update(b085.id, y=40.0)
+        store085.update(c085.id, y=100.0)
+        n_dv = store085.distribute_vertical([a085.id, b085.id, c085.id])
+        assert n_dv >= 1
+        ys = sorted(float(store085.get(i).y) for i in (a085.id, b085.id, c085.id))
+        assert abs((ys[1] - ys[0]) - (ys[2] - ys[1])) < 0.05
+        pv085 = (ROOT / "instantlensdoc" / "ui" / "pdf_view.py").read_text(encoding="utf-8")
+        assert "distribute_selected_annotations_vertical" in pv085
+        assert "duplicate_at" in pv085
+        assert "set_page_number_overlay_font_size" in pv085
+        assert 'kind == "duplicate"' in pv085 or "kind == 'duplicate'" in pv085 or '"duplicate"' in pv085
+        mw085 = (ROOT / "instantlensdoc" / "ui" / "main_window.py").read_text(encoding="utf-8")
+        assert "_on_thumb_duplicate" in mw085
+        assert "_distribute_selected_annotations_vertical" in mw085
+        sb085 = (ROOT / "instantlensdoc" / "ui" / "sidebar.py").read_text(encoding="utf-8")
+        assert "page_duplicate_requested" in sb085
+        assert "Seite duplizieren" in sb085
+        sd085 = (ROOT / "instantlensdoc" / "ui" / "settings_dialog.py").read_text(encoding="utf-8")
+        assert "page_num_font" in sd085
+        assert "set_page_number_overlay_font_size" in sd085
+        assert "tab_width" in sd085
+        assert "set_editor_tab_width" in sd085
+        ed085 = (ROOT / "instantlensdoc" / "ui" / "editor.py").read_text(encoding="utf-8")
+        assert "set_tab_width" in ed085
+        feat085 = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
+        assert "0.8.5" in feat085 and (
+            "Distribute V" in feat085 or "vertikal" in feat085 or "Tab-Breite" in feat085 or "duplizieren" in feat085
+        )
+        cl085 = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+        assert "## 0.8.5" in cl085
+        kb085 = (ROOT / "instantlensdoc" / "ui" / "keyboard_help.py").read_text(encoding="utf-8")
+        assert "0.8.5" in kb085 and (
+            "duplizieren" in kb085 or "Tab-Breite" in kb085 or "Schriftgröße" in kb085 or "vertikal" in kb085
+        )
+        print("0.8.5 CLI align-v/distribute-v/thumb-dup/overlay-font/tab-width: OK")
+
         set_show_printer_marks(True)
         assert get_show_printer_marks() is True
         set_show_printer_marks(False)
@@ -2703,7 +2771,7 @@ def main() -> int:
         assert "Continuous Scroll" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
         assert "Seitenlabel" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8") or "Seitenlabels" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
         assert "Zwischenablage-Verlauf" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8") or "Clipboard" in (ROOT / "FEATURES.md").read_text(encoding="utf-8")
-        assert "0.8.4" in feat and "0.8.3" in feat and "0.8.2" in feat and "0.8.1" in feat and "0.8.0" in feat and "0.7.9" in feat and "0.7.8" in feat and "0.7.7" in feat and "0.7.6" in feat and "0.7.5" in feat and "0.7.4" in feat and "0.7.3" in feat and "0.7.2" in feat and "0.7.1" in feat and "0.6.9" in feat and "0.5.9" in feat and "0.4.9" in feat
+        assert "0.8.5" in feat and "0.8.4" in feat and "0.8.3" in feat and "0.8.2" in feat and "0.8.1" in feat and "0.8.0" in feat and "0.7.9" in feat and "0.7.8" in feat and "0.7.7" in feat and "0.7.6" in feat and "0.7.5" in feat and "0.7.4" in feat and "0.7.3" in feat and "0.7.2" in feat and "0.7.1" in feat and "0.6.9" in feat and "0.5.9" in feat and "0.4.9" in feat
         # --- 0.4.2 CLI: Outline Goto, Ann Copy/Paste, Flatten Progress ---
         import pikepdf as _pike_ol
 
@@ -2828,7 +2896,7 @@ def main() -> int:
         win._add_chained_frame()
         assert len(win.layout_doc.text_frames) >= 2
         assert "Lizenz:" in win.license_label.text() or "⚠" in win.license_label.text()
-        assert "v0.8.4" in win.version_label.text()
+        assert "v0.8.5" in win.version_label.text()
         # Lizenz <7 Tage: Style prominent
         st_lic = win.license_manager.status()
         if st_lic.allowed and st_lic.days_remaining < 7:
@@ -3009,11 +3077,11 @@ def main() -> int:
             assert win.editor.outdent_selection(4)
             assert win.editor.toPlainText().splitlines()[0] == "alpha"
             # Fenstertitel mit Version
-            assert "0.8.4" in win.windowTitle()
+            assert "0.8.5" in win.windowTitle()
             from instantlensdoc.ui.help_dialog import AboutDialog, HelpDialog, open_log_folder
 
             about = AboutDialog(win)
-            assert "0.8.4" in about.windowTitle()
+            assert "0.8.5" in about.windowTitle()
             help_dlg = HelpDialog(win)
             assert help_dlg.windowTitle() == "Hilfe"
             assert callable(open_log_folder)
@@ -3685,7 +3753,7 @@ def main() -> int:
             win.apply_tray_setting()
             if win._tray is not None:
                 tip = win._tray.toolTip()
-                assert "0.8.4" in tip and "InstantLens Doc" in tip
+                assert "0.8.5" in tip and "InstantLens Doc" in tip
             set_minimize_to_tray(False)
             win.apply_tray_setting()
             print("0.3.9 fit-h/ann-stats/special/tray: OK")
@@ -3698,9 +3766,9 @@ def main() -> int:
             from instantlensdoc.ui.password_dialog import CompressPdfDialog, SetPasswordDialog
             from instantlensdoc.ui.stubs import PLANNED
             assert KeyboardHelpDialog and SetPasswordDialog and CompressPdfDialog
-            assert "0.8.4" in PLANNED["ki"]
+            assert "0.8.5" in PLANNED["ki"]
             assert "Coming soon" in PLANNED["cloud"]
-            assert "0.8.4" in PLANNED["stylus"] and "0.8.4" in PLANNED["extrude3d"]
+            assert "0.8.5" in PLANNED["stylus"] and "0.8.5" in PLANNED["extrude3d"]
             # Toolbar ↔ Menü Sync Graustufen/Nacht
             win.pdf_view.set_grayscale(True)
             assert win._grayscale_action.isChecked()
@@ -3735,7 +3803,7 @@ def main() -> int:
             assert win.editor.toPlainText().splitlines() == ["one", "two"]
             from instantlensdoc.ui.help_dialog import HELP_HTML
 
-            assert "Stub 0.8.4" in HELP_HTML
+            assert "Stub 0.8.5" in HELP_HTML
             assert "scripts/sync-ild.ps1" in HELP_HTML
             assert "Präsentationsmodus" in HELP_HTML or "F5" in (
                 ROOT / "instantlensdoc" / "ui" / "keyboard_help.py"
@@ -6381,10 +6449,84 @@ def main() -> int:
             assert "## 0.8.4" in cl084q
             print("0.8.4 Qt align/distribute/thumb-delete/overlay-opacity/word-wrap: OK")
 
+            # --- 0.8.5 Qt: Align/Distribute V, Thumb-Duplizieren, Overlay-Font, Tab-Breite ---
+            from instantlensdoc.core.app_settings import (
+                get_editor_tab_width as get_tw085q,
+                get_page_number_overlay_font_size as get_pno_fs085,
+                set_editor_tab_width as set_tw085q,
+                set_page_number_overlay_font_size as set_pno_fs085,
+            )
+            from instantlensdoc.ui.settings_dialog import SettingsDialog as SD085
+            from ild_pdf import Annotation as Ann085q, AnnotationType as AT085q
+
+            assert callable(getattr(win, "_on_thumb_duplicate", None))
+            assert callable(getattr(win, "_distribute_selected_annotations_vertical", None))
+            assert callable(getattr(win.pdf_view, "distribute_selected_annotations_vertical", None))
+            assert callable(getattr(win.pdf_view, "duplicate_at", None))
+            assert callable(getattr(win.pdf_view, "set_page_number_overlay_font_size", None))
+            assert hasattr(win.sidebar, "page_duplicate_requested")
+            assert callable(getattr(win.editor, "set_tab_width", None))
+            # Overlay font Settings
+            set_pno_fs085(16)
+            sd085q = SD085(parent=win)
+            assert hasattr(sd085q, "page_num_font")
+            assert hasattr(sd085q, "tab_width")
+            sd085q.page_num_font.setValue(18)
+            # Tab-Breite 8
+            for i in range(sd085q.tab_width.count()):
+                if sd085q.tab_width.itemData(i) == 8:
+                    sd085q.tab_width.setCurrentIndex(i)
+                    break
+            sd085q._save()
+            assert get_pno_fs085() == 18
+            assert win.pdf_view.page_number_overlay_font_size() == 18
+            assert get_tw085q() == 8
+            assert win.editor.tab_width() == 8
+            set_pno_fs085(11)
+            win.pdf_view.set_page_number_overlay_font_size(11)
+            set_tw085q(4)
+            win.editor.set_tab_width(4)
+            # Align V / Distribute V
+            if win.pdf_view.pdf_path and win.pdf_view.store is not None:
+                win.stack.setCurrentWidget(win.pdf_view)
+                v1 = Ann085q(0, AT085q.STICKY, 10, 10, width=20, height=12, text="v1")
+                v2 = Ann085q(0, AT085q.STICKY, 30, 40, width=20, height=12, text="v2")
+                v3 = Ann085q(0, AT085q.STICKY, 50, 90, width=20, height=12, text="v3")
+                win.pdf_view.store.add(v1)
+                win.pdf_view.store.add(v2)
+                win.pdf_view.store.add(v3)
+                win.pdf_view._selected_ann_ids = {v1.id, v2.id, v3.id}
+                win.pdf_view._selected_ann_id = v3.id
+                n_top = win.pdf_view.align_selected_annotations("top")
+                assert n_top >= 1
+                ys_t = [float(win.pdf_view.store.get(i).y) for i in (v1.id, v2.id, v3.id)]
+                assert max(ys_t) - min(ys_t) < 0.01
+                win.pdf_view.store.update(v1.id, y=10.0)
+                win.pdf_view.store.update(v2.id, y=40.0)
+                win.pdf_view.store.update(v3.id, y=100.0)
+                win.pdf_view._selected_ann_ids = {v1.id, v2.id, v3.id}
+                n_dv = win.pdf_view.distribute_selected_annotations_vertical()
+                assert n_dv >= 1
+            # Thumb duplicate + Undo
+            if win.pdf_view.pdf_path:
+                win.pdf_view.clear_page_ops_undo()
+                before_d = int(win.pdf_view.page_count)
+                idx_d = min(int(win.pdf_view.page_index), before_d - 1)
+                assert win.pdf_view.duplicate_at(idx_d) is True
+                assert int(win.pdf_view.page_count) == before_d + 1
+                assert win.pdf_view.can_undo_page_op()
+                assert win.pdf_view.undo_page_op() is True
+                assert int(win.pdf_view.page_count) == before_d
+            feat085q = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
+            assert "0.8.5" in feat085q
+            cl085q = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+            assert "## 0.8.5" in cl085q
+            print("0.8.5 Qt align-v/distribute-v/thumb-dup/overlay-font/tab-width: OK")
+
             print("0.4.x selected Qt marks/schema/sort/reset: OK")
             print("0.4.2 Qt outline/copy-paste/case/progress: OK")
             print("0.4.1 Qt links/stamp/encoding/drop: OK")
-            print("0.3.x–0.8.4 review OK")
+            print("0.3.x–0.8.5 review OK")
             assert callable(win.pdf_view.bake_redactions)
             assert callable(win.pdf_view.clear_redactions)
             assert callable(win._set_pdf_password)

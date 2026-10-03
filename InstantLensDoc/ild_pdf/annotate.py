@@ -642,51 +642,99 @@ class AnnotationStore:
             ann.callout_x = float(ann.callout_x) + float(dx)
         ann.touch()
 
+    def _apply_dy(self, ann: Annotation, dy: float) -> None:
+        """Vertikale Verschiebung inkl. Callout-Endpunkt (ohne Undo)."""
+        if abs(float(dy)) < 1e-9:
+            return
+        ann.y = float(ann.y) + float(dy)
+        if ann.callout_x or ann.callout_y:
+            ann.callout_y = float(ann.callout_y) + float(dy)
+        ann.touch()
+
     def align(
         self,
         ann_ids: Sequence[str],
         *,
-        horizontal: str = "left",
+        horizontal: str | None = None,
+        vertical: str | None = None,
     ) -> int:
         """
-        Auswahl horizontal ausrichten: left | center | right (eine Undo-Stufe).
+        Auswahl ausrichten (eine Undo-Stufe).
+        horizontal: left | center | right
+        vertical: top | middle | bottom
+        Mindestens eine Achse; Standard horizontal=left wenn nichts gesetzt.
         Rückgabe: Anzahl bewegter Annotationen.
         """
-        mode = str(horizontal or "left").strip().lower()
-        if mode not in ("left", "center", "right"):
-            mode = "left"
+        h_mode = None
+        v_mode = None
+        if horizontal is not None:
+            h_mode = str(horizontal or "left").strip().lower()
+            if h_mode not in ("left", "center", "right"):
+                h_mode = "left"
+        if vertical is not None:
+            v_mode = str(vertical or "top").strip().lower()
+            if v_mode not in ("top", "middle", "bottom"):
+                v_mode = "top"
+        if h_mode is None and v_mode is None:
+            h_mode = "left"
         ids = {str(i) for i in ann_ids if i}
         if len(ids) < 2:
             return 0
         targets = [a for a in self.annotations if a.id in ids]
         if len(targets) < 2:
             return 0
-        if mode == "left":
-            anchor = min(float(a.x) for a in targets)
-        elif mode == "right":
-            anchor = max(float(a.x) + float(a.width or 0.0) for a in targets)
-        else:
-            left = min(float(a.x) for a in targets)
-            right = max(float(a.x) + float(a.width or 0.0) for a in targets)
-            anchor = (left + right) / 2.0
-        moves: list[tuple[Annotation, float]] = []
-        for a in targets:
-            w = float(a.width or 0.0)
-            if mode == "left":
-                dx = anchor - float(a.x)
-            elif mode == "right":
-                dx = anchor - (float(a.x) + w)
+        moves_x: list[tuple[Annotation, float]] = []
+        moves_y: list[tuple[Annotation, float]] = []
+        if h_mode is not None:
+            if h_mode == "left":
+                anchor_x = min(float(a.x) for a in targets)
+            elif h_mode == "right":
+                anchor_x = max(float(a.x) + float(a.width or 0.0) for a in targets)
             else:
-                dx = anchor - (float(a.x) + w / 2.0)
-            if abs(dx) >= 1e-9:
-                moves.append((a, dx))
-        if not moves:
+                left = min(float(a.x) for a in targets)
+                right = max(float(a.x) + float(a.width or 0.0) for a in targets)
+                anchor_x = (left + right) / 2.0
+            for a in targets:
+                w = float(a.width or 0.0)
+                if h_mode == "left":
+                    dx = anchor_x - float(a.x)
+                elif h_mode == "right":
+                    dx = anchor_x - (float(a.x) + w)
+                else:
+                    dx = anchor_x - (float(a.x) + w / 2.0)
+                if abs(dx) >= 1e-9:
+                    moves_x.append((a, dx))
+        if v_mode is not None:
+            if v_mode == "top":
+                anchor_y = min(float(a.y) for a in targets)
+            elif v_mode == "bottom":
+                anchor_y = max(float(a.y) + float(a.height or 0.0) for a in targets)
+            else:
+                top = min(float(a.y) for a in targets)
+                bottom = max(float(a.y) + float(a.height or 0.0) for a in targets)
+                anchor_y = (top + bottom) / 2.0
+            for a in targets:
+                h = float(a.height or 0.0)
+                if v_mode == "top":
+                    dy = anchor_y - float(a.y)
+                elif v_mode == "bottom":
+                    dy = anchor_y - (float(a.y) + h)
+                else:
+                    dy = anchor_y - (float(a.y) + h / 2.0)
+                if abs(dy) >= 1e-9:
+                    moves_y.append((a, dy))
+        if not moves_x and not moves_y:
             return 0
         self._push_undo()
-        for a, dx in moves:
+        moved_ids: set[str] = set()
+        for a, dx in moves_x:
             self._apply_dx(a, dx)
+            moved_ids.add(a.id)
+        for a, dy in moves_y:
+            self._apply_dy(a, dy)
+            moved_ids.add(a.id)
         self.dirty = True
-        return len(moves)
+        return len(moved_ids)
 
     def distribute_horizontal(self, ann_ids: Sequence[str]) -> int:
         """
@@ -719,6 +767,40 @@ class AnnotationStore:
         self._push_undo()
         for a, dx in moves:
             self._apply_dx(a, dx)
+        self.dirty = True
+        return len(moves)
+
+    def distribute_vertical(self, ann_ids: Sequence[str]) -> int:
+        """
+        Auswahl vertikal gleichmäßig verteilen (obere/untere Kante bleibt).
+        Mindestens 3 Annotationen; eine Undo-Stufe. Rückgabe: bewegte Anzahl.
+        """
+        ids = {str(i) for i in ann_ids if i}
+        if len(ids) < 3:
+            return 0
+        targets = [a for a in self.annotations if a.id in ids]
+        if len(targets) < 3:
+            return 0
+        ordered = sorted(targets, key=lambda a: float(a.y))
+        first = ordered[0]
+        last = ordered[-1]
+        span = float(last.y) - float(first.y)
+        if abs(span) < 1e-9:
+            return 0
+        step = span / float(len(ordered) - 1)
+        moves: list[tuple[Annotation, float]] = []
+        for i, a in enumerate(ordered):
+            if i == 0 or i == len(ordered) - 1:
+                continue
+            target_y = float(first.y) + step * float(i)
+            dy = target_y - float(a.y)
+            if abs(dy) >= 1e-9:
+                moves.append((a, dy))
+        if not moves:
+            return 0
+        self._push_undo()
+        for a, dy in moves:
+            self._apply_dy(a, dy)
         self.dirty = True
         return len(moves)
 

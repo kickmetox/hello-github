@@ -16,6 +16,7 @@ from instantlensdoc.core.app_settings import (
     get_editor_minimap,
     get_editor_soft_wrap,
     get_editor_show_special_chars,
+    get_editor_tab_width,
     get_editor_trim_whitespace_on_paste,
 )
 from instantlensdoc.core.bookmarks import (
@@ -90,6 +91,7 @@ class TextEditor(QPlainTextEdit):
         self._line_numbers = bool(get_editor_line_numbers())
         self._minimap = bool(get_editor_minimap())
         self._soft_wrap = bool(get_editor_soft_wrap())
+        self._tab_width = int(get_editor_tab_width())
         self._show_special = bool(get_editor_show_special_chars())
         self._bracket_match = bool(get_editor_bracket_match())
         self._bracket_auto_close = bool(get_editor_bracket_auto_close())
@@ -112,6 +114,7 @@ class TextEditor(QPlainTextEdit):
         self.set_line_numbers_visible(self._line_numbers)
         self.set_minimap_visible(self._minimap)
         self.set_soft_wrap(self._soft_wrap)
+        self.set_tab_width(self._tab_width)
         self.set_special_chars_visible(self._show_special)
 
     def line_number_area_width(self) -> int:
@@ -387,6 +390,21 @@ class TextEditor(QPlainTextEdit):
 
     def soft_wrap_enabled(self) -> bool:
         return bool(self._soft_wrap)
+
+    def set_tab_width(self, width: int) -> None:
+        """Tabulatorbreite in Zeichen (2 / 4 / 8)."""
+        try:
+            w = int(width)
+        except (TypeError, ValueError):
+            w = 4
+        if w not in (2, 4, 8):
+            w = 4
+        self._tab_width = w
+        space_w = max(1, self.fontMetrics().horizontalAdvance(" "))
+        self.setTabStopDistance(float(space_w * w))
+
+    def tab_width(self) -> int:
+        return int(self._tab_width)
 
     def set_special_chars_visible(self, visible: bool) -> None:
         """Tabs/Leerzeichen/Absatzenden als sichtbare Sonderzeichen (ShowTabsAndSpaces)."""

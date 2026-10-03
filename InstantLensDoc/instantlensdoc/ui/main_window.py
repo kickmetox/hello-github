@@ -407,6 +407,7 @@ class MainWindow(QMainWindow):
         self.sidebar.line_favorites_reordered.connect(self._on_line_favorites_reordered)
         self.sidebar.pages_reordered.connect(self._on_thumbs_reordered)
         self.sidebar.page_rotate_requested.connect(self._on_thumb_rotate)
+        self.sidebar.page_duplicate_requested.connect(self._on_thumb_duplicate)
         self.sidebar.page_delete_requested.connect(self._on_thumb_delete)
         splitter.addWidget(self.sidebar)
 
@@ -926,7 +927,7 @@ class MainWindow(QMainWindow):
         act_opacity_ann.triggered.connect(self._opacity_selected_annotations)
         m_edit.addAction(act_opacity_ann)
         m_align = m_edit.addMenu("Auswahl ausrichten")
-        m_align.setToolTip("Mehrfachauswahl horizontal ausrichten / verteilen")
+        m_align.setToolTip("Mehrfachauswahl ausrichten / verteilen (H/V)")
         act_align_l = QAction("Links", self)
         act_align_l.setToolTip("Ausgewählte Annotationen links ausrichten (≥2)")
         act_align_l.triggered.connect(
@@ -946,12 +947,37 @@ class MainWindow(QMainWindow):
         )
         m_align.addAction(act_align_r)
         m_align.addSeparator()
+        act_align_t = QAction("Oben", self)
+        act_align_t.setToolTip("Ausgewählte Annotationen oben ausrichten (≥2)")
+        act_align_t.triggered.connect(
+            lambda: self._align_selected_annotations("top")
+        )
+        m_align.addAction(act_align_t)
+        act_align_m = QAction("Vertikal mittig", self)
+        act_align_m.setToolTip("Ausgewählte Annotationen vertikal mittig ausrichten (≥2)")
+        act_align_m.triggered.connect(
+            lambda: self._align_selected_annotations("middle")
+        )
+        m_align.addAction(act_align_m)
+        act_align_b = QAction("Unten", self)
+        act_align_b.setToolTip("Ausgewählte Annotationen unten ausrichten (≥2)")
+        act_align_b.triggered.connect(
+            lambda: self._align_selected_annotations("bottom")
+        )
+        m_align.addAction(act_align_b)
+        m_align.addSeparator()
         act_dist_h = QAction("Horizontal verteilen", self)
         act_dist_h.setToolTip(
             "Ausgewählte Annotationen horizontal gleichmäßig verteilen (≥3)"
         )
         act_dist_h.triggered.connect(self._distribute_selected_annotations_horizontal)
         m_align.addAction(act_dist_h)
+        act_dist_v = QAction("Vertikal verteilen", self)
+        act_dist_v.setToolTip(
+            "Ausgewählte Annotationen vertikal gleichmäßig verteilen (≥3)"
+        )
+        act_dist_v.triggered.connect(self._distribute_selected_annotations_vertical)
+        m_align.addAction(act_dist_v)
         act_dup_ann = QAction("Annotation duplizieren", self)
         act_dup_ann.setShortcut(QKeySequence("Ctrl+Shift+D"))
         act_dup_ann.setToolTip(
@@ -2279,11 +2305,11 @@ class MainWindow(QMainWindow):
         if n:
             self._refresh_pdf_marks()
 
-    def _align_selected_annotations(self, horizontal: str = "left"):
+    def _align_selected_annotations(self, mode: str = "left"):
         if self.stack.currentWidget() is not self.pdf_view or not self.pdf_view.pdf_path:
             self._set_status("Ausrichten nur im PDF-Modus")
             return
-        n = self.pdf_view.align_selected_annotations(horizontal)
+        n = self.pdf_view.align_selected_annotations(mode)
         if n:
             self._refresh_pdf_marks()
 
@@ -2292,6 +2318,14 @@ class MainWindow(QMainWindow):
             self._set_status("Verteilen nur im PDF-Modus")
             return
         n = self.pdf_view.distribute_selected_annotations_horizontal()
+        if n:
+            self._refresh_pdf_marks()
+
+    def _distribute_selected_annotations_vertical(self):
+        if self.stack.currentWidget() is not self.pdf_view or not self.pdf_view.pdf_path:
+            self._set_status("Verteilen nur im PDF-Modus")
+            return
+        n = self.pdf_view.distribute_selected_annotations_vertical()
         if n:
             self._refresh_pdf_marks()
 
@@ -4356,6 +4390,16 @@ class MainWindow(QMainWindow):
             self._refresh_thumbs()
             self._update_doc_status()
 
+    def _on_thumb_duplicate(self, page_index: int):
+        """Thumbnail-Kontextmenü: Seite duplizieren (Undo Ctrl+Z)."""
+        if self.stack.currentWidget() is not self.pdf_view:
+            self.stack.setCurrentWidget(self.pdf_view)
+        if not self.pdf_view.pdf_path:
+            return
+        if self.pdf_view.duplicate_at(int(page_index)):
+            self._refresh_thumbs()
+            self._update_doc_status()
+
     def _on_thumb_delete(self, page_index: int):
         """Thumbnail-Kontextmenü: Seite löschen (Bestätigung + Undo Ctrl+Z)."""
         if self.stack.currentWidget() is not self.pdf_view:
@@ -4440,6 +4484,7 @@ class MainWindow(QMainWindow):
                 get_editor_minimap,
                 get_editor_show_special_chars,
                 get_editor_soft_wrap,
+                get_editor_tab_width,
                 get_pdf_grayscale,
                 get_pdf_night_mode,
                 get_sidecar_save_debounce_ms,
@@ -4463,6 +4508,7 @@ class MainWindow(QMainWindow):
                 self._soft_wrap_action.blockSignals(True)
                 self._soft_wrap_action.setChecked(soft)
                 self._soft_wrap_action.blockSignals(False)
+            self.editor.set_tab_width(get_editor_tab_width())
             special = get_editor_show_special_chars()
             self.editor.set_special_chars_visible(special)
             if hasattr(self, "_special_chars_action") and self._special_chars_action is not None:

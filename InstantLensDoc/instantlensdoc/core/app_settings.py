@@ -55,6 +55,7 @@ DEFAULTS: dict[str, Any] = {
     "wizard_skip_once": False,
     "selection_note_with_highlight": False,
     "editor_soft_wrap": True,
+    "editor_tab_width": 4,
     "editor_show_special_chars": False,
     "annotations_visible": True,
     "minimize_to_tray": False,
@@ -74,6 +75,7 @@ DEFAULTS: dict[str, Any] = {
     "show_page_boxes": False,
     "show_page_number_overlay": False,
     "page_number_overlay_opacity": 0.59,
+    "page_number_overlay_font_size": 11,
     "show_printer_marks": False,
     "annotations_locked": False,
     "editor_snippets": [
@@ -946,6 +948,44 @@ def set_page_number_overlay_opacity(opacity: float) -> None:
     except (TypeError, ValueError):
         op = 0.59
     save_settings({"page_number_overlay_opacity": round(max(0.05, min(1.0, op)), 4)})
+
+
+def get_page_number_overlay_font_size() -> int:
+    """Schriftgröße (pt) des Seitennummer-Overlays (8–36)."""
+    try:
+        sz = int(load_settings().get("page_number_overlay_font_size", 11))
+    except (TypeError, ValueError):
+        sz = 11
+    return max(8, min(36, sz))
+
+
+def set_page_number_overlay_font_size(size: int) -> None:
+    try:
+        sz = int(size)
+    except (TypeError, ValueError):
+        sz = 11
+    save_settings({"page_number_overlay_font_size": max(8, min(36, sz))})
+
+
+def get_editor_tab_width() -> int:
+    """Editor-Tab-Breite in Zeichen (2 / 4 / 8)."""
+    try:
+        w = int(load_settings().get("editor_tab_width", 4))
+    except (TypeError, ValueError):
+        w = 4
+    if w not in (2, 4, 8):
+        w = 4
+    return w
+
+
+def set_editor_tab_width(width: int) -> None:
+    try:
+        w = int(width)
+    except (TypeError, ValueError):
+        w = 4
+    if w not in (2, 4, 8):
+        w = 4
+    save_settings({"editor_tab_width": w})
 
 
 def get_show_printer_marks() -> bool:

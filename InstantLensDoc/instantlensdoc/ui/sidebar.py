@@ -323,6 +323,7 @@ class Sidebar(QWidget):
     line_favorites_reordered = Signal(list)  # 1-basierte Zeilen neue Reihenfolge
     pages_reordered = Signal(list)  # alte Indizes in neuer Reihenfolge
     page_rotate_requested = Signal(int, int)  # page_index 0-basiert, degrees (±90)
+    page_duplicate_requested = Signal(int)  # page_index 0-basiert (Duplikat + Undo)
     page_delete_requested = Signal(int)  # page_index 0-basiert (Bestätigung im Handler)
     search_export_requested = Signal(str)  # "csv" | "json"
 
@@ -909,12 +910,15 @@ class Sidebar(QWidget):
         act_r = menu.addAction("Drehen 90° rechts ⟳")
         act_l = menu.addAction("Drehen 90° links ⟲")
         menu.addSeparator()
+        act_dup = menu.addAction("Seite duplizieren")
         act_del = menu.addAction("Seite löschen…")
         chosen = menu.exec(self.thumbs.mapToGlobal(pos))
         if chosen is act_r:
             self.page_rotate_requested.emit(idx, 90)
         elif chosen is act_l:
             self.page_rotate_requested.emit(idx, -90)
+        elif chosen is act_dup:
+            self.page_duplicate_requested.emit(idx)
         elif chosen is act_del:
             self.page_delete_requested.emit(idx)
 

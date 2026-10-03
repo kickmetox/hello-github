@@ -1,5 +1,24 @@
 # Changelog — InstantLens Doc
 
+## 0.8.5 — Ann.-Align/Distribute V, Thumb-Duplizieren, Overlay-Font, Tab-Breite
+
+Nach 0.8.4: Annotation-Auswahl vertikal ausrichten und verteilen, Thumbnail-Seiten duplizieren mit Undo, Seitennummer-Overlay-Schriftgröße, Editor-Tab-Breite. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### PDF / Suche / Annotationen
+- **Auswahl ausrichten**: oben / mittig / unten (≥2); Toolbar + Menü Bearbeiten
+- **Vertikal verteilen**: gleichmäßige Abstände (≥3); Toolbar + Menü
+- Thumbnail-**Kontextmenü**: **Seite duplizieren** mit Undo (Ctrl+Z)
+- **Seitennummer-Overlay Schriftgröße**: Setting in Einstellungen (8–36 pt)
+
+### Editor / Settings
+- Editor-**Tab-Breite**: 2 / 4 / 8 Zeichen in Einstellungen
+
+### Packaging / Docs
+- Version **0.8.5** (App / `ild_pdf` / ISS / Smoke / Docs)
+- Smoke: Align/Distribute V, Thumb-Duplicate+Undo, Overlay-Font, Tab-Breite (CLI + Qt)
+
+---
+
 ## 0.8.4 — Ann.-Align/Distribute, Thumb-Löschen, Overlay-Opacity, Wortumbruch
 
 Nach 0.8.3: Annotation-Auswahl ausrichten und horizontal verteilen, Thumbnail-Seiten löschen mit Bestätigung und Undo, Seitennummer-Overlay-Deckkraft, Wortumbruch-Toggle persistiert. Stubs KI/Cloud/Stylus/3D bleiben Stubs.

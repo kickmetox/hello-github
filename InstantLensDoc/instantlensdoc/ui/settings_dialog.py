@@ -54,6 +54,8 @@ from instantlensdoc.core.app_settings import (
     get_pdf_night_mode,
     get_pdf_thumbnail_scale,
     get_pdf_two_page_spread,
+    get_editor_tab_width,
+    get_page_number_overlay_font_size,
     get_page_number_overlay_opacity,
     get_show_page_number_overlay,
     get_restore_session_on_start,
@@ -97,6 +99,7 @@ from instantlensdoc.core.app_settings import (
     set_editor_minimap,
     set_editor_show_special_chars,
     set_editor_soft_wrap,
+    set_editor_tab_width,
     set_editor_text_encoding,
     set_editor_trim_trailing_whitespace,
     set_editor_trim_whitespace_on_paste,
@@ -111,6 +114,7 @@ from instantlensdoc.core.app_settings import (
     set_pdf_night_mode,
     set_pdf_thumbnail_scale,
     set_pdf_two_page_spread,
+    set_page_number_overlay_font_size,
     set_page_number_overlay_opacity,
     set_show_page_number_overlay,
     set_restore_session_on_start,
@@ -240,6 +244,17 @@ class SettingsDialog(QDialog):
             "Lange Zeilen am Fensterrand umbrechen — Ansicht-Toggle persistiert (Ctrl+Shift+W)"
         )
         form.addRow(self.soft_wrap)
+
+        self.tab_width = QComboBox()
+        self.tab_width.addItem("2 Zeichen", 2)
+        self.tab_width.addItem("4 Zeichen", 4)
+        self.tab_width.addItem("8 Zeichen", 8)
+        cur_tab = get_editor_tab_width()
+        tab_idx = {2: 0, 4: 1, 8: 2}.get(cur_tab, 1)
+        self.tab_width.setCurrentIndex(tab_idx)
+        self.tab_width.setToolTip("Tabulatorbreite im Texteditor (2 / 4 / 8 Zeichen)")
+        form.addRow("Editor Tab-Breite", self.tab_width)
+
         from instantlensdoc.core.app_settings import get_editor_show_special_chars
 
         self.special_chars = QCheckBox("Sonderzeichen anzeigen (Tabs/Leerzeichen)")
@@ -380,6 +395,15 @@ class SettingsDialog(QDialog):
             "Deckkraft des Seitennummer-Overlays (Toolbar „Nr α“, Standard 0.59)"
         )
         form.addRow("Seitennummer-Overlay Deckkraft", self.page_num_opacity)
+
+        self.page_num_font = QSpinBox()
+        self.page_num_font.setRange(8, 36)
+        self.page_num_font.setSuffix(" pt")
+        self.page_num_font.setValue(get_page_number_overlay_font_size())
+        self.page_num_font.setToolTip(
+            "Schriftgröße des Seitennummer-Overlays (Standard 11 pt)"
+        )
+        form.addRow("Seitennummer-Overlay Schriftgröße", self.page_num_font)
 
         self.doc_split_orient = QComboBox()
         self.doc_split_orient.addItem("Horizontal (nebeneinander)", False)
@@ -727,6 +751,7 @@ class SettingsDialog(QDialog):
         set_editor_line_numbers(self.line_numbers.isChecked())
         set_editor_minimap(self.minimap.isChecked())
         set_editor_soft_wrap(self.soft_wrap.isChecked())
+        set_editor_tab_width(int(self.tab_width.currentData() or 4))
         set_editor_show_special_chars(self.special_chars.isChecked())
         set_editor_text_encoding(str(self.enc_combo.currentData() or "auto"))
         set_skip_splash(self.skip_splash.isChecked())
@@ -748,6 +773,7 @@ class SettingsDialog(QDialog):
         set_pdf_continuous_scroll(self.pdf_continuous.isChecked())
         set_show_page_number_overlay(self.page_num_overlay.isChecked())
         set_page_number_overlay_opacity(float(self.page_num_opacity.value()))
+        set_page_number_overlay_font_size(int(self.page_num_font.value()))
         set_editor_doc_split_vertical(bool(self.doc_split_orient.currentData()))
         set_tag_rename_confirm_threshold(int(self.tag_rename_confirm.value()))
         set_sidecar_save_debounce_ms(int(self.sidecar_debounce.value()))
@@ -817,6 +843,8 @@ class SettingsDialog(QDialog):
                     parent.editor.set_minimap_visible(self.minimap.isChecked())
                 if hasattr(parent.editor, "set_soft_wrap"):
                     parent.editor.set_soft_wrap(self.soft_wrap.isChecked())
+                if hasattr(parent.editor, "set_tab_width"):
+                    parent.editor.set_tab_width(int(self.tab_width.currentData() or 4))
                 if hasattr(parent.editor, "set_special_chars_visible"):
                     parent.editor.set_special_chars_visible(self.special_chars.isChecked())
             except Exception:
@@ -853,6 +881,10 @@ class SettingsDialog(QDialog):
                 if hasattr(parent.pdf_view, "set_page_number_overlay_opacity"):
                     parent.pdf_view.set_page_number_overlay_opacity(
                         float(self.page_num_opacity.value())
+                    )
+                if hasattr(parent.pdf_view, "set_page_number_overlay_font_size"):
+                    parent.pdf_view.set_page_number_overlay_font_size(
+                        int(self.page_num_font.value())
                     )
             except Exception:
                 pass
