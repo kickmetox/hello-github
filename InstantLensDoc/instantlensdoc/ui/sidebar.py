@@ -1353,6 +1353,13 @@ class Sidebar(QWidget):
                 item = QListWidgetItem(f"  {line}")
                 if payload is not None:
                     item.setData(256, payload)
+                    # Ellipsis-Kürzung in der Liste → Tooltip mit vollem Text
+                    full_txt = str(getattr(payload, "text", "") or "").strip()
+                    if full_txt:
+                        item.setToolTip(full_txt)
+                    else:
+                        tip_line = str(line or "").strip()
+                        item.setToolTip(tip_line if tip_line else "")
                 self.annotations.addItem(item)
         self._update_ann_stats()
 

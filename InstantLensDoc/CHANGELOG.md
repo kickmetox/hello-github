@@ -1,5 +1,23 @@
 # Changelog — InstantLens Doc
 
+## 0.7.8 — Dry-Run-TXT, Ann.-Tooltip, Blink-Hinweis, Merge-Diff-Länge
+
+Nach 0.7.7: Zip-Dry-Run, Ann.-Liste, Debounce-Hinweis und Merge-Diff verfeinern. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### PDF / Suche / Annotationen
+- Ann.-**Liste**: bei Ellipsis-Kürzung **Tooltip mit vollem Text**
+- Ann.-**Merge-Diff**: **max. Zeichenlänge** je Seite in Einstellungen (12–64)
+
+### Editor / Settings
+- Vorlagen-Zip-Import Dry-Run: **Konfliktliste als TXT** exportieren
+- Status-Blink **aus**: trotzdem **einmaliger Status-Hinweis** ohne Blink
+
+### Packaging / Docs
+- Version **0.7.8** (App / `ild_pdf` / ISS / Smoke / Docs)
+- Smoke: Dry-Run-TXT, Ann.-Tooltip, Blink-Hinweis, Merge-Diff-Länge (CLI + Qt)
+
+---
+
 ## 0.7.7 — Status-Blink Settings, Merge-Tags/Farbe, Zip-Dry-Run, Ann.-Ellipsis
 
 Nach 0.7.6: Dirty-UX, Merge-Diff, Zip-Import und Ann.-Liste verfeinern. Stubs KI/Cloud/Stylus/3D bleiben Stubs.

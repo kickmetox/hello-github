@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Smoke-Test 0.7.7 (CLI + optional offscreen Qt). Kernpfade: open/annotate/export/license + ausgewählte 0.6.x-Pfade."""
+"""Smoke-Test 0.7.8 (CLI + optional offscreen Qt). Kernpfade: open/annotate/export/license + ausgewählte 0.6.x-Pfade."""
 
 from __future__ import annotations
 
@@ -122,8 +122,8 @@ def main() -> int:
     from instantlensdoc.core.update_check import check_for_updates
     from instantlensdoc.license import KEY_DAYS, TRIAL_DAYS, generate_key, verify_key
 
-    assert __version__ == "0.7.7", __version__
-    assert ild_ver == "0.7.7", ild_ver
+    assert __version__ == "0.7.8", __version__
+    assert ild_ver == "0.7.8", ild_ver
     assert TRIAL_DAYS == 28 and KEY_DAYS == 32
     key = generate_key("ame@sellerbach.de")
     ok, msg, _ = verify_key(key)
@@ -141,7 +141,7 @@ def main() -> int:
     assert "Settings" in tr("settings")
     set_lang("de")
     upd = check_for_updates(allow_network=False)
-    assert upd.local_version == "0.7.7" and not upd.online
+    assert upd.local_version == "0.7.8" and not upd.online
     assert get_export_jpeg_quality() >= 10
     assert get_ui_lang() in ("de", "en")
     assert 25 <= get_default_zoom_percent() <= 500
@@ -182,8 +182,8 @@ def main() -> int:
     assert get_ann_pen_color() == "#112233"
     assert (ROOT / "CHANGELOG.md").is_file()
     cl = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-    assert "0.7.7" in cl
-    assert "## 0.7.7" in cl
+    assert "0.7.8" in cl
+    assert "## 0.7.8" in cl
     assert "## 0.7.6" in cl
     assert "## 0.7.4" in cl
     assert "## 0.7.3" in cl
@@ -238,7 +238,7 @@ def main() -> int:
     assert "0.4.9" in cl  # noch in Kurz-Tabelle
     assert "0.3.9" in cl  # noch in Kurz-Tabelle
     assert "0.2.9" in cl  # noch in Kurz-Tabelle
-    assert "0.7.7" in (ROOT / "README.md").read_text(encoding="utf-8")
+    assert "0.7.8" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "run.bat" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "sync-ild.ps1" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "scripts/sync-ild.ps1" in (ROOT / "FEATURES.md").read_text(encoding="utf-8")
@@ -587,13 +587,13 @@ def main() -> int:
 
         assert (ROOT / "installer" / "installer-hinweis.txt").exists()
         iss = (ROOT / "installer" / "instantlensdoc.iss").read_text(encoding="utf-8")
-        assert "0.7.7" in iss and "desktopicon" in iss and "DisableProgramGroupPage=no" in iss
+        assert "0.7.8" in iss and "desktopicon" in iss and "DisableProgramGroupPage=no" in iss
         assert "UninstallDisplayName" in iss and "Uninstallable=yes" in iss
         assert "IncludeKeygen" in iss and "SetupIconFile" in iss
         assert "InstantLensKeygen.exe" in iss
         assert "uninstallexe" in iss
         bw = (ROOT / "build-windows.ps1").read_text(encoding="utf-8")
-        assert "0.7.7" in bw and "NoKeygenInApp" in bw and "--icon" in bw
+        assert "0.7.8" in bw and "NoKeygenInApp" in bw and "--icon" in bw
         assert "InstantLensKeygen.exe" in bw
         bi = (ROOT / "installer" / "build-installer.ps1").read_text(encoding="utf-8")
         assert "InstantLensKeygen.exe" in bi and "IncludeKeygen" in bi
@@ -602,7 +602,7 @@ def main() -> int:
         assert "Installer" in kg_readme
         hinweis = (ROOT / "installer" / "installer-hinweis.txt").read_text(encoding="utf-8")
         assert "InstantLensKeygen.exe" in hinweis or "run-keygen.bat" in hinweis
-        assert "0.7.7" in hinweis
+        assert "0.7.8" in hinweis
         assert "checkedonce" in iss and "Desktop-Verknüpfung" in hinweis
         from ild_pdf.limits import OPEN_TIMEOUT_HINT, OPEN_TIMEOUT_HINT_SEC
 
@@ -614,7 +614,7 @@ def main() -> int:
         assert "QProgressDialog" in (ROOT / "instantlensdoc" / "ui" / "main_window.py").read_text(encoding="utf-8")
 
         assert (ROOT / "examples" / "ild_pdf_demo.py").exists()
-        assert "0.7.7" in (ROOT / "INFO.md").read_text(encoding="utf-8")
+        assert "0.7.8" in (ROOT / "INFO.md").read_text(encoding="utf-8")
         assert (ROOT / "assets" / "app.ico").is_file()
 
         # --- Kernpfade: open / annotate / export / license ---
@@ -747,7 +747,7 @@ def main() -> int:
         assert "| A" in tbl and "| 1" in tbl
         assert ocr_mod.TESSERACT_WIKI_URL.startswith("https://")
 
-        # --- Ausgewählte 0.3.x-/0.4.x-/0.5.x-/0.6.x-Pfade (CLI, Konsolidierung 0.7.0) + 0.7.7 ---
+        # --- Ausgewählte 0.3.x-/0.4.x-/0.5.x-/0.6.x-Pfade (CLI, Konsolidierung 0.7.0) + 0.7.8 ---
         from ild_pdf.annotate import stamp_library_items
         from ild_pdf.attachments import has_attachments, list_attachments
         from ild_pdf.flatten import flatten_annotations_to_pdf
@@ -805,7 +805,7 @@ def main() -> int:
         set_backup_on_save(False)
         assert get_page_size_unit() in ("mm", "inch")
         assert isinstance(get_minimize_to_tray(), bool)
-        assert "0.7.7" in feat and "0.7.6" in feat and "0.7.5" in feat and "0.7.4" in feat and "0.7.3" in feat and "0.7.2" in feat and "0.7.1" in feat and "0.6.9" in feat and "0.5.9" in feat and "0.4.9" in feat  # Release + Zeitraum-Feature-Hinweise
+        assert "0.7.8" in feat and "0.7.7" in feat and "0.7.6" in feat and "0.7.5" in feat and "0.7.4" in feat and "0.7.3" in feat and "0.7.2" in feat and "0.7.1" in feat and "0.6.9" in feat and "0.5.9" in feat and "0.4.9" in feat  # Release + Zeitraum-Feature-Hinweise
         assert "Batch-OCR" in feat or "OCR gesamtes PDF" in feat
         assert "Tag" in feat
         assert "Projekt-Ordner" in feat or "Workspace" in feat
@@ -2054,6 +2054,88 @@ def main() -> int:
         assert "kurz" in kb077 and "Dry-Run" in kb077
         print("0.7.7 CLI blink/merge-tags/zip-dry-run/ann-ellipsis: OK")
 
+        # 0.7.8 CLI: Dry-Run-TXT, Ann.-Tooltip, Blink-Hinweis, Merge-Diff-Länge
+        from instantlensdoc.core.app_settings import (
+            MERGE_DIFF_MAX_SIDE_DEFAULT,
+            MERGE_DIFF_MAX_SIDE_MAX,
+            MERGE_DIFF_MAX_SIDE_MIN,
+            STATUS_BLINK_AUS as AUS078,
+            dry_run_user_templates_zip_import as dry078,
+            export_dry_run_conflict_list_txt as export_txt078,
+            export_user_templates_zip as export_tpl078,
+            format_dry_run_conflict_list_txt as fmt_txt078,
+            get_merge_diff_max_side,
+            get_status_blink_mode as get_blink078,
+            set_merge_diff_max_side,
+            set_status_blink_mode as set_blink078,
+        )
+        from instantlensdoc.core.text_diff import annotation_text_diff_short as diff078
+
+        set_merge_diff_max_side(12)
+        assert get_merge_diff_max_side() == MERGE_DIFF_MAX_SIDE_MIN
+        set_merge_diff_max_side(99)
+        assert get_merge_diff_max_side() == MERGE_DIFF_MAX_SIDE_MAX
+        set_merge_diff_max_side(MERGE_DIFF_MAX_SIDE_DEFAULT)
+        assert get_merge_diff_max_side() == MERGE_DIFF_MAX_SIDE_DEFAULT
+        d078_short = diff078("abcdefghijklmnop", "qrstuvwxyzabcdef", max_side=12)
+        assert "…" in d078_short
+        d078_long = diff078("abcdefghijklmnop", "qrstuvwxyzabcdef", max_side=64)
+        assert "abcdefghijklmnop" in d078_long
+        for old in list(get_user_doc_templates()):
+            delete_user_doc_template(old["id"])
+        save_user_doc_template(title="Konflikt078", body="alt078\n")
+        zip078 = ROOT / ".smoke_templates_078.zip"
+        txt078 = ROOT / ".smoke_dryrun_078.txt"
+        try:
+            export_tpl078(zip078)
+            rows078 = dry078(zip078)
+            assert any(
+                r.get("action") == "overwrite" and r.get("title") == "Konflikt078"
+                for r in rows078
+            )
+            body078 = fmt_txt078(rows078)
+            assert "OVERWRITE" in body078 and "Konflikt078" in body078
+            dest078 = export_txt078(txt078, rows078)
+            assert dest078.is_file()
+            assert "OVERWRITE" in dest078.read_text(encoding="utf-8")
+            fd078 = (ROOT / "instantlensdoc" / "ui" / "file_dialogs.py").read_text(
+                encoding="utf-8"
+            )
+            assert "Liste als TXT" in fd078 and "export_dry_run_conflict_list_txt" in fd078
+        finally:
+            if zip078.is_file():
+                zip078.unlink()
+            if txt078.is_file():
+                txt078.unlink()
+            for old in list(get_user_doc_templates()):
+                if old["title"] == "Konflikt078":
+                    delete_user_doc_template(old["id"])
+        sb078 = (ROOT / "instantlensdoc" / "ui" / "sidebar.py").read_text(
+            encoding="utf-8"
+        )
+        assert "setToolTip" in sb078 and "full_txt" in sb078
+        mw078 = (ROOT / "instantlensdoc" / "ui" / "main_window.py").read_text(
+            encoding="utf-8"
+        )
+        assert "einmaliger Status-Hinweis" in mw078 or "STATUS_BLINK_AUS" in mw078
+        assert "1800" in mw078  # Aus-Hinweis Dauer
+        set_blink078("aus")
+        assert get_blink078() == AUS078
+        set_blink078("kurz")
+        sd078 = (ROOT / "instantlensdoc" / "ui" / "settings_dialog.py").read_text(
+            encoding="utf-8"
+        )
+        assert "merge_diff_max" in sd078 and "set_merge_diff_max_side" in sd078
+        feat078 = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
+        assert "0.7.8" in feat078 and "TXT" in feat078 and "Tooltip" in feat078
+        cl078 = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+        assert "## 0.7.8" in cl078 and "Dry-Run" in cl078
+        kb078 = (ROOT / "instantlensdoc" / "ui" / "keyboard_help.py").read_text(
+            encoding="utf-8"
+        )
+        assert "TXT" in kb078 and "Tooltip" in kb078
+        print("0.7.8 CLI dry-run-txt/ann-tooltip/blink-hint/merge-diff-len: OK")
+
         set_show_printer_marks(True)
         assert get_show_printer_marks() is True
         set_show_printer_marks(False)
@@ -2186,7 +2268,7 @@ def main() -> int:
         assert "Continuous Scroll" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
         assert "Seitenlabel" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8") or "Seitenlabels" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
         assert "Zwischenablage-Verlauf" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8") or "Clipboard" in (ROOT / "FEATURES.md").read_text(encoding="utf-8")
-        assert "0.7.7" in feat and "0.7.6" in feat and "0.7.5" in feat and "0.7.4" in feat and "0.7.3" in feat and "0.7.2" in feat and "0.7.1" in feat and "0.6.9" in feat and "0.5.9" in feat and "0.4.9" in feat
+        assert "0.7.8" in feat and "0.7.7" in feat and "0.7.6" in feat and "0.7.5" in feat and "0.7.4" in feat and "0.7.3" in feat and "0.7.2" in feat and "0.7.1" in feat and "0.6.9" in feat and "0.5.9" in feat and "0.4.9" in feat
         # --- 0.4.2 CLI: Outline Goto, Ann Copy/Paste, Flatten Progress ---
         import pikepdf as _pike_ol
 
@@ -2311,7 +2393,7 @@ def main() -> int:
         win._add_chained_frame()
         assert len(win.layout_doc.text_frames) >= 2
         assert "Lizenz:" in win.license_label.text() or "⚠" in win.license_label.text()
-        assert "v0.7.7" in win.version_label.text()
+        assert "v0.7.8" in win.version_label.text()
         # Lizenz <7 Tage: Style prominent
         st_lic = win.license_manager.status()
         if st_lic.allowed and st_lic.days_remaining < 7:
@@ -2492,11 +2574,11 @@ def main() -> int:
             assert win.editor.outdent_selection(4)
             assert win.editor.toPlainText().splitlines()[0] == "alpha"
             # Fenstertitel mit Version
-            assert "0.7.7" in win.windowTitle()
+            assert "0.7.8" in win.windowTitle()
             from instantlensdoc.ui.help_dialog import AboutDialog, HelpDialog, open_log_folder
 
             about = AboutDialog(win)
-            assert "0.7.7" in about.windowTitle()
+            assert "0.7.8" in about.windowTitle()
             help_dlg = HelpDialog(win)
             assert help_dlg.windowTitle() == "Hilfe"
             assert callable(open_log_folder)
@@ -3156,7 +3238,7 @@ def main() -> int:
             win.apply_tray_setting()
             if win._tray is not None:
                 tip = win._tray.toolTip()
-                assert "0.7.7" in tip and "InstantLens Doc" in tip
+                assert "0.7.8" in tip and "InstantLens Doc" in tip
             set_minimize_to_tray(False)
             win.apply_tray_setting()
             print("0.3.9 fit-h/ann-stats/special/tray: OK")
@@ -3169,9 +3251,9 @@ def main() -> int:
             from instantlensdoc.ui.password_dialog import CompressPdfDialog, SetPasswordDialog
             from instantlensdoc.ui.stubs import PLANNED
             assert KeyboardHelpDialog and SetPasswordDialog and CompressPdfDialog
-            assert "0.7.7" in PLANNED["ki"]
+            assert "0.7.8" in PLANNED["ki"]
             assert "Coming soon" in PLANNED["cloud"]
-            assert "0.7.7" in PLANNED["stylus"] and "0.7.7" in PLANNED["extrude3d"]
+            assert "0.7.8" in PLANNED["stylus"] and "0.7.8" in PLANNED["extrude3d"]
             # Toolbar ↔ Menü Sync Graustufen/Nacht
             win.pdf_view.set_grayscale(True)
             assert win._grayscale_action.isChecked()
@@ -3206,7 +3288,7 @@ def main() -> int:
             assert win.editor.toPlainText().splitlines() == ["one", "two"]
             from instantlensdoc.ui.help_dialog import HELP_HTML
 
-            assert "Stub 0.7.7" in HELP_HTML
+            assert "Stub 0.7.8" in HELP_HTML
             assert "scripts/sync-ild.ps1" in HELP_HTML
             assert "Präsentationsmodus" in HELP_HTML or "F5" in (
                 ROOT / "instantlensdoc" / "ui" / "keyboard_help.py"
@@ -5281,10 +5363,133 @@ def main() -> int:
             assert "## 0.7.7" in cl077q
             print("0.7.7 Qt blink/merge-tags/zip-dry-run/ann-ellipsis: OK")
 
+            # --- 0.7.8 Qt: Dry-Run-TXT, Ann.-Tooltip, Blink-Hinweis, Merge-Diff-Länge ---
+            from instantlensdoc.core.app_settings import (
+                get_merge_diff_max_side as get_md078,
+                set_merge_diff_max_side as set_md078,
+                set_status_blink_mode as set_blink078q,
+                format_dry_run_conflict_list_txt as fmt078q,
+            )
+            from instantlensdoc.core.text_diff import (
+                annotation_text_diff_short as diff078q,
+            )
+            from instantlensdoc.ui.merge_duplicates_dialog import (
+                MergeDuplicatesPreviewDialog as MDP078,
+            )
+            from instantlensdoc.ui.settings_dialog import SettingsDialog as SD078
+
+            set_md078(16)
+            assert get_md078() == 16
+            sd078 = SD078(parent=win)
+            assert hasattr(sd078, "merge_diff_max")
+            assert int(sd078.merge_diff_max.value()) == 16
+            sd078.merge_diff_max.setValue(40)
+            sd078._save()
+            assert get_md078() == 40
+            set_md078(20)
+            d078q = diff078q("A" * 50, "B" * 50, max_side=get_md078())
+            assert "…" in d078q
+            store078 = win.pdf_view.store
+            assert store078 is not None
+            store078.annotations = []
+            store078.clear_history()
+            long078 = "VOLLER TEXT FÜR TOOLTIP " + ("Z" * 60)
+            store078.add(
+                Ann071(0, AT071.STICKY, 1, 1, width=20, height=20, text=long078)
+            )
+            store078.add(
+                Ann071(
+                    0,
+                    AT071.STICKY,
+                    1,
+                    2,
+                    width=20,
+                    height=20,
+                    text="kurz",
+                    color="#112233",
+                )
+            )
+            # Zwei ähnliche für Merge-Diff mit max_side aus Settings
+            store078.annotations = []
+            store078.clear_history()
+            store078.add(
+                Ann071(
+                    0,
+                    AT071.HIGHLIGHT,
+                    3,
+                    3,
+                    width=12,
+                    height=4,
+                    text="AAAAAAAAAAAAAAAABBBBB",
+                    color="#FFE066",
+                    tags=["t1"],
+                )
+            )
+            store078.add(
+                Ann071(
+                    0,
+                    AT071.HIGHLIGHT,
+                    3,
+                    4,
+                    width=12,
+                    height=4,
+                    text="AAAAAAAAAAAAAAAACCCCC",
+                    color="#FF6B6B",
+                    tags=["t2"],
+                )
+            )
+            groups078 = store078.find_duplicate_groups(tol=2.0, same_type=True)
+            dlg078 = MDP078(groups078, parent=win)
+            texts078 = [
+                dlg078.list.item(i).text()
+                for i in range(dlg078.list.count())
+                if dlg078.list.item(i)
+            ]
+            assert any("↕" in t and "…" in t for t in texts078)
+            dlg078.close()
+            # Ann.-Liste Tooltip voller Text
+            store078.annotations = []
+            store078.clear_history()
+            store078.add(
+                Ann071(0, AT071.STICKY, 1, 1, width=20, height=20, text=long078)
+            )
+            summaries078 = win.pdf_view.annotation_summaries()
+            win.sidebar.set_annotations(
+                [s[0] for s in summaries078],
+                [s[1] for s in summaries078],
+            )
+            tip_found = False
+            for i in range(win.sidebar.annotations.count()):
+                it = win.sidebar.annotations.item(i)
+                if it is None:
+                    continue
+                tip = it.toolTip() or ""
+                if long078 in tip:
+                    tip_found = True
+                    break
+            assert tip_found, "Ann.-Liste Tooltip sollte vollen Text zeigen"
+            # Blink aus: einmaliger Hinweis, kein Blink-Flag
+            set_blink078q("aus")
+            win._pending_blink_active = False
+            win._blink_pending_debounce_status()
+            assert win._pending_blink_active is False
+            msg078 = win.statusBar().currentMessage()
+            assert "Speichern ausstehend" in msg078
+            set_blink078q("kurz")
+            set_md078(28)
+            assert "OVERWRITE" in fmt078q(
+                [{"title": "X", "action": "overwrite"}]
+            )
+            feat078q = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
+            assert "0.7.8" in feat078q and "Tooltip" in feat078q
+            cl078q = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+            assert "## 0.7.8" in cl078q
+            print("0.7.8 Qt dry-run-txt/ann-tooltip/blink-hint/merge-diff-len: OK")
+
             print("0.4.x selected Qt marks/schema/sort/reset: OK")
             print("0.4.2 Qt outline/copy-paste/case/progress: OK")
             print("0.4.1 Qt links/stamp/encoding/drop: OK")
-            print("0.3.x–0.7.7 review OK")
+            print("0.3.x–0.7.8 review OK")
             assert callable(win.pdf_view.bake_redactions)
             assert callable(win.pdf_view.clear_redactions)
             assert callable(win._set_pdf_password)

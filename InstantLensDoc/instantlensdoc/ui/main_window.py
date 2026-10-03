@@ -1587,7 +1587,10 @@ class MainWindow(QMainWindow):
                 it.setToolTip("")
 
     def _blink_pending_debounce_status(self) -> None:
-        """Statusleisten-Blink bei pending Sidecar-Debounce (Settings: kurz/aus)."""
+        """
+        Statusleisten-Hinweis bei pending Sidecar-Debounce (Settings: kurz/aus).
+        kurz: Blink-Animation; aus: einmaliger Status-Hinweis ohne Blink.
+        """
         from PySide6.QtCore import QTimer
 
         from instantlensdoc.core.app_settings import (
@@ -1596,8 +1599,10 @@ class MainWindow(QMainWindow):
         )
 
         if get_status_blink_mode() == STATUS_BLINK_AUS:
+            # Aus: kein Blink, aber einmaliger Status-Hinweis (Rising-Edge)
+            self._pending_blink_active = False
             try:
-                self.statusBar().showMessage("Speichern ausstehend…", 600)
+                self.statusBar().showMessage("Speichern ausstehend…", 1800)
             except Exception:
                 pass
             return

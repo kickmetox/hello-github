@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtWidgets import QMessageBox, QWidget
+from PySide6.QtWidgets import QFileDialog, QMessageBox, QWidget
 
 
 def confirm_overwrite_export(
@@ -42,6 +42,7 @@ def resolve_template_zip_conflicts(
     Rückgabe: 'overwrite' | 'skip' | 'cancel'.
     dry_run_rows: optionale Zeilen aus dry_run_user_templates_zip_import
       (action overwrite/add) — zeigt was überschrieben würde.
+    Optional: Konfliktliste als TXT exportieren.
     """
     titles = [str(t).strip() for t in conflict_titles if str(t).strip()]
     if not titles and not dry_run_rows:
@@ -77,23 +78,80 @@ def resolve_template_zip_conflicts(
     if add_titles:
         lines.append(f"Neu: {_sample(add_titles)} ({add_n})")
 
-    box = QMessageBox(parent)
-    box.setIcon(QMessageBox.Warning)
-    box.setWindowTitle("Vorlagen-Import — Dry-Run / Konflikte")
-    box.setText("\n".join(lines))
-    box.setInformativeText(
-        "Überschreiben: lokale Vorlagen ersetzen.\n"
-        "Überspringen: Konflikte behalten, nur neue importieren.\n"
-        "Abbrechen: nichts importieren."
+    while True:
+        box = QMessageBox(parent)
+        box.setIcon(QMessageBox.Warning)
+        box.setWindowTitle("Vorlagen-Import — Dry-Run / Konflikte")
+        box.setText("\n".join(lines))
+        box.setInformativeText(
+            "Überschreiben: lokale Vorlagen ersetzen.\n"
+            "Überspringen: Konflikte behalten, nur neue importieren.\n"
+            "Liste als TXT: Konfliktliste speichern.\n"
+            "Abbrechen: nichts importieren."
+        )
+        btn_over = box.addButton("Überschreiben", QMessageBox.AcceptRole)
+        btn_skip = box.addButton("Überspringen", QMessageBox.ActionRole)
+        btn_txt = box.addButton("Liste als TXT…", QMessageBox.ActionRole)
+        btn_cancel = box.addButton("Abbrechen", QMessageBox.RejectRole)
+        box.setDefaultButton(btn_skip)
+        box.exec()
+        clicked = box.clickedButton()
+        if clicked is btn_txt:
+            _export_dry_run_conflict_txt(
+                parent,
+                dry_run_rows=dry_run_rows,
+                conflict_titles=overwrite_titles,
+            )
+            continue
+        if clicked is btn_over:
+            return "overwrite"
+        if clicked is btn_skip:
+            return "skip"
+        return "cancel"
+
+
+def _export_dry_run_conflict_txt(
+    parent: QWidget | None,
+    *,
+    dry_run_rows: list[dict] | None = None,
+    conflict_titles: list[str] | None = None,
+) -> Path | None:
+    """Konfliktliste als TXT speichern (Dateidialog)."""
+    from instantlensdoc.core.app_settings import (
+        dialog_start_dir,
+        export_dry_run_conflict_list_txt,
+        get_last_export_dir,
+        set_last_export_dir,
     )
-    btn_over = box.addButton("Überschreiben", QMessageBox.AcceptRole)
-    btn_skip = box.addButton("Überspringen", QMessageBox.ActionRole)
-    btn_cancel = box.addButton("Abbrechen", QMessageBox.RejectRole)
-    box.setDefaultButton(btn_skip)
-    box.exec()
-    clicked = box.clickedButton()
-    if clicked is btn_over:
-        return "overwrite"
-    if clicked is btn_skip:
-        return "skip"
-    return "cancel"
+
+    start = dialog_start_dir(get_last_export_dir())
+    path, _ = QFileDialog.getSaveFileName(
+        parent,
+        "Konfliktliste als TXT speichern",
+        str(Path(start) / "ild-templates-dry-run.txt"),
+        "Textdatei (*.txt);;Alle Dateien (*)",
+    )
+    if not path:
+        return None
+    if not path.lower().endswith(".txt"):
+        path = path + ".txt"
+    try:
+        dest = export_dry_run_conflict_list_txt(
+            path,
+            dry_run_rows,
+            conflict_titles=conflict_titles,
+        )
+    except Exception as exc:
+        QMessageBox.warning(
+            parent,
+            "Konfliktliste exportieren",
+            f"TXT-Export fehlgeschlagen:\n{exc}",
+        )
+        return None
+    set_last_export_dir(Path(dest).parent)
+    QMessageBox.information(
+        parent,
+        "Konfliktliste exportieren",
+        f"Gespeichert:\n{dest}",
+    )
+    return dest

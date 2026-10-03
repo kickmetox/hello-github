@@ -49,6 +49,7 @@ from instantlensdoc.core.app_settings import (
     get_pdf_thumbnail_scale,
     get_pdf_two_page_spread,
     get_restore_session_on_start,
+    get_merge_diff_max_side,
     get_search_snippet_context_chars,
     get_search_snippet_ellipsis_style,
     get_sidecar_save_debounce_ms,
@@ -58,6 +59,8 @@ from instantlensdoc.core.app_settings import (
     get_ui_lang,
     get_update_check_on_start,
     get_wizard_completed,
+    MERGE_DIFF_MAX_SIDE_MAX,
+    MERGE_DIFF_MAX_SIDE_MIN,
     SEARCH_SNIPPET_CONTEXT_MAX,
     SEARCH_SNIPPET_CONTEXT_MIN,
     SEARCH_SNIPPET_ELLIPSIS_CHOICES,
@@ -95,6 +98,7 @@ from instantlensdoc.core.app_settings import (
     set_pdf_thumbnail_scale,
     set_pdf_two_page_spread,
     set_restore_session_on_start,
+    set_merge_diff_max_side,
     set_search_snippet_context_chars,
     set_search_snippet_ellipsis_style,
     set_sidecar_save_debounce_ms,
@@ -376,10 +380,23 @@ class SettingsDialog(QDialog):
                 blink_pick = i
         self.status_blink.setCurrentIndex(blink_pick)
         self.status_blink.setToolTip(
-            "Statusleisten-Blink bei pending Sidecar-Debounce: "
-            "Kurz (kurze Dauer/Intensität) oder Aus"
+            "Statusleisten-Hinweis bei pending Sidecar-Debounce: "
+            "Kurz (Blink) oder Aus (einmaliger Hinweis ohne Blink)"
         )
         form.addRow("Status-Blink", self.status_blink)
+
+        self.merge_diff_max = QSpinBox()
+        self.merge_diff_max.setRange(
+            MERGE_DIFF_MAX_SIDE_MIN, MERGE_DIFF_MAX_SIDE_MAX
+        )
+        self.merge_diff_max.setSingleStep(2)
+        self.merge_diff_max.setSuffix(" Zeichen")
+        self.merge_diff_max.setValue(get_merge_diff_max_side())
+        self.merge_diff_max.setToolTip(
+            "Ann.-Merge-Diff: max. Zeichen je Textseite im Kurzvergleich "
+            f"({MERGE_DIFF_MAX_SIDE_MIN}–{MERGE_DIFF_MAX_SIDE_MAX}, Standard 28)"
+        )
+        form.addRow("Merge-Diff max. Länge", self.merge_diff_max)
 
         self.jpeg_q = QSpinBox()
         self.jpeg_q.setRange(10, 100)
@@ -598,6 +615,7 @@ class SettingsDialog(QDialog):
             str(self.snippet_ellipsis.currentData() or "guillemets")
         )
         set_status_blink_mode(str(self.status_blink.currentData() or "kurz"))
+        set_merge_diff_max_side(int(self.merge_diff_max.value()))
         save_settings(
             {
                 "export_jpeg_quality": int(self.jpeg_q.value()),

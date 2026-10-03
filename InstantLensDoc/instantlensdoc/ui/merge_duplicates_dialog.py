@@ -109,9 +109,16 @@ class MergeDuplicatesPreviewDialog(QDialog):
                 other = group[1]
                 t_keep = str(getattr(keep, "text", "") or "")
                 t_other = str(getattr(other, "text", "") or "")
+                try:
+                    from instantlensdoc.core.app_settings import get_merge_diff_max_side
+
+                    max_side = get_merge_diff_max_side()
+                except Exception:
+                    max_side = 28
                 diff_s = annotation_text_diff_short(
                     t_keep,
                     t_other,
+                    max_side=max_side,
                     left_tags=getattr(keep, "tags", None),
                     right_tags=getattr(other, "tags", None),
                     left_color=getattr(keep, "color", None),

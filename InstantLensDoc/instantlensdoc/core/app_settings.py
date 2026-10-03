@@ -79,6 +79,7 @@ DEFAULTS: dict[str, Any] = {
     "search_snippet_context_chars": 40,
     "search_snippet_ellipsis_style": "guillemets",
     "status_blink_mode": "kurz",
+    "merge_diff_max_side": 28,
     "editor_trim_trailing_whitespace": False,
     "editor_trim_whitespace_on_paste": False,
     "pdf_toolbar_groups": {
@@ -1061,6 +1062,62 @@ def dry_run_user_templates_zip_import(src: Path | str) -> list[dict]:
     return out
 
 
+def format_dry_run_conflict_list_txt(
+    dry_run_rows: list[dict] | None = None,
+    *,
+    conflict_titles: list[str] | None = None,
+) -> str:
+    """
+    Konflikt-/Dry-Run-Liste als Klartext (TXT-Export).
+    Zeilen: # Header, dann OVERWRITE/ADD + Titel.
+    """
+    rows = list(dry_run_rows or [])
+    overwrite: list[str] = []
+    add: list[str] = []
+    for row in rows:
+        t = str(row.get("title") or "").strip()
+        if not t:
+            continue
+        if str(row.get("action") or "") == "overwrite":
+            overwrite.append(t)
+        else:
+            add.append(t)
+    if not overwrite and conflict_titles:
+        overwrite = [str(t).strip() for t in conflict_titles if str(t).strip()]
+    lines = [
+        "InstantLens Doc — Vorlagen-Zip Dry-Run / Konflikte",
+        f"Überschreiben: {len(overwrite)}",
+        f"Neu: {len(add)}",
+        "",
+    ]
+    for t in overwrite:
+        lines.append(f"OVERWRITE\t{t}")
+    for t in add:
+        lines.append(f"ADD\t{t}")
+    if not overwrite and not add:
+        lines.append("(keine Einträge)")
+    lines.append("")
+    return "\n".join(lines)
+
+
+def export_dry_run_conflict_list_txt(
+    dest: Path | str,
+    dry_run_rows: list[dict] | None = None,
+    *,
+    conflict_titles: list[str] | None = None,
+) -> Path:
+    """Dry-Run-/Konfliktliste nach TXT schreiben. Rückgabe: Zielpfad."""
+    path = Path(dest)
+    if path.suffix.lower() != ".txt":
+        path = path.with_suffix(".txt")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    text = format_dry_run_conflict_list_txt(
+        dry_run_rows, conflict_titles=conflict_titles
+    )
+    path.write_text(text, encoding="utf-8")
+    return path
+
+
 def import_user_templates_zip(
     src: Path | str,
     *,
@@ -1124,8 +1181,12 @@ STATUS_BLINK_AUS = "aus"
 STATUS_BLINK_DEFAULT = STATUS_BLINK_KURZ
 STATUS_BLINK_CHOICES = (
     (STATUS_BLINK_KURZ, "Kurz (Blink)"),
-    (STATUS_BLINK_AUS, "Aus"),
+    (STATUS_BLINK_AUS, "Aus (einmaliger Hinweis)"),
 )
+
+MERGE_DIFF_MAX_SIDE_MIN = 12
+MERGE_DIFF_MAX_SIDE_MAX = 64
+MERGE_DIFF_MAX_SIDE_DEFAULT = 28
 
 SIDECAR_SAVE_DEBOUNCE_MIN_MS = 200
 SIDECAR_SAVE_DEBOUNCE_MAX_MS = 1000
@@ -1195,6 +1256,28 @@ def set_status_blink_mode(mode: str) -> str:
     else:
         val = STATUS_BLINK_KURZ
     save_settings({"status_blink_mode": val})
+    return val
+
+
+def get_merge_diff_max_side() -> int:
+    """Max. Zeichen je Seite im Ann.-Merge-Diff-Kurztext (12–64, Default 28)."""
+    try:
+        v = int(
+            load_settings().get(
+                "merge_diff_max_side", MERGE_DIFF_MAX_SIDE_DEFAULT
+            )
+        )
+    except (TypeError, ValueError):
+        v = MERGE_DIFF_MAX_SIDE_DEFAULT
+    return max(MERGE_DIFF_MAX_SIDE_MIN, min(MERGE_DIFF_MAX_SIDE_MAX, v))
+
+
+def set_merge_diff_max_side(chars: int) -> int:
+    val = max(
+        MERGE_DIFF_MAX_SIDE_MIN,
+        min(MERGE_DIFF_MAX_SIDE_MAX, int(chars)),
+    )
+    save_settings({"merge_diff_max_side": val})
     return val
 
 
