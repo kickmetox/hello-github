@@ -51,6 +51,7 @@ from instantlensdoc.core.app_settings import (
     get_pdf_two_page_spread,
     get_restore_session_on_start,
     get_merge_diff_max_side,
+    get_recent_files_max,
     get_search_snippet_context_chars,
     get_search_snippet_ellipsis_style,
     get_sidecar_save_debounce_ms,
@@ -62,6 +63,8 @@ from instantlensdoc.core.app_settings import (
     get_wizard_completed,
     MERGE_DIFF_MAX_SIDE_MAX,
     MERGE_DIFF_MAX_SIDE_MIN,
+    RECENT_FILES_MAX_MAX,
+    RECENT_FILES_MAX_MIN,
     SEARCH_SNIPPET_CONTEXT_MAX,
     SEARCH_SNIPPET_CONTEXT_MIN,
     SEARCH_SNIPPET_ELLIPSIS_CHOICES,
@@ -71,6 +74,7 @@ from instantlensdoc.core.app_settings import (
     PDF_THUMBNAIL_SCALE_CHOICES,
     reset_to_defaults,
     save_settings,
+    set_recent_files_max,
     set_wizard_completed,
     set_wizard_skip_once,
     set_autosave_interval_sec,
@@ -407,6 +411,21 @@ class SettingsDialog(QDialog):
         )
         form.addRow("Merge-Diff max. Länge", self.merge_diff_max)
 
+        self.recent_files_max = QSpinBox()
+        self.recent_files_max.setRange(RECENT_FILES_MAX_MIN, RECENT_FILES_MAX_MAX)
+        self.recent_files_max.setValue(get_recent_files_max())
+        self.recent_files_max.setToolTip(
+            "Max. Anzahl „Zuletzt geöffnet“ in Menü/Sidebar "
+            f"({RECENT_FILES_MAX_MIN}–{RECENT_FILES_MAX_MAX}, Standard 12)"
+        )
+        recent_row = QHBoxLayout()
+        recent_row.addWidget(self.recent_files_max)
+        self.btn_clear_recent = QPushButton("Liste leeren")
+        self.btn_clear_recent.setToolTip("Zuletzt geöffnete Dateien leeren")
+        self.btn_clear_recent.clicked.connect(self._clear_recent_files)
+        recent_row.addWidget(self.btn_clear_recent)
+        form.addRow("Zuletzt geöffnet (max.)", recent_row)
+
         self.jpeg_q = QSpinBox()
         self.jpeg_q.setRange(10, 100)
         self.jpeg_q.setValue(get_export_jpeg_quality())
@@ -490,6 +509,32 @@ class SettingsDialog(QDialog):
         buttons.accepted.connect(self._save)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
+
+    def _clear_recent_files(self) -> None:
+        from instantlensdoc.core import recent as recent_mod
+
+        reply = QMessageBox.question(
+            self,
+            "Zuletzt geöffnet",
+            "Liste der zuletzt geöffneten Dateien wirklich leeren?",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
+        )
+        if reply != QMessageBox.Yes:
+            return
+        recent_mod.clear_recent()
+        parent = self.parent()
+        if parent is not None and hasattr(parent, "_refresh_recent"):
+            try:
+                parent._refresh_recent()
+            except Exception:
+                pass
+        if parent is not None and hasattr(parent, "_set_status"):
+            try:
+                parent._set_status("Zuletzt geöffnet geleert")
+            except Exception:
+                pass
+        QMessageBox.information(self, "Zuletzt geöffnet", "Liste geleert.")
 
     def _pick_dir(self, field: QLineEdit):
         start = field.text().strip() or str(Path.home())
@@ -626,6 +671,13 @@ class SettingsDialog(QDialog):
         )
         set_status_blink_mode(str(self.status_blink.currentData() or "kurz"))
         set_merge_diff_max_side(int(self.merge_diff_max.value()))
+        set_recent_files_max(int(self.recent_files_max.value()))
+        parent = self.parent()
+        if parent is not None and hasattr(parent, "_refresh_recent"):
+            try:
+                parent._refresh_recent()
+            except Exception:
+                pass
         save_settings(
             {
                 "export_jpeg_quality": int(self.jpeg_q.value()),

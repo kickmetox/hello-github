@@ -42,7 +42,7 @@ HELP_HTML = f"""
     <b>Doc-Split Layout horizontal/vertikal</b>,
     Update-Hinweis (nur wenn aktiv), Pfade;
     <b>Auf Standard zurücksetzen</b></li>
-<li><b>Datei → Zuletzt geöffnet</b>: Menü + Seitenleiste (persistiert)</li>
+<li><b>Datei → Zuletzt geöffnet</b>: Menü + Seitenleiste (persistiert); Einstellungen: Max-Anzahl + Clear</li>
 <li><b>Datei → Speichern unter</b> (Ctrl+Shift+S): Text → Dokument; PDF → Annotation-Sidecar wählen (PDF unverändert)</li>
 <li><b>Datei → Alles speichern</b> (Ctrl+Alt+Shift+S): aktuelles Doc + PDF-Sidecars offener Tabs</li>
 <li><b>Datei → Als Kopie speichern</b> (Ctrl+Alt+S): PDF + Sidecar kopieren (Doc bleibt offen); Editor → Speichern unter</li>
@@ -201,7 +201,7 @@ WIZARD_PAGES = (
         "4 / 4 — Neu in 0.6",
         "<h3>Highlights 0.6</h3>"
         "<ul>"
-        "<li><b>Tag-Cloud</b>: Klick filtert; Ctrl+Klick Multi; <b>Rechtsklick → Tag umbenennen</b> "
+        "<li><b>Tag-Cloud</b>: Klick filtert; Ctrl+Klick Multi; <b>Rechtsklick → filtern / Farbe / umbenennen</b> "
         "(global, <b>Ctrl+Z</b>; Bestätigung ab Schwelle in Einstellungen)</li>"
         "<li><b>Fenster teilen</b> (Ctrl+\\): PDF+Editor; Sync-Scroll; Panel-Typ + Sync-Scroll "
         "<b>je Session</b> gemerkt</li>"

@@ -62,8 +62,9 @@ SHORTCUTS_HTML = """
 <tr><td>Fenster teilen (zwei Docs)</td><td><code>Ctrl+\\</code> — 0.6.3</td></tr>
 <tr><td>Vertikaler Split (übereinander)</td><td><code>Ctrl+Shift+\\</code> (Toggle) — 0.6.5</td></tr>
 <tr><td>Sync-Scroll (geteilte Docs)</td><td><code>Ctrl+Alt+\\</code>; Zustand je Session gemerkt — 0.6.4 / 0.6.9</td></tr>
-<tr><td>Tag-Cloud Filter</td><td>Klick setzt Filter; <code>Ctrl</code>+Klick Multi-Select — 0.6.4</td></tr>
-<tr><td>Tag-Cloud umbenennen</td><td>Rechtsklick → Tag umbenennen; Ctrl+Z; Bestätigung ab Schwelle (Einstellung, Default 20) — 0.6.5–0.6.9</td></tr>
+<tr><td>Tag-Cloud Filter</td><td>Klick setzt Filter; <code>Ctrl</code>+Klick Multi-Select — 0.6.4; Rechtsklick → filtern — 0.8.0</td></tr>
+<tr><td>Tag-Cloud Farbe / umbenennen</td><td>Rechtsklick → Farbe ändern / umbenennen; Ctrl+Z; Bestätigung ab Schwelle — 0.6.5–0.6.9 / 0.8.0</td></tr>
+<tr><td>Zeilen-Lesezeichen Export/Import</td><td>Bearbeiten → JSON (<code>ildbm-v1</code>) — 0.8.0</td></tr>
 <tr><td>Ungespeicherte Tabs</td><td>Alle speichern: Fortschritt &gt;3, Abbrechen, Fehlerliste am Ende — 0.6.4–0.6.9</td></tr>
 <tr><td>Doc-Split PDF+Editor</td><td>Panel-Typ + Sync-Scroll je Session; H/V Ctrl+Shift+\\ — 0.6.3–0.6.9</td></tr>
 <tr><td>Wizard / 0.6.8</td><td>Nicht mehr zeigen; Reset; Panel-Session; Save-Abbrechen; Tag-Confirm — 0.6.6–0.6.8</td></tr>
@@ -147,7 +148,7 @@ Auswahl-Werkzeug + Text aufziehen + <code>Ctrl+C</code> = <b>Text in Zwischenabl
 <code>Ctrl+Alt+N</code> = <b>Auswahl→Notiz</b> (Sticky mit vorausgefülltem Text; Checkbox <b>+Highlight</b>).
 Annotation-Suche: Tag-<b>Autocomplete</b>. Session-Tabs: ziehen → Reihenfolge; <b>Andere Tabs schließen</b> (Ctrl+Shift+W).
 <b>Fenster teilen</b> (Ctrl+\\); optional <b>vertikal</b> (Ctrl+Shift+\\); optional <b>Sync-Scroll</b> (Ctrl+Alt+\\).
-<b>Tag-Cloud</b>: Klick setzt Filter (exklusiv), Ctrl+Klick Multi-Select; <b>Rechtsklick → umbenennen</b> (global).
+<b>Tag-Cloud</b>: Klick setzt Filter (exklusiv), Ctrl+Klick Multi-Select; <b>Rechtsklick → filtern / Farbe ändern / umbenennen</b>.
 Statusleiste <b>ungespeicherte Tabs</b>: Klick öffnet Liste zum Wechseln + <b>Speichern je Datei</b>.</p>
 <p><b>PDF-Seitenlabels:</b> römische/arabische Labels aus dem PDF werden in Statusleiste und Toolbar angezeigt, wenn vorhanden.</p>
 <p><b>Zwischenablage-Verlauf:</b> Bearbeiten → letzte 3 eingefügten Textschnipsel erneut einfügen.</p>
@@ -189,7 +190,10 @@ Export CSV/Bericht enthält Tags und Gruppen.</p>
 <p><b>Auswahl-Farbe Batch:</b> Annotation(en) auswählen → Ctrl+Alt+Shift+F oder Bearbeiten → Auswahl-Farbe ändern…</p>
 <p><b>Auswahl-Deckkraft:</b> Annotation(en) auswählen → <b>Toolbar-Slider</b> / Ctrl+Alt+Shift+O / α… (Sidecar force-save).</p>
 <p><b>Editor-Zeilenfavoriten:</b> Ctrl+F2 oder Klick auf Zeilennummer; F2 / Shift+F2 springen; <b>Sidebar-Liste</b>;
-Labels editierbar (Doppelklick/Rechtsklick).</p>
+Labels editierbar (Doppelklick/Rechtsklick); <b>JSON Export/Import</b> (<code>ildbm-v1</code>).</p>
+<p><b>Tag-Cloud Kontext:</b> Rechtsklick → filtern / Farbe ändern / umbenennen.</p>
+<p><b>Zuletzt geöffnet:</b> Einstellungen → Max-Anzahl + Liste leeren (auch Datei-Menü).</p>
+<p><b>Statusleiste:</b> PDF → Seite x/y; Editor → Zeile x/y (wechselt mit der Ansicht).</p>
 <p><b>Erste Schritte:</b> Hilfe → Erste Schritte… (Kurz-Wizard, 4 Seiten inkl. 0.6-Highlights).</p>
 <p><b>Rechtschreibung:</b> Einstellungen → Rechtschreibwörterbuch (Wortliste) → F7 prüft ohne Spell-Lib;
 About: Datenschutz-Hinweis (lokal, keine Telemetrie).</p>

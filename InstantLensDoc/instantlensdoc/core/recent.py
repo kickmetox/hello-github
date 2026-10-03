@@ -9,13 +9,31 @@ from typing import List
 from instantlensdoc.config import config_dir
 
 RECENT_MAX = 12
+RECENT_MAX_MIN = 3
+RECENT_MAX_MAX = 50
 
 
 def recent_path() -> Path:
     return config_dir() / "recent.json"
 
 
-def load_recent(max_items: int = RECENT_MAX) -> List[str]:
+def _clamp_max(max_items: int | None) -> int:
+    if max_items is None:
+        try:
+            from instantlensdoc.core.app_settings import get_recent_files_max
+
+            max_items = get_recent_files_max()
+        except Exception:
+            max_items = RECENT_MAX
+    try:
+        n = int(max_items)
+    except (TypeError, ValueError):
+        n = RECENT_MAX
+    return max(RECENT_MAX_MIN, min(RECENT_MAX_MAX, n))
+
+
+def load_recent(max_items: int | None = None) -> List[str]:
+    limit = _clamp_max(max_items)
     path = recent_path()
     if not path.exists():
         return []
@@ -34,12 +52,13 @@ def load_recent(max_items: int = RECENT_MAX) -> List[str]:
         seen.add(key)
         if Path(p).is_file():
             out.append(str(Path(p)))
-        if len(out) >= max_items:
+        if len(out) >= limit:
             break
     return out
 
 
-def save_recent(files: List[str], max_items: int = RECENT_MAX) -> None:
+def save_recent(files: List[str], max_items: int | None = None) -> None:
+    limit = _clamp_max(max_items)
     path = recent_path()
     cleaned: List[str] = []
     seen: set[str] = set()
@@ -49,7 +68,7 @@ def save_recent(files: List[str], max_items: int = RECENT_MAX) -> None:
             continue
         seen.add(key)
         cleaned.append(key)
-        if len(cleaned) >= max_items:
+        if len(cleaned) >= limit:
             break
     path.write_text(
         json.dumps({"files": cleaned}, indent=2, ensure_ascii=False),
@@ -57,12 +76,20 @@ def save_recent(files: List[str], max_items: int = RECENT_MAX) -> None:
     )
 
 
-def add_recent(path: str | Path, max_items: int = RECENT_MAX) -> List[str]:
+def add_recent(path: str | Path, max_items: int | None = None) -> List[str]:
+    limit = _clamp_max(max_items)
     path = str(Path(path))
-    files = [path] + [p for p in load_recent(max_items=max_items * 2) if p != path]
-    save_recent(files, max_items=max_items)
-    return load_recent(max_items=max_items)
+    files = [path] + [p for p in load_recent(max_items=limit * 2) if p != path]
+    save_recent(files, max_items=limit)
+    return load_recent(max_items=limit)
 
 
 def clear_recent() -> None:
     save_recent([])
+
+
+def trim_recent_to_max(max_items: int | None = None) -> List[str]:
+    """Liste auf aktuelle Max-Anzahl kürzen und speichern."""
+    files = load_recent(max_items=max_items)
+    save_recent(files, max_items=max_items)
+    return files

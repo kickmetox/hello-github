@@ -1,5 +1,23 @@
 # Changelog — InstantLens Doc
 
+## 0.8.0 — Bookmark-Export, Tag-Cloud Kontext, Status, Recent-Settings
+
+Nach 0.7.9: Editor-Lesezeichen teilen, Tag-Cloud-Kontextmenü erweitern, Statusleiste und Recent-Liste verfeinern. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### PDF / Suche / Annotationen
+- Tag-Cloud **Rechtsklick**: **filtern**, **Farbe ändern** (alle Ann. mit Tag), umbenennen
+- Statusleiste: **Seiten-/Zeileninfo** beim PDF↔Text-Wechsel robuster (`Zeile x/y` im Editor)
+
+### Editor / Settings
+- Editor-**Lesezeichen Export/Import** JSON (`ildbm-v1`) — Menü Bearbeiten
+- **Zuletzt geöffnet**: **Max-Anzahl** (3–50) + **Liste leeren** in Einstellungen (Menü-Clear bleibt)
+
+### Packaging / Docs
+- Version **0.8.0** (App / `ild_pdf` / ISS / Smoke / Docs)
+- Smoke: Bookmark ildbm-v1, Tag-Cloud Kontext, Status PDF↔Text, Recent max/Clear (CLI + Qt)
+
+---
+
 ## 0.7.9 — Such-Export, Ann.-Filter-Presets, Bracket-Auto-Close
 
 Nach 0.7.8: Suchergebnisse exportieren, Annotations-Filter merken und Editor-Klammern verfeinern. Stubs KI/Cloud/Stylus/3D bleiben Stubs.

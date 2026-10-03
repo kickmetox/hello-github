@@ -230,6 +230,7 @@ class Sidebar(QWidget):
     annotation_page_filter_changed = Signal(bool)  # nur aktuelle Seite
     annotation_tag_filter_changed = Signal(object)  # list[str] Tags oder [] für alle
     annotation_tag_rename_requested = Signal(str, str)  # old_tag, new_tag (global)
+    annotation_tag_recolor_requested = Signal(str)  # tag → Farbe für alle Ann. mit Tag
     annotation_group_edit_requested = Signal(int)  # Seitenindex der Gruppe
     fulltext_hit_activated = Signal(str, object)  # path, page_index|None
     page_thumb_activated = Signal(int)  # PDF-Seite 0-basiert
@@ -440,7 +441,8 @@ class Sidebar(QWidget):
         self.ann_tag_cloud.setObjectName("annTagCloud")
         self.ann_tag_cloud.setToolTip(
             "Häufigste Tags — Klick setzt Filter (exklusiv); Ctrl+Klick Multi-Select (ODER); "
-            "erneut Klick auf allein aktiven Tag löscht Filter; Rechtsklick → Tag umbenennen (global)"
+            "erneut Klick auf allein aktiven Tag löscht Filter; "
+            "Rechtsklick → filtern / Farbe ändern / umbenennen"
         )
         self.ann_tag_cloud_layout = QHBoxLayout(self.ann_tag_cloud)
         self.ann_tag_cloud_layout.setContentsMargins(0, 2, 0, 2)
@@ -1378,13 +1380,22 @@ class Sidebar(QWidget):
         self.set_annotation_tag_filter(nxt)
 
     def _on_tag_cloud_context_menu(self, tag: str, pos) -> None:
-        """Rechtsklick auf Tag-Cloud-Chip: global umbenennen."""
+        """Rechtsklick auf Tag-Cloud-Chip: filtern, Farbe ändern, umbenennen."""
         from PySide6.QtWidgets import QInputDialog
 
         menu = QMenu(self)
-        act = menu.addAction(f"Tag „{tag}“ umbenennen…")
+        act_filter = menu.addAction(f"Nach „{tag}“ filtern")
+        act_color = menu.addAction(f"Farbe für Tag „{tag}“ ändern…")
+        menu.addSeparator()
+        act_rename = menu.addAction(f"Tag „{tag}“ umbenennen…")
         chosen = menu.exec(pos)
-        if chosen is not act:
+        if chosen is act_filter:
+            self.set_annotation_tag_filter([tag])
+            return
+        if chosen is act_color:
+            self.annotation_tag_recolor_requested.emit(tag)
+            return
+        if chosen is not act_rename:
             return
         text, ok = QInputDialog.getText(
             self,
@@ -1432,7 +1443,7 @@ class Sidebar(QWidget):
             btn.setText(f"{tag} · {n}")
             btn.setToolTip(
                 f"Tag „{tag}“ filtern ({n}×) — Klick setzt Filter; Ctrl+Klick Multi-Select; "
-                f"Rechtsklick → umbenennen (global)"
+                f"Rechtsklick → filtern / Farbe ändern / umbenennen"
             )
             btn.setCursor(Qt.PointingHandCursor)
             btn.setAutoRaise(True)

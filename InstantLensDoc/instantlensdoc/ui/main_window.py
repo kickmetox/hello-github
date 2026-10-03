@@ -394,6 +394,7 @@ class MainWindow(QMainWindow):
         self.sidebar.outline_delete_requested.connect(self._outline_delete)
         self.sidebar.annotation_filter_changed.connect(lambda _t: None)
         self.sidebar.annotation_tag_rename_requested.connect(self._rename_annotation_tag_global)
+        self.sidebar.annotation_tag_recolor_requested.connect(self._recolor_annotation_tag_global)
         self.sidebar.annotation_group_edit_requested.connect(self._edit_annotation_group)
         self.sidebar.fulltext_hit_activated.connect(self._on_fulltext_hit)
         self.sidebar.page_thumb_activated.connect(self._on_thumb_jump)
@@ -410,6 +411,7 @@ class MainWindow(QMainWindow):
         self.editor = self.editor_pane.editor
         self.editor.textChanged.connect(self._on_text_changed)
         self.editor.line_bookmarks_changed.connect(self._refresh_line_favorites)
+        self.editor.cursorPositionChanged.connect(self._on_editor_cursor_changed)
         self.pdf_view = PdfViewer()
         self.pdf_view.status.connect(self._set_status)
         self.pdf_view.annotations_changed.connect(self._refresh_pdf_marks)
@@ -443,6 +445,7 @@ class MainWindow(QMainWindow):
         self.stack.addWidget(self.pdf_view)  # 1
         self.stack.addWidget(self.image_label)  # 2
         self.stack.currentChanged.connect(lambda *_: self._apply_doc_split_sync_scroll())
+        self.stack.currentChanged.connect(lambda *_: self._update_doc_status())
         # Doc-Split: horizontal (nebeneinander) oder vertikal (übereinander)
         split_orient = (
             Qt.Vertical if get_editor_doc_split_vertical() else Qt.Horizontal
@@ -768,6 +771,14 @@ class MainWindow(QMainWindow):
         act_bm_clear.setToolTip("Alle Editor-Zeilenfavoriten entfernen")
         act_bm_clear.triggered.connect(self._clear_line_bookmarks)
         m_edit.addAction(act_bm_clear)
+        act_bm_export = QAction("Zeilen-Lesezeichen als JSON exportieren…", self)
+        act_bm_export.setToolTip("Editor-Lesezeichen als ildbm-v1 JSON speichern")
+        act_bm_export.triggered.connect(self._export_line_bookmarks_json)
+        m_edit.addAction(act_bm_export)
+        act_bm_import = QAction("Zeilen-Lesezeichen aus JSON importieren…", self)
+        act_bm_import.setToolTip("Editor-Lesezeichen aus JSON laden (ersetzen oder zusammenführen)")
+        act_bm_import.triggered.connect(self._import_line_bookmarks_json)
+        m_edit.addAction(act_bm_import)
         act_dup_line = QAction("Zeile duplizieren", self)
         act_dup_line.setShortcut(QKeySequence("Ctrl+D"))
         act_dup_line.setToolTip("Aktuelle Zeile / Auswahl darunter duplizieren")
@@ -1489,17 +1500,28 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage(msg, 5000)
 
     def _update_doc_status(self):
-        """Statusleiste: Dateiname, Seite x/y, Seitengröße, Zoom %, Wörter (Editor)."""
+        """Statusleiste: Dateiname, Seite x/y bzw. Zeile x/y, Seitengröße, Zoom %, Wörter."""
         name = "—"
         page_txt = "Seite —"
         size_txt = "—"
         zoom_txt = "— %"
         word_txt = "— Wörter"
+        current = self.stack.currentWidget()
         if self.doc and self.doc.path:
             name = Path(self.doc.path).name
         elif self.pdf_view.pdf_path:
             name = self.pdf_view.pdf_path.name
-        if self.pdf_view.pdf_path and self.pdf_view.page_count > 0:
+        # Aktuelle Ansicht zuerst: PDF↔Editor-Wechsel darf Seiten-/Zeileninfo nicht „kleben“ lassen
+        if current is self.editor_pane:
+            line = self.editor.current_line_number()
+            total = self.editor.line_count()
+            page_txt = f"Zeile {line}/{total}"
+            zoom_txt = "—"
+            words, chars = self.editor.word_stats()
+            word_txt = f"{words} Wörter · {chars} Z."
+            size_txt = "—"
+            self.page_status_label.setToolTip("Editor: aktuelle Zeile / Zeilenanzahl")
+        elif current is self.pdf_view and self.pdf_view.pdf_path and self.pdf_view.page_count > 0:
             from ild_pdf import format_page_status
 
             page_txt = format_page_status(
@@ -1510,14 +1532,23 @@ class MainWindow(QMainWindow):
             zoom_txt = f"{int(round(self.pdf_view.scale * 100))} %"
             word_txt = f"{len(self.pdf_view.store.annotations) if self.pdf_view.store else 0} Ann."
             size_txt = self._format_current_page_size() or "—"
-        elif self.stack.currentWidget() is self.editor_pane:
-            page_txt = "Editor"
+            self.page_status_label.setToolTip("PDF: aktuelle Seite / Seitenanzahl")
+        elif current is self.image_label:
+            page_txt = "Bild"
             zoom_txt = "—"
-            words, chars = self.editor.word_stats()
-            word_txt = f"{words} Wörter · {chars} Z."
-        elif self.doc and self.doc.path:
-            page_txt = "Editor"
-            zoom_txt = "—"
+            self.page_status_label.setToolTip("Bildvorschau")
+        elif self.pdf_view.pdf_path and self.pdf_view.page_count > 0:
+            # Fallback wenn Stack kurzzeitig woanders steht, PDF aber geladen
+            from ild_pdf import format_page_status
+
+            page_txt = format_page_status(
+                self.pdf_view.page_index,
+                self.pdf_view.page_count,
+                self.pdf_view.page_label(),
+            )
+            zoom_txt = f"{int(round(self.pdf_view.scale * 100))} %"
+            word_txt = f"{len(self.pdf_view.store.annotations) if self.pdf_view.store else 0} Ann."
+            size_txt = self._format_current_page_size() or "—"
         self.file_status_label.setText(name)
         self.file_status_label.setToolTip(str(self.doc.path) if self.doc and self.doc.path else name)
         self.page_status_label.setText(page_txt)
@@ -1530,6 +1561,15 @@ class MainWindow(QMainWindow):
         self.zoom_status_label.setText(zoom_txt)
         self.word_status_label.setText(word_txt)
         self._update_unsaved_status()
+
+    def _on_editor_cursor_changed(self) -> None:
+        """Zeileninfo in der Statusleiste live aktualisieren (nur Editor-Ansicht)."""
+        if self.stack.currentWidget() is self.editor_pane:
+            line = self.editor.current_line_number()
+            total = self.editor.line_count()
+            self.page_status_label.setText(f"Zeile {line}/{total}")
+            words, chars = self.editor.word_stats()
+            self.word_status_label.setText(f"{words} Wörter · {chars} Z.")
 
     def _path_key(self, path: str | Path | None) -> str | None:
         if not path:
@@ -2076,6 +2116,8 @@ class MainWindow(QMainWindow):
             self._set_status("Auswahl: PDF mit Annotationen öffnen oder Texteditor nutzen")
 
     def _on_pdf_zoom_changed(self, scale: float):
+        if self.stack.currentWidget() is not self.pdf_view:
+            return
         self.zoom_status_label.setText(f"{int(round(float(scale) * 100))} %")
         if self.pdf_view.pdf_path and self.pdf_view.page_count > 0:
             from ild_pdf import format_page_status
@@ -2176,6 +2218,92 @@ class MainWindow(QMainWindow):
         self.editor.clear_line_bookmarks()
         self._refresh_line_favorites()
         self._set_status("Zeilen-Lesezeichen gelöscht")
+
+    def _export_line_bookmarks_json(self) -> bool:
+        """Editor-Zeilen-Lesezeichen als JSON (ildbm-v1) exportieren."""
+        from PySide6.QtWidgets import QFileDialog
+        from instantlensdoc.ui.file_dialogs import confirm_overwrite_export
+
+        if self.stack.currentWidget() is not self.editor_pane:
+            self.stack.setCurrentWidget(self.editor_pane)
+        marks = self.editor.list_line_bookmarks_with_labels()
+        if not marks:
+            QMessageBox.information(
+                self, "Lesezeichen", "Keine Zeilen-Lesezeichen zum Exportieren."
+            )
+            return False
+        src_name = ""
+        default_dir = str(Path.home())
+        if self.doc and self.doc.path:
+            src_name = Path(self.doc.path).name
+            default_dir = str(Path(self.doc.path).parent)
+            default = str(Path(self.doc.path).with_suffix(".bookmarks.json"))
+        else:
+            default = str(Path(default_dir) / "bookmarks.json")
+        path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Zeilen-Lesezeichen als JSON exportieren",
+            default,
+            "Lesezeichen JSON (*.bookmarks.json *.json);;Alle (*.*)",
+        )
+        if not path:
+            return False
+        dest = Path(path)
+        if dest.suffix.lower() != ".json":
+            dest = dest.with_suffix(".json")
+        if not confirm_overwrite_export(dest, self):
+            return False
+        try:
+            saved = self.editor.export_line_bookmarks_json(dest, source=src_name)
+            self._set_status(f"Lesezeichen exportiert: {saved.name} ({len(marks)})")
+            return True
+        except Exception as e:
+            QMessageBox.warning(self, "Lesezeichen exportieren", str(e))
+            return False
+
+    def _import_line_bookmarks_json(self) -> bool:
+        """Editor-Zeilen-Lesezeichen aus JSON importieren (ersetzen oder zusammenführen)."""
+        from PySide6.QtWidgets import QFileDialog
+        from instantlensdoc.core.bookmarks import BookmarksImportError
+
+        if self.stack.currentWidget() is not self.editor_pane:
+            self.stack.setCurrentWidget(self.editor_pane)
+        start = str(Path(self.doc.path).parent) if self.doc and self.doc.path else str(Path.home())
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Zeilen-Lesezeichen aus JSON importieren",
+            start,
+            "Lesezeichen JSON (*.bookmarks.json *.json);;Alle (*.*)",
+        )
+        if not path:
+            return False
+        reply = QMessageBox.question(
+            self,
+            "Lesezeichen importieren",
+            "Bestehende Lesezeichen behalten und neue anhängen?\n\n"
+            "Ja = zusammenführen · Nein = ersetzen · Abbrechen = abbrechen",
+            QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel,
+            QMessageBox.Yes,
+        )
+        if reply == QMessageBox.Cancel:
+            return False
+        merge = reply == QMessageBox.Yes
+        try:
+            marks = self.editor.import_line_bookmarks_json(
+                path,
+                merge=merge,
+                max_line=self.editor.blockCount(),
+            )
+        except BookmarksImportError as e:
+            QMessageBox.warning(self, "Lesezeichen importieren", str(e))
+            return False
+        except Exception as e:
+            QMessageBox.warning(self, "Lesezeichen importieren", str(e))
+            return False
+        self._refresh_line_favorites()
+        mode = "zusammengeführt" if merge else "ersetzt"
+        self._set_status(f"Lesezeichen {mode}: {len(marks)} Zeile(n)")
+        return True
 
     def _refresh_line_favorites(self):
         """Sidebar-Liste aller Editor-Zeilenfavoriten aktualisieren (inkl. Labels)."""
@@ -2361,6 +2489,55 @@ class MainWindow(QMainWindow):
         self._set_status(
             "Sync-Scroll an (geteilte Docs)" if checked else "Sync-Scroll aus"
         )
+
+    def _recolor_annotation_tag_global(self, tag: str) -> None:
+        """Tag-Cloud: Farbe aller Annotationen mit diesem Tag ändern (eine Undo-Stufe)."""
+        from PySide6.QtGui import QColor
+        from PySide6.QtWidgets import QColorDialog
+
+        store = getattr(self.pdf_view, "store", None)
+        if store is None or not self.pdf_view.pdf_path:
+            self._set_status("Tag-Farbe nur bei geöffnetem PDF")
+            return
+        tag_s = str(tag or "").strip()
+        if not tag_s:
+            return
+        tag_cf = tag_s.casefold()
+        targets = [
+            a
+            for a in store.annotations
+            if any(str(t).casefold() == tag_cf for t in (getattr(a, "tags", None) or []))
+        ]
+        if not targets:
+            self._set_status(f"Kein Tag „{tag_s}“ gefunden")
+            return
+        initial = QColor(getattr(targets[0], "color", None) or "#FFE066")
+        if not initial.isValid():
+            initial = QColor("#FFE066")
+        chosen = QColorDialog.getColor(
+            initial,
+            self,
+            f"Farbe für Tag „{tag_s}“ ({len(targets)} Annotationen)",
+        )
+        if not chosen.isValid():
+            return
+        color = chosen.name().upper()
+        ids = [a.id for a in targets if getattr(a, "id", None)]
+        n = store.set_colors(ids, color)
+        if n <= 0:
+            self._set_status("Farbe nicht geändert")
+            return
+        try:
+            store.save()
+        except Exception as e:
+            QMessageBox.warning(self, "Tag-Farbe", str(e))
+            return
+        self.pdf_view.refresh()
+        self._refresh_pdf_marks()
+        if self.doc and self.doc.path:
+            self._mark_unsaved(self.doc.path, bool(store.dirty))
+        self._refresh_undo_hint()
+        self._set_status(f"Farbe {color} für Tag „{tag_s}“ ({n} Annotationen)")
 
     def _rename_annotation_tag_global(self, old_tag: str, new_tag: str) -> None:
         """Tag-Cloud: Tag in allen Annotationen des aktuellen PDFs umbenennen (eine Undo-Stufe)."""

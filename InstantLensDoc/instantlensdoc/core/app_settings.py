@@ -40,6 +40,7 @@ DEFAULTS: dict[str, Any] = {
     "editor_bracket_auto_close": True,
     "ann_filter_presets": [],
     "ann_default_opacity": 1.0,
+    "recent_files_max": 12,
     "recent_dirs": [],
     "project_workspaces": [],
     "active_project_workspace": "",
@@ -339,6 +340,38 @@ def get_editor_bracket_auto_close() -> bool:
 
 def set_editor_bracket_auto_close(enabled: bool) -> None:
     save_settings({"editor_bracket_auto_close": bool(enabled)})
+
+
+RECENT_FILES_MAX_DEFAULT = 12
+RECENT_FILES_MAX_MIN = 3
+RECENT_FILES_MAX_MAX = 50
+
+
+def get_recent_files_max() -> int:
+    """Max. Anzahl zuletzt geöffneter Dateien (3–50, Standard 12)."""
+    try:
+        n = int(load_settings().get("recent_files_max", RECENT_FILES_MAX_DEFAULT))
+    except (TypeError, ValueError):
+        n = RECENT_FILES_MAX_DEFAULT
+    return max(RECENT_FILES_MAX_MIN, min(RECENT_FILES_MAX_MAX, n))
+
+
+def set_recent_files_max(count: int) -> int:
+    """Max. Anzahl setzen und Recent-Liste ggf. kürzen. Rückgabe: gespeicherter Wert."""
+    try:
+        n = int(count)
+    except (TypeError, ValueError):
+        n = RECENT_FILES_MAX_DEFAULT
+    n = max(RECENT_FILES_MAX_MIN, min(RECENT_FILES_MAX_MAX, n))
+    save_settings({"recent_files_max": n})
+    try:
+        from instantlensdoc.core import recent as recent_mod
+
+        recent_mod.trim_recent_to_max(n)
+    except Exception:
+        pass
+    return n
+
 
 
 ANN_FILTER_PRESETS_MAX = 20

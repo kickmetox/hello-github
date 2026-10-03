@@ -18,6 +18,14 @@ from instantlensdoc.core.app_settings import (
     get_editor_show_special_chars,
     get_editor_trim_whitespace_on_paste,
 )
+from instantlensdoc.core.bookmarks import (
+    BM_SCHEMA_ID,
+    BM_VERSION,
+    BookmarksImportError,
+    bookmarks_to_export_dict,
+    export_bookmarks_json,
+    parse_bookmarks_dict,
+)
 
 CLIPBOARD_HISTORY_MAX = 3
 MINIMAP_WIDTH = 56
@@ -202,6 +210,78 @@ class TextEditor(QPlainTextEdit):
                 return m
         self.goto_line(marks[-1])
         return marks[-1]
+
+    def current_line_number(self) -> int:
+        """1-basierte Cursor-Zeile."""
+        return self.textCursor().blockNumber() + 1
+
+    def line_count(self) -> int:
+        """Anzahl Textzeilen (Blöcke)."""
+        return max(1, self.blockCount())
+
+    def export_line_bookmarks_dict(self, *, source: str = "") -> dict:
+        """Zeilen-Lesezeichen als exportierbares Dict (Schema ildbm-v1)."""
+        return bookmarks_to_export_dict(
+            self.list_line_bookmarks_with_labels(), source=source
+        )
+
+    def export_line_bookmarks_json(
+        self, path: str | Path, *, source: str = ""
+    ) -> Path:
+        """Zeilen-Lesezeichen als JSON-Datei schreiben (ildbm-v1)."""
+        return export_bookmarks_json(
+            path, self.list_line_bookmarks_with_labels(), source=source
+        )
+
+    def import_line_bookmarks_dict(
+        self,
+        data: dict,
+        *,
+        merge: bool = False,
+        max_line: int | None = None,
+    ) -> list[tuple[int, str]]:
+        """
+        Lesezeichen aus Dict übernehmen.
+        merge=True: bestehende behalten und neue anhängen/Label aktualisieren.
+        max_line: optional obere Grenze (inkl.) zum Filtern ungültiger Zeilen.
+        """
+        limit = int(max_line) if max_line is not None else self.blockCount()
+        if limit < 1:
+            limit = self.blockCount()
+        incoming = parse_bookmarks_dict(data, max_line=limit)
+        if not merge:
+            self.clear_line_bookmarks()
+        for line, label in incoming:
+            block_no = line - 1
+            self._line_bookmarks.add(block_no)
+            if label:
+                self._line_bookmark_labels[block_no] = label
+            elif not merge:
+                self._line_bookmark_labels.pop(block_no, None)
+        self._line_number_area.update()
+        self.line_bookmarks_changed.emit()
+        return self.list_line_bookmarks_with_labels()
+
+    def import_line_bookmarks_json(
+        self,
+        path: str | Path,
+        *,
+        merge: bool = False,
+        max_line: int | None = None,
+    ) -> list[tuple[int, str]]:
+        """Lesezeichen aus JSON-Datei laden (ersetzt oder merge)."""
+        import json as _json
+
+        limit = int(max_line) if max_line is not None else self.blockCount()
+        if limit < 1:
+            limit = self.blockCount()
+        try:
+            data = _json.loads(Path(path).read_text(encoding="utf-8"))
+        except _json.JSONDecodeError as e:
+            raise BookmarksImportError(f"Ungültiges JSON: {e}") from e
+        except OSError as e:
+            raise BookmarksImportError(str(e)) from e
+        return self.import_line_bookmarks_dict(data, merge=merge, max_line=limit)
 
     def toggle_bookmark_at_y(self, y: float) -> bool:
         """Klick in Zeilennummernleiste → Lesezeichen der sichtbaren Zeile."""
