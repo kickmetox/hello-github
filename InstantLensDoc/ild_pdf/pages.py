@@ -261,32 +261,63 @@ def parse_page_ranges(
     Seitenbereiche aus String parsen, z. B. ``1-3,5,8-10``.
     Rückgabe: Liste (start, end) 0-basiert inklusive Endseite.
     ``one_based=True``: Eingabe 1..n; sonst 0..n-1.
+    Fehler als klare deutsche ValueError-Meldungen — 1.2.1.
     """
     text = (spec or "").strip()
     if not text:
-        raise ValueError("Kein Seitenbereich angegeben")
+        raise ValueError(
+            "Kein Seitenbereich angegeben. Beispiel: 1-3,5,8-10"
+        )
     n = int(page_count)
     if n <= 0:
-        raise ValueError("PDF hat keine Seiten")
+        raise ValueError("PDF hat keine Seiten.")
+    # Anzeige-Grenzen für Nutzer (1-basiert, wenn one_based)
+    disp_lo = 1 if one_based else 0
+    disp_hi = n if one_based else n - 1
     ranges: list[tuple[int, int]] = []
     for raw_part in text.split(","):
         part = raw_part.strip()
         if not part:
             continue
+        if part.count("-") > 1 and not part.lstrip().startswith("-"):
+            # z. B. 1--3 oder 1-2-3
+            raise ValueError(
+                f"Ungültiger Bereich „{part}“ — erwartet z. B. 1-3 oder 5 "
+                f"(gültig: {disp_lo}…{disp_hi})."
+            )
         if "-" in part:
             a_s, b_s = part.split("-", 1)
             a_s, b_s = a_s.strip(), b_s.strip()
             if not a_s or not b_s:
-                raise ValueError(f"Ungültiger Bereich: {part!r}")
+                raise ValueError(
+                    f"Ungültiger Bereich „{part}“ — Start und Ende angeben "
+                    f"(z. B. 1-3). Gültig: {disp_lo}…{disp_hi}."
+                )
+            if not a_s.lstrip("-").isdigit() or not b_s.lstrip("-").isdigit():
+                raise ValueError(
+                    f"Ungültiger Bereich „{part}“ — nur ganze Zahlen erlaubt "
+                    f"(z. B. 1-3,5,8-10). Gültig: {disp_lo}…{disp_hi}."
+                )
             try:
                 a_i, b_i = int(a_s), int(b_s)
             except ValueError as e:
-                raise ValueError(f"Ungültiger Bereich: {part!r}") from e
+                raise ValueError(
+                    f"Ungültiger Bereich „{part}“ — nur ganze Zahlen erlaubt "
+                    f"(z. B. 1-3). Gültig: {disp_lo}…{disp_hi}."
+                ) from e
         else:
+            if not part.lstrip("-").isdigit():
+                raise ValueError(
+                    f"Ungültige Seitenangabe „{part}“ — nur ganze Zahlen erlaubt "
+                    f"(z. B. 5). Gültig: {disp_lo}…{disp_hi}."
+                )
             try:
                 a_i = b_i = int(part)
             except ValueError as e:
-                raise ValueError(f"Ungültige Seite: {part!r}") from e
+                raise ValueError(
+                    f"Ungültige Seitenangabe „{part}“ — nur ganze Zahlen erlaubt "
+                    f"(z. B. 5). Gültig: {disp_lo}…{disp_hi}."
+                ) from e
         if one_based:
             a_i -= 1
             b_i -= 1
@@ -295,10 +326,15 @@ def parse_page_ranges(
         if a_i < 0 or b_i >= n:
             lo = a_i + 1 if one_based else a_i
             hi = b_i + 1 if one_based else b_i
-            raise ValueError(f"Ungültiger Bereich {lo}–{hi} (gültig: 1…{n})")
+            raise ValueError(
+                f"Bereich {lo}–{hi} liegt außerhalb des Dokuments "
+                f"(gültig: {disp_lo}…{disp_hi})."
+            )
         ranges.append((a_i, b_i))
     if not ranges:
-        raise ValueError("Kein Seitenbereich angegeben")
+        raise ValueError(
+            "Kein Seitenbereich angegeben. Beispiel: 1-3,5,8-10"
+        )
     return ranges
 
 
@@ -313,6 +349,27 @@ def flatten_page_indices(ranges: Sequence[tuple[int, int]]) -> list[int]:
             seen.add(p)
             out.append(p)
     return out
+
+
+def preview_page_range_count(
+    spec: str,
+    page_count: int,
+    *,
+    one_based: bool = True,
+) -> tuple[int, int, str | None]:
+    """
+    Vorschau für Seitenbereiche: (Seitenanzahl, Bereichsanzahl, Fehlertext|None).
+    Bei leerem Spec: (0, 0, None). — 1.2.1
+    """
+    text = (spec or "").strip()
+    if not text:
+        return 0, 0, None
+    try:
+        ranges = parse_page_ranges(text, page_count, one_based=one_based)
+    except ValueError as e:
+        return 0, 0, str(e)
+    pages = flatten_page_indices(ranges)
+    return len(pages), len(ranges), None
 
 
 def extract_by_page_spec(

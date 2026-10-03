@@ -7,6 +7,7 @@ from pathlib import Path
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QFont, QTextCharFormat, QTextCursor
 from PySide6.QtWidgets import (
+    QCheckBox,
     QComboBox,
     QDialog,
     QDialogButtonBox,
@@ -22,7 +23,11 @@ from PySide6.QtWidgets import (
 
 from instantlensdoc.core.app_settings import dialog_start_dir, get_editor_text_encoding
 from instantlensdoc.core.documents import normalize_text_encoding
-from instantlensdoc.core.text_diff import line_diff_sides
+from instantlensdoc.core.text_diff import (
+    filter_diff_differences,
+    format_diff_txt,
+    line_diff_sides,
+)
 
 
 def _read_text(path: str | Path, encoding: str | None = None) -> str:
@@ -42,8 +47,18 @@ _TAG_COLORS = {
 }
 
 
-def _fill_pane(edit: QPlainTextEdit, lines: list[str], tags: list[str], side: str) -> None:
-    numbered = [f"{i + 1:>4} │ {line}" for i, line in enumerate(lines)]
+def _fill_pane(
+    edit: QPlainTextEdit,
+    lines: list[str],
+    tags: list[str],
+    side: str,
+    *,
+    line_numbers: bool = True,
+) -> None:
+    if line_numbers:
+        numbered = [f"{i + 1:>4} │ {line}" for i, line in enumerate(lines)]
+    else:
+        numbered = list(lines)
     edit.setPlainText("\n".join(numbered))
     selections = []
     doc = edit.document()
@@ -101,11 +116,19 @@ class TextCompareDialog(QDialog):
         self._right_text = right_text
         self._left_label = left_label or ""
         self._right_label = right_label or ""
+        self._last_left: list[str] = []
+        self._last_right: list[str] = []
+        self._last_tags: list[str] = []
+        self._last_lname = ""
+        self._last_rname = ""
 
         root = QVBoxLayout(self)
         if self._panel_mode:
             root.addWidget(
-                QLabel("Einfaches Zeilen-Diff Panel: zwei offene Text-Tabs wählen — 1.2.0")
+                QLabel(
+                    "Zeilen-Diff Panel: zwei offene Text-Tabs wählen — "
+                    "Nur-Unterschiede · Zeilennummern · TXT-Export — 1.2.1"
+                )
             )
         pick = QHBoxLayout()
         self.cmb_left = QComboBox()
@@ -127,6 +150,23 @@ class TextCompareDialog(QDialog):
         pick.addWidget(btn_r)
         root.addLayout(pick)
 
+        opts = QHBoxLayout()
+        self.chk_only_diff = QCheckBox("Nur Unterschiede")
+        self.chk_only_diff.setToolTip(
+            "Gleiche Zeilen ausblenden — nur Abweichungen anzeigen — 1.2.1"
+        )
+        self.chk_only_diff.toggled.connect(lambda _: self.refresh())
+        self.chk_line_numbers = QCheckBox("Zeilennummern")
+        self.chk_line_numbers.setChecked(True)
+        self.chk_line_numbers.setToolTip(
+            "Zeilennummern in den Diff-Panes ein-/ausblenden — 1.2.1"
+        )
+        self.chk_line_numbers.toggled.connect(lambda _: self.refresh())
+        opts.addWidget(self.chk_only_diff)
+        opts.addWidget(self.chk_line_numbers)
+        opts.addStretch()
+        root.addLayout(opts)
+
         self.lbl_status = QLabel("—")
         root.addWidget(self.lbl_status)
 
@@ -145,8 +185,12 @@ class TextCompareDialog(QDialog):
 
         btn_reload = QPushButton("Vergleichen")
         btn_reload.clicked.connect(self.refresh)
+        btn_export = QPushButton("Diff als TXT…")
+        btn_export.setToolTip("Aktuellen Diff als Textdatei exportieren — 1.2.1")
+        btn_export.clicked.connect(self._export_diff_txt)
         row = QHBoxLayout()
         row.addWidget(btn_reload)
+        row.addWidget(btn_export)
         row.addStretch()
         root.addLayout(row)
 
@@ -239,13 +283,60 @@ class TextCompareDialog(QDialog):
             self.view_left.setPlainText("")
             self.view_right.setPlainText("")
             self.lbl_status.setText("Zwei Dateien oder Tabs wählen")
+            self._last_left, self._last_right, self._last_tags = [], [], []
             return
         out_l, out_r, tags = line_diff_sides(ltext, rtext)
-        _fill_pane(self.view_left, out_l, tags, "left")
-        _fill_pane(self.view_right, out_r, tags, "right")
+        self._last_left, self._last_right, self._last_tags = out_l, out_r, tags
+        self._last_lname, self._last_rname = lname, rname
+        show_l, show_r, show_t = out_l, out_r, tags
+        only_diff = self.chk_only_diff.isChecked()
+        if only_diff:
+            show_l, show_r, show_t = filter_diff_differences(out_l, out_r, tags)
+        line_nums = self.chk_line_numbers.isChecked()
+        _fill_pane(self.view_left, show_l, show_t, "left", line_numbers=line_nums)
+        _fill_pane(self.view_right, show_r, show_t, "right", line_numbers=line_nums)
         n_diff = sum(1 for t in tags if t != "equal")
+        mode = " · nur Unterschiede" if only_diff else ""
         self.lbl_status.setText(
-            f"{lname}  ↔  {rname}  ·  {len(tags)} Zeilen · {n_diff} abweichend"
+            f"{lname}  ↔  {rname}  ·  {len(show_t)} Zeilen · {n_diff} abweichend{mode}"
         )
         self.view_left.setToolTip(lname)
         self.view_right.setToolTip(rname)
+
+    def _export_diff_txt(self) -> None:
+        """Aktuellen Diff als TXT speichern — 1.2.1."""
+        if not self._last_tags and not self._last_left and not self._last_right:
+            QMessageBox.information(
+                self, "Diff-Export", "Kein Diff vorhanden — zuerst vergleichen."
+            )
+            return
+        from instantlensdoc.core.app_settings import get_last_export_dir, set_last_export_dir
+
+        start = dialog_start_dir(get_last_export_dir())
+        default = str(Path(start) / "diff.txt")
+        path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Diff als TXT exportieren",
+            default,
+            "Text (*.txt);;Alle (*.*)",
+        )
+        if not path:
+            return
+        if not path.lower().endswith(".txt"):
+            path += ".txt"
+        try:
+            text = format_diff_txt(
+                self._last_left,
+                self._last_right,
+                self._last_tags,
+                left_label=self._last_lname or "Links",
+                right_label=self._last_rname or "Rechts",
+                line_numbers=self.chk_line_numbers.isChecked(),
+                only_differences=self.chk_only_diff.isChecked(),
+            )
+            Path(path).write_text(text, encoding="utf-8")
+            set_last_export_dir(Path(path).parent)
+            self.lbl_status.setText(f"Diff exportiert: {Path(path).name}")
+            QMessageBox.information(self, "Diff-Export", f"Gespeichert:\n{path}")
+        except Exception as e:
+            QMessageBox.critical(self, "Diff-Export", str(e))

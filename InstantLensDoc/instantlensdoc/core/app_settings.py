@@ -29,6 +29,8 @@ DEFAULTS: dict[str, Any] = {
     "export_image_max_edge": 2000,
     "update_check_on_start": False,
     "last_export_dir": "",
+    "last_ann_export_dir": "",  # letzter Zielordner Ann.-Export JSON — 1.2.1
+    "ann_export_filename_template": "{stem}_ann.json",  # Dateiname-Template — 1.2.1
     "default_zoom_percent": 150,
     "default_zoom_mode": "percent",  # percent | fit_width | fit_page
     "autosave_interval_sec": 60,  # 15 | 30 | 60 | 120 — 0.9.7
@@ -390,6 +392,82 @@ def set_last_export_dir(path: str | Path) -> None:
     if p.is_file():
         p = p.parent
     save_settings({"last_export_dir": str(p)})
+
+
+DEFAULT_ANN_EXPORT_FILENAME_TEMPLATE = "{stem}_ann.json"
+
+
+def get_last_ann_export_dir() -> Path | None:
+    """Letzter Zielordner für Annotation-JSON-Export — 1.2.1."""
+    raw = str(load_settings().get("last_ann_export_dir") or "").strip()
+    if not raw:
+        return None
+    p = Path(raw)
+    return p if p.is_dir() else None
+
+
+def set_last_ann_export_dir(path: str | Path) -> None:
+    """Zielordner für Ann.-Export merken — 1.2.1."""
+    p = Path(path)
+    if p.is_file():
+        p = p.parent
+    save_settings({"last_ann_export_dir": str(p)})
+
+
+def get_ann_export_filename_template() -> str:
+    """Dateiname-Template für Ann.-JSON-Export, z. B. ``{stem}_ann.json`` — 1.2.1."""
+    raw = str(
+        load_settings().get(
+            "ann_export_filename_template",
+            DEFAULTS["ann_export_filename_template"],
+        )
+        or ""
+    ).strip()
+    if not raw:
+        return DEFAULT_ANN_EXPORT_FILENAME_TEMPLATE
+    # Pflicht: {stem} und .json-Suffix
+    if "{stem}" not in raw:
+        raw = "{stem}_" + raw.lstrip("_")
+    if not raw.lower().endswith(".json"):
+        raw = raw + ".json"
+    return raw
+
+
+def set_ann_export_filename_template(template: str) -> str:
+    """Template speichern und normalisieren — 1.2.1."""
+    raw = str(template or "").strip() or DEFAULT_ANN_EXPORT_FILENAME_TEMPLATE
+    if "{stem}" not in raw:
+        raw = "{stem}_" + raw.lstrip("_")
+    if not raw.lower().endswith(".json"):
+        raw = raw + ".json"
+    # Unsichere Pfadzeichen entfernen (nur Dateiname)
+    raw = raw.replace("/", "_").replace("\\", "_")
+    save_settings({"ann_export_filename_template": raw})
+    return raw
+
+
+def format_ann_export_filename(
+    stem: str,
+    *,
+    page: int | None = None,
+    template: str | None = None,
+) -> str:
+    """
+    Dateiname aus Template bauen.
+    Platzhalter: ``{stem}``, optional ``{page}`` (1-basiert). — 1.2.1
+    """
+    tpl = template if template is not None else get_ann_export_filename_template()
+    name = str(tpl)
+    safe_stem = str(stem or "document").strip() or "document"
+    name = name.replace("{stem}", safe_stem)
+    if page is not None:
+        name = name.replace("{page}", str(int(page)))
+    else:
+        name = name.replace("{page}", "")
+        name = name.replace("__", "_").replace("_.", ".")
+    if not name.lower().endswith(".json"):
+        name += ".json"
+    return name
 
 
 DEFAULT_ZOOM_MODE_PERCENT = "percent"

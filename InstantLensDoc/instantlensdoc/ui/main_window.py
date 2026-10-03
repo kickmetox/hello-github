@@ -1167,7 +1167,7 @@ class MainWindow(QMainWindow):
         act_compare_tabs = QAction("Text-Diff (offene Tabs)…", self)
         act_compare_tabs.setShortcut(QKeySequence("Ctrl+Alt+D"))
         act_compare_tabs.setToolTip(
-            "Zwei offene Text-Tabs vergleichen (einfaches Zeilen-Diff Panel) — 1.2.0"
+            "Zwei offene Text-Tabs: Nur-Unterschiede · Zeilennummern · Diff-TXT — 1.2.1"
         )
         act_compare_tabs.triggered.connect(self._compare_text_tabs)
         m_file.addAction(act_compare_tabs)
@@ -1862,7 +1862,7 @@ class MainWindow(QMainWindow):
         m_pdf.addAction(act_merge)
         act_extract = QAction("Seitenbereich extrahieren…", self)
         act_extract.setToolTip(
-            "Seitenbereiche z. B. 1-3,5,8-10 → neue Datei(en) — 1.2.0"
+            "Seitenbereiche z. B. 1-3,5,8-10; DE-Validierung + Seitenanzahl-Vorschau — 1.2.1"
         )
         act_extract.triggered.connect(self._extract_page_range)
         m_pdf.addAction(act_extract)
@@ -6688,7 +6688,7 @@ class MainWindow(QMainWindow):
         ).exec()
 
     def _extract_page_range(self):
-        """Schnelldialog: Seitenbereiche z. B. 1-3,5,8-10 → neue Datei(en) — 1.2.0."""
+        """Schnelldialog: Seitenbereiche z. B. 1-3,5,8-10; DE-Validierung + Vorschau — 1.2.1."""
         if not self.pdf_view.pdf_path:
             QMessageBox.information(
                 self,
@@ -6831,7 +6831,7 @@ class MainWindow(QMainWindow):
         PdfCompareDialog(self, left_pdf=left).exec()
 
     def _compare_text_tabs(self):
-        """Zwei offene Text-Tabs vergleichen (einfaches Zeilen-Diff Panel) — 1.2.0."""
+        """Zwei offene Text-Tabs: Nur-Unterschiede · Zeilennummern · Diff-TXT — 1.2.1."""
         _TEXT_EXT = {
             ".txt",
             ".md",

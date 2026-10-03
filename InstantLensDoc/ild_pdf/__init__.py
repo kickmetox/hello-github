@@ -35,6 +35,7 @@ from .pages import (
     insert_page_from_bytes,
     merge_pdfs,
     parse_page_ranges,
+    preview_page_range_count,
     split_into_single_page_pdfs,
     split_pdf,
     rotate_page,
@@ -127,6 +128,7 @@ __all__ = [
     "stamp_library_items",
     "PAGE_SIZE_PRESETS",
     "parse_page_ranges",
+    "preview_page_range_count",
     "flatten_page_indices",
     "extract_by_page_spec",
     "extract_page_range",
@@ -210,4 +212,4 @@ __all__ = [
     "uri_link_at",
 ]
 
-__version__ = "1.2.0"
+__version__ = "1.2.1"

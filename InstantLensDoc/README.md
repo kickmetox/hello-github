@@ -2,7 +2,7 @@
 
 Moderne Textverarbeitung mit PDF-Annotator, OCR-Bridge und Formulargenerator.
 
-**Version:** 1.2.0  
+**Version:** 1.2.1  
 **Hersteller:** Andreas Meyer · ame@sellerbach.de
 
 ## Quickstart (Windows)
@@ -21,7 +21,8 @@ Oder lokal im App-Ordner:
 cd /d D:\AI_Temp\InstantLensDoc && pip install -r requirements.txt && run.bat
 ```
 
-Nur starten (nach Sync/pip): `run.bat`
+Nur starten (nach Sync/pip): `run.bat`  
+(`run.bat` kann fehlende Deps optional per J/N mit `python -m pip install -r requirements.txt` nachziehen.)
 
 ## Build
 
@@ -32,8 +33,8 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an).
 
-## Neu in 1.2.0
+## Neu in 1.2.1
 
-PDF-Split: Seitenbereiche `1-3,5,8-10` → neue Datei(en); Annotation-Export Seite/Dokument als JSON (ildann-v4) + optional Flatten-PDF; Text-Diff Panel für zwei offene Text-Tabs; `run.bat` prüft Python/Deps mit DE-Meldungen. Stubs KI/Cloud/Stylus/3D unverändert.
+PDF-Split: Validierung fehlerhafter Bereiche mit klarer DE-Meldung + Seitenanzahl-Vorschau; Ann.-Export merkt Zielordner und Dateiname-Template (`{stem}_ann.json`); Text-Diff mit Nur-Unterschiede/Zeilennummern + TXT-Export; `run.bat` optional pip install (J/N). Stubs KI/Cloud/Stylus/3D unverändert.
 
 Siehe [CHANGELOG.md](CHANGELOG.md), [FEATURES.md](FEATURES.md) und [INFO.md](INFO.md).

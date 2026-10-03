@@ -1,5 +1,27 @@
 # Changelog — InstantLens Doc
 
+## 1.2.1 — PDF-Split Validierung·Vorschau, Ann.-Export Template, Diff Toggle·TXT, run.bat pip
+
+Post-Release-Polish nach 1.2.0: **PDF-Split/Extrakt** validiert fehlerhafte Bereiche mit klaren **DE-Meldungen** und zeigt **Seitenanzahl-Vorschau**; **Ann.-Export** merkt den **Zielordner** und nutzt ein Dateiname-Template aus Settings (`{stem}_ann.json`); **Text-Diff** mit Toggle **Nur Unterschiede** + **Zeilennummern** sowie **Diff als TXT**; **`run.bat`** bietet optional `python -m pip install -r requirements.txt` per **J/N**. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### PDF
+- Split/Extrakt: klare deutsche Fehlermeldungen bei ungültigen Bereichen; Live-**Vorschau Seitenanzahl**
+
+### Annotationen
+- Export: **Zielordner merken**; Dateiname-Template in Settings (**`{stem}_ann.json`**, optional `{page}`)
+
+### Editor
+- Text-Diff: Toggle **Nur Unterschiede** + **Zeilennummern**; **Diff als TXT** exportieren
+
+### Packaging / Start
+- **`run.bat`**: bei fehlenden Deps optional **`python -m pip install -r requirements.txt`** (J/N)
+
+### Packaging / Docs
+- Version **1.2.1** (App / `ild_pdf` / ISS / Smoke / Docs)
+- Smoke: PDF-Split Validierung·Vorschau, Ann.-Export Template/Ordner, Diff Toggle·TXT, run.bat pip (CLI + Qt)
+
+---
+
 ## 1.2.0 — PDF Split Bereiche, Ann.-Export JSON/Flatten, Text-Diff Panel, run.bat Deps
 
 Minor-Release nach 1.1.9: **PDF-Split/Extrakt** mit Seitenbereichen `1-3,5,8-10` → neue Datei(en); **Annotation-Export** aktuelle Seite oder Dokument als JSON (**ildann-v4**) inkl. optionalem **Flatten-PDF**; **Text-Diff Panel** vergleicht zwei offene Text-Tabs; Windows **`run.bat`** prüft Python/Abhängigkeiten mit klaren DE-Meldungen. Stubs KI/Cloud/Stylus/3D bleiben Stubs.

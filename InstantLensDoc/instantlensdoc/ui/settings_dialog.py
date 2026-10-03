@@ -831,6 +831,27 @@ class SettingsDialog(QDialog):
         recent_row.addWidget(self.btn_clear_recent)
         form.addRow("Zuletzt geöffnet (max.)", recent_row)
 
+        from instantlensdoc.core.app_settings import (
+            get_ann_export_filename_template,
+            get_last_ann_export_dir,
+        )
+
+        self.ann_export_tpl = QLineEdit(get_ann_export_filename_template())
+        self.ann_export_tpl.setPlaceholderText("{stem}_ann.json")
+        self.ann_export_tpl.setToolTip(
+            "Dateiname-Template für Annotation-JSON-Export. "
+            "Platzhalter: {stem}, optional {page}. Standard: {stem}_ann.json — 1.2.1"
+        )
+        form.addRow("Ann.-Export Dateiname", self.ann_export_tpl)
+        last_ann = get_last_ann_export_dir()
+        self.ann_export_dir_lbl = QLabel(
+            f"Ann.-Export Ordner: {last_ann}" if last_ann else "Ann.-Export Ordner: (noch keiner)"
+        )
+        self.ann_export_dir_lbl.setToolTip(
+            "Zuletzt genutzter Zielordner für Annotation-JSON-Export — 1.2.1"
+        )
+        form.addRow(self.ann_export_dir_lbl)
+
         self.jpeg_q = QSpinBox()
         self.jpeg_q.setRange(10, 100)
         self.jpeg_q.setValue(get_export_jpeg_quality())
@@ -1495,6 +1516,10 @@ class SettingsDialog(QDialog):
         set_status_blink_mode(str(self.status_blink.currentData() or "kurz"))
         set_merge_diff_max_side(int(self.merge_diff_max.value()))
         set_recent_files_max(int(self.recent_files_max.value()))
+        from instantlensdoc.core.app_settings import set_ann_export_filename_template
+
+        if hasattr(self, "ann_export_tpl"):
+            set_ann_export_filename_template(self.ann_export_tpl.text().strip())
         parent = self.parent()
         if parent is not None and hasattr(parent, "_refresh_recent"):
             try:

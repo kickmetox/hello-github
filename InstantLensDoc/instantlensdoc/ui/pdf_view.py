@@ -5729,7 +5729,7 @@ class PdfViewer(QWidget):
     def export_annotations_json_flatten(self) -> bool:
         """
         Annotation-Export Dialog: aktuelle Seite / Dokument als JSON (ildann-v4)
-        + optional Flatten-PDF — 1.2.0.
+        + optional Flatten-PDF — 1.2.0/1.2.1 (Zielordner merken, Dateiname-Template).
         """
         if not self.store or not self.pdf_path:
             QMessageBox.information(self, "Annotationen", "Kein PDF geladen.")
@@ -5757,18 +5757,22 @@ class PdfViewer(QWidget):
             if not confirm_overwrite_export(opts.flatten_path, self):
                 return False
         try:
+            from instantlensdoc.core.app_settings import (
+                remember_recent_dir,
+                set_last_ann_export_dir,
+                set_last_export_dir,
+            )
+
             if self.store.dirty:
                 self.schedule_sidecar_save(force=True)
             saved = self.store.export_json(opts.json_path, pages=pages)
-            n = opts.json_path
+            set_last_ann_export_dir(opts.json_path.parent)
+            set_last_export_dir(opts.json_path.parent)
+            remember_recent_dir(opts.json_path.parent)
             scope_lbl = f"Seite {page + 1}" if opts.scope == "page" else "Dokument"
             msg = f"JSON {scope_lbl}: {saved.name}"
             if opts.flatten and opts.flatten_path is not None:
                 from ild_pdf import flatten_annotations_to_pdf
-                from instantlensdoc.core.app_settings import (
-                    remember_recent_dir,
-                    set_last_export_dir,
-                )
 
                 bake_scale = max(float(self.scale), 1.5)
                 flat_pages = [page] if opts.scope == "page" else None
@@ -5781,6 +5785,7 @@ class PdfViewer(QWidget):
                     grayscale=self._grayscale,
                     page_indices=flat_pages,
                 )
+                set_last_ann_export_dir(out_flat.parent)
                 set_last_export_dir(out_flat.parent)
                 remember_recent_dir(out_flat.parent)
                 msg += f" + Flatten {out_flat.name}"

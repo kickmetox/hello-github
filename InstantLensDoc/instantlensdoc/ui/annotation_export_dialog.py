@@ -1,4 +1,4 @@
-"""Annotation-Export: aktuelle Seite / Dokument als JSON (ildann-v4) + optional Flatten-PDF — 1.2.0."""
+"""Annotation-Export: aktuelle Seite / Dokument als JSON (ildann-v4) + optional Flatten-PDF — 1.2.0/1.2.1."""
 
 from __future__ import annotations
 
@@ -34,6 +34,7 @@ class AnnotationExportDialog(QDialog):
     """
     Export-Dialog: Scope (aktuelle Seite / gesamtes Dokument),
     JSON Schema ildann-v4, optional Flatten-PDF.
+    Zielordner wird gemerkt; Dateiname aus Settings-Template ({stem}_ann.json) — 1.2.1.
     """
 
     def __init__(
@@ -48,7 +49,7 @@ class AnnotationExportDialog(QDialog):
     ):
         super().__init__(parent)
         self.setWindowTitle("Annotationen exportieren (JSON / Flatten)")
-        self.resize(520, 280)
+        self.resize(520, 300)
         self._pdf_path = Path(pdf_path) if pdf_path else None
         self._current_page = max(0, int(current_page))
         self._page_count = max(1, int(page_count))
@@ -74,16 +75,17 @@ class AnnotationExportDialog(QDialog):
         root.addWidget(self.radio_page)
         root.addWidget(self.radio_doc)
 
+        from instantlensdoc.core.app_settings import get_ann_export_filename_template
+
+        tpl = get_ann_export_filename_template()
+        root.addWidget(
+            QLabel(
+                f"Dateiname-Template (Einstellungen): <code>{tpl}</code> — 1.2.1"
+            )
+        )
+
         form = QFormLayout()
-        default_json = ""
-        default_flat = ""
-        if self._pdf_path:
-            default_json = str(
-                self._pdf_path.with_suffix(self._pdf_path.suffix + ".annotations.json")
-            )
-            default_flat = str(
-                self._pdf_path.with_name(f"{self._pdf_path.stem}_flattened.pdf")
-            )
+        default_json, default_flat = self._default_paths()
         self.json_path = QLineEdit(default_json)
         btn_json = QPushButton("…")
         btn_json.setFixedWidth(32)
@@ -121,6 +123,49 @@ class AnnotationExportDialog(QDialog):
         self.radio_page.toggled.connect(self._update_defaults_for_scope)
         self.radio_doc.toggled.connect(self._update_defaults_for_scope)
 
+    def _export_dir(self) -> Path:
+        """Gemerkter Zielordner oder PDF-Ordner — 1.2.1."""
+        from instantlensdoc.core.app_settings import get_last_ann_export_dir
+
+        remembered = get_last_ann_export_dir()
+        if remembered is not None:
+            return remembered
+        if self._pdf_path is not None:
+            return self._pdf_path.parent
+        return Path.cwd()
+
+    def _default_paths(self) -> tuple[str, str]:
+        from instantlensdoc.core.app_settings import (
+            format_ann_export_filename,
+            get_ann_export_filename_template,
+        )
+
+        if not self._pdf_path:
+            return "", ""
+        stem = self._pdf_path.stem
+        parent = self._export_dir()
+        page_scope = hasattr(self, "radio_page") and self.radio_page.isChecked()
+        page = self._current_page + 1 if page_scope else None
+        tpl = get_ann_export_filename_template()
+        if page is not None:
+            if "{page}" in tpl:
+                fname = format_ann_export_filename(stem, page=page, template=tpl)
+            else:
+                # Standard-Template ohne {page}: Seiten-Suffix einfügen
+                fname = format_ann_export_filename(stem, page=None, template=tpl)
+                if fname.endswith("_ann.json"):
+                    fname = f"{stem}_p{page}_ann.json"
+                else:
+                    fname = f"{Path(fname).stem}_p{page}.json"
+        else:
+            fname = format_ann_export_filename(stem, page=None, template=tpl)
+        json_path = str(parent / fname)
+        if page is not None:
+            flat = str(parent / f"{stem}_p{page}_flattened.pdf")
+        else:
+            flat = str(parent / f"{stem}_flattened.pdf")
+        return json_path, flat
+
     def _sync_flatten_enabled(self, checked: bool) -> None:
         self.flatten_path.setEnabled(bool(checked))
         self._flat_btn.setEnabled(bool(checked))
@@ -128,29 +173,26 @@ class AnnotationExportDialog(QDialog):
     def _update_defaults_for_scope(self, *_args) -> None:
         if not self._pdf_path:
             return
-        stem = self._pdf_path.stem
-        parent = self._pdf_path.parent
-        if self.radio_page.isChecked():
-            p = self._current_page + 1
-            self.json_path.setText(
-                str(parent / f"{stem}_p{p}.annotations.json")
-            )
-            self.flatten_path.setText(str(parent / f"{stem}_p{p}_flattened.pdf"))
-        else:
-            self.json_path.setText(
-                str(self._pdf_path.with_suffix(self._pdf_path.suffix + ".annotations.json"))
-            )
-            self.flatten_path.setText(
-                str(self._pdf_path.with_name(f"{stem}_flattened.pdf"))
-            )
+        j, f = self._default_paths()
+        self.json_path.setText(j)
+        self.flatten_path.setText(f)
 
     def _pick_json(self) -> None:
         from PySide6.QtWidgets import QFileDialog
 
+        from instantlensdoc.core.app_settings import dialog_start_dir, get_last_ann_export_dir
+
+        start = dialog_start_dir(
+            self.json_path.text().strip() or None,
+            get_last_ann_export_dir(),
+            self._pdf_path.parent if self._pdf_path else None,
+        )
         path, _ = QFileDialog.getSaveFileName(
             self,
             "Annotationen JSON",
-            self.json_path.text().strip(),
+            start
+            if not self.json_path.text().strip()
+            else self.json_path.text().strip(),
             "JSON (*.json);;Annotation-Sidecar (*.ildann.json);;Alle (*.*)",
         )
         if path:
@@ -161,10 +203,16 @@ class AnnotationExportDialog(QDialog):
     def _pick_flatten(self) -> None:
         from PySide6.QtWidgets import QFileDialog
 
+        from instantlensdoc.core.app_settings import dialog_start_dir, get_last_ann_export_dir
+
+        start = self.flatten_path.text().strip() or dialog_start_dir(
+            get_last_ann_export_dir(),
+            self._pdf_path.parent if self._pdf_path else None,
+        )
         path, _ = QFileDialog.getSaveFileName(
             self,
             "Flatten-PDF",
-            self.flatten_path.text().strip(),
+            start,
             "PDF (*.pdf);;Alle (*.*)",
         )
         if path:
@@ -174,6 +222,12 @@ class AnnotationExportDialog(QDialog):
 
     def _accept(self) -> None:
         from PySide6.QtWidgets import QMessageBox
+
+        from instantlensdoc.core.app_settings import (
+            remember_recent_dir,
+            set_last_ann_export_dir,
+            set_last_export_dir,
+        )
 
         j = self.json_path.text().strip()
         if not j:
@@ -200,6 +254,10 @@ class AnnotationExportDialog(QDialog):
                 )
                 return
         scope = "page" if self.radio_page.isChecked() else "document"
+        # Zielordner merken — 1.2.1
+        set_last_ann_export_dir(jpath.parent)
+        set_last_export_dir(jpath.parent)
+        remember_recent_dir(jpath.parent)
         self.result_options = AnnotationExportOptions(
             scope=scope,
             json_path=jpath,

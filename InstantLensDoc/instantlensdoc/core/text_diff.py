@@ -109,3 +109,58 @@ def line_diff_sides(left: str, right: str) -> tuple[list[str], list[str], list[s
                 out_r.append(b)
                 tags.append("insert")
     return out_l, out_r, tags
+
+
+def filter_diff_differences(
+    left: list[str],
+    right: list[str],
+    tags: list[str],
+) -> tuple[list[str], list[str], list[str]]:
+    """Nur abweichende Zeilen behalten (equal entfernen) — 1.2.1."""
+    out_l: list[str] = []
+    out_r: list[str] = []
+    out_t: list[str] = []
+    for a, b, t in zip(left, right, tags):
+        if t == "equal":
+            continue
+        out_l.append(a)
+        out_r.append(b)
+        out_t.append(t)
+    return out_l, out_r, out_t
+
+
+def format_diff_txt(
+    left_lines: list[str],
+    right_lines: list[str],
+    tags: list[str],
+    *,
+    left_label: str = "Links",
+    right_label: str = "Rechts",
+    line_numbers: bool = True,
+    only_differences: bool = False,
+) -> str:
+    """
+    Diff als Klartext (TXT) für Export.
+    Marker: `` `` equal, ``~`` replace, ``-`` delete, ``+`` insert. — 1.2.1
+    """
+    l_lines, r_lines, t_tags = left_lines, right_lines, tags
+    if only_differences:
+        l_lines, r_lines, t_tags = filter_diff_differences(l_lines, r_lines, t_tags)
+    mark = {"equal": " ", "replace": "~", "delete": "-", "insert": "+"}
+    rows: list[str] = [
+        f"--- {left_label}",
+        f"+++ {right_label}",
+        f"# Zeilen: {len(t_tags)}"
+        + (" (nur Unterschiede)" if only_differences else ""),
+        "",
+    ]
+    for i, (a, b, t) in enumerate(zip(l_lines, r_lines, t_tags), start=1):
+        m = mark.get(t, "?")
+        if line_numbers:
+            rows.append(f"{m} {i:>4} | {a}")
+            rows.append(f"{m} {i:>4} | {b}")
+        else:
+            rows.append(f"{m} | {a}")
+            rows.append(f"{m} | {b}")
+        rows.append("")
+    return "\n".join(rows).rstrip() + "\n"

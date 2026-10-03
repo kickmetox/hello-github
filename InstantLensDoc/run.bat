@@ -1,9 +1,10 @@
 @echo off
-setlocal EnableExtensions
+setlocal EnableExtensions EnableDelayedExpansion
 chcp 65001 >nul
 cd /d "%~dp0"
 
-REM InstantLens Doc 1.2.0 — Start mit Python-/Abhängigkeitsprüfung (DE-Meldungen)
+REM InstantLens Doc 1.2.1 — Start mit Python-/Abhängigkeitsprüfung (DE-Meldungen)
+REM Optional: pip install -r requirements.txt per J/N — 1.2.1
 
 set "PYEXE="
 if exist ".venv\Scripts\python.exe" (
@@ -49,19 +50,57 @@ if errorlevel 1 (
 
 echo [InstantLens Doc] Abhaengigkeiten pruefen …
 %PYEXE% -c "import PySide6, pypdfium2, pikepdf, PIL" >nul 2>&1
-if errorlevel 1 (
-  echo.
-  echo [InstantLens Doc] FEHLER: Erforderliche Pakete fehlen.
-  echo Bitte im App-Ordner ausfuehren:
+if not errorlevel 1 goto :start_app
+
+echo.
+echo [InstantLens Doc] FEHLER: Erforderliche Pakete fehlen.
+echo Benoetigt u. a.: PySide6, pypdfium2, pikepdf, Pillow
+echo Optional fuer OCR: pytesseract + Tesseract-Runtime
+echo.
+if not exist "requirements.txt" (
+  echo [InstantLens Doc] requirements.txt nicht gefunden — bitte manuell installieren:
   echo   %PYEXE% -m pip install -r requirements.txt
   echo.
-  echo Benoetigt u. a.: PySide6, pypdfium2, pikepdf, Pillow
-  echo Optional fuer OCR: pytesseract + Tesseract-Runtime
+  pause
+  exit /b 1
+)
+echo Fehlende Pakete jetzt mit pip installieren?
+echo   %PYEXE% -m pip install -r requirements.txt
+set "ILD_PIP="
+set /p "ILD_PIP=Jetzt installieren? [J/N]: "
+if /i "!ILD_PIP!"=="J" goto :do_pip
+if /i "!ILD_PIP!"=="Y" goto :do_pip
+if /i "!ILD_PIP!"=="JA" goto :do_pip
+echo.
+echo Installation abgebrochen. Manuell ausfuehren:
+echo   %PYEXE% -m pip install -r requirements.txt
+echo.
+pause
+exit /b 1
+
+:do_pip
+echo.
+echo [InstantLens Doc] Installiere Abhaengigkeiten …
+%PYEXE% -m pip install -r requirements.txt
+if errorlevel 1 (
+  echo.
+  echo [InstantLens Doc] FEHLER: pip install ist fehlgeschlagen.
+  echo Bitte Netzwerk/Rechte pruefen und erneut versuchen.
+  echo.
+  pause
+  exit /b 1
+)
+echo [InstantLens Doc] Abhaengigkeiten erneut pruefen …
+%PYEXE% -c "import PySide6, pypdfium2, pikepdf, PIL" >nul 2>&1
+if errorlevel 1 (
+  echo.
+  echo [InstantLens Doc] FEHLER: Pakete fehlen weiterhin nach der Installation.
   echo.
   pause
   exit /b 1
 )
 
+:start_app
 echo [InstantLens Doc] Start …
 %PYEXE% -m instantlensdoc %*
 set "EC=%ERRORLEVEL%"

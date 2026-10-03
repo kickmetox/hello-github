@@ -25,7 +25,13 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ild_pdf.pages import extract_by_page_spec, merge_pdfs, parse_page_ranges, split_pdf
+from ild_pdf.pages import (
+    extract_by_page_spec,
+    merge_pdfs,
+    parse_page_ranges,
+    preview_page_range_count,
+    split_pdf,
+)
 
 
 def _pil_to_qpixmap(img) -> QPixmap:
@@ -238,17 +244,28 @@ class PdfToolsDialog(QDialog):
         self.split_every.setValue(1)
         form.addRow("Alle N Seiten", self.split_every)
         self.split_ranges = QLineEdit()
-        self.split_ranges.setPlaceholderText("z.B. 1-3,5,8-10 (1-basiert, optional) — 1.2.0")
+        self.split_ranges.setPlaceholderText(
+            "z.B. 1-3,5,8-10 (1-basiert, optional) — 1.2.1"
+        )
         self.split_ranges.setToolTip(
             "Kommagetrennte Seiten/Bereiche (1-basiert), z. B. 1-3,5,8-10 — "
-            "überschreibt „Alle N Seiten“ — 1.2.0"
+            "überschreibt „Alle N Seiten“. Fehlerhafte Bereiche: klare DE-Meldung — 1.2.1"
         )
+        self.split_ranges.textChanged.connect(self._split_update_preview)
+        self.split_src.textChanged.connect(self._split_update_preview)
         form.addRow("Bereiche", self.split_ranges)
+        self.split_preview = QLabel("Vorschau: —")
+        self.split_preview.setWordWrap(True)
+        self.split_preview.setToolTip(
+            "Anzahl Seiten und Bereiche laut aktueller Eingabe — 1.2.1"
+        )
+        form.addRow("Vorschau", self.split_preview)
         self.split_single = QCheckBox("Jede Seite einzeln")
         form.addRow("", self.split_single)
         run = QPushButton("Teilen")
         run.clicked.connect(self._split_run)
         form.addRow(run)
+        self._split_update_preview()
         return w
 
     def _build_extract_tab(self, initial_pdf: str | None) -> QWidget:
@@ -256,7 +273,7 @@ class PdfToolsDialog(QDialog):
         form = QFormLayout(w)
         form.addRow(
             QLabel(
-                "Seitenbereiche extrahieren (1-basiert), z. B. <b>1-3,5,8-10</b> — 1.2.0"
+                "Seitenbereiche extrahieren (1-basiert), z. B. <b>1-3,5,8-10</b> — 1.2.1"
             )
         )
         self.ex_src = QLineEdit(initial_pdf or "")
@@ -276,9 +293,17 @@ class PdfToolsDialog(QDialog):
         self.ex_spec.setPlaceholderText("z.B. 1-3,5,8-10")
         self.ex_spec.setToolTip(
             "Kommagetrennte Seiten und Bereiche (1-basiert, inklusive). "
-            "Leer = Von–Bis-Spinboxen nutzen — 1.2.0"
+            "Leer = Von–Bis-Spinboxen nutzen. Fehlerhafte Bereiche: klare DE-Meldung — 1.2.1"
         )
+        self.ex_spec.textChanged.connect(self._ex_update_preview)
+        self.ex_src.textChanged.connect(self._ex_update_preview)
         form.addRow("Seitenbereiche", self.ex_spec)
+        self.ex_preview = QLabel("Vorschau: —")
+        self.ex_preview.setWordWrap(True)
+        self.ex_preview.setToolTip(
+            "Anzahl Seiten und Bereiche laut aktueller Eingabe — 1.2.1"
+        )
+        form.addRow("Vorschau", self.ex_preview)
         self.ex_from = QSpinBox()
         self.ex_from.setRange(1, 99999)
         self.ex_to = QSpinBox()
@@ -291,6 +316,8 @@ class PdfToolsDialog(QDialog):
         else:
             self.ex_from.setValue(1)
             self.ex_to.setValue(1)
+        self.ex_from.valueChanged.connect(self._ex_update_preview)
+        self.ex_to.valueChanged.connect(self._ex_update_preview)
         form.addRow("Von Seite (Fallback)", self.ex_from)
         form.addRow("Bis Seite (Fallback)", self.ex_to)
         self.ex_one_per_range = QCheckBox("Eine Datei pro Bereich")
@@ -313,6 +340,7 @@ class PdfToolsDialog(QDialog):
         run = QPushButton("Extrahieren")
         run.clicked.connect(self._ex_run)
         form.addRow(run)
+        self._ex_update_preview()
         return w
 
     def _merge_existing_paths(self) -> set[str]:
@@ -517,10 +545,23 @@ class PdfToolsDialog(QDialog):
         except Exception as e:
             QMessageBox.critical(self, "Zusammenführen", str(e))
 
+    def _pdf_page_count(self, path: str) -> int | None:
+        path = (path or "").strip()
+        if not path or not Path(path).is_file():
+            return None
+        try:
+            import pikepdf
+
+            with pikepdf.open(path) as pdf:
+                return len(pdf.pages)
+        except Exception:
+            return None
+
     def _split_pick_src(self):
         path, _ = QFileDialog.getOpenFileName(self, "PDF", "", "PDF (*.pdf)")
         if path:
             self.split_src.setText(path)
+            self._split_update_preview()
 
     def _split_pick_out(self):
         path = QFileDialog.getExistingDirectory(self, "Ausgabeordner")
@@ -528,11 +569,39 @@ class PdfToolsDialog(QDialog):
             self.split_out.setText(path)
 
     def _parse_ranges(self, text: str, page_count: int) -> list[tuple[int, int]] | None:
-        """1-basierte Bereiche → 0-basiert für split_pdf — 1.2.0."""
+        """1-basierte Bereiche → 0-basiert für split_pdf — 1.2.0/1.2.1."""
         text = text.strip()
         if not text:
             return None
         return parse_page_ranges(text, page_count, one_based=True)
+
+    def _split_update_preview(self, *_args) -> None:
+        """Live-Vorschau Seitenanzahl / DE-Fehler — 1.2.1."""
+        if not hasattr(self, "split_preview"):
+            return
+        src = self.split_src.text().strip()
+        spec = self.split_ranges.text().strip()
+        if not spec:
+            self.split_preview.setText("Vorschau: — (keine Bereiche; „Alle N“ / einzeln)")
+            self.split_preview.setStyleSheet("")
+            return
+        n = self._pdf_page_count(src)
+        if n is None:
+            self.split_preview.setText(
+                "Vorschau: Quelle wählen, um Seitenanzahl zu prüfen."
+            )
+            self.split_preview.setStyleSheet("color: #666;")
+            return
+        pages, n_ranges, err = preview_page_range_count(spec, n, one_based=True)
+        if err:
+            self.split_preview.setText(f"Fehler: {err}")
+            self.split_preview.setStyleSheet("color: #b00020;")
+            return
+        self.split_preview.setText(
+            f"Vorschau: {pages} Seite(n) in {n_ranges} Bereich(en) "
+            f"(Dokument: {n} Seiten)"
+        )
+        self.split_preview.setStyleSheet("color: #0a5;")
 
     def _split_run(self):
         src = self.split_src.text().strip()
@@ -541,10 +610,14 @@ class PdfToolsDialog(QDialog):
             QMessageBox.warning(self, "Teilen", "Quelle und Ausgabeordner angeben.")
             return
         try:
-            import pikepdf
-
-            with pikepdf.open(src) as pdf:
-                n = len(pdf.pages)
+            n = self._pdf_page_count(src)
+            if n is None:
+                QMessageBox.warning(
+                    self,
+                    "Teilen",
+                    "PDF konnte nicht gelesen werden. Bitte gültige Quelldatei wählen.",
+                )
+                return
             ranges = self._parse_ranges(self.split_ranges.text(), n)
             written = split_pdf(
                 src,
@@ -560,6 +633,9 @@ class PdfToolsDialog(QDialog):
                 "Teilen",
                 f"{len(written)} Datei(en) erstellt in\n{out}",
             )
+        except ValueError as e:
+            QMessageBox.warning(self, "Teilen — ungültiger Bereich", str(e))
+            self._split_update_preview()
         except Exception as e:
             QMessageBox.critical(self, "Teilen", str(e))
 
@@ -575,8 +651,10 @@ class PdfToolsDialog(QDialog):
                 self.ex_from.setMaximum(max(1, n))
                 self.ex_to.setMaximum(max(1, n))
                 self.ex_to.setValue(n)
+                self._page_count = n
             except Exception:
                 pass
+            self._ex_update_preview()
 
     def _ex_pick_dest(self):
         if self.ex_one_per_range.isChecked():
@@ -594,6 +672,35 @@ class PdfToolsDialog(QDialog):
                 path += ".pdf"
             self.ex_dest.setText(path)
 
+    def _ex_update_preview(self, *_args) -> None:
+        """Live-Vorschau Seitenanzahl / DE-Fehler — 1.2.1."""
+        if not hasattr(self, "ex_preview"):
+            return
+        src = self.ex_src.text().strip()
+        spec = (self.ex_spec.text() or "").strip()
+        if not spec:
+            spec = f"{self.ex_from.value()}-{self.ex_to.value()}"
+        n = self._pdf_page_count(src)
+        if n is None:
+            if self._page_count and self._page_count > 0:
+                n = int(self._page_count)
+            else:
+                self.ex_preview.setText(
+                    "Vorschau: Quelle wählen, um Seitenanzahl zu prüfen."
+                )
+                self.ex_preview.setStyleSheet("color: #666;")
+                return
+        pages, n_ranges, err = preview_page_range_count(spec, n, one_based=True)
+        if err:
+            self.ex_preview.setText(f"Fehler: {err}")
+            self.ex_preview.setStyleSheet("color: #b00020;")
+            return
+        self.ex_preview.setText(
+            f"Vorschau: {pages} Seite(n) in {n_ranges} Bereich(en) "
+            f"(Dokument: {n} Seiten)"
+        )
+        self.ex_preview.setStyleSheet("color: #0a5;")
+
     def _ex_run(self):
         src = self.ex_src.text().strip()
         dest = self.ex_dest.text().strip()
@@ -609,6 +716,16 @@ class PdfToolsDialog(QDialog):
         if not spec:
             spec = f"{self.ex_from.value()}-{self.ex_to.value()}"
         try:
+            n = self._pdf_page_count(src)
+            if n is None:
+                QMessageBox.warning(
+                    self,
+                    "Seitenbereich",
+                    "PDF konnte nicht gelesen werden. Bitte gültige Quelldatei wählen.",
+                )
+                return
+            # Vorab validieren → klare DE-Meldung
+            parse_page_ranges(spec, n, one_based=True)
             if one_per:
                 written = extract_by_page_spec(
                     src, dest, spec, one_based=True, one_file_per_range=True
@@ -630,5 +747,8 @@ class PdfToolsDialog(QDialog):
                     "Seitenbereich",
                     f"Extrahiert: {spec}\n{out}",
                 )
+        except ValueError as e:
+            QMessageBox.warning(self, "Seitenbereich — ungültiger Bereich", str(e))
+            self._ex_update_preview()
         except Exception as e:
             QMessageBox.critical(self, "Seitenbereich", str(e))
