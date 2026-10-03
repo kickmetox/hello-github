@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Nightly/CI Smoke: CLI + Import-Checks für InstantLens Doc — 2.1.0–2.2.4.
+"""Nightly/CI Smoke: CLI + Import-Checks für InstantLens Doc — 2.1.0–2.2.5.
 
 Leichtgewichtig. Exit-Codes:
   0  OK  (ok=true)
@@ -14,12 +14,12 @@ Aufruf:
   python scripts/smoke_ild.py -h
 
 JSON-Schema (--json), Erfolg:
-  {"ok": true, "version": "2.2.4", "duration_ms": 1234,
+  {"ok": true, "version": "2.2.5", "duration_ms": 1234,
    "checks": ["version", "imports", "cli", "measure_diff_import", "changelog"]}
 
 JSON bei Fail: checks[] enthält Objekt mit error-Text (max 200 Zeichen, Truncate …);
 Exitcode spiegelt ok (0↔true, 1↔false) — 2.2.0:
-  {"ok": false, "version": "2.2.4", "duration_ms": 12,
+  {"ok": false, "version": "2.2.5", "duration_ms": 12,
    "checks": ["version", {"name": "imports", "error": "import x: …"}]}
 """
 
@@ -41,7 +41,7 @@ if str(ROOT) not in sys.path:
 # Headless/CI: Qt ohne Display
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-EXPECTED_VERSION = "2.2.4"
+EXPECTED_VERSION = "2.2.5"
 FAIL_ERROR_MAX_LEN = 200
 
 EXIT_OK = 0
@@ -159,22 +159,36 @@ def check_imports(*, with_qt: bool) -> None:
             "EscapeDiscardEditFilter",
             "Klick fokussiert Statusleiste",
             "get_ocr_defaults_toast_sec",
+            "_show_smooth_status_toast",
+            "_announce_smooth_status_toast",
+            "_focus_ink_tool_from_toast",
+            "Klick fokussiert Ink",
         ),
         ROOT / "instantlensdoc" / "ui" / "page_labels_dialog.py": (
             "PageLabelsDialog",
             "Auch in PDF schreiben",
             "PageLabels",
+            "Reset Default",
+            "{stem}",
+            "{date}",
+            "pageLabelTxtPreview",
+            "highlight_page_labels_txt_template_html",
+            "reset_line_edit_template",
         ),
         ROOT / "instantlensdoc" / "ui" / "main_window.py": (
             "_focus_import_status_toast_target",
             "_import_status_toast_active",
             "Klick fokussiert Statusleiste",
+            "_smooth_status_toast_active",
+            "Klick fokussiert Ink",
             "Seitenbeschriftungen…",
             "Dokument-Historie…",
         ),
         ROOT / "CONTRIBUTING.md": (
             "smoke_ild",
             "scripts/smoke_ild.py",
+            "Windows",
+            "-NoStart",
         ),
         ROOT / ".github" / "workflows" / "smoke-ild.yml": (
             "smoke-ild",
@@ -480,12 +494,14 @@ def check_measure_and_diff() -> None:
 
     _ok(
         "measure + textlayer-diff + native-import + measures-csv "
-        "template + status + ink/page-labels/ildhist — 2.2.4"
+        "template + status + ink/page-labels/ildhist — 2.2.5"
     )
 
 
 def check_changelog() -> None:
     cl = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    if "## 2.2.5" not in cl:
+        _fail("CHANGELOG fehlt ## 2.2.5")
     if "## 2.2.4" not in cl:
         _fail("CHANGELOG fehlt ## 2.2.4")
     if "## 2.2.3" not in cl:
@@ -505,7 +521,13 @@ def check_changelog() -> None:
     if "## 2.1.0" not in cl:
         _fail("CHANGELOG fehlt ## 2.1.0")
     if (
-        "{stem}_labels.txt" not in cl
+        "Live-Vorschau" not in cl
+        and "Quick-Insert" not in cl
+        and "Reset Default" not in cl
+        and "Ink-Tool" not in cl
+        and "Redo" not in cl
+        and "NoStart" not in cl
+        and "{stem}_labels.txt" not in cl
         and "BOM" not in cl
         and "Einträge entfernt" not in cl
         and "Undo Clear" not in cl
@@ -527,12 +549,14 @@ def check_changelog() -> None:
         and "Range-Editor" not in cl
         and "Glätten" not in cl
     ):
-        _fail("CHANGELOG 2.2.4 fehlt Kernfeature-Hinweis")
+        _fail("CHANGELOG 2.2.5 fehlt Kernfeature-Hinweis")
     if "## 2.2.1" not in cl:
         _fail("CHANGELOG fehlt ## 2.2.1")
     if "## 2.2.0" not in cl:
         _fail("CHANGELOG fehlt ## 2.2.0")
     feat = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
+    if "2.2.5" not in feat:
+        _fail("FEATURES.md fehlt 2.2.5")
     if "2.2.4" not in feat:
         _fail("FEATURES.md fehlt 2.2.4")
     if "2.2.3" not in feat:
@@ -568,13 +592,17 @@ def check_changelog() -> None:
         _fail("CONTRIBUTING.md fehlt Exitcode-Tabelle")
     if "sync-ild.ps1" not in contrib_txt:
         _fail("CONTRIBUTING.md fehlt Sync-Einzeiler (sync-ild.ps1)")
+    if "Windows" not in contrib_txt:
+        _fail("CONTRIBUTING.md fehlt Windows-Hinweis für Sync")
+    if "-NoStart" not in contrib_txt and "NoStart" not in contrib_txt:
+        _fail("CONTRIBUTING.md fehlt optional -NoStart")
     wf = ROOT / ".github" / "workflows" / "smoke-ild.yml"
     if not wf.is_file():
         _fail("Workflow-Stub smoke-ild.yml fehlt")
     wf_txt = wf.read_text(encoding="utf-8")
     if "manual only" not in wf_txt.casefold() and "MANUAL ONLY" not in wf_txt:
         _fail("Workflow-Stub fehlt klarer „manual only“-Kommentar")
-    _ok("changelog + features + info + CONTRIBUTING(smoke_ild/sync) + workflow manual-only")
+    _ok("changelog + features + info + CONTRIBUTING(smoke_ild/sync/Windows/-NoStart) + workflow manual-only")
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -640,11 +668,11 @@ Exit-Codes:
 Laufzeit: am Ende als „Laufzeit: N ms“ (oder duration_ms im JSON).
 
 Beispiel --json (Erfolg):
-  {"ok": true, "version": "2.2.4", "duration_ms": 1234,
+  {"ok": true, "version": "2.2.5", "duration_ms": 1234,
    "checks": ["version", "imports", "cli", "measure_diff_import", "changelog"]}
 
 Beispiel --json (Fail):
-  {"ok": false, "version": "2.2.4", "duration_ms": 12,
+  {"ok": false, "version": "2.2.5", "duration_ms": 12,
    "checks": ["version", {"name": "imports", "error": "import x: …"}]}
 """.rstrip()
     )

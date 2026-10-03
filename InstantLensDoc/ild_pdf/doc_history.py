@@ -94,6 +94,10 @@ class DocHistory:
     _clear_undo: Optional[List[HistoryEntry]] = field(
         default=None, repr=False, compare=False
     )
+    # Session-Snapshot nach Undo Clear für Redo — 2.2.5
+    _clear_redo: Optional[List[HistoryEntry]] = field(
+        default=None, repr=False, compare=False
+    )
 
     def __post_init__(self) -> None:
         self.pdf_path = Path(self.pdf_path)
@@ -153,11 +157,13 @@ class DocHistory:
 
         Ohne ``action``: alles. Mit ``action``: nur Einträge dieses Typs — 2.2.3.
         Speichert Session-Snapshot für ``undo_clear`` — 2.2.4.
+        Neues Clear invalidiert Redo — 2.2.5.
         """
         # Snapshot vor Clear (tiefe Kopie) — Undo Clear — 2.2.4
         self._clear_undo = [
             HistoryEntry.from_dict(e.to_dict()) for e in self.entries
         ]
+        self._clear_redo = None  # neues Clear → Redo verwerfen — 2.2.5
         act = str(action or "").strip()
         if act and act not in ("*", "alle", "all", ""):
             before = len(self.entries)
@@ -182,18 +188,51 @@ class DocHistory:
         """True wenn Session-Snapshot nach Clear verfügbar — 2.2.4."""
         return self._clear_undo is not None
 
+    def can_redo_clear(self) -> bool:
+        """True wenn Session-Snapshot nach Undo Clear verfügbar — 2.2.5."""
+        return self._clear_redo is not None
+
     def undo_clear(self, *, save: bool = True) -> bool:
         """
         Letztes Clear rückgängig machen (Session-Snapshot) — 2.2.4.
+        Speichert aktuellen Stand für ``redo_clear`` — 2.2.5.
 
         Rückgabe: True wenn wiederhergestellt, sonst False.
         """
         if self._clear_undo is None:
             return False
+        # Aktueller (geleerter) Stand → Redo — 2.2.5
+        self._clear_redo = [
+            HistoryEntry.from_dict(e.to_dict()) for e in self.entries
+        ]
         self.entries = [
             HistoryEntry.from_dict(e.to_dict()) for e in self._clear_undo
         ]
         self._clear_undo = None
+        self.dirty = True
+        if save:
+            try:
+                self.save()
+            except Exception:
+                pass
+        return True
+
+    def redo_clear(self, *, save: bool = True) -> bool:
+        """
+        Clear nach Undo erneut anwenden (Session-Snapshot) — 2.2.5.
+
+        Rückgabe: True wenn angewendet, sonst False.
+        """
+        if self._clear_redo is None:
+            return False
+        # Aktueller Stand → Undo wieder möglich
+        self._clear_undo = [
+            HistoryEntry.from_dict(e.to_dict()) for e in self.entries
+        ]
+        self.entries = [
+            HistoryEntry.from_dict(e.to_dict()) for e in self._clear_redo
+        ]
+        self._clear_redo = None
         self.dirty = True
         if save:
             try:

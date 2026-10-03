@@ -2767,6 +2767,9 @@ class MainWindow(QMainWindow):
         # Import-Status-Toast nur behalten wenn Status dazu passt — 2.1.5
         if "Import-Status" not in text:
             self._import_status_toast_active = False
+        # Ink-Glättungs-Toast nur behalten wenn Status dazu passt — 2.2.5
+        if "Glättung angewandt" not in text:
+            self._smooth_status_toast_active = False
         # Update-Quellen-Tooltip nur bei Update-Status — 1.7.4/1.7.5
         if not text.startswith("Update:") and "Update —" not in text:
             if "Update:" not in text:
@@ -2778,6 +2781,7 @@ class MainWindow(QMainWindow):
         # Text→PDF: Klick öffnet Ordner — 1.7.4
         # Update: Klick öffnet VERSION.txt / docs/VERSION — 1.7.5
         # Import-Status: Klick fokussiert Statusleiste/Log — 2.1.5
+        # Ink-Toast: Klick fokussiert Ink-Tool — 2.2.5
         if getattr(self, "_meta_toast_active", False) and "Metadaten gespeichert" in text:
             self.statusBar().setToolTip(
                 "Klick öffnet Metadaten-Dialog erneut — 1.5.5"
@@ -2786,6 +2790,11 @@ class MainWindow(QMainWindow):
         elif getattr(self, "_import_status_toast_active", False) and "Import-Status" in text:
             self.statusBar().setToolTip(
                 "Klick fokussiert Statusleiste/Log falls vorhanden — 2.1.5"
+            )
+            self.statusBar().setCursor(Qt.PointingHandCursor)
+        elif getattr(self, "_smooth_status_toast_active", False) and "Glättung angewandt" in text:
+            self.statusBar().setToolTip(
+                "Klick fokussiert Ink-/Freihand-Werkzeug — 2.2.5"
             )
             self.statusBar().setCursor(Qt.PointingHandCursor)
         elif getattr(self, "_text_pdf_toast_active", False) and "Text → PDF" in text:
@@ -2932,6 +2941,19 @@ class MainWindow(QMainWindow):
         ):
             if self._focus_import_status_toast_target():
                 return
+        # Ink-Toast: Klick fokussiert Ink-/Freihand-Werkzeug — 2.2.5
+        if (
+            event.button() == Qt.LeftButton
+            and getattr(self, "_smooth_status_toast_active", False)
+            and "Glättung angewandt" in cur
+        ):
+            pv = getattr(self, "pdf_view", None)
+            if pv is not None and hasattr(pv, "_focus_ink_tool_from_toast"):
+                try:
+                    if pv._focus_ink_tool_from_toast():
+                        return
+                except Exception:
+                    pass
         # Text → PDF: Klick öffnet Ordner; fehlt → Neu anlegen — 1.7.5
         if (
             event.button() == Qt.LeftButton

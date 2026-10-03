@@ -3890,6 +3890,41 @@ def set_page_labels_txt_filename_template(template: str) -> str:
     return raw
 
 
+def find_invalid_page_labels_txt_placeholders(template: str) -> list[str]:
+    """Unbekannte Platzhalter im PageLabels-TXT-Template — 2.2.5."""
+    seen: set[str] = set()
+    out: list[str] = []
+    for name in _PAGE_LABELS_TXT_ANY_PLACEHOLDER_RE.findall(str(template or "")):
+        key = name.strip()
+        if not key or key in PAGE_LABELS_TXT_KNOWN_PLACEHOLDERS or key in seen:
+            continue
+        seen.add(key)
+        out.append(key)
+    return out
+
+
+def highlight_page_labels_txt_template_html(template: str) -> str:
+    """Template als HTML; ungültige Platzhalter rot — 2.2.5."""
+    import html as _html
+
+    raw = str(template or "")
+    parts: list[str] = []
+    last = 0
+    for m in _PAGE_LABELS_TXT_ANY_PLACEHOLDER_RE.finditer(raw):
+        parts.append(_html.escape(raw[last : m.start()]))
+        name = m.group(1).strip()
+        token = _html.escape(m.group(0))
+        if name and name not in PAGE_LABELS_TXT_KNOWN_PLACEHOLDERS:
+            parts.append(
+                f'<span style="color:#c62828;font-weight:600">{token}</span>'
+            )
+        else:
+            parts.append(token)
+        last = m.end()
+    parts.append(_html.escape(raw[last:]))
+    return "".join(parts) or _html.escape(raw)
+
+
 def format_page_labels_txt_filename(
     stem: str,
     *,
@@ -3899,7 +3934,7 @@ def format_page_labels_txt_filename(
     """
     PageLabels-TXT-Dateiname aus Template.
     Platzhalter: ``{stem}``, ``{date}`` (YYYY-MM-DD).
-    Default ``{stem}_labels.txt`` — 2.2.4.
+    Default ``{stem}_labels.txt`` — 2.2.4/2.2.5.
     """
     from datetime import date as _date
 

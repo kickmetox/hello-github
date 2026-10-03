@@ -1,10 +1,10 @@
-"""Dialog: benutzerdefinierte PDF-Seitenbeschriftungen — 2.2.0 / Polish 2.2.1–2.2.4."""
+"""Dialog: benutzerdefinierte PDF-Seitenbeschriftungen — 2.2.0 / Polish 2.2.1–2.2.5."""
 
 from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import (
     QCheckBox,
     QDialog,
@@ -140,8 +140,8 @@ class PageLabelsDialog(QDialog):
         btn_export_txt = QPushButton("Labels als TXT…")
         btn_export_txt.setObjectName("pageLabelExportTxt")
         btn_export_txt.setToolTip(
-            "Labels als TXT: Template {stem}_labels.txt · Zielordner merken · "
-            "UTF-8-BOM Option — 2.2.4"
+            "Labels als TXT: Live-Vorschau Dateiname · Quick-Insert {stem}/{date} · "
+            "Reset Default · Zielordner merken · UTF-8-BOM — 2.2.5"
         )
         btn_export_txt.clicked.connect(self._export_labels_txt)
         presets.addWidget(btn_export_txt)
@@ -307,20 +307,27 @@ class PageLabelsDialog(QDialog):
 
     def _export_labels_txt(self) -> None:
         """
-        Labels als TXT: Template ``{stem}_labels.txt``, Zielordner merken,
-        UTF-8-BOM Option — 2.2.4 (Basis Export 2.2.3).
+        Labels als TXT: Live-Vorschau Dateiname, Quick-Insert {stem}/{date},
+        Reset Default, Zielordner merken, UTF-8-BOM — 2.2.5.
         """
         from ild_pdf.page_labels import export_page_labels_txt
         from instantlensdoc.core.app_settings import (
             DEFAULT_PAGE_LABELS_TXT_FILENAME_TEMPLATE,
             dialog_start_dir,
+            find_invalid_page_labels_txt_placeholders,
             format_page_labels_txt_filename,
             get_last_page_labels_txt_dir,
             get_page_labels_txt_filename_template,
             get_page_labels_txt_utf8_bom,
+            highlight_page_labels_txt_template_html,
             set_last_page_labels_txt_dir,
             set_page_labels_txt_filename_template,
             set_page_labels_txt_utf8_bom,
+        )
+        from instantlensdoc.ui.template_reset import (
+            EscapeDiscardEditFilter,
+            focus_line_edit_select_all,
+            reset_line_edit_template,
         )
 
         labels = self.labels()
@@ -344,7 +351,7 @@ class PageLabelsDialog(QDialog):
         ol.addWidget(
             QLabel(
                 f"{len(labels)} Label(s) · Template "
-                f"{DEFAULT_PAGE_LABELS_TXT_FILENAME_TEMPLATE} — 2.2.4"
+                f"{DEFAULT_PAGE_LABELS_TXT_FILENAME_TEMPLATE} — 2.2.5"
             )
         )
         chk_bom = QCheckBox("UTF-8 BOM (Excel)")
@@ -359,23 +366,91 @@ class PageLabelsDialog(QDialog):
         tpl_edit.setObjectName("pageLabelTxtTemplate")
         tpl_edit.setPlaceholderText(DEFAULT_PAGE_LABELS_TXT_FILENAME_TEMPLATE)
         tpl_edit.setToolTip(
-            "Template; Platzhalter {stem}/{date}; Default "
-            f"{DEFAULT_PAGE_LABELS_TXT_FILENAME_TEMPLATE} — 2.2.4"
+            "Live-Dateiname-Template; Platzhalter {stem}/{date}; "
+            "Quick-Insert; Reset Default (Bestätigung nur bei Abweichung · "
+            "Fokus+Selektion); Esc im Feld verwirft Edit — 2.2.5"
         )
         tpl_row.addWidget(tpl_edit, 1)
-        ol.addLayout(tpl_row)
         preview = QLabel("")
         preview.setObjectName("pageLabelTxtPreview")
+        preview.setTextFormat(Qt.RichText)
         preview.setWordWrap(True)
+        preview.setToolTip(
+            "Live-Vorschau Dateiname; ungültige Platzhalter rot — 2.2.5"
+        )
 
         def _update_preview() -> None:
+            import html as _html
+
             tpl = tpl_edit.text().strip() or DEFAULT_PAGE_LABELS_TXT_FILENAME_TEMPLATE
             name = format_page_labels_txt_filename(stem, template=tpl)
-            preview.setText(f"Vorschau: {name}")
+            html = highlight_page_labels_txt_template_html(tpl)
+            invalid = find_invalid_page_labels_txt_placeholders(tpl)
+            note = f" → <code>{_html.escape(name)}</code>"
+            if invalid:
+                note += f" · ungültig: {', '.join(invalid)}"
+            preview.setText(f"TXT: {html}{note}")
 
+        tpl_esc = EscapeDiscardEditFilter(
+            tpl_edit, on_discard=_update_preview, parent=opts
+        )
+
+        for token in ("{stem}", "{date}"):
+            btn = QPushButton(token)
+            btn.setObjectName(
+                "pageLabelTxtInsertStem" if token == "{stem}" else "pageLabelTxtInsertDate"
+            )
+            btn.setAutoDefault(False)
+            btn.setDefault(False)
+            btn.setFocusPolicy(Qt.TabFocus)
+            btn.setToolTip(f"Platzhalter {token} an Cursor einfügen — 2.2.5")
+
+            def _insert(t=token) -> None:
+                tpl_edit.insert(t)
+                tpl_edit.setFocus()
+                _update_preview()
+                tpl_esc.commit()
+
+            btn.clicked.connect(_insert)
+            tpl_row.addWidget(btn)
+
+        btn_reset_tpl = QPushButton("Reset Default")
+        btn_reset_tpl.setObjectName("pageLabelTxtResetDefault")
+        btn_reset_tpl.setAutoDefault(False)
+        btn_reset_tpl.setDefault(False)
+        btn_reset_tpl.setFocusPolicy(Qt.TabFocus)
+        btn_reset_tpl.setToolTip(
+            f"Reset Default ({DEFAULT_PAGE_LABELS_TXT_FILENAME_TEMPLATE}) "
+            "Bestätigung nur bei Abweichung; danach Fokus+Selektion — 2.2.5"
+        )
+
+        def _focus_tpl_select_all() -> None:
+            focus_line_edit_select_all(tpl_edit)
+
+        def _reset_tpl() -> None:
+            default = DEFAULT_PAGE_LABELS_TXT_FILENAME_TEMPLATE
+
+            def _after() -> None:
+                _update_preview()
+                tpl_esc.commit(default)
+
+            reset_line_edit_template(
+                opts,
+                tpl_edit,
+                default,
+                title="Reset Default",
+                body_prefix="PageLabels-TXT-Template auf Default zurücksetzen?",
+                on_updated=_after,
+                after_focus=False,
+            )
+            QTimer.singleShot(0, _focus_tpl_select_all)
+
+        btn_reset_tpl.clicked.connect(_reset_tpl)
+        tpl_row.addWidget(btn_reset_tpl)
+        ol.addLayout(tpl_row)
+        ol.addWidget(preview)
         tpl_edit.textChanged.connect(lambda _t: _update_preview())
         _update_preview()
-        ol.addWidget(preview)
 
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         buttons.button(QDialogButtonBox.Ok).setText("Speichern…")

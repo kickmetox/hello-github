@@ -9368,11 +9368,18 @@ class PdfViewer(QWidget):
     def _announce_smooth_status_toast(self, msg: str) -> None:
         """
         Accessibility-Announcement für Ink-Glättungs-Status —
-        gleiche Pipeline wie OCR/HC/Import (AccessibleName + AnnouncementEvent)
-        — 2.2.4.
+        gleicher Announcement-Pfad wie OCR
+        (MainWindow._announce_status_toast bzw. AccessibleName +
+        AnnouncementEvent, Fallback NameChanged) — 2.2.5.
         """
-        target = self
         win = self.window()
+        if win is not None and hasattr(win, "_announce_status_toast"):
+            try:
+                win._announce_status_toast(msg)
+                return
+            except Exception:
+                pass
+        target = self
         if win is not None and hasattr(win, "statusBar"):
             try:
                 sb = win.statusBar()
@@ -9400,11 +9407,43 @@ class PdfViewer(QWidget):
             except Exception:
                 pass
 
+    def _focus_ink_tool_from_toast(self) -> bool:
+        """Ink-Toast-Klick: Freihand-Werkzeug aktivieren + Fokus — 2.2.5."""
+        from PySide6.QtCore import Qt as _Qt
+
+        try:
+            self._set_tool(AnnotationType.INK)
+        except Exception:
+            return False
+        focused = False
+        for b in getattr(self, "_tool_buttons", []) or []:
+            try:
+                if b.text() == "Freihand":
+                    b.setFocus(_Qt.OtherFocusReason)
+                    focused = True
+                    break
+            except Exception:
+                pass
+        try:
+            self.canvas.setFocus(_Qt.OtherFocusReason)
+            focused = True
+        except Exception:
+            pass
+        win = self.window()
+        if win is not None and hasattr(win, "_announce_status_toast"):
+            try:
+                win._announce_status_toast("Werkzeug: Freihand")
+            except Exception:
+                pass
+        return focused or self.tool == AnnotationType.INK
+
     def _show_smooth_status_toast(self, msg: str = "Glättung angewandt") -> None:
         """
-        Ink-Glättungs-Status: Dauer aus OCR-Defaults-Toast-Settings + A11y — 2.2.4.
+        Ink-Glättungs-Status: Dauer aus OCR-Defaults-Toast-Settings;
+        Klick fokussiert Ink-Tool; A11y wie OCR — 2.2.5.
         """
         from PySide6.QtCore import QTimer
+        from PySide6.QtCore import Qt as _Qt
 
         try:
             from instantlensdoc.core.app_settings import get_ocr_defaults_toast_sec
@@ -9419,10 +9458,20 @@ class PdfViewer(QWidget):
         self._announce_smooth_status_toast(msg)
         self.status.emit(msg)
         win = self.window()
+        if win is not None:
+            try:
+                win._smooth_status_toast_active = True
+                win._smooth_status_toast_msg = msg
+            except Exception:
+                pass
         if win is not None and hasattr(win, "statusBar"):
             try:
                 sb = win.statusBar()
                 sb.showMessage(msg, ms)
+                sb.setToolTip(
+                    "Klick fokussiert Ink-/Freihand-Werkzeug — 2.2.5"
+                )
+                sb.setCursor(_Qt.PointingHandCursor)
             except Exception:
                 pass
 
@@ -9435,6 +9484,12 @@ class PdfViewer(QWidget):
                     sb = win.statusBar()
                     if sb is not None:
                         target = sb
+                        tip = sb.toolTip() or ""
+                        if tip.startswith("Klick fokussiert Ink"):
+                            sb.setToolTip("")
+                            sb.unsetCursor()
+                        if getattr(win, "_smooth_status_toast_active", False):
+                            win._smooth_status_toast_active = False
                 except Exception:
                     pass
             try:

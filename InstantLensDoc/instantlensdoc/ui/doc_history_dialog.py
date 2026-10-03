@@ -1,4 +1,4 @@
-"""Panel: Dokument-Historie (ildhist-v1) — Filter/Export/Clear — 2.2.1–2.2.4."""
+"""Panel: Dokument-Historie (ildhist-v1) — Filter/Export/Clear — 2.2.1–2.2.5."""
 
 from __future__ import annotations
 
@@ -93,7 +93,7 @@ class DocHistoryDialog(QDialog):
         btn_clear.setObjectName("docHistoryClear")
         btn_clear.setToolTip(
             "Historie leeren — optional nur aktuellen Filter; "
-            "Zähler „N Einträge entfernt“ · Undo Clear wenn möglich — 2.2.4"
+            "Zähler „N Einträge entfernt“ · Undo/Redo Clear — 2.2.5"
         )
         btn_clear.clicked.connect(self._clear_with_confirm)
         btn_row.addWidget(btn_clear)
@@ -101,10 +101,18 @@ class DocHistoryDialog(QDialog):
         self.btn_undo_clear.setObjectName("docHistoryUndoClear")
         self.btn_undo_clear.setEnabled(False)
         self.btn_undo_clear.setToolTip(
-            "Letztes Clear in dieser Session rückgängig — 2.2.4"
+            "Letztes Clear in dieser Session rückgängig — 2.2.5"
         )
         self.btn_undo_clear.clicked.connect(self._undo_clear)
         btn_row.addWidget(self.btn_undo_clear)
+        self.btn_redo_clear = QPushButton("Clear wiederholen")
+        self.btn_redo_clear.setObjectName("docHistoryRedoClear")
+        self.btn_redo_clear.setEnabled(False)
+        self.btn_redo_clear.setToolTip(
+            "Clear nach Undo erneut anwenden (Session) — 2.2.5"
+        )
+        self.btn_redo_clear.clicked.connect(self._redo_clear)
+        btn_row.addWidget(self.btn_redo_clear)
         btn_row.addStretch(1)
         layout.addLayout(btn_row)
 
@@ -132,8 +140,13 @@ class DocHistoryDialog(QDialog):
                 self.cmb_action.setCurrentIndex(idx)
         self.cmb_action.blockSignals(False)
 
-    def _reload(self) -> None:
-        self.hist = DocHistory.for_pdf(self.pdf_path, load=True)
+    def _update_clear_buttons(self) -> None:
+        """Undo/Redo-Clear-Buttons an Session-Snapshot anpassen — 2.2.5."""
+        self.btn_undo_clear.setEnabled(bool(self.hist.can_undo_clear()))
+        self.btn_redo_clear.setEnabled(bool(self.hist.can_redo_clear()))
+
+    def _sync_panel_from_hist(self) -> None:
+        """UI aus aktuellem Hist aktualisieren (Session-Snapshots behalten) — 2.2.5."""
         last = self.hist.last_action_ts() or "—"
         self.lbl_meta.setText(
             f"Datei: {self.hist.path.name}\n"
@@ -142,6 +155,16 @@ class DocHistoryDialog(QDialog):
         )
         self._fill_actions()
         self._refresh()
+        self._update_clear_buttons()
+
+    def _reload(self) -> None:
+        # Session Undo/Redo Clear über Disk-Reload hinweg behalten — 2.2.5
+        undo = getattr(self.hist, "_clear_undo", None)
+        redo = getattr(self.hist, "_clear_redo", None)
+        self.hist = DocHistory.for_pdf(self.pdf_path, load=True)
+        self.hist._clear_undo = undo
+        self.hist._clear_redo = redo
+        self._sync_panel_from_hist()
 
     def _selected_action(self) -> str | None:
         data = self.cmb_action.currentData()
@@ -205,11 +228,19 @@ class DocHistoryDialog(QDialog):
                 return
             self.accept()
 
+    def _no_undo_clear_hint(self) -> str:
+        """Klarer DE-Hinweis wenn Clear-Undo nicht möglich — 2.2.5."""
+        return (
+            "Clear-Undo nicht möglich.\n\n"
+            "Es liegt kein Session-Snapshot vor. "
+            "Bitte zuerst die Historie leeren — danach ist "
+            "„Clear rückgängig“ in derselben Session verfügbar."
+        )
+
     def _after_clear(self, n_removed: int) -> None:
-        """Zähler „N Einträge entfernt“ + Undo Clear oder Hinweis — 2.2.4."""
-        self._reload()
+        """Zähler „N Einträge entfernt“ + Undo Clear oder klarer Hinweis — 2.2.5."""
+        self._sync_panel_from_hist()
         can_undo = bool(self.hist.can_undo_clear())
-        self.btn_undo_clear.setEnabled(can_undo)
         if n_removed <= 0:
             return
         count_msg = (
@@ -231,30 +262,50 @@ class DocHistoryDialog(QDialog):
             QMessageBox.information(
                 self,
                 "Dokument-Historie",
-                f"{count_msg}.\n\n"
-                "Hinweis: Clear-Undo in dieser Session nicht verfügbar "
-                "(Snapshot fehlt).",
+                f"{count_msg}.\n\n{self._no_undo_clear_hint()}",
             )
 
     def _undo_clear(self) -> None:
-        """Letztes Clear aus Session-Snapshot wiederherstellen — 2.2.4."""
+        """Letztes Clear aus Session-Snapshot wiederherstellen — 2.2.5."""
         if not self.hist.can_undo_clear():
             QMessageBox.information(
                 self,
                 "Dokument-Historie",
-                "Kein Clear-Undo verfügbar "
-                "(nur in derselben Session nach Leeren).",
+                self._no_undo_clear_hint(),
             )
-            self.btn_undo_clear.setEnabled(False)
+            self._update_clear_buttons()
             return
         if self.hist.undo_clear(save=True):
-            self._reload()
-            self.btn_undo_clear.setEnabled(False)
+            self._sync_panel_from_hist()
             QMessageBox.information(
-                self, "Dokument-Historie", "Clear rückgängig gemacht."
+                self,
+                "Dokument-Historie",
+                "Clear rückgängig gemacht.\n"
+                "„Clear wiederholen“ stellt das Leeren erneut her.",
             )
         else:
-            self.btn_undo_clear.setEnabled(False)
+            self._update_clear_buttons()
+
+    def _redo_clear(self) -> None:
+        """Clear nach Undo erneut anwenden (Session) — 2.2.5."""
+        if not self.hist.can_redo_clear():
+            QMessageBox.information(
+                self,
+                "Dokument-Historie",
+                "Clear-Redo nicht möglich.\n\n"
+                "Es liegt kein Redo-Snapshot vor. "
+                "Zuerst Clear rückgängig machen — danach ist "
+                "„Clear wiederholen“ in derselben Session verfügbar.",
+            )
+            self._update_clear_buttons()
+            return
+        if self.hist.redo_clear(save=True):
+            self._sync_panel_from_hist()
+            QMessageBox.information(
+                self, "Dokument-Historie", "Clear erneut angewendet."
+            )
+        else:
+            self._update_clear_buttons()
 
     def _clear_with_confirm(self) -> None:
         """Clear: bei aktivem Filter optional nur Filter; Zähler+Undo — 2.2.4."""
@@ -286,7 +337,7 @@ class DocHistoryDialog(QDialog):
                     self,
                     "Dokument-Historie leeren",
                     f"Wirklich alle {n} Einträge löschen?\n"
-                    "(Undo Clear in dieser Session möglich — 2.2.4)",
+                    "(Undo/Redo Clear in dieser Session möglich — 2.2.5)",
                     QMessageBox.Yes | QMessageBox.No,
                     QMessageBox.No,
                 )
@@ -303,7 +354,7 @@ class DocHistoryDialog(QDialog):
             self,
             "Dokument-Historie leeren",
             f"Wirklich alle {n} Einträge löschen?\n"
-            "(Undo Clear in dieser Session möglich — 2.2.4)",
+            "(Undo/Redo Clear in dieser Session möglich — 2.2.5)",
             QMessageBox.Yes | QMessageBox.No,
             QMessageBox.No,
         )
