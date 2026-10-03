@@ -1,11 +1,11 @@
-"""PDF-Portfolio erstellen / öffnen (pikepdf Collection + Attachments) — 2.0.4."""
+"""PDF-Portfolio erstellen / öffnen (pikepdf Collection + Attachments) — 2.0.5."""
 
 from __future__ import annotations
 
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QUrl
-from PySide6.QtGui import QDesktopServices, QKeySequence, QShortcut
+from PySide6.QtGui import QDesktopServices, QKeySequence, QMouseEvent, QShortcut
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QApplication,
@@ -42,6 +42,22 @@ from ild_pdf.portfolio import (
 )
 
 
+class _ClickableExtractFooter(QLabel):
+    """Klickbarer Footer: Filter übersprungene (Toggle) — 2.0.5."""
+
+    def __init__(self, on_click, parent=None):
+        super().__init__(parent)
+        self._on_click = on_click
+
+    def mousePressEvent(self, event: QMouseEvent) -> None:
+        if event is not None and event.button() == Qt.LeftButton:
+            if callable(self._on_click):
+                self._on_click()
+            event.accept()
+            return
+        super().mousePressEvent(event)
+
+
 class PortfolioDialog(QDialog):
     """Dialog: Portfolio erstellen (Dateien → Container-PDF) oder öffnen/extrahieren."""
 
@@ -56,8 +72,14 @@ class PortfolioDialog(QDialog):
         self._opened_path: str | None = None
         self._files: list[str] = []
         self._entry_names: list[str] = []
+        self._entry_labels: dict[str, str] = {}
         self.extract_progress: QProgressDialog | None = None  # während Extrakt — 2.0.3
         self._last_extract_dir: str | None = None  # für Ordner öffnen — 2.0.4
+        # Footer-Filter übersprungene — 2.0.5
+        self._last_skipped_names: list[str] = []
+        self._last_extract_total: int = 0
+        self._last_extract_ok: int = 0
+        self._filter_skipped = False
 
         layout = QVBoxLayout(self)
         self.tabs = QTabWidget()
@@ -135,7 +157,8 @@ class PortfolioDialog(QDialog):
                 "und optional extrahieren (alle oder Auswahl). "
                 "Zielordner merken · Namenskollision umbenennen · "
                 "Fortschritt mit Abbruch · Teilergebnis behalten · "
-                "Footer extrahiert X, übersprungen Y · Ordner öffnen — 2.0.4."
+                "Footer-Klick filtert übersprungene (Toggle) · "
+                "leerer Footer bei 0 · Ordner öffnen — 2.0.5."
             )
         )
         row = QHBoxLayout()
@@ -169,17 +192,27 @@ class PortfolioDialog(QDialog):
         self.open_status.setObjectName("portfolioOpenStatus")
         layout.addWidget(self.open_status)
 
-        # Footer Statuszählung + Ordner öffnen — 2.0.4
+        # Footer Statuszählung (klickbar Filter) + Ordner öffnen — 2.0.5
         foot = QHBoxLayout()
-        self.extract_footer = QLabel("")
+        self.extract_footer = _ClickableExtractFooter(self._toggle_skipped_filter)
         self.extract_footer.setObjectName("portfolioExtractFooter")
-        self.extract_footer.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        self.extract_footer.setTextInteractionFlags(Qt.NoTextInteraction)
+        self.extract_footer.setCursor(Qt.PointingHandCursor)
         self.extract_footer.setToolTip(
-            "Statuszählung: extrahiert X, übersprungen Y — 2.0.4"
+            "Klick: Liste auf übersprungene filtern (Toggle). "
+            "Leer wenn Zähler 0 — 2.0.5"
         )
         self.extract_footer.setStyleSheet("color:#333;padding:2px 0;")
         self.extract_footer.setVisible(False)
         foot.addWidget(self.extract_footer, 1)
+        self.filter_badge = QLabel("")
+        self.filter_badge.setObjectName("portfolioExtractFilterBadge")
+        self.filter_badge.setStyleSheet(
+            "color:#0d47a1;font-weight:600;padding:2px 6px;"
+        )
+        self.filter_badge.setVisible(False)
+        self.filter_badge.setToolTip("Filter aktiv: nur übersprungene — 2.0.5")
+        foot.addWidget(self.filter_badge)
         self.btn_open_extract_folder = QPushButton("Ordner öffnen")
         self.btn_open_extract_folder.setObjectName("portfolioOpenExtractFolder")
         self.btn_open_extract_folder.setToolTip(
@@ -189,20 +222,23 @@ class PortfolioDialog(QDialog):
         self.btn_open_extract_folder.clicked.connect(self._open_extract_folder)
         foot.addWidget(self.btn_open_extract_folder)
         layout.addLayout(foot)
+        # Initial leerer Footer (Zähler 0) — 2.0.5
+        self._set_extract_footer("", skipped_names=[])
 
         ex_row = QHBoxLayout()
         btn_extract_sel = QPushButton("Auswahl extrahieren…")
         btn_extract_sel.setObjectName("portfolioExtractSelBtn")
         btn_extract_sel.setToolTip(
             "Nur ausgewählte Einträge; Abbruch behält Teilergebnis; "
-            "Footer extrahiert/übersprungen — 2.0.4"
+            "Footer-Klick filtert übersprungene — 2.0.5"
         )
         btn_extract_sel.clicked.connect(self._extract_selected)
         btn_extract = QPushButton("Alle extrahieren…")
         btn_extract.setObjectName("portfolioExtractBtn")
         btn_extract.setToolTip(
             "Alle Einträge; Fortschritt/Abbruch; "
-            "Footer extrahiert X, übersprungen Y · Ordner öffnen — 2.0.4"
+            "Footer extrahiert X, übersprungen Y · Klick-Filter · "
+            "leer bei 0 · Ordner öffnen — 2.0.5"
         )
         btn_extract.clicked.connect(self._extract)
         ex_row.addWidget(btn_extract_sel)
@@ -220,6 +256,86 @@ class PortfolioDialog(QDialog):
             )
             return
         QDesktopServices.openUrl(QUrl.fromLocalFile(str(folder)))
+
+    def _set_extract_footer(
+        self,
+        footer: str,
+        *,
+        skipped_names: list[str] | None = None,
+        total: int = 0,
+        extracted: int = 0,
+    ) -> None:
+        """Footer setzen; leer wenn 0; Filter-State zurücksetzen — 2.0.5."""
+        msg = (footer or "").strip()
+        self._last_skipped_names = list(skipped_names or [])
+        self._last_extract_total = int(total)
+        self._last_extract_ok = int(extracted)
+        self.extract_footer.setText(msg)
+        self.extract_footer.setAccessibleName(msg)
+        has = bool(msg)
+        self.extract_footer.setVisible(has)
+        if not has:
+            self._filter_skipped = False
+        self._update_filter_badge()
+        if self._filter_skipped:
+            self._apply_entries_filter()
+
+    def _toggle_skipped_filter(self) -> None:
+        """Footer-Klick: Liste auf übersprungene umschalten — 2.0.5."""
+        skipped_n = len(self._last_skipped_names)
+        if not self._filter_skipped and skipped_n == 0:
+            return
+        self._filter_skipped = not self._filter_skipped
+        self._apply_entries_filter()
+        self._update_filter_badge()
+
+    def _update_filter_badge(self) -> None:
+        """Filter-Badge und Footer-Style — 2.0.5."""
+        if self._filter_skipped:
+            n = len(self._last_skipped_names)
+            self.filter_badge.setText(f"Filter: übersprungen ({n})")
+            self.filter_badge.setVisible(True)
+            self.extract_footer.setStyleSheet(
+                "color:#0d47a1;font-weight:bold;text-decoration:underline;padding:2px 0;"
+            )
+            self.extract_footer.setToolTip(
+                "Filter aktiv: nur übersprungene. Klick hebt auf — 2.0.5"
+            )
+        else:
+            self.filter_badge.setText("")
+            self.filter_badge.setVisible(False)
+            has = bool((self.extract_footer.text() or "").strip())
+            self.extract_footer.setStyleSheet(
+                "color:#333;text-decoration:underline;padding:2px 0;"
+                if has
+                else "color:#333;padding:2px 0;"
+            )
+            self.extract_footer.setToolTip(
+                "Klick: Liste auf übersprungene filtern (Toggle). "
+                "Leer wenn Zähler 0 — 2.0.5"
+            )
+
+    def _apply_entries_filter(self) -> None:
+        """Einträge-Liste: alle oder nur übersprungene — 2.0.5."""
+        self.entries_list.clear()
+        if self._filter_skipped:
+            names = list(self._last_skipped_names)
+            if not names:
+                item = QListWidgetItem("(keine übersprungenen)")
+                item.setFlags(Qt.NoItemFlags)
+                self.entries_list.addItem(item)
+                return
+            for name in names:
+                label = self._entry_labels.get(name, name)
+                item = QListWidgetItem(label)
+                item.setData(Qt.UserRole, name)
+                self.entries_list.addItem(item)
+            return
+        for name in self._entry_names:
+            label = self._entry_labels.get(name, name)
+            item = QListWidgetItem(label)
+            item.setData(Qt.UserRole, name)
+            self.entries_list.addItem(item)
 
     def _add_files(self) -> None:
         paths, _ = QFileDialog.getOpenFileNames(
@@ -292,8 +408,11 @@ class PortfolioDialog(QDialog):
         try:
             info = open_portfolio(path)
             self._opened_path = info.path
+            self._filter_skipped = False
+            self._last_skipped_names = []
             self.entries_list.clear()
             self._entry_names = []
+            self._entry_labels = {}
             entries = info.entries or []
             for e in entries:
                 size_kb = (e.size / 1024.0) if e.size else 0
@@ -305,6 +424,9 @@ class PortfolioDialog(QDialog):
                 item.setToolTip(e.description or e.name)
                 self.entries_list.addItem(item)
                 self._entry_names.append(e.name)
+                self._entry_labels[e.name] = label
+            # Footer zurücksetzen (kein Extrakt) — 2.0.5
+            self._set_extract_footer("", skipped_names=[])
             kind = "Portfolio (Collection)" if info.is_portfolio else "PDF mit Anhängen"
             n = len(entries)
             if n == 0:
@@ -343,12 +465,13 @@ class PortfolioDialog(QDialog):
             return
         set_last_portfolio_extract_dir(out)
         self._last_extract_dir = out
-        total = len(names) if names is not None else len(self._entry_names)
+        planned = list(names) if names is not None else list(self._entry_names)
+        total = len(planned)
         if total <= 0:
             QMessageBox.information(self, "Portfolio", "Nichts zu extrahieren.")
             return
 
-        # Fortschritt + Abbruch (Teilergebnis behalten) — 2.0.3/2.0.4
+        # Fortschritt + Abbruch (Teilergebnis behalten) — 2.0.3/2.0.5
         prog = QProgressDialog(
             "Portfolio extrahieren…", "Abbrechen", 0, max(1, total), self
         )
@@ -395,14 +518,23 @@ class PortfolioDialog(QDialog):
             if not cancelled["v"] and not prog.wasCanceled():
                 prog.setValue(total)
             prog.close()
+            n_ok = len(written)
+            # Rest der geplanten Namen = übersprungen (Abbruch) — 2.0.5
+            skipped_names = list(planned[n_ok:])
             renamed = count_renamed_extracts(written)
             status = summarize_extract_status(
                 written, total=total, cancelled=bool(cancelled["v"])
             )
             footer = format_extract_footer(written, total=total)
-            self.extract_footer.setText(footer)
-            self.extract_footer.setAccessibleName(footer)
-            self.extract_footer.setVisible(True)
+            self._filter_skipped = False
+            self._set_extract_footer(
+                footer,
+                skipped_names=skipped_names,
+                total=total,
+                extracted=n_ok,
+            )
+            # Liste ggf. wiederherstellen (Filter aus) — 2.0.5
+            self._apply_entries_filter()
             self.btn_open_extract_folder.setEnabled(True)
             self.open_status.setText(f"{status} → {out}")
             if cancelled["v"]:

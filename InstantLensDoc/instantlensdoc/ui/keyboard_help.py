@@ -46,7 +46,7 @@ SHORTCUTS_HTML = """
 <tr><td>Weitersuchen / Rückwärts</td><td><code>F3</code> / <code>Shift+F3</code> — PDF-Treffer-Highlight + Seiten-Nav — 0.9.0</td></tr>
 <tr><td>Suchen und Ersetzen</td><td><code>Ctrl+R</code></td></tr>
 <tr><td>Multi-Dokument-Suche</td><td><code>Ctrl+Shift+F</code> — zentrale Trefferliste alle offenen PDFs — 2.0.0</td></tr>
-<tr><td>High-Contrast Theme</td><td><code>Ctrl+Alt+H</code> — Toast Dauer OCR-Settings · A11y Announcement — 2.0.4</td></tr>
+<tr><td>High-Contrast Theme</td><td><code>Ctrl+Alt+H</code> — Toast Dauer OCR-Settings · A11y wie OCR-Toast — 2.0.5</td></tr>
 <tr><td>Gehe zu Zeile / Seite</td><td><code>Ctrl+G</code> (Editor / PDF)</td></tr>
 <tr><td>Gehe zu Seite (PDF-Menü)</td><td><code>Ctrl+Shift+G</code></td></tr>
 <tr><td>Tab duplizieren</td><td><code>Ctrl+Alt+Shift+T</code> — 1.4.5 (früher Ctrl+Shift+T)</td></tr>
@@ -338,6 +338,7 @@ Status-Klick öffnet <code>docs/VERSION</code>/<code>VERSION.txt</code> im Edito
 <p><b>PDF verschlüsseln/entschlüsseln:</b> Prefill-Warnung + Button „jetzt ausschalten“ (sofort speichern + Toast) · Passwort nie in Logs · falsches PW klar DE — 1.6.5 (Basis 1.6.4/1.6.3/1.6.2/1.6.1/1.6.0).</p>
 <p><b>Dokument-Statistik:</b> JSON-Dateiname Quick-Insert <code>{stem}</code>/<code>{date}</code> · ungültige Platzhalter rot · Live-Vorschau · Copy · Zielordner · UTF-8 — 1.6.5 (Basis 1.6.4/1.6.3/1.6.2/1.6.1/1.6.0).</p>
 <p><b>Workspace-Layouts:</b> Import-Log Zusammenfassung importiert/übersprungen/umbenannt · kopieren/als TXT · Merge skip/rename · Schema DE — 1.6.5 (Basis 1.6.4/1.6.3/1.6.2/1.6.1/1.6.0).</p>
+<p><b>2.0.5:</b> Multi-Doc Reset Bestätigung nur bei Abweichung · Fokus+Selektion · Portfolio Footer-Filter übersprungene · leer bei 0 · HC-Toast A11y wie OCR · install-ild -Quiet Summary · Exit 0.</p>
 <p><b>2.0.4:</b> Multi-Doc CSV Quick-Insert {date}/{query} · ungültige rot · Reset Default · Portfolio Footer extrahiert/übersprungen · Ordner öffnen · HC-Toast Dauer OCR-Settings · A11y · install-ild Log-Pfad · -Quiet.</p>
 <p><b>2.0.3:</b> Multi-Doc CSV Zielordner · Live-Template {date}_multisearch.csv · Portfolio Extrakt Abbruch/Teilergebnis/Statuszählung · High-Contrast an/aus · UI-Reset Bestätigung nur ≠100 · install-ild fehlende Shortcuts ok.</p>
 <p><b>2.0.2:</b> Multi-Doc CSV Doc,Seite,Snippet,Match · BOM · Regex-Fehlerstatus · Portfolio Extrakt Zielordner/Rename/Fortschritt · UI-Skala Reset 100 % · High-Contrast Ctrl+Alt+H · install-ild -Uninstall/Exitcodes.</p>

@@ -333,7 +333,12 @@ def format_extract_footer(
     *,
     total: int,
 ) -> str:
-    """Footer-Kurzform ``extrahiert X, übersprungen Y`` — 2.0.4."""
+    """
+    Footer-Kurzform ``extrahiert X, übersprungen Y`` — 2.0.5.
+    Leerer String wenn beide Zähler 0 (leerer Footer).
+    """
     n = len(written or [])
     skipped = max(0, int(total) - n)
+    if n == 0 and skipped == 0:
+        return ""
     return f"extrahiert {n}, übersprungen {skipped}"

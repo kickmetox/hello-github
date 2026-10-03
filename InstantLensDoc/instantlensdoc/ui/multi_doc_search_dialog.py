@@ -1,4 +1,4 @@
-"""Zentrale Multi-Dokument-Suche: Volltext über alle offenen PDFs — 2.0.4."""
+"""Zentrale Multi-Dokument-Suche: Volltext über alle offenen PDFs — 2.0.5."""
 
 from __future__ import annotations
 
@@ -45,7 +45,8 @@ class MultiDocSearchDialog(QDialog):
     Zentrale Trefferliste: Volltext (Textlayer) über alle offenen/gelisteten PDFs.
     Case / Regex / Whole-word · CSV Doc,Seite,Snippet,Match · BOM · Fortschritt —
     CSV Zielordner merken · Live-Template Quick-Insert ``{date}``/``{query}`` ·
-    ungültige Platzhalter rot · Reset Default — 2.0.4.
+    ungültige Platzhalter rot · Reset Default Bestätigung nur bei Abweichung ·
+    Fokus+Selektion — 2.0.5.
     Doppelklick / Enter → Treffer aktivieren (Signal hit_activated).
     """
 
@@ -72,7 +73,8 @@ class MultiDocSearchDialog(QDialog):
             "Volltextsuche über alle offenen PDFs (Textlayer). "
             "Optionen Aa / Wort / Regex; CSV Doc,Seite,Snippet,Match; BOM; "
             "Zielordner merken; Template Quick-Insert {date}/{query}; "
-            "ungültige Platzhalter rot; Reset Default; Regex-Fehler im Status."
+            "ungültige Platzhalter rot; Reset Default (Bestätigung nur bei "
+            "Abweichung, Fokus+Selektion); Regex-Fehler im Status."
         )
         intro.setWordWrap(True)
         intro.setObjectName("multiDocSearchIntro")
@@ -123,7 +125,8 @@ class MultiDocSearchDialog(QDialog):
         self.btn_export_csv.setObjectName("multiDocSearchExportCsv")
         self.btn_export_csv.setToolTip(
             "Trefferliste CSV: Doc,Seite,Snippet,Match · Zielordner merken · "
-            "Template Quick-Insert {date}/{query} · Reset Default — 2.0.4"
+            "Template Quick-Insert {date}/{query} · Reset Default "
+            "(Bestätigung nur bei Abweichung · Fokus+Selektion) — 2.0.5"
         )
         self.btn_export_csv.clicked.connect(self._export_csv)
         self.btn_export_csv.setEnabled(False)
@@ -139,8 +142,8 @@ class MultiDocSearchDialog(QDialog):
         self.csv_tpl_edit.setToolTip(
             "Live-Dateiname-Template; Platzhalter {date} (YYYY-MM-DD), "
             "{query} (Suchbegriff); Quick-Insert an Cursor; "
-            "Reset Default ({date}_multisearch.csv); "
-            "ungültige Platzhalter rot — 2.0.4"
+            "Reset Default ({date}_multisearch.csv) Bestätigung nur bei "
+            "Abweichung · Fokus+Selektion; ungültige Platzhalter rot — 2.0.5"
         )
         self.csv_tpl_edit.textChanged.connect(self._update_csv_filename_preview)
         tpl_row.addWidget(self.csv_tpl_edit, 1)
@@ -169,7 +172,7 @@ class MultiDocSearchDialog(QDialog):
         self.btn_reset_csv_tpl.setToolTip(
             f"Template auf Default zurücksetzen "
             f"({DEFAULT_MULTI_DOC_CSV_FILENAME_TEMPLATE}); "
-            "Bestätigung nur bei Abweichung — 2.0.4"
+            "Bestätigung nur bei Abweichung; danach Fokus+Selektion — 2.0.5"
         )
         self.btn_reset_csv_tpl.clicked.connect(self._reset_csv_template)
         tpl_row.addWidget(self.btn_reset_csv_tpl)
@@ -235,20 +238,25 @@ class MultiDocSearchDialog(QDialog):
         self._update_csv_filename_preview()
 
     def _focus_csv_tpl_select_all(self) -> None:
-        """Fokus + Selektion ganzer Default-Text — 2.0.4."""
+        """Fokus + Selektion ganzer Text (wie Ann.-Template) — 2.0.5."""
         edit = self.csv_tpl_edit
-        edit.setFocus()
+        edit.setFocus(Qt.OtherFocusReason)
         edit.selectAll()
 
     def _reset_csv_template(self) -> None:
         """
         Template auf Default; Bestätigung nur bei Abweichung;
-        danach Live-Vorschau + Fokus mit Selektion — 2.0.4.
+        danach Live-Vorschau + Fokus mit Selektion — 2.0.5.
+        Leer/Whitespace gilt als Default (keine Bestätigung).
         """
         edit = self.csv_tpl_edit
         default = DEFAULT_MULTI_DOC_CSV_FILENAME_TEMPLATE
         current = edit.text() or ""
-        if current == default:
+        # Leer/Whitespace ≡ Default (Preview nutzt ebenfalls Default) — 2.0.5
+        if current.strip() == "" or current == default:
+            if current != default:
+                edit.selectAll()
+                edit.insert(default)
             self._update_csv_filename_preview()
             QTimer.singleShot(0, self._focus_csv_tpl_select_all)
             return
@@ -264,6 +272,7 @@ class MultiDocSearchDialog(QDialog):
         if reply != QMessageBox.Yes:
             QTimer.singleShot(0, self._focus_csv_tpl_select_all)
             return
+        # selectAll + insert → ein Undo-Schritt
         edit.selectAll()
         edit.insert(default)
         self._update_csv_filename_preview()

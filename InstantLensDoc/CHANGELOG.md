@@ -1,5 +1,23 @@
 # Changelog — InstantLens Doc
 
+## 2.0.5 — Multi-Doc Reset Bestätigung≠Default·Fokus+Selektion, Portfolio Footer-Filter übersprungen·leer bei 0, HC-Toast A11y wie OCR, install-ild -Quiet Summary·Exit 0
+
+Post-Release-Polish nach 2.0.4: **Multi-Dokument-Suche Reset Default** mit **Bestätigung nur bei Abweichung** und **Fokus+Selektion**; **Portfolio-Extrakt** Footer-**Klick filtert übersprungene** (Toggle), **leerer Footer bei Zähler 0**; High-Contrast Toast nutzt **gleiche Announcement-Pipeline wie OCR-Toast** (AccessibleName + Clear nach Timeout); **install-ild.ps1 -Uninstall -Quiet**: **Exit 0 auch wenn nichts zu entfernen**, **Kurz-Summary auf stdout**. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen unverändert klar markiert / nicht produktiv.
+
+### Multi-Doc / Portfolio
+- Multi-Doc-CSV Reset Default: Bestätigung nur bei Abweichung (Leer≡Default); Fokus+Selektion wie Ann.-Template
+- Portfolio-Extrakt: Footer-Klick → Filter übersprungene (Toggle); Footer leer wenn extrahiert=0 und übersprungen=0
+
+### Accessibility / Installer
+- High-Contrast Ctrl+Alt+H: `_show_hc_toast` / `_announce_hc_toast` wie OCR-Defaults-Toast-Pipeline
+- `scripts/install-ild.ps1`: `-Quiet -Uninstall` Kurz-Summary `entfernt=N fehlend=M Exit=0`; nichts zu entfernen = Exit 0
+
+### Packaging / Docs
+- Version **2.0.5** (App / `ild_pdf` / ISS / Smoke / Docs); `docs/VERSION` + `VERSION.txt`
+- About Serie **2.0**; Smoke: Multi-Doc Reset-Confirm/Focus, Portfolio Footer-Filter/leer, HC OCR-Pipeline, Quiet-Summary (CLI + Qt)
+
+---
+
 ## 2.0.4 — Multi-Doc Template Quick-Insert {date}/{query}·ungültige rot·Reset Default, Portfolio Footer extrahiert/übersprungen·Ordner öffnen, HC-Toast Dauer OCR·A11y, install-ild Log-Pfad·-Quiet
 
 Post-Release-Polish nach 2.0.3: **Multi-Dokument-Suche CSV-Template** mit **Quick-Insert `{date}`/`{query}`**, **ungültige Platzhalter rot**, Button **Reset Default**; **Portfolio-Extrakt** Footer **„extrahiert X, übersprungen Y“** und Button **Ordner öffnen**; High-Contrast Toast **Dauer aus OCR-Toast-Settings** + **Accessibility-Announcement**; **install-ild.ps1 -Uninstall** gibt **Log-Datei-Pfad** aus, **-Quiet** unterdrückt Prompts. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen unverändert klar markiert / nicht produktiv.

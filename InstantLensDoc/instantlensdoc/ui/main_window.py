@@ -2186,7 +2186,8 @@ class MainWindow(QMainWindow):
         self._high_contrast_action.setCheckable(True)
         self._high_contrast_action.setShortcut(QKeySequence("Ctrl+Alt+H"))
         self._high_contrast_action.setToolTip(
-            "High-Contrast Theme ein/aus (Ctrl+Alt+H) — Toast Dauer OCR-Settings · A11y — 2.0.4"
+            "High-Contrast Theme ein/aus (Ctrl+Alt+H) — Toast Dauer OCR-Settings · "
+            "A11y wie OCR-Toast — 2.0.5"
         )
         try:
             from instantlensdoc.core.app_settings import get_high_contrast
@@ -5759,8 +5760,65 @@ class MainWindow(QMainWindow):
         except Exception:
             pass
 
+    def _announce_hc_toast(self, msg: str) -> None:
+        """
+        Accessibility-Announcement für HC-Toast — gleiche Pipeline wie OCR-Defaults-Toast
+        (AccessibleName/Description + AnnouncementEvent, Fallback NameChanged) — 2.0.5.
+        """
+        sb = self.statusBar()
+        try:
+            sb.setAccessibleName(msg)
+            sb.setAccessibleDescription(msg)
+        except Exception:
+            pass
+        try:
+            from PySide6.QtGui import QAccessible, QAccessibleAnnouncementEvent
+
+            ev = QAccessibleAnnouncementEvent(sb, msg)
+            QAccessible.updateAccessibility(ev)
+        except Exception:
+            try:
+                from PySide6.QtGui import QAccessible, QAccessibleEvent
+
+                ev = QAccessibleEvent(sb, QAccessible.Event.NameChanged)
+                QAccessible.updateAccessibility(ev)
+            except Exception:
+                pass
+
+    def _show_hc_toast(self, msg: str) -> None:
+        """
+        HC-Toast: Dauer aus OCR-Defaults-Toast-Settings, Announcement wie OCR,
+        AccessibleName nach Timeout leeren — 2.0.5.
+        """
+        try:
+            from instantlensdoc.core.app_settings import get_ocr_defaults_toast_sec
+
+            ms = max(1, int(get_ocr_defaults_toast_sec())) * 1000
+        except Exception:
+            ms = 2000
+        self._hc_toast_token = int(getattr(self, "_hc_toast_token", 0)) + 1
+        token = self._hc_toast_token
+        self._announce_hc_toast(msg)
+        self.statusBar().showMessage(msg, ms)
+
+        def _clear() -> None:
+            if token != getattr(self, "_hc_toast_token", 0):
+                return
+            sb = self.statusBar()
+            try:
+                if (sb.currentMessage() or "") == msg:
+                    # AccessibleName leeren wie OCR-Defaults-Toast — 2.0.5
+                    sb.setAccessibleName("")
+                    sb.setAccessibleDescription("")
+            except Exception:
+                pass
+
+        from PySide6.QtCore import QTimer
+
+        QTimer.singleShot(ms, _clear)
+
     def _toggle_high_contrast(self, checked: bool = False) -> None:
-        """High-Contrast Theme Toggle — Ctrl+Alt+H — Toast Dauer OCR-Settings + A11y — 2.0.4."""
+        """High-Contrast Theme Toggle — Ctrl+Alt+H — OCR-Toast-Pipeline — 2.0.5."""
         enabled = toggle_high_contrast(self)
         act = getattr(self, "_high_contrast_action", None)
         if act is not None:
@@ -5768,14 +5826,7 @@ class MainWindow(QMainWindow):
             act.setChecked(bool(enabled))
             act.blockSignals(False)
         msg = "High-Contrast an" if enabled else "High-Contrast aus"
-        try:
-            from instantlensdoc.core.app_settings import get_ocr_defaults_toast_sec
-
-            ms = max(1, int(get_ocr_defaults_toast_sec())) * 1000
-        except Exception:
-            ms = 2000
-        self._announce_status_toast(msg)
-        self.statusBar().showMessage(msg, ms)
+        self._show_hc_toast(msg)
 
     def _open_multi_doc_search(self) -> None:
         """Zentrale Multi-Dokument-Suche über alle offenen PDFs — 2.0.0."""

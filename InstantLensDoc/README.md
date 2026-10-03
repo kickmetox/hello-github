@@ -2,7 +2,7 @@
 
 Moderne Textverarbeitung mit PDF-Annotator, OCR-Bridge und Formulargenerator.
 
-**Version:** 2.0.4  
+**Version:** 2.0.5  
 **Hersteller:** Andreas Meyer · ame@sellerbach.de
 
 ## Quickstart (Windows)
@@ -32,7 +32,11 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an).  
-User-Shortcuts: `.\scripts\install-ild.ps1` · Deinstallieren: `-Uninstall [-Quiet]` (Exit **0**/OK · **1**/Fehler; Log-Pfad wird ausgegeben).
+User-Shortcuts: `.\scripts\install-ild.ps1` · Deinstallieren: `-Uninstall [-Quiet]` (Exit **0**/OK · **1**/Fehler; Quiet: Kurz-Summary, Exit 0 auch ohne Shortcuts).
+
+## Neu in 2.0.5
+
+Post-Release-Polish nach **2.0.4**: Multi-Doc Reset Default **Bestätigung nur bei Abweichung · Fokus+Selektion**; Portfolio Footer **Klick-Filter übersprungene · leer bei 0**; HC-Toast **A11y wie OCR-Toast**; **install-ild -Quiet** Kurz-Summary · Exit 0 wenn nichts zu entfernen. Stubs unverändert.
 
 ## Neu in 2.0.4
 

@@ -1,9 +1,10 @@
-# InstantLens Doc 2.0.4 — Benutzer-Installer (ohne Admin wenn möglich)
+# InstantLens Doc 2.0.5 — Benutzer-Installer (ohne Admin wenn möglich)
 # Startmenü-Shortcut + optional Desktop-Link (User-Profil).
 # Idempotent: vorhandene Verknüpfungen werden aktualisiert.
 # -Uninstall entfernt Startmenü- und Desktop-Shortcuts.
 # Fehlende Shortcuts bei -Uninstall sind kein Fehler (Log-Zeile, Exit 0).
 # -Uninstall schreibt Log-Datei und gibt den Pfad aus; -Quiet unterdrückt Prompts.
+# -Quiet -Uninstall: Exit 0 auch wenn nichts zu entfernen; Kurz-Summary auf stdout.
 #
 # Beispiele:
 #   powershell -ExecutionPolicy Bypass -File .\scripts\install-ild.ps1
@@ -31,7 +32,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$Version = "2.0.4"
+$Version = "2.0.5"
 $AppName = "InstantLens Doc"
 
 function Write-IldInfo([string]$msg) { Write-Host "[ILD $Version] $msg" }
@@ -80,7 +81,9 @@ if ($Uninstall) {
     }
 
     $logPath = New-IldUninstallLogPath
-    Write-IldInfo "Log-Datei: $logPath"
+    if (-not $Quiet) {
+        Write-IldInfo "Log-Datei: $logPath"
+    }
     Write-IldLogLine -LogPath $logPath -Message "Uninstall gestartet (Version $Version; Quiet=$Quiet)"
 
     if (-not $Quiet) {
@@ -94,7 +97,6 @@ if ($Uninstall) {
             exit 0
         }
     } else {
-        Write-IldInfo "Quiet: Prompt übersprungen."
         Write-IldLogLine -LogPath $logPath -Message "Quiet: Prompt übersprungen"
     }
 
@@ -106,7 +108,9 @@ if ($Uninstall) {
             try {
                 Remove-Item -LiteralPath $link -Force
                 $removed += $link
-                Write-IldInfo "Shortcut entfernt: $link"
+                if (-not $Quiet) {
+                    Write-IldInfo "Shortcut entfernt: $link"
+                }
                 Write-IldLogLine -LogPath $logPath -Message "entfernt: $link"
             } catch {
                 $failed += $link
@@ -115,22 +119,37 @@ if ($Uninstall) {
             }
         } else {
             $missing += $link
-            Write-IldInfo "Shortcut fehlt bereits (kein Fehler): $link"
+            if (-not $Quiet) {
+                Write-IldInfo "Shortcut fehlt bereits (kein Fehler): $link"
+            }
             Write-IldLogLine -LogPath $logPath -Message "fehlt bereits: $link"
         }
     }
     if ($failed.Count -gt 0) {
         Write-IldErr "Uninstall unvollständig ($($failed.Count) Fehler)."
         Write-IldLogLine -LogPath $logPath -Message "Uninstall unvollständig ($($failed.Count) Fehler)"
+        # Kurz-Summary auch bei Fehler — 2.0.5
+        Write-Host "Uninstall: entfernt=$($removed.Count) fehlend=$($missing.Count) fehler=$($failed.Count) Exit=1"
         Write-IldInfo "Log-Datei: $logPath"
         exit 1
     }
-    if ($missing.Count -gt 0) {
-        Write-IldInfo "fehlende Shortcuts kein Fehler ($($missing.Count) fehlten bereits)."
+    # Nichts zu entfernen (alles fehlte bereits) = Exit 0 — 2.0.5
+    if ($removed.Count -eq 0) {
+        Write-IldLogLine -LogPath $logPath -Message "nichts zu entfernen ($($missing.Count) fehlten bereits) — Exit 0"
     }
-    Write-IldInfo "Uninstall fertig: $($removed.Count) entfernt, $($missing.Count) fehlten bereits. Exit 0."
+    if (-not $Quiet) {
+        if ($missing.Count -gt 0) {
+            Write-IldInfo "fehlende Shortcuts kein Fehler ($($missing.Count) fehlten bereits)."
+        }
+        Write-IldInfo "Uninstall fertig: $($removed.Count) entfernt, $($missing.Count) fehlten bereits. Exit 0."
+        Write-IldInfo "Log-Datei: $logPath"
+    }
     Write-IldLogLine -LogPath $logPath -Message "Uninstall fertig: $($removed.Count) entfernt, $($missing.Count) fehlten bereits"
-    Write-IldInfo "Log-Datei: $logPath"
+    # Kurz-Summary immer auf stdout (Quiet: einzige Erfolgszeile) — 2.0.5
+    Write-Host "Uninstall: entfernt=$($removed.Count) fehlend=$($missing.Count) Exit=0"
+    if ($Quiet) {
+        Write-Host "Log: $logPath"
+    }
     exit 0
 }
 
