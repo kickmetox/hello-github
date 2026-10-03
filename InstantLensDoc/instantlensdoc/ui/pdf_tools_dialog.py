@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QImage, QPixmap
+from PySide6.QtCore import Qt, QTimer, Signal
+from PySide6.QtGui import QCursor, QImage, QPixmap
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QCheckBox,
@@ -146,10 +146,14 @@ class PdfToolsDialog(QDialog):
             "QLabel { background: #f0f0f0; border: 1px solid #bbb; }"
         )
         self.merge_preview.setToolTip(
-            "Thumbnail der ersten Seite der markierten Datei — 1.1.3"
+            "Klick öffnet Datei als Readonly-Vorschau in neuem Tab — 1.1.4"
         )
         self.merge_preview.setText("Keine Auswahl")
         self.merge_preview.setWordWrap(True)
+        self.merge_preview.setCursor(QCursor(Qt.PointingHandCursor))
+        self.merge_preview.mousePressEvent = (  # type: ignore[method-assign]
+            self._merge_preview_clicked
+        )
         preview_col.addWidget(self.merge_preview)
         preview_col.addStretch(1)
         list_row.addLayout(preview_col)
@@ -385,12 +389,15 @@ class PdfToolsDialog(QDialog):
         )
 
     def _merge_update_preview(self):
-        """Thumbnail der ersten Seite der markierten Datei — 1.1.3."""
+        """Thumbnail der ersten Seite der markierten Datei — 1.1.3/1.1.4."""
         item = self.merge_list.currentItem()
         if item is None or not (item.text() or "").strip():
             self._preview_path = None
             self.merge_preview.setPixmap(QPixmap())
             self.merge_preview.setText("Keine Auswahl")
+            self.merge_preview.setToolTip(
+                "Klick öffnet Datei als Readonly-Vorschau in neuem Tab — 1.1.4"
+            )
             return
         path = item.text().strip()
         if (
@@ -410,12 +417,39 @@ class PdfToolsDialog(QDialog):
             self.merge_preview.setPixmap(pm)
             self.merge_preview.setText("")
             self.merge_preview.setToolTip(
-                f"Vorschau 1. Seite: {Path(path).name} — 1.1.3"
+                f"Klick: {Path(path).name} als Readonly-Vorschau öffnen — 1.1.4"
             )
         except Exception as e:
             self.merge_preview.setPixmap(QPixmap())
             self.merge_preview.setText("Vorschau\nnicht möglich")
             self.merge_preview.setToolTip(f"Vorschau fehlgeschlagen: {e}")
+
+    def _merge_preview_clicked(self, event) -> None:
+        """Thumbnail-Klick → Datei in neuem Tab (readonly) — 1.1.4."""
+        path = self._preview_path
+        if not path or not Path(path).is_file():
+            if event is not None:
+                event.accept()
+            return
+        mw = self.parent()
+        while mw is not None and not hasattr(mw, "open_path"):
+            mw = mw.parent()
+        if mw is None:
+            if event is not None:
+                event.accept()
+            return
+        preview_path = str(path)
+
+        def _open():
+            try:
+                mw.open_path(preview_path, readonly=True)
+            except TypeError:
+                mw.open_path(preview_path)
+
+        self.accept()
+        QTimer.singleShot(0, _open)
+        if event is not None:
+            event.accept()
 
     def _merge_pick_dest(self):
         path, _ = QFileDialog.getSaveFileName(self, "Ziel-PDF", "", "PDF (*.pdf)")

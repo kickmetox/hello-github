@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **1.1.3** |
+| Version | **1.1.4** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -59,10 +59,10 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an / `checkedonce`)
 
-## Neu in 1.1.3
+## Neu in 1.1.4
 
-- OCR-Batch: **Seitenfehler** im Ergebnis-TXT; **Abbruch behält Teilergebnis**
-- PDF Mergen: **Vorschau-Thumbnail** der markierten Datei (1. Seite)
-- Annotation: Undo-Text **„N Annotationen (gefiltert)“**
-- Keygen: lokale **History (10 Keys)** + **Clear History** (ohne Secrets in Logs)
+- OCR-Batch: Toggle **„Fehler anhängen“** im Dialog (Standard an)
+- PDF Mergen: **Thumbnail-Klick** öffnet Datei als **Readonly-Vorschau** (neuer Tab)
+- Annotation: bei **0 gefilterten Treffern** Button disabled + Statushinweis
+- Keygen-History: **Doppelklick kopiert**; Maskierung (nur letzte 4) bis Hover/Reveal
 - Stubs KI/Cloud/Stylus/3D unverändert

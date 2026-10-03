@@ -6106,6 +6106,7 @@ class PdfViewer(QWidget):
         )
         # Filter aktiv = gefilterte Menge echt kleiner als alle auf der Seite
         filter_active = filtered_ids is not None and n_filt < n_all
+        zero_filtered = filtered_ids is not None and n_filt <= 0
 
         box = QMessageBox(self)
         box.setIcon(QMessageBox.Question)
@@ -6118,17 +6119,51 @@ class PdfViewer(QWidget):
         cb = QCheckBox("Nur sichtbare/gefilterte Annotationen")
         cb.setToolTip(
             "Nur die aktuell in der Sidebar sichtbaren/gefilterten "
-            "Annotationen dieser Seite löschen — 1.1.2"
+            "Annotationen dieser Seite löschen — 1.1.2/1.1.4"
         )
-        cb.setChecked(bool(filter_active))
-        cb.setEnabled(filtered_ids is not None and n_filt > 0)
-        if filter_active:
+        # Bei 0 Treffern: Option sichtbar, aber nicht vorausgewählt — 1.1.4
+        cb.setChecked(bool(filter_active and n_filt > 0))
+        cb.setEnabled(filtered_ids is not None)
+        if zero_filtered:
+            box.setInformativeText(
+                f"Keine gefilterten Treffer auf Seite {page + 1} — "
+                "gefiltertes Löschen nicht möglich."
+            )
+            self.status.emit(
+                f"Keine gefilterten Treffer auf Seite {page + 1}"
+            )
+        elif filter_active:
             box.setInformativeText(
                 f"Mit Filter: {n_filt} von {n_all} sichtbar/gefiltert."
             )
         box.setCheckBox(cb)
         box.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
         box.setDefaultButton(QMessageBox.No)
+        yes_btn = box.button(QMessageBox.Yes)
+
+        def _sync_filtered_yes(checked: bool = False) -> None:
+            if cb.isChecked() and n_filt <= 0:
+                if yes_btn is not None:
+                    yes_btn.setEnabled(False)
+                box.setInformativeText(
+                    f"Keine gefilterten Treffer auf Seite {page + 1} — "
+                    "Button deaktiviert."
+                )
+            else:
+                if yes_btn is not None:
+                    yes_btn.setEnabled(True)
+                if zero_filtered and not cb.isChecked():
+                    box.setInformativeText(
+                        f"Keine gefilterten Treffer auf Seite {page + 1} — "
+                        "gefiltertes Löschen nicht möglich."
+                    )
+                elif filter_active and n_filt > 0:
+                    box.setInformativeText(
+                        f"Mit Filter: {n_filt} von {n_all} sichtbar/gefiltert."
+                    )
+
+        cb.toggled.connect(_sync_filtered_yes)
+        _sync_filtered_yes(cb.isChecked())
         if box.exec() != QMessageBox.Yes:
             return 0
 
@@ -6136,10 +6171,8 @@ class PdfViewer(QWidget):
         if cb.isChecked() and filtered_ids is not None:
             only_ids = list(filt_set)
             if n_filt <= 0:
-                QMessageBox.information(
-                    self,
-                    "Alle Annotationen auf Seite löschen",
-                    f"Keine gefilterten Annotationen auf Seite {page + 1}.",
+                self.status.emit(
+                    f"Keine gefilterten Treffer auf Seite {page + 1}"
                 )
                 return 0
 

@@ -297,14 +297,15 @@ def ocr_pdf_document(
     dpi: int | None = None,
     page_from: int | None = None,
     page_to: int | None = None,
+    attach_errors: bool = True,
     progress: Optional[Callable[[int, int, str], Optional[bool]]] = None,
 ) -> OcrDocumentResult:
     """
     OCR über PDF-Seiten (optional von–bis, 1-basiert inkl.).
     dpi 150/300 setzt scale=dpi/72; scale-Argument bleibt kompatibel.
     progress(page_1based, total_in_range, preview) → False zum Abbrechen.
-    Seitenfehler werden gesammelt und am Ende als Abschnitt angehängt (1.1.3);
-    Abbruch behält Teilergebnis inkl. bisheriger Fehler.
+    Seitenfehler werden gesammelt; mit attach_errors=True (Default) als Abschnitt
+    angehängt (1.1.3/1.1.4). Abbruch behält Teilergebnis inkl. bisheriger Fehler.
     """
     from ild_pdf import render_page
 
@@ -380,10 +381,16 @@ def ocr_pdf_document(
         header = f"--- Seite {page_no}/{total} ---"
         body = (t or "").rstrip()
         if not body and any(pe[0] == page_no for pe in page_errors):
-            body = "[OCR-Fehler — siehe Abschnitt am Ende]"
+            body = (
+                "[OCR-Fehler — siehe Abschnitt am Ende]"
+                if attach_errors
+                else "[OCR-Fehler]"
+            )
         parts.append(f"{header}\n{body}" if body else header)
     combined = "\n\n".join(parts).strip()
-    err_section = _format_ocr_errors_section(page_errors)
+    err_section = (
+        _format_ocr_errors_section(page_errors) if attach_errors else ""
+    )
     if err_section:
         combined = (combined + "\n\n" + err_section) if combined else err_section
     elif combined:

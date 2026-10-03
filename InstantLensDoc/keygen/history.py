@@ -1,4 +1,4 @@
-"""Lokale Keygen-History (letzte N Keys) — ohne Secrets in Logs — 1.1.3."""
+"""Lokale Keygen-History (letzte N Keys) — ohne Secrets in Logs — 1.1.3/1.1.4."""
 
 from __future__ import annotations
 
@@ -10,6 +10,14 @@ from typing import Any, List
 
 HISTORY_MAX = 10
 _log = logging.getLogger("instantlensdoc.keygen")
+
+
+def mask_key(key: str) -> str:
+    """Key maskieren: nur letzte 4 Zeichen sichtbar — 1.1.4."""
+    key = key or ""
+    if len(key) <= 4:
+        return key
+    return ("•" * min(16, len(key) - 4)) + key[-4:]
 
 
 def history_path() -> Path:

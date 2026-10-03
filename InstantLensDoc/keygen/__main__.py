@@ -17,6 +17,7 @@ from keygen.history import (
     add_history,
     clear_history,
     load_history,
+    mask_key,
 )
 
 
@@ -149,21 +150,34 @@ def run_gui(*, days: int | None = None) -> int:
             hist_header.addWidget(
                 QLabel(f"History (letzte {HISTORY_MAX} Keys, lokal):")
             )
+            self.reveal_check = QPushButton("Reveal")
+            self.reveal_check.setCheckable(True)
+            self.reveal_check.setChecked(False)
+            self.reveal_check.setToolTip(
+                "Keys in der History unmaskiert anzeigen — 1.1.4"
+            )
+            self.reveal_check.toggled.connect(self._on_reveal_toggled)
             btn_clear = QPushButton("Clear History")
             btn_clear.setToolTip(
                 "Lokale Key-History leeren (keine Secrets in Logs) — 1.1.3"
             )
             btn_clear.clicked.connect(self._clear_history)
             hist_header.addStretch(1)
+            hist_header.addWidget(self.reveal_check)
             hist_header.addWidget(btn_clear)
             layout.addLayout(hist_header)
             self.history_list = QListWidget()
             self.history_list.setToolTip(
-                "Doppelklick lädt Key in die Ausgabe — 1.1.3"
+                "Maskiert (nur letzte 4); Hover/Reveal zeigt Key; "
+                "Doppelklick kopiert — 1.1.4"
             )
             self.history_list.setMaximumHeight(120)
-            self.history_list.itemDoubleClicked.connect(self._history_load)
+            self.history_list.setMouseTracking(True)
+            self.history_list.itemDoubleClicked.connect(self._history_copy)
+            self.history_list.itemEntered.connect(self._history_hover_enter)
+            self.history_list.viewport().installEventFilter(self)
             layout.addWidget(self.history_list)
+            self._history_hover_row = -1
 
             layout.addWidget(
                 QLabel(f"Standard: {KEY_DAYS} Tage. Kontakt: ame@sellerbach.de")
@@ -172,27 +186,68 @@ def run_gui(*, days: int | None = None) -> int:
             self._last_days = int(self.days_spin.value())
             self._reload_history()
 
+        def _history_label(self, entry: dict, *, reveal: bool) -> str:
+            email = entry.get("email") or "?"
+            days = entry.get("days") or 0
+            created = (entry.get("created") or "")[:10]
+            key = str(entry.get("key") or "")
+            shown = key if reveal else mask_key(key)
+            return f"{email} · {days}d · {created} · {shown}"
+
         def _reload_history(self):
             self.history_list.clear()
+            self._history_hover_row = -1
+            reveal_all = bool(self.reveal_check.isChecked())
             for entry in load_history():
-                email = entry.get("email") or "?"
-                days = entry.get("days") or 0
-                created = (entry.get("created") or "")[:10]
-                key = entry.get("key") or ""
-                # Anzeige ohne vollen Key (nur Präfix) — Secrets nicht in UI-Label-Spam
-                prefix = key[:12] + "…" if len(key) > 14 else key
-                label = f"{email} · {days}d · {created} · {prefix}"
+                label = self._history_label(entry, reveal=reveal_all)
                 item = QListWidgetItem(label)
                 item.setData(Qt.UserRole, entry)
+                item.setToolTip(
+                    "Hover/Reveal zeigt Key · Doppelklick kopiert — 1.1.4"
+                )
                 self.history_list.addItem(item)
 
-        def _history_load(self, item: QListWidgetItem):
+        def _refresh_history_labels(self):
+            reveal_all = bool(self.reveal_check.isChecked())
+            for i in range(self.history_list.count()):
+                item = self.history_list.item(i)
+                if item is None:
+                    continue
+                entry = item.data(Qt.UserRole)
+                if not isinstance(entry, dict):
+                    continue
+                reveal = reveal_all or (i == self._history_hover_row)
+                item.setText(self._history_label(entry, reveal=reveal))
+
+        def _on_reveal_toggled(self, _checked: bool = False):
+            self._refresh_history_labels()
+
+        def _history_hover_enter(self, item: QListWidgetItem):
+            row = self.history_list.row(item) if item else -1
+            if row == self._history_hover_row:
+                return
+            self._history_hover_row = row
+            self._refresh_history_labels()
+
+        def eventFilter(self, obj, event):
+            from PySide6.QtCore import QEvent
+
+            if obj is self.history_list.viewport():
+                if event.type() == QEvent.Leave:
+                    if self._history_hover_row >= 0:
+                        self._history_hover_row = -1
+                        self._refresh_history_labels()
+            return super().eventFilter(obj, event)
+
+        def _history_copy(self, item: QListWidgetItem):
+            """Doppelklick kopiert Key in die Zwischenablage — 1.1.4."""
             entry = item.data(Qt.UserRole) if item else None
             if not isinstance(entry, dict):
                 return
             key = str(entry.get("key") or "")
             if not key:
                 return
+            QApplication.clipboard().setText(key)
             self.out.setPlainText(key)
             email = str(entry.get("email") or "")
             if email:
@@ -204,7 +259,9 @@ def run_gui(*, days: int | None = None) -> int:
             self.days_spin.setValue(max(1, d))
             self._last_days = d
             self.validity_label.setText(f"Gültigkeit: {d} Tage")
-            self.statusBar().showMessage("Key aus History geladen", 2500)
+            self.statusBar().showMessage(
+                "Key aus History kopiert (Zwischenablage)", 2500
+            )
 
         def _clear_history(self):
             if self.history_list.count() <= 0:

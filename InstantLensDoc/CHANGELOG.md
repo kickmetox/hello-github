@@ -1,5 +1,27 @@
 # Changelog — InstantLens Doc
 
+## 1.1.4 — OCR Fehler-Toggle, Merge-Preview-Tab, Ann. 0-Treffer, Keygen Mask/Copy
+
+Post-Release-Polish nach 1.1.3: OCR-Batch-Dialog mit Toggle **„Fehler anhängen“** (Standard an); Merge-Vorschau-Thumbnail per Klick öffnet die Datei als Readonly-Vorschau in neuem Tab; gefiltertes Annotationen-Löschen bei 0 Treffern mit disabled Button + Statushinweis; Keygen-History maskiert Keys (nur letzte 4), Reveal/Hover zeigt Klartext, Doppelklick kopiert. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### OCR / Batch
+- Dialog-Toggle **„Fehler anhängen“** (Default an) steuert den Abschnitt **„OCR-Fehler“** im Ergebnis-TXT
+
+### PDF
+- **Zusammenführen**: Thumbnail-**Klick** öffnet Datei als **Readonly-Vorschau** (neuer Tab)
+
+### Annotationen
+- Gefiltertes Löschen: bei **0 Treffern** Yes-Button disabled + Statushinweis
+
+### Keygen
+- History: **Maskierung** (nur letzte 4 sichtbar) bis Hover/Reveal; **Doppelklick kopiert** Key
+
+### Packaging / Docs
+- Version **1.1.4** (App / `ild_pdf` / ISS / Smoke / Docs)
+- Smoke: OCR Fehler-Toggle, Merge Preview-Tab, Ann. 0-Treffer, Keygen Mask/Copy (CLI + Qt)
+
+---
+
 ## 1.1.3 — OCR Seitenfehler·Teilergebnis, Merge-Vorschau, Ann. Undo gefiltert, Keygen-History
 
 Post-Release-Polish nach 1.1.2: OCR-Batch sammelt Fehler pro Seite und hängt sie als Abschnitt an das Ergebnis-TXT; Abbruch behält Teilergebnis; PDF-Zusammenführen zeigt Vorschau-Thumbnail der markierten Datei (erste Seite); gefiltertes Annotationen-Löschen mit Undo-Text „N Annotationen (gefiltert)“; Keygen speichert lokal die letzten 10 Keys inkl. Clear History (ohne Secrets in Logs). Stubs KI/Cloud/Stylus/3D bleiben Stubs.

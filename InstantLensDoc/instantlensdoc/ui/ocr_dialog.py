@@ -125,6 +125,18 @@ class OcrDialog(QDialog):
             self.page_from.setVisible(False)
             self.page_to.setVisible(False)
 
+        # Batch: Fehlerabschnitt optional anhängen — 1.1.4
+        self.attach_errors_check = QCheckBox("Fehler anhängen")
+        self.attach_errors_check.setToolTip(
+            "Seitenfehler als Abschnitt „OCR-Fehler“ an das Ergebnis-TXT anhängen "
+            "(Standard an) — 1.1.4"
+        )
+        self.attach_errors_check.setChecked(True)
+        if self._show_page_range:
+            form.addRow(self.attach_errors_check)
+        else:
+            self.attach_errors_check.setVisible(False)
+
         self.rb_editable = QRadioButton("Editierbarer Text (Editor)")
         self.rb_searchable = QRadioButton("Durchsuchbares Bild (PDF + Text-Sidecar)")
         self.rb_editable.setChecked(True)
@@ -194,6 +206,12 @@ class OcrDialog(QDialog):
         if b < a:
             b = a
         return a, b
+
+    def attach_errors(self) -> bool:
+        """True = OCR-Fehler-Abschnitt an Ergebnis anhängen (Default) — 1.1.4."""
+        if not self._show_page_range:
+            return True
+        return bool(self.attach_errors_check.isChecked())
 
     def output_mode(self) -> OcrOutputMode:
         if self.rb_searchable.isChecked():

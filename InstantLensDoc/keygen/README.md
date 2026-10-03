@@ -10,7 +10,8 @@ run-keygen.bat
 
 Startet die GUI. Ausgabe als **Klartext (ohne QR)** mit **Kopieren**- und
 **Speichern als .txt**-Button; **Gültigkeitstage** neben dem Key (Spinbox / `--days`);
-lokale **History der letzten 10 Keys** + **Clear History** (keine Secrets in Logs).
+lokale **History der letzten 10 Keys** + **Clear History** (keine Secrets in Logs);
+History **maskiert** (nur letzte 4), Hover/Reveal zeigt Klartext, **Doppelklick kopiert**.
 Keys gelten standardmäßig **32 Tage (30+2)**. Kontakt: **ame@sellerbach.de**.
 
 ## Installer-Pfad (EXE-Build)

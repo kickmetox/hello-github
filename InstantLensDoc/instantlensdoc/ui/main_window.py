@@ -7112,7 +7112,9 @@ class MainWindow(QMainWindow):
             remember_recent_dir(path)
             self.open_path(path, encoding=enc)
 
-    def open_path(self, path: str, *, encoding: str | None = None):
+    def open_path(
+        self, path: str, *, encoding: str | None = None, readonly: bool = False
+    ):
         # Vor Tab-Wechsel Last-Page/Scroll des aktuellen Docs merken (0.9.1)
         try:
             self._capture_current_tab_view_state()
@@ -7124,9 +7126,15 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, "Öffnen", f"Datei konnte nicht geöffnet werden:\n{e}")
             return
 
+        if readonly:
+            self.doc.meta["readonly"] = True
         self.sidebar.add_document(path)
-        self._remember_path(path)
-        self.setWindowTitle(self._app_title(self.doc.display_name))
+        if not readonly:
+            self._remember_path(path)
+        title_name = self.doc.display_name
+        if readonly:
+            title_name = f"{title_name} [Vorschau]"
+        self.setWindowTitle(self._app_title(title_name))
 
         try:
             if self.doc.kind == DocKind.PDF:
@@ -7173,7 +7181,9 @@ class MainWindow(QMainWindow):
                 pass
             self._update_doc_status()
             enc = self.doc.meta.get("encoding")
-            if enc:
+            if readonly or self.doc.meta.get("readonly"):
+                self._set_status(f"Vorschau (readonly): {path}")
+            elif enc:
                 self._set_status(f"Geöffnet: {path} [{enc}]")
             else:
                 self._set_status(f"Geöffnet: {path}")
@@ -7195,6 +7205,15 @@ class MainWindow(QMainWindow):
                 QMessageBox.warning(self, "Lizenz", "Speichern nicht möglich — Lizenz/Trial abgelaufen.")
             return False
         if not self.doc:
+            return False
+        if self.doc.meta.get("readonly"):
+            if not quiet:
+                QMessageBox.information(
+                    self,
+                    "Vorschau",
+                    "Readonly-Vorschau — Speichern ist deaktiviert.",
+                )
+            self._set_status("Vorschau (readonly) — Speichern deaktiviert")
             return False
         if self.doc.kind == DocKind.PDF:
             if self.pdf_view.save_annotations():
@@ -7649,6 +7668,7 @@ class MainWindow(QMainWindow):
         lang = dlg.lang_code()
         dpi = dlg.dpi()
         page_from, page_to = dlg.page_range()
+        attach_errors = dlg.attach_errors()
         cancelled = {"flag": False}
 
         range_hint = (
@@ -7687,6 +7707,7 @@ class MainWindow(QMainWindow):
                 dpi=dpi,
                 page_from=page_from,
                 page_to=page_to,
+                attach_errors=attach_errors,
                 progress=on_progress,
             )
         except ocr_mod.OcrUnavailable as e:
@@ -7734,6 +7755,8 @@ class MainWindow(QMainWindow):
         )
         if result.page_errors:
             status += f" · {len(result.page_errors)} Seitenfehler"
+            if not attach_errors:
+                status += " (nicht angehängt)"
         if result.cancelled:
             status += " (abgebrochen, Teilergebnis behalten)"
         self._set_status(status)
