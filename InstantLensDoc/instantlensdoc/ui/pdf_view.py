@@ -2549,6 +2549,16 @@ class PdfViewer(QWidget):
         )
         return n, total
 
+    def count_annotations_by_layer_group(self) -> dict[str, int]:
+        """Anzahl Annotationen je Layer-Gruppe — 1.8.2."""
+        out = {"highlight": 0, "note": 0, "shape": 0, "redaction": 0}
+        if not self.store:
+            return out
+        for a in self.store.annotations:
+            g = self.canvas.ann_type_group(a.type)
+            out[g] = out.get(g, 0) + 1
+        return out
+
     def set_annotations_locked(self, locked: bool):
         """Annotationen sperren — nicht per Drag verschiebbar."""
         enabled = bool(locked)
@@ -4501,7 +4511,7 @@ class PdfViewer(QWidget):
                 label = f"Seite {page_h} dupliziert — rückgängig"
             elif kind == "rotate":
                 deg = int(entry.get("degrees", 90))
-                label = f"Seite {page_h} gedreht ({deg:+d}°) — rückgängig"
+                label = f"Seite {page_h} gedreht/gespiegelt ({deg:+d}°) — rückgängig"
             elif kind == "flip":
                 parts = []
                 if entry.get("horizontal"):
@@ -4509,7 +4519,7 @@ class PdfViewer(QWidget):
                 if entry.get("vertical"):
                     parts.append("V")
                 axis = "/".join(parts) or "?"
-                label = f"Seite {page_h} gespiegelt ({axis}) — rückgängig"
+                label = f"Seite {page_h} gedreht/gespiegelt ({axis}) — rückgängig"
             elif kind == "reorder":
                 n = int(entry.get("page_count") or len(entry.get("inverse") or []) or 0)
                 label = f"Seitenreihenfolge geändert ({n} Seiten) — rückgängig"
@@ -5413,12 +5423,19 @@ class PdfViewer(QWidget):
                     horizontal=horizontal,
                     vertical=vertical,
                 )
+                if self.store is not None and entry.get("ann_remapped") and self.store.can_undo():
+                    self.store.undo()
+                    try:
+                        self.schedule_sidecar_save(force=True)
+                    except Exception:
+                        pass
                 clear_render_cache(self.pdf_path)
                 if idx != self.page_index:
                     self.page_index = idx
                 self.refresh()
+                self.annotations_changed.emit()
                 self.document_changed.emit()
-                self.status.emit(f"Spiegeln rückgängig (S. {idx + 1})")
+                self.status.emit(f"Drehen/Spiegeln rückgängig (S. {idx + 1})")
                 return True
             if kind == "reorder":
                 inverse = [int(i) for i in (entry.get("inverse") or [])]
@@ -6952,7 +6969,7 @@ class PdfViewer(QWidget):
             return False
 
     def rotate_many(self, page_indices: list[int] | Sequence[int], degrees: int = 90) -> int:
-        """Mehrere Seiten drehen (±90/180); Undo je Seite Ctrl+Z; Status „N Seiten“ — 1.8.1."""
+        """Mehrere Seiten drehen (±90/180); Undo; Status „N Seiten gedreht/gespiegelt“ — 1.8.2."""
         if not self.pdf_path:
             return 0
         pages = sorted({int(i) for i in page_indices})
@@ -6965,7 +6982,9 @@ class PdfViewer(QWidget):
                 n += 1
         if n:
             label = "1 Seite" if n == 1 else f"{n} Seiten"
-            self.status.emit(f"{label} gedreht ({deg:+d}°) — Ctrl+Z rückgängig")
+            self.status.emit(
+                f"{label} gedreht/gespiegelt ({deg:+d}°) — Ctrl+Z rückgängig"
+            )
         return n
 
     def flip_current(self, *, horizontal: bool = False, vertical: bool = False):
@@ -6979,7 +6998,7 @@ class PdfViewer(QWidget):
         horizontal: bool = False,
         vertical: bool = False,
     ) -> bool:
-        """Seite spiegeln (H/V), speichern, Undo-fähig — 1.8.0."""
+        """Seite spiegeln (H/V), speichern, Undo-fähig; Ann.-Remap — 1.8.2."""
         if not self.pdf_path:
             return False
         if not horizontal and not vertical:
@@ -6989,12 +7008,41 @@ class PdfViewer(QWidget):
             if idx < 0 or idx >= int(self.page_count or 0):
                 self.status.emit("Spiegeln: ungültige Seite")
                 return False
+            page_w = page_h = 0.0
+            try:
+                from ild_pdf import PdfDocument
+
+                with PdfDocument(self.pdf_path, password=self.password) as doc:
+                    page_w, page_h = doc.page_size(idx)
+            except Exception:
+                page_w = page_h = 0.0
+            ann_remapped = False
+            if self.store is not None and page_w > 0 and page_h > 0:
+                undo_before = len(getattr(self.store, "_undo", []) or [])
+                n_ann = self.store.remap_coords_for_flip(
+                    idx,
+                    horizontal=bool(horizontal),
+                    vertical=bool(vertical),
+                    page_w=page_w,
+                    page_h=page_h,
+                    label="Ann. nach Spiegeln",
+                )
+                undo_after = len(getattr(self.store, "_undo", []) or [])
+                ann_remapped = bool(n_ann) and undo_after > undo_before
+                if n_ann:
+                    try:
+                        self.schedule_sidecar_save(force=True)
+                    except Exception:
+                        pass
             self._page_ops_undo.append(
                 {
                     "kind": "flip",
                     "index": idx,
                     "horizontal": bool(horizontal),
                     "vertical": bool(vertical),
+                    "ann_remapped": ann_remapped,
+                    "page_w": page_w,
+                    "page_h": page_h,
                 }
             )
             if len(self._page_ops_undo) > 20:
@@ -7012,13 +7060,15 @@ class PdfViewer(QWidget):
                 self.page_index = idx
             self.refresh()
             self.document_changed.emit()
+            if ann_remapped:
+                self.annotations_changed.emit()
             parts = []
             if horizontal:
                 parts.append("horizontal")
             if vertical:
                 parts.append("vertikal")
             self.status.emit(
-                f"Seite {idx + 1} gespiegelt ({'/'.join(parts)}) — Ctrl+Z rückgängig"
+                f"Seite {idx + 1} gedreht/gespiegelt ({'/'.join(parts)}) — Ctrl+Z rückgängig"
             )
             return True
         except Exception as e:
@@ -7035,7 +7085,7 @@ class PdfViewer(QWidget):
         horizontal: bool = False,
         vertical: bool = False,
     ) -> int:
-        """Mehrere Seiten spiegeln (H/V); Undo je Seite Ctrl+Z — 1.8.0."""
+        """Mehrere Seiten spiegeln (H/V); Undo; Status „N Seiten gedreht/gespiegelt“ — 1.8.2."""
         if not self.pdf_path:
             return 0
         if not horizontal and not vertical:
@@ -7055,7 +7105,7 @@ class PdfViewer(QWidget):
                 parts.append("V")
             label = "1 Seite" if n == 1 else f"{n} Seiten"
             self.status.emit(
-                f"{label} gespiegelt ({'/'.join(parts)}) — Ctrl+Z rückgängig"
+                f"{label} gedreht/gespiegelt ({'/'.join(parts)}) — Ctrl+Z rückgängig"
             )
         return n
 

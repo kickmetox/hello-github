@@ -1,5 +1,23 @@
 # Changelog — InstantLens Doc
 
+## 1.8.2 — Batch Flip-Remap·Undo „gedreht/gespiegelt“, HF Zoom·Auf alle/Bereich, Layer Zähler-Filter·Alle ein/aus, Recovery Alter·Als Kopie
+
+Post-Release-Polish nach 1.8.1: **Batch Spiegeln H/V** remappt **Ann.-Koordinaten** (+ Undo); Status/Historie **„N Seiten gedreht/gespiegelt“**; **Kopf-/Fußzeile** **Vorschau-Zoom**, **„Auf alle anwenden“** vs. **Seitenbereich** klar getrennt; **Layer-Zähler** per Klick **filtert Ann.-Liste**, Menü **„Alle ein“ / „Alle aus“**; **Crash-Recovery** zeigt **Snapshot-Alter**, Option **„Als Kopie öffnen“**. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### PDF / Seiten
+- Batch Spiegel H/V: Ann.-BBox Remap (+ Undo); Status/Historie „1 Seite“ / „N Seiten gedreht/gespiegelt“
+- Kopf-/Fußzeile: Vorschau-Zoom 50–250 %; Radio „Auf alle Seiten anwenden“ vs. Seitenbereich
+
+### Annotationen / Recovery
+- Annotation-Typen: Zähler je Typ im Menü; Klick filtert Sidebar-Liste; „Alle ein“ / „Alle aus“ / Listenfilter zurücksetzen
+- Crash-Recovery: lesbares Alter (Min./Std./Tage); Button „Als Kopie öffnen“ (`*_recovery`)
+
+### Packaging / Docs
+- Version **1.8.2** (App / `ild_pdf` / ISS / Smoke / Docs); `docs/VERSION` + `VERSION.txt`
+- Smoke: Flip-Remap·Undo-Text, HF Zoom·Scope, Layer Filter·Alle ein/aus, Recovery Age·Copy (CLI + Qt)
+
+---
+
 ## 1.8.1 — Batch-Shortcuts·Ann-Remap, HF Schrift/Rand·Vorschau·Seitenbereich, Layer Session·Shortcuts·Zähler, Recovery Meta·Verwerfen sauber
 
 Post-Release-Polish nach 1.8.0: **Batch Drehen/Spiegeln** mit **Shortcuts** (Ctrl+Alt+←/→/↑/H/Shift+V), Status **„N Seiten“**, **Ann.-Koordinaten Remap** bei 90°/180° (+ Undo); **Kopf-/Fußzeile** **Schriftgröße/Rand Settings**, **Vorschau erste Seite**, **Seitenbereich**; **Layer-Toggles** **Session-Persistenz**, **Shortcut-Menü** Ctrl+Alt+1…4, **Zähler sichtbarer Ann.**; **Crash-Recovery** **Snapshot-Metadaten-Vorschau**, **Verwerfen** löscht Orphan (Meta+Payload) sauber. Stubs KI/Cloud/Stylus/3D bleiben Stubs.

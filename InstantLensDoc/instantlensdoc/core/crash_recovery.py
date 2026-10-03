@@ -173,10 +173,31 @@ def restore_orphan(orphan: RecoveryOrphan, *, dest: str | Path | None = None) ->
     return target
 
 
+def format_orphan_age(age_seconds: float) -> str:
+    """Lesbares Snapshot-Alter — 1.8.2."""
+    secs = max(0.0, float(age_seconds or 0.0))
+    if secs < 60:
+        return "gerade eben"
+    mins = int(secs // 60)
+    if mins < 60:
+        return f"vor {mins} Min."
+    hours = mins // 60
+    rem_m = mins % 60
+    if hours < 48:
+        if rem_m:
+            return f"vor {hours} Std. {rem_m} Min."
+        return f"vor {hours} Std."
+    days = hours // 24
+    rem_h = hours % 24
+    if rem_h:
+        return f"vor {days} Tag{'en' if days != 1 else ''} {rem_h} Std."
+    return f"vor {days} Tag{'en' if days != 1 else ''}"
+
+
 def orphan_meta_preview(orphan: RecoveryOrphan) -> str:
     """
-    Lesbare Snapshot-Metadaten für Dialog-Vorschau — 1.8.1.
-    Pfad, Kind, Zeit, Größe, optional Text-Snippet.
+    Lesbare Snapshot-Metadaten für Dialog-Vorschau — 1.8.1; Alter 1.8.2.
+    Pfad, Kind, Zeit, Alter, Größe, optional Text-Snippet.
     """
     from datetime import datetime
 
@@ -198,10 +219,11 @@ def orphan_meta_preview(orphan: RecoveryOrphan) -> str:
         size_s = f"{size_b / 1024:.1f} KB"
     else:
         size_s = f"{size_b} B"
-    age_m = int(orphan.age_seconds() // 60)
+    age_s = format_orphan_age(orphan.age_seconds())
     lines = [
         f"{orphan.label}",
-        f"  Art: {orphan.kind} · {size_s} · {ts} (vor {age_m} min)",
+        f"  Alter: {age_s}",
+        f"  Art: {orphan.kind} · {size_s} · {ts}",
         f"  Pfad: {orphan.source_path}",
     ]
     if orphan.kind == "text" and orphan.payload_path.is_file():
@@ -215,6 +237,37 @@ def orphan_meta_preview(orphan: RecoveryOrphan) -> str:
         except Exception:
             pass
     return "\n".join(lines)
+
+
+def restore_orphan_as_copy(
+    orphan: RecoveryOrphan, *, dest: str | Path | None = None
+) -> Path:
+    """
+    Snapshot als Kopie öffnen (Originalpfad unberührt) — 1.8.2.
+    Ohne dest: neben Quelle als ``{stem}_recovery{suffix}``.
+    """
+    if dest is not None:
+        target = Path(dest)
+    else:
+        src = Path(orphan.source_path)
+        target = src.with_name(f"{src.stem}_recovery{src.suffix or '.bin'}")
+        if target.exists():
+            n = 2
+            while True:
+                cand = src.with_name(f"{src.stem}_recovery{n}{src.suffix or '.bin'}")
+                if not cand.exists():
+                    target = cand
+                    break
+                n += 1
+    target.parent.mkdir(parents=True, exist_ok=True)
+    if orphan.kind == "text":
+        text = orphan.payload_path.read_text(encoding="utf-8")
+        target.write_text(text, encoding="utf-8")
+    else:
+        shutil.copy2(orphan.payload_path, target)
+    # Orphan nach Kopie aufräumen (wie Wiederherstellen)
+    clear_recovery_for(orphan.source_path)
+    return target
 
 
 def discard_orphan(orphan: RecoveryOrphan) -> None:

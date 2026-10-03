@@ -1430,6 +1430,100 @@ class AnnotationStore:
             self.dirty = True
         return n
 
+    @staticmethod
+    def transform_rect_for_flip(
+        x: float,
+        y: float,
+        w: float,
+        h: float,
+        *,
+        page_w: float,
+        page_h: float,
+        horizontal: bool = False,
+        vertical: bool = False,
+    ) -> tuple[float, float, float, float]:
+        """
+        Bounding-Box nach Seitenspiegelung H und/oder V — 1.8.2.
+        page_w/page_h = Anzeigegröße *vor* dem Spiegeln.
+        """
+        nx, ny, nw, nh = float(x), float(y), float(w), float(h)
+        if horizontal:
+            nx = float(page_w) - nx - nw
+        if vertical:
+            ny = float(page_h) - ny - nh
+        return nx, ny, nw, nh
+
+    @staticmethod
+    def transform_point_for_flip(
+        x: float,
+        y: float,
+        *,
+        page_w: float,
+        page_h: float,
+        horizontal: bool = False,
+        vertical: bool = False,
+    ) -> tuple[float, float]:
+        """Punkt nach Seitenspiegelung H/V — 1.8.2."""
+        nx, ny = float(x), float(y)
+        if horizontal:
+            nx = float(page_w) - nx
+        if vertical:
+            ny = float(page_h) - ny
+        return nx, ny
+
+    def remap_coords_for_flip(
+        self,
+        page_index: int,
+        *,
+        horizontal: bool = False,
+        vertical: bool = False,
+        page_w: float,
+        page_h: float,
+        label: str = "Ann. nach Spiegeln",
+    ) -> int:
+        """
+        Annotation-Koordinaten nach Spiegeln H/V remappen — 1.8.2.
+        Rückgabe: Anzahl geänderter Annotationen (0 = kein Undo-Eintrag).
+        """
+        if not horizontal and not vertical:
+            return 0
+        page = int(page_index)
+        pw, ph = float(page_w), float(page_h)
+        if pw <= 0 or ph <= 0:
+            return 0
+        targets = [a for a in self.annotations if int(a.page) == page]
+        if not targets:
+            return 0
+        self._push_undo(label)
+        n = 0
+        for ann in targets:
+            nx, ny, nw, nh = self.transform_rect_for_flip(
+                ann.x,
+                ann.y,
+                ann.width,
+                ann.height,
+                page_w=pw,
+                page_h=ph,
+                horizontal=bool(horizontal),
+                vertical=bool(vertical),
+            )
+            ann.x, ann.y, ann.width, ann.height = nx, ny, nw, nh
+            if ann.callout_x or ann.callout_y:
+                cx, cy = self.transform_point_for_flip(
+                    ann.callout_x,
+                    ann.callout_y,
+                    page_w=pw,
+                    page_h=ph,
+                    horizontal=bool(horizontal),
+                    vertical=bool(vertical),
+                )
+                ann.callout_x, ann.callout_y = cx, cy
+            ann.touch()
+            n += 1
+        if n:
+            self.dirty = True
+        return n
+
     def remap_pages(self, mapping: dict[int, int]) -> None:
         """Seitenindizes nach reorder/delete anpassen; fehlende Keys = Seite entfernt."""
         planned: List[tuple[Annotation, int]] = []

@@ -666,7 +666,7 @@ class WatermarkDialog(QDialog):
             QMessageBox.critical(self, "Seitennummern", str(e))
 
     def _build_hf_tab(self) -> QWidget:
-        """Kopf-/Fußzeile + Seitenzahl bake; Schrift/Rand Settings·Vorschau·Seitenbereich — 1.8.1."""
+        """Kopf-/Fußzeile Bake; Vorschau-Zoom · Auf alle / Bereich getrennt — 1.8.2."""
         w = QWidget()
         root = QHBoxLayout(w)
         form_host = QWidget()
@@ -732,13 +732,39 @@ class WatermarkDialog(QDialog):
         self.hf_margin.setValue(float(self._last_hf.get("margin") or 28))
         self.hf_margin.setToolTip("Rand in pt (Settings merken) — 1.8.1")
         form.addRow("Rand (pt)", self.hf_margin)
-        # Seitenbereich — 1.8.1
-        self.hf_range = QLineEdit(str(self._last_hf.get("page_range") or ""))
-        self.hf_range.setPlaceholderText("leer = alle; z. B. 1-3,5")
-        self.hf_range.setToolTip(
-            "Seitenbereich 1-basiert, z. B. 1-3,5 (Settings merken) — 1.8.1"
+        # Auf alle vs. Seitenbereich klar getrennt — 1.8.2
+        scope_box = QVBoxLayout()
+        scope_lbl = QLabel("Anwendungsbereich")
+        scope_lbl.setStyleSheet("QLabel { font-weight: bold; }")
+        scope_box.addWidget(scope_lbl)
+        saved_range = str(self._last_hf.get("page_range") or "").strip()
+        self.hf_scope_all = QRadioButton("Auf alle Seiten anwenden")
+        self.hf_scope_all.setToolTip("Kopf-/Fußzeile auf jede Seite bakken — 1.8.2")
+        self.hf_scope_range = QRadioButton("Seitenbereich")
+        self.hf_scope_range.setToolTip(
+            "Nur angegebenen Bereich bakken (1-basiert) — 1.8.2"
         )
-        form.addRow("Seitenbereich", self.hf_range)
+        if saved_range:
+            self.hf_scope_range.setChecked(True)
+        else:
+            self.hf_scope_all.setChecked(True)
+        scope_box.addWidget(self.hf_scope_all)
+        scope_box.addWidget(self.hf_scope_range)
+        self.hf_range = QLineEdit(saved_range)
+        self.hf_range.setPlaceholderText("z. B. 1-3,5")
+        self.hf_range.setToolTip(
+            "Seitenbereich 1-basiert, z. B. 1-3,5 (Settings merken) — 1.8.2"
+        )
+        scope_box.addWidget(self.hf_range)
+        scope_host = QWidget()
+        scope_host.setLayout(scope_box)
+        scope_host.setStyleSheet(
+            "QWidget { background: #f7f7f7; border: 1px solid #ddd; padding: 4px; }"
+        )
+        form.addRow(scope_host)
+        self.hf_scope_all.toggled.connect(self._sync_hf_scope_ui)
+        self.hf_scope_range.toggled.connect(self._sync_hf_scope_ui)
+        self._sync_hf_scope_ui()
         self.hf_inplace = QCheckBox("Original überschreiben")
         self.hf_inplace.setChecked(True)
         form.addRow("", self.hf_inplace)
@@ -746,7 +772,7 @@ class WatermarkDialog(QDialog):
         run.clicked.connect(self._run_hf)
         form.addRow(run)
         root.addWidget(form_host, 3)
-        # Vorschau erste Seite — 1.8.1
+        # Vorschau erste Seite + Zoom — 1.8.2
         prev_col = QVBoxLayout()
         prev_col.addWidget(QLabel("Vorschau erste Seite"))
         self.hf_page_thumb = QLabel()
@@ -756,6 +782,16 @@ class WatermarkDialog(QDialog):
             "QLabel { background: #f4f4f4; border: 1px solid #ccc; }"
         )
         prev_col.addWidget(self.hf_page_thumb, 1)
+        zoom_row = QHBoxLayout()
+        zoom_row.addWidget(QLabel("Zoom"))
+        self.hf_preview_zoom = QSpinBox()
+        self.hf_preview_zoom.setRange(50, 250)
+        self.hf_preview_zoom.setSuffix(" %")
+        self.hf_preview_zoom.setValue(100)
+        self.hf_preview_zoom.setToolTip("Vorschau-Zoom der ersten Seite — 1.8.2")
+        self.hf_preview_zoom.valueChanged.connect(lambda *_: self._refresh_hf_preview())
+        zoom_row.addWidget(self.hf_preview_zoom, 1)
+        prev_col.addLayout(zoom_row)
         self.hf_preview = QLabel()
         self.hf_preview.setWordWrap(True)
         self.hf_preview.setTextInteractionFlags(Qt.TextSelectableByMouse)
@@ -780,16 +816,28 @@ class WatermarkDialog(QDialog):
         QTimer.singleShot(0, self._refresh_hf_preview)
         return w
 
+    def _sync_hf_scope_ui(self) -> None:
+        """Seitenbereich nur aktiv wenn Bereich gewählt — 1.8.2."""
+        use_range = bool(
+            hasattr(self, "hf_scope_range") and self.hf_scope_range.isChecked()
+        )
+        if hasattr(self, "hf_range"):
+            self.hf_range.setEnabled(use_range)
+
     def _resolve_hf_pages(self):
-        """Seitenbereich für HF-Bake; None = alle — 1.8.1."""
+        """Seitenbereich für HF-Bake; None = alle — 1.8.2."""
+        if hasattr(self, "hf_scope_all") and self.hf_scope_all.isChecked():
+            return None
         spec = (self.hf_range.text() or "").strip()
         if not spec:
-            return None
+            raise ValueError(
+                "Seitenbereich leer — Bereich angeben oder „Auf alle Seiten anwenden“ wählen."
+            )
         ranges = parse_page_ranges(spec, self._page_count, one_based=True)
         return flatten_page_indices(ranges)
 
     def _refresh_hf_preview(self) -> None:
-        """Text + Thumbnail der ersten Seite — 1.8.1."""
+        """Text + Thumbnail der ersten Seite mit Zoom — 1.8.2."""
         src = ""
         if hasattr(self, "hf_src"):
             src = self.hf_src.text().strip()
@@ -824,7 +872,11 @@ class WatermarkDialog(QDialog):
             try:
                 from ild_pdf.render import render_page
 
-                img = render_page(src, 0, scale=0.35, use_cache=True)
+                zoom_pct = 100
+                if hasattr(self, "hf_preview_zoom"):
+                    zoom_pct = int(self.hf_preview_zoom.value() or 100)
+                scale = 0.35 * (max(50, min(250, zoom_pct)) / 100.0)
+                img = render_page(src, 0, scale=scale, use_cache=True)
                 if img.mode != "RGBA":
                     img = img.convert("RGBA")
                 data = img.tobytes("raw", "RGBA")
@@ -879,6 +931,9 @@ class WatermarkDialog(QDialog):
                 font_size=self.hf_size.value(),
                 margin=self.hf_margin.value(),
             )
+            range_saved = ""
+            if hasattr(self, "hf_scope_range") and self.hf_scope_range.isChecked():
+                range_saved = self.hf_range.text().strip()
             set_last_header_footer_settings(
                 header_text=header,
                 footer_text=footer,
@@ -889,7 +944,7 @@ class WatermarkDialog(QDialog):
                 page_position=self.hf_page_pos.currentText(),
                 font_size=self.hf_size.value(),
                 margin=self.hf_margin.value(),
-                page_range=self.hf_range.text().strip(),
+                page_range=range_saved,
             )
             self.result_path = str(out)
             QMessageBox.information(self, "Kopf-/Fußzeile", f"Gespeichert:\n{out}")

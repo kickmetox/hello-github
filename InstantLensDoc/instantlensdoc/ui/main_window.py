@@ -1984,10 +1984,10 @@ class MainWindow(QMainWindow):
         self._ann_layer_action.setShortcut(QKeySequence("Ctrl+Shift+A"))
         self._ann_layer_action.toggled.connect(self._toggle_ann_layer)
         m_view.addAction(self._ann_layer_action)
-        # Typ-Toggles Highlight/Note/Shape/Redaction — 1.8.0; Shortcuts·Zähler — 1.8.1
+        # Typ-Toggles Highlight/Note/Shape/Redaction — 1.8.0; Zähler-Klick filtert · Alle ein/aus — 1.8.2
         m_ann_types = m_view.addMenu("Annotation-Typen")
         m_ann_types.setToolTip(
-            "Globale Sichtbarkeit nach Typ (Layer); Shortcuts Ctrl+Alt+1…4 — 1.8.1"
+            "Sichtbarkeit nach Typ; Klick auf Zähler filtert Ann.-Liste; Alle ein/aus — 1.8.2"
         )
         types_vis = get_ann_layer_types_visible()
         self._ann_type_actions: dict[str, QAction] = {}
@@ -2003,15 +2003,36 @@ class MainWindow(QMainWindow):
             "shape": "Ctrl+Alt+3",
             "redaction": "Ctrl+Alt+4",
         }
+        act_all_on = QAction("Alle ein", self)
+        act_all_on.setToolTip("Alle Annotation-Typen einblenden — 1.8.2")
+        act_all_on.triggered.connect(lambda: self._set_all_ann_type_layers(True))
+        m_ann_types.addAction(act_all_on)
+        act_all_off = QAction("Alle aus", self)
+        act_all_off.setToolTip("Alle Annotation-Typen ausblenden — 1.8.2")
+        act_all_off.triggered.connect(lambda: self._set_all_ann_type_layers(False))
+        m_ann_types.addAction(act_all_off)
+        act_clear_filter = QAction("Listenfilter zurücksetzen", self)
+        act_clear_filter.setToolTip("Ann.-Listenfilter (Layer-Typ) zurücksetzen — 1.8.2")
+        act_clear_filter.triggered.connect(
+            lambda: self._filter_ann_list_by_layer_group("")
+        )
+        m_ann_types.addAction(act_clear_filter)
+        m_ann_types.addSeparator()
         for key, label in self._ann_type_labels.items():
             act = QAction(label, self)
             act.setCheckable(True)
             act.setChecked(bool(types_vis.get(key, True)))
             act.setData(key)
             act.setShortcut(QKeySequence(type_shortcuts[key]))
-            act.setToolTip(f"{label} ein-/ausblenden ({type_shortcuts[key]})")
+            act.setToolTip(
+                f"{label} ein-/ausblenden ({type_shortcuts[key]}); "
+                f"Klick filtert Ann.-Liste auf diesen Typ — 1.8.2"
+            )
             act.toggled.connect(
                 lambda checked, g=key: self._toggle_ann_type_layer(g, checked)
+            )
+            act.triggered.connect(
+                lambda _checked=False, g=key: self._filter_ann_list_by_layer_group(g)
             )
             m_ann_types.addAction(act)
             self._ann_type_actions[key] = act
@@ -4946,6 +4967,38 @@ class MainWindow(QMainWindow):
         except Exception:
             pass
 
+    def _set_all_ann_type_layers(self, visible: bool) -> None:
+        """Alle Layer-Typen ein- oder ausblenden — 1.8.2."""
+        from instantlensdoc.core.app_settings import (
+            ANN_LAYER_TYPE_KEYS,
+            set_ann_layer_types_visible,
+        )
+
+        payload = {k: bool(visible) for k in ANN_LAYER_TYPE_KEYS}
+        set_ann_layer_types_visible(payload)
+        self.pdf_view.set_annotation_types_visible(payload)
+        self._sync_ann_type_actions()
+        try:
+            self._save_session()
+        except Exception:
+            pass
+        self._set_status(
+            "Annotation-Typen: alle ein" if visible else "Annotation-Typen: alle aus"
+        )
+
+    def _filter_ann_list_by_layer_group(self, group: str) -> None:
+        """Ann.-Liste auf Layer-Typ filtern (Zähler-Klick) — 1.8.2."""
+        try:
+            self.sidebar.set_annotation_layer_group_filter(group)
+        except Exception:
+            return
+        labels = getattr(self, "_ann_type_labels", None) or {}
+        if group:
+            name = labels.get(group, group)
+            self._set_status(f"Ann.-Liste gefiltert: {name}")
+        else:
+            self._set_status("Ann.-Listenfilter zurückgesetzt")
+
     def _sync_ann_type_actions(self) -> None:
         vis = get_ann_layer_types_visible()
         labels = getattr(self, "_ann_type_labels", None) or {
@@ -4959,11 +5012,17 @@ class MainWindow(QMainWindow):
             vis_n, total_n = self.pdf_view.count_visible_annotations()
         except Exception:
             vis_n, total_n = 0, 0
+        by_group: dict[str, int] = {}
+        try:
+            by_group = self.pdf_view.count_annotations_by_layer_group()
+        except Exception:
+            by_group = {}
         for key, act in (getattr(self, "_ann_type_actions", None) or {}).items():
             act.blockSignals(True)
             act.setChecked(bool(vis.get(key, True)))
             base = labels.get(key, key)
-            act.setText(base)
+            cnt = int(by_group.get(key, 0))
+            act.setText(f"{base} ({cnt})")
             act.blockSignals(False)
         menu = getattr(self, "_m_ann_types", None)
         if menu is not None:
@@ -5686,7 +5745,7 @@ class MainWindow(QMainWindow):
             pass
 
     def _maybe_recover_orphans(self) -> None:
-        """Beim Start: dirty Autosave-Orphans anbieten — 1.8.0."""
+        """Beim Start: dirty Autosave-Orphans anbieten — 1.8.0; Alter·Als Kopie — 1.8.2."""
         import os
 
         if os.environ.get("ILD_SMOKE_QT") or os.environ.get("ILD_NO_SESSION"):
@@ -5696,9 +5755,11 @@ class MainWindow(QMainWindow):
         try:
             from instantlensdoc.core.crash_recovery import (
                 discard_orphan,
+                format_orphan_age,
                 list_orphans,
                 orphan_meta_preview,
                 restore_orphan,
+                restore_orphan_as_copy,
             )
 
             orphans = list_orphans(
@@ -5708,26 +5769,30 @@ class MainWindow(QMainWindow):
             return
         if not orphans:
             return
-        # Snapshot-Metadaten-Vorschau — 1.8.1
+        # Snapshot-Metadaten inkl. Alter — 1.8.2
         previews = []
         for o in orphans[:8]:
             try:
                 previews.append(orphan_meta_preview(o))
             except Exception:
-                age_m = int(o.age_seconds() // 60)
-                previews.append(f"{o.label} ({o.kind}, vor {age_m} min)")
+                try:
+                    age_s = format_orphan_age(o.age_seconds())
+                except Exception:
+                    age_s = "Alter unbekannt"
+                previews.append(f"{o.label} ({o.kind}, {age_s})")
         more = f"\n\n… und {len(orphans) - 8} weitere" if len(orphans) > 8 else ""
         msg = (
             "Ungespeicherte Autosave-Snapshots gefunden (Crash-Recovery):\n\n"
             + "\n\n".join(previews)
             + more
-            + "\n\nWiederherstellen?"
+            + "\n\nWiederherstellen, als Kopie öffnen oder verwerfen?"
         )
         box = QMessageBox(self)
         box.setIcon(QMessageBox.Warning)
         box.setWindowTitle("Crash-Recovery")
         box.setText(msg)
         btn_restore = box.addButton("Wiederherstellen", QMessageBox.AcceptRole)
+        btn_copy = box.addButton("Als Kopie öffnen", QMessageBox.ActionRole)
         btn_discard = box.addButton("Verwerfen", QMessageBox.DestructiveRole)
         box.addButton("Später", QMessageBox.RejectRole)
         box.exec()
@@ -5744,6 +5809,22 @@ class MainWindow(QMainWindow):
                         f"Konnte nicht wiederherstellen:\n{o.source_path}\n{e}",
                     )
             self._set_status(f"Crash-Recovery: {len(orphans)} Snapshot(s) wiederhergestellt")
+        elif clicked is btn_copy:
+            opened = 0
+            for o in orphans:
+                try:
+                    path = restore_orphan_as_copy(o)
+                    self.open_path(str(path))
+                    opened += 1
+                except Exception as e:
+                    QMessageBox.warning(
+                        self,
+                        "Crash-Recovery",
+                        f"Kopie fehlgeschlagen:\n{o.source_path}\n{e}",
+                    )
+            self._set_status(
+                f"Crash-Recovery: {opened} Snapshot(s) als Kopie geöffnet"
+            )
         elif clicked is btn_discard:
             for o in orphans:
                 try:

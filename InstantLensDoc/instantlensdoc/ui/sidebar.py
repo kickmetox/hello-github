@@ -71,6 +71,32 @@ ANN_TYPE_LABELS = {
     "redaction": "Schwärzung",
 }
 
+# Layer-Gruppe ← AnnotationType.value — 1.8.2 (spiegel PdfCanvas.ann_type_group)
+ANN_LAYER_GROUP_TYPES = {
+    "highlight": {"highlight", "underline"},
+    "note": {"sticky", "text", "callout", "text_overlay"},
+    "redaction": {"redaction"},
+    "shape": {
+        "rectangle",
+        "line",
+        "arrow",
+        "measure",
+        "stamp",
+        "signature",
+        "signature_field",
+    },
+}
+
+
+def ann_type_to_layer_group(typ) -> str:
+    """AnnotationType/value → Layer-Gruppe highlight|note|shape|redaction — 1.8.2."""
+    val = getattr(typ, "value", None) or typ
+    key = str(val or "").strip().lower()
+    for group, members in ANN_LAYER_GROUP_TYPES.items():
+        if key in members:
+            return group
+    return "shape"
+
 
 # UserRole+1: Tab angeheftet (0.9.2) — geschützt vor „Alle schließen“
 _DOC_PINNED_ROLE = 257
@@ -892,6 +918,7 @@ class Sidebar(QWidget):
         self._ann_all_lines: list[str] = []
         self._ann_all_payloads: list = []
         self._ann_filter_updating = False
+        self._ann_layer_group_filter = ""  # highlight|note|shape|redaction — 1.8.2
         self._ann_search_query = ""
         self._ann_search_regex = False
         self._ann_color_filter = ""
@@ -2372,6 +2399,47 @@ class Sidebar(QWidget):
         data = self.ann_filter.currentData()
         return str(data) if data else ""
 
+    def annotation_layer_group_filter(self) -> str:
+        """Layer-Gruppenfilter (highlight/note/shape/redaction) oder '' — 1.8.2."""
+        return str(getattr(self, "_ann_layer_group_filter", "") or "").strip()
+
+    def set_annotation_layer_group_filter(self, group: str | None) -> None:
+        """Ann.-Liste auf Layer-Typ filtern; leer = alle — 1.8.2."""
+        gid = str(group or "").strip().lower()
+        if gid not in ("", "highlight", "note", "shape", "redaction"):
+            gid = ""
+        prev = self.annotation_layer_group_filter()
+        self._ann_layer_group_filter = gid
+        # Einzeltyp-Combo zurücksetzen wenn Layer-Filter aktiv
+        if gid and hasattr(self, "ann_filter"):
+            try:
+                self._ann_filter_updating = True
+                idx = self.ann_filter.findData("")
+                if idx >= 0:
+                    self.ann_filter.setCurrentIndex(idx)
+            finally:
+                self._ann_filter_updating = False
+        if gid != prev:
+            self._apply_annotation_filter()
+            self.annotation_filter_changed.emit(self.annotation_filter_type())
+
+    def set_annotation_filter_type(self, typ: str | None) -> None:
+        """Combo-Typfilter setzen; leert Layer-Gruppenfilter — 1.8.2."""
+        want = str(typ or "")
+        self._ann_layer_group_filter = ""
+        if not hasattr(self, "ann_filter"):
+            return
+        idx = self.ann_filter.findData(want)
+        if idx < 0:
+            idx = self.ann_filter.findData("")
+        try:
+            self._ann_filter_updating = True
+            self.ann_filter.setCurrentIndex(idx if idx >= 0 else 0)
+        finally:
+            self._ann_filter_updating = False
+        self._apply_annotation_filter()
+        self.annotation_filter_changed.emit(self.annotation_filter_type())
+
     def annotation_filter_color(self) -> str:
         """Aktueller Farben-Filter (#RRGGBB) oder '' für alle."""
         return getattr(self, "_ann_color_filter", "") or ""
@@ -2549,6 +2617,8 @@ class Sidebar(QWidget):
     def _on_ann_filter_changed(self, _index: int = 0):
         if self._ann_filter_updating:
             return
+        # Combo-Typfilter ersetzt Layer-Gruppenfilter — 1.8.2
+        self._ann_layer_group_filter = ""
         self._apply_annotation_filter()
         self.annotation_filter_changed.emit(self.annotation_filter_type())
 
@@ -2803,6 +2873,7 @@ class Sidebar(QWidget):
 
     def _apply_annotation_filter(self):
         want = self.annotation_filter_type()
+        want_layer = self.annotation_layer_group_filter()
         want_color = self.annotation_filter_color()
         want_tags = {t.casefold() for t in self.annotation_filter_tags()}
         query = self._ann_search_query
@@ -2822,7 +2893,13 @@ class Sidebar(QWidget):
                         page = -1
                 if page != int(current_page):
                     continue
-            if want:
+            if want_layer:
+                t = getattr(getattr(payload, "type", None), "value", None) or getattr(
+                    payload, "type", None
+                )
+                if ann_type_to_layer_group(t) != want_layer:
+                    continue
+            elif want:
                 t = getattr(getattr(payload, "type", None), "value", None) or getattr(
                     payload, "type", None
                 )
