@@ -461,7 +461,7 @@ class Sidebar(QWidget):
         btn_row.addWidget(self.btn_full)
         btn_row.addWidget(self.btn_pdfs)
         layout.addLayout(btn_row)
-        # PDF-Suche: Case-sensitive + Whole-word (0.9.2)
+        # PDF-Suche: Case-sensitive + Whole-word (0.9.2) + Regex (0.9.3)
         opt_row = QHBoxLayout()
         self.search_case = QCheckBox("Aa")
         self.search_case.setToolTip("Groß-/Kleinschreibung beachten (PDF-Suche)")
@@ -469,8 +469,14 @@ class Sidebar(QWidget):
         self.search_whole = QCheckBox("Wort")
         self.search_whole.setToolTip("Nur ganze Wörter (PDF-Suche)")
         self.search_whole.setChecked(False)
+        self.search_regex = QCheckBox(".*")
+        self.search_regex.setToolTip(
+            "Suchbegriff als regulärer Ausdruck (PDF-Suche) — Fehler in der Statusleiste"
+        )
+        self.search_regex.setChecked(False)
         opt_row.addWidget(self.search_case)
         opt_row.addWidget(self.search_whole)
+        opt_row.addWidget(self.search_regex)
         opt_row.addStretch(1)
         layout.addLayout(opt_row)
         hits_row = QHBoxLayout()
@@ -759,6 +765,12 @@ class Sidebar(QWidget):
         """PDF-Suche: nur ganze Wörter (0.9.2)."""
         if hasattr(self, "search_whole"):
             return bool(self.search_whole.isChecked())
+        return False
+
+    def search_regex_enabled(self) -> bool:
+        """PDF-Suche: Regex-Modus (0.9.3)."""
+        if hasattr(self, "search_regex"):
+            return bool(self.search_regex.isChecked())
         return False
 
     def search_text(self) -> str:
@@ -1243,6 +1255,56 @@ class Sidebar(QWidget):
             it.setToolTip(tip)
             return True
         return False
+
+    def reorder_documents(self, paths: list[str], *, emit: bool = True) -> bool:
+        """
+        Dokument-Tabs in die angegebene Reihenfolge bringen (Drag-Reorder API).
+        Pin-Status bleibt am Item. True wenn Reihenfolge geändert (0.9.3).
+        """
+        if not paths or self.files.count() <= 1:
+            return False
+        want = [str(Path(p)) for p in paths if p]
+        if not want:
+            return False
+        current: list[str] = []
+        for i in range(self.files.count()):
+            it = self.files.item(i)
+            if not it:
+                continue
+            p = it.data(256) or it.toolTip() or it.text()
+            if p:
+                current.append(str(Path(str(p))))
+        ordered_keys: list[str] = []
+        seen: set[str] = set()
+        current_set = set(current)
+        for key in want:
+            if key in current_set and key not in seen:
+                ordered_keys.append(key)
+                seen.add(key)
+        for key in current:
+            if key not in seen:
+                ordered_keys.append(key)
+                seen.add(key)
+        if current == ordered_keys:
+            return False
+        # takeItem behält Ownership — clear() würde Items löschen
+        by_path: dict[str, object] = {}
+        self.files.blockSignals(True)
+        while self.files.count():
+            it = self.files.takeItem(0)
+            if it is None:
+                continue
+            p = it.data(256) or it.toolTip() or it.text()
+            if p:
+                by_path[str(Path(str(p)))] = it
+        for key in ordered_keys:
+            it = by_path.get(key)
+            if it is not None:
+                self.files.addItem(it)
+        self.files.blockSignals(False)
+        if emit:
+            self.documents_reordered.emit()
+        return True
 
     def clear_thumbs(self):
         self.thumbs.clear()

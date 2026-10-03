@@ -65,6 +65,7 @@ from .images import (
     insert_signature_image,
 )
 from .overlay import (
+    SearchPatternError,
     TextBlock,
     TextMatchRect,
     bake_text_overlays,
@@ -161,6 +162,7 @@ __all__ = [
     "insert_image_stamp_overlay",
     "insert_signature_field",
     "insert_signature_image",
+    "SearchPatternError",
     "TextBlock",
     "TextMatchRect",
     "extract_text_blocks",
@@ -202,4 +204,4 @@ __all__ = [
     "uri_link_at",
 ]
 
-__version__ = "0.9.2"
+__version__ = "0.9.3"

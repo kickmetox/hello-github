@@ -293,10 +293,47 @@ class MainWindow(QMainWindow):
         return out
 
     def _on_documents_reordered(self):
-        """Session-Tab-Reihenfolge nach Drag in der Dokumentliste speichern."""
+        """Session-Tab-Reihenfolge nach Drag in der Dokumentliste speichern (0.9.3)."""
         self._save_session()
         n = len(self._session_paths())
-        self._set_status(f"Dokument-Reihenfolge gespeichert ({n} Tab(s))")
+        self._set_status(f"Tab-Reihenfolge gespeichert ({n} Tab(s))")
+
+    def _main_splitter_sizes(self) -> list[int]:
+        """Aktuelle Sidebar/Viewer-Splitter-Größen (0.9.3)."""
+        try:
+            sp = getattr(self, "main_splitter", None)
+            if sp is None:
+                return []
+            sizes = [int(x) for x in sp.sizes()]
+            if len(sizes) >= 2 and sizes[0] > 0 and sizes[1] > 0:
+                return sizes[:2]
+        except Exception:
+            pass
+        return []
+
+    def _apply_main_splitter_sizes(self, sizes) -> bool:
+        """Splitter-Größen wiederherstellen. True wenn angewendet."""
+        try:
+            if not isinstance(sizes, (list, tuple)) or len(sizes) < 2:
+                return False
+            a, b = int(sizes[0]), int(sizes[1])
+            if a <= 0 or b <= 0:
+                return False
+            sp = getattr(self, "main_splitter", None)
+            if sp is None:
+                return False
+            sp.setSizes([a, b])
+            return True
+        except Exception:
+            return False
+
+    def _on_main_splitter_moved(self, *_args) -> None:
+        """Splitter ziehen → Session merken (debounced über Timer)."""
+        if getattr(self, "_splitter_save_timer", None) is None:
+            self._splitter_save_timer = QTimer(self)
+            self._splitter_save_timer.setSingleShot(True)
+            self._splitter_save_timer.timeout.connect(self._save_session)
+        self._splitter_save_timer.start(400)
 
     def _capture_current_tab_view_state(self) -> None:
         """Aktuelle Seite/Zoom/Scroll für den geöffneten Tab merken (0.9.1)."""
@@ -420,6 +457,7 @@ class MainWindow(QMainWindow):
             secondary_path=sec_path or None,
             secondary_kind=sec_kind or None,
             sync_scroll=get_editor_doc_split_sync_scroll(),
+            splitter_sizes=self._main_splitter_sizes() or None,
         )
         session_mod.save_session(state)
 
@@ -478,6 +516,15 @@ class MainWindow(QMainWindow):
             self._doc_split_sync_action.setChecked(want_sync)
             self._doc_split_sync_action.blockSignals(False)
         self._apply_doc_split_sync_scroll()
+        # Sidebar/Viewer-Splitter aus Session (0.9.3)
+        sizes = list(getattr(state, "splitter_sizes", None) or [])
+        if sizes:
+
+            def _restore_split(sz=sizes) -> None:
+                self._apply_main_splitter_sizes(sz)
+
+            QTimer.singleShot(0, _restore_split)
+            QTimer.singleShot(120, _restore_split)
         self._set_status(f"Session wiederhergestellt ({len(state.tabs)} Tab(s))")
 
     def _build_ui(self):
@@ -487,6 +534,7 @@ class MainWindow(QMainWindow):
         root.setContentsMargins(0, 0, 0, 0)
 
         splitter = QSplitter(Qt.Horizontal)
+        self.main_splitter = splitter  # Sidebar / Viewer — Größen in Session (0.9.3)
         self.sidebar = Sidebar()
         self.sidebar.search_requested.connect(self._on_search)
         self.sidebar.search_next_requested.connect(self._on_search_next)
@@ -612,6 +660,7 @@ class MainWindow(QMainWindow):
         self.secondary_wrap.setVisible(bool(get_editor_doc_split()))
         splitter.addWidget(self.doc_splitter)
         splitter.setStretchFactor(1, 3)
+        splitter.splitterMoved.connect(self._on_main_splitter_moved)
         root.addWidget(splitter)
 
         sb = QStatusBar()
@@ -4287,26 +4336,43 @@ class MainWindow(QMainWindow):
             except Exception:
                 snip_ctx = 40
             # Klickbare Trefferliste: Seite + Snippet je Texttreffer (0.9.1)
-            # Case-sensitive / Whole-word aus Suchleiste (0.9.2)
+            # Case-sensitive / Whole-word (0.9.2) / Regex (0.9.3)
+            from ild_pdf.overlay import SearchPatternError
+
             case_sens = bool(
                 getattr(self.sidebar, "search_case_sensitive", lambda: False)()
             )
             whole_word = bool(
                 getattr(self.sidebar, "search_whole_word", lambda: False)()
             )
+            use_regex = bool(
+                getattr(self.sidebar, "search_regex_enabled", lambda: False)()
+            )
             text_hits: list[tuple[int, int, str]] = []
-            if pdf_path and hasattr(self.pdf_view, "collect_search_hits"):
-                text_hits = self.pdf_view.collect_search_hits(
+            n_page = 0
+            try:
+                if pdf_path and hasattr(self.pdf_view, "collect_search_hits"):
+                    text_hits = self.pdf_view.collect_search_hits(
+                        query,
+                        max_hits=100,
+                        snippet_chars=snip_ctx,
+                        case_sensitive=case_sens,
+                        whole_word=whole_word,
+                        regex=use_regex,
+                    )
+                # Aktuelle Seite: Texttreffer highlighten
+                n_page = self.pdf_view.highlight_search(
                     query,
-                    max_hits=100,
-                    snippet_chars=snip_ctx,
                     case_sensitive=case_sens,
                     whole_word=whole_word,
+                    regex=use_regex,
                 )
-            # Aktuelle Seite: Texttreffer highlighten
-            n_page = self.pdf_view.highlight_search(
-                query, case_sensitive=case_sens, whole_word=whole_word
-            )
+            except SearchPatternError as e:
+                self.pdf_view.clear_search_highlights()
+                self.sidebar.clear_search_hit_status()
+                self.sidebar.set_marks([f"Regex-Fehler: {e}"])
+                self._set_status(f"Regex-Fehler: {e}")
+                return
             if text_hits or hits or n_page:
                 lines = []
                 payloads = []
@@ -4396,19 +4462,32 @@ class MainWindow(QMainWindow):
             if not q:
                 self._set_status("Keine Suche aktiv")
                 return
+            from ild_pdf.overlay import SearchPatternError
+
             case_sens = bool(
                 getattr(self.sidebar, "search_case_sensitive", lambda: False)()
             )
             whole_word = bool(
                 getattr(self.sidebar, "search_whole_word", lambda: False)()
             )
+            use_regex = bool(
+                getattr(self.sidebar, "search_regex_enabled", lambda: False)()
+            )
             self.pdf_view.set_search_options(
-                case_sensitive=case_sens, whole_word=whole_word
+                case_sensitive=case_sens, whole_word=whole_word, regex=use_regex
             )
             if self.pdf_view._search_query != q:
-                n = self.pdf_view.highlight_search(
-                    q, case_sensitive=case_sens, whole_word=whole_word
-                )
+                try:
+                    n = self.pdf_view.highlight_search(
+                        q,
+                        case_sensitive=case_sens,
+                        whole_word=whole_word,
+                        regex=use_regex,
+                    )
+                except SearchPatternError as e:
+                    self.sidebar.clear_search_hit_status()
+                    self._set_status(f"Regex-Fehler: {e}")
+                    return
                 if n:
                     self.sidebar.set_search_hit_status(1, n)
                     self._set_status(f"{n} Treffer auf aktueller Seite (1/{n})")
@@ -4443,19 +4522,32 @@ class MainWindow(QMainWindow):
             if not q:
                 self._set_status("Keine Suche aktiv")
                 return
+            from ild_pdf.overlay import SearchPatternError
+
             case_sens = bool(
                 getattr(self.sidebar, "search_case_sensitive", lambda: False)()
             )
             whole_word = bool(
                 getattr(self.sidebar, "search_whole_word", lambda: False)()
             )
+            use_regex = bool(
+                getattr(self.sidebar, "search_regex_enabled", lambda: False)()
+            )
             self.pdf_view.set_search_options(
-                case_sensitive=case_sens, whole_word=whole_word
+                case_sensitive=case_sens, whole_word=whole_word, regex=use_regex
             )
             if self.pdf_view._search_query != q:
-                n = self.pdf_view.highlight_search(
-                    q, case_sensitive=case_sens, whole_word=whole_word
-                )
+                try:
+                    n = self.pdf_view.highlight_search(
+                        q,
+                        case_sensitive=case_sens,
+                        whole_word=whole_word,
+                        regex=use_regex,
+                    )
+                except SearchPatternError as e:
+                    self.sidebar.clear_search_hit_status()
+                    self._set_status(f"Regex-Fehler: {e}")
+                    return
                 if n:
                     self.pdf_view._search_index = n - 1
                     self.pdf_view.canvas.set_search_highlights(
@@ -4578,26 +4670,40 @@ class MainWindow(QMainWindow):
         if page is not None and self.stack.currentWidget() is self.pdf_view:
             n = 0
             if q:
+                from ild_pdf.overlay import SearchPatternError
+
                 case_sens = bool(
                     getattr(self.sidebar, "search_case_sensitive", lambda: False)()
                 )
                 whole_word = bool(
                     getattr(self.sidebar, "search_whole_word", lambda: False)()
                 )
+                use_regex = bool(
+                    getattr(self.sidebar, "search_regex_enabled", lambda: False)()
+                )
                 self.pdf_view.set_search_options(
-                    case_sensitive=case_sens, whole_word=whole_word
+                    case_sensitive=case_sens,
+                    whole_word=whole_word,
+                    regex=use_regex,
                 )
                 self.pdf_view._search_query = q
-                if hit_index is not None:
-                    ok = self.pdf_view._goto_search_page(
-                        int(page), hit_index=int(hit_index)
-                    )
-                    n = self.pdf_view.search_hit_count() if ok else 0
-                else:
-                    self.pdf_view.goto_page(int(page))
-                    n = self.pdf_view.highlight_search(
-                        q, case_sensitive=case_sens, whole_word=whole_word
-                    )
+                try:
+                    if hit_index is not None:
+                        ok = self.pdf_view._goto_search_page(
+                            int(page), hit_index=int(hit_index)
+                        )
+                        n = self.pdf_view.search_hit_count() if ok else 0
+                    else:
+                        self.pdf_view.goto_page(int(page))
+                        n = self.pdf_view.highlight_search(
+                            q,
+                            case_sensitive=case_sens,
+                            whole_word=whole_word,
+                            regex=use_regex,
+                        )
+                except SearchPatternError as e:
+                    self._set_status(f"Regex-Fehler: {e}")
+                    return
             else:
                 self.pdf_view.goto_page(int(page))
             if n:

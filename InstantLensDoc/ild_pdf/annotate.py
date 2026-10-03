@@ -252,6 +252,7 @@ class Annotation:
     font_size: float = 12.0
     opacity: float = 1.0  # Deckkraft 0.05–1.0
     stroke_width: float = 2.0  # Strichstärke Shapes 1–12 px (0.9.2)
+    fill_color: str = ""  # Füllfarbe Shapes (#RRGGBB); leer = aus color abgeleitet (0.9.3)
     rotation: float = 0.0  # Stempel-Drehung in Grad (0/90/180/270)
     tags: List[str] = field(default_factory=list)  # freie Labels, filterbar
     group_id: str = ""  # temporäre Gruppen-ID (Sidecar; leer = ungruppiert)
@@ -302,6 +303,10 @@ class Annotation:
         except (TypeError, ValueError):
             sw = 2.0
         d["stroke_width"] = round(max(1.0, min(12.0, sw)), 2)
+        fc = str(d.get("fill_color") or "").strip()
+        if fc and not fc.startswith("#"):
+            fc = "#" + fc
+        d["fill_color"] = fc.upper() if fc else ""
         return d
 
     def color_rgb(self) -> list[float]:
@@ -410,6 +415,10 @@ class Annotation:
         except (TypeError, ValueError):
             sw = 2.0
         data["stroke_width"] = max(1.0, min(12.0, sw))
+        fc = str(data.get("fill_color") or "").strip()
+        if fc and not fc.startswith("#"):
+            fc = "#" + fc
+        data["fill_color"] = fc.upper() if fc else ""
         try:
             rot = float(data.get("rotation", 0.0) or 0.0)
         except (TypeError, ValueError):
@@ -964,6 +973,8 @@ class AnnotationStore:
                             setattr(a, k, self._normalize_opacity(v))
                         elif k == "stroke_width":
                             setattr(a, k, self._normalize_stroke_width(v))
+                        elif k == "fill_color":
+                            setattr(a, k, self._normalize_fill_color(v))
                         else:
                             setattr(a, k, v)
                 a.touch()
@@ -992,6 +1003,8 @@ class AnnotationStore:
                         setattr(a, k, self._normalize_opacity(v))
                     elif k == "stroke_width":
                         setattr(a, k, self._normalize_stroke_width(v))
+                    elif k == "fill_color":
+                        setattr(a, k, self._normalize_fill_color(v))
                     else:
                         setattr(a, k, v)
             a.touch()
@@ -1075,6 +1088,20 @@ class AnnotationStore:
         """Batch-Strichstärke für Auswahl setzen (1–12 px) — 0.9.2."""
         w = self._normalize_stroke_width(width)
         return self.update_many(ann_ids, stroke_width=w)
+
+    @staticmethod
+    def _normalize_fill_color(value: object) -> str:
+        c = str(value or "").strip()
+        if not c:
+            return ""
+        if not c.startswith("#"):
+            c = "#" + c
+        return c.upper()
+
+    def set_fill_colors(self, ann_ids: Sequence[str], color: str) -> int:
+        """Batch-Füllfarbe für Auswahl setzen (#RRGGBB oder leer) — 0.9.3."""
+        c = self._normalize_fill_color(color)
+        return self.update_many(ann_ids, fill_color=c)
 
     def save_opacities(self, ann_ids: Sequence[str], opacity: float) -> int:
         """

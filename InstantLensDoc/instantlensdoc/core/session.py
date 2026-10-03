@@ -33,6 +33,8 @@ class SessionState:
     secondary_kind: str = ""
     # Doc-Split Sync-Scroll (0.6.9): Zustand je Session gemerkt
     sync_scroll: bool = False
+    # Haupt-Splitter Sidebar/Viewer Größen (Pixel) — 0.9.3
+    splitter_sizes: List[int] = field(default_factory=list)
 
 
 def session_path() -> Path:
@@ -44,6 +46,22 @@ def _normalize_secondary_kind(kind: str | None) -> str:
     if k in ("pdf", "editor"):
         return k
     return ""
+
+
+def _normalize_splitter_sizes(raw) -> List[int]:
+    """Zwei positive Ints [sidebar, viewer]; sonst leer."""
+    if not isinstance(raw, (list, tuple)) or len(raw) < 2:
+        return []
+    out: List[int] = []
+    for v in raw[:2]:
+        try:
+            n = int(v)
+        except (TypeError, ValueError):
+            return []
+        if n <= 0:
+            return []
+        out.append(n)
+    return out
 
 
 def load_session() -> SessionState:
@@ -96,6 +114,7 @@ def load_session() -> SessionState:
     if secondary_path and not secondary_kind:
         secondary_kind = "pdf" if Path(secondary_path).suffix.lower() == ".pdf" else "editor"
     sync_scroll = bool(raw.get("sync_scroll", False))
+    splitter_sizes = _normalize_splitter_sizes(raw.get("splitter_sizes"))
     return SessionState(
         tabs=tabs,
         active=active,
@@ -103,6 +122,7 @@ def load_session() -> SessionState:
         secondary_path=secondary_path,
         secondary_kind=secondary_kind,
         sync_scroll=sync_scroll,
+        splitter_sizes=splitter_sizes,
     )
 
 
@@ -117,6 +137,7 @@ def save_session(state: SessionState) -> None:
     sec_path = str(state.secondary_path or "").strip()
     if sec_path and not Path(sec_path).is_file():
         sec_path = ""
+    sizes = _normalize_splitter_sizes(getattr(state, "splitter_sizes", None))
     payload = {
         "restore": state.restore,
         "active": state.active,
@@ -124,6 +145,7 @@ def save_session(state: SessionState) -> None:
         "secondary_path": sec_path,
         "secondary_kind": _normalize_secondary_kind(state.secondary_kind),
         "sync_scroll": bool(state.sync_scroll),
+        "splitter_sizes": sizes,
     }
     path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
 
@@ -144,9 +166,11 @@ def build_session(
     secondary_path: Optional[str] = None,
     secondary_kind: Optional[str] = None,
     sync_scroll: bool = False,
+    splitter_sizes: Optional[List[int]] = None,
 ) -> SessionState:
     """
     tab_states: optional {path: {page, scale, scroll_y}} für Last-Page/Zoom/Scroll je Tab (0.9.1/0.9.2).
+    splitter_sizes: optional [sidebar_px, viewer_px] — Haupt-Splitter (0.9.3).
     """
     tabs: List[SessionTab] = []
     seen: set[str] = set()
@@ -223,4 +247,5 @@ def build_session(
         secondary_path=sec,
         secondary_kind=kind,
         sync_scroll=bool(sync_scroll),
+        splitter_sizes=_normalize_splitter_sizes(splitter_sizes),
     )

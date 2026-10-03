@@ -6,11 +6,16 @@ Deshalb: Overlay-Editor (Sidecar) + optionaler Bake-Schritt.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional, Sequence
 
 from .annotate import Annotation, AnnotationStore, AnnotationType
+
+
+class SearchPatternError(ValueError):
+    """Ungültiger Suchausdruck (z. B. fehlerhafte Regex) — Statusleiste."""
 
 
 @dataclass
@@ -292,16 +297,26 @@ def find_text_rects(
     max_hits: int = 200,
     case_sensitive: bool = False,
     whole_word: bool = False,
+    regex: bool = False,
 ) -> List[TextMatchRect]:
     """
     Findet Query-Treffer auf einer PDF-Seite und liefert Highlight-Rechtecke
     (Render-Pixel bei scale, Y von oben).
 
     case_sensitive / whole_word: Toggles der Suchleiste (0.9.2).
+    regex: Suchbegriff als regulärer Ausdruck (0.9.3); wirft SearchPatternError.
     """
     q = (query or "").strip()
     if not q:
         return []
+    # Regex zuerst kompilieren — Fehler auch ohne Text auf der Seite (Statusleiste)
+    pattern = None
+    if regex:
+        flags = 0 if case_sensitive else re.IGNORECASE
+        try:
+            pattern = re.compile(q, flags)
+        except re.error as e:
+            raise SearchPatternError(str(e) or "ungültiger regulärer Ausdruck") from e
     try:
         chars, _w, _h = _page_chars(pdf_path, page_index, password=password)
     except Exception:
@@ -312,34 +327,15 @@ def find_text_rects(
     # Volltext + Index-Mapping (inkl. Whitespace für Wortgrenzen)
     text_chars = [(c[4] or " ") for c in chars]
     hay = "".join(text_chars)
-    if case_sensitive:
-        hay_cmp = hay
-        needle = q
-    else:
-        hay_cmp = hay.lower()
-        needle = q.lower()
-    if not needle or needle not in hay_cmp:
-        return []
-
     hits: List[TextMatchRect] = []
-    start = 0
-    nlen = len(needle)
-    while len(hits) < max_hits:
-        pos = hay_cmp.find(needle, start)
-        if pos < 0:
-            break
-        end = pos + nlen
-        if whole_word:
-            left_ok = pos == 0 or not _is_word_char(hay[pos - 1])
-            right_ok = end >= len(hay) or not _is_word_char(hay[end])
-            if not (left_ok and right_ok):
-                start = pos + 1
-                continue
+
+    def _append_span(pos: int, end: int) -> None:
+        nonlocal hits
+        if pos < 0 or end <= pos or end > len(chars):
+            return
         slice_chars = chars[pos:end]
         if not slice_chars:
-            start = pos + 1
-            continue
-        # Mehrzeilige Treffer → pro Y-Band ein Rechteck
+            return
         bands: dict[int, list[tuple[float, float, float, float, str]]] = {}
         for c in slice_chars:
             key = int(round(c[1] / 2.0) * 2)
@@ -360,7 +356,46 @@ def find_text_rects(
             )
             hits.append(rect.scaled(scale) if scale != 1.0 else rect)
             if len(hits) >= max_hits:
+                return
+
+    if regex and pattern is not None:
+        for m in pattern.finditer(hay):
+            if len(hits) >= max_hits:
                 break
+            pos, end = m.start(), m.end()
+            if end <= pos:
+                continue
+            if whole_word:
+                left_ok = pos == 0 or not _is_word_char(hay[pos - 1])
+                right_ok = end >= len(hay) or not _is_word_char(hay[end])
+                if not (left_ok and right_ok):
+                    continue
+            _append_span(pos, end)
+        return hits
+
+    if case_sensitive:
+        hay_cmp = hay
+        needle = q
+    else:
+        hay_cmp = hay.lower()
+        needle = q.lower()
+    if not needle or needle not in hay_cmp:
+        return []
+
+    start = 0
+    nlen = len(needle)
+    while len(hits) < max_hits:
+        pos = hay_cmp.find(needle, start)
+        if pos < 0:
+            break
+        end = pos + nlen
+        if whole_word:
+            left_ok = pos == 0 or not _is_word_char(hay[pos - 1])
+            right_ok = end >= len(hay) or not _is_word_char(hay[end])
+            if not (left_ok and right_ok):
+                start = pos + 1
+                continue
+        _append_span(pos, end)
         start = pos + max(nlen, 1)
     return hits
 

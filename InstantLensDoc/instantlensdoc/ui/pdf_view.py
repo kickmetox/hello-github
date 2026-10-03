@@ -772,9 +772,10 @@ class PdfCanvas(QLabel):
             painter.drawLine(x, y + box_h, cx, cy)
             painter.drawEllipse(cx - 3, cy - 3, 6, 6)
         elif ann.type == AnnotationType.RECTANGLE:
-            painter.setBrush(QColor(ann.color))
-            c = QColor(ann.color)
-            c.setAlpha(_a(40))
+            fill_src = str(getattr(ann, "fill_color", "") or "").strip() or ann.color
+            painter.setBrush(QColor(fill_src if fill_src else ann.color))
+            c = QColor(fill_src if fill_src else ann.color)
+            c.setAlpha(_a(40 if not str(getattr(ann, "fill_color", "") or "").strip() else 90))
             painter.fillRect(x, y, w, h, c)
             painter.drawRect(x, y, w, h)
         elif ann.type in (AnnotationType.LINE, AnnotationType.ARROW, AnnotationType.MEASURE):
@@ -1154,6 +1155,7 @@ class PdfViewer(QWidget):
         self._suppress_default_zoom = False  # Session Zoom pro Tab (0.9.2)
         self._search_case_sensitive = False
         self._search_whole_word = False
+        self._search_regex = False
         self._annotations_visible = get_annotations_visible()
         self._annotations_locked = get_annotations_locked()
         self._show_page_boxes = get_show_page_boxes()
@@ -1227,6 +1229,11 @@ class PdfViewer(QWidget):
             "Farbe der ausgewählten Annotation(en) ändern (Batch, Ctrl+Alt+Shift+F)"
         )
         btn_ann_color.clicked.connect(self.recolor_selected_annotations)
+        self.btn_ann_fill = QPushButton("Füllung…")
+        self.btn_ann_fill.setToolTip(
+            "Füllfarbe des ausgewählten Shapes ändern (Commit + Undo) — 0.9.3"
+        )
+        self.btn_ann_fill.clicked.connect(self.recolor_fill_selected_annotations)
         btn_ann_opacity = QPushButton("α…")
         btn_ann_opacity.setToolTip(
             "Deckkraft der ausgewählten Annotation(en) ändern (Batch, Ctrl+Alt+Shift+O)"
@@ -1562,6 +1569,7 @@ class PdfViewer(QWidget):
         toolbar.addWidget(self.btn_fav_jump)
         toolbar.addWidget(btn_del_ann)
         toolbar.addWidget(btn_ann_color)
+        toolbar.addWidget(self.btn_ann_fill)
         toolbar.addWidget(btn_ann_opacity)
         toolbar.addWidget(btn_align_l)
         toolbar.addWidget(btn_align_c)
@@ -1632,6 +1640,7 @@ class PdfViewer(QWidget):
                 self.btn_fav_jump,
                 btn_del_ann,
                 btn_ann_color,
+                self.btn_ann_fill,
                 btn_ann_opacity,
                 btn_align_l,
                 btn_align_c,
@@ -3396,34 +3405,46 @@ class PdfViewer(QWidget):
         *,
         case_sensitive: bool | None = None,
         whole_word: bool | None = None,
+        regex: bool | None = None,
     ) -> None:
-        """Case-sensitive / Whole-word Toggles für PDF-Suche (0.9.2)."""
+        """Case-sensitive / Whole-word (0.9.2) / Regex (0.9.3) Toggles für PDF-Suche."""
         if case_sensitive is not None:
             self._search_case_sensitive = bool(case_sensitive)
         if whole_word is not None:
             self._search_whole_word = bool(whole_word)
+        if regex is not None:
+            self._search_regex = bool(regex)
 
     def _search_kw(self) -> dict:
         return {
             "case_sensitive": bool(getattr(self, "_search_case_sensitive", False)),
             "whole_word": bool(getattr(self, "_search_whole_word", False)),
+            "regex": bool(getattr(self, "_search_regex", False)),
         }
 
     def _rebuild_search_rects(self, *, keep_index: bool = True) -> int:
         """Aktualisiert Treffer-Rechtecke der aktuellen Seite für _search_query."""
+        from ild_pdf.overlay import SearchPatternError
+
         q = self._search_query
         if not q or not self.pdf_path:
             self._search_rects = []
             self._search_index = -1
             return 0
-        matches = find_text_rects(
-            self.pdf_path,
-            self.page_index,
-            q,
-            scale=self.scale,
-            password=self.password,
-            **self._search_kw(),
-        )
+        try:
+            matches = find_text_rects(
+                self.pdf_path,
+                self.page_index,
+                q,
+                scale=self.scale,
+                password=self.password,
+                **self._search_kw(),
+            )
+        except SearchPatternError as e:
+            self._search_rects = []
+            self._search_index = -1
+            self.status.emit(f"Regex-Fehler: {e}")
+            raise
         self._search_rects = [(m.x, m.y, m.width, m.height) for m in matches]
         if keep_index and self._search_rects:
             self._search_index = max(0, min(self._search_index, len(self._search_rects) - 1))
@@ -3437,18 +3458,32 @@ class PdfViewer(QWidget):
         *,
         case_sensitive: bool | None = None,
         whole_word: bool | None = None,
+        regex: bool | None = None,
     ) -> int:
         """Highlightet Query-Treffer auf der aktuellen Seite. Liefert Trefferzahl."""
+        from ild_pdf.overlay import SearchPatternError
+
         q = (query or "").strip()
         if not q or not self.pdf_path:
             self.clear_search_highlights()
             return 0
-        if case_sensitive is not None or whole_word is not None:
+        if (
+            case_sensitive is not None
+            or whole_word is not None
+            or regex is not None
+        ):
             self.set_search_options(
-                case_sensitive=case_sensitive, whole_word=whole_word
+                case_sensitive=case_sensitive,
+                whole_word=whole_word,
+                regex=regex,
             )
         self._search_query = q
-        n = self._rebuild_search_rects(keep_index=False)
+        try:
+            n = self._rebuild_search_rects(keep_index=False)
+        except SearchPatternError:
+            self.clear_search_highlights()
+            self._search_query = q  # Query behalten für Status
+            raise
         self.canvas.set_search_highlights(self._search_rects, self._search_index)
         return n
 
@@ -3476,6 +3511,8 @@ class PdfViewer(QWidget):
         stop_exclusive: int | None = None,
     ) -> bool:
         """Nächste Seite mit Query-Treffern ab start (direction ±1)."""
+        from ild_pdf.overlay import SearchPatternError
+
         if not self.pdf_path or not self._search_query or self.page_count <= 0:
             return False
         step = 1 if direction >= 0 else -1
@@ -3483,14 +3520,18 @@ class PdfViewer(QWidget):
         while 0 <= i < self.page_count:
             if stop_exclusive is not None and i == stop_exclusive:
                 break
-            matches = find_text_rects(
-                self.pdf_path,
-                i,
-                self._search_query,
-                scale=self.scale,
-                password=self.password,
-                **self._search_kw(),
-            )
+            try:
+                matches = find_text_rects(
+                    self.pdf_path,
+                    i,
+                    self._search_query,
+                    scale=self.scale,
+                    password=self.password,
+                    **self._search_kw(),
+                )
+            except SearchPatternError as e:
+                self.status.emit(f"Regex-Fehler: {e}")
+                return False
             if matches:
                 hit = 0 if step > 0 else len(matches) - 1
                 return self._goto_search_page(i, hit_index=hit)
@@ -3574,31 +3615,43 @@ class PdfViewer(QWidget):
         snippet_chars: int = 48,
         case_sensitive: bool | None = None,
         whole_word: bool | None = None,
+        regex: bool | None = None,
     ) -> list[tuple[int, int, str]]:
         """
         Alle PDF-Texttreffer für die Trefferliste (Seite, Hit-Index auf Seite, Snippet).
         """
+        from ild_pdf.overlay import SearchPatternError
+
         q = (query or "").strip()
         if not q or not self.pdf_path or self.page_count <= 0:
             return []
-        if case_sensitive is not None or whole_word is not None:
+        if (
+            case_sensitive is not None
+            or whole_word is not None
+            or regex is not None
+        ):
             self.set_search_options(
-                case_sensitive=case_sensitive, whole_word=whole_word
+                case_sensitive=case_sensitive,
+                whole_word=whole_word,
+                regex=regex,
             )
         out: list[tuple[int, int, str]] = []
         ctx = max(12, int(snippet_chars))
         for page_idx in range(int(self.page_count)):
             if len(out) >= max_hits:
                 break
-            matches = find_text_rects(
-                self.pdf_path,
-                page_idx,
-                q,
-                scale=1.0,
-                password=self.password,
-                max_hits=max(1, max_hits - len(out)),
-                **self._search_kw(),
-            )
+            try:
+                matches = find_text_rects(
+                    self.pdf_path,
+                    page_idx,
+                    q,
+                    scale=1.0,
+                    password=self.password,
+                    max_hits=max(1, max_hits - len(out)),
+                    **self._search_kw(),
+                )
+            except SearchPatternError:
+                raise
             for hit_i, m in enumerate(matches):
                 if len(out) >= max_hits:
                     break
@@ -3612,6 +3665,49 @@ class PdfViewer(QWidget):
                     snip = raw[: max(20, ctx)] + ("…" if len(raw) > ctx else "")
                 out.append((page_idx, hit_i, snip or q))
         return out
+
+    def recolor_fill_selected_annotations(self) -> int:
+        """Füllfarbe für ausgewähltes Shape setzen (Commit + Undo) — 0.9.3."""
+        if not self.store:
+            self.status.emit("Kein PDF geladen")
+            return 0
+        ids = list(self._selected_ann_ids) if self._selected_ann_ids else (
+            [self._selected_ann_id] if self._selected_ann_id else []
+        )
+        ids = [i for i in ids if i]
+        if not ids:
+            self.status.emit("Keine Annotation ausgewählt")
+            return 0
+        initial = QColor("#FFE066")
+        first = self.store.get(ids[0])
+        if first:
+            src = str(getattr(first, "fill_color", "") or "").strip() or (
+                first.color or ""
+            )
+            c0 = QColor(src) if src else QColor()
+            if c0.isValid():
+                initial = c0
+        chosen = QColorDialog.getColor(
+            initial,
+            self,
+            f"Füllfarbe für {len(ids)} Annotation(en)",
+        )
+        if not chosen.isValid():
+            return 0
+        color = chosen.name().upper()
+        n = self.store.set_fill_colors(ids, color)
+        if n <= 0:
+            self.status.emit("Füllfarbe nicht geändert")
+            return 0
+        try:
+            self.schedule_sidecar_save(force=True)
+        except Exception as e:
+            QMessageBox.warning(self, "Füllfarbe", str(e))
+            return 0
+        self.refresh()
+        self.annotations_changed.emit()
+        self.status.emit(f"Füllfarbe {color} für {n} Annotation(en)")
+        return n
 
     def set_scale(self, scale: float, *, immediate: bool = False):
         scale = max(0.25, min(5.0, float(scale)))

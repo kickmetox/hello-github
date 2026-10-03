@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Smoke-Test 0.9.2 (CLI + optional offscreen Qt). Kernpfade: open/annotate/export/license + ausgewählte 0.6.x-Pfade."""
+"""Smoke-Test 0.9.3 (CLI + optional offscreen Qt). Kernpfade: open/annotate/export/license + ausgewählte 0.6.x-Pfade."""
 
 from __future__ import annotations
 
@@ -122,8 +122,8 @@ def main() -> int:
     from instantlensdoc.core.update_check import check_for_updates
     from instantlensdoc.license import KEY_DAYS, TRIAL_DAYS, generate_key, verify_key
 
-    assert __version__ == "0.9.2", __version__
-    assert ild_ver == "0.9.2", ild_ver
+    assert __version__ == "0.9.3", __version__
+    assert ild_ver == "0.9.3", ild_ver
     assert TRIAL_DAYS == 28 and KEY_DAYS == 32
     key = generate_key("ame@sellerbach.de")
     ok, msg, _ = verify_key(key)
@@ -141,7 +141,7 @@ def main() -> int:
     assert "Settings" in tr("settings")
     set_lang("de")
     upd = check_for_updates(allow_network=False)
-    assert upd.local_version == "0.9.2" and not upd.online
+    assert upd.local_version == "0.9.3" and not upd.online
     assert get_export_jpeg_quality() >= 10
     assert get_ui_lang() in ("de", "en")
     assert 25 <= get_default_zoom_percent() <= 500
@@ -182,8 +182,8 @@ def main() -> int:
     assert get_ann_pen_color() == "#112233"
     assert (ROOT / "CHANGELOG.md").is_file()
     cl = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-    assert "0.9.2" in cl and "0.9.1" in cl and "0.9.0" in cl and "0.8.9" in cl and "0.8.8" in cl and "0.8.7" in cl and "0.8.6" in cl and "0.8.5" in cl and "0.8.4" in cl and "0.8.3" in cl and "0.8.2" in cl and "0.8.1" in cl and "0.8.0" in cl
-    assert "## 0.9.2" in cl and "## 0.9.1" in cl and "## 0.9.0" in cl and "## 0.8.9" in cl and "## 0.8.8" in cl and "## 0.8.7" in cl and "## 0.8.6" in cl and "## 0.8.5" in cl and "## 0.8.4" in cl and "## 0.8.3" in cl and "## 0.8.2" in cl and "## 0.8.1" in cl and "## 0.8.0" in cl
+    assert "0.9.3" in cl and "0.9.2" in cl and "0.9.1" in cl and "0.9.0" in cl and "0.8.9" in cl and "0.8.8" in cl and "0.8.7" in cl and "0.8.6" in cl and "0.8.5" in cl and "0.8.4" in cl and "0.8.3" in cl and "0.8.2" in cl and "0.8.1" in cl and "0.8.0" in cl
+    assert "## 0.9.3" in cl and "## 0.9.2" in cl and "## 0.9.1" in cl and "## 0.9.0" in cl and "## 0.8.9" in cl and "## 0.8.8" in cl and "## 0.8.7" in cl and "## 0.8.6" in cl and "## 0.8.5" in cl and "## 0.8.4" in cl and "## 0.8.3" in cl and "## 0.8.2" in cl and "## 0.8.1" in cl and "## 0.8.0" in cl
     assert "## 0.7.9" in cl
     assert "## 0.7.8" in cl
     assert "## 0.7.6" in cl
@@ -240,7 +240,7 @@ def main() -> int:
     assert "0.4.9" in cl  # noch in Kurz-Tabelle
     assert "0.3.9" in cl  # noch in Kurz-Tabelle
     assert "0.2.9" in cl  # noch in Kurz-Tabelle
-    assert "0.9.2" in (ROOT / "README.md").read_text(encoding="utf-8")
+    assert "0.9.3" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "run.bat" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "sync-ild.ps1" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "scripts/sync-ild.ps1" in (ROOT / "FEATURES.md").read_text(encoding="utf-8")
@@ -589,13 +589,13 @@ def main() -> int:
 
         assert (ROOT / "installer" / "installer-hinweis.txt").exists()
         iss = (ROOT / "installer" / "instantlensdoc.iss").read_text(encoding="utf-8")
-        assert "0.9.2" in iss and "desktopicon" in iss and "DisableProgramGroupPage=no" in iss
+        assert "0.9.3" in iss and "desktopicon" in iss and "DisableProgramGroupPage=no" in iss
         assert "UninstallDisplayName" in iss and "Uninstallable=yes" in iss
         assert "IncludeKeygen" in iss and "SetupIconFile" in iss
         assert "InstantLensKeygen.exe" in iss
         assert "uninstallexe" in iss
         bw = (ROOT / "build-windows.ps1").read_text(encoding="utf-8")
-        assert "0.9.2" in bw and "NoKeygenInApp" in bw and "--icon" in bw
+        assert "0.9.3" in bw and "NoKeygenInApp" in bw and "--icon" in bw
         assert "InstantLensKeygen.exe" in bw
         bi = (ROOT / "installer" / "build-installer.ps1").read_text(encoding="utf-8")
         assert "InstantLensKeygen.exe" in bi and "IncludeKeygen" in bi
@@ -604,7 +604,7 @@ def main() -> int:
         assert "Installer" in kg_readme
         hinweis = (ROOT / "installer" / "installer-hinweis.txt").read_text(encoding="utf-8")
         assert "InstantLensKeygen.exe" in hinweis or "run-keygen.bat" in hinweis
-        assert "0.9.2" in hinweis
+        assert "0.9.3" in hinweis
         assert "checkedonce" in iss and "Desktop-Verknüpfung" in hinweis
         from ild_pdf.limits import OPEN_TIMEOUT_HINT, OPEN_TIMEOUT_HINT_SEC
 
@@ -616,7 +616,7 @@ def main() -> int:
         assert "QProgressDialog" in (ROOT / "instantlensdoc" / "ui" / "main_window.py").read_text(encoding="utf-8")
 
         assert (ROOT / "examples" / "ild_pdf_demo.py").exists()
-        assert "0.9.2" in (ROOT / "INFO.md").read_text(encoding="utf-8")
+        assert "0.9.3" in (ROOT / "INFO.md").read_text(encoding="utf-8")
         assert (ROOT / "assets" / "app.ico").is_file()
 
         # --- Kernpfade: open / annotate / export / license ---
@@ -807,7 +807,7 @@ def main() -> int:
         set_backup_on_save(False)
         assert get_page_size_unit() in ("mm", "inch")
         assert isinstance(get_minimize_to_tray(), bool)
-        assert "0.9.2" in feat and "0.9.1" in feat and "0.9.0" in feat and "0.8.9" in feat and "0.8.8" in feat and "0.8.7" in feat and "0.8.6" in feat and "0.8.5" in feat and "0.8.4" in feat and "0.8.3" in feat and "0.8.2" in feat and "0.8.1" in feat and "0.8.0" in feat and "0.7.9" in feat and "0.7.8" in feat and "0.7.7" in feat and "0.7.6" in feat and "0.7.5" in feat and "0.7.4" in feat and "0.7.3" in feat and "0.7.2" in feat and "0.7.1" in feat and "0.6.9" in feat and "0.5.9" in feat and "0.4.9" in feat  # Release + Zeitraum-Feature-Hinweise
+        assert "0.9.3" in feat and "0.9.2" in feat and "0.9.1" in feat and "0.9.0" in feat and "0.8.9" in feat and "0.8.8" in feat and "0.8.7" in feat and "0.8.6" in feat and "0.8.5" in feat and "0.8.4" in feat and "0.8.3" in feat and "0.8.2" in feat and "0.8.1" in feat and "0.8.0" in feat and "0.7.9" in feat and "0.7.8" in feat and "0.7.7" in feat and "0.7.6" in feat and "0.7.5" in feat and "0.7.4" in feat and "0.7.3" in feat and "0.7.2" in feat and "0.7.1" in feat and "0.6.9" in feat and "0.5.9" in feat and "0.4.9" in feat  # Release + Zeitraum-Feature-Hinweise
         assert "Batch-OCR" in feat or "OCR gesamtes PDF" in feat
         assert "Tag" in feat
         assert "Projekt-Ordner" in feat or "Workspace" in feat
@@ -3139,6 +3139,87 @@ def main() -> int:
         )
         print("0.9.2 CLI tab-pin/search-case-word/stroke/session-zoom: OK")
 
+        # 0.9.3 CLI: Tab Drag-Reorder/Session-Order, PDF-Regex, Fill-Color, Session-Splitter
+        sb093 = (ROOT / "instantlensdoc" / "ui" / "sidebar.py").read_text(encoding="utf-8")
+        assert "search_regex" in sb093 and "search_regex_enabled" in sb093
+        assert "reorder_documents" in sb093
+        mw093 = (ROOT / "instantlensdoc" / "ui" / "main_window.py").read_text(encoding="utf-8")
+        assert "main_splitter" in mw093
+        assert "_apply_main_splitter_sizes" in mw093
+        assert "splitter_sizes" in mw093
+        assert "Regex-Fehler" in mw093
+        pv093 = (ROOT / "instantlensdoc" / "ui" / "pdf_view.py").read_text(encoding="utf-8")
+        assert "recolor_fill_selected_annotations" in pv093
+        assert "btn_ann_fill" in pv093
+        assert "_search_regex" in pv093
+        ov093 = (ROOT / "ild_pdf" / "overlay.py").read_text(encoding="utf-8")
+        assert "SearchPatternError" in ov093
+        assert "regex" in ov093
+        ann093 = (ROOT / "ild_pdf" / "annotate.py").read_text(encoding="utf-8")
+        assert "fill_color" in ann093
+        assert "set_fill_colors" in ann093
+        from ild_pdf import Annotation as A093, AnnotationType as T093, AnnotationStore as S093
+        from ild_pdf.overlay import SearchPatternError as SPE093, find_text_rects as ftr093
+
+        a093 = A093(0, T093.RECTANGLE, 10, 10, width=40, height=20, fill_color="#112233")
+        d093 = a093.to_dict()
+        assert d093.get("fill_color") == "#112233"
+        a093b = A093.from_dict(d093)
+        assert a093b.fill_color == "#112233"
+        store093 = S093(pdf)
+        store093.annotations = []
+        store093.clear_history()
+        store093.add(a093)
+        store093.clear_history()
+        n_fc = store093.set_fill_colors([a093.id], "#AABBCC")
+        assert n_fc == 1
+        got093 = store093.get(a093.id)
+        assert got093 is not None and got093.fill_color == "#AABBCC"
+        assert len(store093._undo) == 1
+        assert store093.undo() is True
+        got093b = store093.get(a093.id)
+        assert got093b is not None and got093b.fill_color == "#112233"
+        # Regex invalid → SearchPatternError
+        raised = False
+        try:
+            ftr093(pdf, 0, "(", regex=True)
+        except SPE093:
+            raised = True
+        assert raised, "expected SearchPatternError for invalid regex"
+        # Session splitter_sizes
+        sess093 = td / "session093.json"
+        orig_sess093 = session_mod.session_path
+        session_mod.session_path = lambda: sess093  # type: ignore
+        try:
+            st093 = session_mod.build_session(
+                [str(txt), str(pdf)],
+                active_path=str(pdf),
+                splitter_sizes=[220, 880],
+            )
+            assert st093.splitter_sizes == [220, 880]
+            session_mod.save_session(st093)
+            loaded093 = session_mod.load_session()
+            assert loaded093.splitter_sizes == [220, 880]
+            assert [t.path for t in loaded093.tabs] == [str(Path(txt)), str(Path(pdf))]
+            assert "order" in sess093.read_text(encoding="utf-8")
+        finally:
+            session_mod.session_path = orig_sess093  # type: ignore
+        feat093 = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
+        assert "0.9.3" in feat093 and (
+            "Regex" in feat093
+            or "Füllfarbe" in feat093
+            or "Fill-Color" in feat093
+            or "Splitter" in feat093
+            or "Drag-Reorder" in feat093
+        )
+        cl093 = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+        assert "## 0.9.3" in cl093
+        kb093 = (ROOT / "instantlensdoc" / "ui" / "keyboard_help.py").read_text(encoding="utf-8")
+        assert "0.9.3" in kb093 and (
+            "Regex" in kb093 or "Füllung" in kb093 or "Splitter" in kb093 or "Drag-Reorder" in kb093
+        )
+        print("0.9.3 CLI tab-reorder/regex/fill-color/session-splitter: OK")
+
         set_show_printer_marks(True)
         assert get_show_printer_marks() is True
         set_show_printer_marks(False)
@@ -3271,7 +3352,7 @@ def main() -> int:
         assert "Continuous Scroll" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
         assert "Seitenlabel" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8") or "Seitenlabels" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
         assert "Zwischenablage-Verlauf" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8") or "Clipboard" in (ROOT / "FEATURES.md").read_text(encoding="utf-8")
-        assert "0.9.2" in feat and "0.9.1" in feat and "0.9.0" in feat and "0.8.9" in feat and "0.8.8" in feat and "0.8.7" in feat and "0.8.6" in feat and "0.8.5" in feat and "0.8.4" in feat and "0.8.3" in feat and "0.8.2" in feat and "0.8.1" in feat and "0.8.0" in feat and "0.7.9" in feat and "0.7.8" in feat and "0.7.7" in feat and "0.7.6" in feat and "0.7.5" in feat and "0.7.4" in feat and "0.7.3" in feat and "0.7.2" in feat and "0.7.1" in feat and "0.6.9" in feat and "0.5.9" in feat and "0.4.9" in feat
+        assert "0.9.3" in feat and "0.9.2" in feat and "0.9.1" in feat and "0.9.0" in feat and "0.8.9" in feat and "0.8.8" in feat and "0.8.7" in feat and "0.8.6" in feat and "0.8.5" in feat and "0.8.4" in feat and "0.8.3" in feat and "0.8.2" in feat and "0.8.1" in feat and "0.8.0" in feat and "0.7.9" in feat and "0.7.8" in feat and "0.7.7" in feat and "0.7.6" in feat and "0.7.5" in feat and "0.7.4" in feat and "0.7.3" in feat and "0.7.2" in feat and "0.7.1" in feat and "0.6.9" in feat and "0.5.9" in feat and "0.4.9" in feat
         # --- 0.4.2 CLI: Outline Goto, Ann Copy/Paste, Flatten Progress ---
         import pikepdf as _pike_ol
 
@@ -3396,7 +3477,7 @@ def main() -> int:
         win._add_chained_frame()
         assert len(win.layout_doc.text_frames) >= 2
         assert "Lizenz:" in win.license_label.text() or "⚠" in win.license_label.text()
-        assert "v0.9.2" in win.version_label.text()
+        assert "v0.9.3" in win.version_label.text()
         # Lizenz <7 Tage: Style prominent
         st_lic = win.license_manager.status()
         if st_lic.allowed and st_lic.days_remaining < 7:
@@ -3577,11 +3658,11 @@ def main() -> int:
             assert win.editor.outdent_selection(4)
             assert win.editor.toPlainText().splitlines()[0] == "alpha"
             # Fenstertitel mit Version
-            assert "0.9.2" in win.windowTitle()
+            assert "0.9.3" in win.windowTitle()
             from instantlensdoc.ui.help_dialog import AboutDialog, HelpDialog, open_log_folder
 
             about = AboutDialog(win)
-            assert "0.9.2" in about.windowTitle()
+            assert "0.9.3" in about.windowTitle()
             help_dlg = HelpDialog(win)
             assert help_dlg.windowTitle() == "Hilfe"
             assert callable(open_log_folder)
@@ -4253,7 +4334,7 @@ def main() -> int:
             win.apply_tray_setting()
             if win._tray is not None:
                 tip = win._tray.toolTip()
-                assert "0.9.2" in tip and "InstantLens Doc" in tip
+                assert "0.9.3" in tip and "InstantLens Doc" in tip
             set_minimize_to_tray(False)
             win.apply_tray_setting()
             print("0.3.9 fit-h/ann-stats/special/tray: OK")
@@ -4266,9 +4347,9 @@ def main() -> int:
             from instantlensdoc.ui.password_dialog import CompressPdfDialog, SetPasswordDialog
             from instantlensdoc.ui.stubs import PLANNED
             assert KeyboardHelpDialog and SetPasswordDialog and CompressPdfDialog
-            assert "0.9.2" in PLANNED["ki"]
+            assert "0.9.3" in PLANNED["ki"]
             assert "Coming soon" in PLANNED["cloud"]
-            assert "0.9.2" in PLANNED["stylus"] and "0.9.2" in PLANNED["extrude3d"]
+            assert "0.9.3" in PLANNED["stylus"] and "0.9.3" in PLANNED["extrude3d"]
             # Toolbar ↔ Menü Sync Graustufen/Nacht
             win.pdf_view.set_grayscale(True)
             assert win._grayscale_action.isChecked()
@@ -4303,7 +4384,7 @@ def main() -> int:
             assert win.editor.toPlainText().splitlines() == ["one", "two"]
             from instantlensdoc.ui.help_dialog import HELP_HTML
 
-            assert "Stub 0.9.2" in HELP_HTML
+            assert "Stub 0.9.3" in HELP_HTML
             assert "scripts/sync-ild.ps1" in HELP_HTML
             assert "Präsentationsmodus" in HELP_HTML or "F5" in (
                 ROOT / "instantlensdoc" / "ui" / "keyboard_help.py"
@@ -7569,10 +7650,81 @@ def main() -> int:
             assert "## 0.9.2" in cl092q
             print("0.9.2 Qt tab-pin/search-case-word/stroke/session-zoom: OK")
 
+            # --- 0.9.3 Qt: Tab-Reorder, PDF-Regex, Fill-Color, Session-Splitter ---
+            assert callable(getattr(win.sidebar, "reorder_documents", None))
+            assert hasattr(win.sidebar, "search_regex")
+            assert callable(getattr(win.sidebar, "search_regex_enabled", None))
+            assert hasattr(win, "main_splitter")
+            assert callable(getattr(win, "_apply_main_splitter_sizes", None))
+            assert callable(getattr(win.pdf_view, "recolor_fill_selected_annotations", None))
+            assert hasattr(win.pdf_view, "btn_ann_fill")
+            # Tab reorder + pin survives
+            td093 = Path(tempfile.mkdtemp())
+            xa = td093 / "ord093a.txt"
+            xb = td093 / "ord093b.txt"
+            xc = td093 / "ord093c.txt"
+            xa.write_text("a\n", encoding="utf-8")
+            xb.write_text("b\n", encoding="utf-8")
+            xc.write_text("c\n", encoding="utf-8")
+            win.sidebar.clear_documents()
+            win.sidebar.add_document(str(xa))
+            win.sidebar.add_document(str(xb))
+            win.sidebar.add_document(str(xc))
+            win.sidebar.set_document_pinned(str(xb), True)
+            assert win.sidebar.reorder_documents(
+                [str(xc), str(xa), str(xb)], emit=False
+            ) is True
+            names093 = [Path(p).name for p in win.sidebar.document_paths()]
+            assert names093 == [xc.name, xa.name, xb.name]
+            assert win.sidebar.is_document_pinned(str(xb)) is True
+            # Splitter sizes API
+            win.main_splitter.setSizes([200, 900])
+            assert win._apply_main_splitter_sizes([240, 860]) is True
+            sz093 = win._main_splitter_sizes()
+            assert len(sz093) == 2 and sz093[0] > 0 and sz093[1] > 0
+            # Fill-color undo
+            if win.pdf_view.store is not None:
+                from ild_pdf import Annotation as A093q, AnnotationType as T093q
+
+                a093q = A093q(
+                    0, T093q.RECTANGLE, 15, 15, width=30, height=20, fill_color="#111111"
+                )
+                win.pdf_view.store.add(a093q)
+                win.pdf_view.store.clear_history()
+                win.pdf_view._selected_ann_id = a093q.id
+                win.pdf_view._selected_ann_ids = [a093q.id]
+                n_fill = win.pdf_view.store.set_fill_colors([a093q.id], "#FF00AA")
+                assert n_fill == 1
+                assert win.pdf_view.store.get(a093q.id).fill_color == "#FF00AA"
+                assert win.pdf_view.store.undo() is True
+                assert win.pdf_view.store.get(a093q.id).fill_color == "#111111"
+                win.pdf_view._selected_ann_id = None
+                win.pdf_view._selected_ann_ids = []
+            # Regex options + invalid pattern status path
+            win.pdf_view.set_search_options(regex=True)
+            assert win.pdf_view._search_regex is True
+            from ild_pdf.overlay import SearchPatternError as SPE093q
+
+            try:
+                win.pdf_view.highlight_search("(", regex=True)
+                assert False, "expected SearchPatternError"
+            except SPE093q as e093:
+                assert str(e093)
+            win.pdf_view.set_search_options(regex=False)
+            assert win.sidebar.search_regex_enabled() is False
+            win.sidebar.search_regex.setChecked(True)
+            assert win.sidebar.search_regex_enabled() is True
+            win.sidebar.search_regex.setChecked(False)
+            feat093q = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
+            assert "0.9.3" in feat093q
+            cl093q = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+            assert "## 0.9.3" in cl093q
+            print("0.9.3 Qt tab-reorder/regex/fill-color/session-splitter: OK")
+
             print("0.4.x selected Qt marks/schema/sort/reset: OK")
             print("0.4.2 Qt outline/copy-paste/case/progress: OK")
             print("0.4.1 Qt links/stamp/encoding/drop: OK")
-            print("0.3.x–0.9.2 review OK")
+            print("0.3.x–0.9.3 review OK")
             assert callable(win.pdf_view.bake_redactions)
             assert callable(win.pdf_view.clear_redactions)
             assert callable(win._set_pdf_password)
