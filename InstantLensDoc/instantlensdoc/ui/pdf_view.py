@@ -7712,17 +7712,34 @@ class PdfViewer(QWidget):
         return out
 
     def render_thumbnail(self, page_index: int, *, scale: float | None = None):
-        """Eine Thumbnail-Seite rendern (für Lazy-Load)."""
+        """Eine Thumbnail-Seite rendern (Lazy-Load + Disk-Cache mtime — 2.4.0)."""
         from PIL import Image
         from instantlensdoc.core.app_settings import get_pdf_thumbnail_scale, pdf_thumbnail_icon_size
+        from instantlensdoc.core.thumb_cache import (
+            get_cached_thumbnail,
+            put_cached_thumbnail,
+        )
 
         if scale is None:
             scale = get_pdf_thumbnail_scale()
         iw, ih = pdf_thumbnail_icon_size(scale)
         if not self.pdf_path or page_index < 0 or page_index >= self.page_count:
             return Image.new("RGB", (iw, ih), (220, 220, 220))
+        # Disk-Cache: Treffer spürbar bei großen Docs / erneutem Öffnen
         try:
-            return render_page(
+            cached = get_cached_thumbnail(
+                self.pdf_path,
+                page_index,
+                scale,
+                grayscale=self._grayscale,
+                invert=self._night_mode,
+            )
+            if cached is not None:
+                return cached
+        except Exception:
+            pass
+        try:
+            img = render_page(
                 self.pdf_path,
                 page_index,
                 scale=scale,
@@ -7731,6 +7748,18 @@ class PdfViewer(QWidget):
                 grayscale=self._grayscale,
                 invert=self._night_mode,
             )
+            try:
+                put_cached_thumbnail(
+                    self.pdf_path,
+                    page_index,
+                    scale,
+                    img,
+                    grayscale=self._grayscale,
+                    invert=self._night_mode,
+                )
+            except Exception:
+                pass
+            return img
         except Exception:
             return Image.new("RGB", (iw, ih), (220, 220, 220))
 

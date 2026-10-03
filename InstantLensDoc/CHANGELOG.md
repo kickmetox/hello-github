@@ -1,5 +1,20 @@
 # Changelog — InstantLens Doc
 
+## 2.4.0 — Thumbnail Disk-Cache, Annotation-Templates ildtmpl-v1, Split-View Sync-Scroll PDF-Tabs, Tastatur-Cheat-Sheet F1
+
+Minor-Bump nach **2.3.5**: **PDF-Seiten-Thumbnail Disk-Cache** (mtime-invalidiert, spürbar bei großen Docs); **Annotation-Templates** Stempel/Highlight-Styles speichern/laden (**ildtmpl-v1**); **Split-View Sync-Scroll** Toggle für zwei PDF-Tabs nebeneinander (Scroll + Seiten-Sync); **Tastatur-Cheat-Sheet** F1 / Hilfe mit Shortcut-Liste DE. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie klar markiert / nicht produktiv (Ink ≠ Stylus).
+
+### Neu / verbessert
+- Thumbnail Disk-Cache: PNG unter `config/thumb_cache/` · Key inkl. mtime/scale · Auto-Invalidierung bei Dateiänderung
+- Annotation-Vorlagen: Dialog PDF → Annotation-Vorlagen… · Highlight/Stempel-Styles · Export/Import `ildtmpl-v1`
+- Sync-Scroll Split: bei zwei PDF-Tabs Scroll-Ratio + Seiten-Sync (Ctrl+Alt+\); Menü „Sync-Scroll (PDF-Tabs / Split)“
+- Tastatur-Cheat-Sheet: F1 / Hilfe → Shortcut-Liste DE · optional PDF-Export
+
+### Tests / Qualität
+- Version **2.4.0** (App / `ild_pdf` / ISS / Smoke / Docs); Serie **2.4**; `docs/VERSION` + `VERSION.txt`
+- Smoke: 2.4.0 CLI + Qt (Thumb-Cache, ildtmpl-v1, PDF Sync-Scroll, F1 Cheat-Sheet)
+- Stubs: KI/Cloud/Stylus/3D/Hooks/Outline/Telemetrie unverändert markiert
+
 ## 2.3.5 — Kompression A11y·Status-% announced, Links Reset Bestätigung·Fokus+Selektion, Palette Pin-ersetzen mit Namen, Telemetrie Stubs öffnen Fokus erste Zeile
 
 Post-Release-Polish nach **2.3.4**: **PDF-Kompression** Toggle **AccessibleName/Description** und **Status Ersparnis-% announced**; **URL-Links TXT** Template-**Reset Bestätigung nur bei Abweichung** inkl. **Fokus+Selektion**; **Command Palette** Pin-ersetzen-**Bestätigungsdialog mit Namen** des zu ersetzenden Pins; **Telemetrie-Stub** „Stubs öffnen“ → **Fokus erste Stub-Zeile**, Dialog schließt. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie klar markiert / nicht produktiv (Ink ≠ Stylus).

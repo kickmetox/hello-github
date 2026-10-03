@@ -1939,11 +1939,12 @@ class MainWindow(QMainWindow):
         self._doc_split_vertical_action.setShortcut(QKeySequence("Ctrl+Shift+\\"))
         self._doc_split_vertical_action.toggled.connect(self._toggle_doc_split_vertical)
         m_view.addAction(self._doc_split_vertical_action)
-        self._doc_split_sync_action = QAction("Sync-Scroll (geteilte Docs)", self)
+        self._doc_split_sync_action = QAction("Sync-Scroll (PDF-Tabs / Split)", self)
         self._doc_split_sync_action.setCheckable(True)
         self._doc_split_sync_action.setChecked(get_editor_doc_split_sync_scroll())
         self._doc_split_sync_action.setToolTip(
-            "Vertikales Scrollen in beiden Split-Panes synchronisieren (optional)"
+            "Sync-Scroll für zwei Docs nebeneinander — bei zwei PDF-Tabs "
+            "zusätzlich Seiten-Sync (Ctrl+Alt+\\) — 2.4.0"
         )
         self._doc_split_sync_action.setShortcut(QKeySequence("Ctrl+Alt+\\"))
         self._doc_split_sync_action.toggled.connect(self._toggle_doc_split_sync_scroll)
@@ -2303,6 +2304,12 @@ class MainWindow(QMainWindow):
         )
         act_stamp_lib.triggered.connect(self._stamp_image_library)
         m_pdf.addAction(act_stamp_lib)
+        act_ann_tmpl = QAction("Annotation-Vorlagen…", self)
+        act_ann_tmpl.setToolTip(
+            "Stempel/Highlight-Styles speichern/laden (ildtmpl-v1) — 2.4.0"
+        )
+        act_ann_tmpl.triggered.connect(self._open_ann_templates)
+        m_pdf.addAction(act_ann_tmpl)
         act_psize = QAction("Seitengröße / Zuschneiden…", self)
         act_psize.triggered.connect(self._pdf_page_size)
         m_pdf.addAction(act_psize)
@@ -2568,8 +2575,9 @@ class MainWindow(QMainWindow):
         a.setToolTip("Kurz-Wizard: Öffnen, Annotieren, Editor, 0.6-Highlights (4 Seiten)")
         a.triggered.connect(self._show_getting_started_wizard)
         m_help.addAction(a)
-        a = QAction("Tastaturhilfe…", self)
+        a = QAction("Tastatur-Cheat-Sheet…", self)
         a.setShortcut(QKeySequence("F1"))
+        a.setToolTip("Shortcut-Liste (DE) — F1 — 2.4.0")
         a.triggered.connect(lambda: KeyboardHelpDialog(self).exec())
         m_help.addAction(a)
         a = QAction("Hilfe…", self)
@@ -4617,9 +4625,15 @@ class MainWindow(QMainWindow):
         set_editor_doc_split_sync_scroll(bool(checked))
         self._apply_doc_split_sync_scroll()
         self._save_session()
-        self._set_status(
-            "Sync-Scroll an (geteilte Docs)" if checked else "Sync-Scroll aus"
-        )
+        if checked:
+            both_pdf = self._split_both_pdf()
+            self._set_status(
+                "Sync-Scroll an (PDF-Tabs + Seiten-Sync)"
+                if both_pdf
+                else "Sync-Scroll an (geteilte Docs)"
+            )
+        else:
+            self._set_status("Sync-Scroll aus")
 
     def _recolor_annotation_tag_global(self, tag: str) -> None:
         """Tag-Cloud: Farbe aller Annotationen mit diesem Tag ändern (eine Undo-Stufe)."""
@@ -4814,6 +4828,16 @@ class MainWindow(QMainWindow):
             return self.secondary_editor.verticalScrollBar()
         return None
 
+    def _split_both_pdf(self) -> bool:
+        """True wenn Haupt- und Zweit-Panel PDF sind — 2.4.0."""
+        if not hasattr(self, "secondary_wrap") or not self.secondary_wrap.isVisible():
+            return False
+        if self.stack.currentWidget() is not self.pdf_view:
+            return False
+        if not hasattr(self, "secondary_stack") or not hasattr(self, "secondary_pdf"):
+            return False
+        return self.secondary_stack.currentWidget() is self.secondary_pdf
+
     def _disconnect_doc_split_sync_scroll(self) -> None:
         primary = getattr(self, "_sync_primary_bar", None)
         secondary = getattr(self, "_sync_secondary_bar", None)
@@ -4829,9 +4853,24 @@ class MainWindow(QMainWindow):
                 pass
         self._sync_primary_bar = None
         self._sync_secondary_bar = None
+        # PDF-Seiten-Sync lösen — 2.4.0 (nur wenn verbunden)
+        if getattr(self, "_sync_page_hooks", False):
+            try:
+                self.pdf_view.page_changed.disconnect(self._on_primary_page_sync)
+            except (TypeError, RuntimeError):
+                pass
+            if hasattr(self, "secondary_pdf"):
+                try:
+                    self.secondary_pdf.page_changed.disconnect(
+                        self._on_secondary_page_sync
+                    )
+                except (TypeError, RuntimeError):
+                    pass
+            self._sync_page_hooks = False
 
     def _apply_doc_split_sync_scroll(self) -> None:
-        """Sync-Scroll verbinden wenn Split sichtbar und Einstellung an."""
+        """Sync-Scroll verbinden wenn Split sichtbar und Einstellung an.
+        Bei zwei PDF-Tabs: Scroll-Ratio + Seiten-Sync — 2.4.0."""
         self._disconnect_doc_split_sync_scroll()
         if not hasattr(self, "secondary_wrap") or not self.secondary_wrap.isVisible():
             return
@@ -4845,6 +4884,12 @@ class MainWindow(QMainWindow):
         self._sync_secondary_bar = secondary
         primary.valueChanged.connect(self._on_primary_scroll_sync)
         secondary.valueChanged.connect(self._on_secondary_scroll_sync)
+        if self._split_both_pdf():
+            self.pdf_view.page_changed.connect(self._on_primary_page_sync)
+            self.secondary_pdf.page_changed.connect(self._on_secondary_page_sync)
+            self._sync_page_hooks = True
+        else:
+            self._sync_page_hooks = False
 
     def _sync_scroll_ratio(self, source, target) -> None:
         if source is None or target is None or source is target:
@@ -4882,6 +4927,75 @@ class MainWindow(QMainWindow):
             )
         finally:
             self._split_scroll_syncing = False
+
+    def _on_primary_page_sync(self, page: int = 0) -> None:
+        """PDF+PDF Split: Seite im Zweit-Panel mitziehen — 2.4.0."""
+        if getattr(self, "_split_page_syncing", False):
+            return
+        if not self._split_both_pdf() or not get_editor_doc_split_sync_scroll():
+            return
+        self._split_page_syncing = True
+        try:
+            sec = self.secondary_pdf
+            target = max(0, min(int(page), int(sec.page_count or 1) - 1))
+            if int(getattr(sec, "page_index", -1)) != target:
+                sec.goto_page(target)
+        except Exception:
+            pass
+        finally:
+            self._split_page_syncing = False
+
+    def _on_secondary_page_sync(self, page: int = 0) -> None:
+        """PDF+PDF Split: Seite im Haupt-Panel mitziehen — 2.4.0."""
+        if getattr(self, "_split_page_syncing", False):
+            return
+        if not self._split_both_pdf() or not get_editor_doc_split_sync_scroll():
+            return
+        self._split_page_syncing = True
+        try:
+            prim = self.pdf_view
+            target = max(0, min(int(page), int(prim.page_count or 1) - 1))
+            if int(getattr(prim, "page_index", -1)) != target:
+                prim.goto_page(target)
+        except Exception:
+            pass
+        finally:
+            self._split_page_syncing = False
+
+    def _open_ann_templates(self) -> None:
+        """Annotation-Vorlagen (ildtmpl-v1) laden/speichern — 2.4.0."""
+        from instantlensdoc.core.app_settings import (
+            get_ann_highlight_color,
+            get_ann_pen_color,
+        )
+        from instantlensdoc.ui.ann_templates_dialog import AnnTemplatesDialog
+
+        dlg = AnnTemplatesDialog(self)
+        if dlg.exec() == QDialog.Accepted and dlg.applied is not None:
+            t = dlg.applied
+            # Viewer-Farben aus Settings nachziehen
+            try:
+                if t.kind == "highlight":
+                    self.pdf_view._highlight_color = get_ann_highlight_color()
+                    if hasattr(self.pdf_view, "btn_hl_color") and hasattr(
+                        self.pdf_view, "_style_color_btn"
+                    ):
+                        self.pdf_view._style_color_btn(
+                            self.pdf_view.btn_hl_color, self.pdf_view._highlight_color
+                        )
+                else:
+                    self.pdf_view._pen_color = get_ann_pen_color()
+                    if hasattr(self.pdf_view, "btn_pen_color") and hasattr(
+                        self.pdf_view, "_style_color_btn"
+                    ):
+                        self.pdf_view._style_color_btn(
+                            self.pdf_view.btn_pen_color, self.pdf_view._pen_color
+                        )
+            except Exception:
+                pass
+            self.pdf_view.refresh()
+            kind_de = "Stempel" if t.kind == "stamp" else "Highlight"
+            self._set_status(f"Vorlage „{t.name}“ angewandt ({kind_de})")
 
     def _pick_secondary_document(self):
         paths = list(self.sidebar.document_paths()) if hasattr(self.sidebar, "document_paths") else []
@@ -9531,6 +9645,7 @@ class MainWindow(QMainWindow):
             else None,
             "goto_page": self._goto_page,
             "settings": self._settings,
+            "ann_templates": self._open_ann_templates,
             "keyboard_help": _kb,
             "about": _about,
             "theme_cycle": self._cycle_theme_mode,
