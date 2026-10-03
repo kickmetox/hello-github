@@ -83,7 +83,9 @@ class FormFieldsDialog(QDialog):
         )
         edit_row.addWidget(self.value_edit, 1)
         self.btn_csv = QPushButton("CSV…")
-        self.btn_csv.setToolTip("Feldliste als CSV exportieren — 1.3.2")
+        self.btn_csv.setToolTip(
+            "Feldliste als CSV (UTF-8 BOM); Option nur sichtbare Zeilen — 1.3.4"
+        )
         self.btn_csv.clicked.connect(self._export_csv)
         edit_row.addWidget(self.btn_csv)
         layout.addLayout(edit_row)
@@ -218,8 +220,51 @@ class FormFieldsDialog(QDialog):
                 "Nur Textfelder editierbar; Checkbox/Choice Werte nur Anzeige — 1.3.2"
             )
 
+    def _visible_fields(self) -> list[FormFieldInfo]:
+        """Felder der aktuell sichtbaren Tabellenzeilen — 1.3.4."""
+        out: list[FormFieldInfo] = []
+        for fi in self._row_map:
+            if 0 <= fi < len(self._fields):
+                out.append(self._fields[fi])
+        return out
+
     def _export_csv(self):
-        """CSV Name/Typ/Wert/Seite/ReadOnly; Zielordner merken — 1.3.3."""
+        """CSV UTF-8 BOM; Option nur sichtbare/gefilterte Zeilen — 1.3.4."""
+        from PySide6.QtWidgets import QCheckBox
+
+        all_fields = list(self._fields)
+        visible = self._visible_fields()
+        needle = (self.filter_edit.text() or "").strip()
+        filter_active = bool(needle) and len(visible) < len(all_fields)
+
+        box = QMessageBox(self)
+        box.setIcon(QMessageBox.Question)
+        box.setWindowTitle("Feldliste als CSV")
+        box.setText(
+            f"{len(all_fields)} Feld(er) als CSV exportieren (UTF-8 BOM)?\n"
+            "Zielordner wird gemerkt."
+        )
+        cb = QCheckBox("Nur sichtbare/gefilterte Zeilen")
+        cb.setToolTip(
+            "Nur die aktuell gefilterten Felder exportieren — 1.3.4"
+        )
+        cb.setChecked(bool(filter_active and visible))
+        cb.setEnabled(bool(self._fields))
+        if filter_active:
+            box.setInformativeText(
+                f"Mit Filter: {len(visible)} von {len(all_fields)} sichtbar."
+            )
+        box.setCheckBox(cb)
+        box.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
+        box.setDefaultButton(QMessageBox.Yes)
+        if box.exec() != QMessageBox.Yes:
+            return
+        rows = visible if cb.isChecked() else all_fields
+        if not rows:
+            QMessageBox.information(
+                self, "Feldliste CSV", "Keine Felder zum Export."
+            )
+            return
         start_dir = dialog_start_dir(get_last_export_dir() or self.pdf_path.parent)
         start = str(Path(start_dir) / f"{self.pdf_path.stem}_fields.csv")
         path, _ = QFileDialog.getSaveFileName(
@@ -231,13 +276,13 @@ class FormFieldsDialog(QDialog):
             return
         try:
             dest = export_form_fields_csv(
-                self.pdf_path, self._fields, out_path=path
+                self.pdf_path, rows, out_path=path, utf8_bom=True
             )
             set_last_export_dir(Path(dest).parent)
             QMessageBox.information(
                 self,
                 "Feldliste CSV",
-                f"{len(self._fields)} Feld(er) exportiert:\n{dest}",
+                f"{len(rows)} Feld(er) exportiert:\n{dest}",
             )
         except Exception as e:
             QMessageBox.warning(self, "Feldliste CSV", str(e))

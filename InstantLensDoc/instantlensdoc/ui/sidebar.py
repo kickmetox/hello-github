@@ -693,7 +693,7 @@ class Sidebar(QWidget):
         self.btn_form_csv = QPushButton("CSV")
         self.btn_form_csv.setFixedWidth(40)
         self.btn_form_csv.setToolTip(
-            "Feldliste als CSV (Name,Typ,Wert,Seite,ReadOnly); Zielordner merken — 1.3.3"
+            "Feldliste als CSV (UTF-8 BOM); Filter → nur sichtbare Zeilen — 1.3.4"
         )
         self.btn_form_csv.clicked.connect(self.form_fields_export_csv_requested.emit)
         form_edit_row.addWidget(self.btn_form_csv)
@@ -1925,9 +1925,32 @@ class Sidebar(QWidget):
         payload = dict(self._form_dirty)
         self.form_fields_save_requested.emit(payload)
 
-    def form_fields_for_export(self) -> list:
-        """Aktuelle AcroForm-Daten für CSV-Export — 1.3.2."""
+    def form_fields_for_export(self, *, visible_only: bool = False) -> list:
+        """AcroForm-Daten für CSV — visible_only = gefilterte Zeilen — 1.3.4."""
+        if visible_only:
+            return list(self.form_fields_visible())
         return list(self._form_fields_data or [])
+
+    def form_fields_filter_active(self) -> bool:
+        """True wenn Name-Filter-Text gesetzt — 1.3.4."""
+        if hasattr(self, "form_filter"):
+            return bool((self.form_filter.text() or "").strip())
+        return False
+
+    def form_fields_visible(self) -> list:
+        """Aktuell sichtbare/gefilterte AcroForm-Felder — 1.3.4."""
+        needle = ""
+        if hasattr(self, "form_filter"):
+            needle = (self.form_filter.text() or "").strip().lower()
+        data = list(self._form_fields_data or [])
+        if not needle:
+            return data
+        return [
+            f
+            for f in data
+            if needle in str(getattr(f, "name", "") or "").lower()
+            or needle in str(getattr(f, "alternate_name", "") or "").lower()
+        ]
 
     def _apply_form_fields_filter(self, _text: str = "") -> None:
         self._rebuild_form_fields_tree()
@@ -1935,17 +1958,7 @@ class Sidebar(QWidget):
     def _rebuild_form_fields_tree(self) -> None:
         """Feldliste neu aufbauen (Filter + RO + Checkbox/Choice Anzeige)."""
         self.form_fields.clear()
-        needle = ""
-        if hasattr(self, "form_filter"):
-            needle = (self.form_filter.text() or "").strip().lower()
-        data = list(self._form_fields_data or [])
-        if needle:
-            data = [
-                f
-                for f in data
-                if needle in str(getattr(f, "name", "") or "").lower()
-                or needle in str(getattr(f, "alternate_name", "") or "").lower()
-            ]
+        data = list(self.form_fields_visible())
         if not self._form_fields_data:
             empty = QTreeWidgetItem(["(keine AcroForm-Felder)", "", ""])
             empty.setDisabled(True)

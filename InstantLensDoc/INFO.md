@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **1.3.3** |
+| Version | **1.3.4** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -63,10 +63,10 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an / `checkedonce`)
 
-## Neu in 1.3.3
+## Neu in 1.3.4
 
-- Formulare: CSV-Spalten Name,Typ,Wert,Seite,ReadOnly; Zielordner merken
-- Redaction: Batch-Löschen ein Undo-Stack-Eintrag; Zähler im Bestätigungsdialog
-- Bookmarks/Outlines: Export „anderes“ fehlende Datei abfangen; Status mit Pfad
-- Performance: Prefetch ±N Settings (1/2/3); Cancel-Debounce ms Settings
+- Formulare: CSV UTF-8 BOM; Export-Option nur sichtbare/gefilterte Zeilen
+- Redaction: Bestätigung „Auch Sidecar speichern“ (Default an)
+- Bookmarks/Outlines: Status-Klick öffnet Export-Zielordner; Fehlerdialog Retry
+- Performance: Prefetch Live-Label „aktuell N ms / ±N“ in Settings
 - Stubs KI/Cloud/Stylus/3D unverändert

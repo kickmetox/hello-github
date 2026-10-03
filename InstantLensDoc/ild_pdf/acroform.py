@@ -211,19 +211,25 @@ FORM_FIELD_CSV_FIELDS = (
     "ReadOnly",
 )
 
+# UTF-8 BOM für Excel-Kompatibilität — 1.3.4
+_CSV_UTF8_BOM = "\ufeff"
+
 
 def export_form_fields_csv(
     path: str | Path,
     fields: list[FormFieldInfo] | None = None,
     *,
     out_path: str | Path | None = None,
+    utf8_bom: bool = True,
 ) -> Path:
     """
-    AcroForm-Feldliste als CSV exportieren (UTF-8) — 1.3.3.
+    AcroForm-Feldliste als CSV exportieren (UTF-8 mit BOM) — 1.3.4.
     Spalten: Name, Typ, Wert, Seite, ReadOnly.
     path: Quell-PDF (für Default-Dateiname) bzw. bereits gelesene fields.
+    utf8_bom: Excel-kompatibles BOM (Standard an).
     """
     import csv
+    import io
 
     pdf = Path(path)
     dest = Path(out_path) if out_path else pdf.with_name(f"{pdf.stem}_fields.csv")
@@ -231,22 +237,26 @@ def export_form_fields_csv(
         dest = dest.with_suffix(".csv")
     dest.parent.mkdir(parents=True, exist_ok=True)
     rows = list(fields) if fields is not None else list_form_fields(pdf)
-    with dest.open("w", encoding="utf-8", newline="") as fh:
-        writer = csv.DictWriter(
-            fh, fieldnames=list(FORM_FIELD_CSV_FIELDS), extrasaction="ignore"
+    buf = io.StringIO()
+    writer = csv.DictWriter(
+        buf, fieldnames=list(FORM_FIELD_CSV_FIELDS), extrasaction="ignore"
+    )
+    writer.writeheader()
+    for f in rows:
+        page = getattr(f, "page_index", None)
+        writer.writerow(
+            {
+                "Name": str(getattr(f, "name", "") or ""),
+                "Typ": str(getattr(f, "field_type", "") or ""),
+                "Wert": str(getattr(f, "value", "") or ""),
+                "Seite": "" if page is None else str(int(page) + 1),
+                "ReadOnly": "1" if getattr(f, "read_only", False) else "0",
+            }
         )
-        writer.writeheader()
-        for f in rows:
-            page = getattr(f, "page_index", None)
-            writer.writerow(
-                {
-                    "Name": str(getattr(f, "name", "") or ""),
-                    "Typ": str(getattr(f, "field_type", "") or ""),
-                    "Wert": str(getattr(f, "value", "") or ""),
-                    "Seite": "" if page is None else str(int(page) + 1),
-                    "ReadOnly": "1" if getattr(f, "read_only", False) else "0",
-                }
-            )
+    text = buf.getvalue()
+    if utf8_bom:
+        text = _CSV_UTF8_BOM + text
+    dest.write_text(text, encoding="utf-8")
     return dest
 
 

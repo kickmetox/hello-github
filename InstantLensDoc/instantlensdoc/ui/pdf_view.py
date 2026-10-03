@@ -6371,6 +6371,14 @@ class PdfViewer(QWidget):
         chk = QCheckBox("Annotationen nach Anwenden aus Sidecar entfernen")
         chk.setChecked(True if remove_sidecar is None else bool(remove_sidecar))
         lay.addWidget(chk)
+        # Auch Sidecar speichern — Default an — 1.3.4
+        chk_sidecar = QCheckBox("Auch Sidecar speichern")
+        chk_sidecar.setChecked(True)
+        chk_sidecar.setToolTip(
+            "Sidecar nach Anwenden speichern; bei neuem PDF zusätzlich "
+            "neben die Zieldatei schreiben — 1.3.4"
+        )
+        lay.addWidget(chk_sidecar)
         buttons = QDialogButtonBox(QDialogButtonBox.Yes | QDialogButtonBox.No)
         buttons.accepted.connect(dlg.accept)
         buttons.rejected.connect(dlg.reject)
@@ -6378,6 +6386,7 @@ class PdfViewer(QWidget):
         if dlg.exec() != QDialog.Accepted:
             return
         remove = chk.isChecked()
+        save_sidecar = chk_sidecar.isChecked()
         src = Path(self.pdf_path)
         default_name = f"{src.stem}_redacted.pdf"
         path, _ = QFileDialog.getSaveFileName(
@@ -6404,11 +6413,25 @@ class PdfViewer(QWidget):
                 out_path=dest,
                 remove_from_store=remove,
             )
+            if save_sidecar:
+                # Quell-Sidecar flushen (falls remove nicht schon gespeichert hat)
+                try:
+                    self.schedule_sidecar_save(force=True)
+                except Exception:
+                    pass
+                # Sidecar neben neues PDF schreiben — 1.3.4
+                try:
+                    if dest.resolve() != src.resolve():
+                        side_dest = dest.with_name(dest.stem + ".ildann.json")
+                        self.store.save(path=side_dest, force=True)
+                except Exception:
+                    pass
             clear_render_cache(self.pdf_path)
             self.refresh()
             self.annotations_changed.emit()
+            extra = " + Sidecar" if save_sidecar else ""
             self.status.emit(
-                f"{len(reds)} Redaction(s) → {dest.name}"
+                f"{len(reds)} Redaction(s) → {dest.name}{extra}"
             )
         except Exception as e:
             QMessageBox.warning(self, "Redactions", str(e))

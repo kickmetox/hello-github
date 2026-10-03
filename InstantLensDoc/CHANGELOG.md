@@ -1,5 +1,27 @@
 # Changelog — InstantLens Doc
 
+## 1.3.4 — Forms CSV BOM+Filter, Redaction Sidecar-Checkbox, Outlines Ordner-Klick+Retry, Prefetch Live-Label
+
+Post-Release-Polish nach 1.3.3: **Forms-CSV** mit **UTF-8 BOM** und Option **nur sichtbare/gefilterte Zeilen**; **Redactions anwenden** Bestätigung mit Checkbox **„Auch Sidecar speichern“** (Default an); **Outlines-Export** Status-**Klick öffnet Zielordner**, Fehlerdialog **Retry**; Prefetch-Settings **Live-Label „aktuell N ms / ±N“**. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### Formulare
+- Feldliste CSV: **UTF-8 BOM** (Excel); Export-Option **nur sichtbare/gefilterte Zeilen**
+
+### PDF / Redaction
+- Bestätigung „Redactions anwenden“: Checkbox **Auch Sidecar speichern** (Default an)
+
+### Bookmarks / Outlines
+- Status nach Export: **Klick öffnet Export-Zielordner**; Schreibfehler → **Retry-Dialog**
+
+### Performance
+- Prefetch Settings: **Live-Label** „aktuell N ms / ±N“
+
+### Packaging / Docs
+- Version **1.3.4** (App / `ild_pdf` / ISS / Smoke / Docs)
+- Smoke: Forms CSV BOM+Filter, Redaction Sidecar-Checkbox, Outlines Ordner-Klick+Retry, Prefetch Live-Label (CLI + Qt)
+
+---
+
 ## 1.3.3 — Forms CSV Spalten+Zielordner, Redaction Undo+Zähler, Outlines fehlende Datei, Prefetch Settings
 
 Post-Release-Polish nach 1.3.2: **Forms-CSV** mit Spalten **Name,Typ,Wert,Seite,ReadOnly** und **Zielordner merken**; **Redaction Batch-Löschen** als **ein Undo-Stack-Eintrag** mit **Zähler im Bestätigungsdialog**; **Outlines-Export „anderes PDF“** fängt **fehlende Datei** ab, Status danach mit **Pfad**; **Lazy Prefetch ±N** und **Cancel-Debounce ms** in den **Einstellungen** (1/2/3 bzw. ms-Stufen). Stubs KI/Cloud/Stylus/3D bleiben Stubs.

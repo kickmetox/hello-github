@@ -140,6 +140,7 @@ class MainWindow(QMainWindow):
         # Last-Page / Scroll je Tab (path_key → {page, scale, scroll_y}) — 0.9.1
         self._tab_view_state: dict[str, dict] = {}
         self._last_backup_path = None  # Pfad der letzten Backup-Datei — 1.0.1
+        self._last_outline_export_dir = None  # Zielordner Outlines-Export — 1.3.4
 
         self.setAcceptDrops(True)
         self.setWindowTitle(self._app_title())
@@ -982,6 +983,8 @@ class MainWindow(QMainWindow):
 
         sb = QStatusBar()
         self.setStatusBar(sb)
+        # Status-Klick: Outlines-Export-Zielordner öffnen — 1.3.4
+        sb.mousePressEvent = self._on_status_bar_clicked  # type: ignore[method-assign]
         self.file_status_label = QLabel("—")
         self.file_status_label.setMinimumWidth(120)
         self.file_status_label.setStyleSheet("padding-left: 6px; padding-right: 8px;")
@@ -2269,6 +2272,35 @@ class MainWindow(QMainWindow):
 
     def _set_status(self, msg: str):
         self.statusBar().showMessage(msg, 5000)
+        # Outlines-Export: Klick-Hinweis wenn Zielordner gemerkt — 1.3.4
+        if getattr(self, "_last_outline_export_dir", None) and "PDF-Outline" in (
+            msg or ""
+        ):
+            self.statusBar().setToolTip(
+                "Klick öffnet Export-Zielordner — 1.3.4"
+            )
+            self.statusBar().setCursor(Qt.PointingHandCursor)
+        else:
+            self.statusBar().setToolTip("")
+            self.statusBar().unsetCursor()
+
+    def _on_status_bar_clicked(self, event) -> None:
+        """Statusleisten-Klick: Outlines-Export-Zielordner öffnen — 1.3.4."""
+        from PySide6.QtGui import QDesktopServices
+        from PySide6.QtCore import QUrl
+
+        folder = getattr(self, "_last_outline_export_dir", None)
+        cur = self.statusBar().currentMessage() or ""
+        if (
+            event.button() == Qt.LeftButton
+            and folder is not None
+            and "PDF-Outline" in cur
+        ):
+            path = Path(folder)
+            if path.is_dir():
+                QDesktopServices.openUrl(QUrl.fromLocalFile(str(path)))
+                return
+        QStatusBar.mousePressEvent(self.statusBar(), event)
 
     def _on_pdf_view_status(self, msg: str) -> None:
         """PDF-View-Status; 0-Treffer dauerhaft sticky — 1.1.7."""
@@ -5985,25 +6017,64 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Formularfelder", str(e))
 
     def _on_form_fields_export_csv(self) -> None:
-        """AcroForm-Feldliste CSV (Name/Typ/Wert/Seite/ReadOnly); Zielordner merken — 1.3.3."""
+        """AcroForm CSV UTF-8 BOM; Option nur sichtbare/gefilterte Zeilen — 1.3.4."""
+        from PySide6.QtWidgets import QCheckBox
+
         path = self.pdf_view.pdf_path
         if not path:
             self._set_status("Feldliste CSV: PDF öffnen")
             return
-        fields = []
+        all_fields = []
         if hasattr(self.sidebar, "form_fields_for_export"):
-            fields = list(self.sidebar.form_fields_for_export() or [])
-        if not fields:
+            all_fields = list(self.sidebar.form_fields_for_export() or [])
+        if not all_fields:
             try:
                 from ild_pdf.acroform import list_form_fields
 
-                fields = list_form_fields(path)
+                all_fields = list_form_fields(path)
             except Exception as e:
                 QMessageBox.warning(self, "Feldliste CSV", str(e))
                 return
-        if not fields:
+        if not all_fields:
             QMessageBox.information(
                 self, "Feldliste CSV", "Keine AcroForm-Felder zum Export."
+            )
+            return
+        visible = all_fields
+        filter_active = False
+        if hasattr(self.sidebar, "form_fields_visible"):
+            visible = list(self.sidebar.form_fields_visible() or [])
+            filter_active = bool(
+                hasattr(self.sidebar, "form_fields_filter_active")
+                and self.sidebar.form_fields_filter_active()
+            )
+
+        box = QMessageBox(self)
+        box.setIcon(QMessageBox.Question)
+        box.setWindowTitle("Feldliste als CSV")
+        box.setText(
+            f"{len(all_fields)} Feld(er) als CSV exportieren (UTF-8 BOM)?\n"
+            "Zielordner wird gemerkt."
+        )
+        cb = QCheckBox("Nur sichtbare/gefilterte Zeilen")
+        cb.setToolTip(
+            "Nur die aktuell in der Sidebar sichtbaren/gefilterten Felder — 1.3.4"
+        )
+        cb.setChecked(bool(filter_active and visible))
+        cb.setEnabled(True)
+        if filter_active:
+            box.setInformativeText(
+                f"Mit Filter: {len(visible)} von {len(all_fields)} sichtbar."
+            )
+        box.setCheckBox(cb)
+        box.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
+        box.setDefaultButton(QMessageBox.Yes)
+        if box.exec() != QMessageBox.Yes:
+            return
+        fields = visible if cb.isChecked() else all_fields
+        if not fields:
+            QMessageBox.information(
+                self, "Feldliste CSV", "Keine Felder zum Export."
             )
             return
         from pathlib import Path as _Path
@@ -6022,9 +6093,14 @@ class MainWindow(QMainWindow):
         try:
             from ild_pdf.acroform import export_form_fields_csv
 
-            out = export_form_fields_csv(path, fields, out_path=dest)
+            out = export_form_fields_csv(
+                path, fields, out_path=dest, utf8_bom=True
+            )
             set_last_export_dir(out.parent)
-            self._set_status(f"Feldliste CSV: {len(fields)} Feld(er) → {out}")
+            filt = " (gefiltert)" if cb.isChecked() and filter_active else ""
+            self._set_status(
+                f"Feldliste CSV{filt}: {len(fields)} Feld(er) → {out}"
+            )
         except Exception as e:
             QMessageBox.warning(self, "Feldliste CSV", str(e))
 
@@ -6185,7 +6261,7 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Bookmarks importieren", str(e))
 
     def _export_bookmarks_to_outline(self) -> None:
-        """Seiten-Favoriten als PDF-Outlines — Ziel aktuell/anderes; fehlende Datei; Status mit Pfad — 1.3.3."""
+        """Outlines-Export: Status-Klick öffnet Ordner; Fehlerdialog Retry — 1.3.4."""
         if not self.pdf_view.pdf_path or self.pdf_view.store is None:
             QMessageBox.information(
                 self, "Bookmarks exportieren", "Bitte zuerst ein PDF öffnen."
@@ -6284,23 +6360,55 @@ class MainWindow(QMainWindow):
             except Exception:
                 label = ""
             entries.append((int(p), label or f"Seite {int(p) + 1}"))
-        try:
-            from ild_pdf.outline import outline_from_pages, write_outline
+        max_attempts = 3
+        for attempt in range(1, max_attempts + 1):
+            try:
+                from ild_pdf.outline import outline_from_pages, write_outline
 
-            write_outline(target, outline_from_pages(entries))
-            if target.resolve() == source.resolve():
-                self._refresh_outline(self.pdf_view.pdf_path)
-            self._set_status(
-                f"{len(entries)} Bookmark(s) als PDF-Outline → {target}"
-            )
-        except FileNotFoundError:
-            QMessageBox.warning(
-                self,
-                "Bookmarks exportieren",
-                f"Datei nicht gefunden:\n{target}",
-            )
-        except Exception as e:
-            QMessageBox.warning(self, "Bookmarks exportieren", str(e))
+                write_outline(target, outline_from_pages(entries))
+                if target.resolve() == source.resolve():
+                    self._refresh_outline(self.pdf_view.pdf_path)
+                self._last_outline_export_dir = target.parent
+                set_last_export_dir(target.parent)
+                self._set_status(
+                    f"{len(entries)} Bookmark(s) als PDF-Outline → {target}"
+                )
+                return
+            except FileNotFoundError:
+                QMessageBox.warning(
+                    self,
+                    "Bookmarks exportieren",
+                    f"Datei nicht gefunden:\n{target}",
+                )
+                return
+            except OSError as e:
+                if attempt >= max_attempts:
+                    QMessageBox.critical(
+                        self,
+                        "Bookmarks exportieren",
+                        f"Export nach {max_attempts} Versuchen abgebrochen.\n\n"
+                        f"Letzter Fehler:\n{e}",
+                    )
+                    self._set_status(
+                        f"Outlines-Export abgebrochen nach {max_attempts} Versuchen"
+                    )
+                    return
+                err_box = QMessageBox(self)
+                err_box.setIcon(QMessageBox.Critical)
+                err_box.setWindowTitle("Bookmarks exportieren")
+                err_box.setText("Outlines-Export fehlgeschlagen")
+                err_box.setInformativeText(
+                    f"Die Datei konnte nicht geschrieben werden:\n{e}\n\n"
+                    f"Versuch {attempt}/{max_attempts}. Erneut versuchen?"
+                )
+                err_box.setStandardButtons(QMessageBox.Retry | QMessageBox.Cancel)
+                err_box.setDefaultButton(QMessageBox.Retry)
+                if err_box.exec() != QMessageBox.Retry:
+                    self._set_status("Outlines-Export abgebrochen")
+                    return
+            except Exception as e:
+                QMessageBox.warning(self, "Bookmarks exportieren", str(e))
+                return
 
     def _refresh_thumbs(self):
         if not self.pdf_view.pdf_path:

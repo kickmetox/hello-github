@@ -401,6 +401,21 @@ class SettingsDialog(QDialog):
         )
         form.addRow("Prefetch-Cancel-Debounce", self.thumb_cancel_ms)
 
+        # Live-Label „aktuell N ms / ±N“ — 1.3.4
+        self.lbl_prefetch_live = QLabel()
+        self.lbl_prefetch_live.setStyleSheet("color: #555; font-style: italic;")
+        self.lbl_prefetch_live.setToolTip(
+            "Live-Anzeige der gewählten Prefetch-Cancel-Debounce / Radius — 1.3.4"
+        )
+        self.thumb_prefetch.currentIndexChanged.connect(
+            self._update_prefetch_live_label
+        )
+        self.thumb_cancel_ms.currentIndexChanged.connect(
+            self._update_prefetch_live_label
+        )
+        self._update_prefetch_live_label()
+        form.addRow("Prefetch aktuell", self.lbl_prefetch_live)
+
         self.redact_opacity = QDoubleSpinBox()
         self.redact_opacity.setRange(0.05, 1.0)
         self.redact_opacity.setSingleStep(0.05)
@@ -1487,6 +1502,18 @@ class SettingsDialog(QDialog):
         )
         if path:
             self.spell_dict.setText(path)
+
+    def _update_prefetch_live_label(self, *_args) -> None:
+        """Live-Anzeige „aktuell N ms / ±N“ — 1.3.4."""
+        try:
+            ms = int(self.thumb_cancel_ms.currentData() or 90)
+        except (TypeError, ValueError):
+            ms = 90
+        try:
+            radius = int(self.thumb_prefetch.currentData() or 2)
+        except (TypeError, ValueError):
+            radius = 2
+        self.lbl_prefetch_live.setText(f"aktuell {ms} ms / ±{radius}")
 
     def _sync_zoom_pct_enabled(self) -> None:
         mode = str(self.zoom_mode.currentData() or DEFAULT_ZOOM_MODE_PERCENT)
