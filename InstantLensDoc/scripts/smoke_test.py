@@ -6674,7 +6674,14 @@ def main() -> int:
         cl141 = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
         assert "## 1.4.1" in cl141
         kb141 = (ROOT / "instantlensdoc" / "ui" / "keyboard_help.py").read_text(encoding="utf-8")
-        assert "1.4.1" in kb141 and ("Dry-Run" in kb141 or "klickbar" in kb141 or "live" in kb141)
+        assert ("1.4.2" in kb141 or "1.4.1" in kb141) and (
+            "Dry-Run" in kb141
+            or "klickbar" in kb141
+            or "live" in kb141
+            or "Rückgängig" in kb141
+            or "Regex-Fehler" in kb141
+            or "Manuell" in kb141
+        )
         print(
             "1.4.1 CLI pdf-diff-sync-threshold-png/rename-dryrun-collision-undo/"
             "ann-case-regex/theme-live: OK"
@@ -14619,7 +14626,7 @@ def main() -> int:
             print("0.3.x–1.4.2 review OK")
             from instantlensdoc.ui.stubs import PLANNED as PLANNED132
 
-            assert "1.4.1" in PLANNED132["ki"]
+            assert "1.4.2" in PLANNED132["ki"]
             assert callable(win.pdf_view.bake_redactions)
             assert callable(win.pdf_view.clear_redactions)
             assert callable(win._set_pdf_password)
