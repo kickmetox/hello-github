@@ -27,6 +27,22 @@ from .pdf_ann_import import (
     import_native_pdf_annotations,
     plan_duplicate_actions,
 )
+from .page_labels import (
+    merge_labels,
+    normalize_page_labels,
+    page_labels_to_meta,
+    remap_page_labels,
+    write_pdf_page_labels,
+)
+from .doc_history import (
+    HIST_SCHEMA_ID,
+    HIST_VERSION,
+    DocHistory,
+    HistoryEntry,
+    append_doc_history,
+    format_history_summary,
+    history_path_for,
+)
 from .annotate import (
     Annotation,
     AnnotationImportError,
@@ -217,6 +233,18 @@ __all__ = [
     "plan_duplicate_actions",
     "import_native_pdf_annotations",
     "import_native_into_store",
+    "merge_labels",
+    "normalize_page_labels",
+    "page_labels_to_meta",
+    "remap_page_labels",
+    "write_pdf_page_labels",
+    "HIST_SCHEMA_ID",
+    "HIST_VERSION",
+    "DocHistory",
+    "HistoryEntry",
+    "append_doc_history",
+    "format_history_summary",
+    "history_path_for",
     "Annotation",
     "AnnotationImportError",
     "AnnotationStore",
@@ -369,4 +397,4 @@ __all__ = [
     "page_count_for_text",
 ]
 
-__version__ = "2.1.5"
+__version__ = "2.2.0"

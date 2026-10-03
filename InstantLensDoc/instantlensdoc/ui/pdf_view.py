@@ -363,6 +363,7 @@ class PdfCanvas(QLabel):
 
     annotation_placed = Signal(float, float)
     drag_finished = Signal(float, float, float, float)  # x0,y0,x1,y1
+    ink_finished = Signal(object)  # list[(x,y)] Freihand-Polyline — 2.2.0
     text_selection_finished = Signal(float, float, float, float)  # Text-Marquee (Auswahl-Modus)
     overlay_edit_requested = Signal(str)  # ann id
     annotation_selected = Signal(str)  # ann id (leer = Auswahl aufheben)
@@ -381,6 +382,7 @@ class PdfCanvas(QLabel):
         self._select_mode = False
         self._drag_start: tuple[float, float] | None = None
         self._drag_current: tuple[float, float] | None = None
+        self._ink_points: list[tuple[float, float]] | None = None  # Freihand — 2.2.0
         self._text_sel_start: tuple[float, float] | None = None
         self._text_sel_current: tuple[float, float] | None = None
         self._scale = 1.5
@@ -639,6 +641,7 @@ class PdfCanvas(QLabel):
         if not self._select_mode:
             self._text_sel_start = None
             self._text_sel_current = None
+            self._ink_points = None
             self._repaint_overlay()
 
     def set_selected_id(self, ann_id: str | None):
@@ -743,6 +746,13 @@ class PdfCanvas(QLabel):
                 ys.extend([ann.y + max(ann.height, 40), ann.y])
             pad = 6.0
             return min(xs) - pad, min(ys) - pad, max(xs) + pad, max(ys) + pad
+        if ann.type == AnnotationType.INK:
+            pts = getattr(ann, "ink_points", lambda: [])()
+            if pts:
+                xs = [p[0] for p in pts]
+                ys = [p[1] for p in pts]
+                pad = 6.0
+                return min(xs) - pad, min(ys) - pad, max(xs) + pad, max(ys) + pad
         w = max(ann.width, 8)
         h = max(ann.height, 8)
         if ann.type in (AnnotationType.STICKY, AnnotationType.STAMP, AnnotationType.SIGNATURE_FIELD):
@@ -939,6 +949,17 @@ class PdfCanvas(QLabel):
                     unit = "mm"
                 label = ann.text or ann.measure_label(self._scale, unit=unit)
                 painter.drawText(int(mid_x) + 4, int(mid_y) - 4, label)
+        elif ann.type == AnnotationType.INK:
+            # Freihand-Polyline (Maus) — 2.2.0
+            pts = [
+                QPointF(float(pt[0]) + dx, float(pt[1]) + dy)
+                for pt in (getattr(ann, "points", None) or [])
+                if isinstance(pt, (list, tuple)) and len(pt) >= 2
+            ]
+            if len(pts) >= 2:
+                painter.drawPolyline(QPolygonF(pts))
+            elif len(pts) == 1:
+                painter.drawPoint(pts[0])
         painter.setOpacity(1.0)
 
     def _draw_arrow_head(self, painter: QPainter, x0: float, y0: float, x1: float, y1: float):
@@ -1033,7 +1054,18 @@ class PdfCanvas(QLabel):
                     painter.setBrush(Qt.NoBrush)
                     painter.drawRect(int(x0) - 2, int(y0) - 2, int(x1 - x0) + 4, int(y1 - y0) + 4)
         # Drag-Vorschau (auch bei ausgeblendetem Layer sichtbar)
-        if self._drag_start and self._drag_current and self._drag_tool:
+        if self._ink_points and len(self._ink_points) >= 1 and self._drag_tool == AnnotationType.INK:
+            preview = Annotation(
+                page=0,
+                type=AnnotationType.INK,
+                x=0,
+                y=0,
+                points=[[p[0], p[1]] for p in self._ink_points],
+                color="#2980B9",
+            )
+            preview.sync_bounds_from_points()
+            self._draw_ann(painter, preview)
+        elif self._drag_start and self._drag_current and self._drag_tool:
             x0, y0 = self._drag_start
             x1, y1 = self._drag_current
             preview = Annotation(
@@ -1151,6 +1183,12 @@ class PdfCanvas(QLabel):
                 self.annotation_selected.emit(hit_any.id)
                 return
         if self._drag_tool and event.button() == Qt.LeftButton:
+            if self._drag_tool == AnnotationType.INK:
+                # Freihand: Punkte sammeln — 2.2.0
+                self._ink_points = [(x, y)]
+                self._drag_start = (x, y)
+                self._drag_current = (x, y)
+                return
             self._drag_start = (x, y)
             self._drag_current = (x, y)
             return
@@ -1171,6 +1209,15 @@ class PdfCanvas(QLabel):
             if pt:
                 self._text_sel_current = pt
                 self._repaint_overlay()
+            return
+        if self._ink_points is not None:
+            pt = self._map_to_page(event)
+            if pt:
+                lx, ly = self._ink_points[-1]
+                if abs(pt[0] - lx) >= 1.5 or abs(pt[1] - ly) >= 1.5:
+                    self._ink_points.append(pt)
+                    self._drag_current = pt
+                    self._repaint_overlay()
             return
         if self._drag_start is not None:
             pt = self._map_to_page(event)
@@ -1222,6 +1269,21 @@ class PdfCanvas(QLabel):
             else:
                 self._text_sel_start = None
                 self._text_sel_current = None
+                self._repaint_overlay()
+            return
+        if self._ink_points is not None and event.button() == Qt.LeftButton:
+            pt = self._map_to_page(event)
+            if pt:
+                lx, ly = self._ink_points[-1]
+                if abs(pt[0] - lx) >= 0.5 or abs(pt[1] - ly) >= 0.5:
+                    self._ink_points.append(pt)
+            pts = list(self._ink_points)
+            self._ink_points = None
+            self._drag_start = None
+            self._drag_current = None
+            if len(pts) >= 2:
+                self.ink_finished.emit(pts)
+            else:
                 self._repaint_overlay()
             return
         if self._drag_start is not None and event.button() == Qt.LeftButton:
@@ -1572,6 +1634,7 @@ class PdfViewer(QWidget):
             (AnnotationType.MEASURE, "Lineal"),
             (AnnotationType.MEASURE_AREA, "Fläche"),
             (AnnotationType.MEASURE_ANGLE, "Winkel"),
+            (AnnotationType.INK, "Freihand"),
             (AnnotationType.SIGNATURE_FIELD, "Signaturfeld"),
         ]:
             b = QToolButton()
@@ -1590,6 +1653,10 @@ class PdfViewer(QWidget):
                 )
             elif t == AnnotationType.MEASURE:
                 b.setToolTip("Lineal: Distanz ziehen — Anzeige mm/px (Toggle) — 2.1.0")
+            elif t == AnnotationType.INK:
+                b.setToolTip(
+                    "Freihand: Maus-Polyline ziehen (kein Stylus/Druck) — Sidecar + Undo — 2.2.0"
+                )
             b.clicked.connect(lambda checked, tool=t: self._set_tool(tool))
             self._tool_buttons.append(b)
             toolbar.addWidget(b)
@@ -1938,6 +2005,7 @@ class PdfViewer(QWidget):
         self.canvas.set_show_printer_marks(self._show_printer_marks)
         self.canvas.annotation_placed.connect(self._on_place)
         self.canvas.drag_finished.connect(self._on_drag)
+        self.canvas.ink_finished.connect(self._on_ink)
         self.canvas.text_selection_finished.connect(self._on_text_selection)
         self.canvas.overlay_edit_requested.connect(self._edit_overlay)
         self.canvas.annotation_selected.connect(self._on_annotation_selected)
@@ -2518,17 +2586,27 @@ class PdfViewer(QWidget):
         return any(bool(x) for x in (getattr(self, "_page_labels", None) or []))
 
     def _reload_page_labels(self) -> None:
-        """PageLabels aus dem geöffneten PDF laden (Cache)."""
+        """PageLabels aus PDF + Sidecar-Custom laden (Custom überschreibt) — 2.2.0."""
         self._page_labels = []
         if not self.pdf_path or self.page_count <= 0:
             return
+        n = int(self.page_count or 0)
         try:
             from ild_pdf import PdfDocument
 
             with PdfDocument(self.pdf_path, password=self.password) as doc:
-                self._page_labels = list(doc.page_labels())
+                native = list(doc.page_labels())
         except Exception:
-            self._page_labels = [""] * int(self.page_count or 0)
+            native = [""] * n
+        custom: list[str] = []
+        if self.store is not None:
+            try:
+                custom = self.store.list_custom_page_labels(page_count=n)
+            except Exception:
+                custom = []
+        from ild_pdf.page_labels import merge_labels
+
+        self._page_labels = merge_labels(native, custom)
 
     def format_page_label_text(
         self,
@@ -3167,6 +3245,7 @@ class PdfViewer(QWidget):
             AnnotationType.MEASURE: "Lineal",
             AnnotationType.MEASURE_AREA: "Fläche",
             AnnotationType.MEASURE_ANGLE: "Winkel",
+            AnnotationType.INK: "Freihand",
             AnnotationType.SIGNATURE_FIELD: "Signaturfeld",
         }.get(tool, tool.value)
 
@@ -3272,6 +3351,10 @@ class PdfViewer(QWidget):
         elif tool == AnnotationType.MEASURE:
             self.status.emit(
                 f"Werkzeug: Lineal — Distanz ziehen (Anzeige {self._measure_unit()})"
+            )
+        elif tool == AnnotationType.INK:
+            self.status.emit(
+                "Werkzeug: Freihand — Maus ziehen (Polyline); Ctrl+Z = Undo — 2.2.0"
             )
         else:
             self.status.emit(f"Werkzeug: {tool.value}")
@@ -9107,9 +9190,117 @@ class PdfViewer(QWidget):
             self.status.emit(f"Notiz aus Auswahl: {preview}")
         return True
 
+    def _on_ink(self, points: object) -> None:
+        """Freihand-Polyline committen (Sidecar + Undo + Historie) — 2.2.0."""
+        if not self.store:
+            return
+        # Werkzeug sollte INK sein; programmatische Tests dürfen Punkte ohne Tool setzen
+        if self.tool is not None and self.tool != AnnotationType.INK:
+            return
+        raw = list(points or [])
+        if len(raw) < 2:
+            return
+        # Punkte auf Startseite mappen (Spread)
+        page0, lx0, ly0 = self._spread_resolve(float(raw[0][0]), float(raw[0][1]))
+        mapped: list[list[float]] = [[lx0, ly0]]
+        ox, oy = float(raw[0][0]), float(raw[0][1])
+        for pt in raw[1:]:
+            try:
+                x, y = float(pt[0]), float(pt[1])
+            except (TypeError, ValueError, IndexError):
+                continue
+            mapped.append([lx0 + (x - ox), ly0 + (y - oy)])
+        if len(mapped) < 2:
+            return
+        ann = Annotation.from_ink_points(
+            page0,
+            mapped,
+            color=self._pen_color,
+            stroke_width=float(getattr(self, "_default_stroke_width", 2.0) or 2.0),
+        )
+        # Historie: spezifischer Action-Name vor generischem commit
+        try:
+            from ild_pdf.doc_history import append_doc_history
+
+            append_doc_history(
+                self.pdf_path,
+                "annotation.ink",
+                f"page={page0} points={len(mapped)}",
+            )
+        except Exception:
+            pass
+        # _commit_ann loggt zusätzlich annotation.add — OK für Audit
+        self._commit_ann(ann)
+
+    def apply_custom_page_labels(
+        self,
+        labels: Sequence[str],
+        *,
+        write_pdf: bool = False,
+    ) -> None:
+        """Custom-Seitenlabels in Sidecar speichern; optional PDF PageLabels — 2.2.0."""
+        if not self.store or not self.pdf_path:
+            raise RuntimeError("Kein PDF geöffnet")
+        cleaned = self.store.set_custom_page_labels(list(labels))
+        self.store.save(force=True)
+        if write_pdf:
+            from ild_pdf.page_labels import write_pdf_page_labels
+
+            n = int(self.page_count or 0)
+            full = list(cleaned) + [""] * max(0, n - len(cleaned))
+            write_pdf_page_labels(self.pdf_path, full[:n], password=self.password)
+        self._reload_page_labels()
+        self.refresh()
+        self.document_changed.emit()
+        try:
+            from ild_pdf.doc_history import append_doc_history
+
+            n_set = sum(1 for x in cleaned if x)
+            append_doc_history(
+                self.pdf_path,
+                "page_labels.set",
+                f"labels={n_set} write_pdf={bool(write_pdf)}",
+            )
+        except Exception:
+            pass
+        self.status.emit(
+            f"Seitenbeschriftungen gespeichert ({sum(1 for x in cleaned if x)} Labels)"
+            + (" · PDF PageLabels geschrieben" if write_pdf else "")
+        )
+
+    def edit_page_labels(self) -> None:
+        """Dialog Seitenbeschriftungen — 2.2.0."""
+        if not self.pdf_path or not self.store:
+            self.status.emit("Kein PDF geöffnet")
+            return
+        from instantlensdoc.ui.page_labels_dialog import PageLabelsDialog
+
+        dlg = PageLabelsDialog(self, parent=self)
+        dlg.exec()
+
+    def show_doc_history(self) -> None:
+        """Lokale Dokument-Historie (ildhist-v1) anzeigen — 2.2.0."""
+        if not self.pdf_path:
+            self.status.emit("Kein PDF geöffnet")
+            return
+        from ild_pdf.doc_history import DocHistory, format_history_summary
+
+        hist = DocHistory.for_pdf(self.pdf_path, load=True)
+        text = format_history_summary(hist.last_entries(30), max_items=30)
+        last = hist.last_action_ts() or "—"
+        QMessageBox.information(
+            self,
+            "Dokument-Historie",
+            f"Datei: {hist.path.name}\n"
+            f"Schema: ildhist-v1 · Einträge: {len(hist.entries)}\n"
+            f"Letzte Aktion: {last}\n\n{text}",
+        )
+
     def _on_drag(self, x0: float, y0: float, x1: float, y1: float):
         if not self.store or self.tool is None or self.tool not in DRAG_TYPES:
             return
+        if self.tool == AnnotationType.INK:
+            return  # über ink_finished
         page0, lx0, ly0 = self._spread_resolve(x0, y0)
         _page1, lx1, ly1 = self._spread_resolve(x1, y1)
         page = page0
@@ -9388,6 +9579,16 @@ class PdfViewer(QWidget):
             self.schedule_sidecar_save()
         except Exception as e:
             QMessageBox.warning(self, "Annotationen", f"Speichern fehlgeschlagen: {e}")
+        try:
+            from ild_pdf.doc_history import append_doc_history
+
+            append_doc_history(
+                self.pdf_path,
+                "annotation.add",
+                f"type={ann.type.value} page={ann.page}",
+            )
+        except Exception:
+            pass
         self.refresh()
         self.annotations_changed.emit()
         self.status.emit(f"Annotation gespeichert ({ann.type.value})")

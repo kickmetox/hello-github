@@ -2287,6 +2287,18 @@ class MainWindow(QMainWindow):
         act_goto_page.setToolTip("Seitennummer eingeben und springen (auch Ctrl+G im PDF)")
         act_goto_page.triggered.connect(self._goto_page)
         m_pdf.addAction(act_goto_page)
+        act_page_labels = QAction("Seitenbeschriftungen…", self)
+        act_page_labels.setToolTip(
+            "Benutzerdefinierte Labels (i, ii, 1…) — Sidecar + optional PDF PageLabels — 2.2.0"
+        )
+        act_page_labels.triggered.connect(lambda: self.pdf_view.edit_page_labels())
+        m_pdf.addAction(act_page_labels)
+        act_doc_hist = QAction("Dokument-Historie…", self)
+        act_doc_hist.setToolTip(
+            "Lokales Änderungslog (ildhist-v1) mit Zeitstempeln — 2.2.0"
+        )
+        act_doc_hist.triggered.connect(lambda: self.pdf_view.show_doc_history())
+        m_pdf.addAction(act_doc_hist)
         m_pdf.addSeparator()
         for title, slot in [
             ("Annotationen speichern (Sidecar)", lambda: self.pdf_view.save_annotations()),

@@ -245,7 +245,9 @@ Annotation-Suche: Tag-<b>Autocomplete</b>. Session-Tabs: ziehen → Reihenfolge;
 <b>Fenster teilen</b> (Ctrl+\\); optional <b>vertikal</b> (Ctrl+Shift+\\); optional <b>Sync-Scroll</b> (Ctrl+Alt+\\).
 <b>Tag-Cloud</b>: Klick setzt Filter (exklusiv), Ctrl+Klick Multi-Select; <b>Rechtsklick → filtern / Farbe ändern / umbenennen</b>.
 Statusleiste <b>ungespeicherte Tabs</b>: Klick öffnet Liste zum Wechseln + <b>Speichern je Datei</b>.</p>
-<p><b>PDF-Seitenlabels:</b> römische/arabische Labels aus dem PDF werden in Statusleiste und Toolbar angezeigt, wenn vorhanden.</p>
+<p><b>PDF-Seitenlabels:</b> römische/arabische Labels aus dem PDF werden in Statusleiste und Toolbar angezeigt, wenn vorhanden. <b>2.2.0:</b> benutzerdefinierte Labels (i, ii, 1…) über PDF → Seitenbeschriftungen… (Sidecar + optional PageLabels).</p>
+<p><b>Freihand (Ink):</b> Toolbar „Freihand“ — Maus-Polyline; Sidecar + Ctrl+Z Undo — 2.2.0 (kein Stylus).</p>
+<p><b>Dokument-Historie:</b> PDF → Dokument-Historie… — lokale ildhist-v1 Logdatei — 2.2.0.</p>
 <p><b>Zwischenablage-Verlauf:</b> Bearbeiten → letzte 3 eingefügten Textschnipsel erneut einfügen.</p>
 <p><b>About:</b> Hilfe → Über… — Feature-Kurzliste + FEATURES.md öffnen;
 bei <b>Trial</b> zusätzlicher Keygen-Hinweis (run-keygen.bat / InstantLensKeygen.exe).</p>
@@ -338,6 +340,7 @@ Status-Klick öffnet <code>docs/VERSION</code>/<code>VERSION.txt</code> im Edito
 <p><b>PDF verschlüsseln/entschlüsseln:</b> Prefill-Warnung + Button „jetzt ausschalten“ (sofort speichern + Toast) · Passwort nie in Logs · falsches PW klar DE — 1.6.5 (Basis 1.6.4/1.6.3/1.6.2/1.6.1/1.6.0).</p>
 <p><b>Dokument-Statistik:</b> JSON-Dateiname Quick-Insert <code>{stem}</code>/<code>{date}</code> · ungültige Platzhalter rot · Live-Vorschau · Copy · Zielordner · UTF-8 — 1.6.5 (Basis 1.6.4/1.6.3/1.6.2/1.6.1/1.6.0).</p>
 <p><b>Workspace-Layouts:</b> Import-Log Zusammenfassung importiert/übersprungen/umbenannt · kopieren/als TXT · Merge skip/rename · Schema DE — 1.6.5 (Basis 1.6.4/1.6.3/1.6.2/1.6.1/1.6.0).</p>
+<p><b>2.2.0:</b> Seitenbeschriftungen Sidecar+PageLabels · Freihand-Ink Polyline+Undo · Dokument-Historie ildhist-v1 · smoke_ild CONTRIBUTING/CI-Stub.</p>
 <p><b>2.1.5:</b> Import-Copy Toast OCR-Dauer·Klick Status/Log · Mess/Diff-Reset gemeinsamer Helper·Esc verwirft Edit · smoke Fail-error max 200… · FEATURES.md lokal Sync in Info.</p>
 <p><b>2.1.4:</b> Import-Status Clipboard·Toast·A11y · Mess-Template Reset Bestätigung≠Default·Fokus+Selektion · Diff-TXT Quick-Insert·Reset Default · smoke_ild --json Fail checks[].error·Exit=ok.</p>
 <p><b>2.1.3:</b> Kommentar-Import Status ersetzt/übersprungen/neu·kopierbar · Mess-CSV Live-Template {stem}_measures.csv·Quick-Insert · Diff-TXT {stemA}_vs_{stemB}_{mode}.txt Live·ungültige rot · smoke_ild --json Schema+Beispiel.</p>

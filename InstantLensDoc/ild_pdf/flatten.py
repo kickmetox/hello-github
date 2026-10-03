@@ -218,6 +218,21 @@ def draw_annotations_on_image(
                 label = ann.text or ann.measure_label(scale)
                 font = _font(11)
                 draw.text((mid_x + 4, mid_y - 14), label, fill=stroke, font=font)
+        elif ann.type == AnnotationType.INK:
+            # Freihand-Polyline — 2.2.0
+            pts = []
+            for pt in getattr(ann, "points", None) or []:
+                if isinstance(pt, (list, tuple)) and len(pt) >= 2:
+                    try:
+                        pts.append((float(pt[0]), float(pt[1])))
+                    except (TypeError, ValueError):
+                        continue
+            if len(pts) >= 2:
+                draw.line(pts, fill=stroke, width=sw, joint="curve")
+            elif len(pts) == 1:
+                px, py = pts[0]
+                r = max(1, sw)
+                draw.ellipse([px - r, py - r, px + r, py + r], fill=stroke)
 
     return Image.alpha_composite(base, overlay).convert("RGB")
 

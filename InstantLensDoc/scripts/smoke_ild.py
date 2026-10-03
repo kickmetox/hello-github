@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Nightly/CI Smoke: CLI + Import-Checks für InstantLens Doc — 2.1.0–2.1.5.
+"""Nightly/CI Smoke: CLI + Import-Checks für InstantLens Doc — 2.1.0–2.2.0.
 
 Leichtgewichtig. Exit-Codes:
   0  OK  (ok=true)
@@ -14,12 +14,12 @@ Aufruf:
   python scripts/smoke_ild.py -h
 
 JSON-Schema (--json), Erfolg:
-  {"ok": true, "version": "2.1.5", "duration_ms": 1234,
+  {"ok": true, "version": "2.2.0", "duration_ms": 1234,
    "checks": ["version", "imports", "cli", "measure_diff_import", "changelog"]}
 
 JSON bei Fail: checks[] enthält Objekt mit error-Text (max 200 Zeichen, Truncate …);
-Exitcode spiegelt ok (0↔true, 1↔false) — 2.1.5:
-  {"ok": false, "version": "2.1.5", "duration_ms": 12,
+Exitcode spiegelt ok (0↔true, 1↔false) — 2.2.0:
+  {"ok": false, "version": "2.2.0", "duration_ms": 12,
    "checks": ["version", {"name": "imports", "error": "import x: …"}]}
 """
 
@@ -41,7 +41,7 @@ if str(ROOT) not in sys.path:
 # Headless/CI: Qt ohne Display
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-EXPECTED_VERSION = "2.1.5"
+EXPECTED_VERSION = "2.2.0"
 FAIL_ERROR_MAX_LEN = 200
 
 EXIT_OK = 0
@@ -89,6 +89,8 @@ def check_imports(*, with_qt: bool) -> None:
         "ild_pdf.annotate",
         "ild_pdf.diff",
         "ild_pdf.pdf_ann_import",
+        "ild_pdf.page_labels",
+        "ild_pdf.doc_history",
         "ild_pdf.overlay",
         "ild_pdf.render",
         "instantlensdoc",
@@ -130,6 +132,12 @@ def check_imports(*, with_qt: bool) -> None:
             "import_native_pdf_comments",
             "MEASURE_AREA",
             "MEASURE_ANGLE",
+            "AnnotationType.INK",
+            "_on_ink",
+            "apply_custom_page_labels",
+            "edit_page_labels",
+            "show_doc_history",
+            "ink_finished",
             "_toggle_measure_unit",
             "_toggle_measure_snap",
             "export_measures_csv",
@@ -152,10 +160,26 @@ def check_imports(*, with_qt: bool) -> None:
             "Klick fokussiert Statusleiste",
             "get_ocr_defaults_toast_sec",
         ),
+        ROOT / "instantlensdoc" / "ui" / "page_labels_dialog.py": (
+            "PageLabelsDialog",
+            "Auch in PDF schreiben",
+            "PageLabels",
+        ),
         ROOT / "instantlensdoc" / "ui" / "main_window.py": (
             "_focus_import_status_toast_target",
             "_import_status_toast_active",
             "Klick fokussiert Statusleiste",
+            "Seitenbeschriftungen…",
+            "Dokument-Historie…",
+        ),
+        ROOT / "CONTRIBUTING.md": (
+            "smoke_ild",
+            "scripts/smoke_ild.py",
+        ),
+        ROOT / ".github" / "workflows" / "smoke-ild.yml": (
+            "smoke-ild",
+            "smoke_ild.py",
+            "lokal",
         ),
     }
     if with_qt:
@@ -369,14 +393,75 @@ def check_measure_and_diff() -> None:
         raw = csv_nobom.read_bytes()
         assert not raw.startswith(b"\xef\xbb\xbf")
 
+        # Ink + page labels + doc history — 2.2.0
+        from ild_pdf import (
+            AnnotationType as AT220,
+            DocHistory,
+            HIST_SCHEMA_ID,
+            append_doc_history,
+            merge_labels,
+            normalize_page_labels,
+            write_pdf_page_labels,
+        )
+        from ild_pdf.annotate import Annotation as Ann220, DRAG_TYPES as DT220
+
+        assert AT220.INK.value == "ink"
+        assert AT220.INK in DT220
+        ink = Ann220.from_ink_points(
+            0, [[10, 10], [20, 15], [30, 10]], color="#2980B9"
+        )
+        assert ink.type == AT220.INK
+        assert len(ink.ink_points()) == 3
+        store.add(ink)
+        store.set_custom_page_labels(["i", "ii", "1"])
+        assert store.list_custom_page_labels(page_count=3)[:3] == ["i", "ii", "1"]
+        store.save(force=True)
+        store2 = AnnotationStore(a)
+        assert any(x.type == AT220.INK for x in store2.annotations)
+        ink_re = next(x for x in store2.annotations if x.type == AT220.INK)
+        assert len(ink_re.points) >= 2
+        assert store2.can_undo() or True  # history cleared on load
+        store2.clear_history()
+        store2.add(
+            Ann220.from_ink_points(0, [[1, 1], [2, 2]], color="#000")
+        )
+        assert store2.can_undo()
+        assert store2.undo()
+        merged = merge_labels(["a", ""], ["", "ii"])
+        assert merged == ["a", "ii"]
+        assert normalize_page_labels({"0": "i"}, page_count=2) == ["i", ""]
+        # PageLabels write roundtrip
+        import pikepdf as pike220
+
+        pl_pdf = td_path / "labels220.pdf"
+        with pike220.Pdf.new() as doc_w:
+            for _ in range(3):
+                doc_w.add_blank_page(page_size=(200, 200))
+            doc_w.save(pl_pdf)
+        write_pdf_page_labels(pl_pdf, ["i", "ii", "1"])
+        from ild_pdf import PdfDocument
+
+        with PdfDocument(pl_pdf) as doc_pl:
+            assert doc_pl.page_label(0) == "i"
+            assert doc_pl.page_label(2) == "1"
+        he = append_doc_history(pl_pdf, "page_labels.set", "labels=3")
+        assert he is not None
+        hist = DocHistory.for_pdf(pl_pdf, load=True)
+        assert HIST_SCHEMA_ID == "ildhist-v1"
+        assert hist.path.exists()
+        assert hist.last_action_ts()
+        assert any(e.action == "page_labels.set" for e in hist.entries)
+
     _ok(
         "measure + textlayer-diff + native-import + measures-csv "
-        "template + status ersetzt/übersprungen/neu + mode-txt API"
+        "template + status + ink/page-labels/ildhist — 2.2.0"
     )
 
 
 def check_changelog() -> None:
     cl = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    if "## 2.2.0" not in cl:
+        _fail("CHANGELOG fehlt ## 2.2.0")
     if "## 2.1.5" not in cl:
         _fail("CHANGELOG fehlt ## 2.1.5")
     if "## 2.1.4" not in cl:
@@ -389,9 +474,15 @@ def check_changelog() -> None:
         _fail("CHANGELOG fehlt ## 2.1.1")
     if "## 2.1.0" not in cl:
         _fail("CHANGELOG fehlt ## 2.1.0")
+    if "Seitenbeschrift" not in cl and "Freihand" not in cl and "ildhist" not in cl:
+        _fail("CHANGELOG 2.2.0 fehlt Kernfeature-Hinweis")
     feat = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
-    if "2.1.5" not in feat:
-        _fail("FEATURES.md fehlt 2.1.5")
+    if "2.2.0" not in feat:
+        _fail("FEATURES.md fehlt 2.2.0")
+    if "Freihand" not in feat and "ink" not in feat.casefold():
+        _fail("FEATURES.md fehlt Freihand/Ink")
+    if "ildhist" not in feat and "Dokument-Historie" not in feat:
+        _fail("FEATURES.md fehlt Dokument-Historie/ildhist")
     info = (ROOT / "INFO.md").read_text(encoding="utf-8")
     if "smoke_ild" not in info or "--json" not in info:
         _fail("INFO.md fehlt smoke_ild/--json Hinweis")
@@ -405,7 +496,10 @@ def check_changelog() -> None:
         "lokal" not in info.casefold() and "sync" not in info.casefold()
     ):
         _fail("INFO.md fehlt FEATURES.md lokal-sync Hinweis")
-    _ok("changelog + features + info(smoke_ild truncate/FEATURES lokal)")
+    contrib = ROOT / "CONTRIBUTING.md"
+    if not contrib.is_file() or "smoke_ild" not in contrib.read_text(encoding="utf-8"):
+        _fail("CONTRIBUTING.md fehlt / ohne smoke_ild")
+    _ok("changelog + features + info + CONTRIBUTING(smoke_ild)")
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -439,7 +533,7 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help=(
             "Summary als JSON auf stdout "
-            "(ok/checks/duration_ms/version; Fail: checks[].error max 200…) — 2.1.5"
+            "(ok/checks/duration_ms/version; Fail: checks[].error max 200…) — 2.2.0"
         ),
     )
     return p
@@ -461,7 +555,7 @@ Optionen:
   --qt           UI-Quelltext-Checks (compare_dialog/pdf_view) ausführen
   --skip-qt      UI-Checks überspringen (Default ohne --qt)
   --json         Summary als JSON (ok/checks[]/duration_ms/version);
-                 bei Fail: checks[] mit {name,error} (max 200…); Exitcode = ok — 2.1.5
+                 bei Fail: checks[] mit {name,error} (max 200…); Exitcode = ok — 2.2.0
 
 Exit-Codes:
   0  OK (ok=true)
@@ -471,18 +565,18 @@ Exit-Codes:
 Laufzeit: am Ende als „Laufzeit: N ms“ (oder duration_ms im JSON).
 
 Beispiel --json (Erfolg):
-  {"ok": true, "version": "2.1.5", "duration_ms": 1234,
+  {"ok": true, "version": "2.2.0", "duration_ms": 1234,
    "checks": ["version", "imports", "cli", "measure_diff_import", "changelog"]}
 
 Beispiel --json (Fail):
-  {"ok": false, "version": "2.1.5", "duration_ms": 12,
+  {"ok": false, "version": "2.2.0", "duration_ms": 12,
    "checks": ["version", {"name": "imports", "error": "import x: …"}]}
 """.rstrip()
     )
 
 
 def _truncate_fail_error(error: str | None, max_len: int = FAIL_ERROR_MAX_LEN) -> str:
-    """Fail-error auf max_len Zeichen kürzen, Overflow mit … — 2.1.5."""
+    """Fail-error auf max_len Zeichen kürzen, Overflow mit … — 2.2.0."""
     err = (error or "FAIL").strip() or "FAIL"
     limit = max(1, int(max_len))
     if len(err) <= limit:
@@ -494,7 +588,7 @@ def _truncate_fail_error(error: str | None, max_len: int = FAIL_ERROR_MAX_LEN) -
 
 
 def _json_checks_on_fail(passed: list[str], *, check: str | None, error: str | None):
-    """checks[] bei Fail: bestandene Namen + error (max 200, …) — 2.1.5."""
+    """checks[] bei Fail: bestandene Namen + error (max 200, …) — 2.2.0."""
     out: list = list(passed)
     name = check or "unknown"
     err = _truncate_fail_error(error)

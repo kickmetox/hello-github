@@ -155,6 +155,7 @@ class AnnotationType(str, Enum):
     MEASURE = "measure"
     MEASURE_AREA = "measure_area"  # Flächenmessung Rechteck — 2.1.0
     MEASURE_ANGLE = "measure_angle"  # Winkelmessung zwei Linien — 2.1.0
+    INK = "ink"  # Freihand-Polyline (Maus) — 2.2.0
     TEXT_OVERLAY = "text_overlay"
     SIGNATURE_FIELD = "signature_field"  # Platzhalter-Rahmen
     SIGNATURE = "signature"  # Bild-Unterschrift (text: img:…)
@@ -216,6 +217,7 @@ DRAG_TYPES = frozenset(
         AnnotationType.MEASURE,
         AnnotationType.MEASURE_AREA,
         AnnotationType.MEASURE_ANGLE,  # erster Strahl per Drag; zweiter Punkt per Klick — 2.1.0
+        AnnotationType.INK,  # Polyline Press→Move→Release — 2.2.0
         AnnotationType.HIGHLIGHT,
         AnnotationType.REDACTION,
     }
@@ -235,6 +237,7 @@ REPORT_TYPE_LABELS: dict[str, str] = {
     "measure": "Messung",
     "measure_area": "Fläche",
     "measure_angle": "Winkel",
+    "ink": "Freihand",
     "text_overlay": "Text-Overlay",
     "signature_field": "Signaturfeld",
     "signature": "Signatur",
@@ -258,6 +261,8 @@ class Annotation:
     # Winkelmessung: dritter Punkt (Ende zweiter Strahl ab Vertex=callout) — 2.1.0
     p3_x: float = 0.0
     p3_y: float = 0.0
+    # Freihand-Polyline: Liste [x, y] in Render-Pixeln — 2.2.0
+    points: List[List[float]] = field(default_factory=list)
     font_size: float = 12.0
     opacity: float = 1.0  # Deckkraft 0.05–1.0
     stroke_width: float = 2.0  # Strichstärke Shapes 1–12 px (0.9.2)
@@ -276,6 +281,65 @@ class Annotation:
 
     def touch(self) -> None:
         self.modified = datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+    def ink_points(self) -> list[tuple[float, float]]:
+        """Polyline-Punkte für INK (leere Liste wenn keine/ungültig)."""
+        out: list[tuple[float, float]] = []
+        for pt in self.points or []:
+            if not isinstance(pt, (list, tuple)) or len(pt) < 2:
+                continue
+            try:
+                out.append((float(pt[0]), float(pt[1])))
+            except (TypeError, ValueError):
+                continue
+        return out
+
+    def sync_bounds_from_points(self) -> None:
+        """x/y/width/height aus Polyline setzen (INK)."""
+        pts = self.ink_points()
+        if not pts:
+            return
+        xs = [p[0] for p in pts]
+        ys = [p[1] for p in pts]
+        x0, y0 = min(xs), min(ys)
+        x1, y1 = max(xs), max(ys)
+        self.x = float(x0)
+        self.y = float(y0)
+        self.width = max(1.0, float(x1 - x0))
+        self.height = max(1.0, float(y1 - y0))
+
+    @classmethod
+    def from_ink_points(
+        cls,
+        page: int,
+        points: Sequence[Sequence[float]],
+        *,
+        color: str = "#2980B9",
+        stroke_width: float = 2.0,
+    ) -> "Annotation":
+        """INK-Annotation aus Punktliste erzeugen."""
+        cleaned: list[list[float]] = []
+        for pt in points or []:
+            if not isinstance(pt, (list, tuple)) or len(pt) < 2:
+                continue
+            try:
+                cleaned.append([float(pt[0]), float(pt[1])])
+            except (TypeError, ValueError):
+                continue
+        ann = cls(
+            page=int(page),
+            type=AnnotationType.INK,
+            x=0.0,
+            y=0.0,
+            width=1.0,
+            height=1.0,
+            color=color or "#2980B9",
+            stroke_width=float(stroke_width or 2.0),
+            points=cleaned,
+            text="Freihand",
+        )
+        ann.sync_bounds_from_points()
+        return ann
 
     def end_point(self) -> tuple[float, float]:
         """Endpunkt für Linien-artige Annotationen."""
@@ -359,6 +423,16 @@ class Annotation:
         if fc and not fc.startswith("#"):
             fc = "#" + fc
         d["fill_color"] = fc.upper() if fc else ""
+        # Ink-Punkte normalisieren — 2.2.0
+        pts_out: list[list[float]] = []
+        for pt in d.get("points") or []:
+            if not isinstance(pt, (list, tuple)) or len(pt) < 2:
+                continue
+            try:
+                pts_out.append([round(float(pt[0]), 2), round(float(pt[1]), 2)])
+            except (TypeError, ValueError):
+                continue
+        d["points"] = pts_out
         return d
 
     def color_rgb(self) -> list[float]:
@@ -458,6 +532,16 @@ class Annotation:
         data.setdefault("callout_y", 0.0)
         data.setdefault("p3_x", 0.0)
         data.setdefault("p3_y", 0.0)
+        # Ink-Punkte — 2.2.0
+        pts_in: list[list[float]] = []
+        for pt in data.get("points") or []:
+            if not isinstance(pt, (list, tuple)) or len(pt) < 2:
+                continue
+            try:
+                pts_in.append([float(pt[0]), float(pt[1])])
+            except (TypeError, ValueError):
+                continue
+        data["points"] = pts_in
         data.setdefault("font_size", 12.0)
         try:
             op = float(data.get("opacity", 1.0))
@@ -650,6 +734,16 @@ class AnnotationStore:
         if p3x or p3y:
             data["p3_x"] = p3x + float(dx)
             data["p3_y"] = p3y + float(dy)
+        pts = data.get("points") or []
+        if isinstance(pts, list) and pts:
+            shifted: list[list[float]] = []
+            for pt in pts:
+                if isinstance(pt, (list, tuple)) and len(pt) >= 2:
+                    try:
+                        shifted.append([float(pt[0]) + float(dx), float(pt[1]) + float(dy)])
+                    except (TypeError, ValueError):
+                        continue
+            data["points"] = shifted
         return self.add(Annotation.from_dict(data))
 
     def paste_dicts(
@@ -688,6 +782,18 @@ class AnnotationStore:
                 if p3x or p3y:
                     data["p3_x"] = p3x + float(dx)
                     data["p3_y"] = p3y + float(dy)
+                pts = data.get("points") or []
+                if isinstance(pts, list) and pts:
+                    shifted: list[list[float]] = []
+                    for pt in pts:
+                        if isinstance(pt, (list, tuple)) and len(pt) >= 2:
+                            try:
+                                shifted.append(
+                                    [float(pt[0]) + float(dx), float(pt[1]) + float(dy)]
+                                )
+                            except (TypeError, ValueError):
+                                continue
+                    data["points"] = shifted
                 ann = Annotation.from_dict(data)
                 self.annotations.append(ann)
                 created.append(ann)
@@ -728,6 +834,12 @@ class AnnotationStore:
             if a.p3_x or a.p3_y:
                 a.p3_x = float(a.p3_x) + float(dx)
                 a.p3_y = float(a.p3_y) + float(dy)
+            if a.points:
+                a.points = [
+                    [float(pt[0]) + float(dx), float(pt[1]) + float(dy)]
+                    for pt in a.points
+                    if isinstance(pt, (list, tuple)) and len(pt) >= 2
+                ]
             a.touch()
         self.dirty = True
         return len(targets)
@@ -741,6 +853,12 @@ class AnnotationStore:
             ann.callout_x = float(ann.callout_x) + float(dx)
         if ann.p3_x or ann.p3_y:
             ann.p3_x = float(ann.p3_x) + float(dx)
+        if ann.points:
+            ann.points = [
+                [float(pt[0]) + float(dx), float(pt[1])]
+                for pt in ann.points
+                if isinstance(pt, (list, tuple)) and len(pt) >= 2
+            ]
         ann.touch()
 
     def _apply_dy(self, ann: Annotation, dy: float) -> None:
@@ -752,6 +870,12 @@ class AnnotationStore:
             ann.callout_y = float(ann.callout_y) + float(dy)
         if ann.p3_x or ann.p3_y:
             ann.p3_y = float(ann.p3_y) + float(dy)
+        if ann.points:
+            ann.points = [
+                [float(pt[0]), float(pt[1]) + float(dy)]
+                for pt in ann.points
+                if isinstance(pt, (list, tuple)) and len(pt) >= 2
+            ]
         ann.touch()
 
     def align(
@@ -1649,8 +1773,63 @@ class AnnotationStore:
                 self._meta["page_favorites"] = remapped
             else:
                 self._meta.pop("page_favorites", None)
-        if anns_changed or groups or favs:
+        # Custom-Seitenlabels mit-remappen — 2.2.0
+        from .page_labels import normalize_page_labels, page_labels_to_meta, remap_page_labels
+
+        raw_labs = self._meta.get("page_labels")
+        labels_changed = False
+        if raw_labs is not None:
+            old_n = 0
+            if isinstance(raw_labs, (list, tuple)):
+                old_n = len(raw_labs)
+            elif isinstance(raw_labs, dict) and raw_labs:
+                try:
+                    old_n = max(int(k) for k in raw_labs.keys()) + 1
+                except (TypeError, ValueError):
+                    old_n = 0
+            if mapping:
+                old_n = max(old_n, max(int(k) for k in mapping.keys()) + 1)
+                new_n = max(int(v) for v in mapping.values()) + 1
+            else:
+                new_n = old_n
+            old_list = normalize_page_labels(raw_labs, page_count=old_n)
+            remapped_labs = remap_page_labels(old_list, mapping, new_page_count=new_n)
+            meta_labs = page_labels_to_meta(remapped_labs)
+            if meta_labs:
+                self._meta["page_labels"] = meta_labs
+            else:
+                self._meta.pop("page_labels", None)
+            labels_changed = True
+        if anns_changed or groups or favs or labels_changed:
             self.dirty = True
+
+    def list_custom_page_labels(self, *, page_count: int = 0) -> list[str]:
+        """Benutzerdefinierte Seitenbeschriftungen aus Sidecar-Meta — 2.2.0."""
+        from .page_labels import normalize_page_labels
+
+        n = int(page_count) if page_count else 0
+        if n <= 0:
+            raw = self._meta.get("page_labels")
+            if isinstance(raw, (list, tuple)):
+                n = len(raw)
+            elif isinstance(raw, dict):
+                try:
+                    n = max((int(k) for k in raw.keys()), default=-1) + 1
+                except (TypeError, ValueError):
+                    n = 0
+        return normalize_page_labels(self._meta.get("page_labels"), page_count=n)
+
+    def set_custom_page_labels(self, labels: Sequence[str]) -> list[str]:
+        """Custom-Seitenlabels setzen (Sidecar dirty). Leere Liste entfernt Meta."""
+        from .page_labels import page_labels_to_meta
+
+        cleaned = page_labels_to_meta(labels)
+        if cleaned:
+            self._meta["page_labels"] = cleaned
+        else:
+            self._meta.pop("page_labels", None)
+        self.dirty = True
+        return list(cleaned)
 
     def list_page_favorites(self) -> list[int]:
         """Favoriten-Seitenindizes (0-basiert, Reihenfolge wie gespeichert, dedupliziert)."""

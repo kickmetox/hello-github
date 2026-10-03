@@ -1,0 +1,31 @@
+# InstantLens Doc — smoke_ild Workflow-Stub (2.2.0)
+#
+# Nur lokal / manuell gedacht. Keine produktive Cloud-CI-Pflicht.
+# Gleicher Check ohne Actions:
+#   python scripts/smoke_ild.py
+#   python scripts/smoke_ild.py --json
+#
+# workflow_dispatch erlaubt manuellen Lauf, falls Actions aktiviert sind.
+
+name: smoke-ild (stub)
+
+on:
+  workflow_dispatch:
+  # push/pull_request absichtlich nicht aktiv — Stub / lokal dokumentiert
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install deps
+        working-directory: InstantLensDoc
+        run: pip install -r requirements.txt
+      - name: Run smoke_ild
+        working-directory: InstantLensDoc
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: python scripts/smoke_ild.py --json

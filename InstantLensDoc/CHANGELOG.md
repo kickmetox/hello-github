@@ -1,5 +1,20 @@
 # Changelog — InstantLens Doc
 
+## 2.2.0 — Seitenbeschriftungen (Sidecar+PageLabels), Freihand-Ink Polyline+Undo, Dokument-Historie ildhist-v1, smoke_ild CONTRIBUTING/CI-Stub
+
+Minor-Bump nach **2.1.5**: **PDF-Seitenbeschriftungen** benutzerdefinierte Labels (i, ii, 1…) in Sidecar speichern/anzeigen, optional **PDF PageLabels** via pikepdf; **Ink/Freihand** einfache Maus-Polyline-Annotation (Sidecar + Undo, kein Stylus); **Dokument-Historie** lokale Änderungslog-Datei pro Doc (**ildhist-v1**) mit Zeitstempeln; **CI-Liste** `smoke_ild` in CONTRIBUTING/Docs, optional GitHub-Actions-Workflow-Stub (nur lokal dokumentiert). Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen unverändert klar markiert / nicht produktiv (Ink ≠ drucksensitiver Stylus).
+
+### Neu / verbessert
+- Seitenbeschriftungen: Dialog PDF → „Seitenbeschriftungen…“ · Sidecar-Meta `page_labels` · optional `/PageLabels` schreiben
+- Freihand (Ink): Toolbar-Werkzeug · Polyline Maus · Sidecar `points` · Undo über AnnotationStore
+- Dokument-Historie: `*.ildhist.json` Schema **ildhist-v1** · Menü „Dokument-Historie…“
+- CONTRIBUTING.md + `.github/workflows/smoke-ild.yml` Stub (lokal / manuell)
+
+### Packaging / Docs
+- Version **2.2.0** (App / `ild_pdf` / ISS / Smoke / Docs); Serie **2.2**; `docs/VERSION` + `VERSION.txt`
+- Smoke: 2.2.0 CLI + Qt (Labels/Ink/ildhist/CONTRIBUTING)
+- Stubs unverändert (nur Versionsmarker)
+
 ## 2.1.5 — Import-Copy Toast OCR-Dauer·Klick Status/Log, Mess/Diff-Reset Helper·Esc verwirft, smoke Fail-error max 200…, FEATURES.md lokal Sync in Info
 
 Post-Release-Polish nach **2.1.4**: **Import-Status-Toast** Dauer aus **OCR-Toast-Settings**, **Klick fokussiert Statusleiste/Log** falls vorhanden; **Mess-CSV Reset** und **Diff-TXT Reset** nutzen **gemeinsamen Helper** (`template_reset`), **Esc im Feld verwirft Edit** (nicht speichern); **smoke_ild.py `--json`** Fail-`error` **max 200 Zeichen** mit **…**, Docs-Beispiel Fail; **INFO** Hinweis **FEATURES.md lokal sync**. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen unverändert klar markiert / nicht produktiv.
