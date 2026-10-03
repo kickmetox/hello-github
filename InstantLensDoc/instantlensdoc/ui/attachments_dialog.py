@@ -1,10 +1,11 @@
-"""Dialog: PDF-Anhänge listen, extrahieren und hinzufügen — 1.9.3."""
+"""Dialog: PDF-Anhänge listen, extrahieren und hinzufügen — 1.9.4."""
 
 from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtGui import QDragEnterEvent, QDropEvent
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QDragEnterEvent, QDropEvent, QGuiApplication
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QCheckBox,
@@ -51,6 +52,27 @@ def _attachment_type(info: AttachmentInfo) -> str:
     return suf.upper() if suf else "—"
 
 
+def format_attach_add_status(stats: dict[str, int]) -> str:
+    """
+    Footer-Statuszählung — 1.9.4.
+    Format: ``hinzugefügt X, umbenannt Y, übersprungen Z`` (kopierbar).
+    """
+    added = int(stats.get("added", 0) or 0)
+    renamed = int(stats.get("renamed", 0) or 0)
+    skipped = int(stats.get("skipped", 0) or 0)
+    base = f"hinzugefügt {added}, umbenannt {renamed}, übersprungen {skipped}"
+    extras: list[str] = []
+    errors = int(stats.get("errors", 0) or 0)
+    aborted = int(stats.get("aborted", 0) or 0)
+    if errors:
+        extras.append(f"Fehler {errors}")
+    if aborted:
+        extras.append("abgebrochen")
+    if extras:
+        return f"{base}, {', '.join(extras)}"
+    return base
+
+
 class AttachmentsDialog(QDialog):
     """Zeigt eingebettete PDF-Anhänge; Extraktion, Mehrfach-DnD, Duplikat-Warnung."""
 
@@ -58,7 +80,7 @@ class AttachmentsDialog(QDialog):
         super().__init__(parent)
         self.pdf_path = Path(pdf_path)
         self.setWindowTitle("PDF-Anhänge")
-        self.resize(720, 440)
+        self.resize(720, 460)
         self.setAcceptDrops(True)
         self._changed = False
         # Duplikat-Batch: „Für alle anwenden“ — "rename" | "skip" | None — 1.9.3
@@ -67,7 +89,7 @@ class AttachmentsDialog(QDialog):
         layout.addWidget(QLabel(f"{self.pdf_path.name} — eingebettete Dateianhänge"))
         hint = QLabel(
             "Doppelklick: extrahieren · Mehrfach-Dateien per Drag&Drop · "
-            "Duplikat-Namen: Warnung + Umbenennen · „Für alle anwenden“ — 1.9.3"
+            "Duplikat-Namen: Warnung + Umbenennen · Footer Statuszählung kopierbar — 1.9.4"
         )
         hint.setStyleSheet("color:#555;")
         hint.setWordWrap(True)
@@ -92,7 +114,7 @@ class AttachmentsDialog(QDialog):
         self.btn_add.setToolTip(
             "Eine oder mehrere Dateien als PDF-Anhang hinzufügen; "
             "auch Mehrfach-Drag&Drop; bei Namenskonflikt Warnung + Umbenennen "
-            "mit „Für alle anwenden“ — 1.9.3"
+            "mit „Für alle anwenden“ — Footer Statuszählung — 1.9.4"
         )
         self.btn_add.clicked.connect(self._add)
         self.btn_extract = QPushButton("Auswahl extrahieren…")
@@ -110,6 +132,27 @@ class AttachmentsDialog(QDialog):
         row.addStretch(1)
         layout.addLayout(row)
 
+        # Footer Statuszählung (kopierbar) — 1.9.4
+        foot = QHBoxLayout()
+        self.status_footer = QLabel(format_attach_add_status({}))
+        self.status_footer.setObjectName("attachAddStatusFooter")
+        self.status_footer.setTextInteractionFlags(
+            Qt.TextSelectableByMouse | Qt.TextSelectableByKeyboard
+        )
+        self.status_footer.setCursor(Qt.IBeamCursor)
+        self.status_footer.setToolTip(
+            "Statuszählung: hinzugefügt / umbenannt / übersprungen — "
+            "Text markieren oder „Kopieren“ — 1.9.4"
+        )
+        self.status_footer.setStyleSheet("color:#333;padding:2px 0;")
+        foot.addWidget(self.status_footer, 1)
+        self.btn_copy_status = QPushButton("Kopieren")
+        self.btn_copy_status.setObjectName("attachAddStatusCopy")
+        self.btn_copy_status.setToolTip("Statuszählung in die Zwischenablage kopieren — 1.9.4")
+        self.btn_copy_status.clicked.connect(self._copy_status_footer)
+        foot.addWidget(self.btn_copy_status)
+        layout.addLayout(foot)
+
         self._items: list[AttachmentInfo] = []
         self._load()
 
@@ -121,6 +164,18 @@ class AttachmentsDialog(QDialog):
     @property
     def changed(self) -> bool:
         return self._changed
+
+    def _copy_status_footer(self) -> None:
+        text = (self.status_footer.text() or "").strip()
+        clip = QGuiApplication.clipboard()
+        if clip is not None and text:
+            clip.setText(text)
+
+    def _set_status_footer(self, stats: dict[str, int], *, last_info=None) -> str:
+        """Footer setzen; Rückgabe gleicher Text (Smoke/Tests) — 1.9.4."""
+        msg = self._format_add_status(stats, last_info=last_info)
+        self.status_footer.setText(msg)
+        return msg
 
     def _load(self):
         try:
@@ -257,31 +312,28 @@ class AttachmentsDialog(QDialog):
 
     @staticmethod
     def _format_add_status(stats: dict[str, int], *, last_info=None) -> str:
-        """Statuszählung am Ende — 1.9.3."""
-        added = int(stats.get("added", 0))
-        renamed = int(stats.get("renamed", 0))
-        skipped = int(stats.get("skipped", 0))
-        aborted = int(stats.get("aborted", 0))
-        errors = int(stats.get("errors", 0))
-        parts: list[str] = []
-        if added == 1 and last_info and renamed == 0 and skipped == 0 and not aborted:
-            return f"Hinzugefügt: {last_info.name} ({last_info.size} B)"
-        if added:
-            parts.append(f"{added} hinzugefügt")
-        if renamed:
-            parts.append(f"{renamed} umbenannt")
-        if skipped:
-            parts.append(f"{skipped} übersprungen")
-        if errors:
-            parts.append(f"{errors} Fehler")
-        if aborted:
-            parts.append("abgebrochen")
-        if not parts:
-            return "Keine Dateien hinzugefügt."
-        return " · ".join(parts)
+        """Statuszählung Footer — 1.9.4 (Format hinzugefügt X, …)."""
+        # last_info: Kompatibilität 1.9.3-Smoke; Einzel-Hinweis optional
+        added = int(stats.get("added", 0) or 0)
+        renamed = int(stats.get("renamed", 0) or 0)
+        skipped = int(stats.get("skipped", 0) or 0)
+        aborted = int(stats.get("aborted", 0) or 0)
+        errors = int(stats.get("errors", 0) or 0)
+        if (
+            added == 1
+            and last_info is not None
+            and renamed == 0
+            and skipped == 0
+            and not aborted
+            and not errors
+        ):
+            # Einzeldatei ohne Konflikt: Kurzform + Zähler
+            base = format_attach_add_status(stats)
+            return f"{base} — {last_info.name} ({last_info.size} B)"
+        return format_attach_add_status(stats)
 
     def _add_paths(self, paths: list[str | Path]) -> int:
-        """Mehrere Dateien hinzufügen; Duplikat-Namen mit Warnung — 1.9.3."""
+        """Mehrere Dateien hinzufügen; Duplikat-Namen mit Warnung — 1.9.4."""
         files = [Path(p) for p in paths if p and Path(p).is_file()]
         if not files:
             return 0
@@ -320,9 +372,8 @@ class AttachmentsDialog(QDialog):
             self._changed = True
             remember_recent_dir(str(files[0].parent))
             self._load()
-        msg = self._format_add_status(stats, last_info=last_info)
-        if added or stats.get("skipped") or stats.get("aborted") or stats.get("errors"):
-            QMessageBox.information(self, "Anhänge", msg)
+        # Footer statt Modal — 1.9.4
+        self._set_status_footer(stats, last_info=last_info)
         return added
 
     def _add(self):

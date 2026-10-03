@@ -1506,7 +1506,7 @@ class SettingsDialog(QDialog):
         outer.addWidget(buttons)
 
     def _build_stubs_page(self) -> QWidget:
-        """Settings-Seite „Stubs“: Status A–Z, keine Aktion, Link Features — 1.9.3."""
+        """Settings-Seite „Stubs“: Status A–Z, FEATURES-Statushinweis, Doppelklick-Info — 1.9.4."""
         from pathlib import Path as _Path
 
         from PySide6.QtCore import QUrl
@@ -1532,7 +1532,8 @@ class SettingsDialog(QDialog):
 
         no_action = QLabel(
             "Keine Aktion — reine Statusanzeige. "
-            "Einträge sind Stubs / nicht produktiv und lösen keine Funktion aus."
+            "Einträge sind Stubs / nicht produktiv und lösen keine Funktion aus. "
+            "Doppelklick → Info-Dialog."
         )
         no_action.setObjectName("stubsNoActionHint")
         no_action.setWordWrap(True)
@@ -1543,30 +1544,54 @@ class SettingsDialog(QDialog):
         self.btn_stubs_features = QPushButton("FEATURES.md öffnen…")
         self.btn_stubs_features.setObjectName("stubsFeaturesLink")
         self.btn_stubs_features.setToolTip(
-            "Features-Dokumentation öffnen (Stub-Statuslegende) — 1.9.3"
+            "Features-Dokumentation öffnen (Stub-Statuslegende); "
+            "fehlt die Datei → Statushinweis statt Crash — 1.9.4"
         )
+        self.stubs_features_status = QLabel("")
+        self.stubs_features_status.setObjectName("stubsFeaturesStatus")
+        self.stubs_features_status.setWordWrap(True)
+        self.stubs_features_status.setStyleSheet("color:#8a5a00;")
+        self.stubs_features_status.setToolTip("Statushinweis zum FEATURES-Link — 1.9.4")
+
+        def _stubs_status_hint(msg: str) -> None:
+            text = str(msg or "").strip()
+            self.stubs_features_status.setText(text)
+            parent = self.parent()
+            if parent is not None and hasattr(parent, "statusBar"):
+                try:
+                    parent.statusBar().showMessage(text, 6000)
+                except Exception:
+                    pass
+            elif parent is not None and hasattr(parent, "_set_status"):
+                try:
+                    parent._set_status(text)
+                except Exception:
+                    pass
 
         def _open_features_md() -> None:
-            root = _Path(__file__).resolve().parents[2]
-            path = root / "FEATURES.md"
-            if not path.is_file():
-                QMessageBox.information(
-                    self,
-                    "FEATURES.md",
-                    f"FEATURES.md nicht gefunden:\n{path}",
-                )
+            """FEATURES.md öffnen; fehlt Datei → Statushinweis, kein Crash — 1.9.4."""
+            try:
+                root = _Path(__file__).resolve().parents[2]
+                path = root / "FEATURES.md"
+            except Exception:
+                _stubs_status_hint("FEATURES.md: Pfad konnte nicht ermittelt werden.")
                 return
-            ok = QDesktopServices.openUrl(QUrl.fromLocalFile(str(path)))
-            if not ok:
-                QMessageBox.information(
-                    self,
-                    "FEATURES.md",
-                    f"Konnte FEATURES.md nicht öffnen.\nPfad:\n{path}",
-                )
+            try:
+                if not path.is_file():
+                    _stubs_status_hint(f"FEATURES.md fehlt — Statushinweis: {path}")
+                    return
+                ok = QDesktopServices.openUrl(QUrl.fromLocalFile(str(path)))
+                if not ok:
+                    _stubs_status_hint(f"FEATURES.md konnte nicht geöffnet werden: {path}")
+                    return
+                _stubs_status_hint(f"FEATURES.md geöffnet: {path.name}")
+            except Exception as e:
+                _stubs_status_hint(f"FEATURES.md: {e}")
 
+        self._open_stubs_features_md = _open_features_md
         self.btn_stubs_features.clicked.connect(_open_features_md)
         link_row.addWidget(self.btn_stubs_features)
-        link_row.addStretch(1)
+        link_row.addWidget(self.stubs_features_status, 1)
         v.addLayout(link_row)
 
         rows = [
@@ -1578,6 +1603,7 @@ class SettingsDialog(QDialog):
         ]
         # Sortierung A–Z nach Feature-Name — 1.9.3
         rows = sorted(rows, key=lambda r: r[0].casefold())
+        self._stubs_row_keys = [key for _label, key, _status in rows]
         self.stubs_table = QTableWidget(len(rows), 3)
         self.stubs_table.setObjectName("stubsStatusTable")
         self.stubs_table.setHorizontalHeaderLabels(["Feature", "Status", "Hinweis"])
@@ -1585,9 +1611,10 @@ class SettingsDialog(QDialog):
         self.stubs_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
         self.stubs_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
         self.stubs_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
-        self.stubs_table.setSelectionMode(QAbstractItemView.NoSelection)
+        self.stubs_table.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.stubs_table.setSelectionMode(QAbstractItemView.SingleSelection)
         self.stubs_table.setToolTip(
-            "Keine Aktion — Stubs nur zur Statusanzeige (A–Z) — 1.9.3"
+            "Stubs nur zur Statusanzeige (A–Z). Doppelklick → Info-Dialog — 1.9.4"
         )
         try:
             ph = plugin_stub_info()
@@ -1602,6 +1629,7 @@ class SettingsDialog(QDialog):
             st = QTableWidgetItem(status)
             self.stubs_table.setItem(i, 1, st)
             self.stubs_table.setItem(i, 2, QTableWidgetItem(str(hint)))
+        self.stubs_table.itemDoubleClicked.connect(self._on_stub_double_click)
         v.addWidget(self.stubs_table)
 
         events_box = QGroupBox("Plugin-Hooks Events (dokumentiert, Stub · keine Aktion)")
@@ -1621,6 +1649,19 @@ class SettingsDialog(QDialog):
         v.addWidget(events_box)
         v.addStretch(1)
         return page
+
+    def _on_stub_double_click(self, item) -> None:
+        """Doppelklick Stub-Zeile → Info-Dialog (keine Aktion) — 1.9.4."""
+        from instantlensdoc.ui.stubs import show_planned
+
+        if item is None:
+            return
+        row = item.row()
+        keys = getattr(self, "_stubs_row_keys", [])
+        if not (0 <= row < len(keys)):
+            return
+        key = keys[row]
+        show_planned(self, key)
 
     def _insert_ann_export_placeholder(self, token: str) -> None:
         """Quick-Insert {stem}/{page}/{date} an gespeicherter Cursor-Pos — 1.2.5."""

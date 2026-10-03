@@ -4019,6 +4019,52 @@ def set_last_used_stamp(
     return get_last_used_stamp()
 
 
+def get_last_quick_stamp_opacity() -> float | None:
+    """Zuletzt gemerkte Quick-Stempel-Deckkraft (wie Signatur), oder None — 1.9.4."""
+    raw = load_settings().get("last_quick_stamp_opacity", None)
+    if raw is None or raw == "":
+        return None
+    try:
+        op = float(raw)
+    except (TypeError, ValueError):
+        return None
+    return max(0.05, min(1.0, op))
+
+
+def set_last_quick_stamp_opacity(opacity: float) -> float:
+    """Quick-Stempel-Deckkraft merken (wie Signatur) — 1.9.4."""
+    try:
+        op = float(opacity)
+    except (TypeError, ValueError):
+        op = 1.0
+    op = max(0.05, min(1.0, op))
+    save_settings({"last_quick_stamp_opacity": op})
+    return op
+
+
+def get_last_quick_stamp_zoom() -> float | None:
+    """Zuletzt gemerkter Quick-Stempel-Seitenzoom (wie Signatur-Vorschau), oder None — 1.9.4."""
+    raw = load_settings().get("last_quick_stamp_zoom", None)
+    if raw is None or raw == "":
+        return None
+    try:
+        z = float(raw)
+    except (TypeError, ValueError):
+        return None
+    return max(0.1, min(8.0, z))
+
+
+def set_last_quick_stamp_zoom(zoom: float) -> float:
+    """Quick-Stempel-Seitenzoom merken (wie Signatur) — 1.9.4."""
+    try:
+        z = float(zoom)
+    except (TypeError, ValueError):
+        z = 1.0
+    z = max(0.1, min(8.0, z))
+    save_settings({"last_quick_stamp_zoom": z})
+    return z
+
+
 def get_ocr_table_csv_delimiter() -> str:
     """Trennzeichen für Tabellen-OCR→CSV (;/,/Tab) — 1.9.1."""
     raw = str(load_settings().get("ocr_table_csv_delimiter", ";") or ";")

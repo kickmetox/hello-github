@@ -6922,8 +6922,47 @@ class PdfViewer(QWidget):
         self.status.emit(f"{len(created)} Annotation(en) auf Seite {target + 1} eingefügt")
         return len(created)
 
+    def _remember_quick_stamp_zoom_opacity(self) -> None:
+        """Zoom/Opacity wie Signatur merken, falls vorhanden — 1.9.4."""
+        from instantlensdoc.core.app_settings import (
+            set_last_quick_stamp_opacity,
+            set_last_quick_stamp_zoom,
+        )
+
+        try:
+            if hasattr(self, "scale") and self.scale is not None:
+                set_last_quick_stamp_zoom(float(self.scale))
+        except Exception:
+            pass
+        try:
+            op = getattr(self, "_default_opacity", None)
+            if op is not None:
+                set_last_quick_stamp_opacity(float(op))
+        except Exception:
+            pass
+
+    def _restore_quick_stamp_zoom_opacity(self) -> None:
+        """Gemerkte Quick-Stempel Zoom/Opacity wiederherstellen falls vorhanden — 1.9.4."""
+        from instantlensdoc.core.app_settings import (
+            get_last_quick_stamp_opacity,
+            get_last_quick_stamp_zoom,
+        )
+
+        try:
+            z = get_last_quick_stamp_zoom()
+            if z is not None and hasattr(self, "set_scale"):
+                self.set_scale(float(z), immediate=True)
+        except Exception:
+            pass
+        try:
+            op = get_last_quick_stamp_opacity()
+            if op is not None and hasattr(self, "restore_default_opacity"):
+                self.restore_default_opacity(float(op))
+        except Exception:
+            pass
+
     def arm_quick_stamp(self, payload: dict | None = None) -> None:
-        """Toolbar Quick-Stempel: Standard/zuletzt/Bibliothek; Esc bricht ab — 1.9.3."""
+        """Toolbar Quick-Stempel: Standard/zuletzt/Bibliothek; Esc bricht ab — 1.9.4."""
         from instantlensdoc.core.stamp_library import resolve_quick_stamp
 
         if not self.pdf_path:
@@ -6939,6 +6978,8 @@ class PdfViewer(QWidget):
                 "oder Standard-Stempel ★ setzen.",
             )
             return
+        # Zoom/Opacity wie Signatur wiederherstellen falls vorhanden — 1.9.4
+        self._restore_quick_stamp_zoom_opacity()
         self._quick_stamp_payload = payload
         self._quick_stamp_armed = True
         self._set_tool(AnnotationType.STAMP)
@@ -6955,9 +6996,11 @@ class PdfViewer(QWidget):
             pass
 
     def cancel_quick_stamp(self) -> bool:
-        """Esc: Quick-Stempel-Platzieren abbrechen — 1.9.3."""
+        """Esc: Quick-Stempel abbrechen; Status + Zoom/Opacity merken — 1.9.4."""
         if not self._quick_stamp_armed and not self._quick_stamp_payload:
             return False
+        # Wie Signatur: Zoom/Opacity auch bei Abbruch merken falls vorhanden — 1.9.4
+        self._remember_quick_stamp_zoom_opacity()
         self._quick_stamp_armed = False
         self._quick_stamp_payload = None
         self.status.emit("Platzieren abgebrochen")
@@ -8445,6 +8488,8 @@ class PdfViewer(QWidget):
                 payload = self._quick_stamp_payload
                 self._quick_stamp_armed = False
                 self._quick_stamp_payload = None
+                # Zoom/Opacity wie Signatur merken — 1.9.4
+                self._remember_quick_stamp_zoom_opacity()
                 if payload.get("kind") == "image" and payload.get("path"):
                     from instantlensdoc.core.stamp_library import (
                         place_library_stamp,

@@ -2,7 +2,7 @@
 
 Moderne Textverarbeitung mit PDF-Annotator, OCR-Bridge und Formulargenerator.
 
-**Version:** 1.9.3  
+**Version:** 1.9.4  
 **Hersteller:** Andreas Meyer · ame@sellerbach.de
 
 ## Quickstart (Windows)
@@ -33,8 +33,8 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an).
 
-## Neu in 1.9.3
+## Neu in 1.9.4
 
-Polish nach **1.9.2** (Basis **1.9.1** / **1.9.0** / **1.8.5**): Anhänge „Für alle anwenden“·Statuszählung; Quick-Stempel Rechtsklick·Esc; CSV Zeilen/Spalten-Zähler·Trennzeichen live; Stubs A–Z·keine Aktion·FEATURES-Link. Stubs klar markiert.
+Polish nach **1.9.3** (Basis **1.9.2** / **1.9.1** / **1.9.0** / **1.8.5**): Anhänge Status-Footer kopierbar; Quick-Stempel Esc·Zoom/Opacity; CSV Delim Persistenz/Reset; Stubs FEATURES-Status·Doppelklick. Stubs klar markiert.
 
 Siehe [CHANGELOG.md](CHANGELOG.md), [FEATURES.md](FEATURES.md) und [INFO.md](INFO.md).

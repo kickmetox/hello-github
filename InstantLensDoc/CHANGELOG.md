@@ -1,5 +1,23 @@
 # Changelog — InstantLens Doc
 
+## 1.9.4 — Anhänge Status-Footer kopierbar, Quick-Stempel Esc·Zoom/Opacity, CSV Delim Persistenz/Reset, Stubs FEATURES-Status·Doppelklick
+
+Post-Release-Polish nach 1.9.3: **PDF-Anhänge** Statuszählung als **Footer** „hinzugefügt X, umbenannt Y, übersprungen Z“ **kopierbar**; **Quick-Stempel Esc** → Status **„Platzieren abgebrochen“**, **Zoom/Opacity** wie Signatur merken falls vorhanden; **Tabellen-CSV** Live-Trennzeichen **Persistenz erst bei Speichern**, **Vorschau-Reset bei Abbruch**; **Settings-Stubs** FEATURES-Link bei fehlender Datei → **Statushinweis** statt Crash, **Doppelklick Stub = Info-Dialog**. Stubs klar markiert / nicht produktiv.
+
+### PDF / Anhänge / Stempel
+- Anhänge: Footer-Statuszählung „hinzugefügt X, umbenannt Y, übersprungen Z“; Text markierbar + Kopieren
+- Quick-Stempel: Esc → „Platzieren abgebrochen“; Zoom/Opacity persistieren (wie Signatur) falls vorhanden
+
+### OCR / Stubs
+- Tabellen-CSV-Vorschau: Trennzeichen live nur Vorschau; Speichern persistiert; Abbruch/Esc setzt Vorschau zurück
+- Settings-Tab „Stubs“: FEATURES.md fehlt → Statushinweis (kein Crash); Doppelklick Stub → Info-Dialog
+
+### Packaging / Docs
+- Version **1.9.4** (App / `ild_pdf` / ISS / Smoke / Docs); `docs/VERSION` + `VERSION.txt`
+- Smoke: Anhänge Footer/kopierbar, Quick Esc·Zoom/Opacity, CSV Persistenz/Reset, Stubs Status·Doppelklick (CLI + Qt)
+
+---
+
 ## 1.9.3 — Anhänge „Für alle“·Statuszählung, Quick-Stempel Rechtsklick·Esc, CSV-Zähler·Trennzeichen live, Stubs A–Z·Features-Link
 
 Post-Release-Polish nach 1.9.2: **PDF-Anhänge** Duplikat-Dialog mit Checkbox **„Für alle anwenden“** und **Statuszählung** (hinzugefügt/umbenannt/übersprungen/abgebrochen); **Quick-Stempel** per **Rechtsklick Bibliothek** wählen, **Esc** bricht Platzieren ab; **Tabellen-CSV-Vorschau** mit **Zeilen/Spalten-Zähler** und **Trennzeichen live umschaltbar**; **Settings-Seite „Stubs“** sortiert **A–Z**, klar **„keine Aktion“**, Link zu **FEATURES.md**. Stubs klar markiert / nicht produktiv.

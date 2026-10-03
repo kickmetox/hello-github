@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **1.9.3** |
+| Version | **1.9.4** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -62,6 +62,16 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an / `checkedonce`)
+
+## Neu in 1.9.4
+
+Post-Release-Polish nach **1.9.3** (Basis **1.9.2** / **1.9.1** / **1.9.0**):
+
+- **PDF-Anhänge:** Footer **„hinzugefügt X, umbenannt Y, übersprungen Z“** · **kopierbar**
+- **Quick-Stempel:** Esc → **„Platzieren abgebrochen“** · **Zoom/Opacity** wie Signatur merken
+- **Tabellen-OCR → CSV:** Live-Trennzeichen **Persistenz erst Speichern** · **Vorschau-Reset bei Abbruch**
+- **Settings-Seite „Stubs“:** FEATURES fehlt → **Statushinweis** · **Doppelklick Stub = Info-Dialog**
+- Stubs klar als Stub / nicht produktiv markiert
 
 ## Neu in 1.9.3
 

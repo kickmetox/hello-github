@@ -413,7 +413,7 @@ class OcrDialog(QDialog):
 
 
 class CsvPreviewDialog(QDialog):
-    """Vorschau erste N Zeilen Tabellen-CSV; Zeilen/Spalten-Zähler; Trennzeichen live — 1.9.3."""
+    """Vorschau erste N Zeilen; Trennzeichen live; Persistenz erst Speichern — 1.9.4."""
 
     def __init__(
         self,
@@ -431,13 +431,15 @@ class CsvPreviewDialog(QDialog):
         self._all_rows = [list(r) for r in (rows or [])]
         self._max_rows = max(1, int(max_rows))
         self._delimiter = delimiter if delimiter in OCR_TABLE_CSV_DELIMITERS else ";"
+        # Ausgangswert für Abbruch-Reset — Persistenz erst bei Speichern — 1.9.4
+        self._initial_delimiter = self._delimiter
         layout = QVBoxLayout(self)
 
         self.head = QLabel()
         self.head.setWordWrap(True)
         layout.addWidget(self.head)
 
-        # Zähler + Trennzeichen live — 1.9.3
+        # Zähler + Trennzeichen live (ohne Settings-Schreiben) — 1.9.4
         opts = QHBoxLayout()
         self.count_label = QLabel()
         self.count_label.setObjectName("csvPreviewCounts")
@@ -454,7 +456,8 @@ class CsvPreviewDialog(QDialog):
                 pick = i
         self.delim_combo.setCurrentIndex(pick)
         self.delim_combo.setToolTip(
-            "Trennzeichen live in der Vorschau umschalten (wird beim Speichern verwendet) — 1.9.3"
+            "Trennzeichen live in der Vorschau umschalten; "
+            "Persistenz erst beim Speichern · Abbruch setzt zurück — 1.9.4"
         )
         self.delim_combo.currentIndexChanged.connect(self._on_delim_changed)
         opts.addWidget(self.delim_combo)
@@ -478,7 +481,9 @@ class CsvPreviewDialog(QDialog):
         self.raw_preview.setStyleSheet(
             "color:#444;font-family:monospace;background:#f7f7f7;padding:6px;"
         )
-        self.raw_preview.setToolTip("Roh-CSV der Vorschauzeilen (folgt dem Trennzeichen) — 1.9.3")
+        self.raw_preview.setToolTip(
+            "Roh-CSV der Vorschauzeilen (folgt dem Trennzeichen, ohne Persistenz) — 1.9.4"
+        )
         layout.addWidget(self.raw_preview)
 
         buttons = QDialogButtonBox(
@@ -487,12 +492,13 @@ class CsvPreviewDialog(QDialog):
         buttons.button(QDialogButtonBox.Save).setText("Speichern")
         buttons.button(QDialogButtonBox.Cancel).setText("Abbrechen")
         buttons.accepted.connect(self._save)
-        buttons.rejected.connect(self.reject)
+        buttons.rejected.connect(self._cancel_reset)
         layout.addWidget(buttons)
 
         self._rebuild()
 
     def _on_delim_changed(self, _idx: int = 0) -> None:
+        """Nur Vorschau — keine Settings-Persistenz — 1.9.4."""
         data = self.delim_combo.currentData()
         self._delimiter = str(data if data is not None else ";")
         if self._delimiter not in OCR_TABLE_CSV_DELIMITERS:
@@ -513,7 +519,7 @@ class CsvPreviewDialog(QDialog):
         )
         self.head.setText(
             f"Vorschau der ersten {shown} von {total_rows} Zeile(n) "
-            f"(Trennzeichen: {delim_label}). Speichern oder Abbrechen — 1.9.3"
+            f"(Trennzeichen: {delim_label}). Speichern persistiert · Abbruch setzt zurück — 1.9.4"
         )
         self.count_label.setText(
             f"Zeilen: {total_rows} · Spalten: {cols} · Vorschau: {shown}×{preview_cols}"
@@ -538,7 +544,36 @@ class CsvPreviewDialog(QDialog):
         # kurze Rohvorschau (max. 5 Zeilen bereits begrenzt)
         self.raw_preview.setText(raw.rstrip("\n") if raw else "(leer)")
 
+    def _reset_preview_to_initial(self) -> None:
+        """Vorschau-Trennzeichen auf Ausgangswert zurück — 1.9.4."""
+        self._delimiter = self._initial_delimiter
+        if self._delimiter not in OCR_TABLE_CSV_DELIMITERS:
+            self._delimiter = ";"
+            self._initial_delimiter = ";"
+        pick = 0
+        for i in range(self.delim_combo.count()):
+            if self.delim_combo.itemData(i) == self._delimiter:
+                pick = i
+                break
+        self.delim_combo.blockSignals(True)
+        self.delim_combo.setCurrentIndex(pick)
+        self.delim_combo.blockSignals(False)
+        self._rebuild()
+
+    def _cancel_reset(self) -> None:
+        """Abbruch: Vorschau zurücksetzen, keine Persistenz — 1.9.4."""
+        self._accepted_save = False
+        self._reset_preview_to_initial()
+        self.reject()
+
+    def reject(self) -> None:
+        """Esc/Schließen: ebenfalls Vorschau-Reset ohne Persistenz — 1.9.4."""
+        if not self._accepted_save and self._delimiter != self._initial_delimiter:
+            self._reset_preview_to_initial()
+        super().reject()
+
     def _save(self) -> None:
+        """Erst hier Persistenz des Trennzeichens — 1.9.4."""
         self._accepted_save = True
         try:
             set_ocr_table_csv_delimiter(self._delimiter)
@@ -552,8 +587,13 @@ class CsvPreviewDialog(QDialog):
 
     @property
     def selected_delimiter(self) -> str:
-        """Aktuell gewähltes Trennzeichen (live umschaltbar) — 1.9.3."""
+        """Aktuell gewähltes Trennzeichen (live umschaltbar) — 1.9.4."""
         return self._delimiter
+
+    @property
+    def initial_delimiter(self) -> str:
+        """Ausgangswert beim Dialog-Start (für Abbruch-Reset) — 1.9.4."""
+        return self._initial_delimiter
 
     @property
     def row_count(self) -> int:
