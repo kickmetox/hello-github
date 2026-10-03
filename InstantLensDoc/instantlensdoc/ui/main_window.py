@@ -387,6 +387,7 @@ class MainWindow(QMainWindow):
         self.sidebar.search_export_requested.connect(self._on_search_export)
         self.sidebar.file_activated.connect(self.open_path)
         self.sidebar.recent_activated.connect(self.open_path)
+        self.sidebar.recent_remove_requested.connect(self._remove_recent_path)
         self.sidebar.mark_activated.connect(self._on_mark_activated)
         self.sidebar.annotation_activated.connect(self._on_annotation_activated)
         self.sidebar.outline_activated.connect(self._on_outline_jump)
@@ -403,6 +404,7 @@ class MainWindow(QMainWindow):
         self.sidebar.documents_reordered.connect(self._on_documents_reordered)
         self.sidebar.line_favorite_activated.connect(self._on_line_favorite_jump)
         self.sidebar.line_favorite_label_edit.connect(self._edit_line_favorite_label)
+        self.sidebar.line_favorites_reordered.connect(self._on_line_favorites_reordered)
         self.sidebar.pages_reordered.connect(self._on_thumbs_reordered)
         splitter.addWidget(self.sidebar)
 
@@ -410,7 +412,7 @@ class MainWindow(QMainWindow):
         self.editor_pane = EditorPane()
         self.editor = self.editor_pane.editor
         self.editor.textChanged.connect(self._on_text_changed)
-        self.editor.line_bookmarks_changed.connect(self._refresh_line_favorites)
+        self.editor.line_bookmarks_changed.connect(self._on_line_bookmarks_changed)
         self.editor.cursorPositionChanged.connect(self._on_editor_cursor_changed)
         self.pdf_view = PdfViewer()
         self.pdf_view.status.connect(self._set_status)
@@ -1372,24 +1374,34 @@ class MainWindow(QMainWindow):
         m_help.addAction(a)
 
     def _refresh_recent(self):
-        files = recent_mod.load_recent()
-        self.sidebar.set_recent(files)
+        entries = recent_mod.load_recent_entries()
+        self.sidebar.set_recent(entries)
         if self._recent_menu is None:
             return
         self._recent_menu.clear()
-        if not files:
+        if not entries:
             empty = QAction("(leer)", self)
             empty.setEnabled(False)
             self._recent_menu.addAction(empty)
         else:
-            for path in files:
-                a = QAction(str(path), self)
-                a.triggered.connect(lambda checked=False, p=path: self.open_path(p))
+            for path, exists in entries:
+                label = str(path) if exists else f"{path} (fehlt)"
+                a = QAction(label, self)
+                if exists:
+                    a.triggered.connect(lambda checked=False, p=path: self.open_path(p))
+                else:
+                    a.setEnabled(False)
                 self._recent_menu.addAction(a)
         self._recent_menu.addSeparator()
         clear = QAction("Liste leeren", self)
         clear.triggered.connect(self._clear_recent)
         self._recent_menu.addAction(clear)
+
+    def _remove_recent_path(self, path: str) -> None:
+        """Einzelnen Recent-Eintrag entfernen (Sidebar-Kontextmenü)."""
+        recent_mod.remove_recent(path)
+        self._refresh_recent()
+        self._set_status(f"Aus Zuletzt geöffnet entfernt: {Path(path).name}")
 
     def _refresh_workspaces(self):
         """Projekt-Ordner-Menü (letzte 5 Workspaces) neu aufbauen."""
@@ -1529,7 +1541,7 @@ class MainWindow(QMainWindow):
                 self.pdf_view.page_count,
                 self.pdf_view.page_label(),
             )
-            zoom_txt = f"{int(round(self.pdf_view.scale * 100))} %"
+            zoom_txt = f"Zoom {int(round(self.pdf_view.scale * 100))}%"
             word_txt = f"{len(self.pdf_view.store.annotations) if self.pdf_view.store else 0} Ann."
             size_txt = self._format_current_page_size() or "—"
             self.page_status_label.setToolTip("PDF: aktuelle Seite / Seitenanzahl")
@@ -1546,7 +1558,7 @@ class MainWindow(QMainWindow):
                 self.pdf_view.page_count,
                 self.pdf_view.page_label(),
             )
-            zoom_txt = f"{int(round(self.pdf_view.scale * 100))} %"
+            zoom_txt = f"Zoom {int(round(self.pdf_view.scale * 100))}%"
             word_txt = f"{len(self.pdf_view.store.annotations) if self.pdf_view.store else 0} Ann."
             size_txt = self._format_current_page_size() or "—"
         self.file_status_label.setText(name)
@@ -1559,6 +1571,10 @@ class MainWindow(QMainWindow):
                 f"Seitengröße ({unit}) — Klick wechselt mm ↔ inch"
             )
         self.zoom_status_label.setText(zoom_txt)
+        if zoom_txt.startswith("Zoom"):
+            self.zoom_status_label.setToolTip("PDF-Zoom in Prozent")
+        else:
+            self.zoom_status_label.setToolTip("Zoom (nur PDF-Ansicht)")
         self.word_status_label.setText(word_txt)
         self._update_unsaved_status()
 
@@ -2118,7 +2134,8 @@ class MainWindow(QMainWindow):
     def _on_pdf_zoom_changed(self, scale: float):
         if self.stack.currentWidget() is not self.pdf_view:
             return
-        self.zoom_status_label.setText(f"{int(round(float(scale) * 100))} %")
+        self.zoom_status_label.setText(f"Zoom {int(round(float(scale) * 100))}%")
+        self.zoom_status_label.setToolTip("PDF-Zoom in Prozent")
         if self.pdf_view.pdf_path and self.pdf_view.page_count > 0:
             from ild_pdf import format_page_status
 
@@ -2311,6 +2328,70 @@ class MainWindow(QMainWindow):
         lines = [ln for ln, _lab in marks]
         cur = self.editor.textCursor().blockNumber() + 1
         self.sidebar.set_line_favorites(marks, current=cur if cur in lines else None)
+
+    def _on_line_bookmarks_changed(self) -> None:
+        """Sidebar aktualisieren und Sidecar persistieren."""
+        self._refresh_line_favorites()
+        if not getattr(self, "_suppress_bookmark_persist", False):
+            self._persist_line_bookmarks_sidecar()
+
+    def _on_line_favorites_reordered(self, lines: list) -> None:
+        """Drag-Reorder der Bookmark-Liste → Editor-Reihenfolge + Sidecar."""
+        try:
+            order = [int(x) for x in list(lines or [])]
+        except (TypeError, ValueError):
+            return
+        if not order:
+            return
+        self.editor.reorder_line_bookmarks(order)
+        self._set_status(f"Lesezeichen-Reihenfolge: {len(order)} Einträge")
+
+    def _persist_line_bookmarks_sidecar(self) -> None:
+        """Editor-Lesezeichen neben Textdatei speichern (*.ildbm.json)."""
+        if getattr(self, "_suppress_bookmark_persist", False):
+            return
+        if not self.doc or not self.doc.path:
+            return
+        if self.doc.kind in (DocKind.PDF, DocKind.IMAGE):
+            return
+        from instantlensdoc.core.bookmarks import (
+            delete_bookmarks_sidecar,
+            save_bookmarks_sidecar,
+        )
+
+        marks = self.editor.list_line_bookmarks_with_labels()
+        try:
+            if not marks:
+                delete_bookmarks_sidecar(self.doc.path)
+            else:
+                save_bookmarks_sidecar(self.doc.path, marks)
+        except Exception as e:
+            _log.debug("Lesezeichen-Sidecar speichern fehlgeschlagen: %s", e)
+
+    def _load_line_bookmarks_sidecar(self, path: str | Path) -> None:
+        """Sidecar-Lesezeichen für Textdatei laden (falls vorhanden)."""
+        from instantlensdoc.core.bookmarks import (
+            BookmarksImportError,
+            load_bookmarks_sidecar,
+            bookmarks_to_export_dict,
+        )
+
+        try:
+            marks = load_bookmarks_sidecar(path, max_line=self.editor.blockCount())
+        except BookmarksImportError as e:
+            _log.debug("Lesezeichen-Sidecar ungültig: %s", e)
+            return
+        except Exception as e:
+            _log.debug("Lesezeichen-Sidecar laden fehlgeschlagen: %s", e)
+            return
+        if marks is None:
+            return
+        if not marks:
+            return
+        data = bookmarks_to_export_dict(marks, source=Path(path).name)
+        self.editor.import_line_bookmarks_dict(
+            data, merge=False, max_line=self.editor.blockCount()
+        )
 
     def _edit_line_favorite_label(self, line: int):
         """Label eines Editor-Zeilenfavoriten bearbeiten (Sidebar Doppelklick/Menü)."""
@@ -5062,7 +5143,13 @@ class MainWindow(QMainWindow):
                 self.editor.setPlainText(self.doc.text)
                 self.editor.blockSignals(False)
                 self.editor.clear_extra_selections()
-                self.editor.clear_line_bookmarks()
+                self._suppress_bookmark_persist = True
+                try:
+                    self.editor.clear_line_bookmarks()
+                    self._load_line_bookmarks_sidecar(path)
+                finally:
+                    self._suppress_bookmark_persist = False
+                self._refresh_line_favorites()
                 self._editor_marks.clear()
                 self.sidebar.set_marks([])
                 self.sidebar.clear_thumbs()

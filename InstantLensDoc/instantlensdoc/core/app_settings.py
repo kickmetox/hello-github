@@ -41,6 +41,7 @@ DEFAULTS: dict[str, Any] = {
     "ann_filter_presets": [],
     "ann_default_opacity": 1.0,
     "recent_files_max": 12,
+    "tag_cloud_sort": "freq",
     "recent_dirs": [],
     "project_workspaces": [],
     "active_project_workspace": "",
@@ -372,6 +373,28 @@ def set_recent_files_max(count: int) -> int:
         pass
     return n
 
+
+TagCloudSort = Literal["freq", "az"]
+TAG_CLOUD_SORT_FREQ = "freq"
+TAG_CLOUD_SORT_AZ = "az"
+
+
+def get_tag_cloud_sort() -> TagCloudSort:
+    """Tag-Cloud-Sortierung: Häufigkeit (freq) oder A–Z (az)."""
+    raw = str(load_settings().get("tag_cloud_sort", TAG_CLOUD_SORT_FREQ) or "").strip().lower()
+    if raw in ("az", "a-z", "alpha", "name"):
+        return TAG_CLOUD_SORT_AZ
+    return TAG_CLOUD_SORT_FREQ
+
+
+def set_tag_cloud_sort(mode: str) -> TagCloudSort:
+    """Tag-Cloud-Sortierung speichern. Rückgabe: normalisierter Modus."""
+    raw = str(mode or "").strip().lower()
+    value: TagCloudSort = (
+        TAG_CLOUD_SORT_AZ if raw in ("az", "a-z", "alpha", "name") else TAG_CLOUD_SORT_FREQ
+    )
+    save_settings({"tag_cloud_sort": value})
+    return value
 
 
 ANN_FILTER_PRESETS_MAX = 20

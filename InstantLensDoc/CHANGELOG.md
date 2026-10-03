@@ -1,5 +1,23 @@
 # Changelog — InstantLens Doc
 
+## 0.8.1 — Bookmark-Drag, Tag-Cloud-Sort, Recent-Fehlend, Zoom-%
+
+Nach 0.8.0: Bookmark-Liste umsortieren, Tag-Cloud sortieren, fehlende Recent-Dateien handhaben, Zoom in der Statusleiste. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### PDF / Suche / Annotationen
+- Tag-Cloud **Sortierung**: Toggle **Häufigkeit** / **A–Z** (persistiert)
+- Statusleiste: **Zoom n%** bei aktiver PDF-Ansicht
+
+### Editor / Settings
+- Editor-**Lesezeichen-Liste**: **Drag-Reorder** + Persistenz als Sidecar `*.ildbm.json` (Reihenfolge in ildbm-v1)
+- **Zuletzt geöffnet**: fehlende Dateien **grau** („fehlt“); Rechtsklick **Entfernen**
+
+### Packaging / Docs
+- Version **0.8.1** (App / `ild_pdf` / ISS / Smoke / Docs)
+- Smoke: Bookmark-Reorder/Sidecar, Tag-Cloud-Sort, Recent fehlt+Entfernen, Zoom-% (CLI + Qt)
+
+---
+
 ## 0.8.0 — Bookmark-Export, Tag-Cloud Kontext, Status, Recent-Settings
 
 Nach 0.7.9: Editor-Lesezeichen teilen, Tag-Cloud-Kontextmenü erweitern, Statusleiste und Recent-Liste verfeinern. Stubs KI/Cloud/Stylus/3D bleiben Stubs.

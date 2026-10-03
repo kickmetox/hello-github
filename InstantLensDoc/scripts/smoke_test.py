@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Smoke-Test 0.8.0 (CLI + optional offscreen Qt). Kernpfade: open/annotate/export/license + ausgewählte 0.6.x-Pfade."""
+"""Smoke-Test 0.8.1 (CLI + optional offscreen Qt). Kernpfade: open/annotate/export/license + ausgewählte 0.6.x-Pfade."""
 
 from __future__ import annotations
 
@@ -122,8 +122,8 @@ def main() -> int:
     from instantlensdoc.core.update_check import check_for_updates
     from instantlensdoc.license import KEY_DAYS, TRIAL_DAYS, generate_key, verify_key
 
-    assert __version__ == "0.8.0", __version__
-    assert ild_ver == "0.8.0", ild_ver
+    assert __version__ == "0.8.1", __version__
+    assert ild_ver == "0.8.1", ild_ver
     assert TRIAL_DAYS == 28 and KEY_DAYS == 32
     key = generate_key("ame@sellerbach.de")
     ok, msg, _ = verify_key(key)
@@ -141,7 +141,7 @@ def main() -> int:
     assert "Settings" in tr("settings")
     set_lang("de")
     upd = check_for_updates(allow_network=False)
-    assert upd.local_version == "0.8.0" and not upd.online
+    assert upd.local_version == "0.8.1" and not upd.online
     assert get_export_jpeg_quality() >= 10
     assert get_ui_lang() in ("de", "en")
     assert 25 <= get_default_zoom_percent() <= 500
@@ -182,8 +182,8 @@ def main() -> int:
     assert get_ann_pen_color() == "#112233"
     assert (ROOT / "CHANGELOG.md").is_file()
     cl = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-    assert "0.8.0" in cl
-    assert "## 0.8.0" in cl
+    assert "0.8.1" in cl and "0.8.0" in cl
+    assert "## 0.8.1" in cl and "## 0.8.0" in cl
     assert "## 0.7.9" in cl
     assert "## 0.7.8" in cl
     assert "## 0.7.6" in cl
@@ -240,7 +240,7 @@ def main() -> int:
     assert "0.4.9" in cl  # noch in Kurz-Tabelle
     assert "0.3.9" in cl  # noch in Kurz-Tabelle
     assert "0.2.9" in cl  # noch in Kurz-Tabelle
-    assert "0.8.0" in (ROOT / "README.md").read_text(encoding="utf-8")
+    assert "0.8.1" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "run.bat" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "sync-ild.ps1" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "scripts/sync-ild.ps1" in (ROOT / "FEATURES.md").read_text(encoding="utf-8")
@@ -589,13 +589,13 @@ def main() -> int:
 
         assert (ROOT / "installer" / "installer-hinweis.txt").exists()
         iss = (ROOT / "installer" / "instantlensdoc.iss").read_text(encoding="utf-8")
-        assert "0.8.0" in iss and "desktopicon" in iss and "DisableProgramGroupPage=no" in iss
+        assert "0.8.1" in iss and "desktopicon" in iss and "DisableProgramGroupPage=no" in iss
         assert "UninstallDisplayName" in iss and "Uninstallable=yes" in iss
         assert "IncludeKeygen" in iss and "SetupIconFile" in iss
         assert "InstantLensKeygen.exe" in iss
         assert "uninstallexe" in iss
         bw = (ROOT / "build-windows.ps1").read_text(encoding="utf-8")
-        assert "0.8.0" in bw and "NoKeygenInApp" in bw and "--icon" in bw
+        assert "0.8.1" in bw and "NoKeygenInApp" in bw and "--icon" in bw
         assert "InstantLensKeygen.exe" in bw
         bi = (ROOT / "installer" / "build-installer.ps1").read_text(encoding="utf-8")
         assert "InstantLensKeygen.exe" in bi and "IncludeKeygen" in bi
@@ -604,7 +604,7 @@ def main() -> int:
         assert "Installer" in kg_readme
         hinweis = (ROOT / "installer" / "installer-hinweis.txt").read_text(encoding="utf-8")
         assert "InstantLensKeygen.exe" in hinweis or "run-keygen.bat" in hinweis
-        assert "0.8.0" in hinweis
+        assert "0.8.1" in hinweis
         assert "checkedonce" in iss and "Desktop-Verknüpfung" in hinweis
         from ild_pdf.limits import OPEN_TIMEOUT_HINT, OPEN_TIMEOUT_HINT_SEC
 
@@ -616,7 +616,7 @@ def main() -> int:
         assert "QProgressDialog" in (ROOT / "instantlensdoc" / "ui" / "main_window.py").read_text(encoding="utf-8")
 
         assert (ROOT / "examples" / "ild_pdf_demo.py").exists()
-        assert "0.8.0" in (ROOT / "INFO.md").read_text(encoding="utf-8")
+        assert "0.8.1" in (ROOT / "INFO.md").read_text(encoding="utf-8")
         assert (ROOT / "assets" / "app.ico").is_file()
 
         # --- Kernpfade: open / annotate / export / license ---
@@ -749,7 +749,7 @@ def main() -> int:
         assert "| A" in tbl and "| 1" in tbl
         assert ocr_mod.TESSERACT_WIKI_URL.startswith("https://")
 
-        # --- Ausgewählte 0.3.x-/0.4.x-/0.5.x-/0.6.x-Pfade (CLI, Konsolidierung 0.7.0) + 0.8.0 ---
+        # --- Ausgewählte 0.3.x-/0.4.x-/0.5.x-/0.6.x-Pfade (CLI, Konsolidierung 0.7.0) + 0.8.1 ---
         from ild_pdf.annotate import stamp_library_items
         from ild_pdf.attachments import has_attachments, list_attachments
         from ild_pdf.flatten import flatten_annotations_to_pdf
@@ -807,7 +807,7 @@ def main() -> int:
         set_backup_on_save(False)
         assert get_page_size_unit() in ("mm", "inch")
         assert isinstance(get_minimize_to_tray(), bool)
-        assert "0.8.0" in feat and "0.7.9" in feat and "0.7.8" in feat and "0.7.7" in feat and "0.7.6" in feat and "0.7.5" in feat and "0.7.4" in feat and "0.7.3" in feat and "0.7.2" in feat and "0.7.1" in feat and "0.6.9" in feat and "0.5.9" in feat and "0.4.9" in feat  # Release + Zeitraum-Feature-Hinweise
+        assert "0.8.1" in feat and "0.8.0" in feat and "0.7.9" in feat and "0.7.8" in feat and "0.7.7" in feat and "0.7.6" in feat and "0.7.5" in feat and "0.7.4" in feat and "0.7.3" in feat and "0.7.2" in feat and "0.7.1" in feat and "0.6.9" in feat and "0.5.9" in feat and "0.4.9" in feat  # Release + Zeitraum-Feature-Hinweise
         assert "Batch-OCR" in feat or "OCR gesamtes PDF" in feat
         assert "Tag" in feat
         assert "Projekt-Ordner" in feat or "Workspace" in feat
@@ -2330,6 +2330,80 @@ def main() -> int:
         assert "ildbm-v1" in kb080 and "Farbe ändern" in kb080
         print("0.8.0 CLI bookmark-ildbm/tag-cloud-ctx/recent-max/status: OK")
 
+        # 0.8.1 CLI: Bookmark Drag/Sidecar, Tag-Cloud Sort, Recent fehlt+Entfernen, Zoom-%
+        from instantlensdoc.core.app_settings import (
+            TAG_CLOUD_SORT_AZ,
+            TAG_CLOUD_SORT_FREQ,
+            get_tag_cloud_sort,
+            set_tag_cloud_sort,
+        )
+        from instantlensdoc.core import recent as recent_mod081
+        from instantlensdoc.core.bookmarks import (
+            bookmarks_to_export_dict,
+            load_bookmarks_sidecar,
+            parse_bookmarks_dict,
+            save_bookmarks_sidecar,
+            sidecar_path_for,
+        )
+
+        set_tag_cloud_sort("freq")
+        assert get_tag_cloud_sort() == TAG_CLOUD_SORT_FREQ
+        set_tag_cloud_sort("az")
+        assert get_tag_cloud_sort() == TAG_CLOUD_SORT_AZ
+        set_tag_cloud_sort("freq")
+        assert get_tag_cloud_sort() == TAG_CLOUD_SORT_FREQ
+        # ildbm-v1 behält Drag-Reihenfolge
+        d081 = bookmarks_to_export_dict([(5, "Z"), (2, "A"), (9, "")], source="ord.txt")
+        assert [b["line"] for b in d081["bookmarks"]] == [5, 2, 9]
+        assert parse_bookmarks_dict(d081) == [(5, "Z"), (2, "A"), (9, "")]
+        txt081 = td / "bm081.txt"
+        txt081.write_text("L1\nL2\nL3\nL4\nL5\n", encoding="utf-8")
+        side081 = save_bookmarks_sidecar(txt081, [(5, "Ende"), (2, "Start")])
+        assert side081 == sidecar_path_for(txt081)
+        assert side081.is_file()
+        loaded081 = load_bookmarks_sidecar(txt081)
+        assert loaded081 == [(5, "Ende"), (2, "Start")]
+        # Recent: fehlende Dateien behalten + remove_recent
+        recent_file081 = td / "recent081.json"
+        orig_recent081 = recent_mod081.recent_path
+        recent_mod081.recent_path = lambda: recent_file081  # type: ignore
+        try:
+            alive = td / "alive081.txt"
+            alive.write_text("ok", encoding="utf-8")
+            ghost = td / "ghost081-missing.txt"
+            recent_mod081.save_recent([str(alive), str(ghost)], max_items=12)
+            entries081 = recent_mod081.load_recent_entries()
+            assert len(entries081) == 2
+            assert entries081[0] == (str(alive), True)
+            assert entries081[1][0] == str(ghost) and entries081[1][1] is False
+            assert recent_mod081.load_recent(existing_only=True) == [str(alive)]
+            recent_mod081.remove_recent(ghost)
+            assert [p for p, _ in recent_mod081.load_recent_entries()] == [str(alive)]
+            recent_mod081.clear_recent()
+        finally:
+            recent_mod081.recent_path = orig_recent081  # type: ignore
+        ed_src081 = (ROOT / "instantlensdoc" / "ui" / "editor.py").read_text(encoding="utf-8")
+        assert "reorder_line_bookmarks" in ed_src081 and "_line_bookmark_order" in ed_src081
+        sb081 = (ROOT / "instantlensdoc" / "ui" / "sidebar.py").read_text(encoding="utf-8")
+        assert "LineFavoriteList" in sb081 and "line_favorites_reordered" in sb081
+        assert "_toggle_tag_cloud_sort" in sb081 and "recent_remove_requested" in sb081
+        assert "Entfernen" in sb081 and "(fehlt)" in sb081
+        mw081 = (ROOT / "instantlensdoc" / "ui" / "main_window.py").read_text(encoding="utf-8")
+        assert "_on_line_favorites_reordered" in mw081
+        assert "_persist_line_bookmarks_sidecar" in mw081
+        assert "_remove_recent_path" in mw081
+        assert 'Zoom {' in mw081 or "Zoom {" in mw081
+        feat081 = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
+        assert "0.8.1" in feat081 and "Drag-Reorder" in feat081
+        assert "A–Z" in feat081 or "A-Z" in feat081 or "Sort" in feat081
+        cl081 = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+        assert "## 0.8.1" in cl081 and "Zoom" in cl081
+        kb081 = (ROOT / "instantlensdoc" / "ui" / "keyboard_help.py").read_text(
+            encoding="utf-8"
+        )
+        assert "0.8.1" in kb081 and "Tag-Cloud Sortierung" in kb081
+        print("0.8.1 CLI bookmark-drag/tag-sort/recent-missing/zoom: OK")
+
         set_show_printer_marks(True)
         assert get_show_printer_marks() is True
         set_show_printer_marks(False)
@@ -2462,7 +2536,7 @@ def main() -> int:
         assert "Continuous Scroll" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
         assert "Seitenlabel" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8") or "Seitenlabels" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
         assert "Zwischenablage-Verlauf" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8") or "Clipboard" in (ROOT / "FEATURES.md").read_text(encoding="utf-8")
-        assert "0.8.0" in feat and "0.7.9" in feat and "0.7.8" in feat and "0.7.7" in feat and "0.7.6" in feat and "0.7.5" in feat and "0.7.4" in feat and "0.7.3" in feat and "0.7.2" in feat and "0.7.1" in feat and "0.6.9" in feat and "0.5.9" in feat and "0.4.9" in feat
+        assert "0.8.1" in feat and "0.8.0" in feat and "0.7.9" in feat and "0.7.8" in feat and "0.7.7" in feat and "0.7.6" in feat and "0.7.5" in feat and "0.7.4" in feat and "0.7.3" in feat and "0.7.2" in feat and "0.7.1" in feat and "0.6.9" in feat and "0.5.9" in feat and "0.4.9" in feat
         # --- 0.4.2 CLI: Outline Goto, Ann Copy/Paste, Flatten Progress ---
         import pikepdf as _pike_ol
 
@@ -2587,7 +2661,7 @@ def main() -> int:
         win._add_chained_frame()
         assert len(win.layout_doc.text_frames) >= 2
         assert "Lizenz:" in win.license_label.text() or "⚠" in win.license_label.text()
-        assert "v0.8.0" in win.version_label.text()
+        assert "v0.8.1" in win.version_label.text()
         # Lizenz <7 Tage: Style prominent
         st_lic = win.license_manager.status()
         if st_lic.allowed and st_lic.days_remaining < 7:
@@ -2768,11 +2842,11 @@ def main() -> int:
             assert win.editor.outdent_selection(4)
             assert win.editor.toPlainText().splitlines()[0] == "alpha"
             # Fenstertitel mit Version
-            assert "0.8.0" in win.windowTitle()
+            assert "0.8.1" in win.windowTitle()
             from instantlensdoc.ui.help_dialog import AboutDialog, HelpDialog, open_log_folder
 
             about = AboutDialog(win)
-            assert "0.8.0" in about.windowTitle()
+            assert "0.8.1" in about.windowTitle()
             help_dlg = HelpDialog(win)
             assert help_dlg.windowTitle() == "Hilfe"
             assert callable(open_log_folder)
@@ -3444,7 +3518,7 @@ def main() -> int:
             win.apply_tray_setting()
             if win._tray is not None:
                 tip = win._tray.toolTip()
-                assert "0.8.0" in tip and "InstantLens Doc" in tip
+                assert "0.8.1" in tip and "InstantLens Doc" in tip
             set_minimize_to_tray(False)
             win.apply_tray_setting()
             print("0.3.9 fit-h/ann-stats/special/tray: OK")
@@ -3457,9 +3531,9 @@ def main() -> int:
             from instantlensdoc.ui.password_dialog import CompressPdfDialog, SetPasswordDialog
             from instantlensdoc.ui.stubs import PLANNED
             assert KeyboardHelpDialog and SetPasswordDialog and CompressPdfDialog
-            assert "0.8.0" in PLANNED["ki"]
+            assert "0.8.1" in PLANNED["ki"]
             assert "Coming soon" in PLANNED["cloud"]
-            assert "0.8.0" in PLANNED["stylus"] and "0.8.0" in PLANNED["extrude3d"]
+            assert "0.8.1" in PLANNED["stylus"] and "0.8.1" in PLANNED["extrude3d"]
             # Toolbar ↔ Menü Sync Graustufen/Nacht
             win.pdf_view.set_grayscale(True)
             assert win._grayscale_action.isChecked()
@@ -3494,7 +3568,7 @@ def main() -> int:
             assert win.editor.toPlainText().splitlines() == ["one", "two"]
             from instantlensdoc.ui.help_dialog import HELP_HTML
 
-            assert "Stub 0.8.0" in HELP_HTML
+            assert "Stub 0.8.1" in HELP_HTML
             assert "scripts/sync-ild.ps1" in HELP_HTML
             assert "Präsentationsmodus" in HELP_HTML or "F5" in (
                 ROOT / "instantlensdoc" / "ui" / "keyboard_help.py"
@@ -5825,10 +5899,112 @@ def main() -> int:
             assert "## 0.8.0" in cl080q
             print("0.8.0 Qt bookmark-ildbm/tag-cloud-ctx/status/recent: OK")
 
+            # --- 0.8.1 Qt: Bookmark Drag/Sidecar, Tag-Cloud Sort, Recent fehlt, Zoom-% ---
+            from PySide6.QtCore import Qt as Qt081
+            from instantlensdoc.core.app_settings import (
+                TAG_CLOUD_SORT_AZ as TC_AZ081,
+                TAG_CLOUD_SORT_FREQ as TC_FREQ081,
+                get_tag_cloud_sort as get_tcs081,
+                set_tag_cloud_sort as set_tcs081,
+            )
+            from instantlensdoc.core.bookmarks import (
+                load_bookmarks_sidecar as load_side081,
+                sidecar_path_for as side_for081,
+            )
+            from instantlensdoc.core import recent as recent_mod081q
+
+            assert callable(getattr(win.editor, "reorder_line_bookmarks", None))
+            assert hasattr(win.sidebar, "line_favorites_reordered")
+            assert callable(getattr(win.sidebar, "set_tag_cloud_sort_mode", None))
+            assert callable(getattr(win, "_on_line_favorites_reordered", None))
+            assert callable(getattr(win, "_remove_recent_path", None))
+            # Bookmark order + sidecar
+            win.stack.setCurrentWidget(win.editor_pane)
+            win.editor.setPlainText("A\nB\nC\nD\nE\nF\n")
+            win.editor.clear_line_bookmarks()
+            win.editor.toggle_line_bookmark(2)
+            win.editor.toggle_line_bookmark(4)
+            win.editor.toggle_line_bookmark(6)
+            assert win.editor.list_line_bookmarks() == [2, 4, 6]
+            win.editor.reorder_line_bookmarks([6, 2, 4])
+            assert win.editor.list_line_bookmarks() == [6, 2, 4]
+            bm_txt081 = td2 / "qt_bm081.txt"
+            bm_txt081.write_text("A\nB\nC\nD\nE\nF\n", encoding="utf-8")
+            win.open_path(str(bm_txt081))
+            win.editor.clear_line_bookmarks()
+            win.editor.toggle_line_bookmark(3)
+            win.editor.set_line_bookmark_label(3, "Mitte")
+            win.editor.toggle_line_bookmark(1)
+            win.editor.reorder_line_bookmarks([1, 3])
+            win._persist_line_bookmarks_sidecar()
+            assert side_for081(bm_txt081).is_file()
+            assert load_side081(bm_txt081) == [(1, ""), (3, "Mitte")]
+            win._suppress_bookmark_persist = True
+            try:
+                win.editor.clear_line_bookmarks()
+                assert win.editor.list_line_bookmarks() == []
+                win._load_line_bookmarks_sidecar(bm_txt081)
+            finally:
+                win._suppress_bookmark_persist = False
+            assert win.editor.list_line_bookmarks() == [1, 3]
+            assert win.editor.get_line_bookmark_label(3) == "Mitte"
+            # Tag-Cloud sort toggle
+            set_tcs081("freq")
+            assert win.sidebar.set_tag_cloud_sort_mode("az") == TC_AZ081
+            assert get_tcs081() == TC_AZ081
+            assert win.sidebar.tag_cloud_sort_mode() == TC_AZ081
+            assert win.sidebar.set_tag_cloud_sort_mode("freq") == TC_FREQ081
+            # Recent missing gray + remove
+            ghost_q = td2 / "ghost_qt081.txt"
+            alive_q = td2 / "alive_qt081.txt"
+            alive_q.write_text("x", encoding="utf-8")
+            rf081 = td2 / "recent_qt081.json"
+            orig_rf081 = recent_mod081q.recent_path
+            recent_mod081q.recent_path = lambda: rf081  # type: ignore
+            try:
+                recent_mod081q.save_recent([str(alive_q), str(ghost_q)])
+                win._refresh_recent()
+                assert win.sidebar.recent.count() == 2
+                miss_item = None
+                for i in range(win.sidebar.recent.count()):
+                    it = win.sidebar.recent.item(i)
+                    if it is None:
+                        continue
+                    raw = it.data(Qt081.UserRole) or it.data(256)
+                    if raw and Path(str(raw)).name == ghost_q.name:
+                        miss_item = it
+                        break
+                assert miss_item is not None
+                assert miss_item.data(Qt081.UserRole + 1) is False
+                assert "fehlt" in miss_item.text()
+                win._remove_recent_path(str(ghost_q))
+                left = [
+                    win.sidebar.recent.item(i).data(Qt081.UserRole)
+                    or win.sidebar.recent.item(i).data(256)
+                    for i in range(win.sidebar.recent.count())
+                ]
+                assert str(ghost_q) not in left
+            finally:
+                recent_mod081q.recent_path = orig_rf081  # type: ignore
+                recent_mod081q.clear_recent()
+            # Zoom-% in Statusleiste bei PDF
+            if win.pdf_view.pdf_path and win.pdf_view.page_count > 0:
+                win.stack.setCurrentWidget(win.pdf_view)
+                win._update_doc_status()
+                ztxt = win.zoom_status_label.text()
+                assert "Zoom" in ztxt and "%" in ztxt
+                win._on_pdf_zoom_changed(1.25)
+                assert "Zoom 125%" in win.zoom_status_label.text()
+            feat081q = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
+            assert "0.8.1" in feat081q and "Drag-Reorder" in feat081q
+            cl081q = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+            assert "## 0.8.1" in cl081q
+            print("0.8.1 Qt bookmark-drag/tag-sort/recent-missing/zoom: OK")
+
             print("0.4.x selected Qt marks/schema/sort/reset: OK")
             print("0.4.2 Qt outline/copy-paste/case/progress: OK")
             print("0.4.1 Qt links/stamp/encoding/drop: OK")
-            print("0.3.x–0.8.0 review OK")
+            print("0.3.x–0.8.1 review OK")
             assert callable(win.pdf_view.bake_redactions)
             assert callable(win.pdf_view.clear_redactions)
             assert callable(win._set_pdf_password)

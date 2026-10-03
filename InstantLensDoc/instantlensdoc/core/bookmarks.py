@@ -1,4 +1,4 @@
-"""Editor-Zeilen-Lesezeichen Export/Import (Schema ildbm-v1)."""
+"""Editor-Zeilen-Lesezeichen Export/Import (Schema ildbm-v1) + Sidecar-Persistenz."""
 
 from __future__ import annotations
 
@@ -14,12 +14,18 @@ class BookmarksImportError(ValueError):
     """Ungültiges oder inkompatibles Zeilen-Lesezeichen-JSON."""
 
 
+def sidecar_path_for(doc_path: str | Path) -> Path:
+    """Sidecar neben der Textdatei: datei.txt.ildbm.json."""
+    p = Path(doc_path)
+    return p.with_suffix(p.suffix + ".ildbm.json")
+
+
 def bookmarks_to_export_dict(
     bookmarks: Sequence[tuple[int, str]] | Sequence[int],
     *,
     source: str = "",
 ) -> dict:
-    """[(line, label)|line, …] → Export-Dict (ildbm-v1)."""
+    """[(line, label)|line, …] → Export-Dict (ildbm-v1); Reihenfolge bleibt erhalten."""
     out: list[dict] = []
     seen: set[int] = set()
     for item in bookmarks:
@@ -36,7 +42,6 @@ def bookmarks_to_export_dict(
         if label:
             entry["label"] = label
         out.append(entry)
-    out.sort(key=lambda e: int(e["line"]))
     return {
         "version": BM_VERSION,
         "schema": BM_SCHEMA_ID,
@@ -69,6 +74,7 @@ def parse_bookmarks_dict(
 ) -> list[tuple[int, str]]:
     """
     Lesezeichen aus Dict parsen (ohne Editor-Zustand).
+    Reihenfolge der Liste bleibt erhalten (Drag-Reorder).
     max_line: optional obere Grenze (inkl.).
     """
     if not isinstance(data, dict):
@@ -116,7 +122,6 @@ def parse_bookmarks_dict(
             continue
         seen.add(line)
         incoming.append((line, label))
-    incoming.sort(key=lambda t: t[0])
     return incoming
 
 
@@ -134,3 +139,41 @@ def load_bookmarks_json(
     except OSError as e:
         raise BookmarksImportError(str(e)) from e
     return parse_bookmarks_dict(data, max_line=max_line)
+
+
+def save_bookmarks_sidecar(
+    doc_path: str | Path,
+    bookmarks: Sequence[tuple[int, str]] | Sequence[int],
+) -> Path:
+    """Lesezeichen neben der Textdatei persistieren (*.ildbm.json)."""
+    dest = sidecar_path_for(doc_path)
+    return export_bookmarks_json(
+        dest, bookmarks, source=Path(doc_path).name
+    )
+
+
+def load_bookmarks_sidecar(
+    doc_path: str | Path,
+    *,
+    max_line: int | None = None,
+) -> list[tuple[int, str]] | None:
+    """
+    Sidecar laden falls vorhanden.
+    Rückgabe None wenn keine Datei; [] wenn leer/gültig ohne Einträge.
+    """
+    src = sidecar_path_for(doc_path)
+    if not src.is_file():
+        return None
+    return load_bookmarks_json(src, max_line=max_line)
+
+
+def delete_bookmarks_sidecar(doc_path: str | Path) -> bool:
+    """Sidecar löschen wenn vorhanden. True wenn gelöscht."""
+    src = sidecar_path_for(doc_path)
+    if not src.is_file():
+        return False
+    try:
+        src.unlink()
+        return True
+    except OSError:
+        return False

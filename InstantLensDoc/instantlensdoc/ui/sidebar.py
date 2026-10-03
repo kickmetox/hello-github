@@ -28,10 +28,14 @@ from PySide6.QtWidgets import (
 )
 
 from instantlensdoc.core.app_settings import (
+    TAG_CLOUD_SORT_AZ,
+    TAG_CLOUD_SORT_FREQ,
     delete_ann_filter_preset,
     get_ann_filter_presets,
+    get_tag_cloud_sort,
     pdf_thumbnail_icon_size,
     save_ann_filter_preset,
+    set_tag_cloud_sort,
 )
 
 
@@ -214,9 +218,83 @@ class PageFavoriteList(QListWidget):
             self._renumbering = False
 
 
+class LineFavoriteList(QListWidget):
+    """Editor-Zeilenfavoriten; Drag InternalMove → neue Reihenfolge (persistiert)."""
+
+    bookmarks_reordered = Signal(list)  # list[int] 1-basierte Zeilen in neuer Reihenfolge
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setMaximumHeight(100)
+        self.setDragDropMode(QAbstractItemView.InternalMove)
+        self.setDefaultDropAction(Qt.MoveAction)
+        self.setMovement(QListWidget.Snap)
+        self.setToolTip(
+            "Zeilen-Lesezeichen — Klick springt; ziehen zum Umsortieren; "
+            "Doppelklick / Rechtsklick → Label bearbeiten"
+        )
+        self._reorder_enabled = True
+        self._renumbering = False
+
+    def set_reorder_enabled(self, enabled: bool):
+        self._reorder_enabled = bool(enabled)
+        mode = QAbstractItemView.InternalMove if enabled else QAbstractItemView.NoDragDrop
+        self.setDragDropMode(mode)
+
+    def dropEvent(self, event):
+        if not self._reorder_enabled or self._renumbering:
+            event.ignore()
+            return
+        super().dropEvent(event)
+        order: list[int] = []
+        for i in range(self.count()):
+            item = self.item(i)
+            if item is None:
+                continue
+            line = item.data(Qt.UserRole)
+            if line is None:
+                line = item.data(256)
+            if line is not None:
+                try:
+                    order.append(int(line))
+                except (TypeError, ValueError):
+                    continue
+        if order:
+            self._renumber_items()
+            self.bookmarks_reordered.emit(order)
+
+    def _renumber_items(self):
+        """Anzeige-Nummern nach Drag anpassen (1. Zeile N — Label)."""
+        self._renumbering = True
+        try:
+            for i in range(self.count()):
+                item = self.item(i)
+                if item is None:
+                    continue
+                line = item.data(Qt.UserRole)
+                if line is None:
+                    continue
+                label = ""
+                text = item.text() or ""
+                if " — " in text:
+                    label = text.split(" — ", 1)[1].strip()
+                new_text = f"{i + 1}. Zeile {int(line)}"
+                if label:
+                    new_text = f"{new_text} — {label}"
+                item.setText(new_text)
+                tip = f"Zeilenfavorit #{i + 1} → Zeile {int(line)}"
+                if label:
+                    tip = f"{tip} ({label})"
+                tip += " — ziehen zum Umsortieren; Doppelklick/Rechtsklick: Label"
+                item.setToolTip(tip)
+        finally:
+            self._renumbering = False
+
+
 class Sidebar(QWidget):
     file_activated = Signal(str)
     recent_activated = Signal(str)
+    recent_remove_requested = Signal(str)  # Pfad aus Recent entfernen
     search_requested = Signal(str)
     search_next_requested = Signal()
     search_prev_requested = Signal()
@@ -239,6 +317,7 @@ class Sidebar(QWidget):
     documents_reordered = Signal()  # Dokument-/Session-Tab-Reihenfolge geändert
     line_favorite_activated = Signal(int)  # Editor-Zeile 1-basiert
     line_favorite_label_edit = Signal(int)  # Editor-Zeile 1-basiert → Label bearbeiten
+    line_favorites_reordered = Signal(list)  # 1-basierte Zeilen neue Reihenfolge
     pages_reordered = Signal(list)  # alte Indizes in neuer Reihenfolge
     search_export_requested = Signal(str)  # "csv" | "json"
 
@@ -330,6 +409,12 @@ class Sidebar(QWidget):
         layout.addWidget(QLabel("Zuletzt geöffnet"))
         self.recent = QListWidget()
         self.recent.setMaximumHeight(90)
+        self.recent.setToolTip(
+            "Zuletzt geöffnet — Doppelklick öffnet; fehlende Dateien grau; "
+            "Rechtsklick → Entfernen"
+        )
+        self.recent.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.recent.customContextMenuRequested.connect(self._recent_context_menu)
         self.recent.itemDoubleClicked.connect(self._activate_recent)
         layout.addWidget(self.recent)
 
@@ -374,16 +459,13 @@ class Sidebar(QWidget):
         self.page_favorites.favorites_reordered.connect(self.page_favorites_reordered.emit)
         layout.addWidget(self.page_favorites)
 
-        layout.addWidget(QLabel("Editor-Zeilenfavoriten"))
-        self.line_favorites = QListWidget()
-        self.line_favorites.setMaximumHeight(100)
-        self.line_favorites.setToolTip(
-            "Zeilen-Lesezeichen — Klick springt; Doppelklick / Rechtsklick → Label bearbeiten"
-        )
+        layout.addWidget(QLabel("Editor-Zeilenfavoriten — ziehen zum Ordnen"))
+        self.line_favorites = LineFavoriteList()
         self.line_favorites.setContextMenuPolicy(Qt.CustomContextMenu)
         self.line_favorites.customContextMenuRequested.connect(self._line_fav_context_menu)
         self.line_favorites.itemClicked.connect(self._activate_line_favorite)
         self.line_favorites.itemDoubleClicked.connect(self._edit_line_favorite_label)
+        self.line_favorites.bookmarks_reordered.connect(self.line_favorites_reordered.emit)
         layout.addWidget(self.line_favorites)
 
         layout.addWidget(QLabel("Annotationen (gruppiert nach Seite)"))
@@ -436,13 +518,25 @@ class Sidebar(QWidget):
         self.ann_tag_filter.setMaximumHeight(72)
         self.ann_tag_filter.itemSelectionChanged.connect(self._on_ann_tag_filter_changed)
         layout.addWidget(self.ann_tag_filter)
-        layout.addWidget(QLabel("Tag-Cloud (häufigste)"))
+        tag_cloud_hdr = QHBoxLayout()
+        self.ann_tag_cloud_label = QLabel("Tag-Cloud")
+        tag_cloud_hdr.addWidget(self.ann_tag_cloud_label, 1)
+        self.btn_tag_cloud_sort = QToolButton()
+        self.btn_tag_cloud_sort.setAutoRaise(True)
+        self.btn_tag_cloud_sort.setCursor(Qt.PointingHandCursor)
+        self.btn_tag_cloud_sort.setToolTip("Tag-Cloud-Sortierung: Häufigkeit ↔ A–Z")
+        self.btn_tag_cloud_sort.clicked.connect(self._toggle_tag_cloud_sort)
+        tag_cloud_hdr.addWidget(self.btn_tag_cloud_sort)
+        layout.addLayout(tag_cloud_hdr)
+        self._tag_cloud_sort = get_tag_cloud_sort()
+        self._sync_tag_cloud_sort_button()
         self.ann_tag_cloud = QWidget()
         self.ann_tag_cloud.setObjectName("annTagCloud")
         self.ann_tag_cloud.setToolTip(
-            "Häufigste Tags — Klick setzt Filter (exklusiv); Ctrl+Klick Multi-Select (ODER); "
+            "Tags — Klick setzt Filter (exklusiv); Ctrl+Klick Multi-Select (ODER); "
             "erneut Klick auf allein aktiven Tag löscht Filter; "
-            "Rechtsklick → filtern / Farbe ändern / umbenennen"
+            "Rechtsklick → filtern / Farbe ändern / umbenennen; "
+            "Sortierung Häufigkeit / A–Z über den Toggle"
         )
         self.ann_tag_cloud_layout = QHBoxLayout(self.ann_tag_cloud)
         self.ann_tag_cloud_layout.setContentsMargins(0, 2, 0, 2)
@@ -560,9 +654,38 @@ class Sidebar(QWidget):
             self.file_activated.emit(str(path))
 
     def _activate_recent(self, item: QListWidgetItem):
-        path = item.data(256)
-        if path:
+        path = item.data(Qt.UserRole)
+        if path is None:
+            path = item.data(256)
+        if not path:
+            return
+        exists = item.data(Qt.UserRole + 1)
+        if exists is False or (exists is None and not Path(str(path)).is_file()):
+            # Fehlende Datei: nicht öffnen (grau); Entfernen über Kontextmenü
+            return
+        self.recent_activated.emit(str(path))
+
+    def _recent_context_menu(self, pos):
+        item = self.recent.itemAt(pos)
+        if item is None:
+            return
+        path = item.data(Qt.UserRole)
+        if path is None:
+            path = item.data(256)
+        if not path:
+            return
+        menu = QMenu(self)
+        exists = item.data(Qt.UserRole + 1)
+        if exists is not False and Path(str(path)).is_file():
+            act_open = menu.addAction("Öffnen")
+        else:
+            act_open = None
+        act_remove = menu.addAction("Entfernen")
+        chosen = menu.exec(self.recent.mapToGlobal(pos))
+        if act_open is not None and chosen is act_open:
             self.recent_activated.emit(str(path))
+        elif chosen is act_remove:
+            self.recent_remove_requested.emit(str(path))
 
     def _activate_mark(self, item: QListWidgetItem):
         row = self.marks.row(item)
@@ -728,6 +851,9 @@ class Sidebar(QWidget):
             if not label and labels is not None and i < len(labels) and labels[i]:
                 label = str(labels[i]).strip()
             entries.append((line, label))
+        enable_drag = bool(entries)
+        if hasattr(self.line_favorites, "set_reorder_enabled"):
+            self.line_favorites.set_reorder_enabled(enable_drag)
         for i, (line, label) in enumerate(entries):
             text = f"{i + 1}. Zeile {line}"
             if label:
@@ -738,7 +864,7 @@ class Sidebar(QWidget):
             tip = f"Zeilenfavorit #{i + 1} → Zeile {line}"
             if label:
                 tip = f"{tip} ({label})"
-            tip += " — Doppelklick/Rechtsklick: Label"
+            tip += " — ziehen zum Umsortieren; Doppelklick/Rechtsklick: Label"
             item.setToolTip(tip)
             self.line_favorites.addItem(item)
         if not entries:
@@ -761,13 +887,36 @@ class Sidebar(QWidget):
         if page is not None:
             self.page_thumb_activated.emit(int(page))
 
-    def set_recent(self, paths: list[str]):
+    def set_recent(
+        self,
+        paths: list[str] | list[tuple[str, bool]] | None,
+    ):
+        """
+        Recent-Liste setzen.
+        paths: [pfad, …] oder [(pfad, existiert), …] — fehlende Dateien grau.
+        """
         self.recent.clear()
-        for p in paths:
+        for entry in list(paths or []):
+            exists: bool | None = None
+            if isinstance(entry, (tuple, list)) and len(entry) >= 1:
+                p = str(entry[0])
+                if len(entry) >= 2:
+                    exists = bool(entry[1])
+            else:
+                p = str(entry)
             path = Path(p)
-            item = QListWidgetItem(path.name)
-            item.setToolTip(str(path))
+            if exists is None:
+                exists = path.is_file()
+            name = path.name or str(path)
+            item = QListWidgetItem(name if exists else f"{name} (fehlt)")
+            item.setData(Qt.UserRole, str(path))
             item.setData(256, str(path))
+            item.setData(Qt.UserRole + 1, bool(exists))  # exists-Flag (≠ UserRole/256)
+            if exists:
+                item.setToolTip(str(path))
+            else:
+                item.setToolTip(f"Datei fehlt: {path}\nRechtsklick → Entfernen")
+                item.setForeground(QBrush(QColor("#888888")))
             self.recent.addItem(item)
 
     def document_paths(self) -> list[str]:
@@ -1410,8 +1559,43 @@ class Sidebar(QWidget):
             return
         self.annotation_tag_rename_requested.emit(tag, new_tag)
 
+    def _sync_tag_cloud_sort_button(self) -> None:
+        mode = getattr(self, "_tag_cloud_sort", None) or get_tag_cloud_sort()
+        self._tag_cloud_sort = mode
+        btn = getattr(self, "btn_tag_cloud_sort", None)
+        lbl = getattr(self, "ann_tag_cloud_label", None)
+        if mode == TAG_CLOUD_SORT_AZ:
+            if btn is not None:
+                btn.setText("A–Z")
+                btn.setToolTip("Sortierung: A–Z — Klick → nach Häufigkeit")
+            if lbl is not None:
+                lbl.setText("Tag-Cloud (A–Z)")
+        else:
+            if btn is not None:
+                btn.setText("Häufig")
+                btn.setToolTip("Sortierung: Häufigkeit — Klick → A–Z")
+            if lbl is not None:
+                lbl.setText("Tag-Cloud (häufigste)")
+
+    def _toggle_tag_cloud_sort(self) -> None:
+        cur = getattr(self, "_tag_cloud_sort", None) or get_tag_cloud_sort()
+        nxt = TAG_CLOUD_SORT_AZ if cur != TAG_CLOUD_SORT_AZ else TAG_CLOUD_SORT_FREQ
+        self._tag_cloud_sort = set_tag_cloud_sort(nxt)
+        self._sync_tag_cloud_sort_button()
+        self._update_ann_tag_cloud(getattr(self, "_ann_all_payloads", None))
+
+    def set_tag_cloud_sort_mode(self, mode: str) -> str:
+        """Tag-Cloud-Sortierung setzen und Cloud neu aufbauen. Rückgabe: aktiver Modus."""
+        self._tag_cloud_sort = set_tag_cloud_sort(mode)
+        self._sync_tag_cloud_sort_button()
+        self._update_ann_tag_cloud(getattr(self, "_ann_all_payloads", None))
+        return self._tag_cloud_sort
+
+    def tag_cloud_sort_mode(self) -> str:
+        return getattr(self, "_tag_cloud_sort", None) or get_tag_cloud_sort()
+
     def _update_ann_tag_cloud(self, payloads: list | None):
-        """Häufigste Tags als klickbare Chips (max. 10)."""
+        """Tags als klickbare Chips (max. 10); Sortierung Häufigkeit oder A–Z."""
         if not hasattr(self, "ann_tag_cloud_layout"):
             return
         counts: dict[str, int] = {}
@@ -1435,7 +1619,11 @@ class Sidebar(QWidget):
         if hasattr(self, "ann_tag_cloud"):
             self.ann_tag_cloud.setVisible(True)
         active = {t.casefold() for t in self.annotation_filter_tags()}
-        ranked = sorted(counts.keys(), key=lambda k: (-counts[k], labels[k].casefold()))[:10]
+        mode = getattr(self, "_tag_cloud_sort", None) or get_tag_cloud_sort()
+        if mode == TAG_CLOUD_SORT_AZ:
+            ranked = sorted(counts.keys(), key=lambda k: (labels[k].casefold(), -counts[k]))[:10]
+        else:
+            ranked = sorted(counts.keys(), key=lambda k: (-counts[k], labels[k].casefold()))[:10]
         for key in ranked:
             tag = labels[key]
             n = counts[key]

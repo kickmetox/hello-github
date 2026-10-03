@@ -99,6 +99,7 @@ class TextEditor(QPlainTextEdit):
         self._bracket_selections: list = []
         self._spell_selections: list = []
         self._line_bookmarks: set[int] = set()  # 0-basierte Blocknummern
+        self._line_bookmark_order: list[int] = []  # Anzeige-/Persistenz-Reihenfolge (Blocks)
         self._line_bookmark_labels: dict[int, str] = {}  # Block → editierbares Label
         self._line_number_area = _LineNumberArea(self)
         self._minimap_area = _MinimapArea(self)
@@ -121,19 +122,61 @@ class TextEditor(QPlainTextEdit):
         return 14 + self.fontMetrics().horizontalAdvance("9") * digits
 
     def list_line_bookmarks(self) -> list[int]:
-        """1-basierte Zeilennummern der Lesezeichen (sortiert)."""
+        """1-basierte Zeilennummern der Lesezeichen (Drag-Reihenfolge, sonst Einfügereihenfolge)."""
         n = self.blockCount()
-        return sorted(b + 1 for b in self._line_bookmarks if 0 <= b < n)
+        ordered: list[int] = []
+        seen: set[int] = set()
+        for b in self._line_bookmark_order:
+            if b in self._line_bookmarks and 0 <= b < n and b not in seen:
+                ordered.append(b + 1)
+                seen.add(b)
+        for b in sorted(self._line_bookmarks):
+            if 0 <= b < n and b not in seen:
+                ordered.append(b + 1)
+                seen.add(b)
+        return ordered
 
     def list_line_bookmarks_with_labels(self) -> list[tuple[int, str]]:
-        """[(1-basierte Zeile, Label), …] sortiert; Label kann leer sein."""
+        """[(1-basierte Zeile, Label), …] in Anzeige-Reihenfolge; Label kann leer sein."""
         out: list[tuple[int, str]] = []
         for line in self.list_line_bookmarks():
             out.append((line, self.get_line_bookmark_label(line)))
         return out
 
+    def reorder_line_bookmarks(self, lines: list[int]) -> list[int]:
+        """
+        Anzeige-Reihenfolge der Lesezeichen setzen (1-basierte Zeilen).
+        Unbekannte/ungültige Zeilen werden ignoriert; fehlende Favoriten angehängt.
+        """
+        n = self.blockCount()
+        new_order: list[int] = []
+        seen: set[int] = set()
+        for ln in lines:
+            try:
+                block_no = int(ln) - 1
+            except (TypeError, ValueError):
+                continue
+            if block_no not in self._line_bookmarks or not (0 <= block_no < n):
+                continue
+            if block_no in seen:
+                continue
+            new_order.append(block_no)
+            seen.add(block_no)
+        for b in self._line_bookmark_order:
+            if b in self._line_bookmarks and b not in seen and 0 <= b < n:
+                new_order.append(b)
+                seen.add(b)
+        for b in sorted(self._line_bookmarks):
+            if b not in seen and 0 <= b < n:
+                new_order.append(b)
+                seen.add(b)
+        self._line_bookmark_order = new_order
+        self.line_bookmarks_changed.emit()
+        return self.list_line_bookmarks()
+
     def clear_line_bookmarks(self) -> None:
         self._line_bookmarks.clear()
+        self._line_bookmark_order.clear()
         self._line_bookmark_labels.clear()
         self._line_number_area.update()
         self.line_bookmarks_changed.emit()
@@ -176,18 +219,22 @@ class TextEditor(QPlainTextEdit):
             return False
         if block_no in self._line_bookmarks:
             self._line_bookmarks.discard(block_no)
+            if block_no in self._line_bookmark_order:
+                self._line_bookmark_order = [b for b in self._line_bookmark_order if b != block_no]
             self._line_bookmark_labels.pop(block_no, None)
             now = False
         else:
             self._line_bookmarks.add(block_no)
+            if block_no not in self._line_bookmark_order:
+                self._line_bookmark_order.append(block_no)
             now = True
         self._line_number_area.update()
         self.line_bookmarks_changed.emit()
         return now
 
     def goto_next_line_bookmark(self) -> int:
-        """Nächstes Lesezeichen ab Cursor; Rückgabe 1-basierte Zeile oder 0."""
-        marks = self.list_line_bookmarks()
+        """Nächstes Lesezeichen ab Cursor (nach Zeilennummer); Rückgabe 1-basierte Zeile oder 0."""
+        marks = sorted(self.list_line_bookmarks())
         if not marks:
             return 0
         cur = self.textCursor().blockNumber() + 1
@@ -199,8 +246,8 @@ class TextEditor(QPlainTextEdit):
         return marks[0]
 
     def goto_prev_line_bookmark(self) -> int:
-        """Vorheriges Lesezeichen; Rückgabe 1-basierte Zeile oder 0."""
-        marks = self.list_line_bookmarks()
+        """Vorheriges Lesezeichen (nach Zeilennummer); Rückgabe 1-basierte Zeile oder 0."""
+        marks = sorted(self.list_line_bookmarks())
         if not marks:
             return 0
         cur = self.textCursor().blockNumber() + 1
@@ -254,6 +301,8 @@ class TextEditor(QPlainTextEdit):
         for line, label in incoming:
             block_no = line - 1
             self._line_bookmarks.add(block_no)
+            if block_no not in self._line_bookmark_order:
+                self._line_bookmark_order.append(block_no)
             if label:
                 self._line_bookmark_labels[block_no] = label
             elif not merge:

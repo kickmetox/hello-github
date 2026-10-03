@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import List
+from typing import List, Tuple
 
 from instantlensdoc.config import config_dir
 
@@ -32,7 +32,11 @@ def _clamp_max(max_items: int | None) -> int:
     return max(RECENT_MAX_MIN, min(RECENT_MAX_MAX, n))
 
 
-def load_recent(max_items: int | None = None) -> List[str]:
+def load_recent_entries(max_items: int | None = None) -> List[Tuple[str, bool]]:
+    """
+    Recent-Einträge als [(pfad, existiert), …].
+    Fehlende Dateien bleiben in der Liste (für graue Anzeige + Entfernen).
+    """
     limit = _clamp_max(max_items)
     path = recent_path()
     if not path.exists():
@@ -42,19 +46,29 @@ def load_recent(max_items: int | None = None) -> List[str]:
         items = [str(p) for p in data.get("files", []) if p]
     except Exception:
         return []
-    # Nur existierende Pfade behalten
-    out: List[str] = []
+    out: List[Tuple[str, bool]] = []
     seen: set[str] = set()
     for p in items:
         key = str(Path(p))
         if key in seen:
             continue
         seen.add(key)
-        if Path(p).is_file():
-            out.append(str(Path(p)))
+        exists = Path(p).is_file()
+        out.append((key, exists))
         if len(out) >= limit:
             break
     return out
+
+
+def load_recent(max_items: int | None = None, *, existing_only: bool = False) -> List[str]:
+    """
+    Recent-Pfade laden.
+    Standard: inkl. fehlender Dateien. existing_only=True filtert wie früher.
+    """
+    entries = load_recent_entries(max_items=max_items)
+    if existing_only:
+        return [p for p, ok in entries if ok]
+    return [p for p, _ok in entries]
 
 
 def save_recent(files: List[str], max_items: int | None = None) -> None:
@@ -79,7 +93,17 @@ def save_recent(files: List[str], max_items: int | None = None) -> None:
 def add_recent(path: str | Path, max_items: int | None = None) -> List[str]:
     limit = _clamp_max(max_items)
     path = str(Path(path))
+    # Bestehende Liste inkl. fehlender behalten; neue Datei nach vorne
     files = [path] + [p for p in load_recent(max_items=limit * 2) if p != path]
+    save_recent(files, max_items=limit)
+    return load_recent(max_items=limit)
+
+
+def remove_recent(path: str | Path, max_items: int | None = None) -> List[str]:
+    """Einzelnen Pfad aus der Recent-Liste entfernen."""
+    limit = _clamp_max(max_items)
+    target = str(Path(path))
+    files = [p for p in load_recent(max_items=limit * 2) if p != target]
     save_recent(files, max_items=limit)
     return load_recent(max_items=limit)
 
