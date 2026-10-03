@@ -1,5 +1,23 @@
 # Changelog — InstantLens Doc
 
+## 1.7.2 — Präsentation Pause·Countdown·Intervalle, Favoriten Label·Tab·Duplikat-Pfade, Text→PDF Ordner·öffnen, Update Status·Offline
+
+Post-Release-Polish nach 1.7.1: **Präsentation-Timer** mit **Space = Pause**, **Countdown-Overlay** und festen Intervallen **3/5/10/30 s**; **Lesezeichen-Leiste** mit **Label bearbeiten**, **„In neuem Tab öffnen“** und **Duplikat-Pfad-Schutz**; **Text → PDF** merkt **Zielordner** und öffnet optional nach Export; **Update-Prüfung** mit Status **aktuell / neuer Build Hinweis** und **Offline-Fallback ohne Fehlerdialog**. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### PDF / Präsentation
+- Präsentation: Space pausiert/fortsetzt Auto-Advance; Countdown-Overlay; Intervalle aus|3|5|10|30 s
+- Globale Favoriten: Label editieren; In neuem Tab öffnen; ein Eintrag pro Pfad (Duplikate verhindert)
+
+### Editor / Export
+- Text → PDF: Zielordner merken (`last_text_pdf_dir`); optional nach Export öffnen (Settings)
+
+### Update / Packaging
+- Update-Hinweis: Status „aktuell“ / „neuer Build Hinweis“; Offline-Fallback ohne Fehlerdialog
+- Version **1.7.2** (App / `ild_pdf` / ISS / Smoke / Docs); `docs/VERSION` + `VERSION.txt`
+- Smoke: Präsentation Pause·Countdown·Intervalle, Favoriten Label/Tab/Dup-Pfad, text_pdf Ordner·öffnen, update status·offline (CLI + Qt)
+
+---
+
 ## 1.7.1 — Präsentation Timer·schwarz·Seitennummer, Favoriten Drag·fehlend·Export/Import, Text→PDF Schrift/Rand·Vorschau, Update Dismiss·Jetzt prüfen
 
 Post-Release-Polish nach 1.7.0: **Präsentation** mit optionalem **Timer-Autoadvance**, **schwarzem Hintergrund** und **Seitennummer-Overlay-Toggle** (Taste N); **Lesezeichen-Leiste** mit **Drag-Reorder**, **fehlende Dateien grau + Entfernen**, **Export/Import ildfav-v1**; **Text → PDF** mit **Schriftgröße/Ränder** in Settings und **Seitenvorschau**; **Update-Hinweis** **Dismiss bis nächste Version** und Menüpunkt **„Jetzt prüfen…“**. Stubs KI/Cloud/Stylus/3D bleiben Stubs.

@@ -30,12 +30,14 @@ DEFAULTS: dict[str, Any] = {
     "update_check_on_start": False,
     "update_dismissed_version": "",  # Update-Hinweis verworfen bis nächste Version — 1.7.1
     "presentation_hide_annotations": True,  # Ann.-Overlay in Präsentation aus — 1.7.0
-    "presentation_auto_advance_sec": 0,  # 0=aus, sonst Sekunden Auto-Advance — 1.7.1
+    "presentation_auto_advance_sec": 0,  # 0=aus, sonst 3|5|10|30 s — 1.7.2
     "presentation_black_background": True,  # schwarzer Präsentations-Hintergrund — 1.7.1
     "presentation_show_page_number": True,  # Seitennummer-Overlay in Präsentation — 1.7.1
     "favorites_bar_visible": True,  # globale Lesezeichen-Leiste — 1.7.0
     "text_pdf_font_size": 11.0,  # Text→PDF Schriftgröße pt — 1.7.1
     "text_pdf_margin": 50.0,  # Text→PDF Rand pt — 1.7.1
+    "last_text_pdf_dir": "",  # letzter Zielordner Text→PDF — 1.7.2
+    "text_pdf_open_after": False,  # nach Text→PDF optional öffnen — 1.7.2
     "last_export_dir": "",
     "last_ann_export_dir": "",  # letzter Zielordner Ann.-Export JSON — 1.2.1
     "ann_export_filename_template": "{stem}_ann.json",  # Dateiname-Template — 1.2.1
@@ -465,21 +467,47 @@ def set_presentation_hide_annotations(enabled: bool) -> None:
     save_settings({"presentation_hide_annotations": bool(enabled)})
 
 
+# Präsentation Auto-Advance: aus oder 3/5/10/30 s — 1.7.2
+PRESENTATION_AUTO_ADVANCE_CHOICES = (0, 3, 5, 10, 30)
+PRESENTATION_AUTO_ADVANCE_DEFAULT = 0
+
+
+def normalize_presentation_auto_advance_sec(seconds: int | float | str | None) -> int:
+    """Intervall auf 0|3|5|10|30 snappen (0 bleibt aus; sonst nächster erlaubter Wert)."""
+    try:
+        v = int(seconds)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return PRESENTATION_AUTO_ADVANCE_DEFAULT
+    if v <= 0:
+        return 0
+    if v in PRESENTATION_AUTO_ADVANCE_CHOICES:
+        return v
+    best = 3
+    best_dist = abs(best - v)
+    for choice in PRESENTATION_AUTO_ADVANCE_CHOICES:
+        if choice == 0:
+            continue
+        d = abs(choice - v)
+        if d < best_dist or (d == best_dist and choice > best):
+            best = choice
+            best_dist = d
+    return best
+
+
 def get_presentation_auto_advance_sec() -> int:
-    """Auto-Advance-Intervall in Sekunden (0 = aus) — 1.7.1."""
+    """Auto-Advance-Intervall in Sekunden (0 = aus; 3/5/10/30) — 1.7.2."""
     try:
         v = int(load_settings().get("presentation_auto_advance_sec", 0))
     except (TypeError, ValueError):
         v = 0
-    return max(0, min(300, v))
+    return normalize_presentation_auto_advance_sec(v)
 
 
-def set_presentation_auto_advance_sec(sec: int) -> None:
-    try:
-        v = int(sec)
-    except (TypeError, ValueError):
-        v = 0
-    save_settings({"presentation_auto_advance_sec": max(0, min(300, v))})
+def set_presentation_auto_advance_sec(sec: int) -> int:
+    """Auto-Advance setzen (0|3|5|10|30). Rückgabe: gespeicherter Wert — 1.7.2."""
+    v = normalize_presentation_auto_advance_sec(sec)
+    save_settings({"presentation_auto_advance_sec": v})
+    return v
 
 
 def get_presentation_black_background() -> bool:
@@ -541,6 +569,32 @@ def set_text_pdf_margin(margin: float) -> None:
     except (TypeError, ValueError):
         v = 50.0
     save_settings({"text_pdf_margin": max(10.0, min(120.0, v))})
+
+
+def get_last_text_pdf_dir() -> Path | None:
+    """Letzter Zielordner für Text → PDF — 1.7.2."""
+    raw = str(load_settings().get("last_text_pdf_dir") or "").strip()
+    if not raw:
+        return None
+    p = Path(raw)
+    return p if p.is_dir() else None
+
+
+def set_last_text_pdf_dir(path: str | Path) -> None:
+    """Text→PDF Zielordner merken — 1.7.2."""
+    p = Path(path)
+    if p.is_file():
+        p = p.parent
+    save_settings({"last_text_pdf_dir": str(p)})
+
+
+def get_text_pdf_open_after() -> bool:
+    """Nach Text→PDF Export optional öffnen — 1.7.2."""
+    return bool(load_settings().get("text_pdf_open_after", False))
+
+
+def set_text_pdf_open_after(enabled: bool) -> None:
+    save_settings({"text_pdf_open_after": bool(enabled)})
 
 
 def get_last_export_dir() -> Path | None:

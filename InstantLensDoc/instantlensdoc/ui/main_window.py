@@ -72,6 +72,7 @@ from instantlensdoc.core.app_settings import (
     get_editor_markdown_preview,
     get_editor_soft_wrap,
     get_last_export_dir,
+    get_last_text_pdf_dir,
     get_minimize_to_tray,
     get_page_size_unit,
     get_pdf_thumbnail_scale,
@@ -84,6 +85,7 @@ from instantlensdoc.core.app_settings import (
     get_presentation_show_page_number,
     get_text_pdf_font_size,
     get_text_pdf_margin,
+    get_text_pdf_open_after,
     get_update_check_on_start,
     get_update_dismissed_version,
     set_presentation_show_page_number,
@@ -95,6 +97,7 @@ from instantlensdoc.core.app_settings import (
     get_project_workspaces,
     get_active_project_workspace,
     set_last_export_dir,
+    set_last_text_pdf_dir,
     set_window_geometry_b64,
     set_window_state_b64,
     toggle_page_size_unit,
@@ -107,7 +110,7 @@ from instantlensdoc.ui.file_dialogs import (
 
 
 class GlobalFavoritesList(QListWidget):
-    """Horizontale globale Favoriten; Drag InternalMove → Reihenfolge — 1.7.1."""
+    """Horizontale globale Favoriten; Drag InternalMove → Reihenfolge — 1.7.2."""
 
     favorites_reordered = Signal(list)  # list[tuple[str, int]]
 
@@ -125,8 +128,8 @@ class GlobalFavoritesList(QListWidget):
         self.setMovement(QListWidget.Snap)
         self.setResizeMode(QListWidget.Adjust)
         self.setToolTip(
-            "Globale Favoriten (ildfav-v1) — Klick springt; ziehen zum Umsortieren; "
-            "fehlende Dateien grau — 1.7.1"
+            "Globale Favoriten (ildfav-v1) — Klick springt; Rechtsklick: Label / neuer Tab; "
+            "ziehen zum Umsortieren; Duplikat-Pfade verhindert — 1.7.2"
         )
         self._reorder_enabled = True
 
@@ -213,6 +216,10 @@ class MainWindow(QMainWindow):
         self._presentation_prev: dict | None = None
         self._presentation_timer: QTimer | None = None
         self._presentation_page_num_on = True
+        self._presentation_paused = False
+        self._presentation_interval_sec = 0
+        self._presentation_remaining = 0
+        self._presentation_countdown: QLabel | None = None
         self._fav_bar_buttons: list = []
         self._unsaved_paths: set[str] = set()
         self._readonly_preview_paths: set[str] = set()  # Merge-Vorschau-Tabs — 1.1.5
@@ -3158,23 +3165,81 @@ class MainWindow(QMainWindow):
         self._start_presentation_timer()
         ann_note = " · Ann. aus" if self._presentation_prev.get("hid_ann") else ""
         adv = get_presentation_auto_advance_sec()
-        adv_note = f" · Auto {adv}s" if adv > 0 else ""
+        adv_note = f" · Auto {adv}s · Space Pause" if adv > 0 else ""
         pn_note = " · Nr. an" if self._presentation_page_num_on else " · Nr. aus"
         self._set_status(
             f"Präsentation — Seite {self.pdf_view.page_index + 1}/{self.pdf_view.page_count} "
             f"(←/→ Esc · N Nr.){ann_note}{adv_note}{pn_note}"
         )
 
+    def _ensure_countdown_overlay(self) -> QLabel:
+        """Countdown-Overlay Label (Präsentation Timer) — 1.7.2."""
+        lbl = getattr(self, "_presentation_countdown", None)
+        if lbl is None:
+            lbl = QLabel(self)
+            lbl.setObjectName("presentationCountdown")
+            lbl.setAlignment(Qt.AlignCenter)
+            lbl.setStyleSheet(
+                "QLabel#presentationCountdown {"
+                " background: rgba(0,0,0,180); color: #ffffff;"
+                " font-size: 28px; font-weight: 600;"
+                " padding: 8px 16px; border-radius: 8px;"
+                "}"
+            )
+            lbl.hide()
+            self._presentation_countdown = lbl
+        return lbl
+
+    def _position_countdown_overlay(self) -> None:
+        lbl = getattr(self, "_presentation_countdown", None)
+        if lbl is None or not lbl.isVisible():
+            return
+        lbl.adjustSize()
+        margin = 24
+        x = max(margin, self.width() - lbl.width() - margin)
+        y = margin
+        lbl.move(x, y)
+        lbl.raise_()
+
+    def _update_countdown_overlay(self) -> None:
+        """Countdown-Overlay Text/Pause aktualisieren — 1.7.2."""
+        sec = int(getattr(self, "_presentation_interval_sec", 0) or 0)
+        if (
+            not self._presentation_active
+            or sec <= 0
+            or not getattr(self, "_presentation_timer", None)
+        ):
+            self._hide_countdown_overlay()
+            return
+        lbl = self._ensure_countdown_overlay()
+        if getattr(self, "_presentation_paused", False):
+            lbl.setText("❚❚ Pause")
+        else:
+            rem = max(0, int(getattr(self, "_presentation_remaining", 0)))
+            lbl.setText(str(rem))
+        lbl.show()
+        self._position_countdown_overlay()
+
+    def _hide_countdown_overlay(self) -> None:
+        lbl = getattr(self, "_presentation_countdown", None)
+        if lbl is not None:
+            lbl.hide()
+
     def _start_presentation_timer(self) -> None:
-        """Timer-Autoadvance optional — 1.7.1."""
+        """Timer-Autoadvance mit 1s-Countdown; Intervalle 3/5/10/30 — 1.7.2."""
         self._stop_presentation_timer()
         sec = get_presentation_auto_advance_sec()
         if sec <= 0 or not self._presentation_active:
+            self._hide_countdown_overlay()
             return
+        self._presentation_paused = False
+        self._presentation_interval_sec = int(sec)
+        self._presentation_remaining = int(sec)
         self._presentation_timer = QTimer(self)
-        self._presentation_timer.setInterval(int(sec) * 1000)
-        self._presentation_timer.timeout.connect(self._presentation_auto_advance)
+        self._presentation_timer.setInterval(1000)
+        self._presentation_timer.timeout.connect(self._presentation_tick)
         self._presentation_timer.start()
+        self._update_countdown_overlay()
 
     def _stop_presentation_timer(self) -> None:
         t = getattr(self, "_presentation_timer", None)
@@ -3185,6 +3250,46 @@ class MainWindow(QMainWindow):
             except Exception:
                 pass
         self._presentation_timer = None
+        self._presentation_paused = False
+        self._presentation_remaining = 0
+        self._presentation_interval_sec = 0
+        self._hide_countdown_overlay()
+
+    def _presentation_tick(self) -> None:
+        """1s-Tick: Countdown; bei 0 Auto-Advance — 1.7.2."""
+        if not self._presentation_active:
+            self._stop_presentation_timer()
+            return
+        if getattr(self, "_presentation_paused", False):
+            self._update_countdown_overlay()
+            return
+        rem = int(getattr(self, "_presentation_remaining", 0)) - 1
+        self._presentation_remaining = rem
+        if rem <= 0:
+            self._presentation_auto_advance()
+            if self._presentation_active and getattr(self, "_presentation_timer", None):
+                self._presentation_remaining = int(
+                    getattr(self, "_presentation_interval_sec", 0) or 0
+                )
+        self._update_countdown_overlay()
+
+    def _toggle_presentation_pause(self) -> bool:
+        """Space: Timer Pause/Resume; True wenn behandelt — 1.7.2."""
+        if not self._presentation_active:
+            return False
+        if get_presentation_auto_advance_sec() <= 0:
+            return False
+        if getattr(self, "_presentation_timer", None) is None:
+            self._start_presentation_timer()
+            return True
+        self._presentation_paused = not bool(getattr(self, "_presentation_paused", False))
+        self._update_countdown_overlay()
+        state = "pausiert" if self._presentation_paused else "weiter"
+        self._set_status(
+            f"Präsentation — Timer {state} "
+            f"(noch {max(0, int(self._presentation_remaining))}s)"
+        )
+        return True
 
     def _presentation_auto_advance(self) -> None:
         if not self._presentation_active:
@@ -3292,6 +3397,11 @@ class MainWindow(QMainWindow):
                 return True
         return super().eventFilter(obj, event)
 
+    def resizeEvent(self, event):  # noqa: N802
+        super().resizeEvent(event)
+        if self._presentation_active:
+            self._position_countdown_overlay()
+
     def keyPressEvent(self, event):  # noqa: N802
         if self._presentation_active:
             key = event.key()
@@ -3303,6 +3413,11 @@ class MainWindow(QMainWindow):
                 self._toggle_presentation_page_number()
                 event.accept()
                 return
+            # Space: Pause/Resume wenn Timer aktiv, sonst nächste Seite — 1.7.2
+            if key == Qt.Key_Space:
+                if self._toggle_presentation_pause():
+                    event.accept()
+                    return
             if key in (Qt.Key_Right, Qt.Key_Down, Qt.Key_PageDown, Qt.Key_Space, Qt.Key_Return):
                 self.pdf_view.next_page()
                 self._start_presentation_timer()
@@ -8405,15 +8520,20 @@ class MainWindow(QMainWindow):
         from instantlensdoc.core.i18n import get_lang
         from instantlensdoc.core.update_check import check_for_updates, check_local_version
 
-        # Primär lokal (docs/VERSION / VERSION.txt); Online optional — kein Auto-Download — 1.7.0
-        result = check_local_version()
-        if not result.newer_available:
-            # Online nur wenn lokal kein neuer Hinweis — ergänzend
-            online = check_for_updates(allow_network=True)
-            if online.online:
-                result = online
-        msg = result.message(get_lang())
-        self._set_status(msg)
+        lang = get_lang()
+        # Primär lokal; Online optional; Offline-Fallback ohne Fehlerdialog — 1.7.2
+        try:
+            result = check_local_version()
+            if not result.newer_available:
+                # Online ergänzend; Offline → lokales Ergebnis inkl. Hinweis, kein Fehlerdialog
+                result = check_for_updates(allow_network=True)
+        except Exception:
+            # Nie Fehlerdialog bei Update-Prüfung — Status reicht
+            result = check_local_version()
+
+        status_lbl = result.status_label(lang)
+        msg = result.message(lang)
+        self._set_status(f"Update: {status_lbl} — {msg}")
 
         # Dismiss bis nächste Version — 1.7.1
         dismissed = get_update_dismissed_version()
@@ -8432,13 +8552,18 @@ class MainWindow(QMainWindow):
 
         if silent and not result.newer_available:
             return
+        title = (
+            "Update — neuer Build Hinweis"
+            if result.newer_available
+            else "Update — aktuell"
+        )
         if silent and result.newer_available:
             # Banner-ähnlich: Dialog mit Dismiss-Option
             box = QMessageBox(self)
-            box.setWindowTitle("Update-Hinweis")
+            box.setWindowTitle(title)
             box.setText(msg)
             box.setIcon(QMessageBox.Information)
-            btn_ok = box.addButton("OK", QMessageBox.AcceptRole)
+            box.addButton("OK", QMessageBox.AcceptRole)
             btn_dismiss = box.addButton(
                 "Bis nächste Version ausblenden", QMessageBox.ActionRole
             )
@@ -8450,7 +8575,7 @@ class MainWindow(QMainWindow):
         # Manuell („Jetzt prüfen“): immer Dialog; Dismiss nur wenn neuer Hinweis
         if result.newer_available:
             box = QMessageBox(self)
-            box.setWindowTitle("Update-Hinweis")
+            box.setWindowTitle(title)
             box.setText(msg)
             box.setIcon(QMessageBox.Information)
             box.addButton("OK", QMessageBox.AcceptRole)
@@ -8468,7 +8593,7 @@ class MainWindow(QMainWindow):
             if force and dismissed:
                 # Aktuell → Dismiss zurücksetzen
                 set_update_dismissed_version("")
-            QMessageBox.information(self, "Update-Hinweis", msg)
+            QMessageBox.information(self, title, msg)
 
     def _toggle_favorites_bar(self, checked: bool) -> None:
         from instantlensdoc.core.app_settings import set_favorites_bar_visible
@@ -8571,18 +8696,54 @@ class MainWindow(QMainWindow):
         exists = Path(path).is_file()
         act_go = menu.addAction("Springen")
         act_go.setEnabled(exists)
+        act_tab = menu.addAction("In neuem Tab öffnen")
+        act_tab.setEnabled(exists)
+        act_label = menu.addAction("Label bearbeiten…")
         act_rm = menu.addAction("Aus Leiste entfernen")
         if not exists:
             act_rm.setText("Fehlende Datei entfernen")
         chosen = menu.exec(widget.mapToGlobal(pos))
         if chosen is act_go:
             self._jump_global_favorite(path, page)
+        elif chosen is act_tab:
+            self._jump_global_favorite(path, page, force_open=True)
+        elif chosen is act_label:
+            self._edit_global_favorite_label(path, page)
         elif chosen is act_rm:
             from instantlensdoc.core.global_favorites import remove_global_favorite
 
             remove_global_favorite(path, page)
             self._refresh_favorites_bar()
             self._set_status("Favorit aus Leiste entfernt")
+
+    def _edit_global_favorite_label(self, path: str, page: int) -> None:
+        """Favoriten-Label editieren — 1.7.2."""
+        from PySide6.QtWidgets import QInputDialog
+        from instantlensdoc.core.global_favorites import (
+            load_global_favorites,
+            set_global_favorite_label,
+        )
+
+        current = ""
+        for fav in load_global_favorites():
+            try:
+                same = Path(fav.path).resolve() == Path(path).resolve()
+            except OSError:
+                same = str(Path(fav.path)) == str(Path(path))
+            if same:
+                current = fav.label or Path(fav.path).stem
+                break
+        text, ok = QInputDialog.getText(
+            self,
+            "Favoriten-Label",
+            "Anzeigename:",
+            text=current,
+        )
+        if not ok:
+            return
+        set_global_favorite_label(path, text, page=page)
+        self._refresh_favorites_bar()
+        self._set_status(f"Favoriten-Label: {(text or Path(path).stem).strip()[:40]}")
 
     def _export_global_favorites_json(self) -> None:
         from instantlensdoc.core.global_favorites import export_global_favorites_json
@@ -8668,7 +8829,10 @@ class MainWindow(QMainWindow):
         self._refresh_favorites_bar()
         self._set_status(f"Favorit: {Path(path).name} · S{page + 1}")
 
-    def _jump_global_favorite(self, path: str, page: int) -> None:
+    def _jump_global_favorite(
+        self, path: str, page: int, *, force_open: bool = False
+    ) -> None:
+        """Favorit öffnen; force_open = immer open_path (neuer Tab-Fokus) — 1.7.2."""
         p = Path(path)
         if not p.is_file():
             QMessageBox.warning(
@@ -8677,16 +8841,27 @@ class MainWindow(QMainWindow):
                 f"Datei nicht gefunden:\n{path}",
             )
             return
-        self.open_path(str(p))
+        same_doc = False
+        try:
+            cur = self.pdf_view.pdf_path
+            if cur and Path(cur).resolve() == p.resolve():
+                same_doc = True
+        except Exception:
+            same_doc = False
+        if force_open or not same_doc:
+            self.open_path(str(p))
         try:
             if self.pdf_view.pdf_path and self.pdf_view.page_count > 0:
-                self.pdf_view.goto_page(max(0, min(int(page), self.pdf_view.page_count - 1)))
+                self.pdf_view.goto_page(
+                    max(0, min(int(page), self.pdf_view.page_count - 1))
+                )
         except Exception:
             pass
-        self._set_status(f"Favorit → {p.name} · S{int(page) + 1}")
+        mode = "Tab" if force_open else "Jump"
+        self._set_status(f"Favorit ({mode}) → {p.name} · S{int(page) + 1}")
 
     def _export_text_to_pdf(self) -> None:
-        """Aktuellen Text-Tab als einfaches PDF (Schrift/Rand Settings, Seitenvorschau) — 1.7.1."""
+        """Text→PDF: Schrift/Rand, Seitenvorschau, Zielordner merken, optional öffnen — 1.7.2."""
         text = ""
         title = "InstantLens Doc"
         if self.stack.currentWidget() is self.editor_pane:
@@ -8733,7 +8908,7 @@ class MainWindow(QMainWindow):
         default_name = (self.doc.display_name if self.doc else "export") + ".pdf"
         if "." in default_name and not default_name.lower().endswith(".pdf"):
             default_name = Path(default_name).stem + ".pdf"
-        last_dir = get_last_export_dir()
+        last_dir = get_last_text_pdf_dir() or get_last_export_dir()
         start = str(Path(dialog_start_dir(last_dir)) / default_name)
         path, _ = QFileDialog.getSaveFileName(
             self, "Text → PDF", start, "PDF (*.pdf)"
@@ -8751,18 +8926,26 @@ class MainWindow(QMainWindow):
                 font_size=font_size,
                 margin=margin,
             )
+            set_last_text_pdf_dir(str(out))
             set_last_export_dir(str(out))
             remember_recent_dir(str(out))
             self._set_status(f"Text → PDF: {out.name} ({pages} Seite(n))")
-            ask = QMessageBox.question(
-                self,
-                "Text → PDF",
-                f"PDF gespeichert ({pages} Seite(n)):\n{out}\n\nJetzt öffnen?",
-                QMessageBox.Yes | QMessageBox.No,
-                QMessageBox.No,
-            )
-            if ask == QMessageBox.Yes:
+            if get_text_pdf_open_after():
                 self.open_path(str(out))
+            else:
+                ask = QMessageBox.question(
+                    self,
+                    "Text → PDF",
+                    (
+                        f"PDF gespeichert ({pages} Seite(n)):\n{out}\n\n"
+                        f"Jetzt öffnen?\n(Optional dauerhaft: Einstellungen → "
+                        f"Text→PDF nach Export öffnen)"
+                    ),
+                    QMessageBox.Yes | QMessageBox.No,
+                    QMessageBox.No,
+                )
+                if ask == QMessageBox.Yes:
+                    self.open_path(str(out))
         except Exception as e:
             QMessageBox.critical(self, "Text → PDF", f"Export fehlgeschlagen:\n{e}")
 

@@ -157,9 +157,11 @@ from instantlensdoc.core.app_settings import (
     get_presentation_auto_advance_sec,
     get_presentation_black_background,
     get_presentation_show_page_number,
+    PRESENTATION_AUTO_ADVANCE_CHOICES,
     get_favorites_bar_visible,
     get_text_pdf_font_size,
     get_text_pdf_margin,
+    get_text_pdf_open_after,
     get_update_check_on_start,
     get_wizard_completed,
     MERGE_DIFF_MAX_SIDE_MAX,
@@ -252,6 +254,7 @@ from instantlensdoc.core.app_settings import (
     set_presentation_auto_advance_sec,
     set_presentation_black_background,
     set_presentation_show_page_number,
+    set_text_pdf_open_after,
     set_favorites_bar_visible,
     set_text_pdf_font_size,
     set_text_pdf_margin,
@@ -1180,13 +1183,15 @@ class SettingsDialog(QDialog):
         )
         form.addRow(self.presentation_page_num)
 
-        self.presentation_auto_adv = QSpinBox()
-        self.presentation_auto_adv.setRange(0, 300)
-        self.presentation_auto_adv.setSuffix(" s")
-        self.presentation_auto_adv.setSpecialValueText("aus")
-        self.presentation_auto_adv.setValue(get_presentation_auto_advance_sec())
+        self.presentation_auto_adv = QComboBox()
+        cur_adv = get_presentation_auto_advance_sec()
+        for sec in PRESENTATION_AUTO_ADVANCE_CHOICES:
+            label = "aus" if sec == 0 else f"{sec} s"
+            self.presentation_auto_adv.addItem(label, sec)
+        idx_adv = self.presentation_auto_adv.findData(cur_adv)
+        self.presentation_auto_adv.setCurrentIndex(max(0, idx_adv))
         self.presentation_auto_adv.setToolTip(
-            "Timer-Autoadvance: 0 = aus, sonst Sekunden bis zur nächsten Seite — 1.7.1"
+            "Timer-Autoadvance: aus oder 3/5/10/30 s; Space = Pause; Countdown-Overlay — 1.7.2"
         )
         form.addRow("Präsentation: Auto-Advance", self.presentation_auto_adv)
 
@@ -1214,6 +1219,13 @@ class SettingsDialog(QDialog):
         self.text_pdf_margin.setValue(get_text_pdf_margin())
         self.text_pdf_margin.setToolTip("Seitenränder für Text → PDF — 1.7.1")
         form.addRow("Text→PDF Rand", self.text_pdf_margin)
+
+        self.text_pdf_open_after = QCheckBox("Text→PDF nach Export öffnen")
+        self.text_pdf_open_after.setChecked(get_text_pdf_open_after())
+        self.text_pdf_open_after.setToolTip(
+            "Nach Text → PDF die erzeugte Datei automatisch öffnen — 1.7.2"
+        )
+        form.addRow(self.text_pdf_open_after)
 
         self.batch_dir = QLineEdit()
         bd = get_batch_output_dir()
@@ -2039,10 +2051,15 @@ class SettingsDialog(QDialog):
         set_presentation_hide_annotations(self.presentation_hide_ann.isChecked())
         set_presentation_black_background(self.presentation_black_bg.isChecked())
         set_presentation_show_page_number(self.presentation_page_num.isChecked())
-        set_presentation_auto_advance_sec(int(self.presentation_auto_adv.value()))
+        try:
+            adv_sec = int(self.presentation_auto_adv.currentData() or 0)
+        except (TypeError, ValueError):
+            adv_sec = 0
+        set_presentation_auto_advance_sec(adv_sec)
         set_favorites_bar_visible(self.favorites_bar_chk.isChecked())
         set_text_pdf_font_size(float(self.text_pdf_font.value()))
         set_text_pdf_margin(float(self.text_pdf_margin.value()))
+        set_text_pdf_open_after(self.text_pdf_open_after.isChecked())
         set_crypto_reload_prefill_password(self.crypto_prefill.isChecked())
         # Favoriten-Leiste live nachziehen
         try:

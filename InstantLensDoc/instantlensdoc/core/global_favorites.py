@@ -50,23 +50,31 @@ def _normalize_entry(item: object) -> GlobalFavorite | None:
     return None
 
 
+def _path_key(path: str | Path) -> str:
+    """Kanonischer Pfad-Schlüssel (Duplikat-Pfade verhindern) — 1.7.2."""
+    try:
+        return str(Path(path).resolve())
+    except OSError:
+        return str(Path(path))
+
+
 def favorites_to_export_dict(
     favorites: Sequence[GlobalFavorite | dict],
     *,
     source: str = "",
 ) -> dict:
-    """Globale Favoriten → ildfav-v1 Dict (scope=global)."""
+    """Globale Favoriten → ildfav-v1 Dict (scope=global); ein Eintrag pro Pfad — 1.7.2."""
     out: list[dict] = []
-    seen: set[tuple[str, int]] = set()
+    seen: set[str] = set()
     for raw in favorites:
         fav = _normalize_entry(raw)
         if fav is None:
             continue
-        key = (str(Path(fav.path)), int(fav.page))
-        if key in seen:
+        pkey = _path_key(fav.path)
+        if pkey in seen:
             continue
-        seen.add(key)
-        entry: dict = {"path": key[0], "page": key[1]}
+        seen.add(pkey)
+        entry: dict = {"path": str(Path(fav.path)), "page": int(fav.page)}
         if fav.label:
             entry["label"] = fav.label
         out.append(entry)
@@ -110,7 +118,7 @@ def parse_favorites_dict(data: dict) -> list[GlobalFavorite]:
     if not isinstance(raw, (list, tuple)):
         raise FavoritesImportError("„favorites“ muss eine Liste sein.")
     out: list[GlobalFavorite] = []
-    seen: set[tuple[str, int]] = set()
+    seen: set[str] = set()
     for item in raw:
         # Per-Doc ildfav: reine Seitenzahlen — ohne path überspringen
         if isinstance(item, (int, float)) and not isinstance(item, bool):
@@ -118,11 +126,13 @@ def parse_favorites_dict(data: dict) -> list[GlobalFavorite]:
         fav = _normalize_entry(item)
         if fav is None:
             continue
-        key = (str(Path(fav.path)), int(fav.page))
-        if key in seen:
+        pkey = _path_key(fav.path)
+        if pkey in seen:
             continue
-        seen.add(key)
-        out.append(GlobalFavorite(path=key[0], page=key[1], label=fav.label))
+        seen.add(pkey)
+        out.append(
+            GlobalFavorite(path=str(Path(fav.path)), page=int(fav.page), label=fav.label)
+        )
         if len(out) >= GLOBAL_FAV_MAX:
             break
     return out
@@ -159,71 +169,107 @@ def add_global_favorite(
     *,
     label: str = "",
 ) -> list[GlobalFavorite]:
-    """Favorit vorne einfügen (max GLOBAL_FAV_MAX); Duplikat path+page → nach vorne."""
+    """Favorit vorne einfügen; Duplikat-Pfad → Seite/Label aktualisieren, nach vorne — 1.7.2."""
     p = str(Path(path))
+    pkey = _path_key(p)
     page_i = max(0, int(page))
     lbl = str(label or "").strip()[:80]
-    current = [f for f in load_global_favorites() if not (f.path == p and f.page == page_i)]
+    existing = load_global_favorites()
+    # Label beibehalten wenn leer und alter Eintrag existiert
+    if not lbl:
+        for old in existing:
+            if _path_key(old.path) == pkey and old.label:
+                lbl = old.label
+                break
+    current = [f for f in existing if _path_key(f.path) != pkey]
     current.insert(0, GlobalFavorite(path=p, page=page_i, label=lbl))
     current = current[:GLOBAL_FAV_MAX]
     save_global_favorites(current)
     return current
 
 
-def remove_global_favorite(path: str | Path, page: int) -> list[GlobalFavorite]:
-    p = str(Path(path))
-    page_i = int(page)
-    current = [f for f in load_global_favorites() if not (f.path == p and f.page == page_i)]
+def remove_global_favorite(path: str | Path, page: int | None = None) -> list[GlobalFavorite]:
+    """Favorit per Pfad entfernen (page ignoriert; ein Eintrag pro Pfad) — 1.7.2."""
+    pkey = _path_key(path)
+    current = [f for f in load_global_favorites() if _path_key(f.path) != pkey]
     save_global_favorites(current)
     return current
+
+
+def set_global_favorite_label(
+    path: str | Path,
+    label: str,
+    *,
+    page: int | None = None,
+) -> list[GlobalFavorite]:
+    """Label eines Favoriten (per Pfad) setzen — 1.7.2."""
+    pkey = _path_key(path)
+    lbl = str(label or "").strip()[:80]
+    current = load_global_favorites()
+    updated: list[GlobalFavorite] = []
+    found = False
+    for fav in current:
+        if _path_key(fav.path) == pkey:
+            new_page = int(page) if page is not None else fav.page
+            updated.append(
+                GlobalFavorite(path=fav.path, page=max(0, new_page), label=lbl)
+            )
+            found = True
+        else:
+            updated.append(fav)
+    if not found:
+        return current
+    save_global_favorites(updated)
+    return load_global_favorites()
 
 
 def reorder_global_favorites(
     order: Sequence[GlobalFavorite | dict | tuple],
 ) -> list[GlobalFavorite]:
-    """Neue Reihenfolge speichern (Drag-Reorder) — 1.7.1.
+    """Neue Reihenfolge speichern (Drag-Reorder); ein Eintrag pro Pfad — 1.7.2.
 
     ``order``: GlobalFavorite, Dict, oder ``(path, page)``-Tupel.
     Unbekannte Einträge werden übersprungen; fehlende bestehende Favoriten
     werden ans Ende angehängt.
     """
     current = load_global_favorites()
-    by_key = {(f.path, f.page): f for f in current}
+    by_path = {_path_key(f.path): f for f in current}
     new_list: list[GlobalFavorite] = []
-    seen: set[tuple[str, int]] = set()
+    seen: set[str] = set()
     for raw in order:
         fav: GlobalFavorite | None = None
         if isinstance(raw, GlobalFavorite):
             fav = raw
-        elif isinstance(raw, (tuple, list)) and len(raw) >= 2:
+        elif isinstance(raw, (tuple, list)) and len(raw) >= 1:
             try:
-                key = (str(Path(raw[0])), int(raw[1]))
+                pkey = _path_key(raw[0])
             except (TypeError, ValueError):
                 continue
-            fav = by_key.get(key)
+            fav = by_path.get(pkey)
         else:
             fav = _normalize_entry(raw)
         if fav is None:
             continue
-        key = (str(Path(fav.path)), int(fav.page))
-        if key in seen:
+        pkey = _path_key(fav.path)
+        if pkey in seen:
             continue
-        # Label aus aktuellem Store bevorzugen
-        existing = by_key.get(key)
+        existing = by_path.get(pkey)
         if existing is not None:
             fav = existing
         else:
-            fav = GlobalFavorite(path=key[0], page=key[1], label=fav.label)
-        seen.add(key)
+            fav = GlobalFavorite(
+                path=str(Path(fav.path)), page=int(fav.page), label=fav.label
+            )
+        seen.add(pkey)
         new_list.append(fav)
         if len(new_list) >= GLOBAL_FAV_MAX:
             break
     if len(new_list) < GLOBAL_FAV_MAX:
         for fav in current:
-            key = (fav.path, fav.page)
-            if key in seen:
+            pkey = _path_key(fav.path)
+            if pkey in seen:
                 continue
-            seen.add(key)
+            seen.add(pkey)
             new_list.append(fav)
             if len(new_list) >= GLOBAL_FAV_MAX:
                 break
@@ -258,14 +304,14 @@ def import_global_favorites_json(
     if not merge:
         save_global_favorites(incoming)
         return load_global_favorites()
-    # Merge: neue vorne, bestehende behalten
-    seen: set[tuple[str, int]] = set()
+    # Merge: neue vorne, bestehende behalten; Duplikat-Pfad überspringen — 1.7.2
+    seen: set[str] = set()
     merged: list[GlobalFavorite] = []
     for fav in list(incoming) + load_global_favorites():
-        key = (fav.path, fav.page)
-        if key in seen:
+        pkey = _path_key(fav.path)
+        if pkey in seen:
             continue
-        seen.add(key)
+        seen.add(pkey)
         merged.append(fav)
         if len(merged) >= GLOBAL_FAV_MAX:
             break

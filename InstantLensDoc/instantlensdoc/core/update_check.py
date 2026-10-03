@@ -3,20 +3,25 @@
 from __future__ import annotations
 
 import json
+import logging
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
+from typing import Literal, Optional
 
 from instantlensdoc import __version__
 from instantlensdoc.config import ROOT
+
+_log = logging.getLogger("instantlensdoc.update")
 
 # Öffentliche Version-Datei auf dem Feature-Branch (optional; Ausfall = offline OK)
 DEFAULT_VERSION_URL = (
     "https://raw.githubusercontent.com/kickmetox/hello-github/"
     "cursor/instantlensdoc-2108/InstantLensDoc/docs/VERSION"
 )
+
+UpdateStatus = Literal["current", "newer", "unknown"]
 
 
 @dataclass
@@ -28,9 +33,25 @@ class UpdateResult:
     message_de: str
     message_en: str
     reference_source: str = ""  # docs/VERSION | VERSION.txt | remote | none
+    status: UpdateStatus = "unknown"  # aktuell / neuer Build / unbekannt — 1.7.2
 
     def message(self, lang: str = "de") -> str:
         return self.message_en if str(lang).startswith("en") else self.message_de
+
+    def status_label(self, lang: str = "de") -> str:
+        """Kurzstatus: aktuell / neuer Build Hinweis / unbekannt — 1.7.2."""
+        de = {
+            "current": "aktuell",
+            "newer": "neuer Build Hinweis",
+            "unknown": "unbekannt",
+        }
+        en = {
+            "current": "up to date",
+            "newer": "newer build notice",
+            "unknown": "unknown",
+        }
+        table = en if str(lang).startswith("en") else de
+        return table.get(self.status, table["unknown"])
 
 
 def _parse_version_from_init(text: str) -> Optional[str]:
@@ -120,42 +141,49 @@ def check_local_version() -> UpdateResult:
             remote_version=None,
             online=False,
             newer_available=False,
+            status="unknown",
             message_de=(
-                f"Lokal: {local} — keine Referenzdatei "
-                f"(docs/VERSION / VERSION.txt) gefunden (nur Hinweis, kein Download)."
+                f"Status: unbekannt — lokal {local}, keine Referenzdatei "
+                f"(docs/VERSION / VERSION.txt) (nur Hinweis, kein Download)."
             ),
             message_en=(
-                f"Local: {local} — no reference file "
-                f"(docs/VERSION / VERSION.txt) found (hint only, no download)."
+                f"Status: unknown — local {local}, no reference file "
+                f"(docs/VERSION / VERSION.txt) (hint only, no download)."
             ),
             reference_source="none",
         )
     newer = _cmp_tuple(ref) > _cmp_tuple(local)
     older = _cmp_tuple(ref) < _cmp_tuple(local)
     if newer:
+        status: UpdateStatus = "newer"
         msg_de = (
-            f"Update-Hinweis: installiert {local}, Referenz {ref} ({source}). "
-            f"Kein Auto-Download."
+            f"Status: neuer Build Hinweis — installiert {local}, "
+            f"Referenz {ref} ({source}). Kein Auto-Download."
         )
         msg_en = (
-            f"Update notice: installed {local}, reference {ref} ({source}). "
-            f"No auto-download."
+            f"Status: newer build notice — installed {local}, "
+            f"reference {ref} ({source}). No auto-download."
         )
     elif older:
+        status = "current"
         msg_de = (
-            f"Lokal {local} ist neuer als Referenz {ref} ({source}) — nur Hinweis."
+            f"Status: aktuell — lokal {local} ist neuer als Referenz {ref} "
+            f"({source}) (nur Hinweis)."
         )
         msg_en = (
-            f"Local {local} is newer than reference {ref} ({source}) — hint only."
+            f"Status: up to date — local {local} is newer than reference {ref} "
+            f"({source}) (hint only)."
         )
     else:
-        msg_de = f"Aktuell: {local} (entspricht {source})."
-        msg_en = f"Up to date: {local} (matches {source})."
+        status = "current"
+        msg_de = f"Status: aktuell — {local} (entspricht {source})."
+        msg_en = f"Status: up to date — {local} (matches {source})."
     return UpdateResult(
         local_version=local,
         remote_version=ref,
         online=False,
         newer_available=newer,
+        status=status,
         message_de=msg_de,
         message_en=msg_en,
         reference_source=source,
@@ -171,6 +199,7 @@ def check_for_updates(
     """
     Primär: lokaler Vergleich gegen docs/VERSION / VERSION.txt (kein Download).
     Optional: Online-Vergleich gegen Remote-VERSION (nur Hinweis).
+    Offline-Fallback ohne Fehler — 1.7.2.
     """
     local_result = check_local_version()
     if not allow_network:
@@ -190,35 +219,64 @@ def check_for_updates(
                 remote_version=local_result.remote_version,
                 online=True,
                 newer_available=local_result.newer_available,
+                status=local_result.status,
                 message_de=local_result.message_de + " Online: Version nicht lesbar.",
                 message_en=local_result.message_en + " Online: could not parse version.",
                 reference_source=local_result.reference_source,
             )
         newer = _cmp_tuple(remote) > _cmp_tuple(local)
         if newer:
+            status: UpdateStatus = "newer"
             msg_de = (
-                f"Update-Hinweis: lokal {local} → remote {remote} "
+                f"Status: neuer Build Hinweis — lokal {local} → remote {remote} "
                 f"(kein Auto-Download)."
             )
             msg_en = (
-                f"Update notice: local {local} → remote {remote} "
+                f"Status: newer build notice — local {local} → remote {remote} "
                 f"(no auto-download)."
             )
         elif remote == local:
-            msg_de = f"Aktuell: {local} (entspricht Remote; lokal {local_result.reference_source or '—'})."
-            msg_en = f"Up to date: {local} (matches remote; local {local_result.reference_source or '—'})."
+            status = "current"
+            msg_de = (
+                f"Status: aktuell — {local} "
+                f"(entspricht Remote; lokal {local_result.reference_source or '—'})."
+            )
+            msg_en = (
+                f"Status: up to date — {local} "
+                f"(matches remote; local {local_result.reference_source or '—'})."
+            )
         else:
-            msg_de = f"Lokal {local} ist neuer/anders als Remote {remote} (nur Hinweis)."
-            msg_en = f"Local {local} is newer/different than remote {remote} (hint only)."
+            status = "current"
+            msg_de = (
+                f"Status: aktuell — lokal {local} ist neuer/anders als Remote {remote} "
+                f"(nur Hinweis)."
+            )
+            msg_en = (
+                f"Status: up to date — local {local} is newer/different than remote "
+                f"{remote} (hint only)."
+            )
         return UpdateResult(
             local_version=local,
             remote_version=remote,
             online=True,
             newer_available=newer,
+            status=status,
             message_de=msg_de,
             message_en=msg_en,
             reference_source="remote",
         )
-    except (urllib.error.URLError, TimeoutError, OSError, json.JSONDecodeError):
-        # Offline OK — lokaler Hinweis bleibt
-        return local_result
+    except (urllib.error.URLError, TimeoutError, OSError, json.JSONDecodeError, ValueError) as e:
+        # Offline-Fallback: lokal behalten, kein Fehlerdialog / kein Raise — 1.7.2
+        _log.debug("Update online fehlgeschlagen (offline OK): %s", e)
+        offline_note_de = " Offline: lokaler Vergleich (kein Fehler)."
+        offline_note_en = " Offline: local comparison (no error)."
+        return UpdateResult(
+            local_version=local_result.local_version,
+            remote_version=local_result.remote_version,
+            online=False,
+            newer_available=local_result.newer_available,
+            status=local_result.status,
+            message_de=local_result.message_de + offline_note_de,
+            message_en=local_result.message_en + offline_note_en,
+            reference_source=local_result.reference_source,
+        )

@@ -2,7 +2,7 @@
 
 Moderne Textverarbeitung mit PDF-Annotator, OCR-Bridge und Formulargenerator.
 
-**Version:** 1.7.1  
+**Version:** 1.7.2  
 **Hersteller:** Andreas Meyer · ame@sellerbach.de
 
 ## Quickstart (Windows)
@@ -33,8 +33,8 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an).
 
-## Neu in 1.7.1
+## Neu in 1.7.2
 
-Polish auf **1.7.0**: Präsentation Timer-Autoadvance · schwarzer Hintergrund · Seitennummer-Toggle; Favoriten Drag-Reorder · fehlende grau · Export/Import ildfav-v1; Text→PDF Schrift/Ränder · Seitenvorschau; Update Dismiss bis nächste Version · „Jetzt prüfen…“. Stubs KI/Cloud/Stylus/3D unverändert.
+Polish auf **1.7.1**: Präsentation Space-Pause · Countdown-Overlay · Intervalle 3/5/10/30 s; Favoriten Label editieren · In neuem Tab öffnen · Duplikat-Pfade; Text→PDF Zielordner merken · optional öffnen; Update-Status aktuell/neuer Build · Offline ohne Fehlerdialog. Stubs KI/Cloud/Stylus/3D unverändert.
 
 Siehe [CHANGELOG.md](CHANGELOG.md), [FEATURES.md](FEATURES.md) und [INFO.md](INFO.md).
