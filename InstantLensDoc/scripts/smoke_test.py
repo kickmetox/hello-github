@@ -8204,7 +8204,7 @@ def main() -> int:
         win._add_chained_frame()
         assert len(win.layout_doc.text_frames) >= 2
         assert "Lizenz:" in win.license_label.text() or "⚠" in win.license_label.text()
-        assert "v1.5.5" in win.version_label.text()
+        assert "v1.6.0" in win.version_label.text()
         # Lizenz <7 Tage: Style prominent
         st_lic = win.license_manager.status()
         if st_lic.allowed and st_lic.days_remaining < 7:
@@ -9081,7 +9081,7 @@ def main() -> int:
             assert KeyboardHelpDialog and SetPasswordDialog and CompressPdfDialog
             assert "1.6.0" in PLANNED["ki"]
             assert "Coming soon" in PLANNED["cloud"]
-            assert "1.6.0" in PLANNED["stylus"] and "1.5.5" in PLANNED["extrude3d"]
+            assert "1.6.0" in PLANNED["stylus"] and "1.6.0" in PLANNED["extrude3d"]
             # Toolbar ↔ Menü Sync Graustufen/Nacht
             win.pdf_view.set_grayscale(True)
             assert win._grayscale_action.isChecked()
