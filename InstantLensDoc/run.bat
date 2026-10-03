@@ -60,11 +60,11 @@ if defined ILD_HELP (
   echo   ILD_PYTHON       Optionaler Pfad zu python.exe ^(Env-Override, hoechste Prio^)
   echo                    Beispiel: set ILD_PYTHON=C:\Python312\python.exe
   echo                    Wenn gesetzt und Datei existiert: wird vor .venv/PATH genutzt.
-  echo                    Ungueltig/leer: Warnung + Fallback py -3 → python → python3
-  echo                    ^(danach .venv falls vorhanden^).
+  echo                    Ungueltig/leer: Warnung, dann .venv falls vorhanden,
+  echo                    sonst Fallback py -3 → python → python3.
   echo.
   echo Pruefungen:
-  echo   - Python 3.10+ ^(ILD_PYTHON, sonst Fallback py -3/python/python3, sonst .venv^)
+  echo   - Python 3.10+ ^(ILD_PYTHON, sonst .venv, sonst py -3/python/python3^)
   echo   - Kern-Pakete: PySide6, pypdfium2, pikepdf, Pillow
   echo.
   echo Exit-Codes:
