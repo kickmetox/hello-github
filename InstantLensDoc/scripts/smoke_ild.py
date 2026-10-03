@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Nightly/CI Smoke: CLI + Import-Checks für InstantLens Doc — 2.1.0/2.1.1.
+"""Nightly/CI Smoke: CLI + Import-Checks für InstantLens Doc — 2.1.0–2.1.2.
 
 Leichtgewichtig. Exit-Codes:
   0  OK
@@ -10,6 +10,7 @@ Aufruf:
   python scripts/smoke_ild.py
   python scripts/smoke_ild.py --qt          # optionale Qt-Source-Checks
   python scripts/smoke_ild.py --skip-qt     # Qt-Checks überspringen (Default)
+  python scripts/smoke_ild.py --json        # Summary als JSON (stdout)
   python scripts/smoke_ild.py -h
 """
 
@@ -17,9 +18,11 @@ from __future__ import annotations
 
 import argparse
 import importlib
+import json
 import os
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -29,11 +32,14 @@ if str(ROOT) not in sys.path:
 # Headless/CI: Qt ohne Display
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-EXPECTED_VERSION = "2.1.1"
+EXPECTED_VERSION = "2.1.2"
 
 EXIT_OK = 0
 EXIT_FAIL = 1
 EXIT_USAGE = 2
+
+
+_JSON_MODE = False
 
 
 def _fail(msg: str) -> None:
@@ -42,7 +48,8 @@ def _fail(msg: str) -> None:
 
 
 def _ok(msg: str) -> None:
-    print(f"OK: {msg}")
+    if not _JSON_MODE:
+        print(f"OK: {msg}")
 
 
 def check_version() -> None:
@@ -86,6 +93,8 @@ def check_imports(*, with_qt: bool) -> None:
             "text_layer_diff",
             "chk_ignore_ws",
             "chk_only_diff",
+            "chk_side_by_side",
+            "txt_template_edit",
             "_export_text_diff_txt",
         ),
         ROOT / "instantlensdoc" / "ui" / "pdf_view.py": (
@@ -96,6 +105,10 @@ def check_imports(*, with_qt: bool) -> None:
             "_toggle_measure_snap",
             "export_measures_csv",
             "dry_run",
+            "Nach Import Sidecar speichern",
+            "status_counts_de",
+            "get_measure_csv_utf8_bom",
+            "get_last_measure_csv_dir",
         ),
     }
     if with_qt:
@@ -133,7 +146,9 @@ def check_measure_and_diff() -> None:
     from ild_pdf import (
         Annotation,
         AnnotationType,
+        DIFF_FORMAT_SIDE_BY_SIDE,
         export_text_layer_diff_txt,
+        format_side_by_side_diff,
         text_layer_diff,
         text_to_pdf,
     )
@@ -143,12 +158,19 @@ def check_measure_and_diff() -> None:
     )
     from ild_pdf.annotate import AnnotationStore
     from instantlensdoc.core.app_settings import (
+        get_measure_csv_utf8_bom,
         get_measure_labels_persistent,
         get_measure_snap_to_annotation,
         get_measure_unit,
+        get_native_ann_import_save_sidecar,
+        get_textlayer_diff_side_by_side,
+        get_textlayer_diff_txt_template,
+        set_measure_csv_utf8_bom,
         set_measure_labels_persistent,
         set_measure_snap_to_annotation,
         set_measure_unit,
+        set_native_ann_import_save_sidecar,
+        set_textlayer_diff_side_by_side,
         toggle_measure_unit,
     )
 
@@ -166,6 +188,20 @@ def check_measure_and_diff() -> None:
     assert get_measure_snap_to_annotation() is False
     set_measure_labels_persistent(True)
     assert get_measure_labels_persistent() is True
+
+    # BOM / Sidecar-Toggle / Side-by-Side Settings — 2.1.2
+    set_measure_csv_utf8_bom(True)
+    assert get_measure_csv_utf8_bom() is True
+    set_measure_csv_utf8_bom(False)
+    assert get_measure_csv_utf8_bom() is False
+    set_measure_csv_utf8_bom(True)
+    set_native_ann_import_save_sidecar(True)
+    assert get_native_ann_import_save_sidecar() is True
+    set_textlayer_diff_side_by_side(True)
+    assert get_textlayer_diff_side_by_side() is True
+    set_textlayer_diff_side_by_side(False)
+    assert get_textlayer_diff_side_by_side() is False
+    assert "{stemA}" in get_textlayer_diff_txt_template()
 
     # Flächen-/Winkel-Labels
     area = Annotation(
@@ -204,9 +240,23 @@ def check_measure_and_diff() -> None:
             a, b, ignore_whitespace=True, only_differences=True
         )
         assert ws.ignore_whitespace and ws.only_differences
+        # Side-by-Side — 2.1.2
+        sbs = text_layer_diff(
+            a, b, diff_format=DIFF_FORMAT_SIDE_BY_SIDE, only_differences=True
+        )
+        assert sbs.side_by_side_diff
+        assert "|" in sbs.side_by_side_diff
+        assert format_side_by_side_diff(
+            ["a", "b"], ["a", "c"], only_differences=True
+        )
         txt_out = td_path / "diff.txt"
         export_text_layer_diff_txt(ws, txt_out)
         assert txt_out.is_file() and txt_out.stat().st_size > 0
+        txt_sbs = td_path / "diff_sbs.txt"
+        export_text_layer_diff_txt(
+            sbs, txt_sbs, diff_format=DIFF_FORMAT_SIDE_BY_SIDE
+        )
+        assert "Side-by-Side" in txt_sbs.read_text(encoding="utf-8")
         # Native Import auf Text-PDF (meist 0 Annots, API muss laufen)
         native = import_native_pdf_annotations(a)
         assert native.imported >= 0
@@ -217,28 +267,46 @@ def check_measure_and_diff() -> None:
         dry = import_native_into_store(store, a, dry_run=True)
         assert dry.dry_run is True
         assert len(store.annotations) == 0
-        # Messwerte CSV
+        assert "importiert" in dry.status_counts_de()
+        # Messwerte CSV Spalten Typ,Seite,Wert,Einheit + BOM — 2.1.2
         store.add(area)
         store.add(ang)
         csv_path = td_path / "messwerte.csv"
-        store.export_measures_csv(csv_path, scale=1.0, unit="mm")
+        store.export_measures_csv(csv_path, scale=1.0, unit="mm", utf8_bom=True)
         assert csv_path.is_file()
-        body = csv_path.read_text(encoding="utf-8")
+        body = csv_path.read_text(encoding="utf-8-sig")
+        assert body.startswith("Typ,Seite,Wert,Einheit") or body.splitlines()[
+            0
+        ].startswith("Typ")
         assert "measure_area" in body or "measure_angle" in body
+        csv_nobom = td_path / "messwerte_nobom.csv"
+        store.export_measures_csv(
+            csv_nobom, scale=1.0, unit="mm", utf8_bom=False
+        )
+        raw = csv_nobom.read_bytes()
+        assert not raw.startswith(b"\xef\xbb\xbf")
 
-    _ok("measure + textlayer-diff + native-import + measures-csv API")
+    _ok(
+        "measure + textlayer-diff + native-import + measures-csv "
+        "Typ/Seite/Wert/Einheit + side-by-side API"
+    )
 
 
 def check_changelog() -> None:
     cl = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    if "## 2.1.2" not in cl:
+        _fail("CHANGELOG fehlt ## 2.1.2")
     if "## 2.1.1" not in cl:
         _fail("CHANGELOG fehlt ## 2.1.1")
     if "## 2.1.0" not in cl:
         _fail("CHANGELOG fehlt ## 2.1.0")
     feat = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
-    if "2.1.1" not in feat:
-        _fail("FEATURES.md fehlt 2.1.1")
-    _ok("changelog + features")
+    if "2.1.2" not in feat:
+        _fail("FEATURES.md fehlt 2.1.2")
+    info = (ROOT / "INFO.md").read_text(encoding="utf-8")
+    if "smoke_ild" not in info or "--json" not in info:
+        _fail("INFO.md fehlt smoke_ild/--json Hinweis")
+    _ok("changelog + features + info(smoke_ild --json)")
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -267,6 +335,11 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="UI-Quelltext-Checks überspringen (Standard)",
     )
+    p.add_argument(
+        "--json",
+        action="store_true",
+        help="Summary als JSON auf stdout (inkl. duration_ms) — 2.1.2",
+    )
     return p
 
 
@@ -278,17 +351,21 @@ Aufruf:
   python scripts/smoke_ild.py
   python scripts/smoke_ild.py --qt
   python scripts/smoke_ild.py --skip-qt
+  python scripts/smoke_ild.py --json
   python scripts/smoke_ild.py -h
 
 Optionen:
   -h, --help     kurze DE-Hilfe (Exit 0)
   --qt           UI-Quelltext-Checks (compare_dialog/pdf_view) ausführen
   --skip-qt      UI-Checks überspringen (Default ohne --qt)
+  --json         Summary als JSON (ok/version/duration_ms/checks) — 2.1.2
 
 Exit-Codes:
   0  OK
   1  Fehler (Version/Import/Assertion)
   2  unbekannte Option
+
+Laufzeit: am Ende als „Laufzeit: N ms“ (oder duration_ms im JSON).
 """.rstrip()
     )
 
@@ -313,13 +390,63 @@ def main(argv: list[str] | None = None) -> int:
     if args.skip_qt:
         with_qt = False
 
-    print(f"smoke_ild.py — InstantLens Doc {EXPECTED_VERSION}")
-    check_version()
-    check_imports(with_qt=with_qt)
-    check_cli_version()
-    check_measure_and_diff()
-    check_changelog()
-    print("smoke_ild: OK")
+    as_json = bool(args.json)
+    global _JSON_MODE
+    _JSON_MODE = as_json
+    t0 = time.perf_counter()
+    checks: list[str] = []
+    if not as_json:
+        print(f"smoke_ild.py — InstantLens Doc {EXPECTED_VERSION}")
+    try:
+        check_version()
+        checks.append("version")
+        check_imports(with_qt=with_qt)
+        checks.append("imports")
+        check_cli_version()
+        checks.append("cli")
+        check_measure_and_diff()
+        checks.append("measure_diff_import")
+        check_changelog()
+        checks.append("changelog")
+    except SystemExit as e:
+        code = int(e.code) if e.code is not None else EXIT_FAIL
+        duration_ms = int(round((time.perf_counter() - t0) * 1000))
+        if as_json:
+            print(
+                json.dumps(
+                    {
+                        "ok": False,
+                        "version": EXPECTED_VERSION,
+                        "duration_ms": duration_ms,
+                        "with_qt": with_qt,
+                        "checks": checks,
+                        "exit": code,
+                    },
+                    ensure_ascii=False,
+                )
+            )
+        else:
+            print(f"Laufzeit: {duration_ms} ms")
+        return code if code != 0 else EXIT_FAIL
+
+    duration_ms = int(round((time.perf_counter() - t0) * 1000))
+    if as_json:
+        print(
+            json.dumps(
+                {
+                    "ok": True,
+                    "version": EXPECTED_VERSION,
+                    "duration_ms": duration_ms,
+                    "with_qt": with_qt,
+                    "checks": checks,
+                    "exit": EXIT_OK,
+                },
+                ensure_ascii=False,
+            )
+        )
+    else:
+        print(f"Laufzeit: {duration_ms} ms")
+        print("smoke_ild: OK")
     return EXIT_OK
 
 

@@ -2,7 +2,7 @@
 
 Moderne Textverarbeitung mit PDF-Annotator, OCR-Bridge und Formulargenerator.
 
-**Version:** 2.1.1  
+**Version:** 2.1.2  
 **Hersteller:** Andreas Meyer · ame@sellerbach.de
 
 ## Quickstart (Windows)
@@ -33,6 +33,12 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an).  
 User-Shortcuts: `.\scripts\install-ild.ps1` · Deinstallieren: `-Uninstall [-Quiet]` (Exit **0**/OK · **1**/Fehler; Quiet: Kurz-Summary, Exit 0 auch ohne Shortcuts).
+
+Nightly-Smoke: `python scripts\smoke_ild.py` · optional `--qt` · `--json` (Summary inkl. `duration_ms`).
+
+## Neu in 2.1.2
+
+Post-Release-Polish nach **2.1.1**: Kommentar-Import **Sidecar-Toggle · Status N/M**; Mess-CSV **Typ,Seite,Wert,Einheit · Ordner · BOM**; Textlayer **Side-by-Side · TXT-Template**; `smoke_ild.py` **`--json` · Laufzeit ms**. Stubs unverändert.
 
 ## Neu in 2.1.1
 

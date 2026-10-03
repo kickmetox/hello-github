@@ -2124,21 +2124,12 @@ class AnnotationStore:
                 writer.writerow({k: row.get(k, "") for k in self.CSV_FIELDS})
         return path
 
+    # Spalten Typ,Seite,Wert,Einheit — 2.1.2 (vorher engl. Keys + Extrafelder 2.1.1)
     MEASURE_CSV_FIELDS = (
-        "page",
-        "type",
-        "value",
-        "unit",
-        "label",
-        "x",
-        "y",
-        "width",
-        "height",
-        "callout_x",
-        "callout_y",
-        "p3_x",
-        "p3_y",
-        "id",
+        "Typ",
+        "Seite",
+        "Wert",
+        "Einheit",
     )
 
     def list_measure_annotations(self) -> List[Annotation]:
@@ -2156,8 +2147,9 @@ class AnnotationStore:
         *,
         scale: float = 1.0,
         unit: str = "mm",
+        utf8_bom: bool = True,
     ) -> Path:
-        """Messwerte (Lineal/Fläche/Winkel) als CSV exportieren — 2.1.1."""
+        """Messwerte als CSV (Typ,Seite,Wert,Einheit); optional UTF-8-BOM — 2.1.1/2.1.2."""
         path = Path(path)
         path.parent.mkdir(parents=True, exist_ok=True)
         u = (unit or "mm").lower().strip()
@@ -2178,23 +2170,14 @@ class AnnotationStore:
                 unit_out = u
             rows.append(
                 {
-                    "page": int(ann.page) + 1,
-                    "type": ann.type.value,
-                    "value": value,
-                    "unit": unit_out,
-                    "label": label,
-                    "x": round(float(ann.x), 3),
-                    "y": round(float(ann.y), 3),
-                    "width": round(float(ann.width), 3),
-                    "height": round(float(ann.height), 3),
-                    "callout_x": round(float(ann.callout_x), 3),
-                    "callout_y": round(float(ann.callout_y), 3),
-                    "p3_x": round(float(ann.p3_x), 3),
-                    "p3_y": round(float(ann.p3_y), 3),
-                    "id": ann.id,
+                    "Typ": ann.type.value,
+                    "Seite": int(ann.page) + 1,
+                    "Wert": value,
+                    "Einheit": unit_out,
                 }
             )
-        with path.open("w", encoding="utf-8-sig", newline="") as fh:
+        enc = "utf-8-sig" if utf8_bom else "utf-8"
+        with path.open("w", encoding=enc, newline="") as fh:
             writer = csv.DictWriter(
                 fh, fieldnames=list(self.MEASURE_CSV_FIELDS), extrasaction="ignore"
             )

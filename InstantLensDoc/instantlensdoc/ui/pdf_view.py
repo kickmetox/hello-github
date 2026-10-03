@@ -6281,7 +6281,7 @@ class PdfViewer(QWidget):
             return False
 
     def export_measures_csv(self) -> bool:
-        """Messwerte (Lineal/Fläche/Winkel) als CSV exportieren — 2.1.1."""
+        """Messwerte CSV (Typ,Seite,Wert,Einheit); Zielordner merken; BOM-Option — 2.1.1/2.1.2."""
         if not self.store or not self.pdf_path:
             QMessageBox.information(self, "Messwerte", "Kein PDF geladen.")
             return False
@@ -6289,10 +6289,48 @@ class PdfViewer(QWidget):
         if not measures:
             QMessageBox.information(self, "Messwerte", "Keine Mess-Annotationen vorhanden.")
             return False
-        from PySide6.QtWidgets import QFileDialog
+        from PySide6.QtWidgets import (
+            QCheckBox,
+            QDialog,
+            QDialogButtonBox,
+            QFileDialog,
+            QLabel,
+            QVBoxLayout,
+        )
+
+        from instantlensdoc.core.app_settings import (
+            dialog_start_dir,
+            get_last_measure_csv_dir,
+            get_measure_csv_utf8_bom,
+            set_last_measure_csv_dir,
+            set_measure_csv_utf8_bom,
+        )
         from instantlensdoc.ui.file_dialogs import confirm_overwrite_export
 
-        default = str(self.pdf_path.with_suffix(self.pdf_path.suffix + ".messwerte.csv"))
+        opts = QDialog(self)
+        opts.setWindowTitle("Messwerte als CSV")
+        ol = QVBoxLayout(opts)
+        ol.addWidget(
+            QLabel(
+                f"{len(measures)} Messwert(e) · Spalten Typ,Seite,Wert,Einheit — 2.1.2"
+            )
+        )
+        chk_bom = QCheckBox("UTF-8 BOM (Excel)")
+        chk_bom.setChecked(get_measure_csv_utf8_bom())
+        chk_bom.setToolTip("CSV mit UTF-8-BOM schreiben (Excel-freundlich) — 2.1.2")
+        ol.addWidget(chk_bom)
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        buttons.button(QDialogButtonBox.Ok).setText("Speichern…")
+        buttons.accepted.connect(opts.accept)
+        buttons.rejected.connect(opts.reject)
+        ol.addWidget(buttons)
+        if opts.exec() != QDialog.Accepted:
+            return False
+        utf8_bom = bool(chk_bom.isChecked())
+        set_measure_csv_utf8_bom(utf8_bom)
+
+        start = dialog_start_dir(get_last_measure_csv_dir())
+        default = str(Path(start) / f"{self.pdf_path.stem}.messwerte.csv")
         path, _ = QFileDialog.getSaveFileName(
             self,
             "Messwerte als CSV exportieren",
@@ -6309,10 +6347,12 @@ class PdfViewer(QWidget):
         try:
             unit = self._measure_unit()
             saved = self.store.export_measures_csv(
-                dest, scale=self.scale, unit=unit
+                dest, scale=self.scale, unit=unit, utf8_bom=utf8_bom
             )
+            set_last_measure_csv_dir(saved.parent)
+            bom_s = "BOM" if utf8_bom else "ohne BOM"
             self.status.emit(
-                f"Messwerte CSV: {saved.name} ({len(measures)} · Einheit {unit})"
+                f"Messwerte CSV: {saved.name} ({len(measures)} · {unit} · {bom_s})"
             )
             return True
         except Exception as e:
@@ -6535,14 +6575,26 @@ class PdfViewer(QWidget):
             return False
 
     def import_native_pdf_comments(self) -> bool:
-        """Native PDF-Markup → Sidecar; Dry-Run-Zähler, Duplikat-Strategie, Fortschritt/Abbruch — 2.1.1."""
+        """Native PDF-Markup → Sidecar; Dry-Run, Sidecar-Toggle, Status N/M — 2.1.1/2.1.2."""
         if not self.store or not self.pdf_path:
             QMessageBox.information(self, "PDF-Kommentare", "Kein PDF geladen.")
             return False
         from PySide6.QtCore import Qt
-        from PySide6.QtWidgets import QApplication, QProgressDialog
+        from PySide6.QtWidgets import (
+            QApplication,
+            QCheckBox,
+            QDialog,
+            QDialogButtonBox,
+            QLabel,
+            QProgressDialog,
+            QVBoxLayout,
+        )
 
         from ild_pdf.pdf_ann_import import import_native_into_store
+        from instantlensdoc.core.app_settings import (
+            get_native_ann_import_save_sidecar,
+            set_native_ann_import_save_sidecar,
+        )
 
         # 1) Dry-Run: Zähler ohne Schreiben — 2.1.1
         try:
@@ -6559,26 +6611,48 @@ class PdfViewer(QWidget):
             QMessageBox.warning(self, "PDF-Kommentare importieren", str(e))
             return False
 
-        dry_msg = (
-            f"Dry-Run: {dry.candidates} Kandidaten, "
-            f"{dry.imported} neu (Duplikat-skip), "
-            f"{dry.duplicates_found} Duplikate zu Sidecar, "
-            f"{dry.skipped} Typen übersprungen, "
-            f"{dry.pages_scanned} Seiten.\n\n"
-            "Ja = anhängen · Nein = Sidecar ersetzen · Abbrechen = nichts\n"
-            "Hinweis: grobe Übernahme (QuadPoints→Box); Link/Widget übersprungen."
+        dry_dlg = QDialog(self)
+        dry_dlg.setWindowTitle("PDF-Kommentare importieren — Dry-Run")
+        dry_lay = QVBoxLayout(dry_dlg)
+        dry_lay.addWidget(
+            QLabel(
+                f"Dry-Run: {dry.status_counts_de()}\n"
+                f"Kandidaten={dry.candidates}, Duplikate={dry.duplicates_found}, "
+                f"Typen-Skip={dry.skipped}, Seiten={dry.pages_scanned}.\n\n"
+                "Anhängen = Sidecar erweitern · Ersetzen = Sidecar neu.\n"
+                "Hinweis: grobe Übernahme (QuadPoints→Box); Link/Widget übersprungen."
+            )
         )
-        reply = QMessageBox.question(
-            self,
-            "PDF-Kommentare importieren — Dry-Run",
-            dry_msg,
-            QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel,
-            QMessageBox.Yes,
+        chk_save_sidecar = QCheckBox("Nach Import Sidecar speichern")
+        chk_save_sidecar.setChecked(get_native_ann_import_save_sidecar())
+        chk_save_sidecar.setToolTip(
+            "Wenn an: Sidecar nach erfolgreichem Import sofort speichern — 2.1.2"
         )
-        if reply == QMessageBox.Cancel:
+        dry_lay.addWidget(chk_save_sidecar)
+        dry_btns = QDialogButtonBox()
+        btn_append = dry_btns.addButton("Anhängen", QDialogButtonBox.AcceptRole)
+        btn_replace = dry_btns.addButton("Ersetzen", QDialogButtonBox.ActionRole)
+        btn_cancel = dry_btns.addButton(QDialogButtonBox.Cancel)
+        dry_lay.addWidget(dry_btns)
+        choice = {"v": "cancel"}
+
+        def _append() -> None:
+            choice["v"] = "append"
+            dry_dlg.accept()
+
+        def _replace() -> None:
+            choice["v"] = "replace"
+            dry_dlg.accept()
+
+        btn_append.clicked.connect(_append)
+        btn_replace.clicked.connect(_replace)
+        btn_cancel.clicked.connect(dry_dlg.reject)
+        if dry_dlg.exec() != QDialog.Accepted or choice["v"] == "cancel":
             self.status.emit("PDF-Import abgebrochen (Dry-Run)")
             return False
-        replace = reply == QMessageBox.No
+        replace = choice["v"] == "replace"
+        save_sidecar = bool(chk_save_sidecar.isChecked())
+        set_native_ann_import_save_sidecar(save_sidecar)
 
         # Duplikat-Strategie nur beim Anhängen — 2.1.1
         dup_strategy = "keep"
@@ -6645,30 +6719,27 @@ class PdfViewer(QWidget):
             if not result.cancelled:
                 prog.setValue(prog.maximum())
             prog.close()
+            status_line = result.status_counts_de()
             if result.cancelled:
-                # Teilergebnis behalten wenn schon geschrieben — hier Abbruch vor/während Scan
-                # Store nur geändert wenn nicht cancelled vor Write; bei Cancel im Scan: unverändert
-                self.status.emit(
-                    f"PDF-Import abgebrochen — {result.summary_de()}"
-                )
+                self.status.emit(f"PDF-Import abgebrochen — {status_line}")
                 QMessageBox.information(
                     self,
                     "PDF-Kommentare — Abbruch",
-                    f"Import abgebrochen.\n{result.summary_de()}",
+                    f"Import abgebrochen.\n{status_line}\n{result.summary_de()}",
                 )
                 return False
-            self.schedule_sidecar_save(force=True)
+            if save_sidecar:
+                self.schedule_sidecar_save(force=True)
             self.refresh()
             self.annotations_changed.emit()
             mode = "ersetzt" if replace else "angehängt"
-            self.status.emit(
-                f"PDF-Import: {result.imported} {mode}; {result.summary_de()}"
-            )
+            side_s = " · Sidecar gespeichert" if save_sidecar else " · Sidecar nicht gespeichert"
+            self.status.emit(f"PDF-Import ({mode}): {status_line}{side_s}")
             if result.imported == 0:
                 QMessageBox.information(
                     self,
                     "PDF-Kommentare",
-                    f"Keine Annotationen übernommen.\n{result.summary_de()}",
+                    f"Keine Annotationen übernommen.\n{status_line}",
                 )
             return True
         except Exception as e:

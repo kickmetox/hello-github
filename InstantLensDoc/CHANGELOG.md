@@ -1,5 +1,23 @@
 # Changelog — InstantLens Doc
 
+## 2.1.2 — Kommentar-Import Sidecar-Toggle·Status N/M, Mess-CSV Typ/Seite/Wert/Einheit·Ordner·BOM, Textlayer Side-by-Side·TXT-Template, smoke_ild --json·ms
+
+Post-Release-Polish nach **2.1.1**: **PDF-Kommentar-Import** mit Toggle **„Nach Import Sidecar speichern“** und Status **„N importiert, M übersprungen“**; **Messwerte-CSV** Spalten **Typ,Seite,Wert,Einheit**, **Zielordner merken**, **UTF-8-BOM Option**; **Textlayer-Diff TXT** mit **Unified/Side-by-Side Toggle** und **Dateiname-Template**; **smoke_ild.py** **`--json` Summary**, **Laufzeit ms**, in Docs erwähnt. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen unverändert klar markiert / nicht produktiv.
+
+### Kommentar-Import / Messung
+- Dry-Run-Dialog: Checkbox Sidecar speichern (persistiert); Statuszeile „N importiert, M übersprungen“
+- Mess-CSV: Spalten Typ,Seite,Wert,Einheit; letzter Zielordner; BOM-Checkbox vor Speichern
+
+### Vergleich / CI
+- Textlayer: Side-by-Side Toggle (Panel + TXT); TXT-Dateiname-Template `{stemA}_vs_{stemB}_p{page}_text.diff.txt`
+- `scripts/smoke_ild.py`: `--json` (ok/version/duration_ms/checks) · Laufzeit ms · Docs (INFO/FEATURES)
+
+### Packaging / Docs
+- Version **2.1.2** (App / `ild_pdf` / ISS / Smoke / Docs); Serie **2.1**; `docs/VERSION` + `VERSION.txt`
+- Smoke: 2.1.2 CLI + Qt (Sidecar-Toggle/Status, Mess-CSV Spalten/BOM/Ordner, Side-by-Side/Template, smoke_ild --json)
+
+---
+
 ## 2.1.1 — Kommentar-Import Dry-Run·Duplikate·Fortschritt, Messung Snap·Labels·CSV, Textlayer Ignore-WS·Nur-Diff·TXT, smoke_ild Exit/--qt
 
 Post-Release-Polish nach **2.1.0**: **PDF-Kommentar-Import** mit **Dry-Run-Zählern**, **Duplikat-Strategie** (keep/skip/replace), **Fortschrittsdialog** und **Abbruch**; **Messung** mit optionalem **Snap-to-Annotation**, **persistenter Label-Anzeige** (bei mm/px-Toggle) und **Messwerte-CSV-Export**; **Textlayer-Diff** mit **Ignore-Whitespace**, **Nur-Unterschiede** und **Export Unified Diff TXT**; **smoke_ild.py** Exit-Codes **0/1/2**, optional **`--qt`/`--skip-qt`**, kurze **DE-Hilfe**. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen unverändert klar markiert / nicht produktiv.

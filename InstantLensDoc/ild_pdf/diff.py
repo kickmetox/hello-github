@@ -1,4 +1,4 @@
-"""Raster-Diff + Textlayer-Diff zweier PDF-Seiten — 1.4.0–1.4.2 / 2.1.0 / 2.1.1."""
+"""Raster-Diff + Textlayer-Diff zweier PDF-Seiten — 1.4.0–1.4.2 / 2.1.0–2.1.2."""
 
 from __future__ import annotations
 
@@ -9,6 +9,10 @@ from pathlib import Path
 from typing import Tuple
 
 from PIL import Image, ImageChops, ImageEnhance, ImageOps
+
+DIFF_FORMAT_UNIFIED = "unified"
+DIFF_FORMAT_SIDE_BY_SIDE = "side-by-side"
+DIFF_FORMATS = (DIFF_FORMAT_UNIFIED, DIFF_FORMAT_SIDE_BY_SIDE)
 
 
 @dataclass(frozen=True)
@@ -23,7 +27,7 @@ class RasterDiffResult:
 
 @dataclass(frozen=True)
 class TextLayerDiffResult:
-    """Ergebnis eines Textlayer-Vergleichs zweier PDF-Seiten — 2.1.0/2.1.1."""
+    """Ergebnis eines Textlayer-Vergleichs zweier PDF-Seiten — 2.1.0–2.1.2."""
 
     similarity_percent: float  # SequenceMatcher-Ratio 0–100
     left_text: str
@@ -34,6 +38,8 @@ class TextLayerDiffResult:
     changed_hunks: int
     ignore_whitespace: bool = False
     only_differences: bool = False
+    side_by_side_diff: str = ""  # Side-by-Side-Text — 2.1.2
+    diff_format: str = DIFF_FORMAT_UNIFIED  # unified | side-by-side — 2.1.2
 
 
 def _as_rgb(img: Image.Image) -> Image.Image:
@@ -131,6 +137,54 @@ def _filter_unified_only_differences(unified_lines: list[str]) -> list[str]:
     return out
 
 
+def format_side_by_side_diff(
+    left_lines: list[str],
+    right_lines: list[str],
+    *,
+    left_label: str = "Links",
+    right_label: str = "Rechts",
+    ignore_whitespace: bool = False,
+    only_differences: bool = False,
+    width: int = 48,
+) -> str:
+    """Side-by-Side Textlayer-Diff als Klartext — 2.1.2."""
+    a = list(left_lines)
+    b = list(right_lines)
+    a_cmp = [_ws_key(x) for x in a] if ignore_whitespace else a
+    b_cmp = [_ws_key(x) for x in b] if ignore_whitespace else b
+    sm = difflib.SequenceMatcher(a=a_cmp, b=b_cmp, autojunk=False)
+    w = max(12, min(120, int(width)))
+    rows: list[str] = [
+        f"--- {left_label}",
+        f"+++ {right_label}",
+        f"# Side-by-Side · Spaltenbreite {w}",
+        "",
+        f"{'L':<{w}} | {'R':<{w}}",
+        f"{'-' * w}-+-{'-' * w}",
+    ]
+    for tag, i1, i2, j1, j2 in sm.get_opcodes():
+        if tag == "equal":
+            if only_differences:
+                continue
+            for la, lb in zip(a[i1:i2], b[j1:j2]):
+                rows.append(f"  {la[:w]:<{w}} | {lb[:w]:<{w}}")
+        elif tag == "replace":
+            n = max(i2 - i1, j2 - j1)
+            for k in range(n):
+                la = a[i1 + k] if i1 + k < i2 else ""
+                lb = b[j1 + k] if j1 + k < j2 else ""
+                rows.append(f"~ {la[:w]:<{w}} | {lb[:w]:<{w}}")
+        elif tag == "delete":
+            for la in a[i1:i2]:
+                rows.append(f"- {la[:w]:<{w}} | {'':<{w}}")
+        elif tag == "insert":
+            for lb in b[j1:j2]:
+                rows.append(f"+ {'':<{w}} | {lb[:w]:<{w}}")
+    if len(rows) <= 6:
+        rows.append("(identischer Textlayer — kein Diff)")
+    return "\n".join(rows)
+
+
 def text_layer_diff(
     left_pdf: str | Path,
     right_pdf: str | Path,
@@ -142,11 +196,13 @@ def text_layer_diff(
     context: int = 2,
     ignore_whitespace: bool = False,
     only_differences: bool = False,
+    diff_format: str = DIFF_FORMAT_UNIFIED,
 ) -> TextLayerDiffResult:
     """
     Textlayer-Diff zweier PDF-Seiten (pypdfium2 Plaintext + difflib).
     Kein Raster — nur extrahierbarer Text. — 2.1.0
     ``ignore_whitespace`` / ``only_differences`` — 2.1.1.
+    ``diff_format`` unified|side-by-side — 2.1.2.
     """
     from .overlay import extract_page_plain_text
 
@@ -158,6 +214,8 @@ def text_layer_diff(
     ) or ""
     left_lines = left_text.replace("\r\n", "\n").split("\n")
     right_lines = right_text.replace("\r\n", "\n").split("\n")
+    fromfile = f"{Path(left_pdf).name}:p{left_page + 1}"
+    tofile = f"{Path(right_pdf).name}:p{right_page + 1}"
     if ignore_whitespace:
         a_cmp = [_ws_key(x) for x in left_lines]
         b_cmp = [_ws_key(x) for x in right_lines]
@@ -168,8 +226,6 @@ def text_layer_diff(
         # Unified Diff mit Normalisierung über SequenceMatcher auf Keys,
         # Anzeige aber Originalzeilen
         ud_lines: list[str] = []
-        fromfile = f"{Path(left_pdf).name}:p{left_page + 1}"
-        tofile = f"{Path(right_pdf).name}:p{right_page + 1}"
         ud_lines.append(f"--- {fromfile}")
         ud_lines.append(f"+++ {tofile}")
         sm_lines = difflib.SequenceMatcher(a=a_cmp, b=b_cmp, autojunk=False)
@@ -202,8 +258,8 @@ def text_layer_diff(
             difflib.unified_diff(
                 left_lines,
                 right_lines,
-                fromfile=f"{Path(left_pdf).name}:p{left_page + 1}",
-                tofile=f"{Path(right_pdf).name}:p{right_page + 1}",
+                fromfile=fromfile,
+                tofile=tofile,
                 lineterm="",
                 n=max(0, int(context)),
             )
@@ -213,6 +269,20 @@ def text_layer_diff(
         ud = _filter_unified_only_differences(ud)
     # Hunks ≈ Zeilen die mit @@ beginnen
     hunks = sum(1 for line in ud if line.startswith("@@"))
+    sbs = format_side_by_side_diff(
+        left_lines,
+        right_lines,
+        left_label=fromfile,
+        right_label=tofile,
+        ignore_whitespace=bool(ignore_whitespace),
+        only_differences=bool(only_differences),
+    )
+    fmt = (
+        DIFF_FORMAT_SIDE_BY_SIDE
+        if str(diff_format or "").lower().strip()
+        in ("side-by-side", "side_by_side", "sbs", "sidebyside")
+        else DIFF_FORMAT_UNIFIED
+    )
     return TextLayerDiffResult(
         similarity_percent=pct,
         left_text=left_text,
@@ -223,6 +293,8 @@ def text_layer_diff(
         changed_hunks=hunks,
         ignore_whitespace=bool(ignore_whitespace),
         only_differences=bool(only_differences),
+        side_by_side_diff=sbs,
+        diff_format=fmt,
     )
 
 
@@ -231,12 +303,17 @@ def export_text_layer_diff_txt(
     path: str | Path,
     *,
     title: str | None = None,
+    diff_format: str | None = None,
 ) -> Path:
-    """Unified Textlayer-Diff als TXT speichern — 2.1.1."""
+    """Textlayer-Diff als TXT (unified oder side-by-side) — 2.1.1/2.1.2."""
     dest = Path(path)
     dest.parent.mkdir(parents=True, exist_ok=True)
+    fmt = (diff_format or result.diff_format or DIFF_FORMAT_UNIFIED).lower().strip()
+    side = fmt in ("side-by-side", "side_by_side", "sbs", "sidebyside")
+    mode_label = "Side-by-Side" if side else "Unified"
     header = [
-        title or "InstantLens Doc — Textlayer Unified Diff",
+        title or f"InstantLens Doc — Textlayer {mode_label} Diff",
+        f"# Format: {mode_label}",
         f"# Ähnlichkeit: {result.similarity_percent:.1f} %",
         f"# Zeilen L/R: {result.left_lines}/{result.right_lines}",
         f"# Hunks: {result.changed_hunks}",
@@ -244,6 +321,9 @@ def export_text_layer_diff_txt(
         f"# Nur-Unterschiede: {result.only_differences}",
         "",
     ]
-    body = result.unified_diff or "(identischer Textlayer — kein Diff)"
+    if side:
+        body = result.side_by_side_diff or "(identischer Textlayer — kein Diff)"
+    else:
+        body = result.unified_diff or "(identischer Textlayer — kein Diff)"
     dest.write_text("\n".join(header) + body + "\n", encoding="utf-8")
     return dest

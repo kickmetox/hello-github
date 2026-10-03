@@ -26,23 +26,35 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
-from ild_pdf.diff import export_text_layer_diff_txt, raster_diff, text_layer_diff
+from ild_pdf.diff import (
+    DIFF_FORMAT_SIDE_BY_SIDE,
+    DIFF_FORMAT_UNIFIED,
+    export_text_layer_diff_txt,
+    raster_diff,
+    text_layer_diff,
+)
 from ild_pdf.limits import clamp_render_scale, inspect_pdf
 from ild_pdf.render import render_page
 from instantlensdoc.core.app_settings import (
+    DEFAULT_TEXTLAYER_DIFF_TXT_TEMPLATE,
     PDF_COMPARE_DIFF_THRESHOLD_MAX,
     PDF_COMPARE_DIFF_THRESHOLD_MIN,
     dialog_start_dir,
     get_last_pdf_diff_png_dir,
     get_pdf_compare_diff_threshold,
     get_pdf_compare_page_sync,
+    get_textlayer_diff_side_by_side,
+    get_textlayer_diff_txt_template,
     set_last_pdf_diff_png_dir,
     set_pdf_compare_diff_threshold,
     set_pdf_compare_page_sync,
+    set_textlayer_diff_side_by_side,
+    set_textlayer_diff_txt_template,
 )
 
 
 DIFF_PNG_FILENAME_TEMPLATE = "{stemA}_vs_{stemB}_p{page}.png"
+DIFF_TXT_FILENAME_TEMPLATE = DEFAULT_TEXTLAYER_DIFF_TXT_TEMPLATE
 DIFF_PNG_KNOWN_PLACEHOLDERS = frozenset({"stemA", "stemB", "page", "date"})
 _DIFF_PNG_PLACEHOLDER_RE = re.compile(r"\{(stemA|stemB|page|date)\}")
 _DIFF_PNG_ANY_PLACEHOLDER_RE = re.compile(r"\{([^{}]+)\}")
@@ -224,6 +236,12 @@ class PdfCompareDialog(QDialog):
             "Nur geänderte Zeilen im Unified Diff (ohne Context) — 2.1.1"
         )
         self.chk_only_diff.toggled.connect(lambda _: self._refresh())
+        self.chk_side_by_side = QCheckBox("Side-by-Side")
+        self.chk_side_by_side.setChecked(get_textlayer_diff_side_by_side())
+        self.chk_side_by_side.setToolTip(
+            "Textlayer-Diff Side-by-Side statt Unified (Panel + TXT) — 2.1.2"
+        )
+        self.chk_side_by_side.toggled.connect(self._on_side_by_side_toggled)
         self.spin_threshold = QSpinBox()
         self.spin_threshold.setRange(
             PDF_COMPARE_DIFF_THRESHOLD_MIN, PDF_COMPARE_DIFF_THRESHOLD_MAX
@@ -243,7 +261,8 @@ class PdfCompareDialog(QDialog):
         self.btn_export_diff = btn_export
         btn_export_txt = QPushButton("Diff TXT…")
         btn_export_txt.setToolTip(
-            "Textlayer Unified Diff als TXT exportieren — 2.1.1"
+            "Textlayer Diff als TXT (Unified/Side-by-Side) · "
+            "Dateiname-Template — 2.1.1/2.1.2"
         )
         btn_export_txt.clicked.connect(self._export_text_diff_txt)
         self.btn_export_text_diff = btn_export_txt
@@ -258,6 +277,7 @@ class PdfCompareDialog(QDialog):
         nav.addWidget(self.chk_text_diff)
         nav.addWidget(self.chk_ignore_ws)
         nav.addWidget(self.chk_only_diff)
+        nav.addWidget(self.chk_side_by_side)
         nav.addWidget(QLabel("Schwelle"))
         nav.addWidget(self.spin_threshold)
         nav.addWidget(btn_export)
@@ -311,6 +331,43 @@ class PdfCompareDialog(QDialog):
         )
         root.addWidget(self.png_template_preview)
 
+        # Textlayer Diff-TXT Template — 2.1.2
+        txt_tpl_row = QHBoxLayout()
+        txt_tpl_row.addWidget(QLabel("TXT-Template"))
+        self.txt_template_edit = DiffPngTemplateEdit(get_textlayer_diff_txt_template())
+        self.txt_template_edit.setPlaceholderText(DIFF_TXT_FILENAME_TEMPLATE)
+        self.txt_template_edit.setToolTip(
+            "Dateiname-Template für Diff TXT: {stemA}, {stemB}, {page}, {date} — 2.1.2"
+        )
+        self.txt_template_edit.textChanged.connect(self._update_txt_template_preview)
+        txt_tpl_row.addWidget(self.txt_template_edit, 1)
+        for token in ("{stemA}", "{stemB}", "{page}", "{date}"):
+            btn = QPushButton(token)
+            btn.setAutoDefault(False)
+            btn.setDefault(False)
+            btn.setFocusPolicy(Qt.TabFocus)
+            btn.setToolTip(f"Platzhalter {token} einfügen — 2.1.2")
+            btn.clicked.connect(
+                lambda _checked=False, t=token: self._insert_txt_template_placeholder(t)
+            )
+            txt_tpl_row.addWidget(btn)
+        self.btn_reset_txt_tpl = QPushButton("Reset TXT")
+        self.btn_reset_txt_tpl.setAutoDefault(False)
+        self.btn_reset_txt_tpl.setDefault(False)
+        self.btn_reset_txt_tpl.setToolTip(
+            f"TXT-Template auf Default ({DIFF_TXT_FILENAME_TEMPLATE}) — 2.1.2"
+        )
+        self.btn_reset_txt_tpl.clicked.connect(self._reset_txt_template)
+        txt_tpl_row.addWidget(self.btn_reset_txt_tpl)
+        root.addLayout(txt_tpl_row)
+        self.txt_template_preview = QLabel("")
+        self.txt_template_preview.setTextFormat(Qt.RichText)
+        self.txt_template_preview.setWordWrap(True)
+        self.txt_template_preview.setToolTip(
+            "Live-Vorschau Diff-TXT-Dateiname; ungültige Platzhalter rot — 2.1.2"
+        )
+        root.addWidget(self.txt_template_preview)
+
         self.lbl_similarity = QLabel("Ähnlichkeit: —")
         self.lbl_similarity.setToolTip(
             "Grobe Prozent-Ähnlichkeit nach Pixel-Schwellwert — 1.4.1"
@@ -335,7 +392,9 @@ class PdfCompareDialog(QDialog):
         # Diff-Panel: Raster-Bild oder Textlayer Unified Diff — 2.1.0
         self.diff_text = QPlainTextEdit()
         self.diff_text.setReadOnly(True)
-        self.diff_text.setPlaceholderText("Textlayer-Diff (Unified) — 2.1.0")
+        self.diff_text.setPlaceholderText(
+            "Textlayer-Diff (Unified / Side-by-Side) — 2.1.0/2.1.2"
+        )
         mono = QFont("Consolas")
         mono.setStyleHint(QFont.Monospace)
         mono.setPointSize(10)
@@ -367,6 +426,55 @@ class PdfCompareDialog(QDialog):
             self._load_meta(False)
         self._refresh()
         self._update_png_template_preview()
+        self._update_txt_template_preview()
+
+    def _on_side_by_side_toggled(self, checked: bool) -> None:
+        set_textlayer_diff_side_by_side(bool(checked))
+        self._refresh()
+
+    def _current_txt_template(self) -> str:
+        return (
+            self.txt_template_edit.text().strip() or DIFF_TXT_FILENAME_TEMPLATE
+        )
+
+    def _insert_txt_template_placeholder(self, token: str) -> None:
+        edit = self.txt_template_edit
+        if isinstance(edit, DiffPngTemplateEdit):
+            edit.restore_insert_position()
+        edit.insert(str(token or ""))
+        edit.setFocus()
+        set_textlayer_diff_txt_template(self._current_txt_template())
+        self._update_txt_template_preview()
+
+    def _reset_txt_template(self) -> None:
+        cur = self._current_txt_template()
+        if cur != DIFF_TXT_FILENAME_TEMPLATE:
+            reply = QMessageBox.question(
+                self,
+                "TXT-Template zurücksetzen",
+                "TXT-Template auf Default zurücksetzen?",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No,
+            )
+            if reply != QMessageBox.Yes:
+                return
+        self.txt_template_edit.setText(DIFF_TXT_FILENAME_TEMPLATE)
+        set_textlayer_diff_txt_template(DIFF_TXT_FILENAME_TEMPLATE)
+        self._update_txt_template_preview()
+
+    def _update_txt_template_preview(self) -> None:
+        stem_a = Path(self._left).stem if self._left else "a"
+        stem_b = Path(self._right).stem if self._right else "b"
+        page = int(self.spin_left.value()) if hasattr(self, "spin_left") else 1
+        tpl = self._current_txt_template()
+        name = format_diff_png_filename(stem_a, stem_b, page, tpl)
+        invalid = find_invalid_diff_png_placeholders(tpl)
+        html = highlight_diff_png_template_html(tpl)
+        note = f" → <code>{_html.escape(name)}</code>"
+        if invalid:
+            note += f" · ungültig: {', '.join(invalid)}"
+        self.txt_template_preview.setText(f"TXT: {html}{note}")
+        set_textlayer_diff_txt_template(tpl)
 
     def _current_png_template(self) -> str:
         return (
@@ -518,7 +626,7 @@ class PdfCompareDialog(QDialog):
             QMessageBox.critical(self, "Diff PNG", str(e))
 
     def _export_text_diff_txt(self) -> None:
-        """Textlayer Unified Diff als TXT speichern — 2.1.1."""
+        """Textlayer Diff als TXT (Unified/Side-by-Side) · Template — 2.1.1/2.1.2."""
         if not self.chk_text_diff.isChecked():
             QMessageBox.information(
                 self,
@@ -537,9 +645,12 @@ class PdfCompareDialog(QDialog):
         stem_b = Path(self._right).stem if self._right else "b"
         page = int(self.spin_left.value())
         start_dir = dialog_start_dir(get_last_pdf_diff_png_dir())
-        default = str(
-            Path(start_dir) / f"{stem_a}_vs_{stem_b}_p{page}_textlayer.diff.txt"
-        )
+        tpl = self._current_txt_template()
+        set_textlayer_diff_txt_template(tpl)
+        fname = format_diff_png_filename(stem_a, stem_b, page, tpl)
+        if not fname.lower().endswith(".txt"):
+            fname = f"{fname}.txt"
+        default = str(Path(start_dir) / fname)
         path, _ = QFileDialog.getSaveFileName(
             self, "Textlayer-Diff als TXT speichern", default, "Text (*.txt);;Alle (*.*)"
         )
@@ -549,9 +660,18 @@ class PdfCompareDialog(QDialog):
             out = Path(path)
             if out.suffix.lower() != ".txt":
                 out = out.with_suffix(".txt")
-            export_text_layer_diff_txt(self._text_diff_result, out)
+            fmt = (
+                DIFF_FORMAT_SIDE_BY_SIDE
+                if self.chk_side_by_side.isChecked()
+                else DIFF_FORMAT_UNIFIED
+            )
+            export_text_layer_diff_txt(
+                self._text_diff_result, out, diff_format=fmt
+            )
             set_last_pdf_diff_png_dir(out.parent)
-            QMessageBox.information(self, "Diff TXT", f"Gespeichert:\n{out}")
+            QMessageBox.information(
+                self, "Diff TXT", f"Gespeichert ({fmt}):\n{out}"
+            )
         except Exception as e:
             QMessageBox.critical(self, "Diff TXT", str(e))
 
@@ -673,6 +793,7 @@ class PdfCompareDialog(QDialog):
         ):
             self.diff_stack.setCurrentIndex(1)
             try:
+                side = bool(self.chk_side_by_side.isChecked())
                 tresult = text_layer_diff(
                     self._left,
                     self._right,
@@ -680,20 +801,30 @@ class PdfCompareDialog(QDialog):
                     right_page=max(0, int(self.spin_right.value()) - 1),
                     ignore_whitespace=bool(self.chk_ignore_ws.isChecked()),
                     only_differences=bool(self.chk_only_diff.isChecked()),
+                    diff_format=(
+                        DIFF_FORMAT_SIDE_BY_SIDE if side else DIFF_FORMAT_UNIFIED
+                    ),
                 )
                 self._text_diff_result = tresult
-                body = tresult.unified_diff or "(identischer Textlayer — kein Diff)"
+                if side:
+                    body = (
+                        tresult.side_by_side_diff
+                        or "(identischer Textlayer — kein Diff)"
+                    )
+                else:
+                    body = tresult.unified_diff or "(identischer Textlayer — kein Diff)"
                 self.diff_text.setPlainText(body)
                 flags = []
                 if tresult.ignore_whitespace:
                     flags.append("Ignore-WS")
                 if tresult.only_differences:
                     flags.append("Nur-Diff")
-                flag_s = f" · {', '.join(flags)}" if flags else ""
+                flags.append("Side-by-Side" if side else "Unified")
+                flag_s = f" · {', '.join(flags)}"
                 self.lbl_similarity.setText(
                     f"Textlayer-Ähnlichkeit: {tresult.similarity_percent:.1f} % "
                     f"({tresult.left_lines}/{tresult.right_lines} Zeilen, "
-                    f"{tresult.changed_hunks} Hunks{flag_s}) — 2.1.1"
+                    f"{tresult.changed_hunks} Hunks{flag_s}) — 2.1.2"
                 )
             except Exception as e:
                 self.diff_text.setPlainText(f"Textlayer-Diff-Fehler:\n{e}")
@@ -729,6 +860,7 @@ class PdfCompareDialog(QDialog):
             )
             self.lbl_similarity.setText("Ähnlichkeit: —")
         self._update_png_template_preview()
+        self._update_txt_template_preview()
 
 
 def _pil_to_qpixmap(img) -> QPixmap:

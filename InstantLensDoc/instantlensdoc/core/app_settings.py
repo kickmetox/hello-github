@@ -146,6 +146,11 @@ DEFAULTS: dict[str, Any] = {
     "measure_unit": "mm",  # Messanzeige mm|px — 2.1.0
     "measure_snap_to_annotation": False,  # Endpunkte an Ann.-Ecken snappen — 2.1.1
     "measure_labels_persistent": True,  # Mess-Labels in Sidecar/Overlay halten — 2.1.1
+    "measure_csv_utf8_bom": True,  # Messwerte-CSV UTF-8 BOM — 2.1.2
+    "last_measure_csv_dir": "",  # Zielordner Messwerte-CSV merken — 2.1.2
+    "native_ann_import_save_sidecar": True,  # nach Kommentar-Import Sidecar speichern — 2.1.2
+    "textlayer_diff_side_by_side": False,  # Textlayer Diff TXT/Panel Side-by-Side — 2.1.2
+    "textlayer_diff_txt_template": "{stemA}_vs_{stemB}_p{page}_text.diff.txt",  # 2.1.2
     "backup_on_save": False,
     "export_raster_dpi": 150,
     "print_grayscale": False,
@@ -3629,6 +3634,78 @@ def set_measure_labels_persistent(enabled: bool) -> bool:
     v = bool(enabled)
     save_settings({"measure_labels_persistent": v})
     return v
+
+
+def get_measure_csv_utf8_bom() -> bool:
+    """Messwerte-CSV mit UTF-8-BOM schreiben — 2.1.2."""
+    return bool(load_settings().get("measure_csv_utf8_bom", True))
+
+
+def set_measure_csv_utf8_bom(enabled: bool) -> bool:
+    v = bool(enabled)
+    save_settings({"measure_csv_utf8_bom": v})
+    return v
+
+
+def get_last_measure_csv_dir() -> Path | None:
+    """Zuletzt genutzter Zielordner für Messwerte-CSV — 2.1.2."""
+    raw = str(load_settings().get("last_measure_csv_dir", "") or "").strip()
+    if not raw:
+        return None
+    p = Path(raw)
+    return p if p.is_dir() else (p.parent if p.parent.is_dir() else None)
+
+
+def set_last_measure_csv_dir(path: str | Path) -> None:
+    p = Path(path)
+    if p.is_file():
+        p = p.parent
+    save_settings({"last_measure_csv_dir": str(p)})
+
+
+def get_native_ann_import_save_sidecar() -> bool:
+    """Nach PDF-Kommentar-Import Sidecar speichern — 2.1.2."""
+    return bool(load_settings().get("native_ann_import_save_sidecar", True))
+
+
+def set_native_ann_import_save_sidecar(enabled: bool) -> bool:
+    v = bool(enabled)
+    save_settings({"native_ann_import_save_sidecar": v})
+    return v
+
+
+DEFAULT_TEXTLAYER_DIFF_TXT_TEMPLATE = "{stemA}_vs_{stemB}_p{page}_text.diff.txt"
+
+
+def get_textlayer_diff_side_by_side() -> bool:
+    """Textlayer-Diff Side-by-Side statt Unified — 2.1.2."""
+    return bool(load_settings().get("textlayer_diff_side_by_side", False))
+
+
+def set_textlayer_diff_side_by_side(enabled: bool) -> bool:
+    v = bool(enabled)
+    save_settings({"textlayer_diff_side_by_side": v})
+    return v
+
+
+def get_textlayer_diff_txt_template() -> str:
+    """Dateiname-Template für Textlayer-Diff-TXT — 2.1.2."""
+    raw = str(
+        load_settings().get(
+            "textlayer_diff_txt_template",
+            DEFAULTS.get(
+                "textlayer_diff_txt_template", DEFAULT_TEXTLAYER_DIFF_TXT_TEMPLATE
+            ),
+        )
+        or DEFAULT_TEXTLAYER_DIFF_TXT_TEMPLATE
+    ).strip()
+    return raw or DEFAULT_TEXTLAYER_DIFF_TXT_TEMPLATE
+
+
+def set_textlayer_diff_txt_template(template: str) -> str:
+    tpl = str(template or "").strip() or DEFAULT_TEXTLAYER_DIFF_TXT_TEMPLATE
+    save_settings({"textlayer_diff_txt_template": tpl})
+    return tpl
 
 
 def get_backup_on_save() -> bool:

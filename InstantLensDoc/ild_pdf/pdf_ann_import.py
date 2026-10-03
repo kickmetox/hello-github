@@ -1,4 +1,4 @@
-"""Native PDF-Markup-Annotationen (pikepdf) grob in Sidecar-Annotationen mappen — 2.1.0/2.1.1."""
+"""Native PDF-Markup-Annotationen (pikepdf) grob in Sidecar-Annotationen mappen — 2.1.0–2.1.2."""
 
 from __future__ import annotations
 
@@ -36,7 +36,7 @@ CancelCallback = Callable[[], bool]
 
 @dataclass
 class NativeAnnImportResult:
-    """Ergebnis des nativen PDF-Kommentar-Imports — 2.1.0/2.1.1."""
+    """Ergebnis des nativen PDF-Kommentar-Imports — 2.1.0–2.1.2."""
 
     annotations: List[Annotation] = field(default_factory=list)
     imported: int = 0
@@ -53,12 +53,20 @@ class NativeAnnImportResult:
     def count(self) -> int:
         return self.imported
 
+    @property
+    def skipped_total(self) -> int:
+        """Typen-Skip + Duplikat-Skip — 2.1.2."""
+        return int(self.skipped) + int(self.duplicates_skipped)
+
+    def status_counts_de(self) -> str:
+        """Statuszeile „N importiert, M übersprungen“ — 2.1.2."""
+        return f"{int(self.imported)} importiert, {self.skipped_total} übersprungen"
+
     def summary_de(self) -> str:
-        """Kurze DE-Zusammenfassung der Zähler — 2.1.1."""
+        """Kurze DE-Zusammenfassung der Zähler — 2.1.1/2.1.2."""
         parts = [
+            self.status_counts_de(),
             f"Kandidaten={self.candidates or self.imported}",
-            f"übernommen={self.imported}",
-            f"übersprungen={self.skipped}",
             f"Seiten={self.pages_scanned}",
         ]
         if self.duplicates_found:

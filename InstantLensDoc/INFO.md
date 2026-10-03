@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **2.1.1** |
+| Version | **2.1.2** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -62,6 +62,26 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an / `checkedonce`)
+
+## Neu in 2.1.2
+
+Post-Release-Polish nach **2.1.1**:
+
+- **PDF-Kommentar-Import:** Toggle **Nach Import Sidecar speichern** · Status **„N importiert, M übersprungen“**
+- **Messung:** CSV-Spalten **Typ,Seite,Wert,Einheit** · Zielordner merken · UTF-8-BOM Option
+- **PDF-Vergleich:** Textlayer **Unified/Side-by-Side Toggle** · Diff-TXT **Dateiname-Template**
+- **Nightly-Smoke:** `smoke_ild.py` **`--json` Summary** · **Laufzeit ms** · in Docs erwähnt
+- Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen unverändert klar markiert
+
+## Nightly-Smoke
+
+```bat
+python scripts\smoke_ild.py
+python scripts\smoke_ild.py --qt
+python scripts\smoke_ild.py --json
+```
+
+Exit **0**/OK · **1**/Fehler · **2**/ungültige Option. `--json` liefert `ok`, `version`, `duration_ms`, `checks`. Ende (ohne `--json`): `Laufzeit: N ms` · `smoke_ild: OK`.
 
 ## Neu in 2.1.1
 

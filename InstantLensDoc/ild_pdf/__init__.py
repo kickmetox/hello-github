@@ -7,10 +7,14 @@ Basiert auf pypdfium2 (PDFium, lizenzfreundlich). Kein Poppler/GPL.
 from .document import PdfDocument, format_page_status
 from .render import render_page, render_pages
 from .diff import (
+    DIFF_FORMAT_SIDE_BY_SIDE,
+    DIFF_FORMAT_UNIFIED,
+    DIFF_FORMATS,
     RasterDiffResult,
     TextLayerDiffResult,
     align_images,
     export_text_layer_diff_txt,
+    format_side_by_side_diff,
     raster_diff,
     text_layer_diff,
 )
@@ -202,6 +206,10 @@ __all__ = [
     "raster_diff",
     "text_layer_diff",
     "export_text_layer_diff_txt",
+    "format_side_by_side_diff",
+    "DIFF_FORMAT_UNIFIED",
+    "DIFF_FORMAT_SIDE_BY_SIDE",
+    "DIFF_FORMATS",
     "NativeAnnImportResult",
     "DUPLICATE_STRATEGIES",
     "apply_duplicate_strategy",
@@ -361,4 +369,4 @@ __all__ = [
     "page_count_for_text",
 ]
 
-__version__ = "2.1.1"
+__version__ = "2.1.2"
