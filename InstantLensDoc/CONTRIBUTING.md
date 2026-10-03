@@ -47,10 +47,10 @@ Unter `.github/workflows/smoke-ild.yml` liegt ein **Workflow-Stub (manual only)*
 
 ## Sync (Windows)
 
-**Sync-Einzeiler** = Pfad zu `sync-ild.ps1` (Repo: `scripts/sync-ild.ps1`, lokal typisch `D:\AI_Temp\sync-ild.ps1`):
+**Sync-Einzeiler** = Pfad zu `sync-ild.ps1` (Repo: `scripts/sync-ild.ps1`, lokal typisch `D:\AI_Temp\sync-ild.ps1`).
 
-```powershell
-powershell -ExecutionPolicy Bypass -File "D:\AI_Temp\sync-ild.ps1"
-```
+**Copy-ready Sync (eine Zeile):**
+
+`powershell -ExecutionPolicy Bypass -File "D:\AI_Temp\sync-ild.ps1"`
 
 Siehe `INFO.md` / `scripts/sync-ild.ps1`.

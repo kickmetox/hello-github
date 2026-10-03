@@ -149,6 +149,9 @@ DEFAULTS: dict[str, Any] = {
     "measure_csv_utf8_bom": True,  # Messwerte-CSV UTF-8 BOM — 2.1.2
     "last_measure_csv_dir": "",  # Zielordner Messwerte-CSV merken — 2.1.2
     "measure_csv_filename_template": "{stem}_measures.csv",  # Live-Template — 2.1.3
+    "page_labels_txt_utf8_bom": True,  # PageLabels-TXT UTF-8 BOM — 2.2.4
+    "last_page_labels_txt_dir": "",  # Zielordner PageLabels-TXT merken — 2.2.4
+    "page_labels_txt_filename_template": "{stem}_labels.txt",  # Template — 2.2.4
     "native_ann_import_save_sidecar": True,  # nach Kommentar-Import Sidecar speichern — 2.1.2
     "textlayer_diff_side_by_side": False,  # Textlayer Diff TXT/Panel Side-by-Side — 2.1.2
     "textlayer_diff_txt_template": "{stemA}_vs_{stemB}_{mode}.txt",  # 2.1.3
@@ -3823,6 +3826,97 @@ def format_measure_csv_filename(
     if not name.lower().endswith(".csv"):
         name = name + ".csv"
     return name or f"{stem_s}_measures.csv"
+
+
+def get_page_labels_txt_utf8_bom() -> bool:
+    """PageLabels-TXT mit UTF-8-BOM schreiben — 2.2.4."""
+    return bool(load_settings().get("page_labels_txt_utf8_bom", True))
+
+
+def set_page_labels_txt_utf8_bom(enabled: bool) -> bool:
+    v = bool(enabled)
+    save_settings({"page_labels_txt_utf8_bom": v})
+    return v
+
+
+def get_last_page_labels_txt_dir() -> Path | None:
+    """Zuletzt genutzter Zielordner für PageLabels-TXT — 2.2.4."""
+    raw = str(load_settings().get("last_page_labels_txt_dir", "") or "").strip()
+    if not raw:
+        return None
+    p = Path(raw)
+    return p if p.is_dir() else (p.parent if p.parent.is_dir() else None)
+
+
+def set_last_page_labels_txt_dir(path: str | Path) -> None:
+    p = Path(path)
+    if p.is_file():
+        p = p.parent
+    save_settings({"last_page_labels_txt_dir": str(p)})
+
+
+DEFAULT_PAGE_LABELS_TXT_FILENAME_TEMPLATE = "{stem}_labels.txt"
+PAGE_LABELS_TXT_KNOWN_PLACEHOLDERS = frozenset({"stem", "date"})
+_PAGE_LABELS_TXT_ANY_PLACEHOLDER_RE = re.compile(r"\{([^{}]+)\}")
+
+
+def get_page_labels_txt_filename_template() -> str:
+    """Dateiname-Template PageLabels-TXT, Default ``{stem}_labels.txt`` — 2.2.4."""
+    raw = str(
+        load_settings().get(
+            "page_labels_txt_filename_template",
+            DEFAULTS.get(
+                "page_labels_txt_filename_template",
+                DEFAULT_PAGE_LABELS_TXT_FILENAME_TEMPLATE,
+            ),
+        )
+        or ""
+    ).strip()
+    if not raw:
+        return DEFAULT_PAGE_LABELS_TXT_FILENAME_TEMPLATE
+    raw = raw.replace("/", "_").replace("\\", "_")
+    if not raw.lower().endswith(".txt"):
+        raw = raw + ".txt"
+    return raw
+
+
+def set_page_labels_txt_filename_template(template: str) -> str:
+    """PageLabels-TXT-Template speichern — 2.2.4."""
+    raw = str(template or "").strip() or DEFAULT_PAGE_LABELS_TXT_FILENAME_TEMPLATE
+    raw = raw.replace("/", "_").replace("\\", "_")
+    if not raw.lower().endswith(".txt"):
+        raw = raw + ".txt"
+    save_settings({"page_labels_txt_filename_template": raw})
+    return raw
+
+
+def format_page_labels_txt_filename(
+    stem: str,
+    *,
+    template: str | None = None,
+    date: str | None = None,
+) -> str:
+    """
+    PageLabels-TXT-Dateiname aus Template.
+    Platzhalter: ``{stem}``, ``{date}`` (YYYY-MM-DD).
+    Default ``{stem}_labels.txt`` — 2.2.4.
+    """
+    from datetime import date as _date
+
+    tpl = (
+        template
+        if template is not None
+        else get_page_labels_txt_filename_template()
+    )
+    stem_s = (stem or "dokument").strip() or "dokument"
+    date_s = (date if date is not None else _date.today().isoformat()).strip()
+    name = str(tpl or DEFAULT_PAGE_LABELS_TXT_FILENAME_TEMPLATE).replace(
+        "{stem}", stem_s
+    ).replace("{date}", date_s)
+    name = name.replace("/", "_").replace("\\", "_")
+    if not name.lower().endswith(".txt"):
+        name = name + ".txt"
+    return name or f"{stem_s}_labels.txt"
 
 
 def get_native_ann_import_save_sidecar() -> bool:

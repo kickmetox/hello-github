@@ -1,6 +1,8 @@
-"""Dialog: benutzerdefinierte PDF-Seitenbeschriftungen — 2.2.0 / Polish 2.2.1–2.2.3."""
+"""Dialog: benutzerdefinierte PDF-Seitenbeschriftungen — 2.2.0 / Polish 2.2.1–2.2.4."""
 
 from __future__ import annotations
+
+from pathlib import Path
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
@@ -137,7 +139,10 @@ class PageLabelsDialog(QDialog):
         presets.addWidget(btn_arabic)
         btn_export_txt = QPushButton("Labels als TXT…")
         btn_export_txt.setObjectName("pageLabelExportTxt")
-        btn_export_txt.setToolTip("Aktuelle Labels als TXT exportieren — 2.2.3")
+        btn_export_txt.setToolTip(
+            "Labels als TXT: Template {stem}_labels.txt · Zielordner merken · "
+            "UTF-8-BOM Option — 2.2.4"
+        )
         btn_export_txt.clicked.connect(self._export_labels_txt)
         presets.addWidget(btn_export_txt)
         btn_clear = QPushButton("Alle leeren")
@@ -301,8 +306,22 @@ class PageLabelsDialog(QDialog):
         self._update_range_preview()
 
     def _export_labels_txt(self) -> None:
-        """Aktuelle Dialog-Labels als TXT speichern — 2.2.3."""
+        """
+        Labels als TXT: Template ``{stem}_labels.txt``, Zielordner merken,
+        UTF-8-BOM Option — 2.2.4 (Basis Export 2.2.3).
+        """
         from ild_pdf.page_labels import export_page_labels_txt
+        from instantlensdoc.core.app_settings import (
+            DEFAULT_PAGE_LABELS_TXT_FILENAME_TEMPLATE,
+            dialog_start_dir,
+            format_page_labels_txt_filename,
+            get_last_page_labels_txt_dir,
+            get_page_labels_txt_filename_template,
+            get_page_labels_txt_utf8_bom,
+            set_last_page_labels_txt_dir,
+            set_page_labels_txt_filename_template,
+            set_page_labels_txt_utf8_bom,
+        )
 
         labels = self.labels()
         if not labels:
@@ -310,16 +329,70 @@ class PageLabelsDialog(QDialog):
                 self, "Seitenbeschriftungen", "Keine Labels zum Exportieren."
             )
             return
-        stem = "page-labels"
+
+        stem = "dokument"
         try:
             p = getattr(self.pdf_view, "pdf_path", None)
             if p:
-                from pathlib import Path
-
-                stem = Path(p).stem + "-labels"
+                stem = Path(p).stem or "dokument"
         except Exception:
             pass
-        default = f"{stem}.txt"
+
+        opts = QDialog(self)
+        opts.setWindowTitle("Labels als TXT")
+        ol = QVBoxLayout(opts)
+        ol.addWidget(
+            QLabel(
+                f"{len(labels)} Label(s) · Template "
+                f"{DEFAULT_PAGE_LABELS_TXT_FILENAME_TEMPLATE} — 2.2.4"
+            )
+        )
+        chk_bom = QCheckBox("UTF-8 BOM (Excel)")
+        chk_bom.setObjectName("pageLabelTxtBom")
+        chk_bom.setChecked(get_page_labels_txt_utf8_bom())
+        chk_bom.setToolTip("TXT mit UTF-8-BOM schreiben (Excel-freundlich) — 2.2.4")
+        ol.addWidget(chk_bom)
+
+        tpl_row = QHBoxLayout()
+        tpl_row.addWidget(QLabel("Dateiname:"))
+        tpl_edit = QLineEdit(get_page_labels_txt_filename_template())
+        tpl_edit.setObjectName("pageLabelTxtTemplate")
+        tpl_edit.setPlaceholderText(DEFAULT_PAGE_LABELS_TXT_FILENAME_TEMPLATE)
+        tpl_edit.setToolTip(
+            "Template; Platzhalter {stem}/{date}; Default "
+            f"{DEFAULT_PAGE_LABELS_TXT_FILENAME_TEMPLATE} — 2.2.4"
+        )
+        tpl_row.addWidget(tpl_edit, 1)
+        ol.addLayout(tpl_row)
+        preview = QLabel("")
+        preview.setObjectName("pageLabelTxtPreview")
+        preview.setWordWrap(True)
+
+        def _update_preview() -> None:
+            tpl = tpl_edit.text().strip() or DEFAULT_PAGE_LABELS_TXT_FILENAME_TEMPLATE
+            name = format_page_labels_txt_filename(stem, template=tpl)
+            preview.setText(f"Vorschau: {name}")
+
+        tpl_edit.textChanged.connect(lambda _t: _update_preview())
+        _update_preview()
+        ol.addWidget(preview)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        buttons.button(QDialogButtonBox.Ok).setText("Speichern…")
+        buttons.accepted.connect(opts.accept)
+        buttons.rejected.connect(opts.reject)
+        ol.addWidget(buttons)
+        if opts.exec() != QDialog.Accepted:
+            return
+
+        utf8_bom = bool(chk_bom.isChecked())
+        set_page_labels_txt_utf8_bom(utf8_bom)
+        tpl = tpl_edit.text().strip() or DEFAULT_PAGE_LABELS_TXT_FILENAME_TEMPLATE
+        set_page_labels_txt_filename_template(tpl)
+
+        start = dialog_start_dir(get_last_page_labels_txt_dir())
+        fname = format_page_labels_txt_filename(stem, template=tpl)
+        default = str(Path(start) / fname)
         path, _ = QFileDialog.getSaveFileName(
             self,
             "Labels als TXT exportieren",
@@ -328,15 +401,20 @@ class PageLabelsDialog(QDialog):
         )
         if not path:
             return
+        dest = Path(path)
+        if dest.suffix.lower() != ".txt":
+            dest = dest.with_suffix(".txt")
         try:
-            out = export_page_labels_txt(path, labels)
+            out = export_page_labels_txt(dest, labels, utf8_bom=utf8_bom)
+            set_last_page_labels_txt_dir(out.parent)
         except Exception as e:
             QMessageBox.warning(
                 self, "Seitenbeschriftungen", f"Export fehlgeschlagen:\n{e}"
             )
             return
+        bom_s = "BOM" if utf8_bom else "ohne BOM"
         QMessageBox.information(
-            self, "Seitenbeschriftungen", f"Exportiert:\n{out}"
+            self, "Seitenbeschriftungen", f"Exportiert ({bom_s}):\n{out}"
         )
 
     def labels(self) -> list[str]:

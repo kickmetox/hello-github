@@ -2,16 +2,14 @@
 
 Moderne Textverarbeitung mit PDF-Annotator, OCR-Bridge und Formulargenerator.
 
-**Version:** 2.2.3  
+**Version:** 2.2.4  
 **Hersteller:** Andreas Meyer · ame@sellerbach.de
 
 ## Quickstart (Windows)
 
-Eine Sync-Zeile (Branch → `D:\AI_Temp\InstantLensDoc`, pip, Start):
+Copy-ready Sync (eine Zeile → `D:\AI_Temp\InstantLensDoc`, pip, Start):
 
-```powershell
-powershell -ExecutionPolicy Bypass -File "D:\AI_Temp\sync-ild.ps1"
-```
+`powershell -ExecutionPolicy Bypass -File "D:\AI_Temp\sync-ild.ps1"`
 
 Ohne Start: `…\sync-ild.ps1 -SkipStart` (Exit **0**/OK, **1**/Fehler, **2**/Git).
 
@@ -35,6 +33,10 @@ Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an).
 User-Shortcuts: `.\scripts\install-ild.ps1` · Deinstallieren: `-Uninstall [-Quiet]` (Exit **0**/OK · **1**/Fehler; Quiet: Kurz-Summary, Exit 0 auch ohne Shortcuts).
 
 Nightly-Smoke: `python scripts\smoke_ild.py` · optional `--qt` · `--json` (Summary: `ok`, `checks[]`, `duration_ms`, `version`; Fail: `checks[].error` max 200…, Exit=ok). Siehe **CONTRIBUTING.md**; Workflow-Stub `.github/workflows/smoke-ild.yml` (manual only).
+
+## Neu in 2.2.4
+
+Post-Release-Polish nach **2.2.3**: PageLabels TXT **Template `{stem}_labels.txt` · Zielordner · BOM**; Ink Status **Toast-Dauer Settings · A11y**; Historie **Clear-Zähler · Undo Clear**; CONTRIBUTING **Sync copy-ready Einzeiler**. Stubs unverändert (Ink ≠ Stylus).
 
 ## Neu in 2.2.3
 

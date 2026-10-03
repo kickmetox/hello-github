@@ -5888,9 +5888,9 @@ class PdfViewer(QWidget):
             self.schedule_sidecar_save(force=True)
             self.refresh()
             self.annotations_changed.emit()
-            # Nach Redo von Glätten denselben Status wie beim Anwenden — 2.2.3
+            # Nach Redo von Glätten denselben Toast wie beim Anwenden — 2.2.4
             if label == "Freihand glätten":
-                self.status.emit("Glättung angewandt")
+                self._show_smooth_status_toast("Glättung angewandt")
             else:
                 self.status.emit("Annotation wiederholt")
             return True
@@ -9360,9 +9360,94 @@ class PdfViewer(QWidget):
                         pass
                     self.refresh()
                     self.annotations_changed.emit()
-                    self.status.emit("Glättung angewandt")
+                    # Toast Dauer Settings + A11y — 2.2.4
+                    self._show_smooth_status_toast("Glättung angewandt")
             except Exception:
                 pass
+
+    def _announce_smooth_status_toast(self, msg: str) -> None:
+        """
+        Accessibility-Announcement für Ink-Glättungs-Status —
+        gleiche Pipeline wie OCR/HC/Import (AccessibleName + AnnouncementEvent)
+        — 2.2.4.
+        """
+        target = self
+        win = self.window()
+        if win is not None and hasattr(win, "statusBar"):
+            try:
+                sb = win.statusBar()
+                if sb is not None:
+                    target = sb
+            except Exception:
+                pass
+        try:
+            target.setAccessibleName(msg)
+            if hasattr(target, "setAccessibleDescription"):
+                target.setAccessibleDescription(msg)
+        except Exception:
+            pass
+        try:
+            from PySide6.QtGui import QAccessible, QAccessibleAnnouncementEvent
+
+            ev = QAccessibleAnnouncementEvent(target, msg)
+            QAccessible.updateAccessibility(ev)
+        except Exception:
+            try:
+                from PySide6.QtGui import QAccessible, QAccessibleEvent
+
+                ev = QAccessibleEvent(target, QAccessible.Event.NameChanged)
+                QAccessible.updateAccessibility(ev)
+            except Exception:
+                pass
+
+    def _show_smooth_status_toast(self, msg: str = "Glättung angewandt") -> None:
+        """
+        Ink-Glättungs-Status: Dauer aus OCR-Defaults-Toast-Settings + A11y — 2.2.4.
+        """
+        from PySide6.QtCore import QTimer
+
+        try:
+            from instantlensdoc.core.app_settings import get_ocr_defaults_toast_sec
+
+            ms = max(1, int(get_ocr_defaults_toast_sec())) * 1000
+        except Exception:
+            ms = 2000
+        self._smooth_status_toast_token = (
+            int(getattr(self, "_smooth_status_toast_token", 0)) + 1
+        )
+        token = self._smooth_status_toast_token
+        self._announce_smooth_status_toast(msg)
+        self.status.emit(msg)
+        win = self.window()
+        if win is not None and hasattr(win, "statusBar"):
+            try:
+                sb = win.statusBar()
+                sb.showMessage(msg, ms)
+            except Exception:
+                pass
+
+        def _clear() -> None:
+            if token != getattr(self, "_smooth_status_toast_token", 0):
+                return
+            target = self
+            if win is not None and hasattr(win, "statusBar"):
+                try:
+                    sb = win.statusBar()
+                    if sb is not None:
+                        target = sb
+                except Exception:
+                    pass
+            try:
+                if hasattr(target, "accessibleName") and (
+                    target.accessibleName() or ""
+                ) == msg:
+                    target.setAccessibleName("")
+                    if hasattr(target, "setAccessibleDescription"):
+                        target.setAccessibleDescription("")
+            except Exception:
+                pass
+
+        QTimer.singleShot(ms, _clear)
 
     def delete_last_ink_stroke(self) -> bool:
         """Letzten Freihand-Strich löschen (Undo-fähig) — 2.2.1."""

@@ -219,8 +219,13 @@ def export_page_labels_txt(
     labels: Sequence[str],
     *,
     start_page: int = 0,
+    utf8_bom: bool = False,
 ) -> Path:
-    """Labels als TXT exportieren (eine Zeile pro Seite: ``N\\tLabel``) — 2.2.3."""
+    """
+    Labels als TXT exportieren (eine Zeile pro Seite: ``N\\tLabel``) — 2.2.3.
+
+    ``utf8_bom=True``: UTF-8 mit BOM (Excel-freundlich) — 2.2.4.
+    """
     target = Path(path)
     target.parent.mkdir(parents=True, exist_ok=True)
     lo = max(0, int(start_page))
@@ -228,10 +233,12 @@ def export_page_labels_txt(
     for i, lab in enumerate(labels):
         text = str(lab or "").strip()
         lines.append(f"{lo + i + 1}\t{text}")
-    # UTF-8 mit Newline am Ende
+    # UTF-8 mit Newline am Ende; optional BOM — 2.2.4
     body = "\n".join(lines)
     if body:
         body += "\n"
+    if utf8_bom:
+        body = "\ufeff" + body
     target.write_text(body, encoding="utf-8")
     return target
 

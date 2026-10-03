@@ -1,5 +1,20 @@
 # Changelog — InstantLens Doc
 
+## 2.2.4 — PageLabels TXT Template {stem}_labels.txt·Zielordner·BOM, Ink Status-Toast Dauer Settings·A11y, Historie Clear-Zähler·Undo Clear, CONTRIBUTING Sync copy-ready Einzeiler
+
+Post-Release-Polish nach **2.2.3**: **Seitenbeschriftungen** TXT-Export mit Template **`{stem}_labels.txt`**, **Zielordner merken** und **UTF-8-BOM Option**; **Ink/Freihand Glättungs-Status** mit **Toast-Dauer aus Settings** und **A11y Announcement**; **Dokument-Historie** nach Clear mit Zähler **„N Einträge entfernt“** und **Undo Clear** (Session-Snapshot, sonst Hinweis); CONTRIBUTING **Sync-Befehl als eine Zeile copy-ready**. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen unverändert klar markiert / nicht produktiv (Ink ≠ Stylus).
+
+### Neu / verbessert
+- Seitenbeschriftungen: TXT-Template `{stem}_labels.txt` · Zielordner merken · UTF-8-BOM
+- Freihand (Ink): Status „Glättung angewandt“ Toast-Dauer Settings · A11y
+- Dokument-Historie: Clear-Zähler „N Einträge entfernt“ · Undo Clear (Session) bzw. Hinweis
+- CONTRIBUTING: Sync copy-ready Einzeiler
+
+### Tests / Qualität
+- Version **2.2.4** (App / `ild_pdf` / ISS / Smoke / Docs); Serie **2.2**; `docs/VERSION` + `VERSION.txt`
+- Smoke: 2.2.4 CLI + Qt (TXT template/dir/BOM, Ink toast/A11y, Historie Clear-Zähler/Undo, CONTRIBUTING Sync)
+- Stubs unverändert (nur Versionsmarker)
+
 ## 2.2.3 — PageLabels Vorschau Scroll-Liste 20·Export TXT, Ink Undo-Glätten Redo·Status „Glättung angewandt“, Historie Clear optional Filter·Export gefilterte Sicht, CONTRIBUTING Exitcode-Tabelle kurz + Link smoke_ild.py
 
 Post-Release-Polish nach **2.2.2**: **Seitenbeschriftungen** mit **Scroll-Liste der ersten 20 Labels** und **Export Labels als TXT**; **Ink/Freihand Glätten** mit **Redo ok** nach Undo und Status **„Glättung angewandt“**; **Dokument-Historie** **Clear optional nur aktuellen Filter** und **Export gefilterte Sicht**; CONTRIBUTING **Exitcode-Tabelle kurz** + Link zu [`scripts/smoke_ild.py`](scripts/smoke_ild.py). Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen unverändert klar markiert / nicht produktiv (Ink ≠ Stylus).

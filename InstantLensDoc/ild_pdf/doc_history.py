@@ -90,6 +90,10 @@ class DocHistory:
     pdf_path: Path
     entries: List[HistoryEntry] = field(default_factory=list)
     dirty: bool = False
+    # Session-Snapshot vor letztem Clear für Undo — 2.2.4
+    _clear_undo: Optional[List[HistoryEntry]] = field(
+        default=None, repr=False, compare=False
+    )
 
     def __post_init__(self) -> None:
         self.pdf_path = Path(self.pdf_path)
@@ -148,7 +152,12 @@ class DocHistory:
         Einträge löschen — Rückgabe: Anzahl entfernt.
 
         Ohne ``action``: alles. Mit ``action``: nur Einträge dieses Typs — 2.2.3.
+        Speichert Session-Snapshot für ``undo_clear`` — 2.2.4.
         """
+        # Snapshot vor Clear (tiefe Kopie) — Undo Clear — 2.2.4
+        self._clear_undo = [
+            HistoryEntry.from_dict(e.to_dict()) for e in self.entries
+        ]
         act = str(action or "").strip()
         if act and act not in ("*", "alle", "all", ""):
             before = len(self.entries)
@@ -168,6 +177,30 @@ class DocHistory:
     def clear_filtered(self, action: str | None, *, save: bool = True) -> int:
         """Nur aktuellen Filter (Aktionstyp) löschen — 2.2.3."""
         return self.clear(save=save, action=action)
+
+    def can_undo_clear(self) -> bool:
+        """True wenn Session-Snapshot nach Clear verfügbar — 2.2.4."""
+        return self._clear_undo is not None
+
+    def undo_clear(self, *, save: bool = True) -> bool:
+        """
+        Letztes Clear rückgängig machen (Session-Snapshot) — 2.2.4.
+
+        Rückgabe: True wenn wiederhergestellt, sonst False.
+        """
+        if self._clear_undo is None:
+            return False
+        self.entries = [
+            HistoryEntry.from_dict(e.to_dict()) for e in self._clear_undo
+        ]
+        self._clear_undo = None
+        self.dirty = True
+        if save:
+            try:
+                self.save()
+            except Exception:
+                pass
+        return True
 
     def last_entries(self, n: int = 20) -> list[HistoryEntry]:
         k = max(0, int(n))

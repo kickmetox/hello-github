@@ -1,4 +1,4 @@
-"""Panel: Dokument-Historie (ildhist-v1) — Filter/Export/Clear — 2.2.1–2.2.3."""
+"""Panel: Dokument-Historie (ildhist-v1) — Filter/Export/Clear — 2.2.1–2.2.4."""
 
 from __future__ import annotations
 
@@ -92,10 +92,19 @@ class DocHistoryDialog(QDialog):
         btn_clear = QPushButton("Leeren…")
         btn_clear.setObjectName("docHistoryClear")
         btn_clear.setToolTip(
-            "Historie leeren — optional nur aktuellen Filter — 2.2.3"
+            "Historie leeren — optional nur aktuellen Filter; "
+            "Zähler „N Einträge entfernt“ · Undo Clear wenn möglich — 2.2.4"
         )
         btn_clear.clicked.connect(self._clear_with_confirm)
         btn_row.addWidget(btn_clear)
+        self.btn_undo_clear = QPushButton("Clear rückgängig")
+        self.btn_undo_clear.setObjectName("docHistoryUndoClear")
+        self.btn_undo_clear.setEnabled(False)
+        self.btn_undo_clear.setToolTip(
+            "Letztes Clear in dieser Session rückgängig — 2.2.4"
+        )
+        self.btn_undo_clear.clicked.connect(self._undo_clear)
+        btn_row.addWidget(self.btn_undo_clear)
         btn_row.addStretch(1)
         layout.addLayout(btn_row)
 
@@ -196,8 +205,59 @@ class DocHistoryDialog(QDialog):
                 return
             self.accept()
 
+    def _after_clear(self, n_removed: int) -> None:
+        """Zähler „N Einträge entfernt“ + Undo Clear oder Hinweis — 2.2.4."""
+        self._reload()
+        can_undo = bool(self.hist.can_undo_clear())
+        self.btn_undo_clear.setEnabled(can_undo)
+        if n_removed <= 0:
+            return
+        count_msg = (
+            f"{n_removed} Eintrag entfernt"
+            if n_removed == 1
+            else f"{n_removed} Einträge entfernt"
+        )
+        if can_undo:
+            reply = QMessageBox.question(
+                self,
+                "Dokument-Historie",
+                f"{count_msg}.\n\nClear rückgängig machen?",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No,
+            )
+            if reply == QMessageBox.Yes:
+                self._undo_clear()
+        else:
+            QMessageBox.information(
+                self,
+                "Dokument-Historie",
+                f"{count_msg}.\n\n"
+                "Hinweis: Clear-Undo in dieser Session nicht verfügbar "
+                "(Snapshot fehlt).",
+            )
+
+    def _undo_clear(self) -> None:
+        """Letztes Clear aus Session-Snapshot wiederherstellen — 2.2.4."""
+        if not self.hist.can_undo_clear():
+            QMessageBox.information(
+                self,
+                "Dokument-Historie",
+                "Kein Clear-Undo verfügbar "
+                "(nur in derselben Session nach Leeren).",
+            )
+            self.btn_undo_clear.setEnabled(False)
+            return
+        if self.hist.undo_clear(save=True):
+            self._reload()
+            self.btn_undo_clear.setEnabled(False)
+            QMessageBox.information(
+                self, "Dokument-Historie", "Clear rückgängig gemacht."
+            )
+        else:
+            self.btn_undo_clear.setEnabled(False)
+
     def _clear_with_confirm(self) -> None:
-        """Clear: bei aktivem Filter optional nur Filter; sonst alles — 2.2.3."""
+        """Clear: bei aktivem Filter optional nur Filter; Zähler+Undo — 2.2.4."""
         filt = self._selected_action()
         if filt:
             n_filt = len(self.hist.filter_entries(filt, limit=10_000))
@@ -218,21 +278,22 @@ class DocHistoryDialog(QDialog):
             if reply == QMessageBox.Cancel:
                 return
             if reply == QMessageBox.Yes:
-                self.hist.clear_filtered(filt, save=True)
+                n_removed = self.hist.clear_filtered(filt, save=True)
             else:
                 # Nein = gesamte Historie (wie bisher mit Bestätigung)
                 n = len(self.hist.entries)
                 reply2 = QMessageBox.question(
                     self,
                     "Dokument-Historie leeren",
-                    f"Wirklich alle {n} Einträge unwiderruflich löschen?",
+                    f"Wirklich alle {n} Einträge löschen?\n"
+                    "(Undo Clear in dieser Session möglich — 2.2.4)",
                     QMessageBox.Yes | QMessageBox.No,
                     QMessageBox.No,
                 )
                 if reply2 != QMessageBox.Yes:
                     return
-                self.hist.clear(save=True)
-            self._reload()
+                n_removed = self.hist.clear(save=True)
+            self._after_clear(n_removed)
             return
         n = len(self.hist.entries)
         if n <= 0:
@@ -241,14 +302,15 @@ class DocHistoryDialog(QDialog):
         reply = QMessageBox.question(
             self,
             "Dokument-Historie leeren",
-            f"Wirklich alle {n} Einträge unwiderruflich löschen?",
+            f"Wirklich alle {n} Einträge löschen?\n"
+            "(Undo Clear in dieser Session möglich — 2.2.4)",
             QMessageBox.Yes | QMessageBox.No,
             QMessageBox.No,
         )
         if reply != QMessageBox.Yes:
             return
-        self.hist.clear(save=True)
-        self._reload()
+        n_removed = self.hist.clear(save=True)
+        self._after_clear(n_removed)
 
     def summary_text(self) -> str:
         """Textzusammenfassung (Tests/API) — 2.2.1 kompatibel."""
