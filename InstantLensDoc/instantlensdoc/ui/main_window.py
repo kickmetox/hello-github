@@ -1223,14 +1223,18 @@ class MainWindow(QMainWindow):
         self._pending_blink_active = False
         self._pending_was_pending = False
         self._split_scroll_syncing = False
-        # Sync-Scroll Statusleisten-Indikator (PDF↔PDF) — 2.4.1
+        # Sync-Scroll Statusleisten-Indikator (PDF↔PDF) — Klick toggled — 2.4.2
         self.sync_scroll_status_label = QLabel("")
         self.sync_scroll_status_label.setObjectName("syncScrollStatus")
         self.sync_scroll_status_label.setStyleSheet(
             "QLabel#syncScrollStatus { color: #555; padding-right: 8px; font-size: 11px; }"
         )
         self.sync_scroll_status_label.setToolTip(
-            "Sync-Scroll PDF↔PDF — Indikator an/aus in Einstellungen — 2.4.1"
+            "Sync-Scroll PDF↔PDF — Klick toggled · Shortcut Ctrl+Alt+\\ — 2.4.2"
+        )
+        self.sync_scroll_status_label.setCursor(Qt.PointingHandCursor)
+        self.sync_scroll_status_label.mousePressEvent = (  # type: ignore[method-assign]
+            lambda e: self._on_sync_scroll_status_clicked(e)
         )
         self.sync_scroll_status_label.setVisible(False)
         sb.addPermanentWidget(self.sync_scroll_status_label)
@@ -4920,8 +4924,27 @@ class MainWindow(QMainWindow):
         self._sync_page_hooks = True
         self._update_sync_scroll_status_indicator()
 
+    def _on_sync_scroll_status_clicked(self, event=None) -> None:
+        """Statusleisten-Klick toggled Sync-Scroll — 2.4.2."""
+        from instantlensdoc.core.app_settings import get_sync_scroll_status_indicator
+
+        if not get_sync_scroll_status_indicator():
+            return
+        act = getattr(self, "_doc_split_sync_action", None)
+        if act is not None:
+            act.toggle()
+        else:
+            from instantlensdoc.core.app_settings import (
+                get_editor_doc_split_sync_scroll,
+                set_editor_doc_split_sync_scroll,
+            )
+
+            nxt = not get_editor_doc_split_sync_scroll()
+            set_editor_doc_split_sync_scroll(nxt)
+            self._toggle_doc_split_sync_scroll(nxt)
+
     def _update_sync_scroll_status_indicator(self) -> None:
-        """Statusleiste: Sync an/aus nur wenn Indikator aktiv — 2.4.1."""
+        """Statusleiste: Sync an/aus; Klick toggled · Tooltip Shortcut — 2.4.2."""
         if not hasattr(self, "sync_scroll_status_label"):
             return
         from instantlensdoc.core.app_settings import (
@@ -4932,6 +4955,7 @@ class MainWindow(QMainWindow):
         show_pref = get_sync_scroll_status_indicator()
         enabled = get_editor_doc_split_sync_scroll()
         active = bool(enabled and self._split_both_pdf())
+        tip_suffix = " · Klick toggled · Shortcut Ctrl+Alt+\\ — 2.4.2"
         if not show_pref:
             self.sync_scroll_status_label.setVisible(False)
             self.sync_scroll_status_label.setText("")
@@ -4942,7 +4966,7 @@ class MainWindow(QMainWindow):
                 "QLabel#syncScrollStatus { color: #888; padding-right: 8px; font-size: 11px; }"
             )
             self.sync_scroll_status_label.setToolTip(
-                "Sync-Scroll aus (Ctrl+Alt+\\) — nur PDF↔PDF — 2.4.1"
+                "Sync-Scroll aus — nur PDF↔PDF" + tip_suffix
             )
             self.sync_scroll_status_label.setVisible(True)
             return
@@ -4953,7 +4977,7 @@ class MainWindow(QMainWindow):
                 "font-size: 11px; font-weight: 500; }"
             )
             self.sync_scroll_status_label.setToolTip(
-                "Sync-Scroll aktiv (PDF↔PDF Scroll + Seiten) — 2.4.1"
+                "Sync-Scroll aktiv (PDF↔PDF Scroll + Seiten)" + tip_suffix
             )
             self.sync_scroll_status_label.setVisible(True)
         else:
@@ -4962,7 +4986,7 @@ class MainWindow(QMainWindow):
                 "QLabel#syncScrollStatus { color: #a60; padding-right: 8px; font-size: 11px; }"
             )
             self.sync_scroll_status_label.setToolTip(
-                "Sync-Scroll an, aber nur bei zwei PDF-Tabs aktiv — 2.4.1"
+                "Sync-Scroll an, aber nur bei zwei PDF-Tabs aktiv" + tip_suffix
             )
             self.sync_scroll_status_label.setVisible(True)
 
@@ -5069,6 +5093,7 @@ class MainWindow(QMainWindow):
         dlg = AnnTemplatesDialog(self)
         if dlg.exec() == QDialog.Accepted and dlg.applied is not None:
             t = dlg.applied
+            # zuletzt verwendet wird in apply_template gemerkt — 2.4.2
             # Viewer-Farben aus Settings nachziehen
             try:
                 if t.kind == "highlight":

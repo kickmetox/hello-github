@@ -1,5 +1,20 @@
 # Changelog — InstantLens Doc
 
+## 2.4.2 — Thumb-Cache freigegebene MB·Auto-Prune, Templates Quick-Apply·zuletzt, Sync-Scroll Klick-Toggle, F1 TXT {date}_shortcuts.txt
+
+Post-Release-Polish nach **2.4.1**: **Thumbnail Disk-Cache** leeren mit Bestätigung und **freigegebenen MB** in der Statusleiste, **Auto-Prune bei Limit**; **Annotation-Templates** Standard/zuletzt verwendet per Toolbar **Quick-Apply**; **Sync-Scroll** Statusleisten-Klick toggled inkl. Tooltip-Shortcut; **F1 Export TXT** merkt Zielordner und nutzt Template **`{date}_shortcuts.txt`**. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie klar markiert / nicht produktiv (Ink ≠ Stylus).
+
+### Geändert
+- Thumb-Cache: Bestätigung · freigegebene MB Status · Auto-Prune bei Entry-/MB-Limit
+- Annotation-Vorlagen: Toolbar Quick-Apply ★ · zuletzt verwendet merken
+- Sync-Scroll: Status-Klick toggled · Tooltip mit Shortcut Ctrl+Alt+\
+- F1 Cheat-Sheet TXT: Zielordner merken · Template `{date}_shortcuts.txt`
+
+### Tests / Qualität
+- Version **2.4.2** (App / `ild_pdf` / ISS / Smoke / Docs); Serie **2.4**; `docs/VERSION` + `VERSION.txt`
+- Smoke: 2.4.2 CLI + Qt (Thumb freed-MB/Auto-Prune, Templates Quick/Last, Sync-Klick, F1 TXT dir/template)
+- Stubs: KI/Cloud/Stylus/3D/Hooks/Outline/Telemetrie unverändert markiert
+
 ## 2.4.1 — Thumb-Cache max MB·leeren·Hit/Miss, Templates Umbenennen/Vorschau/★, Sync-Scroll Status·nur PDF↔PDF, F1 Suche·Drucken·TXT
 
 Post-Release-Polish nach **2.4.0**: **Thumbnail Disk-Cache** max. Größe MB in Settings, „Cache leeren“, optional Hit/Miss Debug in Statusleiste; **Annotation-Templates** Umbenennen/Löschen, Style-Vorschau, Standard-Vorlage ★; **Sync-Scroll** Statusleisten-Indikator an/aus und nur noch **PDF↔PDF**; **F1 Cheat-Sheet** Suche/Filter, Drucken, Export TXT. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie klar markiert / nicht produktiv (Ink ≠ Stylus).

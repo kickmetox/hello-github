@@ -1,4 +1,4 @@
-"""Tastaturhilfe-Dialog inkl. Suche/Filter, PDF/TXT-Export und Drucken — 2.4.1."""
+"""Tastaturhilfe-Dialog inkl. Suche/Filter, PDF/TXT-Export und Drucken — 2.4.2."""
 
 from __future__ import annotations
 
@@ -20,17 +20,26 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
-from instantlensdoc.core.app_settings import dialog_start_dir, get_last_export_dir, remember_recent_dir, set_last_export_dir
+from instantlensdoc.core.app_settings import (
+    DEFAULT_SHORTCUTS_TXT_FILENAME_TEMPLATE,
+    dialog_start_dir,
+    format_shortcuts_txt_filename,
+    get_last_export_dir,
+    get_last_shortcuts_txt_dir,
+    remember_recent_dir,
+    set_last_export_dir,
+    set_last_shortcuts_txt_dir,
+)
 
 SHORTCUTS_HTML = """
 <h2>Tastatur-Cheat-Sheet — InstantLens Doc</h2>
-<p>Shortcut-Liste (DE) — Hilfe → Tastatur-Cheat-Sheet… / <code>F1</code> — Suche/Filter · Drucken · Export TXT — 2.4.1</p>
+<p>Shortcut-Liste (DE) — Hilfe → Tastatur-Cheat-Sheet… / <code>F1</code> — Suche/Filter · Drucken · Export TXT ({date}_shortcuts.txt) — 2.4.2</p>
 <table cellpadding="4" cellspacing="0">
 <tr><th align="left">Aktion</th><th align="left">Kürzel</th></tr>
-<tr><td>Tastatur-Cheat-Sheet</td><td><code>F1</code> — Shortcut-Liste DE · Suche/Filter · Drucken · PDF/TXT — 2.4.1</td></tr>
-<tr><td>Sync-Scroll (PDF↔PDF)</td><td><code>Ctrl+Alt+\\</code> — nur PDF↔PDF: Scroll + Seiten-Sync · Statusleiste — 2.4.1</td></tr>
-<tr><td>Annotation-Vorlagen</td><td>PDF → Annotation-Vorlagen… (ildtmpl-v1) Umbenennen/Löschen/Vorschau/★ — 2.4.1</td></tr>
-<tr><td>Thumbnail Disk-Cache</td><td>max MB Settings · Cache leeren · Hit/Miss Debug — 2.4.1</td></tr>
+<tr><td>Tastatur-Cheat-Sheet</td><td><code>F1</code> — Shortcut-Liste DE · Suche/Filter · Drucken · TXT Template {date}_shortcuts.txt · Zielordner merken — 2.4.2</td></tr>
+<tr><td>Sync-Scroll (PDF↔PDF)</td><td><code>Ctrl+Alt+\\</code> — nur PDF↔PDF · Status-Klick toggled · Tooltip Shortcut — 2.4.2</td></tr>
+<tr><td>Annotation-Vorlagen</td><td>Toolbar Quick-Apply ★ · zuletzt verwendet · Dialog ildtmpl-v1 — 2.4.2</td></tr>
+<tr><td>Thumbnail Disk-Cache</td><td>Cache leeren Bestätigung · freigegebene MB Status · Auto-Prune bei Limit — 2.4.2</td></tr>
 <tr><td>Neu (leer)</td><td><code>Ctrl+N</code></td></tr>
 <tr><td>Textbaustein 1–3 einfügen</td><td><code>Ctrl+Alt+1</code> … <code>3</code></td></tr>
 <tr><td>Annotationen sperren</td><td><code>Ctrl+Shift+L</code></td></tr>
@@ -139,7 +148,7 @@ SHORTCUTS_HTML = """
 <tr><td>PDF-Trefferliste</td><td>Sidebar Seite + Snippet klickbar → Sprung + Highlight — 0.9.1</td></tr>
 <tr><td>Fenster teilen (zwei Docs)</td><td><code>Ctrl+\\</code> — 0.6.3</td></tr>
 <tr><td>Vertikaler Split (übereinander)</td><td><code>Ctrl+Shift+\\</code> (Toggle) — 0.6.5</td></tr>
-<tr><td>Sync-Scroll (PDF↔PDF)</td><td><code>Ctrl+Alt+\\</code>; nur PDF↔PDF; Statusleisten-Indikator — 0.6.4 / 0.6.9 / 2.4.0 / 2.4.1</td></tr>
+<tr><td>Sync-Scroll (PDF↔PDF)</td><td><code>Ctrl+Alt+\\</code>; nur PDF↔PDF; Status-Klick toggled · Tooltip Shortcut — 0.6.4 / 0.6.9 / 2.4.0 / 2.4.1 / 2.4.2</td></tr>
 <tr><td>Tag-Cloud Filter</td><td>Klick setzt Filter; <code>Ctrl</code>+Klick Multi-Select — 0.6.4; Rechtsklick → filtern — 0.8.0</td></tr>
 <tr><td>Tag-Cloud Farbe / umbenennen</td><td>Rechtsklick → Farbe ändern / umbenennen; Ctrl+Z; Bestätigung ab Schwelle — 0.6.5–0.6.9 / 0.8.0</td></tr>
 <tr><td>Zeilen-Lesezeichen Export/Import</td><td>Bearbeiten → JSON (<code>ildbm-v1</code>) — 0.8.0; Drag-Reorder + Sidecar — 0.8.1</td></tr>
@@ -199,7 +208,7 @@ SHORTCUTS_HTML = """
 <tr><td>Rechtschreibung prüfen</td><td><code>F7</code></td></tr>
 <tr><td>Tastatur-Cheat-Sheet</td><td><code>F1</code> — Hilfe → Tastatur-Cheat-Sheet… · Suche/Filter — 2.4.1</td></tr>
 <tr><td>Cheat-Sheet als PDF</td><td>F1 → „Als PDF exportieren…“</td></tr>
-<tr><td>Cheat-Sheet als TXT</td><td>F1 → „Als TXT exportieren…“ — 2.4.1</td></tr>
+<tr><td>Cheat-Sheet als TXT</td><td>F1 → „Als TXT exportieren…“ · Template {date}_shortcuts.txt · Zielordner merken — 2.4.2</td></tr>
 <tr><td>Cheat-Sheet drucken</td><td>F1 → „Drucken…“ — 2.4.1</td></tr>
 </table>
 <p><b>Speichern unter (PDF):</b> speichert die Annotationen als Sidecar
@@ -487,7 +496,7 @@ def filter_shortcuts_html(query: str) -> str:
 
 
 def export_shortcuts_txt(path: str | Path, *, query: str = "") -> Path:
-    """Cheat-Sheet als Klartext TXT exportieren — 2.4.1."""
+    """Cheat-Sheet als Klartext TXT exportieren — 2.4.2."""
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     q = (query or "").strip().casefold()
@@ -496,7 +505,7 @@ def export_shortcuts_txt(path: str | Path, *, query: str = "") -> Path:
         rows = [(a, s) for a, s in rows if q in a.casefold() or q in s.casefold()]
     lines = [
         "Tastatur-Cheat-Sheet — InstantLens Doc",
-        "Shortcut-Liste (DE) — 2.4.1",
+        "Shortcut-Liste (DE) — 2.4.2",
     ]
     if query.strip():
         lines.append(f"Filter: {query.strip()}")
@@ -567,7 +576,10 @@ class KeyboardHelpDialog(QDialog):
         buttons.addButton(btn_print, QDialogButtonBox.ActionRole)
         btn_txt = QPushButton("Als TXT exportieren…")
         btn_txt.setObjectName("shortcutExportTxt")
-        btn_txt.setToolTip("Tastatur-Cheat-Sheet als TXT speichern — 2.4.1")
+        btn_txt.setToolTip(
+            f"TXT speichern · Template {DEFAULT_SHORTCUTS_TXT_FILENAME_TEMPLATE} · "
+            "Zielordner merken — 2.4.2"
+        )
         btn_txt.clicked.connect(self._export_txt)
         buttons.addButton(btn_txt, QDialogButtonBox.ActionRole)
         btn_pdf = QPushButton("Als PDF exportieren…")
@@ -619,11 +631,13 @@ class KeyboardHelpDialog(QDialog):
             )
 
     def _export_txt(self) -> None:
-        start = get_last_export_dir() or dialog_start_dir()
+        """TXT-Export: Zielordner merken · Template {date}_shortcuts.txt — 2.4.2."""
+        start = get_last_shortcuts_txt_dir() or get_last_export_dir() or dialog_start_dir()
+        default_name = format_shortcuts_txt_filename()
         path, _ = QFileDialog.getSaveFileName(
             self,
             "Tastatur-Cheat-Sheet als TXT",
-            str(Path(start) / "InstantLensDoc-Tastatur-Cheat-Sheet.txt"),
+            str(Path(start) / default_name),
             "Text (*.txt)",
         )
         if not path:
@@ -644,6 +658,7 @@ class KeyboardHelpDialog(QDialog):
         try:
             export_shortcuts_txt(out, query=self.filter_edit.text())
             remember_recent_dir(out)
+            set_last_shortcuts_txt_dir(out.parent)
             set_last_export_dir(out.parent)
             QMessageBox.information(
                 self, "Tastatur-Cheat-Sheet", f"TXT gespeichert:\n{out}"

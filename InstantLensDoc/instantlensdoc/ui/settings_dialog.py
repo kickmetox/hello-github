@@ -646,7 +646,8 @@ class SettingsDialog(QDialog):
                 cache_pick = i
         self.thumb_cache_max_mb.setCurrentIndex(cache_pick)
         self.thumb_cache_max_mb.setToolTip(
-            "Maximale Größe des Thumbnail-Disk-Caches (LRU nach mtime) — 2.4.1"
+            "Maximale Größe des Thumbnail-Disk-Caches (LRU); "
+            "bei Überschreitung Auto-Prune (älteste zuerst) — 2.4.2"
         )
         form.addRow("Thumb-Cache max. Größe", self.thumb_cache_max_mb)
 
@@ -654,7 +655,8 @@ class SettingsDialog(QDialog):
         self.btn_clear_thumb_cache = QPushButton("Cache leeren")
         self.btn_clear_thumb_cache.setObjectName("thumbCacheClear")
         self.btn_clear_thumb_cache.setToolTip(
-            "Gesamten Thumbnail-Disk-Cache unter config/thumb_cache/ löschen — 2.4.1"
+            "Gesamten Thumbnail-Disk-Cache leeren (Bestätigung · "
+            "freigegebene MB in Status) · Auto-Prune bei Limit — 2.4.2"
         )
         self.btn_clear_thumb_cache.clicked.connect(self._clear_thumb_cache)
         cache_row.addWidget(self.btn_clear_thumb_cache)
@@ -2526,35 +2528,45 @@ class SettingsDialog(QDialog):
             self.lbl_thumb_cache_stats.setText("")
 
     def _clear_thumb_cache(self) -> None:
-        """Thumbnail-Disk-Cache leeren — 2.4.1."""
+        """Thumbnail-Disk-Cache leeren — Bestätigung + freigegebene MB Status — 2.4.2."""
         from PySide6.QtWidgets import QMessageBox
 
-        from instantlensdoc.core.thumb_cache import clear_thumb_cache, thumb_cache_stats
+        from instantlensdoc.core.thumb_cache import (
+            clear_thumb_cache_detailed,
+            thumb_cache_stats,
+        )
 
         st = thumb_cache_stats()
         if st["count"] <= 0:
             QMessageBox.information(self, "Thumb-Cache", "Cache ist bereits leer.")
             self._refresh_thumb_cache_stats_label()
             return
+        before_mb = st["bytes"] / (1024 * 1024)
         reply = QMessageBox.question(
             self,
             "Cache leeren",
             f"Thumbnail-Cache wirklich leeren?\n"
-            f"{st['count']} Dateien · {st['bytes'] / (1024 * 1024):.1f} MB",
+            f"{st['count']} Dateien · {before_mb:.1f} MB",
             QMessageBox.Yes | QMessageBox.No,
             QMessageBox.No,
         )
         if reply != QMessageBox.Yes:
             return
-        n = clear_thumb_cache()
+        result = clear_thumb_cache_detailed()
+        n = int(result.get("removed", 0))
+        freed_mb = float(result.get("freed_mb", 0.0))
         self._refresh_thumb_cache_stats_label()
         QMessageBox.information(
-            self, "Thumb-Cache", f"Cache geleert: {n} Datei(en) gelöscht."
+            self,
+            "Thumb-Cache",
+            f"Cache geleert: {n} Datei(en) · {freed_mb:.1f} MB freigegeben.",
         )
         try:
             parent = self.parent()
             if parent is not None and hasattr(parent, "_set_status"):
-                parent._set_status(f"Thumb-Cache geleert ({n})")
+                parent._set_status(
+                    f"Thumb-Cache: {freed_mb:.1f} MB freigegeben ({n} Dateien)"
+                )
         except Exception:
             pass
 

@@ -1612,6 +1612,12 @@ class PdfViewer(QWidget):
         self.btn_quick_stamp.customContextMenuRequested.connect(
             self._quick_stamp_context_menu
         )
+        self.btn_quick_ann_template = QPushButton("Vorlage ★")
+        self.btn_quick_ann_template.setObjectName("btnQuickAnnTemplate")
+        self.btn_quick_ann_template.setToolTip(
+            "Quick-Apply Annotation-Vorlage: zuletzt verwendet, sonst Standard ★ — 2.4.2"
+        )
+        self.btn_quick_ann_template.clicked.connect(self.apply_quick_ann_template)
         btn_rot_ccw = QPushButton("⟲")
         btn_rot_ccw.setToolTip("Aktuelle Seite 90° gegen den Uhrzeigersinn drehen (−90°) und speichern")
         btn_rot_ccw.clicked.connect(lambda: self.rotate_current(-90))
@@ -1980,6 +1986,7 @@ class PdfViewer(QWidget):
         toolbar.addWidget(btn_group_edit)
         toolbar.addWidget(btn_stamp_rot)
         toolbar.addWidget(self.btn_quick_stamp)
+        toolbar.addWidget(self.btn_quick_ann_template)
         toolbar.addWidget(btn_zoom_out)
         toolbar.addWidget(self.lbl_zoom)
         toolbar.addWidget(btn_zoom_in)
@@ -2052,6 +2059,7 @@ class PdfViewer(QWidget):
                 btn_group_edit,
                 btn_stamp_rot,
                 self.btn_quick_stamp,
+                self.btn_quick_ann_template,
             ],
             "zoom": [
                 btn_zoom_out,
@@ -7996,6 +8004,46 @@ class PdfViewer(QWidget):
 
         payload = resolve_standard_stamp()
         self.arm_quick_stamp(payload)
+
+    def apply_quick_ann_template(self) -> bool:
+        """
+        Toolbar Quick-Apply: zuletzt verwendete Annotation-Vorlage,
+        sonst Standard ★ — Styles setzen, zuletzt verwendet merken — 2.4.2.
+        """
+        from instantlensdoc.core.ann_templates import (
+            apply_template,
+            resolve_quick_ann_template,
+        )
+        from instantlensdoc.core.app_settings import (
+            get_ann_highlight_color,
+            get_ann_pen_color,
+        )
+
+        t = resolve_quick_ann_template()
+        if t is None:
+            self.status.emit(
+                "Keine Annotation-Vorlage — Standard ★ setzen oder Vorlage anwenden"
+            )
+            return False
+        apply_template(t)
+        try:
+            if t.kind == "highlight":
+                self._highlight_color = get_ann_highlight_color()
+                if hasattr(self, "btn_hl_color") and hasattr(self, "_style_color_btn"):
+                    self._style_color_btn(self.btn_hl_color, self._highlight_color)
+            else:
+                self._pen_color = get_ann_pen_color()
+                if hasattr(self, "btn_pen_color") and hasattr(self, "_style_color_btn"):
+                    self._style_color_btn(self.btn_pen_color, self._pen_color)
+        except Exception:
+            pass
+        self.refresh()
+        kind_de = "Stempel" if t.kind == "stamp" else "Highlight"
+        from instantlensdoc.core.ann_templates import get_default_template_id
+
+        star = "★ " if t.id == get_default_template_id() else ""
+        self.status.emit(f"Vorlage {star}„{t.name}“ angewandt ({kind_de})")
+        return True
 
     def _on_canvas_escape(self) -> None:
         """Esc: Quick-Stempel / Callout / Winkel-Pending abbrechen — 2.1.0."""

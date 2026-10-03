@@ -1,4 +1,4 @@
-"""PDF-Seiten-Thumbnail Disk-Cache — mtime · max MB · Hit/Miss Debug — 2.4.1."""
+"""PDF-Seiten-Thumbnail Disk-Cache — mtime · max MB · Auto-Prune · Hit/Miss — 2.4.2."""
 
 from __future__ import annotations
 
@@ -17,6 +17,13 @@ _DISK_CACHE_MAX = 2000
 # Session Hit/Miss Zähler (optional Debug) — 2.4.1
 _hits = 0
 _misses = 0
+
+# Letztes Auto-Prune Ergebnis (Session) — 2.4.2
+_last_prune: dict = {
+    "removed": 0,
+    "freed_bytes": 0,
+    "freed_mb": 0.0,
+}
 
 
 def thumb_cache_dir() -> Path:
@@ -145,7 +152,7 @@ def put_cached_thumbnail(
     grayscale: bool = False,
     invert: bool = False,
 ) -> Optional[Path]:
-    """Thumbnail als PNG speichern; bei Erfolg Pfad, sonst None."""
+    """Thumbnail als PNG speichern; bei Erfolg Pfad, sonst None. Auto-Prune bei Limit — 2.4.2."""
     p = Path(pdf_path)
     if not p.is_file() or image is None:
         return None
@@ -159,7 +166,7 @@ def put_cached_thumbnail(
         if to_save.mode not in ("RGB", "RGBA", "L"):
             to_save = to_save.convert("RGB")
         to_save.save(dest, format="PNG", optimize=True)
-        _trim_disk_cache()
+        auto_prune_thumb_cache()
         return dest
     except Exception:
         return None
@@ -188,9 +195,36 @@ def invalidate_pdf_thumbnails(pdf_path: Union[str, Path] | None = None) -> int:
 
 def clear_thumb_cache() -> int:
     """Gesamten Thumbnail-Disk-Cache leeren. Rückgabe: gelöschte Dateien."""
-    n = invalidate_pdf_thumbnails(None)
+    result = clear_thumb_cache_detailed()
+    return int(result["removed"])
+
+
+def clear_thumb_cache_detailed() -> dict:
+    """
+    Gesamten Thumbnail-Disk-Cache leeren.
+    Rückgabe: removed, freed_bytes, freed_mb — 2.4.2.
+    """
+    root = thumb_cache_dir()
+    freed = 0
+    n = 0
+    for f in list(root.glob("*.png")):
+        try:
+            sz = int(f.stat().st_size)
+        except OSError:
+            sz = 0
+        try:
+            f.unlink()
+            n += 1
+            freed += sz
+        except OSError:
+            pass
     reset_hit_miss_stats()
-    return n
+    mb = round(freed / (1024 * 1024), 2)
+    return {
+        "removed": n,
+        "freed_bytes": freed,
+        "freed_mb": mb,
+    }
 
 
 def _max_bytes_from_settings() -> int | None:
@@ -206,12 +240,20 @@ def _max_bytes_from_settings() -> int | None:
     return max(1, mb) * 1024 * 1024
 
 
-def _trim_disk_cache(max_entries: int = _DISK_CACHE_MAX) -> None:
-    """LRU nach mtime: Entry-Cap + optionale max-MB-Grenze — 2.4.1."""
+def _trim_disk_cache(max_entries: int = _DISK_CACHE_MAX) -> dict:
+    """
+    LRU nach mtime: Entry-Cap + optionale max-MB-Grenze (Auto-Prune) — 2.4.2.
+    Rückgabe: removed, freed_bytes, freed_mb.
+    """
+    global _last_prune
     root = thumb_cache_dir()
     files = list(root.glob("*.png"))
+    removed = 0
+    freed = 0
     if not files:
-        return
+        result = {"removed": 0, "freed_bytes": 0, "freed_mb": 0.0}
+        _last_prune = dict(result)
+        return result
 
     def _mtime(f: Path) -> float:
         try:
@@ -226,39 +268,65 @@ def _trim_disk_cache(max_entries: int = _DISK_CACHE_MAX) -> None:
         overflow = len(files) - max_entries
         for f in files[:overflow]:
             try:
+                sz = int(f.stat().st_size)
+            except OSError:
+                sz = 0
+            try:
                 f.unlink()
+                removed += 1
+                freed += sz
             except OSError:
                 pass
         files = files[overflow:]
 
-    # 2) Max-MB Cap
+    # 2) Max-MB Cap — Auto-Prune bei Limit
     max_bytes = _max_bytes_from_settings()
-    if max_bytes is None:
-        return
-    sizes: list[tuple[Path, int]] = []
-    total = 0
-    for f in files:
-        try:
-            sz = int(f.stat().st_size)
-        except OSError:
-            continue
-        sizes.append((f, sz))
-        total += sz
-    if total <= max_bytes:
-        return
-    # älteste zuerst löschen
-    for f, sz in sizes:
-        if total <= max_bytes:
-            break
-        try:
-            f.unlink()
-            total -= sz
-        except OSError:
-            pass
+    if max_bytes is not None:
+        sizes: list[tuple[Path, int]] = []
+        total = 0
+        for f in files:
+            try:
+                sz = int(f.stat().st_size)
+            except OSError:
+                continue
+            sizes.append((f, sz))
+            total += sz
+        if total > max_bytes:
+            for f, sz in sizes:
+                if total <= max_bytes:
+                    break
+                try:
+                    f.unlink()
+                    total -= sz
+                    removed += 1
+                    freed += sz
+                except OSError:
+                    pass
+
+    result = {
+        "removed": removed,
+        "freed_bytes": freed,
+        "freed_mb": round(freed / (1024 * 1024), 2),
+    }
+    _last_prune = dict(result)
+    return result
+
+
+def auto_prune_thumb_cache() -> dict:
+    """
+    Auto-Prune bei Entry-/MB-Limit (älteste zuerst).
+    Rückgabe: removed, freed_bytes, freed_mb — 2.4.2.
+    """
+    return _trim_disk_cache()
+
+
+def last_prune_stats() -> dict:
+    """Letztes Auto-Prune Ergebnis dieser Session — 2.4.2."""
+    return dict(_last_prune)
 
 
 def thumb_cache_stats() -> dict:
-    """Einfache Stats für Smoke/Diagnose inkl. Hit/Miss — 2.4.1."""
+    """Einfache Stats für Smoke/Diagnose inkl. Hit/Miss · last prune — 2.4.2."""
     root = thumb_cache_dir()
     files = list(root.glob("*.png"))
     size = 0
@@ -274,6 +342,7 @@ def thumb_cache_stats() -> dict:
         max_mb = int(get_thumb_cache_max_mb())
     except Exception:
         max_mb = 100
+    lp = last_prune_stats()
     return {
         "dir": str(root),
         "count": len(files),
@@ -282,4 +351,6 @@ def thumb_cache_stats() -> dict:
         "hits": hm["hits"],
         "misses": hm["misses"],
         "hit_rate_pct": hm["hit_rate_pct"],
+        "last_prune_removed": lp.get("removed", 0),
+        "last_prune_freed_mb": lp.get("freed_mb", 0.0),
     }

@@ -1,4 +1,4 @@
-"""Annotation-Templates (Stempel/Highlight-Styles) — Schema ildtmpl-v1 — 2.4.1."""
+"""Annotation-Templates (Stempel/Highlight-Styles) — Schema ildtmpl-v1 — 2.4.2."""
 
 from __future__ import annotations
 
@@ -440,8 +440,35 @@ def capture_current_styles(
     )
 
 
+def remember_ann_template_usage(template_id: str) -> str:
+    """Zuletzt verwendete Vorlage merken — 2.4.2."""
+    from instantlensdoc.core.app_settings import set_last_ann_template_id
+
+    return set_last_ann_template_id(template_id)
+
+
+def get_last_used_template() -> Optional[AnnTemplate]:
+    """Zuletzt verwendete Vorlage oder None — 2.4.2."""
+    from instantlensdoc.core.app_settings import get_last_ann_template_id
+
+    tid = get_last_ann_template_id()
+    if not tid:
+        return None
+    return get_template(tid)
+
+
+def resolve_quick_ann_template() -> Optional[AnnTemplate]:
+    """
+    Quick-Apply: zuletzt verwendet, sonst Standard ★ — 2.4.2.
+    """
+    last = get_last_used_template()
+    if last is not None:
+        return last
+    return get_default_template()
+
+
 def apply_template(template: AnnTemplate) -> None:
-    """Template-Styles in App-Settings übernehmen."""
+    """Template-Styles in App-Settings übernehmen; zuletzt verwendet merken — 2.4.2."""
     from instantlensdoc.core.app_settings import (
         set_ann_default_fill_color,
         set_ann_default_opacity,
@@ -459,3 +486,7 @@ def apply_template(template: AnnTemplate) -> None:
         set_ann_highlight_color(template.color)
         set_ann_default_opacity(template.opacity)
         set_ann_default_fill_color(template.fill_color)
+    try:
+        remember_ann_template_usage(template.id)
+    except Exception:
+        pass

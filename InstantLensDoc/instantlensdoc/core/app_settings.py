@@ -186,6 +186,9 @@ DEFAULTS: dict[str, Any] = {
     "thumb_cache_max_mb": 100,  # Thumbnail Disk-Cache max Größe MB — 2.4.1
     "thumb_cache_debug_hits": False,  # Hit/Miss optional in Status — 2.4.1
     "sync_scroll_status_indicator": True,  # Sync-Scroll Statusleisten-Indikator — 2.4.1
+    "last_ann_template_id": "",  # zuletzt angewandte Annotation-Vorlage — 2.4.2
+    "last_shortcuts_txt_dir": "",  # Zielordner F1 Shortcuts-TXT merken — 2.4.2
+    "shortcuts_txt_filename_template": "{date}_shortcuts.txt",  # F1 TXT Template — 2.4.2
     "thumb_prefetch_radius": 2,
     "thumb_prefetch_cancel_ms": 90,
     "forms_csv_visible_only": False,  # CSV-Export Default „nur sichtbare“ — 1.3.5
@@ -4819,6 +4822,13 @@ def set_thumb_cache_max_mb(mb: int) -> int:
     if v not in THUMB_CACHE_MAX_MB_CHOICES:
         v = min(THUMB_CACHE_MAX_MB_CHOICES, key=lambda x: abs(x - v))
     save_settings({"thumb_cache_max_mb": v})
+    # Auto-Prune bei neuem Limit — 2.4.2
+    try:
+        from instantlensdoc.core.thumb_cache import auto_prune_thumb_cache
+
+        auto_prune_thumb_cache()
+    except Exception:
+        pass
     return v
 
 
@@ -4838,6 +4848,97 @@ def get_sync_scroll_status_indicator() -> bool:
 
 def set_sync_scroll_status_indicator(enabled: bool) -> None:
     save_settings({"sync_scroll_status_indicator": bool(enabled)})
+
+
+def get_last_ann_template_id() -> str:
+    """Zuletzt angewandte Annotation-Vorlage (id) — 2.4.2."""
+    return str(load_settings().get("last_ann_template_id", "") or "").strip()
+
+
+def set_last_ann_template_id(template_id: str | None) -> str:
+    """Merkt zuletzt angewandte Annotation-Vorlage — 2.4.2."""
+    tid = str(template_id or "").strip()
+    save_settings({"last_ann_template_id": tid})
+    return tid
+
+
+DEFAULT_SHORTCUTS_TXT_FILENAME_TEMPLATE = "{date}_shortcuts.txt"
+SHORTCUTS_TXT_KNOWN_PLACEHOLDERS = frozenset({"date"})
+_SHORTCUTS_TXT_ANY_PLACEHOLDER_RE = re.compile(r"\{([^{}]+)\}")
+
+
+def get_last_shortcuts_txt_dir() -> Path | None:
+    """Zuletzt genutzter Zielordner für F1 Shortcuts-TXT — 2.4.2."""
+    raw = str(load_settings().get("last_shortcuts_txt_dir", "") or "").strip()
+    if not raw:
+        return None
+    p = Path(raw)
+    return p if p.is_dir() else (p.parent if p.parent.is_dir() else None)
+
+
+def set_last_shortcuts_txt_dir(path: str | Path) -> None:
+    """F1 Shortcuts-TXT-Zielordner merken — 2.4.2."""
+    p = Path(path)
+    if p.is_file():
+        p = p.parent
+    save_settings({"last_shortcuts_txt_dir": str(p)})
+
+
+def get_shortcuts_txt_filename_template() -> str:
+    """Dateiname-Template F1 Shortcuts-TXT, Default ``{date}_shortcuts.txt`` — 2.4.2."""
+    raw = str(
+        load_settings().get(
+            "shortcuts_txt_filename_template",
+            DEFAULTS.get(
+                "shortcuts_txt_filename_template",
+                DEFAULT_SHORTCUTS_TXT_FILENAME_TEMPLATE,
+            ),
+        )
+        or ""
+    ).strip()
+    if not raw:
+        return DEFAULT_SHORTCUTS_TXT_FILENAME_TEMPLATE
+    raw = raw.replace("/", "_").replace("\\", "_")
+    if not raw.lower().endswith(".txt"):
+        raw = raw + ".txt"
+    return raw
+
+
+def set_shortcuts_txt_filename_template(template: str) -> str:
+    """F1 Shortcuts-TXT-Template speichern — 2.4.2."""
+    raw = str(template or "").strip() or DEFAULT_SHORTCUTS_TXT_FILENAME_TEMPLATE
+    raw = raw.replace("/", "_").replace("\\", "_")
+    if not raw.lower().endswith(".txt"):
+        raw = raw + ".txt"
+    save_settings({"shortcuts_txt_filename_template": raw})
+    return raw
+
+
+def format_shortcuts_txt_filename(
+    *,
+    template: str | None = None,
+    date: str | None = None,
+) -> str:
+    """
+    F1 Shortcuts-TXT-Dateiname aus Template.
+    Platzhalter: ``{date}`` (YYYY-MM-DD).
+    Default ``{date}_shortcuts.txt`` — 2.4.2.
+    """
+    from datetime import date as _date
+
+    tpl = (
+        template
+        if template is not None
+        else get_shortcuts_txt_filename_template()
+    )
+    date_s = (date if date is not None else _date.today().isoformat()).strip()
+    name = str(tpl or DEFAULT_SHORTCUTS_TXT_FILENAME_TEMPLATE).replace(
+        "{date}", date_s
+    )
+    name = name.replace("/", "_").replace("\\", "_")
+    if not name.lower().endswith(".txt"):
+        name = name + ".txt"
+    return name or f"{date_s}_shortcuts.txt"
 
 
 def get_thumb_lazy_threshold() -> int:
