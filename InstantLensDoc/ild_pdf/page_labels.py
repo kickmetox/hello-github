@@ -99,6 +99,92 @@ def arabic_reset_labels(page_count: int, *, start: int = 1) -> list[str]:
     return [str(s + i) for i in range(n)]
 
 
+def normalize_page_range(start_page: int, end_page: int) -> tuple[int, int]:
+    """0-basierter inklusiver Bereich als (lo, hi)."""
+    a = int(start_page)
+    b = int(end_page)
+    return (min(a, b), max(a, b))
+
+
+def label_ranges_overlap(
+    start_a: int,
+    end_a: int,
+    start_b: int,
+    end_b: int,
+) -> bool:
+    """True wenn zwei 0-basierte inklusive Bereiche überlappen — 2.2.2."""
+    a0, a1 = normalize_page_range(start_a, end_a)
+    b0, b1 = normalize_page_range(start_b, end_b)
+    return a0 <= b1 and b0 <= a1
+
+
+def find_overlapping_applied_range(
+    applied: Sequence[tuple[int, int]],
+    start_page: int,
+    end_page: int,
+) -> tuple[int, int] | None:
+    """
+    Ersten überlappenden Bereich aus ``applied`` zurückgeben, sonst None.
+
+    ``applied``-Einträge sind 0-basierte inklusive (start, end).
+    """
+    for prev in applied or []:
+        if not isinstance(prev, (list, tuple)) or len(prev) < 2:
+            continue
+        if label_ranges_overlap(start_page, end_page, int(prev[0]), int(prev[1])):
+            return (int(prev[0]), int(prev[1]))
+    return None
+
+
+def validate_label_range_overlap(
+    applied: Sequence[tuple[int, int]],
+    start_page: int,
+    end_page: int,
+) -> str | None:
+    """
+    DE-Fehlermeldung bei Überlappung mit bereits angewandten Bereichen, sonst None — 2.2.2.
+    """
+    hit = find_overlapping_applied_range(applied, start_page, end_page)
+    if hit is None:
+        return None
+    lo, hi = normalize_page_range(start_page, end_page)
+    plo, phi = hit
+    return (
+        f"Bereich überlappt mit bereits gesetztem Bereich "
+        f"(Seite {plo + 1}–{phi + 1}). "
+        f"Neuer Bereich: Seite {lo + 1}–{hi + 1}."
+    )
+
+
+def preview_label_range(
+    *,
+    start_page: int,
+    end_page: int,
+    start_value: int = 1,
+    max_preview: int = 5,
+) -> list[str]:
+    """
+    Erste Labels eines arabischen Bereichs als Vorschau (ohne Seite zu füllen) — 2.2.2.
+    """
+    lo, hi = normalize_page_range(start_page, end_page)
+    n = max(0, hi - lo + 1)
+    k = max(0, min(int(max_preview), n))
+    sv = int(start_value)
+    return [str(sv + i) for i in range(k)]
+
+
+def format_label_preview(labels: Sequence[str], *, total: int | None = None) -> str:
+    """Kurztext „Vorschau: 1, 2, 3…“ für den Range-Editor."""
+    items = [str(x).strip() for x in labels if str(x).strip()]
+    if not items:
+        return "Vorschau: —"
+    body = ", ".join(items)
+    n = int(total) if total is not None else len(items)
+    if n > len(items):
+        body += "…"
+    return f"Vorschau: {body}"
+
+
 def apply_label_range(
     labels: Sequence[str],
     *,

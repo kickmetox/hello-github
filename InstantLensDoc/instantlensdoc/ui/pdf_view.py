@@ -22,6 +22,7 @@ from PySide6.QtGui import (
 from PySide6.QtWidgets import (
     QApplication,
     QColorDialog,
+    QComboBox,
     QDialog,
     QDialogButtonBox,
     QDoubleSpinBox,
@@ -98,10 +99,14 @@ from instantlensdoc.core.app_settings import (
     get_page_number_overlay_skip_edges,
     get_page_number_overlay_start,
     get_ink_smooth,
+    get_ink_smooth_passes,
+    get_ink_smooth_strength,
     get_measure_labels_persistent,
     get_measure_snap_to_annotation,
     get_measure_unit,
     set_ink_smooth,
+    set_ink_smooth_strength,
+    INK_SMOOTH_STRENGTH_CHOICES,
     get_show_page_boxes,
     get_show_page_number_overlay,
     get_show_printer_marks,
@@ -1672,10 +1677,28 @@ class PdfViewer(QWidget):
         self.btn_ink_smooth.setCheckable(True)
         self.btn_ink_smooth.setChecked(get_ink_smooth())
         self.btn_ink_smooth.setToolTip(
-            "Freihand: leichte Glättung optional — 2.2.1 (kein Stylus)"
+            "Freihand: Glättung optional; Stärke daneben — 2.2.2 (kein Stylus)"
         )
         self.btn_ink_smooth.clicked.connect(self._toggle_ink_smooth)
         toolbar.addWidget(self.btn_ink_smooth)
+
+        self.cmb_ink_smooth_strength = QComboBox()
+        self.cmb_ink_smooth_strength.setObjectName("inkSmoothStrength")
+        self.cmb_ink_smooth_strength.setMaximumWidth(90)
+        cur_str = get_ink_smooth_strength()
+        pick_str = 0
+        for i, (key, label) in enumerate(INK_SMOOTH_STRENGTH_CHOICES):
+            self.cmb_ink_smooth_strength.addItem(label, key)
+            if key == cur_str:
+                pick_str = i
+        self.cmb_ink_smooth_strength.setCurrentIndex(pick_str)
+        self.cmb_ink_smooth_strength.setToolTip(
+            "Glättungsstärke: Leicht / Mittel / Stark (passes 1–3) — 2.2.2"
+        )
+        self.cmb_ink_smooth_strength.currentIndexChanged.connect(
+            self._on_ink_smooth_strength_changed
+        )
+        toolbar.addWidget(self.cmb_ink_smooth_strength)
 
         self.btn_ink_undo_stroke = QToolButton()
         self.btn_ink_undo_stroke.setText("Ink−")
@@ -2122,10 +2145,21 @@ class PdfViewer(QWidget):
         self.canvas.update()
 
     def _toggle_ink_smooth(self) -> None:
-        """Optionale leichte Freihand-Glättung — 2.2.1."""
+        """Optionale Freihand-Glättung — 2.2.1/2.2.2."""
         on = bool(self.btn_ink_smooth.isChecked())
         set_ink_smooth(on)
-        self.status.emit(f"Freihand-Glättung {'an' if on else 'aus'}")
+        strength = get_ink_smooth_strength()
+        self.status.emit(
+            f"Freihand-Glättung {'an' if on else 'aus'}"
+            + (f" ({strength})" if on else "")
+        )
+
+    def _on_ink_smooth_strength_changed(self, _index: int = 0) -> None:
+        """Glättungsstärke persistieren — 2.2.2."""
+        data = self.cmb_ink_smooth_strength.currentData()
+        val = set_ink_smooth_strength(str(data or "leicht"))
+        if self.btn_ink_smooth.isChecked():
+            self.status.emit(f"Freihand-Glättung Stärke: {val}")
 
     def _pick_pen_color(self):
         initial = QColor(self._pen_color)
@@ -9236,7 +9270,7 @@ class PdfViewer(QWidget):
         return True
 
     def _on_ink(self, points: object) -> None:
-        """Freihand-Polyline committen (Strichstärke/Farbe/Glätten) — 2.2.1."""
+        """Freihand-Polyline committen; Glätten als eigener Undo-Eintrag — 2.2.2."""
         if not self.store:
             return
         # Werkzeug sollte INK sein; programmatische Tests dürfen Punkte ohne Tool setzen
@@ -9267,12 +9301,15 @@ class PdfViewer(QWidget):
                 do_smooth = bool(get_ink_smooth())
         except Exception:
             do_smooth = bool(get_ink_smooth())
+        strength = get_ink_smooth_strength()
+        passes = get_ink_smooth_passes()
+        # Rohstrich zuerst (ohne Glättung) — eigener Undo-Eintrag
         ann = Annotation.from_ink_points(
             page0,
             mapped,
             color=self._pen_color,
             stroke_width=float(getattr(self, "_default_stroke_width", 2.0) or 2.0),
-            smooth=do_smooth,
+            smooth=False,
         )
         # Historie: spezifischer Action-Name vor generischem commit
         try:
@@ -9282,12 +9319,40 @@ class PdfViewer(QWidget):
                 self.pdf_path,
                 "annotation.ink",
                 f"page={page0} points={len(ann.ink_points())} smooth={int(do_smooth)} "
-                f"stroke={ann.stroke_width:.0f} color={ann.color}",
+                f"strength={strength} stroke={ann.stroke_width:.0f} color={ann.color}",
+                page=page0,
             )
         except Exception:
             pass
         # _commit_ann loggt zusätzlich annotation.add — OK für Audit
         self._commit_ann(ann)
+        # Glättung als separater Undo-Stack-Eintrag — 2.2.2
+        if do_smooth and self.store is not None:
+            try:
+                smoothed = self.store.smooth_ink(
+                    ann.id, passes=passes, strength=strength
+                )
+                if smoothed is not None:
+                    try:
+                        from ild_pdf.doc_history import append_doc_history
+
+                        append_doc_history(
+                            self.pdf_path,
+                            "annotation.ink_smooth",
+                            f"page={page0} id={ann.id[:8]} strength={strength} "
+                            f"passes={passes}",
+                            page=page0,
+                        )
+                    except Exception:
+                        pass
+                    try:
+                        self.schedule_sidecar_save(force=True)
+                    except Exception:
+                        pass
+                    self.refresh()
+                    self.annotations_changed.emit()
+            except Exception:
+                pass
 
     def delete_last_ink_stroke(self) -> bool:
         """Letzten Freihand-Strich löschen (Undo-fähig) — 2.2.1."""
@@ -9367,13 +9432,22 @@ class PdfViewer(QWidget):
         dlg.exec()
 
     def show_doc_history(self) -> None:
-        """Dokument-Historie-Panel (letzte 50, Filter, Export) — 2.2.1."""
+        """Dokument-Historie-Panel (50/Filter/Export/Doppelklick/Clear) — 2.2.2."""
         if not self.pdf_path:
             self.status.emit("Kein PDF geöffnet")
             return
         from instantlensdoc.ui.doc_history_dialog import DocHistoryDialog
 
-        dlg = DocHistoryDialog(self.pdf_path, parent=self)
+        def _goto(page: int) -> None:
+            self.goto_page(int(page))
+            self.status.emit(f"Historie → Seite {int(page) + 1}")
+
+        dlg = DocHistoryDialog(
+            self.pdf_path,
+            parent=self,
+            on_goto_page=_goto,
+            page_count=int(getattr(self, "page_count", 0) or 0) or None,
+        )
         dlg.exec()
 
     def _on_drag(self, x0: float, y0: float, x1: float, y1: float):

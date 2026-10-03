@@ -1,5 +1,20 @@
 # Changelog — InstantLens Doc
 
+## 2.2.2 — PageLabels Range-Überlappung DE·Vorschau erste Labels, Ink Glättungsstärke·Undo eigener Stack-Eintrag, Historie Doppelklick→Seite·Clear Bestätigung, CONTRIBUTING Sync-Einzeiler=sync-ild.ps1 + smoke Beispiel
+
+Post-Release-Polish nach **2.2.1**: **Seitenbeschriftungen** Range-Editor mit **Validierung überlappender Ranges (DE)** und **Vorschau erste Labels**; **Ink/Freihand Glätten** mit **Strength Settings** (leicht/mittel/stark) und **Undo nach Glätten als eigener Stack-Eintrag**; **Dokument-Historie** **Doppelklick springt zur Seite** (wenn `page` im Eintrag) und **Leeren mit Bestätigung**; CONTRIBUTING **Sync-Einzeiler = sync-ild.ps1-Pfad** + **Smoke-Beispielkommando**. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen unverändert klar markiert / nicht produktiv (Ink ≠ Stylus).
+
+### Neu / verbessert
+- Seitenbeschriftungen: Überlappungs-Validierung DE · Live-Vorschau erste Labels
+- Freihand (Ink): Glättungsstärke leicht/mittel/stark · Glätten = eigener Undo-Eintrag
+- Dokument-Historie: Doppelklick → Seite · Clear mit Bestätigung
+- CONTRIBUTING: Sync-Einzeiler = `sync-ild.ps1`-Pfad · Smoke-Beispiel `python scripts\smoke_ild.py --json`
+
+### Tests / Qualität
+- Version **2.2.2** (App / `ild_pdf` / ISS / Smoke / Docs); Serie **2.2**; `docs/VERSION` + `VERSION.txt`
+- Smoke: 2.2.2 CLI + Qt (Range-Overlap/Preview, Ink strength/undo-smooth, Historie Doppelklick/Clear, CONTRIBUTING)
+- Stubs unverändert (nur Versionsmarker)
+
 ## 2.2.1 — PageLabels Range-Editor·PDF-Import·Reset arabisch 1…, Ink Strichstärke/Farbe·letzter Strich·Glätten, Historie-Panel 50·Filter·Export JSON, smoke Stub manual-only + CONTRIBUTING Sync
 
 Post-Release-Polish nach **2.2.0**: **Seitenbeschriftungen** Dialog mit **Range-Editor**, **Import aus PDF**, **Reset arabisch 1…**; **Ink/Freihand** nutzt **Strichstärke/Farbe**, **Löschen letzter Strich**, optional leichte **Glättung**; **Dokument-Historie** als Panel (**letzte 50**, Filter Aktionstyp, **Export JSON**); Workflow-Stub klar **manual only**; CONTRIBUTING **Sync-Einzeiler**. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen unverändert klar markiert / nicht produktiv (Ink ≠ Stylus).

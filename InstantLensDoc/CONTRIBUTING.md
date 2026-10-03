@@ -18,6 +18,12 @@ python scripts\smoke_ild.py --qt
 python scripts\smoke_ild.py --json
 ```
 
+Smoke-Beispielkommando (JSON-Summary, Exit 0 = OK):
+
+```bat
+python scripts\smoke_ild.py --json
+```
+
 | Exit | Bedeutung |
 |------|-----------|
 | 0 | OK (`ok=true`) |
@@ -38,6 +44,8 @@ python scripts\smoke_test.py
 Unter `.github/workflows/smoke-ild.yml` liegt ein **Workflow-Stub (manual only)**. Nur `workflow_dispatch` — kein Push/PR-Trigger, keine Cloud-CI-Pflicht. Lokal: `python scripts/smoke_ild.py`.
 
 ## Sync (Windows)
+
+**Sync-Einzeiler** = Pfad zu `sync-ild.ps1` (Repo: `scripts/sync-ild.ps1`, lokal typisch `D:\AI_Temp\sync-ild.ps1`):
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File "D:\AI_Temp\sync-ild.ps1"

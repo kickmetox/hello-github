@@ -1,8 +1,9 @@
-"""Panel: Dokument-Historie (ildhist-v1) — letzte 50, Filter, Export JSON — 2.2.1."""
+"""Panel: Dokument-Historie (ildhist-v1) — 50/Filter/Export + Doppelklick/Clear — 2.2.1/2.2.2."""
 
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Callable, Optional
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
@@ -12,9 +13,10 @@ from PySide6.QtWidgets import (
     QFileDialog,
     QHBoxLayout,
     QLabel,
+    QListWidget,
+    QListWidgetItem,
     QMessageBox,
     QPushButton,
-    QPlainTextEdit,
     QVBoxLayout,
 )
 
@@ -22,14 +24,23 @@ from ild_pdf.doc_history import DocHistory, format_history_summary
 
 
 class DocHistoryDialog(QDialog):
-    """Nicht-modales Panel mit Filter Aktionstyp + JSON-Export."""
+    """Panel mit Filter, Export, Doppelklick→Seite, Clear mit Bestätigung."""
 
     PANEL_LIMIT = 50
 
-    def __init__(self, pdf_path: str | Path, parent=None):
+    def __init__(
+        self,
+        pdf_path: str | Path,
+        parent=None,
+        *,
+        on_goto_page: Optional[Callable[[int], None]] = None,
+        page_count: int | None = None,
+    ):
         super().__init__(parent)
         self.pdf_path = Path(pdf_path)
         self.hist = DocHistory.for_pdf(self.pdf_path, load=True)
+        self._on_goto_page = on_goto_page
+        self._page_count = int(page_count) if page_count is not None else None
         self.setWindowTitle("Dokument-Historie")
         self.setWindowModality(Qt.WindowModal)
         self.resize(560, 480)
@@ -55,16 +66,27 @@ class DocHistoryDialog(QDialog):
         filt_row.addWidget(btn_refresh)
         layout.addLayout(filt_row)
 
-        self.txt = QPlainTextEdit()
-        self.txt.setReadOnly(True)
-        self.txt.setLineWrapMode(QPlainTextEdit.NoWrap)
-        layout.addWidget(self.txt, 1)
+        self.list = QListWidget()
+        self.list.setObjectName("docHistoryList")
+        self.list.setToolTip(
+            "Doppelklick: zur Seite springen, wenn Eintrag eine Seite enthält — 2.2.2"
+        )
+        self.list.itemDoubleClicked.connect(self._on_item_double_clicked)
+        layout.addWidget(self.list, 1)
+
+        # Abwärtskompatibel: Text-Zusammenfassung (Tests/API) — 2.2.1
+        self.txt = None  # type: ignore[assignment]
 
         btn_row = QHBoxLayout()
         btn_export = QPushButton("Export JSON…")
         btn_export.setToolTip("ildhist-v1 Payload als JSON speichern — 2.2.1")
         btn_export.clicked.connect(self._export_json)
         btn_row.addWidget(btn_export)
+        btn_clear = QPushButton("Leeren…")
+        btn_clear.setObjectName("docHistoryClear")
+        btn_clear.setToolTip("Historie leeren (mit Bestätigung) — 2.2.2")
+        btn_clear.clicked.connect(self._clear_with_confirm)
+        btn_row.addWidget(btn_clear)
         btn_row.addStretch(1)
         layout.addLayout(btn_row)
 
@@ -113,9 +135,81 @@ class DocHistoryDialog(QDialog):
         entries = self.hist.filter_entries(
             self._selected_action(), limit=self.PANEL_LIMIT
         )
-        self.txt.setPlainText(
-            format_history_summary(entries, max_items=self.PANEL_LIMIT)
+        self.list.clear()
+        if not entries:
+            item = QListWidgetItem("(keine Einträge)")
+            item.setFlags(Qt.NoItemFlags)
+            self.list.addItem(item)
+            return
+        # Neueste oben
+        for e in reversed(entries):
+            ts = e.ts.replace("T", " ").replace("+00:00", " UTC")
+            pg = e.resolved_page()
+            page_bit = f" [S.{pg + 1}]" if pg is not None else ""
+            detail = f" — {e.detail}" if e.detail else ""
+            text = f"{ts}  {e.action}{page_bit}{detail}"
+            item = QListWidgetItem(text)
+            if pg is not None:
+                item.setData(Qt.UserRole, int(pg))
+                item.setToolTip(f"Doppelklick → Seite {pg + 1}")
+            else:
+                item.setData(Qt.UserRole, None)
+                item.setToolTip("Kein Seitenbezug in diesem Eintrag")
+            self.list.addItem(item)
+
+    def _on_item_double_clicked(self, item: QListWidgetItem) -> None:
+        if item is None:
+            return
+        page = item.data(Qt.UserRole)
+        if page is None:
+            return
+        try:
+            idx = int(page)
+        except (TypeError, ValueError):
+            return
+        if idx < 0:
+            return
+        if self._page_count is not None and idx >= self._page_count:
+            QMessageBox.information(
+                self,
+                "Dokument-Historie",
+                f"Seite {idx + 1} liegt außerhalb des Dokuments "
+                f"({self._page_count} Seiten).",
+            )
+            return
+        if callable(self._on_goto_page):
+            try:
+                self._on_goto_page(idx)
+            except Exception as e:
+                QMessageBox.warning(
+                    self, "Dokument-Historie", f"Sprung fehlgeschlagen:\n{e}"
+                )
+                return
+            self.accept()
+
+    def _clear_with_confirm(self) -> None:
+        n = len(self.hist.entries)
+        if n <= 0:
+            QMessageBox.information(self, "Dokument-Historie", "Historie ist bereits leer.")
+            return
+        reply = QMessageBox.question(
+            self,
+            "Dokument-Historie leeren",
+            f"Wirklich alle {n} Einträge unwiderruflich löschen?",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
         )
+        if reply != QMessageBox.Yes:
+            return
+        self.hist.clear(save=True)
+        self._reload()
+
+    def summary_text(self) -> str:
+        """Textzusammenfassung (Tests/API) — 2.2.1 kompatibel."""
+        entries = self.hist.filter_entries(
+            self._selected_action(), limit=self.PANEL_LIMIT
+        )
+        return format_history_summary(entries, max_items=self.PANEL_LIMIT)
 
     def _export_json(self) -> None:
         default = str(self.hist.path.with_name(self.hist.path.stem + "-export.json"))

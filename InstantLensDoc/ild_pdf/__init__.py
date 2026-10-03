@@ -30,11 +30,17 @@ from .pdf_ann_import import (
 from .page_labels import (
     apply_label_range,
     arabic_reset_labels,
+    find_overlapping_applied_range,
+    format_label_preview,
+    label_ranges_overlap,
     merge_labels,
     normalize_page_labels,
+    normalize_page_range,
     page_labels_to_meta,
+    preview_label_range,
     read_pdf_page_labels,
     remap_page_labels,
+    validate_label_range_overlap,
     write_pdf_page_labels,
 )
 from .doc_history import (
@@ -45,6 +51,7 @@ from .doc_history import (
     append_doc_history,
     format_history_summary,
     history_path_for,
+    parse_page_from_detail,
 )
 from .annotate import (
     Annotation,
@@ -57,6 +64,7 @@ from .annotate import (
     FavoritesImportError,
     SCHEMA_ID,
     SIDECAR_VERSION,
+    ink_smooth_passes_for_strength,
     normalize_tags,
     smooth_ink_points,
     tags_to_str,
@@ -240,10 +248,16 @@ __all__ = [
     "merge_labels",
     "apply_label_range",
     "arabic_reset_labels",
+    "find_overlapping_applied_range",
+    "format_label_preview",
+    "label_ranges_overlap",
     "normalize_page_labels",
+    "normalize_page_range",
     "page_labels_to_meta",
+    "preview_label_range",
     "read_pdf_page_labels",
     "remap_page_labels",
+    "validate_label_range_overlap",
     "write_pdf_page_labels",
     "HIST_SCHEMA_ID",
     "HIST_VERSION",
@@ -252,10 +266,12 @@ __all__ = [
     "append_doc_history",
     "format_history_summary",
     "history_path_for",
+    "parse_page_from_detail",
     "Annotation",
     "AnnotationImportError",
     "AnnotationStore",
     "AnnotationType",
+    "ink_smooth_passes_for_strength",
     "smooth_ink_points",
     "validate_annotation_import_data",
     "DRAG_TYPES",
@@ -405,4 +421,4 @@ __all__ = [
     "page_count_for_text",
 ]
 
-__version__ = "2.2.1"
+__version__ = "2.2.2"

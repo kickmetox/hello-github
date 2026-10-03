@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -11,6 +12,8 @@ from typing import List, Optional, Sequence
 HIST_SCHEMA_ID = "ildhist-v1"
 HIST_VERSION = 1
 HISTORY_ENTRY_LIMIT = 200
+
+_PAGE_RE = re.compile(r"(?:^|[;\s,])page\s*=\s*(\d+)", re.IGNORECASE)
 
 
 def history_path_for(pdf_path: str | Path) -> Path:
@@ -22,18 +25,45 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
+def parse_page_from_detail(detail: str) -> Optional[int]:
+    """Seitenindex (0-basiert) aus Detail-Text ``page=N`` lesen — 2.2.2."""
+    m = _PAGE_RE.search(str(detail or ""))
+    if not m:
+        return None
+    try:
+        return int(m.group(1))
+    except (TypeError, ValueError):
+        return None
+
+
 @dataclass
 class HistoryEntry:
     ts: str
     action: str
     detail: str = ""
+    page: Optional[int] = None  # optional 0-basiert — 2.2.2
+
+    def resolved_page(self) -> Optional[int]:
+        """Explizites ``page``-Feld oder aus Detail geparst."""
+        if self.page is not None:
+            try:
+                return int(self.page)
+            except (TypeError, ValueError):
+                pass
+        return parse_page_from_detail(self.detail)
 
     def to_dict(self) -> dict:
-        return {
+        d = {
             "ts": self.ts,
             "action": str(self.action or "").strip(),
             "detail": str(self.detail or ""),
         }
+        if self.page is not None:
+            try:
+                d["page"] = int(self.page)
+            except (TypeError, ValueError):
+                pass
+        return d
 
     @classmethod
     def from_dict(cls, data: object) -> "HistoryEntry":
@@ -42,7 +72,15 @@ class HistoryEntry:
         ts = str(data.get("ts") or "").strip() or _now_iso()
         action = str(data.get("action") or "").strip() or "unknown"
         detail = str(data.get("detail") or "")
-        return cls(ts=ts, action=action, detail=detail)
+        page: Optional[int] = None
+        if "page" in data and data.get("page") is not None:
+            try:
+                page = int(data["page"])
+            except (TypeError, ValueError):
+                page = None
+        if page is None:
+            page = parse_page_from_detail(detail)
+        return cls(ts=ts, action=action, detail=detail, page=page)
 
 
 @dataclass
@@ -71,8 +109,29 @@ class DocHistory:
                 hist.dirty = False
         return hist
 
-    def append(self, action: str, detail: str = "", *, save: bool = True) -> HistoryEntry:
-        entry = HistoryEntry(ts=_now_iso(), action=str(action or "").strip() or "unknown", detail=str(detail or ""))
+    def append(
+        self,
+        action: str,
+        detail: str = "",
+        *,
+        page: int | None = None,
+        save: bool = True,
+    ) -> HistoryEntry:
+        detail_s = str(detail or "")
+        page_i: Optional[int] = None
+        if page is not None:
+            try:
+                page_i = int(page)
+            except (TypeError, ValueError):
+                page_i = None
+        if page_i is None:
+            page_i = parse_page_from_detail(detail_s)
+        entry = HistoryEntry(
+            ts=_now_iso(),
+            action=str(action or "").strip() or "unknown",
+            detail=detail_s,
+            page=page_i,
+        )
         self.entries.append(entry)
         if len(self.entries) > HISTORY_ENTRY_LIMIT:
             self.entries = self.entries[-HISTORY_ENTRY_LIMIT:]
@@ -83,6 +142,18 @@ class DocHistory:
             except Exception:
                 pass
         return entry
+
+    def clear(self, *, save: bool = True) -> int:
+        """Alle Einträge löschen — Rückgabe: Anzahl entfernt — 2.2.2."""
+        n = len(self.entries)
+        self.entries = []
+        self.dirty = True
+        if save:
+            try:
+                self.save()
+            except Exception:
+                pass
+        return n
 
     def last_entries(self, n: int = 20) -> list[HistoryEntry]:
         k = max(0, int(n))
@@ -169,12 +240,14 @@ def append_doc_history(
     pdf_path: str | Path | None,
     action: str,
     detail: str = "",
+    *,
+    page: int | None = None,
 ) -> Optional[HistoryEntry]:
     """Kurzform: Eintrag anhängen wenn pdf_path gesetzt."""
     if not pdf_path:
         return None
     hist = DocHistory.for_pdf(pdf_path, load=True)
-    return hist.append(action, detail, save=True)
+    return hist.append(action, detail, page=page, save=True)
 
 
 def format_history_summary(entries: Sequence[HistoryEntry], *, max_items: int = 10) -> str:
@@ -185,6 +258,8 @@ def format_history_summary(entries: Sequence[HistoryEntry], *, max_items: int = 
     lines: list[str] = []
     for e in items:
         ts = e.ts.replace("T", " ").replace("+00:00", " UTC")
+        pg = e.resolved_page()
+        page_bit = f" [S.{pg + 1}]" if pg is not None else ""
         detail = f" — {e.detail}" if e.detail else ""
-        lines.append(f"{ts}  {e.action}{detail}")
+        lines.append(f"{ts}  {e.action}{page_bit}{detail}")
     return "\n".join(lines)

@@ -3642,6 +3642,53 @@ def toggle_ink_smooth() -> bool:
     return set_ink_smooth(not get_ink_smooth())
 
 
+INK_SMOOTH_LEICHT = "leicht"
+INK_SMOOTH_MITTEL = "mittel"
+INK_SMOOTH_STARK = "stark"
+INK_SMOOTH_STRENGTH_DEFAULT = INK_SMOOTH_LEICHT
+INK_SMOOTH_STRENGTH_CHOICES = (
+    (INK_SMOOTH_LEICHT, "Leicht"),
+    (INK_SMOOTH_MITTEL, "Mittel"),
+    (INK_SMOOTH_STARK, "Stark"),
+)
+INK_SMOOTH_PASSES = {
+    INK_SMOOTH_LEICHT: 1,
+    INK_SMOOTH_MITTEL: 2,
+    INK_SMOOTH_STARK: 3,
+}
+
+
+def get_ink_smooth_strength() -> str:
+    """Glättungsstärke leicht|mittel|stark — 2.2.2."""
+    raw = str(
+        load_settings().get("ink_smooth_strength", INK_SMOOTH_STRENGTH_DEFAULT)
+        or INK_SMOOTH_STRENGTH_DEFAULT
+    ).strip().lower()
+    if raw in ("stark", "strong", "high", "3"):
+        return INK_SMOOTH_STARK
+    if raw in ("mittel", "medium", "med", "2"):
+        return INK_SMOOTH_MITTEL
+    return INK_SMOOTH_LEICHT
+
+
+def set_ink_smooth_strength(strength: str) -> str:
+    """Persistenz Glättungsstärke — 2.2.2."""
+    raw = str(strength or "").strip().lower()
+    if raw in ("stark", "strong", "high", "3"):
+        val = INK_SMOOTH_STARK
+    elif raw in ("mittel", "medium", "med", "2"):
+        val = INK_SMOOTH_MITTEL
+    else:
+        val = INK_SMOOTH_LEICHT
+    save_settings({"ink_smooth_strength": val})
+    return val
+
+
+def get_ink_smooth_passes() -> int:
+    """Passes für aktuelle Glättungsstärke (1–3) — 2.2.2."""
+    return int(INK_SMOOTH_PASSES.get(get_ink_smooth_strength(), 1))
+
+
 def get_measure_labels_persistent() -> bool:
     """Mess-Labels persistent in Sidecar/Overlay halten — 2.1.1."""
     return bool(load_settings().get("measure_labels_persistent", True))

@@ -317,8 +317,9 @@ class Annotation:
         color: str = "#2980B9",
         stroke_width: float = 2.0,
         smooth: bool = False,
+        smooth_passes: int = 1,
     ) -> "Annotation":
-        """INK-Annotation aus Punktliste erzeugen; optional leichte Glättung — 2.2.1."""
+        """INK-Annotation aus Punktliste; optional Glättung (passes) — 2.2.1/2.2.2."""
         cleaned: list[list[float]] = []
         for pt in points or []:
             if not isinstance(pt, (list, tuple)) or len(pt) < 2:
@@ -328,7 +329,7 @@ class Annotation:
             except (TypeError, ValueError):
                 continue
         if smooth:
-            cleaned = smooth_ink_points(cleaned, passes=1)
+            cleaned = smooth_ink_points(cleaned, passes=max(1, int(smooth_passes or 1)))
         ann = cls(
             page=int(page),
             type=AnnotationType.INK,
@@ -585,7 +586,7 @@ def smooth_ink_points(
     *,
     passes: int = 1,
 ) -> list[list[float]]:
-    """Leichte Polyline-Glättung (Nachbar-Mittel, Endpunkte fix) — 2.2.1."""
+    """Polyline-Glättung (Nachbar-Mittel, Endpunkte fix); passes 0–3 — 2.2.1/2.2.2."""
     pts: list[list[float]] = []
     for pt in points or []:
         if not isinstance(pt, (list, tuple)) or len(pt) < 2:
@@ -606,6 +607,16 @@ def smooth_ink_points(
         out.append(pts[-1][:])
         pts = out
     return pts
+
+
+def ink_smooth_passes_for_strength(strength: str | None) -> int:
+    """Strength leicht|mittel|stark → passes 1|2|3 — 2.2.2."""
+    raw = str(strength or "").strip().lower()
+    if raw in ("stark", "strong", "high", "3"):
+        return 3
+    if raw in ("mittel", "medium", "med", "2"):
+        return 2
+    return 1
 
 
 class AnnotationStore:
@@ -1525,6 +1536,41 @@ class AnnotationStore:
                     return ann
                 return None
         return None
+
+    def smooth_ink(
+        self,
+        ann_id: str,
+        *,
+        passes: int = 1,
+        strength: str | None = None,
+    ) -> Optional[Annotation]:
+        """
+        Freihand-Punkte glätten — eigener Undo-Stack-Eintrag („Freihand glätten“) — 2.2.2.
+        """
+        ann = self.get(ann_id)
+        if ann is None or ann.type != AnnotationType.INK:
+            return None
+        n_pass = (
+            ink_smooth_passes_for_strength(strength)
+            if strength is not None
+            else max(1, min(3, int(passes or 1)))
+        )
+        raw = ann.ink_points()
+        if len(raw) < 3:
+            return ann
+        smoothed = smooth_ink_points(raw, passes=n_pass)
+        # Eigene Undo-Stufe mit Label
+        self._push_undo("Freihand glätten")
+        prev = self._recording
+        self._recording = False
+        try:
+            ann.points = [[float(x), float(y)] for x, y in smoothed]
+            ann.sync_bounds_from_points()
+            ann.touch()
+            self.dirty = True
+        finally:
+            self._recording = prev
+        return ann
 
     def for_page(self, page: int) -> List[Annotation]:
         return [a for a in self.annotations if a.page == page]
