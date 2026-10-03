@@ -19,6 +19,7 @@ class SessionTab:
     page: int = 0
     scale: float = 1.5
     kind: str = ""  # optional Hinweis
+    scroll_y: int = 0  # Vertikale Scroll-Position (PDF/Editor) — 0.9.1
 
 
 @dataclass
@@ -69,12 +70,17 @@ def load_session() -> SessionState:
         p = str(item.get("path") or "").strip()
         if not p or not Path(p).is_file():
             continue
+        try:
+            scroll_y = int(item.get("scroll_y") or 0)
+        except (TypeError, ValueError):
+            scroll_y = 0
         tabs.append(
             SessionTab(
                 path=str(Path(p)),
                 page=int(item.get("page") or 0),
                 scale=float(item.get("scale") or 1.5),
                 kind=str(item.get("kind") or ""),
+                scroll_y=max(0, scroll_y),
             )
         )
         if len(tabs) >= SESSION_MAX_TABS:
@@ -131,19 +137,53 @@ def build_session(
     active_path: Optional[str] = None,
     page: int = 0,
     scale: float = 1.5,
+    scroll_y: int = 0,
+    tab_states: Optional[dict] = None,
     restore: bool = True,
     secondary_path: Optional[str] = None,
     secondary_kind: Optional[str] = None,
     sync_scroll: bool = False,
 ) -> SessionState:
+    """
+    tab_states: optional {path: {page, scale, scroll_y}} für Last-Page/Scroll je Tab (0.9.1).
+    """
     tabs: List[SessionTab] = []
     seen: set[str] = set()
+    states = tab_states if isinstance(tab_states, dict) else {}
+
+    def _state_for(key: str) -> dict:
+        if key in states and isinstance(states[key], dict):
+            return states[key]
+        # path_key-Varianten (normiert / roh)
+        for k, v in states.items():
+            try:
+                if str(Path(str(k))) == key and isinstance(v, dict):
+                    return v
+            except Exception:
+                continue
+        return {}
+
     for p in paths:
         key = str(Path(p))
         if key in seen or not Path(key).is_file():
             continue
         seen.add(key)
-        tabs.append(SessionTab(path=key, page=0, scale=1.5))
+        st = _state_for(key)
+        try:
+            t_page = max(0, int(st.get("page", 0) or 0))
+        except (TypeError, ValueError):
+            t_page = 0
+        try:
+            t_scale = float(st.get("scale", 1.5) or 1.5)
+        except (TypeError, ValueError):
+            t_scale = 1.5
+        try:
+            t_scroll = max(0, int(st.get("scroll_y", 0) or 0))
+        except (TypeError, ValueError):
+            t_scroll = 0
+        tabs.append(
+            SessionTab(path=key, page=t_page, scale=t_scale, scroll_y=t_scroll)
+        )
         if len(tabs) >= SESSION_MAX_TABS:
             break
     active = 0
@@ -154,10 +194,18 @@ def build_session(
                 active = i
                 t.page = max(0, int(page))
                 t.scale = float(scale)
+                t.scroll_y = max(0, int(scroll_y))
                 break
         else:
             if Path(ap).is_file():
-                tabs.append(SessionTab(path=ap, page=max(0, int(page)), scale=float(scale)))
+                tabs.append(
+                    SessionTab(
+                        path=ap,
+                        page=max(0, int(page)),
+                        scale=float(scale),
+                        scroll_y=max(0, int(scroll_y)),
+                    )
+                )
                 active = len(tabs) - 1
     sec = str(secondary_path or "").strip()
     if sec and Path(sec).is_file():

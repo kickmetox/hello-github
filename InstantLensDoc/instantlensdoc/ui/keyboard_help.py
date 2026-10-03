@@ -61,8 +61,11 @@ SHORTCUTS_HTML = """
 <tr><td>Auswahl → Notiz (Sticky)</td><td><code>Ctrl+Alt+N</code> (Text vorausgefüllt; optional +Highlight) — 0.6.2/0.6.3</td></tr>
 <tr><td>Andere Tabs schließen</td><td><code>Ctrl+Shift+W</code> (Datei) — 0.6.2; Sidebar-Rechtsklick / Mittelklick schließen — 0.9.0</td></tr>
 <tr><td>Dokument-Tab Mittelklick</td><td>Mittelklick schließt Tab; Rechtsklick → Schließen / Andere schließen — 0.9.0</td></tr>
-<tr><td>Opacity-Slider Auswahl</td><td>Toolbar-Slider steuert ausgewähltes Ann.-Objekt — 0.9.0</td></tr>
+<tr><td>Tabs Alle / Links / Rechts schließen</td><td>Sidebar-Rechtsklick + Datei-Menü; Alle: <code>Ctrl+Alt+Shift+W</code> — 0.9.1</td></tr>
+<tr><td>Opacity-Slider Auswahl</td><td>Toolbar-Slider steuert ausgewähltes Ann.-Objekt — 0.9.0; Undo erst beim Loslassen — 0.9.1</td></tr>
 <tr><td>Session-Toggles</td><td>Einstellungen: Fenstergeometrie + offene Tabs getrennt — 0.9.0</td></tr>
+<tr><td>Session Last-Page / Scroll</td><td>Seite + Scroll-Position pro Tab speichern/wiederherstellen — 0.9.1</td></tr>
+<tr><td>PDF-Trefferliste</td><td>Sidebar Seite + Snippet klickbar → Sprung + Highlight — 0.9.1</td></tr>
 <tr><td>Fenster teilen (zwei Docs)</td><td><code>Ctrl+\\</code> — 0.6.3</td></tr>
 <tr><td>Vertikaler Split (übereinander)</td><td><code>Ctrl+Shift+\\</code> (Toggle) — 0.6.5</td></tr>
 <tr><td>Sync-Scroll (geteilte Docs)</td><td><code>Ctrl+Alt+\\</code>; Zustand je Session gemerkt — 0.6.4 / 0.6.9</td></tr>

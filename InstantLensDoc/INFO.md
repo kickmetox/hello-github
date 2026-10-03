@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **0.9.0** |
+| Version | **0.9.1** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -38,10 +38,10 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Installer-Task: optionale **Desktop-Verknüpfung** (Checkbox, Standard an / `checkedonce`)
 
-## Neu in 0.9.0
+## Neu in 0.9.1
 
-- Dokument-Tabs: **Mittelklick schließen** + Kontextmenü **Andere schließen**
-- PDF-Suche: **Treffer-Highlight** auf Seite + **F3 / Shift+F3** (nächster/vorheriger Treffer)
-- Annotationen: **Opacity-Slider** für ausgewähltes Objekt (Toolbar)
-- Session: **Fenstergeometrie** + **offene Tabs** wiederherstellen (getrennte Toggles)
+- Dokument-Tabs: Kontextmenü **Alle / Links / Rechts schließen**
+- PDF-Suche: **Trefferliste** Sidebar (Seite + Snippet) klickbar
+- Annotationen: **Opacity-Slider** Undo erst beim Loslassen (Commit on release)
+- Session: **Last-Page** + **Scroll-Position** pro Tab wiederherstellen
 - Stubs KI/Cloud/Stylus/3D unverändert

@@ -122,6 +122,8 @@ class MainWindow(QMainWindow):
         self._secondary_kind: str = ""  # "pdf" | "editor" | "" — Panel-Typ je Session
         self._last_tag_rename: tuple[str, str] | None = None  # (old, new) für einstufiges Undo
         self._batch_save_quiet: bool = False  # Alle-speichern: Einzeldialoge unterdrücken
+        # Last-Page / Scroll je Tab (path_key → {page, scale, scroll_y}) — 0.9.1
+        self._tab_view_state: dict[str, dict] = {}
 
         self.setAcceptDrops(True)
         self.setWindowTitle(self._app_title())
@@ -296,11 +298,99 @@ class MainWindow(QMainWindow):
         n = len(self._session_paths())
         self._set_status(f"Dokument-Reihenfolge gespeichert ({n} Tab(s))")
 
+    def _capture_current_tab_view_state(self) -> None:
+        """Aktuelle Seite/Zoom/Scroll für den geöffneten Tab merken (0.9.1)."""
+        if not self.doc or not self.doc.path:
+            return
+        key = self._path_key(self.doc.path)
+        if not key:
+            return
+        page = 0
+        scale = 1.5
+        scroll_y = 0
+        try:
+            if self.doc.kind == DocKind.PDF and self.pdf_view.pdf_path:
+                page = int(self.pdf_view.page_index or 0)
+                scale = float(self.pdf_view.scale or 1.5)
+                bar = self.pdf_view.scroll.verticalScrollBar()
+                scroll_y = int(bar.value()) if bar is not None else 0
+            elif self.stack.currentWidget() is self.editor_pane:
+                bar = self.editor.verticalScrollBar()
+                scroll_y = int(bar.value()) if bar is not None else 0
+        except Exception:
+            pass
+        self._tab_view_state[key] = {
+            "page": max(0, page),
+            "scale": float(scale) if scale > 0 else 1.5,
+            "scroll_y": max(0, scroll_y),
+        }
+
+    def _restore_tab_view_state(self, path: str) -> None:
+        """Gespeicherte Last-Page / Scroll-Position für Tab anwenden."""
+        key = self._path_key(path)
+        if not key:
+            return
+        st = self._tab_view_state.get(key)
+        if not st:
+            return
+        try:
+            page = max(0, int(st.get("page", 0) or 0))
+        except (TypeError, ValueError):
+            page = 0
+        try:
+            scale = float(st.get("scale", 1.5) or 1.5)
+        except (TypeError, ValueError):
+            scale = 1.5
+        try:
+            scroll_y = max(0, int(st.get("scroll_y", 0) or 0))
+        except (TypeError, ValueError):
+            scroll_y = 0
+        if self.doc and self.doc.kind == DocKind.PDF and self.pdf_view.pdf_path:
+            if 0 <= page < int(self.pdf_view.page_count or 0):
+                self.pdf_view.page_index = page
+            if scale > 0:
+                self.pdf_view.set_scale(scale, immediate=True)
+            else:
+                self.pdf_view.refresh()
+
+            def _apply_scroll(sy: int = scroll_y) -> None:
+                try:
+                    bar = self.pdf_view.scroll.verticalScrollBar()
+                    if bar is not None:
+                        bar.setValue(min(sy, bar.maximum()))
+                except Exception:
+                    pass
+
+            QTimer.singleShot(0, _apply_scroll)
+            QTimer.singleShot(80, _apply_scroll)
+        elif self.stack.currentWidget() is self.editor_pane:
+
+            def _apply_ed_scroll(sy: int = scroll_y) -> None:
+                try:
+                    bar = self.editor.verticalScrollBar()
+                    if bar is not None:
+                        bar.setValue(min(sy, bar.maximum()))
+                except Exception:
+                    pass
+
+            QTimer.singleShot(0, _apply_ed_scroll)
+
     def _save_session(self):
+        self._capture_current_tab_view_state()
         paths = self._session_paths()
         active = str(Path(self.doc.path)) if self.doc and self.doc.path else None
         page = self.pdf_view.page_index if self.pdf_view.pdf_path else 0
         scale = self.pdf_view.scale if self.pdf_view.pdf_path else 1.5
+        scroll_y = 0
+        try:
+            if self.pdf_view.pdf_path:
+                bar = self.pdf_view.scroll.verticalScrollBar()
+                scroll_y = int(bar.value()) if bar is not None else 0
+            elif self.stack.currentWidget() is self.editor_pane:
+                bar = self.editor.verticalScrollBar()
+                scroll_y = int(bar.value()) if bar is not None else 0
+        except Exception:
+            scroll_y = 0
         sec_path = ""
         sec_kind = ""
         if getattr(self, "_secondary_path", None) and Path(self._secondary_path).is_file():
@@ -313,6 +403,8 @@ class MainWindow(QMainWindow):
             active_path=active,
             page=page,
             scale=scale,
+            scroll_y=scroll_y,
+            tab_states=getattr(self, "_tab_view_state", None),
             restore=True,
             secondary_path=sec_path or None,
             secondary_kind=sec_kind or None,
@@ -333,21 +425,22 @@ class MainWindow(QMainWindow):
         state = session_mod.load_session()
         if not state.restore or not state.tabs:
             return
-        # Alle Tabs in Sidebar laden, aktives Dokument anzeigen
+        # Alle Tabs in Sidebar laden; View-State je Tab vorbereiten (0.9.1)
         for tab in state.tabs:
             if Path(tab.path).is_file():
                 self.sidebar.add_document(tab.path)
+                key = self._path_key(tab.path)
+                if key:
+                    self._tab_view_state[key] = {
+                        "page": max(0, int(getattr(tab, "page", 0) or 0)),
+                        "scale": float(getattr(tab, "scale", 1.5) or 1.5),
+                        "scroll_y": max(0, int(getattr(tab, "scroll_y", 0) or 0)),
+                    }
         active = state.tabs[state.active] if 0 <= state.active < len(state.tabs) else state.tabs[-1]
         if not Path(active.path).is_file():
             return
         self.open_path(active.path)
-        if self.pdf_view.pdf_path and self.doc and self.doc.kind == DocKind.PDF:
-            if 0 <= active.page < self.pdf_view.page_count:
-                self.pdf_view.page_index = active.page
-            if active.scale > 0:
-                self.pdf_view.set_scale(active.scale, immediate=True)
-            else:
-                self.pdf_view.refresh()
+        # open_path stellt Last-Page/Scroll aus _tab_view_state wieder her
         # Doc-Split Panel-Typ / Zweit-Doc aus Session wiederherstellen
         sec = str(getattr(state, "secondary_path", "") or "").strip()
         kind = str(getattr(state, "secondary_kind", "") or "").strip().lower()
@@ -391,6 +484,9 @@ class MainWindow(QMainWindow):
         self.sidebar.file_activated.connect(self.open_path)
         self.sidebar.document_close_requested.connect(self.close_tab_path)
         self.sidebar.document_close_others_requested.connect(self.close_other_tabs_keeping)
+        self.sidebar.document_close_all_requested.connect(self.close_all_tabs)
+        self.sidebar.document_close_left_requested.connect(self.close_tabs_left_of)
+        self.sidebar.document_close_right_requested.connect(self.close_tabs_right_of)
         self.sidebar.recent_activated.connect(self.open_path)
         self.sidebar.recent_remove_requested.connect(self._remove_recent_path)
         self.sidebar.mark_activated.connect(self._on_mark_activated)
@@ -658,6 +754,19 @@ class MainWindow(QMainWindow):
         )
         act_close_others.triggered.connect(self.close_other_tabs)
         m_file.addAction(act_close_others)
+        act_close_all = QAction("Alle Tabs schließen", self)
+        act_close_all.setShortcut(QKeySequence("Ctrl+Alt+Shift+W"))
+        act_close_all.setToolTip("Alle Dokument-Tabs schließen (Sidebar-Kontextmenü)")
+        act_close_all.triggered.connect(self.close_all_tabs)
+        m_file.addAction(act_close_all)
+        act_close_left = QAction("Tabs links schließen", self)
+        act_close_left.setToolTip("Alle Tabs links vom aktuellen schließen")
+        act_close_left.triggered.connect(self.close_tabs_left_of_current)
+        m_file.addAction(act_close_left)
+        act_close_right = QAction("Tabs rechts schließen", self)
+        act_close_right.setToolTip("Alle Tabs rechts vom aktuellen schließen")
+        act_close_right.triggered.connect(self.close_tabs_right_of_current)
+        m_file.addAction(act_close_right)
         act_dup_tab = QAction("Tab duplizieren", self)
         act_dup_tab.setShortcut(QKeySequence("Ctrl+Shift+T"))
         act_dup_tab.setToolTip(
@@ -4144,15 +4253,6 @@ class MainWindow(QMainWindow):
                     if query.lower() in blob:
                         hits.append(a)
             pdf_path = self.pdf_view.pdf_path
-            page_hits: list[tuple[int, str]] = []
-            if pdf_path:
-                for page_idx, blob in fulltext_mod.extract_document_text(pdf_path):
-                    if page_idx is None:
-                        continue
-                    if query.lower() in blob.lower():
-                        page_hits.append((page_idx, blob))
-            # Aktuelle Seite: Texttreffer highlighten
-            n_page = self.pdf_view.highlight_search(query)
             try:
                 from instantlensdoc.core.app_settings import (
                     get_search_snippet_context_chars,
@@ -4161,50 +4261,62 @@ class MainWindow(QMainWindow):
                 snip_ctx = get_search_snippet_context_chars()
             except Exception:
                 snip_ctx = 40
-            if page_hits:
-                for pi, blob in page_hits:
-                    for line in blob.splitlines():
-                        if query.lower() in line.lower():
-                            snip = fulltext_mod._snippet_around(
-                                line, query, context_chars=snip_ctx, width=96
-                            )
-                            hits.append(("page", pi, snip))
-                            break
-            if hits or n_page:
+            # Klickbare Trefferliste: Seite + Snippet je Texttreffer (0.9.1)
+            text_hits: list[tuple[int, int, str]] = []
+            if pdf_path and hasattr(self.pdf_view, "collect_search_hits"):
+                text_hits = self.pdf_view.collect_search_hits(
+                    query, max_hits=100, snippet_chars=snip_ctx
+                )
+            # Aktuelle Seite: Texttreffer highlighten
+            n_page = self.pdf_view.highlight_search(query)
+            if text_hits or hits or n_page:
                 lines = []
                 payloads = []
-                if n_page:
-                    lines.append(f"Seite {self.pdf_view.page_index + 1}: {n_page} Texttreffer (hervorgehoben)")
-                    payloads.append(("__search__", self.pdf_view.page_index))
+                for page_idx, hit_i, snip in text_hits:
+                    lines.append(
+                        fulltext_mod.format_hit_line(
+                            Path(pdf_path).name if pdf_path else "PDF",
+                            page=page_idx,
+                            line=None,
+                            snippet=snip,
+                            kind="pdf",
+                            query=query,
+                        )
+                    )
+                    payloads.append((str(pdf_path), page_idx, query, hit_i))
                 for h in hits:
-                    if isinstance(h, tuple) and h[0] == "page":
-                        _, pi, snip = h
-                        lines.append(
-                            fulltext_mod.format_hit_line(
-                                Path(pdf_path).name if pdf_path else "PDF",
-                                page=pi,
-                                line=None,
-                                snippet=snip,
-                                kind="pdf",
-                                query=query,
-                            )
-                        )
-                        payloads.append((str(pdf_path), pi, query))
-                    else:
-                        ann_snip = fulltext_mod._snippet_around(
-                            f"{h.type.value} {h.text}",
-                            query,
-                            context_chars=max(20, snip_ctx - 4),
-                            width=80,
-                        )
-                        lines.append(f"S.{h.page + 1} Ann.: {ann_snip}")
-                        payloads.append(h)
+                    ann_snip = fulltext_mod._snippet_around(
+                        f"{h.type.value} {h.text}",
+                        query,
+                        context_chars=max(20, snip_ctx - 4),
+                        width=80,
+                    )
+                    lines.append(f"S.{h.page + 1} Ann.: {ann_snip}")
+                    payloads.append(h)
+                if not lines and n_page:
+                    lines.append(
+                        f"Seite {self.pdf_view.page_index + 1}: "
+                        f"{n_page} Texttreffer (hervorgehoben)"
+                    )
+                    payloads.append(("__search__", self.pdf_view.page_index, query, 0))
                 self.sidebar.set_marks(lines, payloads)
-                if n_page:
+                total_nav = len(
+                    [
+                        p
+                        for p in payloads
+                        if isinstance(p, tuple)
+                        and len(p) >= 2
+                        and p[0] not in (None, "", "__search__")
+                    ]
+                )
+                if total_nav:
+                    self.sidebar.set_search_hit_status(1 if n_page else 0, total_nav)
+                elif n_page:
                     self.sidebar.set_search_hit_status(1, n_page)
                 self._set_status(
-                    f"{n_page} Treffer auf Seite {self.pdf_view.page_index + 1} · "
-                    f"{len(lines)} Einträge (PDF-Text/Annotationen)"
+                    f"{len(text_hits)} Texttreffer · {len(hits)} Ann. · "
+                    f"Seite {self.pdf_view.page_index + 1}: {n_page} hervorgehoben — "
+                    "Klick in Trefferliste springt"
                 )
             else:
                 self.pdf_view.clear_search_highlights()
@@ -4220,7 +4332,8 @@ class MainWindow(QMainWindow):
         if payload[0] in (None, "", "__search__"):
             return False
         q = payload[2] if len(payload) >= 3 else self.sidebar.search_text()
-        self._on_fulltext_hit(str(payload[0]), payload[1], query=q)
+        hit_i = payload[3] if len(payload) >= 4 else None
+        self._on_fulltext_hit(str(payload[0]), payload[1], query=q, hit_index=hit_i)
         total = int(getattr(self.sidebar, "_search_hit_total", 0) or 0)
         cur = int(getattr(self.sidebar, "_search_hit_index", -1)) + 1
         if total > 0 and cur > 0:
@@ -4370,25 +4483,61 @@ class MainWindow(QMainWindow):
     def _on_mark_activated(self, index: int):
         payload = self.sidebar.mark_payload(index)
         if isinstance(payload, tuple) and len(payload) >= 2:
+            if payload[0] in (None, "", "__search__"):
+                q = payload[2] if len(payload) >= 3 else self.sidebar.search_text()
+                hit_i = int(payload[3]) if len(payload) >= 4 else 0
+                page = payload[1]
+                if page is not None and self.stack.currentWidget() is self.pdf_view:
+                    if q:
+                        self.pdf_view._search_query = q
+                        self.pdf_view._goto_search_page(int(page), hit_index=hit_i)
+                    else:
+                        self.pdf_view.goto_page(int(page))
+                    self._set_status(f"Treffer Seite {int(page) + 1}")
+                return
             q = payload[2] if len(payload) >= 3 else self.sidebar.search_text()
-            self._on_fulltext_hit(str(payload[0]), payload[1], query=q)
+            hit_i = payload[3] if len(payload) >= 4 else None
+            self._on_fulltext_hit(str(payload[0]), payload[1], query=q, hit_index=hit_i)
             return
         if payload is not None and hasattr(payload, "page"):
             self.stack.setCurrentWidget(self.pdf_view)
             self.pdf_view.focus_annotation(payload)
             self._set_status(f"Annotation Seite {payload.page + 1}")
 
-    def _on_fulltext_hit(self, path: str, page, query: str | None = None):
+    def _on_fulltext_hit(
+        self,
+        path: str,
+        page,
+        query: str | None = None,
+        hit_index: int | None = None,
+    ):
+        if path in (None, "", "__search__"):
+            return
         self.open_path(path)
         q = (query or self.sidebar.search_text() or "").strip()
         if page is not None and self.stack.currentWidget() is self.pdf_view:
-            self.pdf_view.goto_page(int(page))
             n = 0
             if q:
-                n = self.pdf_view.highlight_search(q)
+                self.pdf_view._search_query = q
+                if hit_index is not None:
+                    ok = self.pdf_view._goto_search_page(
+                        int(page), hit_index=int(hit_index)
+                    )
+                    n = self.pdf_view.search_hit_count() if ok else 0
+                else:
+                    self.pdf_view.goto_page(int(page))
+                    n = self.pdf_view.highlight_search(q)
+            else:
+                self.pdf_view.goto_page(int(page))
             if n:
+                hi = (
+                    int(hit_index) + 1
+                    if hit_index is not None
+                    else self.pdf_view.search_active_index() + 1
+                )
                 self._set_status(
-                    f"Treffer: {Path(path).name} Seite {int(page) + 1} · {n} hervorgehoben"
+                    f"Treffer: {Path(path).name} Seite {int(page) + 1} · "
+                    f"{hi}/{n} hervorgehoben"
                 )
             else:
                 self._set_status(f"Treffer: {Path(path).name} Seite {int(page) + 1}")
@@ -4945,6 +5094,7 @@ class MainWindow(QMainWindow):
             return
         if key:
             self._unsaved_paths.discard(key)
+            self._tab_view_state.pop(key, None)
         try:
             self._save_session()
         except Exception:
@@ -4982,6 +5132,7 @@ class MainWindow(QMainWindow):
             key = self._path_key(p)
             if key:
                 self._unsaved_paths.discard(key)
+                self._tab_view_state.pop(key, None)
             closed += 1
         if closed == 0:
             self._set_status("Keine anderen Tabs zum Schließen")
@@ -4993,6 +5144,139 @@ class MainWindow(QMainWindow):
         self._update_unsaved_status()
         self._refresh_document_dirty_labels()
         self._set_status(f"{closed} andere Tab(s) geschlossen — aktuell bleibt offen")
+
+    def _close_tabs_by_paths(self, targets: list[str], *, status_ok: str) -> int:
+        """Hilfsfunktion: Tabs entfernen (ohne Dirty-Dialog, wie close_other_tabs)."""
+        closed = 0
+        for p in targets:
+            self.sidebar.remove_document(p)
+            key = self._path_key(p)
+            if key:
+                self._unsaved_paths.discard(key)
+                self._tab_view_state.pop(key, None)
+            closed += 1
+        if closed == 0:
+            return 0
+        try:
+            self._save_session()
+        except Exception:
+            pass
+        self._update_unsaved_status()
+        self._refresh_document_dirty_labels()
+        self._set_status(status_ok.format(n=closed))
+        return closed
+
+    def close_tabs_left_of(self, pivot_path: str) -> None:
+        """Alle Tabs links vom angegebenen Pfad schließen (Kontextmenü)."""
+        pivot = str(Path(pivot_path)) if pivot_path else ""
+        paths = list(self.sidebar.document_paths()) if hasattr(self.sidebar, "document_paths") else []
+        if not pivot or not paths:
+            self._set_status("Keine Tabs links zum Schließen")
+            return
+        idx = -1
+        for i, p in enumerate(paths):
+            if str(Path(str(p))) == pivot:
+                idx = i
+                break
+        if idx <= 0:
+            self._set_status("Keine Tabs links zum Schließen")
+            return
+        cur = str(Path(self.doc.path)) if self.doc and self.doc.path else None
+        # Wenn aktuelles Doc unter den zu schließenden liegt → zuerst Pivot aktivieren
+        left = [str(Path(str(p))) for p in paths[:idx]]
+        if cur and any(str(Path(c)) == str(Path(cur)) for c in left):
+            if Path(pivot).is_file():
+                self.open_path(pivot)
+        n = self._close_tabs_by_paths(
+            left, status_ok="{n} Tab(s) links geschlossen"
+        )
+        if n == 0:
+            self._set_status("Keine Tabs links zum Schließen")
+
+    def close_tabs_right_of(self, pivot_path: str) -> None:
+        """Alle Tabs rechts vom angegebenen Pfad schließen (Kontextmenü)."""
+        pivot = str(Path(pivot_path)) if pivot_path else ""
+        paths = list(self.sidebar.document_paths()) if hasattr(self.sidebar, "document_paths") else []
+        if not pivot or not paths:
+            self._set_status("Keine Tabs rechts zum Schließen")
+            return
+        idx = -1
+        for i, p in enumerate(paths):
+            if str(Path(str(p))) == pivot:
+                idx = i
+                break
+        if idx < 0 or idx >= len(paths) - 1:
+            self._set_status("Keine Tabs rechts zum Schließen")
+            return
+        cur = str(Path(self.doc.path)) if self.doc and self.doc.path else None
+        right = [str(Path(str(p))) for p in paths[idx + 1 :]]
+        if cur and any(str(Path(c)) == str(Path(cur)) for c in right):
+            if Path(pivot).is_file():
+                self.open_path(pivot)
+        n = self._close_tabs_by_paths(
+            right, status_ok="{n} Tab(s) rechts geschlossen"
+        )
+        if n == 0:
+            self._set_status("Keine Tabs rechts zum Schließen")
+
+    def close_tabs_left_of_current(self) -> None:
+        if not self.doc or not self.doc.path:
+            self._set_status("Kein Dokument geöffnet")
+            return
+        self.close_tabs_left_of(str(self.doc.path))
+
+    def close_tabs_right_of_current(self) -> None:
+        if not self.doc or not self.doc.path:
+            self._set_status("Kein Dokument geöffnet")
+            return
+        self.close_tabs_right_of(str(self.doc.path))
+
+    def close_all_tabs(self) -> None:
+        """Alle Sidebar-Tabs schließen; aktuelles Doc mit Speichern-Dialog."""
+        paths = list(self.sidebar.document_paths()) if hasattr(self.sidebar, "document_paths") else []
+        if not paths and not self.doc:
+            self._set_status("Keine Tabs zum Schließen")
+            return
+        if self.doc:
+            if not self._confirm_close_current(allow_discard=True):
+                return
+            path = str(self.doc.path) if self.doc.path else None
+            if path:
+                self.sidebar.remove_document(path)
+                key = self._path_key(path)
+                if key:
+                    self._unsaved_paths.discard(key)
+                    self._tab_view_state.pop(key, None)
+            self.doc = None
+            try:
+                self.pdf_view.pdf_path = None
+                self.pdf_view.store = None
+                self.pdf_view.page_count = 0
+            except Exception:
+                pass
+            self.editor.blockSignals(True)
+            self.editor.setPlainText("")
+            self.editor.blockSignals(False)
+        remaining = list(self.sidebar.document_paths())
+        for p in remaining:
+            self.sidebar.remove_document(p)
+            key = self._path_key(p)
+            if key:
+                self._unsaved_paths.discard(key)
+                self._tab_view_state.pop(key, None)
+        self.sidebar.clear_thumbs()
+        self.sidebar.clear_annotations()
+        self.sidebar.set_marks([])
+        self.stack.setCurrentWidget(self.editor_pane)
+        self.setWindowTitle(self._app_title())
+        self._update_doc_status()
+        try:
+            self._save_session()
+        except Exception:
+            pass
+        self._update_unsaved_status()
+        self._refresh_document_dirty_labels()
+        self._set_status("Alle Tabs geschlossen")
 
     def _pdf_page_size(self):
         if not self.pdf_view.pdf_path:
@@ -5600,6 +5884,11 @@ class MainWindow(QMainWindow):
             self.open_path(path, encoding=enc)
 
     def open_path(self, path: str, *, encoding: str | None = None):
+        # Vor Tab-Wechsel Last-Page/Scroll des aktuellen Docs merken (0.9.1)
+        try:
+            self._capture_current_tab_view_state()
+        except Exception:
+            pass
         try:
             self.doc = open_document(path, encoding=encoding)
         except Exception as e:
@@ -5648,6 +5937,11 @@ class MainWindow(QMainWindow):
                 self.sidebar.set_marks([])
                 self.sidebar.clear_thumbs()
                 self.sidebar.clear_annotations()
+            # Last-Page / Scroll-Position für diesen Tab wiederherstellen
+            try:
+                self._restore_tab_view_state(path)
+            except Exception:
+                pass
             self._update_doc_status()
             enc = self.doc.meta.get("encoding")
             if enc:

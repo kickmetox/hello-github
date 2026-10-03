@@ -1388,6 +1388,7 @@ class PdfViewer(QWidget):
         )
         self.spin_opacity.valueChanged.connect(self._on_default_opacity_changed)
         # Toolbar-Slider (0.05–1.0 als 5–100 %) — ausgewähltes Objekt oder Standard
+        # Undo erst bei Loslassen (Commit on release) — 0.9.1
         self.slider_opacity = QSlider(Qt.Horizontal)
         self.slider_opacity.setRange(5, 100)
         self.slider_opacity.setSingleStep(5)
@@ -1395,8 +1396,14 @@ class PdfViewer(QWidget):
         self.slider_opacity.setFixedWidth(88)
         self.slider_opacity.setValue(int(round(self._default_opacity * 100)))
         self.slider_opacity.setToolTip(
-            "Opacity-Slider: Deckkraft des ausgewählten Objekts; ohne Auswahl → Standard"
+            "Opacity-Slider: Deckkraft des ausgewählten Objekts; ohne Auswahl → Standard "
+            "(Undo beim Loslassen)"
         )
+        self._opacity_slider_dragging = False
+        self._opacity_slider_undo_pushed = False
+        self._opacity_slider_prev_recording = True
+        self.slider_opacity.sliderPressed.connect(self._on_opacity_slider_pressed)
+        self.slider_opacity.sliderReleased.connect(self._on_opacity_slider_released)
         self.slider_opacity.valueChanged.connect(self._on_opacity_slider_changed)
         self.btn_grayscale = QToolButton()
         self.btn_grayscale.setText("Grau")
@@ -1831,39 +1838,91 @@ class PdfViewer(QWidget):
             self.spin_opacity.setValue(op)
             self.spin_opacity.blockSignals(False)
 
-    def _apply_toolbar_opacity(self, value: float) -> None:
-        """
-        Opacity-Slider/Spin: bei Auswahl nur ausgewählte Objekte;
-        ohne Auswahl → Standard-Deckkraft für neue Annotationen.
-        """
-        op = max(0.05, min(1.0, float(value)))
+    def _selected_opacity_ids(self) -> list[str]:
         ids = list(self._selected_ann_ids) if self._selected_ann_ids else (
             [self._selected_ann_id] if self._selected_ann_id else []
         )
-        ids = [i for i in ids if i]
+        return [i for i in ids if i]
+
+    def _apply_toolbar_opacity(self, value: float, *, commit: bool = True) -> None:
+        """
+        Opacity-Slider/Spin: bei Auswahl nur ausgewählte Objekte;
+        ohne Auswahl → Standard-Deckkraft für neue Annotationen.
+        commit=False: Live-Vorschau ohne Undo/Sidecar-Force (Slider-Drag).
+        """
+        op = max(0.05, min(1.0, float(value)))
+        ids = self._selected_opacity_ids()
         if self.store and ids:
             n = self.store.set_opacities(ids, op)
             if n > 0:
+                if commit:
+                    try:
+                        self.schedule_sidecar_save(force=True)
+                    except Exception:
+                        pass
+                self.refresh()
+                self.annotations_changed.emit()
+                self.status.emit(f"Deckkraft {op:.2f} für {n} ausgewählte Annotation(en)")
+            return
+        self._default_opacity = op
+        if commit:
+            set_ann_default_opacity(self._default_opacity)
+        self.status.emit(f"Standard-Deckkraft {self._default_opacity:.2f}")
+
+    def _on_opacity_slider_pressed(self) -> None:
+        """Undo-Stufe einmalig beim Drag-Start (Commit on release)."""
+        self._opacity_slider_dragging = True
+        self._opacity_slider_undo_pushed = False
+        ids = self._selected_opacity_ids()
+        if self.store and ids:
+            try:
+                self.store._push_undo("Deckkraft")  # noqa: SLF001 — eine Stufe für Drag
+                self._opacity_slider_prev_recording = bool(self.store._recording)
+                self.store._recording = False
+                self._opacity_slider_undo_pushed = True
+            except Exception:
+                self._opacity_slider_undo_pushed = False
+
+    def _on_opacity_slider_released(self) -> None:
+        """Slider loslassen → Sidecar speichern, Undo-Aufnahme wieder an."""
+        was_dragging = bool(self._opacity_slider_dragging)
+        self._opacity_slider_dragging = False
+        if self.store and self._opacity_slider_undo_pushed:
+            try:
+                self.store._recording = bool(
+                    getattr(self, "_opacity_slider_prev_recording", True)
+                )
+            except Exception:
+                self.store._recording = True
+        self._opacity_slider_undo_pushed = False
+        if was_dragging:
+            # Finalen Wert committen (Sidecar + Default persistieren)
+            percent = int(self.slider_opacity.value()) if hasattr(self, "slider_opacity") else 100
+            value = max(0.05, min(1.0, float(percent) / 100.0))
+            ids = self._selected_opacity_ids()
+            if self.store and ids:
                 try:
                     self.schedule_sidecar_save(force=True)
                 except Exception:
                     pass
                 self.refresh()
                 self.annotations_changed.emit()
-                self.status.emit(f"Deckkraft {op:.2f} für {n} ausgewählte Annotation(en)")
-            return
-        self._default_opacity = op
-        set_ann_default_opacity(self._default_opacity)
-        self.status.emit(f"Standard-Deckkraft {self._default_opacity:.2f}")
+            else:
+                self._default_opacity = value
+                set_ann_default_opacity(self._default_opacity)
 
     def _on_default_opacity_changed(self, value: float):
         self._sync_opacity_controls(value, from_slider=False)
-        self._apply_toolbar_opacity(value)
+        self._apply_toolbar_opacity(value, commit=True)
 
     def _on_opacity_slider_changed(self, percent: int):
         value = max(0.05, min(1.0, float(percent) / 100.0))
         self._sync_opacity_controls(value, from_slider=True)
-        self._apply_toolbar_opacity(value)
+        # Während Drag: Live ohne Undo-Spam; ohne Drag (API/Wheel): sofort committen
+        if getattr(self, "_opacity_slider_dragging", False):
+            self._apply_toolbar_opacity(value, commit=False)
+        else:
+            self._apply_toolbar_opacity(value, commit=True)
 
     def set_grayscale(self, enabled: bool):
         enabled = bool(enabled)
@@ -3324,6 +3383,46 @@ class PdfViewer(QWidget):
     def search_active_index(self) -> int:
         """0-basierter Index des aktiven Treffer-Highlights (−1 wenn keiner)."""
         return int(self._search_index)
+
+    def collect_search_hits(
+        self,
+        query: str,
+        *,
+        max_hits: int = 100,
+        snippet_chars: int = 48,
+    ) -> list[tuple[int, int, str]]:
+        """
+        Alle PDF-Texttreffer für die Trefferliste (Seite, Hit-Index auf Seite, Snippet).
+        """
+        q = (query or "").strip()
+        if not q or not self.pdf_path or self.page_count <= 0:
+            return []
+        out: list[tuple[int, int, str]] = []
+        ctx = max(12, int(snippet_chars))
+        for page_idx in range(int(self.page_count)):
+            if len(out) >= max_hits:
+                break
+            matches = find_text_rects(
+                self.pdf_path,
+                page_idx,
+                q,
+                scale=1.0,
+                password=self.password,
+                max_hits=max(1, max_hits - len(out)),
+            )
+            for hit_i, m in enumerate(matches):
+                if len(out) >= max_hits:
+                    break
+                raw = (getattr(m, "text", None) or q).replace("\n", " ").strip()
+                # Kurzes Snippet um Match
+                try:
+                    from instantlensdoc.core.fulltext import _snippet_around
+
+                    snip = _snippet_around(raw, q, context_chars=ctx, width=max(40, ctx * 2))
+                except Exception:
+                    snip = raw[: max(20, ctx)] + ("…" if len(raw) > ctx else "")
+                out.append((page_idx, hit_i, snip or q))
+        return out
 
     def set_scale(self, scale: float, *, immediate: bool = False):
         scale = max(0.25, min(5.0, float(scale)))

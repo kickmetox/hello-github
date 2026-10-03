@@ -6,7 +6,7 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 |---------|--------|---------|
 | Hauptfenster (Menü, Sidebar, Editor, Status) | fertig | PySide6; Status: Dateiname, Seite x/y (**Seitenlabels** 0.4.9) bzw. **Zeile x/y** (Editor), **Seitengröße mm/inch** 0.3.5, Zoom %, Wörter/Ann.; **Status PDF↔Text robuster** **0.8.0**; **Zoom-% bei PDF** **0.8.1**; **ungespeicherte Tabs** 0.6.3 (**Klick → Dirty-Liste** 0.6.4, **Speichern je Datei** 0.6.5, **Alle speichern** 0.6.6, **Fortschritt >3** 0.6.7, **Abbrechen** 0.6.8, **Fehlerliste** 0.6.9); **Undo-Hint** 0.4.6 (**benannt z. B. Tag umbenennen** 0.6.7); Ann.-Liste Sidebar 0.2.4; **Ann.-Filter Typ** 0.2.6; **Ann.-Farben-Filter klickbar** 0.4.6; **Ann. nur aktuelle Seite** 0.4.9; **Ann.-Tag-Filter** 0.5.1 (**Multi-Select** 0.6.2, **Tag-Cloud** 0.6.3, **Cloud-Klick setzt Filter** 0.6.4, **Rechtsklick umbenennen** 0.6.5, **Rename-Undo ein Schritt** 0.6.6, **Undo-Stack-Label** 0.6.7, **Bestätigung >20** 0.6.8, **Schwelle in Einstellungen** 0.6.9, **Rechtsklick Filter + Farbe** **0.8.0**, **Sort A–Z/Häufigkeit** **0.8.1**); **Ann.-Regex** 0.5.2 |
 | App-Icon Fenster/Taskleiste/About | fertig | Robuste Pfade: `assets/`, CWD, `D:\AI_Temp\InstantLensDoc` |
-| Session-Restore (offene Docs) | fertig | `session.json`, Sidebar-Liste; **optional Toggle in Einstellungen** 0.3.7; **Tab-Reihenfolge Drag + order** 0.6.1; **Andere Tabs schließen** 0.6.2; **Fenster teilen zwei Docs** 0.6.3; **Sync-Scroll optional** 0.6.4; **Vertikal-Split Toggle** 0.6.5; **H/V in Einstellungen** 0.6.6; **PDF+Editor-Mischung zweites Panel** 0.6.7; **Panel-Typ secondary_path/kind je Session** 0.6.8; **Sync-Scroll je Session** 0.6.9; **Toggle „Offene Tabs wiederherstellen“** **0.9.0** |
+| Session-Restore (offene Docs) | fertig | `session.json`, Sidebar-Liste; **optional Toggle in Einstellungen** 0.3.7; **Tab-Reihenfolge Drag + order** 0.6.1; **Andere Tabs schließen** 0.6.2; **Fenster teilen zwei Docs** 0.6.3; **Sync-Scroll optional** 0.6.4; **Vertikal-Split Toggle** 0.6.5; **H/V in Einstellungen** 0.6.6; **PDF+Editor-Mischung zweites Panel** 0.6.7; **Panel-Typ secondary_path/kind je Session** 0.6.8; **Sync-Scroll je Session** 0.6.9; **Toggle „Offene Tabs wiederherstellen“** **0.9.0**; **Last-Page + Scroll-Position pro Tab** **0.9.1** |
 | Fenster-Geometrie speichern | fertig | Größe/Position/State in Settings 0.3.6; **Toggle „Fenstergeometrie wiederherstellen“** **0.9.0** |
 | PDF Präsentationsmodus | fertig | Vollbild F5; Pfeiltasten/Leertaste; Esc beendet 0.3.7 |
 | Clipboard-Paste Bild | fertig | Editor + PDF (Stempel/Seite) |
@@ -51,10 +51,10 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | Annotation-Farben-Favoriten | fertig | 3 Presets speichern/anwenden (Toolbar 1/2/3) 0.3.7 |
 | Annotation-Farbe Palette-Zyklus | fertig | Ctrl+Shift+C Zyklus / Ctrl+Alt+Shift+C Random aus fester Palette 0.5.3 |
 | Annotation-Batch-Farbe (Auswahl) | fertig | Farbe für alle ausgewählten Ann. ändern; Ctrl+Alt+Shift+F 0.5.6 |
-| Annotation-Deckkraft Batch (Auswahl) | fertig | Opacity für Auswahl; Ctrl+Alt+Shift+O / Toolbar α… 0.5.7; **Sidecar Force-Save / Clamp** 0.5.8; **Toolbar-Slider** 0.5.9; **Slider nur Auswahl (ohne Default-Schreiben)** **0.9.0** |
+| Annotation-Deckkraft Batch (Auswahl) | fertig | Opacity für Auswahl; Ctrl+Alt+Shift+O / Toolbar α… 0.5.7; **Sidecar Force-Save / Clamp** 0.5.8; **Toolbar-Slider** 0.5.9; **Slider nur Auswahl (ohne Default-Schreiben)** **0.9.0**; **Undo Commit on release** **0.9.1** |
 | Annotation-Text editieren | fertig | Notiz/Kommentar/Overlay nachträglich; Doppelklick / Ctrl+E 0.2.7 |
 | Annotation-Tags/Labels | fertig | Freie Tags; Sidecar+CSV; Sidebar-Filter; Ctrl+Alt+T 0.5.1 |
-| Annotation-Deckkraft | fertig | `opacity` Sidecar + Toolbar α + Dialog 0.2.8; **persistenter Force-Save** 0.5.8; **Toolbar-Slider** 0.5.9; **Auswahl-Objekt per Slider** **0.9.0** |
+| Annotation-Deckkraft | fertig | `opacity` Sidecar + Toolbar α + Dialog 0.2.8; **persistenter Force-Save** 0.5.8; **Toolbar-Slider** 0.5.9; **Auswahl-Objekt per Slider** **0.9.0**; **Slider-Undo erst beim Loslassen** **0.9.1** |
 | Annotation-Suche Sidebar | fertig | Textfilter in Annotationsliste 0.3.0; **optional Regex** 0.5.2; **Tag-Autocomplete** 0.6.1; **Tag-Filter Multi-Select (ODER)** 0.6.2; **Tag-Cloud häufigste Tags** 0.6.3; **Cloud-Klick setzt Filter** (Ctrl+Klick Multi) 0.6.4; **Rechtsklick → Tag umbenennen global** 0.6.5; **Ctrl+Z ein Undo-Schritt** 0.6.6; **Label „Tag umbenennen“ im PDF-Undo-Stack** 0.6.7; **Bestätigung bei >20 Treffern** 0.6.8; **Schwelle in Einstellungen** 0.6.9 |
 | Stempel / Callouts | fertig | Bibliothek GENEHMIGT/ENTWURF/VERTRAULICH + Datum 0.3.1; Callout (2-Klick); **Rotation 90°** 0.4.1 |
 | PDF URI-Links öffnen | fertig | Native Link-Annotationen http/https; Auswahl-Klick / Ctrl+Klick 0.4.1 |
@@ -68,7 +68,7 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | PDF Seiten als Einzel-PDFs | fertig | Eine Datei pro Seite; Menü + `split_into_single_page_pdfs` 0.3.3 |
 | PDF-Text → Editor | fertig | Seite oder gesamtes PDF; Menü PDF 0.3.4 |
 | PDF-Seitenbild → Editor | fertig | Seite/alle Seiten als PNG + Verweiszeile; Menü PDF 0.4.5 |
-| Tab schließen (dirty) | fertig | Speichern-Dialog; Datei → Schließen / Ctrl+W; Beenden 0.3.1; **Mittelklick** + Kontextmenü Schließen / **Andere schließen** **0.9.0** |
+| Tab schließen (dirty) | fertig | Speichern-Dialog; Datei → Schließen / Ctrl+W; Beenden 0.3.1; **Mittelklick** + Kontextmenü Schließen / **Andere schließen** **0.9.0**; **Alle / Links / Rechts schließen** **0.9.1** |
 | PDF Signaturfeld / Signatur (Bild) | fertig | Sidecar; Menü PDF + Werkzeug |
 | Theme Hell/Dunkel | fertig | Ansicht-Menü, persistiert |
 | Einstellungen Reset-to-Defaults | fertig | Dialog-Button „Auf Standard zurücksetzen“ 0.4.4 |
@@ -88,7 +88,7 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | PDF Nachtmodus | fertig | Invert-Ansicht nur Darstellung; `invert=True` — nicht speichern/exportieren 0.3.0 |
 | PDF leere Seite / duplizieren | fertig | Toolbar + Menü; Annotation-Remap 0.2.4; **Thumb-Duplizieren + Undo Ctrl+Z** **0.8.5** |
 | PDF neu anordnen | fertig | Dialog + Thumbnail-Drag + Annotation-Remap; **Undo Ctrl+Z** **0.8.2** |
-| Textsuche Seitenleiste | fertig | Editor + PDF-Text + Annotationen; Highlight 0.2.2; **letzte Suchbegriffe** merken 0.2.4; **PDF Treffer-Highlight + F3/Shift+F3** (auch seitenübergreifend) **0.9.0** |
+| Textsuche Seitenleiste | fertig | Editor + PDF-Text + Annotationen; Highlight 0.2.2; **letzte Suchbegriffe** merken 0.2.4; **PDF Treffer-Highlight + F3/Shift+F3** (auch seitenübergreifend) **0.9.0**; **klickbare Trefferliste Seite+Snippet** **0.9.1** |
 | Annotation-Liste Sidebar | fertig | Klick → Seite + Auswahl 0.2.4; **Filter nach Typ** 0.2.6; **Textsuche** 0.3.0; **Gruppierung nach Seite** 0.3.5; **Statistik je Typ (Footer)** 0.3.9; **Nur aktuelle Seite** 0.4.9; **Tag-Filter** 0.5.1 (**Multi-Select ODER** 0.6.2, **Tag-Cloud** 0.6.3, **setzt Filter** 0.6.4, **umbenennen** 0.6.5, **Rename-Undo** 0.6.6, **Undo-Label** 0.6.7, **Confirm >20** 0.6.8, **Schwelle Settings** 0.6.9, **Rechtsklick Filter + Farbe** **0.8.0**, **Sort A–Z/Häufigkeit** **0.8.1**); **Regex optional** 0.5.2; **Gruppen Name/Farbe** 0.5.4; **Ellipsis-Style bei gekürztem Text** 0.7.7; **Tooltip voller Text** 0.7.8; **Filter-Presets speichern/laden** 0.7.9 |
 | PDF Seitenbereich extrahieren | fertig | von–bis → neues PDF; Menü + Dialog-Tab 0.2.6 |
 | Editor Find/Replace | fertig | Ctrl+R Dialog 0.2.6 |
@@ -146,27 +146,27 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | Inno-Installer | fertig | Icon, **optionale Desktop-Checkbox** (`desktopicon`/`checkedonce`) 0.6.1, Uninstaller, Keygen optional (`InstantLensKeygen.exe`) 0.2.1 |
 | Sync-Skript Windows | fertig | Repo `scripts/sync-ild.ps1`; Store `docs/sync-ild.ps1`; **-SkipStart** + Exit-Codes 0/1/2 **0.6.2** |
 | Arbeitsverzeichnis öffnen | fertig | Datei-Menü Ctrl+Shift+E; Ordner der Datei bzw. CWD 0.4.8 |
-| In-App Hilfe / About | fertig | Version 0.9.0; Fenstertitel + Splash; Logordner-Button; **Feature-Kurzliste + FEATURES.md** 0.4.9; **Keygen-Hinweis bei Trial** 0.5.3; **Splash überspringbar** 0.5.5; **Privacy: lokal, keine Telemetrie** 0.5.6; **Crash-Report ZIP** 0.5.7; **Screenshot-Pfad optional** 0.5.8; **Erste-Schritte-Wizard (4 Seiten inkl. 0.6 / 0.6.8-Hinweise)** 0.6.9; **skip-once Checkbox + Auto-Show** 0.6.6; **Nicht mehr zeigen (dauerhaft)** 0.6.7; **Reset in Einstellungen** 0.6.8 |
+| In-App Hilfe / About | fertig | Version 0.9.1; Fenstertitel + Splash; Logordner-Button; **Feature-Kurzliste + FEATURES.md** 0.4.9; **Keygen-Hinweis bei Trial** 0.5.3; **Splash überspringbar** 0.5.5; **Privacy: lokal, keine Telemetrie** 0.5.6; **Crash-Report ZIP** 0.5.7; **Screenshot-Pfad optional** 0.5.8; **Erste-Schritte-Wizard (4 Seiten inkl. 0.6 / 0.6.8-Hinweise)** 0.6.9; **skip-once Checkbox + Auto-Show** 0.6.6; **Nicht mehr zeigen (dauerhaft)** 0.6.7; **Reset in Einstellungen** 0.6.8 |
 | Startup-Abhängigkeiten-Check | fertig | pypdfium2 kritisch + Tesseract optional; Dialog bei Problemen 0.5.4 |
 | Quiet Startup / Splash | fertig | Einstellungen: Splash überspringen 0.5.5 |
-| CHANGELOG | fertig | **0.9.0** Tab Mittelklick·Andere / PDF-Suche F3 / Opacity-Auswahl / Session-Toggles; **0.8.9** Gruppen-Filter/JSON / Thumb Tab-Open / Overlay-Edges / Zeilen-HL; **0.8.8** Gruppen-Rename/Farbe / Thumb PDF-Extrakt / Overlay-Start / Indent-Guides; **0.8.7** Gruppen-Select/Lock / Thumb Batch-Drehen / Overlay-Format / Mehrzeilen-Indent; **0.8.6** Gruppieren / Thumb-Multi-Select / Overlay-Position / Soft-Tabs; **0.8.5** Align/Distribute V / Thumb-Duplizieren / Overlay-Font / Tab-Breite; **0.8.4** Align/Distribute / Thumb-Löschen / Overlay-Opacity / Wortumbruch; **0.8.3** Ann.-Multi-Select / Thumb-Drehen / Seitennummer-Overlay / Zeilennummern-Persistenz; **0.8.2** Thumbnail-Undo / Fit-Zoom-Modus / Ann.-Ctrl+D / Standard-Zoom speichern; **0.8.1** Bookmark-Drag/Sidecar / Tag-Cloud Sort / Recent fehlt+Entfernen / Zoom-% PDF; **0.8.0** Bookmark-Export ildbm-v1 / Tag-Cloud Filter+Farbe / Status PDF↔Text / Recent max·Clear; **0.7.9** Such-Export CSV/JSON / Ann.-Filter-Presets / Bracket-Auto-Close; **0.7.8** Dry-Run-TXT / Ann.-Tooltip / Blink-Hinweis / Merge-Diff-Länge; **0.7.7** Status-Blink Settings / Merge-Tags·Farbe / Zip-Dry-Run / Ann.-Ellipsis; **0.7.6** Snippet-Ellipsis / Zip-Konflikt / Merge-Diff / Debounce-Blink; **0.7.5** Snippet-Länge Settings / Alle mergen·behalten / Vorlagen-Zip / Tab-Tooltip Debounce; **0.7.4** Kontext-Snippet / Merge je Paar / Vorlagen-Drag / Dirty-Debounce; **0.7.3** Trefferliste / Vorlagen-Ordner / Merge-Vorschau / Ctrl+S-Flush; **0.7.2** Treffer-Nav / Merge-Undo / Vorlagen-UI / Debounce-Settings; **0.7.1** PDF-Schnellsuche / Ann.-Duplikate / Vorlagen / Sidecar-Debounce; **0.7.0** Konsolidierung 0.6.x |
+| CHANGELOG | fertig | **0.9.1** Tabs Alle·Links·Rechts / PDF-Trefferliste / Opacity-Undo / Session Last-Page·Scroll; **0.9.0** Tab Mittelklick·Andere / PDF-Suche F3 / Opacity-Auswahl / Session-Toggles; **0.8.9** Gruppen-Filter/JSON / Thumb Tab-Open / Overlay-Edges / Zeilen-HL; **0.8.8** Gruppen-Rename/Farbe / Thumb PDF-Extrakt / Overlay-Start / Indent-Guides; **0.8.7** Gruppen-Select/Lock / Thumb Batch-Drehen / Overlay-Format / Mehrzeilen-Indent; **0.8.6** Gruppieren / Thumb-Multi-Select / Overlay-Position / Soft-Tabs; **0.8.5** Align/Distribute V / Thumb-Duplizieren / Overlay-Font / Tab-Breite; **0.8.4** Align/Distribute / Thumb-Löschen / Overlay-Opacity / Wortumbruch; **0.8.3** Ann.-Multi-Select / Thumb-Drehen / Seitennummer-Overlay / Zeilennummern-Persistenz; **0.8.2** Thumbnail-Undo / Fit-Zoom-Modus / Ann.-Ctrl+D / Standard-Zoom speichern; **0.8.1** Bookmark-Drag/Sidecar / Tag-Cloud Sort / Recent fehlt+Entfernen / Zoom-% PDF; **0.8.0** Bookmark-Export ildbm-v1 / Tag-Cloud Filter+Farbe / Status PDF↔Text / Recent max·Clear; **0.7.9** Such-Export CSV/JSON / Ann.-Filter-Presets / Bracket-Auto-Close; **0.7.8** Dry-Run-TXT / Ann.-Tooltip / Blink-Hinweis / Merge-Diff-Länge; **0.7.7** Status-Blink Settings / Merge-Tags·Farbe / Zip-Dry-Run / Ann.-Ellipsis; **0.7.6** Snippet-Ellipsis / Zip-Konflikt / Merge-Diff / Debounce-Blink; **0.7.5** Snippet-Länge Settings / Alle mergen·behalten / Vorlagen-Zip / Tab-Tooltip Debounce; **0.7.4** Kontext-Snippet / Merge je Paar / Vorlagen-Drag / Dirty-Debounce; **0.7.3** Trefferliste / Vorlagen-Ordner / Merge-Vorschau / Ctrl+S-Flush; **0.7.2** Treffer-Nav / Merge-Undo / Vorlagen-UI / Debounce-Settings; **0.7.1** PDF-Schnellsuche / Ann.-Duplikate / Vorlagen / Sidecar-Debounce; **0.7.0** Konsolidierung 0.6.x |
 | FEATURES.md / INFO.md | fertig | |
 | `ild_pdf` Modul + Beispielskript | fertig | metadata / page size / watermark / redact / acroform / attachments / flatten / **plain text** / **selection_to_highlight_rects** / **selection_to_plain_text** / **export_report** / **page_favorites JSON** |
 | Font-Matching | geplant | |
 | Objekt-/Bildbearbeitung | geplant | |
 | Layout-Erhaltung (Scan→edit) | geplant | |
 | Freihand | geplant | |
-| KI-Assistent | Stub | Menü „Geplant“ 0.9.0 (keine Fake-KI) |
+| KI-Assistent | Stub | Menü „Geplant“ 0.9.1 (keine Fake-KI) |
 | Signieren (rechtssicher) | Stub | |
-| Cloud-Sync | Stub | Menü „Geplant“ 0.9.0 (keine Fake-Cloud) |
+| Cloud-Sync | Stub | Menü „Geplant“ 0.9.1 (keine Fake-Cloud) |
 | Text on Path / Text zu Pfaden | geplant | |
 | Envelope Distort / Text Wrap / Area Type | Stub/geplant | |
 | Schnittmasken | geplant | |
 | Füllungen / Live-Effekte | geplant | |
-| 3D-Extrusion | Stub | Menü „Geplant“ 0.9.0 |
+| 3D-Extrusion | Stub | Menü „Geplant“ 0.9.1 |
 | Variable Fonts (voll) | Stub | |
 | Glyphen-Palette | geplant | |
-| Stylus / Palm Rejection | Stub | Menü „Geplant“ 0.9.0 |
-| Intelligente Formerkennung | Stub | Menü „Geplant“ 0.9.0 |
+| Stylus / Palm Rejection | Stub | Menü „Geplant“ 0.9.1 |
+| Intelligente Formerkennung | Stub | Menü „Geplant“ 0.9.1 |
 
 Nicht behauptet als fertig: Cloud, KI, Stylus, 3D — nur Menü-Stubs + dieser Status.

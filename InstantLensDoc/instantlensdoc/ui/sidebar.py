@@ -78,6 +78,9 @@ class DocumentList(QListWidget):
     documents_reordered = Signal()
     document_close_requested = Signal(str)  # Pfad schließen (Mittelklick / Kontext)
     document_close_others_requested = Signal(str)  # andere schließen, diesen behalten
+    document_close_all_requested = Signal()  # alle Tabs schließen
+    document_close_left_requested = Signal(str)  # Tabs links von Pfad schließen
+    document_close_right_requested = Signal(str)  # Tabs rechts von Pfad schließen
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -86,7 +89,7 @@ class DocumentList(QListWidget):
         self.setDefaultDropAction(Qt.MoveAction)
         self.setToolTip(
             "Ziehen zum Neuordnen — Mittelklick schließt Tab — "
-            "Rechtsklick: Schließen / Andere schließen"
+            "Rechtsklick: Schließen / Andere / Links / Rechts / Alle schließen"
         )
         self.setContextMenuPolicy(Qt.CustomContextMenu)
         self.customContextMenuRequested.connect(self._context_menu)
@@ -125,11 +128,21 @@ class DocumentList(QListWidget):
         menu = QMenu(self)
         act_close = menu.addAction("Schließen")
         act_others = menu.addAction("Andere schließen")
+        act_left = menu.addAction("Links schließen")
+        act_right = menu.addAction("Rechts schließen")
+        menu.addSeparator()
+        act_all = menu.addAction("Alle schließen")
         chosen = menu.exec(self.mapToGlobal(pos))
         if chosen is act_close:
             self.document_close_requested.emit(path)
         elif chosen is act_others:
             self.document_close_others_requested.emit(path)
+        elif chosen is act_left:
+            self.document_close_left_requested.emit(path)
+        elif chosen is act_right:
+            self.document_close_right_requested.emit(path)
+        elif chosen is act_all:
+            self.document_close_all_requested.emit()
 
     def dropEvent(self, event):
         if not self._reorder_enabled:
@@ -363,6 +376,9 @@ class Sidebar(QWidget):
     documents_reordered = Signal()  # Dokument-/Session-Tab-Reihenfolge geändert
     document_close_requested = Signal(str)  # Sidebar-Tab schließen (Pfad)
     document_close_others_requested = Signal(str)  # Andere Tabs schließen (Keep-Pfad)
+    document_close_all_requested = Signal()  # Alle Tabs schließen
+    document_close_left_requested = Signal(str)  # Tabs links vom Pfad schließen
+    document_close_right_requested = Signal(str)  # Tabs rechts vom Pfad schließen
     line_favorite_activated = Signal(int)  # Editor-Zeile 1-basiert
     line_favorite_label_edit = Signal(int)  # Editor-Zeile 1-basiert → Label bearbeiten
     line_favorites_reordered = Signal(list)  # 1-basierte Zeilen neue Reihenfolge
@@ -483,6 +499,15 @@ class Sidebar(QWidget):
         self.files.document_close_requested.connect(self.document_close_requested.emit)
         self.files.document_close_others_requested.connect(
             self.document_close_others_requested.emit
+        )
+        self.files.document_close_all_requested.connect(
+            self.document_close_all_requested.emit
+        )
+        self.files.document_close_left_requested.connect(
+            self.document_close_left_requested.emit
+        )
+        self.files.document_close_right_requested.connect(
+            self.document_close_right_requested.emit
         )
         layout.addWidget(self.files)
 
@@ -783,11 +808,14 @@ class Sidebar(QWidget):
                 self._search_hit_index = nav.index(row)
                 self._search_hit_total = len(nav)
                 self._refresh_search_hits_label()
-            path, page = payload[0], payload[1]
-            self.fulltext_hit_activated.emit(str(path), page)
+            # mark_activated: volle Payload inkl. Query + Hit-Index (0.9.1)
+            self.mark_activated.emit(row)
             return
         if isinstance(payload, tuple) and len(payload) >= 2:
             path, page = payload[0], payload[1]
+            if path in (None, "", "__search__"):
+                self.mark_activated.emit(row)
+                return
             self.fulltext_hit_activated.emit(str(path), page)
             return
         self.mark_activated.emit(row)

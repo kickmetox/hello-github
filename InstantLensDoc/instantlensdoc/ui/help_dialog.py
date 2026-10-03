@@ -127,9 +127,11 @@ HELP_HTML = f"""
     <b>Seiten-Thumbnails</b> in der Sidebar</li>
 <li><b>Datei → Schließen</b>: Speichern-Dialog bei ungespeicherten Änderungen;
     <b>Andere Tabs schließen</b> (Ctrl+Shift+W);
-    Sidebar: <b>Mittelklick</b> schließt Tab, Rechtsklick → Schließen / Andere schließen</li>
+    <b>Alle / Links / Rechts schließen</b> (Kontextmenü / Datei);
+    Sidebar: <b>Mittelklick</b> schließt Tab, Rechtsklick → Schließen / Andere / Links / Rechts / Alle</li>
 <li><b>Bearbeiten → Weitersuchen / Rückwärtssuchen</b> (F3 / Shift+F3):
-    PDF-Treffer-Highlight auf der Seite, Navigation auch über Seiten</li>
+    PDF-Treffer-Highlight auf der Seite, Navigation auch über Seiten;
+    klickbare <b>Trefferliste</b> (Seite + Snippet) in der Sidebar</li>
 <li><b>Bearbeiten → Auswahl → Notiz</b> (Ctrl+Alt+N): PDF-Textauswahl als Sticky; optional Checkbox zusätzlich Highlight</li>
 <li><b>Ansicht → Fenster teilen (zwei Docs)</b> (Ctrl+\\): zwei Dokumente; optional <b>vertikal</b> (Ctrl+Shift+\\); Sync-Scroll; Statusleiste dirty Tabs inkl. Speichern</li>
 <li><b>Hilfe → Auf Updates prüfen</b>: lokal immer; Online optional (offline OK)</li>
@@ -140,7 +142,7 @@ HELP_HTML = f"""
 <li><b>Zwischenablage</b>: Bild einfügen (Editor Ctrl+Shift+V / PDF Strg+V) — Stempel oder neue Seite</li>
 <li><b>Session</b>: Offene Dokumente (Sidebar-Liste) und Fenstergeometrie werden beim Beenden gespeichert;
     Wiederherstellung beim Start über getrennte Toggles in den Einstellungen
-    (Fenstergeometrie / offene Tabs)</li>
+    (Fenstergeometrie / offene Tabs); <b>Last-Page</b> und <b>Scroll-Position</b> pro Tab</li>
 <li><b>Logging</b>: Datei unter <code>%APPDATA%/InstantLensDoc/logs/</code> (Windows) bzw. <code>~/.config/InstantLensDoc/logs/</code></li>
 <li><b>Tastaturhilfe</b>: Hilfe → Tastaturhilfe (F1); Cheat-Sheet als PDF exportieren</li>
 <li><b>Extras → Batch-Konvertierung</b>: Ordner → PDF oder OCR</li>
