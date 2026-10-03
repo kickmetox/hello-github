@@ -93,7 +93,7 @@ HELP_HTML = f"""
     Update-Hinweis (nur wenn aktiv), Pfade;
     <b>Auf Standard zurücksetzen</b></li>
 <li><b>Datei → Zuletzt geöffnet</b>: Menü + Seitenleiste (persistiert); Einstellungen: Max-Anzahl + Clear</li>
-<li><b>Datei → Speichern unter</b> (Ctrl+Shift+S): Text → Dokument; PDF → Annotation-Sidecar wählen (PDF unverändert)</li>
+<li><b>Datei → Speichern unter</b> (Ctrl+Alt+Shift+U): Text → Dokument; PDF → Annotation-Sidecar wählen (PDF unverändert) — 1.9.5 (Ctrl+Shift+S = Standard-Stempel ★)</li>
 <li><b>Datei → Alles speichern</b> (Ctrl+Alt+Shift+S): aktuelles Doc + PDF-Sidecars offener Tabs</li>
 <li><b>Datei → Als Kopie speichern</b> (Ctrl+Alt+S): PDF + Sidecar kopieren (Doc bleibt offen); Editor → Speichern unter</li>
 <li><b>Datei → Arbeitsverzeichnis öffnen</b> (Ctrl+Shift+E): Ordner der aktuellen Datei bzw. Prozess-CWD</li>

@@ -1329,9 +1329,11 @@ class MainWindow(QMainWindow):
         m_file.addAction(act_save_all)
 
         act_save_as = QAction("Speichern unter…", self)
-        act_save_as.setShortcut(QKeySequence("Ctrl+Shift+S"))
+        # Ctrl+Shift+S → Standard-Stempel ★ (PDF); Speichern unter → Ctrl+Alt+Shift+U — 1.9.5
+        act_save_as.setShortcut(QKeySequence("Ctrl+Alt+Shift+U"))
         act_save_as.setToolTip(
-            "Text: Dokument speichern unter… · PDF: Annotation-Sidecar speichern unter…"
+            "Text: Dokument speichern unter… · PDF: Annotation-Sidecar speichern unter… "
+            "(Ctrl+Alt+Shift+U; Ctrl+Shift+S = Standard-Stempel ★) — 1.9.5"
         )
         act_save_as.triggered.connect(self.save_as)
         m_file.addAction(act_save_as)

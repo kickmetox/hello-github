@@ -1,5 +1,23 @@
 # Changelog — InstantLens Doc
 
+## 1.9.5 — Anhänge Footer-Filter, Quick-Stempel Esc→Toolbar·Ctrl+Shift+S, CSV Combobox-Reset·A11y, Stubs Geplant-Badge
+
+Post-Release-Polish nach 1.9.4: **PDF-Anhänge** Footer-Klick filtert Liste auf **umbenannt/übersprungen** (Toggle), **leerer Footer wenn Zähler 0**; **Quick-Stempel** Esc → **Fokus Toolbar**, Shortcut **Ctrl+Shift+S** = **Standard-Stempel ★** (Speichern unter → Ctrl+Alt+Shift+U); **Tabellen-CSV** Abbruch setzt **Trennzeichen-Combobox synchron** zurück, **A11y-Announcement beim Speichern**; **Settings-Stubs** Info-Dialog mit **Kurzbeschreibung** + Badge **„Geplant“**, **Esc schließt**. Stubs klar markiert / nicht produktiv.
+
+### PDF / Anhänge / Stempel
+- Anhänge: Footer-Klick → Filter umbenannt/übersprungen (Toggle); Footer leer wenn alle Zähler 0
+- Quick-Stempel: Esc → Fokus Quick-Stempel-Button; Ctrl+Shift+S → Standard-Stempel ★
+
+### OCR / Stubs
+- Tabellen-CSV-Vorschau: Combobox bei Abbruch/Esc synchron zurück; Speichern mit A11y-Announcement
+- Settings-Tab „Stubs“: Info-Dialog Kurzbeschreibung + Badge „Geplant“; Esc schließt
+
+### Packaging / Docs
+- Version **1.9.5** (App / `ild_pdf` / ISS / Smoke / Docs); `docs/VERSION` + `VERSION.txt`
+- Smoke: Anhänge Footer-Filter/leer, Quick Esc-Fokus·Ctrl+Shift+S, CSV Combobox-Reset·A11y, Stubs Geplant-Badge (CLI + Qt)
+
+---
+
 ## 1.9.4 — Anhänge Status-Footer kopierbar, Quick-Stempel Esc·Zoom/Opacity, CSV Delim Persistenz/Reset, Stubs FEATURES-Status·Doppelklick
 
 Post-Release-Polish nach 1.9.3: **PDF-Anhänge** Statuszählung als **Footer** „hinzugefügt X, umbenannt Y, übersprungen Z“ **kopierbar**; **Quick-Stempel Esc** → Status **„Platzieren abgebrochen“**, **Zoom/Opacity** wie Signatur merken falls vorhanden; **Tabellen-CSV** Live-Trennzeichen **Persistenz erst bei Speichern**, **Vorschau-Reset bei Abbruch**; **Settings-Stubs** FEATURES-Link bei fehlender Datei → **Statushinweis** statt Crash, **Doppelklick Stub = Info-Dialog**. Stubs klar markiert / nicht produktiv.

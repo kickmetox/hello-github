@@ -35,7 +35,8 @@ SHORTCUTS_HTML = """
 <tr><td>Öffnen</td><td><code>Ctrl+O</code></td></tr>
 <tr><td>Speichern</td><td><code>Ctrl+S</code> — flush Sidecar-Debounce sofort</td></tr>
 <tr><td>Alles speichern</td><td><code>Ctrl+Alt+Shift+S</code></td></tr>
-<tr><td>Speichern unter…</td><td><code>Ctrl+Shift+S</code></td></tr>
+<tr><td>Speichern unter…</td><td><code>Ctrl+Alt+Shift+U</code> — 1.9.5 (früher Ctrl+Shift+S)</td></tr>
+<tr><td>Standard-Stempel ★ (Quick)</td><td><code>Ctrl+Shift+S</code> — PDF Quick-Stempel Standard ★ — 1.9.5</td></tr>
 <tr><td>Als Kopie speichern…</td><td><code>Ctrl+Alt+S</code></td></tr>
 <tr><td>Drucken</td><td><code>Ctrl+P</code></td></tr>
 <tr><td>Beenden</td><td><code>Ctrl+Q</code></td></tr>
@@ -335,6 +336,7 @@ Status-Klick öffnet <code>docs/VERSION</code>/<code>VERSION.txt</code> im Edito
 <p><b>PDF verschlüsseln/entschlüsseln:</b> Prefill-Warnung + Button „jetzt ausschalten“ (sofort speichern + Toast) · Passwort nie in Logs · falsches PW klar DE — 1.6.5 (Basis 1.6.4/1.6.3/1.6.2/1.6.1/1.6.0).</p>
 <p><b>Dokument-Statistik:</b> JSON-Dateiname Quick-Insert <code>{stem}</code>/<code>{date}</code> · ungültige Platzhalter rot · Live-Vorschau · Copy · Zielordner · UTF-8 — 1.6.5 (Basis 1.6.4/1.6.3/1.6.2/1.6.1/1.6.0).</p>
 <p><b>Workspace-Layouts:</b> Import-Log Zusammenfassung importiert/übersprungen/umbenannt · kopieren/als TXT · Merge skip/rename · Schema DE — 1.6.5 (Basis 1.6.4/1.6.3/1.6.2/1.6.1/1.6.0).</p>
+<p><b>1.9.5:</b> Anhänge Footer-Klick Filter umbenannt/übersprungen·leer bei 0 · Quick-Stempel Esc→Fokus Toolbar·Ctrl+Shift+S Standard ★ · Tabellen-CSV Combobox synchron zurück·A11y Speichern · Stubs Info Kurzbeschreibung+Badge „Geplant“·Esc.</p>
 <p><b>1.9.4:</b> Anhänge Status-Footer „hinzugefügt X, umbenannt Y, übersprungen Z“ kopierbar · Quick-Stempel Esc „Platzieren abgebrochen“·Zoom/Opacity merken · Tabellen-CSV Delim Persistenz erst Speichern·Vorschau-Reset Abbruch · Stubs FEATURES-Statushinweis·Doppelklick Info.</p>
 <p><b>1.9.3:</b> Anhänge „Für alle anwenden“·Statuszählung · Quick-Stempel Rechtsklick Bibliothek·Esc-Abbruch · Tabellen-CSV Zeilen/Spalten-Zähler·Trennzeichen live · Settings-Stubs A–Z·keine Aktion·FEATURES-Link.</p>
 <p><b>1.9.2:</b> Anhänge Mehrfach-DnD·Duplikat-Warnung+Umbenennen · Quick-Stempel (zuletzt verwendet) · Tabellen-CSV 5-Zeilen-Vorschau+Abbruch · Settings-Seite „Stubs“ (KI/Cloud/Stylus/3D/Hooks).</p>

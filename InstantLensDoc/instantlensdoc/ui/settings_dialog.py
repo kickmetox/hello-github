@@ -1506,7 +1506,7 @@ class SettingsDialog(QDialog):
         outer.addWidget(buttons)
 
     def _build_stubs_page(self) -> QWidget:
-        """Settings-Seite „Stubs“: Status A–Z, FEATURES-Statushinweis, Doppelklick-Info — 1.9.4."""
+        """Settings-Seite „Stubs“: Status A–Z, FEATURES-Statushinweis, Doppelklick-Info — 1.9.5."""
         from pathlib import Path as _Path
 
         from PySide6.QtCore import QUrl
@@ -1533,7 +1533,7 @@ class SettingsDialog(QDialog):
         no_action = QLabel(
             "Keine Aktion — reine Statusanzeige. "
             "Einträge sind Stubs / nicht produktiv und lösen keine Funktion aus. "
-            "Doppelklick → Info-Dialog."
+            "Doppelklick → Info-Dialog (Kurzbeschreibung + Badge „Geplant“, Esc schließt)."
         )
         no_action.setObjectName("stubsNoActionHint")
         no_action.setWordWrap(True)
@@ -1614,7 +1614,8 @@ class SettingsDialog(QDialog):
         self.stubs_table.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.stubs_table.setSelectionMode(QAbstractItemView.SingleSelection)
         self.stubs_table.setToolTip(
-            "Stubs nur zur Statusanzeige (A–Z). Doppelklick → Info-Dialog — 1.9.4"
+            "Stubs nur zur Statusanzeige (A–Z). Doppelklick → Info-Dialog "
+            "(Kurzbeschreibung + Badge „Geplant“, Esc schließt) — 1.9.5"
         )
         try:
             ph = plugin_stub_info()
@@ -1651,7 +1652,7 @@ class SettingsDialog(QDialog):
         return page
 
     def _on_stub_double_click(self, item) -> None:
-        """Doppelklick Stub-Zeile → Info-Dialog (keine Aktion) — 1.9.4."""
+        """Doppelklick Stub-Zeile → Info-Dialog Kurzbeschreibung + Geplant-Badge — 1.9.5."""
         from instantlensdoc.ui.stubs import show_planned
 
         if item is None:

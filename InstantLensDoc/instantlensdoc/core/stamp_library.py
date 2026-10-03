@@ -265,6 +265,34 @@ def stamp_library_labels(
     return [i.name for i in src]
 
 
+def resolve_standard_stamp() -> dict | None:
+    """
+    Payload nur für Standard-Stempel ★ (Ctrl+Shift+S) — 1.9.5.
+
+    Priorität: Standard-Bild ★ → GENEHMIGT-Text-Fallback.
+    """
+    default_name = get_default_stamp_name()
+    if default_name:
+        cand = stamp_library_dir() / Path(default_name).name
+        if cand.is_file():
+            return {
+                "kind": "image",
+                "text": "",
+                "color": "#CCCCCC",
+                "image": cand.name,
+                "path": cand,
+            }
+    from ild_pdf.annotate import stamp_with_date
+
+    return {
+        "kind": "text",
+        "text": stamp_with_date("GENEHMIGT", include_date=True),
+        "color": "#1E8449",
+        "image": "",
+        "path": None,
+    }
+
+
 def resolve_quick_stamp() -> dict | None:
     """
     Payload für Quick-Stempel-Button — 1.9.2.
@@ -294,28 +322,8 @@ def resolve_quick_stamp() -> dict | None:
             "image": "",
             "path": None,
         }
-    # Standard-Bild ★
-    default_name = get_default_stamp_name()
-    if default_name:
-        cand = stamp_library_dir() / Path(default_name).name
-        if cand.is_file():
-            return {
-                "kind": "image",
-                "text": "",
-                "color": "#CCCCCC",
-                "image": cand.name,
-                "path": cand,
-            }
-    # Fallback Text-Preset
-    from ild_pdf.annotate import stamp_with_date
-
-    return {
-        "kind": "text",
-        "text": stamp_with_date("GENEHMIGT", include_date=True),
-        "color": "#1E8449",
-        "image": "",
-        "path": None,
-    }
+    # Standard-Bild ★ / GENEHMIGT — 1.9.5
+    return resolve_standard_stamp()
 
 
 def remember_stamp_usage(

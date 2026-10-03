@@ -1440,9 +1440,10 @@ class PdfViewer(QWidget):
         btn_stamp_rot.setToolTip("Ausgewählten Stempel um 90° drehen")
         btn_stamp_rot.clicked.connect(lambda: self.rotate_selected_stamp(90))
         self.btn_quick_stamp = QPushButton("Quick-Stempel")
+        self.btn_quick_stamp.setObjectName("btnQuickStamp")
         self.btn_quick_stamp.setToolTip(
             "Links: zuletzt/Standard platzieren · Rechtsklick: Bibliothek wählen · "
-            "Esc bricht Platzieren ab — 1.9.3"
+            "Esc → Abbruch + Fokus Toolbar · Ctrl+Shift+S = Standard-Stempel ★ — 1.9.5"
         )
         self.btn_quick_stamp.setContextMenuPolicy(Qt.CustomContextMenu)
         self.btn_quick_stamp.clicked.connect(lambda: self.arm_quick_stamp())
@@ -1896,6 +1897,10 @@ class PdfViewer(QWidget):
         opacity_sc = QShortcut(QKeySequence("Ctrl+Alt+Shift+O"), self)
         opacity_sc.setContext(Qt.WidgetWithChildrenShortcut)
         opacity_sc.activated.connect(self.set_opacity_selected_annotations)
+        # Standard-Stempel ★ — Ctrl+Shift+S (Speichern unter → Ctrl+Alt+S) — 1.9.5
+        std_stamp_sc = QShortcut(QKeySequence("Ctrl+Shift+S"), self)
+        std_stamp_sc.setContext(Qt.WidgetWithChildrenShortcut)
+        std_stamp_sc.activated.connect(self.arm_standard_stamp)
 
     def apply_toolbar_groups(self) -> None:
         """Sichtbarkeit der PDF-Toolbar-Gruppen aus den Einstellungen anwenden."""
@@ -6962,7 +6967,7 @@ class PdfViewer(QWidget):
             pass
 
     def arm_quick_stamp(self, payload: dict | None = None) -> None:
-        """Toolbar Quick-Stempel: Standard/zuletzt/Bibliothek; Esc bricht ab — 1.9.4."""
+        """Toolbar Quick-Stempel: Standard/zuletzt/Bibliothek; Esc bricht ab — 1.9.5."""
         from instantlensdoc.core.stamp_library import resolve_quick_stamp
 
         if not self.pdf_path:
@@ -6975,7 +6980,7 @@ class PdfViewer(QWidget):
                 self,
                 "Quick-Stempel",
                 "Kein Stempel verfügbar. Rechtsklick → Bibliothek wählen "
-                "oder Standard-Stempel ★ setzen.",
+                "oder Standard-Stempel ★ setzen (Ctrl+Shift+S).",
             )
             return
         # Zoom/Opacity wie Signatur wiederherstellen falls vorhanden — 1.9.4
@@ -6995,8 +7000,15 @@ class PdfViewer(QWidget):
         except Exception:
             pass
 
+    def arm_standard_stamp(self) -> None:
+        """Ctrl+Shift+S: Standard-Stempel ★ platzieren (nicht zuletzt verwendet) — 1.9.5."""
+        from instantlensdoc.core.stamp_library import resolve_standard_stamp
+
+        payload = resolve_standard_stamp()
+        self.arm_quick_stamp(payload)
+
     def cancel_quick_stamp(self) -> bool:
-        """Esc: Quick-Stempel abbrechen; Status + Zoom/Opacity merken — 1.9.4."""
+        """Esc: Quick-Stempel abbrechen; Status + Zoom/Opacity; Fokus Toolbar — 1.9.5."""
         if not self._quick_stamp_armed and not self._quick_stamp_payload:
             return False
         # Wie Signatur: Zoom/Opacity auch bei Abbruch merken falls vorhanden — 1.9.4
@@ -7004,6 +7016,12 @@ class PdfViewer(QWidget):
         self._quick_stamp_armed = False
         self._quick_stamp_payload = None
         self.status.emit("Platzieren abgebrochen")
+        # Fokus zurück auf Toolbar-Button — 1.9.5
+        try:
+            if hasattr(self, "btn_quick_stamp") and self.btn_quick_stamp is not None:
+                self.btn_quick_stamp.setFocus(Qt.OtherFocusReason)
+        except Exception:
+            pass
         return True
 
     def _quick_stamp_context_menu(self, pos) -> None:
