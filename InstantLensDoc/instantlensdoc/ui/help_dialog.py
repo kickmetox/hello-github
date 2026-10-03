@@ -193,7 +193,7 @@ HELP_HTML = f"""
     <b>Metadaten bearbeiten</b> Dirty/Reset/UTF-8/leere Felder — 1.5.1; <b>PDF bereinigen</b> (optional Metadaten strippen);
     <b>AcroForm-Formularfelder ausfüllen</b>; <b>Anhänge</b> auflisten/extrahieren;
     <b>Seitengröße / Zuschneiden</b> (Anzeige mm/inch, Statusleiste klickbar / Ctrl+Alt+U);
-    Seite/Seiten als PNG/JPEG exportieren (Zielordner·Template <code>{stem}_p{page}</code>·Fortschritt) — 1.5.1 / Bild als neue Seite / Seite drucken; Annotation löschen (Auswahl/letzte, Entf); Statusleiste Seite/Größe/Zoom/Dateiname/Wörter; Thumbnails per Drag neu ordnen (<b>Lazy-Load</b>, Größe in Einstellungen, <b>Ctrl+Z Undo</b>);
+    Seite/Seiten als PNG/JPEG exportieren (Zielordner·Template <code>{{stem}}_p{{page}}</code>·Fortschritt) — 1.5.1 / Bild als neue Seite / Seite drucken; Annotation löschen (Auswahl/letzte, Entf); Statusleiste Seite/Größe/Zoom/Dateiname/Wörter; Thumbnails per Drag neu ordnen (<b>Lazy-Load</b>, Größe in Einstellungen, <b>Ctrl+Z Undo</b>);
     Start: <code>python -m instantlensdoc --open DATEI</code> (mehrfach) / <code>--help</code> DE / <code>--version</code>; Exit 2 fehlende Datei — 1.5.1;
     PDF als Kopie speichern; <b>Seitenbereich extrahieren</b> (z. B. 1-3,5,8-10; DE-Validierung + Vorschau — 1.2.1);
     große PDFs: Warnung / Limits;
