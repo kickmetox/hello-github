@@ -2,7 +2,7 @@
 
 Moderne Textverarbeitung mit PDF-Annotator, OCR-Bridge und Formulargenerator.
 
-**Version:** 0.7.6  
+**Version:** 0.7.7  
 **Hersteller:** Andreas Meyer · ame@sellerbach.de
 
 ## Quickstart (Windows)
@@ -32,8 +32,8 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an).
 
-## Neu in 0.7.6
+## Neu in 0.7.7
 
-Snippet-Ellipsis-Style in Einstellungen («…» / …), Vorlagen-Zip-Import mit Konflikt-Dialog, Merge-Vorschau Diff-Kurztext, Statusleisten-Blink bei pending Sidecar-Debounce. Stubs KI/Cloud/Stylus/3D unverändert.
+Status-Blink kurz/aus in Einstellungen, Merge-Diff mit Tags/Farbe, Zip-Import Dry-Run-Liste, Ellipsis-Style in der Ann.-Liste. Stubs KI/Cloud/Stylus/3D unverändert.
 
 Siehe [CHANGELOG.md](CHANGELOG.md), [FEATURES.md](FEATURES.md) und [INFO.md](INFO.md).

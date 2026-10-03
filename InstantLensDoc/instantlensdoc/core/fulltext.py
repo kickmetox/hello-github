@@ -43,6 +43,31 @@ def _resolve_ellipsis_style(style: str | None = None) -> str:
     return "guillemets"
 
 
+def truncate_display_text(
+    text: str,
+    max_len: int = 40,
+    *,
+    ellipsis_style: str | None = None,
+) -> str:
+    """
+    Text für Listen kürzen — Ellipsis-Style aus Settings:
+    guillemets → endet mit «…»; ellipsis → endet mit ….
+    """
+    raw = str(text or "").replace("\n", " ").replace("\r", " ").strip()
+    if not raw:
+        return ""
+    limit = max(4, int(max_len))
+    if len(raw) <= limit:
+        return raw
+    style = _resolve_ellipsis_style(ellipsis_style)
+    if style == "ellipsis":
+        return raw[: max(1, limit - 1)] + "…"
+    # Guillemets: sichtbarer Kürzungs-Marker «…»
+    marker = "«…»"
+    keep = max(1, limit - len(marker))
+    return raw[:keep] + marker
+
+
 def _snippet_around(
     line: str,
     query: str,

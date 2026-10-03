@@ -34,24 +34,53 @@ def confirm_overwrite_export(
 def resolve_template_zip_conflicts(
     conflict_titles: list[str],
     parent: QWidget | None = None,
+    *,
+    dry_run_rows: list[dict] | None = None,
 ) -> str:
     """
-    Konflikt-Dialog beim Vorlagen-Zip-Import.
+    Konflikt-Dialog beim Vorlagen-Zip-Import inkl. Dry-Run-Liste.
     Rückgabe: 'overwrite' | 'skip' | 'cancel'.
+    dry_run_rows: optionale Zeilen aus dry_run_user_templates_zip_import
+      (action overwrite/add) — zeigt was überschrieben würde.
     """
     titles = [str(t).strip() for t in conflict_titles if str(t).strip()]
-    if not titles:
+    if not titles and not dry_run_rows:
         return "overwrite"
-    sample = ", ".join(titles[:8])
-    if len(titles) > 8:
-        sample += f" … (+{len(titles) - 8})"
+
+    overwrite_titles: list[str] = []
+    add_titles: list[str] = []
+    if dry_run_rows:
+        for row in dry_run_rows:
+            t = str(row.get("title") or "").strip()
+            if not t:
+                continue
+            if str(row.get("action") or "") == "overwrite":
+                overwrite_titles.append(t)
+            else:
+                add_titles.append(t)
+    if not overwrite_titles:
+        overwrite_titles = list(titles)
+
+    def _sample(items: list[str], limit: int = 12) -> str:
+        sample = ", ".join(items[:limit])
+        if len(items) > limit:
+            sample += f" … (+{len(items) - limit})"
+        return sample
+
+    over_n = len(overwrite_titles)
+    add_n = len(add_titles)
+    lines = [
+        f"Dry-Run: {over_n} Vorlage(n) würden überschrieben.",
+    ]
+    if overwrite_titles:
+        lines.append(f"Überschreiben: {_sample(overwrite_titles)}")
+    if add_titles:
+        lines.append(f"Neu: {_sample(add_titles)} ({add_n})")
+
     box = QMessageBox(parent)
     box.setIcon(QMessageBox.Warning)
-    box.setWindowTitle("Vorlagen-Import — Konflikte")
-    box.setText(
-        f"{len(titles)} Vorlage(n) mit gleichem Titel existieren bereits.\n\n"
-        f"{sample}"
-    )
+    box.setWindowTitle("Vorlagen-Import — Dry-Run / Konflikte")
+    box.setText("\n".join(lines))
     box.setInformativeText(
         "Überschreiben: lokale Vorlagen ersetzen.\n"
         "Überspringen: Konflikte behalten, nur neue importieren.\n"

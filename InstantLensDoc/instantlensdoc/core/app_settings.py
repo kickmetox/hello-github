@@ -78,6 +78,7 @@ DEFAULTS: dict[str, Any] = {
     "sidecar_save_debounce_ms": 400,
     "search_snippet_context_chars": 40,
     "search_snippet_ellipsis_style": "guillemets",
+    "status_blink_mode": "kurz",
     "editor_trim_trailing_whitespace": False,
     "editor_trim_whitespace_on_paste": False,
     "pdf_toolbar_groups": {
@@ -1022,6 +1023,44 @@ def find_user_template_import_conflicts(items: list[dict]) -> list[dict]:
     return conflicts
 
 
+def dry_run_user_templates_zip_import(src: Path | str) -> list[dict]:
+    """
+    Dry-Run: Liste was beim Zip-Import überschrieben würde (ohne Schreiben).
+    Rückgabe: [{title, action, incoming, existing?}, …]
+      action: 'overwrite' | 'add'
+    """
+    items = parse_user_templates_zip(src)
+    by_title = {t["title"].casefold(): t for t in get_user_doc_templates()}
+    out: list[dict] = []
+    seen: set[str] = set()
+    for entry in items:
+        title = str(entry.get("title") or "").strip()
+        key = title.casefold()
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        existing = by_title.get(key)
+        if existing is not None:
+            out.append(
+                {
+                    "title": title,
+                    "action": "overwrite",
+                    "incoming": entry,
+                    "existing": existing,
+                }
+            )
+        else:
+            out.append(
+                {
+                    "title": title,
+                    "action": "add",
+                    "incoming": entry,
+                    "existing": None,
+                }
+            )
+    return out
+
+
 def import_user_templates_zip(
     src: Path | str,
     *,
@@ -1080,6 +1119,14 @@ SEARCH_SNIPPET_ELLIPSIS_CHOICES = (
     (SEARCH_SNIPPET_ELLIPSIS_DOTS, "… Ellipsis"),
 )
 
+STATUS_BLINK_KURZ = "kurz"
+STATUS_BLINK_AUS = "aus"
+STATUS_BLINK_DEFAULT = STATUS_BLINK_KURZ
+STATUS_BLINK_CHOICES = (
+    (STATUS_BLINK_KURZ, "Kurz (Blink)"),
+    (STATUS_BLINK_AUS, "Aus"),
+)
+
 SIDECAR_SAVE_DEBOUNCE_MIN_MS = 200
 SIDECAR_SAVE_DEBOUNCE_MAX_MS = 1000
 SIDECAR_SAVE_DEBOUNCE_DEFAULT_MS = 400
@@ -1127,6 +1174,27 @@ def set_search_snippet_ellipsis_style(style: str) -> str:
     else:
         val = SEARCH_SNIPPET_ELLIPSIS_GUILLEMETS
     save_settings({"search_snippet_ellipsis_style": val})
+    return val
+
+
+def get_status_blink_mode() -> str:
+    """Statusleisten-Blink bei pending Debounce: 'kurz' | 'aus'."""
+    raw = str(
+        load_settings().get("status_blink_mode", STATUS_BLINK_DEFAULT)
+        or STATUS_BLINK_DEFAULT
+    ).strip().casefold()
+    if raw in ("aus", "off", "none", "0", "false", "no"):
+        return STATUS_BLINK_AUS
+    return STATUS_BLINK_KURZ
+
+
+def set_status_blink_mode(mode: str) -> str:
+    raw = str(mode or "").strip().casefold()
+    if raw in ("aus", "off", "none", "0", "false", "no"):
+        val = STATUS_BLINK_AUS
+    else:
+        val = STATUS_BLINK_KURZ
+    save_settings({"status_blink_mode": val})
     return val
 
 

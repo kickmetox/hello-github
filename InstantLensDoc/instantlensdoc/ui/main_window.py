@@ -1587,22 +1587,32 @@ class MainWindow(QMainWindow):
                 it.setToolTip("")
 
     def _blink_pending_debounce_status(self) -> None:
-        """Kurzer Blink der Statusleiste bei pending Sidecar-Debounce."""
+        """Statusleisten-Blink bei pending Sidecar-Debounce (Settings: kurz/aus)."""
         from PySide6.QtCore import QTimer
 
+        from instantlensdoc.core.app_settings import (
+            STATUS_BLINK_AUS,
+            get_status_blink_mode,
+        )
+
+        if get_status_blink_mode() == STATUS_BLINK_AUS:
+            try:
+                self.statusBar().showMessage("Speichern ausstehend…", 600)
+            except Exception:
+                pass
+            return
         if getattr(self, "_pending_blink_active", False):
             return
         if not hasattr(self, "unsaved_status_label"):
             return
         self._pending_blink_active = True
         try:
-            self.statusBar().showMessage("Speichern ausstehend…", 900)
+            self.statusBar().showMessage("Speichern ausstehend…", 700)
         except Exception:
             pass
         label = self.unsaved_status_label
+        # kurz: 2 Schritte, schwächere Intensität
         styles = (
-            "padding-right: 10px; color: #fff; background-color: #B9770E; font-weight: 600;",
-            "padding-right: 10px; color: #B9770E; font-weight: 600;",
             "padding-right: 10px; color: #fff; background-color: #B9770E; font-weight: 600;",
             "padding-right: 10px; color: #B9770E; font-weight: 600;",
         )
@@ -1616,7 +1626,7 @@ class MainWindow(QMainWindow):
                 return
             label.setStyleSheet(styles[i])
             self._pending_blink_step = i + 1
-            QTimer.singleShot(110, _tick)
+            QTimer.singleShot(90, _tick)
 
         _tick()
 
@@ -4531,8 +4541,9 @@ class MainWindow(QMainWindow):
         self._set_status(f"Vorlagen exportiert: {dest}")
 
     def _import_user_templates_zip(self) -> None:
-        """Nutzer-Vorlagen aus Zip importieren (merge, Konflikt-Dialog)."""
+        """Nutzer-Vorlagen aus Zip importieren (Dry-Run + Konflikt-Dialog)."""
         from instantlensdoc.core.app_settings import (
+            dry_run_user_templates_zip_import,
             find_user_template_import_conflicts,
             import_user_templates_zip,
             parse_user_templates_zip,
@@ -4549,6 +4560,7 @@ class MainWindow(QMainWindow):
             return
         try:
             items = parse_user_templates_zip(path)
+            dry_rows = dry_run_user_templates_zip_import(path)
             conflicts = find_user_template_import_conflicts(items)
             conflict_mode = "overwrite"
             if conflicts:
@@ -4556,7 +4568,9 @@ class MainWindow(QMainWindow):
                     str(c["existing"].get("title") or c["incoming"].get("title") or "")
                     for c in conflicts
                 ]
-                decision = resolve_template_zip_conflicts(titles, self)
+                decision = resolve_template_zip_conflicts(
+                    titles, self, dry_run_rows=dry_rows
+                )
                 if decision == "cancel":
                     self._set_status("Vorlagen-Import abgebrochen")
                     return

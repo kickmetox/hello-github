@@ -52,6 +52,7 @@ from instantlensdoc.core.app_settings import (
     get_search_snippet_context_chars,
     get_search_snippet_ellipsis_style,
     get_sidecar_save_debounce_ms,
+    get_status_blink_mode,
     get_tag_rename_confirm_threshold,
     get_theme,
     get_ui_lang,
@@ -62,6 +63,7 @@ from instantlensdoc.core.app_settings import (
     SEARCH_SNIPPET_ELLIPSIS_CHOICES,
     SIDECAR_SAVE_DEBOUNCE_MAX_MS,
     SIDECAR_SAVE_DEBOUNCE_MIN_MS,
+    STATUS_BLINK_CHOICES,
     PDF_THUMBNAIL_SCALE_CHOICES,
     reset_to_defaults,
     save_settings,
@@ -96,6 +98,7 @@ from instantlensdoc.core.app_settings import (
     set_search_snippet_context_chars,
     set_search_snippet_ellipsis_style,
     set_sidecar_save_debounce_ms,
+    set_status_blink_mode,
     set_tag_rename_confirm_threshold,
     set_theme,
     set_ui_lang,
@@ -359,9 +362,24 @@ class SettingsDialog(QDialog):
                 ell_pick = i
         self.snippet_ellipsis.setCurrentIndex(ell_pick)
         self.snippet_ellipsis.setToolTip(
-            "Treffer-Markierung im Snippet: «Match» (Guillemets) oder nur … (Ellipsis)"
+            "Treffer-Markierung im Snippet und gekürzter Ann.-Listen-Text: "
+            "«…» (Guillemets) oder … (Ellipsis)"
         )
         form.addRow("Snippet-Ellipsis-Style", self.snippet_ellipsis)
+
+        self.status_blink = QComboBox()
+        cur_blink = get_status_blink_mode()
+        blink_pick = 0
+        for i, (key, label) in enumerate(STATUS_BLINK_CHOICES):
+            self.status_blink.addItem(label, key)
+            if key == cur_blink:
+                blink_pick = i
+        self.status_blink.setCurrentIndex(blink_pick)
+        self.status_blink.setToolTip(
+            "Statusleisten-Blink bei pending Sidecar-Debounce: "
+            "Kurz (kurze Dauer/Intensität) oder Aus"
+        )
+        form.addRow("Status-Blink", self.status_blink)
 
         self.jpeg_q = QSpinBox()
         self.jpeg_q.setRange(10, 100)
@@ -579,6 +597,7 @@ class SettingsDialog(QDialog):
         set_search_snippet_ellipsis_style(
             str(self.snippet_ellipsis.currentData() or "guillemets")
         )
+        set_status_blink_mode(str(self.status_blink.currentData() or "kurz"))
         save_settings(
             {
                 "export_jpeg_quality": int(self.jpeg_q.value()),

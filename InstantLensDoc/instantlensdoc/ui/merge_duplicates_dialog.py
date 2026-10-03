@@ -103,13 +103,20 @@ class MergeDuplicatesPreviewDialog(QDialog):
                 item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
                 self.list.addItem(item)
 
-            # Diff-Kurztext der beiden (älteste vs. nächste) Annotationen
+            # Diff-Kurztext der beiden (älteste vs. nächste) inkl. Tags/Farbe
             if len(group) >= 2:
                 keep = group[0]
                 other = group[1]
                 t_keep = str(getattr(keep, "text", "") or "")
                 t_other = str(getattr(other, "text", "") or "")
-                diff_s = annotation_text_diff_short(t_keep, t_other)
+                diff_s = annotation_text_diff_short(
+                    t_keep,
+                    t_other,
+                    left_tags=getattr(keep, "tags", None),
+                    right_tags=getattr(other, "tags", None),
+                    left_color=getattr(keep, "color", None),
+                    right_color=getattr(other, "color", None),
+                )
                 if len(group) > 2:
                     diff_s = f"{diff_s} (+{len(group) - 2} weitere)"
                 diff_item = QListWidgetItem(f"    ↕ {diff_s}")
@@ -120,7 +127,7 @@ class MergeDuplicatesPreviewDialog(QDialog):
 
         hint = QLabel(
             "Reihenfolge je Gruppe: älteste zuerst (wird bei Merge behalten). "
-            "↕ Diff: Kurzvergleich der Annotationstexte. "
+            "↕ Diff: Kurzvergleich Text + Tags + Farbe. "
             "Übernehmen führt nur markierte Gruppen aus (Ctrl+Z rückgängig)."
         )
         hint.setWordWrap(True)

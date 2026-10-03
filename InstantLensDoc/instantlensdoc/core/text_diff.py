@@ -5,26 +5,74 @@ from __future__ import annotations
 import difflib
 
 
+def _short_side(text: str, max_side: int) -> str:
+    ta = str(text or "").strip().replace("\n", " ").replace("\r", " ")
+    if len(ta) <= max_side:
+        return ta
+    return ta[: max_side - 1] + "…"
+
+
+def _tags_short(tags: object | None, *, max_tags: int = 3) -> str:
+    if not tags:
+        return ""
+    parts = [str(t).strip() for t in list(tags) if str(t).strip()]
+    if not parts:
+        return ""
+    shown = parts[:max_tags]
+    s = ",".join(shown)
+    if len(parts) > max_tags:
+        s += "…"
+    return f"[{s}]"
+
+
+def _color_short(color: str | None) -> str:
+    c = str(color or "").strip()
+    if not c:
+        return ""
+    if not c.startswith("#"):
+        c = "#" + c
+    return c.upper() if len(c) <= 9 else c[:9]
+
+
 def annotation_text_diff_short(
     left: str,
     right: str,
     *,
     max_side: int = 28,
+    left_tags: object | None = None,
+    right_tags: object | None = None,
+    left_color: str | None = None,
+    right_color: str | None = None,
 ) -> str:
     """
-    Kurzer Diff-Hinweis zweier Annotationstexte für Merge-Vorschau.
-    Beispiel: Diff (40%): „foo…“ ≠ „bar…“
+    Kurzer Diff-Hinweis zweier Annotationen für Merge-Vorschau.
+    Zeigt Textausschnitte sowie optional Tags und Farbe.
+    Beispiel: Diff (40%): „foo…“ [a] #FFE066 ≠ „bar…“ [b] #FF6B6B
     """
     ta = str(left or "").strip().replace("\n", " ").replace("\r", " ")
     tb = str(right or "").strip().replace("\n", " ").replace("\r", " ")
-    if ta == tb:
-        sample = ta if len(ta) <= max_side else ta[: max_side - 1] + "…"
-        return f"Diff: identisch („{sample or '—'}“)"
+    la = _short_side(ta, max_side)
+    lb = _short_side(tb, max_side)
+    lt = _tags_short(left_tags)
+    rt = _tags_short(right_tags)
+    lc = _color_short(left_color)
+    rc = _color_short(right_color)
+
+    def _fmt(sample: str, tags_s: str, col_s: str) -> str:
+        parts = [f"„{sample or '—'}“"]
+        if tags_s:
+            parts.append(tags_s)
+        if col_s:
+            parts.append(col_s)
+        return " ".join(parts)
+
+    left_s = _fmt(la, lt, lc)
+    right_s = _fmt(lb, rt, rc)
+    if ta == tb and (lt or "") == (rt or "") and (lc or "") == (rc or ""):
+        return f"Diff: identisch ({left_s})"
     sm = difflib.SequenceMatcher(a=ta, b=tb, autojunk=False)
     pct = int(round(sm.ratio() * 100))
-    la = ta if len(ta) <= max_side else ta[: max_side - 1] + "…"
-    lb = tb if len(tb) <= max_side else tb[: max_side - 1] + "…"
-    return f"Diff ({pct}%): „{la or '—'}“ ≠ „{lb or '—'}“"
+    return f"Diff ({pct}%): {left_s} ≠ {right_s}"
 
 
 def line_diff_sides(left: str, right: str) -> tuple[list[str], list[str], list[str]]:

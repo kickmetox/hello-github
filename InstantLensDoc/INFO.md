@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **0.7.6** |
+| Version | **0.7.7** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -38,10 +38,10 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Installer-Task: optionale **Desktop-Verknüpfung** (Checkbox, Standard an / `checkedonce`)
 
-## Neu in 0.7.6
+## Neu in 0.7.7
 
-- Treffer-Snippet: **Ellipsis-Style** «…» / … in Einstellungen
-- Ann.-Merge-Vorschau: **Diff-Kurztext** der beiden Annotationen
-- Vorlagen-Zip-Import: **Konflikt-Dialog** (Überschreiben / Überspringen / Abbrechen)
-- Pending Sidecar-Debounce: kurzer **Statusleisten-Blink**
+- Status-Blink bei Debounce: **kurz / aus** in Einstellungen
+- Ann.-Merge-Diff: **Tags + Farbe** im Kurztext
+- Vorlagen-Zip-Import: **Dry-Run** was überschrieben würde
+- Ann.-Liste: gekürzter Text mit **Ellipsis-Style**
 - Stubs KI/Cloud/Stylus/3D unverändert

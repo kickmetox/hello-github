@@ -3568,12 +3568,14 @@ class PdfViewer(QWidget):
             except Exception:
                 return raw[:16]
 
+        from instantlensdoc.core.fulltext import truncate_display_text
+
         out: list[tuple[str, Annotation]] = []
         for a in self.store.annotations:
             kind = ANN_TYPE_LABELS.get(a.type.value, a.type.value)
             label = f"S{a.page + 1}: {kind}"
             if a.text:
-                label += f" — {a.text[:40]}"
+                label += f" — {truncate_display_text(a.text, 40)}"
             elif a.type == AnnotationType.MEASURE:
                 label += f" — {a.measure_label(self.scale)}"
             tags = getattr(a, "tags", None) or []
