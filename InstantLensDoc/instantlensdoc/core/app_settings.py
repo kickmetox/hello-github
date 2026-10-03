@@ -31,6 +31,7 @@ DEFAULTS: dict[str, Any] = {
     "last_export_dir": "",
     "last_ann_export_dir": "",  # letzter Zielordner Ann.-Export JSON — 1.2.1
     "ann_export_filename_template": "{stem}_ann.json",  # Dateiname-Template — 1.2.1
+    "split_open_tabs": False,  # PDF-Split: erzeugte Dateien in Tabs öffnen — 1.2.3
     "default_zoom_percent": 150,
     "default_zoom_mode": "percent",  # percent | fit_width | fit_page
     "autosave_interval_sec": 60,  # 15 | 30 | 60 | 120 — 0.9.7
@@ -412,6 +413,60 @@ def set_last_ann_export_dir(path: str | Path) -> None:
     if p.is_file():
         p = p.parent
     save_settings({"last_ann_export_dir": str(p)})
+
+
+ANN_EXPORT_KNOWN_PLACEHOLDERS = frozenset({"stem", "page", "date"})
+
+
+def find_invalid_ann_export_placeholders(template: str) -> list[str]:
+    """
+    Unbekannte ``{…}``-Platzhalter im Ann.-Export-Template (Reihenfolge, unique).
+    Bekannt: stem, page, date. — 1.2.3
+    """
+    import re
+
+    seen: set[str] = set()
+    out: list[str] = []
+    for name in re.findall(r"\{([^{}]+)\}", str(template or "")):
+        key = name.strip()
+        if not key or key in ANN_EXPORT_KNOWN_PLACEHOLDERS or key in seen:
+            continue
+        seen.add(key)
+        out.append(key)
+    return out
+
+
+def highlight_ann_export_template_html(template: str) -> str:
+    """
+    Template als HTML; ungültige Platzhalter rot markiert. — 1.2.3
+    """
+    import html as _html
+    import re
+
+    raw = str(template or "")
+    parts: list[str] = []
+    last = 0
+    for m in re.finditer(r"\{([^{}]+)\}", raw):
+        parts.append(_html.escape(raw[last : m.start()]))
+        name = m.group(1).strip()
+        token = _html.escape(m.group(0))
+        if name and name not in ANN_EXPORT_KNOWN_PLACEHOLDERS:
+            parts.append(f'<span style="color:#c62828;font-weight:600">{token}</span>')
+        else:
+            parts.append(token)
+        last = m.end()
+    parts.append(_html.escape(raw[last:]))
+    return "".join(parts) or _html.escape(raw)
+
+
+def get_split_open_tabs() -> bool:
+    """PDF-Split: erzeugte Dateien in Tabs öffnen — 1.2.3."""
+    return bool(load_settings().get("split_open_tabs", DEFAULTS["split_open_tabs"]))
+
+
+def set_split_open_tabs(enabled: bool) -> None:
+    """Persistenz Checkbox „in Tabs öffnen“ — 1.2.3."""
+    save_settings({"split_open_tabs": bool(enabled)})
 
 
 def get_ann_export_filename_template() -> str:

@@ -263,9 +263,19 @@ class PdfToolsDialog(QDialog):
         form.addRow("Vorschau", self.split_preview)
         self.split_single = QCheckBox("Jede Seite einzeln")
         form.addRow("", self.split_single)
+        from instantlensdoc.core.app_settings import (
+            get_split_open_tabs,
+            set_split_open_tabs,
+        )
+
         self.split_open_tabs = QCheckBox("Erzeugte Dateien in Tabs öffnen")
+        self.split_open_tabs.setChecked(get_split_open_tabs())
         self.split_open_tabs.setToolTip(
-            "Nach erfolgreichem Teilen die neuen PDFs optional in Tabs öffnen — 1.2.2"
+            "Nach erfolgreichem Teilen die neuen PDFs optional in Tabs öffnen "
+            "(Einstellung wird gespeichert) — 1.2.3"
+        )
+        self.split_open_tabs.toggled.connect(
+            lambda checked: set_split_open_tabs(bool(checked))
         )
         form.addRow("", self.split_open_tabs)
         self.split_log = QPlainTextEdit()
@@ -273,9 +283,20 @@ class PdfToolsDialog(QDialog):
         self.split_log.setMaximumHeight(110)
         self.split_log.setPlaceholderText("Log der erzeugten Dateipfade …")
         self.split_log.setToolTip(
-            "Liste der nach dem Teilen erzeugten Dateipfade — 1.2.2"
+            "Liste der nach dem Teilen erzeugten Dateipfade — 1.2.2/1.2.3"
         )
         form.addRow("Pfad-Log", self.split_log)
+        log_btns = QHBoxLayout()
+        btn_copy_log = QPushButton("Log kopieren")
+        btn_copy_log.setToolTip("Pfad-Log in die Zwischenablage kopieren — 1.2.3")
+        btn_copy_log.clicked.connect(self._split_copy_log)
+        btn_save_log = QPushButton("Log als TXT…")
+        btn_save_log.setToolTip("Pfad-Log als Textdatei speichern — 1.2.3")
+        btn_save_log.clicked.connect(self._split_save_log_txt)
+        log_btns.addWidget(btn_copy_log)
+        log_btns.addWidget(btn_save_log)
+        log_btns.addStretch()
+        form.addRow("", log_btns)
         run = QPushButton("Teilen")
         run.clicked.connect(self._split_run)
         form.addRow(run)
@@ -664,6 +685,56 @@ class PdfToolsDialog(QDialog):
         lines = [f"[{i + 1}] {p}" for i, p in enumerate(paths)]
         header = f"Erzeugt: {len(paths)} Datei(en)"
         self.split_log.setPlainText(header + ("\n" + "\n".join(lines) if lines else ""))
+
+    def _split_copy_log(self) -> None:
+        """Pfad-Log in die Zwischenablage — 1.2.3."""
+        from PySide6.QtWidgets import QApplication
+
+        if not hasattr(self, "split_log"):
+            return
+        text = (self.split_log.toPlainText() or "").strip()
+        if not text:
+            QMessageBox.information(
+                self, "Pfad-Log", "Kein Log vorhanden — zuerst teilen."
+            )
+            return
+        QApplication.clipboard().setText(text)
+        QMessageBox.information(self, "Pfad-Log", "Log in die Zwischenablage kopiert.")
+
+    def _split_save_log_txt(self) -> None:
+        """Pfad-Log als TXT speichern — 1.2.3."""
+        if not hasattr(self, "split_log"):
+            return
+        text = (self.split_log.toPlainText() or "").strip()
+        if not text:
+            QMessageBox.information(
+                self, "Pfad-Log", "Kein Log vorhanden — zuerst teilen."
+            )
+            return
+        from instantlensdoc.core.app_settings import (
+            dialog_start_dir,
+            get_last_export_dir,
+            set_last_export_dir,
+        )
+
+        start = dialog_start_dir(get_last_export_dir())
+        default = str(Path(start) / "split-log.txt")
+        path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Pfad-Log als TXT speichern",
+            default,
+            "Text (*.txt);;Alle (*.*)",
+        )
+        if not path:
+            return
+        if not path.lower().endswith(".txt"):
+            path += ".txt"
+        try:
+            Path(path).write_text(text + "\n", encoding="utf-8")
+            set_last_export_dir(Path(path).parent)
+            QMessageBox.information(self, "Pfad-Log", f"Gespeichert:\n{path}")
+        except Exception as e:
+            QMessageBox.critical(self, "Pfad-Log", str(e))
 
     def _split_open_written(self, paths: list[str]) -> None:
         """Erzeugte Split-PDFs optional in Tabs öffnen — 1.2.2."""

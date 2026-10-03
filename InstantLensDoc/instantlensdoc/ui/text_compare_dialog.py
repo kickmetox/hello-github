@@ -187,13 +187,15 @@ class TextCompareDialog(QDialog):
         self._last_tags: list[str] = []
         self._last_lname = ""
         self._last_rname = ""
+        self._scroll_syncing = False
 
         root = QVBoxLayout(self)
         if self._panel_mode:
             root.addWidget(
                 QLabel(
                     "Zeilen-Diff Panel: zwei offene Text-Tabs wählen — "
-                    "Side-by-Side/Unified · Wort-Highlight · TXT-Export — 1.2.2"
+                    "Side-by-Side/Unified · Wort-Highlight · Ignore-Whitespace · "
+                    "Sync-Scroll · TXT-Export — 1.2.3"
                 )
             )
         pick = QHBoxLayout()
@@ -239,10 +241,23 @@ class TextCompareDialog(QDialog):
             "Geänderte Wörter innerhalb abweichender Zeilen hervorheben — 1.2.2"
         )
         self.chk_word_hl.toggled.connect(lambda _: self.refresh())
+        self.chk_ignore_ws = QCheckBox("Ignore-Whitespace")
+        self.chk_ignore_ws.setToolTip(
+            "Whitespace beim Zeilenvergleich ignorieren (Anzeige bleibt original) — 1.2.3"
+        )
+        self.chk_ignore_ws.toggled.connect(lambda _: self.refresh())
+        self.chk_sync_scroll = QCheckBox("Sync-Scroll")
+        self.chk_sync_scroll.setChecked(True)
+        self.chk_sync_scroll.setToolTip(
+            "Scrollposition Links/Rechts im Side-by-Side synchron halten — 1.2.3"
+        )
+        self.chk_sync_scroll.toggled.connect(lambda _: self._apply_sync_scroll())
         opts.addWidget(self.chk_only_diff)
         opts.addWidget(self.chk_line_numbers)
         opts.addWidget(self.chk_unified)
         opts.addWidget(self.chk_word_hl)
+        opts.addWidget(self.chk_ignore_ws)
+        opts.addWidget(self.chk_sync_scroll)
         opts.addStretch()
         root.addLayout(opts)
 
@@ -283,6 +298,7 @@ class TextCompareDialog(QDialog):
         root.addWidget(buttons)
 
         self._select_initial()
+        self._apply_sync_scroll()
         self.refresh()
 
     def _fill_combos(self):
@@ -358,6 +374,65 @@ class TextCompareDialog(QDialog):
             QMessageBox.warning(self, "Lesen", f"{p.name}: {e}")
             return p.name, ""
 
+    def _disconnect_sync_scroll(self) -> None:
+        left_bar = self.view_left.verticalScrollBar()
+        right_bar = self.view_right.verticalScrollBar()
+        try:
+            left_bar.valueChanged.disconnect(self._on_left_scroll_sync)
+        except (TypeError, RuntimeError):
+            pass
+        try:
+            right_bar.valueChanged.disconnect(self._on_right_scroll_sync)
+        except (TypeError, RuntimeError):
+            pass
+
+    def _apply_sync_scroll(self) -> None:
+        """Sync-Scroll Side-by-Side verbinden — 1.2.3."""
+        self._disconnect_sync_scroll()
+        if self.chk_unified.isChecked() or not self.chk_sync_scroll.isChecked():
+            return
+        left_bar = self.view_left.verticalScrollBar()
+        right_bar = self.view_right.verticalScrollBar()
+        left_bar.valueChanged.connect(self._on_left_scroll_sync)
+        right_bar.valueChanged.connect(self._on_right_scroll_sync)
+
+    def _sync_scroll_ratio(self, source, target) -> None:
+        if source is None or target is None or source is target:
+            return
+        s_max = source.maximum()
+        t_max = target.maximum()
+        if s_max <= 0:
+            target.setValue(0)
+            return
+        if t_max <= 0:
+            return
+        ratio = source.value() / s_max
+        target.setValue(int(round(ratio * t_max)))
+
+    def _on_left_scroll_sync(self, _value: int = 0) -> None:
+        if self._scroll_syncing:
+            return
+        self._scroll_syncing = True
+        try:
+            self._sync_scroll_ratio(
+                self.view_left.verticalScrollBar(),
+                self.view_right.verticalScrollBar(),
+            )
+        finally:
+            self._scroll_syncing = False
+
+    def _on_right_scroll_sync(self, _value: int = 0) -> None:
+        if self._scroll_syncing:
+            return
+        self._scroll_syncing = True
+        try:
+            self._sync_scroll_ratio(
+                self.view_right.verticalScrollBar(),
+                self.view_left.verticalScrollBar(),
+            )
+        finally:
+            self._scroll_syncing = False
+
     def refresh(self):
         left_data = self.cmb_left.currentData() or ""
         right_data = self.cmb_right.currentData() or ""
@@ -369,8 +444,12 @@ class TextCompareDialog(QDialog):
             self.view_unified.setPlainText("")
             self.lbl_status.setText("Zwei Dateien oder Tabs wählen")
             self._last_left, self._last_right, self._last_tags = [], [], []
+            self._apply_sync_scroll()
             return
-        out_l, out_r, tags = line_diff_sides(ltext, rtext)
+        ignore_ws = self.chk_ignore_ws.isChecked()
+        out_l, out_r, tags = line_diff_sides(
+            ltext, rtext, ignore_whitespace=ignore_ws
+        )
         self._last_left, self._last_right, self._last_tags = out_l, out_r, tags
         self._last_lname, self._last_rname = lname, rname
         show_l, show_r, show_t = out_l, out_r, tags
@@ -419,12 +498,19 @@ class TextCompareDialog(QDialog):
         n_diff = sum(1 for t in tags if t != "equal")
         mode = " · nur Unterschiede" if only_diff else ""
         view = " · unified" if unified else " · side-by-side"
+        ws = " · ignore-ws" if ignore_ws else ""
+        sync = (
+            " · sync-scroll"
+            if (not unified and self.chk_sync_scroll.isChecked())
+            else ""
+        )
         self.lbl_status.setText(
             f"{lname}  ↔  {rname}  ·  {len(show_t)} Zeilen · "
-            f"{n_diff} abweichend{mode}{view}"
+            f"{n_diff} abweichend{mode}{view}{ws}{sync}"
         )
         self.view_left.setToolTip(lname)
         self.view_right.setToolTip(rname)
+        self._apply_sync_scroll()
 
     def _export_diff_txt(self) -> None:
         """Aktuellen Diff als TXT speichern — 1.2.1/1.2.2."""

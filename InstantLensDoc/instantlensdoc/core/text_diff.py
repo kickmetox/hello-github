@@ -75,22 +75,41 @@ def annotation_text_diff_short(
     return f"Diff ({pct}%): {left_s} ≠ {right_s}"
 
 
-def line_diff_sides(left: str, right: str) -> tuple[list[str], list[str], list[str]]:
+def _ws_key(line: str) -> str:
+    """Vergleichsschlüssel ohne Whitespace — 1.2.3."""
+    import re
+
+    return re.sub(r"\s+", "", line or "")
+
+
+def line_diff_sides(
+    left: str,
+    right: str,
+    *,
+    ignore_whitespace: bool = False,
+) -> tuple[list[str], list[str], list[str]]:
     """
     Einfacher Zeilen-Diff: liefert (linke Zeilen, rechte Zeilen, Tags).
     Tags: 'equal' | 'replace' | 'delete' | 'insert' (pro ausgegebener Zeile).
+    ``ignore_whitespace``: Zeilen nur anhand Inhalt ohne Whitespace vergleichen
+    (Anzeige behält Originalzeilen). — 1.2.3
     """
     left_lines = (left or "").replace("\r\n", "\n").split("\n")
     right_lines = (right or "").replace("\r\n", "\n").split("\n")
-    sm = difflib.SequenceMatcher(a=left_lines, b=right_lines, autojunk=False)
+    if ignore_whitespace:
+        a = [_ws_key(x) for x in left_lines]
+        b = [_ws_key(x) for x in right_lines]
+    else:
+        a, b = left_lines, right_lines
+    sm = difflib.SequenceMatcher(a=a, b=b, autojunk=False)
     out_l: list[str] = []
     out_r: list[str] = []
     tags: list[str] = []
     for tag, i1, i2, j1, j2 in sm.get_opcodes():
         if tag == "equal":
-            for a, b in zip(left_lines[i1:i2], right_lines[j1:j2]):
-                out_l.append(a)
-                out_r.append(b)
+            for aa, bb in zip(left_lines[i1:i2], right_lines[j1:j2]):
+                out_l.append(aa)
+                out_r.append(bb)
                 tags.append("equal")
         elif tag == "replace":
             n = max(i2 - i1, j2 - j1)
@@ -99,14 +118,14 @@ def line_diff_sides(left: str, right: str) -> tuple[list[str], list[str], list[s
                 out_r.append(right_lines[j1 + k] if j1 + k < j2 else "")
                 tags.append("replace")
         elif tag == "delete":
-            for a in left_lines[i1:i2]:
-                out_l.append(a)
+            for aa in left_lines[i1:i2]:
+                out_l.append(aa)
                 out_r.append("")
                 tags.append("delete")
         elif tag == "insert":
-            for b in right_lines[j1:j2]:
+            for bb in right_lines[j1:j2]:
                 out_l.append("")
-                out_r.append(b)
+                out_r.append(bb)
                 tags.append("insert")
     return out_l, out_r, tags
 

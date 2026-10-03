@@ -3,11 +3,12 @@ setlocal EnableExtensions EnableDelayedExpansion
 chcp 65001 >nul
 cd /d "%~dp0"
 
-REM InstantLens Doc 1.2.2 — Start mit Python-/Abhängigkeitsprüfung (DE-Meldungen)
+REM InstantLens Doc 1.2.3 — Start mit Python-/Abhängigkeitsprüfung (DE-Meldungen)
 REM Optional: pip install -r requirements.txt per J/N — oder non-interactive mit --yes / -y
+REM Hilfe: run.bat --help / -h
 REM
 REM Exit-Codes:
-REM   0  OK (App beendet mit 0)
+REM   0  OK (App beendet mit 0) bzw. --help angezeigt
 REM   1  Fehler: Python fehlt / Version ^<3.10 / Deps fehlen / pip fehlgeschlagen /
 REM      Installation abgelehnt / App-Exitcode != 0 wird durchgereicht
 REM
@@ -15,22 +16,61 @@ REM Beispiele:
 REM   run.bat
 REM   run.bat --yes
 REM   run.bat -y
+REM   run.bat --help
 
 set "ILD_YES="
+set "ILD_HELP="
 set "ILD_APP_ARGS="
 for %%A in (%*) do (
   if /i "%%~A"=="--yes" (
     set "ILD_YES=1"
   ) else if /i "%%~A"=="-y" (
     set "ILD_YES=1"
+  ) else if /i "%%~A"=="--help" (
+    set "ILD_HELP=1"
+  ) else if /i "%%~A"=="-h" (
+    set "ILD_HELP=1"
+  ) else if /i "%%~A"=="/?" (
+    set "ILD_HELP=1"
   ) else (
     set "ILD_APP_ARGS=!ILD_APP_ARGS! %%~A"
   )
 )
 
+if defined ILD_HELP (
+  echo.
+  echo InstantLens Doc — run.bat Hilfe
+  echo.
+  echo Verwendung:
+  echo   run.bat [Optionen] [App-Argumente...]
+  echo.
+  echo Optionen:
+  echo   --help, -h, /?   Diese Hilfe auf Deutsch anzeigen und beenden (Exit 0^)
+  echo   --yes, -y        Fehlende Abhaengigkeiten ohne Rueckfrage per pip installieren
+  echo.
+  echo Pruefungen:
+  echo   - Python 3.10+ ^(bevorzugt lokale .venv\Scripts\python.exe^)
+  echo   - Kern-Pakete: PySide6, pypdfium2, pikepdf, Pillow
+  echo.
+  echo Exit-Codes:
+  echo   0  OK ^(App beendet mit 0^) bzw. Hilfe angezeigt
+  echo   1  Python/Deps/pip-Fehler bzw. Installation abgelehnt;
+  echo      App-Exitcode != 0 wird durchgereicht
+  echo.
+  echo Beispiele:
+  echo   run.bat
+  echo   run.bat --yes
+  echo   run.bat -y
+  echo   run.bat --help
+  echo.
+  exit /b 0
+)
+
 set "PYEXE="
+set "ILD_USED_VENV="
 if exist ".venv\Scripts\python.exe" (
   set "PYEXE=.venv\Scripts\python.exe"
+  set "ILD_USED_VENV=1"
 ) else (
   where python >nul 2>&1
   if errorlevel 1 (
@@ -39,6 +79,14 @@ if exist ".venv\Scripts\python.exe" (
       echo.
       echo [InstantLens Doc] FEHLER: Python wurde nicht gefunden.
       echo.
+      if exist ".venv\" (
+        echo Hinweis: Lokaler Ordner .venv ist vorhanden, aber
+        echo   .venv\Scripts\python.exe fehlt ^(venv unvollstaendig^).
+        echo Bitte neu anlegen:
+        echo   python -m venv .venv
+        echo   .venv\Scripts\pip install -r requirements.txt
+        echo.
+      )
       echo Bitte Python 3.12+ installieren und erneut versuchen:
       echo   https://www.python.org/downloads/
       echo Beim Installer „Add python.exe to PATH“ aktivieren.
@@ -53,6 +101,13 @@ if exist ".venv\Scripts\python.exe" (
     set "PYEXE=py -3"
   ) else (
     set "PYEXE=python"
+  )
+  if exist ".venv\" (
+    echo [InstantLens Doc] Hinweis: Lokaler Ordner .venv vorhanden, aber
+    echo   .venv\Scripts\python.exe fehlt — System-Python wird genutzt.
+    echo   Zum Reparieren: python -m venv .venv
+    echo   .venv\Scripts\pip install -r requirements.txt
+    echo.
   )
 )
 
@@ -79,6 +134,12 @@ echo [InstantLens Doc] FEHLER: Erforderliche Pakete fehlen.
 echo Benoetigt u. a.: PySide6, pypdfium2, pikepdf, Pillow
 echo Optional fuer OCR: pytesseract + Tesseract-Runtime
 echo.
+if exist ".venv\" if not defined ILD_USED_VENV (
+  echo Hinweis: Lokaler Ordner .venv vorhanden — ggf. dort installieren:
+  echo   .venv\Scripts\python.exe -m pip install -r requirements.txt
+  echo   ^(run.bat nutzt .venv automatisch, sobald Scripts\python.exe existiert^)
+  echo.
+)
 if not exist "requirements.txt" (
   echo [InstantLens Doc] requirements.txt nicht gefunden — bitte manuell installieren:
   echo   %PYEXE% -m pip install -r requirements.txt

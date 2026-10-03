@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -847,8 +848,10 @@ class SettingsDialog(QDialog):
         form.addRow("Ann.-Export Dateiname", self.ann_export_tpl)
         self.ann_export_preview = QLabel("")
         self.ann_export_preview.setWordWrap(True)
+        self.ann_export_preview.setTextFormat(Qt.RichText)
         self.ann_export_preview.setToolTip(
-            "Live-Vorschau des Dateinamens (Beispiel stem=dokument, page=2) — 1.2.2"
+            "Live-Vorschau des Dateinamens (Beispiel stem=dokument, page=2); "
+            "ungültige Platzhalter rot — 1.2.3"
         )
         form.addRow("Vorschau Dateiname", self.ann_export_preview)
         self._update_ann_export_preview()
@@ -946,16 +949,30 @@ class SettingsDialog(QDialog):
         layout.addWidget(buttons)
 
     def _update_ann_export_preview(self, *_args) -> None:
-        """Live-Vorschau Ann.-Export-Dateiname inkl. {page}/{date} — 1.2.2."""
+        """Live-Vorschau Ann.-Export-Dateiname; ungültige Platzhalter rot — 1.2.3."""
         if not hasattr(self, "ann_export_preview") or not hasattr(self, "ann_export_tpl"):
             return
-        from instantlensdoc.core.app_settings import format_ann_export_filename
+        import html as _html
+
+        from instantlensdoc.core.app_settings import (
+            find_invalid_ann_export_placeholders,
+            format_ann_export_filename,
+            highlight_ann_export_template_html,
+        )
 
         tpl = self.ann_export_tpl.text().strip() or "{stem}_ann.json"
         sample = format_ann_export_filename(
             "dokument", page=2, template=tpl
         )
-        self.ann_export_preview.setText(sample)
+        html_tpl = highlight_ann_export_template_html(tpl)
+        invalid = find_invalid_ann_export_placeholders(tpl)
+        parts = [html_tpl, f"→ {_html.escape(sample)}"]
+        if invalid:
+            listed = ", ".join(_html.escape("{" + n + "}") for n in invalid)
+            parts.append(
+                f'<span style="color:#c62828">Ungültige Platzhalter: {listed}</span>'
+            )
+        self.ann_export_preview.setText("<br>".join(parts))
 
     def _clear_recent_files(self) -> None:
         from instantlensdoc.core import recent as recent_mod

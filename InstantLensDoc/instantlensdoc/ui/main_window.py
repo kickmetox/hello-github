@@ -1167,7 +1167,7 @@ class MainWindow(QMainWindow):
         act_compare_tabs = QAction("Text-Diff (offene Tabs)…", self)
         act_compare_tabs.setShortcut(QKeySequence("Ctrl+Alt+D"))
         act_compare_tabs.setToolTip(
-            "Zwei offene Text-Tabs: Side-by-Side/Unified · Wort-Highlight · Diff-TXT — 1.2.2"
+            "Zwei offene Text-Tabs: Ignore-Whitespace · Sync-Scroll · Unified·Wort-HL · Diff-TXT — 1.2.3"
         )
         act_compare_tabs.triggered.connect(self._compare_text_tabs)
         m_file.addAction(act_compare_tabs)
@@ -6831,7 +6831,7 @@ class MainWindow(QMainWindow):
         PdfCompareDialog(self, left_pdf=left).exec()
 
     def _compare_text_tabs(self):
-        """Zwei offene Text-Tabs: Side-by-Side/Unified · Wort-Highlight · Diff-TXT — 1.2.2."""
+        """Zwei offene Text-Tabs: Ignore-Whitespace · Sync-Scroll · Unified·Wort-HL · Diff-TXT — 1.2.3."""
         _TEXT_EXT = {
             ".txt",
             ".md",

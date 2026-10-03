@@ -1,5 +1,27 @@
 # Changelog — InstantLens Doc
 
+## 1.2.3 — Split-Log kopieren/TXT·Tabs persistieren, Ann. ungültige Platzhalter, Diff Ignore-WS·Sync-Scroll, run.bat --help
+
+Post-Release-Polish nach 1.2.2: **PDF-Split Pfad-Log** kann **kopiert** bzw. **als TXT gespeichert** werden; Checkbox **„in Tabs öffnen“** wird **persistiert**; **Ann.-Export Live-Vorschau** markiert **ungültige Platzhalter rot**; **Text-Diff** mit **Ignore-Whitespace** und **Sync-Scroll** im Side-by-Side; **`run.bat --help`** auf Deutsch sowie **Hinweis bei lokaler .venv**. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### PDF
+- Split: Pfad-Log **kopieren** / **als TXT speichern**; Checkbox **Erzeugte Dateien in Tabs öffnen** persistiert
+
+### Annotationen
+- Export-Template Live-Vorschau: **ungültige Platzhalter** (nicht `{stem}`/`{page}`/`{date}`) **rot** markiert
+
+### Editor
+- Text-Diff: Toggle **Ignore-Whitespace**; **Sync-Scroll** Side-by-Side
+
+### Packaging / Start
+- **`run.bat --help` / `-h` / `/?`**: deutsche Hilfe; Hinweis wenn lokale **`.venv`** vorhanden aber unvollständig
+
+### Packaging / Docs
+- Version **1.2.3** (App / `ild_pdf` / ISS / Smoke / Docs)
+- Smoke: Split-Log kopieren/TXT·Tabs-Persistenz, Ann. ungültige Platzhalter, Diff Ignore-WS·Sync-Scroll, run.bat --help (CLI + Qt)
+
+---
+
 ## 1.2.2 — PDF-Split Tabs·Pfad-Log, Ann.-Template {page}/{date}, Diff Unified·Wort-HL, run.bat --yes
 
 Post-Release-Polish nach 1.2.1: **PDF-Split** kann erzeugte Dateien optional in **Tabs öffnen** und zeigt ein **Pfad-Log**; **Ann.-Export-Template** dokumentiert Platzhalter **`{page}`** / **`{date}`** mit **Live-Vorschau**; **Text-Diff** mit Toggle **Side-by-Side / Unified** und einfachem **Wort-Highlight**; **`run.bat --yes`** für non-interactive pip inkl. dokumentierter **Exit-Codes**. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
