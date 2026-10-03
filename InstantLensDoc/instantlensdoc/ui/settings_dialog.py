@@ -912,7 +912,8 @@ class SettingsDialog(QDialog):
         self.btn_reset_ann_tpl.setToolTip(
             f"Template auf Default zurücksetzen "
             f"({DEFAULT_ANN_EXPORT_FILENAME_TEMPLATE}); "
-            "danach lokales Undo (Ctrl+Z) — 1.2.6"
+            "Bestätigung nur wenn Feld vom Default abweicht; "
+            "danach lokales Undo (Ctrl+Z) — 1.2.7"
         )
         self.btn_reset_ann_tpl.clicked.connect(self._reset_ann_export_template)
         tpl_row.addWidget(self.btn_reset_ann_tpl)
@@ -958,7 +959,7 @@ class SettingsDialog(QDialog):
         self.text_diff_wrap_around.setChecked(get_text_diff_wrap_around())
         self.text_diff_wrap_around.setToolTip(
             "Bei Nächste/Vorherige Änderung (F7/Shift+F7) am Ende "
-            "wieder von vorn / vom Ende — 1.2.6"
+            "wieder von vorn / vom Ende; bei Wrap einmal akustisch/visuell blinken — 1.2.7"
         )
         form.addRow(self.text_diff_wrap_around)
 
@@ -1062,15 +1063,28 @@ class SettingsDialog(QDialog):
         self._update_ann_export_preview()
 
     def _reset_ann_export_template(self) -> None:
-        """Template auf Default zurücksetzen (undo-fähig) — 1.2.6."""
+        """Template auf Default zurücksetzen; Bestätigung nur bei Abweichung — 1.2.7."""
         from instantlensdoc.core.app_settings import DEFAULT_ANN_EXPORT_FILENAME_TEMPLATE
 
         if not hasattr(self, "ann_export_tpl"):
             return
         edit = self.ann_export_tpl
         default = DEFAULT_ANN_EXPORT_FILENAME_TEMPLATE
-        if (edit.text() or "") == default:
+        current = edit.text() or ""
+        if current == default:
+            # Bereits Default — keine Bestätigung, kein Reset
             edit.setFocus()
+            return
+        reply = QMessageBox.question(
+            self,
+            "Reset-Template",
+            f"Ann.-Export-Template auf Default zurücksetzen?\n\n"
+            f"Aktuell: {current}\n"
+            f"Default: {default}",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
+        )
+        if reply != QMessageBox.Yes:
             return
         # selectAll + insert → ein Undo-Schritt (Ctrl+Z stellt vorherigen Text wieder her)
         edit.setFocus()

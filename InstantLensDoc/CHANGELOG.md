@@ -1,5 +1,27 @@
 # Changelog — InstantLens Doc
 
+## 1.2.7 — Split-Log Tabs Statuszählung, Ann. Reset-Bestätigung, Diff Wrap-Blink, run.bat py→python→python3
+
+Post-Release-Polish nach 1.2.6: **PDF-Split „In Tabs öffnen“** überspringt fehlende Dateien und meldet **Statuszählung** (geöffnet/übersprungen); **Ann.-Export Reset-Template** fragt **nur bei Abweichung vom Default** nach Bestätigung; **Text-Diff Wrap-around** blinkt bei Sprung Anfang↔Ende **einmal akustisch und visuell**; **`run.bat`** bei ungültigem/leerem **`%ILD_PYTHON%`** versucht Fallback **`py -3` → `python` → `python3`**. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### PDF
+- Split: „In Tabs öffnen“ — fehlende Dateien **überspringen** + Statuszählung (geöffnet/übersprungen)
+
+### Annotationen
+- Export-Template: **Reset-Template** — Bestätigung **nur wenn Feld vom Default abweicht**
+
+### Editor
+- Text-Diff: Wrap-around bei Sprung Anfang↔Ende **einmal akustisch/visuell blinken**
+
+### Packaging / Start
+- **`run.bat`**: bei ungültigem/leerem **`%ILD_PYTHON%`** Fallback **`py -3` → `python` → `python3`** (nach `.venv`); in `--help` dokumentiert
+
+### Packaging / Docs
+- Version **1.2.7** (App / `ild_pdf` / ISS / Smoke / Docs)
+- Smoke: Split-Log Tabs Statuszählung, Ann. Reset-Bestätigung, Diff Wrap-Blink, run.bat py→python→python3 (CLI + Qt)
+
+---
+
 ## 1.2.6 — Split-Log Pfad kopieren·Tabs, Ann. Undo lokal·Reset, Diff Status·Wrap, run.bat ILD_PYTHON-Fallback
 
 Post-Release-Polish nach 1.2.5: **PDF-Split Pfad-Log Kontextmenü** mit **„Pfad kopieren“** und **„In Tabs öffnen“** für die Auswahl; **Ann.-Export-Template** mit **lokalem Undo (Ctrl+Z)** im Feld und Button **Reset-Template** auf Default; **Text-Diff** Status **„Änderung i/n“** und **Wrap-around** Toggle in Settings/Dialog; **`run.bat`** bei ungültigem **`%ILD_PYTHON%`** mit klarer DE-Fehlermeldung und Fallback-Hinweis (`.venv`/PATH). Stubs KI/Cloud/Stylus/3D bleiben Stubs.

@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **1.2.6** |
+| Version | **1.2.7** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -50,9 +50,9 @@ pip install -r requirements.txt
 run.bat
 ```
 
-`run.bat` prüft Python ≥3.10 und Kern-Deps (PySide6, pypdfium2, pikepdf, Pillow) mit klaren DE-Meldungen; bei fehlenden Paketen optional `python -m pip install -r requirements.txt` (J/N) oder non-interactive **`run.bat --yes`** / **`-y`**. Hilfe: **`run.bat --help`** / **`-h`**. Env-Override: **`set ILD_PYTHON=C:\Pfad\zu\python.exe`** (höchste Priorität vor `.venv`/PATH); bei ungültigem Pfad klare DE-Fehlermeldung + Fallback-Hinweis (`.venv`/PATH). Hinweis wenn lokale **`.venv`** vorhanden aber unvollständig. Fehlt Python: kurzer Download-Hinweis **Microsoft Store** / **python.org**.
+`run.bat` prüft Python ≥3.10 und Kern-Deps (PySide6, pypdfium2, pikepdf, Pillow) mit klaren DE-Meldungen; bei fehlenden Paketen optional `python -m pip install -r requirements.txt` (J/N) oder non-interactive **`run.bat --yes`** / **`-y`**. Hilfe: **`run.bat --help`** / **`-h`**. Env-Override: **`set ILD_PYTHON=C:\Pfad\zu\python.exe`** (höchste Priorität vor `.venv`/PATH); bei ungültigem/leerem Pfad Warnung + Fallback **`py -3` → `python` → `python3`** (danach `.venv` falls vorhanden). Hinweis wenn lokale **`.venv`** vorhanden aber unvollständig. Fehlt Python: kurzer Download-Hinweis **Microsoft Store** / **python.org**.
 
-Exit-Codes `run.bat`: **0** OK / Hilfe · **1** Python/Deps/pip-Fehler bzw. Installation abgelehnt / ILD_PYTHON ungültig (App-Exitcode ≠0 wird durchgereicht).
+Exit-Codes `run.bat`: **0** OK / Hilfe · **1** Python/Deps/pip-Fehler bzw. Installation abgelehnt (App-Exitcode ≠0 wird durchgereicht).
 
 ## Build
 
@@ -63,10 +63,10 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an / `checkedonce`)
 
-## Neu in 1.2.6
+## Neu in 1.2.7
 
-- PDF: Split — Pfad-Log Kontextmenü **„Pfad kopieren“** + **„In Tabs öffnen“** (Auswahl)
-- Annotationen: Template **Ctrl+Z lokal** im Feld; Button **Reset-Template** auf Default
-- Editor: Text-Diff Status **„Änderung i/n“**; **Wrap-around** Toggle (Settings/Dialog)
-- Start: `run.bat` bei ungültigem **`%ILD_PYTHON%`** klare DE-Fehlermeldung + Fallback-Hinweis
+- PDF: Split — „In Tabs öffnen“ überspringt fehlende Dateien + **Statuszählung**
+- Annotationen: **Reset-Template** Bestätigung nur wenn Feld vom Default abweicht
+- Editor: Text-Diff Wrap-around — einmal **akustisch/visuell blinken** bei Sprung Anfang↔Ende
+- Start: `run.bat` bei ungültigem/leerem **`%ILD_PYTHON%`** Fallback **`py -3` → `python` → `python3`**
 - Stubs KI/Cloud/Stylus/3D unverändert

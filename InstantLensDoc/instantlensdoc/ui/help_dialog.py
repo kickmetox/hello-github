@@ -102,10 +102,10 @@ HELP_HTML = f"""
     <b>Export-Profil</b> speichern/anwenden (DPI / Format / Ziel)</li>
 <li><b>OCR gesamtes PDF</b>: Button <b>„Als Defaults speichern“</b> → Toast <b>„OCR-Defaults gespeichert“</b> (Dauer Settings <b>1/2/3 s</b> + Accessibility-Announcement) + Feld-Highlight; Defaults vorbelegt; Toggle <b>„Fehler anhängen“</b> Settings-persistiert; Seitenfehler → Abschnitt im TXT; Abbruch behält Teilergebnis; optional <b>Seitenbereich von–bis</b>; Fortschritt → <b>Textdatei-Tab</b> — 1.1.9</li>
 <li><b>PDF zusammenführen</b>: Thumbnail-Klick → Readonly-Tab mit Banner <b>„Vorschau“</b> + <b>„Zum Bearbeiten öffnen“</b>; Toggle Readonly schließen <b>auch im Merge-Dialog</b> (gleicher Persistenz-Tooltip in Settings); Vorschau-Thumbnail; Drag&amp;Drop; Duplikat-Warnung; Doppelklick/Alle/Seiten-Summe — 1.1.9</li>
-<li><b>PDF Seitenbereich / Split</b>: Bereiche <b>1-3,5,8-10</b>; Pfad-Log Kontextmenü <b>Pfad kopieren</b> · <b>In Tabs öffnen</b>; Mehrfachauswahl; Ordner der Auswahl; Doppelklick; kopieren/als TXT — 1.2.6</li>
-<li><b>Annotationen exportieren (JSON / Flatten)</b>: Quick-Insert <b>{{stem}}</b>/<b>{{page}}</b>/<b>{{date}}</b> an <b>Cursor</b>; <b>Ctrl+Z lokal</b> im Template; <b>Reset-Template</b> auf Default; Live-Vorschau — 1.2.6</li>
-<li><b>Text-Diff Panel</b>: Status <b>Änderung i/n</b>; <b>Wrap-around</b> Toggle; Nächste/Vorherige Änderung (<b>F7</b>/<b>Shift+F7</b>); Sync-Scroll; Ignore-Whitespace; Diff als TXT (Ctrl+Alt+D) — 1.2.6</li>
-<li><b>run.bat</b>: <b>%ILD_PYTHON%</b> ungültig → klare DE-Fehlermeldung + Fallback-Hinweis; Download-Hinweis Microsoft Store / python.org; --help; .venv; --yes; Exit 0/1 — 1.2.6</li>
+<li><b>PDF Seitenbereich / Split</b>: Bereiche <b>1-3,5,8-10</b>; Pfad-Log <b>In Tabs öffnen</b> überspringt fehlende + Statuszählung; Pfad kopieren; Mehrfachauswahl; Ordner der Auswahl — 1.2.7</li>
+<li><b>Annotationen exportieren (JSON / Flatten)</b>: Quick-Insert <b>{{stem}}</b>/<b>{{page}}</b>/<b>{{date}}</b>; <b>Ctrl+Z lokal</b>; <b>Reset-Template</b> mit Bestätigung nur bei Abweichung vom Default — 1.2.7</li>
+<li><b>Text-Diff Panel</b>: Wrap-around bei Sprung Anfang↔Ende einmal akustisch/visuell blinken; Status <b>Änderung i/n</b>; F7/Shift+F7 — 1.2.7</li>
+<li><b>run.bat</b>: bei ungültigem/leerem <b>%ILD_PYTHON%</b> Fallback <b>py -3 → python → python3</b>; --help; .venv; --yes; Exit 0/1 — 1.2.7</li>
 <li><b>Alle Annotationen auf Seite löschen</b>: bei <b>0 gefilterten Treffern</b> Sticky-Status in Statusleiste bis nächste Ann.-Aktion / Seiten-/Dokumentwechsel / <b>Undo/Redo</b> + i18n DE + Menü/Aktion no-op + Button disabled; Undo <b>„N Annotationen (gefiltert)“</b> — 1.1.9</li>
 <li><b>Keygen</b>: Reveal Auto-Hide <b>5/10/30 s</b> + <b>Countdown</b> (Label <b>„pausiert“</b>; Tooltip <b>„Countdown pausiert (Fenster ohne Fokus)“</b>) / <b>Esc</b> maskiert; History maskiert (letzte 4); Doppelklick kopiert; Clear History; .txt; --days — 1.1.9</li>
 <li><b>Datei → Drucken</b> (Ctrl+P): Editor oder aktuelle PDF-Seite (Qt Print); <b>PDF → Dokument drucken…</b> Seitenbereich + DPI + Graustufen; <b>Vorschau PageUp/Down·Home/End + +/- Zoom + Fit-Page + Mausrad + Seitenwahl</b> bei Mehrseiten; Fortschritt; Abbruch → Cleanup — 1.0.9</li>
@@ -122,7 +122,7 @@ HELP_HTML = f"""
 <li><b>Bearbeiten → Suchen und Ersetzen</b> (Ctrl+R): Find/Replace im Texteditor</li>
 <li><b>Bearbeiten → Gehe zu Zeile / Seite</b> (Ctrl+G): Editor → Zeile; PDF → Seite (auch PDF → Gehe zu Seite…, Ctrl+Shift+G)</li>
 <li><b>Datei → Tab duplizieren</b> (Ctrl+Shift+T): Editor-Inhalt als neues Dokument klonen;
-    <b>Text-Diff (offene Tabs)</b> (Ctrl+Alt+D): Änderung i/n · Wrap-around · F7/Shift+F7 · Sync-Scroll · Ignore-Whitespace · Diff-TXT — 1.2.6;
+    <b>Text-Diff (offene Tabs)</b> (Ctrl+Alt+D): Wrap-Blink · Änderung i/n · Wrap-around · F7/Shift+F7 · Sync-Scroll · Ignore-Whitespace · Diff-TXT — 1.2.7;
     <b>Erneut öffnen</b> (Ctrl+Alt+Shift+O): Datei vom Datenträger neu laden</li>
 <li><b>Bearbeiten → Zeile / Annotation duplizieren</b> (Ctrl+D): Editor Zeile/Auswahl; PDF ausgewählte Annotation (auch Ctrl+Shift+D)</li>
 <li><b>Bearbeiten → Zeile verschieben</b> (Alt+Up / Alt+Down)</li>
@@ -222,10 +222,10 @@ HELP_HTML = f"""
     Toggle „Fehler anhängen“ Settings-persistiert; Seitenfehler-Abschnitt + Teilergebnis — 1.1.9</li>
 <li><b>PDF zusammenführen</b>: Thumbnail-Klick → Readonly-Tab mit Banner „Vorschau“ +
     „Zum Bearbeiten öffnen“; Toggle Readonly schließen auch im Merge-Dialog (gleicher Persistenz-Tooltip in Settings); Drag&amp;Drop; Duplikat-Warnung — 1.1.9</li>
-<li><b>PDF Seitenbereich / Split</b>: Bereiche <b>1-3,5,8-10</b>; Pfad-Log Kontextmenü <b>Pfad kopieren</b> · <b>In Tabs öffnen</b>; Mehrfachauswahl; Ordner der Auswahl; Doppelklick; kopieren/als TXT — 1.2.6</li>
-<li><b>Annotationen exportieren (JSON / Flatten)</b>: Quick-Insert <b>{{stem}}</b>/<b>{{page}}</b>/<b>{{date}}</b> an <b>Cursor</b>; <b>Ctrl+Z lokal</b> im Template; <b>Reset-Template</b> auf Default; Live-Vorschau — 1.2.6</li>
-<li><b>Text-Diff Panel</b>: Status <b>Änderung i/n</b>; <b>Wrap-around</b> Toggle; Nächste/Vorherige Änderung (<b>F7</b>/<b>Shift+F7</b>); Sync-Scroll; Ignore-Whitespace; Diff als TXT (Ctrl+Alt+D) — 1.2.6</li>
-<li><b>run.bat</b>: <b>%ILD_PYTHON%</b> ungültig → klare DE-Fehlermeldung + Fallback-Hinweis; Download-Hinweis Microsoft Store / python.org; --help; .venv; --yes; Exit 0/1 — 1.2.6</li>
+<li><b>PDF Seitenbereich / Split</b>: Bereiche <b>1-3,5,8-10</b>; Pfad-Log <b>In Tabs öffnen</b> überspringt fehlende + Statuszählung; Pfad kopieren; Mehrfachauswahl; Ordner der Auswahl — 1.2.7</li>
+<li><b>Annotationen exportieren (JSON / Flatten)</b>: Quick-Insert <b>{{stem}}</b>/<b>{{page}}</b>/<b>{{date}}</b>; <b>Ctrl+Z lokal</b>; <b>Reset-Template</b> mit Bestätigung nur bei Abweichung vom Default — 1.2.7</li>
+<li><b>Text-Diff Panel</b>: Wrap-around bei Sprung Anfang↔Ende einmal akustisch/visuell blinken; Status <b>Änderung i/n</b>; F7/Shift+F7 — 1.2.7</li>
+<li><b>run.bat</b>: bei ungültigem/leerem <b>%ILD_PYTHON%</b> Fallback <b>py -3 → python → python3</b>; --help; .venv; --yes; Exit 0/1 — 1.2.7</li>
 <li><b>Alle Annotationen auf Seite löschen</b>: bei 0 Treffern Sticky-Status Statusleiste
     (Clear bei Seiten-/Dokumentwechsel / Undo/Redo) + i18n DE + Menü/Aktion no-op + Button disabled; Undo „N Annotationen (gefiltert)“ — 1.1.9</li>
 <li><b>Keygen</b>: Reveal Auto-Hide 5/10/30 s + Countdown (Label „pausiert“; Tooltip „Fenster ohne Fokus“) / Esc maskiert;

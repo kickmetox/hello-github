@@ -369,8 +369,9 @@ class PdfToolsDialog(QDialog):
         self.split_log.setToolTip(
             "Liste der nach dem Teilen erzeugten Dateipfade. "
             "Mehrfachauswahl (Ctrl/Shift); Doppelklick öffnet Datei/Ordner; "
-            "Kontextmenü: Pfad kopieren · In Tabs öffnen · "
-            "Ordner der Auswahl — 1.2.6"
+            "Kontextmenü: Pfad kopieren · In Tabs öffnen "
+            "(fehlende überspringen + Statuszählung) · "
+            "Ordner der Auswahl — 1.2.7"
         )
         self.split_log.path_activate.connect(self._split_open_log_path)
         self.split_log.open_selected_folders.connect(self._split_open_selected_folders)
@@ -932,7 +933,7 @@ class PdfToolsDialog(QDialog):
         )
 
     def _split_open_selected_in_tabs(self) -> None:
-        """Ausgewählte Split-PDFs in Tabs öffnen — 1.2.6."""
+        """Ausgewählte Split-PDFs in Tabs öffnen; fehlende überspringen + Statuszählung — 1.2.7."""
         if not hasattr(self, "split_log"):
             return
         if not (self.split_log.toPlainText() or "").strip():
@@ -948,22 +949,37 @@ class PdfToolsDialog(QDialog):
             )
             return
         existing = [p for p in paths if Path(p).is_file()]
+        skipped = [p for p in paths if p not in existing]
+        opened = len(existing)
+        skipped_n = len(skipped)
+        status = (
+            f"In Tabs: {opened} geöffnet, {skipped_n} übersprungen (fehlen)"
+            if skipped_n
+            else f"In Tabs: {opened} geöffnet"
+        )
+        parent = self.parent()
+        if parent is not None and hasattr(parent, "_set_status"):
+            try:
+                parent._set_status(status)
+            except Exception:
+                pass
         if not existing:
             QMessageBox.warning(
                 self,
                 "Pfad-Log",
-                "Keine gültigen Dateien in der Auswahl gefunden.",
+                f"Keine gültigen Dateien in der Auswahl gefunden.\n"
+                f"Status: {opened} geöffnet, {skipped_n} übersprungen.",
             )
             return
         self._split_open_written(existing)
-        missing = [p for p in paths if p not in existing]
-        if missing:
-            QMessageBox.information(
-                self,
-                "Pfad-Log",
-                f"{len(existing)} Datei(en) in Tabs geöffnet.\n"
-                f"{len(missing)} Pfad(e) nicht gefunden.",
-            )
+        QMessageBox.information(
+            self,
+            "Pfad-Log",
+            f"{opened} Datei(en) in Tabs geöffnet.\n"
+            f"{skipped_n} fehlende Datei(en) übersprungen."
+            if skipped_n
+            else f"{opened} Datei(en) in Tabs geöffnet.",
+        )
 
     def _split_copy_log(self) -> None:
         """Pfad-Log in die Zwischenablage — 1.2.3."""

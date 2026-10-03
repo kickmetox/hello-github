@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QColor, QFont, QKeySequence, QShortcut, QTextCharFormat, QTextCursor
 from PySide6.QtWidgets import (
+    QApplication,
     QCheckBox,
     QComboBox,
     QDialog,
@@ -271,7 +272,8 @@ class TextCompareDialog(QDialog):
         self.chk_wrap_around.setChecked(get_text_diff_wrap_around())
         self.chk_wrap_around.setToolTip(
             "F7/Shift+F7 am Ende wieder von vorn (bzw. vom Ende); "
-            "auch in Einstellungen — 1.2.6"
+            "bei Wrap einmal akustisch/visuell blinken; "
+            "auch in Einstellungen — 1.2.7"
         )
         self.chk_wrap_around.toggled.connect(self._on_wrap_around_toggled)
         opts.addWidget(self.chk_only_diff)
@@ -594,8 +596,29 @@ class TextCompareDialog(QDialog):
             return self.view_unified
         return self.view_left
 
+    def _blink_wrap_feedback(self) -> None:
+        """Einmal akustisch + Status kurz blinken bei Wrap Anfang↔Ende — 1.2.7."""
+        try:
+            QApplication.beep()
+        except Exception:
+            pass
+        token = int(getattr(self, "_wrap_blink_token", 0)) + 1
+        self._wrap_blink_token = token
+        prev = self.lbl_status.styleSheet() or ""
+        self.lbl_status.setStyleSheet(
+            "QLabel { background-color: #fff59d; color: #212121; "
+            "padding: 2px 4px; border-radius: 2px; }"
+        )
+
+        def _clear() -> None:
+            if token != getattr(self, "_wrap_blink_token", 0):
+                return
+            self.lbl_status.setStyleSheet(prev)
+
+        QTimer.singleShot(350, _clear)
+
     def _goto_change(self, direction: int) -> None:
-        """Nächste/vorherige Änderung anspringen (F7 / Shift+F7) — 1.2.5/1.2.6."""
+        """Nächste/vorherige Änderung anspringen (F7 / Shift+F7) — 1.2.5–1.2.7."""
         indices = self._change_line_indices()
         if not indices:
             base = (self.lbl_status.text() or "").split(" · Änderung ")[0] or "Diff"
@@ -606,6 +629,7 @@ class TextCompareDialog(QDialog):
         wrap = True
         if hasattr(self, "chk_wrap_around"):
             wrap = bool(self.chk_wrap_around.isChecked())
+        did_wrap = False
         if direction >= 0:
             nxt = next((i for i in indices if i > cur_block), None)
             if nxt is None:
@@ -618,6 +642,7 @@ class TextCompareDialog(QDialog):
                     )
                     return
                 nxt = indices[0]
+                did_wrap = True
         else:
             nxt = next((i for i in reversed(indices) if i < cur_block), None)
             if nxt is None:
@@ -630,6 +655,7 @@ class TextCompareDialog(QDialog):
                     )
                     return
                 nxt = indices[-1]
+                did_wrap = True
         self._change_nav_index = indices.index(nxt)
         block = view.document().findBlockByNumber(nxt)
         if block.isValid():
@@ -645,7 +671,10 @@ class TextCompareDialog(QDialog):
         n = len(indices)
         pos = self._change_nav_index + 1
         base = self.lbl_status.text().split(" · Änderung ")[0]
-        self.lbl_status.setText(f"{base} · Änderung {pos}/{n}")
+        wrap_note = " · Wrap" if did_wrap else ""
+        self.lbl_status.setText(f"{base} · Änderung {pos}/{n}{wrap_note}")
+        if did_wrap:
+            self._blink_wrap_feedback()
 
     def _export_diff_txt(self) -> None:
         """Aktuellen Diff als TXT speichern — 1.2.1/1.2.2."""

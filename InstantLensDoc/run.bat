@@ -3,7 +3,7 @@ setlocal EnableExtensions EnableDelayedExpansion
 chcp 65001 >nul
 cd /d "%~dp0"
 
-REM InstantLens Doc 1.2.6 — Start mit Python-/Abhängigkeitsprüfung (DE-Meldungen)
+REM InstantLens Doc 1.2.7 — Start mit Python-/Abhängigkeitsprüfung (DE-Meldungen)
 REM Optional: pip install -r requirements.txt per J/N — oder non-interactive mit --yes / -y
 REM Hilfe: run.bat --help / -h
 REM
@@ -12,12 +12,13 @@ REM   set ILD_PYTHON=C:\Pfad\zu\python.exe
 REM   run.bat
 REM Wenn %%ILD_PYTHON%% gesetzt ist und auf eine existierende Datei zeigt, wird genau
 REM dieser Interpreter genutzt (vor .venv und PATH).
-REM Bei ungültigem ILD_PYTHON: klare DE-Fehlermeldung + Fallback-Hinweis (.venv/PATH).
+REM Bei ungültigem/leerem ILD_PYTHON: Warnung (wenn gesetzt) + Fallback
+REM   py -3 → python → python3 (danach .venv falls vorhanden, sonst Fehler).
 REM
 REM Exit-Codes:
 REM   0  OK (App beendet mit 0) bzw. --help angezeigt
 REM   1  Fehler: Python fehlt / Version ^<3.10 / Deps fehlen / pip fehlgeschlagen /
-REM      Installation abgelehnt / ILD_PYTHON ungültig / App-Exitcode != 0 wird durchgereicht
+REM      Installation abgelehnt / App-Exitcode != 0 wird durchgereicht
 REM
 REM Beispiele:
 REM   run.bat
@@ -59,17 +60,17 @@ if defined ILD_HELP (
   echo   ILD_PYTHON       Optionaler Pfad zu python.exe ^(Env-Override, hoechste Prio^)
   echo                    Beispiel: set ILD_PYTHON=C:\Python312\python.exe
   echo                    Wenn gesetzt und Datei existiert: wird vor .venv/PATH genutzt.
-  echo                    Ungueltig: klare DE-Fehlermeldung + Fallback-Hinweis
-  echo                    ^(Variable entfernen → .venv bzw. PATH^).
+  echo                    Ungueltig/leer: Warnung + Fallback py -3 → python → python3
+  echo                    ^(danach .venv falls vorhanden^).
   echo.
   echo Pruefungen:
-  echo   - Python 3.10+ ^(ILD_PYTHON, sonst lokale .venv\Scripts\python.exe, sonst PATH^)
+  echo   - Python 3.10+ ^(ILD_PYTHON, sonst Fallback py -3/python/python3, sonst .venv^)
   echo   - Kern-Pakete: PySide6, pypdfium2, pikepdf, Pillow
   echo.
   echo Exit-Codes:
   echo   0  OK ^(App beendet mit 0^) bzw. Hilfe angezeigt
   echo   1  Python/Deps/pip-Fehler bzw. Installation abgelehnt;
-  echo      ILD_PYTHON ungueltig; App-Exitcode != 0 wird durchgereicht
+  echo      App-Exitcode != 0 wird durchgereicht
   echo.
   echo Beispiele:
   echo   run.bat
@@ -85,8 +86,10 @@ if defined ILD_HELP (
 set "PYEXE="
 set "ILD_USED_VENV="
 set "ILD_USED_ENV="
+set "ILD_NEED_FALLBACK="
 
-REM 1.2.5/1.2.6: %%ILD_PYTHON%% Env-Override (höchste Priorität)
+REM 1.2.5–1.2.7: %%ILD_PYTHON%% Env-Override (höchste Priorität)
+REM Bei ungültig/leer: Fallback-Kette py -3 → python → python3 — 1.2.7
 if defined ILD_PYTHON (
   if exist "%ILD_PYTHON%" (
     set "PYEXE=%ILD_PYTHON%"
@@ -94,63 +97,75 @@ if defined ILD_PYTHON (
     echo [InstantLens Doc] Nutze ILD_PYTHON=%ILD_PYTHON%
   ) else (
     echo.
-    echo [InstantLens Doc] FEHLER: ILD_PYTHON ist ungueltig.
+    echo [InstantLens Doc] WARNUNG: ILD_PYTHON ist ungueltig.
     echo Die Datei existiert nicht oder ist kein ausfuehrbarer Python-Interpreter:
     echo   %ILD_PYTHON%
+    echo Fallback: versuche py -3, dann python, dann python3 …
     echo.
-    echo Bitte einen gueltigen Pfad setzen, z. B.:
-    echo   set ILD_PYTHON=C:\Python312\python.exe
-    echo.
-    echo Fallback-Hinweis: Variable entfernen, dann nutzt run.bat automatisch
-    echo   1^) lokale .venv\Scripts\python.exe ^(falls vorhanden^)
-    echo   2^) sonst python/py aus dem PATH
-    echo Entfernen unter cmd.exe:
-    echo   set ILD_PYTHON=
-    echo.
-    if not defined ILD_YES pause
-    exit /b 1
+    set "ILD_NEED_FALLBACK=1"
   )
-) else if exist ".venv\Scripts\python.exe" (
-  set "PYEXE=.venv\Scripts\python.exe"
-  set "ILD_USED_VENV=1"
 ) else (
-  where python >nul 2>&1
-  if errorlevel 1 (
-    where py >nul 2>&1
-    if errorlevel 1 (
-      echo.
-      echo [InstantLens Doc] FEHLER: Python wurde nicht gefunden.
-      echo.
-      if exist ".venv\" (
-        echo Hinweis: Lokaler Ordner .venv ist vorhanden, aber
-        echo   .venv\Scripts\python.exe fehlt ^(venv unvollstaendig^).
-        echo Bitte neu anlegen:
-        echo   python -m venv .venv
-        echo   .venv\Scripts\pip install -r requirements.txt
-        echo.
-      )
-      echo Optional: set ILD_PYTHON=C:\Pfad\zu\python.exe
-      echo.
-      echo Download Python 3.12+ ^(kurz^):
-      echo   Microsoft Store: „Python 3.12“ suchen und installieren
-      echo   oder https://www.python.org/downloads/
-      echo Beim Installer „Add python.exe to PATH“ aktivieren, dann erneut run.bat.
-      echo.
-      if not defined ILD_YES pause
-      exit /b 1
-    )
-    set "PYEXE=py -3"
-  ) else (
-    set "PYEXE=python"
+  set "ILD_NEED_FALLBACK=1"
+)
+
+if defined ILD_NEED_FALLBACK if not defined PYEXE (
+  if exist ".venv\Scripts\python.exe" (
+    set "PYEXE=.venv\Scripts\python.exe"
+    set "ILD_USED_VENV=1"
   )
+)
+if defined ILD_NEED_FALLBACK if not defined PYEXE (
+  REM 1.2.7: PATH-Fallback-Reihenfolge py -3 → python → python3
+  py -3 -c "import sys" >nul 2>&1
+  if not errorlevel 1 (
+    set "PYEXE=py -3"
+    echo [InstantLens Doc] Fallback: py -3
+  )
+)
+if defined ILD_NEED_FALLBACK if not defined PYEXE (
+  python -c "import sys" >nul 2>&1
+  if not errorlevel 1 (
+    set "PYEXE=python"
+    echo [InstantLens Doc] Fallback: python
+  )
+)
+if defined ILD_NEED_FALLBACK if not defined PYEXE (
+  python3 -c "import sys" >nul 2>&1
+  if not errorlevel 1 (
+    set "PYEXE=python3"
+    echo [InstantLens Doc] Fallback: python3
+  )
+)
+if defined ILD_NEED_FALLBACK if not defined PYEXE (
+  echo.
+  echo [InstantLens Doc] FEHLER: Python wurde nicht gefunden.
+  echo Fallback-Reihenfolge ohne Treffer: py -3 → python → python3
+  echo.
   if exist ".venv\" (
-    echo [InstantLens Doc] Hinweis: Lokaler Ordner .venv vorhanden, aber
-    echo   .venv\Scripts\python.exe fehlt — System-Python wird genutzt.
-    echo   Zum Reparieren: python -m venv .venv
+    echo Hinweis: Lokaler Ordner .venv ist vorhanden, aber
+    echo   .venv\Scripts\python.exe fehlt ^(venv unvollstaendig^).
+    echo Bitte neu anlegen:
+    echo   python -m venv .venv
     echo   .venv\Scripts\pip install -r requirements.txt
-    echo   Oder: set ILD_PYTHON=C:\Pfad\zu\python.exe
     echo.
   )
+  echo Optional: set ILD_PYTHON=C:\Pfad\zu\python.exe
+  echo.
+  echo Download Python 3.12+ ^(kurz^):
+  echo   Microsoft Store: „Python 3.12“ suchen und installieren
+  echo   oder https://www.python.org/downloads/
+  echo Beim Installer „Add python.exe to PATH“ aktivieren, dann erneut run.bat.
+  echo.
+  if not defined ILD_YES pause
+  exit /b 1
+)
+if defined ILD_NEED_FALLBACK if defined PYEXE if not defined ILD_USED_VENV if exist ".venv\" (
+  echo [InstantLens Doc] Hinweis: Lokaler Ordner .venv vorhanden, aber
+  echo   .venv\Scripts\python.exe fehlt — System-Python wird genutzt.
+  echo   Zum Reparieren: python -m venv .venv
+  echo   .venv\Scripts\pip install -r requirements.txt
+  echo   Oder: set ILD_PYTHON=C:\Pfad\zu\python.exe
+  echo.
 )
 
 echo [InstantLens Doc] Python-Pruefung …
