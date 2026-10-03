@@ -156,6 +156,8 @@ from instantlensdoc.core.app_settings import (
     get_presentation_hide_annotations,
     get_presentation_auto_advance_sec,
     get_presentation_black_background,
+    get_presentation_countdown_color,
+    get_presentation_countdown_position,
     get_presentation_show_page_number,
     PRESENTATION_AUTO_ADVANCE_CHOICES,
     get_favorites_bar_visible,
@@ -253,6 +255,8 @@ from instantlensdoc.core.app_settings import (
     set_presentation_hide_annotations,
     set_presentation_auto_advance_sec,
     set_presentation_black_background,
+    set_presentation_countdown_color,
+    set_presentation_countdown_position,
     set_presentation_show_page_number,
     set_text_pdf_open_after,
     set_favorites_bar_visible,
@@ -1195,6 +1199,28 @@ class SettingsDialog(QDialog):
         )
         form.addRow("Präsentation: Auto-Advance", self.presentation_auto_adv)
 
+        self.presentation_countdown_pos = QComboBox()
+        self.presentation_countdown_pos.addItem("unten-rechts", "bottom-right")
+        self.presentation_countdown_pos.addItem("mitte", "center")
+        cur_cd_pos = get_presentation_countdown_position()
+        idx_cd_pos = self.presentation_countdown_pos.findData(cur_cd_pos)
+        self.presentation_countdown_pos.setCurrentIndex(max(0, idx_cd_pos))
+        self.presentation_countdown_pos.setToolTip(
+            "Countdown-Overlay Position: unten-rechts oder mitte — 1.7.3"
+        )
+        form.addRow("Präsentation: Countdown-Position", self.presentation_countdown_pos)
+
+        self.presentation_countdown_color = QComboBox()
+        self.presentation_countdown_color.addItem("dunkel", "dark")
+        self.presentation_countdown_color.addItem("hell", "light")
+        cur_cd_col = get_presentation_countdown_color()
+        idx_cd_col = self.presentation_countdown_color.findData(cur_cd_col)
+        self.presentation_countdown_color.setCurrentIndex(max(0, idx_cd_col))
+        self.presentation_countdown_color.setToolTip(
+            "Countdown-Overlay Farbe: hell oder dunkel — 1.7.3"
+        )
+        form.addRow("Präsentation: Countdown-Farbe", self.presentation_countdown_color)
+
         self.favorites_bar_chk = QCheckBox("Lesezeichen-Leiste (globale Favoriten)")
         self.favorites_bar_chk.setChecked(get_favorites_bar_visible())
         self.favorites_bar_chk.setToolTip(
@@ -1223,7 +1249,7 @@ class SettingsDialog(QDialog):
         self.text_pdf_open_after = QCheckBox("Text→PDF nach Export öffnen")
         self.text_pdf_open_after.setChecked(get_text_pdf_open_after())
         self.text_pdf_open_after.setToolTip(
-            "Nach Text → PDF die erzeugte Datei automatisch öffnen — 1.7.2"
+            "Nach Text → PDF öffnen (ohne leeres Sidecar; Status mit Pfad) — 1.7.3"
         )
         form.addRow(self.text_pdf_open_after)
 
@@ -2056,6 +2082,12 @@ class SettingsDialog(QDialog):
         except (TypeError, ValueError):
             adv_sec = 0
         set_presentation_auto_advance_sec(adv_sec)
+        set_presentation_countdown_position(
+            str(self.presentation_countdown_pos.currentData() or "bottom-right")
+        )
+        set_presentation_countdown_color(
+            str(self.presentation_countdown_color.currentData() or "dark")
+        )
         set_favorites_bar_visible(self.favorites_bar_chk.isChecked())
         set_text_pdf_font_size(float(self.text_pdf_font.value()))
         set_text_pdf_margin(float(self.text_pdf_margin.value()))

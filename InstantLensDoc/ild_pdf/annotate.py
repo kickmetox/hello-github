@@ -1726,6 +1726,14 @@ class AnnotationStore:
 
     def save(self, path: Optional[Path] = None, force: bool = False) -> Path:
         target = path or self.sidecar_path
+        # Kein leeres Sidecar anlegen wenn nichts zu speichern — 1.7.3
+        if (
+            path is None
+            and not self.annotations
+            and not self.dirty
+            and not target.exists()
+        ):
+            return target
         if not force and not self.dirty and target.exists() and path is None:
             return target
         # Sidecar speichert Kernfelder; Export ergänzt Highlight-Interop

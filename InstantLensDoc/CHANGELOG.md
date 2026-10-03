@@ -1,5 +1,23 @@
 # Changelog — InstantLens Doc
 
+## 1.7.3 — Präsentation Countdown Position·Farbe, Favoriten Doppelklick·Esc·leer, Text→PDF öffnen ohne Sidecar·Status-Pfad, Update Offline·Zeitstempel
+
+Post-Release-Polish nach 1.7.2: **Countdown-Overlay** mit Settings **Position** (unten-rechts/mitte) und **Farbe** (hell/dunkel); **Favoriten-Label** per **Doppelklick**, **Esc bricht ab**, **leerer Label → Dateiname**; **Text → PDF öffnen** legt **kein Sidecar** an und zeigt **Status mit Pfad**; **Update Offline** mit Status **„offline / nicht geprüft“** und **letztem Check-Zeitstempel**. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### PDF / Präsentation
+- Präsentation: Countdown-Position unten-rechts|mitte; Countdown-Farbe hell|dunkel (Settings)
+- Globale Favoriten: Doppelklick Label editieren; Esc bricht ab; leerer Label → Dateiname
+
+### Editor / Export
+- Text → PDF öffnen: kein leeres `.ildann.json`-Sidecar; Statusleiste mit vollem Pfad
+
+### Update / Packaging
+- Update-Hinweis: Status „offline / nicht geprüft“; letzter Check-Zeitstempel (persistiert)
+- Version **1.7.3** (App / `ild_pdf` / ISS / Smoke / Docs); `docs/VERSION` + `VERSION.txt`
+- Smoke: Countdown Pos·Farbe, Favoriten Doppelklick/Esc/leer, text_pdf open ohne Sidecar·Pfad, update offline·timestamp (CLI + Qt)
+
+---
+
 ## 1.7.2 — Präsentation Pause·Countdown·Intervalle, Favoriten Label·Tab·Duplikat-Pfade, Text→PDF Ordner·öffnen, Update Status·Offline
 
 Post-Release-Polish nach 1.7.1: **Präsentation-Timer** mit **Space = Pause**, **Countdown-Overlay** und festen Intervallen **3/5/10/30 s**; **Lesezeichen-Leiste** mit **Label bearbeiten**, **„In neuem Tab öffnen“** und **Duplikat-Pfad-Schutz**; **Text → PDF** merkt **Zielordner** und öffnet optional nach Export; **Update-Prüfung** mit Status **aktuell / neuer Build Hinweis** und **Offline-Fallback ohne Fehlerdialog**. Stubs KI/Cloud/Stylus/3D bleiben Stubs.

@@ -311,11 +311,11 @@ About: Datenschutz-Hinweis (lokal, keine Telemetrie).</p>
 <p><b>Groß-/Kleinschreibung:</b> Bearbeiten → Ctrl+Shift+U (Auswahl).</p>
 <p><b>Einrückung:</b> Bearbeiten → Ctrl+] / Ctrl+[ bzw. Tab / Shift+Tab (Block, aktuelle Zeile oder Auswahl).</p>
 <p><b>Präsentation:</b> Ansicht → Präsentationsmodus (F5): Vollbild-PDF; Pfeiltasten; Esc beendet;
-Space = Timer Pause; Countdown-Overlay; Intervalle 3/5/10/30 s; schwarzer Hintergrund; Nr. Toggle (N) — 1.7.2.</p>
-<p><b>Lesezeichen-Leiste:</b> globale Favoriten (<code>ildfav-v1</code>); Label editieren; In neuem Tab öffnen;
-Duplikat-Pfade verhindert; Drag-Reorder; fehlende grau; Export/Import; Ctrl+Alt+Shift+B — 1.7.2.</p>
-<p><b>Text → PDF:</b> Datei → Exportieren → Text → PDF… (Ctrl+Shift+P); Schrift/Rand; Zielordner merken; optional öffnen — 1.7.2.</p>
-<p><b>Update-Hinweis:</b> Hilfe → Jetzt prüfen…; Status aktuell / neuer Build Hinweis; Offline ohne Fehlerdialog; Dismiss; lokal <code>docs/VERSION</code> — 1.7.2.</p>
+Space = Timer Pause; Countdown-Overlay Position unten-rechts/mitte · Farbe hell/dunkel; Intervalle 3/5/10/30 s; Nr. Toggle (N) — 1.7.3.</p>
+<p><b>Lesezeichen-Leiste:</b> globale Favoriten (<code>ildfav-v1</code>); Doppelklick Label; Esc abbricht; leerer Label → Dateiname;
+In neuem Tab öffnen; Duplikat-Pfade verhindert; Drag-Reorder; Export/Import; Ctrl+Alt+Shift+B — 1.7.3.</p>
+<p><b>Text → PDF:</b> Datei → Exportieren → Text → PDF… (Ctrl+Shift+P); öffnen ohne Sidecar; Status mit Pfad; Zielordner merken — 1.7.3.</p>
+<p><b>Update-Hinweis:</b> Hilfe → Jetzt prüfen…; Status offline / nicht geprüft; letzter Check-Zeitstempel; Dismiss; lokal <code>docs/VERSION</code> — 1.7.3.</p>
 <p><b>Farben-Favoriten:</b> Toolbar 1/2/3 — Klick = Highlight, Shift+Klick = Stift, Ctrl+Klick = Notiz, Rechtsklick = speichern.</p>
 <p><b>Farbe Palette-Zyklus / Random:</b> Ctrl+Shift+C = nächste Palette-Farbe; Ctrl+Alt+Shift+C = zufällig.</p>
 <p><b>Zeilennummern:</b> Ansicht → Zeilennummern (optional, auch in Einstellungen).</p>
@@ -333,6 +333,7 @@ Duplikat-Pfade verhindert; Drag-Reorder; fehlende grau; Export/Import; Ctrl+Alt+
 <p><b>PDF verschlüsseln/entschlüsseln:</b> Prefill-Warnung + Button „jetzt ausschalten“ (sofort speichern + Toast) · Passwort nie in Logs · falsches PW klar DE — 1.6.5 (Basis 1.6.4/1.6.3/1.6.2/1.6.1/1.6.0).</p>
 <p><b>Dokument-Statistik:</b> JSON-Dateiname Quick-Insert <code>{stem}</code>/<code>{date}</code> · ungültige Platzhalter rot · Live-Vorschau · Copy · Zielordner · UTF-8 — 1.6.5 (Basis 1.6.4/1.6.3/1.6.2/1.6.1/1.6.0).</p>
 <p><b>Workspace-Layouts:</b> Import-Log Zusammenfassung importiert/übersprungen/umbenannt · kopieren/als TXT · Merge skip/rename · Schema DE — 1.6.5 (Basis 1.6.4/1.6.3/1.6.2/1.6.1/1.6.0).</p>
+<p><b>1.7.3:</b> Präsentation Countdown Pos·Farbe · Favoriten Doppelklick·Esc·leer · Text→PDF öffnen ohne Sidecar·Pfad · Update Offline·Zeitstempel.</p>
 <p><b>1.7.2:</b> Präsentation Pause·Countdown·Intervalle · Favoriten Label·Tab·Dup-Pfad · Text→PDF Ordner·öffnen · Update Status·Offline.</p>
 <p><b>1.7.1:</b> Präsentation Timer·schwarz·Nr. · Favoriten Drag·fehlend·Export · Text→PDF Schrift/Rand·Vorschau · Update Dismiss·Jetzt prüfen.</p>
 <p><b>1.7.0:</b> Präsentation Ann.-Overlay · Lesezeichen-Leiste global · Text→PDF · Update lokal VERSION.</p>

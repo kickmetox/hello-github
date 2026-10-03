@@ -33,11 +33,14 @@ DEFAULTS: dict[str, Any] = {
     "presentation_auto_advance_sec": 0,  # 0=aus, sonst 3|5|10|30 s — 1.7.2
     "presentation_black_background": True,  # schwarzer Präsentations-Hintergrund — 1.7.1
     "presentation_show_page_number": True,  # Seitennummer-Overlay in Präsentation — 1.7.1
+    "presentation_countdown_position": "bottom-right",  # unten-rechts | center — 1.7.3
+    "presentation_countdown_color": "dark",  # hell | dunkel — 1.7.3
     "favorites_bar_visible": True,  # globale Lesezeichen-Leiste — 1.7.0
     "text_pdf_font_size": 11.0,  # Text→PDF Schriftgröße pt — 1.7.1
     "text_pdf_margin": 50.0,  # Text→PDF Rand pt — 1.7.1
     "last_text_pdf_dir": "",  # letzter Zielordner Text→PDF — 1.7.2
     "text_pdf_open_after": False,  # nach Text→PDF optional öffnen — 1.7.2
+    "last_update_check_at": "",  # ISO-Zeitstempel letzter Update-Check — 1.7.3
     "last_export_dir": "",
     "last_ann_export_dir": "",  # letzter Zielordner Ann.-Export JSON — 1.2.1
     "ann_export_filename_template": "{stem}_ann.json",  # Dateiname-Template — 1.2.1
@@ -526,6 +529,69 @@ def get_presentation_show_page_number() -> bool:
 
 def set_presentation_show_page_number(enabled: bool) -> None:
     save_settings({"presentation_show_page_number": bool(enabled)})
+
+
+# Countdown-Overlay Position: unten-rechts | mitte — 1.7.3
+PRESENTATION_COUNTDOWN_POSITION_CHOICES = ("bottom-right", "center")
+PRESENTATION_COUNTDOWN_POSITION_DEFAULT = "bottom-right"
+
+
+def normalize_presentation_countdown_position(position: str | None) -> str:
+    raw = str(position or "").strip().lower()
+    if raw in ("center", "mitte", "middle", "centre"):
+        return "center"
+    if raw in ("bottom-right", "bottom_right", "unten-rechts", "unten_rechts", "br"):
+        return "bottom-right"
+    return PRESENTATION_COUNTDOWN_POSITION_DEFAULT
+
+
+def get_presentation_countdown_position() -> str:
+    """Countdown-Overlay Position: bottom-right | center — 1.7.3."""
+    return normalize_presentation_countdown_position(
+        load_settings().get("presentation_countdown_position")
+    )
+
+
+def set_presentation_countdown_position(position: str) -> str:
+    key = normalize_presentation_countdown_position(position)
+    save_settings({"presentation_countdown_position": key})
+    return key
+
+
+# Countdown-Overlay Farbe: hell | dunkel — 1.7.3
+PRESENTATION_COUNTDOWN_COLOR_CHOICES = ("dark", "light")
+PRESENTATION_COUNTDOWN_COLOR_DEFAULT = "dark"
+
+
+def normalize_presentation_countdown_color(color: str | None) -> str:
+    raw = str(color or "").strip().lower()
+    if raw in ("light", "hell", "white", "weiss", "weiß"):
+        return "light"
+    if raw in ("dark", "dunkel", "black", "schwarz"):
+        return "dark"
+    return PRESENTATION_COUNTDOWN_COLOR_DEFAULT
+
+
+def get_presentation_countdown_color() -> str:
+    """Countdown-Overlay Farbe: dark | light — 1.7.3."""
+    return normalize_presentation_countdown_color(
+        load_settings().get("presentation_countdown_color")
+    )
+
+
+def set_presentation_countdown_color(color: str) -> str:
+    key = normalize_presentation_countdown_color(color)
+    save_settings({"presentation_countdown_color": key})
+    return key
+
+
+def get_last_update_check_at() -> str:
+    """ISO-Zeitstempel des letzten Update-Checks (leer = nie) — 1.7.3."""
+    return str(load_settings().get("last_update_check_at") or "").strip()
+
+
+def set_last_update_check_at(iso_ts: str) -> None:
+    save_settings({"last_update_check_at": str(iso_ts or "").strip()})
 
 
 def get_favorites_bar_visible() -> bool:

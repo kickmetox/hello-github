@@ -7,6 +7,7 @@ import logging
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Literal, Optional
 
@@ -21,7 +22,7 @@ DEFAULT_VERSION_URL = (
     "cursor/instantlensdoc-2108/InstantLensDoc/docs/VERSION"
 )
 
-UpdateStatus = Literal["current", "newer", "unknown"]
+UpdateStatus = Literal["current", "newer", "unknown", "offline"]
 
 
 @dataclass
@@ -33,25 +34,56 @@ class UpdateResult:
     message_de: str
     message_en: str
     reference_source: str = ""  # docs/VERSION | VERSION.txt | remote | none
-    status: UpdateStatus = "unknown"  # aktuell / neuer Build / unbekannt — 1.7.2
+    status: UpdateStatus = "unknown"  # aktuell / neuer Build / offline / unbekannt
+    checked_at: str = ""  # ISO-Zeitstempel letzter Check — 1.7.3
 
     def message(self, lang: str = "de") -> str:
         return self.message_en if str(lang).startswith("en") else self.message_de
 
     def status_label(self, lang: str = "de") -> str:
-        """Kurzstatus: aktuell / neuer Build Hinweis / unbekannt — 1.7.2."""
+        """Kurzstatus inkl. offline / nicht geprüft — 1.7.3."""
         de = {
             "current": "aktuell",
             "newer": "neuer Build Hinweis",
             "unknown": "unbekannt",
+            "offline": "offline / nicht geprüft",
         }
         en = {
             "current": "up to date",
             "newer": "newer build notice",
             "unknown": "unknown",
+            "offline": "offline / not checked",
         }
         table = en if str(lang).startswith("en") else de
         return table.get(self.status, table["unknown"])
+
+
+def _now_iso() -> str:
+    return datetime.now(timezone.utc).astimezone().replace(microsecond=0).isoformat()
+
+
+def _record_check_timestamp(iso_ts: str | None = None) -> str:
+    """Zeitstempel speichern und zurückgeben — 1.7.3."""
+    from instantlensdoc.core.app_settings import set_last_update_check_at
+
+    ts = (iso_ts or _now_iso()).strip()
+    try:
+        set_last_update_check_at(ts)
+    except Exception:
+        pass
+    return ts
+
+
+def format_checked_at(iso_ts: str | None, *, lang: str = "de") -> str:
+    """Lesbarer Zeitstempel für Status/Dialog — 1.7.3."""
+    raw = str(iso_ts or "").strip()
+    if not raw:
+        return "nie" if not str(lang).startswith("en") else "never"
+    try:
+        dt = datetime.fromisoformat(raw)
+        return dt.strftime("%d.%m.%Y %H:%M:%S")
+    except ValueError:
+        return raw
 
 
 def _parse_version_from_init(text: str) -> Optional[str]:
@@ -128,12 +160,20 @@ def read_reference_version() -> tuple[Optional[str], str]:
     return ver, label
 
 
-def check_local_version() -> UpdateResult:
+def check_local_version(*, record_timestamp: bool = False) -> UpdateResult:
     """
     Lokaler Versionsvergleich gegen docs/VERSION oder eingebettete VERSION.txt.
     Nur Hinweis — kein Download.
     """
+    from instantlensdoc.core.app_settings import get_last_update_check_at
+
     local = __version__
+    checked = _record_check_timestamp() if record_timestamp else get_last_update_check_at()
+    checked_fmt_de = format_checked_at(checked, lang="de")
+    checked_fmt_en = format_checked_at(checked, lang="en")
+    ts_note_de = f" Letzter Check: {checked_fmt_de}."
+    ts_note_en = f" Last check: {checked_fmt_en}."
+
     ref, source = read_reference_version()
     if not ref:
         return UpdateResult(
@@ -142,13 +182,16 @@ def check_local_version() -> UpdateResult:
             online=False,
             newer_available=False,
             status="unknown",
+            checked_at=checked,
             message_de=(
                 f"Status: unbekannt — lokal {local}, keine Referenzdatei "
                 f"(docs/VERSION / VERSION.txt) (nur Hinweis, kein Download)."
+                f"{ts_note_de}"
             ),
             message_en=(
                 f"Status: unknown — local {local}, no reference file "
                 f"(docs/VERSION / VERSION.txt) (hint only, no download)."
+                f"{ts_note_en}"
             ),
             reference_source="none",
         )
@@ -158,32 +201,33 @@ def check_local_version() -> UpdateResult:
         status: UpdateStatus = "newer"
         msg_de = (
             f"Status: neuer Build Hinweis — installiert {local}, "
-            f"Referenz {ref} ({source}). Kein Auto-Download."
+            f"Referenz {ref} ({source}). Kein Auto-Download.{ts_note_de}"
         )
         msg_en = (
             f"Status: newer build notice — installed {local}, "
-            f"reference {ref} ({source}). No auto-download."
+            f"reference {ref} ({source}). No auto-download.{ts_note_en}"
         )
     elif older:
         status = "current"
         msg_de = (
             f"Status: aktuell — lokal {local} ist neuer als Referenz {ref} "
-            f"({source}) (nur Hinweis)."
+            f"({source}) (nur Hinweis).{ts_note_de}"
         )
         msg_en = (
             f"Status: up to date — local {local} is newer than reference {ref} "
-            f"({source}) (hint only)."
+            f"({source}) (hint only).{ts_note_en}"
         )
     else:
         status = "current"
-        msg_de = f"Status: aktuell — {local} (entspricht {source})."
-        msg_en = f"Status: up to date — {local} (matches {source})."
+        msg_de = f"Status: aktuell — {local} (entspricht {source}).{ts_note_de}"
+        msg_en = f"Status: up to date — {local} (matches {source}).{ts_note_en}"
     return UpdateResult(
         local_version=local,
         remote_version=ref,
         online=False,
         newer_available=newer,
         status=status,
+        checked_at=checked,
         message_de=msg_de,
         message_en=msg_en,
         reference_source=source,
@@ -199,11 +243,45 @@ def check_for_updates(
     """
     Primär: lokaler Vergleich gegen docs/VERSION / VERSION.txt (kein Download).
     Optional: Online-Vergleich gegen Remote-VERSION (nur Hinweis).
-    Offline-Fallback ohne Fehler — 1.7.2.
+    Offline → Status „offline / nicht geprüft“ + Zeitstempel — 1.7.3.
     """
-    local_result = check_local_version()
+    checked = _record_check_timestamp()
+    checked_fmt_de = format_checked_at(checked, lang="de")
+    checked_fmt_en = format_checked_at(checked, lang="en")
+    local_result = check_local_version(record_timestamp=False)
+    # Zeitstempel aus diesem Lauf übernehmen
+    local_result = UpdateResult(
+        local_version=local_result.local_version,
+        remote_version=local_result.remote_version,
+        online=local_result.online,
+        newer_available=local_result.newer_available,
+        status=local_result.status,
+        checked_at=checked,
+        message_de=local_result.message_de,
+        message_en=local_result.message_en,
+        reference_source=local_result.reference_source,
+    )
     if not allow_network:
-        return local_result
+        # Kein Online-Versuch → offline / nicht geprüft — 1.7.3
+        return UpdateResult(
+            local_version=local_result.local_version,
+            remote_version=local_result.remote_version,
+            online=False,
+            newer_available=local_result.newer_available,
+            status="offline",
+            checked_at=checked,
+            message_de=(
+                f"Status: offline / nicht geprüft — lokal {local_result.local_version} "
+                f"({local_result.reference_source or '—'}). "
+                f"Online nicht geprüft. Letzter Check: {checked_fmt_de}."
+            ),
+            message_en=(
+                f"Status: offline / not checked — local {local_result.local_version} "
+                f"({local_result.reference_source or '—'}). "
+                f"Online not checked. Last check: {checked_fmt_en}."
+            ),
+            reference_source=local_result.reference_source,
+        )
 
     # Online nur ergänzend — bei Erfolg Remote bevorzugen wenn lesbar
     local = __version__
@@ -220,8 +298,15 @@ def check_for_updates(
                 online=True,
                 newer_available=local_result.newer_available,
                 status=local_result.status,
-                message_de=local_result.message_de + " Online: Version nicht lesbar.",
-                message_en=local_result.message_en + " Online: could not parse version.",
+                checked_at=checked,
+                message_de=(
+                    local_result.message_de
+                    + f" Online: Version nicht lesbar. Letzter Check: {checked_fmt_de}."
+                ),
+                message_en=(
+                    local_result.message_en
+                    + f" Online: could not parse version. Last check: {checked_fmt_en}."
+                ),
                 reference_source=local_result.reference_source,
             )
         newer = _cmp_tuple(remote) > _cmp_tuple(local)
@@ -229,31 +314,33 @@ def check_for_updates(
             status: UpdateStatus = "newer"
             msg_de = (
                 f"Status: neuer Build Hinweis — lokal {local} → remote {remote} "
-                f"(kein Auto-Download)."
+                f"(kein Auto-Download). Letzter Check: {checked_fmt_de}."
             )
             msg_en = (
                 f"Status: newer build notice — local {local} → remote {remote} "
-                f"(no auto-download)."
+                f"(no auto-download). Last check: {checked_fmt_en}."
             )
         elif remote == local:
             status = "current"
             msg_de = (
                 f"Status: aktuell — {local} "
-                f"(entspricht Remote; lokal {local_result.reference_source or '—'})."
+                f"(entspricht Remote; lokal {local_result.reference_source or '—'}). "
+                f"Letzter Check: {checked_fmt_de}."
             )
             msg_en = (
                 f"Status: up to date — {local} "
-                f"(matches remote; local {local_result.reference_source or '—'})."
+                f"(matches remote; local {local_result.reference_source or '—'}). "
+                f"Last check: {checked_fmt_en}."
             )
         else:
             status = "current"
             msg_de = (
                 f"Status: aktuell — lokal {local} ist neuer/anders als Remote {remote} "
-                f"(nur Hinweis)."
+                f"(nur Hinweis). Letzter Check: {checked_fmt_de}."
             )
             msg_en = (
                 f"Status: up to date — local {local} is newer/different than remote "
-                f"{remote} (hint only)."
+                f"{remote} (hint only). Last check: {checked_fmt_en}."
             )
         return UpdateResult(
             local_version=local,
@@ -261,22 +348,30 @@ def check_for_updates(
             online=True,
             newer_available=newer,
             status=status,
+            checked_at=checked,
             message_de=msg_de,
             message_en=msg_en,
             reference_source="remote",
         )
     except (urllib.error.URLError, TimeoutError, OSError, json.JSONDecodeError, ValueError) as e:
-        # Offline-Fallback: lokal behalten, kein Fehlerdialog / kein Raise — 1.7.2
+        # Offline-Fallback: Status offline / nicht geprüft + Zeitstempel — 1.7.3
         _log.debug("Update online fehlgeschlagen (offline OK): %s", e)
-        offline_note_de = " Offline: lokaler Vergleich (kein Fehler)."
-        offline_note_en = " Offline: local comparison (no error)."
         return UpdateResult(
             local_version=local_result.local_version,
             remote_version=local_result.remote_version,
             online=False,
             newer_available=local_result.newer_available,
-            status=local_result.status,
-            message_de=local_result.message_de + offline_note_de,
-            message_en=local_result.message_en + offline_note_en,
+            status="offline",
+            checked_at=checked,
+            message_de=(
+                f"Status: offline / nicht geprüft — lokal {local_result.local_version} "
+                f"({local_result.reference_source or '—'}). "
+                f"Online nicht erreichbar (kein Fehler). Letzter Check: {checked_fmt_de}."
+            ),
+            message_en=(
+                f"Status: offline / not checked — local {local_result.local_version} "
+                f"({local_result.reference_source or '—'}). "
+                f"Online unreachable (no error). Last check: {checked_fmt_en}."
+            ),
             reference_source=local_result.reference_source,
         )
