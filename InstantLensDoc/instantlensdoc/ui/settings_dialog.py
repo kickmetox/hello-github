@@ -240,6 +240,8 @@ from instantlensdoc.core.app_settings import (
     set_theme,
     set_ui_lang,
     set_update_check_on_start,
+    get_crypto_reload_prefill_password,
+    set_crypto_reload_prefill_password,
 )
 from instantlensdoc.core.i18n import sync_from_settings, tr
 from instantlensdoc.core.ocr import LANG_PRESETS, OCR_DPI_CHOICES
@@ -1156,6 +1158,26 @@ class SettingsDialog(QDialog):
         open_row.addWidget(btn_o)
         form.addRow(tr("open_dir"), open_row)
 
+        # Crypto Prefill — Warnhinweis wenn an; Passwort nie in Logs — 1.6.3
+        self.crypto_prefill = QCheckBox(
+            "Passwort beim Neu-Laden vorausfüllen (unsicher)"
+        )
+        self.crypto_prefill.setChecked(bool(get_crypto_reload_prefill_password()))
+        self.crypto_prefill.setToolTip(
+            "Speichert das Passwort nur kurz im Speicher für den Reload-Dialog. "
+            "Unsicher — Standard aus. Passwort erscheint nie in Logs. — 1.6.3"
+        )
+        form.addRow(self.crypto_prefill)
+        self.crypto_prefill_warn = QLabel(
+            "Warnung: Prefill ist aktiv — Passwort bleibt kurz im Speicher "
+            "(nicht in Settings/Logs). Nur auf vertrauenswürdigen Geräten nutzen."
+        )
+        self.crypto_prefill_warn.setWordWrap(True)
+        self.crypto_prefill_warn.setStyleSheet("color:#c62828; font-weight:600;")
+        self.crypto_prefill_warn.setVisible(self.crypto_prefill.isChecked())
+        self.crypto_prefill.toggled.connect(self.crypto_prefill_warn.setVisible)
+        form.addRow(self.crypto_prefill_warn)
+
         layout.addLayout(form)
 
         tb_group = QGroupBox("PDF-Toolbar — Gruppen ein-/ausblenden")
@@ -1849,6 +1871,7 @@ class SettingsDialog(QDialog):
         set_ui_lang(str(self.ui_lang.currentData() or "de"))
         sync_from_settings()
         set_update_check_on_start(self.update_chk.isChecked())
+        set_crypto_reload_prefill_password(self.crypto_prefill.isChecked())
         set_default_zoom_mode(str(self.zoom_mode.currentData() or DEFAULT_ZOOM_MODE_PERCENT))
         set_default_zoom_percent(int(self.zoom_pct.value()))
         set_pdf_thumbnail_scale(float(self.thumb_scale.currentData() or 0.18))

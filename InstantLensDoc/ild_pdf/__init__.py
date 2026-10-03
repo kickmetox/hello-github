@@ -99,6 +99,7 @@ from .watermark import (
     apply_page_numbers,
     apply_watermark,
     format_watermark_output_path,
+    preview_watermark_output_filename,
     render_watermark_preview,
 )
 from .doc_stats import (
@@ -241,6 +242,7 @@ __all__ = [
     "apply_image_watermark",
     "apply_page_numbers",
     "format_watermark_output_path",
+    "preview_watermark_output_filename",
     "render_watermark_preview",
     "STATS_SCHEMA_ID",
     "STATS_VERSION",
@@ -284,4 +286,4 @@ __all__ = [
     "uri_link_at",
 ]
 
-__version__ = "1.6.2"
+__version__ = "1.6.3"

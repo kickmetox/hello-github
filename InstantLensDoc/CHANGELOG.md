@@ -1,5 +1,23 @@
 # Changelog — InstantLens Doc
 
+## 1.6.3 — WM Bake Teilergebnis·Template-Live-Vorschau, Crypto Prefill-Warnung·keine PW-Logs, Stats Zielordner·UTF-8, Layouts Merge/Ersetzen·Schema DE
+
+Post-Release-Polish nach 1.6.2: **Wasserzeichen-Bake Abbruch** mit **Teilergebnis-Hinweis** (X/Y Seiten gespeichert) und **Template Live-Vorschau Dateiname**; **Crypto-Prefill** **Warnhinweis in Settings** wenn an, **Passwort nie in Logs**; **Dokument-Statistik JSON** **Zielordner merken**, Encoding **UTF-8 ohne BOM**; **Layouts-Import** Dialog **Merge vs. Ersetzen**, **ungültiges Schema klar DE**. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### PDF
+- Wasserzeichen: Bake-Abbruch → Teilergebnis-Hinweis; Template Live-Vorschau Dateiname
+- Verschlüsseln/Entschlüsseln: Prefill-Warnhinweis in Settings wenn an; Passwort nie in Logs
+- Dokument-Statistik: JSON-Export Zielordner merken; UTF-8 ohne BOM (`ildstats-v1`)
+
+### UI / Workspace
+- Workspace-Layouts: Import-Dialog Merge vs. Ersetzen; ungültiges Schema klar DE (`ildlayouts-v1`)
+
+### Packaging / Docs
+- Version **1.6.3** (App / `ild_pdf` / ISS / Smoke / Docs)
+- Smoke: WM Teilergebnis·Live-Vorschau, Crypto Settings-Warn·Redact, Stats Zielordner·no-BOM, Layouts Merge/Replace·Schema-DE (CLI + Qt)
+
+---
+
 ## 1.6.2 — Wasserzeichen Bake Fortschritt·Abbruch·Template, Crypto Prefill·PW-Fehler, Stats Copy·ildstats-v1, Layouts Export/Import·Duplikate
 
 Post-Release-Polish nach 1.6.1: **Wasserzeichen-Bake** mit **Fortschritt + Abbruch** und **Ausgabe-Pfad-Template** in Settings (`{stem}_wm`); **Crypto-Reload** optional **Passwort vorausfüllen** (unsicher, default aus) und klarer **DE-Fehler bei falschem Passwort**; **Dokument-Statistik** **Copy-as-Text** + Export JSON **`ildstats-v1`**; **Workspace-Layouts** Export/Import JSON **`ildlayouts-v1`**, **Duplikat-Namen ablehnen**. Stubs KI/Cloud/Stylus/3D bleiben Stubs.

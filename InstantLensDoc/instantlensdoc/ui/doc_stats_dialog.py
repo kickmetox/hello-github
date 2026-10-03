@@ -1,4 +1,4 @@
-"""Panel/Dialog: Dokument-Statistik (Seiten, Wörter, Ann., Dateigröße) — 1.6.2."""
+"""Panel/Dialog: Dokument-Statistik (Seiten, Wörter, Ann., Dateigröße) — 1.6.3."""
 
 from __future__ import annotations
 
@@ -26,8 +26,8 @@ from ild_pdf.doc_stats import (
 )
 from instantlensdoc.core.app_settings import (
     dialog_start_dir,
-    get_last_export_dir,
-    set_last_export_dir,
+    get_last_stats_export_dir,
+    set_last_stats_export_dir,
 )
 
 
@@ -52,7 +52,8 @@ class DocStatsDialog(QDialog):
 
         layout = QVBoxLayout(self)
         self.hint = QLabel(
-            "Seiten · Wörter (Text-PDF) · Annotationen · Dateigröße — Copy/JSON 1.6.2"
+            "Seiten · Wörter (Text-PDF) · Annotationen · Dateigröße — "
+            "Copy/JSON ildstats-v1 UTF-8 (ohne BOM) · Zielordner merken — 1.6.3"
         )
         self.hint.setWordWrap(True)
         self.hint.setStyleSheet("color:#555;")
@@ -88,7 +89,9 @@ class DocStatsDialog(QDialog):
         self.btn_copy.clicked.connect(self.copy_as_text)
         btn_row.addWidget(self.btn_copy)
         self.btn_export = QPushButton("JSON exportieren…")
-        self.btn_export.setToolTip("Export als ildstats-v1 JSON — 1.6.2")
+        self.btn_export.setToolTip(
+            "Export als ildstats-v1 JSON (UTF-8, ohne BOM); Zielordner merken — 1.6.3"
+        )
         self.btn_export.clicked.connect(self.export_json)
         btn_row.addWidget(self.btn_export)
         layout.addLayout(btn_row)
@@ -153,13 +156,16 @@ class DocStatsDialog(QDialog):
         return True
 
     def export_json(self) -> Path | None:
-        """Statistik als ildstats-v1 JSON speichern — 1.6.2."""
+        """Statistik als ildstats-v1 JSON speichern; Zielordner merken — 1.6.3."""
         stats = self._last_stats or self.refresh()
         if stats is None:
             QMessageBox.information(self, "Dokument-Statistik", "Keine Statistik verfügbar.")
             return None
         stem = Path(stats.path).stem or "document"
-        start = dialog_start_dir(get_last_export_dir(), Path(stats.path).parent)
+        start = dialog_start_dir(
+            get_last_stats_export_dir(),
+            Path(stats.path).parent,
+        )
         path, _ = QFileDialog.getSaveFileName(
             self,
             "Statistik exportieren (ildstats-v1)",
@@ -169,12 +175,13 @@ class DocStatsDialog(QDialog):
         if not path:
             return None
         try:
+            # JSON UTF-8 ohne BOM (BOM nicht nötig) — 1.6.3
             out = export_document_stats_json(stats, path)
-            set_last_export_dir(Path(out).parent)
+            set_last_stats_export_dir(Path(out).parent)
             QMessageBox.information(
                 self,
                 "Dokument-Statistik",
-                f"Exportiert (ildstats-v1):\n{out}",
+                f"Exportiert (ildstats-v1, UTF-8):\n{out}",
             )
             return out
         except Exception as e:

@@ -187,8 +187,8 @@ HELP_HTML = f"""
     Flatten/Bake mit Fortschrittsdialog (Abbrechen);
     <b>Signaturfeld</b> (Platzhalter) und <b>Signatur (Bild)</b> Mausrad-Zoom + Esc + Aspect-Lock + Flatten — 1.5.3;
     <b>PDFs zusammenführen / teilen / Seitenbereich</b>;
-    <b>Wasserzeichen / Seitennummern</b> Bake Fortschritt·Abbruch·Template · Settings·Range — 1.6.2;
-    <b>PDF verschlüsseln/entschlüsseln</b> Prefill·PW-Fehler DE · <b>Dokument-Statistik</b> Copy·ildstats-v1 · <b>Workspace-Layouts</b> Export/Import·Duplikate — 1.6.2;
+    <b>Wasserzeichen / Seitennummern</b> Bake Teilergebnis·Template-Live-Vorschau — 1.6.3;
+    <b>PDF verschlüsseln/entschlüsseln</b> Prefill-Warnung Settings · PW nie in Logs · <b>Dokument-Statistik</b> Zielordner·UTF-8 · <b>Workspace-Layouts</b> Merge/Ersetzen·Schema DE — 1.6.3;
     <b>Zwei PDFs vergleichen</b> (Seite neben Seite);
     <b>Passwort setzen/öffnen</b>; <b>Bildkompression</b> (Seiten neu als JPEG);
     <b>Metadaten bearbeiten</b> Toast-Klick nur wenn Dialog zu · sonst Fokus/raise · Backup <code>.ildbak</code> — 1.5.5; <b>PDF bereinigen</b> (optional Metadaten strippen);
@@ -702,7 +702,7 @@ class AboutDialog(QDialog):
             "<li>PDF lesen/annotieren (Highlight, Notiz, Stempel, Formen) · Sidecar v4</li>"
             "<li><b>Metadaten Toast Fokus/raise · Seiten→Bilder Filter-Badge · Signatur Zoom Settings·Reset · CLI</b> "
             "<code>--list-pages --json</code> · <code>--export-page</code> · Exit 0/1/2 · "
-            "Wasserzeichen Bake progress·template · Encrypt Prefill·PW-DE · Doc-Stats Copy·ildstats-v1 · Layouts Export/Import — 1.6.2</li>"
+            "Wasserzeichen Bake Teilergebnis·Live-Vorschau · Encrypt Prefill-Warn·no-PW-Logs · Doc-Stats Zielordner·UTF-8 · Layouts Merge/Ersetzen·Schema-DE — 1.6.3</li>"
             "<li><b>Theme zyklisch</b> <code>Ctrl+Shift+T</code> "
             "System→Hell→Dunkel (Status-Toast „Theme: …“) — 1.4.5</li>"
             "<li>Willkommen Drag&amp;Drop/Clear-Recent, Druck-DPI 72/150/300, Trial-Resttage konsistent, Backup-Retry — 1.0.2</li>"

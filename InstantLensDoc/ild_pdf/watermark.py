@@ -1,4 +1,4 @@
-"""Wasserzeichen und Seitennummer-Stempel in PDF (pikepdf Content-Stream) — 1.6.2."""
+"""Wasserzeichen und Seitennummer-Stempel in PDF (pikepdf Content-Stream) — 1.6.3."""
 
 from __future__ import annotations
 
@@ -15,7 +15,25 @@ DEFAULT_WATERMARK_OUTPUT_TEMPLATE = "{stem}_wm"
 
 
 class WatermarkBakeCancelled(Exception):
-    """Bake durch on_progress abgebrochen — 1.6.2."""
+    """
+    Bake durch on_progress abgebrochen — 1.6.2/1.6.3.
+    Bei bereits fertigen Seiten: Teilergebnis in ``partial_path`` (done/total).
+    """
+
+    def __init__(
+        self,
+        message: str = "Wasserzeichen-Bake abgebrochen.",
+        *,
+        done: int = 0,
+        total: int = 0,
+        partial_path: str | Path | None = None,
+    ):
+        super().__init__(message)
+        self.done = int(done)
+        self.total = int(total)
+        self.partial_path: Path | None = (
+            Path(partial_path) if partial_path is not None else None
+        )
 
 
 def format_watermark_output_path(
@@ -25,7 +43,7 @@ def format_watermark_output_path(
     inplace: bool = False,
 ) -> Path:
     """
-    Ausgabe-Pfad aus Template (Settings), Default ``{stem}_wm.pdf`` — 1.6.2.
+    Ausgabe-Pfad aus Template (Settings), Default ``{stem}_wm.pdf`` — 1.6.2/1.6.3.
     Platzhalter: ``{stem}``, ``{name}`` (Dateiname ohne Suffix), ``{suffix}``.
     """
     pdf_path = Path(pdf_path)
@@ -45,6 +63,16 @@ def format_watermark_output_path(
     if not rendered.lower().endswith(".pdf"):
         rendered = f"{rendered}{pdf_path.suffix or '.pdf'}"
     return pdf_path.with_name(rendered)
+
+
+def preview_watermark_output_filename(
+    template: str | None = None,
+    *,
+    sample_stem: str = "dokument",
+) -> str:
+    """Live-Vorschau Dateiname aus Template (Beispiel-Stem) — 1.6.3."""
+    fake = Path(f"{sample_stem}.pdf")
+    return format_watermark_output_path(fake, template, inplace=False).name
 
 
 def _pdf_escape(text: str) -> str:
@@ -165,7 +193,8 @@ def apply_watermark(
     Schreibt ein Text-Wasserzeichen auf ausgewählte Seiten.
     placement: ``diagonal`` (Winkel) oder ``center`` (horizontal zentriert).
     Koordinaten: Seitenmitte; Bake in ``out_path`` (Default: neues ``*_wm.pdf``).
-    on_progress: optional ``(current_1based, total) -> bool``; False = Abbruch — 1.6.2.
+    on_progress: optional ``(current_1based, total) -> bool``; False = Abbruch.
+    Abbruch mit fertigen Seiten speichert Teilergebnis (1.6.3).
     """
     import pikepdf
 
@@ -185,6 +214,7 @@ def apply_watermark(
         rad = math.radians(angle)
         cos_a = math.cos(rad)
         sin_a = math.sin(rad)
+        done_pages = 0
         for n, i in enumerate(indices, start=1):
             if on_progress is not None:
                 try:
@@ -192,7 +222,16 @@ def apply_watermark(
                 except Exception:
                     cont = True
                 if cont is False:
-                    raise WatermarkBakeCancelled("Wasserzeichen-Bake abgebrochen.")
+                    partial = None
+                    if done_pages > 0:
+                        pdf.save(out_path)
+                        partial = out_path
+                    raise WatermarkBakeCancelled(
+                        "Wasserzeichen-Bake abgebrochen.",
+                        done=done_pages,
+                        total=total,
+                        partial_path=partial,
+                    )
             page = pdf.pages[i]
             mediabox = page.mediabox
             page_w = float(mediabox[2] - mediabox[0])
@@ -217,6 +256,7 @@ def apply_watermark(
                 "Q",
             ]
             _append_content(page, pdf, "\n".join(parts).encode("latin-1", errors="replace"))
+            done_pages = n
         pdf.save(out_path)
     return out_path
 
@@ -236,7 +276,8 @@ def apply_image_watermark(
     """
     Bild-Wasserzeichen diagonal oder zentriert auf den Seitenbereich bakken.
     scale: Anteil der kürzeren Seitenkante (0.1–1.0). Default-Out: ``*_wm.pdf``.
-    on_progress: optional ``(current_1based, total) -> bool``; False = Abbruch — 1.6.2.
+    on_progress: optional ``(current_1based, total) -> bool``; False = Abbruch.
+    Abbruch mit fertigen Seiten speichert Teilergebnis (1.6.3).
     """
     import pikepdf
 
@@ -261,6 +302,7 @@ def apply_image_watermark(
         rad = math.radians(angle)
         cos_a = math.cos(rad)
         sin_a = math.sin(rad)
+        done_pages = 0
         for n, i in enumerate(indices, start=1):
             if on_progress is not None:
                 try:
@@ -268,7 +310,16 @@ def apply_image_watermark(
                 except Exception:
                     cont = True
                 if cont is False:
-                    raise WatermarkBakeCancelled("Wasserzeichen-Bake abgebrochen.")
+                    partial = None
+                    if done_pages > 0:
+                        pdf.save(out_path)
+                        partial = out_path
+                    raise WatermarkBakeCancelled(
+                        "Wasserzeichen-Bake abgebrochen.",
+                        done=done_pages,
+                        total=total,
+                        partial_path=partial,
+                    )
             page = pdf.pages[i]
             mediabox = page.mediabox
             page_w = float(mediabox[2] - mediabox[0])
@@ -293,6 +344,7 @@ def apply_image_watermark(
                 "Q",
             ]
             _append_content(page, pdf, "\n".join(parts).encode("latin-1", errors="replace"))
+            done_pages = n
         pdf.save(out_path)
     return out_path
 

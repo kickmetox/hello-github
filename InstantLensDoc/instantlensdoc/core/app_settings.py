@@ -73,6 +73,7 @@ DEFAULTS: dict[str, Any] = {
     "default_workspace_layout": "",  # Name des Default-Layouts — 1.6.1
     "watermark_output_template": "{stem}_wm",  # Bake-Ausgabe-Template — 1.6.2
     "crypto_reload_prefill_password": False,  # PW vorausfüllen (unsicher) — 1.6.2
+    "last_stats_export_dir": "",  # letzter Zielordner Stats-JSON — 1.6.3
     "last_watermark_text": "VERTRAULICH",  # zuletzt WM-Text — 1.6.1
     "last_watermark_image": "",  # zuletzt WM-Bild — 1.6.1
     "last_watermark_opacity": 0.25,  # WM Deckkraft Settings — 1.6.1
@@ -1350,15 +1351,32 @@ def set_watermark_output_template(template: str) -> str:
 
 
 def get_crypto_reload_prefill_password() -> bool:
-    """Passwort beim Crypto-Reload vorausfüllen (unsicher, default aus) — 1.6.2."""
+    """Passwort beim Crypto-Reload vorausfüllen (unsicher, default aus) — 1.6.2/1.6.3."""
     return bool(load_settings().get("crypto_reload_prefill_password", False))
 
 
 def set_crypto_reload_prefill_password(enabled: bool) -> bool:
-    """Toggle Crypto-Reload-Prefill speichern — 1.6.2."""
+    """Toggle Crypto-Reload-Prefill speichern — 1.6.2/1.6.3. Passwort nie in Settings/Logs."""
     val = bool(enabled)
     save_settings({"crypto_reload_prefill_password": val})
     return val
+
+
+def get_last_stats_export_dir() -> Path | None:
+    """Letzter Zielordner für Dokument-Statistik JSON — 1.6.3."""
+    raw = str(load_settings().get("last_stats_export_dir") or "").strip()
+    if not raw:
+        return None
+    p = Path(raw)
+    return p if p.is_dir() else None
+
+
+def set_last_stats_export_dir(path: str | Path) -> None:
+    """Zielordner Stats-JSON merken — 1.6.3."""
+    p = Path(path)
+    if p.is_file():
+        p = p.parent
+    save_settings({"last_stats_export_dir": str(p)})
 
 
 def _normalize_workspace_layout(raw: object) -> dict | None:
@@ -1549,7 +1567,7 @@ def delete_workspace_layout(name: str) -> bool:
 
 
 class LayoutsImportError(ValueError):
-    """Ungültiges oder konfliktbehaftetes ildlayouts-v1 JSON — 1.6.2."""
+    """Ungültiges oder konfliktbehaftetes ildlayouts-v1 JSON — 1.6.2/1.6.3."""
 
 
 def export_workspace_layouts_dict() -> dict:
@@ -1581,28 +1599,43 @@ def import_workspace_layouts_dict(
     merge: bool = True,
 ) -> list[dict]:
     """
-    Layouts aus Dict übernehmen (ildlayouts-v1) — 1.6.2.
-    Duplikat-Namen (intern oder gegen bestehende bei merge) werden abgelehnt.
+    Layouts aus Dict übernehmen (ildlayouts-v1) — 1.6.2/1.6.3.
+    merge=True: anhängen (Duplikate abgelehnt); merge=False: ersetzen.
+    Ungültiges Schema: klare DE-Meldung.
     """
     if not isinstance(data, dict):
-        raise LayoutsImportError("Ungültiges Layout-JSON (kein Objekt).")
-    schema = data.get("schema")
-    if schema is not None and str(schema) != LAYOUTS_SCHEMA_ID:
         raise LayoutsImportError(
-            f"Inkompatibles Schema „{schema}“ — erwartet „{LAYOUTS_SCHEMA_ID}“."
+            "Ungültiges Layout-JSON: erwartet ein Objekt mit Schema "
+            f"„{LAYOUTS_SCHEMA_ID}“."
+        )
+    schema = data.get("schema")
+    if schema is None or str(schema).strip() == "":
+        raise LayoutsImportError(
+            f"Ungültiges Schema — Feld „schema“ fehlt. "
+            f"Erwartet wird „{LAYOUTS_SCHEMA_ID}“."
+        )
+    if str(schema) != LAYOUTS_SCHEMA_ID:
+        raise LayoutsImportError(
+            f"Ungültiges Schema — erwartet „{LAYOUTS_SCHEMA_ID}“, "
+            f"erhalten „{schema}“."
         )
     ver = data.get("version", LAYOUTS_VERSION)
     try:
         ver_i = int(ver)
     except (TypeError, ValueError) as e:
-        raise LayoutsImportError(f"Ungültige Version {ver!r}.") from e
+        raise LayoutsImportError(
+            f"Ungültige Version {ver!r} — erwartet {LAYOUTS_VERSION}."
+        ) from e
     if ver_i != LAYOUTS_VERSION:
         raise LayoutsImportError(
-            f"Inkompatible Version {ver_i} — erwartet {LAYOUTS_VERSION}."
+            f"Inkompatible Version {ver_i} — erwartet {LAYOUTS_VERSION} "
+            f"(Schema „{LAYOUTS_SCHEMA_ID}“)."
         )
     raw_list = data.get("layouts")
     if not isinstance(raw_list, list):
-        raise LayoutsImportError("Feld „layouts“ fehlt oder ist keine Liste.")
+        raise LayoutsImportError(
+            "Ungültiges Schema/Inhalt: Feld „layouts“ fehlt oder ist keine Liste."
+        )
     incoming: list[dict] = []
     seen: set[str] = set()
     for item in raw_list:
@@ -1619,14 +1652,15 @@ def import_workspace_layouts_dict(
     if not incoming:
         raise LayoutsImportError("Keine gültigen Layouts im Import.")
     existing = get_workspace_layouts()
-    existing_keys = {str(p["name"]).casefold() for p in existing}
-    for layout in incoming:
-        key = str(layout["name"]).casefold()
-        if key in existing_keys:
-            raise LayoutsImportError(f"Name bereits vergeben: {layout['name']}")
     if merge:
+        existing_keys = {str(p["name"]).casefold() for p in existing}
+        for layout in incoming:
+            key = str(layout["name"]).casefold()
+            if key in existing_keys:
+                raise LayoutsImportError(f"Name bereits vergeben: {layout['name']}")
         combined = incoming + existing
     else:
+        # Ersetzen: bestehende Layouts verwerfen — 1.6.3
         combined = list(incoming)
     if len(combined) > WORKSPACE_LAYOUTS_MAX:
         raise LayoutsImportError(
@@ -1637,6 +1671,8 @@ def import_workspace_layouts_dict(
     if default:
         if any(str(p["name"]).casefold() == default.casefold() for p in combined):
             patch["default_workspace_layout"] = default
+    elif not merge:
+        patch["default_workspace_layout"] = ""
     save_settings(patch)
     return get_workspace_layouts()
 
@@ -1646,7 +1682,7 @@ def import_workspace_layouts_json(
     *,
     merge: bool = True,
 ) -> list[dict]:
-    """Workspace-Layouts aus JSON laden (ildlayouts-v1) — 1.6.2."""
+    """Workspace-Layouts aus JSON laden (ildlayouts-v1) — 1.6.2/1.6.3."""
     import json
 
     path = Path(path)
@@ -1655,7 +1691,10 @@ def import_workspace_layouts_json(
     except Exception as e:
         raise LayoutsImportError(f"JSON lesen fehlgeschlagen: {e}") from e
     if not isinstance(data, dict):
-        raise LayoutsImportError("Ungültiges Layout-JSON (kein Objekt).")
+        raise LayoutsImportError(
+            "Ungültiges Layout-JSON: erwartet ein Objekt mit Schema "
+            f"„{LAYOUTS_SCHEMA_ID}“."
+        )
     return import_workspace_layouts_dict(data, merge=merge)
 
 

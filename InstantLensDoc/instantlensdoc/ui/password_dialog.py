@@ -1,4 +1,4 @@
-"""Dialog: PDF-Passwort setzen / entfernen / öffnen — 1.6.2."""
+"""Dialog: PDF-Passwort setzen / entfernen / öffnen — 1.6.3."""
 
 from __future__ import annotations
 
@@ -91,7 +91,7 @@ class SetPasswordDialog(QDialog):
         self.prefill_reload.setChecked(bool(get_crypto_reload_prefill_password()))
         self.prefill_reload.setToolTip(
             "Speichert das Passwort kurz für den Reload-Dialog. "
-            "Unsicher — Standard aus. — 1.6.2"
+            "Unsicher — Standard aus. Passwort nie in Logs. — 1.6.3"
         )
         layout.addWidget(self.prefill_reload)
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)

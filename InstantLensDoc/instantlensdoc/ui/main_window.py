@@ -139,7 +139,7 @@ class MainWindow(QMainWindow):
         self._ann_search_dialog: AnnotationSearchDialog | None = None
         self._doc_stats_dialog: DocStatsDialog | None = None
         self._workspace_layout_menu = None
-        self._crypto_reload_prefill: str | None = None  # unsicher, Toggle — 1.6.2
+        self._crypto_reload_prefill: str | None = None  # unsicher, Toggle; nie loggen — 1.6.3
         self._autosave_enabled = bool(get_autosave_enabled())
         self._thumb_lazy_timer: QTimer | None = None
         self._thumb_lazy_queue: list[int] = []
@@ -7126,7 +7126,8 @@ class MainWindow(QMainWindow):
         menu.addAction(act_export)
         act_import = QAction("Layouts importieren…", self)
         act_import.setToolTip(
-            "Layouts aus ildlayouts-v1 JSON; Duplikat-Namen abgelehnt — 1.6.2"
+            "Layouts aus ildlayouts-v1 JSON; Dialog Merge vs. Ersetzen; "
+            "ungültiges Schema klar DE — 1.6.3"
         )
         act_import.triggered.connect(self._import_workspace_layouts)
         menu.addAction(act_import)
@@ -7247,7 +7248,7 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Workspace-Layout", str(e))
 
     def _import_workspace_layouts(self):
-        """Layouts aus ildlayouts-v1 JSON importieren; Duplikate abgelehnt — 1.6.2."""
+        """Layouts aus ildlayouts-v1 JSON: Merge vs. Ersetzen; Schema klar DE — 1.6.3."""
         from pathlib import Path as _Path
 
         from instantlensdoc.core.app_settings import (
@@ -7267,15 +7268,28 @@ class MainWindow(QMainWindow):
         )
         if not path:
             return
+        reply = QMessageBox.question(
+            self,
+            "Layouts importieren",
+            "Vorhandene Layouts ersetzen?\n"
+            "„Ja“ = Ersetzen (alle aktuellen Layouts werden verworfen).\n"
+            "„Nein“ = Zusammenführen/Merge (Duplikat-Namen abgelehnt).",
+            QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel,
+            QMessageBox.No,
+        )
+        if reply == QMessageBox.Cancel:
+            return
+        merge = reply == QMessageBox.No
         try:
-            layouts = import_workspace_layouts_json(path, merge=True)
+            layouts = import_workspace_layouts_json(path, merge=merge)
             set_last_export_dir(_Path(path).parent)
             self._refresh_workspace_layout_menu()
-            self._set_status(f"Layouts importiert: {len(layouts)}")
+            mode = "Merge" if merge else "Ersetzen"
+            self._set_status(f"Layouts importiert ({mode}): {len(layouts)}")
             QMessageBox.information(
                 self,
                 "Workspace-Layout",
-                f"{len(layouts)} Layout(s) geladen (ildlayouts-v1).",
+                f"{len(layouts)} Layout(s) geladen (ildlayouts-v1, {mode}).",
             )
         except LayoutsImportError as e:
             QMessageBox.warning(self, "Workspace-Layout", str(e))

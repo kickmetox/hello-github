@@ -1,4 +1,4 @@
-"""Dialog: Wasserzeichen (Text/Bild, Settings, Seitenbereich, Vorschau, Bake) — 1.6.2."""
+"""Dialog: Wasserzeichen (Text/Bild, Settings, Seitenbereich, Vorschau, Bake) — 1.6.3."""
 
 from __future__ import annotations
 
@@ -35,6 +35,7 @@ from ild_pdf.watermark import (
     apply_page_numbers,
     apply_watermark,
     format_watermark_output_path,
+    preview_watermark_output_filename,
     render_watermark_preview,
 )
 from instantlensdoc.core.app_settings import (
@@ -191,14 +192,24 @@ class WatermarkDialog(QDialog):
             )
         )
 
-        # Ausgabe-Pfad Template Settings — 1.6.2
+        # Ausgabe-Pfad Template Settings — 1.6.2/1.6.3
         self.wm_out_tpl = QLineEdit(get_watermark_output_template())
         self.wm_out_tpl.setPlaceholderText("{stem}_wm")
         self.wm_out_tpl.setToolTip(
             "Ausgabe-Pfad-Template (Settings): {stem} → Dateiname ohne Endung. "
-            "Beispiel: {stem}_wm → dok_wm.pdf — 1.6.2"
+            "Beispiel: {stem}_wm → dok_wm.pdf — 1.6.2/1.6.3"
         )
         form.addRow("Ausgabe-Template", self.wm_out_tpl)
+        self.wm_out_preview = QLabel("")
+        self.wm_out_preview.setWordWrap(True)
+        self.wm_out_preview.setStyleSheet("color:#555;")
+        self.wm_out_preview.setToolTip(
+            "Live-Vorschau Dateiname (Beispiel stem=dokument) — 1.6.3"
+        )
+        form.addRow("Vorschau Dateiname", self.wm_out_preview)
+        self.wm_out_tpl.textChanged.connect(self._update_wm_out_preview)
+        self.wm_src.textChanged.connect(self._update_wm_out_preview)
+        self._update_wm_out_preview()
 
         self.wm_inplace = QCheckBox("Original überschreiben")
         self.wm_inplace.setChecked(False)
@@ -212,7 +223,8 @@ class WatermarkDialog(QDialog):
         form.addRow(btn_prev)
         run = QPushButton("Wasserzeichen in PDF bakken")
         run.setToolTip(
-            "Bake mit Fortschritt/Abbruch; Settings merken — 1.6.2"
+            "Bake mit Fortschritt/Abbruch; Teilergebnis bei Abbruch; "
+            "Template Live-Vorschau — 1.6.3"
         )
         run.clicked.connect(self._run_wm)
         form.addRow(run)
@@ -260,6 +272,23 @@ class WatermarkDialog(QDialog):
     def _placement(self) -> str:
         data = self.wm_placement.currentData()
         return str(data or "diagonal")
+
+    def _update_wm_out_preview(self, *_args) -> None:
+        """Live-Vorschau Ausgabe-Dateiname aus Template — 1.6.3."""
+        if not hasattr(self, "wm_out_preview"):
+            return
+        src = (self.wm_src.text().strip() if hasattr(self, "wm_src") else "") or ""
+        sample = Path(src).stem if src else "dokument"
+        try:
+            name = preview_watermark_output_filename(
+                self.wm_out_tpl.text().strip(),
+                sample_stem=sample or "dokument",
+            )
+            self.wm_out_preview.setText(f"→ {name}")
+            self.wm_out_preview.setStyleSheet("color:#555;")
+        except Exception as e:
+            self.wm_out_preview.setText(f"Ungültiges Template: {e}")
+            self.wm_out_preview.setStyleSheet("color:#c62828;")
 
     def _persist_wm_settings(self) -> None:
         set_last_watermark_settings(
@@ -441,13 +470,24 @@ class WatermarkDialog(QDialog):
                 "Wasserzeichen",
                 f"Gebacken / gespeichert:\n{out}",
             )
-        except WatermarkBakeCancelled:
+        except WatermarkBakeCancelled as e:
             prog.close()
-            QMessageBox.information(
-                self,
-                "Wasserzeichen",
-                "Bake abgebrochen — keine Ausgabedatei geschrieben.",
-            )
+            # Teilergebnis-Hinweis — 1.6.3
+            if e.partial_path is not None and Path(e.partial_path).is_file():
+                self.result_path = str(e.partial_path)
+                QMessageBox.information(
+                    self,
+                    "Wasserzeichen",
+                    f"Bake abgebrochen — Teilergebnis "
+                    f"({e.done}/{e.total} Seiten) gespeichert:\n{e.partial_path}",
+                )
+            else:
+                QMessageBox.information(
+                    self,
+                    "Wasserzeichen",
+                    "Bake abgebrochen — kein Teilergebnis "
+                    "(noch keine Seite fertig).",
+                )
         except Exception as e:
             prog.close()
             QMessageBox.critical(self, "Wasserzeichen", str(e))

@@ -1,4 +1,4 @@
-"""Dokument-Statistik: Seiten, Wörter, Annotationen, Dateigröße — 1.6.2."""
+"""Dokument-Statistik: Seiten, Wörter, Annotationen, Dateigröße — 1.6.3."""
 
 from __future__ import annotations
 
@@ -126,11 +126,14 @@ def export_document_stats_json(
     stats: DocumentStats,
     path: str | Path,
 ) -> Path:
-    """Dokument-Statistik als ildstats-v1 JSON schreiben — 1.6.2."""
+    """
+    Dokument-Statistik als ildstats-v1 JSON schreiben — 1.6.2/1.6.3.
+    Encoding: UTF-8 ohne BOM (BOM nicht nötig für JSON).
+    """
     path = Path(path)
     path.write_text(
         json.dumps(stats.to_export_dict(), ensure_ascii=False, indent=2) + "\n",
-        encoding="utf-8",
+        encoding="utf-8",  # kein utf-8-sig — BOM nicht nötig
     )
     return path
 

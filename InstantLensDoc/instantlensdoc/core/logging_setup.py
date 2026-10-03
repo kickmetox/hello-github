@@ -1,14 +1,55 @@
-"""Datei-Logging unter %APPDATA%/InstantLensDoc (bzw. XDG_CONFIG_HOME)."""
+"""Datei-Logging unter %APPDATA%/InstantLensDoc (bzw. XDG_CONFIG_HOME) — 1.6.3."""
 
 from __future__ import annotations
 
 import logging
+import re
 import sys
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from typing import Optional
 
 _CONFIGURED = False
+
+# Passwort/Geheimnisse nie in Logs — 1.6.3
+_SECRET_PATTERNS = (
+    re.compile(r"(?i)(password|passwd|passwort|prefill)\s*[=:]\s*\S+"),
+    re.compile(r"(?i)(user_password|owner_password)\s*[=:]\s*\S+"),
+    re.compile(r"(?i)(_crypto_reload_prefill)\s*[=:]\s*\S+"),
+)
+
+
+def redact_secrets(text: str) -> str:
+    """Entfernt Passwort-/Geheimnis-Werte aus Logtext — 1.6.3."""
+    if not text:
+        return text
+    out = str(text)
+    for pat in _SECRET_PATTERNS:
+        out = pat.sub(lambda m: f"{m.group(1)}=***", out)
+    return out
+
+
+class _SecretRedactFilter(logging.Filter):
+    """Filter: Passwörter nie in Logs schreiben — 1.6.3."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        try:
+            if isinstance(record.msg, str):
+                record.msg = redact_secrets(record.msg)
+            if record.args:
+                if isinstance(record.args, dict):
+                    record.args = {
+                        k: redact_secrets(str(v)) if isinstance(v, str) else v
+                        for k, v in record.args.items()
+                    }
+                elif isinstance(record.args, tuple):
+                    record.args = tuple(
+                        redact_secrets(a) if isinstance(a, str) else a
+                        for a in record.args
+                    )
+        except Exception:
+            pass
+        return True
 
 
 def log_dir() -> Path:
@@ -102,6 +143,7 @@ def setup_logging(*, level: int = logging.INFO, force: bool = False) -> Path:
     Konfiguriert Root-Logger einmalig:
     - Rotierende Datei in config_dir()/logs/instantlensdoc.log
     - Kurz auf stderr (Warnungen+)
+    - Passwort-Redaction-Filter (nie Passwort in Logs) — 1.6.3
     """
     global _CONFIGURED
     path = log_file()
@@ -118,6 +160,7 @@ def setup_logging(*, level: int = logging.INFO, force: bool = False) -> Path:
         "%(asctime)s [%(levelname)s] %(name)s: %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
     )
+    redact = _SecretRedactFilter()
     fh = RotatingFileHandler(
         path,
         maxBytes=1_500_000,
@@ -126,12 +169,17 @@ def setup_logging(*, level: int = logging.INFO, force: bool = False) -> Path:
     )
     fh.setLevel(level)
     fh.setFormatter(fmt)
+    fh.addFilter(redact)
     root.addHandler(fh)
 
     sh = logging.StreamHandler(sys.stderr)
     sh.setLevel(logging.WARNING)
     sh.setFormatter(fmt)
+    sh.addFilter(redact)
     root.addHandler(sh)
+
+    # Auch am Logger selbst, falls Handler später hinzukommen
+    root.addFilter(redact)
 
     _CONFIGURED = True
     logging.getLogger("instantlensdoc").info("Logging gestartet → %s", path)
