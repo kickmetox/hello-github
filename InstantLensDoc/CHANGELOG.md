@@ -1,5 +1,27 @@
 # Changelog — InstantLens Doc
 
+## 1.4.1 — PDF-Diff Sync/Schwelle/PNG, Rename Dry-Run·Kollision·Undo, Ann.-Suche Klick·Case/Regex, Theme live
+
+Post-Release-Polish nach 1.4.0: **PDF-Vergleich** Seitenwahl **Sync/Entkoppelt** (Settings), **Diff-Schwelle** in Settings/Dialog, **Diff-Overlay als PNG** exportieren; **Batch-Umbenennen** mit **Dry-Run-Liste**, **Kollisionswarnung** und **Undo-Log** der alten Namen; **Annotation-Suche** Treffer **klickbar** (Doc+Seite), Toggles **Case** und **Regex**; **System-Theme** bei OS-Wechsel **live nachziehen** wenn „folgen“ aktiv. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### PDF
+- Vergleich: Seiten Sync/Entkoppelt; Diff-Schwelle Settings; Diff-PNG-Export
+
+### Dateien / Tabs
+- Batch-Umbenennen: Dry-Run-Liste speichern; Kollisionswarnung; Undo-Log (`ildrename-undo-v1`)
+
+### Annotationen
+- Suche offene Docs: Treffer klickbar (Doc+Seite); Case- und Regex-Toggles
+
+### UI / Theme
+- System folgen: live bei OS-`colorSchemeChanged`
+
+### Packaging / Docs
+- Version **1.4.1** (App / `ild_pdf` / ISS / Smoke / Docs)
+- Smoke: PDF-Diff Sync/Schwelle/PNG, Rename Dry-Run·Kollision·Undo, Ann. Klick·Case/Regex, Theme live (CLI + Qt)
+
+---
+
 ## 1.4.0 — PDF-Vergleich Raster-Diff, Batch-Umbenennen, Annotation-Suche offen, Theme System+Override
 
 Minor-Release nach 1.3.6: **PDF-Vergleich** Seite-für-Seite mit **Raster-Diff Overlay** (Magenta) und grober **Ähnlichkeit in Prozent**; **Batch-Umbenennen** offener Tabs/Dateiliste mit Template **`{stem}_{n}`** und Live-Vorschau (Sidecars mitumbenennen); **Annotation-Suche** Volltext über Sidecar-Notizen/Highlights quer durch geöffnete Docs; **Dark/Light** mit **System-Theme folgen** und manuellem Override. Stubs KI/Cloud/Stylus/3D bleiben Stubs.

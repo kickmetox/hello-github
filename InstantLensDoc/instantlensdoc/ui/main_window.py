@@ -98,6 +98,7 @@ from instantlensdoc.ui.settings_dialog import SettingsDialog
 from instantlensdoc.ui.stubs import show_planned
 from instantlensdoc.ui.theme import (
     apply_theme,
+    install_system_theme_watch,
     load_theme_mode,
     resolve_theme,
     set_follow_system,
@@ -171,6 +172,8 @@ class MainWindow(QMainWindow):
         self._update_license_status()
         apply_theme()
         self._sync_theme_menu()
+        # System-Theme live nachziehen wenn „folgen“ aktiv — 1.4.1
+        install_system_theme_watch(self._on_system_theme_live)
         if get_editor_doc_split() and get_editor_doc_split_sync_scroll():
             self._apply_doc_split_sync_scroll()
         self._autosave_timer = QTimer(self)
@@ -1876,7 +1879,8 @@ class MainWindow(QMainWindow):
         self._theme_system_action = QAction("System-Theme folgen", self)
         self._theme_system_action.setCheckable(True)
         self._theme_system_action.setToolTip(
-            "OS Hell/Dunkel folgen; aus = manueller Override — 1.4.0"
+            "OS Hell/Dunkel folgen (live bei OS-Wechsel); "
+            "aus = manueller Override — 1.4.1"
         )
         self._theme_system_action.triggered.connect(self._toggle_follow_system)
         m_view.addAction(self._theme_system_action)
@@ -1906,14 +1910,15 @@ class MainWindow(QMainWindow):
         m_pdf.addAction(act_wm)
         act_cmp = QAction("Zwei PDFs vergleichen…", self)
         act_cmp.setToolTip(
-            "Seite-für-Seite + Raster-Diff Overlay und Ähnlichkeit % — 1.4.0"
+            "Seite-für-Seite + Raster-Diff; Sync/Entkoppelt, Diff-Schwelle, "
+            "PNG-Export — 1.4.1"
         )
         act_cmp.triggered.connect(self._compare_pdfs)
         m_pdf.addAction(act_cmp)
         act_ann_search = QAction("Annotation-Suche (offene Docs)…", self)
         act_ann_search.setShortcut(QKeySequence("Ctrl+Shift+F3"))
         act_ann_search.setToolTip(
-            "Volltext Sidecar-Notizen/Highlights quer durch offene Docs — 1.4.0"
+            "Volltext Sidecar; Treffer klickbar (Doc+Seite); Case/Regex — 1.4.1"
         )
         act_ann_search.triggered.connect(self._annotation_search_open_docs)
         m_pdf.addAction(act_ann_search)
@@ -2087,7 +2092,7 @@ class MainWindow(QMainWindow):
         m_extra.addAction(a)
         a = QAction("Batch-Umbenennen (offene Tabs)…", self)
         a.setToolTip(
-            "Offene Tabs mit Template {stem}_{n} umbenennen inkl. Vorschau — 1.4.0"
+            "Offene Tabs Template {stem}_{n}; Dry-Run, Kollision, Undo-Log — 1.4.1"
         )
         a.triggered.connect(self._batch_rename_tabs)
         m_extra.addAction(a)
@@ -4600,7 +4605,7 @@ class MainWindow(QMainWindow):
                 )
 
     def _toggle_follow_system(self, checked: bool = False):
-        """System-Theme folgen Toggle — 1.4.0."""
+        """System-Theme folgen Toggle — 1.4.0/1.4.1 live."""
         follow = bool(checked) if isinstance(checked, bool) else (
             self._theme_system_action.isChecked()
             if getattr(self, "_theme_system_action", None)
@@ -4609,7 +4614,7 @@ class MainWindow(QMainWindow):
         resolved = set_follow_system(follow)
         self._sync_theme_menu()
         self._set_status(
-            "Theme: System folgen" if follow else (
+            "Theme: System folgen (live)" if follow else (
                 "Dunkles Design" if resolved == "dark" else "Helles Design"
             )
         )
@@ -4617,6 +4622,14 @@ class MainWindow(QMainWindow):
             self._save_session()
         except Exception:
             pass
+
+    def _on_system_theme_live(self, resolved: str = "") -> None:
+        """Callback: OS-Theme gewechselt bei aktivem „folgen“ — 1.4.1."""
+        self._sync_theme_menu()
+        mode = resolved or resolve_theme()
+        self._set_status(
+            f"Theme: System → {'Dunkel' if mode == 'dark' else 'Hell'} (live) — 1.4.1"
+        )
 
     def _toggle_theme(self):
         mode = toggle_theme(self)
@@ -7549,7 +7562,7 @@ class MainWindow(QMainWindow):
         except Exception:
             pass
         self._refresh_document_dirty_labels()
-        self._set_status(f"Batch-Umbenennen: {len(dlg.renamed)} Datei(en) — 1.4.0")
+        self._set_status(f"Batch-Umbenennen: {len(dlg.renamed)} Datei(en) — 1.4.1")
 
     def _annotation_search_open_docs(self):
         """Volltext Sidecar-Notizen/Highlights über offene Docs — 1.4.0."""
@@ -7564,7 +7577,7 @@ class MainWindow(QMainWindow):
         self._ann_search_dialog.activateWindow()
 
     def _on_ann_search_hit(self, path: str, page: int, ann_id: str = "") -> None:
-        """Treffer aus Annotation-Suche → Doc öffnen + Seite — 1.4.0."""
+        """Treffer aus Annotation-Suche → Doc öffnen + Seite — 1.4.1."""
         if not path:
             return
         try:
@@ -7575,7 +7588,7 @@ class MainWindow(QMainWindow):
             else:
                 self.pdf_view.page_index = int(page)
             self._set_status(
-                f"Annotation-Treffer: {Path(path).name} S.{int(page) + 1} — 1.4.0"
+                f"Annotation-Treffer: {Path(path).name} S.{int(page) + 1} — 1.4.1"
             )
         except Exception as e:
             self._set_status(f"Annotation-Suche Sprung fehlgeschlagen: {e}")

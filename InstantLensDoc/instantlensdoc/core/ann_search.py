@@ -1,7 +1,8 @@
-"""Annotation-Volltextsuche über Sidecar-Notizen/Highlights geöffneter Docs — 1.4.0."""
+"""Annotation-Volltextsuche über Sidecar-Notizen/Highlights geöffneter Docs — 1.4.1."""
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Sequence
@@ -24,20 +25,91 @@ def _sidecar_for_pdf(pdf_path: Path) -> Path:
     return pdf_path.with_suffix(pdf_path.suffix + ".ildann.json")
 
 
+def _match_blob(
+    blob: str,
+    query: str,
+    *,
+    case_sensitive: bool,
+    use_regex: bool,
+) -> bool:
+    if use_regex:
+        flags = 0 if case_sensitive else re.IGNORECASE
+        try:
+            return re.search(query, blob, flags) is not None
+        except re.error:
+            return False
+    if case_sensitive:
+        return query in blob
+    return query.casefold() in blob.casefold()
+
+
+def _make_snippet(
+    text: str,
+    tags_s: str,
+    typ: str,
+    query: str,
+    *,
+    case_sensitive: bool,
+    use_regex: bool,
+) -> str:
+    """Snippet um den Match herum."""
+    candidates = [text, tags_s, typ]
+    src = text or tags_s or typ
+    for cand in candidates:
+        if cand and _match_blob(
+            cand, query, case_sensitive=case_sensitive, use_regex=use_regex
+        ):
+            src = cand
+            break
+    snip = src.replace("\n", " ").strip()
+    if len(snip) <= 100:
+        return snip or query
+    # Fenster um Match
+    pos = -1
+    if use_regex:
+        flags = 0 if case_sensitive else re.IGNORECASE
+        try:
+            m = re.search(query, snip, flags)
+            if m:
+                pos = m.start()
+        except re.error:
+            pos = -1
+    else:
+        hay = snip if case_sensitive else snip.casefold()
+        needle = query if case_sensitive else query.casefold()
+        pos = hay.find(needle)
+    if pos >= 0:
+        start = max(0, pos - 30)
+        snip = ("…" if start else "") + snip[start : start + 90]
+        if start + 90 < len(src):
+            snip += "…"
+    else:
+        snip = snip[:97] + "…"
+    return snip
+
+
 def search_annotations_in_paths(
     paths: Sequence[str],
     query: str,
     *,
     max_hits: int = 300,
+    case_sensitive: bool = False,
+    use_regex: bool = False,
 ) -> List[AnnSearchHit]:
     """
     Volltext über *.ildann.json Sidecars (Notizen, Highlights, Tags, Typ)
     quer durch die gelisteten Dokumente (typisch: offene Tabs).
+    case_sensitive / use_regex — 1.4.1.
     """
     q = (query or "").strip()
     if not q:
         return []
-    ql = q.casefold()
+    if use_regex:
+        flags = 0 if case_sensitive else re.IGNORECASE
+        try:
+            re.compile(q, flags)
+        except re.error:
+            return []  # ungültiges Regex → keine Treffer (UI zeigt Hinweis)
     hits: List[AnnSearchHit] = []
     seen_pdf: set[str] = set()
 
@@ -78,21 +150,18 @@ def search_annotations_in_paths(
                 getattr(a, "type", "") or ""
             )
             blob = f"{text}\n{tags_s}\n{typ}"
-            if ql not in blob.casefold():
+            if not _match_blob(
+                blob, q, case_sensitive=case_sensitive, use_regex=use_regex
+            ):
                 continue
-            # Snippet: Text bevorzugen, sonst Tags
-            src = text if ql in text.casefold() else (tags_s if ql in tags_s.casefold() else typ)
-            snip = src.replace("\n", " ").strip()
-            if len(snip) > 100:
-                # grobes Fenster um Match
-                pos = snip.casefold().find(ql)
-                if pos >= 0:
-                    start = max(0, pos - 30)
-                    snip = ("…" if start else "") + snip[start : start + 90]
-                    if start + 90 < len(src):
-                        snip += "…"
-                else:
-                    snip = snip[:97] + "…"
+            snip = _make_snippet(
+                text,
+                tags_s,
+                typ,
+                q,
+                case_sensitive=case_sensitive,
+                use_regex=use_regex,
+            )
             hits.append(
                 AnnSearchHit(
                     path=str(pdf),

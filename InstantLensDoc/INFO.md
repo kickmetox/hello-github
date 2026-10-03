@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **1.4.0** |
+| Version | **1.4.1** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -63,10 +63,10 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an / `checkedonce`)
 
-## Neu in 1.4.0
+## Neu in 1.4.1
 
-- PDF-Vergleich: Seite-für-Seite mit **Raster-Diff Overlay** + grobe **Ähnlichkeit %**
-- Batch-Umbenennen: offene Tabs mit Template **`{stem}_{n}`** und Live-Vorschau
-- Annotation-Suche: Volltext Sidecar-Notizen/Highlights quer durch **offene Docs**
-- Theme: **System folgen** Toggle + manuell Hell/Dunkel Override
+- PDF-Vergleich: **Seiten Sync/Entkoppelt**, Diff-**Schwelle** Settings, Diff-**PNG-Export**
+- Batch-Umbenennen: **Dry-Run-Liste**, **Kollisionswarnung**, **Undo-Log** alter Namen
+- Annotation-Suche: Treffer **klickbar** (Doc+Seite); **Case/Regex** Toggles
+- Theme: System folgen **live bei OS-Wechsel**
 - Stubs KI/Cloud/Stylus/3D unverändert

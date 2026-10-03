@@ -1,4 +1,4 @@
-"""Raster-Diff zweier PDF-Seiten (PIL) + grobe Ähnlichkeit in Prozent — 1.4.0."""
+"""Raster-Diff zweier PDF-Seiten (PIL) + grobe Ähnlichkeit in Prozent — 1.4.0/1.4.1."""
 
 from __future__ import annotations
 

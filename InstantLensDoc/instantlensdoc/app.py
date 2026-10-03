@@ -92,12 +92,14 @@ def main(argv: list[str] | None = None) -> int:
     from instantlensdoc.license import LicenseManager
     from instantlensdoc.ui.deps_dialog import show_startup_dependency_dialog
     from instantlensdoc.ui.main_window import MainWindow
-    from instantlensdoc.ui.theme import apply_theme
+    from instantlensdoc.ui.theme import apply_theme, install_system_theme_watch
 
     log_path = setup_logging()
 
     app = QApplication(argv)
     apply_theme(app)
+    # OS-Theme-Wechsel live nachziehen wenn „System folgen“ — 1.4.1
+    install_system_theme_watch()
     app.setApplicationName(DISPLAY_NAME)
     app.setApplicationVersion(__version__)
     app.setOrganizationName("Andreas Meyer")

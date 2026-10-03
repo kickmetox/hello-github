@@ -1,9 +1,11 @@
-"""Batch-Umbenennen offener Tabs: Template {stem}_{n} + Vorschau — 1.4.0."""
+"""Batch-Umbenennen offener Tabs: Template {stem}_{n} + Vorschau — 1.4.1."""
 
 from __future__ import annotations
 
+import json
 import re
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable, List, Sequence
 
@@ -22,6 +24,35 @@ class RenamePreviewItem:
     new_path: str
     skipped: bool = False
     reason: str = ""
+    collision: bool = False  # Kollision in Liste oder Zieldatei — 1.4.1
+
+
+@dataclass
+class RenameUndoEntry:
+    """Ein Eintrag im Undo-Log (alter → neuer Name)."""
+
+    old_path: str
+    new_path: str
+    old_name: str = ""
+    new_name: str = ""
+
+
+@dataclass
+class RenameUndoLog:
+    """Undo-Log nach erfolgreichem Batch-Rename — 1.4.1."""
+
+    created: str
+    template: str
+    entries: List[RenameUndoEntry] = field(default_factory=list)
+
+    def to_dict(self) -> dict:
+        return {
+            "schema": "ildrename-undo-v1",
+            "version": 1,
+            "created": self.created,
+            "template": self.template,
+            "entries": [asdict(e) for e in self.entries],
+        }
 
 
 def apply_rename_template(
@@ -63,7 +94,7 @@ def preview_batch_rename(
     *,
     start_index: int = 1,
 ) -> List[RenamePreviewItem]:
-    """Vorschau für offene Tabs / Dateiliste; Index ab start_index."""
+    """Vorschau / Dry-Run-Liste für offene Tabs; Index ab start_index — 1.4.1."""
     items: List[RenamePreviewItem] = []
     seen_targets: set[str] = set()
     n = max(0, int(start_index))
@@ -72,7 +103,6 @@ def preview_batch_rename(
         if not raw:
             continue
         if not p.is_file() and not p.exists():
-            # Auch nicht-existente offene Tabs listen (z. B. neu)
             stem, ext = p.stem, p.suffix
         else:
             stem, ext = p.stem, p.suffix
@@ -83,6 +113,7 @@ def preview_batch_rename(
         new_path = str(p.with_name(new_name))
         skipped = False
         reason = ""
+        collision = False
         key = new_path.casefold()
         if new_name == p.name:
             skipped = True
@@ -90,11 +121,13 @@ def preview_batch_rename(
         elif key in seen_targets:
             skipped = True
             reason = "Kollision in Liste"
+            collision = True
         elif Path(new_path).exists() and Path(new_path).resolve() != (
             p.resolve() if p.exists() else Path(new_path)
         ):
             skipped = True
             reason = "Zieldatei existiert"
+            collision = True
         else:
             seen_targets.add(key)
         items.append(
@@ -104,9 +137,56 @@ def preview_batch_rename(
                 new_path=new_path,
                 skipped=skipped,
                 reason=reason,
+                collision=collision,
             )
         )
     return items
+
+
+def count_collisions(items: Sequence[RenamePreviewItem]) -> int:
+    """Anzahl Kollisionswarnungen in der Vorschau — 1.4.1."""
+    return sum(1 for it in items if it.collision)
+
+
+def format_dry_run_list(items: Sequence[RenamePreviewItem]) -> str:
+    """Dry-Run-Liste als Klartext (alt → neu) — 1.4.1."""
+    lines = ["# InstantLens Doc Batch-Rename Dry-Run", ""]
+    for it in items:
+        name = Path(it.old_path).name
+        flag = f"  [{it.reason}]" if it.skipped else ""
+        lines.append(f"{name}  →  {it.new_name}{flag}")
+    ok_n = sum(1 for it in items if not it.skipped)
+    col_n = count_collisions(items)
+    lines.append("")
+    lines.append(f"# {ok_n}/{len(items)} würden umbenannt; Kollisionen: {col_n}")
+    return "\n".join(lines) + "\n"
+
+
+def write_undo_log(
+    entries: Sequence[RenameUndoEntry],
+    *,
+    template: str,
+    path: str | Path | None = None,
+) -> Path:
+    """
+    Schreibt Undo-Log der alten Namen (JSON ildrename-undo-v1) — 1.4.1.
+    Default-Pfad: neben erster neuer Datei bzw. CWD.
+    """
+    created = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    log = RenameUndoLog(created=created, template=template, entries=list(entries))
+    if path is None:
+        if entries:
+            base = Path(entries[0].new_path).parent
+        else:
+            base = Path.cwd()
+        stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        path = base / f"ild-rename-undo-{stamp}.json"
+    out = Path(path)
+    out.write_text(
+        json.dumps(log.to_dict(), indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+    return out
 
 
 def rename_files(

@@ -1,4 +1,4 @@
-"""Zwei PDFs Seite-nebeneinander vergleichen + Raster-Diff Overlay — 1.4.0."""
+"""Zwei PDFs Seite-nebeneinander vergleichen + Raster-Diff Overlay — 1.4.1."""
 
 from __future__ import annotations
 
@@ -18,12 +18,19 @@ from PySide6.QtWidgets import (
     QScrollArea,
     QSpinBox,
     QVBoxLayout,
-    QWidget,
 )
 
 from ild_pdf.diff import raster_diff
 from ild_pdf.limits import clamp_render_scale, inspect_pdf
 from ild_pdf.render import render_page
+from instantlensdoc.core.app_settings import (
+    PDF_COMPARE_DIFF_THRESHOLD_MAX,
+    PDF_COMPARE_DIFF_THRESHOLD_MIN,
+    get_pdf_compare_diff_threshold,
+    get_pdf_compare_page_sync,
+    set_pdf_compare_diff_threshold,
+    set_pdf_compare_page_sync,
+)
 
 
 def _pil_to_qpixmap(img) -> QPixmap:
@@ -53,6 +60,7 @@ class PdfCompareDialog(QDialog):
         self._scale = 1.0
         self._left_img = None
         self._right_img = None
+        self._diff_overlay = None  # PIL Image für PNG-Export — 1.4.1
 
         root = QVBoxLayout(self)
         pick = QHBoxLayout()
@@ -77,15 +85,33 @@ class PdfCompareDialog(QDialog):
         self.spin_right.setMinimum(1)
         self.spin_left.valueChanged.connect(lambda _: self._refresh(side="left"))
         self.spin_right.valueChanged.connect(lambda _: self._refresh(side="right"))
-        self.chk_sync = QPushButton("Seiten synchron")
-        self.chk_sync.setCheckable(True)
-        self.chk_sync.setChecked(True)
+        # Seitenwahl Sync / Entkoppelt — 1.4.1
+        self.chk_sync = QCheckBox("Seiten Sync")
+        self.chk_sync.setChecked(get_pdf_compare_page_sync())
+        self.chk_sync.setToolTip(
+            "An: Seitenwahl gekoppelt (Sync). Aus: Entkoppelt — "
+            "Links/Rechts unabhängig — 1.4.1"
+        )
+        self.chk_sync.toggled.connect(self._on_sync_toggled)
         self.chk_diff = QCheckBox("Raster-Diff Overlay")
         self.chk_diff.setChecked(True)
         self.chk_diff.setToolTip(
-            "Magenta-Overlay der Pixel-Unterschiede + Ähnlichkeit % — 1.4.0"
+            "Magenta-Overlay der Pixel-Unterschiede + Ähnlichkeit % — 1.4.0/1.4.1"
         )
         self.chk_diff.toggled.connect(lambda _: self._refresh())
+        self.spin_threshold = QSpinBox()
+        self.spin_threshold.setRange(
+            PDF_COMPARE_DIFF_THRESHOLD_MIN, PDF_COMPARE_DIFF_THRESHOLD_MAX
+        )
+        self.spin_threshold.setValue(get_pdf_compare_diff_threshold())
+        self.spin_threshold.setToolTip(
+            "Diff-Schwelle 0–255 (Settings); niedriger = empfindlicher — 1.4.1"
+        )
+        self.spin_threshold.valueChanged.connect(self._on_threshold_changed)
+        btn_export = QPushButton("Diff PNG…")
+        btn_export.setToolTip("Aktuelles Diff-Overlay als PNG speichern — 1.4.1")
+        btn_export.clicked.connect(self._export_diff_png)
+        self.btn_export_diff = btn_export
         btn_reload = QPushButton("Aktualisieren")
         btn_reload.clicked.connect(lambda: self._refresh())
         nav.addWidget(QLabel("Links Seite"))
@@ -94,15 +120,23 @@ class PdfCompareDialog(QDialog):
         nav.addWidget(self.spin_right)
         nav.addWidget(self.chk_sync)
         nav.addWidget(self.chk_diff)
+        nav.addWidget(QLabel("Schwelle"))
+        nav.addWidget(self.spin_threshold)
+        nav.addWidget(btn_export)
         nav.addWidget(btn_reload)
         nav.addStretch()
         root.addLayout(nav)
 
         self.lbl_similarity = QLabel("Ähnlichkeit: —")
         self.lbl_similarity.setToolTip(
-            "Grobe Prozent-Ähnlichkeit nach Pixel-Schwellwert — 1.4.0"
+            "Grobe Prozent-Ähnlichkeit nach Pixel-Schwellwert — 1.4.1"
         )
-        root.addWidget(self.lbl_similarity)
+        self.lbl_sync_mode = QLabel("")
+        self._update_sync_label()
+        mode_row = QHBoxLayout()
+        mode_row.addWidget(self.lbl_similarity, 1)
+        mode_row.addWidget(self.lbl_sync_mode)
+        root.addLayout(mode_row)
 
         panes = QHBoxLayout()
         self.view_left = QLabel(alignment=Qt.AlignCenter)
@@ -137,6 +171,56 @@ class PdfCompareDialog(QDialog):
         if self._right:
             self._load_meta(False)
         self._refresh()
+
+    def _update_sync_label(self) -> None:
+        if self.chk_sync.isChecked():
+            self.lbl_sync_mode.setText("Modus: Sync — 1.4.1")
+        else:
+            self.lbl_sync_mode.setText("Modus: Entkoppelt — 1.4.1")
+
+    def _on_sync_toggled(self, checked: bool = False) -> None:
+        set_pdf_compare_page_sync(bool(checked))
+        self._update_sync_label()
+        if checked:
+            # Sofort angleichen
+            self._refresh(side="left")
+        else:
+            self._refresh()
+
+    def _on_threshold_changed(self, value: int = 0) -> None:
+        set_pdf_compare_diff_threshold(int(value))
+        self._refresh()
+
+    def _export_diff_png(self) -> None:
+        """Aktuelles Diff-Overlay als PNG speichern — 1.4.1."""
+        if self._diff_overlay is None:
+            QMessageBox.information(
+                self,
+                "Diff PNG",
+                "Kein Diff-Overlay vorhanden. Raster-Diff aktivieren und PDFs wählen.",
+            )
+            return
+        default = "pdf-diff.png"
+        if self._left and self._right:
+            default = (
+                f"{Path(self._left).stem}_vs_{Path(self._right).stem}"
+                f"_p{self.spin_left.value()}-{self.spin_right.value()}_diff.png"
+            )
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Diff als PNG speichern", default, "PNG (*.png)"
+        )
+        if not path:
+            return
+        try:
+            out = Path(path)
+            if out.suffix.lower() != ".png":
+                out = out.with_suffix(".png")
+            self._diff_overlay.save(str(out), "PNG")
+            QMessageBox.information(
+                self, "Diff PNG", f"Gespeichert:\n{out}"
+            )
+        except Exception as e:
+            QMessageBox.critical(self, "Diff PNG", str(e))
 
     def _pick(self, left: bool):
         path, _ = QFileDialog.getOpenFileName(self, "PDF wählen", "", "PDF (*.pdf)")
@@ -212,38 +296,64 @@ class PdfCompareDialog(QDialog):
     def _refresh(self, side: str | None = None):
         if self.chk_sync.isChecked() and side == "left":
             self.spin_right.blockSignals(True)
-            self.spin_right.setValue(min(self.spin_left.value(), max(self.spin_right.maximum(), 1)))
+            self.spin_right.setValue(
+                min(self.spin_left.value(), max(self.spin_right.maximum(), 1))
+            )
             self.spin_right.blockSignals(False)
         elif self.chk_sync.isChecked() and side == "right":
             self.spin_left.blockSignals(True)
-            self.spin_left.setValue(min(self.spin_right.value(), max(self.spin_left.maximum(), 1)))
+            self.spin_left.setValue(
+                min(self.spin_right.value(), max(self.spin_left.maximum(), 1))
+            )
             self.spin_left.blockSignals(False)
 
         warn_l = warn_r = ""
-        if side in (None, "left"):
-            self._left_img, warn_l = self._render_raw(self._left, self.spin_left.value())
+        if side in (None, "left") or (
+            self.chk_sync.isChecked() and side == "right"
+        ):
+            self._left_img, warn_l = self._render_raw(
+                self._left, self.spin_left.value()
+            )
             self._show_pixmap(self.view_left, self._left_img, warn_l or "Kein PDF")
             if warn_l:
                 self.view_left.setToolTip(warn_l)
-        if side in (None, "right"):
-            self._right_img, warn_r = self._render_raw(self._right, self.spin_right.value())
-            self._show_pixmap(self.view_right, self._right_img, warn_r or "Kein PDF")
+        if side in (None, "right") or (
+            self.chk_sync.isChecked() and side == "left"
+        ):
+            self._right_img, warn_r = self._render_raw(
+                self._right, self.spin_right.value()
+            )
+            self._show_pixmap(
+                self.view_right, self._right_img, warn_r or "Kein PDF"
+            )
             if warn_r:
                 self.view_right.setToolTip(warn_r)
 
-        # Raster-Diff Overlay + Ähnlichkeit — 1.4.0
-        if self.chk_diff.isChecked() and self._left_img is not None and self._right_img is not None:
+        # Raster-Diff Overlay + Ähnlichkeit — 1.4.0/1.4.1
+        self._diff_overlay = None
+        if (
+            self.chk_diff.isChecked()
+            and self._left_img is not None
+            and self._right_img is not None
+        ):
             try:
-                result = raster_diff(self._left_img, self._right_img)
+                thr = int(self.spin_threshold.value())
+                result = raster_diff(
+                    self._left_img, self._right_img, threshold=thr
+                )
+                self._diff_overlay = result.overlay
                 self._show_pixmap(self.view_diff, result.overlay, "Diff")
                 self.lbl_similarity.setText(
                     f"Ähnlichkeit: {result.similarity_percent:.1f} % "
-                    f"({result.different_pixels} / {result.total_pixels} Pixel unterschiedlich) — 1.4.0"
+                    f"({result.different_pixels} / {result.total_pixels} Pixel "
+                    f"unterschiedlich, Schwelle {thr}) — 1.4.1"
                 )
             except Exception as e:
                 self.view_diff.setText(f"Diff-Fehler:\n{e}")
                 self.lbl_similarity.setText("Ähnlichkeit: Fehler")
         else:
             self.view_diff.setPixmap(QPixmap())
-            self.view_diff.setText("Diff aus" if not self.chk_diff.isChecked() else "—")
+            self.view_diff.setText(
+                "Diff aus" if not self.chk_diff.isChecked() else "—"
+            )
             self.lbl_similarity.setText("Ähnlichkeit: —")

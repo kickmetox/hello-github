@@ -146,8 +146,12 @@ from instantlensdoc.core.app_settings import (
     get_sidecar_save_debounce_ms,
     get_status_blink_mode,
     get_tag_rename_confirm_threshold,
+    get_pdf_compare_diff_threshold,
+    get_pdf_compare_page_sync,
     get_theme,
     get_ui_lang,
+    PDF_COMPARE_DIFF_THRESHOLD_MAX,
+    PDF_COMPARE_DIFF_THRESHOLD_MIN,
     get_update_check_on_start,
     get_wizard_completed,
     MERGE_DIFF_MAX_SIDE_MAX,
@@ -231,6 +235,8 @@ from instantlensdoc.core.app_settings import (
     set_sidecar_save_debounce_ms,
     set_status_blink_mode,
     set_tag_rename_confirm_threshold,
+    set_pdf_compare_diff_threshold,
+    set_pdf_compare_page_sync,
     set_theme,
     set_ui_lang,
     set_update_check_on_start,
@@ -1085,6 +1091,26 @@ class SettingsDialog(QDialog):
         )
         form.addRow(self.text_diff_wrap_blink_sound)
 
+        # PDF-Vergleich Raster-Diff — 1.4.1
+        self.pdf_compare_page_sync = QCheckBox("PDF-Vergleich Seiten Sync")
+        self.pdf_compare_page_sync.setChecked(get_pdf_compare_page_sync())
+        self.pdf_compare_page_sync.setToolTip(
+            "Standard: Seitenwahl Sync (an) bzw. Entkoppelt (aus); "
+            "auch im Vergleich-Dialog — 1.4.1"
+        )
+        form.addRow(self.pdf_compare_page_sync)
+        self.pdf_compare_diff_threshold = QSpinBox()
+        self.pdf_compare_diff_threshold.setRange(
+            PDF_COMPARE_DIFF_THRESHOLD_MIN, PDF_COMPARE_DIFF_THRESHOLD_MAX
+        )
+        self.pdf_compare_diff_threshold.setValue(get_pdf_compare_diff_threshold())
+        self.pdf_compare_diff_threshold.setToolTip(
+            "Raster-Diff Pixel-Schwellwert 0–255 "
+            f"(Standard {get_pdf_compare_diff_threshold()}); "
+            "niedriger = empfindlicher — 1.4.1"
+        )
+        form.addRow("PDF-Diff-Schwelle", self.pdf_compare_diff_threshold)
+
         self.jpeg_q = QSpinBox()
         self.jpeg_q.setRange(10, 100)
         self.jpeg_q.setValue(get_export_jpeg_quality())
@@ -1930,6 +1956,12 @@ class SettingsDialog(QDialog):
         if hasattr(self, "text_diff_wrap_blink_sound"):
             set_text_diff_wrap_blink_sound(
                 self.text_diff_wrap_blink_sound.isChecked()
+            )
+        if hasattr(self, "pdf_compare_page_sync"):
+            set_pdf_compare_page_sync(self.pdf_compare_page_sync.isChecked())
+        if hasattr(self, "pdf_compare_diff_threshold"):
+            set_pdf_compare_diff_threshold(
+                int(self.pdf_compare_diff_threshold.value())
             )
         parent = self.parent()
         if parent is not None and hasattr(parent, "_refresh_recent"):

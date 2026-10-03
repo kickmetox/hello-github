@@ -37,6 +37,8 @@ DEFAULTS: dict[str, Any] = {
     "text_diff_wrap_around": True,  # Text-Diff F7 Wrap-around — 1.2.6
     "text_diff_wrap_blink_duration": "kurz",  # Wrap-Blink Dauer kurz|mittel|lang — 1.2.9
     "text_diff_wrap_blink_sound": True,  # Wrap-Blink System-Beep vs. stumm — 1.2.9
+    "pdf_compare_diff_threshold": 18,  # Raster-Diff Pixel-Schwellwert 0–255 — 1.4.1
+    "pdf_compare_page_sync": True,  # Seitenwahl Sync (True) / Entkoppelt (False) — 1.4.1
     "default_zoom_percent": 150,
     "default_zoom_mode": "percent",  # percent | fit_width | fit_page
     "autosave_interval_sec": 60,  # 15 | 30 | 60 | 120 — 0.9.7
@@ -590,6 +592,54 @@ def get_text_diff_wrap_blink_sound() -> bool:
 def set_text_diff_wrap_blink_sound(enabled: bool) -> None:
     """Persistenz Wrap-Blink Sound (System-Beep vs. stumm) — 1.2.9."""
     save_settings({"text_diff_wrap_blink_sound": bool(enabled)})
+
+
+PDF_COMPARE_DIFF_THRESHOLD_DEFAULT = 18
+PDF_COMPARE_DIFF_THRESHOLD_MIN = 0
+PDF_COMPARE_DIFF_THRESHOLD_MAX = 255
+
+
+def get_pdf_compare_diff_threshold() -> int:
+    """Raster-Diff Pixel-Schwellwert (0–255) — 1.4.1."""
+    raw = load_settings().get(
+        "pdf_compare_diff_threshold", DEFAULTS["pdf_compare_diff_threshold"]
+    )
+    try:
+        val = int(raw)
+    except (TypeError, ValueError):
+        val = PDF_COMPARE_DIFF_THRESHOLD_DEFAULT
+    return max(
+        PDF_COMPARE_DIFF_THRESHOLD_MIN,
+        min(val, PDF_COMPARE_DIFF_THRESHOLD_MAX),
+    )
+
+
+def set_pdf_compare_diff_threshold(value: int) -> int:
+    """Persistenz Raster-Diff-Schwelle — 1.4.1."""
+    try:
+        val = int(value)
+    except (TypeError, ValueError):
+        val = PDF_COMPARE_DIFF_THRESHOLD_DEFAULT
+    val = max(
+        PDF_COMPARE_DIFF_THRESHOLD_MIN,
+        min(val, PDF_COMPARE_DIFF_THRESHOLD_MAX),
+    )
+    save_settings({"pdf_compare_diff_threshold": val})
+    return val
+
+
+def get_pdf_compare_page_sync() -> bool:
+    """Seitenwahl Sync (True) vs. Entkoppelt (False) — 1.4.1."""
+    return bool(
+        load_settings().get(
+            "pdf_compare_page_sync", DEFAULTS["pdf_compare_page_sync"]
+        )
+    )
+
+
+def set_pdf_compare_page_sync(enabled: bool) -> None:
+    """Persistenz Seitenwahl Sync/Entkoppelt — 1.4.1."""
+    save_settings({"pdf_compare_page_sync": bool(enabled)})
 
 
 def get_ann_export_filename_template() -> str:

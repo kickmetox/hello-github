@@ -1,8 +1,8 @@
-"""Hell/Dunkel/System-Theme für die Qt-Oberfläche — 1.4.0."""
+"""Hell/Dunkel/System-Theme für die Qt-Oberfläche — 1.4.1 live OS-Wechsel."""
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Callable, Literal
 
 from PySide6.QtWidgets import QApplication, QWidget
 
@@ -39,6 +39,10 @@ QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox {
 QSplitter::handle { background: #444; }
 QLabel { color: #e8e8e8; }
 """
+
+# Callback nach Live-Apply (z. B. Menü sync) — 1.4.1
+_on_system_theme_changed: Callable[[ResolvedTheme], None] | None = None
+_system_watch_installed = False
 
 
 def detect_system_theme() -> ResolvedTheme:
@@ -119,3 +123,44 @@ def set_follow_system(follow: bool) -> ResolvedTheme:
     if follow:
         return apply_theme(mode="system")
     return apply_theme(mode=resolve_theme())
+
+
+def _on_color_scheme_changed(*_args) -> None:
+    """OS-Theme gewechselt → bei „folgen“ live nachziehen — 1.4.1."""
+    if load_theme_mode() != "system":
+        return
+    resolved = apply_theme()  # ohne mode: nicht speichern, nur neu resolven
+    cb = _on_system_theme_changed
+    if cb is not None:
+        try:
+            cb(resolved)
+        except Exception:
+            pass
+
+
+def install_system_theme_watch(
+    on_changed: Callable[[ResolvedTheme], None] | None = None,
+) -> bool:
+    """
+    QStyleHints.colorSchemeChanged → Theme live nachziehen wenn System folgen.
+    Idempotent. Liefert True wenn Signal verbunden — 1.4.1.
+    """
+    global _system_watch_installed, _on_system_theme_changed
+    if on_changed is not None:
+        _on_system_theme_changed = on_changed
+    if _system_watch_installed:
+        return True
+    try:
+        from PySide6.QtGui import QGuiApplication
+
+        app = QGuiApplication.instance()
+        if app is None:
+            return False
+        hints = app.styleHints()
+        if hints is None or not hasattr(hints, "colorSchemeChanged"):
+            return False
+        hints.colorSchemeChanged.connect(_on_color_scheme_changed)
+        _system_watch_installed = True
+        return True
+    except Exception:
+        return False
