@@ -63,7 +63,9 @@ from instantlensdoc.core.app_settings import (
     get_export_pdf_page,
     get_minimize_to_tray,
     get_ocr_attach_errors,
+    get_ocr_dpi,
     get_ocr_lang,
+    get_merge_close_preview_on_edit,
     get_page_size_unit,
     get_pdf_continuous_scroll,
     get_pdf_grayscale,
@@ -142,7 +144,9 @@ from instantlensdoc.core.app_settings import (
     set_minimize_to_tray,
     set_pdf_toolbar_groups,
     set_ocr_attach_errors,
+    set_ocr_dpi,
     set_ocr_lang,
+    set_merge_close_preview_on_edit,
     set_page_size_unit,
     set_pdf_continuous_scroll,
     set_pdf_grayscale,
@@ -171,7 +175,7 @@ from instantlensdoc.core.app_settings import (
     set_update_check_on_start,
 )
 from instantlensdoc.core.i18n import sync_from_settings, tr
-from instantlensdoc.core.ocr import LANG_PRESETS
+from instantlensdoc.core.ocr import LANG_PRESETS, OCR_DPI_CHOICES
 from instantlensdoc.ui.theme import apply_theme
 
 
@@ -206,7 +210,23 @@ class SettingsDialog(QDialog):
             if code == cur_lang:
                 pick = i
         self.lang_combo.setCurrentIndex(pick)
+        self.lang_combo.setToolTip(
+            "OCR-Sprach-Preset als Dialog-Default speichern — 1.1.6"
+        )
         form.addRow(tr("ocr_lang"), self.lang_combo)
+
+        self.ocr_dpi_combo = QComboBox()
+        cur_dpi = get_ocr_dpi()
+        dpi_pick = 0
+        for i, d in enumerate(OCR_DPI_CHOICES):
+            self.ocr_dpi_combo.addItem(f"{d} DPI", int(d))
+            if int(d) == int(cur_dpi):
+                dpi_pick = i
+        self.ocr_dpi_combo.setCurrentIndex(dpi_pick)
+        self.ocr_dpi_combo.setToolTip(
+            "OCR-DPI (150/300) als Dialog-Default speichern — 1.1.6"
+        )
+        form.addRow("OCR-DPI (Standard)", self.ocr_dpi_combo)
 
         self.ocr_attach_errors = QCheckBox("OCR: Fehler anhängen")
         self.ocr_attach_errors.setChecked(get_ocr_attach_errors())
@@ -215,6 +235,16 @@ class SettingsDialog(QDialog):
             "(auch im OCR-Dialog) — 1.1.5"
         )
         form.addRow(self.ocr_attach_errors)
+
+        self.merge_close_preview = QCheckBox(
+            "Zusammenführen: Readonly-Vorschau bei „Zum Bearbeiten öffnen“ schließen"
+        )
+        self.merge_close_preview.setChecked(get_merge_close_preview_on_edit())
+        self.merge_close_preview.setToolTip(
+            "Wenn aktiv: Vorschau-Tab schließen und Datei neu bearbeitbar öffnen; "
+            "sonst Vorschau-Tab in Bearbeiten umschalten — 1.1.6"
+        )
+        form.addRow(self.merge_close_preview)
 
         self.zoom_mode = QComboBox()
         self.zoom_mode.addItem("Prozent", DEFAULT_ZOOM_MODE_PERCENT)
@@ -1371,7 +1401,13 @@ class SettingsDialog(QDialog):
         lang = self.lang_combo.currentData() or "deu+eng"
         set_theme("dark" if theme == "dark" else "light")
         set_ocr_lang(str(lang))
+        try:
+            dpi_val = int(self.ocr_dpi_combo.currentData() or 150)
+        except (TypeError, ValueError):
+            dpi_val = 150
+        set_ocr_dpi(dpi_val)
         set_ocr_attach_errors(self.ocr_attach_errors.isChecked())
+        set_merge_close_preview_on_edit(self.merge_close_preview.isChecked())
         set_ui_lang(str(self.ui_lang.currentData() or "de"))
         sync_from_settings()
         set_update_check_on_start(self.update_chk.isChecked())

@@ -77,6 +77,7 @@ def run_gui(*, days: int | None = None) -> int:
         from PySide6.QtGui import QKeySequence, QShortcut
         from PySide6.QtWidgets import (
             QApplication,
+            QComboBox,
             QFileDialog,
             QHBoxLayout,
             QLabel,
@@ -95,13 +96,17 @@ def run_gui(*, days: int | None = None) -> int:
         print("PySide6 fehlt — pip install PySide6", file=sys.stderr)
         return 1
 
-    REVEAL_AUTO_HIDE_MS = 10_000  # Reveal Auto-Hide — 1.1.5
+    from instantlensdoc.core.app_settings import (
+        KEYGEN_REVEAL_AUTO_HIDE_CHOICES,
+        get_keygen_reveal_auto_hide_sec,
+        set_keygen_reveal_auto_hide_sec,
+    )
 
     class KeygenWindow(QMainWindow):
         def __init__(self):
             super().__init__()
             self.setWindowTitle("InstantLens Doc — Keygenerator")
-            self.resize(560, 480)
+            self.resize(580, 500)
             w = QWidget()
             layout = QVBoxLayout(w)
             layout.addWidget(QLabel("E-Mail:"))
@@ -157,22 +162,46 @@ def run_gui(*, days: int | None = None) -> int:
             self.reveal_check.setCheckable(True)
             self.reveal_check.setChecked(False)
             self.reveal_check.setToolTip(
-                "Keys unmaskiert anzeigen — Auto-Hide nach 10 s; Esc maskiert — 1.1.5"
+                "Keys unmaskiert anzeigen — Auto-Hide (5/10/30 s); Esc maskiert — 1.1.6"
             )
             self.reveal_check.toggled.connect(self._on_reveal_toggled)
+            self.reveal_countdown = QLabel("")
+            self.reveal_countdown.setMinimumWidth(36)
+            self.reveal_countdown.setAlignment(Qt.AlignCenter)
+            self.reveal_countdown.setToolTip(
+                "Countdown bis Auto-Hide (neben Reveal) — 1.1.6"
+            )
+            self.reveal_countdown.setStyleSheet("color: #555; font-variant-numeric: tabular-nums;")
+            hide_row = QHBoxLayout()
+            hide_row.addWidget(QLabel("Auto-Hide:"))
+            self.hide_combo = QComboBox()
+            cur_hide = get_keygen_reveal_auto_hide_sec()
+            hide_pick = 0
+            for i, sec in enumerate(KEYGEN_REVEAL_AUTO_HIDE_CHOICES):
+                self.hide_combo.addItem(f"{sec} s", int(sec))
+                if int(sec) == int(cur_hide):
+                    hide_pick = i
+            self.hide_combo.setCurrentIndex(hide_pick)
+            self.hide_combo.setToolTip(
+                "Reveal Auto-Hide Intervall (Settings: 5 / 10 / 30 s) — 1.1.6"
+            )
+            self.hide_combo.currentIndexChanged.connect(self._on_hide_interval_changed)
+            hide_row.addWidget(self.hide_combo)
             btn_clear = QPushButton("Clear History")
             btn_clear.setToolTip(
                 "Lokale Key-History leeren (keine Secrets in Logs) — 1.1.3"
             )
             btn_clear.clicked.connect(self._clear_history)
             hist_header.addStretch(1)
+            hist_header.addLayout(hide_row)
             hist_header.addWidget(self.reveal_check)
+            hist_header.addWidget(self.reveal_countdown)
             hist_header.addWidget(btn_clear)
             layout.addLayout(hist_header)
             self.history_list = QListWidget()
             self.history_list.setToolTip(
                 "Maskiert (nur letzte 4); Hover/Reveal zeigt Key; "
-                "Reveal Auto-Hide 10 s / Esc; Doppelklick kopiert — 1.1.5"
+                "Reveal Auto-Hide 5/10/30 s / Esc; Doppelklick kopiert — 1.1.6"
             )
             self.history_list.setMaximumHeight(120)
             self.history_list.setMouseTracking(True)
@@ -181,10 +210,13 @@ def run_gui(*, days: int | None = None) -> int:
             self.history_list.viewport().installEventFilter(self)
             layout.addWidget(self.history_list)
             self._history_hover_row = -1
+            self._reveal_remaining = 0
             self._reveal_timer = QTimer(self)
             self._reveal_timer.setSingleShot(True)
-            self._reveal_timer.setInterval(REVEAL_AUTO_HIDE_MS)
             self._reveal_timer.timeout.connect(self._auto_hide_reveal)
+            self._countdown_timer = QTimer(self)
+            self._countdown_timer.setInterval(1000)
+            self._countdown_timer.timeout.connect(self._tick_countdown)
             esc = QShortcut(QKeySequence(Qt.Key_Escape), self)
             esc.setContext(Qt.WindowShortcut)
             esc.activated.connect(self._mask_reveal)
@@ -195,6 +227,57 @@ def run_gui(*, days: int | None = None) -> int:
             self.setCentralWidget(w)
             self._last_days = int(self.days_spin.value())
             self._reload_history()
+            self._update_countdown_label()
+
+        def _hide_seconds(self) -> int:
+            data = self.hide_combo.currentData()
+            try:
+                val = int(data) if data is not None else get_keygen_reveal_auto_hide_sec()
+            except (TypeError, ValueError):
+                val = 10
+            if val not in KEYGEN_REVEAL_AUTO_HIDE_CHOICES:
+                val = 10
+            return val
+
+        def _on_hide_interval_changed(self, *_args) -> None:
+            sec = self._hide_seconds()
+            set_keygen_reveal_auto_hide_sec(sec)
+            if self.reveal_check.isChecked():
+                self._start_reveal_timers(sec)
+                self.statusBar().showMessage(
+                    f"Reveal an — Auto-Hide in {sec} s · Esc maskiert", 2500
+                )
+
+        def _start_reveal_timers(self, sec: int | None = None) -> None:
+            seconds = int(sec if sec is not None else self._hide_seconds())
+            self._reveal_remaining = seconds
+            self._reveal_timer.stop()
+            self._reveal_timer.start(seconds * 1000)
+            self._countdown_timer.start()
+            self._update_countdown_label()
+
+        def _stop_reveal_timers(self) -> None:
+            self._reveal_timer.stop()
+            self._countdown_timer.stop()
+            self._reveal_remaining = 0
+            self._update_countdown_label()
+
+        def _tick_countdown(self) -> None:
+            if not self.reveal_check.isChecked():
+                self._stop_reveal_timers()
+                return
+            self._reveal_remaining = max(0, int(self._reveal_remaining) - 1)
+            self._update_countdown_label()
+            if self._reveal_remaining <= 0:
+                self._countdown_timer.stop()
+
+        def _update_countdown_label(self) -> None:
+            if self.reveal_check.isChecked() and self._reveal_remaining > 0:
+                self.reveal_countdown.setText(f"{self._reveal_remaining}s")
+            elif self.reveal_check.isChecked():
+                self.reveal_countdown.setText("0s")
+            else:
+                self.reveal_countdown.setText("")
 
         def _history_label(self, entry: dict, *, reveal: bool) -> str:
             email = entry.get("email") or "?"
@@ -213,8 +296,8 @@ def run_gui(*, days: int | None = None) -> int:
                 item = QListWidgetItem(label)
                 item.setData(Qt.UserRole, entry)
                 item.setToolTip(
-                    "Hover/Reveal zeigt Key · Esc/10s maskiert · "
-                    "Doppelklick kopiert — 1.1.5"
+                    "Hover/Reveal zeigt Key · Esc/Auto-Hide maskiert · "
+                    "Doppelklick kopiert — 1.1.6"
                 )
                 self.history_list.addItem(item)
 
@@ -231,8 +314,8 @@ def run_gui(*, days: int | None = None) -> int:
                 item.setText(self._history_label(entry, reveal=reveal))
 
         def _mask_reveal(self) -> None:
-            """Reveal aus / Keys wieder maskieren (Esc oder Auto-Hide) — 1.1.5."""
-            self._reveal_timer.stop()
+            """Reveal aus / Keys wieder maskieren (Esc oder Auto-Hide) — 1.1.5/1.1.6."""
+            self._stop_reveal_timers()
             if self.reveal_check.isChecked():
                 self.reveal_check.setChecked(False)
             else:
@@ -245,12 +328,13 @@ def run_gui(*, days: int | None = None) -> int:
 
         def _on_reveal_toggled(self, checked: bool = False):
             if checked:
-                self._reveal_timer.start(REVEAL_AUTO_HIDE_MS)
+                sec = self._hide_seconds()
+                self._start_reveal_timers(sec)
                 self.statusBar().showMessage(
-                    "Reveal an — Auto-Hide in 10 s · Esc maskiert", 3000
+                    f"Reveal an — Auto-Hide in {sec} s · Esc maskiert", 3000
                 )
             else:
-                self._reveal_timer.stop()
+                self._stop_reveal_timers()
             self._refresh_history_labels()
 
         def _history_hover_enter(self, item: QListWidgetItem):

@@ -92,7 +92,21 @@ _STRINGS: dict[str, dict[UiLang, str]] = {
         "de": "Ablaufhinweis schließen",
         "en": "Close expiry notice",
     },
+    # Annotationen 0 gefilterte Treffer — einheitlicher Status — 1.1.6
+    "ann_zero_filtered": {
+        "de": "Keine gefilterten Treffer auf Seite {page}",
+        "en": "No filtered matches on page {page}",
+    },
 }
+
+
+def tr_ann_zero_filtered(page: int, *, lang: UiLang | None = None) -> str:
+    """Einheitlicher Status-String bei 0 gefilterten Ann.-Treffern — 1.1.6."""
+    template = tr("ann_zero_filtered", lang=lang)
+    try:
+        return template.format(page=int(page))
+    except Exception:
+        return f"Keine gefilterten Treffer auf Seite {page}"
 
 _current: UiLang = "de"
 

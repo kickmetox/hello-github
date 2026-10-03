@@ -1,5 +1,27 @@
 # Changelog — InstantLens Doc
 
+## 1.1.6 — OCR DPI·Preset-Defaults, Merge Vorschau schließen, Ann. 0-Treffer i18n, Keygen Auto-Hide 5/10/30
+
+Post-Release-Polish nach 1.1.5: OCR-Dialog speichert **DPI** und **Sprach-Preset** als Settings-Defaults und belegt sie vor; Merge **„Zum Bearbeiten öffnen“** kann den Readonly-Tab per Settings-Toggle schließen; Annotationen-Status bei **0 gefilterten Treffern** nutzt einen einheitlichen i18n-String (DE); Keygen-Reveal Auto-Hide wählbar **5/10/30 s** mit Countdown neben Reveal. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### OCR / Batch
+- **DPI** + **Sprach-Preset** als Defaults in Settings persistiert; Dialog vorbelegt und speichert bei OK
+
+### PDF
+- **Zusammenführen**: **„Zum Bearbeiten öffnen“** schließt Readonly-Tab optional (Settings-Toggle)
+
+### Annotationen
+- Status bei **0 Treffern**: einheitlicher String `Keine gefilterten Treffer auf Seite {page}` (i18n DE)
+
+### Keygen
+- Reveal Auto-Hide: Intervall **5 / 10 / 30 s** (Settings) + **Countdown** neben Reveal
+
+### Packaging / Docs
+- Version **1.1.6** (App / `ild_pdf` / ISS / Smoke / Docs)
+- Smoke: OCR Defaults, Merge close-preview, Ann. i18n-0-Treffer, Keygen Auto-Hide (CLI + Qt)
+
+---
+
 ## 1.1.5 — OCR Fehler-Persistenz, Merge Preview-Banner, Ann. Menü-No-op, Keygen Reveal-Timer
 
 Post-Release-Polish nach 1.1.4: OCR-Toggle **„Fehler anhängen“** wird in den Einstellungen persistiert (Dialog + Settings); Merge-Readonly-Vorschau zeigt Banner **„Vorschau“** mit Button **„Zum Bearbeiten öffnen“**; gefiltertes Annotationen-Löschen bei 0 Treffern: Menü/Aktion ebenfalls no-op mit Statushinweis; Keygen-Reveal Auto-Hide nach 10 s, Esc maskiert wieder. Stubs KI/Cloud/Stylus/3D bleiben Stubs.

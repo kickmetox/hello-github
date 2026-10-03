@@ -16,7 +16,10 @@ UiLang = Literal["de", "en"]
 DEFAULTS: dict[str, Any] = {
     "theme": "light",
     "ocr_lang": "deu+eng",
+    "ocr_dpi": 150,  # OCR-Batch Default-DPI 150|300 — 1.1.6
     "ocr_attach_errors": True,  # OCR-Batch: Fehlerabschnitt anhängen — 1.1.5
+    "merge_close_preview_on_edit": False,  # Vorschau-Tab bei „Zum Bearbeiten“ schließen — 1.1.6
+    "keygen_reveal_auto_hide_sec": 10,  # Reveal Auto-Hide 5|10|30 — 1.1.6
     "batch_output_dir": "",
     "default_open_dir": "",
     "ui_lang": "de",
@@ -196,6 +199,33 @@ def set_ocr_lang(code: str) -> None:
     save_settings({"ocr_lang": code or DEFAULTS["ocr_lang"]})
 
 
+OCR_DPI_CHOICES_SETTINGS: tuple[int, ...] = (150, 300)
+
+
+def get_ocr_dpi() -> int:
+    """OCR-Batch Default-DPI (150 oder 300) — 1.1.6."""
+    raw = load_settings().get("ocr_dpi", DEFAULTS["ocr_dpi"])
+    try:
+        val = int(raw)
+    except (TypeError, ValueError):
+        val = int(DEFAULTS["ocr_dpi"])
+    if val not in OCR_DPI_CHOICES_SETTINGS:
+        val = min(OCR_DPI_CHOICES_SETTINGS, key=lambda x: abs(x - val))
+    return val
+
+
+def set_ocr_dpi(dpi: int) -> int:
+    """OCR-Default-DPI speichern; Rückgabe normalisierter Wert — 1.1.6."""
+    try:
+        val = int(dpi)
+    except (TypeError, ValueError):
+        val = int(DEFAULTS["ocr_dpi"])
+    if val not in OCR_DPI_CHOICES_SETTINGS:
+        val = min(OCR_DPI_CHOICES_SETTINGS, key=lambda x: abs(x - val))
+    save_settings({"ocr_dpi": val})
+    return val
+
+
 def get_ocr_attach_errors() -> bool:
     """OCR-Batch: Seitenfehler als Abschnitt anhängen (Default an) — 1.1.5."""
     return bool(load_settings().get("ocr_attach_errors", DEFAULTS["ocr_attach_errors"]))
@@ -203,6 +233,49 @@ def get_ocr_attach_errors() -> bool:
 
 def set_ocr_attach_errors(enabled: bool) -> None:
     save_settings({"ocr_attach_errors": bool(enabled)})
+
+
+def get_merge_close_preview_on_edit() -> bool:
+    """Readonly-Vorschau-Tab bei „Zum Bearbeiten öffnen“ schließen — 1.1.6."""
+    return bool(
+        load_settings().get(
+            "merge_close_preview_on_edit",
+            DEFAULTS["merge_close_preview_on_edit"],
+        )
+    )
+
+
+def set_merge_close_preview_on_edit(enabled: bool) -> None:
+    save_settings({"merge_close_preview_on_edit": bool(enabled)})
+
+
+KEYGEN_REVEAL_AUTO_HIDE_CHOICES: tuple[int, ...] = (5, 10, 30)
+
+
+def get_keygen_reveal_auto_hide_sec() -> int:
+    """Keygen Reveal Auto-Hide Intervall in Sekunden (5/10/30) — 1.1.6."""
+    raw = load_settings().get(
+        "keygen_reveal_auto_hide_sec", DEFAULTS["keygen_reveal_auto_hide_sec"]
+    )
+    try:
+        val = int(raw)
+    except (TypeError, ValueError):
+        val = int(DEFAULTS["keygen_reveal_auto_hide_sec"])
+    if val not in KEYGEN_REVEAL_AUTO_HIDE_CHOICES:
+        val = min(KEYGEN_REVEAL_AUTO_HIDE_CHOICES, key=lambda x: abs(x - val))
+    return val
+
+
+def set_keygen_reveal_auto_hide_sec(seconds: int) -> int:
+    """Keygen Reveal Auto-Hide speichern; Rückgabe normalisierter Wert — 1.1.6."""
+    try:
+        val = int(seconds)
+    except (TypeError, ValueError):
+        val = int(DEFAULTS["keygen_reveal_auto_hide_sec"])
+    if val not in KEYGEN_REVEAL_AUTO_HIDE_CHOICES:
+        val = min(KEYGEN_REVEAL_AUTO_HIDE_CHOICES, key=lambda x: abs(x - val))
+    save_settings({"keygen_reveal_auto_hide_sec": val})
+    return val
 
 
 def get_batch_output_dir() -> Path | None:

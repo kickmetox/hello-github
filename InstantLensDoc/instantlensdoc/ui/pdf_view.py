@@ -6122,16 +6122,14 @@ class PdfViewer(QWidget):
             "Annotationen dieser Seite löschen — 1.1.2/1.1.4"
         )
         # Bei 0 Treffern: Option sichtbar, aber nicht vorausgewählt — 1.1.4
+        from instantlensdoc.core.i18n import tr_ann_zero_filtered
+
+        zero_status = tr_ann_zero_filtered(page + 1)
         cb.setChecked(bool(filter_active and n_filt > 0))
         cb.setEnabled(filtered_ids is not None)
         if zero_filtered:
-            box.setInformativeText(
-                f"Keine gefilterten Treffer auf Seite {page + 1} — "
-                "gefiltertes Löschen nicht möglich."
-            )
-            self.status.emit(
-                f"Keine gefilterten Treffer auf Seite {page + 1}"
-            )
+            box.setInformativeText(zero_status)
+            self.status.emit(zero_status)
         elif filter_active:
             box.setInformativeText(
                 f"Mit Filter: {n_filt} von {n_all} sichtbar/gefiltert."
@@ -6145,18 +6143,12 @@ class PdfViewer(QWidget):
             if cb.isChecked() and n_filt <= 0:
                 if yes_btn is not None:
                     yes_btn.setEnabled(False)
-                box.setInformativeText(
-                    f"Keine gefilterten Treffer auf Seite {page + 1} — "
-                    "Button deaktiviert."
-                )
+                box.setInformativeText(zero_status)
             else:
                 if yes_btn is not None:
                     yes_btn.setEnabled(True)
                 if zero_filtered and not cb.isChecked():
-                    box.setInformativeText(
-                        f"Keine gefilterten Treffer auf Seite {page + 1} — "
-                        "gefiltertes Löschen nicht möglich."
-                    )
+                    box.setInformativeText(zero_status)
                 elif filter_active and n_filt > 0:
                     box.setInformativeText(
                         f"Mit Filter: {n_filt} von {n_all} sichtbar/gefiltert."
@@ -6171,9 +6163,7 @@ class PdfViewer(QWidget):
         if cb.isChecked() and filtered_ids is not None:
             only_ids = list(filt_set)
             if n_filt <= 0:
-                self.status.emit(
-                    f"Keine gefilterten Treffer auf Seite {page + 1}"
-                )
+                self.status.emit(zero_status)
                 return 0
 
         n = self.store.clear_page(page, only_ids=only_ids)

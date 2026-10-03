@@ -20,7 +20,11 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
-from instantlensdoc.core.app_settings import get_ocr_attach_errors, get_ocr_lang
+from instantlensdoc.core.app_settings import (
+    get_ocr_attach_errors,
+    get_ocr_dpi,
+    get_ocr_lang,
+)
 from instantlensdoc.core.ocr import (
     DEFAULT_OCR_DPI,
     INSTALL_HINT_HTML,
@@ -73,7 +77,7 @@ class OcrDialog(QDialog):
         form = QFormLayout()
         self.lang_combo = QComboBox()
         self.lang_combo.setToolTip(
-            "Sprach-Preset für Tesseract (deu/eng/…) — Einstellungs-Default vorgewählt — 1.1.1"
+            "Sprach-Preset für Tesseract (deu/eng/…) — Settings-Default vorgewählt — 1.1.6"
         )
         default_lang = get_ocr_lang()
         pick = 0
@@ -89,10 +93,16 @@ class OcrDialog(QDialog):
         form.addRow("Sprach-Preset", self.lang_combo)
 
         self.dpi_combo = QComboBox()
-        self.dpi_combo.setToolTip("OCR-Render-DPI (150 oder 300) — 1.1.2")
+        self.dpi_combo.setToolTip(
+            "OCR-Render-DPI (150 oder 300) — Settings-Default vorgewählt — 1.1.6"
+        )
         for d in OCR_DPI_CHOICES:
             self.dpi_combo.addItem(f"{d} DPI", int(d))
-        idx_dpi = list(OCR_DPI_CHOICES).index(DEFAULT_OCR_DPI)
+        default_dpi = get_ocr_dpi()
+        try:
+            idx_dpi = list(OCR_DPI_CHOICES).index(int(default_dpi))
+        except ValueError:
+            idx_dpi = list(OCR_DPI_CHOICES).index(DEFAULT_OCR_DPI)
         self.dpi_combo.setCurrentIndex(idx_dpi)
         form.addRow("DPI", self.dpi_combo)
 

@@ -2920,7 +2920,7 @@ class MainWindow(QMainWindow):
                     filtered_ids = self.sidebar.visible_annotation_ids(page=page)
                 except Exception:
                     filtered_ids = None
-            # 0 gefilterte Treffer: Menü/Aktion no-op mit Status (wie Yes disabled) — 1.1.5
+            # 0 gefilterte Treffer: Menü/Aktion no-op mit Status (wie Yes disabled) — 1.1.5/1.1.6
             if (
                 filtered_ids is not None
                 and self._ann_filter_is_active()
@@ -2929,11 +2929,9 @@ class MainWindow(QMainWindow):
                 anns = self.pdf_view.store.for_page(page)
                 n_filt = sum(1 for a in anns if str(a.id) in {str(x) for x in filtered_ids})
                 if anns and n_filt <= 0:
-                    msg = (
-                        f"Keine gefilterten Treffer auf Seite {page + 1} — "
-                        "Löschen abgebrochen"
-                    )
-                    self._set_status(msg)
+                    from instantlensdoc.core.i18n import tr_ann_zero_filtered
+
+                    self._set_status(tr_ann_zero_filtered(page + 1))
                     return
             n = self.pdf_view.clear_annotations_on_page(
                 filtered_ids=filtered_ids,
@@ -7273,7 +7271,7 @@ class MainWindow(QMainWindow):
         banner.setVisible(is_ro)
 
     def _open_preview_for_edit(self) -> None:
-        """Readonly-Vorschau → echtes bearbeitbares Dokument — 1.1.5."""
+        """Readonly-Vorschau → echtes bearbeitbares Dokument — 1.1.5/1.1.6."""
         if not self.doc or not self.doc.path:
             self._set_status("Kein Vorschau-Dokument")
             return
@@ -7287,6 +7285,26 @@ class MainWindow(QMainWindow):
         except Exception:
             path_key = path
         self._readonly_preview_paths.discard(path_key)
+
+        close_preview = False
+        try:
+            from instantlensdoc.core.app_settings import get_merge_close_preview_on_edit
+
+            close_preview = bool(get_merge_close_preview_on_edit())
+        except Exception:
+            close_preview = False
+
+        if close_preview:
+            # Readonly-Tab schließen und Datei neu bearbeitbar öffnen — 1.1.6
+            try:
+                self.sidebar.remove_document(path)
+            except Exception:
+                pass
+            self.doc.meta.pop("readonly", None)
+            self.open_path(path, readonly=False)
+            self._set_status(f"Zum Bearbeiten geöffnet (Vorschau geschlossen): {path}")
+            return
+
         self.doc.meta.pop("readonly", None)
         self._remember_path(path)
         title_name = self.doc.display_name
@@ -7774,8 +7792,14 @@ class MainWindow(QMainWindow):
         page_from, page_to = dlg.page_range()
         attach_errors = dlg.attach_errors()
         try:
-            from instantlensdoc.core.app_settings import set_ocr_attach_errors
+            from instantlensdoc.core.app_settings import (
+                set_ocr_attach_errors,
+                set_ocr_dpi,
+                set_ocr_lang,
+            )
 
+            set_ocr_lang(lang)
+            set_ocr_dpi(dpi)
             set_ocr_attach_errors(attach_errors)
         except Exception:
             pass
