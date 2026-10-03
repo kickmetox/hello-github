@@ -1,5 +1,27 @@
 # Changelog — InstantLens Doc
 
+## 1.3.2 — Forms CSV·Checkbox/Choice, Redaction Multi+Undo, Outlines Ziel-PDF, Lazy Prefetch±2
+
+Post-Release-Polish nach 1.3.1: **AcroForm-Feldliste CSV-Export**; **Checkbox/Choice-Werte** in Sidebar/Dialog sichtbar, **Edit nur Text**; **Redaction-Liste** mit **Mehrfachauswahl löschen** + **Undo** sowie **Doppelklick → Seite**; **Outlines-Export** mit Dialog **aktuelles / anderes Ziel-PDF** und Hinweis bei **leeren Outlines**; **Thumbnail-Lazy Prefetch ±2** um Viewport, **Cancel bei schnellem Scroll**. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### Formulare
+- Feldliste **CSV-Export** (Sidebar + Dialog); Checkbox/Choice **Werte anzeigen**; Edit nur Textfelder
+
+### PDF / Redaction
+- Sidebar: **Mehrfachauswahl** löschen (eine Undo-Stufe); **Doppelklick** springt zur Seite
+
+### Bookmarks / Outlines
+- Export-Dialog: Ziel **aktuelles PDF** oder **anderes PDF**; Hinweis bei leeren Outlines/Favoriten
+
+### Performance
+- Thumbnail-Lazy: **Prefetch ±2** um Viewport; Queue-**Cancel** bei schnellem Scroll
+
+### Packaging / Docs
+- Version **1.3.2** (App / `ild_pdf` / ISS / Smoke / Docs)
+- Smoke: Forms CSV·Checkbox/Choice, Redaction Multi+Undo, Outlines Ziel-PDF, Lazy Prefetch±2 (CLI + Qt)
+
+---
+
 ## 1.3.1 — Forms Filter/RO/dirty, Redaction-Liste+Opacity, Outlines Duplikat-Dialog, Lazy-Threshold
 
 Post-Release-Polish nach 1.3.0: **AcroForm** mit **Name-Filter**, **Read-only-Markierung** und Speichern nur **dirty** Felder; **Redaction-Liste** in der Sidebar mit **einzelnem Löschen** sowie **Preview-Deckkraft** in den Einstellungen; **Outlines→Bookmarks-Import** mit Dialog **Duplikate überspringen / Ersetzen**; **Thumbnail-Lazy-Schwellwert** wählbar (**25 / 50 / 100** Seiten) statt hart 50. Stubs KI/Cloud/Stylus/3D bleiben Stubs.

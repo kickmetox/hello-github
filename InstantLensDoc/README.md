@@ -2,7 +2,7 @@
 
 Moderne Textverarbeitung mit PDF-Annotator, OCR-Bridge und Formulargenerator.
 
-**Version:** 1.3.1  
+**Version:** 1.3.2  
 **Hersteller:** Andreas Meyer · ame@sellerbach.de
 
 ## Quickstart (Windows)
@@ -33,8 +33,8 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an).
 
-## Neu in 1.3.1
+## Neu in 1.3.2
 
-Forms: Name-Filter, Read-only-Markierung, Speichern nur dirty Felder; Redaction-Liste Sidebar + einzeln löschen, Preview-Deckkraft Settings; Outlines-Import Duplikat-Dialog (überspringen/ersetzen); Thumbnail-Lazy-Schwellwert 25/50/100. Stubs KI/Cloud/Stylus/3D unverändert.
+Forms: Feldliste CSV-Export, Checkbox/Choice Werte anzeigen, Edit nur Text; Redaction Mehrfachauswahl löschen + Undo, Doppelklick → Seite; Outlines-Export Ziel aktuell/anderes PDF, leere Outlines Hinweis; Thumbnail Prefetch ±2, Cancel bei schnellem Scroll. Stubs KI/Cloud/Stylus/3D unverändert.
 
 Siehe [CHANGELOG.md](CHANGELOG.md), [FEATURES.md](FEATURES.md) und [INFO.md](INFO.md).

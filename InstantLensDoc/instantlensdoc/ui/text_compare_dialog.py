@@ -617,7 +617,11 @@ class TextCompareDialog(QDialog):
         def _clear() -> None:
             if token != getattr(self, "_wrap_blink_token", 0):
                 return
-            self.lbl_status.setStyleSheet(prev)
+            try:
+                self.lbl_status.setStyleSheet(prev)
+            except RuntimeError:
+                # Dialog bereits zerstört (Smoke/offscreen) — 1.3.2
+                return
 
         QTimer.singleShot(ms, _clear)
 

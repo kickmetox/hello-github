@@ -6,13 +6,14 @@ from pathlib import Path
 
 from PySide6.QtGui import QBrush, QColor
 from PySide6.QtWidgets import (
-    QComboBox,
     QDialog,
     QDialogButtonBox,
+    QFileDialog,
     QHBoxLayout,
     QLabel,
     QLineEdit,
     QMessageBox,
+    QPushButton,
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
@@ -20,11 +21,30 @@ from PySide6.QtWidgets import (
     QHeaderView,
 )
 
-from ild_pdf.acroform import FormFieldInfo, list_form_fields, set_form_values
+from ild_pdf.acroform import (
+    FormFieldInfo,
+    export_form_fields_csv,
+    list_form_fields,
+    set_form_values,
+)
+from instantlensdoc.ui.file_dialogs import confirm_overwrite_export
+
+
+def _display_field_value(f: FormFieldInfo) -> str:
+    """Wert inkl. Checkbox/Choice-Anzeige — 1.3.2."""
+    ftype = str(getattr(f, "field_type", "") or "")
+    value = str(getattr(f, "value", "") or "")
+    opts = list(getattr(f, "options", None) or [])
+    if ftype == "checkbox":
+        on = value.strip().lower() in ("true", "1", "yes", "ja", "on", "x", "checked")
+        return "☑ true" if on else "☐ false"
+    if ftype in ("choice", "radio") and opts:
+        return f"{value}  [{', '.join(opts[:8])}]" if value else f"[{', '.join(opts[:8])}]"
+    return value
 
 
 class FormFieldsDialog(QDialog):
-    """Zeigt AcroForm-Felder und erlaubt Werte zu ändern."""
+    """Zeigt AcroForm-Felder; Edit nur Textfelder — 1.3.2."""
 
     def __init__(self, pdf_path: str | Path, parent=None):
         super().__init__(parent)
@@ -50,14 +70,17 @@ class FormFieldsDialog(QDialog):
         layout.addWidget(self.table)
 
         edit_row = QHBoxLayout()
-        edit_row.addWidget(QLabel("Wert:"))
+        edit_row.addWidget(QLabel("Wert (nur Text):"))
         self.value_edit = QLineEdit()
-        self.value_edit.setPlaceholderText("Feldwert…")
+        self.value_edit.setPlaceholderText("Textfeld-Wert…")
+        self.value_edit.setToolTip(
+            "Nur Textfelder editierbar; Checkbox/Choice Werte nur Anzeige — 1.3.2"
+        )
         edit_row.addWidget(self.value_edit, 1)
-        self.choice = QComboBox()
-        self.choice.setVisible(False)
-        self.choice.currentTextChanged.connect(self._choice_to_edit)
-        edit_row.addWidget(self.choice)
+        self.btn_csv = QPushButton("CSV…")
+        self.btn_csv.setToolTip("Feldliste als CSV exportieren — 1.3.2")
+        self.btn_csv.clicked.connect(self._export_csv)
+        edit_row.addWidget(self.btn_csv)
         layout.addLayout(edit_row)
 
         self._fields: list[FormFieldInfo] = []
@@ -109,11 +132,8 @@ class FormFieldsDialog(QDialog):
             name_disp = f"{f.name} [RO]" if f.read_only else f.name
             self.table.setItem(row, 0, QTableWidgetItem(name_disp))
             self.table.setItem(row, 1, QTableWidgetItem(f.field_type))
-            val_disp = f.value
-            if f.name in self._original and f.value != self._original.get(f.name, f.value):
-                # value already on field object — mark if dirty vs original
-                pass
-            if f.value != self._original.get(f.name, f.value):
+            val_disp = _display_field_value(f)
+            if f.field_type == "text" and f.value != self._original.get(f.name, f.value):
                 val_disp = f"{f.value} *"
             self.table.setItem(row, 2, QTableWidgetItem(val_disp))
             hint = []
@@ -121,16 +141,19 @@ class FormFieldsDialog(QDialog):
                 hint.append("nur lesen")
             if f.required:
                 hint.append("pflicht")
+            if f.field_type in ("checkbox", "choice", "radio"):
+                hint.append("Anzeige (edit nur Text)")
             if f.alternate_name and f.alternate_name != f.name:
                 hint.append(f.alternate_name)
             if f.options:
                 hint.append("Opt: " + ", ".join(f.options[:6]))
             self.table.setItem(row, 3, QTableWidgetItem("; ".join(hint)))
-            if f.read_only:
+            if f.read_only or f.field_type != "text":
                 for col in range(4):
                     it = self.table.item(row, col)
-                    if it is not None:
-                        it.setForeground(gray)
+                    if it is not None and (f.read_only or f.field_type != "text"):
+                        if f.read_only:
+                            it.setForeground(gray)
             self._row_map.append(fi)
         self.table.selectRow(0)
         self._apply_row(0)
@@ -144,10 +167,20 @@ class FormFieldsDialog(QDialog):
         fi = self._field_index_for_row(row)
         if fi is None:
             return
-        if 0 <= fi < len(self._fields) and self.value_edit.isEnabled():
+        # Nur Textfelder speichern — 1.3.2
+        if (
+            0 <= fi < len(self._fields)
+            and self.value_edit.isEnabled()
+            and self._fields[fi].field_type == "text"
+            and not self._fields[fi].read_only
+        ):
             self._fields[fi].value = self.value_edit.text()
             val = self._fields[fi].value
-            disp = f"{val} *" if val != self._original.get(self._fields[fi].name, "") else val
+            disp = (
+                f"{val} *"
+                if val != self._original.get(self._fields[fi].name, "")
+                else val
+            )
             self.table.setItem(row, 2, QTableWidgetItem(disp))
 
     def _mark_dirty_from_edit(self, _text: str = ""):
@@ -164,48 +197,60 @@ class FormFieldsDialog(QDialog):
             return
         f = self._fields[fi]
         self.value_edit.blockSignals(True)
-        self.value_edit.setText(f.value)
-        self.value_edit.blockSignals(False)
-        ro = f.read_only or f.field_type in ("signature", "pushbutton")
-        self.value_edit.setEnabled(not ro)
-        if f.options and f.field_type in ("choice", "radio", "checkbox"):
-            self.choice.blockSignals(True)
-            self.choice.clear()
-            opts = list(f.options)
-            if f.field_type == "checkbox" and not opts:
-                opts = ["true", "false"]
-            if f.value and f.value not in opts:
-                opts = [f.value] + opts
-            self.choice.addItems(opts)
-            idx = self.choice.findText(f.value)
-            if idx >= 0:
-                self.choice.setCurrentIndex(idx)
-            self.choice.setVisible(True)
-            self.choice.setEnabled(not ro)
-            self.choice.blockSignals(False)
+        if f.field_type == "text":
+            self.value_edit.setText(f.value)
         else:
-            self.choice.setVisible(False)
+            self.value_edit.setText(_display_field_value(f))
+        self.value_edit.blockSignals(False)
+        editable = (not f.read_only) and f.field_type == "text"
+        self.value_edit.setEnabled(editable)
+        if not editable and f.field_type in ("checkbox", "choice", "radio"):
+            self.value_edit.setToolTip(
+                f"{f.field_type}: {_display_field_value(f)} — nur Anzeige, Edit nur Text — 1.3.2"
+            )
+        else:
+            self.value_edit.setToolTip(
+                "Nur Textfelder editierbar; Checkbox/Choice Werte nur Anzeige — 1.3.2"
+            )
 
-    def _choice_to_edit(self, text: str):
-        if self.choice.isVisible():
-            self.value_edit.setText(text)
+    def _export_csv(self):
+        start = str(self.pdf_path.with_name(f"{self.pdf_path.stem}_fields.csv"))
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Feldliste als CSV", start, "CSV (*.csv)"
+        )
+        if not path:
+            return
+        if not confirm_overwrite_export(path, self):
+            return
+        try:
+            dest = export_form_fields_csv(
+                self.pdf_path, self._fields, out_path=path
+            )
+            QMessageBox.information(
+                self,
+                "Feldliste CSV",
+                f"{len(self._fields)} Feld(er) exportiert:\n{dest}",
+            )
+        except Exception as e:
+            QMessageBox.warning(self, "Feldliste CSV", str(e))
 
     def _save(self):
         self._persist_row(self.table.currentRow())
         if not self._fields:
             self.reject()
             return
-        # Nur dirty (gegenüber Original) und nicht read-only — 1.3.1
+        # Nur dirty Textfelder (gegenüber Original), nicht read-only — 1.3.1/1.3.2
         values = {
             f.name: f.value
             for f in self._fields
             if (not f.read_only)
+            and f.field_type == "text"
             and f.name
             and f.value != self._original.get(f.name, f.value)
         }
         if not values:
             QMessageBox.information(
-                self, "Formularfelder", "Keine geänderten Felder zum Speichern."
+                self, "Formularfelder", "Keine geänderten Textfelder zum Speichern."
             )
             return
         try:

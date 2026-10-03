@@ -203,6 +203,60 @@ def get_form_values(path: str | Path) -> dict[str, str]:
     return {f.name: f.value for f in list_form_fields(path)}
 
 
+FORM_FIELD_CSV_FIELDS = (
+    "name",
+    "field_type",
+    "value",
+    "options",
+    "read_only",
+    "required",
+    "alternate_name",
+    "page",
+)
+
+
+def export_form_fields_csv(
+    path: str | Path,
+    fields: list[FormFieldInfo] | None = None,
+    *,
+    out_path: str | Path | None = None,
+) -> Path:
+    """
+    AcroForm-Feldliste als CSV exportieren (UTF-8) — 1.3.2.
+    path: Quell-PDF (für Default-Dateiname) bzw. bereits gelesene fields.
+    """
+    import csv
+
+    pdf = Path(path)
+    dest = Path(out_path) if out_path else pdf.with_name(f"{pdf.stem}_fields.csv")
+    if dest.suffix.lower() != ".csv":
+        dest = dest.with_suffix(".csv")
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    rows = list(fields) if fields is not None else list_form_fields(pdf)
+    with dest.open("w", encoding="utf-8", newline="") as fh:
+        writer = csv.DictWriter(
+            fh, fieldnames=list(FORM_FIELD_CSV_FIELDS), extrasaction="ignore"
+        )
+        writer.writeheader()
+        for f in rows:
+            page = getattr(f, "page_index", None)
+            writer.writerow(
+                {
+                    "name": str(getattr(f, "name", "") or ""),
+                    "field_type": str(getattr(f, "field_type", "") or ""),
+                    "value": str(getattr(f, "value", "") or ""),
+                    "options": "|".join(
+                        str(o) for o in (getattr(f, "options", None) or [])
+                    ),
+                    "read_only": "1" if getattr(f, "read_only", False) else "0",
+                    "required": "1" if getattr(f, "required", False) else "0",
+                    "alternate_name": str(getattr(f, "alternate_name", "") or ""),
+                    "page": "" if page is None else str(int(page) + 1),
+                }
+            )
+    return dest
+
+
 def set_form_values(
     path: str | Path,
     values: dict[str, Any],

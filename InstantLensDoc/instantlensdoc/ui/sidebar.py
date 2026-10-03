@@ -422,8 +422,10 @@ class Sidebar(QWidget):
     outline_delete_requested = Signal()
     form_field_activated = Signal(object)  # FormFieldInfo — Sprung zum Feld
     form_fields_save_requested = Signal(object)  # dict[name→value] Textfelder speichern
+    form_fields_export_csv_requested = Signal()  # Feldliste CSV — 1.3.2
     redaction_activated = Signal(object)  # Annotation REDACTION — Sprung
-    redaction_delete_requested = Signal(object)  # Annotation oder id — einzeln löschen
+    redaction_delete_requested = Signal(object)  # Annotation / Liste — löschen (+Undo)
+    thumbs_viewport_changed = Signal(int, bool)  # Mitte-Seite, cancel_fast — 1.3.2
     annotation_filter_changed = Signal(str)  # Typ-Wert oder "" für alle
     annotation_color_filter_changed = Signal(str)  # #RRGGBB oder "" für alle
     annotation_page_filter_changed = Signal(bool)  # nur aktuelle Seite
@@ -620,6 +622,10 @@ class Sidebar(QWidget):
         self.thumbs.pages_reordered.connect(self.pages_reordered.emit)
         self.thumbs.setContextMenuPolicy(Qt.CustomContextMenu)
         self.thumbs.customContextMenuRequested.connect(self._thumbs_context_menu)
+        self.thumbs.verticalScrollBar().valueChanged.connect(self._on_thumbs_scrolled)
+        self._thumb_scroll_last_t = 0.0
+        self._thumb_scroll_last_v = 0
+        self._thumb_scroll_emit_armed = True
         self.thumbs.setToolTip(
             "Klick → Seite; Shift+Klick Mehrfachauswahl; "
             "Ziehen zum Neuordnen (Ctrl+Z); Rechtsklick → Drehen/Duplizieren/Löschen"
@@ -665,7 +671,7 @@ class Sidebar(QWidget):
         self.form_fields.setMaximumHeight(140)
         self.form_fields.setToolTip(
             "AcroForm-Felder — Klick springt zur Seite; Textwert unten editieren und Speichern; "
-            "nur lesen = grau/RO; Speichern nur dirty Felder — 1.3.1"
+            "Checkbox/Choice Werte Anzeige; Edit nur Text; CSV-Export — 1.3.2"
         )
         self.form_fields.itemClicked.connect(self._activate_form_field)
         self.form_fields.itemActivated.connect(self._activate_form_field)
@@ -673,7 +679,9 @@ class Sidebar(QWidget):
         form_edit_row = QHBoxLayout()
         self.form_value_edit = QLineEdit()
         self.form_value_edit.setPlaceholderText("Textfeld-Wert…")
-        self.form_value_edit.setToolTip("Einfache Textfeld-Wert-Editierung (pikepdf)")
+        self.form_value_edit.setToolTip(
+            "Nur Textfelder editierbar (Checkbox/Choice nur Anzeige) — 1.3.2"
+        )
         self.form_value_edit.textChanged.connect(self._on_form_value_edited)
         form_edit_row.addWidget(self.form_value_edit, 1)
         self.btn_form_save = QPushButton("Speichern")
@@ -682,6 +690,11 @@ class Sidebar(QWidget):
         )
         self.btn_form_save.clicked.connect(self._emit_form_fields_save)
         form_edit_row.addWidget(self.btn_form_save)
+        self.btn_form_csv = QPushButton("CSV")
+        self.btn_form_csv.setFixedWidth(40)
+        self.btn_form_csv.setToolTip("Feldliste als CSV exportieren — 1.3.2")
+        self.btn_form_csv.clicked.connect(self.form_fields_export_csv_requested.emit)
+        form_edit_row.addWidget(self.btn_form_csv)
         self.form_edit_host = QWidget()
         self.form_edit_host.setLayout(form_edit_row)
         layout.addWidget(self.form_edit_host)
@@ -693,16 +706,20 @@ class Sidebar(QWidget):
         layout.addWidget(self.lbl_redactions)
         self.redactions = QListWidget()
         self.redactions.setMaximumHeight(120)
+        self.redactions.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self.redactions.setToolTip(
-            "Schwärzungs-Annotationen — Klick springt zur Seite; − löscht einzeln — 1.3.1"
+            "Schwärzungen — Doppelklick → Seite; Shift/Ctrl Mehrfachauswahl; "
+            "− löscht Auswahl (Undo Ctrl+Z) — 1.3.2"
         )
-        self.redactions.itemClicked.connect(self._activate_redaction)
+        self.redactions.itemDoubleClicked.connect(self._activate_redaction)
         self.redactions.itemActivated.connect(self._activate_redaction)
         layout.addWidget(self.redactions)
         red_btns = QHBoxLayout()
         self.btn_redaction_del = QPushButton("−")
         self.btn_redaction_del.setFixedWidth(28)
-        self.btn_redaction_del.setToolTip("Ausgewählte Schwärzung löschen — 1.3.1")
+        self.btn_redaction_del.setToolTip(
+            "Ausgewählte Schwärzung(en) löschen (Mehrfachauswahl, Undo) — 1.3.2"
+        )
         self.btn_redaction_del.clicked.connect(self._emit_redaction_delete)
         red_btns.addWidget(self.btn_redaction_del)
         red_btns.addStretch(1)
@@ -1691,25 +1708,35 @@ class Sidebar(QWidget):
 
     def prepare_lazy_thumbs(self, page_count: int, *, current: int = 0, max_pages: int | None = None):
         """Platzhalter für alle Seiten (Lazy-Load); max_pages begrenzt optional — 1.3.0."""
-        self.thumbs.clear()
-        self._thumb_token = getattr(self, "_thumb_token", 0) + 1
-        w, h = pdf_thumbnail_icon_size()
-        self.thumbs.apply_icon_size(w, h)
-        total = max(0, int(page_count))
-        if max_pages is None:
-            n = total
-        else:
-            n = max(0, min(total, int(max_pages)))
-        for i in range(n):
-            item = QListWidgetItem(f"S. {i + 1}")
-            item.setData(Qt.UserRole, i)
-            item.setToolTip(f"Seite {i + 1} — laden…")
-            # hellgraues Platzhalter-Icon
-            pm = QPixmap(w, h)
-            pm.fill(Qt.lightGray)
-            item.setIcon(QIcon(pm))
-            self.thumbs.addItem(item)
-        self.select_thumb(current)
+        bar = self.thumbs.verticalScrollBar()
+        prev_armed = getattr(self, "_thumb_scroll_emit_armed", True)
+        self._thumb_scroll_emit_armed = False
+        bar.blockSignals(True)
+        self.thumbs.blockSignals(True)
+        try:
+            self.thumbs.clear()
+            self._thumb_token = getattr(self, "_thumb_token", 0) + 1
+            w, h = pdf_thumbnail_icon_size()
+            self.thumbs.apply_icon_size(w, h)
+            total = max(0, int(page_count))
+            if max_pages is None:
+                n = total
+            else:
+                n = max(0, min(total, int(max_pages)))
+            for i in range(n):
+                item = QListWidgetItem(f"S. {i + 1}")
+                item.setData(Qt.UserRole, i)
+                item.setToolTip(f"Seite {i + 1} — laden…")
+                # hellgraues Platzhalter-Icon
+                pm = QPixmap(w, h)
+                pm.fill(Qt.lightGray)
+                item.setIcon(QIcon(pm))
+                self.thumbs.addItem(item)
+            self.select_thumb(current)
+        finally:
+            self.thumbs.blockSignals(False)
+            bar.blockSignals(False)
+            self._thumb_scroll_emit_armed = prev_armed
         return self._thumb_token
 
     def update_thumb(self, page_index: int, image, *, token: int | None = None) -> bool:
@@ -1769,8 +1796,15 @@ class Sidebar(QWidget):
         """items: Liste von OutlineItem (ild_pdf) oder leer."""
         self.outline.clear()
         if not items:
-            empty = QTreeWidgetItem("(kein Outline)")
+            empty = QTreeWidgetItem(
+                ["(keine Outlines — Favoriten exportieren oder + hinzufügen)"]
+            )
             empty.setDisabled(True)
+            empty.setToolTip(
+                0,
+                "PDF hat keine Lesezeichen/Outlines. "
+                "Bookmarks als Outlines exportieren oder + für aktuelle Seite — 1.3.2",
+            )
             self.outline.addTopLevelItem(empty)
             return
 
@@ -1811,6 +1845,33 @@ class Sidebar(QWidget):
             return None
         return tuple(int(i) for i in path)
 
+    @staticmethod
+    def _form_value_display(info, value: str | None = None) -> str:
+        """Checkbox/Choice Werte anzeigen — 1.3.2."""
+        ftype = str(getattr(info, "field_type", "") or "")
+        val = (
+            str(value)
+            if value is not None
+            else str(getattr(info, "value", "") or "")
+        )
+        opts = list(getattr(info, "options", None) or [])
+        if ftype == "checkbox":
+            on = val.strip().lower() in (
+                "true",
+                "1",
+                "yes",
+                "ja",
+                "on",
+                "x",
+                "checked",
+            )
+            return "☑ true" if on else "☐ false"
+        if ftype in ("choice", "radio"):
+            if opts:
+                return f"{val} [{', '.join(opts[:6])}]" if val else f"[{', '.join(opts[:6])}]"
+            return val
+        return val
+
     def _activate_form_field(self, item: QTreeWidgetItem, _column: int = 0):
         if item is None or item.isDisabled():
             return
@@ -1822,7 +1883,8 @@ class Sidebar(QWidget):
         ro = bool(getattr(info, "read_only", False))
         editable = (not ro) and ftype == "text"
         name = str(getattr(info, "name", "") or "")
-        shown = self._form_dirty.get(name, str(getattr(info, "value", "") or ""))
+        raw = self._form_dirty.get(name, str(getattr(info, "value", "") or ""))
+        shown = raw if editable else self._form_value_display(info, raw)
         self.form_value_edit.blockSignals(True)
         self.form_value_edit.setText(shown)
         self.form_value_edit.blockSignals(False)
@@ -1861,11 +1923,15 @@ class Sidebar(QWidget):
         payload = dict(self._form_dirty)
         self.form_fields_save_requested.emit(payload)
 
+    def form_fields_for_export(self) -> list:
+        """Aktuelle AcroForm-Daten für CSV-Export — 1.3.2."""
+        return list(self._form_fields_data or [])
+
     def _apply_form_fields_filter(self, _text: str = "") -> None:
         self._rebuild_form_fields_tree()
 
     def _rebuild_form_fields_tree(self) -> None:
-        """Feldliste neu aufbauen (Filter + RO-Markierung + dirty Werte)."""
+        """Feldliste neu aufbauen (Filter + RO + Checkbox/Choice Anzeige)."""
         self.form_fields.clear()
         needle = ""
         if hasattr(self, "form_filter"):
@@ -1891,19 +1957,21 @@ class Sidebar(QWidget):
         for f in data:
             name = str(getattr(f, "name", "") or "")
             ftype = str(getattr(f, "field_type", "") or "")
-            value = self._form_dirty.get(name, str(getattr(f, "value", "") or ""))
+            raw = self._form_dirty.get(name, str(getattr(f, "value", "") or ""))
             ro = bool(getattr(f, "read_only", False))
             name_disp = f"{name} [RO]" if ro else name
-            if name in self._form_dirty:
-                value_disp = f"{value} *"
+            if ftype == "text":
+                value_disp = f"{raw} *" if name in self._form_dirty else raw
             else:
-                value_disp = value
+                value_disp = self._form_value_display(f, raw)
             twi = QTreeWidgetItem([name_disp, ftype, value_disp])
             twi.setData(0, Qt.UserRole, f)
             page = getattr(f, "page_index", None)
             tip = f"{name} ({ftype})"
             if page is not None:
                 tip += f" — S. {int(page) + 1}"
+            if ftype in ("checkbox", "choice", "radio"):
+                tip += f" · Wert: {self._form_value_display(f, raw)} (edit nur Text)"
             if ro:
                 tip += " · nur lesen"
                 gray = QBrush(QColor("#888888"))
@@ -1917,7 +1985,7 @@ class Sidebar(QWidget):
             self.form_fields.resizeColumnToContents(col)
 
     def set_form_fields(self, fields) -> None:
-        """AcroForm-Feldliste (Name/Typ/Wert) in der Sidebar — 1.3.0/1.3.1."""
+        """AcroForm-Feldliste (Name/Typ/Wert) in der Sidebar — 1.3.0–1.3.2."""
         self._form_fields_data = list(fields or [])
         self._form_original = {
             str(getattr(f, "name", "") or ""): str(getattr(f, "value", "") or "")
@@ -1935,8 +2003,15 @@ class Sidebar(QWidget):
     def clear_form_fields(self) -> None:
         self.set_form_fields([])
 
+    @staticmethod
+    def _list_item_enabled(item: QListWidgetItem | None) -> bool:
+        if item is None:
+            return False
+        return bool(item.flags() & Qt.ItemIsEnabled)
+
     def _activate_redaction(self, item: QListWidgetItem):
-        if item is None or item.isDisabled():
+        """Doppelklick/Enter → Seite springen — 1.3.2."""
+        if not self._list_item_enabled(item):
             return
         payload = item.data(256)
         if payload is None:
@@ -1944,16 +2019,26 @@ class Sidebar(QWidget):
         self.redaction_activated.emit(payload)
 
     def _emit_redaction_delete(self):
-        item = self.redactions.currentItem()
-        if item is None or item.isDisabled():
+        """Mehrfachauswahl löschen — 1.3.2."""
+        selected = []
+        for item in self.redactions.selectedItems():
+            if not self._list_item_enabled(item):
+                continue
+            payload = item.data(256)
+            if payload is not None:
+                selected.append(payload)
+        if not selected:
+            item = self.redactions.currentItem()
+            if self._list_item_enabled(item):
+                payload = item.data(256)
+                if payload is not None:
+                    selected = [payload]
+        if not selected:
             return
-        payload = item.data(256)
-        if payload is None:
-            return
-        self.redaction_delete_requested.emit(payload)
+        self.redaction_delete_requested.emit(selected)
 
     def set_redactions(self, annotations) -> None:
-        """Schwärzungs-Liste in der Sidebar — 1.3.1."""
+        """Schwärzungs-Liste in der Sidebar — 1.3.1/1.3.2."""
         self.redactions.clear()
         anns = list(annotations or [])
         if not anns:
@@ -1972,11 +2057,43 @@ class Sidebar(QWidget):
                 label += f" — {txt[:24]}"
             item = QListWidgetItem(label)
             item.setData(256, a)
-            item.setToolTip(f"Schwärzung Seite {page} — Klick springt hin")
+            item.setToolTip(
+                f"Schwärzung Seite {page} — Doppelklick springt hin; "
+                "Mehrfachauswahl + − löschen (Undo) — 1.3.2"
+            )
             self.redactions.addItem(item)
 
     def clear_redactions(self) -> None:
         self.set_redactions([])
+
+    def visible_thumb_center(self) -> int:
+        """Geschätzte mittlere sichtbare Thumbnail-Seite — 1.3.2."""
+        n = self.thumbs.count()
+        if n <= 0:
+            return 0
+        bar = self.thumbs.verticalScrollBar()
+        if bar.maximum() <= 0:
+            row = self.thumbs.currentRow()
+            return max(0, row if row >= 0 else 0)
+        ratio = bar.value() / max(1, bar.maximum())
+        return max(0, min(n - 1, int(round(ratio * (n - 1)))))
+
+    def _on_thumbs_scrolled(self, value: int = 0) -> None:
+        """Viewport-Mitte melden; schneller Scroll → cancel_fast — 1.3.2."""
+        import time
+
+        if not getattr(self, "_thumb_scroll_emit_armed", True):
+            return
+        now = time.monotonic()
+        last_t = float(getattr(self, "_thumb_scroll_last_t", 0.0) or 0.0)
+        dt = now - last_t if last_t else 1.0
+        dv = abs(int(value) - int(getattr(self, "_thumb_scroll_last_v", 0) or 0))
+        self._thumb_scroll_last_t = now
+        self._thumb_scroll_last_v = int(value)
+        # Debounce: bei sehr schnellen Folge-Events nur cancel merken
+        center = self.visible_thumb_center()
+        cancel_fast = bool(last_t and dt < 0.09 and dv > 24)
+        self.thumbs_viewport_changed.emit(center, cancel_fast)
 
     def search_hit_records(self) -> list[dict]:
         """Aktuelle Trefferliste als strukturierte Dicts für CSV/JSON-Export."""

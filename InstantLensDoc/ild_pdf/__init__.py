@@ -96,7 +96,9 @@ from .security import needs_password, remove_password, set_password, try_open_pa
 from .redact import bake_redactions
 from .metadata import PdfMetadata, get_metadata, sanitize_pdf, set_metadata, strip_metadata
 from .acroform import (
+    FORM_FIELD_CSV_FIELDS,
     FormFieldInfo,
+    export_form_fields_csv,
     get_form_values,
     has_acroform,
     list_form_fields,
@@ -209,10 +211,12 @@ __all__ = [
     "strip_metadata",
     "sanitize_pdf",
     "FormFieldInfo",
+    "FORM_FIELD_CSV_FIELDS",
     "has_acroform",
     "list_form_fields",
     "get_form_values",
     "set_form_values",
+    "export_form_fields_csv",
     "AttachmentInfo",
     "has_attachments",
     "list_attachments",
@@ -224,4 +228,4 @@ __all__ = [
     "uri_link_at",
 ]
 
-__version__ = "1.3.1"
+__version__ = "1.3.2"
