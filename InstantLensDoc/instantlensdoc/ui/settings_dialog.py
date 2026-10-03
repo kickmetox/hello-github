@@ -154,7 +154,12 @@ from instantlensdoc.core.app_settings import (
     PDF_COMPARE_DIFF_THRESHOLD_MAX,
     PDF_COMPARE_DIFF_THRESHOLD_MIN,
     get_presentation_hide_annotations,
+    get_presentation_auto_advance_sec,
+    get_presentation_black_background,
+    get_presentation_show_page_number,
     get_favorites_bar_visible,
+    get_text_pdf_font_size,
+    get_text_pdf_margin,
     get_update_check_on_start,
     get_wizard_completed,
     MERGE_DIFF_MAX_SIDE_MAX,
@@ -244,7 +249,12 @@ from instantlensdoc.core.app_settings import (
     set_ui_lang,
     set_update_check_on_start,
     set_presentation_hide_annotations,
+    set_presentation_auto_advance_sec,
+    set_presentation_black_background,
+    set_presentation_show_page_number,
     set_favorites_bar_visible,
+    set_text_pdf_font_size,
+    set_text_pdf_margin,
     get_crypto_reload_prefill_password,
     set_crypto_reload_prefill_password,
 )
@@ -1156,12 +1166,54 @@ class SettingsDialog(QDialog):
         )
         form.addRow(self.presentation_hide_ann)
 
+        self.presentation_black_bg = QCheckBox("Präsentation: schwarzer Hintergrund")
+        self.presentation_black_bg.setChecked(get_presentation_black_background())
+        self.presentation_black_bg.setToolTip(
+            "Vollbild-Präsentation mit schwarzem Hintergrund — 1.7.1"
+        )
+        form.addRow(self.presentation_black_bg)
+
+        self.presentation_page_num = QCheckBox("Präsentation: Seitennummer-Overlay")
+        self.presentation_page_num.setChecked(get_presentation_show_page_number())
+        self.presentation_page_num.setToolTip(
+            "Seitennummer während der Präsentation anzeigen (Taste N zum Umschalten) — 1.7.1"
+        )
+        form.addRow(self.presentation_page_num)
+
+        self.presentation_auto_adv = QSpinBox()
+        self.presentation_auto_adv.setRange(0, 300)
+        self.presentation_auto_adv.setSuffix(" s")
+        self.presentation_auto_adv.setSpecialValueText("aus")
+        self.presentation_auto_adv.setValue(get_presentation_auto_advance_sec())
+        self.presentation_auto_adv.setToolTip(
+            "Timer-Autoadvance: 0 = aus, sonst Sekunden bis zur nächsten Seite — 1.7.1"
+        )
+        form.addRow("Präsentation: Auto-Advance", self.presentation_auto_adv)
+
         self.favorites_bar_chk = QCheckBox("Lesezeichen-Leiste (globale Favoriten)")
         self.favorites_bar_chk.setChecked(get_favorites_bar_visible())
         self.favorites_bar_chk.setToolTip(
             "Schnelljump-Leiste über Docs (globale ildfav-v1 Liste) — 1.7.0"
         )
         form.addRow(self.favorites_bar_chk)
+
+        self.text_pdf_font = QDoubleSpinBox()
+        self.text_pdf_font.setRange(6.0, 36.0)
+        self.text_pdf_font.setDecimals(1)
+        self.text_pdf_font.setSingleStep(0.5)
+        self.text_pdf_font.setSuffix(" pt")
+        self.text_pdf_font.setValue(get_text_pdf_font_size())
+        self.text_pdf_font.setToolTip("Schriftgröße für Text → PDF — 1.7.1")
+        form.addRow("Text→PDF Schriftgröße", self.text_pdf_font)
+
+        self.text_pdf_margin = QDoubleSpinBox()
+        self.text_pdf_margin.setRange(10.0, 120.0)
+        self.text_pdf_margin.setDecimals(0)
+        self.text_pdf_margin.setSingleStep(5.0)
+        self.text_pdf_margin.setSuffix(" pt")
+        self.text_pdf_margin.setValue(get_text_pdf_margin())
+        self.text_pdf_margin.setToolTip("Seitenränder für Text → PDF — 1.7.1")
+        form.addRow("Text→PDF Rand", self.text_pdf_margin)
 
         self.batch_dir = QLineEdit()
         bd = get_batch_output_dir()
@@ -1985,7 +2037,12 @@ class SettingsDialog(QDialog):
         sync_from_settings()
         set_update_check_on_start(self.update_chk.isChecked())
         set_presentation_hide_annotations(self.presentation_hide_ann.isChecked())
+        set_presentation_black_background(self.presentation_black_bg.isChecked())
+        set_presentation_show_page_number(self.presentation_page_num.isChecked())
+        set_presentation_auto_advance_sec(int(self.presentation_auto_adv.value()))
         set_favorites_bar_visible(self.favorites_bar_chk.isChecked())
+        set_text_pdf_font_size(float(self.text_pdf_font.value()))
+        set_text_pdf_margin(float(self.text_pdf_margin.value()))
         set_crypto_reload_prefill_password(self.crypto_prefill.isChecked())
         # Favoriten-Leiste live nachziehen
         try:

@@ -146,8 +146,8 @@ HELP_HTML = f"""
 <li><b>Bearbeiten → Einrückung erhöhen/verringern</b> (Ctrl+] / Ctrl+[; Tab / Shift+Tab Block)</li>
 <li><b>Ansicht</b>: Zoom +/−, Fit-Page (Ctrl+0), Fit-Width (Ctrl+9), Höhe (Ctrl+8), 100&nbsp;% (Ctrl+1),
     <b>Aktuellen Zoom als Standard</b> (Ctrl+Shift+0);
-    <b>Präsentationsmodus</b> (F5 Vollbild, Pfeiltasten, Esc; optional Ann.-Overlay aus — 1.7.0);
-    <b>Lesezeichen-Leiste</b> (globale Favoriten ildfav-v1); <b>Hell/Dunkel</b>-Design umschalten; optionale <b>Zeilennummern</b>; <b>Markdown-Vorschau</b> (Split, Ctrl+Shift+M);
+    <b>Präsentationsmodus</b> (F5 Vollbild, Pfeiltasten, Esc; Ann.-Overlay aus; Timer·schwarz·Seitennummer N — 1.7.1);
+    <b>Lesezeichen-Leiste</b> (globale Favoriten ildfav-v1, Drag·fehlend grau·Export — 1.7.1); <b>Hell/Dunkel</b>-Design umschalten; optionale <b>Zeilennummern</b>; <b>Markdown-Vorschau</b> (Split, Ctrl+Shift+M);
     <b>Soft-Wrap</b>; <b>Sonderzeichen anzeigen</b> (Ctrl+Shift+.);
     <b>PDF Graustufen</b>; <b>PDF Nachtmodus</b> (Invert-Ansicht, nur Darstellung);
     <b>Zwei-Seiten-Ansicht (Spread)</b> (Ctrl+2 / Toolbar 2S);
@@ -209,9 +209,9 @@ HELP_HTML = f"""
     klickbare <b>Trefferliste</b> (Seite + Snippet) in der Sidebar</li>
 <li><b>Bearbeiten → Auswahl → Notiz</b> (Ctrl+Alt+N): PDF-Textauswahl als Sticky; optional Checkbox zusätzlich Highlight</li>
 <li><b>Ansicht → Fenster teilen (zwei Docs)</b> (Ctrl+\\): zwei Dokumente; optional <b>vertikal</b> (Ctrl+Shift+\\); Sync-Scroll; Statusleiste dirty Tabs inkl. Speichern</li>
-<li><b>Datei → Exportieren → Text → PDF</b>: aktueller Text-Tab als einfaches PDF (pikepdf Seiten) — 1.7.0</li>
-<li><b>Hilfe → Auf Updates prüfen</b>: lokal gegen <code>docs/VERSION</code> / <code>VERSION.txt</code>
-    (nur Hinweis, kein Auto-Download); Online optional (offline OK) — 1.7.0</li>
+<li><b>Datei → Exportieren → Text → PDF</b>: Schriftgröße/Ränder Settings; Seitenvorschau Anzahl — 1.7.1</li>
+<li><b>Hilfe → Jetzt prüfen…</b>: Update-Hinweis; Dismiss bis nächste Version; lokal
+    <code>docs/VERSION</code> / <code>VERSION.txt</code> (kein Auto-Download) — 1.7.1</li>
 <li><b>Hilfe → Über InstantLens Doc</b>: Feature-Kurzliste + Link zu FEATURES.md;
     Datenschutz-Hinweis (lokal, keine Telemetrie, keine Cloud)</li>
 <li><b>Hilfe → Logordner öffnen</b>: Crash-/App-Logs im Dateimanager</li>

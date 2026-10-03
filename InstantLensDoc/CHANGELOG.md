@@ -1,5 +1,23 @@
 # Changelog — InstantLens Doc
 
+## 1.7.1 — Präsentation Timer·schwarz·Seitennummer, Favoriten Drag·fehlend·Export/Import, Text→PDF Schrift/Rand·Vorschau, Update Dismiss·Jetzt prüfen
+
+Post-Release-Polish nach 1.7.0: **Präsentation** mit optionalem **Timer-Autoadvance**, **schwarzem Hintergrund** und **Seitennummer-Overlay-Toggle** (Taste N); **Lesezeichen-Leiste** mit **Drag-Reorder**, **fehlende Dateien grau + Entfernen**, **Export/Import ildfav-v1**; **Text → PDF** mit **Schriftgröße/Ränder** in Settings und **Seitenvorschau**; **Update-Hinweis** **Dismiss bis nächste Version** und Menüpunkt **„Jetzt prüfen…“**. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### PDF / Präsentation
+- Präsentation: Auto-Advance (0=aus); schwarzer Hintergrund; Seitennummer-Overlay Toggle (Settings + Taste N)
+- Globale Favoriten: Drag-Umsortieren; fehlende Pfade grau + Entfernen; Export/Import `ildfav-v1`
+
+### Editor / Export
+- Text → PDF: Schriftgröße/Rand in Einstellungen; Seitenvorschau (Anzahl) vor Speichern
+
+### Update / Packaging
+- Update-Hinweis: Dismiss bis nächste Referenzversion; Hilfe → „Jetzt prüfen…“
+- Version **1.7.1** (App / `ild_pdf` / ISS / Smoke / Docs); `docs/VERSION` + `VERSION.txt`
+- Smoke: Präsentation Timer·schwarz·Nr., Favoriten reorder/missing/export, text_pdf font/margin·preview, update dismiss (CLI + Qt)
+
+---
+
 ## 1.7.0 — Präsentationsmodus Ann.-Overlay, Lesezeichen-Leiste ildfav-v1, Text→PDF, Update-Hinweis lokal
 
 Minor-Release mit neuen Kernfeatures (Basis **1.6.5**): **Präsentationsmodus** Vollbild-PDF mit Pfeiltasten/Esc und optional **Annotation-Overlay aus**; **Lesezeichen-Leiste** für globale Favoriten (Schema **`ildfav-v1`**, Schnelljump über Docs); **Text → PDF** exportiert den aktuellen Text-Tab als einfaches Mehrseiten-PDF (`ild_pdf.text_to_pdf`, pikepdf Seiten); **Update-Hinweis** vergleicht lokal gegen **`docs/VERSION`** oder eingebettete **`VERSION.txt`** (nur Hinweis, kein Auto-Download). Stubs KI/Cloud/Stylus/3D bleiben Stubs.

@@ -178,6 +178,59 @@ def remove_global_favorite(path: str | Path, page: int) -> list[GlobalFavorite]:
     return current
 
 
+def reorder_global_favorites(
+    order: Sequence[GlobalFavorite | dict | tuple],
+) -> list[GlobalFavorite]:
+    """Neue Reihenfolge speichern (Drag-Reorder) — 1.7.1.
+
+    ``order``: GlobalFavorite, Dict, oder ``(path, page)``-Tupel.
+    Unbekannte Einträge werden übersprungen; fehlende bestehende Favoriten
+    werden ans Ende angehängt.
+    """
+    current = load_global_favorites()
+    by_key = {(f.path, f.page): f for f in current}
+    new_list: list[GlobalFavorite] = []
+    seen: set[tuple[str, int]] = set()
+    for raw in order:
+        fav: GlobalFavorite | None = None
+        if isinstance(raw, GlobalFavorite):
+            fav = raw
+        elif isinstance(raw, (tuple, list)) and len(raw) >= 2:
+            try:
+                key = (str(Path(raw[0])), int(raw[1]))
+            except (TypeError, ValueError):
+                continue
+            fav = by_key.get(key)
+        else:
+            fav = _normalize_entry(raw)
+        if fav is None:
+            continue
+        key = (str(Path(fav.path)), int(fav.page))
+        if key in seen:
+            continue
+        # Label aus aktuellem Store bevorzugen
+        existing = by_key.get(key)
+        if existing is not None:
+            fav = existing
+        else:
+            fav = GlobalFavorite(path=key[0], page=key[1], label=fav.label)
+        seen.add(key)
+        new_list.append(fav)
+        if len(new_list) >= GLOBAL_FAV_MAX:
+            break
+    if len(new_list) < GLOBAL_FAV_MAX:
+        for fav in current:
+            key = (fav.path, fav.page)
+            if key in seen:
+                continue
+            seen.add(key)
+            new_list.append(fav)
+            if len(new_list) >= GLOBAL_FAV_MAX:
+                break
+    save_global_favorites(new_list)
+    return load_global_favorites()
+
+
 def export_global_favorites_json(path: str | Path) -> Path:
     dest = Path(path)
     dest.parent.mkdir(parents=True, exist_ok=True)

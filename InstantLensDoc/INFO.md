@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **1.7.0** |
+| Version | **1.7.1** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -63,10 +63,10 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an / `checkedonce`)
 
-## Neu in 1.7.0
+## Neu in 1.7.1
 
-- **Präsentationsmodus:** Vollbild-PDF, Pfeiltasten/Esc; optional **Ann.-Overlay aus**
-- **Lesezeichen-Leiste:** globale Favoriten (`ildfav-v1`) — Schnelljump über Docs
-- **Text → PDF:** aktueller Text-Tab als einfaches PDF (`ild_pdf.text_to_pdf` / pikepdf Seiten)
-- **Update-Hinweis:** lokaler Vergleich gegen `docs/VERSION` oder `VERSION.txt` (kein Auto-Download)
+- **Präsentation:** Timer-Autoadvance optional; schwarzer Hintergrund; Seitennummer-Overlay Toggle (N)
+- **Favoriten:** Drag-Reorder; fehlende Dateien grau + Entfernen; Export/Import `ildfav-v1`
+- **Text → PDF:** Schriftgröße/Ränder Settings; Seitenvorschau (Anzahl)
+- **Update-Hinweis:** Dismiss bis nächste Version; Hilfe → **Jetzt prüfen…**
 - Stubs KI/Cloud/Stylus/3D unverändert

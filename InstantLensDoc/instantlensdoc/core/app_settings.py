@@ -28,8 +28,14 @@ DEFAULTS: dict[str, Any] = {
     "export_pdf_page": "A4",
     "export_image_max_edge": 2000,
     "update_check_on_start": False,
+    "update_dismissed_version": "",  # Update-Hinweis verworfen bis nächste Version — 1.7.1
     "presentation_hide_annotations": True,  # Ann.-Overlay in Präsentation aus — 1.7.0
+    "presentation_auto_advance_sec": 0,  # 0=aus, sonst Sekunden Auto-Advance — 1.7.1
+    "presentation_black_background": True,  # schwarzer Präsentations-Hintergrund — 1.7.1
+    "presentation_show_page_number": True,  # Seitennummer-Overlay in Präsentation — 1.7.1
     "favorites_bar_visible": True,  # globale Lesezeichen-Leiste — 1.7.0
+    "text_pdf_font_size": 11.0,  # Text→PDF Schriftgröße pt — 1.7.1
+    "text_pdf_margin": 50.0,  # Text→PDF Rand pt — 1.7.1
     "last_export_dir": "",
     "last_ann_export_dir": "",  # letzter Zielordner Ann.-Export JSON — 1.2.1
     "ann_export_filename_template": "{stem}_ann.json",  # Dateiname-Template — 1.2.1
@@ -437,6 +443,19 @@ def set_update_check_on_start(enabled: bool) -> None:
     save_settings({"update_check_on_start": bool(enabled)})
 
 
+def get_update_dismissed_version() -> str:
+    """Version, für die der Update-Hinweis verworfen wurde (bis nächste) — 1.7.1."""
+    return str(load_settings().get("update_dismissed_version") or "").strip()
+
+
+def set_update_dismissed_version(version: str) -> None:
+    save_settings({"update_dismissed_version": str(version or "").strip()})
+
+
+def clear_update_dismissed_version() -> None:
+    save_settings({"update_dismissed_version": ""})
+
+
 def get_presentation_hide_annotations() -> bool:
     """Präsentationsmodus: Annotation-Overlay optional ausblenden — 1.7.0."""
     return bool(load_settings().get("presentation_hide_annotations", True))
@@ -446,6 +465,41 @@ def set_presentation_hide_annotations(enabled: bool) -> None:
     save_settings({"presentation_hide_annotations": bool(enabled)})
 
 
+def get_presentation_auto_advance_sec() -> int:
+    """Auto-Advance-Intervall in Sekunden (0 = aus) — 1.7.1."""
+    try:
+        v = int(load_settings().get("presentation_auto_advance_sec", 0))
+    except (TypeError, ValueError):
+        v = 0
+    return max(0, min(300, v))
+
+
+def set_presentation_auto_advance_sec(sec: int) -> None:
+    try:
+        v = int(sec)
+    except (TypeError, ValueError):
+        v = 0
+    save_settings({"presentation_auto_advance_sec": max(0, min(300, v))})
+
+
+def get_presentation_black_background() -> bool:
+    """Präsentation: schwarzer Hintergrund — 1.7.1."""
+    return bool(load_settings().get("presentation_black_background", True))
+
+
+def set_presentation_black_background(enabled: bool) -> None:
+    save_settings({"presentation_black_background": bool(enabled)})
+
+
+def get_presentation_show_page_number() -> bool:
+    """Präsentation: Seitennummer-Overlay anzeigen — 1.7.1."""
+    return bool(load_settings().get("presentation_show_page_number", True))
+
+
+def set_presentation_show_page_number(enabled: bool) -> None:
+    save_settings({"presentation_show_page_number": bool(enabled)})
+
+
 def get_favorites_bar_visible() -> bool:
     """Globale Favoriten-/Lesezeichen-Leiste sichtbar — 1.7.0."""
     return bool(load_settings().get("favorites_bar_visible", True))
@@ -453,6 +507,40 @@ def get_favorites_bar_visible() -> bool:
 
 def set_favorites_bar_visible(visible: bool) -> None:
     save_settings({"favorites_bar_visible": bool(visible)})
+
+
+def get_text_pdf_font_size() -> float:
+    """Text→PDF Schriftgröße in pt — 1.7.1."""
+    try:
+        v = float(load_settings().get("text_pdf_font_size", 11.0))
+    except (TypeError, ValueError):
+        v = 11.0
+    return max(6.0, min(36.0, v))
+
+
+def set_text_pdf_font_size(size: float) -> None:
+    try:
+        v = float(size)
+    except (TypeError, ValueError):
+        v = 11.0
+    save_settings({"text_pdf_font_size": max(6.0, min(36.0, v))})
+
+
+def get_text_pdf_margin() -> float:
+    """Text→PDF Rand in pt — 1.7.1."""
+    try:
+        v = float(load_settings().get("text_pdf_margin", 50.0))
+    except (TypeError, ValueError):
+        v = 50.0
+    return max(10.0, min(120.0, v))
+
+
+def set_text_pdf_margin(margin: float) -> None:
+    try:
+        v = float(margin)
+    except (TypeError, ValueError):
+        v = 50.0
+    save_settings({"text_pdf_margin": max(10.0, min(120.0, v))})
 
 
 def get_last_export_dir() -> Path | None:

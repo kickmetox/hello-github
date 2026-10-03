@@ -4,13 +4,16 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import QEvent, Qt, QTimer
-from PySide6.QtGui import QAction, QIcon, QKeySequence
+from PySide6.QtCore import QEvent, Qt, QTimer, Signal
+from PySide6.QtGui import QAction, QColor, QIcon, QKeySequence
 from PySide6.QtWidgets import (
+    QAbstractItemView,
     QFileDialog,
     QFrame,
     QHBoxLayout,
     QLabel,
+    QListWidget,
+    QListWidgetItem,
     QMainWindow,
     QMenu,
     QMessageBox,
@@ -75,8 +78,16 @@ from instantlensdoc.core.app_settings import (
     get_restore_session_on_start,
     get_restore_window_geometry_on_start,
     get_favorites_bar_visible,
+    get_presentation_auto_advance_sec,
+    get_presentation_black_background,
     get_presentation_hide_annotations,
+    get_presentation_show_page_number,
+    get_text_pdf_font_size,
+    get_text_pdf_margin,
     get_update_check_on_start,
+    get_update_dismissed_version,
+    set_presentation_show_page_number,
+    set_update_dismissed_version,
     get_window_geometry_b64,
     get_window_state_b64,
     remember_recent_dir,
@@ -93,6 +104,50 @@ from instantlensdoc.ui.file_dialogs import (
     confirm_overwrite_export,
     resolve_template_zip_conflicts,
 )
+
+
+class GlobalFavoritesList(QListWidget):
+    """Horizontale globale Favoriten; Drag InternalMove → Reihenfolge — 1.7.1."""
+
+    favorites_reordered = Signal(list)  # list[tuple[str, int]]
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setFlow(QListWidget.LeftToRight)
+        self.setWrapping(False)
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.setFixedHeight(32)
+        self.setSpacing(2)
+        self.setFrameShape(QFrame.NoFrame)
+        self.setDragDropMode(QAbstractItemView.InternalMove)
+        self.setDefaultDropAction(Qt.MoveAction)
+        self.setMovement(QListWidget.Snap)
+        self.setResizeMode(QListWidget.Adjust)
+        self.setToolTip(
+            "Globale Favoriten (ildfav-v1) — Klick springt; ziehen zum Umsortieren; "
+            "fehlende Dateien grau — 1.7.1"
+        )
+        self._reorder_enabled = True
+
+    def dropEvent(self, event):  # noqa: N802
+        if not self._reorder_enabled:
+            event.ignore()
+            return
+        super().dropEvent(event)
+        order: list[tuple[str, int]] = []
+        for i in range(self.count()):
+            item = self.item(i)
+            if item is None:
+                continue
+            data = item.data(Qt.UserRole)
+            if isinstance(data, (tuple, list)) and len(data) >= 2:
+                try:
+                    order.append((str(data[0]), int(data[1])))
+                except (TypeError, ValueError):
+                    continue
+        if order:
+            self.favorites_reordered.emit(order)
 from instantlensdoc.ui.pdf_tools_dialog import PdfToolsDialog
 from instantlensdoc.ui.watermark_dialog import WatermarkDialog
 from instantlensdoc.ui.annotation_search_dialog import AnnotationSearchDialog
@@ -156,6 +211,8 @@ class MainWindow(QMainWindow):
         self._force_quit = False
         self._presentation_active = False
         self._presentation_prev: dict | None = None
+        self._presentation_timer: QTimer | None = None
+        self._presentation_page_num_on = True
         self._fav_bar_buttons: list = []
         self._unsaved_paths: set[str] = set()
         self._readonly_preview_paths: set[str] = set()  # Merge-Vorschau-Tabs — 1.1.5
@@ -841,7 +898,7 @@ class MainWindow(QMainWindow):
         self.preview_readonly_banner.setVisible(False)
         outer.addWidget(self.preview_readonly_banner)
 
-        # Globale Lesezeichen-Leiste (ildfav-v1) — Schnelljump über Docs — 1.7.0
+        # Globale Lesezeichen-Leiste (ildfav-v1) — Drag-Reorder / fehlend grau — 1.7.1
         self.favorites_bar = QFrame()
         self.favorites_bar.setObjectName("globalFavoritesBar")
         self.favorites_bar.setAttribute(Qt.WA_StyledBackground, True)
@@ -856,22 +913,21 @@ class MainWindow(QMainWindow):
         self.favorites_bar_label = QLabel("★ Favoriten")
         self.favorites_bar_label.setStyleSheet("font-weight: 600; color: #334;")
         self.favorites_bar_label.setToolTip(
-            "Globale Dokument-Favoriten (ildfav-v1) — Schnelljump — 1.7.0"
+            "Globale Dokument-Favoriten (ildfav-v1) — Drag-Reorder, Export/Import — 1.7.1"
         )
         fav_outer.addWidget(self.favorites_bar_label)
-        self.favorites_bar_scroll = QScrollArea()
-        self.favorites_bar_scroll.setWidgetResizable(True)
-        self.favorites_bar_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
-        self.favorites_bar_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self.favorites_bar_scroll.setFixedHeight(34)
-        self.favorites_bar_scroll.setFrameShape(QFrame.NoFrame)
+        # Kompatibilität: leeres Layout (ältere Smoke-Tests)
         self.favorites_bar_inner = QWidget()
         self.favorites_bar_layout = QHBoxLayout(self.favorites_bar_inner)
         self.favorites_bar_layout.setContentsMargins(0, 0, 0, 0)
-        self.favorites_bar_layout.setSpacing(4)
-        self.favorites_bar_layout.addStretch(1)
-        self.favorites_bar_scroll.setWidget(self.favorites_bar_inner)
-        fav_outer.addWidget(self.favorites_bar_scroll, 1)
+        self.favorites_list = GlobalFavoritesList(self.favorites_bar)
+        self.favorites_list.itemClicked.connect(self._on_global_fav_item_clicked)
+        self.favorites_list.favorites_reordered.connect(self._on_global_favorites_reordered)
+        self.favorites_list.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.favorites_list.customContextMenuRequested.connect(
+            self._on_global_fav_list_context
+        )
+        fav_outer.addWidget(self.favorites_list, 1)
         self.btn_fav_add = QToolButton()
         self.btn_fav_add.setText("+")
         self.btn_fav_add.setToolTip(
@@ -879,6 +935,20 @@ class MainWindow(QMainWindow):
         )
         self.btn_fav_add.clicked.connect(self._add_current_to_global_favorites)
         fav_outer.addWidget(self.btn_fav_add)
+        self.btn_fav_export = QToolButton()
+        self.btn_fav_export.setText("⇓")
+        self.btn_fav_export.setToolTip(
+            "Globale Favoriten als ildfav-v1 JSON exportieren — 1.7.1"
+        )
+        self.btn_fav_export.clicked.connect(self._export_global_favorites_json)
+        fav_outer.addWidget(self.btn_fav_export)
+        self.btn_fav_import = QToolButton()
+        self.btn_fav_import.setText("⇑")
+        self.btn_fav_import.setToolTip(
+            "Globale Favoriten aus ildfav-v1 JSON importieren — 1.7.1"
+        )
+        self.btn_fav_import.clicked.connect(self._import_global_favorites_json)
+        fav_outer.addWidget(self.btn_fav_import)
         self.favorites_bar.setVisible(get_favorites_bar_visible())
         outer.addWidget(self.favorites_bar)
         QTimer.singleShot(0, self._refresh_favorites_bar)
@@ -2166,6 +2236,16 @@ class MainWindow(QMainWindow):
         )
         act_global_fav.triggered.connect(self._add_current_to_global_favorites)
         m_pdf.addAction(act_global_fav)
+        act_gf_export = QAction("Lesezeichen-Leiste als JSON exportieren…", self)
+        act_gf_export.setToolTip("Globale Favoriten als ildfav-v1 JSON speichern — 1.7.1")
+        act_gf_export.triggered.connect(self._export_global_favorites_json)
+        m_pdf.addAction(act_gf_export)
+        act_gf_import = QAction("Lesezeichen-Leiste aus JSON importieren…", self)
+        act_gf_import.setToolTip(
+            "Globale Favoriten aus ildfav-v1 JSON laden (ersetzen oder zusammenführen) — 1.7.1"
+        )
+        act_gf_import.triggered.connect(self._import_global_favorites_json)
+        m_pdf.addAction(act_gf_import)
         act_ol_import = QAction("Bookmarks aus PDF-Outlines importieren…", self)
         act_ol_import.setToolTip(
             "PDF-Outline → Seiten-Favoriten (Bookmarks) importieren — 1.3.0"
@@ -2269,8 +2349,17 @@ class MainWindow(QMainWindow):
         a.triggered.connect(self._create_crash_report)
         m_help.addAction(a)
         m_help.addSeparator()
+        a = QAction("Jetzt prüfen…", self)
+        a.setToolTip(
+            "Update-Hinweis jetzt prüfen (lokal docs/VERSION / VERSION.txt; "
+            "kein Auto-Download) — 1.7.1"
+        )
+        a.triggered.connect(lambda: self._check_updates(silent=False, force=True))
+        m_help.addAction(a)
+        # Alias für Abwärtskompatibilität / Erkennbarkeit
         a = QAction("Auf Updates prüfen…", self)
-        a.triggered.connect(lambda: self._check_updates(silent=False))
+        a.setToolTip("Alias: Jetzt prüfen… — 1.7.1")
+        a.triggered.connect(lambda: self._check_updates(silent=False, force=True))
         m_help.addAction(a)
         a = QAction("Lizenz…", self)
         a.triggered.connect(self._license)
@@ -2990,6 +3079,12 @@ class MainWindow(QMainWindow):
         except TypeError:
             ann_was = bool(self.pdf_view.annotations_visible)
         hide_ann = get_presentation_hide_annotations()
+        page_num_was = False
+        try:
+            page_num_was = bool(self.pdf_view.show_page_number_overlay())
+        except Exception:
+            page_num_was = False
+        self._presentation_page_num_on = bool(get_presentation_show_page_number())
         self._presentation_prev = {
             "menu": self.menuBar().isVisible(),
             "status": self.statusBar().isVisible(),
@@ -3002,6 +3097,13 @@ class MainWindow(QMainWindow):
             "stack": self.stack.currentWidget(),
             "ann_visible": ann_was,
             "hid_ann": False,
+            "page_num": page_num_was,
+            "stylesheet": self.styleSheet() or "",
+            "central_ss": (
+                self.centralWidget().styleSheet()
+                if self.centralWidget() is not None
+                else ""
+            ),
         }
         # PDF-Toolbar ausblenden (erste Layout-Zeile)
         try:
@@ -3028,6 +3130,24 @@ class MainWindow(QMainWindow):
                 self._presentation_prev["hid_ann"] = True
             except Exception:
                 self._presentation_prev["hid_ann"] = False
+        # Schwarzer Hintergrund — 1.7.1
+        if get_presentation_black_background():
+            black_ss = (
+                "QMainWindow, QWidget#central, QStackedWidget {"
+                " background: #000000; }"
+            )
+            try:
+                self.setStyleSheet((self.styleSheet() or "") + black_ss)
+                if self.centralWidget() is not None:
+                    self.centralWidget().setStyleSheet("background: #000000;")
+                self.pdf_view.setStyleSheet("background: #000000;")
+            except Exception:
+                pass
+        # Seitennummer-Overlay Toggle — 1.7.1
+        try:
+            self.pdf_view.set_show_page_number_overlay(self._presentation_page_num_on)
+        except Exception:
+            pass
         self._presentation_active = True
         self.showFullScreen()
         try:
@@ -3035,17 +3155,77 @@ class MainWindow(QMainWindow):
         except Exception:
             pass
         self.pdf_view.setFocus(Qt.OtherFocusReason)
+        self._start_presentation_timer()
         ann_note = " · Ann. aus" if self._presentation_prev.get("hid_ann") else ""
+        adv = get_presentation_auto_advance_sec()
+        adv_note = f" · Auto {adv}s" if adv > 0 else ""
+        pn_note = " · Nr. an" if self._presentation_page_num_on else " · Nr. aus"
         self._set_status(
             f"Präsentation — Seite {self.pdf_view.page_index + 1}/{self.pdf_view.page_count} "
-            f"(←/→ Esc){ann_note}"
+            f"(←/→ Esc · N Nr.){ann_note}{adv_note}{pn_note}"
         )
+
+    def _start_presentation_timer(self) -> None:
+        """Timer-Autoadvance optional — 1.7.1."""
+        self._stop_presentation_timer()
+        sec = get_presentation_auto_advance_sec()
+        if sec <= 0 or not self._presentation_active:
+            return
+        self._presentation_timer = QTimer(self)
+        self._presentation_timer.setInterval(int(sec) * 1000)
+        self._presentation_timer.timeout.connect(self._presentation_auto_advance)
+        self._presentation_timer.start()
+
+    def _stop_presentation_timer(self) -> None:
+        t = getattr(self, "_presentation_timer", None)
+        if t is not None:
+            try:
+                t.stop()
+                t.deleteLater()
+            except Exception:
+                pass
+        self._presentation_timer = None
+
+    def _presentation_auto_advance(self) -> None:
+        if not self._presentation_active:
+            self._stop_presentation_timer()
+            return
+        try:
+            idx = int(self.pdf_view.page_index)
+            total = int(self.pdf_view.page_count)
+            if total <= 0:
+                return
+            if idx + 1 >= total:
+                # am Ende: Timer stoppen (kein Loop)
+                self._stop_presentation_timer()
+                self._set_status(
+                    f"Präsentation — Ende ({total}/{total}); Auto-Advance gestoppt"
+                )
+                return
+            self.pdf_view.next_page()
+            self._set_status(
+                f"Präsentation — Seite {self.pdf_view.page_index + 1}/{self.pdf_view.page_count}"
+            )
+        except Exception:
+            self._stop_presentation_timer()
+
+    def _toggle_presentation_page_number(self) -> None:
+        """Seitennummer-Overlay in Präsentation umschalten — 1.7.1."""
+        self._presentation_page_num_on = not bool(self._presentation_page_num_on)
+        set_presentation_show_page_number(self._presentation_page_num_on)
+        try:
+            self.pdf_view.set_show_page_number_overlay(self._presentation_page_num_on)
+        except Exception:
+            pass
+        state = "an" if self._presentation_page_num_on else "aus"
+        self._set_status(f"Präsentation — Seitennummer {state}")
 
     def _exit_presentation(self):
         if not self._presentation_active:
             return
         prev = self._presentation_prev or {}
         self._presentation_active = False
+        self._stop_presentation_timer()
         # Toolbar wieder ein
         tb = prev.get("toolbar_layout")
         if tb is not None:
@@ -3070,6 +3250,19 @@ class MainWindow(QMainWindow):
                 self.pdf_view.set_annotations_visible(bool(prev.get("ann_visible", True)))
             except Exception:
                 pass
+        # Seitennummer-Overlay auf Vor-Zustand
+        try:
+            self.pdf_view.set_show_page_number_overlay(bool(prev.get("page_num", False)))
+        except Exception:
+            pass
+        # Stylesheet wiederherstellen
+        try:
+            self.setStyleSheet(str(prev.get("stylesheet") or ""))
+            if self.centralWidget() is not None:
+                self.centralWidget().setStyleSheet(str(prev.get("central_ss") or ""))
+            self.pdf_view.setStyleSheet("")
+        except Exception:
+            pass
         stack_w = prev.get("stack")
         if stack_w is not None:
             self.stack.setCurrentWidget(stack_w)
@@ -3106,8 +3299,13 @@ class MainWindow(QMainWindow):
                 self._exit_presentation()
                 event.accept()
                 return
+            if key == Qt.Key_N:
+                self._toggle_presentation_page_number()
+                event.accept()
+                return
             if key in (Qt.Key_Right, Qt.Key_Down, Qt.Key_PageDown, Qt.Key_Space, Qt.Key_Return):
                 self.pdf_view.next_page()
+                self._start_presentation_timer()
                 self._set_status(
                     f"Präsentation — Seite {self.pdf_view.page_index + 1}/{self.pdf_view.page_count}"
                 )
@@ -3115,6 +3313,7 @@ class MainWindow(QMainWindow):
                 return
             if key in (Qt.Key_Left, Qt.Key_Up, Qt.Key_PageUp, Qt.Key_Backspace):
                 self.pdf_view.prev_page()
+                self._start_presentation_timer()
                 self._set_status(
                     f"Präsentation — Seite {self.pdf_view.page_index + 1}/{self.pdf_view.page_count}"
                 )
@@ -3122,10 +3321,12 @@ class MainWindow(QMainWindow):
                 return
             if key == Qt.Key_Home:
                 self.pdf_view.goto_page(0)
+                self._start_presentation_timer()
                 event.accept()
                 return
             if key == Qt.Key_End and self.pdf_view.page_count > 0:
                 self.pdf_view.goto_page(self.pdf_view.page_count - 1)
+                self._start_presentation_timer()
                 event.accept()
                 return
             event.accept()
@@ -8200,7 +8401,7 @@ class MainWindow(QMainWindow):
             self.pdf_view.refresh()
             self._set_status("Seitengröße/Crop aktualisiert")
 
-    def _check_updates(self, *, silent: bool = False):
+    def _check_updates(self, *, silent: bool = False, force: bool = False):
         from instantlensdoc.core.i18n import get_lang
         from instantlensdoc.core.update_check import check_for_updates, check_local_version
 
@@ -8213,9 +8414,61 @@ class MainWindow(QMainWindow):
                 result = online
         msg = result.message(get_lang())
         self._set_status(msg)
+
+        # Dismiss bis nächste Version — 1.7.1
+        dismissed = get_update_dismissed_version()
+        ref = str(result.remote_version or "").strip()
+        if (
+            result.newer_available
+            and dismissed
+            and ref
+            and dismissed == ref
+            and not force
+        ):
+            if silent:
+                return
+            # Force=False und manuell: trotzdem kurz Status, kein Dialog
+            return
+
         if silent and not result.newer_available:
             return
-        QMessageBox.information(self, "Update-Hinweis", msg)
+        if silent and result.newer_available:
+            # Banner-ähnlich: Dialog mit Dismiss-Option
+            box = QMessageBox(self)
+            box.setWindowTitle("Update-Hinweis")
+            box.setText(msg)
+            box.setIcon(QMessageBox.Information)
+            btn_ok = box.addButton("OK", QMessageBox.AcceptRole)
+            btn_dismiss = box.addButton(
+                "Bis nächste Version ausblenden", QMessageBox.ActionRole
+            )
+            box.exec()
+            if box.clickedButton() is btn_dismiss and ref:
+                set_update_dismissed_version(ref)
+                self._set_status(f"Update-Hinweis für {ref} ausgeblendet")
+            return
+        # Manuell („Jetzt prüfen“): immer Dialog; Dismiss nur wenn neuer Hinweis
+        if result.newer_available:
+            box = QMessageBox(self)
+            box.setWindowTitle("Update-Hinweis")
+            box.setText(msg)
+            box.setIcon(QMessageBox.Information)
+            box.addButton("OK", QMessageBox.AcceptRole)
+            btn_dismiss = box.addButton(
+                "Bis nächste Version ausblenden", QMessageBox.ActionRole
+            )
+            box.exec()
+            if box.clickedButton() is btn_dismiss and ref:
+                set_update_dismissed_version(ref)
+                self._set_status(f"Update-Hinweis für {ref} ausgeblendet")
+            elif force and dismissed and ref and dismissed != ref:
+                # Neue Version → altes Dismiss ungültig
+                set_update_dismissed_version("")
+        else:
+            if force and dismissed:
+                # Aktuell → Dismiss zurücksetzen
+                set_update_dismissed_version("")
+            QMessageBox.information(self, "Update-Hinweis", msg)
 
     def _toggle_favorites_bar(self, checked: bool) -> None:
         from instantlensdoc.core.app_settings import set_favorites_bar_visible
@@ -8231,51 +8484,97 @@ class MainWindow(QMainWindow):
             self._refresh_favorites_bar()
 
     def _refresh_favorites_bar(self) -> None:
-        """Globale ildfav-v1 Favoriten als Schnelljump-Buttons zeichnen — 1.7.0."""
+        """Globale ildfav-v1 Favoriten; fehlende grau; Drag-Reorder — 1.7.1."""
         from instantlensdoc.core.global_favorites import load_global_favorites
 
-        lay = getattr(self, "favorites_bar_layout", None)
-        if lay is None:
+        lst = getattr(self, "favorites_list", None)
+        if lst is None:
             return
-        # Alte Buttons entfernen (Stretch behalten)
-        while lay.count() > 1:
-            item = lay.takeAt(0)
-            w = item.widget() if item else None
-            if w is not None:
-                w.deleteLater()
+        lst.blockSignals(True)
+        lst.clear()
         self._fav_bar_buttons = []
         favs = load_global_favorites()
         if not favs:
-            empty = QLabel("— keine —")
-            empty.setStyleSheet("color: #889;")
+            empty = QListWidgetItem("— keine —")
+            empty.setFlags(Qt.NoItemFlags)
+            empty.setForeground(QColor("#888888"))
             empty.setToolTip("PDF → Zur Lesezeichen-Leiste hinzufügen (Ctrl+Alt+Shift+B)")
-            lay.insertWidget(0, empty)
+            lst.addItem(empty)
+            lst.blockSignals(False)
             return
         for fav in favs:
-            btn = QToolButton()
             label = fav.display_label()
             if len(label) > 28:
                 label = label[:25] + "…"
-            btn.setText(label)
-            btn.setToolTip(f"{fav.path}\nSeite {fav.page + 1}")
-            btn.setAutoRaise(True)
-            path, page = fav.path, fav.page
-            btn.clicked.connect(
-                lambda checked=False, p=path, pg=page: self._jump_global_favorite(p, pg)
-            )
-            # Rechtsklick entfernen
-            btn.setContextMenuPolicy(Qt.CustomContextMenu)
-            btn.customContextMenuRequested.connect(
-                lambda pos, b=btn, p=path, pg=page: self._global_fav_context(b, p, pg, pos)
-            )
-            lay.insertWidget(lay.count() - 1, btn)
-            self._fav_bar_buttons.append(btn)
+            exists = Path(fav.path).is_file()
+            if not exists:
+                label = f"⚠ {label}"
+            item = QListWidgetItem(label)
+            item.setData(Qt.UserRole, (fav.path, fav.page))
+            tip = f"{fav.path}\nSeite {fav.page + 1}"
+            if not exists:
+                tip += "\n(Datei fehlt — Rechtsklick → Entfernen)"
+                item.setForeground(QColor("#888888"))
+                item.setToolTip(tip)
+            else:
+                item.setToolTip(tip)
+            lst.addItem(item)
+            self._fav_bar_buttons.append(item)
+        lst.blockSignals(False)
 
-    def _global_fav_context(self, btn, path: str, page: int, pos) -> None:
+    def _on_global_fav_item_clicked(self, item) -> None:
+        if item is None:
+            return
+        data = item.data(Qt.UserRole)
+        if not isinstance(data, (tuple, list)) or len(data) < 2:
+            return
+        path, page = str(data[0]), int(data[1])
+        if not Path(path).is_file():
+            ask = QMessageBox.question(
+                self,
+                "Lesezeichen-Leiste",
+                f"Datei nicht gefunden:\n{path}\n\nFavorit entfernen?",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.Yes,
+            )
+            if ask == QMessageBox.Yes:
+                from instantlensdoc.core.global_favorites import remove_global_favorite
+
+                remove_global_favorite(path, page)
+                self._refresh_favorites_bar()
+                self._set_status("Fehlender Favorit entfernt")
+            return
+        self._jump_global_favorite(path, page)
+
+    def _on_global_favorites_reordered(self, order: list) -> None:
+        from instantlensdoc.core.global_favorites import reorder_global_favorites
+
+        reorder_global_favorites(order)
+        self._refresh_favorites_bar()
+        self._set_status("Favoriten-Reihenfolge gespeichert")
+
+    def _on_global_fav_list_context(self, pos) -> None:
+        lst = getattr(self, "favorites_list", None)
+        if lst is None:
+            return
+        item = lst.itemAt(pos)
+        if item is None:
+            return
+        data = item.data(Qt.UserRole)
+        if not isinstance(data, (tuple, list)) or len(data) < 2:
+            return
+        path, page = str(data[0]), int(data[1])
+        self._global_fav_context(lst, path, page, pos)
+
+    def _global_fav_context(self, widget, path: str, page: int, pos) -> None:
         menu = QMenu(self)
+        exists = Path(path).is_file()
         act_go = menu.addAction("Springen")
+        act_go.setEnabled(exists)
         act_rm = menu.addAction("Aus Leiste entfernen")
-        chosen = menu.exec(btn.mapToGlobal(pos))
+        if not exists:
+            act_rm.setText("Fehlende Datei entfernen")
+        chosen = menu.exec(widget.mapToGlobal(pos))
         if chosen is act_go:
             self._jump_global_favorite(path, page)
         elif chosen is act_rm:
@@ -8284,6 +8583,64 @@ class MainWindow(QMainWindow):
             remove_global_favorite(path, page)
             self._refresh_favorites_bar()
             self._set_status("Favorit aus Leiste entfernt")
+
+    def _export_global_favorites_json(self) -> None:
+        from instantlensdoc.core.global_favorites import export_global_favorites_json
+
+        last_dir = get_last_export_dir()
+        start = str(Path(dialog_start_dir(last_dir)) / "global_favorites.ildfav.json")
+        path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Lesezeichen-Leiste exportieren (ildfav-v1)",
+            start,
+            "ildfav JSON (*.json)",
+        )
+        if not path:
+            return
+        try:
+            out = export_global_favorites_json(path)
+            set_last_export_dir(str(out))
+            remember_recent_dir(str(out))
+            self._set_status(f"Globale Favoriten exportiert: {out.name}")
+        except Exception as e:
+            QMessageBox.critical(self, "Lesezeichen-Leiste", f"Export fehlgeschlagen:\n{e}")
+
+    def _import_global_favorites_json(self) -> None:
+        from ild_pdf.annotate import FavoritesImportError
+        from instantlensdoc.core.global_favorites import import_global_favorites_json
+
+        last_dir = get_last_export_dir()
+        start = str(dialog_start_dir(last_dir))
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Lesezeichen-Leiste importieren (ildfav-v1)",
+            start,
+            "ildfav JSON (*.json);;Alle Dateien (*)",
+        )
+        if not path:
+            return
+        merge = QMessageBox.question(
+            self,
+            "Lesezeichen-Leiste importieren",
+            "Zusammenführen (Ja) oder ersetzen (Nein)?",
+            QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel,
+            QMessageBox.Yes,
+        )
+        if merge == QMessageBox.Cancel:
+            return
+        try:
+            favs = import_global_favorites_json(path, merge=(merge == QMessageBox.Yes))
+            self._refresh_favorites_bar()
+            if getattr(self, "favorites_bar", None) is not None:
+                from instantlensdoc.core.app_settings import set_favorites_bar_visible
+
+                set_favorites_bar_visible(True)
+                self.favorites_bar.setVisible(True)
+            self._set_status(f"Globale Favoriten importiert: {len(favs)} Einträge")
+        except FavoritesImportError as e:
+            QMessageBox.warning(self, "Lesezeichen-Leiste", str(e))
+        except Exception as e:
+            QMessageBox.critical(self, "Lesezeichen-Leiste", f"Import fehlgeschlagen:\n{e}")
 
     def _add_current_to_global_favorites(self) -> None:
         from instantlensdoc.core.global_favorites import add_global_favorite
@@ -8329,7 +8686,7 @@ class MainWindow(QMainWindow):
         self._set_status(f"Favorit → {p.name} · S{int(page) + 1}")
 
     def _export_text_to_pdf(self) -> None:
-        """Aktuellen Text-Tab als einfaches PDF (pikepdf Seiten) — 1.7.0."""
+        """Aktuellen Text-Tab als einfaches PDF (Schrift/Rand Settings, Seitenvorschau) — 1.7.1."""
         text = ""
         title = "InstantLens Doc"
         if self.stack.currentWidget() is self.editor_pane:
@@ -8351,6 +8708,28 @@ class MainWindow(QMainWindow):
                 "Bitte einen Text-Tab öffnen (TXT/MD/HTML/DOCX) oder Text eingeben.",
             )
             return
+        from ild_pdf.text_pdf import page_count_for_text, text_to_pdf
+        from instantlensdoc.core.export import resolve_page_size
+
+        page_size = resolve_page_size(None)
+        font_size = get_text_pdf_font_size()
+        margin = get_text_pdf_margin()
+        pages = page_count_for_text(
+            text, page_size=page_size, font_size=font_size, margin=margin
+        )
+        preview = QMessageBox.question(
+            self,
+            "Text → PDF — Seitenvorschau",
+            (
+                f"Geschätzte Seitenzahl: {pages}\n"
+                f"Schriftgröße: {font_size:g} pt · Rand: {margin:g} pt\n"
+                f"(Einstellungen → Text→PDF)\n\nAls PDF speichern?"
+            ),
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.Yes,
+        )
+        if preview != QMessageBox.Yes:
+            return
         default_name = (self.doc.display_name if self.doc else "export") + ".pdf"
         if "." in default_name and not default_name.lower().endswith(".pdf"):
             default_name = Path(default_name).stem + ".pdf"
@@ -8364,16 +8743,14 @@ class MainWindow(QMainWindow):
         if not confirm_overwrite_export(path, self):
             return
         try:
-            from ild_pdf.text_pdf import page_count_for_text, text_to_pdf
-            from instantlensdoc.core.export import resolve_page_size
-
             out = text_to_pdf(
                 text,
                 path,
                 title=title,
-                page_size=resolve_page_size(None),
+                page_size=page_size,
+                font_size=font_size,
+                margin=margin,
             )
-            pages = page_count_for_text(text, page_size=resolve_page_size(None))
             set_last_export_dir(str(out))
             remember_recent_dir(str(out))
             self._set_status(f"Text → PDF: {out.name} ({pages} Seite(n))")
