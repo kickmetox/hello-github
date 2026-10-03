@@ -245,6 +245,8 @@ from instantlensdoc.core.app_settings import (
     get_text_pdf_open_after,
     get_update_check_on_start,
     get_telemetry_opt_in,
+    get_command_palette_recent_max,
+    COMMAND_PALETTE_RECENT_CHOICES,
     get_wizard_completed,
     MERGE_DIFF_MAX_SIDE_MAX,
     MERGE_DIFF_MAX_SIDE_MIN,
@@ -340,6 +342,7 @@ from instantlensdoc.core.app_settings import (
     set_ui_lang,
     set_update_check_on_start,
     set_telemetry_opt_in,
+    set_command_palette_recent_max,
     set_presentation_hide_annotations,
     set_presentation_auto_advance_sec,
     set_presentation_black_background,
@@ -1342,25 +1345,50 @@ class SettingsDialog(QDialog):
         )
         form.addRow(self.update_chk)
 
-        self.telemetry_chk = QCheckBox("Anonym Nutzung melden (Stub, opt-in)")
+        self.telemetry_chk = QCheckBox("Anonym Nutzung melden (Stub — deaktiviert)")
         self.telemetry_chk.setObjectName("telemetryOptIn")
-        self.telemetry_chk.setChecked(get_telemetry_opt_in())
+        self.telemetry_chk.setChecked(False)
+        self.telemetry_chk.setEnabled(False)  # Toggle disabled bleibt — 2.3.2
         self.telemetry_chk.setToolTip(
-            "Telemetrie-Stub 2.3.1: Default aus; auch bei Opt-in no-op — "
-            "keine Datenübertragung, kein Netzwerk"
+            "Telemetrie-Stub 2.3.2: Toggle bleibt disabled (aus). "
+            "Info-Button erklärt warum — keine Datenübertragung"
         )
-        form.addRow(self.telemetry_chk)
+        tel_row = QHBoxLayout()
+        tel_row.addWidget(self.telemetry_chk, 1)
+        self.btn_telemetry_info = QPushButton("Info…")
+        self.btn_telemetry_info.setObjectName("telemetryStubInfoBtn")
+        self.btn_telemetry_info.setToolTip(
+            "Warum Telemetrie Stub ist (Info-Dialog) — 2.3.2"
+        )
+        self.btn_telemetry_info.clicked.connect(self._show_telemetry_stub_info)
+        tel_row.addWidget(self.btn_telemetry_info)
+        form.addRow(tel_row)
         tel_hint = QLabel(
-            "<b>⚠️ Stub — keine Datenübertragung:</b> Diese Einstellung speichert "
-            "nur den Opt-in-Flag lokal. Es werden <b>niemals</b> Nutzungsdaten "
-            "gesendet — kein Netzwerk, keine Queue, kein Fingerprinting "
-            "(immer no-op) — 2.3.1."
+            "<b>Stub — keine Datenübertragung:</b> Toggle ist <b>deaktiviert</b> "
+            "und bleibt aus. Es werden <b>niemals</b> Nutzungsdaten gesendet — "
+            "kein Netzwerk, keine Queue, kein Fingerprinting (immer no-op) — 2.3.2. "
+            "„Info…“ erklärt warum."
         )
         tel_hint.setWordWrap(True)
         tel_hint.setObjectName("telemetryStubHint")
         tel_hint.setStyleSheet("color: #8a6d00;")
-        tel_hint.setToolTip("Telemetrie bleibt Stub: keine Datenübertragung — 2.3.1")
+        tel_hint.setToolTip("Telemetrie bleibt Stub: Toggle disabled — 2.3.2")
         form.addRow(tel_hint)
+
+        self.palette_recent_max = QComboBox()
+        self.palette_recent_max.setObjectName("commandPaletteRecentMax")
+        for n in COMMAND_PALETTE_RECENT_CHOICES:
+            self.palette_recent_max.addItem(f"{n} letzte Befehle", n)
+        cur_prm = get_command_palette_recent_max()
+        idx_prm = self.palette_recent_max.findData(cur_prm)
+        if idx_prm < 0:
+            idx_prm = self.palette_recent_max.findData(10)
+        if idx_prm >= 0:
+            self.palette_recent_max.setCurrentIndex(idx_prm)
+        self.palette_recent_max.setToolTip(
+            "Anzahl Recent-Einträge in der Command Palette (Ctrl+K): 5 / 10 / 20 — 2.3.2"
+        )
+        form.addRow("Schnellaktionen Recent:", self.palette_recent_max)
 
         self.presentation_hide_ann = QCheckBox(
             "Präsentation: Annotation-Overlay ausblenden"
@@ -1827,6 +1855,12 @@ class SettingsDialog(QDialog):
         except Exception:
             pass
         self._update_ui_font_preview_label()
+
+    def _show_telemetry_stub_info(self) -> None:
+        """Info-Dialog: warum Telemetrie Stub / Toggle disabled — 2.3.2."""
+        from instantlensdoc.ui.stubs import show_planned
+
+        show_planned(self, "telemetry")
 
     def _reset_ui_font_scale_100(self) -> None:
         """UI-Schrift Skala auf 100 %; Bestätigung nur bei ≠100 — 2.0.3."""
@@ -2620,7 +2654,13 @@ class SettingsDialog(QDialog):
         set_ui_lang(str(self.ui_lang.currentData() or "de"))
         sync_from_settings()
         set_update_check_on_start(self.update_chk.isChecked())
-        set_telemetry_opt_in(self.telemetry_chk.isChecked())
+        # Telemetrie: Toggle disabled — immer False speichern — 2.3.2
+        set_telemetry_opt_in(False)
+        try:
+            prm = int(self.palette_recent_max.currentData() or 10)
+        except (TypeError, ValueError):
+            prm = 10
+        set_command_palette_recent_max(prm)
         set_presentation_hide_annotations(self.presentation_hide_ann.isChecked())
         set_presentation_black_background(self.presentation_black_bg.isChecked())
         set_presentation_show_page_number(self.presentation_page_num.isChecked())

@@ -186,16 +186,17 @@ class RemovePasswordDialog(QDialog):
 
 
 class CompressPdfDialog(QDialog):
-    """PDF-Kompression / Bilder-Downsample — Qualitäts-Dialog — 2.3.0/2.3.1.
+    """PDF-Kompression / Bilder-Downsample — Qualitäts-Dialog — 2.3.0–2.3.2.
 
-    2.3.1: Vorher-Größe, DPI/Qualität-Presets (Bildschirm/E-Book/Druck), Abbruch via Fortschritt.
+    2.3.1: Vorher-Größe, DPI/Qualität-Presets, Abbruch.
+    2.3.2: optional neues File öffnen; Größenersparnis-% im Status.
     """
 
     def __init__(self, parent=None, *, source_path: str | Path | None = None):
         super().__init__(parent)
         self.setWindowTitle("PDF komprimieren / Downsample")
         self.setObjectName("compressPdfDialog")
-        self.resize(480, 340)
+        self.resize(480, 380)
         self._source_path = Path(source_path) if source_path else None
         self._updating_preset = False
         layout = QVBoxLayout(self)
@@ -203,13 +204,14 @@ class CompressPdfDialog(QDialog):
             QLabel(
                 "Seiten via pypdfium2 rastern, optional Downsample, JPEG und "
                 "per pikepdf als <b>neues File</b> speichern (verlustbehaftet). "
-                "Abbruch im Fortschrittsdialog möglich — 2.3.1."
+                "Abbruch im Fortschrittsdialog möglich — 2.3.2."
             )
         )
         form = QFormLayout()
         from PySide6.QtWidgets import QCheckBox, QDoubleSpinBox, QSpinBox
         from ild_pdf.images import COMPRESS_PRESETS, format_byte_size
         from instantlensdoc.core.app_settings import (
+            get_compress_open_after,
             get_export_image_max_edge,
             get_export_jpeg_quality,
         )
@@ -280,6 +282,15 @@ class CompressPdfDialog(QDialog):
         form.addRow("Max. Kante (px):", self.max_edge)
         form.addRow("Render-Scale:", self.render_scale)
         form.addRow("≈ DPI:", self.dpi_hint)
+
+        self.open_after = QCheckBox("Nach Erfolg neues File öffnen")
+        self.open_after.setObjectName("compressOpenAfter")
+        self.open_after.setChecked(bool(get_compress_open_after()))
+        self.open_after.setToolTip(
+            "Komprimiertes PDF nach Speichern in InstantLens Doc öffnen — 2.3.2"
+        )
+        form.addRow(self.open_after)
+
         layout.addLayout(form)
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         buttons.accepted.connect(self.accept)
@@ -337,4 +348,5 @@ class CompressPdfDialog(QDialog):
             "render_scale": float(self.render_scale.value()),
             "preset": key,
             "dpi": int(round(float(self.render_scale.value()) * 72.0)),
+            "open_after": bool(self.open_after.isChecked()),
         }

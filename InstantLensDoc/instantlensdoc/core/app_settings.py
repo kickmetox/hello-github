@@ -152,8 +152,11 @@ DEFAULTS: dict[str, Any] = {
     "page_labels_txt_utf8_bom": True,  # PageLabels-TXT UTF-8 BOM — 2.2.4
     "last_page_labels_txt_dir": "",  # Zielordner PageLabels-TXT merken — 2.2.4
     "page_labels_txt_filename_template": "{stem}_labels.txt",  # Template — 2.2.4
-    "telemetry_opt_in": False,  # anonym Nutzung melden — Stub opt-in, Default aus, no-op — 2.3.0
+    "telemetry_opt_in": False,  # anonym Nutzung melden — Stub; Toggle disabled bleibt aus — 2.3.2
     "command_palette_recent": [],  # letzte Command-Palette-Befehle (IDs) — 2.3.1
+    "command_palette_recent_max": 10,  # Recent-Anzahl 5/10/20 — 2.3.2
+    "command_palette_pinned": [],  # angeheftete Palette-Befehle (IDs) — 2.3.2
+    "compress_open_after": False,  # nach Kompression neues File öffnen — 2.3.2
     "native_ann_import_save_sidecar": True,  # nach Kommentar-Import Sidecar speichern — 2.1.2
     "textlayer_diff_side_by_side": False,  # Textlayer Diff TXT/Panel Side-by-Side — 2.1.2
     "textlayer_diff_txt_template": "{stemA}_vs_{stemB}_{mode}.txt",  # 2.1.3
@@ -580,26 +583,100 @@ def set_update_check_on_start(enabled: bool) -> None:
 
 
 def get_telemetry_opt_in() -> bool:
-    """Opt-in „anonym Nutzung melden“ — Default False; Telemetrie bleibt no-op Stub — 2.3.0."""
-    return bool(load_settings().get("telemetry_opt_in", False))
+    """Opt-in „anonym Nutzung melden“ — immer False; Toggle disabled Stub — 2.3.2."""
+    # 2.3.2: Toggle bleibt disabled → Flag wird nicht mehr aktiviert
+    return False
 
 
 def set_telemetry_opt_in(enabled: bool) -> None:
-    save_settings({"telemetry_opt_in": bool(enabled)})
-    # Stub: auch bei True keine Side-Effects
+    """Stub: speichert immer False — Toggle disabled, keine Aktivierung — 2.3.2."""
+    save_settings({"telemetry_opt_in": False})
+    # Stub: auch bei True keine Side-Effects / keine Aktivierung
     try:
         from instantlensdoc.core.telemetry import report_anonymous_usage
 
-        report_anonymous_usage("settings.telemetry_opt_in", enabled=bool(enabled))
+        report_anonymous_usage(
+            "settings.telemetry_opt_in", enabled=False, requested=bool(enabled)
+        )
     except Exception:
         pass
 
 
-COMMAND_PALETTE_RECENT_MAX = 8
+COMMAND_PALETTE_RECENT_MAX = 10  # Default; Settings 5/10/20 — 2.3.2
+COMMAND_PALETTE_RECENT_CHOICES = (5, 10, 20)
 
 
-def get_command_palette_recent(max_items: int = COMMAND_PALETTE_RECENT_MAX) -> list[str]:
-    """Letzte Command-Palette-Befehls-IDs (neueste zuerst) — 2.3.1."""
+def get_command_palette_recent_max() -> int:
+    """Anzahl Recent-Einträge in der Command Palette (5/10/20) — 2.3.2."""
+    raw = load_settings().get("command_palette_recent_max", COMMAND_PALETTE_RECENT_MAX)
+    try:
+        n = int(raw)
+    except (TypeError, ValueError):
+        n = COMMAND_PALETTE_RECENT_MAX
+    if n not in COMMAND_PALETTE_RECENT_CHOICES:
+        # nächste erlaubte Stufe
+        n = min(COMMAND_PALETTE_RECENT_CHOICES, key=lambda x: abs(x - n))
+    return n
+
+
+def set_command_palette_recent_max(n: int) -> int:
+    """Recent-Anzahl setzen (5/10/20) und Liste trimmen — 2.3.2."""
+    try:
+        val = int(n)
+    except (TypeError, ValueError):
+        val = COMMAND_PALETTE_RECENT_MAX
+    if val not in COMMAND_PALETTE_RECENT_CHOICES:
+        val = min(COMMAND_PALETTE_RECENT_CHOICES, key=lambda x: abs(x - val))
+    save_settings({"command_palette_recent_max": val})
+    # Liste auf neues Max trimmen
+    cur = get_command_palette_recent(max_items=val)
+    save_settings({"command_palette_recent": cur})
+    return val
+
+
+def get_command_palette_pinned() -> list[str]:
+    """Angeheftete Command-Palette-Befehls-IDs — 2.3.2."""
+    raw = load_settings().get("command_palette_pinned") or []
+    out: list[str] = []
+    if isinstance(raw, list):
+        for x in raw:
+            s = str(x or "").strip()
+            if s and s not in out:
+                out.append(s)
+    return out
+
+
+def set_command_palette_pinned(ids: list[str] | tuple[str, ...]) -> list[str]:
+    """Pinned-Liste setzen (Reihenfolge behalten) — 2.3.2."""
+    out: list[str] = []
+    for x in ids or []:
+        s = str(x or "").strip()
+        if s and s not in out:
+            out.append(s)
+    save_settings({"command_palette_pinned": out})
+    return out
+
+
+def toggle_command_palette_pin(cmd_id: str) -> bool:
+    """Pin umschalten; True = jetzt angeheftet — 2.3.2."""
+    cid = str(cmd_id or "").strip()
+    if not cid:
+        return False
+    pinned = get_command_palette_pinned()
+    if cid in pinned:
+        pinned = [x for x in pinned if x != cid]
+        set_command_palette_pinned(pinned)
+        return False
+    pinned.append(cid)
+    set_command_palette_pinned(pinned)
+    return True
+
+
+def get_command_palette_recent(
+    max_items: int | None = None,
+) -> list[str]:
+    """Letzte Command-Palette-Befehls-IDs (neueste zuerst) — 2.3.1/2.3.2."""
+    limit = get_command_palette_recent_max() if max_items is None else max(1, int(max_items))
     raw = load_settings().get("command_palette_recent") or []
     out: list[str] = []
     if isinstance(raw, list):
@@ -607,23 +684,33 @@ def get_command_palette_recent(max_items: int = COMMAND_PALETTE_RECENT_MAX) -> l
             s = str(x or "").strip()
             if s and s not in out:
                 out.append(s)
-            if len(out) >= max(1, int(max_items)):
+            if len(out) >= limit:
                 break
     return out
 
 
 def push_command_palette_recent(
-    cmd_id: str, *, max_items: int = COMMAND_PALETTE_RECENT_MAX
+    cmd_id: str, *, max_items: int | None = None
 ) -> list[str]:
-    """Befehl in Recent-Liste nach vorne schieben — 2.3.1."""
+    """Befehl in Recent-Liste nach vorne schieben — 2.3.1/2.3.2."""
+    limit = get_command_palette_recent_max() if max_items is None else max(1, int(max_items))
     cid = str(cmd_id or "").strip()
     if not cid:
-        return get_command_palette_recent(max_items=max_items)
-    prev = [x for x in get_command_palette_recent(max_items=max_items * 2) if x != cid]
+        return get_command_palette_recent(max_items=limit)
+    prev = [x for x in get_command_palette_recent(max_items=limit * 2) if x != cid]
     nxt = [cid] + prev
-    nxt = nxt[: max(1, int(max_items))]
+    nxt = nxt[:limit]
     save_settings({"command_palette_recent": nxt})
     return nxt
+
+
+def get_compress_open_after() -> bool:
+    """Nach erfolgreicher PDF-Kompression neues File öffnen — 2.3.2."""
+    return bool(load_settings().get("compress_open_after", False))
+
+
+def set_compress_open_after(enabled: bool) -> None:
+    save_settings({"compress_open_after": bool(enabled)})
 
 
 def get_update_dismissed_version() -> str:

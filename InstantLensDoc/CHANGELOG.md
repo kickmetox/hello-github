@@ -1,5 +1,20 @@
 # Changelog — InstantLens Doc
 
+## 2.3.2 — Kompression öffnen·Ersparnis-%, Links Filter·Doppelklick·TXT, Palette Pin·Recent 5/10/20, Telemetrie Toggle disabled·Info-Dialog
+
+Post-Release-Polish nach **2.3.1**: **PDF-Kompression** optional **neues File öffnen** und **Größenersparnis-%** in der Statuszeile; **URL-Links-Sidebar** mit **Suche/Filter**, **Doppelklick springt zur Seite**, **Export URL-Liste TXT**; **Command Palette** mit **Pin** für häufige Befehle und Settings **Recent-Anzahl 5/10/20**; **Telemetrie-Stub** mit **disabled Toggle** (bleibt aus) und **Info-Dialog warum Stub**. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie klar markiert / nicht produktiv (Ink ≠ Stylus).
+
+### Neu / verbessert
+- PDF komprimieren: optional neues File öffnen · Ersparnis-% Status
+- Links Sidebar: Suche/Filter · Doppelklick → Seite · URL-Liste TXT exportieren
+- Schnellaktionen Ctrl+K: Pin häufige Befehle · Recent 5/10/20 Settings
+- Telemetrie-Stub: Toggle disabled bleibt · Info-Dialog warum Stub · weiter no-op
+
+### Tests / Qualität
+- Version **2.3.2** (App / `ild_pdf` / ISS / Smoke / Docs); Serie **2.3**; `docs/VERSION` + `VERSION.txt`
+- Smoke: 2.3.2 CLI + Qt (Kompression open/Ersparnis, Links Filter/Export, Palette Pin/Recent-Max, Telemetrie disabled/Info)
+- Stubs: Telemetrie Toggle disabled + Info; KI/Cloud/Stylus/3D/Hooks/Outline unverändert markiert
+
 ## 2.3.1 — Kompression Vorher/Nachher·Abbruch·DPI/Q-Presets, Links Validierung·Tooltip·Sidebar Edit/Löschen, Palette Fuzzy·Recent·Esc·Kategorien, Telemetrie-Warntext „keine Datenübertragung“
 
 Post-Release-Polish nach **2.3.0**: **PDF-Kompression** mit **Vorher/Nachher-Größenanzeige**, **Abbruch** im Fortschrittsdialog und **DPI/Qualität-Presets** (Bildschirm/E-Book/Druck); **URL-Links** mit **Live-Validierung**, **Hover-Tooltip**, **Sidebar-Liste** sowie **Bearbeiten/Löschen**; **Command Palette** mit **Fuzzy-Filter**, **letzten Befehlen**, **Esc schließt** und **Kategorien**; **Telemetrie-Stub** Settings-**Warntext „keine Datenübertragung“** (bleibt no-op). Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie klar markiert / nicht produktiv (Ink ≠ Stylus).

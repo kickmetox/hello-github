@@ -1035,6 +1035,8 @@ class MainWindow(QMainWindow):
         self.sidebar.link_activated.connect(self._on_link_activated)
         self.sidebar.link_edit_requested.connect(self._on_link_edit)
         self.sidebar.link_delete_requested.connect(self._on_link_delete)
+        if hasattr(self.sidebar, "links_export_requested"):
+            self.sidebar.links_export_requested.connect(self._export_links_txt)
         self.sidebar.thumbs_viewport_changed.connect(self._on_thumbs_viewport_changed)
         self.sidebar.annotation_filter_changed.connect(lambda _t: None)
         self.sidebar.annotation_tag_rename_requested.connect(self._rename_annotation_tag_global)
@@ -7917,15 +7919,45 @@ class MainWindow(QMainWindow):
         self.sidebar.set_links(links)
 
     def _on_link_activated(self, ann) -> None:
-        """Sprung zum Link (Doppelklick Sidebar) — 2.3.1."""
+        """Doppelklick Sidebar springt zur Seite — 2.3.1/2.3.2."""
         if self.stack.currentWidget() is not self.pdf_view:
             self.stack.setCurrentWidget(self.pdf_view)
         if self.pdf_view.focus_annotation(ann):
+            if ann is not None and hasattr(ann, "page"):
+                self._set_status(f"Link → Seite {int(ann.page) + 1}")
             return
         if ann is not None and hasattr(ann, "page"):
             self.pdf_view.goto_page(int(ann.page))
             self.sidebar.select_thumb(int(ann.page))
             self._set_status(f"Link → Seite {int(ann.page) + 1}")
+
+    def _export_links_txt(self) -> None:
+        """Gefilterte URL-Liste als TXT (eine URL/Zeile) — 2.3.2."""
+        if not hasattr(self.sidebar, "filtered_link_uris"):
+            return
+        uris = self.sidebar.filtered_link_uris()
+        if not uris:
+            QMessageBox.information(
+                self, "Links exportieren", "Keine URLs zum Export (Filter prüfen)."
+            )
+            return
+        stem = "links"
+        if self.pdf_view.pdf_path:
+            stem = Path(self.pdf_view.pdf_path).stem
+        suggested = str(Path(self.pdf_view.pdf_path or ".").with_name(f"{stem}_links.txt"))
+        path, _ok = QFileDialog.getSaveFileName(
+            self,
+            "URL-Liste als TXT exportieren",
+            suggested,
+            "Text (*.txt)",
+        )
+        if not path:
+            return
+        try:
+            Path(path).write_text("\n".join(uris) + "\n", encoding="utf-8")
+            self._set_status(f"Links TXT: {len(uris)} URL(s) → {Path(path).name}")
+        except Exception as e:
+            QMessageBox.warning(self, "Links exportieren", str(e))
 
     def _on_link_edit(self, ann) -> None:
         """Link-URL bearbeiten — 2.3.1."""
@@ -9202,18 +9234,47 @@ class MainWindow(QMainWindow):
             after_bytes = out.stat().st_size if out.is_file() else 0
             before_s = format_byte_size(before_bytes)
             after_s = format_byte_size(after_bytes)
-            if before_bytes > 0 and after_bytes > 0:
-                ratio = (1.0 - (after_bytes / before_bytes)) * 100.0
-                size_line = f"Vorher: {before_s} → Nachher: {after_s} ({ratio:+.1f} %)"
+            savings_pct: float | None = None
+            if before_bytes > 0 and after_bytes >= 0:
+                savings_pct = (1.0 - (after_bytes / before_bytes)) * 100.0
+                size_line = (
+                    f"Ersparnis {savings_pct:.1f} % · "
+                    f"Vorher: {before_s} → Nachher: {after_s}"
+                )
             else:
                 size_line = f"Vorher: {before_s} → Nachher: {after_s}"
-            self._set_status(f"Komprimiert → {out.name} · {size_line}")
+            # Größenersparnis % in Status — 2.3.2
+            status = f"Komprimiert → {out.name}"
+            if savings_pct is not None:
+                status += f" · Ersparnis {savings_pct:.1f} %"
+            status += f" · {before_s} → {after_s}"
+            self._set_status(status)
+            # Dialog-Checkbox merken — 2.3.2
+            try:
+                from instantlensdoc.core.app_settings import set_compress_open_after
+
+                set_compress_open_after(bool(vals.get("open_after")))
+            except Exception:
+                pass
             QMessageBox.information(
                 self,
                 "Kompression",
                 f"Gespeichert:\n{out}\n\n{size_line}",
             )
             _log.info("PDF compressed: %s (%s)", out, size_line)
+            if vals.get("open_after") and out.is_file():
+                try:
+                    self.open_path(str(out))
+                    self._set_status(
+                        f"Komprimiert geöffnet: {out.name}"
+                        + (
+                            f" · Ersparnis {savings_pct:.1f} %"
+                            if savings_pct is not None
+                            else ""
+                        )
+                    )
+                except Exception as open_err:
+                    _log.warning("Komprimiertes PDF öffnen fehlgeschlagen: %s", open_err)
             try:
                 from instantlensdoc.core.telemetry import report_anonymous_usage
 

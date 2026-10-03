@@ -31,8 +31,8 @@ PLANNED = {
         "(TTS/Screenreader-Anbindung geplant; keine Aktion)"
     ),
     "telemetry": (
-        f"Telemetrie — Stub {__version__} — opt-in „anonym Nutzung melden“ "
-        "Default aus, immer no-op — keine Datenübertragung"
+        f"Telemetrie — Stub {__version__} — Toggle disabled (bleibt aus), "
+        "immer no-op — keine Datenübertragung — Info-Dialog warum Stub"
     ),
     "varfonts": "Variable Fonts (voll) — geplant",
     "envelope": "Envelope Distort (voll) — geplant",
@@ -54,8 +54,8 @@ PLANNED_EN = {
         "(TTS/screen reader planned; no action)"
     ),
     "telemetry": (
-        f"Telemetry — stub {__version__} — opt-in “report anonymous usage” "
-        "default off, always no-op (no data transfer)"
+        f"Telemetry — stub {__version__} — toggle disabled (stays off), "
+        "always no-op — no data transfer — info dialog why stub"
     ),
     "varfonts": "Variable fonts (full) — planned",
     "envelope": "Envelope distort (full) — planned",
@@ -76,8 +76,8 @@ STUB_SHORT = {
         "Document Outline Vorlesen (TTS) — Stub / geplant / keine Aktion — 2.0.0."
     ),
     "telemetry": (
-        "Anonyme Nutzung melden — Stub / opt-in Default aus / immer no-op — "
-        "keine Datenübertragung — 2.3.1."
+        "Anonyme Nutzung melden — Stub / Toggle disabled bleibt aus / immer no-op — "
+        "keine Datenübertragung. Warum: kein Backend, Privacy lokal — 2.3.2."
     ),
     "varfonts": "Vollständige Variable-Fonts-Unterstützung — geplant.",
     "envelope": "Envelope-Distort-Transformation — geplant.",
@@ -97,8 +97,8 @@ STUB_SHORT_EN = {
         "Document outline read-aloud (TTS) — stub / planned / no action — 2.0.0."
     ),
     "telemetry": (
-        "Report anonymous usage — stub / opt-in default off / always no-op — "
-        "no data transfer — 2.3.1."
+        "Report anonymous usage — stub / toggle disabled stays off / always no-op — "
+        "no data transfer. Why: no backend, local privacy — 2.3.2."
     ),
     "varfonts": "Full variable fonts support — planned.",
     "envelope": "Envelope distort transform — planned.",

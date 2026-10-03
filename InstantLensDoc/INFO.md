@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **2.3.1** |
+| Version | **2.3.2** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -33,7 +33,7 @@
 
 Skript: [sync-ild.ps1](scripts/sync-ild.ps1) — Branch `cursor/instantlensdoc-2108` (oder `-LocalPack` / Pack-Zip) nach `D:\AI_Temp\InstantLensDoc`, pip, Start. **Nutzer-Icon in `assets` wird nicht überschrieben.**
 
-**FEATURES.md lokal sync:** Nach Sync liegt `FEATURES.md` lokal im App-Ordner (`D:\AI_Temp\InstantLensDoc\FEATURES.md`); About/Stubs öffnen diese lokale Datei — Version **2.3.1**.
+**FEATURES.md lokal sync:** Nach Sync liegt `FEATURES.md` lokal im App-Ordner (`D:\AI_Temp\InstantLensDoc\FEATURES.md`); About/Stubs öffnen diese lokale Datei — Version **2.3.2**.
 
 Ohne Start: `-NoStart` (Alias `-SkipStart`). Exit-Codes: **0** OK · **1** allgemein · **2** Git-Fehler.
 
@@ -62,6 +62,16 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an / `checkedonce`)
+
+## Neu in 2.3.2
+
+Post-Release-Polish nach **2.3.1**:
+
+- **PDF-Kompression:** optional neues File öffnen · Größenersparnis-% in Status
+- **URL-Links Sidebar:** Suche/Filter · Doppelklick springt zur Seite · Export URL-Liste TXT
+- **Command Palette:** Pin häufige Befehle · Recent-Anzahl Settings 5/10/20
+- **Telemetrie-Stub:** Toggle disabled bleibt · Info-Dialog warum Stub
+- Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie klar markiert (Ink ≠ Stylus)
 
 ## Neu in 2.3.1
 
@@ -158,13 +168,13 @@ Exit **0**/OK (`ok=true`) · **1**/Fehler (`ok=false`) · **2**/ungültige Optio
 Beispiel Erfolg:
 
 ```json
-{"ok": true, "version": "2.3.1", "duration_ms": 1234, "checks": ["version", "imports", "cli", "measure_diff_import", "changelog"]}
+{"ok": true, "version": "2.3.2", "duration_ms": 1234, "checks": ["version", "imports", "cli", "measure_diff_import", "changelog"]}
 ```
 
 Beispiel Fail:
 
 ```json
-{"ok": false, "version": "2.3.1", "duration_ms": 12, "checks": ["version", {"name": "imports", "error": "import x: …"}]}
+{"ok": false, "version": "2.3.2", "duration_ms": 12, "checks": ["version", {"name": "imports", "error": "import x: …"}]}
 ```
 
 Ende (ohne `--json`): `Laufzeit: N ms` · `smoke_ild: OK`.

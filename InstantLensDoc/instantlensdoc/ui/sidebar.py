@@ -460,6 +460,7 @@ class Sidebar(QWidget):
     link_activated = Signal(object)  # Annotation LINK — Sprung — 2.3.1
     link_edit_requested = Signal(object)  # Annotation LINK — URL bearbeiten — 2.3.1
     link_delete_requested = Signal(object)  # Annotation LINK / Liste — löschen — 2.3.1
+    links_export_requested = Signal()  # URL-Liste als TXT exportieren — 2.3.2
     thumbs_viewport_changed = Signal(int, bool)  # Mitte-Seite, cancel_fast — 1.3.2
     annotation_filter_changed = Signal(str)  # Typ-Wert oder "" für alle
     annotation_color_filter_changed = Signal(str)  # #RRGGBB oder "" für alle
@@ -797,20 +798,33 @@ class Sidebar(QWidget):
         self.redaction_btns_host.setLayout(red_btns)
         layout.addWidget(self.redaction_btns_host)
 
-        # URL-Links Sidebar — 2.3.1
+        # URL-Links Sidebar — 2.3.1/2.3.2 (Filter · Doppelklick → Seite · Export TXT)
         self.lbl_links = QLabel("URL-Links")
         self.lbl_links.setObjectName("sidebarLinksLabel")
         layout.addWidget(self.lbl_links)
+        self.links_filter = QLineEdit()
+        self.links_filter.setObjectName("sidebarLinksFilter")
+        self.links_filter.setPlaceholderText("Links filtern (URL/Seite)…")
+        self.links_filter.setClearButtonEnabled(True)
+        self.links_filter.setToolTip(
+            "Live-Suche/Filter über URL und Seitennummer — 2.3.2"
+        )
+        self.links_filter.textChanged.connect(self._apply_links_filter)
+        layout.addWidget(self.links_filter)
         self.links_list = QListWidget()
         self.links_list.setObjectName("sidebarLinksList")
         self.links_list.setMaximumHeight(120)
         self.links_list.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self.links_list.setToolTip(
-            "Sidecar-URL-Links — Doppelklick → Seite; Bearbeiten/Löschen — 2.3.1"
+            "Sidecar-URL-Links — Doppelklick springt zur Seite; "
+            "Filter · Bearbeiten/Löschen · Export TXT — 2.3.2"
         )
         self.links_list.itemDoubleClicked.connect(self._activate_link)
         self.links_list.itemActivated.connect(self._activate_link)
         layout.addWidget(self.links_list)
+        self.links_count = QLabel("")
+        self.links_count.setObjectName("sidebarLinksCount")
+        layout.addWidget(self.links_count)
         link_btns = QHBoxLayout()
         self.btn_link_edit = QPushButton("✎")
         self.btn_link_edit.setObjectName("sidebarLinkEditBtn")
@@ -822,13 +836,22 @@ class Sidebar(QWidget):
         self.btn_link_del.setFixedWidth(28)
         self.btn_link_del.setToolTip("Ausgewählte Links löschen — 2.3.1")
         self.btn_link_del.clicked.connect(self._emit_link_delete)
+        self.btn_link_export = QPushButton("TXT")
+        self.btn_link_export.setObjectName("sidebarLinkExportBtn")
+        self.btn_link_export.setFixedWidth(40)
+        self.btn_link_export.setToolTip(
+            "Gefilterte URL-Liste als TXT exportieren (eine URL pro Zeile) — 2.3.2"
+        )
+        self.btn_link_export.clicked.connect(self.links_export_requested.emit)
         link_btns.addWidget(self.btn_link_edit)
         link_btns.addWidget(self.btn_link_del)
+        link_btns.addWidget(self.btn_link_export)
         link_btns.addStretch(1)
         self.link_btns_host = QWidget()
         self.link_btns_host.setObjectName("sidebarLinkBtns")
         self.link_btns_host.setLayout(link_btns)
         layout.addWidget(self.link_btns_host)
+        self._links_all: list = []
 
         layout.addWidget(QLabel("PDF-Favoriten — ziehen zum Ordnen"))
         self.page_favorites = PageFavoriteList()
@@ -2308,32 +2331,69 @@ class Sidebar(QWidget):
         self.link_delete_requested.emit(selected)
 
     def set_links(self, annotations) -> None:
-        """URL-Link-Liste in der Sidebar — 2.3.1."""
+        """URL-Link-Liste in der Sidebar — 2.3.1/2.3.2 (Filter)."""
+        self._links_all = list(annotations or [])
+        self._apply_links_filter()
+
+    def clear_links(self) -> None:
+        self.set_links([])
+
+    def _apply_links_filter(self, _text: str = "") -> None:
+        """Live-Filter URL/Seite — 2.3.2."""
+        q = ""
+        filt = getattr(self, "links_filter", None)
+        if filt is not None:
+            q = (filt.text() or "").strip().lower()
+        anns = list(getattr(self, "_links_all", None) or [])
         self.links_list.clear()
-        anns = list(annotations or [])
         if not anns:
             empty = QListWidgetItem("(keine Links)")
             empty.setFlags(Qt.NoItemFlags)
             self.links_list.addItem(empty)
+            if hasattr(self, "links_count"):
+                self.links_count.setText("0 Links")
             return
+        shown = 0
         for i, a in enumerate(anns, start=1):
             try:
                 page = int(getattr(a, "page", 0) or 0) + 1
             except (TypeError, ValueError):
                 page = "?"
             uri = str(getattr(a, "text", "") or "").strip()
+            hay = f"{uri} {page} s.{page} seite {page}".lower()
+            if q and q not in hay:
+                continue
             short = uri if len(uri) <= 36 else uri[:33] + "…"
             label = f"{i}. S. {page} — {short or '(ohne URL)'}"
             item = QListWidgetItem(label)
             item.setData(256, a)
             item.setToolTip(
-                f"{uri}\nSeite {page} — Doppelklick springt hin; "
-                "✎ bearbeiten · − löschen — 2.3.1"
+                f"{uri}\nSeite {page} — Doppelklick springt zur Seite; "
+                "✎ bearbeiten · − löschen · TXT Export — 2.3.2"
             )
             self.links_list.addItem(item)
+            shown += 1
+        if shown == 0:
+            empty = QListWidgetItem("(keine Treffer)")
+            empty.setFlags(Qt.NoItemFlags)
+            self.links_list.addItem(empty)
+        if hasattr(self, "links_count"):
+            self.links_count.setText(f"{shown} / {len(anns)} Links")
 
-    def clear_links(self) -> None:
-        self.set_links([])
+    def filtered_link_uris(self) -> list[str]:
+        """Sichtbare Link-URLs (Filter berücksichtigt) für TXT-Export — 2.3.2."""
+        uris: list[str] = []
+        for i in range(self.links_list.count()):
+            item = self.links_list.item(i)
+            if item is None or not self._list_item_enabled(item):
+                continue
+            a = item.data(256)
+            if a is None:
+                continue
+            uri = str(getattr(a, "text", "") or "").strip()
+            if uri:
+                uris.append(uri)
+        return uris
 
     def visible_thumb_center(self) -> int:
         """Geschätzte mittlere sichtbare Thumbnail-Seite — 1.3.2."""

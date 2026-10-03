@@ -1,6 +1,7 @@
-"""Schnellaktionen-Palette (Ctrl+K Command Palette) — 2.3.0/2.3.1.
+"""Schnellaktionen-Palette (Ctrl+K Command Palette) — 2.3.0–2.3.2.
 
 2.3.1: Fuzzy-Filter, letzte Befehle, Esc schließt, Kategorien gruppiert.
+2.3.2: Pin häufige Befehle · Recent-Anzahl Settings 5/10/20.
 """
 
 from __future__ import annotations
@@ -9,7 +10,7 @@ from dataclasses import dataclass
 from typing import Callable, List, Optional
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QKeySequence, QShortcut
+from PySide6.QtGui import QAction, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QDialog,
     QHBoxLayout,
@@ -17,6 +18,7 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QListWidget,
     QListWidgetItem,
+    QMenu,
     QVBoxLayout,
 )
 
@@ -117,7 +119,7 @@ def match_command(query: str, cmd: PaletteCommand) -> int | None:
 
 
 class CommandPaletteDialog(QDialog):
-    """Filterbare Schnellaktionen-Palette — Ctrl+K; Fuzzy · Recent · Kategorien · Esc — 2.3.1."""
+    """Filterbare Schnellaktionen — Fuzzy · Pin · Recent · Kategorien · Esc — 2.3.2."""
 
     def __init__(
         self,
@@ -129,7 +131,7 @@ class CommandPaletteDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("Schnellaktionen (Ctrl+K)")
         self.setObjectName("commandPalette")
-        self.resize(560, 420)
+        self.resize(560, 440)
         self.setModal(True)
         self._commands = list(commands or default_palette_commands())
         self._runner = runner
@@ -138,8 +140,8 @@ class CommandPaletteDialog(QDialog):
 
         layout = QVBoxLayout(self)
         hint = QLabel(
-            "Tipp: tippen = Fuzzy-Filter · Enter ausführen · Esc schließen · "
-            "Kategorien · letzte Befehle oben — 2.3.1"
+            "Tipp: tippen = Fuzzy · Enter ausführen · Esc schließen · "
+            "Rechtsklick = Anheften · Recent 5/10/20 (Einstellungen) — 2.3.2"
         )
         hint.setObjectName("commandPaletteHint")
         hint.setWordWrap(True)
@@ -156,6 +158,8 @@ class CommandPaletteDialog(QDialog):
         self.list.setObjectName("commandPaletteList")
         self.list.itemActivated.connect(self._activate_item)
         self.list.itemDoubleClicked.connect(self._activate_item)
+        self.list.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.list.customContextMenuRequested.connect(self._context_menu)
         layout.addWidget(self.list)
 
         foot = QHBoxLayout()
@@ -194,6 +198,14 @@ class CommandPaletteDialog(QDialog):
         except Exception:
             return []
 
+    def _pinned_ids(self) -> list[str]:
+        try:
+            from instantlensdoc.core.app_settings import get_command_palette_pinned
+
+            return list(get_command_palette_pinned())
+        except Exception:
+            return []
+
     def _remember(self, cmd_id: str) -> None:
         try:
             from instantlensdoc.core.app_settings import push_command_palette_recent
@@ -202,10 +214,38 @@ class CommandPaletteDialog(QDialog):
         except Exception:
             pass
 
+    def _context_menu(self, pos) -> None:
+        item = self.list.itemAt(pos)
+        if item is None:
+            return
+        cid = str(item.data(Qt.UserRole) or "").strip()
+        if not cid:
+            return
+        pinned = set(self._pinned_ids())
+        menu = QMenu(self)
+        if cid in pinned:
+            act = QAction("Lösen (Pin entfernen)", self)
+            act.triggered.connect(lambda: self._toggle_pin(cid))
+        else:
+            act = QAction("Anheften (häufiger Befehl)", self)
+            act.triggered.connect(lambda: self._toggle_pin(cid))
+        menu.addAction(act)
+        menu.exec(self.list.mapToGlobal(pos))
+
+    def _toggle_pin(self, cmd_id: str) -> None:
+        try:
+            from instantlensdoc.core.app_settings import toggle_command_palette_pin
+
+            toggle_command_palette_pin(cmd_id)
+        except Exception:
+            pass
+        self._refilter()
+
     def _refilter(self, _text: str = "") -> None:
         q = (self.filter_edit.text() or "").strip()
         self.list.clear()
         recent = self._recent_ids()
+        pinned = self._pinned_ids()
         scored: list[tuple[int, PaletteCommand]] = []
         for cmd in self._commands:
             sc = match_command(q, cmd)
@@ -213,11 +253,17 @@ class CommandPaletteDialog(QDialog):
                 continue
             scored.append((sc, cmd))
 
-        # Ohne Query: Recent zuerst, dann nach Kategorie — 2.3.1
+        # Ohne Query: Pinned → Recent → Kategorie — 2.3.2
         if not q:
-            recent_cmds = [self._by_id[i] for i in recent if i in self._by_id]
-            rest = [c for c in self._commands if c.id not in {x.id for x in recent_cmds}]
-            # Rest nach Kategorie, dann Titel
+            pinned_cmds = [self._by_id[i] for i in pinned if i in self._by_id]
+            pinned_set = {c.id for c in pinned_cmds}
+            recent_cmds = [
+                self._by_id[i]
+                for i in recent
+                if i in self._by_id and i not in pinned_set
+            ]
+            used = pinned_set | {c.id for c in recent_cmds}
+            rest = [c for c in self._commands if c.id not in used]
             cat_order = ["Datei", "Bearbeiten", "PDF", "OCR", "Ansicht", "App", "Hilfe"]
             cat_rank = {c: i for i, c in enumerate(cat_order)}
 
@@ -226,6 +272,14 @@ class CommandPaletteDialog(QDialog):
 
             rest.sort(key=_sort_key)
             shown = 0
+            if pinned_cmds:
+                hdr = QListWidgetItem("—— Angeheftet ——")
+                hdr.setFlags(Qt.NoItemFlags)
+                hdr.setData(Qt.UserRole, "")
+                self.list.addItem(hdr)
+                for cmd in pinned_cmds:
+                    self._add_cmd_item(cmd, pinned_mark=True)
+                    shown += 1
             if recent_cmds:
                 hdr = QListWidgetItem("—— Letzte Befehle ——")
                 hdr.setFlags(Qt.NoItemFlags)
@@ -234,7 +288,6 @@ class CommandPaletteDialog(QDialog):
                 for cmd in recent_cmds:
                     self._add_cmd_item(cmd, recent_mark=True)
                     shown += 1
-            # Nach Kategorie gruppieren
             last_cat = None
             for cmd in rest:
                 if cmd.category != last_cat:
@@ -248,9 +301,9 @@ class CommandPaletteDialog(QDialog):
             self.count_label.setText(f"{shown} / {len(self._commands)}")
         else:
             scored.sort(key=lambda x: (-x[0], x[1].category, x[1].title.lower()))
-            # Kategorie-Header bei Filter nur wenn gemischt
             last_cat = object()
             shown = 0
+            pinned_set = set(pinned)
             for _sc, cmd in scored:
                 if cmd.category != last_cat:
                     last_cat = cmd.category
@@ -258,7 +311,7 @@ class CommandPaletteDialog(QDialog):
                     hdr.setFlags(Qt.NoItemFlags)
                     hdr.setData(Qt.UserRole, "")
                     self.list.addItem(hdr)
-                self._add_cmd_item(cmd)
+                self._add_cmd_item(cmd, pinned_mark=cmd.id in pinned_set)
                 shown += 1
             self.count_label.setText(f"{shown} Treffer (Fuzzy)")
 
@@ -269,11 +322,22 @@ class CommandPaletteDialog(QDialog):
                 self.list.setCurrentRow(i)
                 break
 
-    def _add_cmd_item(self, cmd: PaletteCommand, *, recent_mark: bool = False) -> None:
+    def _add_cmd_item(
+        self,
+        cmd: PaletteCommand,
+        *,
+        recent_mark: bool = False,
+        pinned_mark: bool = False,
+    ) -> None:
         label = cmd.title
         if cmd.shortcut:
             label = f"{cmd.title}  ·  {cmd.shortcut}"
-        prefix = "★ " if recent_mark else ""
+        if pinned_mark:
+            prefix = "[Pin] "
+        elif recent_mark:
+            prefix = "★ "
+        else:
+            prefix = ""
         if cmd.category:
             label = f"{prefix}[{cmd.category}] {label}"
         else:
@@ -285,6 +349,8 @@ class CommandPaletteDialog(QDialog):
             tip += f"\nKategorie: {cmd.category}"
         if cmd.shortcut:
             tip += f"\nShortcut: {cmd.shortcut}"
+        if pinned_mark:
+            tip += "\nAngeheftet (Rechtsklick → Lösen) — 2.3.2"
         if cmd.keywords:
             tip += f"\n{cmd.keywords}"
         item.setToolTip(tip.strip())
