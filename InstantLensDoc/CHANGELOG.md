@@ -1,5 +1,23 @@
 # Changelog — InstantLens Doc
 
+## 1.6.2 — Wasserzeichen Bake Fortschritt·Abbruch·Template, Crypto Prefill·PW-Fehler, Stats Copy·ildstats-v1, Layouts Export/Import·Duplikate
+
+Post-Release-Polish nach 1.6.1: **Wasserzeichen-Bake** mit **Fortschritt + Abbruch** und **Ausgabe-Pfad-Template** in Settings (`{stem}_wm`); **Crypto-Reload** optional **Passwort vorausfüllen** (unsicher, default aus) und klarer **DE-Fehler bei falschem Passwort**; **Dokument-Statistik** **Copy-as-Text** + Export JSON **`ildstats-v1`**; **Workspace-Layouts** Export/Import JSON **`ildlayouts-v1`**, **Duplikat-Namen ablehnen**. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### PDF
+- Wasserzeichen: Bake-Fortschritt + Abbruch; Ausgabe-Template Settings (`{stem}_wm`)
+- Verschlüsseln/Entschlüsseln: Prefill-Toggle für Reload (unsicher, default aus); falsches PW klar DE
+- Dokument-Statistik: Als Text kopieren; JSON-Export `ildstats-v1`
+
+### UI / Workspace
+- Workspace-Layouts: Export/Import JSON `ildlayouts-v1`; Duplikat-Namen abgelehnt
+
+### Packaging / Docs
+- Version **1.6.2** (App / `ild_pdf` / ISS / Smoke / Docs)
+- Smoke: WM Bake progress·cancel·template, Crypto prefill·wrong-PW, Stats copy·ildstats-v1, Layouts export/import·dup-reject (CLI + Qt)
+
+---
+
 ## 1.6.1 — Wasserzeichen Settings·Seitenbereich·Merken, Crypto Stärke·Reload, Stats Refresh·Auto, Layouts Rename·Default·max20
 
 Post-Release-Polish nach 1.6.0: **Wasserzeichen** persistiert Opacity/Größe/Winkel in Settings, **Seitenbereich** (alle/aktuell/1-3,5) und merkt zuletzt Text/Bild; **Verschlüsselung** mit **Stärke-Hinweis**, leeres Passwort ablehnen, nach Erfolg Option **Datei neu laden**; **Dokument-Statistik** mit Refresh-Button, **Auto-Update bei Doc-Wechsel**, Wörter nur bei Textschicht sonst „—“; **Workspace-Layouts** Umbenennen/Löschen, **Default markieren (★)**, max. **20**. Stubs KI/Cloud/Stylus/3D bleiben Stubs.

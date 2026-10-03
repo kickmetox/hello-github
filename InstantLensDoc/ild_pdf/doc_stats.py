@@ -1,10 +1,16 @@
-"""Dokument-Statistik: Seiten, Wörter, Annotationen, Dateigröße — 1.6.0."""
+"""Dokument-Statistik: Seiten, Wörter, Annotationen, Dateigröße — 1.6.2."""
 
 from __future__ import annotations
 
+import json
 import re
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from pathlib import Path
+from typing import Any
+
+
+STATS_SCHEMA_ID = "ildstats-v1"
+STATS_VERSION = 1
 
 
 @dataclass
@@ -23,6 +29,35 @@ class DocumentStats:
         if n < 1024 * 1024:
             return f"{n / 1024:.1f} KB"
         return f"{n / (1024 * 1024):.2f} MB"
+
+    def to_export_dict(self) -> dict[str, Any]:
+        """Export-Dict Schema ildstats-v1 — 1.6.2."""
+        return {
+            "version": STATS_VERSION,
+            "schema": STATS_SCHEMA_ID,
+            "stats": {
+                "path": self.path,
+                "pages": int(self.pages),
+                "words": int(self.words) if self.has_text else None,
+                "has_text": bool(self.has_text),
+                "annotations": int(self.annotations),
+                "file_size": int(self.file_size),
+                "file_size_label": self.format_size(),
+            },
+        }
+
+    def format_text(self) -> str:
+        """Copy-as-Text — 1.6.2."""
+        words = str(self.words) if self.has_text else "—"
+        return (
+            "Dokument-Statistik\n"
+            f"Datei: {Path(self.path).name}\n"
+            f"Pfad: {self.path}\n"
+            f"Seiten: {self.pages}\n"
+            f"Wörter: {words}\n"
+            f"Annotationen: {self.annotations}\n"
+            f"Dateigröße: {self.format_size()} ({self.file_size} B)\n"
+        )
 
 
 _WORD_RE = re.compile(r"\w+", re.UNICODE)
@@ -85,3 +120,21 @@ def collect_document_stats(
         file_size=size,
         has_text=has_text,
     )
+
+
+def export_document_stats_json(
+    stats: DocumentStats,
+    path: str | Path,
+) -> Path:
+    """Dokument-Statistik als ildstats-v1 JSON schreiben — 1.6.2."""
+    path = Path(path)
+    path.write_text(
+        json.dumps(stats.to_export_dict(), ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    return path
+
+
+def format_document_stats_text(stats: DocumentStats) -> str:
+    """Alias Copy-as-Text — 1.6.2."""
+    return stats.format_text()

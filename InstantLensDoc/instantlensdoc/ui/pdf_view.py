@@ -3256,10 +3256,25 @@ class PdfViewer(QWidget):
                 return False
             pw = password if password is not None else self.password
 
+            # Prefill aus Crypto-Reload (nur wenn Toggle an) — 1.6.2
+            prefill = ""
+            try:
+                win = self.window()
+                raw_pf = getattr(win, "_crypto_reload_prefill", None)
+                if raw_pf:
+                    from instantlensdoc.core.app_settings import (
+                        get_crypto_reload_prefill_password,
+                    )
+
+                    if get_crypto_reload_prefill_password():
+                        prefill = str(raw_pf)
+            except Exception:
+                prefill = ""
+
             # Passwort nachfragen wenn nötig
             try:
                 if pw is None and needs_password(path):
-                    pw = ask_pdf_password(self, path)
+                    pw = ask_pdf_password(self, path, prefill=prefill)
                     if pw is None:
                         return False
             except Exception as e:
@@ -3281,9 +3296,20 @@ class PdfViewer(QWidget):
                 return False
 
             if health.errors:
-                # ggf. nochmal Passwort versuchen
-                if any("passwort" in e.lower() or "password" in e.lower() for e in health.errors):
-                    pw2 = ask_pdf_password(self, path)
+                # ggf. nochmal Passwort versuchen — klarer DE-Fehler — 1.6.2
+                from ild_pdf.security import (
+                    WRONG_PASSWORD_MSG_DE,
+                    is_wrong_password_error,
+                )
+
+                pw_err = any(is_wrong_password_error(e) for e in health.errors)
+                if pw_err:
+                    pw2 = ask_pdf_password(
+                        self,
+                        path,
+                        prefill=prefill if prefill else "",
+                        wrong_password=True,
+                    )
                     if pw2 is None:
                         return False
                     pw = pw2
@@ -3297,12 +3323,20 @@ class PdfViewer(QWidget):
                         )
                         return False
                 if health.errors:
-                    QMessageBox.critical(
-                        self,
-                        "PDF öffnen",
-                        "PDF kann nicht geöffnet werden:\n\n"
-                        + "\n".join(health.errors),
-                    )
+                    # Nochmals Passwort? Sonst klare DE-Meldung — 1.6.2
+                    if any(is_wrong_password_error(e) for e in health.errors):
+                        QMessageBox.critical(
+                            self,
+                            "PDF öffnen",
+                            WRONG_PASSWORD_MSG_DE,
+                        )
+                    else:
+                        QMessageBox.critical(
+                            self,
+                            "PDF öffnen",
+                            "PDF kann nicht geöffnet werden:\n\n"
+                            + "\n".join(health.errors),
+                        )
                     self.pdf_path = None
                     self.store = None
                     self.password = None

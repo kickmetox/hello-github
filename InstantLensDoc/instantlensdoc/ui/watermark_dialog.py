@@ -1,4 +1,4 @@
-"""Dialog: Wasserzeichen (Text/Bild, Settings, Seitenbereich, Vorschau, Bake) — 1.6.1."""
+"""Dialog: Wasserzeichen (Text/Bild, Settings, Seitenbereich, Vorschau, Bake) — 1.6.2."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ from pathlib import Path
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QImage, QPixmap
 from PySide6.QtWidgets import (
+    QApplication,
     QCheckBox,
     QComboBox,
     QDialog,
@@ -18,6 +19,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QMessageBox,
+    QProgressDialog,
     QPushButton,
     QRadioButton,
     QSpinBox,
@@ -28,14 +30,18 @@ from PySide6.QtWidgets import (
 
 from ild_pdf.pages import flatten_page_indices, parse_page_ranges
 from ild_pdf.watermark import (
+    WatermarkBakeCancelled,
     apply_image_watermark,
     apply_page_numbers,
     apply_watermark,
+    format_watermark_output_path,
     render_watermark_preview,
 )
 from instantlensdoc.core.app_settings import (
     get_last_watermark_settings,
+    get_watermark_output_template,
     set_last_watermark_settings,
+    set_watermark_output_template,
 )
 
 
@@ -50,7 +56,7 @@ class WatermarkDialog(QDialog):
     ):
         super().__init__(parent)
         self.setWindowTitle("Wasserzeichen / Seitennummern")
-        self.resize(720, 600)
+        self.resize(740, 640)
         self._initial = pdf_path or ""
         self._page_index = page_index
         self._page_count = max(page_count, 1)
@@ -185,9 +191,20 @@ class WatermarkDialog(QDialog):
             )
         )
 
+        # Ausgabe-Pfad Template Settings — 1.6.2
+        self.wm_out_tpl = QLineEdit(get_watermark_output_template())
+        self.wm_out_tpl.setPlaceholderText("{stem}_wm")
+        self.wm_out_tpl.setToolTip(
+            "Ausgabe-Pfad-Template (Settings): {stem} → Dateiname ohne Endung. "
+            "Beispiel: {stem}_wm → dok_wm.pdf — 1.6.2"
+        )
+        form.addRow("Ausgabe-Template", self.wm_out_tpl)
+
         self.wm_inplace = QCheckBox("Original überschreiben")
         self.wm_inplace.setChecked(False)
-        self.wm_inplace.setToolTip("Standard: neues PDF (*_wm.pdf) — Bake — 1.6.0")
+        self.wm_inplace.setToolTip(
+            "Standard: neues PDF aus Template (Settings) — Bake — 1.6.2"
+        )
         form.addRow("", self.wm_inplace)
 
         btn_prev = QPushButton("Vorschau aktualisieren")
@@ -195,7 +212,7 @@ class WatermarkDialog(QDialog):
         form.addRow(btn_prev)
         run = QPushButton("Wasserzeichen in PDF bakken")
         run.setToolTip(
-            "Schreibt Text- oder Bild-Wasserzeichen; Settings merken — 1.6.1"
+            "Bake mit Fortschritt/Abbruch; Settings merken — 1.6.2"
         )
         run.clicked.connect(self._run_wm)
         form.addRow(run)
@@ -255,6 +272,7 @@ class WatermarkDialog(QDialog):
             placement=self._placement(),
             mode="image" if self.wm_mode_image.isChecked() else "text",
         )
+        set_watermark_output_template(self.wm_out_tpl.text().strip())
 
     def _resolve_pages(self) -> list[int] | None:
         """None = alle Seiten; sonst 0-basierte Indizes — 1.6.1."""
@@ -335,6 +353,9 @@ class WatermarkDialog(QDialog):
     def _out_path(self, src: Path, inplace: bool, suffix: str) -> Path:
         if inplace:
             return src
+        if suffix == "wm":
+            tpl = set_watermark_output_template(self.wm_out_tpl.text().strip())
+            return format_watermark_output_path(src, tpl, inplace=False)
         return src.with_name(f"{src.stem}_{suffix}{src.suffix}")
 
     def _run_wm(self):
@@ -350,10 +371,38 @@ class WatermarkDialog(QDialog):
         path = Path(src)
         out = self._out_path(path, self.wm_inplace.isChecked(), "wm")
         placement = self._placement()
+        # Fortschritt + Abbruch — 1.6.2
+        if pages is None:
+            total_pages = max(1, self._page_count)
+        else:
+            total_pages = max(1, len(pages))
+        prog = QProgressDialog(
+            "Wasserzeichen bakken…", "Abbrechen", 0, total_pages, self
+        )
+        prog.setWindowTitle("Wasserzeichen")
+        prog.setWindowModality(Qt.WindowModal)
+        prog.setMinimumDuration(0)
+        prog.setValue(0)
+        cancelled = {"v": False}
+
+        def on_progress(cur: int, total: int) -> bool:
+            if prog.wasCanceled():
+                cancelled["v"] = True
+                return False
+            prog.setMaximum(max(1, total))
+            prog.setValue(cur)
+            prog.setLabelText(f"Wasserzeichen bakken… Seite {cur}/{total}")
+            QApplication.processEvents()
+            if prog.wasCanceled():
+                cancelled["v"] = True
+                return False
+            return True
+
         try:
             if self.wm_mode_image.isChecked():
                 img = self.wm_image.text().strip()
                 if not img or not Path(img).is_file():
+                    prog.close()
                     QMessageBox.warning(self, "Wasserzeichen", "Bilddatei angeben.")
                     return
                 apply_image_watermark(
@@ -365,10 +414,12 @@ class WatermarkDialog(QDialog):
                     angle_deg=self.wm_angle.value(),
                     scale=self.wm_img_scale.value(),
                     placement=placement,
+                    on_progress=on_progress,
                 )
             else:
                 text = self.wm_text.text().strip()
                 if not text:
+                    prog.close()
                     QMessageBox.warning(self, "Wasserzeichen", "Text angeben.")
                     return
                 apply_watermark(
@@ -380,7 +431,9 @@ class WatermarkDialog(QDialog):
                     angle_deg=self.wm_angle.value(),
                     font_size=self.wm_size.value(),
                     placement=placement,
+                    on_progress=on_progress,
                 )
+            prog.close()
             self._persist_wm_settings()
             self.result_path = str(out)
             QMessageBox.information(
@@ -388,7 +441,15 @@ class WatermarkDialog(QDialog):
                 "Wasserzeichen",
                 f"Gebacken / gespeichert:\n{out}",
             )
+        except WatermarkBakeCancelled:
+            prog.close()
+            QMessageBox.information(
+                self,
+                "Wasserzeichen",
+                "Bake abgebrochen — keine Ausgabedatei geschrieben.",
+            )
         except Exception as e:
+            prog.close()
             QMessageBox.critical(self, "Wasserzeichen", str(e))
 
     def _run_num(self):

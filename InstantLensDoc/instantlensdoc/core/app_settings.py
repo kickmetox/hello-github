@@ -71,6 +71,8 @@ DEFAULTS: dict[str, Any] = {
     "ann_filter_presets": [],
     "workspace_layouts": [],  # benannte Sidebar-Layouts Name+Panels+Splitter — 1.6.0
     "default_workspace_layout": "",  # Name des Default-Layouts — 1.6.1
+    "watermark_output_template": "{stem}_wm",  # Bake-Ausgabe-Template — 1.6.2
+    "crypto_reload_prefill_password": False,  # PW vorausfüllen (unsicher) — 1.6.2
     "last_watermark_text": "VERTRAULICH",  # zuletzt WM-Text — 1.6.1
     "last_watermark_image": "",  # zuletzt WM-Bild — 1.6.1
     "last_watermark_opacity": 0.25,  # WM Deckkraft Settings — 1.6.1
@@ -1307,6 +1309,56 @@ def delete_ann_filter_preset(name: str) -> bool:
 
 
 WORKSPACE_LAYOUTS_MAX = 20  # max. 20 Layouts — 1.6.1
+LAYOUTS_SCHEMA_ID = "ildlayouts-v1"
+LAYOUTS_VERSION = 1
+DEFAULT_WATERMARK_OUTPUT_TEMPLATE = "{stem}_wm"
+
+
+def get_watermark_output_template() -> str:
+    """Bake-Ausgabe-Pfad-Template, Default ``{stem}_wm`` — 1.6.2."""
+    raw = str(
+        load_settings().get(
+            "watermark_output_template",
+            DEFAULTS["watermark_output_template"],
+        )
+        or ""
+    ).strip()
+    if not raw:
+        return DEFAULT_WATERMARK_OUTPUT_TEMPLATE
+    raw = raw.replace("/", "_").replace("\\", "_")
+    for suf in (".pdf", ".PDF"):
+        if raw.endswith(suf):
+            raw = raw[: -len(suf)]
+            break
+    if "{stem}" not in raw and "{name}" not in raw:
+        raw = "{stem}_" + raw.lstrip("_")
+    return raw or DEFAULT_WATERMARK_OUTPUT_TEMPLATE
+
+
+def set_watermark_output_template(template: str) -> str:
+    """Bake-Ausgabe-Template speichern — 1.6.2."""
+    raw = str(template or "").strip() or DEFAULT_WATERMARK_OUTPUT_TEMPLATE
+    raw = raw.replace("/", "_").replace("\\", "_")
+    for suf in (".pdf", ".PDF"):
+        if raw.endswith(suf):
+            raw = raw[: -len(suf)]
+            break
+    if "{stem}" not in raw and "{name}" not in raw:
+        raw = "{stem}_" + raw.lstrip("_")
+    save_settings({"watermark_output_template": raw})
+    return raw
+
+
+def get_crypto_reload_prefill_password() -> bool:
+    """Passwort beim Crypto-Reload vorausfüllen (unsicher, default aus) — 1.6.2."""
+    return bool(load_settings().get("crypto_reload_prefill_password", False))
+
+
+def set_crypto_reload_prefill_password(enabled: bool) -> bool:
+    """Toggle Crypto-Reload-Prefill speichern — 1.6.2."""
+    val = bool(enabled)
+    save_settings({"crypto_reload_prefill_password": val})
+    return val
 
 
 def _normalize_workspace_layout(raw: object) -> dict | None:
@@ -1392,8 +1444,13 @@ def save_workspace_layout(
     panels: dict | None = None,
     splitter_sizes: list[int] | None = None,
     state: dict | None = None,
+    overwrite: bool = False,
 ) -> dict:
-    """Layout speichern/überschreiben (gleicher Name → Update) — 1.6.0/1.6.1."""
+    """
+    Layout speichern — 1.6.0/1.6.2.
+    Duplikat-Namen werden abgelehnt (overwrite=False, Default) — 1.6.2.
+    overwrite=True: bestehenden Namen aktualisieren.
+    """
     if isinstance(state, dict):
         if not name:
             name = str(state.get("name") or "")
@@ -1414,13 +1471,16 @@ def save_workspace_layout(
         raise ValueError("Layout-Name fehlt")
     layouts = get_workspace_layouts()
     key = str(layout["name"]).casefold()
-    replaced = False
+    existing_idx = None
     for i, existing in enumerate(layouts):
         if str(existing["name"]).casefold() == key:
-            layouts[i] = layout
-            replaced = True
+            existing_idx = i
             break
-    if not replaced:
+    if existing_idx is not None:
+        if not overwrite:
+            raise ValueError(f"Name bereits vergeben: {layout['name']}")
+        layouts[existing_idx] = layout
+    else:
         if len(layouts) >= WORKSPACE_LAYOUTS_MAX:
             raise ValueError(
                 f"Maximal {WORKSPACE_LAYOUTS_MAX} Layouts — bitte eines löschen."
@@ -1486,6 +1546,117 @@ def delete_workspace_layout(name: str) -> bool:
         patch["default_workspace_layout"] = ""
     save_settings(patch)
     return True
+
+
+class LayoutsImportError(ValueError):
+    """Ungültiges oder konfliktbehaftetes ildlayouts-v1 JSON — 1.6.2."""
+
+
+def export_workspace_layouts_dict() -> dict:
+    """Workspace-Layouts als exportierbares Dict (ildlayouts-v1) — 1.6.2."""
+    return {
+        "version": LAYOUTS_VERSION,
+        "schema": LAYOUTS_SCHEMA_ID,
+        "default": get_default_workspace_layout_name(),
+        "layouts": get_workspace_layouts(),
+    }
+
+
+def export_workspace_layouts_json(path: str | Path) -> Path:
+    """Workspace-Layouts als JSON schreiben (ildlayouts-v1) — 1.6.2."""
+    import json
+
+    path = Path(path)
+    path.write_text(
+        json.dumps(export_workspace_layouts_dict(), ensure_ascii=False, indent=2)
+        + "\n",
+        encoding="utf-8",
+    )
+    return path
+
+
+def import_workspace_layouts_dict(
+    data: dict,
+    *,
+    merge: bool = True,
+) -> list[dict]:
+    """
+    Layouts aus Dict übernehmen (ildlayouts-v1) — 1.6.2.
+    Duplikat-Namen (intern oder gegen bestehende bei merge) werden abgelehnt.
+    """
+    if not isinstance(data, dict):
+        raise LayoutsImportError("Ungültiges Layout-JSON (kein Objekt).")
+    schema = data.get("schema")
+    if schema is not None and str(schema) != LAYOUTS_SCHEMA_ID:
+        raise LayoutsImportError(
+            f"Inkompatibles Schema „{schema}“ — erwartet „{LAYOUTS_SCHEMA_ID}“."
+        )
+    ver = data.get("version", LAYOUTS_VERSION)
+    try:
+        ver_i = int(ver)
+    except (TypeError, ValueError) as e:
+        raise LayoutsImportError(f"Ungültige Version {ver!r}.") from e
+    if ver_i != LAYOUTS_VERSION:
+        raise LayoutsImportError(
+            f"Inkompatible Version {ver_i} — erwartet {LAYOUTS_VERSION}."
+        )
+    raw_list = data.get("layouts")
+    if not isinstance(raw_list, list):
+        raise LayoutsImportError("Feld „layouts“ fehlt oder ist keine Liste.")
+    incoming: list[dict] = []
+    seen: set[str] = set()
+    for item in raw_list:
+        layout = _normalize_workspace_layout(item)
+        if not layout:
+            continue
+        key = str(layout["name"]).casefold()
+        if key in seen:
+            raise LayoutsImportError(
+                f"Name bereits vergeben (im Import): {layout['name']}"
+            )
+        seen.add(key)
+        incoming.append(layout)
+    if not incoming:
+        raise LayoutsImportError("Keine gültigen Layouts im Import.")
+    existing = get_workspace_layouts()
+    existing_keys = {str(p["name"]).casefold() for p in existing}
+    for layout in incoming:
+        key = str(layout["name"]).casefold()
+        if key in existing_keys:
+            raise LayoutsImportError(f"Name bereits vergeben: {layout['name']}")
+    if merge:
+        combined = incoming + existing
+    else:
+        combined = list(incoming)
+    if len(combined) > WORKSPACE_LAYOUTS_MAX:
+        raise LayoutsImportError(
+            f"Maximal {WORKSPACE_LAYOUTS_MAX} Layouts — Import würde Limit überschreiten."
+        )
+    patch: dict = {"workspace_layouts": combined[:WORKSPACE_LAYOUTS_MAX]}
+    default = str(data.get("default") or "").strip()
+    if default:
+        if any(str(p["name"]).casefold() == default.casefold() for p in combined):
+            patch["default_workspace_layout"] = default
+    save_settings(patch)
+    return get_workspace_layouts()
+
+
+def import_workspace_layouts_json(
+    path: str | Path,
+    *,
+    merge: bool = True,
+) -> list[dict]:
+    """Workspace-Layouts aus JSON laden (ildlayouts-v1) — 1.6.2."""
+    import json
+
+    path = Path(path)
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except Exception as e:
+        raise LayoutsImportError(f"JSON lesen fehlgeschlagen: {e}") from e
+    if not isinstance(data, dict):
+        raise LayoutsImportError("Ungültiges Layout-JSON (kein Objekt).")
+    return import_workspace_layouts_dict(data, merge=merge)
 
 
 def get_last_watermark_settings() -> dict:

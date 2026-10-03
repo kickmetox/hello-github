@@ -1,15 +1,50 @@
-"""Wasserzeichen und Seitennummer-Stempel in PDF (pikepdf Content-Stream) — 1.6.0."""
+"""Wasserzeichen und Seitennummer-Stempel in PDF (pikepdf Content-Stream) — 1.6.2."""
 
 from __future__ import annotations
 
 import io
 import math
 from pathlib import Path
-from typing import Iterable, Literal, Optional, Sequence, Union
+from typing import Callable, Iterable, Literal, Optional, Sequence, Union
 
 from PIL import Image, ImageDraw, ImageFont
 
 Placement = Literal["diagonal", "center"]
+
+DEFAULT_WATERMARK_OUTPUT_TEMPLATE = "{stem}_wm"
+
+
+class WatermarkBakeCancelled(Exception):
+    """Bake durch on_progress abgebrochen — 1.6.2."""
+
+
+def format_watermark_output_path(
+    pdf_path: str | Path,
+    template: str | None = None,
+    *,
+    inplace: bool = False,
+) -> Path:
+    """
+    Ausgabe-Pfad aus Template (Settings), Default ``{stem}_wm.pdf`` — 1.6.2.
+    Platzhalter: ``{stem}``, ``{name}`` (Dateiname ohne Suffix), ``{suffix}``.
+    """
+    pdf_path = Path(pdf_path)
+    if inplace:
+        return pdf_path
+    tpl = (template or DEFAULT_WATERMARK_OUTPUT_TEMPLATE).strip() or DEFAULT_WATERMARK_OUTPUT_TEMPLATE
+    tpl = tpl.replace("\\", "_").replace("/", "_")
+    for suf in (".pdf", ".PDF"):
+        if tpl.endswith(suf):
+            tpl = tpl[: -len(suf)]
+            break
+    if "{stem}" not in tpl and "{name}" not in tpl:
+        tpl = "{stem}_" + tpl.lstrip("_")
+    stem = pdf_path.stem
+    rendered = tpl.format(stem=stem, name=stem, suffix=pdf_path.suffix.lstrip(".") or "pdf")
+    rendered = rendered.strip().rstrip(".")
+    if not rendered.lower().endswith(".pdf"):
+        rendered = f"{rendered}{pdf_path.suffix or '.pdf'}"
+    return pdf_path.with_name(rendered)
 
 
 def _pdf_escape(text: str) -> str:
@@ -124,17 +159,19 @@ def apply_watermark(
     font_size: float = 48.0,
     color_gray: float = 0.55,
     placement: Placement | str = "diagonal",
+    on_progress: Optional[Callable[[int, int], bool]] = None,
 ) -> Path:
     """
     Schreibt ein Text-Wasserzeichen auf ausgewählte Seiten.
     placement: ``diagonal`` (Winkel) oder ``center`` (horizontal zentriert).
     Koordinaten: Seitenmitte; Bake in ``out_path`` (Default: neues ``*_wm.pdf``).
+    on_progress: optional ``(current_1based, total) -> bool``; False = Abbruch — 1.6.2.
     """
     import pikepdf
 
     pdf_path = Path(pdf_path)
     if out_path is None:
-        out_path = pdf_path.with_name(f"{pdf_path.stem}_wm{pdf_path.suffix}")
+        out_path = format_watermark_output_path(pdf_path)
     else:
         out_path = Path(out_path)
     text = (text or "").strip()
@@ -144,10 +181,18 @@ def apply_watermark(
     angle = _placement_angle(placement, angle_deg)
     with pikepdf.open(pdf_path, allow_overwriting_input=True) as pdf:
         indices = _page_indices(len(pdf.pages), pages)
+        total = len(indices)
         rad = math.radians(angle)
         cos_a = math.cos(rad)
         sin_a = math.sin(rad)
-        for i in indices:
+        for n, i in enumerate(indices, start=1):
+            if on_progress is not None:
+                try:
+                    cont = on_progress(n, total)
+                except Exception:
+                    cont = True
+                if cont is False:
+                    raise WatermarkBakeCancelled("Wasserzeichen-Bake abgebrochen.")
             page = pdf.pages[i]
             mediabox = page.mediabox
             page_w = float(mediabox[2] - mediabox[0])
@@ -186,16 +231,18 @@ def apply_image_watermark(
     angle_deg: float = 45.0,
     scale: float = 0.45,
     placement: Placement | str = "diagonal",
+    on_progress: Optional[Callable[[int, int], bool]] = None,
 ) -> Path:
     """
     Bild-Wasserzeichen diagonal oder zentriert auf den Seitenbereich bakken.
     scale: Anteil der kürzeren Seitenkante (0.1–1.0). Default-Out: ``*_wm.pdf``.
+    on_progress: optional ``(current_1based, total) -> bool``; False = Abbruch — 1.6.2.
     """
     import pikepdf
 
     pdf_path = Path(pdf_path)
     if out_path is None:
-        out_path = pdf_path.with_name(f"{pdf_path.stem}_wm{pdf_path.suffix}")
+        out_path = format_watermark_output_path(pdf_path)
     else:
         out_path = Path(out_path)
 
@@ -210,10 +257,18 @@ def apply_image_watermark(
 
     with pikepdf.open(pdf_path, allow_overwriting_input=True) as pdf:
         indices = _page_indices(len(pdf.pages), pages)
+        total = len(indices)
         rad = math.radians(angle)
         cos_a = math.cos(rad)
         sin_a = math.sin(rad)
-        for i in indices:
+        for n, i in enumerate(indices, start=1):
+            if on_progress is not None:
+                try:
+                    cont = on_progress(n, total)
+                except Exception:
+                    cont = True
+                if cont is False:
+                    raise WatermarkBakeCancelled("Wasserzeichen-Bake abgebrochen.")
             page = pdf.pages[i]
             mediabox = page.mediabox
             page_w = float(mediabox[2] - mediabox[0])

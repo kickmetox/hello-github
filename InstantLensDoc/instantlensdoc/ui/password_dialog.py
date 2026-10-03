@@ -1,4 +1,4 @@
-"""Dialog: PDF-Passwort setzen / entfernen / öffnen — 1.6.1."""
+"""Dialog: PDF-Passwort setzen / entfernen / öffnen — 1.6.2."""
 
 from __future__ import annotations
 
@@ -9,7 +9,6 @@ from PySide6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
     QFormLayout,
-    QHBoxLayout,
     QLabel,
     QLineEdit,
     QMessageBox,
@@ -17,18 +16,36 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ild_pdf.security import password_strength
+from ild_pdf.security import WRONG_PASSWORD_MSG_DE, password_strength
+from instantlensdoc.core.app_settings import (
+    get_crypto_reload_prefill_password,
+    set_crypto_reload_prefill_password,
+)
 
 
-def ask_pdf_password(parent: QWidget | None, path: str | Path) -> str | None:
-    """Fragt nach dem Öffnen-Passwort. None = Abbruch."""
+def ask_pdf_password(
+    parent: QWidget | None,
+    path: str | Path,
+    *,
+    prefill: str = "",
+    wrong_password: bool = False,
+) -> str | None:
+    """
+    Fragt nach dem Öffnen-Passwort. None = Abbruch.
+    prefill: vorausgefülltes Passwort (nur wenn Settings-Toggle an) — 1.6.2.
+    wrong_password: klarer DE-Hinweis bei erneutem Versuch — 1.6.2.
+    """
     from PySide6.QtWidgets import QInputDialog
 
+    hint = ""
+    if wrong_password:
+        hint = f"{WRONG_PASSWORD_MSG_DE}\n\n"
     text, ok = QInputDialog.getText(
         parent,
         "PDF-Passwort",
-        f"Passwort für:\n{Path(path).name}",
+        f"{hint}Passwort für:\n{Path(path).name}",
         QLineEdit.Password,
+        prefill or "",
     )
     if not ok:
         return None
@@ -39,7 +56,7 @@ class SetPasswordDialog(QDialog):
     def __init__(self, parent=None, pdf_name: str = ""):
         super().__init__(parent)
         self.setWindowTitle("PDF verschlüsseln")
-        self.resize(420, 280)
+        self.resize(420, 320)
         layout = QVBoxLayout(self)
         layout.addWidget(
             QLabel(
@@ -67,6 +84,16 @@ class SetPasswordDialog(QDialog):
         layout.addWidget(self.allow_print)
         layout.addWidget(self.allow_modify)
         layout.addWidget(self.allow_extract)
+        # Reload-Prefill Toggle (unsicher, default aus) — 1.6.2
+        self.prefill_reload = QCheckBox(
+            "Passwort beim Neu-Laden vorausfüllen (unsicher)"
+        )
+        self.prefill_reload.setChecked(bool(get_crypto_reload_prefill_password()))
+        self.prefill_reload.setToolTip(
+            "Speichert das Passwort kurz für den Reload-Dialog. "
+            "Unsicher — Standard aus. — 1.6.2"
+        )
+        layout.addWidget(self.prefill_reload)
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         buttons.accepted.connect(self._accept)
         buttons.rejected.connect(self.reject)
@@ -91,6 +118,7 @@ class SetPasswordDialog(QDialog):
         if not self.user.text().strip():
             QMessageBox.warning(self, "Passwort", "User-Passwort darf nicht leer sein.")
             return
+        set_crypto_reload_prefill_password(self.prefill_reload.isChecked())
         self.accept()
 
     def values(self) -> dict:
@@ -101,16 +129,17 @@ class SetPasswordDialog(QDialog):
             "allow_printing": self.allow_print.isChecked(),
             "allow_modify": self.allow_modify.isChecked(),
             "allow_extract": self.allow_extract.isChecked(),
+            "prefill_reload": self.prefill_reload.isChecked(),
         }
 
 
 class RemovePasswordDialog(QDialog):
-    """PDF entschlüsseln: User-/Owner-Passwort, speichert ungeschütztes PDF — 1.6.0."""
+    """PDF entschlüsseln: User-/Owner-Passwort, speichert ungeschütztes PDF — 1.6.0/1.6.2."""
 
     def __init__(self, parent=None, pdf_name: str = ""):
         super().__init__(parent)
         self.setWindowTitle("PDF entschlüsseln")
-        self.resize(420, 200)
+        self.resize(420, 240)
         layout = QVBoxLayout(self)
         layout.addWidget(
             QLabel(
@@ -127,6 +156,14 @@ class RemovePasswordDialog(QDialog):
         self.inplace.setChecked(False)
         self.inplace.setToolTip("Standard: neues PDF (*_unlocked.pdf)")
         layout.addWidget(self.inplace)
+        self.prefill_reload = QCheckBox(
+            "Passwort beim Neu-Laden vorausfüllen (unsicher)"
+        )
+        self.prefill_reload.setChecked(bool(get_crypto_reload_prefill_password()))
+        self.prefill_reload.setToolTip(
+            "Nur relevant wenn die Zieldatei noch geschützt ist. Unsicher — Standard aus. — 1.6.2"
+        )
+        layout.addWidget(self.prefill_reload)
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         buttons.accepted.connect(self._accept)
         buttons.rejected.connect(self.reject)
@@ -136,12 +173,14 @@ class RemovePasswordDialog(QDialog):
         if not self.password.text().strip():
             QMessageBox.warning(self, "Passwort", "Passwort darf nicht leer sein.")
             return
+        set_crypto_reload_prefill_password(self.prefill_reload.isChecked())
         self.accept()
 
     def values(self) -> dict:
         return {
             "password": self.password.text(),
             "inplace": self.inplace.isChecked(),
+            "prefill_reload": self.prefill_reload.isChecked(),
         }
 
 

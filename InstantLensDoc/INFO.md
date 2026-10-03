@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **1.6.1** |
+| Version | **1.6.2** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -63,10 +63,10 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an / `checkedonce`)
 
-## Neu in 1.6.1
+## Neu in 1.6.2
 
-- Wasserzeichen: Opacity/Größe/Winkel **Settings**; **Seitenbereich**; zuletzt Text/Bild merken
-- Verschlüsselung: **Stärke-Hinweis**; leeres Passwort ablehnen; nach Erfolg **Datei neu laden**
-- Dokument-Statistik: **Refresh**; Auto-Update bei Doc-Wechsel; Wörter nur bei Textschicht sonst „—“
-- Workspace-Layouts: **Umbenennen/Löschen**; Default markieren (★); max. **20** Layouts
+- Wasserzeichen: Bake **Fortschritt + Abbruch**; Ausgabe-Pfad-**Template** Settings (`{stem}_wm`)
+- Verschlüsselung: Reload-**Prefill-Toggle** (unsicher, default aus); falsches PW klar **DE**
+- Dokument-Statistik: **Copy-as-Text**; Export JSON **`ildstats-v1`**
+- Workspace-Layouts: **Export/Import** JSON `ildlayouts-v1`; **Duplikat-Namen ablehnen**
 - Stubs KI/Cloud/Stylus/3D unverändert

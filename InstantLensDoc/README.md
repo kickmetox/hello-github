@@ -2,7 +2,7 @@
 
 Moderne Textverarbeitung mit PDF-Annotator, OCR-Bridge und Formulargenerator.
 
-**Version:** 1.6.1  
+**Version:** 1.6.2  
 **Hersteller:** Andreas Meyer · ame@sellerbach.de
 
 ## Quickstart (Windows)
@@ -33,8 +33,8 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an).
 
-## Neu in 1.6.1
+## Neu in 1.6.2
 
-Polish auf 1.6.0: **Wasserzeichen** Opacity/Größe/Winkel Settings + Seitenbereich + zuletzt Text/Bild merken; **Verschlüsselung** Stärke-Hinweis, leeres Passwort ablehnen, nach Erfolg Datei neu laden; **Statistik** Refresh + Auto-Update bei Doc-Wechsel, Wörter nur bei Textschicht sonst „—“; **Layouts** Umbenennen/Löschen, Default markieren (★), max. 20. Stubs KI/Cloud/Stylus/3D unverändert.
+Polish auf 1.6.1: **Wasserzeichen-Bake** Fortschritt + Abbruch + Ausgabe-Template Settings; **Crypto-Reload** Prefill-Toggle (unsicher, default aus) + klarer DE-Fehler bei falschem PW; **Statistik** Copy-as-Text + JSON `ildstats-v1`; **Layouts** Export/Import JSON + Duplikat-Namen ablehnen. Stubs KI/Cloud/Stylus/3D unverändert.
 
 Siehe [CHANGELOG.md](CHANGELOG.md), [FEATURES.md](FEATURES.md) und [INFO.md](INFO.md).

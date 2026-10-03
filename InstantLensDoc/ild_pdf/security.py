@@ -56,6 +56,26 @@ def needs_password(path: str | Path) -> bool:
         return "password" in msg or "passwd" in msg
 
 
+WRONG_PASSWORD_MSG_DE = "Falsches Passwort. Bitte erneut eingeben."
+
+
+def is_wrong_password_error(message: str | Exception | None) -> bool:
+    """Erkennt typische Passwort-Fehler (EN/DE) — 1.6.2."""
+    msg = str(message or "").lower()
+    if not msg:
+        return False
+    keys = (
+        "password",
+        "passwd",
+        "passwort",
+        "wrong password",
+        "incorrect password",
+        "invalid password",
+        "authentication",
+    )
+    return any(k in msg for k in keys)
+
+
 def try_open_password(path: str | Path, password: str | None) -> Tuple[bool, str]:
     """Prüft, ob path mit password geöffnet werden kann."""
     path = Path(path)
@@ -71,6 +91,8 @@ def try_open_password(path: str | Path, password: str | None) -> Tuple[bool, str
             return False, "PDF enthält keine Seiten."
         return True, ""
     except Exception as e:
+        if is_wrong_password_error(e):
+            return False, WRONG_PASSWORD_MSG_DE
         return False, str(e)
 
 

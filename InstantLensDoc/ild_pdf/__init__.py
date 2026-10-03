@@ -93,15 +93,28 @@ from .overlay import (
     selection_to_plain_text,
 )
 from .watermark import (
+    DEFAULT_WATERMARK_OUTPUT_TEMPLATE,
+    WatermarkBakeCancelled,
     apply_image_watermark,
     apply_page_numbers,
     apply_watermark,
+    format_watermark_output_path,
     render_watermark_preview,
 )
-from .doc_stats import DocumentStats, collect_document_stats, count_words
+from .doc_stats import (
+    STATS_SCHEMA_ID,
+    STATS_VERSION,
+    DocumentStats,
+    collect_document_stats,
+    count_words,
+    export_document_stats_json,
+    format_document_stats_text,
+)
 from .limits import PdfHealth, THUMB_LAZY_THRESHOLD, clamp_render_scale, inspect_pdf
 from .render import clear_render_cache
 from .security import (
+    WRONG_PASSWORD_MSG_DE,
+    is_wrong_password_error,
     needs_password,
     password_strength,
     remove_password,
@@ -222,16 +235,25 @@ __all__ = [
     "selection_to_highlight_rects",
     "selection_to_plain_text",
     "bake_text_overlays",
+    "DEFAULT_WATERMARK_OUTPUT_TEMPLATE",
+    "WatermarkBakeCancelled",
     "apply_watermark",
     "apply_image_watermark",
     "apply_page_numbers",
+    "format_watermark_output_path",
     "render_watermark_preview",
+    "STATS_SCHEMA_ID",
+    "STATS_VERSION",
     "DocumentStats",
     "collect_document_stats",
     "count_words",
+    "export_document_stats_json",
+    "format_document_stats_text",
     "PdfHealth",
     "inspect_pdf",
     "clamp_render_scale",
+    "WRONG_PASSWORD_MSG_DE",
+    "is_wrong_password_error",
     "needs_password",
     "try_open_password",
     "password_strength",
@@ -262,4 +284,4 @@ __all__ = [
     "uri_link_at",
 ]
 
-__version__ = "1.6.1"
+__version__ = "1.6.2"

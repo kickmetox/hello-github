@@ -139,6 +139,7 @@ class MainWindow(QMainWindow):
         self._ann_search_dialog: AnnotationSearchDialog | None = None
         self._doc_stats_dialog: DocStatsDialog | None = None
         self._workspace_layout_menu = None
+        self._crypto_reload_prefill: str | None = None  # unsicher, Toggle — 1.6.2
         self._autosave_enabled = bool(get_autosave_enabled())
         self._thumb_lazy_timer: QTimer | None = None
         self._thumb_lazy_queue: list[int] = []
@@ -6948,9 +6949,18 @@ class MainWindow(QMainWindow):
         self.sidebar.set_annotation_current_page(page_index)
         self._refresh_page_favorites()
         self._update_doc_status()
-    def _offer_reload_pdf(self, out_path, *, title: str = "Passwort") -> None:
-        """Nach Encrypt/Decrypt optional Datei neu laden — 1.6.1."""
+    def _offer_reload_pdf(
+        self,
+        out_path,
+        *,
+        title: str = "Passwort",
+        password: str | None = None,
+        prefill: bool = False,
+    ) -> None:
+        """Nach Encrypt/Decrypt optional Datei neu laden — 1.6.1/1.6.2."""
         from pathlib import Path as _Path
+
+        from instantlensdoc.core.app_settings import get_crypto_reload_prefill_password
 
         path = _Path(out_path)
         if not path.is_file():
@@ -6964,9 +6974,17 @@ class MainWindow(QMainWindow):
         )
         if reply == QMessageBox.Yes:
             try:
+                # Prefill nur wenn Toggle an (unsicher, default aus) — 1.6.2
+                use_prefill = bool(prefill) or get_crypto_reload_prefill_password()
+                if use_prefill and password:
+                    self._crypto_reload_prefill = str(password)
+                else:
+                    self._crypto_reload_prefill = None
                 self.open_path(str(path))
             except Exception as e:
                 QMessageBox.warning(self, title, f"Neu laden fehlgeschlagen:\n{e}")
+            finally:
+                self._crypto_reload_prefill = None
 
     def _set_pdf_password(self):
         if not self.pdf_view.pdf_path:
@@ -6976,9 +6994,11 @@ class MainWindow(QMainWindow):
         if not dlg.exec():
             return
         vals = dlg.values()
-        if not str(vals.get("user_password") or "").strip():
+        user_pw = str(vals.get("user_password") or "")
+        if not user_pw.strip():
             QMessageBox.warning(self, "Passwort", "User-Passwort darf nicht leer sein.")
             return
+        prefill = bool(vals.pop("prefill_reload", False))
         try:
             from ild_pdf import set_password
             from ild_pdf.render import clear_render_cache
@@ -6990,13 +7010,15 @@ class MainWindow(QMainWindow):
             clear_render_cache(self.pdf_view.pdf_path)
             self._set_status(f"Passwort gesetzt → {out.name}")
             _log.info("PDF encrypted: %s", out)
-            self._offer_reload_pdf(out, title="Passwort")
+            self._offer_reload_pdf(
+                out, title="Passwort", password=user_pw, prefill=prefill
+            )
         except Exception as e:
             _log.exception("Passwort setzen fehlgeschlagen")
             QMessageBox.warning(self, "Passwort", str(e))
 
     def _remove_pdf_password(self):
-        """PDF entschlüsseln / Passwort entfernen — 1.6.0/1.6.1."""
+        """PDF entschlüsseln / Passwort entfernen — 1.6.0/1.6.2."""
         if not self.pdf_view.pdf_path:
             QMessageBox.information(self, "Passwort", "Bitte zuerst ein PDF öffnen.")
             return
@@ -7004,9 +7026,11 @@ class MainWindow(QMainWindow):
         if not dlg.exec():
             return
         vals = dlg.values()
-        if not str(vals.get("password") or "").strip():
+        pw = str(vals.get("password") or "")
+        if not pw.strip():
             QMessageBox.warning(self, "Passwort", "Passwort darf nicht leer sein.")
             return
+        prefill = bool(vals.pop("prefill_reload", False))
         try:
             from ild_pdf import remove_password
             from ild_pdf.render import clear_render_cache
@@ -7016,14 +7040,19 @@ class MainWindow(QMainWindow):
                 out = src
             else:
                 out = src.with_name(f"{src.stem}_unlocked.pdf")
-            remove_password(src, vals["password"], out_path=out)
+            remove_password(src, pw, out_path=out)
             clear_render_cache(src)
             self._set_status(f"Passwort entfernt → {out.name}")
             _log.info("PDF decrypted: %s", out)
-            self._offer_reload_pdf(out, title="Passwort")
+            self._offer_reload_pdf(
+                out, title="Passwort", password=pw, prefill=prefill
+            )
         except Exception as e:
             _log.exception("Passwort entfernen fehlgeschlagen")
-            QMessageBox.warning(self, "Passwort", str(e))
+            from ild_pdf.security import WRONG_PASSWORD_MSG_DE, is_wrong_password_error
+
+            msg = WRONG_PASSWORD_MSG_DE if is_wrong_password_error(e) else str(e)
+            QMessageBox.warning(self, "Passwort", msg)
 
     def _sync_doc_stats_panel(self) -> None:
         """Offenes Statistik-Panel bei Doc-Wechsel aktualisieren — 1.6.1."""
@@ -7086,10 +7115,21 @@ class MainWindow(QMainWindow):
         menu.clear()
         act_save = QAction("Layout speichern…", self)
         act_save.setToolTip(
-            f"Aktuelle Panels + Splitter speichern (max. {WORKSPACE_LAYOUTS_MAX}) — 1.6.1"
+            f"Aktuelle Panels + Splitter speichern (max. {WORKSPACE_LAYOUTS_MAX}; "
+            "Duplikat-Namen abgelehnt) — 1.6.2"
         )
         act_save.triggered.connect(self._save_workspace_layout)
         menu.addAction(act_save)
+        act_export = QAction("Layouts exportieren…", self)
+        act_export.setToolTip("Alle Layouts als ildlayouts-v1 JSON — 1.6.2")
+        act_export.triggered.connect(self._export_workspace_layouts)
+        menu.addAction(act_export)
+        act_import = QAction("Layouts importieren…", self)
+        act_import.setToolTip(
+            "Layouts aus ildlayouts-v1 JSON; Duplikat-Namen abgelehnt — 1.6.2"
+        )
+        act_import.triggered.connect(self._import_workspace_layouts)
+        menu.addAction(act_import)
         menu.addSeparator()
         layouts = get_workspace_layouts()
         default_name = get_default_workspace_layout_name()
@@ -7139,13 +7179,14 @@ class MainWindow(QMainWindow):
 
         from instantlensdoc.core.app_settings import (
             WORKSPACE_LAYOUTS_MAX,
+            get_workspace_layout,
             save_workspace_layout,
         )
 
         name, ok = QInputDialog.getText(
             self,
             "Workspace-Layout",
-            f"Name für das Layout (max. {WORKSPACE_LAYOUTS_MAX}):",
+            f"Name für das Layout (max. {WORKSPACE_LAYOUTS_MAX}; Duplikate abgelehnt):",
         )
         if not ok:
             return
@@ -7153,10 +7194,91 @@ class MainWindow(QMainWindow):
         if not name:
             QMessageBox.warning(self, "Workspace-Layout", "Name darf nicht leer sein.")
             return
+        if get_workspace_layout(name) is not None:
+            QMessageBox.warning(
+                self,
+                "Workspace-Layout",
+                f"Name bereits vergeben: {name}",
+            )
+            return
         try:
-            save_workspace_layout(name, state=self._current_workspace_layout_state())
+            save_workspace_layout(
+                name,
+                state=self._current_workspace_layout_state(),
+                overwrite=False,
+            )
             self._refresh_workspace_layout_menu()
             self._set_status(f"Layout gespeichert: {name}")
+        except Exception as e:
+            QMessageBox.warning(self, "Workspace-Layout", str(e))
+
+    def _export_workspace_layouts(self):
+        """Layouts als ildlayouts-v1 JSON exportieren — 1.6.2."""
+        from pathlib import Path as _Path
+
+        from instantlensdoc.core.app_settings import (
+            dialog_start_dir,
+            export_workspace_layouts_json,
+            get_last_export_dir,
+            get_workspace_layouts,
+            set_last_export_dir,
+        )
+
+        if not get_workspace_layouts():
+            QMessageBox.information(self, "Workspace-Layout", "Keine Layouts gespeichert.")
+            return
+        start = dialog_start_dir(get_last_export_dir())
+        path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Layouts exportieren (ildlayouts-v1)",
+            str(_Path(start) / "workspace_layouts.json"),
+            "JSON (*.json);;Alle (*.*)",
+        )
+        if not path:
+            return
+        try:
+            out = export_workspace_layouts_json(path)
+            set_last_export_dir(_Path(out).parent)
+            self._set_status(f"Layouts exportiert: {_Path(out).name}")
+            QMessageBox.information(
+                self, "Workspace-Layout", f"Exportiert (ildlayouts-v1):\n{out}"
+            )
+        except Exception as e:
+            QMessageBox.warning(self, "Workspace-Layout", str(e))
+
+    def _import_workspace_layouts(self):
+        """Layouts aus ildlayouts-v1 JSON importieren; Duplikate abgelehnt — 1.6.2."""
+        from pathlib import Path as _Path
+
+        from instantlensdoc.core.app_settings import (
+            LayoutsImportError,
+            dialog_start_dir,
+            get_last_export_dir,
+            import_workspace_layouts_json,
+            set_last_export_dir,
+        )
+
+        start = dialog_start_dir(get_last_export_dir())
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Layouts importieren (ildlayouts-v1)",
+            start,
+            "JSON (*.json);;Alle (*.*)",
+        )
+        if not path:
+            return
+        try:
+            layouts = import_workspace_layouts_json(path, merge=True)
+            set_last_export_dir(_Path(path).parent)
+            self._refresh_workspace_layout_menu()
+            self._set_status(f"Layouts importiert: {len(layouts)}")
+            QMessageBox.information(
+                self,
+                "Workspace-Layout",
+                f"{len(layouts)} Layout(s) geladen (ildlayouts-v1).",
+            )
+        except LayoutsImportError as e:
+            QMessageBox.warning(self, "Workspace-Layout", str(e))
         except Exception as e:
             QMessageBox.warning(self, "Workspace-Layout", str(e))
 

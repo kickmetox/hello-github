@@ -1,20 +1,34 @@
-"""Panel/Dialog: Dokument-Statistik (Seiten, Wörter, Ann., Dateigröße) — 1.6.1."""
+"""Panel/Dialog: Dokument-Statistik (Seiten, Wörter, Ann., Dateigröße) — 1.6.2."""
 
 from __future__ import annotations
 
 from pathlib import Path
 
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QGuiApplication
 from PySide6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
+    QFileDialog,
     QFormLayout,
+    QHBoxLayout,
     QLabel,
+    QMessageBox,
     QPushButton,
     QVBoxLayout,
 )
 
-from ild_pdf.doc_stats import DocumentStats, collect_document_stats
+from ild_pdf.doc_stats import (
+    DocumentStats,
+    collect_document_stats,
+    export_document_stats_json,
+    format_document_stats_text,
+)
+from instantlensdoc.core.app_settings import (
+    dialog_start_dir,
+    get_last_export_dir,
+    set_last_export_dir,
+)
 
 
 class DocStatsDialog(QDialog):
@@ -31,12 +45,15 @@ class DocStatsDialog(QDialog):
         self.setWindowTitle("Dokument-Statistik")
         self.setWindowModality(Qt.NonModal)
         self.setAttribute(Qt.WA_DeleteOnClose, False)
-        self.resize(380, 260)
+        self.resize(400, 300)
         self._pdf_path = Path(pdf_path) if pdf_path else None
         self._ann_count = annotation_count
+        self._last_stats: DocumentStats | None = None
 
         layout = QVBoxLayout(self)
-        self.hint = QLabel("Seiten · Wörter (Text-PDF) · Annotationen · Dateigröße")
+        self.hint = QLabel(
+            "Seiten · Wörter (Text-PDF) · Annotationen · Dateigröße — Copy/JSON 1.6.2"
+        )
         self.hint.setWordWrap(True)
         self.hint.setStyleSheet("color:#555;")
         layout.addWidget(self.hint)
@@ -62,9 +79,19 @@ class DocStatsDialog(QDialog):
         form.addRow("Dateigröße", self.lbl_size)
         layout.addLayout(form)
 
+        btn_row = QHBoxLayout()
         self.btn_refresh = QPushButton("Aktualisieren")
         self.btn_refresh.clicked.connect(self.refresh)
-        layout.addWidget(self.btn_refresh)
+        btn_row.addWidget(self.btn_refresh)
+        self.btn_copy = QPushButton("Als Text kopieren")
+        self.btn_copy.setToolTip("Statistik in die Zwischenablage (Copy-as-Text) — 1.6.2")
+        self.btn_copy.clicked.connect(self.copy_as_text)
+        btn_row.addWidget(self.btn_copy)
+        self.btn_export = QPushButton("JSON exportieren…")
+        self.btn_export.setToolTip("Export als ildstats-v1 JSON — 1.6.2")
+        self.btn_export.clicked.connect(self.export_json)
+        btn_row.addWidget(self.btn_export)
+        layout.addLayout(btn_row)
 
         buttons = QDialogButtonBox(QDialogButtonBox.Close)
         buttons.rejected.connect(self.close)
@@ -90,6 +117,7 @@ class DocStatsDialog(QDialog):
             self.lbl_words.setText("— (kein PDF)")
             self.lbl_ann.setText("—")
             self.lbl_size.setText("—")
+            self._last_stats = None
             return None
         try:
             stats = collect_document_stats(
@@ -99,6 +127,7 @@ class DocStatsDialog(QDialog):
         except Exception as e:
             self.lbl_file.setText(self._pdf_path.name)
             self.lbl_words.setText(f"Fehler: {e}")
+            self._last_stats = None
             return None
         self.lbl_file.setText(self._pdf_path.name)
         self.lbl_file.setToolTip(str(self._pdf_path))
@@ -110,4 +139,44 @@ class DocStatsDialog(QDialog):
             self.lbl_words.setText("—")
         self.lbl_ann.setText(str(stats.annotations))
         self.lbl_size.setText(f"{stats.format_size()} ({stats.file_size} B)")
+        self._last_stats = stats
         return stats
+
+    def copy_as_text(self) -> bool:
+        """Statistik als Text in die Zwischenablage — 1.6.2."""
+        stats = self._last_stats or self.refresh()
+        if stats is None:
+            QMessageBox.information(self, "Dokument-Statistik", "Keine Statistik verfügbar.")
+            return False
+        text = format_document_stats_text(stats)
+        QGuiApplication.clipboard().setText(text)
+        return True
+
+    def export_json(self) -> Path | None:
+        """Statistik als ildstats-v1 JSON speichern — 1.6.2."""
+        stats = self._last_stats or self.refresh()
+        if stats is None:
+            QMessageBox.information(self, "Dokument-Statistik", "Keine Statistik verfügbar.")
+            return None
+        stem = Path(stats.path).stem or "document"
+        start = dialog_start_dir(get_last_export_dir(), Path(stats.path).parent)
+        path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Statistik exportieren (ildstats-v1)",
+            str(Path(start) / f"{stem}_stats.json"),
+            "JSON (*.json);;Alle (*.*)",
+        )
+        if not path:
+            return None
+        try:
+            out = export_document_stats_json(stats, path)
+            set_last_export_dir(Path(out).parent)
+            QMessageBox.information(
+                self,
+                "Dokument-Statistik",
+                f"Exportiert (ildstats-v1):\n{out}",
+            )
+            return out
+        except Exception as e:
+            QMessageBox.critical(self, "Dokument-Statistik", str(e))
+            return None
