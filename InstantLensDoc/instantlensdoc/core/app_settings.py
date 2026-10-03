@@ -70,7 +70,14 @@ DEFAULTS: dict[str, Any] = {
     "active_export_profile": "",
     "window_geometry": "",
     "window_state": "",
-    "ann_color_presets": ["#FFE066", "#FF6B6B", "#4ECDC4"],
+    "ann_color_presets": [
+        "#FFE066",
+        "#FF6B6B",
+        "#4ECDC4",
+        "#5B8DEF",
+        "#F5A623",
+        "#9B59B6",
+    ],
     "restore_session_on_start": True,
     "restore_window_geometry_on_start": True,
     "pdf_thumbnail_scale": 0.18,
@@ -1904,8 +1911,15 @@ def set_window_state_b64(data: str) -> None:
     save_settings({"window_state": str(data or "")})
 
 
-ANN_COLOR_PRESET_COUNT = 3
-_DEFAULT_ANN_PRESETS = ["#FFE066", "#FF6B6B", "#4ECDC4"]
+ANN_COLOR_PRESET_COUNT = 6
+_DEFAULT_ANN_PRESETS = [
+    "#FFE066",
+    "#FF6B6B",
+    "#4ECDC4",
+    "#5B8DEF",
+    "#F5A623",
+    "#9B59B6",
+]
 
 
 def _normalize_hex_color(color: str, fallback: str = "#888888") -> str:
@@ -1916,11 +1930,11 @@ def _normalize_hex_color(color: str, fallback: str = "#888888") -> str:
         c = "#" + c
     if len(c) < 4:
         return fallback
-    return c
+    return c.upper() if len(c) >= 7 else c
 
 
 def get_ann_color_presets() -> list[str]:
-    """Drei Favoriten-Farben für Annotationen (Highlight/Stift)."""
+    """Sechs Favoriten-Farben für Annotationen (Stroke/Fill Quick-Bar) — 0.9.5."""
     raw = load_settings().get("ann_color_presets")
     defaults = list(_DEFAULT_ANN_PRESETS)
     if not isinstance(raw, list):
@@ -1947,7 +1961,7 @@ def set_ann_color_presets(colors: list[str]) -> list[str]:
 
 
 def set_ann_color_preset(index: int, color: str) -> list[str]:
-    """Einzelnen Favoriten-Slot (0..2) setzen."""
+    """Einzelnen Favoriten-Slot (0..5) setzen — 0.9.5: 6 Farben."""
     presets = get_ann_color_presets()
     i = max(0, min(ANN_COLOR_PRESET_COUNT - 1, int(index)))
     presets[i] = _normalize_hex_color(color, presets[i])

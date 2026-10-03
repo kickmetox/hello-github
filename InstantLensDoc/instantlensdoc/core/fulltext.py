@@ -380,13 +380,17 @@ def export_search_hits_csv(
     return dest
 
 
+# Felder je Treffer in ildsearch-v1 (kompatibel erweitert um offset — 0.9.4/0.9.5)
+SEARCH_HIT_JSON_FIELDS = SEARCH_HIT_CSV_FIELDS
+
+
 def export_search_hits_json(
     path: str | Path,
     hits: Sequence[dict],
     *,
     query: str = "",
 ) -> Path:
-    """Suchergebnisse als JSON exportieren (Schema ildsearch-v1)."""
+    """Suchergebnisse als JSON exportieren (Schema ildsearch-v1, inkl. Offset)."""
     import json
     from datetime import datetime, timezone
 
@@ -398,13 +402,19 @@ def export_search_hits_json(
         normalize_search_hit_record(h, index=i + 1, query=query)
         for i, h in enumerate(hits or [])
     ]
+    # Explizite Feldreihenfolge / Vollständigkeit (offset inkl.)
+    ordered = [
+        {k: row.get(k, "") for k in SEARCH_HIT_JSON_FIELDS}
+        for row in rows
+    ]
     payload = {
         "version": 1,
         "schema": "ildsearch-v1",
         "exported_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "query": str(query or ""),
-        "count": len(rows),
-        "hits": rows,
+        "count": len(ordered),
+        "fields": list(SEARCH_HIT_JSON_FIELDS),
+        "hits": ordered,
     }
     dest.write_text(
         json.dumps(payload, ensure_ascii=False, indent=2) + "\n",

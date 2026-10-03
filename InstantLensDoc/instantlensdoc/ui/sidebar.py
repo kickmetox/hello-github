@@ -90,6 +90,7 @@ class DocumentList(QListWidget):
     document_close_right_requested = Signal(str)  # Tabs rechts von Pfad schließen
     document_pin_toggled = Signal(str, bool)  # Pfad, pinned — 0.9.2
     document_rename_requested = Signal(str)  # Pfad — Doppelklick Titel umbenennen (0.9.4)
+    document_label_reset_requested = Signal(str)  # Pfad — Originaltitel (0.9.5)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -99,7 +100,9 @@ class DocumentList(QListWidget):
         self.setToolTip(
             "Ziehen zum Neuordnen — Doppelklick Titel umbenennen — "
             "Mittelklick schließt Tab — "
-            "Rechtsklick: Anheften / Umbenennen / Schließen / Andere / Links / Rechts / Alle"
+            "Rechtsklick: Anheften / Umbenennen / Originaltitel / "
+            "Schließen / Andere / Links / Rechts / Alle — "
+            "Tooltip = voller Pfad"
         )
         self.setContextMenuPolicy(Qt.CustomContextMenu)
         self.customContextMenuRequested.connect(self._context_menu)
@@ -154,9 +157,17 @@ class DocumentList(QListWidget):
         if not path:
             return
         pinned = self._item_pinned(item)
+        custom = str(item.data(_DOC_LABEL_ROLE) or "").strip() if item else ""
         menu = QMenu(self)
         act_pin = menu.addAction("Lösen" if pinned else "Anheften")
         act_rename = menu.addAction("Umbenennen…")
+        act_reset = menu.addAction("Originaltitel")
+        act_reset.setEnabled(bool(custom))
+        act_reset.setToolTip(
+            "Anzeige-Label zurücksetzen → Dateiname"
+            if custom
+            else "Kein eigenes Anzeige-Label gesetzt"
+        )
         menu.addSeparator()
         act_close = menu.addAction("Schließen")
         if pinned:
@@ -173,6 +184,8 @@ class DocumentList(QListWidget):
             self.document_pin_toggled.emit(path, not pinned)
         elif chosen is act_rename:
             self.document_rename_requested.emit(path)
+        elif chosen is act_reset:
+            self.document_label_reset_requested.emit(path)
         elif chosen is act_close:
             self.document_close_requested.emit(path)
         elif chosen is act_others:
@@ -415,6 +428,7 @@ class Sidebar(QWidget):
     page_favorites_reordered = Signal(list)  # Seiten 0-basiert neue Reihenfolge
     documents_reordered = Signal()  # Dokument-/Session-Tab-Reihenfolge geändert
     document_rename_requested = Signal(str)  # Tab-Titel umbenennen (Anzeige-Label) — 0.9.4
+    document_label_reset_requested = Signal(str)  # Originaltitel — Label zurücksetzen (0.9.5)
     document_close_requested = Signal(str)  # Sidebar-Tab schließen (Pfad)
     document_close_others_requested = Signal(str)  # Andere Tabs schließen (Keep-Pfad)
     document_close_all_requested = Signal()  # Alle Tabs schließen
@@ -519,7 +533,7 @@ class Sidebar(QWidget):
         self.btn_export_search_json = QPushButton("JSON")
         self.btn_export_search_json.setFixedWidth(48)
         self.btn_export_search_json.setToolTip(
-            "Suchergebnisse der Trefferliste als JSON exportieren (ildsearch-v1)"
+            "Suchergebnisse als JSON (ildsearch-v1): Seite, Offset, Snippet — 0.9.5"
         )
         self.btn_export_search_json.clicked.connect(
             lambda: self.search_export_requested.emit("json")
@@ -572,9 +586,11 @@ class Sidebar(QWidget):
         )
         self.files.document_pin_toggled.connect(self.document_pin_toggled.emit)
         self.files.document_rename_requested.connect(self._rename_document_label)
+        self.files.document_label_reset_requested.connect(self._reset_document_label)
         layout.addWidget(self.files)
 
-        layout.addWidget(QLabel("Seiten (Vorschaubilder) — ziehen zum Ordnen"))
+        self.lbl_thumbs = QLabel("Seiten (Vorschaubilder) — ziehen zum Ordnen")
+        layout.addWidget(self.lbl_thumbs)
         self.thumbs = ThumbnailList()
         self.thumbs.itemClicked.connect(self._activate_thumb)
         self.thumbs.pages_reordered.connect(self.pages_reordered.emit)
@@ -586,7 +602,8 @@ class Sidebar(QWidget):
         )
         layout.addWidget(self.thumbs)
 
-        layout.addWidget(QLabel("Lesezeichen / Outline"))
+        self.lbl_outline = QLabel("Lesezeichen / Outline")
+        layout.addWidget(self.lbl_outline)
         self.outline = QTreeWidget()
         self.outline.setHeaderHidden(True)
         self.outline.setMaximumHeight(120)
@@ -606,7 +623,9 @@ class Sidebar(QWidget):
         ol_btns.addWidget(self.btn_outline_add)
         ol_btns.addWidget(self.btn_outline_del)
         ol_btns.addStretch(1)
-        layout.addLayout(ol_btns)
+        self.outline_btns_host = QWidget()
+        self.outline_btns_host.setLayout(ol_btns)
+        layout.addWidget(self.outline_btns_host)
 
         layout.addWidget(QLabel("PDF-Favoriten — ziehen zum Ordnen"))
         self.page_favorites = PageFavoriteList()
@@ -624,7 +643,8 @@ class Sidebar(QWidget):
         self.line_favorites.bookmarks_reordered.connect(self.line_favorites_reordered.emit)
         layout.addWidget(self.line_favorites)
 
-        layout.addWidget(QLabel("Annotationen (gruppiert nach Seite)"))
+        self.lbl_annotations = QLabel("Annotationen (gruppiert nach Seite)")
+        layout.addWidget(self.lbl_annotations)
         self.ann_filter = QComboBox()
         self.ann_filter.setToolTip("Nach Annotationstyp filtern")
         self.ann_filter.addItem("Alle Typen", "")
@@ -1203,6 +1223,7 @@ class Sidebar(QWidget):
         item.setData(256, str(path))
         item.setData(_DOC_PINNED_ROLE, False)
         item.setData(_DOC_LABEL_ROLE, label)
+        # Tooltip: voller Pfad (0.9.5)
         tip = str(path)
         if label and label != path.name:
             tip = f"{path}\nAnzeige: {label}"
@@ -1294,15 +1315,18 @@ class Sidebar(QWidget):
         base = self._document_display_base(item)
         pinned = bool(item.data(_DOC_PINNED_ROLE))
         item.setText((_PIN_PREFIX + base) if pinned else base)
-        tip = str(p)
+        # Tooltip: immer voller Pfad zuerst (0.9.5)
+        tip = str(p) if p else ""
         custom = str(item.data(_DOC_LABEL_ROLE) or "").strip()
         extras: list[str] = []
         if custom and p and custom != Path(str(p)).name:
             extras.append(f"Anzeige: {custom}")
         if pinned:
             extras.append("Angeheftet — geschützt vor „Alle schließen“")
-        if extras:
-            tip = str(p) + "\n" + "\n".join(extras)
+        if extras and tip:
+            tip = tip + "\n" + "\n".join(extras)
+        elif extras:
+            tip = "\n".join(extras)
         item.setToolTip(tip)
 
     def document_label(self, path: str) -> str:
@@ -1372,6 +1396,83 @@ class Sidebar(QWidget):
             return
         if self.set_document_label(target, text):
             self.document_rename_requested.emit(target)
+
+    def _reset_document_label(self, path: str) -> None:
+        """Kontext „Originaltitel“: Anzeige-Label → Dateiname (0.9.5)."""
+        target = str(Path(path)) if path else ""
+        if not target:
+            return
+        if self.set_document_label(target, ""):
+            self.document_label_reset_requested.emit(target)
+
+    def reset_document_label(self, path: str) -> bool:
+        """Anzeige-Label zurücksetzen (API). True wenn Tab gefunden."""
+        ok = self.set_document_label(path, "")
+        return bool(ok)
+
+    def panel_visibility(self) -> dict[str, bool]:
+        """Sichtbarkeit Sidebar-Panels Thumb / Ann / Bookmark (0.9.5)."""
+        return {
+            "thumbs": bool(self.thumbs.isVisible()),
+            "ann": bool(self.annotations.isVisible()),
+            "bookmark": bool(self.outline.isVisible()),
+        }
+
+    def set_panel_visibility(
+        self,
+        *,
+        thumbs: bool | None = None,
+        ann: bool | None = None,
+        bookmark: bool | None = None,
+    ) -> dict[str, bool]:
+        """Panels Thumb/Ann/Bookmark ein-/ausblenden (Label + Widget) — 0.9.5."""
+        if thumbs is not None:
+            vis = bool(thumbs)
+            self.thumbs.setVisible(vis)
+            if hasattr(self, "lbl_thumbs"):
+                self.lbl_thumbs.setVisible(vis)
+        if ann is not None:
+            vis = bool(ann)
+            self.annotations.setVisible(vis)
+            if hasattr(self, "lbl_annotations"):
+                self.lbl_annotations.setVisible(vis)
+            # Filter-/Preset-Zeile mit ausblenden
+            for wname in (
+                "ann_filter",
+                "ann_filter_preset",
+                "btn_ann_preset_save",
+                "btn_ann_preset_load",
+                "btn_ann_preset_del",
+                "ann_current_page",
+                "ann_tag_filter",
+                "ann_tag_cloud",
+                "ann_search",
+                "ann_search_regex",
+                "ann_stats_label",
+                "ann_color_stats",
+                "ann_group_filter_label",
+                "btn_clear_ann_group_filter",
+                "btn_tag_cloud_sort",
+            ):
+                w = getattr(self, wname, None)
+                if w is not None and hasattr(w, "setVisible"):
+                    try:
+                        w.setVisible(vis)
+                    except Exception:
+                        pass
+        if bookmark is not None:
+            vis = bool(bookmark)
+            self.outline.setVisible(vis)
+            if hasattr(self, "lbl_outline"):
+                self.lbl_outline.setVisible(vis)
+            if hasattr(self, "outline_btns_host"):
+                self.outline_btns_host.setVisible(vis)
+            else:
+                for wname in ("btn_outline_add", "btn_outline_del"):
+                    w = getattr(self, wname, None)
+                    if w is not None:
+                        w.setVisible(vis)
+        return self.panel_visibility()
 
     def reorder_documents(self, paths: list[str], *, emit: bool = True) -> bool:
         """

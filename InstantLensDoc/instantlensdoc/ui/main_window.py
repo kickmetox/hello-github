@@ -299,6 +299,10 @@ class MainWindow(QMainWindow):
     def _on_document_renamed(self, _path: str = "") -> None:
         """Tab-Anzeige-Label geändert → Session speichern (0.9.4)."""
         self._save_session()
+
+    def _on_document_label_reset(self, _path: str = ""):
+        """Tab-Label auf Originaltitel zurückgesetzt → Session (0.9.5)."""
+        self._save_session()
         self._set_status("Tab-Titel gespeichert")
         n = len(self._session_paths())
         self._set_status(f"Tab-Reihenfolge gespeichert ({n} Tab(s))")
@@ -461,6 +465,11 @@ class MainWindow(QMainWindow):
             tab_labels = dict(self.sidebar.document_labels())
         except Exception:
             tab_labels = {}
+        panels = {"thumbs": True, "ann": True, "bookmark": True}
+        try:
+            panels = dict(self.sidebar.panel_visibility())
+        except Exception:
+            panels = {"thumbs": True, "ann": True, "bookmark": True}
         state = session_mod.build_session(
             paths,
             active_path=active,
@@ -475,6 +484,7 @@ class MainWindow(QMainWindow):
             splitter_sizes=self._main_splitter_sizes() or None,
             theme=theme or None,
             tab_labels=tab_labels or None,
+            panels=panels,
         )
         session_mod.save_session(state)
 
@@ -561,6 +571,16 @@ class MainWindow(QMainWindow):
 
             QTimer.singleShot(0, _restore_split)
             QTimer.singleShot(120, _restore_split)
+        # Panel-Sichtbarkeit Thumb/Ann/Bookmark (0.9.5)
+        try:
+            self.sidebar.set_panel_visibility(
+                thumbs=bool(getattr(state, "panel_thumbs", True)),
+                ann=bool(getattr(state, "panel_ann", True)),
+                bookmark=bool(getattr(state, "panel_bookmark", True)),
+            )
+            self._sync_panel_visibility_menu()
+        except Exception:
+            pass
         self._set_status(f"Session wiederhergestellt ({len(state.tabs)} Tab(s))")
 
     def _build_ui(self):
@@ -584,6 +604,7 @@ class MainWindow(QMainWindow):
         self.sidebar.document_close_right_requested.connect(self.close_tabs_right_of)
         self.sidebar.document_pin_toggled.connect(self._on_document_pin_toggled)
         self.sidebar.document_rename_requested.connect(self._on_document_renamed)
+        self.sidebar.document_label_reset_requested.connect(self._on_document_label_reset)
         self.sidebar.recent_activated.connect(self.open_path)
         self.sidebar.recent_remove_requested.connect(self._remove_recent_path)
         self.sidebar.mark_activated.connect(self._on_mark_activated)
@@ -981,7 +1002,7 @@ class MainWindow(QMainWindow):
         m_edit.addAction(act_search_csv)
         act_search_json = QAction("Suchergebnisse als JSON exportieren…", self)
         act_search_json.setToolTip(
-            "Aktuelle Trefferliste (Sidebar) als JSON speichern (ildsearch-v1)"
+            "Trefferliste als JSON (ildsearch-v1): Seite, Offset, Snippet — 0.9.5"
         )
         act_search_json.triggered.connect(lambda: self._on_search_export("json"))
         m_edit.addAction(act_search_json)
@@ -1273,6 +1294,31 @@ class MainWindow(QMainWindow):
         a.setChecked(True)
         a.toggled.connect(self.sidebar.setVisible)
         m_view.addAction(a)
+        # Panel-Sichtbarkeit Thumb / Ann / Bookmark — Session (0.9.5)
+        self._panel_thumbs_action = QAction("Vorschaubilder (Thumbnails)", self)
+        self._panel_thumbs_action.setCheckable(True)
+        self._panel_thumbs_action.setChecked(True)
+        self._panel_thumbs_action.setToolTip(
+            "Sidebar-Panel Vorschaubilder ein-/ausblenden (Session) — 0.9.5"
+        )
+        self._panel_thumbs_action.toggled.connect(self._toggle_panel_thumbs)
+        m_view.addAction(self._panel_thumbs_action)
+        self._panel_ann_action = QAction("Annotationsliste", self)
+        self._panel_ann_action.setCheckable(True)
+        self._panel_ann_action.setChecked(True)
+        self._panel_ann_action.setToolTip(
+            "Sidebar-Panel Annotationen ein-/ausblenden (Session) — 0.9.5"
+        )
+        self._panel_ann_action.toggled.connect(self._toggle_panel_ann)
+        m_view.addAction(self._panel_ann_action)
+        self._panel_bookmark_action = QAction("Lesezeichen / Outline", self)
+        self._panel_bookmark_action.setCheckable(True)
+        self._panel_bookmark_action.setChecked(True)
+        self._panel_bookmark_action.setToolTip(
+            "Sidebar-Panel Lesezeichen/Outline ein-/ausblenden (Session) — 0.9.5"
+        )
+        self._panel_bookmark_action.toggled.connect(self._toggle_panel_bookmark)
+        m_view.addAction(self._panel_bookmark_action)
         self._line_numbers_action = QAction("Zeilennummern", self)
         self._line_numbers_action.setCheckable(True)
         from instantlensdoc.core.app_settings import (
@@ -3555,6 +3601,57 @@ class MainWindow(QMainWindow):
         self.pdf_view.set_continuous_scroll(bool(checked))
         self._sync_continuous_action(bool(checked))
         self._sync_spread_action()
+
+    def _toggle_panel_thumbs(self, checked: bool):
+        """Sidebar-Panel Vorschaubilder — Session (0.9.5)."""
+        try:
+            self.sidebar.set_panel_visibility(thumbs=bool(checked))
+        except Exception:
+            pass
+        self._save_session()
+        self._set_status(
+            "Vorschaubilder ein" if checked else "Vorschaubilder aus"
+        )
+
+    def _toggle_panel_ann(self, checked: bool):
+        """Sidebar-Panel Annotationen — Session (0.9.5)."""
+        try:
+            self.sidebar.set_panel_visibility(ann=bool(checked))
+        except Exception:
+            pass
+        self._save_session()
+        self._set_status(
+            "Annotationsliste ein" if checked else "Annotationsliste aus"
+        )
+
+    def _toggle_panel_bookmark(self, checked: bool):
+        """Sidebar-Panel Lesezeichen/Outline — Session (0.9.5)."""
+        try:
+            self.sidebar.set_panel_visibility(bookmark=bool(checked))
+        except Exception:
+            pass
+        self._save_session()
+        self._set_status(
+            "Lesezeichen ein" if checked else "Lesezeichen aus"
+        )
+
+    def _sync_panel_visibility_menu(self) -> None:
+        """Menü-Checks an Sidebar-Panel-Sichtbarkeit anpassen (0.9.5)."""
+        try:
+            vis = self.sidebar.panel_visibility()
+        except Exception:
+            vis = {"thumbs": True, "ann": True, "bookmark": True}
+        for attr, key in (
+            ("_panel_thumbs_action", "thumbs"),
+            ("_panel_ann_action", "ann"),
+            ("_panel_bookmark_action", "bookmark"),
+        ):
+            act = getattr(self, attr, None)
+            if act is None:
+                continue
+            act.blockSignals(True)
+            act.setChecked(bool(vis.get(key, True)))
+            act.blockSignals(False)
 
     def _toggle_ann_layer(self, checked: bool):
         self.pdf_view.set_annotations_visible(bool(checked))

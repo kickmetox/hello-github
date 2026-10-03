@@ -1531,13 +1531,17 @@ class PdfViewer(QWidget):
         toolbar.addWidget(self.btn_hl_color)
         toolbar.addWidget(self.btn_pen_color)
         toolbar.addWidget(self.btn_note_color)
+        # Color-Presets Quick-Bar: 6 Farben Stroke/Fill + Undo (0.9.5)
+        from instantlensdoc.core.app_settings import ANN_COLOR_PRESET_COUNT
+
         self._preset_btns: list[QPushButton] = []
-        for i in range(3):
+        for i in range(ANN_COLOR_PRESET_COUNT):
             pb = QPushButton(str(i + 1))
             pb.setFixedWidth(22)
             pb.setToolTip(
-                f"Favorit {i + 1}: Klick = Highlight-Farbe · Shift+Klick = Stift · "
-                "Rechtsklick = aktuellen HL speichern"
+                f"Preset {i + 1}: Auswahl → Strich · Shift → Füllung (Undo); "
+                "ohne Auswahl → Highlight · Shift=Stift · Ctrl=Notiz; "
+                "Rechtsklick speichern"
             )
             pb.clicked.connect(lambda checked=False, idx=i: self._apply_color_preset(idx))
             pb.setContextMenuPolicy(Qt.CustomContextMenu)
@@ -1800,9 +1804,74 @@ class PdfViewer(QWidget):
             c = presets[i] if i < len(presets) else "#888888"
             self._style_color_btn(btn, c)
             btn.setToolTip(
-                f"Favorit {i + 1}: {c} — Klick = Highlight · Shift+Klick = Stift · "
-                "Ctrl+Klick = Notiz · Rechtsklick = HL speichern"
+                f"Preset {i + 1}: {c} — Auswahl: Klick=Strich · Shift=Füllung (Undo); "
+                "ohne Auswahl: Highlight · Shift=Stift · Ctrl=Notiz; "
+                "Rechtsklick speichern — 0.9.5"
             )
+
+    def _selected_annotation_ids(self) -> list[str]:
+        ids = list(self._selected_ann_ids) if self._selected_ann_ids else (
+            [self._selected_ann_id] if self._selected_ann_id else []
+        )
+        return [i for i in ids if i]
+
+    def apply_preset_stroke_color(self, color: str) -> int:
+        """Strichfarbe für Auswahl setzen (Commit + Undo) — Quick-Bar 0.9.5."""
+        if not self.store:
+            self.status.emit("Kein PDF geladen")
+            return 0
+        ids = self._selected_annotation_ids()
+        if not ids:
+            self.status.emit("Keine Annotation ausgewählt")
+            return 0
+        c = str(color or "").strip()
+        if not c:
+            return 0
+        if not c.startswith("#"):
+            c = "#" + c
+        c = c.upper()
+        n = self.store.set_stroke_colors(ids, c)
+        if n <= 0:
+            self.status.emit("Strichfarbe nicht geändert")
+            return 0
+        try:
+            self.schedule_sidecar_save(force=True)
+        except Exception as e:
+            QMessageBox.warning(self, "Strichfarbe", str(e))
+            return 0
+        self.refresh()
+        self.annotations_changed.emit()
+        self.status.emit(f"Strichfarbe {c} für {n} Annotation(en)")
+        return n
+
+    def apply_preset_fill_color(self, color: str) -> int:
+        """Füllfarbe für Auswahl setzen (Commit + Undo) — Quick-Bar 0.9.5."""
+        if not self.store:
+            self.status.emit("Kein PDF geladen")
+            return 0
+        ids = self._selected_annotation_ids()
+        if not ids:
+            self.status.emit("Keine Annotation ausgewählt")
+            return 0
+        c = str(color or "").strip()
+        if not c:
+            return 0
+        if not c.startswith("#"):
+            c = "#" + c
+        c = c.upper()
+        n = self.store.set_fill_colors(ids, c)
+        if n <= 0:
+            self.status.emit("Füllfarbe nicht geändert")
+            return 0
+        try:
+            self.schedule_sidecar_save(force=True)
+        except Exception as e:
+            QMessageBox.warning(self, "Füllfarbe", str(e))
+            return 0
+        self.refresh()
+        self.annotations_changed.emit()
+        self.status.emit(f"Füllfarbe {c} für {n} Annotation(en)")
+        return n
 
     def _apply_color_preset(self, index: int):
         presets = get_ann_color_presets()
@@ -1810,26 +1879,40 @@ class PdfViewer(QWidget):
             return
         color = presets[index]
         mods = QApplication.keyboardModifiers()
+        # Mit Auswahl: Stroke/Fill Quick-Bar (0.9.5)
+        if self._selected_annotation_ids() and self.store is not None:
+            if mods & Qt.ShiftModifier:
+                self.apply_preset_fill_color(color)
+            else:
+                self.apply_preset_stroke_color(color)
+            return
         if mods & Qt.ControlModifier:
             self._note_color = color
             set_ann_note_color(color)
             self._style_color_btn(self.btn_note_color, color)
-            self.status.emit(f"Notizfarbe (Favorit {index + 1}): {color}")
+            self.status.emit(f"Notizfarbe (Preset {index + 1}): {color}")
         elif mods & Qt.ShiftModifier:
             self._pen_color = color
             set_ann_pen_color(color)
             self._style_color_btn(self.btn_pen_color, color)
-            self.status.emit(f"Stift-Farbe (Favorit {index + 1}): {color}")
+            self.status.emit(f"Stift-Farbe (Preset {index + 1}): {color}")
         else:
             self._highlight_color = color
             set_ann_highlight_color(color)
             self._style_color_btn(self.btn_hl_color, color)
-            self.status.emit(f"Highlight-Farbe (Favorit {index + 1}): {color}")
+            self.status.emit(f"Highlight-Farbe (Preset {index + 1}): {color}")
 
     def _save_color_preset(self, index: int):
-        set_ann_color_preset(index, self._highlight_color)
+        # Bei Auswahl: aktuelle Strichfarbe speichern, sonst Highlight
+        color = self._highlight_color
+        ids = self._selected_annotation_ids()
+        if ids and self.store is not None:
+            first = self.store.get(ids[0])
+            if first and first.color:
+                color = first.color
+        set_ann_color_preset(index, color)
         self._refresh_preset_btns()
-        self.status.emit(f"Favorit {index + 1} = {self._highlight_color}")
+        self.status.emit(f"Preset {index + 1} = {color}")
 
     def _apply_active_color(self, color: str, *, label: str) -> None:
         """Aktive Farbe setzen (Highlight; Shift=Stift; Ctrl=Notiz)."""

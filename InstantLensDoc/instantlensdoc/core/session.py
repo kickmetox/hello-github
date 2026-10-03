@@ -38,6 +38,10 @@ class SessionState:
     splitter_sizes: List[int] = field(default_factory=list)
     # Theme dark|light je Session — 0.9.4
     theme: str = ""
+    # Sidebar-Panel-Sichtbarkeit Thumb / Ann / Bookmark — 0.9.5
+    panel_thumbs: bool = True
+    panel_ann: bool = True
+    panel_bookmark: bool = True
 
 
 def session_path() -> Path:
@@ -76,6 +80,35 @@ def _normalize_theme(raw) -> str:
 
 def _normalize_label(raw) -> str:
     return str(raw or "").strip()
+
+
+def _normalize_panel_flag(raw, default: bool = True) -> bool:
+    if raw is None:
+        return bool(default)
+    if isinstance(raw, bool):
+        return raw
+    if isinstance(raw, (int, float)):
+        return bool(raw)
+    s = str(raw).strip().lower()
+    if s in ("0", "false", "no", "off", ""):
+        return False
+    if s in ("1", "true", "yes", "on"):
+        return True
+    return bool(default)
+
+
+def _normalize_panels(raw) -> dict[str, bool]:
+    """panel_thumbs / panel_ann / panel_bookmark aus Session-Dict oder nested panels."""
+    out = {"thumbs": True, "ann": True, "bookmark": True}
+    if isinstance(raw, dict):
+        # nested: {"thumbs": …, "ann": …, "bookmark": …}
+        if any(k in raw for k in ("thumbs", "ann", "bookmark", "outline")):
+            out["thumbs"] = _normalize_panel_flag(raw.get("thumbs"), True)
+            out["ann"] = _normalize_panel_flag(raw.get("ann"), True)
+            bm = raw.get("bookmark", raw.get("outline"))
+            out["bookmark"] = _normalize_panel_flag(bm, True)
+            return out
+    return out
 
 
 def load_session() -> SessionState:
@@ -131,6 +164,16 @@ def load_session() -> SessionState:
     sync_scroll = bool(raw.get("sync_scroll", False))
     splitter_sizes = _normalize_splitter_sizes(raw.get("splitter_sizes"))
     theme = _normalize_theme(raw.get("theme"))
+    panels = _normalize_panels(raw.get("panels"))
+    # Flat keys (Fallback) überschreiben nested defaults
+    if "panel_thumbs" in raw:
+        panels["thumbs"] = _normalize_panel_flag(raw.get("panel_thumbs"), True)
+    if "panel_ann" in raw:
+        panels["ann"] = _normalize_panel_flag(raw.get("panel_ann"), True)
+    if "panel_bookmark" in raw or "panel_outline" in raw:
+        panels["bookmark"] = _normalize_panel_flag(
+            raw.get("panel_bookmark", raw.get("panel_outline")), True
+        )
     return SessionState(
         tabs=tabs,
         active=active,
@@ -140,6 +183,9 @@ def load_session() -> SessionState:
         sync_scroll=sync_scroll,
         splitter_sizes=splitter_sizes,
         theme=theme,
+        panel_thumbs=panels["thumbs"],
+        panel_ann=panels["ann"],
+        panel_bookmark=panels["bookmark"],
     )
 
 
@@ -165,6 +211,13 @@ def save_session(state: SessionState) -> None:
         "sync_scroll": bool(state.sync_scroll),
         "splitter_sizes": sizes,
         "theme": _normalize_theme(getattr(state, "theme", "")),
+        "panels": {
+            "thumbs": _normalize_panel_flag(getattr(state, "panel_thumbs", True), True),
+            "ann": _normalize_panel_flag(getattr(state, "panel_ann", True), True),
+            "bookmark": _normalize_panel_flag(
+                getattr(state, "panel_bookmark", True), True
+            ),
+        },
     }
     path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
 
@@ -188,12 +241,17 @@ def build_session(
     splitter_sizes: Optional[List[int]] = None,
     theme: Optional[str] = None,
     tab_labels: Optional[dict] = None,
+    panel_thumbs: Optional[bool] = None,
+    panel_ann: Optional[bool] = None,
+    panel_bookmark: Optional[bool] = None,
+    panels: Optional[dict] = None,
 ) -> SessionState:
     """
     tab_states: optional {path: {page, scale, scroll_y}} für Last-Page/Zoom/Scroll je Tab (0.9.1/0.9.2).
     splitter_sizes: optional [sidebar_px, viewer_px] — Haupt-Splitter (0.9.3).
     theme: optional dark|light — Session-Theme (0.9.4).
     tab_labels: optional {path: Anzeige-Label} — Tab-Titel ≠ Dateiname (0.9.4).
+    panels / panel_*: Sidebar Thumb/Ann/Bookmark Sichtbarkeit (0.9.5).
     """
     tabs: List[SessionTab] = []
     seen: set[str] = set()
@@ -283,6 +341,13 @@ def build_session(
     kind = _normalize_secondary_kind(secondary_kind)
     if sec and not kind:
         kind = "pdf" if Path(sec).suffix.lower() == ".pdf" else "editor"
+    panel_map = _normalize_panels(panels if isinstance(panels, dict) else {})
+    if panel_thumbs is not None:
+        panel_map["thumbs"] = bool(panel_thumbs)
+    if panel_ann is not None:
+        panel_map["ann"] = bool(panel_ann)
+    if panel_bookmark is not None:
+        panel_map["bookmark"] = bool(panel_bookmark)
     return SessionState(
         tabs=tabs,
         active=active,
@@ -292,4 +357,7 @@ def build_session(
         sync_scroll=bool(sync_scroll),
         splitter_sizes=_normalize_splitter_sizes(splitter_sizes),
         theme=_normalize_theme(theme),
+        panel_thumbs=panel_map["thumbs"],
+        panel_ann=panel_map["ann"],
+        panel_bookmark=panel_map["bookmark"],
     )

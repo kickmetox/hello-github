@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **0.9.4** |
+| Version | **0.9.5** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -38,10 +38,10 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Installer-Task: optionale **Desktop-Verknüpfung** (Checkbox, Standard an / `checkedonce`)
 
-## Neu in 0.9.4
+## Neu in 0.9.5
 
-- Dokument-Tabs: **Doppelklick umbenennen** (Anzeige-Label ≠ Dateiname) + Session-Persistenz
-- PDF-Suche: **Treffer-Export CSV** mit Seite, Offset, Snippet
-- Annotationen: **Stroke-Color Picker** („Strich…“) getrennt von Fill (Commit + Undo)
-- Session: **Theme** (dark/light) + **aktiver Tab-Index** wiederherstellen
+- Dokument-Tabs: Kontext **„Originaltitel“** setzt Anzeige-Label zurück; Tooltip = voller Pfad
+- PDF-Suche: **Treffer-Export JSON** (`ildsearch-v1`, Seite/Offset/Snippet)
+- Annotationen: **Color-Presets Quick-Bar** (6 Farben Stroke/Fill) + Undo
+- Session: **Panel-Sichtbarkeit** Thumb / Ann / Bookmark wiederherstellen
 - Stubs KI/Cloud/Stylus/3D unverändert
