@@ -130,6 +130,7 @@ class MainWindow(QMainWindow):
         self._presentation_prev: dict | None = None
         self._unsaved_paths: set[str] = set()
         self._readonly_preview_paths: set[str] = set()  # Merge-Vorschau-Tabs — 1.1.5
+        self._ann_zero_sticky = False  # 0-Treffer-Status dauerhaft — 1.1.7
         self._secondary_path: str | None = None
         self._secondary_kind: str = ""  # "pdf" | "editor" | "" — Panel-Typ je Session
         self._last_tag_rename: tuple[str, str] | None = None  # (old, new) für einstufiges Undo
@@ -867,7 +868,7 @@ class MainWindow(QMainWindow):
         self.editor.line_bookmarks_changed.connect(self._on_line_bookmarks_changed)
         self.editor.cursorPositionChanged.connect(self._on_editor_cursor_changed)
         self.pdf_view = PdfViewer()
-        self.pdf_view.status.connect(self._set_status)
+        self.pdf_view.status.connect(self._on_pdf_view_status)
         self.pdf_view.annotations_changed.connect(self._refresh_pdf_marks)
         self.pdf_view.annotations_changed.connect(self._refresh_undo_hint)
         # Toolbar-Undo und Ctrl+Z: Tag-Rename-Filter nach einstufigem Undo mitziehen
@@ -1002,6 +1003,17 @@ class MainWindow(QMainWindow):
             "Rückgängig: Editor · PDF-Annotationen (benannt, z. B. Tag umbenennen) · Seiten (Ctrl+Z)"
         )
         sb.addPermanentWidget(self.undo_hint_label)
+        # Ann. 0-Treffer: dauerhaft bis nächste Ann.-Aktion — 1.1.7
+        self.ann_zero_status_label = QLabel("")
+        self.ann_zero_status_label.setObjectName("annZeroStatus")
+        self.ann_zero_status_label.setStyleSheet(
+            "QLabel#annZeroStatus { color: #a60; padding-right: 8px; font-size: 11px; }"
+        )
+        self.ann_zero_status_label.setToolTip(
+            "0 gefilterte Annotationen — bleibt bis zur nächsten Annotations-Aktion — 1.1.7"
+        )
+        self.ann_zero_status_label.setVisible(False)
+        sb.addPermanentWidget(self.ann_zero_status_label)
         self.version_label = QLabel(f"v{__version__}")
         self.version_label.setStyleSheet("color: #666; padding-right: 8px;")
         sb.addPermanentWidget(self.version_label)
@@ -2217,6 +2229,46 @@ class MainWindow(QMainWindow):
     def _set_status(self, msg: str):
         self.statusBar().showMessage(msg, 5000)
 
+    def _on_pdf_view_status(self, msg: str) -> None:
+        """PDF-View-Status; 0-Treffer dauerhaft sticky — 1.1.7."""
+        text = str(msg or "")
+        if "gefilterten Treffer" in text:
+            self._set_ann_zero_sticky_status(text)
+            return
+        # Nächste Ann.-Aktion (Löschen/Einfügen/…) beendet Sticky — 1.1.7
+        if "Annotation" in text and any(
+            k in text for k in ("gelöscht", "eingefügt", "kopiert", "dupliziert")
+        ):
+            self._clear_ann_zero_sticky_status()
+        self._set_status(text)
+
+    def _set_ann_zero_sticky_status(self, msg: str) -> None:
+        """0-Treffer-Hinweis dauerhaft in Statusleiste bis nächste Ann.-Aktion — 1.1.7."""
+        self._ann_zero_sticky = True
+        lbl = getattr(self, "ann_zero_status_label", None)
+        if lbl is not None:
+            lbl.setText(msg)
+            lbl.setVisible(True)
+        self.statusBar().showMessage(msg, 0)
+
+    def _clear_ann_zero_sticky_status(self) -> None:
+        """Sticky 0-Treffer-Status entfernen (nächste Ann.-Aktion) — 1.1.7."""
+        if not getattr(self, "_ann_zero_sticky", False):
+            return
+        self._ann_zero_sticky = False
+        lbl = getattr(self, "ann_zero_status_label", None)
+        if lbl is not None:
+            lbl.setText("")
+            lbl.setVisible(False)
+        cur = self.statusBar().currentMessage() or ""
+        if "gefilterten Treffer" in cur:
+            self.statusBar().clearMessage()
+
+    def _ann_action_status(self, msg: str) -> None:
+        """Status einer Annotations-Aktion — löscht Sticky 0-Treffer — 1.1.7."""
+        self._clear_ann_zero_sticky_status()
+        self._set_status(msg)
+
     def _update_doc_status(self):
         """Statusleiste: Dateiname, Seite x/y bzw. Zeile x/y, Seitengröße, Zoom %, Wörter."""
         name = "—"
@@ -2920,7 +2972,7 @@ class MainWindow(QMainWindow):
                     filtered_ids = self.sidebar.visible_annotation_ids(page=page)
                 except Exception:
                     filtered_ids = None
-            # 0 gefilterte Treffer: Menü/Aktion no-op mit Status (wie Yes disabled) — 1.1.5/1.1.6
+            # 0 gefilterte Treffer: Menü/Aktion no-op mit Sticky-Status — 1.1.5/1.1.7
             if (
                 filtered_ids is not None
                 and self._ann_filter_is_active()
@@ -2931,14 +2983,16 @@ class MainWindow(QMainWindow):
                 if anns and n_filt <= 0:
                     from instantlensdoc.core.i18n import tr_ann_zero_filtered
 
-                    self._set_status(tr_ann_zero_filtered(page + 1))
+                    self._set_ann_zero_sticky_status(tr_ann_zero_filtered(page + 1))
                     return
             n = self.pdf_view.clear_annotations_on_page(
                 filtered_ids=filtered_ids,
             )
             if n == 0:
                 return
-            self._set_status(f"{n} Annotation(en) auf Seite gelöscht (Ctrl+Z rückgängig)")
+            self._ann_action_status(
+                f"{n} Annotation(en) auf Seite gelöscht (Ctrl+Z rückgängig)"
+            )
             return
         self._set_status("Alle auf Seite löschen nur im PDF-Modus")
 
@@ -2962,6 +3016,7 @@ class MainWindow(QMainWindow):
 
     def _delete_annotation(self):
         if self.stack.currentWidget() is self.pdf_view and self.pdf_view.pdf_path:
+            self._clear_ann_zero_sticky_status()
             self.pdf_view.delete_annotation()
         else:
             self._set_status("Annotation löschen nur im PDF-Modus")
@@ -2973,6 +3028,7 @@ class MainWindow(QMainWindow):
         if not self.pdf_view._selected_ann_id:
             self._set_status("Keine Annotation ausgewählt (Auswahl-Werkzeug / Doppelklick)")
             return
+        self._clear_ann_zero_sticky_status()
         self.pdf_view.edit_selected_annotation_text()
 
     def _edit_annotation_tags(self):
@@ -2982,6 +3038,7 @@ class MainWindow(QMainWindow):
         if not self.pdf_view._selected_ann_id:
             self._set_status("Keine Annotation ausgewählt")
             return
+        self._clear_ann_zero_sticky_status()
         self.pdf_view.edit_selected_annotation_tags()
 
     def _edit_annotation_group(self, page: int | None = None):

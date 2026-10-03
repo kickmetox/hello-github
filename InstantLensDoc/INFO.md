@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **1.1.6** |
+| Version | **1.1.7** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -59,10 +59,10 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an / `checkedonce`)
 
-## Neu in 1.1.6
+## Neu in 1.1.7
 
-- OCR-Batch: **DPI** + **Sprach-Preset** Defaults in Settings; Dialog vorbelegt
-- PDF Mergen: **„Zum Bearbeiten öffnen“** schließt Readonly-Tab optional (Settings-Toggle)
-- Annotation: bei **0 Treffern** einheitlicher i18n-Status DE
-- Keygen-Reveal: Auto-Hide **5/10/30 s** + **Countdown** neben Reveal
+- OCR-Dialog: Button **„Als Defaults speichern“** neben DPI/Sprache
+- PDF Mergen: Readonly-schließen-Toggle **auch im Merge-Dialog** (Sync mit Settings)
+- Annotation: 0-Treffer-Status **dauerhaft in Statusleiste** bis nächste Ann.-Aktion
+- Keygen-Countdown: **Pause bei Fenster inaktiv**, Fortsetzen bei Fokus
 - Stubs KI/Cloud/Stylus/3D unverändert

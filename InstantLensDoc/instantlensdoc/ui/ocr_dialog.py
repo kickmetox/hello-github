@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
     QFormLayout,
     QHBoxLayout,
     QLabel,
+    QPushButton,
     QRadioButton,
     QSpinBox,
     QTextBrowser,
@@ -24,6 +25,9 @@ from instantlensdoc.core.app_settings import (
     get_ocr_attach_errors,
     get_ocr_dpi,
     get_ocr_lang,
+    set_ocr_attach_errors,
+    set_ocr_dpi,
+    set_ocr_lang,
 )
 from instantlensdoc.core.ocr import (
     DEFAULT_OCR_DPI,
@@ -77,7 +81,7 @@ class OcrDialog(QDialog):
         form = QFormLayout()
         self.lang_combo = QComboBox()
         self.lang_combo.setToolTip(
-            "Sprach-Preset für Tesseract (deu/eng/…) — Settings-Default vorgewählt — 1.1.6"
+            "Sprach-Preset für Tesseract (deu/eng/…) — Settings-Default vorgewählt — 1.1.6/1.1.7"
         )
         default_lang = get_ocr_lang()
         pick = 0
@@ -90,11 +94,22 @@ class OcrDialog(QDialog):
         installed = list_installed_languages()
         if installed:
             form.addRow(QLabel(f"Installiert: {', '.join(installed[:12])}"))
-        form.addRow("Sprach-Preset", self.lang_combo)
+
+        # Sprach-Preset + „Als Defaults speichern“ nebeneinander — 1.1.7
+        lang_row = QHBoxLayout()
+        lang_row.addWidget(self.lang_combo, 1)
+        self.btn_save_defaults = QPushButton("Als Defaults speichern")
+        self.btn_save_defaults.setToolTip(
+            "Aktuelles Sprach-Preset und DPI als Settings-Defaults speichern "
+            "(ohne Dialog zu schließen) — 1.1.7"
+        )
+        self.btn_save_defaults.clicked.connect(self._save_as_defaults)
+        lang_row.addWidget(self.btn_save_defaults)
+        form.addRow("Sprach-Preset", lang_row)
 
         self.dpi_combo = QComboBox()
         self.dpi_combo.setToolTip(
-            "OCR-Render-DPI (150 oder 300) — Settings-Default vorgewählt — 1.1.6"
+            "OCR-Render-DPI (150 oder 300) — Settings-Default vorgewählt — 1.1.6/1.1.7"
         )
         for d in OCR_DPI_CHOICES:
             self.dpi_combo.addItem(f"{d} DPI", int(d))
@@ -104,7 +119,15 @@ class OcrDialog(QDialog):
         except ValueError:
             idx_dpi = list(OCR_DPI_CHOICES).index(DEFAULT_OCR_DPI)
         self.dpi_combo.setCurrentIndex(idx_dpi)
-        form.addRow("DPI", self.dpi_combo)
+        dpi_row = QHBoxLayout()
+        dpi_row.addWidget(self.dpi_combo, 1)
+        self.defaults_feedback = QLabel("")
+        self.defaults_feedback.setStyleSheet("color: #2a7; font-size: 11px;")
+        self.defaults_feedback.setToolTip(
+            "Bestätigung nach „Als Defaults speichern“ — 1.1.7"
+        )
+        dpi_row.addWidget(self.defaults_feedback)
+        form.addRow("DPI", dpi_row)
 
         self.range_check = QCheckBox("Seitenbereich von–bis")
         self.range_check.setToolTip(
@@ -180,6 +203,17 @@ class OcrDialog(QDialog):
     def _clamp_range(self, *_args) -> None:
         if self.page_to.value() < self.page_from.value():
             self.page_to.setValue(self.page_from.value())
+
+    def _save_as_defaults(self) -> None:
+        """Sprach-Preset + DPI (+ Fehler-Toggle) sofort als Settings speichern — 1.1.7."""
+        try:
+            set_ocr_lang(self.lang_code())
+            set_ocr_dpi(self.dpi())
+            if self._show_page_range:
+                set_ocr_attach_errors(self.attach_errors())
+            self.defaults_feedback.setText("Defaults gespeichert")
+        except Exception:
+            self.defaults_feedback.setText("Speichern fehlgeschlagen")
 
     def _pick(self):
         path, _ = QFileDialog.getOpenFileName(

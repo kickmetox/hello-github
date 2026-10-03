@@ -162,14 +162,15 @@ def run_gui(*, days: int | None = None) -> int:
             self.reveal_check.setCheckable(True)
             self.reveal_check.setChecked(False)
             self.reveal_check.setToolTip(
-                "Keys unmaskiert anzeigen — Auto-Hide (5/10/30 s); Esc maskiert — 1.1.6"
+                "Keys unmaskiert anzeigen — Auto-Hide (5/10/30 s); Esc maskiert; "
+                "Countdown pausiert bei inaktivem Fenster — 1.1.7"
             )
             self.reveal_check.toggled.connect(self._on_reveal_toggled)
             self.reveal_countdown = QLabel("")
             self.reveal_countdown.setMinimumWidth(36)
             self.reveal_countdown.setAlignment(Qt.AlignCenter)
             self.reveal_countdown.setToolTip(
-                "Countdown bis Auto-Hide (neben Reveal) — 1.1.6"
+                "Countdown bis Auto-Hide — Pause bei Fokusverlust, Fortsetzen bei Fokus — 1.1.7"
             )
             self.reveal_countdown.setStyleSheet("color: #555; font-variant-numeric: tabular-nums;")
             hide_row = QHBoxLayout()
@@ -201,7 +202,8 @@ def run_gui(*, days: int | None = None) -> int:
             self.history_list = QListWidget()
             self.history_list.setToolTip(
                 "Maskiert (nur letzte 4); Hover/Reveal zeigt Key; "
-                "Reveal Auto-Hide 5/10/30 s / Esc; Doppelklick kopiert — 1.1.6"
+                "Reveal Auto-Hide 5/10/30 s / Esc; Countdown Pause bei Fokusverlust; "
+                "Doppelklick kopiert — 1.1.7"
             )
             self.history_list.setMaximumHeight(120)
             self.history_list.setMouseTracking(True)
@@ -211,6 +213,8 @@ def run_gui(*, days: int | None = None) -> int:
             layout.addWidget(self.history_list)
             self._history_hover_row = -1
             self._reveal_remaining = 0
+            self._countdown_paused = False
+            self._reveal_paused_ms = 0
             self._reveal_timer = QTimer(self)
             self._reveal_timer.setSingleShot(True)
             self._reveal_timer.timeout.connect(self._auto_hide_reveal)
@@ -220,6 +224,9 @@ def run_gui(*, days: int | None = None) -> int:
             esc = QShortcut(QKeySequence(Qt.Key_Escape), self)
             esc.setContext(Qt.WindowShortcut)
             esc.activated.connect(self._mask_reveal)
+            app = QApplication.instance()
+            if app is not None:
+                app.applicationStateChanged.connect(self._on_app_state_changed)
 
             layout.addWidget(
                 QLabel(f"Standard: {KEY_DAYS} Tage. Kontakt: ame@sellerbach.de")
@@ -250,6 +257,8 @@ def run_gui(*, days: int | None = None) -> int:
 
         def _start_reveal_timers(self, sec: int | None = None) -> None:
             seconds = int(sec if sec is not None else self._hide_seconds())
+            self._countdown_paused = False
+            self._reveal_paused_ms = 0
             self._reveal_remaining = seconds
             self._reveal_timer.stop()
             self._reveal_timer.start(seconds * 1000)
@@ -260,11 +269,63 @@ def run_gui(*, days: int | None = None) -> int:
             self._reveal_timer.stop()
             self._countdown_timer.stop()
             self._reveal_remaining = 0
+            self._countdown_paused = False
+            self._reveal_paused_ms = 0
             self._update_countdown_label()
+
+        def _pause_countdown(self) -> None:
+            """Countdown + Auto-Hide pausieren bei inaktivem Fenster — 1.1.7."""
+            if not self.reveal_check.isChecked() or self._countdown_paused:
+                return
+            if not self._reveal_timer.isActive() and self._reveal_remaining <= 0:
+                return
+            self._countdown_paused = True
+            remaining_ms = self._reveal_timer.remainingTime()
+            if remaining_ms > 0:
+                self._reveal_paused_ms = int(remaining_ms)
+                self._reveal_remaining = max(1, (remaining_ms + 999) // 1000)
+            else:
+                self._reveal_paused_ms = max(0, int(self._reveal_remaining) * 1000)
+            self._reveal_timer.stop()
+            self._countdown_timer.stop()
+            self._update_countdown_label()
+
+        def _resume_countdown(self) -> None:
+            """Countdown fortsetzen wenn Fenster wieder Fokus hat — 1.1.7."""
+            if not self._countdown_paused or not self.reveal_check.isChecked():
+                self._countdown_paused = False
+                return
+            self._countdown_paused = False
+            ms = int(getattr(self, "_reveal_paused_ms", 0) or 0)
+            self._reveal_paused_ms = 0
+            if ms <= 0:
+                self._auto_hide_reveal()
+                return
+            self._reveal_remaining = max(1, (ms + 999) // 1000)
+            self._reveal_timer.start(ms)
+            self._countdown_timer.start()
+            self._update_countdown_label()
+
+        def _on_app_state_changed(self, state) -> None:
+            if state == Qt.ApplicationInactive or state == Qt.ApplicationSuspended:
+                self._pause_countdown()
+            elif state == Qt.ApplicationActive:
+                self._resume_countdown()
+
+        def changeEvent(self, event) -> None:
+            from PySide6.QtCore import QEvent
+
+            if event.type() == QEvent.WindowDeactivate:
+                self._pause_countdown()
+            elif event.type() == QEvent.WindowActivate:
+                self._resume_countdown()
+            super().changeEvent(event)
 
         def _tick_countdown(self) -> None:
             if not self.reveal_check.isChecked():
                 self._stop_reveal_timers()
+                return
+            if self._countdown_paused:
                 return
             self._reveal_remaining = max(0, int(self._reveal_remaining) - 1)
             self._update_countdown_label()
@@ -273,7 +334,13 @@ def run_gui(*, days: int | None = None) -> int:
 
         def _update_countdown_label(self) -> None:
             if self.reveal_check.isChecked() and self._reveal_remaining > 0:
+                # Bei Pause bleibt die Zahl stehen (ohne Auto-Hide) — 1.1.7
                 self.reveal_countdown.setText(f"{self._reveal_remaining}s")
+                self.reveal_countdown.setToolTip(
+                    "Countdown pausiert (Fenster inaktiv) — 1.1.7"
+                    if self._countdown_paused
+                    else "Countdown bis Auto-Hide — Pause bei Fokusverlust — 1.1.7"
+                )
             elif self.reveal_check.isChecked():
                 self.reveal_countdown.setText("0s")
             else:
@@ -297,7 +364,7 @@ def run_gui(*, days: int | None = None) -> int:
                 item.setData(Qt.UserRole, entry)
                 item.setToolTip(
                     "Hover/Reveal zeigt Key · Esc/Auto-Hide maskiert · "
-                    "Doppelklick kopiert — 1.1.6"
+                    "Countdown Pause bei Fokusverlust · Doppelklick kopiert — 1.1.7"
                 )
                 self.history_list.addItem(item)
 

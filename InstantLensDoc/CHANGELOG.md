@@ -1,5 +1,27 @@
 # Changelog — InstantLens Doc
 
+## 1.1.7 — OCR Defaults-Button, Merge-Toggle im Dialog, Ann. Sticky-Status, Keygen Countdown-Pause
+
+Post-Release-Polish nach 1.1.6: OCR-Dialog mit Button **„Als Defaults speichern“** neben DPI/Sprache; Merge-Dialog zeigt denselben **Readonly-schließen**-Toggle wie Settings (sofort synchron); Annotationen-**0-Treffer**-Status bleibt **dauerhaft in der Statusleiste** bis zur nächsten Ann.-Aktion; Keygen-Countdown **pausiert bei Fokusverlust** und setzt bei Fokus fort. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### OCR / Batch
+- Button **„Als Defaults speichern“** neben Sprach-Preset/DPI (sofort Settings, ohne Dialog schließen)
+
+### PDF
+- **Zusammenführen**: Toggle **„Readonly-Vorschau … schließen“** auch im Merge-Dialog (Sync mit Settings)
+
+### Annotationen
+- Status bei **0 Treffern**: dauerhaft in Statusleiste (Label + Message) bis nächste Ann.-Aktion
+
+### Keygen
+- Reveal-Countdown: **Pause** bei Fenster/App inaktiv; **Fortsetzen** bei Fokus
+
+### Packaging / Docs
+- Version **1.1.7** (App / `ild_pdf` / ISS / Smoke / Docs)
+- Smoke: OCR Defaults-Button, Merge-Dialog-Toggle, Ann. Sticky-Status, Keygen Countdown-Pause (CLI + Qt)
+
+---
+
 ## 1.1.6 — OCR DPI·Preset-Defaults, Merge Vorschau schließen, Ann. 0-Treffer i18n, Keygen Auto-Hide 5/10/30
 
 Post-Release-Polish nach 1.1.5: OCR-Dialog speichert **DPI** und **Sprach-Preset** als Settings-Defaults und belegt sie vor; Merge **„Zum Bearbeiten öffnen“** kann den Readonly-Tab per Settings-Toggle schließen; Annotationen-Status bei **0 gefilterten Treffern** nutzt einen einheitlichen i18n-String (DE); Keygen-Reveal Auto-Hide wählbar **5/10/30 s** mit Countdown neben Reveal. Stubs KI/Cloud/Stylus/3D bleiben Stubs.

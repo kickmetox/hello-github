@@ -164,6 +164,26 @@ class PdfToolsDialog(QDialog):
             "Summe der Seitenzahlen aller PDFs in der Liste — 1.1.1"
         )
         lay.addWidget(self.merge_pages_label)
+
+        # Readonly-Vorschau schließen — Sync mit Settings — 1.1.7
+        from instantlensdoc.core.app_settings import (
+            get_merge_close_preview_on_edit,
+            set_merge_close_preview_on_edit,
+        )
+
+        self.merge_close_preview = QCheckBox(
+            "Readonly-Vorschau bei „Zum Bearbeiten öffnen“ schließen"
+        )
+        self.merge_close_preview.setChecked(get_merge_close_preview_on_edit())
+        self.merge_close_preview.setToolTip(
+            "Wie in Einstellungen: Vorschau-Tab schließen und Datei neu bearbeitbar öffnen "
+            "(sofort synchron) — 1.1.7"
+        )
+        self.merge_close_preview.toggled.connect(
+            lambda checked: set_merge_close_preview_on_edit(bool(checked))
+        )
+        lay.addWidget(self.merge_close_preview)
+
         row = QHBoxLayout()
         btn_add = QPushButton("PDFs hinzufügen…")
         btn_add.setToolTip("Mehrere PDFs auswählen (Mehrfachauswahl)")
