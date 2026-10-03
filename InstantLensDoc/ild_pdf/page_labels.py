@@ -77,6 +77,57 @@ def remap_page_labels(
     return out
 
 
+def read_pdf_page_labels(
+    pdf_path: str | Path,
+    *,
+    password: str | None = None,
+) -> list[str]:
+    """Native PDF-Seitenlabels (pypdfium2) lesen — Import in den Dialog."""
+    from .document import PdfDocument
+
+    path = Path(pdf_path)
+    if not path.is_file():
+        raise FileNotFoundError(f"PDF nicht gefunden: {path}")
+    with PdfDocument(path, password=password) as doc:
+        return list(doc.page_labels())
+
+
+def arabic_reset_labels(page_count: int, *, start: int = 1) -> list[str]:
+    """Arabische Nummerierung 1… (oder ab ``start``) für alle Seiten."""
+    n = max(0, int(page_count))
+    s = int(start)
+    return [str(s + i) for i in range(n)]
+
+
+def apply_label_range(
+    labels: Sequence[str],
+    *,
+    start_page: int,
+    end_page: int,
+    start_value: int = 1,
+    page_count: int | None = None,
+) -> list[str]:
+    """
+    Bereich (0-basiert inkl.) mit arabischer Folge ab ``start_value`` füllen.
+
+    ``start_page``/``end_page`` werden geklemmt; Reihenfolge egal (min/max).
+    """
+    n = int(page_count) if page_count is not None else len(labels)
+    n = max(0, n)
+    out = [str(x or "").strip() for x in labels]
+    while len(out) < n:
+        out.append("")
+    out = out[:n]
+    if n <= 0:
+        return out
+    a = max(0, min(int(start_page), int(end_page)))
+    b = min(n - 1, max(int(start_page), int(end_page)))
+    sv = int(start_value)
+    for i in range(a, b + 1):
+        out[i] = str(sv + (i - a))
+    return out
+
+
 def write_pdf_page_labels(
     pdf_path: str | Path,
     labels: Sequence[str],

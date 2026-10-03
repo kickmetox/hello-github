@@ -1,17 +1,16 @@
-# InstantLens Doc — smoke_ild Workflow-Stub (2.2.0)
+# InstantLens Doc — smoke_ild Workflow-Stub (2.2.1)
 #
-# Nur lokal / manuell gedacht. Keine produktive Cloud-CI-Pflicht.
-# Gleicher Check ohne Actions:
+# MANUAL ONLY — nur manuell starten (workflow_dispatch).
+# Kein push/pull_request-Trigger. Keine produktive Cloud-CI-Pflicht.
+# Gleicher Check lokal ohne Actions:
 #   python scripts/smoke_ild.py
 #   python scripts/smoke_ild.py --json
-#
-# workflow_dispatch erlaubt manuellen Lauf, falls Actions aktiviert sind.
 
-name: smoke-ild (stub)
+name: smoke-ild (stub, manual only)
 
 on:
   workflow_dispatch:
-  # push/pull_request absichtlich nicht aktiv — Stub / lokal dokumentiert
+  # push/pull_request absichtlich nicht aktiv — MANUAL ONLY / lokal dokumentiert
 
 jobs:
   smoke:

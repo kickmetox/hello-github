@@ -1,5 +1,20 @@
 # Changelog — InstantLens Doc
 
+## 2.2.1 — PageLabels Range-Editor·PDF-Import·Reset arabisch 1…, Ink Strichstärke/Farbe·letzter Strich·Glätten, Historie-Panel 50·Filter·Export JSON, smoke Stub manual-only + CONTRIBUTING Sync
+
+Post-Release-Polish nach **2.2.0**: **Seitenbeschriftungen** Dialog mit **Range-Editor**, **Import aus PDF**, **Reset arabisch 1…**; **Ink/Freihand** nutzt **Strichstärke/Farbe**, **Löschen letzter Strich**, optional leichte **Glättung**; **Dokument-Historie** als Panel (**letzte 50**, Filter Aktionstyp, **Export JSON**); Workflow-Stub klar **manual only**; CONTRIBUTING **Sync-Einzeiler**. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen unverändert klar markiert / nicht produktiv (Ink ≠ Stylus).
+
+### Neu / verbessert
+- Seitenbeschriftungen: Range-Editor · Aus PDF importieren · Reset arabisch 1…
+- Freihand (Ink): Strichstärke/Farbe · Ink− letzter Strich · Glätten optional leicht
+- Dokument-Historie: Panel letzte 50 · Filter Aktionstyp · Export JSON
+- `.github/workflows/smoke-ild.yml`: klarer **manual only**-Kommentar; CONTRIBUTING Sync-Einzeiler
+
+### Tests / Qualität
+- Version **2.2.1** (App / `ild_pdf` / ISS / Smoke / Docs); Serie **2.2**; `docs/VERSION` + `VERSION.txt`
+- Smoke: 2.2.1 CLI + Qt (Range/Import/Reset, Ink stroke/delete/smooth, Historie-Panel, workflow manual-only)
+- Stubs unverändert (nur Versionsmarker)
+
 ## 2.2.0 — Seitenbeschriftungen (Sidecar+PageLabels), Freihand-Ink Polyline+Undo, Dokument-Historie ildhist-v1, smoke_ild CONTRIBUTING/CI-Stub
 
 Minor-Bump nach **2.1.5**: **PDF-Seitenbeschriftungen** benutzerdefinierte Labels (i, ii, 1…) in Sidecar speichern/anzeigen, optional **PDF PageLabels** via pikepdf; **Ink/Freihand** einfache Maus-Polyline-Annotation (Sidecar + Undo, kein Stylus); **Dokument-Historie** lokale Änderungslog-Datei pro Doc (**ildhist-v1**) mit Zeitstempeln; **CI-Liste** `smoke_ild` in CONTRIBUTING/Docs, optional GitHub-Actions-Workflow-Stub (nur lokal dokumentiert). Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen unverändert klar markiert / nicht produktiv (Ink ≠ drucksensitiver Stylus).

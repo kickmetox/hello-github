@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Nightly/CI Smoke: CLI + Import-Checks für InstantLens Doc — 2.1.0–2.2.0.
+"""Nightly/CI Smoke: CLI + Import-Checks für InstantLens Doc — 2.1.0–2.2.1.
 
 Leichtgewichtig. Exit-Codes:
   0  OK  (ok=true)
@@ -14,12 +14,12 @@ Aufruf:
   python scripts/smoke_ild.py -h
 
 JSON-Schema (--json), Erfolg:
-  {"ok": true, "version": "2.2.0", "duration_ms": 1234,
+  {"ok": true, "version": "2.2.1", "duration_ms": 1234,
    "checks": ["version", "imports", "cli", "measure_diff_import", "changelog"]}
 
 JSON bei Fail: checks[] enthält Objekt mit error-Text (max 200 Zeichen, Truncate …);
 Exitcode spiegelt ok (0↔true, 1↔false) — 2.2.0:
-  {"ok": false, "version": "2.2.0", "duration_ms": 12,
+  {"ok": false, "version": "2.2.1", "duration_ms": 12,
    "checks": ["version", {"name": "imports", "error": "import x: …"}]}
 """
 
@@ -41,7 +41,7 @@ if str(ROOT) not in sys.path:
 # Headless/CI: Qt ohne Display
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-EXPECTED_VERSION = "2.2.0"
+EXPECTED_VERSION = "2.2.1"
 FAIL_ERROR_MAX_LEN = 200
 
 EXIT_OK = 0
@@ -393,14 +393,18 @@ def check_measure_and_diff() -> None:
         raw = csv_nobom.read_bytes()
         assert not raw.startswith(b"\xef\xbb\xbf")
 
-        # Ink + page labels + doc history — 2.2.0
+        # Ink + page labels + doc history — 2.2.0 / Polish 2.2.1
         from ild_pdf import (
             AnnotationType as AT220,
             DocHistory,
             HIST_SCHEMA_ID,
             append_doc_history,
+            apply_label_range,
+            arabic_reset_labels,
             merge_labels,
             normalize_page_labels,
+            read_pdf_page_labels,
+            smooth_ink_points,
             write_pdf_page_labels,
         )
         from ild_pdf.annotate import Annotation as Ann220, DRAG_TYPES as DT220
@@ -408,13 +412,29 @@ def check_measure_and_diff() -> None:
         assert AT220.INK.value == "ink"
         assert AT220.INK in DT220
         ink = Ann220.from_ink_points(
-            0, [[10, 10], [20, 15], [30, 10]], color="#2980B9"
+            0,
+            [[10, 10], [20, 15], [30, 10], [40, 20]],
+            color="#E74C3C",
+            stroke_width=4,
+            smooth=True,
         )
         assert ink.type == AT220.INK
-        assert len(ink.ink_points()) == 3
+        assert len(ink.ink_points()) >= 3
+        assert abs(float(ink.stroke_width) - 4.0) < 0.01
+        assert ink.color.upper() == "#E74C3C"
+        sm = smooth_ink_points([[0, 0], [10, 10], [20, 0], [30, 10]], passes=1)
+        assert len(sm) == 4
+        store.add(ink)
+        assert store.remove_last_ink() is not None
         store.add(ink)
         store.set_custom_page_labels(["i", "ii", "1"])
         assert store.list_custom_page_labels(page_count=3)[:3] == ["i", "ii", "1"]
+        assert arabic_reset_labels(3) == ["1", "2", "3"]
+        assert apply_label_range(["", "", ""], start_page=1, end_page=2, start_value=5) == [
+            "",
+            "5",
+            "6",
+        ]
         store.save(force=True)
         store2 = AnnotationStore(a)
         assert any(x.type == AT220.INK for x in store2.annotations)
@@ -444,6 +464,8 @@ def check_measure_and_diff() -> None:
         with PdfDocument(pl_pdf) as doc_pl:
             assert doc_pl.page_label(0) == "i"
             assert doc_pl.page_label(2) == "1"
+        native_labs = read_pdf_page_labels(pl_pdf)
+        assert native_labs[0] == "i"
         he = append_doc_history(pl_pdf, "page_labels.set", "labels=3")
         assert he is not None
         hist = DocHistory.for_pdf(pl_pdf, load=True)
@@ -451,17 +473,21 @@ def check_measure_and_diff() -> None:
         assert hist.path.exists()
         assert hist.last_action_ts()
         assert any(e.action == "page_labels.set" for e in hist.entries)
+        filt = hist.filter_entries("page_labels.set", limit=50)
+        assert len(filt) >= 1
+        exp = hist.export_json(td_path / "hist-export.json")
+        assert exp.is_file()
 
     _ok(
         "measure + textlayer-diff + native-import + measures-csv "
-        "template + status + ink/page-labels/ildhist — 2.2.0"
+        "template + status + ink/page-labels/ildhist — 2.2.1"
     )
 
 
 def check_changelog() -> None:
     cl = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-    if "## 2.2.0" not in cl:
-        _fail("CHANGELOG fehlt ## 2.2.0")
+    if "## 2.2.1" not in cl:
+        _fail("CHANGELOG fehlt ## 2.2.1")
     if "## 2.1.5" not in cl:
         _fail("CHANGELOG fehlt ## 2.1.5")
     if "## 2.1.4" not in cl:
@@ -474,11 +500,19 @@ def check_changelog() -> None:
         _fail("CHANGELOG fehlt ## 2.1.1")
     if "## 2.1.0" not in cl:
         _fail("CHANGELOG fehlt ## 2.1.0")
-    if "Seitenbeschrift" not in cl and "Freihand" not in cl and "ildhist" not in cl:
-        _fail("CHANGELOG 2.2.0 fehlt Kernfeature-Hinweis")
+    if (
+        "Seitenbeschrift" not in cl
+        and "Freihand" not in cl
+        and "ildhist" not in cl
+        and "Range-Editor" not in cl
+        and "Glätten" not in cl
+    ):
+        _fail("CHANGELOG 2.2.1 fehlt Kernfeature-Hinweis")
+    if "## 2.2.0" not in cl:
+        _fail("CHANGELOG fehlt ## 2.2.0")
     feat = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
-    if "2.2.0" not in feat:
-        _fail("FEATURES.md fehlt 2.2.0")
+    if "2.2.1" not in feat:
+        _fail("FEATURES.md fehlt 2.2.1")
     if "Freihand" not in feat and "ink" not in feat.casefold():
         _fail("FEATURES.md fehlt Freihand/Ink")
     if "ildhist" not in feat and "Dokument-Historie" not in feat:
@@ -497,9 +531,20 @@ def check_changelog() -> None:
     ):
         _fail("INFO.md fehlt FEATURES.md lokal-sync Hinweis")
     contrib = ROOT / "CONTRIBUTING.md"
-    if not contrib.is_file() or "smoke_ild" not in contrib.read_text(encoding="utf-8"):
-        _fail("CONTRIBUTING.md fehlt / ohne smoke_ild")
-    _ok("changelog + features + info + CONTRIBUTING(smoke_ild)")
+    if not contrib.is_file():
+        _fail("CONTRIBUTING.md fehlt")
+    contrib_txt = contrib.read_text(encoding="utf-8")
+    if "smoke_ild" not in contrib_txt:
+        _fail("CONTRIBUTING.md ohne smoke_ild")
+    if "sync-ild.ps1" not in contrib_txt:
+        _fail("CONTRIBUTING.md fehlt Sync-Einzeiler (sync-ild.ps1)")
+    wf = ROOT / ".github" / "workflows" / "smoke-ild.yml"
+    if not wf.is_file():
+        _fail("Workflow-Stub smoke-ild.yml fehlt")
+    wf_txt = wf.read_text(encoding="utf-8")
+    if "manual only" not in wf_txt.casefold() and "MANUAL ONLY" not in wf_txt:
+        _fail("Workflow-Stub fehlt klarer „manual only“-Kommentar")
+    _ok("changelog + features + info + CONTRIBUTING(smoke_ild/sync) + workflow manual-only")
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -565,11 +610,11 @@ Exit-Codes:
 Laufzeit: am Ende als „Laufzeit: N ms“ (oder duration_ms im JSON).
 
 Beispiel --json (Erfolg):
-  {"ok": true, "version": "2.2.0", "duration_ms": 1234,
+  {"ok": true, "version": "2.2.1", "duration_ms": 1234,
    "checks": ["version", "imports", "cli", "measure_diff_import", "changelog"]}
 
 Beispiel --json (Fail):
-  {"ok": false, "version": "2.2.0", "duration_ms": 12,
+  {"ok": false, "version": "2.2.1", "duration_ms": 12,
    "checks": ["version", {"name": "imports", "error": "import x: …"}]}
 """.rstrip()
     )

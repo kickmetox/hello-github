@@ -97,9 +97,11 @@ from instantlensdoc.core.app_settings import (
     get_page_number_overlay_position,
     get_page_number_overlay_skip_edges,
     get_page_number_overlay_start,
+    get_ink_smooth,
     get_measure_labels_persistent,
     get_measure_snap_to_annotation,
     get_measure_unit,
+    set_ink_smooth,
     get_show_page_boxes,
     get_show_page_number_overlay,
     get_show_printer_marks,
@@ -383,6 +385,8 @@ class PdfCanvas(QLabel):
         self._drag_start: tuple[float, float] | None = None
         self._drag_current: tuple[float, float] | None = None
         self._ink_points: list[tuple[float, float]] | None = None  # Freihand — 2.2.0
+        self._ink_preview_color: str = "#2980B9"  # Strichfarbe Vorschau — 2.2.1
+        self._ink_preview_stroke: float = 2.0  # Strichstärke Vorschau — 2.2.1
         self._text_sel_start: tuple[float, float] | None = None
         self._text_sel_current: tuple[float, float] | None = None
         self._scale = 1.5
@@ -1061,7 +1065,8 @@ class PdfCanvas(QLabel):
                 x=0,
                 y=0,
                 points=[[p[0], p[1]] for p in self._ink_points],
-                color="#2980B9",
+                color=str(getattr(self, "_ink_preview_color", None) or "#2980B9"),
+                stroke_width=float(getattr(self, "_ink_preview_stroke", 2.0) or 2.0),
             )
             preview.sync_bounds_from_points()
             self._draw_ann(painter, preview)
@@ -1655,11 +1660,30 @@ class PdfViewer(QWidget):
                 b.setToolTip("Lineal: Distanz ziehen — Anzeige mm/px (Toggle) — 2.1.0")
             elif t == AnnotationType.INK:
                 b.setToolTip(
-                    "Freihand: Maus-Polyline ziehen (kein Stylus/Druck) — Sidecar + Undo — 2.2.0"
+                    "Freihand: Maus-Polyline; Strichstärke/Farbe (Stift+Slider); "
+                    "optional Glätten — 2.2.1 (kein Stylus/Druck)"
                 )
             b.clicked.connect(lambda checked, tool=t: self._set_tool(tool))
             self._tool_buttons.append(b)
             toolbar.addWidget(b)
+
+        self.btn_ink_smooth = QToolButton()
+        self.btn_ink_smooth.setText("Glätten")
+        self.btn_ink_smooth.setCheckable(True)
+        self.btn_ink_smooth.setChecked(get_ink_smooth())
+        self.btn_ink_smooth.setToolTip(
+            "Freihand: leichte Glättung optional — 2.2.1 (kein Stylus)"
+        )
+        self.btn_ink_smooth.clicked.connect(self._toggle_ink_smooth)
+        toolbar.addWidget(self.btn_ink_smooth)
+
+        self.btn_ink_undo_stroke = QToolButton()
+        self.btn_ink_undo_stroke.setText("Ink−")
+        self.btn_ink_undo_stroke.setToolTip(
+            "Letzten Freihand-Strich löschen (Undo-fähig) — 2.2.1"
+        )
+        self.btn_ink_undo_stroke.clicked.connect(self.delete_last_ink_stroke)
+        toolbar.addWidget(self.btn_ink_undo_stroke)
 
         self.btn_measure_unit = QToolButton()
         self.btn_measure_unit.setText(f"Maß:{get_measure_unit()}")
@@ -1685,7 +1709,9 @@ class PdfViewer(QWidget):
         self.btn_hl_color.clicked.connect(self._pick_highlight_color)
         self._style_color_btn(self.btn_hl_color, self._highlight_color)
         self.btn_pen_color = QPushButton("Stift")
-        self.btn_pen_color.setToolTip("Stift-Farbe (Linie/Pfeil/Rechteck/Unterstreichen)")
+        self.btn_pen_color.setToolTip(
+            "Stift-Farbe (Linie/Pfeil/Rechteck/Unterstreichen/Freihand) — 2.2.1"
+        )
         self.btn_pen_color.setFixedWidth(44)
         self.btn_pen_color.clicked.connect(self._pick_pen_color)
         self._style_color_btn(self.btn_pen_color, self._pen_color)
@@ -2006,6 +2032,7 @@ class PdfViewer(QWidget):
         self.canvas.annotation_placed.connect(self._on_place)
         self.canvas.drag_finished.connect(self._on_drag)
         self.canvas.ink_finished.connect(self._on_ink)
+        self._sync_ink_preview_style()
         self.canvas.text_selection_finished.connect(self._on_text_selection)
         self.canvas.overlay_edit_requested.connect(self._edit_overlay)
         self.canvas.annotation_selected.connect(self._on_annotation_selected)
@@ -2084,6 +2111,22 @@ class PdfViewer(QWidget):
             self._style_color_btn(self.btn_hl_color, self._highlight_color)
             self.status.emit(f"Highlight-Farbe: {self._highlight_color}")
 
+    def _sync_ink_preview_style(self) -> None:
+        """Freihand-Vorschau: aktuelle Stiftfarbe + Strichstärke — 2.2.1."""
+        if not hasattr(self, "canvas") or self.canvas is None:
+            return
+        self.canvas._ink_preview_color = str(self._pen_color or "#2980B9")
+        self.canvas._ink_preview_stroke = float(
+            getattr(self, "_default_stroke_width", 2.0) or 2.0
+        )
+        self.canvas.update()
+
+    def _toggle_ink_smooth(self) -> None:
+        """Optionale leichte Freihand-Glättung — 2.2.1."""
+        on = bool(self.btn_ink_smooth.isChecked())
+        set_ink_smooth(on)
+        self.status.emit(f"Freihand-Glättung {'an' if on else 'aus'}")
+
     def _pick_pen_color(self):
         initial = QColor(self._pen_color)
         color = QColorDialog.getColor(initial, self, "Stift-Farbe")
@@ -2091,6 +2134,7 @@ class PdfViewer(QWidget):
             self._pen_color = color.name()
             set_ann_pen_color(self._pen_color)
             self._style_color_btn(self.btn_pen_color, self._pen_color)
+            self._sync_ink_preview_style()
             self.status.emit(f"Stift-Farbe: {self._pen_color}")
 
     def _pick_note_color(self):
@@ -2423,6 +2467,7 @@ class PdfViewer(QWidget):
                 set_ann_default_stroke_width(self._default_stroke_width)
             except Exception:
                 pass
+        self._sync_ink_preview_style()
         self.status.emit(f"Standard-Strichstärke {self._default_stroke_width:.0f}px")
 
     def _on_stroke_slider_pressed(self) -> None:
@@ -9191,7 +9236,7 @@ class PdfViewer(QWidget):
         return True
 
     def _on_ink(self, points: object) -> None:
-        """Freihand-Polyline committen (Sidecar + Undo + Historie) — 2.2.0."""
+        """Freihand-Polyline committen (Strichstärke/Farbe/Glätten) — 2.2.1."""
         if not self.store:
             return
         # Werkzeug sollte INK sein; programmatische Tests dürfen Punkte ohne Tool setzen
@@ -9212,11 +9257,22 @@ class PdfViewer(QWidget):
             mapped.append([lx0 + (x - ox), ly0 + (y - oy)])
         if len(mapped) < 2:
             return
+        do_smooth = False
+        try:
+            do_smooth = bool(
+                getattr(self, "btn_ink_smooth", None)
+                and self.btn_ink_smooth.isChecked()
+            )
+            if not do_smooth:
+                do_smooth = bool(get_ink_smooth())
+        except Exception:
+            do_smooth = bool(get_ink_smooth())
         ann = Annotation.from_ink_points(
             page0,
             mapped,
             color=self._pen_color,
             stroke_width=float(getattr(self, "_default_stroke_width", 2.0) or 2.0),
+            smooth=do_smooth,
         )
         # Historie: spezifischer Action-Name vor generischem commit
         try:
@@ -9225,12 +9281,44 @@ class PdfViewer(QWidget):
             append_doc_history(
                 self.pdf_path,
                 "annotation.ink",
-                f"page={page0} points={len(mapped)}",
+                f"page={page0} points={len(ann.ink_points())} smooth={int(do_smooth)} "
+                f"stroke={ann.stroke_width:.0f} color={ann.color}",
             )
         except Exception:
             pass
         # _commit_ann loggt zusätzlich annotation.add — OK für Audit
         self._commit_ann(ann)
+
+    def delete_last_ink_stroke(self) -> bool:
+        """Letzten Freihand-Strich löschen (Undo-fähig) — 2.2.1."""
+        if not self.store:
+            self.status.emit("Kein PDF geöffnet")
+            return False
+        target = self.store.remove_last_ink(page=self.page_index)
+        if target is None:
+            target = self.store.remove_last_ink(page=None)
+        if target is None:
+            self.status.emit("Kein Freihand-Strich zum Löschen")
+            return False
+        try:
+            self.schedule_sidecar_save(force=True)
+        except Exception:
+            pass
+        try:
+            from ild_pdf.doc_history import append_doc_history
+
+            append_doc_history(
+                self.pdf_path,
+                "annotation.ink_delete",
+                f"page={target.page} id={target.id[:8]}",
+            )
+        except Exception:
+            pass
+        self.refresh()
+        self.annotations_changed.emit()
+        self.document_changed.emit()
+        self.status.emit("Letzter Freihand-Strich gelöscht")
+        return True
 
     def apply_custom_page_labels(
         self,
@@ -9279,22 +9367,14 @@ class PdfViewer(QWidget):
         dlg.exec()
 
     def show_doc_history(self) -> None:
-        """Lokale Dokument-Historie (ildhist-v1) anzeigen — 2.2.0."""
+        """Dokument-Historie-Panel (letzte 50, Filter, Export) — 2.2.1."""
         if not self.pdf_path:
             self.status.emit("Kein PDF geöffnet")
             return
-        from ild_pdf.doc_history import DocHistory, format_history_summary
+        from instantlensdoc.ui.doc_history_dialog import DocHistoryDialog
 
-        hist = DocHistory.for_pdf(self.pdf_path, load=True)
-        text = format_history_summary(hist.last_entries(30), max_items=30)
-        last = hist.last_action_ts() or "—"
-        QMessageBox.information(
-            self,
-            "Dokument-Historie",
-            f"Datei: {hist.path.name}\n"
-            f"Schema: ildhist-v1 · Einträge: {len(hist.entries)}\n"
-            f"Letzte Aktion: {last}\n\n{text}",
-        )
+        dlg = DocHistoryDialog(self.pdf_path, parent=self)
+        dlg.exec()
 
     def _on_drag(self, x0: float, y0: float, x1: float, y1: float):
         if not self.store or self.tool is None or self.tool not in DRAG_TYPES:

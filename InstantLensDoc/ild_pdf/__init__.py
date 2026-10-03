@@ -28,9 +28,12 @@ from .pdf_ann_import import (
     plan_duplicate_actions,
 )
 from .page_labels import (
+    apply_label_range,
+    arabic_reset_labels,
     merge_labels,
     normalize_page_labels,
     page_labels_to_meta,
+    read_pdf_page_labels,
     remap_page_labels,
     write_pdf_page_labels,
 )
@@ -55,6 +58,7 @@ from .annotate import (
     SCHEMA_ID,
     SIDECAR_VERSION,
     normalize_tags,
+    smooth_ink_points,
     tags_to_str,
     validate_annotation_import_data,
     STAMP_LIBRARY,
@@ -234,8 +238,11 @@ __all__ = [
     "import_native_pdf_annotations",
     "import_native_into_store",
     "merge_labels",
+    "apply_label_range",
+    "arabic_reset_labels",
     "normalize_page_labels",
     "page_labels_to_meta",
+    "read_pdf_page_labels",
     "remap_page_labels",
     "write_pdf_page_labels",
     "HIST_SCHEMA_ID",
@@ -249,6 +256,7 @@ __all__ = [
     "AnnotationImportError",
     "AnnotationStore",
     "AnnotationType",
+    "smooth_ink_points",
     "validate_annotation_import_data",
     "DRAG_TYPES",
     "FAV_SCHEMA_ID",
@@ -397,4 +405,4 @@ __all__ = [
     "page_count_for_text",
 ]
 
-__version__ = "2.2.0"
+__version__ = "2.2.1"

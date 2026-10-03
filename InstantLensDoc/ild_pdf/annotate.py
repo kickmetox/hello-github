@@ -316,8 +316,9 @@ class Annotation:
         *,
         color: str = "#2980B9",
         stroke_width: float = 2.0,
+        smooth: bool = False,
     ) -> "Annotation":
-        """INK-Annotation aus Punktliste erzeugen."""
+        """INK-Annotation aus Punktliste erzeugen; optional leichte Glättung — 2.2.1."""
         cleaned: list[list[float]] = []
         for pt in points or []:
             if not isinstance(pt, (list, tuple)) or len(pt) < 2:
@@ -326,6 +327,8 @@ class Annotation:
                 cleaned.append([float(pt[0]), float(pt[1])])
             except (TypeError, ValueError):
                 continue
+        if smooth:
+            cleaned = smooth_ink_points(cleaned, passes=1)
         ann = cls(
             page=int(page),
             type=AnnotationType.INK,
@@ -575,6 +578,34 @@ class Annotation:
         known = {f.name for f in cls.__dataclass_fields__.values()}  # type: ignore[attr-defined]
         data = {k: v for k, v in data.items() if k in known}
         return cls(**data)
+
+
+def smooth_ink_points(
+    points: Sequence[Sequence[float]],
+    *,
+    passes: int = 1,
+) -> list[list[float]]:
+    """Leichte Polyline-Glättung (Nachbar-Mittel, Endpunkte fix) — 2.2.1."""
+    pts: list[list[float]] = []
+    for pt in points or []:
+        if not isinstance(pt, (list, tuple)) or len(pt) < 2:
+            continue
+        try:
+            pts.append([float(pt[0]), float(pt[1])])
+        except (TypeError, ValueError):
+            continue
+    if len(pts) < 3:
+        return pts
+    n_pass = max(0, min(3, int(passes)))
+    for _ in range(n_pass):
+        out: list[list[float]] = [pts[0][:]]
+        for i in range(1, len(pts) - 1):
+            x = (pts[i - 1][0] + pts[i][0] * 2.0 + pts[i + 1][0]) / 4.0
+            y = (pts[i - 1][1] + pts[i][1] * 2.0 + pts[i + 1][1]) / 4.0
+            out.append([x, y])
+        out.append(pts[-1][:])
+        pts = out
+    return pts
 
 
 class AnnotationStore:
@@ -1483,6 +1514,16 @@ class AnnotationStore:
         target = candidates[-1]
         if self.remove(target.id):
             return target
+        return None
+
+    def remove_last_ink(self, page: int | None = None) -> Optional[Annotation]:
+        """Löscht den letzten Freihand-Strich (INK), optional nur auf page — 2.2.1."""
+        candidates = self.annotations if page is None else self.for_page(page)
+        for ann in reversed(candidates):
+            if ann.type == AnnotationType.INK:
+                if self.remove(ann.id):
+                    return ann
+                return None
         return None
 
     def for_page(self, page: int) -> List[Annotation]:

@@ -90,6 +90,36 @@ class DocHistory:
             return []
         return list(self.entries[-k:])
 
+    def action_types(self) -> list[str]:
+        """Sortierte eindeutige Aktionstypen (für Filter)."""
+        return sorted({str(e.action or "").strip() for e in self.entries if e.action})
+
+    def filter_entries(
+        self,
+        action: str | None = None,
+        *,
+        limit: int = 50,
+    ) -> list[HistoryEntry]:
+        """Letzte ``limit`` Einträge, optional gefiltert nach Aktionstyp — 2.2.1."""
+        items = list(self.entries)
+        act = str(action or "").strip()
+        if act and act not in ("*", "alle", "all", ""):
+            items = [e for e in items if e.action == act]
+        k = max(0, int(limit))
+        if k <= 0:
+            return []
+        return items[-k:]
+
+    def export_json(self, path: str | Path) -> Path:
+        """Aktuellen Stand als JSON exportieren (ildhist-v1 Payload)."""
+        target = Path(path)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(
+            json.dumps(self._payload(), indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
+        return target
+
     def last_action_ts(self) -> str:
         if not self.entries:
             return ""

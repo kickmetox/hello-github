@@ -35,7 +35,7 @@ python scripts\smoke_test.py
 
 ## GitHub Actions Stub
 
-Unter `.github/workflows/smoke-ild.yml` liegt ein **Workflow-Stub**. Er ist bewusst nur als Vorlage dokumentiert und lokal / manuell lauffähig gedacht — nicht als produktive Cloud-CI-Pflicht. Zum lokalen Dry-Run der gleichen Checks reicht `python scripts/smoke_ild.py`.
+Unter `.github/workflows/smoke-ild.yml` liegt ein **Workflow-Stub (manual only)**. Nur `workflow_dispatch` — kein Push/PR-Trigger, keine Cloud-CI-Pflicht. Lokal: `python scripts/smoke_ild.py`.
 
 ## Sync (Windows)
 

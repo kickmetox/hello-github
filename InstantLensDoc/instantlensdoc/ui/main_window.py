@@ -2289,13 +2289,13 @@ class MainWindow(QMainWindow):
         m_pdf.addAction(act_goto_page)
         act_page_labels = QAction("Seitenbeschriftungen…", self)
         act_page_labels.setToolTip(
-            "Benutzerdefinierte Labels (i, ii, 1…) — Sidecar + optional PDF PageLabels — 2.2.0"
+            "Benutzerdefinierte Labels — Range-Editor · Import PDF · Reset arabisch 1… — 2.2.1"
         )
         act_page_labels.triggered.connect(lambda: self.pdf_view.edit_page_labels())
         m_pdf.addAction(act_page_labels)
         act_doc_hist = QAction("Dokument-Historie…", self)
         act_doc_hist.setToolTip(
-            "Lokales Änderungslog (ildhist-v1) mit Zeitstempeln — 2.2.0"
+            "Dokument-Historie-Panel: letzte 50 · Filter Aktionstyp · Export JSON — 2.2.1"
         )
         act_doc_hist.triggered.connect(lambda: self.pdf_view.show_doc_history())
         m_pdf.addAction(act_doc_hist)

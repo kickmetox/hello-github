@@ -1,4 +1,4 @@
-"""Dialog: benutzerdefinierte PDF-Seitenbeschriftungen speichern/anzeigen — 2.2.0."""
+"""Dialog: benutzerdefinierte PDF-Seitenbeschriftungen — 2.2.0 / Polish 2.2.1."""
 
 from __future__ import annotations
 
@@ -7,12 +7,15 @@ from PySide6.QtWidgets import (
     QCheckBox,
     QDialog,
     QDialogButtonBox,
+    QFormLayout,
+    QGroupBox,
     QHBoxLayout,
     QLabel,
     QLineEdit,
     QMessageBox,
     QPushButton,
     QScrollArea,
+    QSpinBox,
     QVBoxLayout,
     QWidget,
 )
@@ -26,12 +29,12 @@ class PageLabelsDialog(QDialog):
         self.pdf_view = pdf_view
         self.setWindowTitle("Seitenbeschriftungen…")
         self.setWindowModality(Qt.WindowModal)
-        self.resize(420, 480)
+        self.resize(480, 560)
         layout = QVBoxLayout(self)
         layout.addWidget(
             QLabel(
                 "Benutzerdefinierte Labels (z. B. i, ii, 1…). "
-                "Leer = PDF-Standard / native PageLabels. — 2.2.0"
+                "Leer = PDF-Standard / native PageLabels. — 2.2.1"
             )
         )
         scroll = QScrollArea()
@@ -52,7 +55,6 @@ class PageLabelsDialog(QDialog):
                 native = str(pdf_view.page_label(i) or "")
             except Exception:
                 native = ""
-            # Anzeige: Index + aktuelles Label (ohne Custom-Override in Preview)
             hint = f"Seite {i + 1}"
             if native and (i >= len(custom) or not custom[i]):
                 hint += f" ({native})"
@@ -68,11 +70,41 @@ class PageLabelsDialog(QDialog):
         scroll.setWidget(body)
         layout.addWidget(scroll, 1)
 
+        # Range-Editor — 2.2.1
+        range_box = QGroupBox("Bereich setzen (Range-Editor)")
+        range_form = QFormLayout(range_box)
+        self.spin_from = QSpinBox()
+        self.spin_from.setRange(1, max(1, n))
+        self.spin_from.setValue(1)
+        self.spin_to = QSpinBox()
+        self.spin_to.setRange(1, max(1, n))
+        self.spin_to.setValue(max(1, n))
+        self.spin_start = QSpinBox()
+        self.spin_start.setRange(0, 9999)
+        self.spin_start.setValue(1)
+        self.spin_start.setToolTip("Arabischer Startwert für den Bereich")
+        range_form.addRow("Von Seite", self.spin_from)
+        range_form.addRow("Bis Seite", self.spin_to)
+        range_form.addRow("Startwert", self.spin_start)
+        btn_range = QPushButton("Bereich arabisch anwenden")
+        btn_range.setToolTip("Füllt den Bereich mit 1, 2, 3… ab Startwert")
+        btn_range.clicked.connect(self._apply_range)
+        range_form.addRow(btn_range)
+        layout.addWidget(range_box)
+
         presets = QHBoxLayout()
         btn_roman = QPushButton("Vorspann i, ii…")
         btn_roman.setToolTip("Erste Seiten römisch klein, Rest arabisch ab 1")
         btn_roman.clicked.connect(self._preset_frontmatter)
         presets.addWidget(btn_roman)
+        btn_import = QPushButton("Aus PDF importieren")
+        btn_import.setToolTip("Native PDF-PageLabels in die Felder übernehmen — 2.2.1")
+        btn_import.clicked.connect(self._import_from_pdf)
+        presets.addWidget(btn_import)
+        btn_arabic = QPushButton("Reset arabisch 1…")
+        btn_arabic.setToolTip("Alle Seiten auf arabisch 1, 2, 3… zurücksetzen — 2.2.1")
+        btn_arabic.clicked.connect(self._reset_arabic)
+        presets.addWidget(btn_arabic)
         btn_clear = QPushButton("Alle leeren")
         btn_clear.clicked.connect(self._clear_all)
         presets.addWidget(btn_clear)
@@ -108,6 +140,45 @@ class PageLabelsDialog(QDialog):
                 ed.setText(romans[i] if i < len(romans) else str(i + 1))
             else:
                 ed.setText(str(i - front + 1))
+
+    def _apply_range(self) -> None:
+        from ild_pdf.page_labels import apply_label_range
+
+        n = len(self._edits)
+        if n <= 0:
+            return
+        current = self.labels()
+        filled = apply_label_range(
+            current,
+            start_page=self.spin_from.value() - 1,
+            end_page=self.spin_to.value() - 1,
+            start_value=self.spin_start.value(),
+            page_count=n,
+        )
+        for i, ed in enumerate(self._edits):
+            ed.setText(filled[i] if i < len(filled) else "")
+
+    def _import_from_pdf(self) -> None:
+        pv = self.pdf_view
+        if not getattr(pv, "pdf_path", None):
+            QMessageBox.warning(self, "Seitenbeschriftungen", "Kein PDF geöffnet.")
+            return
+        try:
+            from ild_pdf.page_labels import read_pdf_page_labels
+
+            native = read_pdf_page_labels(pv.pdf_path, password=getattr(pv, "password", None))
+        except Exception as e:
+            QMessageBox.warning(self, "Seitenbeschriftungen", f"Import fehlgeschlagen:\n{e}")
+            return
+        for i, ed in enumerate(self._edits):
+            ed.setText(native[i] if i < len(native) else "")
+
+    def _reset_arabic(self) -> None:
+        from ild_pdf.page_labels import arabic_reset_labels
+
+        filled = arabic_reset_labels(len(self._edits), start=1)
+        for i, ed in enumerate(self._edits):
+            ed.setText(filled[i] if i < len(filled) else "")
 
     def labels(self) -> list[str]:
         return [ed.text().strip() for ed in self._edits]

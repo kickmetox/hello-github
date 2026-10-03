@@ -3626,6 +3626,22 @@ def toggle_measure_snap_to_annotation() -> bool:
     return set_measure_snap_to_annotation(not get_measure_snap_to_annotation())
 
 
+def get_ink_smooth() -> bool:
+    """Freihand leichte Glättung optional — 2.2.1."""
+    return bool(load_settings().get("ink_smooth", False))
+
+
+def set_ink_smooth(enabled: bool) -> bool:
+    v = bool(enabled)
+    save_settings({"ink_smooth": v})
+    return v
+
+
+def toggle_ink_smooth() -> bool:
+    """Freihand-Glättung umschalten — 2.2.1."""
+    return set_ink_smooth(not get_ink_smooth())
+
+
 def get_measure_labels_persistent() -> bool:
     """Mess-Labels persistent in Sidecar/Overlay halten — 2.1.1."""
     return bool(load_settings().get("measure_labels_persistent", True))
