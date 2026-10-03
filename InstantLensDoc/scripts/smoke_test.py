@@ -11059,7 +11059,7 @@ def main() -> int:
         assert len(win.layout_doc.text_frames) >= 2
         assert "Lizenz:" in win.license_label.text() or "⚠" in win.license_label.text()
         _vl = win.version_label.text()
-        assert "v2.0.0" in _vl, repr(_vl)
+        assert "v2.0.1" in _vl, repr(_vl)
         # Lizenz <7 Tage: Style prominent
         st_lic = win.license_manager.status()
         if st_lic.allowed and st_lic.days_remaining < 7:
