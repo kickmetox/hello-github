@@ -100,9 +100,10 @@ HELP_HTML = f"""
 <li><b>Datei → Projekt-Ordner</b>: Workspace wählen (letzte 5); Dialoge starten im aktiven Ordner</li>
 <li><b>Datei → Exportieren</b>: Editor-Inhalt als HTML, DOCX oder PDF (zuletzt genutzter Ordner wird gemerkt);
     <b>Export-Profil</b> speichern/anwenden (DPI / Format / Ziel)</li>
-<li><b>Datei → Drucken</b> (Ctrl+P): Editor oder aktuelle PDF-Seite (Qt Print); <b>PDF → Dokument drucken…</b> alle Seiten (Raster via pypdfium2) — 1.0.0</li>
-<li><b>Datei → Backup jetzt</b> / <b>Backup-Ordner öffnen…</b>: manuelles Backup nach App-Config/backups — 1.0.0</li>
-<li><b>Willkommen</b>: Startseite mit Recent + „Dokument öffnen“ / „Leeres Text“ wenn keine Tabs — 1.0.0</li>
+<li><b>Datei → Drucken</b> (Ctrl+P): Editor oder aktuelle PDF-Seite (Qt Print); <b>PDF → Dokument drucken…</b> Seitenbereich von–bis, dann QPrintDialog (Raster via pypdfium2) — 1.0.1</li>
+<li><b>Datei → Backup jetzt</b> / <b>Backup-Ordner öffnen…</b>: manuelles Backup nach App-Config/backups; Status zeigt Pfad der letzten Backup-Datei — 1.0.1</li>
+<li><b>Willkommen</b>: Startseite mit Recent (Rechtsklick Entfernen / Ordner öffnen; fehlende Pfade grau) + „Dokument öffnen“ / „Leeres Text“ — 1.0.1</li>
+<li><b>Hilfe → Info</b>: bei Trial/ungültig Button <b>Lizenz aktivieren…</b> — 1.0.1</li>
 <li><b>Seitenleiste</b>: Suche (inkl. letzte Suchbegriffe), „Alle Docs“-Volltext, Zuletzt geöffnet, Dokumente,
     Lesezeichen/Outline (+/− hinzufügen/löschen), <b>Annotationen</b> (klickbar, <b>nach Seite gruppiert</b>,
     <b>Filter nach Typ</b>, <b>Textsuche in der Liste</b> (optional <b>Regex</b>), <b>Statistik je Typ</b>,
@@ -533,6 +534,8 @@ class HelpDialog(QDialog):
 class AboutDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
+        self._parent_win = parent
+        self._license_mgr = None
         self.setWindowTitle(f"{DISPLAY_NAME} {__version__}")
         self.resize(560, 640)
         icon = QIcon()
@@ -555,9 +558,10 @@ class AboutDialog(QDialog):
                 f"<p>Icon: assets/app.ico · assets/icon.png</p>"
             )
         )
-        # Lizenzstatus immer anzeigen — 1.0.0
+        # Lizenzstatus immer anzeigen — 1.0.0 / Aktivieren-Button 1.0.1
         license_html = ""
         trial_hint = ""
+        show_activate = False
         try:
             from instantlensdoc.license import LicenseManager
 
@@ -566,6 +570,7 @@ class AboutDialog(QDialog):
                 mgr = parent.license_manager
             if mgr is None:
                 mgr = LicenseManager()
+            self._license_mgr = mgr
             st = mgr.status()
             mode_lbl = {
                 "trial": "Testversion (Trial)",
@@ -595,6 +600,8 @@ class AboutDialog(QDialog):
                 f"Kontakt / Key: <a href='mailto:{CONTACT_EMAIL}'>{CONTACT_EMAIL}</a>"
                 f"</p>"
             )
+            # Button bei Trial / abgelaufen / ungültig — 1.0.1
+            show_activate = st.mode != "licensed"
             if st.mode == "trial":
                 rem = st.days_remaining
                 trial_hint = (
@@ -612,11 +619,20 @@ class AboutDialog(QDialog):
                 f"Kontakt: <a href='mailto:{CONTACT_EMAIL}'>{CONTACT_EMAIL}</a></p>"
             )
             trial_hint = ""
+            show_activate = True
         if license_html:
             lic_lbl = QLabel(license_html)
             lic_lbl.setWordWrap(True)
             lic_lbl.setOpenExternalLinks(True)
             layout.addWidget(lic_lbl)
+        if show_activate:
+            btn_activate = QPushButton("Lizenz aktivieren…")
+            btn_activate.setToolTip("Lizenzschlüssel eingeben (Trial / ungültig / abgelaufen)")
+            btn_activate.clicked.connect(self._activate_license)
+            layout.addWidget(btn_activate)
+            self._btn_activate = btn_activate
+        else:
+            self._btn_activate = None
         if trial_hint:
             hint_lbl = QLabel(trial_hint)
             hint_lbl.setWordWrap(True)
@@ -642,7 +658,7 @@ class AboutDialog(QDialog):
             "<h3>Features (Kurz)</h3>"
             "<ul>"
             "<li>PDF lesen/annotieren (Highlight, Notiz, Stempel, Formen) · Sidecar v4</li>"
-            "<li>Willkommen-Startseite, manuelles Backup, PDF-Dokument drucken — 1.0.0</li>"
+            "<li>Willkommen Recent-Kontextmenü, Druck-Seitenbereich, Lizenz aktivieren, Backup-Pfad — 1.0.1</li>"
             "<li>Editor: Find/Replace, Snippets, Bracket-Match, Minimap, Zeilen-Lesezeichen</li>"
             "<li>OCR-Bridge, Formulargenerator, Batch, Export · Ann.-Batch-Farbe/Deckkraft</li>"
             "<li>Lizenz Trial/Keys · lokal, ohne Telemetrie · Stubs: KI, Cloud, Stylus, 3D</li>"
@@ -668,6 +684,29 @@ class AboutDialog(QDialog):
         buttons = QDialogButtonBox(QDialogButtonBox.Ok)
         buttons.accepted.connect(self.accept)
         layout.addWidget(buttons)
+
+    def _activate_license(self) -> None:
+        """Lizenzdialog öffnen (Trial / ungültig / abgelaufen) — 1.0.1."""
+        from instantlensdoc.ui.license_dialog import LicenseDialog
+
+        mgr = self._license_mgr
+        if mgr is None:
+            from instantlensdoc.license import LicenseManager
+
+            mgr = LicenseManager()
+            self._license_mgr = mgr
+        parent = self._parent_win if self._parent_win is not None else self
+        if LicenseDialog(mgr, parent).exec():
+            # Statusleiste aktualisieren wenn Hauptfenster
+            if self._parent_win is not None and hasattr(
+                self._parent_win, "_update_license_status"
+            ):
+                try:
+                    self._parent_win._update_license_status()
+                except Exception:
+                    pass
+            # About schließen — Status hat sich ggf. geändert
+            self.accept()
 
     def _open_features_md(self) -> None:
         path = ROOT / "FEATURES.md"

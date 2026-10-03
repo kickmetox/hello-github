@@ -133,6 +133,7 @@ class MainWindow(QMainWindow):
         self._batch_save_quiet: bool = False  # Alle-speichern: Einzeldialoge unterdrücken
         # Last-Page / Scroll je Tab (path_key → {page, scale, scroll_y}) — 0.9.1
         self._tab_view_state: dict[str, dict] = {}
+        self._last_backup_path = None  # Pfad der letzten Backup-Datei — 1.0.1
 
         self.setAcceptDrops(True)
         self.setWindowTitle(self._app_title())
@@ -804,6 +805,7 @@ class MainWindow(QMainWindow):
         self.welcome_page.open_requested.connect(self.open_dialog)
         self.welcome_page.new_text_requested.connect(lambda: self.new_doc("empty"))
         self.welcome_page.recent_activated.connect(self.open_path)
+        self.welcome_page.recent_remove_requested.connect(self._remove_recent_path)
         self.stack.addWidget(self.editor_pane)  # 0
         self.stack.addWidget(self.pdf_view)  # 1
         self.stack.addWidget(self.image_label)  # 2
@@ -3996,7 +3998,8 @@ class MainWindow(QMainWindow):
                 if dest is None:
                     QMessageBox.warning(self, "Backup", "Backup fehlgeschlagen.")
                     return
-                self._set_status(f"Backup erstellt: {dest.name}")
+                self._last_backup_path = dest
+                self._set_status(f"Backup erstellt: {dest}")
                 QMessageBox.information(
                     self,
                     "Backup jetzt",
@@ -4012,7 +4015,8 @@ class MainWindow(QMainWindow):
                 if dest is None:
                     QMessageBox.warning(self, "Backup", "Backup fehlgeschlagen.")
                     return
-                self._set_status(f"Backup erstellt: {dest.name}")
+                self._last_backup_path = dest
+                self._set_status(f"Backup erstellt: {dest}")
                 QMessageBox.information(
                     self,
                     "Backup jetzt",
@@ -4038,7 +4042,8 @@ class MainWindow(QMainWindow):
                     else ".txt"
                 )
                 dest = manual_backup_text(body, title=title, suffix=suffix)
-                self._set_status(f"Backup erstellt: {dest.name}")
+                self._last_backup_path = dest
+                self._set_status(f"Backup erstellt: {dest}")
                 QMessageBox.information(
                     self,
                     "Backup jetzt",

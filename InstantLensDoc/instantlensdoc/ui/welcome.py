@@ -1,16 +1,17 @@
-"""Willkommens-/Startseite wenn keine Dokument-Tabs offen sind — 1.0.0."""
+"""Willkommens-/Startseite wenn keine Dokument-Tabs offen sind — 1.0.1."""
 
 from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QColor
+from PySide6.QtCore import Qt, QUrl, Signal
+from PySide6.QtGui import QColor, QDesktopServices
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QListWidget,
     QListWidgetItem,
+    QMenu,
     QPushButton,
     QVBoxLayout,
     QWidget,
@@ -27,6 +28,7 @@ class WelcomePage(QWidget):
     open_requested = Signal()
     new_text_requested = Signal()
     recent_activated = Signal(str)
+    recent_remove_requested = Signal(str)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -59,7 +61,11 @@ class WelcomePage(QWidget):
         lay.addWidget(QLabel("<b>Zuletzt geöffnet</b>"))
         self.recent_list = QListWidget()
         self.recent_list.setMinimumHeight(180)
-        self.recent_list.setToolTip("Doppelklick öffnet den Eintrag")
+        self.recent_list.setToolTip(
+            "Doppelklick öffnet den Eintrag; Rechtsklick: Entfernen / Ordner öffnen"
+        )
+        self.recent_list.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.recent_list.customContextMenuRequested.connect(self._recent_context_menu)
         self.recent_list.itemDoubleClicked.connect(self._on_recent_dbl)
         lay.addWidget(self.recent_list, 1)
 
@@ -77,6 +83,7 @@ class WelcomePage(QWidget):
             label = str(path) if exists else f"{path} (fehlt)"
             item = QListWidgetItem(label)
             item.setData(Qt.UserRole, str(path))
+            item.setData(Qt.UserRole + 1, bool(exists))
             if not exists:
                 item.setForeground(QColor("#888888"))
             self.recent_list.addItem(item)
@@ -88,3 +95,26 @@ class WelcomePage(QWidget):
         if not Path(str(path)).is_file():
             return
         self.recent_activated.emit(str(path))
+
+    def _recent_context_menu(self, pos) -> None:
+        item = self.recent_list.itemAt(pos)
+        if item is None:
+            return
+        path = item.data(Qt.UserRole)
+        if not path:
+            return
+        menu = QMenu(self)
+        act_remove = menu.addAction("Entfernen")
+        act_folder = menu.addAction("Ordner öffnen")
+        chosen = menu.exec(self.recent_list.mapToGlobal(pos))
+        if chosen is act_remove:
+            self.recent_remove_requested.emit(str(path))
+        elif chosen is act_folder:
+            self._open_containing_folder(str(path))
+
+    def _open_containing_folder(self, path: str) -> None:
+        p = Path(path)
+        folder = p if p.is_dir() else p.parent
+        if not folder.is_dir():
+            return
+        QDesktopServices.openUrl(QUrl.fromLocalFile(str(folder)))

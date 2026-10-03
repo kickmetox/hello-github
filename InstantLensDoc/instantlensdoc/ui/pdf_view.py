@@ -5344,7 +5344,7 @@ class PdfViewer(QWidget):
             return False
 
     def print_document(self) -> bool:
-        """Gesamtes PDF (alle Seiten, Raster via pypdfium2) über QPrintDialog drucken — 1.0.0."""
+        """PDF-Dokument (Seitenbereich) gerastert über QPrintDialog drucken — 1.0.1."""
         if not self.pdf_path:
             QMessageBox.information(self, "Drucken", "Kein PDF geladen.")
             return False
@@ -5353,9 +5353,22 @@ class PdfViewer(QWidget):
             from PySide6.QtPrintSupport import QPrintDialog, QPrinter
             from PySide6.QtWidgets import QProgressDialog
 
+            from instantlensdoc.ui.print_range_dialog import PrintRangeDialog
+
             n = int(self.page_count or 0)
             if n <= 0:
                 QMessageBox.warning(self, "Drucken", "PDF hat keine Seiten.")
+                return False
+
+            # Seitenbereich (von–bis) vor dem Druckerdialog — 1.0.1
+            range_dlg = PrintRangeDialog(n, self)
+            if range_dlg.exec() != PrintRangeDialog.Accepted:
+                return False
+            start, end = range_dlg.page_range()
+            start = max(0, min(start, n - 1))
+            end = max(start + 1, min(end, n))
+            pages = list(range(start, end))
+            if not pages:
                 return False
 
             printer = QPrinter(QPrinter.HighResolution)
@@ -5366,20 +5379,22 @@ class PdfViewer(QWidget):
                 return False
 
             scale = 2.0
-            progress = QProgressDialog("Drucke PDF…", "Abbrechen", 0, n, self)
+            total = len(pages)
+            progress = QProgressDialog("Drucke PDF…", "Abbrechen", 0, total, self)
             progress.setWindowModality(Qt.WindowModal)
             progress.setMinimumDuration(0)
             painter = QPainter(printer)
+            printed = 0
             try:
-                for i in range(n):
+                for idx, i in enumerate(pages):
                     if progress.wasCanceled():
                         break
-                    progress.setValue(i)
+                    progress.setValue(idx)
                     progress.setLabelText(f"Drucke Seite {i + 1} / {n}…")
                     pm = self._pixmap_from_rendered_page(i, scale)
                     if pm is None or pm.isNull():
                         continue
-                    if i > 0:
+                    if printed > 0:
                         printer.newPage()
                     page_rect = printer.pageRect(QPrinter.DevicePixel)
                     scaled = pm.scaled(
@@ -5391,7 +5406,8 @@ class PdfViewer(QWidget):
                     x = int((page_rect.width() - scaled.width()) / 2)
                     y = int((page_rect.height() - scaled.height()) / 2)
                     painter.drawPixmap(x, y, scaled)
-                progress.setValue(n)
+                    printed += 1
+                progress.setValue(total)
             finally:
                 painter.end()
                 try:
@@ -5399,7 +5415,9 @@ class PdfViewer(QWidget):
                 except Exception:
                     pass
             self.refresh()
-            self.status.emit(f"PDF-Dokument gedruckt ({n} Seite(n))")
+            self.status.emit(
+                f"PDF-Dokument gedruckt (Seiten {start + 1}–{end}, {printed} Seite(n))"
+            )
             return True
         except Exception as e:
             QMessageBox.critical(self, "Drucken", f"Dokumentdruck fehlgeschlagen:\n{e}")

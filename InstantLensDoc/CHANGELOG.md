@@ -1,5 +1,27 @@
 # Changelog — InstantLens Doc
 
+## 1.0.1 — Willkommen-Kontextmenü, Druck-Seitenbereich, Lizenz aktivieren, Backup-Pfad
+
+Post-Release-Polish nach 1.0.0: Willkommen-Recent mit Rechtsklick Entfernen/Ordner öffnen und grauen fehlenden Pfaden; PDF-Dokumentdruck mit Seitenbereich von–bis vor QPrintDialog; About mit „Lizenz aktivieren…“ bei Trial/ungültig; Backup-Statusmeldung mit Pfad der letzten Backup-Datei. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### Willkommen / Start
+- Recent-Liste: **Rechtsklick → Entfernen** / **Ordner öffnen**; fehlende Pfade grau („fehlt“)
+
+### PDF / Druck
+- **Dokument drucken…**: Dialog **Seitenbereich (von–bis)** vor QPrintDialog; nur gewählte Seiten gerastert
+
+### About / Lizenz
+- Button **Lizenz aktivieren…** wenn Trial, abgelaufen oder ungültig
+
+### Backup
+- Statusleiste zeigt **vollen Pfad** der letzten Backup-Datei (`_last_backup_path`)
+
+### Packaging / Docs
+- Version **1.0.1** (App / `ild_pdf` / ISS / Smoke / Docs)
+- Smoke: Welcome-Kontextmenü, PrintRangeDialog, About-Aktivieren, Backup-Pfad (CLI + Qt)
+
+---
+
 ## 1.0.0 — About/Lizenz/Changelog, Backup jetzt, PDF-Dokumentdruck, Willkommen
 
 Major-Release nach 0.9.9: About zeigt Version, Lizenzstatus und Kontakt ame@sellerbach.de plus Changelog-Kurzliste; manuelles „Backup jetzt“ und Backup-Ordner öffnen; PDF-Dokumentdruck (alle Seiten) via QPrintDialog und Raster (pypdfium2); Willkommens-Startseite mit Recent-Liste und „Dokument öffnen“ / „Leeres Text“ wenn keine Tabs. Stubs KI/Cloud/Stylus/3D bleiben Stubs.

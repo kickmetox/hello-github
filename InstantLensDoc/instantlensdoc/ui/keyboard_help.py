@@ -89,8 +89,10 @@ SHORTCUTS_HTML = """
 <tr><td>Session Ann.-Opacity / Stroke</td><td>Letzte Deckkraft und Strichstärke speichern/wiederherstellen — 0.9.8</td></tr>
 <tr><td>Session Fill-/Stroke-Color</td><td>Letzte Fill- und Stroke-Farb-Defaults speichern/wiederherstellen — 0.9.9</td></tr>
 <tr><td>About Lizenz / Changelog</td><td>Hilfe → Info: Version, Lizenzstatus, Kontakt ame@sellerbach.de, Changelog-Kurzliste — 1.0.0</td></tr>
-<tr><td>Backup jetzt / Ordner</td><td>Datei → Backup jetzt; Backup-Ordner öffnen (Config/backups) — 1.0.0</td></tr>
-<tr><td>PDF Dokument drucken</td><td>PDF → Dokument drucken… (alle Seiten, pypdfium2-Raster, QPrintDialog); Ctrl+P = Seite — 1.0.0</td></tr>
+<tr><td>Backup jetzt / Ordner</td><td>Datei → Backup jetzt; Status mit Pfad der letzten Backup-Datei; Backup-Ordner öffnen (Config/backups) — 1.0.1</td></tr>
+<tr><td>PDF Dokument drucken</td><td>PDF → Dokument drucken… (Seitenbereich von–bis, dann QPrintDialog, pypdfium2-Raster); Ctrl+P = Seite — 1.0.1</td></tr>
+<tr><td>Willkommen Recent</td><td>Rechtsklick: Entfernen / Ordner öffnen; fehlende Pfade grau — 1.0.1</td></tr>
+<tr><td>About Lizenz aktivieren</td><td>Hilfe → Info: „Lizenz aktivieren…“ bei Trial/ungültig — 1.0.1</td></tr>
 <tr><td>Willkommen-Startseite</td><td>Ohne Tabs: Recent + Dokument öffnen / Leeres Text — 1.0.0</td></tr>
 <tr><td>PDF-Trefferliste</td><td>Sidebar Seite + Snippet klickbar → Sprung + Highlight — 0.9.1</td></tr>
 <tr><td>Fenster teilen (zwei Docs)</td><td><code>Ctrl+\\</code> — 0.6.3</td></tr>
