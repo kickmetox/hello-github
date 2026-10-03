@@ -83,7 +83,15 @@ def run_gui() -> int:
             btn_copy.clicked.connect(self._copy)
             row.addWidget(btn_copy)
             layout.addLayout(row)
-            layout.addWidget(QLabel("Ausgabe (Klartext, ohne QR):"))
+            out_header = QHBoxLayout()
+            out_header.addWidget(QLabel("Ausgabe (Klartext, ohne QR):"))
+            self.validity_label = QLabel("")
+            self.validity_label.setToolTip(
+                f"Gültigkeitstage des generierten Keys ({KEY_DAYS} = 30+2) — 1.1.1"
+            )
+            out_header.addStretch(1)
+            out_header.addWidget(self.validity_label)
+            layout.addLayout(out_header)
             self.out = QTextEdit()
             self.out.setReadOnly(True)
             self.out.setPlaceholderText("Key erscheint hier als Klartext…")
@@ -98,6 +106,7 @@ def run_gui() -> int:
                 return
             key = generate_key(email)
             self.out.setPlainText(key)
+            self.validity_label.setText(f"Gültigkeit: {KEY_DAYS} Tage")
 
         def _copy(self):
             text = self.out.toPlainText().strip()

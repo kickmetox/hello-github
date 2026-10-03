@@ -8,7 +8,8 @@ Separates Tool zur Erzeugung und Prüfung von Lizenzkeys.
 run-keygen.bat
 ```
 
-Startet die GUI. Ausgabe als **Klartext (ohne QR)** mit **Kopieren**-Button.
+Startet die GUI. Ausgabe als **Klartext (ohne QR)** mit **Kopieren**-Button;
+**Gültigkeitstage** erscheinen neben dem generierten Key.
 Keys gelten **32 Tage (30+2)**. Kontakt: **ame@sellerbach.de**.
 
 ## Installer-Pfad (EXE-Build)

@@ -38,11 +38,25 @@ LANG_PRESETS: Dict[str, str] = {
 
 TESSERACT_WIKI_URL = "https://github.com/UB-Mannheim/tesseract/wiki"
 
+# Typische Installationspfade (Windows) — Hinweis wenn Runtime nicht im PATH
+TESSERACT_COMMON_PATHS = (
+    r"C:\Program Files\Tesseract-OCR\tesseract.exe",
+    r"C:\Program Files (x86)\Tesseract-OCR\tesseract.exe",
+)
+
+_PATH_HINT_DE = (
+    "Pfad-Hilfe (falls nicht im PATH):\n"
+    + "\n".join(f"  {p}" for p in TESSERACT_COMMON_PATHS)
+    + "\n"
+    "  → PATH um den Ordner ergänzen oder TESSDATA_PREFIX setzen."
+)
+
 INSTALL_HINT_DE = (
     "OCR benötigt die Tesseract-Runtime.\n\n"
     "Windows:\n"
     "  winget install UB-Mannheim.TesseractOCR\n"
     f"  oder Installer: {TESSERACT_WIKI_URL}\n\n"
+    f"{_PATH_HINT_DE}\n\n"
     "Danach Python-Paket (falls fehlen):\n"
     "  pip install pytesseract\n\n"
     "Sprachen: deu + eng empfohlen (im Tesseract-Installer anhaken)."
@@ -53,6 +67,9 @@ INSTALL_HINT_HTML = (
     "<p><b>Windows:</b><br>"
     "<code>winget install UB-Mannheim.TesseractOCR</code><br>"
     f'oder <a href="{TESSERACT_WIKI_URL}">UB-Mannheim Tesseract (Wiki)</a></p>'
+    "<p><b>Pfad-Hilfe</b> (falls nicht im PATH):<br>"
+    + "<br>".join(f"<code>{p}</code>" for p in TESSERACT_COMMON_PATHS)
+    + "<br>→ PATH um den Ordner ergänzen oder <code>TESSDATA_PREFIX</code> setzen.</p>"
     "<p>Python: <code>pip install pytesseract</code></p>"
     "<p>Sprachen <code>deu</code> + <code>eng</code> im Installer anhaken.</p>"
 )

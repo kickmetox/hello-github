@@ -1,5 +1,27 @@
 # Changelog — InstantLens Doc
 
+## 1.1.1 — OCR Sprach-Preset/Pfad, Merge Doppelklick·Summe, Ann.-Zähler, Keygen Gültigkeit
+
+Post-Release-Polish nach 1.1.0: OCR-Batch mit klarer Sprach-Preset-Combobox und Tesseract-Hinweis inkl. Wiki-Link sowie Windows-Pfad-Hilfe; PDF-Zusammenführen mit Doppelklick-Entfernen, „Alle entfernen“ und Seitenzahl-Summe; Bestätigungsdialog „Alle Annotationen auf Seite löschen“ mit Zähler „N Annotationen“; Keygen zeigt Gültigkeitstage neben dem generierten Key. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### OCR / Batch
+- **Sprach-Preset**-Combobox im OCR-Dialog (Batch-Titel); fehlendes Tesseract: Hinweis mit **Link** (UB-Mannheim Wiki) + **Pfad-Hilfe** (`C:\Program Files\Tesseract-OCR\…`)
+
+### PDF
+- **Zusammenführen**: **Doppelklick** entfernt Eintrag; Button **Alle entfernen**; Label **Seiten gesamt** (Summe)
+
+### Annotationen
+- **Alle auf Seite löschen…**: Bestätigung mit explizitem Zähler (**N Annotation** / **N Annotationen**)
+
+### Keygen
+- GUI: **Gültigkeit: X Tage** neben generiertem Key (Label neben Ausgabe)
+
+### Packaging / Docs
+- Version **1.1.1** (App / `ild_pdf` / ISS / Smoke / Docs)
+- Smoke: OCR Preset·Pfad, Merge Doppelklick·Alle·Summe, Ann.-Zähler, Keygen Gültigkeit (CLI + Qt)
+
+---
+
 ## 1.1.0 — OCR-Batch Text-Tab, PDF-Merge Drag, Ann. Seite löschen, Keygen Copy
 
 Minor-Release nach 1.0.9: OCR gesamtes PDF schreibt Ergebnis in eine neue Textdatei-Tab (`*-ocr.txt`) bei Fortschrittsdialog mit Abbruch; PDF-Zusammenführen mit Mehrfachauswahl und Drag-Reihenfolge; „Alle Annotationen auf Seite löschen“ mit Bestätigung und einem Undo-Schritt; Keygen-GUI Klartext ohne QR plus Kopieren-Button. Stubs KI/Cloud/Stylus/3D bleiben Stubs.

@@ -57,6 +57,9 @@ class OcrDialog(QDialog):
 
         form = QFormLayout()
         self.lang_combo = QComboBox()
+        self.lang_combo.setToolTip(
+            "Sprach-Preset für Tesseract (deu/eng/…) — Einstellungs-Default vorgewählt — 1.1.1"
+        )
         default_lang = get_ocr_lang()
         pick = 0
         for i, (name, code) in enumerate(LANG_PRESETS.items()):
@@ -68,7 +71,7 @@ class OcrDialog(QDialog):
         installed = list_installed_languages()
         if installed:
             form.addRow(QLabel(f"Installiert: {', '.join(installed[:12])}"))
-        form.addRow("Sprache", self.lang_combo)
+        form.addRow("Sprach-Preset", self.lang_combo)
 
         self.rb_editable = QRadioButton("Editierbarer Text (Editor)")
         self.rb_searchable = QRadioButton("Durchsuchbares Bild (PDF + Text-Sidecar)")

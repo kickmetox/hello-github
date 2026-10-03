@@ -1519,7 +1519,7 @@ class MainWindow(QMainWindow):
         act_clear_page_ann = QAction("Alle Annotationen auf Seite löschen…", self)
         act_clear_page_ann.setToolTip(
             "Alle Annotationen der aktuellen Seite nach Bestätigung löschen "
-            "(ein Undo-Schritt, Ctrl+Z) — 1.1.0"
+            "(Zähler N Annotationen, ein Undo-Schritt, Ctrl+Z) — 1.1.1"
         )
         act_clear_page_ann.triggered.connect(self._clear_annotations_on_page)
         m_edit.addAction(act_clear_page_ann)
@@ -1973,7 +1973,7 @@ class MainWindow(QMainWindow):
         m_extra.addAction(a)
         a = QAction("OCR gesamtes PDF…", self)
         a.setToolTip(
-            "Batch-OCR aller Seiten mit Fortschritt/Abbrechen → neue Textdatei-Tab — 1.1.0"
+            "Batch-OCR: Sprach-Preset + Fortschritt/Abbrechen → neue Textdatei-Tab — 1.1.1"
         )
         a.triggered.connect(self._run_ocr_document)
         m_extra.addAction(a)
@@ -7604,13 +7604,22 @@ class MainWindow(QMainWindow):
             need_file=False,
             default_label=f"{Path(self.doc.path).name} (alle Seiten)",
         )
-        # Batch-OCR liefert immer editierbaren Text
+        # Batch-OCR: Sprach-Preset-Combobox + Tesseract-Hinweis (Link/Pfad) im Dialog — 1.1.1
+        dlg.setWindowTitle("OCR gesamtes PDF — Sprach-Preset")
         dlg.rb_editable.setChecked(True)
         dlg.rb_searchable.setEnabled(False)
         if dlg.exec() != QDialog.Accepted:
             return
         if not ok:
-            QMessageBox.information(self, "OCR — Tesseract fehlt", msg)
+            box = QMessageBox(self)
+            box.setIcon(QMessageBox.Information)
+            box.setWindowTitle("OCR — Tesseract fehlt")
+            box.setTextFormat(Qt.RichText)
+            box.setText(
+                ocr_mod.INSTALL_HINT_HTML
+                + f"<p><small>{msg.splitlines()[0] if msg else 'Tesseract fehlt'}</small></p>"
+            )
+            box.exec()
             self._set_status("OCR nicht verfügbar")
             return
 

@@ -6076,7 +6076,7 @@ class PdfViewer(QWidget):
         return sum(1 for a in self.store.annotations if a.type == AnnotationType.REDACTION)
 
     def clear_annotations_on_page(self, page_index: int | None = None) -> int:
-        """Alle Annotationen einer Seite löschen — Bestätigung + ein Undo-Schritt (1.1.0)."""
+        """Alle Annotationen einer Seite löschen — Bestätigung + Zähler + Undo (1.1.1)."""
         if not self.store:
             self.status.emit("Keine Annotationen")
             return 0
@@ -6089,10 +6089,12 @@ class PdfViewer(QWidget):
                 f"Keine Annotationen auf Seite {page + 1}.",
             )
             return 0
+        n_ann = len(anns)
+        ann_word = "Annotation" if n_ann == 1 else "Annotationen"
         reply = QMessageBox.question(
             self,
             "Alle Annotationen auf Seite löschen",
-            f"{len(anns)} Annotation(en) auf Seite {page + 1} löschen?\n"
+            f"{n_ann} {ann_word} auf Seite {page + 1} löschen?\n"
             "Rückgängig mit Ctrl+Z (ein Undo-Schritt).",
         )
         if reply != QMessageBox.Yes:

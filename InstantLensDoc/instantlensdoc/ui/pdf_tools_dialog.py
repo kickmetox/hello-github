@@ -58,7 +58,7 @@ class PdfToolsDialog(QDialog):
         lay.addWidget(
             QLabel(
                 "PDFs in Liste-Reihenfolge zu einer Datei "
-                "(Mehrfachauswahl; Reihenfolge per Drag oder ▲/▼):"
+                "(Mehrfachauswahl; Reihenfolge per Drag oder ▲/▼; Doppelklick entfernt):"
             )
         )
         self.merge_list = QListWidget()
@@ -66,9 +66,20 @@ class PdfToolsDialog(QDialog):
         self.merge_list.setDefaultDropAction(Qt.MoveAction)
         self.merge_list.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self.merge_list.setToolTip(
-            "Dateien ziehen zum Neuordnen; Mehrfachauswahl beim Hinzufügen — 1.1.0"
+            "Dateien ziehen zum Neuordnen; Doppelklick entfernt Eintrag; "
+            "Mehrfachauswahl beim Hinzufügen — 1.1.1"
         )
+        self.merge_list.itemDoubleClicked.connect(self._merge_double_click)
+        model = self.merge_list.model()
+        if model is not None:
+            model.rowsInserted.connect(lambda *_: self._merge_update_pages_sum())
+            model.rowsRemoved.connect(lambda *_: self._merge_update_pages_sum())
         lay.addWidget(self.merge_list)
+        self.merge_pages_label = QLabel("Seiten gesamt: 0")
+        self.merge_pages_label.setToolTip(
+            "Summe der Seitenzahlen aller PDFs in der Liste — 1.1.1"
+        )
+        lay.addWidget(self.merge_pages_label)
         row = QHBoxLayout()
         btn_add = QPushButton("PDFs hinzufügen…")
         btn_add.setToolTip("Mehrere PDFs auswählen (Mehrfachauswahl)")
@@ -80,11 +91,16 @@ class PdfToolsDialog(QDialog):
         btn_up.clicked.connect(self._merge_up)
         btn_down.clicked.connect(self._merge_down)
         btn_rem = QPushButton("Entfernen")
+        btn_rem.setToolTip("Ausgewählte Einträge entfernen")
         btn_rem.clicked.connect(self._merge_remove)
+        btn_rem_all = QPushButton("Alle entfernen")
+        btn_rem_all.setToolTip("Gesamte Liste leeren — 1.1.1")
+        btn_rem_all.clicked.connect(self._merge_remove_all)
         row.addWidget(btn_add)
         row.addWidget(btn_up)
         row.addWidget(btn_down)
         row.addWidget(btn_rem)
+        row.addWidget(btn_rem_all)
         lay.addLayout(row)
         self.merge_dest = QLineEdit()
         pick = QPushButton("Ziel-PDF…")
@@ -176,6 +192,7 @@ class PdfToolsDialog(QDialog):
         paths, _ = QFileDialog.getOpenFileNames(self, "PDFs wählen", "", "PDF (*.pdf)")
         for p in paths:
             self.merge_list.addItem(p)
+        self._merge_update_pages_sum()
 
     def _merge_up(self):
         row = self.merge_list.currentRow()
@@ -194,9 +211,51 @@ class PdfToolsDialog(QDialog):
         self.merge_list.setCurrentRow(row + 1)
 
     def _merge_remove(self):
-        row = self.merge_list.currentRow()
+        rows = sorted(
+            {i.row() for i in self.merge_list.selectedIndexes()},
+            reverse=True,
+        )
+        if not rows:
+            row = self.merge_list.currentRow()
+            if row >= 0:
+                rows = [row]
+        for row in rows:
+            self.merge_list.takeItem(row)
+        self._merge_update_pages_sum()
+
+    def _merge_double_click(self, item):
+        """Doppelklick entfernt den Eintrag — 1.1.1."""
+        row = self.merge_list.row(item)
         if row >= 0:
             self.merge_list.takeItem(row)
+            self._merge_update_pages_sum()
+
+    def _merge_remove_all(self):
+        """Gesamte Merge-Liste leeren — 1.1.1."""
+        self.merge_list.clear()
+        self._merge_update_pages_sum()
+
+    def _merge_page_count(self, path: str) -> int:
+        try:
+            import pikepdf
+
+            with pikepdf.open(path) as pdf:
+                return len(pdf.pages)
+        except Exception:
+            return 0
+
+    def _merge_update_pages_sum(self):
+        total = 0
+        for i in range(self.merge_list.count()):
+            item = self.merge_list.item(i)
+            if item is None:
+                continue
+            total += self._merge_page_count(item.text())
+        n_files = self.merge_list.count()
+        self.merge_pages_label.setText(
+            f"Seiten gesamt: {total}"
+            + (f" ({n_files} Datei{'en' if n_files != 1 else ''})" if n_files else "")
+        )
 
     def _merge_pick_dest(self):
         path, _ = QFileDialog.getSaveFileName(self, "Ziel-PDF", "", "PDF (*.pdf)")

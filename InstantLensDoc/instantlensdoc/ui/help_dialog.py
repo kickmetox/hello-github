@@ -100,10 +100,10 @@ HELP_HTML = f"""
 <li><b>Datei → Projekt-Ordner</b>: Workspace wählen (letzte 5); Dialoge starten im aktiven Ordner</li>
 <li><b>Datei → Exportieren</b>: Editor-Inhalt als HTML, DOCX oder PDF (zuletzt genutzter Ordner wird gemerkt);
     <b>Export-Profil</b> speichern/anwenden (DPI / Format / Ziel)</li>
-<li><b>OCR gesamtes PDF</b>: Fortschritt/Abbrechen → <b>neue Textdatei-Tab</b> (<code>*-ocr.txt</code>) — 1.1.0</li>
-<li><b>PDF zusammenführen</b>: Mehrfachauswahl + <b>Drag-Reihenfolge</b> + Ziel speichern — 1.1.0</li>
-<li><b>Alle Annotationen auf Seite löschen</b>: Bestätigung + ein Undo-Schritt (Ctrl+Z) — 1.1.0</li>
-<li><b>Keygen</b>: Klartext ohne QR + <b>Kopieren</b>-Button — 1.1.0</li>
+<li><b>OCR gesamtes PDF</b>: <b>Sprach-Preset</b>-Combobox; ohne Tesseract Hinweis mit <b>Link + Pfad-Hilfe</b>; Fortschritt/Abbrechen → <b>neue Textdatei-Tab</b> (<code>*-ocr.txt</code>) — 1.1.1</li>
+<li><b>PDF zusammenführen</b>: Mehrfachauswahl + Drag; <b>Doppelklick entfernt</b>; <b>Alle entfernen</b>; <b>Seiten-Summe</b>-Label — 1.1.1</li>
+<li><b>Alle Annotationen auf Seite löschen</b>: Bestätigung mit <b>Zähler (N Annotationen)</b> + ein Undo-Schritt (Ctrl+Z) — 1.1.1</li>
+<li><b>Keygen</b>: Klartext ohne QR + Kopieren; <b>Gültigkeitstage</b> neben generiertem Key — 1.1.1</li>
 <li><b>Datei → Drucken</b> (Ctrl+P): Editor oder aktuelle PDF-Seite (Qt Print); <b>PDF → Dokument drucken…</b> Seitenbereich + DPI + Graustufen; <b>Vorschau PageUp/Down·Home/End + +/- Zoom + Fit-Page + Mausrad + Seitenwahl</b> bei Mehrseiten; Fortschritt; Abbruch → Cleanup — 1.0.9</li>
 <li><b>Datei → Backup jetzt</b> / <b>Backup-Ordner öffnen…</b>: manuelles Backup; max. 3 Versuche; Log letzte 20; Filter Erfolg/Fehler; <b>Sortierung neueste zuerst</b> (Toggle); Hinweis bei leerer Liste; <b>Export TXT</b> (Zeitstempel-Name, UTF-8 BOM); Doppelklick öffnet Datei/Ordner — 1.0.9</li>
 <li><b>Willkommen</b>: <b>Weiterarbeiten</b> deaktiviert + Tooltip wenn Session fehlt/leer; sonst Tab-Anzahl + Pfad-Snippet; Esc leert Filter → Fokus Liste; Clear + Treffer; Enter/Entf; Drag&amp;Drop — 1.0.9</li>
@@ -205,16 +205,19 @@ HELP_HTML = f"""
 <li><b>Tastaturhilfe</b>: Hilfe → Tastaturhilfe (F1); Cheat-Sheet als PDF exportieren</li>
 <li><b>Extras → Batch-Konvertierung</b>: Ordner → PDF oder OCR</li>
 <li><b>Einfügen → Verketteter Textrahmen</b>: Overflow fließt in den Folgeahmen</li>
-<li><b>OCR</b>: Extras → OCR (Seite/Bild) oder <b>OCR gesamtes PDF</b> (Batch mit Fortschritt/Abbrechen;
+<li><b>OCR</b>: Extras → OCR (Seite/Bild) oder <b>OCR gesamtes PDF</b> (Batch mit
+    <b>Sprach-Preset</b>-Combobox, Fortschritt/Abbrechen;
     Ergebnis als <b>neue Textdatei-Tab</b> <code>*-ocr.txt</code>) —
-    Sprach-Presets + Modus „editierbarer Text“ oder
+    Modus „editierbarer Text“ oder
     „durchsuchbares Bild“ (PDF + <code>*.ildocr.txt</code>); Tabellen-Heuristik als Markdown wo möglich.
-    Ohne Tesseract: Install-Hinweis mit Link
+    Ohne Tesseract: Install-Hinweis mit Link und <b>Pfad-Hilfe</b>
     (<a href="https://github.com/UB-Mannheim/tesseract/wiki">UB-Mannheim Wiki</a>,
-    <code>winget install UB-Mannheim.TesseractOCR</code>)</li>
-<li><b>PDF zusammenführen</b>: Mehrfachauswahl, Drag-Reihenfolge, Ziel speichern</li>
-<li><b>Alle Annotationen auf Seite löschen</b>: Bearbeiten-Menü, Bestätigung, ein Undo-Schritt</li>
-<li><b>Keygen</b>: Klartext-Ausgabe (ohne QR) + Kopieren-Button in der GUI</li>
+    <code>winget install UB-Mannheim.TesseractOCR</code>,
+    typisch <code>C:\\Program Files\\Tesseract-OCR\\tesseract.exe</code>) — 1.1.1</li>
+<li><b>PDF zusammenführen</b>: Mehrfachauswahl, Drag-Reihenfolge, Doppelklick entfernt,
+    Alle entfernen, Seiten-Summe — 1.1.1</li>
+<li><b>Alle Annotationen auf Seite löschen</b>: Bearbeiten-Menü, Bestätigung mit N-Zähler, ein Undo-Schritt — 1.1.1</li>
+<li><b>Keygen</b>: Klartext-Ausgabe (ohne QR) + Kopieren + Gültigkeitstage neben Key — 1.1.1</li>
 <li><b>Formulare</b>: Extras → Formulargenerator — mehr Feldtypen, Definition speichern/laden
     (<code>*.ildform.json</code>), Live-Vorschau, Export HTML/PDF</li>
 <li><b>Build (Windows)</b>: <code>build-windows.ps1</code> — PyInstaller App + Keygen</li>
