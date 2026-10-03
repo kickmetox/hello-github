@@ -842,10 +842,19 @@ class SettingsDialog(QDialog):
         self.ann_export_tpl.setToolTip(
             "Dateiname-Template für Annotation-JSON-Export. "
             "Platzhalter: {stem}, {page} (1-basiert), {date} (YYYY-MM-DD). "
-            "Standard: {stem}_ann.json — 1.2.2"
+            "Quick-Insert-Buttons daneben — 1.2.4"
         )
         self.ann_export_tpl.textChanged.connect(self._update_ann_export_preview)
-        form.addRow("Ann.-Export Dateiname", self.ann_export_tpl)
+        tpl_row = QHBoxLayout()
+        tpl_row.addWidget(self.ann_export_tpl, 1)
+        for token in ("{stem}", "{page}", "{date}"):
+            btn = QPushButton(token)
+            btn.setToolTip(f"Platzhalter {token} an Cursor einfügen — 1.2.4")
+            btn.clicked.connect(
+                lambda _checked=False, t=token: self._insert_ann_export_placeholder(t)
+            )
+            tpl_row.addWidget(btn)
+        form.addRow("Ann.-Export Dateiname", tpl_row)
         self.ann_export_preview = QLabel("")
         self.ann_export_preview.setWordWrap(True)
         self.ann_export_preview.setTextFormat(Qt.RichText)
@@ -863,6 +872,25 @@ class SettingsDialog(QDialog):
             "Zuletzt genutzter Zielordner für Annotation-JSON-Export — 1.2.1"
         )
         form.addRow(self.ann_export_dir_lbl)
+
+        from instantlensdoc.core.app_settings import (
+            get_text_diff_ignore_whitespace,
+            get_text_diff_sync_scroll,
+        )
+
+        self.text_diff_sync_scroll = QCheckBox("Text-Diff Sync-Scroll (Side-by-Side)")
+        self.text_diff_sync_scroll.setChecked(get_text_diff_sync_scroll())
+        self.text_diff_sync_scroll.setToolTip(
+            "Standard für Sync-Scroll im Text-Diff-Panel; "
+            "wird mit dem Dialog-Toggle synchron persistiert — 1.2.4"
+        )
+        form.addRow(self.text_diff_sync_scroll)
+        self.text_diff_ignore_ws = QCheckBox("Text-Diff Ignore-Whitespace")
+        self.text_diff_ignore_ws.setChecked(get_text_diff_ignore_whitespace())
+        self.text_diff_ignore_ws.setToolTip(
+            "Whitespace beim Text-Diff-Vergleich ignorieren (persistiert) — 1.2.4"
+        )
+        form.addRow(self.text_diff_ignore_ws)
 
         self.jpeg_q = QSpinBox()
         self.jpeg_q.setRange(10, 100)
@@ -947,6 +975,14 @@ class SettingsDialog(QDialog):
         buttons.accepted.connect(self._save)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
+
+    def _insert_ann_export_placeholder(self, token: str) -> None:
+        """Quick-Insert {stem}/{page}/{date} an Cursor — 1.2.4."""
+        if not hasattr(self, "ann_export_tpl"):
+            return
+        self.ann_export_tpl.insert(str(token or ""))
+        self.ann_export_tpl.setFocus()
+        self._update_ann_export_preview()
 
     def _update_ann_export_preview(self, *_args) -> None:
         """Live-Vorschau Ann.-Export-Dateiname; ungültige Platzhalter rot — 1.2.3."""
@@ -1554,10 +1590,18 @@ class SettingsDialog(QDialog):
         set_status_blink_mode(str(self.status_blink.currentData() or "kurz"))
         set_merge_diff_max_side(int(self.merge_diff_max.value()))
         set_recent_files_max(int(self.recent_files_max.value()))
-        from instantlensdoc.core.app_settings import set_ann_export_filename_template
+        from instantlensdoc.core.app_settings import (
+            set_ann_export_filename_template,
+            set_text_diff_ignore_whitespace,
+            set_text_diff_sync_scroll,
+        )
 
         if hasattr(self, "ann_export_tpl"):
             set_ann_export_filename_template(self.ann_export_tpl.text().strip())
+        if hasattr(self, "text_diff_sync_scroll"):
+            set_text_diff_sync_scroll(self.text_diff_sync_scroll.isChecked())
+        if hasattr(self, "text_diff_ignore_ws"):
+            set_text_diff_ignore_whitespace(self.text_diff_ignore_ws.isChecked())
         parent = self.parent()
         if parent is not None and hasattr(parent, "_refresh_recent"):
             try:

@@ -22,7 +22,14 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from instantlensdoc.core.app_settings import dialog_start_dir, get_editor_text_encoding
+from instantlensdoc.core.app_settings import (
+    dialog_start_dir,
+    get_editor_text_encoding,
+    get_text_diff_ignore_whitespace,
+    get_text_diff_sync_scroll,
+    set_text_diff_ignore_whitespace,
+    set_text_diff_sync_scroll,
+)
 from instantlensdoc.core.documents import normalize_text_encoding
 from instantlensdoc.core.text_diff import (
     filter_diff_differences,
@@ -195,7 +202,7 @@ class TextCompareDialog(QDialog):
                 QLabel(
                     "Zeilen-Diff Panel: zwei offene Text-Tabs wählen — "
                     "Side-by-Side/Unified · Wort-Highlight · Ignore-Whitespace · "
-                    "Sync-Scroll · TXT-Export — 1.2.3"
+                    "Sync-Scroll (Settings) · TXT-Export — 1.2.4"
                 )
             )
         pick = QHBoxLayout()
@@ -242,16 +249,19 @@ class TextCompareDialog(QDialog):
         )
         self.chk_word_hl.toggled.connect(lambda _: self.refresh())
         self.chk_ignore_ws = QCheckBox("Ignore-Whitespace")
+        self.chk_ignore_ws.setChecked(get_text_diff_ignore_whitespace())
         self.chk_ignore_ws.setToolTip(
-            "Whitespace beim Zeilenvergleich ignorieren (Anzeige bleibt original) — 1.2.3"
+            "Whitespace beim Zeilenvergleich ignorieren (Anzeige bleibt original); "
+            "Einstellung wird gespeichert — 1.2.4"
         )
-        self.chk_ignore_ws.toggled.connect(lambda _: self.refresh())
+        self.chk_ignore_ws.toggled.connect(self._on_ignore_ws_toggled)
         self.chk_sync_scroll = QCheckBox("Sync-Scroll")
-        self.chk_sync_scroll.setChecked(True)
+        self.chk_sync_scroll.setChecked(get_text_diff_sync_scroll())
         self.chk_sync_scroll.setToolTip(
-            "Scrollposition Links/Rechts im Side-by-Side synchron halten — 1.2.3"
+            "Scrollposition Links/Rechts im Side-by-Side synchron halten; "
+            "auch in Einstellungen — 1.2.4"
         )
-        self.chk_sync_scroll.toggled.connect(lambda _: self._apply_sync_scroll())
+        self.chk_sync_scroll.toggled.connect(self._on_sync_scroll_toggled)
         opts.addWidget(self.chk_only_diff)
         opts.addWidget(self.chk_line_numbers)
         opts.addWidget(self.chk_unified)
@@ -386,8 +396,18 @@ class TextCompareDialog(QDialog):
         except (TypeError, RuntimeError):
             pass
 
+    def _on_ignore_ws_toggled(self, checked: bool) -> None:
+        """Ignore-Whitespace persistieren — 1.2.4."""
+        set_text_diff_ignore_whitespace(bool(checked))
+        self.refresh()
+
+    def _on_sync_scroll_toggled(self, checked: bool) -> None:
+        """Sync-Scroll persistieren und anwenden — 1.2.4."""
+        set_text_diff_sync_scroll(bool(checked))
+        self._apply_sync_scroll()
+
     def _apply_sync_scroll(self) -> None:
-        """Sync-Scroll Side-by-Side verbinden — 1.2.3."""
+        """Sync-Scroll Side-by-Side verbinden — 1.2.3/1.2.4."""
         self._disconnect_sync_scroll()
         if self.chk_unified.isChecked() or not self.chk_sync_scroll.isChecked():
             return

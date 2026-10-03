@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QTimer, Signal
-from PySide6.QtGui import QCursor, QImage, QPixmap
+from PySide6.QtCore import Qt, QTimer, QUrl, Signal
+from PySide6.QtGui import QCursor, QDesktopServices, QImage, QPixmap
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QCheckBox,
@@ -25,6 +25,16 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
+
+class SplitPathLogEdit(QPlainTextEdit):
+    """Pfad-Log: Doppelklick öffnet Datei/Ordner — 1.2.4."""
+
+    path_activate = Signal()
+
+    def mouseDoubleClickEvent(self, event):
+        super().mouseDoubleClickEvent(event)
+        self.path_activate.emit()
 
 from ild_pdf.pages import (
     extract_by_page_spec,
@@ -278,13 +288,18 @@ class PdfToolsDialog(QDialog):
             lambda checked: set_split_open_tabs(bool(checked))
         )
         form.addRow("", self.split_open_tabs)
-        self.split_log = QPlainTextEdit()
+        self.split_log = SplitPathLogEdit()
         self.split_log.setReadOnly(True)
         self.split_log.setMaximumHeight(110)
-        self.split_log.setPlaceholderText("Log der erzeugten Dateipfade …")
-        self.split_log.setToolTip(
-            "Liste der nach dem Teilen erzeugten Dateipfade — 1.2.2/1.2.3"
+        self.split_log.setPlaceholderText(
+            "Noch kein Log — nach dem Teilen erscheinen Pfade hier. "
+            "Doppelklick öffnet Datei/Ordner."
         )
+        self.split_log.setToolTip(
+            "Liste der nach dem Teilen erzeugten Dateipfade. "
+            "Doppelklick auf eine Zeile öffnet Datei bzw. Ordner — 1.2.4"
+        )
+        self.split_log.path_activate.connect(self._split_open_log_path)
         form.addRow("Pfad-Log", self.split_log)
         log_btns = QHBoxLayout()
         btn_copy_log = QPushButton("Log kopieren")
@@ -686,6 +701,63 @@ class PdfToolsDialog(QDialog):
         header = f"Erzeugt: {len(paths)} Datei(en)"
         self.split_log.setPlainText(header + ("\n" + "\n".join(lines) if lines else ""))
 
+    def _split_log_empty_hint(self) -> None:
+        """Hinweis bei leerem Pfad-Log — 1.2.4."""
+        QMessageBox.information(
+            self,
+            "Pfad-Log",
+            "Kein Log vorhanden — zuerst teilen.\n"
+            "Danach: Doppelklick auf eine Zeile öffnet Datei oder Ordner.",
+        )
+
+    def _split_path_from_line(self, line: str) -> str | None:
+        """Pfad aus Log-Zeile ``[n] /pfad`` oder blankem Pfad — 1.2.4."""
+        import re
+
+        text = (line or "").strip()
+        if not text or text.lower().startswith("erzeugt:"):
+            return None
+        m = re.match(r"^\[\d+\]\s+(.+)$", text)
+        if m:
+            return m.group(1).strip().strip('"') or None
+        # Fallback: ganze Zeile, wenn sie wie ein Pfad aussieht
+        if "/" in text or "\\" in text or text.endswith(".pdf"):
+            return text.strip('"')
+        return None
+
+    def _split_open_log_path(self) -> None:
+        """Doppelklick: Datei öffnen, sonst Ordner — 1.2.4."""
+        if not hasattr(self, "split_log"):
+            return
+        text = (self.split_log.toPlainText() or "").strip()
+        if not text:
+            self._split_log_empty_hint()
+            return
+        cursor = self.split_log.textCursor()
+        block = cursor.block()
+        path_s = self._split_path_from_line(block.text() if block.isValid() else "")
+        if not path_s:
+            QMessageBox.information(
+                self,
+                "Pfad-Log",
+                "Keine Pfadzeile unter dem Cursor.\n"
+                "Doppelklick auf eine Zeile mit Dateipfad.",
+            )
+            return
+        target = Path(path_s)
+        if target.is_file():
+            QDesktopServices.openUrl(QUrl.fromLocalFile(str(target)))
+            return
+        folder = target if target.is_dir() else target.parent
+        if folder.is_dir():
+            QDesktopServices.openUrl(QUrl.fromLocalFile(str(folder)))
+            return
+        QMessageBox.warning(
+            self,
+            "Pfad-Log",
+            f"Datei/Ordner nicht gefunden:\n{path_s}",
+        )
+
     def _split_copy_log(self) -> None:
         """Pfad-Log in die Zwischenablage — 1.2.3."""
         from PySide6.QtWidgets import QApplication
@@ -694,9 +766,7 @@ class PdfToolsDialog(QDialog):
             return
         text = (self.split_log.toPlainText() or "").strip()
         if not text:
-            QMessageBox.information(
-                self, "Pfad-Log", "Kein Log vorhanden — zuerst teilen."
-            )
+            self._split_log_empty_hint()
             return
         QApplication.clipboard().setText(text)
         QMessageBox.information(self, "Pfad-Log", "Log in die Zwischenablage kopiert.")
@@ -707,9 +777,7 @@ class PdfToolsDialog(QDialog):
             return
         text = (self.split_log.toPlainText() or "").strip()
         if not text:
-            QMessageBox.information(
-                self, "Pfad-Log", "Kein Log vorhanden — zuerst teilen."
-            )
+            self._split_log_empty_hint()
             return
         from instantlensdoc.core.app_settings import (
             dialog_start_dir,

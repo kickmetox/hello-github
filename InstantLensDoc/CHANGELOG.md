@@ -1,5 +1,27 @@
 # Changelog — InstantLens Doc
 
+## 1.2.4 — Split-Log Doppelklick, Ann. Quick-Insert, Diff Sync-Scroll Settings, run.bat Python-Download
+
+Post-Release-Polish nach 1.2.3: **PDF-Split Pfad-Log** öffnet per **Doppelklick** Datei/Ordner und zeigt bei **leerem Log** einen Hinweis; **Ann.-Export-Template** mit Quick-Insert-Buttons **`{stem}`** / **`{page}`** / **`{date}`**; **Text-Diff Sync-Scroll** als Toggle in **Settings**; **Ignore-Whitespace** wird **persistiert**; **`run.bat`** bei fehlendem Python mit kurzem Download-Hinweis **Microsoft Store** / **python.org**. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### PDF
+- Split: Pfad-Log **Doppelklick** öffnet Datei bzw. Ordner; Hinweis bei **leerem Log**
+
+### Annotationen
+- Export-Template: Quick-Insert-Buttons **`{stem}`** / **`{page}`** / **`{date}`** neben dem Feld
+
+### Editor
+- Text-Diff: **Sync-Scroll** Toggle in Settings; **Ignore-Whitespace** persistiert (Dialog ↔ Settings)
+
+### Packaging / Start
+- **`run.bat`**: bei fehlendem Python kurzer DE-Hinweis — Microsoft Store / python.org
+
+### Packaging / Docs
+- Version **1.2.4** (App / `ild_pdf` / ISS / Smoke / Docs)
+- Smoke: Split-Log Doppelklick·leer, Ann. Quick-Insert, Diff Sync-Scroll Settings·Ignore-WS Persistenz, run.bat Python-Download (CLI + Qt)
+
+---
+
 ## 1.2.3 — Split-Log kopieren/TXT·Tabs persistieren, Ann. ungültige Platzhalter, Diff Ignore-WS·Sync-Scroll, run.bat --help
 
 Post-Release-Polish nach 1.2.2: **PDF-Split Pfad-Log** kann **kopiert** bzw. **als TXT gespeichert** werden; Checkbox **„in Tabs öffnen“** wird **persistiert**; **Ann.-Export Live-Vorschau** markiert **ungültige Platzhalter rot**; **Text-Diff** mit **Ignore-Whitespace** und **Sync-Scroll** im Side-by-Side; **`run.bat --help`** auf Deutsch sowie **Hinweis bei lokaler .venv**. Stubs KI/Cloud/Stylus/3D bleiben Stubs.

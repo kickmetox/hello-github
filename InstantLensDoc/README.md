@@ -2,7 +2,7 @@
 
 Moderne Textverarbeitung mit PDF-Annotator, OCR-Bridge und Formulargenerator.
 
-**Version:** 1.2.3  
+**Version:** 1.2.4  
 **Hersteller:** Andreas Meyer · ame@sellerbach.de
 
 ## Quickstart (Windows)
@@ -33,8 +33,8 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an).
 
-## Neu in 1.2.3
+## Neu in 1.2.4
 
-PDF-Split: Pfad-Log kopieren/als TXT + Checkbox „in Tabs öffnen“ persistiert; Ann.-Export Live-Vorschau markiert ungültige Platzhalter rot; Text-Diff Ignore-Whitespace + Sync-Scroll Side-by-Side; `run.bat --help` auf Deutsch + Hinweis bei lokaler `.venv`. Stubs KI/Cloud/Stylus/3D unverändert.
+PDF-Split: Pfad-Log Doppelklick öffnet Datei/Ordner + Hinweis bei leerem Log; Ann.-Export Quick-Insert `{stem}`/`{page}`/`{date}`; Text-Diff Sync-Scroll Toggle in Settings + Ignore-Whitespace persistiert; `run.bat` Download-Hinweis Microsoft Store / python.org wenn Python fehlt. Stubs KI/Cloud/Stylus/3D unverändert.
 
 Siehe [CHANGELOG.md](CHANGELOG.md), [FEATURES.md](FEATURES.md) und [INFO.md](INFO.md).

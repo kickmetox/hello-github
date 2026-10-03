@@ -3,7 +3,7 @@ setlocal EnableExtensions EnableDelayedExpansion
 chcp 65001 >nul
 cd /d "%~dp0"
 
-REM InstantLens Doc 1.2.3 — Start mit Python-/Abhängigkeitsprüfung (DE-Meldungen)
+REM InstantLens Doc 1.2.4 — Start mit Python-/Abhängigkeitsprüfung (DE-Meldungen)
 REM Optional: pip install -r requirements.txt per J/N — oder non-interactive mit --yes / -y
 REM Hilfe: run.bat --help / -h
 REM
@@ -87,13 +87,10 @@ if exist ".venv\Scripts\python.exe" (
         echo   .venv\Scripts\pip install -r requirements.txt
         echo.
       )
-      echo Bitte Python 3.12+ installieren und erneut versuchen:
-      echo   https://www.python.org/downloads/
-      echo Beim Installer „Add python.exe to PATH“ aktivieren.
-      echo.
-      echo Alternativ: virtuelle Umgebung anlegen:
-      echo   python -m venv .venv
-      echo   .venv\Scripts\pip install -r requirements.txt
+      echo Download Python 3.12+ ^(kurz^):
+      echo   Microsoft Store: „Python 3.12“ suchen und installieren
+      echo   oder https://www.python.org/downloads/
+      echo Beim Installer „Add python.exe to PATH“ aktivieren, dann erneut run.bat.
       echo.
       if not defined ILD_YES pause
       exit /b 1

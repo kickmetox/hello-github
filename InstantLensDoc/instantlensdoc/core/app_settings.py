@@ -32,6 +32,8 @@ DEFAULTS: dict[str, Any] = {
     "last_ann_export_dir": "",  # letzter Zielordner Ann.-Export JSON — 1.2.1
     "ann_export_filename_template": "{stem}_ann.json",  # Dateiname-Template — 1.2.1
     "split_open_tabs": False,  # PDF-Split: erzeugte Dateien in Tabs öffnen — 1.2.3
+    "text_diff_sync_scroll": True,  # Text-Diff Sync-Scroll Default — 1.2.4
+    "text_diff_ignore_whitespace": False,  # Text-Diff Ignore-Whitespace — 1.2.4
     "default_zoom_percent": 150,
     "default_zoom_mode": "percent",  # percent | fit_width | fit_page
     "autosave_interval_sec": 60,  # 15 | 30 | 60 | 120 — 0.9.7
@@ -467,6 +469,32 @@ def get_split_open_tabs() -> bool:
 def set_split_open_tabs(enabled: bool) -> None:
     """Persistenz Checkbox „in Tabs öffnen“ — 1.2.3."""
     save_settings({"split_open_tabs": bool(enabled)})
+
+
+def get_text_diff_sync_scroll() -> bool:
+    """Text-Diff: Sync-Scroll Side-by-Side Default — 1.2.4."""
+    return bool(
+        load_settings().get("text_diff_sync_scroll", DEFAULTS["text_diff_sync_scroll"])
+    )
+
+
+def set_text_diff_sync_scroll(enabled: bool) -> None:
+    """Persistenz Text-Diff Sync-Scroll — 1.2.4."""
+    save_settings({"text_diff_sync_scroll": bool(enabled)})
+
+
+def get_text_diff_ignore_whitespace() -> bool:
+    """Text-Diff: Ignore-Whitespace Default — 1.2.4."""
+    return bool(
+        load_settings().get(
+            "text_diff_ignore_whitespace", DEFAULTS["text_diff_ignore_whitespace"]
+        )
+    )
+
+
+def set_text_diff_ignore_whitespace(enabled: bool) -> None:
+    """Persistenz Text-Diff Ignore-Whitespace — 1.2.4."""
+    save_settings({"text_diff_ignore_whitespace": bool(enabled)})
 
 
 def get_ann_export_filename_template() -> str:
