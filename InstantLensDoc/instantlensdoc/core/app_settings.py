@@ -41,6 +41,7 @@ DEFAULTS: dict[str, Any] = {
     "editor_bracket_auto_close": True,
     "ann_filter_presets": [],
     "ann_default_opacity": 1.0,
+    "ann_default_stroke_width": 2.0,
     "recent_files_max": 12,
     "tag_cloud_sort": "freq",
     "recent_dirs": [],
@@ -677,6 +678,23 @@ def set_ann_default_opacity(opacity: float) -> None:
     except (TypeError, ValueError):
         v = 1.0
     save_settings({"ann_default_opacity": max(0.05, min(1.0, v))})
+
+
+def get_ann_default_stroke_width() -> float:
+    """Standard-Strichstärke für neue Shapes (1–12 px) — 0.9.2."""
+    try:
+        v = float(load_settings().get("ann_default_stroke_width", 2.0))
+    except (TypeError, ValueError):
+        v = 2.0
+    return max(1.0, min(12.0, v))
+
+
+def set_ann_default_stroke_width(width: float) -> None:
+    try:
+        v = float(width)
+    except (TypeError, ValueError):
+        v = 2.0
+    save_settings({"ann_default_stroke_width": max(1.0, min(12.0, v))})
 
 
 RECENT_DIRS_MAX = 8

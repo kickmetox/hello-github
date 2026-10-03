@@ -251,6 +251,7 @@ class Annotation:
     callout_y: float = 0.0
     font_size: float = 12.0
     opacity: float = 1.0  # Deckkraft 0.05–1.0
+    stroke_width: float = 2.0  # Strichstärke Shapes 1–12 px (0.9.2)
     rotation: float = 0.0  # Stempel-Drehung in Grad (0/90/180/270)
     tags: List[str] = field(default_factory=list)  # freie Labels, filterbar
     group_id: str = ""  # temporäre Gruppen-ID (Sidecar; leer = ungruppiert)
@@ -296,6 +297,11 @@ class Annotation:
         except (TypeError, ValueError):
             op = 1.0
         d["opacity"] = round(max(0.05, min(1.0, op)), 4)
+        try:
+            sw = float(d.get("stroke_width", 2.0))
+        except (TypeError, ValueError):
+            sw = 2.0
+        d["stroke_width"] = round(max(1.0, min(12.0, sw)), 2)
         return d
 
     def color_rgb(self) -> list[float]:
@@ -399,6 +405,11 @@ class Annotation:
         except (TypeError, ValueError):
             op = 1.0
         data["opacity"] = max(0.05, min(1.0, op))
+        try:
+            sw = float(data.get("stroke_width", 2.0) or 2.0)
+        except (TypeError, ValueError):
+            sw = 2.0
+        data["stroke_width"] = max(1.0, min(12.0, sw))
         try:
             rot = float(data.get("rotation", 0.0) or 0.0)
         except (TypeError, ValueError):
@@ -951,6 +962,8 @@ class AnnotationStore:
                             setattr(a, k, normalize_tags(v))
                         elif k == "opacity":
                             setattr(a, k, self._normalize_opacity(v))
+                        elif k == "stroke_width":
+                            setattr(a, k, self._normalize_stroke_width(v))
                         else:
                             setattr(a, k, v)
                 a.touch()
@@ -977,6 +990,8 @@ class AnnotationStore:
                         setattr(a, k, normalize_tags(v))
                     elif k == "opacity":
                         setattr(a, k, self._normalize_opacity(v))
+                    elif k == "stroke_width":
+                        setattr(a, k, self._normalize_stroke_width(v))
                     else:
                         setattr(a, k, v)
             a.touch()
@@ -1047,6 +1062,19 @@ class AnnotationStore:
         """Batch-Deckkraft für Auswahl setzen (0.05–1.0); Sidecar-Feld opacity."""
         op = self._normalize_opacity(opacity)
         return self.update_many(ann_ids, opacity=op)
+
+    @staticmethod
+    def _normalize_stroke_width(value: object) -> float:
+        try:
+            w = float(value)  # type: ignore[arg-type]
+        except (TypeError, ValueError):
+            w = 2.0
+        return round(max(1.0, min(12.0, w)), 2)
+
+    def set_stroke_widths(self, ann_ids: Sequence[str], width: float) -> int:
+        """Batch-Strichstärke für Auswahl setzen (1–12 px) — 0.9.2."""
+        w = self._normalize_stroke_width(width)
+        return self.update_many(ann_ids, stroke_width=w)
 
     def save_opacities(self, ann_ids: Sequence[str], opacity: float) -> int:
         """

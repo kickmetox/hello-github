@@ -72,6 +72,11 @@ ANN_TYPE_LABELS = {
 }
 
 
+# UserRole+1: Tab angeheftet (0.9.2) — geschützt vor „Alle schließen“
+_DOC_PINNED_ROLE = 257
+_PIN_PREFIX = "📌 "
+
+
 class DocumentList(QListWidget):
     """Dokument-/Session-Tabs; Drag InternalMove → Reihenfolge speichern."""
 
@@ -81,6 +86,7 @@ class DocumentList(QListWidget):
     document_close_all_requested = Signal()  # alle Tabs schließen
     document_close_left_requested = Signal(str)  # Tabs links von Pfad schließen
     document_close_right_requested = Signal(str)  # Tabs rechts von Pfad schließen
+    document_pin_toggled = Signal(str, bool)  # Pfad, pinned — 0.9.2
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -89,7 +95,7 @@ class DocumentList(QListWidget):
         self.setDefaultDropAction(Qt.MoveAction)
         self.setToolTip(
             "Ziehen zum Neuordnen — Mittelklick schließt Tab — "
-            "Rechtsklick: Schließen / Andere / Links / Rechts / Alle schließen"
+            "Rechtsklick: Anheften / Schließen / Andere / Links / Rechts / Alle schließen"
         )
         self.setContextMenuPolicy(Qt.CustomContextMenu)
         self.customContextMenuRequested.connect(self._context_menu)
@@ -105,6 +111,11 @@ class DocumentList(QListWidget):
             return ""
         p = item.data(256) or item.data(Qt.UserRole) or item.toolTip() or item.text()
         return str(p).strip() if p else ""
+
+    def _item_pinned(self, item) -> bool:
+        if item is None:
+            return False
+        return bool(item.data(_DOC_PINNED_ROLE))
 
     def mousePressEvent(self, event):
         if event.button() == Qt.MiddleButton:
@@ -125,15 +136,24 @@ class DocumentList(QListWidget):
         path = self._item_path(item)
         if not path:
             return
+        pinned = self._item_pinned(item)
         menu = QMenu(self)
+        act_pin = menu.addAction("Lösen" if pinned else "Anheften")
+        menu.addSeparator()
         act_close = menu.addAction("Schließen")
+        if pinned:
+            act_close.setEnabled(False)
+            act_close.setToolTip("Angeheftete Tabs zuerst lösen")
         act_others = menu.addAction("Andere schließen")
         act_left = menu.addAction("Links schließen")
         act_right = menu.addAction("Rechts schließen")
         menu.addSeparator()
         act_all = menu.addAction("Alle schließen")
+        act_all.setToolTip("Angeheftete Tabs bleiben offen")
         chosen = menu.exec(self.mapToGlobal(pos))
-        if chosen is act_close:
+        if chosen is act_pin:
+            self.document_pin_toggled.emit(path, not pinned)
+        elif chosen is act_close:
             self.document_close_requested.emit(path)
         elif chosen is act_others:
             self.document_close_others_requested.emit(path)
@@ -379,6 +399,7 @@ class Sidebar(QWidget):
     document_close_all_requested = Signal()  # Alle Tabs schließen
     document_close_left_requested = Signal(str)  # Tabs links vom Pfad schließen
     document_close_right_requested = Signal(str)  # Tabs rechts vom Pfad schließen
+    document_pin_toggled = Signal(str, bool)  # Tab anheften/lösen — 0.9.2
     line_favorite_activated = Signal(int)  # Editor-Zeile 1-basiert
     line_favorite_label_edit = Signal(int)  # Editor-Zeile 1-basiert → Label bearbeiten
     line_favorites_reordered = Signal(list)  # 1-basierte Zeilen neue Reihenfolge
@@ -440,6 +461,18 @@ class Sidebar(QWidget):
         btn_row.addWidget(self.btn_full)
         btn_row.addWidget(self.btn_pdfs)
         layout.addLayout(btn_row)
+        # PDF-Suche: Case-sensitive + Whole-word (0.9.2)
+        opt_row = QHBoxLayout()
+        self.search_case = QCheckBox("Aa")
+        self.search_case.setToolTip("Groß-/Kleinschreibung beachten (PDF-Suche)")
+        self.search_case.setChecked(False)
+        self.search_whole = QCheckBox("Wort")
+        self.search_whole.setToolTip("Nur ganze Wörter (PDF-Suche)")
+        self.search_whole.setChecked(False)
+        opt_row.addWidget(self.search_case)
+        opt_row.addWidget(self.search_whole)
+        opt_row.addStretch(1)
+        layout.addLayout(opt_row)
         hits_row = QHBoxLayout()
         self.search_hits_label = QLabel("")
         self.search_hits_label.setObjectName("searchHitsLabel")
@@ -509,6 +542,7 @@ class Sidebar(QWidget):
         self.files.document_close_right_requested.connect(
             self.document_close_right_requested.emit
         )
+        self.files.document_pin_toggled.connect(self.document_pin_toggled.emit)
         layout.addWidget(self.files)
 
         layout.addWidget(QLabel("Seiten (Vorschaubilder) — ziehen zum Ordnen"))
@@ -714,6 +748,18 @@ class Sidebar(QWidget):
         self._ann_tag_updating = False
         self._ann_page_groups: dict[int, dict] = {}
         self._ann_sel_groups: dict[str, dict] = {}  # group_id → {title, color}
+
+    def search_case_sensitive(self) -> bool:
+        """PDF-Suche: Groß-/Kleinschreibung beachten (0.9.2)."""
+        if hasattr(self, "search_case"):
+            return bool(self.search_case.isChecked())
+        return False
+
+    def search_whole_word(self) -> bool:
+        """PDF-Suche: nur ganze Wörter (0.9.2)."""
+        if hasattr(self, "search_whole"):
+            return bool(self.search_whole.isChecked())
+        return False
 
     def search_text(self) -> str:
         return self.search.currentText().strip()
@@ -1119,6 +1165,8 @@ class Sidebar(QWidget):
                 return
         item = QListWidgetItem(title or path.name)
         item.setData(256, str(path))
+        item.setData(_DOC_PINNED_ROLE, False)
+        item.setToolTip(str(path))
         self.files.addItem(item)
 
     def clear_documents(self):
@@ -1144,6 +1192,57 @@ class Sidebar(QWidget):
             if it and it.data(256):
                 out.append(str(it.data(256)))
         return out
+
+    def is_document_pinned(self, path: str) -> bool:
+        """True wenn Tab angeheftet (0.9.2)."""
+        target = str(Path(path)) if path else ""
+        if not target:
+            return False
+        for i in range(self.files.count()):
+            it = self.files.item(i)
+            if not it:
+                continue
+            p = it.data(256) or it.toolTip() or it.text()
+            if p and str(Path(str(p))) == target:
+                return bool(it.data(_DOC_PINNED_ROLE))
+        return False
+
+    def pinned_document_paths(self) -> list[str]:
+        """Pfade aller angehefteten Tabs (0.9.2)."""
+        out: list[str] = []
+        for i in range(self.files.count()):
+            it = self.files.item(i)
+            if not it or not it.data(_DOC_PINNED_ROLE):
+                continue
+            p = it.data(256)
+            if p:
+                out.append(str(p))
+        return out
+
+    def set_document_pinned(self, path: str, pinned: bool) -> bool:
+        """Tab anheften/lösen + visueller Pin-Indikator. True wenn gefunden."""
+        target = str(Path(path)) if path else ""
+        if not target:
+            return False
+        want = bool(pinned)
+        for i in range(self.files.count()):
+            it = self.files.item(i)
+            if not it:
+                continue
+            p = it.data(256) or it.toolTip() or it.text()
+            if not p or str(Path(str(p))) != target:
+                continue
+            it.setData(_DOC_PINNED_ROLE, want)
+            name = Path(str(p)).name
+            if want:
+                it.setText(_PIN_PREFIX + name)
+                tip = f"{p}\nAngeheftet — geschützt vor „Alle schließen“"
+            else:
+                it.setText(name)
+                tip = str(p)
+            it.setToolTip(tip)
+            return True
+        return False
 
     def clear_thumbs(self):
         self.thumbs.clear()

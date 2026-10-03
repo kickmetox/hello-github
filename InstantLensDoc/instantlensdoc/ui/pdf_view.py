@@ -657,10 +657,15 @@ class PdfCanvas(QLabel):
         color.setAlpha(_a(90 if ann.type == AnnotationType.HIGHLIGHT else 200))
         # Deckkraft nur über α der Farben — kein zusätzliches painter.setOpacity
         # (sonst doppelte Multiplikation bei Fills mit _a(...)).
+        try:
+            stroke_w = float(getattr(ann, "stroke_width", 2.0) or 2.0)
+        except (TypeError, ValueError):
+            stroke_w = 2.0
+        stroke_w = max(1.0, min(12.0, stroke_w))
         pen_c = QColor(ann.color)
         pen_c.setAlpha(_a(255))
         pen = QPen(pen_c)
-        pen.setWidth(2)
+        pen.setWidthF(stroke_w)
         painter.setPen(pen)
         x, y = int(ann.x + dx), int(ann.y + dy)
         w, h = int(ann.width), int(ann.height)
@@ -1140,6 +1145,15 @@ class PdfViewer(QWidget):
         self._continuous_gap = CONTINUOUS_PAGE_GAP
         self._continuous_scroll_syncing = False
         self._default_opacity = get_ann_default_opacity()
+        try:
+            from instantlensdoc.core.app_settings import get_ann_default_stroke_width
+
+            self._default_stroke_width = float(get_ann_default_stroke_width())
+        except Exception:
+            self._default_stroke_width = 2.0
+        self._suppress_default_zoom = False  # Session Zoom pro Tab (0.9.2)
+        self._search_case_sensitive = False
+        self._search_whole_word = False
         self._annotations_visible = get_annotations_visible()
         self._annotations_locked = get_annotations_locked()
         self._show_page_boxes = get_show_page_boxes()
@@ -1405,6 +1419,26 @@ class PdfViewer(QWidget):
         self.slider_opacity.sliderPressed.connect(self._on_opacity_slider_pressed)
         self.slider_opacity.sliderReleased.connect(self._on_opacity_slider_released)
         self.slider_opacity.valueChanged.connect(self._on_opacity_slider_changed)
+        # Stroke-Width Slider für ausgewähltes Shape — Commit on release + Undo (0.9.2)
+        self.slider_stroke = QSlider(Qt.Horizontal)
+        self.slider_stroke.setRange(1, 12)
+        self.slider_stroke.setSingleStep(1)
+        self.slider_stroke.setPageStep(2)
+        self.slider_stroke.setFixedWidth(72)
+        self.slider_stroke.setValue(int(round(self._default_stroke_width)))
+        self.slider_stroke.setToolTip(
+            "Strichstärke (px) des ausgewählten Shapes; ohne Auswahl → Standard "
+            "(Undo beim Loslassen)"
+        )
+        self._stroke_slider_dragging = False
+        self._stroke_slider_undo_pushed = False
+        self._stroke_slider_prev_recording = True
+        self.slider_stroke.sliderPressed.connect(self._on_stroke_slider_pressed)
+        self.slider_stroke.sliderReleased.connect(self._on_stroke_slider_released)
+        self.slider_stroke.valueChanged.connect(self._on_stroke_slider_changed)
+        self.lbl_stroke = QLabel(f"Strich {int(round(self._default_stroke_width))}")
+        self.lbl_stroke.setFixedWidth(52)
+        self.lbl_stroke.setToolTip("Aktuelle Strichstärke in Pixel")
         self.btn_grayscale = QToolButton()
         self.btn_grayscale.setText("Grau")
         self.btn_grayscale.setCheckable(True)
@@ -1505,6 +1539,8 @@ class PdfViewer(QWidget):
         self._refresh_preset_btns()
         toolbar.addWidget(self.spin_opacity)
         toolbar.addWidget(self.slider_opacity)
+        toolbar.addWidget(self.lbl_stroke)
+        toolbar.addWidget(self.slider_stroke)
         toolbar.addWidget(self.btn_grayscale)
         toolbar.addWidget(self.btn_night)
         toolbar.addWidget(self.btn_spread)
@@ -1572,6 +1608,8 @@ class PdfViewer(QWidget):
                 *self._preset_btns,
                 self.spin_opacity,
                 self.slider_opacity,
+                self.lbl_stroke,
+                self.slider_stroke,
             ],
             "view": [
                 self.btn_grayscale,
@@ -1923,6 +1961,101 @@ class PdfViewer(QWidget):
             self._apply_toolbar_opacity(value, commit=False)
         else:
             self._apply_toolbar_opacity(value, commit=True)
+
+    def _sync_stroke_controls(self, value: float) -> None:
+        w = max(1.0, min(12.0, float(value)))
+        iw = int(round(w))
+        if hasattr(self, "slider_stroke"):
+            self.slider_stroke.blockSignals(True)
+            self.slider_stroke.setValue(iw)
+            self.slider_stroke.blockSignals(False)
+        if hasattr(self, "lbl_stroke"):
+            self.lbl_stroke.setText(f"Strich {iw}")
+
+    def _selected_stroke_ids(self) -> list[str]:
+        return self._selected_opacity_ids()
+
+    def _apply_toolbar_stroke(self, value: float, *, commit: bool = True) -> None:
+        """
+        Stroke-Slider: bei Auswahl nur ausgewählte Shapes;
+        ohne Auswahl → Standard-Strichstärke. commit=False: Live ohne Undo/Sidecar.
+        """
+        w = max(1.0, min(12.0, float(value)))
+        ids = self._selected_stroke_ids()
+        if self.store and ids:
+            n = self.store.set_stroke_widths(ids, w)
+            if n > 0:
+                if commit:
+                    try:
+                        self.schedule_sidecar_save(force=True)
+                    except Exception:
+                        pass
+                self.refresh()
+                self.annotations_changed.emit()
+                self.status.emit(f"Strichstärke {w:.0f}px für {n} ausgewählte Annotation(en)")
+            return
+        self._default_stroke_width = w
+        if commit:
+            try:
+                from instantlensdoc.core.app_settings import set_ann_default_stroke_width
+
+                set_ann_default_stroke_width(self._default_stroke_width)
+            except Exception:
+                pass
+        self.status.emit(f"Standard-Strichstärke {self._default_stroke_width:.0f}px")
+
+    def _on_stroke_slider_pressed(self) -> None:
+        """Undo-Stufe einmalig beim Drag-Start (Commit on release) — 0.9.2."""
+        self._stroke_slider_dragging = True
+        self._stroke_slider_undo_pushed = False
+        ids = self._selected_stroke_ids()
+        if self.store and ids:
+            try:
+                self.store._push_undo("Strichstärke")  # noqa: SLF001
+                self._stroke_slider_prev_recording = bool(self.store._recording)
+                self.store._recording = False
+                self._stroke_slider_undo_pushed = True
+            except Exception:
+                self._stroke_slider_undo_pushed = False
+
+    def _on_stroke_slider_released(self) -> None:
+        was_dragging = bool(self._stroke_slider_dragging)
+        self._stroke_slider_dragging = False
+        if self.store and self._stroke_slider_undo_pushed:
+            try:
+                self.store._recording = bool(
+                    getattr(self, "_stroke_slider_prev_recording", True)
+                )
+            except Exception:
+                self.store._recording = True
+        self._stroke_slider_undo_pushed = False
+        if was_dragging:
+            px = int(self.slider_stroke.value()) if hasattr(self, "slider_stroke") else 2
+            value = max(1.0, min(12.0, float(px)))
+            ids = self._selected_stroke_ids()
+            if self.store and ids:
+                try:
+                    self.schedule_sidecar_save(force=True)
+                except Exception:
+                    pass
+                self.refresh()
+                self.annotations_changed.emit()
+            else:
+                self._default_stroke_width = value
+                try:
+                    from instantlensdoc.core.app_settings import set_ann_default_stroke_width
+
+                    set_ann_default_stroke_width(self._default_stroke_width)
+                except Exception:
+                    pass
+
+    def _on_stroke_slider_changed(self, px: int) -> None:
+        value = max(1.0, min(12.0, float(px)))
+        self._sync_stroke_controls(value)
+        if getattr(self, "_stroke_slider_dragging", False):
+            self._apply_toolbar_stroke(value, commit=False)
+        else:
+            self._apply_toolbar_stroke(value, commit=True)
 
     def set_grayscale(self, enabled: bool):
         enabled = bool(enabled)
@@ -2583,6 +2716,9 @@ class PdfViewer(QWidget):
 
     def apply_default_zoom(self):
         """Standard-Zoom aus Einstellungen: Prozent / Fit-Width / Fit-Page."""
+        # Session-Zoom pro Tab hat Vorrang (0.9.2)
+        if getattr(self, "_suppress_default_zoom", False):
+            return
         mode = get_default_zoom_mode()
         if mode == "fit_width":
             self.fit_width()
@@ -2666,6 +2802,14 @@ class PdfViewer(QWidget):
                     except (TypeError, ValueError):
                         op = self._default_opacity
                     self._sync_opacity_controls(op)
+                    try:
+                        sw = float(
+                            getattr(ann, "stroke_width", self._default_stroke_width)
+                            or self._default_stroke_width
+                        )
+                    except (TypeError, ValueError):
+                        sw = self._default_stroke_width
+                    self._sync_stroke_controls(sw)
                     self.status.emit(f"Auswahl: {ann.type.value} (S. {ann.page + 1})")
                 else:
                     self.status.emit("1 Annotation ausgewählt")
@@ -2684,6 +2828,14 @@ class PdfViewer(QWidget):
                 except (TypeError, ValueError):
                     op = self._default_opacity
                 self._sync_opacity_controls(op)
+                try:
+                    sw = float(
+                        getattr(ann, "stroke_width", self._default_stroke_width)
+                        or self._default_stroke_width
+                    )
+                except (TypeError, ValueError):
+                    sw = self._default_stroke_width
+                self._sync_stroke_controls(sw)
                 n = len(self._selected_ann_ids)
                 gid = str(getattr(ann, "group_id", "") or "").strip()
                 if n > 1 and gid:
@@ -3239,6 +3391,24 @@ class PdfViewer(QWidget):
         self._search_index = -1
         self.canvas.clear_search_highlights()
 
+    def set_search_options(
+        self,
+        *,
+        case_sensitive: bool | None = None,
+        whole_word: bool | None = None,
+    ) -> None:
+        """Case-sensitive / Whole-word Toggles für PDF-Suche (0.9.2)."""
+        if case_sensitive is not None:
+            self._search_case_sensitive = bool(case_sensitive)
+        if whole_word is not None:
+            self._search_whole_word = bool(whole_word)
+
+    def _search_kw(self) -> dict:
+        return {
+            "case_sensitive": bool(getattr(self, "_search_case_sensitive", False)),
+            "whole_word": bool(getattr(self, "_search_whole_word", False)),
+        }
+
     def _rebuild_search_rects(self, *, keep_index: bool = True) -> int:
         """Aktualisiert Treffer-Rechtecke der aktuellen Seite für _search_query."""
         q = self._search_query
@@ -3252,6 +3422,7 @@ class PdfViewer(QWidget):
             q,
             scale=self.scale,
             password=self.password,
+            **self._search_kw(),
         )
         self._search_rects = [(m.x, m.y, m.width, m.height) for m in matches]
         if keep_index and self._search_rects:
@@ -3260,12 +3431,22 @@ class PdfViewer(QWidget):
             self._search_index = 0 if self._search_rects else -1
         return len(self._search_rects)
 
-    def highlight_search(self, query: str) -> int:
+    def highlight_search(
+        self,
+        query: str,
+        *,
+        case_sensitive: bool | None = None,
+        whole_word: bool | None = None,
+    ) -> int:
         """Highlightet Query-Treffer auf der aktuellen Seite. Liefert Trefferzahl."""
         q = (query or "").strip()
         if not q or not self.pdf_path:
             self.clear_search_highlights()
             return 0
+        if case_sensitive is not None or whole_word is not None:
+            self.set_search_options(
+                case_sensitive=case_sensitive, whole_word=whole_word
+            )
         self._search_query = q
         n = self._rebuild_search_rects(keep_index=False)
         self.canvas.set_search_highlights(self._search_rects, self._search_index)
@@ -3308,6 +3489,7 @@ class PdfViewer(QWidget):
                 self._search_query,
                 scale=self.scale,
                 password=self.password,
+                **self._search_kw(),
             )
             if matches:
                 hit = 0 if step > 0 else len(matches) - 1
@@ -3390,6 +3572,8 @@ class PdfViewer(QWidget):
         *,
         max_hits: int = 100,
         snippet_chars: int = 48,
+        case_sensitive: bool | None = None,
+        whole_word: bool | None = None,
     ) -> list[tuple[int, int, str]]:
         """
         Alle PDF-Texttreffer für die Trefferliste (Seite, Hit-Index auf Seite, Snippet).
@@ -3397,6 +3581,10 @@ class PdfViewer(QWidget):
         q = (query or "").strip()
         if not q or not self.pdf_path or self.page_count <= 0:
             return []
+        if case_sensitive is not None or whole_word is not None:
+            self.set_search_options(
+                case_sensitive=case_sensitive, whole_word=whole_word
+            )
         out: list[tuple[int, int, str]] = []
         ctx = max(12, int(snippet_chars))
         for page_idx in range(int(self.page_count)):
@@ -3409,6 +3597,7 @@ class PdfViewer(QWidget):
                 scale=1.0,
                 password=self.password,
                 max_hits=max(1, max_hits - len(out)),
+                **self._search_kw(),
             )
             for hit_i, m in enumerate(matches):
                 if len(out) >= max_hits:
@@ -6323,6 +6512,12 @@ class PdfViewer(QWidget):
             ann.opacity = max(0.05, min(1.0, float(self._default_opacity)))
         except (TypeError, ValueError):
             ann.opacity = 1.0
+        try:
+            ann.stroke_width = max(
+                1.0, min(12.0, float(getattr(self, "_default_stroke_width", 2.0)))
+            )
+        except (TypeError, ValueError):
+            ann.stroke_width = 2.0
         self.store.add(ann)
         try:
             self.schedule_sidecar_save()

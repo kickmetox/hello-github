@@ -20,6 +20,7 @@ class SessionTab:
     scale: float = 1.5
     kind: str = ""  # optional Hinweis
     scroll_y: int = 0  # Vertikale Scroll-Position (PDF/Editor) — 0.9.1
+    # scale (oben): Zoom-Level pro Tab — Restore mit Vorrang vor Fit/Default (0.9.2)
 
 
 @dataclass
@@ -145,7 +146,7 @@ def build_session(
     sync_scroll: bool = False,
 ) -> SessionState:
     """
-    tab_states: optional {path: {page, scale, scroll_y}} für Last-Page/Scroll je Tab (0.9.1).
+    tab_states: optional {path: {page, scale, scroll_y}} für Last-Page/Zoom/Scroll je Tab (0.9.1/0.9.2).
     """
     tabs: List[SessionTab] = []
     seen: set[str] = set()

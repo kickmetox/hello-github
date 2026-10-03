@@ -326,7 +326,7 @@ class MainWindow(QMainWindow):
         }
 
     def _restore_tab_view_state(self, path: str) -> None:
-        """Gespeicherte Last-Page / Scroll-Position für Tab anwenden."""
+        """Gespeicherte Last-Page / Zoom / Scroll für Tab anwenden (0.9.2 Zoom)."""
         key = self._path_key(path)
         if not key:
             return
@@ -346,6 +346,9 @@ class MainWindow(QMainWindow):
         except (TypeError, ValueError):
             scroll_y = 0
         if self.doc and self.doc.kind == DocKind.PDF and self.pdf_view.pdf_path:
+            # Session-Zoom hat Vorrang vor Fit/Default-Zoom aus load()
+            if scale > 0:
+                self.pdf_view._suppress_default_zoom = True
             if 0 <= page < int(self.pdf_view.page_count or 0):
                 self.pdf_view.page_index = page
             if scale > 0:
@@ -361,8 +364,16 @@ class MainWindow(QMainWindow):
                 except Exception:
                     pass
 
+            def _clear_zoom_suppress() -> None:
+                try:
+                    self.pdf_view._suppress_default_zoom = False
+                except Exception:
+                    pass
+
             QTimer.singleShot(0, _apply_scroll)
             QTimer.singleShot(80, _apply_scroll)
+            # Fit-Default-Timer aus load() (~0ms) überdauern, dann Flag lösen
+            QTimer.singleShot(200, _clear_zoom_suppress)
         elif self.stack.currentWidget() is self.editor_pane:
 
             def _apply_ed_scroll(sy: int = scroll_y) -> None:
@@ -487,6 +498,7 @@ class MainWindow(QMainWindow):
         self.sidebar.document_close_all_requested.connect(self.close_all_tabs)
         self.sidebar.document_close_left_requested.connect(self.close_tabs_left_of)
         self.sidebar.document_close_right_requested.connect(self.close_tabs_right_of)
+        self.sidebar.document_pin_toggled.connect(self._on_document_pin_toggled)
         self.sidebar.recent_activated.connect(self.open_path)
         self.sidebar.recent_remove_requested.connect(self._remove_recent_path)
         self.sidebar.mark_activated.connect(self._on_mark_activated)
@@ -1904,6 +1916,8 @@ class MainWindow(QMainWindow):
         if pending and not was:
             self._blink_pending_debounce_status()
         self._pending_was_pending = bool(pending)
+        from instantlensdoc.ui.sidebar import _DOC_PINNED_ROLE, _PIN_PREFIX
+
         for i in range(files.count()):
             it = files.item(i)
             if it is None:
@@ -1913,15 +1927,26 @@ class MainWindow(QMainWindow):
                 continue
             key = self._path_key(raw)
             base = Path(str(raw)).name
+            pinned = bool(it.data(_DOC_PINNED_ROLE))
+            label = (_PIN_PREFIX + base) if pinned else base
             if key and key in dirty_keys:
-                it.setText(f"{base} *")
+                it.setText(f"{label} *")
+                tips = []
                 if pending_key and key == pending_key:
-                    it.setToolTip("Speichern ausstehend…")
+                    tips.append("Speichern ausstehend…")
                 else:
-                    it.setToolTip("Ungespeicherte Änderungen")
+                    tips.append("Ungespeicherte Änderungen")
+                if pinned:
+                    tips.append("Angeheftet — geschützt vor „Alle schließen“")
+                it.setToolTip("\n".join(tips))
             else:
-                it.setText(base)
-                it.setToolTip("")
+                it.setText(label)
+                if pinned:
+                    it.setToolTip(
+                        f"{raw}\nAngeheftet — geschützt vor „Alle schließen“"
+                    )
+                else:
+                    it.setToolTip(str(raw))
 
     def _blink_pending_debounce_status(self) -> None:
         """
@@ -4262,13 +4287,26 @@ class MainWindow(QMainWindow):
             except Exception:
                 snip_ctx = 40
             # Klickbare Trefferliste: Seite + Snippet je Texttreffer (0.9.1)
+            # Case-sensitive / Whole-word aus Suchleiste (0.9.2)
+            case_sens = bool(
+                getattr(self.sidebar, "search_case_sensitive", lambda: False)()
+            )
+            whole_word = bool(
+                getattr(self.sidebar, "search_whole_word", lambda: False)()
+            )
             text_hits: list[tuple[int, int, str]] = []
             if pdf_path and hasattr(self.pdf_view, "collect_search_hits"):
                 text_hits = self.pdf_view.collect_search_hits(
-                    query, max_hits=100, snippet_chars=snip_ctx
+                    query,
+                    max_hits=100,
+                    snippet_chars=snip_ctx,
+                    case_sensitive=case_sens,
+                    whole_word=whole_word,
                 )
             # Aktuelle Seite: Texttreffer highlighten
-            n_page = self.pdf_view.highlight_search(query)
+            n_page = self.pdf_view.highlight_search(
+                query, case_sensitive=case_sens, whole_word=whole_word
+            )
             if text_hits or hits or n_page:
                 lines = []
                 payloads = []
@@ -4358,8 +4396,19 @@ class MainWindow(QMainWindow):
             if not q:
                 self._set_status("Keine Suche aktiv")
                 return
+            case_sens = bool(
+                getattr(self.sidebar, "search_case_sensitive", lambda: False)()
+            )
+            whole_word = bool(
+                getattr(self.sidebar, "search_whole_word", lambda: False)()
+            )
+            self.pdf_view.set_search_options(
+                case_sensitive=case_sens, whole_word=whole_word
+            )
             if self.pdf_view._search_query != q:
-                n = self.pdf_view.highlight_search(q)
+                n = self.pdf_view.highlight_search(
+                    q, case_sensitive=case_sens, whole_word=whole_word
+                )
                 if n:
                     self.sidebar.set_search_hit_status(1, n)
                     self._set_status(f"{n} Treffer auf aktueller Seite (1/{n})")
@@ -4394,8 +4443,19 @@ class MainWindow(QMainWindow):
             if not q:
                 self._set_status("Keine Suche aktiv")
                 return
+            case_sens = bool(
+                getattr(self.sidebar, "search_case_sensitive", lambda: False)()
+            )
+            whole_word = bool(
+                getattr(self.sidebar, "search_whole_word", lambda: False)()
+            )
+            self.pdf_view.set_search_options(
+                case_sensitive=case_sens, whole_word=whole_word
+            )
             if self.pdf_view._search_query != q:
-                n = self.pdf_view.highlight_search(q)
+                n = self.pdf_view.highlight_search(
+                    q, case_sensitive=case_sens, whole_word=whole_word
+                )
                 if n:
                     self.pdf_view._search_index = n - 1
                     self.pdf_view.canvas.set_search_highlights(
@@ -4518,6 +4578,15 @@ class MainWindow(QMainWindow):
         if page is not None and self.stack.currentWidget() is self.pdf_view:
             n = 0
             if q:
+                case_sens = bool(
+                    getattr(self.sidebar, "search_case_sensitive", lambda: False)()
+                )
+                whole_word = bool(
+                    getattr(self.sidebar, "search_whole_word", lambda: False)()
+                )
+                self.pdf_view.set_search_options(
+                    case_sensitive=case_sens, whole_word=whole_word
+                )
                 self.pdf_view._search_query = q
                 if hit_index is not None:
                     ok = self.pdf_view._goto_search_page(
@@ -4526,7 +4595,9 @@ class MainWindow(QMainWindow):
                     n = self.pdf_view.search_hit_count() if ok else 0
                 else:
                     self.pdf_view.goto_page(int(page))
-                    n = self.pdf_view.highlight_search(q)
+                    n = self.pdf_view.highlight_search(
+                        q, case_sensitive=case_sens, whole_word=whole_word
+                    )
             else:
                 self.pdf_view.goto_page(int(page))
             if n:
@@ -5041,6 +5112,11 @@ class MainWindow(QMainWindow):
         if not self.doc:
             self._set_status("Kein Dokument geöffnet")
             return
+        if self.doc.path and self.sidebar.is_document_pinned(str(self.doc.path)):
+            self._set_status(
+                f"Tab angeheftet: {Path(self.doc.path).name} — zuerst lösen (Rechtsklick)"
+            )
+            return
         if not self._confirm_close_current(allow_discard=True):
             return
         path = str(self.doc.path) if self.doc.path else None
@@ -5073,11 +5149,31 @@ class MainWindow(QMainWindow):
         else:
             self._set_status("Dokument geschlossen")
 
+    def _on_document_pin_toggled(self, path: str, pinned: bool) -> None:
+        """Tab anheften/lösen (0.9.2) — visueller Indikator + Schutz vor Alle schließen."""
+        if not path:
+            return
+        ok = self.sidebar.set_document_pinned(path, bool(pinned))
+        if not ok:
+            self._set_status("Tab nicht gefunden")
+            return
+        name = Path(path).name
+        if pinned:
+            self._set_status(f"Tab angeheftet: {name} — bleibt bei „Alle schließen“")
+        else:
+            self._set_status(f"Tab gelöst: {name}")
+        self._refresh_document_dirty_labels()
+
     def close_tab_path(self, path: str) -> None:
         """Sidebar-Tab schließen (Mittelklick / Kontextmenü) — dirty → Speichern-Dialog."""
         target = str(Path(path)) if path else ""
         if not target:
             self._set_status("Kein Tab zum Schließen")
+            return
+        if self.sidebar.is_document_pinned(target):
+            self._set_status(
+                f"Tab angeheftet: {Path(target).name} — zuerst lösen (Rechtsklick)"
+            )
             return
         cur = str(Path(self.doc.path)) if self.doc and self.doc.path else None
         if cur and target == cur:
@@ -5115,7 +5211,7 @@ class MainWindow(QMainWindow):
         self.close_other_tabs()
 
     def close_other_tabs(self):
-        """Alle Sidebar-Dokumente schließen außer dem aktuellen."""
+        """Alle Sidebar-Dokumente schließen außer dem aktuellen (angeheftete bleiben)."""
         if not self.doc:
             self._set_status("Kein Dokument geöffnet")
             return
@@ -5125,8 +5221,12 @@ class MainWindow(QMainWindow):
             self._set_status("Keine weiteren Tabs")
             return
         closed = 0
+        skipped_pin = 0
         for p in paths:
             if keep and str(Path(str(p))) == str(Path(keep)):
+                continue
+            if self.sidebar.is_document_pinned(str(p)):
+                skipped_pin += 1
                 continue
             self.sidebar.remove_document(p)
             key = self._path_key(p)
@@ -5135,7 +5235,12 @@ class MainWindow(QMainWindow):
                 self._tab_view_state.pop(key, None)
             closed += 1
         if closed == 0:
-            self._set_status("Keine anderen Tabs zum Schließen")
+            if skipped_pin:
+                self._set_status(
+                    f"Keine Tabs geschlossen — {skipped_pin} angeheftet"
+                )
+            else:
+                self._set_status("Keine anderen Tabs zum Schließen")
             return
         try:
             self._save_session()
@@ -5143,12 +5248,19 @@ class MainWindow(QMainWindow):
             pass
         self._update_unsaved_status()
         self._refresh_document_dirty_labels()
-        self._set_status(f"{closed} andere Tab(s) geschlossen — aktuell bleibt offen")
+        extra = f" · {skipped_pin} angeheftet" if skipped_pin else ""
+        self._set_status(
+            f"{closed} andere Tab(s) geschlossen — aktuell bleibt offen{extra}"
+        )
 
     def _close_tabs_by_paths(self, targets: list[str], *, status_ok: str) -> int:
         """Hilfsfunktion: Tabs entfernen (ohne Dirty-Dialog, wie close_other_tabs)."""
         closed = 0
+        skipped_pin = 0
         for p in targets:
+            if self.sidebar.is_document_pinned(str(p)):
+                skipped_pin += 1
+                continue
             self.sidebar.remove_document(p)
             key = self._path_key(p)
             if key:
@@ -5163,7 +5275,10 @@ class MainWindow(QMainWindow):
             pass
         self._update_unsaved_status()
         self._refresh_document_dirty_labels()
-        self._set_status(status_ok.format(n=closed))
+        msg = status_ok.format(n=closed)
+        if skipped_pin:
+            msg = f"{msg} · {skipped_pin} angeheftet"
+        self._set_status(msg)
         return closed
 
     def close_tabs_left_of(self, pivot_path: str) -> None:
@@ -5232,12 +5347,24 @@ class MainWindow(QMainWindow):
         self.close_tabs_right_of(str(self.doc.path))
 
     def close_all_tabs(self) -> None:
-        """Alle Sidebar-Tabs schließen; aktuelles Doc mit Speichern-Dialog."""
+        """
+        Alle nicht angehefteten Sidebar-Tabs schließen (0.9.2: Pin-Schutz).
+        Aktuelles Doc mit Speichern-Dialog — außer es ist angeheftet.
+        """
         paths = list(self.sidebar.document_paths()) if hasattr(self.sidebar, "document_paths") else []
         if not paths and not self.doc:
             self._set_status("Keine Tabs zum Schließen")
             return
-        if self.doc:
+        pinned_paths = set()
+        try:
+            pinned_paths = {
+                str(Path(p)) for p in self.sidebar.pinned_document_paths()
+            }
+        except Exception:
+            pinned_paths = set()
+        cur_path = str(Path(self.doc.path)) if self.doc and self.doc.path else None
+        cur_pinned = bool(cur_path and cur_path in pinned_paths)
+        if self.doc and not cur_pinned:
             if not self._confirm_close_current(allow_discard=True):
                 return
             path = str(self.doc.path) if self.doc.path else None
@@ -5258,12 +5385,38 @@ class MainWindow(QMainWindow):
             self.editor.setPlainText("")
             self.editor.blockSignals(False)
         remaining = list(self.sidebar.document_paths())
+        closed = 0
+        kept_pin = 0
         for p in remaining:
+            key_p = str(Path(str(p)))
+            if key_p in pinned_paths:
+                kept_pin += 1
+                continue
             self.sidebar.remove_document(p)
             key = self._path_key(p)
             if key:
                 self._unsaved_paths.discard(key)
                 self._tab_view_state.pop(key, None)
+            closed += 1
+        kept = list(self.sidebar.document_paths())
+        if kept:
+            # Angeheftete bleiben — ersten anzeigen falls aktuelles Doc weg
+            if not self.doc or not self.doc.path:
+                try:
+                    self.open_path(kept[0])
+                except Exception:
+                    pass
+            self._update_doc_status()
+            try:
+                self._save_session()
+            except Exception:
+                pass
+            self._update_unsaved_status()
+            self._refresh_document_dirty_labels()
+            self._set_status(
+                f"{closed} Tab(s) geschlossen · {len(kept)} angeheftet bleiben"
+            )
+            return
         self.sidebar.clear_thumbs()
         self.sidebar.clear_annotations()
         self.sidebar.set_marks([])

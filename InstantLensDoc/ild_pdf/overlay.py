@@ -275,6 +275,13 @@ def _page_chars(
         doc.close()
 
 
+def _is_word_char(ch: str) -> bool:
+    """Zeichen zählt zur Wortgrenze (Whole-word-Suche)."""
+    if not ch:
+        return False
+    return ch.isalnum() or ch == "_"
+
+
 def find_text_rects(
     pdf_path: str | Path,
     page_index: int,
@@ -283,10 +290,14 @@ def find_text_rects(
     scale: float = 1.0,
     password: str | None = None,
     max_hits: int = 200,
+    case_sensitive: bool = False,
+    whole_word: bool = False,
 ) -> List[TextMatchRect]:
     """
     Findet Query-Treffer auf einer PDF-Seite und liefert Highlight-Rechtecke
-    (Render-Pixel bei scale, Y von oben). Case-insensitive.
+    (Render-Pixel bei scale, Y von oben).
+
+    case_sensitive / whole_word: Toggles der Suchleiste (0.9.2).
     """
     q = (query or "").strip()
     if not q:
@@ -301,18 +312,29 @@ def find_text_rects(
     # Volltext + Index-Mapping (inkl. Whitespace für Wortgrenzen)
     text_chars = [(c[4] or " ") for c in chars]
     hay = "".join(text_chars)
-    hay_l = hay.lower()
-    needle = q.lower()
-    if not needle or needle not in hay_l:
+    if case_sensitive:
+        hay_cmp = hay
+        needle = q
+    else:
+        hay_cmp = hay.lower()
+        needle = q.lower()
+    if not needle or needle not in hay_cmp:
         return []
 
     hits: List[TextMatchRect] = []
     start = 0
+    nlen = len(needle)
     while len(hits) < max_hits:
-        pos = hay_l.find(needle, start)
+        pos = hay_cmp.find(needle, start)
         if pos < 0:
             break
-        end = pos + len(needle)
+        end = pos + nlen
+        if whole_word:
+            left_ok = pos == 0 or not _is_word_char(hay[pos - 1])
+            right_ok = end >= len(hay) or not _is_word_char(hay[end])
+            if not (left_ok and right_ok):
+                start = pos + 1
+                continue
         slice_chars = chars[pos:end]
         if not slice_chars:
             start = pos + 1
@@ -339,7 +361,7 @@ def find_text_rects(
             hits.append(rect.scaled(scale) if scale != 1.0 else rect)
             if len(hits) >= max_hits:
                 break
-        start = pos + max(len(needle), 1)
+        start = pos + max(nlen, 1)
     return hits
 
 

@@ -68,15 +68,20 @@ def draw_annotations_on_image(
         w, h = float(ann.width), float(ann.height)
         fill_a = _opacity_alpha(ann, 90 if ann.type == AnnotationType.HIGHLIGHT else 200)
         stroke = _parse_color(ann.color, _opacity_alpha(ann, 255))
+        try:
+            sw = int(round(float(getattr(ann, "stroke_width", 2.0) or 2.0)))
+        except (TypeError, ValueError):
+            sw = 2
+        sw = max(1, min(12, sw))
 
         if ann.type == AnnotationType.HIGHLIGHT:
             draw.rectangle([x, y, x + w, y + h], fill=_parse_color(ann.color, fill_a))
         elif ann.type == AnnotationType.REDACTION:
             rw, rh = max(w, 4), max(h, 4)
             draw.rectangle([x, y, x + rw, y + rh], fill=(0, 0, 0, _opacity_alpha(ann, 230)))
-            draw.rectangle([x, y, x + rw, y + rh], outline=(220, 50, 50, 255), width=2)
+            draw.rectangle([x, y, x + rw, y + rh], outline=(220, 50, 50, 255), width=sw)
         elif ann.type == AnnotationType.UNDERLINE:
-            draw.line([x, y + h, x + w, y + h], fill=stroke, width=2)
+            draw.line([x, y + h, x + w, y + h], fill=stroke, width=sw)
         elif ann.type == AnnotationType.STICKY:
             bw, bh = max(w, 80), max(h, 60)
             draw.rectangle([x, y, x + bw, y + bh], fill=(255, 255, 150, _opacity_alpha(ann, 200)))
@@ -167,11 +172,11 @@ def draw_annotations_on_image(
                 [x, y, x + w, y + h],
                 fill=_parse_color(ann.color, _opacity_alpha(ann, 40)),
                 outline=stroke,
-                width=2,
+                width=sw,
             )
         elif ann.type in (AnnotationType.LINE, AnnotationType.ARROW, AnnotationType.MEASURE):
             x2, y2 = ann.end_point()
-            draw.line([ann.x, ann.y, x2, y2], fill=stroke, width=2)
+            draw.line([ann.x, ann.y, x2, y2], fill=stroke, width=sw)
             if ann.type == AnnotationType.ARROW:
                 angle = math.atan2(y2 - ann.y, x2 - ann.x)
                 size = 12.0
