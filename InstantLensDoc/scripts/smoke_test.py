@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Smoke-Test 1.0.9 (CLI + optional offscreen Qt). Kernpfade: open/annotate/export/license + ausgewählte 0.6.x-Pfade."""
+"""Smoke-Test 1.1.0 (CLI + optional offscreen Qt). Kernpfade: open/annotate/export/license + ausgewählte 0.6.x-Pfade."""
 
 from __future__ import annotations
 
@@ -122,8 +122,8 @@ def main() -> int:
     from instantlensdoc.core.update_check import check_for_updates
     from instantlensdoc.license import KEY_DAYS, TRIAL_DAYS, generate_key, verify_key
 
-    assert __version__ == "1.0.9", __version__
-    assert ild_ver == "1.0.9", ild_ver
+    assert __version__ == "1.1.0", __version__
+    assert ild_ver == "1.1.0", ild_ver
     assert TRIAL_DAYS == 28 and KEY_DAYS == 32
     key = generate_key("ame@sellerbach.de")
     ok, msg, _ = verify_key(key)
@@ -141,7 +141,7 @@ def main() -> int:
     assert "Settings" in tr("settings")
     set_lang("de")
     upd = check_for_updates(allow_network=False)
-    assert upd.local_version == "1.0.9" and not upd.online
+    assert upd.local_version == "1.1.0" and not upd.online
     assert get_export_jpeg_quality() >= 10
     assert get_ui_lang() in ("de", "en")
     assert 25 <= get_default_zoom_percent() <= 500
@@ -184,8 +184,8 @@ def main() -> int:
     assert get_ann_pen_color() == "#112233"
     assert (ROOT / "CHANGELOG.md").is_file()
     cl = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-    assert "1.0.9" in cl and "1.0.8" in cl and "1.0.7" in cl and "1.0.6" in cl and "1.0.5" in cl and "1.0.4" in cl and "1.0.3" in cl and "1.0.2" in cl and "1.0.1" in cl and "1.0.0" in cl and "0.9.9" in cl and "0.9.8" in cl and "0.9.7" in cl and "0.9.6" in cl and "0.9.5" in cl and "0.9.4" in cl and "0.9.3" in cl and "0.9.2" in cl and "0.9.1" in cl and "0.9.0" in cl and "0.8.9" in cl and "0.8.8" in cl and "0.8.7" in cl and "0.8.6" in cl and "0.8.5" in cl and "0.8.4" in cl and "0.8.3" in cl and "0.8.2" in cl and "0.8.1" in cl and "0.8.0" in cl
-    assert "## 1.0.9" in cl and "## 1.0.8" in cl and "## 1.0.7" in cl and "## 1.0.6" in cl and "## 1.0.5" in cl and "## 1.0.4" in cl and "## 1.0.3" in cl and "## 1.0.2" in cl and "## 1.0.1" in cl and "## 1.0.0" in cl and "## 0.9.9" in cl and "## 0.9.8" in cl and "## 0.9.7" in cl and "## 0.9.6" in cl and "## 0.9.5" in cl and "## 0.9.4" in cl and "## 0.9.3" in cl and "## 0.9.2" in cl and "## 0.9.1" in cl and "## 0.9.0" in cl and "## 0.8.9" in cl and "## 0.8.8" in cl and "## 0.8.7" in cl and "## 0.8.6" in cl and "## 0.8.5" in cl and "## 0.8.4" in cl and "## 0.8.3" in cl and "## 0.8.2" in cl and "## 0.8.1" in cl and "## 0.8.0" in cl
+    assert "1.1.0" in cl and "1.0.9" in cl and "1.0.8" in cl and "1.0.7" in cl and "1.0.6" in cl and "1.0.5" in cl and "1.0.4" in cl and "1.0.3" in cl and "1.0.2" in cl and "1.0.1" in cl and "1.0.0" in cl and "0.9.9" in cl and "0.9.8" in cl and "0.9.7" in cl and "0.9.6" in cl and "0.9.5" in cl and "0.9.4" in cl and "0.9.3" in cl and "0.9.2" in cl and "0.9.1" in cl and "0.9.0" in cl and "0.8.9" in cl and "0.8.8" in cl and "0.8.7" in cl and "0.8.6" in cl and "0.8.5" in cl and "0.8.4" in cl and "0.8.3" in cl and "0.8.2" in cl and "0.8.1" in cl and "0.8.0" in cl
+    assert "## 1.1.0" in cl and "## 1.0.9" in cl and "## 1.0.8" in cl and "## 1.0.7" in cl and "## 1.0.6" in cl and "## 1.0.5" in cl and "## 1.0.4" in cl and "## 1.0.3" in cl and "## 1.0.2" in cl and "## 1.0.1" in cl and "## 1.0.0" in cl and "## 0.9.9" in cl and "## 0.9.8" in cl and "## 0.9.7" in cl and "## 0.9.6" in cl and "## 0.9.5" in cl and "## 0.9.4" in cl and "## 0.9.3" in cl and "## 0.9.2" in cl and "## 0.9.1" in cl and "## 0.9.0" in cl and "## 0.8.9" in cl and "## 0.8.8" in cl and "## 0.8.7" in cl and "## 0.8.6" in cl and "## 0.8.5" in cl and "## 0.8.4" in cl and "## 0.8.3" in cl and "## 0.8.2" in cl and "## 0.8.1" in cl and "## 0.8.0" in cl
     assert "## 0.7.9" in cl
     assert "## 0.7.8" in cl
     assert "## 0.7.6" in cl
@@ -242,7 +242,7 @@ def main() -> int:
     assert "0.4.9" in cl  # noch in Kurz-Tabelle
     assert "0.3.9" in cl  # noch in Kurz-Tabelle
     assert "0.2.9" in cl  # noch in Kurz-Tabelle
-    assert "1.0.9" in (ROOT / "README.md").read_text(encoding="utf-8")
+    assert "1.1.0" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "run.bat" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "sync-ild.ps1" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "scripts/sync-ild.ps1" in (ROOT / "FEATURES.md").read_text(encoding="utf-8")
@@ -591,13 +591,13 @@ def main() -> int:
 
         assert (ROOT / "installer" / "installer-hinweis.txt").exists()
         iss = (ROOT / "installer" / "instantlensdoc.iss").read_text(encoding="utf-8")
-        assert "1.0.9" in iss and "desktopicon" in iss and "DisableProgramGroupPage=no" in iss
+        assert "1.1.0" in iss and "desktopicon" in iss and "DisableProgramGroupPage=no" in iss
         assert "UninstallDisplayName" in iss and "Uninstallable=yes" in iss
         assert "IncludeKeygen" in iss and "SetupIconFile" in iss
         assert "InstantLensKeygen.exe" in iss
         assert "uninstallexe" in iss
         bw = (ROOT / "build-windows.ps1").read_text(encoding="utf-8")
-        assert "1.0.9" in bw and "NoKeygenInApp" in bw and "--icon" in bw
+        assert "1.1.0" in bw and "NoKeygenInApp" in bw and "--icon" in bw
         assert "InstantLensKeygen.exe" in bw
         bi = (ROOT / "installer" / "build-installer.ps1").read_text(encoding="utf-8")
         assert "InstantLensKeygen.exe" in bi and "IncludeKeygen" in bi
@@ -606,7 +606,7 @@ def main() -> int:
         assert "Installer" in kg_readme
         hinweis = (ROOT / "installer" / "installer-hinweis.txt").read_text(encoding="utf-8")
         assert "InstantLensKeygen.exe" in hinweis or "run-keygen.bat" in hinweis
-        assert "1.0.9" in hinweis
+        assert "1.1.0" in hinweis
         assert "checkedonce" in iss and "Desktop-Verknüpfung" in hinweis
         from ild_pdf.limits import OPEN_TIMEOUT_HINT, OPEN_TIMEOUT_HINT_SEC
 
@@ -618,7 +618,7 @@ def main() -> int:
         assert "QProgressDialog" in (ROOT / "instantlensdoc" / "ui" / "main_window.py").read_text(encoding="utf-8")
 
         assert (ROOT / "examples" / "ild_pdf_demo.py").exists()
-        assert "1.0.9" in (ROOT / "INFO.md").read_text(encoding="utf-8")
+        assert "1.1.0" in (ROOT / "INFO.md").read_text(encoding="utf-8")
         assert (ROOT / "assets" / "app.ico").is_file()
 
         # --- Kernpfade: open / annotate / export / license ---
@@ -809,7 +809,7 @@ def main() -> int:
         set_backup_on_save(False)
         assert get_page_size_unit() in ("mm", "inch")
         assert isinstance(get_minimize_to_tray(), bool)
-        assert "1.0.9" in feat and "1.0.8" in feat and "1.0.7" in feat and "1.0.6" in feat and "1.0.5" in feat and "1.0.4" in feat and "1.0.3" in feat and "1.0.2" in feat and "1.0.1" in feat and "1.0.0" in feat and "0.9.9" in feat and "0.9.8" in feat and "0.9.7" in feat and "0.9.6" in feat and "0.9.5" in feat and "0.9.4" in feat and "0.9.3" in feat and "0.9.2" in feat and "0.9.1" in feat and "0.9.0" in feat and "0.8.9" in feat and "0.8.8" in feat and "0.8.7" in feat and "0.8.6" in feat and "0.8.5" in feat and "0.8.4" in feat and "0.8.3" in feat and "0.8.2" in feat and "0.8.1" in feat and "0.8.0" in feat and "0.7.9" in feat and "0.7.8" in feat and "0.7.7" in feat and "0.7.6" in feat and "0.7.5" in feat and "0.7.4" in feat and "0.7.3" in feat and "0.7.2" in feat and "0.7.1" in feat and "0.6.9" in feat and "0.5.9" in feat and "0.4.9" in feat  # Release + Zeitraum-Feature-Hinweise
+        assert "1.1.0" in feat and "1.0.9" in feat and "1.0.8" in feat and "1.0.7" in feat and "1.0.6" in feat and "1.0.5" in feat and "1.0.4" in feat and "1.0.3" in feat and "1.0.2" in feat and "1.0.1" in feat and "1.0.0" in feat and "0.9.9" in feat and "0.9.8" in feat and "0.9.7" in feat and "0.9.6" in feat and "0.9.5" in feat and "0.9.4" in feat and "0.9.3" in feat and "0.9.2" in feat and "0.9.1" in feat and "0.9.0" in feat and "0.8.9" in feat and "0.8.8" in feat and "0.8.7" in feat and "0.8.6" in feat and "0.8.5" in feat and "0.8.4" in feat and "0.8.3" in feat and "0.8.2" in feat and "0.8.1" in feat and "0.8.0" in feat and "0.7.9" in feat and "0.7.8" in feat and "0.7.7" in feat and "0.7.6" in feat and "0.7.5" in feat and "0.7.4" in feat and "0.7.3" in feat and "0.7.2" in feat and "0.7.1" in feat and "0.6.9" in feat and "0.5.9" in feat and "0.4.9" in feat  # Release + Zeitraum-Feature-Hinweise
         assert "Batch-OCR" in feat or "OCR gesamtes PDF" in feat
         assert "Tag" in feat
         assert "Projekt-Ordner" in feat or "Workspace" in feat
@@ -4241,7 +4241,7 @@ def main() -> int:
         kb105 = (ROOT / "instantlensdoc" / "ui" / "keyboard_help.py").read_text(
             encoding="utf-8"
         )
-        assert ("1.0.5" in kb105 or "1.0.6" in kb105 or "1.0.7" in kb105 or "1.0.8" in kb105 or "1.0.9" in kb105) and (
+        assert ("1.0.5" in kb105 or "1.0.6" in kb105 or "1.0.7" in kb105 or "1.0.8" in kb105 or "1.0.9" in kb105 or "1.1.0" in kb105) and (
             "Trefferanzahl" in kb105
             or "Druck abgebrochen" in kb105
             or "Dismiss" in kb105
@@ -4337,7 +4337,7 @@ def main() -> int:
         kb106 = (ROOT / "instantlensdoc" / "ui" / "keyboard_help.py").read_text(
             encoding="utf-8"
         )
-        assert ("1.0.6" in kb106 or "1.0.7" in kb106 or "1.0.8" in kb106 or "1.0.9" in kb106) and (
+        assert ("1.0.6" in kb106 or "1.0.7" in kb106 or "1.0.8" in kb106 or "1.0.9" in kb106 or "1.1.0" in kb106) and (
             "Esc" in kb106
             or "Vorschau" in kb106
             or "Doppelklick" in kb106
@@ -4444,7 +4444,7 @@ def main() -> int:
         kb107 = (ROOT / "instantlensdoc" / "ui" / "keyboard_help.py").read_text(
             encoding="utf-8"
         )
-        assert ("1.0.7" in kb107 or "1.0.8" in kb107 or "1.0.9" in kb107) and (
+        assert ("1.0.7" in kb107 or "1.0.8" in kb107 or "1.0.9" in kb107 or "1.1.0" in kb107) and (
             "Zoom" in kb107
             or "Weiterarbeiten" in kb107
             or "dismiss_date" in kb107
@@ -4533,7 +4533,7 @@ def main() -> int:
         kb108 = (ROOT / "instantlensdoc" / "ui" / "keyboard_help.py").read_text(
             encoding="utf-8"
         )
-        assert ("1.0.8" in kb108 or "1.0.9" in kb108) and (
+        assert ("1.0.8" in kb108 or "1.0.9" in kb108 or "1.1.0" in kb108) and (
             "Fit-Page" in kb108
             or "AccessibleName" in kb108
             or "BOM" in kb108
@@ -4620,6 +4620,73 @@ def main() -> int:
         )
         print(
             "1.0.9 CLI preview-keys/banner-focus-enter/backup-sort-empty/welcome-disabled: OK"
+        )
+
+        # 1.1.0 CLI: OCR Text-Tab, PDF-Merge Drag, Ann clear_page, Keygen Copy
+        mw110 = (ROOT / "instantlensdoc" / "ui" / "main_window.py").read_text(
+            encoding="utf-8"
+        )
+        assert "_run_ocr_document" in mw110
+        assert "-ocr.txt" in mw110
+        assert "open_path(str(out_txt))" in mw110
+        assert "_clear_annotations_on_page" in mw110
+        assert "Alle Annotationen auf Seite löschen" in mw110
+        ptd110 = (ROOT / "instantlensdoc" / "ui" / "pdf_tools_dialog.py").read_text(
+            encoding="utf-8"
+        )
+        assert "InternalMove" in ptd110
+        assert "setDragDropMode" in ptd110
+        assert "getOpenFileNames" in ptd110
+        assert "merge_pdfs" in ptd110
+        pv110 = (ROOT / "instantlensdoc" / "ui" / "pdf_view.py").read_text(
+            encoding="utf-8"
+        )
+        assert "clear_annotations_on_page" in pv110
+        assert "clear_page" in pv110
+        ann110src = (ROOT / "ild_pdf" / "annotate.py").read_text(encoding="utf-8")
+        assert "def clear_page" in ann110src
+        store110 = AnnotationStore(pdf)
+        store110.annotations = []
+        store110.clear_history()
+        store110.add(Annotation(0, AnnotationType.HIGHLIGHT, 10, 10, text="p0a"))
+        store110.add(Annotation(0, AnnotationType.STICKY, 20, 20, text="p0b"))
+        store110.add(Annotation(1, AnnotationType.HIGHLIGHT, 10, 10, text="p1"))
+        n_before = len(store110.annotations)
+        removed110 = store110.clear_page(0)
+        assert removed110 == 2
+        assert len(store110.annotations) == n_before - 2
+        assert all(a.page != 0 for a in store110.annotations)
+        assert store110.can_undo()
+        assert store110.undo()
+        assert len(store110.annotations) == n_before
+        kg110 = (ROOT / "keygen" / "__main__.py").read_text(encoding="utf-8")
+        assert "Kopieren" in kg110
+        assert "_copy" in kg110
+        assert "Klartext" in kg110 or "ohne QR" in kg110
+        assert "clipboard" in kg110.casefold() or "setText" in kg110
+        assert "qrcode" not in kg110.casefold()
+        feat110 = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
+        assert "1.1.0" in feat110 and (
+            "Textdatei-Tab" in feat110
+            or "Drag-Reihenfolge" in feat110
+            or "Seite löschen" in feat110
+            or "Kopieren" in feat110
+            or "Klartext" in feat110
+        )
+        cl110 = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+        assert "## 1.1.0" in cl110 and "## 1.0.9" in cl110
+        kb110 = (ROOT / "instantlensdoc" / "ui" / "keyboard_help.py").read_text(
+            encoding="utf-8"
+        )
+        assert "1.1.0" in kb110 and (
+            "Textdatei-Tab" in kb110
+            or "Drag" in kb110
+            or "Seite löschen" in kb110
+            or "Kopieren" in kb110
+            or "Klartext" in kb110
+        )
+        print(
+            "1.1.0 CLI ocr-text-tab/merge-drag/ann-clear-page/keygen-copy: OK"
         )
 
         set_show_printer_marks(True)
@@ -4754,7 +4821,7 @@ def main() -> int:
         assert "Continuous Scroll" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
         assert "Seitenlabel" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8") or "Seitenlabels" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
         assert "Zwischenablage-Verlauf" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8") or "Clipboard" in (ROOT / "FEATURES.md").read_text(encoding="utf-8")
-        assert "1.0.9" in feat and "1.0.8" in feat and "1.0.7" in feat and "1.0.6" in feat and "1.0.5" in feat and "1.0.4" in feat and "1.0.3" in feat and "1.0.2" in feat and "1.0.1" in feat and "1.0.0" in feat and "0.9.9" in feat and "0.9.8" in feat and "0.9.7" in feat and "0.9.6" in feat and "0.9.5" in feat and "0.9.4" in feat and "0.9.3" in feat and "0.9.2" in feat and "0.9.1" in feat and "0.9.0" in feat and "0.8.9" in feat and "0.8.8" in feat and "0.8.7" in feat and "0.8.6" in feat and "0.8.5" in feat and "0.8.4" in feat and "0.8.3" in feat and "0.8.2" in feat and "0.8.1" in feat and "0.8.0" in feat and "0.7.9" in feat and "0.7.8" in feat and "0.7.7" in feat and "0.7.6" in feat and "0.7.5" in feat and "0.7.4" in feat and "0.7.3" in feat and "0.7.2" in feat and "0.7.1" in feat and "0.6.9" in feat and "0.5.9" in feat and "0.4.9" in feat
+        assert "1.1.0" in feat and "1.0.9" in feat and "1.0.8" in feat and "1.0.7" in feat and "1.0.6" in feat and "1.0.5" in feat and "1.0.4" in feat and "1.0.3" in feat and "1.0.2" in feat and "1.0.1" in feat and "1.0.0" in feat and "0.9.9" in feat and "0.9.8" in feat and "0.9.7" in feat and "0.9.6" in feat and "0.9.5" in feat and "0.9.4" in feat and "0.9.3" in feat and "0.9.2" in feat and "0.9.1" in feat and "0.9.0" in feat and "0.8.9" in feat and "0.8.8" in feat and "0.8.7" in feat and "0.8.6" in feat and "0.8.5" in feat and "0.8.4" in feat and "0.8.3" in feat and "0.8.2" in feat and "0.8.1" in feat and "0.8.0" in feat and "0.7.9" in feat and "0.7.8" in feat and "0.7.7" in feat and "0.7.6" in feat and "0.7.5" in feat and "0.7.4" in feat and "0.7.3" in feat and "0.7.2" in feat and "0.7.1" in feat and "0.6.9" in feat and "0.5.9" in feat and "0.4.9" in feat
         # --- 0.4.2 CLI: Outline Goto, Ann Copy/Paste, Flatten Progress ---
         import pikepdf as _pike_ol
 
@@ -4879,7 +4946,7 @@ def main() -> int:
         win._add_chained_frame()
         assert len(win.layout_doc.text_frames) >= 2
         assert "Lizenz:" in win.license_label.text() or "⚠" in win.license_label.text()
-        assert "v1.0.9" in win.version_label.text()
+        assert "v1.1.0" in win.version_label.text()
         # Lizenz <7 Tage: Style prominent
         st_lic = win.license_manager.status()
         if st_lic.allowed and st_lic.days_remaining < 7:
@@ -5060,11 +5127,11 @@ def main() -> int:
             assert win.editor.outdent_selection(4)
             assert win.editor.toPlainText().splitlines()[0] == "alpha"
             # Fenstertitel mit Version
-            assert "1.0.9" in win.windowTitle()
+            assert "1.1.0" in win.windowTitle()
             from instantlensdoc.ui.help_dialog import AboutDialog, HelpDialog, open_log_folder
 
             about = AboutDialog(win)
-            assert "1.0.9" in about.windowTitle()
+            assert "1.1.0" in about.windowTitle()
             help_dlg = HelpDialog(win)
             assert help_dlg.windowTitle() == "Hilfe"
             assert callable(open_log_folder)
@@ -5741,7 +5808,7 @@ def main() -> int:
             win.apply_tray_setting()
             if win._tray is not None:
                 tip = win._tray.toolTip()
-                assert "1.0.9" in tip and "InstantLens Doc" in tip
+                assert "1.1.0" in tip and "InstantLens Doc" in tip
             set_minimize_to_tray(False)
             win.apply_tray_setting()
             print("0.3.9 fit-h/ann-stats/special/tray: OK")
@@ -5754,9 +5821,9 @@ def main() -> int:
             from instantlensdoc.ui.password_dialog import CompressPdfDialog, SetPasswordDialog
             from instantlensdoc.ui.stubs import PLANNED
             assert KeyboardHelpDialog and SetPasswordDialog and CompressPdfDialog
-            assert "1.0.9" in PLANNED["ki"]
+            assert "1.1.0" in PLANNED["ki"]
             assert "Coming soon" in PLANNED["cloud"]
-            assert "1.0.9" in PLANNED["stylus"] and "1.0.9" in PLANNED["extrude3d"]
+            assert "1.1.0" in PLANNED["stylus"] and "1.1.0" in PLANNED["extrude3d"]
             # Toolbar ↔ Menü Sync Graustufen/Nacht
             win.pdf_view.set_grayscale(True)
             assert win._grayscale_action.isChecked()
@@ -5791,7 +5858,7 @@ def main() -> int:
             assert win.editor.toPlainText().splitlines() == ["one", "two"]
             from instantlensdoc.ui.help_dialog import HELP_HTML
 
-            assert "Stub 1.0.9" in HELP_HTML
+            assert "Stub 1.1.0" in HELP_HTML
             assert "scripts/sync-ild.ps1" in HELP_HTML
             assert "Präsentationsmodus" in HELP_HTML or "F5" in (
                 ROOT / "instantlensdoc" / "ui" / "keyboard_help.py"
@@ -9491,7 +9558,7 @@ def main() -> int:
             assert win.welcome_page.btn_open is not None
             assert win.welcome_page.btn_empty is not None
             about100 = About100(win)
-            assert "1.0.9" in about100.windowTitle()
+            assert "1.1.0" in about100.windowTitle()
             # Lizenzstatus / Changelog / Kontakt im Dialog-Inhalt
             from PySide6.QtWidgets import QLabel as _QL100
 
@@ -9534,7 +9601,7 @@ def main() -> int:
             assert callable(getattr(win.welcome_page, "_recent_context_menu", None))
             win.welcome_page.refresh_recent()
             about101 = About101(win)
-            assert "1.0.9" in about101.windowTitle()
+            assert "1.1.0" in about101.windowTitle()
             assert getattr(about101, "_btn_activate", None) is not None or hasattr(
                 about101, "_activate_license"
             )
@@ -9591,7 +9658,7 @@ def main() -> int:
             assert prd102q.dpi() == 300
             prd102q.close()
             about102 = About102(win)
-            assert "1.0.9" in about102.windowTitle()
+            assert "1.1.0" in about102.windowTitle()
             # Resttage-Phrase konsistent Status ↔ About
             st102 = win.license_manager.status()
             phrase102 = rp102(st102.days_remaining)
@@ -9643,7 +9710,7 @@ def main() -> int:
             spg103(False)
             sd103.close()
             about103 = About103(win)
-            assert "1.0.9" in about103.windowTitle()
+            assert "1.1.0" in about103.windowTitle()
             st103 = win.license_manager.status()
             if st103.expires_at is not None:
                 ablauf103 = fa103(st103.expires_at)
@@ -9704,7 +9771,7 @@ def main() -> int:
             assert sd104q.backup_log_list.count() >= 1
             sd104q.close()
             about104 = About104(win)
-            assert "1.0.9" in about104.windowTitle()
+            assert "1.1.0" in about104.windowTitle()
             about104.close()
             feat104q = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
             assert "1.0.4" in feat104q
@@ -9749,7 +9816,7 @@ def main() -> int:
             assert hasattr(sd105q, "_clear_backup_log")
             sd105q.close()
             about105 = About105(win)
-            assert "1.0.9" in about105.windowTitle()
+            assert "1.1.0" in about105.windowTitle()
             about105.close()
             feat105q = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
             assert "1.0.5" in feat105q
@@ -9807,7 +9874,7 @@ def main() -> int:
             assert hasattr(sd106q, "print_preview")
             sd106q.close()
             about106 = About106(win)
-            assert "1.0.9" in about106.windowTitle()
+            assert "1.1.0" in about106.windowTitle()
             about106.close()
             feat106q = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
             assert "1.0.6" in feat106q
@@ -9875,7 +9942,7 @@ def main() -> int:
             assert hasattr(sd107q, "_on_backup_log_filter")
             sd107q.close()
             about107 = About107(win)
-            assert "1.0.9" in about107.windowTitle()
+            assert "1.1.0" in about107.windowTitle()
             about107.close()
             feat107q = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
             assert "1.0.7" in feat107q
@@ -9929,7 +9996,7 @@ def main() -> int:
             assert callable(bak108q.default_backup_log_export_name)
             sd108q.close()
             about108 = About108(win)
-            assert "1.0.9" in about108.windowTitle()
+            assert "1.1.0" in about108.windowTitle()
             about108.close()
             feat108q = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
             assert "1.0.8" in feat108q
@@ -10026,7 +10093,7 @@ def main() -> int:
             assert "leer" in tip_empty109.casefold()
             win.welcome_page.refresh_continue_button()
             about109 = About109(win)
-            assert "1.0.9" in about109.windowTitle()
+            assert "1.1.0" in about109.windowTitle()
             about109.close()
             feat109q = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
             assert "1.0.9" in feat109q
@@ -10036,10 +10103,48 @@ def main() -> int:
                 "1.0.9 Qt preview-keys/banner-focus-enter/backup-sort-empty/welcome-disabled: OK"
             )
 
+            # --- 1.1.0 Qt: OCR Text-Tab helpers, Merge Drag, Ann clear_page, Keygen Copy ---
+            from instantlensdoc.ui.help_dialog import AboutDialog as About110
+            from instantlensdoc.ui.pdf_tools_dialog import PdfToolsDialog as PTD110
+            from PySide6.QtWidgets import QAbstractItemView as QAI110
+            from PySide6.QtCore import Qt as Qt110
+
+            ptd110q = PTD110(win)
+            assert ptd110q.merge_list.dragDropMode() == QAI110.InternalMove
+            assert ptd110q.merge_list.defaultDropAction() == Qt110.MoveAction
+            ptd110q.merge_list.addItem("/tmp/a.pdf")
+            ptd110q.merge_list.addItem("/tmp/b.pdf")
+            assert ptd110q.merge_list.count() == 2
+            ptd110q.close()
+            # clear_page via store (confirm UI covered by source asserts)
+            assert callable(win.pdf_view.clear_annotations_on_page)
+            assert callable(win._clear_annotations_on_page)
+            assert win.pdf_view.store is not None
+            assert callable(win.pdf_view.store.clear_page)
+            # Keygen GUI symbols (ohne exec)
+            kg110path = ROOT / "keygen" / "__main__.py"
+            kg110txt = kg110path.read_text(encoding="utf-8")
+            assert "Kopieren" in kg110txt and "def _copy" in kg110txt
+            assert "Klartext" in kg110txt or "ohne QR" in kg110txt
+            # OCR document path writes *-ocr.txt then open_path
+            assert "open_path(str(out_txt))" in (
+                ROOT / "instantlensdoc" / "ui" / "main_window.py"
+            ).read_text(encoding="utf-8")
+            about110 = About110(win)
+            assert "1.1.0" in about110.windowTitle()
+            about110.close()
+            feat110q = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
+            assert "1.1.0" in feat110q
+            cl110q = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+            assert "## 1.1.0" in cl110q
+            print(
+                "1.1.0 Qt ocr-text-tab/merge-drag/ann-clear-page/keygen-copy: OK"
+            )
+
             print("0.4.x selected Qt marks/schema/sort/reset: OK")
             print("0.4.2 Qt outline/copy-paste/case/progress: OK")
             print("0.4.1 Qt links/stamp/encoding/drop: OK")
-            print("0.3.x–1.0.9 review OK")
+            print("0.3.x–1.1.0 review OK")
             assert callable(win.pdf_view.bake_redactions)
             assert callable(win.pdf_view.clear_redactions)
             assert callable(win._set_pdf_password)

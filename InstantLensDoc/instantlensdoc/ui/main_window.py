@@ -1516,6 +1516,13 @@ class MainWindow(QMainWindow):
         )
         act_sel_all_ann.triggered.connect(self._select_all_annotations_on_page)
         m_edit.addAction(act_sel_all_ann)
+        act_clear_page_ann = QAction("Alle Annotationen auf Seite löschen…", self)
+        act_clear_page_ann.setToolTip(
+            "Alle Annotationen der aktuellen Seite nach Bestätigung löschen "
+            "(ein Undo-Schritt, Ctrl+Z) — 1.1.0"
+        )
+        act_clear_page_ann.triggered.connect(self._clear_annotations_on_page)
+        m_edit.addAction(act_clear_page_ann)
 
         m_view = mb.addMenu("&Ansicht")
         a = QAction("Seitenleiste", self)
@@ -1965,7 +1972,9 @@ class MainWindow(QMainWindow):
         a.triggered.connect(self._run_ocr)
         m_extra.addAction(a)
         a = QAction("OCR gesamtes PDF…", self)
-        a.setToolTip("Batch-OCR aller Seiten mit Fortschrittsanzeige")
+        a.setToolTip(
+            "Batch-OCR aller Seiten mit Fortschritt/Abbrechen → neue Textdatei-Tab — 1.1.0"
+        )
         a.triggered.connect(self._run_ocr_document)
         m_extra.addAction(a)
         a = QAction("Formulargenerator…", self)
@@ -2850,6 +2859,16 @@ class MainWindow(QMainWindow):
             self._set_status("Text ausgewählt")
         else:
             self._set_status("Auswahl: PDF mit Annotationen öffnen oder Texteditor nutzen")
+
+    def _clear_annotations_on_page(self):
+        """Alle Annotationen der aktuellen PDF-Seite löschen (Bestätigung + Undo)."""
+        if self.stack.currentWidget() is self.pdf_view and self.pdf_view.pdf_path:
+            n = self.pdf_view.clear_annotations_on_page()
+            if n == 0:
+                return
+            self._set_status(f"{n} Annotation(en) auf Seite gelöscht (Ctrl+Z rückgängig)")
+            return
+        self._set_status("Alle auf Seite löschen nur im PDF-Modus")
 
     def _on_pdf_zoom_changed(self, scale: float):
         if self.stack.currentWidget() is not self.pdf_view:
@@ -7649,13 +7668,25 @@ class MainWindow(QMainWindow):
             if not result.text.strip():
                 return
 
-        title = f"OCR — {pdf_path.name} ({result.pages_done}/{result.pages_total})"
-        self.stack.setCurrentWidget(self.editor_pane)
-        self.editor.setPlainText(result.text)
-        self.doc = Document(kind=DocKind.TEXT, title=title, text=result.text)
-        self.setWindowTitle(self._app_title(title))
+        # Ergebnis als neue Textdatei-Tab (PDF-Tab bleibt) — 1.1.0
+        out_txt = pdf_path.with_name(f"{pdf_path.stem}-ocr.txt")
+        n = 1
+        while out_txt.exists() and n < 1000:
+            out_txt = pdf_path.with_name(f"{pdf_path.stem}-ocr-{n}.txt")
+            n += 1
+        try:
+            out_txt.write_text(result.text, encoding="utf-8")
+        except Exception as e:
+            QMessageBox.warning(
+                self,
+                "OCR gesamtes PDF",
+                f"OCR-Text konnte nicht gespeichert werden:\n{e}",
+            )
+            return
+        self.open_path(str(out_txt))
         status = (
             f"Batch-OCR ({result.lang}): {result.pages_done}/{result.pages_total} Seiten"
+            f" → Tab {out_txt.name}"
         )
         if result.cancelled:
             status += " (abgebrochen)"

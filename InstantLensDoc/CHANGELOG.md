@@ -1,5 +1,27 @@
 # Changelog — InstantLens Doc
 
+## 1.1.0 — OCR-Batch Text-Tab, PDF-Merge Drag, Ann. Seite löschen, Keygen Copy
+
+Minor-Release nach 1.0.9: OCR gesamtes PDF schreibt Ergebnis in eine neue Textdatei-Tab (`*-ocr.txt`) bei Fortschrittsdialog mit Abbruch; PDF-Zusammenführen mit Mehrfachauswahl und Drag-Reihenfolge; „Alle Annotationen auf Seite löschen“ mit Bestätigung und einem Undo-Schritt; Keygen-GUI Klartext ohne QR plus Kopieren-Button. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### OCR / Batch
+- **OCR gesamtes PDF**: Fortschritt + Abbrechen; Ergebnis als **neue Textdatei-Tab** (PDF-Tab bleibt)
+
+### PDF
+- **Zusammenführen**: Mehrfachauswahl beim Hinzufügen; **Drag-InternalMove** für Reihenfolge (▲/▼ bleiben); Ziel speichern
+
+### Annotationen
+- **Alle auf Seite löschen…**: Bestätigung; ein Undo-Schritt via `AnnotationStore.clear_page` / `atomic`
+
+### Keygen
+- GUI: Ausgabe **Klartext (ohne QR)**; Button **Kopieren** → Zwischenablage
+
+### Packaging / Docs
+- Version **1.1.0** (App / `ild_pdf` / ISS / Smoke / Docs)
+- Smoke: OCR-Tab, Merge-Drag, clear_page Confirm·Undo, Keygen Copy (CLI + Qt)
+
+---
+
 ## 1.0.9 — Druckvorschau Tastatur, Banner Fokus·Enter, Backup-Sort, Weiter disabled
 
 Post-Release-Polish nach 1.0.8: Druckvorschau mit Tastatur PageUp/PageDown·Home/End für Seiten und +/- für Zoom; Lizenz-Banner mit sichtbarem Fokus-Ring und Enter öffnet Aktivierung; Backup-Log Sortier-Toggle „Neueste zuerst“ plus Hinweistext bei leerer Liste; Willkommen „Weiterarbeiten“ deaktiviert mit Tooltip wenn Session-Datei fehlt oder leer. Stubs KI/Cloud/Stylus/3D bleiben Stubs.

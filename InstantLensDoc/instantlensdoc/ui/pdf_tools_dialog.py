@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
+    QAbstractItemView,
     QCheckBox,
     QDialog,
     QDialogButtonBox,
@@ -53,14 +55,28 @@ class PdfToolsDialog(QDialog):
     def _build_merge_tab(self) -> QWidget:
         w = QWidget()
         lay = QVBoxLayout(w)
-        lay.addWidget(QLabel("PDFs in Liste-Reihenfolge zu einer Datei:"))
+        lay.addWidget(
+            QLabel(
+                "PDFs in Liste-Reihenfolge zu einer Datei "
+                "(Mehrfachauswahl; Reihenfolge per Drag oder ▲/▼):"
+            )
+        )
         self.merge_list = QListWidget()
+        self.merge_list.setDragDropMode(QAbstractItemView.InternalMove)
+        self.merge_list.setDefaultDropAction(Qt.MoveAction)
+        self.merge_list.setSelectionMode(QAbstractItemView.ExtendedSelection)
+        self.merge_list.setToolTip(
+            "Dateien ziehen zum Neuordnen; Mehrfachauswahl beim Hinzufügen — 1.1.0"
+        )
         lay.addWidget(self.merge_list)
         row = QHBoxLayout()
         btn_add = QPushButton("PDFs hinzufügen…")
+        btn_add.setToolTip("Mehrere PDFs auswählen (Mehrfachauswahl)")
         btn_add.clicked.connect(self._merge_add)
         btn_up = QPushButton("▲")
         btn_down = QPushButton("▼")
+        btn_up.setToolTip("Ausgewählten Eintrag nach oben")
+        btn_down.setToolTip("Ausgewählten Eintrag nach unten")
         btn_up.clicked.connect(self._merge_up)
         btn_down.clicked.connect(self._merge_down)
         btn_rem = QPushButton("Entfernen")

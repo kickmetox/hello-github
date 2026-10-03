@@ -64,7 +64,7 @@ def run_gui() -> int:
         def __init__(self):
             super().__init__()
             self.setWindowTitle("InstantLens Doc — Keygenerator")
-            self.resize(520, 280)
+            self.resize(520, 300)
             w = QWidget()
             layout = QVBoxLayout(w)
             layout.addWidget(QLabel("E-Mail:"))
@@ -78,9 +78,15 @@ def run_gui() -> int:
             btn2 = QPushButton("Prüfen")
             btn2.clicked.connect(self._verify)
             row.addWidget(btn2)
+            btn_copy = QPushButton("Kopieren")
+            btn_copy.setToolTip("Key als Klartext in die Zwischenablage kopieren — 1.1.0")
+            btn_copy.clicked.connect(self._copy)
+            row.addWidget(btn_copy)
             layout.addLayout(row)
+            layout.addWidget(QLabel("Ausgabe (Klartext, ohne QR):"))
             self.out = QTextEdit()
             self.out.setReadOnly(True)
+            self.out.setPlaceholderText("Key erscheint hier als Klartext…")
             layout.addWidget(self.out)
             layout.addWidget(QLabel(f"Keys gelten {KEY_DAYS} Tage. Kontakt: ame@sellerbach.de"))
             self.setCentralWidget(w)
@@ -92,6 +98,14 @@ def run_gui() -> int:
                 return
             key = generate_key(email)
             self.out.setPlainText(key)
+
+        def _copy(self):
+            text = self.out.toPlainText().strip()
+            if not text:
+                QMessageBox.information(self, "Kopieren", "Kein Key zum Kopieren.")
+                return
+            QApplication.clipboard().setText(text)
+            self.statusBar().showMessage("Key in Zwischenablage kopiert", 2500)
 
         def _verify(self):
             key = self.out.toPlainText().strip() or self.email.text().strip()

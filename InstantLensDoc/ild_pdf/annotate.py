@@ -1293,6 +1293,18 @@ class AnnotationStore:
     def for_page(self, page: int) -> List[Annotation]:
         return [a for a in self.annotations if a.page == page]
 
+    def clear_page(self, page: int) -> int:
+        """Alle Annotationen einer Seite löschen — ein Undo-Schritt. Rückgabe: Anzahl."""
+        page = int(page)
+        targets = self.for_page(page)
+        if not targets:
+            return 0
+        n = len(targets)
+        with self.atomic(label=f"Alle Ann. Seite {page + 1} löschen"):
+            self.annotations = [a for a in self.annotations if a.page != page]
+            self.dirty = True
+        return n
+
     def text_overlays(self, page: int | None = None) -> List[Annotation]:
         items = [
             a

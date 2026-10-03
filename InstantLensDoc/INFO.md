@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **1.0.9** |
+| Version | **1.1.0** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -59,10 +59,10 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an / `checkedonce`)
 
-## Neu in 1.0.9
+## Neu in 1.1.0
 
-- Drucken: Vorschau **PageUp/Down·Home/End** + **+/- Zoom** (Tastatur)
-- Lizenz: Banner **Fokus-Ring**; **Enter** öffnet Aktivierung
-- Backup: Log **Sortierung neueste zuerst** (Toggle) + **leere-Liste-Hinweis**
-- Willkommen: **Weiterarbeiten** deaktiviert + Tooltip wenn Session fehlt/leer
+- OCR-Batch: Fortschrittsdialog + Abbruch; Ergebnis als **neue Textdatei-Tab** (`*-ocr.txt`)
+- PDF Mergen: **Mehrfachauswahl** + **Drag-Reihenfolge**; Ausgabe speichern
+- Annotation: **Alle auf Seite löschen** mit Bestätigung + ein Undo-Schritt
+- Keygen: Ausgabe **Klartext ohne QR** + **Kopieren**-Button
 - Stubs KI/Cloud/Stylus/3D unverändert

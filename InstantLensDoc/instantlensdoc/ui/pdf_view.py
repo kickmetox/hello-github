@@ -6075,6 +6075,44 @@ class PdfViewer(QWidget):
             return 0
         return sum(1 for a in self.store.annotations if a.type == AnnotationType.REDACTION)
 
+    def clear_annotations_on_page(self, page_index: int | None = None) -> int:
+        """Alle Annotationen einer Seite löschen — Bestätigung + ein Undo-Schritt (1.1.0)."""
+        if not self.store:
+            self.status.emit("Keine Annotationen")
+            return 0
+        page = self.page_index if page_index is None else int(page_index)
+        anns = self.store.for_page(page)
+        if not anns:
+            QMessageBox.information(
+                self,
+                "Alle Annotationen auf Seite löschen",
+                f"Keine Annotationen auf Seite {page + 1}.",
+            )
+            return 0
+        reply = QMessageBox.question(
+            self,
+            "Alle Annotationen auf Seite löschen",
+            f"{len(anns)} Annotation(en) auf Seite {page + 1} löschen?\n"
+            "Rückgängig mit Ctrl+Z (ein Undo-Schritt).",
+        )
+        if reply != QMessageBox.Yes:
+            return 0
+        n = self.store.clear_page(page)
+        if n <= 0:
+            return 0
+        self._selected_ann_id = None
+        self._selected_ann_ids = set()
+        self.canvas.set_selected_id(None)
+        try:
+            self.schedule_sidecar_save(force=True)
+        except Exception as e:
+            QMessageBox.warning(self, "Alle Annotationen auf Seite löschen", str(e))
+            return 0
+        self.refresh()
+        self.annotations_changed.emit()
+        self.status.emit(f"{n} Annotation(en) auf Seite {page + 1} gelöscht")
+        return n
+
     def clear_redactions(self):
         """Entfernt nur REDACTION-Annotationen aus dem Sidecar (PDF unverändert)."""
         if not self.store:
