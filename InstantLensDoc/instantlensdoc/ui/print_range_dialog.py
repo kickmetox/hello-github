@@ -1,4 +1,4 @@
-"""PDF-Dokumentdruck: Seitenbereich (von–bis) + DPI + Graustufen vor QPrintDialog — 1.0.3."""
+"""PDF-Dokumentdruck: Seitenbereich + DPI + Graustufen + Vorschau-Toggle — 1.0.6."""
 
 from __future__ import annotations
 
@@ -18,11 +18,12 @@ from instantlensdoc.core.app_settings import (
     EXPORT_RASTER_DPI_CHOICES,
     get_export_raster_dpi,
     get_print_grayscale,
+    get_print_preview,
 )
 
 
 class PrintRangeDialog(QDialog):
-    """Modaler Dialog: Seitenbereich von–bis (1-basiert) + Raster-DPI + Graustufen."""
+    """Modaler Dialog: Seitenbereich von–bis + DPI + Graustufen + Vorschau-Toggle."""
 
     def __init__(
         self,
@@ -31,11 +32,12 @@ class PrintRangeDialog(QDialog):
         *,
         default_dpi: int | None = None,
         default_grayscale: bool | None = None,
+        default_preview: bool | None = None,
     ):
         super().__init__(parent)
         self.setWindowTitle("Seitenbereich drucken")
         self.setWindowModality(Qt.WindowModal)
-        self.resize(340, 210)
+        self.resize(340, 240)
         n = max(1, int(page_count or 1))
         layout = QVBoxLayout(self)
         layout.addWidget(QLabel(f"Seitenbereich wählen (1 … {n}):"))
@@ -75,6 +77,17 @@ class PrintRangeDialog(QDialog):
             "Dokumentdruck monochrom (Graustufen) — Einstellung wird gemerkt — 1.0.3"
         )
         form.addRow("Farbe:", self.grayscale_check)
+
+        if default_preview is None:
+            preview = bool(get_print_preview())
+        else:
+            preview = bool(default_preview)
+        self.preview_check = QCheckBox("Druckvorschau (erste Seite)")
+        self.preview_check.setChecked(preview)
+        self.preview_check.setToolTip(
+            "Vor dem Druckjob Thumbnail der ersten Seite zeigen — optional, wird gemerkt — 1.0.6"
+        )
+        form.addRow("Vorschau:", self.preview_check)
 
         layout.addLayout(form)
         self.from_spin.valueChanged.connect(self._sync_from)
@@ -117,3 +130,7 @@ class PrintRangeDialog(QDialog):
     def grayscale(self) -> bool:
         """Dokumentdruck in Graustufen — 1.0.3."""
         return bool(self.grayscale_check.isChecked())
+
+    def preview(self) -> bool:
+        """Druckvorschau vor dem Druckjob — 1.0.6."""
+        return bool(self.preview_check.isChecked())

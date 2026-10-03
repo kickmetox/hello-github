@@ -2,7 +2,7 @@
 
 Moderne Textverarbeitung mit PDF-Annotator, OCR-Bridge und Formulargenerator.
 
-**Version:** 1.0.5  
+**Version:** 1.0.6  
 **Hersteller:** Andreas Meyer · ame@sellerbach.de
 
 ## Quickstart (Windows)
@@ -32,8 +32,8 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an).
 
-## Neu in 1.0.5
+## Neu in 1.0.6
 
-Post-Release-Polish: Willkommen-Filter mit Clear-Button und Trefferanzahl; Druck-Abbruch mit sauberem Cleanup (Status „Druck abgebrochen“); Lizenz-Warnung klickbar (About/Aktivierung) und Dismiss bis morgen; Backup-Log Eintrag kopieren + Log leeren. Stubs KI/Cloud/Stylus/3D unverändert.
+Post-Release-Polish: Willkommen-Filter Esc leert und Fokus zurück auf Liste; Druckvorschau (erste Seite Thumbnail, optionaler Toggle); Lizenz-Banner i18n (DE) mit Farben Warnung vs. abgelaufen; Backup-Log Doppelklick öffnet Datei/Ordner. Stubs KI/Cloud/Stylus/3D unverändert.
 
 Siehe [CHANGELOG.md](CHANGELOG.md), [FEATURES.md](FEATURES.md) und [INFO.md](INFO.md).

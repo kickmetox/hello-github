@@ -718,32 +718,27 @@ class MainWindow(QMainWindow):
         outer.setContentsMargins(0, 0, 0, 0)
         outer.setSpacing(0)
 
-        # Ablaufwarnung-Banner: Klick → About/Aktivierung, Dismiss bis morgen — 1.0.5
+        # Ablaufwarnung-Banner: i18n-Text, Farbe Warnung vs. abgelaufen — 1.0.6
+        from instantlensdoc.core.i18n import tr as _tr_ban
+
         self.expiry_warn_banner = QWidget()
         self.expiry_warn_banner.setObjectName("expiryWarnBanner")
-        self.expiry_warn_banner.setStyleSheet(
-            "QWidget#expiryWarnBanner {"
-            " background: #FFF3CD; border-bottom: 1px solid #E0C36A;"
-            "}"
-        )
+        self._expiry_banner_kind = "warn"
+        self._apply_expiry_banner_style("warn")
         ban_lay = QHBoxLayout(self.expiry_warn_banner)
         ban_lay.setContentsMargins(10, 6, 8, 6)
         ban_lay.setSpacing(8)
         self.expiry_warn_label = QLabel()
         self.expiry_warn_label.setWordWrap(True)
         self.expiry_warn_label.setCursor(Qt.PointingHandCursor)
-        self.expiry_warn_label.setToolTip(
-            "Klick öffnet Info / Lizenz aktivieren — 1.0.5"
-        )
+        self.expiry_warn_label.setToolTip(_tr_ban("expiry_warn_tooltip"))
         self.expiry_warn_label.mousePressEvent = (  # type: ignore[method-assign]
             lambda e: self._on_expiry_warn_clicked(e)
         )
         ban_lay.addWidget(self.expiry_warn_label, 1)
         self.btn_expiry_warn_dismiss = QPushButton("×")
         self.btn_expiry_warn_dismiss.setFixedWidth(28)
-        self.btn_expiry_warn_dismiss.setToolTip(
-            "Hinweis schließen — wird bis morgen nicht erneut gezeigt — 1.0.5"
-        )
+        self.btn_expiry_warn_dismiss.setToolTip(_tr_ban("expiry_dismiss_tooltip"))
         self.btn_expiry_warn_dismiss.clicked.connect(self._dismiss_expiry_warning)
         ban_lay.addWidget(self.btn_expiry_warn_dismiss)
         self.expiry_warn_banner.setVisible(False)
@@ -4458,8 +4453,28 @@ class MainWindow(QMainWindow):
                 st.message + "\n\nDie App bleibt geöffnet, Speichern kann eingeschränkt sein.",
             )
 
+    def _apply_expiry_banner_style(self, kind: str) -> None:
+        """Warnung = Gelb, abgelaufen = Rot — 1.0.6."""
+        banner = getattr(self, "expiry_warn_banner", None)
+        if banner is None:
+            return
+        self._expiry_banner_kind = kind
+        if kind == "expired":
+            banner.setStyleSheet(
+                "QWidget#expiryWarnBanner {"
+                " background: #F8D7DA; border-bottom: 1px solid #C0392B;"
+                "}"
+            )
+        else:
+            banner.setStyleSheet(
+                "QWidget#expiryWarnBanner {"
+                " background: #FFF3CD; border-bottom: 1px solid #E0C36A;"
+                "}"
+            )
+
     def _sync_expiry_warn_banner(self, st=None, ablauf: str = "") -> None:
-        """Banner zeigen wenn Warnung fällig; ohne Auto-Dismiss — 1.0.5."""
+        """Banner i18n: Warnung vs. abgelaufen mit unterschiedlicher Farbe — 1.0.6."""
+        from instantlensdoc.core.i18n import tr
         from instantlensdoc.license import EXPIRY_WARN_DAYS, resttage_phrase
 
         if st is None:
@@ -4471,12 +4486,24 @@ class MainWindow(QMainWindow):
         if not show:
             banner.setVisible(False)
             return
-        warn = (
-            f"Hinweis: Lizenz/Trial läuft in {resttage_phrase(st.days_remaining)} ab"
-            + (f" (bis {ablauf})" if ablauf else "")
-            + " — Klick: Info/Aktivierung · × schließt bis morgen"
-        )
+        kind = "expired"
+        if hasattr(self.license_manager, "expiry_banner_kind"):
+            kind = self.license_manager.expiry_banner_kind(st)
+        else:
+            kind = "expired" if not st.allowed else "warn"
+        self._apply_expiry_banner_style(kind)
+        until = f" (bis {ablauf})" if ablauf else ""
+        if kind == "expired":
+            warn = tr("expiry_expired_banner").format(until=until)
+        else:
+            warn = tr("expiry_warn_banner").format(
+                rest=resttage_phrase(st.days_remaining),
+                until=until,
+            )
         self.expiry_warn_label.setText(warn)
+        self.expiry_warn_label.setToolTip(tr("expiry_warn_tooltip"))
+        if hasattr(self, "btn_expiry_warn_dismiss"):
+            self.btn_expiry_warn_dismiss.setToolTip(tr("expiry_dismiss_tooltip"))
         was_visible = banner.isVisible()
         banner.setVisible(True)
         if not was_visible:
@@ -4487,8 +4514,13 @@ class MainWindow(QMainWindow):
                 and self._tray.isVisible()
             ):
                 try:
+                    title = (
+                        f"{DISPLAY_NAME}: Lizenz abgelaufen"
+                        if kind == "expired"
+                        else f"{DISPLAY_NAME}: Ablauf in ≤{EXPIRY_WARN_DAYS} Tagen"
+                    )
                     self._tray.showMessage(
-                        f"{DISPLAY_NAME}: Ablauf in ≤{EXPIRY_WARN_DAYS} Tagen",
+                        title,
                         warn,
                         QSystemTrayIcon.Warning,
                         8000,
@@ -4511,7 +4543,9 @@ class MainWindow(QMainWindow):
             pass
 
     def _dismiss_expiry_warning(self) -> None:
-        """Dismiss speichert bis morgen — 1.0.5."""
+        """Dismiss speichert bis morgen — 1.0.5/1.0.6."""
+        from instantlensdoc.core.i18n import tr
+
         try:
             if hasattr(self.license_manager, "dismiss_expiry_warning"):
                 self.license_manager.dismiss_expiry_warning()
@@ -4523,9 +4557,7 @@ class MainWindow(QMainWindow):
         if banner is not None:
             banner.setVisible(False)
         try:
-            self.statusBar().showMessage(
-                "Ablauf-Hinweis bis morgen ausgeblendet", 4000
-            )
+            self.statusBar().showMessage(tr("expiry_dismiss_status"), 4000)
         except Exception:
             pass
 

@@ -43,6 +43,27 @@ _STRINGS: dict[str, dict[UiLang, str]] = {
     "field_keywords": {"de": "Stichwörter", "en": "Keywords"},
     "field_creator": {"de": "Ersteller", "en": "Creator"},
     "field_producer": {"de": "Produzent", "en": "Producer"},
+    # Lizenz-Banner — 1.0.6
+    "expiry_warn_banner": {
+        "de": "Hinweis: Lizenz/Trial läuft in {rest} ab{until} — Klick: Info/Aktivierung · × schließt bis morgen",
+        "en": "Notice: license/trial expires in {rest}{until} — Click: About/Activate · × dismisses until tomorrow",
+    },
+    "expiry_expired_banner": {
+        "de": "Lizenz abgelaufen{until} — Klick: Info/Aktivierung · × schließt bis morgen",
+        "en": "License expired{until} — Click: About/Activate · × dismisses until tomorrow",
+    },
+    "expiry_warn_tooltip": {
+        "de": "Klick öffnet Info / Lizenz aktivieren — 1.0.6",
+        "en": "Click opens About / activate license — 1.0.6",
+    },
+    "expiry_dismiss_tooltip": {
+        "de": "Hinweis schließen — wird bis morgen nicht erneut gezeigt — 1.0.6",
+        "en": "Dismiss notice — will not show again until tomorrow — 1.0.6",
+    },
+    "expiry_dismiss_status": {
+        "de": "Ablauf-Hinweis bis morgen ausgeblendet",
+        "en": "Expiry notice hidden until tomorrow",
+    },
 }
 
 _current: UiLang = "de"

@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **1.0.5** |
+| Version | **1.0.6** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -20,6 +20,7 @@
 - Resttage Statusleiste + About **konsistent** („noch X Tage“ / „noch 1 Tag“)  
 - Ablaufdatum **TT.MM.JJJJ** in About + Status (+ Lizenzdialog)  
 - Warnung **≤3 Tage** vor Ablauf: Banner (nicht modal); **Klick → About/Aktivierung**, **Dismiss bis morgen**  
+- Banner-Text **i18n** (DE); Farbe **Warnung** (gelb) vs. **abgelaufen** (rot)  
 - Lizenz-Dialog: Resttage + Ablaufdatum klar  
 - About: Version, **Lizenzstatus**, Kontakt, Changelog-Kurzliste; bei Trial/ungültig **Lizenz aktivieren…**; **Privacy: lokal, keine Telemetrie**
 
@@ -55,10 +56,10 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an / `checkedonce`)
 
-## Neu in 1.0.5
+## Neu in 1.0.6
 
-- Willkommen: Filter **Clear-Button** + **Trefferanzahl**-Label
-- Drucken: Abbruch mit **sauberem Cleanup** (`printer.abort`), Status **„Druck abgebrochen“**
-- Lizenz: Warnung **Klick → About/Aktivierung**, **Dismiss speichert bis morgen**
-- Backup: Log **Eintrag kopieren** + **Log leeren** in Einstellungen
+- Willkommen: Filter **Esc** leert + Fokus zurück auf Liste
+- Drucken: **Vorschau-Dialog** (erste Seite Thumbnail) vor dem Druckjob, optionaler Toggle
+- Lizenz: Banner **i18n (DE)**; Farbe **Warnung vs. abgelaufen**
+- Backup: Log **Doppelklick** öffnet Backup-Datei bzw. Ordner wenn Datei fehlt
 - Stubs KI/Cloud/Stylus/3D unverändert

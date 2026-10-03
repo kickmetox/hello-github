@@ -1,5 +1,27 @@
 # Changelog — InstantLens Doc
 
+## 1.0.6 — Filter Esc, Druckvorschau, Banner i18n/Farben, Backup-Log Doppelklick
+
+Post-Release-Polish nach 1.0.5: Willkommen-Filter Esc leert und Fokus zurück auf Liste; Dokumentdruck mit optionalem Vorschau-Dialog (Thumbnail erste Seite, Toggle in Dialog/Settings); Lizenz-Banner Text über i18n (DE) mit getrennten Farben für Warnung vs. abgelaufen; Backup-Log Doppelklick öffnet Backup-Datei bzw. Ordner wenn Datei fehlt. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### Willkommen / Start
+- Filter: **Esc** leert den Filter und setzt den Fokus zurück auf die Recent-Liste (`_escape_recent_filter`)
+
+### PDF / Druck
+- **Dokument drucken…**: optionaler **Vorschau-Dialog** mit Thumbnail der ersten Druckseite vor dem Druckjob; Toggle in Seitenbereich-Dialog und Einstellungen (`print_preview`, Standard an)
+
+### About / Lizenz
+- Banner-Text **i18n-klar** (DE/EN über `tr`); Farbe **Warnung** (gelb) vs. **abgelaufen** (rot); Abgelaufen zeigt ebenfalls Banner (Dismiss bis morgen)
+
+### Backup
+- Einstellungen: **Doppelklick** auf Log-Eintrag öffnet Backup-Datei bzw. Ordner wenn Datei fehlt
+
+### Packaging / Docs
+- Version **1.0.6** (App / `ild_pdf` / ISS / Smoke / Docs)
+- Smoke: Filter Esc, Print Preview, Banner i18n/Colors, Backup-Log Doppelklick (CLI + Qt)
+
+---
+
 ## 1.0.5 — Filter Clear/Treffer, Druck-Abbruch Cleanup, Warnung Klick/Dismiss, Backup-Log Copy/Clear
 
 Post-Release-Polish nach 1.0.4: Willkommen-Filter mit explizitem Clear-Button und Trefferanzahl-Label; Mehrseiten-Druck-Abbruch verwirft den Job sauber (`printer.abort`) mit Status „Druck abgebrochen“; Lizenz-Ablaufwarnung als Banner — Klick öffnet About/Aktivierung, Dismiss speichert bis morgen; Backup-Log Eintrag kopieren und Log leeren in Einstellungen. Stubs KI/Cloud/Stylus/3D bleiben Stubs.

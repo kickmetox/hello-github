@@ -175,14 +175,24 @@ class LicenseManager:
         self._save()
 
     def should_show_expiry_warning(self, st: Optional[LicenseStatus] = None) -> bool:
-        """True wenn Resttage ≤3, noch gültig, und heute noch nicht dismissed — 1.0.5."""
+        """True bei Warnung (≤3 Tage) oder abgelaufen, sofern heute nicht dismissed — 1.0.6."""
         status = st if st is not None else self.status()
-        if not status.allowed:
+        last = str(self.state.get("expiry_warn_day") or "")
+        if last == _today_iso():
             return False
+        if not status.allowed:
+            # Abgelaufen: Banner mit eigener Farbe — 1.0.6
+            return True
         if int(status.days_remaining) > EXPIRY_WARN_DAYS:
             return False
-        last = str(self.state.get("expiry_warn_day") or "")
-        return last != _today_iso()
+        return True
+
+    def expiry_banner_kind(self, st: Optional[LicenseStatus] = None) -> str:
+        """``warn`` (≤3 Tage gültig) oder ``expired`` — 1.0.6."""
+        status = st if st is not None else self.status()
+        if not status.allowed:
+            return "expired"
+        return "warn"
 
     def mark_expiry_warning_shown(self) -> None:
         """Dismiss: speichert bis morgen (heutiger Kalendertag) — 1.0.5."""

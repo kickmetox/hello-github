@@ -5347,7 +5347,7 @@ class PdfViewer(QWidget):
             return False
 
     def print_document(self) -> bool:
-        """PDF-Dokument (Seitenbereich + DPI + Graustufen) gerastert drucken — 1.0.5."""
+        """PDF-Dokument (Bereich + DPI + Graustufen + optionale Vorschau) — 1.0.6."""
         if not self.pdf_path:
             QMessageBox.information(self, "Drucken", "Kein PDF geladen.")
             return False
@@ -5359,7 +5359,9 @@ class PdfViewer(QWidget):
             from instantlensdoc.core.app_settings import (
                 set_export_raster_dpi,
                 set_print_grayscale,
+                set_print_preview,
             )
+            from instantlensdoc.ui.print_preview_dialog import PrintPreviewDialog
             from instantlensdoc.ui.print_range_dialog import PrintRangeDialog
 
             n = int(self.page_count or 0)
@@ -5367,7 +5369,7 @@ class PdfViewer(QWidget):
                 QMessageBox.warning(self, "Drucken", "PDF hat keine Seiten.")
                 return False
 
-            # Seitenbereich + DPI + Graustufen vor dem Druckerdialog — 1.0.3
+            # Seitenbereich + DPI + Graustufen + Vorschau-Toggle — 1.0.6
             range_dlg = PrintRangeDialog(n, self)
             if range_dlg.exec() != PrintRangeDialog.Accepted:
                 return False
@@ -5379,12 +5381,43 @@ class PdfViewer(QWidget):
                 return False
             dpi = int(range_dlg.dpi())
             gray = bool(range_dlg.grayscale())
+            show_preview = bool(range_dlg.preview())
             try:
                 set_export_raster_dpi(dpi)
                 set_print_grayscale(gray)
+                set_print_preview(show_preview)
             except Exception:
                 pass
             scale = max(dpi / 72.0, 1.0)
+
+            # Optionale Vorschau: Thumbnail der ersten Druckseite — 1.0.6
+            if show_preview:
+                thumb_scale = min(scale, 2.0)
+                preview_pm = self._pixmap_from_rendered_page(
+                    pages[0], thumb_scale, grayscale=gray
+                )
+                preview_dlg = PrintPreviewDialog(
+                    preview_pm,
+                    page_label=f"Seite {pages[0] + 1}",
+                    page_count=len(pages),
+                    dpi=dpi,
+                    grayscale=gray,
+                    parent=self,
+                    default_preview=True,
+                )
+                if preview_dlg.exec() != PrintPreviewDialog.Accepted:
+                    try:
+                        self.refresh()
+                    except Exception:
+                        pass
+                    return False
+                try:
+                    set_print_preview(preview_dlg.preview_enabled())
+                except Exception:
+                    pass
+                if not preview_dlg.preview_enabled():
+                    # Toggle abgewählt: weiterdrucken ohne künftige Vorschau
+                    pass
 
             printer = QPrinter(QPrinter.HighResolution)
             printer.setDocName(str(self.pdf_path.stem))

@@ -100,10 +100,10 @@ HELP_HTML = f"""
 <li><b>Datei → Projekt-Ordner</b>: Workspace wählen (letzte 5); Dialoge starten im aktiven Ordner</li>
 <li><b>Datei → Exportieren</b>: Editor-Inhalt als HTML, DOCX oder PDF (zuletzt genutzter Ordner wird gemerkt);
     <b>Export-Profil</b> speichern/anwenden (DPI / Format / Ziel)</li>
-<li><b>Datei → Drucken</b> (Ctrl+P): Editor oder aktuelle PDF-Seite (Qt Print); <b>PDF → Dokument drucken…</b> Seitenbereich + DPI + Graustufen; Mehrseiten-Fortschritt; Abbruch → Cleanup, Status <b>Druck abgebrochen</b> — 1.0.5</li>
-<li><b>Datei → Backup jetzt</b> / <b>Backup-Ordner öffnen…</b>: manuelles Backup; max. 3 Versuche; Log letzte 20; <b>Eintrag kopieren / Log leeren</b> — 1.0.5</li>
-<li><b>Willkommen</b>: Live-Suchfilter mit <b>Clear-Button</b> + <b>Trefferanzahl</b>; Enter/Entf; Drag&amp;Drop; Recent leeren — 1.0.5</li>
-<li><b>Hilfe → Info / Lizenz</b>: Warnung ≤3 Tage: Banner <b>Klick → About/Aktivierung</b>, <b>Dismiss bis morgen</b>; Ablauf TT.MM.JJJJ — 1.0.5</li>
+<li><b>Datei → Drucken</b> (Ctrl+P): Editor oder aktuelle PDF-Seite (Qt Print); <b>PDF → Dokument drucken…</b> Seitenbereich + DPI + Graustufen; optionale <b>Vorschau erste Seite</b>; Mehrseiten-Fortschritt; Abbruch → Cleanup — 1.0.6</li>
+<li><b>Datei → Backup jetzt</b> / <b>Backup-Ordner öffnen…</b>: manuelles Backup; max. 3 Versuche; Log letzte 20; <b>Doppelklick öffnet Datei/Ordner</b>; Eintrag kopieren / Log leeren — 1.0.6</li>
+<li><b>Willkommen</b>: Live-Suchfilter: <b>Esc leert + Fokus Liste</b>; Clear-Button + Trefferanzahl; Enter/Entf; Drag&amp;Drop — 1.0.6</li>
+<li><b>Hilfe → Info / Lizenz</b>: Banner <b>i18n</b>, Farbe <b>Warnung vs. abgelaufen</b>; Klick → About/Aktivierung, Dismiss bis morgen — 1.0.6</li>
 <li><b>Seitenleiste</b>: Suche (inkl. letzte Suchbegriffe), „Alle Docs“-Volltext, Zuletzt geöffnet, Dokumente,
     Lesezeichen/Outline (+/− hinzufügen/löschen), <b>Annotationen</b> (klickbar, <b>nach Seite gruppiert</b>,
     <b>Filter nach Typ</b>, <b>Textsuche in der Liste</b> (optional <b>Regex</b>), <b>Statistik je Typ</b>,

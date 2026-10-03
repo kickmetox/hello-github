@@ -68,6 +68,7 @@ from instantlensdoc.core.app_settings import (
     get_pdf_grayscale,
     get_pdf_night_mode,
     get_print_grayscale,
+    get_print_preview,
     get_pdf_thumbnail_scale,
     get_pdf_two_page_spread,
     get_editor_current_line_highlight,
@@ -145,6 +146,7 @@ from instantlensdoc.core.app_settings import (
     set_pdf_grayscale,
     set_pdf_night_mode,
     set_print_grayscale,
+    set_print_preview,
     set_pdf_thumbnail_scale,
     set_pdf_two_page_spread,
     set_page_number_overlay_font_size,
@@ -474,7 +476,7 @@ class SettingsDialog(QDialog):
         )
         form.addRow(self.backup_on_save)
 
-        # Letzte 20 manuellen Backup-Vorgänge; Kopieren + Leeren — 1.0.5
+        # Letzte 20 manuellen Backup-Vorgänge; Doppelklick öffnet Datei/Ordner — 1.0.6
         from PySide6.QtCore import Qt as _Qt
 
         from instantlensdoc.core.manual_backup import (
@@ -488,9 +490,11 @@ class SettingsDialog(QDialog):
         self.backup_log_list.setMaximumHeight(180)
         self.backup_log_list.setToolTip(
             f"Letzte {BACKUP_LOG_MAX} manuellen Backup-Vorgänge (neueste oben); "
-            "Eintrag kopieren / Log leeren — 1.0.5"
+            "Doppelklick öffnet Backup-Datei bzw. Ordner; "
+            "Eintrag kopieren / Log leeren — 1.0.6"
         )
         self.backup_log_list.setAlternatingRowColors(True)
+        self.backup_log_list.itemDoubleClicked.connect(self._open_backup_log_entry)
         self._backup_log_entries: list = list(load_backup_log())
         for entry in self._backup_log_entries:
             self.backup_log_list.addItem(QListWidgetItem(format_backup_log_line(entry)))
@@ -551,6 +555,13 @@ class SettingsDialog(QDialog):
             "PDF → Dokument drucken… standardmäßig monochrom (auch im Druckdialog) — 1.0.3"
         )
         form.addRow(self.print_grayscale)
+
+        self.print_preview = QCheckBox("Druckvorschau vor Dokumentdruck")
+        self.print_preview.setChecked(get_print_preview())
+        self.print_preview.setToolTip(
+            "Vor dem Druckjob Thumbnail der ersten Seite anzeigen (optional) — 1.0.6"
+        )
+        form.addRow(self.print_preview)
 
         self.pdf_night = QCheckBox("PDF Nachtmodus (Invert-Ansicht)")
         self.pdf_night.setChecked(get_pdf_night_mode())
@@ -872,6 +883,59 @@ class SettingsDialog(QDialog):
             empty.setFlags(_Qt.NoItemFlags)
             self.backup_log_list.addItem(empty)
         self._sync_backup_log_buttons()
+
+    def _open_backup_log_entry(self, item=None) -> None:
+        """Doppelklick: Backup-Datei öffnen, sonst Ordner — 1.0.6."""
+        from PySide6.QtCore import QUrl
+        from PySide6.QtGui import QDesktopServices
+
+        if item is None:
+            item = self.backup_log_list.currentItem()
+        entries = getattr(self, "_backup_log_entries", None) or []
+        if item is None or not entries:
+            return
+        if item.flags() == 0:
+            return
+        row = self.backup_log_list.row(item)
+        if not (0 <= row < len(entries)):
+            return
+        entry = entries[row]
+        dest = str(entry.get("dest") or "").strip()
+        source = str(entry.get("source") or "").strip()
+        target = Path(dest) if dest else (Path(source) if source else None)
+        if target is None:
+            QMessageBox.information(
+                self, "Backup-Log", "Kein Dateipfad in diesem Eintrag."
+            )
+            return
+        if target.is_file():
+            opened = QDesktopServices.openUrl(QUrl.fromLocalFile(str(target)))
+            status = f"Backup geöffnet: {target}"
+        else:
+            folder = target if target.is_dir() else target.parent
+            if not folder.is_dir():
+                # Fallback: Backup-Stammordner
+                try:
+                    from instantlensdoc.core.manual_backup import backup_dir
+
+                    folder = backup_dir()
+                except Exception:
+                    folder = None
+            if folder is None or not Path(folder).is_dir():
+                QMessageBox.warning(
+                    self,
+                    "Backup-Log",
+                    f"Datei fehlt und Ordner nicht gefunden:\n{target}",
+                )
+                return
+            opened = QDesktopServices.openUrl(QUrl.fromLocalFile(str(folder)))
+            status = f"Backup-Ordner geöffnet (Datei fehlt): {folder}"
+        parent = self.parent()
+        if parent is not None and hasattr(parent, "_set_status") and opened:
+            try:
+                parent._set_status(status)
+            except Exception:
+                pass
 
     def _copy_backup_log_entry(self) -> None:
         """Ausgewählten Backup-Log-Eintrag in die Zwischenablage — 1.0.5."""
@@ -1220,6 +1284,7 @@ class SettingsDialog(QDialog):
         set_page_size_unit(str(self.page_unit.currentData() or "mm"))
         set_pdf_grayscale(self.pdf_grayscale.isChecked())
         set_print_grayscale(self.print_grayscale.isChecked())
+        set_print_preview(self.print_preview.isChecked())
         set_pdf_night_mode(self.pdf_night.isChecked())
         set_pdf_two_page_spread(self.pdf_spread.isChecked())
         set_pdf_continuous_scroll(self.pdf_continuous.isChecked())

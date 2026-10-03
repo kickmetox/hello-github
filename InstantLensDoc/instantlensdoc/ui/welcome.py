@@ -1,4 +1,4 @@
-"""Willkommens-/Startseite wenn keine Dokument-Tabs offen sind — 1.0.5."""
+"""Willkommens-/Startseite wenn keine Dokument-Tabs offen sind — 1.0.6."""
 
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ from instantlensdoc.core import recent as recent_mod
 
 
 class WelcomePage(QWidget):
-    """Startseite: Recent-Liste + Live-Filter (Clear + Trefferanzahl) + Aktionen."""
+    """Startseite: Recent-Liste + Live-Filter (Esc leert → Fokus Liste) + Aktionen."""
 
     open_requested = Signal()
     new_text_requested = Signal()
@@ -74,12 +74,13 @@ class WelcomePage(QWidget):
         self.recent_filter.setPlaceholderText("Recent filtern…")
         self.recent_filter.setClearButtonEnabled(True)
         self.recent_filter.setToolTip(
-            "Live-Filter über Dateiname/Pfad der Recent-Liste — Clear leert den Filter"
+            "Live-Filter über Dateiname/Pfad — Esc leert und Fokus zurück auf Liste — 1.0.6"
         )
         self.recent_filter.textChanged.connect(self._apply_recent_filter)
+        self.recent_filter.installEventFilter(self)
         filter_row.addWidget(self.recent_filter, 1)
         self.btn_clear_filter = QPushButton("Filter leeren")
-        self.btn_clear_filter.setToolTip("Suchfilter zurücksetzen — 1.0.5")
+        self.btn_clear_filter.setToolTip("Suchfilter zurücksetzen — 1.0.5/1.0.6")
         self.btn_clear_filter.clicked.connect(self._clear_recent_filter)
         filter_row.addWidget(self.btn_clear_filter)
         self.filter_hits_label = QLabel("0 Treffer")
@@ -94,7 +95,7 @@ class WelcomePage(QWidget):
         self.recent_list.setToolTip(
             "Enter / Doppelklick öffnet; Entf entfernt den Eintrag; "
             "Rechtsklick: Entfernen / Ordner öffnen; Drag & Drop öffnet Dateien; "
-            "Filter oben filtert live; Trefferanzahl rechts"
+            "Filter oben filtert live; Esc leert Filter → Fokus Liste; Trefferanzahl rechts"
         )
         self.recent_list.setAcceptDrops(True)
         self.recent_list.setContextMenuPolicy(Qt.CustomContextMenu)
@@ -107,19 +108,23 @@ class WelcomePage(QWidget):
         self.refresh_recent()
 
     def eventFilter(self, obj, event):  # noqa: N802
-        """Delete entfernt Recent-Eintrag; Enter öffnet (Fallback) — 1.0.3."""
-        if obj is self.recent_list and event.type() == QEvent.KeyPress:
+        """Esc leert Filter→Liste; Delete entfernt; Enter öffnet — 1.0.6."""
+        if event.type() == QEvent.KeyPress:
             assert isinstance(event, QKeyEvent)
             key = event.key()
-            item = self.recent_list.currentItem()
-            if item is not None and key in (Qt.Key_Return, Qt.Key_Enter):
-                self._on_recent_dbl(item)
+            if key == Qt.Key_Escape and obj in (self.recent_filter, self.recent_list):
+                self._escape_recent_filter()
                 return True
-            if item is not None and key in (Qt.Key_Delete, Qt.Key_Backspace):
-                path = item.data(Qt.UserRole)
-                if path:
-                    self.recent_remove_requested.emit(str(path))
+            if obj is self.recent_list:
+                item = self.recent_list.currentItem()
+                if item is not None and key in (Qt.Key_Return, Qt.Key_Enter):
+                    self._on_recent_dbl(item)
                     return True
+                if item is not None and key in (Qt.Key_Delete, Qt.Key_Backspace):
+                    path = item.data(Qt.UserRole)
+                    if path:
+                        self.recent_remove_requested.emit(str(path))
+                        return True
         return super().eventFilter(obj, event)
 
     def refresh_recent(self) -> None:
@@ -134,6 +139,17 @@ class WelcomePage(QWidget):
         """Filtertext leeren — 1.0.5."""
         self.recent_filter.clear()
         self.recent_filter.setFocus()
+
+    def _escape_recent_filter(self) -> None:
+        """Esc: Filter leeren und Fokus zurück auf die Recent-Liste — 1.0.6."""
+        self.recent_filter.clear()
+        self.recent_list.setFocus()
+        if self.recent_list.count() > 0 and self.recent_list.currentRow() < 0:
+            for i in range(self.recent_list.count()):
+                it = self.recent_list.item(i)
+                if it is not None and it.flags() & Qt.ItemIsEnabled and it.data(Qt.UserRole):
+                    self.recent_list.setCurrentRow(i)
+                    break
 
     def _apply_recent_filter(self, _text: str | None = None) -> None:
         """Live-Filter der Recent-Liste; Trefferanzahl aktualisieren — 1.0.5."""

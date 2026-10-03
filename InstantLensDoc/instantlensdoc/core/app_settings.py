@@ -1870,6 +1870,15 @@ def set_print_grayscale(enabled: bool) -> None:
     save_settings({"print_grayscale": bool(enabled)})
 
 
+def get_print_preview() -> bool:
+    """Druckvorschau (erste Seite) vor Dokumentdruck — 1.0.6. Standard: an."""
+    return bool(load_settings().get("print_preview", True))
+
+
+def set_print_preview(enabled: bool) -> None:
+    save_settings({"print_preview": bool(enabled)})
+
+
 EXPORT_PROFILE_FORMATS = ("PNG", "JPEG")
 EXPORT_PROFILES_MAX = 12
 
