@@ -46,6 +46,8 @@ DEFAULTS: dict[str, Any] = {
     "last_signature_width": 180.0,  # Signatur-Breite Default — 1.5.1
     "last_signature_height": 64.0,  # Signatur-Höhe Default — 1.5.1
     "last_signature_opacity": 1.0,  # Signatur-Deckkraft Default — 1.5.1
+    "signature_aspect_lock": True,  # Aspect-Ratio Lock Signatur — 1.5.2
+    "meta_backup_on_save": True,  # .ildbak vor Metadaten-Speichern — 1.5.2
     "last_rename_undo_log": "",  # letzter Batch-Rename Undo-Log (TXT) — 1.4.2
     "default_zoom_percent": 150,
     "default_zoom_mode": "percent",  # percent | fit_width | fit_page
@@ -385,6 +387,17 @@ def get_export_jpeg_quality() -> int:
     except (TypeError, ValueError):
         q = 85
     return max(10, min(100, q))
+
+
+def set_export_jpeg_quality(quality: int) -> int:
+    """JPEG-Qualität für Seiten→Bilder / Export speichern (10–100) — 1.5.2."""
+    try:
+        q = int(quality)
+    except (TypeError, ValueError):
+        q = 85
+    q = max(10, min(100, q))
+    save_settings({"export_jpeg_quality": q})
+    return q
 
 
 def get_export_pdf_page() -> str:
@@ -775,6 +788,26 @@ def set_last_signature_opacity(opacity: float) -> None:
     except (TypeError, ValueError):
         op = 1.0
     save_settings({"last_signature_opacity": max(0.05, min(1.0, op))})
+
+
+def get_signature_aspect_lock() -> bool:
+    """Aspect-Ratio Lock für Signatur-Bild — 1.5.2."""
+    return bool(load_settings().get("signature_aspect_lock", True))
+
+
+def set_signature_aspect_lock(enabled: bool) -> None:
+    """Aspect-Ratio Lock Signatur merken — 1.5.2."""
+    save_settings({"signature_aspect_lock": bool(enabled)})
+
+
+def get_meta_backup_on_save() -> bool:
+    """Toggle: .ildbak vor Metadaten-Speichern — 1.5.2."""
+    return bool(load_settings().get("meta_backup_on_save", True))
+
+
+def set_meta_backup_on_save(enabled: bool) -> None:
+    """Toggle Metadaten-Backup .ildbak speichern — 1.5.2."""
+    save_settings({"meta_backup_on_save": bool(enabled)})
 
 
 def get_last_rename_undo_log() -> Path | None:

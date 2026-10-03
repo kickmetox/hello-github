@@ -1,5 +1,23 @@
 # Changelog — InstantLens Doc
 
+## 1.5.2 — Metadaten Backup·Toast, Seiten→Bilder Abbruch·JPEG-Q, Signatur Aspect-Lock·Vorschau, CLI --export-page
+
+Post-Release-Polish nach 1.5.1: **Metadaten-Speichern** erzeugt optional **Backup `.ildbak`** (Toggle) und zeigt **Erfolgs-Toast** mit Felder-Kurzinfo; **Seiten→Bilder** behält bei **Abbruch** bereits geschriebene Dateien inkl. **Statuszählung**, **JPEG-Qualität** aus Settings wählbar; **Signatur** mit **Aspect-Ratio Lock** und **Vorschau vor Platzieren**; **CLI** `--export-page N --out PATH` als **One-Shot ohne GUI** (headless ok). Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### PDF
+- Metadaten: Toggle Backup `.ildbak` vor Speichern; Erfolgs-Toast mit Felder-Kurzinfo (Titel/Autor/…)
+- Seiten → Bilder: Abbruch behält geschriebene Dateien + Zählung `n/total`; JPEG-Qualität Settings
+- Signatur (Bild): Aspect-Ratio Lock Toggle; Live-Vorschau vor Platzieren
+
+### CLI / Start
+- `python -m instantlensdoc DATEI --export-page N --out PATH` (One-Shot, kein Qt); Exit 0/1/2
+
+### Packaging / Docs
+- Version **1.5.2** (App / `ild_pdf` / ISS / Smoke / Docs)
+- Smoke: Metadaten Backup·Toast, Seiten→Bilder Cancel-Keep·JPEG-Q, Signatur Aspect-Lock·Preview, CLI export-page (CLI + Qt)
+
+---
+
 ## 1.5.1 — Metadaten Dirty·Reset·UTF-8·leere Felder, Seiten→Bilder Ordner·Template·Fortschritt, Signatur Größe·Opacity, CLI Help DE·multi-open·Exitcodes
 
 Post-Release-Polish nach 1.5.0: **Metadaten-Dialog** mit **Dirty-Markierung** (*), **Zurücksetzen**, **UTF-8-sicheren** Werten (NFC) und Toggle **„Leere Felder beim Speichern löschen“**; **Seiten→Bilder** merkt **Zielordner**, Dateiname-Template **`{stem}_p{page}`**, **Fortschrittsdialog** bei Bereich/Mehrseiten (Abbrechen); **Signatur** mit **Größe-/Deckkraft-Slider** und **zuletzt verwendetes Bild** merken; **CLI** `--help` auf Deutsch, **mehrere `--open`**, **Exitcode 2** bei fehlender Datei. Stubs KI/Cloud/Stylus/3D bleiben Stubs.

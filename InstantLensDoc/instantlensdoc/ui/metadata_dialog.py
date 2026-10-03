@@ -1,4 +1,4 @@
-"""Dialog: PDF-Metadaten bearbeiten (Titel/Autor/Betreff/Keywords) — 1.5.1."""
+"""Dialog: PDF-Metadaten bearbeiten (Titel/Autor/Betreff/Keywords) — 1.5.2."""
 
 from __future__ import annotations
 
@@ -22,14 +22,16 @@ from instantlensdoc.core.i18n import tr
 
 
 class MetadataDialog(QDialog):
-    """Liest/schreibt DocInfo+XMP via pikepdf; Dirty-Markierung, Reset, leere Felder löschen — 1.5.1."""
+    """Liest/schreibt DocInfo+XMP; Dirty/Reset; Backup .ildbak; Erfolgs-Toast — 1.5.2."""
 
     def __init__(self, pdf_path: str | Path, parent=None):
         super().__init__(parent)
         self.pdf_path = Path(pdf_path)
         self.setWindowTitle(tr("meta_title"))
         self.setWindowModified(False)
-        self.resize(520, 380)
+        self.resize(520, 400)
+        self.last_toast = ""
+        self.backup_path: Path | None = None
         layout = QVBoxLayout(self)
         layout.addWidget(QLabel(f"{self.pdf_path.name}"))
         hint = QLabel(tr("meta_hint"))
@@ -73,9 +75,21 @@ class MetadataDialog(QDialog):
         self.chk_delete_empty.setToolTip(tr("meta_delete_empty_tip"))
         layout.addWidget(self.chk_delete_empty)
 
+        from instantlensdoc.core.app_settings import get_meta_backup_on_save
+
+        self.chk_backup = QCheckBox(tr("meta_backup"))
+        self.chk_backup.setChecked(bool(get_meta_backup_on_save()))
+        self.chk_backup.setToolTip(tr("meta_backup_tip"))
+        layout.addWidget(self.chk_backup)
+
         self.dirty_label = QLabel("")
         self.dirty_label.setStyleSheet("color:#A65C00; font-weight:600;")
         layout.addWidget(self.dirty_label)
+
+        self.toast_label = QLabel("")
+        self.toast_label.setWordWrap(True)
+        self.toast_label.setStyleSheet("color:#1B6B2A; font-weight:600;")
+        layout.addWidget(self.toast_label)
 
         row = QHBoxLayout()
         self.btn_reset = QPushButton(tr("meta_reset"))
@@ -143,9 +157,42 @@ class MetadataDialog(QDialog):
             edit.blockSignals(False)
         self._refresh_dirty()
 
+    def _field_short_info(self, meta: PdfMetadata) -> str:
+        """Kurzinfo gefüllter Felder für Erfolgs-Toast — 1.5.2."""
+        parts: list[str] = []
+        mapping = [
+            ("title", tr("field_title")),
+            ("author", tr("field_author")),
+            ("subject", tr("field_subject")),
+            ("keywords", tr("field_keywords")),
+        ]
+        for attr, label in mapping:
+            val = utf8_safe(getattr(meta, attr, "") or "").strip()
+            if not val:
+                continue
+            if len(val) > 28:
+                val = val[:25] + "…"
+            parts.append(f"{label}: {val}")
+        if not parts:
+            return tr("meta_toast_empty")
+        return " · ".join(parts)
+
     def _save(self):
+        from instantlensdoc.core.app_settings import (
+            get_autosave_backup_max,
+            set_meta_backup_on_save,
+        )
+        from instantlensdoc.core.documents import backup_ildbak
+
         meta = self.current_metadata()
+        do_backup = bool(self.chk_backup.isChecked())
+        set_meta_backup_on_save(do_backup)
         try:
+            self.backup_path = None
+            if do_backup and self.pdf_path.is_file():
+                self.backup_path = backup_ildbak(
+                    self.pdf_path, max_backups=get_autosave_backup_max()
+                )
             set_metadata(
                 self.pdf_path,
                 meta,
@@ -155,6 +202,12 @@ class MetadataDialog(QDialog):
                 k: utf8_safe(e.text()) for k, e in self.fields.items()
             }
             self._refresh_dirty()
+            short = self._field_short_info(meta)
+            bak_note = ""
+            if self.backup_path is not None:
+                bak_note = f" · Backup {self.backup_path.name}"
+            self.last_toast = f"{tr('meta_toast_ok')}: {short}{bak_note}"
+            self.toast_label.setText(self.last_toast)
             self.accept()
         except Exception as e:
             QMessageBox.warning(self, tr("meta_title"), str(e))

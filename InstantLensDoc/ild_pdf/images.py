@@ -193,7 +193,8 @@ def extract_pages_as_images(
     pages=None → alle Seiten. Rückgabe: Liste geschriebener Pfade.
     dpi: wenn gesetzt, überschreibt scale (siehe extract_page_image).
     filename_template: Default ``{stem}_p{page}`` — 1.5.1.
-    on_progress: optional ``(current_1based, total) -> bool``; False = Abbruch — 1.5.1.
+    on_progress: optional ``(current_1based, total) -> bool``; False = Abbruch.
+    Abbruch behält bereits geschriebene Dateien (keine Rollback-Löschung) — 1.5.2.
     """
     from .document import PdfDocument
 
@@ -218,6 +219,7 @@ def extract_pages_as_images(
             except Exception:
                 cont = True
             if cont is False:
+                # Bereits geschriebene Dateien behalten — 1.5.2
                 break
         name = format_page_image_filename(
             pdf_path.stem, i + 1, template=tpl, ext=ext

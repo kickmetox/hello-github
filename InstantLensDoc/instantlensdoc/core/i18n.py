@@ -46,8 +46,8 @@ _STRINGS: dict[str, dict[UiLang, str]] = {
     "field_producer": {"de": "Produzent", "en": "Producer"},
     "meta_save": {"de": "Speichern", "en": "Save"},
     "meta_hint": {
-        "de": "Titel, Autor, Betreff und Keywords (DocInfo + XMP) — Speichern schreibt in die PDF-Datei. Dirty-Markierung · Zurücksetzen · leere Felder löschen — 1.5.1.",
-        "en": "Title, author, subject and keywords (DocInfo + XMP) — Save writes into the PDF. Dirty mark · Reset · delete empty fields — 1.5.1.",
+        "de": "Titel, Autor, Betreff und Keywords (DocInfo + XMP) — Speichern schreibt in die PDF-Datei. Dirty · Reset · Backup .ildbak · Erfolgs-Toast — 1.5.2.",
+        "en": "Title, author, subject and keywords (DocInfo + XMP) — Save writes into the PDF. Dirty · Reset · .ildbak backup · success toast — 1.5.2.",
     },
     "meta_reset": {"de": "Zurücksetzen", "en": "Reset"},
     "meta_reset_tip": {
@@ -65,6 +65,22 @@ _STRINGS: dict[str, dict[UiLang, str]] = {
     "meta_delete_empty_tip": {
         "de": "An: leere Metadaten-Felder aus DocInfo/XMP entfernen. Aus: leere Strings belassen — 1.5.1",
         "en": "On: remove empty metadata fields from DocInfo/XMP. Off: keep empty strings — 1.5.1",
+    },
+    "meta_backup": {
+        "de": "Backup (.ildbak) vor Speichern",
+        "en": "Backup (.ildbak) before save",
+    },
+    "meta_backup_tip": {
+        "de": "Vor dem Schreiben eine rotierende Backup-Kopie dateiname.pdf.ildbak anlegen — 1.5.2",
+        "en": "Create a rotating backup copy filename.pdf.ildbak before writing — 1.5.2",
+    },
+    "meta_toast_ok": {
+        "de": "Metadaten gespeichert",
+        "en": "Metadata saved",
+    },
+    "meta_toast_empty": {
+        "de": "(keine Felder gesetzt)",
+        "en": "(no fields set)",
     },
     # Lizenz-Banner — 1.0.9
     "expiry_warn_banner": {

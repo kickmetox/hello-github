@@ -7035,8 +7035,15 @@ class MainWindow(QMainWindow):
         if not self.pdf_view.pdf_path:
             QMessageBox.information(self, "Metadaten", "Bitte zuerst ein PDF öffnen.")
             return
-        if MetadataDialog(self.pdf_view.pdf_path, self).exec():
-            self._set_status("PDF-Metadaten gespeichert")
+        dlg = MetadataDialog(self.pdf_view.pdf_path, self)
+        if dlg.exec():
+            # Erfolgs-Toast mit Felder-Kurzinfo — 1.5.2
+            toast = getattr(dlg, "last_toast", "") or "PDF-Metadaten gespeichert"
+            self._set_status(toast)
+            try:
+                self.statusBar().showMessage(toast, 4500)
+            except Exception:
+                pass
 
     def _edit_pdf_form_fields(self):
         if not self.pdf_view.pdf_path:

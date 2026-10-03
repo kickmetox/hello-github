@@ -22,8 +22,8 @@ class _GermanHelpFormatter(argparse.HelpFormatter):
 
 def parse_cli(argv: list[str] | None = None) -> argparse.Namespace:
     """
-    CLI für ``python -m instantlensdoc`` — 1.5.1.
-    ``--version`` / ``--open FILE`` (mehrfach) / ``--help`` DE; positional Datei bleibt kompatibel.
+    CLI für ``python -m instantlensdoc`` — 1.5.2.
+    ``--version`` / ``--open FILE`` / ``--export-page N --out PATH`` / ``--help`` DE.
     """
     from instantlensdoc import __version__
 
@@ -31,14 +31,16 @@ def parse_cli(argv: list[str] | None = None) -> argparse.Namespace:
         prog="instantlensdoc",
         description=(
             "InstantLens Doc — PDF-Annotator, OCR, Formulare.\n"
-            "Startet die Desktop-Oberfläche; optional Dateien öffnen."
+            "Startet die Desktop-Oberfläche; optional Dateien öffnen.\n"
+            "One-Shot ohne GUI: --export-page N --out PATH."
         ),
         epilog=(
             "Beispiele:\n"
             "  python -m instantlensdoc --version\n"
             "  python -m instantlensdoc --open dokument.pdf\n"
             "  python -m instantlensdoc --open a.pdf --open b.pdf\n"
-            "  python -m instantlensdoc dokument.pdf\n"
+            "  python -m instantlensdoc dokument.pdf --export-page 1 --out seite.png\n"
+            "  python -m instantlensdoc --open dokument.pdf --export-page 2 --out /tmp/p2.jpg\n"
             "\n"
             "Exitcodes: 0 OK · 1 allgemeiner Fehler · 2 Datei nicht gefunden"
         ),
@@ -65,6 +67,21 @@ def parse_cli(argv: list[str] | None = None) -> argparse.Namespace:
         action="append",
         default=None,
         help="Datei beim Start öffnen (mehrfach möglich)",
+    )
+    p.add_argument(
+        "--export-page",
+        metavar="N",
+        dest="export_page",
+        type=int,
+        default=None,
+        help="Seite N (1-basiert) als Bild exportieren (One-Shot, ohne GUI)",
+    )
+    p.add_argument(
+        "--out",
+        metavar="PATH",
+        dest="export_out",
+        default=None,
+        help="Zielpfad für --export-page (PNG/JPEG je nach Endung)",
     )
     p.add_argument(
         "file",
@@ -98,6 +115,73 @@ def _collect_open_targets(cli: argparse.Namespace) -> list[Path]:
         seen.add(key)
         targets.append(p)
     return targets
+
+
+def _cli_export_page(cli: argparse.Namespace) -> int:
+    """
+    One-Shot Seitenexport ohne GUI — 1.5.2.
+    ``--export-page N --out PATH`` (+ PDF via --open oder positional).
+    Headless ok (kein Qt nötig).
+    """
+    page_n = cli.export_page
+    out_raw = cli.export_out
+    if page_n is None and out_raw is None:
+        return -1  # kein One-Shot
+    if page_n is None or out_raw is None:
+        print(
+            "Fehler: --export-page N und --out PATH müssen zusammen angegeben werden.",
+            file=sys.stderr,
+        )
+        return 1
+    if int(page_n) < 1:
+        print("Fehler: --export-page muss ≥ 1 sein (1-basiert).", file=sys.stderr)
+        return 1
+    targets = _collect_open_targets(cli)
+    if not targets:
+        print(
+            "Fehler: PDF-Datei für --export-page fehlt (--open DATEI oder positional).",
+            file=sys.stderr,
+        )
+        return 1
+    pdf = targets[0]
+    if not pdf.is_file():
+        print(f"Datei nicht gefunden: {pdf}", file=sys.stderr)
+        return 2
+    out = Path(out_raw)
+    suffix = out.suffix.lower()
+    if suffix in (".jpg", ".jpeg"):
+        fmt = "JPEG"
+    elif suffix == ".png" or suffix == "":
+        fmt = "PNG"
+        if suffix == "":
+            out = out.with_suffix(".png")
+    else:
+        # unbekannte Endung → PNG erzwingen
+        fmt = "PNG"
+    try:
+        out.parent.mkdir(parents=True, exist_ok=True)
+    except OSError as e:
+        print(f"Zielordner nicht anlegbar: {e}", file=sys.stderr)
+        return 1
+    try:
+        from ild_pdf.images import extract_page_image
+        from instantlensdoc.core.app_settings import get_export_jpeg_quality, get_export_raster_dpi
+
+        dpi = get_export_raster_dpi()
+        jpeg_q = get_export_jpeg_quality()
+        written = extract_page_image(
+            pdf,
+            int(page_n) - 1,
+            out,
+            dpi=dpi,
+            format=fmt,
+            jpeg_quality=jpeg_q,
+        )
+    except Exception as e:
+        print(f"Export fehlgeschlagen: {e}", file=sys.stderr)
+        return 1
+    print(str(written))
+    return 0
 
 
 def _apply_icon(app) -> None:
@@ -175,6 +259,11 @@ def main(argv: list[str] | None = None) -> int:
     if cli.version:
         print(f"InstantLens Doc {cli.version_str}")
         return 0
+
+    # One-Shot Export ohne GUI (headless ok) — 1.5.2
+    export_rc = _cli_export_page(cli)
+    if export_rc >= 0:
+        return export_rc
 
     open_targets = _collect_open_targets(cli)
     missing = [p for p in open_targets if not p.exists()]

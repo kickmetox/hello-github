@@ -6903,7 +6903,7 @@ class PdfViewer(QWidget):
             QMessageBox.warning(self, "Extrahieren", str(e))
 
     def export_pages_as_images(self):
-        """Alle (oder aktuelle) PDF-Seiten als PNG/JPEG; Zielordner·Template·Fortschritt — 1.5.1."""
+        """Seiten→Bilder; Abbruch behält Dateien; JPEG-Qualität Settings — 1.5.2."""
         if not self.pdf_path:
             QMessageBox.information(self, "Export", "Kein PDF geladen.")
             return
@@ -6914,12 +6914,14 @@ class PdfViewer(QWidget):
             apply_export_profile,
             dialog_start_dir,
             get_active_export_profile_name,
+            get_export_jpeg_quality,
             get_export_profile,
             get_export_profiles,
             get_export_raster_dpi,
             get_last_page_image_export_dir,
             get_page_image_filename_template,
             remember_recent_dir,
+            set_export_jpeg_quality,
             set_export_raster_dpi,
             set_last_export_dir,
             set_last_page_image_export_dir,
@@ -7024,6 +7026,21 @@ class PdfViewer(QWidget):
             return
         dpi = int(dpi_str)
         set_export_raster_dpi(dpi)
+        # JPEG-Qualität aus Settings (bei JPEG wählbar) — 1.5.2
+        jpeg_q = get_export_jpeg_quality()
+        if str(fmt).upper() in ("JPEG", "JPG"):
+            jpeg_q, ok = QInputDialog.getInt(
+                self,
+                "Seiten als Bilder",
+                "JPEG-Qualität (Settings, 10–100):",
+                jpeg_q,
+                10,
+                100,
+                1,
+            )
+            if not ok:
+                return
+            jpeg_q = set_export_jpeg_quality(jpeg_q)
         # Dateiname-Template {stem}_p{page} — 1.5.1
         tpl_default = get_page_image_filename_template()
         tpl, ok = QInputDialog.getText(
@@ -7057,7 +7074,7 @@ class PdfViewer(QWidget):
                 total_export = len(pages)
             progress: QProgressDialog | None = None
             cancelled = {"v": False}
-            # Fortschritt bei Bereich/Mehrseiten — 1.5.1
+            # Fortschritt bei Bereich/Mehrseiten; Abbruch behält geschriebene Dateien — 1.5.2
             if total_export > 1:
                 progress = QProgressDialog(
                     "Seiten als Bilder…", "Abbrechen", 0, total_export, self
@@ -7065,12 +7082,14 @@ class PdfViewer(QWidget):
                 progress.setWindowTitle("Export")
                 progress.setMinimumDuration(0)
                 progress.setValue(0)
+                progress.setAutoClose(False)
+                progress.setAutoReset(False)
 
                 def _on_prog(cur: int, total: int) -> bool:
                     if progress is None:
                         return True
                     progress.setMaximum(total)
-                    progress.setValue(cur)
+                    progress.setValue(cur - 1)
                     progress.setLabelText(f"Seite {cur} von {total}…")
                     QApplication.processEvents()
                     if progress.wasCanceled():
@@ -7086,31 +7105,43 @@ class PdfViewer(QWidget):
                 pages=pages,
                 dpi=dpi,
                 format=fmt,
+                jpeg_quality=jpeg_q,
                 password=self.password,
                 grayscale=self._grayscale,
                 filename_template=tpl,
                 on_progress=_on_prog,
             )
             if progress is not None:
+                # Geschriebene Dateien bleiben bei Abbruch erhalten — 1.5.2
+                if not cancelled["v"]:
+                    progress.setValue(total_export)
                 progress.close()
             set_last_export_dir(out_dir)
             set_last_page_image_export_dir(out_dir)
             remember_recent_dir(out_dir)
+            n_ok = len(written)
             if cancelled["v"]:
-                self.status.emit(
-                    f"Export abgebrochen ({len(written)}/{total_export}) → {Path(out_dir).name}"
+                status_msg = (
+                    f"Export abgebrochen — {n_ok}/{total_export} behalten → {Path(out_dir).name}"
                 )
+                self.status.emit(status_msg)
                 QMessageBox.information(
                     self,
                     "Export",
-                    f"Abgebrochen nach {len(written)} von {total_export} Seite(n).\n{out_dir}",
+                    f"Abgebrochen.\n"
+                    f"Bereits geschrieben und behalten: {n_ok} von {total_export} Seite(n).\n"
+                    f"{out_dir}",
                 )
             else:
-                self.status.emit(f"{len(written)} Bild(er) @ {dpi} DPI → {Path(out_dir).name}")
+                q_note = f", Q={jpeg_q}" if str(fmt).upper() in ("JPEG", "JPG") else ""
+                self.status.emit(
+                    f"{n_ok}/{total_export} Bild(er) @ {dpi} DPI{q_note} → {Path(out_dir).name}"
+                )
                 QMessageBox.information(
                     self,
                     "Export",
-                    f"{len(written)} Seite(n) als {fmt} ({dpi} DPI) exportiert nach:\n{out_dir}",
+                    f"{n_ok} Seite(n) als {fmt} ({dpi} DPI"
+                    f"{q_note}) exportiert nach:\n{out_dir}",
                 )
         except Exception as e:
             QMessageBox.warning(self, "Export", str(e))
@@ -7121,7 +7152,7 @@ class PdfViewer(QWidget):
         self.status.emit("Signaturfeld: auf die Seite klicken")
 
     def insert_signature_image(self):
-        """Bildstempel-Signatur; Größe/Opacity-Slider; letztes Bild merken — 1.5.1."""
+        """Bildstempel-Signatur; Aspect-Lock + Vorschau vor Platzieren — 1.5.2."""
         if not self.store or not self.pdf_path:
             QMessageBox.information(self, "Signatur", "Kein PDF geladen.")
             return
@@ -7136,16 +7167,19 @@ class PdfViewer(QWidget):
             QVBoxLayout,
         )
         from PySide6.QtCore import Qt as _Qt
+        from PySide6.QtGui import QPixmap
         from ild_pdf import insert_signature_image
         from instantlensdoc.core.app_settings import (
             dialog_start_dir,
             get_last_signature_image,
             get_last_signature_opacity,
             get_last_signature_size,
+            get_signature_aspect_lock,
             remember_recent_dir,
             set_last_signature_image,
             set_last_signature_opacity,
             set_last_signature_size,
+            set_signature_aspect_lock,
         )
         from instantlensdoc.ui.file_dialogs import confirm_overwrite_export
 
@@ -7177,12 +7211,30 @@ class PdfViewer(QWidget):
             return
         remember_recent_dir(path)
         set_last_signature_image(path)
-        # Option: Größe/Opacity + Flatten — 1.5.1
+        # Bild-Seitenverhältnis für Aspect-Lock — 1.5.2
+        img_aspect = 180.0 / 64.0
+        try:
+            from PIL import Image as _PILImg
+
+            with _PILImg.open(path) as im:
+                iw, ih = im.size
+            if iw > 0 and ih > 0:
+                img_aspect = float(iw) / float(ih)
+        except Exception:
+            pass
+        # Option: Größe/Opacity/Aspect-Lock + Vorschau + Flatten — 1.5.2
         opt = QDialog(self)
-        opt.setWindowTitle("Signatur platzieren")
+        opt.setWindowTitle("Signatur platzieren — Vorschau")
         ol = QVBoxLayout(opt)
         ol.addWidget(QLabel(f"Bild: {Path(path).name}"))
-        ol.addWidget(QLabel("Bildstempel als Sidecar-Annotation auf die aktuelle Seite setzen."))
+        ol.addWidget(QLabel("Vorschau vor dem Platzieren; Bildstempel als Sidecar-Annotation."))
+        preview_lbl = QLabel()
+        preview_lbl.setAlignment(_Qt.AlignCenter)
+        preview_lbl.setMinimumHeight(100)
+        preview_lbl.setStyleSheet(
+            "QLabel { background:#F4F6F8; border:1px solid #CCD5DD; }"
+        )
+        ol.addWidget(preview_lbl)
         form = QFormLayout()
         last_w, last_h = get_last_signature_size()
         last_op = get_last_signature_opacity()
@@ -7192,7 +7244,6 @@ class PdfViewer(QWidget):
         size_pct = int(round((last_w / 180.0) * 100))
         size_slider.setValue(max(40, min(300, size_pct)))
         size_lbl = QLabel(f"{size_slider.value()} %")
-        size_slider.valueChanged.connect(lambda v: size_lbl.setText(f"{v} %"))
         size_row = QVBoxLayout()
         size_row.addWidget(size_slider)
         size_row.addWidget(size_lbl)
@@ -7201,12 +7252,58 @@ class PdfViewer(QWidget):
         op_slider.setRange(5, 100)
         op_slider.setValue(int(round(last_op * 100)))
         op_lbl = QLabel(f"{op_slider.value()} %")
-        op_slider.valueChanged.connect(lambda v: op_lbl.setText(f"{v} %"))
         op_row = QVBoxLayout()
         op_row.addWidget(op_slider)
         op_row.addWidget(op_lbl)
         form.addRow("Deckkraft", op_row)
         ol.addLayout(form)
+        chk_aspect = QCheckBox("Seitenverhältnis sperren (Aspect-Ratio Lock)")
+        chk_aspect.setChecked(bool(get_signature_aspect_lock()))
+        chk_aspect.setToolTip(
+            "An: Höhe folgt der Bild-Proportion zur Breite. Aus: freies 180×64-Skalieren — 1.5.2"
+        )
+        ol.addWidget(chk_aspect)
+        dims_lbl = QLabel("")
+        dims_lbl.setStyleSheet("color:#555;")
+        ol.addWidget(dims_lbl)
+
+        def _calc_size() -> tuple[float, float]:
+            scale = size_slider.value() / 100.0
+            width = max(40.0, 180.0 * scale)
+            if chk_aspect.isChecked():
+                height = max(12.0, width / max(0.05, img_aspect))
+            else:
+                height = max(20.0, 64.0 * scale)
+            return width, height
+
+        def _update_preview(*_args) -> None:
+            from PySide6.QtGui import QPainter as _QP
+
+            size_lbl.setText(f"{size_slider.value()} %")
+            op_lbl.setText(f"{op_slider.value()} %")
+            w, h = _calc_size()
+            dims_lbl.setText(f"Platzierung: {w:.0f} × {h:.0f} pt")
+            pm = QPixmap(path)
+            if pm.isNull():
+                preview_lbl.setText("(Vorschau nicht verfügbar)")
+                return
+            op = max(0.05, min(1.0, op_slider.value() / 100.0))
+            # Vorschau skaliert auf max. 280×100, Deckkraft andeuten — 1.5.2
+            scaled = pm.scaled(280, 100, _Qt.KeepAspectRatio, _Qt.SmoothTransformation)
+            if op < 0.999:
+                canvas = QPixmap(scaled.size())
+                canvas.fill(_Qt.transparent)
+                painter = _QP(canvas)
+                painter.setOpacity(op)
+                painter.drawPixmap(0, 0, scaled)
+                painter.end()
+                scaled = canvas
+            preview_lbl.setPixmap(scaled)
+
+        size_slider.valueChanged.connect(_update_preview)
+        op_slider.valueChanged.connect(_update_preview)
+        chk_aspect.toggled.connect(_update_preview)
+        _update_preview()
         chk_flat = QCheckBox("Zusätzlich Flatten-PDF erzeugen (Signatur einbrennen)")
         chk_flat.setChecked(False)
         chk_flat.setToolTip(
@@ -7214,17 +7311,19 @@ class PdfViewer(QWidget):
         )
         ol.addWidget(chk_flat)
         btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        ok_btn = btns.button(QDialogButtonBox.Ok)
+        if ok_btn is not None:
+            ok_btn.setText("Platzieren")
         btns.accepted.connect(opt.accept)
         btns.rejected.connect(opt.reject)
         ol.addWidget(btns)
         if opt.exec() != QDialog.Accepted:
             return
-        scale = size_slider.value() / 100.0
-        width = max(40.0, 180.0 * scale)
-        height = max(20.0, 64.0 * scale)
+        width, height = _calc_size()
         opacity = max(0.05, min(1.0, op_slider.value() / 100.0))
         set_last_signature_size(width, height)
         set_last_signature_opacity(opacity)
+        set_signature_aspect_lock(chk_aspect.isChecked())
         do_flatten = chk_flat.isChecked()
         flatten_out = None
         if do_flatten:
@@ -7277,8 +7376,10 @@ class PdfViewer(QWidget):
                 remember_recent_dir(flat)
                 self.status.emit(f"Signatur platziert + Flatten: {Path(flat).name}")
             else:
+                lock_note = " · Aspect-Lock" if chk_aspect.isChecked() else ""
                 self.status.emit(
-                    f"Signatur-Bild platziert (Sidecar, {int(opacity * 100)} % Deckkraft)"
+                    f"Signatur platziert ({int(width)}×{int(height)} pt, "
+                    f"{int(opacity * 100)} %{lock_note})"
                 )
         except Exception as e:
             QMessageBox.warning(self, "Signatur", str(e))

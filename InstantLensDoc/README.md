@@ -2,7 +2,7 @@
 
 Moderne Textverarbeitung mit PDF-Annotator, OCR-Bridge und Formulargenerator.
 
-**Version:** 1.5.1  
+**Version:** 1.5.2  
 **Hersteller:** Andreas Meyer · ame@sellerbach.de
 
 ## Quickstart (Windows)
@@ -33,8 +33,8 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an).
 
-## Neu in 1.5.1
+## Neu in 1.5.2
 
-Polish auf 1.5.0: Metadaten Dirty/Reset/UTF-8/leere Felder löschen; Seiten→Bilder Zielordner·Template `{stem}_p{page}`·Fortschritt; Signatur Größe/Opacity + letztes Bild; CLI `--help` DE, mehrere `--open`, Exitcode 2 bei fehlender Datei. Stubs KI/Cloud/Stylus/3D unverändert.
+Polish auf 1.5.1: Metadaten Backup `.ildbak` (Toggle) + Erfolgs-Toast mit Felder-Kurzinfo; Seiten→Bilder Abbruch behält Dateien + Statuszählung, JPEG-Qualität Settings; Signatur Aspect-Ratio Lock + Vorschau vor Platzieren; CLI `--export-page N --out PATH` One-Shot ohne GUI. Stubs KI/Cloud/Stylus/3D unverändert.
 
 Siehe [CHANGELOG.md](CHANGELOG.md), [FEATURES.md](FEATURES.md) und [INFO.md](INFO.md).
