@@ -158,75 +158,15 @@ def export_pdf(
     page_size: tuple[float, float] | str | None = None,
 ) -> Path:
     """
-    Einfaches Mehrseiten-PDF aus Plaintext (Helvetica via pikepdf).
-    Kein Layout-Engine — Zeilenumbruch nach Zeichenzahl.
+    Einfaches Mehrseiten-PDF aus Plaintext (Helvetica via pikepdf Seiten).
+    Delegiert an ild_pdf.text_pdf.text_to_pdf — 1.7.0.
     page_size: Tupel, Preset-Name oder None (= Einstellung/A4).
     """
-    import pikepdf
-    from pikepdf import Dictionary, Name, Stream
+    from ild_pdf.text_pdf import text_to_pdf
 
-    path = Path(path)
-    page_w, page_h = resolve_page_size(page_size)
-    margin = 50.0
-    font_size = 11.0
-    line_h = font_size * 1.35
-    usable_w = page_w - 2 * margin
-    chars_per_line = max(int(usable_w / (font_size * 0.5)), 40)
-
-    def wrap(paragraph: str) -> list[str]:
-        if not paragraph:
-            return [""]
-        words = paragraph.split()
-        if not words:
-            return [""]
-        lines: list[str] = []
-        cur = words[0]
-        for w in words[1:]:
-            if len(cur) + 1 + len(w) <= chars_per_line:
-                cur = f"{cur} {w}"
-            else:
-                lines.append(cur)
-                cur = w
-        lines.append(cur)
-        return lines
-
-    all_lines: list[str] = []
-    for para in _lines(text):
-        all_lines.extend(wrap(para))
-
-    lines_per_page = max(int((page_h - 2 * margin) / line_h), 1)
-    pages_lines = [
-        all_lines[i : i + lines_per_page] for i in range(0, max(len(all_lines), 1), lines_per_page)
-    ]
-    if not pages_lines:
-        pages_lines = [[""]]
-
-    def esc(s: str) -> str:
-        return s.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
-
-    pdf = pikepdf.Pdf.new()
-    font = Dictionary(
-        Type=Name.Font,
-        Subtype=Name.Type1,
-        BaseFont=Name.Helvetica,
+    return text_to_pdf(
+        text,
+        path,
+        title=title,
+        page_size=resolve_page_size(page_size),
     )
-    for plines in pages_lines:
-        parts = ["BT", f"/F1 {font_size:.1f} Tf", f"1 0 0 1 {margin:.1f} {page_h - margin:.1f} Tm"]
-        first = True
-        for line in plines:
-            if first:
-                parts.append(f"({esc(line)}) Tj")
-                first = False
-            else:
-                parts.append(f"0 {-line_h:.2f} Td ({esc(line)}) Tj")
-        parts.append("ET")
-        content = "\n".join(parts).encode("latin-1", errors="replace")
-        page = pdf.add_blank_page(page_size=(page_w, page_h))
-        page[Name.Resources] = Dictionary(Font=Dictionary(F1=font))
-        page[Name.Contents] = Stream(pdf, content)
-
-    if title:
-        with pdf.open_metadata() as meta:
-            meta["dc:title"] = title
-    pdf.save(path)
-    return path

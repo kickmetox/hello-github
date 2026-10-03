@@ -8,16 +8,19 @@ from PySide6.QtCore import QEvent, Qt, QTimer
 from PySide6.QtGui import QAction, QIcon, QKeySequence
 from PySide6.QtWidgets import (
     QFileDialog,
+    QFrame,
     QHBoxLayout,
     QLabel,
     QMainWindow,
     QMenu,
     QMessageBox,
     QPushButton,
+    QScrollArea,
     QSplitter,
     QStackedWidget,
     QStatusBar,
     QSystemTrayIcon,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
@@ -71,6 +74,8 @@ from instantlensdoc.core.app_settings import (
     get_pdf_thumbnail_scale,
     get_restore_session_on_start,
     get_restore_window_geometry_on_start,
+    get_favorites_bar_visible,
+    get_presentation_hide_annotations,
     get_update_check_on_start,
     get_window_geometry_b64,
     get_window_state_b64,
@@ -151,6 +156,7 @@ class MainWindow(QMainWindow):
         self._force_quit = False
         self._presentation_active = False
         self._presentation_prev: dict | None = None
+        self._fav_bar_buttons: list = []
         self._unsaved_paths: set[str] = set()
         self._readonly_preview_paths: set[str] = set()  # Merge-Vorschau-Tabs — 1.1.5
         self._ann_zero_sticky = False  # 0-Treffer-Status dauerhaft — 1.1.7
@@ -835,6 +841,48 @@ class MainWindow(QMainWindow):
         self.preview_readonly_banner.setVisible(False)
         outer.addWidget(self.preview_readonly_banner)
 
+        # Globale Lesezeichen-Leiste (ildfav-v1) — Schnelljump über Docs — 1.7.0
+        self.favorites_bar = QFrame()
+        self.favorites_bar.setObjectName("globalFavoritesBar")
+        self.favorites_bar.setAttribute(Qt.WA_StyledBackground, True)
+        self.favorites_bar.setStyleSheet(
+            "#globalFavoritesBar {"
+            " background: #F3F5F8; border-bottom: 1px solid #C8D0DA;"
+            "}"
+        )
+        fav_outer = QHBoxLayout(self.favorites_bar)
+        fav_outer.setContentsMargins(8, 2, 8, 2)
+        fav_outer.setSpacing(6)
+        self.favorites_bar_label = QLabel("★ Favoriten")
+        self.favorites_bar_label.setStyleSheet("font-weight: 600; color: #334;")
+        self.favorites_bar_label.setToolTip(
+            "Globale Dokument-Favoriten (ildfav-v1) — Schnelljump — 1.7.0"
+        )
+        fav_outer.addWidget(self.favorites_bar_label)
+        self.favorites_bar_scroll = QScrollArea()
+        self.favorites_bar_scroll.setWidgetResizable(True)
+        self.favorites_bar_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.favorites_bar_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.favorites_bar_scroll.setFixedHeight(34)
+        self.favorites_bar_scroll.setFrameShape(QFrame.NoFrame)
+        self.favorites_bar_inner = QWidget()
+        self.favorites_bar_layout = QHBoxLayout(self.favorites_bar_inner)
+        self.favorites_bar_layout.setContentsMargins(0, 0, 0, 0)
+        self.favorites_bar_layout.setSpacing(4)
+        self.favorites_bar_layout.addStretch(1)
+        self.favorites_bar_scroll.setWidget(self.favorites_bar_inner)
+        fav_outer.addWidget(self.favorites_bar_scroll, 1)
+        self.btn_fav_add = QToolButton()
+        self.btn_fav_add.setText("+")
+        self.btn_fav_add.setToolTip(
+            "Aktuelle PDF-Seite zur globalen Favoriten-Leiste hinzufügen — 1.7.0"
+        )
+        self.btn_fav_add.clicked.connect(self._add_current_to_global_favorites)
+        fav_outer.addWidget(self.btn_fav_add)
+        self.favorites_bar.setVisible(get_favorites_bar_visible())
+        outer.addWidget(self.favorites_bar)
+        QTimer.singleShot(0, self._refresh_favorites_bar)
+
         root = QHBoxLayout()
         root.setContentsMargins(0, 0, 0, 0)
         outer.addLayout(root, 1)
@@ -1245,6 +1293,13 @@ class MainWindow(QMainWindow):
             a = QAction(title, self)
             a.triggered.connect(lambda checked=False, f=fmt: self._export_editor(f))
             m_export.addAction(a)
+        act_text_pdf = QAction("Text → PDF…", self)
+        act_text_pdf.setShortcut(QKeySequence("Ctrl+Shift+P"))
+        act_text_pdf.setToolTip(
+            "Aktuellen Text-Tab als einfaches PDF exportieren (pikepdf Seiten) — 1.7.0"
+        )
+        act_text_pdf.triggered.connect(self._export_text_to_pdf)
+        m_export.addAction(act_text_pdf)
         m_export.addSeparator()
         act_exp_prof_save = QAction("Export-Profil speichern…", self)
         act_exp_prof_save.setToolTip("DPI / Format / Zielordner als Profil speichern")
@@ -1866,10 +1921,19 @@ class MainWindow(QMainWindow):
         act_present = QAction("Präsentationsmodus", self)
         act_present.setShortcut(QKeySequence("F5"))
         act_present.setToolTip(
-            "PDF Vollbild-Präsentation (Pfeiltasten/Leertaste weiter, Esc beendet)"
+            "PDF Vollbild-Präsentation (Pfeiltasten/Leertaste weiter, Esc beendet; "
+            "optional Ann.-Overlay aus) — 1.7.0"
         )
         act_present.triggered.connect(self._toggle_presentation)
         m_view.addAction(act_present)
+        self._favorites_bar_action = QAction("Lesezeichen-Leiste", self)
+        self._favorites_bar_action.setCheckable(True)
+        self._favorites_bar_action.setChecked(get_favorites_bar_visible())
+        self._favorites_bar_action.setToolTip(
+            "Globale Favoriten-Leiste (ildfav-v1) ein-/ausblenden — 1.7.0"
+        )
+        self._favorites_bar_action.toggled.connect(self._toggle_favorites_bar)
+        m_view.addAction(self._favorites_bar_action)
         m_view.addSeparator()
         act_zi = QAction("Vergrößern", self)
         act_zi.setShortcut(QKeySequence.ZoomIn)
@@ -2095,6 +2159,13 @@ class MainWindow(QMainWindow):
         act_fav_import.setToolTip("Favoritenliste aus JSON laden (ersetzen oder zusammenführen)")
         act_fav_import.triggered.connect(lambda: self.pdf_view.import_page_favorites_json())
         m_pdf.addAction(act_fav_import)
+        act_global_fav = QAction("Zur Lesezeichen-Leiste hinzufügen", self)
+        act_global_fav.setShortcut(QKeySequence("Ctrl+Alt+Shift+B"))
+        act_global_fav.setToolTip(
+            "Aktuelle Seite in globale Favoriten (ildfav-v1) — Schnelljump — 1.7.0"
+        )
+        act_global_fav.triggered.connect(self._add_current_to_global_favorites)
+        m_pdf.addAction(act_global_fav)
         act_ol_import = QAction("Bookmarks aus PDF-Outlines importieren…", self)
         act_ol_import.setToolTip(
             "PDF-Outline → Seiten-Favoriten (Bookmarks) importieren — 1.3.0"
@@ -2483,6 +2554,9 @@ class MainWindow(QMainWindow):
 
     def _update_doc_status(self):
         """Statusleiste: Dateiname, Seite x/y bzw. Zeile x/y, Seitengröße, Zoom %, Wörter."""
+        # Während _build_ui kann stack.currentChanged feuern, bevor Labels existieren
+        if not hasattr(self, "file_status_label"):
+            return
         name = "—"
         page_txt = "Seite —"
         size_txt = "—"
@@ -2911,12 +2985,23 @@ class MainWindow(QMainWindow):
                 "Bitte zuerst ein PDF öffnen.",
             )
             return
+        try:
+            ann_was = bool(self.pdf_view.annotations_visible())
+        except TypeError:
+            ann_was = bool(self.pdf_view.annotations_visible)
+        hide_ann = get_presentation_hide_annotations()
         self._presentation_prev = {
             "menu": self.menuBar().isVisible(),
             "status": self.statusBar().isVisible(),
             "sidebar": self.sidebar.isVisible(),
+            "favorites_bar": bool(
+                getattr(self, "favorites_bar", None)
+                and self.favorites_bar.isVisible()
+            ),
             "was_fullscreen": self.isFullScreen(),
             "stack": self.stack.currentWidget(),
+            "ann_visible": ann_was,
+            "hid_ann": False,
         }
         # PDF-Toolbar ausblenden (erste Layout-Zeile)
         try:
@@ -2934,6 +3019,15 @@ class MainWindow(QMainWindow):
         self.menuBar().setVisible(False)
         self.statusBar().setVisible(False)
         self.sidebar.setVisible(False)
+        if getattr(self, "favorites_bar", None) is not None:
+            self.favorites_bar.setVisible(False)
+        # Optional Annotation-Overlay aus — 1.7.0
+        if hide_ann and ann_was:
+            try:
+                self.pdf_view.set_annotations_visible(False)
+                self._presentation_prev["hid_ann"] = True
+            except Exception:
+                self._presentation_prev["hid_ann"] = False
         self._presentation_active = True
         self.showFullScreen()
         try:
@@ -2941,9 +3035,10 @@ class MainWindow(QMainWindow):
         except Exception:
             pass
         self.pdf_view.setFocus(Qt.OtherFocusReason)
+        ann_note = " · Ann. aus" if self._presentation_prev.get("hid_ann") else ""
         self._set_status(
             f"Präsentation — Seite {self.pdf_view.page_index + 1}/{self.pdf_view.page_count} "
-            "(←/→ Esc)"
+            f"(←/→ Esc){ann_note}"
         )
 
     def _exit_presentation(self):
@@ -2965,6 +3060,16 @@ class MainWindow(QMainWindow):
         self.menuBar().setVisible(bool(prev.get("menu", True)))
         self.statusBar().setVisible(bool(prev.get("status", True)))
         self.sidebar.setVisible(bool(prev.get("sidebar", True)))
+        if getattr(self, "favorites_bar", None) is not None:
+            # nur wieder zeigen wenn Setting an und vorher sichtbar / Setting an
+            show_bar = get_favorites_bar_visible()
+            self.favorites_bar.setVisible(bool(show_bar))
+        # Ann.-Overlay wiederherstellen wenn Präsentation ihn ausgeblendet hat
+        if prev.get("hid_ann"):
+            try:
+                self.pdf_view.set_annotations_visible(bool(prev.get("ann_visible", True)))
+            except Exception:
+                pass
         stack_w = prev.get("stack")
         if stack_w is not None:
             self.stack.setCurrentWidget(stack_w)
@@ -8097,14 +8202,192 @@ class MainWindow(QMainWindow):
 
     def _check_updates(self, *, silent: bool = False):
         from instantlensdoc.core.i18n import get_lang
-        from instantlensdoc.core.update_check import check_for_updates
+        from instantlensdoc.core.update_check import check_for_updates, check_local_version
 
-        result = check_for_updates(allow_network=True)
+        # Primär lokal (docs/VERSION / VERSION.txt); Online optional — kein Auto-Download — 1.7.0
+        result = check_local_version()
+        if not result.newer_available:
+            # Online nur wenn lokal kein neuer Hinweis — ergänzend
+            online = check_for_updates(allow_network=True)
+            if online.online:
+                result = online
         msg = result.message(get_lang())
         self._set_status(msg)
         if silent and not result.newer_available:
             return
-        QMessageBox.information(self, "Update-Check", msg)
+        QMessageBox.information(self, "Update-Hinweis", msg)
+
+    def _toggle_favorites_bar(self, checked: bool) -> None:
+        from instantlensdoc.core.app_settings import set_favorites_bar_visible
+
+        set_favorites_bar_visible(bool(checked))
+        if getattr(self, "favorites_bar", None) is not None:
+            self.favorites_bar.setVisible(bool(checked) and not self._presentation_active)
+        if getattr(self, "_favorites_bar_action", None) is not None:
+            self._favorites_bar_action.blockSignals(True)
+            self._favorites_bar_action.setChecked(bool(checked))
+            self._favorites_bar_action.blockSignals(False)
+        if checked:
+            self._refresh_favorites_bar()
+
+    def _refresh_favorites_bar(self) -> None:
+        """Globale ildfav-v1 Favoriten als Schnelljump-Buttons zeichnen — 1.7.0."""
+        from instantlensdoc.core.global_favorites import load_global_favorites
+
+        lay = getattr(self, "favorites_bar_layout", None)
+        if lay is None:
+            return
+        # Alte Buttons entfernen (Stretch behalten)
+        while lay.count() > 1:
+            item = lay.takeAt(0)
+            w = item.widget() if item else None
+            if w is not None:
+                w.deleteLater()
+        self._fav_bar_buttons = []
+        favs = load_global_favorites()
+        if not favs:
+            empty = QLabel("— keine —")
+            empty.setStyleSheet("color: #889;")
+            empty.setToolTip("PDF → Zur Lesezeichen-Leiste hinzufügen (Ctrl+Alt+Shift+B)")
+            lay.insertWidget(0, empty)
+            return
+        for fav in favs:
+            btn = QToolButton()
+            label = fav.display_label()
+            if len(label) > 28:
+                label = label[:25] + "…"
+            btn.setText(label)
+            btn.setToolTip(f"{fav.path}\nSeite {fav.page + 1}")
+            btn.setAutoRaise(True)
+            path, page = fav.path, fav.page
+            btn.clicked.connect(
+                lambda checked=False, p=path, pg=page: self._jump_global_favorite(p, pg)
+            )
+            # Rechtsklick entfernen
+            btn.setContextMenuPolicy(Qt.CustomContextMenu)
+            btn.customContextMenuRequested.connect(
+                lambda pos, b=btn, p=path, pg=page: self._global_fav_context(b, p, pg, pos)
+            )
+            lay.insertWidget(lay.count() - 1, btn)
+            self._fav_bar_buttons.append(btn)
+
+    def _global_fav_context(self, btn, path: str, page: int, pos) -> None:
+        menu = QMenu(self)
+        act_go = menu.addAction("Springen")
+        act_rm = menu.addAction("Aus Leiste entfernen")
+        chosen = menu.exec(btn.mapToGlobal(pos))
+        if chosen is act_go:
+            self._jump_global_favorite(path, page)
+        elif chosen is act_rm:
+            from instantlensdoc.core.global_favorites import remove_global_favorite
+
+            remove_global_favorite(path, page)
+            self._refresh_favorites_bar()
+            self._set_status("Favorit aus Leiste entfernt")
+
+    def _add_current_to_global_favorites(self) -> None:
+        from instantlensdoc.core.global_favorites import add_global_favorite
+
+        if not self.pdf_view.pdf_path:
+            QMessageBox.information(
+                self,
+                "Lesezeichen-Leiste",
+                "Bitte zuerst ein PDF öffnen.",
+            )
+            return
+        path = str(Path(self.pdf_view.pdf_path))
+        page = int(self.pdf_view.page_index or 0)
+        label = Path(path).stem
+        add_global_favorite(path, page, label=label)
+        if getattr(self, "favorites_bar", None) is not None:
+            from instantlensdoc.core.app_settings import set_favorites_bar_visible
+
+            set_favorites_bar_visible(True)
+            self.favorites_bar.setVisible(True)
+            if getattr(self, "_favorites_bar_action", None) is not None:
+                self._favorites_bar_action.blockSignals(True)
+                self._favorites_bar_action.setChecked(True)
+                self._favorites_bar_action.blockSignals(False)
+        self._refresh_favorites_bar()
+        self._set_status(f"Favorit: {Path(path).name} · S{page + 1}")
+
+    def _jump_global_favorite(self, path: str, page: int) -> None:
+        p = Path(path)
+        if not p.is_file():
+            QMessageBox.warning(
+                self,
+                "Lesezeichen-Leiste",
+                f"Datei nicht gefunden:\n{path}",
+            )
+            return
+        self.open_path(str(p))
+        try:
+            if self.pdf_view.pdf_path and self.pdf_view.page_count > 0:
+                self.pdf_view.goto_page(max(0, min(int(page), self.pdf_view.page_count - 1)))
+        except Exception:
+            pass
+        self._set_status(f"Favorit → {p.name} · S{int(page) + 1}")
+
+    def _export_text_to_pdf(self) -> None:
+        """Aktuellen Text-Tab als einfaches PDF (pikepdf Seiten) — 1.7.0."""
+        text = ""
+        title = "InstantLens Doc"
+        if self.stack.currentWidget() is self.editor_pane:
+            text = self.editor.toPlainText()
+            if self.doc:
+                title = self.doc.title or self.doc.display_name
+        elif self.doc and self.doc.kind in (
+            DocKind.TEXT,
+            DocKind.MARKDOWN,
+            DocKind.HTML,
+            DocKind.DOCX,
+        ):
+            text = self.doc.text or self.editor.toPlainText()
+            title = self.doc.display_name
+        else:
+            QMessageBox.information(
+                self,
+                "Text → PDF",
+                "Bitte einen Text-Tab öffnen (TXT/MD/HTML/DOCX) oder Text eingeben.",
+            )
+            return
+        default_name = (self.doc.display_name if self.doc else "export") + ".pdf"
+        if "." in default_name and not default_name.lower().endswith(".pdf"):
+            default_name = Path(default_name).stem + ".pdf"
+        last_dir = get_last_export_dir()
+        start = str(Path(dialog_start_dir(last_dir)) / default_name)
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Text → PDF", start, "PDF (*.pdf)"
+        )
+        if not path:
+            return
+        if not confirm_overwrite_export(path, self):
+            return
+        try:
+            from ild_pdf.text_pdf import page_count_for_text, text_to_pdf
+            from instantlensdoc.core.export import resolve_page_size
+
+            out = text_to_pdf(
+                text,
+                path,
+                title=title,
+                page_size=resolve_page_size(None),
+            )
+            pages = page_count_for_text(text, page_size=resolve_page_size(None))
+            set_last_export_dir(str(out))
+            remember_recent_dir(str(out))
+            self._set_status(f"Text → PDF: {out.name} ({pages} Seite(n))")
+            ask = QMessageBox.question(
+                self,
+                "Text → PDF",
+                f"PDF gespeichert ({pages} Seite(n)):\n{out}\n\nJetzt öffnen?",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No,
+            )
+            if ask == QMessageBox.Yes:
+                self.open_path(str(out))
+        except Exception as e:
+            QMessageBox.critical(self, "Text → PDF", f"Export fehlgeschlagen:\n{e}")
 
     def _batch_convert(self):
         BatchConvertDialog(self).exec()

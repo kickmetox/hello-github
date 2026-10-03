@@ -1,5 +1,23 @@
 # Changelog — InstantLens Doc
 
+## 1.7.0 — Präsentationsmodus Ann.-Overlay, Lesezeichen-Leiste ildfav-v1, Text→PDF, Update-Hinweis lokal
+
+Minor-Release mit neuen Kernfeatures (Basis **1.6.5**): **Präsentationsmodus** Vollbild-PDF mit Pfeiltasten/Esc und optional **Annotation-Overlay aus**; **Lesezeichen-Leiste** für globale Favoriten (Schema **`ildfav-v1`**, Schnelljump über Docs); **Text → PDF** exportiert den aktuellen Text-Tab als einfaches Mehrseiten-PDF (`ild_pdf.text_to_pdf`, pikepdf Seiten); **Update-Hinweis** vergleicht lokal gegen **`docs/VERSION`** oder eingebettete **`VERSION.txt`** (nur Hinweis, kein Auto-Download). Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### PDF / Präsentation
+- Präsentationsmodus (F5): Vollbild; ←/→/Leertaste; Esc beendet; Setting „Ann.-Overlay ausblenden“ (Default an)
+- Globale Favoriten-Leiste: aktuelle Seite hinzufügen (Ctrl+Shift+B); Jump öffnet Doc+Seite; Persistenz `global_favorites.ildfav.json`
+
+### Editor / Export
+- Text → PDF… (Ctrl+Shift+P): aktueller Text-Tab → einfaches PDF via pikepdf `add_blank_page`
+
+### Update / Packaging
+- Update-Hinweis: lokaler Versionsvergleich `docs/VERSION` / `VERSION.txt`; optional Online; kein Auto-Download
+- Version **1.7.0** (App / `ild_pdf` / ISS / Smoke / Docs); `docs/VERSION` + `VERSION.txt`
+- Smoke: Präsentation Ann-hide, globale Favoriten-Leiste, text_to_pdf, lokaler Update-Check (CLI + Qt)
+
+---
+
 ## 1.6.5 — WM Reset-Template·Fokus/Selektion, Crypto Prefill Toast, Stats Quick-Insert·ungültige rot, Layouts Import-Log kopieren/TXT·Zusammenfassung
 
 Post-Release-Polish nach 1.6.4: **Wasserzeichen-Template** mit **Reset-Template**-Button und **Fokus/Selektion** wie Ann.-Template; **Crypto „jetzt ausschalten“** speichert sofort und zeigt **Toast-Bestätigung**; **Dokument-Statistik** Template **Quick-Insert `{stem}`/`{date}`** und **ungültige Platzhalter rot**; **Layouts Import-Log** mit **Zusammenfassung** (importiert/übersprungen/umbenannt) sowie **kopieren** / **als TXT**. Stubs KI/Cloud/Stylus/3D bleiben Stubs.

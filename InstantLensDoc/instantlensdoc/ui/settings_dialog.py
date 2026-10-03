@@ -153,6 +153,8 @@ from instantlensdoc.core.app_settings import (
     get_ui_lang,
     PDF_COMPARE_DIFF_THRESHOLD_MAX,
     PDF_COMPARE_DIFF_THRESHOLD_MIN,
+    get_presentation_hide_annotations,
+    get_favorites_bar_visible,
     get_update_check_on_start,
     get_wizard_completed,
     MERGE_DIFF_MAX_SIDE_MAX,
@@ -241,6 +243,8 @@ from instantlensdoc.core.app_settings import (
     set_theme,
     set_ui_lang,
     set_update_check_on_start,
+    set_presentation_hide_annotations,
+    set_favorites_bar_visible,
     get_crypto_reload_prefill_password,
     set_crypto_reload_prefill_password,
 )
@@ -1137,7 +1141,27 @@ class SettingsDialog(QDialog):
 
         self.update_chk = QCheckBox(tr("update_check"))
         self.update_chk.setChecked(get_update_check_on_start())
+        self.update_chk.setToolTip(
+            "Lokaler Versionsvergleich gegen docs/VERSION oder VERSION.txt "
+            "(nur Hinweis, kein Auto-Download) — 1.7.0"
+        )
         form.addRow(self.update_chk)
+
+        self.presentation_hide_ann = QCheckBox(
+            "Präsentation: Annotation-Overlay ausblenden"
+        )
+        self.presentation_hide_ann.setChecked(get_presentation_hide_annotations())
+        self.presentation_hide_ann.setToolTip(
+            "Im Präsentationsmodus (F5) Annotationen optional ausblenden — 1.7.0"
+        )
+        form.addRow(self.presentation_hide_ann)
+
+        self.favorites_bar_chk = QCheckBox("Lesezeichen-Leiste (globale Favoriten)")
+        self.favorites_bar_chk.setChecked(get_favorites_bar_visible())
+        self.favorites_bar_chk.setToolTip(
+            "Schnelljump-Leiste über Docs (globale ildfav-v1 Liste) — 1.7.0"
+        )
+        form.addRow(self.favorites_bar_chk)
 
         self.batch_dir = QLineEdit()
         bd = get_batch_output_dir()
@@ -1960,7 +1984,18 @@ class SettingsDialog(QDialog):
         set_ui_lang(str(self.ui_lang.currentData() or "de"))
         sync_from_settings()
         set_update_check_on_start(self.update_chk.isChecked())
+        set_presentation_hide_annotations(self.presentation_hide_ann.isChecked())
+        set_favorites_bar_visible(self.favorites_bar_chk.isChecked())
         set_crypto_reload_prefill_password(self.crypto_prefill.isChecked())
+        # Favoriten-Leiste live nachziehen
+        try:
+            parent = self.parent()
+            if parent is not None and hasattr(parent, "_refresh_favorites_bar"):
+                parent._refresh_favorites_bar()
+                if hasattr(parent, "favorites_bar"):
+                    parent.favorites_bar.setVisible(self.favorites_bar_chk.isChecked())
+        except Exception:
+            pass
         set_default_zoom_mode(str(self.zoom_mode.currentData() or DEFAULT_ZOOM_MODE_PERCENT))
         set_default_zoom_percent(int(self.zoom_pct.value()))
         set_pdf_thumbnail_scale(float(self.thumb_scale.currentData() or 0.18))

@@ -2,7 +2,7 @@
 
 Moderne Textverarbeitung mit PDF-Annotator, OCR-Bridge und Formulargenerator.
 
-**Version:** 1.6.5  
+**Version:** 1.7.0  
 **Hersteller:** Andreas Meyer · ame@sellerbach.de
 
 ## Quickstart (Windows)
@@ -33,8 +33,8 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an).
 
-## Neu in 1.6.5
+## Neu in 1.7.0
 
-Polish auf 1.6.4: **WM-Template** Reset-Template + Fokus/Selektion (wie Ann.-Template); **Crypto Prefill** „jetzt ausschalten“ sofort speichern + Toast; **Stats JSON** Quick-Insert `{stem}`/`{date}` + ungültige Platzhalter rot; **Layouts Import-Log** Zusammenfassung + kopieren/als TXT. Stubs KI/Cloud/Stylus/3D unverändert.
+Minor-Release: **Präsentationsmodus** (Vollbild, Pfeiltasten, Esc; optional Ann.-Overlay aus); **Lesezeichen-Leiste** mit globalen Favoriten (`ildfav-v1`); **Text → PDF** (aktueller Text-Tab, pikepdf Seiten); **Update-Hinweis** lokal gegen `docs/VERSION` / `VERSION.txt` (kein Auto-Download). Stubs KI/Cloud/Stylus/3D unverändert.
 
 Siehe [CHANGELOG.md](CHANGELOG.md), [FEATURES.md](FEATURES.md) und [INFO.md](INFO.md).

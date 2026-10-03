@@ -28,6 +28,8 @@ DEFAULTS: dict[str, Any] = {
     "export_pdf_page": "A4",
     "export_image_max_edge": 2000,
     "update_check_on_start": False,
+    "presentation_hide_annotations": True,  # Ann.-Overlay in Präsentation aus — 1.7.0
+    "favorites_bar_visible": True,  # globale Lesezeichen-Leiste — 1.7.0
     "last_export_dir": "",
     "last_ann_export_dir": "",  # letzter Zielordner Ann.-Export JSON — 1.2.1
     "ann_export_filename_template": "{stem}_ann.json",  # Dateiname-Template — 1.2.1
@@ -433,6 +435,24 @@ def get_update_check_on_start() -> bool:
 
 def set_update_check_on_start(enabled: bool) -> None:
     save_settings({"update_check_on_start": bool(enabled)})
+
+
+def get_presentation_hide_annotations() -> bool:
+    """Präsentationsmodus: Annotation-Overlay optional ausblenden — 1.7.0."""
+    return bool(load_settings().get("presentation_hide_annotations", True))
+
+
+def set_presentation_hide_annotations(enabled: bool) -> None:
+    save_settings({"presentation_hide_annotations": bool(enabled)})
+
+
+def get_favorites_bar_visible() -> bool:
+    """Globale Favoriten-/Lesezeichen-Leiste sichtbar — 1.7.0."""
+    return bool(load_settings().get("favorites_bar_visible", True))
+
+
+def set_favorites_bar_visible(visible: bool) -> None:
+    save_settings({"favorites_bar_visible": bool(visible)})
 
 
 def get_last_export_dir() -> Path | None:

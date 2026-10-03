@@ -56,6 +56,7 @@ from .pages import (
     inch_to_pt,
     set_crop_box,
 )
+from .text_pdf import page_count_for_text, text_to_pdf
 from .flatten import bake_annotations, draw_annotations_on_image, flatten_annotations_to_pdf
 from .outline import (
     OutlineItem,
@@ -302,6 +303,8 @@ __all__ = [
     "is_external_http_uri",
     "list_page_uri_links",
     "uri_link_at",
+    "text_to_pdf",
+    "page_count_for_text",
 ]
 
-__version__ = "1.6.5"
+__version__ = "1.7.0"
