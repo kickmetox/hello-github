@@ -840,9 +840,18 @@ class SettingsDialog(QDialog):
         self.ann_export_tpl.setPlaceholderText("{stem}_ann.json")
         self.ann_export_tpl.setToolTip(
             "Dateiname-Template für Annotation-JSON-Export. "
-            "Platzhalter: {stem}, optional {page}. Standard: {stem}_ann.json — 1.2.1"
+            "Platzhalter: {stem}, {page} (1-basiert), {date} (YYYY-MM-DD). "
+            "Standard: {stem}_ann.json — 1.2.2"
         )
+        self.ann_export_tpl.textChanged.connect(self._update_ann_export_preview)
         form.addRow("Ann.-Export Dateiname", self.ann_export_tpl)
+        self.ann_export_preview = QLabel("")
+        self.ann_export_preview.setWordWrap(True)
+        self.ann_export_preview.setToolTip(
+            "Live-Vorschau des Dateinamens (Beispiel stem=dokument, page=2) — 1.2.2"
+        )
+        form.addRow("Vorschau Dateiname", self.ann_export_preview)
+        self._update_ann_export_preview()
         last_ann = get_last_ann_export_dir()
         self.ann_export_dir_lbl = QLabel(
             f"Ann.-Export Ordner: {last_ann}" if last_ann else "Ann.-Export Ordner: (noch keiner)"
@@ -935,6 +944,18 @@ class SettingsDialog(QDialog):
         buttons.accepted.connect(self._save)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
+
+    def _update_ann_export_preview(self, *_args) -> None:
+        """Live-Vorschau Ann.-Export-Dateiname inkl. {page}/{date} — 1.2.2."""
+        if not hasattr(self, "ann_export_preview") or not hasattr(self, "ann_export_tpl"):
+            return
+        from instantlensdoc.core.app_settings import format_ann_export_filename
+
+        tpl = self.ann_export_tpl.text().strip() or "{stem}_ann.json"
+        sample = format_ann_export_filename(
+            "dokument", page=2, template=tpl
+        )
+        self.ann_export_preview.setText(sample)
 
     def _clear_recent_files(self) -> None:
         from instantlensdoc.core import recent as recent_mod

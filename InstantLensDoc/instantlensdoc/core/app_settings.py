@@ -451,20 +451,30 @@ def format_ann_export_filename(
     *,
     page: int | None = None,
     template: str | None = None,
+    date: str | None = None,
 ) -> str:
     """
     Dateiname aus Template bauen.
-    Platzhalter: ``{stem}``, optional ``{page}`` (1-basiert). — 1.2.1
+    Platzhalter: ``{stem}``, optional ``{page}`` (1-basiert),
+    ``{date}`` (YYYY-MM-DD). — 1.2.1/1.2.2
     """
+    from datetime import date as _date
+
     tpl = template if template is not None else get_ann_export_filename_template()
     name = str(tpl)
     safe_stem = str(stem or "document").strip() or "document"
     name = name.replace("{stem}", safe_stem)
+    date_s = (date if date is not None else _date.today().isoformat()).strip()
+    name = name.replace("{date}", date_s)
     if page is not None:
         name = name.replace("{page}", str(int(page)))
     else:
         name = name.replace("{page}", "")
         name = name.replace("__", "_").replace("_.", ".")
+    # Leere Doppel-Unterstriche nach fehlendem {page} bereinigen
+    while "__" in name:
+        name = name.replace("__", "_")
+    name = name.replace("_.", ".")
     if not name.lower().endswith(".json"):
         name += ".json"
     return name

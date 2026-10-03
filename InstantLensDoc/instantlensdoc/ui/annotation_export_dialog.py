@@ -80,7 +80,8 @@ class AnnotationExportDialog(QDialog):
         tpl = get_ann_export_filename_template()
         root.addWidget(
             QLabel(
-                f"Dateiname-Template (Einstellungen): <code>{tpl}</code> — 1.2.1"
+                f"Dateiname-Template (Einstellungen): <code>{tpl}</code><br>"
+                "Platzhalter: <b>{stem}</b>, <b>{page}</b>, <b>{date}</b> (YYYY-MM-DD) — 1.2.2"
             )
         )
 

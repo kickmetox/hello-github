@@ -129,7 +129,43 @@ def filter_diff_differences(
     return out_l, out_r, out_t
 
 
-def format_diff_txt(
+def word_diff_spans(left: str, right: str) -> tuple[list[tuple[str, str]], list[tuple[str, str]]]:
+    """
+    Einfaches Wort-Diff innerhalb einer Zeile.
+    Liefert (left_spans, right_spans) mit Tags equal|replace|delete|insert. — 1.2.2
+    """
+    import re
+
+    def _tokens(s: str) -> list[str]:
+        # Wörter und Trennzeichen getrennt halten
+        return re.findall(r"\w+|\W+", s or "") or ([""] if not s else [])
+
+    a = _tokens(left)
+    b = _tokens(right)
+    sm = difflib.SequenceMatcher(a=a, b=b, autojunk=False)
+    left_spans: list[tuple[str, str]] = []
+    right_spans: list[tuple[str, str]] = []
+    for tag, i1, i2, j1, j2 in sm.get_opcodes():
+        if tag == "equal":
+            for t in a[i1:i2]:
+                left_spans.append(("equal", t))
+            for t in b[j1:j2]:
+                right_spans.append(("equal", t))
+        elif tag == "replace":
+            for t in a[i1:i2]:
+                left_spans.append(("replace", t))
+            for t in b[j1:j2]:
+                right_spans.append(("replace", t))
+        elif tag == "delete":
+            for t in a[i1:i2]:
+                left_spans.append(("delete", t))
+        elif tag == "insert":
+            for t in b[j1:j2]:
+                right_spans.append(("insert", t))
+    return left_spans, right_spans
+
+
+def format_unified_diff(
     left_lines: list[str],
     right_lines: list[str],
     tags: list[str],
@@ -139,10 +175,58 @@ def format_diff_txt(
     line_numbers: bool = True,
     only_differences: bool = False,
 ) -> str:
+    """Unified-Diff-Text (eine Spalte) — 1.2.2."""
+    l_lines, r_lines, t_tags = left_lines, right_lines, tags
+    if only_differences:
+        l_lines, r_lines, t_tags = filter_diff_differences(l_lines, r_lines, t_tags)
+    rows: list[str] = [
+        f"--- {left_label}",
+        f"+++ {right_label}",
+        f"# Unified · Zeilen: {len(t_tags)}"
+        + (" (nur Unterschiede)" if only_differences else ""),
+        "",
+    ]
+    for i, (a, b, t) in enumerate(zip(l_lines, r_lines, t_tags), start=1):
+        num = f"{i:>4} " if line_numbers else ""
+        if t == "equal":
+            rows.append(f"  {num}{a}")
+        elif t == "replace":
+            rows.append(f"- {num}{a}")
+            rows.append(f"+ {num}{b}")
+        elif t == "delete":
+            rows.append(f"- {num}{a}")
+        elif t == "insert":
+            rows.append(f"+ {num}{b}")
+        else:
+            rows.append(f"? {num}{a} | {b}")
+    return "\n".join(rows).rstrip() + "\n"
+
+
+def format_diff_txt(
+    left_lines: list[str],
+    right_lines: list[str],
+    tags: list[str],
+    *,
+    left_label: str = "Links",
+    right_label: str = "Rechts",
+    line_numbers: bool = True,
+    only_differences: bool = False,
+    unified: bool = False,
+) -> str:
     """
     Diff als Klartext (TXT) für Export.
-    Marker: `` `` equal, ``~`` replace, ``-`` delete, ``+`` insert. — 1.2.1
+    Marker: `` `` equal, ``~`` replace, ``-`` delete, ``+`` insert. — 1.2.1/1.2.2
     """
+    if unified:
+        return format_unified_diff(
+            left_lines,
+            right_lines,
+            tags,
+            left_label=left_label,
+            right_label=right_label,
+            line_numbers=line_numbers,
+            only_differences=only_differences,
+        )
     l_lines, r_lines, t_tags = left_lines, right_lines, tags
     if only_differences:
         l_lines, r_lines, t_tags = filter_diff_differences(l_lines, r_lines, t_tags)

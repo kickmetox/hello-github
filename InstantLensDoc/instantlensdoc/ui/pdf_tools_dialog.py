@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QListWidget,
     QMessageBox,
+    QPlainTextEdit,
     QPushButton,
     QSpinBox,
     QTabWidget,
@@ -262,6 +263,19 @@ class PdfToolsDialog(QDialog):
         form.addRow("Vorschau", self.split_preview)
         self.split_single = QCheckBox("Jede Seite einzeln")
         form.addRow("", self.split_single)
+        self.split_open_tabs = QCheckBox("Erzeugte Dateien in Tabs öffnen")
+        self.split_open_tabs.setToolTip(
+            "Nach erfolgreichem Teilen die neuen PDFs optional in Tabs öffnen — 1.2.2"
+        )
+        form.addRow("", self.split_open_tabs)
+        self.split_log = QPlainTextEdit()
+        self.split_log.setReadOnly(True)
+        self.split_log.setMaximumHeight(110)
+        self.split_log.setPlaceholderText("Log der erzeugten Dateipfade …")
+        self.split_log.setToolTip(
+            "Liste der nach dem Teilen erzeugten Dateipfade — 1.2.2"
+        )
+        form.addRow("Pfad-Log", self.split_log)
         run = QPushButton("Teilen")
         run.clicked.connect(self._split_run)
         form.addRow(run)
@@ -628,16 +642,48 @@ class PdfToolsDialog(QDialog):
                 ranges=ranges,
                 single_pages=self.split_single.isChecked(),
             )
+            paths = [str(p) for p in written]
+            self._split_log_paths(paths)
             QMessageBox.information(
                 self,
                 "Teilen",
                 f"{len(written)} Datei(en) erstellt in\n{out}",
             )
+            if self.split_open_tabs.isChecked() and paths:
+                self._split_open_written(paths)
         except ValueError as e:
             QMessageBox.warning(self, "Teilen — ungültiger Bereich", str(e))
             self._split_update_preview()
         except Exception as e:
             QMessageBox.critical(self, "Teilen", str(e))
+
+    def _split_log_paths(self, paths: list[str]) -> None:
+        """Erzeugte Pfade ins Split-Log schreiben — 1.2.2."""
+        if not hasattr(self, "split_log"):
+            return
+        lines = [f"[{i + 1}] {p}" for i, p in enumerate(paths)]
+        header = f"Erzeugt: {len(paths)} Datei(en)"
+        self.split_log.setPlainText(header + ("\n" + "\n".join(lines) if lines else ""))
+
+    def _split_open_written(self, paths: list[str]) -> None:
+        """Erzeugte Split-PDFs optional in Tabs öffnen — 1.2.2."""
+        mw = self.parent()
+        while mw is not None and not hasattr(mw, "open_path"):
+            mw = mw.parent()
+        if mw is None:
+            return
+        # Begrenze Mass-Open; Rest bleibt im Pfad-Log
+        to_open = [p for p in paths if p and Path(p).is_file()][:12]
+
+        def _open_all():
+            for p in to_open:
+                try:
+                    mw.open_path(p)
+                except Exception:
+                    pass
+
+        self.accept()
+        QTimer.singleShot(0, _open_all)
 
     def _ex_pick_src(self):
         path, _ = QFileDialog.getOpenFileName(self, "PDF", "", "PDF (*.pdf)")

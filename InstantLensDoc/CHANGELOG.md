@@ -1,5 +1,27 @@
 # Changelog — InstantLens Doc
 
+## 1.2.2 — PDF-Split Tabs·Pfad-Log, Ann.-Template {page}/{date}, Diff Unified·Wort-HL, run.bat --yes
+
+Post-Release-Polish nach 1.2.1: **PDF-Split** kann erzeugte Dateien optional in **Tabs öffnen** und zeigt ein **Pfad-Log**; **Ann.-Export-Template** dokumentiert Platzhalter **`{page}`** / **`{date}`** mit **Live-Vorschau**; **Text-Diff** mit Toggle **Side-by-Side / Unified** und einfachem **Wort-Highlight**; **`run.bat --yes`** für non-interactive pip inkl. dokumentierter **Exit-Codes**. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### PDF
+- Split: Checkbox **Erzeugte Dateien in Tabs öffnen**; **Pfad-Log** der erzeugten Dateien
+
+### Annotationen
+- Export-Template: Platzhalter **`{page}`**, **`{date}`** (YYYY-MM-DD) dokumentiert; Settings-**Live-Vorschau** Dateiname
+
+### Editor
+- Text-Diff: Toggle **Unified** vs. Side-by-Side; **Wort-Highlight** in geänderten Zeilen
+
+### Packaging / Start
+- **`run.bat --yes` / `-y`**: non-interactive `pip install -r requirements.txt`; Exit-Codes dokumentiert (0 OK · 1 Fehler)
+
+### Packaging / Docs
+- Version **1.2.2** (App / `ild_pdf` / ISS / Smoke / Docs)
+- Smoke: Split Tabs·Log, Ann.-Template {page}/{date}·Vorschau, Diff Unified·Wort-HL, run.bat --yes (CLI + Qt)
+
+---
+
 ## 1.2.1 — PDF-Split Validierung·Vorschau, Ann.-Export Template, Diff Toggle·TXT, run.bat pip
 
 Post-Release-Polish nach 1.2.0: **PDF-Split/Extrakt** validiert fehlerhafte Bereiche mit klaren **DE-Meldungen** und zeigt **Seitenanzahl-Vorschau**; **Ann.-Export** merkt den **Zielordner** und nutzt ein Dateiname-Template aus Settings (`{stem}_ann.json`); **Text-Diff** mit Toggle **Nur Unterschiede** + **Zeilennummern** sowie **Diff als TXT**; **`run.bat`** bietet optional `python -m pip install -r requirements.txt` per **J/N**. Stubs KI/Cloud/Stylus/3D bleiben Stubs.

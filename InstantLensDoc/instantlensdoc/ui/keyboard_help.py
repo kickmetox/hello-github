@@ -95,10 +95,10 @@ SHORTCUTS_HTML = """
 <tr><td>About / Lizenz Ablauf</td><td>Banner Fokus-Ring + Enter→Aktivierung + Esc schließt + AccessibleName; Icon + Dismiss + Schließen-X; Persistenz dismiss_date; Farbe Warnung vs. abgelaufen; Ablauf TT.MM.JJJJ — 1.0.9</td></tr>
 <tr><td>OCR gesamtes PDF</td><td>Extras → „Als Defaults speichern“ → Toast „OCR-Defaults gespeichert“ (Dauer Settings 1/2/3 s + Accessibility-Announcement) + Feld-Highlight; Fehler anhängen persistiert; Seitenfehler + Teilergebnis; von–bis → Textdatei-Tab — 1.1.9</td></tr>
 <tr><td>PDF zusammenführen</td><td>Thumbnail-Klick → Readonly-Tab Banner „Vorschau“ + „Zum Bearbeiten öffnen“; Toggle Readonly schließen auch im Merge-Dialog (gleicher Persistenz-Tooltip in Settings); Drag&amp;Drop + Duplikat-Warnung + Doppelklick/Alle/Summe — 1.1.9</td></tr>
-<tr><td>PDF Seitenbereich / Split</td><td>PDF → Seitenbereich extrahieren…: Bereiche z. B. 1-3,5,8-10; DE-Validierung fehlerhafter Bereiche + Seitenanzahl-Vorschau; Split-Tab 1-basiert — 1.2.1</td></tr>
-<tr><td>Ann. Export JSON/Flatten</td><td>PDF → Annotationen exportieren (JSON / Flatten)…: ildann-v4 + optional Flatten; Zielordner merken; Dateiname-Template Settings ({stem}_ann.json) — 1.2.1</td></tr>
-<tr><td>Text-Diff Panel</td><td>Datei → Text-Diff (offene Tabs)… (Ctrl+Alt+D): Nur-Unterschiede + Zeilennummern; Diff als TXT exportieren — 1.2.1</td></tr>
-<tr><td>run.bat Deps / pip</td><td>Windows-Start: Python ≥3.10 + Kern-Deps prüfen; bei fehlenden Paketen optional python -m pip install -r requirements.txt (J/N) — 1.2.1</td></tr>
+<tr><td>PDF Seitenbereich / Split</td><td>PDF → Seitenbereich extrahieren… / Teilen: Bereiche z. B. 1-3,5,8-10; optional erzeugte Dateien in Tabs öffnen + Pfad-Log — 1.2.2</td></tr>
+<tr><td>Ann. Export JSON/Flatten</td><td>PDF → Annotationen exportieren (JSON / Flatten)…: Template-Platzhalter {stem}/{page}/{date}; Live-Vorschau Dateiname in Settings — 1.2.2</td></tr>
+<tr><td>Text-Diff Panel</td><td>Datei → Text-Diff (offene Tabs)… (Ctrl+Alt+D): Side-by-Side/Unified Toggle; Wort-Highlight; Diff als TXT — 1.2.2</td></tr>
+<tr><td>run.bat Deps / pip</td><td>Windows-Start: Python ≥3.10 + Kern-Deps; optional pip (J/N) oder run.bat --yes/-y non-interactive; Exit 0 OK · 1 Fehler — 1.2.2</td></tr>
 <tr><td>Alle Ann. auf Seite löschen</td><td>Bearbeiten → bei 0 Treffern Sticky-Status Statusleiste bis nächste Ann.-Aktion / Seiten-/Dokumentwechsel / Undo/Redo + i18n DE + Menü/Aktion no-op + Button disabled; Undo „N Annotationen (gefiltert)“ — 1.1.9</td></tr>
 <tr><td>Keygen</td><td>Reveal Auto-Hide 5/10/30 s + Countdown „pausiert“ (Tooltip „Countdown pausiert (Fenster ohne Fokus)“) / Esc maskiert + History maskiert (letzte 4) / Doppelklick kopiert + Clear + .txt + --days — 1.1.9</td></tr>
 <tr><td>Willkommen-Startseite</td><td>Ohne Tabs: Recent + Dokument öffnen / Leeres Text — 1.0.0</td></tr>

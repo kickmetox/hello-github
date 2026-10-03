@@ -3,8 +3,30 @@ setlocal EnableExtensions EnableDelayedExpansion
 chcp 65001 >nul
 cd /d "%~dp0"
 
-REM InstantLens Doc 1.2.1 — Start mit Python-/Abhängigkeitsprüfung (DE-Meldungen)
-REM Optional: pip install -r requirements.txt per J/N — 1.2.1
+REM InstantLens Doc 1.2.2 — Start mit Python-/Abhängigkeitsprüfung (DE-Meldungen)
+REM Optional: pip install -r requirements.txt per J/N — oder non-interactive mit --yes / -y
+REM
+REM Exit-Codes:
+REM   0  OK (App beendet mit 0)
+REM   1  Fehler: Python fehlt / Version ^<3.10 / Deps fehlen / pip fehlgeschlagen /
+REM      Installation abgelehnt / App-Exitcode != 0 wird durchgereicht
+REM
+REM Beispiele:
+REM   run.bat
+REM   run.bat --yes
+REM   run.bat -y
+
+set "ILD_YES="
+set "ILD_APP_ARGS="
+for %%A in (%*) do (
+  if /i "%%~A"=="--yes" (
+    set "ILD_YES=1"
+  ) else if /i "%%~A"=="-y" (
+    set "ILD_YES=1"
+  ) else (
+    set "ILD_APP_ARGS=!ILD_APP_ARGS! %%~A"
+  )
+)
 
 set "PYEXE="
 if exist ".venv\Scripts\python.exe" (
@@ -25,7 +47,7 @@ if exist ".venv\Scripts\python.exe" (
       echo   python -m venv .venv
       echo   .venv\Scripts\pip install -r requirements.txt
       echo.
-      pause
+      if not defined ILD_YES pause
       exit /b 1
     )
     set "PYEXE=py -3"
@@ -44,7 +66,7 @@ if errorlevel 1 (
   echo.
   echo Bitte eine passende Version installieren und PATH pruefen.
   echo.
-  pause
+  if not defined ILD_YES pause
   exit /b 1
 )
 
@@ -61,11 +83,15 @@ if not exist "requirements.txt" (
   echo [InstantLens Doc] requirements.txt nicht gefunden — bitte manuell installieren:
   echo   %PYEXE% -m pip install -r requirements.txt
   echo.
-  pause
+  if not defined ILD_YES pause
   exit /b 1
 )
-echo Fehlende Pakete jetzt mit pip installieren?
+echo Fehlende Pakete mit pip installieren:
 echo   %PYEXE% -m pip install -r requirements.txt
+if defined ILD_YES (
+  echo [InstantLens Doc] --yes: Installation ohne Rueckfrage …
+  goto :do_pip
+)
 set "ILD_PIP="
 set /p "ILD_PIP=Jetzt installieren? [J/N]: "
 if /i "!ILD_PIP!"=="J" goto :do_pip
@@ -74,6 +100,7 @@ if /i "!ILD_PIP!"=="JA" goto :do_pip
 echo.
 echo Installation abgebrochen. Manuell ausfuehren:
 echo   %PYEXE% -m pip install -r requirements.txt
+echo Oder non-interactive: run.bat --yes
 echo.
 pause
 exit /b 1
@@ -87,7 +114,7 @@ if errorlevel 1 (
   echo [InstantLens Doc] FEHLER: pip install ist fehlgeschlagen.
   echo Bitte Netzwerk/Rechte pruefen und erneut versuchen.
   echo.
-  pause
+  if not defined ILD_YES pause
   exit /b 1
 )
 echo [InstantLens Doc] Abhaengigkeiten erneut pruefen …
@@ -96,17 +123,17 @@ if errorlevel 1 (
   echo.
   echo [InstantLens Doc] FEHLER: Pakete fehlen weiterhin nach der Installation.
   echo.
-  pause
+  if not defined ILD_YES pause
   exit /b 1
 )
 
 :start_app
 echo [InstantLens Doc] Start …
-%PYEXE% -m instantlensdoc %*
+%PYEXE% -m instantlensdoc !ILD_APP_ARGS!
 set "EC=%ERRORLEVEL%"
 if not "%EC%"=="0" (
   echo.
   echo [InstantLens Doc] Die Anwendung wurde mit Fehlercode %EC% beendet.
-  pause
+  if not defined ILD_YES pause
 )
 exit /b %EC%

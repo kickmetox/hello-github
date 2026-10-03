@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **1.2.1** |
+| Version | **1.2.2** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -50,7 +50,9 @@ pip install -r requirements.txt
 run.bat
 ```
 
-`run.bat` prüft Python ≥3.10 und Kern-Deps (PySide6, pypdfium2, pikepdf, Pillow) mit klaren DE-Meldungen; bei fehlenden Paketen optional `python -m pip install -r requirements.txt` (J/N).
+`run.bat` prüft Python ≥3.10 und Kern-Deps (PySide6, pypdfium2, pikepdf, Pillow) mit klaren DE-Meldungen; bei fehlenden Paketen optional `python -m pip install -r requirements.txt` (J/N) oder non-interactive **`run.bat --yes`** / **`-y`**.
+
+Exit-Codes `run.bat`: **0** OK · **1** Python/Deps/pip-Fehler bzw. Installation abgelehnt (App-Exitcode ≠0 wird durchgereicht).
 
 ## Build
 
@@ -61,10 +63,10 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an / `checkedonce`)
 
-## Neu in 1.2.1
+## Neu in 1.2.2
 
-- PDF: Split/Extrakt — **DE-Validierung** fehlerhafter Bereiche + **Seitenanzahl-Vorschau**
-- Annotationen: Export **Zielordner merken**; Dateiname-Template **`{stem}_ann.json`** (Settings)
-- Editor: Text-Diff **Nur Unterschiede** + **Zeilennummern**; **Diff als TXT**
-- Start: **`run.bat`** optional pip install per **J/N**
+- PDF: Split — optional **Dateien in Tabs öffnen** + **Pfad-Log** der erzeugten Dateien
+- Annotationen: Template-Platzhalter **`{page}`** / **`{date}`** dokumentiert; Settings-**Live-Vorschau**
+- Editor: Text-Diff **Side-by-Side / Unified** Toggle; **Wort-Highlight** in geänderten Zeilen
+- Start: **`run.bat --yes`** non-interactive pip; Exit-Codes dokumentiert
 - Stubs KI/Cloud/Stylus/3D unverändert
