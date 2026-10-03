@@ -469,6 +469,177 @@ def apply_page_numbers(
     return out_path
 
 
+def _format_hf_label(
+    template: str,
+    *,
+    n: int,
+    total: int,
+    i: int,
+    stem: str = "",
+    date: str = "",
+) -> str:
+    """Header/Footer-Text mit Platzhaltern {n}/{total}/{i}/{page}/{stem}/{date} — 1.8.0."""
+    tpl = template if template is not None else ""
+    mapping = {
+        "n": n,
+        "total": total,
+        "i": i,
+        "page": n,
+        "stem": stem,
+        "date": date,
+    }
+    try:
+        return tpl.format(**mapping)
+    except (KeyError, ValueError, IndexError):
+        out = tpl
+        for key, val in mapping.items():
+            out = out.replace("{" + key + "}", str(val))
+        return out
+
+
+def _draw_text_line(
+    page,
+    pdf,
+    *,
+    label: str,
+    position: str,
+    font_size: float,
+    margin: float,
+    page_w: float,
+    page_h: float,
+) -> None:
+    """Eine Textzeile an Position bakken (Helvetica)."""
+    text = (label or "").strip()
+    if not text:
+        return
+    approx_w = len(text) * font_size * 0.5
+    pos = (position or "bottom-center").strip().lower()
+    if pos == "bottom-right":
+        x = page_w - margin - approx_w
+        y = margin
+    elif pos == "bottom-left":
+        x = margin
+        y = margin
+    elif pos == "top-left":
+        x = margin
+        y = page_h - margin - font_size
+    elif pos == "top-right":
+        x = page_w - margin - approx_w
+        y = page_h - margin - font_size
+    elif pos == "top-center":
+        x = (page_w - approx_w) / 2.0
+        y = page_h - margin - font_size
+    else:  # bottom-center
+        x = (page_w - approx_w) / 2.0
+        y = margin
+    _ensure_helvetica(page)
+    parts = [
+        "q",
+        "0 g",
+        "BT",
+        f"/Helv {font_size:.2f} Tf",
+        f"1 0 0 1 {x:.2f} {y:.2f} Tm",
+        f"({_pdf_escape(text)}) Tj",
+        "ET",
+        "Q",
+    ]
+    _append_content(page, pdf, "\n".join(parts).encode("latin-1", errors="replace"))
+
+
+def apply_header_footer(
+    pdf_path: str | Path,
+    *,
+    out_path: str | Path | None = None,
+    pages: Optional[Sequence[int]] = None,
+    header_text: str = "",
+    footer_text: str = "",
+    include_page_numbers: bool = True,
+    page_number_template: str = "{n} / {total}",
+    header_position: Position = "top-center",
+    footer_position: Position = "bottom-center",
+    page_number_position: Position = "bottom-right",
+    font_size: float = 10.0,
+    margin: float = 28.0,
+    start_at: int = 1,
+    on_progress: Optional[Callable[[int, int], bool]] = None,
+) -> Path:
+    """
+    Kopf-/Fußzeile + optionale Seitenzahl in PDF bakken (pikepdf Content) — 1.8.0.
+    Platzhalter: {n}, {total}, {i}, {page}, {stem}, {date}.
+    """
+    import pikepdf
+    from datetime import date as _date
+
+    pdf_path = Path(pdf_path)
+    out_path = Path(out_path) if out_path else pdf_path
+    stem = pdf_path.stem
+    today = _date.today().isoformat()
+    header_tpl = str(header_text or "")
+    footer_tpl = str(footer_text or "")
+    num_tpl = str(page_number_template or "{n} / {total}")
+
+    with pikepdf.open(pdf_path, allow_overwriting_input=True) as pdf:
+        total = len(pdf.pages)
+        indices = _page_indices(total, pages)
+        n_total = max(1, len(indices))
+        for done, i in enumerate(indices, start=1):
+            if on_progress is not None and not on_progress(done, n_total):
+                raise WatermarkBakeCancelled(
+                    "Kopf-/Fußzeile-Bake abgebrochen.",
+                    done=done - 1,
+                    total=n_total,
+                )
+            page = pdf.pages[i]
+            mediabox = page.mediabox
+            page_w = float(mediabox[2] - mediabox[0])
+            page_h = float(mediabox[3] - mediabox[1])
+            n = start_at + i
+            if header_tpl.strip():
+                label = _format_hf_label(
+                    header_tpl, n=n, total=total, i=i, stem=stem, date=today
+                )
+                _draw_text_line(
+                    page,
+                    pdf,
+                    label=label,
+                    position=header_position,
+                    font_size=font_size,
+                    margin=margin,
+                    page_w=page_w,
+                    page_h=page_h,
+                )
+            if footer_tpl.strip():
+                label = _format_hf_label(
+                    footer_tpl, n=n, total=total, i=i, stem=stem, date=today
+                )
+                _draw_text_line(
+                    page,
+                    pdf,
+                    label=label,
+                    position=footer_position,
+                    font_size=font_size,
+                    margin=margin,
+                    page_w=page_w,
+                    page_h=page_h,
+                )
+            if include_page_numbers:
+                label = _format_hf_label(
+                    num_tpl, n=n, total=total, i=i, stem=stem, date=today
+                )
+                _draw_text_line(
+                    page,
+                    pdf,
+                    label=label,
+                    position=page_number_position,
+                    font_size=font_size,
+                    margin=margin,
+                    page_w=page_w,
+                    page_h=page_h,
+                )
+        pdf.save(out_path)
+    return out_path
+
+
 def watermark_pages(
     pdf_path: str | Path,
     text: str,

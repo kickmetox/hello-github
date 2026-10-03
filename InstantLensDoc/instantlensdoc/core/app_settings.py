@@ -118,6 +118,24 @@ DEFAULTS: dict[str, Any] = {
     "editor_current_line_highlight": True,
     "editor_show_special_chars": False,
     "annotations_visible": True,
+    # Annotation-Layer Typ-Toggles global (Highlight/Note/Shape/Redaction) — 1.8.0
+    "ann_layer_types_visible": {
+        "highlight": True,
+        "note": True,
+        "shape": True,
+        "redaction": True,
+    },
+    "crash_recovery_enabled": True,  # Autosave-Snapshots für Crash-Recovery — 1.8.0
+    "crash_recovery_max_age_hours": 72.0,  # Orphans älter verwerfen — 1.8.0
+    "last_header_text": "",  # Kopfzeile Bake — 1.8.0
+    "last_footer_text": "",  # Fußzeile Bake — 1.8.0
+    "last_hf_include_page_numbers": True,
+    "last_hf_page_template": "{n} / {total}",
+    "last_hf_header_position": "top-center",
+    "last_hf_footer_position": "bottom-center",
+    "last_hf_page_position": "bottom-right",
+    "last_hf_font_size": 10.0,
+    "last_hf_margin": 28.0,
     "minimize_to_tray": False,
     "page_size_unit": "mm",
     "backup_on_save": False,
@@ -2570,6 +2588,108 @@ def get_annotations_visible() -> bool:
 
 def set_annotations_visible(visible: bool) -> None:
     save_settings({"annotations_visible": bool(visible)})
+
+
+ANN_LAYER_TYPE_KEYS = ("highlight", "note", "shape", "redaction")
+
+
+def get_ann_layer_types_visible() -> dict[str, bool]:
+    """Globale Typ-Sichtbarkeit für Annotation-Layer — 1.8.0."""
+    raw = load_settings().get("ann_layer_types_visible") or {}
+    out: dict[str, bool] = {}
+    for key in ANN_LAYER_TYPE_KEYS:
+        if isinstance(raw, dict) and key in raw:
+            out[key] = bool(raw[key])
+        else:
+            out[key] = True
+    return out
+
+
+def set_ann_layer_types_visible(visible: dict[str, bool] | None) -> dict[str, bool]:
+    """Typ-Toggles speichern; fehlende Keys bleiben True — 1.8.0."""
+    cur = get_ann_layer_types_visible()
+    if visible:
+        for key in ANN_LAYER_TYPE_KEYS:
+            if key in visible:
+                cur[key] = bool(visible[key])
+    save_settings({"ann_layer_types_visible": cur})
+    return cur
+
+
+def set_ann_layer_type_visible(group: str, visible: bool) -> dict[str, bool]:
+    key = str(group or "").strip().lower()
+    if key not in ANN_LAYER_TYPE_KEYS:
+        return get_ann_layer_types_visible()
+    cur = get_ann_layer_types_visible()
+    cur[key] = bool(visible)
+    save_settings({"ann_layer_types_visible": cur})
+    return cur
+
+
+def get_crash_recovery_enabled() -> bool:
+    return bool(load_settings().get("crash_recovery_enabled", True))
+
+
+def set_crash_recovery_enabled(enabled: bool) -> None:
+    save_settings({"crash_recovery_enabled": bool(enabled)})
+
+
+def get_crash_recovery_max_age_hours() -> float:
+    try:
+        v = float(load_settings().get("crash_recovery_max_age_hours", 72.0))
+    except (TypeError, ValueError):
+        v = 72.0
+    return max(1.0, min(720.0, v))
+
+
+def set_crash_recovery_max_age_hours(hours: float) -> None:
+    try:
+        v = float(hours)
+    except (TypeError, ValueError):
+        v = 72.0
+    save_settings({"crash_recovery_max_age_hours": max(1.0, min(720.0, v))})
+
+
+def get_last_header_footer_settings() -> dict[str, Any]:
+    s = load_settings()
+    return {
+        "header_text": str(s.get("last_header_text") or ""),
+        "footer_text": str(s.get("last_footer_text") or ""),
+        "include_page_numbers": bool(s.get("last_hf_include_page_numbers", True)),
+        "page_template": str(s.get("last_hf_page_template") or "{n} / {total}"),
+        "header_position": str(s.get("last_hf_header_position") or "top-center"),
+        "footer_position": str(s.get("last_hf_footer_position") or "bottom-center"),
+        "page_position": str(s.get("last_hf_page_position") or "bottom-right"),
+        "font_size": float(s.get("last_hf_font_size") or 10.0),
+        "margin": float(s.get("last_hf_margin") or 28.0),
+    }
+
+
+def set_last_header_footer_settings(
+    *,
+    header_text: str = "",
+    footer_text: str = "",
+    include_page_numbers: bool = True,
+    page_template: str = "{n} / {total}",
+    header_position: str = "top-center",
+    footer_position: str = "bottom-center",
+    page_position: str = "bottom-right",
+    font_size: float = 10.0,
+    margin: float = 28.0,
+) -> None:
+    save_settings(
+        {
+            "last_header_text": str(header_text or ""),
+            "last_footer_text": str(footer_text or ""),
+            "last_hf_include_page_numbers": bool(include_page_numbers),
+            "last_hf_page_template": str(page_template or "{n} / {total}"),
+            "last_hf_header_position": str(header_position or "top-center"),
+            "last_hf_footer_position": str(footer_position or "bottom-center"),
+            "last_hf_page_position": str(page_position or "bottom-right"),
+            "last_hf_font_size": float(font_size),
+            "last_hf_margin": float(margin),
+        }
+    )
 
 
 def get_show_page_boxes() -> bool:

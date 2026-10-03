@@ -63,8 +63,11 @@ from instantlensdoc.ui.welcome import WelcomePage
 from instantlensdoc.core import fulltext as fulltext_mod
 from instantlensdoc.core.app_settings import (
     dialog_start_dir,
+    get_ann_layer_types_visible,
     get_annotations_visible,
     get_autosave_enabled,
+    get_crash_recovery_enabled,
+    get_crash_recovery_max_age_hours,
     get_autosave_interval_sec,
     get_default_open_dir,
     get_editor_doc_split,
@@ -269,6 +272,8 @@ class MainWindow(QMainWindow):
         self._autosave_timer.setInterval(get_autosave_interval_sec() * 1000)
         self._autosave_timer.timeout.connect(self._autosave_tick)
         self._autosave_timer.start()
+        # Crash-Recovery vor Session-Restore — 1.8.0
+        QTimer.singleShot(150, self._maybe_recover_orphans)
         QTimer.singleShot(200, self._restore_session)
         QTimer.singleShot(600, self._maybe_show_getting_started_wizard)
         if get_update_check_on_start():
@@ -1022,11 +1027,13 @@ class MainWindow(QMainWindow):
         self.sidebar.line_favorites_reordered.connect(self._on_line_favorites_reordered)
         self.sidebar.pages_reordered.connect(self._on_thumbs_reordered)
         self.sidebar.page_rotate_requested.connect(self._on_thumb_rotate)
+        self.sidebar.page_flip_requested.connect(self._on_thumb_flip)
         self.sidebar.page_duplicate_requested.connect(self._on_thumb_duplicate)
         self.sidebar.page_delete_requested.connect(self._on_thumb_delete)
         self.sidebar.pages_batch_duplicate_requested.connect(self._on_thumbs_batch_duplicate)
         self.sidebar.pages_batch_delete_requested.connect(self._on_thumbs_batch_delete)
         self.sidebar.pages_batch_rotate_requested.connect(self._on_thumbs_batch_rotate)
+        self.sidebar.pages_batch_flip_requested.connect(self._on_thumbs_batch_flip)
         self.sidebar.pages_batch_extract_requested.connect(self._on_thumbs_batch_extract)
         self.sidebar.pages_batch_open_requested.connect(self._on_thumbs_batch_open)
         self.sidebar.annotation_group_export_requested.connect(self._on_ann_group_export)
@@ -1959,6 +1966,26 @@ class MainWindow(QMainWindow):
         self._ann_layer_action.setShortcut(QKeySequence("Ctrl+Shift+A"))
         self._ann_layer_action.toggled.connect(self._toggle_ann_layer)
         m_view.addAction(self._ann_layer_action)
+        # Typ-Toggles Highlight/Note/Shape/Redaction — 1.8.0
+        m_ann_types = m_view.addMenu("Annotation-Typen")
+        m_ann_types.setToolTip("Globale Sichtbarkeit nach Typ (Layer)")
+        types_vis = get_ann_layer_types_visible()
+        self._ann_type_actions: dict[str, QAction] = {}
+        for key, label in (
+            ("highlight", "Markierungen"),
+            ("note", "Notizen"),
+            ("shape", "Formen"),
+            ("redaction", "Schwärzungen"),
+        ):
+            act = QAction(label, self)
+            act.setCheckable(True)
+            act.setChecked(bool(types_vis.get(key, True)))
+            act.setData(key)
+            act.toggled.connect(
+                lambda checked, g=key: self._toggle_ann_type_layer(g, checked)
+            )
+            m_ann_types.addAction(act)
+            self._ann_type_actions[key] = act
         from instantlensdoc.core.app_settings import (
             get_annotations_locked,
             get_show_page_boxes,
@@ -2097,7 +2124,7 @@ class MainWindow(QMainWindow):
         act_split_pages.setToolTip("Jede Seite als eigene PDF-Datei in einen Ordner")
         act_split_pages.triggered.connect(self._split_into_single_page_pdfs)
         m_pdf.addAction(act_split_pages)
-        act_wm = QAction("Wasserzeichen / Seitennummern…", self)
+        act_wm = QAction("Wasserzeichen / Seitennummern / Kopfzeile…", self)
         act_wm.setToolTip(
             "Opacity/Größe/Winkel Settings; Seitenbereich; zuletzt Text/Bild; Bake — 1.6.1"
         )
@@ -4839,6 +4866,18 @@ class MainWindow(QMainWindow):
         self.pdf_view.set_annotations_visible(bool(checked))
         self._sync_ann_layer_action(bool(checked))
 
+    def _toggle_ann_type_layer(self, group: str, checked: bool):
+        """Annotation-Typ global ein-/ausblenden — 1.8.0."""
+        self.pdf_view.set_annotation_type_visible(str(group), bool(checked))
+        self._sync_ann_type_actions()
+
+    def _sync_ann_type_actions(self) -> None:
+        vis = get_ann_layer_types_visible()
+        for key, act in (getattr(self, "_ann_type_actions", None) or {}).items():
+            act.blockSignals(True)
+            act.setChecked(bool(vis.get(key, True)))
+            act.blockSignals(False)
+
     def _toggle_ann_lock(self, checked: bool):
         self.pdf_view.set_annotations_locked(bool(checked))
         self._sync_ann_lock_action(bool(checked))
@@ -5469,6 +5508,121 @@ class MainWindow(QMainWindow):
         except Exception:
             pass
 
+    def _autosave_write_recovery_snapshot(self) -> None:
+        """Dirty-Orphan-Snapshot für Crash-Recovery — 1.8.0."""
+        if not get_crash_recovery_enabled():
+            return
+        if not self.doc or not self.doc.path:
+            return
+        try:
+            from instantlensdoc.core.crash_recovery import write_recovery_snapshot
+
+            if self.doc.kind == DocKind.PDF:
+                side = None
+                if self.pdf_view.store is not None:
+                    side = getattr(self.pdf_view.store, "sidecar_path", None)
+                if side is not None and Path(side).is_file():
+                    write_recovery_snapshot(
+                        self.doc.path,
+                        kind="sidecar",
+                        copy_from=side,
+                        dirty=True,
+                    )
+                elif Path(self.doc.path).is_file():
+                    write_recovery_snapshot(
+                        self.doc.path,
+                        kind="pdf",
+                        copy_from=self.doc.path,
+                        dirty=True,
+                    )
+                return
+            if self.doc.kind in (
+                DocKind.TEXT,
+                DocKind.MARKDOWN,
+                DocKind.HTML,
+                DocKind.DOCX,
+            ):
+                write_recovery_snapshot(
+                    self.doc.path,
+                    kind="text",
+                    text=self.editor.toPlainText(),
+                    dirty=True,
+                )
+        except Exception:
+            pass
+
+    def _clear_recovery_for_current(self) -> None:
+        if not self.doc or not self.doc.path:
+            return
+        try:
+            from instantlensdoc.core.crash_recovery import clear_recovery_for
+
+            clear_recovery_for(self.doc.path)
+        except Exception:
+            pass
+
+    def _maybe_recover_orphans(self) -> None:
+        """Beim Start: dirty Autosave-Orphans anbieten — 1.8.0."""
+        import os
+
+        if os.environ.get("ILD_SMOKE_QT") or os.environ.get("ILD_NO_SESSION"):
+            return
+        if not get_crash_recovery_enabled():
+            return
+        try:
+            from instantlensdoc.core.crash_recovery import (
+                discard_orphan,
+                list_orphans,
+                restore_orphan,
+            )
+
+            orphans = list_orphans(
+                max_age_hours=get_crash_recovery_max_age_hours()
+            )
+        except Exception:
+            return
+        if not orphans:
+            return
+        lines = []
+        for o in orphans[:12]:
+            age_m = int(o.age_seconds() // 60)
+            lines.append(f"• {o.label} ({o.kind}, vor {age_m} min)")
+        more = f"\n… und {len(orphans) - 12} weitere" if len(orphans) > 12 else ""
+        msg = (
+            "Ungespeicherte Autosave-Snapshots gefunden (Crash-Recovery):\n\n"
+            + "\n".join(lines)
+            + more
+            + "\n\nWiederherstellen?"
+        )
+        box = QMessageBox(self)
+        box.setIcon(QMessageBox.Warning)
+        box.setWindowTitle("Crash-Recovery")
+        box.setText(msg)
+        btn_restore = box.addButton("Wiederherstellen", QMessageBox.AcceptRole)
+        btn_discard = box.addButton("Verwerfen", QMessageBox.DestructiveRole)
+        box.addButton("Später", QMessageBox.RejectRole)
+        box.exec()
+        clicked = box.clickedButton()
+        if clicked is btn_restore:
+            for o in orphans:
+                try:
+                    path = restore_orphan(o)
+                    self.open_path(str(path))
+                except Exception as e:
+                    QMessageBox.warning(
+                        self,
+                        "Crash-Recovery",
+                        f"Konnte nicht wiederherstellen:\n{o.source_path}\n{e}",
+                    )
+            self._set_status(f"Crash-Recovery: {len(orphans)} Snapshot(s) wiederhergestellt")
+        elif clicked is btn_discard:
+            for o in orphans:
+                try:
+                    discard_orphan(o)
+                except Exception:
+                    pass
+            self._set_status("Crash-Recovery: Snapshots verworfen")
+
     def _autosave_tick(self):
         if not self._autosave_enabled:
             return
@@ -5493,7 +5647,10 @@ class MainWindow(QMainWindow):
                             self._autosave_maybe_backup(side)
                     except Exception:
                         pass
+                    # Snapshot vor Speichern; bei Crash bleibt Orphan — 1.8.0
+                    self._autosave_write_recovery_snapshot()
                     self.pdf_view.schedule_sidecar_save(force=True)
+                    self._clear_recovery_for_current()
                     if self.doc.path:
                         self._mark_unsaved(self.doc.path, False)
                     self._set_status(self._autosave_status_saved())
@@ -5506,8 +5663,11 @@ class MainWindow(QMainWindow):
         self.doc.text = self.editor.toPlainText()
         try:
             self._autosave_maybe_backup(self.doc.path)
+            # Snapshot vor Speichern; bei Crash bleibt Orphan — 1.8.0
+            self._autosave_write_recovery_snapshot()
             save_document(self.doc)
             self.doc.dirty = False
+            self._clear_recovery_for_current()
             if self.doc.path:
                 self._mark_unsaved(self.doc.path, False)
             self._set_status(self._autosave_status_saved())
@@ -7453,13 +7613,38 @@ class MainWindow(QMainWindow):
             self._update_doc_status()
 
     def _on_thumbs_batch_rotate(self, pages: list, degrees: int):
-        """Thumbnail-Mehrfachauswahl: Seiten batch-drehen (±90, Undo Ctrl+Z)."""
+        """Thumbnail-Mehrfachauswahl: Seiten batch-drehen (±90/180, Undo Ctrl+Z)."""
         if self.stack.currentWidget() is not self.pdf_view:
             self.stack.setCurrentWidget(self.pdf_view)
         if not self.pdf_view.pdf_path:
             return
         idxs = [int(p) for p in (pages or [])]
         if self.pdf_view.rotate_many(idxs, int(degrees)):
+            self._refresh_thumbs()
+            self._update_doc_status()
+
+    def _on_thumb_flip(self, page_index: int, horizontal: bool, vertical: bool):
+        """Thumbnail: Seite spiegeln (H/V) + Undo — 1.8.0."""
+        if self.stack.currentWidget() is not self.pdf_view:
+            self.stack.setCurrentWidget(self.pdf_view)
+        if not self.pdf_view.pdf_path:
+            return
+        if self.pdf_view.flip_at(
+            int(page_index), horizontal=bool(horizontal), vertical=bool(vertical)
+        ):
+            self._refresh_thumbs()
+            self._update_doc_status()
+
+    def _on_thumbs_batch_flip(self, pages: list, horizontal: bool, vertical: bool):
+        """Thumbnail-Mehrfachauswahl: spiegeln H/V + Undo — 1.8.0."""
+        if self.stack.currentWidget() is not self.pdf_view:
+            self.stack.setCurrentWidget(self.pdf_view)
+        if not self.pdf_view.pdf_path:
+            return
+        idxs = [int(p) for p in (pages or [])]
+        if self.pdf_view.flip_many(
+            idxs, horizontal=bool(horizontal), vertical=bool(vertical)
+        ):
             self._refresh_thumbs()
             self._update_doc_status()
 
@@ -10108,6 +10293,7 @@ class MainWindow(QMainWindow):
                 )
                 if self.doc.path:
                     self._mark_unsaved(self.doc.path, False)
+                self._clear_recovery_for_current()
                 self._set_status(f"PDF-Annotationen (Sidecar) gespeichert: {side}")
                 return True
             return False
@@ -10121,6 +10307,7 @@ class MainWindow(QMainWindow):
             save_document(self.doc)
             self._remember_path(self.doc.path)
             self._mark_unsaved(self.doc.path, False)
+            self._clear_recovery_for_current()
             enc = self.doc.meta.get("encoding")
             suffix = f" [{enc}]" if enc else ""
             self._set_status(f"Gespeichert: {self.doc.path}{suffix}")

@@ -81,6 +81,7 @@ from instantlensdoc.core.app_settings import (
     get_ann_highlight_color,
     get_ann_note_color,
     get_ann_pen_color,
+    get_ann_layer_types_visible,
     get_annotations_locked,
     get_annotations_visible,
     get_default_zoom_mode,
@@ -106,6 +107,8 @@ from instantlensdoc.core.app_settings import (
     set_ann_highlight_color,
     set_ann_note_color,
     set_ann_pen_color,
+    set_ann_layer_type_visible,
+    set_ann_layer_types_visible,
     set_annotations_locked,
     set_annotations_visible,
     set_page_number_overlay_font_size,
@@ -348,6 +351,12 @@ class PdfCanvas(QLabel):
         self._selected_id: str | None = None
         self._selected_ids: set[str] = set()
         self._annotations_visible = True
+        self._ann_type_visible: dict[str, bool] = {
+            "highlight": True,
+            "note": True,
+            "shape": True,
+            "redaction": True,
+        }
         self._annotations_locked = False
         self._show_page_boxes = False
         self._show_page_number_overlay = False
@@ -391,6 +400,50 @@ class PdfCanvas(QLabel):
 
     def annotations_visible(self) -> bool:
         return bool(self._annotations_visible)
+
+    def set_ann_type_visible(self, visible: dict[str, bool] | None):
+        """Typ-Gruppen-Sichtbarkeit (highlight/note/shape/redaction) — 1.8.0."""
+        base = {
+            "highlight": True,
+            "note": True,
+            "shape": True,
+            "redaction": True,
+        }
+        if visible:
+            for k, v in visible.items():
+                if k in base:
+                    base[k] = bool(v)
+        self._ann_type_visible = base
+        self._repaint_overlay()
+
+    def ann_type_visible(self) -> dict[str, bool]:
+        return dict(self._ann_type_visible)
+
+    @staticmethod
+    def ann_type_group(ann_type) -> str:
+        """AnnotationType → Layer-Gruppe — 1.8.0."""
+        try:
+            t = ann_type if isinstance(ann_type, AnnotationType) else AnnotationType(str(ann_type))
+        except Exception:
+            return "shape"
+        if t in (AnnotationType.HIGHLIGHT, AnnotationType.UNDERLINE):
+            return "highlight"
+        if t in (
+            AnnotationType.STICKY,
+            AnnotationType.TEXT,
+            AnnotationType.CALLOUT,
+            AnnotationType.TEXT_OVERLAY,
+        ):
+            return "note"
+        if t == AnnotationType.REDACTION:
+            return "redaction"
+        return "shape"
+
+    def _ann_type_is_visible(self, ann: Annotation) -> bool:
+        if not self._annotations_visible:
+            return False
+        group = self.ann_type_group(ann.type)
+        return bool(self._ann_type_visible.get(group, True))
 
     def set_annotations_locked(self, locked: bool):
         self._annotations_locked = bool(locked)
@@ -622,6 +675,8 @@ class PdfCanvas(QLabel):
         for ann in reversed(self._annotations):
             if ann.type not in editable:
                 continue
+            if not self._ann_type_is_visible(ann):
+                continue
             x0, y0, x1, y1 = self._ann_bounds(ann)
             if x0 <= x <= x1 and y0 <= y <= y1:
                 return ann
@@ -653,6 +708,8 @@ class PdfCanvas(QLabel):
 
     def _hit_annotation(self, x: float, y: float) -> Annotation | None:
         for ann in reversed(self._annotations):
+            if not self._ann_type_is_visible(ann):
+                continue
             x0, y0, x1, y1 = self._ann_bounds(ann)
             if x0 <= x <= x1 and y0 <= y <= y1:
                 return ann
@@ -893,6 +950,8 @@ class PdfCanvas(QLabel):
         move_dx, move_dy = self._move_delta if self._move_origin is not None else (0.0, 0.0)
         if self._annotations_visible:
             for ann in self._annotations:
+                if not self._ann_type_is_visible(ann):
+                    continue
                 dx = move_dx if ann.id in self._move_ids else 0.0
                 dy = move_dy if ann.id in self._move_ids else 0.0
                 self._draw_ann(painter, ann, dx=dx, dy=dy)
@@ -1727,6 +1786,7 @@ class PdfViewer(QWidget):
         self.scroll.setWidgetResizable(True)
         self.canvas = PdfCanvas()
         self.canvas.set_annotations_visible(self._annotations_visible)
+        self.canvas.set_ann_type_visible(get_ann_layer_types_visible())
         self.canvas.set_annotations_locked(self._annotations_locked)
         self.canvas.set_show_page_boxes(self._show_page_boxes)
         self.canvas.set_show_page_number_overlay(self._show_page_number_overlay)
@@ -2454,6 +2514,25 @@ class PdfViewer(QWidget):
     def annotations_visible(self) -> bool:
         return bool(self._annotations_visible)
 
+    def annotation_types_visible(self) -> dict[str, bool]:
+        """Globale Typ-Toggles Highlight/Note/Shape/Redaction — 1.8.0."""
+        return get_ann_layer_types_visible()
+
+    def set_annotation_type_visible(self, group: str, visible: bool) -> None:
+        """Einen Annotation-Typ global ein-/ausblenden — 1.8.0."""
+        types = set_ann_layer_type_visible(group, visible)
+        self.canvas.set_ann_type_visible(types)
+        self.status.emit(
+            f"Annotation-Typ „{group}“ "
+            + ("sichtbar" if visible else "ausgeblendet")
+        )
+        self.annotations_layer_changed.emit(self._annotations_visible)
+
+    def set_annotation_types_visible(self, visible: dict[str, bool]) -> None:
+        types = set_ann_layer_types_visible(visible)
+        self.canvas.set_ann_type_visible(types)
+        self.annotations_layer_changed.emit(self._annotations_visible)
+
     def set_annotations_locked(self, locked: bool):
         """Annotationen sperren — nicht per Drag verschiebbar."""
         enabled = bool(locked)
@@ -2834,6 +2913,7 @@ class PdfViewer(QWidget):
             self.btn_ann_layer.setChecked(self._annotations_visible)
             self.btn_ann_layer.blockSignals(False)
         self.canvas.set_annotations_visible(self._annotations_visible)
+        self.canvas.set_ann_type_visible(get_ann_layer_types_visible())
         self._annotations_locked = get_annotations_locked()
         if hasattr(self, "btn_ann_lock"):
             self.btn_ann_lock.blockSignals(True)
@@ -4406,6 +4486,14 @@ class PdfViewer(QWidget):
             elif kind == "rotate":
                 deg = int(entry.get("degrees", 90))
                 label = f"Seite {page_h} gedreht ({deg:+d}°) — rückgängig"
+            elif kind == "flip":
+                parts = []
+                if entry.get("horizontal"):
+                    parts.append("H")
+                if entry.get("vertical"):
+                    parts.append("V")
+                axis = "/".join(parts) or "?"
+                label = f"Seite {page_h} gespiegelt ({axis}) — rückgängig"
             elif kind == "reorder":
                 n = int(entry.get("page_count") or len(entry.get("inverse") or []) or 0)
                 label = f"Seitenreihenfolge geändert ({n} Seiten) — rückgängig"
@@ -5290,6 +5378,24 @@ class PdfViewer(QWidget):
                 self.refresh()
                 self.document_changed.emit()
                 self.status.emit(f"Seitendrehung rückgängig (S. {idx + 1})")
+                return True
+            if kind == "flip":
+                idx = int(entry["index"])
+                horizontal = bool(entry.get("horizontal"))
+                vertical = bool(entry.get("vertical"))
+                # Spiegeln ist involutorisch: gleiche Achse erneut = Undo
+                flip_page(
+                    self.pdf_path,
+                    idx,
+                    horizontal=horizontal,
+                    vertical=vertical,
+                )
+                clear_render_cache(self.pdf_path)
+                if idx != self.page_index:
+                    self.page_index = idx
+                self.refresh()
+                self.document_changed.emit()
+                self.status.emit(f"Spiegeln rückgängig (S. {idx + 1})")
                 return True
             if kind == "reorder":
                 inverse = [int(i) for i in (entry.get("inverse") or [])]
@@ -6809,20 +6915,46 @@ class PdfViewer(QWidget):
 
     def flip_current(self, *, horizontal: bool = False, vertical: bool = False):
         """Aktuelle Seite spiegeln (horizontal und/oder vertikal) und speichern."""
+        return self.flip_at(self.page_index, horizontal=horizontal, vertical=vertical)
+
+    def flip_at(
+        self,
+        page_index: int,
+        *,
+        horizontal: bool = False,
+        vertical: bool = False,
+    ) -> bool:
+        """Seite spiegeln (H/V), speichern, Undo-fähig — 1.8.0."""
         if not self.pdf_path:
-            return
+            return False
         if not horizontal and not vertical:
-            return
+            return False
         try:
+            idx = int(page_index)
+            if idx < 0 or idx >= int(self.page_count or 0):
+                self.status.emit("Spiegeln: ungültige Seite")
+                return False
+            self._page_ops_undo.append(
+                {
+                    "kind": "flip",
+                    "index": idx,
+                    "horizontal": bool(horizontal),
+                    "vertical": bool(vertical),
+                }
+            )
+            if len(self._page_ops_undo) > 20:
+                self._page_ops_undo.pop(0)
             flip_page(
                 self.pdf_path,
-                self.page_index,
-                horizontal=horizontal,
-                vertical=vertical,
+                idx,
+                horizontal=bool(horizontal),
+                vertical=bool(vertical),
             )
             from ild_pdf.render import clear_render_cache
 
             clear_render_cache(self.pdf_path)
+            if idx != self.page_index:
+                self.page_index = idx
             self.refresh()
             self.document_changed.emit()
             parts = []
@@ -6831,10 +6963,45 @@ class PdfViewer(QWidget):
             if vertical:
                 parts.append("vertikal")
             self.status.emit(
-                f"Seite {self.page_index + 1} gespiegelt ({'/'.join(parts)}) und gespeichert"
+                f"Seite {idx + 1} gespiegelt ({'/'.join(parts)}) — Ctrl+Z rückgängig"
             )
+            return True
         except Exception as e:
+            if self._page_ops_undo and self._page_ops_undo[-1].get("kind") == "flip":
+                if int(self._page_ops_undo[-1].get("index", -1)) == int(page_index):
+                    self._page_ops_undo.pop()
             QMessageBox.warning(self, "Spiegeln", str(e))
+            return False
+
+    def flip_many(
+        self,
+        page_indices: list[int] | Sequence[int],
+        *,
+        horizontal: bool = False,
+        vertical: bool = False,
+    ) -> int:
+        """Mehrere Seiten spiegeln (H/V); Undo je Seite Ctrl+Z — 1.8.0."""
+        if not self.pdf_path:
+            return 0
+        if not horizontal and not vertical:
+            return 0
+        pages = sorted({int(i) for i in page_indices})
+        if not pages:
+            return 0
+        n = 0
+        for idx in pages:
+            if self.flip_at(idx, horizontal=horizontal, vertical=vertical):
+                n += 1
+        if n:
+            parts = []
+            if horizontal:
+                parts.append("H")
+            if vertical:
+                parts.append("V")
+            self.status.emit(
+                f"{n} Seite(n) gespiegelt ({'/'.join(parts)}) — Ctrl+Z rückgängig"
+            )
+        return n
 
     def extract_page_as_image(self):
         if not self.pdf_path:

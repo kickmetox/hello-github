@@ -450,12 +450,14 @@ class Sidebar(QWidget):
     line_favorite_label_edit = Signal(int)  # Editor-Zeile 1-basiert → Label bearbeiten
     line_favorites_reordered = Signal(list)  # 1-basierte Zeilen neue Reihenfolge
     pages_reordered = Signal(list)  # alte Indizes in neuer Reihenfolge
-    page_rotate_requested = Signal(int, int)  # page_index 0-basiert, degrees (±90)
+    page_rotate_requested = Signal(int, int)  # page_index 0-basiert, degrees (±90/180)
+    page_flip_requested = Signal(int, bool, bool)  # page, horizontal, vertical — 1.8.0
     page_duplicate_requested = Signal(int)  # page_index 0-basiert (Duplikat + Undo)
     page_delete_requested = Signal(int)  # page_index 0-basiert (Bestätigung im Handler)
     pages_batch_duplicate_requested = Signal(list)  # Mehrfachauswahl duplizieren
     pages_batch_delete_requested = Signal(list)  # Mehrfachauswahl löschen
-    pages_batch_rotate_requested = Signal(list, int)  # Mehrfachauswahl drehen (±90)
+    pages_batch_rotate_requested = Signal(list, int)  # Mehrfachauswahl drehen (±90/180)
+    pages_batch_flip_requested = Signal(list, bool, bool)  # Auswahl spiegeln H/V — 1.8.0
     pages_batch_extract_requested = Signal(list)  # Mehrfachauswahl als PDF extrahieren
     pages_batch_open_requested = Signal(list)  # Auswahl → neues Dokument in Tab öffnen
     annotation_group_filter_changed = Signal(str)  # group_id oder "" für alle
@@ -1275,9 +1277,15 @@ class Sidebar(QWidget):
         if multi:
             act_r = menu.addAction(f"{len(selected)} Seiten 90° rechts ⟳")
             act_l = menu.addAction(f"{len(selected)} Seiten 90° links ⟲")
+            act_180 = menu.addAction(f"{len(selected)} Seiten 180° drehen")
+            act_fh = menu.addAction(f"{len(selected)} Seiten spiegeln horizontal ↔")
+            act_fv = menu.addAction(f"{len(selected)} Seiten spiegeln vertikal ↕")
         else:
             act_r = menu.addAction("Drehen 90° rechts ⟳")
             act_l = menu.addAction("Drehen 90° links ⟲")
+            act_180 = menu.addAction("Drehen 180°")
+            act_fh = menu.addAction("Spiegeln horizontal ↔")
+            act_fv = menu.addAction("Spiegeln vertikal ↕")
         menu.addSeparator()
         if multi:
             act_dup = menu.addAction(f"{len(selected)} Seiten duplizieren")
@@ -1300,6 +1308,21 @@ class Sidebar(QWidget):
                 self.pages_batch_rotate_requested.emit(list(selected), -90)
             else:
                 self.page_rotate_requested.emit(idx, -90)
+        elif chosen is act_180:
+            if multi:
+                self.pages_batch_rotate_requested.emit(list(selected), 180)
+            else:
+                self.page_rotate_requested.emit(idx, 180)
+        elif chosen is act_fh:
+            if multi:
+                self.pages_batch_flip_requested.emit(list(selected), True, False)
+            else:
+                self.page_flip_requested.emit(idx, True, False)
+        elif chosen is act_fv:
+            if multi:
+                self.pages_batch_flip_requested.emit(list(selected), False, True)
+            else:
+                self.page_flip_requested.emit(idx, False, True)
         elif chosen is act_dup:
             if multi:
                 self.pages_batch_duplicate_requested.emit(list(selected))

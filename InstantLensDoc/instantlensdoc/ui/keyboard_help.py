@@ -335,13 +335,17 @@ Status-Klick öffnet <code>docs/VERSION</code>/<code>VERSION.txt</code> im Edito
 <p><b>PDF verschlüsseln/entschlüsseln:</b> Prefill-Warnung + Button „jetzt ausschalten“ (sofort speichern + Toast) · Passwort nie in Logs · falsches PW klar DE — 1.6.5 (Basis 1.6.4/1.6.3/1.6.2/1.6.1/1.6.0).</p>
 <p><b>Dokument-Statistik:</b> JSON-Dateiname Quick-Insert <code>{stem}</code>/<code>{date}</code> · ungültige Platzhalter rot · Live-Vorschau · Copy · Zielordner · UTF-8 — 1.6.5 (Basis 1.6.4/1.6.3/1.6.2/1.6.1/1.6.0).</p>
 <p><b>Workspace-Layouts:</b> Import-Log Zusammenfassung importiert/übersprungen/umbenannt · kopieren/als TXT · Merge skip/rename · Schema DE — 1.6.5 (Basis 1.6.4/1.6.3/1.6.2/1.6.1/1.6.0).</p>
+<p><b>1.8.0:</b> Seiten Batch 90°/180°/Spiegel H/V + Undo · Kopf-/Fußzeile Bake · Ann.-Typ-Layer Highlight/Note/Shape/Redaction · Crash-Recovery Snapshot-Dialog.</p>
 <p><b>1.7.5:</b> Countdown Defaults Bestätigung·Live-Vorschau · Favoriten Enter leer→Dateiname · Text→PDF Ordner Neu anlegen · Update Status-Klick VERSION.</p>
 <p><b>1.7.4:</b> Countdown Live-Vorschau·Defaults · Favoriten Esc-Fokus·Enter · Text→PDF Status-Klick·A11y · Update Zeitstempel TT.MM.JJJJ HH:MM·Quellen-Tooltip.</p>
 <p><b>1.7.3:</b> Präsentation Countdown Pos·Farbe · Favoriten Doppelklick·Esc·leer · Text→PDF öffnen ohne Sidecar·Pfad · Update Offline·Zeitstempel.</p>
 <p><b>1.7.2:</b> Präsentation Pause·Countdown·Intervalle · Favoriten Label·Tab·Dup-Pfad · Text→PDF Ordner·öffnen · Update Status·Offline.</p>
 <p><b>1.7.1:</b> Präsentation Timer·schwarz·Nr. · Favoriten Drag·fehlend·Export · Text→PDF Schrift/Rand·Vorschau · Update Dismiss·Jetzt prüfen.</p>
 <p><b>1.7.0:</b> Präsentation Ann.-Overlay · Lesezeichen-Leiste global · Text→PDF · Update lokal VERSION.</p>
-<p><b>Thumbnails:</b> in der Sidebar ziehen zum Neuordnen der Seiten (Ctrl+Z rückgängig); Größe in Einstellungen (klein/normal/groß).</p>
+<p><b>Thumbnails:</b> in der Sidebar ziehen zum Neuordnen der Seiten (Ctrl+Z rückgängig); Kontextmenü 90°/180° drehen · Spiegeln H/V — 1.8.0; Größe in Einstellungen (klein/normal/groß).</p>
+<p><b>Kopf-/Fußzeile:</b> PDF → Wasserzeichen / Seitennummern / Kopfzeile… → Tab Kopf-/Fußzeile; Bake inkl. Seitenzahl — 1.8.0.</p>
+<p><b>Annotation-Typen:</b> Ansicht → Annotation-Typen (Highlight/Note/Shape/Redaction); Master Ctrl+Shift+A — 1.8.0.</p>
+<p><b>Crash-Recovery:</b> Autosave-Snapshots; Start-Dialog Wiederherstellen/Verwerfen bei dirty Orphans — 1.8.0.</p>
 <p><b>Statusleiste:</b> Dateiname · Seite x/y · Seitengröße (mm/inch, klickbar) · Zoom % · Wörter/Ann. · Version · Lizenz.</p>
 <p><b>PDF-Vergleich:</b> Diff-PNG Reset Bestätigung nur bei Abweichung; Fokus+Selektion — 1.4.5</p>
 <p><b>Batch-Umbenennen:</b> Undo „rückgängig X, übersprungen Y“ kopierbar — 1.4.5</p>

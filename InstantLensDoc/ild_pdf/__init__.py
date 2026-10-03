@@ -97,6 +97,7 @@ from .watermark import (
     DEFAULT_WATERMARK_OUTPUT_TEMPLATE,
     WATERMARK_KNOWN_PLACEHOLDERS,
     WatermarkBakeCancelled,
+    apply_header_footer,
     apply_image_watermark,
     apply_page_numbers,
     apply_watermark,
@@ -252,6 +253,7 @@ __all__ = [
     "apply_watermark",
     "apply_image_watermark",
     "apply_page_numbers",
+    "apply_header_footer",
     "find_invalid_watermark_placeholders",
     "format_watermark_output_path",
     "highlight_watermark_template_html",
@@ -307,4 +309,4 @@ __all__ = [
     "page_count_for_text",
 ]
 
-__version__ = "1.7.5"
+__version__ = "1.8.0"

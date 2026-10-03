@@ -2,7 +2,7 @@
 
 Moderne Textverarbeitung mit PDF-Annotator, OCR-Bridge und Formulargenerator.
 
-**Version:** 1.7.5  
+**Version:** 1.8.0  
 **Hersteller:** Andreas Meyer · ame@sellerbach.de
 
 ## Quickstart (Windows)
@@ -33,8 +33,8 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an).
 
-## Neu in 1.7.5
+## Neu in 1.8.0
 
-Polish auf **1.7.4**: Countdown Defaults Bestätigung nur bei Abweichung · Live-Vorschau sofort; Favoriten Enter bei leerem Edit → Dateiname ohne extra Schritt; Text→PDF fehlender Ordner → Dialog Neu anlegen; Update-Status-Klick öffnet VERSION.txt / docs/VERSION im Editor. Stubs KI/Cloud/Stylus/3D unverändert.
+Minor auf **1.7.5**: PDF-Seiten Batch drehen (90°/180°) und spiegeln H/V mit Undo; Kopf-/Fußzeile + Seitenzahl bake (pikepdf Content); Annotation-Layer Typ-Toggles Highlight/Note/Shape/Redaction; Crash-Recovery Autosave-Snapshot-Dialog beim Start. Stubs KI/Cloud/Stylus/3D unverändert.
 
 Siehe [CHANGELOG.md](CHANGELOG.md), [FEATURES.md](FEATURES.md) und [INFO.md](INFO.md).

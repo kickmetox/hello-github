@@ -33,6 +33,7 @@ from ild_pdf.pages import flatten_page_indices, parse_page_ranges
 from ild_pdf.watermark import (
     DEFAULT_WATERMARK_OUTPUT_TEMPLATE,
     WatermarkBakeCancelled,
+    apply_header_footer,
     apply_image_watermark,
     apply_page_numbers,
     apply_watermark,
@@ -43,8 +44,10 @@ from ild_pdf.watermark import (
     render_watermark_preview,
 )
 from instantlensdoc.core.app_settings import (
+    get_last_header_footer_settings,
     get_last_watermark_settings,
     get_watermark_output_template,
+    set_last_header_footer_settings,
     set_last_watermark_settings,
     set_watermark_output_template,
 )
@@ -98,18 +101,20 @@ class WatermarkDialog(QDialog):
         page_count: int = 1,
     ):
         super().__init__(parent)
-        self.setWindowTitle("Wasserzeichen / Seitennummern")
+        self.setWindowTitle("Wasserzeichen / Seitennummern / Kopfzeile")
         self.resize(740, 640)
         self._initial = pdf_path or ""
         self._page_index = page_index
         self._page_count = max(page_count, 1)
         self.result_path: str | None = None
         self._last = get_last_watermark_settings()
+        self._last_hf = get_last_header_footer_settings()
 
         layout = QVBoxLayout(self)
         tabs = QTabWidget()
         tabs.addTab(self._build_wm_tab(), "Wasserzeichen")
         tabs.addTab(self._build_num_tab(), "Seitennummern")
+        tabs.addTab(self._build_hf_tab(), "Kopf-/Fußzeile")
         layout.addWidget(tabs)
         buttons = QDialogButtonBox(QDialogButtonBox.Close)
         buttons.rejected.connect(self.reject)
@@ -658,6 +663,124 @@ class WatermarkDialog(QDialog):
             QMessageBox.information(self, "Seitennummern", f"Gespeichert:\n{out}")
         except Exception as e:
             QMessageBox.critical(self, "Seitennummern", str(e))
+
+    def _build_hf_tab(self) -> QWidget:
+        """Kopf-/Fußzeile + Seitenzahl bake — 1.8.0."""
+        w = QWidget()
+        form = QFormLayout(w)
+        self.hf_src, src_row = self._path_row(self._initial)
+        form.addRow("PDF", src_row)
+        self.hf_header = QLineEdit(str(self._last_hf.get("header_text") or ""))
+        self.hf_header.setPlaceholderText("z. B. {stem} — vertraulich")
+        self.hf_header.setToolTip("Platzhalter: {n} {total} {page} {stem} {date}")
+        form.addRow("Kopfzeile", self.hf_header)
+        self.hf_footer = QLineEdit(str(self._last_hf.get("footer_text") or ""))
+        self.hf_footer.setPlaceholderText("z. B. Entwurf {date}")
+        self.hf_footer.setToolTip("Platzhalter: {n} {total} {page} {stem} {date}")
+        form.addRow("Fußzeile", self.hf_footer)
+        self.hf_include_num = QCheckBox("Seitenzahl bakken")
+        self.hf_include_num.setChecked(
+            bool(self._last_hf.get("include_page_numbers", True))
+        )
+        form.addRow("", self.hf_include_num)
+        self.hf_num_tpl = QLineEdit(
+            str(self._last_hf.get("page_template") or "{n} / {total}")
+        )
+        form.addRow("Seitenzahl-Vorlage", self.hf_num_tpl)
+        positions = [
+            "top-left",
+            "top-center",
+            "top-right",
+            "bottom-left",
+            "bottom-center",
+            "bottom-right",
+        ]
+        self.hf_header_pos = QComboBox()
+        self.hf_header_pos.addItems(positions)
+        idx = self.hf_header_pos.findText(
+            str(self._last_hf.get("header_position") or "top-center")
+        )
+        if idx >= 0:
+            self.hf_header_pos.setCurrentIndex(idx)
+        form.addRow("Kopf-Position", self.hf_header_pos)
+        self.hf_footer_pos = QComboBox()
+        self.hf_footer_pos.addItems(positions)
+        idx = self.hf_footer_pos.findText(
+            str(self._last_hf.get("footer_position") or "bottom-center")
+        )
+        if idx >= 0:
+            self.hf_footer_pos.setCurrentIndex(idx)
+        form.addRow("Fuß-Position", self.hf_footer_pos)
+        self.hf_page_pos = QComboBox()
+        self.hf_page_pos.addItems(positions)
+        idx = self.hf_page_pos.findText(
+            str(self._last_hf.get("page_position") or "bottom-right")
+        )
+        if idx >= 0:
+            self.hf_page_pos.setCurrentIndex(idx)
+        form.addRow("Seitenzahl-Position", self.hf_page_pos)
+        self.hf_size = QDoubleSpinBox()
+        self.hf_size.setRange(6, 36)
+        self.hf_size.setValue(float(self._last_hf.get("font_size") or 10))
+        form.addRow("Schriftgröße", self.hf_size)
+        self.hf_margin = QDoubleSpinBox()
+        self.hf_margin.setRange(8, 120)
+        self.hf_margin.setValue(float(self._last_hf.get("margin") or 28))
+        form.addRow("Rand (pt)", self.hf_margin)
+        self.hf_inplace = QCheckBox("Original überschreiben")
+        self.hf_inplace.setChecked(True)
+        form.addRow("", self.hf_inplace)
+        run = QPushButton("Kopf-/Fußzeile bakken")
+        run.clicked.connect(self._run_hf)
+        form.addRow(run)
+        return w
+
+    def _run_hf(self):
+        src = self.hf_src.text().strip()
+        if not src:
+            QMessageBox.warning(self, "Kopf-/Fußzeile", "PDF angeben.")
+            return
+        header = self.hf_header.text()
+        footer = self.hf_footer.text()
+        include_num = self.hf_include_num.isChecked()
+        if not header.strip() and not footer.strip() and not include_num:
+            QMessageBox.warning(
+                self,
+                "Kopf-/Fußzeile",
+                "Kopfzeile, Fußzeile oder Seitenzahl angeben.",
+            )
+            return
+        try:
+            path = Path(src)
+            out = self._out_path(path, self.hf_inplace.isChecked(), "hf")
+            apply_header_footer(
+                path,
+                out_path=out,
+                header_text=header,
+                footer_text=footer,
+                include_page_numbers=include_num,
+                page_number_template=self.hf_num_tpl.text().strip() or "{n} / {total}",
+                header_position=self.hf_header_pos.currentText(),
+                footer_position=self.hf_footer_pos.currentText(),
+                page_number_position=self.hf_page_pos.currentText(),
+                font_size=self.hf_size.value(),
+                margin=self.hf_margin.value(),
+            )
+            set_last_header_footer_settings(
+                header_text=header,
+                footer_text=footer,
+                include_page_numbers=include_num,
+                page_template=self.hf_num_tpl.text().strip() or "{n} / {total}",
+                header_position=self.hf_header_pos.currentText(),
+                footer_position=self.hf_footer_pos.currentText(),
+                page_position=self.hf_page_pos.currentText(),
+                font_size=self.hf_size.value(),
+                margin=self.hf_margin.value(),
+            )
+            self.result_path = str(out)
+            QMessageBox.information(self, "Kopf-/Fußzeile", f"Gespeichert:\n{out}")
+        except Exception as e:
+            QMessageBox.critical(self, "Kopf-/Fußzeile", str(e))
 
     def resizeEvent(self, event):
         super().resizeEvent(event)

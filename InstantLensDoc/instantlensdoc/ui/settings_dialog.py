@@ -143,6 +143,8 @@ from instantlensdoc.core.app_settings import (
     get_autosave_backup_max,
     get_autosave_enabled,
     get_autosave_interval_sec,
+    get_crash_recovery_enabled,
+    get_crash_recovery_max_age_hours,
     import_ann_color_presets_json,
     AUTOSAVE_BACKUP_MAX_MAX,
     AUTOSAVE_BACKUP_MAX_MIN,
@@ -255,6 +257,8 @@ from instantlensdoc.core.app_settings import (
     set_autosave_backup_max,
     set_autosave_enabled,
     set_autosave_interval_sec,
+    set_crash_recovery_enabled,
+    set_crash_recovery_max_age_hours,
     set_backup_on_save,
     set_batch_output_dir,
     set_default_open_dir,
@@ -582,6 +586,22 @@ class SettingsDialog(QDialog):
         self.autosave_backup_max.setEnabled(self.autosave_backup.isChecked())
         self.autosave_backup.toggled.connect(self.autosave_backup_max.setEnabled)
         form.addRow("Autosave-Backups max.", self.autosave_backup_max)
+
+        self.crash_recovery = QCheckBox("Crash-Recovery (Autosave-Snapshots)")
+        self.crash_recovery.setChecked(get_crash_recovery_enabled())
+        self.crash_recovery.setToolTip(
+            "Bei dirty Docs Snapshots schreiben; beim Start Wiederherstellen-Dialog — 1.8.0"
+        )
+        form.addRow(self.crash_recovery)
+        self.crash_recovery_hours = QDoubleSpinBox()
+        self.crash_recovery_hours.setRange(1.0, 720.0)
+        self.crash_recovery_hours.setDecimals(0)
+        self.crash_recovery_hours.setSuffix(" h")
+        self.crash_recovery_hours.setValue(get_crash_recovery_max_age_hours())
+        self.crash_recovery_hours.setToolTip("Max. Alter Orphan-Snapshots (Stunden) — 1.8.0")
+        self.crash_recovery_hours.setEnabled(self.crash_recovery.isChecked())
+        self.crash_recovery.toggled.connect(self.crash_recovery_hours.setEnabled)
+        form.addRow("Recovery max. Alter", self.crash_recovery_hours)
 
         # Color-Presets (User) — speichern/zurücksetzen auch per Rechtsklick in PDF-Toolbar
         preset_row = QHBoxLayout()
@@ -2273,6 +2293,8 @@ class SettingsDialog(QDialog):
             as_sec = 60
         set_autosave_interval_sec(as_sec)
         set_autosave_backup_enabled(self.autosave_backup.isChecked())
+        set_crash_recovery_enabled(self.crash_recovery.isChecked())
+        set_crash_recovery_max_age_hours(self.crash_recovery_hours.value())
         set_autosave_backup_max(int(self.autosave_backup_max.value()))
         if getattr(self, "_preset_edits", None):
             set_ann_color_presets([ed.text().strip() for ed in self._preset_edits])

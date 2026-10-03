@@ -1,5 +1,23 @@
 # Changelog — InstantLens Doc
 
+## 1.8.0 — Seiten drehen/spiegeln Batch+Undo, Kopf-/Fußzeile Bake, Ann.-Typ-Layer, Crash-Recovery
+
+Minor-Release mit neuen Kernfeatures (Basis **1.7.5**): **PDF-Seiten Batch drehen/spiegeln** (Auswahl + 90°/180°/Spiegel H/V) mit **Undo**; **Kopf-/Fußzeile** inkl. Seitenzahl und benutzerdefiniertem Text als **pikepdf Content-Bake**; **Annotation-Layer Typ-Toggles** (Highlight/Note/Shape/Redaction) global; **Crash-Recovery** mit Autosave-Snapshot und Wiederherstellen-Dialog beim Start bei dirty Orphans. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### PDF / Seiten
+- Thumbnails: Mehrfachauswahl 90°/180° drehen · Spiegeln horizontal/vertikal; Undo Ctrl+Z (flip involutorisch)
+- Kopf-/Fußzeile: Tab in Wasserzeichen-Dialog; Bake Text + Seitenzahl (`{n}`/`{total}`/`{page}`/`{stem}`/`{date}`)
+
+### Annotationen / Recovery
+- Annotation-Layer: globale Typ-Toggles Ansicht → Annotation-Typen (Highlight/Note/Shape/Redaction)
+- Crash-Recovery: Autosave schreibt Snapshots unter `config/recovery/`; Start-Dialog Wiederherstellen/Verwerfen
+
+### Packaging / Docs
+- Version **1.8.0** (App / `ild_pdf` / ISS / Smoke / Docs); `docs/VERSION` + `VERSION.txt`
+- Smoke: rotate/flip Batch+Undo, apply_header_footer, Ann-Typ-Layer, Crash-Recovery Orphans (CLI + Qt)
+
+---
+
 ## 1.7.5 — Countdown Defaults Bestätigung·Live-Vorschau, Favoriten Enter leer→Dateiname, Text→PDF Ordner Neu anlegen, Update Status-Klick VERSION
 
 Post-Release-Polish nach 1.7.4: **Countdown Defaults-Reset** mit **Bestätigung nur bei Abweichung** und **Live-Vorschau sofort**; **Favoriten Enter** bei **leerem Edit** setzt **Dateiname ohne extra Schritt**; **Text → PDF Ordner-Klick** bei fehlendem Ordner → **Dialog mit Neu anlegen**; **Update-Status-Klick** öffnet **VERSION.txt / docs/VERSION** im Editor falls lokal vorhanden. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
