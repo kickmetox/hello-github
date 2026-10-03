@@ -30,11 +30,13 @@ from PySide6.QtWidgets import (
 
 
 class SplitPathLogEdit(QListWidget):
-    """Pfad-Log: Mehrfachauswahl, Doppelklick, Kontextmenü — 1.2.5."""
+    """Pfad-Log: Mehrfachauswahl, Doppelklick, Kontextmenü — 1.2.5/1.2.6."""
 
     path_activate = Signal()
     open_selected_folders = Signal()
     copy_requested = Signal()
+    copy_paths_requested = Signal()
+    open_in_tabs_requested = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -86,7 +88,9 @@ class SplitPathLogEdit(QListWidget):
         act_open = menu.addAction("Öffnen")
         act_folder = menu.addAction("Ordner öffnen")
         act_sel = menu.addAction("Ordner der Auswahl öffnen")
+        act_tabs = menu.addAction("In Tabs öffnen")
         menu.addSeparator()
+        act_copy_path = menu.addAction("Pfad kopieren")
         act_copy = menu.addAction("Auswahl / Log kopieren")
         chosen = menu.exec(self.mapToGlobal(pos))
         if chosen is act_open:
@@ -95,6 +99,10 @@ class SplitPathLogEdit(QListWidget):
             self.path_activate.emit()
         elif chosen is act_sel:
             self.open_selected_folders.emit()
+        elif chosen is act_tabs:
+            self.open_in_tabs_requested.emit()
+        elif chosen is act_copy_path:
+            self.copy_paths_requested.emit()
         elif chosen is act_copy:
             self.copy_requested.emit()
 
@@ -355,16 +363,20 @@ class PdfToolsDialog(QDialog):
         self.split_log.setMaximumHeight(130)
         self.split_log.setPlaceholderText(
             "Noch kein Log — nach dem Teilen erscheinen Pfade hier. "
-            "Mehrfachauswahl · Doppelklick · Kontextmenü · Ordner der Auswahl."
+            "Mehrfachauswahl · Doppelklick · Kontextmenü · "
+            "Pfad kopieren · In Tabs öffnen."
         )
         self.split_log.setToolTip(
             "Liste der nach dem Teilen erzeugten Dateipfade. "
             "Mehrfachauswahl (Ctrl/Shift); Doppelklick öffnet Datei/Ordner; "
-            "Kontextmenü; „Ordner der Auswahl öffnen“ — 1.2.5"
+            "Kontextmenü: Pfad kopieren · In Tabs öffnen · "
+            "Ordner der Auswahl — 1.2.6"
         )
         self.split_log.path_activate.connect(self._split_open_log_path)
         self.split_log.open_selected_folders.connect(self._split_open_selected_folders)
         self.split_log.copy_requested.connect(self._split_copy_log)
+        self.split_log.copy_paths_requested.connect(self._split_copy_selected_paths)
+        self.split_log.open_in_tabs_requested.connect(self._split_open_selected_in_tabs)
         form.addRow("Pfad-Log", self.split_log)
         log_btns = QHBoxLayout()
         btn_copy_log = QPushButton("Log kopieren")
@@ -774,12 +786,13 @@ class PdfToolsDialog(QDialog):
         self.split_log.setPlainText(header + ("\n" + "\n".join(lines) if lines else ""))
 
     def _split_log_empty_hint(self) -> None:
-        """Hinweis bei leerem Pfad-Log — 1.2.4/1.2.5."""
+        """Hinweis bei leerem Pfad-Log — 1.2.4/1.2.6."""
         QMessageBox.information(
             self,
             "Pfad-Log",
             "Kein Log vorhanden — zuerst teilen.\n"
             "Danach: Mehrfachauswahl, Doppelklick, Kontextmenü "
+            "(Pfad kopieren · In Tabs öffnen) "
             "oder „Ordner der Auswahl öffnen“.",
         )
 
@@ -890,6 +903,67 @@ class PdfToolsDialog(QDialog):
                 "Keine Ordner gefunden für die Auswahl:\n" + "\n".join(missing[:5]),
             )
 
+    def _split_copy_selected_paths(self) -> None:
+        """Ausgewählte Pfade in die Zwischenablage — 1.2.6."""
+        from PySide6.QtWidgets import QApplication
+
+        if not hasattr(self, "split_log"):
+            return
+        if not (self.split_log.toPlainText() or "").strip():
+            self._split_log_empty_hint()
+            return
+        paths = self._split_selected_paths()
+        if not paths:
+            QMessageBox.information(
+                self,
+                "Pfad-Log",
+                "Keine Pfadzeilen ausgewählt.\n"
+                "Eine oder mehrere Zeilen markieren (Ctrl/Shift).",
+            )
+            return
+        QApplication.clipboard().setText("\n".join(paths))
+        n = len(paths)
+        QMessageBox.information(
+            self,
+            "Pfad-Log",
+            f"{n} Pfad(e) in die Zwischenablage kopiert."
+            if n != 1
+            else "Pfad in die Zwischenablage kopiert.",
+        )
+
+    def _split_open_selected_in_tabs(self) -> None:
+        """Ausgewählte Split-PDFs in Tabs öffnen — 1.2.6."""
+        if not hasattr(self, "split_log"):
+            return
+        if not (self.split_log.toPlainText() or "").strip():
+            self._split_log_empty_hint()
+            return
+        paths = self._split_selected_paths()
+        if not paths:
+            QMessageBox.information(
+                self,
+                "Pfad-Log",
+                "Keine Pfadzeilen ausgewählt.\n"
+                "Eine oder mehrere Zeilen markieren (Ctrl/Shift).",
+            )
+            return
+        existing = [p for p in paths if Path(p).is_file()]
+        if not existing:
+            QMessageBox.warning(
+                self,
+                "Pfad-Log",
+                "Keine gültigen Dateien in der Auswahl gefunden.",
+            )
+            return
+        self._split_open_written(existing)
+        missing = [p for p in paths if p not in existing]
+        if missing:
+            QMessageBox.information(
+                self,
+                "Pfad-Log",
+                f"{len(existing)} Datei(en) in Tabs geöffnet.\n"
+                f"{len(missing)} Pfad(e) nicht gefunden.",
+            )
 
     def _split_copy_log(self) -> None:
         """Pfad-Log in die Zwischenablage — 1.2.3."""

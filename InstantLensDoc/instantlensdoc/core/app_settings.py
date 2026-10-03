@@ -34,6 +34,7 @@ DEFAULTS: dict[str, Any] = {
     "split_open_tabs": False,  # PDF-Split: erzeugte Dateien in Tabs öffnen — 1.2.3
     "text_diff_sync_scroll": True,  # Text-Diff Sync-Scroll Default — 1.2.4
     "text_diff_ignore_whitespace": False,  # Text-Diff Ignore-Whitespace — 1.2.4
+    "text_diff_wrap_around": True,  # Text-Diff F7 Wrap-around — 1.2.6
     "default_zoom_percent": 150,
     "default_zoom_mode": "percent",  # percent | fit_width | fit_page
     "autosave_interval_sec": 60,  # 15 | 30 | 60 | 120 — 0.9.7
@@ -495,6 +496,20 @@ def get_text_diff_ignore_whitespace() -> bool:
 def set_text_diff_ignore_whitespace(enabled: bool) -> None:
     """Persistenz Text-Diff Ignore-Whitespace — 1.2.4."""
     save_settings({"text_diff_ignore_whitespace": bool(enabled)})
+
+
+def get_text_diff_wrap_around() -> bool:
+    """Text-Diff: Wrap-around bei F7/Shift+F7 — 1.2.6."""
+    return bool(
+        load_settings().get(
+            "text_diff_wrap_around", DEFAULTS["text_diff_wrap_around"]
+        )
+    )
+
+
+def set_text_diff_wrap_around(enabled: bool) -> None:
+    """Persistenz Text-Diff Wrap-around — 1.2.6."""
+    save_settings({"text_diff_wrap_around": bool(enabled)})
 
 
 def get_ann_export_filename_template() -> str:

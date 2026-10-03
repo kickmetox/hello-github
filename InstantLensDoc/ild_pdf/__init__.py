@@ -212,4 +212,4 @@ __all__ = [
     "uri_link_at",
 ]
 
-__version__ = "1.2.5"
+__version__ = "1.2.6"

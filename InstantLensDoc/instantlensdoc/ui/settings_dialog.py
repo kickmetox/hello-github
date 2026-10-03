@@ -27,20 +27,36 @@ from PySide6.QtWidgets import (
 
 
 class AnnExportTemplateEdit(QLineEdit):
-    """Ann.-Export-Template: Cursor-Position merken + Undo — 1.2.5."""
+    """Ann.-Export-Template: Cursor-Position merken + lokales Undo — 1.2.5/1.2.6."""
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._saved_cursor = 0
         self._saved_sel_start = -1
         self._saved_sel_len = 0
-        # QLineEdit: Undo/Redo standardmäßig aktiv (Ctrl+Z nach insert)
+        # QLineEdit: Undo/Redo lokal (Ctrl+Z/Y via keyPressEvent) — 1.2.6
 
     def focusOutEvent(self, event):
         self._saved_cursor = self.cursorPosition()
         self._saved_sel_start = self.selectionStart()
         self._saved_sel_len = self.selectionLength()
         super().focusOutEvent(event)
+
+    def keyPressEvent(self, event):
+        """Ctrl+Z / Ctrl+Y nur lokal im Feld (kein App-Undo) — 1.2.6."""
+        from PySide6.QtGui import QKeySequence
+
+        if event.matches(QKeySequence.Undo):
+            if self.isUndoAvailable():
+                self.undo()
+            event.accept()
+            return
+        if event.matches(QKeySequence.Redo):
+            if self.isRedoAvailable():
+                self.redo()
+            event.accept()
+            return
+        super().keyPressEvent(event)
 
     def restore_insert_position(self) -> None:
         """Cursor/Selektion vor Quick-Insert wiederherstellen — 1.2.5."""
@@ -860,16 +876,18 @@ class SettingsDialog(QDialog):
         form.addRow("Zuletzt geöffnet (max.)", recent_row)
 
         from instantlensdoc.core.app_settings import (
+            DEFAULT_ANN_EXPORT_FILENAME_TEMPLATE,
             get_ann_export_filename_template,
             get_last_ann_export_dir,
         )
 
         self.ann_export_tpl = AnnExportTemplateEdit(get_ann_export_filename_template())
-        self.ann_export_tpl.setPlaceholderText("{stem}_ann.json")
+        self.ann_export_tpl.setPlaceholderText(DEFAULT_ANN_EXPORT_FILENAME_TEMPLATE)
         self.ann_export_tpl.setToolTip(
             "Dateiname-Template für Annotation-JSON-Export. "
             "Platzhalter: {stem}, {page} (1-basiert), {date} (YYYY-MM-DD). "
-            "Quick-Insert an Cursor-Position; Undo im Feld (Ctrl+Z) — 1.2.5"
+            "Quick-Insert an Cursor-Position; lokales Undo (Ctrl+Z); "
+            "Reset-Template auf Default — 1.2.6"
         )
         self.ann_export_tpl.textChanged.connect(self._update_ann_export_preview)
         tpl_row = QHBoxLayout()
@@ -881,12 +899,23 @@ class SettingsDialog(QDialog):
             btn.setFocusPolicy(Qt.TabFocus)
             btn.setToolTip(
                 f"Platzhalter {token} an Cursor-Position einfügen "
-                "(Undo: Ctrl+Z) — 1.2.5"
+                "(lokales Undo: Ctrl+Z) — 1.2.6"
             )
             btn.clicked.connect(
                 lambda _checked=False, t=token: self._insert_ann_export_placeholder(t)
             )
             tpl_row.addWidget(btn)
+        self.btn_reset_ann_tpl = QPushButton("Reset-Template")
+        self.btn_reset_ann_tpl.setAutoDefault(False)
+        self.btn_reset_ann_tpl.setDefault(False)
+        self.btn_reset_ann_tpl.setFocusPolicy(Qt.TabFocus)
+        self.btn_reset_ann_tpl.setToolTip(
+            f"Template auf Default zurücksetzen "
+            f"({DEFAULT_ANN_EXPORT_FILENAME_TEMPLATE}); "
+            "danach lokales Undo (Ctrl+Z) — 1.2.6"
+        )
+        self.btn_reset_ann_tpl.clicked.connect(self._reset_ann_export_template)
+        tpl_row.addWidget(self.btn_reset_ann_tpl)
         form.addRow("Ann.-Export Dateiname", tpl_row)
         self.ann_export_preview = QLabel("")
         self.ann_export_preview.setWordWrap(True)
@@ -909,6 +938,7 @@ class SettingsDialog(QDialog):
         from instantlensdoc.core.app_settings import (
             get_text_diff_ignore_whitespace,
             get_text_diff_sync_scroll,
+            get_text_diff_wrap_around,
         )
 
         self.text_diff_sync_scroll = QCheckBox("Text-Diff Sync-Scroll (Side-by-Side)")
@@ -924,6 +954,13 @@ class SettingsDialog(QDialog):
             "Whitespace beim Text-Diff-Vergleich ignorieren (persistiert) — 1.2.4"
         )
         form.addRow(self.text_diff_ignore_ws)
+        self.text_diff_wrap_around = QCheckBox("Text-Diff Wrap-around (F7)")
+        self.text_diff_wrap_around.setChecked(get_text_diff_wrap_around())
+        self.text_diff_wrap_around.setToolTip(
+            "Bei Nächste/Vorherige Änderung (F7/Shift+F7) am Ende "
+            "wieder von vorn / vom Ende — 1.2.6"
+        )
+        form.addRow(self.text_diff_wrap_around)
 
         self.jpeg_q = QSpinBox()
         self.jpeg_q.setRange(10, 100)
@@ -1016,8 +1053,29 @@ class SettingsDialog(QDialog):
         edit = self.ann_export_tpl
         if isinstance(edit, AnnExportTemplateEdit):
             edit.restore_insert_position()
-        edit.insert(str(token or ""))  # undo-fähig (Ctrl+Z)
+        edit.insert(str(token or ""))  # undo-fähig (Ctrl+Z lokal)
         edit.setFocus()
+        if isinstance(edit, AnnExportTemplateEdit):
+            edit._saved_cursor = edit.cursorPosition()
+            edit._saved_sel_start = -1
+            edit._saved_sel_len = 0
+        self._update_ann_export_preview()
+
+    def _reset_ann_export_template(self) -> None:
+        """Template auf Default zurücksetzen (undo-fähig) — 1.2.6."""
+        from instantlensdoc.core.app_settings import DEFAULT_ANN_EXPORT_FILENAME_TEMPLATE
+
+        if not hasattr(self, "ann_export_tpl"):
+            return
+        edit = self.ann_export_tpl
+        default = DEFAULT_ANN_EXPORT_FILENAME_TEMPLATE
+        if (edit.text() or "") == default:
+            edit.setFocus()
+            return
+        # selectAll + insert → ein Undo-Schritt (Ctrl+Z stellt vorherigen Text wieder her)
+        edit.setFocus()
+        edit.selectAll()
+        edit.insert(default)
         if isinstance(edit, AnnExportTemplateEdit):
             edit._saved_cursor = edit.cursorPosition()
             edit._saved_sel_start = -1
@@ -1634,6 +1692,7 @@ class SettingsDialog(QDialog):
             set_ann_export_filename_template,
             set_text_diff_ignore_whitespace,
             set_text_diff_sync_scroll,
+            set_text_diff_wrap_around,
         )
 
         if hasattr(self, "ann_export_tpl"):
@@ -1642,6 +1701,8 @@ class SettingsDialog(QDialog):
             set_text_diff_sync_scroll(self.text_diff_sync_scroll.isChecked())
         if hasattr(self, "text_diff_ignore_ws"):
             set_text_diff_ignore_whitespace(self.text_diff_ignore_ws.isChecked())
+        if hasattr(self, "text_diff_wrap_around"):
+            set_text_diff_wrap_around(self.text_diff_wrap_around.isChecked())
         parent = self.parent()
         if parent is not None and hasattr(parent, "_refresh_recent"):
             try:

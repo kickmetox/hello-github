@@ -27,8 +27,10 @@ from instantlensdoc.core.app_settings import (
     get_editor_text_encoding,
     get_text_diff_ignore_whitespace,
     get_text_diff_sync_scroll,
+    get_text_diff_wrap_around,
     set_text_diff_ignore_whitespace,
     set_text_diff_sync_scroll,
+    set_text_diff_wrap_around,
 )
 from instantlensdoc.core.documents import normalize_text_encoding
 from instantlensdoc.core.text_diff import (
@@ -204,7 +206,8 @@ class TextCompareDialog(QDialog):
                 QLabel(
                     "Zeilen-Diff Panel: zwei offene Text-Tabs wählen — "
                     "Side-by-Side/Unified · Wort-Highlight · Ignore-Whitespace · "
-                    "Sync-Scroll · Nächste/Vorherige Änderung (F7/Shift+F7) — 1.2.5"
+                    "Sync-Scroll · Nächste/Vorherige Änderung (F7/Shift+F7) · "
+                    "Status Änderung i/n · Wrap-around — 1.2.6"
                 )
             )
         pick = QHBoxLayout()
@@ -264,12 +267,20 @@ class TextCompareDialog(QDialog):
             "auch in Einstellungen — 1.2.4"
         )
         self.chk_sync_scroll.toggled.connect(self._on_sync_scroll_toggled)
+        self.chk_wrap_around = QCheckBox("Wrap-around")
+        self.chk_wrap_around.setChecked(get_text_diff_wrap_around())
+        self.chk_wrap_around.setToolTip(
+            "F7/Shift+F7 am Ende wieder von vorn (bzw. vom Ende); "
+            "auch in Einstellungen — 1.2.6"
+        )
+        self.chk_wrap_around.toggled.connect(self._on_wrap_around_toggled)
         opts.addWidget(self.chk_only_diff)
         opts.addWidget(self.chk_line_numbers)
         opts.addWidget(self.chk_unified)
         opts.addWidget(self.chk_word_hl)
         opts.addWidget(self.chk_ignore_ws)
         opts.addWidget(self.chk_sync_scroll)
+        opts.addWidget(self.chk_wrap_around)
         opts.addStretch()
         root.addLayout(opts)
 
@@ -300,10 +311,14 @@ class TextCompareDialog(QDialog):
         btn_export.setToolTip("Aktuellen Diff als Textdatei exportieren — 1.2.1/1.2.2")
         btn_export.clicked.connect(self._export_diff_txt)
         self.btn_prev_change = QPushButton("Vorherige Änderung")
-        self.btn_prev_change.setToolTip("Zur vorherigen Abweichung (Shift+F7) — 1.2.5")
+        self.btn_prev_change.setToolTip(
+            "Zur vorherigen Abweichung (Shift+F7); Status Änderung i/n — 1.2.6"
+        )
         self.btn_prev_change.clicked.connect(lambda: self._goto_change(-1))
         self.btn_next_change = QPushButton("Nächste Änderung")
-        self.btn_next_change.setToolTip("Zur nächsten Abweichung (F7) — 1.2.5")
+        self.btn_next_change.setToolTip(
+            "Zur nächsten Abweichung (F7); Status Änderung i/n — 1.2.6"
+        )
         self.btn_next_change.clicked.connect(lambda: self._goto_change(1))
         row = QHBoxLayout()
         row.addWidget(btn_reload)
@@ -422,6 +437,10 @@ class TextCompareDialog(QDialog):
         """Sync-Scroll persistieren und anwenden — 1.2.4."""
         set_text_diff_sync_scroll(bool(checked))
         self._apply_sync_scroll()
+
+    def _on_wrap_around_toggled(self, checked: bool) -> None:
+        """Wrap-around persistieren — 1.2.6."""
+        set_text_diff_wrap_around(bool(checked))
 
     def _apply_sync_scroll(self) -> None:
         """Sync-Scroll Side-by-Side verbinden — 1.2.3/1.2.4."""
@@ -576,7 +595,7 @@ class TextCompareDialog(QDialog):
         return self.view_left
 
     def _goto_change(self, direction: int) -> None:
-        """Nächste/vorherige Änderung anspringen (F7 / Shift+F7) — 1.2.5."""
+        """Nächste/vorherige Änderung anspringen (F7 / Shift+F7) — 1.2.5/1.2.6."""
         indices = self._change_line_indices()
         if not indices:
             base = (self.lbl_status.text() or "").split(" · Änderung ")[0] or "Diff"
@@ -584,13 +603,32 @@ class TextCompareDialog(QDialog):
             return
         view = self._active_diff_view()
         cur_block = view.textCursor().blockNumber()
+        wrap = True
+        if hasattr(self, "chk_wrap_around"):
+            wrap = bool(self.chk_wrap_around.isChecked())
         if direction >= 0:
             nxt = next((i for i in indices if i > cur_block), None)
             if nxt is None:
+                if not wrap:
+                    n = len(indices)
+                    pos = indices.index(indices[-1]) + 1 if indices else 0
+                    base = self.lbl_status.text().split(" · Änderung ")[0]
+                    self.lbl_status.setText(
+                        f"{base} · Änderung {pos}/{n} · Ende"
+                    )
+                    return
                 nxt = indices[0]
         else:
             nxt = next((i for i in reversed(indices) if i < cur_block), None)
             if nxt is None:
+                if not wrap:
+                    n = len(indices)
+                    pos = 1
+                    base = self.lbl_status.text().split(" · Änderung ")[0]
+                    self.lbl_status.setText(
+                        f"{base} · Änderung {pos}/{n} · Anfang"
+                    )
+                    return
                 nxt = indices[-1]
         self._change_nav_index = indices.index(nxt)
         block = view.document().findBlockByNumber(nxt)

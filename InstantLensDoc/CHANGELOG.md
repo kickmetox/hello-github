@@ -1,5 +1,27 @@
 # Changelog — InstantLens Doc
 
+## 1.2.6 — Split-Log Pfad kopieren·Tabs, Ann. Undo lokal·Reset, Diff Status·Wrap, run.bat ILD_PYTHON-Fallback
+
+Post-Release-Polish nach 1.2.5: **PDF-Split Pfad-Log Kontextmenü** mit **„Pfad kopieren“** und **„In Tabs öffnen“** für die Auswahl; **Ann.-Export-Template** mit **lokalem Undo (Ctrl+Z)** im Feld und Button **Reset-Template** auf Default; **Text-Diff** Status **„Änderung i/n“** und **Wrap-around** Toggle in Settings/Dialog; **`run.bat`** bei ungültigem **`%ILD_PYTHON%`** mit klarer DE-Fehlermeldung und Fallback-Hinweis (`.venv`/PATH). Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### PDF
+- Split: Pfad-Log Kontextmenü **„Pfad kopieren“** + **„In Tabs öffnen“** (Auswahl)
+
+### Annotationen
+- Export-Template: **Ctrl+Z lokal** im Feld; Button **Reset-Template** → Default `{stem}_ann.json`
+
+### Editor
+- Text-Diff: Status **„Änderung i/n“**; Toggle **Wrap-around** (Settings + Dialog, persistiert)
+
+### Packaging / Start
+- **`run.bat`**: ungültiges **`%ILD_PYTHON%`** → klare DE-Fehlermeldung + Fallback-Hinweis (`.venv`/PATH); in `--help` dokumentiert
+
+### Packaging / Docs
+- Version **1.2.6** (App / `ild_pdf` / ISS / Smoke / Docs)
+- Smoke: Split-Log Pfad kopieren·Tabs, Ann. Undo lokal·Reset, Diff Status·Wrap, run.bat ILD_PYTHON-Fallback (CLI + Qt)
+
+---
+
 ## 1.2.5 — Split-Log Mehrfachauswahl, Ann. Cursor/Undo, Diff Nav F7, run.bat ILD_PYTHON
 
 Post-Release-Polish nach 1.2.4: **PDF-Split Pfad-Log** mit **Mehrfachauswahl**, Button **„Ordner der Auswahl öffnen“** und **Kontextmenü**; **Ann.-Export Quick-Insert** fügt an der **Cursor-Position** ein und unterstützt **Undo (Ctrl+Z)** im Template-Feld; **Text-Diff** mit Buttons **Nächste/Vorherige Änderung** (**F7** / **Shift+F7**); **`run.bat`** nutzt und dokumentiert Env-Override **`%ILD_PYTHON%`**. Stubs KI/Cloud/Stylus/3D bleiben Stubs.

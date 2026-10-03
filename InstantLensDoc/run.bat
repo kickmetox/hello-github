@@ -3,7 +3,7 @@ setlocal EnableExtensions EnableDelayedExpansion
 chcp 65001 >nul
 cd /d "%~dp0"
 
-REM InstantLens Doc 1.2.5 — Start mit Python-/Abhängigkeitsprüfung (DE-Meldungen)
+REM InstantLens Doc 1.2.6 — Start mit Python-/Abhängigkeitsprüfung (DE-Meldungen)
 REM Optional: pip install -r requirements.txt per J/N — oder non-interactive mit --yes / -y
 REM Hilfe: run.bat --help / -h
 REM
@@ -12,6 +12,7 @@ REM   set ILD_PYTHON=C:\Pfad\zu\python.exe
 REM   run.bat
 REM Wenn %%ILD_PYTHON%% gesetzt ist und auf eine existierende Datei zeigt, wird genau
 REM dieser Interpreter genutzt (vor .venv und PATH).
+REM Bei ungültigem ILD_PYTHON: klare DE-Fehlermeldung + Fallback-Hinweis (.venv/PATH).
 REM
 REM Exit-Codes:
 REM   0  OK (App beendet mit 0) bzw. --help angezeigt
@@ -58,6 +59,8 @@ if defined ILD_HELP (
   echo   ILD_PYTHON       Optionaler Pfad zu python.exe ^(Env-Override, hoechste Prio^)
   echo                    Beispiel: set ILD_PYTHON=C:\Python312\python.exe
   echo                    Wenn gesetzt und Datei existiert: wird vor .venv/PATH genutzt.
+  echo                    Ungueltig: klare DE-Fehlermeldung + Fallback-Hinweis
+  echo                    ^(Variable entfernen → .venv bzw. PATH^).
   echo.
   echo Pruefungen:
   echo   - Python 3.10+ ^(ILD_PYTHON, sonst lokale .venv\Scripts\python.exe, sonst PATH^)
@@ -66,7 +69,7 @@ if defined ILD_HELP (
   echo Exit-Codes:
   echo   0  OK ^(App beendet mit 0^) bzw. Hilfe angezeigt
   echo   1  Python/Deps/pip-Fehler bzw. Installation abgelehnt;
-  echo      App-Exitcode != 0 wird durchgereicht
+  echo      ILD_PYTHON ungueltig; App-Exitcode != 0 wird durchgereicht
   echo.
   echo Beispiele:
   echo   run.bat
@@ -83,7 +86,7 @@ set "PYEXE="
 set "ILD_USED_VENV="
 set "ILD_USED_ENV="
 
-REM 1.2.5: %%ILD_PYTHON%% Env-Override (höchste Priorität)
+REM 1.2.5/1.2.6: %%ILD_PYTHON%% Env-Override (höchste Priorität)
 if defined ILD_PYTHON (
   if exist "%ILD_PYTHON%" (
     set "PYEXE=%ILD_PYTHON%"
@@ -91,9 +94,18 @@ if defined ILD_PYTHON (
     echo [InstantLens Doc] Nutze ILD_PYTHON=%ILD_PYTHON%
   ) else (
     echo.
-    echo [InstantLens Doc] FEHLER: ILD_PYTHON ist gesetzt, aber die Datei fehlt:
+    echo [InstantLens Doc] FEHLER: ILD_PYTHON ist ungueltig.
+    echo Die Datei existiert nicht oder ist kein ausfuehrbarer Python-Interpreter:
     echo   %ILD_PYTHON%
-    echo Bitte auf einen gültigen python.exe-Pfad setzen oder Variable entfernen.
+    echo.
+    echo Bitte einen gueltigen Pfad setzen, z. B.:
+    echo   set ILD_PYTHON=C:\Python312\python.exe
+    echo.
+    echo Fallback-Hinweis: Variable entfernen, dann nutzt run.bat automatisch
+    echo   1^) lokale .venv\Scripts\python.exe ^(falls vorhanden^)
+    echo   2^) sonst python/py aus dem PATH
+    echo Entfernen unter cmd.exe:
+    echo   set ILD_PYTHON=
     echo.
     if not defined ILD_YES pause
     exit /b 1
