@@ -721,13 +721,15 @@ class MainWindow(QMainWindow):
         outer.setContentsMargins(0, 0, 0, 0)
         outer.setSpacing(0)
 
-        # Ablaufwarnung-Banner: Icon + Dismiss + Schließen-X, dismiss_date — 1.0.7
+        # Ablaufwarnung-Banner: Esc schließt; AccessibleName — 1.0.8
         from PySide6.QtWidgets import QStyle
 
         from instantlensdoc.core.i18n import tr as _tr_ban
 
         self.expiry_warn_banner = QWidget()
         self.expiry_warn_banner.setObjectName("expiryWarnBanner")
+        self.expiry_warn_banner.setAccessibleName(_tr_ban("expiry_banner_accessible"))
+        self.expiry_warn_banner.setFocusPolicy(Qt.StrongFocus)
         self._expiry_banner_kind = "warn"
         self._apply_expiry_banner_style("warn")
         ban_lay = QHBoxLayout(self.expiry_warn_banner)
@@ -742,22 +744,30 @@ class MainWindow(QMainWindow):
         except Exception:
             self.expiry_warn_icon.setText("⚠")
         self.expiry_warn_icon.setToolTip(_tr_ban("expiry_warn_tooltip"))
+        self.expiry_warn_icon.setAccessibleName(_tr_ban("expiry_banner_icon_accessible"))
         ban_lay.addWidget(self.expiry_warn_icon)
         self.expiry_warn_label = QLabel()
         self.expiry_warn_label.setWordWrap(True)
         self.expiry_warn_label.setCursor(Qt.PointingHandCursor)
         self.expiry_warn_label.setToolTip(_tr_ban("expiry_warn_tooltip"))
+        self.expiry_warn_label.setAccessibleName(_tr_ban("expiry_banner_accessible"))
         self.expiry_warn_label.mousePressEvent = (  # type: ignore[method-assign]
             lambda e: self._on_expiry_warn_clicked(e)
         )
         ban_lay.addWidget(self.expiry_warn_label, 1)
         self.btn_expiry_warn_dismiss = QPushButton(_tr_ban("expiry_dismiss_label"))
         self.btn_expiry_warn_dismiss.setToolTip(_tr_ban("expiry_dismiss_tooltip"))
+        self.btn_expiry_warn_dismiss.setAccessibleName(
+            _tr_ban("expiry_dismiss_accessible")
+        )
         self.btn_expiry_warn_dismiss.clicked.connect(self._dismiss_expiry_warning)
         ban_lay.addWidget(self.btn_expiry_warn_dismiss)
         self.btn_expiry_warn_close = QPushButton("×")
         self.btn_expiry_warn_close.setFixedWidth(28)
         self.btn_expiry_warn_close.setToolTip(_tr_ban("expiry_close_tooltip"))
+        self.btn_expiry_warn_close.setAccessibleName(
+            _tr_ban("expiry_close_accessible")
+        )
         self.btn_expiry_warn_close.clicked.connect(self._dismiss_expiry_warning)
         ban_lay.addWidget(self.btn_expiry_warn_close)
         self.expiry_warn_banner.setVisible(False)
@@ -2687,6 +2697,13 @@ class MainWindow(QMainWindow):
                 return
             event.accept()
             return
+        # Esc schließt sichtbares Lizenz-Banner — 1.0.8
+        if event.key() == Qt.Key_Escape:
+            banner = getattr(self, "expiry_warn_banner", None)
+            if banner is not None and banner.isVisible():
+                self._dismiss_expiry_warning()
+                event.accept()
+                return
         super().keyPressEvent(event)
 
     def _duplicate_current(self):
@@ -4549,11 +4566,25 @@ class MainWindow(QMainWindow):
             )
         self.expiry_warn_label.setText(warn)
         self.expiry_warn_label.setToolTip(tr("expiry_warn_tooltip"))
+        # Screenreader AccessibleName (Warnung vs. abgelaufen) — 1.0.8
+        acc = tr(
+            "expiry_banner_expired_accessible"
+            if kind == "expired"
+            else "expiry_banner_accessible"
+        )
+        banner.setAccessibleName(acc)
+        self.expiry_warn_label.setAccessibleName(acc)
         if hasattr(self, "btn_expiry_warn_dismiss"):
             self.btn_expiry_warn_dismiss.setText(tr("expiry_dismiss_label"))
             self.btn_expiry_warn_dismiss.setToolTip(tr("expiry_dismiss_tooltip"))
+            self.btn_expiry_warn_dismiss.setAccessibleName(
+                tr("expiry_dismiss_accessible")
+            )
         if hasattr(self, "btn_expiry_warn_close"):
             self.btn_expiry_warn_close.setToolTip(tr("expiry_close_tooltip"))
+            self.btn_expiry_warn_close.setAccessibleName(
+                tr("expiry_close_accessible")
+            )
         was_visible = banner.isVisible()
         banner.setVisible(True)
         if not was_visible:

@@ -1010,8 +1010,11 @@ class SettingsDialog(QDialog):
                 pass
 
     def _export_backup_log(self) -> None:
-        """Gefiltertes Backup-Log als TXT exportieren — 1.0.7."""
-        from instantlensdoc.core.manual_backup import export_backup_log_txt
+        """Gefiltertes Backup-Log als TXT (Zeitstempel-Name, UTF-8 BOM) — 1.0.8."""
+        from instantlensdoc.core.manual_backup import (
+            default_backup_log_export_name,
+            export_backup_log_txt,
+        )
 
         visible = getattr(self, "_backup_log_visible", None) or []
         if not visible:
@@ -1019,16 +1022,17 @@ class SettingsDialog(QDialog):
                 self, "Backup-Log", "Keine Einträge zum Exportieren."
             )
             return
+        suggested = Path.home() / default_backup_log_export_name()
         path, _ = QFileDialog.getSaveFileName(
             self,
             "Backup-Log exportieren",
-            str(Path.home() / "backup-log.txt"),
+            str(suggested),
             "Textdatei (*.txt);;Alle Dateien (*)",
         )
         if not path:
             return
         try:
-            out = export_backup_log_txt(path, visible)
+            out = export_backup_log_txt(path, visible, utf8_bom=True)
         except Exception as e:
             QMessageBox.critical(
                 self, "Backup-Log", f"Export fehlgeschlagen:\n{e}"

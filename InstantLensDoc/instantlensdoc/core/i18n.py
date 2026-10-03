@@ -43,34 +43,54 @@ _STRINGS: dict[str, dict[UiLang, str]] = {
     "field_keywords": {"de": "Stichwörter", "en": "Keywords"},
     "field_creator": {"de": "Ersteller", "en": "Creator"},
     "field_producer": {"de": "Produzent", "en": "Producer"},
-    # Lizenz-Banner — 1.0.7
+    # Lizenz-Banner — 1.0.8
     "expiry_warn_banner": {
-        "de": "Hinweis: Lizenz/Trial läuft in {rest} ab{until} — Klick: Info/Aktivierung · Dismiss / × bis morgen",
-        "en": "Notice: license/trial expires in {rest}{until} — Click: About/Activate · Dismiss / × until tomorrow",
+        "de": "Hinweis: Lizenz/Trial läuft in {rest} ab{until} — Klick: Info/Aktivierung · Esc / Dismiss / × bis morgen",
+        "en": "Notice: license/trial expires in {rest}{until} — Click: About/Activate · Esc / Dismiss / × until tomorrow",
     },
     "expiry_expired_banner": {
-        "de": "Lizenz abgelaufen{until} — Klick: Info/Aktivierung · Dismiss / × bis morgen",
-        "en": "License expired{until} — Click: About/Activate · Dismiss / × until tomorrow",
+        "de": "Lizenz abgelaufen{until} — Klick: Info/Aktivierung · Esc / Dismiss / × bis morgen",
+        "en": "License expired{until} — Click: About/Activate · Esc / Dismiss / × until tomorrow",
     },
     "expiry_warn_tooltip": {
-        "de": "Klick öffnet Info / Lizenz aktivieren — 1.0.7",
-        "en": "Click opens About / activate license — 1.0.7",
+        "de": "Klick öffnet Info / Lizenz aktivieren; Esc schließt — 1.0.8",
+        "en": "Click opens About / activate license; Esc dismisses — 1.0.8",
     },
     "expiry_dismiss_label": {
         "de": "Dismiss",
         "en": "Dismiss",
     },
     "expiry_dismiss_tooltip": {
-        "de": "Hinweis schließen — dismiss_date bis morgen — 1.0.7",
-        "en": "Dismiss notice — dismiss_date until tomorrow — 1.0.7",
+        "de": "Hinweis schließen — dismiss_date bis morgen — 1.0.8",
+        "en": "Dismiss notice — dismiss_date until tomorrow — 1.0.8",
     },
     "expiry_close_tooltip": {
-        "de": "Schließen (×) — Hinweis bis morgen ausblenden — 1.0.7",
-        "en": "Close (×) — hide notice until tomorrow — 1.0.7",
+        "de": "Schließen (×) — Hinweis bis morgen ausblenden — 1.0.8",
+        "en": "Close (×) — hide notice until tomorrow — 1.0.8",
     },
     "expiry_dismiss_status": {
         "de": "Ablauf-Hinweis bis morgen ausgeblendet",
         "en": "Expiry notice hidden until tomorrow",
+    },
+    "expiry_banner_accessible": {
+        "de": "Lizenz-Ablaufhinweis",
+        "en": "License expiry notice",
+    },
+    "expiry_banner_expired_accessible": {
+        "de": "Lizenz abgelaufen — Hinweisbanner",
+        "en": "License expired — notice banner",
+    },
+    "expiry_banner_icon_accessible": {
+        "de": "Warnsymbol Lizenzablauf",
+        "en": "License expiry warning icon",
+    },
+    "expiry_dismiss_accessible": {
+        "de": "Ablaufhinweis schließen (Dismiss)",
+        "en": "Dismiss expiry notice",
+    },
+    "expiry_close_accessible": {
+        "de": "Ablaufhinweis schließen",
+        "en": "Close expiry notice",
     },
 }
 

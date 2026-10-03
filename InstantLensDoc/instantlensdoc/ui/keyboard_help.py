@@ -89,10 +89,10 @@ SHORTCUTS_HTML = """
 <tr><td>Session Ann.-Opacity / Stroke</td><td>Letzte Deckkraft und Strichstärke speichern/wiederherstellen — 0.9.8</td></tr>
 <tr><td>Session Fill-/Stroke-Color</td><td>Letzte Fill- und Stroke-Farb-Defaults speichern/wiederherstellen — 0.9.9</td></tr>
 <tr><td>About Lizenz / Changelog</td><td>Hilfe → Info: Version, Lizenzstatus, Kontakt ame@sellerbach.de, Changelog-Kurzliste — 1.0.0</td></tr>
-<tr><td>Backup jetzt / Ordner</td><td>Datei → Backup jetzt; max. 3 Versuche; Log letzte 20; Filter Erfolg/Fehler; Export TXT; Doppelklick öffnet Datei/Ordner — 1.0.7</td></tr>
-<tr><td>PDF Dokument drucken</td><td>PDF → Dokument drucken… (Seitenbereich + DPI + Graustufen; Vorschau Zoom +/- + Seitenwahl Mehrseiten; Fortschritt; Abbruch → Cleanup); Ctrl+P = Seite — 1.0.7</td></tr>
-<tr><td>Willkommen</td><td>Weiterarbeiten (Session wenn Restore aus); Esc leert Filter → Fokus Liste; Clear + Treffer; Enter/Entf; Drag&amp;Drop — 1.0.7</td></tr>
-<tr><td>About / Lizenz Ablauf</td><td>Banner Icon + Dismiss + Schließen-X; Persistenz dismiss_date; Farbe Warnung vs. abgelaufen; Ablauf TT.MM.JJJJ — 1.0.7</td></tr>
+<tr><td>Backup jetzt / Ordner</td><td>Datei → Backup jetzt; max. 3 Versuche; Log letzte 20; Filter Erfolg/Fehler; Export TXT (Zeitstempel + UTF-8 BOM); Doppelklick öffnet Datei/Ordner — 1.0.8</td></tr>
+<tr><td>PDF Dokument drucken</td><td>PDF → Dokument drucken… (Seitenbereich + DPI + Graustufen; Vorschau Fit-Page + Mausrad-Zoom + Zoom +/- + Seitenwahl Mehrseiten; Fortschritt; Abbruch → Cleanup); Ctrl+P = Seite — 1.0.8</td></tr>
+<tr><td>Willkommen</td><td>Weiterarbeiten (Tooltip: Tabs + Pfad-Snippet); Esc leert Filter → Fokus Liste; Clear + Treffer; Enter/Entf; Drag&amp;Drop — 1.0.8</td></tr>
+<tr><td>About / Lizenz Ablauf</td><td>Banner Esc schließt + AccessibleName; Icon + Dismiss + Schließen-X; Persistenz dismiss_date; Farbe Warnung vs. abgelaufen; Ablauf TT.MM.JJJJ — 1.0.8</td></tr>
 <tr><td>Willkommen-Startseite</td><td>Ohne Tabs: Recent + Dokument öffnen / Leeres Text — 1.0.0</td></tr>
 <tr><td>PDF-Trefferliste</td><td>Sidebar Seite + Snippet klickbar → Sprung + Highlight — 0.9.1</td></tr>
 <tr><td>Fenster teilen (zwei Docs)</td><td><code>Ctrl+\\</code> — 0.6.3</td></tr>

@@ -1,5 +1,27 @@
 # Changelog — InstantLens Doc
 
+## 1.0.8 — Druckvorschau Fit-Page/Mausrad, Banner Esc·a11y, Backup-Log BOM, Weiter-Tooltip
+
+Post-Release-Polish nach 1.0.7: Druckvorschau mit Fit-Page-Toggle und Mausrad-Zoom; Lizenz-Banner schließt mit Esc und setzt Screenreader-AccessibleName; Backup-Log-TXT mit Zeitstempel im Dateinamen und UTF-8-BOM für Excel; Willkommen-Tooltip „Weiterarbeiten“ mit Tab-Anzahl und Pfad-Snippet der ersten Datei. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### Willkommen / Start
+- **Weiterarbeiten**-Tooltip: **Anzahl Tabs** + **Pfad-Snippet** der ersten Session-Datei (`_path_snippet`)
+
+### PDF / Druck
+- **Druckvorschau**: **Fit-Page**-Toggle („Seite einpassen“) + **Mausrad-Zoom** über dem Vorschaubereich (Zoom beendet Fit-Page)
+
+### About / Lizenz
+- Banner: **Esc** schließt (Dismiss bis morgen); **AccessibleName** für Banner/Icon/Buttons (i18n)
+
+### Backup
+- Log-Export: Standardname **`backup-log-YYYYMMDD-HHMMSS.txt`**; Schreibweise **UTF-8 mit BOM** (`utf8_bom`, Excel)
+
+### Packaging / Docs
+- Version **1.0.8** (App / `ild_pdf` / ISS / Smoke / Docs)
+- Smoke: Preview Fit/Wheel, Banner Esc·a11y, Backup BOM·Timestamp, Welcome Tooltip (CLI + Qt)
+
+---
+
 ## 1.0.7 — Druckvorschau Zoom/Seiten, Banner Icon·X, Backup-Filter·Export, Weiterarbeiten
 
 Post-Release-Polish nach 1.0.6: Druckvorschau mit Zoom +/- und Seitenwahl bei Mehrseiten-Bereich; Lizenz-Banner mit Icon, Dismiss-Button und Schließen-X (Persistenz `dismiss_date`); Backup-Log Filter Erfolg/Fehler plus TXT-Export; Willkommen-Button „Weiterarbeiten“ für letzte Session-Tabs wenn Session-Restore aus. Stubs KI/Cloud/Stylus/3D bleiben Stubs.

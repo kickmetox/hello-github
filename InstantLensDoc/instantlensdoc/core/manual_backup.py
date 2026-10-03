@@ -1,4 +1,4 @@
-"""Manuelles Backup aktueller Dokumente in den App-Backup-Ordner — 1.0.7."""
+"""Manuelles Backup aktueller Dokumente in den App-Backup-Ordner — 1.0.8."""
 
 from __future__ import annotations
 
@@ -12,6 +12,8 @@ from instantlensdoc.config import config_dir
 
 # Letzte N Backup-Vorgänge in Settings anzeigen — 1.0.4
 BACKUP_LOG_MAX = 20
+# UTF-8 BOM für Excel-Kompatibilität beim TXT-Export — 1.0.8
+_UTF8_BOM = "\ufeff"
 
 
 def backup_dir() -> Path:
@@ -120,11 +122,23 @@ def filter_backup_log(
     return [e for e in items if isinstance(e, dict)]
 
 
+def default_backup_log_export_name(*, when: datetime | None = None) -> str:
+    """Standard-Dateiname mit Zeitstempel für Backup-Log-TXT — 1.0.8."""
+    ts = (when or datetime.now()).strftime("%Y%m%d-%H%M%S")
+    return f"backup-log-{ts}.txt"
+
+
 def export_backup_log_txt(
     path: str | Path,
     entries: list[dict[str, Any]] | None = None,
+    *,
+    utf8_bom: bool = True,
 ) -> Path:
-    """Backup-Log als TXT exportieren (eine Zeile pro Eintrag) — 1.0.7."""
+    """
+    Backup-Log als TXT exportieren (eine Zeile pro Eintrag) — 1.0.8.
+
+    Schreibt UTF-8 mit BOM (``utf8_bom=True``, Standard) für Excel.
+    """
     items = list(entries) if entries is not None else load_backup_log()
     out = Path(path)
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -136,7 +150,10 @@ def export_backup_log_txt(
     )
     body = "\n".join(lines)
     text = header + (body + "\n" if body else "(leer)\n")
-    out.write_text(text, encoding="utf-8")
+    if utf8_bom:
+        out.write_text(_UTF8_BOM + text, encoding="utf-8")
+    else:
+        out.write_text(text, encoding="utf-8")
     return out
 
 

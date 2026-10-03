@@ -1,11 +1,11 @@
-"""Druckvorschau: Zoom +/- und Seitenwahl bei Mehrseiten-Bereich — 1.0.7."""
+"""Druckvorschau: Fit-Page Toggle + Mausrad-Zoom — 1.0.8."""
 
 from __future__ import annotations
 
 from collections.abc import Callable
 
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QPixmap
+from PySide6.QtCore import QEvent, Qt
+from PySide6.QtGui import QPixmap, QWheelEvent
 from PySide6.QtWidgets import (
     QCheckBox,
     QDialog,
@@ -20,7 +20,7 @@ from PySide6.QtWidgets import (
 
 from instantlensdoc.core.app_settings import get_print_preview, set_print_preview
 
-# Basis-Anzeigegröße; Zoom skaliert relativ dazu — 1.0.7
+# Basis-Anzeigegröße; Zoom skaliert relativ dazu — 1.0.7/1.0.8
 _BASE_W = 360
 _BASE_H = 480
 _ZOOM_MIN = 0.5
@@ -29,7 +29,7 @@ _ZOOM_STEP = 0.25
 
 
 class PrintPreviewDialog(QDialog):
-    """Modaler Dialog: Thumbnail mit Zoom +/- und Seitenwahl bei Mehrseiten."""
+    """Modaler Dialog: Thumbnail mit Fit-Page, Zoom +/- / Mausrad und Seitenwahl."""
 
     def __init__(
         self,
@@ -55,6 +55,7 @@ class PrintPreviewDialog(QDialog):
         self._page_count = max(1, int(page_count or len(self._pages)))
         self._pixmap_provider = pixmap_provider
         self._zoom = 1.0
+        self._fit_page = False  # Fit-Page Toggle — 1.0.8
         self._index = 0  # Index in self._pages
         self._cache: dict[int, QPixmap] = {}
         if pixmap is not None and not pixmap.isNull():
@@ -70,11 +71,13 @@ class PrintPreviewDialog(QDialog):
         self._info.setWordWrap(True)
         layout.addWidget(self._info)
 
-        # Zoom +/- und ggf. Seitenwahl — 1.0.7
+        # Zoom +/- , Fit-Page und ggf. Seitenwahl — 1.0.7/1.0.8
         ctrl = QHBoxLayout()
         self.btn_zoom_out = QPushButton("−")
         self.btn_zoom_out.setFixedWidth(32)
-        self.btn_zoom_out.setToolTip("Vorschau verkleinern — 1.0.7")
+        self.btn_zoom_out.setToolTip(
+            "Vorschau verkleinern (auch Mausrad) — 1.0.8"
+        )
         self.btn_zoom_out.clicked.connect(self._zoom_out)
         ctrl.addWidget(self.btn_zoom_out)
         self.zoom_label = QLabel("100 %")
@@ -84,9 +87,17 @@ class PrintPreviewDialog(QDialog):
         ctrl.addWidget(self.zoom_label)
         self.btn_zoom_in = QPushButton("+")
         self.btn_zoom_in.setFixedWidth(32)
-        self.btn_zoom_in.setToolTip("Vorschau vergrößern — 1.0.7")
+        self.btn_zoom_in.setToolTip(
+            "Vorschau vergrößern (auch Mausrad) — 1.0.8"
+        )
         self.btn_zoom_in.clicked.connect(self._zoom_in)
         ctrl.addWidget(self.btn_zoom_in)
+        self.fit_page_check = QCheckBox("Seite einpassen")
+        self.fit_page_check.setToolTip(
+            "Vorschau an sichtbaren Bereich anpassen (Fit-Page) — 1.0.8"
+        )
+        self.fit_page_check.toggled.connect(self._on_fit_page_toggled)
+        ctrl.addWidget(self.fit_page_check)
         ctrl.addSpacing(16)
 
         multi = len(self._pages) > 1
@@ -121,6 +132,10 @@ class PrintPreviewDialog(QDialog):
         self._scroll = QScrollArea()
         self._scroll.setWidgetResizable(True)
         self._scroll.setAlignment(Qt.AlignCenter)
+        self._scroll.setToolTip(
+            "Mausrad: Zoom; „Seite einpassen“ für Fit-Page — 1.0.8"
+        )
+        self._scroll.viewport().installEventFilter(self)
         self._thumb = QLabel()
         self._thumb.setAlignment(Qt.AlignCenter)
         self._thumb.setMinimumSize(200, 260)
@@ -137,7 +152,7 @@ class PrintPreviewDialog(QDialog):
         self.preview_check = QCheckBox("Druckvorschau vor dem Drucken anzeigen")
         self.preview_check.setChecked(preview_on)
         self.preview_check.setToolTip(
-            "Optional: Vorschau-Dialog vor dem Druckerdialog — Einstellung wird gemerkt — 1.0.7"
+            "Optional: Vorschau-Dialog vor dem Druckerdialog — Einstellung wird gemerkt — 1.0.8"
         )
         layout.addWidget(self.preview_check)
 
@@ -150,6 +165,26 @@ class PrintPreviewDialog(QDialog):
         layout.addWidget(buttons)
 
         self._refresh_view()
+
+    def eventFilter(self, obj, event):  # noqa: N802
+        """Mausrad über Vorschau → Zoom — 1.0.8."""
+        if obj is self._scroll.viewport() and event.type() == QEvent.Type.Wheel:
+            assert isinstance(event, QWheelEvent)
+            delta = event.angleDelta().y()
+            if delta == 0:
+                delta = event.pixelDelta().y()
+            if delta > 0:
+                self._zoom_in()
+            elif delta < 0:
+                self._zoom_out()
+            event.accept()
+            return True
+        return super().eventFilter(obj, event)
+
+    def resizeEvent(self, event) -> None:  # noqa: N802
+        super().resizeEvent(event)
+        if self._fit_page:
+            self._refresh_view()
 
     def _current_page_index(self) -> int:
         return int(self._pages[self._index])
@@ -168,11 +203,25 @@ class PrintPreviewDialog(QDialog):
                 return pm
         return None
 
+    def _fit_target_size(self) -> tuple[int, int]:
+        """Zielgröße für Fit-Page (Viewport minus Rand) — 1.0.8."""
+        vp = self._scroll.viewport()
+        if vp is not None:
+            w = max(80, vp.width() - 16)
+            h = max(100, vp.height() - 16)
+            return w, h
+        return _BASE_W, _BASE_H
+
     def _refresh_view(self) -> None:
         page_idx = self._current_page_index()
         pm = self._get_pixmap(page_idx)
-        tw = max(80, int(_BASE_W * self._zoom))
-        th = max(100, int(_BASE_H * self._zoom))
+        if self._fit_page:
+            tw, th = self._fit_target_size()
+            zoom_pct = "Fit"
+        else:
+            tw = max(80, int(_BASE_W * self._zoom))
+            th = max(100, int(_BASE_H * self._zoom))
+            zoom_pct = f"{int(round(self._zoom * 100))} %"
         if pm is not None and not pm.isNull():
             scaled = pm.scaled(
                 tw,
@@ -183,15 +232,20 @@ class PrintPreviewDialog(QDialog):
             self._thumb.setPixmap(scaled)
             self._thumb.setText("")
             self._thumb.setToolTip(
-                f"Druckseite {page_idx + 1} — Zoom {int(self._zoom * 100)} % — 1.0.7"
+                f"Druckseite {page_idx + 1} — Zoom {zoom_pct} — 1.0.8"
             )
         else:
             self._thumb.clear()
             self._thumb.setText("(keine Vorschau verfügbar)")
             self._thumb.setToolTip("")
-        self.zoom_label.setText(f"{int(round(self._zoom * 100))} %")
-        self.btn_zoom_out.setEnabled(self._zoom > _ZOOM_MIN + 1e-6)
-        self.btn_zoom_in.setEnabled(self._zoom < _ZOOM_MAX - 1e-6)
+        if self._fit_page:
+            self.zoom_label.setText("Fit")
+            self.btn_zoom_out.setEnabled(True)
+            self.btn_zoom_in.setEnabled(True)
+        else:
+            self.zoom_label.setText(f"{int(round(self._zoom * 100))} %")
+            self.btn_zoom_out.setEnabled(self._zoom > _ZOOM_MIN + 1e-6)
+            self.btn_zoom_in.setEnabled(self._zoom < _ZOOM_MAX - 1e-6)
         if self.page_spin is not None:
             self.page_spin.blockSignals(True)
             self.page_spin.setValue(self._index + 1)
@@ -206,11 +260,33 @@ class PrintPreviewDialog(QDialog):
         head = f"Druckvorschau (Seite {page_idx + 1})"
         self._info.setText(f"{head} — {suffix}" if suffix else head)
 
+    def _clear_fit_page(self) -> None:
+        """Manueller Zoom beendet Fit-Page — 1.0.8."""
+        if not self._fit_page:
+            return
+        self._fit_page = False
+        self.fit_page_check.blockSignals(True)
+        self.fit_page_check.setChecked(False)
+        self.fit_page_check.blockSignals(False)
+
+    def _on_fit_page_toggled(self, checked: bool) -> None:
+        self._fit_page = bool(checked)
+        if self._fit_page:
+            # Zoom-Faktor an Fit-Größe angleichen (für späteren +/-) — 1.0.8
+            tw, th = self._fit_target_size()
+            self._zoom = max(
+                _ZOOM_MIN,
+                min(_ZOOM_MAX, round(min(tw / _BASE_W, th / _BASE_H), 2)),
+            )
+        self._refresh_view()
+
     def _zoom_in(self) -> None:
+        self._clear_fit_page()
         self._zoom = min(_ZOOM_MAX, round(self._zoom + _ZOOM_STEP, 2))
         self._refresh_view()
 
     def _zoom_out(self) -> None:
+        self._clear_fit_page()
         self._zoom = max(_ZOOM_MIN, round(self._zoom - _ZOOM_STEP, 2))
         self._refresh_view()
 
