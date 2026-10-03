@@ -691,7 +691,7 @@ class AboutDialog(QDialog):
             "<p style='background:#E8F5E9;padding:8px;border:1px solid #81C784;'>"
             "<b>Datenschutz / Privacy</b><br>"
             "InstantLens Doc arbeitet <b>lokal</b> auf diesem Rechner. "
-            "Telemetrie-Stub (2.3.0): Settings opt-in „anonym Nutzung melden“ "
+            "Telemetrie-Stub (2.3.1): Settings opt-in „anonym Nutzung melden“ "
             "Default <b>aus</b>, immer <b>no-op</b> — keine Datenübertragung. "
             "Kein produktives Nutzungs-Tracking und "
             "<b>kein Cloud-Upload</b> von Dokumenten oder Annotationen. "

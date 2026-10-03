@@ -6,6 +6,7 @@ from pathlib import Path
 
 from PySide6.QtWidgets import (
     QCheckBox,
+    QComboBox,
     QDialog,
     QDialogButtonBox,
     QFormLayout,
@@ -185,23 +186,60 @@ class RemovePasswordDialog(QDialog):
 
 
 class CompressPdfDialog(QDialog):
-    """PDF-Kompression / Bilder-Downsample — Qualitäts-Dialog — 2.3.0."""
+    """PDF-Kompression / Bilder-Downsample — Qualitäts-Dialog — 2.3.0/2.3.1.
 
-    def __init__(self, parent=None):
+    2.3.1: Vorher-Größe, DPI/Qualität-Presets (Bildschirm/E-Book/Druck), Abbruch via Fortschritt.
+    """
+
+    def __init__(self, parent=None, *, source_path: str | Path | None = None):
         super().__init__(parent)
         self.setWindowTitle("PDF komprimieren / Downsample")
         self.setObjectName("compressPdfDialog")
-        self.resize(440, 260)
+        self.resize(480, 340)
+        self._source_path = Path(source_path) if source_path else None
+        self._updating_preset = False
         layout = QVBoxLayout(self)
         layout.addWidget(
             QLabel(
                 "Seiten via pypdfium2 rastern, optional Downsample, JPEG und "
-                "per pikepdf als <b>neues File</b> speichern (verlustbehaftet) — 2.3.0."
+                "per pikepdf als <b>neues File</b> speichern (verlustbehaftet). "
+                "Abbruch im Fortschrittsdialog möglich — 2.3.1."
             )
         )
         form = QFormLayout()
         from PySide6.QtWidgets import QCheckBox, QDoubleSpinBox, QSpinBox
-        from instantlensdoc.core.app_settings import get_export_image_max_edge, get_export_jpeg_quality
+        from ild_pdf.images import COMPRESS_PRESETS, format_byte_size
+        from instantlensdoc.core.app_settings import (
+            get_export_image_max_edge,
+            get_export_jpeg_quality,
+        )
+
+        self.size_label = QLabel("—")
+        self.size_label.setObjectName("compressSourceSize")
+        if self._source_path and self._source_path.is_file():
+            try:
+                before = self._source_path.stat().st_size
+                self.size_label.setText(
+                    f"Vorher: {format_byte_size(before)} ({self._source_path.name})"
+                )
+            except OSError:
+                self.size_label.setText("Vorher: (Größe unbekannt)")
+        else:
+            self.size_label.setText("Vorher: (kein PDF)")
+        self.size_label.setToolTip("Quelldatei-Größe vor Kompression — 2.3.1")
+        form.addRow("Dateigröße:", self.size_label)
+
+        self.preset = QComboBox()
+        self.preset.setObjectName("compressPreset")
+        self._presets = COMPRESS_PRESETS
+        for key in ("screen", "ebook", "print", "custom"):
+            p = self._presets[key]
+            self.preset.addItem(p["label"], key)
+        self.preset.setToolTip(
+            "DPI/Qualität-Presets: Bildschirm 72·Q50, E-Book 150·Q70, Druck 300·Q85 — 2.3.1"
+        )
+        self.preset.currentIndexChanged.connect(self._apply_preset)
+        form.addRow("Preset:", self.preset)
 
         self.quality = QSpinBox()
         self.quality.setObjectName("compressJpegQuality")
@@ -223,25 +261,80 @@ class CompressPdfDialog(QDialog):
         self.downsample.toggled.connect(self.max_edge.setEnabled)
         self.render_scale = QDoubleSpinBox()
         self.render_scale.setObjectName("compressRenderScale")
-        self.render_scale.setRange(0.5, 3.0)
+        self.render_scale.setRange(0.5, 4.5)
         self.render_scale.setSingleStep(0.25)
         self.render_scale.setValue(1.5)
         self.render_scale.setDecimals(2)
-        self.render_scale.setToolTip("Raster-Skalierung vor Kompression (höher = schärfer/größer)")
+        self.render_scale.setToolTip(
+            "Raster-Skalierung vor Kompression (≈ DPI/72; höher = schärfer/größer) — 2.3.1"
+        )
+        self.dpi_hint = QLabel("")
+        self.dpi_hint.setObjectName("compressDpiHint")
+        self.quality.valueChanged.connect(self._mark_custom)
+        self.max_edge.valueChanged.connect(self._mark_custom)
+        self.render_scale.valueChanged.connect(self._on_scale_changed)
+        self.downsample.toggled.connect(self._mark_custom)
+
         form.addRow("JPEG-Qualität:", self.quality)
         form.addRow(self.downsample)
         form.addRow("Max. Kante (px):", self.max_edge)
         form.addRow("Render-Scale:", self.render_scale)
+        form.addRow("≈ DPI:", self.dpi_hint)
         layout.addLayout(form)
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
+        idx = self.preset.findData("ebook")
+        if idx >= 0:
+            self.preset.setCurrentIndex(idx)
+        self._apply_preset()
+
+    def _on_scale_changed(self, _v=None) -> None:
+        self._update_dpi_hint()
+        self._mark_custom()
+
+    def _update_dpi_hint(self) -> None:
+        try:
+            dpi = int(round(float(self.render_scale.value()) * 72.0))
+            self.dpi_hint.setText(f"≈ {dpi} DPI")
+        except Exception:
+            self.dpi_hint.setText("")
+
+    def _mark_custom(self, *_args) -> None:
+        if self._updating_preset:
+            return
+        idx = self.preset.findData("custom")
+        if idx >= 0 and self.preset.currentData() != "custom":
+            self._updating_preset = True
+            self.preset.setCurrentIndex(idx)
+            self._updating_preset = False
+
+    def _apply_preset(self, _i: int = 0) -> None:
+        if self._updating_preset:
+            return
+        key = str(self.preset.currentData() or "custom")
+        p = self._presets.get(key)
+        if not p or key == "custom":
+            self._update_dpi_hint()
+            return
+        self._updating_preset = True
+        try:
+            self.quality.setValue(int(p["jpeg_quality"]))
+            self.max_edge.setValue(int(p["max_edge"]))
+            self.render_scale.setValue(float(p["render_scale"]))
+            self.downsample.setChecked(bool(p.get("downsample", True)))
+        finally:
+            self._updating_preset = False
+        self._update_dpi_hint()
 
     def values(self) -> dict:
+        key = str(self.preset.currentData() or "custom")
         return {
             "jpeg_quality": self.quality.value(),
             "max_edge": self.max_edge.value(),
             "downsample": bool(self.downsample.isChecked()),
             "render_scale": float(self.render_scale.value()),
+            "preset": key,
+            "dpi": int(round(float(self.render_scale.value()) * 72.0)),
         }

@@ -1,5 +1,5 @@
 """
-Plugin-Hooks — STUB (2.3.0)
+Plugin-Hooks — STUB (Version siehe ``__version__``)
 
 Kein echtes Plugin-System. Dieser Modul stellt nur einen **internen Event-Bus**
 und einen **no-op Loader** bereit, damit spätere Erweiterungen einen klaren
@@ -28,11 +28,13 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any, Callable, DefaultDict, Iterable, List, Optional, Sequence
 
+from instantlensdoc import __version__ as _ILD_VERSION
+
 # Klare Stub-Markierung — kein echtes Plugin-System, nicht produktiv
 IS_STUB = True
 NOT_PRODUCTION_READY = True
 STUB_MESSAGE = (
-    "Plugin-Hooks Stub 2.3.0 — nicht produktiv; "
+    f"Plugin-Hooks Stub {_ILD_VERSION} — nicht produktiv; "
     "interner Event-Bus + no-op Loader; kein Plugin-System (Coming soon)."
 )
 
@@ -133,7 +135,7 @@ def plugin_stub_info() -> dict[str, Any]:
         "stub": True,
         "is_stub": IS_STUB,
         "not_production_ready": NOT_PRODUCTION_READY,
-        "version_marker": "2.3.0",
+        "version_marker": _ILD_VERSION,
         "message": STUB_MESSAGE,
         "known_events": list(KNOWN_EVENTS),
         "event_descriptions": dict(EVENT_DESCRIPTIONS),

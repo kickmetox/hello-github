@@ -32,7 +32,7 @@ PLANNED = {
     ),
     "telemetry": (
         f"Telemetrie — Stub {__version__} — opt-in „anonym Nutzung melden“ "
-        "Default aus, immer no-op (keine Datenübertragung)"
+        "Default aus, immer no-op — keine Datenübertragung"
     ),
     "varfonts": "Variable Fonts (voll) — geplant",
     "envelope": "Envelope Distort (voll) — geplant",
@@ -76,7 +76,8 @@ STUB_SHORT = {
         "Document Outline Vorlesen (TTS) — Stub / geplant / keine Aktion — 2.0.0."
     ),
     "telemetry": (
-        "Anonyme Nutzung melden — Stub / opt-in Default aus / immer no-op — 2.3.0."
+        "Anonyme Nutzung melden — Stub / opt-in Default aus / immer no-op — "
+        "keine Datenübertragung — 2.3.1."
     ),
     "varfonts": "Vollständige Variable-Fonts-Unterstützung — geplant.",
     "envelope": "Envelope-Distort-Transformation — geplant.",
@@ -96,7 +97,8 @@ STUB_SHORT_EN = {
         "Document outline read-aloud (TTS) — stub / planned / no action — 2.0.0."
     ),
     "telemetry": (
-        "Report anonymous usage — stub / opt-in default off / always no-op — 2.3.0."
+        "Report anonymous usage — stub / opt-in default off / always no-op — "
+        "no data transfer — 2.3.1."
     ),
     "varfonts": "Full variable fonts support — planned.",
     "envelope": "Envelope distort transform — planned.",

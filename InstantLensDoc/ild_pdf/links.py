@@ -35,6 +35,41 @@ def is_external_http_uri(uri: str) -> bool:
     return parsed.scheme in ("http", "https") and bool(parsed.netloc)
 
 
+def normalize_http_uri(uri: str) -> str:
+    """
+    URL trimmen; fehlendes Schema → https:// vorschlagen (nur wenn Host erkennbar).
+    Validierung bleibt bei ``is_external_http_uri`` — 2.3.1.
+    """
+    raw = (uri or "").strip()
+    if not raw:
+        return ""
+    if "://" not in raw and "." in raw and " " not in raw:
+        raw = "https://" + raw
+    return raw
+
+
+def validate_link_uri(uri: str) -> tuple[bool, str, str]:
+    """
+    URL prüfen — 2.3.1.
+
+    Returns: (ok, normalized_uri, de_fehlertext).
+    """
+    norm = normalize_http_uri(uri)
+    if not norm:
+        return False, "", "URL darf nicht leer sein."
+    if is_external_http_uri(norm):
+        return True, norm, ""
+    try:
+        parsed = urlparse(norm)
+    except Exception:
+        return False, norm, "Ungültige URL."
+    if parsed.scheme and parsed.scheme not in ("http", "https"):
+        return False, norm, "Nur http- oder https-URLs sind erlaubt."
+    if not parsed.netloc:
+        return False, norm, "Host/Domain fehlt (Beispiel: https://example.com)."
+    return False, norm, "Bitte eine gültige http(s)-URL eingeben."
+
+
 def list_page_uri_links(
     pdf_path: str | Path,
     page_index: int = 0,

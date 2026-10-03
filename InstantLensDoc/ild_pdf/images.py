@@ -47,6 +47,58 @@ def compress_image_for_pdf(
     return img
 
 
+class CompressCancelled(Exception):
+    """Abbruch durch Benutzer während PDF-Kompression / Downsample — 2.3.1."""
+
+
+def format_byte_size(num: int | float) -> str:
+    """Menschenlesbare Dateigröße (B/KB/MB) — 2.3.1."""
+    n = max(0.0, float(num or 0))
+    if n < 1024:
+        return f"{int(n)} B"
+    if n < 1024 * 1024:
+        return f"{n / 1024:.1f} KB"
+    return f"{n / (1024 * 1024):.2f} MB"
+
+
+# DPI-/Qualitäts-Presets für Kompressionsdialog — 2.3.1
+# render_scale ≈ dpi/72; max_edge und jpeg_quality passend zur Zielqualität
+COMPRESS_PRESETS: dict[str, dict] = {
+    "screen": {
+        "label": "Bildschirm (72 DPI, Q50)",
+        "jpeg_quality": 50,
+        "max_edge": 1000,
+        "render_scale": 1.0,
+        "downsample": True,
+        "dpi": 72,
+    },
+    "ebook": {
+        "label": "E-Book (150 DPI, Q70)",
+        "jpeg_quality": 70,
+        "max_edge": 1600,
+        "render_scale": 150 / 72.0,
+        "downsample": True,
+        "dpi": 150,
+    },
+    "print": {
+        "label": "Druck (300 DPI, Q85)",
+        "jpeg_quality": 85,
+        "max_edge": 3000,
+        "render_scale": 300 / 72.0,
+        "downsample": True,
+        "dpi": 300,
+    },
+    "custom": {
+        "label": "Benutzerdefiniert",
+        "jpeg_quality": 70,
+        "max_edge": 2000,
+        "render_scale": 1.5,
+        "downsample": True,
+        "dpi": None,
+    },
+}
+
+
 def compress_pdf_as_images(
     pdf_path: str | Path,
     *,
@@ -55,12 +107,15 @@ def compress_pdf_as_images(
     render_scale: float = 1.5,
     max_edge: int = 2000,
     downsample: bool = True,
+    on_progress: Optional[Callable[[int, int], bool]] = None,
 ) -> Path:
     """
     Rendert jede Seite (pypdfium2), optional Downsample (max_edge), JPEG-Kompression
     und ersetzt Seiten via pikepdf in einem **neuen** PDF (verlustbehaftet).
 
     ``downsample=False`` behält die gerasterte Auflösung (nur JPEG-Q).
+    ``on_progress``: optional ``(current_1based, total) -> bool``; False = Abbruch
+    ohne Zieldatei (``CompressCancelled``) — 2.3.1.
     """
     from .render import render_page
     from .document import PdfDocument
@@ -73,6 +128,13 @@ def compress_pdf_as_images(
         sizes = [doc.page_size(i) for i in range(n)]
     edge = max(64, int(max_edge)) if downsample else 50_000
     for i in range(n):
+        if on_progress is not None:
+            try:
+                cont = on_progress(i + 1, n)
+            except Exception:
+                cont = True
+            if cont is False:
+                raise CompressCancelled("Kompression abgebrochen")
         raw = render_page(pdf_path, i, scale=render_scale, use_cache=False)
         pages.append(
             compress_image_for_pdf(raw, max_edge=edge, quality=jpeg_quality, to_jpeg=True)
@@ -82,7 +144,15 @@ def compress_pdf_as_images(
     import pikepdf
 
     with pikepdf.Pdf.new() as dst:
-        for img, (pw, ph) in zip(pages, sizes):
+        for idx, (img, (pw, ph)) in enumerate(zip(pages, sizes)):
+            if on_progress is not None:
+                try:
+                    # Schreibphase: Fortschritt bleibt bei total (nach Render)
+                    cont = on_progress(n, n)
+                except Exception:
+                    cont = True
+                if cont is False:
+                    raise CompressCancelled("Kompression abgebrochen")
             img_pdf = io.BytesIO()
             canvas = Image.new("RGB", (max(1, int(pw)), max(1, int(ph))), "white")
             iw, ih = img.size
@@ -107,10 +177,12 @@ def downsample_pdf_images(
     jpeg_quality: int = 70,
     max_edge: int = 1200,
     render_scale: float = 1.5,
+    on_progress: Optional[Callable[[int, int], bool]] = None,
 ) -> Path:
     """
-    Bilder-Downsample (2.3.0): pypdfium2-Raster → JPEG-Downsample → pikepdf-Replace.
+    Bilder-Downsample (2.3.0/2.3.1): pypdfium2-Raster → JPEG-Downsample → pikepdf-Replace.
     Ausgabe immer als neues File (Default ``*_optimized.pdf``).
+    ``on_progress`` / Abbruch wie ``compress_pdf_as_images`` — 2.3.1.
     """
     pdf_path = Path(pdf_path)
     out_path = Path(out_path) if out_path else pdf_path.with_name(f"{pdf_path.stem}_optimized.pdf")
@@ -121,6 +193,7 @@ def downsample_pdf_images(
         max_edge=max_edge,
         render_scale=render_scale,
         downsample=True,
+        on_progress=on_progress,
     )
 
 

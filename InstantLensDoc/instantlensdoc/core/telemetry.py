@@ -41,7 +41,8 @@ def telemetry_stub_info() -> dict[str, Any]:
         "noop": True,
         "message": (
             f"Telemetrie-Stub {__version__}: opt-in „anonym Nutzung melden“ "
-            f"{'an' if opt_in else 'aus'}, immer no-op — keine Datenübertragung"
+            f"{'an' if opt_in else 'aus'}, immer no-op — "
+            "keine Datenübertragung (kein Netzwerk)"
         ),
         "version_marker": __version__,
         "not_production_ready": True,

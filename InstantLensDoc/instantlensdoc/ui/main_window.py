@@ -1032,6 +1032,9 @@ class MainWindow(QMainWindow):
         )
         self.sidebar.redaction_activated.connect(self._on_redaction_activated)
         self.sidebar.redaction_delete_requested.connect(self._on_redaction_delete)
+        self.sidebar.link_activated.connect(self._on_link_activated)
+        self.sidebar.link_edit_requested.connect(self._on_link_edit)
+        self.sidebar.link_delete_requested.connect(self._on_link_delete)
         self.sidebar.thumbs_viewport_changed.connect(self._on_thumbs_viewport_changed)
         self.sidebar.annotation_filter_changed.connect(lambda _t: None)
         self.sidebar.annotation_tag_rename_requested.connect(self._rename_annotation_tag_global)
@@ -7552,6 +7555,7 @@ class MainWindow(QMainWindow):
             ann_groups=ann_groups,
         )
         self._refresh_redactions_list()
+        self._refresh_links_list()
         n = len(self.pdf_view.store.annotations) if self.pdf_view.store else 0
         self.word_status_label.setText(f"{n} Ann.")
         if self.doc and self.doc.path and self.pdf_view.store is not None:
@@ -7891,6 +7895,79 @@ class MainWindow(QMainWindow):
         except Exception:
             reds = []
         self.sidebar.set_redactions(reds)
+
+    def _refresh_links_list(self) -> None:
+        """URL-Link-Liste Sidebar — 2.3.1."""
+        if not hasattr(self.sidebar, "set_links"):
+            return
+        store = getattr(self.pdf_view, "store", None)
+        if store is None:
+            self.sidebar.clear_links()
+            return
+        try:
+            from ild_pdf.annotate import AnnotationType
+
+            links = [
+                a
+                for a in (store.annotations or [])
+                if getattr(a, "type", None) == AnnotationType.LINK
+            ]
+        except Exception:
+            links = []
+        self.sidebar.set_links(links)
+
+    def _on_link_activated(self, ann) -> None:
+        """Sprung zum Link (Doppelklick Sidebar) — 2.3.1."""
+        if self.stack.currentWidget() is not self.pdf_view:
+            self.stack.setCurrentWidget(self.pdf_view)
+        if self.pdf_view.focus_annotation(ann):
+            return
+        if ann is not None and hasattr(ann, "page"):
+            self.pdf_view.goto_page(int(ann.page))
+            self.sidebar.select_thumb(int(ann.page))
+            self._set_status(f"Link → Seite {int(ann.page) + 1}")
+
+    def _on_link_edit(self, ann) -> None:
+        """Link-URL bearbeiten — 2.3.1."""
+        if ann is None or not self.pdf_view.store:
+            return
+        aid = getattr(ann, "id", None)
+        if not aid:
+            return
+        self.pdf_view._selected_ann_id = aid
+        self.pdf_view.edit_link_uri(aid)
+
+    def _on_link_delete(self, ann_or_list) -> None:
+        """Link(s) löschen mit Bestätigung — 2.3.1."""
+        if not self.pdf_view.store or ann_or_list is None:
+            return
+        anns = list(ann_or_list) if isinstance(ann_or_list, (list, tuple)) else [ann_or_list]
+        anns = [a for a in anns if a is not None and getattr(a, "id", None)]
+        if not anns:
+            return
+        n = len(anns)
+        reply = QMessageBox.question(
+            self,
+            "Links löschen",
+            f"{n} Link(s) wirklich löschen?",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
+        )
+        if reply != QMessageBox.Yes:
+            return
+        ids = [str(a.id) for a in anns]
+        try:
+            if hasattr(self.pdf_view.store, "remove_many"):
+                self.pdf_view.store.remove_many(ids)
+            else:
+                for aid in ids:
+                    self.pdf_view.store.remove(aid)
+            self.pdf_view.schedule_sidecar_save()
+            self.pdf_view.refresh()
+            self.pdf_view.annotations_changed.emit()
+            self._set_status(f"{n} Link(s) gelöscht")
+        except Exception as e:
+            QMessageBox.warning(self, "Links löschen", str(e))
 
     def _on_redaction_activated(self, ann) -> None:
         """Sprung zur Schwärzungs-Annotation (Doppelklick) — 1.3.2."""
@@ -9051,18 +9128,23 @@ class MainWindow(QMainWindow):
         if not self.pdf_view.pdf_path:
             QMessageBox.information(self, "Kompression", "Bitte zuerst ein PDF öffnen.")
             return
-        dlg = CompressPdfDialog(self)
+        src = Path(self.pdf_view.pdf_path)
+        dlg = CompressPdfDialog(self, source_path=src)
         if not dlg.exec():
             return
         vals = dlg.values()
         try:
-            from ild_pdf import compress_pdf_as_images, downsample_pdf_images
+            from ild_pdf import (
+                CompressCancelled,
+                compress_pdf_as_images,
+                downsample_pdf_images,
+                format_byte_size,
+            )
             from ild_pdf.render import clear_render_cache
+            from PySide6.QtWidgets import QApplication, QProgressDialog
 
             stem_suffix = "_optimized" if vals.get("downsample", True) else "_compressed"
-            out = self.pdf_view.pdf_path.with_name(
-                f"{self.pdf_view.pdf_path.stem}{stem_suffix}.pdf"
-            )
+            out = src.with_name(f"{src.stem}{stem_suffix}.pdf")
             path, _ok = QFileDialog.getSaveFileName(
                 self,
                 "Komprimiertes PDF speichern",
@@ -9072,24 +9154,66 @@ class MainWindow(QMainWindow):
             if not path:
                 return
             out = Path(path)
+            before_bytes = src.stat().st_size if src.is_file() else 0
             kw = dict(
                 out_path=out,
                 jpeg_quality=vals["jpeg_quality"],
                 max_edge=vals["max_edge"],
                 render_scale=float(vals.get("render_scale") or 1.5),
             )
-            if vals.get("downsample", True):
-                downsample_pdf_images(self.pdf_view.pdf_path, **kw)
-            else:
-                compress_pdf_as_images(
-                    self.pdf_view.pdf_path,
-                    downsample=False,
-                    **kw,
+            prog = QProgressDialog(
+                "PDF wird komprimiert…", "Abbrechen", 0, 1, self
+            )
+            prog.setWindowTitle("Kompression")
+            prog.setWindowModality(Qt.WindowModal)
+            prog.setMinimumDuration(0)
+            prog.setValue(0)
+            prog.show()
+            QApplication.processEvents()
+
+            def on_progress(cur: int, total: int) -> bool:
+                if prog.wasCanceled():
+                    return False
+                prog.setMaximum(max(1, int(total)))
+                prog.setValue(max(0, int(cur)))
+                dpi = vals.get("dpi") or int(round(float(vals.get("render_scale") or 1.5) * 72))
+                prog.setLabelText(
+                    f"Kompression: Seite {cur}/{total} · ≈{dpi} DPI · Q{vals['jpeg_quality']}"
                 )
-            clear_render_cache(self.pdf_view.pdf_path)
-            self._set_status(f"Komprimiert → {out.name}")
-            QMessageBox.information(self, "Kompression", f"Gespeichert:\n{out}")
-            _log.info("PDF compressed: %s", out)
+                QApplication.processEvents()
+                return not prog.wasCanceled()
+
+            kw["on_progress"] = on_progress
+            try:
+                if vals.get("downsample", True):
+                    downsample_pdf_images(src, **kw)
+                else:
+                    compress_pdf_as_images(src, downsample=False, **kw)
+            except CompressCancelled:
+                prog.close()
+                self._set_status("Kompression abgebrochen")
+                QMessageBox.information(
+                    self, "Kompression", "Abgebrochen — keine Zieldatei geschrieben."
+                )
+                return
+            finally:
+                prog.close()
+            clear_render_cache(src)
+            after_bytes = out.stat().st_size if out.is_file() else 0
+            before_s = format_byte_size(before_bytes)
+            after_s = format_byte_size(after_bytes)
+            if before_bytes > 0 and after_bytes > 0:
+                ratio = (1.0 - (after_bytes / before_bytes)) * 100.0
+                size_line = f"Vorher: {before_s} → Nachher: {after_s} ({ratio:+.1f} %)"
+            else:
+                size_line = f"Vorher: {before_s} → Nachher: {after_s}"
+            self._set_status(f"Komprimiert → {out.name} · {size_line}")
+            QMessageBox.information(
+                self,
+                "Kompression",
+                f"Gespeichert:\n{out}\n\n{size_line}",
+            )
+            _log.info("PDF compressed: %s (%s)", out, size_line)
             try:
                 from instantlensdoc.core.telemetry import report_anonymous_usage
 

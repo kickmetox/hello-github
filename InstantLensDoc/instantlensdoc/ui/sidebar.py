@@ -457,6 +457,9 @@ class Sidebar(QWidget):
     form_fields_export_csv_requested = Signal()  # Feldliste CSV — 1.3.2
     redaction_activated = Signal(object)  # Annotation REDACTION — Sprung
     redaction_delete_requested = Signal(object)  # Annotation / Liste — löschen (+Undo)
+    link_activated = Signal(object)  # Annotation LINK — Sprung — 2.3.1
+    link_edit_requested = Signal(object)  # Annotation LINK — URL bearbeiten — 2.3.1
+    link_delete_requested = Signal(object)  # Annotation LINK / Liste — löschen — 2.3.1
     thumbs_viewport_changed = Signal(int, bool)  # Mitte-Seite, cancel_fast — 1.3.2
     annotation_filter_changed = Signal(str)  # Typ-Wert oder "" für alle
     annotation_color_filter_changed = Signal(str)  # #RRGGBB oder "" für alle
@@ -793,6 +796,39 @@ class Sidebar(QWidget):
         self.redaction_btns_host = QWidget()
         self.redaction_btns_host.setLayout(red_btns)
         layout.addWidget(self.redaction_btns_host)
+
+        # URL-Links Sidebar — 2.3.1
+        self.lbl_links = QLabel("URL-Links")
+        self.lbl_links.setObjectName("sidebarLinksLabel")
+        layout.addWidget(self.lbl_links)
+        self.links_list = QListWidget()
+        self.links_list.setObjectName("sidebarLinksList")
+        self.links_list.setMaximumHeight(120)
+        self.links_list.setSelectionMode(QAbstractItemView.ExtendedSelection)
+        self.links_list.setToolTip(
+            "Sidecar-URL-Links — Doppelklick → Seite; Bearbeiten/Löschen — 2.3.1"
+        )
+        self.links_list.itemDoubleClicked.connect(self._activate_link)
+        self.links_list.itemActivated.connect(self._activate_link)
+        layout.addWidget(self.links_list)
+        link_btns = QHBoxLayout()
+        self.btn_link_edit = QPushButton("✎")
+        self.btn_link_edit.setObjectName("sidebarLinkEditBtn")
+        self.btn_link_edit.setFixedWidth(28)
+        self.btn_link_edit.setToolTip("Ausgewählten Link bearbeiten (URL) — 2.3.1")
+        self.btn_link_edit.clicked.connect(self._emit_link_edit)
+        self.btn_link_del = QPushButton("−")
+        self.btn_link_del.setObjectName("sidebarLinkDelBtn")
+        self.btn_link_del.setFixedWidth(28)
+        self.btn_link_del.setToolTip("Ausgewählte Links löschen — 2.3.1")
+        self.btn_link_del.clicked.connect(self._emit_link_delete)
+        link_btns.addWidget(self.btn_link_edit)
+        link_btns.addWidget(self.btn_link_del)
+        link_btns.addStretch(1)
+        self.link_btns_host = QWidget()
+        self.link_btns_host.setObjectName("sidebarLinkBtns")
+        self.link_btns_host.setLayout(link_btns)
+        layout.addWidget(self.link_btns_host)
 
         layout.addWidget(QLabel("PDF-Favoriten — ziehen zum Ordnen"))
         self.page_favorites = PageFavoriteList()
@@ -2237,6 +2273,67 @@ class Sidebar(QWidget):
 
     def clear_redactions(self) -> None:
         self.set_redactions([])
+
+    def _activate_link(self, item: QListWidgetItem) -> None:
+        if item is None or not self._list_item_enabled(item):
+            return
+        payload = item.data(256)
+        if payload is not None:
+            self.link_activated.emit(payload)
+
+    def _emit_link_edit(self) -> None:
+        item = self.links_list.currentItem()
+        if item is None or not self._list_item_enabled(item):
+            return
+        payload = item.data(256)
+        if payload is not None:
+            self.link_edit_requested.emit(payload)
+
+    def _emit_link_delete(self) -> None:
+        selected = []
+        for item in self.links_list.selectedItems():
+            if not self._list_item_enabled(item):
+                continue
+            payload = item.data(256)
+            if payload is not None:
+                selected.append(payload)
+        if not selected:
+            item = self.links_list.currentItem()
+            if self._list_item_enabled(item):
+                payload = item.data(256)
+                if payload is not None:
+                    selected = [payload]
+        if not selected:
+            return
+        self.link_delete_requested.emit(selected)
+
+    def set_links(self, annotations) -> None:
+        """URL-Link-Liste in der Sidebar — 2.3.1."""
+        self.links_list.clear()
+        anns = list(annotations or [])
+        if not anns:
+            empty = QListWidgetItem("(keine Links)")
+            empty.setFlags(Qt.NoItemFlags)
+            self.links_list.addItem(empty)
+            return
+        for i, a in enumerate(anns, start=1):
+            try:
+                page = int(getattr(a, "page", 0) or 0) + 1
+            except (TypeError, ValueError):
+                page = "?"
+            uri = str(getattr(a, "text", "") or "").strip()
+            short = uri if len(uri) <= 36 else uri[:33] + "…"
+            label = f"{i}. S. {page} — {short or '(ohne URL)'}"
+            item = QListWidgetItem(label)
+            item.setData(256, a)
+            item.setToolTip(
+                f"{uri}\nSeite {page} — Doppelklick springt hin; "
+                "✎ bearbeiten · − löschen — 2.3.1"
+            )
+            self.links_list.addItem(item)
+
+    def clear_links(self) -> None:
+        self.set_links([])
 
     def visible_thumb_center(self) -> int:
         """Geschätzte mittlere sichtbare Thumbnail-Seite — 1.3.2."""

@@ -119,13 +119,16 @@ from .outline import (
     write_outline,
 )
 from .images import (
+    COMPRESS_PRESETS,
     DEFAULT_PAGE_IMAGE_FILENAME_TEMPLATE,
+    CompressCancelled,
     compress_image_for_pdf,
     compress_pdf_as_images,
     downsample_pdf_images,
     extract_page_image,
     extract_pages_as_images,
     extract_embedded_images,
+    format_byte_size,
     format_page_image_filename,
     insert_image_as_page,
     insert_image_stamp_overlay,
@@ -229,6 +232,8 @@ from .links import (
     UriLink,
     bake_uri_links_to_pdf,
     is_external_http_uri,
+    normalize_http_uri,
+    validate_link_uri,
     list_page_uri_links,
     sidecar_links_from_annotations,
     uri_link_at,
@@ -340,6 +345,8 @@ __all__ = [
     "outline_from_pages",
     "write_outline",
     "THUMB_LAZY_THRESHOLD",
+    "COMPRESS_PRESETS",
+    "CompressCancelled",
     "compress_image_for_pdf",
     "compress_pdf_as_images",
     "downsample_pdf_images",
@@ -347,6 +354,7 @@ __all__ = [
     "extract_page_image",
     "extract_pages_as_images",
     "extract_embedded_images",
+    "format_byte_size",
     "format_page_image_filename",
     "insert_image_as_page",
     "insert_image_stamp_overlay",
@@ -432,6 +440,8 @@ __all__ = [
     "UriLink",
     "SidecarUriLink",
     "is_external_http_uri",
+    "normalize_http_uri",
+    "validate_link_uri",
     "list_page_uri_links",
     "uri_link_at",
     "sidecar_links_from_annotations",
@@ -440,4 +450,4 @@ __all__ = [
     "page_count_for_text",
 ]
 
-__version__ = "2.3.0"
+__version__ = "2.3.1"

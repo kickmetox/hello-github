@@ -1255,8 +1255,27 @@ class PdfCanvas(QLabel):
                 self._repaint_overlay()
         else:
             pt = self._map_to_page(event)
-            if pt and self._hit_uri_link(*pt):
+            tip_uri = ""
+            if pt:
+                native = self._hit_uri_link(*pt)
+                if native is not None:
+                    tip_uri = str(getattr(native, "uri", "") or "").strip()
+                elif self._select_mode or self._drag_tool is None:
+                    hit = self._hit_annotation(*pt)
+                    if hit is not None and hit.type == AnnotationType.LINK:
+                        tip_uri = str(hit.text or "").strip()
+            if tip_uri:
                 self.setCursor(QCursor(Qt.PointingHandCursor))
+                # Hover-Tooltip mit voller URL — 2.3.1
+                from PySide6.QtWidgets import QToolTip
+
+                QToolTip.showText(
+                    event.globalPosition().toPoint()
+                    if hasattr(event, "globalPosition")
+                    else event.globalPos(),
+                    tip_uri,
+                    self,
+                )
             elif (
                 pt
                 and self._select_mode
@@ -1690,8 +1709,9 @@ class PdfViewer(QWidget):
                 )
             elif t == AnnotationType.LINK:
                 b.setToolTip(
-                    "URL-Link: Rechteck ziehen, URI eingeben; Klick öffnet Browser; "
-                    "optional Bake als PDF-Link — 2.3.0"
+                    "URL-Link: Rechteck ziehen, URI mit Live-Validierung; "
+                    "Hover-Tooltip; Sidebar Liste Bearbeiten/Löschen; "
+                    "Klick öffnet Browser; optional Bake — 2.3.1"
                 )
             b.clicked.connect(lambda checked, tool=t: self._set_tool(tool))
             self._tool_buttons.append(b)
@@ -7721,6 +7741,9 @@ class PdfViewer(QWidget):
         ann = self.store.get(ann_id)
         if not ann:
             return
+        if ann.type == AnnotationType.LINK:
+            self.edit_link_uri(ann.id)
+            return
         editable = {
             AnnotationType.TEXT_OVERLAY,
             AnnotationType.TEXT,
@@ -8052,16 +8075,98 @@ class PdfViewer(QWidget):
         self.status.emit(f"Stempel gedreht ({int(new_rot)}°)")
         return True
 
+    def _ask_link_uri(self, *, initial: str = "https://") -> str | None:
+        """URL-Dialog mit Live-Validierung — 2.3.1. None = Abbruch."""
+        from ild_pdf import validate_link_uri
+        from PySide6.QtWidgets import (
+            QDialog,
+            QDialogButtonBox,
+            QLabel,
+            QLineEdit,
+            QVBoxLayout,
+        )
+
+        dlg = QDialog(self)
+        dlg.setWindowTitle("URL-Link")
+        dlg.setObjectName("linkUriDialog")
+        dlg.resize(440, 160)
+        lay = QVBoxLayout(dlg)
+        lay.addWidget(QLabel("URL (http/https) — Live-Validierung — 2.3.1:"))
+        edit = QLineEdit()
+        edit.setObjectName("linkUriEdit")
+        edit.setText(initial or "https://")
+        edit.setClearButtonEnabled(True)
+        edit.setPlaceholderText("https://example.com")
+        lay.addWidget(edit)
+        status = QLabel("")
+        status.setObjectName("linkUriStatus")
+        status.setWordWrap(True)
+        lay.addWidget(status)
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        ok_btn = buttons.button(QDialogButtonBox.Ok)
+        lay.addWidget(buttons)
+        buttons.accepted.connect(dlg.accept)
+        buttons.rejected.connect(dlg.reject)
+
+        def _validate(_t: str = "") -> None:
+            ok, _norm, err = validate_link_uri(edit.text())
+            if ok:
+                status.setText("✓ gültige URL")
+                status.setStyleSheet("color: #2e7d32;")
+                ok_btn.setEnabled(True)
+            else:
+                status.setText(err or "Ungültige URL")
+                status.setStyleSheet("color: #c62828;")
+                ok_btn.setEnabled(False)
+
+        edit.textChanged.connect(_validate)
+        _validate()
+        edit.selectAll()
+        edit.setFocus()
+        if dlg.exec() != QDialog.Accepted:
+            return None
+        ok, norm, err = validate_link_uri(edit.text())
+        if not ok:
+            QMessageBox.warning(self, "URL-Link", err or "Ungültige URL")
+            return None
+        return norm
+
+    def edit_link_uri(self, ann_id: str | None = None) -> bool:
+        """Link-URL bearbeiten (Validierung) — 2.3.1."""
+        if not self.store:
+            return False
+        aid = ann_id or self._selected_ann_id
+        if not aid:
+            self.status.emit("Kein Link ausgewählt")
+            return False
+        ann = self.store.get(aid)
+        if not ann or ann.type != AnnotationType.LINK:
+            self.status.emit("Auswahl ist kein Link")
+            return False
+        uri = self._ask_link_uri(initial=(ann.text or "https://"))
+        if uri is None:
+            return False
+        self.store.update(aid, text=uri)
+        try:
+            self.schedule_sidecar_save()
+        except Exception as e:
+            QMessageBox.warning(self, "Link bearbeiten", str(e))
+            return False
+        self.refresh()
+        self.annotations_changed.emit()
+        self.status.emit(f"Link aktualisiert: {uri[:60]}")
+        return True
+
     def _open_uri_link(self, uri: str) -> None:
         """Externe http(s)-URL im Systembrowser öffnen."""
-        from ild_pdf import is_external_http_uri
+        from ild_pdf import is_external_http_uri, validate_link_uri
 
-        raw = (uri or "").strip()
-        if not is_external_http_uri(raw):
+        ok, raw, _err = validate_link_uri(uri or "")
+        if not ok or not is_external_http_uri(raw):
             self.status.emit("Kein gültiger externer Link")
             return
-        ok = QDesktopServices.openUrl(QUrl(raw))
-        if ok:
+        opened = QDesktopServices.openUrl(QUrl(raw))
+        if opened:
             self.status.emit(f"Link geöffnet: {raw[:80]}")
         else:
             QMessageBox.warning(self, "Link", f"URL konnte nicht geöffnet werden:\n{raw}")
@@ -9733,23 +9838,8 @@ class PdfViewer(QWidget):
                 fill_color=str(getattr(self, "_default_fill_color", "") or "").strip(),
             )
         elif self.tool == AnnotationType.LINK:
-            uri, ok = QInputDialog.getText(
-                self,
-                "URL-Link",
-                "URL (http/https):",
-                text="https://",
-            )
-            if not ok:
-                return
-            uri = (uri or "").strip()
-            from ild_pdf import is_external_http_uri
-
-            if not is_external_http_uri(uri):
-                QMessageBox.warning(
-                    self,
-                    "URL-Link",
-                    "Bitte eine gültige http(s)-URL eingeben.",
-                )
+            uri = self._ask_link_uri(initial="https://")
+            if uri is None:
                 return
             ann = Annotation(
                 page=page,

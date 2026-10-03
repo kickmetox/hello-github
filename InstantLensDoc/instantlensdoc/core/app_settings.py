@@ -153,6 +153,7 @@ DEFAULTS: dict[str, Any] = {
     "last_page_labels_txt_dir": "",  # Zielordner PageLabels-TXT merken — 2.2.4
     "page_labels_txt_filename_template": "{stem}_labels.txt",  # Template — 2.2.4
     "telemetry_opt_in": False,  # anonym Nutzung melden — Stub opt-in, Default aus, no-op — 2.3.0
+    "command_palette_recent": [],  # letzte Command-Palette-Befehle (IDs) — 2.3.1
     "native_ann_import_save_sidecar": True,  # nach Kommentar-Import Sidecar speichern — 2.1.2
     "textlayer_diff_side_by_side": False,  # Textlayer Diff TXT/Panel Side-by-Side — 2.1.2
     "textlayer_diff_txt_template": "{stemA}_vs_{stemB}_{mode}.txt",  # 2.1.3
@@ -592,6 +593,37 @@ def set_telemetry_opt_in(enabled: bool) -> None:
         report_anonymous_usage("settings.telemetry_opt_in", enabled=bool(enabled))
     except Exception:
         pass
+
+
+COMMAND_PALETTE_RECENT_MAX = 8
+
+
+def get_command_palette_recent(max_items: int = COMMAND_PALETTE_RECENT_MAX) -> list[str]:
+    """Letzte Command-Palette-Befehls-IDs (neueste zuerst) — 2.3.1."""
+    raw = load_settings().get("command_palette_recent") or []
+    out: list[str] = []
+    if isinstance(raw, list):
+        for x in raw:
+            s = str(x or "").strip()
+            if s and s not in out:
+                out.append(s)
+            if len(out) >= max(1, int(max_items)):
+                break
+    return out
+
+
+def push_command_palette_recent(
+    cmd_id: str, *, max_items: int = COMMAND_PALETTE_RECENT_MAX
+) -> list[str]:
+    """Befehl in Recent-Liste nach vorne schieben — 2.3.1."""
+    cid = str(cmd_id or "").strip()
+    if not cid:
+        return get_command_palette_recent(max_items=max_items)
+    prev = [x for x in get_command_palette_recent(max_items=max_items * 2) if x != cid]
+    nxt = [cid] + prev
+    nxt = nxt[: max(1, int(max_items))]
+    save_settings({"command_palette_recent": nxt})
+    return nxt
 
 
 def get_update_dismissed_version() -> str:

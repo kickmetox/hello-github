@@ -1346,16 +1346,20 @@ class SettingsDialog(QDialog):
         self.telemetry_chk.setObjectName("telemetryOptIn")
         self.telemetry_chk.setChecked(get_telemetry_opt_in())
         self.telemetry_chk.setToolTip(
-            "Telemetrie-Stub 2.3.0: Default aus; auch bei Opt-in no-op — "
+            "Telemetrie-Stub 2.3.1: Default aus; auch bei Opt-in no-op — "
             "keine Datenübertragung, kein Netzwerk"
         )
         form.addRow(self.telemetry_chk)
         tel_hint = QLabel(
-            "<i>Stub:</i> Einstellung speichert nur den Opt-in-Flag. "
-            "Es werden niemals Nutzungsdaten gesendet."
+            "<b>⚠️ Stub — keine Datenübertragung:</b> Diese Einstellung speichert "
+            "nur den Opt-in-Flag lokal. Es werden <b>niemals</b> Nutzungsdaten "
+            "gesendet — kein Netzwerk, keine Queue, kein Fingerprinting "
+            "(immer no-op) — 2.3.1."
         )
         tel_hint.setWordWrap(True)
         tel_hint.setObjectName("telemetryStubHint")
+        tel_hint.setStyleSheet("color: #8a6d00;")
+        tel_hint.setToolTip("Telemetrie bleibt Stub: keine Datenübertragung — 2.3.1")
         form.addRow(tel_hint)
 
         self.presentation_hide_ann = QCheckBox(
@@ -1684,7 +1688,7 @@ class SettingsDialog(QDialog):
             (
                 "Telemetrie",
                 "telemetry",
-                "Stub · opt-in Default aus · no-op — 2.3.0",
+                "Stub · opt-in Default aus · no-op — keine Datenübertragung — 2.3.1",
             ),
         ]
         # Sortierung A–Z nach Feature-Name — 1.9.3

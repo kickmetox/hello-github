@@ -1,5 +1,20 @@
 # Changelog — InstantLens Doc
 
+## 2.3.1 — Kompression Vorher/Nachher·Abbruch·DPI/Q-Presets, Links Validierung·Tooltip·Sidebar Edit/Löschen, Palette Fuzzy·Recent·Esc·Kategorien, Telemetrie-Warntext „keine Datenübertragung“
+
+Post-Release-Polish nach **2.3.0**: **PDF-Kompression** mit **Vorher/Nachher-Größenanzeige**, **Abbruch** im Fortschrittsdialog und **DPI/Qualität-Presets** (Bildschirm/E-Book/Druck); **URL-Links** mit **Live-Validierung**, **Hover-Tooltip**, **Sidebar-Liste** sowie **Bearbeiten/Löschen**; **Command Palette** mit **Fuzzy-Filter**, **letzten Befehlen**, **Esc schließt** und **Kategorien**; **Telemetrie-Stub** Settings-**Warntext „keine Datenübertragung“** (bleibt no-op). Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie klar markiert / nicht produktiv (Ink ≠ Stylus).
+
+### Neu / verbessert
+- PDF komprimieren: Vorher/Nachher-Größe · Abbruch · Presets 72/150/300 DPI · Q50/70/85
+- Links: URL Live-Validierung · Hover-Tooltip · Sidebar Liste · Bearbeiten/Löschen
+- Schnellaktionen Ctrl+K: Fuzzy-Filter · letzte Befehle · Esc · Kategorie-Gruppen
+- Telemetrie-Stub: Settings-Warntext „keine Datenübertragung“ · weiter no-op
+
+### Tests / Qualität
+- Version **2.3.1** (App / `ild_pdf` / ISS / Smoke / Docs); Serie **2.3**; `docs/VERSION` + `VERSION.txt`
+- Smoke: 2.3.1 CLI + Qt (Kompression size/cancel/presets, Links validate/sidebar, Palette fuzzy/recent/esc, Telemetrie-Warntext)
+- Stubs: Telemetrie-Hinweis geschärft; KI/Cloud/Stylus/3D/Hooks/Outline unverändert markiert
+
 ## 2.3.0 — PDF-Kompression/Downsample, Link-Annotationen Sidecar+Bake, Ctrl+K Command Palette, Telemetrie-Stub opt-in no-op
 
 Minor-Bump nach **2.2.5**: **PDF-Kompression/Optimierung** mit Qualitäts-Dialog und optionalem **Bilder-Downsample** (pypdfium2-Raster + pikepdf-Replace) → immer **neues File**; **URL-Link-Annotationen** (Rechteck + URI im Sidecar, Klick öffnet Browser, optional Bake als native PDF-Link-Annotation); **Schnellaktionen-Palette** Ctrl+K für häufige Befehle (öffnen, suchen, OCR, export…); **Telemetrie-Stub** klar opt-in Settings „anonym Nutzung melden“ (Default aus, immer no-op). Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie klar markiert / nicht produktiv (Ink ≠ Stylus).
