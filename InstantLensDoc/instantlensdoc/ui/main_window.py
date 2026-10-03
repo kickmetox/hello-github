@@ -551,6 +551,12 @@ class MainWindow(QMainWindow):
         m_new.addAction(act_new_notiz)
         self._m_user_templates = m_new.addMenu("Meine Vorlagen")
         self._refresh_user_template_menu()
+        act_tpl_folder = QAction("Vorlagen-Ordner öffnen…", self)
+        act_tpl_folder.setToolTip(
+            "Gespiegelte Nutzer-Vorlagen im Dateimanager öffnen (Explorer)"
+        )
+        act_tpl_folder.triggered.connect(self._open_user_templates_folder)
+        m_new.addAction(act_tpl_folder)
         act_save_tpl = QAction("Als Vorlage speichern…", self)
         act_save_tpl.setToolTip(
             "Aktuelles Editor-Dokument als wiederverwendbare Vorlage speichern"
@@ -4301,28 +4307,51 @@ class MainWindow(QMainWindow):
             empty = QAction("(keine gespeichert)", self)
             empty.setEnabled(False)
             menu.addAction(empty)
-            return
-        for t in templates:
-            tid = t["id"]
-            title = t["title"]
-            sub = menu.addMenu(title)
-            sub.setToolTip(f"Vorlage „{title}“")
-            act_open = QAction("Öffnen", self)
-            act_open.setToolTip(f"Neues Dokument aus Vorlage „{title}“")
-            act_open.triggered.connect(
-                lambda checked=False, i=tid: self.new_doc(f"user:{i}")
+        else:
+            for t in templates:
+                tid = t["id"]
+                title = t["title"]
+                sub = menu.addMenu(title)
+                sub.setToolTip(f"Vorlage „{title}“")
+                act_open = QAction("Öffnen", self)
+                act_open.setToolTip(f"Neues Dokument aus Vorlage „{title}“")
+                act_open.triggered.connect(
+                    lambda checked=False, i=tid: self.new_doc(f"user:{i}")
+                )
+                sub.addAction(act_open)
+                act_ren = QAction("Umbenennen…", self)
+                act_ren.triggered.connect(
+                    lambda checked=False, i=tid, n=title: self._rename_user_template(i, n)
+                )
+                sub.addAction(act_ren)
+                act_del = QAction("Löschen…", self)
+                act_del.triggered.connect(
+                    lambda checked=False, i=tid, n=title: self._delete_user_template(i, n)
+                )
+                sub.addAction(act_del)
+        menu.addSeparator()
+        act_folder = QAction("Vorlagen-Ordner öffnen…", self)
+        act_folder.setToolTip("Spiegel-Ordner der Nutzer-Vorlagen im Explorer öffnen")
+        act_folder.triggered.connect(self._open_user_templates_folder)
+        menu.addAction(act_folder)
+
+    def _open_user_templates_folder(self) -> None:
+        """Nutzer-Vorlagen spiegeln und Ordner im Dateimanager öffnen."""
+        from PySide6.QtCore import QUrl
+        from PySide6.QtGui import QDesktopServices
+
+        from instantlensdoc.core.app_settings import sync_user_templates_folder
+
+        folder = sync_user_templates_folder()
+        ok = QDesktopServices.openUrl(QUrl.fromLocalFile(str(folder)))
+        if ok:
+            self._set_status(f"Vorlagen-Ordner: {folder}")
+        else:
+            QMessageBox.information(
+                self,
+                "Vorlagen-Ordner",
+                f"Ordner konnte nicht geöffnet werden.\nPfad:\n{folder}",
             )
-            sub.addAction(act_open)
-            act_ren = QAction("Umbenennen…", self)
-            act_ren.triggered.connect(
-                lambda checked=False, i=tid, n=title: self._rename_user_template(i, n)
-            )
-            sub.addAction(act_ren)
-            act_del = QAction("Löschen…", self)
-            act_del.triggered.connect(
-                lambda checked=False, i=tid, n=title: self._delete_user_template(i, n)
-            )
-            sub.addAction(act_del)
 
     def _rename_user_template(self, template_id: str, current_title: str = "") -> None:
         from instantlensdoc.core.app_settings import rename_user_doc_template
@@ -4529,6 +4558,11 @@ class MainWindow(QMainWindow):
     def save_doc(self) -> bool:
         """Dokument speichern. Rückgabe True bei Erfolg (für Alle-speichern-Fehlerliste)."""
         quiet = bool(getattr(self, "_batch_save_quiet", False))
+        # Ctrl+S: ausstehendes Sidecar-Debounce sofort flushen
+        try:
+            self.pdf_view.flush_sidecar_save()
+        except Exception:
+            pass
         st = self.license_manager.status()
         if not st.allowed:
             if not quiet:

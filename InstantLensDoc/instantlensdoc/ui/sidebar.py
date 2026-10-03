@@ -286,6 +286,17 @@ class Sidebar(QWidget):
         self.search_hits_label.setToolTip("Trefferanzahl der letzten Schnellsuche")
         layout.addWidget(self.search_hits_label)
 
+        layout.addWidget(QLabel("Schnellsuche-Treffer / Markierungen"))
+        self.marks = QListWidget()
+        self.marks.setObjectName("searchHitsList")
+        self.marks.setMaximumHeight(140)
+        self.marks.setToolTip(
+            "Schnellsuche-Trefferliste — Klick öffnet Treffer / springt zur Markierung"
+        )
+        self.marks.itemClicked.connect(self._activate_mark)
+        self.marks.itemActivated.connect(self._activate_mark)
+        layout.addWidget(self.marks)
+
         layout.addWidget(QLabel("Zuletzt geöffnet"))
         self.recent = QListWidget()
         self.recent.setMaximumHeight(90)
@@ -406,11 +417,6 @@ class Sidebar(QWidget):
         self.annotations.customContextMenuRequested.connect(self._ann_context_menu)
         layout.addWidget(self.annotations)
 
-        layout.addWidget(QLabel("Treffer / Markierungen"))
-        self.marks = QListWidget()
-        self.marks.itemDoubleClicked.connect(self._activate_mark)
-        layout.addWidget(self.marks)
-
         layout.addStretch(1)
         self.ann_stats_label = QLabel("Ann.: —")
         self.ann_stats_label.setWordWrap(True)
@@ -500,6 +506,20 @@ class Sidebar(QWidget):
     def _activate_mark(self, item: QListWidgetItem):
         row = self.marks.row(item)
         payload = item.data(256)
+        # Trefferindex für Weiter/Zurück mit Klick synchronisieren
+        if isinstance(payload, tuple) and len(payload) >= 2 and payload[0] not in (
+            None,
+            "",
+            "__search__",
+        ):
+            nav = self.navigable_mark_indices()
+            if row in nav:
+                self._search_hit_index = nav.index(row)
+                self._search_hit_total = len(nav)
+                self._refresh_search_hits_label()
+            path, page = payload[0], payload[1]
+            self.fulltext_hit_activated.emit(str(path), page)
+            return
         if isinstance(payload, tuple) and len(payload) >= 2:
             path, page = payload[0], payload[1]
             self.fulltext_hit_activated.emit(str(path), page)

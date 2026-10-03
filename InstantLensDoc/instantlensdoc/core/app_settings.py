@@ -866,6 +866,44 @@ def rename_user_doc_template(template_id: str, new_title: str) -> dict | None:
     return None
 
 
+def user_templates_dir() -> Path:
+    """Ordner für gespiegelte Nutzer-Vorlagen (Explorer)."""
+    d = config_dir() / "templates"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def sync_user_templates_folder() -> Path:
+    """
+    Nutzer-Vorlagen als .md-Dateien nach config/templates spiegeln.
+    Rückgabe: Ordnerpfad (immer existierend).
+    """
+    import re
+
+    folder = user_templates_dir()
+    # Alte Spiegel-Dateien entfernen (nur *.md mit unserer Marker-Endung)
+    for old in folder.glob("*.ildtpl.md"):
+        try:
+            old.unlink()
+        except OSError:
+            pass
+    for t in get_user_doc_templates():
+        tid = t["id"]
+        title = t["title"]
+        safe = re.sub(r"[^\w\-]+", "_", title, flags=re.UNICODE).strip("_") or "vorlage"
+        safe = safe[:48]
+        name = f"{safe}.{tid[:8]}.ildtpl.md"
+        (folder / name).write_text(t["body"], encoding="utf-8")
+    readme = folder / "README.txt"
+    readme.write_text(
+        "InstantLens Doc — Nutzer-Vorlagen (Spiegel).\n"
+        "Dateien *.ildtpl.md werden aus den gespeicherten Vorlagen erzeugt.\n"
+        "Bearbeiten hier ändert die App-Vorlagen nicht; bitte in der App speichern.\n",
+        encoding="utf-8",
+    )
+    return folder
+
+
 SIDECAR_SAVE_DEBOUNCE_MIN_MS = 200
 SIDECAR_SAVE_DEBOUNCE_MAX_MS = 1000
 SIDECAR_SAVE_DEBOUNCE_DEFAULT_MS = 400

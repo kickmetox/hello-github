@@ -33,7 +33,7 @@ SHORTCUTS_HTML = """
 <tr><td>Projekt-Ordner / Workspace</td><td>Datei → Projekt-Ordner (letzte 5)</td></tr>
 <tr><td>Zeilen sortieren (A–Z)</td><td><code>Ctrl+Shift+O</code></td></tr>
 <tr><td>Öffnen</td><td><code>Ctrl+O</code></td></tr>
-<tr><td>Speichern</td><td><code>Ctrl+S</code></td></tr>
+<tr><td>Speichern</td><td><code>Ctrl+S</code> — flush Sidecar-Debounce sofort</td></tr>
 <tr><td>Alles speichern</td><td><code>Ctrl+Alt+Shift+S</code></td></tr>
 <tr><td>Speichern unter…</td><td><code>Ctrl+Shift+S</code></td></tr>
 <tr><td>Als Kopie speichern…</td><td><code>Ctrl+Alt+S</code></td></tr>
@@ -120,7 +120,9 @@ Seite <b>⟲/⟳ drehen</b>, <b>↔/↕ spiegeln</b>, <b>leere Seite</b>, <b>dup
 <p><b>Drag &amp; Drop:</b> mehrere Dateien → mehrere Tabs in der Sidebar.</p>
 <p><b>PDF-Suche:</b> Sidebar-Suche highlightet Treffer auf der aktuellen Seite;
 „Weiter/Zurück“ springt zum nächsten/vorherigen Treffer (auch über Docs bei Alle Docs/PDFs);
-Trefferanzahl in der Sidebar; <b>letzte Suchbegriffe</b> im Dropdown.</p>
+Trefferanzahl + <b>klickbare Trefferliste</b> in der Sidebar; <b>letzte Suchbegriffe</b> im Dropdown.</p>
+<p><b>Ctrl+S:</b> speichert das Dokument und <b>flusht</b> ausstehendes Sidecar-Debounce sofort.</p>
+<p><b>Vorlagen-Ordner:</b> Datei → Neu → Vorlagen-Ordner öffnen… (Spiegel unter config/templates).</p>
 <p><b>Annotationen:</b> eigene Liste in der Sidebar — <b>gruppiert nach Seite</b>; Klick springt zur Annotation;
 Filter-Dropdown nach Typ; <b>Nur aktuelle Seite</b>-Checkbox; <b>Tag-Filter Multi-Select</b> (ODER); <b>Tag-Cloud</b> (häufigste Tags); <b>Farben-Chips in der Statistik klickbar</b>; <b>Textsuche in der Liste</b> (optional <b>Regex</b>);
 Text nachträglich editierbar; Deckkraft pro Annotation; <b>Notizfarbe unabhängig von Highlight</b>;

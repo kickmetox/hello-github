@@ -2231,10 +2231,18 @@ class PdfViewer(QWidget):
             QMessageBox.warning(self, "Annotationen", f"Speichern fehlgeschlagen: {e}")
 
     def flush_sidecar_save(self) -> None:
-        """Ausstehendes Debounce sofort ausführen (vor PDF-Wechsel / Close)."""
+        """Ausstehendes Debounce sofort ausführen (PDF-Wechsel / Close / Ctrl+S)."""
         if self._sidecar_save_timer.isActive() or self._sidecar_save_pending:
             self._sidecar_save_timer.stop()
-            self._flush_sidecar_save()
+            pending = self._sidecar_save_pending
+            self._sidecar_save_pending = False
+            if pending and self.store:
+                try:
+                    self.store.save(force=True)
+                except Exception as e:
+                    QMessageBox.warning(
+                        self, "Annotationen", f"Speichern fehlgeschlagen: {e}"
+                    )
 
     def load(self, path: str | Path, password: str | None = None) -> bool:
         from PySide6.QtWidgets import QApplication
@@ -3576,7 +3584,7 @@ class PdfViewer(QWidget):
             return False
 
     def merge_duplicate_annotations(self) -> int:
-        """Duplikate (gleiche Seite+BBox) finden und optional zusammenführen."""
+        """Duplikate (gleiche Seite+BBox) finden; Vorschau-Dialog, dann optional Apply."""
         if not self.store or not self.pdf_path:
             QMessageBox.information(self, "Duplikate", "Kein PDF geladen.")
             return 0
@@ -3590,16 +3598,12 @@ class PdfViewer(QWidget):
             self.status.emit("Keine Annotation-Duplikate")
             return 0
         n_groups = len(groups)
-        n_extra = sum(len(g) - 1 for g in groups)
-        r = QMessageBox.question(
-            self,
-            "Duplikate zusammenführen",
-            f"{n_groups} Duplikat-Gruppe(n), {n_extra} überzählige Annotation(en).\n\n"
-            "Zusammenführen? (älteste behalten, Text/Tags mergen)",
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.Yes,
+        from instantlensdoc.ui.merge_duplicates_dialog import (
+            MergeDuplicatesPreviewDialog,
         )
-        if r != QMessageBox.Yes:
+
+        dlg = MergeDuplicatesPreviewDialog(groups, parent=self)
+        if dlg.exec() != QDialog.Accepted:
             self.status.emit(f"{n_groups} Duplikat-Gruppe(n) — nicht zusammengeführt")
             return 0
         removed = self.store.merge_duplicates(
