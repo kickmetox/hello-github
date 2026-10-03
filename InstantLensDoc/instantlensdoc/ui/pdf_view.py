@@ -32,6 +32,7 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QListWidget,
     QListWidgetItem,
+    QMenu,
     QMessageBox,
     QPlainTextEdit,
     QPushButton,
@@ -74,6 +75,7 @@ from ild_pdf.pages import (
 from instantlensdoc.core.app_settings import (
     cycle_ann_palette_color,
     get_ann_color_presets,
+    reset_ann_color_preset,
     get_ann_default_opacity,
     get_ann_highlight_color,
     get_ann_note_color,
@@ -1541,12 +1543,12 @@ class PdfViewer(QWidget):
             pb.setToolTip(
                 f"Preset {i + 1}: Auswahl → Strich · Shift → Füllung (Undo); "
                 "ohne Auswahl → Highlight · Shift=Stift · Ctrl=Notiz; "
-                "Rechtsklick speichern"
+                "Rechtsklick: speichern / zurücksetzen — 0.9.6"
             )
             pb.clicked.connect(lambda checked=False, idx=i: self._apply_color_preset(idx))
             pb.setContextMenuPolicy(Qt.CustomContextMenu)
             pb.customContextMenuRequested.connect(
-                lambda pos, idx=i, btn=pb: self._save_color_preset(idx)
+                lambda pos, idx=i, btn=pb: self._color_preset_context_menu(btn, idx, pos)
             )
             self._preset_btns.append(pb)
             toolbar.addWidget(pb)
@@ -1806,7 +1808,7 @@ class PdfViewer(QWidget):
             btn.setToolTip(
                 f"Preset {i + 1}: {c} — Auswahl: Klick=Strich · Shift=Füllung (Undo); "
                 "ohne Auswahl: Highlight · Shift=Stift · Ctrl=Notiz; "
-                "Rechtsklick speichern — 0.9.5"
+                "Rechtsklick: speichern / zurücksetzen — 0.9.6"
             )
 
     def _selected_annotation_ids(self) -> list[str]:
@@ -1902,8 +1904,19 @@ class PdfViewer(QWidget):
             self._style_color_btn(self.btn_hl_color, color)
             self.status.emit(f"Highlight-Farbe (Preset {index + 1}): {color}")
 
+    def _color_preset_context_menu(self, btn: QPushButton, index: int, pos) -> None:
+        """Rechtsklick: Preset speichern / auf Standard zurücksetzen — 0.9.6."""
+        menu = QMenu(self)
+        act_save = menu.addAction("Preset speichern…")
+        act_reset = menu.addAction("Preset zurücksetzen")
+        chosen = menu.exec(btn.mapToGlobal(pos))
+        if chosen == act_save:
+            self._save_color_preset(index)
+        elif chosen == act_reset:
+            self._reset_color_preset(index)
+
     def _save_color_preset(self, index: int):
-        # Bei Auswahl: aktuelle Strichfarbe speichern, sonst Highlight
+        # Bei Auswahl: aktuelle Strichfarbe speichern, sonst Highlight (Settings)
         color = self._highlight_color
         ids = self._selected_annotation_ids()
         if ids and self.store is not None:
@@ -1912,7 +1925,13 @@ class PdfViewer(QWidget):
                 color = first.color
         set_ann_color_preset(index, color)
         self._refresh_preset_btns()
-        self.status.emit(f"Preset {index + 1} = {color}")
+        self.status.emit(f"Preset {index + 1} gespeichert = {color}")
+
+    def _reset_color_preset(self, index: int):
+        presets = reset_ann_color_preset(index)
+        self._refresh_preset_btns()
+        color = presets[index] if 0 <= index < len(presets) else ""
+        self.status.emit(f"Preset {index + 1} zurückgesetzt = {color}")
 
     def _apply_active_color(self, color: str, *, label: str) -> None:
         """Aktive Farbe setzen (Highlight; Shift=Stift; Ctrl=Notiz)."""
@@ -3692,6 +3711,80 @@ class PdfViewer(QWidget):
     def search_active_index(self) -> int:
         """0-basierter Index des aktiven Treffer-Highlights (−1 wenn keiner)."""
         return int(self._search_index)
+
+    def annotate_search_hits_current_page(
+        self,
+        query: str | None = None,
+        *,
+        case_sensitive: bool | None = None,
+        whole_word: bool | None = None,
+        regex: bool | None = None,
+    ) -> int:
+        """
+        Suchtreffer der aktuellen Seite als Highlight-Annotationen anlegen (Batch) — 0.9.6.
+        Nutzt aktuelle Query/Optionen; ein Undo-Schritt via atomic().
+        """
+        from ild_pdf.overlay import SearchPatternError
+
+        if not self.store or not self.pdf_path:
+            self.status.emit("Kein PDF geladen")
+            return 0
+        q = (query if query is not None else self._search_query) or ""
+        q = q.strip()
+        if not q:
+            self.status.emit("Keine Suche aktiv")
+            return 0
+        if (
+            case_sensitive is not None
+            or whole_word is not None
+            or regex is not None
+        ):
+            self.set_search_options(
+                case_sensitive=case_sensitive,
+                whole_word=whole_word,
+                regex=regex,
+            )
+        self._search_query = q
+        try:
+            n = self._rebuild_search_rects(keep_index=True)
+        except SearchPatternError as e:
+            self.status.emit(f"Regex-Fehler: {e}")
+            raise
+        if n <= 0 or not self._search_rects:
+            self.status.emit("Keine Treffer auf dieser Seite")
+            return 0
+        page = int(self.page_index)
+        color = self._highlight_color or "#FFE066"
+        opacity = float(getattr(self, "_default_opacity", 1.0) or 1.0)
+        created = 0
+        with self.store.atomic(label="Suche → Highlight"):
+            for i, (rx, ry, rw, rh) in enumerate(self._search_rects):
+                snippet = q if i == 0 else ""
+                self.store.add(
+                    Annotation(
+                        page=page,
+                        type=AnnotationType.HIGHLIGHT,
+                        x=float(rx),
+                        y=float(ry),
+                        width=max(float(rw), 4.0),
+                        height=max(float(rh), 6.0),
+                        color=color,
+                        text=snippet,
+                        opacity=opacity,
+                    )
+                )
+                created += 1
+        try:
+            self.schedule_sidecar_save(force=True)
+        except Exception as e:
+            QMessageBox.warning(self, "Treffer markieren", str(e))
+        self.canvas.set_search_highlights(self._search_rects, self._search_index)
+        self.refresh()
+        self.annotations_changed.emit()
+        self.status.emit(
+            f"{created} Highlight(s) aus Suche (Seite {page + 1})"
+        )
+        return created
 
     def collect_search_hits(
         self,

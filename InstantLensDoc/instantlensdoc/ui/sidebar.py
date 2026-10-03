@@ -76,7 +76,12 @@ ANN_TYPE_LABELS = {
 _DOC_PINNED_ROLE = 257
 # UserRole+2: Anzeige-Label (≠ Dateiname) — 0.9.4
 _DOC_LABEL_ROLE = 258
+# UserRole+3: Dirty / ungespeichert (*) — 0.9.6
+_DOC_DIRTY_ROLE = 259
+# UserRole+4: Dirty-Tooltip-Hinweis ("pending" | "") — 0.9.6
+_DOC_DIRTY_HINT_ROLE = 260
 _PIN_PREFIX = "📌 "
+_DIRTY_SUFFIX = " *"
 
 
 class DocumentList(QListWidget):
@@ -102,7 +107,7 @@ class DocumentList(QListWidget):
             "Mittelklick schließt Tab — "
             "Rechtsklick: Anheften / Umbenennen / Originaltitel / "
             "Schließen / Andere / Links / Rechts / Alle — "
-            "Tooltip = voller Pfad"
+            "Tooltip = voller Pfad; * = ungespeichert"
         )
         self.setContextMenuPolicy(Qt.CustomContextMenu)
         self.customContextMenuRequested.connect(self._context_menu)
@@ -450,6 +455,7 @@ class Sidebar(QWidget):
     annotation_group_filter_changed = Signal(str)  # group_id oder "" für alle
     annotation_group_export_requested = Signal(str)  # group_id → JSON-Export
     search_export_requested = Signal(str)  # "csv" | "json"
+    search_annotate_requested = Signal()  # Treffer aktuelle Seite → Highlight-Anns (0.9.6)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -538,8 +544,17 @@ class Sidebar(QWidget):
         self.btn_export_search_json.clicked.connect(
             lambda: self.search_export_requested.emit("json")
         )
+        self.btn_annotate_search = QPushButton("HL")
+        self.btn_annotate_search.setFixedWidth(36)
+        self.btn_annotate_search.setToolTip(
+            "Suchtreffer der aktuellen Seite als Highlight-Annotationen markieren (Batch) — 0.9.6"
+        )
+        self.btn_annotate_search.clicked.connect(
+            lambda: self.search_annotate_requested.emit()
+        )
         hits_row.addWidget(self.btn_export_search_csv)
         hits_row.addWidget(self.btn_export_search_json)
+        hits_row.addWidget(self.btn_annotate_search)
         layout.addLayout(hits_row)
 
         layout.addWidget(QLabel("Schnellsuche-Treffer / Markierungen"))
@@ -815,6 +830,35 @@ class Sidebar(QWidget):
         if hasattr(self, "search_regex"):
             return bool(self.search_regex.isChecked())
         return False
+
+    def search_options(self) -> dict[str, bool]:
+        """PDF-Suche Toggles Aa / Wort / Regex — 0.9.6 Session."""
+        return {
+            "case": self.search_case_sensitive(),
+            "whole": self.search_whole_word(),
+            "regex": self.search_regex_enabled(),
+        }
+
+    def set_search_options(
+        self,
+        *,
+        case: bool | None = None,
+        whole: bool | None = None,
+        regex: bool | None = None,
+    ) -> None:
+        """PDF-Suche Toggles setzen (Session-Restore) — 0.9.6."""
+        if case is not None and hasattr(self, "search_case"):
+            self.search_case.blockSignals(True)
+            self.search_case.setChecked(bool(case))
+            self.search_case.blockSignals(False)
+        if whole is not None and hasattr(self, "search_whole"):
+            self.search_whole.blockSignals(True)
+            self.search_whole.setChecked(bool(whole))
+            self.search_whole.blockSignals(False)
+        if regex is not None and hasattr(self, "search_regex"):
+            self.search_regex.blockSignals(True)
+            self.search_regex.setChecked(bool(regex))
+            self.search_regex.blockSignals(False)
 
     def search_text(self) -> str:
         return self.search.currentText().strip()
@@ -1314,13 +1358,23 @@ class Sidebar(QWidget):
         p = item.data(256) or ""
         base = self._document_display_base(item)
         pinned = bool(item.data(_DOC_PINNED_ROLE))
-        item.setText((_PIN_PREFIX + base) if pinned else base)
-        # Tooltip: immer voller Pfad zuerst (0.9.5)
+        dirty = bool(item.data(_DOC_DIRTY_ROLE))
+        label = (_PIN_PREFIX + base) if pinned else base
+        if dirty:
+            label = f"{label}{_DIRTY_SUFFIX}"
+        item.setText(label)
+        # Tooltip: immer voller Pfad zuerst (0.9.5); Dirty-Hinweis 0.9.6
         tip = str(p) if p else ""
         custom = str(item.data(_DOC_LABEL_ROLE) or "").strip()
         extras: list[str] = []
         if custom and p and custom != Path(str(p)).name:
             extras.append(f"Anzeige: {custom}")
+        if dirty:
+            hint = str(item.data(_DOC_DIRTY_HINT_ROLE) or "").strip()
+            if hint == "pending":
+                extras.append("Speichern ausstehend…")
+            else:
+                extras.append("Ungespeicherte Änderungen")
         if pinned:
             extras.append("Angeheftet — geschützt vor „Alle schließen“")
         if extras and tip:
@@ -1328,6 +1382,30 @@ class Sidebar(QWidget):
         elif extras:
             tip = "\n".join(extras)
         item.setToolTip(tip)
+
+    def set_documents_dirty(
+        self,
+        dirty_keys: set[str] | None,
+        *,
+        pending_key: str | None = None,
+    ) -> None:
+        """Dirty-Indikator (*) für Dokument-Tabs setzen — 0.9.6."""
+        keys = {str(Path(k)) for k in (dirty_keys or set()) if k}
+        pending = str(Path(pending_key)) if pending_key else ""
+        for i in range(self.files.count()):
+            it = self.files.item(i)
+            if it is None:
+                continue
+            raw = it.data(256) or it.data(Qt.UserRole)
+            key = str(Path(str(raw))) if raw else ""
+            want = bool(key and key in keys)
+            it.setData(_DOC_DIRTY_ROLE, want)
+            # pending Sidecar-Debounce: spezieller Tooltip-Hinweis
+            if want and pending and key == pending:
+                it.setData(_DOC_DIRTY_HINT_ROLE, "pending")
+            else:
+                it.setData(_DOC_DIRTY_HINT_ROLE, "")
+            self._refresh_document_item_text(it)
 
     def document_label(self, path: str) -> str:
         """Anzeige-Label eines Tabs (leer = Dateiname)."""

@@ -27,6 +27,7 @@ DEFAULTS: dict[str, Any] = {
     "default_zoom_percent": 150,
     "default_zoom_mode": "percent",  # percent | fit_width | fit_page
     "autosave_interval_sec": 60,
+    "autosave_enabled": True,
     "ann_highlight_color": "#FFE066",
     "ann_pen_color": "#2C3E50",
     "ann_note_color": "#FFEB3B",
@@ -320,6 +321,15 @@ def get_autosave_interval_sec() -> int:
 
 def set_autosave_interval_sec(seconds: int) -> None:
     save_settings({"autosave_interval_sec": max(10, min(600, int(seconds)))})
+
+
+def get_autosave_enabled() -> bool:
+    """Autosave Ein/Aus (Toggle in Einstellungen) — 0.9.6."""
+    return bool(load_settings().get("autosave_enabled", True))
+
+
+def set_autosave_enabled(enabled: bool) -> None:
+    save_settings({"autosave_enabled": bool(enabled)})
 
 
 def get_ann_highlight_color() -> str:
@@ -1966,6 +1976,18 @@ def set_ann_color_preset(index: int, color: str) -> list[str]:
     i = max(0, min(ANN_COLOR_PRESET_COUNT - 1, int(index)))
     presets[i] = _normalize_hex_color(color, presets[i])
     return set_ann_color_presets(presets)
+
+
+def reset_ann_color_preset(index: int) -> list[str]:
+    """Einzelnen Favoriten-Slot auf Werkstandard zurücksetzen — 0.9.6."""
+    defaults = list(_DEFAULT_ANN_PRESETS)
+    i = max(0, min(ANN_COLOR_PRESET_COUNT - 1, int(index)))
+    return set_ann_color_preset(i, defaults[i])
+
+
+def reset_ann_color_presets() -> list[str]:
+    """Alle 6 Color-Presets auf Werkstandard — 0.9.6."""
+    return set_ann_color_presets(list(_DEFAULT_ANN_PRESETS))
 
 
 def get_restore_session_on_start() -> bool:

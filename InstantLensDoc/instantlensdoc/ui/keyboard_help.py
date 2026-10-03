@@ -66,21 +66,24 @@ SHORTCUTS_HTML = """
 <tr><td>Tab Drag-Reorder</td><td>Dokumentliste ziehen → Reihenfolge; Session speichert `order` — 0.9.3</td></tr>
 <tr><td>Tab umbenennen</td><td>Doppelklick / Rechtsklick „Umbenennen…“ → Anzeige-Label (≠ Dateiname); Session `label` — 0.9.4</td></tr>
 <tr><td>Tab Originaltitel</td><td>Rechtsklick „Originaltitel“ setzt Anzeige-Label zurück; Tooltip = voller Pfad — 0.9.5</td></tr>
+<tr><td>Tab Dirty-Indikator</td><td><code>*</code> bei ungespeicherten Änderungen (Label/Pin bleiben); Autosave-Toggle in Einstellungen — 0.9.6</td></tr>
 <tr><td>Opacity-Slider Auswahl</td><td>Toolbar-Slider steuert ausgewähltes Ann.-Objekt — 0.9.0; Undo erst beim Loslassen — 0.9.1</td></tr>
 <tr><td>Stroke-Width Slider</td><td>Toolbar 1–12 px für ausgewähltes Shape; Undo beim Loslassen — 0.9.2</td></tr>
 <tr><td>Fill-Color Picker</td><td>Toolbar „Füllung…“ für ausgewähltes Shape; Commit + Undo — 0.9.3</td></tr>
 <tr><td>Stroke-Color Picker</td><td>Toolbar „Strich…“ Strichfarbe getrennt von Füllung; Commit + Undo — 0.9.4</td></tr>
-<tr><td>Color-Presets Quick-Bar</td><td>6 Farben: Auswahl Klick=Strich · Shift=Füllung (Undo); ohne Auswahl HL/Stift/Notiz — 0.9.5</td></tr>
+<tr><td>Color-Presets Quick-Bar</td><td>6 Farben: Auswahl Klick=Strich · Shift=Füllung (Undo); ohne Auswahl HL/Stift/Notiz — 0.9.5; Rechtsklick speichern/zurücksetzen + Settings — 0.9.6</td></tr>
 <tr><td>PDF-Suche Aa / Wort</td><td>Suchleisten-Toggles Case-sensitive + Whole-word — 0.9.2</td></tr>
 <tr><td>PDF-Suche Regex</td><td>Suchleisten-Toggle `.*`; Fehlerstatus in Statusleiste — 0.9.3</td></tr>
 <tr><td>PDF-Suche CSV-Export</td><td>Treffer als CSV: Seite, Offset, Snippet — 0.9.4</td></tr>
 <tr><td>PDF-Suche JSON-Export</td><td>Treffer als JSON (`ildsearch-v1`): Seite, Offset, Snippet — 0.9.5</td></tr>
+<tr><td>PDF-Suche → Highlight</td><td>Button HL / Menü: Treffer der aktuellen Seite als Highlight-Annotationen (Batch + Undo) — 0.9.6</td></tr>
 <tr><td>Session-Toggles</td><td>Einstellungen: Fenstergeometrie + offene Tabs getrennt — 0.9.0</td></tr>
 <tr><td>Session Last-Page / Scroll</td><td>Seite + Scroll-Position pro Tab speichern/wiederherstellen — 0.9.1</td></tr>
 <tr><td>Session Zoom pro Tab</td><td>Zoom-Level speichern/wiederherstellen (Vorrang vor Fit/Default) — 0.9.2</td></tr>
 <tr><td>Session Splitter</td><td>Sidebar/Viewer-Größen speichern/wiederherstellen — 0.9.3</td></tr>
 <tr><td>Session Theme / aktiver Tab</td><td>Theme dark/light + aktiver Tab-Index speichern/wiederherstellen — 0.9.4</td></tr>
 <tr><td>Session Panels Thumb/Ann/Bookmark</td><td>Panel-Sichtbarkeit speichern/wiederherstellen — 0.9.5</td></tr>
+<tr><td>Session Suche Aa/Wort/Regex</td><td>Suchfilter-Toggles speichern/wiederherstellen — 0.9.6</td></tr>
 <tr><td>PDF-Trefferliste</td><td>Sidebar Seite + Snippet klickbar → Sprung + Highlight — 0.9.1</td></tr>
 <tr><td>Fenster teilen (zwei Docs)</td><td><code>Ctrl+\\</code> — 0.6.3</td></tr>
 <tr><td>Vertikaler Split (übereinander)</td><td><code>Ctrl+Shift+\\</code> (Toggle) — 0.6.5</td></tr>

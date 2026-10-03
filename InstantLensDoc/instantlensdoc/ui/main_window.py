@@ -47,6 +47,7 @@ from instantlensdoc.core import fulltext as fulltext_mod
 from instantlensdoc.core.app_settings import (
     dialog_start_dir,
     get_annotations_visible,
+    get_autosave_enabled,
     get_autosave_interval_sec,
     get_default_open_dir,
     get_editor_doc_split,
@@ -108,7 +109,7 @@ class MainWindow(QMainWindow):
         self._recent_menu = None
         self._workspace_menu = None
         self._theme_action: QAction | None = None
-        self._autosave_enabled = True
+        self._autosave_enabled = bool(get_autosave_enabled())
         self._thumb_lazy_timer: QTimer | None = None
         self._thumb_lazy_queue: list[int] = []
         self._thumb_lazy_token: int | None = None
@@ -470,6 +471,11 @@ class MainWindow(QMainWindow):
             panels = dict(self.sidebar.panel_visibility())
         except Exception:
             panels = {"thumbs": True, "ann": True, "bookmark": True}
+        search = {"case": False, "whole": False, "regex": False}
+        try:
+            search = dict(self.sidebar.search_options())
+        except Exception:
+            search = {"case": False, "whole": False, "regex": False}
         state = session_mod.build_session(
             paths,
             active_path=active,
@@ -485,6 +491,7 @@ class MainWindow(QMainWindow):
             theme=theme or None,
             tab_labels=tab_labels or None,
             panels=panels,
+            search=search,
         )
         session_mod.save_session(state)
 
@@ -581,6 +588,21 @@ class MainWindow(QMainWindow):
             self._sync_panel_visibility_menu()
         except Exception:
             pass
+        # PDF-Suche Toggles Aa / Wort / Regex (0.9.6)
+        try:
+            self.sidebar.set_search_options(
+                case=bool(getattr(state, "search_case", False)),
+                whole=bool(getattr(state, "search_whole", False)),
+                regex=bool(getattr(state, "search_regex", False)),
+            )
+            if hasattr(self.pdf_view, "set_search_options"):
+                self.pdf_view.set_search_options(
+                    case_sensitive=bool(getattr(state, "search_case", False)),
+                    whole_word=bool(getattr(state, "search_whole", False)),
+                    regex=bool(getattr(state, "search_regex", False)),
+                )
+        except Exception:
+            pass
         self._set_status(f"Session wiederhergestellt ({len(state.tabs)} Tab(s))")
 
     def _build_ui(self):
@@ -596,6 +618,7 @@ class MainWindow(QMainWindow):
         self.sidebar.search_next_requested.connect(self._on_search_next)
         self.sidebar.search_prev_requested.connect(self._on_search_prev)
         self.sidebar.search_export_requested.connect(self._on_search_export)
+        self.sidebar.search_annotate_requested.connect(self._on_search_annotate_page)
         self.sidebar.file_activated.connect(self.open_path)
         self.sidebar.document_close_requested.connect(self.close_tab_path)
         self.sidebar.document_close_others_requested.connect(self.close_other_tabs_keeping)
@@ -1006,6 +1029,12 @@ class MainWindow(QMainWindow):
         )
         act_search_json.triggered.connect(lambda: self._on_search_export("json"))
         m_edit.addAction(act_search_json)
+        act_search_hl = QAction("Treffer als Highlight (Seite)…", self)
+        act_search_hl.setToolTip(
+            "Suchtreffer der aktuellen PDF-Seite als Highlight-Annotationen — 0.9.6"
+        )
+        act_search_hl.triggered.connect(self._on_search_annotate_page)
+        m_edit.addAction(act_search_hl)
         act_goto = QAction("Gehe zu Zeile…", self)
         act_goto.setShortcut(QKeySequence("Ctrl+G"))
         act_goto.setToolTip("Editor: Zeile · PDF: Seite (Ctrl+G)")
@@ -2021,17 +2050,14 @@ class MainWindow(QMainWindow):
         self._refresh_document_dirty_labels()
 
     def _refresh_document_dirty_labels(self) -> None:
-        """Dirty-Indikator (*) an Sidebar-Dokument-Tabs inkl. pending Sidecar-Debounce."""
-        files = getattr(self.sidebar, "files", None)
-        if files is None:
-            return
+        """Dirty-Indikator (*) an Sidebar-Dokument-Tabs inkl. pending Sidecar-Debounce — 0.9.6."""
         dirty_keys = set(self._unsaved_paths)
         if self._current_is_dirty() and self.doc and self.doc.path:
             cur = self._path_key(self.doc.path)
             if cur:
                 dirty_keys.add(cur)
-        pending_key = None
         pending = False
+        pending_key = None
         if (
             self.doc
             and self.doc.path
@@ -2043,13 +2069,20 @@ class MainWindow(QMainWindow):
                 pending = bool(getattr(self.pdf_view, "_sidecar_save_pending", False))
             if pending:
                 pending_key = self._path_key(self.doc.path)
+                if pending_key:
+                    dirty_keys.add(pending_key)
         # Rising-edge: kurzer Statusleisten-Blink bei pending Debounce
         was = bool(getattr(self, "_pending_was_pending", False))
         if pending and not was:
             self._blink_pending_debounce_status()
         self._pending_was_pending = bool(pending)
-        from instantlensdoc.ui.sidebar import _DOC_PINNED_ROLE, _PIN_PREFIX
-
+        if hasattr(self.sidebar, "set_documents_dirty"):
+            self.sidebar.set_documents_dirty(dirty_keys, pending_key=pending_key)
+            return
+        # Fallback ohne Sidebar-API
+        files = getattr(self.sidebar, "files", None)
+        if files is None:
+            return
         for i in range(files.count()):
             it = files.item(i)
             if it is None:
@@ -2059,26 +2092,10 @@ class MainWindow(QMainWindow):
                 continue
             key = self._path_key(raw)
             base = Path(str(raw)).name
-            pinned = bool(it.data(_DOC_PINNED_ROLE))
-            label = (_PIN_PREFIX + base) if pinned else base
             if key and key in dirty_keys:
-                it.setText(f"{label} *")
-                tips = []
-                if pending_key and key == pending_key:
-                    tips.append("Speichern ausstehend…")
-                else:
-                    tips.append("Ungespeicherte Änderungen")
-                if pinned:
-                    tips.append("Angeheftet — geschützt vor „Alle schließen“")
-                it.setToolTip("\n".join(tips))
+                it.setText(f"{base} *")
             else:
-                it.setText(label)
-                if pinned:
-                    it.setToolTip(
-                        f"{raw}\nAngeheftet — geschützt vor „Alle schließen“"
-                    )
-                else:
-                    it.setToolTip(str(raw))
+                it.setText(base)
 
     def _blink_pending_debounce_status(self) -> None:
         """
@@ -4397,6 +4414,42 @@ class MainWindow(QMainWindow):
         set_last_export_dir(Path(dest).parent)
         self._set_status(f"Suchergebnisse exportiert ({len(hits)}): {dest.name}")
 
+    def _on_search_annotate_page(self):
+        """Suchtreffer der aktuellen PDF-Seite als Highlight-Annotationen (Batch) — 0.9.6."""
+        if not self.pdf_view.pdf_path or not self.pdf_view.store:
+            self._set_status("Kein PDF geladen")
+            QMessageBox.information(
+                self,
+                "Treffer markieren",
+                "Bitte zuerst ein PDF öffnen und suchen.",
+            )
+            return
+        query = self.sidebar.search_text()
+        if not query.strip():
+            self._set_status("Leere Suche — kein Highlight-Batch")
+            return
+        case = getattr(self.sidebar, "search_case_sensitive", lambda: False)()
+        whole = getattr(self.sidebar, "search_whole_word", lambda: False)()
+        regex = getattr(self.sidebar, "search_regex_enabled", lambda: False)()
+        try:
+            n = self.pdf_view.annotate_search_hits_current_page(
+                query,
+                case_sensitive=case,
+                whole_word=whole,
+                regex=regex,
+            )
+        except Exception as e:
+            self._set_status(f"Highlight-Batch fehlgeschlagen: {e}")
+            QMessageBox.warning(self, "Treffer markieren", str(e))
+            return
+        if n <= 0:
+            self._set_status("Keine Treffer auf der aktuellen Seite")
+            return
+        if self.doc and self.doc.path:
+            self._mark_unsaved(self.doc.path, True)
+        self._refresh_pdf_marks()
+        self._set_status(f"{n} Highlight(s) aus Suche auf Seite {self.pdf_view.page_index + 1}")
+
     def _on_search(self, query: str):
         if not query:
             self._set_status("Leere Suche")
@@ -5241,6 +5294,7 @@ class MainWindow(QMainWindow):
                 self._night_action.blockSignals(True)
                 self._night_action.setChecked(night)
                 self._night_action.blockSignals(False)
+            self._autosave_enabled = bool(get_autosave_enabled())
             self._autosave_timer.setInterval(get_autosave_interval_sec() * 1000)
             debounce_ms = self.pdf_view.apply_sidecar_debounce_ms(
                 get_sidecar_save_debounce_ms()
@@ -5249,8 +5303,13 @@ class MainWindow(QMainWindow):
             self.pdf_view.apply_toolbar_groups()
             if self.pdf_view.pdf_path:
                 self._refresh_thumbs()
+            as_label = (
+                f"Autosave {get_autosave_interval_sec()}s"
+                if get_autosave_enabled()
+                else "Autosave aus"
+            )
             self._set_status(
-                f"Einstellungen gespeichert · Autosave {get_autosave_interval_sec()}s · "
+                f"Einstellungen gespeichert · {as_label} · "
                 f"Sidecar-Debounce {debounce_ms} ms"
             )
 

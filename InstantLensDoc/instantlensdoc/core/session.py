@@ -42,6 +42,10 @@ class SessionState:
     panel_thumbs: bool = True
     panel_ann: bool = True
     panel_bookmark: bool = True
+    # PDF-Suche Toggles Aa / Wort / Regex — 0.9.6
+    search_case: bool = False
+    search_whole: bool = False
+    search_regex: bool = False
 
 
 def session_path() -> Path:
@@ -174,6 +178,16 @@ def load_session() -> SessionState:
         panels["bookmark"] = _normalize_panel_flag(
             raw.get("panel_bookmark", raw.get("panel_outline")), True
         )
+    search = raw.get("search") if isinstance(raw.get("search"), dict) else {}
+    search_case = _normalize_panel_flag(
+        search.get("case", raw.get("search_case")), False
+    )
+    search_whole = _normalize_panel_flag(
+        search.get("whole", raw.get("search_whole")), False
+    )
+    search_regex = _normalize_panel_flag(
+        search.get("regex", raw.get("search_regex")), False
+    )
     return SessionState(
         tabs=tabs,
         active=active,
@@ -186,6 +200,9 @@ def load_session() -> SessionState:
         panel_thumbs=panels["thumbs"],
         panel_ann=panels["ann"],
         panel_bookmark=panels["bookmark"],
+        search_case=search_case,
+        search_whole=search_whole,
+        search_regex=search_regex,
     )
 
 
@@ -218,6 +235,11 @@ def save_session(state: SessionState) -> None:
                 getattr(state, "panel_bookmark", True), True
             ),
         },
+        "search": {
+            "case": bool(getattr(state, "search_case", False)),
+            "whole": bool(getattr(state, "search_whole", False)),
+            "regex": bool(getattr(state, "search_regex", False)),
+        },
     }
     path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
 
@@ -245,6 +267,10 @@ def build_session(
     panel_ann: Optional[bool] = None,
     panel_bookmark: Optional[bool] = None,
     panels: Optional[dict] = None,
+    search_case: Optional[bool] = None,
+    search_whole: Optional[bool] = None,
+    search_regex: Optional[bool] = None,
+    search: Optional[dict] = None,
 ) -> SessionState:
     """
     tab_states: optional {path: {page, scale, scroll_y}} für Last-Page/Zoom/Scroll je Tab (0.9.1/0.9.2).
@@ -252,6 +278,7 @@ def build_session(
     theme: optional dark|light — Session-Theme (0.9.4).
     tab_labels: optional {path: Anzeige-Label} — Tab-Titel ≠ Dateiname (0.9.4).
     panels / panel_*: Sidebar Thumb/Ann/Bookmark Sichtbarkeit (0.9.5).
+    search / search_*: PDF-Suche Aa/Wort/Regex (0.9.6).
     """
     tabs: List[SessionTab] = []
     seen: set[str] = set()
@@ -348,6 +375,17 @@ def build_session(
         panel_map["ann"] = bool(panel_ann)
     if panel_bookmark is not None:
         panel_map["bookmark"] = bool(panel_bookmark)
+    search_map = {"case": False, "whole": False, "regex": False}
+    if isinstance(search, dict):
+        search_map["case"] = _normalize_panel_flag(search.get("case"), False)
+        search_map["whole"] = _normalize_panel_flag(search.get("whole"), False)
+        search_map["regex"] = _normalize_panel_flag(search.get("regex"), False)
+    if search_case is not None:
+        search_map["case"] = bool(search_case)
+    if search_whole is not None:
+        search_map["whole"] = bool(search_whole)
+    if search_regex is not None:
+        search_map["regex"] = bool(search_regex)
     return SessionState(
         tabs=tabs,
         active=active,
@@ -360,4 +398,7 @@ def build_session(
         panel_thumbs=panel_map["thumbs"],
         panel_ann=panel_map["ann"],
         panel_bookmark=panel_map["bookmark"],
+        search_case=search_map["case"],
+        search_whole=search_map["whole"],
+        search_regex=search_map["regex"],
     )

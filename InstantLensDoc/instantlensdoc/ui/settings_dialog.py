@@ -24,6 +24,9 @@ from PySide6.QtWidgets import (
 
 from ild_pdf.pages import PAGE_SIZE_PRESETS
 from instantlensdoc.core.app_settings import (
+    ANN_COLOR_PRESET_COUNT,
+    get_ann_color_presets,
+    get_autosave_enabled,
     get_autosave_interval_sec,
     get_backup_on_save,
     get_batch_output_dir,
@@ -89,11 +92,14 @@ from instantlensdoc.core.app_settings import (
     SIDECAR_SAVE_DEBOUNCE_MIN_MS,
     STATUS_BLINK_CHOICES,
     PDF_THUMBNAIL_SCALE_CHOICES,
+    reset_ann_color_presets,
     reset_to_defaults,
     save_settings,
+    set_ann_color_presets,
     set_recent_files_max,
     set_wizard_completed,
     set_wizard_skip_once,
+    set_autosave_enabled,
     set_autosave_interval_sec,
     set_backup_on_save,
     set_batch_output_dir,
@@ -228,13 +234,39 @@ class SettingsDialog(QDialog):
         self.thumb_scale.setToolTip("Größe der PDF-Seitenvorschau in der Sidebar")
         form.addRow("PDF-Thumbnail-Größe", self.thumb_scale)
 
+        self.autosave_enabled = QCheckBox("Autosave aktiv")
+        self.autosave_enabled.setChecked(get_autosave_enabled())
+        self.autosave_enabled.setToolTip(
+            "Automatisches Speichern von Editor und Annotationen (Intervall unten) — 0.9.6"
+        )
+        form.addRow(self.autosave_enabled)
+
         self.autosave_sec = QSpinBox()
         self.autosave_sec.setRange(10, 600)
         self.autosave_sec.setSingleStep(10)
         self.autosave_sec.setSuffix(" s")
         self.autosave_sec.setValue(get_autosave_interval_sec())
         self.autosave_sec.setToolTip("Intervall für Autosave (Editor + Annotationen)")
+        self.autosave_sec.setEnabled(self.autosave_enabled.isChecked())
+        self.autosave_enabled.toggled.connect(self.autosave_sec.setEnabled)
         form.addRow(tr("autosave_interval"), self.autosave_sec)
+
+        # Color-Presets (User) — speichern/zurücksetzen auch per Rechtsklick in PDF-Toolbar
+        preset_row = QHBoxLayout()
+        self._preset_edits: list[QLineEdit] = []
+        presets = get_ann_color_presets()
+        for i in range(ANN_COLOR_PRESET_COUNT):
+            ed = QLineEdit(presets[i] if i < len(presets) else "#888888")
+            ed.setMaxLength(7)
+            ed.setFixedWidth(72)
+            ed.setToolTip(f"Color-Preset {i + 1} (#RRGGBB) — User-Preset in Settings 0.9.6")
+            self._preset_edits.append(ed)
+            preset_row.addWidget(ed)
+        btn_reset_presets = QPushButton("Presets zurücksetzen")
+        btn_reset_presets.setToolTip("Alle 6 Color-Presets auf Werkstandard")
+        btn_reset_presets.clicked.connect(self._reset_color_presets_ui)
+        preset_row.addWidget(btn_reset_presets)
+        form.addRow("Ann.-Color-Presets", preset_row)
 
         self.line_numbers = QCheckBox("Zeilennummern im Editor")
         from instantlensdoc.core.app_settings import (
@@ -748,6 +780,12 @@ class SettingsDialog(QDialog):
             self.wizard_status.setText("Erste-Schritte-Wizard: beim Start aktiv")
             self.wizard_status.setStyleSheet("color: #444;")
 
+    def _reset_color_presets_ui(self) -> None:
+        """Alle Color-Presets auf Werkstandard und Felder aktualisieren — 0.9.6."""
+        presets = reset_ann_color_presets()
+        for i, ed in enumerate(getattr(self, "_preset_edits", []) or []):
+            ed.setText(presets[i] if i < len(presets) else "#888888")
+
     def _reset_wizard(self) -> None:
         """„Nicht mehr zeigen“ aufheben — Wizard erscheint wieder beim Start."""
         if not get_wizard_completed():
@@ -827,7 +865,10 @@ class SettingsDialog(QDialog):
         set_default_zoom_mode(str(self.zoom_mode.currentData() or DEFAULT_ZOOM_MODE_PERCENT))
         set_default_zoom_percent(int(self.zoom_pct.value()))
         set_pdf_thumbnail_scale(float(self.thumb_scale.currentData() or 0.18))
+        set_autosave_enabled(self.autosave_enabled.isChecked())
         set_autosave_interval_sec(int(self.autosave_sec.value()))
+        if getattr(self, "_preset_edits", None):
+            set_ann_color_presets([ed.text().strip() for ed in self._preset_edits])
         set_editor_line_numbers(self.line_numbers.isChecked())
         set_editor_minimap(self.minimap.isChecked())
         set_editor_soft_wrap(self.soft_wrap.isChecked())
