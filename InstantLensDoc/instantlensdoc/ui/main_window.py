@@ -5815,8 +5815,37 @@ class MainWindow(QMainWindow):
         """Treffer aus zentraler Multi-Doc-Suche öffnen/hervorheben — 2.0.0."""
         self._on_fulltext_hit(str(path), page, query=query or "")
 
+    def _refresh_portfolio_sidebar(self, path: str | None) -> None:
+        """Portfolio-Inhaltsliste in Sidebar aktualisieren — 2.0.1."""
+        clear = getattr(self.sidebar, "clear_portfolio_entries", None)
+        set_entries = getattr(self.sidebar, "set_portfolio_entries", None)
+        if not callable(set_entries):
+            return
+        if not path or not Path(path).is_file():
+            if callable(clear):
+                clear()
+            return
+        try:
+            from ild_pdf.portfolio import has_collection, open_portfolio
+
+            info = open_portfolio(path)
+            entries = info.entries or []
+            is_coll = bool(info.is_portfolio or has_collection(path))
+            if not is_coll and not entries:
+                if callable(clear):
+                    clear()
+                return
+            set_entries(
+                entries,
+                title=info.title or Path(path).name,
+                is_empty_collection=bool(is_coll and not entries),
+            )
+        except Exception:
+            if callable(clear):
+                clear()
+
     def _pdf_portfolio(self) -> None:
-        """PDF-Portfolio erstellen/öffnen — 2.0.0."""
+        """PDF-Portfolio erstellen/öffnen — 2.0.0/2.0.1."""
         from instantlensdoc.ui.portfolio_dialog import PortfolioDialog
 
         start = ""
@@ -5831,13 +5860,14 @@ class MainWindow(QMainWindow):
             start = str(Path(self.pdf_view.pdf_path).parent)
         dlg = PortfolioDialog(self, start_dir=start)
         dlg.exec()
-        created = getattr(dlg, "created_path", None)
+        created = getattr(dlg, "created_path", None) or getattr(dlg, "opened_path", None)
         if created and Path(created).is_file():
             try:
                 self.open_path(created)
                 self._set_status(f"Portfolio geöffnet: {Path(created).name}")
             except Exception:
                 self._set_status(f"Portfolio erstellt: {Path(created).name}")
+                self._refresh_portfolio_sidebar(created)
 
     def _toggle_follow_system(self, checked: bool = False):
         """System-Theme folgen Toggle — 1.4.0/1.4.2 Status-Indicator."""
@@ -10780,6 +10810,7 @@ class MainWindow(QMainWindow):
                 self._refresh_pdf_marks()
                 self._refresh_outline(path)
                 self._refresh_thumbs()
+                self._refresh_portfolio_sidebar(path)
                 _log.info("PDF geöffnet: %s", path)
             elif self.doc.kind == DocKind.IMAGE:
                 from PySide6.QtGui import QPixmap
@@ -10793,6 +10824,7 @@ class MainWindow(QMainWindow):
                 self._stop_thumb_lazy()
                 self.sidebar.clear_thumbs()
                 self.sidebar.clear_annotations()
+                self._refresh_portfolio_sidebar(None)
             else:
                 self.stack.setCurrentWidget(self.editor_pane)
                 self.editor.blockSignals(True)
@@ -10811,6 +10843,7 @@ class MainWindow(QMainWindow):
                 self._stop_thumb_lazy()
                 self.sidebar.clear_thumbs()
                 self.sidebar.clear_annotations()
+                self._refresh_portfolio_sidebar(None)
             # Last-Page / Scroll-Position für diesen Tab wiederherstellen
             try:
                 self._restore_tab_view_state(path)

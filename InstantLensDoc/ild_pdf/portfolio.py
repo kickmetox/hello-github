@@ -237,3 +237,23 @@ def extract_portfolio(
     path = Path(path)
     dest = Path(out_dir) if out_dir else path.parent / f"{path.stem}_portfolio"
     return extract_all_attachments(path, out_dir=dest)
+
+
+def extract_portfolio_entries(
+    path: str | Path,
+    names: Sequence[str],
+    out_dir: str | Path | None = None,
+) -> list[Path]:
+    """Ausgewählte Portfolio-Einträge extrahieren (nach Name/Dateiname) — 2.0.1."""
+    from ild_pdf.attachments import extract_attachment
+
+    path = Path(path)
+    dest = Path(out_dir) if out_dir else path.parent / f"{path.stem}_portfolio"
+    dest.mkdir(parents=True, exist_ok=True)
+    written: list[Path] = []
+    for name in names or []:
+        key = str(name or "").strip()
+        if not key:
+            continue
+        written.append(extract_attachment(path, key, out_dir=dest))
+    return written

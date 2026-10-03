@@ -166,6 +166,7 @@ from .portfolio import (
     PortfolioInfo,
     create_portfolio,
     extract_portfolio,
+    extract_portfolio_entries,
     has_collection,
     is_portfolio,
     list_portfolio_entries,
@@ -321,6 +322,7 @@ __all__ = [
     "PortfolioInfo",
     "create_portfolio",
     "extract_portfolio",
+    "extract_portfolio_entries",
     "has_collection",
     "is_portfolio",
     "list_portfolio_entries",
@@ -333,4 +335,4 @@ __all__ = [
     "page_count_for_text",
 ]
 
-__version__ = "2.0.0"
+__version__ = "2.0.1"

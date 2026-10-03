@@ -1,4 +1,4 @@
-"""Hell/Dunkel/System-Theme + High-Contrast / UI-Schrift — 2.0.0 (Basis 1.5.1)."""
+"""Hell/Dunkel/System-Theme + High-Contrast / UI-Schrift — 2.0.1 (Basis 2.0.0)."""
 
 from __future__ import annotations
 
@@ -8,9 +8,11 @@ from PySide6.QtGui import QFont
 from PySide6.QtWidgets import QApplication, QWidget
 
 from instantlensdoc.core.app_settings import (
+    effective_ui_font_pt,
     get_high_contrast,
     get_theme,
     get_ui_font_pt,
+    get_ui_font_scale_percent,
     set_high_contrast,
     set_theme,
 )
@@ -145,21 +147,43 @@ def resolve_theme(mode: ThemeMode | None = None) -> ResolvedTheme:
     return "dark" if m == "dark" else "light"
 
 
-def apply_ui_font(app: QApplication | None = None, *, pt: int | None = None) -> int:
-    """UI-Schriftgröße setzen (pt); speichert wenn pt übergeben — 2.0.0."""
-    if pt is not None:
-        size = int(pt)
-        try:
-            from instantlensdoc.core.app_settings import set_ui_font_pt
+def apply_ui_font(
+    app: QApplication | None = None,
+    *,
+    pt: int | None = None,
+    scale_percent: int | None = None,
+    persist: bool = True,
+) -> int:
+    """
+    UI-Schriftgröße setzen (effektiv = pt × Skala%).
+    persist=True speichert übergebene pt/scale — 2.0.1.
+    """
+    try:
+        from instantlensdoc.core.app_settings import (
+            set_ui_font_pt,
+            set_ui_font_scale_percent,
+        )
 
-            size = set_ui_font_pt(size)
-        except Exception:
-            size = max(9, min(20, size))
-    else:
+        if pt is not None and persist:
+            set_ui_font_pt(int(pt))
+        if scale_percent is not None and persist:
+            set_ui_font_scale_percent(int(scale_percent))
+        size = int(
+            effective_ui_font_pt(
+                pt=pt if pt is not None else get_ui_font_pt(),
+                scale_percent=(
+                    scale_percent
+                    if scale_percent is not None
+                    else get_ui_font_scale_percent()
+                ),
+            )
+        )
+    except Exception:
         try:
             size = int(get_ui_font_pt())
         except Exception:
             size = 10
+        size = max(9, min(28, size))
     target = app or QApplication.instance()
     if target is not None:
         font = QFont(target.font())

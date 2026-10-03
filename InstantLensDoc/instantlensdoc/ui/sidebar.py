@@ -696,6 +696,25 @@ class Sidebar(QWidget):
         self.outline_btns_host.setLayout(ol_btns)
         layout.addWidget(self.outline_btns_host)
 
+        # Portfolio-Inhaltsliste — 2.0.1
+        self.lbl_portfolio = QLabel("Portfolio-Inhalt")
+        self.lbl_portfolio.setObjectName("sidebarPortfolioLabel")
+        layout.addWidget(self.lbl_portfolio)
+        self.portfolio_list = QListWidget()
+        self.portfolio_list.setObjectName("sidebarPortfolioList")
+        self.portfolio_list.setAccessibleName("Portfolio-Inhaltsliste")
+        self.portfolio_list.setMaximumHeight(100)
+        self.portfolio_list.setToolTip(
+            "Eingebettete Dateien des aktuellen PDF-Portfolios — 2.0.1"
+        )
+        layout.addWidget(self.portfolio_list)
+        self.portfolio_empty_hint = QLabel("")
+        self.portfolio_empty_hint.setObjectName("sidebarPortfolioEmpty")
+        self.portfolio_empty_hint.setWordWrap(True)
+        self.portfolio_empty_hint.setStyleSheet("color: #a67c00; font-size: 11px;")
+        self.portfolio_empty_hint.setVisible(False)
+        layout.addWidget(self.portfolio_empty_hint)
+
         self.lbl_forms = QLabel("Formularfelder (AcroForm)")
         layout.addWidget(self.lbl_forms)
         self.form_filter = QLineEdit()
@@ -1034,6 +1053,51 @@ class Sidebar(QWidget):
         self._fulltext_mode = True
         self._pdf_fulltext_mode = True
         self.search_requested.emit(self.search_text())
+
+    def set_portfolio_entries(
+        self,
+        entries: list | None = None,
+        *,
+        title: str = "",
+        is_empty_collection: bool = False,
+    ) -> None:
+        """Portfolio-Inhaltsliste in der Sidebar füllen — 2.0.1."""
+        self.portfolio_list.clear()
+        items = list(entries or [])
+        for e in items:
+            if hasattr(e, "filename"):
+                label = str(getattr(e, "filename", None) or getattr(e, "name", "") or "")
+                tip = str(getattr(e, "description", None) or getattr(e, "name", "") or "")
+            elif isinstance(e, dict):
+                label = str(e.get("filename") or e.get("name") or "")
+                tip = str(e.get("description") or e.get("name") or "")
+            else:
+                label = str(e)
+                tip = label
+            if not label:
+                continue
+            item = QListWidgetItem(label)
+            item.setToolTip(tip)
+            self.portfolio_list.addItem(item)
+        if title:
+            self.lbl_portfolio.setText(f"Portfolio-Inhalt — {title}")
+        else:
+            self.lbl_portfolio.setText("Portfolio-Inhalt")
+        if is_empty_collection or (not items and title):
+            self.portfolio_empty_hint.setText(
+                "Leere Collection — keine eingebetteten Dateien."
+            )
+            self.portfolio_empty_hint.setVisible(True)
+        else:
+            self.portfolio_empty_hint.clear()
+            self.portfolio_empty_hint.setVisible(False)
+
+    def clear_portfolio_entries(self) -> None:
+        """Portfolio-Inhaltsliste leeren — 2.0.1."""
+        self.portfolio_list.clear()
+        self.lbl_portfolio.setText("Portfolio-Inhalt")
+        self.portfolio_empty_hint.clear()
+        self.portfolio_empty_hint.setVisible(False)
 
     def _outline_read_stub(self) -> None:
         """Document Outline Vorlesen — Stub / keine Aktion — 2.0.0."""

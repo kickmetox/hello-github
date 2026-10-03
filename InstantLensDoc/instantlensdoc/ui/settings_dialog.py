@@ -224,6 +224,8 @@ from instantlensdoc.core.app_settings import (
     get_high_contrast,
     get_theme,
     get_ui_font_pt,
+    get_ui_font_scale_percent,
+    UI_FONT_SCALE_CHOICES,
     get_ui_lang,
     PDF_COMPARE_DIFF_THRESHOLD_MAX,
     PDF_COMPARE_DIFF_THRESHOLD_MIN,
@@ -333,6 +335,7 @@ from instantlensdoc.core.app_settings import (
     set_high_contrast,
     set_theme,
     set_ui_font_pt,
+    set_ui_font_scale_percent,
     set_ui_lang,
     set_update_check_on_start,
     set_presentation_hide_annotations,
@@ -382,8 +385,10 @@ class SettingsDialog(QDialog):
         self.high_contrast.setObjectName("settingsHighContrast")
         self.high_contrast.setChecked(bool(get_high_contrast()))
         self.high_contrast.setToolTip(
-            "Barrierefreiheit: High-Contrast Theme (schwarz/weiß) — 2.0.0"
+            "Barrierefreiheit: High-Contrast Theme (schwarz/weiß) — "
+            "sofort speichern und anwenden — 2.0.1"
         )
+        self.high_contrast.toggled.connect(self._on_high_contrast_live)
         form.addRow("Accessibility", self.high_contrast)
 
         self.ui_font_spin = QSpinBox()
@@ -392,9 +397,29 @@ class SettingsDialog(QDialog):
         self.ui_font_spin.setSuffix(" pt")
         self.ui_font_spin.setValue(int(get_ui_font_pt()))
         self.ui_font_spin.setToolTip(
-            "Größere UI-Schrift (9–20 pt) für bessere Lesbarkeit — 2.0.0"
+            "Basis-UI-Schrift (9–20 pt); Skala 100/125/150 % multipliziert — 2.0.1"
         )
+        self.ui_font_spin.valueChanged.connect(self._on_ui_font_live)
         form.addRow("UI-Schriftgröße", self.ui_font_spin)
+
+        self.ui_font_scale = QComboBox()
+        self.ui_font_scale.setObjectName("settingsUiFontScale")
+        for pct in UI_FONT_SCALE_CHOICES:
+            self.ui_font_scale.addItem(f"{pct} %", int(pct))
+        cur_scale = int(get_ui_font_scale_percent())
+        scale_idx = {100: 0, 125: 1, 150: 2}.get(cur_scale, 0)
+        self.ui_font_scale.setCurrentIndex(scale_idx)
+        self.ui_font_scale.setToolTip(
+            "UI-Schrift Skala 100 / 125 / 150 % — Live-Vorschau — 2.0.1"
+        )
+        self.ui_font_scale.currentIndexChanged.connect(self._on_ui_font_live)
+        form.addRow("UI-Schrift Skala", self.ui_font_scale)
+
+        self.ui_font_preview = QLabel("Vorschau: InstantLens Doc Aa")
+        self.ui_font_preview.setObjectName("settingsUiFontPreview")
+        self.ui_font_preview.setToolTip("Live-Vorschau der UI-Schrift — 2.0.1")
+        self._update_ui_font_preview_label()
+        form.addRow("Live-Vorschau", self.ui_font_preview)
 
         self.ui_lang = QComboBox()
         self.ui_lang.addItem(tr("lang_de"), "de")
@@ -1718,6 +1743,56 @@ class SettingsDialog(QDialog):
             edit._saved_sel_start = 0
             edit._saved_sel_len = len(edit.text() or "")
 
+    def _update_ui_font_preview_label(self, *_args) -> None:
+        """Live-Vorschau-Label Text/Größe für UI-Schrift — 2.0.1."""
+        from PySide6.QtGui import QFont
+
+        from instantlensdoc.core.app_settings import effective_ui_font_pt
+
+        try:
+            base = int(self.ui_font_spin.value())
+        except Exception:
+            base = 10
+        try:
+            scale = int(self.ui_font_scale.currentData() or 100)
+        except Exception:
+            scale = 100
+        eff = int(effective_ui_font_pt(pt=base, scale_percent=scale))
+        lbl = getattr(self, "ui_font_preview", None)
+        if lbl is None:
+            return
+        lbl.setText(f"Vorschau: InstantLens Doc Aa · {eff} pt ({scale} %)")
+        f = QFont(lbl.font())
+        f.setPointSize(eff)
+        lbl.setFont(f)
+
+    def _on_ui_font_live(self, *_args) -> None:
+        """UI-Schrift + Skala live anwenden und speichern — 2.0.1."""
+        try:
+            base = int(self.ui_font_spin.value())
+        except Exception:
+            base = 10
+        try:
+            scale = int(self.ui_font_scale.currentData() or 100)
+        except Exception:
+            scale = 100
+        try:
+            apply_ui_font(pt=base, scale_percent=scale, persist=True)
+        except Exception:
+            pass
+        self._update_ui_font_preview_label()
+
+    def _on_high_contrast_live(self, checked: bool = False) -> None:
+        """High-Contrast sofort persistieren und Theme anwenden — 2.0.1."""
+        try:
+            set_high_contrast(bool(checked))
+        except Exception:
+            pass
+        try:
+            apply_theme()
+        except Exception:
+            pass
+
     def _update_countdown_preview(self, *_args) -> None:
         """Live-Vorschau Mini-Widget aus Combos — sofort — 1.7.5."""
         prev = getattr(self, "countdown_preview", None)
@@ -2447,6 +2522,17 @@ class SettingsDialog(QDialog):
         set_theme(theme)
         set_high_contrast(bool(self.high_contrast.isChecked()))
         set_ui_font_pt(int(self.ui_font_spin.value()))
+        try:
+            scale_val = int(self.ui_font_scale.currentData() or 100)
+        except (TypeError, ValueError, AttributeError):
+            scale_val = 100
+        set_ui_font_scale_percent(scale_val)
+        apply_ui_font(
+            pt=int(self.ui_font_spin.value()),
+            scale_percent=scale_val,
+            persist=True,
+        )
+        apply_theme()
         set_ocr_lang(str(lang))
         try:
             dpi_val = int(self.ocr_dpi_combo.currentData() or 150)

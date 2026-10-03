@@ -15,8 +15,9 @@ UiLang = Literal["de", "en"]
 
 DEFAULTS: dict[str, Any] = {
     "theme": "system",  # System folgen; manuell light/dark Override — 1.4.0
-    "high_contrast": False,  # High-Contrast Theme Toggle — 2.0.0
+    "high_contrast": False,  # High-Contrast Theme Toggle — 2.0.0 (Persistenz 2.0.1)
     "ui_font_pt": 10,  # UI-Schriftgröße pt (9–20) — 2.0.0
+    "ui_font_scale_percent": 100,  # UI-Schrift Skala 100|125|150 % — 2.0.1
     "ocr_lang": "deu+eng",
     "ocr_dpi": 150,  # OCR-Batch Default-DPI 150|300 — 1.1.6
     "ocr_attach_errors": True,  # OCR-Batch: Fehlerabschnitt anhängen — 1.1.5
@@ -314,6 +315,53 @@ def set_ui_font_pt(pt: int) -> int:
     val = max(UI_FONT_PT_MIN, min(UI_FONT_PT_MAX, val))
     save_settings({"ui_font_pt": val})
     return val
+
+
+UI_FONT_SCALE_CHOICES: tuple[int, ...] = (100, 125, 150)
+UI_FONT_SCALE_DEFAULT = 100
+
+
+def get_ui_font_scale_percent() -> int:
+    """UI-Schrift Skala in Prozent (100|125|150) — 2.0.1."""
+    raw = load_settings().get(
+        "ui_font_scale_percent", DEFAULTS["ui_font_scale_percent"]
+    )
+    try:
+        val = int(raw)
+    except (TypeError, ValueError):
+        val = int(DEFAULTS["ui_font_scale_percent"])
+    if val not in UI_FONT_SCALE_CHOICES:
+        # Nächsten erlaubten Wert wählen
+        val = min(UI_FONT_SCALE_CHOICES, key=lambda c: abs(c - val))
+    return int(val)
+
+
+def set_ui_font_scale_percent(percent: int) -> int:
+    """UI-Schrift Skala speichern; Rückgabe normalisierter Wert — 2.0.1."""
+    try:
+        val = int(percent)
+    except (TypeError, ValueError):
+        val = UI_FONT_SCALE_DEFAULT
+    if val not in UI_FONT_SCALE_CHOICES:
+        val = min(UI_FONT_SCALE_CHOICES, key=lambda c: abs(c - val))
+    save_settings({"ui_font_scale_percent": int(val)})
+    return int(val)
+
+
+def effective_ui_font_pt(
+    *, pt: int | None = None, scale_percent: int | None = None
+) -> int:
+    """Effektive UI-pt aus Basis-pt × Skala% — 2.0.1."""
+    base = int(pt) if pt is not None else get_ui_font_pt()
+    scale = (
+        int(scale_percent)
+        if scale_percent is not None
+        else get_ui_font_scale_percent()
+    )
+    if scale not in UI_FONT_SCALE_CHOICES:
+        scale = UI_FONT_SCALE_DEFAULT
+    eff = int(round(base * scale / 100.0))
+    return max(UI_FONT_PT_MIN, min(28, eff))
 
 
 def get_ocr_lang() -> str:

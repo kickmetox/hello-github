@@ -1,4 +1,4 @@
-"""PDF-Portfolio erstellen / öffnen (pikepdf Collection + Attachments) — 2.0.0."""
+"""PDF-Portfolio erstellen / öffnen (pikepdf Collection + Attachments) — 2.0.1."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ from pathlib import Path
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import (
+    QAbstractItemView,
     QDialog,
     QDialogButtonBox,
     QFileDialog,
@@ -26,6 +27,7 @@ from PySide6.QtWidgets import (
 from ild_pdf.portfolio import (
     create_portfolio,
     extract_portfolio,
+    extract_portfolio_entries,
     open_portfolio,
 )
 
@@ -38,11 +40,12 @@ class PortfolioDialog(QDialog):
         self.setObjectName("portfolioDialog")
         self.setWindowTitle("PDF-Portfolio — InstantLens Doc 2.0")
         self.setModal(True)
-        self.resize(560, 420)
+        self.resize(560, 440)
         self._start_dir = start_dir or ""
         self._created_path: str | None = None
         self._opened_path: str | None = None
         self._files: list[str] = []
+        self._entry_names: list[str] = []
 
         layout = QVBoxLayout(self)
         self.tabs = QTabWidget()
@@ -108,7 +111,7 @@ class PortfolioDialog(QDialog):
         layout.addWidget(
             QLabel(
                 "Bestehendes Portfolio öffnen: Collection/Attachments listen "
-                "und optional extrahieren."
+                "und optional extrahieren (alle oder Auswahl)."
             )
         )
         row = QHBoxLayout()
@@ -125,19 +128,35 @@ class PortfolioDialog(QDialog):
         row.addWidget(btn_inspect)
         layout.addLayout(row)
 
+        self.empty_hint = QLabel("")
+        self.empty_hint.setObjectName("portfolioEmptyHint")
+        self.empty_hint.setWordWrap(True)
+        self.empty_hint.setStyleSheet("color: #a67c00;")
+        self.empty_hint.setVisible(False)
+        layout.addWidget(self.empty_hint)
+
         self.entries_list = QListWidget()
         self.entries_list.setObjectName("portfolioEntries")
         self.entries_list.setAccessibleName("Portfolio-Einträge")
+        self.entries_list.setSelectionMode(QAbstractItemView.ExtendedSelection)
         layout.addWidget(self.entries_list, 1)
 
         self.open_status = QLabel("")
         self.open_status.setObjectName("portfolioOpenStatus")
         layout.addWidget(self.open_status)
 
+        ex_row = QHBoxLayout()
+        btn_extract_sel = QPushButton("Auswahl extrahieren…")
+        btn_extract_sel.setObjectName("portfolioExtractSelBtn")
+        btn_extract_sel.setToolTip("Nur ausgewählte Einträge extrahieren — 2.0.1")
+        btn_extract_sel.clicked.connect(self._extract_selected)
         btn_extract = QPushButton("Alle extrahieren…")
         btn_extract.setObjectName("portfolioExtractBtn")
         btn_extract.clicked.connect(self._extract)
-        layout.addWidget(btn_extract)
+        ex_row.addWidget(btn_extract_sel)
+        ex_row.addWidget(btn_extract)
+        ex_row.addStretch(1)
+        layout.addLayout(ex_row)
         return w
 
     def _add_files(self) -> None:
@@ -212,25 +231,82 @@ class PortfolioDialog(QDialog):
             info = open_portfolio(path)
             self._opened_path = info.path
             self.entries_list.clear()
-            for e in info.entries or []:
+            self._entry_names = []
+            entries = info.entries or []
+            for e in entries:
                 size_kb = (e.size / 1024.0) if e.size else 0
                 label = f"{e.filename or e.name}"
                 if size_kb:
                     label += f"  ({size_kb:.1f} KB)"
                 item = QListWidgetItem(label)
+                item.setData(Qt.UserRole, e.name)
                 item.setToolTip(e.description or e.name)
                 self.entries_list.addItem(item)
+                self._entry_names.append(e.name)
             kind = "Portfolio (Collection)" if info.is_portfolio else "PDF mit Anhängen"
+            n = len(entries)
+            if n == 0:
+                self.empty_hint.setText(
+                    "Leere Collection — keine eingebetteten Dateien in diesem Portfolio."
+                )
+                self.empty_hint.setVisible(True)
+                self.open_status.setText(f"{kind}: {info.title} · leer (0 Dateien)")
+            else:
+                self.empty_hint.setVisible(False)
+                self.empty_hint.clear()
+                self.open_status.setText(f"{kind}: {info.title} · {n} Datei(en)")
+        except Exception as exc:
+            self.empty_hint.setVisible(False)
+            QMessageBox.critical(self, "Portfolio", f"Öffnen fehlgeschlagen:\n{exc}")
+
+    def _selected_entry_names(self) -> list[str]:
+        names: list[str] = []
+        for item in self.entries_list.selectedItems():
+            key = item.data(Qt.UserRole)
+            if key:
+                names.append(str(key))
+        return names
+
+    def _extract_selected(self) -> None:
+        path = self._opened_path or (self.open_path_edit.text() or "").strip()
+        if not path:
+            QMessageBox.warning(self, "Portfolio", "Zuerst Portfolio öffnen.")
+            return
+        names = self._selected_entry_names()
+        if not names:
+            QMessageBox.information(
+                self, "Portfolio", "Bitte mindestens einen Eintrag auswählen."
+            )
+            return
+        out = QFileDialog.getExistingDirectory(
+            self, "Zielordner für Extraktion", self._start_dir or str(Path(path).parent)
+        )
+        if not out:
+            return
+        try:
+            written = extract_portfolio_entries(path, names, out_dir=out)
             self.open_status.setText(
-                f"{kind}: {info.title} · {len(info.entries or [])} Datei(en)"
+                f"{len(written)} Auswahl extrahiert → {out}"
+            )
+            QMessageBox.information(
+                self,
+                "Portfolio",
+                f"{len(written)} Datei(en) extrahiert nach:\n{out}",
             )
         except Exception as exc:
-            QMessageBox.critical(self, "Portfolio", f"Öffnen fehlgeschlagen:\n{exc}")
+            QMessageBox.critical(self, "Portfolio", f"Extraktion fehlgeschlagen:\n{exc}")
 
     def _extract(self) -> None:
         path = self._opened_path or (self.open_path_edit.text() or "").strip()
         if not path:
             QMessageBox.warning(self, "Portfolio", "Zuerst Portfolio öffnen.")
+            return
+        if not self._entry_names:
+            QMessageBox.information(
+                self,
+                "Portfolio",
+                "Leere Collection — nichts zu extrahieren.",
+            )
             return
         out = QFileDialog.getExistingDirectory(
             self, "Zielordner für Extraktion", self._start_dir or str(Path(path).parent)

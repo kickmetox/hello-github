@@ -1,5 +1,24 @@
 # Changelog — InstantLens Doc
 
+## 2.0.1 — Multi-Doc Case/Regex/CSV·Fortschritt, Portfolio Sidebar·Auswahl·leer, High-Contrast Persistenz·UI-Skala live, install-ild Idempotenz
+
+Post-Release-Polish nach 2.0.0: **Multi-Dokument-Suche** Optionen **Aa / Wort / Regex**, **Treffer-CSV-Export**, **Fortschrittsanzeige** bei vielen Docs; **PDF-Portfolios** **Inhaltsliste in der Sidebar**, **Auswahl extrahieren**, Hinweis bei **leerer Collection**; **High-Contrast** sofort persistieren; **UI-Schrift Skala 100/125/150 %** mit **Live-Vorschau** in Settings; **install-ild.ps1** Schalter **-NoDesktop**, **Idempotenz** (Verknüpfungen aktualisieren), DE-Meldungen, Hinweis auf **sync-ild.ps1**. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen unverändert klar markiert / nicht produktiv.
+
+### Suche / Portfolio
+- Multi-Dokument-Suche: Case / Whole-word / Regex; Treffer CSV; Fortschritt ≥3 PDFs
+- Portfolio: Sidebar-Inhaltsliste; Auswahl extrahieren; leere Collection-Hinweis
+
+### Accessibility / Installer
+- High-Contrast Toggle speichert und wendet sofort an
+- UI-Schrift Skala 100/125/150 % Live-Vorschau (Settings)
+- `scripts/install-ild.ps1`: `-NoDesktop`, idempotent, DE, sync-ild.ps1-Hinweis
+
+### Packaging / Docs
+- Version **2.0.1** (App / `ild_pdf` / ISS / Smoke / Docs); `docs/VERSION` + `VERSION.txt`
+- About Serie **2.0**; Smoke: Multi-Doc-Optionen/CSV/Fortschritt, Portfolio Sidebar/Auswahl/leer, Font-Skala, install-ild (CLI + Qt)
+
+---
+
 ## 2.0.0 — Multi-Dokument-Suche, PDF-Portfolios, Accessibility High-Contrast·UI-Schrift, install-ild.ps1
 
 Major-Release nach 1.9.5: **Multi-Dokument-Suche** Volltext (Textlayer) über alle offenen PDFs mit **zentraler Trefferliste** (Ctrl+Shift+F); **PDF-Portfolios** erstellen/öffnen/extrahieren (pikepdf Attachments + `/Collection`); **Accessibility** High-Contrast Theme Toggle + größere UI-Schrift in Settings (Document Outline Vorlesen bleibt Stub); **install-ild.ps1** legt Startmenü-Shortcut + optional Desktop-Link an (User-Profil, ohne Admin). About zeigt Serie **„2.0“**. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks unverändert klar markiert / nicht produktiv.

@@ -1,13 +1,18 @@
-"""Volltextsuche über mehrere geöffnete Dokumente / PDFs."""
+"""Volltextsuche über mehrere geöffnete Dokumente / PDFs — 2.0.1: Case/Regex/Wort."""
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Sequence
+from typing import Callable, List, Sequence
 
 _TEXT_SUFFIXES = {".txt", ".md", ".html", ".htm", ".json", ".ildocr.txt"}
 _IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff"}
+
+
+class SearchPatternError(ValueError):
+    """Ungültiger Suchausdruck (z. B. fehlerhafte Regex) — Multi-Doc-Suche."""
 
 
 @dataclass
@@ -17,6 +22,74 @@ class SearchHit:
     line: int | None
     snippet: str
     kind: str  # text | pdf | sidecar
+
+
+def _is_word_char(ch: str) -> bool:
+    if not ch:
+        return False
+    return ch.isalnum() or ch == "_"
+
+
+def _compile_pattern(
+    query: str,
+    *,
+    case_sensitive: bool = False,
+    regex: bool = False,
+) -> re.Pattern[str] | None:
+    """Regex-Pattern oder None (Literal-Suche). Wirft SearchPatternError."""
+    q = (query or "").strip()
+    if not q or not regex:
+        return None
+    flags = 0 if case_sensitive else re.IGNORECASE
+    try:
+        return re.compile(q, flags)
+    except re.error as e:
+        raise SearchPatternError(str(e) or "ungültiger regulärer Ausdruck") from e
+
+
+def _line_has_match(
+    line: str,
+    query: str,
+    *,
+    case_sensitive: bool = False,
+    whole_word: bool = False,
+    pattern: re.Pattern[str] | None = None,
+) -> bool:
+    """True wenn Zeile den Suchbegriff (Literal/Regex, Case, Whole-word) trifft."""
+    if not line:
+        return False
+    q = (query or "").strip()
+    if not q and pattern is None:
+        return False
+    if pattern is not None:
+        for m in pattern.finditer(line):
+            if not whole_word:
+                return True
+            pos, end = m.start(), m.end()
+            left_ok = pos == 0 or not _is_word_char(line[pos - 1])
+            right_ok = end >= len(line) or not _is_word_char(line[end])
+            if left_ok and right_ok:
+                return True
+        return False
+    hay = line if case_sensitive else line.casefold()
+    needle = q if case_sensitive else q.casefold()
+    if not needle:
+        return False
+    start = 0
+    nlen = len(needle)
+    while True:
+        pos = hay.find(needle, start)
+        if pos < 0:
+            return False
+        end = pos + nlen
+        if whole_word:
+            left_ok = pos == 0 or not _is_word_char(line[pos - 1])
+            right_ok = end >= len(line) or not _is_word_char(line[end])
+            if left_ok and right_ok:
+                return True
+            start = pos + 1
+            continue
+        return True
 
 
 def _read_text_file(path: Path) -> str:
@@ -225,15 +298,21 @@ def search_paths(
     *,
     max_hits: int = 200,
     pdf_only: bool = False,
+    case_sensitive: bool = False,
+    whole_word: bool = False,
+    regex: bool = False,
+    on_progress: Callable[[int, int, str], None] | None = None,
 ) -> List[SearchHit]:
     """
     Volltextsuche über Pfade.
     pdf_only=True: nur PDFs (+ optional OCR-Sidecar am PDF).
+    case_sensitive / whole_word / regex — 2.0.1.
+    on_progress(i, total, path) bei vielen Docs — 2.0.1.
     """
     q = (query or "").strip()
     if not q:
         return []
-    ql = q.casefold()
+    pattern = _compile_pattern(q, case_sensitive=case_sensitive, regex=regex)
     try:
         from instantlensdoc.core.app_settings import get_search_snippet_context_chars
 
@@ -242,8 +321,14 @@ def search_paths(
         ctx = 40
     hits: List[SearchHit] = []
     iter_paths = filter_pdf_paths(paths) if pdf_only else list(paths)
-    for raw in iter_paths:
+    total = len(iter_paths)
+    for idx, raw in enumerate(iter_paths):
         p = Path(raw)
+        if on_progress is not None:
+            try:
+                on_progress(idx + 1, total, str(p))
+            except Exception:
+                pass
         if not p.is_file():
             continue
         if pdf_only and p.suffix.lower() != ".pdf":
@@ -254,10 +339,24 @@ def search_paths(
         except Exception:
             continue
         for page_idx, blob in sections:
-            if not blob or ql not in blob.casefold():
+            if not blob:
+                continue
+            # Schnellfilter nur bei Literal ohne Case/Wort (Regex braucht Zeilen)
+            if (
+                pattern is None
+                and not case_sensitive
+                and not whole_word
+                and q.casefold() not in blob.casefold()
+            ):
                 continue
             for line_no, line in enumerate(blob.splitlines(), start=1):
-                if ql not in line.casefold():
+                if not _line_has_match(
+                    line,
+                    q,
+                    case_sensitive=case_sensitive,
+                    whole_word=whole_word,
+                    pattern=pattern,
+                ):
                     continue
                 snippet = _snippet_around(line, q, context_chars=ctx)
                 hit_kind = kind
@@ -282,9 +381,22 @@ def search_open_pdfs(
     query: str,
     *,
     max_hits: int = 200,
+    case_sensitive: bool = False,
+    whole_word: bool = False,
+    regex: bool = False,
+    on_progress: Callable[[int, int, str], None] | None = None,
 ) -> List[SearchHit]:
-    """Schnellsuche nur über geöffnete / gelistete PDFs."""
-    return search_paths(paths, query, max_hits=max_hits, pdf_only=True)
+    """Schnellsuche nur über geöffnete / gelistete PDFs — Optionen 2.0.1."""
+    return search_paths(
+        paths,
+        query,
+        max_hits=max_hits,
+        pdf_only=True,
+        case_sensitive=case_sensitive,
+        whole_word=whole_word,
+        regex=regex,
+        on_progress=on_progress,
+    )
 
 
 def sidebar_document_paths(files_widget) -> List[str]:
