@@ -1,5 +1,23 @@
 # Changelog — InstantLens Doc
 
+## 1.9.0 — PDF-Anhänge hinzufügen, Stempel-Bildbibliothek, Tabellen-OCR→CSV, Plugin-Hooks Stub
+
+Minor-Release mit neuen Kernfeatures (Basis **1.8.5**): **PDF-Anhänge** listen/extrahieren/**hinzufügen** (pikepdf Attachments, inkl. Entfernen); **Stempel-Bildbibliothek** unter `config/stamps/` mit Sidecar-Stempel (`img:…`); **Tabellen-OCR** mit grober Heuristik → **CSV** (UTF-8 BOM, `;`); **Plugin-Hooks Stub** mit internem Event-Bus und **no-op Loader** (kein echtes Plugin-System). Stubs KI/Cloud/Stylus/3D bleiben Stubs; Plugin-Hooks zusätzlich als Stub.
+
+### PDF / Anhänge / Stempel
+- Anhänge: `add_attachment` / `remove_attachment`; Dialog „Hinzufügen…“ / „Auswahl entfernen“; Menü öffnet auch leere Anhänge-Liste
+- Stempel-Bildbibliothek: Ordner verwalten, Bilder hinzufügen/entfernen, als Sidecar-Stempel setzen (PDF-Menü + Stempel-Dialog)
+
+### OCR / Hooks
+- OCR-Ausgabe „Tabelle als CSV (heuristisch)“; `ocr_image_to_csv` / `format_rows_as_csv` / `OcrOutputMode.TABLE_CSV`
+- Plugin-Hooks Stub: `instantlensdoc.core.plugin_hooks` — Event-Bus + `load_plugins()` no-op; Menü „Plugin-Hooks (Stub)“; `app.started` / `ocr.finished`
+
+### Packaging / Docs
+- Version **1.9.0** (App / `ild_pdf` / ISS / Smoke / Docs); `docs/VERSION` + `VERSION.txt`
+- Smoke: Anhänge add/remove, Stempel-Bibliothek, Tabellen-CSV, Plugin-Hooks Stub (CLI + Qt)
+
+---
+
 ## 1.8.5 — Batch Blink aus=Status einmalig, HF Fit-Zoom nur Vorschau, Layer A11y Alle ein/aus, Recovery Mehrfach-Verwerfen
 
 Post-Release-Polish nach 1.8.4: **Batch Status-Blink „aus“** zeigt **einmaligen Status ohne Blink** (wie Pending-Status-Blink); **HF Fit-/Zoom-Persistenz** klar **nur Vorschau** — **irrelevant für Bake / „Auf alle“**; **Layer Alle ein/aus** mit **Accessibility-Announcement**; **Crash-Recovery** mit **Mehrfachauswahl Verwerfen** und **„Alle verwerfen“ inkl. Bestätigung**. Stubs KI/Cloud/Stylus/3D bleiben Stubs.

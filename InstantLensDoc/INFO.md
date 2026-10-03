@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **1.8.5** |
+| Version | **1.9.0** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -63,12 +63,12 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an / `checkedonce`)
 
-## Neu in 1.8.5
+## Neu in 1.9.0
 
-Post-Release-Polish nach **1.8.4** (Basis **1.8.3** / **1.8.2**):
+Minor-Release nach **1.8.5** (Basis **1.8.4** / **1.8.3** / **1.8.2**):
 
-- **Seiten:** Batch Status-Blink „aus“ = einmaliger Status ohne Blink
-- **Kopf-/Fußzeile:** Fit-/Zoom-Persistenz nur Vorschau — irrelevant für Bake / „Auf alle“
-- **Annotation-Layer:** Accessibility-Announcement bei „Alle ein/aus“
-- **Crash-Recovery:** Mehrfachauswahl Verwerfen · „Alle verwerfen“ mit Bestätigung
-- Stubs KI/Cloud/Stylus/3D unverändert
+- **PDF-Anhänge:** listen / extrahieren / **hinzufügen** (pikepdf; Entfernen im Dialog)
+- **Stempel-Bildbibliothek:** eigene Bilder unter `config/stamps/` · Sidecar-Stempel aus Bibliothek
+- **Tabellen-OCR → CSV:** grobe Tabellenerkennung → CSV (UTF-8 BOM, `;`)
+- **Plugin-Hooks Stub:** interner Event-Bus + no-op Loader (kein Plugin-System)
+- Stubs KI/Cloud/Stylus/3D unverändert; Plugin-Hooks zusätzlich als Stub

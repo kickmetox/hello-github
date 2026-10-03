@@ -1,4 +1,4 @@
-"""Dialog: PDF-Anhänge auflisten und extrahieren."""
+"""Dialog: PDF-Anhänge listen, extrahieren und hinzufügen — 1.9.0."""
 
 from __future__ import annotations
 
@@ -21,21 +21,24 @@ from PySide6.QtWidgets import (
 
 from ild_pdf.attachments import (
     AttachmentInfo,
+    add_attachment,
     extract_all_attachments,
     extract_attachment,
     list_attachments,
+    remove_attachment,
 )
 from instantlensdoc.core.app_settings import dialog_start_dir, remember_recent_dir
 
 
 class AttachmentsDialog(QDialog):
-    """Zeigt eingebettete PDF-Anhänge und erlaubt Extraktion."""
+    """Zeigt eingebettete PDF-Anhänge; Extraktion und Hinzufügen."""
 
     def __init__(self, pdf_path: str | Path, parent=None):
         super().__init__(parent)
         self.pdf_path = Path(pdf_path)
         self.setWindowTitle("PDF-Anhänge")
-        self.resize(640, 400)
+        self.resize(680, 420)
+        self._changed = False
         layout = QVBoxLayout(self)
         layout.addWidget(QLabel(f"{self.pdf_path.name} — eingebettete Dateianhänge"))
 
@@ -50,12 +53,20 @@ class AttachmentsDialog(QDialog):
         layout.addWidget(self.table)
 
         row = QHBoxLayout()
+        self.btn_add = QPushButton("Hinzufügen…")
+        self.btn_add.setToolTip("Datei als eingebetteten PDF-Anhang hinzufügen (pikepdf) — 1.9.0")
+        self.btn_add.clicked.connect(self._add)
         self.btn_extract = QPushButton("Auswahl extrahieren…")
         self.btn_extract.clicked.connect(self._extract_selected)
         self.btn_all = QPushButton("Alle extrahieren…")
         self.btn_all.clicked.connect(self._extract_all)
+        self.btn_remove = QPushButton("Auswahl entfernen")
+        self.btn_remove.setToolTip("Ausgewählte Anhänge aus dem PDF entfernen — 1.9.0")
+        self.btn_remove.clicked.connect(self._remove_selected)
+        row.addWidget(self.btn_add)
         row.addWidget(self.btn_extract)
         row.addWidget(self.btn_all)
+        row.addWidget(self.btn_remove)
         row.addStretch(1)
         layout.addLayout(row)
 
@@ -67,6 +78,10 @@ class AttachmentsDialog(QDialog):
         buttons.accepted.connect(self.accept)
         layout.addWidget(buttons)
 
+    @property
+    def changed(self) -> bool:
+        return self._changed
+
     def _load(self):
         try:
             self._items = list_attachments(self.pdf_path)
@@ -74,11 +89,13 @@ class AttachmentsDialog(QDialog):
             QMessageBox.warning(self, "Anhänge", str(e))
             self._items = []
         self.table.setRowCount(0)
+        has = bool(self._items)
+        self.btn_extract.setEnabled(has)
+        self.btn_all.setEnabled(has)
+        self.btn_remove.setEnabled(has)
         if not self._items:
             self.table.setRowCount(1)
             self.table.setItem(0, 0, QTableWidgetItem("(keine Anhänge)"))
-            self.btn_extract.setEnabled(False)
-            self.btn_all.setEnabled(False)
             return
         self.table.setRowCount(len(self._items))
         for i, info in enumerate(self._items):
@@ -107,6 +124,30 @@ class AttachmentsDialog(QDialog):
             return None
         remember_recent_dir(path)
         return Path(path)
+
+    def _add(self):
+        start = dialog_start_dir(self.pdf_path.parent)
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Datei als Anhang hinzufügen",
+            start,
+            "Alle Dateien (*.*)",
+        )
+        if not path:
+            return
+        remember_recent_dir(path)
+        try:
+            info = add_attachment(self.pdf_path, path)
+        except Exception as e:
+            QMessageBox.warning(self, "Anhang hinzufügen", str(e))
+            return
+        self._changed = True
+        self._load()
+        QMessageBox.information(
+            self,
+            "Anhänge",
+            f"Hinzugefügt: {info.name} ({info.size} B)",
+        )
 
     def _extract_selected(self):
         names = self._selected_names()
@@ -145,3 +186,28 @@ class AttachmentsDialog(QDialog):
             "Anhänge",
             f"{len(written)} Datei(en) nach:\n{out_dir}",
         )
+
+    def _remove_selected(self):
+        names = self._selected_names()
+        if not names:
+            QMessageBox.information(self, "Anhänge", "Bitte Zeile(n) auswählen.")
+            return
+        reply = QMessageBox.question(
+            self,
+            "Anhänge entfernen",
+            f"{len(names)} Anhang/Anhänge wirklich aus dem PDF entfernen?",
+        )
+        if reply != QMessageBox.Yes:
+            return
+        removed = 0
+        try:
+            for name in names:
+                if remove_attachment(self.pdf_path, name):
+                    removed += 1
+        except Exception as e:
+            QMessageBox.warning(self, "Entfernen", str(e))
+            return
+        if removed:
+            self._changed = True
+        self._load()
+        QMessageBox.information(self, "Anhänge", f"{removed} Anhang/Anhänge entfernt.")

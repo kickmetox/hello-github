@@ -185,13 +185,19 @@ class OcrDialog(QDialog):
 
         self.rb_editable = QRadioButton("Editierbarer Text (Editor)")
         self.rb_searchable = QRadioButton("Durchsuchbares Bild (PDF + Text-Sidecar)")
+        self.rb_table_csv = QRadioButton("Tabelle als CSV (heuristisch)")
+        self.rb_table_csv.setToolTip(
+            "Grobe Tabellenerkennung aus OCR → CSV (UTF-8 BOM, `;`) — 1.9.0"
+        )
         self.rb_editable.setChecked(True)
         group = QButtonGroup(self)
         group.addButton(self.rb_editable)
         group.addButton(self.rb_searchable)
+        group.addButton(self.rb_table_csv)
         mode_box = QVBoxLayout()
         mode_box.addWidget(self.rb_editable)
         mode_box.addWidget(self.rb_searchable)
+        mode_box.addWidget(self.rb_table_csv)
         form.addRow("Ausgabe", mode_box)
 
         if default_label:
@@ -342,6 +348,8 @@ class OcrDialog(QDialog):
         return bool(self.attach_errors_check.isChecked())
 
     def output_mode(self) -> OcrOutputMode:
+        if self.rb_table_csv.isChecked():
+            return OcrOutputMode.TABLE_CSV
         if self.rb_searchable.isChecked():
             return OcrOutputMode.SEARCHABLE_IMAGE
         return OcrOutputMode.EDITABLE_TEXT

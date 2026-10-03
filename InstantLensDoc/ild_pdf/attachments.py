@@ -1,7 +1,8 @@
-"""PDF-Anhänge (Embedded Files / NameTree) auflisten und extrahieren."""
+"""PDF-Anhänge (Embedded Files / NameTree) listen, extrahieren und hinzufügen — 1.9.0."""
 
 from __future__ import annotations
 
+import mimetypes
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Optional
@@ -25,6 +26,21 @@ class AttachmentInfo:
 def _safe_name(name: str) -> str:
     base = "".join(c if c.isalnum() or c in ".-_" else "_" for c in (name or "anhang"))
     return (base or "anhang")[:80]
+
+
+def _unique_attachment_key(pdf, preferred: str) -> str:
+    """Eindeutigen Attachments-Key erzeugen (Kollision → _2, _3, …)."""
+    base = _safe_name(preferred) or "anhang"
+    if base not in pdf.attachments:
+        return base
+    stem = Path(base).stem
+    suf = Path(base).suffix
+    n = 2
+    while True:
+        cand = f"{stem}_{n}{suf}"
+        if cand not in pdf.attachments:
+            return cand
+        n += 1
 
 
 def has_attachments(path: str | Path) -> bool:
@@ -142,3 +158,100 @@ def extract_all_attachments(
     for info in list_attachments(path):
         written.append(extract_attachment(path, info.name, out_dir=out_dir))
     return written
+
+
+def add_attachment(
+    path: str | Path,
+    file_path: str | Path,
+    *,
+    name: str | None = None,
+    description: str = "",
+    mime_type: str | None = None,
+    in_place: bool = True,
+    out_path: str | Path | None = None,
+) -> AttachmentInfo:
+    """
+    Fügt eine Datei als eingebetteten PDF-Anhang hinzu (pikepdf Attachments).
+
+    Standard: in_place=True schreibt das Quell-PDF. Sonst out_path (oder
+    ``{stem}_with_att.pdf`` neben der Quelle).
+    """
+    import pikepdf
+
+    path = Path(path)
+    file_path = Path(file_path)
+    if not file_path.is_file():
+        raise FileNotFoundError(f"Datei nicht gefunden: {file_path}")
+    data = file_path.read_bytes()
+    key_pref = name or file_path.name
+    mime = mime_type
+    if not mime:
+        guess, _ = mimetypes.guess_type(str(file_path))
+        mime = guess or "application/octet-stream"
+
+    dest = Path(out_path) if out_path else (path if in_place else path.with_name(f"{path.stem}_with_att.pdf"))
+    with pikepdf.open(path, allow_overwriting_input=True) as pdf:
+        key = _unique_attachment_key(pdf, key_pref)
+        # pikepdf: Zuweisung von bytes oder Pfad erzeugt EmbeddedFile
+        pdf.attachments[key] = data
+        try:
+            spec = pdf.attachments[key]
+            if description:
+                try:
+                    spec.description = description
+                except Exception:
+                    pass
+            try:
+                af = spec.get_file()
+                if mime and hasattr(af, "mime_type"):
+                    af.mime_type = mime
+            except Exception:
+                pass
+        except Exception:
+            pass
+        pdf.save(dest)
+
+    infos = {i.name: i for i in list_attachments(dest)}
+    if key in infos:
+        return infos[key]
+    return AttachmentInfo(
+        name=key,
+        filename=file_path.name,
+        description=description or "",
+        mime_type=mime or "",
+        size=len(data),
+    )
+
+
+def remove_attachment(
+    path: str | Path,
+    name: str,
+    *,
+    in_place: bool = True,
+    out_path: str | Path | None = None,
+) -> bool:
+    """Entfernt einen Anhang nach Key/Dateiname. True wenn entfernt."""
+    import pikepdf
+
+    path = Path(path)
+    dest = Path(out_path) if out_path else (path if in_place else path.with_name(f"{path.stem}_no_att.pdf"))
+    removed = False
+    with pikepdf.open(path, allow_overwriting_input=True) as pdf:
+        key = None
+        if name in pdf.attachments:
+            key = name
+        else:
+            for k, spec in pdf.attachments.items():
+                fn = str(getattr(spec, "filename", None) or k)
+                if str(k) == name or fn == name:
+                    key = str(k)
+                    break
+        if key is not None:
+            try:
+                del pdf.attachments[key]
+                removed = True
+            except Exception:
+                removed = False
+        if removed:
+            pdf.save(dest)
+    return removed

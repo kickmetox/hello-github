@@ -410,6 +410,15 @@ def main(argv: list[str] | None = None) -> int:
     app.setOrganizationDomain("sellerbach.de")
     _apply_icon(app)
 
+    # Plugin-Hooks Stub: no-op Loader + interner Event-Bus — 1.9.0
+    try:
+        from instantlensdoc.core import plugin_hooks
+
+        plugin_hooks.load_plugins()  # no-op, gibt []
+        plugin_hooks.emit("app.started", version=__version__)
+    except Exception:
+        pass
+
     splash = None
     # Kein Splash in Smoke/Headless-Tests; optional Quiet-Startup (Einstellungen)
     import os

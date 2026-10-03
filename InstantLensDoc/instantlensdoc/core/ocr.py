@@ -19,6 +19,7 @@ class OcrOutputMode(str, Enum):
 
     EDITABLE_TEXT = "editable_text"  # reiner Text → Editor
     SEARCHABLE_IMAGE = "searchable_image"  # Bildseite + Textlayer-Sidecar
+    TABLE_CSV = "table_csv"  # Tabellen-Heuristik → CSV — 1.9.0
 
 
 # UI-Presets: Anzeigename → Tesseract-lang
@@ -142,6 +143,134 @@ def format_text_as_table(lines: List[List[str]]) -> str:
     return "\n".join(out)
 
 
+def format_rows_as_csv(
+    rows: List[List[str]],
+    *,
+    delimiter: str = ";",
+    dialect: str = "excel",
+) -> str:
+    """
+    Zeilen/Spalten als CSV (Default `;` für DE-Excel) — 1.9.0.
+    UTF-8 mit BOM-Präfix im String (für Excel-kompatibles Speichern).
+    """
+    import csv
+    import io
+
+    buf = io.StringIO()
+    writer = csv.writer(buf, delimiter=delimiter, dialect=dialect, lineterminator="\n")
+    for row in rows:
+        writer.writerow([str(c) if c is not None else "" for c in row])
+    return "\ufeff" + buf.getvalue()
+
+
+def write_ocr_table_csv(
+    path: str | Path,
+    rows: List[List[str]],
+    *,
+    delimiter: str = ";",
+) -> Path:
+    """Schreibt Tabellen-OCR als CSV (UTF-8 BOM)."""
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    text = format_rows_as_csv(rows, delimiter=delimiter)
+    path.write_text(text, encoding="utf-8")
+    return path
+
+
+def _rows_from_tesseract_data(
+    data: dict,
+    *,
+    gap_threshold: int = 28,
+    min_conf: int = 40,
+) -> tuple[List[List[str]], bool]:
+    """Grobe Tabellenerkennung aus image_to_data → (rows, table_like)."""
+    n = len(data.get("text") or [])
+    buckets: dict[tuple[int, int], list[tuple[int, str]]] = {}
+    for i in range(n):
+        word = (data["text"][i] or "").strip()
+        if not word:
+            continue
+        conf_raw = data["conf"][i]
+        conf = int(float(conf_raw)) if conf_raw not in ("-1", "") else -1
+        if conf >= 0 and conf < min_conf:
+            continue
+        key = (int(data["block_num"][i]), int(data["line_num"][i]))
+        left = int(data["left"][i])
+        buckets.setdefault(key, []).append((left, word))
+
+    if not buckets:
+        return [], False
+
+    line_rows: List[List[str]] = []
+    table_like = False
+    for _key in sorted(buckets.keys()):
+        words = sorted(buckets[_key], key=lambda t: t[0])
+        if len(words) >= 2:
+            cols: List[str] = []
+            col_words: List[str] = []
+            prev_x = words[0][0]
+            for left, w in words:
+                if col_words and left - prev_x > gap_threshold:
+                    cols.append(" ".join(col_words))
+                    col_words = [w]
+                else:
+                    col_words.append(w)
+                prev_x = left + len(w) * 8
+            if col_words:
+                cols.append(" ".join(col_words))
+            if len(cols) >= 2:
+                table_like = True
+                line_rows.append(cols)
+            else:
+                line_rows.append([" ".join(w for _, w in words)])
+        else:
+            line_rows.append([words[0][1]])
+    return line_rows, table_like
+
+
+def ocr_image_table_rows(
+    source: Union[str, Path, Image.Image],
+    lang: str = "deu+eng",
+) -> tuple[List[List[str]], bool]:
+    """
+    Tabellen-OCR → Roh-Zeilen (heuristisch) — 1.9.0.
+    Rückgabe: (rows, table_like).
+    """
+    ok, msg = tesseract_available()
+    if not ok:
+        raise OcrUnavailable(msg)
+
+    import pytesseract
+
+    img = _load_image(source)
+    try:
+        data = pytesseract.image_to_data(img, lang=lang, output_type=pytesseract.Output.DICT)
+    except Exception:
+        plain = pytesseract.image_to_string(img, lang="eng")
+        lines = [ln.split() for ln in plain.splitlines() if ln.strip()]
+        return lines, False
+
+    rows, table_like = _rows_from_tesseract_data(data)
+    if not rows:
+        plain = pytesseract.image_to_string(img, lang=lang)
+        lines = [ln.split() for ln in plain.splitlines() if ln.strip()]
+        return lines, False
+    return rows, table_like
+
+
+def ocr_image_to_csv(
+    source: Union[str, Path, Image.Image],
+    lang: str = "deu+eng",
+    *,
+    delimiter: str = ";",
+) -> tuple[str, bool]:
+    """OCR → CSV-String (UTF-8 BOM) + table_like-Flag — 1.9.0."""
+    rows, table_like = ocr_image_table_rows(source, lang=lang)
+    if not rows:
+        return "\ufeff", False
+    return format_rows_as_csv(rows, delimiter=delimiter), table_like
+
+
 def ocr_image_structured(
     source: Union[str, Path, Image.Image],
     lang: str = "deu+eng",
@@ -163,49 +292,10 @@ def ocr_image_structured(
         plain = pytesseract.image_to_string(img, lang="eng")
         return plain, False
 
-    n = len(data["text"])
-    rows: dict[tuple[int, int], list[tuple[int, str]]] = {}
-    for i in range(n):
-        word = (data["text"][i] or "").strip()
-        if not word:
-            continue
-        conf = int(float(data["conf"][i])) if data["conf"][i] not in ("-1", "") else -1
-        if conf >= 0 and conf < 40:
-            continue
-        key = (int(data["block_num"][i]), int(data["line_num"][i]))
-        left = int(data["left"][i])
-        rows.setdefault(key, []).append((left, word))
-
-    if not rows:
+    line_rows, table_like = _rows_from_tesseract_data(data)
+    if not line_rows:
         plain = pytesseract.image_to_string(img, lang=lang)
         return plain, False
-
-    line_rows: List[List[str]] = []
-    table_like = False
-    for _key in sorted(rows.keys()):
-        words = sorted(rows[_key], key=lambda t: t[0])
-        if len(words) >= 2:
-            # Spalten anhand horizontaler Lücken gruppieren
-            cols: List[str] = []
-            col_words: List[str] = []
-            prev_x = words[0][0]
-            gap_threshold = 28
-            for left, w in words:
-                if col_words and left - prev_x > gap_threshold:
-                    cols.append(" ".join(col_words))
-                    col_words = [w]
-                else:
-                    col_words.append(w)
-                prev_x = left + len(w) * 8
-            if col_words:
-                cols.append(" ".join(col_words))
-            if len(cols) >= 2:
-                table_like = True
-                line_rows.append(cols)
-            else:
-                line_rows.append([" ".join(w for _, w in words)])
-        else:
-            line_rows.append([words[0][1]])
 
     if table_like and len(line_rows) >= 2:
         return format_text_as_table(line_rows), True
@@ -456,10 +546,25 @@ def run_ocr(
     source_label: str = "",
 ) -> OcrResult:
     """Einheitlicher OCR-Einstieg inkl. Ausgabe-Modus."""
-    text = ocr_image(source, lang=lang)
     label = source_label or (
         str(source) if isinstance(source, (str, Path)) else "Bild"
     )
+    if mode == OcrOutputMode.TABLE_CSV:
+        csv_text, _used = ocr_image_to_csv(source, lang=lang)
+        out_dir_p = Path(out_dir) if out_dir else Path.cwd()
+        out_dir_p.mkdir(parents=True, exist_ok=True)
+        stem = Path(label).stem if label else "ocr"
+        csv_path = out_dir_p / f"{stem}_table.csv"
+        csv_path.write_text(csv_text, encoding="utf-8")
+        return OcrResult(
+            text=csv_text,
+            lang=lang,
+            mode=mode,
+            source_label=label,
+            sidecar=csv_path,
+        )
+
+    text = ocr_image(source, lang=lang)
     if mode == OcrOutputMode.EDITABLE_TEXT:
         return OcrResult(text=text, lang=lang, mode=mode, source_label=label)
 

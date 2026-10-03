@@ -183,13 +183,13 @@ class PageReorderDialog(QDialog):
 
 
 class StampPickDialog(QDialog):
-    """Stempel-Bibliothek: Genehmigt/Entwurf/Vertraulich (+ Datum) und weitere Presets."""
+    """Stempel-Bibliothek: Text-Presets (+ Datum) und Link zur Bild-Bibliothek — 1.9.0."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Stempel")
-        self.resize(380, 320)
-        from PySide6.QtWidgets import QCheckBox, QListWidget
+        self.resize(400, 360)
+        from PySide6.QtWidgets import QCheckBox, QListWidget, QPushButton
 
         layout = QVBoxLayout(self)
         layout.addWidget(QLabel("Bibliothek / Preset wählen:"))
@@ -203,12 +203,41 @@ class StampPickDialog(QDialog):
         self.custom = QLineEdit()
         self.custom.setPlaceholderText("Oder eigenen Text…")
         layout.addWidget(self.custom)
+        self.btn_images = QPushButton("Eigene Stempel-Bilder…")
+        self.btn_images.setToolTip(
+            "Stempel-Bildbibliothek verwalten (Ordner) und als Sidecar-Stempel setzen — 1.9.0"
+        )
+        self.btn_images.clicked.connect(self._open_image_library)
+        layout.addWidget(self.btn_images)
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
         self._items: list[tuple[str, str]] = []  # display, (text, color) encoded
+        self._image_placed = False
         self._rebuild()
+
+    def _open_image_library(self) -> None:
+        from instantlensdoc.ui.stamp_library_dialog import StampLibraryDialog
+
+        parent = self.parent()
+        pdf_path = None
+        page_index = 0
+        if parent is not None and hasattr(parent, "pdf_path"):
+            pdf_path = getattr(parent, "pdf_path", None)
+            page_index = int(getattr(parent, "page_index", 0) or 0)
+        dlg = StampLibraryDialog(
+            self,
+            pdf_path=pdf_path,
+            page_index=page_index,
+            allow_place=bool(pdf_path),
+        )
+        if dlg.exec() == QDialog.Accepted and dlg.placed_path:
+            self._image_placed = True
+            self.accept()
+
+    def image_placed(self) -> bool:
+        return bool(getattr(self, "_image_placed", False))
 
     def _rebuild(self):
         include = self.with_date.isChecked()
@@ -230,6 +259,8 @@ class StampPickDialog(QDialog):
 
     def result_stamp(self) -> tuple[str, str] | None:
         """(text, color) oder None."""
+        if getattr(self, "_image_placed", False):
+            return None
         custom = self.custom.text().strip()
         if custom:
             text = stamp_with_date(custom, include_date=self.with_date.isChecked())

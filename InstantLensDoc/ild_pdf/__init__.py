@@ -154,10 +154,12 @@ from .acroform import (
 )
 from .attachments import (
     AttachmentInfo,
+    add_attachment,
     extract_all_attachments,
     extract_attachment,
     has_attachments,
     list_attachments,
+    remove_attachment,
 )
 from .links import UriLink, is_external_http_uri, list_page_uri_links, uri_link_at
 
@@ -303,6 +305,8 @@ __all__ = [
     "list_attachments",
     "extract_attachment",
     "extract_all_attachments",
+    "add_attachment",
+    "remove_attachment",
     "UriLink",
     "is_external_http_uri",
     "list_page_uri_links",
@@ -311,4 +315,4 @@ __all__ = [
     "page_count_for_text",
 ]
 
-__version__ = "1.8.5"
+__version__ = "1.9.0"

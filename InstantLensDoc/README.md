@@ -2,7 +2,7 @@
 
 Moderne Textverarbeitung mit PDF-Annotator, OCR-Bridge und Formulargenerator.
 
-**Version:** 1.8.5  
+**Version:** 1.9.0  
 **Hersteller:** Andreas Meyer · ame@sellerbach.de
 
 ## Quickstart (Windows)
@@ -33,8 +33,8 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an).
 
-## Neu in 1.8.5
+## Neu in 1.9.0
 
-Post-Release-Polish nach **1.8.4** (Basis **1.8.3** / **1.8.2**): Batch Blink „aus“ = einmaliger Status ohne Blink; HF Fit-/Zoom nur Vorschau (Bake/„Auf alle“ irrelevant); Layer Alle ein/aus mit A11y-Announcement; Recovery Mehrfachauswahl Verwerfen · „Alle verwerfen“ mit Bestätigung. Stubs KI/Cloud/Stylus/3D unverändert.
+Minor-Release (Basis **1.8.5**): **PDF-Anhänge** listen/extrahieren/**hinzufügen** (pikepdf); **Stempel-Bildbibliothek** (Ordner + Sidecar-Stempel); **Tabellen-OCR → CSV** (heuristisch); **Plugin-Hooks Stub** (interner Event-Bus + no-op Loader). Stubs KI/Cloud/Stylus/3D unverändert; Plugin-Hooks zusätzlich als Stub.
 
 Siehe [CHANGELOG.md](CHANGELOG.md), [FEATURES.md](FEATURES.md) und [INFO.md](INFO.md).

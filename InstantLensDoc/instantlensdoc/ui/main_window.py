@@ -2237,9 +2237,17 @@ class MainWindow(QMainWindow):
         act_forms.triggered.connect(self._edit_pdf_form_fields)
         m_pdf.addAction(act_forms)
         act_attach = QAction("Anhänge…", self)
-        act_attach.setToolTip("Eingebettete PDF-Anhänge auflisten und extrahieren")
+        act_attach.setToolTip(
+            "Eingebettete PDF-Anhänge listen, extrahieren und hinzufügen (pikepdf) — 1.9.0"
+        )
         act_attach.triggered.connect(self._pdf_attachments)
         m_pdf.addAction(act_attach)
+        act_stamp_lib = QAction("Stempel-Bibliothek (Bilder)…", self)
+        act_stamp_lib.setToolTip(
+            "Eigene Stempel-Bilder verwalten und als Sidecar-Stempel setzen — 1.9.0"
+        )
+        act_stamp_lib.triggered.connect(self._stamp_image_library)
+        m_pdf.addAction(act_stamp_lib)
         act_psize = QAction("Seitengröße / Zuschneiden…", self)
         act_psize.triggered.connect(self._pdf_page_size)
         m_pdf.addAction(act_psize)
@@ -2471,6 +2479,7 @@ class MainWindow(QMainWindow):
             ("stylus", "Stylus / Palm Rejection (geplant)"),
             ("shapes_ai", "Intelligente Formerkennung (geplant)"),
             ("extrude3d", "3D-Extrusion (geplant)"),
+            ("plugins", "Plugin-Hooks (Stub)"),
             ("varfonts", "Variable Fonts (geplant)"),
             ("envelope", "Envelope Distort (geplant)"),
             ("esign", "E-Signatur (geplant)"),
@@ -8910,17 +8919,31 @@ class MainWindow(QMainWindow):
         if not self.pdf_view.pdf_path:
             QMessageBox.information(self, "Anhänge", "Bitte zuerst ein PDF öffnen.")
             return
-        from ild_pdf import list_attachments
+        dlg = AttachmentsDialog(self.pdf_view.pdf_path, self)
+        dlg.exec()
+        if getattr(dlg, "changed", False):
+            from ild_pdf.render import clear_render_cache
 
-        try:
-            items = list_attachments(self.pdf_view.pdf_path)
-        except Exception as e:
-            QMessageBox.warning(self, "Anhänge", str(e))
-            return
-        if not items:
-            QMessageBox.information(self, "Anhänge", "Dieses PDF enthält keine Anhänge.")
-            return
-        AttachmentsDialog(self.pdf_view.pdf_path, self).exec()
+            clear_render_cache(self.pdf_view.pdf_path)
+            self.pdf_view.refresh()
+            self._set_status("PDF-Anhänge aktualisiert")
+
+    def _stamp_image_library(self):
+        """Eigene Stempel-Bilder verwalten / Sidecar-Stempel setzen — 1.9.0."""
+        from instantlensdoc.ui.stamp_library_dialog import StampLibraryDialog
+
+        pdf = self.pdf_view.pdf_path
+        page = int(getattr(self.pdf_view, "page_index", 0) or 0)
+        dlg = StampLibraryDialog(
+            self,
+            pdf_path=pdf,
+            page_index=page,
+            allow_place=bool(pdf),
+        )
+        if dlg.exec() and dlg.placed_path:
+            self.pdf_view.reload_annotations()
+            self.pdf_view.refresh()
+            self._set_status(f"Stempel-Bild gesetzt: {dlg.placed_path.name}")
 
     def _current_is_dirty(self) -> bool:
         if not self.doc:
@@ -11156,14 +11179,27 @@ class MainWindow(QMainWindow):
 
         self.stack.setCurrentWidget(self.editor_pane)
         self.editor.setPlainText(result.text)
-        self.doc = Document(kind=DocKind.TEXT, title=f"OCR — {source_label}", text=result.text)
-        self.setWindowTitle(self._app_title(f"OCR — {source_label}"))
+        title_suffix = "CSV" if result.mode == ocr_mod.OcrOutputMode.TABLE_CSV else source_label
+        self.doc = Document(
+            kind=DocKind.TEXT,
+            title=f"OCR — {title_suffix}",
+            text=result.text,
+        )
+        self.setWindowTitle(self._app_title(f"OCR — {title_suffix}"))
         extra = ""
         if result.searchable_pdf:
             extra = f" · PDF {result.searchable_pdf.name}"
             if result.sidecar:
                 extra += f" + {result.sidecar.name}"
+        elif result.mode == ocr_mod.OcrOutputMode.TABLE_CSV and result.sidecar:
+            extra = f" · CSV {result.sidecar.name}"
         self._set_status(f"OCR ({result.lang}, {result.mode.value}){extra}")
+        try:
+            from instantlensdoc.core.plugin_hooks import emit as emit_hook
+
+            emit_hook("ocr.finished", mode=result.mode.value, lang=result.lang)
+        except Exception:
+            pass
 
     def _run_ocr_document(self):
         """Batch-OCR aller PDF-Seiten mit Fortschrittsdialog."""

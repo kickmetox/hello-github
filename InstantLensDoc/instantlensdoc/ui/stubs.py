@@ -13,6 +13,10 @@ PLANNED = {
     "stylus": f"Drucksensitiver Stylus / Palm Rejection — Stub {__version__}",
     "shapes_ai": f"Intelligente Formerkennung — Stub {__version__}",
     "extrude3d": f"3D-Extrusion — Stub {__version__}",
+    "plugins": (
+        f"Plugin-Hooks — Stub {__version__} "
+        "(interner Event-Bus + no-op Loader; kein Plugin-System)"
+    ),
     "varfonts": "Variable Fonts (voll) — geplant",
     "envelope": "Envelope Distort (voll) — geplant",
     "esign": "E-Signatur (rechtssicher) — geplant",
@@ -24,6 +28,10 @@ PLANNED_EN = {
     "stylus": f"Pressure-sensitive stylus / palm rejection — stub {__version__}",
     "shapes_ai": f"Smart shape recognition — stub {__version__}",
     "extrude3d": f"3D extrusion — stub {__version__}",
+    "plugins": (
+        f"Plugin hooks — stub {__version__} "
+        "(internal event bus + no-op loader; no plugin system)"
+    ),
     "varfonts": "Variable fonts (full) — planned",
     "envelope": "Envelope distort (full) — planned",
     "esign": "E-signature (legally binding) — planned",
