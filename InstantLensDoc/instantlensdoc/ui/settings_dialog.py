@@ -25,6 +25,33 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
+
+class AnnExportTemplateEdit(QLineEdit):
+    """Ann.-Export-Template: Cursor-Position merken + Undo — 1.2.5."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._saved_cursor = 0
+        self._saved_sel_start = -1
+        self._saved_sel_len = 0
+        # QLineEdit: Undo/Redo standardmäßig aktiv (Ctrl+Z nach insert)
+
+    def focusOutEvent(self, event):
+        self._saved_cursor = self.cursorPosition()
+        self._saved_sel_start = self.selectionStart()
+        self._saved_sel_len = self.selectionLength()
+        super().focusOutEvent(event)
+
+    def restore_insert_position(self) -> None:
+        """Cursor/Selektion vor Quick-Insert wiederherstellen — 1.2.5."""
+        if self.hasFocus():
+            return
+        if self._saved_sel_start >= 0 and self._saved_sel_len > 0:
+            self.setSelection(self._saved_sel_start, self._saved_sel_len)
+        else:
+            pos = max(0, min(self._saved_cursor, len(self.text())))
+            self.setCursorPosition(pos)
+
 from ild_pdf.pages import PAGE_SIZE_PRESETS
 from instantlensdoc.core.app_settings import (
     ANN_COLOR_PRESET_COUNT,
@@ -837,19 +864,25 @@ class SettingsDialog(QDialog):
             get_last_ann_export_dir,
         )
 
-        self.ann_export_tpl = QLineEdit(get_ann_export_filename_template())
+        self.ann_export_tpl = AnnExportTemplateEdit(get_ann_export_filename_template())
         self.ann_export_tpl.setPlaceholderText("{stem}_ann.json")
         self.ann_export_tpl.setToolTip(
             "Dateiname-Template für Annotation-JSON-Export. "
             "Platzhalter: {stem}, {page} (1-basiert), {date} (YYYY-MM-DD). "
-            "Quick-Insert-Buttons daneben — 1.2.4"
+            "Quick-Insert an Cursor-Position; Undo im Feld (Ctrl+Z) — 1.2.5"
         )
         self.ann_export_tpl.textChanged.connect(self._update_ann_export_preview)
         tpl_row = QHBoxLayout()
         tpl_row.addWidget(self.ann_export_tpl, 1)
         for token in ("{stem}", "{page}", "{date}"):
             btn = QPushButton(token)
-            btn.setToolTip(f"Platzhalter {token} an Cursor einfügen — 1.2.4")
+            btn.setAutoDefault(False)
+            btn.setDefault(False)
+            btn.setFocusPolicy(Qt.TabFocus)
+            btn.setToolTip(
+                f"Platzhalter {token} an Cursor-Position einfügen "
+                "(Undo: Ctrl+Z) — 1.2.5"
+            )
             btn.clicked.connect(
                 lambda _checked=False, t=token: self._insert_ann_export_placeholder(t)
             )
@@ -977,11 +1010,18 @@ class SettingsDialog(QDialog):
         layout.addWidget(buttons)
 
     def _insert_ann_export_placeholder(self, token: str) -> None:
-        """Quick-Insert {stem}/{page}/{date} an Cursor — 1.2.4."""
+        """Quick-Insert {stem}/{page}/{date} an gespeicherter Cursor-Pos — 1.2.5."""
         if not hasattr(self, "ann_export_tpl"):
             return
-        self.ann_export_tpl.insert(str(token or ""))
-        self.ann_export_tpl.setFocus()
+        edit = self.ann_export_tpl
+        if isinstance(edit, AnnExportTemplateEdit):
+            edit.restore_insert_position()
+        edit.insert(str(token or ""))  # undo-fähig (Ctrl+Z)
+        edit.setFocus()
+        if isinstance(edit, AnnExportTemplateEdit):
+            edit._saved_cursor = edit.cursorPosition()
+            edit._saved_sel_start = -1
+            edit._saved_sel_len = 0
         self._update_ann_export_preview()
 
     def _update_ann_export_preview(self, *_args) -> None:

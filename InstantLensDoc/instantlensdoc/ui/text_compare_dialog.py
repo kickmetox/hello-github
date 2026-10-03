@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QColor, QFont, QTextCharFormat, QTextCursor
+from PySide6.QtGui import QColor, QFont, QKeySequence, QShortcut, QTextCharFormat, QTextCursor
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -192,9 +192,11 @@ class TextCompareDialog(QDialog):
         self._last_left: list[str] = []
         self._last_right: list[str] = []
         self._last_tags: list[str] = []
+        self._show_tags: list[str] = []
         self._last_lname = ""
         self._last_rname = ""
         self._scroll_syncing = False
+        self._change_nav_index = -1
 
         root = QVBoxLayout(self)
         if self._panel_mode:
@@ -202,7 +204,7 @@ class TextCompareDialog(QDialog):
                 QLabel(
                     "Zeilen-Diff Panel: zwei offene Text-Tabs wählen — "
                     "Side-by-Side/Unified · Wort-Highlight · Ignore-Whitespace · "
-                    "Sync-Scroll (Settings) · TXT-Export — 1.2.4"
+                    "Sync-Scroll · Nächste/Vorherige Änderung (F7/Shift+F7) — 1.2.5"
                 )
             )
         pick = QHBoxLayout()
@@ -297,15 +299,30 @@ class TextCompareDialog(QDialog):
         btn_export = QPushButton("Diff als TXT…")
         btn_export.setToolTip("Aktuellen Diff als Textdatei exportieren — 1.2.1/1.2.2")
         btn_export.clicked.connect(self._export_diff_txt)
+        self.btn_prev_change = QPushButton("Vorherige Änderung")
+        self.btn_prev_change.setToolTip("Zur vorherigen Abweichung (Shift+F7) — 1.2.5")
+        self.btn_prev_change.clicked.connect(lambda: self._goto_change(-1))
+        self.btn_next_change = QPushButton("Nächste Änderung")
+        self.btn_next_change.setToolTip("Zur nächsten Abweichung (F7) — 1.2.5")
+        self.btn_next_change.clicked.connect(lambda: self._goto_change(1))
         row = QHBoxLayout()
         row.addWidget(btn_reload)
         row.addWidget(btn_export)
+        row.addWidget(self.btn_prev_change)
+        row.addWidget(self.btn_next_change)
         row.addStretch()
         root.addLayout(row)
 
         buttons = QDialogButtonBox(QDialogButtonBox.Close)
         buttons.rejected.connect(self.reject)
         root.addWidget(buttons)
+
+        sc_next = QShortcut(QKeySequence(Qt.Key_F7), self)
+        sc_next.setContext(Qt.WidgetWithChildrenShortcut)
+        sc_next.activated.connect(lambda: self._goto_change(1))
+        sc_prev = QShortcut(QKeySequence(Qt.SHIFT | Qt.Key_F7), self)
+        sc_prev.setContext(Qt.WidgetWithChildrenShortcut)
+        sc_prev.activated.connect(lambda: self._goto_change(-1))
 
         self._select_initial()
         self._apply_sync_scroll()
@@ -464,6 +481,8 @@ class TextCompareDialog(QDialog):
             self.view_unified.setPlainText("")
             self.lbl_status.setText("Zwei Dateien oder Tabs wählen")
             self._last_left, self._last_right, self._last_tags = [], [], []
+            self._show_tags = []
+            self._change_nav_index = -1
             self._apply_sync_scroll()
             return
         ignore_ws = self.chk_ignore_ws.isChecked()
@@ -476,6 +495,8 @@ class TextCompareDialog(QDialog):
         only_diff = self.chk_only_diff.isChecked()
         if only_diff:
             show_l, show_r, show_t = filter_diff_differences(out_l, out_r, tags)
+        self._show_tags = list(show_t)
+        self._change_nav_index = -1
         line_nums = self.chk_line_numbers.isChecked()
         unified = self.chk_unified.isChecked()
         word_hl = self.chk_word_hl.isChecked()
@@ -531,6 +552,62 @@ class TextCompareDialog(QDialog):
         self.view_left.setToolTip(lname)
         self.view_right.setToolTip(rname)
         self._apply_sync_scroll()
+
+    def _change_line_indices(self) -> list[int]:
+        """Sichtbare Zeilenindizes mit Abweichung — 1.2.5."""
+        if self.chk_unified.isChecked() and self.view_unified.isVisible():
+            indices: list[int] = []
+            doc = self.view_unified.document()
+            block = doc.firstBlock()
+            while block.isValid():
+                line = block.text()
+                if line.startswith("---") or line.startswith("+++"):
+                    pass
+                elif line.startswith("-") or line.startswith("+"):
+                    indices.append(block.blockNumber())
+                block = block.next()
+            return indices
+        tags = self._show_tags or self._last_tags
+        return [i for i, t in enumerate(tags) if t and t != "equal"]
+
+    def _active_diff_view(self) -> QPlainTextEdit:
+        if self.chk_unified.isChecked() and self.view_unified.isVisible():
+            return self.view_unified
+        return self.view_left
+
+    def _goto_change(self, direction: int) -> None:
+        """Nächste/vorherige Änderung anspringen (F7 / Shift+F7) — 1.2.5."""
+        indices = self._change_line_indices()
+        if not indices:
+            base = (self.lbl_status.text() or "").split(" · Änderung ")[0] or "Diff"
+            self.lbl_status.setText(f"{base} · keine Änderungen")
+            return
+        view = self._active_diff_view()
+        cur_block = view.textCursor().blockNumber()
+        if direction >= 0:
+            nxt = next((i for i in indices if i > cur_block), None)
+            if nxt is None:
+                nxt = indices[0]
+        else:
+            nxt = next((i for i in reversed(indices) if i < cur_block), None)
+            if nxt is None:
+                nxt = indices[-1]
+        self._change_nav_index = indices.index(nxt)
+        block = view.document().findBlockByNumber(nxt)
+        if block.isValid():
+            cur = QTextCursor(block)
+            view.setTextCursor(cur)
+            view.centerCursor()
+        if not self.chk_unified.isChecked():
+            rblock = self.view_right.document().findBlockByNumber(nxt)
+            if rblock.isValid():
+                rcur = QTextCursor(rblock)
+                self.view_right.setTextCursor(rcur)
+                self.view_right.centerCursor()
+        n = len(indices)
+        pos = self._change_nav_index + 1
+        base = self.lbl_status.text().split(" · Änderung ")[0]
+        self.lbl_status.setText(f"{base} · Änderung {pos}/{n}")
 
     def _export_diff_txt(self) -> None:
         """Aktuellen Diff als TXT speichern — 1.2.1/1.2.2."""

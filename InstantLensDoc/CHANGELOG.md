@@ -1,5 +1,27 @@
 # Changelog — InstantLens Doc
 
+## 1.2.5 — Split-Log Mehrfachauswahl, Ann. Cursor/Undo, Diff Nav F7, run.bat ILD_PYTHON
+
+Post-Release-Polish nach 1.2.4: **PDF-Split Pfad-Log** mit **Mehrfachauswahl**, Button **„Ordner der Auswahl öffnen“** und **Kontextmenü**; **Ann.-Export Quick-Insert** fügt an der **Cursor-Position** ein und unterstützt **Undo (Ctrl+Z)** im Template-Feld; **Text-Diff** mit Buttons **Nächste/Vorherige Änderung** (**F7** / **Shift+F7**); **`run.bat`** nutzt und dokumentiert Env-Override **`%ILD_PYTHON%`**. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### PDF
+- Split: Pfad-Log **Mehrfachauswahl**; **„Ordner der Auswahl öffnen“**; **Kontextmenü** (Öffnen / Ordner / Auswahl / Kopieren)
+
+### Annotationen
+- Export-Template: Quick-Insert an **Cursor-Position**; **Undo** im Template-Feld (Ctrl+Z)
+
+### Editor
+- Text-Diff: Buttons **Nächste/Vorherige Änderung**; Tasten **F7** / **Shift+F7**
+
+### Packaging / Start
+- **`run.bat`**: Env-Override **`%ILD_PYTHON%`** (höchste Priorität vor `.venv`/PATH); in `--help` dokumentiert
+
+### Packaging / Docs
+- Version **1.2.5** (App / `ild_pdf` / ISS / Smoke / Docs)
+- Smoke: Split-Log Mehrfachauswahl·Ordner·Kontextmenü, Ann. Cursor/Undo, Diff Nav F7, run.bat ILD_PYTHON (CLI + Qt)
+
+---
+
 ## 1.2.4 — Split-Log Doppelklick, Ann. Quick-Insert, Diff Sync-Scroll Settings, run.bat Python-Download
 
 Post-Release-Polish nach 1.2.3: **PDF-Split Pfad-Log** öffnet per **Doppelklick** Datei/Ordner und zeigt bei **leerem Log** einen Hinweis; **Ann.-Export-Template** mit Quick-Insert-Buttons **`{stem}`** / **`{page}`** / **`{date}`**; **Text-Diff Sync-Scroll** als Toggle in **Settings**; **Ignore-Whitespace** wird **persistiert**; **`run.bat`** bei fehlendem Python mit kurzem Download-Hinweis **Microsoft Store** / **python.org**. Stubs KI/Cloud/Stylus/3D bleiben Stubs.

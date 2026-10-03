@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **1.2.4** |
+| Version | **1.2.5** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -50,7 +50,7 @@ pip install -r requirements.txt
 run.bat
 ```
 
-`run.bat` prüft Python ≥3.10 und Kern-Deps (PySide6, pypdfium2, pikepdf, Pillow) mit klaren DE-Meldungen; bei fehlenden Paketen optional `python -m pip install -r requirements.txt` (J/N) oder non-interactive **`run.bat --yes`** / **`-y`**. Hilfe: **`run.bat --help`** / **`-h`**. Hinweis wenn lokale **`.venv`** vorhanden aber unvollständig. Fehlt Python: kurzer Download-Hinweis **Microsoft Store** / **python.org**.
+`run.bat` prüft Python ≥3.10 und Kern-Deps (PySide6, pypdfium2, pikepdf, Pillow) mit klaren DE-Meldungen; bei fehlenden Paketen optional `python -m pip install -r requirements.txt` (J/N) oder non-interactive **`run.bat --yes`** / **`-y`**. Hilfe: **`run.bat --help`** / **`-h`**. Env-Override: **`set ILD_PYTHON=C:\Pfad\zu\python.exe`** (höchste Priorität vor `.venv`/PATH). Hinweis wenn lokale **`.venv`** vorhanden aber unvollständig. Fehlt Python: kurzer Download-Hinweis **Microsoft Store** / **python.org**.
 
 Exit-Codes `run.bat`: **0** OK / Hilfe · **1** Python/Deps/pip-Fehler bzw. Installation abgelehnt (App-Exitcode ≠0 wird durchgereicht).
 
@@ -63,10 +63,10 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an / `checkedonce`)
 
-## Neu in 1.2.4
+## Neu in 1.2.5
 
-- PDF: Split — Pfad-Log **Doppelklick** öffnet Datei/Ordner; Hinweis bei **leerem Log**
-- Annotationen: Quick-Insert-Buttons **`{stem}`** / **`{page}`** / **`{date}`** neben Template
-- Editor: Text-Diff **Sync-Scroll** Toggle in Settings; **Ignore-Whitespace** persistiert
-- Start: `run.bat` bei fehlendem Python — Download-Hinweis **Microsoft Store** / **python.org**
+- PDF: Split — Pfad-Log **Mehrfachauswahl**; **„Ordner der Auswahl öffnen“**; **Kontextmenü**
+- Annotationen: Quick-Insert an **Cursor-Position**; **Undo (Ctrl+Z)** im Template-Feld
+- Editor: Text-Diff **Nächste/Vorherige Änderung** (**F7** / **Shift+F7**)
+- Start: `run.bat` Env-Override **`%ILD_PYTHON%`** (dokumentiert + genutzt)
 - Stubs KI/Cloud/Stylus/3D unverändert

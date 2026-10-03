@@ -3,19 +3,25 @@ setlocal EnableExtensions EnableDelayedExpansion
 chcp 65001 >nul
 cd /d "%~dp0"
 
-REM InstantLens Doc 1.2.4 — Start mit Python-/Abhängigkeitsprüfung (DE-Meldungen)
+REM InstantLens Doc 1.2.5 — Start mit Python-/Abhängigkeitsprüfung (DE-Meldungen)
 REM Optional: pip install -r requirements.txt per J/N — oder non-interactive mit --yes / -y
 REM Hilfe: run.bat --help / -h
+REM
+REM Env-Override (höchste Priorität):
+REM   set ILD_PYTHON=C:\Pfad\zu\python.exe
+REM   run.bat
+REM Wenn %%ILD_PYTHON%% gesetzt ist und auf eine existierende Datei zeigt, wird genau
+REM dieser Interpreter genutzt (vor .venv und PATH).
 REM
 REM Exit-Codes:
 REM   0  OK (App beendet mit 0) bzw. --help angezeigt
 REM   1  Fehler: Python fehlt / Version ^<3.10 / Deps fehlen / pip fehlgeschlagen /
-REM      Installation abgelehnt / App-Exitcode != 0 wird durchgereicht
+REM      Installation abgelehnt / ILD_PYTHON ungültig / App-Exitcode != 0 wird durchgereicht
 REM
 REM Beispiele:
 REM   run.bat
 REM   run.bat --yes
-REM   run.bat -y
+REM   set ILD_PYTHON=C:\Python312\python.exe ^& run.bat
 REM   run.bat --help
 
 set "ILD_YES="
@@ -48,8 +54,13 @@ if defined ILD_HELP (
   echo   --help, -h, /?   Diese Hilfe auf Deutsch anzeigen und beenden (Exit 0^)
   echo   --yes, -y        Fehlende Abhaengigkeiten ohne Rueckfrage per pip installieren
   echo.
+  echo Umgebungsvariable:
+  echo   ILD_PYTHON       Optionaler Pfad zu python.exe ^(Env-Override, hoechste Prio^)
+  echo                    Beispiel: set ILD_PYTHON=C:\Python312\python.exe
+  echo                    Wenn gesetzt und Datei existiert: wird vor .venv/PATH genutzt.
+  echo.
   echo Pruefungen:
-  echo   - Python 3.10+ ^(bevorzugt lokale .venv\Scripts\python.exe^)
+  echo   - Python 3.10+ ^(ILD_PYTHON, sonst lokale .venv\Scripts\python.exe, sonst PATH^)
   echo   - Kern-Pakete: PySide6, pypdfium2, pikepdf, Pillow
   echo.
   echo Exit-Codes:
@@ -61,6 +72,8 @@ if defined ILD_HELP (
   echo   run.bat
   echo   run.bat --yes
   echo   run.bat -y
+  echo   set ILD_PYTHON=C:\Python312\python.exe
+  echo   run.bat
   echo   run.bat --help
   echo.
   exit /b 0
@@ -68,7 +81,24 @@ if defined ILD_HELP (
 
 set "PYEXE="
 set "ILD_USED_VENV="
-if exist ".venv\Scripts\python.exe" (
+set "ILD_USED_ENV="
+
+REM 1.2.5: %%ILD_PYTHON%% Env-Override (höchste Priorität)
+if defined ILD_PYTHON (
+  if exist "%ILD_PYTHON%" (
+    set "PYEXE=%ILD_PYTHON%"
+    set "ILD_USED_ENV=1"
+    echo [InstantLens Doc] Nutze ILD_PYTHON=%ILD_PYTHON%
+  ) else (
+    echo.
+    echo [InstantLens Doc] FEHLER: ILD_PYTHON ist gesetzt, aber die Datei fehlt:
+    echo   %ILD_PYTHON%
+    echo Bitte auf einen gültigen python.exe-Pfad setzen oder Variable entfernen.
+    echo.
+    if not defined ILD_YES pause
+    exit /b 1
+  )
+) else if exist ".venv\Scripts\python.exe" (
   set "PYEXE=.venv\Scripts\python.exe"
   set "ILD_USED_VENV=1"
 ) else (
@@ -87,6 +117,8 @@ if exist ".venv\Scripts\python.exe" (
         echo   .venv\Scripts\pip install -r requirements.txt
         echo.
       )
+      echo Optional: set ILD_PYTHON=C:\Pfad\zu\python.exe
+      echo.
       echo Download Python 3.12+ ^(kurz^):
       echo   Microsoft Store: „Python 3.12“ suchen und installieren
       echo   oder https://www.python.org/downloads/
@@ -104,6 +136,7 @@ if exist ".venv\Scripts\python.exe" (
     echo   .venv\Scripts\python.exe fehlt — System-Python wird genutzt.
     echo   Zum Reparieren: python -m venv .venv
     echo   .venv\Scripts\pip install -r requirements.txt
+    echo   Oder: set ILD_PYTHON=C:\Pfad\zu\python.exe
     echo.
   )
 )
@@ -117,6 +150,7 @@ if errorlevel 1 (
   %PYEXE% --version 2>&1
   echo.
   echo Bitte eine passende Version installieren und PATH pruefen.
+  echo Optional: set ILD_PYTHON=C:\Pfad\zu\python.exe
   echo.
   if not defined ILD_YES pause
   exit /b 1
@@ -131,7 +165,7 @@ echo [InstantLens Doc] FEHLER: Erforderliche Pakete fehlen.
 echo Benoetigt u. a.: PySide6, pypdfium2, pikepdf, Pillow
 echo Optional fuer OCR: pytesseract + Tesseract-Runtime
 echo.
-if exist ".venv\" if not defined ILD_USED_VENV (
+if exist ".venv\" if not defined ILD_USED_VENV if not defined ILD_USED_ENV (
   echo Hinweis: Lokaler Ordner .venv vorhanden — ggf. dort installieren:
   echo   .venv\Scripts\python.exe -m pip install -r requirements.txt
   echo   ^(run.bat nutzt .venv automatisch, sobald Scripts\python.exe existiert^)

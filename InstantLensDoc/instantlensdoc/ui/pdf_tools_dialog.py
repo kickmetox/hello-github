@@ -17,6 +17,8 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QListWidget,
+    QListWidgetItem,
+    QMenu,
     QMessageBox,
     QPlainTextEdit,
     QPushButton,
@@ -27,14 +29,74 @@ from PySide6.QtWidgets import (
 )
 
 
-class SplitPathLogEdit(QPlainTextEdit):
-    """Pfad-Log: Doppelklick öffnet Datei/Ordner — 1.2.4."""
+class SplitPathLogEdit(QListWidget):
+    """Pfad-Log: Mehrfachauswahl, Doppelklick, Kontextmenü — 1.2.5."""
 
     path_activate = Signal()
+    open_selected_folders = Signal()
+    copy_requested = Signal()
 
-    def mouseDoubleClickEvent(self, event):
-        super().mouseDoubleClickEvent(event)
-        self.path_activate.emit()
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._placeholder = ""
+        self.setSelectionMode(QAbstractItemView.ExtendedSelection)
+        self.setAlternatingRowColors(True)
+        self.itemDoubleClicked.connect(lambda _item: self.path_activate.emit())
+        self.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.customContextMenuRequested.connect(self._show_context_menu)
+
+    def setReadOnly(self, _ro: bool) -> None:
+        """Kompatibilität zu früherem QPlainTextEdit — 1.2.5."""
+        return
+
+    def setPlaceholderText(self, text: str) -> None:
+        self._placeholder = str(text or "")
+        self._refresh_empty_hint()
+
+    def placeholderText(self) -> str:
+        return self._placeholder
+
+    def toPlainText(self) -> str:
+        return "\n".join(self.item(i).text() for i in range(self.count()))
+
+    def setPlainText(self, text: str) -> None:
+        self.clear()
+        for line in str(text or "").splitlines():
+            if line.strip():
+                self.addItem(QListWidgetItem(line))
+        self._refresh_empty_hint()
+
+    def _refresh_empty_hint(self) -> None:
+        if self.count() == 0 and self._placeholder:
+            self.setToolTip(self._placeholder)
+        # Basis-Tooltip bleibt über setToolTip vom Dialog gesetzt
+
+    def selected_lines(self) -> list[str]:
+        return [i.text() for i in self.selectedItems()]
+
+    def current_line(self) -> str:
+        item = self.currentItem()
+        if item is not None:
+            return item.text()
+        selected = self.selected_lines()
+        return selected[0] if selected else ""
+
+    def _show_context_menu(self, pos) -> None:
+        menu = QMenu(self)
+        act_open = menu.addAction("Öffnen")
+        act_folder = menu.addAction("Ordner öffnen")
+        act_sel = menu.addAction("Ordner der Auswahl öffnen")
+        menu.addSeparator()
+        act_copy = menu.addAction("Auswahl / Log kopieren")
+        chosen = menu.exec(self.mapToGlobal(pos))
+        if chosen is act_open:
+            self.path_activate.emit()
+        elif chosen is act_folder:
+            self.path_activate.emit()
+        elif chosen is act_sel:
+            self.open_selected_folders.emit()
+        elif chosen is act_copy:
+            self.copy_requested.emit()
 
 from ild_pdf.pages import (
     extract_by_page_spec,
@@ -290,16 +352,19 @@ class PdfToolsDialog(QDialog):
         form.addRow("", self.split_open_tabs)
         self.split_log = SplitPathLogEdit()
         self.split_log.setReadOnly(True)
-        self.split_log.setMaximumHeight(110)
+        self.split_log.setMaximumHeight(130)
         self.split_log.setPlaceholderText(
             "Noch kein Log — nach dem Teilen erscheinen Pfade hier. "
-            "Doppelklick öffnet Datei/Ordner."
+            "Mehrfachauswahl · Doppelklick · Kontextmenü · Ordner der Auswahl."
         )
         self.split_log.setToolTip(
             "Liste der nach dem Teilen erzeugten Dateipfade. "
-            "Doppelklick auf eine Zeile öffnet Datei bzw. Ordner — 1.2.4"
+            "Mehrfachauswahl (Ctrl/Shift); Doppelklick öffnet Datei/Ordner; "
+            "Kontextmenü; „Ordner der Auswahl öffnen“ — 1.2.5"
         )
         self.split_log.path_activate.connect(self._split_open_log_path)
+        self.split_log.open_selected_folders.connect(self._split_open_selected_folders)
+        self.split_log.copy_requested.connect(self._split_copy_log)
         form.addRow("Pfad-Log", self.split_log)
         log_btns = QHBoxLayout()
         btn_copy_log = QPushButton("Log kopieren")
@@ -308,8 +373,15 @@ class PdfToolsDialog(QDialog):
         btn_save_log = QPushButton("Log als TXT…")
         btn_save_log.setToolTip("Pfad-Log als Textdatei speichern — 1.2.3")
         btn_save_log.clicked.connect(self._split_save_log_txt)
+        btn_open_sel = QPushButton("Ordner der Auswahl öffnen")
+        btn_open_sel.setToolTip(
+            "Elternordner der ausgewählten Log-Zeilen öffnen "
+            "(Mehrfachauswahl möglich) — 1.2.5"
+        )
+        btn_open_sel.clicked.connect(self._split_open_selected_folders)
         log_btns.addWidget(btn_copy_log)
         log_btns.addWidget(btn_save_log)
+        log_btns.addWidget(btn_open_sel)
         log_btns.addStretch()
         form.addRow("", log_btns)
         run = QPushButton("Teilen")
@@ -702,12 +774,13 @@ class PdfToolsDialog(QDialog):
         self.split_log.setPlainText(header + ("\n" + "\n".join(lines) if lines else ""))
 
     def _split_log_empty_hint(self) -> None:
-        """Hinweis bei leerem Pfad-Log — 1.2.4."""
+        """Hinweis bei leerem Pfad-Log — 1.2.4/1.2.5."""
         QMessageBox.information(
             self,
             "Pfad-Log",
             "Kein Log vorhanden — zuerst teilen.\n"
-            "Danach: Doppelklick auf eine Zeile öffnet Datei oder Ordner.",
+            "Danach: Mehrfachauswahl, Doppelklick, Kontextmenü "
+            "oder „Ordner der Auswahl öffnen“.",
         )
 
     def _split_path_from_line(self, line: str) -> str | None:
@@ -725,38 +798,98 @@ class PdfToolsDialog(QDialog):
             return text.strip('"')
         return None
 
+    def _split_selected_paths(self) -> list[str]:
+        """Ausgewählte (oder aktuelle) Pfade aus dem Log — 1.2.5."""
+        if not hasattr(self, "split_log"):
+            return []
+        lines = self.split_log.selected_lines()
+        if not lines:
+            cur = self.split_log.current_line()
+            if cur:
+                lines = [cur]
+        paths: list[str] = []
+        for line in lines:
+            p = self._split_path_from_line(line)
+            if p:
+                paths.append(p)
+        return paths
+
+    def _split_open_path_str(self, path_s: str, *, prefer_folder: bool = False) -> bool:
+        """Datei oder Ordner öffnen; True bei Erfolg — 1.2.5."""
+        target = Path(path_s)
+        if not prefer_folder and target.is_file():
+            QDesktopServices.openUrl(QUrl.fromLocalFile(str(target)))
+            return True
+        folder = target if target.is_dir() else target.parent
+        if folder.is_dir():
+            QDesktopServices.openUrl(QUrl.fromLocalFile(str(folder)))
+            return True
+        return False
+
     def _split_open_log_path(self) -> None:
-        """Doppelklick: Datei öffnen, sonst Ordner — 1.2.4."""
+        """Doppelklick/Kontext: Datei öffnen, sonst Ordner — 1.2.4/1.2.5."""
         if not hasattr(self, "split_log"):
             return
         text = (self.split_log.toPlainText() or "").strip()
         if not text:
             self._split_log_empty_hint()
             return
-        cursor = self.split_log.textCursor()
-        block = cursor.block()
-        path_s = self._split_path_from_line(block.text() if block.isValid() else "")
+        line = self.split_log.current_line()
+        path_s = self._split_path_from_line(line)
         if not path_s:
             QMessageBox.information(
                 self,
                 "Pfad-Log",
-                "Keine Pfadzeile unter dem Cursor.\n"
-                "Doppelklick auf eine Zeile mit Dateipfad.",
+                "Keine Pfadzeile ausgewählt.\n"
+                "Zeile mit Dateipfad wählen (Doppelklick / Kontextmenü).",
             )
             return
-        target = Path(path_s)
-        if target.is_file():
-            QDesktopServices.openUrl(QUrl.fromLocalFile(str(target)))
-            return
-        folder = target if target.is_dir() else target.parent
-        if folder.is_dir():
-            QDesktopServices.openUrl(QUrl.fromLocalFile(str(folder)))
+        if self._split_open_path_str(path_s):
             return
         QMessageBox.warning(
             self,
             "Pfad-Log",
             f"Datei/Ordner nicht gefunden:\n{path_s}",
         )
+
+    def _split_open_selected_folders(self) -> None:
+        """Elternordner der Auswahl öffnen (Mehrfachauswahl) — 1.2.5."""
+        if not hasattr(self, "split_log"):
+            return
+        if not (self.split_log.toPlainText() or "").strip():
+            self._split_log_empty_hint()
+            return
+        paths = self._split_selected_paths()
+        if not paths:
+            QMessageBox.information(
+                self,
+                "Pfad-Log",
+                "Keine Pfadzeilen ausgewählt.\n"
+                "Eine oder mehrere Zeilen markieren (Ctrl/Shift).",
+            )
+            return
+        folders: list[str] = []
+        seen: set[str] = set()
+        missing: list[str] = []
+        for path_s in paths:
+            target = Path(path_s)
+            folder = target if target.is_dir() else target.parent
+            key = str(folder.resolve()) if folder.exists() else str(folder)
+            if not folder.is_dir():
+                missing.append(path_s)
+                continue
+            if key in seen:
+                continue
+            seen.add(key)
+            folders.append(str(folder))
+            QDesktopServices.openUrl(QUrl.fromLocalFile(str(folder)))
+        if not folders and missing:
+            QMessageBox.warning(
+                self,
+                "Pfad-Log",
+                "Keine Ordner gefunden für die Auswahl:\n" + "\n".join(missing[:5]),
+            )
+
 
     def _split_copy_log(self) -> None:
         """Pfad-Log in die Zwischenablage — 1.2.3."""
