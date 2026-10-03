@@ -121,11 +121,11 @@ def clear_recovery_for(source_path: str | Path) -> None:
 
 
 def list_orphans(*, max_age_hours: float = 72.0) -> list[RecoveryOrphan]:
-    """Dirty Orphans im Recovery-Ordner (neueste zuerst)."""
+    """Dirty Orphans im Recovery-Ordner (älteste zuerst) — 1.8.4."""
     rdir = recovery_dir()
     out: list[RecoveryOrphan] = []
     cutoff = time.time() - max(1.0, float(max_age_hours)) * 3600.0
-    for meta_path in sorted(rdir.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True):
+    for meta_path in rdir.glob("*.json"):
         try:
             data = json.loads(meta_path.read_text(encoding="utf-8"))
         except Exception:
@@ -154,6 +154,13 @@ def list_orphans(*, max_age_hours: float = 72.0) -> list[RecoveryOrphan]:
                 label=str(data.get("label") or Path(src).name),
             )
         )
+    # Älteste zuerst (saved_at, Fallback mtime) — 1.8.4
+    out.sort(
+        key=lambda o: (
+            float(o.saved_at or 0.0),
+            o.meta_path.stat().st_mtime if o.meta_path.is_file() else 0.0,
+        )
+    )
     return out
 
 

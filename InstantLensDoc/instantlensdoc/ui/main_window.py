@@ -1067,8 +1067,9 @@ class MainWindow(QMainWindow):
         self.pdf_view.status.connect(self._on_pdf_view_status)
         self.pdf_view.annotations_changed.connect(self._refresh_pdf_marks)
         self.pdf_view.annotations_changed.connect(self._refresh_undo_hint)
-        # Toolbar-Undo und Ctrl+Z: Layer-Alle-ein/aus · Tag-Rename-Filter — 1.8.3
+        # Toolbar-Undo/Redo: Layer-Alle-ein/aus · Tag-Rename-Filter — 1.8.3/1.8.4
         self._ann_layer_undo: list[dict[str, bool]] = []
+        self._ann_layer_redo: list[dict[str, bool]] = []
         _pdf_undo = self.pdf_view.undo_annotation
 
         def _undo_annotation_with_tag_revert() -> bool:
@@ -1086,6 +1087,8 @@ class MainWindow(QMainWindow):
         _pdf_redo = self.pdf_view.redo_annotation
 
         def _redo_annotation_with_sticky_clear() -> bool:
+            if self._redo_ann_type_layers():
+                return True
             ok = bool(_pdf_redo())
             if ok:
                 # Sticky 0-Treffer auch bei Ann.-Redo leeren — 1.1.9
@@ -2009,14 +2012,14 @@ class MainWindow(QMainWindow):
         act_all_on = QAction("Alle ein", self)
         act_all_on.setShortcut(QKeySequence("Ctrl+Alt+0"))
         act_all_on.setToolTip(
-            "Alle Annotation-Typen einblenden (Ctrl+Alt+0); Undo ein Stack-Eintrag — 1.8.3"
+            "Alle Annotation-Typen einblenden (Ctrl+Alt+0); Undo/Redo ein Stack-Eintrag — 1.8.4"
         )
         act_all_on.triggered.connect(lambda: self._set_all_ann_type_layers(True))
         m_ann_types.addAction(act_all_on)
         act_all_off = QAction("Alle aus", self)
         act_all_off.setShortcut(QKeySequence("Ctrl+Alt+Shift+0"))
         act_all_off.setToolTip(
-            "Alle Annotation-Typen ausblenden (Ctrl+Alt+Shift+0); Undo ein Stack-Eintrag — 1.8.3"
+            "Alle Annotation-Typen ausblenden (Ctrl+Alt+Shift+0); Undo/Redo ein Stack-Eintrag — 1.8.4"
         )
         act_all_off.triggered.connect(lambda: self._set_all_ann_type_layers(False))
         m_ann_types.addAction(act_all_off)
@@ -3035,9 +3038,21 @@ class MainWindow(QMainWindow):
                 it.setText(base)
 
     def _blink_status_briefly(self) -> None:
-        """Statusleiste kurz blinken bei Batch-Abschluss — 1.8.3."""
+        """
+        Statusleiste blinken bei Batch-Abschluss — 1.8.3.
+        Dauer/Modus wie Status-Blink Settings (kurz/aus) — 1.8.4.
+        """
         from PySide6.QtCore import QTimer
 
+        from instantlensdoc.core.app_settings import (
+            STATUS_BLINK_AUS,
+            get_status_blink_mode,
+        )
+
+        if get_status_blink_mode() == STATUS_BLINK_AUS:
+            # Aus: kein Blink (Status-Text vom Batch bleibt sichtbar)
+            self._batch_status_blink_active = False
+            return
         if getattr(self, "_batch_status_blink_active", False):
             return
         sb = self.statusBar()
@@ -3045,6 +3060,7 @@ class MainWindow(QMainWindow):
             return
         self._batch_status_blink_active = True
         base = sb.styleSheet() or ""
+        # kurz: 2 Blink-Zyklen, gleiche Timing-Familie wie Pending-Blink
         styles = (
             "color: #fff; background-color: #1F6F4A; font-weight: 600;",
             base,
@@ -3067,7 +3083,7 @@ class MainWindow(QMainWindow):
             except Exception:
                 pass
             self._batch_status_blink_step = i + 1
-            QTimer.singleShot(80, _tick)
+            QTimer.singleShot(90, _tick)
 
         _tick()
 
@@ -5014,7 +5030,7 @@ class MainWindow(QMainWindow):
             pass
 
     def _set_all_ann_type_layers(self, visible: bool) -> None:
-        """Alle Layer-Typen ein-/aus; Undo als ein Stack-Eintrag — 1.8.3."""
+        """Alle Layer-Typen ein-/aus; Undo/Redo als ein Stack-Eintrag — 1.8.3/1.8.4."""
         from instantlensdoc.core.app_settings import (
             ANN_LAYER_TYPE_KEYS,
             get_ann_layer_types_visible,
@@ -5024,9 +5040,7 @@ class MainWindow(QMainWindow):
         prev = dict(get_ann_layer_types_visible())
         payload = {k: bool(visible) for k in ANN_LAYER_TYPE_KEYS}
         if prev == payload:
-            self._set_status(
-                "Annotation-Typen: alle ein" if visible else "Annotation-Typen: alle aus"
-            )
+            self._set_status("Layer: alle ein" if visible else "Layer: alle aus")
             return
         stack = getattr(self, "_ann_layer_undo", None)
         if stack is None:
@@ -5035,6 +5049,8 @@ class MainWindow(QMainWindow):
         stack.append(prev)
         if len(stack) > 20:
             stack.pop(0)
+        # Neuer Vorwärts-Schritt leert Redo — 1.8.4
+        self._ann_layer_redo = []
         set_ann_layer_types_visible(payload)
         self.pdf_view.set_annotation_types_visible(payload)
         self._sync_ann_type_actions()
@@ -5042,21 +5058,28 @@ class MainWindow(QMainWindow):
             self._save_session()
         except Exception:
             pass
-        self._set_status(
-            "Annotation-Typen: alle ein — Ctrl+Z rückgängig"
-            if visible
-            else "Annotation-Typen: alle aus — Ctrl+Z rückgängig"
-        )
+        self._set_status("Layer: alle ein" if visible else "Layer: alle aus")
         self._refresh_undo_hint()
 
     def _undo_ann_type_layers(self) -> bool:
-        """Einen Layer-Alle-ein/aus-Eintrag rückgängig — 1.8.3."""
+        """Einen Layer-Alle-ein/aus-Eintrag rückgängig — 1.8.3; Redo-fähig — 1.8.4."""
         stack = getattr(self, "_ann_layer_undo", None) or []
         if not stack:
             return False
-        from instantlensdoc.core.app_settings import set_ann_layer_types_visible
+        from instantlensdoc.core.app_settings import (
+            get_ann_layer_types_visible,
+            set_ann_layer_types_visible,
+        )
 
+        current = dict(get_ann_layer_types_visible())
         prev = stack.pop()
+        redo = getattr(self, "_ann_layer_redo", None)
+        if redo is None:
+            self._ann_layer_redo = []
+            redo = self._ann_layer_redo
+        redo.append(current)
+        if len(redo) > 20:
+            redo.pop(0)
         set_ann_layer_types_visible(prev)
         self.pdf_view.set_annotation_types_visible(prev)
         self._sync_ann_type_actions()
@@ -5064,7 +5087,44 @@ class MainWindow(QMainWindow):
             self._save_session()
         except Exception:
             pass
-        self._set_status("Annotation-Typen: Sichtbarkeit rückgängig")
+        self._set_status("Layer: Sichtbarkeit rückgängig")
+        self._refresh_undo_hint()
+        return True
+
+    def _redo_ann_type_layers(self) -> bool:
+        """Layer-Alle-ein/aus wiederholen (Ctrl+Y) — 1.8.4."""
+        redo = getattr(self, "_ann_layer_redo", None) or []
+        if not redo:
+            return False
+        from instantlensdoc.core.app_settings import (
+            get_ann_layer_types_visible,
+            set_ann_layer_types_visible,
+        )
+
+        current = dict(get_ann_layer_types_visible())
+        nxt = redo.pop()
+        undo = getattr(self, "_ann_layer_undo", None)
+        if undo is None:
+            self._ann_layer_undo = []
+            undo = self._ann_layer_undo
+        undo.append(current)
+        if len(undo) > 20:
+            undo.pop(0)
+        set_ann_layer_types_visible(nxt)
+        self.pdf_view.set_annotation_types_visible(nxt)
+        self._sync_ann_type_actions()
+        try:
+            self._save_session()
+        except Exception:
+            pass
+        # Status analog zu Set: alle ein/aus wenn einheitlich
+        vals = set(bool(v) for v in nxt.values()) if nxt else set()
+        if vals == {True}:
+            self._set_status("Layer: alle ein")
+        elif vals == {False}:
+            self._set_status("Layer: alle aus")
+        else:
+            self._set_status("Layer: Sichtbarkeit wiederholen")
         self._refresh_undo_hint()
         return True
 
@@ -5827,7 +5887,10 @@ class MainWindow(QMainWindow):
             pass
 
     def _maybe_recover_orphans(self) -> None:
-        """Beim Start: dirty Autosave-Orphans anbieten — 1.8.0; Alter·Als Kopie — 1.8.2."""
+        """
+        Beim Start: dirty Autosave-Orphans anbieten — 1.8.0; Alter·Als Kopie — 1.8.2.
+        Mehrere Orphans als Liste, älteste zuerst — 1.8.4.
+        """
         import os
 
         if os.environ.get("ILD_SMOKE_QT") or os.environ.get("ILD_NO_SESSION"):
@@ -5851,20 +5914,36 @@ class MainWindow(QMainWindow):
             return
         if not orphans:
             return
-        # Snapshot-Metadaten inkl. Alter — 1.8.2
+        # Liste aller Orphans (älteste zuerst); nummeriert bei mehreren — 1.8.4
         previews = []
-        for o in orphans[:8]:
+        multi = len(orphans) > 1
+        show_n = min(len(orphans), 12)
+        for idx, o in enumerate(orphans[:show_n], start=1):
             try:
-                previews.append(orphan_meta_preview(o))
+                body = orphan_meta_preview(o)
             except Exception:
                 try:
                     age_s = format_orphan_age(o.age_seconds())
                 except Exception:
                     age_s = "Alter unbekannt"
-                previews.append(f"{o.label} ({o.kind}, {age_s})")
-        more = f"\n\n… und {len(orphans) - 8} weitere" if len(orphans) > 8 else ""
+                body = f"{o.label} ({o.kind}, {age_s})"
+            if multi:
+                previews.append(f"{idx}. {body}")
+            else:
+                previews.append(body)
+        more = (
+            f"\n\n… und {len(orphans) - show_n} weitere"
+            if len(orphans) > show_n
+            else ""
+        )
+        head = (
+            f"{len(orphans)} ungespeicherte Autosave-Snapshots (Crash-Recovery), "
+            "älteste zuerst:\n\n"
+            if multi
+            else "Ungespeicherter Autosave-Snapshot gefunden (Crash-Recovery):\n\n"
+        )
         msg = (
-            "Ungespeicherte Autosave-Snapshots gefunden (Crash-Recovery):\n\n"
+            head
             + "\n\n".join(previews)
             + more
             + "\n\nWiederherstellen, als Kopie öffnen oder verwerfen?"

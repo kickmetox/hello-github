@@ -94,27 +94,36 @@ class WmOutTemplateEdit(QLineEdit):
 
 
 class _HfPagePreviewDialog(QDialog):
-    """HF-Seitenvorschau: Fit-Page · Mausrad · Esc schließt — 1.8.3."""
+    """HF-Seitenvorschau: Fit-Page · Mausrad · Esc → Fokus Dialog — 1.8.3/1.8.4."""
 
-    def __init__(self, parent, *, pdf_path: str, zoom_pct: int = 100):
+    def __init__(
+        self,
+        parent,
+        *,
+        pdf_path: str,
+        zoom_pct: int = 100,
+        fit_page: bool = False,
+    ):
         super().__init__(parent)
         self.setWindowTitle("Kopf-/Fußzeile — Seitenvorschau")
         self.resize(520, 640)
         self._pdf_path = pdf_path
         self._zoom = max(50, min(250, int(zoom_pct or 100))) / 100.0
-        self._fit_page = False
+        self._fit_page = bool(fit_page)
         self._base_pm: QPixmap | None = None
 
         root = QVBoxLayout(self)
         hint = QLabel(
-            "Fit-Page · Mausrad zoomt · Esc schließt Vorschau — 1.8.3"
+            "Fit-Page · Mausrad zoomt · Esc schließt → Fokus Dialog — 1.8.4"
         )
         hint.setWordWrap(True)
         hint.setStyleSheet("color:#555;")
         root.addWidget(hint)
         ctrl = QHBoxLayout()
         self.fit_page_check = QCheckBox("Seite einpassen")
-        self.fit_page_check.setToolTip("Vorschau an Viewport anpassen (Fit-Page) — 1.8.3")
+        self.fit_page_check.setToolTip(
+            "Vorschau an Viewport anpassen (Fit-Page); merkt Modus für nächste Vorschau — 1.8.4"
+        )
         self.fit_page_check.toggled.connect(self._on_fit_page_toggled)
         ctrl.addWidget(self.fit_page_check)
         self.zoom_label = QLabel(f"{int(round(self._zoom * 100))} %")
@@ -139,6 +148,10 @@ class _HfPagePreviewDialog(QDialog):
         bb.rejected.connect(self.reject)
         root.addWidget(bb)
         self._load_base()
+        if self._fit_page:
+            self.fit_page_check.blockSignals(True)
+            self.fit_page_check.setChecked(True)
+            self.fit_page_check.blockSignals(False)
         self._refresh_view()
 
     def keyPressEvent(self, event: QKeyEvent) -> None:  # noqa: N802
@@ -147,6 +160,12 @@ class _HfPagePreviewDialog(QDialog):
             event.accept()
             return
         super().keyPressEvent(event)
+
+    def zoom_pct(self) -> int:
+        return int(round(self._zoom * 100))
+
+    def fit_page_enabled(self) -> bool:
+        return bool(self._fit_page)
 
     def eventFilter(self, obj, event):  # noqa: N802
         if obj is self._scroll.viewport() and event.type() == QEvent.Type.Wheel:
@@ -930,7 +949,9 @@ class WatermarkDialog(QDialog):
         prev_col.addLayout(zoom_row)
         self.hf_fit_page = QCheckBox("Seite einpassen")
         self.hf_fit_page.setObjectName("hfFitPage")
-        self.hf_fit_page.setToolTip("Vorschau an Label-Größe anpassen (Fit-Page) — 1.8.3")
+        self.hf_fit_page.setToolTip(
+            "Vorschau an Label-Größe anpassen (Fit-Page); merkt Modus für nächste Vorschau — 1.8.4"
+        )
         self.hf_fit_page.toggled.connect(self._on_hf_fit_page_toggled)
         prev_col.addWidget(self.hf_fit_page)
         self.hf_preview = QLabel()
@@ -1024,8 +1045,29 @@ class WatermarkDialog(QDialog):
         self._hf_fit_page = bool(checked)
         self._refresh_hf_preview()
 
+    def _restore_focus_after_preview(self) -> None:
+        """Nach Esc/Schließen der großen Vorschau Fokus zurück auf HF-Dialog — 1.8.4."""
+        try:
+            self.raise_()
+            self.activateWindow()
+        except Exception:
+            pass
+        # Bevorzugt Zoom-Steuerung / Fit-Checkbox, sonst Dialog
+        target = None
+        if hasattr(self, "hf_preview_zoom") and self.hf_preview_zoom.isEnabled():
+            target = self.hf_preview_zoom
+        elif hasattr(self, "hf_fit_page"):
+            target = self.hf_fit_page
+        try:
+            if target is not None:
+                target.setFocus()
+            else:
+                self.setFocus()
+        except Exception:
+            pass
+
     def _open_hf_preview_window(self) -> None:
-        """Große HF-Vorschau (Fit-Page · Mausrad · Esc) — 1.8.3."""
+        """Große HF-Vorschau; Esc → Fokus Dialog; Fit-Page merken — 1.8.4."""
         src = ""
         if hasattr(self, "hf_src"):
             src = self.hf_src.text().strip()
@@ -1035,8 +1077,27 @@ class WatermarkDialog(QDialog):
         zoom = 100
         if hasattr(self, "hf_preview_zoom"):
             zoom = int(self.hf_preview_zoom.value() or 100)
-        dlg = _HfPagePreviewDialog(self, pdf_path=src, zoom_pct=zoom)
+        fit = bool(getattr(self, "_hf_fit_page", False))
+        dlg = _HfPagePreviewDialog(
+            self, pdf_path=src, zoom_pct=zoom, fit_page=fit
+        )
         dlg.exec()
+        # Zoom-Modus (Fit vs. %) für nächste Vorschau übernehmen — 1.8.4
+        try:
+            fit_now = bool(dlg.fit_page_enabled())
+            self._hf_fit_page = fit_now
+            if hasattr(self, "hf_fit_page"):
+                self.hf_fit_page.blockSignals(True)
+                self.hf_fit_page.setChecked(fit_now)
+                self.hf_fit_page.blockSignals(False)
+            if not fit_now and hasattr(self, "hf_preview_zoom"):
+                self.hf_preview_zoom.blockSignals(True)
+                self.hf_preview_zoom.setValue(int(dlg.zoom_pct()))
+                self.hf_preview_zoom.blockSignals(False)
+            self._refresh_hf_preview()
+        except Exception:
+            pass
+        self._restore_focus_after_preview()
 
     def _refresh_hf_preview(self) -> None:
         """Text + Thumbnail; Fit-Page / Zoom — 1.8.3."""

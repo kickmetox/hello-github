@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **1.8.3** |
+| Version | **1.8.4** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -63,12 +63,12 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an / `checkedonce`)
 
-## Neu in 1.8.3
+## Neu in 1.8.4
 
-Post-Release-Polish nach **1.8.2**:
+Post-Release-Polish nach **1.8.3** (Basis **1.8.2**):
 
-- **Seiten:** Batch Undo-Text „gedreht“ / „gespiegelt“ · Statusleiste blinkt kurz bei Abschluss
-- **Kopf-/Fußzeile:** Fit-Page in Vorschau · Mausrad-Zoom · Esc schließt Vorschau-Fenster
-- **Annotation-Layer:** „Alle ein/aus“ als ein Undo-Eintrag · Ctrl+Alt+0 / Ctrl+Alt+Shift+0
-- **Crash-Recovery:** Kopie mit Suffix `_recovered` · Original-Orphan bleibt bis Verwerfen
+- **Seiten:** Batch Status-Blink folgt Settings kurz/aus
+- **Kopf-/Fußzeile:** Esc → Fokus zurück auf Dialog · Fit-Page merkt Zoom-Modus für nächste Vorschau
+- **Annotation-Layer:** Redo nach „Alle ein/aus“ · Status „Layer: alle ein/aus“
+- **Crash-Recovery:** mehrere Orphans als Liste, älteste zuerst
 - Stubs KI/Cloud/Stylus/3D unverändert

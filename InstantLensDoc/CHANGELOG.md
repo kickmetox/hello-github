@@ -1,5 +1,23 @@
 # Changelog — InstantLens Doc
 
+## 1.8.4 — Batch Status-Blink Settings, HF Esc-Fokus·Fit merken, Layer Redo·Status, Recovery Orphan-Liste älteste zuerst
+
+Post-Release-Polish nach 1.8.3: **Batch Status-Blink** nutzt **Status-Blink Settings (kurz/aus)**; **Kopf-/Fußzeile-Vorschau** mit **Esc → Fokus zurück auf Dialog** und **Fit-Page speichert Zoom-Modus** für die nächste Vorschau; **Layer Alle ein/aus** mit **Redo (Ctrl+Y)** und Status **„Layer: alle ein/aus“**; **Crash-Recovery** listet **mehrere Orphans** (nummeriert), **älteste zuerst**. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### PDF / Seiten
+- Batch Status-Blink: Modus/Dauer wie Einstellungen Status-Blink (kurz = Blink, aus = kein Blink)
+- Kopf-/Fußzeile: Esc schließt große Vorschau und setzt Fokus zurück; Fit-Page-Modus bleibt für nächste Vorschau
+
+### Annotationen / Recovery
+- Annotation-Typen „Alle ein/aus“: Redo nach Undo; Status „Layer: alle ein“ / „Layer: alle aus“
+- Crash-Recovery: mehrere Orphans als Liste (älteste zuerst), nummeriert bei >1
+
+### Packaging / Docs
+- Version **1.8.4** (App / `ild_pdf` / ISS / Smoke / Docs); `docs/VERSION` + `VERSION.txt`
+- Smoke: Batch Blink-Settings, HF Esc-Fokus·Fit merken, Layer Redo·Status, Orphan-Liste älteste zuerst (CLI + Qt)
+
+---
+
 ## 1.8.3 — Batch Undo DE-Verben·Status-Blink, HF Fit-Page·Mausrad·Esc, Layer Alle ein/aus Undo+Shortcuts, Recovery `_recovered`
 
 Post-Release-Polish nach 1.8.2: **Batch Drehen/Spiegeln** mit **einheitlichen DE-Verben** („gedreht“ / „gespiegelt“) und **Statusleisten-Blink** bei Abschluss; **Kopf-/Fußzeile-Vorschau** mit **Fit-Page**, **Mausrad-Zoom**, **Esc schließt Vorschau-Fenster**; **Layer „Alle ein/aus“** als **ein Undo-Stack-Eintrag** inkl. Shortcuts **Ctrl+Alt+0** / **Ctrl+Alt+Shift+0**; **Crash-Recovery-Kopie** mit Suffix **`_recovered`**, Original-Orphan bleibt bis **Verwerfen**. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
