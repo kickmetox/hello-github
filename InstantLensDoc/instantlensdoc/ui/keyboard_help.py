@@ -38,13 +38,13 @@ from instantlensdoc.core.app_settings import (
 
 SHORTCUTS_HTML = """
 <h2>Tastatur-Cheat-Sheet — InstantLens Doc</h2>
-<p>Shortcut-Liste (DE) — Hilfe → Tastatur-Cheat-Sheet… / <code>F1</code> — Suche/Filter · Drucken · Export TXT Live-Vorschau · Quick-Insert {date} · Reset Default — 2.4.3</p>
+<p>Shortcut-Liste (DE) — Hilfe → Tastatur-Cheat-Sheet… / <code>F1</code> — Suche/Filter · Drucken · Export TXT Live-Vorschau · Quick-Insert {date} · Reset Default Bestätigung nur bei Abweichung · Fokus+Selektion — 2.4.4</p>
 <table cellpadding="4" cellspacing="0">
 <tr><th align="left">Aktion</th><th align="left">Kürzel</th></tr>
-<tr><td>Tastatur-Cheat-Sheet</td><td><code>F1</code> — Shortcut-Liste DE · Suche/Filter · Drucken · TXT Live-Vorschau · Quick-Insert {date} · Reset Default · Zielordner merken — 2.4.3</td></tr>
-<tr><td>Sync-Scroll (PDF↔PDF)</td><td><code>Ctrl+Alt+\\</code> — nur PDF↔PDF · Status-Klick · Tooltip Zustand an/aus · A11y — 2.4.3</td></tr>
-<tr><td>Annotation-Vorlagen</td><td>Toolbar Quick-Apply ★ · Rechtsklick wählen · Esc Apply-Modus abbrechen — 2.4.3</td></tr>
-<tr><td>Thumbnail Disk-Cache</td><td>Auto-Prune Status „N Dateien / X MB entfernt“ · Settings Intervall oder on-write — 2.4.3</td></tr>
+<tr><td>Tastatur-Cheat-Sheet</td><td><code>F1</code> — Shortcut-Liste DE · Suche/Filter · Drucken · TXT Live-Vorschau · Quick-Insert {date} · Reset Default Bestätigung nur bei Abweichung · Fokus+Selektion · Zielordner merken — 2.4.4</td></tr>
+<tr><td>Sync-Scroll (PDF↔PDF)</td><td><code>Ctrl+Alt+\\</code> — nur PDF↔PDF · Status-Widget AccessibleName · Announcement bei Toggle · Klick toggled — 2.4.4</td></tr>
+<tr><td>Annotation-Vorlagen</td><td>Toolbar Quick-Apply ★ · Rechtsklick wählen · Esc → „Apply abgebrochen“ · Fokus Toolbar — 2.4.4</td></tr>
+<tr><td>Thumbnail Disk-Cache</td><td>Auto-Prune Status „N Dateien / X MB entfernt“ kopierbar · Toast optional Settings · Intervall/on-write — 2.4.4</td></tr>
 <tr><td>Neu (leer)</td><td><code>Ctrl+N</code></td></tr>
 <tr><td>Textbaustein 1–3 einfügen</td><td><code>Ctrl+Alt+1</code> … <code>3</code></td></tr>
 <tr><td>Annotationen sperren</td><td><code>Ctrl+Shift+L</code></td></tr>
@@ -584,7 +584,8 @@ class KeyboardHelpDialog(QDialog):
         btn_txt.setToolTip(
             f"TXT speichern · Live-Vorschau · Quick-Insert {{date}} · "
             f"Reset Default ({DEFAULT_SHORTCUTS_TXT_FILENAME_TEMPLATE}) · "
-            "Zielordner merken — 2.4.3"
+            "Bestätigung nur bei Abweichung · Fokus+Selektion · "
+            "Zielordner merken — 2.4.4"
         )
         btn_txt.setAccessibleName("Shortcuts als TXT exportieren")
         btn_txt.clicked.connect(self._export_txt)
@@ -639,8 +640,8 @@ class KeyboardHelpDialog(QDialog):
 
     def _export_txt(self) -> None:
         """
-        TXT-Export: Live-Vorschau Dateiname · Quick-Insert {date} ·
-        Reset Default · Zielordner merken — 2.4.3.
+        TXT-Export: Live-Vorschau · Quick-Insert {date} ·
+        Reset Default Bestätigung nur bei Abweichung · Fokus+Selektion — 2.4.4.
         """
         from instantlensdoc.ui.template_reset import (
             EscapeDiscardEditFilter,
@@ -654,7 +655,8 @@ class KeyboardHelpDialog(QDialog):
         ol.addWidget(
             QLabel(
                 f"Template {DEFAULT_SHORTCUTS_TXT_FILENAME_TEMPLATE} · "
-                "Live-Vorschau · Quick-Insert · Reset Default — 2.4.3"
+                "Live-Vorschau · Quick-Insert · Reset Default "
+                "(Bestätigung nur bei Abweichung · Fokus+Selektion) — 2.4.4"
             )
         )
 
@@ -666,7 +668,7 @@ class KeyboardHelpDialog(QDialog):
         tpl_edit.setToolTip(
             "Live-Dateiname-Template; Platzhalter {date}; "
             "Quick-Insert; Reset Default (Bestätigung nur bei Abweichung · "
-            "Fokus+Selektion); Esc im Feld verwirft Edit — 2.4.3"
+            "Fokus+Selektion); Esc im Feld verwirft Edit — 2.4.4"
         )
         tpl_edit.setAccessibleName("Shortcuts-TXT Dateiname-Template")
         tpl_row.addWidget(tpl_edit, 1)
@@ -721,12 +723,12 @@ class KeyboardHelpDialog(QDialog):
         btn_reset_tpl.setFocusPolicy(Qt.TabFocus)
         btn_reset_tpl.setToolTip(
             f"Reset Default ({DEFAULT_SHORTCUTS_TXT_FILENAME_TEMPLATE}) "
-            "Bestätigung nur bei Abweichung; danach Fokus+Selektion — 2.4.3"
+            "Bestätigung nur bei Abweichung; danach Fokus+Selektion — 2.4.4"
         )
         btn_reset_tpl.setAccessibleName("Shortcuts-TXT Reset Default")
         btn_reset_tpl.setAccessibleDescription(
             "Template auf Default zurücksetzen. Bestätigung nur bei Abweichung; "
-            "danach Fokus und Selektion im Template-Feld — 2.4.3"
+            "danach Fokus und Selektion im Template-Feld — 2.4.4"
         )
 
         def _reset_tpl() -> None:

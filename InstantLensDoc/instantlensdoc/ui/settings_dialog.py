@@ -200,6 +200,7 @@ from instantlensdoc.core.app_settings import (
     get_thumb_cache_max_mb,
     get_thumb_cache_prune_interval_min,
     get_thumb_cache_prune_mode,
+    get_thumb_cache_prune_toast,
     get_thumb_lazy_threshold,
     get_thumb_prefetch_cancel_ms,
     get_thumb_prefetch_radius,
@@ -331,6 +332,7 @@ from instantlensdoc.core.app_settings import (
     set_thumb_cache_max_mb,
     set_thumb_cache_prune_interval_min,
     set_thumb_cache_prune_mode,
+    set_thumb_cache_prune_toast,
     set_thumb_lazy_threshold,
     set_thumb_prefetch_cancel_ms,
     set_thumb_prefetch_radius,
@@ -692,7 +694,8 @@ class SettingsDialog(QDialog):
         self.thumb_cache_prune_mode.setCurrentIndex(prune_mode_pick)
         self.thumb_cache_prune_mode.setToolTip(
             "Auto-Prune bei Limit: sofort beim Cache-Schreiben oder "
-            "periodisch im Intervall — Status „N Dateien / X MB entfernt“ — 2.4.3"
+            "periodisch im Intervall — Status „N Dateien / X MB entfernt“ "
+            "kopierbar · Toast optional — 2.4.4"
         )
         self.thumb_cache_prune_mode.setAccessibleName("Thumb-Cache Auto-Prune Modus")
         form.addRow("Thumb Auto-Prune", self.thumb_cache_prune_mode)
@@ -725,6 +728,20 @@ class SettingsDialog(QDialog):
             _sync_prune_interval_enabled
         )
         _sync_prune_interval_enabled()
+
+        self.thumb_cache_prune_toast = QCheckBox(
+            "Auto-Prune Status-Toast anzeigen"
+        )
+        self.thumb_cache_prune_toast.setObjectName("thumbCachePruneToast")
+        self.thumb_cache_prune_toast.setChecked(get_thumb_cache_prune_toast())
+        self.thumb_cache_prune_toast.setToolTip(
+            "Optionaler Toast bei Auto-Prune „N Dateien / X MB entfernt“ "
+            "(Dauer OCR-Toast-Settings); Status bleibt kopierbar — 2.4.4"
+        )
+        self.thumb_cache_prune_toast.setAccessibleName(
+            "Auto-Prune Status-Toast optional"
+        )
+        form.addRow(self.thumb_cache_prune_toast)
 
         self.thumb_cache_debug = QCheckBox("Thumb-Cache Hit/Miss Status (Debug)")
         self.thumb_cache_debug.setObjectName("thumbCacheDebugHits")
@@ -3003,6 +3020,8 @@ class SettingsDialog(QDialog):
                 )
             except (TypeError, ValueError):
                 set_thumb_cache_prune_interval_min(15)
+        if hasattr(self, "thumb_cache_prune_toast"):
+            set_thumb_cache_prune_toast(self.thumb_cache_prune_toast.isChecked())
         try:
             parent = self.parent()
             if parent is not None and hasattr(parent, "_sync_thumb_prune_timer"):

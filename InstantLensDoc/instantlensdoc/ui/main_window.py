@@ -1233,20 +1233,22 @@ class MainWindow(QMainWindow):
         self._pending_blink_active = False
         self._pending_was_pending = False
         self._split_scroll_syncing = False
-        # Sync-Scroll Statusleisten-Indikator (PDF↔PDF) — Klick · Tooltip Zustand · A11y — 2.4.3
+        # Sync-Scroll Status-Widget (PDF↔PDF) — AccessibleName · Announcement Toggle — 2.4.4
         self.sync_scroll_status_label = QLabel("")
         self.sync_scroll_status_label.setObjectName("syncScrollStatus")
         self.sync_scroll_status_label.setStyleSheet(
             "QLabel#syncScrollStatus { color: #555; padding-right: 8px; font-size: 11px; }"
         )
         self.sync_scroll_status_label.setToolTip(
-            "Sync-Scroll: Zustand aus — Klick toggled · Shortcut Ctrl+Alt+\\ — 2.4.3"
+            "Sync-Scroll: Zustand aus — Klick toggled · Shortcut Ctrl+Alt+\\ — 2.4.4"
         )
-        self.sync_scroll_status_label.setAccessibleName("Sync-Scroll Zustand")
+        self.sync_scroll_status_label.setAccessibleName("Sync-Scroll Status: aus")
         self.sync_scroll_status_label.setAccessibleDescription(
-            "Sync-Scroll PDF↔PDF. Tooltip zeigt aktuellen Zustand an oder aus. "
-            "Klick toggled. Shortcut Ctrl+Alt+Backslash."
+            "Sync-Scroll Status-Widget PDF↔PDF. Tooltip zeigt aktuellen Zustand an oder aus. "
+            "Klick toggled. Shortcut Ctrl+Alt+Backslash. Toggle mit Announcement — 2.4.4"
         )
+        self._last_thumb_prune_status = ""
+        self._thumb_prune_status_active = False
         self.sync_scroll_status_label.setCursor(Qt.PointingHandCursor)
         self.sync_scroll_status_label.mousePressEvent = (  # type: ignore[method-assign]
             lambda e: self._on_sync_scroll_status_clicked(e)
@@ -2845,6 +2847,9 @@ class MainWindow(QMainWindow):
         # Ink-Glättungs-Toast nur behalten wenn Status dazu passt — 2.2.5
         if "Glättung angewandt" not in text:
             self._smooth_status_toast_active = False
+        # Auto-Prune Status kopierbar nur behalten wenn Status dazu passt — 2.4.4
+        if "Thumb Auto-Prune" not in text and "Auto-Prune Status kopiert" not in text:
+            self._thumb_prune_status_active = False
         # Update-Quellen-Tooltip nur bei Update-Status — 1.7.4/1.7.5
         if not text.startswith("Update:") and "Update —" not in text:
             if "Update:" not in text:
@@ -2857,6 +2862,7 @@ class MainWindow(QMainWindow):
         # Update: Klick öffnet VERSION.txt / docs/VERSION — 1.7.5
         # Import-Status: Klick fokussiert Statusleiste/Log — 2.1.5
         # Ink-Toast: Klick fokussiert Ink-Tool — 2.2.5
+        # Auto-Prune: Klick kopiert Status — 2.4.4
         if getattr(self, "_meta_toast_active", False) and "Metadaten gespeichert" in text:
             self.statusBar().setToolTip(
                 "Klick öffnet Metadaten-Dialog erneut — 1.5.5"
@@ -2870,6 +2876,14 @@ class MainWindow(QMainWindow):
         elif getattr(self, "_smooth_status_toast_active", False) and "Glättung angewandt" in text:
             self.statusBar().setToolTip(
                 "Klick fokussiert Ink-/Freihand-Werkzeug — 2.2.5"
+            )
+            self.statusBar().setCursor(Qt.PointingHandCursor)
+        elif (
+            getattr(self, "_thumb_prune_status_active", False)
+            and "Thumb Auto-Prune" in text
+        ):
+            self.statusBar().setToolTip(
+                "Klick kopiert Auto-Prune Status in die Zwischenablage — 2.4.4"
             )
             self.statusBar().setCursor(Qt.PointingHandCursor)
         elif getattr(self, "_text_pdf_toast_active", False) and "Text → PDF" in text:
@@ -2987,7 +3001,7 @@ class MainWindow(QMainWindow):
         return True
 
     def _on_status_bar_clicked(self, event) -> None:
-        """Statusleisten-Klick: Meta / Import-Status / Text→PDF / Update / Outlines — 2.1.5."""
+        """Statusleisten-Klick: Meta / Import / Prune-Copy / Text→PDF / Update — 2.4.4."""
         from PySide6.QtGui import QDesktopServices
         from PySide6.QtCore import QUrl
 
@@ -3015,6 +3029,14 @@ class MainWindow(QMainWindow):
             and "Import-Status" in cur
         ):
             if self._focus_import_status_toast_target():
+                return
+        # Auto-Prune Status: Klick → Zwischenablage — 2.4.4
+        if (
+            event.button() == Qt.LeftButton
+            and getattr(self, "_thumb_prune_status_active", False)
+            and ("Thumb Auto-Prune" in cur or getattr(self, "_last_thumb_prune_status", ""))
+        ):
+            if self._copy_thumb_prune_status_to_clipboard():
                 return
         # Ink-Toast: Klick fokussiert Ink-/Freihand-Werkzeug — 2.2.5
         if (
@@ -4671,13 +4693,19 @@ class MainWindow(QMainWindow):
         self._update_sync_scroll_status_indicator()
         if checked:
             both_pdf = self._split_both_pdf()
-            self._set_status(
+            msg = (
                 "Sync-Scroll an (PDF↔PDF + Seiten-Sync)"
                 if both_pdf
                 else "Sync-Scroll an — aktiv nur bei PDF↔PDF"
             )
         else:
-            self._set_status("Sync-Scroll aus")
+            msg = "Sync-Scroll aus"
+        self._set_status(msg)
+        # A11y Announcement bei Toggle — 2.4.4
+        try:
+            self._announce_status_toast(msg)
+        except Exception:
+            pass
 
     def _recolor_annotation_tag_global(self, tag: str) -> None:
         """Tag-Cloud: Farbe aller Annotationen mit diesem Tag ändern (eine Undo-Stufe)."""
@@ -4959,11 +4987,81 @@ class MainWindow(QMainWindow):
             self._toggle_doc_split_sync_scroll(nxt)
 
     def _on_thumb_prune_status(self, msg: str) -> None:
-        """Callback: Auto-Prune Status „N Dateien / X MB entfernt“ — 2.4.3."""
+        """
+        Callback: Auto-Prune Status kopierbar; Toast optional Settings — 2.4.4.
+        """
+        text = (msg or "").strip()
+        if not text:
+            return
+        self._last_thumb_prune_status = text
+        self._thumb_prune_status_active = True
         try:
-            self._set_status(msg or "")
+            from instantlensdoc.core.app_settings import (
+                get_ocr_defaults_toast_sec,
+                get_thumb_cache_prune_toast,
+            )
+
+            show_toast = bool(get_thumb_cache_prune_toast())
+            if show_toast:
+                try:
+                    ms = max(1, int(get_ocr_defaults_toast_sec())) * 1000
+                except Exception:
+                    ms = 2000
+                self.statusBar().showMessage(text, ms)
+                self.statusBar().setToolTip(
+                    "Klick kopiert Auto-Prune Status in die Zwischenablage — 2.4.4"
+                )
+                self.statusBar().setCursor(Qt.PointingHandCursor)
+                try:
+                    self._announce_status_toast(text)
+                except Exception:
+                    pass
+            else:
+                # Ohne Toast: Status dauerhaft (länger) + kopierbar — 2.4.4
+                self.statusBar().showMessage(text, 15000)
+                self.statusBar().setToolTip(
+                    "Klick kopiert Auto-Prune Status in die Zwischenablage — 2.4.4"
+                )
+                self.statusBar().setCursor(Qt.PointingHandCursor)
+        except Exception:
+            try:
+                self._set_status(text)
+            except Exception:
+                pass
+
+    def _copy_thumb_prune_status_to_clipboard(self) -> bool:
+        """Auto-Prune Status in Zwischenablage; kurzer Toast — 2.4.4."""
+        text = (getattr(self, "_last_thumb_prune_status", "") or "").strip()
+        if not text:
+            cur = self.statusBar().currentMessage() or ""
+            if "Thumb Auto-Prune" in cur:
+                text = cur.strip()
+        if not text:
+            return False
+        try:
+            from PySide6.QtWidgets import QApplication
+
+            clip = QApplication.clipboard()
+            if clip is not None:
+                clip.setText(text.rstrip() + "\n")
+        except Exception:
+            return False
+        toast = "Auto-Prune Status kopiert"
+        self._thumb_prune_status_active = False
+        try:
+            self._announce_status_toast(toast)
         except Exception:
             pass
+        try:
+            from instantlensdoc.core.app_settings import get_ocr_defaults_toast_sec
+
+            ms = max(1, int(get_ocr_defaults_toast_sec())) * 1000
+        except Exception:
+            ms = 2000
+        self.statusBar().showMessage(toast, ms)
+        self.statusBar().setToolTip("")
+        self.statusBar().unsetCursor()
+        return True
 
     def _sync_thumb_prune_timer(self) -> None:
         """Intervall-Timer für Thumb Auto-Prune starten/stoppen — 2.4.3."""
@@ -4995,7 +5093,7 @@ class MainWindow(QMainWindow):
             pass
 
     def _update_sync_scroll_status_indicator(self) -> None:
-        """Statusleiste: Sync an/aus; Tooltip Zustand · A11y — 2.4.3."""
+        """Statusleiste: Sync an/aus; AccessibleName Status-Widget · A11y — 2.4.4."""
         if not hasattr(self, "sync_scroll_status_label"):
             return
         from instantlensdoc.core.app_settings import (
@@ -5006,11 +5104,18 @@ class MainWindow(QMainWindow):
         show_pref = get_sync_scroll_status_indicator()
         enabled = get_editor_doc_split_sync_scroll()
         active = bool(enabled and self._split_both_pdf())
-        tip_suffix = " · Klick toggled · Shortcut Ctrl+Alt+\\ — 2.4.3"
+        tip_suffix = " · Klick toggled · Shortcut Ctrl+Alt+\\ — 2.4.4"
+        # Stabiler AccessibleName für Status-Widget — 2.4.4
+        widget_name = "Sync-Scroll Status"
         if not show_pref:
             self.sync_scroll_status_label.setVisible(False)
             self.sync_scroll_status_label.setText("")
-            self.sync_scroll_status_label.setAccessibleName("Sync-Scroll ausgeblendet")
+            self.sync_scroll_status_label.setAccessibleName(
+                f"{widget_name}: ausgeblendet"
+            )
+            self.sync_scroll_status_label.setAccessibleDescription(
+                "Sync-Scroll Status-Widget ausgeblendet (Einstellungen)."
+            )
             return
         if not enabled:
             tip = "Sync-Scroll: Zustand aus — nur PDF↔PDF" + tip_suffix
@@ -5019,7 +5124,7 @@ class MainWindow(QMainWindow):
                 "QLabel#syncScrollStatus { color: #888; padding-right: 8px; font-size: 11px; }"
             )
             self.sync_scroll_status_label.setToolTip(tip)
-            self.sync_scroll_status_label.setAccessibleName("Sync-Scroll aus")
+            self.sync_scroll_status_label.setAccessibleName(f"{widget_name}: aus")
             self.sync_scroll_status_label.setAccessibleDescription(tip)
             self.sync_scroll_status_label.setVisible(True)
             return
@@ -5034,7 +5139,7 @@ class MainWindow(QMainWindow):
                 "font-size: 11px; font-weight: 500; }"
             )
             self.sync_scroll_status_label.setToolTip(tip)
-            self.sync_scroll_status_label.setAccessibleName("Sync-Scroll an")
+            self.sync_scroll_status_label.setAccessibleName(f"{widget_name}: an")
             self.sync_scroll_status_label.setAccessibleDescription(tip)
             self.sync_scroll_status_label.setVisible(True)
         else:
@@ -5047,7 +5152,7 @@ class MainWindow(QMainWindow):
                 "QLabel#syncScrollStatus { color: #a60; padding-right: 8px; font-size: 11px; }"
             )
             self.sync_scroll_status_label.setToolTip(tip)
-            self.sync_scroll_status_label.setAccessibleName("Sync-Scroll bereit")
+            self.sync_scroll_status_label.setAccessibleName(f"{widget_name}: bereit")
             self.sync_scroll_status_label.setAccessibleDescription(tip)
             self.sync_scroll_status_label.setVisible(True)
 

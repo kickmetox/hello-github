@@ -2,7 +2,7 @@
 
 Moderne Textverarbeitung mit PDF-Annotator, OCR-Bridge und Formulargenerator.
 
-**Version:** 2.4.3  
+**Version:** 2.4.4  
 **Hersteller:** Andreas Meyer · ame@sellerbach.de
 
 ## Quickstart (Windows)
@@ -33,6 +33,10 @@ Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an).
 User-Shortcuts: `.\scripts\install-ild.ps1` · Deinstallieren: `-Uninstall [-Quiet]` (Exit **0**/OK · **1**/Fehler; Quiet: Kurz-Summary, Exit 0 auch ohne Shortcuts).
 
 Nightly-Smoke: `python scripts\smoke_ild.py` · optional `--qt` · `--json` (Summary: `ok`, `checks[]`, `duration_ms`, `version`; Fail: `checks[].error` max 200…, Exit=ok). Siehe **CONTRIBUTING.md**; Workflow-Stub `.github/workflows/smoke-ild.yml` (manual only).
+
+## Neu in 2.4.4
+
+Post-Release-Polish nach **2.4.3**: **Thumb Auto-Prune** Status kopierbar · Toast optional Settings; **Quick-Apply Esc** „Apply abgebrochen“ · Fokus Toolbar; **Sync-Scroll** Announcement bei Toggle · AccessibleName Status-Widget; **F1 Reset** Bestätigung nur bei Abweichung · Fokus+Selektion. Stubs klar markiert (Ink ≠ Stylus).
 
 ## Neu in 2.4.3
 

@@ -1630,7 +1630,7 @@ class PdfViewer(QWidget):
         self.btn_quick_ann_template.setObjectName("btnQuickAnnTemplate")
         self.btn_quick_ann_template.setToolTip(
             "Links: Quick-Apply zuletzt/Standard ★ · Rechtsklick: Vorlage wählen · "
-            "Esc bricht Apply-Modus ab — 2.4.3"
+            "Esc → „Apply abgebrochen“ · Fokus Toolbar — 2.4.4"
         )
         self.btn_quick_ann_template.setAccessibleName("Annotation-Vorlage Quick-Apply")
         self.btn_quick_ann_template.setAccessibleDescription(
@@ -8112,7 +8112,7 @@ class PdfViewer(QWidget):
         return True
 
     def cancel_quick_ann_template(self) -> bool:
-        """Esc: Apply-Modus abbrechen; Fokus Toolbar — 2.4.3."""
+        """Esc: Status „Apply abgebrochen“; Fokus Toolbar — 2.4.4."""
         if not self._quick_ann_template_armed:
             return False
         self._quick_ann_template_armed = False
@@ -8122,7 +8122,7 @@ class PdfViewer(QWidget):
             self._remember_quick_stamp_zoom_opacity()
             self._quick_stamp_armed = False
             self._quick_stamp_payload = None
-        self.status.emit("Apply-Modus abgebrochen")
+        self.status.emit("Apply abgebrochen")
         try:
             if (
                 hasattr(self, "btn_quick_ann_template")

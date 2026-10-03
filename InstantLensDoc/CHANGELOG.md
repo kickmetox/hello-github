@@ -1,5 +1,20 @@
 # Changelog — InstantLens Doc
 
+## 2.4.4 — Auto-Prune Status kopierbar·Toast optional, Quick-Apply Esc „Apply abgebrochen“, Sync Announcement·AccessibleName, F1 Reset Bestätigung·Fokus+Selektion
+
+Post-Release-Polish nach **2.4.3**: **Thumbnail Auto-Prune** Status **kopierbar** (Klick → Zwischenablage), **Toast optional** in Settings; **Quick-Apply Esc** setzt Status **„Apply abgebrochen“** und **Fokus Toolbar**; **Sync-Scroll** mit **Announcement bei Toggle** und **AccessibleName** am Status-Widget; **F1 TXT Reset Default** mit **Bestätigung nur bei Abweichung** und **Fokus+Selektion**. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie klar markiert / nicht produktiv (Ink ≠ Stylus).
+
+### Geändert
+- Thumb Auto-Prune: Status kopierbar · Toast optional Settings
+- Annotation-Vorlagen: Esc → Status „Apply abgebrochen“ · Fokus Toolbar
+- Sync-Scroll: Announcement bei Toggle · AccessibleName Status-Widget
+- F1 Cheat-Sheet TXT: Reset Default Bestätigung nur bei Abweichung · Fokus+Selektion
+
+### Tests / Qualität
+- Version **2.4.4** (App / `ild_pdf` / ISS / Smoke / Docs); Serie **2.4**; `docs/VERSION` + `VERSION.txt`
+- Smoke: 2.4.4 CLI + Qt (Prune copy/toast, Apply Esc, Sync A11y, F1 Reset)
+- Stubs: KI/Cloud/Stylus/3D/Hooks/Outline/Telemetrie unverändert markiert
+
 ## 2.4.3 — Thumb Auto-Prune Status·Intervall/on-write, Quick-Apply Rechtsklick·Esc, Sync-Scroll Tooltip Zustand·A11y, F1 Live·{date}·Reset
 
 Post-Release-Polish nach **2.4.2**: **Thumbnail Auto-Prune** meldet **„N Dateien / X MB entfernt“** in Log/Status und Settings wählt **Intervall oder on-write**; **Annotation Quick-Apply** per **Rechtsklick Vorlage wählen**, **Esc** bricht Apply-Modus ab; **Sync-Scroll** Tooltip zeigt **Zustand an/aus** inkl. **A11y**; **F1 TXT** mit **Live-Vorschau**, **Quick-Insert `{date}`** und **Reset Default**. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie klar markiert / nicht produktiv (Ink ≠ Stylus).

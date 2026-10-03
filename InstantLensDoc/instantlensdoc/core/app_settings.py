@@ -187,6 +187,7 @@ DEFAULTS: dict[str, Any] = {
     "thumb_cache_debug_hits": False,  # Hit/Miss optional in Status — 2.4.1
     "thumb_cache_prune_mode": "on_write",  # on_write | interval — Auto-Prune — 2.4.3
     "thumb_cache_prune_interval_min": 15,  # Intervall-Minuten wenn mode=interval — 2.4.3
+    "thumb_cache_prune_toast": True,  # Auto-Prune Status-Toast optional — 2.4.4
     "sync_scroll_status_indicator": True,  # Sync-Scroll Statusleisten-Indikator — 2.4.1
     "last_ann_template_id": "",  # zuletzt angewandte Annotation-Vorlage — 2.4.2
     "last_shortcuts_txt_dir": "",  # Zielordner F1 Shortcuts-TXT merken — 2.4.2
@@ -4903,6 +4904,16 @@ def set_thumb_cache_prune_interval_min(minutes: int) -> int:
         )
     save_settings({"thumb_cache_prune_interval_min": v})
     return v
+
+
+def get_thumb_cache_prune_toast() -> bool:
+    """Auto-Prune Status-Toast optional (Default an) — 2.4.4."""
+    return bool(load_settings().get("thumb_cache_prune_toast", True))
+
+
+def set_thumb_cache_prune_toast(enabled: bool) -> None:
+    """Auto-Prune Toast an/aus speichern — 2.4.4."""
+    save_settings({"thumb_cache_prune_toast": bool(enabled)})
 
 
 def get_sync_scroll_status_indicator() -> bool:
