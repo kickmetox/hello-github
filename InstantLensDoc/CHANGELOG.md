@@ -1,5 +1,27 @@
 # Changelog — InstantLens Doc
 
+## 1.2.8 — Split-Log Status geöffnet/übersprungen, Ann. Reset Vorschau+Fokus, Diff Wrap-Blink Dauer/Sound, run.bat gefunden
+
+Post-Release-Polish nach 1.2.7: **PDF-Split „In Tabs öffnen“** meldet detailliert **geöffnet X, übersprungen Y** in **Statusleiste** und **Log-Footer**; **Ann.-Export Reset-Template** aktualisiert die **Live-Vorschau sofort** und setzt den **Fokus zurück ins Feld**; **Text-Diff Wrap-Blink** mit **Dauer Settings (kurz/mittel)** und optional **Sound aus**; **`run.bat`** gibt die gewählte Python-Binary als **`gefunden: …`** aus. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### PDF
+- Split: Statuszählung detailliert **geöffnet X, übersprungen Y** in Statusleiste + Log-Footer
+
+### Annotationen
+- Export-Template: **Reset-Template** — Live-Vorschau sofort aktualisieren; Fokus zurück ins Feld
+
+### Editor
+- Text-Diff: Wrap-Blink **Dauer Settings (kurz/mittel)**; optional **Sound aus**
+
+### Packaging / Start
+- **`run.bat`**: gewählte Python-Binary in Konsolenzeile **`gefunden: …`**; in `--help` dokumentiert
+
+### Packaging / Docs
+- Version **1.2.8** (App / `ild_pdf` / ISS / Smoke / Docs)
+- Smoke: Split-Log Status geöffnet/übersprungen, Ann. Reset Vorschau+Fokus, Diff Wrap-Blink Dauer/Sound, run.bat gefunden (CLI + Qt)
+
+---
+
 ## 1.2.7 — Split-Log Tabs Statuszählung, Ann. Reset-Bestätigung, Diff Wrap-Blink, run.bat py→python→python3
 
 Post-Release-Polish nach 1.2.6: **PDF-Split „In Tabs öffnen“** überspringt fehlende Dateien und meldet **Statuszählung** (geöffnet/übersprungen); **Ann.-Export Reset-Template** fragt **nur bei Abweichung vom Default** nach Bestätigung; **Text-Diff Wrap-around** blinkt bei Sprung Anfang↔Ende **einmal akustisch und visuell**; **`run.bat`** bei ungültigem/leerem **`%ILD_PYTHON%`** versucht Fallback **`py -3` → `python` → `python3`**. Stubs KI/Cloud/Stylus/3D bleiben Stubs.

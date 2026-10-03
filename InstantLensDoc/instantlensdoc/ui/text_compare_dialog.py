@@ -29,6 +29,8 @@ from instantlensdoc.core.app_settings import (
     get_text_diff_ignore_whitespace,
     get_text_diff_sync_scroll,
     get_text_diff_wrap_around,
+    get_text_diff_wrap_blink_ms,
+    get_text_diff_wrap_blink_sound,
     set_text_diff_ignore_whitespace,
     set_text_diff_sync_scroll,
     set_text_diff_wrap_around,
@@ -272,8 +274,8 @@ class TextCompareDialog(QDialog):
         self.chk_wrap_around.setChecked(get_text_diff_wrap_around())
         self.chk_wrap_around.setToolTip(
             "F7/Shift+F7 am Ende wieder von vorn (bzw. vom Ende); "
-            "bei Wrap einmal akustisch/visuell blinken; "
-            "auch in Einstellungen — 1.2.7"
+            "bei Wrap Blink (Dauer kurz/mittel + optional Sound in Settings); "
+            "auch in Einstellungen — 1.2.8"
         )
         self.chk_wrap_around.toggled.connect(self._on_wrap_around_toggled)
         opts.addWidget(self.chk_only_diff)
@@ -597,11 +599,12 @@ class TextCompareDialog(QDialog):
         return self.view_left
 
     def _blink_wrap_feedback(self) -> None:
-        """Einmal akustisch + Status kurz blinken bei Wrap Anfang↔Ende — 1.2.7."""
-        try:
-            QApplication.beep()
-        except Exception:
-            pass
+        """Status blinken bei Wrap; Dauer Settings kurz/mittel; Sound optional — 1.2.8."""
+        if get_text_diff_wrap_blink_sound():
+            try:
+                QApplication.beep()
+            except Exception:
+                pass
         token = int(getattr(self, "_wrap_blink_token", 0)) + 1
         self._wrap_blink_token = token
         prev = self.lbl_status.styleSheet() or ""
@@ -609,16 +612,17 @@ class TextCompareDialog(QDialog):
             "QLabel { background-color: #fff59d; color: #212121; "
             "padding: 2px 4px; border-radius: 2px; }"
         )
+        ms = max(100, int(get_text_diff_wrap_blink_ms()))
 
         def _clear() -> None:
             if token != getattr(self, "_wrap_blink_token", 0):
                 return
             self.lbl_status.setStyleSheet(prev)
 
-        QTimer.singleShot(350, _clear)
+        QTimer.singleShot(ms, _clear)
 
     def _goto_change(self, direction: int) -> None:
-        """Nächste/vorherige Änderung anspringen (F7 / Shift+F7) — 1.2.5–1.2.7."""
+        """Nächste/vorherige Änderung anspringen (F7 / Shift+F7) — 1.2.5–1.2.8."""
         indices = self._change_line_indices()
         if not indices:
             base = (self.lbl_status.text() or "").split(" · Änderung ")[0] or "Diff"

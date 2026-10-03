@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -913,7 +913,7 @@ class SettingsDialog(QDialog):
             f"Template auf Default zurücksetzen "
             f"({DEFAULT_ANN_EXPORT_FILENAME_TEMPLATE}); "
             "Bestätigung nur wenn Feld vom Default abweicht; "
-            "danach lokales Undo (Ctrl+Z) — 1.2.7"
+            "danach Live-Vorschau sofort + Fokus zurück ins Feld — 1.2.8"
         )
         self.btn_reset_ann_tpl.clicked.connect(self._reset_ann_export_template)
         tpl_row.addWidget(self.btn_reset_ann_tpl)
@@ -937,9 +937,12 @@ class SettingsDialog(QDialog):
         form.addRow(self.ann_export_dir_lbl)
 
         from instantlensdoc.core.app_settings import (
+            WRAP_BLINK_DURATION_CHOICES,
             get_text_diff_ignore_whitespace,
             get_text_diff_sync_scroll,
             get_text_diff_wrap_around,
+            get_text_diff_wrap_blink_duration,
+            get_text_diff_wrap_blink_sound,
         )
 
         self.text_diff_sync_scroll = QCheckBox("Text-Diff Sync-Scroll (Side-by-Side)")
@@ -959,9 +962,28 @@ class SettingsDialog(QDialog):
         self.text_diff_wrap_around.setChecked(get_text_diff_wrap_around())
         self.text_diff_wrap_around.setToolTip(
             "Bei Nächste/Vorherige Änderung (F7/Shift+F7) am Ende "
-            "wieder von vorn / vom Ende; bei Wrap einmal akustisch/visuell blinken — 1.2.7"
+            "wieder von vorn / vom Ende; bei Wrap Blink (Dauer/Sound unten) — 1.2.8"
         )
         form.addRow(self.text_diff_wrap_around)
+        self.text_diff_wrap_blink = QComboBox()
+        cur_wrap_blink = get_text_diff_wrap_blink_duration()
+        wrap_blink_pick = 0
+        for i, (key, label) in enumerate(WRAP_BLINK_DURATION_CHOICES):
+            self.text_diff_wrap_blink.addItem(label, key)
+            if key == cur_wrap_blink:
+                wrap_blink_pick = i
+        self.text_diff_wrap_blink.setCurrentIndex(wrap_blink_pick)
+        self.text_diff_wrap_blink.setToolTip(
+            "Dauer des Status-Blinks bei Wrap-around Anfang↔Ende "
+            "(kurz ≈350 ms, mittel ≈700 ms) — 1.2.8"
+        )
+        form.addRow("Wrap-Blink Dauer", self.text_diff_wrap_blink)
+        self.text_diff_wrap_blink_sound = QCheckBox("Wrap-Blink Sound")
+        self.text_diff_wrap_blink_sound.setChecked(get_text_diff_wrap_blink_sound())
+        self.text_diff_wrap_blink_sound.setToolTip(
+            "Akustisches Feedback (Beep) bei Wrap-Blink; abschaltbar — 1.2.8"
+        )
+        form.addRow(self.text_diff_wrap_blink_sound)
 
         self.jpeg_q = QSpinBox()
         self.jpeg_q.setRange(10, 100)
@@ -1063,7 +1085,7 @@ class SettingsDialog(QDialog):
         self._update_ann_export_preview()
 
     def _reset_ann_export_template(self) -> None:
-        """Template auf Default zurücksetzen; Bestätigung nur bei Abweichung — 1.2.7."""
+        """Template auf Default; Live-Vorschau sofort + Fokus zurück ins Feld — 1.2.8."""
         from instantlensdoc.core.app_settings import DEFAULT_ANN_EXPORT_FILENAME_TEMPLATE
 
         if not hasattr(self, "ann_export_tpl"):
@@ -1072,8 +1094,9 @@ class SettingsDialog(QDialog):
         default = DEFAULT_ANN_EXPORT_FILENAME_TEMPLATE
         current = edit.text() or ""
         if current == default:
-            # Bereits Default — keine Bestätigung, kein Reset
-            edit.setFocus()
+            # Bereits Default — keine Bestätigung; Vorschau + Fokus
+            self._update_ann_export_preview()
+            QTimer.singleShot(0, edit.setFocus)
             return
         reply = QMessageBox.question(
             self,
@@ -1085,16 +1108,18 @@ class SettingsDialog(QDialog):
             QMessageBox.No,
         )
         if reply != QMessageBox.Yes:
+            QTimer.singleShot(0, edit.setFocus)
             return
         # selectAll + insert → ein Undo-Schritt (Ctrl+Z stellt vorherigen Text wieder her)
-        edit.setFocus()
         edit.selectAll()
         edit.insert(default)
         if isinstance(edit, AnnExportTemplateEdit):
             edit._saved_cursor = edit.cursorPosition()
             edit._saved_sel_start = -1
             edit._saved_sel_len = 0
+        # Live-Vorschau sofort aktualisieren; Fokus zurück ins Feld — 1.2.8
         self._update_ann_export_preview()
+        QTimer.singleShot(0, edit.setFocus)
 
     def _update_ann_export_preview(self, *_args) -> None:
         """Live-Vorschau Ann.-Export-Dateiname; ungültige Platzhalter rot — 1.2.3."""
@@ -1707,6 +1732,8 @@ class SettingsDialog(QDialog):
             set_text_diff_ignore_whitespace,
             set_text_diff_sync_scroll,
             set_text_diff_wrap_around,
+            set_text_diff_wrap_blink_duration,
+            set_text_diff_wrap_blink_sound,
         )
 
         if hasattr(self, "ann_export_tpl"):
@@ -1717,6 +1744,14 @@ class SettingsDialog(QDialog):
             set_text_diff_ignore_whitespace(self.text_diff_ignore_ws.isChecked())
         if hasattr(self, "text_diff_wrap_around"):
             set_text_diff_wrap_around(self.text_diff_wrap_around.isChecked())
+        if hasattr(self, "text_diff_wrap_blink"):
+            set_text_diff_wrap_blink_duration(
+                str(self.text_diff_wrap_blink.currentData() or "kurz")
+            )
+        if hasattr(self, "text_diff_wrap_blink_sound"):
+            set_text_diff_wrap_blink_sound(
+                self.text_diff_wrap_blink_sound.isChecked()
+            )
         parent = self.parent()
         if parent is not None and hasattr(parent, "_refresh_recent"):
             try:

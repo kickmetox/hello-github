@@ -370,8 +370,8 @@ class PdfToolsDialog(QDialog):
             "Liste der nach dem Teilen erzeugten Dateipfade. "
             "Mehrfachauswahl (Ctrl/Shift); Doppelklick öffnet Datei/Ordner; "
             "Kontextmenü: Pfad kopieren · In Tabs öffnen "
-            "(fehlende überspringen + Statuszählung) · "
-            "Ordner der Auswahl — 1.2.7"
+            "(fehlende überspringen + Statuszählung geöffnet X, übersprungen Y) · "
+            "Ordner der Auswahl — 1.2.8"
         )
         self.split_log.path_activate.connect(self._split_open_log_path)
         self.split_log.open_selected_folders.connect(self._split_open_selected_folders)
@@ -379,6 +379,13 @@ class PdfToolsDialog(QDialog):
         self.split_log.copy_paths_requested.connect(self._split_copy_selected_paths)
         self.split_log.open_in_tabs_requested.connect(self._split_open_selected_in_tabs)
         form.addRow("Pfad-Log", self.split_log)
+        self.split_log_footer = QLabel("geöffnet 0, übersprungen 0")
+        self.split_log_footer.setToolTip(
+            "Statuszählung nach „In Tabs öffnen“: geöffnet X, übersprungen Y "
+            "(auch in der Statusleiste) — 1.2.8"
+        )
+        self.split_log_footer.setStyleSheet("color: #555;")
+        form.addRow("Log-Footer", self.split_log_footer)
         log_btns = QHBoxLayout()
         btn_copy_log = QPushButton("Log kopieren")
         btn_copy_log.setToolTip("Pfad-Log in die Zwischenablage kopieren — 1.2.3")
@@ -785,6 +792,14 @@ class PdfToolsDialog(QDialog):
         lines = [f"[{i + 1}] {p}" for i, p in enumerate(paths)]
         header = f"Erzeugt: {len(paths)} Datei(en)"
         self.split_log.setPlainText(header + ("\n" + "\n".join(lines) if lines else ""))
+        self._split_set_open_counts(0, 0)
+
+    def _split_set_open_counts(self, opened: int, skipped: int) -> str:
+        """Detaillierte Statuszählung geöffnet X, übersprungen Y — 1.2.8."""
+        detail = f"geöffnet {int(opened)}, übersprungen {int(skipped)}"
+        if hasattr(self, "split_log_footer"):
+            self.split_log_footer.setText(detail)
+        return detail
 
     def _split_log_empty_hint(self) -> None:
         """Hinweis bei leerem Pfad-Log — 1.2.4/1.2.6."""
@@ -933,7 +948,7 @@ class PdfToolsDialog(QDialog):
         )
 
     def _split_open_selected_in_tabs(self) -> None:
-        """Ausgewählte Split-PDFs in Tabs öffnen; fehlende überspringen + Statuszählung — 1.2.7."""
+        """Ausgewählte Split-PDFs in Tabs öffnen; Statuszählung geöffnet X, übersprungen Y — 1.2.8."""
         if not hasattr(self, "split_log"):
             return
         if not (self.split_log.toPlainText() or "").strip():
@@ -952,11 +967,8 @@ class PdfToolsDialog(QDialog):
         skipped = [p for p in paths if p not in existing]
         opened = len(existing)
         skipped_n = len(skipped)
-        status = (
-            f"In Tabs: {opened} geöffnet, {skipped_n} übersprungen (fehlen)"
-            if skipped_n
-            else f"In Tabs: {opened} geöffnet"
-        )
+        detail = self._split_set_open_counts(opened, skipped_n)
+        status = f"In Tabs: {detail}"
         parent = self.parent()
         if parent is not None and hasattr(parent, "_set_status"):
             try:
@@ -968,18 +980,19 @@ class PdfToolsDialog(QDialog):
                 self,
                 "Pfad-Log",
                 f"Keine gültigen Dateien in der Auswahl gefunden.\n"
-                f"Status: {opened} geöffnet, {skipped_n} übersprungen.",
+                f"Status: {detail}.",
             )
             return
         self._split_open_written(existing)
-        QMessageBox.information(
-            self,
-            "Pfad-Log",
-            f"{opened} Datei(en) in Tabs geöffnet.\n"
-            f"{skipped_n} fehlende Datei(en) übersprungen."
-            if skipped_n
-            else f"{opened} Datei(en) in Tabs geöffnet.",
-        )
+        if skipped_n:
+            msg = (
+                f"{opened} Datei(en) in Tabs geöffnet.\n"
+                f"{skipped_n} fehlende Datei(en) übersprungen.\n"
+                f"Status: {detail}."
+            )
+        else:
+            msg = f"{opened} Datei(en) in Tabs geöffnet.\nStatus: {detail}."
+        QMessageBox.information(self, "Pfad-Log", msg)
 
     def _split_copy_log(self) -> None:
         """Pfad-Log in die Zwischenablage — 1.2.3."""
