@@ -121,11 +121,13 @@ Seite <b>⟲/⟳ drehen</b>, <b>↔/↕ spiegeln</b>, <b>leere Seite</b>, <b>dup
 <p><b>PDF-Suche:</b> Sidebar-Suche highlightet Treffer auf der aktuellen Seite;
 „Weiter/Zurück“ springt zum nächsten/vorherigen Treffer (auch über Docs bei Alle Docs/PDFs);
 Trefferanzahl + <b>klickbare Trefferliste</b> mit <b>Kontext-Snippet</b> («Match») in der Sidebar;
+Snippet-Länge (Zeichen um Match) in <b>Einstellungen</b> (20–80);
 <b>letzte Suchbegriffe</b> im Dropdown.</p>
 <p><b>Ctrl+S:</b> speichert das Dokument und <b>flusht</b> ausstehendes Sidecar-Debounce sofort.
-Dirty-Indikator am Tab auch während pending Debounce.</p>
-<p><b>Vorlagen:</b> Datei → Neu → Vorlagen-Ordner öffnen… / <b>Vorlagen-Reihenfolge…</b> (Drag speichern).</p>
-<p><b>Duplikate mergen:</b> Vorschau je Paar einzeln mergen oder behalten.</p>
+Dirty-Indikator am Tab auch während pending Debounce; Tooltip <b>„Speichern ausstehend…“</b>.</p>
+<p><b>Vorlagen:</b> Datei → Neu → Vorlagen-Ordner öffnen… / <b>Vorlagen-Reihenfolge…</b> (Drag) /
+<b>Export/Import als Zip</b>.</p>
+<p><b>Duplikate mergen:</b> Vorschau je Paar; Buttons <b>Alle mergen</b> / <b>Alle behalten</b>.</p>
 <p><b>Annotationen:</b> eigene Liste in der Sidebar — <b>gruppiert nach Seite</b>; Klick springt zur Annotation;
 Filter-Dropdown nach Typ; <b>Nur aktuelle Seite</b>-Checkbox; <b>Tag-Filter Multi-Select</b> (ODER); <b>Tag-Cloud</b> (häufigste Tags); <b>Farben-Chips in der Statistik klickbar</b>; <b>Textsuche in der Liste</b> (optional <b>Regex</b>);
 Text nachträglich editierbar; Deckkraft pro Annotation; <b>Notizfarbe unabhängig von Highlight</b>;

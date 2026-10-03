@@ -49,12 +49,15 @@ from instantlensdoc.core.app_settings import (
     get_pdf_thumbnail_scale,
     get_pdf_two_page_spread,
     get_restore_session_on_start,
+    get_search_snippet_context_chars,
     get_sidecar_save_debounce_ms,
     get_tag_rename_confirm_threshold,
     get_theme,
     get_ui_lang,
     get_update_check_on_start,
     get_wizard_completed,
+    SEARCH_SNIPPET_CONTEXT_MAX,
+    SEARCH_SNIPPET_CONTEXT_MIN,
     SIDECAR_SAVE_DEBOUNCE_MAX_MS,
     SIDECAR_SAVE_DEBOUNCE_MIN_MS,
     PDF_THUMBNAIL_SCALE_CHOICES,
@@ -88,6 +91,7 @@ from instantlensdoc.core.app_settings import (
     set_pdf_thumbnail_scale,
     set_pdf_two_page_spread,
     set_restore_session_on_start,
+    set_search_snippet_context_chars,
     set_sidecar_save_debounce_ms,
     set_tag_rename_confirm_threshold,
     set_theme,
@@ -330,6 +334,19 @@ class SettingsDialog(QDialog):
         )
         form.addRow("Sidecar-Debounce", self.sidecar_debounce)
 
+        self.snippet_context = QSpinBox()
+        self.snippet_context.setRange(
+            SEARCH_SNIPPET_CONTEXT_MIN, SEARCH_SNIPPET_CONTEXT_MAX
+        )
+        self.snippet_context.setSingleStep(5)
+        self.snippet_context.setSuffix(" Zeichen")
+        self.snippet_context.setValue(get_search_snippet_context_chars())
+        self.snippet_context.setToolTip(
+            "Treffer-Snippet: Zeichen links/rechts vom Match "
+            f"({SEARCH_SNIPPET_CONTEXT_MIN}–{SEARCH_SNIPPET_CONTEXT_MAX}, Standard 40)"
+        )
+        form.addRow("Treffer-Snippet-Länge", self.snippet_context)
+
         self.jpeg_q = QSpinBox()
         self.jpeg_q.setRange(10, 100)
         self.jpeg_q.setValue(get_export_jpeg_quality())
@@ -542,6 +559,7 @@ class SettingsDialog(QDialog):
         set_editor_doc_split_vertical(bool(self.doc_split_orient.currentData()))
         set_tag_rename_confirm_threshold(int(self.tag_rename_confirm.value()))
         set_sidecar_save_debounce_ms(int(self.sidecar_debounce.value()))
+        set_search_snippet_context_chars(int(self.snippet_context.value()))
         save_settings(
             {
                 "export_jpeg_quality": int(self.jpeg_q.value()),

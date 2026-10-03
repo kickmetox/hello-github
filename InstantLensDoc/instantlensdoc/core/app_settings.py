@@ -76,6 +76,7 @@ DEFAULTS: dict[str, Any] = {
     ],
     "user_doc_templates": [],
     "sidecar_save_debounce_ms": 400,
+    "search_snippet_context_chars": 40,
     "editor_trim_trailing_whitespace": False,
     "editor_trim_whitespace_on_paste": False,
     "pdf_toolbar_groups": {
@@ -925,15 +926,129 @@ def sync_user_templates_folder() -> Path:
     readme.write_text(
         "InstantLens Doc — Nutzer-Vorlagen (Spiegel).\n"
         "Dateien *.ildtpl.md werden aus den gespeicherten Vorlagen erzeugt.\n"
-        "Bearbeiten hier ändert die App-Vorlagen nicht; bitte in der App speichern.\n",
+        "Bearbeiten hier ändert die App-Vorlagen nicht; bitte in der App speichern.\n"
+        "Export/Import: Datei → Neu → Meine Vorlagen → als Zip.\n",
         encoding="utf-8",
     )
     return folder
 
 
+def export_user_templates_zip(dest: Path | str) -> Path:
+    """
+    Nutzer-Vorlagen-Ordner als Zip exportieren (templates.json + *.ildtpl.md).
+    Rückgabe: Zielpfad.
+    """
+    import json
+    import zipfile
+
+    dest_path = Path(dest)
+    folder = sync_user_templates_folder()
+    templates = get_user_doc_templates()
+    manifest = {"format": "ildtpl-v1", "templates": templates}
+    with zipfile.ZipFile(dest_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr(
+            "templates.json",
+            json.dumps(manifest, ensure_ascii=False, indent=2) + "\n",
+        )
+        for f in sorted(folder.glob("*.ildtpl.md")):
+            zf.write(f, arcname=f.name)
+        readme = folder / "README.txt"
+        if readme.is_file():
+            zf.write(readme, arcname="README.txt")
+    return dest_path
+
+
+def import_user_templates_zip(
+    src: Path | str,
+    *,
+    merge: bool = True,
+) -> list[dict]:
+    """
+    Vorlagen aus Zip importieren.
+    merge=True: hinzufügen/überschreiben (Titel); False: bestehende ersetzen.
+    Rückgabe: importierte Einträge.
+    """
+    import json
+    import zipfile
+
+    src_path = Path(src)
+    if not src_path.is_file():
+        raise FileNotFoundError(str(src_path))
+    items: list[dict] = []
+    with zipfile.ZipFile(src_path, "r") as zf:
+        names = zf.namelist()
+        if "templates.json" in names:
+            raw = json.loads(zf.read("templates.json").decode("utf-8"))
+            payload = raw.get("templates") if isinstance(raw, dict) else raw
+            if isinstance(payload, list):
+                for entry in payload:
+                    if not isinstance(entry, dict):
+                        continue
+                    title = str(entry.get("title") or "").strip()
+                    body = str(entry.get("body") if entry.get("body") is not None else "")
+                    tid = str(entry.get("id") or "").strip() or None
+                    if not title:
+                        continue
+                    items.append({"id": tid, "title": title, "body": body})
+        if not items:
+            for name in names:
+                base = Path(name).name
+                if not base.endswith(".ildtpl.md"):
+                    continue
+                try:
+                    body = zf.read(name).decode("utf-8")
+                except Exception:
+                    continue
+                # safe.title.tid.ildtpl.md oder title.ildtpl.md
+                stem = base[: -len(".ildtpl.md")]
+                parts = stem.rsplit(".", 1)
+                title = parts[0].replace("_", " ").strip() or stem
+                tid = parts[1] if len(parts) == 2 and len(parts[1]) >= 4 else None
+                items.append({"id": tid, "title": title, "body": body})
+    if not merge:
+        for old in list(get_user_doc_templates()):
+            delete_user_doc_template(old["id"])
+    imported: list[dict] = []
+    for entry in items:
+        saved = save_user_doc_template(
+            title=entry["title"],
+            body=entry["body"],
+            template_id=entry.get("id"),
+        )
+        imported.append(saved)
+    sync_user_templates_folder()
+    return imported
+
+
+SEARCH_SNIPPET_CONTEXT_MIN = 20
+SEARCH_SNIPPET_CONTEXT_MAX = 80
+SEARCH_SNIPPET_CONTEXT_DEFAULT = 40
+
 SIDECAR_SAVE_DEBOUNCE_MIN_MS = 200
 SIDECAR_SAVE_DEBOUNCE_MAX_MS = 1000
 SIDECAR_SAVE_DEBOUNCE_DEFAULT_MS = 400
+
+
+def get_search_snippet_context_chars() -> int:
+    """Kontext-Zeichen links/rechts vom Treffer-Match (20–80, Default 40)."""
+    try:
+        v = int(
+            load_settings().get(
+                "search_snippet_context_chars", SEARCH_SNIPPET_CONTEXT_DEFAULT
+            )
+        )
+    except (TypeError, ValueError):
+        v = SEARCH_SNIPPET_CONTEXT_DEFAULT
+    return max(SEARCH_SNIPPET_CONTEXT_MIN, min(SEARCH_SNIPPET_CONTEXT_MAX, v))
+
+
+def set_search_snippet_context_chars(chars: int) -> int:
+    val = max(
+        SEARCH_SNIPPET_CONTEXT_MIN,
+        min(SEARCH_SNIPPET_CONTEXT_MAX, int(chars)),
+    )
+    save_settings({"search_snippet_context_chars": val})
+    return val
 
 
 def get_sidecar_save_debounce_ms() -> int:

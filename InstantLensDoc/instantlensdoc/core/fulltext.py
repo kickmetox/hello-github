@@ -189,6 +189,12 @@ def search_paths(
     if not q:
         return []
     ql = q.casefold()
+    try:
+        from instantlensdoc.core.app_settings import get_search_snippet_context_chars
+
+        ctx = get_search_snippet_context_chars()
+    except Exception:
+        ctx = 40
     hits: List[SearchHit] = []
     iter_paths = filter_pdf_paths(paths) if pdf_only else list(paths)
     for raw in iter_paths:
@@ -208,7 +214,7 @@ def search_paths(
             for line_no, line in enumerate(blob.splitlines(), start=1):
                 if ql not in line.casefold():
                     continue
-                snippet = _snippet_around(line, q)
+                snippet = _snippet_around(line, q, context_chars=ctx)
                 hit_kind = kind
                 if page_idx is None and p.suffix.lower() == ".pdf":
                     hit_kind = "sidecar"

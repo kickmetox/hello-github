@@ -557,6 +557,14 @@ class MainWindow(QMainWindow):
         )
         act_tpl_folder.triggered.connect(self._open_user_templates_folder)
         m_new.addAction(act_tpl_folder)
+        act_tpl_export = QAction("Vorlagen als Zip exportieren…", self)
+        act_tpl_export.setToolTip("Nutzer-Vorlagen-Ordner als Zip speichern")
+        act_tpl_export.triggered.connect(self._export_user_templates_zip)
+        m_new.addAction(act_tpl_export)
+        act_tpl_import = QAction("Vorlagen aus Zip importieren…", self)
+        act_tpl_import.setToolTip("Nutzer-Vorlagen aus Zip laden (merge)")
+        act_tpl_import.triggered.connect(self._import_user_templates_zip)
+        m_new.addAction(act_tpl_import)
         act_tpl_order = QAction("Vorlagen-Reihenfolge…", self)
         act_tpl_order.setToolTip(
             "Nutzer-Vorlagen per Drag umsortieren und Reihenfolge speichern"
@@ -1536,6 +1544,19 @@ class MainWindow(QMainWindow):
             cur = self._path_key(self.doc.path)
             if cur:
                 dirty_keys.add(cur)
+        pending_key = None
+        if (
+            self.doc
+            and self.doc.path
+            and self.stack.currentWidget() is self.pdf_view
+        ):
+            pending = False
+            if hasattr(self.pdf_view, "sidecar_save_pending"):
+                pending = bool(self.pdf_view.sidecar_save_pending())
+            else:
+                pending = bool(getattr(self.pdf_view, "_sidecar_save_pending", False))
+            if pending:
+                pending_key = self._path_key(self.doc.path)
         for i in range(files.count()):
             it = files.item(i)
             if it is None:
@@ -1547,8 +1568,13 @@ class MainWindow(QMainWindow):
             base = Path(str(raw)).name
             if key and key in dirty_keys:
                 it.setText(f"{base} *")
+                if pending_key and key == pending_key:
+                    it.setToolTip("Speichern ausstehend…")
+                else:
+                    it.setToolTip("Ungespeicherte Änderungen")
             else:
                 it.setText(base)
+                it.setToolTip("")
 
     def count_unsaved_tabs(self) -> int:
         """Ungespeicherte Tabs: aktuelles Doc + markierte offene Sidebar-Pfade."""
@@ -3430,12 +3456,20 @@ class MainWindow(QMainWindow):
                         page_hits.append((page_idx, blob))
             # Aktuelle Seite: Texttreffer highlighten
             n_page = self.pdf_view.highlight_search(query)
+            try:
+                from instantlensdoc.core.app_settings import (
+                    get_search_snippet_context_chars,
+                )
+
+                snip_ctx = get_search_snippet_context_chars()
+            except Exception:
+                snip_ctx = 40
             if page_hits:
                 for pi, blob in page_hits:
                     for line in blob.splitlines():
                         if query.lower() in line.lower():
                             snip = fulltext_mod._snippet_around(
-                                line, query, context_chars=40, width=96
+                                line, query, context_chars=snip_ctx, width=96
                             )
                             hits.append(("page", pi, snip))
                             break
@@ -3461,7 +3495,10 @@ class MainWindow(QMainWindow):
                         payloads.append((str(pdf_path), pi, query))
                     else:
                         ann_snip = fulltext_mod._snippet_around(
-                            f"{h.type.value} {h.text}", query, context_chars=36, width=80
+                            f"{h.type.value} {h.text}",
+                            query,
+                            context_chars=max(20, snip_ctx - 4),
+                            width=80,
                         )
                         lines.append(f"S.{h.page + 1} Ann.: {ann_snip}")
                         payloads.append(h)
@@ -4407,6 +4444,74 @@ class MainWindow(QMainWindow):
         act_folder.setToolTip("Spiegel-Ordner der Nutzer-Vorlagen im Explorer öffnen")
         act_folder.triggered.connect(self._open_user_templates_folder)
         menu.addAction(act_folder)
+        act_export = QAction("Als Zip exportieren…", self)
+        act_export.setToolTip("Vorlagen-Ordner als Zip speichern (templates.json + *.ildtpl.md)")
+        act_export.triggered.connect(self._export_user_templates_zip)
+        menu.addAction(act_export)
+        act_import = QAction("Aus Zip importieren…", self)
+        act_import.setToolTip("Vorlagen aus Zip laden und mit bestehenden mergen")
+        act_import.triggered.connect(self._import_user_templates_zip)
+        menu.addAction(act_import)
+
+    def _export_user_templates_zip(self) -> None:
+        """Nutzer-Vorlagen-Ordner als Zip exportieren."""
+        from instantlensdoc.core.app_settings import (
+            export_user_templates_zip,
+            get_user_doc_templates,
+        )
+
+        if not get_user_doc_templates():
+            QMessageBox.information(
+                self,
+                "Vorlagen exportieren",
+                "Keine Nutzer-Vorlagen gespeichert.",
+            )
+            return
+        start = dialog_start_dir(get_last_export_dir())
+        path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Vorlagen als Zip exportieren",
+            str(Path(start) / "ild-templates.zip"),
+            "Zip-Archiv (*.zip)",
+        )
+        if not path:
+            return
+        if not path.lower().endswith(".zip"):
+            path = path + ".zip"
+        try:
+            dest = export_user_templates_zip(path)
+        except Exception as exc:
+            QMessageBox.warning(self, "Vorlagen exportieren", f"Export fehlgeschlagen:\n{exc}")
+            return
+        set_last_export_dir(Path(dest).parent)
+        self._set_status(f"Vorlagen exportiert: {dest}")
+
+    def _import_user_templates_zip(self) -> None:
+        """Nutzer-Vorlagen aus Zip importieren (merge)."""
+        from instantlensdoc.core.app_settings import import_user_templates_zip
+
+        start = dialog_start_dir(get_last_export_dir())
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Vorlagen aus Zip importieren",
+            start,
+            "Zip-Archiv (*.zip);;Alle Dateien (*)",
+        )
+        if not path:
+            return
+        try:
+            imported = import_user_templates_zip(path, merge=True)
+        except Exception as exc:
+            QMessageBox.warning(self, "Vorlagen importieren", f"Import fehlgeschlagen:\n{exc}")
+            return
+        self._refresh_user_template_menu()
+        set_last_export_dir(Path(path).parent)
+        self._set_status(f"Vorlagen importiert: {len(imported)}")
+        QMessageBox.information(
+            self,
+            "Vorlagen importieren",
+            f"{len(imported)} Vorlage(n) importiert (merge).",
+        )
 
     def _reorder_user_templates_dialog(self) -> None:
         """Drag-Reihenfolge der Nutzer-Vorlagen speichern."""

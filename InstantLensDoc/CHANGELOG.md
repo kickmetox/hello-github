@@ -1,5 +1,23 @@
 # Changelog — InstantLens Doc
 
+## 0.7.5 — Snippet-Länge, Alle mergen/behalten, Vorlagen-Zip, Debounce-Tooltip
+
+Nach 0.7.4: Suche, Merge-Vorschau, Vorlagen und Dirty-UX verfeinern. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### PDF / Suche / Annotationen
+- **Treffer-Snippet-Länge** in Einstellungen (20–80 Zeichen Kontext um Match, Standard 40)
+- Ann.-**Merge-Vorschau**: Buttons **Alle mergen** / **Alle behalten**
+
+### Editor / Settings
+- Nutzer-Vorlagen: **Export/Import Ordner als Zip** (`templates.json` + `*.ildtpl.md`)
+- Pending Sidecar-Debounce: Tab-Tooltip **„Speichern ausstehend…“**
+
+### Packaging / Docs
+- Version **0.7.5** (App / `ild_pdf` / ISS / Smoke / Docs)
+- Smoke: Snippet-Länge-Settings, Alle mergen/behalten, Vorlagen-Zip, Debounce-Tooltip (CLI + Qt)
+
+---
+
 ## 0.7.4 — Kontext-Snippets, Merge je Paar, Vorlagen-Drag, Dirty-Debounce
 
 Nach 0.7.3: Trefferliste, Merge und Vorlagen/Dirty verfeinern. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
