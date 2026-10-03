@@ -5,6 +5,28 @@ from __future__ import annotations
 import difflib
 
 
+def annotation_text_diff_short(
+    left: str,
+    right: str,
+    *,
+    max_side: int = 28,
+) -> str:
+    """
+    Kurzer Diff-Hinweis zweier Annotationstexte für Merge-Vorschau.
+    Beispiel: Diff (40%): „foo…“ ≠ „bar…“
+    """
+    ta = str(left or "").strip().replace("\n", " ").replace("\r", " ")
+    tb = str(right or "").strip().replace("\n", " ").replace("\r", " ")
+    if ta == tb:
+        sample = ta if len(ta) <= max_side else ta[: max_side - 1] + "…"
+        return f"Diff: identisch („{sample or '—'}“)"
+    sm = difflib.SequenceMatcher(a=ta, b=tb, autojunk=False)
+    pct = int(round(sm.ratio() * 100))
+    la = ta if len(ta) <= max_side else ta[: max_side - 1] + "…"
+    lb = tb if len(tb) <= max_side else tb[: max_side - 1] + "…"
+    return f"Diff ({pct}%): „{la or '—'}“ ≠ „{lb or '—'}“"
+
+
 def line_diff_sides(left: str, right: str) -> tuple[list[str], list[str], list[str]]:
     """
     Einfacher Zeilen-Diff: liefert (linke Zeilen, rechte Zeilen, Tags).

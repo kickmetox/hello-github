@@ -72,7 +72,10 @@ from instantlensdoc.core.app_settings import (
     toggle_page_size_unit,
 )
 from instantlensdoc.ui.batch_dialog import BatchConvertDialog
-from instantlensdoc.ui.file_dialogs import confirm_overwrite_export
+from instantlensdoc.ui.file_dialogs import (
+    confirm_overwrite_export,
+    resolve_template_zip_conflicts,
+)
 from instantlensdoc.ui.pdf_tools_dialog import PdfToolsDialog
 from instantlensdoc.ui.watermark_dialog import WatermarkDialog
 from instantlensdoc.ui.compare_dialog import PdfCompareDialog
@@ -514,6 +517,8 @@ class MainWindow(QMainWindow):
             lambda e: self._on_unsaved_status_clicked(e)
         )
         sb.addPermanentWidget(self.unsaved_status_label)
+        self._pending_blink_active = False
+        self._pending_was_pending = False
         self._split_scroll_syncing = False
         self.undo_hint_label = QLabel("Ctrl+Z · Letzte Aktion rückgängig")
         self.undo_hint_label.setObjectName("undoHint")
@@ -1545,18 +1550,23 @@ class MainWindow(QMainWindow):
             if cur:
                 dirty_keys.add(cur)
         pending_key = None
+        pending = False
         if (
             self.doc
             and self.doc.path
             and self.stack.currentWidget() is self.pdf_view
         ):
-            pending = False
             if hasattr(self.pdf_view, "sidecar_save_pending"):
                 pending = bool(self.pdf_view.sidecar_save_pending())
             else:
                 pending = bool(getattr(self.pdf_view, "_sidecar_save_pending", False))
             if pending:
                 pending_key = self._path_key(self.doc.path)
+        # Rising-edge: kurzer Statusleisten-Blink bei pending Debounce
+        was = bool(getattr(self, "_pending_was_pending", False))
+        if pending and not was:
+            self._blink_pending_debounce_status()
+        self._pending_was_pending = bool(pending)
         for i in range(files.count()):
             it = files.item(i)
             if it is None:
@@ -1575,6 +1585,40 @@ class MainWindow(QMainWindow):
             else:
                 it.setText(base)
                 it.setToolTip("")
+
+    def _blink_pending_debounce_status(self) -> None:
+        """Kurzer Blink der Statusleiste bei pending Sidecar-Debounce."""
+        from PySide6.QtCore import QTimer
+
+        if getattr(self, "_pending_blink_active", False):
+            return
+        if not hasattr(self, "unsaved_status_label"):
+            return
+        self._pending_blink_active = True
+        try:
+            self.statusBar().showMessage("Speichern ausstehend…", 900)
+        except Exception:
+            pass
+        label = self.unsaved_status_label
+        styles = (
+            "padding-right: 10px; color: #fff; background-color: #B9770E; font-weight: 600;",
+            "padding-right: 10px; color: #B9770E; font-weight: 600;",
+            "padding-right: 10px; color: #fff; background-color: #B9770E; font-weight: 600;",
+            "padding-right: 10px; color: #B9770E; font-weight: 600;",
+        )
+        self._pending_blink_step = 0
+
+        def _tick() -> None:
+            i = int(getattr(self, "_pending_blink_step", 0))
+            if i >= len(styles):
+                self._pending_blink_active = False
+                self._update_unsaved_status()
+                return
+            label.setStyleSheet(styles[i])
+            self._pending_blink_step = i + 1
+            QTimer.singleShot(110, _tick)
+
+        _tick()
 
     def count_unsaved_tabs(self) -> int:
         """Ungespeicherte Tabs: aktuelles Doc + markierte offene Sidebar-Pfade."""
@@ -4487,8 +4531,12 @@ class MainWindow(QMainWindow):
         self._set_status(f"Vorlagen exportiert: {dest}")
 
     def _import_user_templates_zip(self) -> None:
-        """Nutzer-Vorlagen aus Zip importieren (merge)."""
-        from instantlensdoc.core.app_settings import import_user_templates_zip
+        """Nutzer-Vorlagen aus Zip importieren (merge, Konflikt-Dialog)."""
+        from instantlensdoc.core.app_settings import (
+            find_user_template_import_conflicts,
+            import_user_templates_zip,
+            parse_user_templates_zip,
+        )
 
         start = dialog_start_dir(get_last_export_dir())
         path, _ = QFileDialog.getOpenFileName(
@@ -4500,17 +4548,37 @@ class MainWindow(QMainWindow):
         if not path:
             return
         try:
-            imported = import_user_templates_zip(path, merge=True)
+            items = parse_user_templates_zip(path)
+            conflicts = find_user_template_import_conflicts(items)
+            conflict_mode = "overwrite"
+            if conflicts:
+                titles = [
+                    str(c["existing"].get("title") or c["incoming"].get("title") or "")
+                    for c in conflicts
+                ]
+                decision = resolve_template_zip_conflicts(titles, self)
+                if decision == "cancel":
+                    self._set_status("Vorlagen-Import abgebrochen")
+                    return
+                conflict_mode = decision
+            imported = import_user_templates_zip(
+                path, merge=True, conflict_mode=conflict_mode
+            )
         except Exception as exc:
             QMessageBox.warning(self, "Vorlagen importieren", f"Import fehlgeschlagen:\n{exc}")
             return
         self._refresh_user_template_menu()
         set_last_export_dir(Path(path).parent)
-        self._set_status(f"Vorlagen importiert: {len(imported)}")
+        mode_label = (
+            "Konflikte übersprungen"
+            if conflict_mode == "skip"
+            else "merge"
+        )
+        self._set_status(f"Vorlagen importiert: {len(imported)} ({mode_label})")
         QMessageBox.information(
             self,
             "Vorlagen importieren",
-            f"{len(imported)} Vorlage(n) importiert (merge).",
+            f"{len(imported)} Vorlage(n) importiert ({mode_label}).",
         )
 
     def _reorder_user_templates_dialog(self) -> None:

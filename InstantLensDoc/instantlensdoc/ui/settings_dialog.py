@@ -50,6 +50,7 @@ from instantlensdoc.core.app_settings import (
     get_pdf_two_page_spread,
     get_restore_session_on_start,
     get_search_snippet_context_chars,
+    get_search_snippet_ellipsis_style,
     get_sidecar_save_debounce_ms,
     get_tag_rename_confirm_threshold,
     get_theme,
@@ -58,6 +59,7 @@ from instantlensdoc.core.app_settings import (
     get_wizard_completed,
     SEARCH_SNIPPET_CONTEXT_MAX,
     SEARCH_SNIPPET_CONTEXT_MIN,
+    SEARCH_SNIPPET_ELLIPSIS_CHOICES,
     SIDECAR_SAVE_DEBOUNCE_MAX_MS,
     SIDECAR_SAVE_DEBOUNCE_MIN_MS,
     PDF_THUMBNAIL_SCALE_CHOICES,
@@ -92,6 +94,7 @@ from instantlensdoc.core.app_settings import (
     set_pdf_two_page_spread,
     set_restore_session_on_start,
     set_search_snippet_context_chars,
+    set_search_snippet_ellipsis_style,
     set_sidecar_save_debounce_ms,
     set_tag_rename_confirm_threshold,
     set_theme,
@@ -347,6 +350,19 @@ class SettingsDialog(QDialog):
         )
         form.addRow("Treffer-Snippet-Länge", self.snippet_context)
 
+        self.snippet_ellipsis = QComboBox()
+        cur_ell = get_search_snippet_ellipsis_style()
+        ell_pick = 0
+        for i, (key, label) in enumerate(SEARCH_SNIPPET_ELLIPSIS_CHOICES):
+            self.snippet_ellipsis.addItem(label, key)
+            if key == cur_ell:
+                ell_pick = i
+        self.snippet_ellipsis.setCurrentIndex(ell_pick)
+        self.snippet_ellipsis.setToolTip(
+            "Treffer-Markierung im Snippet: «Match» (Guillemets) oder nur … (Ellipsis)"
+        )
+        form.addRow("Snippet-Ellipsis-Style", self.snippet_ellipsis)
+
         self.jpeg_q = QSpinBox()
         self.jpeg_q.setRange(10, 100)
         self.jpeg_q.setValue(get_export_jpeg_quality())
@@ -560,6 +576,9 @@ class SettingsDialog(QDialog):
         set_tag_rename_confirm_threshold(int(self.tag_rename_confirm.value()))
         set_sidecar_save_debounce_ms(int(self.sidecar_debounce.value()))
         set_search_snippet_context_chars(int(self.snippet_context.value()))
+        set_search_snippet_ellipsis_style(
+            str(self.snippet_ellipsis.currentData() or "guillemets")
+        )
         save_settings(
             {
                 "export_jpeg_quality": int(self.jpeg_q.value()),

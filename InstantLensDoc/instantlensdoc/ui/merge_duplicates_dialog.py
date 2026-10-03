@@ -16,6 +16,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from instantlensdoc.core.text_diff import annotation_text_diff_short
+
 
 class MergeDuplicatesPreviewDialog(QDialog):
     """
@@ -100,10 +102,25 @@ class MergeDuplicatesPreviewDialog(QDialog):
                 item.setData(Qt.UserRole, getattr(ann, "id", None))
                 item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
                 self.list.addItem(item)
+
+            # Diff-Kurztext der beiden (älteste vs. nächste) Annotationen
+            if len(group) >= 2:
+                keep = group[0]
+                other = group[1]
+                t_keep = str(getattr(keep, "text", "") or "")
+                t_other = str(getattr(other, "text", "") or "")
+                diff_s = annotation_text_diff_short(t_keep, t_other)
+                if len(group) > 2:
+                    diff_s = f"{diff_s} (+{len(group) - 2} weitere)"
+                diff_item = QListWidgetItem(f"    ↕ {diff_s}")
+                diff_item.setData(Qt.UserRole, ("diff", gi - 1))
+                diff_item.setFlags(Qt.ItemIsEnabled)
+                self.list.addItem(diff_item)
         layout.addWidget(self.list)
 
         hint = QLabel(
             "Reihenfolge je Gruppe: älteste zuerst (wird bei Merge behalten). "
+            "↕ Diff: Kurzvergleich der Annotationstexte. "
             "Übernehmen führt nur markierte Gruppen aus (Ctrl+Z rückgängig)."
         )
         hint.setWordWrap(True)

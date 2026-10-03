@@ -28,6 +28,21 @@ def _read_text_file(path: Path) -> str:
     return ""
 
 
+def _resolve_ellipsis_style(style: str | None = None) -> str:
+    """guillemets («») oder ellipsis (…)."""
+    if style is None:
+        try:
+            from instantlensdoc.core.app_settings import get_search_snippet_ellipsis_style
+
+            style = get_search_snippet_ellipsis_style()
+        except Exception:
+            style = "guillemets"
+    s = str(style or "guillemets").strip().casefold()
+    if s in ("ellipsis", "…", "...", "dots", "dot"):
+        return "ellipsis"
+    return "guillemets"
+
+
 def _snippet_around(
     line: str,
     query: str,
@@ -35,12 +50,14 @@ def _snippet_around(
     width: int = 120,
     context_chars: int = 40,
     mark_match: bool = True,
+    ellipsis_style: str | None = None,
 ) -> str:
     """
     Kompaktes Kontext-Snippet um den Treffer (casefold-Match).
     context_chars: Zeichen links/rechts vom Match (wenn width groß genug).
-    mark_match: Match in «…» hervorheben.
+    mark_match: Match hervorheben — Style «…» (guillemets) oder nur … (ellipsis).
     """
+    style = _resolve_ellipsis_style(ellipsis_style)
     snippet = (line or "").replace("\t", " ").strip()
     if not snippet:
         return ""
@@ -69,7 +86,10 @@ def _snippet_around(
     before = snippet[start:pos]
     after = snippet[pos + qlen : end]
     if mark_match and q:
-        mid = f"«{match_raw}»"
+        if style == "ellipsis":
+            mid = match_raw
+        else:
+            mid = f"«{match_raw}»"
     else:
         mid = match_raw
     out = f"{before}{mid}{after}".strip()

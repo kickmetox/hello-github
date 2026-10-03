@@ -77,6 +77,7 @@ DEFAULTS: dict[str, Any] = {
     "user_doc_templates": [],
     "sidecar_save_debounce_ms": 400,
     "search_snippet_context_chars": 40,
+    "search_snippet_ellipsis_style": "guillemets",
     "editor_trim_trailing_whitespace": False,
     "editor_trim_whitespace_on_paste": False,
     "pdf_toolbar_groups": {
@@ -958,16 +959,8 @@ def export_user_templates_zip(dest: Path | str) -> Path:
     return dest_path
 
 
-def import_user_templates_zip(
-    src: Path | str,
-    *,
-    merge: bool = True,
-) -> list[dict]:
-    """
-    Vorlagen aus Zip importieren.
-    merge=True: hinzufügen/überschreiben (Titel); False: bestehende ersetzen.
-    Rückgabe: importierte Einträge.
-    """
+def parse_user_templates_zip(src: Path | str) -> list[dict]:
+    """Vorlagen-Einträge aus Zip lesen (ohne Speichern)."""
     import json
     import zipfile
 
@@ -1005,15 +998,70 @@ def import_user_templates_zip(
                 title = parts[0].replace("_", " ").strip() or stem
                 tid = parts[1] if len(parts) == 2 and len(parts[1]) >= 4 else None
                 items.append({"id": tid, "title": title, "body": body})
+    return items
+
+
+def find_user_template_import_conflicts(items: list[dict]) -> list[dict]:
+    """
+    Einträge aus Zip, deren Titel (casefold) schon lokal existieren.
+    Rückgabe: [{incoming, existing}, …].
+    """
+    by_title = {t["title"].casefold(): t for t in get_user_doc_templates()}
+    conflicts: list[dict] = []
+    seen: set[str] = set()
+    for entry in items:
+        title = str(entry.get("title") or "").strip()
+        key = title.casefold()
+        if not key or key in seen:
+            continue
+        existing = by_title.get(key)
+        if existing is None:
+            continue
+        seen.add(key)
+        conflicts.append({"incoming": entry, "existing": existing})
+    return conflicts
+
+
+def import_user_templates_zip(
+    src: Path | str,
+    *,
+    merge: bool = True,
+    conflict_mode: str = "overwrite",
+) -> list[dict]:
+    """
+    Vorlagen aus Zip importieren.
+    merge=True: hinzufügen/überschreiben (Titel); False: bestehende ersetzen.
+    conflict_mode: 'overwrite' (Default) | 'skip' — bei Titel-Konflikt.
+    Rückgabe: importierte Einträge.
+    """
+    items = parse_user_templates_zip(src)
+    mode = str(conflict_mode or "overwrite").strip().casefold()
+    if mode not in ("overwrite", "skip"):
+        mode = "overwrite"
     if not merge:
         for old in list(get_user_doc_templates()):
             delete_user_doc_template(old["id"])
+        mode = "overwrite"
+    skip_titles: set[str] = set()
+    if mode == "skip":
+        skip_titles = {
+            c["existing"]["title"].casefold()
+            for c in find_user_template_import_conflicts(items)
+        }
     imported: list[dict] = []
     for entry in items:
+        title = str(entry.get("title") or "").strip()
+        if title.casefold() in skip_titles:
+            continue
+        tid = entry.get("id")
+        if mode == "overwrite" and title:
+            existing = get_user_doc_template(title)
+            if existing and existing["title"].casefold() == title.casefold():
+                tid = existing["id"]
         saved = save_user_doc_template(
             title=entry["title"],
             body=entry["body"],
-            template_id=entry.get("id"),
+            template_id=tid,
         )
         imported.append(saved)
     sync_user_templates_folder()
@@ -1023,6 +1071,14 @@ def import_user_templates_zip(
 SEARCH_SNIPPET_CONTEXT_MIN = 20
 SEARCH_SNIPPET_CONTEXT_MAX = 80
 SEARCH_SNIPPET_CONTEXT_DEFAULT = 40
+
+SEARCH_SNIPPET_ELLIPSIS_GUILLEMETS = "guillemets"
+SEARCH_SNIPPET_ELLIPSIS_DOTS = "ellipsis"
+SEARCH_SNIPPET_ELLIPSIS_DEFAULT = SEARCH_SNIPPET_ELLIPSIS_GUILLEMETS
+SEARCH_SNIPPET_ELLIPSIS_CHOICES = (
+    (SEARCH_SNIPPET_ELLIPSIS_GUILLEMETS, "«…» Guillemets"),
+    (SEARCH_SNIPPET_ELLIPSIS_DOTS, "… Ellipsis"),
+)
 
 SIDECAR_SAVE_DEBOUNCE_MIN_MS = 200
 SIDECAR_SAVE_DEBOUNCE_MAX_MS = 1000
@@ -1048,6 +1104,29 @@ def set_search_snippet_context_chars(chars: int) -> int:
         min(SEARCH_SNIPPET_CONTEXT_MAX, int(chars)),
     )
     save_settings({"search_snippet_context_chars": val})
+    return val
+
+
+def get_search_snippet_ellipsis_style() -> str:
+    """Treffer-Markierung: guillemets («») oder ellipsis (…)."""
+    raw = str(
+        load_settings().get(
+            "search_snippet_ellipsis_style", SEARCH_SNIPPET_ELLIPSIS_DEFAULT
+        )
+        or SEARCH_SNIPPET_ELLIPSIS_DEFAULT
+    ).strip().casefold()
+    if raw in ("ellipsis", "…", "...", "dots", "dot"):
+        return SEARCH_SNIPPET_ELLIPSIS_DOTS
+    return SEARCH_SNIPPET_ELLIPSIS_GUILLEMETS
+
+
+def set_search_snippet_ellipsis_style(style: str) -> str:
+    raw = str(style or "").strip().casefold()
+    if raw in ("ellipsis", "…", "...", "dots", "dot"):
+        val = SEARCH_SNIPPET_ELLIPSIS_DOTS
+    else:
+        val = SEARCH_SNIPPET_ELLIPSIS_GUILLEMETS
+    save_settings({"search_snippet_ellipsis_style": val})
     return val
 
 
