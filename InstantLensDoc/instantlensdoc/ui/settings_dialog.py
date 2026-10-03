@@ -244,6 +244,7 @@ from instantlensdoc.core.app_settings import (
     get_text_pdf_margin,
     get_text_pdf_open_after,
     get_update_check_on_start,
+    get_telemetry_opt_in,
     get_wizard_completed,
     MERGE_DIFF_MAX_SIDE_MAX,
     MERGE_DIFF_MAX_SIDE_MIN,
@@ -338,6 +339,7 @@ from instantlensdoc.core.app_settings import (
     set_ui_font_scale_percent,
     set_ui_lang,
     set_update_check_on_start,
+    set_telemetry_opt_in,
     set_presentation_hide_annotations,
     set_presentation_auto_advance_sec,
     set_presentation_black_background,
@@ -1340,6 +1342,22 @@ class SettingsDialog(QDialog):
         )
         form.addRow(self.update_chk)
 
+        self.telemetry_chk = QCheckBox("Anonym Nutzung melden (Stub, opt-in)")
+        self.telemetry_chk.setObjectName("telemetryOptIn")
+        self.telemetry_chk.setChecked(get_telemetry_opt_in())
+        self.telemetry_chk.setToolTip(
+            "Telemetrie-Stub 2.3.0: Default aus; auch bei Opt-in no-op — "
+            "keine Datenübertragung, kein Netzwerk"
+        )
+        form.addRow(self.telemetry_chk)
+        tel_hint = QLabel(
+            "<i>Stub:</i> Einstellung speichert nur den Opt-in-Flag. "
+            "Es werden niemals Nutzungsdaten gesendet."
+        )
+        tel_hint.setWordWrap(True)
+        tel_hint.setObjectName("telemetryStubHint")
+        form.addRow(tel_hint)
+
         self.presentation_hide_ann = QCheckBox(
             "Präsentation: Annotation-Overlay ausblenden"
         )
@@ -1663,6 +1681,11 @@ class SettingsDialog(QDialog):
                 "outline_read",
                 "Stub · geplant · keine Aktion — 2.0.0",
             ),
+            (
+                "Telemetrie",
+                "telemetry",
+                "Stub · opt-in Default aus · no-op — 2.3.0",
+            ),
         ]
         # Sortierung A–Z nach Feature-Name — 1.9.3
         rows = sorted(rows, key=lambda r: r[0].casefold())
@@ -1685,10 +1708,18 @@ class SettingsDialog(QDialog):
             hooks_hint = ph.get("message") or PLANNED.get("plugins", "")
         except Exception:
             hooks_hint = PLANNED.get("plugins", f"Plugin-Hooks — Stub {__version__}")
+        try:
+            from instantlensdoc.core.telemetry import telemetry_stub_info
+
+            tel_hint = telemetry_stub_info().get("message") or PLANNED.get("telemetry", "")
+        except Exception:
+            tel_hint = PLANNED.get("telemetry", f"Telemetrie — Stub {__version__}")
         for i, (label, key, status) in enumerate(rows):
             hint = PLANNED.get(key, "")
             if key == "plugins":
                 hint = hooks_hint
+            elif key == "telemetry":
+                hint = tel_hint
             self.stubs_table.setItem(i, 0, QTableWidgetItem(label))
             st = QTableWidgetItem(status)
             self.stubs_table.setItem(i, 1, st)
@@ -2585,6 +2616,7 @@ class SettingsDialog(QDialog):
         set_ui_lang(str(self.ui_lang.currentData() or "de"))
         sync_from_settings()
         set_update_check_on_start(self.update_chk.isChecked())
+        set_telemetry_opt_in(self.telemetry_chk.isChecked())
         set_presentation_hide_annotations(self.presentation_hide_ann.isChecked())
         set_presentation_black_background(self.presentation_black_bg.isChecked())
         set_presentation_show_page_number(self.presentation_page_num.isChecked())

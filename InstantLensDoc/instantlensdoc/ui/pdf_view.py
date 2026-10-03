@@ -969,6 +969,15 @@ class PdfCanvas(QLabel):
                 painter.drawPolyline(QPolygonF(pts))
             elif len(pts) == 1:
                 painter.drawPoint(pts[0])
+        elif ann.type == AnnotationType.LINK:
+            # URL-Link Rechteck (Sidecar) — 2.3.0
+            painter.setPen(QPen(QColor(ann.color or "#1565C0"), 2, Qt.DashLine))
+            painter.setBrush(QColor(21, 101, 192, _a(35)))
+            painter.drawRect(x, y, max(int(w), 8), max(int(h), 8))
+            uri = (ann.text or "").strip()
+            if uri:
+                painter.setPen(QColor(ann.color or "#1565C0"))
+                painter.drawText(x + 4, y + 14, uri[:48])
         painter.setOpacity(1.0)
 
     def _draw_arrow_head(self, painter: QPainter, x0: float, y0: float, x1: float, y1: float):
@@ -1154,6 +1163,16 @@ class PdfCanvas(QLabel):
                 self.uri_link_clicked.emit(link.uri)
                 return
             hit_any = self._hit_annotation(x, y)
+            # Sidecar-LINK: Klick öffnet Browser (ohne Shift) — 2.3.0
+            if (
+                hit_any is not None
+                and hit_any.type == AnnotationType.LINK
+                and not (event.modifiers() & Qt.ShiftModifier)
+            ):
+                uri = (hit_any.text or "").strip()
+                if uri:
+                    self.uri_link_clicked.emit(uri)
+                    return
             if hit_any:
                 shift = bool(event.modifiers() & Qt.ShiftModifier)
                 if shift:
@@ -1645,6 +1664,7 @@ class PdfViewer(QWidget):
             (AnnotationType.MEASURE_AREA, "Fläche"),
             (AnnotationType.MEASURE_ANGLE, "Winkel"),
             (AnnotationType.INK, "Freihand"),
+            (AnnotationType.LINK, "Link"),
             (AnnotationType.SIGNATURE_FIELD, "Signaturfeld"),
         ]:
             b = QToolButton()
@@ -1667,6 +1687,11 @@ class PdfViewer(QWidget):
                 b.setToolTip(
                     "Freihand: Maus-Polyline; Strichstärke/Farbe (Stift+Slider); "
                     "optional Glätten — 2.2.1 (kein Stylus/Druck)"
+                )
+            elif t == AnnotationType.LINK:
+                b.setToolTip(
+                    "URL-Link: Rechteck ziehen, URI eingeben; Klick öffnet Browser; "
+                    "optional Bake als PDF-Link — 2.3.0"
                 )
             b.clicked.connect(lambda checked, tool=t: self._set_tool(tool))
             self._tool_buttons.append(b)
@@ -3325,6 +3350,7 @@ class PdfViewer(QWidget):
             AnnotationType.MEASURE_AREA: "Fläche",
             AnnotationType.MEASURE_ANGLE: "Winkel",
             AnnotationType.INK: "Freihand",
+            AnnotationType.LINK: "Link",
             AnnotationType.SIGNATURE_FIELD: "Signaturfeld",
         }.get(tool, tool.value)
 
@@ -3434,6 +3460,10 @@ class PdfViewer(QWidget):
         elif tool == AnnotationType.INK:
             self.status.emit(
                 "Werkzeug: Freihand — Maus ziehen (Polyline); Ctrl+Z = Undo — 2.2.0"
+            )
+        elif tool == AnnotationType.LINK:
+            self.status.emit(
+                "Werkzeug: Link — Rechteck ziehen, dann URL eingeben (http/https) — 2.3.0"
             )
         else:
             self.status.emit(f"Werkzeug: {tool.value}")
@@ -7444,6 +7474,53 @@ class PdfViewer(QWidget):
         self.annotations_changed.emit()
         self.status.emit(f"{len(reds)} Schwärzungs-Annotation(en) gelöscht")
 
+    def bake_uri_links(self) -> Path | None:
+        """Sidecar-LINK-Annotationen als native PDF-Links backen → neues File — 2.3.0."""
+        if not self.store or not self.pdf_path:
+            QMessageBox.information(self, "Links backen", "Bitte zuerst ein PDF öffnen.")
+            return None
+        from PySide6.QtWidgets import QFileDialog
+        from ild_pdf import (
+            bake_uri_links_to_pdf,
+            sidecar_links_from_annotations,
+        )
+
+        links = sidecar_links_from_annotations(self.store.annotations)
+        if not links:
+            QMessageBox.information(
+                self,
+                "Links backen",
+                "Keine gültigen URL-Link-Annotationen (http/https) im Sidecar.",
+            )
+            return None
+        out = self.pdf_path.with_name(f"{self.pdf_path.stem}_links.pdf")
+        path, _ok = QFileDialog.getSaveFileName(
+            self,
+            "Links als PDF speichern",
+            str(out),
+            "PDF (*.pdf)",
+        )
+        if not path:
+            return None
+        try:
+            result = bake_uri_links_to_pdf(
+                self.pdf_path,
+                links,
+                out_path=path,
+                scale=float(self.scale or 1.0),
+                password=self.password,
+            )
+            self.status.emit(f"Links gebacken → {Path(result).name} ({len(links)})")
+            QMessageBox.information(
+                self,
+                "Links backen",
+                f"{len(links)} Link(s) als PDF-Annotationen gespeichert:\n{result}",
+            )
+            return Path(result)
+        except Exception as e:
+            QMessageBox.warning(self, "Links backen", str(e))
+            return None
+
     def bake_redactions(self, *, remove_sidecar: bool | None = None):
         """Redactions anwenden → neues PDF mit schwarzen Flächen (Bake) — 1.3.0."""
         if not self.store or not self.pdf_path:
@@ -9654,6 +9731,35 @@ class PdfViewer(QWidget):
                 height=max(abs(y1 - y0), 8),
                 color=self._pen_color,
                 fill_color=str(getattr(self, "_default_fill_color", "") or "").strip(),
+            )
+        elif self.tool == AnnotationType.LINK:
+            uri, ok = QInputDialog.getText(
+                self,
+                "URL-Link",
+                "URL (http/https):",
+                text="https://",
+            )
+            if not ok:
+                return
+            uri = (uri or "").strip()
+            from ild_pdf import is_external_http_uri
+
+            if not is_external_http_uri(uri):
+                QMessageBox.warning(
+                    self,
+                    "URL-Link",
+                    "Bitte eine gültige http(s)-URL eingeben.",
+                )
+                return
+            ann = Annotation(
+                page=page,
+                type=AnnotationType.LINK,
+                x=min(x0, x1),
+                y=min(y0, y1),
+                width=max(abs(x1 - x0), 8),
+                height=max(abs(y1 - y0), 8),
+                color="#1565C0",
+                text=uri,
             )
         elif self.tool == AnnotationType.MEASURE_AREA:
             ann = Annotation(

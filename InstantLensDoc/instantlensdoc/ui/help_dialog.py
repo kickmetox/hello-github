@@ -691,10 +691,12 @@ class AboutDialog(QDialog):
             "<p style='background:#E8F5E9;padding:8px;border:1px solid #81C784;'>"
             "<b>Datenschutz / Privacy</b><br>"
             "InstantLens Doc arbeitet <b>lokal</b> auf diesem Rechner. "
-            "Es gibt <b>keine Telemetrie</b>, kein Nutzungs-Tracking und "
-            "<b>keinen Cloud-Upload</b> von Dokumenten oder Annotationen. "
+            "Telemetrie-Stub (2.3.0): Settings opt-in „anonym Nutzung melden“ "
+            "Default <b>aus</b>, immer <b>no-op</b> — keine Datenübertragung. "
+            "Kein produktives Nutzungs-Tracking und "
+            "<b>kein Cloud-Upload</b> von Dokumenten oder Annotationen. "
             "Optionale Online-Update-Prüfung nur wenn in den Einstellungen aktiviert "
-            "(sonst offline). Stubs KI/Cloud bleiben bewusst ohne Funktion."
+            "(sonst offline). Stubs KI/Cloud/Telemetrie bleiben bewusst ohne Funktion."
             "</p>"
         )
         privacy.setWordWrap(True)

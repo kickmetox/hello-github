@@ -156,6 +156,7 @@ class AnnotationType(str, Enum):
     MEASURE_AREA = "measure_area"  # Flächenmessung Rechteck — 2.1.0
     MEASURE_ANGLE = "measure_angle"  # Winkelmessung zwei Linien — 2.1.0
     INK = "ink"  # Freihand-Polyline (Maus) — 2.2.0
+    LINK = "link"  # URL-Link Rechteck + URI in text — 2.3.0
     TEXT_OVERLAY = "text_overlay"
     SIGNATURE_FIELD = "signature_field"  # Platzhalter-Rahmen
     SIGNATURE = "signature"  # Bild-Unterschrift (text: img:…)
@@ -218,6 +219,7 @@ DRAG_TYPES = frozenset(
         AnnotationType.MEASURE_AREA,
         AnnotationType.MEASURE_ANGLE,  # erster Strahl per Drag; zweiter Punkt per Klick — 2.1.0
         AnnotationType.INK,  # Polyline Press→Move→Release — 2.2.0
+        AnnotationType.LINK,  # Rechteck + URI — 2.3.0
         AnnotationType.HIGHLIGHT,
         AnnotationType.REDACTION,
     }
@@ -238,6 +240,7 @@ REPORT_TYPE_LABELS: dict[str, str] = {
     "measure_area": "Fläche",
     "measure_angle": "Winkel",
     "ink": "Freihand",
+    "link": "Link",
     "text_overlay": "Text-Overlay",
     "signature_field": "Signaturfeld",
     "signature": "Signatur",

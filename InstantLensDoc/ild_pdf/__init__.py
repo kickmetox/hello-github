@@ -122,6 +122,7 @@ from .images import (
     DEFAULT_PAGE_IMAGE_FILENAME_TEMPLATE,
     compress_image_for_pdf,
     compress_pdf_as_images,
+    downsample_pdf_images,
     extract_page_image,
     extract_pages_as_images,
     extract_embedded_images,
@@ -223,7 +224,15 @@ from .portfolio import (
     list_portfolio_entries,
     open_portfolio,
 )
-from .links import UriLink, is_external_http_uri, list_page_uri_links, uri_link_at
+from .links import (
+    SidecarUriLink,
+    UriLink,
+    bake_uri_links_to_pdf,
+    is_external_http_uri,
+    list_page_uri_links,
+    sidecar_links_from_annotations,
+    uri_link_at,
+)
 
 __all__ = [
     "PdfDocument",
@@ -333,6 +342,7 @@ __all__ = [
     "THUMB_LAZY_THRESHOLD",
     "compress_image_for_pdf",
     "compress_pdf_as_images",
+    "downsample_pdf_images",
     "DEFAULT_PAGE_IMAGE_FILENAME_TEMPLATE",
     "extract_page_image",
     "extract_pages_as_images",
@@ -420,11 +430,14 @@ __all__ = [
     "list_portfolio_entries",
     "open_portfolio",
     "UriLink",
+    "SidecarUriLink",
     "is_external_http_uri",
     "list_page_uri_links",
     "uri_link_at",
+    "sidecar_links_from_annotations",
+    "bake_uri_links_to_pdf",
     "text_to_pdf",
     "page_count_for_text",
 ]
 
-__version__ = "2.2.5"
+__version__ = "2.3.0"

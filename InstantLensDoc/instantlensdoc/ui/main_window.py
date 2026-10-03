@@ -1499,6 +1499,13 @@ class MainWindow(QMainWindow):
         act_find_repl.setToolTip("Find/Replace im Texteditor")
         act_find_repl.triggered.connect(self._find_replace)
         m_edit.addAction(act_find_repl)
+        act_palette = QAction("Schnellaktionen…", self)
+        act_palette.setShortcut(QKeySequence("Ctrl+K"))
+        act_palette.setToolTip(
+            "Command Palette: öffnen, suchen, OCR, export… — Ctrl+K — 2.3.0"
+        )
+        act_palette.triggered.connect(self._open_command_palette)
+        m_edit.addAction(act_palette)
         act_search_csv = QAction("Suchergebnisse als CSV exportieren…", self)
         act_search_csv.setToolTip("Aktuelle Trefferliste (Sidebar) als CSV speichern")
         act_search_csv.triggered.connect(lambda: self._on_search_export("csv"))
@@ -2247,9 +2254,18 @@ class MainWindow(QMainWindow):
         )
         act_stats.triggered.connect(self._show_doc_stats)
         m_pdf.addAction(act_stats)
-        act_compress = QAction("Bildkompression (Seiten neu)…", self)
+        act_compress = QAction("PDF komprimieren / Downsample…", self)
+        act_compress.setToolTip(
+            "Seiten rastern (pypdfium2), optional Downsample, JPEG → neues File (pikepdf) — 2.3.0"
+        )
         act_compress.triggered.connect(self._compress_pdf_images)
         m_pdf.addAction(act_compress)
+        act_bake_links = QAction("Link-Annotationen in PDF backen…", self)
+        act_bake_links.setToolTip(
+            "Sidecar-URL-Links als native PDF Link-Annotationen speichern — 2.3.0"
+        )
+        act_bake_links.triggered.connect(self._bake_uri_links)
+        m_pdf.addAction(act_bake_links)
         act_meta = QAction("Metadaten bearbeiten…", self)
         act_meta.triggered.connect(self._edit_pdf_metadata)
         m_pdf.addAction(act_meta)
@@ -9040,26 +9056,122 @@ class MainWindow(QMainWindow):
             return
         vals = dlg.values()
         try:
-            from ild_pdf import compress_pdf_as_images
+            from ild_pdf import compress_pdf_as_images, downsample_pdf_images
             from ild_pdf.render import clear_render_cache
 
+            stem_suffix = "_optimized" if vals.get("downsample", True) else "_compressed"
             out = self.pdf_view.pdf_path.with_name(
-                f"{self.pdf_view.pdf_path.stem}_compressed.pdf"
+                f"{self.pdf_view.pdf_path.stem}{stem_suffix}.pdf"
             )
-            compress_pdf_as_images(
-                self.pdf_view.pdf_path,
+            path, _ok = QFileDialog.getSaveFileName(
+                self,
+                "Komprimiertes PDF speichern",
+                str(out),
+                "PDF (*.pdf)",
+            )
+            if not path:
+                return
+            out = Path(path)
+            kw = dict(
                 out_path=out,
                 jpeg_quality=vals["jpeg_quality"],
                 max_edge=vals["max_edge"],
-                render_scale=1.5,
+                render_scale=float(vals.get("render_scale") or 1.5),
             )
+            if vals.get("downsample", True):
+                downsample_pdf_images(self.pdf_view.pdf_path, **kw)
+            else:
+                compress_pdf_as_images(
+                    self.pdf_view.pdf_path,
+                    downsample=False,
+                    **kw,
+                )
             clear_render_cache(self.pdf_view.pdf_path)
             self._set_status(f"Komprimiert → {out.name}")
             QMessageBox.information(self, "Kompression", f"Gespeichert:\n{out}")
             _log.info("PDF compressed: %s", out)
+            try:
+                from instantlensdoc.core.telemetry import report_anonymous_usage
+
+                report_anonymous_usage("pdf.compress")
+            except Exception:
+                pass
         except Exception as e:
             _log.exception("Kompression fehlgeschlagen")
             QMessageBox.warning(self, "Kompression", str(e))
+
+    def _bake_uri_links(self):
+        """Sidecar-URL-Links als native PDF-Annotationen backen — 2.3.0."""
+        if not self.pdf_view.pdf_path:
+            QMessageBox.information(self, "Links backen", "Bitte zuerst ein PDF öffnen.")
+            return
+        self.pdf_view.bake_uri_links()
+
+    def _open_command_palette(self):
+        """Ctrl+K Schnellaktionen-Palette — 2.3.0."""
+        from instantlensdoc.ui.command_palette import CommandPaletteDialog
+
+        dlg = CommandPaletteDialog(self, runner=self._run_palette_command)
+        dlg.exec()
+
+    def _run_palette_command(self, cmd_id: str) -> None:
+        """Führt einen Command-Palette-Befehl aus — 2.3.0."""
+        cid = (cmd_id or "").strip().lower()
+
+        def _about():
+            AboutDialog(self).exec()
+
+        def _kb():
+            KeyboardHelpDialog(self).exec()
+
+        def _export_menu():
+            # HTML-Export als Default-Schnellaktion
+            self._export_editor("html")
+
+        def _ann_layer():
+            vis = not bool(self.pdf_view.annotations_visible())
+            self.pdf_view.set_annotations_visible(vis)
+            if hasattr(self, "_ann_layer_action"):
+                self._ann_layer_action.setChecked(vis)
+
+        mapping = {
+            "open": self.open_dialog,
+            "save": self.save_doc,
+            "save_all": self.save_all_docs,
+            "search": lambda: self.sidebar.setFocus()
+            if hasattr(self, "sidebar")
+            else None,
+            "multi_search": self._open_multi_doc_search,
+            "find_replace": self._find_replace,
+            "ocr_page": self._run_ocr,
+            "ocr_pdf": self._run_ocr_document,
+            "export": _export_menu,
+            "export_page_images": lambda: self.pdf_view.export_pages_as_images()
+            if hasattr(self.pdf_view, "export_pages_as_images")
+            else None,
+            "compress": self._compress_pdf_images,
+            "bake_links": self._bake_uri_links,
+            "page_labels": lambda: self.pdf_view.edit_page_labels()
+            if hasattr(self.pdf_view, "edit_page_labels")
+            else None,
+            "doc_history": lambda: self.pdf_view.show_doc_history()
+            if hasattr(self.pdf_view, "show_doc_history")
+            else None,
+            "goto_page": self._goto_page,
+            "settings": self._settings,
+            "keyboard_help": _kb,
+            "about": _about,
+            "theme_cycle": self._cycle_theme_mode,
+            "ann_layer": _ann_layer,
+        }
+        fn = mapping.get(cid)
+        if callable(fn):
+            try:
+                fn()
+            except Exception as e:
+                self._set_status(f"Schnellaktion „{cid}“: {e}")
+        else:
+            self._set_status(f"Schnellaktion unbekannt: {cid}")
 
     def _settings(self):
         if SettingsDialog(self).exec():

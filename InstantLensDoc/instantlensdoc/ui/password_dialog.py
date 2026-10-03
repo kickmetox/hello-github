@@ -185,30 +185,53 @@ class RemovePasswordDialog(QDialog):
 
 
 class CompressPdfDialog(QDialog):
+    """PDF-Kompression / Bilder-Downsample — Qualitäts-Dialog — 2.3.0."""
+
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("PDF-Bildkompression")
-        self.resize(400, 180)
+        self.setWindowTitle("PDF komprimieren / Downsample")
+        self.setObjectName("compressPdfDialog")
+        self.resize(440, 260)
         layout = QVBoxLayout(self)
         layout.addWidget(
             QLabel(
-                "Seiten als JPEG neu einbetten (verlustbehaftet).<br>"
-                "Reduziert die Dateigröße von Scan-/Bild-PDFs."
+                "Seiten via pypdfium2 rastern, optional Downsample, JPEG und "
+                "per pikepdf als <b>neues File</b> speichern (verlustbehaftet) — 2.3.0."
             )
         )
         form = QFormLayout()
-        from PySide6.QtWidgets import QSpinBox
+        from PySide6.QtWidgets import QCheckBox, QDoubleSpinBox, QSpinBox
         from instantlensdoc.core.app_settings import get_export_image_max_edge, get_export_jpeg_quality
 
         self.quality = QSpinBox()
+        self.quality.setObjectName("compressJpegQuality")
         self.quality.setRange(20, 95)
         self.quality.setValue(min(95, max(20, get_export_jpeg_quality())))
+        self.quality.setToolTip("JPEG-Qualität 20–95 (niedriger = kleiner)")
         self.max_edge = QSpinBox()
+        self.max_edge.setObjectName("compressMaxEdge")
         self.max_edge.setRange(400, 4000)
         self.max_edge.setSingleStep(100)
         self.max_edge.setValue(min(4000, max(400, get_export_image_max_edge())))
+        self.max_edge.setToolTip("Maximale Bildkante in Pixel (Downsample)")
+        self.downsample = QCheckBox("Bilder downsample (max. Kante)")
+        self.downsample.setObjectName("compressDownsample")
+        self.downsample.setChecked(True)
+        self.downsample.setToolTip(
+            "Längste Kante auf Max. Kante begrenzen (pypdfium2-Raster → pikepdf) — 2.3.0"
+        )
+        self.downsample.toggled.connect(self.max_edge.setEnabled)
+        self.render_scale = QDoubleSpinBox()
+        self.render_scale.setObjectName("compressRenderScale")
+        self.render_scale.setRange(0.5, 3.0)
+        self.render_scale.setSingleStep(0.25)
+        self.render_scale.setValue(1.5)
+        self.render_scale.setDecimals(2)
+        self.render_scale.setToolTip("Raster-Skalierung vor Kompression (höher = schärfer/größer)")
         form.addRow("JPEG-Qualität:", self.quality)
+        form.addRow(self.downsample)
         form.addRow("Max. Kante (px):", self.max_edge)
+        form.addRow("Render-Scale:", self.render_scale)
         layout.addLayout(form)
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         buttons.accepted.connect(self.accept)
@@ -219,4 +242,6 @@ class CompressPdfDialog(QDialog):
         return {
             "jpeg_quality": self.quality.value(),
             "max_edge": self.max_edge.value(),
+            "downsample": bool(self.downsample.isChecked()),
+            "render_scale": float(self.render_scale.value()),
         }

@@ -152,6 +152,7 @@ DEFAULTS: dict[str, Any] = {
     "page_labels_txt_utf8_bom": True,  # PageLabels-TXT UTF-8 BOM — 2.2.4
     "last_page_labels_txt_dir": "",  # Zielordner PageLabels-TXT merken — 2.2.4
     "page_labels_txt_filename_template": "{stem}_labels.txt",  # Template — 2.2.4
+    "telemetry_opt_in": False,  # anonym Nutzung melden — Stub opt-in, Default aus, no-op — 2.3.0
     "native_ann_import_save_sidecar": True,  # nach Kommentar-Import Sidecar speichern — 2.1.2
     "textlayer_diff_side_by_side": False,  # Textlayer Diff TXT/Panel Side-by-Side — 2.1.2
     "textlayer_diff_txt_template": "{stemA}_vs_{stemB}_{mode}.txt",  # 2.1.3
@@ -575,6 +576,22 @@ def get_update_check_on_start() -> bool:
 
 def set_update_check_on_start(enabled: bool) -> None:
     save_settings({"update_check_on_start": bool(enabled)})
+
+
+def get_telemetry_opt_in() -> bool:
+    """Opt-in „anonym Nutzung melden“ — Default False; Telemetrie bleibt no-op Stub — 2.3.0."""
+    return bool(load_settings().get("telemetry_opt_in", False))
+
+
+def set_telemetry_opt_in(enabled: bool) -> None:
+    save_settings({"telemetry_opt_in": bool(enabled)})
+    # Stub: auch bei True keine Side-Effects
+    try:
+        from instantlensdoc.core.telemetry import report_anonymous_usage
+
+        report_anonymous_usage("settings.telemetry_opt_in", enabled=bool(enabled))
+    except Exception:
+        pass
 
 
 def get_update_dismissed_version() -> str:

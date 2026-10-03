@@ -30,6 +30,10 @@ PLANNED = {
         f"Document Outline Vorlesen — Stub {__version__} "
         "(TTS/Screenreader-Anbindung geplant; keine Aktion)"
     ),
+    "telemetry": (
+        f"Telemetrie — Stub {__version__} — opt-in „anonym Nutzung melden“ "
+        "Default aus, immer no-op (keine Datenübertragung)"
+    ),
     "varfonts": "Variable Fonts (voll) — geplant",
     "envelope": "Envelope Distort (voll) — geplant",
     "esign": "E-Signatur (rechtssicher) — geplant",
@@ -49,6 +53,10 @@ PLANNED_EN = {
         f"Document outline read-aloud — stub {__version__} "
         "(TTS/screen reader planned; no action)"
     ),
+    "telemetry": (
+        f"Telemetry — stub {__version__} — opt-in “report anonymous usage” "
+        "default off, always no-op (no data transfer)"
+    ),
     "varfonts": "Variable fonts (full) — planned",
     "envelope": "Envelope distort (full) — planned",
     "esign": "E-signature (legally binding) — planned",
@@ -67,6 +75,9 @@ STUB_SHORT = {
     "outline_read": (
         "Document Outline Vorlesen (TTS) — Stub / geplant / keine Aktion — 2.0.0."
     ),
+    "telemetry": (
+        "Anonyme Nutzung melden — Stub / opt-in Default aus / immer no-op — 2.3.0."
+    ),
     "varfonts": "Vollständige Variable-Fonts-Unterstützung — geplant.",
     "envelope": "Envelope-Distort-Transformation — geplant.",
     "esign": "Rechtssichere E-Signatur — geplant.",
@@ -84,6 +95,9 @@ STUB_SHORT_EN = {
     "outline_read": (
         "Document outline read-aloud (TTS) — stub / planned / no action — 2.0.0."
     ),
+    "telemetry": (
+        "Report anonymous usage — stub / opt-in default off / always no-op — 2.3.0."
+    ),
     "varfonts": "Full variable fonts support — planned.",
     "envelope": "Envelope distort transform — planned.",
     "esign": "Legally binding e-signature — planned.",
@@ -97,6 +111,7 @@ STUB_TITLES = {
     "extrude3d": "3D-Extrusion",
     "plugins": "Plugin-Hooks",
     "outline_read": "Document Outline Vorlesen",
+    "telemetry": "Telemetrie",
     "varfonts": "Variable Fonts",
     "envelope": "Envelope Distort",
     "esign": "E-Signatur",
@@ -110,6 +125,7 @@ STUB_TITLES_EN = {
     "extrude3d": "3D extrusion",
     "plugins": "Plugin hooks",
     "outline_read": "Document outline read-aloud",
+    "telemetry": "Telemetry",
     "varfonts": "Variable fonts",
     "envelope": "Envelope distort",
     "esign": "E-signature",

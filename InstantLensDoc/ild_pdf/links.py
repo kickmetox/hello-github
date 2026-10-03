@@ -1,10 +1,10 @@
-"""Native PDF-Link-Annotationen (externe URI) lesen."""
+"""Native PDF-Link-Annotationen (externe URI) lesen und Sidecar-Links backen — 2.3.0."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional
+from typing import Iterable, List, Optional, Sequence
 from urllib.parse import urlparse
 
 
@@ -129,3 +129,109 @@ def uri_link_at(
         if link.contains(x, y):
             return link
     return None
+
+
+@dataclass(frozen=True)
+class SidecarUriLink:
+    """Sidecar-Link (Rechteck + URI) in Render-Pixeln, Y von oben — 2.3.0."""
+
+    page: int
+    x: float
+    y: float
+    width: float
+    height: float
+    uri: str
+
+
+def sidecar_links_from_annotations(
+    annotations: Iterable[object],
+) -> List[SidecarUriLink]:
+    """Extrahiert LINK-Annotationen (type=link, text=URI) aus Sidecar-Objekten."""
+    out: List[SidecarUriLink] = []
+    for ann in annotations or []:
+        try:
+            t = getattr(ann, "type", None)
+            t_val = getattr(t, "value", t)
+            if str(t_val or "").lower() != "link":
+                continue
+            uri = str(getattr(ann, "text", "") or "").strip()
+            if not is_external_http_uri(uri):
+                continue
+            out.append(
+                SidecarUriLink(
+                    page=int(getattr(ann, "page", 0) or 0),
+                    x=float(getattr(ann, "x", 0) or 0),
+                    y=float(getattr(ann, "y", 0) or 0),
+                    width=max(1.0, float(getattr(ann, "width", 1) or 1)),
+                    height=max(1.0, float(getattr(ann, "height", 1) or 1)),
+                    uri=uri,
+                )
+            )
+        except Exception:
+            continue
+    return out
+
+
+def bake_uri_links_to_pdf(
+    pdf_path: str | Path,
+    links: Sequence[SidecarUriLink | UriLink],
+    *,
+    out_path: str | Path | None = None,
+    scale: float = 1.0,
+    password: str | None = None,
+) -> Path:
+    """
+    Schreibt Sidecar-/URI-Links als native PDF Link-Annotationen (pikepdf).
+    Ausgabe neues File (Default ``*_links.pdf``). Koordinaten: Render-Pixel bei ``scale``.
+    """
+    import pikepdf
+    from pikepdf import Dictionary, Name
+
+    src = Path(pdf_path)
+    dst = Path(out_path) if out_path else src.with_name(f"{src.stem}_links.pdf")
+    scale = max(float(scale or 1.0), 1e-6)
+    open_kw: dict = {}
+    if password:
+        open_kw["password"] = password
+
+    with pikepdf.open(src, **open_kw) as doc:
+        by_page: dict[int, list] = {}
+        for link in links or []:
+            uri = str(getattr(link, "uri", "") or "").strip()
+            if not is_external_http_uri(uri):
+                continue
+            page_i = int(getattr(link, "page", 0) or 0)
+            if page_i < 0 or page_i >= len(doc.pages):
+                continue
+            by_page.setdefault(page_i, []).append(link)
+
+        for page_i, page_links in by_page.items():
+            page = doc.pages[page_i]
+            mediabox = page.mediabox
+            page_h = float(mediabox[3] - mediabox[1])
+            annots = page.get("/Annots")
+            if annots is None:
+                annots = doc.make_indirect(pikepdf.Array())
+                page["/Annots"] = annots
+            for link in page_links:
+                x = float(link.x) / scale
+                y_top = float(link.y) / scale
+                w = max(1.0, float(link.width) / scale)
+                h = max(1.0, float(link.height) / scale)
+                # Render Y oben → PDF Y unten
+                left = x
+                right = x + w
+                top = page_h - y_top
+                bottom = page_h - (y_top + h)
+                rect = [min(left, right), min(bottom, top), max(left, right), max(bottom, top)]
+                annot = Dictionary(
+                    Type=Name.Annot,
+                    Subtype=Name.Link,
+                    Rect=rect,
+                    Border=[0, 0, 1],
+                    C=[0.0, 0.0, 1.0],
+                    A=Dictionary(Type=Name.Action, S=Name.URI, URI=str(link.uri)),
+                )
+                annots.append(doc.make_indirect(annot))
+        doc.save(dst)
+    return dst

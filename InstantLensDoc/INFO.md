@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **2.2.5** |
+| Version | **2.3.0** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -33,7 +33,7 @@
 
 Skript: [sync-ild.ps1](scripts/sync-ild.ps1) — Branch `cursor/instantlensdoc-2108` (oder `-LocalPack` / Pack-Zip) nach `D:\AI_Temp\InstantLensDoc`, pip, Start. **Nutzer-Icon in `assets` wird nicht überschrieben.**
 
-**FEATURES.md lokal sync:** Nach Sync liegt `FEATURES.md` lokal im App-Ordner (`D:\AI_Temp\InstantLensDoc\FEATURES.md`); About/Stubs öffnen diese lokale Datei — Version **2.2.5**.
+**FEATURES.md lokal sync:** Nach Sync liegt `FEATURES.md` lokal im App-Ordner (`D:\AI_Temp\InstantLensDoc\FEATURES.md`); About/Stubs öffnen diese lokale Datei — Version **2.3.0**.
 
 Ohne Start: `-NoStart` (Alias `-SkipStart`). Exit-Codes: **0** OK · **1** allgemein · **2** Git-Fehler.
 
@@ -62,6 +62,16 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an / `checkedonce`)
+
+## Neu in 2.3.0
+
+Minor-Bump nach **2.2.5**:
+
+- **PDF-Kompression/Downsample:** Qualitäts-Dialog · optional Bilder-Downsample (pypdfium2-Raster + pikepdf) → neues File
+- **Link-Annotationen:** Rechteck + URI in Sidecar · Klick öffnet Browser · optional Bake als PDF-Link
+- **Schnellaktionen-Palette:** Ctrl+K Command Palette (öffnen, suchen, OCR, export…)
+- **Telemetrie-Stub:** Settings opt-in „anonym Nutzung melden“ Default aus · immer no-op
+- Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie klar markiert (Ink ≠ Stylus)
 
 ## Neu in 2.2.5
 
@@ -138,13 +148,13 @@ Exit **0**/OK (`ok=true`) · **1**/Fehler (`ok=false`) · **2**/ungültige Optio
 Beispiel Erfolg:
 
 ```json
-{"ok": true, "version": "2.2.5", "duration_ms": 1234, "checks": ["version", "imports", "cli", "measure_diff_import", "changelog"]}
+{"ok": true, "version": "2.3.0", "duration_ms": 1234, "checks": ["version", "imports", "cli", "measure_diff_import", "changelog"]}
 ```
 
 Beispiel Fail:
 
 ```json
-{"ok": false, "version": "2.2.5", "duration_ms": 12, "checks": ["version", {"name": "imports", "error": "import x: …"}]}
+{"ok": false, "version": "2.3.0", "duration_ms": 12, "checks": ["version", {"name": "imports", "error": "import x: …"}]}
 ```
 
 Ende (ohne `--json`): `Laufzeit: N ms` · `smoke_ild: OK`.

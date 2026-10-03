@@ -54,10 +54,13 @@ def compress_pdf_as_images(
     jpeg_quality: int = 70,
     render_scale: float = 1.5,
     max_edge: int = 2000,
+    downsample: bool = True,
 ) -> Path:
     """
-    Rendert jede Seite, komprimiert als JPEG und baut ein neues PDF
-    (verlustbehaftet — gut für Scan-PDFs / Dateigröße).
+    Rendert jede Seite (pypdfium2), optional Downsample (max_edge), JPEG-Kompression
+    und ersetzt Seiten via pikepdf in einem **neuen** PDF (verlustbehaftet).
+
+    ``downsample=False`` behält die gerasterte Auflösung (nur JPEG-Q).
     """
     from .render import render_page
     from .document import PdfDocument
@@ -68,13 +71,14 @@ def compress_pdf_as_images(
     with PdfDocument(pdf_path) as doc:
         n = len(doc)
         sizes = [doc.page_size(i) for i in range(n)]
+    edge = max(64, int(max_edge)) if downsample else 50_000
     for i in range(n):
         raw = render_page(pdf_path, i, scale=render_scale, use_cache=False)
         pages.append(
-            compress_image_for_pdf(raw, max_edge=max_edge, quality=jpeg_quality, to_jpeg=True)
+            compress_image_for_pdf(raw, max_edge=edge, quality=jpeg_quality, to_jpeg=True)
         )
 
-    # Einzelseiten zusammenführen
+    # Einzelseiten zusammenführen (pikepdf replace)
     import pikepdf
 
     with pikepdf.Pdf.new() as dst:
@@ -94,6 +98,30 @@ def compress_pdf_as_images(
                 dst.pages.append(src.pages[0])
         dst.save(out_path)
     return out_path
+
+
+def downsample_pdf_images(
+    pdf_path: str | Path,
+    *,
+    out_path: str | Path | None = None,
+    jpeg_quality: int = 70,
+    max_edge: int = 1200,
+    render_scale: float = 1.5,
+) -> Path:
+    """
+    Bilder-Downsample (2.3.0): pypdfium2-Raster → JPEG-Downsample → pikepdf-Replace.
+    Ausgabe immer als neues File (Default ``*_optimized.pdf``).
+    """
+    pdf_path = Path(pdf_path)
+    out_path = Path(out_path) if out_path else pdf_path.with_name(f"{pdf_path.stem}_optimized.pdf")
+    return compress_pdf_as_images(
+        pdf_path,
+        out_path=out_path,
+        jpeg_quality=jpeg_quality,
+        max_edge=max_edge,
+        render_scale=render_scale,
+        downsample=True,
+    )
 
 
 DEFAULT_PAGE_IMAGE_FILENAME_TEMPLATE = "{stem}_p{page}"

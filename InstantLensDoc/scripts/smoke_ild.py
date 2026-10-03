@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Nightly/CI Smoke: CLI + Import-Checks für InstantLens Doc — 2.1.0–2.2.5.
+"""Nightly/CI Smoke: CLI + Import-Checks für InstantLens Doc — 2.1.0–2.3.0.
 
 Leichtgewichtig. Exit-Codes:
   0  OK  (ok=true)
@@ -14,12 +14,12 @@ Aufruf:
   python scripts/smoke_ild.py -h
 
 JSON-Schema (--json), Erfolg:
-  {"ok": true, "version": "2.2.5", "duration_ms": 1234,
+  {"ok": true, "version": "2.3.0", "duration_ms": 1234,
    "checks": ["version", "imports", "cli", "measure_diff_import", "changelog"]}
 
 JSON bei Fail: checks[] enthält Objekt mit error-Text (max 200 Zeichen, Truncate …);
 Exitcode spiegelt ok (0↔true, 1↔false) — 2.2.0:
-  {"ok": false, "version": "2.2.5", "duration_ms": 12,
+  {"ok": false, "version": "2.3.0", "duration_ms": 12,
    "checks": ["version", {"name": "imports", "error": "import x: …"}]}
 """
 
@@ -41,7 +41,7 @@ if str(ROOT) not in sys.path:
 # Headless/CI: Qt ohne Display
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-EXPECTED_VERSION = "2.2.5"
+EXPECTED_VERSION = "2.3.0"
 FAIL_ERROR_MAX_LEN = 200
 
 EXIT_OK = 0
@@ -133,7 +133,9 @@ def check_imports(*, with_qt: bool) -> None:
             "MEASURE_AREA",
             "MEASURE_ANGLE",
             "AnnotationType.INK",
+            "AnnotationType.LINK",
             "_on_ink",
+            "bake_uri_links",
             "apply_custom_page_labels",
             "edit_page_labels",
             "show_doc_history",
@@ -175,6 +177,11 @@ def check_imports(*, with_qt: bool) -> None:
             "highlight_page_labels_txt_template_html",
             "reset_line_edit_template",
         ),
+        ROOT / "instantlensdoc" / "ui" / "command_palette.py": (
+            "CommandPaletteDialog",
+            "default_palette_commands",
+            "commandPalette",
+        ),
         ROOT / "instantlensdoc" / "ui" / "main_window.py": (
             "_focus_import_status_toast_target",
             "_import_status_toast_active",
@@ -183,6 +190,16 @@ def check_imports(*, with_qt: bool) -> None:
             "Klick fokussiert Ink",
             "Seitenbeschriftungen…",
             "Dokument-Historie…",
+            "_open_command_palette",
+            "_compress_pdf_images",
+            "_bake_uri_links",
+            "Ctrl+K",
+            "Downsample",
+        ),
+        ROOT / "instantlensdoc" / "core" / "telemetry.py": (
+            "report_anonymous_usage",
+            "telemetry_stub_info",
+            "no-op",
         ),
         ROOT / "CONTRIBUTING.md": (
             "smoke_ild",
@@ -494,12 +511,14 @@ def check_measure_and_diff() -> None:
 
     _ok(
         "measure + textlayer-diff + native-import + measures-csv "
-        "template + status + ink/page-labels/ildhist — 2.2.5"
+        "template + status + ink/page-labels/ildhist — 2.3.0"
     )
 
 
 def check_changelog() -> None:
     cl = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    if "## 2.3.0" not in cl:
+        _fail("CHANGELOG fehlt ## 2.3.0")
     if "## 2.2.5" not in cl:
         _fail("CHANGELOG fehlt ## 2.2.5")
     if "## 2.2.4" not in cl:
@@ -521,7 +540,13 @@ def check_changelog() -> None:
     if "## 2.1.0" not in cl:
         _fail("CHANGELOG fehlt ## 2.1.0")
     if (
-        "Live-Vorschau" not in cl
+        "Downsample" not in cl
+        and "Kompression" not in cl
+        and "Command Palette" not in cl
+        and "Schnellaktionen" not in cl
+        and "Telemetrie" not in cl
+        and "Link-Annotation" not in cl
+        and "Live-Vorschau" not in cl
         and "Quick-Insert" not in cl
         and "Reset Default" not in cl
         and "Ink-Tool" not in cl
@@ -549,12 +574,14 @@ def check_changelog() -> None:
         and "Range-Editor" not in cl
         and "Glätten" not in cl
     ):
-        _fail("CHANGELOG 2.2.5 fehlt Kernfeature-Hinweis")
+        _fail("CHANGELOG 2.3.0 fehlt Kernfeature-Hinweis")
     if "## 2.2.1" not in cl:
         _fail("CHANGELOG fehlt ## 2.2.1")
     if "## 2.2.0" not in cl:
         _fail("CHANGELOG fehlt ## 2.2.0")
     feat = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
+    if "2.3.0" not in feat:
+        _fail("FEATURES.md fehlt 2.3.0")
     if "2.2.5" not in feat:
         _fail("FEATURES.md fehlt 2.2.5")
     if "2.2.4" not in feat:
@@ -563,6 +590,10 @@ def check_changelog() -> None:
         _fail("FEATURES.md fehlt 2.2.3")
     if "2.2.2" not in feat:
         _fail("FEATURES.md fehlt 2.2.2")
+    if "Downsample" not in feat and "Schnellaktionen" not in feat:
+        _fail("FEATURES.md fehlt 2.3.0 Kernfeatures")
+    if "Telemetrie" not in feat:
+        _fail("FEATURES.md fehlt Telemetrie-Stub")
     if "Freihand" not in feat and "ink" not in feat.casefold():
         _fail("FEATURES.md fehlt Freihand/Ink")
     if "ildhist" not in feat and "Dokument-Historie" not in feat:
@@ -668,11 +699,11 @@ Exit-Codes:
 Laufzeit: am Ende als „Laufzeit: N ms“ (oder duration_ms im JSON).
 
 Beispiel --json (Erfolg):
-  {"ok": true, "version": "2.2.5", "duration_ms": 1234,
+  {"ok": true, "version": "2.3.0", "duration_ms": 1234,
    "checks": ["version", "imports", "cli", "measure_diff_import", "changelog"]}
 
 Beispiel --json (Fail):
-  {"ok": false, "version": "2.2.5", "duration_ms": 12,
+  {"ok": false, "version": "2.3.0", "duration_ms": 12,
    "checks": ["version", {"name": "imports", "error": "import x: …"}]}
 """.rstrip()
     )

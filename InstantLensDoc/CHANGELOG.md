@@ -1,5 +1,20 @@
 # Changelog — InstantLens Doc
 
+## 2.3.0 — PDF-Kompression/Downsample, Link-Annotationen Sidecar+Bake, Ctrl+K Command Palette, Telemetrie-Stub opt-in no-op
+
+Minor-Bump nach **2.2.5**: **PDF-Kompression/Optimierung** mit Qualitäts-Dialog und optionalem **Bilder-Downsample** (pypdfium2-Raster + pikepdf-Replace) → immer **neues File**; **URL-Link-Annotationen** (Rechteck + URI im Sidecar, Klick öffnet Browser, optional Bake als native PDF-Link-Annotation); **Schnellaktionen-Palette** Ctrl+K für häufige Befehle (öffnen, suchen, OCR, export…); **Telemetrie-Stub** klar opt-in Settings „anonym Nutzung melden“ (Default aus, immer no-op). Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie klar markiert / nicht produktiv (Ink ≠ Stylus).
+
+### Neu / verbessert
+- PDF komprimieren / Downsample: Dialog JPEG-Q · Max-Kante · Render-Scale · Downsample-Toggle · Ausgabe neues File
+- Link-Werkzeug: Rechteck ziehen → URL (http/https) · Sidecar `type=link` · Klick öffnet Browser · Menü „Link-Annotationen in PDF backen…“
+- Schnellaktionen: Ctrl+K Command Palette (filterbar) · Bearbeiten-Menü
+- Telemetrie-Stub: Settings-Checkbox opt-in · `report_anonymous_usage` no-op · Stubs-Seite Eintrag
+
+### Packaging / Docs
+- Version **2.3.0** (App / `ild_pdf` / ISS / Smoke / Docs); Serie **2.3**; `docs/VERSION` + `VERSION.txt`
+- Smoke: 2.3.0 CLI + Qt (Kompression/Downsample, Links/Bake, Palette Ctrl+K, Telemetrie-Stub)
+- Stubs: Telemetrie ergänzt; KI/Cloud/Stylus/3D/Hooks/Outline unverändert markiert
+
 ## 2.2.5 — PageLabels TXT Live-Vorschau·Quick-Insert {stem}/{date}·Reset Default, Ink Toast Klick→Ink-Tool·A11y wie OCR, Historie Undo Clear Redo·klarer DE-Hinweis, CONTRIBUTING Sync Windows·-NoStart
 
 Post-Release-Polish nach **2.2.4**: **Seitenbeschriftungen** TXT-Export mit **Live-Vorschau Dateiname**, **Quick-Insert `{stem}`/`{date}`** und **Reset Default**; **Ink/Freihand Status-Toast** **Klick fokussiert Ink-Tool**, Announcement **gleicher Pfad wie OCR**; **Dokument-Historie** **Redo nach Undo Clear** und **klarer DE-Hinweis** wenn kein Undo möglich; CONTRIBUTING Sync-Zeile erwähnt **Windows** und optional **`-NoStart`**. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen unverändert klar markiert / nicht produktiv (Ink ≠ Stylus).
