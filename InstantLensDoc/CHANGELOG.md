@@ -1,5 +1,23 @@
 # Changelog — InstantLens Doc
 
+## 2.1.1 — Kommentar-Import Dry-Run·Duplikate·Fortschritt, Messung Snap·Labels·CSV, Textlayer Ignore-WS·Nur-Diff·TXT, smoke_ild Exit/--qt
+
+Post-Release-Polish nach **2.1.0**: **PDF-Kommentar-Import** mit **Dry-Run-Zählern**, **Duplikat-Strategie** (keep/skip/replace), **Fortschrittsdialog** und **Abbruch**; **Messung** mit optionalem **Snap-to-Annotation**, **persistenter Label-Anzeige** (bei mm/px-Toggle) und **Messwerte-CSV-Export**; **Textlayer-Diff** mit **Ignore-Whitespace**, **Nur-Unterschiede** und **Export Unified Diff TXT**; **smoke_ild.py** Exit-Codes **0/1/2**, optional **`--qt`/`--skip-qt`**, kurze **DE-Hilfe**. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen unverändert klar markiert / nicht produktiv.
+
+### Kommentar-Import / Messung
+- Dry-Run vor Import (Kandidaten/Duplikate/übersprungen/Seiten); Duplikat-Dialog keep/skip/replace; QProgressDialog + Abbrechen
+- Snap-Toolbar-Toggle; Labels bei Einheit-Wechsel aktualisieren; Menü „Messwerte als CSV exportieren…“
+
+### Vergleich / CI
+- Textlayer: Checkboxen Ignore-Whitespace + Nur-Unterschiede; Button „Diff TXT…“
+- `scripts/smoke_ild.py`: Exit 0/1/2 · `--qt` / `--skip-qt` · `-h` DE-Hilfe
+
+### Packaging / Docs
+- Version **2.1.1** (App / `ild_pdf` / ISS / Smoke / Docs); Serie **2.1**; `docs/VERSION` + `VERSION.txt`
+- Smoke: 2.1.1 CLI + Qt (Dry-Run/Snap/CSV/Ignore-WS/TXT/smoke_ild)
+
+---
+
 ## 2.1.0 — PDF-Kommentar-Import, Messung Fläche+Winkel·mm/px, Textlayer-Diff, Nightly-Smoke
 
 Minor-Bump nach **2.0.5**: **native PDF-Markup → Sidecar** (pikepdf, grob); **Messwerkzeug Fläche (Rechteck) + Winkel (zwei Linien)** mit Anzeige-Einheit **mm/px Toggle**; **PDF-Vergleich Textlayer-Diff** (nicht nur Raster) im Diff-Panel; **Nightly-Smoke** `scripts/smoke_ild.py` (CLI+Import). Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen unverändert klar markiert / nicht produktiv.

@@ -2124,6 +2124,99 @@ class AnnotationStore:
                 writer.writerow({k: row.get(k, "") for k in self.CSV_FIELDS})
         return path
 
+    MEASURE_CSV_FIELDS = (
+        "page",
+        "type",
+        "value",
+        "unit",
+        "label",
+        "x",
+        "y",
+        "width",
+        "height",
+        "callout_x",
+        "callout_y",
+        "p3_x",
+        "p3_y",
+        "id",
+    )
+
+    def list_measure_annotations(self) -> List[Annotation]:
+        """Nur Mess-Annotationen (Lineal/Fläche/Winkel) — 2.1.1."""
+        measure_types = {
+            AnnotationType.MEASURE,
+            AnnotationType.MEASURE_AREA,
+            AnnotationType.MEASURE_ANGLE,
+        }
+        return [a for a in self.annotations if a.type in measure_types]
+
+    def export_measures_csv(
+        self,
+        path: str | Path,
+        *,
+        scale: float = 1.0,
+        unit: str = "mm",
+    ) -> Path:
+        """Messwerte (Lineal/Fläche/Winkel) als CSV exportieren — 2.1.1."""
+        path = Path(path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        u = (unit or "mm").lower().strip()
+        if u not in ("mm", "px", "pt"):
+            u = "mm"
+        rows: list[dict] = []
+        for ann in self.list_measure_annotations():
+            label = ann.measure_label(scale, unit=u)
+            if ann.type == AnnotationType.MEASURE_ANGLE:
+                value = f"{ann.angle_degrees():.1f}"
+                unit_out = "deg"
+            elif ann.type == AnnotationType.MEASURE_AREA:
+                # numerischer Wert ohne Einheit aus Label ziehen
+                value = label.split()[0] if label else "0"
+                unit_out = "mm2" if u == "mm" else ("px2" if u == "px" else "pt2")
+            else:
+                value = label.split()[0] if label else "0"
+                unit_out = u
+            rows.append(
+                {
+                    "page": int(ann.page) + 1,
+                    "type": ann.type.value,
+                    "value": value,
+                    "unit": unit_out,
+                    "label": label,
+                    "x": round(float(ann.x), 3),
+                    "y": round(float(ann.y), 3),
+                    "width": round(float(ann.width), 3),
+                    "height": round(float(ann.height), 3),
+                    "callout_x": round(float(ann.callout_x), 3),
+                    "callout_y": round(float(ann.callout_y), 3),
+                    "p3_x": round(float(ann.p3_x), 3),
+                    "p3_y": round(float(ann.p3_y), 3),
+                    "id": ann.id,
+                }
+            )
+        with path.open("w", encoding="utf-8-sig", newline="") as fh:
+            writer = csv.DictWriter(
+                fh, fieldnames=list(self.MEASURE_CSV_FIELDS), extrasaction="ignore"
+            )
+            writer.writeheader()
+            for row in rows:
+                writer.writerow(row)
+        return path
+
+    def refresh_measure_labels(
+        self, *, scale: float = 1.0, unit: str = "mm"
+    ) -> int:
+        """Mess-Labels in ``ann.text`` aktualisieren (persistente Anzeige) — 2.1.1."""
+        n = 0
+        for ann in self.list_measure_annotations():
+            new_label = ann.measure_label(scale, unit=unit)
+            if ann.text != new_label:
+                ann.text = new_label
+                n += 1
+        if n:
+            self.dirty = True
+        return n
+
     def build_report(
         self,
         *,

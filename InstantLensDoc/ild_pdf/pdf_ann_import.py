@@ -1,10 +1,10 @@
-"""Native PDF-Markup-Annotationen (pikepdf) grob in Sidecar-Annotationen mappen — 2.1.0."""
+"""Native PDF-Markup-Annotationen (pikepdf) grob in Sidecar-Annotationen mappen — 2.1.0/2.1.1."""
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import List, Optional, Sequence
+from typing import Callable, List, Optional, Sequence
 
 from .annotate import Annotation, AnnotationStore, AnnotationType
 
@@ -27,19 +27,51 @@ _SUBTYPE_MAP: dict[str, AnnotationType] = {
     "PolyLine": AnnotationType.LINE,
 }
 
+# Duplikat-Strategie beim Schreiben in den Sidecar — 2.1.1
+DUPLICATE_STRATEGIES = ("keep", "skip", "replace")
 
-@dataclass(frozen=True)
+ProgressCallback = Callable[[int, int, str], None]
+CancelCallback = Callable[[], bool]
+
+
+@dataclass
 class NativeAnnImportResult:
-    """Ergebnis des nativen PDF-Kommentar-Imports."""
+    """Ergebnis des nativen PDF-Kommentar-Imports — 2.1.0/2.1.1."""
 
-    annotations: List[Annotation]
-    imported: int
-    skipped: int
-    pages_scanned: int
+    annotations: List[Annotation] = field(default_factory=list)
+    imported: int = 0
+    skipped: int = 0
+    pages_scanned: int = 0
+    candidates: int = 0  # Roh-Treffer vor Duplikat-Filter — 2.1.1
+    duplicates_found: int = 0
+    duplicates_skipped: int = 0
+    duplicates_replaced: int = 0
+    cancelled: bool = False
+    dry_run: bool = False
 
     @property
     def count(self) -> int:
         return self.imported
+
+    def summary_de(self) -> str:
+        """Kurze DE-Zusammenfassung der Zähler — 2.1.1."""
+        parts = [
+            f"Kandidaten={self.candidates or self.imported}",
+            f"übernommen={self.imported}",
+            f"übersprungen={self.skipped}",
+            f"Seiten={self.pages_scanned}",
+        ]
+        if self.duplicates_found:
+            parts.append(f"Duplikate={self.duplicates_found}")
+        if self.duplicates_skipped:
+            parts.append(f"Duplikate-skip={self.duplicates_skipped}")
+        if self.duplicates_replaced:
+            parts.append(f"Duplikate-ersetzt={self.duplicates_replaced}")
+        if self.cancelled:
+            parts.append("abgebrochen")
+        if self.dry_run:
+            parts.append("Dry-Run")
+        return ", ".join(parts)
 
 
 def _color_from_annot(obj) -> str:
@@ -127,12 +159,42 @@ def _ink_endpoints(
         return None
 
 
+def _ann_bbox_close(a: Annotation, b: Annotation, *, tol: float = 2.0) -> bool:
+    """Gleiche Seite+Typ+BBox (±tol) — Duplikat-Erkennung — 2.1.1."""
+    if int(a.page) != int(b.page):
+        return False
+    if a.type != b.type:
+        return False
+    t = max(0.0, float(tol))
+    return (
+        abs(float(a.x) - float(b.x)) <= t
+        and abs(float(a.y) - float(b.y)) <= t
+        and abs(float(a.width) - float(b.width)) <= t
+        and abs(float(a.height) - float(b.height)) <= t
+    )
+
+
+def find_matching_existing(
+    candidate: Annotation,
+    existing: Sequence[Annotation],
+    *,
+    tol: float = 2.0,
+) -> Optional[Annotation]:
+    """Erste Sidecar-Annotation die als Duplikat von ``candidate`` gilt — 2.1.1."""
+    for ann in existing:
+        if _ann_bbox_close(candidate, ann, tol=tol):
+            return ann
+    return None
+
+
 def import_native_pdf_annotations(
     pdf_path: str | Path,
     *,
     scale: float = 1.0,
     password: str | None = None,
     page_indices: Sequence[int] | None = None,
+    on_progress: ProgressCallback | None = None,
+    should_cancel: CancelCallback | None = None,
 ) -> NativeAnnImportResult:
     """
     Liest bestehende PDF-Annotationen (Markup) via pikepdf und mappt sie grob
@@ -140,14 +202,15 @@ def import_native_pdf_annotations(
 
     Nicht übernommen: Link, Widget/AcroForm, Popup-only, unbekannte Subtypes.
     QuadPoints → Bounding-Rect (kein Zeichen-genaues Highlight).
+    Fortschritt/Abbruch optional — 2.1.1.
     """
     import pikepdf
-    from pikepdf import Name
 
     path = Path(pdf_path)
     anns: List[Annotation] = []
     skipped = 0
     pages_scanned = 0
+    cancelled = False
     open_kw: dict = {}
     if password:
         open_kw["password"] = password
@@ -158,7 +221,16 @@ def import_native_pdf_annotations(
             if page_indices is not None
             else list(range(len(doc.pages)))
         )
-        for page_index in indices:
+        total_pages = max(1, len(indices))
+        for pi, page_index in enumerate(indices):
+            if should_cancel is not None and should_cancel():
+                cancelled = True
+                break
+            if on_progress is not None:
+                try:
+                    on_progress(pi + 1, total_pages, f"Seite {page_index + 1}")
+                except Exception:
+                    pass
             if page_index < 0 or page_index >= len(doc.pages):
                 continue
             pages_scanned += 1
@@ -169,6 +241,9 @@ def import_native_pdf_annotations(
             if annots is None:
                 continue
             for annot in annots:
+                if should_cancel is not None and should_cancel():
+                    cancelled = True
+                    break
                 try:
                     obj = annot.get_object() if hasattr(annot, "get_object") else annot
                     subtype = obj.get("/Subtype")
@@ -177,7 +252,19 @@ def import_native_pdf_annotations(
                         continue
                     name = str(subtype).lstrip("/")
                     # Popup / Link / Widget überspringen
-                    if name in ("Popup", "Link", "Widget", "FileAttachment", "Sound", "Movie", "Screen", "PrinterMark", "TrapNet", "Watermark", "3D"):
+                    if name in (
+                        "Popup",
+                        "Link",
+                        "Widget",
+                        "FileAttachment",
+                        "Sound",
+                        "Movie",
+                        "Screen",
+                        "PrinterMark",
+                        "TrapNet",
+                        "Watermark",
+                        "3D",
+                    ):
                         skipped += 1
                         continue
                     atype = _SUBTYPE_MAP.get(name)
@@ -278,13 +365,112 @@ def import_native_pdf_annotations(
                 except Exception:
                     skipped += 1
                     continue
+            if cancelled:
+                break
 
     return NativeAnnImportResult(
         annotations=anns,
         imported=len(anns),
         skipped=skipped,
         pages_scanned=pages_scanned,
+        candidates=len(anns),
+        cancelled=cancelled,
+        dry_run=False,
     )
+
+
+def apply_duplicate_strategy(
+    candidates: Sequence[Annotation],
+    existing: Sequence[Annotation],
+    *,
+    strategy: str = "keep",
+    tol: float = 2.0,
+) -> tuple[List[Annotation], int, int, int]:
+    """
+    Duplikat-Strategie auf Import-Kandidaten anwenden — 2.1.1.
+
+    strategy:
+      - keep: alle behalten (auch Duplikate)
+      - skip: Duplikate zu bestehendem Sidecar auslassen
+      - replace: bestehende Duplikate markieren (IDs in replace-Liste via Mutator)
+
+    Rückgabe: (zu_importierende, duplicates_found, duplicates_skipped, replace_ids_count)
+    Für ``replace`` werden Matching-IDs als Annotation.id in der 4. Rückgabe
+    nicht geliefert — Caller nutzt ``find_matching_existing`` erneut bzw.
+    ``plan_duplicate_actions``.
+    """
+    strat = (strategy or "keep").strip().lower()
+    if strat not in DUPLICATE_STRATEGIES:
+        strat = "keep"
+    found = 0
+    skipped = 0
+    replace_n = 0
+    out: List[Annotation] = []
+    # Working copy of existing for sequential skip/replace planning
+    live = list(existing)
+    for cand in candidates:
+        match = find_matching_existing(cand, live, tol=tol)
+        if match is None:
+            out.append(cand)
+            if strat == "replace":
+                live.append(cand)
+            continue
+        found += 1
+        if strat == "skip":
+            skipped += 1
+            continue
+        if strat == "replace":
+            replace_n += 1
+            # Entferne Match aus Live-Liste, füge Kandidat hinzu
+            live = [a for a in live if a.id != match.id]
+            live.append(cand)
+            out.append(cand)
+            continue
+        # keep
+        out.append(cand)
+    return out, found, skipped, replace_n
+
+
+def plan_duplicate_actions(
+    candidates: Sequence[Annotation],
+    existing: Sequence[Annotation],
+    *,
+    strategy: str = "keep",
+    tol: float = 2.0,
+) -> tuple[List[Annotation], List[str], int, int, int]:
+    """
+    Plant Import: zu schreibende Annotationen + zu entfernende bestehende IDs.
+    Rückgabe: (to_add, remove_ids, found, skipped, replaced) — 2.1.1.
+    """
+    strat = (strategy or "keep").strip().lower()
+    if strat not in DUPLICATE_STRATEGIES:
+        strat = "keep"
+    found = 0
+    skipped = 0
+    replaced = 0
+    to_add: List[Annotation] = []
+    remove_ids: List[str] = []
+    live = list(existing)
+    for cand in candidates:
+        match = find_matching_existing(cand, live, tol=tol)
+        if match is None:
+            to_add.append(cand)
+            live.append(cand)
+            continue
+        found += 1
+        if strat == "skip":
+            skipped += 1
+            continue
+        if strat == "replace":
+            replaced += 1
+            remove_ids.append(match.id)
+            live = [a for a in live if a.id != match.id]
+            to_add.append(cand)
+            live.append(cand)
+            continue
+        to_add.append(cand)
+        live.append(cand)
+    return to_add, remove_ids, found, skipped, replaced
 
 
 def import_native_into_store(
@@ -294,19 +480,57 @@ def import_native_into_store(
     replace: bool = False,
     scale: float = 1.0,
     password: str | None = None,
+    duplicate_strategy: str = "keep",
+    dry_run: bool = False,
+    tol: float = 2.0,
+    on_progress: ProgressCallback | None = None,
+    should_cancel: CancelCallback | None = None,
 ) -> NativeAnnImportResult:
     """
     Native PDF-Annotationen laden und in ``store`` schreiben (Sidecar dirty).
     ``replace=True`` ersetzt bestehende Sidecar-Einträge.
+    ``dry_run=True``: nur zählen, Store unverändert — 2.1.1.
+    ``duplicate_strategy``: keep|skip|replace (bei replace=False relevant).
     """
     path = Path(pdf_path) if pdf_path else store.pdf_path
     if path is None:
         raise ValueError("Kein PDF-Pfad für nativen Kommentar-Import.")
-    result = import_native_pdf_annotations(path, scale=scale, password=password)
+    result = import_native_pdf_annotations(
+        path,
+        scale=scale,
+        password=password,
+        on_progress=on_progress,
+        should_cancel=should_cancel,
+    )
+    if result.cancelled:
+        result.dry_run = dry_run
+        return result
+
+    existing = [] if replace else list(store.annotations)
+    result.candidates = len(result.annotations)
+    to_add, remove_ids, dup_found, dup_skip, dup_repl = plan_duplicate_actions(
+        result.annotations,
+        existing,
+        strategy="keep" if replace else duplicate_strategy,
+        tol=tol,
+    )
+    result.duplicates_found = dup_found
+    result.duplicates_skipped = dup_skip
+    result.duplicates_replaced = dup_repl
+    result.imported = len(to_add)
+    result.annotations = list(to_add)
+    result.dry_run = dry_run
+
+    if dry_run:
+        return result
+
     store._push_undo()  # noqa: SLF001 — ein Undo-Schritt für den Import
     if replace:
-        store.annotations = list(result.annotations)
+        store.annotations = list(to_add)
     else:
-        store.annotations.extend(list(result.annotations))
+        if remove_ids:
+            rid = set(remove_ids)
+            store.annotations = [a for a in store.annotations if a.id not in rid]
+        store.annotations.extend(list(to_add))
     store.dirty = True
     return result

@@ -97,11 +97,14 @@ from instantlensdoc.core.app_settings import (
     get_page_number_overlay_position,
     get_page_number_overlay_skip_edges,
     get_page_number_overlay_start,
+    get_measure_labels_persistent,
+    get_measure_snap_to_annotation,
     get_measure_unit,
     get_show_page_boxes,
     get_show_page_number_overlay,
     get_show_printer_marks,
     set_measure_unit,
+    toggle_measure_snap_to_annotation,
     toggle_measure_unit,
     random_ann_palette_color,
     set_ann_color_preset,
@@ -1594,10 +1597,20 @@ class PdfViewer(QWidget):
         self.btn_measure_unit = QToolButton()
         self.btn_measure_unit.setText(f"Maß:{get_measure_unit()}")
         self.btn_measure_unit.setToolTip(
-            "Messanzeige-Einheit umschalten (mm ↔ px) — 2.1.0"
+            "Messanzeige-Einheit umschalten (mm ↔ px); Labels werden aktualisiert — 2.1.1"
         )
         self.btn_measure_unit.clicked.connect(self._toggle_measure_unit)
         toolbar.addWidget(self.btn_measure_unit)
+
+        self.btn_measure_snap = QToolButton()
+        self.btn_measure_snap.setText("Snap")
+        self.btn_measure_snap.setCheckable(True)
+        self.btn_measure_snap.setChecked(get_measure_snap_to_annotation())
+        self.btn_measure_snap.setToolTip(
+            "Mess-Endpunkte optional an Annotation-Ecken snappen — 2.1.1"
+        )
+        self.btn_measure_snap.clicked.connect(self._toggle_measure_snap)
+        toolbar.addWidget(self.btn_measure_snap)
 
         self.btn_hl_color = QPushButton("HL")
         self.btn_hl_color.setToolTip("Highlight-Farbe")
@@ -3158,18 +3171,68 @@ class PdfViewer(QWidget):
         }.get(tool, tool.value)
 
     def _toggle_measure_unit(self) -> None:
-        """Messanzeige mm ↔ px — 2.1.0."""
+        """Messanzeige mm ↔ px; Labels persistent aktualisieren — 2.1.0/2.1.1."""
         unit = toggle_measure_unit()
         if hasattr(self, "btn_measure_unit"):
             self.btn_measure_unit.setText(f"Maß:{unit}")
+        if self.store and get_measure_labels_persistent():
+            n = self.store.refresh_measure_labels(scale=self.scale, unit=unit)
+            if n:
+                self.schedule_sidecar_save(force=False)
+                self.annotations_changed.emit()
         self.refresh()
         self.status.emit(f"Messanzeige: {unit}")
+
+    def _toggle_measure_snap(self) -> None:
+        """Snap-to-Annotation für Messung umschalten — 2.1.1."""
+        enabled = toggle_measure_snap_to_annotation()
+        if hasattr(self, "btn_measure_snap"):
+            self.btn_measure_snap.setChecked(enabled)
+        self.status.emit(
+            "Mess-Snap an Annotationen: an"
+            if enabled
+            else "Mess-Snap an Annotationen: aus"
+        )
 
     def _measure_unit(self) -> str:
         try:
             return get_measure_unit()
         except Exception:
             return "mm"
+
+    def _snap_measure_point(
+        self, x: float, y: float, *, page: int, tol: float = 8.0
+    ) -> tuple[float, float]:
+        """Punkt optional an nächste Ann.-Ecke/Endpunkt snappen — 2.1.1."""
+        if not get_measure_snap_to_annotation() or not self.store:
+            return x, y
+        best = None
+        best_d = float(tol)
+        for ann in self.store.annotations:
+            if int(ann.page) != int(page):
+                continue
+            pts = [
+                (float(ann.x), float(ann.y)),
+                (float(ann.x + ann.width), float(ann.y)),
+                (float(ann.x), float(ann.y + ann.height)),
+                (float(ann.x + ann.width), float(ann.y + ann.height)),
+            ]
+            if ann.type in (
+                AnnotationType.LINE,
+                AnnotationType.ARROW,
+                AnnotationType.MEASURE,
+                AnnotationType.MEASURE_ANGLE,
+                AnnotationType.CALLOUT,
+            ):
+                pts.append((float(ann.callout_x), float(ann.callout_y)))
+            if ann.type == AnnotationType.MEASURE_ANGLE:
+                pts.append((float(ann.p3_x), float(ann.p3_y)))
+            for px, py in pts:
+                d = ((px - x) ** 2 + (py - y) ** 2) ** 0.5
+                if d <= best_d:
+                    best_d = d
+                    best = (px, py)
+        return best if best is not None else (x, y)
 
     def _set_tool(self, tool: AnnotationType | None):
         self.tool = tool
@@ -6217,6 +6280,45 @@ class PdfViewer(QWidget):
             QMessageBox.warning(self, "Annotationen CSV exportieren", str(e))
             return False
 
+    def export_measures_csv(self) -> bool:
+        """Messwerte (Lineal/Fläche/Winkel) als CSV exportieren — 2.1.1."""
+        if not self.store or not self.pdf_path:
+            QMessageBox.information(self, "Messwerte", "Kein PDF geladen.")
+            return False
+        measures = self.store.list_measure_annotations()
+        if not measures:
+            QMessageBox.information(self, "Messwerte", "Keine Mess-Annotationen vorhanden.")
+            return False
+        from PySide6.QtWidgets import QFileDialog
+        from instantlensdoc.ui.file_dialogs import confirm_overwrite_export
+
+        default = str(self.pdf_path.with_suffix(self.pdf_path.suffix + ".messwerte.csv"))
+        path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Messwerte als CSV exportieren",
+            default,
+            "CSV (*.csv);;Alle (*.*)",
+        )
+        if not path:
+            return False
+        dest = Path(path)
+        if dest.suffix.lower() != ".csv":
+            dest = dest.with_suffix(".csv")
+        if not confirm_overwrite_export(dest, self):
+            return False
+        try:
+            unit = self._measure_unit()
+            saved = self.store.export_measures_csv(
+                dest, scale=self.scale, unit=unit
+            )
+            self.status.emit(
+                f"Messwerte CSV: {saved.name} ({len(measures)} · Einheit {unit})"
+            )
+            return True
+        except Exception as e:
+            QMessageBox.warning(self, "Messwerte CSV exportieren", str(e))
+            return False
+
     def export_annotations_report(self, *, default_fmt: str = "md") -> bool:
         """PDF-Kommentare als zusammenhängenden TXT/MD-Bericht exportieren."""
         if not self.store or not self.pdf_path:
@@ -6433,49 +6535,144 @@ class PdfViewer(QWidget):
             return False
 
     def import_native_pdf_comments(self) -> bool:
-        """Bestehende PDF-Markup-Annotationen grob in Sidecar übernehmen — 2.1.0."""
+        """Native PDF-Markup → Sidecar; Dry-Run-Zähler, Duplikat-Strategie, Fortschritt/Abbruch — 2.1.1."""
         if not self.store or not self.pdf_path:
             QMessageBox.information(self, "PDF-Kommentare", "Kein PDF geladen.")
             return False
+        from PySide6.QtCore import Qt
+        from PySide6.QtWidgets import QApplication, QProgressDialog
+
+        from ild_pdf.pdf_ann_import import import_native_into_store
+
+        # 1) Dry-Run: Zähler ohne Schreiben — 2.1.1
+        try:
+            dry = import_native_into_store(
+                self.store,
+                self.pdf_path,
+                replace=False,
+                scale=1.0,
+                password=self.password,
+                duplicate_strategy="skip",
+                dry_run=True,
+            )
+        except Exception as e:
+            QMessageBox.warning(self, "PDF-Kommentare importieren", str(e))
+            return False
+
+        dry_msg = (
+            f"Dry-Run: {dry.candidates} Kandidaten, "
+            f"{dry.imported} neu (Duplikat-skip), "
+            f"{dry.duplicates_found} Duplikate zu Sidecar, "
+            f"{dry.skipped} Typen übersprungen, "
+            f"{dry.pages_scanned} Seiten.\n\n"
+            "Ja = anhängen · Nein = Sidecar ersetzen · Abbrechen = nichts\n"
+            "Hinweis: grobe Übernahme (QuadPoints→Box); Link/Widget übersprungen."
+        )
         reply = QMessageBox.question(
             self,
-            "PDF-Kommentare importieren",
-            "Native PDF-Annotationen (Highlight/Notiz/Formen …) in Sidecar übernehmen?\n\n"
-            "Ja = anhängen · Nein = Sidecar ersetzen · Abbrechen = nichts\n\n"
-            "Hinweis: grobe Übernahme (QuadPoints→Box); Link/Widget werden übersprungen.",
+            "PDF-Kommentare importieren — Dry-Run",
+            dry_msg,
             QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel,
             QMessageBox.Yes,
         )
         if reply == QMessageBox.Cancel:
+            self.status.emit("PDF-Import abgebrochen (Dry-Run)")
             return False
         replace = reply == QMessageBox.No
-        try:
-            from ild_pdf.pdf_ann_import import import_native_into_store
 
+        # Duplikat-Strategie nur beim Anhängen — 2.1.1
+        dup_strategy = "keep"
+        if not replace and dry.duplicates_found > 0:
+            dup_box = QMessageBox(self)
+            dup_box.setWindowTitle("Duplikat-Strategie")
+            dup_box.setText(
+                f"{dry.duplicates_found} mögliche Duplikate zur bestehenden Sidecar.\n"
+                "Wie verfahren?"
+            )
+            btn_keep = dup_box.addButton("Beide behalten", QMessageBox.AcceptRole)
+            btn_skip = dup_box.addButton("Duplikate überspringen", QMessageBox.ActionRole)
+            btn_repl = dup_box.addButton("Duplikate ersetzen", QMessageBox.ActionRole)
+            dup_box.addButton(QMessageBox.Cancel)
+            dup_box.exec()
+            clicked = dup_box.clickedButton()
+            if clicked is None or clicked == dup_box.button(QMessageBox.Cancel):
+                self.status.emit("PDF-Import abgebrochen")
+                return False
+            if clicked == btn_skip:
+                dup_strategy = "skip"
+            elif clicked == btn_repl:
+                dup_strategy = "replace"
+            else:
+                dup_strategy = "keep"
+            _ = btn_keep  # Role-Marker
+
+        # 2) Import mit Fortschritt + Abbruch — 2.1.1
+        prog = QProgressDialog(
+            "PDF-Kommentare importieren…", "Abbrechen", 0, max(1, dry.pages_scanned), self
+        )
+        prog.setWindowTitle("PDF-Kommentar-Import")
+        prog.setWindowModality(Qt.WindowModal)
+        prog.setMinimumDuration(0)
+        prog.setValue(0)
+        cancelled = {"v": False}
+
+        def on_progress(cur: int, tot: int, label: str) -> None:
+            prog.setMaximum(max(1, tot))
+            prog.setValue(max(0, cur - 1))
+            prog.setLabelText(f"{label} ({cur}/{tot})")
+            QApplication.processEvents()
+            if prog.wasCanceled():
+                cancelled["v"] = True
+
+        def should_cancel() -> bool:
+            QApplication.processEvents()
+            if prog.wasCanceled():
+                cancelled["v"] = True
+            return bool(cancelled["v"])
+
+        try:
             result = import_native_into_store(
                 self.store,
                 self.pdf_path,
                 replace=replace,
                 scale=1.0,
                 password=self.password,
+                duplicate_strategy=dup_strategy,
+                dry_run=False,
+                on_progress=on_progress,
+                should_cancel=should_cancel,
             )
+            if not result.cancelled:
+                prog.setValue(prog.maximum())
+            prog.close()
+            if result.cancelled:
+                # Teilergebnis behalten wenn schon geschrieben — hier Abbruch vor/während Scan
+                # Store nur geändert wenn nicht cancelled vor Write; bei Cancel im Scan: unverändert
+                self.status.emit(
+                    f"PDF-Import abgebrochen — {result.summary_de()}"
+                )
+                QMessageBox.information(
+                    self,
+                    "PDF-Kommentare — Abbruch",
+                    f"Import abgebrochen.\n{result.summary_de()}",
+                )
+                return False
             self.schedule_sidecar_save(force=True)
             self.refresh()
             self.annotations_changed.emit()
             mode = "ersetzt" if replace else "angehängt"
             self.status.emit(
-                f"PDF-Import: {result.imported} {mode}, "
-                f"{result.skipped} übersprungen ({result.pages_scanned} Seiten)"
+                f"PDF-Import: {result.imported} {mode}; {result.summary_de()}"
             )
             if result.imported == 0:
                 QMessageBox.information(
                     self,
                     "PDF-Kommentare",
-                    f"Keine importierbaren Markup-Annotationen gefunden.\n"
-                    f"Übersprungen: {result.skipped}",
+                    f"Keine Annotationen übernommen.\n{result.summary_de()}",
                 )
             return True
         except Exception as e:
+            prog.close()
             QMessageBox.warning(self, "PDF-Kommentare importieren", str(e))
             return False
 
@@ -8574,6 +8771,14 @@ class PdfViewer(QWidget):
         lx1 = lx0 + (x1 - x0)
         ly1 = ly0 + (y1 - y0)
         x0, y0, x1, y1 = lx0, ly0, lx1, ly1
+        # Optional Snap-to-Annotation für Messwerkzeuge — 2.1.1
+        if self.tool in (
+            AnnotationType.MEASURE,
+            AnnotationType.MEASURE_AREA,
+            AnnotationType.MEASURE_ANGLE,
+        ):
+            x0, y0 = self._snap_measure_point(x0, y0, page=page)
+            x1, y1 = self._snap_measure_point(x1, y1, page=page)
         if self.tool == AnnotationType.HIGHLIGHT:
             # Selection→Highlight: Text unter dem Drag-Rechteck als Annotation(en)
             if self.pdf_path and self._highlight_from_text_selection(page, x0, y0, x1, y1):
@@ -8648,9 +8853,10 @@ class PdfViewer(QWidget):
     def _on_place(self, x: float, y: float):
         if not self.store or self.tool is None:
             return
-        # Winkel: zweiter Klick nach erstem Drag — 2.1.0
+        # Winkel: zweiter Klick nach erstem Drag — 2.1.0/2.1.1
         if self.tool == AnnotationType.MEASURE_ANGLE and self._pending_angle is not None:
             page, x, y = self._spread_resolve(x, y)
+            x, y = self._snap_measure_point(x, y, page=page)
             ax, ay, vx, vy, apage = self._pending_angle
             self._pending_angle = None
             ann = Annotation(
@@ -8666,7 +8872,7 @@ class PdfViewer(QWidget):
                 p3_y=y,
                 color=self._pen_color,
             )
-            ann.text = ann.measure_label(self.scale)
+            ann.text = ann.measure_label(self.scale, unit=self._measure_unit())
             self._commit_ann(ann)
             # Drag wieder aktiv für nächsten Winkel
             self.canvas.set_drag_tool(AnnotationType.MEASURE_ANGLE, select_mode=False)

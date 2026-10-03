@@ -144,6 +144,8 @@ DEFAULTS: dict[str, Any] = {
     "minimize_to_tray": False,
     "page_size_unit": "mm",
     "measure_unit": "mm",  # Messanzeige mm|px — 2.1.0
+    "measure_snap_to_annotation": False,  # Endpunkte an Ann.-Ecken snappen — 2.1.1
+    "measure_labels_persistent": True,  # Mess-Labels in Sidecar/Overlay halten — 2.1.1
     "backup_on_save": False,
     "export_raster_dpi": 150,
     "print_grayscale": False,
@@ -3600,6 +3602,33 @@ def set_measure_unit(unit: str) -> str:
 def toggle_measure_unit() -> str:
     """Wechselt mm ↔ px und speichert; Rückgabe: neue Einheit — 2.1.0."""
     return set_measure_unit("px" if get_measure_unit() == "mm" else "mm")
+
+
+def get_measure_snap_to_annotation() -> bool:
+    """Snap-to-Annotation für Messwerkzeuge — 2.1.1."""
+    return bool(load_settings().get("measure_snap_to_annotation", False))
+
+
+def set_measure_snap_to_annotation(enabled: bool) -> bool:
+    v = bool(enabled)
+    save_settings({"measure_snap_to_annotation": v})
+    return v
+
+
+def toggle_measure_snap_to_annotation() -> bool:
+    """Snap-to-Annotation umschalten — 2.1.1."""
+    return set_measure_snap_to_annotation(not get_measure_snap_to_annotation())
+
+
+def get_measure_labels_persistent() -> bool:
+    """Mess-Labels persistent in Sidecar/Overlay halten — 2.1.1."""
+    return bool(load_settings().get("measure_labels_persistent", True))
+
+
+def set_measure_labels_persistent(enabled: bool) -> bool:
+    v = bool(enabled)
+    save_settings({"measure_labels_persistent": v})
+    return v
 
 
 def get_backup_on_save() -> bool:

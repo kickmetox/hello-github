@@ -2299,6 +2299,10 @@ class MainWindow(QMainWindow):
             ),
             ("Annotationen als CSV exportieren…", lambda: self.pdf_view.export_annotations_csv()),
             (
+                "Messwerte als CSV exportieren…",
+                lambda: self.pdf_view.export_measures_csv(),
+            ),
+            (
                 "Kommentar-Bericht (Markdown)…",
                 lambda: self.pdf_view.export_annotations_report(default_fmt="md"),
             ),

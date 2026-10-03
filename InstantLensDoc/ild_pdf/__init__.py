@@ -10,13 +10,18 @@ from .diff import (
     RasterDiffResult,
     TextLayerDiffResult,
     align_images,
+    export_text_layer_diff_txt,
     raster_diff,
     text_layer_diff,
 )
 from .pdf_ann_import import (
+    DUPLICATE_STRATEGIES,
     NativeAnnImportResult,
+    apply_duplicate_strategy,
+    find_matching_existing,
     import_native_into_store,
     import_native_pdf_annotations,
+    plan_duplicate_actions,
 )
 from .annotate import (
     Annotation,
@@ -196,7 +201,12 @@ __all__ = [
     "align_images",
     "raster_diff",
     "text_layer_diff",
+    "export_text_layer_diff_txt",
     "NativeAnnImportResult",
+    "DUPLICATE_STRATEGIES",
+    "apply_duplicate_strategy",
+    "find_matching_existing",
+    "plan_duplicate_actions",
     "import_native_pdf_annotations",
     "import_native_into_store",
     "Annotation",
@@ -351,4 +361,4 @@ __all__ = [
     "page_count_for_text",
 ]
 
-__version__ = "2.1.0"
+__version__ = "2.1.1"
