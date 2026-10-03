@@ -1,4 +1,4 @@
-InstantLens Doc 2.3.3 — Installation
+InstantLens Doc 2.3.4 — Installation
 
 Startmenü: Gruppe „InstantLens Doc“ mit Programm, optional Keygenerator, INFO und Deinstallieren.
 

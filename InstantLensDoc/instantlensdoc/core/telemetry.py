@@ -1,9 +1,10 @@
-"""Telemetrie-Stub — klar markiert, Toggle disabled, immer no-op — 2.3.3.
+"""Telemetrie-Stub — klar markiert, Toggle disabled, immer no-op — 2.3.4.
 
 Auch bei gespeichertem Opt-in-Flag wird **nichts** gesendet und nichts geloggt.
 Kein Netzwerk, keine Queue, kein Fingerprinting.
 Ab 2.3.2: Settings-Toggle bleibt disabled (aus).
 Ab 2.3.3: Info kurz „warum Stub“ + Verweis auf Settings-Tab „Stubs“.
+Ab 2.3.4: Info-Dialog Esc schließt · Button „Stubs öffnen“.
 """
 
 from __future__ import annotations
@@ -31,7 +32,7 @@ def report_anonymous_usage(event: str = "", **_kwargs: Any) -> None:
 
 
 def telemetry_stub_info() -> dict[str, Any]:
-    """Status für Settings/About/Stubs-Seite — 2.3.3."""
+    """Status für Settings/About/Stubs-Seite — 2.3.4."""
     from instantlensdoc import __version__
 
     why = (
@@ -39,8 +40,8 @@ def telemetry_stub_info() -> dict[str, Any]:
         "deshalb Toggle disabled (aus) und immer no-op (keine Datenübertragung)."
     )
     stubs_tab_hint = (
-        "Details und Status: Einstellungen → Tab „Stubs“ → Eintrag Telemetrie "
-        "(Doppelklick Info)."
+        "Details und Status: Einstellungen → Tab „Stubs“ (Button „Stubs öffnen“) "
+        "→ Eintrag Telemetrie (Doppelklick Info). Esc schließt den Info-Dialog."
     )
     return {
         "name": "Telemetrie",

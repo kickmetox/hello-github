@@ -1,8 +1,9 @@
-"""Schnellaktionen-Palette (Ctrl+K Command Palette) — 2.3.0–2.3.3.
+"""Schnellaktionen-Palette (Ctrl+K Command Palette) — 2.3.0–2.3.4.
 
 2.3.1: Fuzzy-Filter, letzte Befehle, Esc schließt, Kategorien gruppiert.
 2.3.2: Pin häufige Befehle · Recent-Anzahl Settings 5/10/20.
 2.3.3: Pin-Persistenz · Unpin · max Pins Settings 3/5/10.
+2.3.4: Overflow-Hinweis bei Pin-Limit · Option ältesten Pin ersetzen.
 """
 
 from __future__ import annotations
@@ -20,6 +21,7 @@ from PySide6.QtWidgets import (
     QListWidget,
     QListWidgetItem,
     QMenu,
+    QMessageBox,
     QVBoxLayout,
 )
 
@@ -120,7 +122,7 @@ def match_command(query: str, cmd: PaletteCommand) -> int | None:
 
 
 class CommandPaletteDialog(QDialog):
-    """Filterbare Schnellaktionen — Fuzzy · Pin/Unpin · Recent · Esc — 2.3.3."""
+    """Filterbare Schnellaktionen — Fuzzy · Pin/Unpin · Overflow · Esc — 2.3.4."""
 
     def __init__(
         self,
@@ -143,11 +145,19 @@ class CommandPaletteDialog(QDialog):
         hint = QLabel(
             "Tipp: tippen = Fuzzy · Enter ausführen · Esc schließen · "
             "Rechtsklick = Anheften/Unpin · Pins persistiert · "
-            "max Pins 3/5/10 · Recent 5/10/20 (Einstellungen) — 2.3.3"
+            "max Pins 3/5/10 · bei Limit: Overflow-Hinweis + ältesten ersetzen — 2.3.4"
         )
         hint.setObjectName("commandPaletteHint")
         hint.setWordWrap(True)
         layout.addWidget(hint)
+
+        self.pin_overflow_hint = QLabel("")
+        self.pin_overflow_hint.setObjectName("commandPalettePinOverflow")
+        self.pin_overflow_hint.setWordWrap(True)
+        self.pin_overflow_hint.setStyleSheet("color: #8a6d00; font-weight: 600;")
+        self.pin_overflow_hint.setAccessibleName("Pin-Limit Overflow-Hinweis")
+        self.pin_overflow_hint.hide()
+        layout.addWidget(self.pin_overflow_hint)
 
         self.filter_edit = QLineEdit()
         self.filter_edit.setObjectName("commandPaletteFilter")
@@ -216,6 +226,37 @@ class CommandPaletteDialog(QDialog):
         except Exception:
             pass
 
+    def _pin_limit(self) -> int:
+        try:
+            from instantlensdoc.core.app_settings import get_command_palette_pin_max
+
+            return int(get_command_palette_pin_max())
+        except Exception:
+            return 5
+
+    def _update_pin_overflow_hint(self) -> None:
+        """Overflow-Hinweis wenn Pin-Limit erreicht — 2.3.4."""
+        try:
+            from instantlensdoc.core.app_settings import command_palette_pins_at_limit
+
+            at_limit = bool(command_palette_pins_at_limit())
+        except Exception:
+            at_limit = False
+        if at_limit:
+            lim = self._pin_limit()
+            msg = (
+                f"Pin-Limit erreicht ({lim}). "
+                "Neuer Pin: ältesten ersetzen oder zuerst Unpin — 2.3.4"
+            )
+            self.pin_overflow_hint.setText(msg)
+            self.pin_overflow_hint.setToolTip(msg)
+            self.pin_overflow_hint.setAccessibleName(msg)
+            self.pin_overflow_hint.show()
+        else:
+            self.pin_overflow_hint.clear()
+            self.pin_overflow_hint.setAccessibleName("Pin-Limit Overflow-Hinweis")
+            self.pin_overflow_hint.hide()
+
     def _context_menu(self, pos) -> None:
         item = self.list.itemAt(pos)
         if item is None:
@@ -228,24 +269,64 @@ class CommandPaletteDialog(QDialog):
         if cid in pinned:
             act = QAction("Unpin (Pin entfernen)", self)
             act.setObjectName("commandPaletteUnpin")
-            act.setToolTip("Pin lösen — Persistenz Settings — 2.3.3")
+            act.setToolTip("Pin lösen — Persistenz Settings — 2.3.4")
             act.triggered.connect(lambda: self._toggle_pin(cid))
         else:
-            act = QAction("Anheften (häufiger Befehl)", self)
-            act.setObjectName("commandPalettePin")
-            act.setToolTip("Anheften — Persistenz · max Pins Settings — 2.3.3")
+            at_limit = len(pinned) >= self._pin_limit()
+            if at_limit:
+                act = QAction("Anheften (ältesten Pin ersetzen)…", self)
+                act.setObjectName("commandPalettePinReplaceOldest")
+                act.setToolTip(
+                    "Pin-Limit erreicht — Option: ältesten Pin ersetzen — 2.3.4"
+                )
+            else:
+                act = QAction("Anheften (häufiger Befehl)", self)
+                act.setObjectName("commandPalettePin")
+                act.setToolTip(
+                    "Anheften — Persistenz · max Pins Settings — 2.3.4"
+                )
             act.triggered.connect(lambda: self._toggle_pin(cid))
         menu.addAction(act)
         menu.exec(self.list.mapToGlobal(pos))
 
     def _toggle_pin(self, cmd_id: str) -> None:
-        """Pin/Unpin mit Persistenz und Max-Limit — 2.3.3."""
+        """Pin/Unpin; bei Limit Overflow-Hinweis + Option ältesten ersetzen — 2.3.4."""
         try:
-            from instantlensdoc.core.app_settings import toggle_command_palette_pin
+            from instantlensdoc.core.app_settings import (
+                get_command_palette_pin_max,
+                get_command_palette_pinned,
+                toggle_command_palette_pin,
+            )
 
-            toggle_command_palette_pin(cmd_id)
+            pinned = list(get_command_palette_pinned())
+            if cmd_id in pinned:
+                toggle_command_palette_pin(cmd_id)
+            else:
+                result = toggle_command_palette_pin(cmd_id, replace_oldest=False)
+                if result is None:
+                    limit = int(get_command_palette_pin_max())
+                    oldest = pinned[-1] if pinned else ""
+                    oldest_title = (
+                        self._by_id[oldest].title
+                        if oldest in self._by_id
+                        else (oldest or "—")
+                    )
+                    reply = QMessageBox.question(
+                        self,
+                        "Pin-Limit erreicht",
+                        (
+                            f"Maximal {limit} Pins. "
+                            f"Ältesten Pin ersetzen?\n\n"
+                            f"Wird ersetzt: {oldest_title}"
+                        ),
+                        QMessageBox.Yes | QMessageBox.No,
+                        QMessageBox.Yes,
+                    )
+                    if reply == QMessageBox.Yes:
+                        toggle_command_palette_pin(cmd_id, replace_oldest=True)
         except Exception:
             pass
+        self._update_pin_overflow_hint()
         self._refilter()
 
     def _refilter(self, _text: str = "") -> None:
@@ -328,6 +409,7 @@ class CommandPaletteDialog(QDialog):
             if item and item.data(Qt.UserRole):
                 self.list.setCurrentRow(i)
                 break
+        self._update_pin_overflow_hint()
 
     def _add_cmd_item(
         self,

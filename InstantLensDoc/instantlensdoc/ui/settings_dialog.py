@@ -1353,17 +1353,17 @@ class SettingsDialog(QDialog):
         self.telemetry_chk = QCheckBox("Anonym Nutzung melden (Stub — deaktiviert)")
         self.telemetry_chk.setObjectName("telemetryOptIn")
         self.telemetry_chk.setChecked(False)
-        self.telemetry_chk.setEnabled(False)  # Toggle disabled bleibt — 2.3.2/2.3.3
+        self.telemetry_chk.setEnabled(False)  # Toggle disabled bleibt — 2.3.2–2.3.4
         self.telemetry_chk.setToolTip(
-            "Telemetrie-Stub 2.3.3: Toggle bleibt disabled (aus). "
-            "Info-Button: warum Stub + Verweis Stubs-Tab — keine Datenübertragung"
+            "Telemetrie-Stub 2.3.4: Toggle bleibt disabled (aus). "
+            "Info: Esc schließt · Button „Stubs öffnen“ — keine Datenübertragung"
         )
         tel_row = QHBoxLayout()
         tel_row.addWidget(self.telemetry_chk, 1)
         self.btn_telemetry_info = QPushButton("Info…")
         self.btn_telemetry_info.setObjectName("telemetryStubInfoBtn")
         self.btn_telemetry_info.setToolTip(
-            "Warum Stub (kurz) + Verweis auf Tab „Stubs“ — 2.3.3"
+            "Warum Stub (kurz) · Esc schließt · „Stubs öffnen“ — 2.3.4"
         )
         self.btn_telemetry_info.clicked.connect(self._show_telemetry_stub_info)
         tel_row.addWidget(self.btn_telemetry_info)
@@ -1371,25 +1371,28 @@ class SettingsDialog(QDialog):
         tel_hint = QLabel(
             "<b>Stub — keine Datenübertragung:</b> Toggle ist <b>deaktiviert</b> "
             "und bleibt aus. Es werden <b>niemals</b> Nutzungsdaten gesendet — "
-            "kein Netzwerk, keine Queue, kein Fingerprinting (immer no-op) — 2.3.3. "
-            "„Info…“: warum Stub · Details im Tab <b>Stubs</b>."
+            "kein Netzwerk, keine Queue, kein Fingerprinting (immer no-op) — 2.3.4. "
+            "„Info…“: Esc schließt · Button <b>Stubs öffnen</b>."
         )
         tel_hint.setWordWrap(True)
         tel_hint.setObjectName("telemetryStubHint")
         tel_hint.setStyleSheet("color: #8a6d00;")
         tel_hint.setToolTip(
-            "Telemetrie bleibt Stub: Toggle disabled · siehe Tab Stubs — 2.3.3"
+            "Telemetrie bleibt Stub: Toggle disabled · Esc · Stubs öffnen — 2.3.4"
         )
         form.addRow(tel_hint)
 
-        self.compress_open_chk = QCheckBox(
-            "Nach PDF-Kompression neues File öffnen"
-        )
+        self.compress_open_chk = QCheckBox("Ergebnis nach Kompression öffnen")
         self.compress_open_chk.setObjectName("compressOpenAfterSettings")
+        self.compress_open_chk.setAccessibleName("Ergebnis nach Kompression öffnen")
+        self.compress_open_chk.setAccessibleDescription(
+            "Öffnet das komprimierte Ergebnis-PDF nach erfolgreicher Speicherung. "
+            "Gleicher Wert wie die Checkbox im Kompressions-Dialog."
+        )
         self.compress_open_chk.setChecked(bool(get_compress_open_after()))
         self.compress_open_chk.setToolTip(
-            "Settings-Toggle: nach erfolgreicher Kompression Ziel-PDF öffnen "
-            "(gleicher Wert wie Dialog-Checkbox) — 2.3.3"
+            "Ergebnis nach Kompression öffnen — Settings-Toggle (gleicher Wert "
+            "wie Dialog-Checkbox). Bei Öffnen-Fehler bleibt Ersparnis-% — 2.3.4"
         )
         form.addRow(self.compress_open_chk)
 
@@ -1891,7 +1894,10 @@ class SettingsDialog(QDialog):
         self._update_ui_font_preview_label()
 
     def _show_telemetry_stub_info(self) -> None:
-        """Info-Dialog: kurz warum Stub + Verweis Tab Stubs — 2.3.3."""
+        """Info-Dialog: Esc schließt · Button „Stubs öffnen“ — 2.3.4."""
+        from PySide6.QtGui import QKeySequence, QShortcut
+        from PySide6.QtWidgets import QPushButton as _QPushButton
+
         from instantlensdoc.core.telemetry import telemetry_stub_info
         from instantlensdoc.ui.stubs import StubInfoDialog
 
@@ -1905,6 +1911,7 @@ class SettingsDialog(QDialog):
         detail = str(info.get("message") or "")
         if stubs_ref:
             detail = (detail + "\n\n" + stubs_ref).strip()
+        detail = (detail + "\n\nEsc schließt diesen Dialog.").strip()
         dlg = StubInfoDialog(
             self,
             title="Telemetrie",
@@ -1912,27 +1919,27 @@ class SettingsDialog(QDialog):
             detail=detail,
             badge="Stub",
         )
-        # Button → Tab Stubs — 2.3.3
-        try:
-            from PySide6.QtWidgets import QPushButton as _QPushButton
+        dlg.setObjectName("telemetryStubInfoDialog")
+        # Esc schließt (explizit zusätzlich zu StubInfoDialog) — 2.3.4
+        esc = QShortcut(QKeySequence(Qt.Key_Escape), dlg)
+        esc.setContext(Qt.WindowShortcut)
+        esc.activated.connect(dlg.reject)
+        # Button „Stubs öffnen“ — 2.3.4
+        btn_stubs = _QPushButton("Stubs öffnen")
+        btn_stubs.setObjectName("telemetryGotoStubsBtn")
+        btn_stubs.setAccessibleName("Stubs öffnen")
+        btn_stubs.setToolTip(
+            "Einstellungen → Tab Stubs öffnen (Telemetrie-Eintrag) — 2.3.4"
+        )
 
-            btn_stubs = _QPushButton("Zum Tab „Stubs“…")
-            btn_stubs.setObjectName("telemetryGotoStubsBtn")
-            btn_stubs.setToolTip(
-                "Einstellungen → Tab Stubs (Telemetrie-Eintrag) — 2.3.3"
-            )
+        def _goto_stubs() -> None:
+            dlg.accept()
+            self.goto_stubs_tab()
 
-            def _goto_stubs() -> None:
-                dlg.accept()
-                self.goto_stubs_tab()
-
-            btn_stubs.clicked.connect(_goto_stubs)
-            # Layout: vor ButtonBox einfügen
-            lay = dlg.layout()
-            if lay is not None and lay.count() >= 1:
-                lay.insertWidget(max(0, lay.count() - 1), btn_stubs)
-        except Exception:
-            pass
+        btn_stubs.clicked.connect(_goto_stubs)
+        lay = dlg.layout()
+        if lay is not None and lay.count() >= 1:
+            lay.insertWidget(max(0, lay.count() - 1), btn_stubs)
         dlg.exec()
 
     def goto_stubs_tab(self) -> None:

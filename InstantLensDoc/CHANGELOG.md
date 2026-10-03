@@ -1,5 +1,18 @@
 # Changelog — InstantLens Doc
 
+## 2.3.4 — Kompression Label·A11y, Links TXT Live·Quick-Insert·Reset, Palette Pin-Overflow·ältesten ersetzen, Telemetrie Esc·Stubs öffnen
+
+Post-Release-Polish nach **2.3.3**: **PDF-Kompression** Toggle-Label klar **„Ergebnis nach Kompression öffnen“** inkl. **A11y** (AccessibleName/Description); **URL-Links TXT** **Live-Vorschau Dateiname**, **Quick-Insert `{stem}`/`{date}`**, **Reset Default**; **Command Palette** **Overflow-Hinweis** bei Pin-Limit und Option **ältesten Pin ersetzen**; **Telemetrie-Stub** Info-Dialog **Esc schließt** und Button **„Stubs öffnen“**. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie klar markiert / nicht produktiv (Ink ≠ Stylus).
+
+### Geändert
+- PDF-Kompression: Label „Ergebnis nach Kompression öffnen“ · AccessibleName/Description (Dialog + Settings)
+- Links TXT: Live-Vorschau Dateiname · Quick-Insert {stem}/{date} · Reset Default (ungültige rot)
+- Command Palette: Overflow-Hinweis bei max Pins · Option ältesten Pin ersetzen (Bestätigung)
+- Telemetrie-Stub: Esc schließt Info · Button „Stubs öffnen“ · weiter no-op / Toggle disabled
+- Version **2.3.4** (App / `ild_pdf` / ISS / Smoke / Docs); Serie **2.3**; `docs/VERSION` + `VERSION.txt`
+- Smoke: 2.3.4 CLI + Qt (Kompression Label/A11y, Links Live/Quick/Reset, Palette Overflow/Replace, Telemetrie Esc/Stubs öffnen)
+- Stubs: Telemetrie Esc + Stubs öffnen; KI/Cloud/Stylus/3D/Hooks/Outline unverändert markiert
+
 ## 2.3.3 — Kompression Toggle Settings·Status-% bei Fehler, Links TXT Template·Zielordner·BOM, Palette Pin Persistenz·Unpin·max Pins, Telemetrie warum Stub + Stubs-Tab
 
 Post-Release-Polish nach **2.3.2**: **PDF-Kompression** **Toggle in Settings merken** und bei Fehler **trotzdem Status mit Ersparnis-%**; **URL-Links TXT-Export** mit Template **`{stem}_links.txt`**, **Zielordner merken** und **UTF-8-BOM Option**; **Command Palette** **Pin-Persistenz**, **Unpin** und Settings **max Pins 3/5/10**; **Telemetrie-Stub** Info kurz **„warum Stub“** plus **Verweis Tab Stubs**. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie klar markiert / nicht produktiv (Ink ≠ Stylus).

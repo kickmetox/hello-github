@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Nightly/CI Smoke: CLI + Import-Checks für InstantLens Doc — 2.1.0–2.3.3.
+"""Nightly/CI Smoke: CLI + Import-Checks für InstantLens Doc — 2.1.0–2.3.4.
 
 Leichtgewichtig. Exit-Codes:
   0  OK  (ok=true)
@@ -14,12 +14,12 @@ Aufruf:
   python scripts/smoke_ild.py -h
 
 JSON-Schema (--json), Erfolg:
-  {"ok": true, "version": "2.3.3", "duration_ms": 1234,
+  {"ok": true, "version": "2.3.4", "duration_ms": 1234,
    "checks": ["version", "imports", "cli", "measure_diff_import", "changelog"]}
 
 JSON bei Fail: checks[] enthält Objekt mit error-Text (max 200 Zeichen, Truncate …);
 Exitcode spiegelt ok (0↔true, 1↔false) — 2.2.0:
-  {"ok": false, "version": "2.3.3", "duration_ms": 12,
+  {"ok": false, "version": "2.3.4", "duration_ms": 12,
    "checks": ["version", {"name": "imports", "error": "import x: …"}]}
 """
 
@@ -41,7 +41,7 @@ if str(ROOT) not in sys.path:
 # Headless/CI: Qt ohne Display
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-EXPECTED_VERSION = "2.3.3"
+EXPECTED_VERSION = "2.3.4"
 FAIL_ERROR_MAX_LEN = 200
 
 EXIT_OK = 0
@@ -185,6 +185,9 @@ def check_imports(*, with_qt: bool) -> None:
             "_toggle_pin",
             "Unpin",
             "max Pins",
+            "commandPalettePinOverflow",
+            "replace_oldest",
+            "Pin-Limit erreicht",
         ),
         ROOT / "instantlensdoc" / "ui" / "main_window.py": (
             "_focus_import_status_toast_target",
@@ -200,16 +203,28 @@ def check_imports(*, with_qt: bool) -> None:
             "_export_links_txt",
             "linksTxtBom",
             "DEFAULT_LINKS_TXT",
+            "linksTxtResetDefault",
+            "linksTxtInsertStem",
+            "Live-Vorschau",
             "Öffnen fehlgeschlagen",
             "Ersparnis",
             "Ctrl+K",
             "Downsample",
         ),
+        ROOT / "instantlensdoc" / "ui" / "password_dialog.py": (
+            "compressOpenAfter",
+            "Ergebnis nach Kompression öffnen",
+            "setAccessibleName",
+        ),
         ROOT / "instantlensdoc" / "ui" / "settings_dialog.py": (
             "compressOpenAfterSettings",
+            "Ergebnis nach Kompression öffnen",
+            "setAccessibleName",
             "commandPalettePinMax",
             "goto_stubs_tab",
             "telemetryStubInfoBtn",
+            "Stubs öffnen",
+            "Key_Escape",
         ),
         ROOT / "instantlensdoc" / "ui" / "sidebar.py": (
             "sidebarLinksFilter",
@@ -541,6 +556,8 @@ def check_measure_and_diff() -> None:
 
 def check_changelog() -> None:
     cl = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    if "## 2.3.4" not in cl:
+        _fail("CHANGELOG fehlt ## 2.3.4")
     if "## 2.3.3" not in cl:
         _fail("CHANGELOG fehlt ## 2.3.3")
     if "## 2.3.2" not in cl:
@@ -570,7 +587,12 @@ def check_changelog() -> None:
     if "## 2.1.0" not in cl:
         _fail("CHANGELOG fehlt ## 2.1.0")
     if (
-        "{stem}_links.txt" not in cl
+        "Ergebnis nach Kompression" not in cl
+        and "Overflow" not in cl
+        and "ältesten" not in cl
+        and "Stubs öffnen" not in cl
+        and "Live-Vorschau" not in cl
+        and "{stem}_links.txt" not in cl
         and "max Pins" not in cl
         and "Unpin" not in cl
         and "Stubs-Tab" not in cl
@@ -617,13 +639,13 @@ def check_changelog() -> None:
         and "Range-Editor" not in cl
         and "Glätten" not in cl
     ):
-        _fail("CHANGELOG 2.3.3 fehlt Kernfeature-Hinweis")
+        _fail("CHANGELOG 2.3.4 fehlt Kernfeature-Hinweis")
     if "## 2.2.1" not in cl:
         _fail("CHANGELOG fehlt ## 2.2.1")
     if "## 2.2.0" not in cl:
         _fail("CHANGELOG fehlt ## 2.2.0")
     feat = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
-    if "2.3.3" not in feat:
+    if "2.3.4" not in feat:
         _fail("FEATURES.md fehlt 2.3.3")
     if "2.3.2" not in feat:
         _fail("FEATURES.md fehlt 2.3.2")
@@ -642,7 +664,11 @@ def check_changelog() -> None:
     if "Downsample" not in feat and "Schnellaktionen" not in feat:
         _fail("FEATURES.md fehlt 2.3.x Kernfeatures")
     if (
-        "{stem}_links.txt" not in feat
+        "Ergebnis nach Kompression" not in feat
+        and "Overflow" not in feat
+        and "ältesten" not in feat
+        and "Stubs öffnen" not in feat
+        and "{stem}_links.txt" not in feat
         and "max Pins" not in feat
         and "Tab Stubs" not in feat
         and "Ersparnis" not in feat
@@ -653,7 +679,7 @@ def check_changelog() -> None:
         and "Fuzzy" not in feat
         and "keine Datenübertragung" not in feat
     ):
-        _fail("FEATURES.md fehlt 2.3.3 Polish")
+        _fail("FEATURES.md fehlt 2.3.4 Polish")
     if "Telemetrie" not in feat:
         _fail("FEATURES.md fehlt Telemetrie-Stub")
     if "Freihand" not in feat and "ink" not in feat.casefold():
@@ -761,11 +787,11 @@ Exit-Codes:
 Laufzeit: am Ende als „Laufzeit: N ms“ (oder duration_ms im JSON).
 
 Beispiel --json (Erfolg):
-  {"ok": true, "version": "2.3.3", "duration_ms": 1234,
+  {"ok": true, "version": "2.3.4", "duration_ms": 1234,
    "checks": ["version", "imports", "cli", "measure_diff_import", "changelog"]}
 
 Beispiel --json (Fail):
-  {"ok": false, "version": "2.3.3", "duration_ms": 12,
+  {"ok": false, "version": "2.3.4", "duration_ms": 12,
    "checks": ["version", {"name": "imports", "error": "import x: …"}]}
 """.rstrip()
     )

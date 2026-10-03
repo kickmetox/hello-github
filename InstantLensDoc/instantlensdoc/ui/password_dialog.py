@@ -284,12 +284,17 @@ class CompressPdfDialog(QDialog):
         form.addRow("Render-Scale:", self.render_scale)
         form.addRow("≈ DPI:", self.dpi_hint)
 
-        self.open_after = QCheckBox("Nach Erfolg neues File öffnen")
+        self.open_after = QCheckBox("Ergebnis nach Kompression öffnen")
         self.open_after.setObjectName("compressOpenAfter")
+        self.open_after.setAccessibleName("Ergebnis nach Kompression öffnen")
+        self.open_after.setAccessibleDescription(
+            "Öffnet das komprimierte Ergebnis-PDF nach erfolgreicher Speicherung. "
+            "Toggle wird in den Einstellungen gemerkt."
+        )
         self.open_after.setChecked(bool(get_compress_open_after()))
         self.open_after.setToolTip(
-            "Komprimiertes PDF nach Speichern öffnen; Toggle in Einstellungen "
-            "gemerkt. Bei Öffnen-Fehler bleibt Ersparnis-% in Status — 2.3.3"
+            "Ergebnis nach Kompression öffnen — Toggle in Einstellungen gemerkt. "
+            "Bei Öffnen-Fehler bleibt Ersparnis-% in Status — 2.3.4"
         )
         form.addRow(self.open_after)
 

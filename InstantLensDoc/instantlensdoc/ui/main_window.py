@@ -7936,8 +7936,8 @@ class MainWindow(QMainWindow):
 
     def _export_links_txt(self) -> None:
         """
-        Gefilterte URL-Liste als TXT: Template ``{stem}_links.txt``,
-        Zielordner merken, UTF-8-BOM Option — 2.3.3.
+        Gefilterte URL-Liste als TXT: Live-Vorschau Dateiname,
+        Quick-Insert {stem}/{date}, Reset Default, Zielordner, UTF-8-BOM — 2.3.4.
         """
         if not hasattr(self.sidebar, "filtered_link_uris"):
             return
@@ -7951,13 +7951,20 @@ class MainWindow(QMainWindow):
         from instantlensdoc.core.app_settings import (
             DEFAULT_LINKS_TXT_FILENAME_TEMPLATE,
             dialog_start_dir,
+            find_invalid_links_txt_placeholders,
             format_links_txt_filename,
             get_last_links_txt_dir,
             get_links_txt_filename_template,
             get_links_txt_utf8_bom,
+            highlight_links_txt_template_html,
             set_last_links_txt_dir,
             set_links_txt_filename_template,
             set_links_txt_utf8_bom,
+        )
+        from instantlensdoc.ui.template_reset import (
+            EscapeDiscardEditFilter,
+            focus_line_edit_select_all,
+            reset_line_edit_template,
         )
 
         stem = "links"
@@ -7970,37 +7977,109 @@ class MainWindow(QMainWindow):
         ol.addWidget(
             QLabel(
                 f"{len(uris)} URL(s) · Template "
-                f"{DEFAULT_LINKS_TXT_FILENAME_TEMPLATE} — 2.3.3"
+                f"{DEFAULT_LINKS_TXT_FILENAME_TEMPLATE} — 2.3.4"
             )
         )
         chk_bom = QCheckBox("UTF-8 BOM (Excel)")
         chk_bom.setObjectName("linksTxtBom")
         chk_bom.setChecked(get_links_txt_utf8_bom())
-        chk_bom.setToolTip("TXT mit UTF-8-BOM schreiben (Excel-freundlich) — 2.3.3")
+        chk_bom.setToolTip("TXT mit UTF-8-BOM schreiben (Excel-freundlich) — 2.3.4")
         ol.addWidget(chk_bom)
+
         tpl_row = QHBoxLayout()
         tpl_row.addWidget(QLabel("Dateiname:"))
         tpl_edit = QLineEdit(get_links_txt_filename_template())
         tpl_edit.setObjectName("linksTxtTemplate")
         tpl_edit.setPlaceholderText(DEFAULT_LINKS_TXT_FILENAME_TEMPLATE)
         tpl_edit.setToolTip(
-            "Dateiname-Template; Platzhalter {stem}/{date}; Default "
-            f"{DEFAULT_LINKS_TXT_FILENAME_TEMPLATE} — 2.3.3"
+            "Live-Dateiname-Template; Platzhalter {stem}/{date}; "
+            "Quick-Insert; Reset Default (Bestätigung nur bei Abweichung · "
+            "Fokus+Selektion); Esc im Feld verwirft Edit — 2.3.4"
         )
         tpl_row.addWidget(tpl_edit, 1)
-        ol.addLayout(tpl_row)
         preview = QLabel("")
         preview.setObjectName("linksTxtPreview")
+        preview.setTextFormat(Qt.RichText)
         preview.setWordWrap(True)
+        preview.setToolTip(
+            "Live-Vorschau Dateiname; ungültige Platzhalter rot — 2.3.4"
+        )
+        preview.setAccessibleName("Links-TXT Live-Vorschau Dateiname")
 
         def _update_preview() -> None:
+            import html as _html
+
             tpl = tpl_edit.text().strip() or DEFAULT_LINKS_TXT_FILENAME_TEMPLATE
             name = format_links_txt_filename(stem, template=tpl)
-            preview.setText(f"Vorschau: {name}")
+            html = highlight_links_txt_template_html(tpl)
+            invalid = find_invalid_links_txt_placeholders(tpl)
+            note = f" → <code>{_html.escape(name)}</code>"
+            if invalid:
+                note += f" · ungültig: {', '.join(invalid)}"
+            preview.setText(f"TXT: {html}{note}")
+            preview.setAccessibleName(f"Links-TXT Live-Vorschau {name}")
 
+        tpl_esc = EscapeDiscardEditFilter(
+            tpl_edit, on_discard=_update_preview, parent=opts
+        )
+
+        for token in ("{stem}", "{date}"):
+            btn = QPushButton(token)
+            btn.setObjectName(
+                "linksTxtInsertStem" if token == "{stem}" else "linksTxtInsertDate"
+            )
+            btn.setAutoDefault(False)
+            btn.setDefault(False)
+            btn.setFocusPolicy(Qt.TabFocus)
+            btn.setToolTip(f"Platzhalter {token} an Cursor einfügen — 2.3.4")
+
+            def _insert(t=token) -> None:
+                tpl_edit.insert(t)
+                tpl_edit.setFocus()
+                _update_preview()
+                tpl_esc.commit()
+
+            btn.clicked.connect(_insert)
+            tpl_row.addWidget(btn)
+
+        btn_reset_tpl = QPushButton("Reset Default")
+        btn_reset_tpl.setObjectName("linksTxtResetDefault")
+        btn_reset_tpl.setAutoDefault(False)
+        btn_reset_tpl.setDefault(False)
+        btn_reset_tpl.setFocusPolicy(Qt.TabFocus)
+        btn_reset_tpl.setToolTip(
+            f"Reset Default ({DEFAULT_LINKS_TXT_FILENAME_TEMPLATE}) "
+            "Bestätigung nur bei Abweichung; danach Fokus+Selektion — 2.3.4"
+        )
+
+        def _focus_tpl_select_all() -> None:
+            focus_line_edit_select_all(tpl_edit)
+
+        def _reset_tpl() -> None:
+            default = DEFAULT_LINKS_TXT_FILENAME_TEMPLATE
+
+            def _after() -> None:
+                _update_preview()
+                tpl_esc.commit(default)
+
+            reset_line_edit_template(
+                opts,
+                tpl_edit,
+                default,
+                title="Reset Default",
+                body_prefix="Links-TXT-Template auf Default zurücksetzen?",
+                on_updated=_after,
+                after_focus=False,
+            )
+            QTimer.singleShot(0, _focus_tpl_select_all)
+
+        btn_reset_tpl.clicked.connect(_reset_tpl)
+        tpl_row.addWidget(btn_reset_tpl)
+        ol.addLayout(tpl_row)
+        ol.addWidget(preview)
         tpl_edit.textChanged.connect(lambda _t: _update_preview())
         _update_preview()
-        ol.addWidget(preview)
+
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         buttons.button(QDialogButtonBox.Ok).setText("Speichern…")
         buttons.accepted.connect(opts.accept)

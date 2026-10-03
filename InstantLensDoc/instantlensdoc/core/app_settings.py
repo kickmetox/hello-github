@@ -696,8 +696,19 @@ def set_command_palette_pinned(ids: list[str] | tuple[str, ...]) -> list[str]:
     return out
 
 
-def toggle_command_palette_pin(cmd_id: str) -> bool:
-    """Pin umschalten (Unpin wenn gesetzt); True = jetzt angeheftet — 2.3.2/2.3.3."""
+def toggle_command_palette_pin(
+    cmd_id: str, *, replace_oldest: bool = False
+) -> bool | None:
+    """
+    Pin umschalten (Unpin wenn gesetzt).
+
+    Returns:
+      True  — jetzt angeheftet
+      False — jetzt unpinned / leer
+      None  — Pin-Limit erreicht und ``replace_oldest=False`` (nichts geändert)
+
+    Bei Limit + ``replace_oldest=True``: ältesten Pin (Ende) ersetzen — 2.3.4.
+    """
     cid = str(cmd_id or "").strip()
     if not cid:
         return False
@@ -706,12 +717,20 @@ def toggle_command_palette_pin(cmd_id: str) -> bool:
         pinned = [x for x in pinned if x != cid]
         set_command_palette_pinned(pinned)
         return False
-    # Neu anheften am Anfang; bei Max ältesten (Ende) verdrängen — 2.3.3
     limit = get_command_palette_pin_max()
-    pinned = [cid] + [x for x in pinned if x != cid]
+    others = [x for x in pinned if x != cid]
+    if len(others) >= limit and not replace_oldest:
+        return None
+    # Neu anheften am Anfang; bei Max ältesten (Ende) verdrängen — 2.3.4
+    pinned = [cid] + others
     pinned = pinned[:limit]
     set_command_palette_pinned(pinned)
     return True
+
+
+def command_palette_pins_at_limit() -> bool:
+    """True wenn aktuelle Pin-Anzahl das Max erreicht hat — 2.3.4."""
+    return len(get_command_palette_pinned()) >= get_command_palette_pin_max()
 
 
 def get_command_palette_recent(
@@ -818,6 +837,41 @@ def set_links_txt_filename_template(template: str) -> str:
     return raw
 
 
+def find_invalid_links_txt_placeholders(template: str) -> list[str]:
+    """Unbekannte Platzhalter im Links-TXT-Template — 2.3.4."""
+    seen: set[str] = set()
+    out: list[str] = []
+    for name in _LINKS_TXT_ANY_PLACEHOLDER_RE.findall(str(template or "")):
+        key = name.strip()
+        if not key or key in LINKS_TXT_KNOWN_PLACEHOLDERS or key in seen:
+            continue
+        seen.add(key)
+        out.append(key)
+    return out
+
+
+def highlight_links_txt_template_html(template: str) -> str:
+    """Template als HTML; ungültige Platzhalter rot — 2.3.4."""
+    import html as _html
+
+    raw = str(template or "")
+    parts: list[str] = []
+    last = 0
+    for m in _LINKS_TXT_ANY_PLACEHOLDER_RE.finditer(raw):
+        parts.append(_html.escape(raw[last : m.start()]))
+        name = m.group(1).strip()
+        token = _html.escape(m.group(0))
+        if name and name not in LINKS_TXT_KNOWN_PLACEHOLDERS:
+            parts.append(
+                f'<span style="color:#c62828;font-weight:600">{token}</span>'
+            )
+        else:
+            parts.append(token)
+        last = m.end()
+    parts.append(_html.escape(raw[last:]))
+    return "".join(parts) or _html.escape(raw)
+
+
 def format_links_txt_filename(
     stem: str,
     *,
@@ -827,7 +881,7 @@ def format_links_txt_filename(
     """
     Links-TXT-Dateiname aus Template.
     Platzhalter: ``{stem}``, ``{date}`` (YYYY-MM-DD).
-    Default ``{stem}_links.txt`` — 2.3.3.
+    Default ``{stem}_links.txt`` — 2.3.3/2.3.4.
     """
     from datetime import date as _date
 

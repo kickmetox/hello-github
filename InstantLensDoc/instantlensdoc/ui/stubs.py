@@ -32,7 +32,8 @@ PLANNED = {
     ),
     "telemetry": (
         f"Telemetrie — Stub {__version__} — Toggle disabled (bleibt aus), "
-        "immer no-op — keine Datenübertragung — warum Stub + Tab Stubs — 2.3.3"
+        "immer no-op — keine Datenübertragung — Esc schließt Info · "
+        "„Stubs öffnen“ — 2.3.4"
     ),
     "varfonts": "Variable Fonts (voll) — geplant",
     "envelope": "Envelope Distort (voll) — geplant",
@@ -55,7 +56,8 @@ PLANNED_EN = {
     ),
     "telemetry": (
         f"Telemetry — stub {__version__} — toggle disabled (stays off), "
-        "always no-op — no data transfer — why stub + Stubs tab — 2.3.3"
+        "always no-op — no data transfer — Esc closes info · "
+        "Open Stubs — 2.3.4"
     ),
     "varfonts": "Variable fonts (full) — planned",
     "envelope": "Envelope distort (full) — planned",
@@ -78,7 +80,7 @@ STUB_SHORT = {
     "telemetry": (
         "Anonyme Nutzung melden — Stub / Toggle disabled bleibt aus / immer no-op — "
         "keine Datenübertragung. Warum Stub: kein Backend, Privacy lokal. "
-        "Details: Einstellungen → Tab Stubs — 2.3.3."
+        "Info: Esc schließt · Button „Stubs öffnen“ — 2.3.4."
     ),
     "varfonts": "Vollständige Variable-Fonts-Unterstützung — geplant.",
     "envelope": "Envelope-Distort-Transformation — geplant.",
@@ -100,7 +102,7 @@ STUB_SHORT_EN = {
     "telemetry": (
         "Report anonymous usage — stub / toggle disabled stays off / always no-op — "
         "no data transfer. Why stub: no backend, local privacy. "
-        "Details: Settings → Stubs tab — 2.3.3."
+        "Info: Esc closes · Open Stubs button — 2.3.4."
     ),
     "varfonts": "Full variable fonts support — planned.",
     "envelope": "Envelope distort transform — planned.",
