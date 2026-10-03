@@ -14,6 +14,7 @@ from instantlensdoc.core.app_settings import (
     get_editor_bracket_match,
     get_editor_line_numbers,
     get_editor_minimap,
+    get_editor_soft_tabs,
     get_editor_soft_wrap,
     get_editor_show_special_chars,
     get_editor_tab_width,
@@ -92,6 +93,7 @@ class TextEditor(QPlainTextEdit):
         self._minimap = bool(get_editor_minimap())
         self._soft_wrap = bool(get_editor_soft_wrap())
         self._tab_width = int(get_editor_tab_width())
+        self._soft_tabs = bool(get_editor_soft_tabs())
         self._show_special = bool(get_editor_show_special_chars())
         self._bracket_match = bool(get_editor_bracket_match())
         self._bracket_auto_close = bool(get_editor_bracket_auto_close())
@@ -405,6 +407,13 @@ class TextEditor(QPlainTextEdit):
 
     def tab_width(self) -> int:
         return int(self._tab_width)
+
+    def set_soft_tabs(self, enabled: bool) -> None:
+        """Soft-Tabs (Leerzeichen) vs. echte Tabulatorzeichen."""
+        self._soft_tabs = bool(enabled)
+
+    def soft_tabs_enabled(self) -> bool:
+        return bool(self._soft_tabs)
 
     def set_special_chars_visible(self, visible: bool) -> None:
         """Tabs/Leerzeichen/Absatzenden als sichtbare Sonderzeichen (ShowTabsAndSpaces)."""
@@ -1348,13 +1357,22 @@ class TextEditor(QPlainTextEdit):
         self.setTextCursor(new_cur)
         return True
 
-    def indent_selection(self, spaces: int = 4) -> bool:
-        """Einrückung der ausgewählten Zeilen erhöhen (Leerzeichen voranstellen)."""
-        return self._adjust_indent(+max(1, int(spaces)))
+    def indent_selection(self, spaces: int | None = None) -> bool:
+        """Einrückung der ausgewählten Zeilen erhöhen (Soft-Tabs oder echte Tabs)."""
+        width = int(spaces) if spaces is not None else int(self._tab_width)
+        return self._adjust_indent(+max(1, width))
 
-    def outdent_selection(self, spaces: int = 4) -> bool:
+    def outdent_selection(self, spaces: int | None = None) -> bool:
         """Einrückung der ausgewählten Zeilen verringern."""
-        return self._adjust_indent(-max(1, int(spaces)))
+        width = int(spaces) if spaces is not None else int(self._tab_width)
+        return self._adjust_indent(-max(1, width))
+
+    def _indent_pad(self, width: int) -> str:
+        """Einrückungszeichenfolge: Soft-Tabs → Leerzeichen, sonst \\t."""
+        w = max(1, int(width))
+        if self._soft_tabs:
+            return " " * w
+        return "\t"
 
     def _adjust_indent(self, delta: int) -> bool:
         """delta > 0: einrücken; delta < 0: ausrücken. Wirkt auf alle Zeilen der Auswahl."""
@@ -1373,7 +1391,8 @@ class TextEditor(QPlainTextEdit):
             if not end_block.isValid():
                 end_block = start_block
 
-        pad = " " * abs(delta)
+        width = abs(int(delta))
+        pad = self._indent_pad(width)
         cur.beginEditBlock()
         start_bn = start_block.blockNumber()
         end_bn = end_block.blockNumber()
@@ -1386,14 +1405,17 @@ class TextEditor(QPlainTextEdit):
                 bcur.insertText(pad)
             else:
                 remove = 0
-                for ch in text[: abs(delta)]:
-                    if ch == " ":
-                        remove += 1
-                    elif ch == "\t":
-                        remove += 1
-                        break
-                    else:
-                        break
+                if text.startswith("\t"):
+                    remove = 1
+                else:
+                    for ch in text[:width]:
+                        if ch == " ":
+                            remove += 1
+                        elif ch == "\t":
+                            remove += 1
+                            break
+                        else:
+                            break
                 if remove:
                     bcur.movePosition(QTextCursor.Right, QTextCursor.KeepAnchor, remove)
                     bcur.removeSelectedText()

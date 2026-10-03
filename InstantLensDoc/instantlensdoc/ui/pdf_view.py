@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Sequence
 
 from PySide6.QtCore import QPointF, Qt, QTimer, Signal, QUrl
 from PySide6.QtGui import (
@@ -87,6 +87,7 @@ from instantlensdoc.core.app_settings import (
     get_pdf_two_page_spread,
     get_page_number_overlay_font_size,
     get_page_number_overlay_opacity,
+    get_page_number_overlay_position,
     get_show_page_boxes,
     get_show_page_number_overlay,
     get_show_printer_marks,
@@ -100,6 +101,7 @@ from instantlensdoc.core.app_settings import (
     set_annotations_visible,
     set_page_number_overlay_font_size,
     set_page_number_overlay_opacity,
+    set_page_number_overlay_position,
     set_pdf_continuous_scroll,
     set_pdf_grayscale,
     set_pdf_night_mode,
@@ -339,6 +341,7 @@ class PdfCanvas(QLabel):
         self._page_number_text = ""
         self._page_number_overlay_opacity = 0.59
         self._page_number_overlay_font_size = 11
+        self._page_number_overlay_position = "bottom-center"
         self._show_printer_marks = False
         # Pixel-Rects (x,y,w,h) für MediaBox / CropBox / Druckermarken
         self._mediabox_rect: tuple[float, float, float, float] | None = None
@@ -419,6 +422,17 @@ class PdfCanvas(QLabel):
 
     def page_number_overlay_font_size(self) -> int:
         return int(self._page_number_overlay_font_size)
+
+    def set_page_number_overlay_position(self, position: str):
+        raw = str(position or "bottom-center").strip().lower().replace("_", "-")
+        self._page_number_overlay_position = (
+            "top-center" if raw in ("top-center", "top", "oben", "oben-mitte") else "bottom-center"
+        )
+        if self._show_page_number_overlay:
+            self._repaint_overlay()
+
+    def page_number_overlay_position(self) -> str:
+        return str(self._page_number_overlay_position or "bottom-center")
 
     def set_show_printer_marks(self, enabled: bool):
         self._show_printer_marks = bool(enabled)
@@ -794,7 +808,7 @@ class PdfCanvas(QLabel):
         # Optional: Seitenrand-Druckermarken (Crop/Registration)
         if self._show_printer_marks and self._printer_marks_rect:
             self._draw_printer_marks(painter, self._printer_marks_rect)
-        # Optional: Seitennummer-Overlay (HUD unten rechts)
+        # Optional: Seitennummer-Overlay (HUD unten-/oben-mitte)
         if self._show_page_number_overlay and self._page_number_text:
             label = self._page_number_text
             font = QFont()
@@ -808,8 +822,14 @@ class PdfCanvas(QLabel):
             metrics = painter.fontMetrics()
             tw = metrics.horizontalAdvance(label) + 16
             th = metrics.height() + 10
-            px = max(8, pm.width() - tw - 12)
-            py = max(8, pm.height() - th - 12)
+            px = max(8, (pm.width() - tw) // 2)
+            pos = str(
+                getattr(self, "_page_number_overlay_position", "bottom-center") or "bottom-center"
+            ).lower()
+            if pos in ("top-center", "top", "oben", "oben-mitte"):
+                py = 12
+            else:
+                py = max(8, pm.height() - th - 12)
             try:
                 op = float(self._page_number_overlay_opacity)
             except (TypeError, ValueError, AttributeError):
@@ -1096,6 +1116,7 @@ class PdfViewer(QWidget):
         self._show_page_number_overlay = get_show_page_number_overlay()
         self._page_number_overlay_opacity = get_page_number_overlay_opacity()
         self._page_number_overlay_font_size = get_page_number_overlay_font_size()
+        self._page_number_overlay_position = get_page_number_overlay_position()
         self._show_printer_marks = get_show_printer_marks()
         self._search_query = ""
         self._search_rects: list[tuple[float, float, float, float]] = []
@@ -1200,6 +1221,16 @@ class PdfViewer(QWidget):
             "Auswahl vertikal verteilen (≥3 Annotationen; Ränder bleiben)"
         )
         btn_dist_v.clicked.connect(self.distribute_selected_annotations_vertical)
+        btn_group = QPushButton("Grp")
+        btn_group.setFixedWidth(28)
+        btn_group.setToolTip(
+            "Auswahl gruppieren (≥2) — temporäre Gruppen-ID im Sidecar"
+        )
+        btn_group.clicked.connect(self.group_selected_annotations)
+        btn_ungroup = QPushButton("⧉")
+        btn_ungroup.setFixedWidth(28)
+        btn_ungroup.setToolTip("Auswahl entgruppieren (group_id leeren)")
+        btn_ungroup.clicked.connect(self.ungroup_selected_annotations)
         btn_stamp_rot = QPushButton("Stempel ↻")
         btn_stamp_rot.setToolTip("Ausgewählten Stempel um 90° drehen")
         btn_stamp_rot.clicked.connect(lambda: self.rotate_selected_stamp(90))
@@ -1452,6 +1483,8 @@ class PdfViewer(QWidget):
         toolbar.addWidget(btn_align_b)
         toolbar.addWidget(btn_dist_h)
         toolbar.addWidget(btn_dist_v)
+        toolbar.addWidget(btn_group)
+        toolbar.addWidget(btn_ungroup)
         toolbar.addWidget(btn_stamp_rot)
         toolbar.addWidget(btn_zoom_out)
         toolbar.addWidget(self.lbl_zoom)
@@ -1516,6 +1549,8 @@ class PdfViewer(QWidget):
                 btn_align_b,
                 btn_dist_h,
                 btn_dist_v,
+                btn_group,
+                btn_ungroup,
                 btn_stamp_rot,
             ],
             "zoom": [
@@ -1557,6 +1592,7 @@ class PdfViewer(QWidget):
         self.canvas.set_show_page_number_overlay(self._show_page_number_overlay)
         self.canvas.set_page_number_overlay_opacity(self._page_number_overlay_opacity)
         self.canvas.set_page_number_overlay_font_size(self._page_number_overlay_font_size)
+        self.canvas.set_page_number_overlay_position(self._page_number_overlay_position)
         self.canvas.set_show_printer_marks(self._show_printer_marks)
         self.canvas.annotation_placed.connect(self._on_place)
         self.canvas.drag_finished.connect(self._on_drag)
@@ -2131,6 +2167,26 @@ class PdfViewer(QWidget):
     def page_number_overlay_font_size(self) -> int:
         return int(self._page_number_overlay_font_size)
 
+    def set_page_number_overlay_position(self, position: str):
+        """Position des Seitennummer-Overlays: bottom-center | top-center (persistiert)."""
+        raw = str(position or "bottom-center").strip().lower().replace("_", "-")
+        key = (
+            "top-center"
+            if raw in ("top-center", "top", "oben", "oben-mitte")
+            else "bottom-center"
+        )
+        changed = str(self._page_number_overlay_position) != key
+        self._page_number_overlay_position = key
+        set_page_number_overlay_position(key)
+        if getattr(self, "canvas", None):
+            self.canvas.set_page_number_overlay_position(key)
+        if changed:
+            label = "oben-mitte" if key == "top-center" else "unten-mitte"
+            self.status.emit(f"Seitennummer-Overlay Position {label}")
+
+    def page_number_overlay_position(self) -> str:
+        return str(self._page_number_overlay_position or "bottom-center")
+
     def _update_page_number_overlay(self) -> None:
         """Aktuelle Seitennummer/Label an Canvas-Overlay übergeben."""
         if not getattr(self, "canvas", None):
@@ -2292,6 +2348,7 @@ class PdfViewer(QWidget):
         self._show_page_number_overlay = get_show_page_number_overlay()
         self._page_number_overlay_opacity = get_page_number_overlay_opacity()
         self._page_number_overlay_font_size = get_page_number_overlay_font_size()
+        self._page_number_overlay_position = get_page_number_overlay_position()
         if hasattr(self, "btn_page_num"):
             self.btn_page_num.blockSignals(True)
             self.btn_page_num.setChecked(self._show_page_number_overlay)
@@ -2303,6 +2360,7 @@ class PdfViewer(QWidget):
         self.canvas.set_show_page_number_overlay(self._show_page_number_overlay)
         self.canvas.set_page_number_overlay_opacity(self._page_number_overlay_opacity)
         self.canvas.set_page_number_overlay_font_size(self._page_number_overlay_font_size)
+        self.canvas.set_page_number_overlay_position(self._page_number_overlay_position)
         self._update_page_number_overlay()
         self._show_printer_marks = get_show_printer_marks()
         if hasattr(self, "btn_printer_marks"):
@@ -3725,6 +3783,52 @@ class PdfViewer(QWidget):
         self.refresh()
         self.annotations_changed.emit()
         self.status.emit(f"{n} Annotation(en) vertikal verteilt")
+        return n
+
+    def group_selected_annotations(self) -> int:
+        """Auswahl gruppieren: gemeinsame temporäre group_id im Sidecar (≥2)."""
+        if not self.store:
+            self.status.emit("Kein PDF geladen")
+            return 0
+        ids = self._selected_annotation_ids()
+        if len(ids) < 2:
+            self.status.emit("Gruppieren: mindestens 2 Annotationen auswählen")
+            return 0
+        n, gid = self.store.group(ids)
+        if n <= 0 or not gid:
+            self.status.emit("Gruppieren: keine Änderung")
+            return 0
+        try:
+            self.schedule_sidecar_save(force=True)
+        except Exception as e:
+            QMessageBox.warning(self, "Gruppieren", str(e))
+            return 0
+        self.refresh()
+        self.annotations_changed.emit()
+        self.status.emit(f"{n} Annotation(en) gruppiert ({gid})")
+        return n
+
+    def ungroup_selected_annotations(self) -> int:
+        """Auswahl entgruppieren (group_id leeren)."""
+        if not self.store:
+            self.status.emit("Kein PDF geladen")
+            return 0
+        ids = self._selected_annotation_ids()
+        if not ids:
+            self.status.emit("Entgruppieren: keine Auswahl")
+            return 0
+        n = self.store.ungroup(ids)
+        if n <= 0:
+            self.status.emit("Entgruppieren: keine Gruppe in der Auswahl")
+            return 0
+        try:
+            self.schedule_sidecar_save(force=True)
+        except Exception as e:
+            QMessageBox.warning(self, "Entgruppieren", str(e))
+            return 0
+        self.refresh()
+        self.annotations_changed.emit()
+        self.status.emit(f"{n} Annotation(en) entgruppiert")
         return n
 
     def reorder_page_favorites(self, pages: list[int]) -> list[int]:
@@ -5713,6 +5817,53 @@ class PdfViewer(QWidget):
     def duplicate_current(self):
         """Aktuelle Seite duplizieren (Kopie danach) und speichern; Undo Ctrl+Z."""
         return self.duplicate_at(self.page_index)
+
+    def duplicate_many(self, page_indices: list[int] | Sequence[int]) -> int:
+        """Mehrere Seiten duplizieren (hohe Indizes zuerst); Undo je Seite Ctrl+Z."""
+        if not self.pdf_path:
+            return 0
+        pages = sorted({int(i) for i in page_indices}, reverse=True)
+        if not pages:
+            return 0
+        n = 0
+        for idx in pages:
+            if self.duplicate_at(idx):
+                n += 1
+        if n:
+            self.status.emit(f"{n} Seite(n) dupliziert (Ctrl+Z rückgängig)")
+        return n
+
+    def delete_many(self, page_indices: list[int] | Sequence[int], *, confirm: bool = True) -> int:
+        """Mehrere Seiten löschen (hohe Indizes zuerst); eine Bestätigung; Undo je Seite."""
+        if not self.pdf_path:
+            return 0
+        pages = sorted({int(i) for i in page_indices})
+        if not pages:
+            return 0
+        remaining = int(self.page_count or 0) - len(pages)
+        if remaining < 1:
+            QMessageBox.information(
+                self, "Löschen", "Es muss mindestens eine Seite übrig bleiben."
+            )
+            return 0
+        if confirm:
+            labels = ", ".join(str(p + 1) for p in pages[:12])
+            if len(pages) > 12:
+                labels += "…"
+            reply = QMessageBox.question(
+                self,
+                "Seiten löschen",
+                f"{len(pages)} Seite(n) wirklich löschen?\n({labels})\n(Rückgängig: Ctrl+Z)",
+            )
+            if reply != QMessageBox.Yes:
+                return 0
+        n = 0
+        for idx in sorted(pages, reverse=True):
+            if self.delete_at(idx, confirm=False):
+                n += 1
+        if n:
+            self.status.emit(f"{n} Seite(n) gelöscht (Ctrl+Z rückgängig)")
+        return n
 
     def duplicate_at(self, page_index: int) -> bool:
         """Seite an Index duplizieren (Kopie danach); Undo Ctrl+Z."""

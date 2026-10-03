@@ -409,6 +409,8 @@ class MainWindow(QMainWindow):
         self.sidebar.page_rotate_requested.connect(self._on_thumb_rotate)
         self.sidebar.page_duplicate_requested.connect(self._on_thumb_duplicate)
         self.sidebar.page_delete_requested.connect(self._on_thumb_delete)
+        self.sidebar.pages_batch_duplicate_requested.connect(self._on_thumbs_batch_duplicate)
+        self.sidebar.pages_batch_delete_requested.connect(self._on_thumbs_batch_delete)
         splitter.addWidget(self.sidebar)
 
         self.stack = QStackedWidget()
@@ -978,6 +980,22 @@ class MainWindow(QMainWindow):
         )
         act_dist_v.triggered.connect(self._distribute_selected_annotations_vertical)
         m_align.addAction(act_dist_v)
+        m_align.addSeparator()
+        act_group = QAction("Gruppieren", self)
+        act_group.setShortcut(QKeySequence("Ctrl+Alt+Shift+G"))
+        act_group.setToolTip(
+            "Ausgewählte Annotationen gruppieren (≥2) — temporäre Gruppen-ID im Sidecar "
+            "(Ctrl+Alt+Shift+G)"
+        )
+        act_group.triggered.connect(self._group_selected_annotations)
+        m_align.addAction(act_group)
+        act_ungroup = QAction("Entgruppieren", self)
+        act_ungroup.setShortcut(QKeySequence("Ctrl+Alt+Shift+Y"))
+        act_ungroup.setToolTip(
+            "Auswahl entgruppieren (group_id leeren) — Ctrl+Alt+Shift+Y"
+        )
+        act_ungroup.triggered.connect(self._ungroup_selected_annotations)
+        m_align.addAction(act_ungroup)
         act_dup_ann = QAction("Annotation duplizieren", self)
         act_dup_ann.setShortcut(QKeySequence("Ctrl+Shift+D"))
         act_dup_ann.setToolTip(
@@ -2326,6 +2344,22 @@ class MainWindow(QMainWindow):
             self._set_status("Verteilen nur im PDF-Modus")
             return
         n = self.pdf_view.distribute_selected_annotations_vertical()
+        if n:
+            self._refresh_pdf_marks()
+
+    def _group_selected_annotations(self):
+        if self.stack.currentWidget() is not self.pdf_view or not self.pdf_view.pdf_path:
+            self._set_status("Gruppieren nur im PDF-Modus")
+            return
+        n = self.pdf_view.group_selected_annotations()
+        if n:
+            self._refresh_pdf_marks()
+
+    def _ungroup_selected_annotations(self):
+        if self.stack.currentWidget() is not self.pdf_view or not self.pdf_view.pdf_path:
+            self._set_status("Entgruppieren nur im PDF-Modus")
+            return
+        n = self.pdf_view.ungroup_selected_annotations()
         if n:
             self._refresh_pdf_marks()
 
@@ -4410,6 +4444,28 @@ class MainWindow(QMainWindow):
             self._refresh_thumbs()
             self._update_doc_status()
 
+    def _on_thumbs_batch_duplicate(self, pages: list):
+        """Thumbnail-Mehrfachauswahl: Seiten batch-duplizieren."""
+        if self.stack.currentWidget() is not self.pdf_view:
+            self.stack.setCurrentWidget(self.pdf_view)
+        if not self.pdf_view.pdf_path:
+            return
+        idxs = [int(p) for p in (pages or [])]
+        if self.pdf_view.duplicate_many(idxs):
+            self._refresh_thumbs()
+            self._update_doc_status()
+
+    def _on_thumbs_batch_delete(self, pages: list):
+        """Thumbnail-Mehrfachauswahl: Seiten batch-löschen."""
+        if self.stack.currentWidget() is not self.pdf_view:
+            self.stack.setCurrentWidget(self.pdf_view)
+        if not self.pdf_view.pdf_path:
+            return
+        idxs = [int(p) for p in (pages or [])]
+        if self.pdf_view.delete_many(idxs, confirm=True):
+            self._refresh_thumbs()
+            self._update_doc_status()
+
     def _on_pdf_page_changed(self, page_index: int):
         self.sidebar.select_thumb(page_index)
         self.sidebar.set_annotation_current_page(page_index)
@@ -4483,6 +4539,7 @@ class MainWindow(QMainWindow):
                 get_editor_markdown_preview,
                 get_editor_minimap,
                 get_editor_show_special_chars,
+                get_editor_soft_tabs,
                 get_editor_soft_wrap,
                 get_editor_tab_width,
                 get_pdf_grayscale,
@@ -4509,6 +4566,8 @@ class MainWindow(QMainWindow):
                 self._soft_wrap_action.setChecked(soft)
                 self._soft_wrap_action.blockSignals(False)
             self.editor.set_tab_width(get_editor_tab_width())
+            if hasattr(self.editor, "set_soft_tabs"):
+                self.editor.set_soft_tabs(get_editor_soft_tabs())
             special = get_editor_show_special_chars()
             self.editor.set_special_chars_visible(special)
             if hasattr(self, "_special_chars_action") and self._special_chars_action is not None:

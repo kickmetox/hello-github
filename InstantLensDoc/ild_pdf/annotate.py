@@ -253,6 +253,7 @@ class Annotation:
     opacity: float = 1.0  # Deckkraft 0.05–1.0
     rotation: float = 0.0  # Stempel-Drehung in Grad (0/90/180/270)
     tags: List[str] = field(default_factory=list)  # freie Labels, filterbar
+    group_id: str = ""  # temporäre Gruppen-ID (Sidecar; leer = ungruppiert)
     id: str = field(default_factory=lambda: uuid4().hex)
     created: str = field(
         default_factory=lambda: datetime.now(timezone.utc).isoformat(timespec="seconds")
@@ -404,6 +405,11 @@ class Annotation:
         # Einfache Stempel-Rotation: auf 0/90/180/270 normalisieren
         data["rotation"] = float(int(round(rot / 90.0)) % 4 * 90)
         data["tags"] = normalize_tags(data.get("tags"))
+        gid = data.get("group_id")
+        if gid is None:
+            data["group_id"] = ""
+        else:
+            data["group_id"] = str(gid).strip()
         data.setdefault("created", datetime.now(timezone.utc).isoformat(timespec="seconds"))
         data.setdefault("modified", data["created"])
         known = {f.name for f in cls.__dataclass_fields__.values()}  # type: ignore[attr-defined]
@@ -803,6 +809,47 @@ class AnnotationStore:
             self._apply_dy(a, dy)
         self.dirty = True
         return len(moves)
+
+    def group(self, ann_ids: Sequence[str], group_id: str | None = None) -> tuple[int, str]:
+        """
+        Auswahl gruppieren: gemeinsame temporäre group_id im Sidecar (≥2).
+        Eine Undo-Stufe. Rückgabe: (Anzahl, group_id) — (0, \"\") bei Abbruch.
+        """
+        ids = {str(i) for i in ann_ids if i}
+        if len(ids) < 2:
+            return 0, ""
+        targets = [a for a in self.annotations if a.id in ids]
+        if len(targets) < 2:
+            return 0, ""
+        gid = str(group_id or "").strip() or uuid4().hex[:12]
+        self._push_undo()
+        for a in targets:
+            a.group_id = gid
+            a.touch()
+        self.dirty = True
+        return len(targets), gid
+
+    def ungroup(self, ann_ids: Sequence[str]) -> int:
+        """
+        Auswahl entgruppieren: group_id leeren.
+        Ohne IDs: alle Annotationen mit group_id. Eine Undo-Stufe.
+        Rückgabe: Anzahl geänderter Annotationen.
+        """
+        ids = {str(i) for i in ann_ids if i}
+        if ids:
+            targets = [
+                a for a in self.annotations if a.id in ids and str(a.group_id or "").strip()
+            ]
+        else:
+            targets = [a for a in self.annotations if str(a.group_id or "").strip()]
+        if not targets:
+            return 0
+        self._push_undo()
+        for a in targets:
+            a.group_id = ""
+            a.touch()
+        self.dirty = True
+        return len(targets)
 
     @staticmethod
     def _normalize_opacity(value: object) -> float:

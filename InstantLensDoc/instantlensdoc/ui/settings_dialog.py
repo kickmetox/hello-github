@@ -54,9 +54,11 @@ from instantlensdoc.core.app_settings import (
     get_pdf_night_mode,
     get_pdf_thumbnail_scale,
     get_pdf_two_page_spread,
+    get_editor_soft_tabs,
     get_editor_tab_width,
     get_page_number_overlay_font_size,
     get_page_number_overlay_opacity,
+    get_page_number_overlay_position,
     get_show_page_number_overlay,
     get_restore_session_on_start,
     get_merge_diff_max_side,
@@ -98,6 +100,7 @@ from instantlensdoc.core.app_settings import (
     set_editor_line_numbers,
     set_editor_minimap,
     set_editor_show_special_chars,
+    set_editor_soft_tabs,
     set_editor_soft_wrap,
     set_editor_tab_width,
     set_editor_text_encoding,
@@ -116,6 +119,7 @@ from instantlensdoc.core.app_settings import (
     set_pdf_two_page_spread,
     set_page_number_overlay_font_size,
     set_page_number_overlay_opacity,
+    set_page_number_overlay_position,
     set_show_page_number_overlay,
     set_restore_session_on_start,
     set_merge_diff_max_side,
@@ -254,6 +258,13 @@ class SettingsDialog(QDialog):
         self.tab_width.setCurrentIndex(tab_idx)
         self.tab_width.setToolTip("Tabulatorbreite im Texteditor (2 / 4 / 8 Zeichen)")
         form.addRow("Editor Tab-Breite", self.tab_width)
+
+        self.soft_tabs = QCheckBox("Soft-Tabs (Tab als Leerzeichen)")
+        self.soft_tabs.setChecked(get_editor_soft_tabs())
+        self.soft_tabs.setToolTip(
+            "An: Tab/Einrücken mit Leerzeichen (Tab-Breite); Aus: echte Tabulatorzeichen"
+        )
+        form.addRow(self.soft_tabs)
 
         from instantlensdoc.core.app_settings import get_editor_show_special_chars
 
@@ -404,6 +415,17 @@ class SettingsDialog(QDialog):
             "Schriftgröße des Seitennummer-Overlays (Standard 11 pt)"
         )
         form.addRow("Seitennummer-Overlay Schriftgröße", self.page_num_font)
+
+        self.page_num_pos = QComboBox()
+        self.page_num_pos.addItem("Unten mitte", "bottom-center")
+        self.page_num_pos.addItem("Oben mitte", "top-center")
+        cur_pos = get_page_number_overlay_position()
+        pos_idx = 1 if cur_pos == "top-center" else 0
+        self.page_num_pos.setCurrentIndex(pos_idx)
+        self.page_num_pos.setToolTip(
+            "Position des Seitennummer-Overlays: unten-mitte oder oben-mitte"
+        )
+        form.addRow("Seitennummer-Overlay Position", self.page_num_pos)
 
         self.doc_split_orient = QComboBox()
         self.doc_split_orient.addItem("Horizontal (nebeneinander)", False)
@@ -752,6 +774,7 @@ class SettingsDialog(QDialog):
         set_editor_minimap(self.minimap.isChecked())
         set_editor_soft_wrap(self.soft_wrap.isChecked())
         set_editor_tab_width(int(self.tab_width.currentData() or 4))
+        set_editor_soft_tabs(self.soft_tabs.isChecked())
         set_editor_show_special_chars(self.special_chars.isChecked())
         set_editor_text_encoding(str(self.enc_combo.currentData() or "auto"))
         set_skip_splash(self.skip_splash.isChecked())
@@ -774,6 +797,9 @@ class SettingsDialog(QDialog):
         set_show_page_number_overlay(self.page_num_overlay.isChecked())
         set_page_number_overlay_opacity(float(self.page_num_opacity.value()))
         set_page_number_overlay_font_size(int(self.page_num_font.value()))
+        set_page_number_overlay_position(
+            str(self.page_num_pos.currentData() or "bottom-center")
+        )
         set_editor_doc_split_vertical(bool(self.doc_split_orient.currentData()))
         set_tag_rename_confirm_threshold(int(self.tag_rename_confirm.value()))
         set_sidecar_save_debounce_ms(int(self.sidecar_debounce.value()))
@@ -845,6 +871,8 @@ class SettingsDialog(QDialog):
                     parent.editor.set_soft_wrap(self.soft_wrap.isChecked())
                 if hasattr(parent.editor, "set_tab_width"):
                     parent.editor.set_tab_width(int(self.tab_width.currentData() or 4))
+                if hasattr(parent.editor, "set_soft_tabs"):
+                    parent.editor.set_soft_tabs(self.soft_tabs.isChecked())
                 if hasattr(parent.editor, "set_special_chars_visible"):
                     parent.editor.set_special_chars_visible(self.special_chars.isChecked())
             except Exception:
@@ -885,6 +913,10 @@ class SettingsDialog(QDialog):
                 if hasattr(parent.pdf_view, "set_page_number_overlay_font_size"):
                     parent.pdf_view.set_page_number_overlay_font_size(
                         int(self.page_num_font.value())
+                    )
+                if hasattr(parent.pdf_view, "set_page_number_overlay_position"):
+                    parent.pdf_view.set_page_number_overlay_position(
+                        str(self.page_num_pos.currentData() or "bottom-center")
                     )
             except Exception:
                 pass

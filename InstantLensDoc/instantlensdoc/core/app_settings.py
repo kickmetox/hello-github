@@ -56,6 +56,7 @@ DEFAULTS: dict[str, Any] = {
     "selection_note_with_highlight": False,
     "editor_soft_wrap": True,
     "editor_tab_width": 4,
+    "editor_soft_tabs": True,
     "editor_show_special_chars": False,
     "annotations_visible": True,
     "minimize_to_tray": False,
@@ -76,6 +77,7 @@ DEFAULTS: dict[str, Any] = {
     "show_page_number_overlay": False,
     "page_number_overlay_opacity": 0.59,
     "page_number_overlay_font_size": 11,
+    "page_number_overlay_position": "bottom-center",
     "show_printer_marks": False,
     "annotations_locked": False,
     "editor_snippets": [
@@ -967,6 +969,24 @@ def set_page_number_overlay_font_size(size: int) -> None:
     save_settings({"page_number_overlay_font_size": max(8, min(36, sz))})
 
 
+def get_page_number_overlay_position() -> str:
+    """Position des Seitennummer-Overlays: bottom-center | top-center."""
+    raw = str(load_settings().get("page_number_overlay_position", "bottom-center") or "")
+    key = raw.strip().lower().replace("_", "-")
+    if key in ("top-center", "top", "oben", "oben-mitte"):
+        return "top-center"
+    return "bottom-center"
+
+
+def set_page_number_overlay_position(position: str) -> None:
+    raw = str(position or "bottom-center").strip().lower().replace("_", "-")
+    if raw in ("top-center", "top", "oben", "oben-mitte"):
+        key = "top-center"
+    else:
+        key = "bottom-center"
+    save_settings({"page_number_overlay_position": key})
+
+
 def get_editor_tab_width() -> int:
     """Editor-Tab-Breite in Zeichen (2 / 4 / 8)."""
     try:
@@ -986,6 +1006,15 @@ def set_editor_tab_width(width: int) -> None:
     if w not in (2, 4, 8):
         w = 4
     save_settings({"editor_tab_width": w})
+
+
+def get_editor_soft_tabs() -> bool:
+    """True = Tab als Leerzeichen (Soft-Tabs); False = echte Tabulatorzeichen."""
+    return bool(load_settings().get("editor_soft_tabs", True))
+
+
+def set_editor_soft_tabs(enabled: bool) -> None:
+    save_settings({"editor_soft_tabs": bool(enabled)})
 
 
 def get_show_printer_marks() -> bool:

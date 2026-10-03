@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **0.8.5** |
+| Version | **0.8.6** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -38,10 +38,10 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Installer-Task: optionale **Desktop-Verknüpfung** (Checkbox, Standard an / `checkedonce`)
 
-## Neu in 0.8.5
+## Neu in 0.8.6
 
-- Annotation-**Ausrichten** oben/mittig/unten + **vertikal verteilen** (Toolbar/Menü)
-- Thumbnail-**Seite duplizieren** mit Undo (Ctrl+Z)
-- **Seitennummer-Overlay Schriftgröße** in Einstellungen
-- Editor-**Tab-Breite** 2 / 4 / 8 in Einstellungen
+- Annotation-**Gruppieren/Entgruppieren** (temporäre `group_id` im Sidecar)
+- Thumbnail-**Mehrfachauswahl** Shift+Klick + Batch-Löschen/Duplizieren
+- **Seitennummer-Overlay Position** unten-mitte / oben-mitte
+- Editor-**Soft-Tabs** vs. echte Tabs (Einstellungen)
 - Stubs KI/Cloud/Stylus/3D unverändert

@@ -8,6 +8,7 @@ from PySide6.QtCore import QStringListModel, Qt, Signal
 from PySide6.QtGui import QBrush, QColor, QIcon, QImage, QPixmap
 from PySide6.QtWidgets import (
     QAbstractItemView,
+    QApplication,
     QCheckBox,
     QComboBox,
     QCompleter,
@@ -109,14 +110,15 @@ class ThumbnailList(QListWidget):
         self.setIconSize(QPixmap(w, h).size())
         self.setResizeMode(QListWidget.Adjust)
         self.setMovement(QListWidget.Snap)
+        self.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self.setDragDropMode(QAbstractItemView.InternalMove)
         self.setDefaultDropAction(Qt.MoveAction)
         self.setSpacing(4)
         self.setMaximumHeight(200)
         self.setMinimumHeight(100)
         self.setToolTip(
-            "Ziehen zum Neuordnen der PDF-Seiten (Rückgängig: Ctrl+Z); "
-            "Rechtsklick → 90° drehen"
+            "Klick → Seite; Shift+Klick Mehrfachauswahl; "
+            "Ziehen zum Neuordnen (Ctrl+Z); Rechtsklick → Drehen/Duplizieren/Löschen"
         )
         self._reorder_enabled = True
 
@@ -325,6 +327,8 @@ class Sidebar(QWidget):
     page_rotate_requested = Signal(int, int)  # page_index 0-basiert, degrees (±90)
     page_duplicate_requested = Signal(int)  # page_index 0-basiert (Duplikat + Undo)
     page_delete_requested = Signal(int)  # page_index 0-basiert (Bestätigung im Handler)
+    pages_batch_duplicate_requested = Signal(list)  # Mehrfachauswahl duplizieren
+    pages_batch_delete_requested = Signal(list)  # Mehrfachauswahl löschen
     search_export_requested = Signal(str)  # "csv" | "json"
 
     def __init__(self, parent=None):
@@ -437,7 +441,8 @@ class Sidebar(QWidget):
         self.thumbs.setContextMenuPolicy(Qt.CustomContextMenu)
         self.thumbs.customContextMenuRequested.connect(self._thumbs_context_menu)
         self.thumbs.setToolTip(
-            "Ziehen zum Neuordnen; Rechtsklick → 90° drehen (Ctrl+Z rückgängig)"
+            "Klick → Seite; Shift+Klick Mehrfachauswahl; "
+            "Ziehen zum Neuordnen (Ctrl+Z); Rechtsklick → Drehen/Duplizieren/Löschen"
         )
         layout.addWidget(self.thumbs)
 
@@ -893,10 +898,23 @@ class Sidebar(QWidget):
     def clear_line_favorites(self):
         self.set_line_favorites([])
 
+    def selected_thumb_pages(self) -> list[int]:
+        """0-basierte Seitenindizes der Thumbnail-Mehrfachauswahl (sortiert)."""
+        pages: list[int] = []
+        for item in self.thumbs.selectedItems():
+            page = item.data(Qt.UserRole)
+            if page is not None:
+                pages.append(int(page))
+        return sorted(set(pages))
+
     def _activate_thumb(self, item: QListWidgetItem):
         page = item.data(Qt.UserRole)
-        if page is not None:
-            self.page_thumb_activated.emit(int(page))
+        if page is None:
+            return
+        # Shift+Klick: ExtendedSelection pflegt die Mehrfachauswahl — kein Jump
+        if QApplication.keyboardModifiers() & Qt.ShiftModifier:
+            return
+        self.page_thumb_activated.emit(int(page))
 
     def _thumbs_context_menu(self, pos):
         item = self.thumbs.itemAt(pos)
@@ -906,21 +924,36 @@ class Sidebar(QWidget):
         if page is None:
             return
         idx = int(page)
+        selected = self.selected_thumb_pages()
+        if idx not in selected:
+            selected = [idx]
+            self.thumbs.setCurrentItem(item)
+        multi = len(selected) > 1
         menu = QMenu(self)
         act_r = menu.addAction("Drehen 90° rechts ⟳")
         act_l = menu.addAction("Drehen 90° links ⟲")
         menu.addSeparator()
-        act_dup = menu.addAction("Seite duplizieren")
-        act_del = menu.addAction("Seite löschen…")
+        if multi:
+            act_dup = menu.addAction(f"{len(selected)} Seiten duplizieren")
+            act_del = menu.addAction(f"{len(selected)} Seiten löschen…")
+        else:
+            act_dup = menu.addAction("Seite duplizieren")
+            act_del = menu.addAction("Seite löschen…")
         chosen = menu.exec(self.thumbs.mapToGlobal(pos))
         if chosen is act_r:
             self.page_rotate_requested.emit(idx, 90)
         elif chosen is act_l:
             self.page_rotate_requested.emit(idx, -90)
         elif chosen is act_dup:
-            self.page_duplicate_requested.emit(idx)
+            if multi:
+                self.pages_batch_duplicate_requested.emit(list(selected))
+            else:
+                self.page_duplicate_requested.emit(idx)
         elif chosen is act_del:
-            self.page_delete_requested.emit(idx)
+            if multi:
+                self.pages_batch_delete_requested.emit(list(selected))
+            else:
+                self.page_delete_requested.emit(idx)
 
     def set_recent(
         self,
