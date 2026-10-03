@@ -57,6 +57,7 @@ from instantlensdoc.core.app_settings import (
     get_editor_soft_tabs,
     get_editor_tab_width,
     get_page_number_overlay_font_size,
+    get_page_number_overlay_format,
     get_page_number_overlay_opacity,
     get_page_number_overlay_position,
     get_show_page_number_overlay,
@@ -118,6 +119,7 @@ from instantlensdoc.core.app_settings import (
     set_pdf_thumbnail_scale,
     set_pdf_two_page_spread,
     set_page_number_overlay_font_size,
+    set_page_number_overlay_format,
     set_page_number_overlay_opacity,
     set_page_number_overlay_position,
     set_show_page_number_overlay,
@@ -426,6 +428,16 @@ class SettingsDialog(QDialog):
             "Position des Seitennummer-Overlays: unten-mitte oder oben-mitte"
         )
         form.addRow("Seitennummer-Overlay Position", self.page_num_pos)
+
+        self.page_num_format = QLineEdit()
+        self.page_num_format.setText(get_page_number_overlay_format())
+        self.page_num_format.setMaxLength(80)
+        self.page_num_format.setPlaceholderText("{page} / {pages}")
+        self.page_num_format.setToolTip(
+            "Format-String für das Seitennummer-Overlay. "
+            "Platzhalter: {page}, {pages} (Aliase {n}, {total}; optional {label})"
+        )
+        form.addRow("Seitennummer-Overlay Format", self.page_num_format)
 
         self.doc_split_orient = QComboBox()
         self.doc_split_orient.addItem("Horizontal (nebeneinander)", False)
@@ -800,6 +812,7 @@ class SettingsDialog(QDialog):
         set_page_number_overlay_position(
             str(self.page_num_pos.currentData() or "bottom-center")
         )
+        set_page_number_overlay_format(self.page_num_format.text().strip())
         set_editor_doc_split_vertical(bool(self.doc_split_orient.currentData()))
         set_tag_rename_confirm_threshold(int(self.tag_rename_confirm.value()))
         set_sidecar_save_debounce_ms(int(self.sidecar_debounce.value()))
@@ -917,6 +930,10 @@ class SettingsDialog(QDialog):
                 if hasattr(parent.pdf_view, "set_page_number_overlay_position"):
                     parent.pdf_view.set_page_number_overlay_position(
                         str(self.page_num_pos.currentData() or "bottom-center")
+                    )
+                if hasattr(parent.pdf_view, "set_page_number_overlay_format"):
+                    parent.pdf_view.set_page_number_overlay_format(
+                        self.page_num_format.text().strip()
                     )
             except Exception:
                 pass

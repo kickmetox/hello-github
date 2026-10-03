@@ -329,6 +329,7 @@ class Sidebar(QWidget):
     page_delete_requested = Signal(int)  # page_index 0-basiert (Bestätigung im Handler)
     pages_batch_duplicate_requested = Signal(list)  # Mehrfachauswahl duplizieren
     pages_batch_delete_requested = Signal(list)  # Mehrfachauswahl löschen
+    pages_batch_rotate_requested = Signal(list, int)  # Mehrfachauswahl drehen (±90)
     search_export_requested = Signal(str)  # "csv" | "json"
 
     def __init__(self, parent=None):
@@ -930,8 +931,12 @@ class Sidebar(QWidget):
             self.thumbs.setCurrentItem(item)
         multi = len(selected) > 1
         menu = QMenu(self)
-        act_r = menu.addAction("Drehen 90° rechts ⟳")
-        act_l = menu.addAction("Drehen 90° links ⟲")
+        if multi:
+            act_r = menu.addAction(f"{len(selected)} Seiten 90° rechts ⟳")
+            act_l = menu.addAction(f"{len(selected)} Seiten 90° links ⟲")
+        else:
+            act_r = menu.addAction("Drehen 90° rechts ⟳")
+            act_l = menu.addAction("Drehen 90° links ⟲")
         menu.addSeparator()
         if multi:
             act_dup = menu.addAction(f"{len(selected)} Seiten duplizieren")
@@ -941,9 +946,15 @@ class Sidebar(QWidget):
             act_del = menu.addAction("Seite löschen…")
         chosen = menu.exec(self.thumbs.mapToGlobal(pos))
         if chosen is act_r:
-            self.page_rotate_requested.emit(idx, 90)
+            if multi:
+                self.pages_batch_rotate_requested.emit(list(selected), 90)
+            else:
+                self.page_rotate_requested.emit(idx, 90)
         elif chosen is act_l:
-            self.page_rotate_requested.emit(idx, -90)
+            if multi:
+                self.pages_batch_rotate_requested.emit(list(selected), -90)
+            else:
+                self.page_rotate_requested.emit(idx, -90)
         elif chosen is act_dup:
             if multi:
                 self.pages_batch_duplicate_requested.emit(list(selected))

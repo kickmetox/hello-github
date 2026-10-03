@@ -1437,13 +1437,33 @@ class TextEditor(QPlainTextEdit):
         self.setTextCursor(new_cur)
         return True
 
+    def selection_spans_multiple_lines(self) -> bool:
+        """True wenn die Auswahl mindestens zwei Zeilen umfasst."""
+        cur = self.textCursor()
+        if not cur.hasSelection():
+            return False
+        doc = self.document()
+        start = cur.selectionStart()
+        end = cur.selectionEnd()
+        # Endposition vor dem Anchor am Zeilenanfang zählen nicht als eigene Zeile
+        end_pos = end - 1 if end > start else start
+        return doc.findBlock(start).blockNumber() != doc.findBlock(end_pos).blockNumber()
+
+    def insert_indent_at_cursor(self) -> bool:
+        """Soft-Tab oder echtes Tab an der Cursorposition einfügen."""
+        pad = self._indent_pad(int(self._tab_width))
+        self.insertPlainText(pad)
+        return True
+
     def keyPressEvent(self, event):  # noqa: N802
-        # Block ein-/ausrücken: Tab / Shift+Tab (aktuelle Zeile oder Auswahl)
+        # Auswahl (ein-/mehrzeilig): Tab/Shift+Tab ein-/ausrücken; ohne Auswahl Tab einfügen
         if event.key() == Qt.Key_Tab and not (event.modifiers() & Qt.ControlModifier):
             if event.modifiers() & Qt.ShiftModifier:
                 self.outdent_selection()
-            else:
+            elif self.textCursor().hasSelection():
                 self.indent_selection()
+            else:
+                self.insert_indent_at_cursor()
             return
         if event.key() == Qt.Key_Backtab:
             self.outdent_selection()

@@ -254,6 +254,7 @@ class Annotation:
     rotation: float = 0.0  # Stempel-Drehung in Grad (0/90/180/270)
     tags: List[str] = field(default_factory=list)  # freie Labels, filterbar
     group_id: str = ""  # temporäre Gruppen-ID (Sidecar; leer = ungruppiert)
+    locked: bool = False  # Gruppen-/Ann.-Sperre: nicht verschiebbar
     id: str = field(default_factory=lambda: uuid4().hex)
     created: str = field(
         default_factory=lambda: datetime.now(timezone.utc).isoformat(timespec="seconds")
@@ -410,6 +411,7 @@ class Annotation:
             data["group_id"] = ""
         else:
             data["group_id"] = str(gid).strip()
+        data["locked"] = bool(data.get("locked", False))
         data.setdefault("created", datetime.now(timezone.utc).isoformat(timespec="seconds"))
         data.setdefault("modified", data["created"])
         known = {f.name for f in cls.__dataclass_fields__.values()}  # type: ignore[attr-defined]
@@ -625,7 +627,11 @@ class AnnotationStore:
         ids = {str(i) for i in ann_ids if i}
         if not ids or (abs(float(dx)) < 1e-9 and abs(float(dy)) < 1e-9):
             return 0
-        targets = [a for a in self.annotations if a.id in ids]
+        targets = [
+            a
+            for a in self.annotations
+            if a.id in ids and not bool(getattr(a, "locked", False))
+        ]
         if not targets:
             return 0
         self._push_undo()
@@ -850,6 +856,75 @@ class AnnotationStore:
             a.touch()
         self.dirty = True
         return len(targets)
+
+    def ids_in_group(self, group_id: str) -> list[str]:
+        """Alle Annotation-IDs mit der gegebenen group_id (Reihenfolge wie im Store)."""
+        gid = str(group_id or "").strip()
+        if not gid:
+            return []
+        return [
+            a.id
+            for a in self.annotations
+            if str(getattr(a, "group_id", "") or "").strip() == gid
+        ]
+
+    def expand_group_ids(self, ann_ids: Sequence[str]) -> list[str]:
+        """Auswahl um alle Gruppenmitglieder erweitern (ohne Duplikate)."""
+        out: list[str] = []
+        seen: set[str] = set()
+        for raw in ann_ids or []:
+            aid = str(raw or "").strip()
+            if not aid or aid in seen:
+                continue
+            ann = self.get(aid)
+            gid = str(getattr(ann, "group_id", "") or "").strip() if ann else ""
+            if gid:
+                for mid in self.ids_in_group(gid):
+                    if mid not in seen:
+                        seen.add(mid)
+                        out.append(mid)
+            else:
+                seen.add(aid)
+                out.append(aid)
+        return out
+
+    def set_locked(self, ann_ids: Sequence[str], locked: bool) -> int:
+        """locked-Flag für Auswahl setzen. Eine Undo-Stufe. Rückgabe: Anzahl."""
+        ids = {str(i) for i in ann_ids if i}
+        if not ids:
+            return 0
+        flag = bool(locked)
+        targets = [
+            a
+            for a in self.annotations
+            if a.id in ids and bool(getattr(a, "locked", False)) != flag
+        ]
+        if not targets:
+            return 0
+        self._push_undo()
+        for a in targets:
+            a.locked = flag
+            a.touch()
+        self.dirty = True
+        return len(targets)
+
+    def toggle_group_lock(self, ann_ids: Sequence[str]) -> tuple[int, bool]:
+        """
+        Gruppen-Sperre umschalten: alle Mitglieder der Gruppen in der Auswahl.
+        Ohne group_id: locked nur für die genannten IDs.
+        Rückgabe: (Anzahl, neuer locked-Zustand).
+        """
+        expanded = self.expand_group_ids(ann_ids)
+        if not expanded:
+            return 0, False
+        anns = [self.get(i) for i in expanded]
+        anns = [a for a in anns if a is not None]
+        if not anns:
+            return 0, False
+        # Wenn mind. eine entsperrt → alle sperren; sonst alle entsperren
+        new_locked = not all(bool(getattr(a, "locked", False)) for a in anns)
+        n = self.set_locked(expanded, new_locked)
+        return n, new_locked
 
     @staticmethod
     def _normalize_opacity(value: object) -> float:

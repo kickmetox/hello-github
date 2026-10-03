@@ -78,6 +78,7 @@ DEFAULTS: dict[str, Any] = {
     "page_number_overlay_opacity": 0.59,
     "page_number_overlay_font_size": 11,
     "page_number_overlay_position": "bottom-center",
+    "page_number_overlay_format": "{page} / {pages}",
     "show_printer_marks": False,
     "annotations_locked": False,
     "editor_snippets": [
@@ -985,6 +986,21 @@ def set_page_number_overlay_position(position: str) -> None:
     else:
         key = "bottom-center"
     save_settings({"page_number_overlay_position": key})
+
+
+def get_page_number_overlay_format() -> str:
+    """Format-String für Seitennummer-Overlay; Platzhalter {page}/{pages} bzw. {n}/{total}."""
+    raw = str(
+        load_settings().get("page_number_overlay_format", "{page} / {pages}") or ""
+    ).strip()
+    return raw or "{page} / {pages}"
+
+
+def set_page_number_overlay_format(fmt: str) -> None:
+    text = str(fmt or "").strip() or "{page} / {pages}"
+    if len(text) > 80:
+        text = text[:80]
+    save_settings({"page_number_overlay_format": text})
 
 
 def get_editor_tab_width() -> int:

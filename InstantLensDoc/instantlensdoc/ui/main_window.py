@@ -411,6 +411,7 @@ class MainWindow(QMainWindow):
         self.sidebar.page_delete_requested.connect(self._on_thumb_delete)
         self.sidebar.pages_batch_duplicate_requested.connect(self._on_thumbs_batch_duplicate)
         self.sidebar.pages_batch_delete_requested.connect(self._on_thumbs_batch_delete)
+        self.sidebar.pages_batch_rotate_requested.connect(self._on_thumbs_batch_rotate)
         splitter.addWidget(self.sidebar)
 
         self.stack = QStackedWidget()
@@ -996,6 +997,14 @@ class MainWindow(QMainWindow):
         )
         act_ungroup.triggered.connect(self._ungroup_selected_annotations)
         m_align.addAction(act_ungroup)
+        act_group_lock = QAction("Gruppen-Sperre umschalten", self)
+        act_group_lock.setShortcut(QKeySequence("Ctrl+Alt+Shift+L"))
+        act_group_lock.setToolTip(
+            "Gruppenmitglieder der Auswahl sperren/entsperren (nicht verschiebbar) "
+            "— Ctrl+Alt+Shift+L"
+        )
+        act_group_lock.triggered.connect(self._toggle_selected_group_lock)
+        m_align.addAction(act_group_lock)
         act_dup_ann = QAction("Annotation duplizieren", self)
         act_dup_ann.setShortcut(QKeySequence("Ctrl+Shift+D"))
         act_dup_ann.setToolTip(
@@ -2360,6 +2369,14 @@ class MainWindow(QMainWindow):
             self._set_status("Entgruppieren nur im PDF-Modus")
             return
         n = self.pdf_view.ungroup_selected_annotations()
+        if n:
+            self._refresh_pdf_marks()
+
+    def _toggle_selected_group_lock(self):
+        if self.stack.currentWidget() is not self.pdf_view or not self.pdf_view.pdf_path:
+            self._set_status("Gruppen-Sperre nur im PDF-Modus")
+            return
+        n = self.pdf_view.toggle_selected_group_lock()
         if n:
             self._refresh_pdf_marks()
 
@@ -4463,6 +4480,17 @@ class MainWindow(QMainWindow):
             return
         idxs = [int(p) for p in (pages or [])]
         if self.pdf_view.delete_many(idxs, confirm=True):
+            self._refresh_thumbs()
+            self._update_doc_status()
+
+    def _on_thumbs_batch_rotate(self, pages: list, degrees: int):
+        """Thumbnail-Mehrfachauswahl: Seiten batch-drehen (±90, Undo Ctrl+Z)."""
+        if self.stack.currentWidget() is not self.pdf_view:
+            self.stack.setCurrentWidget(self.pdf_view)
+        if not self.pdf_view.pdf_path:
+            return
+        idxs = [int(p) for p in (pages or [])]
+        if self.pdf_view.rotate_many(idxs, int(degrees)):
             self._refresh_thumbs()
             self._update_doc_status()
 

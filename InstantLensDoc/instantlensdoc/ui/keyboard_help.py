@@ -71,14 +71,16 @@ SHORTCUTS_HTML = """
 <tr><td>Thumbnail-Reorder Undo</td><td>Seiten ziehen; <code>Ctrl+Z</code> rückgängig — 0.8.2</td></tr>
 <tr><td>Thumbnail Drehen 90°</td><td>Rechtsklick L/R; <code>Ctrl+Z</code> Undo — 0.8.3</td></tr>
 <tr><td>Thumbnail Seite duplizieren</td><td>Rechtsklick → Duplizieren; <code>Ctrl+Z</code> Undo — 0.8.5</td></tr>
-<tr><td>Thumbnail Mehrfachauswahl</td><td><code>Shift</code>+Klick; Batch-Duplizieren/Löschen — 0.8.6</td></tr>
+<tr><td>Thumbnail Mehrfachauswahl</td><td><code>Shift</code>+Klick; Batch-Duplizieren/Löschen — 0.8.6; Batch-Drehen L/R — 0.8.7</td></tr>
 <tr><td>Thumbnail Seite löschen</td><td>Rechtsklick → Löschen…; Bestätigung; <code>Ctrl+Z</code> Undo — 0.8.4</td></tr>
 <tr><td>Annotation Mehrfachauswahl</td><td><code>Shift</code>+Klick; gemeinsame Verschiebung — 0.8.3</td></tr>
 <tr><td>Auswahl ausrichten / verteilen</td><td>L/C/R + oben/mittig/unten (≥2); H/V verteilen (≥3) — Toolbar/Menü — 0.8.4/0.8.5</td></tr>
 <tr><td>Auswahl Gruppieren / Entgruppieren</td><td>temporäre <code>group_id</code> Sidecar; Toolbar/Menü — 0.8.6</td></tr>
-<tr><td>Seitennummer-Overlay</td><td>Ansicht / Einstellungen / Toolbar „Nr.“ — 0.8.3; Deckkraft — 0.8.4; Schriftgröße — 0.8.5; Position unten-/oben-mitte — 0.8.6</td></tr>
+<tr><td>Gruppen-Auswahl / Sperre</td><td>Klick → alle Mitglieder; Gruppen-Sperre Toolbar/Menü <code>Ctrl+Alt+Shift+L</code> — 0.8.7</td></tr>
+<tr><td>Seitennummer-Overlay</td><td>Ansicht / Einstellungen / Toolbar „Nr.“ — 0.8.3; Deckkraft — 0.8.4; Schriftgröße — 0.8.5; Position unten-/oben-mitte — 0.8.6; Format <code>{page}</code>/<code>{pages}</code> — 0.8.7</td></tr>
 <tr><td>Editor Tab-Breite</td><td>Einstellungen: 2 / 4 / 8 Zeichen — 0.8.5</td></tr>
 <tr><td>Editor Soft-Tabs</td><td>Einstellungen: Soft-Tabs (Leerzeichen) vs. echte Tabs — 0.8.6</td></tr>
+<tr><td>Editor Mehrzeilen-Indent</td><td><code>Tab</code>/<code>Shift+Tab</code> bei Mehrzeilen-Auswahl; sonst Tab einfügen — 0.8.7</td></tr>
 <tr><td>Zeilennummern Toggle</td><td>Ansicht ↔ Settings, persistiert — 0.8.3</td></tr>
 <tr><td>Wortumbruch Toggle</td><td>Ansicht ↔ Settings, persistiert (<code>Ctrl+Shift+W</code>) — 0.8.4</td></tr>
 <tr><td>Fit-Width / Fit-Page</td><td><code>Ctrl+9</code> / <code>Ctrl+0</code>; Standard-Zoom-Modus — 0.8.2</td></tr>
