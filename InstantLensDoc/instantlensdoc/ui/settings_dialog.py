@@ -913,7 +913,7 @@ class SettingsDialog(QDialog):
             f"Template auf Default zurücksetzen "
             f"({DEFAULT_ANN_EXPORT_FILENAME_TEMPLATE}); "
             "Bestätigung nur wenn Feld vom Default abweicht; "
-            "danach Live-Vorschau sofort + Fokus zurück ins Feld — 1.2.8"
+            "danach Live-Vorschau + Fokus mit Selektion des Default-Texts — 1.2.9"
         )
         self.btn_reset_ann_tpl.clicked.connect(self._reset_ann_export_template)
         tpl_row.addWidget(self.btn_reset_ann_tpl)
@@ -962,7 +962,7 @@ class SettingsDialog(QDialog):
         self.text_diff_wrap_around.setChecked(get_text_diff_wrap_around())
         self.text_diff_wrap_around.setToolTip(
             "Bei Nächste/Vorherige Änderung (F7/Shift+F7) am Ende "
-            "wieder von vorn / vom Ende; bei Wrap Blink (Dauer/Sound unten) — 1.2.8"
+            "wieder von vorn / vom Ende; bei Wrap Blink (Dauer/Sound unten) — 1.2.9"
         )
         form.addRow(self.text_diff_wrap_around)
         self.text_diff_wrap_blink = QComboBox()
@@ -975,13 +975,14 @@ class SettingsDialog(QDialog):
         self.text_diff_wrap_blink.setCurrentIndex(wrap_blink_pick)
         self.text_diff_wrap_blink.setToolTip(
             "Dauer des Status-Blinks bei Wrap-around Anfang↔Ende "
-            "(kurz ≈350 ms, mittel ≈700 ms) — 1.2.8"
+            "(kurz ≈350 ms, mittel ≈700 ms, lang ≈1200 ms) — 1.2.9"
         )
         form.addRow("Wrap-Blink Dauer", self.text_diff_wrap_blink)
-        self.text_diff_wrap_blink_sound = QCheckBox("Wrap-Blink Sound")
+        self.text_diff_wrap_blink_sound = QCheckBox("Wrap-Blink System-Beep")
         self.text_diff_wrap_blink_sound.setChecked(get_text_diff_wrap_blink_sound())
         self.text_diff_wrap_blink_sound.setToolTip(
-            "Akustisches Feedback (Beep) bei Wrap-Blink; abschaltbar — 1.2.8"
+            "Akustisches Feedback: System-Beep bei Wrap-Blink; "
+            "aus = stumm — 1.2.9"
         )
         form.addRow(self.text_diff_wrap_blink_sound)
 
@@ -1084,8 +1085,20 @@ class SettingsDialog(QDialog):
             edit._saved_sel_len = 0
         self._update_ann_export_preview()
 
+    def _focus_ann_export_tpl_select_all(self) -> None:
+        """Fokus + Selektion ganzer Default-Text zum schnellen Überschreiben — 1.2.9."""
+        if not hasattr(self, "ann_export_tpl"):
+            return
+        edit = self.ann_export_tpl
+        edit.setFocus()
+        edit.selectAll()
+        if isinstance(edit, AnnExportTemplateEdit):
+            edit._saved_cursor = 0
+            edit._saved_sel_start = 0
+            edit._saved_sel_len = len(edit.text() or "")
+
     def _reset_ann_export_template(self) -> None:
-        """Template auf Default; Live-Vorschau sofort + Fokus zurück ins Feld — 1.2.8."""
+        """Template auf Default; Live-Vorschau + Fokus mit Selektion — 1.2.9."""
         from instantlensdoc.core.app_settings import DEFAULT_ANN_EXPORT_FILENAME_TEMPLATE
 
         if not hasattr(self, "ann_export_tpl"):
@@ -1094,9 +1107,9 @@ class SettingsDialog(QDialog):
         default = DEFAULT_ANN_EXPORT_FILENAME_TEMPLATE
         current = edit.text() or ""
         if current == default:
-            # Bereits Default — keine Bestätigung; Vorschau + Fokus
+            # Bereits Default — keine Bestätigung; Vorschau + Fokus + Selektion
             self._update_ann_export_preview()
-            QTimer.singleShot(0, edit.setFocus)
+            QTimer.singleShot(0, self._focus_ann_export_tpl_select_all)
             return
         reply = QMessageBox.question(
             self,
@@ -1108,7 +1121,7 @@ class SettingsDialog(QDialog):
             QMessageBox.No,
         )
         if reply != QMessageBox.Yes:
-            QTimer.singleShot(0, edit.setFocus)
+            QTimer.singleShot(0, self._focus_ann_export_tpl_select_all)
             return
         # selectAll + insert → ein Undo-Schritt (Ctrl+Z stellt vorherigen Text wieder her)
         edit.selectAll()
@@ -1117,9 +1130,9 @@ class SettingsDialog(QDialog):
             edit._saved_cursor = edit.cursorPosition()
             edit._saved_sel_start = -1
             edit._saved_sel_len = 0
-        # Live-Vorschau sofort aktualisieren; Fokus zurück ins Feld — 1.2.8
+        # Live-Vorschau sofort; Fokus + Selektion ganzer Default-Text — 1.2.9
         self._update_ann_export_preview()
-        QTimer.singleShot(0, edit.setFocus)
+        QTimer.singleShot(0, self._focus_ann_export_tpl_select_all)
 
     def _update_ann_export_preview(self, *_args) -> None:
         """Live-Vorschau Ann.-Export-Dateiname; ungültige Platzhalter rot — 1.2.3."""

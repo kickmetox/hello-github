@@ -35,8 +35,8 @@ DEFAULTS: dict[str, Any] = {
     "text_diff_sync_scroll": True,  # Text-Diff Sync-Scroll Default — 1.2.4
     "text_diff_ignore_whitespace": False,  # Text-Diff Ignore-Whitespace — 1.2.4
     "text_diff_wrap_around": True,  # Text-Diff F7 Wrap-around — 1.2.6
-    "text_diff_wrap_blink_duration": "kurz",  # Wrap-Blink Dauer kurz|mittel — 1.2.8
-    "text_diff_wrap_blink_sound": True,  # Wrap-Blink Sound optional — 1.2.8
+    "text_diff_wrap_blink_duration": "kurz",  # Wrap-Blink Dauer kurz|mittel|lang — 1.2.9
+    "text_diff_wrap_blink_sound": True,  # Wrap-Blink System-Beep vs. stumm — 1.2.9
     "default_zoom_percent": 150,
     "default_zoom_mode": "percent",  # percent | fit_width | fit_page
     "autosave_interval_sec": 60,  # 15 | 30 | 60 | 120 — 0.9.7
@@ -516,19 +516,22 @@ def set_text_diff_wrap_around(enabled: bool) -> None:
 
 WRAP_BLINK_KURZ = "kurz"
 WRAP_BLINK_MITTEL = "mittel"
+WRAP_BLINK_LANG = "lang"
 WRAP_BLINK_DURATION_DEFAULT = WRAP_BLINK_KURZ
 WRAP_BLINK_DURATION_CHOICES = (
     (WRAP_BLINK_KURZ, "Kurz"),
     (WRAP_BLINK_MITTEL, "Mittel"),
+    (WRAP_BLINK_LANG, "Lang"),
 )
 WRAP_BLINK_MS = {
     WRAP_BLINK_KURZ: 350,
     WRAP_BLINK_MITTEL: 700,
+    WRAP_BLINK_LANG: 1200,
 }
 
 
 def get_text_diff_wrap_blink_duration() -> str:
-    """Wrap-Blink Dauer: kurz|mittel — 1.2.8."""
+    """Wrap-Blink Dauer: kurz|mittel|lang — 1.2.9."""
     raw = str(
         load_settings().get(
             "text_diff_wrap_blink_duration",
@@ -536,26 +539,33 @@ def get_text_diff_wrap_blink_duration() -> str:
         )
         or WRAP_BLINK_DURATION_DEFAULT
     ).strip().lower()
+    if raw in ("lang", "long", "lng"):
+        return WRAP_BLINK_LANG
     if raw in ("mittel", "medium", "med"):
         return WRAP_BLINK_MITTEL
     return WRAP_BLINK_KURZ
 
 
 def set_text_diff_wrap_blink_duration(mode: str) -> str:
-    """Persistenz Wrap-Blink Dauer — 1.2.8."""
+    """Persistenz Wrap-Blink Dauer — 1.2.9."""
     raw = str(mode or "").strip().lower()
-    val = WRAP_BLINK_MITTEL if raw in ("mittel", "medium", "med") else WRAP_BLINK_KURZ
+    if raw in ("lang", "long", "lng"):
+        val = WRAP_BLINK_LANG
+    elif raw in ("mittel", "medium", "med"):
+        val = WRAP_BLINK_MITTEL
+    else:
+        val = WRAP_BLINK_KURZ
     save_settings({"text_diff_wrap_blink_duration": val})
     return val
 
 
 def get_text_diff_wrap_blink_ms() -> int:
-    """Wrap-Blink Dauer in ms (350 kurz / 700 mittel) — 1.2.8."""
+    """Wrap-Blink Dauer in ms (350 kurz / 700 mittel / 1200 lang) — 1.2.9."""
     return int(WRAP_BLINK_MS.get(get_text_diff_wrap_blink_duration(), 350))
 
 
 def get_text_diff_wrap_blink_sound() -> bool:
-    """Wrap-Blink akustisch (beep) — 1.2.8."""
+    """Wrap-Blink System-Beep (True) vs. stumm (False) — 1.2.9."""
     return bool(
         load_settings().get(
             "text_diff_wrap_blink_sound",
@@ -565,7 +575,7 @@ def get_text_diff_wrap_blink_sound() -> bool:
 
 
 def set_text_diff_wrap_blink_sound(enabled: bool) -> None:
-    """Persistenz Wrap-Blink Sound — 1.2.8."""
+    """Persistenz Wrap-Blink Sound (System-Beep vs. stumm) — 1.2.9."""
     save_settings({"text_diff_wrap_blink_sound": bool(enabled)})
 
 

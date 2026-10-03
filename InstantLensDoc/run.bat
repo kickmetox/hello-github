@@ -3,7 +3,7 @@ setlocal EnableExtensions EnableDelayedExpansion
 chcp 65001 >nul
 cd /d "%~dp0"
 
-REM InstantLens Doc 1.2.8 — Start mit Python-/Abhängigkeitsprüfung (DE-Meldungen)
+REM InstantLens Doc 1.2.9 — Start mit Python-/Abhängigkeitsprüfung (DE-Meldungen)
 REM Optional: pip install -r requirements.txt per J/N — oder non-interactive mit --yes / -y
 REM Hilfe: run.bat --help / -h
 REM
@@ -14,7 +14,7 @@ REM Wenn %%ILD_PYTHON%% gesetzt ist und auf eine existierende Datei zeigt, wird 
 REM dieser Interpreter genutzt (vor .venv und PATH).
 REM Bei ungültigem/leerem ILD_PYTHON: Warnung (wenn gesetzt) + Fallback
 REM   py -3 → python → python3 (danach .venv falls vorhanden, sonst Fehler).
-REM Nach Auswahl: Konsolenzeile „gefunden: …“ mit gewählter Python-Binary — 1.2.8
+REM Nach Auswahl: „gefunden: …“ + kurz python --version — 1.2.9
 REM
 REM Exit-Codes:
 REM   0  OK (App beendet mit 0) bzw. --help angezeigt
@@ -66,7 +66,7 @@ if defined ILD_HELP (
   echo.
   echo Pruefungen:
   echo   - Python 3.10+ ^(ILD_PYTHON, sonst .venv, sonst py -3/python/python3^)
-  echo   - Nach Auswahl: „gefunden: …“ mit gewaehlter Binary
+  echo   - Nach Auswahl: „gefunden: …“ + kurz python --version
   echo   - Kern-Pakete: PySide6, pypdfium2, pikepdf, Pillow
   echo.
   echo Exit-Codes:
@@ -90,9 +90,9 @@ set "ILD_USED_VENV="
 set "ILD_USED_ENV="
 set "ILD_NEED_FALLBACK="
 
-REM 1.2.5–1.2.8: %%ILD_PYTHON%% Env-Override (höchste Priorität)
+REM 1.2.5–1.2.9: %%ILD_PYTHON%% Env-Override (höchste Priorität)
 REM Bei ungültig/leer: Fallback-Kette py -3 → python → python3 — 1.2.7
-REM Gewählte Binary: „gefunden: …“ — 1.2.8
+REM Gewählte Binary: „gefunden: …“ + --version — 1.2.9
 if defined ILD_PYTHON (
   if exist "%ILD_PYTHON%" (
     set "PYEXE=%ILD_PYTHON%"
@@ -171,8 +171,16 @@ if defined ILD_NEED_FALLBACK if defined PYEXE if not defined ILD_USED_VENV if ex
   echo.
 )
 
-REM 1.2.8: gewählte Python-Binary in Konsolenzeile ausgeben
-echo [InstantLens Doc] gefunden: %PYEXE%
+REM 1.2.9: gewählte Python-Binary + kurz --version ausgeben
+set "ILD_PYVER="
+for /f "delims=" %%V in ('%PYEXE% --version 2^>^&1') do (
+  if not defined ILD_PYVER set "ILD_PYVER=%%V"
+)
+if defined ILD_PYVER (
+  echo [InstantLens Doc] gefunden: %PYEXE%  ^(%ILD_PYVER%^)
+) else (
+  echo [InstantLens Doc] gefunden: %PYEXE%
+)
 
 echo [InstantLens Doc] Python-Pruefung …
 %PYEXE% -c "import sys; v=sys.version_info; raise SystemExit(0 if v.major==3 and v.minor>=10 else 1)" >nul 2>&1

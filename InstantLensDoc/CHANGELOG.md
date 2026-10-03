@@ -1,5 +1,27 @@
 # Changelog — InstantLens Doc
 
+## 1.2.9 — Split-Log Footer Filter übersprungen, Ann. Reset Selektion, Diff Wrap-Blink lang/Beep, run.bat --version
+
+Post-Release-Polish nach 1.2.8: **PDF-Split Log-Footer** ist **klickbar** und filtert die Liste auf **übersprungene** Einträge (Toggle); **Ann.-Export Reset-Template** setzt den **Fokus mit Selektion des ganzen Default-Texts** für schnelles Überschreiben; **Text-Diff Wrap-Blink** mit Dauer-Option **lang** und Sound klar als **System-Beep vs. stumm**; **`run.bat`** zeigt in der **gefunden**-Zeile kurz auch **`python --version`**. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### PDF
+- Split: Log-Footer **klickbar** → Filter Liste auf übersprungene Einträge (Toggle)
+
+### Annotationen
+- Export-Template: **Reset-Template** — Fokus + Selektion ganzer Default-Text
+
+### Editor
+- Text-Diff: Wrap-Blink Dauer **lang** (≈1200 ms); Sound **System-Beep vs. stumm**
+
+### Packaging / Start
+- **`run.bat`**: **gefunden**-Zeile inkl. kurz **`python --version`**; in `--help` dokumentiert
+
+### Packaging / Docs
+- Version **1.2.9** (App / `ild_pdf` / ISS / Smoke / Docs)
+- Smoke: Split-Log Footer Filter, Ann. Reset Selektion, Diff Wrap-Blink lang/Beep, run.bat --version (CLI + Qt)
+
+---
+
 ## 1.2.8 — Split-Log Status geöffnet/übersprungen, Ann. Reset Vorschau+Fokus, Diff Wrap-Blink Dauer/Sound, run.bat gefunden
 
 Post-Release-Polish nach 1.2.7: **PDF-Split „In Tabs öffnen“** meldet detailliert **geöffnet X, übersprungen Y** in **Statusleiste** und **Log-Footer**; **Ann.-Export Reset-Template** aktualisiert die **Live-Vorschau sofort** und setzt den **Fokus zurück ins Feld**; **Text-Diff Wrap-Blink** mit **Dauer Settings (kurz/mittel)** und optional **Sound aus**; **`run.bat`** gibt die gewählte Python-Binary als **`gefunden: …`** aus. Stubs KI/Cloud/Stylus/3D bleiben Stubs.

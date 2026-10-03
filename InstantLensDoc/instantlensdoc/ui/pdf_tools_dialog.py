@@ -371,7 +371,7 @@ class PdfToolsDialog(QDialog):
             "Mehrfachauswahl (Ctrl/Shift); Doppelklick öffnet Datei/Ordner; "
             "Kontextmenü: Pfad kopieren · In Tabs öffnen "
             "(fehlende überspringen + Statuszählung geöffnet X, übersprungen Y) · "
-            "Ordner der Auswahl — 1.2.8"
+            "Log-Footer klickbar → Filter übersprungene — 1.2.9"
         )
         self.split_log.path_activate.connect(self._split_open_log_path)
         self.split_log.open_selected_folders.connect(self._split_open_selected_folders)
@@ -379,12 +379,21 @@ class PdfToolsDialog(QDialog):
         self.split_log.copy_paths_requested.connect(self._split_copy_selected_paths)
         self.split_log.open_in_tabs_requested.connect(self._split_open_selected_in_tabs)
         form.addRow("Pfad-Log", self.split_log)
+        self._split_log_full_text = ""
+        self._split_skipped_paths: list[str] = []
+        self._split_filter_skipped = False
         self.split_log_footer = QLabel("geöffnet 0, übersprungen 0")
+        self.split_log_footer.setCursor(Qt.PointingHandCursor)
         self.split_log_footer.setToolTip(
-            "Statuszählung nach „In Tabs öffnen“: geöffnet X, übersprungen Y "
-            "(auch in der Statusleiste) — 1.2.8"
+            "Klick: Liste auf übersprungene Einträge filtern (Toggle). "
+            "Statuszählung geöffnet X, übersprungen Y — 1.2.9"
         )
-        self.split_log_footer.setStyleSheet("color: #555;")
+        self.split_log_footer.setStyleSheet(
+            "color: #555; text-decoration: underline;"
+        )
+        self.split_log_footer.mousePressEvent = (  # type: ignore[method-assign]
+            lambda event: self._split_footer_clicked(event)
+        )
         form.addRow("Log-Footer", self.split_log_footer)
         log_btns = QHBoxLayout()
         btn_copy_log = QPushButton("Log kopieren")
@@ -791,15 +800,86 @@ class PdfToolsDialog(QDialog):
             return
         lines = [f"[{i + 1}] {p}" for i, p in enumerate(paths)]
         header = f"Erzeugt: {len(paths)} Datei(en)"
-        self.split_log.setPlainText(header + ("\n" + "\n".join(lines) if lines else ""))
+        text = header + ("\n" + "\n".join(lines) if lines else "")
+        self._split_log_full_text = text
+        self._split_skipped_paths = []
+        self._split_filter_skipped = False
+        self.split_log.setPlainText(text)
         self._split_set_open_counts(0, 0)
 
-    def _split_set_open_counts(self, opened: int, skipped: int) -> str:
-        """Detaillierte Statuszählung geöffnet X, übersprungen Y — 1.2.8."""
+    def _split_set_open_counts(
+        self,
+        opened: int,
+        skipped: int,
+        skipped_paths: list[str] | None = None,
+    ) -> str:
+        """Detaillierte Statuszählung geöffnet X, übersprungen Y — 1.2.8/1.2.9."""
         detail = f"geöffnet {int(opened)}, übersprungen {int(skipped)}"
+        if skipped_paths is not None:
+            self._split_skipped_paths = list(skipped_paths)
         if hasattr(self, "split_log_footer"):
             self.split_log_footer.setText(detail)
+            self._split_update_footer_style()
         return detail
+
+    def _split_footer_clicked(self, event) -> None:
+        """Log-Footer-Klick: Filter übersprungene umschalten — 1.2.9."""
+        from PySide6.QtCore import Qt as _Qt
+
+        if event is not None and getattr(event, "button", lambda: _Qt.LeftButton)() != _Qt.LeftButton:
+            return
+        self._split_toggle_skipped_filter()
+
+    def _split_toggle_skipped_filter(self) -> None:
+        """Toggle: Pfad-Log nur übersprungene Einträge — 1.2.9."""
+        if not hasattr(self, "split_log"):
+            return
+        if not self._split_filter_skipped and not self._split_skipped_paths:
+            return
+        self._split_filter_skipped = not self._split_filter_skipped
+        self._split_apply_log_filter()
+
+    def _split_apply_log_filter(self) -> None:
+        """Volles Log oder nur übersprungene Pfade anzeigen — 1.2.9."""
+        if not hasattr(self, "split_log"):
+            return
+        full = self._split_log_full_text or self.split_log.toPlainText()
+        if not self._split_filter_skipped:
+            self.split_log.setPlainText(full)
+            self._split_update_footer_style()
+            return
+        skipped_set = set(self._split_skipped_paths or [])
+        lines: list[str] = []
+        for line in (full or "").splitlines():
+            p = self._split_path_from_line(line)
+            if p and p in skipped_set:
+                lines.append(line)
+        header = f"Filter: übersprungen ({len(lines)})"
+        self.split_log.setPlainText(
+            header + ("\n" + "\n".join(lines) if lines else "")
+        )
+        self._split_update_footer_style()
+
+    def _split_update_footer_style(self) -> None:
+        """Footer-Optik: Filter aktiv vs. inaktiv — 1.2.9."""
+        if not hasattr(self, "split_log_footer"):
+            return
+        if self._split_filter_skipped:
+            self.split_log_footer.setStyleSheet(
+                "color: #0d47a1; font-weight: bold; text-decoration: underline;"
+            )
+            self.split_log_footer.setToolTip(
+                "Filter aktiv: nur übersprungene Einträge. "
+                "Klick hebt den Filter auf — 1.2.9"
+            )
+        else:
+            self.split_log_footer.setStyleSheet(
+                "color: #555; text-decoration: underline;"
+            )
+            self.split_log_footer.setToolTip(
+                "Klick: Liste auf übersprungene Einträge filtern (Toggle). "
+                "Statuszählung geöffnet X, übersprungen Y — 1.2.9"
+            )
 
     def _split_log_empty_hint(self) -> None:
         """Hinweis bei leerem Pfad-Log — 1.2.4/1.2.6."""
@@ -967,7 +1047,13 @@ class PdfToolsDialog(QDialog):
         skipped = [p for p in paths if p not in existing]
         opened = len(existing)
         skipped_n = len(skipped)
-        detail = self._split_set_open_counts(opened, skipped_n)
+        # Volltext merken (für Footer-Filter Toggle) — 1.2.9
+        if not self._split_log_full_text:
+            self._split_log_full_text = self.split_log.toPlainText() or ""
+        self._split_filter_skipped = False
+        detail = self._split_set_open_counts(
+            opened, skipped_n, skipped_paths=skipped
+        )
         status = f"In Tabs: {detail}"
         parent = self.parent()
         if parent is not None and hasattr(parent, "_set_status"):

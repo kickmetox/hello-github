@@ -274,8 +274,8 @@ class TextCompareDialog(QDialog):
         self.chk_wrap_around.setChecked(get_text_diff_wrap_around())
         self.chk_wrap_around.setToolTip(
             "F7/Shift+F7 am Ende wieder von vorn (bzw. vom Ende); "
-            "bei Wrap Blink (Dauer kurz/mittel + optional Sound in Settings); "
-            "auch in Einstellungen — 1.2.8"
+            "bei Wrap Blink (Dauer kurz/mittel/lang + System-Beep/stumm in Settings); "
+            "auch in Einstellungen — 1.2.9"
         )
         self.chk_wrap_around.toggled.connect(self._on_wrap_around_toggled)
         opts.addWidget(self.chk_only_diff)
@@ -599,10 +599,10 @@ class TextCompareDialog(QDialog):
         return self.view_left
 
     def _blink_wrap_feedback(self) -> None:
-        """Status blinken bei Wrap; Dauer Settings kurz/mittel; Sound optional — 1.2.8."""
+        """Status blinken bei Wrap; Dauer kurz/mittel/lang; System-Beep vs. stumm — 1.2.9."""
         if get_text_diff_wrap_blink_sound():
             try:
-                QApplication.beep()
+                QApplication.beep()  # System-Beep; Settings aus = stumm
             except Exception:
                 pass
         token = int(getattr(self, "_wrap_blink_token", 0)) + 1
