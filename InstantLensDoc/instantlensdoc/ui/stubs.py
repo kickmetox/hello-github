@@ -26,6 +26,10 @@ PLANNED = {
         f"Plugin-Hooks — Stub {__version__} — nicht produktiv "
         "(interner Event-Bus + no-op Loader; kein Plugin-System)"
     ),
+    "outline_read": (
+        f"Document Outline Vorlesen — Stub {__version__} "
+        "(TTS/Screenreader-Anbindung geplant; keine Aktion)"
+    ),
     "varfonts": "Variable Fonts (voll) — geplant",
     "envelope": "Envelope Distort (voll) — geplant",
     "esign": "E-Signatur (rechtssicher) — geplant",
@@ -40,6 +44,10 @@ PLANNED_EN = {
     "plugins": (
         f"Plugin hooks — stub {__version__} — not production-ready "
         "(internal event bus + no-op loader; no plugin system)"
+    ),
+    "outline_read": (
+        f"Document outline read-aloud — stub {__version__} "
+        "(TTS/screen reader planned; no action)"
     ),
     "varfonts": "Variable fonts (full) — planned",
     "envelope": "Envelope distort (full) — planned",
@@ -56,6 +64,9 @@ STUB_SHORT = {
     "plugins": (
         "Plugin-Hooks: interner Event-Bus + no-op Loader — Stub / nicht produktiv."
     ),
+    "outline_read": (
+        "Document Outline Vorlesen (TTS) — Stub / geplant / keine Aktion — 2.0.0."
+    ),
     "varfonts": "Vollständige Variable-Fonts-Unterstützung — geplant.",
     "envelope": "Envelope-Distort-Transformation — geplant.",
     "esign": "Rechtssichere E-Signatur — geplant.",
@@ -70,6 +81,9 @@ STUB_SHORT_EN = {
     "plugins": (
         "Plugin hooks: internal event bus + no-op loader — stub / not production."
     ),
+    "outline_read": (
+        "Document outline read-aloud (TTS) — stub / planned / no action — 2.0.0."
+    ),
     "varfonts": "Full variable fonts support — planned.",
     "envelope": "Envelope distort transform — planned.",
     "esign": "Legally binding e-signature — planned.",
@@ -82,6 +96,7 @@ STUB_TITLES = {
     "shapes_ai": "Intelligente Formerkennung",
     "extrude3d": "3D-Extrusion",
     "plugins": "Plugin-Hooks",
+    "outline_read": "Document Outline Vorlesen",
     "varfonts": "Variable Fonts",
     "envelope": "Envelope Distort",
     "esign": "E-Signatur",
@@ -94,6 +109,7 @@ STUB_TITLES_EN = {
     "shapes_ai": "Smart shape recognition",
     "extrude3d": "3D extrusion",
     "plugins": "Plugin hooks",
+    "outline_read": "Document outline read-aloud",
     "varfonts": "Variable fonts",
     "envelope": "Envelope distort",
     "esign": "E-signature",

@@ -176,6 +176,7 @@ from instantlensdoc.ui.theme import (
     resolve_theme,
     set_follow_system,
     theme_status_text,
+    toggle_high_contrast,
     toggle_theme,
 )
 from instantlensdoc.ui.keyboard_help import KeyboardHelpDialog
@@ -1508,6 +1509,13 @@ class MainWindow(QMainWindow):
         )
         act_search_json.triggered.connect(lambda: self._on_search_export("json"))
         m_edit.addAction(act_search_json)
+        act_multi_search = QAction("Multi-Dokument-Suche…", self)
+        act_multi_search.setShortcut(QKeySequence("Ctrl+Shift+F"))
+        act_multi_search.setToolTip(
+            "Volltext über alle offenen PDFs (Textlayer) · zentrale Trefferliste — 2.0.0"
+        )
+        act_multi_search.triggered.connect(self._open_multi_doc_search)
+        m_edit.addAction(act_multi_search)
         act_search_hl = QAction("Treffer als Highlight (Seite)…", self)
         act_search_hl.setToolTip(
             "Suchtreffer der aktuellen PDF-Seite als Highlight-Annotationen — 0.9.6"
@@ -2174,6 +2182,20 @@ class MainWindow(QMainWindow):
         act_theme_cycle.triggered.connect(self._cycle_theme_mode)
         m_view.addAction(act_theme_cycle)
         self._theme_cycle_action = act_theme_cycle
+        self._high_contrast_action = QAction("High-Contrast Theme", self)
+        self._high_contrast_action.setCheckable(True)
+        self._high_contrast_action.setShortcut(QKeySequence("Ctrl+Alt+Shift+H"))
+        self._high_contrast_action.setToolTip(
+            "High-Contrast Theme ein/aus (Accessibility) — 2.0.0"
+        )
+        try:
+            from instantlensdoc.core.app_settings import get_high_contrast
+
+            self._high_contrast_action.setChecked(bool(get_high_contrast()))
+        except Exception:
+            self._high_contrast_action.setChecked(False)
+        self._high_contrast_action.triggered.connect(self._toggle_high_contrast)
+        m_view.addAction(self._high_contrast_action)
         self._sync_theme_menu()
 
         m_pdf = mb.addMenu("&PDF")
@@ -2244,6 +2266,12 @@ class MainWindow(QMainWindow):
         )
         act_attach.triggered.connect(self._pdf_attachments)
         m_pdf.addAction(act_attach)
+        act_portfolio = QAction("PDF-Portfolio…", self)
+        act_portfolio.setToolTip(
+            "Portfolio erstellen/öffnen (pikepdf Attachments + Collection) — 2.0.0"
+        )
+        act_portfolio.triggered.connect(self._pdf_portfolio)
+        m_pdf.addAction(act_portfolio)
         act_stamp_lib = QAction("Stempel-Bibliothek (Bilder)…", self)
         act_stamp_lib.setToolTip(
             "Eigene Stempel-Bilder verwalten und als Sidecar-Stempel setzen — 1.9.0"
@@ -5730,6 +5758,86 @@ class MainWindow(QMainWindow):
             self._save_session()
         except Exception:
             pass
+
+    def _toggle_high_contrast(self, checked: bool = False) -> None:
+        """High-Contrast Theme Toggle — Accessibility 2.0.0."""
+        enabled = toggle_high_contrast(self)
+        act = getattr(self, "_high_contrast_action", None)
+        if act is not None:
+            act.blockSignals(True)
+            act.setChecked(bool(enabled))
+            act.blockSignals(False)
+        msg = "High-Contrast: an" if enabled else "High-Contrast: aus"
+        self.statusBar().showMessage(msg, 2500)
+        self._set_status(msg)
+
+    def _open_multi_doc_search(self) -> None:
+        """Zentrale Multi-Dokument-Suche über alle offenen PDFs — 2.0.0."""
+        from instantlensdoc.ui.multi_doc_search_dialog import MultiDocSearchDialog
+
+        paths = []
+        try:
+            paths = list(self.sidebar.document_paths())
+        except Exception:
+            paths = []
+        if self.doc and self.doc.path and str(self.doc.path) not in paths:
+            paths.append(str(self.doc.path))
+        # Offene Tabs (PDF) ergänzen
+        try:
+            for i in range(self.tabs.count()):
+                w = self.tabs.widget(i)
+                p = getattr(w, "pdf_path", None) or getattr(w, "path", None)
+                if p and str(p) not in paths:
+                    paths.append(str(p))
+        except Exception:
+            pass
+        q = ""
+        try:
+            q = self.sidebar.search_text()
+        except Exception:
+            q = ""
+        dlg = getattr(self, "_multi_doc_search_dlg", None)
+        if dlg is None:
+            dlg = MultiDocSearchDialog(self, paths=paths, initial_query=q)
+            dlg.hit_activated.connect(self._on_multi_doc_hit)
+            self._multi_doc_search_dlg = dlg
+        else:
+            dlg.set_paths(paths)
+            if q:
+                dlg.query_edit.setText(q)
+        dlg.show()
+        dlg.raise_()
+        dlg.activateWindow()
+        if q:
+            dlg.run_search()
+
+    def _on_multi_doc_hit(self, path: str, page, query: str = "") -> None:
+        """Treffer aus zentraler Multi-Doc-Suche öffnen/hervorheben — 2.0.0."""
+        self._on_fulltext_hit(str(path), page, query=query or "")
+
+    def _pdf_portfolio(self) -> None:
+        """PDF-Portfolio erstellen/öffnen — 2.0.0."""
+        from instantlensdoc.ui.portfolio_dialog import PortfolioDialog
+
+        start = ""
+        try:
+            from instantlensdoc.core.app_settings import get_default_open_dir
+
+            dod = get_default_open_dir()
+            start = str(dod) if dod else ""
+        except Exception:
+            start = ""
+        if not start and self.pdf_view.pdf_path:
+            start = str(Path(self.pdf_view.pdf_path).parent)
+        dlg = PortfolioDialog(self, start_dir=start)
+        dlg.exec()
+        created = getattr(dlg, "created_path", None)
+        if created and Path(created).is_file():
+            try:
+                self.open_path(created)
+                self._set_status(f"Portfolio geöffnet: {Path(created).name}")
+            except Exception:
+                self._set_status(f"Portfolio erstellt: {Path(created).name}")
 
     def _toggle_follow_system(self, checked: bool = False):
         """System-Theme folgen Toggle — 1.4.0/1.4.2 Status-Indicator."""

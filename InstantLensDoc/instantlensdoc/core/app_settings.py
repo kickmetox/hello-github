@@ -15,6 +15,8 @@ UiLang = Literal["de", "en"]
 
 DEFAULTS: dict[str, Any] = {
     "theme": "system",  # System folgen; manuell light/dark Override — 1.4.0
+    "high_contrast": False,  # High-Contrast Theme Toggle — 2.0.0
+    "ui_font_pt": 10,  # UI-Schriftgröße pt (9–20) — 2.0.0
     "ocr_lang": "deu+eng",
     "ocr_dpi": 150,  # OCR-Batch Default-DPI 150|300 — 1.1.6
     "ocr_attach_errors": True,  # OCR-Batch: Fehlerabschnitt anhängen — 1.1.5
@@ -276,6 +278,42 @@ def set_theme(mode: ThemeMode | str) -> None:
     if m not in ("light", "dark", "system"):
         m = "system"
     save_settings({"theme": m})
+
+
+def get_high_contrast() -> bool:
+    """High-Contrast Theme aktiv — 2.0.0."""
+    return bool(load_settings().get("high_contrast", DEFAULTS["high_contrast"]))
+
+
+def set_high_contrast(enabled: bool) -> None:
+    """High-Contrast Theme speichern — 2.0.0."""
+    save_settings({"high_contrast": bool(enabled)})
+
+
+UI_FONT_PT_MIN = 9
+UI_FONT_PT_MAX = 20
+UI_FONT_PT_DEFAULT = 10
+
+
+def get_ui_font_pt() -> int:
+    """UI-Schriftgröße in pt (9–20) — 2.0.0."""
+    raw = load_settings().get("ui_font_pt", DEFAULTS["ui_font_pt"])
+    try:
+        val = int(raw)
+    except (TypeError, ValueError):
+        val = int(DEFAULTS["ui_font_pt"])
+    return max(UI_FONT_PT_MIN, min(UI_FONT_PT_MAX, val))
+
+
+def set_ui_font_pt(pt: int) -> int:
+    """UI-Schriftgröße speichern; Rückgabe normalisierter Wert — 2.0.0."""
+    try:
+        val = int(pt)
+    except (TypeError, ValueError):
+        val = int(DEFAULTS["ui_font_pt"])
+    val = max(UI_FONT_PT_MIN, min(UI_FONT_PT_MAX, val))
+    save_settings({"ui_font_pt": val})
+    return val
 
 
 def get_ocr_lang() -> str:

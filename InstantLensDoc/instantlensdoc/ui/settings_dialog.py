@@ -221,7 +221,9 @@ from instantlensdoc.core.app_settings import (
     get_tag_rename_confirm_threshold,
     get_pdf_compare_diff_threshold,
     get_pdf_compare_page_sync,
+    get_high_contrast,
     get_theme,
+    get_ui_font_pt,
     get_ui_lang,
     PDF_COMPARE_DIFF_THRESHOLD_MAX,
     PDF_COMPARE_DIFF_THRESHOLD_MIN,
@@ -328,7 +330,9 @@ from instantlensdoc.core.app_settings import (
     set_tag_rename_confirm_threshold,
     set_pdf_compare_diff_threshold,
     set_pdf_compare_page_sync,
+    set_high_contrast,
     set_theme,
+    set_ui_font_pt,
     set_ui_lang,
     set_update_check_on_start,
     set_presentation_hide_annotations,
@@ -346,7 +350,7 @@ from instantlensdoc.core.app_settings import (
 )
 from instantlensdoc.core.i18n import sync_from_settings, tr
 from instantlensdoc.core.ocr import LANG_PRESETS, OCR_DPI_CHOICES
-from instantlensdoc.ui.theme import apply_theme
+from instantlensdoc.ui.theme import apply_theme, apply_ui_font
 
 
 class SettingsDialog(QDialog):
@@ -373,6 +377,24 @@ class SettingsDialog(QDialog):
         theme_idx = {"system": 0, "light": 1, "dark": 2}.get(cur_theme, 0)
         self.theme_combo.setCurrentIndex(theme_idx)
         form.addRow(tr("theme"), self.theme_combo)
+
+        self.high_contrast = QCheckBox("High-Contrast Theme")
+        self.high_contrast.setObjectName("settingsHighContrast")
+        self.high_contrast.setChecked(bool(get_high_contrast()))
+        self.high_contrast.setToolTip(
+            "Barrierefreiheit: High-Contrast Theme (schwarz/weiß) — 2.0.0"
+        )
+        form.addRow("Accessibility", self.high_contrast)
+
+        self.ui_font_spin = QSpinBox()
+        self.ui_font_spin.setObjectName("settingsUiFontPt")
+        self.ui_font_spin.setRange(9, 20)
+        self.ui_font_spin.setSuffix(" pt")
+        self.ui_font_spin.setValue(int(get_ui_font_pt()))
+        self.ui_font_spin.setToolTip(
+            "Größere UI-Schrift (9–20 pt) für bessere Lesbarkeit — 2.0.0"
+        )
+        form.addRow("UI-Schriftgröße", self.ui_font_spin)
 
         self.ui_lang = QComboBox()
         self.ui_lang.addItem(tr("lang_de"), "de")
@@ -1600,6 +1622,11 @@ class SettingsDialog(QDialog):
             ("Stylus / Palm Rejection", "stylus", "Stub · keine Aktion"),
             ("3D-Extrusion", "extrude3d", "Stub · keine Aktion"),
             ("Plugin-Hooks", "plugins", "Stub · nicht produktiv · keine Aktion"),
+            (
+                "Document Outline Vorlesen",
+                "outline_read",
+                "Stub · geplant · keine Aktion — 2.0.0",
+            ),
         ]
         # Sortierung A–Z nach Feature-Name — 1.9.3
         rows = sorted(rows, key=lambda r: r[0].casefold())
@@ -2418,6 +2445,8 @@ class SettingsDialog(QDialog):
         if theme not in ("light", "dark", "system"):
             theme = "system"
         set_theme(theme)
+        set_high_contrast(bool(self.high_contrast.isChecked()))
+        set_ui_font_pt(int(self.ui_font_spin.value()))
         set_ocr_lang(str(lang))
         try:
             dpi_val = int(self.ocr_dpi_combo.currentData() or 150)

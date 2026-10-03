@@ -1,0 +1,239 @@
+"""PDF-Portfolios (Collection + Attachments) erstellen und öffnen — 2.0.0.
+
+Ein Portfolio ist ein Container-PDF mit eingebetteten Dateien (pikepdf attachments)
+und Catalog-/Collection-Eintrag (Adobe PDF Portfolio / PDF Collection).
+"""
+
+from __future__ import annotations
+
+import mimetypes
+from dataclasses import asdict, dataclass
+from pathlib import Path
+from typing import Any, Sequence
+
+
+@dataclass
+class PortfolioEntry:
+    """Ein Eintrag im Portfolio (Anhang)."""
+
+    name: str
+    filename: str = ""
+    description: str = ""
+    mime_type: str = ""
+    size: int = 0
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass
+class PortfolioInfo:
+    """Metadaten eines geöffneten/erkannten Portfolios."""
+
+    path: str
+    title: str = ""
+    is_portfolio: bool = False
+    entries: list[PortfolioEntry] | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "path": self.path,
+            "title": self.title,
+            "is_portfolio": self.is_portfolio,
+            "entries": [e.to_dict() for e in (self.entries or [])],
+            "count": len(self.entries or []),
+        }
+
+
+def _safe_name(name: str) -> str:
+    base = "".join(c if c.isalnum() or c in ".-_" else "_" for c in (name or "datei"))
+    return (base or "datei")[:80]
+
+
+def _unique_key(existing: set[str], preferred: str) -> str:
+    base = _safe_name(preferred) or "datei"
+    if base not in existing:
+        return base
+    stem = Path(base).stem
+    suf = Path(base).suffix
+    n = 2
+    while True:
+        cand = f"{stem}_{n}{suf}"
+        if cand not in existing:
+            return cand
+        n += 1
+
+
+def is_portfolio(path: str | Path) -> bool:
+    """True wenn PDF eine Collection (Portfolio) und/oder Attachments hat."""
+    import pikepdf
+
+    path = Path(path)
+    if not path.is_file():
+        return False
+    try:
+        with pikepdf.open(path) as pdf:
+            root = pdf.Root
+            has_coll = "/Collection" in root
+            try:
+                n_att = len(list(pdf.attachments.keys()))
+            except Exception:
+                n_att = 0
+            return bool(has_coll) or n_att > 0 and has_coll
+    except Exception:
+        return False
+
+
+def has_collection(path: str | Path) -> bool:
+    """True wenn Catalog /Collection gesetzt ist."""
+    import pikepdf
+
+    path = Path(path)
+    try:
+        with pikepdf.open(path) as pdf:
+            return "/Collection" in pdf.Root
+    except Exception:
+        return False
+
+
+def list_portfolio_entries(path: str | Path) -> list[PortfolioEntry]:
+    """Listet Portfolio-Anhänge (Attachments) als Einträge."""
+    from ild_pdf.attachments import list_attachments
+
+    out: list[PortfolioEntry] = []
+    for info in list_attachments(path):
+        out.append(
+            PortfolioEntry(
+                name=info.name,
+                filename=info.filename or info.name,
+                description=info.description or "",
+                mime_type=info.mime_type or "",
+                size=int(info.size or 0),
+            )
+        )
+    return out
+
+
+def open_portfolio(path: str | Path) -> PortfolioInfo:
+    """
+    Portfolio öffnen / inspizieren: Collection + Attachments listen.
+    Wirft FileNotFoundError wenn Datei fehlt.
+    """
+    import pikepdf
+
+    path = Path(path)
+    if not path.is_file():
+        raise FileNotFoundError(f"Portfolio nicht gefunden: {path}")
+    title = path.stem
+    is_pf = False
+    try:
+        with pikepdf.open(path) as pdf:
+            is_pf = "/Collection" in pdf.Root
+            try:
+                di = pdf.docinfo
+                if di is not None and "/Title" in di:
+                    title = str(di["/Title"]) or title
+            except Exception:
+                pass
+    except Exception as exc:
+        raise RuntimeError(f"Portfolio konnte nicht geöffnet werden: {exc}") from exc
+    entries = list_portfolio_entries(path)
+    if not is_pf and entries:
+        # Attachments ohne Collection: als „ähnliches“ Portfolio melden
+        is_pf = False
+    return PortfolioInfo(
+        path=str(path.resolve()),
+        title=title,
+        is_portfolio=is_pf or bool(entries),
+        entries=entries,
+    )
+
+
+def create_portfolio(
+    out_path: str | Path,
+    files: Sequence[str | Path],
+    *,
+    title: str = "InstantLens Portfolio",
+    cover_text: str | None = None,
+) -> PortfolioInfo:
+    """
+    Erstellt ein Container-PDF (Portfolio) mit eingebetteten Dateien
+    und Catalog-/Collection (pikepdf attachments + /Collection).
+    """
+    import pikepdf
+
+    out_path = Path(out_path)
+    if out_path.suffix.lower() != ".pdf":
+        out_path = out_path.with_suffix(".pdf")
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+
+    file_paths: list[Path] = []
+    for raw in files:
+        p = Path(raw)
+        if p.is_file():
+            file_paths.append(p)
+    if not file_paths:
+        raise ValueError("Keine gültigen Dateien für das Portfolio.")
+
+    used_keys: set[str] = set()
+    with pikepdf.Pdf.new() as pdf:
+        # Cover-Seite (Portfolio braucht mindestens eine Seite)
+        pdf.add_blank_page(page_size=(595, 842))  # A4
+        try:
+            with pdf.open_metadata() as meta:
+                meta["dc:title"] = title or "InstantLens Portfolio"
+                meta["dc:creator"] = ["InstantLens Doc"]
+        except Exception:
+            pass
+        try:
+            pdf.docinfo["/Title"] = title or "InstantLens Portfolio"
+            pdf.docinfo["/Creator"] = "InstantLens Doc 2.0"
+        except Exception:
+            pass
+
+        for fp in file_paths:
+            key = _unique_key(used_keys, fp.name)
+            used_keys.add(key)
+            data = fp.read_bytes()
+            pdf.attachments[key] = data
+            try:
+                spec = pdf.attachments[key]
+                try:
+                    spec.description = cover_text or f"Portfolio-Datei: {fp.name}"
+                except Exception:
+                    pass
+                mime, _ = mimetypes.guess_type(str(fp))
+                if mime:
+                    try:
+                        af = spec.get_file()
+                        if hasattr(af, "mime_type"):
+                            af.mime_type = mime
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+
+        # PDF Collection / Portfolio Catalog
+        coll = pikepdf.Dictionary(
+            {
+                "/Type": pikepdf.Name("/Collection"),
+                "/View": pikepdf.Name("/D"),  # Details
+            }
+        )
+        pdf.Root["/Collection"] = coll
+        pdf.Root["/PageMode"] = pikepdf.Name("/UseAttachments")
+        pdf.save(out_path)
+
+    return open_portfolio(out_path)
+
+
+def extract_portfolio(
+    path: str | Path,
+    out_dir: str | Path | None = None,
+) -> list[Path]:
+    """Alle Portfolio-Anhänge extrahieren (wie Attachments)."""
+    from ild_pdf.attachments import extract_all_attachments
+
+    path = Path(path)
+    dest = Path(out_dir) if out_dir else path.parent / f"{path.stem}_portfolio"
+    return extract_all_attachments(path, out_dir=dest)

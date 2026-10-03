@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **1.9.5** |
+| Version | **2.0.0** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -62,6 +62,16 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an / `checkedonce`)
+
+## Neu in 2.0.0
+
+Major-Release nach **1.9.5** (Basis **1.9.4** / **1.9.3** / **1.9.2** / **1.9.1** / **1.9.0**):
+
+- **Multi-Dokument-Suche:** Volltext über alle offenen PDFs (Textlayer) · zentrale Trefferliste (Ctrl+Shift+F)
+- **PDF-Portfolios:** mehrere Dateien → Container-PDF (pikepdf Attachments + `/Collection`) erstellen/öffnen/extrahieren
+- **Accessibility:** Document Outline Vorlesen bleibt Stub; neu High-Contrast Theme Toggle + größere UI-Schrift (Settings)
+- **Installer:** `scripts/install-ild.ps1` — Startmenü-Shortcut + optional Desktop-Link (User-Profil, ohne Admin)
+- About zeigt Serie **„2.0“**; Stubs KI/Cloud/Stylus/3D/Plugin-Hooks unverändert klar markiert
 
 ## Neu in 1.9.5
 

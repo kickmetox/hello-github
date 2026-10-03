@@ -1,12 +1,19 @@
-"""Hell/Dunkel/System-Theme für die Qt-Oberfläche — 1.5.1 (Zyklus-Toast 1.4.5)."""
+"""Hell/Dunkel/System-Theme + High-Contrast / UI-Schrift — 2.0.0 (Basis 1.5.1)."""
 
 from __future__ import annotations
 
 from typing import Callable, Literal
 
+from PySide6.QtGui import QFont
 from PySide6.QtWidgets import QApplication, QWidget
 
-from instantlensdoc.core.app_settings import get_theme, set_theme
+from instantlensdoc.core.app_settings import (
+    get_high_contrast,
+    get_theme,
+    get_ui_font_pt,
+    set_high_contrast,
+    set_theme,
+)
 
 ThemeMode = Literal["light", "dark", "system"]
 ResolvedTheme = Literal["light", "dark"]
@@ -41,6 +48,35 @@ QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox {
 }
 QSplitter::handle { background: #444; }
 QLabel { color: #e8e8e8; }
+"""
+
+# High-Contrast Theme — 2.0.0 (WCAG-orientiert, schwarz/weiß + Gelb-Fokus)
+HIGH_CONTRAST_STYLE = """
+QMainWindow, QWidget { background: #000000; color: #FFFFFF; }
+QPlainTextEdit, QTextEdit, QTextBrowser {
+    background: #000000; color: #FFFFFF;
+    selection-background-color: #FFFF00; selection-color: #000000;
+    border: 1px solid #FFFFFF;
+}
+QMenuBar, QMenu { background: #000000; color: #FFFFFF; border: 1px solid #FFFFFF; }
+QMenuBar::item:selected, QMenu::item:selected {
+    background: #FFFF00; color: #000000;
+}
+QStatusBar { background: #000000; color: #FFFF00; border-top: 1px solid #FFFFFF; }
+QToolButton { color: #FFFFFF; background: #000000; border: 1px solid #FFFFFF; }
+QToolButton:checked { background: #FFFF00; color: #000000; border: 2px solid #FFFFFF; }
+QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox, QListWidget, QTreeWidget, QTableWidget {
+    background: #000000; color: #FFFFFF; border: 1px solid #FFFFFF;
+}
+QPushButton {
+    background: #000000; color: #FFFFFF; border: 2px solid #FFFFFF; padding: 4px 10px;
+}
+QPushButton:hover, QPushButton:focus { background: #FFFF00; color: #000000; }
+QSplitter::handle { background: #FFFFFF; }
+QLabel { color: #FFFFFF; }
+QCheckBox, QRadioButton { color: #FFFFFF; }
+QTabBar::tab { background: #000000; color: #FFFFFF; border: 1px solid #FFFFFF; padding: 4px 8px; }
+QTabBar::tab:selected { background: #FFFF00; color: #000000; }
 """
 
 # Callback nach Live-Apply (z. B. Menü sync) — 1.4.1
@@ -109,6 +145,29 @@ def resolve_theme(mode: ThemeMode | None = None) -> ResolvedTheme:
     return "dark" if m == "dark" else "light"
 
 
+def apply_ui_font(app: QApplication | None = None, *, pt: int | None = None) -> int:
+    """UI-Schriftgröße setzen (pt); speichert wenn pt übergeben — 2.0.0."""
+    if pt is not None:
+        size = int(pt)
+        try:
+            from instantlensdoc.core.app_settings import set_ui_font_pt
+
+            size = set_ui_font_pt(size)
+        except Exception:
+            size = max(9, min(20, size))
+    else:
+        try:
+            size = int(get_ui_font_pt())
+        except Exception:
+            size = 10
+    target = app or QApplication.instance()
+    if target is not None:
+        font = QFont(target.font())
+        font.setPointSize(size)
+        target.setFont(font)
+    return size
+
+
 def apply_theme(
     app: QApplication | None = None, *, mode: ThemeMode | None = None
 ) -> ResolvedTheme:
@@ -119,11 +178,38 @@ def apply_theme(
     else:
         pref = load_theme_mode()
     resolved = resolve_theme(pref)
-    qss = DARK_STYLE if resolved == "dark" else LIGHT_STYLE
+    hc = False
+    try:
+        hc = bool(get_high_contrast())
+    except Exception:
+        hc = False
+    if hc:
+        qss = HIGH_CONTRAST_STYLE
+    else:
+        qss = DARK_STYLE if resolved == "dark" else LIGHT_STYLE
     target = app or QApplication.instance()
     if target is not None:
         target.setStyleSheet(qss)
+        try:
+            apply_ui_font(target)
+        except Exception:
+            pass
     return resolved
+
+
+def toggle_high_contrast(parent: QWidget | None = None) -> bool:
+    """High-Contrast Theme ein/aus; liefert neuen Zustand — 2.0.0."""
+    try:
+        cur = bool(get_high_contrast())
+    except Exception:
+        cur = False
+    new = not cur
+    try:
+        set_high_contrast(new)
+    except Exception:
+        pass
+    apply_theme()
+    return new
 
 
 def toggle_theme(parent: QWidget | None = None) -> ResolvedTheme:

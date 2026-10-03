@@ -161,6 +161,16 @@ from .attachments import (
     list_attachments,
     remove_attachment,
 )
+from .portfolio import (
+    PortfolioEntry,
+    PortfolioInfo,
+    create_portfolio,
+    extract_portfolio,
+    has_collection,
+    is_portfolio,
+    list_portfolio_entries,
+    open_portfolio,
+)
 from .links import UriLink, is_external_http_uri, list_page_uri_links, uri_link_at
 
 __all__ = [
@@ -307,6 +317,14 @@ __all__ = [
     "extract_all_attachments",
     "add_attachment",
     "remove_attachment",
+    "PortfolioEntry",
+    "PortfolioInfo",
+    "create_portfolio",
+    "extract_portfolio",
+    "has_collection",
+    "is_portfolio",
+    "list_portfolio_entries",
+    "open_portfolio",
     "UriLink",
     "is_external_http_uri",
     "list_page_uri_links",
@@ -315,4 +333,4 @@ __all__ = [
     "page_count_for_text",
 ]
 
-__version__ = "1.9.5"
+__version__ = "2.0.0"

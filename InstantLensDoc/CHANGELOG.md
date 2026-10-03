@@ -1,5 +1,24 @@
 # Changelog — InstantLens Doc
 
+## 2.0.0 — Multi-Dokument-Suche, PDF-Portfolios, Accessibility High-Contrast·UI-Schrift, install-ild.ps1
+
+Major-Release nach 1.9.5: **Multi-Dokument-Suche** Volltext (Textlayer) über alle offenen PDFs mit **zentraler Trefferliste** (Ctrl+Shift+F); **PDF-Portfolios** erstellen/öffnen/extrahieren (pikepdf Attachments + `/Collection`); **Accessibility** High-Contrast Theme Toggle + größere UI-Schrift in Settings (Document Outline Vorlesen bleibt Stub); **install-ild.ps1** legt Startmenü-Shortcut + optional Desktop-Link an (User-Profil, ohne Admin). About zeigt Serie **„2.0“**. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks unverändert klar markiert / nicht produktiv.
+
+### Suche / Portfolio
+- Multi-Dokument-Suche: zentrale Trefferliste über offene PDFs; Sprung per Doppelklick
+- PDF-Portfolio-Dialog: Dateien → Container-PDF; Öffnen/Listen/Extrahieren
+
+### Accessibility / Installer
+- High-Contrast Theme (Ansicht + Settings); UI-Schriftgröße 9–20 pt
+- Outline-Vorlesen-Button bleibt Stub (Geplant / keine Aktion)
+- `scripts/install-ild.ps1`: Startmenü + optional Desktop (ohne Admin)
+
+### Packaging / Docs
+- Version **2.0.0** (App / `ild_pdf` / ISS / Smoke / Docs); `docs/VERSION` + `VERSION.txt`
+- About Serie **2.0**; Smoke: Multi-Doc-Suche, Portfolio, High-Contrast/UI-Font, install-ild (CLI + Qt)
+
+---
+
 ## 1.9.5 — Anhänge Footer-Filter, Quick-Stempel Esc→Toolbar·Ctrl+Shift+S, CSV Combobox-Reset·A11y, Stubs Geplant-Badge
 
 Post-Release-Polish nach 1.9.4: **PDF-Anhänge** Footer-Klick filtert Liste auf **umbenannt/übersprungen** (Toggle), **leerer Footer wenn Zähler 0**; **Quick-Stempel** Esc → **Fokus Toolbar**, Shortcut **Ctrl+Shift+S** = **Standard-Stempel ★** (Speichern unter → Ctrl+Alt+Shift+U); **Tabellen-CSV** Abbruch setzt **Trennzeichen-Combobox synchron** zurück, **A11y-Announcement beim Speichern**; **Settings-Stubs** Info-Dialog mit **Kurzbeschreibung** + Badge **„Geplant“**, **Esc schließt**. Stubs klar markiert / nicht produktiv.

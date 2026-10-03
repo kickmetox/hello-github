@@ -21,7 +21,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
-from instantlensdoc import __version__
+from instantlensdoc import __series__, __version__
 from instantlensdoc.config import CONTACT_EMAIL, DISPLAY_NAME, ROOT, VENDOR, icon_paths_for_qt
 from instantlensdoc.core.logging_setup import log_dir
 
@@ -586,7 +586,7 @@ class AboutDialog(QDialog):
         super().__init__(parent)
         self._parent_win = parent
         self._license_mgr = None
-        self.setWindowTitle(f"{DISPLAY_NAME} {__version__}")
+        self.setWindowTitle(f"{DISPLAY_NAME} {__series__}")
         self.resize(560, 640)
         icon = QIcon()
         for p in icon_paths_for_qt():
@@ -600,8 +600,8 @@ class AboutDialog(QDialog):
             layout.addWidget(icon_lbl)
         layout.addWidget(
             QLabel(
-                f"<h2>{DISPLAY_NAME} {__version__}</h2>"
-                f"<p><b>Version</b> {__version__}<br>"
+                f"<h2>{DISPLAY_NAME} {__series__}</h2>"
+                f"<p><b>Version</b> {__version__} · Serie <b>{__series__}</b><br>"
                 f"Hersteller: {VENDOR}<br>"
                 f"Kontakt: <a href='mailto:{CONTACT_EMAIL}'>{CONTACT_EMAIL}</a></p>"
                 f"<p>PDF-Engine: pypdfium2 / PDFium (lizenzfreundlich)</p>"

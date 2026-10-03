@@ -678,8 +678,19 @@ class Sidebar(QWidget):
         self.btn_outline_del.setFixedWidth(28)
         self.btn_outline_del.setToolTip("Ausgewähltes Lesezeichen löschen")
         self.btn_outline_del.clicked.connect(self.outline_delete_requested.emit)
+        # Document Outline Vorlesen — Stub bleibt (keine TTS) — 2.0.0
+        self.btn_outline_read = QPushButton("Vorlesen")
+        self.btn_outline_read.setObjectName("outlineReadStubBtn")
+        self.btn_outline_read.setToolTip(
+            "Document Outline Vorlesen — Stub / geplant / keine Aktion — 2.0.0"
+        )
+        self.btn_outline_read.setAccessibleName(
+            "Document Outline Vorlesen Stub — nicht produktiv"
+        )
+        self.btn_outline_read.clicked.connect(self._outline_read_stub)
         ol_btns.addWidget(self.btn_outline_add)
         ol_btns.addWidget(self.btn_outline_del)
+        ol_btns.addWidget(self.btn_outline_read)
         ol_btns.addStretch(1)
         self.outline_btns_host = QWidget()
         self.outline_btns_host.setLayout(ol_btns)
@@ -1023,6 +1034,12 @@ class Sidebar(QWidget):
         self._fulltext_mode = True
         self._pdf_fulltext_mode = True
         self.search_requested.emit(self.search_text())
+
+    def _outline_read_stub(self) -> None:
+        """Document Outline Vorlesen — Stub / keine Aktion — 2.0.0."""
+        from instantlensdoc.ui.stubs import show_planned
+
+        show_planned(self, "outline_read")
 
     @property
     def fulltext_mode(self) -> bool:
