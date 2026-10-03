@@ -148,9 +148,10 @@ DEFAULTS: dict[str, Any] = {
     "measure_labels_persistent": True,  # Mess-Labels in Sidecar/Overlay halten — 2.1.1
     "measure_csv_utf8_bom": True,  # Messwerte-CSV UTF-8 BOM — 2.1.2
     "last_measure_csv_dir": "",  # Zielordner Messwerte-CSV merken — 2.1.2
+    "measure_csv_filename_template": "{stem}_measures.csv",  # Live-Template — 2.1.3
     "native_ann_import_save_sidecar": True,  # nach Kommentar-Import Sidecar speichern — 2.1.2
     "textlayer_diff_side_by_side": False,  # Textlayer Diff TXT/Panel Side-by-Side — 2.1.2
-    "textlayer_diff_txt_template": "{stemA}_vs_{stemB}_p{page}_text.diff.txt",  # 2.1.2
+    "textlayer_diff_txt_template": "{stemA}_vs_{stemB}_{mode}.txt",  # 2.1.3
     "backup_on_save": False,
     "export_raster_dpi": 150,
     "print_grayscale": False,
@@ -3663,6 +3664,104 @@ def set_last_measure_csv_dir(path: str | Path) -> None:
     save_settings({"last_measure_csv_dir": str(p)})
 
 
+DEFAULT_MEASURE_CSV_FILENAME_TEMPLATE = "{stem}_measures.csv"
+MEASURE_CSV_KNOWN_PLACEHOLDERS = frozenset({"stem", "date"})
+_MEASURE_CSV_ANY_PLACEHOLDER_RE = re.compile(r"\{([^{}]+)\}")
+
+
+def get_measure_csv_filename_template() -> str:
+    """Dateiname-Template Messwerte-CSV, Default ``{stem}_measures.csv`` — 2.1.3."""
+    raw = str(
+        load_settings().get(
+            "measure_csv_filename_template",
+            DEFAULTS.get(
+                "measure_csv_filename_template", DEFAULT_MEASURE_CSV_FILENAME_TEMPLATE
+            ),
+        )
+        or ""
+    ).strip()
+    if not raw:
+        return DEFAULT_MEASURE_CSV_FILENAME_TEMPLATE
+    raw = raw.replace("/", "_").replace("\\", "_")
+    if not raw.lower().endswith(".csv"):
+        raw = raw + ".csv"
+    return raw
+
+
+def set_measure_csv_filename_template(template: str) -> str:
+    """Messwerte-CSV-Template speichern — 2.1.3."""
+    raw = str(template or "").strip() or DEFAULT_MEASURE_CSV_FILENAME_TEMPLATE
+    raw = raw.replace("/", "_").replace("\\", "_")
+    if not raw.lower().endswith(".csv"):
+        raw = raw + ".csv"
+    save_settings({"measure_csv_filename_template": raw})
+    return raw
+
+
+def find_invalid_measure_csv_placeholders(template: str) -> list[str]:
+    """Unbekannte Platzhalter im Mess-CSV-Template — 2.1.3."""
+    seen: set[str] = set()
+    out: list[str] = []
+    for name in _MEASURE_CSV_ANY_PLACEHOLDER_RE.findall(str(template or "")):
+        key = name.strip()
+        if not key or key in MEASURE_CSV_KNOWN_PLACEHOLDERS or key in seen:
+            continue
+        seen.add(key)
+        out.append(key)
+    return out
+
+
+def highlight_measure_csv_template_html(template: str) -> str:
+    """Template als HTML; ungültige Platzhalter rot — 2.1.3."""
+    import html as _html
+
+    raw = str(template or "")
+    parts: list[str] = []
+    last = 0
+    for m in _MEASURE_CSV_ANY_PLACEHOLDER_RE.finditer(raw):
+        parts.append(_html.escape(raw[last : m.start()]))
+        name = m.group(1).strip()
+        token = _html.escape(m.group(0))
+        if name and name not in MEASURE_CSV_KNOWN_PLACEHOLDERS:
+            parts.append(
+                f'<span style="color:#c62828;font-weight:600">{token}</span>'
+            )
+        else:
+            parts.append(token)
+        last = m.end()
+    parts.append(_html.escape(raw[last:]))
+    return "".join(parts) or _html.escape(raw)
+
+
+def format_measure_csv_filename(
+    stem: str,
+    *,
+    template: str | None = None,
+    date: str | None = None,
+) -> str:
+    """
+    Messwerte-CSV-Dateiname aus Template.
+    Platzhalter: ``{stem}``, ``{date}`` (YYYY-MM-DD).
+    Default ``{stem}_measures.csv`` — 2.1.3.
+    """
+    from datetime import date as _date
+
+    tpl = (
+        template
+        if template is not None
+        else get_measure_csv_filename_template()
+    )
+    stem_s = (stem or "dokument").strip() or "dokument"
+    date_s = (date if date is not None else _date.today().isoformat()).strip()
+    name = str(tpl or DEFAULT_MEASURE_CSV_FILENAME_TEMPLATE).replace(
+        "{stem}", stem_s
+    ).replace("{date}", date_s)
+    name = name.replace("/", "_").replace("\\", "_")
+    if not name.lower().endswith(".csv"):
+        name = name + ".csv"
+    return name or f"{stem_s}_measures.csv"
+
+
 def get_native_ann_import_save_sidecar() -> bool:
     """Nach PDF-Kommentar-Import Sidecar speichern — 2.1.2."""
     return bool(load_settings().get("native_ann_import_save_sidecar", True))
@@ -3674,7 +3773,14 @@ def set_native_ann_import_save_sidecar(enabled: bool) -> bool:
     return v
 
 
-DEFAULT_TEXTLAYER_DIFF_TXT_TEMPLATE = "{stemA}_vs_{stemB}_p{page}_text.diff.txt"
+DEFAULT_TEXTLAYER_DIFF_TXT_TEMPLATE = "{stemA}_vs_{stemB}_{mode}.txt"
+TEXTLAYER_DIFF_TXT_KNOWN_PLACEHOLDERS = frozenset(
+    {"stemA", "stemB", "page", "date", "mode"}
+)
+_TEXTLAYER_DIFF_TXT_PLACEHOLDER_RE = re.compile(
+    r"\{(stemA|stemB|page|date|mode)\}"
+)
+_TEXTLAYER_DIFF_TXT_ANY_PLACEHOLDER_RE = re.compile(r"\{([^{}]+)\}")
 
 
 def get_textlayer_diff_side_by_side() -> bool:
@@ -3689,7 +3795,7 @@ def set_textlayer_diff_side_by_side(enabled: bool) -> bool:
 
 
 def get_textlayer_diff_txt_template() -> str:
-    """Dateiname-Template für Textlayer-Diff-TXT — 2.1.2."""
+    """Dateiname-Template für Textlayer-Diff-TXT — 2.1.2/2.1.3."""
     raw = str(
         load_settings().get(
             "textlayer_diff_txt_template",
@@ -3706,6 +3812,85 @@ def set_textlayer_diff_txt_template(template: str) -> str:
     tpl = str(template or "").strip() or DEFAULT_TEXTLAYER_DIFF_TXT_TEMPLATE
     save_settings({"textlayer_diff_txt_template": tpl})
     return tpl
+
+
+def find_invalid_textlayer_diff_txt_placeholders(template: str) -> list[str]:
+    """Unbekannte Platzhalter im Diff-TXT-Template — 2.1.3."""
+    seen: set[str] = set()
+    out: list[str] = []
+    for name in _TEXTLAYER_DIFF_TXT_ANY_PLACEHOLDER_RE.findall(str(template or "")):
+        key = name.strip()
+        if not key or key in TEXTLAYER_DIFF_TXT_KNOWN_PLACEHOLDERS or key in seen:
+            continue
+        seen.add(key)
+        out.append(key)
+    return out
+
+
+def highlight_textlayer_diff_txt_template_html(template: str) -> str:
+    """Diff-TXT-Template als HTML; ungültige Platzhalter rot — 2.1.3."""
+    import html as _html
+
+    raw = str(template or "")
+    parts: list[str] = []
+    last = 0
+    for m in _TEXTLAYER_DIFF_TXT_ANY_PLACEHOLDER_RE.finditer(raw):
+        parts.append(_html.escape(raw[last : m.start()]))
+        name = m.group(1).strip()
+        token = _html.escape(m.group(0))
+        if name and name not in TEXTLAYER_DIFF_TXT_KNOWN_PLACEHOLDERS:
+            parts.append(
+                f'<span style="color:#c62828;font-weight:600">{token}</span>'
+            )
+        else:
+            parts.append(token)
+        last = m.end()
+    parts.append(_html.escape(raw[last:]))
+    return "".join(parts) or _html.escape(raw)
+
+
+def format_textlayer_diff_txt_filename(
+    stem_a: str,
+    stem_b: str,
+    *,
+    template: str | None = None,
+    page: int = 1,
+    mode: str = "unified",
+    date: str | None = None,
+) -> str:
+    """
+    Diff-TXT-Dateiname aus Template ``{stemA}_vs_{stemB}_{mode}.txt``.
+    Platzhalter: stemA, stemB, page, date, mode (unified|sidebyside) — 2.1.3.
+    """
+    from datetime import date as _date
+
+    a = (stem_a or "a").strip() or "a"
+    b = (stem_b or "b").strip() or "b"
+    p = max(1, int(page))
+    d = (date or "").strip() or _date.today().isoformat()
+    m = (mode or "unified").strip().lower() or "unified"
+    if m in ("side_by_side", "side-by-side", "sbs"):
+        m = "sidebyside"
+    tpl = (
+        (template or DEFAULT_TEXTLAYER_DIFF_TXT_TEMPLATE).strip()
+        or DEFAULT_TEXTLAYER_DIFF_TXT_TEMPLATE
+    )
+    mapping = {
+        "stemA": a,
+        "stemB": b,
+        "page": str(p),
+        "date": d,
+        "mode": m,
+    }
+
+    def _sub(mm: re.Match) -> str:
+        return mapping.get(mm.group(1), mm.group(0))
+
+    name = _TEXTLAYER_DIFF_TXT_PLACEHOLDER_RE.sub(_sub, tpl)
+    name = name.replace("/", "_").replace("\\", "_")
+    if not name.lower().endswith(".txt"):
+        name = name + ".txt"
+    return name
 
 
 def get_backup_on_save() -> bool:

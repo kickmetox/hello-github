@@ -6281,7 +6281,7 @@ class PdfViewer(QWidget):
             return False
 
     def export_measures_csv(self) -> bool:
-        """Messwerte CSV (Typ,Seite,Wert,Einheit); Zielordner merken; BOM-Option — 2.1.1/2.1.2."""
+        """Messwerte CSV · Live-Template ``{stem}_measures.csv`` · Quick-Insert — 2.1.3."""
         if not self.store or not self.pdf_path:
             QMessageBox.information(self, "Messwerte", "Kein PDF geladen.")
             return False
@@ -6289,20 +6289,30 @@ class PdfViewer(QWidget):
         if not measures:
             QMessageBox.information(self, "Messwerte", "Keine Mess-Annotationen vorhanden.")
             return False
+        from PySide6.QtCore import Qt
         from PySide6.QtWidgets import (
             QCheckBox,
             QDialog,
             QDialogButtonBox,
             QFileDialog,
+            QHBoxLayout,
             QLabel,
+            QLineEdit,
+            QPushButton,
             QVBoxLayout,
         )
 
         from instantlensdoc.core.app_settings import (
+            DEFAULT_MEASURE_CSV_FILENAME_TEMPLATE,
             dialog_start_dir,
+            find_invalid_measure_csv_placeholders,
+            format_measure_csv_filename,
             get_last_measure_csv_dir,
+            get_measure_csv_filename_template,
             get_measure_csv_utf8_bom,
+            highlight_measure_csv_template_html,
             set_last_measure_csv_dir,
+            set_measure_csv_filename_template,
             set_measure_csv_utf8_bom,
         )
         from instantlensdoc.ui.file_dialogs import confirm_overwrite_export
@@ -6312,13 +6322,88 @@ class PdfViewer(QWidget):
         ol = QVBoxLayout(opts)
         ol.addWidget(
             QLabel(
-                f"{len(measures)} Messwert(e) · Spalten Typ,Seite,Wert,Einheit — 2.1.2"
+                f"{len(measures)} Messwert(e) · Spalten Typ,Seite,Wert,Einheit · "
+                f"Template {DEFAULT_MEASURE_CSV_FILENAME_TEMPLATE} — 2.1.3"
             )
         )
         chk_bom = QCheckBox("UTF-8 BOM (Excel)")
         chk_bom.setChecked(get_measure_csv_utf8_bom())
         chk_bom.setToolTip("CSV mit UTF-8-BOM schreiben (Excel-freundlich) — 2.1.2")
         ol.addWidget(chk_bom)
+
+        tpl_row = QHBoxLayout()
+        tpl_row.addWidget(QLabel("Dateiname:"))
+        tpl_edit = QLineEdit(get_measure_csv_filename_template())
+        tpl_edit.setPlaceholderText(DEFAULT_MEASURE_CSV_FILENAME_TEMPLATE)
+        tpl_edit.setToolTip(
+            "Live-Dateiname-Template; Platzhalter {stem}/{date}; "
+            "Quick-Insert; ungültige Platzhalter rot — 2.1.3"
+        )
+        tpl_row.addWidget(tpl_edit, 1)
+        for token in ("{stem}", "{date}"):
+            btn = QPushButton(token)
+            btn.setAutoDefault(False)
+            btn.setDefault(False)
+            btn.setFocusPolicy(Qt.TabFocus)
+            btn.setToolTip(f"Platzhalter {token} an Cursor einfügen — 2.1.3")
+
+            def _insert(t=token) -> None:
+                tpl_edit.insert(t)
+                tpl_edit.setFocus()
+                _update_preview()
+
+            btn.clicked.connect(_insert)
+            tpl_row.addWidget(btn)
+        btn_reset_tpl = QPushButton("Reset")
+        btn_reset_tpl.setAutoDefault(False)
+        btn_reset_tpl.setDefault(False)
+        btn_reset_tpl.setToolTip(
+            f"Template auf Default ({DEFAULT_MEASURE_CSV_FILENAME_TEMPLATE}) — 2.1.3"
+        )
+        ol.addLayout(tpl_row)
+        preview = QLabel("")
+        preview.setTextFormat(Qt.RichText)
+        preview.setWordWrap(True)
+        preview.setToolTip(
+            "Live-Vorschau Mess-CSV-Dateiname; ungültige Platzhalter rot — 2.1.3"
+        )
+        ol.addWidget(preview)
+
+        def _update_preview() -> None:
+            import html as _html
+
+            tpl = tpl_edit.text().strip() or DEFAULT_MEASURE_CSV_FILENAME_TEMPLATE
+            stem = self.pdf_path.stem if self.pdf_path else "dokument"
+            name = format_measure_csv_filename(stem, template=tpl)
+            html = highlight_measure_csv_template_html(tpl)
+            invalid = find_invalid_measure_csv_placeholders(tpl)
+            note = f" → <code>{_html.escape(name)}</code>"
+            if invalid:
+                note += f" · ungültig: {', '.join(invalid)}"
+            preview.setText(f"CSV: {html}{note}")
+
+        def _reset_tpl() -> None:
+            cur = tpl_edit.text().strip() or DEFAULT_MEASURE_CSV_FILENAME_TEMPLATE
+            if cur != DEFAULT_MEASURE_CSV_FILENAME_TEMPLATE:
+                reply = QMessageBox.question(
+                    opts,
+                    "CSV-Template zurücksetzen",
+                    "Mess-CSV-Template auf Default zurücksetzen?",
+                    QMessageBox.Yes | QMessageBox.No,
+                    QMessageBox.No,
+                )
+                if reply != QMessageBox.Yes:
+                    return
+            tpl_edit.setText(DEFAULT_MEASURE_CSV_FILENAME_TEMPLATE)
+            tpl_edit.setFocus()
+            tpl_edit.selectAll()
+            _update_preview()
+
+        btn_reset_tpl.clicked.connect(_reset_tpl)
+        tpl_row.addWidget(btn_reset_tpl)
+        tpl_edit.textChanged.connect(lambda _t: _update_preview())
+        _update_preview()
+
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         buttons.button(QDialogButtonBox.Ok).setText("Speichern…")
         buttons.accepted.connect(opts.accept)
@@ -6328,9 +6413,12 @@ class PdfViewer(QWidget):
             return False
         utf8_bom = bool(chk_bom.isChecked())
         set_measure_csv_utf8_bom(utf8_bom)
+        tpl = tpl_edit.text().strip() or DEFAULT_MEASURE_CSV_FILENAME_TEMPLATE
+        set_measure_csv_filename_template(tpl)
 
         start = dialog_start_dir(get_last_measure_csv_dir())
-        default = str(Path(start) / f"{self.pdf_path.stem}.messwerte.csv")
+        fname = format_measure_csv_filename(self.pdf_path.stem, template=tpl)
+        default = str(Path(start) / fname)
         path, _ = QFileDialog.getSaveFileName(
             self,
             "Messwerte als CSV exportieren",
@@ -6575,7 +6663,7 @@ class PdfViewer(QWidget):
             return False
 
     def import_native_pdf_comments(self) -> bool:
-        """Native PDF-Markup → Sidecar; Dry-Run, Sidecar-Toggle, Status N/M — 2.1.1/2.1.2."""
+        """Native PDF-Markup → Sidecar; Status ersetzt/übersprungen/neu·kopierbar — 2.1.3."""
         if not self.store or not self.pdf_path:
             QMessageBox.information(self, "PDF-Kommentare", "Kein PDF geladen.")
             return False
@@ -6614,15 +6702,36 @@ class PdfViewer(QWidget):
         dry_dlg = QDialog(self)
         dry_dlg.setWindowTitle("PDF-Kommentare importieren — Dry-Run")
         dry_lay = QVBoxLayout(dry_dlg)
-        dry_lay.addWidget(
-            QLabel(
-                f"Dry-Run: {dry.status_counts_de()}\n"
-                f"Kandidaten={dry.candidates}, Duplikate={dry.duplicates_found}, "
-                f"Typen-Skip={dry.skipped}, Seiten={dry.pages_scanned}.\n\n"
-                "Anhängen = Sidecar erweitern · Ersetzen = Sidecar neu.\n"
-                "Hinweis: grobe Übernahme (QuadPoints→Box); Link/Widget übersprungen."
-            )
+        dry_status = dry.copyable_status_text()
+        dry_lbl = QLabel(
+            f"Dry-Run: {dry.status_counts_de()}\n"
+            f"Kandidaten={dry.candidates}, Duplikate={dry.duplicates_found}, "
+            f"Typen-Skip={dry.skipped}, Seiten={dry.pages_scanned}.\n\n"
+            "Anhängen = Sidecar erweitern · Ersetzen = Sidecar neu.\n"
+            "Hinweis: grobe Übernahme (QuadPoints→Box); Link/Widget übersprungen."
         )
+        dry_lbl.setTextInteractionFlags(
+            Qt.TextSelectableByMouse | Qt.TextSelectableByKeyboard
+        )
+        dry_lbl.setToolTip(
+            "Status ersetzt/übersprungen/neu — Text selektierbar/kopierbar — 2.1.3"
+        )
+        dry_lay.addWidget(dry_lbl)
+        from PySide6.QtWidgets import QPushButton as _QPushButton
+
+        btn_copy_dry = _QPushButton("Status kopieren")
+        btn_copy_dry.setToolTip(
+            "Detail-Status (ersetzt/übersprungen/neu) in Zwischenablage — 2.1.3"
+        )
+
+        def _copy_dry_status() -> None:
+            clip = QApplication.clipboard()
+            if clip is not None:
+                clip.setText(dry_status + "\n")
+            self.status.emit("Import-Status kopiert (Dry-Run)")
+
+        btn_copy_dry.clicked.connect(_copy_dry_status)
+        dry_lay.addWidget(btn_copy_dry)
         chk_save_sidecar = QCheckBox("Nach Import Sidecar speichern")
         chk_save_sidecar.setChecked(get_native_ann_import_save_sidecar())
         chk_save_sidecar.setToolTip(
@@ -6720,12 +6829,13 @@ class PdfViewer(QWidget):
                 prog.setValue(prog.maximum())
             prog.close()
             status_line = result.status_counts_de()
+            copy_text = result.copyable_status_text()
             if result.cancelled:
                 self.status.emit(f"PDF-Import abgebrochen — {status_line}")
-                QMessageBox.information(
-                    self,
+                self._show_import_status_copyable(
                     "PDF-Kommentare — Abbruch",
                     f"Import abgebrochen.\n{status_line}\n{result.summary_de()}",
+                    copy_text,
                 )
                 return False
             if save_sidecar:
@@ -6735,17 +6845,46 @@ class PdfViewer(QWidget):
             mode = "ersetzt" if replace else "angehängt"
             side_s = " · Sidecar gespeichert" if save_sidecar else " · Sidecar nicht gespeichert"
             self.status.emit(f"PDF-Import ({mode}): {status_line}{side_s}")
-            if result.imported == 0:
-                QMessageBox.information(
-                    self,
-                    "PDF-Kommentare",
-                    f"Keine Annotationen übernommen.\n{status_line}",
-                )
+            # Ergebnis-Status immer kopierbar anbieten — 2.1.3
+            self._show_import_status_copyable(
+                "PDF-Kommentare — Status",
+                (
+                    f"PDF-Import ({mode}): {status_line}{side_s}\n"
+                    f"{result.summary_de()}"
+                    if result.imported > 0
+                    else f"Keine Annotationen übernommen.\n{status_line}"
+                ),
+                copy_text,
+            )
             return True
         except Exception as e:
             prog.close()
             QMessageBox.warning(self, "PDF-Kommentare importieren", str(e))
             return False
+
+    def _show_import_status_copyable(
+        self, title: str, text: str, copy_text: str
+    ) -> None:
+        """Import-Status Dialog: selektierbarer Text + Kopieren — 2.1.3."""
+        from PySide6.QtCore import Qt
+        from PySide6.QtWidgets import QApplication, QLabel, QMessageBox
+
+        box = QMessageBox(self)
+        box.setIcon(QMessageBox.Information)
+        box.setWindowTitle(title)
+        box.setText(text)
+        box.setStandardButtons(QMessageBox.Ok)
+        copy_btn = box.addButton("Status kopieren", QMessageBox.ActionRole)
+        for lbl in box.findChildren(QLabel):
+            lbl.setTextInteractionFlags(
+                Qt.TextSelectableByMouse | Qt.TextSelectableByKeyboard
+            )
+        box.exec()
+        if box.clickedButton() is copy_btn:
+            clip = QApplication.clipboard()
+            if clip is not None:
+                clip.setText((copy_text or text).rstrip() + "\n")
+            self.status.emit("Import-Status kopiert")
 
     def save_pdf_as_copy(self) -> bool:
         """PDF (und Sidecar falls vorhanden) als Kopie speichern; aktuelles Dokument bleibt geöffnet."""

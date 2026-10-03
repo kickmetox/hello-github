@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **2.1.2** |
+| Version | **2.1.3** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -63,14 +63,14 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an / `checkedonce`)
 
-## Neu in 2.1.2
+## Neu in 2.1.3
 
-Post-Release-Polish nach **2.1.1**:
+Post-Release-Polish nach **2.1.2**:
 
-- **PDF-Kommentar-Import:** Toggle **Nach Import Sidecar speichern** · Status **„N importiert, M übersprungen“**
-- **Messung:** CSV-Spalten **Typ,Seite,Wert,Einheit** · Zielordner merken · UTF-8-BOM Option
-- **PDF-Vergleich:** Textlayer **Unified/Side-by-Side Toggle** · Diff-TXT **Dateiname-Template**
-- **Nightly-Smoke:** `smoke_ild.py` **`--json` Summary** · **Laufzeit ms** · in Docs erwähnt
+- **PDF-Kommentar-Import:** Status **ersetzt / übersprungen / neu** · **kopierbarer Text** (Status kopieren)
+- **Messung:** CSV Live-Template **`{stem}_measures.csv`** · Quick-Insert `{stem}`/`{date}` · ungültige rot
+- **PDF-Vergleich:** Diff-TXT Template **`{stemA}_vs_{stemB}_{mode}.txt`** · Live-Vorschau · ungültige rot
+- **Nightly-Smoke:** `smoke_ild.py --json` Felder **`ok`**, **`checks[]`**, **`duration_ms`**, **`version`** · Beispiel in Docs
 - Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen unverändert klar markiert
 
 ## Nightly-Smoke
@@ -81,7 +81,25 @@ python scripts\smoke_ild.py --qt
 python scripts\smoke_ild.py --json
 ```
 
-Exit **0**/OK · **1**/Fehler · **2**/ungültige Option. `--json` liefert `ok`, `version`, `duration_ms`, `checks`. Ende (ohne `--json`): `Laufzeit: N ms` · `smoke_ild: OK`.
+Exit **0**/OK · **1**/Fehler · **2**/ungültige Option. `--json` liefert `ok`, `checks`, `duration_ms`, `version`.
+
+Beispiel:
+
+```json
+{"ok": true, "version": "2.1.3", "duration_ms": 1234, "checks": ["version", "imports", "cli", "measure_diff_import", "changelog"]}
+```
+
+Ende (ohne `--json`): `Laufzeit: N ms` · `smoke_ild: OK`.
+
+## Neu in 2.1.2
+
+Post-Release-Polish nach **2.1.1**:
+
+- **PDF-Kommentar-Import:** Toggle **Nach Import Sidecar speichern** · Status **„N importiert, M übersprungen“**
+- **Messung:** CSV-Spalten **Typ,Seite,Wert,Einheit** · Zielordner merken · UTF-8-BOM Option
+- **PDF-Vergleich:** Textlayer **Unified/Side-by-Side Toggle** · Diff-TXT **Dateiname-Template**
+- **Nightly-Smoke:** `smoke_ild.py` **`--json` Summary** · **Laufzeit ms** · in Docs erwähnt
+- Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen unverändert klar markiert
 
 ## Neu in 2.1.1
 

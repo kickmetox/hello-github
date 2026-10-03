@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Nightly/CI Smoke: CLI + Import-Checks für InstantLens Doc — 2.1.0–2.1.2.
+"""Nightly/CI Smoke: CLI + Import-Checks für InstantLens Doc — 2.1.0–2.1.3.
 
 Leichtgewichtig. Exit-Codes:
   0  OK
@@ -12,6 +12,10 @@ Aufruf:
   python scripts/smoke_ild.py --skip-qt     # Qt-Checks überspringen (Default)
   python scripts/smoke_ild.py --json        # Summary als JSON (stdout)
   python scripts/smoke_ild.py -h
+
+JSON-Schema (--json), Beispiel:
+  {"ok": true, "version": "2.1.3", "duration_ms": 1234,
+   "checks": ["version", "imports", "cli", "measure_diff_import", "changelog"]}
 """
 
 from __future__ import annotations
@@ -32,7 +36,7 @@ if str(ROOT) not in sys.path:
 # Headless/CI: Qt ohne Display
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-EXPECTED_VERSION = "2.1.2"
+EXPECTED_VERSION = "2.1.3"
 
 EXIT_OK = 0
 EXIT_FAIL = 1
@@ -96,6 +100,9 @@ def check_imports(*, with_qt: bool) -> None:
             "chk_side_by_side",
             "txt_template_edit",
             "_export_text_diff_txt",
+            "{mode}",
+            "format_textlayer_diff_txt_filename",
+            "find_invalid_textlayer_diff_txt_placeholders",
         ),
         ROOT / "instantlensdoc" / "ui" / "pdf_view.py": (
             "import_native_pdf_comments",
@@ -107,8 +114,12 @@ def check_imports(*, with_qt: bool) -> None:
             "dry_run",
             "Nach Import Sidecar speichern",
             "status_counts_de",
+            "copyable_status_text",
+            "Status kopieren",
             "get_measure_csv_utf8_bom",
             "get_last_measure_csv_dir",
+            "format_measure_csv_filename",
+            "DEFAULT_MEASURE_CSV_FILENAME_TEMPLATE",
         ),
     }
     if with_qt:
@@ -158,6 +169,13 @@ def check_measure_and_diff() -> None:
     )
     from ild_pdf.annotate import AnnotationStore
     from instantlensdoc.core.app_settings import (
+        DEFAULT_MEASURE_CSV_FILENAME_TEMPLATE,
+        DEFAULT_TEXTLAYER_DIFF_TXT_TEMPLATE,
+        find_invalid_measure_csv_placeholders,
+        find_invalid_textlayer_diff_txt_placeholders,
+        format_measure_csv_filename,
+        format_textlayer_diff_txt_filename,
+        get_measure_csv_filename_template,
         get_measure_csv_utf8_bom,
         get_measure_labels_persistent,
         get_measure_snap_to_annotation,
@@ -165,12 +183,16 @@ def check_measure_and_diff() -> None:
         get_native_ann_import_save_sidecar,
         get_textlayer_diff_side_by_side,
         get_textlayer_diff_txt_template,
+        highlight_measure_csv_template_html,
+        highlight_textlayer_diff_txt_template_html,
+        set_measure_csv_filename_template,
         set_measure_csv_utf8_bom,
         set_measure_labels_persistent,
         set_measure_snap_to_annotation,
         set_measure_unit,
         set_native_ann_import_save_sidecar,
         set_textlayer_diff_side_by_side,
+        set_textlayer_diff_txt_template,
         toggle_measure_unit,
     )
 
@@ -201,7 +223,29 @@ def check_measure_and_diff() -> None:
     assert get_textlayer_diff_side_by_side() is True
     set_textlayer_diff_side_by_side(False)
     assert get_textlayer_diff_side_by_side() is False
-    assert "{stemA}" in get_textlayer_diff_txt_template()
+
+    # Mess-CSV Live-Template + Diff-TXT {mode} — 2.1.3
+    assert DEFAULT_MEASURE_CSV_FILENAME_TEMPLATE == "{stem}_measures.csv"
+    set_measure_csv_filename_template("{stem}_measures.csv")
+    assert get_measure_csv_filename_template() == "{stem}_measures.csv"
+    assert format_measure_csv_filename("dok") == "dok_measures.csv"
+    assert find_invalid_measure_csv_placeholders("{stem}_{x}.csv") == ["x"]
+    assert "#c62828" in highlight_measure_csv_template_html("{stem}_{x}.csv")
+    assert DEFAULT_TEXTLAYER_DIFF_TXT_TEMPLATE == "{stemA}_vs_{stemB}_{mode}.txt"
+    set_textlayer_diff_txt_template("{stemA}_vs_{stemB}_{mode}.txt")
+    assert "{mode}" in get_textlayer_diff_txt_template()
+    assert format_textlayer_diff_txt_filename("a", "b", mode="unified") == (
+        "a_vs_b_unified.txt"
+    )
+    assert format_textlayer_diff_txt_filename("a", "b", mode="sidebyside") == (
+        "a_vs_b_sidebyside.txt"
+    )
+    assert find_invalid_textlayer_diff_txt_placeholders(
+        "{stemA}_{foo}_{mode}.txt"
+    ) == ["foo"]
+    assert "#c62828" in highlight_textlayer_diff_txt_template_html(
+        "{stemA}_{foo}.txt"
+    )
 
     # Flächen-/Winkel-Labels
     area = Annotation(
@@ -267,7 +311,10 @@ def check_measure_and_diff() -> None:
         dry = import_native_into_store(store, a, dry_run=True)
         assert dry.dry_run is True
         assert len(store.annotations) == 0
-        assert "importiert" in dry.status_counts_de()
+        assert "ersetzt" in dry.status_counts_de()
+        assert "übersprungen" in dry.status_counts_de()
+        assert "neu" in dry.status_counts_de()
+        assert "ersetzt" in dry.copyable_status_text()
         # Messwerte CSV Spalten Typ,Seite,Wert,Einheit + BOM — 2.1.2
         store.add(area)
         store.add(ang)
@@ -288,12 +335,14 @@ def check_measure_and_diff() -> None:
 
     _ok(
         "measure + textlayer-diff + native-import + measures-csv "
-        "Typ/Seite/Wert/Einheit + side-by-side API"
+        "template + status ersetzt/übersprungen/neu + mode-txt API"
     )
 
 
 def check_changelog() -> None:
     cl = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    if "## 2.1.3" not in cl:
+        _fail("CHANGELOG fehlt ## 2.1.3")
     if "## 2.1.2" not in cl:
         _fail("CHANGELOG fehlt ## 2.1.2")
     if "## 2.1.1" not in cl:
@@ -301,12 +350,14 @@ def check_changelog() -> None:
     if "## 2.1.0" not in cl:
         _fail("CHANGELOG fehlt ## 2.1.0")
     feat = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
-    if "2.1.2" not in feat:
-        _fail("FEATURES.md fehlt 2.1.2")
+    if "2.1.3" not in feat:
+        _fail("FEATURES.md fehlt 2.1.3")
     info = (ROOT / "INFO.md").read_text(encoding="utf-8")
     if "smoke_ild" not in info or "--json" not in info:
         _fail("INFO.md fehlt smoke_ild/--json Hinweis")
-    _ok("changelog + features + info(smoke_ild --json)")
+    if '"ok"' not in info or "duration_ms" not in info:
+        _fail("INFO.md fehlt smoke --json Beispiel-Felder")
+    _ok("changelog + features + info(smoke_ild --json Beispiel)")
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -338,7 +389,7 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--json",
         action="store_true",
-        help="Summary als JSON auf stdout (inkl. duration_ms) — 2.1.2",
+        help="Summary als JSON auf stdout (ok/checks/duration_ms/version) — 2.1.3",
     )
     return p
 
@@ -358,7 +409,7 @@ Optionen:
   -h, --help     kurze DE-Hilfe (Exit 0)
   --qt           UI-Quelltext-Checks (compare_dialog/pdf_view) ausführen
   --skip-qt      UI-Checks überspringen (Default ohne --qt)
-  --json         Summary als JSON (ok/version/duration_ms/checks) — 2.1.2
+  --json         Summary als JSON (ok/checks[]/duration_ms/version) — 2.1.3
 
 Exit-Codes:
   0  OK
@@ -366,6 +417,10 @@ Exit-Codes:
   2  unbekannte Option
 
 Laufzeit: am Ende als „Laufzeit: N ms“ (oder duration_ms im JSON).
+
+Beispiel --json:
+  {"ok": true, "version": "2.1.3", "duration_ms": 1234,
+   "checks": ["version", "imports", "cli", "measure_diff_import", "changelog"]}
 """.rstrip()
     )
 
@@ -418,9 +473,7 @@ def main(argv: list[str] | None = None) -> int:
                         "ok": False,
                         "version": EXPECTED_VERSION,
                         "duration_ms": duration_ms,
-                        "with_qt": with_qt,
                         "checks": checks,
-                        "exit": code,
                     },
                     ensure_ascii=False,
                 )
@@ -437,9 +490,7 @@ def main(argv: list[str] | None = None) -> int:
                     "ok": True,
                     "version": EXPECTED_VERSION,
                     "duration_ms": duration_ms,
-                    "with_qt": with_qt,
                     "checks": checks,
-                    "exit": EXIT_OK,
                 },
                 ensure_ascii=False,
             )

@@ -1,4 +1,4 @@
-# InstantLens Doc — Windows-Build (PyInstaller App + Keygen) 2.1.2
+# InstantLens Doc — Windows-Build (PyInstaller App + Keygen) 2.1.3
 # Eine Zeile:
 #   powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 #
@@ -24,7 +24,7 @@ $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $Root
 
-Write-Host "=== InstantLens Doc Build 2.1.2 ==="
+Write-Host "=== InstantLens Doc Build 2.1.3 ==="
 Write-Host "Root: $Root"
 
 # Icon Pflicht für Release-Build (Fallback PNG)

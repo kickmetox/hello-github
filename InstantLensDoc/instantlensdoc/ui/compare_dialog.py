@@ -40,11 +40,14 @@ from instantlensdoc.core.app_settings import (
     PDF_COMPARE_DIFF_THRESHOLD_MAX,
     PDF_COMPARE_DIFF_THRESHOLD_MIN,
     dialog_start_dir,
+    find_invalid_textlayer_diff_txt_placeholders,
+    format_textlayer_diff_txt_filename,
     get_last_pdf_diff_png_dir,
     get_pdf_compare_diff_threshold,
     get_pdf_compare_page_sync,
     get_textlayer_diff_side_by_side,
     get_textlayer_diff_txt_template,
+    highlight_textlayer_diff_txt_template_html,
     set_last_pdf_diff_png_dir,
     set_pdf_compare_diff_threshold,
     set_pdf_compare_page_sync,
@@ -262,7 +265,8 @@ class PdfCompareDialog(QDialog):
         btn_export_txt = QPushButton("Diff TXT…")
         btn_export_txt.setToolTip(
             "Textlayer Diff als TXT (Unified/Side-by-Side) · "
-            "Dateiname-Template — 2.1.1/2.1.2"
+            "Dateiname-Template {stemA}_vs_{stemB}_{mode}.txt · "
+            "Live-Vorschau · ungültige Platzhalter rot — 2.1.3"
         )
         btn_export_txt.clicked.connect(self._export_text_diff_txt)
         self.btn_export_text_diff = btn_export_txt
@@ -331,22 +335,23 @@ class PdfCompareDialog(QDialog):
         )
         root.addWidget(self.png_template_preview)
 
-        # Textlayer Diff-TXT Template — 2.1.2
+        # Textlayer Diff-TXT Template — 2.1.2/2.1.3
         txt_tpl_row = QHBoxLayout()
         txt_tpl_row.addWidget(QLabel("TXT-Template"))
         self.txt_template_edit = DiffPngTemplateEdit(get_textlayer_diff_txt_template())
         self.txt_template_edit.setPlaceholderText(DIFF_TXT_FILENAME_TEMPLATE)
         self.txt_template_edit.setToolTip(
-            "Dateiname-Template für Diff TXT: {stemA}, {stemB}, {page}, {date} — 2.1.2"
+            "Dateiname-Template für Diff TXT: {stemA}, {stemB}, {mode}, "
+            "{page}, {date}. Quick-Insert; ungültige Platzhalter rot — 2.1.3"
         )
         self.txt_template_edit.textChanged.connect(self._update_txt_template_preview)
         txt_tpl_row.addWidget(self.txt_template_edit, 1)
-        for token in ("{stemA}", "{stemB}", "{page}", "{date}"):
+        for token in ("{stemA}", "{stemB}", "{mode}", "{page}", "{date}"):
             btn = QPushButton(token)
             btn.setAutoDefault(False)
             btn.setDefault(False)
             btn.setFocusPolicy(Qt.TabFocus)
-            btn.setToolTip(f"Platzhalter {token} einfügen — 2.1.2")
+            btn.setToolTip(f"Platzhalter {token} einfügen — 2.1.3")
             btn.clicked.connect(
                 lambda _checked=False, t=token: self._insert_txt_template_placeholder(t)
             )
@@ -355,7 +360,7 @@ class PdfCompareDialog(QDialog):
         self.btn_reset_txt_tpl.setAutoDefault(False)
         self.btn_reset_txt_tpl.setDefault(False)
         self.btn_reset_txt_tpl.setToolTip(
-            f"TXT-Template auf Default ({DIFF_TXT_FILENAME_TEMPLATE}) — 2.1.2"
+            f"TXT-Template auf Default ({DIFF_TXT_FILENAME_TEMPLATE}) — 2.1.3"
         )
         self.btn_reset_txt_tpl.clicked.connect(self._reset_txt_template)
         txt_tpl_row.addWidget(self.btn_reset_txt_tpl)
@@ -364,7 +369,7 @@ class PdfCompareDialog(QDialog):
         self.txt_template_preview.setTextFormat(Qt.RichText)
         self.txt_template_preview.setWordWrap(True)
         self.txt_template_preview.setToolTip(
-            "Live-Vorschau Diff-TXT-Dateiname; ungültige Platzhalter rot — 2.1.2"
+            "Live-Vorschau Diff-TXT-Dateiname; ungültige Platzhalter rot — 2.1.3"
         )
         root.addWidget(self.txt_template_preview)
 
@@ -430,12 +435,18 @@ class PdfCompareDialog(QDialog):
 
     def _on_side_by_side_toggled(self, checked: bool) -> None:
         set_textlayer_diff_side_by_side(bool(checked))
+        self._update_txt_template_preview()
         self._refresh()
 
     def _current_txt_template(self) -> str:
         return (
             self.txt_template_edit.text().strip() or DIFF_TXT_FILENAME_TEMPLATE
         )
+
+    def _txt_mode_token(self) -> str:
+        if hasattr(self, "chk_side_by_side") and self.chk_side_by_side.isChecked():
+            return "sidebyside"
+        return "unified"
 
     def _insert_txt_template_placeholder(self, token: str) -> None:
         edit = self.txt_template_edit
@@ -467,9 +478,12 @@ class PdfCompareDialog(QDialog):
         stem_b = Path(self._right).stem if self._right else "b"
         page = int(self.spin_left.value()) if hasattr(self, "spin_left") else 1
         tpl = self._current_txt_template()
-        name = format_diff_png_filename(stem_a, stem_b, page, tpl)
-        invalid = find_invalid_diff_png_placeholders(tpl)
-        html = highlight_diff_png_template_html(tpl)
+        mode = self._txt_mode_token()
+        name = format_textlayer_diff_txt_filename(
+            stem_a, stem_b, template=tpl, page=page, mode=mode
+        )
+        invalid = find_invalid_textlayer_diff_txt_placeholders(tpl)
+        html = highlight_textlayer_diff_txt_template_html(tpl)
         note = f" → <code>{_html.escape(name)}</code>"
         if invalid:
             note += f" · ungültig: {', '.join(invalid)}"
@@ -626,7 +640,7 @@ class PdfCompareDialog(QDialog):
             QMessageBox.critical(self, "Diff PNG", str(e))
 
     def _export_text_diff_txt(self) -> None:
-        """Textlayer Diff als TXT (Unified/Side-by-Side) · Template — 2.1.1/2.1.2."""
+        """Textlayer Diff als TXT · Template {stemA}_vs_{stemB}_{mode}.txt — 2.1.3."""
         if not self.chk_text_diff.isChecked():
             QMessageBox.information(
                 self,
@@ -647,9 +661,10 @@ class PdfCompareDialog(QDialog):
         start_dir = dialog_start_dir(get_last_pdf_diff_png_dir())
         tpl = self._current_txt_template()
         set_textlayer_diff_txt_template(tpl)
-        fname = format_diff_png_filename(stem_a, stem_b, page, tpl)
-        if not fname.lower().endswith(".txt"):
-            fname = f"{fname}.txt"
+        mode = self._txt_mode_token()
+        fname = format_textlayer_diff_txt_filename(
+            stem_a, stem_b, template=tpl, page=page, mode=mode
+        )
         default = str(Path(start_dir) / fname)
         path, _ = QFileDialog.getSaveFileName(
             self, "Textlayer-Diff als TXT speichern", default, "Text (*.txt);;Alle (*.*)"

@@ -1,5 +1,20 @@
 # Changelog — InstantLens Doc
 
+## 2.1.3 — Kommentar-Import Status ersetzt/übersprungen/neu·kopierbar, Mess-CSV Live-Template {stem}_measures.csv·Quick-Insert, Diff-TXT {stemA}_vs_{stemB}_{mode}.txt Live·ungültige rot, smoke_ild --json Schema+Beispiel
+
+Post-Release-Polish nach **2.1.2**: **PDF-Kommentar-Import** Status detailliert **„ersetzt X, übersprungen Y, neu Z“** mit **kopierbarem Text** (Status kopieren); **Messwerte-CSV** Live-Dateiname-Template **`{stem}_measures.csv`** inkl. **Quick-Insert** `{stem}`/`{date}` und ungültige Platzhalter rot; **Textlayer Diff-TXT** Default-Template **`{stemA}_vs_{stemB}_{mode}.txt`** mit **Live-Vorschau** und **ungültigen Platzhaltern rot**; **smoke_ild.py `--json`** Felder **`ok`**, **`checks[]`**, **`duration_ms`**, **`version`** inkl. **Beispiel in Hilfe/Docs**. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen unverändert klar markiert / nicht produktiv.
+
+### Neu / verbessert
+- Kommentar-Import: Status **ersetzt / übersprungen / neu** · Dialog **Status kopieren** (Dry-Run + Ergebnis)
+- Mess-CSV: Live-Template `{stem}_measures.csv` · Quick-Insert · ungültige rot · Reset
+- Diff-TXT: Template `{stemA}_vs_{stemB}_{mode}.txt` · Quick-Insert `{mode}` · Live-Vorschau · ungültige rot
+- `scripts/smoke_ild.py`: `--json` Schema `ok`/`checks`/`duration_ms`/`version` · Beispiel in Hilfe + INFO
+
+### Tests / Qualität
+- Version **2.1.3** (App / `ild_pdf` / ISS / Smoke / Docs); Serie **2.1**; `docs/VERSION` + `VERSION.txt`
+- Smoke: 2.1.3 CLI + Qt (Status-Copyable, Mess-CSV-Template, Diff-TXT-Mode, smoke_ild JSON-Schema)
+- Stubs unverändert
+
 ## 2.1.2 — Kommentar-Import Sidecar-Toggle·Status N/M, Mess-CSV Typ/Seite/Wert/Einheit·Ordner·BOM, Textlayer Side-by-Side·TXT-Template, smoke_ild --json·ms
 
 Post-Release-Polish nach **2.1.1**: **PDF-Kommentar-Import** mit Toggle **„Nach Import Sidecar speichern“** und Status **„N importiert, M übersprungen“**; **Messwerte-CSV** Spalten **Typ,Seite,Wert,Einheit**, **Zielordner merken**, **UTF-8-BOM Option**; **Textlayer-Diff TXT** mit **Unified/Side-by-Side Toggle** und **Dateiname-Template**; **smoke_ild.py** **`--json` Summary**, **Laufzeit ms**, in Docs erwähnt. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen unverändert klar markiert / nicht produktiv.

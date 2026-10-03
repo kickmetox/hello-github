@@ -1,4 +1,4 @@
-"""Native PDF-Markup-Annotationen (pikepdf) grob in Sidecar-Annotationen mappen — 2.1.0–2.1.2."""
+"""Native PDF-Markup-Annotationen (pikepdf) grob in Sidecar-Annotationen mappen — 2.1.0–2.1.3."""
 
 from __future__ import annotations
 
@@ -36,7 +36,7 @@ CancelCallback = Callable[[], bool]
 
 @dataclass
 class NativeAnnImportResult:
-    """Ergebnis des nativen PDF-Kommentar-Imports — 2.1.0–2.1.2."""
+    """Ergebnis des nativen PDF-Kommentar-Imports — 2.1.0–2.1.3."""
 
     annotations: List[Annotation] = field(default_factory=list)
     imported: int = 0
@@ -58,12 +58,44 @@ class NativeAnnImportResult:
         """Typen-Skip + Duplikat-Skip — 2.1.2."""
         return int(self.skipped) + int(self.duplicates_skipped)
 
+    @property
+    def replaced_count(self) -> int:
+        """Ersetzte Duplikate — 2.1.3."""
+        return int(self.duplicates_replaced)
+
+    @property
+    def new_count(self) -> int:
+        """Neu hinzugefügte (ohne Ersetzungen) — 2.1.3."""
+        return max(0, int(self.imported) - int(self.duplicates_replaced))
+
     def status_counts_de(self) -> str:
-        """Statuszeile „N importiert, M übersprungen“ — 2.1.2."""
-        return f"{int(self.imported)} importiert, {self.skipped_total} übersprungen"
+        """Statuszeile „ersetzt X, übersprungen Y, neu Z“ — 2.1.3."""
+        return (
+            f"ersetzt {self.replaced_count}, "
+            f"übersprungen {self.skipped_total}, "
+            f"neu {self.new_count}"
+        )
+
+    def copyable_status_text(self) -> str:
+        """Kopierbarer Detail-Status (ersetzt/übersprungen/neu + Meta) — 2.1.3."""
+        lines = [
+            self.status_counts_de(),
+            f"importiert={int(self.imported)}",
+            f"Kandidaten={self.candidates or self.imported}",
+            f"Seiten={self.pages_scanned}",
+            f"Typen-Skip={int(self.skipped)}",
+            f"Duplikate={int(self.duplicates_found)}",
+            f"Duplikate-skip={int(self.duplicates_skipped)}",
+            f"Duplikate-ersetzt={int(self.duplicates_replaced)}",
+        ]
+        if self.cancelled:
+            lines.append("abgebrochen=ja")
+        if self.dry_run:
+            lines.append("Dry-Run=ja")
+        return "\n".join(lines)
 
     def summary_de(self) -> str:
-        """Kurze DE-Zusammenfassung der Zähler — 2.1.1/2.1.2."""
+        """Kurze DE-Zusammenfassung der Zähler — 2.1.1–2.1.3."""
         parts = [
             self.status_counts_de(),
             f"Kandidaten={self.candidates or self.imported}",
