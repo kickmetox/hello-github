@@ -21,6 +21,7 @@ class SessionTab:
     kind: str = ""  # optional Hinweis
     scroll_y: int = 0  # Vertikale Scroll-Position (PDF/Editor) — 0.9.1
     # scale (oben): Zoom-Level pro Tab — Restore mit Vorrang vor Fit/Default (0.9.2)
+    label: str = ""  # Anzeige-Label (≠ Dateiname) — 0.9.4
 
 
 @dataclass
@@ -35,6 +36,8 @@ class SessionState:
     sync_scroll: bool = False
     # Haupt-Splitter Sidebar/Viewer Größen (Pixel) — 0.9.3
     splitter_sizes: List[int] = field(default_factory=list)
+    # Theme dark|light je Session — 0.9.4
+    theme: str = ""
 
 
 def session_path() -> Path:
@@ -62,6 +65,17 @@ def _normalize_splitter_sizes(raw) -> List[int]:
             return []
         out.append(n)
     return out
+
+
+def _normalize_theme(raw) -> str:
+    t = str(raw or "").strip().lower()
+    if t in ("dark", "light"):
+        return t
+    return ""
+
+
+def _normalize_label(raw) -> str:
+    return str(raw or "").strip()
 
 
 def load_session() -> SessionState:
@@ -100,6 +114,7 @@ def load_session() -> SessionState:
                 scale=float(item.get("scale") or 1.5),
                 kind=str(item.get("kind") or ""),
                 scroll_y=max(0, scroll_y),
+                label=_normalize_label(item.get("label")),
             )
         )
         if len(tabs) >= SESSION_MAX_TABS:
@@ -115,6 +130,7 @@ def load_session() -> SessionState:
         secondary_kind = "pdf" if Path(secondary_path).suffix.lower() == ".pdf" else "editor"
     sync_scroll = bool(raw.get("sync_scroll", False))
     splitter_sizes = _normalize_splitter_sizes(raw.get("splitter_sizes"))
+    theme = _normalize_theme(raw.get("theme"))
     return SessionState(
         tabs=tabs,
         active=active,
@@ -123,6 +139,7 @@ def load_session() -> SessionState:
         secondary_kind=secondary_kind,
         sync_scroll=sync_scroll,
         splitter_sizes=splitter_sizes,
+        theme=theme,
     )
 
 
@@ -133,6 +150,7 @@ def save_session(state: SessionState) -> None:
     for i, t in enumerate(state.tabs[:SESSION_MAX_TABS]):
         d = asdict(t)
         d["order"] = i  # Reihenfolge der Session-Tabs (Drag in Sidebar)
+        d["label"] = _normalize_label(d.get("label"))
         tabs_payload.append(d)
     sec_path = str(state.secondary_path or "").strip()
     if sec_path and not Path(sec_path).is_file():
@@ -140,12 +158,13 @@ def save_session(state: SessionState) -> None:
     sizes = _normalize_splitter_sizes(getattr(state, "splitter_sizes", None))
     payload = {
         "restore": state.restore,
-        "active": state.active,
+        "active": int(state.active),
         "tabs": tabs_payload,
         "secondary_path": sec_path,
         "secondary_kind": _normalize_secondary_kind(state.secondary_kind),
         "sync_scroll": bool(state.sync_scroll),
         "splitter_sizes": sizes,
+        "theme": _normalize_theme(getattr(state, "theme", "")),
     }
     path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
 
@@ -167,14 +186,19 @@ def build_session(
     secondary_kind: Optional[str] = None,
     sync_scroll: bool = False,
     splitter_sizes: Optional[List[int]] = None,
+    theme: Optional[str] = None,
+    tab_labels: Optional[dict] = None,
 ) -> SessionState:
     """
     tab_states: optional {path: {page, scale, scroll_y}} für Last-Page/Zoom/Scroll je Tab (0.9.1/0.9.2).
     splitter_sizes: optional [sidebar_px, viewer_px] — Haupt-Splitter (0.9.3).
+    theme: optional dark|light — Session-Theme (0.9.4).
+    tab_labels: optional {path: Anzeige-Label} — Tab-Titel ≠ Dateiname (0.9.4).
     """
     tabs: List[SessionTab] = []
     seen: set[str] = set()
     states = tab_states if isinstance(tab_states, dict) else {}
+    labels = tab_labels if isinstance(tab_labels, dict) else {}
 
     def _state_for(key: str) -> dict:
         if key in states and isinstance(states[key], dict):
@@ -187,6 +211,18 @@ def build_session(
             except Exception:
                 continue
         return {}
+
+    def _label_for(key: str) -> str:
+        if key in labels:
+            return _normalize_label(labels.get(key))
+        for k, v in labels.items():
+            try:
+                if str(Path(str(k))) == key:
+                    return _normalize_label(v)
+            except Exception:
+                continue
+        st = _state_for(key)
+        return _normalize_label(st.get("label"))
 
     for p in paths:
         key = str(Path(p))
@@ -207,7 +243,13 @@ def build_session(
         except (TypeError, ValueError):
             t_scroll = 0
         tabs.append(
-            SessionTab(path=key, page=t_page, scale=t_scale, scroll_y=t_scroll)
+            SessionTab(
+                path=key,
+                page=t_page,
+                scale=t_scale,
+                scroll_y=t_scroll,
+                label=_label_for(key),
+            )
         )
         if len(tabs) >= SESSION_MAX_TABS:
             break
@@ -229,6 +271,7 @@ def build_session(
                         page=max(0, int(page)),
                         scale=float(scale),
                         scroll_y=max(0, int(scroll_y)),
+                        label=_label_for(ap),
                     )
                 )
                 active = len(tabs) - 1
@@ -248,4 +291,5 @@ def build_session(
         secondary_kind=kind,
         sync_scroll=bool(sync_scroll),
         splitter_sizes=_normalize_splitter_sizes(splitter_sizes),
+        theme=_normalize_theme(theme),
     )

@@ -74,6 +74,8 @@ ANN_TYPE_LABELS = {
 
 # UserRole+1: Tab angeheftet (0.9.2) — geschützt vor „Alle schließen“
 _DOC_PINNED_ROLE = 257
+# UserRole+2: Anzeige-Label (≠ Dateiname) — 0.9.4
+_DOC_LABEL_ROLE = 258
 _PIN_PREFIX = "📌 "
 
 
@@ -87,6 +89,7 @@ class DocumentList(QListWidget):
     document_close_left_requested = Signal(str)  # Tabs links von Pfad schließen
     document_close_right_requested = Signal(str)  # Tabs rechts von Pfad schließen
     document_pin_toggled = Signal(str, bool)  # Pfad, pinned — 0.9.2
+    document_rename_requested = Signal(str)  # Pfad — Doppelklick Titel umbenennen (0.9.4)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -94,8 +97,9 @@ class DocumentList(QListWidget):
         self.setDragDropMode(QAbstractItemView.InternalMove)
         self.setDefaultDropAction(Qt.MoveAction)
         self.setToolTip(
-            "Ziehen zum Neuordnen — Mittelklick schließt Tab — "
-            "Rechtsklick: Anheften / Schließen / Andere / Links / Rechts / Alle schließen"
+            "Ziehen zum Neuordnen — Doppelklick Titel umbenennen — "
+            "Mittelklick schließt Tab — "
+            "Rechtsklick: Anheften / Umbenennen / Schließen / Andere / Links / Rechts / Alle"
         )
         self.setContextMenuPolicy(Qt.CustomContextMenu)
         self.customContextMenuRequested.connect(self._context_menu)
@@ -131,6 +135,19 @@ class DocumentList(QListWidget):
                 return
         super().mousePressEvent(event)
 
+    def mouseDoubleClickEvent(self, event):
+        try:
+            pt = event.position().toPoint()
+        except Exception:
+            pt = event.pos()
+        item = self.itemAt(pt)
+        path = self._item_path(item)
+        if path:
+            self.document_rename_requested.emit(path)
+            event.accept()
+            return
+        super().mouseDoubleClickEvent(event)
+
     def _context_menu(self, pos):
         item = self.itemAt(pos)
         path = self._item_path(item)
@@ -139,6 +156,7 @@ class DocumentList(QListWidget):
         pinned = self._item_pinned(item)
         menu = QMenu(self)
         act_pin = menu.addAction("Lösen" if pinned else "Anheften")
+        act_rename = menu.addAction("Umbenennen…")
         menu.addSeparator()
         act_close = menu.addAction("Schließen")
         if pinned:
@@ -153,6 +171,8 @@ class DocumentList(QListWidget):
         chosen = menu.exec(self.mapToGlobal(pos))
         if chosen is act_pin:
             self.document_pin_toggled.emit(path, not pinned)
+        elif chosen is act_rename:
+            self.document_rename_requested.emit(path)
         elif chosen is act_close:
             self.document_close_requested.emit(path)
         elif chosen is act_others:
@@ -394,6 +414,7 @@ class Sidebar(QWidget):
     page_favorite_activated = Signal(int)  # PDF-Seite 0-basiert (Favoriten-Liste)
     page_favorites_reordered = Signal(list)  # Seiten 0-basiert neue Reihenfolge
     documents_reordered = Signal()  # Dokument-/Session-Tab-Reihenfolge geändert
+    document_rename_requested = Signal(str)  # Tab-Titel umbenennen (Anzeige-Label) — 0.9.4
     document_close_requested = Signal(str)  # Sidebar-Tab schließen (Pfad)
     document_close_others_requested = Signal(str)  # Andere Tabs schließen (Keep-Pfad)
     document_close_all_requested = Signal()  # Alle Tabs schließen
@@ -533,7 +554,8 @@ class Sidebar(QWidget):
 
         layout.addWidget(QLabel("Dokumente — ziehen / Mittelklick / Rechtsklick"))
         self.files = DocumentList()
-        self.files.itemDoubleClicked.connect(self._activate)
+        self.files.itemClicked.connect(self._activate)
+        self.files.itemActivated.connect(self._activate)
         self.files.documents_reordered.connect(self.documents_reordered.emit)
         self.files.document_close_requested.connect(self.document_close_requested.emit)
         self.files.document_close_others_requested.connect(
@@ -549,6 +571,7 @@ class Sidebar(QWidget):
             self.document_close_right_requested.emit
         )
         self.files.document_pin_toggled.connect(self.document_pin_toggled.emit)
+        self.files.document_rename_requested.connect(self._rename_document_label)
         layout.addWidget(self.files)
 
         layout.addWidget(QLabel("Seiten (Vorschaubilder) — ziehen zum Ordnen"))
@@ -1175,10 +1198,15 @@ class Sidebar(QWidget):
             it = self.files.item(i)
             if it and it.data(256) == str(path):
                 return
-        item = QListWidgetItem(title or path.name)
+        label = str(title).strip() if title else ""
+        item = QListWidgetItem(label or path.name)
         item.setData(256, str(path))
         item.setData(_DOC_PINNED_ROLE, False)
-        item.setToolTip(str(path))
+        item.setData(_DOC_LABEL_ROLE, label)
+        tip = str(path)
+        if label and label != path.name:
+            tip = f"{path}\nAnzeige: {label}"
+        item.setToolTip(tip)
         self.files.addItem(item)
 
     def clear_documents(self):
@@ -1245,16 +1273,105 @@ class Sidebar(QWidget):
             if not p or str(Path(str(p))) != target:
                 continue
             it.setData(_DOC_PINNED_ROLE, want)
-            name = Path(str(p)).name
-            if want:
-                it.setText(_PIN_PREFIX + name)
-                tip = f"{p}\nAngeheftet — geschützt vor „Alle schließen“"
-            else:
-                it.setText(name)
-                tip = str(p)
-            it.setToolTip(tip)
+            self._refresh_document_item_text(it)
             return True
         return False
+
+    def _document_display_base(self, item: QListWidgetItem | None) -> str:
+        """Anzeige-Basis ohne Pin-Prefix (Label oder Dateiname)."""
+        if item is None:
+            return ""
+        p = item.data(256) or ""
+        custom = str(item.data(_DOC_LABEL_ROLE) or "").strip()
+        if custom:
+            return custom
+        return Path(str(p)).name if p else (item.text() or "").removeprefix(_PIN_PREFIX)
+
+    def _refresh_document_item_text(self, item: QListWidgetItem | None) -> None:
+        if item is None:
+            return
+        p = item.data(256) or ""
+        base = self._document_display_base(item)
+        pinned = bool(item.data(_DOC_PINNED_ROLE))
+        item.setText((_PIN_PREFIX + base) if pinned else base)
+        tip = str(p)
+        custom = str(item.data(_DOC_LABEL_ROLE) or "").strip()
+        extras: list[str] = []
+        if custom and p and custom != Path(str(p)).name:
+            extras.append(f"Anzeige: {custom}")
+        if pinned:
+            extras.append("Angeheftet — geschützt vor „Alle schließen“")
+        if extras:
+            tip = str(p) + "\n" + "\n".join(extras)
+        item.setToolTip(tip)
+
+    def document_label(self, path: str) -> str:
+        """Anzeige-Label eines Tabs (leer = Dateiname)."""
+        target = str(Path(path)) if path else ""
+        if not target:
+            return ""
+        for i in range(self.files.count()):
+            it = self.files.item(i)
+            if not it:
+                continue
+            p = it.data(256)
+            if p and str(Path(str(p))) == target:
+                return str(it.data(_DOC_LABEL_ROLE) or "").strip()
+        return ""
+
+    def document_labels(self) -> dict[str, str]:
+        """{path: Anzeige-Label} für alle Tabs mit Custom-Label (0.9.4)."""
+        out: dict[str, str] = {}
+        for i in range(self.files.count()):
+            it = self.files.item(i)
+            if not it:
+                continue
+            p = it.data(256)
+            label = str(it.data(_DOC_LABEL_ROLE) or "").strip()
+            if p and label:
+                out[str(Path(str(p)))] = label
+        return out
+
+    def set_document_label(self, path: str, label: str | None) -> bool:
+        """
+        Anzeige-Label setzen (≠ Dateiname). Leer/None → Dateiname.
+        True wenn Tab gefunden (0.9.4).
+        """
+        target = str(Path(path)) if path else ""
+        if not target:
+            return False
+        want = str(label or "").strip()
+        for i in range(self.files.count()):
+            it = self.files.item(i)
+            if not it:
+                continue
+            p = it.data(256)
+            if not p or str(Path(str(p))) != target:
+                continue
+            # Gleicher Name wie Datei → kein Custom-Label speichern
+            if want and want == Path(str(p)).name:
+                want = ""
+            it.setData(_DOC_LABEL_ROLE, want)
+            self._refresh_document_item_text(it)
+            return True
+        return False
+
+    def _rename_document_label(self, path: str) -> None:
+        """Doppelklick/Kontext: Anzeige-Titel umbenennen (nicht Dateiname)."""
+        target = str(Path(path)) if path else ""
+        if not target or not Path(target).is_file():
+            return
+        current = self.document_label(target) or Path(target).name
+        text, ok = QInputDialog.getText(
+            self,
+            "Tab umbenennen",
+            "Anzeige-Titel (Dateiname bleibt unverändert):",
+            text=current,
+        )
+        if not ok:
+            return
+        if self.set_document_label(target, text):
+            self.document_rename_requested.emit(target)
 
     def reorder_documents(self, paths: list[str], *, emit: bool = True) -> bool:
         """
@@ -1443,6 +1560,7 @@ class Sidebar(QWidget):
                 "label": label,
                 "path": "",
                 "page": "",
+                "offset": "",
                 "line": "",
                 "kind": "mark",
                 "query": q_default,
@@ -1453,6 +1571,8 @@ class Sidebar(QWidget):
             if isinstance(payload, tuple) and len(payload) >= 2:
                 path, page = payload[0], payload[1]
                 query = payload[2] if len(payload) >= 3 else q_default
+                # payload: (path, page, query, hit_i|offset) — Offset ab 0.9.4
+                offset = payload[3] if len(payload) >= 4 else ""
                 if path in (None, "", "__search__"):
                     rec["kind"] = "page_highlight"
                     if page is not None:
@@ -1470,6 +1590,11 @@ class Sidebar(QWidget):
                         except (TypeError, ValueError):
                             rec["page"] = page
                     rec["query"] = str(query or q_default)
+                if offset != "" and offset is not None:
+                    try:
+                        rec["offset"] = int(offset)
+                    except (TypeError, ValueError):
+                        rec["offset"] = offset
             elif payload is not None and hasattr(payload, "page"):
                 typ = getattr(getattr(payload, "type", None), "value", None) or str(
                     getattr(payload, "type", "") or "annotation"

@@ -1224,11 +1224,14 @@ class PdfViewer(QWidget):
         btn_del_ann = QPushButton("Ann. löschen")
         btn_del_ann.setToolTip("Ausgewählte Annotation löschen, sonst die letzte (Entf)")
         btn_del_ann.clicked.connect(self.delete_annotation)
-        btn_ann_color = QPushButton("Farbe…")
-        btn_ann_color.setToolTip(
-            "Farbe der ausgewählten Annotation(en) ändern (Batch, Ctrl+Alt+Shift+F)"
+        self.btn_ann_stroke = QPushButton("Strich…")
+        self.btn_ann_stroke.setToolTip(
+            "Strichfarbe des ausgewählten Shapes ändern (getrennt von Füllung; "
+            "Commit + Undo) — 0.9.4"
         )
-        btn_ann_color.clicked.connect(self.recolor_selected_annotations)
+        self.btn_ann_stroke.clicked.connect(self.recolor_stroke_selected_annotations)
+        # Alias: ältere Menü-/Shortcut-Pfade nutzen weiterhin Farbe…
+        btn_ann_color = self.btn_ann_stroke
         self.btn_ann_fill = QPushButton("Füllung…")
         self.btn_ann_fill.setToolTip(
             "Füllfarbe des ausgewählten Shapes ändern (Commit + Undo) — 0.9.3"
@@ -1568,7 +1571,7 @@ class PdfViewer(QWidget):
         toolbar.addWidget(self.btn_fav)
         toolbar.addWidget(self.btn_fav_jump)
         toolbar.addWidget(btn_del_ann)
-        toolbar.addWidget(btn_ann_color)
+        toolbar.addWidget(self.btn_ann_stroke)
         toolbar.addWidget(self.btn_ann_fill)
         toolbar.addWidget(btn_ann_opacity)
         toolbar.addWidget(btn_align_l)
@@ -3618,7 +3621,8 @@ class PdfViewer(QWidget):
         regex: bool | None = None,
     ) -> list[tuple[int, int, str]]:
         """
-        Alle PDF-Texttreffer für die Trefferliste (Seite, Hit-Index auf Seite, Snippet).
+        Alle PDF-Texttreffer für die Trefferliste.
+        Rückgabe: (Seite, Zeichen-Offset, Snippet) — Offset ab 0.9.4.
         """
         from ild_pdf.overlay import SearchPatternError
 
@@ -3663,8 +3667,54 @@ class PdfViewer(QWidget):
                     snip = _snippet_around(raw, q, context_chars=ctx, width=max(40, ctx * 2))
                 except Exception:
                     snip = raw[: max(20, ctx)] + ("…" if len(raw) > ctx else "")
-                out.append((page_idx, hit_i, snip or q))
+                try:
+                    off = int(getattr(m, "offset", hit_i))
+                except (TypeError, ValueError):
+                    off = hit_i
+                if off < 0:
+                    off = hit_i
+                out.append((page_idx, off, snip or q))
         return out
+
+    def recolor_stroke_selected_annotations(self) -> int:
+        """Strichfarbe für ausgewähltes Shape setzen (getrennt von Füllung; Commit + Undo) — 0.9.4."""
+        if not self.store:
+            self.status.emit("Kein PDF geladen")
+            return 0
+        ids = list(self._selected_ann_ids) if self._selected_ann_ids else (
+            [self._selected_ann_id] if self._selected_ann_id else []
+        )
+        ids = [i for i in ids if i]
+        if not ids:
+            self.status.emit("Keine Annotation ausgewählt")
+            return 0
+        initial = QColor(self._highlight_color or "#FFE066")
+        first = self.store.get(ids[0])
+        if first and first.color:
+            c0 = QColor(first.color)
+            if c0.isValid():
+                initial = c0
+        chosen = QColorDialog.getColor(
+            initial,
+            self,
+            f"Strichfarbe für {len(ids)} Annotation(en)",
+        )
+        if not chosen.isValid():
+            return 0
+        color = chosen.name().upper()
+        n = self.store.set_colors(ids, color)
+        if n <= 0:
+            self.status.emit("Strichfarbe nicht geändert")
+            return 0
+        try:
+            self.schedule_sidecar_save(force=True)
+        except Exception as e:
+            QMessageBox.warning(self, "Strichfarbe", str(e))
+            return 0
+        self.refresh()
+        self.annotations_changed.emit()
+        self.status.emit(f"Strichfarbe {color} für {n} Annotation(en)")
+        return n
 
     def recolor_fill_selected_annotations(self) -> int:
         """Füllfarbe für ausgewähltes Shape setzen (Commit + Undo) — 0.9.3."""
@@ -4240,45 +4290,8 @@ class PdfViewer(QWidget):
         return bool(jumped["ok"])
 
     def recolor_selected_annotations(self) -> int:
-        """Batch-Farbe für ausgewählte Annotation(en) ändern."""
-        if not self.store:
-            self.status.emit("Kein PDF geladen")
-            return 0
-        ids = list(self._selected_ann_ids) if self._selected_ann_ids else (
-            [self._selected_ann_id] if self._selected_ann_id else []
-        )
-        ids = [i for i in ids if i]
-        if not ids:
-            self.status.emit("Keine Annotation ausgewählt")
-            return 0
-        # Startfarbe: erste Auswahl oder aktuelle Highlight-Farbe
-        initial = QColor(self._highlight_color or "#FFE066")
-        first = self.store.get(ids[0])
-        if first and first.color:
-            c0 = QColor(first.color)
-            if c0.isValid():
-                initial = c0
-        chosen = QColorDialog.getColor(
-            initial,
-            self,
-            f"Farbe für {len(ids)} Annotation(en)",
-        )
-        if not chosen.isValid():
-            return 0
-        color = chosen.name().upper()
-        n = self.store.set_colors(ids, color)
-        if n <= 0:
-            self.status.emit("Farbe nicht geändert")
-            return 0
-        try:
-            self.schedule_sidecar_save()
-        except Exception as e:
-            QMessageBox.warning(self, "Annotation-Farbe", str(e))
-            return 0
-        self.refresh()
-        self.annotations_changed.emit()
-        self.status.emit(f"Farbe {color} für {n} Annotation(en)")
-        return n
+        """Batch-Strichfarbe (Alias) — nutzt Stroke-Color Picker 0.9.4."""
+        return self.recolor_stroke_selected_annotations()
 
     def set_opacity_selected_annotations(self) -> int:
         """Batch-Deckkraft für ausgewählte Annotation(en) ändern."""

@@ -1062,7 +1062,7 @@ class AnnotationStore:
         return len(targets)
 
     def set_colors(self, ann_ids: Sequence[str], color: str) -> int:
-        """Batch-Farbe für Auswahl setzen (#RRGGBB)."""
+        """Batch-Strichfarbe für Auswahl setzen (#RRGGBB) — getrennt von fill_color."""
         c = str(color or "").strip()
         if not c:
             return 0
@@ -1070,6 +1070,10 @@ class AnnotationStore:
             c = "#" + c
         c = c.upper()
         return self.update_many(ann_ids, color=c)
+
+    def set_stroke_colors(self, ann_ids: Sequence[str], color: str) -> int:
+        """Alias: Strichfarbe setzen (Commit + Undo via update_many) — 0.9.4."""
+        return self.set_colors(ann_ids, color)
 
     def set_opacities(self, ann_ids: Sequence[str], opacity: float) -> int:
         """Batch-Deckkraft für Auswahl setzen (0.05–1.0); Sidecar-Feld opacity."""

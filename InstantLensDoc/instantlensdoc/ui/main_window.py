@@ -295,6 +295,11 @@ class MainWindow(QMainWindow):
     def _on_documents_reordered(self):
         """Session-Tab-Reihenfolge nach Drag in der Dokumentliste speichern (0.9.3)."""
         self._save_session()
+
+    def _on_document_renamed(self, _path: str = "") -> None:
+        """Tab-Anzeige-Label geändert → Session speichern (0.9.4)."""
+        self._save_session()
+        self._set_status("Tab-Titel gespeichert")
         n = len(self._session_paths())
         self._set_status(f"Tab-Reihenfolge gespeichert ({n} Tab(s))")
 
@@ -446,6 +451,16 @@ class MainWindow(QMainWindow):
             sec_kind = str(getattr(self, "_secondary_kind", "") or "")
             if not sec_kind:
                 sec_kind = "pdf" if Path(sec_path).suffix.lower() == ".pdf" else "editor"
+        theme = ""
+        try:
+            theme = load_theme_mode()
+        except Exception:
+            theme = ""
+        tab_labels = {}
+        try:
+            tab_labels = dict(self.sidebar.document_labels())
+        except Exception:
+            tab_labels = {}
         state = session_mod.build_session(
             paths,
             active_path=active,
@@ -458,6 +473,8 @@ class MainWindow(QMainWindow):
             secondary_kind=sec_kind or None,
             sync_scroll=get_editor_doc_split_sync_scroll(),
             splitter_sizes=self._main_splitter_sizes() or None,
+            theme=theme or None,
+            tab_labels=tab_labels or None,
         )
         session_mod.save_session(state)
 
@@ -474,10 +491,25 @@ class MainWindow(QMainWindow):
         state = session_mod.load_session()
         if not state.restore or not state.tabs:
             return
+        # Theme aus Session wiederherstellen (0.9.4)
+        theme = str(getattr(state, "theme", "") or "").strip().lower()
+        if theme in ("dark", "light"):
+            try:
+                apply_theme(mode=theme)  # type: ignore[arg-type]
+                self._sync_theme_menu()
+            except Exception:
+                pass
         # Alle Tabs in Sidebar laden; View-State je Tab vorbereiten (0.9.1)
         for tab in state.tabs:
             if Path(tab.path).is_file():
                 self.sidebar.add_document(tab.path)
+                # Anzeige-Label (≠ Dateiname) — 0.9.4
+                lbl = str(getattr(tab, "label", "") or "").strip()
+                if lbl:
+                    try:
+                        self.sidebar.set_document_label(tab.path, lbl)
+                    except Exception:
+                        pass
                 key = self._path_key(tab.path)
                 if key:
                     self._tab_view_state[key] = {
@@ -485,7 +517,11 @@ class MainWindow(QMainWindow):
                         "scale": float(getattr(tab, "scale", 1.5) or 1.5),
                         "scroll_y": max(0, int(getattr(tab, "scroll_y", 0) or 0)),
                     }
-        active = state.tabs[state.active] if 0 <= state.active < len(state.tabs) else state.tabs[-1]
+        # Aktiver Tab-Index aus Session (0.9.4 explizit)
+        active_idx = int(getattr(state, "active", 0) or 0)
+        if active_idx < 0 or active_idx >= len(state.tabs):
+            active_idx = len(state.tabs) - 1
+        active = state.tabs[active_idx]
         if not Path(active.path).is_file():
             return
         self.open_path(active.path)
@@ -547,6 +583,7 @@ class MainWindow(QMainWindow):
         self.sidebar.document_close_left_requested.connect(self.close_tabs_left_of)
         self.sidebar.document_close_right_requested.connect(self.close_tabs_right_of)
         self.sidebar.document_pin_toggled.connect(self._on_document_pin_toggled)
+        self.sidebar.document_rename_requested.connect(self._on_document_renamed)
         self.sidebar.recent_activated.connect(self.open_path)
         self.sidebar.recent_remove_requested.connect(self._remove_recent_path)
         self.sidebar.mark_activated.connect(self._on_mark_activated)
@@ -2552,9 +2589,9 @@ class MainWindow(QMainWindow):
 
     def _recolor_selected_annotations(self):
         if self.stack.currentWidget() is not self.pdf_view or not self.pdf_view.pdf_path:
-            self._set_status("Auswahl-Farbe nur im PDF-Modus")
+            self._set_status("Strichfarbe nur im PDF-Modus")
             return
-        n = self.pdf_view.recolor_selected_annotations()
+        n = self.pdf_view.recolor_stroke_selected_annotations()
         if n:
             self._refresh_pdf_marks()
 
@@ -3726,6 +3763,11 @@ class MainWindow(QMainWindow):
         mode = toggle_theme(self)
         self._sync_theme_menu()
         self._set_status("Dunkles Design" if mode == "dark" else "Helles Design")
+        # Theme in Session merken (0.9.4)
+        try:
+            self._save_session()
+        except Exception:
+            pass
 
     def dragEnterEvent(self, event):
         if event.mimeData().hasUrls():
@@ -4376,7 +4418,8 @@ class MainWindow(QMainWindow):
             if text_hits or hits or n_page:
                 lines = []
                 payloads = []
-                for page_idx, hit_i, snip in text_hits:
+                # text_hits: (Seite, Zeichen-Offset, Snippet) — CSV-Export 0.9.4
+                for page_idx, offset, snip in text_hits:
                     lines.append(
                         fulltext_mod.format_hit_line(
                             Path(pdf_path).name if pdf_path else "PDF",
@@ -4387,7 +4430,7 @@ class MainWindow(QMainWindow):
                             query=query,
                         )
                     )
-                    payloads.append((str(pdf_path), page_idx, query, hit_i))
+                    payloads.append((str(pdf_path), page_idx, query, offset))
                 for h in hits:
                     ann_snip = fulltext_mod._snippet_around(
                         f"{h.type.value} {h.text}",

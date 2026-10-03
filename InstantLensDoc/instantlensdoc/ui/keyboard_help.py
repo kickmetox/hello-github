@@ -64,15 +64,19 @@ SHORTCUTS_HTML = """
 <tr><td>Tabs Alle / Links / Rechts schließen</td><td>Sidebar-Rechtsklick + Datei-Menü; Alle: <code>Ctrl+Alt+Shift+W</code> — 0.9.1</td></tr>
 <tr><td>Tab anheften / lösen</td><td>Sidebar-Rechtsklick; angeheftet bleibt bei „Alle schließen“; Indikator 📌 — 0.9.2</td></tr>
 <tr><td>Tab Drag-Reorder</td><td>Dokumentliste ziehen → Reihenfolge; Session speichert `order` — 0.9.3</td></tr>
+<tr><td>Tab umbenennen</td><td>Doppelklick / Rechtsklick „Umbenennen…“ → Anzeige-Label (≠ Dateiname); Session `label` — 0.9.4</td></tr>
 <tr><td>Opacity-Slider Auswahl</td><td>Toolbar-Slider steuert ausgewähltes Ann.-Objekt — 0.9.0; Undo erst beim Loslassen — 0.9.1</td></tr>
 <tr><td>Stroke-Width Slider</td><td>Toolbar 1–12 px für ausgewähltes Shape; Undo beim Loslassen — 0.9.2</td></tr>
 <tr><td>Fill-Color Picker</td><td>Toolbar „Füllung…“ für ausgewähltes Shape; Commit + Undo — 0.9.3</td></tr>
+<tr><td>Stroke-Color Picker</td><td>Toolbar „Strich…“ Strichfarbe getrennt von Füllung; Commit + Undo — 0.9.4</td></tr>
 <tr><td>PDF-Suche Aa / Wort</td><td>Suchleisten-Toggles Case-sensitive + Whole-word — 0.9.2</td></tr>
 <tr><td>PDF-Suche Regex</td><td>Suchleisten-Toggle `.*`; Fehlerstatus in Statusleiste — 0.9.3</td></tr>
+<tr><td>PDF-Suche CSV-Export</td><td>Treffer als CSV: Seite, Offset, Snippet — 0.9.4</td></tr>
 <tr><td>Session-Toggles</td><td>Einstellungen: Fenstergeometrie + offene Tabs getrennt — 0.9.0</td></tr>
 <tr><td>Session Last-Page / Scroll</td><td>Seite + Scroll-Position pro Tab speichern/wiederherstellen — 0.9.1</td></tr>
 <tr><td>Session Zoom pro Tab</td><td>Zoom-Level speichern/wiederherstellen (Vorrang vor Fit/Default) — 0.9.2</td></tr>
 <tr><td>Session Splitter</td><td>Sidebar/Viewer-Größen speichern/wiederherstellen — 0.9.3</td></tr>
+<tr><td>Session Theme / aktiver Tab</td><td>Theme dark/light + aktiver Tab-Index speichern/wiederherstellen — 0.9.4</td></tr>
 <tr><td>PDF-Trefferliste</td><td>Sidebar Seite + Snippet klickbar → Sprung + Highlight — 0.9.1</td></tr>
 <tr><td>Fenster teilen (zwei Docs)</td><td><code>Ctrl+\\</code> — 0.6.3</td></tr>
 <tr><td>Vertikaler Split (übereinander)</td><td><code>Ctrl+Shift+\\</code> (Toggle) — 0.6.5</td></tr>

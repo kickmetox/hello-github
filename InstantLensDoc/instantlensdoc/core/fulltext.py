@@ -305,6 +305,7 @@ SEARCH_HIT_CSV_FIELDS = (
     "label",
     "path",
     "page",
+    "offset",
     "line",
     "kind",
     "query",
@@ -313,14 +314,17 @@ SEARCH_HIT_CSV_FIELDS = (
 
 
 def normalize_search_hit_record(raw: dict | None, *, index: int = 1, query: str = "") -> dict:
-    """Eine Trefferzeile für CSV/JSON-Export normalisieren."""
+    """Eine Trefferzeile für CSV/JSON-Export normalisieren (inkl. Offset 0.9.4)."""
     src = dict(raw or {})
     page = src.get("page", "")
     line = src.get("line", "")
+    offset = src.get("offset", "")
     if page is None:
         page = ""
     if line is None:
         line = ""
+    if offset is None:
+        offset = ""
     if page != "" and not isinstance(page, str):
         try:
             page = int(page)
@@ -331,11 +335,17 @@ def normalize_search_hit_record(raw: dict | None, *, index: int = 1, query: str 
             line = int(line)
         except (TypeError, ValueError):
             line = str(line)
+    if offset != "" and not isinstance(offset, str):
+        try:
+            offset = int(offset)
+        except (TypeError, ValueError):
+            offset = str(offset)
     return {
         "index": int(src.get("index") or index),
         "label": str(src.get("label") or ""),
         "path": str(src.get("path") or ""),
         "page": page,
+        "offset": offset,
         "line": line,
         "kind": str(src.get("kind") or "mark"),
         "query": str(src.get("query") if src.get("query") is not None else query),

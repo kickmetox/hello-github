@@ -227,6 +227,7 @@ class TextMatchRect:
     width: float
     height: float
     text: str = ""
+    offset: int = -1  # Zeichen-Offset im Seiten-Volltext (0.9.4)
 
     def scaled(self, scale: float) -> "TextMatchRect":
         s = float(scale)
@@ -237,6 +238,7 @@ class TextMatchRect:
             width=self.width * s,
             height=self.height * s,
             text=self.text,
+            offset=int(self.offset),
         )
 
 
@@ -353,6 +355,7 @@ def find_text_rects(
                 width=max(x1 - x0, 4.0),
                 height=max(y1 - y0, 6.0),
                 text=snippet,
+                offset=int(pos),
             )
             hits.append(rect.scaled(scale) if scale != 1.0 else rect)
             if len(hits) >= max_hits:
