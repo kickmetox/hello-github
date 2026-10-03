@@ -1,5 +1,28 @@
 # Changelog — InstantLens Doc
 
+## 1.1.3 — OCR Seitenfehler·Teilergebnis, Merge-Vorschau, Ann. Undo gefiltert, Keygen-History
+
+Post-Release-Polish nach 1.1.2: OCR-Batch sammelt Fehler pro Seite und hängt sie als Abschnitt an das Ergebnis-TXT; Abbruch behält Teilergebnis; PDF-Zusammenführen zeigt Vorschau-Thumbnail der markierten Datei (erste Seite); gefiltertes Annotationen-Löschen mit Undo-Text „N Annotationen (gefiltert)“; Keygen speichert lokal die letzten 10 Keys inkl. Clear History (ohne Secrets in Logs). Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### OCR / Batch
+- **Seitenfehler** werden gesammelt und am Ende als Abschnitt **„OCR-Fehler“** im Ergebnis-TXT
+- **Abbruch** behält **Teilergebnis** (bisherige Seiten + Fehlerliste)
+
+### PDF
+- **Zusammenführen**: **Vorschau-Thumbnail** der markierten Datei (erste Seite)
+
+### Annotationen
+- Gefiltertes Löschen: Undo-Text **„N Annotationen (gefiltert)“**
+
+### Keygen
+- GUI/CLI: lokale **History der letzten 10 Keys**; Button **Clear History** (keine Secrets in Logs)
+
+### Packaging / Docs
+- Version **1.1.3** (App / `ild_pdf` / ISS / Smoke / Docs)
+- Smoke: OCR page_errors·Teilergebnis, Merge-Vorschau, Ann. Undo gefiltert, Keygen-History (CLI + Qt)
+
+---
+
 ## 1.1.2 — OCR DPI·Seitenbereich, Merge DnD·Duplikat, Ann. Filter-Löschen, Keygen .txt/--days
 
 Post-Release-Polish nach 1.1.1: OCR-Batch mit DPI-Auswahl 150/300 und optionalem Seitenbereich von–bis; PDF-Zusammenführen nimmt Dateien per Drag&Drop in die Liste und warnt bei Duplikaten; „Alle Annotationen auf Seite löschen“ mit Option nur sichtbare/gefilterte; Keygen speichert als .txt, CLI `--days` bleibt kompatibel. Stubs KI/Cloud/Stylus/3D bleiben Stubs.

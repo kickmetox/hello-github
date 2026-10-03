@@ -7700,9 +7700,15 @@ class MainWindow(QMainWindow):
 
         if result.cancelled or cancelled["flag"]:
             self._set_status(
-                f"Batch-OCR abgebrochen ({result.pages_done}/{result.pages_total})"
+                f"Batch-OCR abgebrochen — Teilergebnis "
+                f"({result.pages_done}/{result.pages_total})"
+                + (
+                    f", {len(result.page_errors)} Fehler"
+                    if result.page_errors
+                    else ""
+                )
             )
-            if not result.text.strip():
+            if not (result.text or "").strip():
                 return
 
         # Ergebnis als neue Textdatei-Tab (PDF-Tab bleibt) — 1.1.0
@@ -7726,8 +7732,10 @@ class MainWindow(QMainWindow):
             f"{result.pages_done}/{result.pages_total} Seiten"
             f" → Tab {out_txt.name}"
         )
+        if result.page_errors:
+            status += f" · {len(result.page_errors)} Seitenfehler"
         if result.cancelled:
-            status += " (abgebrochen)"
+            status += " (abgebrochen, Teilergebnis behalten)"
         self._set_status(status)
 
     def _sanitize_pdf(self):

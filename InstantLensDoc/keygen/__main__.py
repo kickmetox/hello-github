@@ -12,6 +12,12 @@ if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
 from instantlensdoc.license import KEY_DAYS, generate_key, verify_key
+from keygen.history import (
+    HISTORY_MAX,
+    add_history,
+    clear_history,
+    load_history,
+)
 
 
 def cli(argv: list[str] | None = None) -> int:
@@ -26,10 +32,20 @@ def cli(argv: list[str] | None = None) -> int:
         metavar="N",
         help=f"Gültigkeitstage (Standard: {KEY_DAYS}; kompatibel ohne --days)",
     )
+    p.add_argument(
+        "--clear-history",
+        action="store_true",
+        help="Lokale Key-History leeren (keine Secrets in Logs) — 1.1.3",
+    )
     args = p.parse_args(argv)
 
     if args.gui:
         return run_gui(days=args.days)
+
+    if args.clear_history:
+        clear_history()
+        print(f"# History geleert (max. {HISTORY_MAX} Einträge)")
+        return 0
 
     if args.verify:
         ok, msg, data = verify_key(args.verify)
@@ -47,6 +63,7 @@ def cli(argv: list[str] | None = None) -> int:
         print("FEHLER: --days muss ≥ 1 sein", file=sys.stderr)
         return 2
     key = generate_key(args.email, days=days)
+    add_history(email=args.email, key=key, days=days)
     print(key)
     print(f"# Gültigkeit: {days} Tage" + (" (30+2)" if days == KEY_DAYS else "") + " ab Ausstellung")
     print("# Kontakt: ame@sellerbach.de")
@@ -55,12 +72,15 @@ def cli(argv: list[str] | None = None) -> int:
 
 def run_gui(*, days: int | None = None) -> int:
     try:
+        from PySide6.QtCore import Qt
         from PySide6.QtWidgets import (
             QApplication,
             QFileDialog,
             QHBoxLayout,
             QLabel,
             QLineEdit,
+            QListWidget,
+            QListWidgetItem,
             QMainWindow,
             QMessageBox,
             QPushButton,
@@ -77,7 +97,7 @@ def run_gui(*, days: int | None = None) -> int:
         def __init__(self):
             super().__init__()
             self.setWindowTitle("InstantLens Doc — Keygenerator")
-            self.resize(540, 320)
+            self.resize(560, 480)
             w = QWidget()
             layout = QVBoxLayout(w)
             layout.addWidget(QLabel("E-Mail:"))
@@ -124,11 +144,82 @@ def run_gui(*, days: int | None = None) -> int:
             self.out.setReadOnly(True)
             self.out.setPlaceholderText("Key erscheint hier als Klartext…")
             layout.addWidget(self.out)
+
+            hist_header = QHBoxLayout()
+            hist_header.addWidget(
+                QLabel(f"History (letzte {HISTORY_MAX} Keys, lokal):")
+            )
+            btn_clear = QPushButton("Clear History")
+            btn_clear.setToolTip(
+                "Lokale Key-History leeren (keine Secrets in Logs) — 1.1.3"
+            )
+            btn_clear.clicked.connect(self._clear_history)
+            hist_header.addStretch(1)
+            hist_header.addWidget(btn_clear)
+            layout.addLayout(hist_header)
+            self.history_list = QListWidget()
+            self.history_list.setToolTip(
+                "Doppelklick lädt Key in die Ausgabe — 1.1.3"
+            )
+            self.history_list.setMaximumHeight(120)
+            self.history_list.itemDoubleClicked.connect(self._history_load)
+            layout.addWidget(self.history_list)
+
             layout.addWidget(
                 QLabel(f"Standard: {KEY_DAYS} Tage. Kontakt: ame@sellerbach.de")
             )
             self.setCentralWidget(w)
             self._last_days = int(self.days_spin.value())
+            self._reload_history()
+
+        def _reload_history(self):
+            self.history_list.clear()
+            for entry in load_history():
+                email = entry.get("email") or "?"
+                days = entry.get("days") or 0
+                created = (entry.get("created") or "")[:10]
+                key = entry.get("key") or ""
+                # Anzeige ohne vollen Key (nur Präfix) — Secrets nicht in UI-Label-Spam
+                prefix = key[:12] + "…" if len(key) > 14 else key
+                label = f"{email} · {days}d · {created} · {prefix}"
+                item = QListWidgetItem(label)
+                item.setData(Qt.UserRole, entry)
+                self.history_list.addItem(item)
+
+        def _history_load(self, item: QListWidgetItem):
+            entry = item.data(Qt.UserRole) if item else None
+            if not isinstance(entry, dict):
+                return
+            key = str(entry.get("key") or "")
+            if not key:
+                return
+            self.out.setPlainText(key)
+            email = str(entry.get("email") or "")
+            if email:
+                self.email.setText(email)
+            try:
+                d = int(entry.get("days") or KEY_DAYS)
+            except (TypeError, ValueError):
+                d = KEY_DAYS
+            self.days_spin.setValue(max(1, d))
+            self._last_days = d
+            self.validity_label.setText(f"Gültigkeit: {d} Tage")
+            self.statusBar().showMessage("Key aus History geladen", 2500)
+
+        def _clear_history(self):
+            if self.history_list.count() <= 0:
+                QMessageBox.information(self, "History", "History ist bereits leer.")
+                return
+            reply = QMessageBox.question(
+                self,
+                "Clear History",
+                f"Lokale History ({self.history_list.count()} Einträge) leeren?",
+            )
+            if reply != QMessageBox.Yes:
+                return
+            clear_history()
+            self._reload_history()
+            self.statusBar().showMessage("History geleert", 2500)
 
         def _gen(self):
             email = self.email.text().strip()
@@ -140,6 +231,8 @@ def run_gui(*, days: int | None = None) -> int:
             self.out.setPlainText(key)
             self._last_days = d
             self.validity_label.setText(f"Gültigkeit: {d} Tage")
+            add_history(email=email, key=key, days=d)
+            self._reload_history()
 
         def _copy(self):
             text = self.out.toPlainText().strip()

@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QImage, QPixmap
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QCheckBox,
@@ -25,6 +26,15 @@ from PySide6.QtWidgets import (
 )
 
 from ild_pdf.pages import extract_page_range, merge_pdfs, split_pdf
+
+
+def _pil_to_qpixmap(img) -> QPixmap:
+    if img.mode not in ("RGB", "RGBA"):
+        img = img.convert("RGB")
+    data = img.tobytes("raw", img.mode)
+    fmt = QImage.Format_RGBA8888 if img.mode == "RGBA" else QImage.Format_RGB888
+    qimg = QImage(data, img.width, img.height, fmt).copy()
+    return QPixmap.fromImage(qimg)
 
 
 class MergeListWidget(QListWidget):
@@ -83,10 +93,11 @@ class PdfToolsDialog(QDialog):
     ):
         super().__init__(parent)
         self.setWindowTitle("PDF zusammenführen / teilen / Bereich")
-        self.resize(520, 460)
+        self.resize(560, 520)
         self._initial_pdf = initial_pdf or ""
         self._page_count = page_count
         self._current_page = max(0, int(current_page))
+        self._preview_path: str | None = None
         layout = QVBoxLayout(self)
         tabs = QTabWidget()
         tabs.addTab(self._build_merge_tab(), "Zusammenführen")
@@ -106,6 +117,7 @@ class PdfToolsDialog(QDialog):
                 "(Drag&Drop Dateien / Neuordnen; Doppelklick entfernt):"
             )
         )
+        list_row = QHBoxLayout()
         self.merge_list = MergeListWidget()
         self.merge_list.setToolTip(
             "PDFs per Drag&Drop in die Liste ziehen; intern neuordnen; "
@@ -113,11 +125,36 @@ class PdfToolsDialog(QDialog):
         )
         self.merge_list.itemDoubleClicked.connect(self._merge_double_click)
         self.merge_list.files_dropped.connect(self._merge_add_paths)
+        self.merge_list.currentItemChanged.connect(
+            lambda _cur, _prev: self._merge_update_preview()
+        )
         model = self.merge_list.model()
         if model is not None:
             model.rowsInserted.connect(lambda *_: self._merge_update_pages_sum())
             model.rowsRemoved.connect(lambda *_: self._merge_update_pages_sum())
-        lay.addWidget(self.merge_list)
+            model.rowsInserted.connect(lambda *_: self._merge_update_preview())
+            model.rowsRemoved.connect(lambda *_: self._merge_update_preview())
+        list_row.addWidget(self.merge_list, 1)
+
+        preview_col = QVBoxLayout()
+        preview_col.addWidget(QLabel("Vorschau (1. Seite):"))
+        self.merge_preview = QLabel()
+        self.merge_preview.setAlignment(Qt.AlignCenter)
+        self.merge_preview.setMinimumSize(140, 180)
+        self.merge_preview.setMaximumWidth(180)
+        self.merge_preview.setStyleSheet(
+            "QLabel { background: #f0f0f0; border: 1px solid #bbb; }"
+        )
+        self.merge_preview.setToolTip(
+            "Thumbnail der ersten Seite der markierten Datei — 1.1.3"
+        )
+        self.merge_preview.setText("Keine Auswahl")
+        self.merge_preview.setWordWrap(True)
+        preview_col.addWidget(self.merge_preview)
+        preview_col.addStretch(1)
+        list_row.addLayout(preview_col)
+        lay.addLayout(list_row)
+
         self.merge_pages_label = QLabel("Seiten gesamt: 0")
         self.merge_pages_label.setToolTip(
             "Summe der Seitenzahlen aller PDFs in der Liste — 1.1.1"
@@ -274,6 +311,10 @@ class PdfToolsDialog(QDialog):
                 f"{shown}{more}",
             )
         self._merge_update_pages_sum()
+        if added and self.merge_list.currentRow() < 0 and self.merge_list.count() > 0:
+            self.merge_list.setCurrentRow(self.merge_list.count() - 1)
+        else:
+            self._merge_update_preview()
         return added
 
     def _merge_add(self):
@@ -342,6 +383,39 @@ class PdfToolsDialog(QDialog):
             f"Seiten gesamt: {total}"
             + (f" ({n_files} Datei{'en' if n_files != 1 else ''})" if n_files else "")
         )
+
+    def _merge_update_preview(self):
+        """Thumbnail der ersten Seite der markierten Datei — 1.1.3."""
+        item = self.merge_list.currentItem()
+        if item is None or not (item.text() or "").strip():
+            self._preview_path = None
+            self.merge_preview.setPixmap(QPixmap())
+            self.merge_preview.setText("Keine Auswahl")
+            return
+        path = item.text().strip()
+        if (
+            path == self._preview_path
+            and self.merge_preview.pixmap() is not None
+            and not self.merge_preview.pixmap().isNull()
+        ):
+            return
+        self._preview_path = path
+        try:
+            from ild_pdf.render import render_page
+
+            img = render_page(path, page_index=0, scale=0.35, use_cache=True)
+            pm = _pil_to_qpixmap(img).scaled(
+                160, 200, Qt.KeepAspectRatio, Qt.SmoothTransformation
+            )
+            self.merge_preview.setPixmap(pm)
+            self.merge_preview.setText("")
+            self.merge_preview.setToolTip(
+                f"Vorschau 1. Seite: {Path(path).name} — 1.1.3"
+            )
+        except Exception as e:
+            self.merge_preview.setPixmap(QPixmap())
+            self.merge_preview.setText("Vorschau\nnicht möglich")
+            self.merge_preview.setToolTip(f"Vorschau fehlgeschlagen: {e}")
 
     def _merge_pick_dest(self):
         path, _ = QFileDialog.getSaveFileName(self, "Ziel-PDF", "", "PDF (*.pdf)")

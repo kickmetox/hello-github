@@ -9,7 +9,8 @@ run-keygen.bat
 ```
 
 Startet die GUI. Ausgabe als **Klartext (ohne QR)** mit **Kopieren**- und
-**Speichern als .txt**-Button; **Gültigkeitstage** neben dem Key (Spinbox / `--days`).
+**Speichern als .txt**-Button; **Gültigkeitstage** neben dem Key (Spinbox / `--days`);
+lokale **History der letzten 10 Keys** + **Clear History** (keine Secrets in Logs).
 Keys gelten standardmäßig **32 Tage (30+2)**. Kontakt: **ame@sellerbach.de**.
 
 ## Installer-Pfad (EXE-Build)
@@ -40,6 +41,9 @@ python -m keygen --verify "ILD1...."
 
 # GUI
 python -m keygen --gui
+
+# History leeren
+python -m keygen --clear-history
 ```
 
 Format: `ILD1.<payload>.<sig>`.

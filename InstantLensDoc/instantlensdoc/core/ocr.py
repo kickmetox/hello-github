@@ -272,6 +272,21 @@ class OcrDocumentResult:
     dpi: int = DEFAULT_OCR_DPI
     page_from: int = 1  # 1-basiert inkl.
     page_to: int = 0  # 1-basiert inkl.; 0 = Ende
+    # (Seitennummer 1-basiert, Fehlermeldung) — 1.1.3
+    page_errors: List[tuple[int, str]] = field(default_factory=list)
+
+
+def _format_ocr_errors_section(page_errors: List[tuple[int, str]]) -> str:
+    """Abschnitt „OCR-Fehler“ für Ergebnis-TXT — 1.1.3."""
+    if not page_errors:
+        return ""
+    lines = ["--- OCR-Fehler ---"]
+    for page_no, err in page_errors:
+        msg = (err or "unbekannt").strip().replace("\n", " ")
+        if len(msg) > 200:
+            msg = msg[:197] + "…"
+        lines.append(f"Seite {page_no}: {msg}")
+    return "\n".join(lines) + "\n"
 
 
 def ocr_pdf_document(
@@ -288,6 +303,8 @@ def ocr_pdf_document(
     OCR über PDF-Seiten (optional von–bis, 1-basiert inkl.).
     dpi 150/300 setzt scale=dpi/72; scale-Argument bleibt kompatibel.
     progress(page_1based, total_in_range, preview) → False zum Abbrechen.
+    Seitenfehler werden gesammelt und am Ende als Abschnitt angehängt (1.1.3);
+    Abbruch behält Teilergebnis inkl. bisheriger Fehler.
     """
     from ild_pdf import render_page
 
@@ -329,11 +346,13 @@ def ocr_pdf_document(
             dpi=use_dpi,
             page_from=start,
             page_to=end,
+            page_errors=[],
         )
 
     indices = list(range(start - 1, end))  # 0-basiert
     range_total = len(indices)
     page_texts: List[str] = []
+    page_errors: List[tuple[int, str]] = []
     cancelled = False
     for i, page in enumerate(indices):
         if progress is not None:
@@ -345,16 +364,30 @@ def ocr_pdf_document(
             if cont is False:
                 cancelled = True
                 break
-        img = render_page(pdf_path, page_index=page, scale=scale)
-        page_texts.append(ocr_image(img, lang=lang))
+        page_no = page + 1
+        try:
+            img = render_page(pdf_path, page_index=page, scale=scale)
+            page_texts.append(ocr_image(img, lang=lang))
+        except OcrUnavailable:
+            raise
+        except Exception as e:
+            page_texts.append("")
+            page_errors.append((page_no, f"{type(e).__name__}: {e}"))
 
     parts: List[str] = []
     for i, t in enumerate(page_texts):
         page_no = indices[i] + 1
         header = f"--- Seite {page_no}/{total} ---"
         body = (t or "").rstrip()
+        if not body and any(pe[0] == page_no for pe in page_errors):
+            body = "[OCR-Fehler — siehe Abschnitt am Ende]"
         parts.append(f"{header}\n{body}" if body else header)
-    combined = "\n\n".join(parts).strip() + ("\n" if parts else "")
+    combined = "\n\n".join(parts).strip()
+    err_section = _format_ocr_errors_section(page_errors)
+    if err_section:
+        combined = (combined + "\n\n" + err_section) if combined else err_section
+    elif combined:
+        combined += "\n"
     return OcrDocumentResult(
         text=combined,
         lang=lang,
@@ -365,6 +398,7 @@ def ocr_pdf_document(
         dpi=use_dpi,
         page_from=start,
         page_to=end,
+        page_errors=page_errors,
     )
 
 

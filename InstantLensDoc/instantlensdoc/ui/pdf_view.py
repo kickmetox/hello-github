@@ -6156,8 +6156,13 @@ class PdfViewer(QWidget):
             return 0
         self.refresh()
         self.annotations_changed.emit()
-        scope = "gefilterte " if only_ids is not None else ""
-        self.status.emit(f"{n} {scope}Annotation(en) auf Seite {page + 1} gelöscht")
+        if only_ids is not None:
+            ann_word = "Annotation" if n == 1 else "Annotationen"
+            self.status.emit(
+                f"{n} {ann_word} (gefiltert) auf Seite {page + 1} gelöscht"
+            )
+        else:
+            self.status.emit(f"{n} Annotation(en) auf Seite {page + 1} gelöscht")
         return n
 
     def clear_redactions(self):

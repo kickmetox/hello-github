@@ -1313,11 +1313,12 @@ class AnnotationStore:
             return 0
         n = len(targets)
         remove_ids = {str(a.id) for a in targets}
-        label = (
-            f"Gefilterte Ann. Seite {page + 1} löschen"
-            if only_ids is not None
-            else f"Alle Ann. Seite {page + 1} löschen"
-        )
+        if only_ids is not None:
+            # Undo-Text „N Annotationen (gefiltert)“ — 1.1.3
+            ann_word = "Annotation" if n == 1 else "Annotationen"
+            label = f"{n} {ann_word} (gefiltert)"
+        else:
+            label = f"Alle Ann. Seite {page + 1} löschen"
         with self.atomic(label=label):
             self.annotations = [
                 a for a in self.annotations if str(a.id) not in remove_ids
