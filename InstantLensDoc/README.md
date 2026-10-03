@@ -2,7 +2,7 @@
 
 Moderne Textverarbeitung mit PDF-Annotator, OCR-Bridge und Formulargenerator.
 
-**Version:** 1.5.5  
+**Version:** 1.6.0  
 **Hersteller:** Andreas Meyer · ame@sellerbach.de
 
 ## Quickstart (Windows)
@@ -33,8 +33,8 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an).
 
-## Neu in 1.5.5
+## Neu in 1.6.0
 
-Polish auf 1.5.4: Metadaten-Toast-Klick nur wenn Dialog zu (sonst Fokus/raise); Seiten→Bilder-Footer Badge „Filter: übersprungen“ wenn aktiv; Signatur-Zoom in Settings persistiert + Reset-Zoom in Vorschau; CLI `--list-pages FILE --json` → `{pages,path}`, Exit 2 bei fehlender Datei. Stubs KI/Cloud/Stylus/3D unverändert.
+Minor-Release: **Wasserzeichen** Text oder Bild diagonal/zentriert mit Vorschau und Bake in neues PDF; **PDF verschlüsseln/entschlüsseln** (User-Passwort, Owner optional, pikepdf); **Dokument-Statistik**-Panel (Seiten, Wörter, Annotationen, Dateigröße); **Workspace-Layouts** speichern/laden (Name + Panel-Sichtbarkeit + Splitter). Stubs KI/Cloud/Stylus/3D unverändert.
 
 Siehe [CHANGELOG.md](CHANGELOG.md), [FEATURES.md](FEATURES.md) und [INFO.md](INFO.md).

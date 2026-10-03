@@ -187,7 +187,8 @@ HELP_HTML = f"""
     Flatten/Bake mit Fortschrittsdialog (Abbrechen);
     <b>Signaturfeld</b> (Platzhalter) und <b>Signatur (Bild)</b> Mausrad-Zoom + Esc + Aspect-Lock + Flatten — 1.5.3;
     <b>PDFs zusammenführen / teilen / Seitenbereich</b>;
-    <b>Wasserzeichen / Seitennummern</b>;
+    <b>Wasserzeichen / Seitennummern</b> Text/Bild · diagonal/zentriert · Vorschau · Bake — 1.6.0;
+    <b>PDF verschlüsseln/entschlüsseln</b> · <b>Dokument-Statistik</b> · <b>Workspace-Layouts</b> — 1.6.0;
     <b>Zwei PDFs vergleichen</b> (Seite neben Seite);
     <b>Passwort setzen/öffnen</b>; <b>Bildkompression</b> (Seiten neu als JPEG);
     <b>Metadaten bearbeiten</b> Toast-Klick nur wenn Dialog zu · sonst Fokus/raise · Backup <code>.ildbak</code> — 1.5.5; <b>PDF bereinigen</b> (optional Metadaten strippen);
@@ -700,7 +701,8 @@ class AboutDialog(QDialog):
             "<ul>"
             "<li>PDF lesen/annotieren (Highlight, Notiz, Stempel, Formen) · Sidecar v4</li>"
             "<li><b>Metadaten Toast Fokus/raise · Seiten→Bilder Filter-Badge · Signatur Zoom Settings·Reset · CLI</b> "
-            "<code>--list-pages --json</code> · <code>--export-page</code> · Exit 0/1/2 — 1.5.5</li>"
+            "<code>--list-pages --json</code> · <code>--export-page</code> · Exit 0/1/2 · "
+            "Wasserzeichen Bake · Encrypt/Decrypt · Doc-Stats · Workspace-Layouts — 1.6.0</li>"
             "<li><b>Theme zyklisch</b> <code>Ctrl+Shift+T</code> "
             "System→Hell→Dunkel (Status-Toast „Theme: …“) — 1.4.5</li>"
             "<li>Willkommen Drag&amp;Drop/Clear-Recent, Druck-DPI 72/150/300, Trial-Resttage konsistent, Backup-Retry — 1.0.2</li>"

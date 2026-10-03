@@ -107,8 +107,13 @@ from instantlensdoc.ui.theme import (
     toggle_theme,
 )
 from instantlensdoc.ui.keyboard_help import KeyboardHelpDialog
-from instantlensdoc.ui.password_dialog import CompressPdfDialog, SetPasswordDialog
+from instantlensdoc.ui.password_dialog import (
+    CompressPdfDialog,
+    RemovePasswordDialog,
+    SetPasswordDialog,
+)
 from instantlensdoc.ui.metadata_dialog import MetadataDialog
+from instantlensdoc.ui.doc_stats_dialog import DocStatsDialog
 from instantlensdoc.ui.form_fields_dialog import FormFieldsDialog
 from instantlensdoc.ui.page_size_dialog import PageSizeDialog
 from instantlensdoc.core import session as session_mod
@@ -132,6 +137,8 @@ class MainWindow(QMainWindow):
         self._theme_action: QAction | None = None
         self._theme_system_action: QAction | None = None
         self._ann_search_dialog: AnnotationSearchDialog | None = None
+        self._doc_stats_dialog: DocStatsDialog | None = None
+        self._workspace_layout_menu = None
         self._autosave_enabled = bool(get_autosave_enabled())
         self._thumb_lazy_timer: QTimer | None = None
         self._thumb_lazy_queue: list[int] = []
@@ -1658,6 +1665,9 @@ class MainWindow(QMainWindow):
         )
         self._panel_bookmark_action.toggled.connect(self._toggle_panel_bookmark)
         m_view.addAction(self._panel_bookmark_action)
+        # Workspace-Layouts: Name + Panel-Sichtbarkeit + Splitter — 1.6.0
+        self._workspace_layout_menu = m_view.addMenu("Workspace-Layouts")
+        self._refresh_workspace_layout_menu()
         self._line_numbers_action = QAction("Zeilennummern", self)
         self._line_numbers_action.setCheckable(True)
         from instantlensdoc.core.app_settings import (
@@ -1934,6 +1944,9 @@ class MainWindow(QMainWindow):
         act_split_pages.triggered.connect(self._split_into_single_page_pdfs)
         m_pdf.addAction(act_split_pages)
         act_wm = QAction("Wasserzeichen / Seitennummern…", self)
+        act_wm.setToolTip(
+            "Text oder Bild diagonal/zentriert; Vorschau; Bake in neues PDF — 1.6.0"
+        )
         act_wm.triggered.connect(self._watermark_tools)
         m_pdf.addAction(act_wm)
         act_cmp = QAction("Zwei PDFs vergleichen…", self)
@@ -1950,9 +1963,20 @@ class MainWindow(QMainWindow):
         )
         act_ann_search.triggered.connect(self._annotation_search_open_docs)
         m_pdf.addAction(act_ann_search)
-        act_pw = QAction("Passwort setzen…", self)
+        act_pw = QAction("PDF verschlüsseln…", self)
+        act_pw.setToolTip("User-Passwort setzen; Owner optional (pikepdf) — 1.6.0")
         act_pw.triggered.connect(self._set_pdf_password)
         m_pdf.addAction(act_pw)
+        act_pw_rm = QAction("PDF entschlüsseln…", self)
+        act_pw_rm.setToolTip("Passwortschutz entfernen via pikepdf — 1.6.0")
+        act_pw_rm.triggered.connect(self._remove_pdf_password)
+        m_pdf.addAction(act_pw_rm)
+        act_stats = QAction("Dokument-Statistik…", self)
+        act_stats.setToolTip(
+            "Seiten, Wörter (Text-PDF), Annotationen, Dateigröße — 1.6.0"
+        )
+        act_stats.triggered.connect(self._show_doc_stats)
+        m_pdf.addAction(act_stats)
         act_compress = QAction("Bildkompression (Seiten neu)…", self)
         act_compress.triggered.connect(self._compress_pdf_images)
         m_pdf.addAction(act_compress)
@@ -6950,6 +6974,174 @@ class MainWindow(QMainWindow):
         except Exception as e:
             _log.exception("Passwort setzen fehlgeschlagen")
             QMessageBox.warning(self, "Passwort", str(e))
+
+    def _remove_pdf_password(self):
+        """PDF entschlüsseln / Passwort entfernen — 1.6.0."""
+        if not self.pdf_view.pdf_path:
+            QMessageBox.information(self, "Passwort", "Bitte zuerst ein PDF öffnen.")
+            return
+        dlg = RemovePasswordDialog(self, pdf_name=self.pdf_view.pdf_path.name)
+        if not dlg.exec():
+            return
+        vals = dlg.values()
+        try:
+            from ild_pdf import remove_password
+            from ild_pdf.render import clear_render_cache
+
+            src = self.pdf_view.pdf_path
+            if vals.get("inplace"):
+                out = src
+            else:
+                out = src.with_name(f"{src.stem}_unlocked.pdf")
+            remove_password(src, vals["password"], out_path=out)
+            clear_render_cache(src)
+            self._set_status(f"Passwort entfernt → {out.name}")
+            QMessageBox.information(
+                self,
+                "Passwort",
+                f"Ungeschütztes PDF gespeichert:\n{out}",
+            )
+            _log.info("PDF decrypted: %s", out)
+        except Exception as e:
+            _log.exception("Passwort entfernen fehlgeschlagen")
+            QMessageBox.warning(self, "Passwort", str(e))
+
+    def _show_doc_stats(self):
+        """Dokument-Statistik-Panel (Seiten/Wörter/Ann./Größe) — 1.6.0."""
+        if not self.pdf_view.pdf_path:
+            QMessageBox.information(
+                self, "Dokument-Statistik", "Bitte zuerst ein PDF öffnen."
+            )
+            return
+        ann_n = (
+            len(self.pdf_view.store.annotations)
+            if getattr(self.pdf_view, "store", None)
+            else None
+        )
+        dlg = getattr(self, "_doc_stats_dialog", None)
+        if dlg is None:
+            dlg = DocStatsDialog(
+                self,
+                pdf_path=self.pdf_view.pdf_path,
+                annotation_count=ann_n,
+            )
+            self._doc_stats_dialog = dlg
+        else:
+            dlg.set_document(self.pdf_view.pdf_path, annotation_count=ann_n)
+        dlg.show()
+        dlg.raise_()
+        dlg.activateWindow()
+
+    def _refresh_workspace_layout_menu(self):
+        """Ansicht → Workspace-Layouts Menü neu aufbauen — 1.6.0."""
+        from instantlensdoc.core.app_settings import get_workspace_layouts
+
+        menu = getattr(self, "_workspace_layout_menu", None)
+        if menu is None:
+            return
+        menu.clear()
+        act_save = QAction("Layout speichern…", self)
+        act_save.setToolTip(
+            "Aktuelle Panel-Sichtbarkeit + Splitter unter Namen speichern — 1.6.0"
+        )
+        act_save.triggered.connect(self._save_workspace_layout)
+        menu.addAction(act_save)
+        menu.addSeparator()
+        layouts = get_workspace_layouts()
+        if not layouts:
+            empty = QAction("(keine Layouts)", self)
+            empty.setEnabled(False)
+            menu.addAction(empty)
+        else:
+            for layout in layouts:
+                name = str(layout.get("name") or "")
+                act = QAction(name, self)
+                act.setToolTip(f"Layout „{name}“ laden (Panels + Splitter)")
+                act.triggered.connect(
+                    lambda checked=False, n=name: self._load_workspace_layout(n)
+                )
+                menu.addAction(act)
+            menu.addSeparator()
+            act_del = QAction("Layout löschen…", self)
+            act_del.triggered.connect(self._delete_workspace_layout)
+            menu.addAction(act_del)
+
+    def _current_workspace_layout_state(self) -> dict:
+        panels = {}
+        if hasattr(self, "sidebar") and hasattr(self.sidebar, "panel_visibility"):
+            panels = dict(self.sidebar.panel_visibility())
+        else:
+            panels = {"thumbs": True, "ann": True, "bookmark": True}
+        return {
+            "panels": panels,
+            "splitter_sizes": self._main_splitter_sizes() or [],
+        }
+
+    def _save_workspace_layout(self):
+        from PySide6.QtWidgets import QInputDialog
+
+        from instantlensdoc.core.app_settings import save_workspace_layout
+
+        name, ok = QInputDialog.getText(
+            self, "Workspace-Layout", "Name für das Layout:"
+        )
+        if not ok:
+            return
+        name = (name or "").strip()
+        if not name:
+            QMessageBox.warning(self, "Workspace-Layout", "Name darf nicht leer sein.")
+            return
+        try:
+            save_workspace_layout(name, state=self._current_workspace_layout_state())
+            self._refresh_workspace_layout_menu()
+            self._set_status(f"Layout gespeichert: {name}")
+        except Exception as e:
+            QMessageBox.warning(self, "Workspace-Layout", str(e))
+
+    def _load_workspace_layout(self, name: str):
+        from instantlensdoc.core.app_settings import get_workspace_layout
+
+        layout = get_workspace_layout(name)
+        if not layout:
+            self._set_status(f"Layout nicht gefunden: {name}")
+            return
+        panels = layout.get("panels") or {}
+        if hasattr(self, "sidebar") and hasattr(self.sidebar, "set_panel_visibility"):
+            self.sidebar.set_panel_visibility(
+                thumbs=bool(panels.get("thumbs", True)),
+                ann=bool(panels.get("ann", True)),
+                bookmark=bool(panels.get("bookmark", True)),
+            )
+            self._sync_panel_visibility_menu()
+        sizes = list(layout.get("splitter_sizes") or [])
+        if sizes:
+            self._apply_main_splitter_sizes(sizes)
+        self._save_session()
+        self._set_status(f"Layout geladen: {name}")
+
+    def _delete_workspace_layout(self):
+        from PySide6.QtWidgets import QInputDialog
+
+        from instantlensdoc.core.app_settings import (
+            delete_workspace_layout,
+            get_workspace_layouts,
+        )
+
+        layouts = get_workspace_layouts()
+        if not layouts:
+            QMessageBox.information(self, "Workspace-Layout", "Keine Layouts gespeichert.")
+            return
+        names = [str(p.get("name") or "") for p in layouts]
+        name, ok = QInputDialog.getItem(
+            self, "Workspace-Layout löschen", "Layout:", names, 0, False
+        )
+        if not ok or not name:
+            return
+        if delete_workspace_layout(name):
+            self._refresh_workspace_layout_menu()
+            self._set_status(f"Layout gelöscht: {name}")
+        else:
+            self._set_status(f"Layout nicht gelöscht: {name}")
 
     def _compress_pdf_images(self):
         if not self.pdf_view.pdf_path:

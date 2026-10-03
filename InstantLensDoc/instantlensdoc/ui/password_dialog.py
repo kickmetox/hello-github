@@ -1,4 +1,4 @@
-"""Dialog: PDF-Passwort setzen / öffnen."""
+"""Dialog: PDF-Passwort setzen / entfernen / öffnen — 1.6.0."""
 
 from __future__ import annotations
 
@@ -36,13 +36,13 @@ def ask_pdf_password(parent: QWidget | None, path: str | Path) -> str | None:
 class SetPasswordDialog(QDialog):
     def __init__(self, parent=None, pdf_name: str = ""):
         super().__init__(parent)
-        self.setWindowTitle("PDF-Passwort setzen")
-        self.resize(420, 220)
+        self.setWindowTitle("PDF verschlüsseln")
+        self.resize(420, 240)
         layout = QVBoxLayout(self)
         layout.addWidget(
             QLabel(
                 f"Passwortschutz für <b>{pdf_name or 'PDF'}</b><br>"
-                "User-Passwort wird zum Öffnen benötigt."
+                "User-Passwort wird zum Öffnen benötigt. Owner optional."
             )
         )
         form = QFormLayout()
@@ -80,6 +80,47 @@ class SetPasswordDialog(QDialog):
             "allow_printing": self.allow_print.isChecked(),
             "allow_modify": self.allow_modify.isChecked(),
             "allow_extract": self.allow_extract.isChecked(),
+        }
+
+
+class RemovePasswordDialog(QDialog):
+    """PDF entschlüsseln: User-/Owner-Passwort, speichert ungeschütztes PDF — 1.6.0."""
+
+    def __init__(self, parent=None, pdf_name: str = ""):
+        super().__init__(parent)
+        self.setWindowTitle("PDF entschlüsseln")
+        self.resize(420, 200)
+        layout = QVBoxLayout(self)
+        layout.addWidget(
+            QLabel(
+                f"Verschlüsselung entfernen für <b>{pdf_name or 'PDF'}</b><br>"
+                "Gültiges User- oder Owner-Passwort erforderlich."
+            )
+        )
+        form = QFormLayout()
+        self.password = QLineEdit()
+        self.password.setEchoMode(QLineEdit.Password)
+        form.addRow("Passwort:", self.password)
+        layout.addLayout(form)
+        self.inplace = QCheckBox("Original überschreiben")
+        self.inplace.setChecked(False)
+        self.inplace.setToolTip("Standard: neues PDF (*_unlocked.pdf)")
+        layout.addWidget(self.inplace)
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        buttons.accepted.connect(self._accept)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+    def _accept(self):
+        if not self.password.text():
+            QMessageBox.warning(self, "Passwort", "Passwort darf nicht leer sein.")
+            return
+        self.accept()
+
+    def values(self) -> dict:
+        return {
+            "password": self.password.text(),
+            "inplace": self.inplace.isChecked(),
         }
 
 

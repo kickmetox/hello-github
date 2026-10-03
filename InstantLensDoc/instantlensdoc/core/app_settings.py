@@ -69,6 +69,7 @@ DEFAULTS: dict[str, Any] = {
     "editor_bracket_match": True,
     "editor_bracket_auto_close": True,
     "ann_filter_presets": [],
+    "workspace_layouts": [],  # benannte Sidebar-Layouts Name+Panels+Splitter — 1.6.0
     "ann_default_opacity": 1.0,
     "ann_default_stroke_width": 2.0,
     "recent_files_max": 12,
@@ -1293,6 +1294,125 @@ def delete_ann_filter_preset(name: str) -> bool:
     if len(kept) == len(presets):
         return False
     save_settings({"ann_filter_presets": kept})
+    return True
+
+
+WORKSPACE_LAYOUTS_MAX = 16
+
+
+def _normalize_workspace_layout(raw: object) -> dict | None:
+    """Layout: name + Panel-Sichtbarkeit + Splitter-Größen — 1.6.0."""
+    if not isinstance(raw, dict):
+        return None
+    name = str(raw.get("name") or "").strip()
+    if not name:
+        return None
+    panels_raw = raw.get("panels") or {}
+    if not isinstance(panels_raw, dict):
+        panels_raw = {}
+    panels = {
+        "thumbs": bool(panels_raw.get("thumbs", True)),
+        "ann": bool(panels_raw.get("ann", True)),
+        "bookmark": bool(panels_raw.get("bookmark", True)),
+    }
+    sizes_raw = raw.get("splitter_sizes") or raw.get("splitter") or []
+    sizes: list[int] = []
+    if isinstance(sizes_raw, (list, tuple)):
+        for v in sizes_raw:
+            try:
+                iv = int(v)
+            except (TypeError, ValueError):
+                continue
+            if iv > 0:
+                sizes.append(iv)
+    return {
+        "name": name,
+        "panels": panels,
+        "splitter_sizes": sizes,
+    }
+
+
+def get_workspace_layouts() -> list[dict]:
+    """Gespeicherte Sidebar-Workspace-Layouts (Name + Panels + Splitter)."""
+    raw = load_settings().get("workspace_layouts") or []
+    if not isinstance(raw, list):
+        return []
+    out: list[dict] = []
+    seen: set[str] = set()
+    for item in raw:
+        p = _normalize_workspace_layout(item)
+        if not p:
+            continue
+        key = str(p["name"]).casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(p)
+        if len(out) >= WORKSPACE_LAYOUTS_MAX:
+            break
+    return out
+
+
+def get_workspace_layout(name: str) -> dict | None:
+    want = (name or "").strip().casefold()
+    if not want:
+        return None
+    for p in get_workspace_layouts():
+        if str(p["name"]).casefold() == want:
+            return dict(p)
+    return None
+
+
+def save_workspace_layout(
+    name: str,
+    *,
+    panels: dict | None = None,
+    splitter_sizes: list[int] | None = None,
+    state: dict | None = None,
+) -> dict:
+    """Layout speichern/überschreiben (gleicher Name → Update) — 1.6.0."""
+    if isinstance(state, dict):
+        if not name:
+            name = str(state.get("name") or "")
+        panels = state.get("panels") if state.get("panels") is not None else panels
+        splitter_sizes = (
+            state.get("splitter_sizes")
+            if state.get("splitter_sizes") is not None
+            else splitter_sizes
+        )
+    layout = _normalize_workspace_layout(
+        {
+            "name": name,
+            "panels": panels or {"thumbs": True, "ann": True, "bookmark": True},
+            "splitter_sizes": splitter_sizes or [],
+        }
+    )
+    if not layout:
+        raise ValueError("Layout-Name fehlt")
+    layouts = get_workspace_layouts()
+    key = str(layout["name"]).casefold()
+    replaced = False
+    for i, existing in enumerate(layouts):
+        if str(existing["name"]).casefold() == key:
+            layouts[i] = layout
+            replaced = True
+            break
+    if not replaced:
+        layouts.insert(0, layout)
+    layouts = layouts[:WORKSPACE_LAYOUTS_MAX]
+    save_settings({"workspace_layouts": layouts})
+    return dict(layout)
+
+
+def delete_workspace_layout(name: str) -> bool:
+    want = (name or "").strip().casefold()
+    if not want:
+        return False
+    layouts = get_workspace_layouts()
+    kept = [p for p in layouts if str(p["name"]).casefold() != want]
+    if len(kept) == len(layouts):
+        return False
+    save_settings({"workspace_layouts": kept})
     return True
 
 

@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **1.5.5** |
+| Version | **1.6.0** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -63,10 +63,10 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an / `checkedonce`)
 
-## Neu in 1.5.5
+## Neu in 1.6.0
 
-- Metadaten: Toast-Klick **nur wenn Dialog zu**; sonst **Fokus/raise**
-- Seiten→Bilder: Badge **„Filter: übersprungen“** am Footer wenn aktiv
-- Signatur: Zoom in **Settings persistieren**; **Reset-Zoom** in Vorschau
-- CLI: **`--list-pages FILE [--json]`** → `{pages,path}`; Exit **2** bei fehlender Datei
+- Wasserzeichen: **Text oder Bild**, diagonal/zentriert; **Vorschau**; Bake in neues PDF
+- PDF **verschlüsseln/entschlüsseln**: User-Passwort setzen/entfernen (Owner optional, pikepdf)
+- Dokument-Statistik: Seiten, Wörter (Text-PDF), Ann.-Anzahl, Dateigröße (Panel)
+- Workspace-Layouts: Sidebar-Layouts speichern/laden (Name + Panel-Sichtbarkeit + Splitter)
 - Stubs KI/Cloud/Stylus/3D unverändert

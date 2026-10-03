@@ -92,7 +92,13 @@ from .overlay import (
     selection_to_highlight_rects,
     selection_to_plain_text,
 )
-from .watermark import apply_page_numbers, apply_watermark
+from .watermark import (
+    apply_image_watermark,
+    apply_page_numbers,
+    apply_watermark,
+    render_watermark_preview,
+)
+from .doc_stats import DocumentStats, collect_document_stats, count_words
 from .limits import PdfHealth, THUMB_LAZY_THRESHOLD, clamp_render_scale, inspect_pdf
 from .render import clear_render_cache
 from .security import needs_password, remove_password, set_password, try_open_password
@@ -211,7 +217,12 @@ __all__ = [
     "selection_to_plain_text",
     "bake_text_overlays",
     "apply_watermark",
+    "apply_image_watermark",
     "apply_page_numbers",
+    "render_watermark_preview",
+    "DocumentStats",
+    "collect_document_stats",
+    "count_words",
     "PdfHealth",
     "inspect_pdf",
     "clamp_render_scale",
@@ -244,4 +255,4 @@ __all__ = [
     "uri_link_at",
 ]
 
-__version__ = "1.5.5"
+__version__ = "1.6.0"

@@ -1,5 +1,24 @@
 # Changelog — InstantLens Doc
 
+## 1.6.0 — Wasserzeichen Text/Bild·Vorschau·Bake, PDF verschlüsseln/entschlüsseln, Dokument-Statistik, Workspace-Layouts
+
+Minor-Release mit neuen Kernfeatures: **Wasserzeichen** als Text oder Bild, Position **diagonal** oder **zentriert**, Live-**Vorschau** und **Bake** in ein neues PDF; **PDF verschlüsseln/entschlüsseln** (User-Passwort setzen/entfernen via pikepdf, Owner optional); **Dokument-Statistik**-Panel (Seiten, Wörter aus Text-PDF, Annotationen, Dateigröße); **Workspace-Layouts** speichern/laden (Name + Panel-Sichtbarkeit Thumb/Ann/Bookmark + Splitter). Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### PDF
+- Wasserzeichen: Text oder Bild; diagonal/zentriert; Vorschau; Bake → neues PDF (`*_wm.pdf`)
+- Verschlüsseln: User-Passwort setzen, Owner optional (pikepdf AES)
+- Entschlüsseln: Passwortschutz entfernen → `*_unlocked.pdf` (oder Original)
+- Dokument-Statistik: Seiten, Wörter (Text-PDF), Ann.-Anzahl, Dateigröße (nicht-modales Panel)
+
+### UI / Workspace
+- Workspace-Layouts: Ansicht → Layout speichern/laden/löschen (Panels + Splitter)
+
+### Packaging / Docs
+- Version **1.6.0** (App / `ild_pdf` / ISS / Smoke / Docs)
+- Smoke: Wasserzeichen Bild·Placement·Preview·Bake, Encrypt/Decrypt, Doc-Stats, Workspace-Layouts (CLI + Qt)
+
+---
+
 ## 1.5.5 — Metadaten Toast Fokus, Seiten→Bilder Filter-Badge, Signatur Zoom Settings·Reset, CLI list-pages --json
 
 Post-Release-Polish nach 1.5.4: **Metadaten-Toast-Klick** öffnet den Dialog **nur wenn nicht schon offen** (sonst **Fokus/raise**); **Seiten→Bilder**-Footer zeigt Badge **„Filter: übersprungen“** wenn der Filter aktiv ist; **Signatur-Vorschau-Zoom** wird in **Settings persistiert** inkl. **Reset-Zoom**-Button; **CLI** `--list-pages FILE --json` liefert `{pages,path}`, Exit **2** bei fehlender Datei. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
