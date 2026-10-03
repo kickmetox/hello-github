@@ -173,6 +173,8 @@ DEFAULTS: dict[str, Any] = {
     "ocr_table_csv_utf8_bom": True,  # Tabellen-OCR CSV UTF-8 BOM — 1.9.1
     "last_ocr_table_csv_dir": "",  # Zielordner Tabellen-OCR CSV merken — 1.9.1
     "last_portfolio_extract_dir": "",  # Zielordner Portfolio-Extrakt merken — 2.0.2
+    "last_multi_doc_csv_dir": "",  # Zielordner Multi-Doc-Suche CSV merken — 2.0.3
+    "multi_doc_csv_filename_template": "{date}_multisearch.csv",  # Live-Template — 2.0.3
     "redaction_bake_continue_on_sidecar_skip": True,  # Bake fortsetzen merken — 1.3.6
     "redaction_preview_opacity": 0.90,
     "editor_text_encoding": "auto",
@@ -4214,6 +4216,81 @@ def set_last_portfolio_extract_dir(path: str | Path) -> None:
     if p.is_file():
         p = p.parent
     save_settings({"last_portfolio_extract_dir": str(p)})
+
+
+DEFAULT_MULTI_DOC_CSV_FILENAME_TEMPLATE = "{date}_multisearch.csv"
+
+
+def get_last_multi_doc_csv_dir() -> Path | None:
+    """Zuletzt genutzter Zielordner für Multi-Doc-Suche CSV — 2.0.3."""
+    raw = str(load_settings().get("last_multi_doc_csv_dir", "") or "").strip()
+    if not raw:
+        return None
+    p = Path(raw)
+    return p if p.is_dir() else None
+
+
+def set_last_multi_doc_csv_dir(path: str | Path) -> None:
+    """Multi-Doc-CSV-Zielordner merken — 2.0.3."""
+    p = Path(path)
+    if p.is_file():
+        p = p.parent
+    save_settings({"last_multi_doc_csv_dir": str(p)})
+
+
+def get_multi_doc_csv_filename_template() -> str:
+    """Dateiname-Template Multi-Doc-CSV, Default ``{date}_multisearch.csv`` — 2.0.3."""
+    raw = str(
+        load_settings().get(
+            "multi_doc_csv_filename_template",
+            DEFAULTS["multi_doc_csv_filename_template"],
+        )
+        or ""
+    ).strip()
+    if not raw:
+        return DEFAULT_MULTI_DOC_CSV_FILENAME_TEMPLATE
+    raw = raw.replace("/", "_").replace("\\", "_")
+    if not raw.lower().endswith(".csv"):
+        raw = raw + ".csv"
+    return raw
+
+
+def set_multi_doc_csv_filename_template(template: str) -> str:
+    """Multi-Doc-CSV-Template speichern — 2.0.3."""
+    raw = str(template or "").strip() or DEFAULT_MULTI_DOC_CSV_FILENAME_TEMPLATE
+    raw = raw.replace("/", "_").replace("\\", "_")
+    if not raw.lower().endswith(".csv"):
+        raw = raw + ".csv"
+    save_settings({"multi_doc_csv_filename_template": raw})
+    return raw
+
+
+def format_multi_doc_csv_filename(
+    *,
+    template: str | None = None,
+    date: str | None = None,
+) -> str:
+    """
+    Multi-Doc-CSV-Dateiname aus Template.
+    Platzhalter: ``{date}`` (YYYY-MM-DD). Default ``{date}_multisearch.csv`` — 2.0.3.
+    """
+    from datetime import date as _date
+
+    tpl = (
+        template
+        if template is not None
+        else get_multi_doc_csv_filename_template()
+    )
+    date_s = (date if date is not None else _date.today().isoformat()).strip()
+    name = str(tpl or DEFAULT_MULTI_DOC_CSV_FILENAME_TEMPLATE).replace(
+        "{date}", date_s
+    )
+    name = name.replace("/", "_").replace("\\", "_")
+    if not name.lower().endswith(".csv"):
+        name = name + ".csv"
+    return name or DEFAULT_MULTI_DOC_CSV_FILENAME_TEMPLATE.replace(
+        "{date}", date_s
+    )
 
 
 def get_redaction_bake_continue_on_sidecar_skip() -> bool:

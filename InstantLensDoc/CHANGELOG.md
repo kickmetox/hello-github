@@ -1,5 +1,22 @@
 # Changelog — InstantLens Doc
 
+## 2.0.3 — Multi-Doc CSV Zielordner·Live-Template, Portfolio Extrakt Abbruch·Teilergebnis·Status, HC-Toast·UI-Reset≠100, install-ild fehlende Shortcuts ok
+
+Post-Release-Polish nach 2.0.2: **Multi-Dokument-Suche CSV** merkt **Zielordner**, Live-Dateiname-Template **`{date}_multisearch.csv`**; **Portfolio-Extrakt** mit **Abbruch**, **Teilergebnis behalten** und **Statuszählung**; High-Contrast Shortcut Toast **„High-Contrast an/aus“**; UI-Skala Reset **Bestätigung nur bei ≠100 %**; **install-ild.ps1 -Uninstall**: fehlende Shortcuts **kein Fehler** (Log-Zeile, Exit 0). Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen unverändert klar markiert / nicht produktiv.
+
+### Suche / Portfolio
+- Multi-Doc-CSV: Zielordner merken; Live-Template `{date}_multisearch.csv` mit Vorschau
+- Portfolio-Extrakt: Abbruch möglich; Teilergebnis behalten; Statuszählung extrahiert/umbenannt/abgebrochen
+
+### Accessibility / Installer
+- High-Contrast Ctrl+Alt+H: Toast „High-Contrast an“ / „High-Contrast aus“
+- UI-Skala Reset 100 %: Bestätigung nur wenn aktuell ≠ 100 %
+- `scripts/install-ild.ps1`: `-Uninstall` — fehlende Shortcuts Log-Zeile, kein Fehler
+
+### Version / Docs
+- Version **2.0.3** (App / `ild_pdf` / ISS / Smoke / Docs); `docs/VERSION` + `VERSION.txt`
+- About Serie **2.0**; Smoke: Multi-Doc CSV-Ordner/Template, Portfolio Cancel/Teilergebnis/Status, HC-Toast, Scale-Reset-Confirm, install-ild missing-ok (CLI + Qt)
+
 ## 2.0.2 — Multi-Doc CSV Doc/Seite/Snippet/Match·BOM·Regex-Status, Portfolio Extrakt Ordner/Rename/Fortschritt, UI-Skala Reset 100 %·HC Ctrl+Alt+H, install-ild -Uninstall
 
 Post-Release-Polish nach 2.0.1: **Multi-Dokument-Suche CSV** mit Spalten **Doc,Seite,Snippet,Match**, Option **UTF-8 BOM**, klarer **Regex-Fehlerstatus**; **Portfolio-Extrakt** merkt **Zielordner**, **Namenskollision → Umbenennen** (_2/_3), **Fortschrittsanzeige**; **UI-Schrift Skala** Button **Reset 100 %**; High-Contrast Shortcut **Ctrl+Alt+H**; **install-ild.ps1** Schalter **-Uninstall** entfernt Shortcuts, **Exit-Codes dokumentiert**. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen unverändert klar markiert / nicht produktiv.

@@ -1,4 +1,4 @@
-"""PDF-Portfolio erstellen / öffnen (pikepdf Collection + Attachments) — 2.0.2."""
+"""PDF-Portfolio erstellen / öffnen (pikepdf Collection + Attachments) — 2.0.3."""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ from PySide6.QtWidgets import (
     QListWidget,
     QListWidgetItem,
     QMessageBox,
-    QProgressBar,
+    QProgressDialog,
     QPushButton,
     QTabWidget,
     QVBoxLayout,
@@ -37,6 +37,7 @@ from ild_pdf.portfolio import (
     extract_portfolio,
     extract_portfolio_entries,
     open_portfolio,
+    summarize_extract_status,
 )
 
 
@@ -54,6 +55,7 @@ class PortfolioDialog(QDialog):
         self._opened_path: str | None = None
         self._files: list[str] = []
         self._entry_names: list[str] = []
+        self.extract_progress: QProgressDialog | None = None  # während Extrakt — 2.0.3
 
         layout = QVBoxLayout(self)
         self.tabs = QTabWidget()
@@ -129,7 +131,8 @@ class PortfolioDialog(QDialog):
             QLabel(
                 "Bestehendes Portfolio öffnen: Collection/Attachments listen "
                 "und optional extrahieren (alle oder Auswahl). "
-                "Zielordner merken · Namenskollision umbenennen · Fortschritt — 2.0.2."
+                "Zielordner merken · Namenskollision umbenennen · "
+                "Fortschritt mit Abbruch · Teilergebnis behalten — 2.0.3."
             )
         )
         row = QHBoxLayout()
@@ -159,16 +162,6 @@ class PortfolioDialog(QDialog):
         self.entries_list.setSelectionMode(QAbstractItemView.ExtendedSelection)
         layout.addWidget(self.entries_list, 1)
 
-        self.extract_progress = QProgressBar()
-        self.extract_progress.setObjectName("portfolioExtractProgress")
-        self.extract_progress.setAccessibleName("Portfolio-Extrakt Fortschritt")
-        self.extract_progress.setRange(0, 100)
-        self.extract_progress.setValue(0)
-        self.extract_progress.setTextVisible(True)
-        self.extract_progress.setFormat("%v / %m Dateien")
-        self.extract_progress.setVisible(False)
-        layout.addWidget(self.extract_progress)
-
         self.open_status = QLabel("")
         self.open_status.setObjectName("portfolioOpenStatus")
         layout.addWidget(self.open_status)
@@ -177,13 +170,13 @@ class PortfolioDialog(QDialog):
         btn_extract_sel = QPushButton("Auswahl extrahieren…")
         btn_extract_sel.setObjectName("portfolioExtractSelBtn")
         btn_extract_sel.setToolTip(
-            "Nur ausgewählte Einträge extrahieren; Zielordner merken — 2.0.2"
+            "Nur ausgewählte Einträge; Abbruch behält Teilergebnis — 2.0.3"
         )
         btn_extract_sel.clicked.connect(self._extract_selected)
         btn_extract = QPushButton("Alle extrahieren…")
         btn_extract.setObjectName("portfolioExtractBtn")
         btn_extract.setToolTip(
-            "Alle Einträge extrahieren; Namenskollision → Umbenennen — 2.0.2"
+            "Alle Einträge; Fortschritt/Abbruch; Statuszählung — 2.0.3"
         )
         btn_extract.clicked.connect(self._extract)
         ex_row.addWidget(btn_extract_sel)
@@ -300,12 +293,6 @@ class PortfolioDialog(QDialog):
                 names.append(str(key))
         return names
 
-    def _on_extract_progress(self, current: int, total: int, name: str) -> None:
-        self.extract_progress.setMaximum(max(1, total))
-        self.extract_progress.setValue(current)
-        self.open_status.setText(f"Extrahiere… {current}/{total} · {name}")
-        QApplication.processEvents()
-
     def _run_extract(
         self,
         path: str,
@@ -320,37 +307,77 @@ class PortfolioDialog(QDialog):
             return
         set_last_portfolio_extract_dir(out)
         total = len(names) if names is not None else len(self._entry_names)
-        show_prog = total >= 2
-        self.extract_progress.setVisible(show_prog)
-        if show_prog:
-            self.extract_progress.setMaximum(max(1, total))
-            self.extract_progress.setValue(0)
+        if total <= 0:
+            QMessageBox.information(self, "Portfolio", "Nichts zu extrahieren.")
+            return
+
+        # Fortschritt + Abbruch (Teilergebnis behalten) — 2.0.3
+        prog = QProgressDialog(
+            "Portfolio extrahieren…", "Abbrechen", 0, max(1, total), self
+        )
+        prog.setObjectName("portfolioExtractProgress")
+        prog.setWindowTitle("Portfolio-Extrakt")
+        prog.setWindowModality(Qt.WindowModal)
+        prog.setMinimumDuration(0)
+        prog.setCancelButtonText("Abbrechen")
+        prog.setValue(0)
+        prog.setLabelText(f"0 / {total} Dateien…")
+        self.extract_progress = prog
+        cancelled = {"v": False}
+        QApplication.processEvents()
+
+        def on_progress(current: int, tot: int, name: str) -> bool:
+            if prog.wasCanceled():
+                cancelled["v"] = True
+                return False
+            prog.setMaximum(max(1, tot))
+            # current = Datei die als Nächstes kommt (1-basiert)
+            prog.setValue(max(0, current - 1))
+            prog.setLabelText(f"Extrahiere… {current}/{tot} · {name}")
+            self.open_status.setText(f"Extrahiere… {current}/{tot} · {name}")
+            QApplication.processEvents()
+            if prog.wasCanceled():
+                cancelled["v"] = True
+                return False
+            return True
+
         try:
             if names is not None:
                 written = extract_portfolio_entries(
                     path,
                     names,
                     out_dir=out,
-                    on_progress=self._on_extract_progress if show_prog else None,
+                    on_progress=on_progress,
                 )
             else:
                 written = extract_portfolio(
                     path,
                     out_dir=out,
-                    on_progress=self._on_extract_progress if show_prog else None,
+                    on_progress=on_progress,
                 )
+            if not cancelled["v"] and not prog.wasCanceled():
+                prog.setValue(total)
+            prog.close()
             renamed = count_renamed_extracts(written)
-            self.extract_progress.setVisible(False)
-            rename_s = f" · {renamed} umbenannt" if renamed else ""
-            self.open_status.setText(
-                f"{len(written)} Datei(en) extrahiert → {out}{rename_s}"
+            status = summarize_extract_status(
+                written, total=total, cancelled=bool(cancelled["v"])
             )
-            msg = f"{len(written)} Datei(en) extrahiert nach:\n{out}"
-            if renamed:
-                msg += f"\n{renamed} wegen Namenskollision umbenannt (_2, _3, …)."
-            QMessageBox.information(self, "Portfolio", msg)
+            self.open_status.setText(f"{status} → {out}")
+            if cancelled["v"]:
+                msg = (
+                    f"Extrakt abgebrochen — Teilergebnis behalten.\n"
+                    f"{status}\nZiel: {out}"
+                )
+                if renamed:
+                    msg += f"\n{renamed} wegen Namenskollision umbenannt (_2, _3, …)."
+                QMessageBox.information(self, "Portfolio — Teilergebnis", msg)
+            else:
+                msg = f"{len(written)} Datei(en) extrahiert nach:\n{out}\n{status}"
+                if renamed:
+                    msg += f"\n{renamed} wegen Namenskollision umbenannt (_2, _3, …)."
+                QMessageBox.information(self, "Portfolio", msg)
         except Exception as exc:
-            self.extract_progress.setVisible(False)
+            prog.close()
             QMessageBox.critical(self, "Portfolio", f"Extraktion fehlgeschlagen:\n{exc}")
 
     def _extract_selected(self) -> None:

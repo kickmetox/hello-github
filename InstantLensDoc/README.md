@@ -2,7 +2,7 @@
 
 Moderne Textverarbeitung mit PDF-Annotator, OCR-Bridge und Formulargenerator.
 
-**Version:** 2.0.2  
+**Version:** 2.0.3  
 **Hersteller:** Andreas Meyer · ame@sellerbach.de
 
 ## Quickstart (Windows)
@@ -34,9 +34,9 @@ Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)
 Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an).  
 User-Shortcuts: `.\scripts\install-ild.ps1` · Deinstallieren: `-Uninstall` (Exit **0**/OK · **1**/Fehler).
 
-## Neu in 2.0.2
+## Neu in 2.0.3
 
-Post-Release-Polish nach **2.0.1**: Multi-Doc CSV **Doc,Seite,Snippet,Match · BOM · Regex-Fehlerstatus**; Portfolio Extrakt **Zielordner · Rename · Fortschritt**; UI-Skala **Reset 100 %**; High-Contrast **Ctrl+Alt+H**; **install-ild.ps1** `-Uninstall` / Exitcodes. Stubs unverändert.
+Post-Release-Polish nach **2.0.2**: Multi-Doc CSV **Zielordner · Live-Template `{date}_multisearch.csv`**; Portfolio Extrakt **Abbruch · Teilergebnis · Statuszählung**; HC-Toast **an/aus**; UI-Reset **Bestätigung nur ≠100**; **install-ild.ps1** fehlende Shortcuts kein Fehler. Stubs unverändert.
 
 ## Neu in 2.0.1
 

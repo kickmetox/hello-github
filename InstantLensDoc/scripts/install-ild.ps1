@@ -1,7 +1,8 @@
-# InstantLens Doc 2.0.2 — Benutzer-Installer (ohne Admin wenn möglich)
+# InstantLens Doc 2.0.3 — Benutzer-Installer (ohne Admin wenn möglich)
 # Startmenü-Shortcut + optional Desktop-Link (User-Profil).
 # Idempotent: vorhandene Verknüpfungen werden aktualisiert.
 # -Uninstall entfernt Startmenü- und Desktop-Shortcuts.
+# Fehlende Shortcuts bei -Uninstall sind kein Fehler (Log-Zeile, Exit 0).
 #
 # Beispiele:
 #   powershell -ExecutionPolicy Bypass -File .\scripts\install-ild.ps1
@@ -27,7 +28,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$Version = "2.0.2"
+$Version = "2.0.3"
 $AppName = "InstantLens Doc"
 
 function Write-IldInfo([string]$msg) { Write-Host "[ILD $Version] $msg" }
@@ -64,12 +65,15 @@ if ($Uninstall) {
             }
         } else {
             $missing += $link
-            Write-IldInfo "Nicht vorhanden (ok): $link"
+            Write-IldInfo "Shortcut fehlt bereits (kein Fehler): $link"
         }
     }
     if ($failed.Count -gt 0) {
         Write-IldErr "Uninstall unvollständig ($($failed.Count) Fehler)."
         exit 1
+    }
+    if ($missing.Count -gt 0) {
+        Write-IldInfo "fehlende Shortcuts kein Fehler ($($missing.Count) fehlten bereits)."
     }
     Write-IldInfo "Uninstall fertig: $($removed.Count) entfernt, $($missing.Count) fehlten bereits. Exit 0."
     exit 0

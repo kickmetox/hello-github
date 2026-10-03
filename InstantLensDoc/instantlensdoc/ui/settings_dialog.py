@@ -420,7 +420,7 @@ class SettingsDialog(QDialog):
         self.btn_ui_scale_reset.setAutoDefault(False)
         self.btn_ui_scale_reset.setDefault(False)
         self.btn_ui_scale_reset.setToolTip(
-            "UI-Schrift Skala auf 100 % zurücksetzen — 2.0.2"
+            "UI-Schrift Skala auf 100 %; Bestätigung nur wenn aktuell ≠ 100 % — 2.0.3"
         )
         self.btn_ui_scale_reset.clicked.connect(self._reset_ui_font_scale_100)
         scale_row.addWidget(self.btn_ui_scale_reset)
@@ -1794,7 +1794,20 @@ class SettingsDialog(QDialog):
         self._update_ui_font_preview_label()
 
     def _reset_ui_font_scale_100(self) -> None:
-        """UI-Schrift Skala auf 100 % zurücksetzen — 2.0.2."""
+        """UI-Schrift Skala auf 100 %; Bestätigung nur bei ≠100 — 2.0.3."""
+        current = int(self.ui_font_scale.currentData() or 100)
+        if current != 100:
+            reply = QMessageBox.question(
+                self,
+                "UI-Schrift Skala zurücksetzen",
+                f"UI-Schrift Skala auf 100 % zurücksetzen?\n\n"
+                f"Aktuell: {current} %\n"
+                f"Ziel: 100 %",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No,
+            )
+            if reply != QMessageBox.Yes:
+                return
         idx = self.ui_font_scale.findData(100)
         if idx < 0:
             idx = 0

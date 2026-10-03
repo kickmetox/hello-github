@@ -1,4 +1,4 @@
-"""Zentrale Multi-Dokument-Suche: Volltext über alle offenen PDFs — 2.0.2."""
+"""Zentrale Multi-Dokument-Suche: Volltext über alle offenen PDFs — 2.0.3."""
 
 from __future__ import annotations
 
@@ -24,6 +24,15 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from instantlensdoc.core.app_settings import (
+    DEFAULT_MULTI_DOC_CSV_FILENAME_TEMPLATE,
+    dialog_start_dir,
+    format_multi_doc_csv_filename,
+    get_last_multi_doc_csv_dir,
+    get_multi_doc_csv_filename_template,
+    set_last_multi_doc_csv_dir,
+    set_multi_doc_csv_filename_template,
+)
 from instantlensdoc.core import fulltext as fulltext_mod
 from instantlensdoc.core.fulltext import SearchPatternError
 
@@ -31,7 +40,8 @@ from instantlensdoc.core.fulltext import SearchPatternError
 class MultiDocSearchDialog(QDialog):
     """
     Zentrale Trefferliste: Volltext (Textlayer) über alle offenen/gelisteten PDFs.
-    Case / Regex / Whole-word · CSV Doc,Seite,Snippet,Match · BOM · Fortschritt — 2.0.2.
+    Case / Regex / Whole-word · CSV Doc,Seite,Snippet,Match · BOM · Fortschritt —
+    CSV Zielordner merken · Live-Dateiname-Template ``{date}_multisearch.csv`` — 2.0.3.
     Doppelklick / Enter → Treffer aktivieren (Signal hit_activated).
     """
 
@@ -57,6 +67,7 @@ class MultiDocSearchDialog(QDialog):
         intro = QLabel(
             "Volltextsuche über alle offenen PDFs (Textlayer). "
             "Optionen Aa / Wort / Regex; CSV Doc,Seite,Snippet,Match; BOM; "
+            "Zielordner merken; Live-Dateiname {date}_multisearch.csv; "
             "Regex-Fehler im Status."
         )
         intro.setWordWrap(True)
@@ -106,12 +117,36 @@ class MultiDocSearchDialog(QDialog):
         self.btn_export_csv = QPushButton("Treffer CSV…")
         self.btn_export_csv.setObjectName("multiDocSearchExportCsv")
         self.btn_export_csv.setToolTip(
-            "Trefferliste CSV: Spalten Doc,Seite,Snippet,Match — 2.0.2"
+            "Trefferliste CSV: Doc,Seite,Snippet,Match · Zielordner merken · "
+            "Template {date}_multisearch.csv — 2.0.3"
         )
         self.btn_export_csv.clicked.connect(self._export_csv)
         self.btn_export_csv.setEnabled(False)
         opt_row.addWidget(self.btn_export_csv)
         layout.addLayout(opt_row)
+
+        tpl_row = QHBoxLayout()
+        tpl_row.addWidget(QLabel("CSV-Dateiname:"))
+        self.csv_tpl_edit = QLineEdit()
+        self.csv_tpl_edit.setObjectName("multiDocSearchCsvTemplate")
+        self.csv_tpl_edit.setPlaceholderText(DEFAULT_MULTI_DOC_CSV_FILENAME_TEMPLATE)
+        self.csv_tpl_edit.setText(get_multi_doc_csv_filename_template())
+        self.csv_tpl_edit.setToolTip(
+            "Live-Dateiname-Template; Platzhalter {date} (YYYY-MM-DD); "
+            f"Default {DEFAULT_MULTI_DOC_CSV_FILENAME_TEMPLATE} — 2.0.3"
+        )
+        self.csv_tpl_edit.textChanged.connect(self._update_csv_filename_preview)
+        tpl_row.addWidget(self.csv_tpl_edit, 1)
+        layout.addLayout(tpl_row)
+
+        self.csv_filename_preview = QLabel("")
+        self.csv_filename_preview.setObjectName("multiDocSearchCsvPreview")
+        self.csv_filename_preview.setWordWrap(True)
+        self.csv_filename_preview.setToolTip(
+            "Live-Vorschau des CSV-Dateinamens ({date} aufgelöst) — 2.0.3"
+        )
+        layout.addWidget(self.csv_filename_preview)
+        self._update_csv_filename_preview()
 
         self.progress = QProgressBar()
         self.progress.setObjectName("multiDocSearchProgress")
@@ -151,6 +186,21 @@ class MultiDocSearchDialog(QDialog):
 
     def set_paths(self, paths: list[str]) -> None:
         self._paths = list(paths or [])
+
+    def _update_csv_filename_preview(self, *_args) -> None:
+        """Live-Vorschau Dateiname mit aufgelöstem {date} — 2.0.3."""
+        tpl = (self.csv_tpl_edit.text() or "").strip() or DEFAULT_MULTI_DOC_CSV_FILENAME_TEMPLATE
+        name = format_multi_doc_csv_filename(template=tpl)
+        self.csv_filename_preview.setText(f"Vorschau: {name}")
+        self.csv_filename_preview.setAccessibleName(f"CSV-Dateiname Vorschau {name}")
+
+    def _csv_start_path(self) -> str:
+        """Startpfad Save-Dialog: gemerkter Ordner + Live-Template — 2.0.3."""
+        tpl = (self.csv_tpl_edit.text() or "").strip() or DEFAULT_MULTI_DOC_CSV_FILENAME_TEMPLATE
+        name = format_multi_doc_csv_filename(template=tpl)
+        remembered = get_last_multi_doc_csv_dir()
+        start_dir = dialog_start_dir(remembered)
+        return str(Path(start_dir) / name)
 
     def _set_regex_error(self, message: str) -> None:
         """Regex-Fehlerstatus sichtbar setzen — 2.0.2."""
@@ -246,10 +296,13 @@ class MultiDocSearchDialog(QDialog):
         if not self._hits:
             QMessageBox.information(self, "Multi-Dokument-Suche", "Keine Treffer zum Export.")
             return
+        tpl = (self.csv_tpl_edit.text() or "").strip() or DEFAULT_MULTI_DOC_CSV_FILENAME_TEMPLATE
+        set_multi_doc_csv_filename_template(tpl)
+        start = self._csv_start_path()
         path, _ = QFileDialog.getSaveFileName(
             self,
             "Treffer als CSV speichern",
-            "multi-doc-suche.csv",
+            start,
             "CSV (*.csv)",
         )
         if not path:
@@ -261,10 +314,11 @@ class MultiDocSearchDialog(QDialog):
                 query=self._query,
                 utf8_bom=bool(self.chk_bom.isChecked()),
             )
+            set_last_multi_doc_csv_dir(dest.parent)
             bom_s = "BOM" if self.chk_bom.isChecked() else "ohne BOM"
             self.status.setText(
                 f"CSV exportiert: {dest.name} · {len(self._hits)} Zeile(n) · "
-                f"Doc,Seite,Snippet,Match · {bom_s}"
+                f"Doc,Seite,Snippet,Match · {bom_s} · Ordner gemerkt"
             )
         except Exception as exc:
             QMessageBox.critical(self, "Multi-Dokument-Suche", f"CSV-Export fehlgeschlagen:\n{exc}")

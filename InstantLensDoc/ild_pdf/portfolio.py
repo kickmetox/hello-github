@@ -1,8 +1,8 @@
-"""PDF-Portfolios (Collection + Attachments) erstellen und öffnen — 2.0.2.
+"""PDF-Portfolios (Collection + Attachments) erstellen und öffnen — 2.0.3.
 
 Ein Portfolio ist ein Container-PDF mit eingebetteten Dateien (pikepdf attachments)
 und Catalog-/Collection-Eintrag (Adobe PDF Portfolio / PDF Collection).
-Extrakt: Fortschritt, Namenskollision → Umbenennen — 2.0.2.
+Extrakt: Fortschritt/Abbruch, Teilergebnis behalten, Namenskollision → Umbenennen — 2.0.3.
 """
 
 from __future__ import annotations
@@ -232,11 +232,12 @@ def extract_portfolio(
     path: str | Path,
     out_dir: str | Path | None = None,
     *,
-    on_progress: Callable[[int, int, str], None] | None = None,
+    on_progress: Callable[[int, int, str], bool | None] | None = None,
 ) -> list[Path]:
     """
     Alle Portfolio-Anhänge extrahieren.
-    Namenskollision → Umbenennen (_2, _3, …); optional Fortschritt — 2.0.2.
+    Namenskollision → Umbenennen (_2, _3, …); optional Fortschritt.
+    ``on_progress`` darf ``False`` zurückgeben → Abbruch; Teilergebnis bleibt — 2.0.3.
     """
     from ild_pdf.attachments import extract_attachment, list_attachments
 
@@ -249,9 +250,11 @@ def extract_portfolio(
     for i, info in enumerate(infos, start=1):
         if on_progress is not None:
             try:
-                on_progress(i, total, info.filename or info.name)
+                cont = on_progress(i, total, info.filename or info.name)
             except Exception:
-                pass
+                cont = True
+            if cont is False:
+                break
         written.append(extract_attachment(path, info.name, out_dir=dest))
     return written
 
@@ -261,11 +264,11 @@ def extract_portfolio_entries(
     names: Sequence[str],
     out_dir: str | Path | None = None,
     *,
-    on_progress: Callable[[int, int, str], None] | None = None,
+    on_progress: Callable[[int, int, str], bool | None] | None = None,
 ) -> list[Path]:
     """
     Ausgewählte Portfolio-Einträge extrahieren (nach Name/Dateiname).
-    Namenskollision → Umbenennen; optional Fortschritt — 2.0.2.
+    Namenskollision → Umbenennen; Abbruch behält Teilergebnis — 2.0.3.
     """
     from ild_pdf.attachments import extract_attachment
 
@@ -278,9 +281,11 @@ def extract_portfolio_entries(
     for i, key in enumerate(keys, start=1):
         if on_progress is not None:
             try:
-                on_progress(i, total, key)
+                cont = on_progress(i, total, key)
             except Exception:
-                pass
+                cont = True
+            if cont is False:
+                break
         written.append(extract_attachment(path, key, out_dir=dest))
     return written
 
@@ -299,3 +304,26 @@ def count_renamed_extracts(written: Sequence[Path]) -> int:
         if base and suf.isdigit() and int(suf) >= 2:
             n += 1
     return n
+
+
+def summarize_extract_status(
+    written: Sequence[Path],
+    *,
+    total: int,
+    cancelled: bool = False,
+) -> str:
+    """
+    Statuszählung Portfolio-Extrakt:
+    ``extrahiert X · umbenannt Y`` (+ Abbruch/offen) — 2.0.3.
+    """
+    n = len(written or [])
+    renamed = count_renamed_extracts(written)
+    parts = [f"extrahiert {n}"]
+    if renamed:
+        parts.append(f"umbenannt {renamed}")
+    if cancelled:
+        remaining = max(0, int(total) - n)
+        parts.append(f"abgebrochen ({n} von {max(int(total), n)})")
+        if remaining:
+            parts.append(f"offen {remaining}")
+    return " · ".join(parts)
