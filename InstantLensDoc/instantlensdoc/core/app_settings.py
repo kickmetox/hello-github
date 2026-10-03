@@ -156,7 +156,11 @@ DEFAULTS: dict[str, Any] = {
     "command_palette_recent": [],  # letzte Command-Palette-Befehle (IDs) — 2.3.1
     "command_palette_recent_max": 10,  # Recent-Anzahl 5/10/20 — 2.3.2
     "command_palette_pinned": [],  # angeheftete Palette-Befehle (IDs) — 2.3.2
-    "compress_open_after": False,  # nach Kompression neues File öffnen — 2.3.2
+    "command_palette_pin_max": 5,  # max Pins 3/5/10 — 2.3.3
+    "compress_open_after": False,  # nach Kompression neues File öffnen — Settings Toggle — 2.3.2/2.3.3
+    "links_txt_utf8_bom": True,  # Links-TXT UTF-8 BOM — 2.3.3
+    "last_links_txt_dir": "",  # Zielordner Links-TXT merken — 2.3.3
+    "links_txt_filename_template": "{stem}_links.txt",  # Template — 2.3.3
     "native_ann_import_save_sidecar": True,  # nach Kommentar-Import Sidecar speichern — 2.1.2
     "textlayer_diff_side_by_side": False,  # Textlayer Diff TXT/Panel Side-by-Side — 2.1.2
     "textlayer_diff_txt_template": "{stemA}_vs_{stemB}_{mode}.txt",  # 2.1.3
@@ -604,6 +608,8 @@ def set_telemetry_opt_in(enabled: bool) -> None:
 
 COMMAND_PALETTE_RECENT_MAX = 10  # Default; Settings 5/10/20 — 2.3.2
 COMMAND_PALETTE_RECENT_CHOICES = (5, 10, 20)
+COMMAND_PALETTE_PIN_MAX = 5  # Default; Settings 3/5/10 — 2.3.3
+COMMAND_PALETTE_PIN_CHOICES = (3, 5, 10)
 
 
 def get_command_palette_recent_max() -> int:
@@ -634,31 +640,64 @@ def set_command_palette_recent_max(n: int) -> int:
     return val
 
 
+def get_command_palette_pin_max() -> int:
+    """Max. Anzahl angehefteter Palette-Befehle (3/5/10) — 2.3.3."""
+    raw = load_settings().get("command_palette_pin_max", COMMAND_PALETTE_PIN_MAX)
+    try:
+        n = int(raw)
+    except (TypeError, ValueError):
+        n = COMMAND_PALETTE_PIN_MAX
+    if n not in COMMAND_PALETTE_PIN_CHOICES:
+        n = min(COMMAND_PALETTE_PIN_CHOICES, key=lambda x: abs(x - n))
+    return n
+
+
+def set_command_palette_pin_max(n: int) -> int:
+    """Pin-Max setzen (3/5/10) und Liste trimmen — 2.3.3."""
+    try:
+        val = int(n)
+    except (TypeError, ValueError):
+        val = COMMAND_PALETTE_PIN_MAX
+    if val not in COMMAND_PALETTE_PIN_CHOICES:
+        val = min(COMMAND_PALETTE_PIN_CHOICES, key=lambda x: abs(x - val))
+    save_settings({"command_palette_pin_max": val})
+    cur = get_command_palette_pinned()
+    if len(cur) > val:
+        set_command_palette_pinned(cur[:val])
+    return val
+
+
 def get_command_palette_pinned() -> list[str]:
-    """Angeheftete Command-Palette-Befehls-IDs — 2.3.2."""
+    """Angeheftete Command-Palette-Befehls-IDs (persistiert, max Pins) — 2.3.2/2.3.3."""
     raw = load_settings().get("command_palette_pinned") or []
+    limit = get_command_palette_pin_max()
     out: list[str] = []
     if isinstance(raw, list):
         for x in raw:
             s = str(x or "").strip()
             if s and s not in out:
                 out.append(s)
+            if len(out) >= limit:
+                break
     return out
 
 
 def set_command_palette_pinned(ids: list[str] | tuple[str, ...]) -> list[str]:
-    """Pinned-Liste setzen (Reihenfolge behalten) — 2.3.2."""
+    """Pinned-Liste setzen (Reihenfolge behalten, max Pins) — 2.3.2/2.3.3."""
+    limit = get_command_palette_pin_max()
     out: list[str] = []
     for x in ids or []:
         s = str(x or "").strip()
         if s and s not in out:
             out.append(s)
+        if len(out) >= limit:
+            break
     save_settings({"command_palette_pinned": out})
     return out
 
 
 def toggle_command_palette_pin(cmd_id: str) -> bool:
-    """Pin umschalten; True = jetzt angeheftet — 2.3.2."""
+    """Pin umschalten (Unpin wenn gesetzt); True = jetzt angeheftet — 2.3.2/2.3.3."""
     cid = str(cmd_id or "").strip()
     if not cid:
         return False
@@ -667,7 +706,10 @@ def toggle_command_palette_pin(cmd_id: str) -> bool:
         pinned = [x for x in pinned if x != cid]
         set_command_palette_pinned(pinned)
         return False
-    pinned.append(cid)
+    # Neu anheften am Anfang; bei Max ältesten (Ende) verdrängen — 2.3.3
+    limit = get_command_palette_pin_max()
+    pinned = [cid] + [x for x in pinned if x != cid]
+    pinned = pinned[:limit]
     set_command_palette_pinned(pinned)
     return True
 
@@ -705,12 +747,100 @@ def push_command_palette_recent(
 
 
 def get_compress_open_after() -> bool:
-    """Nach erfolgreicher PDF-Kompression neues File öffnen — 2.3.2."""
+    """Nach erfolgreicher PDF-Kompression neues File öffnen — Settings Toggle — 2.3.2/2.3.3."""
     return bool(load_settings().get("compress_open_after", False))
 
 
 def set_compress_open_after(enabled: bool) -> None:
+    """Toggle merken (Dialog + Einstellungen) — 2.3.3."""
     save_settings({"compress_open_after": bool(enabled)})
+
+
+DEFAULT_LINKS_TXT_FILENAME_TEMPLATE = "{stem}_links.txt"
+LINKS_TXT_KNOWN_PLACEHOLDERS = frozenset({"stem", "date"})
+_LINKS_TXT_ANY_PLACEHOLDER_RE = re.compile(r"\{([^{}]+)\}")
+
+
+def get_links_txt_utf8_bom() -> bool:
+    """Links-TXT mit UTF-8-BOM schreiben — 2.3.3."""
+    return bool(load_settings().get("links_txt_utf8_bom", True))
+
+
+def set_links_txt_utf8_bom(enabled: bool) -> bool:
+    v = bool(enabled)
+    save_settings({"links_txt_utf8_bom": v})
+    return v
+
+
+def get_last_links_txt_dir() -> Path | None:
+    """Zuletzt genutzter Zielordner für Links-TXT — 2.3.3."""
+    raw = str(load_settings().get("last_links_txt_dir", "") or "").strip()
+    if not raw:
+        return None
+    p = Path(raw)
+    return p if p.is_dir() else (p.parent if p.parent.is_dir() else None)
+
+
+def set_last_links_txt_dir(path: str | Path) -> None:
+    p = Path(path)
+    if p.is_file():
+        p = p.parent
+    save_settings({"last_links_txt_dir": str(p)})
+
+
+def get_links_txt_filename_template() -> str:
+    """Dateiname-Template Links-TXT, Default ``{stem}_links.txt`` — 2.3.3."""
+    raw = str(
+        load_settings().get(
+            "links_txt_filename_template",
+            DEFAULTS.get(
+                "links_txt_filename_template",
+                DEFAULT_LINKS_TXT_FILENAME_TEMPLATE,
+            ),
+        )
+        or ""
+    ).strip()
+    if not raw:
+        return DEFAULT_LINKS_TXT_FILENAME_TEMPLATE
+    raw = raw.replace("/", "_").replace("\\", "_")
+    if not raw.lower().endswith(".txt"):
+        raw = raw + ".txt"
+    return raw
+
+
+def set_links_txt_filename_template(template: str) -> str:
+    """Links-TXT-Template speichern — 2.3.3."""
+    raw = str(template or "").strip() or DEFAULT_LINKS_TXT_FILENAME_TEMPLATE
+    raw = raw.replace("/", "_").replace("\\", "_")
+    if not raw.lower().endswith(".txt"):
+        raw = raw + ".txt"
+    save_settings({"links_txt_filename_template": raw})
+    return raw
+
+
+def format_links_txt_filename(
+    stem: str,
+    *,
+    template: str | None = None,
+    date: str | None = None,
+) -> str:
+    """
+    Links-TXT-Dateiname aus Template.
+    Platzhalter: ``{stem}``, ``{date}`` (YYYY-MM-DD).
+    Default ``{stem}_links.txt`` — 2.3.3.
+    """
+    from datetime import date as _date
+
+    tpl = template if template is not None else get_links_txt_filename_template()
+    stem_s = (stem or "links").strip() or "links"
+    date_s = (date if date is not None else _date.today().isoformat()).strip()
+    name = str(tpl or DEFAULT_LINKS_TXT_FILENAME_TEMPLATE).replace(
+        "{stem}", stem_s
+    ).replace("{date}", date_s)
+    name = name.replace("/", "_").replace("\\", "_")
+    if not name.lower().endswith(".txt"):
+        name = name + ".txt"
+    return name or f"{stem_s}_links.txt"
 
 
 def get_update_dismissed_version() -> str:

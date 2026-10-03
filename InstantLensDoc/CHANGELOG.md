@@ -1,5 +1,20 @@
 # Changelog — InstantLens Doc
 
+## 2.3.3 — Kompression Toggle Settings·Status-% bei Fehler, Links TXT Template·Zielordner·BOM, Palette Pin Persistenz·Unpin·max Pins, Telemetrie warum Stub + Stubs-Tab
+
+Post-Release-Polish nach **2.3.2**: **PDF-Kompression** **Toggle in Settings merken** und bei Fehler **trotzdem Status mit Ersparnis-%**; **URL-Links TXT-Export** mit Template **`{stem}_links.txt`**, **Zielordner merken** und **UTF-8-BOM Option**; **Command Palette** **Pin-Persistenz**, **Unpin** und Settings **max Pins 3/5/10**; **Telemetrie-Stub** Info kurz **„warum Stub“** plus **Verweis Tab Stubs**. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie klar markiert / nicht produktiv (Ink ≠ Stylus).
+
+### Neu / verbessert
+- PDF komprimieren: Öffnen-Toggle Settings merken · Status mit % auch bei Fehler/Öffnen-Fail
+- Links TXT: Template `{stem}_links.txt` · Zielordner merken · UTF-8-BOM
+- Schnellaktionen Ctrl+K: Pin Persistenz · Unpin · max Pins 3/5/10 Settings
+- Telemetrie-Stub: kurz warum Stub · Verweis Settings-Tab Stubs · weiter no-op
+
+### Tests / Qualität
+- Version **2.3.3** (App / `ild_pdf` / ISS / Smoke / Docs); Serie **2.3**; `docs/VERSION` + `VERSION.txt`
+- Smoke: 2.3.3 CLI + Qt (Kompression Settings/Status-%, Links Template/dir/BOM, Palette Pin-Max/Unpin, Telemetrie why+Stubs)
+- Stubs: Telemetrie warum + Stubs-Tab; KI/Cloud/Stylus/3D/Hooks/Outline unverändert markiert
+
 ## 2.3.2 — Kompression öffnen·Ersparnis-%, Links Filter·Doppelklick·TXT, Palette Pin·Recent 5/10/20, Telemetrie Toggle disabled·Info-Dialog
 
 Post-Release-Polish nach **2.3.1**: **PDF-Kompression** optional **neues File öffnen** und **Größenersparnis-%** in der Statuszeile; **URL-Links-Sidebar** mit **Suche/Filter**, **Doppelklick springt zur Seite**, **Export URL-Liste TXT**; **Command Palette** mit **Pin** für häufige Befehle und Settings **Recent-Anzahl 5/10/20**; **Telemetrie-Stub** mit **disabled Toggle** (bleibt aus) und **Info-Dialog warum Stub**. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie klar markiert / nicht produktiv (Ink ≠ Stylus).

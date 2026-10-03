@@ -1,7 +1,8 @@
-"""Schnellaktionen-Palette (Ctrl+K Command Palette) — 2.3.0–2.3.2.
+"""Schnellaktionen-Palette (Ctrl+K Command Palette) — 2.3.0–2.3.3.
 
 2.3.1: Fuzzy-Filter, letzte Befehle, Esc schließt, Kategorien gruppiert.
 2.3.2: Pin häufige Befehle · Recent-Anzahl Settings 5/10/20.
+2.3.3: Pin-Persistenz · Unpin · max Pins Settings 3/5/10.
 """
 
 from __future__ import annotations
@@ -119,7 +120,7 @@ def match_command(query: str, cmd: PaletteCommand) -> int | None:
 
 
 class CommandPaletteDialog(QDialog):
-    """Filterbare Schnellaktionen — Fuzzy · Pin · Recent · Kategorien · Esc — 2.3.2."""
+    """Filterbare Schnellaktionen — Fuzzy · Pin/Unpin · Recent · Esc — 2.3.3."""
 
     def __init__(
         self,
@@ -141,7 +142,8 @@ class CommandPaletteDialog(QDialog):
         layout = QVBoxLayout(self)
         hint = QLabel(
             "Tipp: tippen = Fuzzy · Enter ausführen · Esc schließen · "
-            "Rechtsklick = Anheften · Recent 5/10/20 (Einstellungen) — 2.3.2"
+            "Rechtsklick = Anheften/Unpin · Pins persistiert · "
+            "max Pins 3/5/10 · Recent 5/10/20 (Einstellungen) — 2.3.3"
         )
         hint.setObjectName("commandPaletteHint")
         hint.setWordWrap(True)
@@ -224,15 +226,20 @@ class CommandPaletteDialog(QDialog):
         pinned = set(self._pinned_ids())
         menu = QMenu(self)
         if cid in pinned:
-            act = QAction("Lösen (Pin entfernen)", self)
+            act = QAction("Unpin (Pin entfernen)", self)
+            act.setObjectName("commandPaletteUnpin")
+            act.setToolTip("Pin lösen — Persistenz Settings — 2.3.3")
             act.triggered.connect(lambda: self._toggle_pin(cid))
         else:
             act = QAction("Anheften (häufiger Befehl)", self)
+            act.setObjectName("commandPalettePin")
+            act.setToolTip("Anheften — Persistenz · max Pins Settings — 2.3.3")
             act.triggered.connect(lambda: self._toggle_pin(cid))
         menu.addAction(act)
         menu.exec(self.list.mapToGlobal(pos))
 
     def _toggle_pin(self, cmd_id: str) -> None:
+        """Pin/Unpin mit Persistenz und Max-Limit — 2.3.3."""
         try:
             from instantlensdoc.core.app_settings import toggle_command_palette_pin
 
@@ -350,7 +357,7 @@ class CommandPaletteDialog(QDialog):
         if cmd.shortcut:
             tip += f"\nShortcut: {cmd.shortcut}"
         if pinned_mark:
-            tip += "\nAngeheftet (Rechtsklick → Lösen) — 2.3.2"
+            tip += "\nAngeheftet (Rechtsklick → Unpin) · Persistenz Settings — 2.3.3"
         if cmd.keywords:
             tip += f"\n{cmd.keywords}"
         item.setToolTip(tip.strip())

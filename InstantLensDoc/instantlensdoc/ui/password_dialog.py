@@ -204,7 +204,8 @@ class CompressPdfDialog(QDialog):
             QLabel(
                 "Seiten via pypdfium2 rastern, optional Downsample, JPEG und "
                 "per pikepdf als <b>neues File</b> speichern (verlustbehaftet). "
-                "Abbruch im Fortschrittsdialog möglich — 2.3.2."
+                "Abbruch im Fortschrittsdialog möglich. "
+                "„Öffnen“-Toggle wird in Einstellungen gemerkt — 2.3.3."
             )
         )
         form = QFormLayout()
@@ -287,7 +288,8 @@ class CompressPdfDialog(QDialog):
         self.open_after.setObjectName("compressOpenAfter")
         self.open_after.setChecked(bool(get_compress_open_after()))
         self.open_after.setToolTip(
-            "Komprimiertes PDF nach Speichern in InstantLens Doc öffnen — 2.3.2"
+            "Komprimiertes PDF nach Speichern öffnen; Toggle in Einstellungen "
+            "gemerkt. Bei Öffnen-Fehler bleibt Ersparnis-% in Status — 2.3.3"
         )
         form.addRow(self.open_after)
 

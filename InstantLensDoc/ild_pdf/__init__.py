@@ -231,6 +231,7 @@ from .links import (
     SidecarUriLink,
     UriLink,
     bake_uri_links_to_pdf,
+    export_links_txt,
     is_external_http_uri,
     normalize_http_uri,
     validate_link_uri,
@@ -446,8 +447,9 @@ __all__ = [
     "uri_link_at",
     "sidecar_links_from_annotations",
     "bake_uri_links_to_pdf",
+    "export_links_txt",
     "text_to_pdf",
     "page_count_for_text",
 ]
 
-__version__ = "2.3.2"
+__version__ = "2.3.3"

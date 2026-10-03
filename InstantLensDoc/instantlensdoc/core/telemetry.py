@@ -1,8 +1,9 @@
-"""Telemetrie-Stub — klar markiert, Toggle disabled, immer no-op — 2.3.2.
+"""Telemetrie-Stub — klar markiert, Toggle disabled, immer no-op — 2.3.3.
 
 Auch bei gespeichertem Opt-in-Flag wird **nichts** gesendet und nichts geloggt.
 Kein Netzwerk, keine Queue, kein Fingerprinting.
-Ab 2.3.2: Settings-Toggle bleibt disabled (aus); Info-Dialog erklärt warum.
+Ab 2.3.2: Settings-Toggle bleibt disabled (aus).
+Ab 2.3.3: Info kurz „warum Stub“ + Verweis auf Settings-Tab „Stubs“.
 """
 
 from __future__ import annotations
@@ -30,9 +31,17 @@ def report_anonymous_usage(event: str = "", **_kwargs: Any) -> None:
 
 
 def telemetry_stub_info() -> dict[str, Any]:
-    """Status für Settings/About/Stubs-Seite — 2.3.2."""
+    """Status für Settings/About/Stubs-Seite — 2.3.3."""
     from instantlensdoc import __version__
 
+    why = (
+        "Warum Stub: Es gibt kein Telemetrie-Backend und Privacy bleibt lokal — "
+        "deshalb Toggle disabled (aus) und immer no-op (keine Datenübertragung)."
+    )
+    stubs_tab_hint = (
+        "Details und Status: Einstellungen → Tab „Stubs“ → Eintrag Telemetrie "
+        "(Doppelklick Info)."
+    )
     return {
         "name": "Telemetrie",
         "stub": True,
@@ -40,10 +49,12 @@ def telemetry_stub_info() -> dict[str, Any]:
         "enabled": False,  # nie aktiv — Stub; Toggle disabled
         "toggle_disabled": True,
         "noop": True,
+        "why": why,
+        "stubs_tab_hint": stubs_tab_hint,
         "message": (
             f"Telemetrie-Stub {__version__}: Toggle disabled (bleibt aus), "
             "immer no-op — keine Datenübertragung (kein Netzwerk). "
-            "Info-Dialog erklärt warum Stub."
+            f"{why} {stubs_tab_hint}"
         ),
         "version_marker": __version__,
         "not_production_ready": True,

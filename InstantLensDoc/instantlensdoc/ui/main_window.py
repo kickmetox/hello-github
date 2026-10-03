@@ -9,11 +9,14 @@ from PySide6.QtCore import QEvent, Qt, QTimer, Signal
 from PySide6.QtGui import QAction, QColor, QIcon, QKeySequence
 from PySide6.QtWidgets import (
     QAbstractItemView,
+    QCheckBox,
     QDialog,
+    QDialogButtonBox,
     QFileDialog,
     QFrame,
     QHBoxLayout,
     QLabel,
+    QLineEdit,
     QListWidget,
     QListWidgetItem,
     QMainWindow,
@@ -7932,7 +7935,10 @@ class MainWindow(QMainWindow):
             self._set_status(f"Link → Seite {int(ann.page) + 1}")
 
     def _export_links_txt(self) -> None:
-        """Gefilterte URL-Liste als TXT (eine URL/Zeile) — 2.3.2."""
+        """
+        Gefilterte URL-Liste als TXT: Template ``{stem}_links.txt``,
+        Zielordner merken, UTF-8-BOM Option — 2.3.3.
+        """
         if not hasattr(self.sidebar, "filtered_link_uris"):
             return
         uris = self.sidebar.filtered_link_uris()
@@ -7941,21 +7947,94 @@ class MainWindow(QMainWindow):
                 self, "Links exportieren", "Keine URLs zum Export (Filter prüfen)."
             )
             return
+        from ild_pdf.links import export_links_txt
+        from instantlensdoc.core.app_settings import (
+            DEFAULT_LINKS_TXT_FILENAME_TEMPLATE,
+            dialog_start_dir,
+            format_links_txt_filename,
+            get_last_links_txt_dir,
+            get_links_txt_filename_template,
+            get_links_txt_utf8_bom,
+            set_last_links_txt_dir,
+            set_links_txt_filename_template,
+            set_links_txt_utf8_bom,
+        )
+
         stem = "links"
         if self.pdf_view.pdf_path:
-            stem = Path(self.pdf_view.pdf_path).stem
-        suggested = str(Path(self.pdf_view.pdf_path or ".").with_name(f"{stem}_links.txt"))
+            stem = Path(self.pdf_view.pdf_path).stem or "links"
+
+        opts = QDialog(self)
+        opts.setWindowTitle("URL-Liste als TXT")
+        ol = QVBoxLayout(opts)
+        ol.addWidget(
+            QLabel(
+                f"{len(uris)} URL(s) · Template "
+                f"{DEFAULT_LINKS_TXT_FILENAME_TEMPLATE} — 2.3.3"
+            )
+        )
+        chk_bom = QCheckBox("UTF-8 BOM (Excel)")
+        chk_bom.setObjectName("linksTxtBom")
+        chk_bom.setChecked(get_links_txt_utf8_bom())
+        chk_bom.setToolTip("TXT mit UTF-8-BOM schreiben (Excel-freundlich) — 2.3.3")
+        ol.addWidget(chk_bom)
+        tpl_row = QHBoxLayout()
+        tpl_row.addWidget(QLabel("Dateiname:"))
+        tpl_edit = QLineEdit(get_links_txt_filename_template())
+        tpl_edit.setObjectName("linksTxtTemplate")
+        tpl_edit.setPlaceholderText(DEFAULT_LINKS_TXT_FILENAME_TEMPLATE)
+        tpl_edit.setToolTip(
+            "Dateiname-Template; Platzhalter {stem}/{date}; Default "
+            f"{DEFAULT_LINKS_TXT_FILENAME_TEMPLATE} — 2.3.3"
+        )
+        tpl_row.addWidget(tpl_edit, 1)
+        ol.addLayout(tpl_row)
+        preview = QLabel("")
+        preview.setObjectName("linksTxtPreview")
+        preview.setWordWrap(True)
+
+        def _update_preview() -> None:
+            tpl = tpl_edit.text().strip() or DEFAULT_LINKS_TXT_FILENAME_TEMPLATE
+            name = format_links_txt_filename(stem, template=tpl)
+            preview.setText(f"Vorschau: {name}")
+
+        tpl_edit.textChanged.connect(lambda _t: _update_preview())
+        _update_preview()
+        ol.addWidget(preview)
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        buttons.button(QDialogButtonBox.Ok).setText("Speichern…")
+        buttons.accepted.connect(opts.accept)
+        buttons.rejected.connect(opts.reject)
+        ol.addWidget(buttons)
+        if opts.exec() != QDialog.Accepted:
+            return
+
+        utf8_bom = bool(chk_bom.isChecked())
+        set_links_txt_utf8_bom(utf8_bom)
+        tpl = tpl_edit.text().strip() or DEFAULT_LINKS_TXT_FILENAME_TEMPLATE
+        set_links_txt_filename_template(tpl)
+
+        start = dialog_start_dir(get_last_links_txt_dir())
+        fname = format_links_txt_filename(stem, template=tpl)
+        default = str(Path(start) / fname)
         path, _ok = QFileDialog.getSaveFileName(
             self,
             "URL-Liste als TXT exportieren",
-            suggested,
-            "Text (*.txt)",
+            default,
+            "Text (*.txt);;Alle Dateien (*)",
         )
         if not path:
             return
+        dest = Path(path)
+        if dest.suffix.lower() != ".txt":
+            dest = dest.with_suffix(".txt")
         try:
-            Path(path).write_text("\n".join(uris) + "\n", encoding="utf-8")
-            self._set_status(f"Links TXT: {len(uris)} URL(s) → {Path(path).name}")
+            out = export_links_txt(dest, uris, utf8_bom=utf8_bom)
+            set_last_links_txt_dir(out.parent)
+            bom_s = "BOM" if utf8_bom else "ohne BOM"
+            self._set_status(
+                f"Links TXT: {len(uris)} URL(s) → {out.name} ({bom_s})"
+            )
         except Exception as e:
             QMessageBox.warning(self, "Links exportieren", str(e))
 
@@ -9243,13 +9322,13 @@ class MainWindow(QMainWindow):
                 )
             else:
                 size_line = f"Vorher: {before_s} → Nachher: {after_s}"
-            # Größenersparnis % in Status — 2.3.2
-            status = f"Komprimiert → {out.name}"
-            if savings_pct is not None:
-                status += f" · Ersparnis {savings_pct:.1f} %"
-            status += f" · {before_s} → {after_s}"
+            # Größenersparnis % in Status — 2.3.2/2.3.3
+            savings_suffix = (
+                f" · Ersparnis {savings_pct:.1f} %" if savings_pct is not None else ""
+            )
+            status = f"Komprimiert → {out.name}{savings_suffix} · {before_s} → {after_s}"
             self._set_status(status)
-            # Dialog-Checkbox merken — 2.3.2
+            # Dialog-Checkbox → Settings merken — 2.3.2/2.3.3
             try:
                 from instantlensdoc.core.app_settings import set_compress_open_after
 
@@ -9266,15 +9345,17 @@ class MainWindow(QMainWindow):
                 try:
                     self.open_path(str(out))
                     self._set_status(
-                        f"Komprimiert geöffnet: {out.name}"
-                        + (
-                            f" · Ersparnis {savings_pct:.1f} %"
-                            if savings_pct is not None
-                            else ""
-                        )
+                        f"Komprimiert geöffnet: {out.name}{savings_suffix}"
                     )
                 except Exception as open_err:
-                    _log.warning("Komprimiertes PDF öffnen fehlgeschlagen: %s", open_err)
+                    # Bei Öffnen-Fehler trotzdem Status mit % behalten — 2.3.3
+                    _log.warning(
+                        "Komprimiertes PDF öffnen fehlgeschlagen: %s", open_err
+                    )
+                    self._set_status(
+                        f"Komprimiert → {out.name}{savings_suffix} · "
+                        f"{before_s} → {after_s} · Öffnen fehlgeschlagen"
+                    )
             try:
                 from instantlensdoc.core.telemetry import report_anonymous_usage
 
@@ -9283,6 +9364,22 @@ class MainWindow(QMainWindow):
                 pass
         except Exception as e:
             _log.exception("Kompression fehlgeschlagen")
+            # Auch bei Fehler Status mit %-Hinweis falls Größen bekannt — 2.3.3
+            try:
+                err_pct = locals().get("savings_pct")
+                err_before = locals().get("before_s")
+                err_after = locals().get("after_s")
+                if err_pct is not None and err_before and err_after:
+                    self._set_status(
+                        f"Kompression fehlgeschlagen · Ersparnis {err_pct:.1f} % · "
+                        f"{err_before} → {err_after}"
+                    )
+                elif err_before and err_after:
+                    self._set_status(
+                        f"Kompression fehlgeschlagen · {err_before} → {err_after}"
+                    )
+            except Exception:
+                pass
             QMessageBox.warning(self, "Kompression", str(e))
 
     def _bake_uri_links(self):

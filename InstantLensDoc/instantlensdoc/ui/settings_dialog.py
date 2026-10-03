@@ -246,7 +246,10 @@ from instantlensdoc.core.app_settings import (
     get_update_check_on_start,
     get_telemetry_opt_in,
     get_command_palette_recent_max,
+    get_command_palette_pin_max,
+    get_compress_open_after,
     COMMAND_PALETTE_RECENT_CHOICES,
+    COMMAND_PALETTE_PIN_CHOICES,
     get_wizard_completed,
     MERGE_DIFF_MAX_SIDE_MAX,
     MERGE_DIFF_MAX_SIDE_MIN,
@@ -343,6 +346,8 @@ from instantlensdoc.core.app_settings import (
     set_update_check_on_start,
     set_telemetry_opt_in,
     set_command_palette_recent_max,
+    set_command_palette_pin_max,
+    set_compress_open_after,
     set_presentation_hide_annotations,
     set_presentation_auto_advance_sec,
     set_presentation_black_background,
@@ -1348,17 +1353,17 @@ class SettingsDialog(QDialog):
         self.telemetry_chk = QCheckBox("Anonym Nutzung melden (Stub — deaktiviert)")
         self.telemetry_chk.setObjectName("telemetryOptIn")
         self.telemetry_chk.setChecked(False)
-        self.telemetry_chk.setEnabled(False)  # Toggle disabled bleibt — 2.3.2
+        self.telemetry_chk.setEnabled(False)  # Toggle disabled bleibt — 2.3.2/2.3.3
         self.telemetry_chk.setToolTip(
-            "Telemetrie-Stub 2.3.2: Toggle bleibt disabled (aus). "
-            "Info-Button erklärt warum — keine Datenübertragung"
+            "Telemetrie-Stub 2.3.3: Toggle bleibt disabled (aus). "
+            "Info-Button: warum Stub + Verweis Stubs-Tab — keine Datenübertragung"
         )
         tel_row = QHBoxLayout()
         tel_row.addWidget(self.telemetry_chk, 1)
         self.btn_telemetry_info = QPushButton("Info…")
         self.btn_telemetry_info.setObjectName("telemetryStubInfoBtn")
         self.btn_telemetry_info.setToolTip(
-            "Warum Telemetrie Stub ist (Info-Dialog) — 2.3.2"
+            "Warum Stub (kurz) + Verweis auf Tab „Stubs“ — 2.3.3"
         )
         self.btn_telemetry_info.clicked.connect(self._show_telemetry_stub_info)
         tel_row.addWidget(self.btn_telemetry_info)
@@ -1366,14 +1371,27 @@ class SettingsDialog(QDialog):
         tel_hint = QLabel(
             "<b>Stub — keine Datenübertragung:</b> Toggle ist <b>deaktiviert</b> "
             "und bleibt aus. Es werden <b>niemals</b> Nutzungsdaten gesendet — "
-            "kein Netzwerk, keine Queue, kein Fingerprinting (immer no-op) — 2.3.2. "
-            "„Info…“ erklärt warum."
+            "kein Netzwerk, keine Queue, kein Fingerprinting (immer no-op) — 2.3.3. "
+            "„Info…“: warum Stub · Details im Tab <b>Stubs</b>."
         )
         tel_hint.setWordWrap(True)
         tel_hint.setObjectName("telemetryStubHint")
         tel_hint.setStyleSheet("color: #8a6d00;")
-        tel_hint.setToolTip("Telemetrie bleibt Stub: Toggle disabled — 2.3.2")
+        tel_hint.setToolTip(
+            "Telemetrie bleibt Stub: Toggle disabled · siehe Tab Stubs — 2.3.3"
+        )
         form.addRow(tel_hint)
+
+        self.compress_open_chk = QCheckBox(
+            "Nach PDF-Kompression neues File öffnen"
+        )
+        self.compress_open_chk.setObjectName("compressOpenAfterSettings")
+        self.compress_open_chk.setChecked(bool(get_compress_open_after()))
+        self.compress_open_chk.setToolTip(
+            "Settings-Toggle: nach erfolgreicher Kompression Ziel-PDF öffnen "
+            "(gleicher Wert wie Dialog-Checkbox) — 2.3.3"
+        )
+        form.addRow(self.compress_open_chk)
 
         self.palette_recent_max = QComboBox()
         self.palette_recent_max.setObjectName("commandPaletteRecentMax")
@@ -1389,6 +1407,22 @@ class SettingsDialog(QDialog):
             "Anzahl Recent-Einträge in der Command Palette (Ctrl+K): 5 / 10 / 20 — 2.3.2"
         )
         form.addRow("Schnellaktionen Recent:", self.palette_recent_max)
+
+        self.palette_pin_max = QComboBox()
+        self.palette_pin_max.setObjectName("commandPalettePinMax")
+        for n in COMMAND_PALETTE_PIN_CHOICES:
+            self.palette_pin_max.addItem(f"{n} Pins", n)
+        cur_ppm = get_command_palette_pin_max()
+        idx_ppm = self.palette_pin_max.findData(cur_ppm)
+        if idx_ppm < 0:
+            idx_ppm = self.palette_pin_max.findData(5)
+        if idx_ppm >= 0:
+            self.palette_pin_max.setCurrentIndex(idx_ppm)
+        self.palette_pin_max.setToolTip(
+            "Max. angeheftete Befehle in der Command Palette (Ctrl+K): "
+            "3 / 5 / 10 · Unpin per Rechtsklick · Persistenz Settings — 2.3.3"
+        )
+        form.addRow("Schnellaktionen max. Pins:", self.palette_pin_max)
 
         self.presentation_hide_ann = QCheckBox(
             "Präsentation: Annotation-Overlay ausblenden"
@@ -1857,10 +1891,59 @@ class SettingsDialog(QDialog):
         self._update_ui_font_preview_label()
 
     def _show_telemetry_stub_info(self) -> None:
-        """Info-Dialog: warum Telemetrie Stub / Toggle disabled — 2.3.2."""
-        from instantlensdoc.ui.stubs import show_planned
+        """Info-Dialog: kurz warum Stub + Verweis Tab Stubs — 2.3.3."""
+        from instantlensdoc.core.telemetry import telemetry_stub_info
+        from instantlensdoc.ui.stubs import StubInfoDialog
 
-        show_planned(self, "telemetry")
+        info = telemetry_stub_info()
+        why = str(info.get("why") or "").strip()
+        stubs_ref = str(info.get("stubs_tab_hint") or "").strip()
+        short = why or (
+            "Warum Stub: kein Telemetrie-Backend, Privacy lokal — "
+            "Toggle bleibt disabled, immer no-op."
+        )
+        detail = str(info.get("message") or "")
+        if stubs_ref:
+            detail = (detail + "\n\n" + stubs_ref).strip()
+        dlg = StubInfoDialog(
+            self,
+            title="Telemetrie",
+            short=short,
+            detail=detail,
+            badge="Stub",
+        )
+        # Button → Tab Stubs — 2.3.3
+        try:
+            from PySide6.QtWidgets import QPushButton as _QPushButton
+
+            btn_stubs = _QPushButton("Zum Tab „Stubs“…")
+            btn_stubs.setObjectName("telemetryGotoStubsBtn")
+            btn_stubs.setToolTip(
+                "Einstellungen → Tab Stubs (Telemetrie-Eintrag) — 2.3.3"
+            )
+
+            def _goto_stubs() -> None:
+                dlg.accept()
+                self.goto_stubs_tab()
+
+            btn_stubs.clicked.connect(_goto_stubs)
+            # Layout: vor ButtonBox einfügen
+            lay = dlg.layout()
+            if lay is not None and lay.count() >= 1:
+                lay.insertWidget(max(0, lay.count() - 1), btn_stubs)
+        except Exception:
+            pass
+        dlg.exec()
+
+    def goto_stubs_tab(self) -> None:
+        """Wechselt zum Settings-Tab „Stubs“ — 2.3.3."""
+        try:
+            for i in range(self.tabs.count()):
+                if self.tabs.tabText(i).strip().casefold() == "stubs":
+                    self.tabs.setCurrentIndex(i)
+                    return
+        except Exception:
+            pass
 
     def _reset_ui_font_scale_100(self) -> None:
         """UI-Schrift Skala auf 100 %; Bestätigung nur bei ≠100 — 2.0.3."""
@@ -2654,13 +2737,19 @@ class SettingsDialog(QDialog):
         set_ui_lang(str(self.ui_lang.currentData() or "de"))
         sync_from_settings()
         set_update_check_on_start(self.update_chk.isChecked())
-        # Telemetrie: Toggle disabled — immer False speichern — 2.3.2
+        # Telemetrie: Toggle disabled — immer False speichern — 2.3.2/2.3.3
         set_telemetry_opt_in(False)
+        set_compress_open_after(bool(self.compress_open_chk.isChecked()))
         try:
             prm = int(self.palette_recent_max.currentData() or 10)
         except (TypeError, ValueError):
             prm = 10
         set_command_palette_recent_max(prm)
+        try:
+            ppm = int(self.palette_pin_max.currentData() or 5)
+        except (TypeError, ValueError):
+            ppm = 5
+        set_command_palette_pin_max(ppm)
         set_presentation_hide_annotations(self.presentation_hide_ann.isChecked())
         set_presentation_black_background(self.presentation_black_bg.isChecked())
         set_presentation_show_page_number(self.presentation_page_num.isChecked())

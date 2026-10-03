@@ -270,3 +270,26 @@ def bake_uri_links_to_pdf(
                 annots.append(doc.make_indirect(annot))
         doc.save(dst)
     return dst
+
+
+def export_links_txt(
+    path: str | Path,
+    uris: Sequence[str],
+    *,
+    utf8_bom: bool = False,
+) -> Path:
+    """
+    URL-Liste als TXT (eine URL pro Zeile) — 2.3.2/2.3.3.
+
+    ``utf8_bom=True``: UTF-8 mit BOM (Excel-freundlich) — 2.3.3.
+    """
+    target = Path(path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    lines = [str(u or "").strip() for u in uris if str(u or "").strip()]
+    body = "\n".join(lines)
+    if body:
+        body += "\n"
+    if utf8_bom:
+        body = "\ufeff" + body
+    target.write_text(body, encoding="utf-8")
+    return target
