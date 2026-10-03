@@ -1,11 +1,12 @@
-"""Dialog: Wasserzeichen (Text/Bild, Settings, Seitenbereich, Vorschau, Bake) — 1.6.3."""
+"""Dialog: Wasserzeichen (Text/Bild, Settings, Seitenbereich, Vorschau, Bake) — 1.6.4."""
 
 from __future__ import annotations
 
+import html as _html
 from pathlib import Path
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QImage, QPixmap
+from PySide6.QtGui import QImage, QKeySequence, QPixmap
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -30,11 +31,14 @@ from PySide6.QtWidgets import (
 
 from ild_pdf.pages import flatten_page_indices, parse_page_ranges
 from ild_pdf.watermark import (
+    DEFAULT_WATERMARK_OUTPUT_TEMPLATE,
     WatermarkBakeCancelled,
     apply_image_watermark,
     apply_page_numbers,
     apply_watermark,
+    find_invalid_watermark_placeholders,
     format_watermark_output_path,
+    highlight_watermark_template_html,
     preview_watermark_output_filename,
     render_watermark_preview,
 )
@@ -44,6 +48,44 @@ from instantlensdoc.core.app_settings import (
     set_last_watermark_settings,
     set_watermark_output_template,
 )
+
+
+class WmOutTemplateEdit(QLineEdit):
+    """WM-Ausgabe-Template: Cursor merken + lokales Undo — 1.6.4."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._saved_cursor = 0
+        self._saved_sel_start = -1
+        self._saved_sel_len = 0
+
+    def focusOutEvent(self, event):
+        self._saved_cursor = self.cursorPosition()
+        self._saved_sel_start = self.selectionStart()
+        self._saved_sel_len = self.selectionLength()
+        super().focusOutEvent(event)
+
+    def keyPressEvent(self, event):
+        if event.matches(QKeySequence.Undo):
+            if self.isUndoAvailable():
+                self.undo()
+            event.accept()
+            return
+        if event.matches(QKeySequence.Redo):
+            if self.isRedoAvailable():
+                self.redo()
+            event.accept()
+            return
+        super().keyPressEvent(event)
+
+    def restore_insert_position(self) -> None:
+        if self.hasFocus():
+            return
+        if self._saved_sel_start >= 0 and self._saved_sel_len > 0:
+            self.setSelection(self._saved_sel_start, self._saved_sel_len)
+        else:
+            pos = max(0, min(self._saved_cursor, len(self.text())))
+            self.setCursorPosition(pos)
 
 
 class WatermarkDialog(QDialog):
@@ -192,19 +234,35 @@ class WatermarkDialog(QDialog):
             )
         )
 
-        # Ausgabe-Pfad Template Settings — 1.6.2/1.6.3
-        self.wm_out_tpl = QLineEdit(get_watermark_output_template())
-        self.wm_out_tpl.setPlaceholderText("{stem}_wm")
+        # Ausgabe-Pfad Template: Quick-Insert {stem}/{date}; ungültige rot — 1.6.4
+        self.wm_out_tpl = WmOutTemplateEdit(get_watermark_output_template())
+        self.wm_out_tpl.setPlaceholderText(DEFAULT_WATERMARK_OUTPUT_TEMPLATE)
         self.wm_out_tpl.setToolTip(
-            "Ausgabe-Pfad-Template (Settings): {stem} → Dateiname ohne Endung. "
-            "Beispiel: {stem}_wm → dok_wm.pdf — 1.6.2/1.6.3"
+            "Ausgabe-Pfad-Template: {stem}, {name}, {suffix}, {date}. "
+            "Quick-Insert an Cursor; lokales Undo (Ctrl+Z) — 1.6.4"
         )
-        form.addRow("Ausgabe-Template", self.wm_out_tpl)
+        tpl_row = QHBoxLayout()
+        tpl_row.addWidget(self.wm_out_tpl, 1)
+        for token in ("{stem}", "{date}"):
+            btn = QPushButton(token)
+            btn.setAutoDefault(False)
+            btn.setDefault(False)
+            btn.setFocusPolicy(Qt.TabFocus)
+            btn.setToolTip(
+                f"Platzhalter {token} an Cursor-Position einfügen "
+                "(lokales Undo: Ctrl+Z) — 1.6.4"
+            )
+            btn.clicked.connect(
+                lambda _checked=False, t=token: self._insert_wm_out_placeholder(t)
+            )
+            tpl_row.addWidget(btn)
+        form.addRow("Ausgabe-Template", tpl_row)
         self.wm_out_preview = QLabel("")
         self.wm_out_preview.setWordWrap(True)
+        self.wm_out_preview.setTextFormat(Qt.RichText)
         self.wm_out_preview.setStyleSheet("color:#555;")
         self.wm_out_preview.setToolTip(
-            "Live-Vorschau Dateiname (Beispiel stem=dokument) — 1.6.3"
+            "Live-Vorschau Dateiname; ungültige Platzhalter rot — 1.6.4"
         )
         form.addRow("Vorschau Dateiname", self.wm_out_preview)
         self.wm_out_tpl.textChanged.connect(self._update_wm_out_preview)
@@ -224,7 +282,7 @@ class WatermarkDialog(QDialog):
         run = QPushButton("Wasserzeichen in PDF bakken")
         run.setToolTip(
             "Bake mit Fortschritt/Abbruch; Teilergebnis bei Abbruch; "
-            "Template Live-Vorschau — 1.6.3"
+            "Template Quick-Insert {stem}/{date}; ungültige Platzhalter rot — 1.6.4"
         )
         run.clicked.connect(self._run_wm)
         form.addRow(run)
@@ -273,21 +331,46 @@ class WatermarkDialog(QDialog):
         data = self.wm_placement.currentData()
         return str(data or "diagonal")
 
+    def _insert_wm_out_placeholder(self, token: str) -> None:
+        """Quick-Insert {stem}/{date} an Cursor — 1.6.4."""
+        edit = self.wm_out_tpl
+        if isinstance(edit, WmOutTemplateEdit):
+            edit.restore_insert_position()
+        edit.insert(str(token or ""))
+        edit.setFocus()
+        if isinstance(edit, WmOutTemplateEdit):
+            edit._saved_cursor = edit.cursorPosition()
+            edit._saved_sel_start = -1
+            edit._saved_sel_len = 0
+        self._update_wm_out_preview()
+
     def _update_wm_out_preview(self, *_args) -> None:
-        """Live-Vorschau Ausgabe-Dateiname aus Template — 1.6.3."""
+        """Live-Vorschau; ungültige Platzhalter rot — 1.6.4."""
         if not hasattr(self, "wm_out_preview"):
             return
         src = (self.wm_src.text().strip() if hasattr(self, "wm_src") else "") or ""
         sample = Path(src).stem if src else "dokument"
+        tpl = self.wm_out_tpl.text().strip() or DEFAULT_WATERMARK_OUTPUT_TEMPLATE
         try:
             name = preview_watermark_output_filename(
-                self.wm_out_tpl.text().strip(),
+                tpl,
                 sample_stem=sample or "dokument",
             )
-            self.wm_out_preview.setText(f"→ {name}")
+            html_tpl = highlight_watermark_template_html(tpl)
+            invalid = find_invalid_watermark_placeholders(tpl)
+            parts = [html_tpl, f"→ {_html.escape(name)}"]
+            if invalid:
+                listed = ", ".join(_html.escape("{" + n + "}") for n in invalid)
+                parts.append(
+                    f'<span style="color:#c62828">Ungültige Platzhalter: {listed}</span>'
+                )
+            self.wm_out_preview.setText("<br>".join(parts))
             self.wm_out_preview.setStyleSheet("color:#555;")
         except Exception as e:
-            self.wm_out_preview.setText(f"Ungültiges Template: {e}")
+            self.wm_out_preview.setText(
+                f'<span style="color:#c62828">Ungültiges Template: '
+                f"{_html.escape(str(e))}</span>"
+            )
             self.wm_out_preview.setStyleSheet("color:#c62828;")
 
     def _persist_wm_settings(self) -> None:

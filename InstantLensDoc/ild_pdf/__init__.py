@@ -94,22 +94,31 @@ from .overlay import (
 )
 from .watermark import (
     DEFAULT_WATERMARK_OUTPUT_TEMPLATE,
+    WATERMARK_KNOWN_PLACEHOLDERS,
     WatermarkBakeCancelled,
     apply_image_watermark,
     apply_page_numbers,
     apply_watermark,
+    find_invalid_watermark_placeholders,
     format_watermark_output_path,
+    highlight_watermark_template_html,
     preview_watermark_output_filename,
     render_watermark_preview,
 )
 from .doc_stats import (
+    DEFAULT_STATS_FILENAME_TEMPLATE,
+    STATS_KNOWN_PLACEHOLDERS,
     STATS_SCHEMA_ID,
     STATS_VERSION,
     DocumentStats,
     collect_document_stats,
     count_words,
     export_document_stats_json,
+    find_invalid_stats_placeholders,
     format_document_stats_text,
+    format_stats_filename,
+    highlight_stats_template_html,
+    preview_stats_filename,
 )
 from .limits import PdfHealth, THUMB_LAZY_THRESHOLD, clamp_render_scale, inspect_pdf
 from .render import clear_render_cache
@@ -237,20 +246,29 @@ __all__ = [
     "selection_to_plain_text",
     "bake_text_overlays",
     "DEFAULT_WATERMARK_OUTPUT_TEMPLATE",
+    "WATERMARK_KNOWN_PLACEHOLDERS",
     "WatermarkBakeCancelled",
     "apply_watermark",
     "apply_image_watermark",
     "apply_page_numbers",
+    "find_invalid_watermark_placeholders",
     "format_watermark_output_path",
+    "highlight_watermark_template_html",
     "preview_watermark_output_filename",
     "render_watermark_preview",
+    "DEFAULT_STATS_FILENAME_TEMPLATE",
+    "STATS_KNOWN_PLACEHOLDERS",
     "STATS_SCHEMA_ID",
     "STATS_VERSION",
     "DocumentStats",
     "collect_document_stats",
     "count_words",
     "export_document_stats_json",
+    "find_invalid_stats_placeholders",
     "format_document_stats_text",
+    "format_stats_filename",
+    "highlight_stats_template_html",
+    "preview_stats_filename",
     "PdfHealth",
     "inspect_pdf",
     "clamp_render_scale",
@@ -286,4 +304,4 @@ __all__ = [
     "uri_link_at",
 ]
 
-__version__ = "1.6.3"
+__version__ = "1.6.4"

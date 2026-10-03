@@ -2,7 +2,7 @@
 
 Moderne Textverarbeitung mit PDF-Annotator, OCR-Bridge und Formulargenerator.
 
-**Version:** 1.6.3  
+**Version:** 1.6.4  
 **Hersteller:** Andreas Meyer · ame@sellerbach.de
 
 ## Quickstart (Windows)
@@ -33,8 +33,8 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an).
 
-## Neu in 1.6.3
+## Neu in 1.6.4
 
-Polish auf 1.6.2: **WM-Bake Abbruch** Teilergebnis-Hinweis + Template **Live-Vorschau Dateiname**; **Crypto Prefill** Warnhinweis in Settings wenn an, Passwort nie in Logs; **Stats JSON** Zielordner merken, UTF-8 ohne BOM; **Layouts Import** Dialog Merge vs. Ersetzen, ungültiges Schema klar DE. Stubs KI/Cloud/Stylus/3D unverändert.
+Polish auf 1.6.3: **WM-Template** Quick-Insert `{stem}`/`{date}` + ungültige Platzhalter rot; **Crypto Prefill** Button **„jetzt ausschalten“**; **Stats JSON** Dateiname-Template `{stem}_stats.json` Live-Vorschau; **Layouts Merge** Kollision überspringen/umbenennen (`_2`) + Import-Log. Stubs KI/Cloud/Stylus/3D unverändert.
 
 Siehe [CHANGELOG.md](CHANGELOG.md), [FEATURES.md](FEATURES.md) und [INFO.md](INFO.md).

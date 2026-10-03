@@ -1,16 +1,91 @@
-"""Dokument-Statistik: Seiten, Wörter, Annotationen, Dateigröße — 1.6.3."""
+"""Dokument-Statistik: Seiten, Wörter, Annotationen, Dateigröße — 1.6.4."""
 
 from __future__ import annotations
 
+import html as _html
 import json
 import re
 from dataclasses import asdict, dataclass
+from datetime import date as _date
 from pathlib import Path
 from typing import Any
 
 
 STATS_SCHEMA_ID = "ildstats-v1"
 STATS_VERSION = 1
+DEFAULT_STATS_FILENAME_TEMPLATE = "{stem}_stats.json"
+STATS_KNOWN_PLACEHOLDERS = frozenset({"stem", "date"})
+_STATS_PLACEHOLDER_RE = re.compile(r"\{(stem|date)\}")
+_STATS_ANY_PLACEHOLDER_RE = re.compile(r"\{([^{}]+)\}")
+
+
+def find_invalid_stats_placeholders(template: str) -> list[str]:
+    """Unbekannte Platzhalter im Stats-Dateiname-Template — 1.6.4."""
+    seen: set[str] = set()
+    out: list[str] = []
+    for name in _STATS_ANY_PLACEHOLDER_RE.findall(str(template or "")):
+        key = name.strip()
+        if not key or key in STATS_KNOWN_PLACEHOLDERS or key in seen:
+            continue
+        seen.add(key)
+        out.append(key)
+    return out
+
+
+def highlight_stats_template_html(template: str) -> str:
+    """Template als HTML; ungültige Platzhalter rot — 1.6.4."""
+    raw = str(template or "")
+    parts: list[str] = []
+    last = 0
+    for m in _STATS_ANY_PLACEHOLDER_RE.finditer(raw):
+        parts.append(_html.escape(raw[last : m.start()]))
+        name = m.group(1).strip()
+        token = _html.escape(m.group(0))
+        if name and name not in STATS_KNOWN_PLACEHOLDERS:
+            parts.append(
+                f'<span style="color:#c62828;font-weight:600">{token}</span>'
+            )
+        else:
+            parts.append(token)
+        last = m.end()
+    parts.append(_html.escape(raw[last:]))
+    return "".join(parts) or _html.escape(raw)
+
+
+def format_stats_filename(
+    stem: str,
+    template: str | None = None,
+    *,
+    date: str | None = None,
+) -> str:
+    """
+    Dateiname aus Template, Default ``{stem}_stats.json`` — 1.6.4.
+    Platzhalter: ``{stem}``, ``{date}`` (YYYY-MM-DD).
+    """
+    safe_stem = str(stem or "document").strip() or "document"
+    safe_stem = "".join(c if c.isalnum() or c in "-_." else "_" for c in safe_stem)[:120]
+    tpl = (template or DEFAULT_STATS_FILENAME_TEMPLATE).strip() or DEFAULT_STATS_FILENAME_TEMPLATE
+    tpl = tpl.replace("\\", "_").replace("/", "_")
+    d = (date or "").strip() or _date.today().isoformat()
+    mapping = {"stem": safe_stem, "date": d}
+
+    def _sub(m: re.Match) -> str:
+        return mapping.get(m.group(1), m.group(0))
+
+    name = _STATS_PLACEHOLDER_RE.sub(_sub, tpl).strip()
+    if not name.lower().endswith(".json"):
+        name = f"{name}.json" if name else f"{safe_stem}_stats.json"
+    return name
+
+
+def preview_stats_filename(
+    template: str | None = None,
+    *,
+    sample_stem: str = "dokument",
+    date: str | None = None,
+) -> str:
+    """Live-Vorschau Stats-JSON-Dateiname — 1.6.4."""
+    return format_stats_filename(sample_stem, template, date=date)
 
 
 @dataclass

@@ -1,9 +1,12 @@
-"""Wasserzeichen und Seitennummer-Stempel in PDF (pikepdf Content-Stream) — 1.6.3."""
+"""Wasserzeichen und Seitennummer-Stempel in PDF (pikepdf Content-Stream) — 1.6.4."""
 
 from __future__ import annotations
 
+import html as _html
 import io
 import math
+import re
+from datetime import date as _date
 from pathlib import Path
 from typing import Callable, Iterable, Literal, Optional, Sequence, Union
 
@@ -12,6 +15,9 @@ from PIL import Image, ImageDraw, ImageFont
 Placement = Literal["diagonal", "center"]
 
 DEFAULT_WATERMARK_OUTPUT_TEMPLATE = "{stem}_wm"
+WATERMARK_KNOWN_PLACEHOLDERS = frozenset({"stem", "name", "suffix", "date"})
+_WM_PLACEHOLDER_RE = re.compile(r"\{(stem|name|suffix|date)\}")
+_WM_ANY_PLACEHOLDER_RE = re.compile(r"\{([^{}]+)\}")
 
 
 class WatermarkBakeCancelled(Exception):
@@ -36,15 +42,53 @@ class WatermarkBakeCancelled(Exception):
         )
 
 
+def find_invalid_watermark_placeholders(template: str) -> list[str]:
+    """
+    Unbekannte ``{…}``-Platzhalter im WM-Ausgabe-Template (Reihenfolge, unique).
+    Bekannt: stem, name, suffix, date. — 1.6.4
+    """
+    seen: set[str] = set()
+    out: list[str] = []
+    for name in _WM_ANY_PLACEHOLDER_RE.findall(str(template or "")):
+        key = name.strip()
+        if not key or key in WATERMARK_KNOWN_PLACEHOLDERS or key in seen:
+            continue
+        seen.add(key)
+        out.append(key)
+    return out
+
+
+def highlight_watermark_template_html(template: str) -> str:
+    """Template als HTML; ungültige Platzhalter rot markiert. — 1.6.4"""
+    raw = str(template or "")
+    parts: list[str] = []
+    last = 0
+    for m in _WM_ANY_PLACEHOLDER_RE.finditer(raw):
+        parts.append(_html.escape(raw[last : m.start()]))
+        name = m.group(1).strip()
+        token = _html.escape(m.group(0))
+        if name and name not in WATERMARK_KNOWN_PLACEHOLDERS:
+            parts.append(
+                f'<span style="color:#c62828;font-weight:600">{token}</span>'
+            )
+        else:
+            parts.append(token)
+        last = m.end()
+    parts.append(_html.escape(raw[last:]))
+    return "".join(parts) or _html.escape(raw)
+
+
 def format_watermark_output_path(
     pdf_path: str | Path,
     template: str | None = None,
     *,
     inplace: bool = False,
+    date: str | None = None,
 ) -> Path:
     """
-    Ausgabe-Pfad aus Template (Settings), Default ``{stem}_wm.pdf`` — 1.6.2/1.6.3.
-    Platzhalter: ``{stem}``, ``{name}`` (Dateiname ohne Suffix), ``{suffix}``.
+    Ausgabe-Pfad aus Template (Settings), Default ``{stem}_wm.pdf`` — 1.6.2–1.6.4.
+    Platzhalter: ``{stem}``, ``{name}``, ``{suffix}``, ``{date}`` (YYYY-MM-DD).
+    Unbekannte Platzhalter bleiben unverändert (Live-Vorschau) — 1.6.4.
     """
     pdf_path = Path(pdf_path)
     if inplace:
@@ -58,7 +102,18 @@ def format_watermark_output_path(
     if "{stem}" not in tpl and "{name}" not in tpl:
         tpl = "{stem}_" + tpl.lstrip("_")
     stem = pdf_path.stem
-    rendered = tpl.format(stem=stem, name=stem, suffix=pdf_path.suffix.lstrip(".") or "pdf")
+    d = (date or "").strip() or _date.today().isoformat()
+    mapping = {
+        "stem": stem,
+        "name": stem,
+        "suffix": pdf_path.suffix.lstrip(".") or "pdf",
+        "date": d,
+    }
+
+    def _sub(m: re.Match) -> str:
+        return mapping.get(m.group(1), m.group(0))
+
+    rendered = _WM_PLACEHOLDER_RE.sub(_sub, tpl)
     rendered = rendered.strip().rstrip(".")
     if not rendered.lower().endswith(".pdf"):
         rendered = f"{rendered}{pdf_path.suffix or '.pdf'}"
@@ -69,10 +124,13 @@ def preview_watermark_output_filename(
     template: str | None = None,
     *,
     sample_stem: str = "dokument",
+    date: str | None = None,
 ) -> str:
-    """Live-Vorschau Dateiname aus Template (Beispiel-Stem) — 1.6.3."""
+    """Live-Vorschau Dateiname aus Template (Beispiel-Stem) — 1.6.3/1.6.4."""
     fake = Path(f"{sample_stem}.pdf")
-    return format_watermark_output_path(fake, template, inplace=False).name
+    return format_watermark_output_path(
+        fake, template, inplace=False, date=date
+    ).name
 
 
 def _pdf_escape(text: str) -> str:

@@ -74,6 +74,7 @@ DEFAULTS: dict[str, Any] = {
     "watermark_output_template": "{stem}_wm",  # Bake-Ausgabe-Template — 1.6.2
     "crypto_reload_prefill_password": False,  # PW vorausfüllen (unsicher) — 1.6.2
     "last_stats_export_dir": "",  # letzter Zielordner Stats-JSON — 1.6.3
+    "stats_filename_template": "{stem}_stats.json",  # Stats-JSON Dateiname — 1.6.4
     "last_watermark_text": "VERTRAULICH",  # zuletzt WM-Text — 1.6.1
     "last_watermark_image": "",  # zuletzt WM-Bild — 1.6.1
     "last_watermark_opacity": 0.25,  # WM Deckkraft Settings — 1.6.1
@@ -1313,6 +1314,30 @@ WORKSPACE_LAYOUTS_MAX = 20  # max. 20 Layouts — 1.6.1
 LAYOUTS_SCHEMA_ID = "ildlayouts-v1"
 LAYOUTS_VERSION = 1
 DEFAULT_WATERMARK_OUTPUT_TEMPLATE = "{stem}_wm"
+DEFAULT_STATS_FILENAME_TEMPLATE = "{stem}_stats.json"
+
+
+def get_stats_filename_template() -> str:
+    """Stats-JSON Dateiname-Template, Default ``{stem}_stats.json`` — 1.6.4."""
+    raw = str(
+        load_settings().get(
+            "stats_filename_template",
+            DEFAULTS.get("stats_filename_template", DEFAULT_STATS_FILENAME_TEMPLATE),
+        )
+        or ""
+    ).strip()
+    if not raw:
+        return DEFAULT_STATS_FILENAME_TEMPLATE
+    raw = raw.replace("/", "_").replace("\\", "_")
+    return raw or DEFAULT_STATS_FILENAME_TEMPLATE
+
+
+def set_stats_filename_template(template: str) -> str:
+    """Stats-JSON Dateiname-Template speichern — 1.6.4."""
+    raw = str(template or "").strip() or DEFAULT_STATS_FILENAME_TEMPLATE
+    raw = raw.replace("/", "_").replace("\\", "_")
+    save_settings({"stats_filename_template": raw})
+    return raw
 
 
 def get_watermark_output_template() -> str:
@@ -1570,6 +1595,36 @@ class LayoutsImportError(ValueError):
     """Ungültiges oder konfliktbehaftetes ildlayouts-v1 JSON — 1.6.2/1.6.3."""
 
 
+class LayoutsImportResult:
+    """Import-Ergebnis inkl. Log — 1.6.4."""
+
+    def __init__(self, layouts: list[dict], log: list[str] | None = None):
+        self.layouts = list(layouts or [])
+        self.log = list(log or [])
+
+    def __iter__(self):
+        return iter(self.layouts)
+
+    def __len__(self) -> int:
+        return len(self.layouts)
+
+    def __bool__(self) -> bool:
+        return bool(self.layouts)
+
+
+def _unique_layout_name(base: str, used: set[str]) -> str:
+    """Nächsten freien Namen ``base``, ``base_2``, ``base_3``, … wählen — 1.6.4."""
+    name = (base or "Layout").strip() or "Layout"
+    if name.casefold() not in used:
+        return name
+    n = 2
+    while True:
+        candidate = f"{name}_{n}"
+        if candidate.casefold() not in used:
+            return candidate
+        n += 1
+
+
 def export_workspace_layouts_dict() -> dict:
     """Workspace-Layouts als exportierbares Dict (ildlayouts-v1) — 1.6.2."""
     return {
@@ -1597,10 +1652,13 @@ def import_workspace_layouts_dict(
     data: dict,
     *,
     merge: bool = True,
-) -> list[dict]:
+    on_collision: str = "reject",
+) -> LayoutsImportResult:
     """
-    Layouts aus Dict übernehmen (ildlayouts-v1) — 1.6.2/1.6.3.
-    merge=True: anhängen (Duplikate abgelehnt); merge=False: ersetzen.
+    Layouts aus Dict übernehmen (ildlayouts-v1) — 1.6.2–1.6.4.
+    merge=True: anhängen; merge=False: ersetzen.
+    on_collision (nur Merge): ``reject`` (Default, 1.6.2), ``skip``, ``rename`` (_2) — 1.6.4.
+    Rückgabe: LayoutsImportResult (layouts + Import-Log).
     Ungültiges Schema: klare DE-Meldung.
     """
     if not isinstance(data, dict):
@@ -1651,17 +1709,44 @@ def import_workspace_layouts_dict(
         incoming.append(layout)
     if not incoming:
         raise LayoutsImportError("Keine gültigen Layouts im Import.")
+
+    mode = str(on_collision or "reject").strip().lower()
+    if mode not in ("reject", "skip", "rename"):
+        mode = "reject"
+
+    log: list[str] = []
     existing = get_workspace_layouts()
     if merge:
         existing_keys = {str(p["name"]).casefold() for p in existing}
+        accepted: list[dict] = []
         for layout in incoming:
             key = str(layout["name"]).casefold()
+            orig = str(layout["name"])
             if key in existing_keys:
-                raise LayoutsImportError(f"Name bereits vergeben: {layout['name']}")
-        combined = incoming + existing
+                if mode == "reject":
+                    raise LayoutsImportError(f"Name bereits vergeben: {orig}")
+                if mode == "skip":
+                    log.append(f"übersprungen: {orig}")
+                    continue
+                # rename → Name_2, Name_3, …
+                new_name = _unique_layout_name(orig, existing_keys)
+                layout = dict(layout)
+                layout["name"] = new_name
+                log.append(f"umbenannt: {orig} → {new_name}")
+                existing_keys.add(new_name.casefold())
+                accepted.append(layout)
+            else:
+                log.append(f"importiert: {orig}")
+                existing_keys.add(key)
+                accepted.append(layout)
+        combined = accepted + existing
+        if not accepted and not existing:
+            raise LayoutsImportError("Keine gültigen Layouts im Import.")
     else:
         # Ersetzen: bestehende Layouts verwerfen — 1.6.3
         combined = list(incoming)
+        for layout in incoming:
+            log.append(f"ersetzt/importiert: {layout['name']}")
     if len(combined) > WORKSPACE_LAYOUTS_MAX:
         raise LayoutsImportError(
             f"Maximal {WORKSPACE_LAYOUTS_MAX} Layouts — Import würde Limit überschreiten."
@@ -1671,18 +1756,30 @@ def import_workspace_layouts_dict(
     if default:
         if any(str(p["name"]).casefold() == default.casefold() for p in combined):
             patch["default_workspace_layout"] = default
+        elif merge and mode == "rename":
+            # Default-Name ggf. mitumbenannt — im Log nachsehen
+            for line in log:
+                if line.startswith(f"umbenannt: {default} → "):
+                    new_def = line.split(" → ", 1)[1].strip()
+                    if any(
+                        str(p["name"]).casefold() == new_def.casefold()
+                        for p in combined
+                    ):
+                        patch["default_workspace_layout"] = new_def
+                    break
     elif not merge:
         patch["default_workspace_layout"] = ""
     save_settings(patch)
-    return get_workspace_layouts()
+    return LayoutsImportResult(get_workspace_layouts(), log)
 
 
 def import_workspace_layouts_json(
     path: str | Path,
     *,
     merge: bool = True,
-) -> list[dict]:
-    """Workspace-Layouts aus JSON laden (ildlayouts-v1) — 1.6.2/1.6.3."""
+    on_collision: str = "reject",
+) -> LayoutsImportResult:
+    """Workspace-Layouts aus JSON laden (ildlayouts-v1) — 1.6.2–1.6.4."""
     import json
 
     path = Path(path)
@@ -1695,7 +1792,9 @@ def import_workspace_layouts_json(
             "Ungültiges Layout-JSON: erwartet ein Objekt mit Schema "
             f"„{LAYOUTS_SCHEMA_ID}“."
         )
-    return import_workspace_layouts_dict(data, merge=merge)
+    return import_workspace_layouts_dict(
+        data, merge=merge, on_collision=on_collision
+    )
 
 
 def get_last_watermark_settings() -> dict:

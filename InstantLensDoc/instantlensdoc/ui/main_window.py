@@ -7126,8 +7126,8 @@ class MainWindow(QMainWindow):
         menu.addAction(act_export)
         act_import = QAction("Layouts importieren…", self)
         act_import.setToolTip(
-            "Layouts aus ildlayouts-v1 JSON; Dialog Merge vs. Ersetzen; "
-            "ungültiges Schema klar DE — 1.6.3"
+            "Layouts aus ildlayouts-v1 JSON; Merge Kollision skip/rename + Log; "
+            "ungültiges Schema klar DE — 1.6.4"
         )
         act_import.triggered.connect(self._import_workspace_layouts)
         menu.addAction(act_import)
@@ -7248,7 +7248,10 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Workspace-Layout", str(e))
 
     def _import_workspace_layouts(self):
-        """Layouts aus ildlayouts-v1 JSON: Merge vs. Ersetzen; Schema klar DE — 1.6.3."""
+        """
+        Layouts aus ildlayouts-v1 JSON: Merge vs. Ersetzen;
+        bei Merge Kollision überspringen/umbenennen (_2) + Import-Log — 1.6.4.
+        """
         from pathlib import Path as _Path
 
         from instantlensdoc.core.app_settings import (
@@ -7273,23 +7276,45 @@ class MainWindow(QMainWindow):
             "Layouts importieren",
             "Vorhandene Layouts ersetzen?\n"
             "„Ja“ = Ersetzen (alle aktuellen Layouts werden verworfen).\n"
-            "„Nein“ = Zusammenführen/Merge (Duplikat-Namen abgelehnt).",
+            "„Nein“ = Zusammenführen/Merge (Kollisionsstrategie wählen).",
             QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel,
             QMessageBox.No,
         )
         if reply == QMessageBox.Cancel:
             return
         merge = reply == QMessageBox.No
+        on_collision = "reject"
+        if merge:
+            coll = QMessageBox.question(
+                self,
+                "Namenskollision",
+                "Bei gleichem Layout-Namen:\n"
+                "„Ja“ = überspringen\n"
+                "„Nein“ = umbenennen (_2, _3, …)",
+                QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel,
+                QMessageBox.Yes,
+            )
+            if coll == QMessageBox.Cancel:
+                return
+            on_collision = "skip" if coll == QMessageBox.Yes else "rename"
         try:
-            layouts = import_workspace_layouts_json(path, merge=merge)
+            result = import_workspace_layouts_json(
+                path, merge=merge, on_collision=on_collision
+            )
             set_last_export_dir(_Path(path).parent)
             self._refresh_workspace_layout_menu()
             mode = "Merge" if merge else "Ersetzen"
-            self._set_status(f"Layouts importiert ({mode}): {len(layouts)}")
+            strat = ""
+            if merge:
+                strat = " · überspringen" if on_collision == "skip" else " · umbenennen"
+            status = f"Layouts importiert ({mode}{strat}): {len(result)}"
+            self._set_status(status)
+            log_txt = "\n".join(result.log) if result.log else "(keine Einträge)"
             QMessageBox.information(
                 self,
                 "Workspace-Layout",
-                f"{len(layouts)} Layout(s) geladen (ildlayouts-v1, {mode}).",
+                f"{len(result)} Layout(s) geladen (ildlayouts-v1, {mode}{strat}).\n\n"
+                f"Import-Log:\n{log_txt}",
             )
         except LayoutsImportError as e:
             QMessageBox.warning(self, "Workspace-Layout", str(e))

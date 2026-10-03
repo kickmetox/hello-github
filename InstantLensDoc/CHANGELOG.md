@@ -1,5 +1,23 @@
 # Changelog — InstantLens Doc
 
+## 1.6.4 — WM Template Quick-Insert·ungültige rot, Crypto Prefill „jetzt ausschalten“, Stats Dateiname-Template Live-Vorschau, Layouts Merge Kollision skip/rename·Import-Log
+
+Post-Release-Polish nach 1.6.3: **Wasserzeichen-Template** mit **Quick-Insert `{stem}`/`{date}`** und **ungültigen Platzhaltern rot**; **Crypto-Prefill-Warnung** mit Link/Button **„jetzt ausschalten“**; **Dokument-Statistik JSON** **Dateiname-Template** `{stem}_stats.json` **Live-Vorschau**; **Layouts-Merge** **Kollisionsstrategie** pro Name (**überspringen** / **umbenennen `_2`**) inkl. **Import-Log**. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### PDF
+- Wasserzeichen: Template Quick-Insert `{stem}`/`{date}`; ungültige Platzhalter rot; `{date}` im Ausgabe-Pfad
+- Verschlüsseln/Entschlüsseln: Prefill-Warnung mit Button „jetzt ausschalten“ (sofort speichern)
+- Dokument-Statistik: JSON-Dateiname-Template `{stem}_stats.json` Live-Vorschau (+ `{date}`)
+
+### UI / Workspace
+- Workspace-Layouts: Merge-Kollision überspringen oder umbenennen (`_2`); Import-Log im Ergebnisdialog
+
+### Packaging / Docs
+- Version **1.6.4** (App / `ild_pdf` / ISS / Smoke / Docs)
+- Smoke: WM Quick-Insert·invalid-red, Crypto disable-now, Stats filename-preview, Layouts skip/rename·import-log (CLI + Qt)
+
+---
+
 ## 1.6.3 — WM Bake Teilergebnis·Template-Live-Vorschau, Crypto Prefill-Warnung·keine PW-Logs, Stats Zielordner·UTF-8, Layouts Merge/Ersetzen·Schema DE
 
 Post-Release-Polish nach 1.6.2: **Wasserzeichen-Bake Abbruch** mit **Teilergebnis-Hinweis** (X/Y Seiten gespeichert) und **Template Live-Vorschau Dateiname**; **Crypto-Prefill** **Warnhinweis in Settings** wenn an, **Passwort nie in Logs**; **Dokument-Statistik JSON** **Zielordner merken**, Encoding **UTF-8 ohne BOM**; **Layouts-Import** Dialog **Merge vs. Ersetzen**, **ungültiges Schema klar DE**. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
