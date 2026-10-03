@@ -184,6 +184,25 @@ def draw_annotations_on_image(
                 outline=stroke,
                 width=sw,
             )
+        elif ann.type == AnnotationType.MEASURE_AREA:
+            draw.rectangle(
+                [x, y, x + w, y + h],
+                fill=_parse_color(ann.color, _opacity_alpha(ann, 30)),
+                outline=stroke,
+                width=sw,
+            )
+            label = ann.text or ann.measure_label(scale, unit="mm")
+            font = _font(11)
+            draw.text((x + 4, y + 4), label, fill=stroke, font=font)
+        elif ann.type == AnnotationType.MEASURE_ANGLE:
+            x2, y2 = ann.end_point()
+            x3 = float(ann.p3_x) if (ann.p3_x or ann.p3_y) else float(ann.x + ann.width)
+            y3 = float(ann.p3_y) if (ann.p3_x or ann.p3_y) else float(ann.y)
+            draw.line([ann.x, ann.y, x2, y2], fill=stroke, width=sw)
+            draw.line([x2, y2, x3, y3], fill=stroke, width=sw)
+            label = ann.text or ann.measure_label(scale)
+            font = _font(11)
+            draw.text((x2 + 4, y2 - 14), label, fill=stroke, font=font)
         elif ann.type in (AnnotationType.LINE, AnnotationType.ARROW, AnnotationType.MEASURE):
             x2, y2 = ann.end_point()
             draw.line([ann.x, ann.y, x2, y2], fill=stroke, width=sw)

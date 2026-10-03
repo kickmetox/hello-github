@@ -1,5 +1,23 @@
 # Changelog — InstantLens Doc
 
+## 2.1.0 — PDF-Kommentar-Import, Messung Fläche+Winkel·mm/px, Textlayer-Diff, Nightly-Smoke
+
+Minor-Bump nach **2.0.5**: **native PDF-Markup → Sidecar** (pikepdf, grob); **Messwerkzeug Fläche (Rechteck) + Winkel (zwei Linien)** mit Anzeige-Einheit **mm/px Toggle**; **PDF-Vergleich Textlayer-Diff** (nicht nur Raster) im Diff-Panel; **Nightly-Smoke** `scripts/smoke_ild.py` (CLI+Import). Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen unverändert klar markiert / nicht produktiv.
+
+### Annotationen / Messung
+- PDF-Kommentare importieren (native): Highlight/Underline/Text/FreeText/Stamp/Square/Line/Ink… → Sidecar; Link/Widget übersprungen; Menü PDF
+- Messwerkzeug: **Fläche** (Rechteck, mm²/px²) + **Winkel** (erster Strahl ziehen, zweiter Endpunkt klicken); Toolbar **Maß:mm/px** Toggle
+
+### Vergleich / CI
+- PDF vergleichen: Checkbox **Textlayer-Diff** → Unified Diff im Diff-Panel (pypdfium2 + difflib)
+- `scripts/smoke_ild.py`: Version/Imports/CLI/--version/Measure/Textlayer/Native-Import/CHANGELOG
+
+### Packaging / Docs
+- Version **2.1.0** (App / `ild_pdf` / ISS / Smoke / Docs); Serie **2.1**; `docs/VERSION` + `VERSION.txt`
+- Smoke: 2.1.0 CLI + Qt (Import/Messung/Textlayer/smoke_ild)
+
+---
+
 ## 2.0.5 — Multi-Doc Reset Bestätigung≠Default·Fokus+Selektion, Portfolio Footer-Filter übersprungen·leer bei 0, HC-Toast A11y wie OCR, install-ild -Quiet Summary·Exit 0
 
 Post-Release-Polish nach 2.0.4: **Multi-Dokument-Suche Reset Default** mit **Bestätigung nur bei Abweichung** und **Fokus+Selektion**; **Portfolio-Extrakt** Footer-**Klick filtert übersprungene** (Toggle), **leerer Footer bei Zähler 0**; High-Contrast Toast nutzt **gleiche Announcement-Pipeline wie OCR-Toast** (AccessibleName + Clear nach Timeout); **install-ild.ps1 -Uninstall -Quiet**: **Exit 0 auch wenn nichts zu entfernen**, **Kurz-Summary auf stdout**. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen unverändert klar markiert / nicht produktiv.

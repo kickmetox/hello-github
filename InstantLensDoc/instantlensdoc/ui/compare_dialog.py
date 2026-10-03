@@ -8,7 +8,7 @@ from datetime import date as _date
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QTimer
-from PySide6.QtGui import QImage, QKeySequence, QPixmap
+from PySide6.QtGui import QFont, QImage, QKeySequence, QPixmap
 from PySide6.QtWidgets import (
     QCheckBox,
     QDialog,
@@ -18,13 +18,15 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QMessageBox,
+    QPlainTextEdit,
     QPushButton,
     QScrollArea,
     QSpinBox,
+    QStackedWidget,
     QVBoxLayout,
 )
 
-from ild_pdf.diff import raster_diff
+from ild_pdf.diff import raster_diff, text_layer_diff
 from ild_pdf.limits import clamp_render_scale, inspect_pdf
 from ild_pdf.render import render_page
 from instantlensdoc.core.app_settings import (
@@ -165,6 +167,7 @@ class PdfCompareDialog(QDialog):
         self._left_img = None
         self._right_img = None
         self._diff_overlay = None  # PIL Image für PNG-Export — 1.4.1
+        self._text_diff_result = None  # TextLayerDiffResult — 2.1.0
 
         root = QVBoxLayout(self)
         pick = QHBoxLayout()
@@ -203,6 +206,12 @@ class PdfCompareDialog(QDialog):
             "Magenta-Overlay der Pixel-Unterschiede + Ähnlichkeit % — 1.4.0/1.4.1"
         )
         self.chk_diff.toggled.connect(lambda _: self._refresh())
+        self.chk_text_diff = QCheckBox("Textlayer-Diff")
+        self.chk_text_diff.setChecked(False)
+        self.chk_text_diff.setToolTip(
+            "Textlayer (pypdfium2) zeilenweise vergleichen — Unified Diff im Diff-Panel — 2.1.0"
+        )
+        self.chk_text_diff.toggled.connect(lambda _: self._refresh())
         self.spin_threshold = QSpinBox()
         self.spin_threshold.setRange(
             PDF_COMPARE_DIFF_THRESHOLD_MIN, PDF_COMPARE_DIFF_THRESHOLD_MAX
@@ -228,6 +237,7 @@ class PdfCompareDialog(QDialog):
         nav.addWidget(self.spin_right)
         nav.addWidget(self.chk_sync)
         nav.addWidget(self.chk_diff)
+        nav.addWidget(self.chk_text_diff)
         nav.addWidget(QLabel("Schwelle"))
         nav.addWidget(self.spin_threshold)
         nav.addWidget(btn_export)
@@ -301,18 +311,29 @@ class PdfCompareDialog(QDialog):
         self.view_left.setMinimumSize(280, 420)
         self.view_right.setMinimumSize(280, 420)
         self.view_diff.setMinimumSize(280, 420)
+        # Diff-Panel: Raster-Bild oder Textlayer Unified Diff — 2.1.0
+        self.diff_text = QPlainTextEdit()
+        self.diff_text.setReadOnly(True)
+        self.diff_text.setPlaceholderText("Textlayer-Diff (Unified) — 2.1.0")
+        mono = QFont("Consolas")
+        mono.setStyleHint(QFont.Monospace)
+        mono.setPointSize(10)
+        self.diff_text.setFont(mono)
+        self.diff_stack = QStackedWidget()
+        sl_diff_img = QScrollArea()
+        sl_diff_img.setWidgetResizable(True)
+        sl_diff_img.setWidget(self.view_diff)
+        self.diff_stack.addWidget(sl_diff_img)  # 0 = Raster
+        self.diff_stack.addWidget(self.diff_text)  # 1 = Text
         sl = QScrollArea()
         sr = QScrollArea()
-        sd = QScrollArea()
         sl.setWidgetResizable(True)
         sr.setWidgetResizable(True)
-        sd.setWidgetResizable(True)
         sl.setWidget(self.view_left)
         sr.setWidget(self.view_right)
-        sd.setWidget(self.view_diff)
         panes.addWidget(sl)
         panes.addWidget(sr)
-        panes.addWidget(sd)
+        panes.addWidget(self.diff_stack)
         root.addLayout(panes, 1)
 
         buttons = QDialogButtonBox(QDialogButtonBox.Close)
@@ -583,13 +604,39 @@ class PdfCompareDialog(QDialog):
             if warn_r:
                 self.view_right.setToolTip(warn_r)
 
-        # Raster-Diff Overlay + Ähnlichkeit — 1.4.0/1.4.1
+        # Textlayer-Diff hat Vorrang im Diff-Panel wenn aktiv — 2.1.0
         self._diff_overlay = None
+        self._text_diff_result = None
         if (
+            self.chk_text_diff.isChecked()
+            and self._left
+            and self._right
+        ):
+            self.diff_stack.setCurrentIndex(1)
+            try:
+                tresult = text_layer_diff(
+                    self._left,
+                    self._right,
+                    left_page=max(0, int(self.spin_left.value()) - 1),
+                    right_page=max(0, int(self.spin_right.value()) - 1),
+                )
+                self._text_diff_result = tresult
+                body = tresult.unified_diff or "(identischer Textlayer — kein Diff)"
+                self.diff_text.setPlainText(body)
+                self.lbl_similarity.setText(
+                    f"Textlayer-Ähnlichkeit: {tresult.similarity_percent:.1f} % "
+                    f"({tresult.left_lines}/{tresult.right_lines} Zeilen, "
+                    f"{tresult.changed_hunks} Hunks) — 2.1.0"
+                )
+            except Exception as e:
+                self.diff_text.setPlainText(f"Textlayer-Diff-Fehler:\n{e}")
+                self.lbl_similarity.setText("Textlayer: Fehler")
+        elif (
             self.chk_diff.isChecked()
             and self._left_img is not None
             and self._right_img is not None
         ):
+            self.diff_stack.setCurrentIndex(0)
             try:
                 thr = int(self.spin_threshold.value())
                 result = raster_diff(
@@ -606,9 +653,12 @@ class PdfCompareDialog(QDialog):
                 self.view_diff.setText(f"Diff-Fehler:\n{e}")
                 self.lbl_similarity.setText("Ähnlichkeit: Fehler")
         else:
+            self.diff_stack.setCurrentIndex(0)
             self.view_diff.setPixmap(QPixmap())
             self.view_diff.setText(
-                "Diff aus" if not self.chk_diff.isChecked() else "—"
+                "Diff aus"
+                if not self.chk_diff.isChecked() and not self.chk_text_diff.isChecked()
+                else "—"
             )
             self.lbl_similarity.setText("Ähnlichkeit: —")
         self._update_png_template_preview()

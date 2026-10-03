@@ -143,6 +143,7 @@ DEFAULTS: dict[str, Any] = {
     "last_hf_margin": 28.0,
     "minimize_to_tray": False,
     "page_size_unit": "mm",
+    "measure_unit": "mm",  # Messanzeige mm|px — 2.1.0
     "backup_on_save": False,
     "export_raster_dpi": 150,
     "print_grayscale": False,
@@ -3580,6 +3581,25 @@ def set_page_size_unit(unit: str) -> str:
 def toggle_page_size_unit() -> str:
     """Wechselt mm ↔ inch und speichert; Rückgabe: neue Einheit."""
     return set_page_size_unit("inch" if get_page_size_unit() == "mm" else "mm")
+
+
+def get_measure_unit() -> str:
+    """Messanzeige-Einheit: 'mm' oder 'px' — 2.1.0."""
+    raw = str(load_settings().get("measure_unit", "mm") or "mm").lower().strip()
+    if raw in ("px", "pixel", "pixels"):
+        return "px"
+    return "mm"
+
+
+def set_measure_unit(unit: str) -> str:
+    u = "px" if str(unit or "").lower().strip() in ("px", "pixel", "pixels") else "mm"
+    save_settings({"measure_unit": u})
+    return u
+
+
+def toggle_measure_unit() -> str:
+    """Wechselt mm ↔ px und speichert; Rückgabe: neue Einheit — 2.1.0."""
+    return set_measure_unit("px" if get_measure_unit() == "mm" else "mm")
 
 
 def get_backup_on_save() -> bool:

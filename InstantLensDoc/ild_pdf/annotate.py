@@ -153,6 +153,8 @@ class AnnotationType(str, Enum):
     LINE = "line"
     ARROW = "arrow"
     MEASURE = "measure"
+    MEASURE_AREA = "measure_area"  # Flächenmessung Rechteck — 2.1.0
+    MEASURE_ANGLE = "measure_angle"  # Winkelmessung zwei Linien — 2.1.0
     TEXT_OVERLAY = "text_overlay"
     SIGNATURE_FIELD = "signature_field"  # Platzhalter-Rahmen
     SIGNATURE = "signature"  # Bild-Unterschrift (text: img:…)
@@ -212,6 +214,8 @@ DRAG_TYPES = frozenset(
         AnnotationType.LINE,
         AnnotationType.ARROW,
         AnnotationType.MEASURE,
+        AnnotationType.MEASURE_AREA,
+        AnnotationType.MEASURE_ANGLE,  # erster Strahl per Drag; zweiter Punkt per Klick — 2.1.0
         AnnotationType.HIGHLIGHT,
         AnnotationType.REDACTION,
     }
@@ -229,6 +233,8 @@ REPORT_TYPE_LABELS: dict[str, str] = {
     "line": "Linie",
     "arrow": "Pfeil",
     "measure": "Messung",
+    "measure_area": "Fläche",
+    "measure_angle": "Winkel",
     "text_overlay": "Text-Overlay",
     "signature_field": "Signaturfeld",
     "signature": "Signatur",
@@ -249,6 +255,9 @@ class Annotation:
     # Callout / Linie / Pfeil / Messung: zweiter Punkt
     callout_x: float = 0.0
     callout_y: float = 0.0
+    # Winkelmessung: dritter Punkt (Ende zweiter Strahl ab Vertex=callout) — 2.1.0
+    p3_x: float = 0.0
+    p3_y: float = 0.0
     font_size: float = 12.0
     opacity: float = 1.0  # Deckkraft 0.05–1.0
     stroke_width: float = 2.0  # Strichstärke Shapes 1–12 px (0.9.2)
@@ -270,6 +279,14 @@ class Annotation:
 
     def end_point(self) -> tuple[float, float]:
         """Endpunkt für Linien-artige Annotationen."""
+        # Linien/Winkel: callout auch bei (0,0) gültig — 2.1.0
+        if self.type in (
+            AnnotationType.LINE,
+            AnnotationType.ARROW,
+            AnnotationType.MEASURE,
+            AnnotationType.MEASURE_ANGLE,
+        ):
+            return float(self.callout_x), float(self.callout_y)
         if self.callout_x or self.callout_y:
             return float(self.callout_x), float(self.callout_y)
         return float(self.x + self.width), float(self.y + self.height)
@@ -278,13 +295,48 @@ class Annotation:
         x2, y2 = self.end_point()
         return math.hypot(x2 - self.x, y2 - self.y)
 
+    def area_px(self) -> float:
+        """Fläche in Render-Pixel² (Rechteck width×height)."""
+        return abs(float(self.width) * float(self.height))
+
+    def angle_degrees(self) -> float:
+        """
+        Winkel am Vertex (callout_x/y) zwischen Punkten (x,y) und (p3_x,p3_y).
+        Rückgabe 0–180°.
+        """
+        vx, vy = float(self.callout_x), float(self.callout_y)
+        ax, ay = float(self.x) - vx, float(self.y) - vy
+        # p3 auch bei (0,0) gültig
+        bx, by = float(self.p3_x) - vx, float(self.p3_y) - vy
+        na = math.hypot(ax, ay)
+        nb = math.hypot(bx, by)
+        if na < 1e-9 or nb < 1e-9:
+            return 0.0
+        cos_a = max(-1.0, min(1.0, (ax * bx + ay * by) / (na * nb)))
+        return math.degrees(math.acos(cos_a))
+
     def measure_label(self, scale: float = 1.0, unit: str = "pt") -> str:
-        """Distanzlabel: Pixel → PDF-Punkte (bei bekanntem Render-Scale)."""
+        """Distanz-/Flächen-/Winkellabel; unit: pt|mm|px — 2.1.0."""
+        u = (unit or "pt").lower().strip()
+        if u in ("in", "inch", "inches"):
+            u = "pt"  # inch nicht für Mess-Anzeige; Fallback pt
+        if self.type == AnnotationType.MEASURE_AREA:
+            px2 = self.area_px()
+            if u == "px":
+                return f"{px2:.0f} px²"
+            # PDF-Punkte²: (px/scale)²
+            pt2 = px2 / max(scale * scale, 1e-6)
+            if u == "mm":
+                mm2 = pt2 * ((25.4 / 72.0) ** 2)
+                return f"{mm2:.1f} mm²"
+            return f"{pt2:.1f} pt²"
+        if self.type == AnnotationType.MEASURE_ANGLE:
+            return f"{self.angle_degrees():.1f}°"
         px = self.length_px()
         pts = px / max(scale, 0.01)
-        if unit == "mm":
+        if u == "mm":
             return f"{pts * 25.4 / 72:.1f} mm"
-        if unit == "px":
+        if u == "px":
             return f"{px:.0f} px"
         return f"{pts:.1f} pt"
 
@@ -404,6 +456,8 @@ class Annotation:
         data["type"] = AnnotationType(data["type"])
         data.setdefault("callout_x", 0.0)
         data.setdefault("callout_y", 0.0)
+        data.setdefault("p3_x", 0.0)
+        data.setdefault("p3_y", 0.0)
         data.setdefault("font_size", 12.0)
         try:
             op = float(data.get("opacity", 1.0))
@@ -591,6 +645,11 @@ class AnnotationStore:
         if cx or cy:
             data["callout_x"] = cx + float(dx)
             data["callout_y"] = cy + float(dy)
+        p3x = float(data.get("p3_x", 0.0) or 0.0)
+        p3y = float(data.get("p3_y", 0.0) or 0.0)
+        if p3x or p3y:
+            data["p3_x"] = p3x + float(dx)
+            data["p3_y"] = p3y + float(dy)
         return self.add(Annotation.from_dict(data))
 
     def paste_dicts(
@@ -624,6 +683,11 @@ class AnnotationStore:
                 if cx or cy:
                     data["callout_x"] = cx + float(dx)
                     data["callout_y"] = cy + float(dy)
+                p3x = float(data.get("p3_x", 0.0) or 0.0)
+                p3y = float(data.get("p3_y", 0.0) or 0.0)
+                if p3x or p3y:
+                    data["p3_x"] = p3x + float(dx)
+                    data["p3_y"] = p3y + float(dy)
                 ann = Annotation.from_dict(data)
                 self.annotations.append(ann)
                 created.append(ann)
@@ -661,26 +725,33 @@ class AnnotationStore:
             if a.callout_x or a.callout_y:
                 a.callout_x = float(a.callout_x) + float(dx)
                 a.callout_y = float(a.callout_y) + float(dy)
+            if a.p3_x or a.p3_y:
+                a.p3_x = float(a.p3_x) + float(dx)
+                a.p3_y = float(a.p3_y) + float(dy)
             a.touch()
         self.dirty = True
         return len(targets)
 
     def _apply_dx(self, ann: Annotation, dx: float) -> None:
-        """Horizontale Verschiebung inkl. Callout-Endpunkt (ohne Undo)."""
+        """Horizontale Verschiebung inkl. Callout-/Winkel-Endpunkte (ohne Undo)."""
         if abs(float(dx)) < 1e-9:
             return
         ann.x = float(ann.x) + float(dx)
         if ann.callout_x or ann.callout_y:
             ann.callout_x = float(ann.callout_x) + float(dx)
+        if ann.p3_x or ann.p3_y:
+            ann.p3_x = float(ann.p3_x) + float(dx)
         ann.touch()
 
     def _apply_dy(self, ann: Annotation, dy: float) -> None:
-        """Vertikale Verschiebung inkl. Callout-Endpunkt (ohne Undo)."""
+        """Vertikale Verschiebung inkl. Callout-/Winkel-Endpunkte (ohne Undo)."""
         if abs(float(dy)) < 1e-9:
             return
         ann.y = float(ann.y) + float(dy)
         if ann.callout_x or ann.callout_y:
             ann.callout_y = float(ann.callout_y) + float(dy)
+        if ann.p3_x or ann.p3_y:
+            ann.p3_y = float(ann.p3_y) + float(dy)
         ann.touch()
 
     def align(

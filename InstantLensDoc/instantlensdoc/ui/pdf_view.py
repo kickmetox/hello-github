@@ -97,9 +97,12 @@ from instantlensdoc.core.app_settings import (
     get_page_number_overlay_position,
     get_page_number_overlay_skip_edges,
     get_page_number_overlay_start,
+    get_measure_unit,
     get_show_page_boxes,
     get_show_page_number_overlay,
     get_show_printer_marks,
+    set_measure_unit,
+    toggle_measure_unit,
     random_ann_palette_color,
     set_ann_color_preset,
     set_ann_default_fill_color,
@@ -721,11 +724,17 @@ class PdfCanvas(QLabel):
             AnnotationType.LINE,
             AnnotationType.ARROW,
             AnnotationType.MEASURE,
+            AnnotationType.MEASURE_ANGLE,
             AnnotationType.CALLOUT,
         ):
             x2, y2 = ann.end_point()
             xs = [ann.x, x2]
             ys = [ann.y, y2]
+            if ann.type == AnnotationType.MEASURE_ANGLE:
+                x3 = float(ann.p3_x) if (ann.p3_x or ann.p3_y) else float(ann.x + ann.width)
+                y3 = float(ann.p3_y) if (ann.p3_x or ann.p3_y) else float(ann.y)
+                xs.append(x3)
+                ys.append(y3)
             if ann.type == AnnotationType.CALLOUT:
                 xs.extend([ann.x + max(ann.width, 100), ann.x])
                 ys.extend([ann.y + max(ann.height, 40), ann.y])
@@ -885,13 +894,31 @@ class PdfCanvas(QLabel):
             cy = int(ann.callout_y + dy) if ann.callout_y else y + box_h + 30
             painter.drawLine(x, y + box_h, cx, cy)
             painter.drawEllipse(cx - 3, cy - 3, 6, 6)
-        elif ann.type == AnnotationType.RECTANGLE:
+        elif ann.type in (AnnotationType.RECTANGLE, AnnotationType.MEASURE_AREA):
             fill_src = str(getattr(ann, "fill_color", "") or "").strip() or ann.color
             painter.setBrush(QColor(fill_src if fill_src else ann.color))
             c = QColor(fill_src if fill_src else ann.color)
             c.setAlpha(_a(40 if not str(getattr(ann, "fill_color", "") or "").strip() else 90))
             painter.fillRect(x, y, w, h, c)
             painter.drawRect(x, y, w, h)
+            if ann.type == AnnotationType.MEASURE_AREA:
+                try:
+                    from instantlensdoc.core.app_settings import get_measure_unit as _gmu
+
+                    unit = _gmu()
+                except Exception:
+                    unit = "mm"
+                label = ann.text or ann.measure_label(self._scale, unit=unit)
+                painter.drawText(x + 4, y + 14, label)
+        elif ann.type == AnnotationType.MEASURE_ANGLE:
+            x2, y2 = ann.end_point()
+            x2, y2 = x2 + dx, y2 + dy
+            x3 = (float(ann.p3_x) if (ann.p3_x or ann.p3_y) else float(ann.x + ann.width)) + dx
+            y3 = (float(ann.p3_y) if (ann.p3_x or ann.p3_y) else float(ann.y)) + dy
+            painter.drawLine(x, y, int(x2), int(y2))
+            painter.drawLine(int(x2), int(y2), int(x3), int(y3))
+            label = ann.text or ann.measure_label(self._scale)
+            painter.drawText(int(x2) + 4, int(y2) - 4, label)
         elif ann.type in (AnnotationType.LINE, AnnotationType.ARROW, AnnotationType.MEASURE):
             x2, y2 = ann.end_point()
             x2, y2 = x2 + dx, y2 + dy
@@ -901,7 +928,13 @@ class PdfCanvas(QLabel):
             if ann.type == AnnotationType.MEASURE:
                 mid_x = (x + x2) / 2
                 mid_y = (y + y2) / 2
-                label = ann.text or ann.measure_label(self._scale)
+                try:
+                    from instantlensdoc.core.app_settings import get_measure_unit as _gmu2
+
+                    unit = _gmu2()
+                except Exception:
+                    unit = "mm"
+                label = ann.text or ann.measure_label(self._scale, unit=unit)
                 painter.drawText(int(mid_x) + 4, int(mid_y) - 4, label)
         painter.setOpacity(1.0)
 
@@ -1015,7 +1048,21 @@ class PdfCanvas(QLabel):
                 preview.x, preview.y = x0, y0
                 preview.callout_x, preview.callout_y = x1, y1
             if self._drag_tool == AnnotationType.MEASURE:
-                preview.text = preview.measure_label(self._scale)
+                try:
+                    from instantlensdoc.core.app_settings import get_measure_unit as _gmu3
+
+                    unit = _gmu3()
+                except Exception:
+                    unit = "mm"
+                preview.text = preview.measure_label(self._scale, unit=unit)
+            if self._drag_tool == AnnotationType.MEASURE_AREA:
+                try:
+                    from instantlensdoc.core.app_settings import get_measure_unit as _gmu4
+
+                    unit = _gmu4()
+                except Exception:
+                    unit = "mm"
+                preview.text = preview.measure_label(self._scale, unit=unit)
             self._draw_ann(painter, preview)
         # Text-Auswahl-Marquee (Auswahl-Modus → Zwischenablage)
         if self._text_sel_start and self._text_sel_current:
@@ -1245,6 +1292,8 @@ class PdfViewer(QWidget):
         self._tool_buttons: list[QToolButton] = []
         self._pending_callout_anchor: tuple[float, float] | None = None
         self._pending_callout_page: int = 0
+        # Winkel: nach erstem Drag (Strahl 1) zweiter Klick setzt p3 — 2.1.0
+        self._pending_angle: tuple[float, float, float, float, int] | None = None
         self._quick_stamp_armed: bool = False  # Quick-Stempel ohne Dialog — 1.9.2
         self._quick_stamp_payload: dict | None = None
         self._zoom_timer = QTimer(self)
@@ -1518,6 +1567,8 @@ class PdfViewer(QWidget):
             (AnnotationType.LINE, "Linie"),
             (AnnotationType.ARROW, "Pfeil"),
             (AnnotationType.MEASURE, "Lineal"),
+            (AnnotationType.MEASURE_AREA, "Fläche"),
+            (AnnotationType.MEASURE_ANGLE, "Winkel"),
             (AnnotationType.SIGNATURE_FIELD, "Signaturfeld"),
         ]:
             b = QToolButton()
@@ -1528,9 +1579,25 @@ class PdfViewer(QWidget):
                 b.setToolTip(
                     "Highlight: Text aufziehen (Selection→Highlight) oder freies Rechteck — speichert Annotation"
                 )
+            elif t == AnnotationType.MEASURE_AREA:
+                b.setToolTip("Fläche: Rechteck aufziehen — Anzeige mm²/px² (Toggle mm/px) — 2.1.0")
+            elif t == AnnotationType.MEASURE_ANGLE:
+                b.setToolTip(
+                    "Winkel: ersten Strahl ziehen, dann zweiten Endpunkt klicken — 2.1.0"
+                )
+            elif t == AnnotationType.MEASURE:
+                b.setToolTip("Lineal: Distanz ziehen — Anzeige mm/px (Toggle) — 2.1.0")
             b.clicked.connect(lambda checked, tool=t: self._set_tool(tool))
             self._tool_buttons.append(b)
             toolbar.addWidget(b)
+
+        self.btn_measure_unit = QToolButton()
+        self.btn_measure_unit.setText(f"Maß:{get_measure_unit()}")
+        self.btn_measure_unit.setToolTip(
+            "Messanzeige-Einheit umschalten (mm ↔ px) — 2.1.0"
+        )
+        self.btn_measure_unit.clicked.connect(self._toggle_measure_unit)
+        toolbar.addWidget(self.btn_measure_unit)
 
         self.btn_hl_color = QPushButton("HL")
         self.btn_hl_color.setToolTip("Highlight-Farbe")
@@ -1863,7 +1930,7 @@ class PdfViewer(QWidget):
         self.canvas.annotation_selected.connect(self._on_annotation_selected)
         self.canvas.uri_link_clicked.connect(self._open_uri_link)
         self.canvas.annotations_moved.connect(self._on_annotations_moved)
-        self.canvas.escape_pressed.connect(self.cancel_quick_stamp)
+        self.canvas.escape_pressed.connect(self._on_canvas_escape)
         self.scroll.setWidget(self.canvas)
         self.scroll.verticalScrollBar().valueChanged.connect(self._on_continuous_scroll)
         layout.addWidget(self.scroll)
@@ -3085,13 +3152,30 @@ class PdfViewer(QWidget):
             AnnotationType.LINE: "Linie",
             AnnotationType.ARROW: "Pfeil",
             AnnotationType.MEASURE: "Lineal",
+            AnnotationType.MEASURE_AREA: "Fläche",
+            AnnotationType.MEASURE_ANGLE: "Winkel",
             AnnotationType.SIGNATURE_FIELD: "Signaturfeld",
         }.get(tool, tool.value)
+
+    def _toggle_measure_unit(self) -> None:
+        """Messanzeige mm ↔ px — 2.1.0."""
+        unit = toggle_measure_unit()
+        if hasattr(self, "btn_measure_unit"):
+            self.btn_measure_unit.setText(f"Maß:{unit}")
+        self.refresh()
+        self.status.emit(f"Messanzeige: {unit}")
+
+    def _measure_unit(self) -> str:
+        try:
+            return get_measure_unit()
+        except Exception:
+            return "mm"
 
     def _set_tool(self, tool: AnnotationType | None):
         self.tool = tool
         self._pending_callout_anchor = None
         self._pending_callout_page = self.page_index
+        self._pending_angle = None
         # Quick-Stempel nur über arm_quick_stamp(); Werkzeugwechsel löscht — 1.9.2
         self._quick_stamp_armed = False
         self._quick_stamp_payload = None
@@ -3113,6 +3197,18 @@ class PdfViewer(QWidget):
             self.status.emit(
                 f"Werkzeug: Schwärzen — Rechteck ziehen · {n} offen · "
                 "PDF → Redactions anwenden"
+            )
+        elif tool == AnnotationType.MEASURE_ANGLE:
+            self.status.emit(
+                "Werkzeug: Winkel — ersten Strahl ziehen, dann zweiten Endpunkt klicken"
+            )
+        elif tool == AnnotationType.MEASURE_AREA:
+            self.status.emit(
+                f"Werkzeug: Fläche — Rechteck ziehen (Anzeige {self._measure_unit()}²)"
+            )
+        elif tool == AnnotationType.MEASURE:
+            self.status.emit(
+                f"Werkzeug: Lineal — Distanz ziehen (Anzeige {self._measure_unit()})"
             )
         else:
             self.status.emit(f"Werkzeug: {tool.value}")
@@ -5843,8 +5939,12 @@ class PdfViewer(QWidget):
             label = f"S{a.page + 1}: {kind}"
             if a.text:
                 label += f" — {truncate_display_text(a.text, 40)}"
-            elif a.type == AnnotationType.MEASURE:
-                label += f" — {a.measure_label(self.scale)}"
+            elif a.type in (
+                AnnotationType.MEASURE,
+                AnnotationType.MEASURE_AREA,
+                AnnotationType.MEASURE_ANGLE,
+            ):
+                label += f" — {a.measure_label(self.scale, unit=self._measure_unit())}"
             tags = getattr(a, "tags", None) or []
             if tags:
                 from ild_pdf.annotate import tags_to_str
@@ -6330,6 +6430,53 @@ class PdfViewer(QWidget):
                 QMessageBox.warning(self, title, f"Schema v4 / Struktur ungültig:\n\n{e}")
             else:
                 QMessageBox.warning(self, title, str(e))
+            return False
+
+    def import_native_pdf_comments(self) -> bool:
+        """Bestehende PDF-Markup-Annotationen grob in Sidecar übernehmen — 2.1.0."""
+        if not self.store or not self.pdf_path:
+            QMessageBox.information(self, "PDF-Kommentare", "Kein PDF geladen.")
+            return False
+        reply = QMessageBox.question(
+            self,
+            "PDF-Kommentare importieren",
+            "Native PDF-Annotationen (Highlight/Notiz/Formen …) in Sidecar übernehmen?\n\n"
+            "Ja = anhängen · Nein = Sidecar ersetzen · Abbrechen = nichts\n\n"
+            "Hinweis: grobe Übernahme (QuadPoints→Box); Link/Widget werden übersprungen.",
+            QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel,
+            QMessageBox.Yes,
+        )
+        if reply == QMessageBox.Cancel:
+            return False
+        replace = reply == QMessageBox.No
+        try:
+            from ild_pdf.pdf_ann_import import import_native_into_store
+
+            result = import_native_into_store(
+                self.store,
+                self.pdf_path,
+                replace=replace,
+                scale=1.0,
+                password=self.password,
+            )
+            self.schedule_sidecar_save(force=True)
+            self.refresh()
+            self.annotations_changed.emit()
+            mode = "ersetzt" if replace else "angehängt"
+            self.status.emit(
+                f"PDF-Import: {result.imported} {mode}, "
+                f"{result.skipped} übersprungen ({result.pages_scanned} Seiten)"
+            )
+            if result.imported == 0:
+                QMessageBox.information(
+                    self,
+                    "PDF-Kommentare",
+                    f"Keine importierbaren Markup-Annotationen gefunden.\n"
+                    f"Übersprungen: {result.skipped}",
+                )
+            return True
+        except Exception as e:
+            QMessageBox.warning(self, "PDF-Kommentare importieren", str(e))
             return False
 
     def save_pdf_as_copy(self) -> bool:
@@ -7006,6 +7153,26 @@ class PdfViewer(QWidget):
 
         payload = resolve_standard_stamp()
         self.arm_quick_stamp(payload)
+
+    def _on_canvas_escape(self) -> None:
+        """Esc: Quick-Stempel / Callout / Winkel-Pending abbrechen — 2.1.0."""
+        if self.cancel_pending_angle():
+            return
+        if self._pending_callout_anchor is not None:
+            self._pending_callout_anchor = None
+            self.status.emit("Platzieren abgebrochen")
+            return
+        self.cancel_quick_stamp()
+
+    def cancel_pending_angle(self) -> bool:
+        """Esc: Winkel-Zweitklick abbrechen — 2.1.0."""
+        if self._pending_angle is None:
+            return False
+        self._pending_angle = None
+        if self.tool == AnnotationType.MEASURE_ANGLE:
+            self.canvas.set_drag_tool(AnnotationType.MEASURE_ANGLE, select_mode=False)
+        self.status.emit("Winkel abgebrochen")
+        return True
 
     def cancel_quick_stamp(self) -> bool:
         """Esc: Quick-Stempel abbrechen; Status + Zoom/Opacity; Fokus Toolbar — 1.9.5."""
@@ -8442,6 +8609,24 @@ class PdfViewer(QWidget):
                 color=self._pen_color,
                 fill_color=str(getattr(self, "_default_fill_color", "") or "").strip(),
             )
+        elif self.tool == AnnotationType.MEASURE_AREA:
+            ann = Annotation(
+                page=page,
+                type=AnnotationType.MEASURE_AREA,
+                x=min(x0, x1),
+                y=min(y0, y1),
+                width=max(abs(x1 - x0), 8),
+                height=max(abs(y1 - y0), 8),
+                color=self._pen_color,
+            )
+            ann.text = ann.measure_label(self.scale, unit=self._measure_unit())
+        elif self.tool == AnnotationType.MEASURE_ANGLE:
+            # Erster Strahl: Start → Vertex (callout); zweiter Klick setzt p3
+            self._pending_angle = (x0, y0, x1, y1, page)
+            # Drag-Tool aus, damit nächster Klick als Place ankommt — 2.1.0
+            self.canvas.set_drag_tool(None, select_mode=False)
+            self.status.emit("Winkel: zweiten Endpunkt klicken (Esc bricht ab)")
+            return
         elif self.tool in (AnnotationType.LINE, AnnotationType.ARROW, AnnotationType.MEASURE):
             ann = Annotation(
                 page=page,
@@ -8455,13 +8640,36 @@ class PdfViewer(QWidget):
                 color=self._pen_color,
             )
             if self.tool == AnnotationType.MEASURE:
-                ann.text = ann.measure_label(self.scale)
+                ann.text = ann.measure_label(self.scale, unit=self._measure_unit())
         else:
             return
         self._commit_ann(ann)
 
     def _on_place(self, x: float, y: float):
         if not self.store or self.tool is None:
+            return
+        # Winkel: zweiter Klick nach erstem Drag — 2.1.0
+        if self.tool == AnnotationType.MEASURE_ANGLE and self._pending_angle is not None:
+            page, x, y = self._spread_resolve(x, y)
+            ax, ay, vx, vy, apage = self._pending_angle
+            self._pending_angle = None
+            ann = Annotation(
+                page=apage,
+                type=AnnotationType.MEASURE_ANGLE,
+                x=ax,
+                y=ay,
+                width=abs(vx - ax),
+                height=abs(vy - ay),
+                callout_x=vx,
+                callout_y=vy,
+                p3_x=x,
+                p3_y=y,
+                color=self._pen_color,
+            )
+            ann.text = ann.measure_label(self.scale)
+            self._commit_ann(ann)
+            # Drag wieder aktiv für nächsten Winkel
+            self.canvas.set_drag_tool(AnnotationType.MEASURE_ANGLE, select_mode=False)
             return
         if self.tool in DRAG_TYPES:
             return  # Drag-Werkzeuge

@@ -1,8 +1,10 @@
-"""Raster-Diff zweier PDF-Seiten (PIL) + grobe Ähnlichkeit in Prozent — 1.4.0–1.4.2."""
+"""Raster-Diff + Textlayer-Diff zweier PDF-Seiten — 1.4.0–1.4.2 / 2.1.0."""
 
 from __future__ import annotations
 
+import difflib
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Tuple
 
 from PIL import Image, ImageChops, ImageEnhance, ImageOps
@@ -16,6 +18,19 @@ class RasterDiffResult:
     different_pixels: int
     total_pixels: int
     overlay: Image.Image  # RGB: Basis + magentafarbene Diff-Maske
+
+
+@dataclass(frozen=True)
+class TextLayerDiffResult:
+    """Ergebnis eines Textlayer-Vergleichs zweier PDF-Seiten — 2.1.0."""
+
+    similarity_percent: float  # SequenceMatcher-Ratio 0–100
+    left_text: str
+    right_text: str
+    unified_diff: str
+    left_lines: int
+    right_lines: int
+    changed_hunks: int
 
 
 def _as_rgb(img: Image.Image) -> Image.Image:
@@ -80,4 +95,53 @@ def raster_diff(
         different_pixels=int(different),
         total_pixels=int(total),
         overlay=overlay,
+    )
+
+
+def text_layer_diff(
+    left_pdf: str | Path,
+    right_pdf: str | Path,
+    *,
+    left_page: int = 0,
+    right_page: int = 0,
+    left_password: str | None = None,
+    right_password: str | None = None,
+    context: int = 2,
+) -> TextLayerDiffResult:
+    """
+    Textlayer-Diff zweier PDF-Seiten (pypdfium2 Plaintext + difflib).
+    Kein Raster — nur extrahierbarer Text. — 2.1.0
+    """
+    from .overlay import extract_page_plain_text
+
+    left_text = extract_page_plain_text(
+        left_pdf, left_page, password=left_password
+    ) or ""
+    right_text = extract_page_plain_text(
+        right_pdf, right_page, password=right_password
+    ) or ""
+    left_lines = left_text.replace("\r\n", "\n").split("\n")
+    right_lines = right_text.replace("\r\n", "\n").split("\n")
+    sm = difflib.SequenceMatcher(a=left_text, b=right_text, autojunk=False)
+    pct = round(100.0 * sm.ratio(), 1)
+    ud = list(
+        difflib.unified_diff(
+            left_lines,
+            right_lines,
+            fromfile=f"{Path(left_pdf).name}:p{left_page + 1}",
+            tofile=f"{Path(right_pdf).name}:p{right_page + 1}",
+            lineterm="",
+            n=max(0, int(context)),
+        )
+    )
+    # Hunks ≈ Zeilen die mit @@ beginnen
+    hunks = sum(1 for line in ud if line.startswith("@@"))
+    return TextLayerDiffResult(
+        similarity_percent=pct,
+        left_text=left_text,
+        right_text=right_text,
+        unified_diff="\n".join(ud),
+        left_lines=len(left_lines),
+        right_lines=len(right_lines),
+        changed_hunks=hunks,
     )

@@ -6,7 +6,18 @@ Basiert auf pypdfium2 (PDFium, lizenzfreundlich). Kein Poppler/GPL.
 
 from .document import PdfDocument, format_page_status
 from .render import render_page, render_pages
-from .diff import RasterDiffResult, align_images, raster_diff
+from .diff import (
+    RasterDiffResult,
+    TextLayerDiffResult,
+    align_images,
+    raster_diff,
+    text_layer_diff,
+)
+from .pdf_ann_import import (
+    NativeAnnImportResult,
+    import_native_into_store,
+    import_native_pdf_annotations,
+)
 from .annotate import (
     Annotation,
     AnnotationImportError,
@@ -181,8 +192,13 @@ __all__ = [
     "render_pages",
     "clear_render_cache",
     "RasterDiffResult",
+    "TextLayerDiffResult",
     "align_images",
     "raster_diff",
+    "text_layer_diff",
+    "NativeAnnImportResult",
+    "import_native_pdf_annotations",
+    "import_native_into_store",
     "Annotation",
     "AnnotationImportError",
     "AnnotationStore",
@@ -335,4 +351,4 @@ __all__ = [
     "page_count_for_text",
 ]
 
-__version__ = "2.0.5"
+__version__ = "2.1.0"

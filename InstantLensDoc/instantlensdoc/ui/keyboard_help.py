@@ -338,6 +338,7 @@ Status-Klick öffnet <code>docs/VERSION</code>/<code>VERSION.txt</code> im Edito
 <p><b>PDF verschlüsseln/entschlüsseln:</b> Prefill-Warnung + Button „jetzt ausschalten“ (sofort speichern + Toast) · Passwort nie in Logs · falsches PW klar DE — 1.6.5 (Basis 1.6.4/1.6.3/1.6.2/1.6.1/1.6.0).</p>
 <p><b>Dokument-Statistik:</b> JSON-Dateiname Quick-Insert <code>{stem}</code>/<code>{date}</code> · ungültige Platzhalter rot · Live-Vorschau · Copy · Zielordner · UTF-8 — 1.6.5 (Basis 1.6.4/1.6.3/1.6.2/1.6.1/1.6.0).</p>
 <p><b>Workspace-Layouts:</b> Import-Log Zusammenfassung importiert/übersprungen/umbenannt · kopieren/als TXT · Merge skip/rename · Schema DE — 1.6.5 (Basis 1.6.4/1.6.3/1.6.2/1.6.1/1.6.0).</p>
+<p><b>2.1.0:</b> PDF-Kommentar-Import (native) · Messung Fläche+Winkel · Maß mm/px Toggle · Textlayer-Diff im PDF-Vergleich · smoke_ild.py.</p>
 <p><b>2.0.5:</b> Multi-Doc Reset Bestätigung nur bei Abweichung · Fokus+Selektion · Portfolio Footer-Filter übersprungene · leer bei 0 · HC-Toast A11y wie OCR · install-ild -Quiet Summary · Exit 0.</p>
 <p><b>2.0.4:</b> Multi-Doc CSV Quick-Insert {date}/{query} · ungültige rot · Reset Default · Portfolio Footer extrahiert/übersprungen · Ordner öffnen · HC-Toast Dauer OCR-Settings · A11y · install-ild Log-Pfad · -Quiet.</p>
 <p><b>2.0.3:</b> Multi-Doc CSV Zielordner · Live-Template {date}_multisearch.csv · Portfolio Extrakt Abbruch/Teilergebnis/Statuszählung · High-Contrast an/aus · UI-Reset Bestätigung nur ≠100 · install-ild fehlende Shortcuts ok.</p>

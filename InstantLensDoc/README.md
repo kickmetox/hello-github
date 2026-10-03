@@ -2,7 +2,7 @@
 
 Moderne Textverarbeitung mit PDF-Annotator, OCR-Bridge und Formulargenerator.
 
-**Version:** 2.0.5  
+**Version:** 2.1.0  
 **Hersteller:** Andreas Meyer · ame@sellerbach.de
 
 ## Quickstart (Windows)
@@ -33,6 +33,10 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an).  
 User-Shortcuts: `.\scripts\install-ild.ps1` · Deinstallieren: `-Uninstall [-Quiet]` (Exit **0**/OK · **1**/Fehler; Quiet: Kurz-Summary, Exit 0 auch ohne Shortcuts).
+
+## Neu in 2.1.0
+
+Minor-Bump nach **2.0.5**: **PDF-Kommentar-Import** (native Markup → Sidecar); **Messung Fläche + Winkel** mit **mm/px Toggle**; **Textlayer-Diff** im PDF-Vergleich; Nightly-Smoke `scripts/smoke_ild.py`. Stubs unverändert.
 
 ## Neu in 2.0.5
 

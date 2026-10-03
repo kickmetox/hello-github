@@ -2309,6 +2309,10 @@ class MainWindow(QMainWindow):
             ("Annotationen flatten/bake exportieren…", lambda: self.pdf_view.export_annotations_flattened()),
             ("Annotationen aus JSON importieren…", lambda: self.pdf_view.import_annotations_json()),
             (
+                "PDF-Kommentare importieren (native)…",
+                lambda: self.pdf_view.import_native_pdf_comments(),
+            ),
+            (
                 "Annotation-Duplikate finden / zusammenführen…",
                 lambda: self.pdf_view.merge_duplicate_annotations(),
             ),

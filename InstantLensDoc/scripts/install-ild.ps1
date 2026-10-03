@@ -1,4 +1,4 @@
-# InstantLens Doc 2.0.5 — Benutzer-Installer (ohne Admin wenn möglich)
+# InstantLens Doc 2.1.0 — Benutzer-Installer (ohne Admin wenn möglich)
 # Startmenü-Shortcut + optional Desktop-Link (User-Profil).
 # Idempotent: vorhandene Verknüpfungen werden aktualisiert.
 # -Uninstall entfernt Startmenü- und Desktop-Shortcuts.
@@ -32,7 +32,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$Version = "2.0.5"
+$Version = "2.1.0"
 $AppName = "InstantLens Doc"
 
 function Write-IldInfo([string]$msg) { Write-Host "[ILD $Version] $msg" }

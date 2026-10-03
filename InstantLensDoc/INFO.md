@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **2.0.5** |
+| Version | **2.1.0** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -62,6 +62,16 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an / `checkedonce`)
+
+## Neu in 2.1.0
+
+Minor-Bump nach **2.0.5**:
+
+- **PDF-Kommentar-Import:** native Markup (pikepdf) grob → Sidecar
+- **Messung:** Fläche (Rechteck) + Winkel (zwei Linien); Anzeige **mm/px Toggle**
+- **PDF-Vergleich:** Textlayer-Diff (Unified) im Diff-Panel
+- **Nightly-Smoke:** `scripts/smoke_ild.py` CLI+Import-Checks
+- Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen unverändert klar markiert
 
 ## Neu in 2.0.5
 
