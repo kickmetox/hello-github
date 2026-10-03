@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (
     QComboBox,
     QDialog,
     QDialogButtonBox,
+    QDoubleSpinBox,
     QFileDialog,
     QFormLayout,
     QGroupBox,
@@ -53,6 +54,7 @@ from instantlensdoc.core.app_settings import (
     get_pdf_night_mode,
     get_pdf_thumbnail_scale,
     get_pdf_two_page_spread,
+    get_page_number_overlay_opacity,
     get_show_page_number_overlay,
     get_restore_session_on_start,
     get_merge_diff_max_side,
@@ -109,6 +111,7 @@ from instantlensdoc.core.app_settings import (
     set_pdf_night_mode,
     set_pdf_thumbnail_scale,
     set_pdf_two_page_spread,
+    set_page_number_overlay_opacity,
     set_show_page_number_overlay,
     set_restore_session_on_start,
     set_merge_diff_max_side,
@@ -231,9 +234,11 @@ class SettingsDialog(QDialog):
         )
         form.addRow(self.minimap)
 
-        self.soft_wrap = QCheckBox("Soft-Wrap (Zeilenumbruch) im Editor")
+        self.soft_wrap = QCheckBox("Wortumbruch (Soft-Wrap) im Editor")
         self.soft_wrap.setChecked(get_editor_soft_wrap())
-        self.soft_wrap.setToolTip("Lange Zeilen am Fensterrand umbrechen")
+        self.soft_wrap.setToolTip(
+            "Lange Zeilen am Fensterrand umbrechen — Ansicht-Toggle persistiert (Ctrl+Shift+W)"
+        )
         form.addRow(self.soft_wrap)
         from instantlensdoc.core.app_settings import get_editor_show_special_chars
 
@@ -365,6 +370,16 @@ class SettingsDialog(QDialog):
             "(Ansicht → Seitennummer-Overlay / Toolbar „Nr.“)"
         )
         form.addRow(self.page_num_overlay)
+
+        self.page_num_opacity = QDoubleSpinBox()
+        self.page_num_opacity.setRange(0.05, 1.0)
+        self.page_num_opacity.setSingleStep(0.05)
+        self.page_num_opacity.setDecimals(2)
+        self.page_num_opacity.setValue(get_page_number_overlay_opacity())
+        self.page_num_opacity.setToolTip(
+            "Deckkraft des Seitennummer-Overlays (Toolbar „Nr α“, Standard 0.59)"
+        )
+        form.addRow("Seitennummer-Overlay Deckkraft", self.page_num_opacity)
 
         self.doc_split_orient = QComboBox()
         self.doc_split_orient.addItem("Horizontal (nebeneinander)", False)
@@ -732,6 +747,7 @@ class SettingsDialog(QDialog):
         set_pdf_two_page_spread(self.pdf_spread.isChecked())
         set_pdf_continuous_scroll(self.pdf_continuous.isChecked())
         set_show_page_number_overlay(self.page_num_overlay.isChecked())
+        set_page_number_overlay_opacity(float(self.page_num_opacity.value()))
         set_editor_doc_split_vertical(bool(self.doc_split_orient.currentData()))
         set_tag_rename_confirm_threshold(int(self.tag_rename_confirm.value()))
         set_sidecar_save_debounce_ms(int(self.sidecar_debounce.value()))
@@ -819,6 +835,13 @@ class SettingsDialog(QDialog):
                 parent._line_numbers_action.blockSignals(False)
             except Exception:
                 pass
+        if parent is not None and hasattr(parent, "_soft_wrap_action"):
+            try:
+                parent._soft_wrap_action.blockSignals(True)
+                parent._soft_wrap_action.setChecked(self.soft_wrap.isChecked())
+                parent._soft_wrap_action.blockSignals(False)
+            except Exception:
+                pass
         if parent is not None and hasattr(parent, "pdf_view"):
             try:
                 parent.pdf_view.apply_settings_colors()
@@ -826,6 +849,10 @@ class SettingsDialog(QDialog):
                 if hasattr(parent.pdf_view, "set_show_page_number_overlay"):
                     parent.pdf_view.set_show_page_number_overlay(
                         self.page_num_overlay.isChecked()
+                    )
+                if hasattr(parent.pdf_view, "set_page_number_overlay_opacity"):
+                    parent.pdf_view.set_page_number_overlay_opacity(
+                        float(self.page_num_opacity.value())
                     )
             except Exception:
                 pass

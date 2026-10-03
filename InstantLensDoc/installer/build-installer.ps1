@@ -1,4 +1,4 @@
-# InstantLens Doc — Inno-Setup-Installer bauen (eine Datei) 0.8.3
+# InstantLens Doc — Inno-Setup-Installer bauen (eine Datei) 0.8.4
 # Voraussetzung: Inno Setup 6 (iscc.exe)
 # Aufruf:
 #   powershell -ExecutionPolicy Bypass -File .\installer\build-installer.ps1

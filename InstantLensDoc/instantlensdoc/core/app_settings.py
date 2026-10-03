@@ -73,6 +73,7 @@ DEFAULTS: dict[str, Any] = {
     "spellcheck_dict_path": "",
     "show_page_boxes": False,
     "show_page_number_overlay": False,
+    "page_number_overlay_opacity": 0.59,
     "show_printer_marks": False,
     "annotations_locked": False,
     "editor_snippets": [
@@ -928,6 +929,23 @@ def get_show_page_number_overlay() -> bool:
 
 def set_show_page_number_overlay(enabled: bool) -> None:
     save_settings({"show_page_number_overlay": bool(enabled)})
+
+
+def get_page_number_overlay_opacity() -> float:
+    """Deckkraft des Seitennummer-Overlays (0.05–1.0)."""
+    try:
+        op = float(load_settings().get("page_number_overlay_opacity", 0.59))
+    except (TypeError, ValueError):
+        op = 0.59
+    return round(max(0.05, min(1.0, op)), 4)
+
+
+def set_page_number_overlay_opacity(opacity: float) -> None:
+    try:
+        op = float(opacity)
+    except (TypeError, ValueError):
+        op = 0.59
+    save_settings({"page_number_overlay_opacity": round(max(0.05, min(1.0, op)), 4)})
 
 
 def get_show_printer_marks() -> bool:

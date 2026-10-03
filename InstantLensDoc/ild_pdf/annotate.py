@@ -633,6 +633,95 @@ class AnnotationStore:
         self.dirty = True
         return len(targets)
 
+    def _apply_dx(self, ann: Annotation, dx: float) -> None:
+        """Horizontale Verschiebung inkl. Callout-Endpunkt (ohne Undo)."""
+        if abs(float(dx)) < 1e-9:
+            return
+        ann.x = float(ann.x) + float(dx)
+        if ann.callout_x or ann.callout_y:
+            ann.callout_x = float(ann.callout_x) + float(dx)
+        ann.touch()
+
+    def align(
+        self,
+        ann_ids: Sequence[str],
+        *,
+        horizontal: str = "left",
+    ) -> int:
+        """
+        Auswahl horizontal ausrichten: left | center | right (eine Undo-Stufe).
+        Rückgabe: Anzahl bewegter Annotationen.
+        """
+        mode = str(horizontal or "left").strip().lower()
+        if mode not in ("left", "center", "right"):
+            mode = "left"
+        ids = {str(i) for i in ann_ids if i}
+        if len(ids) < 2:
+            return 0
+        targets = [a for a in self.annotations if a.id in ids]
+        if len(targets) < 2:
+            return 0
+        if mode == "left":
+            anchor = min(float(a.x) for a in targets)
+        elif mode == "right":
+            anchor = max(float(a.x) + float(a.width or 0.0) for a in targets)
+        else:
+            left = min(float(a.x) for a in targets)
+            right = max(float(a.x) + float(a.width or 0.0) for a in targets)
+            anchor = (left + right) / 2.0
+        moves: list[tuple[Annotation, float]] = []
+        for a in targets:
+            w = float(a.width or 0.0)
+            if mode == "left":
+                dx = anchor - float(a.x)
+            elif mode == "right":
+                dx = anchor - (float(a.x) + w)
+            else:
+                dx = anchor - (float(a.x) + w / 2.0)
+            if abs(dx) >= 1e-9:
+                moves.append((a, dx))
+        if not moves:
+            return 0
+        self._push_undo()
+        for a, dx in moves:
+            self._apply_dx(a, dx)
+        self.dirty = True
+        return len(moves)
+
+    def distribute_horizontal(self, ann_ids: Sequence[str]) -> int:
+        """
+        Auswahl horizontal gleichmäßig verteilen (linke/rechte Kante bleibt).
+        Mindestens 3 Annotationen; eine Undo-Stufe. Rückgabe: bewegte Anzahl.
+        """
+        ids = {str(i) for i in ann_ids if i}
+        if len(ids) < 3:
+            return 0
+        targets = [a for a in self.annotations if a.id in ids]
+        if len(targets) < 3:
+            return 0
+        ordered = sorted(targets, key=lambda a: float(a.x))
+        first = ordered[0]
+        last = ordered[-1]
+        span = float(last.x) - float(first.x)
+        if abs(span) < 1e-9:
+            return 0
+        step = span / float(len(ordered) - 1)
+        moves: list[tuple[Annotation, float]] = []
+        for i, a in enumerate(ordered):
+            if i == 0 or i == len(ordered) - 1:
+                continue
+            target_x = float(first.x) + step * float(i)
+            dx = target_x - float(a.x)
+            if abs(dx) >= 1e-9:
+                moves.append((a, dx))
+        if not moves:
+            return 0
+        self._push_undo()
+        for a, dx in moves:
+            self._apply_dx(a, dx)
+        self.dirty = True
+        return len(moves)
+
     @staticmethod
     def _normalize_opacity(value: object) -> float:
         try:

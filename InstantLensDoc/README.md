@@ -2,7 +2,7 @@
 
 Moderne Textverarbeitung mit PDF-Annotator, OCR-Bridge und Formulargenerator.
 
-**Version:** 0.8.3  
+**Version:** 0.8.4  
 **Hersteller:** Andreas Meyer · ame@sellerbach.de
 
 ## Quickstart (Windows)
@@ -32,8 +32,8 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an).
 
-## Neu in 0.8.3
+## Neu in 0.8.4
 
-Annotation-Mehrfachauswahl (Shift+Klick) inkl. gemeinsamer Verschiebung, Thumbnail-Kontextmenü Drehen 90° L/R mit Undo, Seitennummer-Overlay in Einstellungen, Editor-Zeilennummern-Toggle persistiert. Stubs KI/Cloud/Stylus/3D unverändert.
+Annotation-Auswahl ausrichten (links/mittig/rechts) und horizontal verteilen, Thumbnail-Seiten löschen mit Bestätigung und Undo, Seitennummer-Overlay-Deckkraft in Einstellungen, Editor-Wortumbruch-Toggle persistiert. Stubs KI/Cloud/Stylus/3D unverändert.
 
 Siehe [CHANGELOG.md](CHANGELOG.md), [FEATURES.md](FEATURES.md) und [INFO.md](INFO.md).

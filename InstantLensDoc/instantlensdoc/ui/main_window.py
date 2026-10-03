@@ -407,6 +407,7 @@ class MainWindow(QMainWindow):
         self.sidebar.line_favorites_reordered.connect(self._on_line_favorites_reordered)
         self.sidebar.pages_reordered.connect(self._on_thumbs_reordered)
         self.sidebar.page_rotate_requested.connect(self._on_thumb_rotate)
+        self.sidebar.page_delete_requested.connect(self._on_thumb_delete)
         splitter.addWidget(self.sidebar)
 
         self.stack = QStackedWidget()
@@ -924,6 +925,33 @@ class MainWindow(QMainWindow):
         )
         act_opacity_ann.triggered.connect(self._opacity_selected_annotations)
         m_edit.addAction(act_opacity_ann)
+        m_align = m_edit.addMenu("Auswahl ausrichten")
+        m_align.setToolTip("Mehrfachauswahl horizontal ausrichten / verteilen")
+        act_align_l = QAction("Links", self)
+        act_align_l.setToolTip("Ausgewählte Annotationen links ausrichten (≥2)")
+        act_align_l.triggered.connect(
+            lambda: self._align_selected_annotations("left")
+        )
+        m_align.addAction(act_align_l)
+        act_align_c = QAction("Zentrieren", self)
+        act_align_c.setToolTip("Ausgewählte Annotationen horizontal zentrieren (≥2)")
+        act_align_c.triggered.connect(
+            lambda: self._align_selected_annotations("center")
+        )
+        m_align.addAction(act_align_c)
+        act_align_r = QAction("Rechts", self)
+        act_align_r.setToolTip("Ausgewählte Annotationen rechts ausrichten (≥2)")
+        act_align_r.triggered.connect(
+            lambda: self._align_selected_annotations("right")
+        )
+        m_align.addAction(act_align_r)
+        m_align.addSeparator()
+        act_dist_h = QAction("Horizontal verteilen", self)
+        act_dist_h.setToolTip(
+            "Ausgewählte Annotationen horizontal gleichmäßig verteilen (≥3)"
+        )
+        act_dist_h.triggered.connect(self._distribute_selected_annotations_horizontal)
+        m_align.addAction(act_dist_h)
         act_dup_ann = QAction("Annotation duplizieren", self)
         act_dup_ann.setShortcut(QKeySequence("Ctrl+Shift+D"))
         act_dup_ann.setToolTip(
@@ -1016,10 +1044,12 @@ class MainWindow(QMainWindow):
         act_sec_doc.setToolTip("Datei für die rechte Split-Ansicht aus offenen Tabs wählen")
         act_sec_doc.triggered.connect(self._pick_secondary_document)
         m_view.addAction(act_sec_doc)
-        self._soft_wrap_action = QAction("Soft-Wrap", self)
+        self._soft_wrap_action = QAction("Wortumbruch", self)
         self._soft_wrap_action.setCheckable(True)
         self._soft_wrap_action.setChecked(get_editor_soft_wrap())
-        self._soft_wrap_action.setToolTip("Zeilenumbruch am Fensterrand im Texteditor")
+        self._soft_wrap_action.setToolTip(
+            "Wortumbruch (Soft-Wrap) am Fensterrand im Texteditor — persistiert"
+        )
         self._soft_wrap_action.setShortcut(QKeySequence("Ctrl+Shift+W"))
         self._soft_wrap_action.toggled.connect(self._toggle_soft_wrap)
         m_view.addAction(self._soft_wrap_action)
@@ -2249,6 +2279,22 @@ class MainWindow(QMainWindow):
         if n:
             self._refresh_pdf_marks()
 
+    def _align_selected_annotations(self, horizontal: str = "left"):
+        if self.stack.currentWidget() is not self.pdf_view or not self.pdf_view.pdf_path:
+            self._set_status("Ausrichten nur im PDF-Modus")
+            return
+        n = self.pdf_view.align_selected_annotations(horizontal)
+        if n:
+            self._refresh_pdf_marks()
+
+    def _distribute_selected_annotations_horizontal(self):
+        if self.stack.currentWidget() is not self.pdf_view or not self.pdf_view.pdf_path:
+            self._set_status("Verteilen nur im PDF-Modus")
+            return
+        n = self.pdf_view.distribute_selected_annotations_horizontal()
+        if n:
+            self._refresh_pdf_marks()
+
     def _toggle_line_bookmark(self):
         if self.stack.currentWidget() is not self.editor_pane:
             self.stack.setCurrentWidget(self.editor_pane)
@@ -3059,11 +3105,24 @@ class MainWindow(QMainWindow):
         self._set_status("Markdown-Vorschau an" if checked else "Markdown-Vorschau aus")
 
     def _toggle_soft_wrap(self, checked: bool):
-        from instantlensdoc.core.app_settings import set_editor_soft_wrap
+        """Ansicht-Toggle: Wortumbruch sofort anwenden und in Settings persistieren."""
+        from instantlensdoc.core.app_settings import (
+            get_editor_soft_wrap,
+            set_editor_soft_wrap,
+        )
 
-        set_editor_soft_wrap(bool(checked))
-        self.editor.set_soft_wrap(bool(checked))
-        self._set_status("Soft-Wrap an" if checked else "Soft-Wrap aus")
+        on = bool(checked)
+        set_editor_soft_wrap(on)
+        self.editor.set_soft_wrap(on)
+        persisted = bool(get_editor_soft_wrap())
+        if persisted != on:
+            set_editor_soft_wrap(on)
+            persisted = bool(get_editor_soft_wrap())
+        if hasattr(self, "_soft_wrap_action") and self._soft_wrap_action is not None:
+            self._soft_wrap_action.blockSignals(True)
+            self._soft_wrap_action.setChecked(persisted)
+            self._soft_wrap_action.blockSignals(False)
+        self._set_status("Wortumbruch an" if persisted else "Wortumbruch aus")
 
     def _toggle_special_chars(self, checked: bool):
         from instantlensdoc.core.app_settings import set_editor_show_special_chars
@@ -4294,6 +4353,16 @@ class MainWindow(QMainWindow):
         if not self.pdf_view.pdf_path:
             return
         if self.pdf_view.rotate_at(int(page_index), int(degrees)):
+            self._refresh_thumbs()
+            self._update_doc_status()
+
+    def _on_thumb_delete(self, page_index: int):
+        """Thumbnail-Kontextmenü: Seite löschen (Bestätigung + Undo Ctrl+Z)."""
+        if self.stack.currentWidget() is not self.pdf_view:
+            self.stack.setCurrentWidget(self.pdf_view)
+        if not self.pdf_view.pdf_path:
+            return
+        if self.pdf_view.delete_at(int(page_index), confirm=True):
             self._refresh_thumbs()
             self._update_doc_status()
 
