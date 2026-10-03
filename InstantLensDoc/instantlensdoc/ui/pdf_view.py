@@ -362,6 +362,7 @@ class PdfCanvas(QLabel):
     annotation_selected = Signal(str)  # ann id (leer = Auswahl aufheben)
     uri_link_clicked = Signal(str)  # externe http(s)-URL
     annotations_moved = Signal(list, float, float)  # ids, dx, dy
+    escape_pressed = Signal()  # Esc → z. B. Quick-Stempel abbrechen — 1.9.3
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -1200,6 +1201,19 @@ class PdfCanvas(QLabel):
                 return
         super().mouseDoubleClickEvent(event)
 
+    def keyPressEvent(self, event):  # noqa: N802
+        """Esc bricht Quick-Stempel-Platzieren ab — 1.9.3."""
+        if event.key() == Qt.Key_Escape:
+            viewer = self.parent()
+            while viewer is not None and not hasattr(viewer, "cancel_quick_stamp"):
+                viewer = viewer.parent()
+            if viewer is not None and getattr(viewer, "_quick_stamp_armed", False):
+                viewer.cancel_quick_stamp()
+                event.accept()
+                return
+            self.escape_pressed.emit()
+        super().keyPressEvent(event)
+
 
 class PdfViewer(QWidget):
     status = Signal(str)
@@ -1427,10 +1441,14 @@ class PdfViewer(QWidget):
         btn_stamp_rot.clicked.connect(lambda: self.rotate_selected_stamp(90))
         self.btn_quick_stamp = QPushButton("Quick-Stempel")
         self.btn_quick_stamp.setToolTip(
-            "Standard-/zuletzt verwendeten Stempel platzieren "
-            "(Klick auf Seite; merkt zuletzt verwendet) — 1.9.2"
+            "Links: zuletzt/Standard platzieren · Rechtsklick: Bibliothek wählen · "
+            "Esc bricht Platzieren ab — 1.9.3"
         )
-        self.btn_quick_stamp.clicked.connect(self.arm_quick_stamp)
+        self.btn_quick_stamp.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.btn_quick_stamp.clicked.connect(lambda: self.arm_quick_stamp())
+        self.btn_quick_stamp.customContextMenuRequested.connect(
+            self._quick_stamp_context_menu
+        )
         btn_rot_ccw = QPushButton("⟲")
         btn_rot_ccw.setToolTip("Aktuelle Seite 90° gegen den Uhrzeigersinn drehen (−90°) und speichern")
         btn_rot_ccw.clicked.connect(lambda: self.rotate_current(-90))
@@ -1844,6 +1862,7 @@ class PdfViewer(QWidget):
         self.canvas.annotation_selected.connect(self._on_annotation_selected)
         self.canvas.uri_link_clicked.connect(self._open_uri_link)
         self.canvas.annotations_moved.connect(self._on_annotations_moved)
+        self.canvas.escape_pressed.connect(self.cancel_quick_stamp)
         self.scroll.setWidget(self.canvas)
         self.scroll.verticalScrollBar().valueChanged.connect(self._on_continuous_scroll)
         layout.addWidget(self.scroll)
@@ -6903,20 +6922,21 @@ class PdfViewer(QWidget):
         self.status.emit(f"{len(created)} Annotation(en) auf Seite {target + 1} eingefügt")
         return len(created)
 
-    def arm_quick_stamp(self) -> None:
-        """Toolbar Quick-Stempel: Standard/zuletzt verwendet, nächster Klick platziert — 1.9.2."""
+    def arm_quick_stamp(self, payload: dict | None = None) -> None:
+        """Toolbar Quick-Stempel: Standard/zuletzt/Bibliothek; Esc bricht ab — 1.9.3."""
         from instantlensdoc.core.stamp_library import resolve_quick_stamp
 
         if not self.pdf_path:
             self.status.emit("Kein PDF für Quick-Stempel")
             return
-        payload = resolve_quick_stamp()
+        if not isinstance(payload, dict):
+            payload = resolve_quick_stamp()
         if not payload:
             QMessageBox.information(
                 self,
                 "Quick-Stempel",
-                "Kein Stempel verfügbar. Bitte zuerst einen Stempel wählen "
-                "oder Standard-Stempel ★ in der Bildbibliothek setzen.",
+                "Kein Stempel verfügbar. Rechtsklick → Bibliothek wählen "
+                "oder Standard-Stempel ★ setzen.",
             )
             return
         self._quick_stamp_payload = payload
@@ -6926,7 +6946,67 @@ class PdfViewer(QWidget):
         self._quick_stamp_payload = payload
         self._quick_stamp_armed = True
         label = payload.get("image") or (payload.get("text") or "Stempel").split("\n")[0]
-        self.status.emit(f"Quick-Stempel bereit: {label} — Klick auf Seite")
+        self.status.emit(
+            f"Quick-Stempel bereit: {label} — Klick auf Seite · Esc = Abbruch"
+        )
+        try:
+            self.canvas.setFocus(Qt.OtherFocusReason)
+        except Exception:
+            pass
+
+    def cancel_quick_stamp(self) -> bool:
+        """Esc: Quick-Stempel-Platzieren abbrechen — 1.9.3."""
+        if not self._quick_stamp_armed and not self._quick_stamp_payload:
+            return False
+        self._quick_stamp_armed = False
+        self._quick_stamp_payload = None
+        self.status.emit("Platzieren abgebrochen")
+        return True
+
+    def _quick_stamp_context_menu(self, pos) -> None:
+        """Rechtsklick Quick-Stempel: Bibliothek / Text-Presets wählen — 1.9.3."""
+        from instantlensdoc.core.stamp_library import list_stamp_images
+
+        menu = QMenu(self)
+        act_last = menu.addAction("Zuletzt / Standard (wie Linksklick)")
+        act_last.triggered.connect(lambda: self.arm_quick_stamp())
+        images = list_stamp_images()
+        if images:
+            img_menu = menu.addMenu("Bildbibliothek")
+            for info in images:
+                label = f"★ {info.name}" if info.is_default else info.name
+                act = img_menu.addAction(label)
+
+                def _arm_img(checked=False, entry=info):
+                    self.arm_quick_stamp(
+                        {
+                            "kind": "image",
+                            "text": "",
+                            "color": "#CCCCCC",
+                            "image": entry.name,
+                            "path": entry.path,
+                        }
+                    )
+
+                act.triggered.connect(_arm_img)
+        else:
+            empty = menu.addAction("(Bildbibliothek leer)")
+            empty.setEnabled(False)
+        text_menu = menu.addMenu("Text-Presets")
+        for display, text, color in stamp_library_items(include_date=True):
+            act = text_menu.addAction(display.replace("\n", " · "))
+
+            def _arm_txt(checked=False, t=text, c=color):
+                self.arm_quick_stamp(
+                    {"kind": "text", "text": t, "color": c, "image": "", "path": None}
+                )
+
+            act.triggered.connect(_arm_txt)
+        if self._quick_stamp_armed:
+            menu.addSeparator()
+            act_cancel = menu.addAction("Platzieren abbrechen (Esc)")
+            act_cancel.triggered.connect(self.cancel_quick_stamp)
+        menu.exec(self.btn_quick_stamp.mapToGlobal(pos))
 
     def rotate_selected_stamp(self, degrees: int = 90) -> bool:
         """Ausgewählten Stempel um 90°-Schritte drehen (Sidecar)."""

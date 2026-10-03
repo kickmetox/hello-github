@@ -1506,7 +1506,12 @@ class SettingsDialog(QDialog):
         outer.addWidget(buttons)
 
     def _build_stubs_page(self) -> QWidget:
-        """Settings-Seite „Stubs“: KI/Cloud/Stylus/3D/Hooks mit Status — 1.9.2."""
+        """Settings-Seite „Stubs“: Status A–Z, keine Aktion, Link Features — 1.9.3."""
+        from pathlib import Path as _Path
+
+        from PySide6.QtCore import QUrl
+        from PySide6.QtGui import QDesktopServices
+
         from instantlensdoc import __version__
         from instantlensdoc.core.plugin_hooks import plugin_stub_info
         from instantlensdoc.ui.stubs import PLANNED
@@ -1525,13 +1530,54 @@ class SettingsDialog(QDialog):
         info.setStyleSheet("color:#555;")
         v.addWidget(info)
 
+        no_action = QLabel(
+            "Keine Aktion — reine Statusanzeige. "
+            "Einträge sind Stubs / nicht produktiv und lösen keine Funktion aus."
+        )
+        no_action.setObjectName("stubsNoActionHint")
+        no_action.setWordWrap(True)
+        no_action.setStyleSheet("color:#8a5a00;font-weight:600;")
+        v.addWidget(no_action)
+
+        link_row = QHBoxLayout()
+        self.btn_stubs_features = QPushButton("FEATURES.md öffnen…")
+        self.btn_stubs_features.setObjectName("stubsFeaturesLink")
+        self.btn_stubs_features.setToolTip(
+            "Features-Dokumentation öffnen (Stub-Statuslegende) — 1.9.3"
+        )
+
+        def _open_features_md() -> None:
+            root = _Path(__file__).resolve().parents[2]
+            path = root / "FEATURES.md"
+            if not path.is_file():
+                QMessageBox.information(
+                    self,
+                    "FEATURES.md",
+                    f"FEATURES.md nicht gefunden:\n{path}",
+                )
+                return
+            ok = QDesktopServices.openUrl(QUrl.fromLocalFile(str(path)))
+            if not ok:
+                QMessageBox.information(
+                    self,
+                    "FEATURES.md",
+                    f"Konnte FEATURES.md nicht öffnen.\nPfad:\n{path}",
+                )
+
+        self.btn_stubs_features.clicked.connect(_open_features_md)
+        link_row.addWidget(self.btn_stubs_features)
+        link_row.addStretch(1)
+        v.addLayout(link_row)
+
         rows = [
-            ("KI-Assistent", "ki", "Stub · Coming soon"),
-            ("Cloud-Sync", "cloud", "Stub · Coming soon"),
-            ("Stylus / Palm Rejection", "stylus", "Stub"),
-            ("3D-Extrusion", "extrude3d", "Stub"),
-            ("Plugin-Hooks", "plugins", "Stub · nicht produktiv"),
+            ("KI-Assistent", "ki", "Stub · Coming soon · keine Aktion"),
+            ("Cloud-Sync", "cloud", "Stub · Coming soon · keine Aktion"),
+            ("Stylus / Palm Rejection", "stylus", "Stub · keine Aktion"),
+            ("3D-Extrusion", "extrude3d", "Stub · keine Aktion"),
+            ("Plugin-Hooks", "plugins", "Stub · nicht produktiv · keine Aktion"),
         ]
+        # Sortierung A–Z nach Feature-Name — 1.9.3
+        rows = sorted(rows, key=lambda r: r[0].casefold())
         self.stubs_table = QTableWidget(len(rows), 3)
         self.stubs_table.setObjectName("stubsStatusTable")
         self.stubs_table.setHorizontalHeaderLabels(["Feature", "Status", "Hinweis"])
@@ -1540,6 +1586,9 @@ class SettingsDialog(QDialog):
         self.stubs_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
         self.stubs_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.stubs_table.setSelectionMode(QAbstractItemView.NoSelection)
+        self.stubs_table.setToolTip(
+            "Keine Aktion — Stubs nur zur Statusanzeige (A–Z) — 1.9.3"
+        )
         try:
             ph = plugin_stub_info()
             hooks_hint = ph.get("message") or PLANNED.get("plugins", "")
@@ -1555,7 +1604,7 @@ class SettingsDialog(QDialog):
             self.stubs_table.setItem(i, 2, QTableWidgetItem(str(hint)))
         v.addWidget(self.stubs_table)
 
-        events_box = QGroupBox("Plugin-Hooks Events (dokumentiert, Stub)")
+        events_box = QGroupBox("Plugin-Hooks Events (dokumentiert, Stub · keine Aktion)")
         ev_layout = QVBoxLayout(events_box)
         try:
             from instantlensdoc.core.plugin_hooks import EVENT_DESCRIPTIONS, KNOWN_EVENTS

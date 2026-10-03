@@ -1,5 +1,23 @@
 # Changelog — InstantLens Doc
 
+## 1.9.3 — Anhänge „Für alle“·Statuszählung, Quick-Stempel Rechtsklick·Esc, CSV-Zähler·Trennzeichen live, Stubs A–Z·Features-Link
+
+Post-Release-Polish nach 1.9.2: **PDF-Anhänge** Duplikat-Dialog mit Checkbox **„Für alle anwenden“** und **Statuszählung** (hinzugefügt/umbenannt/übersprungen/abgebrochen); **Quick-Stempel** per **Rechtsklick Bibliothek** wählen, **Esc** bricht Platzieren ab; **Tabellen-CSV-Vorschau** mit **Zeilen/Spalten-Zähler** und **Trennzeichen live umschaltbar**; **Settings-Seite „Stubs“** sortiert **A–Z**, klar **„keine Aktion“**, Link zu **FEATURES.md**. Stubs klar markiert / nicht produktiv.
+
+### PDF / Anhänge / Stempel
+- Anhänge: Duplikat-Dialog Checkbox „Für alle anwenden“ (Umbenennen/Überspringen für Rest); Statuszählung am Ende
+- Quick-Stempel: Rechtsklick → Bildbibliothek/Text-Presets; Esc → „Platzieren abgebrochen“
+
+### OCR / Stubs
+- Tabellen-CSV-Vorschau: Zeilen/Spalten-Zähler; Trennzeichen-Combo live (Rohvorschau + Speichern)
+- Settings-Tab „Stubs“: A–Z, „keine Aktion“-Hinweis, Button FEATURES.md öffnen
+
+### Packaging / Docs
+- Version **1.9.3** (App / `ild_pdf` / ISS / Smoke / Docs); `docs/VERSION` + `VERSION.txt`
+- Smoke: Anhänge Für-alle/Status, Quick-Stempel Rechtsklick/Esc, CSV-Zähler/Delim-live, Stubs A–Z/Features (CLI + Qt)
+
+---
+
 ## 1.9.2 — Anhänge Mehrfach-DnD·Duplikat-Warnung, Quick-Stempel, CSV 5-Zeilen-Vorschau, Settings-Seite Stubs
 
 Post-Release-Polish nach 1.9.1: **PDF-Anhänge** mit **Mehrfach-Drag&Drop**, **Duplikat-Namen Warnung + Umbenennen**; **Quick-Stempel** in der Toolbar (Standard ★ / zuletzt verwendet merken); **Tabellen-OCR→CSV** mit **Vorschau der ersten 5 Zeilen** vor Speichern und **Abbruch**; **Settings-Seite „Stubs“** listet KI/Cloud/Stylus/3D/Plugin-Hooks mit Status. Stubs klar markiert / nicht produktiv.

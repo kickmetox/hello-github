@@ -413,7 +413,7 @@ class OcrDialog(QDialog):
 
 
 class CsvPreviewDialog(QDialog):
-    """Vorschau erste N Zeilen Tabellen-CSV vor Speichern; Abbruch möglich — 1.9.2."""
+    """Vorschau erste N Zeilen Tabellen-CSV; Zeilen/Spalten-Zähler; Trennzeichen live — 1.9.3."""
 
     def __init__(
         self,
@@ -426,40 +426,60 @@ class CsvPreviewDialog(QDialog):
     ):
         super().__init__(parent)
         self.setWindowTitle("Tabellen-CSV — Vorschau")
-        self.resize(640, 320)
+        self.resize(680, 400)
         self._accepted_save = False
+        self._all_rows = [list(r) for r in (rows or [])]
+        self._max_rows = max(1, int(max_rows))
+        self._delimiter = delimiter if delimiter in OCR_TABLE_CSV_DELIMITERS else ";"
         layout = QVBoxLayout(self)
-        total = len(rows or [])
-        shown = min(max_rows, total)
-        head = QLabel(
-            f"Vorschau der ersten {shown} von {total} Zeile(n) "
-            f"(Trennzeichen: {repr(delimiter)[1:-1] if delimiter != chr(9) else 'Tab'}). "
-            "Speichern oder Abbrechen — 1.9.2"
+
+        self.head = QLabel()
+        self.head.setWordWrap(True)
+        layout.addWidget(self.head)
+
+        # Zähler + Trennzeichen live — 1.9.3
+        opts = QHBoxLayout()
+        self.count_label = QLabel()
+        self.count_label.setObjectName("csvPreviewCounts")
+        self.count_label.setStyleSheet("font-weight:600;")
+        opts.addWidget(self.count_label)
+        opts.addStretch(1)
+        opts.addWidget(QLabel("Trennzeichen:"))
+        self.delim_combo = QComboBox()
+        self.delim_combo.setObjectName("csvPreviewDelim")
+        pick = 0
+        for i, d in enumerate(OCR_TABLE_CSV_DELIMITERS):
+            self.delim_combo.addItem(OCR_TABLE_CSV_DELIMITER_LABELS.get(d, d), d)
+            if d == self._delimiter:
+                pick = i
+        self.delim_combo.setCurrentIndex(pick)
+        self.delim_combo.setToolTip(
+            "Trennzeichen live in der Vorschau umschalten (wird beim Speichern verwendet) — 1.9.3"
         )
-        head.setWordWrap(True)
-        layout.addWidget(head)
+        self.delim_combo.currentIndexChanged.connect(self._on_delim_changed)
+        opts.addWidget(self.delim_combo)
+        layout.addLayout(opts)
+
         if target_hint:
             hint = QLabel(f"Ziel: {target_hint}")
             hint.setStyleSheet("color:#555;")
             hint.setWordWrap(True)
             layout.addWidget(hint)
 
-        preview_rows = list(rows or [])[:max_rows]
-        cols = max((len(r) for r in preview_rows), default=1)
-        self.table = QTableWidget(len(preview_rows), cols)
-        self.table.setHorizontalHeaderLabels([f"Spalte {i + 1}" for i in range(cols)])
-        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.table = QTableWidget(0, 1)
         self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.table.setSelectionMode(QAbstractItemView.NoSelection)
-        for r_i, row in enumerate(preview_rows):
-            for c_i in range(cols):
-                val = row[c_i] if c_i < len(row) else ""
-                self.table.setItem(r_i, c_i, QTableWidgetItem(str(val)))
-        if not preview_rows:
-            self.table.setRowCount(1)
-            self.table.setColumnCount(1)
-            self.table.setItem(0, 0, QTableWidgetItem("(keine Zeilen erkannt)"))
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         layout.addWidget(self.table)
+
+        self.raw_preview = QLabel()
+        self.raw_preview.setObjectName("csvPreviewRaw")
+        self.raw_preview.setWordWrap(True)
+        self.raw_preview.setStyleSheet(
+            "color:#444;font-family:monospace;background:#f7f7f7;padding:6px;"
+        )
+        self.raw_preview.setToolTip("Roh-CSV der Vorschauzeilen (folgt dem Trennzeichen) — 1.9.3")
+        layout.addWidget(self.raw_preview)
 
         buttons = QDialogButtonBox(
             QDialogButtonBox.Save | QDialogButtonBox.Cancel
@@ -470,10 +490,76 @@ class CsvPreviewDialog(QDialog):
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
 
+        self._rebuild()
+
+    def _on_delim_changed(self, _idx: int = 0) -> None:
+        data = self.delim_combo.currentData()
+        self._delimiter = str(data if data is not None else ";")
+        if self._delimiter not in OCR_TABLE_CSV_DELIMITERS:
+            self._delimiter = ";"
+        self._rebuild()
+
+    def _rebuild(self) -> None:
+        from instantlensdoc.core.ocr import format_rows_as_csv
+
+        total_rows = len(self._all_rows)
+        preview_rows = self._all_rows[: self._max_rows]
+        shown = len(preview_rows)
+        cols = max((len(r) for r in self._all_rows), default=0)
+        preview_cols = max((len(r) for r in preview_rows), default=0) or max(cols, 1)
+        delim_label = OCR_TABLE_CSV_DELIMITER_LABELS.get(
+            self._delimiter,
+            "Tab" if self._delimiter == "\t" else repr(self._delimiter)[1:-1],
+        )
+        self.head.setText(
+            f"Vorschau der ersten {shown} von {total_rows} Zeile(n) "
+            f"(Trennzeichen: {delim_label}). Speichern oder Abbrechen — 1.9.3"
+        )
+        self.count_label.setText(
+            f"Zeilen: {total_rows} · Spalten: {cols} · Vorschau: {shown}×{preview_cols}"
+        )
+
+        self.table.clear()
+        if not preview_rows:
+            self.table.setRowCount(1)
+            self.table.setColumnCount(1)
+            self.table.setHorizontalHeaderLabels(["Spalte 1"])
+            self.table.setItem(0, 0, QTableWidgetItem("(keine Zeilen erkannt)"))
+            self.raw_preview.setText("(leer)")
+            return
+        self.table.setRowCount(shown)
+        self.table.setColumnCount(preview_cols)
+        self.table.setHorizontalHeaderLabels([f"Spalte {i + 1}" for i in range(preview_cols)])
+        for r_i, row in enumerate(preview_rows):
+            for c_i in range(preview_cols):
+                val = row[c_i] if c_i < len(row) else ""
+                self.table.setItem(r_i, c_i, QTableWidgetItem(str(val)))
+        raw = format_rows_as_csv(preview_rows, delimiter=self._delimiter, utf8_bom=False)
+        # kurze Rohvorschau (max. 5 Zeilen bereits begrenzt)
+        self.raw_preview.setText(raw.rstrip("\n") if raw else "(leer)")
+
     def _save(self) -> None:
         self._accepted_save = True
+        try:
+            set_ocr_table_csv_delimiter(self._delimiter)
+        except Exception:
+            pass
         self.accept()
 
     @property
     def save_confirmed(self) -> bool:
         return bool(self._accepted_save)
+
+    @property
+    def selected_delimiter(self) -> str:
+        """Aktuell gewähltes Trennzeichen (live umschaltbar) — 1.9.3."""
+        return self._delimiter
+
+    @property
+    def row_count(self) -> int:
+        return len(self._all_rows)
+
+    @property
+    def column_count(self) -> int:
+        return max((len(r) for r in self._all_rows), default=0)
+

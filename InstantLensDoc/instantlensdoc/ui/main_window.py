@@ -3789,6 +3789,14 @@ class MainWindow(QMainWindow):
                 self._on_expiry_warn_clicked()
                 event.accept()
                 return
+        # Quick-Stempel: Esc bricht Platzieren ab — 1.9.3
+        if event.key() == Qt.Key_Escape:
+            pv = getattr(self, "pdf_view", None)
+            if pv is not None and getattr(pv, "_quick_stamp_armed", False):
+                if callable(getattr(pv, "cancel_quick_stamp", None)):
+                    pv.cancel_quick_stamp()
+                    event.accept()
+                    return
         super().keyPressEvent(event)
 
     def _duplicate_current(self):
@@ -11230,6 +11238,8 @@ class MainWindow(QMainWindow):
             if prev.exec() != QDialog.Accepted or not prev.save_confirmed:
                 self._set_status("Tabellen-CSV abgebrochen (nicht gespeichert)")
                 return
+            # Trennzeichen aus Live-Vorschau (1.9.3)
+            csv_delim = getattr(prev, "selected_delimiter", None) or csv_delim or ";"
             try:
                 from instantlensdoc.core.ocr import write_ocr_table_csv
                 from instantlensdoc.core.app_settings import set_last_ocr_table_csv_dir
