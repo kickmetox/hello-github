@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from PySide6.QtGui import QBrush, QColor
 from PySide6.QtWidgets import (
     QComboBox,
     QDialog,
@@ -33,6 +34,13 @@ class FormFieldsDialog(QDialog):
         layout = QVBoxLayout(self)
         layout.addWidget(QLabel(f"{self.pdf_path.name} — bestehende AcroForm-Felder"))
 
+        self.filter_edit = QLineEdit()
+        self.filter_edit.setPlaceholderText("Filter nach Name…")
+        self.filter_edit.setClearButtonEnabled(True)
+        self.filter_edit.setToolTip("Formularfelder nach Name filtern — 1.3.1")
+        self.filter_edit.textChanged.connect(self._rebuild_table)
+        layout.addWidget(self.filter_edit)
+
         self.table = QTableWidget(0, 4)
         self.table.setHorizontalHeaderLabels(["Name", "Typ", "Wert", "Hinweis"])
         self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
@@ -53,9 +61,12 @@ class FormFieldsDialog(QDialog):
         layout.addLayout(edit_row)
 
         self._fields: list[FormFieldInfo] = []
+        self._original: dict[str, str] = {}
+        self._row_map: list[int] = []  # table row → field index
         self._load()
 
         self.table.currentCellChanged.connect(self._on_cell)
+        self.value_edit.textChanged.connect(self._mark_dirty_from_edit)
         buttons = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
         buttons.accepted.connect(self._save)
         buttons.rejected.connect(self.reject)
@@ -67,17 +78,44 @@ class FormFieldsDialog(QDialog):
         except Exception as e:
             QMessageBox.warning(self, "Formularfelder", str(e))
             self._fields = []
+        self._original = {f.name: f.value for f in self._fields}
+        self._rebuild_table()
+
+    def _rebuild_table(self, _text: str = ""):
         self.table.setRowCount(0)
+        self._row_map = []
+        needle = (self.filter_edit.text() or "").strip().lower()
         if not self._fields:
             self.table.setRowCount(1)
             self.table.setItem(0, 0, QTableWidgetItem("(keine AcroForm-Felder)"))
             self.value_edit.setEnabled(False)
             return
-        self.table.setRowCount(len(self._fields))
+        rows = []
         for i, f in enumerate(self._fields):
-            self.table.setItem(i, 0, QTableWidgetItem(f.name))
-            self.table.setItem(i, 1, QTableWidgetItem(f.field_type))
-            self.table.setItem(i, 2, QTableWidgetItem(f.value))
+            if needle and needle not in f.name.lower() and needle not in (
+                f.alternate_name or ""
+            ).lower():
+                continue
+            rows.append(i)
+        if not rows:
+            self.table.setRowCount(1)
+            self.table.setItem(0, 0, QTableWidgetItem("(keine Treffer)"))
+            self.value_edit.setEnabled(False)
+            return
+        self.table.setRowCount(len(rows))
+        gray = QBrush(QColor("#888888"))
+        for row, fi in enumerate(rows):
+            f = self._fields[fi]
+            name_disp = f"{f.name} [RO]" if f.read_only else f.name
+            self.table.setItem(row, 0, QTableWidgetItem(name_disp))
+            self.table.setItem(row, 1, QTableWidgetItem(f.field_type))
+            val_disp = f.value
+            if f.name in self._original and f.value != self._original.get(f.name, f.value):
+                # value already on field object — mark if dirty vs original
+                pass
+            if f.value != self._original.get(f.name, f.value):
+                val_disp = f"{f.value} *"
+            self.table.setItem(row, 2, QTableWidgetItem(val_disp))
             hint = []
             if f.read_only:
                 hint.append("nur lesen")
@@ -87,23 +125,44 @@ class FormFieldsDialog(QDialog):
                 hint.append(f.alternate_name)
             if f.options:
                 hint.append("Opt: " + ", ".join(f.options[:6]))
-            self.table.setItem(i, 3, QTableWidgetItem("; ".join(hint)))
+            self.table.setItem(row, 3, QTableWidgetItem("; ".join(hint)))
+            if f.read_only:
+                for col in range(4):
+                    it = self.table.item(row, col)
+                    if it is not None:
+                        it.setForeground(gray)
+            self._row_map.append(fi)
         self.table.selectRow(0)
         self._apply_row(0)
 
+    def _field_index_for_row(self, row: int) -> int | None:
+        if 0 <= row < len(self._row_map):
+            return self._row_map[row]
+        return None
+
     def _persist_row(self, row: int):
-        if 0 <= row < len(self._fields) and self.value_edit.isEnabled():
-            self._fields[row].value = self.value_edit.text()
-            self.table.setItem(row, 2, QTableWidgetItem(self._fields[row].value))
+        fi = self._field_index_for_row(row)
+        if fi is None:
+            return
+        if 0 <= fi < len(self._fields) and self.value_edit.isEnabled():
+            self._fields[fi].value = self.value_edit.text()
+            val = self._fields[fi].value
+            disp = f"{val} *" if val != self._original.get(self._fields[fi].name, "") else val
+            self.table.setItem(row, 2, QTableWidgetItem(disp))
+
+    def _mark_dirty_from_edit(self, _text: str = ""):
+        row = self.table.currentRow()
+        self._persist_row(row)
 
     def _on_cell(self, row: int, _c, prev_row: int, _pc):
         self._persist_row(prev_row)
         self._apply_row(row)
 
     def _apply_row(self, row: int):
-        if row < 0 or row >= len(self._fields):
+        fi = self._field_index_for_row(row)
+        if fi is None or fi < 0 or fi >= len(self._fields):
             return
-        f = self._fields[row]
+        f = self._fields[fi]
         self.value_edit.blockSignals(True)
         self.value_edit.setText(f.value)
         self.value_edit.blockSignals(False)
@@ -136,7 +195,19 @@ class FormFieldsDialog(QDialog):
         if not self._fields:
             self.reject()
             return
-        values = {f.name: f.value for f in self._fields if not f.read_only}
+        # Nur dirty (gegenüber Original) und nicht read-only — 1.3.1
+        values = {
+            f.name: f.value
+            for f in self._fields
+            if (not f.read_only)
+            and f.name
+            and f.value != self._original.get(f.name, f.value)
+        }
+        if not values:
+            QMessageBox.information(
+                self, "Formularfelder", "Keine geänderten Felder zum Speichern."
+            )
+            return
         try:
             set_form_values(self.pdf_path, values)
             self.accept()

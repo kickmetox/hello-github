@@ -2,7 +2,7 @@
 
 Moderne Textverarbeitung mit PDF-Annotator, OCR-Bridge und Formulargenerator.
 
-**Version:** 1.3.0  
+**Version:** 1.3.1  
 **Hersteller:** Andreas Meyer · ame@sellerbach.de
 
 ## Quickstart (Windows)
@@ -33,8 +33,8 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an).
 
-## Neu in 1.3.0
+## Neu in 1.3.1
 
-AcroForm-Sidebar (Name/Typ/Wert + Sprung + Textfeld speichern); Redactions anwenden → neues PDF; Bookmarks ↔ PDF-Outlines; Thumbnail-Lazy-Load >50 Seiten mit Platzhaltern. Stubs KI/Cloud/Stylus/3D unverändert.
+Forms: Name-Filter, Read-only-Markierung, Speichern nur dirty Felder; Redaction-Liste Sidebar + einzeln löschen, Preview-Deckkraft Settings; Outlines-Import Duplikat-Dialog (überspringen/ersetzen); Thumbnail-Lazy-Schwellwert 25/50/100. Stubs KI/Cloud/Stylus/3D unverändert.
 
 Siehe [CHANGELOG.md](CHANGELOG.md), [FEATURES.md](FEATURES.md) und [INFO.md](INFO.md).

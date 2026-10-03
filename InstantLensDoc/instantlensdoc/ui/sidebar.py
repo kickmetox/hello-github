@@ -422,6 +422,8 @@ class Sidebar(QWidget):
     outline_delete_requested = Signal()
     form_field_activated = Signal(object)  # FormFieldInfo — Sprung zum Feld
     form_fields_save_requested = Signal(object)  # dict[name→value] Textfelder speichern
+    redaction_activated = Signal(object)  # Annotation REDACTION — Sprung
+    redaction_delete_requested = Signal(object)  # Annotation oder id — einzeln löschen
     annotation_filter_changed = Signal(str)  # Typ-Wert oder "" für alle
     annotation_color_filter_changed = Signal(str)  # #RRGGBB oder "" für alle
     annotation_page_filter_changed = Signal(bool)  # nur aktuelle Seite
@@ -651,12 +653,19 @@ class Sidebar(QWidget):
 
         self.lbl_forms = QLabel("Formularfelder (AcroForm)")
         layout.addWidget(self.lbl_forms)
+        self.form_filter = QLineEdit()
+        self.form_filter.setPlaceholderText("Filter nach Name…")
+        self.form_filter.setClearButtonEnabled(True)
+        self.form_filter.setToolTip("Formularfelder nach Name filtern — 1.3.1")
+        self.form_filter.textChanged.connect(self._apply_form_fields_filter)
+        layout.addWidget(self.form_filter)
         self.form_fields = QTreeWidget()
         self.form_fields.setHeaderLabels(["Name", "Typ", "Wert"])
         self.form_fields.setRootIsDecorated(False)
         self.form_fields.setMaximumHeight(140)
         self.form_fields.setToolTip(
-            "AcroForm-Felder — Klick springt zur Seite; Textwert unten editieren und Speichern"
+            "AcroForm-Felder — Klick springt zur Seite; Textwert unten editieren und Speichern; "
+            "nur lesen = grau/RO; Speichern nur dirty Felder — 1.3.1"
         )
         self.form_fields.itemClicked.connect(self._activate_form_field)
         self.form_fields.itemActivated.connect(self._activate_form_field)
@@ -665,15 +674,41 @@ class Sidebar(QWidget):
         self.form_value_edit = QLineEdit()
         self.form_value_edit.setPlaceholderText("Textfeld-Wert…")
         self.form_value_edit.setToolTip("Einfache Textfeld-Wert-Editierung (pikepdf)")
+        self.form_value_edit.textChanged.connect(self._on_form_value_edited)
         form_edit_row.addWidget(self.form_value_edit, 1)
         self.btn_form_save = QPushButton("Speichern")
-        self.btn_form_save.setToolTip("Textfeld-Wert per pikepdf in PDF schreiben")
+        self.btn_form_save.setToolTip(
+            "Nur geänderte (dirty) Textfeld-Werte per pikepdf speichern — 1.3.1"
+        )
         self.btn_form_save.clicked.connect(self._emit_form_fields_save)
         form_edit_row.addWidget(self.btn_form_save)
         self.form_edit_host = QWidget()
         self.form_edit_host.setLayout(form_edit_row)
         layout.addWidget(self.form_edit_host)
         self._form_fields_data: list = []
+        self._form_original: dict = {}
+        self._form_dirty: dict = {}
+
+        self.lbl_redactions = QLabel("Schwärzungen (Redactions)")
+        layout.addWidget(self.lbl_redactions)
+        self.redactions = QListWidget()
+        self.redactions.setMaximumHeight(120)
+        self.redactions.setToolTip(
+            "Schwärzungs-Annotationen — Klick springt zur Seite; − löscht einzeln — 1.3.1"
+        )
+        self.redactions.itemClicked.connect(self._activate_redaction)
+        self.redactions.itemActivated.connect(self._activate_redaction)
+        layout.addWidget(self.redactions)
+        red_btns = QHBoxLayout()
+        self.btn_redaction_del = QPushButton("−")
+        self.btn_redaction_del.setFixedWidth(28)
+        self.btn_redaction_del.setToolTip("Ausgewählte Schwärzung löschen — 1.3.1")
+        self.btn_redaction_del.clicked.connect(self._emit_redaction_delete)
+        red_btns.addWidget(self.btn_redaction_del)
+        red_btns.addStretch(1)
+        self.redaction_btns_host = QWidget()
+        self.redaction_btns_host.setLayout(red_btns)
+        layout.addWidget(self.redaction_btns_host)
 
         layout.addWidget(QLabel("PDF-Favoriten — ziehen zum Ordnen"))
         self.page_favorites = PageFavoriteList()
@@ -1786,14 +1821,16 @@ class Sidebar(QWidget):
         ftype = str(getattr(info, "field_type", "") or "")
         ro = bool(getattr(info, "read_only", False))
         editable = (not ro) and ftype == "text"
+        name = str(getattr(info, "name", "") or "")
+        shown = self._form_dirty.get(name, str(getattr(info, "value", "") or ""))
         self.form_value_edit.blockSignals(True)
-        self.form_value_edit.setText(str(getattr(info, "value", "") or ""))
+        self.form_value_edit.setText(shown)
         self.form_value_edit.blockSignals(False)
         self.form_value_edit.setEnabled(editable)
-        self.btn_form_save.setEnabled(editable)
+        self.btn_form_save.setEnabled(bool(self._form_dirty))
         self.form_field_activated.emit(info)
 
-    def _emit_form_fields_save(self):
+    def _on_form_value_edited(self, text: str) -> None:
         item = self.form_fields.currentItem()
         if item is None or item.isDisabled():
             return
@@ -1806,33 +1843,72 @@ class Sidebar(QWidget):
         name = str(getattr(info, "name", "") or "")
         if not name:
             return
-        value = self.form_value_edit.text()
-        self.form_fields_save_requested.emit({name: value})
+        orig = self._form_original.get(name, str(getattr(info, "value", "") or ""))
+        if text != orig:
+            self._form_dirty[name] = text
+            item.setText(2, text + " *")
+        else:
+            self._form_dirty.pop(name, None)
+            item.setText(2, orig)
+        self.btn_form_save.setEnabled(bool(self._form_dirty))
 
-    def set_form_fields(self, fields) -> None:
-        """AcroForm-Feldliste (Name/Typ/Wert) in der Sidebar — 1.3.0."""
+    def _emit_form_fields_save(self):
+        # Aktuelles Edit-Feld übernehmen
+        self._on_form_value_edited(self.form_value_edit.text())
+        if not self._form_dirty:
+            return
+        # Nur dirty Textfelder speichern — 1.3.1
+        payload = dict(self._form_dirty)
+        self.form_fields_save_requested.emit(payload)
+
+    def _apply_form_fields_filter(self, _text: str = "") -> None:
+        self._rebuild_form_fields_tree()
+
+    def _rebuild_form_fields_tree(self) -> None:
+        """Feldliste neu aufbauen (Filter + RO-Markierung + dirty Werte)."""
         self.form_fields.clear()
-        self._form_fields_data = list(fields or [])
-        self.form_value_edit.clear()
-        self.form_value_edit.setEnabled(False)
-        self.btn_form_save.setEnabled(False)
+        needle = ""
+        if hasattr(self, "form_filter"):
+            needle = (self.form_filter.text() or "").strip().lower()
+        data = list(self._form_fields_data or [])
+        if needle:
+            data = [
+                f
+                for f in data
+                if needle in str(getattr(f, "name", "") or "").lower()
+                or needle in str(getattr(f, "alternate_name", "") or "").lower()
+            ]
         if not self._form_fields_data:
             empty = QTreeWidgetItem(["(keine AcroForm-Felder)", "", ""])
             empty.setDisabled(True)
             self.form_fields.addTopLevelItem(empty)
             return
-        for f in self._form_fields_data:
+        if not data:
+            empty = QTreeWidgetItem(["(keine Treffer)", "", ""])
+            empty.setDisabled(True)
+            self.form_fields.addTopLevelItem(empty)
+            return
+        for f in data:
             name = str(getattr(f, "name", "") or "")
             ftype = str(getattr(f, "field_type", "") or "")
-            value = str(getattr(f, "value", "") or "")
-            twi = QTreeWidgetItem([name, ftype, value])
+            value = self._form_dirty.get(name, str(getattr(f, "value", "") or ""))
+            ro = bool(getattr(f, "read_only", False))
+            name_disp = f"{name} [RO]" if ro else name
+            if name in self._form_dirty:
+                value_disp = f"{value} *"
+            else:
+                value_disp = value
+            twi = QTreeWidgetItem([name_disp, ftype, value_disp])
             twi.setData(0, Qt.UserRole, f)
             page = getattr(f, "page_index", None)
             tip = f"{name} ({ftype})"
             if page is not None:
                 tip += f" — S. {int(page) + 1}"
-            if getattr(f, "read_only", False):
+            if ro:
                 tip += " · nur lesen"
+                gray = QBrush(QColor("#888888"))
+                for col in (0, 1, 2):
+                    twi.setForeground(col, gray)
             twi.setToolTip(0, tip)
             twi.setToolTip(1, tip)
             twi.setToolTip(2, tip)
@@ -1840,8 +1916,67 @@ class Sidebar(QWidget):
         for col in (0, 1, 2):
             self.form_fields.resizeColumnToContents(col)
 
+    def set_form_fields(self, fields) -> None:
+        """AcroForm-Feldliste (Name/Typ/Wert) in der Sidebar — 1.3.0/1.3.1."""
+        self._form_fields_data = list(fields or [])
+        self._form_original = {
+            str(getattr(f, "name", "") or ""): str(getattr(f, "value", "") or "")
+            for f in self._form_fields_data
+            if str(getattr(f, "name", "") or "")
+        }
+        self._form_dirty = {}
+        self.form_value_edit.blockSignals(True)
+        self.form_value_edit.clear()
+        self.form_value_edit.blockSignals(False)
+        self.form_value_edit.setEnabled(False)
+        self.btn_form_save.setEnabled(False)
+        self._rebuild_form_fields_tree()
+
     def clear_form_fields(self) -> None:
         self.set_form_fields([])
+
+    def _activate_redaction(self, item: QListWidgetItem):
+        if item is None or item.isDisabled():
+            return
+        payload = item.data(256)
+        if payload is None:
+            return
+        self.redaction_activated.emit(payload)
+
+    def _emit_redaction_delete(self):
+        item = self.redactions.currentItem()
+        if item is None or item.isDisabled():
+            return
+        payload = item.data(256)
+        if payload is None:
+            return
+        self.redaction_delete_requested.emit(payload)
+
+    def set_redactions(self, annotations) -> None:
+        """Schwärzungs-Liste in der Sidebar — 1.3.1."""
+        self.redactions.clear()
+        anns = list(annotations or [])
+        if not anns:
+            empty = QListWidgetItem("(keine Schwärzungen)")
+            empty.setFlags(Qt.NoItemFlags)
+            self.redactions.addItem(empty)
+            return
+        for i, a in enumerate(anns, start=1):
+            try:
+                page = int(getattr(a, "page", 0) or 0) + 1
+            except (TypeError, ValueError):
+                page = "?"
+            label = f"{i}. S. {page}"
+            txt = str(getattr(a, "text", "") or "").strip()
+            if txt and txt != "REDACT":
+                label += f" — {txt[:24]}"
+            item = QListWidgetItem(label)
+            item.setData(256, a)
+            item.setToolTip(f"Schwärzung Seite {page} — Klick springt hin")
+            self.redactions.addItem(item)
+
+    def clear_redactions(self) -> None:
+        self.set_redactions([])
 
     def search_hit_records(self) -> list[dict]:
         """Aktuelle Trefferliste als strukturierte Dicts für CSV/JSON-Export."""

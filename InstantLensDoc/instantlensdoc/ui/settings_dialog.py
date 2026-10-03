@@ -120,6 +120,8 @@ from instantlensdoc.core.app_settings import (
     get_print_grayscale,
     get_print_preview,
     get_pdf_thumbnail_scale,
+    get_redaction_preview_opacity,
+    get_thumb_lazy_threshold,
     get_pdf_two_page_spread,
     get_editor_current_line_highlight,
     get_editor_indent_guides,
@@ -156,6 +158,7 @@ from instantlensdoc.core.app_settings import (
     SIDECAR_SAVE_DEBOUNCE_MIN_MS,
     STATUS_BLINK_CHOICES,
     PDF_THUMBNAIL_SCALE_CHOICES,
+    THUMB_LAZY_THRESHOLD_CHOICES,
     reset_ann_color_presets,
     reset_to_defaults,
     save_settings,
@@ -202,6 +205,8 @@ from instantlensdoc.core.app_settings import (
     set_print_grayscale,
     set_print_preview,
     set_pdf_thumbnail_scale,
+    set_redaction_preview_opacity,
+    set_thumb_lazy_threshold,
     set_pdf_two_page_spread,
     set_page_number_overlay_font_size,
     set_page_number_overlay_format,
@@ -350,6 +355,29 @@ class SettingsDialog(QDialog):
         self.thumb_scale.setCurrentIndex(thumb_pick)
         self.thumb_scale.setToolTip("Größe der PDF-Seitenvorschau in der Sidebar")
         form.addRow("PDF-Thumbnail-Größe", self.thumb_scale)
+
+        self.thumb_lazy = QComboBox()
+        cur_lazy = get_thumb_lazy_threshold()
+        lazy_pick = 0
+        for i, n in enumerate(THUMB_LAZY_THRESHOLD_CHOICES):
+            self.thumb_lazy.addItem(f">{n} Seiten", n)
+            if n == cur_lazy:
+                lazy_pick = i
+        self.thumb_lazy.setCurrentIndex(lazy_pick)
+        self.thumb_lazy.setToolTip(
+            "Ab dieser Seitenanzahl Lazy-Load mit Platzhaltern (25 / 50 / 100) — 1.3.1"
+        )
+        form.addRow("Thumbnail-Lazy ab", self.thumb_lazy)
+
+        self.redact_opacity = QDoubleSpinBox()
+        self.redact_opacity.setRange(0.05, 1.0)
+        self.redact_opacity.setSingleStep(0.05)
+        self.redact_opacity.setDecimals(2)
+        self.redact_opacity.setValue(get_redaction_preview_opacity())
+        self.redact_opacity.setToolTip(
+            "Deckkraft der Schwärzungs-Vorschau (vor Einbrennen) — 1.3.1"
+        )
+        form.addRow("Schwärzung Preview-Deckkraft", self.redact_opacity)
 
         self.autosave_enabled = QCheckBox("Autosave aktiv")
         self.autosave_enabled.setChecked(get_autosave_enabled())
@@ -1679,6 +1707,12 @@ class SettingsDialog(QDialog):
         set_default_zoom_mode(str(self.zoom_mode.currentData() or DEFAULT_ZOOM_MODE_PERCENT))
         set_default_zoom_percent(int(self.zoom_pct.value()))
         set_pdf_thumbnail_scale(float(self.thumb_scale.currentData() or 0.18))
+        try:
+            lazy_th = int(self.thumb_lazy.currentData() or 50)
+        except (TypeError, ValueError):
+            lazy_th = 50
+        set_thumb_lazy_threshold(lazy_th)
+        set_redaction_preview_opacity(float(self.redact_opacity.value()))
         set_autosave_enabled(self.autosave_enabled.isChecked())
         try:
             as_sec = int(self.autosave_sec.currentData() or 60)
@@ -1889,6 +1923,12 @@ class SettingsDialog(QDialog):
                     parent.pdf_view.set_page_number_overlay_skip_edges(
                         self.page_num_skip_edges.isChecked()
                     )
+                if hasattr(parent.pdf_view, "set_redaction_preview_opacity"):
+                    parent.pdf_view.set_redaction_preview_opacity(
+                        float(self.redact_opacity.value())
+                    )
+                if hasattr(parent, "_refresh_thumbs"):
+                    parent._refresh_thumbs()
             except Exception:
                 pass
         if parent is not None and hasattr(parent, "_indent_guides_action"):

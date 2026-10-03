@@ -1,5 +1,27 @@
 # Changelog — InstantLens Doc
 
+## 1.3.1 — Forms Filter/RO/dirty, Redaction-Liste+Opacity, Outlines Duplikat-Dialog, Lazy-Threshold
+
+Post-Release-Polish nach 1.3.0: **AcroForm** mit **Name-Filter**, **Read-only-Markierung** und Speichern nur **dirty** Felder; **Redaction-Liste** in der Sidebar mit **einzelnem Löschen** sowie **Preview-Deckkraft** in den Einstellungen; **Outlines→Bookmarks-Import** mit Dialog **Duplikate überspringen / Ersetzen**; **Thumbnail-Lazy-Schwellwert** wählbar (**25 / 50 / 100** Seiten) statt hart 50. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### Formulare
+- Sidebar/Dialog: **Filter nach Name**; Read-only als **[RO]**/grau; Speichern nur geänderte Felder
+
+### PDF / Redaction
+- Sidebar-Liste der Schwärzungen; **einzeln löschen**; Preview-Deckkraft Settings
+
+### Bookmarks / Outlines
+- Import: bei bestehenden Favoriten Dialog **Duplikate überspringen** oder **Ersetzen**
+
+### Performance
+- Thumbnail-Lazy-Load: Schwellwert Settings **25 / 50 / 100** (Default 50)
+
+### Packaging / Docs
+- Version **1.3.1** (App / `ild_pdf` / ISS / Smoke / Docs)
+- Smoke: Forms Filter/RO/dirty, Redaction-Liste+Opacity, Outlines Duplikat-Dialog, Lazy-Threshold (CLI + Qt)
+
+---
+
 ## 1.3.0 — AcroForm-Sidebar, Redactions→neues PDF, Bookmarks↔Outlines, Thumb Lazy >50
 
 Minor-Release nach 1.2.9: **AcroForm-Feldliste** in der Sidebar (Name/Typ/Wert) mit Sprung zum Feld und einfacher Textfeld-Wert-Editierung via **pikepdf**; **Redactions anwenden** erzeugt ein **neues PDF** mit eingebrannten schwarzen Flächen (Rechteck-Werkzeug → Sidecar); **Bookmarks** aus PDF-Outlines importieren und als PDF-Outlines exportieren; **Thumbnail-Lazy-Load** für große PDFs (**>50 Seiten**) mit Platzhaltern für alle Seiten. Stubs KI/Cloud/Stylus/3D bleiben Stubs.

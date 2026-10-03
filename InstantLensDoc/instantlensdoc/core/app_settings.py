@@ -99,6 +99,8 @@ DEFAULTS: dict[str, Any] = {
     "restore_session_on_start": True,
     "restore_window_geometry_on_start": True,
     "pdf_thumbnail_scale": 0.18,
+    "thumb_lazy_threshold": 50,
+    "redaction_preview_opacity": 0.90,
     "editor_text_encoding": "auto",
     "skip_splash": False,
     "spellcheck_dict_path": "",
@@ -2577,6 +2579,51 @@ def get_restore_window_geometry_on_start() -> bool:
 
 def set_restore_window_geometry_on_start(enabled: bool) -> None:
     save_settings({"restore_window_geometry_on_start": bool(enabled)})
+
+
+
+THUMB_LAZY_THRESHOLD_CHOICES = (25, 50, 100)
+
+
+def get_thumb_lazy_threshold() -> int:
+    """Seiten-Schwellwert für Thumbnail-Lazy-Load (25/50/100, Default 50)."""
+    try:
+        v = int(load_settings().get("thumb_lazy_threshold", 50))
+    except (TypeError, ValueError):
+        v = 50
+    if v not in THUMB_LAZY_THRESHOLD_CHOICES:
+        return min(THUMB_LAZY_THRESHOLD_CHOICES, key=lambda x: abs(x - v))
+    return v
+
+
+def set_thumb_lazy_threshold(threshold: int) -> int:
+    try:
+        v = int(threshold)
+    except (TypeError, ValueError):
+        v = 50
+    if v not in THUMB_LAZY_THRESHOLD_CHOICES:
+        v = min(THUMB_LAZY_THRESHOLD_CHOICES, key=lambda x: abs(x - v))
+    save_settings({"thumb_lazy_threshold": v})
+    return v
+
+
+def get_redaction_preview_opacity() -> float:
+    """Deckkraft der Schwärzungs-Vorschau (0.05–1.0, Default 0.90)."""
+    try:
+        v = float(load_settings().get("redaction_preview_opacity", 0.90))
+    except (TypeError, ValueError):
+        v = 0.90
+    return max(0.05, min(1.0, v))
+
+
+def set_redaction_preview_opacity(opacity: float) -> float:
+    try:
+        v = float(opacity)
+    except (TypeError, ValueError):
+        v = 0.90
+    v = max(0.05, min(1.0, v))
+    save_settings({"redaction_preview_opacity": round(v, 4)})
+    return v
 
 
 PDF_THUMBNAIL_SCALE_CHOICES = (0.12, 0.18, 0.24)

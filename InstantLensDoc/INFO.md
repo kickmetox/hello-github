@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **1.3.0** |
+| Version | **1.3.1** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -63,10 +63,10 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an / `checkedonce`)
 
-## Neu in 1.3.0
+## Neu in 1.3.1
 
-- Formulare: AcroForm-Feldliste Sidebar (Name/Typ/Wert) + Sprung zum Feld; Textfeld-Wert speichern via pikepdf
-- Redaction: Rechteck → Sidecar; **Redactions anwenden** → neues PDF mit schwarzen Flächen
-- Bookmarks: aus PDF-Outlines importieren + als PDF-Outlines exportieren
-- Performance: Thumbnail-Lazy-Load für große PDFs (>50 Seiten) mit Platzhaltern
+- Formulare: Name-Filter; Read-only markiert ([RO]/grau); Speichern nur dirty Felder
+- Redaction: Sidebar-Liste + einzeln löschen; Preview-Deckkraft in Einstellungen
+- Bookmarks/Outlines: Import-Dialog Duplikate überspringen oder Favoriten ersetzen
+- Performance: Thumbnail-Lazy-Schwellwert Settings (25 / 50 / 100 Seiten)
 - Stubs KI/Cloud/Stylus/3D unverändert

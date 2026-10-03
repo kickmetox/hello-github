@@ -839,6 +839,8 @@ class MainWindow(QMainWindow):
         self.sidebar.outline_delete_requested.connect(self._outline_delete)
         self.sidebar.form_field_activated.connect(self._on_form_field_jump)
         self.sidebar.form_fields_save_requested.connect(self._on_form_fields_save)
+        self.sidebar.redaction_activated.connect(self._on_redaction_activated)
+        self.sidebar.redaction_delete_requested.connect(self._on_redaction_delete)
         self.sidebar.annotation_filter_changed.connect(lambda _t: None)
         self.sidebar.annotation_tag_rename_requested.connect(self._rename_annotation_tag_global)
         self.sidebar.annotation_tag_recolor_requested.connect(self._recolor_annotation_tag_global)
@@ -4893,6 +4895,8 @@ class MainWindow(QMainWindow):
             self.sidebar.clear_annotations()
             self.sidebar.set_outline([])
             self.sidebar.clear_form_fields()
+            if hasattr(self.sidebar, "clear_redactions"):
+                self.sidebar.clear_redactions()
             self.sidebar.clear_page_favorites()
             self.sidebar.clear_line_favorites()
 
@@ -5730,6 +5734,7 @@ class MainWindow(QMainWindow):
             page_groups=groups,
             ann_groups=ann_groups,
         )
+        self._refresh_redactions_list()
         n = len(self.pdf_view.store.annotations) if self.pdf_view.store else 0
         self.word_status_label.setText(f"{n} Ann.")
         if self.doc and self.doc.path and self.pdf_view.store is not None:
@@ -5946,11 +5951,12 @@ class MainWindow(QMainWindow):
         self._set_status(f"Formularfeld „{name}“ → Seite {idx + 1}")
 
     def _on_form_fields_save(self, values) -> None:
-        """Textfeld-Werte via pikepdf speichern — 1.3.0."""
+        """Textfeld-Werte via pikepdf speichern — nur dirty — 1.3.0/1.3.1."""
         if not self.pdf_view.pdf_path:
             self._set_status("Formularfelder speichern: PDF öffnen")
             return
         if not isinstance(values, dict) or not values:
+            self._set_status("Formularfelder: keine Änderungen")
             return
         try:
             from ild_pdf.acroform import set_form_values
@@ -5961,12 +5967,69 @@ class MainWindow(QMainWindow):
             self.pdf_view.refresh()
             self._refresh_form_fields()
             names = ", ".join(str(k) for k in values.keys())
-            self._set_status(f"Formularfeld gespeichert: {names}")
+            self._set_status(f"Formularfeld gespeichert ({len(values)} dirty): {names}")
         except Exception as e:
             QMessageBox.warning(self, "Formularfelder", str(e))
 
+    def _refresh_redactions_list(self) -> None:
+        """Schwärzungs-Liste Sidebar — 1.3.1."""
+        if not hasattr(self.sidebar, "set_redactions"):
+            return
+        store = getattr(self.pdf_view, "store", None)
+        if store is None:
+            self.sidebar.clear_redactions()
+            return
+        try:
+            from ild_pdf.annotate import AnnotationType
+
+            reds = [
+                a
+                for a in (store.annotations or [])
+                if getattr(a, "type", None) == AnnotationType.REDACTION
+            ]
+        except Exception:
+            reds = []
+        self.sidebar.set_redactions(reds)
+
+    def _on_redaction_activated(self, ann) -> None:
+        """Sprung zur Schwärzungs-Annotation — 1.3.1."""
+        if self.stack.currentWidget() is not self.pdf_view:
+            self.stack.setCurrentWidget(self.pdf_view)
+        if self.pdf_view.focus_annotation(ann):
+            return
+        if ann is not None and hasattr(ann, "page"):
+            self.pdf_view.goto_page(int(ann.page))
+            self.sidebar.select_thumb(int(ann.page))
+            self._set_status(f"Schwärzung → Seite {int(ann.page) + 1}")
+
+    def _on_redaction_delete(self, ann) -> None:
+        """Einzelne Schwärzung aus Sidecar löschen — 1.3.1."""
+        if not self.pdf_view.store or ann is None:
+            return
+        aid = str(getattr(ann, "id", "") or "")
+        if not aid:
+            self._set_status("Schwärzung löschen: keine ID")
+            return
+        try:
+            from ild_pdf.annotate import AnnotationType
+
+            target = self.pdf_view.store.get(aid)
+            if target is None or target.type != AnnotationType.REDACTION:
+                self._set_status("Schwärzung nicht gefunden")
+                return
+            if not self.pdf_view.store.remove(aid):
+                self._set_status("Schwärzung löschen fehlgeschlagen")
+                return
+            self.pdf_view.clear_annotation_selection()
+            self.pdf_view.schedule_sidecar_save(force=True)
+            self.pdf_view.refresh()
+            self.pdf_view.annotations_changed.emit()
+            self._set_status(f"Schwärzung gelöscht (S. {int(target.page) + 1})")
+        except Exception as e:
+            QMessageBox.warning(self, "Schwärzung", str(e))
+
     def _import_bookmarks_from_outline(self) -> None:
-        """PDF-Outlines → Seiten-Favoriten (Bookmarks) — 1.3.0."""
+        """PDF-Outlines → Seiten-Favoriten (Bookmarks) — 1.3.0/1.3.1."""
         if not self.pdf_view.pdf_path or self.pdf_view.store is None:
             QMessageBox.information(
                 self, "Bookmarks importieren", "Bitte zuerst ein PDF öffnen."
@@ -5993,10 +6056,44 @@ class MainWindow(QMainWindow):
                 self, "Bookmarks importieren", "Keine gültigen Outline-Seiten."
             )
             return
+        existing = list(self.pdf_view.list_page_favorites())
+        existing_set = set(existing)
+        dupes = [p for p in order if p in existing_set]
+        final_order = list(order)
+        mode = "ersetzt"
+        if existing:
+            box = QMessageBox(self)
+            box.setWindowTitle("Bookmarks importieren")
+            box.setIcon(QMessageBox.Question)
+            box.setText(
+                f"{len(order)} Outline-Seite(n) importieren.\n"
+                f"Bereits {len(existing)} Favorit(en)"
+                + (f", davon {len(dupes)} Duplikat(e)" if dupes else "")
+                + ".\n\n"
+                "Duplikate überspringen = bestehende behalten, nur neue anhängen.\n"
+                "Ersetzen = Favoritenliste durch Outline ersetzen."
+            )
+            btn_skip = box.addButton(
+                "Duplikate überspringen", QMessageBox.AcceptRole
+            )
+            btn_replace = box.addButton("Ersetzen", QMessageBox.DestructiveRole)
+            box.addButton(QMessageBox.Cancel)
+            box.exec()
+            clicked = box.clickedButton()
+            if clicked is None or clicked not in (btn_skip, btn_replace):
+                return
+            if clicked is btn_skip:
+                final_order = existing + [p for p in order if p not in existing_set]
+                mode = "übersprungen"
+            else:
+                final_order = list(order)
+                mode = "ersetzt"
         try:
-            self.pdf_view.reorder_page_favorites(order)
+            self.pdf_view.reorder_page_favorites(final_order)
             self._refresh_page_favorites()
-            self._set_status(f"{len(order)} Bookmark(s) aus Outline importiert")
+            self._set_status(
+                f"{len(final_order)} Bookmark(s) aus Outline importiert ({mode})"
+            )
         except Exception as e:
             QMessageBox.warning(self, "Bookmarks importieren", str(e))
 
@@ -6040,10 +6137,15 @@ class MainWindow(QMainWindow):
             self._stop_thumb_lazy()
             self.sidebar.clear_thumbs()
             return
-        # Lazy: Platzhalter für alle Seiten, Nachladen (bei >50 Seiten kritisch) — 1.3.0
+        # Lazy: Platzhalter für alle Seiten; Schwellwert Settings 25/50/100 — 1.3.1
         try:
             from ild_pdf.limits import THUMB_LAZY_THRESHOLD
+            from instantlensdoc.core.app_settings import get_thumb_lazy_threshold
 
+            try:
+                threshold = int(get_thumb_lazy_threshold())
+            except Exception:
+                threshold = int(THUMB_LAZY_THRESHOLD)
             page_count = int(self.pdf_view.page_count or 0)
             current = int(self.pdf_view.page_index or 0)
             # Alle Seiten als Platzhalter; große PDFs (>Threshold) immer lazy
@@ -6052,9 +6154,9 @@ class MainWindow(QMainWindow):
                 page_count, current=current, max_pages=max_pages or page_count
             )
             self._start_thumb_lazy(token, page_count=page_count, prefer=current)
-            if page_count > THUMB_LAZY_THRESHOLD:
+            if page_count > threshold:
                 self._set_status(
-                    f"Thumbnails: Lazy-Load {page_count} Seiten (>{THUMB_LAZY_THRESHOLD})"
+                    f"Thumbnails: Lazy-Load {page_count} Seiten (>{threshold})"
                 )
         except Exception as e:
             _log.warning("Thumbnails: %s", e)

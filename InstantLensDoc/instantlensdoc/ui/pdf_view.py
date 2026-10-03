@@ -92,6 +92,7 @@ from instantlensdoc.core.app_settings import (
     get_page_number_overlay_font_size,
     get_page_number_overlay_format,
     get_page_number_overlay_opacity,
+    get_redaction_preview_opacity,
     get_page_number_overlay_position,
     get_page_number_overlay_skip_edges,
     get_page_number_overlay_start,
@@ -110,6 +111,7 @@ from instantlensdoc.core.app_settings import (
     set_page_number_overlay_font_size,
     set_page_number_overlay_format,
     set_page_number_overlay_opacity,
+    set_redaction_preview_opacity,
     set_page_number_overlay_position,
     set_page_number_overlay_skip_edges,
     set_page_number_overlay_start,
@@ -354,6 +356,7 @@ class PdfCanvas(QLabel):
         self._page_number_overlay_font_size = 11
         self._page_number_overlay_position = "bottom-center"
         self._page_number_overlay_format = "{page} / {pages}"
+        self._redaction_preview_opacity = 0.90
         self._show_printer_marks = False
         # Pixel-Rects (x,y,w,h) für MediaBox / CropBox / Druckermarken
         self._mediabox_rect: tuple[float, float, float, float] | None = None
@@ -364,6 +367,14 @@ class PdfCanvas(QLabel):
         self._move_delta: tuple[float, float] = (0.0, 0.0)
         self.setMouseTracking(True)
         self.setFocusPolicy(Qt.StrongFocus)
+
+    def set_redaction_preview_opacity(self, opacity: float):
+        try:
+            op = float(opacity)
+        except (TypeError, ValueError):
+            op = 0.90
+        self._redaction_preview_opacity = max(0.05, min(1.0, op))
+        self.update()
 
     def set_uri_links(self, links: list | None):
         self._uri_links = list(links or [])
@@ -678,7 +689,15 @@ class PdfCanvas(QLabel):
             painter.fillRect(x, y, w, h, color)
         elif ann.type == AnnotationType.REDACTION:
             rw, rh = max(w, 4), max(h, 4)
-            painter.fillRect(x, y, rw, rh, QColor(0, 0, 0, _a(230)))
+            try:
+                preview_op = float(
+                    getattr(self, "_redaction_preview_opacity", 0.90) or 0.90
+                )
+            except (TypeError, ValueError):
+                preview_op = 0.90
+            preview_op = max(0.05, min(1.0, preview_op))
+            base_a = int(round(255 * preview_op))
+            painter.fillRect(x, y, rw, rh, QColor(0, 0, 0, _a(base_a)))
             # Sichtbarer Hinweisrahmen (besserer UX vor Einbrennen)
             painter.setPen(QPen(QColor(220, 50, 50), 2, Qt.DashLine))
             painter.drawRect(x, y, rw, rh)
@@ -1174,6 +1193,7 @@ class PdfViewer(QWidget):
         self._page_number_overlay_format = get_page_number_overlay_format()
         self._page_number_overlay_start = get_page_number_overlay_start()
         self._page_number_overlay_skip_edges = get_page_number_overlay_skip_edges()
+        self._redaction_preview_opacity = get_redaction_preview_opacity()
         self._show_printer_marks = get_show_printer_marks()
         self._search_query = ""
         self._search_rects: list[tuple[float, float, float, float]] = []
@@ -1712,6 +1732,7 @@ class PdfViewer(QWidget):
         self.canvas.set_page_number_overlay_font_size(self._page_number_overlay_font_size)
         self.canvas.set_page_number_overlay_position(self._page_number_overlay_position)
         self.canvas.set_page_number_overlay_format(self._page_number_overlay_format)
+        self.canvas.set_redaction_preview_opacity(self._redaction_preview_opacity)
         self.canvas.set_show_printer_marks(self._show_printer_marks)
         self.canvas.annotation_placed.connect(self._on_place)
         self.canvas.drag_finished.connect(self._on_drag)
@@ -2520,6 +2541,24 @@ class PdfViewer(QWidget):
     def page_number_overlay_opacity(self) -> float:
         return float(self._page_number_overlay_opacity)
 
+    def set_redaction_preview_opacity(self, opacity: float):
+        """Deckkraft der Schwärzungs-Vorschau setzen (persistiert) — 1.3.1."""
+        try:
+            op = float(opacity)
+        except (TypeError, ValueError):
+            op = 0.90
+        op = max(0.05, min(1.0, op))
+        self._redaction_preview_opacity = op
+        set_redaction_preview_opacity(op)
+        if getattr(self, "canvas", None):
+            self.canvas.set_redaction_preview_opacity(op)
+        if self.pdf_path:
+            self.refresh()
+        self.status.emit(f"Schwärzung Preview-Deckkraft {op:.0%}")
+
+    def redaction_preview_opacity(self) -> float:
+        return float(getattr(self, "_redaction_preview_opacity", 0.90) or 0.90)
+
     def set_page_number_overlay_font_size(self, size: int):
         """Schriftgröße (pt) des Seitennummer-Overlays setzen (persistiert)."""
         try:
@@ -2829,6 +2868,8 @@ class PdfViewer(QWidget):
         self.canvas.set_page_number_overlay_font_size(self._page_number_overlay_font_size)
         self.canvas.set_page_number_overlay_position(self._page_number_overlay_position)
         self.canvas.set_page_number_overlay_format(self._page_number_overlay_format)
+        self._redaction_preview_opacity = get_redaction_preview_opacity()
+        self.canvas.set_redaction_preview_opacity(self._redaction_preview_opacity)
         self._update_page_number_overlay()
         self._show_printer_marks = get_show_printer_marks()
         if hasattr(self, "btn_printer_marks"):

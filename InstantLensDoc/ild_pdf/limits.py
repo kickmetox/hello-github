@@ -11,7 +11,7 @@ SOFT_PAGE_WARN = 200
 HARD_PAGE_LIMIT = 2500
 SOFT_SIZE_MB = 80.0
 HARD_SIZE_MB = 512.0
-# Thumbnail-Lazy-Load: ab dieser Seitenanzahl Platzhalter für alle Seiten + Nachladen
+# Thumbnail-Lazy-Load: Default-Schwellwert (Settings: 25/50/100) — 1.3.1
 THUMB_LAZY_THRESHOLD = 50
 # Hinweis für langsame/hängende Öffnungen (kein harter Kill — nur UX)
 OPEN_TIMEOUT_HINT_SEC = 30
