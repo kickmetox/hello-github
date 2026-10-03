@@ -6431,7 +6431,15 @@ class PdfViewer(QWidget):
                     sidecar_ok = False
                     sidecar_err = e
                 if not sidecar_ok:
-                    # Sidecar-Fehler: Warnung, PDF-Bake fortsetzen Option — 1.3.5
+                    # Sidecar-Fehler: Warnung, Fortsetzen-Option Settings merken — 1.3.6
+                    from instantlensdoc.core.app_settings import (
+                        get_redaction_bake_continue_on_sidecar_skip,
+                        set_redaction_bake_continue_on_sidecar_skip,
+                    )
+
+                    prefer_continue = bool(
+                        get_redaction_bake_continue_on_sidecar_skip()
+                    )
                     warn = QMessageBox(self)
                     warn.setIcon(QMessageBox.Warning)
                     warn.setWindowTitle("Redactions — Sidecar")
@@ -6442,8 +6450,12 @@ class PdfViewer(QWidget):
                         "PDF-Bake trotzdem fortsetzen?"
                     )
                     warn.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
-                    warn.setDefaultButton(QMessageBox.Yes)
-                    if warn.exec() != QMessageBox.Yes:
+                    warn.setDefaultButton(
+                        QMessageBox.Yes if prefer_continue else QMessageBox.No
+                    )
+                    cont = warn.exec() == QMessageBox.Yes
+                    set_redaction_bake_continue_on_sidecar_skip(cont)
+                    if not cont:
                         self.status.emit(
                             f"Redaction PDF geschrieben, Sidecar-Abbruch → {dest.name}"
                         )
@@ -6451,18 +6463,29 @@ class PdfViewer(QWidget):
                         self.refresh()
                         self.annotations_changed.emit()
                         return
+                    # Fortsetzung: Sidecar übersprungen — Status — 1.3.6
+                    sidecar_skipped = True
+                else:
+                    sidecar_skipped = False
+            else:
+                sidecar_skipped = False
             clear_render_cache(self.pdf_path)
             self.refresh()
             self.annotations_changed.emit()
-            if save_sidecar and sidecar_ok:
-                extra = " + Sidecar"
+            if sidecar_skipped:
+                self.status.emit(
+                    f"Sidecar übersprungen · {len(reds)} Redaction(s) → {dest.name}"
+                )
+            elif save_sidecar and sidecar_ok:
+                self.status.emit(
+                    f"{len(reds)} Redaction(s) → {dest.name} + Sidecar"
+                )
             elif save_sidecar:
-                extra = " (Sidecar-Warnung)"
+                self.status.emit(
+                    f"{len(reds)} Redaction(s) → {dest.name} (Sidecar-Warnung)"
+                )
             else:
-                extra = ""
-            self.status.emit(
-                f"{len(reds)} Redaction(s) → {dest.name}{extra}"
-            )
+                self.status.emit(f"{len(reds)} Redaction(s) → {dest.name}")
         except Exception as e:
             QMessageBox.warning(self, "Redactions", str(e))
 

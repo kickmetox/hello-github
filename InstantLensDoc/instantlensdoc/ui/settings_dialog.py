@@ -120,6 +120,7 @@ from instantlensdoc.core.app_settings import (
     get_print_grayscale,
     get_print_preview,
     get_pdf_thumbnail_scale,
+    get_redaction_bake_continue_on_sidecar_skip,
     get_redaction_preview_opacity,
     get_thumb_lazy_threshold,
     get_thumb_prefetch_cancel_ms,
@@ -209,6 +210,7 @@ from instantlensdoc.core.app_settings import (
     set_print_grayscale,
     set_print_preview,
     set_pdf_thumbnail_scale,
+    set_redaction_bake_continue_on_sidecar_skip,
     set_redaction_preview_opacity,
     set_thumb_lazy_threshold,
     set_thumb_prefetch_cancel_ms,
@@ -401,12 +403,12 @@ class SettingsDialog(QDialog):
         )
         form.addRow("Prefetch-Cancel-Debounce", self.thumb_cancel_ms)
 
-        # Live-Label „aktuell N ms / ±N“ — sofort ohne Apply — 1.3.5
+        # Live-Label „aktuell N ms / ±N“ — grau wenn Lazy aus, sonst aktiv — 1.3.6
         self.lbl_prefetch_live = QLabel()
-        self.lbl_prefetch_live.setStyleSheet("color: #555; font-style: italic;")
+        self.lbl_prefetch_live.setStyleSheet("color: #888; font-style: italic;")
         self.lbl_prefetch_live.setToolTip(
-            "Live-Anzeige der gewählten Prefetch-Werte — aktualisiert sofort "
-            "bei Änderung, ohne Übernehmen/Apply — 1.3.5"
+            "Live-Anzeige der gewählten Prefetch-Werte — grau wenn Lazy aus "
+            "(Dokument unter Schwellwert), aktiv wenn Lazy an — 1.3.6"
         )
         self.thumb_prefetch.currentIndexChanged.connect(
             self._update_prefetch_live_label
@@ -416,6 +418,8 @@ class SettingsDialog(QDialog):
             self._update_prefetch_live_label
         )
         self.thumb_cancel_ms.activated.connect(self._update_prefetch_live_label)
+        self.thumb_lazy.currentIndexChanged.connect(self._update_prefetch_live_label)
+        self.thumb_lazy.activated.connect(self._update_prefetch_live_label)
         self._update_prefetch_live_label()
         form.addRow("Prefetch aktuell", self.lbl_prefetch_live)
 
@@ -428,6 +432,18 @@ class SettingsDialog(QDialog):
             "Deckkraft der Schwärzungs-Vorschau (vor Einbrennen) — 1.3.1"
         )
         form.addRow("Schwärzung Preview-Deckkraft", self.redact_opacity)
+
+        self.redact_bake_continue = QCheckBox(
+            "Bei Sidecar-Fehler PDF-Bake fortsetzen"
+        )
+        self.redact_bake_continue.setChecked(
+            get_redaction_bake_continue_on_sidecar_skip()
+        )
+        self.redact_bake_continue.setToolTip(
+            "Merkt die Option „PDF-Bake trotzdem fortsetzen“ bei Sidecar-Schreibfehler; "
+            "Status dann „Sidecar übersprungen“ — 1.3.6"
+        )
+        form.addRow(self.redact_bake_continue)
 
         self.autosave_enabled = QCheckBox("Autosave aktiv")
         self.autosave_enabled.setChecked(get_autosave_enabled())
@@ -1507,7 +1523,7 @@ class SettingsDialog(QDialog):
             self.spell_dict.setText(path)
 
     def _update_prefetch_live_label(self, *_args) -> None:
-        """Live-Anzeige „aktuell N ms / ±N“ aus Combo-Werten, ohne Apply — 1.3.5."""
+        """Live-Anzeige „aktuell N ms / ±N“; grau wenn Lazy aus (unter Schwellwert) — 1.3.6."""
         # Immer Widget-Stand (nicht gespeicherte Settings) — sofort bei Slider/Combo
         try:
             ms = int(self.thumb_cancel_ms.currentData() or 90)
@@ -1517,10 +1533,40 @@ class SettingsDialog(QDialog):
             radius = int(self.thumb_prefetch.currentData() or 2)
         except (TypeError, ValueError):
             radius = 2
-        self.lbl_prefetch_live.setText(f"aktuell {ms} ms / ±{radius}")
-        self.lbl_prefetch_live.setToolTip(
-            f"Vorschau ohne Übernehmen: Cancel {ms} ms, Prefetch ±{radius} — 1.3.5"
-        )
+        try:
+            lazy_th = int(self.thumb_lazy.currentData() or 50)
+        except (TypeError, ValueError):
+            lazy_th = 50
+        page_count = 0
+        parent = self.parent()
+        pdf_view = getattr(parent, "pdf_view", None) if parent is not None else None
+        if pdf_view is not None:
+            try:
+                page_count = int(getattr(pdf_view, "page_count", 0) or 0)
+            except (TypeError, ValueError):
+                page_count = 0
+        # Lazy aktiv nur wenn Dokument über Schwellwert (wie MainWindow) — 1.3.6
+        lazy_active = page_count > lazy_th
+        if lazy_active:
+            self.lbl_prefetch_live.setText(f"aktuell {ms} ms / ±{radius}")
+            self.lbl_prefetch_live.setStyleSheet(
+                "color: #2d5a27; font-style: italic; font-weight: 500;"
+            )
+            self.lbl_prefetch_live.setToolTip(
+                f"Lazy aktiv ({page_count} > {lazy_th}): Cancel {ms} ms, "
+                f"Prefetch ±{radius} — 1.3.6"
+            )
+        else:
+            self.lbl_prefetch_live.setText(f"aktuell {ms} ms / ±{radius}")
+            self.lbl_prefetch_live.setStyleSheet("color: #888; font-style: italic;")
+            under = (
+                f"Dokument {page_count} ≤ {lazy_th}"
+                if page_count > 0
+                else f"kein Dokument / unter Schwellwert {lazy_th}"
+            )
+            self.lbl_prefetch_live.setToolTip(
+                f"Lazy aus ({under}): Prefetch inaktiv — grau — 1.3.6"
+            )
 
     def _sync_zoom_pct_enabled(self) -> None:
         mode = str(self.zoom_mode.currentData() or DEFAULT_ZOOM_MODE_PERCENT)
@@ -1789,6 +1835,9 @@ class SettingsDialog(QDialog):
             cancel_ms = 90
         set_thumb_prefetch_cancel_ms(cancel_ms)
         set_redaction_preview_opacity(float(self.redact_opacity.value()))
+        set_redaction_bake_continue_on_sidecar_skip(
+            self.redact_bake_continue.isChecked()
+        )
         set_autosave_enabled(self.autosave_enabled.isChecked())
         try:
             as_sec = int(self.autosave_sec.currentData() or 60)

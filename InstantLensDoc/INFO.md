@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **1.3.5** |
+| Version | **1.3.6** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -63,10 +63,10 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an / `checkedonce`)
 
-## Neu in 1.3.5
+## Neu in 1.3.6
 
-- Formulare: CSV-Dialog Zähler **N von M Zeilen**; Default „nur sichtbar“ persistiert
-- Redaction: Sidecar-Schreibfehler → Warnung + Option PDF-Bake fortsetzen
-- Bookmarks/Outlines: Retry max. 3 wie Backup, danach Abbruch-Hinweis
-- Performance: Prefetch Live-Label sofort bei Änderung ohne Apply
+- Formulare: CSV-Dialog **Esc** ohne Export; **Enter** auf OK startet Export
+- Redaction: Status **„Sidecar übersprungen“**; Fortsetzen-Option in **Settings** merken
+- Bookmarks/Outlines: Fehlerdialog Retry-Zähler **Versuch k/3**
+- Performance: Prefetch-Label **grau** wenn Lazy aus (unter Schwellwert), sonst aktiv
 - Stubs KI/Cloud/Stylus/3D unverändert

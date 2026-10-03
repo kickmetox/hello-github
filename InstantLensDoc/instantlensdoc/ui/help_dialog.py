@@ -102,10 +102,10 @@ HELP_HTML = f"""
     <b>Export-Profil</b> speichern/anwenden (DPI / Format / Ziel)</li>
 <li><b>OCR gesamtes PDF</b>: Button <b>„Als Defaults speichern“</b> → Toast <b>„OCR-Defaults gespeichert“</b> (Dauer Settings <b>1/2/3 s</b> + Accessibility-Announcement) + Feld-Highlight; Defaults vorbelegt; Toggle <b>„Fehler anhängen“</b> Settings-persistiert; Seitenfehler → Abschnitt im TXT; Abbruch behält Teilergebnis; optional <b>Seitenbereich von–bis</b>; Fortschritt → <b>Textdatei-Tab</b> — 1.1.9</li>
 <li><b>PDF zusammenführen</b>: Thumbnail-Klick → Readonly-Tab mit Banner <b>„Vorschau“</b> + <b>„Zum Bearbeiten öffnen“</b>; Toggle Readonly schließen <b>auch im Merge-Dialog</b> (gleicher Persistenz-Tooltip in Settings); Vorschau-Thumbnail; Drag&amp;Drop; Duplikat-Warnung; Doppelklick/Alle/Seiten-Summe — 1.1.9</li>
-<li><b>Forms CSV</b>: Zähler <b>N von M Zeilen</b>; Default „nur sichtbar“ persistiert — 1.3.5</li>
-<li><b>Redaction Sidecar</b>: bei Sidecar-Fehler Warnung + Option <b>PDF-Bake fortsetzen</b> — 1.3.5</li>
-<li><b>Outlines Export</b>: Retry <b>max. 3</b> wie Backup, danach Abbruch-Hinweis — 1.3.5</li>
-<li><b>Thumbnail Prefetch</b>: Live-Label sofort bei Änderung <b>ohne Apply</b> — 1.3.5</li>
+<li><b>Forms CSV</b>: <b>Esc</b> schließt ohne Export; <b>Enter</b> auf OK startet Export; Zähler N von M — 1.3.6</li>
+<li><b>Redaction Sidecar</b>: Status <b>„Sidecar übersprungen“</b>; Fortsetzen-Option in Settings merken — 1.3.6</li>
+<li><b>Outlines Export</b>: Fehlerdialog Retry-Zähler <b>Versuch k/3</b> — 1.3.6</li>
+<li><b>Thumbnail Prefetch</b>: Live-Label <b>grau</b> wenn Lazy aus (unter Schwellwert), sonst aktiv — 1.3.6</li>
 <li><b>AcroForm-Sidebar</b>: Feldliste <b>Name/Typ/Wert</b>; Klick → Seite; Textfeld-Wert speichern via <b>pikepdf</b> — 1.3.0</li>
 <li><b>Redactions anwenden</b>: Rechteck → Sidecar; Menü erzeugt <b>neues PDF</b> mit schwarzen Flächen — 1.3.0</li>
 <li><b>Bookmarks ↔ Outlines</b>: Import aus PDF-Outlines / Export als PDF-Outlines — 1.3.0</li>
@@ -231,10 +231,10 @@ HELP_HTML = f"""
     Toggle „Fehler anhängen“ Settings-persistiert; Seitenfehler-Abschnitt + Teilergebnis — 1.1.9</li>
 <li><b>PDF zusammenführen</b>: Thumbnail-Klick → Readonly-Tab mit Banner „Vorschau“ +
     „Zum Bearbeiten öffnen“; Toggle Readonly schließen auch im Merge-Dialog (gleicher Persistenz-Tooltip in Settings); Drag&amp;Drop; Duplikat-Warnung — 1.1.9</li>
-<li><b>Forms CSV</b>: Zähler <b>N von M Zeilen</b>; Default „nur sichtbar“ persistiert — 1.3.5</li>
-<li><b>Redaction Sidecar</b>: bei Sidecar-Fehler Warnung + Option <b>PDF-Bake fortsetzen</b> — 1.3.5</li>
-<li><b>Outlines Export</b>: Retry <b>max. 3</b> wie Backup, danach Abbruch-Hinweis — 1.3.5</li>
-<li><b>Thumbnail Prefetch</b>: Live-Label sofort bei Änderung <b>ohne Apply</b> — 1.3.5</li>
+<li><b>Forms CSV</b>: <b>Esc</b> schließt ohne Export; <b>Enter</b> auf OK startet Export; Zähler N von M — 1.3.6</li>
+<li><b>Redaction Sidecar</b>: Status <b>„Sidecar übersprungen“</b>; Fortsetzen-Option in Settings merken — 1.3.6</li>
+<li><b>Outlines Export</b>: Fehlerdialog Retry-Zähler <b>Versuch k/3</b> — 1.3.6</li>
+<li><b>Thumbnail Prefetch</b>: Live-Label <b>grau</b> wenn Lazy aus (unter Schwellwert), sonst aktiv — 1.3.6</li>
 <li><b>AcroForm-Sidebar</b>: Feldliste <b>Name/Typ/Wert</b>; Klick → Seite; Textfeld-Wert speichern via <b>pikepdf</b> — 1.3.0</li>
 <li><b>Redactions anwenden</b>: Rechteck → Sidecar; Menü erzeugt <b>neues PDF</b> mit schwarzen Flächen — 1.3.0</li>
 <li><b>Bookmarks ↔ Outlines</b>: Import aus PDF-Outlines / Export als PDF-Outlines — 1.3.0</li>

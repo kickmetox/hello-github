@@ -4,8 +4,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from PySide6.QtCore import QEvent, QObject, Qt
 from PySide6.QtGui import QBrush, QColor
 from PySide6.QtWidgets import (
+    QCheckBox,
     QDialog,
     QDialogButtonBox,
     QFileDialog,
@@ -19,6 +21,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QAbstractItemView,
     QHeaderView,
+    QWidget,
 )
 
 from ild_pdf.acroform import (
@@ -35,6 +38,86 @@ from instantlensdoc.core.app_settings import (
     set_last_export_dir,
 )
 from instantlensdoc.ui.file_dialogs import confirm_overwrite_export
+
+
+def ask_forms_csv_export_options(
+    parent: QWidget | None,
+    *,
+    n_all: int,
+    n_vis: int,
+    prefer_visible: bool,
+    checkbox_enabled: bool = True,
+) -> bool | None:
+    """CSV-Optionen: Esc schließt ohne Export; Enter auf OK startet Export — 1.3.6.
+
+    Returns:
+        True = nur sichtbare, False = alle, None = abgebrochen.
+    """
+    dlg = QDialog(parent)
+    dlg.setWindowTitle("Feldliste als CSV")
+    lay = QVBoxLayout(dlg)
+    lay.addWidget(
+        QLabel(
+            f"{n_all} Feld(er) als CSV exportieren (UTF-8 BOM)?\n"
+            "Zielordner wird gemerkt."
+        )
+    )
+    lbl_count = QLabel()
+    lay.addWidget(lbl_count)
+    cb = QCheckBox("Nur sichtbare/gefilterte Zeilen")
+    cb.setToolTip(
+        "Nur die aktuell sichtbaren/gefilterten Felder; Default wird persistiert — 1.3.6"
+    )
+    cb.setChecked(bool(prefer_visible and n_vis > 0))
+    cb.setEnabled(bool(checkbox_enabled))
+    lay.addWidget(cb)
+
+    def _sync_csv_count(_checked: bool = False) -> None:
+        n_export = n_vis if cb.isChecked() else n_all
+        lbl_count.setText(f"{n_export} von {n_all} Zeilen")
+
+    cb.toggled.connect(_sync_csv_count)
+    _sync_csv_count(cb.isChecked())
+
+    buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+    ok_btn = buttons.button(QDialogButtonBox.Ok)
+    cancel_btn = buttons.button(QDialogButtonBox.Cancel)
+    ok_btn.setText("OK")
+    ok_btn.setDefault(True)
+    ok_btn.setAutoDefault(True)
+    cancel_btn.setAutoDefault(False)
+    buttons.accepted.connect(dlg.accept)
+    buttons.rejected.connect(dlg.reject)
+    lay.addWidget(buttons)
+    ok_btn.setFocus(Qt.FocusReason.OtherFocusReason)
+
+    class _CsvKeyFilter(QObject):
+        """Esc → Abbruch; Enter nur bei Fokus auf OK → Export — 1.3.6."""
+
+        def eventFilter(self, obj, event):  # noqa: N802
+            if event.type() == QEvent.Type.KeyPress:
+                key = event.key()
+                if key == Qt.Key_Escape:
+                    dlg.reject()
+                    return True
+                if key in (Qt.Key_Return, Qt.Key_Enter):
+                    fw = dlg.focusWidget()
+                    if fw is ok_btn:
+                        dlg.accept()
+                        return True
+                    # Kein Export ohne OK-Fokus (Enter nicht an Default-Button)
+                    return True
+            return False
+
+    key_filter = _CsvKeyFilter(dlg)
+    dlg.installEventFilter(key_filter)
+    ok_btn.installEventFilter(key_filter)
+    cancel_btn.installEventFilter(key_filter)
+    cb.installEventFilter(key_filter)
+
+    if dlg.exec() != QDialog.DialogCode.Accepted:
+        return None
+    return bool(cb.isChecked())
 
 
 def _display_field_value(f: FormFieldInfo) -> str:
@@ -231,42 +314,23 @@ class FormFieldsDialog(QDialog):
         return out
 
     def _export_csv(self):
-        """CSV: Zähler N von M Zeilen; Default persistiert — 1.3.5."""
-        from PySide6.QtWidgets import QCheckBox
-
+        """CSV: Esc ohne Export; Enter auf OK; Zähler N von M; Default persistiert — 1.3.6."""
         all_fields = list(self._fields)
         visible = self._visible_fields()
         n_vis = len(visible)
         n_all = len(all_fields)
 
-        box = QMessageBox(self)
-        box.setIcon(QMessageBox.Question)
-        box.setWindowTitle("Feldliste als CSV")
-        box.setText(
-            f"{n_all} Feld(er) als CSV exportieren (UTF-8 BOM)?\n"
-            "Zielordner wird gemerkt."
+        choice = ask_forms_csv_export_options(
+            self,
+            n_all=n_all,
+            n_vis=n_vis,
+            prefer_visible=bool(get_forms_csv_visible_only()),
+            checkbox_enabled=bool(self._fields),
         )
-        cb = QCheckBox("Nur sichtbare/gefilterte Zeilen")
-        cb.setToolTip(
-            "Nur die aktuell gefilterten Felder; Default wird persistiert — 1.3.5"
-        )
-        prefer_visible = bool(get_forms_csv_visible_only())
-        cb.setChecked(bool(prefer_visible and n_vis > 0))
-        cb.setEnabled(bool(self._fields))
-
-        def _sync_csv_count(_checked: bool = False) -> None:
-            n_export = n_vis if cb.isChecked() else n_all
-            box.setInformativeText(f"{n_export} von {n_all} Zeilen")
-
-        cb.toggled.connect(_sync_csv_count)
-        _sync_csv_count(cb.isChecked())
-        box.setCheckBox(cb)
-        box.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
-        box.setDefaultButton(QMessageBox.Yes)
-        if box.exec() != QMessageBox.Yes:
+        if choice is None:
             return
-        set_forms_csv_visible_only(cb.isChecked())
-        rows = visible if cb.isChecked() else all_fields
+        set_forms_csv_visible_only(choice)
+        rows = visible if choice else all_fields
         if not rows:
             QMessageBox.information(
                 self, "Feldliste CSV", "Keine Felder zum Export."

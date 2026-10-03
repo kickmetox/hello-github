@@ -693,7 +693,8 @@ class Sidebar(QWidget):
         self.btn_form_csv = QPushButton("CSV")
         self.btn_form_csv.setFixedWidth(40)
         self.btn_form_csv.setToolTip(
-            "Feldliste als CSV (UTF-8 BOM); Zähler N von M Zeilen; Default persistiert — 1.3.5"
+            "Feldliste als CSV (UTF-8 BOM); Esc ohne Export; Enter auf OK; "
+            "Zähler N von M; Default persistiert — 1.3.6"
         )
         self.btn_form_csv.clicked.connect(self.form_fields_export_csv_requested.emit)
         form_edit_row.addWidget(self.btn_form_csv)

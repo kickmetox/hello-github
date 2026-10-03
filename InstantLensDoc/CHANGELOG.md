@@ -1,5 +1,27 @@
 # Changelog — InstantLens Doc
 
+## 1.3.6 — Forms CSV Esc/Enter, Redaction Sidecar übersprungen+Settings, Outlines Versuch k/3, Prefetch Lazy-Farbe
+
+Post-Release-Polish nach 1.3.5: **Forms-CSV** Dialog **Esc** schließt ohne Export, **Enter** startet Export wenn Fokus auf **OK**; **Redactions** bei fortgesetztem Bake Status **„Sidecar übersprungen“**, Fortsetzen-Option in **Settings** merken; **Outlines-Export** Fehlerdialog mit Retry-Zähler **„Versuch k/3“**; Prefetch Live-Label **grau** wenn Lazy aus (Dokument unter Schwellwert), sonst **aktiv**. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### Formulare
+- Feldliste CSV: **Esc** schließt ohne Export; **Enter** auf OK startet Export
+
+### PDF / Redaction
+- Bake-Fortsetzung: Status **„Sidecar übersprungen“**; Option in **Settings** merken
+
+### Bookmarks / Outlines
+- Fehlerdialog Retry-Zähler **„Versuch k/3“**
+
+### Performance
+- Prefetch Live-Label: **grau** wenn Lazy aus (unter Schwellwert), sonst aktiv
+
+### Packaging / Docs
+- Version **1.3.6** (App / `ild_pdf` / ISS / Smoke / Docs)
+- Smoke: Forms CSV Esc/Enter, Redaction Sidecar übersprungen+Settings, Outlines Versuch k/3, Prefetch Lazy-Farbe (CLI + Qt)
+
+---
+
 ## 1.3.5 — Forms CSV Zähler+Default, Redaction Sidecar-Warnung, Outlines Retry max-3, Prefetch Live ohne Apply
 
 Post-Release-Polish nach 1.3.4: **Forms-CSV** Dialog mit Zähler **„N von M Zeilen“** und **persistiertem Default** „nur sichtbar“; **Redactions** bei Sidecar-Schreibfehler **Warnung** mit Option **PDF-Bake fortsetzen**; **Outlines-Export** Retry **max. 3 wie Backup**, danach **Abbruch-Hinweis**; Prefetch Live-Label aktualisiert **sofort bei Slider/Combo ohne Apply**. Stubs KI/Cloud/Stylus/3D bleiben Stubs.

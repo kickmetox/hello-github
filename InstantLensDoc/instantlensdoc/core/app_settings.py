@@ -103,6 +103,7 @@ DEFAULTS: dict[str, Any] = {
     "thumb_prefetch_radius": 2,
     "thumb_prefetch_cancel_ms": 90,
     "forms_csv_visible_only": False,  # CSV-Export Default „nur sichtbare“ — 1.3.5
+    "redaction_bake_continue_on_sidecar_skip": True,  # Bake fortsetzen merken — 1.3.6
     "redaction_preview_opacity": 0.90,
     "editor_text_encoding": "auto",
     "skip_splash": False,
@@ -2674,6 +2675,17 @@ def get_forms_csv_visible_only() -> bool:
 def set_forms_csv_visible_only(enabled: bool) -> bool:
     val = bool(enabled)
     save_settings({"forms_csv_visible_only": val})
+    return val
+
+
+def get_redaction_bake_continue_on_sidecar_skip() -> bool:
+    """Default: PDF-Bake bei Sidecar-Fehler fortsetzen — 1.3.6."""
+    return bool(load_settings().get("redaction_bake_continue_on_sidecar_skip", True))
+
+
+def set_redaction_bake_continue_on_sidecar_skip(enabled: bool) -> bool:
+    val = bool(enabled)
+    save_settings({"redaction_bake_continue_on_sidecar_skip": val})
     return val
 
 
