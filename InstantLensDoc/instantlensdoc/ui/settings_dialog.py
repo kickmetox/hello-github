@@ -476,12 +476,11 @@ class SettingsDialog(QDialog):
         )
         form.addRow(self.backup_on_save)
 
-        # Letzte 20 manuellen Backup-Vorgänge; Doppelklick öffnet Datei/Ordner — 1.0.6
+        # Letzte 20: Filter Erfolg/Fehler + Export TXT + Doppelklick — 1.0.7
         from PySide6.QtCore import Qt as _Qt
 
         from instantlensdoc.core.manual_backup import (
             BACKUP_LOG_MAX,
-            format_backup_log_line,
             load_backup_log,
         )
 
@@ -490,20 +489,27 @@ class SettingsDialog(QDialog):
         self.backup_log_list.setMaximumHeight(180)
         self.backup_log_list.setToolTip(
             f"Letzte {BACKUP_LOG_MAX} manuellen Backup-Vorgänge (neueste oben); "
-            "Doppelklick öffnet Backup-Datei bzw. Ordner; "
-            "Eintrag kopieren / Log leeren — 1.0.6"
+            "Filter Erfolg/Fehler; Export als TXT; "
+            "Doppelklick öffnet Backup-Datei bzw. Ordner — 1.0.7"
         )
         self.backup_log_list.setAlternatingRowColors(True)
         self.backup_log_list.itemDoubleClicked.connect(self._open_backup_log_entry)
         self._backup_log_entries: list = list(load_backup_log())
-        for entry in self._backup_log_entries:
-            self.backup_log_list.addItem(QListWidgetItem(format_backup_log_line(entry)))
-        if self.backup_log_list.count() == 0:
-            empty = QListWidgetItem("(noch keine Backup-Vorgänge protokolliert)")
-            empty.setFlags(_Qt.NoItemFlags)
-            self.backup_log_list.addItem(empty)
+        self._backup_log_filter_mode = "all"
         bak_log_col = QVBoxLayout()
         bak_log_col.setContentsMargins(0, 0, 0, 0)
+        filter_row = QHBoxLayout()
+        filter_row.addWidget(QLabel("Filter:"))
+        self.backup_log_filter = QComboBox()
+        self.backup_log_filter.addItem("Alle", "all")
+        self.backup_log_filter.addItem("Nur Erfolg", "ok")
+        self.backup_log_filter.addItem("Nur Fehler", "error")
+        self.backup_log_filter.setToolTip(
+            "Backup-Log nach Erfolg oder Fehler filtern — 1.0.7"
+        )
+        self.backup_log_filter.currentIndexChanged.connect(self._on_backup_log_filter)
+        filter_row.addWidget(self.backup_log_filter, 1)
+        bak_log_col.addLayout(filter_row)
         bak_log_col.addWidget(self.backup_log_list)
         bak_log_btns = QHBoxLayout()
         self.btn_backup_log_copy = QPushButton("Eintrag kopieren")
@@ -512,6 +518,12 @@ class SettingsDialog(QDialog):
         )
         self.btn_backup_log_copy.clicked.connect(self._copy_backup_log_entry)
         bak_log_btns.addWidget(self.btn_backup_log_copy)
+        self.btn_backup_log_export = QPushButton("Log exportieren…")
+        self.btn_backup_log_export.setToolTip(
+            "Gefiltertes Backup-Log als TXT speichern — 1.0.7"
+        )
+        self.btn_backup_log_export.clicked.connect(self._export_backup_log)
+        bak_log_btns.addWidget(self.btn_backup_log_export)
         self.btn_backup_log_clear = QPushButton("Log leeren")
         self.btn_backup_log_clear.setToolTip(
             "Backup-Log zurücksetzen (alle Einträge löschen) — 1.0.5"
@@ -520,7 +532,7 @@ class SettingsDialog(QDialog):
         bak_log_btns.addWidget(self.btn_backup_log_clear)
         bak_log_btns.addStretch(1)
         bak_log_col.addLayout(bak_log_btns)
-        self._sync_backup_log_buttons()
+        self._reload_backup_log_list()
         form.addRow(f"Backup-Log (letzte {BACKUP_LOG_MAX})", bak_log_col)
 
         self.restore_geometry = QCheckBox("Fenstergeometrie wiederherstellen")
@@ -858,48 +870,80 @@ class SettingsDialog(QDialog):
         QMessageBox.information(self, "Zuletzt geöffnet", "Liste geleert.")
 
     def _sync_backup_log_buttons(self) -> None:
-        """Buttons Eintrag kopieren / Log leeren je nach Inhalt — 1.0.5."""
+        """Buttons kopieren / exportieren / leeren je nach Inhalt — 1.0.7."""
         entries = getattr(self, "_backup_log_entries", None) or []
-        has = bool(entries)
+        visible = getattr(self, "_backup_log_visible", None) or []
+        has_all = bool(entries)
+        has_vis = bool(visible)
         if hasattr(self, "btn_backup_log_copy"):
-            self.btn_backup_log_copy.setEnabled(has)
+            self.btn_backup_log_copy.setEnabled(has_vis)
+        if hasattr(self, "btn_backup_log_export"):
+            self.btn_backup_log_export.setEnabled(has_vis)
         if hasattr(self, "btn_backup_log_clear"):
-            self.btn_backup_log_clear.setEnabled(has)
+            self.btn_backup_log_clear.setEnabled(has_all)
 
-    def _reload_backup_log_list(self) -> None:
+    def _on_backup_log_filter(self, _idx: int = 0) -> None:
+        """Filter Erfolg/Fehler anwenden — 1.0.7."""
+        mode = "all"
+        if hasattr(self, "backup_log_filter"):
+            data = self.backup_log_filter.currentData()
+            mode = str(data or "all")
+        self._backup_log_filter_mode = mode
+        self._populate_backup_log_list()
+
+    def _populate_backup_log_list(self) -> None:
         from PySide6.QtCore import Qt as _Qt
 
         from instantlensdoc.core.manual_backup import (
+            filter_backup_log,
             format_backup_log_line,
-            load_backup_log,
         )
 
-        self._backup_log_entries = list(load_backup_log())
+        mode = getattr(self, "_backup_log_filter_mode", "all") or "all"
+        entries = getattr(self, "_backup_log_entries", None) or []
+        visible = filter_backup_log(entries, mode=mode)
+        self._backup_log_visible = visible
         self.backup_log_list.clear()
-        for entry in self._backup_log_entries:
-            self.backup_log_list.addItem(QListWidgetItem(format_backup_log_line(entry)))
+        for entry in visible:
+            item = QListWidgetItem(format_backup_log_line(entry))
+            item.setData(_Qt.UserRole, entry)
+            self.backup_log_list.addItem(item)
         if self.backup_log_list.count() == 0:
-            empty = QListWidgetItem("(noch keine Backup-Vorgänge protokolliert)")
+            if not entries:
+                empty = QListWidgetItem("(noch keine Backup-Vorgänge protokolliert)")
+            else:
+                empty = QListWidgetItem("(keine Einträge für diesen Filter)")
             empty.setFlags(_Qt.NoItemFlags)
             self.backup_log_list.addItem(empty)
         self._sync_backup_log_buttons()
 
+    def _reload_backup_log_list(self) -> None:
+        from instantlensdoc.core.manual_backup import load_backup_log
+
+        self._backup_log_entries = list(load_backup_log())
+        self._populate_backup_log_list()
+
+    def _backup_log_entry_from_item(self, item) -> dict | None:
+        """Eintrag aus Listeneintrag (Filter-sicher via UserRole) — 1.0.7."""
+        from PySide6.QtCore import Qt as _Qt
+
+        if item is None or item.flags() == 0:
+            return None
+        data = item.data(_Qt.UserRole)
+        if isinstance(data, dict):
+            return data
+        return None
+
     def _open_backup_log_entry(self, item=None) -> None:
-        """Doppelklick: Backup-Datei öffnen, sonst Ordner — 1.0.6."""
+        """Doppelklick: Backup-Datei öffnen, sonst Ordner — 1.0.6/1.0.7."""
         from PySide6.QtCore import QUrl
         from PySide6.QtGui import QDesktopServices
 
         if item is None:
             item = self.backup_log_list.currentItem()
-        entries = getattr(self, "_backup_log_entries", None) or []
-        if item is None or not entries:
+        entry = self._backup_log_entry_from_item(item)
+        if entry is None:
             return
-        if item.flags() == 0:
-            return
-        row = self.backup_log_list.row(item)
-        if not (0 <= row < len(entries)):
-            return
-        entry = entries[row]
         dest = str(entry.get("dest") or "").strip()
         source = str(entry.get("source") or "").strip()
         target = Path(dest) if dest else (Path(source) if source else None)
@@ -938,24 +982,21 @@ class SettingsDialog(QDialog):
                 pass
 
     def _copy_backup_log_entry(self) -> None:
-        """Ausgewählten Backup-Log-Eintrag in die Zwischenablage — 1.0.5."""
+        """Ausgewählten Backup-Log-Eintrag in die Zwischenablage — 1.0.5/1.0.7."""
         from PySide6.QtWidgets import QApplication
 
         from instantlensdoc.core.manual_backup import format_backup_log_line
 
         item = self.backup_log_list.currentItem()
-        entries = getattr(self, "_backup_log_entries", None) or []
+        entry = self._backup_log_entry_from_item(item)
+        visible = getattr(self, "_backup_log_visible", None) or []
         text = ""
-        if item is not None and item.flags() != 0:
-            row = self.backup_log_list.row(item)
-            if 0 <= row < len(entries):
-                text = format_backup_log_line(entries[row])
-            else:
-                text = item.text().strip()
-        elif entries:
-            text = format_backup_log_line(entries[0])
+        if entry is not None:
+            text = format_backup_log_line(entry)
+        elif visible:
+            text = format_backup_log_line(visible[0])
             self.backup_log_list.setCurrentRow(0)
-        if not text or text.startswith("(noch keine"):
+        if not text or text.startswith("(noch keine") or text.startswith("(keine Einträge"):
             QMessageBox.information(
                 self, "Backup-Log", "Kein Eintrag zum Kopieren vorhanden."
             )
@@ -967,6 +1008,41 @@ class SettingsDialog(QDialog):
                 parent._set_status("Backup-Log-Eintrag kopiert")
             except Exception:
                 pass
+
+    def _export_backup_log(self) -> None:
+        """Gefiltertes Backup-Log als TXT exportieren — 1.0.7."""
+        from instantlensdoc.core.manual_backup import export_backup_log_txt
+
+        visible = getattr(self, "_backup_log_visible", None) or []
+        if not visible:
+            QMessageBox.information(
+                self, "Backup-Log", "Keine Einträge zum Exportieren."
+            )
+            return
+        path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Backup-Log exportieren",
+            str(Path.home() / "backup-log.txt"),
+            "Textdatei (*.txt);;Alle Dateien (*)",
+        )
+        if not path:
+            return
+        try:
+            out = export_backup_log_txt(path, visible)
+        except Exception as e:
+            QMessageBox.critical(
+                self, "Backup-Log", f"Export fehlgeschlagen:\n{e}"
+            )
+            return
+        parent = self.parent()
+        if parent is not None and hasattr(parent, "_set_status"):
+            try:
+                parent._set_status(f"Backup-Log exportiert: {out}")
+            except Exception:
+                pass
+        QMessageBox.information(
+            self, "Backup-Log", f"Log exportiert:\n{out}"
+        )
 
     def _clear_backup_log(self) -> None:
         """Backup-Log leeren — 1.0.5."""

@@ -1,5 +1,27 @@
 # Changelog — InstantLens Doc
 
+## 1.0.7 — Druckvorschau Zoom/Seiten, Banner Icon·X, Backup-Filter·Export, Weiterarbeiten
+
+Post-Release-Polish nach 1.0.6: Druckvorschau mit Zoom +/- und Seitenwahl bei Mehrseiten-Bereich; Lizenz-Banner mit Icon, Dismiss-Button und Schließen-X (Persistenz `dismiss_date`); Backup-Log Filter Erfolg/Fehler plus TXT-Export; Willkommen-Button „Weiterarbeiten“ für letzte Session-Tabs wenn Session-Restore aus. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### Willkommen / Start
+- **Weiterarbeiten**-Button: öffnet letzte Session-Tabs wenn „Offene Tabs wiederherstellen“ aus und Session vorhanden (`continue_session_requested` / `_restore_session(force=True)`)
+
+### PDF / Druck
+- **Druckvorschau**: **Zoom +/-** (50–300 %); bei **Mehrseiten-Bereich** Seitenwahl (Spin/◀▶) mit Lazy-Render der gewählten Seite
+
+### About / Lizenz
+- Banner: **Warn-Icon** + Text-Button **Dismiss** + **Schließen-X** daneben; Persistenz **`dismiss_date`** (Kompatibilität `expiry_warn_day`)
+
+### Backup
+- Einstellungen: Log-**Filter** Alle / Nur Erfolg / Nur Fehler; **Log exportieren…** als TXT (`export_backup_log_txt`)
+
+### Packaging / Docs
+- Version **1.0.7** (App / `ild_pdf` / ISS / Smoke / Docs)
+- Smoke: Preview Zoom/Pages, Banner Icon·X·dismiss_date, Backup Filter·Export, Welcome Continue (CLI + Qt)
+
+---
+
 ## 1.0.6 — Filter Esc, Druckvorschau, Banner i18n/Farben, Backup-Log Doppelklick
 
 Post-Release-Polish nach 1.0.5: Willkommen-Filter Esc leert und Fokus zurück auf Liste; Dokumentdruck mit optionalem Vorschau-Dialog (Thumbnail erste Seite, Toggle in Dialog/Settings); Lizenz-Banner Text über i18n (DE) mit getrennten Farben für Warnung vs. abgelaufen; Backup-Log Doppelklick öffnet Backup-Datei bzw. Ordner wenn Datei fehlt. Stubs KI/Cloud/Stylus/3D bleiben Stubs.

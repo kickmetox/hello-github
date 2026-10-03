@@ -540,18 +540,21 @@ class MainWindow(QMainWindow):
         )
         session_mod.save_session(state)
 
-    def _restore_session(self):
+    def _restore_session(self, force: bool = False):
+        """Session-Tabs wiederherstellen. ``force=True``: Willkommen „Weiterarbeiten“ — 1.0.7."""
         import os
 
         if os.environ.get("ILD_NO_SESSION") == "1" or os.environ.get("ILD_SMOKE_QT"):
             return
-        if not get_restore_session_on_start():
+        if not force and not get_restore_session_on_start():
             return
         # CLI-Argument hat Vorrang (app.py öffnet danach) — nur wenn noch kein Doc
         if self.doc and self.doc.path:
             return
         state = session_mod.load_session()
-        if not state.restore or not state.tabs:
+        if not force and not state.restore:
+            return
+        if not state.tabs:
             return
         # Theme aus Session wiederherstellen (0.9.4)
         theme = str(getattr(state, "theme", "") or "").strip().lower()
@@ -718,7 +721,9 @@ class MainWindow(QMainWindow):
         outer.setContentsMargins(0, 0, 0, 0)
         outer.setSpacing(0)
 
-        # Ablaufwarnung-Banner: i18n-Text, Farbe Warnung vs. abgelaufen — 1.0.6
+        # Ablaufwarnung-Banner: Icon + Dismiss + Schließen-X, dismiss_date — 1.0.7
+        from PySide6.QtWidgets import QStyle
+
         from instantlensdoc.core.i18n import tr as _tr_ban
 
         self.expiry_warn_banner = QWidget()
@@ -728,6 +733,16 @@ class MainWindow(QMainWindow):
         ban_lay = QHBoxLayout(self.expiry_warn_banner)
         ban_lay.setContentsMargins(10, 6, 8, 6)
         ban_lay.setSpacing(8)
+        self.expiry_warn_icon = QLabel()
+        self.expiry_warn_icon.setFixedSize(22, 22)
+        self.expiry_warn_icon.setAlignment(Qt.AlignCenter)
+        try:
+            icon = self.style().standardIcon(QStyle.SP_MessageBoxWarning)
+            self.expiry_warn_icon.setPixmap(icon.pixmap(20, 20))
+        except Exception:
+            self.expiry_warn_icon.setText("⚠")
+        self.expiry_warn_icon.setToolTip(_tr_ban("expiry_warn_tooltip"))
+        ban_lay.addWidget(self.expiry_warn_icon)
         self.expiry_warn_label = QLabel()
         self.expiry_warn_label.setWordWrap(True)
         self.expiry_warn_label.setCursor(Qt.PointingHandCursor)
@@ -736,11 +751,15 @@ class MainWindow(QMainWindow):
             lambda e: self._on_expiry_warn_clicked(e)
         )
         ban_lay.addWidget(self.expiry_warn_label, 1)
-        self.btn_expiry_warn_dismiss = QPushButton("×")
-        self.btn_expiry_warn_dismiss.setFixedWidth(28)
+        self.btn_expiry_warn_dismiss = QPushButton(_tr_ban("expiry_dismiss_label"))
         self.btn_expiry_warn_dismiss.setToolTip(_tr_ban("expiry_dismiss_tooltip"))
         self.btn_expiry_warn_dismiss.clicked.connect(self._dismiss_expiry_warning)
         ban_lay.addWidget(self.btn_expiry_warn_dismiss)
+        self.btn_expiry_warn_close = QPushButton("×")
+        self.btn_expiry_warn_close.setFixedWidth(28)
+        self.btn_expiry_warn_close.setToolTip(_tr_ban("expiry_close_tooltip"))
+        self.btn_expiry_warn_close.clicked.connect(self._dismiss_expiry_warning)
+        ban_lay.addWidget(self.btn_expiry_warn_close)
         self.expiry_warn_banner.setVisible(False)
         outer.addWidget(self.expiry_warn_banner)
 
@@ -841,6 +860,7 @@ class MainWindow(QMainWindow):
         self.welcome_page.recent_remove_requested.connect(self._remove_recent_path)
         self.welcome_page.clear_recent_requested.connect(self._clear_recent)
         self.welcome_page.files_dropped.connect(self._welcome_files_dropped)
+        self.welcome_page.continue_session_requested.connect(self._continue_last_session)
         self.stack.addWidget(self.editor_pane)  # 0
         self.stack.addWidget(self.pdf_view)  # 1
         self.stack.addWidget(self.image_label)  # 2
@@ -4018,6 +4038,28 @@ class MainWindow(QMainWindow):
 
             self._set_status(f"Logordner: {log_dir()}")
 
+    def _continue_last_session(self) -> None:
+        """Willkommen „Weiterarbeiten“: letzte Session-Tabs öffnen (Restore-Toggle aus) — 1.0.7."""
+        try:
+            self._restore_session(force=True)
+        except Exception as e:
+            QMessageBox.warning(
+                self,
+                "Weiterarbeiten",
+                f"Letzte Session konnte nicht geladen werden:\n{e}",
+            )
+            return
+        # Wenn weiterhin leer: Hinweis
+        paths = []
+        try:
+            paths = list(self.sidebar.document_paths())
+        except Exception:
+            paths = []
+        if not paths and not (self.doc and self.doc.path):
+            self._set_status("Keine wiederherstellbaren Session-Tabs")
+        else:
+            self._set_status("Weitergearbeitet — letzte Session-Tabs geöffnet")
+
     def _show_welcome_if_empty(self) -> bool:
         """Willkommensseite anzeigen wenn keine Tabs / kein Dokument — 1.0.0."""
         paths = []
@@ -4032,6 +4074,11 @@ class MainWindow(QMainWindow):
                 return False
         try:
             self.welcome_page.refresh_recent()
+        except Exception:
+            pass
+        try:
+            if hasattr(self.welcome_page, "refresh_continue_button"):
+                self.welcome_page.refresh_continue_button()
         except Exception:
             pass
         self.stack.setCurrentWidget(self.welcome_page)
@@ -4503,7 +4550,10 @@ class MainWindow(QMainWindow):
         self.expiry_warn_label.setText(warn)
         self.expiry_warn_label.setToolTip(tr("expiry_warn_tooltip"))
         if hasattr(self, "btn_expiry_warn_dismiss"):
+            self.btn_expiry_warn_dismiss.setText(tr("expiry_dismiss_label"))
             self.btn_expiry_warn_dismiss.setToolTip(tr("expiry_dismiss_tooltip"))
+        if hasattr(self, "btn_expiry_warn_close"):
+            self.btn_expiry_warn_close.setToolTip(tr("expiry_close_tooltip"))
         was_visible = banner.isVisible()
         banner.setVisible(True)
         if not was_visible:

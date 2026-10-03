@@ -43,22 +43,30 @@ _STRINGS: dict[str, dict[UiLang, str]] = {
     "field_keywords": {"de": "Stichwörter", "en": "Keywords"},
     "field_creator": {"de": "Ersteller", "en": "Creator"},
     "field_producer": {"de": "Produzent", "en": "Producer"},
-    # Lizenz-Banner — 1.0.6
+    # Lizenz-Banner — 1.0.7
     "expiry_warn_banner": {
-        "de": "Hinweis: Lizenz/Trial läuft in {rest} ab{until} — Klick: Info/Aktivierung · × schließt bis morgen",
-        "en": "Notice: license/trial expires in {rest}{until} — Click: About/Activate · × dismisses until tomorrow",
+        "de": "Hinweis: Lizenz/Trial läuft in {rest} ab{until} — Klick: Info/Aktivierung · Dismiss / × bis morgen",
+        "en": "Notice: license/trial expires in {rest}{until} — Click: About/Activate · Dismiss / × until tomorrow",
     },
     "expiry_expired_banner": {
-        "de": "Lizenz abgelaufen{until} — Klick: Info/Aktivierung · × schließt bis morgen",
-        "en": "License expired{until} — Click: About/Activate · × dismisses until tomorrow",
+        "de": "Lizenz abgelaufen{until} — Klick: Info/Aktivierung · Dismiss / × bis morgen",
+        "en": "License expired{until} — Click: About/Activate · Dismiss / × until tomorrow",
     },
     "expiry_warn_tooltip": {
-        "de": "Klick öffnet Info / Lizenz aktivieren — 1.0.6",
-        "en": "Click opens About / activate license — 1.0.6",
+        "de": "Klick öffnet Info / Lizenz aktivieren — 1.0.7",
+        "en": "Click opens About / activate license — 1.0.7",
+    },
+    "expiry_dismiss_label": {
+        "de": "Dismiss",
+        "en": "Dismiss",
     },
     "expiry_dismiss_tooltip": {
-        "de": "Hinweis schließen — wird bis morgen nicht erneut gezeigt — 1.0.6",
-        "en": "Dismiss notice — will not show again until tomorrow — 1.0.6",
+        "de": "Hinweis schließen — dismiss_date bis morgen — 1.0.7",
+        "en": "Dismiss notice — dismiss_date until tomorrow — 1.0.7",
+    },
+    "expiry_close_tooltip": {
+        "de": "Schließen (×) — Hinweis bis morgen ausblenden — 1.0.7",
+        "en": "Close (×) — hide notice until tomorrow — 1.0.7",
     },
     "expiry_dismiss_status": {
         "de": "Ablauf-Hinweis bis morgen ausgeblendet",

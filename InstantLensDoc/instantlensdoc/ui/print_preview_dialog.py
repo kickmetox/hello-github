@@ -1,6 +1,8 @@
-"""Druckvorschau: erste Seite als Thumbnail vor dem Druckjob — 1.0.6."""
+"""Druckvorschau: Zoom +/- und Seitenwahl bei Mehrseiten-Bereich — 1.0.7."""
 
 from __future__ import annotations
+
+from collections.abc import Callable
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QPixmap
@@ -8,16 +10,26 @@ from PySide6.QtWidgets import (
     QCheckBox,
     QDialog,
     QDialogButtonBox,
+    QHBoxLayout,
     QLabel,
+    QPushButton,
     QScrollArea,
+    QSpinBox,
     QVBoxLayout,
 )
 
 from instantlensdoc.core.app_settings import get_print_preview, set_print_preview
 
+# Basis-Anzeigegröße; Zoom skaliert relativ dazu — 1.0.7
+_BASE_W = 360
+_BASE_H = 480
+_ZOOM_MIN = 0.5
+_ZOOM_MAX = 3.0
+_ZOOM_STEP = 0.25
+
 
 class PrintPreviewDialog(QDialog):
-    """Modaler Dialog: Thumbnail der ersten Druckseite + optionaler Toggle."""
+    """Modaler Dialog: Thumbnail mit Zoom +/- und Seitenwahl bei Mehrseiten."""
 
     def __init__(
         self,
@@ -29,43 +41,94 @@ class PrintPreviewDialog(QDialog):
         grayscale: bool = False,
         parent=None,
         default_preview: bool | None = None,
+        pages: list[int] | None = None,
+        pixmap_provider: Callable[[int], QPixmap | None] | None = None,
     ):
         super().__init__(parent)
         self.setWindowTitle("Druckvorschau")
         self.setWindowModality(Qt.WindowModal)
-        self.resize(420, 520)
+        self.resize(480, 580)
+
+        self._pages = list(pages) if pages else [0]
+        if not self._pages:
+            self._pages = [0]
+        self._page_count = max(1, int(page_count or len(self._pages)))
+        self._pixmap_provider = pixmap_provider
+        self._zoom = 1.0
+        self._index = 0  # Index in self._pages
+        self._cache: dict[int, QPixmap] = {}
+        if pixmap is not None and not pixmap.isNull():
+            self._cache[self._pages[0]] = pixmap
+
         layout = QVBoxLayout(self)
 
         gray_lbl = ", Graustufen" if grayscale else ""
-        info = QLabel(
-            f"Vorschau der ersten Druckseite ({page_label})"
-            f" — {page_count} Seite(n), {dpi} DPI{gray_lbl}"
+        self._info = QLabel(
+            f"Druckvorschau ({page_label})"
+            f" — {self._page_count} Seite(n), {dpi} DPI{gray_lbl}"
         )
-        info.setWordWrap(True)
-        layout.addWidget(info)
+        self._info.setWordWrap(True)
+        layout.addWidget(self._info)
 
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setAlignment(Qt.AlignCenter)
-        thumb = QLabel()
-        thumb.setAlignment(Qt.AlignCenter)
-        thumb.setMinimumSize(200, 260)
-        thumb.setStyleSheet(
+        # Zoom +/- und ggf. Seitenwahl — 1.0.7
+        ctrl = QHBoxLayout()
+        self.btn_zoom_out = QPushButton("−")
+        self.btn_zoom_out.setFixedWidth(32)
+        self.btn_zoom_out.setToolTip("Vorschau verkleinern — 1.0.7")
+        self.btn_zoom_out.clicked.connect(self._zoom_out)
+        ctrl.addWidget(self.btn_zoom_out)
+        self.zoom_label = QLabel("100 %")
+        self.zoom_label.setMinimumWidth(48)
+        self.zoom_label.setAlignment(Qt.AlignCenter)
+        self.zoom_label.setToolTip("Aktueller Zoom der Druckvorschau")
+        ctrl.addWidget(self.zoom_label)
+        self.btn_zoom_in = QPushButton("+")
+        self.btn_zoom_in.setFixedWidth(32)
+        self.btn_zoom_in.setToolTip("Vorschau vergrößern — 1.0.7")
+        self.btn_zoom_in.clicked.connect(self._zoom_in)
+        ctrl.addWidget(self.btn_zoom_in)
+        ctrl.addSpacing(16)
+
+        multi = len(self._pages) > 1
+        self.page_spin: QSpinBox | None = None
+        self.btn_page_prev: QPushButton | None = None
+        self.btn_page_next: QPushButton | None = None
+        if multi:
+            self.btn_page_prev = QPushButton("◀")
+            self.btn_page_prev.setFixedWidth(32)
+            self.btn_page_prev.setToolTip("Vorherige Druckseite — 1.0.7")
+            self.btn_page_prev.clicked.connect(self._page_prev)
+            ctrl.addWidget(self.btn_page_prev)
+            self.page_spin = QSpinBox()
+            self.page_spin.setRange(1, len(self._pages))
+            self.page_spin.setValue(1)
+            self.page_spin.setPrefix("Seite ")
+            self.page_spin.setToolTip(
+                "Seite im gewählten Mehrseiten-Druckbereich wählen — 1.0.7"
+            )
+            self.page_spin.valueChanged.connect(self._on_page_spin)
+            ctrl.addWidget(self.page_spin)
+            self.btn_page_next = QPushButton("▶")
+            self.btn_page_next.setFixedWidth(32)
+            self.btn_page_next.setToolTip("Nächste Druckseite — 1.0.7")
+            self.btn_page_next.clicked.connect(self._page_next)
+            ctrl.addWidget(self.btn_page_next)
+            self._page_nav_label = QLabel(f"/ {len(self._pages)}")
+            ctrl.addWidget(self._page_nav_label)
+        ctrl.addStretch(1)
+        layout.addLayout(ctrl)
+
+        self._scroll = QScrollArea()
+        self._scroll.setWidgetResizable(True)
+        self._scroll.setAlignment(Qt.AlignCenter)
+        self._thumb = QLabel()
+        self._thumb.setAlignment(Qt.AlignCenter)
+        self._thumb.setMinimumSize(200, 260)
+        self._thumb.setStyleSheet(
             "QLabel { background: #F5F5F5; border: 1px solid #CCC; }"
         )
-        if pixmap is not None and not pixmap.isNull():
-            scaled = pixmap.scaled(
-                360,
-                480,
-                Qt.KeepAspectRatio,
-                Qt.SmoothTransformation,
-            )
-            thumb.setPixmap(scaled)
-            thumb.setToolTip("Erste Seite des gewählten Druckbereichs — 1.0.6")
-        else:
-            thumb.setText("(keine Vorschau verfügbar)")
-        scroll.setWidget(thumb)
-        layout.addWidget(scroll, 1)
+        self._scroll.setWidget(self._thumb)
+        layout.addWidget(self._scroll, 1)
 
         if default_preview is None:
             preview_on = bool(get_print_preview())
@@ -74,7 +137,7 @@ class PrintPreviewDialog(QDialog):
         self.preview_check = QCheckBox("Druckvorschau vor dem Drucken anzeigen")
         self.preview_check.setChecked(preview_on)
         self.preview_check.setToolTip(
-            "Optional: Vorschau-Dialog vor dem Druckerdialog — Einstellung wird gemerkt — 1.0.6"
+            "Optional: Vorschau-Dialog vor dem Druckerdialog — Einstellung wird gemerkt — 1.0.7"
         )
         layout.addWidget(self.preview_check)
 
@@ -85,6 +148,87 @@ class PrintPreviewDialog(QDialog):
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
+
+        self._refresh_view()
+
+    def _current_page_index(self) -> int:
+        return int(self._pages[self._index])
+
+    def _get_pixmap(self, page_idx: int) -> QPixmap | None:
+        cached = self._cache.get(page_idx)
+        if cached is not None and not cached.isNull():
+            return cached
+        if self._pixmap_provider is not None:
+            try:
+                pm = self._pixmap_provider(page_idx)
+            except Exception:
+                pm = None
+            if pm is not None and not pm.isNull():
+                self._cache[page_idx] = pm
+                return pm
+        return None
+
+    def _refresh_view(self) -> None:
+        page_idx = self._current_page_index()
+        pm = self._get_pixmap(page_idx)
+        tw = max(80, int(_BASE_W * self._zoom))
+        th = max(100, int(_BASE_H * self._zoom))
+        if pm is not None and not pm.isNull():
+            scaled = pm.scaled(
+                tw,
+                th,
+                Qt.KeepAspectRatio,
+                Qt.SmoothTransformation,
+            )
+            self._thumb.setPixmap(scaled)
+            self._thumb.setText("")
+            self._thumb.setToolTip(
+                f"Druckseite {page_idx + 1} — Zoom {int(self._zoom * 100)} % — 1.0.7"
+            )
+        else:
+            self._thumb.clear()
+            self._thumb.setText("(keine Vorschau verfügbar)")
+            self._thumb.setToolTip("")
+        self.zoom_label.setText(f"{int(round(self._zoom * 100))} %")
+        self.btn_zoom_out.setEnabled(self._zoom > _ZOOM_MIN + 1e-6)
+        self.btn_zoom_in.setEnabled(self._zoom < _ZOOM_MAX - 1e-6)
+        if self.page_spin is not None:
+            self.page_spin.blockSignals(True)
+            self.page_spin.setValue(self._index + 1)
+            self.page_spin.blockSignals(False)
+        if self.btn_page_prev is not None:
+            self.btn_page_prev.setEnabled(self._index > 0)
+        if self.btn_page_next is not None:
+            self.btn_page_next.setEnabled(self._index < len(self._pages) - 1)
+        # Info-Label aktualisieren
+        base = self._info.text().split(" — ", 1)
+        suffix = base[1] if len(base) > 1 else ""
+        head = f"Druckvorschau (Seite {page_idx + 1})"
+        self._info.setText(f"{head} — {suffix}" if suffix else head)
+
+    def _zoom_in(self) -> None:
+        self._zoom = min(_ZOOM_MAX, round(self._zoom + _ZOOM_STEP, 2))
+        self._refresh_view()
+
+    def _zoom_out(self) -> None:
+        self._zoom = max(_ZOOM_MIN, round(self._zoom - _ZOOM_STEP, 2))
+        self._refresh_view()
+
+    def _page_prev(self) -> None:
+        if self._index > 0:
+            self._index -= 1
+            self._refresh_view()
+
+    def _page_next(self) -> None:
+        if self._index < len(self._pages) - 1:
+            self._index += 1
+            self._refresh_view()
+
+    def _on_page_spin(self, value: int) -> None:
+        idx = max(0, min(int(value) - 1, len(self._pages) - 1))
+        if idx != self._index:
+            self._index = idx
+            self._refresh_view()
 
     def preview_enabled(self) -> bool:
         """Ob Vorschau künftig gezeigt werden soll."""

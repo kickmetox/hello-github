@@ -5347,7 +5347,7 @@ class PdfViewer(QWidget):
             return False
 
     def print_document(self) -> bool:
-        """PDF-Dokument (Bereich + DPI + Graustufen + optionale Vorschau) — 1.0.6."""
+        """PDF-Dokument (Bereich + DPI + Graustufen + Vorschau Zoom/Seiten) — 1.0.7."""
         if not self.pdf_path:
             QMessageBox.information(self, "Drucken", "Kein PDF geladen.")
             return False
@@ -5390,12 +5390,16 @@ class PdfViewer(QWidget):
                 pass
             scale = max(dpi / 72.0, 1.0)
 
-            # Optionale Vorschau: Thumbnail der ersten Druckseite — 1.0.6
+            # Optionale Vorschau: Zoom +/- + Seitenwahl bei Mehrseiten — 1.0.7
             if show_preview:
                 thumb_scale = min(scale, 2.0)
-                preview_pm = self._pixmap_from_rendered_page(
-                    pages[0], thumb_scale, grayscale=gray
-                )
+
+                def _preview_pm(pidx: int, _ts=thumb_scale, _g=gray):
+                    return self._pixmap_from_rendered_page(
+                        pidx, _ts, grayscale=_g
+                    )
+
+                preview_pm = _preview_pm(pages[0])
                 preview_dlg = PrintPreviewDialog(
                     preview_pm,
                     page_label=f"Seite {pages[0] + 1}",
@@ -5404,6 +5408,8 @@ class PdfViewer(QWidget):
                     grayscale=gray,
                     parent=self,
                     default_preview=True,
+                    pages=list(pages),
+                    pixmap_provider=_preview_pm,
                 )
                 if preview_dlg.exec() != PrintPreviewDialog.Accepted:
                     try:

@@ -174,11 +174,18 @@ class LicenseManager:
         self.state.pop("activated_at", None)
         self._save()
 
+    def _dismiss_date(self) -> str:
+        """Persistiertes Dismiss-Datum (ISO); Fallback ``expiry_warn_day`` — 1.0.7."""
+        return str(
+            self.state.get("dismiss_date")
+            or self.state.get("expiry_warn_day")
+            or ""
+        )
+
     def should_show_expiry_warning(self, st: Optional[LicenseStatus] = None) -> bool:
-        """True bei Warnung (≤3 Tage) oder abgelaufen, sofern heute nicht dismissed — 1.0.6."""
+        """True bei Warnung (≤3 Tage) oder abgelaufen, sofern heute nicht dismissed — 1.0.7."""
         status = st if st is not None else self.status()
-        last = str(self.state.get("expiry_warn_day") or "")
-        if last == _today_iso():
+        if self._dismiss_date() == _today_iso():
             return False
         if not status.allowed:
             # Abgelaufen: Banner mit eigener Farbe — 1.0.6
@@ -195,12 +202,14 @@ class LicenseManager:
         return "warn"
 
     def mark_expiry_warning_shown(self) -> None:
-        """Dismiss: speichert bis morgen (heutiger Kalendertag) — 1.0.5."""
-        self.state["expiry_warn_day"] = _today_iso()
+        """Dismiss: speichert ``dismiss_date`` bis morgen — 1.0.7."""
+        today = _today_iso()
+        self.state["dismiss_date"] = today
+        self.state["expiry_warn_day"] = today  # Kompatibilität 1.0.5/1.0.6
         self._save()
 
     def dismiss_expiry_warning(self) -> None:
-        """Alias: Warnung bis morgen ausblenden — 1.0.5."""
+        """Alias: Warnung bis morgen ausblenden (Persistenz ``dismiss_date``) — 1.0.7."""
         self.mark_expiry_warning_shown()
 
     def status(self) -> LicenseStatus:

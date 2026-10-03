@@ -100,10 +100,10 @@ HELP_HTML = f"""
 <li><b>Datei → Projekt-Ordner</b>: Workspace wählen (letzte 5); Dialoge starten im aktiven Ordner</li>
 <li><b>Datei → Exportieren</b>: Editor-Inhalt als HTML, DOCX oder PDF (zuletzt genutzter Ordner wird gemerkt);
     <b>Export-Profil</b> speichern/anwenden (DPI / Format / Ziel)</li>
-<li><b>Datei → Drucken</b> (Ctrl+P): Editor oder aktuelle PDF-Seite (Qt Print); <b>PDF → Dokument drucken…</b> Seitenbereich + DPI + Graustufen; optionale <b>Vorschau erste Seite</b>; Mehrseiten-Fortschritt; Abbruch → Cleanup — 1.0.6</li>
-<li><b>Datei → Backup jetzt</b> / <b>Backup-Ordner öffnen…</b>: manuelles Backup; max. 3 Versuche; Log letzte 20; <b>Doppelklick öffnet Datei/Ordner</b>; Eintrag kopieren / Log leeren — 1.0.6</li>
-<li><b>Willkommen</b>: Live-Suchfilter: <b>Esc leert + Fokus Liste</b>; Clear-Button + Trefferanzahl; Enter/Entf; Drag&amp;Drop — 1.0.6</li>
-<li><b>Hilfe → Info / Lizenz</b>: Banner <b>i18n</b>, Farbe <b>Warnung vs. abgelaufen</b>; Klick → About/Aktivierung, Dismiss bis morgen — 1.0.6</li>
+<li><b>Datei → Drucken</b> (Ctrl+P): Editor oder aktuelle PDF-Seite (Qt Print); <b>PDF → Dokument drucken…</b> Seitenbereich + DPI + Graustufen; <b>Vorschau Zoom +/- + Seitenwahl</b> bei Mehrseiten; Fortschritt; Abbruch → Cleanup — 1.0.7</li>
+<li><b>Datei → Backup jetzt</b> / <b>Backup-Ordner öffnen…</b>: manuelles Backup; max. 3 Versuche; Log letzte 20; Filter Erfolg/Fehler; <b>Export TXT</b>; Doppelklick öffnet Datei/Ordner — 1.0.7</li>
+<li><b>Willkommen</b>: <b>Weiterarbeiten</b> (Session-Tabs wenn Restore aus); Esc leert Filter → Fokus Liste; Clear + Treffer; Enter/Entf; Drag&amp;Drop — 1.0.7</li>
+<li><b>Hilfe → Info / Lizenz</b>: Banner <b>Icon + Dismiss + Schließen-X</b>, Persistenz <b>dismiss_date</b>; Farbe Warnung vs. abgelaufen — 1.0.7</li>
 <li><b>Seitenleiste</b>: Suche (inkl. letzte Suchbegriffe), „Alle Docs“-Volltext, Zuletzt geöffnet, Dokumente,
     Lesezeichen/Outline (+/− hinzufügen/löschen), <b>Annotationen</b> (klickbar, <b>nach Seite gruppiert</b>,
     <b>Filter nach Typ</b>, <b>Textsuche in der Liste</b> (optional <b>Regex</b>), <b>Statistik je Typ</b>,

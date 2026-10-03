@@ -1,4 +1,4 @@
-"""Manuelles Backup aktueller Dokumente in den App-Backup-Ordner — 1.0.5."""
+"""Manuelles Backup aktueller Dokumente in den App-Backup-Ordner — 1.0.7."""
 
 from __future__ import annotations
 
@@ -99,6 +99,45 @@ def format_backup_log_line(entry: dict[str, Any]) -> str:
     if msg and not ok:
         return f"[{ts}] {status}: {msg}"
     return f"[{ts}] {status}: {target}"
+
+
+def filter_backup_log(
+    entries: list[dict[str, Any]] | None = None,
+    *,
+    mode: str = "all",
+) -> list[dict[str, Any]]:
+    """
+    Backup-Log nach Erfolg/Fehler filtern — 1.0.7.
+
+    ``mode``: ``all`` | ``ok`` / ``success`` | ``error`` / ``fail`` / ``fehler``
+    """
+    items = list(entries) if entries is not None else load_backup_log()
+    key = (mode or "all").strip().lower()
+    if key in ("ok", "success", "erfolg"):
+        return [e for e in items if isinstance(e, dict) and bool(e.get("ok", True))]
+    if key in ("error", "fail", "fehler", "err"):
+        return [e for e in items if isinstance(e, dict) and not bool(e.get("ok", True))]
+    return [e for e in items if isinstance(e, dict)]
+
+
+def export_backup_log_txt(
+    path: str | Path,
+    entries: list[dict[str, Any]] | None = None,
+) -> Path:
+    """Backup-Log als TXT exportieren (eine Zeile pro Eintrag) — 1.0.7."""
+    items = list(entries) if entries is not None else load_backup_log()
+    out = Path(path)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    lines = [format_backup_log_line(e) for e in items if isinstance(e, dict)]
+    header = (
+        f"# InstantLens Doc Backup-Log\n"
+        f"# Einträge: {len(lines)}\n"
+        f"# Export: {datetime.now().astimezone().strftime('%Y-%m-%d %H:%M:%S')}\n"
+    )
+    body = "\n".join(lines)
+    text = header + (body + "\n" if body else "(leer)\n")
+    out.write_text(text, encoding="utf-8")
+    return out
 
 
 def _stamp() -> str:

@@ -1,4 +1,4 @@
-"""Willkommens-/Startseite wenn keine Dokument-Tabs offen sind — 1.0.6."""
+"""Willkommens-/Startseite wenn keine Dokument-Tabs offen sind — 1.0.7."""
 
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ from instantlensdoc.core import recent as recent_mod
 
 
 class WelcomePage(QWidget):
-    """Startseite: Recent-Liste + Live-Filter (Esc leert → Fokus Liste) + Aktionen."""
+    """Startseite: Recent-Liste + Live-Filter + Weiterarbeiten (Session) + Aktionen."""
 
     open_requested = Signal()
     new_text_requested = Signal()
@@ -32,6 +32,7 @@ class WelcomePage(QWidget):
     recent_remove_requested = Signal(str)
     clear_recent_requested = Signal()
     files_dropped = Signal(list)  # list[str] lokale Dateipfade
+    continue_session_requested = Signal()  # letzte Session-Tabs — 1.0.7
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -61,6 +62,13 @@ class WelcomePage(QWidget):
         self.btn_empty.setToolTip("Neues leeres Textdokument")
         self.btn_empty.clicked.connect(self.new_text_requested.emit)
         btn_row.addWidget(self.btn_empty)
+        self.btn_continue = QPushButton("Weiterarbeiten")
+        self.btn_continue.setToolTip(
+            "Letzte Session-Tabs öffnen (wenn „Offene Tabs wiederherstellen“ aus) — 1.0.7"
+        )
+        self.btn_continue.clicked.connect(self.continue_session_requested.emit)
+        self.btn_continue.setVisible(False)
+        btn_row.addWidget(self.btn_continue)
         self.btn_clear_recent = QPushButton("Recent leeren")
         self.btn_clear_recent.setToolTip("Liste der zuletzt geöffneten Dateien leeren")
         self.btn_clear_recent.clicked.connect(self.clear_recent_requested.emit)
@@ -95,7 +103,8 @@ class WelcomePage(QWidget):
         self.recent_list.setToolTip(
             "Enter / Doppelklick öffnet; Entf entfernt den Eintrag; "
             "Rechtsklick: Entfernen / Ordner öffnen; Drag & Drop öffnet Dateien; "
-            "Filter oben filtert live; Esc leert Filter → Fokus Liste; Trefferanzahl rechts"
+            "Filter oben filtert live; Esc leert Filter → Fokus Liste; Trefferanzahl rechts; "
+            "Weiterarbeiten öffnet letzte Session wenn Restore aus — 1.0.7"
         )
         self.recent_list.setAcceptDrops(True)
         self.recent_list.setContextMenuPolicy(Qt.CustomContextMenu)
@@ -106,6 +115,31 @@ class WelcomePage(QWidget):
         lay.addWidget(self.recent_list, 1)
 
         self.refresh_recent()
+        self.refresh_continue_button()
+
+    def refresh_continue_button(self) -> None:
+        """„Weiterarbeiten“ nur wenn Session-Restore aus und Session-Tabs vorhanden — 1.0.7."""
+        show = False
+        try:
+            from instantlensdoc.core.app_settings import get_restore_session_on_start
+            from instantlensdoc.core.session import load_session
+
+            if not get_restore_session_on_start():
+                state = load_session()
+                show = bool(state.tabs)
+        except Exception:
+            show = False
+        self.btn_continue.setVisible(show)
+        if show:
+            try:
+                from instantlensdoc.core.session import load_session
+
+                n = len(load_session().tabs)
+                self.btn_continue.setText(
+                    f"Weiterarbeiten ({n})" if n > 0 else "Weiterarbeiten"
+                )
+            except Exception:
+                self.btn_continue.setText("Weiterarbeiten")
 
     def eventFilter(self, obj, event):  # noqa: N802
         """Esc leert Filter→Liste; Delete entfernt; Enter öffnet — 1.0.6."""
@@ -134,6 +168,7 @@ class WelcomePage(QWidget):
         self.recent_filter.setEnabled(has_entries)
         self.btn_clear_filter.setEnabled(has_entries)
         self._apply_recent_filter()
+        self.refresh_continue_button()
 
     def _clear_recent_filter(self) -> None:
         """Filtertext leeren — 1.0.5."""
