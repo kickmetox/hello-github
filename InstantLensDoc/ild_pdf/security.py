@@ -2,8 +2,41 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Optional, Tuple
+
+
+def password_strength(password: str) -> tuple[str, int]:
+    """
+    Passwort-Stärke-Hinweis — 1.6.1.
+    Rückgabe: (Label DE, Score 0–4). Leeres Passwort → („leer“, 0).
+    """
+    pw = password or ""
+    if not pw:
+        return "leer", 0
+    score = 0
+    if len(pw) >= 8:
+        score += 1
+    if len(pw) >= 12:
+        score += 1
+    if re.search(r"[a-z]", pw) and re.search(r"[A-Z]", pw):
+        score += 1
+    if re.search(r"\d", pw) and re.search(r"[^A-Za-z0-9]", pw):
+        score += 1
+    labels = {
+        0: "sehr schwach",
+        1: "schwach",
+        2: "mittel",
+        3: "gut",
+        4: "stark",
+    }
+    # unter 8 Zeichen höchstens „schwach“
+    if len(pw) < 8:
+        score = min(score, 1)
+        if score == 0:
+            return "sehr schwach", 0
+    return labels.get(score, "schwach"), score
 
 
 def needs_password(path: str | Path) -> bool:
@@ -60,7 +93,7 @@ def set_password(
     pdf_path = Path(pdf_path)
     out_path = Path(out_path) if out_path else pdf_path
     owner = owner_password if owner_password is not None else user_password
-    if not user_password:
+    if not (user_password or "").strip():
         raise ValueError("User-Passwort darf nicht leer sein.")
 
     perms = pikepdf.Permissions(

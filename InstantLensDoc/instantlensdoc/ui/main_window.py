@@ -1945,7 +1945,7 @@ class MainWindow(QMainWindow):
         m_pdf.addAction(act_split_pages)
         act_wm = QAction("Wasserzeichen / Seitennummern…", self)
         act_wm.setToolTip(
-            "Text oder Bild diagonal/zentriert; Vorschau; Bake in neues PDF — 1.6.0"
+            "Opacity/Größe/Winkel Settings; Seitenbereich; zuletzt Text/Bild; Bake — 1.6.1"
         )
         act_wm.triggered.connect(self._watermark_tools)
         m_pdf.addAction(act_wm)
@@ -1964,16 +1964,16 @@ class MainWindow(QMainWindow):
         act_ann_search.triggered.connect(self._annotation_search_open_docs)
         m_pdf.addAction(act_ann_search)
         act_pw = QAction("PDF verschlüsseln…", self)
-        act_pw.setToolTip("User-Passwort setzen; Owner optional (pikepdf) — 1.6.0")
+        act_pw.setToolTip("Stärke-Hinweis; leeres PW abgelehnt; nach Erfolg neu laden — 1.6.1")
         act_pw.triggered.connect(self._set_pdf_password)
         m_pdf.addAction(act_pw)
         act_pw_rm = QAction("PDF entschlüsseln…", self)
-        act_pw_rm.setToolTip("Passwortschutz entfernen via pikepdf — 1.6.0")
+        act_pw_rm.setToolTip("Passwort entfernen; leeres PW abgelehnt; nach Erfolg neu laden — 1.6.1")
         act_pw_rm.triggered.connect(self._remove_pdf_password)
         m_pdf.addAction(act_pw_rm)
         act_stats = QAction("Dokument-Statistik…", self)
         act_stats.setToolTip(
-            "Seiten, Wörter (Text-PDF), Annotationen, Dateigröße — 1.6.0"
+            "Refresh; Auto-Update Doc-Wechsel; Wörter nur Textschicht sonst „—“ — 1.6.1"
         )
         act_stats.triggered.connect(self._show_doc_stats)
         m_pdf.addAction(act_stats)
@@ -5192,6 +5192,8 @@ class MainWindow(QMainWindow):
                 self.sidebar.clear_redactions()
             self.sidebar.clear_page_favorites()
             self.sidebar.clear_line_favorites()
+        # Dokument-Statistik Auto-Update bei Doc-Wechsel — 1.6.1
+        self._sync_doc_stats_panel()
 
     def _refresh_page_favorites(self):
         """Sidebar-Liste der nummerierten PDF-Favoriten aktualisieren."""
@@ -6946,6 +6948,26 @@ class MainWindow(QMainWindow):
         self.sidebar.set_annotation_current_page(page_index)
         self._refresh_page_favorites()
         self._update_doc_status()
+    def _offer_reload_pdf(self, out_path, *, title: str = "Passwort") -> None:
+        """Nach Encrypt/Decrypt optional Datei neu laden — 1.6.1."""
+        from pathlib import Path as _Path
+
+        path = _Path(out_path)
+        if not path.is_file():
+            return
+        reply = QMessageBox.question(
+            self,
+            title,
+            f"Gespeichert:\n{path}\n\nDatei jetzt neu laden?",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.Yes,
+        )
+        if reply == QMessageBox.Yes:
+            try:
+                self.open_path(str(path))
+            except Exception as e:
+                QMessageBox.warning(self, title, f"Neu laden fehlgeschlagen:\n{e}")
+
     def _set_pdf_password(self):
         if not self.pdf_view.pdf_path:
             QMessageBox.information(self, "Passwort", "Bitte zuerst ein PDF öffnen.")
@@ -6954,6 +6976,9 @@ class MainWindow(QMainWindow):
         if not dlg.exec():
             return
         vals = dlg.values()
+        if not str(vals.get("user_password") or "").strip():
+            QMessageBox.warning(self, "Passwort", "User-Passwort darf nicht leer sein.")
+            return
         try:
             from ild_pdf import set_password
             from ild_pdf.render import clear_render_cache
@@ -6964,19 +6989,14 @@ class MainWindow(QMainWindow):
             set_password(self.pdf_view.pdf_path, out_path=out, **vals)
             clear_render_cache(self.pdf_view.pdf_path)
             self._set_status(f"Passwort gesetzt → {out.name}")
-            QMessageBox.information(
-                self,
-                "Passwort",
-                f"Geschütztes PDF gespeichert:\n{out}\n\n"
-                "Öffnen Sie die Datei und geben Sie das User-Passwort ein.",
-            )
             _log.info("PDF encrypted: %s", out)
+            self._offer_reload_pdf(out, title="Passwort")
         except Exception as e:
             _log.exception("Passwort setzen fehlgeschlagen")
             QMessageBox.warning(self, "Passwort", str(e))
 
     def _remove_pdf_password(self):
-        """PDF entschlüsseln / Passwort entfernen — 1.6.0."""
+        """PDF entschlüsseln / Passwort entfernen — 1.6.0/1.6.1."""
         if not self.pdf_view.pdf_path:
             QMessageBox.information(self, "Passwort", "Bitte zuerst ein PDF öffnen.")
             return
@@ -6984,6 +7004,9 @@ class MainWindow(QMainWindow):
         if not dlg.exec():
             return
         vals = dlg.values()
+        if not str(vals.get("password") or "").strip():
+            QMessageBox.warning(self, "Passwort", "Passwort darf nicht leer sein.")
+            return
         try:
             from ild_pdf import remove_password
             from ild_pdf.render import clear_render_cache
@@ -6996,18 +7019,35 @@ class MainWindow(QMainWindow):
             remove_password(src, vals["password"], out_path=out)
             clear_render_cache(src)
             self._set_status(f"Passwort entfernt → {out.name}")
-            QMessageBox.information(
-                self,
-                "Passwort",
-                f"Ungeschütztes PDF gespeichert:\n{out}",
-            )
             _log.info("PDF decrypted: %s", out)
+            self._offer_reload_pdf(out, title="Passwort")
         except Exception as e:
             _log.exception("Passwort entfernen fehlgeschlagen")
             QMessageBox.warning(self, "Passwort", str(e))
 
+    def _sync_doc_stats_panel(self) -> None:
+        """Offenes Statistik-Panel bei Doc-Wechsel aktualisieren — 1.6.1."""
+        dlg = getattr(self, "_doc_stats_dialog", None)
+        if dlg is None:
+            return
+        try:
+            if not dlg.isVisible():
+                return
+        except RuntimeError:
+            self._doc_stats_dialog = None
+            return
+        ann_n = (
+            len(self.pdf_view.store.annotations)
+            if self.pdf_view.pdf_path and getattr(self.pdf_view, "store", None)
+            else None
+        )
+        dlg.set_document(
+            self.pdf_view.pdf_path if self.pdf_view.pdf_path else None,
+            annotation_count=ann_n,
+        )
+
     def _show_doc_stats(self):
-        """Dokument-Statistik-Panel (Seiten/Wörter/Ann./Größe) — 1.6.0."""
+        """Dokument-Statistik-Panel (Seiten/Wörter/Ann./Größe) — 1.6.0/1.6.1."""
         if not self.pdf_view.pdf_path:
             QMessageBox.information(
                 self, "Dokument-Statistik", "Bitte zuerst ein PDF öffnen."
@@ -7033,8 +7073,12 @@ class MainWindow(QMainWindow):
         dlg.activateWindow()
 
     def _refresh_workspace_layout_menu(self):
-        """Ansicht → Workspace-Layouts Menü neu aufbauen — 1.6.0."""
-        from instantlensdoc.core.app_settings import get_workspace_layouts
+        """Ansicht → Workspace-Layouts Menü neu aufbauen — 1.6.1."""
+        from instantlensdoc.core.app_settings import (
+            WORKSPACE_LAYOUTS_MAX,
+            get_default_workspace_layout_name,
+            get_workspace_layouts,
+        )
 
         menu = getattr(self, "_workspace_layout_menu", None)
         if menu is None:
@@ -7042,12 +7086,14 @@ class MainWindow(QMainWindow):
         menu.clear()
         act_save = QAction("Layout speichern…", self)
         act_save.setToolTip(
-            "Aktuelle Panel-Sichtbarkeit + Splitter unter Namen speichern — 1.6.0"
+            f"Aktuelle Panels + Splitter speichern (max. {WORKSPACE_LAYOUTS_MAX}) — 1.6.1"
         )
         act_save.triggered.connect(self._save_workspace_layout)
         menu.addAction(act_save)
         menu.addSeparator()
         layouts = get_workspace_layouts()
+        default_name = get_default_workspace_layout_name()
+        default_key = default_name.casefold() if default_name else ""
         if not layouts:
             empty = QAction("(keine Layouts)", self)
             empty.setEnabled(False)
@@ -7055,13 +7101,24 @@ class MainWindow(QMainWindow):
         else:
             for layout in layouts:
                 name = str(layout.get("name") or "")
-                act = QAction(name, self)
-                act.setToolTip(f"Layout „{name}“ laden (Panels + Splitter)")
+                label = f"{name} ★" if name.casefold() == default_key else name
+                act = QAction(label, self)
+                tip = f"Layout „{name}“ laden (Panels + Splitter)"
+                if name.casefold() == default_key:
+                    tip += " — Standard"
+                act.setToolTip(tip)
                 act.triggered.connect(
                     lambda checked=False, n=name: self._load_workspace_layout(n)
                 )
                 menu.addAction(act)
             menu.addSeparator()
+            act_rename = QAction("Layout umbenennen…", self)
+            act_rename.triggered.connect(self._rename_workspace_layout)
+            menu.addAction(act_rename)
+            act_default = QAction("Als Standard markieren…", self)
+            act_default.setToolTip("Default-Layout markieren (★) — 1.6.1")
+            act_default.triggered.connect(self._mark_default_workspace_layout)
+            menu.addAction(act_default)
             act_del = QAction("Layout löschen…", self)
             act_del.triggered.connect(self._delete_workspace_layout)
             menu.addAction(act_del)
@@ -7080,10 +7137,15 @@ class MainWindow(QMainWindow):
     def _save_workspace_layout(self):
         from PySide6.QtWidgets import QInputDialog
 
-        from instantlensdoc.core.app_settings import save_workspace_layout
+        from instantlensdoc.core.app_settings import (
+            WORKSPACE_LAYOUTS_MAX,
+            save_workspace_layout,
+        )
 
         name, ok = QInputDialog.getText(
-            self, "Workspace-Layout", "Name für das Layout:"
+            self,
+            "Workspace-Layout",
+            f"Name für das Layout (max. {WORKSPACE_LAYOUTS_MAX}):",
         )
         if not ok:
             return
@@ -7118,6 +7180,75 @@ class MainWindow(QMainWindow):
             self._apply_main_splitter_sizes(sizes)
         self._save_session()
         self._set_status(f"Layout geladen: {name}")
+
+    def _rename_workspace_layout(self):
+        """Layout umbenennen — 1.6.1."""
+        from PySide6.QtWidgets import QInputDialog
+
+        from instantlensdoc.core.app_settings import (
+            get_workspace_layouts,
+            rename_workspace_layout,
+        )
+
+        layouts = get_workspace_layouts()
+        if not layouts:
+            QMessageBox.information(self, "Workspace-Layout", "Keine Layouts gespeichert.")
+            return
+        names = [str(p.get("name") or "") for p in layouts]
+        old, ok = QInputDialog.getItem(
+            self, "Layout umbenennen", "Layout:", names, 0, False
+        )
+        if not ok or not old:
+            return
+        new, ok2 = QInputDialog.getText(
+            self, "Layout umbenennen", "Neuer Name:", text=old
+        )
+        if not ok2:
+            return
+        new = (new or "").strip()
+        if not new:
+            QMessageBox.warning(self, "Workspace-Layout", "Name darf nicht leer sein.")
+            return
+        try:
+            rename_workspace_layout(old, new)
+            self._refresh_workspace_layout_menu()
+            self._set_status(f"Layout umbenannt: {old} → {new}")
+        except Exception as e:
+            QMessageBox.warning(self, "Workspace-Layout", str(e))
+
+    def _mark_default_workspace_layout(self):
+        """Default-Layout markieren — 1.6.1."""
+        from PySide6.QtWidgets import QInputDialog
+
+        from instantlensdoc.core.app_settings import (
+            get_default_workspace_layout_name,
+            get_workspace_layouts,
+            set_default_workspace_layout,
+        )
+
+        layouts = get_workspace_layouts()
+        if not layouts:
+            QMessageBox.information(self, "Workspace-Layout", "Keine Layouts gespeichert.")
+            return
+        names = [str(p.get("name") or "") for p in layouts]
+        current = get_default_workspace_layout_name()
+        start = names.index(current) if current in names else 0
+        name, ok = QInputDialog.getItem(
+            self,
+            "Als Standard markieren",
+            "Default-Layout:",
+            names,
+            start,
+            False,
+        )
+        if not ok or not name:
+            return
+        try:
+            set_default_workspace_layout(name)
+            self._refresh_workspace_layout_menu()
+            self._set_status(f"Standard-Layout: {name}")
+        except Exception as e:
+            QMessageBox.warning(self, "Workspace-Layout", str(e))
 
     def _delete_workspace_layout(self):
         from PySide6.QtWidgets import QInputDialog

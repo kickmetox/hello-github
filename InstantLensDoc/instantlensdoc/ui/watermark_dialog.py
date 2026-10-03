@@ -1,4 +1,4 @@
-"""Dialog: Wasserzeichen (Text/Bild, diagonal/zentriert, Vorschau, Bake) / Seitennummern — 1.6.0."""
+"""Dialog: Wasserzeichen (Text/Bild, Settings, Seitenbereich, Vorschau, Bake) — 1.6.1."""
 
 from __future__ import annotations
 
@@ -26,11 +26,16 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ild_pdf.pages import flatten_page_indices, parse_page_ranges
 from ild_pdf.watermark import (
     apply_image_watermark,
     apply_page_numbers,
     apply_watermark,
     render_watermark_preview,
+)
+from instantlensdoc.core.app_settings import (
+    get_last_watermark_settings,
+    set_last_watermark_settings,
 )
 
 
@@ -45,11 +50,12 @@ class WatermarkDialog(QDialog):
     ):
         super().__init__(parent)
         self.setWindowTitle("Wasserzeichen / Seitennummern")
-        self.resize(720, 560)
+        self.resize(720, 600)
         self._initial = pdf_path or ""
         self._page_index = page_index
         self._page_count = max(page_count, 1)
         self.result_path: str | None = None
+        self._last = get_last_watermark_settings()
 
         layout = QVBoxLayout(self)
         tabs = QTabWidget()
@@ -89,7 +95,10 @@ class WatermarkDialog(QDialog):
         mode_row = QHBoxLayout()
         self.wm_mode_text = QRadioButton("Text")
         self.wm_mode_image = QRadioButton("Bild")
-        self.wm_mode_text.setChecked(True)
+        if self._last.get("mode") == "image":
+            self.wm_mode_image.setChecked(True)
+        else:
+            self.wm_mode_text.setChecked(True)
         mode_row.addWidget(self.wm_mode_text)
         mode_row.addWidget(self.wm_mode_image)
         mode_row.addStretch(1)
@@ -97,12 +106,12 @@ class WatermarkDialog(QDialog):
         self.wm_mode_text.toggled.connect(self._on_wm_mode)
         self.wm_mode_image.toggled.connect(self._on_wm_mode)
 
-        self.wm_text = QLineEdit("VERTRAULICH")
+        self.wm_text = QLineEdit(str(self._last.get("text") or "VERTRAULICH"))
         self.wm_text.textChanged.connect(lambda *_: self._refresh_preview())
         form.addRow("Text", self.wm_text)
 
         img_row = QHBoxLayout()
-        self.wm_image = QLineEdit()
+        self.wm_image = QLineEdit(str(self._last.get("image") or ""))
         self.wm_image.setPlaceholderText("PNG / JPEG…")
         btn_img = QPushButton("Bild…")
         btn_img.clicked.connect(self._pick_image)
@@ -114,37 +123,68 @@ class WatermarkDialog(QDialog):
         self.wm_placement = QComboBox()
         self.wm_placement.addItem("Diagonal", "diagonal")
         self.wm_placement.addItem("Zentriert", "center")
+        place = str(self._last.get("placement") or "diagonal")
+        idx = self.wm_placement.findData(place)
+        if idx >= 0:
+            self.wm_placement.setCurrentIndex(idx)
         self.wm_placement.currentIndexChanged.connect(lambda *_: self._refresh_preview())
         form.addRow("Position", self.wm_placement)
 
+        # Opacity / Größe / Winkel Settings — 1.6.1
         self.wm_opacity = QDoubleSpinBox()
         self.wm_opacity.setRange(0.05, 1.0)
         self.wm_opacity.setSingleStep(0.05)
-        self.wm_opacity.setValue(0.25)
+        self.wm_opacity.setValue(float(self._last.get("opacity") or 0.25))
+        self.wm_opacity.setToolTip("Deckkraft (Settings merken) — 1.6.1")
         self.wm_opacity.valueChanged.connect(lambda *_: self._refresh_preview())
         form.addRow("Deckkraft", self.wm_opacity)
 
         self.wm_angle = QDoubleSpinBox()
         self.wm_angle.setRange(-90, 90)
-        self.wm_angle.setValue(45)
+        self.wm_angle.setValue(float(self._last.get("angle") or 45))
+        self.wm_angle.setToolTip("Winkel in Grad (Settings merken) — 1.6.1")
         self.wm_angle.valueChanged.connect(lambda *_: self._refresh_preview())
         form.addRow("Winkel °", self.wm_angle)
 
         self.wm_size = QDoubleSpinBox()
         self.wm_size.setRange(8, 120)
-        self.wm_size.setValue(48)
+        self.wm_size.setValue(float(self._last.get("font_size") or 48))
+        self.wm_size.setToolTip("Schriftgröße (Settings merken) — 1.6.1")
         self.wm_size.valueChanged.connect(lambda *_: self._refresh_preview())
         form.addRow("Schriftgröße", self.wm_size)
 
         self.wm_img_scale = QDoubleSpinBox()
         self.wm_img_scale.setRange(0.1, 1.0)
         self.wm_img_scale.setSingleStep(0.05)
-        self.wm_img_scale.setValue(0.45)
+        self.wm_img_scale.setValue(float(self._last.get("img_scale") or 0.45))
+        self.wm_img_scale.setToolTip("Bild-Skalierung (Settings merken) — 1.6.1")
         self.wm_img_scale.valueChanged.connect(lambda *_: self._refresh_preview())
         form.addRow("Bild-Skalierung", self.wm_img_scale)
 
+        # Seitenbereich — 1.6.1
+        self.wm_scope = QComboBox()
+        self.wm_scope.addItem("Alle Seiten", "all")
+        self.wm_scope.addItem("Aktuelle Seite", "current")
+        self.wm_scope.addItem("Seitenbereich…", "range")
+        self.wm_scope.currentIndexChanged.connect(self._on_wm_scope)
+        form.addRow("Seiten", self.wm_scope)
+
+        self.wm_range = QLineEdit()
+        self.wm_range.setPlaceholderText(f"z.B. 1-3,5 (1…{self._page_count})")
+        self.wm_range.setToolTip(
+            "Seitenbereich 1-basiert, z. B. 1-3,5 — 1.6.1"
+        )
+        form.addRow("Seitenbereich", self.wm_range)
+
+        # Kompatibilität: altes Flag bleibt für Smoke/API erreichbar
         self.wm_current = QCheckBox("Nur aktuelle Seite")
-        form.addRow("", self.wm_current)
+        self.wm_current.setVisible(False)
+        self.wm_scope.currentIndexChanged.connect(
+            lambda *_: self.wm_current.setChecked(
+                self.wm_scope.currentData() == "current"
+            )
+        )
+
         self.wm_inplace = QCheckBox("Original überschreiben")
         self.wm_inplace.setChecked(False)
         self.wm_inplace.setToolTip("Standard: neues PDF (*_wm.pdf) — Bake — 1.6.0")
@@ -154,7 +194,9 @@ class WatermarkDialog(QDialog):
         btn_prev.clicked.connect(self._refresh_preview)
         form.addRow(btn_prev)
         run = QPushButton("Wasserzeichen in PDF bakken")
-        run.setToolTip("Schreibt Text- oder Bild-Wasserzeichen in ein neues PDF — 1.6.0")
+        run.setToolTip(
+            "Schreibt Text- oder Bild-Wasserzeichen; Settings merken — 1.6.1"
+        )
         run.clicked.connect(self._run_wm)
         form.addRow(run)
 
@@ -171,7 +213,12 @@ class WatermarkDialog(QDialog):
         prev_col.addWidget(self.wm_preview, 1)
         root.addLayout(prev_col, 2)
         self._on_wm_mode()
+        self._on_wm_scope()
         return w
+
+    def _on_wm_scope(self, *_):
+        is_range = self.wm_scope.currentData() == "range"
+        self.wm_range.setEnabled(is_range)
 
     def _on_wm_mode(self, *_):
         is_text = self.wm_mode_text.isChecked()
@@ -179,7 +226,6 @@ class WatermarkDialog(QDialog):
         self.wm_size.setEnabled(is_text)
         self.wm_image.setEnabled(not is_text)
         self.wm_img_scale.setEnabled(not is_text)
-        # Winkel nur bei Diagonal relevant
         self._refresh_preview()
 
     def _pick_image(self):
@@ -197,6 +243,29 @@ class WatermarkDialog(QDialog):
     def _placement(self) -> str:
         data = self.wm_placement.currentData()
         return str(data or "diagonal")
+
+    def _persist_wm_settings(self) -> None:
+        set_last_watermark_settings(
+            text=self.wm_text.text().strip() or "VERTRAULICH",
+            image=self.wm_image.text().strip(),
+            opacity=self.wm_opacity.value(),
+            angle=self.wm_angle.value(),
+            font_size=self.wm_size.value(),
+            img_scale=self.wm_img_scale.value(),
+            placement=self._placement(),
+            mode="image" if self.wm_mode_image.isChecked() else "text",
+        )
+
+    def _resolve_pages(self) -> list[int] | None:
+        """None = alle Seiten; sonst 0-basierte Indizes — 1.6.1."""
+        scope = str(self.wm_scope.currentData() or "all")
+        if scope == "current" or self.wm_current.isChecked():
+            return [self._page_index]
+        if scope == "range":
+            spec = self.wm_range.text().strip()
+            ranges = parse_page_ranges(spec, self._page_count, one_based=True)
+            return flatten_page_indices(ranges)
+        return None
 
     def _refresh_preview(self):
         src = (self.wm_src.text() if hasattr(self, "wm_src") else "").strip()
@@ -273,7 +342,11 @@ class WatermarkDialog(QDialog):
         if not src:
             QMessageBox.warning(self, "Wasserzeichen", "PDF angeben.")
             return
-        pages = [self._page_index] if self.wm_current.isChecked() else None
+        try:
+            pages = self._resolve_pages()
+        except ValueError as e:
+            QMessageBox.warning(self, "Wasserzeichen — Seitenbereich", str(e))
+            return
         path = Path(src)
         out = self._out_path(path, self.wm_inplace.isChecked(), "wm")
         placement = self._placement()
@@ -308,6 +381,7 @@ class WatermarkDialog(QDialog):
                     font_size=self.wm_size.value(),
                     placement=placement,
                 )
+            self._persist_wm_settings()
             self.result_path = str(out)
             QMessageBox.information(
                 self,

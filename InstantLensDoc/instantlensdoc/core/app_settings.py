@@ -70,6 +70,15 @@ DEFAULTS: dict[str, Any] = {
     "editor_bracket_auto_close": True,
     "ann_filter_presets": [],
     "workspace_layouts": [],  # benannte Sidebar-Layouts Name+Panels+Splitter — 1.6.0
+    "default_workspace_layout": "",  # Name des Default-Layouts — 1.6.1
+    "last_watermark_text": "VERTRAULICH",  # zuletzt WM-Text — 1.6.1
+    "last_watermark_image": "",  # zuletzt WM-Bild — 1.6.1
+    "last_watermark_opacity": 0.25,  # WM Deckkraft Settings — 1.6.1
+    "last_watermark_angle": 45.0,  # WM Winkel Settings — 1.6.1
+    "last_watermark_font_size": 48.0,  # WM Schriftgröße Settings — 1.6.1
+    "last_watermark_img_scale": 0.45,  # WM Bild-Skalierung Settings — 1.6.1
+    "last_watermark_placement": "diagonal",  # diagonal|center — 1.6.1
+    "last_watermark_mode": "text",  # text|image — 1.6.1
     "ann_default_opacity": 1.0,
     "ann_default_stroke_width": 2.0,
     "recent_files_max": 12,
@@ -1297,11 +1306,11 @@ def delete_ann_filter_preset(name: str) -> bool:
     return True
 
 
-WORKSPACE_LAYOUTS_MAX = 16
+WORKSPACE_LAYOUTS_MAX = 20  # max. 20 Layouts — 1.6.1
 
 
 def _normalize_workspace_layout(raw: object) -> dict | None:
-    """Layout: name + Panel-Sichtbarkeit + Splitter-Größen — 1.6.0."""
+    """Layout: name + Panel-Sichtbarkeit + Splitter-Größen — 1.6.0/1.6.1."""
     if not isinstance(raw, dict):
         return None
     name = str(raw.get("name") or "").strip()
@@ -1363,6 +1372,20 @@ def get_workspace_layout(name: str) -> dict | None:
     return None
 
 
+def get_default_workspace_layout_name() -> str:
+    """Name des markierten Default-Layouts — 1.6.1."""
+    return str(load_settings().get("default_workspace_layout") or "").strip()
+
+
+def set_default_workspace_layout(name: str | None) -> str:
+    """Default-Layout setzen (leer = keines) — 1.6.1."""
+    want = (name or "").strip()
+    if want and get_workspace_layout(want) is None:
+        raise ValueError(f"Layout nicht gefunden: {want}")
+    save_settings({"default_workspace_layout": want})
+    return want
+
+
 def save_workspace_layout(
     name: str,
     *,
@@ -1370,7 +1393,7 @@ def save_workspace_layout(
     splitter_sizes: list[int] | None = None,
     state: dict | None = None,
 ) -> dict:
-    """Layout speichern/überschreiben (gleicher Name → Update) — 1.6.0."""
+    """Layout speichern/überschreiben (gleicher Name → Update) — 1.6.0/1.6.1."""
     if isinstance(state, dict):
         if not name:
             name = str(state.get("name") or "")
@@ -1398,10 +1421,55 @@ def save_workspace_layout(
             replaced = True
             break
     if not replaced:
+        if len(layouts) >= WORKSPACE_LAYOUTS_MAX:
+            raise ValueError(
+                f"Maximal {WORKSPACE_LAYOUTS_MAX} Layouts — bitte eines löschen."
+            )
         layouts.insert(0, layout)
     layouts = layouts[:WORKSPACE_LAYOUTS_MAX]
     save_settings({"workspace_layouts": layouts})
     return dict(layout)
+
+
+def rename_workspace_layout(old_name: str, new_name: str) -> dict:
+    """Layout umbenennen — 1.6.1."""
+    old = (old_name or "").strip()
+    new = (new_name or "").strip()
+    if not old:
+        raise ValueError("Alter Name fehlt")
+    if not new:
+        raise ValueError("Neuer Name darf nicht leer sein")
+    layouts = get_workspace_layouts()
+    old_key = old.casefold()
+    new_key = new.casefold()
+    target = None
+    for p in layouts:
+        if str(p["name"]).casefold() == old_key:
+            target = p
+            break
+    if target is None:
+        raise ValueError(f"Layout nicht gefunden: {old}")
+    if old_key != new_key:
+        for p in layouts:
+            if str(p["name"]).casefold() == new_key:
+                raise ValueError(f"Name bereits vergeben: {new}")
+    renamed = {
+        "name": new,
+        "panels": dict(target.get("panels") or {}),
+        "splitter_sizes": list(target.get("splitter_sizes") or []),
+    }
+    out: list[dict] = []
+    for p in layouts:
+        if str(p["name"]).casefold() == old_key:
+            out.append(renamed)
+        else:
+            out.append(p)
+    patch: dict = {"workspace_layouts": out}
+    default = get_default_workspace_layout_name()
+    if default and default.casefold() == old_key:
+        patch["default_workspace_layout"] = new
+    save_settings(patch)
+    return dict(renamed)
 
 
 def delete_workspace_layout(name: str) -> bool:
@@ -1412,8 +1480,100 @@ def delete_workspace_layout(name: str) -> bool:
     kept = [p for p in layouts if str(p["name"]).casefold() != want]
     if len(kept) == len(layouts):
         return False
-    save_settings({"workspace_layouts": kept})
+    patch: dict = {"workspace_layouts": kept}
+    default = get_default_workspace_layout_name()
+    if default and default.casefold() == want:
+        patch["default_workspace_layout"] = ""
+    save_settings(patch)
     return True
+
+
+def get_last_watermark_settings() -> dict:
+    """Zuletzt verwendete Wasserzeichen-Settings — 1.6.1."""
+    s = load_settings()
+    try:
+        opacity = float(s.get("last_watermark_opacity", 0.25) or 0.25)
+    except (TypeError, ValueError):
+        opacity = 0.25
+    try:
+        angle = float(s.get("last_watermark_angle", 45.0) or 45.0)
+    except (TypeError, ValueError):
+        angle = 45.0
+    try:
+        font_size = float(s.get("last_watermark_font_size", 48.0) or 48.0)
+    except (TypeError, ValueError):
+        font_size = 48.0
+    try:
+        img_scale = float(s.get("last_watermark_img_scale", 0.45) or 0.45)
+    except (TypeError, ValueError):
+        img_scale = 0.45
+    placement = str(s.get("last_watermark_placement") or "diagonal").strip().lower()
+    if placement not in ("diagonal", "center"):
+        placement = "diagonal"
+    mode = str(s.get("last_watermark_mode") or "text").strip().lower()
+    if mode not in ("text", "image"):
+        mode = "text"
+    text = str(s.get("last_watermark_text") or "VERTRAULICH")
+    image = str(s.get("last_watermark_image") or "").strip()
+    return {
+        "text": text,
+        "image": image,
+        "opacity": max(0.05, min(1.0, opacity)),
+        "angle": max(-90.0, min(90.0, angle)),
+        "font_size": max(8.0, min(120.0, font_size)),
+        "img_scale": max(0.1, min(1.0, img_scale)),
+        "placement": placement,
+        "mode": mode,
+    }
+
+
+def set_last_watermark_settings(
+    *,
+    text: str | None = None,
+    image: str | None = None,
+    opacity: float | None = None,
+    angle: float | None = None,
+    font_size: float | None = None,
+    img_scale: float | None = None,
+    placement: str | None = None,
+    mode: str | None = None,
+) -> None:
+    """Wasserzeichen-Settings (Opacity/Größe/Winkel + Text/Bild) merken — 1.6.1."""
+    patch: dict = {}
+    if text is not None:
+        patch["last_watermark_text"] = str(text)
+    if image is not None:
+        patch["last_watermark_image"] = str(image or "")
+    if opacity is not None:
+        try:
+            patch["last_watermark_opacity"] = max(0.05, min(1.0, float(opacity)))
+        except (TypeError, ValueError):
+            pass
+    if angle is not None:
+        try:
+            patch["last_watermark_angle"] = max(-90.0, min(90.0, float(angle)))
+        except (TypeError, ValueError):
+            pass
+    if font_size is not None:
+        try:
+            patch["last_watermark_font_size"] = max(8.0, min(120.0, float(font_size)))
+        except (TypeError, ValueError):
+            pass
+    if img_scale is not None:
+        try:
+            patch["last_watermark_img_scale"] = max(0.1, min(1.0, float(img_scale)))
+        except (TypeError, ValueError):
+            pass
+    if placement is not None:
+        p = str(placement).strip().lower()
+        if p in ("diagonal", "center"):
+            patch["last_watermark_placement"] = p
+    if mode is not None:
+        m = str(mode).strip().lower()
+        if m in ("text", "image"):
+            patch["last_watermark_mode"] = m
+    if patch:
+        save_settings(patch)
 
 
 def get_editor_line_numbers() -> bool:

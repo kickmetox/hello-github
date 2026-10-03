@@ -1,4 +1,4 @@
-"""Panel/Dialog: Dokument-Statistik (Seiten, Wörter, Ann., Dateigröße) — 1.6.0."""
+"""Panel/Dialog: Dokument-Statistik (Seiten, Wörter, Ann., Dateigröße) — 1.6.1."""
 
 from __future__ import annotations
 
@@ -103,10 +103,11 @@ class DocStatsDialog(QDialog):
         self.lbl_file.setText(self._pdf_path.name)
         self.lbl_file.setToolTip(str(self._pdf_path))
         self.lbl_pages.setText(str(stats.pages))
+        # Wörter nur bei vorhandener Textschicht, sonst „—“ — 1.6.1
         if stats.has_text:
             self.lbl_words.setText(f"{stats.words}")
         else:
-            self.lbl_words.setText(f"{stats.words} (wenig/kein Text)")
+            self.lbl_words.setText("—")
         self.lbl_ann.setText(str(stats.annotations))
         self.lbl_size.setText(f"{stats.format_size()} ({stats.file_size} B)")
         return stats

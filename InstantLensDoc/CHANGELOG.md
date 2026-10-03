@@ -1,5 +1,24 @@
 # Changelog — InstantLens Doc
 
+## 1.6.1 — Wasserzeichen Settings·Seitenbereich·Merken, Crypto Stärke·Reload, Stats Refresh·Auto, Layouts Rename·Default·max20
+
+Post-Release-Polish nach 1.6.0: **Wasserzeichen** persistiert Opacity/Größe/Winkel in Settings, **Seitenbereich** (alle/aktuell/1-3,5) und merkt zuletzt Text/Bild; **Verschlüsselung** mit **Stärke-Hinweis**, leeres Passwort ablehnen, nach Erfolg Option **Datei neu laden**; **Dokument-Statistik** mit Refresh-Button, **Auto-Update bei Doc-Wechsel**, Wörter nur bei Textschicht sonst „—“; **Workspace-Layouts** Umbenennen/Löschen, **Default markieren (★)**, max. **20**. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### PDF
+- Wasserzeichen: Opacity/Größe/Winkel Settings; Seitenbereich; zuletzt Text/Bild merken
+- Verschlüsseln: Stärke-Hinweis live; leeres User-Passwort abgelehnt; nach Erfolg neu laden
+- Entschlüsseln: leeres Passwort abgelehnt; nach Erfolg neu laden
+- Dokument-Statistik: Refresh; Auto-Update bei Doc-Wechsel; Wörter „—“ ohne Textschicht
+
+### UI / Workspace
+- Workspace-Layouts: Umbenennen; Als Standard markieren (★); max. 20 Layouts
+
+### Packaging / Docs
+- Version **1.6.1** (App / `ild_pdf` / ISS / Smoke / Docs)
+- Smoke: WM Settings·Range·Merken, Crypto Stärke·leer·Reload, Stats Refresh·Auto·Wörter—, Layouts Rename·Default·max20 (CLI + Qt)
+
+---
+
 ## 1.6.0 — Wasserzeichen Text/Bild·Vorschau·Bake, PDF verschlüsseln/entschlüsseln, Dokument-Statistik, Workspace-Layouts
 
 Minor-Release mit neuen Kernfeatures: **Wasserzeichen** als Text oder Bild, Position **diagonal** oder **zentriert**, Live-**Vorschau** und **Bake** in ein neues PDF; **PDF verschlüsseln/entschlüsseln** (User-Passwort setzen/entfernen via pikepdf, Owner optional); **Dokument-Statistik**-Panel (Seiten, Wörter aus Text-PDF, Annotationen, Dateigröße); **Workspace-Layouts** speichern/laden (Name + Panel-Sichtbarkeit Thumb/Ann/Bookmark + Splitter). Stubs KI/Cloud/Stylus/3D bleiben Stubs.

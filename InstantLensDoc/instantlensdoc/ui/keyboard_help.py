@@ -101,10 +101,10 @@ SHORTCUTS_HTML = """
 <tr><td>Text-Diff Panel</td><td>Datei → Text-Diff (offene Tabs)… (Ctrl+Alt+D): Wrap-Blink Dauer kurz/mittel/lang + System-Beep vs. stumm; Status Änderung i/n; F7/Shift+F7 — 1.2.9</td></tr>
 <tr><td>run.bat Deps / pip</td><td>Windows-Start: gewählte Python-Binary als „gefunden: …“ inkl. python --version; %ILD_PYTHON% ungültig/leer → Fallback py -3 → python → python3; --help; .venv; --yes/-y; Exit 0/1 — 1.2.9</td></tr>
 <tr><td>CLI Start</td><td><code>python -m instantlensdoc --open DATEI</code> · <code>--list-pages FILE [--json]</code> → Zahl/{pages,path} · <code>--export-page N --out PATH [--dpi] [--format png|jpeg]</code> One-Shot · <code>--version</code>/−V · <code>--help</code> DE; Exit 0/1/2 — 1.5.5</td></tr>
-<tr><td>Wasserzeichen (1.6.0)</td><td>PDF → Wasserzeichen: Text/Bild · diagonal/zentriert · Vorschau · Bake neues PDF — 1.6.0</td></tr>
-<tr><td>PDF verschlüsseln/entschlüsseln</td><td>PDF → verschlüsseln (User, Owner optional) / entschlüsseln — pikepdf — 1.6.0</td></tr>
-<tr><td>Dokument-Statistik</td><td>PDF → Dokument-Statistik: Seiten, Wörter, Ann., Dateigröße — 1.6.0</td></tr>
-<tr><td>Workspace-Layouts</td><td>Ansicht → Workspace-Layouts speichern/laden (Panels + Splitter) — 1.6.0</td></tr>
+<tr><td>Wasserzeichen (1.6.1)</td><td>PDF → Wasserzeichen: Opacity/Größe/Winkel Settings · Seitenbereich · zuletzt Text/Bild · Vorschau · Bake — 1.6.1 (Basis Text/Bild·diagonal/zentriert 1.6.0)</td></tr>
+<tr><td>PDF verschlüsseln/entschlüsseln</td><td>PDF → verschlüsseln (Stärke-Hinweis, leeres PW abgelehnt) / entschlüsseln · nach Erfolg neu laden — 1.6.1 (Basis 1.6.0)</td></tr>
+<tr><td>Dokument-Statistik</td><td>PDF → Dokument-Statistik: Refresh · Auto-Update Doc-Wechsel · Wörter nur Textschicht sonst „—“ — 1.6.1 (Basis 1.6.0)</td></tr>
+<tr><td>Workspace-Layouts</td><td>Ansicht → Layouts speichern/laden/löschen/umbenennen · Default ★ · max. 20 — 1.6.1 (Basis 1.6.0)</td></tr>
 <tr><td>CLI/Metadaten/Bilder/Signatur (1.5.0)</td><td>Basis: Metadaten Betreff · Seitenbereich DPI · Signatur Flatten · <code>--open</code>/<code>--version</code> — 1.5.0</td></tr>
 <tr><td>Metadaten/Bilder/Signatur/CLI (1.5.1)</td><td>Dirty/Reset/UTF-8/leere Felder · Template <code>{stem}_p{page}</code>/Fortschritt · Größe/Opacity · <code>--help</code> DE/multi-<code>--open</code>/Exit 2 — 1.5.1</td></tr>
 <tr><td>Metadaten/Bilder/Signatur/CLI (1.5.2)</td><td>Backup <code>.ildbak</code>·Toast · Abbruch behält Dateien·JPEG-Q · Aspect-Lock·Vorschau · <code>--export-page</code> — 1.5.2</td></tr>
@@ -324,10 +324,10 @@ About: Datenschutz-Hinweis (lokal, keine Telemetrie).</p>
 <p><b>PDF-Metadaten:</b> Toast-Klick nur wenn Dialog zu · sonst Fokus/raise · Accessibility · max 3 Felder — 1.5.5 (Basis 1.5.4).</p>
 <p><b>Signatur (Bild):</b> Zoom Settings persistieren · Reset-Zoom Vorschau · Esc-Status — 1.5.5 (Basis 1.5.4).</p>
 <p><b>CLI:</b> <code>--list-pages FILE [--json]</code> → {pages,path} · Exit 0/1/2 — 1.5.5 (Basis 1.5.4).</p>
-<p><b>Wasserzeichen:</b> Text oder Bild · diagonal/zentriert · Vorschau · Bake neues PDF — 1.6.0.</p>
-<p><b>PDF verschlüsseln/entschlüsseln:</b> User-Passwort setzen/entfernen, Owner optional (pikepdf) — 1.6.0.</p>
-<p><b>Dokument-Statistik:</b> Seiten, Wörter (Text-PDF), Annotationen, Dateigröße — 1.6.0.</p>
-<p><b>Workspace-Layouts:</b> Name + Panel-Sichtbarkeit + Splitter speichern/laden — 1.6.0.</p>
+<p><b>Wasserzeichen:</b> Opacity/Größe/Winkel Settings · Seitenbereich · zuletzt Text/Bild · Vorschau · Bake — 1.6.1 (Basis 1.6.0).</p>
+<p><b>PDF verschlüsseln/entschlüsseln:</b> Stärke-Hinweis · leeres PW abgelehnt · nach Erfolg neu laden — 1.6.1 (Basis 1.6.0).</p>
+<p><b>Dokument-Statistik:</b> Refresh · Auto-Update Doc-Wechsel · Wörter nur Textschicht sonst „—“ — 1.6.1 (Basis 1.6.0).</p>
+<p><b>Workspace-Layouts:</b> Umbenennen/Löschen · Default ★ · max. 20 — 1.6.1 (Basis 1.6.0).</p>
 <p><b>Thumbnails:</b> in der Sidebar ziehen zum Neuordnen der Seiten (Ctrl+Z rückgängig); Größe in Einstellungen (klein/normal/groß).</p>
 <p><b>Statusleiste:</b> Dateiname · Seite x/y · Seitengröße (mm/inch, klickbar) · Zoom % · Wörter/Ann. · Version · Lizenz.</p>
 <p><b>PDF-Vergleich:</b> Diff-PNG Reset Bestätigung nur bei Abweichung; Fokus+Selektion — 1.4.5</p>

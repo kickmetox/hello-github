@@ -1,4 +1,4 @@
-"""Dialog: PDF-Passwort setzen / entfernen / öffnen — 1.6.0."""
+"""Dialog: PDF-Passwort setzen / entfernen / öffnen — 1.6.1."""
 
 from __future__ import annotations
 
@@ -16,6 +16,8 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
+from ild_pdf.security import password_strength
 
 
 def ask_pdf_password(parent: QWidget | None, path: str | Path) -> str | None:
@@ -37,7 +39,7 @@ class SetPasswordDialog(QDialog):
     def __init__(self, parent=None, pdf_name: str = ""):
         super().__init__(parent)
         self.setWindowTitle("PDF verschlüsseln")
-        self.resize(420, 240)
+        self.resize(420, 280)
         layout = QVBoxLayout(self)
         layout.addWidget(
             QLabel(
@@ -52,8 +54,12 @@ class SetPasswordDialog(QDialog):
         self.owner.setEchoMode(QLineEdit.Password)
         self.owner.setPlaceholderText("(optional, sonst = User)")
         form.addRow("User-Passwort:", self.user)
+        self.strength_label = QLabel("Stärke: —")
+        self.strength_label.setStyleSheet("color:#666;")
+        form.addRow("", self.strength_label)
         form.addRow("Owner-Passwort:", self.owner)
         layout.addLayout(form)
+        self.user.textChanged.connect(self._update_strength)
         self.allow_print = QCheckBox("Drucken erlauben")
         self.allow_print.setChecked(True)
         self.allow_modify = QCheckBox("Ändern erlauben")
@@ -65,9 +71,24 @@ class SetPasswordDialog(QDialog):
         buttons.accepted.connect(self._accept)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
+        self._update_strength()
+
+    def _update_strength(self, *_):
+        label, score = password_strength(self.user.text())
+        colors = {
+            0: "#b71c1c",
+            1: "#e65100",
+            2: "#f9a825",
+            3: "#558b2f",
+            4: "#2e7d32",
+        }
+        color = colors.get(score, "#666")
+        self.strength_label.setText(f"Stärke: {label}")
+        self.strength_label.setStyleSheet(f"color:{color};")
 
     def _accept(self):
-        if not self.user.text():
+        # Leeres Passwort ablehnen — 1.6.1
+        if not self.user.text().strip():
             QMessageBox.warning(self, "Passwort", "User-Passwort darf nicht leer sein.")
             return
         self.accept()
@@ -112,7 +133,7 @@ class RemovePasswordDialog(QDialog):
         layout.addWidget(buttons)
 
     def _accept(self):
-        if not self.password.text():
+        if not self.password.text().strip():
             QMessageBox.warning(self, "Passwort", "Passwort darf nicht leer sein.")
             return
         self.accept()

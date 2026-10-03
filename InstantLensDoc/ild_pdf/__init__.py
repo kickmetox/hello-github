@@ -101,7 +101,13 @@ from .watermark import (
 from .doc_stats import DocumentStats, collect_document_stats, count_words
 from .limits import PdfHealth, THUMB_LAZY_THRESHOLD, clamp_render_scale, inspect_pdf
 from .render import clear_render_cache
-from .security import needs_password, remove_password, set_password, try_open_password
+from .security import (
+    needs_password,
+    password_strength,
+    remove_password,
+    set_password,
+    try_open_password,
+)
 from .redact import bake_redactions
 from .metadata import (
     PdfMetadata,
@@ -228,6 +234,7 @@ __all__ = [
     "clamp_render_scale",
     "needs_password",
     "try_open_password",
+    "password_strength",
     "set_password",
     "remove_password",
     "bake_redactions",
@@ -255,4 +262,4 @@ __all__ = [
     "uri_link_at",
 ]
 
-__version__ = "1.6.0"
+__version__ = "1.6.1"
