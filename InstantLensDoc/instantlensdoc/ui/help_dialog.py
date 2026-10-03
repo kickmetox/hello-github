@@ -37,7 +37,8 @@ HELP_HTML = f"""
     optional <b>Bracket-Auto-Close</b>,
     optional <b>Minimieren in System-Tray</b>,
     optional <b>Backup .bak beim Speichern</b>, <b>Seitengröße-Einheit mm/inch</b>,
-    optional <b>letzte Session beim Start</b>, <b>PDF-Toolbar-Gruppen</b> ein-/ausblenden,
+    optional <b>Fenstergeometrie</b> und <b>offene Tabs</b> beim Start (getrennte Toggles),
+    <b>PDF-Toolbar-Gruppen</b> ein-/ausblenden,
     optional <b>PDF Zwei-Seiten-Ansicht (Spread)</b>, optional <b>PDF Continuous Scroll</b>,
     <b>Doc-Split Layout horizontal/vertikal</b>,
     Update-Hinweis (nur wenn aktiv), Pfade;
@@ -125,7 +126,10 @@ HELP_HTML = f"""
     große PDFs: Warnung / Limits;
     <b>Seiten-Thumbnails</b> in der Sidebar</li>
 <li><b>Datei → Schließen</b>: Speichern-Dialog bei ungespeicherten Änderungen;
-    <b>Andere Tabs schließen</b> (Ctrl+Shift+W)</li>
+    <b>Andere Tabs schließen</b> (Ctrl+Shift+W);
+    Sidebar: <b>Mittelklick</b> schließt Tab, Rechtsklick → Schließen / Andere schließen</li>
+<li><b>Bearbeiten → Weitersuchen / Rückwärtssuchen</b> (F3 / Shift+F3):
+    PDF-Treffer-Highlight auf der Seite, Navigation auch über Seiten</li>
 <li><b>Bearbeiten → Auswahl → Notiz</b> (Ctrl+Alt+N): PDF-Textauswahl als Sticky; optional Checkbox zusätzlich Highlight</li>
 <li><b>Ansicht → Fenster teilen (zwei Docs)</b> (Ctrl+\\): zwei Dokumente; optional <b>vertikal</b> (Ctrl+Shift+\\); Sync-Scroll; Statusleiste dirty Tabs inkl. Speichern</li>
 <li><b>Hilfe → Auf Updates prüfen</b>: lokal immer; Online optional (offline OK)</li>
@@ -134,8 +138,9 @@ HELP_HTML = f"""
 <li><b>Hilfe → Logordner öffnen</b>: Crash-/App-Logs im Dateimanager</li>
 <li><b>Hilfe → Crash-Report erstellen</b>: Logordner als ZIP speichern (optional Screenshot-Pfad-Hinweis)</li>
 <li><b>Zwischenablage</b>: Bild einfügen (Editor Ctrl+Shift+V / PDF Strg+V) — Stempel oder neue Seite</li>
-<li><b>Session</b>: Offene Dokumente (Sidebar-Liste) werden beim Beenden gespeichert;
-    Wiederherstellung beim Start optional in den Einstellungen</li>
+<li><b>Session</b>: Offene Dokumente (Sidebar-Liste) und Fenstergeometrie werden beim Beenden gespeichert;
+    Wiederherstellung beim Start über getrennte Toggles in den Einstellungen
+    (Fenstergeometrie / offene Tabs)</li>
 <li><b>Logging</b>: Datei unter <code>%APPDATA%/InstantLensDoc/logs/</code> (Windows) bzw. <code>~/.config/InstantLensDoc/logs/</code></li>
 <li><b>Tastaturhilfe</b>: Hilfe → Tastaturhilfe (F1); Cheat-Sheet als PDF exportieren</li>
 <li><b>Extras → Batch-Konvertierung</b>: Ordner → PDF oder OCR</li>

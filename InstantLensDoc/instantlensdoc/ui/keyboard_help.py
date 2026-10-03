@@ -42,6 +42,7 @@ SHORTCUTS_HTML = """
 <tr><td>Rückgängig</td><td><code>Ctrl+Z</code></td></tr>
 <tr><td>Wiederholen</td><td><code>Ctrl+Y</code> / <code>Ctrl+Shift+Z</code></td></tr>
 <tr><td>Suchen</td><td><code>Ctrl+F</code></td></tr>
+<tr><td>Weitersuchen / Rückwärts</td><td><code>F3</code> / <code>Shift+F3</code> — PDF-Treffer-Highlight + Seiten-Nav — 0.9.0</td></tr>
 <tr><td>Suchen und Ersetzen</td><td><code>Ctrl+R</code></td></tr>
 <tr><td>Gehe zu Zeile / Seite</td><td><code>Ctrl+G</code> (Editor / PDF)</td></tr>
 <tr><td>Gehe zu Seite (PDF-Menü)</td><td><code>Ctrl+Shift+G</code></td></tr>
@@ -58,7 +59,10 @@ SHORTCUTS_HTML = """
 <tr><td>Bild aus Zwischenablage</td><td><code>Ctrl+Shift+V</code></td></tr>
 <tr><td>PDF-Text kopieren (Auswahl)</td><td><code>Ctrl+C</code> (Auswahl-Werkzeug + Text aufziehen) — 0.6.1</td></tr>
 <tr><td>Auswahl → Notiz (Sticky)</td><td><code>Ctrl+Alt+N</code> (Text vorausgefüllt; optional +Highlight) — 0.6.2/0.6.3</td></tr>
-<tr><td>Andere Tabs schließen</td><td><code>Ctrl+Shift+W</code> (Datei) — 0.6.2</td></tr>
+<tr><td>Andere Tabs schließen</td><td><code>Ctrl+Shift+W</code> (Datei) — 0.6.2; Sidebar-Rechtsklick / Mittelklick schließen — 0.9.0</td></tr>
+<tr><td>Dokument-Tab Mittelklick</td><td>Mittelklick schließt Tab; Rechtsklick → Schließen / Andere schließen — 0.9.0</td></tr>
+<tr><td>Opacity-Slider Auswahl</td><td>Toolbar-Slider steuert ausgewähltes Ann.-Objekt — 0.9.0</td></tr>
+<tr><td>Session-Toggles</td><td>Einstellungen: Fenstergeometrie + offene Tabs getrennt — 0.9.0</td></tr>
 <tr><td>Fenster teilen (zwei Docs)</td><td><code>Ctrl+\\</code> — 0.6.3</td></tr>
 <tr><td>Vertikaler Split (übereinander)</td><td><code>Ctrl+Shift+\\</code> (Toggle) — 0.6.5</td></tr>
 <tr><td>Sync-Scroll (geteilte Docs)</td><td><code>Ctrl+Alt+\\</code>; Zustand je Session gemerkt — 0.6.4 / 0.6.9</td></tr>

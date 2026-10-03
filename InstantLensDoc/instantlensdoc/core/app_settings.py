@@ -71,6 +71,7 @@ DEFAULTS: dict[str, Any] = {
     "window_state": "",
     "ann_color_presets": ["#FFE066", "#FF6B6B", "#4ECDC4"],
     "restore_session_on_start": True,
+    "restore_window_geometry_on_start": True,
     "pdf_thumbnail_scale": 0.18,
     "editor_text_encoding": "auto",
     "skip_splash": False,
@@ -1941,6 +1942,15 @@ def get_restore_session_on_start() -> bool:
 
 def set_restore_session_on_start(enabled: bool) -> None:
     save_settings({"restore_session_on_start": bool(enabled)})
+
+
+def get_restore_window_geometry_on_start() -> bool:
+    """Fenstergeometrie/-state beim Start wiederherstellen (Toggle)."""
+    return bool(load_settings().get("restore_window_geometry_on_start", True))
+
+
+def set_restore_window_geometry_on_start(enabled: bool) -> None:
+    save_settings({"restore_window_geometry_on_start": bool(enabled)})
 
 
 PDF_THUMBNAIL_SCALE_CHOICES = (0.12, 0.18, 0.24)

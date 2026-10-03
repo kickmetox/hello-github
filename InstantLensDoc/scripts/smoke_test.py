@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Smoke-Test 0.8.9 (CLI + optional offscreen Qt). Kernpfade: open/annotate/export/license + ausgewählte 0.6.x-Pfade."""
+"""Smoke-Test 0.9.0 (CLI + optional offscreen Qt). Kernpfade: open/annotate/export/license + ausgewählte 0.6.x-Pfade."""
 
 from __future__ import annotations
 
@@ -122,8 +122,8 @@ def main() -> int:
     from instantlensdoc.core.update_check import check_for_updates
     from instantlensdoc.license import KEY_DAYS, TRIAL_DAYS, generate_key, verify_key
 
-    assert __version__ == "0.8.9", __version__
-    assert ild_ver == "0.8.9", ild_ver
+    assert __version__ == "0.9.0", __version__
+    assert ild_ver == "0.9.0", ild_ver
     assert TRIAL_DAYS == 28 and KEY_DAYS == 32
     key = generate_key("ame@sellerbach.de")
     ok, msg, _ = verify_key(key)
@@ -141,7 +141,7 @@ def main() -> int:
     assert "Settings" in tr("settings")
     set_lang("de")
     upd = check_for_updates(allow_network=False)
-    assert upd.local_version == "0.8.9" and not upd.online
+    assert upd.local_version == "0.9.0" and not upd.online
     assert get_export_jpeg_quality() >= 10
     assert get_ui_lang() in ("de", "en")
     assert 25 <= get_default_zoom_percent() <= 500
@@ -182,8 +182,8 @@ def main() -> int:
     assert get_ann_pen_color() == "#112233"
     assert (ROOT / "CHANGELOG.md").is_file()
     cl = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-    assert "0.8.9" in cl and "0.8.8" in cl and "0.8.7" in cl and "0.8.6" in cl and "0.8.5" in cl and "0.8.4" in cl and "0.8.3" in cl and "0.8.2" in cl and "0.8.1" in cl and "0.8.0" in cl
-    assert "## 0.8.9" in cl and "## 0.8.8" in cl and "## 0.8.7" in cl and "## 0.8.6" in cl and "## 0.8.5" in cl and "## 0.8.4" in cl and "## 0.8.3" in cl and "## 0.8.2" in cl and "## 0.8.1" in cl and "## 0.8.0" in cl
+    assert "0.9.0" in cl and "0.8.9" in cl and "0.8.8" in cl and "0.8.7" in cl and "0.8.6" in cl and "0.8.5" in cl and "0.8.4" in cl and "0.8.3" in cl and "0.8.2" in cl and "0.8.1" in cl and "0.8.0" in cl
+    assert "## 0.9.0" in cl and "## 0.8.9" in cl and "## 0.8.8" in cl and "## 0.8.7" in cl and "## 0.8.6" in cl and "## 0.8.5" in cl and "## 0.8.4" in cl and "## 0.8.3" in cl and "## 0.8.2" in cl and "## 0.8.1" in cl and "## 0.8.0" in cl
     assert "## 0.7.9" in cl
     assert "## 0.7.8" in cl
     assert "## 0.7.6" in cl
@@ -240,7 +240,7 @@ def main() -> int:
     assert "0.4.9" in cl  # noch in Kurz-Tabelle
     assert "0.3.9" in cl  # noch in Kurz-Tabelle
     assert "0.2.9" in cl  # noch in Kurz-Tabelle
-    assert "0.8.9" in (ROOT / "README.md").read_text(encoding="utf-8")
+    assert "0.9.0" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "run.bat" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "sync-ild.ps1" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "scripts/sync-ild.ps1" in (ROOT / "FEATURES.md").read_text(encoding="utf-8")
@@ -589,13 +589,13 @@ def main() -> int:
 
         assert (ROOT / "installer" / "installer-hinweis.txt").exists()
         iss = (ROOT / "installer" / "instantlensdoc.iss").read_text(encoding="utf-8")
-        assert "0.8.9" in iss and "desktopicon" in iss and "DisableProgramGroupPage=no" in iss
+        assert "0.9.0" in iss and "desktopicon" in iss and "DisableProgramGroupPage=no" in iss
         assert "UninstallDisplayName" in iss and "Uninstallable=yes" in iss
         assert "IncludeKeygen" in iss and "SetupIconFile" in iss
         assert "InstantLensKeygen.exe" in iss
         assert "uninstallexe" in iss
         bw = (ROOT / "build-windows.ps1").read_text(encoding="utf-8")
-        assert "0.8.9" in bw and "NoKeygenInApp" in bw and "--icon" in bw
+        assert "0.9.0" in bw and "NoKeygenInApp" in bw and "--icon" in bw
         assert "InstantLensKeygen.exe" in bw
         bi = (ROOT / "installer" / "build-installer.ps1").read_text(encoding="utf-8")
         assert "InstantLensKeygen.exe" in bi and "IncludeKeygen" in bi
@@ -604,7 +604,7 @@ def main() -> int:
         assert "Installer" in kg_readme
         hinweis = (ROOT / "installer" / "installer-hinweis.txt").read_text(encoding="utf-8")
         assert "InstantLensKeygen.exe" in hinweis or "run-keygen.bat" in hinweis
-        assert "0.8.9" in hinweis
+        assert "0.9.0" in hinweis
         assert "checkedonce" in iss and "Desktop-Verknüpfung" in hinweis
         from ild_pdf.limits import OPEN_TIMEOUT_HINT, OPEN_TIMEOUT_HINT_SEC
 
@@ -616,7 +616,7 @@ def main() -> int:
         assert "QProgressDialog" in (ROOT / "instantlensdoc" / "ui" / "main_window.py").read_text(encoding="utf-8")
 
         assert (ROOT / "examples" / "ild_pdf_demo.py").exists()
-        assert "0.8.9" in (ROOT / "INFO.md").read_text(encoding="utf-8")
+        assert "0.9.0" in (ROOT / "INFO.md").read_text(encoding="utf-8")
         assert (ROOT / "assets" / "app.ico").is_file()
 
         # --- Kernpfade: open / annotate / export / license ---
@@ -749,7 +749,7 @@ def main() -> int:
         assert "| A" in tbl and "| 1" in tbl
         assert ocr_mod.TESSERACT_WIKI_URL.startswith("https://")
 
-        # --- Ausgewählte 0.3.x-/0.4.x-/0.5.x-/0.6.x-Pfade (CLI, Konsolidierung 0.7.0) + 0.8.9 ---
+        # --- Ausgewählte 0.3.x-/0.4.x-/0.5.x-/0.6.x-Pfade (CLI, Konsolidierung 0.7.0) + 0.9.0 ---
         from ild_pdf.annotate import stamp_library_items
         from ild_pdf.attachments import has_attachments, list_attachments
         from ild_pdf.flatten import flatten_annotations_to_pdf
@@ -807,7 +807,7 @@ def main() -> int:
         set_backup_on_save(False)
         assert get_page_size_unit() in ("mm", "inch")
         assert isinstance(get_minimize_to_tray(), bool)
-        assert "0.8.9" in feat and "0.8.8" in feat and "0.8.7" in feat and "0.8.6" in feat and "0.8.5" in feat and "0.8.4" in feat and "0.8.3" in feat and "0.8.2" in feat and "0.8.1" in feat and "0.8.0" in feat and "0.7.9" in feat and "0.7.8" in feat and "0.7.7" in feat and "0.7.6" in feat and "0.7.5" in feat and "0.7.4" in feat and "0.7.3" in feat and "0.7.2" in feat and "0.7.1" in feat and "0.6.9" in feat and "0.5.9" in feat and "0.4.9" in feat  # Release + Zeitraum-Feature-Hinweise
+        assert "0.9.0" in feat and "0.8.9" in feat and "0.8.8" in feat and "0.8.7" in feat and "0.8.6" in feat and "0.8.5" in feat and "0.8.4" in feat and "0.8.3" in feat and "0.8.2" in feat and "0.8.1" in feat and "0.8.0" in feat and "0.7.9" in feat and "0.7.8" in feat and "0.7.7" in feat and "0.7.6" in feat and "0.7.5" in feat and "0.7.4" in feat and "0.7.3" in feat and "0.7.2" in feat and "0.7.1" in feat and "0.6.9" in feat and "0.5.9" in feat and "0.4.9" in feat  # Release + Zeitraum-Feature-Hinweise
         assert "Batch-OCR" in feat or "OCR gesamtes PDF" in feat
         assert "Tag" in feat
         assert "Projekt-Ordner" in feat or "Workspace" in feat
@@ -2952,6 +2952,50 @@ def main() -> int:
         )
         print("0.8.9 CLI group-filter/json/thumb-open/overlay-edges/line-hl: OK")
 
+        # 0.9.0 CLI: Tab Mittelklick/Andere, PDF-Suche F3, Opacity-Auswahl, Session-Geometry-Toggle
+        from instantlensdoc.core.app_settings import (
+            get_restore_window_geometry_on_start,
+            set_restore_window_geometry_on_start,
+        )
+
+        set_restore_window_geometry_on_start(False)
+        assert get_restore_window_geometry_on_start() is False
+        set_restore_window_geometry_on_start(True)
+        assert get_restore_window_geometry_on_start() is True
+        sb090 = (ROOT / "instantlensdoc" / "ui" / "sidebar.py").read_text(encoding="utf-8")
+        assert "document_close_requested" in sb090
+        assert "document_close_others_requested" in sb090
+        assert "MiddleButton" in sb090
+        assert "Andere schließen" in sb090
+        mw090 = (ROOT / "instantlensdoc" / "ui" / "main_window.py").read_text(encoding="utf-8")
+        assert "close_tab_path" in mw090
+        assert "close_other_tabs_keeping" in mw090
+        assert "FindNext" in mw090 and "FindPrevious" in mw090
+        assert "get_restore_window_geometry_on_start" in mw090
+        pv090 = (ROOT / "instantlensdoc" / "ui" / "pdf_view.py").read_text(encoding="utf-8")
+        assert "_find_search_on_pages" in pv090
+        assert "search_active_index" in pv090
+        assert "ausgewählte Annotation" in pv090 or "ausgewähltes Objekt" in pv090.lower() or "Opacity-Slider" in pv090
+        sd090 = (ROOT / "instantlensdoc" / "ui" / "settings_dialog.py").read_text(encoding="utf-8")
+        assert "restore_geometry" in sd090
+        assert "set_restore_window_geometry_on_start" in sd090
+        assert "Offene Tabs wiederherstellen" in sd090
+        assert "Fenstergeometrie wiederherstellen" in sd090
+        feat090 = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
+        assert "0.9.0" in feat090 and (
+            "Mittelklick" in feat090
+            or "F3" in feat090
+            or "Fenstergeometrie" in feat090
+            or "Opacity" in feat090
+        )
+        cl090 = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+        assert "## 0.9.0" in cl090
+        kb090 = (ROOT / "instantlensdoc" / "ui" / "keyboard_help.py").read_text(encoding="utf-8")
+        assert "0.9.0" in kb090 and (
+            "F3" in kb090 or "Mittelklick" in kb090 or "Session-Toggles" in kb090
+        )
+        print("0.9.0 CLI tab-midclick/search-f3/opacity/session-toggles: OK")
+
         set_show_printer_marks(True)
         assert get_show_printer_marks() is True
         set_show_printer_marks(False)
@@ -3084,7 +3128,7 @@ def main() -> int:
         assert "Continuous Scroll" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
         assert "Seitenlabel" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8") or "Seitenlabels" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
         assert "Zwischenablage-Verlauf" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8") or "Clipboard" in (ROOT / "FEATURES.md").read_text(encoding="utf-8")
-        assert "0.8.9" in feat and "0.8.8" in feat and "0.8.7" in feat and "0.8.6" in feat and "0.8.5" in feat and "0.8.4" in feat and "0.8.3" in feat and "0.8.2" in feat and "0.8.1" in feat and "0.8.0" in feat and "0.7.9" in feat and "0.7.8" in feat and "0.7.7" in feat and "0.7.6" in feat and "0.7.5" in feat and "0.7.4" in feat and "0.7.3" in feat and "0.7.2" in feat and "0.7.1" in feat and "0.6.9" in feat and "0.5.9" in feat and "0.4.9" in feat
+        assert "0.9.0" in feat and "0.8.9" in feat and "0.8.8" in feat and "0.8.7" in feat and "0.8.6" in feat and "0.8.5" in feat and "0.8.4" in feat and "0.8.3" in feat and "0.8.2" in feat and "0.8.1" in feat and "0.8.0" in feat and "0.7.9" in feat and "0.7.8" in feat and "0.7.7" in feat and "0.7.6" in feat and "0.7.5" in feat and "0.7.4" in feat and "0.7.3" in feat and "0.7.2" in feat and "0.7.1" in feat and "0.6.9" in feat and "0.5.9" in feat and "0.4.9" in feat
         # --- 0.4.2 CLI: Outline Goto, Ann Copy/Paste, Flatten Progress ---
         import pikepdf as _pike_ol
 
@@ -3209,7 +3253,7 @@ def main() -> int:
         win._add_chained_frame()
         assert len(win.layout_doc.text_frames) >= 2
         assert "Lizenz:" in win.license_label.text() or "⚠" in win.license_label.text()
-        assert "v0.8.9" in win.version_label.text()
+        assert "v0.9.0" in win.version_label.text()
         # Lizenz <7 Tage: Style prominent
         st_lic = win.license_manager.status()
         if st_lic.allowed and st_lic.days_remaining < 7:
@@ -3390,11 +3434,11 @@ def main() -> int:
             assert win.editor.outdent_selection(4)
             assert win.editor.toPlainText().splitlines()[0] == "alpha"
             # Fenstertitel mit Version
-            assert "0.8.9" in win.windowTitle()
+            assert "0.9.0" in win.windowTitle()
             from instantlensdoc.ui.help_dialog import AboutDialog, HelpDialog, open_log_folder
 
             about = AboutDialog(win)
-            assert "0.8.9" in about.windowTitle()
+            assert "0.9.0" in about.windowTitle()
             help_dlg = HelpDialog(win)
             assert help_dlg.windowTitle() == "Hilfe"
             assert callable(open_log_folder)
@@ -4066,7 +4110,7 @@ def main() -> int:
             win.apply_tray_setting()
             if win._tray is not None:
                 tip = win._tray.toolTip()
-                assert "0.8.9" in tip and "InstantLens Doc" in tip
+                assert "0.9.0" in tip and "InstantLens Doc" in tip
             set_minimize_to_tray(False)
             win.apply_tray_setting()
             print("0.3.9 fit-h/ann-stats/special/tray: OK")
@@ -4079,9 +4123,9 @@ def main() -> int:
             from instantlensdoc.ui.password_dialog import CompressPdfDialog, SetPasswordDialog
             from instantlensdoc.ui.stubs import PLANNED
             assert KeyboardHelpDialog and SetPasswordDialog and CompressPdfDialog
-            assert "0.8.9" in PLANNED["ki"]
+            assert "0.9.0" in PLANNED["ki"]
             assert "Coming soon" in PLANNED["cloud"]
-            assert "0.8.9" in PLANNED["stylus"] and "0.8.9" in PLANNED["extrude3d"]
+            assert "0.9.0" in PLANNED["stylus"] and "0.9.0" in PLANNED["extrude3d"]
             # Toolbar ↔ Menü Sync Graustufen/Nacht
             win.pdf_view.set_grayscale(True)
             assert win._grayscale_action.isChecked()
@@ -4116,7 +4160,7 @@ def main() -> int:
             assert win.editor.toPlainText().splitlines() == ["one", "two"]
             from instantlensdoc.ui.help_dialog import HELP_HTML
 
-            assert "Stub 0.8.9" in HELP_HTML
+            assert "Stub 0.9.0" in HELP_HTML
             assert "scripts/sync-ild.ps1" in HELP_HTML
             assert "Präsentationsmodus" in HELP_HTML or "F5" in (
                 ROOT / "instantlensdoc" / "ui" / "keyboard_help.py"
@@ -5101,6 +5145,9 @@ def main() -> int:
             win.pdf_view.store.import_page_favorites_json(fav_qt)
             assert win.pdf_view.list_page_favorites() == [0, 2]
             win._refresh_page_favorites()
+            # Ohne Auswahl → Standard-Deckkraft; mit Auswahl → nur Objekt (0.9.0)
+            win.pdf_view._selected_ann_id = None
+            win.pdf_view._selected_ann_ids = []
             win.pdf_view.slider_opacity.blockSignals(True)
             win.pdf_view.slider_opacity.setValue(40)
             win.pdf_view.slider_opacity.blockSignals(False)
@@ -5120,8 +5167,10 @@ def main() -> int:
             win.pdf_view.store.add(ann059)
             win.pdf_view._selected_ann_id = ann059.id
             win.pdf_view._selected_ann_ids = {ann059.id}
+            before_def059 = float(win.pdf_view._default_opacity)
             win.pdf_view._on_opacity_slider_changed(65)
             assert abs(win.pdf_view.store.get(ann059.id).opacity - 0.65) < 0.001
+            assert abs(float(win.pdf_view._default_opacity) - before_def059) < 0.001
             win.stack.setCurrentWidget(win.editor_pane)
             win.editor.setPlainText("a\nb\nc\nd\n")
             win.editor.clear_line_bookmarks()
@@ -7116,10 +7165,99 @@ def main() -> int:
             assert "## 0.8.9" in cl089q
             print("0.8.9 Qt group-filter/json/thumb-open/overlay-edges/line-hl: OK")
 
+            # --- 0.9.0 Qt: Tab Mittelklick/Andere, PDF-Suche F3, Opacity-Auswahl, Session-Toggles ---
+            from instantlensdoc.core.app_settings import (
+                get_restore_window_geometry_on_start as get_geo090,
+                set_restore_window_geometry_on_start as set_geo090,
+            )
+            from instantlensdoc.ui.settings_dialog import SettingsDialog as SD090q
+            from PySide6.QtGui import QKeySequence
+
+            assert callable(getattr(win, "close_tab_path", None))
+            assert callable(getattr(win, "close_other_tabs_keeping", None))
+            assert hasattr(win.sidebar, "document_close_requested")
+            assert hasattr(win.sidebar, "document_close_others_requested")
+            assert hasattr(win.sidebar.files, "document_close_requested")
+            assert callable(getattr(win.pdf_view, "search_next", None))
+            assert callable(getattr(win.pdf_view, "search_prev", None))
+            assert callable(getattr(win.pdf_view, "highlight_search", None))
+            assert callable(getattr(win.pdf_view, "_find_search_on_pages", None))
+            assert callable(getattr(win.pdf_view, "search_active_index", None))
+            sd090q = SD090q(win)
+            assert hasattr(sd090q, "restore_geometry")
+            assert hasattr(sd090q, "restore_session")
+            set_geo090(False)
+            sd090q.restore_geometry.setChecked(False)
+            sd090q.restore_session.setChecked(True)
+            sd090q._save()
+            assert get_geo090() is False
+            set_geo090(True)
+            sd090q.restore_geometry.setChecked(True)
+            sd090q._save()
+            assert get_geo090() is True
+            # Opacity-Slider: Auswahl → nur Objekt; ohne Auswahl → Default
+            if win.pdf_view.store is not None:
+                from ild_pdf import Annotation as A090q, AnnotationType as T090q
+
+                a090 = A090q(0, T090q.HIGHLIGHT, 12, 12, width=24, height=10, text="op090", opacity=1.0)
+                win.pdf_view.store.add(a090)
+                win.pdf_view._selected_ann_id = a090.id
+                win.pdf_view._selected_ann_ids = [a090.id]
+                before_default = float(win.pdf_view._default_opacity)
+                win.pdf_view._on_opacity_slider_changed(40)
+                ann090 = win.pdf_view.store.get(a090.id)
+                assert ann090 is not None
+                assert abs(float(ann090.opacity) - 0.40) < 0.02
+                assert abs(float(win.pdf_view._default_opacity) - before_default) < 0.02
+                win.pdf_view._selected_ann_id = None
+                win.pdf_view._selected_ann_ids = []
+                win.pdf_view._on_opacity_slider_changed(55)
+                assert abs(float(win.pdf_view._default_opacity) - 0.55) < 0.02
+            # PDF-Suche Highlight + next/prev API
+            if win.pdf_view.pdf_path:
+                n_hl = win.pdf_view.highlight_search("a")
+                if n_hl > 0:
+                    assert win.pdf_view.search_active_index() >= 0
+                    assert win.pdf_view.search_next() is True
+                    assert win.pdf_view.search_prev() is True
+                win.pdf_view.clear_search_highlights()
+            # F3 / Shift+F3 Shortcuts vorhanden
+            from PySide6.QtGui import QAction as QA090
+
+            find_next_ok = False
+            find_prev_ok = False
+            for act in win.findChildren(QA090):
+                sc = act.shortcut()
+                if sc == QKeySequence.FindNext or sc.toString() in ("F3", "Find Next"):
+                    find_next_ok = True
+                if sc == QKeySequence.FindPrevious or "Shift+F3" in sc.toString() or sc.toString() in (
+                    "Shift+F3",
+                    "Find Previous",
+                ):
+                    find_prev_ok = True
+            assert find_next_ok and find_prev_ok
+            # Tab close helpers: close_other_tabs_keeping / close_tab_path callable
+            t1 = Path(tempfile.mkdtemp()) / "tab090a.txt"
+            t2 = Path(tempfile.mkdtemp()) / "tab090b.txt"
+            t1.write_text("alpha\n", encoding="utf-8")
+            t2.write_text("beta\n", encoding="utf-8")
+            win.sidebar.add_document(str(t1))
+            win.sidebar.add_document(str(t2))
+            win.open_path(str(t1))
+            win.close_other_tabs_keeping(str(t1))
+            paths_keep = win.sidebar.document_paths()
+            assert str(t1) in paths_keep or any(Path(p).name == t1.name for p in paths_keep)
+            assert not any(Path(p).name == t2.name for p in paths_keep)
+            feat090q = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
+            assert "0.9.0" in feat090q
+            cl090q = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+            assert "## 0.9.0" in cl090q
+            print("0.9.0 Qt tab-midclick/search-f3/opacity/session-toggles: OK")
+
             print("0.4.x selected Qt marks/schema/sort/reset: OK")
             print("0.4.2 Qt outline/copy-paste/case/progress: OK")
             print("0.4.1 Qt links/stamp/encoding/drop: OK")
-            print("0.3.x–0.8.9 review OK")
+            print("0.3.x–0.9.0 review OK")
             assert callable(win.pdf_view.bake_redactions)
             assert callable(win.pdf_view.clear_redactions)
             assert callable(win._set_pdf_password)

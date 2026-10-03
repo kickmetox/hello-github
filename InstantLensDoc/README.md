@@ -2,7 +2,7 @@
 
 Moderne Textverarbeitung mit PDF-Annotator, OCR-Bridge und Formulargenerator.
 
-**Version:** 0.8.9  
+**Version:** 0.9.0  
 **Hersteller:** Andreas Meyer · ame@sellerbach.de
 
 ## Quickstart (Windows)
@@ -32,8 +32,8 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an).
 
-## Neu in 0.8.9
+## Neu in 0.9.0
 
-Ann.-Gruppen Filter („nur diese Gruppe“) + JSON-Export, Thumbnail-Batch Auswahl als neues Dokument in neuem Tab, Seitennummer-Overlay Ausschluss erste/letzte Seite, Editor aktuelle Zeile hervorheben. Stubs KI/Cloud/Stylus/3D unverändert.
+Dokument-Tabs Mittelklick schließen + Kontextmenü „Andere schließen“, PDF-Suche Treffer-Highlight + F3/Shift+F3, Annotation Opacity-Slider für Auswahl (Toolbar), Session-Toggles Fenstergeometrie + offene Tabs. Stubs KI/Cloud/Stylus/3D unverändert.
 
 Siehe [CHANGELOG.md](CHANGELOG.md), [FEATURES.md](FEATURES.md) und [INFO.md](INFO.md).

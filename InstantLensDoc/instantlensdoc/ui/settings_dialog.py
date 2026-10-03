@@ -66,6 +66,7 @@ from instantlensdoc.core.app_settings import (
     get_page_number_overlay_start,
     get_show_page_number_overlay,
     get_restore_session_on_start,
+    get_restore_window_geometry_on_start,
     get_merge_diff_max_side,
     get_recent_files_max,
     get_search_snippet_context_chars,
@@ -132,6 +133,7 @@ from instantlensdoc.core.app_settings import (
     set_page_number_overlay_start,
     set_show_page_number_overlay,
     set_restore_session_on_start,
+    set_restore_window_geometry_on_start,
     set_merge_diff_max_side,
     set_search_snippet_context_chars,
     set_search_snippet_ellipsis_style,
@@ -374,10 +376,17 @@ class SettingsDialog(QDialog):
         )
         form.addRow(self.backup_on_save)
 
-        self.restore_session = QCheckBox("Beim Start letzte Session wiederherstellen")
+        self.restore_geometry = QCheckBox("Fenstergeometrie wiederherstellen")
+        self.restore_geometry.setChecked(get_restore_window_geometry_on_start())
+        self.restore_geometry.setToolTip(
+            "Größe, Position und Fensterzustand der letzten Sitzung beim Start laden"
+        )
+        form.addRow(self.restore_geometry)
+
+        self.restore_session = QCheckBox("Offene Tabs wiederherstellen")
         self.restore_session.setChecked(get_restore_session_on_start())
         self.restore_session.setToolTip(
-            "Offene Dokumente der letzten Sitzung beim Start laden (optional)"
+            "Offene Dokument-Tabs der letzten Sitzung beim Start laden (Session)"
         )
         form.addRow(self.restore_session)
 
@@ -839,6 +848,7 @@ class SettingsDialog(QDialog):
         )
         set_minimize_to_tray(self.minimize_tray.isChecked())
         set_backup_on_save(self.backup_on_save.isChecked())
+        set_restore_window_geometry_on_start(self.restore_geometry.isChecked())
         set_restore_session_on_start(self.restore_session.isChecked())
         set_page_size_unit(str(self.page_unit.currentData() or "mm"))
         set_pdf_grayscale(self.pdf_grayscale.isChecked())

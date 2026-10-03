@@ -76,19 +76,60 @@ class DocumentList(QListWidget):
     """Dokument-/Session-Tabs; Drag InternalMove → Reihenfolge speichern."""
 
     documents_reordered = Signal()
+    document_close_requested = Signal(str)  # Pfad schließen (Mittelklick / Kontext)
+    document_close_others_requested = Signal(str)  # andere schließen, diesen behalten
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setMaximumHeight(100)
         self.setDragDropMode(QAbstractItemView.InternalMove)
         self.setDefaultDropAction(Qt.MoveAction)
-        self.setToolTip("Ziehen zum Neuordnen — Reihenfolge wird in der Session gespeichert")
+        self.setToolTip(
+            "Ziehen zum Neuordnen — Mittelklick schließt Tab — "
+            "Rechtsklick: Schließen / Andere schließen"
+        )
+        self.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.customContextMenuRequested.connect(self._context_menu)
         self._reorder_enabled = True
 
     def set_reorder_enabled(self, enabled: bool):
         self._reorder_enabled = bool(enabled)
         mode = QAbstractItemView.InternalMove if enabled else QAbstractItemView.NoDragDrop
         self.setDragDropMode(mode)
+
+    def _item_path(self, item) -> str:
+        if item is None:
+            return ""
+        p = item.data(256) or item.data(Qt.UserRole) or item.toolTip() or item.text()
+        return str(p).strip() if p else ""
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MiddleButton:
+            try:
+                pt = event.position().toPoint()
+            except Exception:
+                pt = event.pos()
+            item = self.itemAt(pt)
+            path = self._item_path(item)
+            if path:
+                self.document_close_requested.emit(path)
+                event.accept()
+                return
+        super().mousePressEvent(event)
+
+    def _context_menu(self, pos):
+        item = self.itemAt(pos)
+        path = self._item_path(item)
+        if not path:
+            return
+        menu = QMenu(self)
+        act_close = menu.addAction("Schließen")
+        act_others = menu.addAction("Andere schließen")
+        chosen = menu.exec(self.mapToGlobal(pos))
+        if chosen is act_close:
+            self.document_close_requested.emit(path)
+        elif chosen is act_others:
+            self.document_close_others_requested.emit(path)
 
     def dropEvent(self, event):
         if not self._reorder_enabled:
@@ -320,6 +361,8 @@ class Sidebar(QWidget):
     page_favorite_activated = Signal(int)  # PDF-Seite 0-basiert (Favoriten-Liste)
     page_favorites_reordered = Signal(list)  # Seiten 0-basiert neue Reihenfolge
     documents_reordered = Signal()  # Dokument-/Session-Tab-Reihenfolge geändert
+    document_close_requested = Signal(str)  # Sidebar-Tab schließen (Pfad)
+    document_close_others_requested = Signal(str)  # Andere Tabs schließen (Keep-Pfad)
     line_favorite_activated = Signal(int)  # Editor-Zeile 1-basiert
     line_favorite_label_edit = Signal(int)  # Editor-Zeile 1-basiert → Label bearbeiten
     line_favorites_reordered = Signal(list)  # 1-basierte Zeilen neue Reihenfolge
@@ -433,10 +476,14 @@ class Sidebar(QWidget):
         self.recent.itemDoubleClicked.connect(self._activate_recent)
         layout.addWidget(self.recent)
 
-        layout.addWidget(QLabel("Dokumente — ziehen zum Ordnen"))
+        layout.addWidget(QLabel("Dokumente — ziehen / Mittelklick / Rechtsklick"))
         self.files = DocumentList()
         self.files.itemDoubleClicked.connect(self._activate)
         self.files.documents_reordered.connect(self.documents_reordered.emit)
+        self.files.document_close_requested.connect(self.document_close_requested.emit)
+        self.files.document_close_others_requested.connect(
+            self.document_close_others_requested.emit
+        )
         layout.addWidget(self.files)
 
         layout.addWidget(QLabel("Seiten (Vorschaubilder) — ziehen zum Ordnen"))

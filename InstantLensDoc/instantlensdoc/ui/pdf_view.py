@@ -1384,10 +1384,10 @@ class PdfViewer(QWidget):
         self.spin_opacity.setPrefix("α ")
         self.spin_opacity.setFixedWidth(78)
         self.spin_opacity.setToolTip(
-            "Deckkraft: Standard für neue Annotationen; bei Auswahl → ausgewählte Ann."
+            "Deckkraft: bei Auswahl → ausgewähltes Objekt; sonst Standard für neue Ann."
         )
         self.spin_opacity.valueChanged.connect(self._on_default_opacity_changed)
-        # Toolbar-Slider (0.05–1.0 als 5–100 %) — nicht nur Dialog α…
+        # Toolbar-Slider (0.05–1.0 als 5–100 %) — ausgewähltes Objekt oder Standard
         self.slider_opacity = QSlider(Qt.Horizontal)
         self.slider_opacity.setRange(5, 100)
         self.slider_opacity.setSingleStep(5)
@@ -1395,7 +1395,7 @@ class PdfViewer(QWidget):
         self.slider_opacity.setFixedWidth(88)
         self.slider_opacity.setValue(int(round(self._default_opacity * 100)))
         self.slider_opacity.setToolTip(
-            "Annotation-Deckkraft per Slider (Auswahl oder Standard) — ohne Dialog"
+            "Opacity-Slider: Deckkraft des ausgewählten Objekts; ohne Auswahl → Standard"
         )
         self.slider_opacity.valueChanged.connect(self._on_opacity_slider_changed)
         self.btn_grayscale = QToolButton()
@@ -1832,15 +1832,17 @@ class PdfViewer(QWidget):
             self.spin_opacity.blockSignals(False)
 
     def _apply_toolbar_opacity(self, value: float) -> None:
-        """Standard-Deckkraft setzen; bei Auswahl alle ausgewählten Ann. aktualisieren."""
-        self._default_opacity = max(0.05, min(1.0, float(value)))
-        set_ann_default_opacity(self._default_opacity)
+        """
+        Opacity-Slider/Spin: bei Auswahl nur ausgewählte Objekte;
+        ohne Auswahl → Standard-Deckkraft für neue Annotationen.
+        """
+        op = max(0.05, min(1.0, float(value)))
         ids = list(self._selected_ann_ids) if self._selected_ann_ids else (
             [self._selected_ann_id] if self._selected_ann_id else []
         )
         ids = [i for i in ids if i]
         if self.store and ids:
-            n = self.store.set_opacities(ids, self._default_opacity)
+            n = self.store.set_opacities(ids, op)
             if n > 0:
                 try:
                     self.schedule_sidecar_save(force=True)
@@ -1848,9 +1850,11 @@ class PdfViewer(QWidget):
                     pass
                 self.refresh()
                 self.annotations_changed.emit()
-                self.status.emit(
-                    f"Deckkraft {self._default_opacity:.2f} für {n} Annotation(en)"
-                )
+                self.status.emit(f"Deckkraft {op:.2f} für {n} ausgewählte Annotation(en)")
+            return
+        self._default_opacity = op
+        set_ann_default_opacity(self._default_opacity)
+        self.status.emit(f"Standard-Deckkraft {self._default_opacity:.2f}")
 
     def _on_default_opacity_changed(self, value: float):
         self._sync_opacity_controls(value, from_slider=False)
@@ -3208,33 +3212,118 @@ class PdfViewer(QWidget):
         self.canvas.set_search_highlights(self._search_rects, self._search_index)
         return n
 
-    def search_next(self) -> bool:
-        """Nächster Treffer auf aktueller Seite; wrappt. False wenn keine Treffer."""
-        if not self._search_query:
+    def _goto_search_page(self, page_index: int, *, hit_index: int = 0) -> bool:
+        """Seite wechseln und Treffer-Highlight setzen. False wenn keine Treffer."""
+        if not self.pdf_path or not self._search_query:
             return False
-        if not self._search_rects:
+        if page_index < 0 or page_index >= self.page_count:
+            return False
+        if page_index != self.page_index:
+            self.goto_page(page_index)
+        else:
             self._rebuild_search_rects(keep_index=False)
         if not self._search_rects:
             return False
-        self._search_index = (self._search_index + 1) % len(self._search_rects)
+        self._search_index = max(0, min(int(hit_index), len(self._search_rects) - 1))
         self.canvas.set_search_highlights(self._search_rects, self._search_index)
         return True
 
-    def search_prev(self) -> bool:
-        """Vorheriger Treffer auf aktueller Seite; wrappt. False wenn keine Treffer."""
+    def _find_search_on_pages(
+        self,
+        *,
+        start: int,
+        direction: int,
+        stop_exclusive: int | None = None,
+    ) -> bool:
+        """Nächste Seite mit Query-Treffern ab start (direction ±1)."""
+        if not self.pdf_path or not self._search_query or self.page_count <= 0:
+            return False
+        step = 1 if direction >= 0 else -1
+        i = int(start)
+        while 0 <= i < self.page_count:
+            if stop_exclusive is not None and i == stop_exclusive:
+                break
+            matches = find_text_rects(
+                self.pdf_path,
+                i,
+                self._search_query,
+                scale=self.scale,
+                password=self.password,
+            )
+            if matches:
+                hit = 0 if step > 0 else len(matches) - 1
+                return self._goto_search_page(i, hit_index=hit)
+            i += step
+        return False
+
+    def search_next(self) -> bool:
+        """Nächster Treffer: Seite → weitere Seiten → Wrap. False wenn keine Treffer."""
         if not self._search_query:
             return False
         if not self._search_rects:
             self._rebuild_search_rects(keep_index=False)
-        if not self._search_rects:
+        if self._search_rects:
+            if self._search_index < len(self._search_rects) - 1:
+                self._search_index += 1
+                self.canvas.set_search_highlights(self._search_rects, self._search_index)
+                return True
+            # Letzter Treffer der Seite → folgende Seiten, sonst Wrap ab Anfang
+            if self._find_search_on_pages(start=self.page_index + 1, direction=1):
+                return True
+            if self._find_search_on_pages(
+                start=0, direction=1, stop_exclusive=self.page_index + 1
+            ):
+                return True
+            self._search_index = 0
+            self.canvas.set_search_highlights(self._search_rects, self._search_index)
+            return True
+        if self._find_search_on_pages(start=self.page_index + 1, direction=1):
+            return True
+        if self._find_search_on_pages(
+            start=0, direction=1, stop_exclusive=self.page_index + 1
+        ):
+            return True
+        return False
+
+    def search_prev(self) -> bool:
+        """Vorheriger Treffer: Seite → vorherige Seiten → Wrap. False wenn keine Treffer."""
+        if not self._search_query:
             return False
-        n = len(self._search_rects)
-        self._search_index = (self._search_index - 1) % n if self._search_index >= 0 else n - 1
-        self.canvas.set_search_highlights(self._search_rects, self._search_index)
-        return True
+        if not self._search_rects:
+            self._rebuild_search_rects(keep_index=False)
+        if self._search_rects:
+            if self._search_index > 0:
+                self._search_index -= 1
+                self.canvas.set_search_highlights(self._search_rects, self._search_index)
+                return True
+            if self._find_search_on_pages(start=self.page_index - 1, direction=-1):
+                return True
+            if self._find_search_on_pages(
+                start=self.page_count - 1,
+                direction=-1,
+                stop_exclusive=self.page_index - 1,
+            ):
+                return True
+            n = len(self._search_rects)
+            self._search_index = n - 1
+            self.canvas.set_search_highlights(self._search_rects, self._search_index)
+            return True
+        if self._find_search_on_pages(start=self.page_index - 1, direction=-1):
+            return True
+        if self._find_search_on_pages(
+            start=self.page_count - 1,
+            direction=-1,
+            stop_exclusive=self.page_index - 1,
+        ):
+            return True
+        return False
 
     def search_hit_count(self) -> int:
         return len(self._search_rects)
+
+    def search_active_index(self) -> int:
+        """0-basierter Index des aktiven Treffer-Highlights (−1 wenn keiner)."""
+        return int(self._search_index)
 
     def set_scale(self, scale: float, *, immediate: bool = False):
         scale = max(0.25, min(5.0, float(scale)))

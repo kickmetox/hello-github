@@ -59,6 +59,7 @@ from instantlensdoc.core.app_settings import (
     get_page_size_unit,
     get_pdf_thumbnail_scale,
     get_restore_session_on_start,
+    get_restore_window_geometry_on_start,
     get_update_check_on_start,
     get_window_geometry_b64,
     get_window_state_b64,
@@ -157,6 +158,8 @@ class MainWindow(QMainWindow):
 
         from PySide6.QtCore import QByteArray
 
+        if not get_restore_window_geometry_on_start():
+            return
         geo = get_window_geometry_b64()
         state = get_window_state_b64()
         if geo:
@@ -386,6 +389,8 @@ class MainWindow(QMainWindow):
         self.sidebar.search_prev_requested.connect(self._on_search_prev)
         self.sidebar.search_export_requested.connect(self._on_search_export)
         self.sidebar.file_activated.connect(self.open_path)
+        self.sidebar.document_close_requested.connect(self.close_tab_path)
+        self.sidebar.document_close_others_requested.connect(self.close_other_tabs_keeping)
         self.sidebar.recent_activated.connect(self.open_path)
         self.sidebar.recent_remove_requested.connect(self._remove_recent_path)
         self.sidebar.mark_activated.connect(self._on_mark_activated)
@@ -744,6 +749,20 @@ class MainWindow(QMainWindow):
         act_find.setShortcut(QKeySequence.Find)
         act_find.triggered.connect(self._focus_search)
         m_edit.addAction(act_find)
+        act_find_next = QAction("Weitersuchen", self)
+        act_find_next.setShortcut(QKeySequence.FindNext)  # F3
+        act_find_next.setToolTip(
+            "Nächster Suchtreffer (F3) — PDF: Highlight auf Seite, Editor: nächster Treffer"
+        )
+        act_find_next.triggered.connect(self._on_search_next)
+        m_edit.addAction(act_find_next)
+        act_find_prev = QAction("Rückwärtssuchen", self)
+        act_find_prev.setShortcut(QKeySequence.FindPrevious)  # Shift+F3
+        act_find_prev.setToolTip(
+            "Vorheriger Suchtreffer (Shift+F3) — PDF: Highlight auf Seite"
+        )
+        act_find_prev.triggered.connect(self._on_search_prev)
+        m_edit.addAction(act_find_prev)
         act_find_repl = QAction("Suchen und Ersetzen…", self)
         act_find_repl.setShortcut(QKeySequence("Ctrl+R"))
         act_find_repl.setToolTip("Find/Replace im Texteditor")
@@ -4878,6 +4897,9 @@ class MainWindow(QMainWindow):
         path = str(self.doc.path) if self.doc.path else None
         if path:
             self.sidebar.remove_document(path)
+            key = self._path_key(path)
+            if key:
+                self._unsaved_paths.discard(key)
         remaining = self.sidebar.document_paths()
         self.doc = None
         try:
@@ -4902,6 +4924,46 @@ class MainWindow(QMainWindow):
         else:
             self._set_status("Dokument geschlossen")
 
+    def close_tab_path(self, path: str) -> None:
+        """Sidebar-Tab schließen (Mittelklick / Kontextmenü) — dirty → Speichern-Dialog."""
+        target = str(Path(path)) if path else ""
+        if not target:
+            self._set_status("Kein Tab zum Schließen")
+            return
+        cur = str(Path(self.doc.path)) if self.doc and self.doc.path else None
+        if cur and target == cur:
+            self.close_current_tab()
+            return
+        key = self._path_key(target)
+        if key and key in self._unsaved_paths and Path(target).is_file():
+            # Dirty anderer Tab: erst aktivieren, dann mit Bestätigung schließen
+            self.open_path(target)
+            self.close_current_tab()
+            return
+        if not self.sidebar.remove_document(target):
+            self._set_status("Tab nicht in der Liste")
+            return
+        if key:
+            self._unsaved_paths.discard(key)
+        try:
+            self._save_session()
+        except Exception:
+            pass
+        self._update_unsaved_status()
+        self._refresh_document_dirty_labels()
+        self._set_status(f"Tab geschlossen: {Path(target).name}")
+
+    def close_other_tabs_keeping(self, keep_path: str) -> None:
+        """Andere Tabs schließen; Keep-Pfad aktivieren (Kontextmenü „Andere schließen“)."""
+        keep = str(Path(keep_path)) if keep_path else ""
+        if not keep or not Path(keep).is_file():
+            self._set_status("Kein Tab zum Behalten")
+            return
+        cur = str(Path(self.doc.path)) if self.doc and self.doc.path else None
+        if cur != keep:
+            self.open_path(keep)
+        self.close_other_tabs()
+
     def close_other_tabs(self):
         """Alle Sidebar-Dokumente schließen außer dem aktuellen."""
         if not self.doc:
@@ -4914,9 +4976,12 @@ class MainWindow(QMainWindow):
             return
         closed = 0
         for p in paths:
-            if keep and str(p) == keep:
+            if keep and str(Path(str(p))) == str(Path(keep)):
                 continue
             self.sidebar.remove_document(p)
+            key = self._path_key(p)
+            if key:
+                self._unsaved_paths.discard(key)
             closed += 1
         if closed == 0:
             self._set_status("Keine anderen Tabs zum Schließen")
@@ -4925,6 +4990,8 @@ class MainWindow(QMainWindow):
             self._save_session()
         except Exception:
             pass
+        self._update_unsaved_status()
+        self._refresh_document_dirty_labels()
         self._set_status(f"{closed} andere Tab(s) geschlossen — aktuell bleibt offen")
 
     def _pdf_page_size(self):
