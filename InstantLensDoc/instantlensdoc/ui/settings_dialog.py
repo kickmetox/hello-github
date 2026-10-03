@@ -122,6 +122,8 @@ from instantlensdoc.core.app_settings import (
     get_pdf_thumbnail_scale,
     get_redaction_preview_opacity,
     get_thumb_lazy_threshold,
+    get_thumb_prefetch_cancel_ms,
+    get_thumb_prefetch_radius,
     get_pdf_two_page_spread,
     get_editor_current_line_highlight,
     get_editor_indent_guides,
@@ -159,6 +161,8 @@ from instantlensdoc.core.app_settings import (
     STATUS_BLINK_CHOICES,
     PDF_THUMBNAIL_SCALE_CHOICES,
     THUMB_LAZY_THRESHOLD_CHOICES,
+    THUMB_PREFETCH_CANCEL_MS_CHOICES,
+    THUMB_PREFETCH_RADIUS_CHOICES,
     reset_ann_color_presets,
     reset_to_defaults,
     save_settings,
@@ -207,6 +211,8 @@ from instantlensdoc.core.app_settings import (
     set_pdf_thumbnail_scale,
     set_redaction_preview_opacity,
     set_thumb_lazy_threshold,
+    set_thumb_prefetch_cancel_ms,
+    set_thumb_prefetch_radius,
     set_pdf_two_page_spread,
     set_page_number_overlay_font_size,
     set_page_number_overlay_format,
@@ -368,6 +374,32 @@ class SettingsDialog(QDialog):
             "Ab dieser Seitenanzahl Lazy-Load mit Platzhaltern (25 / 50 / 100) — 1.3.1"
         )
         form.addRow("Thumbnail-Lazy ab", self.thumb_lazy)
+
+        self.thumb_prefetch = QComboBox()
+        cur_pref = get_thumb_prefetch_radius()
+        pref_pick = 0
+        for i, n in enumerate(THUMB_PREFETCH_RADIUS_CHOICES):
+            self.thumb_prefetch.addItem(f"±{n}", n)
+            if n == cur_pref:
+                pref_pick = i
+        self.thumb_prefetch.setCurrentIndex(pref_pick)
+        self.thumb_prefetch.setToolTip(
+            "Thumbnail Prefetch um Viewport (±1 / ±2 / ±3) — 1.3.3"
+        )
+        form.addRow("Thumbnail-Prefetch", self.thumb_prefetch)
+
+        self.thumb_cancel_ms = QComboBox()
+        cur_cancel = get_thumb_prefetch_cancel_ms()
+        cancel_pick = 0
+        for i, ms in enumerate(THUMB_PREFETCH_CANCEL_MS_CHOICES):
+            self.thumb_cancel_ms.addItem(f"{ms} ms", ms)
+            if ms == cur_cancel:
+                cancel_pick = i
+        self.thumb_cancel_ms.setCurrentIndex(cancel_pick)
+        self.thumb_cancel_ms.setToolTip(
+            "Cancel-Debounce bei schnellem Thumbnail-Scroll (ms) — 1.3.3"
+        )
+        form.addRow("Prefetch-Cancel-Debounce", self.thumb_cancel_ms)
 
         self.redact_opacity = QDoubleSpinBox()
         self.redact_opacity.setRange(0.05, 1.0)
@@ -1712,6 +1744,16 @@ class SettingsDialog(QDialog):
         except (TypeError, ValueError):
             lazy_th = 50
         set_thumb_lazy_threshold(lazy_th)
+        try:
+            pref_r = int(self.thumb_prefetch.currentData() or 2)
+        except (TypeError, ValueError):
+            pref_r = 2
+        set_thumb_prefetch_radius(pref_r)
+        try:
+            cancel_ms = int(self.thumb_cancel_ms.currentData() or 90)
+        except (TypeError, ValueError):
+            cancel_ms = 90
+        set_thumb_prefetch_cancel_ms(cancel_ms)
         set_redaction_preview_opacity(float(self.redact_opacity.value()))
         set_autosave_enabled(self.autosave_enabled.isChecked())
         try:

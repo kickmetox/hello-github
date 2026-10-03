@@ -692,7 +692,9 @@ class Sidebar(QWidget):
         form_edit_row.addWidget(self.btn_form_save)
         self.btn_form_csv = QPushButton("CSV")
         self.btn_form_csv.setFixedWidth(40)
-        self.btn_form_csv.setToolTip("Feldliste als CSV exportieren — 1.3.2")
+        self.btn_form_csv.setToolTip(
+            "Feldliste als CSV (Name,Typ,Wert,Seite,ReadOnly); Zielordner merken — 1.3.3"
+        )
         self.btn_form_csv.clicked.connect(self.form_fields_export_csv_requested.emit)
         form_edit_row.addWidget(self.btn_form_csv)
         self.form_edit_host = QWidget()
@@ -709,7 +711,7 @@ class Sidebar(QWidget):
         self.redactions.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self.redactions.setToolTip(
             "Schwärzungen — Doppelklick → Seite; Shift/Ctrl Mehrfachauswahl; "
-            "− löscht Auswahl (Undo Ctrl+Z) — 1.3.2"
+            "− löscht Auswahl mit Zähler-Bestätigung (ein Undo) — 1.3.3"
         )
         self.redactions.itemDoubleClicked.connect(self._activate_redaction)
         self.redactions.itemActivated.connect(self._activate_redaction)
@@ -718,7 +720,7 @@ class Sidebar(QWidget):
         self.btn_redaction_del = QPushButton("−")
         self.btn_redaction_del.setFixedWidth(28)
         self.btn_redaction_del.setToolTip(
-            "Ausgewählte Schwärzung(en) löschen (Mehrfachauswahl, Undo) — 1.3.2"
+            "Ausgewählte Schwärzung(en) löschen — Bestätigung mit Zähler, ein Undo — 1.3.3"
         )
         self.btn_redaction_del.clicked.connect(self._emit_redaction_delete)
         red_btns.addWidget(self.btn_redaction_del)
@@ -2059,7 +2061,7 @@ class Sidebar(QWidget):
             item.setData(256, a)
             item.setToolTip(
                 f"Schwärzung Seite {page} — Doppelklick springt hin; "
-                "Mehrfachauswahl + − löschen (Undo) — 1.3.2"
+                "Mehrfachauswahl + − löschen (Zähler, ein Undo) — 1.3.3"
             )
             self.redactions.addItem(item)
 
@@ -2079,7 +2081,7 @@ class Sidebar(QWidget):
         return max(0, min(n - 1, int(round(ratio * (n - 1)))))
 
     def _on_thumbs_scrolled(self, value: int = 0) -> None:
-        """Viewport-Mitte melden; schneller Scroll → cancel_fast — 1.3.2."""
+        """Viewport-Mitte melden; schneller Scroll → cancel_fast (Debounce ms Settings) — 1.3.3."""
         import time
 
         if not getattr(self, "_thumb_scroll_emit_armed", True):
@@ -2090,9 +2092,16 @@ class Sidebar(QWidget):
         dv = abs(int(value) - int(getattr(self, "_thumb_scroll_last_v", 0) or 0))
         self._thumb_scroll_last_t = now
         self._thumb_scroll_last_v = int(value)
-        # Debounce: bei sehr schnellen Folge-Events nur cancel merken
+        # Debounce ms aus Settings (Cancel bei schnellem Scroll) — 1.3.3
+        try:
+            from instantlensdoc.core.app_settings import get_thumb_prefetch_cancel_ms
+
+            cancel_ms = float(get_thumb_prefetch_cancel_ms())
+        except Exception:
+            cancel_ms = 90.0
+        cancel_s = max(0.01, cancel_ms / 1000.0)
         center = self.visible_thumb_center()
-        cancel_fast = bool(last_t and dt < 0.09 and dv > 24)
+        cancel_fast = bool(last_t and dt < cancel_s and dv > 24)
         self.thumbs_viewport_changed.emit(center, cancel_fast)
 
     def search_hit_records(self) -> list[dict]:

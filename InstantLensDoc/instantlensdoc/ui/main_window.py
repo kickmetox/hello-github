@@ -5985,7 +5985,7 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Formularfelder", str(e))
 
     def _on_form_fields_export_csv(self) -> None:
-        """AcroForm-Feldliste als CSV exportieren — 1.3.2."""
+        """AcroForm-Feldliste CSV (Name/Typ/Wert/Seite/ReadOnly); Zielordner merken — 1.3.3."""
         path = self.pdf_view.pdf_path
         if not path:
             self._set_status("Feldliste CSV: PDF öffnen")
@@ -6010,7 +6010,8 @@ class MainWindow(QMainWindow):
 
         from instantlensdoc.ui.file_dialogs import confirm_overwrite_export
 
-        start = str(_Path(path).with_name(f"{_Path(path).stem}_fields.csv"))
+        start_dir = dialog_start_dir(get_last_export_dir() or _Path(path).parent)
+        start = str(_Path(start_dir) / f"{_Path(path).stem}_fields.csv")
         dest, _ = QFileDialog.getSaveFileName(
             self, "Feldliste als CSV", start, "CSV (*.csv)"
         )
@@ -6022,7 +6023,8 @@ class MainWindow(QMainWindow):
             from ild_pdf.acroform import export_form_fields_csv
 
             out = export_form_fields_csv(path, fields, out_path=dest)
-            self._set_status(f"Feldliste CSV: {len(fields)} Feld(er) → {out.name}")
+            set_last_export_dir(out.parent)
+            self._set_status(f"Feldliste CSV: {len(fields)} Feld(er) → {out}")
         except Exception as e:
             QMessageBox.warning(self, "Feldliste CSV", str(e))
 
@@ -6058,7 +6060,7 @@ class MainWindow(QMainWindow):
             self._set_status(f"Schwärzung → Seite {int(ann.page) + 1}")
 
     def _on_redaction_delete(self, ann_or_list) -> None:
-        """Schwärzung(en) löschen — Mehrfachauswahl + eine Undo-Stufe — 1.3.2."""
+        """Schwärzung(en) löschen — Bestätigung mit Zähler; ein Undo-Stack-Eintrag — 1.3.3."""
         if not self.pdf_view.store or ann_or_list is None:
             return
         if isinstance(ann_or_list, (list, tuple)):
@@ -6082,11 +6084,19 @@ class MainWindow(QMainWindow):
             if not ids:
                 self._set_status("Schwärzung nicht gefunden")
                 return
-            label = (
-                f"{len(ids)} Schwärzung(en)"
-                if len(ids) > 1
-                else "Schwärzung"
+            n = len(ids)
+            reply = QMessageBox.question(
+                self,
+                "Schwärzungen löschen",
+                f"{n} Schwärzung(en) wirklich löschen?\n\n"
+                "Ein Undo-Schritt stellt alle wieder her (Ctrl+Z).",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No,
             )
+            if reply != QMessageBox.Yes:
+                self._set_status(f"Schwärzung löschen abgebrochen ({n})")
+                return
+            label = f"{n} Schwärzung(en)" if n > 1 else "Schwärzung"
             with self.pdf_view.store.atomic(label=label):
                 removed = 0
                 for aid in ids:
@@ -6175,7 +6185,7 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Bookmarks importieren", str(e))
 
     def _export_bookmarks_to_outline(self) -> None:
-        """Seiten-Favoriten als PDF-Outlines — Ziel aktuell/anderes PDF — 1.3.2."""
+        """Seiten-Favoriten als PDF-Outlines — Ziel aktuell/anderes; fehlende Datei; Status mit Pfad — 1.3.3."""
         if not self.pdf_view.pdf_path or self.pdf_view.store is None:
             QMessageBox.information(
                 self, "Bookmarks exportieren", "Bitte zuerst ein PDF öffnen."
@@ -6216,26 +6226,53 @@ class MainWindow(QMainWindow):
         clicked = box.clickedButton()
         if clicked is None or clicked not in (btn_current, btn_other):
             return
-        target = Path(self.pdf_view.pdf_path)
+        source = Path(self.pdf_view.pdf_path)
+        target = source
         if clicked is btn_other:
+            start = dialog_start_dir(get_last_export_dir() or source.parent)
+            suggest = str(Path(start) / f"{source.stem}_outlines.pdf")
             path, _ = QFileDialog.getSaveFileName(
                 self,
                 "Ziel-PDF für Outlines",
-                str(target.with_name(f"{target.stem}_outlines.pdf")),
+                suggest,
                 "PDF (*.pdf)",
             )
             if not path:
                 return
             target = Path(path)
-            # Anderes PDF: bestehende Datei öffnen oder Kopie des aktuellen schreiben
-            if not target.is_file():
+            # Anderes PDF: bestehende Datei nutzen oder Kopie; fehlende Quelle abfangen — 1.3.3
+            if target.is_file():
+                pass
+            else:
+                if not source.is_file():
+                    QMessageBox.warning(
+                        self,
+                        "Bookmarks exportieren",
+                        f"Quell-PDF nicht gefunden:\n{source}",
+                    )
+                    return
                 try:
                     import shutil
 
-                    shutil.copy2(self.pdf_view.pdf_path, target)
+                    shutil.copy2(source, target)
+                except FileNotFoundError:
+                    QMessageBox.warning(
+                        self,
+                        "Bookmarks exportieren",
+                        f"Datei nicht gefunden:\n{source}",
+                    )
+                    return
                 except Exception as e:
                     QMessageBox.warning(self, "Bookmarks exportieren", str(e))
                     return
+            if not target.is_file():
+                QMessageBox.warning(
+                    self,
+                    "Bookmarks exportieren",
+                    f"Ziel-PDF nicht gefunden:\n{target}",
+                )
+                return
+            set_last_export_dir(target.parent)
         entries: list[tuple[int, str]] = []
         for p in favs:
             try:
@@ -6251,10 +6288,16 @@ class MainWindow(QMainWindow):
             from ild_pdf.outline import outline_from_pages, write_outline
 
             write_outline(target, outline_from_pages(entries))
-            if target.resolve() == Path(self.pdf_view.pdf_path).resolve():
+            if target.resolve() == source.resolve():
                 self._refresh_outline(self.pdf_view.pdf_path)
             self._set_status(
-                f"{len(entries)} Bookmark(s) als PDF-Outline → {target.name}"
+                f"{len(entries)} Bookmark(s) als PDF-Outline → {target}"
+            )
+        except FileNotFoundError:
+            QMessageBox.warning(
+                self,
+                "Bookmarks exportieren",
+                f"Datei nicht gefunden:\n{target}",
             )
         except Exception as e:
             QMessageBox.warning(self, "Bookmarks exportieren", str(e))
@@ -6264,16 +6307,23 @@ class MainWindow(QMainWindow):
             self._stop_thumb_lazy()
             self.sidebar.clear_thumbs()
             return
-        # Lazy: Platzhalter; Prefetch ±2 um Viewport; Schwellwert Settings — 1.3.2
+        # Lazy: Platzhalter; Prefetch ±N (Settings); Schwellwert Settings — 1.3.3
         self._stop_thumb_lazy()
         try:
             from ild_pdf.limits import THUMB_LAZY_THRESHOLD
-            from instantlensdoc.core.app_settings import get_thumb_lazy_threshold
+            from instantlensdoc.core.app_settings import (
+                get_thumb_lazy_threshold,
+                get_thumb_prefetch_radius,
+            )
 
             try:
                 threshold = int(get_thumb_lazy_threshold())
             except Exception:
                 threshold = int(THUMB_LAZY_THRESHOLD)
+            try:
+                radius = int(get_thumb_prefetch_radius())
+            except Exception:
+                radius = 2
             page_count = int(self.pdf_view.page_count or 0)
             current = int(self.pdf_view.page_index or 0)
             # Alle Seiten als Platzhalter; große PDFs (>Threshold) immer lazy
@@ -6281,10 +6331,13 @@ class MainWindow(QMainWindow):
             token = self.sidebar.prepare_lazy_thumbs(
                 page_count, current=current, max_pages=max_pages or page_count
             )
-            self._start_thumb_lazy(token, page_count=page_count, prefer=current)
+            self._start_thumb_lazy(
+                token, page_count=page_count, prefer=current, radius=radius
+            )
             if page_count > threshold and hasattr(self, "file_status_label"):
                 self._set_status(
-                    f"Thumbnails: Lazy-Load {page_count} Seiten (>{threshold}, Prefetch ±2)"
+                    f"Thumbnails: Lazy-Load {page_count} Seiten "
+                    f"(>{threshold}, Prefetch ±{radius})"
                 )
         except Exception as e:
             _log.warning("Thumbnails: %s", e)
@@ -6307,11 +6360,19 @@ class MainWindow(QMainWindow):
         """Warteschlange leeren (Token/Timer behalten) — schneller Scroll — 1.3.2."""
         self._thumb_lazy_queue = []
 
-    def _prefetch_thumbs_around(self, center: int, *, radius: int = 2, cancel: bool = False):
-        """Prefetch Viewport ±radius; optional Queue cancel — 1.3.2."""
+    def _prefetch_thumbs_around(self, center: int, *, radius: int | None = None, cancel: bool = False):
+        """Prefetch Viewport ±radius (Settings 1/2/3); optional Queue cancel — 1.3.3."""
         n = int(self._thumb_lazy_page_count or 0)
         if n <= 0 or self._thumb_lazy_token is None:
             return
+        if radius is None:
+            try:
+                from instantlensdoc.core.app_settings import get_thumb_prefetch_radius
+
+                radius = int(get_thumb_prefetch_radius())
+            except Exception:
+                radius = 2
+        radius = max(1, min(3, int(radius)))
         if cancel:
             self._cancel_thumb_lazy_queue()
         prefer: list[int] = []
@@ -6331,20 +6392,30 @@ class MainWindow(QMainWindow):
             self._thumb_lazy_timer.start()
 
     def _on_thumbs_viewport_changed(self, center: int, cancel_fast: bool = False):
-        """Sidebar-Thumb-Scroll: Prefetch ±2; Cancel bei schnellem Scroll — 1.3.2."""
+        """Sidebar-Thumb-Scroll: Prefetch ±N Settings; Cancel bei schnellem Scroll — 1.3.3."""
         if self._thumb_lazy_token is None:
             return
-        self._prefetch_thumbs_around(int(center), radius=2, cancel=bool(cancel_fast))
+        self._prefetch_thumbs_around(int(center), cancel=bool(cancel_fast))
 
-    def _start_thumb_lazy(self, token: int, *, page_count: int, prefer: int = 0):
+    def _start_thumb_lazy(
+        self, token: int, *, page_count: int, prefer: int = 0, radius: int | None = None
+    ):
         self._stop_thumb_lazy()
         if page_count <= 0:
             return
-        # Aktuelle Seite zuerst, dann Prefetch ±2, dann Rest — 1.3.2
+        if radius is None:
+            try:
+                from instantlensdoc.core.app_settings import get_thumb_prefetch_radius
+
+                radius = int(get_thumb_prefetch_radius())
+            except Exception:
+                radius = 2
+        radius = max(1, min(3, int(radius)))
+        # Aktuelle Seite zuerst, dann Prefetch ±N, dann Rest — 1.3.3
         order: list[int] = []
         seen: set[int] = set()
         near = [prefer]
-        for d in (1, 2):
+        for d in range(1, radius + 1):
             near.extend([prefer - d, prefer + d])
         for i in near + list(range(page_count)):
             if 0 <= i < page_count and i not in seen:
@@ -6396,7 +6467,7 @@ class MainWindow(QMainWindow):
         if self.stack.currentWidget() is not self.pdf_view:
             return
         self.pdf_view.goto_page(page_index)
-        self._prefetch_thumbs_around(int(page_index), radius=2, cancel=False)
+        self._prefetch_thumbs_around(int(page_index), cancel=False)
 
     def _on_thumbs_reordered(self, order: list):
         if self.stack.currentWidget() is not self.pdf_view:

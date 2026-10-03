@@ -204,14 +204,11 @@ def get_form_values(path: str | Path) -> dict[str, str]:
 
 
 FORM_FIELD_CSV_FIELDS = (
-    "name",
-    "field_type",
-    "value",
-    "options",
-    "read_only",
-    "required",
-    "alternate_name",
-    "page",
+    "Name",
+    "Typ",
+    "Wert",
+    "Seite",
+    "ReadOnly",
 )
 
 
@@ -222,7 +219,8 @@ def export_form_fields_csv(
     out_path: str | Path | None = None,
 ) -> Path:
     """
-    AcroForm-Feldliste als CSV exportieren (UTF-8) — 1.3.2.
+    AcroForm-Feldliste als CSV exportieren (UTF-8) — 1.3.3.
+    Spalten: Name, Typ, Wert, Seite, ReadOnly.
     path: Quell-PDF (für Default-Dateiname) bzw. bereits gelesene fields.
     """
     import csv
@@ -242,16 +240,11 @@ def export_form_fields_csv(
             page = getattr(f, "page_index", None)
             writer.writerow(
                 {
-                    "name": str(getattr(f, "name", "") or ""),
-                    "field_type": str(getattr(f, "field_type", "") or ""),
-                    "value": str(getattr(f, "value", "") or ""),
-                    "options": "|".join(
-                        str(o) for o in (getattr(f, "options", None) or [])
-                    ),
-                    "read_only": "1" if getattr(f, "read_only", False) else "0",
-                    "required": "1" if getattr(f, "required", False) else "0",
-                    "alternate_name": str(getattr(f, "alternate_name", "") or ""),
-                    "page": "" if page is None else str(int(page) + 1),
+                    "Name": str(getattr(f, "name", "") or ""),
+                    "Typ": str(getattr(f, "field_type", "") or ""),
+                    "Wert": str(getattr(f, "value", "") or ""),
+                    "Seite": "" if page is None else str(int(page) + 1),
+                    "ReadOnly": "1" if getattr(f, "read_only", False) else "0",
                 }
             )
     return dest

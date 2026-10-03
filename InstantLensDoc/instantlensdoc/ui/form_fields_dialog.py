@@ -27,6 +27,11 @@ from ild_pdf.acroform import (
     list_form_fields,
     set_form_values,
 )
+from instantlensdoc.core.app_settings import (
+    dialog_start_dir,
+    get_last_export_dir,
+    set_last_export_dir,
+)
 from instantlensdoc.ui.file_dialogs import confirm_overwrite_export
 
 
@@ -214,7 +219,9 @@ class FormFieldsDialog(QDialog):
             )
 
     def _export_csv(self):
-        start = str(self.pdf_path.with_name(f"{self.pdf_path.stem}_fields.csv"))
+        """CSV Name/Typ/Wert/Seite/ReadOnly; Zielordner merken — 1.3.3."""
+        start_dir = dialog_start_dir(get_last_export_dir() or self.pdf_path.parent)
+        start = str(Path(start_dir) / f"{self.pdf_path.stem}_fields.csv")
         path, _ = QFileDialog.getSaveFileName(
             self, "Feldliste als CSV", start, "CSV (*.csv)"
         )
@@ -226,6 +233,7 @@ class FormFieldsDialog(QDialog):
             dest = export_form_fields_csv(
                 self.pdf_path, self._fields, out_path=path
             )
+            set_last_export_dir(Path(dest).parent)
             QMessageBox.information(
                 self,
                 "Feldliste CSV",

@@ -99,10 +99,10 @@ SHORTCUTS_HTML = """
 <tr><td>Ann. Export JSON/Flatten</td><td>PDF → Annotationen exportieren (JSON / Flatten)…: Quick-Insert {stem}/{page}/{date}; Ctrl+Z lokal; Reset-Template → Live-Vorschau + Fokus mit Selektion ganzer Default-Text; Bestätigung nur bei Abweichung — 1.2.9</td></tr>
 <tr><td>Text-Diff Panel</td><td>Datei → Text-Diff (offene Tabs)… (Ctrl+Alt+D): Wrap-Blink Dauer kurz/mittel/lang + System-Beep vs. stumm; Status Änderung i/n; F7/Shift+F7 — 1.2.9</td></tr>
 <tr><td>run.bat Deps / pip</td><td>Windows-Start: gewählte Python-Binary als „gefunden: …“ inkl. python --version; %ILD_PYTHON% ungültig/leer → Fallback py -3 → python → python3; --help; .venv; --yes/-y; Exit 0/1 — 1.2.9</td></tr>
-<tr><td>AcroForm-Sidebar</td><td>Feldliste CSV; Checkbox/Choice Werte; Edit nur Text; Filter/RO/dirty — 1.3.2</td></tr>
-<tr><td>Redactions Liste</td><td>Mehrfachauswahl löschen + Undo; Doppelklick → Seite; Preview-Deckkraft — 1.3.2</td></tr>
-<tr><td>Bookmarks ↔ Outlines</td><td>Export Ziel aktuell/anderes PDF; leere Outlines Hinweis; Import Duplikat-Dialog — 1.3.2</td></tr>
-<tr><td>Thumbnail Lazy-Load</td><td>Prefetch ±2 Viewport; Cancel bei schnellem Scroll; Schwellwert 25/50/100 — 1.3.2</td></tr>
+<tr><td>AcroForm-Sidebar</td><td>CSV Name,Typ,Wert,Seite,ReadOnly; Zielordner merken; Checkbox/Choice; Filter/RO — 1.3.3</td></tr>
+<tr><td>Redactions Liste</td><td>Batch-Löschen ein Undo; Zähler im Bestätigungsdialog; Doppelklick → Seite — 1.3.3</td></tr>
+<tr><td>Bookmarks ↔ Outlines</td><td>Export „anderes“ fehlende Datei abfangen; Status mit Pfad; Import Duplikat-Dialog — 1.3.3</td></tr>
+<tr><td>Thumbnail Lazy-Load</td><td>Prefetch ±N Settings (1/2/3); Cancel-Debounce ms Settings; Schwellwert 25/50/100 — 1.3.3</td></tr>
 <tr><td>Alle Ann. auf Seite löschen</td><td>Bearbeiten → bei 0 Treffern Sticky-Status Statusleiste bis nächste Ann.-Aktion / Seiten-/Dokumentwechsel / Undo/Redo + i18n DE + Menü/Aktion no-op + Button disabled; Undo „N Annotationen (gefiltert)“ — 1.1.9</td></tr>
 <tr><td>Keygen</td><td>Reveal Auto-Hide 5/10/30 s + Countdown „pausiert“ (Tooltip „Countdown pausiert (Fenster ohne Fokus)“) / Esc maskiert + History maskiert (letzte 4) / Doppelklick kopiert + Clear + .txt + --days — 1.1.9</td></tr>
 <tr><td>Willkommen-Startseite</td><td>Ohne Tabs: Recent + Dokument öffnen / Leeres Text — 1.0.0</td></tr>
@@ -305,11 +305,11 @@ About: Datenschutz-Hinweis (lokal, keine Telemetrie).</p>
 <p><b>Seiten als Bilder:</b> PDF → Seite/Seiten als PNG/JPEG exportieren (aktuell oder alle; DPI 72/150/300).</p>
 <p><b>Thumbnails:</b> in der Sidebar ziehen zum Neuordnen der Seiten (Ctrl+Z rückgängig); Größe in Einstellungen (klein/normal/groß).</p>
 <p><b>Statusleiste:</b> Dateiname · Seite x/y · Seitengröße (mm/inch, klickbar) · Zoom % · Wörter/Ann. · Version · Lizenz.</p>
-<p><b>Schwärzung / Redactions:</b> Rechteck ziehen → Sidecar; Mehrfachauswahl löschen + Undo;
-Doppelklick → Seite; Preview-Deckkraft; PDF → Redactions anwenden… → neues PDF — 1.3.2</p>
-<p><b>AcroForm:</b> Feldliste CSV; Checkbox/Choice Werte; Edit nur Text; Filter/RO/dirty — 1.3.2</p>
-<p><b>Bookmarks/Outlines:</b> Export Ziel aktuell/anderes PDF; leere Outlines Hinweis; Import Duplikat-Dialog — 1.3.2</p>
-<p><b>Thumbnails:</b> Prefetch ±2; Cancel bei schnellem Scroll; Lazy-Schwellwert 25/50/100 — 1.3.2</p>
+<p><b>Schwärzung / Redactions:</b> Rechteck ziehen → Sidecar; Batch-Löschen ein Undo + Zähler-Bestätigung;
+Doppelklick → Seite; Preview-Deckkraft; PDF → Redactions anwenden… → neues PDF — 1.3.3</p>
+<p><b>AcroForm:</b> CSV Name,Typ,Wert,Seite,ReadOnly; Zielordner merken; Checkbox/Choice; Filter/RO — 1.3.3</p>
+<p><b>Bookmarks/Outlines:</b> Export „anderes“ fehlende Datei abfangen; Status mit Pfad; Import Duplikat-Dialog — 1.3.3</p>
+<p><b>Thumbnails:</b> Prefetch ±N Settings (1/2/3); Cancel-Debounce ms Settings; Lazy-Schwellwert 25/50/100 — 1.3.3</p>
 <p><b>Export-Overwrite:</b> Existiert die Zieldatei schon, Nachfrage (Default: Nein).</p>
 <p><b>Ann.-Statistik:</b> Sidebar-Footer zeigt Anzahl je Annotationstyp.</p>
 <p><b>Tray:</b> Tooltip enthält App-Version; Update-Hinweis beim Start nur wenn in Einstellungen aktiv.</p>

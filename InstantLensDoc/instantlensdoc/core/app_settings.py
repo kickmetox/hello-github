@@ -100,6 +100,8 @@ DEFAULTS: dict[str, Any] = {
     "restore_window_geometry_on_start": True,
     "pdf_thumbnail_scale": 0.18,
     "thumb_lazy_threshold": 50,
+    "thumb_prefetch_radius": 2,
+    "thumb_prefetch_cancel_ms": 90,
     "redaction_preview_opacity": 0.90,
     "editor_text_encoding": "auto",
     "skip_splash": False,
@@ -2583,6 +2585,10 @@ def set_restore_window_geometry_on_start(enabled: bool) -> None:
 
 
 THUMB_LAZY_THRESHOLD_CHOICES = (25, 50, 100)
+THUMB_PREFETCH_RADIUS_CHOICES = (1, 2, 3)
+THUMB_PREFETCH_CANCEL_MS_CHOICES = (50, 90, 150, 250)
+THUMB_PREFETCH_RADIUS_DEFAULT = 2
+THUMB_PREFETCH_CANCEL_MS_DEFAULT = 90
 
 
 def get_thumb_lazy_threshold() -> int:
@@ -2604,6 +2610,58 @@ def set_thumb_lazy_threshold(threshold: int) -> int:
     if v not in THUMB_LAZY_THRESHOLD_CHOICES:
         v = min(THUMB_LAZY_THRESHOLD_CHOICES, key=lambda x: abs(x - v))
     save_settings({"thumb_lazy_threshold": v})
+    return v
+
+
+def get_thumb_prefetch_radius() -> int:
+    """Prefetch-Radius um Viewport (±1/2/3, Default 2) — 1.3.3."""
+    try:
+        v = int(
+            load_settings().get(
+                "thumb_prefetch_radius", THUMB_PREFETCH_RADIUS_DEFAULT
+            )
+        )
+    except (TypeError, ValueError):
+        v = THUMB_PREFETCH_RADIUS_DEFAULT
+    if v not in THUMB_PREFETCH_RADIUS_CHOICES:
+        return min(THUMB_PREFETCH_RADIUS_CHOICES, key=lambda x: abs(x - v))
+    return v
+
+
+def set_thumb_prefetch_radius(radius: int) -> int:
+    try:
+        v = int(radius)
+    except (TypeError, ValueError):
+        v = THUMB_PREFETCH_RADIUS_DEFAULT
+    if v not in THUMB_PREFETCH_RADIUS_CHOICES:
+        v = min(THUMB_PREFETCH_RADIUS_CHOICES, key=lambda x: abs(x - v))
+    save_settings({"thumb_prefetch_radius": v})
+    return v
+
+
+def get_thumb_prefetch_cancel_ms() -> int:
+    """Cancel-Debounce bei schnellem Thumb-Scroll (ms) — 1.3.3."""
+    try:
+        v = int(
+            load_settings().get(
+                "thumb_prefetch_cancel_ms", THUMB_PREFETCH_CANCEL_MS_DEFAULT
+            )
+        )
+    except (TypeError, ValueError):
+        v = THUMB_PREFETCH_CANCEL_MS_DEFAULT
+    if v not in THUMB_PREFETCH_CANCEL_MS_CHOICES:
+        return min(THUMB_PREFETCH_CANCEL_MS_CHOICES, key=lambda x: abs(x - v))
+    return v
+
+
+def set_thumb_prefetch_cancel_ms(ms: int) -> int:
+    try:
+        v = int(ms)
+    except (TypeError, ValueError):
+        v = THUMB_PREFETCH_CANCEL_MS_DEFAULT
+    if v not in THUMB_PREFETCH_CANCEL_MS_CHOICES:
+        v = min(THUMB_PREFETCH_CANCEL_MS_CHOICES, key=lambda x: abs(x - v))
+    save_settings({"thumb_prefetch_cancel_ms": v})
     return v
 
 

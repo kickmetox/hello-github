@@ -102,10 +102,10 @@ HELP_HTML = f"""
     <b>Export-Profil</b> speichern/anwenden (DPI / Format / Ziel)</li>
 <li><b>OCR gesamtes PDF</b>: Button <b>„Als Defaults speichern“</b> → Toast <b>„OCR-Defaults gespeichert“</b> (Dauer Settings <b>1/2/3 s</b> + Accessibility-Announcement) + Feld-Highlight; Defaults vorbelegt; Toggle <b>„Fehler anhängen“</b> Settings-persistiert; Seitenfehler → Abschnitt im TXT; Abbruch behält Teilergebnis; optional <b>Seitenbereich von–bis</b>; Fortschritt → <b>Textdatei-Tab</b> — 1.1.9</li>
 <li><b>PDF zusammenführen</b>: Thumbnail-Klick → Readonly-Tab mit Banner <b>„Vorschau“</b> + <b>„Zum Bearbeiten öffnen“</b>; Toggle Readonly schließen <b>auch im Merge-Dialog</b> (gleicher Persistenz-Tooltip in Settings); Vorschau-Thumbnail; Drag&amp;Drop; Duplikat-Warnung; Doppelklick/Alle/Seiten-Summe — 1.1.9</li>
-<li><b>Forms CSV/Werte</b>: Feldliste CSV; Checkbox/Choice Anzeige; Edit nur Text — 1.3.2</li>
-<li><b>Redaction Multi</b>: Mehrfachauswahl löschen + Undo; Doppelklick → Seite — 1.3.2</li>
-<li><b>Outlines Export</b>: Ziel aktuell/anderes PDF; leere Outlines Hinweis — 1.3.2</li>
-<li><b>Thumbnail Prefetch</b>: ±2 um Viewport; Cancel bei schnellem Scroll — 1.3.2</li>
+<li><b>Forms CSV</b>: Spalten <b>Name,Typ,Wert,Seite,ReadOnly</b>; Zielordner merken — 1.3.3</li>
+<li><b>Redaction Undo</b>: Batch-Löschen ein Undo-Stack-Eintrag; Zähler im Bestätigungsdialog — 1.3.3</li>
+<li><b>Outlines Export</b>: „anderes PDF“ fehlende Datei abfangen; Status mit Pfad — 1.3.3</li>
+<li><b>Thumbnail Prefetch</b>: ±N Settings (1/2/3); Cancel-Debounce ms Settings — 1.3.3</li>
 <li><b>AcroForm-Sidebar</b>: Feldliste <b>Name/Typ/Wert</b>; Klick → Seite; Textfeld-Wert speichern via <b>pikepdf</b> — 1.3.0</li>
 <li><b>Redactions anwenden</b>: Rechteck → Sidecar; Menü erzeugt <b>neues PDF</b> mit schwarzen Flächen — 1.3.0</li>
 <li><b>Bookmarks ↔ Outlines</b>: Import aus PDF-Outlines / Export als PDF-Outlines — 1.3.0</li>
@@ -231,10 +231,10 @@ HELP_HTML = f"""
     Toggle „Fehler anhängen“ Settings-persistiert; Seitenfehler-Abschnitt + Teilergebnis — 1.1.9</li>
 <li><b>PDF zusammenführen</b>: Thumbnail-Klick → Readonly-Tab mit Banner „Vorschau“ +
     „Zum Bearbeiten öffnen“; Toggle Readonly schließen auch im Merge-Dialog (gleicher Persistenz-Tooltip in Settings); Drag&amp;Drop; Duplikat-Warnung — 1.1.9</li>
-<li><b>Forms CSV/Werte</b>: Feldliste CSV; Checkbox/Choice Anzeige; Edit nur Text — 1.3.2</li>
-<li><b>Redaction Multi</b>: Mehrfachauswahl löschen + Undo; Doppelklick → Seite — 1.3.2</li>
-<li><b>Outlines Export</b>: Ziel aktuell/anderes PDF; leere Outlines Hinweis — 1.3.2</li>
-<li><b>Thumbnail Prefetch</b>: ±2 um Viewport; Cancel bei schnellem Scroll — 1.3.2</li>
+<li><b>Forms CSV</b>: Spalten <b>Name,Typ,Wert,Seite,ReadOnly</b>; Zielordner merken — 1.3.3</li>
+<li><b>Redaction Undo</b>: Batch-Löschen ein Undo-Stack-Eintrag; Zähler im Bestätigungsdialog — 1.3.3</li>
+<li><b>Outlines Export</b>: „anderes PDF“ fehlende Datei abfangen; Status mit Pfad — 1.3.3</li>
+<li><b>Thumbnail Prefetch</b>: ±N Settings (1/2/3); Cancel-Debounce ms Settings — 1.3.3</li>
 <li><b>AcroForm-Sidebar</b>: Feldliste <b>Name/Typ/Wert</b>; Klick → Seite; Textfeld-Wert speichern via <b>pikepdf</b> — 1.3.0</li>
 <li><b>Redactions anwenden</b>: Rechteck → Sidecar; Menü erzeugt <b>neues PDF</b> mit schwarzen Flächen — 1.3.0</li>
 <li><b>Bookmarks ↔ Outlines</b>: Import aus PDF-Outlines / Export als PDF-Outlines — 1.3.0</li>

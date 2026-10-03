@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **1.3.2** |
+| Version | **1.3.3** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -63,10 +63,10 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an / `checkedonce`)
 
-## Neu in 1.3.2
+## Neu in 1.3.3
 
-- Formulare: Feldliste CSV-Export; Checkbox/Choice Werte anzeigen; Edit nur Text
-- Redaction: Mehrfachauswahl löschen + Undo; Doppelklick → Seite
-- Bookmarks/Outlines: Export-Dialog Ziel aktuell/anderes PDF; Hinweis bei leeren Outlines
-- Performance: Thumbnail Prefetch ±2 um Viewport; Cancel bei schnellem Scroll
+- Formulare: CSV-Spalten Name,Typ,Wert,Seite,ReadOnly; Zielordner merken
+- Redaction: Batch-Löschen ein Undo-Stack-Eintrag; Zähler im Bestätigungsdialog
+- Bookmarks/Outlines: Export „anderes“ fehlende Datei abfangen; Status mit Pfad
+- Performance: Prefetch ±N Settings (1/2/3); Cancel-Debounce ms Settings
 - Stubs KI/Cloud/Stylus/3D unverändert
