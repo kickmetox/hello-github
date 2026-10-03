@@ -481,6 +481,18 @@ class MainWindow(QMainWindow):
             ann_tool = self.pdf_view.current_tool_id()
         except Exception:
             ann_tool = ""
+        ann_opacity = 0.0
+        ann_stroke_width = 0.0
+        try:
+            ann_opacity = float(getattr(self.pdf_view, "_default_opacity", 0.0) or 0.0)
+        except Exception:
+            ann_opacity = 0.0
+        try:
+            ann_stroke_width = float(
+                getattr(self.pdf_view, "_default_stroke_width", 0.0) or 0.0
+            )
+        except Exception:
+            ann_stroke_width = 0.0
         state = session_mod.build_session(
             paths,
             active_path=active,
@@ -498,6 +510,8 @@ class MainWindow(QMainWindow):
             panels=panels,
             search=search,
             ann_tool=ann_tool,
+            ann_opacity=ann_opacity,
+            ann_stroke_width=ann_stroke_width,
         )
         session_mod.save_session(state)
 
@@ -614,6 +628,33 @@ class MainWindow(QMainWindow):
             tool_id = str(getattr(state, "ann_tool", "") or "")
             if hasattr(self.pdf_view, "set_tool_from_id"):
                 self.pdf_view.set_tool_from_id(tool_id)
+        except Exception:
+            pass
+        # Letzte Ann.-Opacity / Stroke-Width (0.9.8)
+        try:
+            op = float(getattr(state, "ann_opacity", 0.0) or 0.0)
+            if op > 0 and hasattr(self.pdf_view, "restore_default_opacity"):
+                self.pdf_view.restore_default_opacity(op)
+            elif op > 0:
+                from instantlensdoc.core.app_settings import set_ann_default_opacity
+
+                set_ann_default_opacity(op)
+                self.pdf_view._default_opacity = max(0.05, min(1.0, op))
+                if hasattr(self.pdf_view, "_sync_opacity_controls"):
+                    self.pdf_view._sync_opacity_controls(self.pdf_view._default_opacity)
+        except Exception:
+            pass
+        try:
+            sw = float(getattr(state, "ann_stroke_width", 0.0) or 0.0)
+            if sw > 0 and hasattr(self.pdf_view, "restore_default_stroke_width"):
+                self.pdf_view.restore_default_stroke_width(sw)
+            elif sw > 0:
+                from instantlensdoc.core.app_settings import set_ann_default_stroke_width
+
+                set_ann_default_stroke_width(sw)
+                self.pdf_view._default_stroke_width = max(1.0, min(12.0, sw))
+                if hasattr(self.pdf_view, "_sync_stroke_controls"):
+                    self.pdf_view._sync_stroke_controls(self.pdf_view._default_stroke_width)
         except Exception:
             pass
         self._set_status(f"Session wiederhergestellt ({len(state.tabs)} Tab(s))")
@@ -3937,8 +3978,58 @@ class MainWindow(QMainWindow):
 
         return f"Gespeichert {datetime.now().strftime('%H:%M:%S')}"
 
+    def _autosave_modal_open(self) -> bool:
+        """True wenn ein modaler Dialog offen ist — Autosave pausiert (0.9.8)."""
+        try:
+            from PySide6.QtWidgets import QApplication
+
+            app = QApplication.instance()
+            if app is None:
+                return False
+            return app.activeModalWidget() is not None
+        except Exception:
+            return False
+
+    def _blink_autosave_error_status(self) -> None:
+        """Status kurz blinken bei Autosave-Fehler — 0.9.8."""
+        from PySide6.QtCore import QTimer
+
+        try:
+            self.statusBar().showMessage("Autosave fehlgeschlagen", 2000)
+        except Exception:
+            pass
+        if not hasattr(self, "unsaved_status_label"):
+            return
+        if getattr(self, "_autosave_err_blink_active", False):
+            return
+        self._autosave_err_blink_active = True
+        label = self.unsaved_status_label
+        styles = (
+            "padding-right: 10px; color: #fff; background-color: #C0392B; font-weight: 600;",
+            "padding-right: 10px; color: #C0392B; font-weight: 600;",
+        )
+        self._autosave_err_blink_step = 0
+
+        def _tick() -> None:
+            i = int(getattr(self, "_autosave_err_blink_step", 0))
+            if i >= len(styles):
+                self._autosave_err_blink_active = False
+                try:
+                    self._update_unsaved_status()
+                except Exception:
+                    pass
+                return
+            label.setStyleSheet(styles[i])
+            self._autosave_err_blink_step = i + 1
+            QTimer.singleShot(100, _tick)
+
+        _tick()
+
     def _autosave_tick(self):
         if not self._autosave_enabled:
+            return
+        # Modal-Dialoge: Autosave pausieren; Ctrl+S (save_doc) bleibt aktiv — 0.9.8
+        if self._autosave_modal_open():
             return
         st = self.license_manager.status()
         if not st.allowed:
@@ -3956,7 +4047,7 @@ class MainWindow(QMainWindow):
                         self._mark_unsaved(self.doc.path, False)
                     self._set_status(self._autosave_status_saved())
                 except Exception:
-                    pass
+                    self._blink_autosave_error_status()
             return
         if self.doc.kind not in (DocKind.TEXT, DocKind.MARKDOWN, DocKind.HTML, DocKind.DOCX):
             return
@@ -3969,7 +4060,7 @@ class MainWindow(QMainWindow):
                 self._mark_unsaved(self.doc.path, False)
             self._set_status(self._autosave_status_saved())
         except Exception:
-            pass
+            self._blink_autosave_error_status()
 
     def _update_license_status(self):
         st = self.license_manager.status()
@@ -4448,7 +4539,9 @@ class MainWindow(QMainWindow):
         self._on_search_annotate_hits(False)
 
     def _on_search_annotate_hits(self, all_pages: bool = False):
-        """Suchtreffer als Highlight-Annotationen (Seite oder alle, ein Undo) — 0.9.6/0.9.7."""
+        """Suchtreffer als Highlight-Annotationen (Seite oder alle, ein Undo) — 0.9.6/0.9.7/0.9.8."""
+        from PySide6.QtWidgets import QInputDialog
+
         if not self.pdf_view.pdf_path or not self.pdf_view.store:
             self._set_status("Kein PDF geladen")
             QMessageBox.information(
@@ -4461,6 +4554,16 @@ class MainWindow(QMainWindow):
         if not query.strip():
             self._set_status("Leere Suche — kein Highlight-Batch")
             return
+        # Optionaler Tag für neue Highlights — 0.9.8
+        tag_text, tag_ok = QInputDialog.getText(
+            self,
+            "Highlight-Tag",
+            "Optionaler Tag für neue Highlights (leer = ohne Tag):",
+        )
+        if not tag_ok:
+            self._set_status("Highlight-Batch abgebrochen")
+            return
+        tag = (tag_text or "").strip()
         case = getattr(self.sidebar, "search_case_sensitive", lambda: False)()
         whole = getattr(self.sidebar, "search_whole_word", lambda: False)()
         regex = getattr(self.sidebar, "search_regex_enabled", lambda: False)()
@@ -4471,6 +4574,7 @@ class MainWindow(QMainWindow):
                 case_sensitive=case,
                 whole_word=whole,
                 regex=regex,
+                tag=tag or None,
             )
         except Exception as e:
             self._set_status(f"Highlight-Batch fehlgeschlagen: {e}")
@@ -4486,11 +4590,12 @@ class MainWindow(QMainWindow):
         if self.doc and self.doc.path:
             self._mark_unsaved(self.doc.path, True)
         self._refresh_pdf_marks()
+        tag_note = f", Tag „{tag}“" if tag else ""
         if all_pages:
-            self._set_status(f"{n} Highlight(s) aus Suche (alle Seiten)")
+            self._set_status(f"{n} Highlight(s) aus Suche (alle Seiten{tag_note})")
         else:
             self._set_status(
-                f"{n} Highlight(s) aus Suche auf Seite {self.pdf_view.page_index + 1}"
+                f"{n} Highlight(s) aus Suche auf Seite {self.pdf_view.page_index + 1}{tag_note}"
             )
 
     def _on_search(self, query: str):

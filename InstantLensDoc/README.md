@@ -2,7 +2,7 @@
 
 Moderne Textverarbeitung mit PDF-Annotator, OCR-Bridge und Formulargenerator.
 
-**Version:** 0.9.7  
+**Version:** 0.9.8  
 **Hersteller:** Andreas Meyer · ame@sellerbach.de
 
 ## Quickstart (Windows)
@@ -32,8 +32,8 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an).
 
-## Neu in 0.9.7
+## Neu in 0.9.8
 
-Autosave-Intervall 15/30/60/120 s + Status „Gespeichert HH:MM:SS“, PDF-Suche Highlight-Batch auch für alle Seiten (ein Undo), Color-Presets Export/Import JSON (`ildcolors-v1`), Session stellt zuletzt genutztes Ann.-Werkzeug wieder her. Stubs KI/Cloud/Stylus/3D unverändert.
+Autosave pausiert bei Modal-Dialogen (Ctrl+S bleibt) und blinkt kurz bei Fehler; PDF-Suche→Highlight mit optionalem Tag; Color-Presets Reset-all + Werksstandard in Einstellungen; Session stellt Ann.-Opacity und Stroke-Width wieder her. Stubs KI/Cloud/Stylus/3D unverändert.
 
 Siehe [CHANGELOG.md](CHANGELOG.md), [FEATURES.md](FEATURES.md) und [INFO.md](INFO.md).

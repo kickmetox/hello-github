@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Smoke-Test 0.9.7 (CLI + optional offscreen Qt). Kernpfade: open/annotate/export/license + ausgewählte 0.6.x-Pfade."""
+"""Smoke-Test 0.9.8 (CLI + optional offscreen Qt). Kernpfade: open/annotate/export/license + ausgewählte 0.6.x-Pfade."""
 
 from __future__ import annotations
 
@@ -122,8 +122,8 @@ def main() -> int:
     from instantlensdoc.core.update_check import check_for_updates
     from instantlensdoc.license import KEY_DAYS, TRIAL_DAYS, generate_key, verify_key
 
-    assert __version__ == "0.9.7", __version__
-    assert ild_ver == "0.9.7", ild_ver
+    assert __version__ == "0.9.8", __version__
+    assert ild_ver == "0.9.8", ild_ver
     assert TRIAL_DAYS == 28 and KEY_DAYS == 32
     key = generate_key("ame@sellerbach.de")
     ok, msg, _ = verify_key(key)
@@ -141,7 +141,7 @@ def main() -> int:
     assert "Settings" in tr("settings")
     set_lang("de")
     upd = check_for_updates(allow_network=False)
-    assert upd.local_version == "0.9.7" and not upd.online
+    assert upd.local_version == "0.9.8" and not upd.online
     assert get_export_jpeg_quality() >= 10
     assert get_ui_lang() in ("de", "en")
     assert 25 <= get_default_zoom_percent() <= 500
@@ -184,8 +184,8 @@ def main() -> int:
     assert get_ann_pen_color() == "#112233"
     assert (ROOT / "CHANGELOG.md").is_file()
     cl = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-    assert "0.9.7" in cl and "0.9.6" in cl and "0.9.5" in cl and "0.9.4" in cl and "0.9.3" in cl and "0.9.2" in cl and "0.9.1" in cl and "0.9.0" in cl and "0.8.9" in cl and "0.8.8" in cl and "0.8.7" in cl and "0.8.6" in cl and "0.8.5" in cl and "0.8.4" in cl and "0.8.3" in cl and "0.8.2" in cl and "0.8.1" in cl and "0.8.0" in cl
-    assert "## 0.9.7" in cl and "## 0.9.6" in cl and "## 0.9.5" in cl and "## 0.9.4" in cl and "## 0.9.3" in cl and "## 0.9.2" in cl and "## 0.9.1" in cl and "## 0.9.0" in cl and "## 0.8.9" in cl and "## 0.8.8" in cl and "## 0.8.7" in cl and "## 0.8.6" in cl and "## 0.8.5" in cl and "## 0.8.4" in cl and "## 0.8.3" in cl and "## 0.8.2" in cl and "## 0.8.1" in cl and "## 0.8.0" in cl
+    assert "0.9.8" in cl and "0.9.7" in cl and "0.9.6" in cl and "0.9.5" in cl and "0.9.4" in cl and "0.9.3" in cl and "0.9.2" in cl and "0.9.1" in cl and "0.9.0" in cl and "0.8.9" in cl and "0.8.8" in cl and "0.8.7" in cl and "0.8.6" in cl and "0.8.5" in cl and "0.8.4" in cl and "0.8.3" in cl and "0.8.2" in cl and "0.8.1" in cl and "0.8.0" in cl
+    assert "## 0.9.8" in cl and "## 0.9.7" in cl and "## 0.9.6" in cl and "## 0.9.5" in cl and "## 0.9.4" in cl and "## 0.9.3" in cl and "## 0.9.2" in cl and "## 0.9.1" in cl and "## 0.9.0" in cl and "## 0.8.9" in cl and "## 0.8.8" in cl and "## 0.8.7" in cl and "## 0.8.6" in cl and "## 0.8.5" in cl and "## 0.8.4" in cl and "## 0.8.3" in cl and "## 0.8.2" in cl and "## 0.8.1" in cl and "## 0.8.0" in cl
     assert "## 0.7.9" in cl
     assert "## 0.7.8" in cl
     assert "## 0.7.6" in cl
@@ -242,7 +242,7 @@ def main() -> int:
     assert "0.4.9" in cl  # noch in Kurz-Tabelle
     assert "0.3.9" in cl  # noch in Kurz-Tabelle
     assert "0.2.9" in cl  # noch in Kurz-Tabelle
-    assert "0.9.7" in (ROOT / "README.md").read_text(encoding="utf-8")
+    assert "0.9.8" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "run.bat" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "sync-ild.ps1" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "scripts/sync-ild.ps1" in (ROOT / "FEATURES.md").read_text(encoding="utf-8")
@@ -591,13 +591,13 @@ def main() -> int:
 
         assert (ROOT / "installer" / "installer-hinweis.txt").exists()
         iss = (ROOT / "installer" / "instantlensdoc.iss").read_text(encoding="utf-8")
-        assert "0.9.7" in iss and "desktopicon" in iss and "DisableProgramGroupPage=no" in iss
+        assert "0.9.8" in iss and "desktopicon" in iss and "DisableProgramGroupPage=no" in iss
         assert "UninstallDisplayName" in iss and "Uninstallable=yes" in iss
         assert "IncludeKeygen" in iss and "SetupIconFile" in iss
         assert "InstantLensKeygen.exe" in iss
         assert "uninstallexe" in iss
         bw = (ROOT / "build-windows.ps1").read_text(encoding="utf-8")
-        assert "0.9.7" in bw and "NoKeygenInApp" in bw and "--icon" in bw
+        assert "0.9.8" in bw and "NoKeygenInApp" in bw and "--icon" in bw
         assert "InstantLensKeygen.exe" in bw
         bi = (ROOT / "installer" / "build-installer.ps1").read_text(encoding="utf-8")
         assert "InstantLensKeygen.exe" in bi and "IncludeKeygen" in bi
@@ -606,7 +606,7 @@ def main() -> int:
         assert "Installer" in kg_readme
         hinweis = (ROOT / "installer" / "installer-hinweis.txt").read_text(encoding="utf-8")
         assert "InstantLensKeygen.exe" in hinweis or "run-keygen.bat" in hinweis
-        assert "0.9.7" in hinweis
+        assert "0.9.8" in hinweis
         assert "checkedonce" in iss and "Desktop-Verknüpfung" in hinweis
         from ild_pdf.limits import OPEN_TIMEOUT_HINT, OPEN_TIMEOUT_HINT_SEC
 
@@ -618,7 +618,7 @@ def main() -> int:
         assert "QProgressDialog" in (ROOT / "instantlensdoc" / "ui" / "main_window.py").read_text(encoding="utf-8")
 
         assert (ROOT / "examples" / "ild_pdf_demo.py").exists()
-        assert "0.9.7" in (ROOT / "INFO.md").read_text(encoding="utf-8")
+        assert "0.9.8" in (ROOT / "INFO.md").read_text(encoding="utf-8")
         assert (ROOT / "assets" / "app.ico").is_file()
 
         # --- Kernpfade: open / annotate / export / license ---
@@ -809,7 +809,7 @@ def main() -> int:
         set_backup_on_save(False)
         assert get_page_size_unit() in ("mm", "inch")
         assert isinstance(get_minimize_to_tray(), bool)
-        assert "0.9.7" in feat and "0.9.6" in feat and "0.9.5" in feat and "0.9.4" in feat and "0.9.3" in feat and "0.9.2" in feat and "0.9.1" in feat and "0.9.0" in feat and "0.8.9" in feat and "0.8.8" in feat and "0.8.7" in feat and "0.8.6" in feat and "0.8.5" in feat and "0.8.4" in feat and "0.8.3" in feat and "0.8.2" in feat and "0.8.1" in feat and "0.8.0" in feat and "0.7.9" in feat and "0.7.8" in feat and "0.7.7" in feat and "0.7.6" in feat and "0.7.5" in feat and "0.7.4" in feat and "0.7.3" in feat and "0.7.2" in feat and "0.7.1" in feat and "0.6.9" in feat and "0.5.9" in feat and "0.4.9" in feat  # Release + Zeitraum-Feature-Hinweise
+        assert "0.9.8" in feat and "0.9.7" in feat and "0.9.6" in feat and "0.9.5" in feat and "0.9.4" in feat and "0.9.3" in feat and "0.9.2" in feat and "0.9.1" in feat and "0.9.0" in feat and "0.8.9" in feat and "0.8.8" in feat and "0.8.7" in feat and "0.8.6" in feat and "0.8.5" in feat and "0.8.4" in feat and "0.8.3" in feat and "0.8.2" in feat and "0.8.1" in feat and "0.8.0" in feat and "0.7.9" in feat and "0.7.8" in feat and "0.7.7" in feat and "0.7.6" in feat and "0.7.5" in feat and "0.7.4" in feat and "0.7.3" in feat and "0.7.2" in feat and "0.7.1" in feat and "0.6.9" in feat and "0.5.9" in feat and "0.4.9" in feat  # Release + Zeitraum-Feature-Hinweise
         assert "Batch-OCR" in feat or "OCR gesamtes PDF" in feat
         assert "Tag" in feat
         assert "Projekt-Ordner" in feat or "Workspace" in feat
@@ -3668,6 +3668,106 @@ def main() -> int:
         )
         print("0.9.7 CLI autosave-interval/hl-all/ildcolors/session-tool: OK")
 
+        # 0.9.8 CLI: Autosave-Modal/Error-Blink, HL-Tag, Factory-Presets, Session Opacity/Stroke
+        from instantlensdoc.core.app_settings import (
+            ANN_COLOR_PRESET_FACTORY as ACPF098,
+            factory_ann_color_presets as facp098,
+            get_ann_color_presets as gap098,
+            reset_ann_color_presets as racps098,
+            set_ann_color_presets as sap098,
+        )
+
+        mw098 = (ROOT / "instantlensdoc" / "ui" / "main_window.py").read_text(encoding="utf-8")
+        assert "_autosave_modal_open" in mw098
+        assert "_blink_autosave_error_status" in mw098
+        assert "activeModalWidget" in mw098
+        assert "Highlight-Tag" in mw098
+        assert "ann_opacity" in mw098 and "ann_stroke_width" in mw098
+        pv098 = (ROOT / "instantlensdoc" / "ui" / "pdf_view.py").read_text(encoding="utf-8")
+        assert "tag: str | None" in pv098 or "tag=" in pv098
+        assert "restore_default_opacity" in pv098
+        assert "restore_default_stroke_width" in pv098
+        assert "tags=list(tags)" in pv098 or "tags=list(" in pv098
+        sd098 = (ROOT / "instantlensdoc" / "ui" / "settings_dialog.py").read_text(encoding="utf-8")
+        assert "_load_factory_color_presets_ui" in sd098
+        assert "Alle zurücksetzen" in sd098
+        assert "Werksstandard" in sd098
+        assert "factory_ann_color_presets" in sd098
+        # Factory defaults API
+        factory098 = facp098()
+        assert len(factory098) == 6
+        assert tuple(factory098) == ACPF098
+        assert factory098[0] == "#FFE066"
+        sap098(["#111111", "#222222", "#333333", "#444444", "#555555", "#666666"])
+        assert gap098()[0] == "#111111"
+        racps098()
+        assert gap098() == factory098
+        # Session opacity / stroke_width
+        sess098 = td / "session098.json"
+        orig_sess098 = session_mod.session_path
+        session_mod.session_path = lambda: sess098  # type: ignore
+        try:
+            st098 = session_mod.build_session(
+                [str(pdf)],
+                active_path=str(pdf),
+                ann_opacity=0.42,
+                ann_stroke_width=7.0,
+            )
+            assert abs(st098.ann_opacity - 0.42) < 0.001
+            assert abs(st098.ann_stroke_width - 7.0) < 0.001
+            session_mod.save_session(st098)
+            loaded098 = session_mod.load_session()
+            assert abs(loaded098.ann_opacity - 0.42) < 0.001
+            assert abs(loaded098.ann_stroke_width - 7.0) < 0.001
+            raw098 = json.loads(sess098.read_text(encoding="utf-8"))
+            assert abs(float(raw098["ann_opacity"]) - 0.42) < 0.001
+            assert abs(float(raw098["ann_stroke_width"]) - 7.0) < 0.001
+            st098b = session_mod.build_session([str(pdf)], ann_opacity=0, ann_stroke_width=-1)
+            assert st098b.ann_opacity == 0.0
+            assert st098b.ann_stroke_width == 0.0
+        finally:
+            session_mod.session_path = orig_sess098  # type: ignore
+        # HL tag on Annotation via store
+        from ild_pdf import Annotation as A098, AnnotationType as T098, AnnotationStore as S098
+
+        store098 = S098(pdf)
+        store098.annotations = []
+        store098.clear_history()
+        with store098.atomic(label="Suche → Highlight"):
+            store098.add(
+                A098(
+                    0,
+                    T098.HIGHLIGHT,
+                    8,
+                    8,
+                    width=30,
+                    height=10,
+                    color="#FFE066",
+                    tags=["batch-tag"],
+                )
+            )
+        assert store098.annotations[0].tags == ["batch-tag"]
+        feat098 = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
+        assert "0.9.8" in feat098 and (
+            "Modal" in feat098
+            or "Werksstandard" in feat098
+            or "Factory" in feat098
+            or "optionaler Tag" in feat098
+            or "Stroke-Width" in feat098
+            or "Opacity" in feat098
+        )
+        cl098 = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+        assert "## 0.9.8" in cl098
+        kb098 = (ROOT / "instantlensdoc" / "ui" / "keyboard_help.py").read_text(encoding="utf-8")
+        assert "0.9.8" in kb098 and (
+            "Modal" in kb098
+            or "Tag" in kb098
+            or "Werksstandard" in kb098
+            or "Opacity" in kb098
+            or "Stroke" in kb098
+        )
+        print("0.9.8 CLI autosave-modal/hl-tag/factory/session-opacity-stroke: OK")
+
         set_show_printer_marks(True)
         assert get_show_printer_marks() is True
         set_show_printer_marks(False)
@@ -3800,7 +3900,7 @@ def main() -> int:
         assert "Continuous Scroll" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
         assert "Seitenlabel" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8") or "Seitenlabels" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
         assert "Zwischenablage-Verlauf" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8") or "Clipboard" in (ROOT / "FEATURES.md").read_text(encoding="utf-8")
-        assert "0.9.7" in feat and "0.9.6" in feat and "0.9.5" in feat and "0.9.4" in feat and "0.9.3" in feat and "0.9.2" in feat and "0.9.1" in feat and "0.9.0" in feat and "0.8.9" in feat and "0.8.8" in feat and "0.8.7" in feat and "0.8.6" in feat and "0.8.5" in feat and "0.8.4" in feat and "0.8.3" in feat and "0.8.2" in feat and "0.8.1" in feat and "0.8.0" in feat and "0.7.9" in feat and "0.7.8" in feat and "0.7.7" in feat and "0.7.6" in feat and "0.7.5" in feat and "0.7.4" in feat and "0.7.3" in feat and "0.7.2" in feat and "0.7.1" in feat and "0.6.9" in feat and "0.5.9" in feat and "0.4.9" in feat
+        assert "0.9.8" in feat and "0.9.7" in feat and "0.9.6" in feat and "0.9.5" in feat and "0.9.4" in feat and "0.9.3" in feat and "0.9.2" in feat and "0.9.1" in feat and "0.9.0" in feat and "0.8.9" in feat and "0.8.8" in feat and "0.8.7" in feat and "0.8.6" in feat and "0.8.5" in feat and "0.8.4" in feat and "0.8.3" in feat and "0.8.2" in feat and "0.8.1" in feat and "0.8.0" in feat and "0.7.9" in feat and "0.7.8" in feat and "0.7.7" in feat and "0.7.6" in feat and "0.7.5" in feat and "0.7.4" in feat and "0.7.3" in feat and "0.7.2" in feat and "0.7.1" in feat and "0.6.9" in feat and "0.5.9" in feat and "0.4.9" in feat
         # --- 0.4.2 CLI: Outline Goto, Ann Copy/Paste, Flatten Progress ---
         import pikepdf as _pike_ol
 
@@ -3925,7 +4025,7 @@ def main() -> int:
         win._add_chained_frame()
         assert len(win.layout_doc.text_frames) >= 2
         assert "Lizenz:" in win.license_label.text() or "⚠" in win.license_label.text()
-        assert "v0.9.7" in win.version_label.text()
+        assert "v0.9.8" in win.version_label.text()
         # Lizenz <7 Tage: Style prominent
         st_lic = win.license_manager.status()
         if st_lic.allowed and st_lic.days_remaining < 7:
@@ -4106,11 +4206,11 @@ def main() -> int:
             assert win.editor.outdent_selection(4)
             assert win.editor.toPlainText().splitlines()[0] == "alpha"
             # Fenstertitel mit Version
-            assert "0.9.7" in win.windowTitle()
+            assert "0.9.8" in win.windowTitle()
             from instantlensdoc.ui.help_dialog import AboutDialog, HelpDialog, open_log_folder
 
             about = AboutDialog(win)
-            assert "0.9.7" in about.windowTitle()
+            assert "0.9.8" in about.windowTitle()
             help_dlg = HelpDialog(win)
             assert help_dlg.windowTitle() == "Hilfe"
             assert callable(open_log_folder)
@@ -4787,7 +4887,7 @@ def main() -> int:
             win.apply_tray_setting()
             if win._tray is not None:
                 tip = win._tray.toolTip()
-                assert "0.9.7" in tip and "InstantLens Doc" in tip
+                assert "0.9.8" in tip and "InstantLens Doc" in tip
             set_minimize_to_tray(False)
             win.apply_tray_setting()
             print("0.3.9 fit-h/ann-stats/special/tray: OK")
@@ -4800,9 +4900,9 @@ def main() -> int:
             from instantlensdoc.ui.password_dialog import CompressPdfDialog, SetPasswordDialog
             from instantlensdoc.ui.stubs import PLANNED
             assert KeyboardHelpDialog and SetPasswordDialog and CompressPdfDialog
-            assert "0.9.7" in PLANNED["ki"]
+            assert "0.9.8" in PLANNED["ki"]
             assert "Coming soon" in PLANNED["cloud"]
-            assert "0.9.7" in PLANNED["stylus"] and "0.9.7" in PLANNED["extrude3d"]
+            assert "0.9.8" in PLANNED["stylus"] and "0.9.8" in PLANNED["extrude3d"]
             # Toolbar ↔ Menü Sync Graustufen/Nacht
             win.pdf_view.set_grayscale(True)
             assert win._grayscale_action.isChecked()
@@ -4837,7 +4937,7 @@ def main() -> int:
             assert win.editor.toPlainText().splitlines() == ["one", "two"]
             from instantlensdoc.ui.help_dialog import HELP_HTML
 
-            assert "Stub 0.9.7" in HELP_HTML
+            assert "Stub 0.9.8" in HELP_HTML
             assert "scripts/sync-ild.ps1" in HELP_HTML
             assert "Präsentationsmodus" in HELP_HTML or "F5" in (
                 ROOT / "instantlensdoc" / "ui" / "keyboard_help.py"
@@ -8420,10 +8520,55 @@ def main() -> int:
             assert "## 0.9.7" in cl097q
             print("0.9.7 Qt autosave-interval/hl-all/ildcolors/session-tool: OK")
 
+            # --- 0.9.8 Qt: Autosave-Modal/Error-Blink, HL-Tag, Factory, Session Opacity/Stroke ---
+            from instantlensdoc.core.app_settings import (
+                factory_ann_color_presets as facp098q,
+                get_ann_color_presets as gap098q,
+                reset_ann_color_presets as racps098q,
+                set_ann_color_presets as sap098q,
+            )
+            from instantlensdoc.ui.settings_dialog import SettingsDialog as SD098q
+
+            assert callable(getattr(win, "_autosave_modal_open", None))
+            assert callable(getattr(win, "_blink_autosave_error_status", None))
+            assert win._autosave_modal_open() is False
+            assert callable(getattr(win.pdf_view, "restore_default_opacity", None))
+            assert callable(getattr(win.pdf_view, "restore_default_stroke_width", None))
+            # Opacity / Stroke restore
+            win.pdf_view.restore_default_opacity(0.37)
+            assert abs(float(win.pdf_view._default_opacity) - 0.37) < 0.02
+            win.pdf_view.restore_default_stroke_width(8.0)
+            assert abs(float(win.pdf_view._default_stroke_width) - 8.0) < 0.1
+            # Factory presets UI helpers
+            sap098q(["#AAA001", "#AAA002", "#AAA003", "#AAA004", "#AAA005", "#AAA006"])
+            sd098q = SD098q(win)
+            assert hasattr(sd098q, "_load_factory_color_presets_ui")
+            sd098q._load_factory_color_presets_ui()
+            factory_ui = facp098q()
+            assert sd098q._preset_edits[0].text().upper() == factory_ui[0].upper()
+            racps098q()
+            assert gap098q()[0] == factory_ui[0]
+            # HL tag parameter (API, ohne InputDialog)
+            if win.pdf_view.pdf_path and win.pdf_view.store is not None:
+                win.pdf_view.store.annotations = []
+                win.pdf_view.store.clear_history()
+                n_tag = win.pdf_view.annotate_search_hits("a", all_pages=False, tag="hl098")
+                if n_tag > 0:
+                    tags0 = list(getattr(win.pdf_view.store.annotations[0], "tags", []) or [])
+                    assert "hl098" in tags0
+                    assert win.pdf_view.store.undo() is True
+            # Error blink callable
+            win._blink_autosave_error_status()
+            feat098q = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
+            assert "0.9.8" in feat098q
+            cl098q = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+            assert "## 0.9.8" in cl098q
+            print("0.9.8 Qt autosave-modal/hl-tag/factory/session-opacity-stroke: OK")
+
             print("0.4.x selected Qt marks/schema/sort/reset: OK")
             print("0.4.2 Qt outline/copy-paste/case/progress: OK")
             print("0.4.1 Qt links/stamp/encoding/drop: OK")
-            print("0.3.x–0.9.7 review OK")
+            print("0.3.x–0.9.8 review OK")
             assert callable(win.pdf_view.bake_redactions)
             assert callable(win.pdf_view.clear_redactions)
             assert callable(win._set_pdf_password)

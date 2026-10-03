@@ -48,6 +48,9 @@ class SessionState:
     search_regex: bool = False
     # Zuletzt genutztes Ann.-Werkzeug (AnnotationType.value oder "" = Auswahl) — 0.9.7
     ann_tool: str = ""
+    # Letzte Ann.-Standard-Opacity / Stroke-Width (0 = nicht gesetzt) — 0.9.8
+    ann_opacity: float = 0.0
+    ann_stroke_width: float = 0.0
 
 
 def session_path() -> Path:
@@ -118,6 +121,28 @@ def _normalize_ann_tool(raw) -> str:
     if t in _ANN_TOOL_VALUES:
         return t
     return ""
+
+
+def _normalize_ann_opacity(raw) -> float:
+    """Session-Opacity 0.05–1.0; 0/ungültig = nicht gesetzt — 0.9.8."""
+    try:
+        v = float(raw)
+    except (TypeError, ValueError):
+        return 0.0
+    if v <= 0:
+        return 0.0
+    return max(0.05, min(1.0, v))
+
+
+def _normalize_ann_stroke_width(raw) -> float:
+    """Session-Stroke 1–12; 0/ungültig = nicht gesetzt — 0.9.8."""
+    try:
+        v = float(raw)
+    except (TypeError, ValueError):
+        return 0.0
+    if v <= 0:
+        return 0.0
+    return max(1.0, min(12.0, v))
 
 
 def _normalize_panel_flag(raw, default: bool = True) -> bool:
@@ -223,6 +248,12 @@ def load_session() -> SessionState:
         search.get("regex", raw.get("search_regex")), False
     )
     ann_tool = _normalize_ann_tool(raw.get("ann_tool", raw.get("annotation_tool")))
+    ann_opacity = _normalize_ann_opacity(
+        raw.get("ann_opacity", raw.get("annotation_opacity"))
+    )
+    ann_stroke_width = _normalize_ann_stroke_width(
+        raw.get("ann_stroke_width", raw.get("annotation_stroke_width"))
+    )
     return SessionState(
         tabs=tabs,
         active=active,
@@ -239,6 +270,8 @@ def load_session() -> SessionState:
         search_whole=search_whole,
         search_regex=search_regex,
         ann_tool=ann_tool,
+        ann_opacity=ann_opacity,
+        ann_stroke_width=ann_stroke_width,
     )
 
 
@@ -277,6 +310,10 @@ def save_session(state: SessionState) -> None:
             "regex": bool(getattr(state, "search_regex", False)),
         },
         "ann_tool": _normalize_ann_tool(getattr(state, "ann_tool", "")),
+        "ann_opacity": _normalize_ann_opacity(getattr(state, "ann_opacity", 0.0)),
+        "ann_stroke_width": _normalize_ann_stroke_width(
+            getattr(state, "ann_stroke_width", 0.0)
+        ),
     }
     path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
 
@@ -309,6 +346,8 @@ def build_session(
     search_regex: Optional[bool] = None,
     search: Optional[dict] = None,
     ann_tool: Optional[str] = None,
+    ann_opacity: Optional[float] = None,
+    ann_stroke_width: Optional[float] = None,
 ) -> SessionState:
     """
     tab_states: optional {path: {page, scale, scroll_y}} für Last-Page/Zoom/Scroll je Tab (0.9.1/0.9.2).
@@ -318,6 +357,7 @@ def build_session(
     panels / panel_*: Sidebar Thumb/Ann/Bookmark Sichtbarkeit (0.9.5).
     search / search_*: PDF-Suche Aa/Wort/Regex (0.9.6).
     ann_tool: zuletzt genutztes Ann.-Werkzeug (AnnotationType.value / "" = Auswahl) — 0.9.7.
+    ann_opacity / ann_stroke_width: letzte Ann.-Standards (0 = nicht gesetzt) — 0.9.8.
     """
     tabs: List[SessionTab] = []
     seen: set[str] = set()
@@ -441,4 +481,6 @@ def build_session(
         search_whole=search_map["whole"],
         search_regex=search_map["regex"],
         ann_tool=_normalize_ann_tool(ann_tool),
+        ann_opacity=_normalize_ann_opacity(ann_opacity),
+        ann_stroke_width=_normalize_ann_stroke_width(ann_stroke_width),
     )

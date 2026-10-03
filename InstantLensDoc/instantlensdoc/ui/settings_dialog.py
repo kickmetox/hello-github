@@ -29,6 +29,7 @@ from instantlensdoc.core.app_settings import (
     AUTOSAVE_INTERVAL_CHOICES,
     AnnColorsImportError,
     export_ann_color_presets_json,
+    factory_ann_color_presets,
     get_ann_color_presets,
     get_autosave_enabled,
     get_autosave_interval_sec,
@@ -272,10 +273,18 @@ class SettingsDialog(QDialog):
             ed.setToolTip(f"Color-Preset {i + 1} (#RRGGBB) — User-Preset in Settings 0.9.6")
             self._preset_edits.append(ed)
             preset_row.addWidget(ed)
-        btn_reset_presets = QPushButton("Presets zurücksetzen")
-        btn_reset_presets.setToolTip("Alle 6 Color-Presets auf Werkstandard")
+        btn_reset_presets = QPushButton("Alle zurücksetzen…")
+        btn_reset_presets.setToolTip(
+            "Alle 6 Color-Presets auf Werksstandard zurücksetzen (mit Bestätigung) — 0.9.8"
+        )
         btn_reset_presets.clicked.connect(self._reset_color_presets_ui)
         preset_row.addWidget(btn_reset_presets)
+        btn_factory_presets = QPushButton("Werksstandard")
+        btn_factory_presets.setToolTip(
+            "Factory-Defaults in die Felder laden (nach OK speichern) — 0.9.8"
+        )
+        btn_factory_presets.clicked.connect(self._load_factory_color_presets_ui)
+        preset_row.addWidget(btn_factory_presets)
         btn_export_presets = QPushButton("Export…")
         btn_export_presets.setToolTip(
             f"Color-Presets als JSON exportieren ({ANN_COLORS_SCHEMA_ID}) — 0.9.7"
@@ -803,10 +812,23 @@ class SettingsDialog(QDialog):
             self.wizard_status.setStyleSheet("color: #444;")
 
     def _reset_color_presets_ui(self) -> None:
-        """Alle Color-Presets auf Werkstandard und Felder aktualisieren — 0.9.6."""
+        """Alle Color-Presets sofort auf Werksstandard speichern — 0.9.6/0.9.8."""
+        reply = QMessageBox.question(
+            self,
+            "Color-Presets",
+            "Alle 6 Color-Presets auf Werksstandard zurücksetzen?",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
+        )
+        if reply != QMessageBox.Yes:
+            return
         presets = reset_ann_color_presets()
-        for i, ed in enumerate(getattr(self, "_preset_edits", []) or []):
-            ed.setText(presets[i] if i < len(presets) else "#888888")
+        self._sync_preset_edits(presets)
+
+    def _load_factory_color_presets_ui(self) -> None:
+        """Factory-Defaults nur in die Dialogfelder laden (nach OK speichern) — 0.9.8."""
+        presets = factory_ann_color_presets()
+        self._sync_preset_edits(presets)
 
     def _sync_preset_edits(self, presets: list[str]) -> None:
         for i, ed in enumerate(getattr(self, "_preset_edits", []) or []):

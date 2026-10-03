@@ -1956,6 +1956,13 @@ _DEFAULT_ANN_PRESETS = [
     "#F5A623",
     "#9B59B6",
 ]
+# Werksfarben (unveränderliche Factory-Defaults) — 0.9.8
+ANN_COLOR_PRESET_FACTORY = tuple(_DEFAULT_ANN_PRESETS)
+
+
+def factory_ann_color_presets() -> list[str]:
+    """Werksstandard der 6 Color-Presets (Kopie) — 0.9.8."""
+    return list(ANN_COLOR_PRESET_FACTORY)
 
 
 def _normalize_hex_color(color: str, fallback: str = "#888888") -> str:
@@ -2012,8 +2019,8 @@ def reset_ann_color_preset(index: int) -> list[str]:
 
 
 def reset_ann_color_presets() -> list[str]:
-    """Alle 6 Color-Presets auf Werkstandard — 0.9.6."""
-    return set_ann_color_presets(list(_DEFAULT_ANN_PRESETS))
+    """Alle 6 Color-Presets auf Werkstandard (Factory) — 0.9.6/0.9.8."""
+    return set_ann_color_presets(factory_ann_color_presets())
 
 
 # Color-Presets JSON Export/Import — 0.9.7

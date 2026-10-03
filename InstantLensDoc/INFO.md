@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **0.9.7** |
+| Version | **0.9.8** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -52,10 +52,10 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an / `checkedonce`)
 
-## Neu in 0.9.7
+## Neu in 0.9.8
 
-- Autosave: Intervall **15 / 30 / 60 / 120 s**; Status **„Gespeichert HH:MM:SS“**
-- PDF-Suche: Highlight-Batch **alle Seiten** (Checkbox / Menü) mit **einem Undo**
-- Color-Presets: **Export/Import JSON** (`ildcolors-v1`)
-- Session: zuletzt genutztes **Ann.-Werkzeug** wiederherstellen
+- Autosave: **Pause bei Modal-Dialogen**; Ctrl+S bleibt; Status **blinkt kurz bei Fehler**
+- PDF-Suche: Highlight-Batch mit **optionalem Tag** (Input-Dialog)
+- Color-Presets: **Alle zurücksetzen…** + **Werksstandard** (Factory) in Einstellungen
+- Session: letzte **Ann.-Opacity** und **Stroke-Width** wiederherstellen
 - Stubs KI/Cloud/Stylus/3D unverändert

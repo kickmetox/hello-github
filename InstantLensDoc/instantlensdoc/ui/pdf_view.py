@@ -2906,6 +2906,34 @@ class PdfViewer(QWidget):
             return
         self._set_tool(tool)
 
+    def restore_default_opacity(self, opacity: float) -> None:
+        """Standard-Deckkraft aus Session wiederherstellen — 0.9.8."""
+        try:
+            op = max(0.05, min(1.0, float(opacity)))
+        except (TypeError, ValueError):
+            return
+        self._default_opacity = op
+        try:
+            set_ann_default_opacity(op)
+        except Exception:
+            pass
+        self._sync_opacity_controls(op)
+
+    def restore_default_stroke_width(self, width: float) -> None:
+        """Standard-Strichstärke aus Session wiederherstellen — 0.9.8."""
+        try:
+            w = max(1.0, min(12.0, float(width)))
+        except (TypeError, ValueError):
+            return
+        self._default_stroke_width = w
+        try:
+            from instantlensdoc.core.app_settings import set_ann_default_stroke_width
+
+            set_ann_default_stroke_width(w)
+        except Exception:
+            pass
+        self._sync_stroke_controls(w)
+
     def _on_annotation_selected(self, ann_id: str):
         """Auswahl setzen; Gruppe → alle Mitglieder; Shift+Klick Mehrfachauswahl umschalten."""
         shift = bool(QApplication.keyboardModifiers() & Qt.ShiftModifier)
@@ -3740,6 +3768,7 @@ class PdfViewer(QWidget):
         case_sensitive: bool | None = None,
         whole_word: bool | None = None,
         regex: bool | None = None,
+        tag: str | None = None,
     ) -> int:
         """Suchtreffer der aktuellen Seite als Highlight-Annotationen — 0.9.6."""
         return self.annotate_search_hits(
@@ -3748,6 +3777,7 @@ class PdfViewer(QWidget):
             case_sensitive=case_sensitive,
             whole_word=whole_word,
             regex=regex,
+            tag=tag,
         )
 
     def annotate_search_hits_all_pages(
@@ -3757,6 +3787,7 @@ class PdfViewer(QWidget):
         case_sensitive: bool | None = None,
         whole_word: bool | None = None,
         regex: bool | None = None,
+        tag: str | None = None,
     ) -> int:
         """Suchtreffer aller Seiten als Highlight-Annotationen (ein Undo) — 0.9.7."""
         return self.annotate_search_hits(
@@ -3765,6 +3796,7 @@ class PdfViewer(QWidget):
             case_sensitive=case_sensitive,
             whole_word=whole_word,
             regex=regex,
+            tag=tag,
         )
 
     def annotate_search_hits(
@@ -3775,10 +3807,12 @@ class PdfViewer(QWidget):
         case_sensitive: bool | None = None,
         whole_word: bool | None = None,
         regex: bool | None = None,
+        tag: str | None = None,
     ) -> int:
         """
         Suchtreffer als Highlight-Annotationen anlegen (Batch).
         all_pages=False: aktuelle Seite (0.9.6); True: alle Seiten (0.9.7).
+        tag: optionaler Tag an neue Highlights (0.9.8).
         Immer ein Undo-Schritt via store.atomic().
         """
         from ild_pdf.overlay import SearchPatternError, find_text_rects
@@ -3804,6 +3838,8 @@ class PdfViewer(QWidget):
         self._search_query = q
         color = self._highlight_color or "#FFE066"
         opacity = float(getattr(self, "_default_opacity", 1.0) or 1.0)
+        tag_clean = (tag or "").strip()
+        tags = [tag_clean] if tag_clean else []
         pages: list[int]
         if all_pages:
             pages = list(range(max(0, int(self.page_count))))
@@ -3861,6 +3897,7 @@ class PdfViewer(QWidget):
                             color=color,
                             text=snippet,
                             opacity=opacity,
+                            tags=list(tags),
                         )
                     )
                     created += 1
@@ -3876,13 +3913,14 @@ class PdfViewer(QWidget):
         self.canvas.set_search_highlights(self._search_rects, self._search_index)
         self.refresh()
         self.annotations_changed.emit()
+        tag_note = f", Tag „{tag_clean}“" if tag_clean else ""
         if all_pages:
             self.status.emit(
-                f"{created} Highlight(s) aus Suche (alle Seiten, {len(page_hits)} Seite(n))"
+                f"{created} Highlight(s) aus Suche (alle Seiten, {len(page_hits)} Seite(n){tag_note})"
             )
         else:
             self.status.emit(
-                f"{created} Highlight(s) aus Suche (Seite {pages[0] + 1})"
+                f"{created} Highlight(s) aus Suche (Seite {pages[0] + 1}{tag_note})"
             )
         return created
 
