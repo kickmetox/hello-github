@@ -48,7 +48,7 @@ SHORTCUTS_HTML = """
 <tr><td>Tab duplizieren</td><td><code>Ctrl+Shift+T</code></td></tr>
 <tr><td>Dateien vergleichen (Side-by-Side)</td><td><code>Ctrl+Alt+D</code></td></tr>
 <tr><td>Erneut öffnen</td><td><code>Ctrl+Alt+Shift+O</code></td></tr>
-<tr><td>Zeile duplizieren</td><td><code>Ctrl+D</code></td></tr>
+<tr><td>Zeile / Annotation duplizieren</td><td><code>Ctrl+D</code> (Editor Zeile; PDF Auswahl) — 0.8.2</td></tr>
 <tr><td>Zeile kommentieren/auskommentieren</td><td><code>Ctrl+/</code> (# oder //)</td></tr>
 <tr><td>Auswahl markieren</td><td><code>Ctrl+H</code></td></tr>
 <tr><td>Groß-/Kleinschreibung umschalten</td><td><code>Ctrl+Shift+U</code></td></tr>
@@ -68,14 +68,17 @@ SHORTCUTS_HTML = """
 <tr><td>Tag-Cloud Sortierung</td><td>Toggle Häufigkeit / A–Z — 0.8.1</td></tr>
 <tr><td>Recent fehlend</td><td>Grau + Rechtsklick Entfernen — 0.8.1</td></tr>
 <tr><td>Status Zoom</td><td>PDF: Zoom n% in der Statusleiste — 0.8.1</td></tr>
+<tr><td>Thumbnail-Reorder Undo</td><td>Seiten ziehen; <code>Ctrl+Z</code> rückgängig — 0.8.2</td></tr>
+<tr><td>Fit-Width / Fit-Page</td><td><code>Ctrl+9</code> / <code>Ctrl+0</code>; Standard-Zoom-Modus — 0.8.2</td></tr>
+<tr><td>Zoom als Standard</td><td><code>Ctrl+Shift+0</code> aktuellen Zoom-% speichern — 0.8.2</td></tr>
 <tr><td>Ungespeicherte Tabs</td><td>Alle speichern: Fortschritt &gt;3, Abbrechen, Fehlerliste am Ende — 0.6.4–0.6.9</td></tr>
 <tr><td>Doc-Split PDF+Editor</td><td>Panel-Typ + Sync-Scroll je Session; H/V Ctrl+Shift+\\ — 0.6.3–0.6.9</td></tr>
 <tr><td>Wizard / 0.6.8</td><td>Nicht mehr zeigen; Reset; Panel-Session; Save-Abbrechen; Tag-Confirm — 0.6.6–0.6.8</td></tr>
 <tr><td>PDF: Bild einfügen (Viewer)</td><td><code>Ctrl+V</code></td></tr>
 <tr><td>Zoom +</td><td><code>Ctrl++</code></td></tr>
 <tr><td>Zoom −</td><td><code>Ctrl+-</code></td></tr>
-<tr><td>Seite einpassen</td><td><code>Ctrl+0</code></td></tr>
-<tr><td>Breite einpassen</td><td><code>Ctrl+9</code></td></tr>
+<tr><td>Seite einpassen (Fit-Page)</td><td><code>Ctrl+0</code> — 0.8.2</td></tr>
+<tr><td>Breite einpassen (Fit-Width)</td><td><code>Ctrl+9</code> — 0.8.2</td></tr>
 <tr><td>Höhe einpassen</td><td><code>Ctrl+8</code></td></tr>
 <tr><td>Zoom 100&nbsp;%</td><td><code>Ctrl+1</code></td></tr>
 <tr><td>Overlay / Notiz bearbeiten</td><td>Doppelklick / <code>Ctrl</code>+Klick / <code>Ctrl+E</code></td></tr>
@@ -84,7 +87,7 @@ SHORTCUTS_HTML = """
 <tr><td>Stempel drehen 90°</td><td>Toolbar „Stempel ↻“ / PDF-Menü (Auswahl)</td></tr>
 <tr><td>Annotation löschen</td><td><code>Entf</code> / <code>Backspace</code> (Auswahl oder letzte)</td></tr>
 <tr><td>Annotation-Tags bearbeiten</td><td><code>Ctrl+Alt+T</code></td></tr>
-<tr><td>Annotation duplizieren</td><td><code>Ctrl+Shift+D</code> (Auswahl)</td></tr>
+<tr><td>Annotation duplizieren</td><td><code>Ctrl+D</code> / <code>Ctrl+Shift+D</code> (Auswahl) — 0.8.2</td></tr>
 <tr><td>Alle Annotationen auf Seite</td><td><code>Ctrl+A</code> (PDF-Modus)</td></tr>
 <tr><td>Seitengröße mm/inch</td><td><code>Ctrl+Alt+U</code> / Klick Status</td></tr>
 <tr><td>Seite als Favorit umschalten</td><td><code>Ctrl+Shift+F</code> / Toolbar ★</td></tr>
@@ -175,7 +178,7 @@ Erneut öffnen: Ctrl+Alt+Shift+O.</p>
 Vorbefüllung beim Seiten-Bild-Export.</p>
 <p><b>Annotation-Farben:</b> Sidebar-Statistik-Chips klicken → Liste nach Farbe filtern.</p>
 <p><b>Statusleiste:</b> Hint „Ctrl+Z · Letzte Aktion rückgängig“.</p>
-<p><b>Zeile duplizieren:</b> Bearbeiten → Ctrl+D (aktuelle Zeile oder Auswahl).</p>
+<p><b>Zeile / Annotation duplizieren:</b> Bearbeiten → Ctrl+D (Editor: Zeile; PDF: ausgewählte Annotation).</p>
 <p><b>Zeile verschieben:</b> Bearbeiten → Alt+Up / Alt+Down (aktuelle Zeile oder Auswahl).</p>
 <p><b>Zeilen sortieren (A–Z):</b> Bearbeiten → Ctrl+Shift+O (Auswahl; ohne Auswahl ganze Datei).</p>
 <p><b>Sonderzeichen:</b> Ansicht → Sonderzeichen anzeigen (Ctrl+Shift+.) — Tabs/Leerzeichen/Absätze.</p>
@@ -218,7 +221,7 @@ About: Datenschutz-Hinweis (lokal, keine Telemetrie).</p>
 <p><b>Crash-Report:</b> Hilfe → Crash-Report erstellen… (ZIP aus Logordner; optional Screenshot-Pfad-Hinweis).</p>
 <p><b>Lizenz:</b> bei weniger als 7 Resttagen prominent in der Statusleiste.</p>
 <p><b>Seiten als Bilder:</b> PDF → Seite/Seiten als PNG/JPEG exportieren (aktuell oder alle; DPI 72/150/300).</p>
-<p><b>Thumbnails:</b> in der Sidebar ziehen zum Neuordnen der Seiten; Größe in Einstellungen (klein/normal/groß).</p>
+<p><b>Thumbnails:</b> in der Sidebar ziehen zum Neuordnen der Seiten (Ctrl+Z rückgängig); Größe in Einstellungen (klein/normal/groß).</p>
 <p><b>Statusleiste:</b> Dateiname · Seite x/y · Seitengröße (mm/inch, klickbar) · Zoom % · Wörter/Ann. · Version · Lizenz.</p>
 <p><b>Schwärzung:</b> Rechteck ziehen → PDF → Schwärzung einbrennen… (Sidecar optional leeren)
 bzw. Schwärzungs-Annotationen löschen…</p>

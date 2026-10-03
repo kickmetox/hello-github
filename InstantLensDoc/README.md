@@ -2,7 +2,7 @@
 
 Moderne Textverarbeitung mit PDF-Annotator, OCR-Bridge und Formulargenerator.
 
-**Version:** 0.8.1  
+**Version:** 0.8.2  
 **Hersteller:** Andreas Meyer · ame@sellerbach.de
 
 ## Quickstart (Windows)
@@ -32,8 +32,8 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an).
 
-## Neu in 0.8.1
+## Neu in 0.8.2
 
-Bookmark-Liste Drag-Reorder + Sidecar-Persistenz, Tag-Cloud Sort A–Z/Häufigkeit, Recent fehlend grau + Entfernen, Statusleiste Zoom-% bei PDF. Stubs KI/Cloud/Stylus/3D unverändert.
+Thumbnail-Seiten Drag-Reorder mit Undo, Fit-Width/Fit-Page Shortcuts + Standard-Zoom-Modus, Annotation duplizieren per Ctrl+D, aktuellen Zoom als Standard speichern. Stubs KI/Cloud/Stylus/3D unverändert.
 
 Siehe [CHANGELOG.md](CHANGELOG.md), [FEATURES.md](FEATURES.md) und [INFO.md](INFO.md).

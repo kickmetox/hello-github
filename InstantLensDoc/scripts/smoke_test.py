@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Smoke-Test 0.8.1 (CLI + optional offscreen Qt). Kernpfade: open/annotate/export/license + ausgewählte 0.6.x-Pfade."""
+"""Smoke-Test 0.8.2 (CLI + optional offscreen Qt). Kernpfade: open/annotate/export/license + ausgewählte 0.6.x-Pfade."""
 
 from __future__ import annotations
 
@@ -122,8 +122,8 @@ def main() -> int:
     from instantlensdoc.core.update_check import check_for_updates
     from instantlensdoc.license import KEY_DAYS, TRIAL_DAYS, generate_key, verify_key
 
-    assert __version__ == "0.8.1", __version__
-    assert ild_ver == "0.8.1", ild_ver
+    assert __version__ == "0.8.2", __version__
+    assert ild_ver == "0.8.2", ild_ver
     assert TRIAL_DAYS == 28 and KEY_DAYS == 32
     key = generate_key("ame@sellerbach.de")
     ok, msg, _ = verify_key(key)
@@ -141,7 +141,7 @@ def main() -> int:
     assert "Settings" in tr("settings")
     set_lang("de")
     upd = check_for_updates(allow_network=False)
-    assert upd.local_version == "0.8.1" and not upd.online
+    assert upd.local_version == "0.8.2" and not upd.online
     assert get_export_jpeg_quality() >= 10
     assert get_ui_lang() in ("de", "en")
     assert 25 <= get_default_zoom_percent() <= 500
@@ -182,8 +182,8 @@ def main() -> int:
     assert get_ann_pen_color() == "#112233"
     assert (ROOT / "CHANGELOG.md").is_file()
     cl = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-    assert "0.8.1" in cl and "0.8.0" in cl
-    assert "## 0.8.1" in cl and "## 0.8.0" in cl
+    assert "0.8.2" in cl and "0.8.1" in cl and "0.8.0" in cl
+    assert "## 0.8.2" in cl and "## 0.8.1" in cl and "## 0.8.0" in cl
     assert "## 0.7.9" in cl
     assert "## 0.7.8" in cl
     assert "## 0.7.6" in cl
@@ -240,7 +240,7 @@ def main() -> int:
     assert "0.4.9" in cl  # noch in Kurz-Tabelle
     assert "0.3.9" in cl  # noch in Kurz-Tabelle
     assert "0.2.9" in cl  # noch in Kurz-Tabelle
-    assert "0.8.1" in (ROOT / "README.md").read_text(encoding="utf-8")
+    assert "0.8.2" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "run.bat" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "sync-ild.ps1" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "scripts/sync-ild.ps1" in (ROOT / "FEATURES.md").read_text(encoding="utf-8")
@@ -589,13 +589,13 @@ def main() -> int:
 
         assert (ROOT / "installer" / "installer-hinweis.txt").exists()
         iss = (ROOT / "installer" / "instantlensdoc.iss").read_text(encoding="utf-8")
-        assert "0.8.1" in iss and "desktopicon" in iss and "DisableProgramGroupPage=no" in iss
+        assert "0.8.2" in iss and "desktopicon" in iss and "DisableProgramGroupPage=no" in iss
         assert "UninstallDisplayName" in iss and "Uninstallable=yes" in iss
         assert "IncludeKeygen" in iss and "SetupIconFile" in iss
         assert "InstantLensKeygen.exe" in iss
         assert "uninstallexe" in iss
         bw = (ROOT / "build-windows.ps1").read_text(encoding="utf-8")
-        assert "0.8.1" in bw and "NoKeygenInApp" in bw and "--icon" in bw
+        assert "0.8.2" in bw and "NoKeygenInApp" in bw and "--icon" in bw
         assert "InstantLensKeygen.exe" in bw
         bi = (ROOT / "installer" / "build-installer.ps1").read_text(encoding="utf-8")
         assert "InstantLensKeygen.exe" in bi and "IncludeKeygen" in bi
@@ -604,7 +604,7 @@ def main() -> int:
         assert "Installer" in kg_readme
         hinweis = (ROOT / "installer" / "installer-hinweis.txt").read_text(encoding="utf-8")
         assert "InstantLensKeygen.exe" in hinweis or "run-keygen.bat" in hinweis
-        assert "0.8.1" in hinweis
+        assert "0.8.2" in hinweis
         assert "checkedonce" in iss and "Desktop-Verknüpfung" in hinweis
         from ild_pdf.limits import OPEN_TIMEOUT_HINT, OPEN_TIMEOUT_HINT_SEC
 
@@ -616,7 +616,7 @@ def main() -> int:
         assert "QProgressDialog" in (ROOT / "instantlensdoc" / "ui" / "main_window.py").read_text(encoding="utf-8")
 
         assert (ROOT / "examples" / "ild_pdf_demo.py").exists()
-        assert "0.8.1" in (ROOT / "INFO.md").read_text(encoding="utf-8")
+        assert "0.8.2" in (ROOT / "INFO.md").read_text(encoding="utf-8")
         assert (ROOT / "assets" / "app.ico").is_file()
 
         # --- Kernpfade: open / annotate / export / license ---
@@ -749,7 +749,7 @@ def main() -> int:
         assert "| A" in tbl and "| 1" in tbl
         assert ocr_mod.TESSERACT_WIKI_URL.startswith("https://")
 
-        # --- Ausgewählte 0.3.x-/0.4.x-/0.5.x-/0.6.x-Pfade (CLI, Konsolidierung 0.7.0) + 0.8.1 ---
+        # --- Ausgewählte 0.3.x-/0.4.x-/0.5.x-/0.6.x-Pfade (CLI, Konsolidierung 0.7.0) + 0.8.2 ---
         from ild_pdf.annotate import stamp_library_items
         from ild_pdf.attachments import has_attachments, list_attachments
         from ild_pdf.flatten import flatten_annotations_to_pdf
@@ -807,7 +807,7 @@ def main() -> int:
         set_backup_on_save(False)
         assert get_page_size_unit() in ("mm", "inch")
         assert isinstance(get_minimize_to_tray(), bool)
-        assert "0.8.1" in feat and "0.8.0" in feat and "0.7.9" in feat and "0.7.8" in feat and "0.7.7" in feat and "0.7.6" in feat and "0.7.5" in feat and "0.7.4" in feat and "0.7.3" in feat and "0.7.2" in feat and "0.7.1" in feat and "0.6.9" in feat and "0.5.9" in feat and "0.4.9" in feat  # Release + Zeitraum-Feature-Hinweise
+        assert "0.8.2" in feat and "0.8.1" in feat and "0.8.0" in feat and "0.7.9" in feat and "0.7.8" in feat and "0.7.7" in feat and "0.7.6" in feat and "0.7.5" in feat and "0.7.4" in feat and "0.7.3" in feat and "0.7.2" in feat and "0.7.1" in feat and "0.6.9" in feat and "0.5.9" in feat and "0.4.9" in feat  # Release + Zeitraum-Feature-Hinweise
         assert "Batch-OCR" in feat or "OCR gesamtes PDF" in feat
         assert "Tag" in feat
         assert "Projekt-Ordner" in feat or "Workspace" in feat
@@ -2404,6 +2404,60 @@ def main() -> int:
         assert "0.8.1" in kb081 and "Tag-Cloud Sortierung" in kb081
         print("0.8.1 CLI bookmark-drag/tag-sort/recent-missing/zoom: OK")
 
+        # 0.8.2 CLI: Thumbnail-Undo, Fit-Zoom-Modus, Ann.-Ctrl+D, Standard-Zoom speichern
+        from instantlensdoc.core.app_settings import (
+            DEFAULT_ZOOM_MODE_FIT_PAGE,
+            DEFAULT_ZOOM_MODE_FIT_WIDTH,
+            DEFAULT_ZOOM_MODE_PERCENT,
+            get_default_zoom_mode,
+            set_default_zoom_mode,
+        )
+
+        set_default_zoom_mode("percent")
+        assert get_default_zoom_mode() == DEFAULT_ZOOM_MODE_PERCENT
+        set_default_zoom_mode("fit_width")
+        assert get_default_zoom_mode() == DEFAULT_ZOOM_MODE_FIT_WIDTH
+        set_default_zoom_mode("fit_page")
+        assert get_default_zoom_mode() == DEFAULT_ZOOM_MODE_FIT_PAGE
+        set_default_zoom_mode("bogus")
+        assert get_default_zoom_mode() == DEFAULT_ZOOM_MODE_PERCENT
+        set_default_zoom_mode("percent")
+        pv082 = (ROOT / "instantlensdoc" / "ui" / "pdf_view.py").read_text(
+            encoding="utf-8"
+        )
+        assert 'kind == "reorder"' in pv082
+        assert "record_undo" in pv082
+        assert "ann_remapped" in pv082
+        assert "get_default_zoom_mode" in pv082
+        assert "Fit-Width" in pv082 and "Fit-Page" in pv082
+        mw082 = (ROOT / "instantlensdoc" / "ui" / "main_window.py").read_text(
+            encoding="utf-8"
+        )
+        assert "_duplicate_current" in mw082
+        assert "_save_current_zoom_as_default" in mw082
+        assert "Ctrl+Shift+0" in mw082
+        assert "Fit-Width" in mw082 and "Fit-Page" in mw082
+        sd082 = (ROOT / "instantlensdoc" / "ui" / "settings_dialog.py").read_text(
+            encoding="utf-8"
+        )
+        assert "zoom_mode" in sd082 and "_capture_current_pdf_zoom" in sd082
+        assert "set_default_zoom_mode" in sd082
+        sb082 = (ROOT / "instantlensdoc" / "ui" / "sidebar.py").read_text(
+            encoding="utf-8"
+        )
+        assert "Ctrl+Z" in sb082
+        feat082 = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
+        assert "0.8.2" in feat082 and "Ctrl+D" in feat082
+        assert "Reorder-Undo" in feat082 or "Undo Ctrl+Z" in feat082
+        cl082 = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+        assert "## 0.8.2" in cl082 and "Fit-Width" in cl082
+        kb082 = (ROOT / "instantlensdoc" / "ui" / "keyboard_help.py").read_text(
+            encoding="utf-8"
+        )
+        assert "0.8.2" in kb082 and "Fit-Width" in kb082
+        assert "Thumbnail-Reorder Undo" in kb082
+        print("0.8.2 CLI thumb-undo/fit-zoom/ann-ctrl-d/default-zoom: OK")
+
         set_show_printer_marks(True)
         assert get_show_printer_marks() is True
         set_show_printer_marks(False)
@@ -2536,7 +2590,7 @@ def main() -> int:
         assert "Continuous Scroll" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
         assert "Seitenlabel" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8") or "Seitenlabels" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
         assert "Zwischenablage-Verlauf" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8") or "Clipboard" in (ROOT / "FEATURES.md").read_text(encoding="utf-8")
-        assert "0.8.1" in feat and "0.8.0" in feat and "0.7.9" in feat and "0.7.8" in feat and "0.7.7" in feat and "0.7.6" in feat and "0.7.5" in feat and "0.7.4" in feat and "0.7.3" in feat and "0.7.2" in feat and "0.7.1" in feat and "0.6.9" in feat and "0.5.9" in feat and "0.4.9" in feat
+        assert "0.8.2" in feat and "0.8.1" in feat and "0.8.0" in feat and "0.7.9" in feat and "0.7.8" in feat and "0.7.7" in feat and "0.7.6" in feat and "0.7.5" in feat and "0.7.4" in feat and "0.7.3" in feat and "0.7.2" in feat and "0.7.1" in feat and "0.6.9" in feat and "0.5.9" in feat and "0.4.9" in feat
         # --- 0.4.2 CLI: Outline Goto, Ann Copy/Paste, Flatten Progress ---
         import pikepdf as _pike_ol
 
@@ -2661,7 +2715,7 @@ def main() -> int:
         win._add_chained_frame()
         assert len(win.layout_doc.text_frames) >= 2
         assert "Lizenz:" in win.license_label.text() or "⚠" in win.license_label.text()
-        assert "v0.8.1" in win.version_label.text()
+        assert "v0.8.2" in win.version_label.text()
         # Lizenz <7 Tage: Style prominent
         st_lic = win.license_manager.status()
         if st_lic.allowed and st_lic.days_remaining < 7:
@@ -2842,11 +2896,11 @@ def main() -> int:
             assert win.editor.outdent_selection(4)
             assert win.editor.toPlainText().splitlines()[0] == "alpha"
             # Fenstertitel mit Version
-            assert "0.8.1" in win.windowTitle()
+            assert "0.8.2" in win.windowTitle()
             from instantlensdoc.ui.help_dialog import AboutDialog, HelpDialog, open_log_folder
 
             about = AboutDialog(win)
-            assert "0.8.1" in about.windowTitle()
+            assert "0.8.2" in about.windowTitle()
             help_dlg = HelpDialog(win)
             assert help_dlg.windowTitle() == "Hilfe"
             assert callable(open_log_folder)
@@ -3518,7 +3572,7 @@ def main() -> int:
             win.apply_tray_setting()
             if win._tray is not None:
                 tip = win._tray.toolTip()
-                assert "0.8.1" in tip and "InstantLens Doc" in tip
+                assert "0.8.2" in tip and "InstantLens Doc" in tip
             set_minimize_to_tray(False)
             win.apply_tray_setting()
             print("0.3.9 fit-h/ann-stats/special/tray: OK")
@@ -3531,9 +3585,9 @@ def main() -> int:
             from instantlensdoc.ui.password_dialog import CompressPdfDialog, SetPasswordDialog
             from instantlensdoc.ui.stubs import PLANNED
             assert KeyboardHelpDialog and SetPasswordDialog and CompressPdfDialog
-            assert "0.8.1" in PLANNED["ki"]
+            assert "0.8.2" in PLANNED["ki"]
             assert "Coming soon" in PLANNED["cloud"]
-            assert "0.8.1" in PLANNED["stylus"] and "0.8.1" in PLANNED["extrude3d"]
+            assert "0.8.2" in PLANNED["stylus"] and "0.8.2" in PLANNED["extrude3d"]
             # Toolbar ↔ Menü Sync Graustufen/Nacht
             win.pdf_view.set_grayscale(True)
             assert win._grayscale_action.isChecked()
@@ -3568,7 +3622,7 @@ def main() -> int:
             assert win.editor.toPlainText().splitlines() == ["one", "two"]
             from instantlensdoc.ui.help_dialog import HELP_HTML
 
-            assert "Stub 0.8.1" in HELP_HTML
+            assert "Stub 0.8.2" in HELP_HTML
             assert "scripts/sync-ild.ps1" in HELP_HTML
             assert "Präsentationsmodus" in HELP_HTML or "F5" in (
                 ROOT / "instantlensdoc" / "ui" / "keyboard_help.py"
@@ -6001,10 +6055,77 @@ def main() -> int:
             assert "## 0.8.1" in cl081q
             print("0.8.1 Qt bookmark-drag/tag-sort/recent-missing/zoom: OK")
 
+            # --- 0.8.2 Qt: Thumbnail-Undo, Fit-Zoom, Ann.-Ctrl+D, Standard-Zoom ---
+            from instantlensdoc.core.app_settings import (
+                DEFAULT_ZOOM_MODE_FIT_WIDTH as ZM_FW082,
+                DEFAULT_ZOOM_MODE_PERCENT as ZM_PCT082,
+                get_default_zoom_mode as get_zm082,
+                get_default_zoom_percent as get_zp082,
+                set_default_zoom_mode as set_zm082,
+                set_default_zoom_percent as set_zp082,
+            )
+            from instantlensdoc.ui.settings_dialog import SettingsDialog as SD082
+            from ild_pdf import Annotation as Ann082, AnnotationType as AT082
+
+            assert callable(getattr(win, "_duplicate_current", None))
+            assert callable(getattr(win, "_save_current_zoom_as_default", None))
+            assert callable(getattr(win.pdf_view, "apply_page_order", None))
+            # Standard-Zoom-Modus Settings
+            set_zm082("percent")
+            set_zp082(140)
+            sd082q = SD082(parent=win)
+            assert hasattr(sd082q, "zoom_mode") and hasattr(sd082q, "btn_zoom_from_pdf")
+            assert sd082q.zoom_mode.currentData() == ZM_PCT082
+            for i in range(sd082q.zoom_mode.count()):
+                if sd082q.zoom_mode.itemData(i) == ZM_FW082:
+                    sd082q.zoom_mode.setCurrentIndex(i)
+                    break
+            sd082q._sync_zoom_pct_enabled()
+            assert not sd082q.zoom_pct.isEnabled()
+            sd082q._save()
+            assert get_zm082() == ZM_FW082
+            set_zm082("percent")
+            # Thumbnail reorder + undo
+            if win.pdf_view.pdf_path and win.pdf_view.page_count >= 2:
+                n_pages = win.pdf_view.page_count
+                order = list(range(n_pages))
+                order[0], order[1] = order[1], order[0]
+                win.pdf_view.clear_page_ops_undo()
+                assert win.pdf_view.apply_page_order(order) is True
+                assert win.pdf_view.can_undo_page_op()
+                hist = win.pdf_view.page_ops_history_items()
+                assert any(h.get("kind") == "reorder" for h in hist)
+                assert win.pdf_view.undo_page_op() is True
+                assert not win.pdf_view.can_undo_page_op()
+            # Ctrl+D / Annotation duplizieren
+            if win.pdf_view.pdf_path and win.pdf_view.store is not None:
+                win.stack.setCurrentWidget(win.pdf_view)
+                a082 = Ann082(
+                    0, AT082.HIGHLIGHT, 5, 5, width=20, height=10, text="dup082"
+                )
+                win.pdf_view.store.add(a082)
+                win.pdf_view._selected_ann_id = a082.id
+                win.pdf_view._selected_ann_ids = {a082.id}
+                before_n = len(win.pdf_view.store.annotations)
+                win._duplicate_current()
+                assert len(win.pdf_view.store.annotations) == before_n + 1
+            # Aktuellen Zoom als Standard speichern
+            if win.pdf_view.pdf_path:
+                win.stack.setCurrentWidget(win.pdf_view)
+                win.pdf_view.set_scale(1.33, immediate=True)
+                win._save_current_zoom_as_default()
+                assert get_zp082() == 133
+                assert get_zm082() == ZM_PCT082
+            feat082q = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
+            assert "0.8.2" in feat082q and ("Ctrl+D" in feat082q or "Fit-Width" in feat082q)
+            cl082q = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+            assert "## 0.8.2" in cl082q
+            print("0.8.2 Qt thumb-undo/fit-zoom/ann-ctrl-d/default-zoom: OK")
+
             print("0.4.x selected Qt marks/schema/sort/reset: OK")
             print("0.4.2 Qt outline/copy-paste/case/progress: OK")
             print("0.4.1 Qt links/stamp/encoding/drop: OK")
-            print("0.3.x–0.8.1 review OK")
+            print("0.3.x–0.8.2 review OK")
             assert callable(win.pdf_view.bake_redactions)
             assert callable(win.pdf_view.clear_redactions)
             assert callable(win._set_pdf_password)

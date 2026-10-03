@@ -114,7 +114,7 @@ class ThumbnailList(QListWidget):
         self.setSpacing(4)
         self.setMaximumHeight(200)
         self.setMinimumHeight(100)
-        self.setToolTip("Ziehen zum Neuordnen der PDF-Seiten")
+        self.setToolTip("Ziehen zum Neuordnen der PDF-Seiten (Rückgängig: Ctrl+Z)")
         self._reorder_enabled = True
 
     def apply_icon_size(self, width: int | None = None, height: int | None = None):

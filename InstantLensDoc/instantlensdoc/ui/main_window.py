@@ -781,10 +781,12 @@ class MainWindow(QMainWindow):
         act_bm_import.setToolTip("Editor-Lesezeichen aus JSON laden (ersetzen oder zusammenführen)")
         act_bm_import.triggered.connect(self._import_line_bookmarks_json)
         m_edit.addAction(act_bm_import)
-        act_dup_line = QAction("Zeile duplizieren", self)
+        act_dup_line = QAction("Zeile / Annotation duplizieren", self)
         act_dup_line.setShortcut(QKeySequence("Ctrl+D"))
-        act_dup_line.setToolTip("Aktuelle Zeile / Auswahl darunter duplizieren")
-        act_dup_line.triggered.connect(self._duplicate_line)
+        act_dup_line.setToolTip(
+            "Editor: Zeile/Auswahl duplizieren; PDF: ausgewählte Annotation (Ctrl+D)"
+        )
+        act_dup_line.triggered.connect(self._duplicate_current)
         m_edit.addAction(act_dup_line)
         act_move_up = QAction("Zeile nach oben", self)
         act_move_up.setShortcut(QKeySequence("Alt+Up"))
@@ -920,7 +922,9 @@ class MainWindow(QMainWindow):
         m_edit.addAction(act_opacity_ann)
         act_dup_ann = QAction("Annotation duplizieren", self)
         act_dup_ann.setShortcut(QKeySequence("Ctrl+Shift+D"))
-        act_dup_ann.setToolTip("Ausgewählte Annotation kopieren (leicht versetzt)")
+        act_dup_ann.setToolTip(
+            "Ausgewählte Annotation kopieren (leicht versetzt); im PDF auch Ctrl+D"
+        )
         act_dup_ann.triggered.connect(self._duplicate_annotation)
         m_edit.addAction(act_dup_ann)
         act_copy_ann = QAction("Annotationen kopieren", self)
@@ -1124,12 +1128,14 @@ class MainWindow(QMainWindow):
         act_zo.setShortcut(QKeySequence.ZoomOut)
         act_zo.triggered.connect(self._zoom_out)
         m_view.addAction(act_zo)
-        act_fit = QAction("Seite einpassen", self)
+        act_fit = QAction("Seite einpassen (Fit-Page)", self)
         act_fit.setShortcut(QKeySequence("Ctrl+0"))
+        act_fit.setToolTip("Aktuelle Seite in Viewport einpassen (Ctrl+0)")
         act_fit.triggered.connect(self._fit_page)
         m_view.addAction(act_fit)
-        act_fit_w = QAction("Breite einpassen", self)
+        act_fit_w = QAction("Breite einpassen (Fit-Width)", self)
         act_fit_w.setShortcut(QKeySequence("Ctrl+9"))
+        act_fit_w.setToolTip("Seitenbreite an Viewport anpassen (Ctrl+9)")
         act_fit_w.triggered.connect(self._fit_width)
         m_view.addAction(act_fit_w)
         act_fit_h = QAction("Höhe einpassen", self)
@@ -1141,6 +1147,13 @@ class MainWindow(QMainWindow):
         act_z100.setShortcut(QKeySequence("Ctrl+1"))
         act_z100.triggered.connect(self._zoom_100)
         m_view.addAction(act_z100)
+        act_zoom_default = QAction("Aktuellen Zoom als Standard speichern", self)
+        act_zoom_default.setShortcut(QKeySequence("Ctrl+Shift+0"))
+        act_zoom_default.setToolTip(
+            "Aktuellen PDF-Zoom-% als Standard-Zoom in den Einstellungen speichern"
+        )
+        act_zoom_default.triggered.connect(self._save_current_zoom_as_default)
+        m_view.addAction(act_zoom_default)
         m_view.addSeparator()
         self._theme_action = QAction("Dunkles Design", self)
         self._theme_action.setCheckable(True)
@@ -2037,6 +2050,16 @@ class MainWindow(QMainWindow):
             return
         super().keyPressEvent(event)
 
+    def _duplicate_current(self):
+        """Ctrl+D: PDF → Annotation duplizieren; Editor → Zeile duplizieren."""
+        if self.stack.currentWidget() is self.pdf_view and self.pdf_view.pdf_path:
+            if self.pdf_view._selected_ann_id:
+                self._duplicate_annotation()
+                return
+            self._set_status("Keine Annotation ausgewählt (Ctrl+D)")
+            return
+        self._duplicate_line()
+
     def _duplicate_line(self):
         if self.stack.currentWidget() is not self.editor_pane:
             self._set_status("Zeile duplizieren nur im Texteditor")
@@ -2054,6 +2077,21 @@ class MainWindow(QMainWindow):
             self._set_status("Zeile dupliziert")
         else:
             self._set_status("Zeile duplizieren nicht möglich")
+
+    def _save_current_zoom_as_default(self):
+        """Aktuellen PDF-Zoom als Standard-% speichern (Modus: Prozent)."""
+        from instantlensdoc.core.app_settings import (
+            set_default_zoom_mode,
+            set_default_zoom_percent,
+        )
+
+        if self.stack.currentWidget() is not self.pdf_view or not self.pdf_view.pdf_path:
+            self._set_status("Standard-Zoom: PDF öffnen")
+            return
+        pct = max(25, min(500, int(round(float(self.pdf_view.scale) * 100))))
+        set_default_zoom_percent(pct)
+        set_default_zoom_mode("percent")
+        self._set_status(f"Standard-Zoom gespeichert: {pct}%")
 
     def _move_line_up(self):
         self._move_line(-1)

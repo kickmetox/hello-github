@@ -78,6 +78,7 @@ from instantlensdoc.core.app_settings import (
     get_ann_pen_color,
     get_annotations_locked,
     get_annotations_visible,
+    get_default_zoom_mode,
     get_default_zoom_scale,
     get_pdf_continuous_scroll,
     get_pdf_grayscale,
@@ -1041,10 +1042,10 @@ class PdfViewer(QWidget):
         btn_zoom_in.clicked.connect(self.zoom_in)
         btn_zoom_out.clicked.connect(self.zoom_out)
         btn_fit = QPushButton("Seite")
-        btn_fit.setToolTip("Seite einpassen (Ctrl+0)")
+        btn_fit.setToolTip("Seite einpassen / Fit-Page (Ctrl+0)")
         btn_fit.clicked.connect(self.fit_page)
         btn_fit_w = QPushButton("Breite")
-        btn_fit_w.setToolTip("Seitenbreite einpassen (Ctrl+9)")
+        btn_fit_w.setToolTip("Seitenbreite einpassen / Fit-Width (Ctrl+9)")
         btn_fit_w.clicked.connect(self.fit_width)
         btn_fit_h = QPushButton("Höhe")
         btn_fit_h.setToolTip("Seitenhöhe einpassen (Ctrl+8)")
@@ -2072,6 +2073,14 @@ class PdfViewer(QWidget):
             self.refresh()
 
     def apply_default_zoom(self):
+        """Standard-Zoom aus Einstellungen: Prozent / Fit-Width / Fit-Page."""
+        mode = get_default_zoom_mode()
+        if mode == "fit_width":
+            self.fit_width()
+            return
+        if mode == "fit_page":
+            self.fit_page()
+            return
         self.set_scale(get_default_zoom_scale(), immediate=True)
 
     def _tool_label(self, tool: AnnotationType) -> str:
@@ -2362,6 +2371,10 @@ class PdfViewer(QWidget):
             self.page_changed.emit(self.page_index)
             self.zoom_changed.emit(self.scale)
             self.document_changed.emit()
+            # Fit-Modi brauchen Viewport-Größe → nach Show/Layout
+            mode = get_default_zoom_mode()
+            if mode in ("fit_width", "fit_page"):
+                QTimer.singleShot(0, self.apply_default_zoom)
             return True
         except MemoryError:
             QMessageBox.critical(
@@ -2923,6 +2936,9 @@ class PdfViewer(QWidget):
             elif kind == "rotate":
                 deg = int(entry.get("degrees", 90))
                 label = f"Seite {page_h} gedreht ({deg:+d}°) — rückgängig"
+            elif kind == "reorder":
+                n = int(entry.get("page_count") or len(entry.get("inverse") or []) or 0)
+                label = f"Seitenreihenfolge geändert ({n} Seiten) — rückgängig"
             else:
                 label = f"Aktion „{kind}“ (S. {page_h})"
             items.append(
@@ -3434,7 +3450,7 @@ class PdfViewer(QWidget):
         return True
 
     def undo_page_op(self) -> bool:
-        """Letzte Seiten-Operation (Löschen oder Drehen) rückgängig."""
+        """Letzte Seiten-Operation (Löschen, Drehen, Neuordnen) rückgängig."""
         stack = getattr(self, "_page_ops_undo", None)
         if not stack or not self.pdf_path:
             return False
@@ -3477,6 +3493,48 @@ class PdfViewer(QWidget):
                 self.refresh()
                 self.document_changed.emit()
                 self.status.emit(f"Seitendrehung rückgängig (S. {idx + 1})")
+                return True
+            if kind == "reorder":
+                inverse = [int(i) for i in (entry.get("inverse") or [])]
+                if not inverse or len(inverse) != self.page_count:
+                    self.status.emit("Seiten-Undo: ungültige Reihenfolge")
+                    return False
+                if sorted(inverse) != list(range(self.page_count)):
+                    self.status.emit("Seiten-Undo: ungültige Reihenfolge")
+                    return False
+                # Nur PDF zurücksetzen; Ann.-Remap über Store-Undo, Meta aus Snapshot
+                reorder_pages(self.pdf_path, inverse)
+                if self.store is not None:
+                    if entry.get("ann_remapped") and self.store.can_undo():
+                        self.store.undo()
+                    if "page_groups" in entry:
+                        self.store._meta["page_groups"] = dict(entry["page_groups"] or {})
+                    if "page_favorites" in entry:
+                        favs = list(entry["page_favorites"] or [])
+                        if favs:
+                            self.store._meta["page_favorites"] = favs
+                        else:
+                            self.store._meta.pop("page_favorites", None)
+                    self.store.dirty = True
+                    try:
+                        self.schedule_sidecar_save(force=True)
+                    except Exception:
+                        pass
+                from ild_pdf import PdfDocument
+
+                with PdfDocument(self.pdf_path, password=self.password) as doc:
+                    self.page_count = len(doc)
+                    self._reload_page_labels()
+                self.page_index = min(max(0, self.page_index), max(0, self.page_count - 1))
+                self._selected_ann_id = None
+                self._selected_ann_ids = set()
+                self.canvas.set_selected_id(None)
+                clear_render_cache(self.pdf_path)
+                self.refresh()
+                self.annotations_changed.emit()
+                self.page_changed.emit(self.page_index)
+                self.document_changed.emit()
+                self.status.emit("Seitenreihenfolge rückgängig (Undo)")
                 return True
             self.status.emit("Unbekannte Seiten-Undo-Aktion")
             return False
@@ -5433,8 +5491,8 @@ class PdfViewer(QWidget):
         order = dlg.new_order()
         self.apply_page_order(order)
 
-    def apply_page_order(self, order: list[int]) -> bool:
-        """Wendet neue Seitenreihenfolge an (Dialog oder Thumbnail-Drag)."""
+    def apply_page_order(self, order: list[int], *, record_undo: bool = True) -> bool:
+        """Wendet neue Seitenreihenfolge an (Dialog oder Thumbnail-Drag); Undo via Ctrl+Z."""
         if not self.pdf_path or self.page_count < 2:
             return False
         if not order or len(order) != self.page_count:
@@ -5445,11 +5503,37 @@ class PdfViewer(QWidget):
             QMessageBox.warning(self, "Neu anordnen", "Ungültige Seitenreihenfolge.")
             return False
         try:
+            # Inverse: order[new]=old → inverse[old]=new
+            inverse = [0] * len(order)
+            for new_i, old_i in enumerate(order):
+                inverse[int(old_i)] = int(new_i)
+            groups_before: dict = {}
+            favs_before: list = []
+            if self.store is not None:
+                groups_before = dict(self.store._meta.get("page_groups") or {})
+                favs_before = list(self.store._meta.get("page_favorites") or [])
             reorder_pages(self.pdf_path, order)
+            ann_remapped = False
             if self.store:
                 mapping = {old: new for new, old in enumerate(order)}
+                undo_before = len(getattr(self.store, "_undo", []) or [])
                 self.store.remap_pages(mapping)
+                undo_after = len(getattr(self.store, "_undo", []) or [])
+                ann_remapped = undo_after > undo_before
                 self.schedule_sidecar_save(force=True)
+            if record_undo:
+                self._page_ops_undo.append(
+                    {
+                        "kind": "reorder",
+                        "inverse": inverse,
+                        "page_count": len(order),
+                        "page_groups": groups_before,
+                        "page_favorites": favs_before,
+                        "ann_remapped": ann_remapped,
+                    }
+                )
+                if len(self._page_ops_undo) > 20:
+                    self._page_ops_undo.pop(0)
             self.page_index = 0
             self._selected_ann_id = None
             self._selected_ann_ids = set()
@@ -5463,7 +5547,10 @@ class PdfViewer(QWidget):
             self.annotations_changed.emit()
             self.page_changed.emit(self.page_index)
             self.document_changed.emit()
-            self.status.emit("Seiten neu angeordnet")
+            msg = "Seiten neu angeordnet"
+            if record_undo:
+                msg += " (Ctrl+Z rückgängig)"
+            self.status.emit(msg)
             return True
         except Exception as e:
             QMessageBox.warning(self, "Neu anordnen", str(e))

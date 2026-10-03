@@ -27,6 +27,10 @@ from instantlensdoc.core.app_settings import (
     get_backup_on_save,
     get_batch_output_dir,
     get_default_open_dir,
+    DEFAULT_ZOOM_MODE_FIT_PAGE,
+    DEFAULT_ZOOM_MODE_FIT_WIDTH,
+    DEFAULT_ZOOM_MODE_PERCENT,
+    get_default_zoom_mode,
     get_default_zoom_percent,
     PDF_TOOLBAR_GROUP_LABELS,
     get_editor_doc_split_vertical,
@@ -81,6 +85,7 @@ from instantlensdoc.core.app_settings import (
     set_backup_on_save,
     set_batch_output_dir,
     set_default_open_dir,
+    set_default_zoom_mode,
     set_default_zoom_percent,
     set_editor_bracket_auto_close,
     set_editor_bracket_match,
@@ -152,13 +157,39 @@ class SettingsDialog(QDialog):
         self.lang_combo.setCurrentIndex(pick)
         form.addRow(tr("ocr_lang"), self.lang_combo)
 
+        self.zoom_mode = QComboBox()
+        self.zoom_mode.addItem("Prozent", DEFAULT_ZOOM_MODE_PERCENT)
+        self.zoom_mode.addItem("Seitenbreite (Fit-Width)", DEFAULT_ZOOM_MODE_FIT_WIDTH)
+        self.zoom_mode.addItem("Seite einpassen (Fit-Page)", DEFAULT_ZOOM_MODE_FIT_PAGE)
+        cur_zoom_mode = get_default_zoom_mode()
+        zoom_mode_pick = 0
+        for i in range(self.zoom_mode.count()):
+            if self.zoom_mode.itemData(i) == cur_zoom_mode:
+                zoom_mode_pick = i
+                break
+        self.zoom_mode.setCurrentIndex(zoom_mode_pick)
+        self.zoom_mode.setToolTip(
+            "Beim Öffnen: fester Zoom-% oder Fit-Width / Fit-Page (Shortcuts Ctrl+9 / Ctrl+0)"
+        )
+        self.zoom_mode.currentIndexChanged.connect(self._sync_zoom_pct_enabled)
+        form.addRow(tr("default_zoom_mode"), self.zoom_mode)
+
+        zoom_row = QHBoxLayout()
         self.zoom_pct = QSpinBox()
         self.zoom_pct.setRange(25, 500)
         self.zoom_pct.setSingleStep(10)
         self.zoom_pct.setSuffix(" %")
         self.zoom_pct.setValue(get_default_zoom_percent())
-        self.zoom_pct.setToolTip("Standard-Zoom beim Öffnen von PDFs")
-        form.addRow(tr("default_zoom"), self.zoom_pct)
+        self.zoom_pct.setToolTip("Standard-Zoom-% beim Öffnen (nur Modus Prozent)")
+        zoom_row.addWidget(self.zoom_pct)
+        self.btn_zoom_from_pdf = QPushButton("Aktuell speichern")
+        self.btn_zoom_from_pdf.setToolTip(
+            "Aktuellen PDF-Zoom als Standard-% speichern (Modus → Prozent)"
+        )
+        self.btn_zoom_from_pdf.clicked.connect(self._capture_current_pdf_zoom)
+        zoom_row.addWidget(self.btn_zoom_from_pdf)
+        form.addRow(tr("default_zoom"), zoom_row)
+        self._sync_zoom_pct_enabled()
 
         self.thumb_scale = QComboBox()
         cur_thumb = get_pdf_thumbnail_scale()
@@ -553,6 +584,33 @@ class SettingsDialog(QDialog):
         if path:
             self.spell_dict.setText(path)
 
+    def _sync_zoom_pct_enabled(self) -> None:
+        mode = str(self.zoom_mode.currentData() or DEFAULT_ZOOM_MODE_PERCENT)
+        self.zoom_pct.setEnabled(mode == DEFAULT_ZOOM_MODE_PERCENT)
+
+    def _capture_current_pdf_zoom(self) -> None:
+        parent = self.parent()
+        pdf_view = getattr(parent, "pdf_view", None) if parent is not None else None
+        if pdf_view is None or not getattr(pdf_view, "pdf_path", None):
+            QMessageBox.information(
+                self,
+                "Standard-Zoom",
+                "Kein PDF geöffnet — bitte zuerst ein PDF laden und zoomen.",
+            )
+            return
+        pct = max(25, min(500, int(round(float(pdf_view.scale) * 100))))
+        self.zoom_pct.setValue(pct)
+        for i in range(self.zoom_mode.count()):
+            if self.zoom_mode.itemData(i) == DEFAULT_ZOOM_MODE_PERCENT:
+                self.zoom_mode.setCurrentIndex(i)
+                break
+        self._sync_zoom_pct_enabled()
+        QMessageBox.information(
+            self,
+            "Standard-Zoom",
+            f"Aktueller Zoom {pct}% übernommen (nach OK speichern).",
+        )
+
     def _refresh_wizard_status(self) -> None:
         if get_wizard_completed():
             self.wizard_status.setText("Erste-Schritte-Wizard: dauerhaft aus")
@@ -637,6 +695,7 @@ class SettingsDialog(QDialog):
         set_ui_lang(str(self.ui_lang.currentData() or "de"))
         sync_from_settings()
         set_update_check_on_start(self.update_chk.isChecked())
+        set_default_zoom_mode(str(self.zoom_mode.currentData() or DEFAULT_ZOOM_MODE_PERCENT))
         set_default_zoom_percent(int(self.zoom_pct.value()))
         set_pdf_thumbnail_scale(float(self.thumb_scale.currentData() or 0.18))
         set_autosave_interval_sec(int(self.autosave_sec.value()))

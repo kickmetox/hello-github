@@ -25,6 +25,7 @@ DEFAULTS: dict[str, Any] = {
     "update_check_on_start": False,
     "last_export_dir": "",
     "default_zoom_percent": 150,
+    "default_zoom_mode": "percent",  # percent | fit_width | fit_page
     "autosave_interval_sec": 60,
     "ann_highlight_color": "#FFE066",
     "ann_pen_color": "#2C3E50",
@@ -246,6 +247,16 @@ def set_last_export_dir(path: str | Path) -> None:
     save_settings({"last_export_dir": str(p)})
 
 
+DEFAULT_ZOOM_MODE_PERCENT = "percent"
+DEFAULT_ZOOM_MODE_FIT_WIDTH = "fit_width"
+DEFAULT_ZOOM_MODE_FIT_PAGE = "fit_page"
+DEFAULT_ZOOM_MODES = (
+    DEFAULT_ZOOM_MODE_PERCENT,
+    DEFAULT_ZOOM_MODE_FIT_WIDTH,
+    DEFAULT_ZOOM_MODE_FIT_PAGE,
+)
+
+
 def get_default_zoom_percent() -> int:
     try:
         v = int(load_settings().get("default_zoom_percent", 150))
@@ -256,6 +267,23 @@ def get_default_zoom_percent() -> int:
 
 def set_default_zoom_percent(percent: int) -> None:
     save_settings({"default_zoom_percent": max(25, min(500, int(percent)))})
+
+
+def get_default_zoom_mode() -> str:
+    """Standard-Zoom-Modus beim Öffnen: percent | fit_width | fit_page."""
+    raw = str(load_settings().get("default_zoom_mode", DEFAULT_ZOOM_MODE_PERCENT) or "")
+    raw = raw.strip().lower()
+    if raw in DEFAULT_ZOOM_MODES:
+        return raw
+    return DEFAULT_ZOOM_MODE_PERCENT
+
+
+def set_default_zoom_mode(mode: str) -> str:
+    m = str(mode or DEFAULT_ZOOM_MODE_PERCENT).strip().lower()
+    if m not in DEFAULT_ZOOM_MODES:
+        m = DEFAULT_ZOOM_MODE_PERCENT
+    save_settings({"default_zoom_mode": m})
+    return m
 
 
 def get_default_zoom_scale() -> float:

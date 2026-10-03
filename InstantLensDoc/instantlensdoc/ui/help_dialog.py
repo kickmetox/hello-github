@@ -31,7 +31,7 @@ HELP_HTML = f"""
 <ul>
 <li><b>Datei → Öffnen</b>: TXT, MD, HTML, DOCX, PDF, Bilder</li>
 <li><b>Extras → Einstellungen</b>: Theme, <b>UI-Sprache DE/EN</b>, OCR, Export-Qualität,
-    <b>Standard-Zoom</b>, <b>Autosave-Intervall</b>, Soft-Wrap, <b>Sonderzeichen anzeigen</b>,
+    <b>Standard-Zoom</b> (Prozent / Fit-Width / Fit-Page), <b>Autosave-Intervall</b>, Soft-Wrap, <b>Sonderzeichen anzeigen</b>,
     optional <b>Trailing Whitespace trimmen</b>, optional <b>Whitespace trim on paste</b>,
     optional <b>Bracket-Match Highlight</b>,
     optional <b>Bracket-Auto-Close</b>,
@@ -63,7 +63,7 @@ HELP_HTML = f"""
 <li><b>Datei → Tab duplizieren</b> (Ctrl+Shift+T): Editor-Inhalt als neues Dokument klonen;
     <b>Dateien vergleichen</b> (Ctrl+Alt+D): zwei Tabs Side-by-Side (Zeilen-Diff);
     <b>Erneut öffnen</b> (Ctrl+Alt+Shift+O): Datei vom Datenträger neu laden</li>
-<li><b>Bearbeiten → Zeile duplizieren</b> (Ctrl+D): aktuelle Zeile / Auswahl darunter kopieren</li>
+<li><b>Bearbeiten → Zeile / Annotation duplizieren</b> (Ctrl+D): Editor Zeile/Auswahl; PDF ausgewählte Annotation (auch Ctrl+Shift+D)</li>
 <li><b>Bearbeiten → Zeile verschieben</b> (Alt+Up / Alt+Down)</li>
 <li><b>Bearbeiten → Zeilen sortieren (A–Z)</b> (Ctrl+Shift+O): Auswahl alphabetisch</li>
 <li><b>Bearbeiten → Auswahl markieren</b> (Ctrl+H): Markierung im Editor + Eintrag in der Seitenleiste</li>
@@ -73,7 +73,8 @@ HELP_HTML = f"""
 <li><b>Bearbeiten → Zwischenablage-Verlauf</b>: letzte 3 eingefügten Textschnipsel erneut einfügen</li>
 <li><b>Datei → Neu</b>: leeres Dokument oder Vorlage <b>Brief</b> / <b>Notiz</b></li>
 <li><b>Bearbeiten → Einrückung erhöhen/verringern</b> (Ctrl+] / Ctrl+[; Tab / Shift+Tab Block)</li>
-<li><b>Ansicht</b>: Zoom +/−, Seite einpassen (Ctrl+0), Breite (Ctrl+9), Höhe (Ctrl+8), 100&nbsp;% (Ctrl+1);
+<li><b>Ansicht</b>: Zoom +/−, Fit-Page (Ctrl+0), Fit-Width (Ctrl+9), Höhe (Ctrl+8), 100&nbsp;% (Ctrl+1),
+    <b>Aktuellen Zoom als Standard</b> (Ctrl+Shift+0);
     <b>Präsentationsmodus</b> (F5 Vollbild, Pfeiltasten); <b>Hell/Dunkel</b>-Design umschalten; optionale <b>Zeilennummern</b>; <b>Markdown-Vorschau</b> (Split, Ctrl+Shift+M);
     <b>Soft-Wrap</b>; <b>Sonderzeichen anzeigen</b> (Ctrl+Shift+.);
     <b>PDF Graustufen</b>; <b>PDF Nachtmodus</b> (Invert-Ansicht, nur Darstellung);
@@ -119,7 +120,7 @@ HELP_HTML = f"""
     <b>Metadaten bearbeiten</b>; <b>PDF bereinigen</b> (optional Metadaten strippen);
     <b>AcroForm-Formularfelder ausfüllen</b>; <b>Anhänge</b> auflisten/extrahieren;
     <b>Seitengröße / Zuschneiden</b> (Anzeige mm/inch, Statusleiste klickbar / Ctrl+Alt+U);
-    Seite/Seiten als PNG/JPEG exportieren / Bild als neue Seite / Seite drucken; Annotation löschen (Auswahl/letzte, Entf); Statusleiste Seite/Größe/Zoom/Dateiname/Wörter; Thumbnails per Drag neu ordnen (<b>Lazy-Load</b>, Größe in Einstellungen);
+    Seite/Seiten als PNG/JPEG exportieren / Bild als neue Seite / Seite drucken; Annotation löschen (Auswahl/letzte, Entf); Statusleiste Seite/Größe/Zoom/Dateiname/Wörter; Thumbnails per Drag neu ordnen (<b>Lazy-Load</b>, Größe in Einstellungen, <b>Ctrl+Z Undo</b>);
     PDF als Kopie speichern; <b>Seitenbereich extrahieren</b> (von–bis → neues PDF);
     große PDFs: Warnung / Limits;
     <b>Seiten-Thumbnails</b> in der Sidebar</li>
