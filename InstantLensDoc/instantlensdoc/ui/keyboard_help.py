@@ -69,6 +69,10 @@ SHORTCUTS_HTML = """
 <tr><td>Recent fehlend</td><td>Grau + Rechtsklick Entfernen — 0.8.1</td></tr>
 <tr><td>Status Zoom</td><td>PDF: Zoom n% in der Statusleiste — 0.8.1</td></tr>
 <tr><td>Thumbnail-Reorder Undo</td><td>Seiten ziehen; <code>Ctrl+Z</code> rückgängig — 0.8.2</td></tr>
+<tr><td>Thumbnail Drehen 90°</td><td>Rechtsklick L/R; <code>Ctrl+Z</code> Undo — 0.8.3</td></tr>
+<tr><td>Annotation Mehrfachauswahl</td><td><code>Shift</code>+Klick; gemeinsame Verschiebung — 0.8.3</td></tr>
+<tr><td>Seitennummer-Overlay</td><td>Ansicht / Einstellungen / Toolbar „Nr.“ — 0.8.3</td></tr>
+<tr><td>Zeilennummern Toggle</td><td>Ansicht ↔ Settings, persistiert — 0.8.3</td></tr>
 <tr><td>Fit-Width / Fit-Page</td><td><code>Ctrl+9</code> / <code>Ctrl+0</code>; Standard-Zoom-Modus — 0.8.2</td></tr>
 <tr><td>Zoom als Standard</td><td><code>Ctrl+Shift+0</code> aktuellen Zoom-% speichern — 0.8.2</td></tr>
 <tr><td>Ungespeicherte Tabs</td><td>Alle speichern: Fortschritt &gt;3, Abbrechen, Fehlerliste am Ende — 0.6.4–0.6.9</td></tr>

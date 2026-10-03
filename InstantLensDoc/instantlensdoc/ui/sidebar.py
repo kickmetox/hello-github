@@ -114,7 +114,10 @@ class ThumbnailList(QListWidget):
         self.setSpacing(4)
         self.setMaximumHeight(200)
         self.setMinimumHeight(100)
-        self.setToolTip("Ziehen zum Neuordnen der PDF-Seiten (Rückgängig: Ctrl+Z)")
+        self.setToolTip(
+            "Ziehen zum Neuordnen der PDF-Seiten (Rückgängig: Ctrl+Z); "
+            "Rechtsklick → 90° drehen"
+        )
         self._reorder_enabled = True
 
     def apply_icon_size(self, width: int | None = None, height: int | None = None):
@@ -319,6 +322,7 @@ class Sidebar(QWidget):
     line_favorite_label_edit = Signal(int)  # Editor-Zeile 1-basiert → Label bearbeiten
     line_favorites_reordered = Signal(list)  # 1-basierte Zeilen neue Reihenfolge
     pages_reordered = Signal(list)  # alte Indizes in neuer Reihenfolge
+    page_rotate_requested = Signal(int, int)  # page_index 0-basiert, degrees (±90)
     search_export_requested = Signal(str)  # "csv" | "json"
 
     def __init__(self, parent=None):
@@ -428,6 +432,11 @@ class Sidebar(QWidget):
         self.thumbs = ThumbnailList()
         self.thumbs.itemClicked.connect(self._activate_thumb)
         self.thumbs.pages_reordered.connect(self.pages_reordered.emit)
+        self.thumbs.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.thumbs.customContextMenuRequested.connect(self._thumbs_context_menu)
+        self.thumbs.setToolTip(
+            "Ziehen zum Neuordnen; Rechtsklick → 90° drehen (Ctrl+Z rückgängig)"
+        )
         layout.addWidget(self.thumbs)
 
         layout.addWidget(QLabel("Lesezeichen / Outline"))
@@ -886,6 +895,23 @@ class Sidebar(QWidget):
         page = item.data(Qt.UserRole)
         if page is not None:
             self.page_thumb_activated.emit(int(page))
+
+    def _thumbs_context_menu(self, pos):
+        item = self.thumbs.itemAt(pos)
+        if item is None:
+            return
+        page = item.data(Qt.UserRole)
+        if page is None:
+            return
+        idx = int(page)
+        menu = QMenu(self)
+        act_r = menu.addAction("Drehen 90° rechts ⟳")
+        act_l = menu.addAction("Drehen 90° links ⟲")
+        chosen = menu.exec(self.thumbs.mapToGlobal(pos))
+        if chosen is act_r:
+            self.page_rotate_requested.emit(idx, 90)
+        elif chosen is act_l:
+            self.page_rotate_requested.emit(idx, -90)
 
     def set_recent(
         self,

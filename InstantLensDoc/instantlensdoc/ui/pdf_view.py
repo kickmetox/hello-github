@@ -10,6 +10,7 @@ from PySide6.QtGui import (
     QColor,
     QCursor,
     QDesktopServices,
+    QFont,
     QImage,
     QKeySequence,
     QPainter,
@@ -85,6 +86,7 @@ from instantlensdoc.core.app_settings import (
     get_pdf_night_mode,
     get_pdf_two_page_spread,
     get_show_page_boxes,
+    get_show_page_number_overlay,
     get_show_printer_marks,
     random_ann_palette_color,
     set_ann_color_preset,
@@ -99,6 +101,7 @@ from instantlensdoc.core.app_settings import (
     set_pdf_night_mode,
     set_pdf_two_page_spread,
     set_show_page_boxes,
+    set_show_page_number_overlay,
     set_show_printer_marks,
 )
 
@@ -328,6 +331,8 @@ class PdfCanvas(QLabel):
         self._annotations_visible = True
         self._annotations_locked = False
         self._show_page_boxes = False
+        self._show_page_number_overlay = False
+        self._page_number_text = ""
         self._show_printer_marks = False
         # Pixel-Rects (x,y,w,h) für MediaBox / CropBox / Druckermarken
         self._mediabox_rect: tuple[float, float, float, float] | None = None
@@ -372,6 +377,18 @@ class PdfCanvas(QLabel):
 
     def show_page_boxes(self) -> bool:
         return bool(self._show_page_boxes)
+
+    def set_show_page_number_overlay(self, enabled: bool):
+        self._show_page_number_overlay = bool(enabled)
+        self._repaint_overlay()
+
+    def show_page_number_overlay(self) -> bool:
+        return bool(self._show_page_number_overlay)
+
+    def set_page_number_text(self, text: str | None):
+        self._page_number_text = str(text or "").strip()
+        if self._show_page_number_overlay:
+            self._repaint_overlay()
 
     def set_show_printer_marks(self, enabled: bool):
         self._show_printer_marks = bool(enabled)
@@ -747,6 +764,21 @@ class PdfCanvas(QLabel):
         # Optional: Seitenrand-Druckermarken (Crop/Registration)
         if self._show_printer_marks and self._printer_marks_rect:
             self._draw_printer_marks(painter, self._printer_marks_rect)
+        # Optional: Seitennummer-Overlay (HUD unten rechts)
+        if self._show_page_number_overlay and self._page_number_text:
+            label = self._page_number_text
+            font = QFont()
+            font.setPointSize(11)
+            font.setBold(True)
+            painter.setFont(font)
+            metrics = painter.fontMetrics()
+            tw = metrics.horizontalAdvance(label) + 16
+            th = metrics.height() + 10
+            px = max(8, pm.width() - tw - 12)
+            py = max(8, pm.height() - th - 12)
+            painter.fillRect(px, py, tw, th, QColor(20, 20, 20, 150))
+            painter.setPen(QPen(QColor(255, 255, 255, 230)))
+            painter.drawText(px + 8, py + th - 8, label)
         move_dx, move_dy = self._move_delta if self._move_origin is not None else (0.0, 0.0)
         if self._annotations_visible:
             for ann in self._annotations:
@@ -829,16 +861,18 @@ class PdfCanvas(QLabel):
                 return
             hit_any = self._hit_annotation(x, y)
             if hit_any:
-                self.annotation_selected.emit(hit_any.id if hit_any else "")
-                # Verschieben starten wenn nicht gesperrt
-                if (
-                    hit_any
-                    and not self._annotations_locked
-                    and not (event.modifiers() & Qt.ShiftModifier)
-                ):
-                    ids = set(self._selected_ids) if self._selected_ids else set()
-                    if hit_any.id not in ids:
-                        ids = {hit_any.id}
+                shift = bool(event.modifiers() & Qt.ShiftModifier)
+                if shift:
+                    # Mehrfachauswahl umschalten — kein Verschieben
+                    self.annotation_selected.emit(hit_any.id)
+                    return
+                # Bereits ausgewählt → Mehrfachauswahl behalten und gemeinsam verschieben
+                if hit_any.id in self._selected_ids:
+                    ids = set(self._selected_ids)
+                else:
+                    self.annotation_selected.emit(hit_any.id)
+                    ids = {hit_any.id}
+                if not self._annotations_locked:
                     self._move_ids = ids
                     self._move_origin = (x, y)
                     self._move_delta = (0.0, 0.0)
@@ -967,6 +1001,7 @@ class PdfViewer(QWidget):
     annotations_layer_changed = Signal(bool)
     annotations_lock_changed = Signal(bool)
     page_boxes_changed = Signal(bool)
+    page_number_overlay_changed = Signal(bool)
     printer_marks_changed = Signal(bool)
     two_page_spread_changed = Signal(bool)
     continuous_scroll_changed = Signal(bool)
@@ -1017,6 +1052,7 @@ class PdfViewer(QWidget):
         self._annotations_visible = get_annotations_visible()
         self._annotations_locked = get_annotations_locked()
         self._show_page_boxes = get_show_page_boxes()
+        self._show_page_number_overlay = get_show_page_number_overlay()
         self._show_printer_marks = get_show_printer_marks()
         self._search_query = ""
         self._search_rects: list[tuple[float, float, float, float]] = []
@@ -1257,6 +1293,14 @@ class PdfViewer(QWidget):
         self.btn_page_boxes.setChecked(self._show_page_boxes)
         self.btn_page_boxes.setToolTip("MediaBox/CropBox-Seitenrahmen als Overlay anzeigen")
         self.btn_page_boxes.toggled.connect(self.set_show_page_boxes)
+        self.btn_page_num = QToolButton()
+        self.btn_page_num.setText("Nr.")
+        self.btn_page_num.setCheckable(True)
+        self.btn_page_num.setChecked(self._show_page_number_overlay)
+        self.btn_page_num.setToolTip(
+            "Seitennummer als Overlay auf der PDF-Seite anzeigen (Einstellungen)"
+        )
+        self.btn_page_num.toggled.connect(self.set_show_page_number_overlay)
         self.btn_printer_marks = QToolButton()
         self.btn_printer_marks.setText("Marken")
         self.btn_printer_marks.setCheckable(True)
@@ -1293,6 +1337,7 @@ class PdfViewer(QWidget):
         toolbar.addWidget(self.btn_ann_layer)
         toolbar.addWidget(self.btn_ann_lock)
         toolbar.addWidget(self.btn_page_boxes)
+        toolbar.addWidget(self.btn_page_num)
         toolbar.addWidget(self.btn_printer_marks)
 
         toolbar.addWidget(btn_prev)
@@ -1348,6 +1393,7 @@ class PdfViewer(QWidget):
                 self.btn_ann_layer,
                 self.btn_ann_lock,
                 self.btn_page_boxes,
+                self.btn_page_num,
                 self.btn_printer_marks,
             ],
             "nav": [btn_prev, self.lbl_page, btn_next],
@@ -1398,6 +1444,7 @@ class PdfViewer(QWidget):
         self.canvas.set_annotations_visible(self._annotations_visible)
         self.canvas.set_annotations_locked(self._annotations_locked)
         self.canvas.set_show_page_boxes(self._show_page_boxes)
+        self.canvas.set_show_page_number_overlay(self._show_page_number_overlay)
         self.canvas.set_show_printer_marks(self._show_printer_marks)
         self.canvas.annotation_placed.connect(self._on_place)
         self.canvas.drag_finished.connect(self._on_drag)
@@ -1911,6 +1958,37 @@ class PdfViewer(QWidget):
     def show_page_boxes(self) -> bool:
         return bool(self._show_page_boxes)
 
+    def set_show_page_number_overlay(self, enabled: bool):
+        """Seitennummer als Overlay ein-/ausblenden (persistiert)."""
+        on = bool(enabled)
+        changed = self._show_page_number_overlay != on
+        self._show_page_number_overlay = on
+        set_show_page_number_overlay(on)
+        if hasattr(self, "btn_page_num"):
+            self.btn_page_num.blockSignals(True)
+            self.btn_page_num.setChecked(on)
+            self.btn_page_num.blockSignals(False)
+        self.canvas.set_show_page_number_overlay(on)
+        self._update_page_number_overlay()
+        if changed:
+            self.page_number_overlay_changed.emit(on)
+            self.status.emit(
+                "Seitennummer-Overlay an" if on else "Seitennummer-Overlay aus"
+            )
+
+    def show_page_number_overlay(self) -> bool:
+        return bool(self._show_page_number_overlay)
+
+    def _update_page_number_overlay(self) -> None:
+        """Aktuelle Seitennummer/Label an Canvas-Overlay übergeben."""
+        if not getattr(self, "canvas", None):
+            return
+        if not self._show_page_number_overlay or not self.pdf_path:
+            self.canvas.set_page_number_text("")
+            return
+        text = self.format_page_label_text()
+        self.canvas.set_page_number_text(text)
+
     def set_show_printer_marks(self, enabled: bool):
         """Seitenrand-Druckermarken als Overlay ein-/ausblenden."""
         on = bool(enabled)
@@ -2057,6 +2135,13 @@ class PdfViewer(QWidget):
         self.canvas.set_show_page_boxes(self._show_page_boxes)
         if self._show_page_boxes:
             self._update_page_box_overlay()
+        self._show_page_number_overlay = get_show_page_number_overlay()
+        if hasattr(self, "btn_page_num"):
+            self.btn_page_num.blockSignals(True)
+            self.btn_page_num.setChecked(self._show_page_number_overlay)
+            self.btn_page_num.blockSignals(False)
+        self.canvas.set_show_page_number_overlay(self._show_page_number_overlay)
+        self._update_page_number_overlay()
         else:
             self.canvas.clear_page_box_rects()
         self._show_printer_marks = get_show_printer_marks()
@@ -2127,7 +2212,38 @@ class PdfViewer(QWidget):
             self.status.emit(f"Werkzeug: {tool.value}")
 
     def _on_annotation_selected(self, ann_id: str):
-        self._selected_ann_id = ann_id or None
+        """Auswahl setzen; mit Shift+Klick Mehrfachauswahl umschalten."""
+        shift = bool(QApplication.keyboardModifiers() & Qt.ShiftModifier)
+        aid = ann_id or None
+        if shift and aid:
+            ids = set(self._selected_ann_ids)
+            if aid in ids:
+                ids.discard(aid)
+            else:
+                ids.add(aid)
+            self._selected_ann_ids = ids
+            self._selected_ann_id = aid if aid in ids else (next(iter(ids), None))
+            self.canvas.set_selected_ids(self._selected_ann_ids)
+            n = len(self._selected_ann_ids)
+            if n == 0:
+                self.status.emit("Auswahl aufgehoben")
+            elif n == 1 and self.store:
+                ann = self.store.get(self._selected_ann_id) if self._selected_ann_id else None
+                if ann:
+                    try:
+                        op = float(
+                            getattr(ann, "opacity", self._default_opacity) or self._default_opacity
+                        )
+                    except (TypeError, ValueError):
+                        op = self._default_opacity
+                    self._sync_opacity_controls(op)
+                    self.status.emit(f"Auswahl: {ann.type.value} (S. {ann.page + 1})")
+                else:
+                    self.status.emit("1 Annotation ausgewählt")
+            else:
+                self.status.emit(f"{n} Annotationen ausgewählt (Shift+Klick)")
+            return
+        self._selected_ann_id = aid
         self._selected_ann_ids = {self._selected_ann_id} if self._selected_ann_id else set()
         self.canvas.set_selected_id(self._selected_ann_id)
         if self._selected_ann_id and self.store:
@@ -2595,6 +2711,7 @@ class PdfViewer(QWidget):
             self.canvas.set_uri_links(links)
             self._update_page_box_overlay()
             self._update_printer_marks_overlay()
+            self._update_page_number_overlay()
             if self._search_rects:
                 self.canvas.set_search_highlights(self._search_rects, self._search_index)
             self.lbl_zoom.setText(f"{int(round(self.scale * 100))}%")
@@ -4472,29 +4589,42 @@ class PdfViewer(QWidget):
 
     def rotate_current(self, degrees: int = 90):
         """Aktuelle Seite drehen (−90/90/180/270) und PDF speichern (Undo-fähig)."""
+        return self.rotate_at(self.page_index, degrees)
+
+    def rotate_at(self, page_index: int, degrees: int = 90) -> bool:
+        """Seite an Index drehen (−90/90/180/270), speichern, Undo-fähig."""
         if not self.pdf_path:
-            return
+            return False
         try:
+            idx = int(page_index)
+            if idx < 0 or idx >= int(self.page_count or 0):
+                self.status.emit("Drehen: ungültige Seite")
+                return False
             deg = int(degrees)
             self._page_ops_undo.append(
-                {"kind": "rotate", "index": int(self.page_index), "degrees": deg}
+                {"kind": "rotate", "index": idx, "degrees": deg}
             )
             if len(self._page_ops_undo) > 20:
                 self._page_ops_undo.pop(0)
-            rotate_page(self.pdf_path, self.page_index, deg)
+            rotate_page(self.pdf_path, idx, deg)
             from ild_pdf.render import clear_render_cache
 
             clear_render_cache(self.pdf_path)
+            if idx != self.page_index:
+                self.page_index = idx
             self.refresh()
             self.document_changed.emit()
             shown = deg % 360
             self.status.emit(
-                f"Seite {self.page_index + 1} gedreht ({shown}°) — Ctrl+Z rückgängig"
+                f"Seite {idx + 1} gedreht ({shown}°) — Ctrl+Z rückgängig"
             )
+            return True
         except Exception as e:
             if self._page_ops_undo and self._page_ops_undo[-1].get("kind") == "rotate":
-                self._page_ops_undo.pop()
+                if int(self._page_ops_undo[-1].get("index", -1)) == int(page_index):
+                    self._page_ops_undo.pop()
             QMessageBox.warning(self, "Drehen", str(e))
+            return False
 
     def flip_current(self, *, horizontal: bool = False, vertical: bool = False):
         """Aktuelle Seite spiegeln (horizontal und/oder vertikal) und speichern."""

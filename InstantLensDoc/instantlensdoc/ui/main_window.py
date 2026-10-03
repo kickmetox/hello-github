@@ -406,6 +406,7 @@ class MainWindow(QMainWindow):
         self.sidebar.line_favorite_label_edit.connect(self._edit_line_favorite_label)
         self.sidebar.line_favorites_reordered.connect(self._on_line_favorites_reordered)
         self.sidebar.pages_reordered.connect(self._on_thumbs_reordered)
+        self.sidebar.page_rotate_requested.connect(self._on_thumb_rotate)
         splitter.addWidget(self.sidebar)
 
         self.stack = QStackedWidget()
@@ -440,6 +441,9 @@ class MainWindow(QMainWindow):
         self.pdf_view.annotations_layer_changed.connect(self._sync_ann_layer_action)
         self.pdf_view.annotations_lock_changed.connect(self._sync_ann_lock_action)
         self.pdf_view.page_boxes_changed.connect(self._sync_page_boxes_action)
+        self.pdf_view.page_number_overlay_changed.connect(
+            self._sync_page_number_overlay_action
+        )
         self.pdf_view.printer_marks_changed.connect(self._sync_printer_marks_action)
         self.image_label = QLabel(alignment=Qt.AlignCenter)
         self.image_label.setText("Bildvorschau")
@@ -1098,6 +1102,16 @@ class MainWindow(QMainWindow):
         self._page_boxes_action.setShortcut(QKeySequence("Ctrl+Shift+B"))
         self._page_boxes_action.toggled.connect(self._toggle_page_boxes)
         m_view.addAction(self._page_boxes_action)
+        from instantlensdoc.core.app_settings import get_show_page_number_overlay
+
+        self._page_num_overlay_action = QAction("Seitennummer-Overlay", self)
+        self._page_num_overlay_action.setCheckable(True)
+        self._page_num_overlay_action.setChecked(get_show_page_number_overlay())
+        self._page_num_overlay_action.setToolTip(
+            "Seitennummer als Overlay auf der PDF-Seite (auch in Einstellungen)"
+        )
+        self._page_num_overlay_action.toggled.connect(self._toggle_page_number_overlay)
+        m_view.addAction(self._page_num_overlay_action)
         self._printer_marks_action = QAction("Druckermarken", self)
         self._printer_marks_action.setCheckable(True)
         self._printer_marks_action.setChecked(get_show_printer_marks())
@@ -3013,11 +3027,25 @@ class MainWindow(QMainWindow):
             self._set_status(f"{n} Annotation(en) eingefügt")
 
     def _toggle_line_numbers(self, checked: bool):
-        from instantlensdoc.core.app_settings import set_editor_line_numbers
+        """Ansicht-Toggle: Zeilennummern sofort anwenden und in Settings persistieren."""
+        from instantlensdoc.core.app_settings import (
+            get_editor_line_numbers,
+            set_editor_line_numbers,
+        )
 
-        set_editor_line_numbers(bool(checked))
-        self.editor.set_line_numbers_visible(bool(checked))
-        self._set_status("Zeilennummern an" if checked else "Zeilennummern aus")
+        on = bool(checked)
+        set_editor_line_numbers(on)
+        self.editor.set_line_numbers_visible(on)
+        # Verifizieren: Round-Trip Settings → Anzeige
+        persisted = bool(get_editor_line_numbers())
+        if persisted != on:
+            set_editor_line_numbers(on)
+            persisted = bool(get_editor_line_numbers())
+        if hasattr(self, "_line_numbers_action") and self._line_numbers_action is not None:
+            self._line_numbers_action.blockSignals(True)
+            self._line_numbers_action.setChecked(persisted)
+            self._line_numbers_action.blockSignals(False)
+        self._set_status("Zeilennummern an" if persisted else "Zeilennummern aus")
 
     def _toggle_minimap(self, checked: bool):
         from instantlensdoc.core.app_settings import set_editor_minimap
@@ -3074,6 +3102,10 @@ class MainWindow(QMainWindow):
         self.pdf_view.set_show_page_boxes(bool(checked))
         self._sync_page_boxes_action(bool(checked))
 
+    def _toggle_page_number_overlay(self, checked: bool):
+        self.pdf_view.set_show_page_number_overlay(bool(checked))
+        self._sync_page_number_overlay_action(bool(checked))
+
     def _toggle_printer_marks(self, checked: bool):
         self.pdf_view.set_show_printer_marks(bool(checked))
         self._sync_printer_marks_action(bool(checked))
@@ -3123,6 +3155,15 @@ class MainWindow(QMainWindow):
             self._page_boxes_action.blockSignals(True)
             self._page_boxes_action.setChecked(bool(enabled))
             self._page_boxes_action.blockSignals(False)
+
+    def _sync_page_number_overlay_action(self, enabled: bool):
+        if (
+            hasattr(self, "_page_num_overlay_action")
+            and self._page_num_overlay_action is not None
+        ):
+            self._page_num_overlay_action.blockSignals(True)
+            self._page_num_overlay_action.setChecked(bool(enabled))
+            self._page_num_overlay_action.blockSignals(False)
 
     def _sync_printer_marks_action(self, enabled: bool):
         if hasattr(self, "_printer_marks_action") and self._printer_marks_action is not None:
@@ -4243,6 +4284,16 @@ class MainWindow(QMainWindow):
         if not self.pdf_view.pdf_path:
             return
         if self.pdf_view.apply_page_order([int(i) for i in order]):
+            self._refresh_thumbs()
+            self._update_doc_status()
+
+    def _on_thumb_rotate(self, page_index: int, degrees: int):
+        """Thumbnail-Kontextmenü: Seite 90° drehen (Undo via Ctrl+Z)."""
+        if self.stack.currentWidget() is not self.pdf_view:
+            self.stack.setCurrentWidget(self.pdf_view)
+        if not self.pdf_view.pdf_path:
+            return
+        if self.pdf_view.rotate_at(int(page_index), int(degrees)):
             self._refresh_thumbs()
             self._update_doc_status()
 

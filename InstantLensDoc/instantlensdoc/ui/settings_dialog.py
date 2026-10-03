@@ -53,6 +53,7 @@ from instantlensdoc.core.app_settings import (
     get_pdf_night_mode,
     get_pdf_thumbnail_scale,
     get_pdf_two_page_spread,
+    get_show_page_number_overlay,
     get_restore_session_on_start,
     get_merge_diff_max_side,
     get_recent_files_max,
@@ -108,6 +109,7 @@ from instantlensdoc.core.app_settings import (
     set_pdf_night_mode,
     set_pdf_thumbnail_scale,
     set_pdf_two_page_spread,
+    set_show_page_number_overlay,
     set_restore_session_on_start,
     set_merge_diff_max_side,
     set_search_snippet_context_chars,
@@ -355,6 +357,14 @@ class SettingsDialog(QDialog):
             "schließt Zwei-Seiten-Ansicht aus"
         )
         form.addRow(self.pdf_continuous)
+
+        self.page_num_overlay = QCheckBox("PDF Seitennummer-Overlay")
+        self.page_num_overlay.setChecked(get_show_page_number_overlay())
+        self.page_num_overlay.setToolTip(
+            "Aktuelle Seitennummer als Overlay auf der PDF-Seite anzeigen "
+            "(Ansicht → Seitennummer-Overlay / Toolbar „Nr.“)"
+        )
+        form.addRow(self.page_num_overlay)
 
         self.doc_split_orient = QComboBox()
         self.doc_split_orient.addItem("Horizontal (nebeneinander)", False)
@@ -721,6 +731,7 @@ class SettingsDialog(QDialog):
         set_pdf_night_mode(self.pdf_night.isChecked())
         set_pdf_two_page_spread(self.pdf_spread.isChecked())
         set_pdf_continuous_scroll(self.pdf_continuous.isChecked())
+        set_show_page_number_overlay(self.page_num_overlay.isChecked())
         set_editor_doc_split_vertical(bool(self.doc_split_orient.currentData()))
         set_tag_rename_confirm_threshold(int(self.tag_rename_confirm.value()))
         set_sidecar_save_debounce_ms(int(self.sidecar_debounce.value()))
@@ -812,6 +823,17 @@ class SettingsDialog(QDialog):
             try:
                 parent.pdf_view.apply_settings_colors()
                 parent.pdf_view.apply_toolbar_groups()
+                if hasattr(parent.pdf_view, "set_show_page_number_overlay"):
+                    parent.pdf_view.set_show_page_number_overlay(
+                        self.page_num_overlay.isChecked()
+                    )
+            except Exception:
+                pass
+        if parent is not None and hasattr(parent, "_sync_page_number_overlay_action"):
+            try:
+                parent._sync_page_number_overlay_action(
+                    self.page_num_overlay.isChecked()
+                )
             except Exception:
                 pass
         if parent is not None and hasattr(parent, "_sync_spread_action"):

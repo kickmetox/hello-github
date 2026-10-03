@@ -72,6 +72,7 @@ DEFAULTS: dict[str, Any] = {
     "skip_splash": False,
     "spellcheck_dict_path": "",
     "show_page_boxes": False,
+    "show_page_number_overlay": False,
     "show_printer_marks": False,
     "annotations_locked": False,
     "editor_snippets": [
@@ -918,6 +919,15 @@ def get_show_page_boxes() -> bool:
 
 def set_show_page_boxes(enabled: bool) -> None:
     save_settings({"show_page_boxes": bool(enabled)})
+
+
+def get_show_page_number_overlay() -> bool:
+    """Optional: Seitennummer als Overlay auf der PDF-Seite."""
+    return bool(load_settings().get("show_page_number_overlay", False))
+
+
+def set_show_page_number_overlay(enabled: bool) -> None:
+    save_settings({"show_page_number_overlay": bool(enabled)})
 
 
 def get_show_printer_marks() -> bool:
