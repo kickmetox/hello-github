@@ -330,6 +330,7 @@ class Sidebar(QWidget):
     pages_batch_duplicate_requested = Signal(list)  # Mehrfachauswahl duplizieren
     pages_batch_delete_requested = Signal(list)  # Mehrfachauswahl löschen
     pages_batch_rotate_requested = Signal(list, int)  # Mehrfachauswahl drehen (±90)
+    pages_batch_extract_requested = Signal(list)  # Mehrfachauswahl als PDF extrahieren
     search_export_requested = Signal(str)  # "csv" | "json"
 
     def __init__(self, parent=None):
@@ -624,6 +625,7 @@ class Sidebar(QWidget):
         self._ann_filter_current_page = False
         self._ann_tag_updating = False
         self._ann_page_groups: dict[int, dict] = {}
+        self._ann_sel_groups: dict[str, dict] = {}  # group_id → {title, color}
 
     def search_text(self) -> str:
         return self.search.currentText().strip()
@@ -941,9 +943,11 @@ class Sidebar(QWidget):
         if multi:
             act_dup = menu.addAction(f"{len(selected)} Seiten duplizieren")
             act_del = menu.addAction(f"{len(selected)} Seiten löschen…")
+            act_ext = menu.addAction(f"{len(selected)} Seiten als PDF extrahieren…")
         else:
             act_dup = menu.addAction("Seite duplizieren")
             act_del = menu.addAction("Seite löschen…")
+            act_ext = menu.addAction("Seite als PDF extrahieren…")
         chosen = menu.exec(self.thumbs.mapToGlobal(pos))
         if chosen is act_r:
             if multi:
@@ -965,6 +969,8 @@ class Sidebar(QWidget):
                 self.pages_batch_delete_requested.emit(list(selected))
             else:
                 self.page_delete_requested.emit(idx)
+        elif chosen is act_ext:
+            self.pages_batch_extract_requested.emit(list(selected))
 
     def set_recent(
         self,
@@ -1856,16 +1862,41 @@ class Sidebar(QWidget):
                     header.setForeground(QBrush(fg))
             self.annotations.addItem(header)
             for line, payload in items:
-                item = QListWidgetItem(f"  {line}")
+                prefix = "  "
+                gid = ""
+                gmeta: dict = {}
+                if payload is not None:
+                    gid = str(getattr(payload, "group_id", "") or "").strip()
+                    if gid:
+                        gmeta = (getattr(self, "_ann_sel_groups", None) or {}).get(gid) or {}
+                        gtitle = str(gmeta.get("title") or "").strip()
+                        if gtitle:
+                            prefix = f"  [{gtitle}] "
+                        else:
+                            prefix = "  [G] "
+                item = QListWidgetItem(f"{prefix}{line}")
                 if payload is not None:
                     item.setData(256, payload)
                     # Ellipsis-Kürzung in der Liste → Tooltip mit vollem Text
                     full_txt = str(getattr(payload, "text", "") or "").strip()
+                    tips: list[str] = []
+                    if gid:
+                        gtitle = str(gmeta.get("title") or "").strip()
+                        tips.append(f"Gruppe: {gtitle or gid[:8]}")
                     if full_txt:
-                        item.setToolTip(full_txt)
+                        tips.append(full_txt)
                     else:
                         tip_line = str(line or "").strip()
-                        item.setToolTip(tip_line if tip_line else "")
+                        if tip_line:
+                            tips.append(tip_line)
+                    item.setToolTip("\n".join(tips) if tips else "")
+                    # Gruppenmarkierung: farbiger Hintergrund links in der Liste
+                    gcolor = normalize_ann_color(gmeta.get("color")) if gmeta else ""
+                    if gcolor:
+                        qc = QColor(gcolor)
+                        if qc.isValid():
+                            qc.setAlpha(90)
+                            item.setBackground(QBrush(qc))
                 self.annotations.addItem(item)
         self._update_ann_stats()
 
@@ -1971,6 +2002,7 @@ class Sidebar(QWidget):
         payloads: list | None = None,
         *,
         page_groups: dict | None = None,
+        ann_groups: dict | None = None,
     ):
         self._ann_all_lines = list(lines)
         self._ann_all_payloads = list(payloads) if payloads else [None] * len(lines)
@@ -1982,6 +2014,14 @@ class Sidebar(QWidget):
                 except (TypeError, ValueError):
                     continue
         self._ann_page_groups = groups
+        sel_groups: dict[str, dict] = {}
+        if isinstance(ann_groups, dict):
+            for k, v in ann_groups.items():
+                gid = str(k or "").strip()
+                if not gid:
+                    continue
+                sel_groups[gid] = dict(v) if isinstance(v, dict) else {}
+        self._ann_sel_groups = sel_groups
         self._sync_ann_filter_options(self._ann_all_payloads)
         self._apply_annotation_filter()
 
@@ -1989,6 +2029,7 @@ class Sidebar(QWidget):
         self._ann_all_lines = []
         self._ann_all_payloads = []
         self._ann_page_groups = {}
+        self._ann_sel_groups = {}
         self._ann_search_query = ""
         self._ann_search_regex = False
         self._ann_color_filter = ""

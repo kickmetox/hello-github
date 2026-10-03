@@ -64,6 +64,7 @@ from ild_pdf.pages import (
     delete_pages,
     duplicate_page,
     extract_page_bytes,
+    extract_pages,
     flip_page,
     insert_blank_page,
     insert_page_from_bytes,
@@ -89,6 +90,7 @@ from instantlensdoc.core.app_settings import (
     get_page_number_overlay_format,
     get_page_number_overlay_opacity,
     get_page_number_overlay_position,
+    get_page_number_overlay_start,
     get_show_page_boxes,
     get_show_page_number_overlay,
     get_show_printer_marks,
@@ -104,6 +106,7 @@ from instantlensdoc.core.app_settings import (
     set_page_number_overlay_format,
     set_page_number_overlay_opacity,
     set_page_number_overlay_position,
+    set_page_number_overlay_start,
     set_pdf_continuous_scroll,
     set_pdf_grayscale,
     set_pdf_night_mode,
@@ -1143,6 +1146,7 @@ class PdfViewer(QWidget):
         self._page_number_overlay_font_size = get_page_number_overlay_font_size()
         self._page_number_overlay_position = get_page_number_overlay_position()
         self._page_number_overlay_format = get_page_number_overlay_format()
+        self._page_number_overlay_start = get_page_number_overlay_start()
         self._show_printer_marks = get_show_printer_marks()
         self._search_query = ""
         self._search_rects: list[tuple[float, float, float, float]] = []
@@ -1263,6 +1267,12 @@ class PdfViewer(QWidget):
             "Gruppen-Sperre umschalten — Mitglieder der Auswahl nicht verschiebbar"
         )
         btn_group_lock.clicked.connect(self.toggle_selected_group_lock)
+        btn_group_edit = QPushButton("🏷")
+        btn_group_edit.setFixedWidth(28)
+        btn_group_edit.setToolTip(
+            "Ann.-Gruppe umbenennen / Farbe (Sidecar-Markierung)"
+        )
+        btn_group_edit.clicked.connect(self.edit_selected_ann_group)
         btn_stamp_rot = QPushButton("Stempel ↻")
         btn_stamp_rot.setToolTip("Ausgewählten Stempel um 90° drehen")
         btn_stamp_rot.clicked.connect(lambda: self.rotate_selected_stamp(90))
@@ -1518,6 +1528,7 @@ class PdfViewer(QWidget):
         toolbar.addWidget(btn_group)
         toolbar.addWidget(btn_ungroup)
         toolbar.addWidget(btn_group_lock)
+        toolbar.addWidget(btn_group_edit)
         toolbar.addWidget(btn_stamp_rot)
         toolbar.addWidget(btn_zoom_out)
         toolbar.addWidget(self.lbl_zoom)
@@ -1585,6 +1596,7 @@ class PdfViewer(QWidget):
                 btn_group,
                 btn_ungroup,
                 btn_group_lock,
+                btn_group_edit,
                 btn_stamp_rot,
             ],
             "zoom": [
@@ -2239,10 +2251,29 @@ class PdfViewer(QWidget):
     def page_number_overlay_format(self) -> str:
         return str(self._page_number_overlay_format or "{page} / {pages}")
 
+    def set_page_number_overlay_start(self, start: int):
+        """Startnummer der ersten Seite im Overlay (persistiert)."""
+        try:
+            n = int(start)
+        except (TypeError, ValueError):
+            n = 1
+        n = max(0, min(9999, n))
+        changed = int(getattr(self, "_page_number_overlay_start", 1)) != n
+        self._page_number_overlay_start = n
+        set_page_number_overlay_start(n)
+        self._update_page_number_overlay()
+        if changed:
+            self.status.emit(f"Seitennummer-Overlay Start: {n}")
+
+    def page_number_overlay_start(self) -> int:
+        return int(getattr(self, "_page_number_overlay_start", 1) or 1)
+
     def format_page_number_overlay_text(self) -> str:
         """Overlay-Text aus Format-String ({page}/{pages}, Aliase {n}/{total}, {label})."""
-        page = int(self.page_index) + 1
-        pages = int(self.page_count or 0)
+        start = int(getattr(self, "_page_number_overlay_start", 1) or 1)
+        page = int(self.page_index) + start
+        count = int(self.page_count or 0)
+        pages = count + start - 1 if count > 0 else 0
         lab = self.page_label(self.page_index) or ""
         fmt = str(self._page_number_overlay_format or "{page} / {pages}")
         try:
@@ -2419,6 +2450,7 @@ class PdfViewer(QWidget):
         self._page_number_overlay_font_size = get_page_number_overlay_font_size()
         self._page_number_overlay_position = get_page_number_overlay_position()
         self._page_number_overlay_format = get_page_number_overlay_format()
+        self._page_number_overlay_start = get_page_number_overlay_start()
         if hasattr(self, "btn_page_num"):
             self.btn_page_num.blockSignals(True)
             self.btn_page_num.setChecked(self._show_page_number_overlay)
@@ -2553,7 +2585,12 @@ class PdfViewer(QWidget):
                 gid = str(getattr(ann, "group_id", "") or "").strip()
                 if n > 1 and gid:
                     lock_txt = " · gesperrt" if bool(getattr(ann, "locked", False)) else ""
-                    self.status.emit(f"Gruppe {gid}: {n} Annotationen ausgewählt{lock_txt}")
+                    gmeta = self.store.get_ann_group(gid) if self.store else {}
+                    gtitle = str((gmeta or {}).get("title") or "").strip()
+                    gname = gtitle or gid[:8]
+                    self.status.emit(
+                        f"Gruppe „{gname}“: {n} Annotationen ausgewählt{lock_txt}"
+                    )
                 else:
                     self.status.emit(f"Auswahl: {ann.type.value} (S. {ann.page + 1})")
             else:
@@ -3946,6 +3983,103 @@ class PdfViewer(QWidget):
         state = "gesperrt" if locked else "entsperrt"
         self.status.emit(f"{n} Annotation(en) {state}")
         return n
+
+    def edit_selected_ann_group(self) -> bool:
+        """Temporäre Ann.-Gruppe umbenennen und farblich markieren (Sidecar)."""
+        if not self.store:
+            QMessageBox.information(self, "Gruppe", "Kein PDF mit Annotationen geladen.")
+            return False
+        ids = self._selected_annotation_ids()
+        if not ids:
+            self.status.emit("Ann.-Gruppe: keine Auswahl")
+            return False
+        expanded = self.store.expand_group_ids(ids)
+        gid = ""
+        for aid in expanded:
+            ann = self.store.get(aid)
+            if ann and str(getattr(ann, "group_id", "") or "").strip():
+                gid = str(ann.group_id).strip()
+                break
+        if not gid:
+            self.status.emit("Ann.-Gruppe: Auswahl ist nicht gruppiert")
+            return False
+        cur = self.store.get_ann_group(gid)
+        title, ok = QInputDialog.getText(
+            self,
+            "Ann.-Gruppe",
+            f"Name für Gruppe ({len(self.store.ids_in_group(gid))} Mitglieder):",
+            text=cur.get("title") or "",
+        )
+        if not ok:
+            return False
+        color = cur.get("color") or ""
+        pick = QMessageBox.question(
+            self,
+            "Gruppenfarbe",
+            "Farbe für die Gruppenmarkierung wählen?",
+            QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel,
+            QMessageBox.Yes,
+        )
+        if pick == QMessageBox.Cancel:
+            return False
+        if pick == QMessageBox.Yes:
+            initial = QColor(color) if color else QColor("#90CAF9")
+            chosen = QColorDialog.getColor(initial, self, "Gruppenfarbe")
+            if chosen.isValid():
+                color = chosen.name().upper()
+            elif not color:
+                color = ""
+        self.store.set_ann_group(gid, title=title, color=color)
+        try:
+            self.schedule_sidecar_save(force=True)
+        except Exception as e:
+            QMessageBox.warning(self, "Ann.-Gruppe", str(e))
+            return False
+        self.annotations_changed.emit()
+        label = title.strip() or gid[:8]
+        self.status.emit(f"Ann.-Gruppe „{label}“ aktualisiert")
+        return True
+
+    def extract_selected_pages_as_pdf(
+        self, page_indices: list[int] | Sequence[int] | None = None
+    ) -> bool:
+        """Ausgewählte Seiten (Thumbnail-Batch) als neues PDF speichern."""
+        if not self.pdf_path:
+            QMessageBox.information(self, "Extrahieren", "Kein PDF geladen.")
+            return False
+        idxs = [int(p) for p in (page_indices or [])]
+        if not idxs:
+            self.status.emit("Extrahieren: keine Seiten ausgewählt")
+            return False
+        # Duplikate entfernen, Reihenfolge behalten
+        seen: set[int] = set()
+        clean: list[int] = []
+        for i in idxs:
+            if i in seen:
+                continue
+            seen.add(i)
+            clean.append(i)
+        from PySide6.QtWidgets import QFileDialog
+
+        default_name = f"{self.pdf_path.stem}_extract.pdf"
+        path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Seiten als PDF extrahieren",
+            str(self.pdf_path.with_name(default_name)),
+            "PDF (*.pdf)",
+        )
+        if not path:
+            return False
+        dest = Path(path)
+        if dest.suffix.lower() != ".pdf":
+            dest = dest.with_suffix(".pdf")
+        try:
+            extract_pages(self.pdf_path, dest, clean)
+        except Exception as e:
+            QMessageBox.warning(self, "Extrahieren", str(e))
+            return False
+        self.status.emit(f"{len(clean)} Seite(n) → {dest.name}")
+        return True
 
     def reorder_page_favorites(self, pages: list[int]) -> list[int]:
         """PDF-Favoriten-Reihenfolge aus Sidebar-Drag speichern."""

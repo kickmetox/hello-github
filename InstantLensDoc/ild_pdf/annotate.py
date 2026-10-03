@@ -832,6 +832,11 @@ class AnnotationStore:
         for a in targets:
             a.group_id = gid
             a.touch()
+        # Meta-Eintrag anlegen, falls noch keiner existiert
+        groups = dict(self._meta.get("ann_groups") or {})
+        if gid not in groups:
+            groups[gid] = {"title": "", "color": ""}
+            self._meta["ann_groups"] = groups
         self.dirty = True
         return len(targets), gid
 
@@ -850,10 +855,12 @@ class AnnotationStore:
             targets = [a for a in self.annotations if str(a.group_id or "").strip()]
         if not targets:
             return 0
+        affected = {str(a.group_id or "").strip() for a in targets if str(a.group_id or "").strip()}
         self._push_undo()
         for a in targets:
             a.group_id = ""
             a.touch()
+        self._prune_ann_groups(keep_check=affected)
         self.dirty = True
         return len(targets)
 
@@ -1512,6 +1519,100 @@ class AnnotationStore:
                 if title or color:
                     out[p] = {"title": title, "color": color.upper() if color else ""}
         return out
+
+    def get_ann_group(self, group_id: str) -> dict:
+        """Ann.-Gruppen-Metadaten: {title, color} für temporäre group_id."""
+        gid = str(group_id or "").strip()
+        if not gid:
+            return {"title": "", "color": ""}
+        groups = self._meta.get("ann_groups") or {}
+        raw = groups.get(gid) or {}
+        if not isinstance(raw, dict):
+            return {"title": "", "color": ""}
+        title = str(raw.get("title") or "").strip()
+        color = str(raw.get("color") or "").strip()
+        if color and not color.startswith("#"):
+            color = "#" + color
+        return {"title": title, "color": color.upper() if color else ""}
+
+    def set_ann_group(
+        self,
+        group_id: str,
+        *,
+        title: str | None = None,
+        color: str | None = None,
+    ) -> dict:
+        """
+        Temporäre Ann.-Gruppe umbenennen und/oder farblich markieren (Sidecar-Meta).
+        title/color=None → unverändert; leerer String → zurücksetzen.
+        """
+        gid = str(group_id or "").strip()
+        if not gid:
+            return {"title": "", "color": ""}
+        groups = dict(self._meta.get("ann_groups") or {})
+        cur = dict(self.get_ann_group(gid))
+        if title is not None:
+            cur["title"] = str(title).strip()
+        if color is not None:
+            c = str(color).strip()
+            if c and not c.startswith("#"):
+                c = "#" + c
+            cur["color"] = c.upper() if c else ""
+        if not cur.get("title") and not cur.get("color"):
+            # Eintrag behalten wenn Mitglieder existieren (leere Meta ok)
+            if self.ids_in_group(gid):
+                groups[gid] = {"title": "", "color": ""}
+            else:
+                groups.pop(gid, None)
+        else:
+            groups[gid] = {"title": cur.get("title") or "", "color": cur.get("color") or ""}
+        self._meta["ann_groups"] = groups
+        self.dirty = True
+        return self.get_ann_group(gid)
+
+    def list_ann_groups(self) -> dict[str, dict]:
+        """Alle Ann.-Gruppen mit Mitgliedern als {group_id: {title, color}}."""
+        out: dict[str, dict] = {}
+        # Zuerst Meta
+        groups = self._meta.get("ann_groups") or {}
+        if isinstance(groups, dict):
+            for key, val in groups.items():
+                gid = str(key or "").strip()
+                if not gid or not isinstance(val, dict):
+                    continue
+                title = str(val.get("title") or "").strip()
+                color = str(val.get("color") or "").strip()
+                if color and not color.startswith("#"):
+                    color = "#" + color
+                out[gid] = {"title": title, "color": color.upper() if color else ""}
+        # Gruppen mit Mitgliedern ohne Meta-Eintrag ergänzen
+        for a in self.annotations:
+            gid = str(getattr(a, "group_id", "") or "").strip()
+            if gid and gid not in out:
+                out[gid] = {"title": "", "color": ""}
+        return out
+
+    def _prune_ann_groups(self, keep_check: set[str] | None = None) -> None:
+        """Verwaiste ann_groups-Meta-Einträge entfernen (keine Mitglieder mehr)."""
+        groups = dict(self._meta.get("ann_groups") or {})
+        if not groups:
+            return
+        live = {
+            str(getattr(a, "group_id", "") or "").strip()
+            for a in self.annotations
+            if str(getattr(a, "group_id", "") or "").strip()
+        }
+        check = keep_check if keep_check is not None else set(groups.keys())
+        changed = False
+        for gid in list(check):
+            if gid and gid not in live and gid in groups:
+                groups.pop(gid, None)
+                changed = True
+        if changed:
+            if groups:
+                self._meta["ann_groups"] = groups
+            else:
+                self._meta.pop("ann_groups", None)
 
     def _payload(self, *, export: bool = False) -> dict:
         now = datetime.now(timezone.utc).isoformat(timespec="seconds")

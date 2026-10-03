@@ -12,6 +12,7 @@ from PySide6.QtWidgets import QApplication, QPlainTextEdit, QTextEdit, QWidget
 from instantlensdoc.core.app_settings import (
     get_editor_bracket_auto_close,
     get_editor_bracket_match,
+    get_editor_indent_guides,
     get_editor_line_numbers,
     get_editor_minimap,
     get_editor_soft_tabs,
@@ -94,6 +95,7 @@ class TextEditor(QPlainTextEdit):
         self._soft_wrap = bool(get_editor_soft_wrap())
         self._tab_width = int(get_editor_tab_width())
         self._soft_tabs = bool(get_editor_soft_tabs())
+        self._indent_guides = bool(get_editor_indent_guides())
         self._show_special = bool(get_editor_show_special_chars())
         self._bracket_match = bool(get_editor_bracket_match())
         self._bracket_auto_close = bool(get_editor_bracket_auto_close())
@@ -117,6 +119,7 @@ class TextEditor(QPlainTextEdit):
         self.set_minimap_visible(self._minimap)
         self.set_soft_wrap(self._soft_wrap)
         self.set_tab_width(self._tab_width)
+        self.set_indent_guides_visible(self._indent_guides)
         self.set_special_chars_visible(self._show_special)
 
     def line_number_area_width(self) -> int:
@@ -414,6 +417,64 @@ class TextEditor(QPlainTextEdit):
 
     def soft_tabs_enabled(self) -> bool:
         return bool(self._soft_tabs)
+
+    def set_indent_guides_visible(self, visible: bool) -> None:
+        """Vertikale Einrückungs-Guides an Tab-Stops ein-/ausblenden."""
+        self._indent_guides = bool(visible)
+        self.viewport().update()
+
+    def indent_guides_visible(self) -> bool:
+        return bool(self._indent_guides)
+
+    def paintEvent(self, event):  # noqa: N802
+        super().paintEvent(event)
+        if self._indent_guides:
+            self._paint_indent_guides(event)
+
+    def _paint_indent_guides(self, event) -> None:
+        """Vertikale Linien bei Tab-Stops für führende Einrückung."""
+        painter = QPainter(self.viewport())
+        try:
+            color = QColor("#B0B8C0")
+            color.setAlpha(110)
+            from PySide6.QtGui import QPen
+
+            pen = QPen(color, 1, Qt.DotLine)
+            painter.setPen(pen)
+            space_w = max(1, self.fontMetrics().horizontalAdvance(" "))
+            tab_w = max(1, int(self._tab_width)) * space_w
+            if tab_w <= 0:
+                return
+            offset = self.contentOffset()
+            block = self.firstVisibleBlock()
+            viewport_bottom = self.viewport().height()
+            while block.isValid():
+                geom = self.blockBoundingGeometry(block).translated(offset)
+                top = int(geom.top())
+                if top > viewport_bottom:
+                    break
+                bottom = int(geom.bottom())
+                if bottom >= 0:
+                    text = block.text()
+                    # Führende Einrückung in Spalten (Tabs + Spaces)
+                    col = 0
+                    for ch in text:
+                        if ch == "\t":
+                            col = ((col // max(1, int(self._tab_width))) + 1) * max(
+                                1, int(self._tab_width)
+                            )
+                        elif ch == " ":
+                            col += 1
+                        else:
+                            break
+                    levels = col // max(1, int(self._tab_width))
+                    for lvl in range(1, levels + 1):
+                        x = int(lvl * tab_w) + int(offset.x())
+                        if 0 <= x < self.viewport().width():
+                            painter.drawLine(x, max(0, top), x, min(viewport_bottom, bottom))
+                block = block.next()
+        finally:
+            painter.end()
 
     def set_special_chars_visible(self, visible: bool) -> None:
         """Tabs/Leerzeichen/Absatzenden als sichtbare Sonderzeichen (ShowTabsAndSpaces)."""

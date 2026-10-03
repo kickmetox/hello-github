@@ -57,6 +57,7 @@ DEFAULTS: dict[str, Any] = {
     "editor_soft_wrap": True,
     "editor_tab_width": 4,
     "editor_soft_tabs": True,
+    "editor_indent_guides": True,
     "editor_show_special_chars": False,
     "annotations_visible": True,
     "minimize_to_tray": False,
@@ -79,6 +80,7 @@ DEFAULTS: dict[str, Any] = {
     "page_number_overlay_font_size": 11,
     "page_number_overlay_position": "bottom-center",
     "page_number_overlay_format": "{page} / {pages}",
+    "page_number_overlay_start": 1,
     "show_printer_marks": False,
     "annotations_locked": False,
     "editor_snippets": [
@@ -1003,6 +1005,23 @@ def set_page_number_overlay_format(fmt: str) -> None:
     save_settings({"page_number_overlay_format": text})
 
 
+def get_page_number_overlay_start() -> int:
+    """Startnummer für Seitennummer-Overlay (erste Seite ≠ 1 möglich)."""
+    try:
+        n = int(load_settings().get("page_number_overlay_start", 1))
+    except (TypeError, ValueError):
+        n = 1
+    return max(0, min(9999, n))
+
+
+def set_page_number_overlay_start(start: int) -> None:
+    try:
+        n = int(start)
+    except (TypeError, ValueError):
+        n = 1
+    save_settings({"page_number_overlay_start": max(0, min(9999, n))})
+
+
 def get_editor_tab_width() -> int:
     """Editor-Tab-Breite in Zeichen (2 / 4 / 8)."""
     try:
@@ -1031,6 +1050,15 @@ def get_editor_soft_tabs() -> bool:
 
 def set_editor_soft_tabs(enabled: bool) -> None:
     save_settings({"editor_soft_tabs": bool(enabled)})
+
+
+def get_editor_indent_guides() -> bool:
+    """True = vertikale Einrückungs-Guides (Tab-Stops) im Editor."""
+    return bool(load_settings().get("editor_indent_guides", True))
+
+
+def set_editor_indent_guides(enabled: bool) -> None:
+    save_settings({"editor_indent_guides": bool(enabled)})
 
 
 def get_show_printer_marks() -> bool:

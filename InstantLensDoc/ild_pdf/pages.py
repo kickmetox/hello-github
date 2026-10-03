@@ -286,6 +286,49 @@ def extract_page_range(
     return dest
 
 
+def extract_pages(
+    path: str | Path,
+    dest: str | Path,
+    page_indices: Sequence[int],
+    *,
+    one_based: bool = False,
+) -> Path:
+    """
+    Ausgewählte Seiten (auch nicht zusammenhängend) als neues PDF speichern.
+    page_indices: 0-basiert, oder 1-basiert wenn one_based=True.
+    Reihenfolge der Indizes bleibt erhalten; Duplikate werden entfernt.
+    Quell-PDF bleibt unverändert.
+    """
+    path = Path(path)
+    dest = Path(dest)
+    raw = [int(p) for p in (page_indices or [])]
+    if one_based:
+        raw = [p - 1 for p in raw]
+    # Reihenfolge behalten, Duplikate streichen
+    seen: set[int] = set()
+    indices: list[int] = []
+    for p in raw:
+        if p in seen:
+            continue
+        seen.add(p)
+        indices.append(p)
+    if not indices:
+        raise ValueError("Keine Seiten ausgewählt")
+    with pikepdf.open(path) as pdf:
+        n = len(pdf.pages)
+        if n == 0:
+            raise ValueError("PDF hat keine Seiten")
+        for p in indices:
+            if p < 0 or p >= n:
+                raise ValueError(f"Ungültiger Seitenindex {p + 1} (1..{n})")
+        out = pikepdf.Pdf.new()
+        for p in indices:
+            out.pages.append(pdf.pages[p])
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        out.save(dest)
+    return dest
+
+
 def split_into_single_page_pdfs(
     path: str | Path,
     dest_dir: str | Path,

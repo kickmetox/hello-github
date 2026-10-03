@@ -28,6 +28,7 @@ from .annotate import (
 from .pages import (
     PAGE_SIZE_PRESETS,
     extract_page_range,
+    extract_pages,
     extract_page_bytes,
     insert_page_from_bytes,
     merge_pdfs,
@@ -122,6 +123,7 @@ __all__ = [
     "stamp_library_items",
     "PAGE_SIZE_PRESETS",
     "extract_page_range",
+    "extract_pages",
     "merge_pdfs",
     "split_into_single_page_pdfs",
     "split_pdf",
@@ -200,4 +202,4 @@ __all__ = [
     "uri_link_at",
 ]
 
-__version__ = "0.8.7"
+__version__ = "0.8.8"

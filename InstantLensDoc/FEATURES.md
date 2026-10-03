@@ -36,7 +36,7 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | Export-Profil (DPI/Format/Ziel) | fertig | Speichern/Anwenden; Vorbefüllung Seiten-Export 0.5.2 |
 | Mehrsprach-UI DE/EN | teilweise | Einstellungen + Dialoge/Stubs (Minimal) |
 | Update-Check-Hinweis | fertig | Hilfe-Menü; optional Start (nur wenn Einstellung aktiv); offline OK; Tray-Tooltip mit Version 0.3.9 |
-| Sidebar Seiten-Thumbnails | fertig | Vorschaubilder, Klick → Seite; Drag-Reorder 0.2.3; **Lazy-Load** 0.3.1; **Größe in Einstellungen** 0.3.8; **Reorder-Undo Ctrl+Z** **0.8.2**; **Kontextmenü Drehen 90° L/R + Undo** **0.8.3**; **Seite löschen Bestätigung+Undo** **0.8.4**; **Seite duplizieren + Undo** **0.8.5**; **Shift+Klick Mehrfachauswahl + Batch-Löschen/Duplizieren** **0.8.6**; **Batch-Drehen L/R + Undo** **0.8.7** |
+| Sidebar Seiten-Thumbnails | fertig | Vorschaubilder, Klick → Seite; Drag-Reorder 0.2.3; **Lazy-Load** 0.3.1; **Größe in Einstellungen** 0.3.8; **Reorder-Undo Ctrl+Z** **0.8.2**; **Kontextmenü Drehen 90° L/R + Undo** **0.8.3**; **Seite löschen Bestätigung+Undo** **0.8.4**; **Seite duplizieren + Undo** **0.8.5**; **Shift+Klick Mehrfachauswahl + Batch-Löschen/Duplizieren** **0.8.6**; **Batch-Drehen L/R + Undo** **0.8.7**; **Batch als PDF extrahieren** **0.8.8** |
 | Tastaturhilfe-Dialog | fertig | Hilfe → F1; **Cheat-Sheet als PDF exportieren** 0.4.7; **0.6.x-Keys** + kurze **0.6.8-Hinweise** / Sync-Scroll-Session / Tag-Schwelle / Save-Fehlerliste 0.6.9 |
 | App-Logging | fertig | %APPDATA%/InstantLensDoc/logs; **Hilfe → Logordner öffnen** 0.3.0; **Crash-Report ZIP** 0.5.7; **optional Screenshot-Pfad-Hinweis** 0.5.8 |
 | PDF-Annotationen (Highlight, Underline, Sticky, Text) | fertig | Sidecar `*.ildann.json` **v4** (`ildann-v4`); Farben-Picker Highlight/Stift 0.2.2; **Notizfarbe unabhängig** 0.4.7; Löschen Auswahl/letzte 0.2.3; **JSON Export/Import** 0.2.5; **PDF-Highlight Schema v4** 0.4.4; **Import-Validierung Schema v4** 0.4.5; **CSV Export** 0.3.8; **Sidebar-Filter nach Typ** 0.2.6; **Text nachträglich editierbar** 0.2.7; **Deckkraft/Opacity** 0.2.8; **Sidebar-Textsuche** 0.3.0; **Farben-Chips klickbar filtern** 0.4.6; **Zeitstempel in Liste** 0.4.8; **Filter nur aktuelle Seite** 0.4.9; **freie Tags/Labels filterbar** 0.5.1; **Selection→Highlight** 0.5.2; **Selection→Clipboard (Ctrl+C)** 0.6.1; **Selection→Notiz (Ctrl+Alt+N)** 0.6.2; **Selection→Highlight+Notiz (Checkbox)** 0.6.3 |
@@ -46,7 +46,7 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | Annotation-Duplikate zusammenführen | fertig | Gleiche Seite+BBox (±2px) + Typ erkennen; optional mergen (Text/Tags); Menü PDF 0.7.1; **benannter Undo-Stack** „Duplikate zusammenführen“ 0.7.2; **Vorschau-Dialog vor Apply** 0.7.3; **je Paar behalten/mergen** 0.7.4; **Alle mergen / Alle behalten** 0.7.5; **Diff-Kurztext** 0.7.6; **Diff inkl. Tags/Farbe** 0.7.7; **Diff max. Zeichenlänge Settings** 0.7.8 |
 | Annotation kopieren/einfügen | fertig | Zwischen Seiten; Ctrl+Alt+C / Ctrl+Alt+V 0.4.2 |
 | Annotation Select-All Seite | fertig | Alle Ann. der aktuellen Seite; Ctrl+A im PDF 0.3.6 |
-| Annotation Mehrfachauswahl | fertig | **Shift+Klick** umschalten; gemeinsame Verschiebung der Auswahl **0.8.3**; **Align L/C/R + Distribute H** Toolbar/Menü **0.8.4**; **Align T/M/B + Distribute V** **0.8.5**; **Gruppieren/Entgruppieren** temporäre `group_id` Sidecar **0.8.6**; **Gruppen-Klick wählt alle Mitglieder + Gruppen-Sperre** **0.8.7** |
+| Annotation Mehrfachauswahl | fertig | **Shift+Klick** umschalten; gemeinsame Verschiebung der Auswahl **0.8.3**; **Align L/C/R + Distribute H** Toolbar/Menü **0.8.4**; **Align T/M/B + Distribute V** **0.8.5**; **Gruppieren/Entgruppieren** temporäre `group_id` Sidecar **0.8.6**; **Gruppen-Klick wählt alle Mitglieder + Gruppen-Sperre** **0.8.7**; **Gruppen Rename/Farbe Sidecar-Markierung** **0.8.8** |
 | Annotation verschieben / Lock | fertig | Drag im Auswahl-Werkzeug; **Sperre-Toggle** (nicht verschiebbar) 0.4.3; **Multi-Select gemeinsam** **0.8.3**; **Gruppen-Sperre** `locked` Sidecar **0.8.7** |
 | Annotation-Farben-Favoriten | fertig | 3 Presets speichern/anwenden (Toolbar 1/2/3) 0.3.7 |
 | Annotation-Farbe Palette-Zyklus | fertig | Ctrl+Shift+C Zyklus / Ctrl+Alt+Shift+C Random aus fester Palette 0.5.3 |
@@ -83,7 +83,7 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | PDF drehen / Seite löschen | fertig | Toolbar ⟲/⟳ (−90°/+90°) speichert; **Seite löschen Undo (Ctrl+Z)** 0.5.4; **Historie-Liste Wiederherstellen** 0.5.5; Annotation-Remap |
 | PDF spiegeln (H/V) | fertig | Toolbar ↔/↕ + Menü; `ild_pdf.flip_page` 0.2.7 |
 | PDF Druckermarken | fertig | Seitenrand Crop/Registration-Overlay optional; Toolbar „Marken“; Ctrl+Alt+M 0.4.4 |
-| PDF Seitennummer-Overlay | fertig | Aktuelle Seitennummer als Overlay; Toggle Einstellungen / Ansicht / Toolbar „Nr.“ **0.8.3**; **Deckkraft Setting/Toolbar** **0.8.4**; **Schriftgröße Settings** **0.8.5**; **Position unten-mitte / oben-mitte** **0.8.6**; **Format-String `{page}`/`{pages}`** **0.8.7** |
+| PDF Seitennummer-Overlay | fertig | Aktuelle Seitennummer als Overlay; Toggle Einstellungen / Ansicht / Toolbar „Nr.“ **0.8.3**; **Deckkraft Setting/Toolbar** **0.8.4**; **Schriftgröße Settings** **0.8.5**; **Position unten-mitte / oben-mitte** **0.8.6**; **Format-String `{page}`/`{pages}`** **0.8.7**; **Start-Offset** **0.8.8** |
 | PDF Graustufen | fertig | Toggle Ansicht/Export; `render_page(..., grayscale=True)` 0.2.8 |
 | PDF Nachtmodus | fertig | Invert-Ansicht nur Darstellung; `invert=True` — nicht speichern/exportieren 0.3.0 |
 | PDF leere Seite / duplizieren | fertig | Toolbar + Menü; Annotation-Remap 0.2.4; **Thumb-Duplizieren + Undo Ctrl+Z** **0.8.5** |
@@ -102,6 +102,7 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | Editor Soft-Wrap / Wortumbruch | fertig | Toggle Ansicht/Einstellungen; Ctrl+Shift+W 0.3.3; **Persistenz Round-Trip Ansicht↔Settings** **0.8.4** |
 | Editor Tab-Breite | fertig | Einstellungen 2 / 4 / 8 Zeichen **0.8.5** |
 | Editor Soft-Tabs | fertig | Soft-Tabs (Leerzeichen) vs. echte Tabs Toggle in Einstellungen **0.8.6**; Mehrzeilen-Indent nutzt Soft-Tabs **0.8.7** |
+| Editor Einrückungs-Guides | fertig | Vertikale Linien an Tab-Stops; Toggle Ansicht/Einstellungen **0.8.8** |
 | Editor Sonderzeichen | fertig | Tabs/Leerzeichen/Absätze sichtbar; Ansicht/Einstellungen; Ctrl+Shift+. 0.3.9; **Soft-Hyphen/NBSP einfügen** 0.5.4 |
 | Editor Gehe zu Zeile | fertig | Dialog Ctrl+G (Editor; PDF → Seite) 0.3.4/0.4.6 |
 | Editor Tab duplizieren | fertig | Inhalt klonen Ctrl+Shift+T; Erneut öffnen Ctrl+Alt+Shift+O 0.4.6 |
@@ -128,7 +129,7 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | Editor Wortzählung | fertig | Statusleiste Wörter · Zeichen 0.2.5 |
 | Batch-Konvertierung Ordner | fertig | Bilder→PDF, OCR-Ordner, PDF-OCR-Text; Fortschrittsbalken; **Abbrechen/Fehler robust** 0.4.2 |
 | PDF zusammenführen / teilen | fertig | Dialog unter Menü PDF |
-| Einstellungen-Dialog | fertig | OCR, Theme, Sprache, Export-Q, Standard-Zoom, **PDF-Thumbnail-Größe** 0.3.8, Autosave, optional Tray-Minimize, **Backup .bak**, **Seitengröße-Einheit**, **Session-Restore Toggle**, **Sonderzeichen** 0.3.9, **Doc-Split Layout H/V** 0.6.6, **Wizard-Reset** 0.6.8, **Tag-Rename-Schwelle** 0.6.9, **Sidecar-Debounce ms** 0.7.2, **Treffer-Snippet-Länge 20–80** 0.7.5, **Snippet-Ellipsis-Style** 0.7.6, **Status-Blink kurz/aus** 0.7.7, **Merge-Diff max. Länge** 0.7.8, **Bracket-Auto-Close** 0.7.9, **Recent max/Clear** **0.8.0**, **Standard-Zoom-Modus + Aktuell speichern** **0.8.2**, **Seitennummer-Overlay** **0.8.3**, **Overlay-Deckkraft** **0.8.4**, **Overlay-Schriftgröße** **0.8.5**, **Tab-Breite 2/4/8** **0.8.5**, **Overlay-Position** **0.8.6**, **Soft-Tabs** **0.8.6**, **Overlay-Format `{page}`/`{pages}`** **0.8.7**, Pfade, Update |
+| Einstellungen-Dialog | fertig | OCR, Theme, Sprache, Export-Q, Standard-Zoom, **PDF-Thumbnail-Größe** 0.3.8, Autosave, optional Tray-Minimize, **Backup .bak**, **Seitengröße-Einheit**, **Session-Restore Toggle**, **Sonderzeichen** 0.3.9, **Doc-Split Layout H/V** 0.6.6, **Wizard-Reset** 0.6.8, **Tag-Rename-Schwelle** 0.6.9, **Sidecar-Debounce ms** 0.7.2, **Treffer-Snippet-Länge 20–80** 0.7.5, **Snippet-Ellipsis-Style** 0.7.6, **Status-Blink kurz/aus** 0.7.7, **Merge-Diff max. Länge** 0.7.8, **Bracket-Auto-Close** 0.7.9, **Recent max/Clear** **0.8.0**, **Standard-Zoom-Modus + Aktuell speichern** **0.8.2**, **Seitennummer-Overlay** **0.8.3**, **Overlay-Deckkraft** **0.8.4**, **Overlay-Schriftgröße** **0.8.5**, **Tab-Breite 2/4/8** **0.8.5**, **Overlay-Position** **0.8.6**, **Soft-Tabs** **0.8.6**, **Overlay-Format `{page}`/`{pages}`** **0.8.7**, **Overlay-Start-Offset** **0.8.8**, **Einrückungs-Guides** **0.8.8**, Pfade, Update |
 | Markieren im Editor | fertig | Ctrl+H |
 | Bilder JPEG/PNG anzeigen | fertig | |
 | OCR Bild/PDF-Seite | teilweise | Presets + Modi; Tabellen-Heuristik; Fortschrittsdialog 0.2.1 |
@@ -144,27 +145,27 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | Inno-Installer | fertig | Icon, **optionale Desktop-Checkbox** (`desktopicon`/`checkedonce`) 0.6.1, Uninstaller, Keygen optional (`InstantLensKeygen.exe`) 0.2.1 |
 | Sync-Skript Windows | fertig | Repo `scripts/sync-ild.ps1`; Store `docs/sync-ild.ps1`; **-SkipStart** + Exit-Codes 0/1/2 **0.6.2** |
 | Arbeitsverzeichnis öffnen | fertig | Datei-Menü Ctrl+Shift+E; Ordner der Datei bzw. CWD 0.4.8 |
-| In-App Hilfe / About | fertig | Version 0.8.7; Fenstertitel + Splash; Logordner-Button; **Feature-Kurzliste + FEATURES.md** 0.4.9; **Keygen-Hinweis bei Trial** 0.5.3; **Splash überspringbar** 0.5.5; **Privacy: lokal, keine Telemetrie** 0.5.6; **Crash-Report ZIP** 0.5.7; **Screenshot-Pfad optional** 0.5.8; **Erste-Schritte-Wizard (4 Seiten inkl. 0.6 / 0.6.8-Hinweise)** 0.6.9; **skip-once Checkbox + Auto-Show** 0.6.6; **Nicht mehr zeigen (dauerhaft)** 0.6.7; **Reset in Einstellungen** 0.6.8 |
+| In-App Hilfe / About | fertig | Version 0.8.8; Fenstertitel + Splash; Logordner-Button; **Feature-Kurzliste + FEATURES.md** 0.4.9; **Keygen-Hinweis bei Trial** 0.5.3; **Splash überspringbar** 0.5.5; **Privacy: lokal, keine Telemetrie** 0.5.6; **Crash-Report ZIP** 0.5.7; **Screenshot-Pfad optional** 0.5.8; **Erste-Schritte-Wizard (4 Seiten inkl. 0.6 / 0.6.8-Hinweise)** 0.6.9; **skip-once Checkbox + Auto-Show** 0.6.6; **Nicht mehr zeigen (dauerhaft)** 0.6.7; **Reset in Einstellungen** 0.6.8 |
 | Startup-Abhängigkeiten-Check | fertig | pypdfium2 kritisch + Tesseract optional; Dialog bei Problemen 0.5.4 |
 | Quiet Startup / Splash | fertig | Einstellungen: Splash überspringen 0.5.5 |
-| CHANGELOG | fertig | **0.8.7** Gruppen-Select/Lock / Thumb Batch-Drehen / Overlay-Format / Mehrzeilen-Indent; **0.8.6** Gruppieren / Thumb-Multi-Select / Overlay-Position / Soft-Tabs; **0.8.5** Align/Distribute V / Thumb-Duplizieren / Overlay-Font / Tab-Breite; **0.8.4** Align/Distribute / Thumb-Löschen / Overlay-Opacity / Wortumbruch; **0.8.3** Ann.-Multi-Select / Thumb-Drehen / Seitennummer-Overlay / Zeilennummern-Persistenz; **0.8.2** Thumbnail-Undo / Fit-Zoom-Modus / Ann.-Ctrl+D / Standard-Zoom speichern; **0.8.1** Bookmark-Drag/Sidecar / Tag-Cloud Sort / Recent fehlt+Entfernen / Zoom-% PDF; **0.8.0** Bookmark-Export ildbm-v1 / Tag-Cloud Filter+Farbe / Status PDF↔Text / Recent max·Clear; **0.7.9** Such-Export CSV/JSON / Ann.-Filter-Presets / Bracket-Auto-Close; **0.7.8** Dry-Run-TXT / Ann.-Tooltip / Blink-Hinweis / Merge-Diff-Länge; **0.7.7** Status-Blink Settings / Merge-Tags·Farbe / Zip-Dry-Run / Ann.-Ellipsis; **0.7.6** Snippet-Ellipsis / Zip-Konflikt / Merge-Diff / Debounce-Blink; **0.7.5** Snippet-Länge Settings / Alle mergen·behalten / Vorlagen-Zip / Tab-Tooltip Debounce; **0.7.4** Kontext-Snippet / Merge je Paar / Vorlagen-Drag / Dirty-Debounce; **0.7.3** Trefferliste / Vorlagen-Ordner / Merge-Vorschau / Ctrl+S-Flush; **0.7.2** Treffer-Nav / Merge-Undo / Vorlagen-UI / Debounce-Settings; **0.7.1** PDF-Schnellsuche / Ann.-Duplikate / Vorlagen / Sidecar-Debounce; **0.7.0** Konsolidierung 0.6.x |
+| CHANGELOG | fertig | **0.8.8** Gruppen-Rename/Farbe / Thumb PDF-Extrakt / Overlay-Start / Indent-Guides; **0.8.7** Gruppen-Select/Lock / Thumb Batch-Drehen / Overlay-Format / Mehrzeilen-Indent; **0.8.6** Gruppieren / Thumb-Multi-Select / Overlay-Position / Soft-Tabs; **0.8.5** Align/Distribute V / Thumb-Duplizieren / Overlay-Font / Tab-Breite; **0.8.4** Align/Distribute / Thumb-Löschen / Overlay-Opacity / Wortumbruch; **0.8.3** Ann.-Multi-Select / Thumb-Drehen / Seitennummer-Overlay / Zeilennummern-Persistenz; **0.8.2** Thumbnail-Undo / Fit-Zoom-Modus / Ann.-Ctrl+D / Standard-Zoom speichern; **0.8.1** Bookmark-Drag/Sidecar / Tag-Cloud Sort / Recent fehlt+Entfernen / Zoom-% PDF; **0.8.0** Bookmark-Export ildbm-v1 / Tag-Cloud Filter+Farbe / Status PDF↔Text / Recent max·Clear; **0.7.9** Such-Export CSV/JSON / Ann.-Filter-Presets / Bracket-Auto-Close; **0.7.8** Dry-Run-TXT / Ann.-Tooltip / Blink-Hinweis / Merge-Diff-Länge; **0.7.7** Status-Blink Settings / Merge-Tags·Farbe / Zip-Dry-Run / Ann.-Ellipsis; **0.7.6** Snippet-Ellipsis / Zip-Konflikt / Merge-Diff / Debounce-Blink; **0.7.5** Snippet-Länge Settings / Alle mergen·behalten / Vorlagen-Zip / Tab-Tooltip Debounce; **0.7.4** Kontext-Snippet / Merge je Paar / Vorlagen-Drag / Dirty-Debounce; **0.7.3** Trefferliste / Vorlagen-Ordner / Merge-Vorschau / Ctrl+S-Flush; **0.7.2** Treffer-Nav / Merge-Undo / Vorlagen-UI / Debounce-Settings; **0.7.1** PDF-Schnellsuche / Ann.-Duplikate / Vorlagen / Sidecar-Debounce; **0.7.0** Konsolidierung 0.6.x |
 | FEATURES.md / INFO.md | fertig | |
 | `ild_pdf` Modul + Beispielskript | fertig | metadata / page size / watermark / redact / acroform / attachments / flatten / **plain text** / **selection_to_highlight_rects** / **selection_to_plain_text** / **export_report** / **page_favorites JSON** |
 | Font-Matching | geplant | |
 | Objekt-/Bildbearbeitung | geplant | |
 | Layout-Erhaltung (Scan→edit) | geplant | |
 | Freihand | geplant | |
-| KI-Assistent | Stub | Menü „Geplant“ 0.8.7 (keine Fake-KI) |
+| KI-Assistent | Stub | Menü „Geplant“ 0.8.8 (keine Fake-KI) |
 | Signieren (rechtssicher) | Stub | |
-| Cloud-Sync | Stub | Menü „Geplant“ 0.8.7 (keine Fake-Cloud) |
+| Cloud-Sync | Stub | Menü „Geplant“ 0.8.8 (keine Fake-Cloud) |
 | Text on Path / Text zu Pfaden | geplant | |
 | Envelope Distort / Text Wrap / Area Type | Stub/geplant | |
 | Schnittmasken | geplant | |
 | Füllungen / Live-Effekte | geplant | |
-| 3D-Extrusion | Stub | Menü „Geplant“ 0.8.7 |
+| 3D-Extrusion | Stub | Menü „Geplant“ 0.8.8 |
 | Variable Fonts (voll) | Stub | |
 | Glyphen-Palette | geplant | |
-| Stylus / Palm Rejection | Stub | Menü „Geplant“ 0.8.7 |
-| Intelligente Formerkennung | Stub | Menü „Geplant“ 0.8.7 |
+| Stylus / Palm Rejection | Stub | Menü „Geplant“ 0.8.8 |
+| Intelligente Formerkennung | Stub | Menü „Geplant“ 0.8.8 |
 
 Nicht behauptet als fertig: Cloud, KI, Stylus, 3D — nur Menü-Stubs + dieser Status.

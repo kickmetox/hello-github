@@ -412,6 +412,7 @@ class MainWindow(QMainWindow):
         self.sidebar.pages_batch_duplicate_requested.connect(self._on_thumbs_batch_duplicate)
         self.sidebar.pages_batch_delete_requested.connect(self._on_thumbs_batch_delete)
         self.sidebar.pages_batch_rotate_requested.connect(self._on_thumbs_batch_rotate)
+        self.sidebar.pages_batch_extract_requested.connect(self._on_thumbs_batch_extract)
         splitter.addWidget(self.sidebar)
 
         self.stack = QStackedWidget()
@@ -1005,6 +1006,14 @@ class MainWindow(QMainWindow):
         )
         act_group_lock.triggered.connect(self._toggle_selected_group_lock)
         m_align.addAction(act_group_lock)
+        act_group_edit = QAction("Gruppe umbenennen / Farbe…", self)
+        act_group_edit.setShortcut(QKeySequence("Ctrl+Alt+Shift+N"))
+        act_group_edit.setToolTip(
+            "Temporäre Ann.-Gruppe umbenennen und Farbe der Sidecar-Markierung "
+            "— Ctrl+Alt+Shift+N"
+        )
+        act_group_edit.triggered.connect(self._edit_selected_ann_group)
+        m_align.addAction(act_group_edit)
         act_dup_ann = QAction("Annotation duplizieren", self)
         act_dup_ann.setShortcut(QKeySequence("Ctrl+Shift+D"))
         act_dup_ann.setToolTip(
@@ -1049,6 +1058,16 @@ class MainWindow(QMainWindow):
         self._line_numbers_action.setToolTip("Zeilennummern im Texteditor anzeigen")
         self._line_numbers_action.toggled.connect(self._toggle_line_numbers)
         m_view.addAction(self._line_numbers_action)
+        self._indent_guides_action = QAction("Einrückungs-Guides", self)
+        self._indent_guides_action.setCheckable(True)
+        from instantlensdoc.core.app_settings import get_editor_indent_guides
+
+        self._indent_guides_action.setChecked(get_editor_indent_guides())
+        self._indent_guides_action.setToolTip(
+            "Vertikale Linien an Tab-Stops für führende Einrückung"
+        )
+        self._indent_guides_action.toggled.connect(self._toggle_indent_guides)
+        m_view.addAction(self._indent_guides_action)
         self._minimap_action = QAction("Editor-Minimap", self)
         self._minimap_action.setCheckable(True)
         self._minimap_action.setChecked(get_editor_minimap())
@@ -2380,6 +2399,13 @@ class MainWindow(QMainWindow):
         if n:
             self._refresh_pdf_marks()
 
+    def _edit_selected_ann_group(self):
+        if self.stack.currentWidget() is not self.pdf_view or not self.pdf_view.pdf_path:
+            self._set_status("Ann.-Gruppe nur im PDF-Modus")
+            return
+        if self.pdf_view.edit_selected_ann_group():
+            self._refresh_pdf_marks()
+
     def _toggle_line_bookmark(self):
         if self.stack.currentWidget() is not self.editor_pane:
             self.stack.setCurrentWidget(self.editor_pane)
@@ -3177,6 +3203,27 @@ class MainWindow(QMainWindow):
             self._line_numbers_action.setChecked(persisted)
             self._line_numbers_action.blockSignals(False)
         self._set_status("Zeilennummern an" if persisted else "Zeilennummern aus")
+
+    def _toggle_indent_guides(self, checked: bool):
+        """Ansicht-Toggle: Einrückungs-Guides sofort anwenden und persistieren."""
+        from instantlensdoc.core.app_settings import (
+            get_editor_indent_guides,
+            set_editor_indent_guides,
+        )
+
+        on = bool(checked)
+        set_editor_indent_guides(on)
+        if hasattr(self.editor, "set_indent_guides_visible"):
+            self.editor.set_indent_guides_visible(on)
+        persisted = bool(get_editor_indent_guides())
+        if persisted != on:
+            set_editor_indent_guides(on)
+            persisted = bool(get_editor_indent_guides())
+        if hasattr(self, "_indent_guides_action") and self._indent_guides_action is not None:
+            self._indent_guides_action.blockSignals(True)
+            self._indent_guides_action.setChecked(persisted)
+            self._indent_guides_action.blockSignals(False)
+        self._set_status("Einrückungs-Guides an" if persisted else "Einrückungs-Guides aus")
 
     def _toggle_minimap(self, checked: bool):
         from instantlensdoc.core.app_settings import set_editor_minimap
@@ -4230,12 +4277,16 @@ class MainWindow(QMainWindow):
         pairs = self.pdf_view.annotation_summaries()
         self.sidebar.set_annotation_current_page(self.pdf_view.page_index)
         groups = None
+        ann_groups = None
         if self.pdf_view.store is not None:
             groups = self.pdf_view.store.list_page_groups()
+            if hasattr(self.pdf_view.store, "list_ann_groups"):
+                ann_groups = self.pdf_view.store.list_ann_groups()
         self.sidebar.set_annotations(
             [p[0] for p in pairs],
             [p[1] for p in pairs],
             page_groups=groups,
+            ann_groups=ann_groups,
         )
         n = len(self.pdf_view.store.annotations) if self.pdf_view.store else 0
         self.word_status_label.setText(f"{n} Ann.")
@@ -4493,6 +4544,15 @@ class MainWindow(QMainWindow):
         if self.pdf_view.rotate_many(idxs, int(degrees)):
             self._refresh_thumbs()
             self._update_doc_status()
+
+    def _on_thumbs_batch_extract(self, pages: list):
+        """Thumbnail-Auswahl: Seiten als neues PDF extrahieren."""
+        if self.stack.currentWidget() is not self.pdf_view:
+            self.stack.setCurrentWidget(self.pdf_view)
+        if not self.pdf_view.pdf_path:
+            return
+        idxs = [int(p) for p in (pages or [])]
+        self.pdf_view.extract_selected_pages_as_pdf(idxs)
 
     def _on_pdf_page_changed(self, page_index: int):
         self.sidebar.select_thumb(page_index)
