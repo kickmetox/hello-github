@@ -63,9 +63,12 @@ from instantlensdoc.core.app_settings import (
     get_export_pdf_page,
     get_minimize_to_tray,
     get_ocr_attach_errors,
+    get_ocr_defaults_toast_sec,
     get_ocr_dpi,
     get_ocr_lang,
     get_merge_close_preview_on_edit,
+    MERGE_CLOSE_PREVIEW_TOOLTIP,
+    OCR_DEFAULTS_TOAST_CHOICES,
     get_page_size_unit,
     get_pdf_continuous_scroll,
     get_pdf_grayscale,
@@ -144,6 +147,7 @@ from instantlensdoc.core.app_settings import (
     set_minimize_to_tray,
     set_pdf_toolbar_groups,
     set_ocr_attach_errors,
+    set_ocr_defaults_toast_sec,
     set_ocr_dpi,
     set_ocr_lang,
     set_merge_close_preview_on_edit,
@@ -236,15 +240,25 @@ class SettingsDialog(QDialog):
         )
         form.addRow(self.ocr_attach_errors)
 
+        self.ocr_toast_sec = QComboBox()
+        cur_toast = get_ocr_defaults_toast_sec()
+        toast_pick = 0
+        for i, sec in enumerate(OCR_DEFAULTS_TOAST_CHOICES):
+            self.ocr_toast_sec.addItem(f"{sec} s", int(sec))
+            if int(sec) == int(cur_toast):
+                toast_pick = i
+        self.ocr_toast_sec.setCurrentIndex(toast_pick)
+        self.ocr_toast_sec.setToolTip(
+            "Dauer des Toasts „OCR-Defaults gespeichert“ (1/2/3 s) "
+            "inkl. Accessibility-Announcement — 1.1.9"
+        )
+        form.addRow("OCR-Defaults-Toast", self.ocr_toast_sec)
+
         self.merge_close_preview = QCheckBox(
             "Zusammenführen: Readonly-Vorschau bei „Zum Bearbeiten öffnen“ schließen"
         )
         self.merge_close_preview.setChecked(get_merge_close_preview_on_edit())
-        self.merge_close_preview.setToolTip(
-            "Wenn aktiv: Vorschau-Tab schließen und Datei neu bearbeitbar öffnen; "
-            "sonst Vorschau-Tab in Bearbeiten umschalten. Persistiert in Settings; "
-            "gleicher Toggle im Merge-Dialog (beidseitiger Sync) — 1.1.8"
-        )
+        self.merge_close_preview.setToolTip(MERGE_CLOSE_PREVIEW_TOOLTIP)
         form.addRow(self.merge_close_preview)
 
         self.zoom_mode = QComboBox()
@@ -1408,6 +1422,11 @@ class SettingsDialog(QDialog):
             dpi_val = 150
         set_ocr_dpi(dpi_val)
         set_ocr_attach_errors(self.ocr_attach_errors.isChecked())
+        try:
+            toast_sec = int(self.ocr_toast_sec.currentData() or 2)
+        except (TypeError, ValueError):
+            toast_sec = 2
+        set_ocr_defaults_toast_sec(toast_sec)
         set_merge_close_preview_on_edit(self.merge_close_preview.isChecked())
         set_ui_lang(str(self.ui_lang.currentData() or "de"))
         sync_from_settings()

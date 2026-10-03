@@ -24,6 +24,7 @@ from PySide6.QtWidgets import (
 
 from instantlensdoc.core.app_settings import (
     get_ocr_attach_errors,
+    get_ocr_defaults_toast_sec,
     get_ocr_dpi,
     get_ocr_lang,
     set_ocr_attach_errors,
@@ -102,7 +103,8 @@ class OcrDialog(QDialog):
         self.btn_save_defaults = QPushButton("Als Defaults speichern")
         self.btn_save_defaults.setToolTip(
             "Aktuelles Sprach-Preset und DPI als Settings-Defaults speichern "
-            "(ohne Dialog zu schließen); Toast + Feld-Highlight — 1.1.8"
+            "(ohne Dialog zu schließen); Toast (Dauer Settings 1/2/3 s) + "
+            "Feld-Highlight + Accessibility-Announcement — 1.1.9"
         )
         self.btn_save_defaults.clicked.connect(self._save_as_defaults)
         lang_row.addWidget(self.btn_save_defaults)
@@ -110,7 +112,7 @@ class OcrDialog(QDialog):
 
         self.dpi_combo = QComboBox()
         self.dpi_combo.setToolTip(
-            "OCR-Render-DPI (150 oder 300) — Settings-Default vorgewählt — 1.1.6–1.1.8"
+            "OCR-Render-DPI (150 oder 300) — Settings-Default vorgewählt — 1.1.6–1.1.9"
         )
         for d in OCR_DPI_CHOICES:
             self.dpi_combo.addItem(f"{d} DPI", int(d))
@@ -125,11 +127,17 @@ class OcrDialog(QDialog):
         self.defaults_feedback = QLabel("")
         self.defaults_feedback.setStyleSheet("color: #2a7; font-size: 11px;")
         self.defaults_feedback.setToolTip(
-            "Toast/Status nach „Als Defaults speichern“ — 1.1.8"
+            "Toast/Status nach „Als Defaults speichern“ — Dauer in Settings "
+            "(1/2/3 s); Screenreader-Announcement — 1.1.9"
+        )
+        self.defaults_feedback.setAccessibleName("")
+        self.defaults_feedback.setAccessibleDescription(
+            "OCR-Defaults-Toast — Accessibility-Announcement — 1.1.9"
         )
         dpi_row.addWidget(self.defaults_feedback)
         form.addRow("DPI", dpi_row)
         self._defaults_hl_token = 0
+        self._defaults_toast_token = 0
         self._defaults_hl_style = (
             "QComboBox { background-color: #d8f5e3; border: 1px solid #2a7; }"
         )
@@ -227,27 +235,67 @@ class OcrDialog(QDialog):
 
         QTimer.singleShot(900, _clear)
 
+    def _announce_defaults_toast(self, msg: str) -> None:
+        """Accessibility-Announcement für OCR-Defaults-Toast — 1.1.9."""
+        self.defaults_feedback.setAccessibleName(msg)
+        self.defaults_feedback.setAccessibleDescription(msg)
+        try:
+            from PySide6.QtGui import QAccessible, QAccessibleAnnouncementEvent
+
+            ev = QAccessibleAnnouncementEvent(self.defaults_feedback, msg)
+            QAccessible.updateAccessibility(ev)
+        except Exception:
+            try:
+                from PySide6.QtGui import QAccessible, QAccessibleEvent
+
+                ev = QAccessibleEvent(
+                    self.defaults_feedback, QAccessible.Event.NameChanged
+                )
+                QAccessible.updateAccessibility(ev)
+            except Exception:
+                pass
+
+    def _show_defaults_toast(self, msg: str) -> None:
+        """Toast anzeigen, nach Settings-Dauer (1/2/3 s) ausblenden + announce — 1.1.9."""
+        sec = get_ocr_defaults_toast_sec()
+        ms = max(1, int(sec)) * 1000
+        self._defaults_toast_token = (
+            int(getattr(self, "_defaults_toast_token", 0)) + 1
+        )
+        token = self._defaults_toast_token
+        self.defaults_feedback.setText(msg)
+        self._announce_defaults_toast(msg)
+
+        def _clear() -> None:
+            if token != getattr(self, "_defaults_toast_token", 0):
+                return
+            if (self.defaults_feedback.text() or "") == msg:
+                self.defaults_feedback.setText("")
+                self.defaults_feedback.setAccessibleName("")
+
+        QTimer.singleShot(ms, _clear)
+        parent = self.parent()
+        if parent is not None and hasattr(parent, "statusBar"):
+            try:
+                parent.statusBar().showMessage(msg, ms)
+            except Exception:
+                pass
+        elif parent is not None and hasattr(parent, "_set_status"):
+            try:
+                parent._set_status(msg)
+            except Exception:
+                pass
+
     def _save_as_defaults(self) -> None:
-        """Sprach-Preset + DPI (+ Fehler-Toggle) sofort speichern; Toast + Highlight — 1.1.8."""
+        """Sprach-Preset + DPI (+ Fehler-Toggle) sofort speichern; Toast + Highlight — 1.1.9."""
         try:
             set_ocr_lang(self.lang_code())
             set_ocr_dpi(self.dpi())
             if self._show_page_range:
                 set_ocr_attach_errors(self.attach_errors())
             msg = "OCR-Defaults gespeichert"
-            self.defaults_feedback.setText(msg)
+            self._show_defaults_toast(msg)
             self._flash_defaults_fields()
-            parent = self.parent()
-            if parent is not None and hasattr(parent, "_set_status"):
-                try:
-                    parent._set_status(msg)
-                except Exception:
-                    pass
-            elif parent is not None and hasattr(parent, "statusBar"):
-                try:
-                    parent.statusBar().showMessage(msg, 4000)
-                except Exception:
-                    pass
         except Exception:
             self.defaults_feedback.setText("Speichern fehlgeschlagen")
 

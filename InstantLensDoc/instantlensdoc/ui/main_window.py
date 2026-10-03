@@ -877,11 +877,24 @@ class MainWindow(QMainWindow):
         def _undo_annotation_with_tag_revert() -> bool:
             ok = bool(_pdf_undo())
             if ok:
+                # Sticky 0-Treffer auch bei Ann.-Undo leeren — 1.1.9
+                self._clear_ann_zero_sticky_status()
                 self._revert_tag_filter_after_rename_undo()
                 self._refresh_undo_hint()
             return ok
 
         self.pdf_view.undo_annotation = _undo_annotation_with_tag_revert  # type: ignore[method-assign]
+        _pdf_redo = self.pdf_view.redo_annotation
+
+        def _redo_annotation_with_sticky_clear() -> bool:
+            ok = bool(_pdf_redo())
+            if ok:
+                # Sticky 0-Treffer auch bei Ann.-Redo leeren — 1.1.9
+                self._clear_ann_zero_sticky_status()
+                self._refresh_undo_hint()
+            return ok
+
+        self.pdf_view.redo_annotation = _redo_annotation_with_sticky_clear  # type: ignore[method-assign]
         self.pdf_view.page_favorites_changed.connect(self._refresh_page_favorites)
         self.pdf_view.page_changed.connect(self._on_pdf_page_changed)
         self.pdf_view.zoom_changed.connect(self._on_pdf_zoom_changed)
@@ -5130,12 +5143,14 @@ class MainWindow(QMainWindow):
 
     def _undo(self):
         if self.stack.currentWidget() is self.pdf_view:
+            # Sticky Clear bei Ann.-Undo (zusätzlich Seite/Dokument) — 1.1.9
             self.pdf_view.undo_annotation()
         else:
             self.editor.undo()
 
     def _redo(self):
         if self.stack.currentWidget() is self.pdf_view:
+            # Sticky Clear bei Ann.-Redo (zusätzlich Seite/Dokument) — 1.1.9
             self.pdf_view.redo_annotation()
             self._last_tag_rename = None
         else:

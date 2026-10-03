@@ -163,7 +163,8 @@ def run_gui(*, days: int | None = None) -> int:
             self.reveal_check.setChecked(False)
             self.reveal_check.setToolTip(
                 "Keys unmaskiert anzeigen — Auto-Hide (5/10/30 s); Esc maskiert; "
-                "Countdown pausiert bei inaktivem Fenster (Label „pausiert“) — 1.1.8"
+                "Countdown pausiert bei Fenster ohne Fokus "
+                "(Label „pausiert“, Tooltip „Countdown pausiert (Fenster ohne Fokus)“) — 1.1.9"
             )
             self.reveal_check.toggled.connect(self._on_reveal_toggled)
             self.reveal_countdown = QLabel("")
@@ -344,7 +345,7 @@ def run_gui(*, days: int | None = None) -> int:
                         "color: #a65; font-variant-numeric: tabular-nums; font-style: italic;"
                     )
                     self.reveal_countdown.setToolTip(
-                        "Countdown pausiert (Fenster inaktiv) — 1.1.8"
+                        "Countdown pausiert (Fenster ohne Fokus)"
                     )
                 else:
                     self.reveal_countdown.setText(f"{self._reveal_remaining}s")

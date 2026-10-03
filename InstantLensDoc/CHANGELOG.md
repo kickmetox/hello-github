@@ -1,5 +1,27 @@
 # Changelog — InstantLens Doc
 
+## 1.1.9 — OCR Toast Dauer·A11y, Merge Tooltip Settings, Ann. Sticky Undo/Redo, Keygen Pause-Tooltip
+
+Post-Release-Polish nach 1.1.8: OCR-Toast **„OCR-Defaults gespeichert“** mit einstellbarer Dauer **1/2/3 s** und **Accessibility-Announcement**; Merge-**Readonly-schließen**-Checkbox in Settings trägt denselben Persistenz-Tooltip wie der Merge-Dialog; Annotationen-Sticky-Status wird zusätzlich bei **Undo/Redo** geleert; Keygen-Countdown-Tooltip bei Pause: **„Countdown pausiert (Fenster ohne Fokus)“**. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### OCR / Batch
+- Toast-Dauer in Settings **1 / 2 / 3 s** (Default 2) + Screenreader-**Announcement**
+
+### PDF
+- **Zusammenführen**: Settings-Checkbox **Readonly schließen** mit **identischem Tooltip** wie Merge-Dialog
+
+### Annotationen
+- Sticky 0-Treffer-Status: **Clear** zusätzlich bei Annotationen-**Undo/Redo**
+
+### Keygen
+- Countdown pausiert: Tooltip **„Countdown pausiert (Fenster ohne Fokus)“**
+
+### Packaging / Docs
+- Version **1.1.9** (App / `ild_pdf` / ISS / Smoke / Docs)
+- Smoke: OCR Toast Dauer·A11y, Merge Tooltip Settings, Ann. Sticky Undo/Redo, Keygen Pause-Tooltip (CLI + Qt)
+
+---
+
 ## 1.1.8 — OCR Defaults Toast·Highlight, Merge-Toggle Tooltips, Ann. Sticky Clear, Keygen „pausiert“
 
 Post-Release-Polish nach 1.1.7: OCR-Button **„Als Defaults speichern“** zeigt Toast/Status **„OCR-Defaults gespeichert“** und kurz hervorgehobene Felder; Merge-Dialog-Toggle erklärt per Tooltip die **Settings-Persistenz**; Annotationen-Sticky-Status wird bei **Seiten- und Dokumentwechsel** geleert; Keygen-Countdown zeigt am Label **„pausiert“** bei Fokusverlust. Stubs KI/Cloud/Stylus/3D bleiben Stubs.

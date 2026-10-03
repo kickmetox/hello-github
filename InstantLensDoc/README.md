@@ -2,7 +2,7 @@
 
 Moderne Textverarbeitung mit PDF-Annotator, OCR-Bridge und Formulargenerator.
 
-**Version:** 1.1.8  
+**Version:** 1.1.9  
 **Hersteller:** Andreas Meyer · ame@sellerbach.de
 
 ## Quickstart (Windows)
@@ -32,8 +32,8 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an).
 
-## Neu in 1.1.6
+## Neu in 1.1.9
 
-Polish: OCR DPI + Sprach-Preset Defaults speichern (Dialog vorbelegt); Merge „Zum Bearbeiten öffnen“ schließt Readonly-Tab optional (Settings); Ann. 0-Treffer: einheitlicher i18n-Status DE; Keygen Reveal Auto-Hide 5/10/30 s + Countdown. Stubs KI/Cloud/Stylus/3D unverändert.
+Polish: OCR-Defaults-Toast Dauer Settings 1/2/3 s + Accessibility-Announcement; Merge Readonly-schließen-Tooltip identisch in Settings; Ann. Sticky Clear bei Undo/Redo; Keygen Pause-Tooltip „Countdown pausiert (Fenster ohne Fokus)“. Stubs KI/Cloud/Stylus/3D unverändert.
 
 Siehe [CHANGELOG.md](CHANGELOG.md), [FEATURES.md](FEATURES.md) und [INFO.md](INFO.md).

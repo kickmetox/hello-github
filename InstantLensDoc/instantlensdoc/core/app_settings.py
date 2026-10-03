@@ -18,6 +18,7 @@ DEFAULTS: dict[str, Any] = {
     "ocr_lang": "deu+eng",
     "ocr_dpi": 150,  # OCR-Batch Default-DPI 150|300 — 1.1.6
     "ocr_attach_errors": True,  # OCR-Batch: Fehlerabschnitt anhängen — 1.1.5
+    "ocr_defaults_toast_sec": 2,  # OCR-Defaults-Toast Dauer 1|2|3 s — 1.1.9
     "merge_close_preview_on_edit": False,  # Vorschau-Tab bei „Zum Bearbeiten“ schließen — 1.1.6
     "keygen_reveal_auto_hide_sec": 10,  # Reveal Auto-Hide 5|10|30 — 1.1.6
     "batch_output_dir": "",
@@ -233,6 +234,42 @@ def get_ocr_attach_errors() -> bool:
 
 def set_ocr_attach_errors(enabled: bool) -> None:
     save_settings({"ocr_attach_errors": bool(enabled)})
+
+
+OCR_DEFAULTS_TOAST_CHOICES: tuple[int, ...] = (1, 2, 3)
+
+# Gemeinsamer Tooltip Settings + Merge-Dialog (Readonly schließen) — 1.1.9
+MERGE_CLOSE_PREVIEW_TOOLTIP = (
+    "Einstellung wird sofort in den App-Settings persistiert und bleibt über "
+    "Neustarts erhalten. Identisch mit Einstellungen → „Zusammenführen: "
+    "Readonly-Vorschau … schließen“ (beidseitiger Sync) — 1.1.9"
+)
+
+
+def get_ocr_defaults_toast_sec() -> int:
+    """OCR-Defaults-Toast Dauer in Sekunden (1/2/3) — 1.1.9."""
+    raw = load_settings().get(
+        "ocr_defaults_toast_sec", DEFAULTS["ocr_defaults_toast_sec"]
+    )
+    try:
+        val = int(raw)
+    except (TypeError, ValueError):
+        val = int(DEFAULTS["ocr_defaults_toast_sec"])
+    if val not in OCR_DEFAULTS_TOAST_CHOICES:
+        val = min(OCR_DEFAULTS_TOAST_CHOICES, key=lambda x: abs(x - val))
+    return val
+
+
+def set_ocr_defaults_toast_sec(seconds: int) -> int:
+    """OCR-Defaults-Toast Dauer speichern; Rückgabe normalisierter Wert — 1.1.9."""
+    try:
+        val = int(seconds)
+    except (TypeError, ValueError):
+        val = int(DEFAULTS["ocr_defaults_toast_sec"])
+    if val not in OCR_DEFAULTS_TOAST_CHOICES:
+        val = min(OCR_DEFAULTS_TOAST_CHOICES, key=lambda x: abs(x - val))
+    save_settings({"ocr_defaults_toast_sec": val})
+    return val
 
 
 def get_merge_close_preview_on_edit() -> bool:

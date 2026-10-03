@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **1.1.8** |
+| Version | **1.1.9** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -59,10 +59,10 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an / `checkedonce`)
 
-## Neu in 1.1.8
+## Neu in 1.1.9
 
-- OCR-Defaults: Toast/Status **„OCR-Defaults gespeichert“** + Kurz-Highlight der Felder
-- Merge-Dialog-Toggle: Tooltips erklären **Settings-Persistenz** (beidseitiger Sync)
-- Ann. Sticky-Status: Clear bei **Seitenwechsel** und **Dokumentwechsel**
-- Keygen-Countdown: Indikator **„pausiert“** am Countdown-Label bei Fokusverlust
+- OCR-Defaults-Toast: Dauer in Settings **1/2/3 s** + **Accessibility-Announcement**
+- Merge: Settings-Checkbox **Readonly schließen** mit **demselben Persistenz-Tooltip** wie Merge-Dialog
+- Ann. Sticky-Status: Clear zusätzlich bei Annotationen-**Undo/Redo**
+- Keygen-Countdown pausiert: Tooltip **„Countdown pausiert (Fenster ohne Fokus)“**
 - Stubs KI/Cloud/Stylus/3D unverändert
