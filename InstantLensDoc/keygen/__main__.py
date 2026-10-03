@@ -163,14 +163,15 @@ def run_gui(*, days: int | None = None) -> int:
             self.reveal_check.setChecked(False)
             self.reveal_check.setToolTip(
                 "Keys unmaskiert anzeigen — Auto-Hide (5/10/30 s); Esc maskiert; "
-                "Countdown pausiert bei inaktivem Fenster — 1.1.7"
+                "Countdown pausiert bei inaktivem Fenster (Label „pausiert“) — 1.1.8"
             )
             self.reveal_check.toggled.connect(self._on_reveal_toggled)
             self.reveal_countdown = QLabel("")
-            self.reveal_countdown.setMinimumWidth(36)
+            self.reveal_countdown.setMinimumWidth(72)
             self.reveal_countdown.setAlignment(Qt.AlignCenter)
             self.reveal_countdown.setToolTip(
-                "Countdown bis Auto-Hide — Pause bei Fokusverlust, Fortsetzen bei Fokus — 1.1.7"
+                "Countdown bis Auto-Hide — bei Fokusverlust Label „pausiert“, "
+                "Fortsetzen bei Fokus — 1.1.8"
             )
             self.reveal_countdown.setStyleSheet("color: #555; font-variant-numeric: tabular-nums;")
             hide_row = QHBoxLayout()
@@ -202,8 +203,8 @@ def run_gui(*, days: int | None = None) -> int:
             self.history_list = QListWidget()
             self.history_list.setToolTip(
                 "Maskiert (nur letzte 4); Hover/Reveal zeigt Key; "
-                "Reveal Auto-Hide 5/10/30 s / Esc; Countdown Pause bei Fokusverlust; "
-                "Doppelklick kopiert — 1.1.7"
+                "Reveal Auto-Hide 5/10/30 s / Esc; Countdown „pausiert“ bei Fokusverlust; "
+                "Doppelklick kopiert — 1.1.8"
             )
             self.history_list.setMaximumHeight(120)
             self.history_list.setMouseTracking(True)
@@ -334,17 +335,35 @@ def run_gui(*, days: int | None = None) -> int:
 
         def _update_countdown_label(self) -> None:
             if self.reveal_check.isChecked() and self._reveal_remaining > 0:
-                # Bei Pause bleibt die Zahl stehen (ohne Auto-Hide) — 1.1.7
-                self.reveal_countdown.setText(f"{self._reveal_remaining}s")
-                self.reveal_countdown.setToolTip(
-                    "Countdown pausiert (Fenster inaktiv) — 1.1.7"
-                    if self._countdown_paused
-                    else "Countdown bis Auto-Hide — Pause bei Fokusverlust — 1.1.7"
-                )
+                # Pause-Indikator am Countdown-Label — 1.1.8
+                if self._countdown_paused:
+                    self.reveal_countdown.setText(
+                        f"{self._reveal_remaining}s · pausiert"
+                    )
+                    self.reveal_countdown.setStyleSheet(
+                        "color: #a65; font-variant-numeric: tabular-nums; font-style: italic;"
+                    )
+                    self.reveal_countdown.setToolTip(
+                        "Countdown pausiert (Fenster inaktiv) — 1.1.8"
+                    )
+                else:
+                    self.reveal_countdown.setText(f"{self._reveal_remaining}s")
+                    self.reveal_countdown.setStyleSheet(
+                        "color: #555; font-variant-numeric: tabular-nums;"
+                    )
+                    self.reveal_countdown.setToolTip(
+                        "Countdown bis Auto-Hide — bei Fokusverlust „pausiert“ — 1.1.8"
+                    )
             elif self.reveal_check.isChecked():
                 self.reveal_countdown.setText("0s")
+                self.reveal_countdown.setStyleSheet(
+                    "color: #555; font-variant-numeric: tabular-nums;"
+                )
             else:
                 self.reveal_countdown.setText("")
+                self.reveal_countdown.setStyleSheet(
+                    "color: #555; font-variant-numeric: tabular-nums;"
+                )
 
         def _history_label(self, entry: dict, *, reveal: bool) -> str:
             email = entry.get("email") or "?"
@@ -364,7 +383,7 @@ def run_gui(*, days: int | None = None) -> int:
                 item.setData(Qt.UserRole, entry)
                 item.setToolTip(
                     "Hover/Reveal zeigt Key · Esc/Auto-Hide maskiert · "
-                    "Countdown Pause bei Fokusverlust · Doppelklick kopiert — 1.1.7"
+                    "Countdown „pausiert“ bei Fokusverlust · Doppelklick kopiert — 1.1.8"
                 )
                 self.history_list.addItem(item)
 

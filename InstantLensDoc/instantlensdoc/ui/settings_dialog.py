@@ -242,8 +242,8 @@ class SettingsDialog(QDialog):
         self.merge_close_preview.setChecked(get_merge_close_preview_on_edit())
         self.merge_close_preview.setToolTip(
             "Wenn aktiv: Vorschau-Tab schließen und Datei neu bearbeitbar öffnen; "
-            "sonst Vorschau-Tab in Bearbeiten umschalten "
-            "(auch im Merge-Dialog sichtbar) — 1.1.6/1.1.7"
+            "sonst Vorschau-Tab in Bearbeiten umschalten. Persistiert in Settings; "
+            "gleicher Toggle im Merge-Dialog (beidseitiger Sync) — 1.1.8"
         )
         form.addRow(self.merge_close_preview)
 

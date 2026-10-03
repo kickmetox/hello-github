@@ -4847,6 +4847,8 @@ class MainWindow(QMainWindow):
             self.word_status_label.setText(f"{words} Wörter · {chars} Z.")
 
     def _on_pdf_document_changed(self):
+        # Sticky 0-Treffer-Status bei Dokumentwechsel löschen — 1.1.8
+        self._clear_ann_zero_sticky_status()
         self._update_doc_status()
         if self.pdf_view.pdf_path:
             self._refresh_thumbs()
@@ -6043,6 +6045,8 @@ class MainWindow(QMainWindow):
             self.pdf_view.export_selected_ann_group_json(group_id)
 
     def _on_pdf_page_changed(self, page_index: int):
+        # Sticky 0-Treffer-Status bei Seitenwechsel löschen — 1.1.8
+        self._clear_ann_zero_sticky_status()
         self.sidebar.select_thumb(page_index)
         self.sidebar.set_annotation_current_page(page_index)
         self._refresh_page_favorites()

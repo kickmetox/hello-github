@@ -165,7 +165,7 @@ class PdfToolsDialog(QDialog):
         )
         lay.addWidget(self.merge_pages_label)
 
-        # Readonly-Vorschau schließen — Sync mit Settings — 1.1.7
+        # Readonly-Vorschau schließen — Sync mit Settings — 1.1.7/1.1.8
         from instantlensdoc.core.app_settings import (
             get_merge_close_preview_on_edit,
             set_merge_close_preview_on_edit,
@@ -176,8 +176,9 @@ class PdfToolsDialog(QDialog):
         )
         self.merge_close_preview.setChecked(get_merge_close_preview_on_edit())
         self.merge_close_preview.setToolTip(
-            "Wie in Einstellungen: Vorschau-Tab schließen und Datei neu bearbeitbar öffnen "
-            "(sofort synchron) — 1.1.7"
+            "Einstellung wird sofort in den App-Settings persistiert und bleibt über "
+            "Neustarts erhalten. Identisch mit Einstellungen → „Zusammenführen: "
+            "Readonly-Vorschau … schließen“ (beidseitiger Sync) — 1.1.8"
         )
         self.merge_close_preview.toggled.connect(
             lambda checked: set_merge_close_preview_on_edit(bool(checked))

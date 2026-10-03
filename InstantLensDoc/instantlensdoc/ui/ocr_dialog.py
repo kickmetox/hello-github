@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import (
     QButtonGroup,
     QCheckBox,
@@ -81,7 +82,7 @@ class OcrDialog(QDialog):
         form = QFormLayout()
         self.lang_combo = QComboBox()
         self.lang_combo.setToolTip(
-            "Sprach-Preset für Tesseract (deu/eng/…) — Settings-Default vorgewählt — 1.1.6/1.1.7"
+            "Sprach-Preset für Tesseract (deu/eng/…) — Settings-Default vorgewählt — 1.1.6–1.1.8"
         )
         default_lang = get_ocr_lang()
         pick = 0
@@ -95,13 +96,13 @@ class OcrDialog(QDialog):
         if installed:
             form.addRow(QLabel(f"Installiert: {', '.join(installed[:12])}"))
 
-        # Sprach-Preset + „Als Defaults speichern“ nebeneinander — 1.1.7
+        # Sprach-Preset + „Als Defaults speichern“ nebeneinander — 1.1.7/1.1.8
         lang_row = QHBoxLayout()
         lang_row.addWidget(self.lang_combo, 1)
         self.btn_save_defaults = QPushButton("Als Defaults speichern")
         self.btn_save_defaults.setToolTip(
             "Aktuelles Sprach-Preset und DPI als Settings-Defaults speichern "
-            "(ohne Dialog zu schließen) — 1.1.7"
+            "(ohne Dialog zu schließen); Toast + Feld-Highlight — 1.1.8"
         )
         self.btn_save_defaults.clicked.connect(self._save_as_defaults)
         lang_row.addWidget(self.btn_save_defaults)
@@ -109,7 +110,7 @@ class OcrDialog(QDialog):
 
         self.dpi_combo = QComboBox()
         self.dpi_combo.setToolTip(
-            "OCR-Render-DPI (150 oder 300) — Settings-Default vorgewählt — 1.1.6/1.1.7"
+            "OCR-Render-DPI (150 oder 300) — Settings-Default vorgewählt — 1.1.6–1.1.8"
         )
         for d in OCR_DPI_CHOICES:
             self.dpi_combo.addItem(f"{d} DPI", int(d))
@@ -124,10 +125,14 @@ class OcrDialog(QDialog):
         self.defaults_feedback = QLabel("")
         self.defaults_feedback.setStyleSheet("color: #2a7; font-size: 11px;")
         self.defaults_feedback.setToolTip(
-            "Bestätigung nach „Als Defaults speichern“ — 1.1.7"
+            "Toast/Status nach „Als Defaults speichern“ — 1.1.8"
         )
         dpi_row.addWidget(self.defaults_feedback)
         form.addRow("DPI", dpi_row)
+        self._defaults_hl_token = 0
+        self._defaults_hl_style = (
+            "QComboBox { background-color: #d8f5e3; border: 1px solid #2a7; }"
+        )
 
         self.range_check = QCheckBox("Seitenbereich von–bis")
         self.range_check.setToolTip(
@@ -204,14 +209,45 @@ class OcrDialog(QDialog):
         if self.page_to.value() < self.page_from.value():
             self.page_to.setValue(self.page_from.value())
 
+    def _flash_defaults_fields(self) -> None:
+        """Kurz-Highlight für Sprach-/DPI-Felder nach Defaults-Speichern — 1.1.8."""
+        self._defaults_hl_token = int(getattr(self, "_defaults_hl_token", 0)) + 1
+        token = self._defaults_hl_token
+        widgets = [self.lang_combo, self.dpi_combo]
+        if self._show_page_range and self.attach_errors_check.isVisible():
+            widgets.append(self.attach_errors_check)
+        for w in widgets:
+            w.setStyleSheet(self._defaults_hl_style)
+
+        def _clear() -> None:
+            if token != getattr(self, "_defaults_hl_token", 0):
+                return
+            for w in widgets:
+                w.setStyleSheet("")
+
+        QTimer.singleShot(900, _clear)
+
     def _save_as_defaults(self) -> None:
-        """Sprach-Preset + DPI (+ Fehler-Toggle) sofort als Settings speichern — 1.1.7."""
+        """Sprach-Preset + DPI (+ Fehler-Toggle) sofort speichern; Toast + Highlight — 1.1.8."""
         try:
             set_ocr_lang(self.lang_code())
             set_ocr_dpi(self.dpi())
             if self._show_page_range:
                 set_ocr_attach_errors(self.attach_errors())
-            self.defaults_feedback.setText("Defaults gespeichert")
+            msg = "OCR-Defaults gespeichert"
+            self.defaults_feedback.setText(msg)
+            self._flash_defaults_fields()
+            parent = self.parent()
+            if parent is not None and hasattr(parent, "_set_status"):
+                try:
+                    parent._set_status(msg)
+                except Exception:
+                    pass
+            elif parent is not None and hasattr(parent, "statusBar"):
+                try:
+                    parent.statusBar().showMessage(msg, 4000)
+                except Exception:
+                    pass
         except Exception:
             self.defaults_feedback.setText("Speichern fehlgeschlagen")
 

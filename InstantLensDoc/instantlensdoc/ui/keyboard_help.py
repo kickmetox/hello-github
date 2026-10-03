@@ -93,10 +93,10 @@ SHORTCUTS_HTML = """
 <tr><td>PDF Dokument drucken</td><td>PDF → Dokument drucken… (Seitenbereich + DPI + Graustufen; Vorschau PageUp/Down·Home/End + +/- Zoom + Fit-Page + Mausrad + Seitenwahl Mehrseiten; Fortschritt; Abbruch → Cleanup); Ctrl+P = Seite — 1.0.9</td></tr>
 <tr><td>Willkommen</td><td>Weiterarbeiten disabled+Tooltip wenn Session fehlt/leer; sonst Tabs + Pfad-Snippet; Esc leert Filter → Fokus Liste; Clear + Treffer; Enter/Entf; Drag&amp;Drop — 1.0.9</td></tr>
 <tr><td>About / Lizenz Ablauf</td><td>Banner Fokus-Ring + Enter→Aktivierung + Esc schließt + AccessibleName; Icon + Dismiss + Schließen-X; Persistenz dismiss_date; Farbe Warnung vs. abgelaufen; Ablauf TT.MM.JJJJ — 1.0.9</td></tr>
-<tr><td>OCR gesamtes PDF</td><td>Extras → „Als Defaults speichern“ neben DPI/Sprache; Fehler anhängen persistiert; Seitenfehler + Teilergebnis; von–bis → Textdatei-Tab — 1.1.7</td></tr>
-<tr><td>PDF zusammenführen</td><td>Thumbnail-Klick → Readonly-Tab Banner „Vorschau“ + „Zum Bearbeiten öffnen“; Toggle Readonly schließen auch im Merge-Dialog; Drag&amp;Drop + Duplikat-Warnung + Doppelklick/Alle/Summe — 1.1.7</td></tr>
-<tr><td>Alle Ann. auf Seite löschen</td><td>Bearbeiten → bei 0 Treffern Sticky-Status Statusleiste bis nächste Ann.-Aktion + i18n DE + Menü/Aktion no-op + Button disabled; Undo „N Annotationen (gefiltert)“ — 1.1.7</td></tr>
-<tr><td>Keygen</td><td>Reveal Auto-Hide 5/10/30 s + Countdown Pause bei Fokusverlust / Esc maskiert + History maskiert (letzte 4) / Doppelklick kopiert + Clear + .txt + --days — 1.1.7</td></tr>
+<tr><td>OCR gesamtes PDF</td><td>Extras → „Als Defaults speichern“ → Toast „OCR-Defaults gespeichert“ + Feld-Highlight; Fehler anhängen persistiert; Seitenfehler + Teilergebnis; von–bis → Textdatei-Tab — 1.1.8</td></tr>
+<tr><td>PDF zusammenführen</td><td>Thumbnail-Klick → Readonly-Tab Banner „Vorschau“ + „Zum Bearbeiten öffnen“; Toggle Readonly schließen auch im Merge-Dialog (Tooltip Settings-Persistenz); Drag&amp;Drop + Duplikat-Warnung + Doppelklick/Alle/Summe — 1.1.8</td></tr>
+<tr><td>Alle Ann. auf Seite löschen</td><td>Bearbeiten → bei 0 Treffern Sticky-Status Statusleiste bis nächste Ann.-Aktion / Seiten-/Dokumentwechsel + i18n DE + Menü/Aktion no-op + Button disabled; Undo „N Annotationen (gefiltert)“ — 1.1.8</td></tr>
+<tr><td>Keygen</td><td>Reveal Auto-Hide 5/10/30 s + Countdown „pausiert“ bei Fokusverlust / Esc maskiert + History maskiert (letzte 4) / Doppelklick kopiert + Clear + .txt + --days — 1.1.8</td></tr>
 <tr><td>Willkommen-Startseite</td><td>Ohne Tabs: Recent + Dokument öffnen / Leeres Text — 1.0.0</td></tr>
 <tr><td>PDF-Trefferliste</td><td>Sidebar Seite + Snippet klickbar → Sprung + Highlight — 0.9.1</td></tr>
 <tr><td>Fenster teilen (zwei Docs)</td><td><code>Ctrl+\\</code> — 0.6.3</td></tr>
@@ -225,17 +225,17 @@ bei <b>Trial</b> zusätzlicher Keygen-Hinweis (run-keygen.bat / InstantLensKeyge
 <p><b>Arbeitsverzeichnis öffnen:</b> Datei → Ctrl+Shift+E — Ordner der aktuellen Datei (sonst CWD) im Dateimanager.</p>
 <p><b>Projekt-Ordner:</b> Datei → Projekt-Ordner — Workspace wählen (letzte 5); Dialoge starten dort.</p>
 <p><b>OCR gesamtes PDF:</b> Extras → OCR gesamtes PDF — Button <b>„Als Defaults speichern“</b>
-neben DPI/Sprache; Toggle „Fehler anhängen“ persistiert;
-Seitenfehler-Abschnitt / Teilergebnis; optional <b>von–bis</b> → Textdatei-Tab — 1.1.7.</p>
+→ Toast <b>„OCR-Defaults gespeichert“</b> + Feld-Highlight; Toggle „Fehler anhängen“ persistiert;
+Seitenfehler-Abschnitt / Teilergebnis; optional <b>von–bis</b> → Textdatei-Tab — 1.1.8.</p>
 <p><b>PDF zusammenführen:</b> Thumbnail-Klick → Readonly-Tab mit Banner <b>„Vorschau“</b> +
-<b>„Zum Bearbeiten öffnen“</b>; Toggle Readonly schließen <b>auch im Merge-Dialog</b>;
-Drag&amp;Drop, Duplikat-Warnung, Doppelklick/Alle/Summe — 1.1.7.</p>
+<b>„Zum Bearbeiten öffnen“</b>; Toggle Readonly schließen <b>auch im Merge-Dialog</b>
+(Tooltip Settings-Persistenz); Drag&amp;Drop, Duplikat-Warnung, Doppelklick/Alle/Summe — 1.1.8.</p>
 <p><b>Alle Annotationen auf Seite löschen:</b> Bearbeiten → bei 0 Treffern
-<b>Sticky-Status Statusleiste</b> bis nächste Ann.-Aktion + i18n DE + Menü/Aktion no-op;
-Undo <b>„N Annotationen (gefiltert)“</b> — 1.1.7.</p>
-<p><b>Keygen:</b> Reveal Auto-Hide <b>5/10/30 s</b> + <b>Countdown Pause bei Fokusverlust</b> /
+<b>Sticky-Status Statusleiste</b> bis nächste Ann.-Aktion / Seiten-/Dokumentwechsel + i18n DE + Menü/Aktion no-op;
+Undo <b>„N Annotationen (gefiltert)“</b> — 1.1.8.</p>
+<p><b>Keygen:</b> Reveal Auto-Hide <b>5/10/30 s</b> + Countdown-Label <b>„pausiert“</b> bei Fokusverlust /
 <b>Esc</b> maskiert; History maskiert (letzte 4); Doppelklick kopiert; <b>Clear History</b>;
-Speichern als <b>.txt</b> + CLI <b>--days</b> — 1.1.7.</p>
+Speichern als <b>.txt</b> + CLI <b>--days</b> — 1.1.8.</p>
 <p><b>PDF bereinigen:</b> PDF → PDF bereinigen — optional Metadaten entfernen, neu speichern.</p>
 <p><b>Seitenbereich:</b> PDF → Seitenbereich extrahieren… (von–bis → neues PDF)
 bzw. Dialog „zusammenführen / teilen / Bereich“.</p>
