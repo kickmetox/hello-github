@@ -245,9 +245,9 @@ Annotation-Suche: Tag-<b>Autocomplete</b>. Session-Tabs: ziehen → Reihenfolge;
 <b>Fenster teilen</b> (Ctrl+\\); optional <b>vertikal</b> (Ctrl+Shift+\\); optional <b>Sync-Scroll</b> (Ctrl+Alt+\\).
 <b>Tag-Cloud</b>: Klick setzt Filter (exklusiv), Ctrl+Klick Multi-Select; <b>Rechtsklick → filtern / Farbe ändern / umbenennen</b>.
 Statusleiste <b>ungespeicherte Tabs</b>: Klick öffnet Liste zum Wechseln + <b>Speichern je Datei</b>.</p>
-<p><b>PDF-Seitenlabels:</b> römische/arabische Labels aus dem PDF werden in Statusleiste und Toolbar angezeigt, wenn vorhanden. <b>2.2.0:</b> benutzerdefinierte Labels (i, ii, 1…) über PDF → Seitenbeschriftungen… (Sidecar + optional PageLabels). <b>2.2.1:</b> Range-Editor · Import aus PDF · Reset arabisch 1…. <b>2.2.2:</b> Überlappungs-Validierung DE · Vorschau erste Labels.</p>
-<p><b>Freihand (Ink):</b> Toolbar „Freihand“ — Maus-Polyline; Sidecar + Ctrl+Z Undo — 2.2.0 (kein Stylus). <b>2.2.1:</b> Strichstärke/Farbe · Ink− letzter Strich · Glätten optional. <b>2.2.2:</b> Glättungsstärke · Undo nach Glätten eigener Stack-Eintrag.</p>
-<p><b>Dokument-Historie:</b> PDF → Dokument-Historie… — lokale ildhist-v1 Logdatei — 2.2.0. <b>2.2.1:</b> Panel letzte 50 · Filter Aktionstyp · Export JSON. <b>2.2.2:</b> Doppelklick → Seite · Clear mit Bestätigung.</p>
+<p><b>PDF-Seitenlabels:</b> römische/arabische Labels aus dem PDF werden in Statusleiste und Toolbar angezeigt, wenn vorhanden. <b>2.2.0:</b> benutzerdefinierte Labels (i, ii, 1…) über PDF → Seitenbeschriftungen… (Sidecar + optional PageLabels). <b>2.2.1:</b> Range-Editor · Import aus PDF · Reset arabisch 1…. <b>2.2.2:</b> Überlappungs-Validierung DE · Vorschau erste Labels. <b>2.2.3:</b> Scroll-Liste erste 20 · Export Labels TXT.</p>
+<p><b>Freihand (Ink):</b> Toolbar „Freihand“ — Maus-Polyline; Sidecar + Ctrl+Z Undo — 2.2.0 (kein Stylus). <b>2.2.1:</b> Strichstärke/Farbe · Ink− letzter Strich · Glätten optional. <b>2.2.2:</b> Glättungsstärke · Undo nach Glätten eigener Stack-Eintrag. <b>2.2.3:</b> Redo ok · Status „Glättung angewandt“.</p>
+<p><b>Dokument-Historie:</b> PDF → Dokument-Historie… — lokale ildhist-v1 Logdatei — 2.2.0. <b>2.2.1:</b> Panel letzte 50 · Filter Aktionstyp · Export JSON. <b>2.2.2:</b> Doppelklick → Seite · Clear mit Bestätigung. <b>2.2.3:</b> Clear optional nur Filter · Export gefilterte Sicht.</p>
 <p><b>Zwischenablage-Verlauf:</b> Bearbeiten → letzte 3 eingefügten Textschnipsel erneut einfügen.</p>
 <p><b>About:</b> Hilfe → Über… — Feature-Kurzliste + FEATURES.md öffnen;
 bei <b>Trial</b> zusätzlicher Keygen-Hinweis (run-keygen.bat / InstantLensKeygen.exe).</p>
@@ -340,6 +340,7 @@ Status-Klick öffnet <code>docs/VERSION</code>/<code>VERSION.txt</code> im Edito
 <p><b>PDF verschlüsseln/entschlüsseln:</b> Prefill-Warnung + Button „jetzt ausschalten“ (sofort speichern + Toast) · Passwort nie in Logs · falsches PW klar DE — 1.6.5 (Basis 1.6.4/1.6.3/1.6.2/1.6.1/1.6.0).</p>
 <p><b>Dokument-Statistik:</b> JSON-Dateiname Quick-Insert <code>{stem}</code>/<code>{date}</code> · ungültige Platzhalter rot · Live-Vorschau · Copy · Zielordner · UTF-8 — 1.6.5 (Basis 1.6.4/1.6.3/1.6.2/1.6.1/1.6.0).</p>
 <p><b>Workspace-Layouts:</b> Import-Log Zusammenfassung importiert/übersprungen/umbenannt · kopieren/als TXT · Merge skip/rename · Schema DE — 1.6.5 (Basis 1.6.4/1.6.3/1.6.2/1.6.1/1.6.0).</p>
+<p><b>2.2.3:</b> PageLabels Scroll-20·TXT · Ink Undo-Smooth Redo·Status „Glättung angewandt“ · Historie Clear-Filter·Export gefiltert · CONTRIBUTING Exitcode-Tabelle + Link smoke_ild.py.</p>
 <p><b>2.2.2:</b> PageLabels Überlappung DE·Vorschau · Ink Strength·Undo-Smooth · Historie Doppelklick/Clear · CONTRIBUTING Sync=sync-ild.ps1 + smoke Beispiel.</p>
 <p><b>2.2.1:</b> PageLabels Range/Import/Reset · Ink Strichstärke/Farbe/letzter Strich/Glätten · Historie-Panel 50/Filter/Export · smoke Stub manual-only + CONTRIBUTING Sync.</p>
 <p><b>2.2.0:</b> Seitenbeschriftungen Sidecar+PageLabels · Freihand-Ink Polyline+Undo · Dokument-Historie ildhist-v1 · smoke_ild CONTRIBUTING/CI-Stub.</p>

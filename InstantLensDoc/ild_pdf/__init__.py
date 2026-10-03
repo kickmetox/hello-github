@@ -28,10 +28,13 @@ from .pdf_ann_import import (
     plan_duplicate_actions,
 )
 from .page_labels import (
+    LABEL_PREVIEW_SCROLL_LIMIT,
     apply_label_range,
     arabic_reset_labels,
+    export_page_labels_txt,
     find_overlapping_applied_range,
     format_label_preview,
+    format_label_preview_lines,
     label_ranges_overlap,
     merge_labels,
     normalize_page_labels,
@@ -248,8 +251,11 @@ __all__ = [
     "merge_labels",
     "apply_label_range",
     "arabic_reset_labels",
+    "LABEL_PREVIEW_SCROLL_LIMIT",
+    "export_page_labels_txt",
     "find_overlapping_applied_range",
     "format_label_preview",
+    "format_label_preview_lines",
     "label_ranges_overlap",
     "normalize_page_labels",
     "normalize_page_range",
@@ -421,4 +427,4 @@ __all__ = [
     "page_count_for_text",
 ]
 
-__version__ = "2.2.2"
+__version__ = "2.2.3"

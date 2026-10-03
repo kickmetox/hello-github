@@ -1,4 +1,4 @@
-"""Panel: Dokument-Historie (ildhist-v1) — 50/Filter/Export + Doppelklick/Clear — 2.2.1/2.2.2."""
+"""Panel: Dokument-Historie (ildhist-v1) — Filter/Export/Clear — 2.2.1–2.2.3."""
 
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ from ild_pdf.doc_history import DocHistory, format_history_summary
 
 
 class DocHistoryDialog(QDialog):
-    """Panel mit Filter, Export, Doppelklick→Seite, Clear mit Bestätigung."""
+    """Panel mit Filter, Export (auch gefiltert), Doppelklick→Seite, Clear optional Filter."""
 
     PANEL_LIMIT = 50
 
@@ -69,7 +69,7 @@ class DocHistoryDialog(QDialog):
         self.list = QListWidget()
         self.list.setObjectName("docHistoryList")
         self.list.setToolTip(
-            "Doppelklick: zur Seite springen, wenn Eintrag eine Seite enthält — 2.2.2"
+            "Doppelklick: zur Seite springen, wenn Eintrag eine Seite enthält — 2.2.3"
         )
         self.list.itemDoubleClicked.connect(self._on_item_double_clicked)
         layout.addWidget(self.list, 1)
@@ -79,12 +79,21 @@ class DocHistoryDialog(QDialog):
 
         btn_row = QHBoxLayout()
         btn_export = QPushButton("Export JSON…")
-        btn_export.setToolTip("ildhist-v1 Payload als JSON speichern — 2.2.1")
+        btn_export.setToolTip("Gesamte Historie als JSON speichern — 2.2.1")
         btn_export.clicked.connect(self._export_json)
         btn_row.addWidget(btn_export)
+        btn_export_filt = QPushButton("Export gefilterte Sicht…")
+        btn_export_filt.setObjectName("docHistoryExportFiltered")
+        btn_export_filt.setToolTip(
+            "Nur die aktuell gefilterte Sicht als JSON exportieren — 2.2.3"
+        )
+        btn_export_filt.clicked.connect(self._export_filtered)
+        btn_row.addWidget(btn_export_filt)
         btn_clear = QPushButton("Leeren…")
         btn_clear.setObjectName("docHistoryClear")
-        btn_clear.setToolTip("Historie leeren (mit Bestätigung) — 2.2.2")
+        btn_clear.setToolTip(
+            "Historie leeren — optional nur aktuellen Filter — 2.2.3"
+        )
         btn_clear.clicked.connect(self._clear_with_confirm)
         btn_row.addWidget(btn_clear)
         btn_row.addStretch(1)
@@ -188,6 +197,43 @@ class DocHistoryDialog(QDialog):
             self.accept()
 
     def _clear_with_confirm(self) -> None:
+        """Clear: bei aktivem Filter optional nur Filter; sonst alles — 2.2.3."""
+        filt = self._selected_action()
+        if filt:
+            n_filt = len(self.hist.filter_entries(filt, limit=10_000))
+            if n_filt <= 0:
+                QMessageBox.information(
+                    self, "Dokument-Historie", "Keine Einträge für diesen Filter."
+                )
+                return
+            reply = QMessageBox.question(
+                self,
+                "Dokument-Historie leeren",
+                f"Nur aktuellen Filter „{filt}“ löschen ({n_filt} Einträge)?\n\n"
+                f"„Ja“ = nur Filter · „Nein“ = gesamte Historie "
+                f"({len(self.hist.entries)} Einträge) · Abbrechen = nichts.",
+                QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel,
+                QMessageBox.Cancel,
+            )
+            if reply == QMessageBox.Cancel:
+                return
+            if reply == QMessageBox.Yes:
+                self.hist.clear_filtered(filt, save=True)
+            else:
+                # Nein = gesamte Historie (wie bisher mit Bestätigung)
+                n = len(self.hist.entries)
+                reply2 = QMessageBox.question(
+                    self,
+                    "Dokument-Historie leeren",
+                    f"Wirklich alle {n} Einträge unwiderruflich löschen?",
+                    QMessageBox.Yes | QMessageBox.No,
+                    QMessageBox.No,
+                )
+                if reply2 != QMessageBox.Yes:
+                    return
+                self.hist.clear(save=True)
+            self._reload()
+            return
         n = len(self.hist.entries)
         if n <= 0:
             QMessageBox.information(self, "Dokument-Historie", "Historie ist bereits leer.")
@@ -228,4 +274,32 @@ class DocHistoryDialog(QDialog):
             return
         QMessageBox.information(
             self, "Dokument-Historie", f"Exportiert:\n{out}"
+        )
+
+    def _export_filtered(self) -> None:
+        """Gefilterte Sicht exportieren — 2.2.3."""
+        filt = self._selected_action()
+        suffix = f"-{filt}" if filt else "-view"
+        # Dateiname-sicher
+        safe = "".join(c if c.isalnum() or c in "._-" else "_" for c in (suffix or ""))
+        default = str(
+            self.hist.path.with_name(self.hist.path.stem + f"{safe}-filtered.json")
+        )
+        path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Gefilterte Historie exportieren",
+            default,
+            "JSON (*.json);;Alle Dateien (*)",
+        )
+        if not path:
+            return
+        try:
+            out = self.hist.export_filtered_json(
+                path, filt, limit=self.PANEL_LIMIT
+            )
+        except Exception as e:
+            QMessageBox.warning(self, "Dokument-Historie", f"Export fehlgeschlagen:\n{e}")
+            return
+        QMessageBox.information(
+            self, "Dokument-Historie", f"Gefilterte Sicht exportiert:\n{out}"
         )

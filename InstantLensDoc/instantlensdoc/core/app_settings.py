@@ -3659,7 +3659,7 @@ INK_SMOOTH_PASSES = {
 
 
 def get_ink_smooth_strength() -> str:
-    """Glättungsstärke leicht|mittel|stark — 2.2.2."""
+    """Glättungsstärke leicht|mittel|stark — 2.2.3."""
     raw = str(
         load_settings().get("ink_smooth_strength", INK_SMOOTH_STRENGTH_DEFAULT)
         or INK_SMOOTH_STRENGTH_DEFAULT
@@ -3672,7 +3672,7 @@ def get_ink_smooth_strength() -> str:
 
 
 def set_ink_smooth_strength(strength: str) -> str:
-    """Persistenz Glättungsstärke — 2.2.2."""
+    """Persistenz Glättungsstärke — 2.2.3."""
     raw = str(strength or "").strip().lower()
     if raw in ("stark", "strong", "high", "3"):
         val = INK_SMOOTH_STARK
@@ -3685,7 +3685,7 @@ def set_ink_smooth_strength(strength: str) -> str:
 
 
 def get_ink_smooth_passes() -> int:
-    """Passes für aktuelle Glättungsstärke (1–3) — 2.2.2."""
+    """Passes für aktuelle Glättungsstärke (1–3) — 2.2.3."""
     return int(INK_SMOOTH_PASSES.get(get_ink_smooth_strength(), 1))
 
 

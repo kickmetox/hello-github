@@ -1677,7 +1677,7 @@ class PdfViewer(QWidget):
         self.btn_ink_smooth.setCheckable(True)
         self.btn_ink_smooth.setChecked(get_ink_smooth())
         self.btn_ink_smooth.setToolTip(
-            "Freihand: Glättung optional; Stärke daneben — 2.2.2 (kein Stylus)"
+            "Freihand: Glättung optional; Stärke daneben — 2.2.3 (kein Stylus)"
         )
         self.btn_ink_smooth.clicked.connect(self._toggle_ink_smooth)
         toolbar.addWidget(self.btn_ink_smooth)
@@ -1693,7 +1693,7 @@ class PdfViewer(QWidget):
                 pick_str = i
         self.cmb_ink_smooth_strength.setCurrentIndex(pick_str)
         self.cmb_ink_smooth_strength.setToolTip(
-            "Glättungsstärke: Leicht / Mittel / Stark (passes 1–3) — 2.2.2"
+            "Glättungsstärke: Leicht / Mittel / Stark (passes 1–3) — 2.2.3"
         )
         self.cmb_ink_smooth_strength.currentIndexChanged.connect(
             self._on_ink_smooth_strength_changed
@@ -2145,7 +2145,7 @@ class PdfViewer(QWidget):
         self.canvas.update()
 
     def _toggle_ink_smooth(self) -> None:
-        """Optionale Freihand-Glättung — 2.2.1/2.2.2."""
+        """Optionale Freihand-Glättung — 2.2.1/2.2.3."""
         on = bool(self.btn_ink_smooth.isChecked())
         set_ink_smooth(on)
         strength = get_ink_smooth_strength()
@@ -2155,7 +2155,7 @@ class PdfViewer(QWidget):
         )
 
     def _on_ink_smooth_strength_changed(self, _index: int = 0) -> None:
-        """Glättungsstärke persistieren — 2.2.2."""
+        """Glättungsstärke persistieren — 2.2.3."""
         data = self.cmb_ink_smooth_strength.currentData()
         val = set_ink_smooth_strength(str(data or "leicht"))
         if self.btn_ink_smooth.isChecked():
@@ -5879,11 +5879,20 @@ class PdfViewer(QWidget):
             self.status.emit("Nichts zu wiederholen")
             return False
         try:
+            label = None
+            try:
+                label = self.store.peek_redo_label()
+            except Exception:
+                label = None
             self.store.redo()
             self.schedule_sidecar_save(force=True)
             self.refresh()
             self.annotations_changed.emit()
-            self.status.emit("Annotation wiederholt")
+            # Nach Redo von Glätten denselben Status wie beim Anwenden — 2.2.3
+            if label == "Freihand glätten":
+                self.status.emit("Glättung angewandt")
+            else:
+                self.status.emit("Annotation wiederholt")
             return True
         except Exception as e:
             QMessageBox.warning(self, "Wiederholen", str(e))
@@ -9270,7 +9279,7 @@ class PdfViewer(QWidget):
         return True
 
     def _on_ink(self, points: object) -> None:
-        """Freihand-Polyline committen; Glätten als eigener Undo-Eintrag — 2.2.2."""
+        """Freihand-Polyline committen; Glätten als eigener Undo-Eintrag — 2.2.3."""
         if not self.store:
             return
         # Werkzeug sollte INK sein; programmatische Tests dürfen Punkte ohne Tool setzen
@@ -9326,7 +9335,7 @@ class PdfViewer(QWidget):
             pass
         # _commit_ann loggt zusätzlich annotation.add — OK für Audit
         self._commit_ann(ann)
-        # Glättung als separater Undo-Stack-Eintrag — 2.2.2
+        # Glättung als separater Undo-Stack-Eintrag; Redo ok; Status — 2.2.3
         if do_smooth and self.store is not None:
             try:
                 smoothed = self.store.smooth_ink(
@@ -9351,6 +9360,7 @@ class PdfViewer(QWidget):
                         pass
                     self.refresh()
                     self.annotations_changed.emit()
+                    self.status.emit("Glättung angewandt")
             except Exception:
                 pass
 
@@ -9432,7 +9442,7 @@ class PdfViewer(QWidget):
         dlg.exec()
 
     def show_doc_history(self) -> None:
-        """Dokument-Historie-Panel (50/Filter/Export/Doppelklick/Clear) — 2.2.2."""
+        """Dokument-Historie-Panel (50/Filter/Export/Doppelklick/Clear) — 2.2.3."""
         if not self.pdf_path:
             self.status.emit("Kein PDF geöffnet")
             return

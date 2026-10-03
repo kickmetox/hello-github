@@ -1,5 +1,20 @@
 # Changelog — InstantLens Doc
 
+## 2.2.3 — PageLabels Vorschau Scroll-Liste 20·Export TXT, Ink Undo-Glätten Redo·Status „Glättung angewandt“, Historie Clear optional Filter·Export gefilterte Sicht, CONTRIBUTING Exitcode-Tabelle kurz + Link smoke_ild.py
+
+Post-Release-Polish nach **2.2.2**: **Seitenbeschriftungen** mit **Scroll-Liste der ersten 20 Labels** und **Export Labels als TXT**; **Ink/Freihand Glätten** mit **Redo ok** nach Undo und Status **„Glättung angewandt“**; **Dokument-Historie** **Clear optional nur aktuellen Filter** und **Export gefilterte Sicht**; CONTRIBUTING **Exitcode-Tabelle kurz** + Link zu [`scripts/smoke_ild.py`](scripts/smoke_ild.py). Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen unverändert klar markiert / nicht produktiv (Ink ≠ Stylus).
+
+### Neu / verbessert
+- Seitenbeschriftungen: Scroll-Liste erste 20 · Labels als TXT exportieren
+- Freihand (Ink): Redo nach Glätten ok · Status „Glättung angewandt“
+- Dokument-Historie: Clear optional nur Filter · Export gefilterte Sicht
+- CONTRIBUTING: Exitcode-Tabelle kurz · Link `scripts/smoke_ild.py`
+
+### Tests / Qualität
+- Version **2.2.3** (App / `ild_pdf` / ISS / Smoke / Docs); Serie **2.2**; `docs/VERSION` + `VERSION.txt`
+- Smoke: 2.2.3 CLI + Qt (Preview-Scroll/TXT, Ink redo/status, Historie Clear-Filter/Export, CONTRIBUTING)
+- Stubs unverändert (nur Versionsmarker)
+
 ## 2.2.2 — PageLabels Range-Überlappung DE·Vorschau erste Labels, Ink Glättungsstärke·Undo eigener Stack-Eintrag, Historie Doppelklick→Seite·Clear Bestätigung, CONTRIBUTING Sync-Einzeiler=sync-ild.ps1 + smoke Beispiel
 
 Post-Release-Polish nach **2.2.1**: **Seitenbeschriftungen** Range-Editor mit **Validierung überlappender Ranges (DE)** und **Vorschau erste Labels**; **Ink/Freihand Glätten** mit **Strength Settings** (leicht/mittel/stark) und **Undo nach Glätten als eigener Stack-Eintrag**; **Dokument-Historie** **Doppelklick springt zur Seite** (wenn `page` im Eintrag) und **Leeren mit Bestätigung**; CONTRIBUTING **Sync-Einzeiler = sync-ild.ps1-Pfad** + **Smoke-Beispielkommando**. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen unverändert klar markiert / nicht produktiv (Ink ≠ Stylus).

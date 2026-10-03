@@ -156,15 +156,21 @@ def validate_label_range_overlap(
     )
 
 
+# Scroll-Liste im Dialog: erste N Labels — 2.2.3
+LABEL_PREVIEW_SCROLL_LIMIT = 20
+
+
 def preview_label_range(
     *,
     start_page: int,
     end_page: int,
     start_value: int = 1,
-    max_preview: int = 5,
+    max_preview: int = LABEL_PREVIEW_SCROLL_LIMIT,
 ) -> list[str]:
     """
-    Erste Labels eines arabischen Bereichs als Vorschau (ohne Seite zu füllen) — 2.2.2.
+    Erste Labels eines arabischen Bereichs als Vorschau (ohne Seite zu füllen).
+
+    Default ``max_preview`` = 20 (Scroll-Liste) — 2.2.3; Kurztext kann weniger nutzen.
     """
     lo, hi = normalize_page_range(start_page, end_page)
     n = max(0, hi - lo + 1)
@@ -183,6 +189,51 @@ def format_label_preview(labels: Sequence[str], *, total: int | None = None) -> 
     if n > len(items):
         body += "…"
     return f"Vorschau: {body}"
+
+
+def format_label_preview_lines(
+    labels: Sequence[str],
+    *,
+    start_page: int = 0,
+    total: int | None = None,
+    max_lines: int = LABEL_PREVIEW_SCROLL_LIMIT,
+) -> list[str]:
+    """
+    Zeilen für Scroll-Liste „Seite N → Label“ (erste ``max_lines``) — 2.2.3.
+    """
+    lo = max(0, int(start_page))
+    items = [str(x).strip() for x in labels]
+    k = max(0, min(int(max_lines), len(items)))
+    lines: list[str] = []
+    for i in range(k):
+        lab = items[i] or "—"
+        lines.append(f"Seite {lo + i + 1} → {lab}")
+    n = int(total) if total is not None else len(items)
+    if n > k and k > 0:
+        lines.append(f"… (+{n - k} weitere)")
+    return lines
+
+
+def export_page_labels_txt(
+    path: str | Path,
+    labels: Sequence[str],
+    *,
+    start_page: int = 0,
+) -> Path:
+    """Labels als TXT exportieren (eine Zeile pro Seite: ``N\\tLabel``) — 2.2.3."""
+    target = Path(path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    lo = max(0, int(start_page))
+    lines: list[str] = []
+    for i, lab in enumerate(labels):
+        text = str(lab or "").strip()
+        lines.append(f"{lo + i + 1}\t{text}")
+    # UTF-8 mit Newline am Ende
+    body = "\n".join(lines)
+    if body:
+        body += "\n"
+    target.write_text(body, encoding="utf-8")
+    return target
 
 
 def apply_label_range(

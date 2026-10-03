@@ -668,6 +668,14 @@ class AnnotationStore:
             return str(self._undo_labels[-1] or "Annotation")
         return "Annotation"
 
+    def peek_redo_label(self) -> str | None:
+        """Label der nächsten Redo-Stufe (z. B. „Freihand glätten“), oder None — 2.2.3."""
+        if not self._redo:
+            return None
+        if self._redo_labels:
+            return str(self._redo_labels[-1] or "Annotation")
+        return "Annotation"
+
     def undo_history_items(self) -> List[dict]:
         """
         Lesbare Annotation-Undo-Historie (älteste zuerst).
@@ -1545,7 +1553,9 @@ class AnnotationStore:
         strength: str | None = None,
     ) -> Optional[Annotation]:
         """
-        Freihand-Punkte glätten — eigener Undo-Stack-Eintrag („Freihand glätten“) — 2.2.2.
+        Freihand-Punkte glätten — eigener Undo-Stack-Eintrag („Freihand glätten“).
+
+        Undo/Redo ok (Ctrl+Z / Ctrl+Y); UI-Status „Glättung angewandt“ — 2.2.3.
         """
         ann = self.get(ann_id)
         if ann is None or ann.type != AnnotationType.INK:

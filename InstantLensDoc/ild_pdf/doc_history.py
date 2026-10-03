@@ -143,10 +143,20 @@ class DocHistory:
                 pass
         return entry
 
-    def clear(self, *, save: bool = True) -> int:
-        """Alle Einträge löschen — Rückgabe: Anzahl entfernt — 2.2.2."""
-        n = len(self.entries)
-        self.entries = []
+    def clear(self, *, save: bool = True, action: str | None = None) -> int:
+        """
+        Einträge löschen — Rückgabe: Anzahl entfernt.
+
+        Ohne ``action``: alles. Mit ``action``: nur Einträge dieses Typs — 2.2.3.
+        """
+        act = str(action or "").strip()
+        if act and act not in ("*", "alle", "all", ""):
+            before = len(self.entries)
+            self.entries = [e for e in self.entries if e.action != act]
+            n = before - len(self.entries)
+        else:
+            n = len(self.entries)
+            self.entries = []
         self.dirty = True
         if save:
             try:
@@ -154,6 +164,10 @@ class DocHistory:
             except Exception:
                 pass
         return n
+
+    def clear_filtered(self, action: str | None, *, save: bool = True) -> int:
+        """Nur aktuellen Filter (Aktionstyp) löschen — 2.2.3."""
+        return self.clear(save=save, action=action)
 
     def last_entries(self, n: int = 20) -> list[HistoryEntry]:
         k = max(0, int(n))
@@ -181,15 +195,47 @@ class DocHistory:
             return []
         return items[-k:]
 
-    def export_json(self, path: str | Path) -> Path:
-        """Aktuellen Stand als JSON exportieren (ildhist-v1 Payload)."""
+    def export_json(
+        self,
+        path: str | Path,
+        *,
+        action: str | None = None,
+        limit: int | None = None,
+        filtered: bool = False,
+    ) -> Path:
+        """
+        Stand als JSON exportieren (ildhist-v1 Payload).
+
+        ``filtered=True`` oder ``action`` gesetzt: nur gefilterte Sicht — 2.2.3.
+        """
         target = Path(path)
         target.parent.mkdir(parents=True, exist_ok=True)
+        use_filter = bool(filtered) or (
+            action is not None
+            and str(action).strip()
+            and str(action).strip() not in ("*", "alle", "all", "")
+        )
+        if use_filter:
+            lim = int(limit) if limit is not None else HISTORY_ENTRY_LIMIT
+            entries = self.filter_entries(action, limit=lim)
+            payload = self._payload_for_entries(entries, filter_action=action)
+        else:
+            payload = self._payload()
         target.write_text(
-            json.dumps(self._payload(), indent=2, ensure_ascii=False),
+            json.dumps(payload, indent=2, ensure_ascii=False),
             encoding="utf-8",
         )
         return target
+
+    def export_filtered_json(
+        self,
+        path: str | Path,
+        action: str | None = None,
+        *,
+        limit: int = 50,
+    ) -> Path:
+        """Gefilterte Sicht als JSON exportieren — 2.2.3."""
+        return self.export_json(path, action=action, limit=limit, filtered=True)
 
     def last_action_ts(self) -> str:
         if not self.entries:
@@ -197,14 +243,28 @@ class DocHistory:
         return str(self.entries[-1].ts or "")
 
     def _payload(self) -> dict:
-        return {
+        return self._payload_for_entries(self.entries)
+
+    def _payload_for_entries(
+        self,
+        entries: Sequence[HistoryEntry],
+        *,
+        filter_action: str | None = None,
+    ) -> dict:
+        items = list(entries)
+        payload: dict = {
             "version": HIST_VERSION,
             "schema": HIST_SCHEMA_ID,
             "pdf": str(self.pdf_path),
             "saved_at": _now_iso(),
-            "count": len(self.entries),
-            "entries": [e.to_dict() for e in self.entries],
+            "count": len(items),
+            "entries": [e.to_dict() for e in items],
         }
+        act = str(filter_action or "").strip()
+        if act and act not in ("*", "alle", "all", ""):
+            payload["filter_action"] = act
+            payload["filtered"] = True
+        return payload
 
     def save(self, path: Optional[Path] = None) -> Path:
         target = Path(path) if path else self.path

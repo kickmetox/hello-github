@@ -1,4 +1,4 @@
-"""Dialog: benutzerdefinierte PDF-Seitenbeschriftungen — 2.2.0 / Polish 2.2.1–2.2.2."""
+"""Dialog: benutzerdefinierte PDF-Seitenbeschriftungen — 2.2.0 / Polish 2.2.1–2.2.3."""
 
 from __future__ import annotations
 
@@ -7,11 +7,14 @@ from PySide6.QtWidgets import (
     QCheckBox,
     QDialog,
     QDialogButtonBox,
+    QFileDialog,
     QFormLayout,
     QGroupBox,
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QListWidget,
+    QListWidgetItem,
     QMessageBox,
     QPushButton,
     QScrollArea,
@@ -29,14 +32,14 @@ class PageLabelsDialog(QDialog):
         self.pdf_view = pdf_view
         self.setWindowTitle("Seitenbeschriftungen…")
         self.setWindowModality(Qt.WindowModal)
-        self.resize(480, 600)
-        # Bereits angewandte Ranges in dieser Dialog-Session (0-basiert inkl.) — 2.2.2
+        self.resize(500, 640)
+        # Bereits angewandte Ranges in dieser Dialog-Session (0-basiert inkl.) — 2.2.3
         self._applied_ranges: list[tuple[int, int]] = []
         layout = QVBoxLayout(self)
         layout.addWidget(
             QLabel(
                 "Benutzerdefinierte Labels (z. B. i, ii, 1…). "
-                "Leer = PDF-Standard / native PageLabels. — 2.2.2"
+                "Leer = PDF-Standard / native PageLabels. — 2.2.3"
             )
         )
         scroll = QScrollArea()
@@ -72,7 +75,7 @@ class PageLabelsDialog(QDialog):
         scroll.setWidget(body)
         layout.addWidget(scroll, 1)
 
-        # Range-Editor — 2.2.1 + Überlappung/Vorschau — 2.2.2
+        # Range-Editor — 2.2.1 + Überlappung/Vorschau — 2.2.3 + Scroll-Liste 20 — 2.2.3
         range_box = QGroupBox("Bereich setzen (Range-Editor)")
         range_form = QFormLayout(range_box)
         self.spin_from = QSpinBox()
@@ -91,9 +94,16 @@ class PageLabelsDialog(QDialog):
         self.lbl_range_preview = QLabel("Vorschau: —")
         self.lbl_range_preview.setObjectName("pageLabelRangePreview")
         self.lbl_range_preview.setToolTip(
-            "Erste Labels des Bereichs (Vorschau) — 2.2.2"
+            "Kurzvorschau erste Labels — 2.2.3; Scroll-Liste darunter (max. 20) — 2.2.3"
         )
         range_form.addRow(self.lbl_range_preview)
+        self.list_preview = QListWidget()
+        self.list_preview.setObjectName("pageLabelPreviewList")
+        self.list_preview.setMaximumHeight(140)
+        self.list_preview.setToolTip(
+            "Scroll-Liste: erste 20 Labels des Bereichs — 2.2.3"
+        )
+        range_form.addRow(self.list_preview)
         self.lbl_range_error = QLabel("")
         self.lbl_range_error.setObjectName("pageLabelRangeError")
         self.lbl_range_error.setStyleSheet("color: #B00020;")
@@ -102,7 +112,7 @@ class PageLabelsDialog(QDialog):
         btn_range = QPushButton("Bereich arabisch anwenden")
         btn_range.setToolTip(
             "Füllt den Bereich mit 1, 2, 3… ab Startwert; "
-            "überlappende Bereiche werden abgelehnt (DE) — 2.2.2"
+            "überlappende Bereiche werden abgelehnt (DE) — 2.2.3"
         )
         btn_range.clicked.connect(self._apply_range)
         range_form.addRow(btn_range)
@@ -125,6 +135,11 @@ class PageLabelsDialog(QDialog):
         btn_arabic.setToolTip("Alle Seiten auf arabisch 1, 2, 3… zurücksetzen — 2.2.1")
         btn_arabic.clicked.connect(self._reset_arabic)
         presets.addWidget(btn_arabic)
+        btn_export_txt = QPushButton("Labels als TXT…")
+        btn_export_txt.setObjectName("pageLabelExportTxt")
+        btn_export_txt.setToolTip("Aktuelle Labels als TXT exportieren — 2.2.3")
+        btn_export_txt.clicked.connect(self._export_labels_txt)
+        presets.addWidget(btn_export_txt)
         btn_clear = QPushButton("Alle leeren")
         btn_clear.clicked.connect(self._clear_all)
         presets.addWidget(btn_clear)
@@ -177,7 +192,9 @@ class PageLabelsDialog(QDialog):
 
     def _update_range_preview(self) -> None:
         from ild_pdf.page_labels import (
+            LABEL_PREVIEW_SCROLL_LIMIT,
             format_label_preview,
+            format_label_preview_lines,
             normalize_page_range,
             preview_label_range,
             validate_label_range_overlap,
@@ -185,13 +202,35 @@ class PageLabelsDialog(QDialog):
 
         lo, hi = self._range_bounds()
         total = max(0, hi - lo + 1)
-        first = preview_label_range(
+        # Kurztext: erste 5
+        first_short = preview_label_range(
             start_page=lo,
             end_page=hi,
             start_value=self.spin_start.value(),
             max_preview=5,
         )
-        self.lbl_range_preview.setText(format_label_preview(first, total=total))
+        self.lbl_range_preview.setText(format_label_preview(first_short, total=total))
+        # Scroll-Liste: erste 20
+        first_scroll = preview_label_range(
+            start_page=lo,
+            end_page=hi,
+            start_value=self.spin_start.value(),
+            max_preview=LABEL_PREVIEW_SCROLL_LIMIT,
+        )
+        lines = format_label_preview_lines(
+            first_scroll,
+            start_page=lo,
+            total=total,
+            max_lines=LABEL_PREVIEW_SCROLL_LIMIT,
+        )
+        self.list_preview.clear()
+        if not lines:
+            item = QListWidgetItem("(keine Vorschau)")
+            item.setFlags(Qt.NoItemFlags)
+            self.list_preview.addItem(item)
+        else:
+            for line in lines:
+                self.list_preview.addItem(QListWidgetItem(line))
         err = validate_label_range_overlap(self._applied_ranges, lo, hi)
         if err:
             self.lbl_range_error.setText(err)
@@ -260,6 +299,45 @@ class PageLabelsDialog(QDialog):
         if n > 0:
             self._applied_ranges.append((0, n - 1))
         self._update_range_preview()
+
+    def _export_labels_txt(self) -> None:
+        """Aktuelle Dialog-Labels als TXT speichern — 2.2.3."""
+        from ild_pdf.page_labels import export_page_labels_txt
+
+        labels = self.labels()
+        if not labels:
+            QMessageBox.information(
+                self, "Seitenbeschriftungen", "Keine Labels zum Exportieren."
+            )
+            return
+        stem = "page-labels"
+        try:
+            p = getattr(self.pdf_view, "pdf_path", None)
+            if p:
+                from pathlib import Path
+
+                stem = Path(p).stem + "-labels"
+        except Exception:
+            pass
+        default = f"{stem}.txt"
+        path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Labels als TXT exportieren",
+            default,
+            "Text (*.txt);;Alle Dateien (*)",
+        )
+        if not path:
+            return
+        try:
+            out = export_page_labels_txt(path, labels)
+        except Exception as e:
+            QMessageBox.warning(
+                self, "Seitenbeschriftungen", f"Export fehlgeschlagen:\n{e}"
+            )
+            return
+        QMessageBox.information(
+            self, "Seitenbeschriftungen", f"Exportiert:\n{out}"
+        )
 
     def labels(self) -> list[str]:
         return [ed.text().strip() for ed in self._edits]

@@ -10,7 +10,7 @@ Kurzleitfaden für lokale Entwicklung und Smoke-Checks.
 
 ## Nightly-Smoke (`smoke_ild`)
 
-Leichtgewichtiger CI-/Nightly-Check (Version, Imports, CLI, Measure/Diff/Import, Changelog):
+Skript: [`scripts/smoke_ild.py`](scripts/smoke_ild.py) — Version, Imports, CLI, Measure/Diff/Import, Changelog.
 
 ```bat
 python scripts\smoke_ild.py
@@ -18,19 +18,21 @@ python scripts\smoke_ild.py --qt
 python scripts\smoke_ild.py --json
 ```
 
-Smoke-Beispielkommando (JSON-Summary, Exit 0 = OK):
+Smoke-Beispielkommando (JSON-Summary):
 
 ```bat
 python scripts\smoke_ild.py --json
 ```
 
+### Exitcodes (kurz)
+
 | Exit | Bedeutung |
 |------|-----------|
-| 0 | OK (`ok=true`) |
-| 1 | Fehler (`ok=false`) |
-| 2 | ungültige Option (`--help` → 0) |
+| 0 | OK |
+| 1 | Fehler |
+| 2 | ungültige Option |
 
-`--json` liefert `ok`, `checks`, `duration_ms`, `version`. Bei Fail enthält `checks[]` ein Objekt mit `error` (max 200 Zeichen, Overflow `…`).
+`--help` → Exit 0. `--json` liefert `ok`, `checks`, `duration_ms`, `version`. Bei Fail: `checks[].error` (max 200 Zeichen, Overflow `…`).
 
 Vollständiger Smoke (inkl. Qt-UI-Pfad):
 
@@ -41,7 +43,7 @@ python scripts\smoke_test.py
 
 ## GitHub Actions Stub
 
-Unter `.github/workflows/smoke-ild.yml` liegt ein **Workflow-Stub (manual only)**. Nur `workflow_dispatch` — kein Push/PR-Trigger, keine Cloud-CI-Pflicht. Lokal: `python scripts/smoke_ild.py`.
+Unter `.github/workflows/smoke-ild.yml` liegt ein **Workflow-Stub (manual only)**. Nur `workflow_dispatch` — kein Push/PR-Trigger, keine Cloud-CI-Pflicht. Lokal: [`scripts/smoke_ild.py`](scripts/smoke_ild.py).
 
 ## Sync (Windows)
 
