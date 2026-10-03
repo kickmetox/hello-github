@@ -338,6 +338,7 @@ Status-Klick öffnet <code>docs/VERSION</code>/<code>VERSION.txt</code> im Edito
 <p><b>PDF verschlüsseln/entschlüsseln:</b> Prefill-Warnung + Button „jetzt ausschalten“ (sofort speichern + Toast) · Passwort nie in Logs · falsches PW klar DE — 1.6.5 (Basis 1.6.4/1.6.3/1.6.2/1.6.1/1.6.0).</p>
 <p><b>Dokument-Statistik:</b> JSON-Dateiname Quick-Insert <code>{stem}</code>/<code>{date}</code> · ungültige Platzhalter rot · Live-Vorschau · Copy · Zielordner · UTF-8 — 1.6.5 (Basis 1.6.4/1.6.3/1.6.2/1.6.1/1.6.0).</p>
 <p><b>Workspace-Layouts:</b> Import-Log Zusammenfassung importiert/übersprungen/umbenannt · kopieren/als TXT · Merge skip/rename · Schema DE — 1.6.5 (Basis 1.6.4/1.6.3/1.6.2/1.6.1/1.6.0).</p>
+<p><b>2.1.4:</b> Import-Status Clipboard·Toast·A11y · Mess-Template Reset Bestätigung≠Default·Fokus+Selektion · Diff-TXT Quick-Insert·Reset Default · smoke_ild --json Fail checks[].error·Exit=ok.</p>
 <p><b>2.1.3:</b> Kommentar-Import Status ersetzt/übersprungen/neu·kopierbar · Mess-CSV Live-Template {stem}_measures.csv·Quick-Insert · Diff-TXT {stemA}_vs_{stemB}_{mode}.txt Live·ungültige rot · smoke_ild --json Schema+Beispiel.</p>
 <p><b>2.1.2:</b> Kommentar-Import Sidecar-Toggle·Status N/M · Mess-CSV Typ/Seite/Wert/Einheit·Ordner·BOM · Textlayer Side-by-Side·TXT-Template · smoke_ild --json·Laufzeit ms.</p>
 <p><b>2.1.1:</b> Kommentar-Import Dry-Run/Duplikate/Fortschritt/Abbruch · Messung Snap·Labels persistent·Messwerte-CSV · Textlayer Ignore-WS/Nur-Diff/TXT · smoke_ild Exit/--qt/Hilfe.</p>

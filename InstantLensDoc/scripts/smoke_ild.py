@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Nightly/CI Smoke: CLI + Import-Checks für InstantLens Doc — 2.1.0–2.1.3.
+"""Nightly/CI Smoke: CLI + Import-Checks für InstantLens Doc — 2.1.0–2.1.4.
 
 Leichtgewichtig. Exit-Codes:
-  0  OK
-  1  Fehler (Assertion/Import/Version)
+  0  OK  (ok=true)
+  1  Fehler (Assertion/Import/Version; ok=false)
   2  Nutzung / unbekannte Option (--help → 0)
 
 Aufruf:
@@ -13,9 +13,14 @@ Aufruf:
   python scripts/smoke_ild.py --json        # Summary als JSON (stdout)
   python scripts/smoke_ild.py -h
 
-JSON-Schema (--json), Beispiel:
-  {"ok": true, "version": "2.1.3", "duration_ms": 1234,
+JSON-Schema (--json), Erfolg:
+  {"ok": true, "version": "2.1.4", "duration_ms": 1234,
    "checks": ["version", "imports", "cli", "measure_diff_import", "changelog"]}
+
+JSON bei Fail: checks[] enthält Objekt mit error-Text für den fehlgeschlagenen Check;
+Exitcode spiegelt ok (0↔true, 1↔false) — 2.1.4:
+  {"ok": false, "version": "2.1.4", "duration_ms": 12,
+   "checks": ["version", {"name": "imports", "error": "…"}]}
 """
 
 from __future__ import annotations
@@ -36,7 +41,7 @@ if str(ROOT) not in sys.path:
 # Headless/CI: Qt ohne Display
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-EXPECTED_VERSION = "2.1.3"
+EXPECTED_VERSION = "2.1.4"
 
 EXIT_OK = 0
 EXIT_FAIL = 1
@@ -44,9 +49,13 @@ EXIT_USAGE = 2
 
 
 _JSON_MODE = False
+_CURRENT_CHECK: str | None = None
+_LAST_ERROR: str | None = None
 
 
 def _fail(msg: str) -> None:
+    global _LAST_ERROR
+    _LAST_ERROR = str(msg)
     print(f"FAIL: {msg}", file=sys.stderr)
     raise SystemExit(EXIT_FAIL)
 
@@ -103,6 +112,9 @@ def check_imports(*, with_qt: bool) -> None:
             "{mode}",
             "format_textlayer_diff_txt_filename",
             "find_invalid_textlayer_diff_txt_placeholders",
+            "Reset Default",
+            "_focus_txt_template_select_all",
+            "_insert_txt_template_placeholder",
         ),
         ROOT / "instantlensdoc" / "ui" / "pdf_view.py": (
             "import_native_pdf_comments",
@@ -116,6 +128,11 @@ def check_imports(*, with_qt: bool) -> None:
             "status_counts_de",
             "copyable_status_text",
             "Status kopieren",
+            "_copy_import_status_to_clipboard",
+            "_show_import_status_toast",
+            "_announce_import_status_toast",
+            "Reset Default",
+            "Bestätigung nur bei Abweichung",
             "get_measure_csv_utf8_bom",
             "get_last_measure_csv_dir",
             "format_measure_csv_filename",
@@ -224,7 +241,7 @@ def check_measure_and_diff() -> None:
     set_textlayer_diff_side_by_side(False)
     assert get_textlayer_diff_side_by_side() is False
 
-    # Mess-CSV Live-Template + Diff-TXT {mode} — 2.1.3
+    # Mess-CSV Live-Template + Diff-TXT {mode} — 2.1.3/2.1.4
     assert DEFAULT_MEASURE_CSV_FILENAME_TEMPLATE == "{stem}_measures.csv"
     set_measure_csv_filename_template("{stem}_measures.csv")
     assert get_measure_csv_filename_template() == "{stem}_measures.csv"
@@ -341,6 +358,8 @@ def check_measure_and_diff() -> None:
 
 def check_changelog() -> None:
     cl = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    if "## 2.1.4" not in cl:
+        _fail("CHANGELOG fehlt ## 2.1.4")
     if "## 2.1.3" not in cl:
         _fail("CHANGELOG fehlt ## 2.1.3")
     if "## 2.1.2" not in cl:
@@ -350,14 +369,16 @@ def check_changelog() -> None:
     if "## 2.1.0" not in cl:
         _fail("CHANGELOG fehlt ## 2.1.0")
     feat = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
-    if "2.1.3" not in feat:
-        _fail("FEATURES.md fehlt 2.1.3")
+    if "2.1.4" not in feat:
+        _fail("FEATURES.md fehlt 2.1.4")
     info = (ROOT / "INFO.md").read_text(encoding="utf-8")
     if "smoke_ild" not in info or "--json" not in info:
         _fail("INFO.md fehlt smoke_ild/--json Hinweis")
     if '"ok"' not in info or "duration_ms" not in info:
         _fail("INFO.md fehlt smoke --json Beispiel-Felder")
-    _ok("changelog + features + info(smoke_ild --json Beispiel)")
+    if "error" not in info:
+        _fail("INFO.md fehlt smoke --json Fail checks[].error Hinweis")
+    _ok("changelog + features + info(smoke_ild --json error/exit)")
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -365,7 +386,7 @@ def _build_parser() -> argparse.ArgumentParser:
         prog="smoke_ild.py",
         description=(
             "InstantLens Doc Nightly-Smoke (CLI/Imports/Messung/Diff).\n"
-            "Exit: 0=OK, 1=Fehler, 2=ungültige Option."
+            "Exit: 0=OK (ok=true), 1=Fehler (ok=false), 2=ungültige Option."
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
         add_help=False,
@@ -389,7 +410,10 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--json",
         action="store_true",
-        help="Summary als JSON auf stdout (ok/checks/duration_ms/version) — 2.1.3",
+        help=(
+            "Summary als JSON auf stdout "
+            "(ok/checks/duration_ms/version; Fail: checks[].error) — 2.1.4"
+        ),
     )
     return p
 
@@ -409,23 +433,39 @@ Optionen:
   -h, --help     kurze DE-Hilfe (Exit 0)
   --qt           UI-Quelltext-Checks (compare_dialog/pdf_view) ausführen
   --skip-qt      UI-Checks überspringen (Default ohne --qt)
-  --json         Summary als JSON (ok/checks[]/duration_ms/version) — 2.1.3
+  --json         Summary als JSON (ok/checks[]/duration_ms/version);
+                 bei Fail: checks[] mit {name,error}; Exitcode = ok — 2.1.4
 
 Exit-Codes:
-  0  OK
-  1  Fehler (Version/Import/Assertion)
+  0  OK (ok=true)
+  1  Fehler (ok=false; Version/Import/Assertion)
   2  unbekannte Option
 
 Laufzeit: am Ende als „Laufzeit: N ms“ (oder duration_ms im JSON).
 
-Beispiel --json:
-  {"ok": true, "version": "2.1.3", "duration_ms": 1234,
+Beispiel --json (Erfolg):
+  {"ok": true, "version": "2.1.4", "duration_ms": 1234,
    "checks": ["version", "imports", "cli", "measure_diff_import", "changelog"]}
+
+Beispiel --json (Fail):
+  {"ok": false, "version": "2.1.4", "duration_ms": 12,
+   "checks": ["version", {"name": "imports", "error": "import x: …"}]}
 """.rstrip()
     )
 
 
+def _json_checks_on_fail(passed: list[str], *, check: str | None, error: str | None):
+    """checks[] bei Fail: bestandene Namen + Objekt mit error-Text — 2.1.4."""
+    out: list = list(passed)
+    name = check or "unknown"
+    err = (error or "FAIL").strip() or "FAIL"
+    out.append({"name": name, "error": err})
+    return out
+
+
 def main(argv: list[str] | None = None) -> int:
+    global _CURRENT_CHECK, _LAST_ERROR, _JSON_MODE
+
     argv = list(sys.argv[1:] if argv is None else argv)
     parser = _build_parser()
     try:
@@ -446,25 +486,34 @@ def main(argv: list[str] | None = None) -> int:
         with_qt = False
 
     as_json = bool(args.json)
-    global _JSON_MODE
     _JSON_MODE = as_json
     t0 = time.perf_counter()
     checks: list[str] = []
+    ok = True
     if not as_json:
         print(f"smoke_ild.py — InstantLens Doc {EXPECTED_VERSION}")
     try:
+        _CURRENT_CHECK = "version"
         check_version()
         checks.append("version")
+        _CURRENT_CHECK = "imports"
         check_imports(with_qt=with_qt)
         checks.append("imports")
+        _CURRENT_CHECK = "cli"
         check_cli_version()
         checks.append("cli")
+        _CURRENT_CHECK = "measure_diff_import"
         check_measure_and_diff()
         checks.append("measure_diff_import")
+        _CURRENT_CHECK = "changelog"
         check_changelog()
         checks.append("changelog")
+        _CURRENT_CHECK = None
     except SystemExit as e:
+        ok = False
         code = int(e.code) if e.code is not None else EXIT_FAIL
+        if code == 0:
+            code = EXIT_FAIL
         duration_ms = int(round((time.perf_counter() - t0) * 1000))
         if as_json:
             print(
@@ -473,14 +522,45 @@ def main(argv: list[str] | None = None) -> int:
                         "ok": False,
                         "version": EXPECTED_VERSION,
                         "duration_ms": duration_ms,
-                        "checks": checks,
+                        "checks": _json_checks_on_fail(
+                            checks,
+                            check=_CURRENT_CHECK,
+                            error=_LAST_ERROR,
+                        ),
                     },
                     ensure_ascii=False,
                 )
             )
         else:
             print(f"Laufzeit: {duration_ms} ms")
-        return code if code != 0 else EXIT_FAIL
+        # Exitcode spiegelt ok — 2.1.4
+        return EXIT_FAIL if not ok else EXIT_OK
+    except Exception as e:
+        ok = False
+        duration_ms = int(round((time.perf_counter() - t0) * 1000))
+        err = f"{type(e).__name__}: {e}"
+        _LAST_ERROR = err
+        if not as_json:
+            print(f"FAIL: {err}", file=sys.stderr)
+        if as_json:
+            print(
+                json.dumps(
+                    {
+                        "ok": False,
+                        "version": EXPECTED_VERSION,
+                        "duration_ms": duration_ms,
+                        "checks": _json_checks_on_fail(
+                            checks,
+                            check=_CURRENT_CHECK,
+                            error=err,
+                        ),
+                    },
+                    ensure_ascii=False,
+                )
+            )
+        else:
+            print(f"Laufzeit: {duration_ms} ms")
+        return EXIT_FAIL
 
     duration_ms = int(round((time.perf_counter() - t0) * 1000))
     if as_json:
@@ -498,7 +578,8 @@ def main(argv: list[str] | None = None) -> int:
     else:
         print(f"Laufzeit: {duration_ms} ms")
         print("smoke_ild: OK")
-    return EXIT_OK
+    # Exitcode spiegelt ok — 2.1.4
+    return EXIT_OK if ok else EXIT_FAIL
 
 
 if __name__ == "__main__":

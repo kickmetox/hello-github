@@ -1,5 +1,20 @@
 # Changelog — InstantLens Doc
 
+## 2.1.4 — Import-Status Clipboard·Toast·A11y, Mess-Template Reset Bestätigung≠Default·Fokus+Selektion, Diff-TXT Quick-Insert·Reset Default, smoke_ild --json Fail checks[].error·Exit=ok
+
+Post-Release-Polish nach **2.1.3**: **PDF-Kommentar-Import** „Status kopieren“ schreibt in die **Zwischenablage** und zeigt **Toast + A11y Announcement** (OCR/HC-Pipeline); **Mess-CSV Reset Default** mit **Bestätigung nur bei Abweichung** und **Fokus+Selektion**; **Diff-TXT Template** mit **Quick-Insert-Buttons** und **Reset Default** (Bestätigung nur bei Abweichung · Fokus+Selektion); **smoke_ild.py `--json`** bei Fail liefert **`checks[].error` Text**, **Exitcode spiegelt `ok`**. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen unverändert klar markiert / nicht produktiv.
+
+### Neu / verbessert
+- Kommentar-Import Status kopieren: Clipboard + Toast (OCR-Dauer) + A11y Announcement
+- Mess-CSV: Reset Default · Bestätigung nur bei Abweichung (Leer≡Default) · Fokus+Selektion
+- Diff-TXT: Quick-Insert `{stemA}`/`{stemB}`/`{mode}`/`{page}`/`{date}` · Reset Default · Fokus+Selektion
+- `scripts/smoke_ild.py`: Fail-JSON `checks[]` mit `{name,error}` · Exit 0↔ok=true / 1↔ok=false
+
+### Tests / Qualität
+- Version **2.1.4** (App / `ild_pdf` / ISS / Smoke / Docs); Serie **2.1**; `docs/VERSION` + `VERSION.txt`
+- Smoke: 2.1.4 CLI + Qt (Import-Toast-A11y, Mess-Reset-Confirm/Focus, Diff-TXT Quick-Insert/Reset, smoke_ild JSON-error/exit)
+- Stubs unverändert
+
 ## 2.1.3 — Kommentar-Import Status ersetzt/übersprungen/neu·kopierbar, Mess-CSV Live-Template {stem}_measures.csv·Quick-Insert, Diff-TXT {stemA}_vs_{stemB}_{mode}.txt Live·ungültige rot, smoke_ild --json Schema+Beispiel
 
 Post-Release-Polish nach **2.1.2**: **PDF-Kommentar-Import** Status detailliert **„ersetzt X, übersprungen Y, neu Z“** mit **kopierbarem Text** (Status kopieren); **Messwerte-CSV** Live-Dateiname-Template **`{stem}_measures.csv`** inkl. **Quick-Insert** `{stem}`/`{date}` und ungültige Platzhalter rot; **Textlayer Diff-TXT** Default-Template **`{stemA}_vs_{stemB}_{mode}.txt`** mit **Live-Vorschau** und **ungültigen Platzhaltern rot**; **smoke_ild.py `--json`** Felder **`ok`**, **`checks[]`**, **`duration_ms`**, **`version`** inkl. **Beispiel in Hilfe/Docs**. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen unverändert klar markiert / nicht produktiv.
