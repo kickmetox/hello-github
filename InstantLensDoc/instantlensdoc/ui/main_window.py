@@ -1973,7 +1973,8 @@ class MainWindow(QMainWindow):
         m_extra.addAction(a)
         a = QAction("OCR gesamtes PDF…", self)
         a.setToolTip(
-            "Batch-OCR: Sprach-Preset + Fortschritt/Abbrechen → neue Textdatei-Tab — 1.1.1"
+            "Batch-OCR: Sprach-Preset + DPI 150/300 + optional von–bis "
+            "→ neue Textdatei-Tab — 1.1.2"
         )
         a.triggered.connect(self._run_ocr_document)
         m_extra.addAction(a)
@@ -2863,7 +2864,16 @@ class MainWindow(QMainWindow):
     def _clear_annotations_on_page(self):
         """Alle Annotationen der aktuellen PDF-Seite löschen (Bestätigung + Undo)."""
         if self.stack.currentWidget() is self.pdf_view and self.pdf_view.pdf_path:
-            n = self.pdf_view.clear_annotations_on_page()
+            page = int(self.pdf_view.page_index)
+            filtered_ids = None
+            if hasattr(self.sidebar, "visible_annotation_ids"):
+                try:
+                    filtered_ids = self.sidebar.visible_annotation_ids(page=page)
+                except Exception:
+                    filtered_ids = None
+            n = self.pdf_view.clear_annotations_on_page(
+                filtered_ids=filtered_ids,
+            )
             if n == 0:
                 return
             self._set_status(f"{n} Annotation(en) auf Seite gelöscht (Ctrl+Z rückgängig)")
@@ -7599,13 +7609,26 @@ class MainWindow(QMainWindow):
             return
 
         ok, msg = ocr_mod.tesseract_available()
+        # Seitenzahl vorab für Dialog (DPI + optional von–bis) — 1.1.2
+        pdf_path = Path(self.doc.path)
+        try:
+            import pypdfium2 as pdfium
+
+            _doc = pdfium.PdfDocument(str(pdf_path))
+            total = len(_doc)
+            _doc.close()
+        except Exception:
+            total = max(1, int(self.pdf_view.page_count or 1))
+
         dlg = OcrDialog(
             self,
             need_file=False,
-            default_label=f"{Path(self.doc.path).name} (alle Seiten)",
+            default_label=f"{Path(self.doc.path).name} (Batch)",
+            page_count=total,
+            show_page_range=True,
         )
-        # Batch-OCR: Sprach-Preset-Combobox + Tesseract-Hinweis (Link/Pfad) im Dialog — 1.1.1
-        dlg.setWindowTitle("OCR gesamtes PDF — Sprach-Preset")
+        # Batch-OCR: Sprach-Preset + DPI 150/300 + optional Seitenbereich — 1.1.2
+        dlg.setWindowTitle("OCR gesamtes PDF — Sprach-Preset / DPI")
         dlg.rb_editable.setChecked(True)
         dlg.rb_searchable.setEnabled(False)
         if dlg.exec() != QDialog.Accepted:
@@ -7624,20 +7647,22 @@ class MainWindow(QMainWindow):
             return
 
         lang = dlg.lang_code()
-        pdf_path = Path(self.doc.path)
+        dpi = dlg.dpi()
+        page_from, page_to = dlg.page_range()
         cancelled = {"flag": False}
 
-        # Seitenzahl vorab für Dialog
-        try:
-            import pypdfium2 as pdfium
-
-            _doc = pdfium.PdfDocument(str(pdf_path))
-            total = len(_doc)
-            _doc.close()
-        except Exception:
-            total = max(1, int(self.pdf_view.page_count or 1))
-
-        prog = QProgressDialog("OCR gesamtes PDF…", "Abbrechen", 0, total, self)
+        range_hint = (
+            f" S. {page_from}–{page_to}"
+            if page_from is not None and page_to is not None
+            else ""
+        )
+        prog = QProgressDialog(
+            f"OCR gesamtes PDF ({dpi} DPI{range_hint})…",
+            "Abbrechen",
+            0,
+            total,
+            self,
+        )
         prog.setWindowTitle("Batch-OCR")
         prog.setWindowModality(Qt.WindowModal)
         prog.setMinimumDuration(0)
@@ -7651,7 +7676,7 @@ class MainWindow(QMainWindow):
                 return False
             prog.setMaximum(max(1, n))
             prog.setValue(page)
-            prog.setLabelText(f"OCR: {pdf_path.name} — {label}")
+            prog.setLabelText(f"OCR: {pdf_path.name} — {label} @ {dpi} DPI")
             QApplication.processEvents()
             return True
 
@@ -7659,6 +7684,9 @@ class MainWindow(QMainWindow):
             result = ocr_mod.ocr_pdf_document(
                 pdf_path,
                 lang=lang,
+                dpi=dpi,
+                page_from=page_from,
+                page_to=page_to,
                 progress=on_progress,
             )
         except ocr_mod.OcrUnavailable as e:
@@ -7694,7 +7722,8 @@ class MainWindow(QMainWindow):
             return
         self.open_path(str(out_txt))
         status = (
-            f"Batch-OCR ({result.lang}): {result.pages_done}/{result.pages_total} Seiten"
+            f"Batch-OCR ({result.lang}, {result.dpi} DPI): "
+            f"{result.pages_done}/{result.pages_total} Seiten"
             f" → Tab {out_txt.name}"
         )
         if result.cancelled:

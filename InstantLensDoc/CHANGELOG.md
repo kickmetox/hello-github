@@ -1,5 +1,27 @@
 # Changelog — InstantLens Doc
 
+## 1.1.2 — OCR DPI·Seitenbereich, Merge DnD·Duplikat, Ann. Filter-Löschen, Keygen .txt/--days
+
+Post-Release-Polish nach 1.1.1: OCR-Batch mit DPI-Auswahl 150/300 und optionalem Seitenbereich von–bis; PDF-Zusammenführen nimmt Dateien per Drag&Drop in die Liste und warnt bei Duplikaten; „Alle Annotationen auf Seite löschen“ mit Option nur sichtbare/gefilterte; Keygen speichert als .txt, CLI `--days` bleibt kompatibel. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### OCR / Batch
+- **DPI**-Einstellungen **150 / 300** im OCR-Dialog; optionaler **Seitenbereich von–bis**
+
+### PDF
+- **Zusammenführen**: Dateien per **Drag&Drop** in die Liste; **Duplikat-Warnung** (übersprungen)
+
+### Annotationen
+- **Alle auf Seite löschen…**: Option **nur sichtbare/gefilterte** Annotationen
+
+### Keygen
+- GUI: **Speichern als .txt…**; CLI **`--days`** (ohne Flag unverändert / kompatibel)
+
+### Packaging / Docs
+- Version **1.1.2** (App / `ild_pdf` / ISS / Smoke / Docs)
+- Smoke: OCR DPI·Range, Merge DnD·Duplikat, Ann. Filter-Option, Keygen .txt/--days (CLI + Qt)
+
+---
+
 ## 1.1.1 — OCR Sprach-Preset/Pfad, Merge Doppelklick·Summe, Ann.-Zähler, Keygen Gültigkeit
 
 Post-Release-Polish nach 1.1.0: OCR-Batch mit klarer Sprach-Preset-Combobox und Tesseract-Hinweis inkl. Wiki-Link sowie Windows-Pfad-Hilfe; PDF-Zusammenführen mit Doppelklick-Entfernen, „Alle entfernen“ und Seitenzahl-Summe; Bestätigungsdialog „Alle Annotationen auf Seite löschen“ mit Zähler „N Annotationen“; Keygen zeigt Gültigkeitstage neben dem generierten Key. Stubs KI/Cloud/Stylus/3D bleiben Stubs.

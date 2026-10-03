@@ -1923,6 +1923,34 @@ class Sidebar(QWidget):
         if delete_ann_filter_preset(name):
             self._refresh_ann_filter_preset_combo(keep="")
 
+    def visible_annotation_ids(self, page: int | None = None) -> list[str]:
+        """
+        IDs der aktuell in der Sidebar sichtbaren/gefilterten Annotationen.
+        page: optional nur diese Seite (0-basiert) — 1.1.2.
+        """
+        ids: list[str] = []
+        if not hasattr(self, "annotations"):
+            return ids
+        for i in range(self.annotations.count()):
+            item = self.annotations.item(i)
+            if item is None:
+                continue
+            if item.data(Qt.UserRole + 2) == "group":
+                continue
+            payload = item.data(256)
+            if payload is None:
+                continue
+            if page is not None:
+                try:
+                    if int(getattr(payload, "page", -1)) != int(page):
+                        continue
+                except (TypeError, ValueError):
+                    continue
+            aid = getattr(payload, "id", None)
+            if aid:
+                ids.append(str(aid))
+        return ids
+
     def annotation_filter_type(self) -> str:
         """Aktueller Filter: AnnotationType.value oder '' für alle."""
         data = self.ann_filter.currentData()

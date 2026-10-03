@@ -1293,15 +1293,35 @@ class AnnotationStore:
     def for_page(self, page: int) -> List[Annotation]:
         return [a for a in self.annotations if a.page == page]
 
-    def clear_page(self, page: int) -> int:
-        """Alle Annotationen einer Seite löschen — ein Undo-Schritt. Rückgabe: Anzahl."""
+    def clear_page(
+        self,
+        page: int,
+        *,
+        only_ids: Sequence[str] | None = None,
+    ) -> int:
+        """
+        Annotationen einer Seite löschen — ein Undo-Schritt.
+        only_ids: optional nur diese IDs (gefilterte/sichtbare) — 1.1.2.
+        Rückgabe: Anzahl.
+        """
         page = int(page)
         targets = self.for_page(page)
+        if only_ids is not None:
+            idset = {str(x) for x in only_ids}
+            targets = [a for a in targets if str(a.id) in idset]
         if not targets:
             return 0
         n = len(targets)
-        with self.atomic(label=f"Alle Ann. Seite {page + 1} löschen"):
-            self.annotations = [a for a in self.annotations if a.page != page]
+        remove_ids = {str(a.id) for a in targets}
+        label = (
+            f"Gefilterte Ann. Seite {page + 1} löschen"
+            if only_ids is not None
+            else f"Alle Ann. Seite {page + 1} löschen"
+        )
+        with self.atomic(label=label):
+            self.annotations = [
+                a for a in self.annotations if str(a.id) not in remove_ids
+            ]
             self.dirty = True
         return n
 

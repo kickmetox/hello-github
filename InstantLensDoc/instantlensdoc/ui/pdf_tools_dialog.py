@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QCheckBox,
@@ -25,6 +25,51 @@ from PySide6.QtWidgets import (
 )
 
 from ild_pdf.pages import extract_page_range, merge_pdfs, split_pdf
+
+
+class MergeListWidget(QListWidget):
+    """Liste mit InternalMove + externe PDF-Dateien per Drag&Drop — 1.1.2."""
+
+    files_dropped = Signal(list)
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setAcceptDrops(True)
+        self.setDragDropMode(QAbstractItemView.DragDrop)
+        self.setDefaultDropAction(Qt.MoveAction)
+        self.setSelectionMode(QAbstractItemView.ExtendedSelection)
+
+    def _pdf_paths_from_mime(self, mime) -> list[str]:
+        paths: list[str] = []
+        if mime is None or not mime.hasUrls():
+            return paths
+        for url in mime.urls():
+            if not url.isLocalFile():
+                continue
+            path = url.toLocalFile()
+            if path and path.lower().endswith(".pdf"):
+                paths.append(path)
+        return paths
+
+    def dragEnterEvent(self, event):
+        if self._pdf_paths_from_mime(event.mimeData()):
+            event.acceptProposedAction()
+            return
+        super().dragEnterEvent(event)
+
+    def dragMoveEvent(self, event):
+        if self._pdf_paths_from_mime(event.mimeData()):
+            event.acceptProposedAction()
+            return
+        super().dragMoveEvent(event)
+
+    def dropEvent(self, event):
+        paths = self._pdf_paths_from_mime(event.mimeData())
+        if paths:
+            self.files_dropped.emit(paths)
+            event.acceptProposedAction()
+            return
+        super().dropEvent(event)
 
 
 class PdfToolsDialog(QDialog):
@@ -58,18 +103,16 @@ class PdfToolsDialog(QDialog):
         lay.addWidget(
             QLabel(
                 "PDFs in Liste-Reihenfolge zu einer Datei "
-                "(Mehrfachauswahl; Reihenfolge per Drag oder ▲/▼; Doppelklick entfernt):"
+                "(Drag&Drop Dateien / Neuordnen; Doppelklick entfernt):"
             )
         )
-        self.merge_list = QListWidget()
-        self.merge_list.setDragDropMode(QAbstractItemView.InternalMove)
-        self.merge_list.setDefaultDropAction(Qt.MoveAction)
-        self.merge_list.setSelectionMode(QAbstractItemView.ExtendedSelection)
+        self.merge_list = MergeListWidget()
         self.merge_list.setToolTip(
-            "Dateien ziehen zum Neuordnen; Doppelklick entfernt Eintrag; "
-            "Mehrfachauswahl beim Hinzufügen — 1.1.1"
+            "PDFs per Drag&Drop in die Liste ziehen; intern neuordnen; "
+            "Doppelklick entfernt; Duplikate werden gewarnt — 1.1.2"
         )
         self.merge_list.itemDoubleClicked.connect(self._merge_double_click)
+        self.merge_list.files_dropped.connect(self._merge_add_paths)
         model = self.merge_list.model()
         if model is not None:
             model.rowsInserted.connect(lambda *_: self._merge_update_pages_sum())
@@ -188,11 +231,54 @@ class PdfToolsDialog(QDialog):
         form.addRow(run)
         return w
 
+    def _merge_existing_paths(self) -> set[str]:
+        existing: set[str] = set()
+        for i in range(self.merge_list.count()):
+            item = self.merge_list.item(i)
+            if item is None:
+                continue
+            existing.add(str(Path(item.text()).resolve()) if item.text() else "")
+            existing.add(item.text())
+        existing.discard("")
+        return existing
+
+    def _merge_add_paths(self, paths: list[str], *, warn_duplicates: bool = True) -> int:
+        """Pfade hinzufügen; Duplikate warnen und überspringen — 1.1.2."""
+        if not paths:
+            return 0
+        existing = self._merge_existing_paths()
+        dups: list[str] = []
+        added = 0
+        for p in paths:
+            p = str(p)
+            if not p.lower().endswith(".pdf"):
+                continue
+            try:
+                key = str(Path(p).resolve())
+            except Exception:
+                key = p
+            if p in existing or key in existing:
+                dups.append(p)
+                continue
+            self.merge_list.addItem(p)
+            existing.add(p)
+            existing.add(key)
+            added += 1
+        if warn_duplicates and dups:
+            shown = "\n".join(Path(d).name for d in dups[:8])
+            more = f"\n… (+{len(dups) - 8})" if len(dups) > 8 else ""
+            QMessageBox.warning(
+                self,
+                "Duplikat",
+                f"{len(dups)} Duplikat(e) übersprungen (bereits in der Liste):\n"
+                f"{shown}{more}",
+            )
+        self._merge_update_pages_sum()
+        return added
+
     def _merge_add(self):
         paths, _ = QFileDialog.getOpenFileNames(self, "PDFs wählen", "", "PDF (*.pdf)")
-        for p in paths:
-            self.merge_list.addItem(p)
-        self._merge_update_pages_sum()
+        self._merge_add_paths(list(paths))
 
     def _merge_up(self):
         row = self.merge_list.currentRow()
@@ -316,7 +402,9 @@ class PdfToolsDialog(QDialog):
             written = split_pdf(
                 src,
                 out,
-                every_n=None if ranges or self.split_single.isChecked() else self.split_every.value(),
+                every_n=None
+                if ranges or self.split_single.isChecked()
+                else self.split_every.value(),
                 ranges=ranges,
                 single_pages=self.split_single.isChecked(),
             )

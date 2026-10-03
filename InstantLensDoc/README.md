@@ -2,7 +2,7 @@
 
 Moderne Textverarbeitung mit PDF-Annotator, OCR-Bridge und Formulargenerator.
 
-**Version:** 1.1.1  
+**Version:** 1.1.2  
 **Hersteller:** Andreas Meyer · ame@sellerbach.de
 
 ## Quickstart (Windows)
@@ -32,8 +32,8 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an).
 
-## Neu in 1.1.1
+## Neu in 1.1.2
 
-Polish: OCR-Batch Sprach-Preset + Tesseract-Hinweis (Link/Pfad); PDF Mergen Doppelklick entfernt + Alle entfernen + Seiten-Summe; Ann.-Löschen mit N-Zähler; Keygen Gültigkeitstage neben Key. Stubs KI/Cloud/Stylus/3D unverändert.
+Polish: OCR-Batch DPI 150/300 + optional von–bis; PDF Mergen Drag&Drop in Liste + Duplikat-Warnung; Ann. Seite löschen nur gefilterte Option; Keygen Speichern als .txt + CLI `--days`. Stubs KI/Cloud/Stylus/3D unverändert.
 
 Siehe [CHANGELOG.md](CHANGELOG.md), [FEATURES.md](FEATURES.md) und [INFO.md](INFO.md).

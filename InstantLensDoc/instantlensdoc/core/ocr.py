@@ -246,9 +246,22 @@ def ocr_pdf_page(pdf_path: str | Path, page_index: int = 0, lang: str = "deu+eng
     return ocr_image(img, lang=lang)
 
 
+# OCR-Render-DPI (Batch-Dialog): 150 / 300 — 1.1.2
+OCR_DPI_CHOICES: tuple[int, ...] = (150, 300)
+DEFAULT_OCR_DPI = 150
+
+
+def dpi_to_scale(dpi: int) -> float:
+    """DPI → pypdfium2-Render-Scale (72 DPI = 1.0)."""
+    d = int(dpi) if dpi else DEFAULT_OCR_DPI
+    if d not in OCR_DPI_CHOICES:
+        d = min(OCR_DPI_CHOICES, key=lambda x: abs(x - d))
+    return max(d / 72.0, 1.0)
+
+
 @dataclass
 class OcrDocumentResult:
-    """Ergebnis einer Batch-OCR über alle PDF-Seiten."""
+    """Ergebnis einer Batch-OCR über PDF-Seiten (optional Bereich)."""
 
     text: str
     lang: str
@@ -256,18 +269,25 @@ class OcrDocumentResult:
     pages_total: int
     cancelled: bool = False
     page_texts: List[str] = field(default_factory=list)
+    dpi: int = DEFAULT_OCR_DPI
+    page_from: int = 1  # 1-basiert inkl.
+    page_to: int = 0  # 1-basiert inkl.; 0 = Ende
 
 
 def ocr_pdf_document(
     pdf_path: str | Path,
     *,
     lang: str = "deu+eng",
-    scale: float = 2.0,
+    scale: float | None = None,
+    dpi: int | None = None,
+    page_from: int | None = None,
+    page_to: int | None = None,
     progress: Optional[Callable[[int, int, str], Optional[bool]]] = None,
 ) -> OcrDocumentResult:
     """
-    OCR über alle Seiten eines PDFs.
-    progress(page_1based, total, preview) → False zum Abbrechen, sonst True/None.
+    OCR über PDF-Seiten (optional von–bis, 1-basiert inkl.).
+    dpi 150/300 setzt scale=dpi/72; scale-Argument bleibt kompatibel.
+    progress(page_1based, total_in_range, preview) → False zum Abbrechen.
     """
     from ild_pdf import render_page
 
@@ -284,11 +304,44 @@ def ocr_pdf_document(
     finally:
         doc.close()
 
+    use_dpi = int(dpi) if dpi is not None else DEFAULT_OCR_DPI
+    if use_dpi not in OCR_DPI_CHOICES:
+        use_dpi = min(OCR_DPI_CHOICES, key=lambda x: abs(x - use_dpi))
+    if scale is None:
+        scale = dpi_to_scale(use_dpi)
+    else:
+        scale = max(float(scale), 1.0)
+
+    start = 1 if page_from is None else max(1, int(page_from))
+    end = total if page_to is None else min(total, int(page_to))
+    if start > total:
+        start = total if total else 1
+    if end < start:
+        end = start
+    if total <= 0:
+        return OcrDocumentResult(
+            text="",
+            lang=lang,
+            pages_done=0,
+            pages_total=0,
+            cancelled=False,
+            page_texts=[],
+            dpi=use_dpi,
+            page_from=start,
+            page_to=end,
+        )
+
+    indices = list(range(start - 1, end))  # 0-basiert
+    range_total = len(indices)
     page_texts: List[str] = []
     cancelled = False
-    for page in range(total):
+    for i, page in enumerate(indices):
         if progress is not None:
-            cont = progress(page + 1, total, f"Seite {page + 1}/{total}")
+            cont = progress(
+                i + 1,
+                range_total,
+                f"Seite {page + 1}/{total} ({i + 1}/{range_total})",
+            )
             if cont is False:
                 cancelled = True
                 break
@@ -297,7 +350,8 @@ def ocr_pdf_document(
 
     parts: List[str] = []
     for i, t in enumerate(page_texts):
-        header = f"--- Seite {i + 1}/{total} ---"
+        page_no = indices[i] + 1
+        header = f"--- Seite {page_no}/{total} ---"
         body = (t or "").rstrip()
         parts.append(f"{header}\n{body}" if body else header)
     combined = "\n\n".join(parts).strip() + ("\n" if parts else "")
@@ -305,9 +359,12 @@ def ocr_pdf_document(
         text=combined,
         lang=lang,
         pages_done=len(page_texts),
-        pages_total=total,
+        pages_total=range_total,
         cancelled=cancelled,
         page_texts=page_texts,
+        dpi=use_dpi,
+        page_from=start,
+        page_to=end,
     )
 
 

@@ -44,11 +44,19 @@ def _b64url_decode(s: str) -> bytes:
     return base64.urlsafe_b64decode(s + pad)
 
 
-def generate_key(email: str, issued_at: Optional[int] = None) -> str:
-    """Key erzeugen: ILD1.<payload_b64>.<sig_b64>"""
+def generate_key(
+    email: str,
+    issued_at: Optional[int] = None,
+    *,
+    days: Optional[int] = None,
+) -> str:
+    """Key erzeugen: ILD1.<payload_b64>.<sig_b64>. days default KEY_DAYS (CLI --days kompatibel)."""
     issued = int(issued_at if issued_at is not None else time.time())
+    d = int(days) if days is not None else KEY_DAYS
+    if d < 1:
+        d = KEY_DAYS
     payload = json.dumps(
-        {"e": email.strip().lower(), "i": issued, "d": KEY_DAYS, "v": 1},
+        {"e": email.strip().lower(), "i": issued, "d": d, "v": 1},
         separators=(",", ":"),
         ensure_ascii=False,
     ).encode("utf-8")

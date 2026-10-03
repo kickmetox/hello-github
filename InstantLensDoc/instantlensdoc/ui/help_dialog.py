@@ -100,10 +100,10 @@ HELP_HTML = f"""
 <li><b>Datei → Projekt-Ordner</b>: Workspace wählen (letzte 5); Dialoge starten im aktiven Ordner</li>
 <li><b>Datei → Exportieren</b>: Editor-Inhalt als HTML, DOCX oder PDF (zuletzt genutzter Ordner wird gemerkt);
     <b>Export-Profil</b> speichern/anwenden (DPI / Format / Ziel)</li>
-<li><b>OCR gesamtes PDF</b>: <b>Sprach-Preset</b>-Combobox; ohne Tesseract Hinweis mit <b>Link + Pfad-Hilfe</b>; Fortschritt/Abbrechen → <b>neue Textdatei-Tab</b> (<code>*-ocr.txt</code>) — 1.1.1</li>
-<li><b>PDF zusammenführen</b>: Mehrfachauswahl + Drag; <b>Doppelklick entfernt</b>; <b>Alle entfernen</b>; <b>Seiten-Summe</b>-Label — 1.1.1</li>
-<li><b>Alle Annotationen auf Seite löschen</b>: Bestätigung mit <b>Zähler (N Annotationen)</b> + ein Undo-Schritt (Ctrl+Z) — 1.1.1</li>
-<li><b>Keygen</b>: Klartext ohne QR + Kopieren; <b>Gültigkeitstage</b> neben generiertem Key — 1.1.1</li>
+<li><b>OCR gesamtes PDF</b>: <b>DPI 150/300</b> + optional <b>Seitenbereich von–bis</b>; Sprach-Preset; Fortschritt → <b>Textdatei-Tab</b> — 1.1.2</li>
+<li><b>PDF zusammenführen</b>: Dateien per <b>Drag&amp;Drop</b> in die Liste; <b>Duplikat-Warnung</b>; Doppelklick/Alle entfernen/Seiten-Summe — 1.1.2</li>
+<li><b>Alle Annotationen auf Seite löschen</b>: Option <b>nur sichtbare/gefilterte</b> + Zähler + Undo (Ctrl+Z) — 1.1.2</li>
+<li><b>Keygen</b>: <b>Speichern als .txt</b>; CLI <b>--days</b> kompatibel; Klartext + Kopieren + Gültigkeit — 1.1.2</li>
 <li><b>Datei → Drucken</b> (Ctrl+P): Editor oder aktuelle PDF-Seite (Qt Print); <b>PDF → Dokument drucken…</b> Seitenbereich + DPI + Graustufen; <b>Vorschau PageUp/Down·Home/End + +/- Zoom + Fit-Page + Mausrad + Seitenwahl</b> bei Mehrseiten; Fortschritt; Abbruch → Cleanup — 1.0.9</li>
 <li><b>Datei → Backup jetzt</b> / <b>Backup-Ordner öffnen…</b>: manuelles Backup; max. 3 Versuche; Log letzte 20; Filter Erfolg/Fehler; <b>Sortierung neueste zuerst</b> (Toggle); Hinweis bei leerer Liste; <b>Export TXT</b> (Zeitstempel-Name, UTF-8 BOM); Doppelklick öffnet Datei/Ordner — 1.0.9</li>
 <li><b>Willkommen</b>: <b>Weiterarbeiten</b> deaktiviert + Tooltip wenn Session fehlt/leer; sonst Tab-Anzahl + Pfad-Snippet; Esc leert Filter → Fokus Liste; Clear + Treffer; Enter/Entf; Drag&amp;Drop — 1.0.9</li>
@@ -213,11 +213,12 @@ HELP_HTML = f"""
     Ohne Tesseract: Install-Hinweis mit Link und <b>Pfad-Hilfe</b>
     (<a href="https://github.com/UB-Mannheim/tesseract/wiki">UB-Mannheim Wiki</a>,
     <code>winget install UB-Mannheim.TesseractOCR</code>,
-    typisch <code>C:\\Program Files\\Tesseract-OCR\\tesseract.exe</code>) — 1.1.1</li>
-<li><b>PDF zusammenführen</b>: Mehrfachauswahl, Drag-Reihenfolge, Doppelklick entfernt,
-    Alle entfernen, Seiten-Summe — 1.1.1</li>
-<li><b>Alle Annotationen auf Seite löschen</b>: Bearbeiten-Menü, Bestätigung mit N-Zähler, ein Undo-Schritt — 1.1.1</li>
-<li><b>Keygen</b>: Klartext-Ausgabe (ohne QR) + Kopieren + Gültigkeitstage neben Key — 1.1.1</li>
+    typisch <code>C:\\Program Files\\Tesseract-OCR\\tesseract.exe</code>);
+    <b>DPI 150/300</b> und optionaler Seitenbereich von–bis — 1.1.2</li>
+<li><b>PDF zusammenführen</b>: Dateien per Drag&amp;Drop in die Liste, Duplikat-Warnung,
+    Doppelklick/Alle entfernen/Seiten-Summe — 1.1.2</li>
+<li><b>Alle Annotationen auf Seite löschen</b>: Option nur sichtbare/gefilterte + N-Zähler + Undo — 1.1.2</li>
+<li><b>Keygen</b>: Speichern als .txt; CLI --days kompatibel; Klartext + Kopieren + Gültigkeit — 1.1.2</li>
 <li><b>Formulare</b>: Extras → Formulargenerator — mehr Feldtypen, Definition speichern/laden
     (<code>*.ildform.json</code>), Live-Vorschau, Export HTML/PDF</li>
 <li><b>Build (Windows)</b>: <code>build-windows.ps1</code> — PyInstaller App + Keygen</li>

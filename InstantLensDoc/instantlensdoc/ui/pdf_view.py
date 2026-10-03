@@ -6075,8 +6075,18 @@ class PdfViewer(QWidget):
             return 0
         return sum(1 for a in self.store.annotations if a.type == AnnotationType.REDACTION)
 
-    def clear_annotations_on_page(self, page_index: int | None = None) -> int:
-        """Alle Annotationen einer Seite löschen — Bestätigung + Zähler + Undo (1.1.1)."""
+    def clear_annotations_on_page(
+        self,
+        page_index: int | None = None,
+        *,
+        filtered_ids: list[str] | None = None,
+    ) -> int:
+        """
+        Annotationen einer Seite löschen — Bestätigung + Zähler + Undo.
+        Option: nur sichtbare/gefilterte (filtered_ids) — 1.1.2.
+        """
+        from PySide6.QtWidgets import QCheckBox
+
         if not self.store:
             self.status.emit("Keine Annotationen")
             return 0
@@ -6089,17 +6099,51 @@ class PdfViewer(QWidget):
                 f"Keine Annotationen auf Seite {page + 1}.",
             )
             return 0
-        n_ann = len(anns)
-        ann_word = "Annotation" if n_ann == 1 else "Annotationen"
-        reply = QMessageBox.question(
-            self,
-            "Alle Annotationen auf Seite löschen",
-            f"{n_ann} {ann_word} auf Seite {page + 1} löschen?\n"
-            "Rückgängig mit Ctrl+Z (ein Undo-Schritt).",
+        n_all = len(anns)
+        filt_set = {str(x) for x in (filtered_ids or [])}
+        n_filt = (
+            sum(1 for a in anns if str(a.id) in filt_set) if filtered_ids is not None else n_all
         )
-        if reply != QMessageBox.Yes:
+        # Filter aktiv = gefilterte Menge echt kleiner als alle auf der Seite
+        filter_active = filtered_ids is not None and n_filt < n_all
+
+        box = QMessageBox(self)
+        box.setIcon(QMessageBox.Question)
+        box.setWindowTitle("Alle Annotationen auf Seite löschen")
+        ann_word = "Annotation" if n_all == 1 else "Annotationen"
+        box.setText(
+            f"{n_all} {ann_word} auf Seite {page + 1} löschen?\n"
+            "Rückgängig mit Ctrl+Z (ein Undo-Schritt)."
+        )
+        cb = QCheckBox("Nur sichtbare/gefilterte Annotationen")
+        cb.setToolTip(
+            "Nur die aktuell in der Sidebar sichtbaren/gefilterten "
+            "Annotationen dieser Seite löschen — 1.1.2"
+        )
+        cb.setChecked(bool(filter_active))
+        cb.setEnabled(filtered_ids is not None and n_filt > 0)
+        if filter_active:
+            box.setInformativeText(
+                f"Mit Filter: {n_filt} von {n_all} sichtbar/gefiltert."
+            )
+        box.setCheckBox(cb)
+        box.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
+        box.setDefaultButton(QMessageBox.No)
+        if box.exec() != QMessageBox.Yes:
             return 0
-        n = self.store.clear_page(page)
+
+        only_ids = None
+        if cb.isChecked() and filtered_ids is not None:
+            only_ids = list(filt_set)
+            if n_filt <= 0:
+                QMessageBox.information(
+                    self,
+                    "Alle Annotationen auf Seite löschen",
+                    f"Keine gefilterten Annotationen auf Seite {page + 1}.",
+                )
+                return 0
+
+        n = self.store.clear_page(page, only_ids=only_ids)
         if n <= 0:
             return 0
         self._selected_ann_id = None
@@ -6112,7 +6156,8 @@ class PdfViewer(QWidget):
             return 0
         self.refresh()
         self.annotations_changed.emit()
-        self.status.emit(f"{n} Annotation(en) auf Seite {page + 1} gelöscht")
+        scope = "gefilterte " if only_ids is not None else ""
+        self.status.emit(f"{n} {scope}Annotation(en) auf Seite {page + 1} gelöscht")
         return n
 
     def clear_redactions(self):
