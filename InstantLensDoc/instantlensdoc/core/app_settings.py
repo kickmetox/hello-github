@@ -28,9 +28,12 @@ DEFAULTS: dict[str, Any] = {
     "default_zoom_mode": "percent",  # percent | fit_width | fit_page
     "autosave_interval_sec": 60,  # 15 | 30 | 60 | 120 — 0.9.7
     "autosave_enabled": True,
+    "autosave_backup_enabled": False,  # .ildbak vor Autosave-Überschreiben — 0.9.9
+    "autosave_backup_max": 3,  # 1–10 Rotations-Backups — 0.9.9
     "ann_highlight_color": "#FFE066",
     "ann_pen_color": "#2C3E50",
     "ann_note_color": "#FFEB3B",
+    "ann_default_fill_color": "#FFE066",  # Standard-Füllfarbe Shapes — 0.9.9
     "editor_line_numbers": False,
     "editor_minimap": False,
     "ann_palette_index": 0,
@@ -356,6 +359,39 @@ def get_autosave_enabled() -> bool:
 
 def set_autosave_enabled(enabled: bool) -> None:
     save_settings({"autosave_enabled": bool(enabled)})
+
+
+AUTOSAVE_BACKUP_MAX_MIN = 1
+AUTOSAVE_BACKUP_MAX_MAX = 10
+AUTOSAVE_BACKUP_MAX_DEFAULT = 3
+
+
+def get_autosave_backup_enabled() -> bool:
+    """Autosave legt vor Überschreiben eine .ildbak-Kopie an — 0.9.9."""
+    return bool(load_settings().get("autosave_backup_enabled", False))
+
+
+def set_autosave_backup_enabled(enabled: bool) -> None:
+    save_settings({"autosave_backup_enabled": bool(enabled)})
+
+
+def get_autosave_backup_max() -> int:
+    """Max. Anzahl rotierender .ildbak-Backups (1–10) — 0.9.9."""
+    try:
+        v = int(load_settings().get("autosave_backup_max", AUTOSAVE_BACKUP_MAX_DEFAULT))
+    except (TypeError, ValueError):
+        v = AUTOSAVE_BACKUP_MAX_DEFAULT
+    return max(AUTOSAVE_BACKUP_MAX_MIN, min(AUTOSAVE_BACKUP_MAX_MAX, v))
+
+
+def set_autosave_backup_max(count: int) -> int:
+    try:
+        v = int(count)
+    except (TypeError, ValueError):
+        v = AUTOSAVE_BACKUP_MAX_DEFAULT
+    v = max(AUTOSAVE_BACKUP_MAX_MIN, min(AUTOSAVE_BACKUP_MAX_MAX, v))
+    save_settings({"autosave_backup_max": v})
+    return v
 
 
 def get_ann_highlight_color() -> str:
@@ -738,6 +774,25 @@ def set_ann_default_stroke_width(width: float) -> None:
     except (TypeError, ValueError):
         v = 2.0
     save_settings({"ann_default_stroke_width": max(1.0, min(12.0, v))})
+
+
+def get_ann_default_fill_color() -> str:
+    """Standard-Füllfarbe für neue Shapes (#RRGGBB) — 0.9.9."""
+    fallback = str(DEFAULTS.get("ann_default_fill_color") or "#FFE066")
+    c = str(load_settings().get("ann_default_fill_color") or fallback).strip()
+    if not c.startswith("#"):
+        c = "#" + c if c else fallback
+    return c.upper() if len(c) >= 4 else fallback.upper()
+
+
+def set_ann_default_fill_color(color: str) -> str:
+    fallback = str(DEFAULTS.get("ann_default_fill_color") or "#FFE066")
+    c = (color or "").strip() or fallback
+    if not c.startswith("#"):
+        c = "#" + c
+    c = c.upper()
+    save_settings({"ann_default_fill_color": c})
+    return c
 
 
 RECENT_DIRS_MAX = 8

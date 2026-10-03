@@ -51,6 +51,9 @@ class SessionState:
     # Letzte Ann.-Standard-Opacity / Stroke-Width (0 = nicht gesetzt) — 0.9.8
     ann_opacity: float = 0.0
     ann_stroke_width: float = 0.0
+    # Letzte Ann.-Standard Fill-/Stroke-Farbe ("" = nicht gesetzt) — 0.9.9
+    ann_fill_color: str = ""
+    ann_stroke_color: str = ""
 
 
 def session_path() -> Path:
@@ -143,6 +146,26 @@ def _normalize_ann_stroke_width(raw) -> float:
     if v <= 0:
         return 0.0
     return max(1.0, min(12.0, v))
+
+
+def _normalize_ann_color(raw) -> str:
+    """Session-Farbe #RRGGBB; leer/ungültig = nicht gesetzt — 0.9.9."""
+    c = str(raw or "").strip()
+    if not c:
+        return ""
+    if not c.startswith("#"):
+        c = "#" + c
+    if len(c) < 4:
+        return ""
+    # Kurzform #RGB → #RRGGBB
+    if len(c) == 4:
+        c = "#" + "".join(ch * 2 for ch in c[1:])
+    if len(c) < 7:
+        return ""
+    hexpart = c[1:7]
+    if any(ch not in "0123456789abcdefABCDEF" for ch in hexpart):
+        return ""
+    return ("#" + hexpart).upper()
 
 
 def _normalize_panel_flag(raw, default: bool = True) -> bool:
@@ -254,6 +277,12 @@ def load_session() -> SessionState:
     ann_stroke_width = _normalize_ann_stroke_width(
         raw.get("ann_stroke_width", raw.get("annotation_stroke_width"))
     )
+    ann_fill_color = _normalize_ann_color(
+        raw.get("ann_fill_color", raw.get("annotation_fill_color"))
+    )
+    ann_stroke_color = _normalize_ann_color(
+        raw.get("ann_stroke_color", raw.get("annotation_stroke_color"))
+    )
     return SessionState(
         tabs=tabs,
         active=active,
@@ -272,6 +301,8 @@ def load_session() -> SessionState:
         ann_tool=ann_tool,
         ann_opacity=ann_opacity,
         ann_stroke_width=ann_stroke_width,
+        ann_fill_color=ann_fill_color,
+        ann_stroke_color=ann_stroke_color,
     )
 
 
@@ -314,6 +345,10 @@ def save_session(state: SessionState) -> None:
         "ann_stroke_width": _normalize_ann_stroke_width(
             getattr(state, "ann_stroke_width", 0.0)
         ),
+        "ann_fill_color": _normalize_ann_color(getattr(state, "ann_fill_color", "")),
+        "ann_stroke_color": _normalize_ann_color(
+            getattr(state, "ann_stroke_color", "")
+        ),
     }
     path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
 
@@ -348,6 +383,8 @@ def build_session(
     ann_tool: Optional[str] = None,
     ann_opacity: Optional[float] = None,
     ann_stroke_width: Optional[float] = None,
+    ann_fill_color: Optional[str] = None,
+    ann_stroke_color: Optional[str] = None,
 ) -> SessionState:
     """
     tab_states: optional {path: {page, scale, scroll_y}} für Last-Page/Zoom/Scroll je Tab (0.9.1/0.9.2).
@@ -358,6 +395,7 @@ def build_session(
     search / search_*: PDF-Suche Aa/Wort/Regex (0.9.6).
     ann_tool: zuletzt genutztes Ann.-Werkzeug (AnnotationType.value / "" = Auswahl) — 0.9.7.
     ann_opacity / ann_stroke_width: letzte Ann.-Standards (0 = nicht gesetzt) — 0.9.8.
+    ann_fill_color / ann_stroke_color: letzte Ann.-Farb-Defaults ("" = nicht gesetzt) — 0.9.9.
     """
     tabs: List[SessionTab] = []
     seen: set[str] = set()
@@ -483,4 +521,6 @@ def build_session(
         ann_tool=_normalize_ann_tool(ann_tool),
         ann_opacity=_normalize_ann_opacity(ann_opacity),
         ann_stroke_width=_normalize_ann_stroke_width(ann_stroke_width),
+        ann_fill_color=_normalize_ann_color(ann_fill_color),
+        ann_stroke_color=_normalize_ann_color(ann_stroke_color),
     )

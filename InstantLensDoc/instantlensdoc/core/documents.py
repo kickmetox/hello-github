@@ -256,6 +256,58 @@ def backup_existing(path: Path) -> Path | None:
     return bak
 
 
+def backup_ildbak(path: Path, max_backups: int = 3) -> Path | None:
+    """
+    Autosave-Backup als path.ext.ildbak mit Rotation (max. 1–10) — 0.9.9.
+
+    Neueste Kopie: ``dateiname.ext.ildbak``;
+    ältere: ``dateiname.ext.1.ildbak`` … ``dateiname.ext.(n-1).ildbak``.
+    """
+    path = Path(path)
+    if not path.is_file():
+        return None
+    try:
+        n = int(max_backups)
+    except (TypeError, ValueError):
+        n = 3
+    n = max(1, min(10, n))
+    base = str(path)
+    newest = Path(base + ".ildbak")
+    if n == 1:
+        shutil.copy2(path, newest)
+        return newest
+    oldest = Path(f"{base}.{n - 1}.ildbak")
+    if oldest.is_file():
+        try:
+            oldest.unlink()
+        except OSError:
+            pass
+    for i in range(n - 2, 0, -1):
+        src = Path(f"{base}.{i}.ildbak")
+        dst = Path(f"{base}.{i + 1}.ildbak")
+        if src.is_file():
+            try:
+                src.replace(dst)
+            except OSError:
+                try:
+                    shutil.copy2(src, dst)
+                    src.unlink()
+                except OSError:
+                    pass
+    if newest.is_file():
+        slot1 = Path(f"{base}.1.ildbak")
+        try:
+            newest.replace(slot1)
+        except OSError:
+            try:
+                shutil.copy2(newest, slot1)
+                newest.unlink()
+            except OSError:
+                pass
+    shutil.copy2(path, newest)
+    return newest
+
+
 def save_document(
     doc: Document,
     path: Optional[Path] = None,

@@ -26,6 +26,7 @@ from instantlensdoc.config import DISPLAY_NAME, icon_paths_for_qt
 from instantlensdoc.core.documents import (
     DocKind,
     Document,
+    backup_ildbak,
     open_document,
     render_doc_template,
     save_document,
@@ -34,6 +35,7 @@ from instantlensdoc.core import ocr as ocr_mod
 from instantlensdoc.core.layout import LayoutDocument
 from instantlensdoc.core import recent as recent_mod
 from instantlensdoc.core import recent_searches as recent_searches_mod
+from instantlensdoc.core import recent_tags as recent_tags_mod
 from instantlensdoc.license import LicenseManager
 from instantlensdoc.ui.editor import EditorPane
 from instantlensdoc.ui.form_builder import FormBuilderDialog
@@ -483,6 +485,8 @@ class MainWindow(QMainWindow):
             ann_tool = ""
         ann_opacity = 0.0
         ann_stroke_width = 0.0
+        ann_fill_color = ""
+        ann_stroke_color = ""
         try:
             ann_opacity = float(getattr(self.pdf_view, "_default_opacity", 0.0) or 0.0)
         except Exception:
@@ -493,6 +497,16 @@ class MainWindow(QMainWindow):
             )
         except Exception:
             ann_stroke_width = 0.0
+        try:
+            ann_fill_color = str(
+                getattr(self.pdf_view, "_default_fill_color", "") or ""
+            ).strip()
+        except Exception:
+            ann_fill_color = ""
+        try:
+            ann_stroke_color = str(getattr(self.pdf_view, "_pen_color", "") or "").strip()
+        except Exception:
+            ann_stroke_color = ""
         state = session_mod.build_session(
             paths,
             active_path=active,
@@ -512,6 +526,8 @@ class MainWindow(QMainWindow):
             ann_tool=ann_tool,
             ann_opacity=ann_opacity,
             ann_stroke_width=ann_stroke_width,
+            ann_fill_color=ann_fill_color or None,
+            ann_stroke_color=ann_stroke_color or None,
         )
         session_mod.save_session(state)
 
@@ -655,6 +671,33 @@ class MainWindow(QMainWindow):
                 self.pdf_view._default_stroke_width = max(1.0, min(12.0, sw))
                 if hasattr(self.pdf_view, "_sync_stroke_controls"):
                     self.pdf_view._sync_stroke_controls(self.pdf_view._default_stroke_width)
+        except Exception:
+            pass
+        # Letzte Ann.-Fill-/Stroke-Farbe (0.9.9)
+        try:
+            fc = str(getattr(state, "ann_fill_color", "") or "").strip()
+            if fc and hasattr(self.pdf_view, "restore_default_fill_color"):
+                self.pdf_view.restore_default_fill_color(fc)
+            elif fc:
+                from instantlensdoc.core.app_settings import set_ann_default_fill_color
+
+                set_ann_default_fill_color(fc)
+                self.pdf_view._default_fill_color = fc
+        except Exception:
+            pass
+        try:
+            sc = str(getattr(state, "ann_stroke_color", "") or "").strip()
+            if sc and hasattr(self.pdf_view, "restore_default_stroke_color"):
+                self.pdf_view.restore_default_stroke_color(sc)
+            elif sc:
+                from instantlensdoc.core.app_settings import set_ann_pen_color
+
+                set_ann_pen_color(sc)
+                self.pdf_view._pen_color = sc
+                if hasattr(self.pdf_view, "_style_color_btn") and hasattr(
+                    self.pdf_view, "btn_pen_color"
+                ):
+                    self.pdf_view._style_color_btn(self.pdf_view.btn_pen_color, sc)
         except Exception:
             pass
         self._set_status(f"Session wiederhergestellt ({len(state.tabs)} Tab(s))")
@@ -4025,6 +4068,23 @@ class MainWindow(QMainWindow):
 
         _tick()
 
+    def _autosave_maybe_backup(self, path) -> None:
+        """Optionale .ildbak-Kopie vor Autosave-Überschreiben — 0.9.9."""
+        try:
+            from instantlensdoc.core.app_settings import (
+                get_autosave_backup_enabled,
+                get_autosave_backup_max,
+            )
+
+            if not get_autosave_backup_enabled():
+                return
+            p = Path(path) if path else None
+            if p is None or not p.is_file():
+                return
+            backup_ildbak(p, max_backups=get_autosave_backup_max())
+        except Exception:
+            pass
+
     def _autosave_tick(self):
         if not self._autosave_enabled:
             return
@@ -4042,6 +4102,13 @@ class MainWindow(QMainWindow):
                 or getattr(self.pdf_view, "_sidecar_save_pending", False)
             ):
                 try:
+                    # Sidecar vor Autosave sichern
+                    try:
+                        side = getattr(self.pdf_view.store, "sidecar_path", None)
+                        if side is not None:
+                            self._autosave_maybe_backup(side)
+                    except Exception:
+                        pass
                     self.pdf_view.schedule_sidecar_save(force=True)
                     if self.doc.path:
                         self._mark_unsaved(self.doc.path, False)
@@ -4054,6 +4121,7 @@ class MainWindow(QMainWindow):
         self._sync_editor_text_before_save()
         self.doc.text = self.editor.toPlainText()
         try:
+            self._autosave_maybe_backup(self.doc.path)
             save_document(self.doc)
             self.doc.dirty = False
             if self.doc.path:
@@ -4539,7 +4607,7 @@ class MainWindow(QMainWindow):
         self._on_search_annotate_hits(False)
 
     def _on_search_annotate_hits(self, all_pages: bool = False):
-        """Suchtreffer als Highlight-Annotationen (Seite oder alle, ein Undo) — 0.9.6/0.9.7/0.9.8."""
+        """Suchtreffer als Highlight-Annotationen (Seite oder alle, ein Undo) — 0.9.6–0.9.9."""
         from PySide6.QtWidgets import QInputDialog
 
         if not self.pdf_view.pdf_path or not self.pdf_view.store:
@@ -4554,11 +4622,16 @@ class MainWindow(QMainWindow):
         if not query.strip():
             self._set_status("Leere Suche — kein Highlight-Batch")
             return
-        # Optionaler Tag für neue Highlights — 0.9.8
-        tag_text, tag_ok = QInputDialog.getText(
+        # Optionaler Tag: Combobox mit zuletzt genutzten Tags — 0.9.8/0.9.9
+        recent = recent_tags_mod.load_recent_tags()
+        items = [""] + list(recent)
+        tag_text, tag_ok = QInputDialog.getItem(
             self,
             "Highlight-Tag",
             "Optionaler Tag für neue Highlights (leer = ohne Tag):",
+            items,
+            0,
+            True,
         )
         if not tag_ok:
             self._set_status("Highlight-Batch abgebrochen")
@@ -4587,6 +4660,11 @@ class MainWindow(QMainWindow):
                 else "Keine Treffer auf der aktuellen Seite"
             )
             return
+        if tag:
+            try:
+                recent_tags_mod.add_recent_tag(tag)
+            except Exception:
+                pass
         if self.doc and self.doc.path:
             self._mark_unsaved(self.doc.path, True)
         self._refresh_pdf_marks()

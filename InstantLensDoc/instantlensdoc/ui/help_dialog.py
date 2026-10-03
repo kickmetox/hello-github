@@ -36,7 +36,8 @@ HELP_HTML = f"""
     optional <b>Bracket-Match Highlight</b>,
     optional <b>Bracket-Auto-Close</b>,
     optional <b>Minimieren in System-Tray</b>,
-    optional <b>Backup .bak beim Speichern</b>, <b>Seitengröße-Einheit mm/inch</b>,
+    optional <b>Backup .bak beim Speichern</b>, optional <b>Autosave-Backup .ildbak</b> (max. 1–10),
+    <b>Seitengröße-Einheit mm/inch</b>,
     optional <b>Fenstergeometrie</b> und <b>offene Tabs</b> beim Start (getrennte Toggles),
     <b>PDF-Toolbar-Gruppen</b> ein-/ausblenden,
     optional <b>PDF Zwei-Seiten-Ansicht (Spread)</b>, optional <b>PDF Continuous Scroll</b>,
@@ -89,6 +90,7 @@ HELP_HTML = f"""
 <li><b>Datei → Öffnen/Speichern mit Encoding</b>: UTF-8, Latin-1 oder <b>Automatisch</b> (BOM / optional chardet)</li>
 <li><b>Drag &amp; Drop</b>: eine oder mehrere Dateien auf das Fenster ziehen → mehrere Tabs</li>
 <li><b>Autosave</b>: Textdokumente (mit Pfad) und PDF-Annotationen — Intervall 15/30/60/120 s; Status „Gespeichert HH:MM:SS“;
+    optional <b>.ildbak</b> vor Überschreiben (max. 1–10);
     Pause bei Modal-Dialogen; Ctrl+S bleibt; kurzer Status-Blink bei Fehler</li>
 <li><b>PDF</b>: Blättern, Zoom/Fit (debounced + Cache), <b>⟲/⟳ drehen</b> / <b>↔/↕ spiegeln</b> (speichert),
     <b>Graustufen</b> (Ansicht + Bild-Export), <b>Nachtmodus</b> (nur Ansicht, nicht speichern),

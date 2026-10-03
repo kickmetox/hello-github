@@ -76,6 +76,7 @@ from instantlensdoc.core.app_settings import (
     cycle_ann_palette_color,
     get_ann_color_presets,
     reset_ann_color_preset,
+    get_ann_default_fill_color,
     get_ann_default_opacity,
     get_ann_highlight_color,
     get_ann_note_color,
@@ -99,6 +100,7 @@ from instantlensdoc.core.app_settings import (
     get_show_printer_marks,
     random_ann_palette_color,
     set_ann_color_preset,
+    set_ann_default_fill_color,
     set_ann_default_opacity,
     set_ann_highlight_color,
     set_ann_note_color,
@@ -1154,6 +1156,10 @@ class PdfViewer(QWidget):
             self._default_stroke_width = float(get_ann_default_stroke_width())
         except Exception:
             self._default_stroke_width = 2.0
+        try:
+            self._default_fill_color = get_ann_default_fill_color()
+        except Exception:
+            self._default_fill_color = "#FFE066"
         self._suppress_default_zoom = False  # Session Zoom pro Tab (0.9.2)
         self._search_case_sensitive = False
         self._search_whole_word = False
@@ -1865,6 +1871,11 @@ class PdfViewer(QWidget):
         if n <= 0:
             self.status.emit("Füllfarbe nicht geändert")
             return 0
+        self._default_fill_color = c
+        try:
+            set_ann_default_fill_color(c)
+        except Exception:
+            pass
         try:
             self.schedule_sidecar_save(force=True)
         except Exception as e:
@@ -2742,6 +2753,10 @@ class PdfViewer(QWidget):
         self._highlight_color = get_ann_highlight_color()
         self._pen_color = get_ann_pen_color()
         self._note_color = get_ann_note_color()
+        try:
+            self._default_fill_color = get_ann_default_fill_color()
+        except Exception:
+            self._default_fill_color = getattr(self, "_default_fill_color", "#FFE066")
         self._style_color_btn(self.btn_hl_color, self._highlight_color)
         self._style_color_btn(self.btn_pen_color, self._pen_color)
         if hasattr(self, "btn_note_color"):
@@ -2933,6 +2948,42 @@ class PdfViewer(QWidget):
         except Exception:
             pass
         self._sync_stroke_controls(w)
+
+    def restore_default_fill_color(self, color: str) -> None:
+        """Standard-Füllfarbe aus Session wiederherstellen — 0.9.9."""
+        c = str(color or "").strip()
+        if not c:
+            return
+        if not c.startswith("#"):
+            c = "#" + c
+        c = c.upper()
+        if len(c) < 4:
+            return
+        self._default_fill_color = c
+        try:
+            set_ann_default_fill_color(c)
+        except Exception:
+            pass
+
+    def restore_default_stroke_color(self, color: str) -> None:
+        """Standard-Strichfarbe (Stift) aus Session wiederherstellen — 0.9.9."""
+        c = str(color or "").strip()
+        if not c:
+            return
+        if not c.startswith("#"):
+            c = "#" + c
+        c = c.upper()
+        if len(c) < 4:
+            return
+        self._pen_color = c
+        try:
+            set_ann_pen_color(c)
+        except Exception:
+            pass
+        try:
+            self._style_color_btn(self.btn_pen_color, c)
+        except Exception:
+            pass
 
     def _on_annotation_selected(self, ann_id: str):
         """Auswahl setzen; Gruppe → alle Mitglieder; Shift+Klick Mehrfachauswahl umschalten."""
@@ -4063,6 +4114,11 @@ class PdfViewer(QWidget):
         if n <= 0:
             self.status.emit("Füllfarbe nicht geändert")
             return 0
+        self._default_fill_color = color
+        try:
+            set_ann_default_fill_color(color)
+        except Exception:
+            pass
         try:
             self.schedule_sidecar_save(force=True)
         except Exception as e:
@@ -6813,6 +6869,7 @@ class PdfViewer(QWidget):
                 width=max(abs(x1 - x0), 8),
                 height=max(abs(y1 - y0), 8),
                 color=self._pen_color,
+                fill_color=str(getattr(self, "_default_fill_color", "") or "").strip(),
             )
         elif self.tool in (AnnotationType.LINE, AnnotationType.ARROW, AnnotationType.MEASURE):
             ann = Annotation(
@@ -6941,6 +6998,16 @@ class PdfViewer(QWidget):
             )
         except (TypeError, ValueError):
             ann.stroke_width = 2.0
+        # Fill-Default für Shapes ohne explizite Füllung — 0.9.9
+        try:
+            if ann.type == AnnotationType.RECTANGLE and not str(
+                getattr(ann, "fill_color", "") or ""
+            ).strip():
+                fc = str(getattr(self, "_default_fill_color", "") or "").strip()
+                if fc:
+                    ann.fill_color = fc
+        except Exception:
+            pass
         self.store.add(ann)
         try:
             self.schedule_sidecar_save()

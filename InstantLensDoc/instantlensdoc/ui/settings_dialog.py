@@ -31,9 +31,13 @@ from instantlensdoc.core.app_settings import (
     export_ann_color_presets_json,
     factory_ann_color_presets,
     get_ann_color_presets,
+    get_autosave_backup_enabled,
+    get_autosave_backup_max,
     get_autosave_enabled,
     get_autosave_interval_sec,
     import_ann_color_presets_json,
+    AUTOSAVE_BACKUP_MAX_MAX,
+    AUTOSAVE_BACKUP_MAX_MIN,
     get_backup_on_save,
     get_batch_output_dir,
     get_default_open_dir,
@@ -105,6 +109,8 @@ from instantlensdoc.core.app_settings import (
     set_recent_files_max,
     set_wizard_completed,
     set_wizard_skip_once,
+    set_autosave_backup_enabled,
+    set_autosave_backup_max,
     set_autosave_enabled,
     set_autosave_interval_sec,
     set_backup_on_save,
@@ -262,9 +268,27 @@ class SettingsDialog(QDialog):
         self.autosave_enabled.toggled.connect(self.autosave_sec.setEnabled)
         form.addRow(tr("autosave_interval"), self.autosave_sec)
 
+        self.autosave_backup = QCheckBox("Autosave-Backup (.ildbak) vor Überschreiben")
+        self.autosave_backup.setChecked(get_autosave_backup_enabled())
+        self.autosave_backup.setToolTip(
+            "Vor Autosave eine rotierende Backup-Kopie dateiname.ext.ildbak anlegen — 0.9.9"
+        )
+        form.addRow(self.autosave_backup)
+
+        self.autosave_backup_max = QSpinBox()
+        self.autosave_backup_max.setRange(AUTOSAVE_BACKUP_MAX_MIN, AUTOSAVE_BACKUP_MAX_MAX)
+        self.autosave_backup_max.setValue(get_autosave_backup_max())
+        self.autosave_backup_max.setToolTip(
+            "Max. Anzahl .ildbak-Backups (1–10, Rotation) — 0.9.9"
+        )
+        self.autosave_backup_max.setEnabled(self.autosave_backup.isChecked())
+        self.autosave_backup.toggled.connect(self.autosave_backup_max.setEnabled)
+        form.addRow("Autosave-Backups max.", self.autosave_backup_max)
+
         # Color-Presets (User) — speichern/zurücksetzen auch per Rechtsklick in PDF-Toolbar
         preset_row = QHBoxLayout()
         self._preset_edits: list[QLineEdit] = []
+        self._preset_undo: list[str] | None = None
         presets = get_ann_color_presets()
         for i in range(ANN_COLOR_PRESET_COUNT):
             ed = QLineEdit(presets[i] if i < len(presets) else "#888888")
@@ -281,10 +305,17 @@ class SettingsDialog(QDialog):
         preset_row.addWidget(btn_reset_presets)
         btn_factory_presets = QPushButton("Werksstandard")
         btn_factory_presets.setToolTip(
-            "Factory-Defaults in die Felder laden (nach OK speichern) — 0.9.8"
+            "Factory-Defaults in die Felder laden (Bestätigung; Undo möglich) — 0.9.9"
         )
         btn_factory_presets.clicked.connect(self._load_factory_color_presets_ui)
         preset_row.addWidget(btn_factory_presets)
+        self.btn_undo_factory_presets = QPushButton("Rückgängig")
+        self.btn_undo_factory_presets.setToolTip(
+            "Letzte Factory-Preset-Änderung in den Feldern rückgängig — 0.9.9"
+        )
+        self.btn_undo_factory_presets.setEnabled(False)
+        self.btn_undo_factory_presets.clicked.connect(self._undo_factory_color_presets_ui)
+        preset_row.addWidget(self.btn_undo_factory_presets)
         btn_export_presets = QPushButton("Export…")
         btn_export_presets.setToolTip(
             f"Color-Presets als JSON exportieren ({ANN_COLORS_SCHEMA_ID}) — 0.9.7"
@@ -826,9 +857,33 @@ class SettingsDialog(QDialog):
         self._sync_preset_edits(presets)
 
     def _load_factory_color_presets_ui(self) -> None:
-        """Factory-Defaults nur in die Dialogfelder laden (nach OK speichern) — 0.9.8."""
+        """Factory-Defaults in Felder laden (Bestätigung + Undo) — 0.9.8/0.9.9."""
+        reply = QMessageBox.question(
+            self,
+            "Werksstandard",
+            "Factory-Defaults in die Color-Preset-Felder laden?\n"
+            "(Wird nach OK gespeichert; Rückgängig möglich.)",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
+        )
+        if reply != QMessageBox.Yes:
+            return
+        prev = [ed.text().strip() for ed in (getattr(self, "_preset_edits", []) or [])]
         presets = factory_ann_color_presets()
         self._sync_preset_edits(presets)
+        self._preset_undo = prev
+        if hasattr(self, "btn_undo_factory_presets"):
+            self.btn_undo_factory_presets.setEnabled(bool(prev))
+
+    def _undo_factory_color_presets_ui(self) -> None:
+        """Letzte Factory-Änderung in den Preset-Feldern rückgängig — 0.9.9."""
+        prev = getattr(self, "_preset_undo", None)
+        if not prev:
+            return
+        self._sync_preset_edits(list(prev))
+        self._preset_undo = None
+        if hasattr(self, "btn_undo_factory_presets"):
+            self.btn_undo_factory_presets.setEnabled(False)
 
     def _sync_preset_edits(self, presets: list[str]) -> None:
         for i, ed in enumerate(getattr(self, "_preset_edits", []) or []):
@@ -997,8 +1052,13 @@ class SettingsDialog(QDialog):
         except (TypeError, ValueError):
             as_sec = 60
         set_autosave_interval_sec(as_sec)
+        set_autosave_backup_enabled(self.autosave_backup.isChecked())
+        set_autosave_backup_max(int(self.autosave_backup_max.value()))
         if getattr(self, "_preset_edits", None):
             set_ann_color_presets([ed.text().strip() for ed in self._preset_edits])
+        self._preset_undo = None
+        if hasattr(self, "btn_undo_factory_presets"):
+            self.btn_undo_factory_presets.setEnabled(False)
         set_editor_line_numbers(self.line_numbers.isChecked())
         set_editor_minimap(self.minimap.isChecked())
         set_editor_soft_wrap(self.soft_wrap.isChecked())
