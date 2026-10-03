@@ -102,6 +102,7 @@ from instantlensdoc.ui.theme import (
     load_theme_mode,
     resolve_theme,
     set_follow_system,
+    theme_status_text,
     toggle_theme,
 )
 from instantlensdoc.ui.keyboard_help import KeyboardHelpDialog
@@ -1053,6 +1054,16 @@ class MainWindow(QMainWindow):
         )
         self.ann_zero_status_label.setVisible(False)
         sb.addPermanentWidget(self.ann_zero_status_label)
+        # Theme folgen: Indicator System / Manuell dunkel/hell — 1.4.2
+        self.theme_status_label = QLabel(theme_status_text())
+        self.theme_status_label.setObjectName("themeStatus")
+        self.theme_status_label.setStyleSheet(
+            "QLabel#themeStatus { color: #666; padding-right: 8px; font-size: 11px; }"
+        )
+        self.theme_status_label.setToolTip(
+            "Theme: System folgen oder manuell Hell/Dunkel — 1.4.2"
+        )
+        sb.addPermanentWidget(self.theme_status_label)
         self.version_label = QLabel(f"v{__version__}")
         self.version_label.setStyleSheet("color: #666; padding-right: 8px;")
         sb.addPermanentWidget(self.version_label)
@@ -4603,9 +4614,28 @@ class MainWindow(QMainWindow):
                 self._theme_action.setText(
                     "Helles Design" if dark else "Dunkles Design"
                 )
+        self._refresh_theme_status_label(pref)
+
+    def _refresh_theme_status_label(self, pref: str | None = None) -> None:
+        """Statusleisten-Indicator Theme: System / Manuell dunkel/hell — 1.4.2."""
+        lbl = getattr(self, "theme_status_label", None)
+        if lbl is None:
+            return
+        mode = pref if pref in ("system", "dark", "light") else load_theme_mode()
+        text = theme_status_text(mode)  # type: ignore[arg-type]
+        resolved = resolve_theme(mode)  # type: ignore[arg-type]
+        if mode == "system":
+            tip = (
+                f"Theme: System folgen "
+                f"(aktuell {'dunkel' if resolved == 'dark' else 'hell'}) — 1.4.2"
+            )
+        else:
+            tip = f"{text} (Override) — 1.4.2"
+        lbl.setText(text)
+        lbl.setToolTip(tip)
 
     def _toggle_follow_system(self, checked: bool = False):
-        """System-Theme folgen Toggle — 1.4.0/1.4.1 live."""
+        """System-Theme folgen Toggle — 1.4.0/1.4.2 Status-Indicator."""
         follow = bool(checked) if isinstance(checked, bool) else (
             self._theme_system_action.isChecked()
             if getattr(self, "_theme_system_action", None)
@@ -4614,9 +4644,9 @@ class MainWindow(QMainWindow):
         resolved = set_follow_system(follow)
         self._sync_theme_menu()
         self._set_status(
-            "Theme: System folgen (live)" if follow else (
-                "Dunkles Design" if resolved == "dark" else "Helles Design"
-            )
+            theme_status_text("system" if follow else (
+                "dark" if resolved == "dark" else "light"
+            ))
         )
         try:
             self._save_session()
@@ -4624,17 +4654,17 @@ class MainWindow(QMainWindow):
             pass
 
     def _on_system_theme_live(self, resolved: str = "") -> None:
-        """Callback: OS-Theme gewechselt bei aktivem „folgen“ — 1.4.1."""
+        """Callback: OS-Theme gewechselt bei aktivem „folgen“ — 1.4.1/1.4.2."""
         self._sync_theme_menu()
         mode = resolved or resolve_theme()
         self._set_status(
-            f"Theme: System → {'Dunkel' if mode == 'dark' else 'Hell'} (live) — 1.4.1"
+            f"Theme: System → {'Dunkel' if mode == 'dark' else 'Hell'} (live) — 1.4.2"
         )
 
     def _toggle_theme(self):
         mode = toggle_theme(self)
         self._sync_theme_menu()
-        self._set_status("Dunkles Design" if mode == "dark" else "Helles Design")
+        self._set_status(theme_status_text("dark" if mode == "dark" else "light"))
         # Theme in Session merken (0.9.4)
         try:
             self._save_session()

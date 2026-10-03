@@ -99,10 +99,10 @@ SHORTCUTS_HTML = """
 <tr><td>Ann. Export JSON/Flatten</td><td>PDF → Annotationen exportieren (JSON / Flatten)…: Quick-Insert {stem}/{page}/{date}; Ctrl+Z lokal; Reset-Template → Live-Vorschau + Fokus mit Selektion ganzer Default-Text; Bestätigung nur bei Abweichung — 1.2.9</td></tr>
 <tr><td>Text-Diff Panel</td><td>Datei → Text-Diff (offene Tabs)… (Ctrl+Alt+D): Wrap-Blink Dauer kurz/mittel/lang + System-Beep vs. stumm; Status Änderung i/n; F7/Shift+F7 — 1.2.9</td></tr>
 <tr><td>run.bat Deps / pip</td><td>Windows-Start: gewählte Python-Binary als „gefunden: …“ inkl. python --version; %ILD_PYTHON% ungültig/leer → Fallback py -3 → python → python3; --help; .venv; --yes/-y; Exit 0/1 — 1.2.9</td></tr>
-<tr><td>PDF-Vergleich Diff</td><td>Sync/Entkoppelt, Diff-Schwelle Settings, Diff PNG-Export — 1.4.1</td></tr>
-<tr><td>Batch-Umbenennen</td><td>Dry-Run-Liste, Kollisionswarnung, Undo-Log alter Namen — 1.4.1</td></tr>
-<tr><td>Annotation-Suche offen</td><td>Ctrl+Shift+F3: Treffer klickbar (Doc+Seite); Case/Regex — 1.4.1</td></tr>
-<tr><td>Theme System</td><td>System folgen live bei OS-Wechsel + Override — 1.4.1</td></tr>
+<tr><td>PDF-Vergleich Diff</td><td>Diff-PNG Zielordner merken; Template {stemA}_vs_{stemB}_p{page}.png — 1.4.2</td></tr>
+<tr><td>Batch-Umbenennen</td><td>Undo-Log TXT; Rückgängig letzte Batch — 1.4.2</td></tr>
+<tr><td>Annotation-Suche offen</td><td>Ctrl+Shift+F3: Regex-Fehler wie PDF-Suche; Treffer-CSV — 1.4.2</td></tr>
+<tr><td>Theme System</td><td>Statusleiste Indicator System/Manuell dunkel/hell — 1.4.2</td></tr>
 <tr><td>AcroForm-Sidebar</td><td>CSV Esc ohne Export; Enter auf OK; Zähler N von M; Default persistiert — 1.3.6</td></tr>
 <tr><td>Redactions anwenden</td><td>Status „Sidecar übersprungen“; Fortsetzen-Option Settings merken — 1.3.6</td></tr>
 <tr><td>Bookmarks ↔ Outlines</td><td>Fehlerdialog Retry-Zähler „Versuch k/3“; max. 3 wie Backup — 1.3.6</td></tr>
@@ -309,10 +309,10 @@ About: Datenschutz-Hinweis (lokal, keine Telemetrie).</p>
 <p><b>Seiten als Bilder:</b> PDF → Seite/Seiten als PNG/JPEG exportieren (aktuell oder alle; DPI 72/150/300).</p>
 <p><b>Thumbnails:</b> in der Sidebar ziehen zum Neuordnen der Seiten (Ctrl+Z rückgängig); Größe in Einstellungen (klein/normal/groß).</p>
 <p><b>Statusleiste:</b> Dateiname · Seite x/y · Seitengröße (mm/inch, klickbar) · Zoom % · Wörter/Ann. · Version · Lizenz.</p>
-<p><b>PDF-Vergleich:</b> Sync/Entkoppelt, Diff-Schwelle, PNG-Export — 1.4.1</p>
-<p><b>Batch-Umbenennen:</b> Dry-Run, Kollision, Undo-Log — 1.4.1</p>
-<p><b>Annotation-Suche:</b> klickbare Treffer Doc+Seite; Case/Regex — 1.4.1</p>
-<p><b>Theme:</b> System folgen live bei OS-Wechsel — 1.4.1</p>
+<p><b>PDF-Vergleich:</b> Diff-PNG Zielordner + Template {stemA}_vs_{stemB}_p{page}.png — 1.4.2</p>
+<p><b>Batch-Umbenennen:</b> Undo-Log TXT; Rückgängig letzte Batch — 1.4.2</p>
+<p><b>Annotation-Suche:</b> Regex-Fehler wie PDF-Suche; Treffer-CSV — 1.4.2</p>
+<p><b>Theme:</b> Statusleiste System / Manuell dunkel / Manuell hell — 1.4.2</p>
 <p><b>Schwärzung / Redactions:</b> Rechteck ziehen → Sidecar; Status „Sidecar übersprungen“;
 Fortsetzen-Option in Settings merken — 1.3.6</p>
 <p><b>AcroForm:</b> CSV Esc ohne Export; Enter auf OK; Zähler N von M — 1.3.6</p>

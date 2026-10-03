@@ -1,4 +1,4 @@
-"""Hell/Dunkel/System-Theme für die Qt-Oberfläche — 1.4.1 live OS-Wechsel."""
+"""Hell/Dunkel/System-Theme für die Qt-Oberfläche — 1.4.2 Status-Indicator."""
 
 from __future__ import annotations
 
@@ -84,6 +84,18 @@ def load_theme_mode() -> ThemeMode:
 
 def save_theme_mode(mode: ThemeMode) -> None:
     set_theme(mode)
+
+
+def theme_status_text(mode: ThemeMode | None = None) -> str:
+    """
+    Statusleisten-Indicator: System / Manuell dunkel / Manuell hell — 1.4.2.
+    """
+    pref = mode if mode is not None else load_theme_mode()
+    if pref == "system":
+        return "Theme: System"
+    if pref == "dark":
+        return "Theme: Manuell dunkel"
+    return "Theme: Manuell hell"
 
 
 def resolve_theme(mode: ThemeMode | None = None) -> ResolvedTheme:

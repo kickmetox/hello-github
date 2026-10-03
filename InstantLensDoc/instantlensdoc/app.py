@@ -98,7 +98,7 @@ def main(argv: list[str] | None = None) -> int:
 
     app = QApplication(argv)
     apply_theme(app)
-    # OS-Theme-Wechsel live nachziehen wenn „System folgen“ — 1.4.1
+    # OS-Theme-Wechsel live nachziehen wenn „System folgen“ — 1.4.2
     install_system_theme_watch()
     app.setApplicationName(DISPLAY_NAME)
     app.setApplicationVersion(__version__)

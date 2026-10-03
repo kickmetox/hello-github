@@ -1,4 +1,4 @@
-"""Zwei PDFs Seite-nebeneinander vergleichen + Raster-Diff Overlay — 1.4.1."""
+"""Zwei PDFs Seite-nebeneinander vergleichen + Raster-Diff Overlay — 1.4.2."""
 
 from __future__ import annotations
 
@@ -26,11 +26,25 @@ from ild_pdf.render import render_page
 from instantlensdoc.core.app_settings import (
     PDF_COMPARE_DIFF_THRESHOLD_MAX,
     PDF_COMPARE_DIFF_THRESHOLD_MIN,
+    dialog_start_dir,
+    get_last_pdf_diff_png_dir,
     get_pdf_compare_diff_threshold,
     get_pdf_compare_page_sync,
+    set_last_pdf_diff_png_dir,
     set_pdf_compare_diff_threshold,
     set_pdf_compare_page_sync,
 )
+
+
+DIFF_PNG_FILENAME_TEMPLATE = "{stemA}_vs_{stemB}_p{page}.png"
+
+
+def format_diff_png_filename(stem_a: str, stem_b: str, page: int) -> str:
+    """Dateiname-Template ``{stemA}_vs_{stemB}_p{page}.png`` — 1.4.2."""
+    a = (stem_a or "a").strip() or "a"
+    b = (stem_b or "b").strip() or "b"
+    p = max(1, int(page))
+    return DIFF_PNG_FILENAME_TEMPLATE.format(stemA=a, stemB=b, page=p)
 
 
 def _pil_to_qpixmap(img) -> QPixmap:
@@ -109,7 +123,10 @@ class PdfCompareDialog(QDialog):
         )
         self.spin_threshold.valueChanged.connect(self._on_threshold_changed)
         btn_export = QPushButton("Diff PNG…")
-        btn_export.setToolTip("Aktuelles Diff-Overlay als PNG speichern — 1.4.1")
+        btn_export.setToolTip(
+            "Diff-Overlay als PNG: Zielordner merken; "
+            f"Template {DIFF_PNG_FILENAME_TEMPLATE} — 1.4.2"
+        )
         btn_export.clicked.connect(self._export_diff_png)
         self.btn_export_diff = btn_export
         btn_reload = QPushButton("Aktualisieren")
@@ -192,7 +209,7 @@ class PdfCompareDialog(QDialog):
         self._refresh()
 
     def _export_diff_png(self) -> None:
-        """Aktuelles Diff-Overlay als PNG speichern — 1.4.1."""
+        """Diff-PNG: Zielordner merken + Template {stemA}_vs_{stemB}_p{page}.png — 1.4.2."""
         if self._diff_overlay is None:
             QMessageBox.information(
                 self,
@@ -200,12 +217,15 @@ class PdfCompareDialog(QDialog):
                 "Kein Diff-Overlay vorhanden. Raster-Diff aktivieren und PDFs wählen.",
             )
             return
-        default = "pdf-diff.png"
-        if self._left and self._right:
-            default = (
-                f"{Path(self._left).stem}_vs_{Path(self._right).stem}"
-                f"_p{self.spin_left.value()}-{self.spin_right.value()}_diff.png"
-            )
+        # Sync: gemeinsame Seite; Entkoppelt: linke Seite als {page}
+        page = int(self.spin_left.value())
+        if self.chk_sync.isChecked():
+            page = int(self.spin_left.value())
+        stem_a = Path(self._left).stem if self._left else "a"
+        stem_b = Path(self._right).stem if self._right else "b"
+        fname = format_diff_png_filename(stem_a, stem_b, page)
+        start_dir = dialog_start_dir(get_last_pdf_diff_png_dir())
+        default = str(Path(start_dir) / fname)
         path, _ = QFileDialog.getSaveFileName(
             self, "Diff als PNG speichern", default, "PNG (*.png)"
         )
@@ -216,6 +236,7 @@ class PdfCompareDialog(QDialog):
             if out.suffix.lower() != ".png":
                 out = out.with_suffix(".png")
             self._diff_overlay.save(str(out), "PNG")
+            set_last_pdf_diff_png_dir(out.parent)
             QMessageBox.information(
                 self, "Diff PNG", f"Gespeichert:\n{out}"
             )

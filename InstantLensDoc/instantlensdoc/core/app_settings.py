@@ -39,6 +39,8 @@ DEFAULTS: dict[str, Any] = {
     "text_diff_wrap_blink_sound": True,  # Wrap-Blink System-Beep vs. stumm — 1.2.9
     "pdf_compare_diff_threshold": 18,  # Raster-Diff Pixel-Schwellwert 0–255 — 1.4.1
     "pdf_compare_page_sync": True,  # Seitenwahl Sync (True) / Entkoppelt (False) — 1.4.1
+    "last_pdf_diff_png_dir": "",  # letzter Zielordner Diff-PNG-Export — 1.4.2
+    "last_rename_undo_log": "",  # letzter Batch-Rename Undo-Log (TXT) — 1.4.2
     "default_zoom_percent": 150,
     "default_zoom_mode": "percent",  # percent | fit_width | fit_page
     "autosave_interval_sec": 60,  # 15 | 30 | 60 | 120 — 0.9.7
@@ -640,6 +642,37 @@ def get_pdf_compare_page_sync() -> bool:
 def set_pdf_compare_page_sync(enabled: bool) -> None:
     """Persistenz Seitenwahl Sync/Entkoppelt — 1.4.1."""
     save_settings({"pdf_compare_page_sync": bool(enabled)})
+
+
+def get_last_pdf_diff_png_dir() -> Path | None:
+    """Letzter Zielordner für Diff-PNG-Export — 1.4.2."""
+    raw = str(load_settings().get("last_pdf_diff_png_dir") or "").strip()
+    if not raw:
+        return None
+    p = Path(raw)
+    return p if p.is_dir() else None
+
+
+def set_last_pdf_diff_png_dir(path: str | Path) -> None:
+    """Zielordner Diff-PNG merken — 1.4.2."""
+    p = Path(path)
+    if p.is_file():
+        p = p.parent
+    save_settings({"last_pdf_diff_png_dir": str(p)})
+
+
+def get_last_rename_undo_log() -> Path | None:
+    """Pfad des letzten Batch-Rename Undo-Logs (TXT) — 1.4.2."""
+    raw = str(load_settings().get("last_rename_undo_log") or "").strip()
+    if not raw:
+        return None
+    p = Path(raw)
+    return p if p.is_file() else None
+
+
+def set_last_rename_undo_log(path: str | Path) -> None:
+    """Letztes Batch-Rename Undo-Log merken — 1.4.2."""
+    save_settings({"last_rename_undo_log": str(Path(path))})
 
 
 def get_ann_export_filename_template() -> str:

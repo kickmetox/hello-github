@@ -2,7 +2,7 @@
 
 Moderne Textverarbeitung mit PDF-Annotator, OCR-Bridge und Formulargenerator.
 
-**Version:** 1.4.1  
+**Version:** 1.4.2  
 **Hersteller:** Andreas Meyer · ame@sellerbach.de
 
 ## Quickstart (Windows)
@@ -33,8 +33,8 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an).
 
-## Neu in 1.4.1
+## Neu in 1.4.2
 
-PDF-Vergleich: Seitenwahl Sync/Entkoppelt, Diff-Schwelle in Settings, Diff-PNG-Export; Batch-Umbenennen mit Dry-Run-Liste, Kollisionswarnung und Undo-Log der alten Namen; Annotation-Suche mit klickbaren Treffern (Doc+Seite) sowie Case/Regex-Toggles; System-Theme folgt OS-Wechsel live. Stubs KI/Cloud/Stylus/3D unverändert.
+PDF-Vergleich Diff-PNG: Zielordner merken, Dateiname `{stemA}_vs_{stemB}_p{page}.png`; Batch-Umbenennen Undo-Log als TXT mit Button „Rückgängig letzte Batch“; Annotation-Suche Regex-Fehlerstatus wie PDF-Suche plus Treffer-CSV; Theme-Indicator in der Statusleiste (System / Manuell dunkel/hell). Stubs KI/Cloud/Stylus/3D unverändert.
 
 Siehe [CHANGELOG.md](CHANGELOG.md), [FEATURES.md](FEATURES.md) und [INFO.md](INFO.md).

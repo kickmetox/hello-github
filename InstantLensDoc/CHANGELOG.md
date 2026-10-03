@@ -1,5 +1,27 @@
 # Changelog — InstantLens Doc
 
+## 1.4.2 — PDF-Diff PNG Zielordner·Template, Rename Undo-TXT·Rückgängig, Ann. Regex-Fehler·CSV, Theme-Status
+
+Post-Release-Polish nach 1.4.1: **Diff-PNG** merkt **Zielordner** und nutzt Dateiname-Template **`{stemA}_vs_{stemB}_p{page}.png`**; **Batch-Umbenennen** speichert Undo-Log als **TXT** und bietet **„Rückgängig letzte Batch“**; **Annotation-Suche** zeigt bei ungültigem Regex denselben **Fehlerstatus wie PDF-Suche** (`Regex-Fehler: …`) und exportiert Treffer als **CSV**; **Theme folgen** mit Indicator in der **Statusleiste** (System / Manuell dunkel / Manuell hell). Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### PDF
+- Vergleich Diff-PNG: Zielordner merken; Template `{stemA}_vs_{stemB}_p{page}.png`
+
+### Dateien / Tabs
+- Batch-Umbenennen: Undo-Log als TXT; Button „Rückgängig letzte Batch“
+
+### Annotationen
+- Suche offene Docs: Regex-Fehlerstatus wie PDF-Suche; Treffer-Export CSV
+
+### UI / Theme
+- Statusleiste: Theme-Indicator System / Manuell dunkel / Manuell hell
+
+### Packaging / Docs
+- Version **1.4.2** (App / `ild_pdf` / ISS / Smoke / Docs)
+- Smoke: Diff-PNG Ordner·Template, Rename Undo-TXT·Rückgängig, Ann. Regex-Fehler·CSV, Theme-Status (CLI + Qt)
+
+---
+
 ## 1.4.1 — PDF-Diff Sync/Schwelle/PNG, Rename Dry-Run·Kollision·Undo, Ann.-Suche Klick·Case/Regex, Theme live
 
 Post-Release-Polish nach 1.4.0: **PDF-Vergleich** Seitenwahl **Sync/Entkoppelt** (Settings), **Diff-Schwelle** in Settings/Dialog, **Diff-Overlay als PNG** exportieren; **Batch-Umbenennen** mit **Dry-Run-Liste**, **Kollisionswarnung** und **Undo-Log** der alten Namen; **Annotation-Suche** Treffer **klickbar** (Doc+Seite), Toggles **Case** und **Regex**; **System-Theme** bei OS-Wechsel **live nachziehen** wenn „folgen“ aktiv. Stubs KI/Cloud/Stylus/3D bleiben Stubs.

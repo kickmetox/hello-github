@@ -1,4 +1,4 @@
-"""Batch-Umbenennen offener Tabs: Template {stem}_{n} + Vorschau — 1.4.1."""
+"""Batch-Umbenennen offener Tabs: Template {stem}_{n} + Undo-TXT — 1.4.2."""
 
 from __future__ import annotations
 
@@ -13,6 +13,7 @@ from typing import Iterable, List, Sequence
 DEFAULT_BATCH_RENAME_TEMPLATE = "{stem}_{n}"
 
 _PLACEHOLDER_RE = re.compile(r"\{(stem|n|ext|name)\}")
+_UNDO_ARROW_RE = re.compile(r"^(.+?)\s+→\s+(.+)$")
 
 
 @dataclass(frozen=True)
@@ -39,7 +40,7 @@ class RenameUndoEntry:
 
 @dataclass
 class RenameUndoLog:
-    """Undo-Log nach erfolgreichem Batch-Rename — 1.4.1."""
+    """Undo-Log nach erfolgreichem Batch-Rename — 1.4.1/1.4.2 TXT."""
 
     created: str
     template: str
@@ -162,6 +163,26 @@ def format_dry_run_list(items: Sequence[RenamePreviewItem]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def format_undo_log_txt(log: RenameUndoLog) -> str:
+    """
+    Undo-Log als TXT (schema ildrename-undo-v1).
+    Zeilen: NEW → OLD (Rückgängig = neue Datei zurück zum alten Namen) — 1.4.2.
+    """
+    lines = [
+        "# InstantLens Doc Batch-Rename Undo-Log",
+        "# schema: ildrename-undo-v1",
+        f"# created: {log.created}",
+        f"# template: {log.template}",
+        "# Format: NEW → OLD (Rückgängig letzte Batch)",
+        "",
+    ]
+    for e in log.entries:
+        lines.append(f"{e.new_path}  →  {e.old_path}")
+    lines.append("")
+    lines.append(f"# {len(log.entries)} Eintrag/Einträge")
+    return "\n".join(lines) + "\n"
+
+
 def write_undo_log(
     entries: Sequence[RenameUndoEntry],
     *,
@@ -169,8 +190,8 @@ def write_undo_log(
     path: str | Path | None = None,
 ) -> Path:
     """
-    Schreibt Undo-Log der alten Namen (JSON ildrename-undo-v1) — 1.4.1.
-    Default-Pfad: neben erster neuer Datei bzw. CWD.
+    Schreibt Undo-Log der alten Namen als TXT (ildrename-undo-v1) — 1.4.2.
+    Default-Pfad: neben erster neuer Datei bzw. CWD, Endung .txt.
     """
     created = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     log = RenameUndoLog(created=created, template=template, entries=list(entries))
@@ -180,13 +201,107 @@ def write_undo_log(
         else:
             base = Path.cwd()
         stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        path = base / f"ild-rename-undo-{stamp}.json"
+        path = base / f"ild-rename-undo-{stamp}.txt"
     out = Path(path)
-    out.write_text(
-        json.dumps(log.to_dict(), indent=2, ensure_ascii=False) + "\n",
-        encoding="utf-8",
-    )
+    if out.suffix.lower() != ".txt":
+        out = out.with_suffix(".txt")
+    out.write_text(format_undo_log_txt(log), encoding="utf-8")
     return out
+
+
+def read_undo_log(path: str | Path) -> RenameUndoLog:
+    """
+    Liest Undo-Log aus TXT (1.4.2) oder JSON (1.4.1 Kompatibilität).
+    """
+    p = Path(path)
+    raw = p.read_text(encoding="utf-8")
+    stripped = raw.lstrip()
+    if stripped.startswith("{"):
+        data = json.loads(raw)
+        entries = [
+            RenameUndoEntry(
+                old_path=str(e.get("old_path") or ""),
+                new_path=str(e.get("new_path") or ""),
+                old_name=str(e.get("old_name") or ""),
+                new_name=str(e.get("new_name") or ""),
+            )
+            for e in (data.get("entries") or [])
+            if isinstance(e, dict)
+        ]
+        return RenameUndoLog(
+            created=str(data.get("created") or ""),
+            template=str(data.get("template") or ""),
+            entries=entries,
+        )
+    created = ""
+    template = ""
+    entries: List[RenameUndoEntry] = []
+    for line in raw.splitlines():
+        s = line.strip()
+        if not s:
+            continue
+        if s.startswith("#"):
+            low = s.lower()
+            if low.startswith("# created:"):
+                created = s.split(":", 1)[1].strip()
+            elif low.startswith("# template:"):
+                template = s.split(":", 1)[1].strip()
+            continue
+        m = _UNDO_ARROW_RE.match(s)
+        if not m:
+            continue
+        new_path = m.group(1).strip()
+        old_path = m.group(2).strip()
+        entries.append(
+            RenameUndoEntry(
+                old_path=old_path,
+                new_path=new_path,
+                old_name=Path(old_path).name,
+                new_name=Path(new_path).name,
+            )
+        )
+    return RenameUndoLog(created=created, template=template, entries=entries)
+
+
+def apply_undo_log(
+    log: RenameUndoLog,
+    *,
+    also_sidecars: bool = True,
+) -> List[tuple[str, str, str | None]]:
+    """
+    Macht einen Batch-Rename rückgängig: NEW → OLD.
+    Returns: Liste (from_new, to_old, error|None) — 1.4.2.
+    """
+    results: List[tuple[str, str, str | None]] = []
+    sidecar_suffixes = (
+        ".ildann.json",
+        ".ildocr.txt",
+        ".ildfav.json",
+        ".ildbm.json",
+    )
+    # Umgekehrt der Umbenenn-Reihenfolge (weniger Kollisionen)
+    for e in reversed(list(log.entries)):
+        src = Path(e.new_path)
+        dst = Path(e.old_path)
+        try:
+            if not src.exists():
+                results.append((e.new_path, e.old_path, "Quelle (neu) fehlt"))
+                continue
+            if dst.exists() and dst.resolve() != src.resolve():
+                results.append((e.new_path, e.old_path, "Ziel (alt) existiert"))
+                continue
+            src.rename(dst)
+            if also_sidecars:
+                for suf in sidecar_suffixes:
+                    c = Path(str(src) + suf)
+                    if c.is_file():
+                        target = Path(str(dst) + suf)
+                        if not target.exists():
+                            c.rename(target)
+            results.append((e.new_path, e.old_path, None))
+        except Exception as ex:
+            results.append((e.new_path, e.old_path, str(ex)))
+    return results
 
 
 def rename_files(
