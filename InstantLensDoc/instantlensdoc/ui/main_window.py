@@ -1067,10 +1067,13 @@ class MainWindow(QMainWindow):
         self.pdf_view.status.connect(self._on_pdf_view_status)
         self.pdf_view.annotations_changed.connect(self._refresh_pdf_marks)
         self.pdf_view.annotations_changed.connect(self._refresh_undo_hint)
-        # Toolbar-Undo und Ctrl+Z: Tag-Rename-Filter nach einstufigem Undo mitziehen
+        # Toolbar-Undo und Ctrl+Z: Layer-Alle-ein/aus · Tag-Rename-Filter — 1.8.3
+        self._ann_layer_undo: list[dict[str, bool]] = []
         _pdf_undo = self.pdf_view.undo_annotation
 
         def _undo_annotation_with_tag_revert() -> bool:
+            if self._undo_ann_type_layers():
+                return True
             ok = bool(_pdf_undo())
             if ok:
                 # Sticky 0-Treffer auch bei Ann.-Undo leeren — 1.1.9
@@ -2004,11 +2007,17 @@ class MainWindow(QMainWindow):
             "redaction": "Ctrl+Alt+4",
         }
         act_all_on = QAction("Alle ein", self)
-        act_all_on.setToolTip("Alle Annotation-Typen einblenden — 1.8.2")
+        act_all_on.setShortcut(QKeySequence("Ctrl+Alt+0"))
+        act_all_on.setToolTip(
+            "Alle Annotation-Typen einblenden (Ctrl+Alt+0); Undo ein Stack-Eintrag — 1.8.3"
+        )
         act_all_on.triggered.connect(lambda: self._set_all_ann_type_layers(True))
         m_ann_types.addAction(act_all_on)
         act_all_off = QAction("Alle aus", self)
-        act_all_off.setToolTip("Alle Annotation-Typen ausblenden — 1.8.2")
+        act_all_off.setShortcut(QKeySequence("Ctrl+Alt+Shift+0"))
+        act_all_off.setToolTip(
+            "Alle Annotation-Typen ausblenden (Ctrl+Alt+Shift+0); Undo ein Stack-Eintrag — 1.8.3"
+        )
         act_all_off.triggered.connect(lambda: self._set_all_ann_type_layers(False))
         m_ann_types.addAction(act_all_off)
         act_clear_filter = QAction("Listenfilter zurücksetzen", self)
@@ -3024,6 +3033,43 @@ class MainWindow(QMainWindow):
                 it.setText(f"{base} *")
             else:
                 it.setText(base)
+
+    def _blink_status_briefly(self) -> None:
+        """Statusleiste kurz blinken bei Batch-Abschluss — 1.8.3."""
+        from PySide6.QtCore import QTimer
+
+        if getattr(self, "_batch_status_blink_active", False):
+            return
+        sb = self.statusBar()
+        if sb is None:
+            return
+        self._batch_status_blink_active = True
+        base = sb.styleSheet() or ""
+        styles = (
+            "color: #fff; background-color: #1F6F4A; font-weight: 600;",
+            base,
+            "color: #fff; background-color: #1F6F4A; font-weight: 600;",
+            base,
+        )
+        self._batch_status_blink_step = 0
+
+        def _tick() -> None:
+            i = int(getattr(self, "_batch_status_blink_step", 0))
+            if i >= len(styles):
+                self._batch_status_blink_active = False
+                try:
+                    sb.setStyleSheet(base)
+                except Exception:
+                    pass
+                return
+            try:
+                sb.setStyleSheet(styles[i])
+            except Exception:
+                pass
+            self._batch_status_blink_step = i + 1
+            QTimer.singleShot(80, _tick)
+
+        _tick()
 
     def _blink_pending_debounce_status(self) -> None:
         """
@@ -4968,13 +5014,27 @@ class MainWindow(QMainWindow):
             pass
 
     def _set_all_ann_type_layers(self, visible: bool) -> None:
-        """Alle Layer-Typen ein- oder ausblenden — 1.8.2."""
+        """Alle Layer-Typen ein-/aus; Undo als ein Stack-Eintrag — 1.8.3."""
         from instantlensdoc.core.app_settings import (
             ANN_LAYER_TYPE_KEYS,
+            get_ann_layer_types_visible,
             set_ann_layer_types_visible,
         )
 
+        prev = dict(get_ann_layer_types_visible())
         payload = {k: bool(visible) for k in ANN_LAYER_TYPE_KEYS}
+        if prev == payload:
+            self._set_status(
+                "Annotation-Typen: alle ein" if visible else "Annotation-Typen: alle aus"
+            )
+            return
+        stack = getattr(self, "_ann_layer_undo", None)
+        if stack is None:
+            self._ann_layer_undo = []
+            stack = self._ann_layer_undo
+        stack.append(prev)
+        if len(stack) > 20:
+            stack.pop(0)
         set_ann_layer_types_visible(payload)
         self.pdf_view.set_annotation_types_visible(payload)
         self._sync_ann_type_actions()
@@ -4983,8 +5043,30 @@ class MainWindow(QMainWindow):
         except Exception:
             pass
         self._set_status(
-            "Annotation-Typen: alle ein" if visible else "Annotation-Typen: alle aus"
+            "Annotation-Typen: alle ein — Ctrl+Z rückgängig"
+            if visible
+            else "Annotation-Typen: alle aus — Ctrl+Z rückgängig"
         )
+        self._refresh_undo_hint()
+
+    def _undo_ann_type_layers(self) -> bool:
+        """Einen Layer-Alle-ein/aus-Eintrag rückgängig — 1.8.3."""
+        stack = getattr(self, "_ann_layer_undo", None) or []
+        if not stack:
+            return False
+        from instantlensdoc.core.app_settings import set_ann_layer_types_visible
+
+        prev = stack.pop()
+        set_ann_layer_types_visible(prev)
+        self.pdf_view.set_annotation_types_visible(prev)
+        self._sync_ann_type_actions()
+        try:
+            self._save_session()
+        except Exception:
+            pass
+        self._set_status("Annotation-Typen: Sichtbarkeit rückgängig")
+        self._refresh_undo_hint()
+        return True
 
     def _filter_ann_list_by_layer_group(self, group: str) -> None:
         """Ann.-Liste auf Layer-Typ filtern (Zähler-Klick) — 1.8.2."""
@@ -7843,6 +7925,7 @@ class MainWindow(QMainWindow):
         if self.pdf_view.rotate_many(idxs, int(degrees)):
             self._refresh_thumbs()
             self._update_doc_status()
+            self._blink_status_briefly()
 
     def _on_thumb_flip(self, page_index: int, horizontal: bool, vertical: bool):
         """Thumbnail: Seite spiegeln (H/V) + Undo — 1.8.0."""
@@ -7868,6 +7951,7 @@ class MainWindow(QMainWindow):
         ):
             self._refresh_thumbs()
             self._update_doc_status()
+            self._blink_status_briefly()
 
     def _on_thumbs_batch_extract(self, pages: list):
         """Thumbnail-Auswahl: Seiten als neues PDF extrahieren."""

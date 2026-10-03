@@ -5,8 +5,8 @@ from __future__ import annotations
 import html as _html
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QTimer
-from PySide6.QtGui import QImage, QKeySequence, QPixmap
+from PySide6.QtCore import QEvent, Qt, QTimer
+from PySide6.QtGui import QImage, QKeyEvent, QKeySequence, QPixmap, QWheelEvent
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -23,6 +23,7 @@ from PySide6.QtWidgets import (
     QProgressDialog,
     QPushButton,
     QRadioButton,
+    QScrollArea,
     QSpinBox,
     QTabWidget,
     QVBoxLayout,
@@ -92,6 +93,126 @@ class WmOutTemplateEdit(QLineEdit):
             self.setCursorPosition(pos)
 
 
+class _HfPagePreviewDialog(QDialog):
+    """HF-Seitenvorschau: Fit-Page · Mausrad · Esc schließt — 1.8.3."""
+
+    def __init__(self, parent, *, pdf_path: str, zoom_pct: int = 100):
+        super().__init__(parent)
+        self.setWindowTitle("Kopf-/Fußzeile — Seitenvorschau")
+        self.resize(520, 640)
+        self._pdf_path = pdf_path
+        self._zoom = max(50, min(250, int(zoom_pct or 100))) / 100.0
+        self._fit_page = False
+        self._base_pm: QPixmap | None = None
+
+        root = QVBoxLayout(self)
+        hint = QLabel(
+            "Fit-Page · Mausrad zoomt · Esc schließt Vorschau — 1.8.3"
+        )
+        hint.setWordWrap(True)
+        hint.setStyleSheet("color:#555;")
+        root.addWidget(hint)
+        ctrl = QHBoxLayout()
+        self.fit_page_check = QCheckBox("Seite einpassen")
+        self.fit_page_check.setToolTip("Vorschau an Viewport anpassen (Fit-Page) — 1.8.3")
+        self.fit_page_check.toggled.connect(self._on_fit_page_toggled)
+        ctrl.addWidget(self.fit_page_check)
+        self.zoom_label = QLabel(f"{int(round(self._zoom * 100))} %")
+        self.zoom_label.setMinimumWidth(48)
+        ctrl.addWidget(self.zoom_label)
+        ctrl.addStretch(1)
+        root.addLayout(ctrl)
+        self._scroll = QScrollArea()
+        self._scroll.setWidgetResizable(True)
+        self._scroll.setAlignment(Qt.AlignCenter)
+        self._scroll.setToolTip("Mausrad: Zoom — 1.8.3")
+        self._scroll.viewport().installEventFilter(self)
+        self._thumb = QLabel()
+        self._thumb.setAlignment(Qt.AlignCenter)
+        self._thumb.setMinimumSize(200, 260)
+        self._thumb.setStyleSheet(
+            "QLabel { background: #f4f4f4; border: 1px solid #ccc; }"
+        )
+        self._scroll.setWidget(self._thumb)
+        root.addWidget(self._scroll, 1)
+        bb = QDialogButtonBox(QDialogButtonBox.Close)
+        bb.rejected.connect(self.reject)
+        root.addWidget(bb)
+        self._load_base()
+        self._refresh_view()
+
+    def keyPressEvent(self, event: QKeyEvent) -> None:  # noqa: N802
+        if event.key() == Qt.Key_Escape:
+            self.reject()
+            event.accept()
+            return
+        super().keyPressEvent(event)
+
+    def eventFilter(self, obj, event):  # noqa: N802
+        if obj is self._scroll.viewport() and event.type() == QEvent.Type.Wheel:
+            assert isinstance(event, QWheelEvent)
+            delta = event.angleDelta().y()
+            if delta == 0:
+                delta = event.pixelDelta().y()
+            if delta > 0:
+                self._zoom_by(1.15)
+            elif delta < 0:
+                self._zoom_by(1 / 1.15)
+            event.accept()
+            return True
+        return super().eventFilter(obj, event)
+
+    def resizeEvent(self, event) -> None:  # noqa: N802
+        super().resizeEvent(event)
+        if self._fit_page:
+            self._refresh_view()
+
+    def _load_base(self) -> None:
+        try:
+            from ild_pdf.render import render_page
+
+            img = render_page(self._pdf_path, 0, scale=1.0, use_cache=True)
+            if img.mode != "RGBA":
+                img = img.convert("RGBA")
+            data = img.tobytes("raw", "RGBA")
+            qimg = QImage(data, img.width, img.height, QImage.Format_RGBA8888)
+            self._base_pm = QPixmap.fromImage(qimg.copy())
+        except Exception:
+            self._base_pm = None
+
+    def _on_fit_page_toggled(self, checked: bool) -> None:
+        self._fit_page = bool(checked)
+        self._refresh_view()
+
+    def _zoom_by(self, factor: float) -> None:
+        self._fit_page = False
+        self.fit_page_check.blockSignals(True)
+        self.fit_page_check.setChecked(False)
+        self.fit_page_check.blockSignals(False)
+        self._zoom = max(0.5, min(2.5, self._zoom * float(factor)))
+        self._refresh_view()
+
+    def _refresh_view(self) -> None:
+        pm = self._base_pm
+        if pm is None or pm.isNull():
+            self._thumb.setText("Vorschau n/a")
+            self.zoom_label.setText("—")
+            return
+        if self._fit_page:
+            vp = self._scroll.viewport()
+            tw = max(80, (vp.width() if vp else 400) - 16)
+            th = max(100, (vp.height() if vp else 500) - 16)
+            scaled = pm.scaled(tw, th, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            self.zoom_label.setText("Fit")
+        else:
+            tw = max(80, int(pm.width() * self._zoom * 0.35))
+            th = max(100, int(pm.height() * self._zoom * 0.35))
+            scaled = pm.scaled(tw, th, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            self.zoom_label.setText(f"{int(round(self._zoom * 100))} %")
+        self._thumb.setPixmap(scaled)
+        self._thumb.setText("")
+
+
 class WatermarkDialog(QDialog):
     def __init__(
         self,
@@ -110,17 +231,26 @@ class WatermarkDialog(QDialog):
         self.result_path: str | None = None
         self._last = get_last_watermark_settings()
         self._last_hf = get_last_header_footer_settings()
+        self._hf_fit_page = False
 
         layout = QVBoxLayout(self)
-        tabs = QTabWidget()
-        tabs.addTab(self._build_wm_tab(), "Wasserzeichen")
-        tabs.addTab(self._build_num_tab(), "Seitennummern")
-        tabs.addTab(self._build_hf_tab(), "Kopf-/Fußzeile")
-        layout.addWidget(tabs)
+        self._tabs = QTabWidget()
+        self._tabs.addTab(self._build_wm_tab(), "Wasserzeichen")
+        self._tabs.addTab(self._build_num_tab(), "Seitennummern")
+        self._tabs.addTab(self._build_hf_tab(), "Kopf-/Fußzeile")
+        layout.addWidget(self._tabs)
         buttons = QDialogButtonBox(QDialogButtonBox.Close)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
         self._refresh_preview()
+
+    def keyPressEvent(self, event: QKeyEvent) -> None:  # noqa: N802
+        # Esc auf HF-Tab: Vorschau-Fenster schließen bzw. Dialog — 1.8.3
+        if event.key() == Qt.Key_Escape:
+            self.reject()
+            event.accept()
+            return
+        super().keyPressEvent(event)
 
     def _path_row(self, initial: str) -> tuple[QLineEdit, QHBoxLayout]:
         edit = QLineEdit(initial)
@@ -772,7 +902,7 @@ class WatermarkDialog(QDialog):
         run.clicked.connect(self._run_hf)
         form.addRow(run)
         root.addWidget(form_host, 3)
-        # Vorschau erste Seite + Zoom — 1.8.2
+        # Vorschau erste Seite + Zoom · Fit-Page · Mausrad · Esc — 1.8.3
         prev_col = QVBoxLayout()
         prev_col.addWidget(QLabel("Vorschau erste Seite"))
         self.hf_page_thumb = QLabel()
@@ -781,6 +911,10 @@ class WatermarkDialog(QDialog):
         self.hf_page_thumb.setStyleSheet(
             "QLabel { background: #f4f4f4; border: 1px solid #ccc; }"
         )
+        self.hf_page_thumb.setToolTip(
+            "Mausrad: Zoom · Doppelklick: Vorschau-Fenster (Esc schließt) — 1.8.3"
+        )
+        self.hf_page_thumb.installEventFilter(self)
         prev_col.addWidget(self.hf_page_thumb, 1)
         zoom_row = QHBoxLayout()
         zoom_row.addWidget(QLabel("Zoom"))
@@ -788,18 +922,32 @@ class WatermarkDialog(QDialog):
         self.hf_preview_zoom.setRange(50, 250)
         self.hf_preview_zoom.setSuffix(" %")
         self.hf_preview_zoom.setValue(100)
-        self.hf_preview_zoom.setToolTip("Vorschau-Zoom der ersten Seite — 1.8.2")
-        self.hf_preview_zoom.valueChanged.connect(lambda *_: self._refresh_hf_preview())
+        self.hf_preview_zoom.setToolTip(
+            "Vorschau-Zoom der ersten Seite (Mausrad); Fit-Page beendet manuellen Zoom — 1.8.3"
+        )
+        self.hf_preview_zoom.valueChanged.connect(self._on_hf_zoom_changed)
         zoom_row.addWidget(self.hf_preview_zoom, 1)
         prev_col.addLayout(zoom_row)
+        self.hf_fit_page = QCheckBox("Seite einpassen")
+        self.hf_fit_page.setObjectName("hfFitPage")
+        self.hf_fit_page.setToolTip("Vorschau an Label-Größe anpassen (Fit-Page) — 1.8.3")
+        self.hf_fit_page.toggled.connect(self._on_hf_fit_page_toggled)
+        prev_col.addWidget(self.hf_fit_page)
         self.hf_preview = QLabel()
         self.hf_preview.setWordWrap(True)
         self.hf_preview.setTextInteractionFlags(Qt.TextSelectableByMouse)
         self.hf_preview.setStyleSheet("QLabel { color: #333; padding: 4px; }")
         prev_col.addWidget(self.hf_preview)
+        btn_row = QHBoxLayout()
         btn_prev = QPushButton("Vorschau aktualisieren")
         btn_prev.clicked.connect(self._refresh_hf_preview)
-        prev_col.addWidget(btn_prev)
+        btn_row.addWidget(btn_prev)
+        btn_win = QPushButton("Vorschau-Fenster…")
+        btn_win.setObjectName("hfPreviewWindow")
+        btn_win.setToolTip("Große Vorschau: Fit-Page · Mausrad · Esc schließt — 1.8.3")
+        btn_win.clicked.connect(self._open_hf_preview_window)
+        btn_row.addWidget(btn_win)
+        prev_col.addLayout(btn_row)
         prev_host = QWidget()
         prev_host.setLayout(prev_col)
         root.addWidget(prev_host, 2)
@@ -836,8 +984,62 @@ class WatermarkDialog(QDialog):
         ranges = parse_page_ranges(spec, self._page_count, one_based=True)
         return flatten_page_indices(ranges)
 
+    def eventFilter(self, obj, event):  # noqa: N802
+        """HF-Thumb: Mausrad-Zoom · Doppelklick öffnet Vorschau-Fenster — 1.8.3."""
+        if obj is getattr(self, "hf_page_thumb", None):
+            if event.type() == QEvent.Type.Wheel:
+                assert isinstance(event, QWheelEvent)
+                if getattr(self, "_hf_fit_page", False):
+                    self._hf_fit_page = False
+                    if hasattr(self, "hf_fit_page"):
+                        self.hf_fit_page.blockSignals(True)
+                        self.hf_fit_page.setChecked(False)
+                        self.hf_fit_page.blockSignals(False)
+                delta = event.angleDelta().y()
+                if delta == 0:
+                    delta = event.pixelDelta().y()
+                if hasattr(self, "hf_preview_zoom"):
+                    step = 10 if delta > 0 else -10
+                    self.hf_preview_zoom.setValue(
+                        max(50, min(250, int(self.hf_preview_zoom.value()) + step))
+                    )
+                event.accept()
+                return True
+            if event.type() == QEvent.Type.MouseButtonDblClick:
+                self._open_hf_preview_window()
+                event.accept()
+                return True
+        return super().eventFilter(obj, event)
+
+    def _on_hf_zoom_changed(self, *_args) -> None:
+        if getattr(self, "_hf_fit_page", False):
+            self._hf_fit_page = False
+            if hasattr(self, "hf_fit_page"):
+                self.hf_fit_page.blockSignals(True)
+                self.hf_fit_page.setChecked(False)
+                self.hf_fit_page.blockSignals(False)
+        self._refresh_hf_preview()
+
+    def _on_hf_fit_page_toggled(self, checked: bool) -> None:
+        self._hf_fit_page = bool(checked)
+        self._refresh_hf_preview()
+
+    def _open_hf_preview_window(self) -> None:
+        """Große HF-Vorschau (Fit-Page · Mausrad · Esc) — 1.8.3."""
+        src = ""
+        if hasattr(self, "hf_src"):
+            src = self.hf_src.text().strip()
+        if not src or not Path(src).is_file():
+            QMessageBox.information(self, "Vorschau", "Bitte zuerst ein PDF wählen.")
+            return
+        zoom = 100
+        if hasattr(self, "hf_preview_zoom"):
+            zoom = int(self.hf_preview_zoom.value() or 100)
+        dlg = _HfPagePreviewDialog(self, pdf_path=src, zoom_pct=zoom)
+        dlg.exec()
+
     def _refresh_hf_preview(self) -> None:
-        """Text + Thumbnail der ersten Seite mit Zoom — 1.8.2."""
+        """Text + Thumbnail; Fit-Page / Zoom — 1.8.3."""
         src = ""
         if hasattr(self, "hf_src"):
             src = self.hf_src.text().strip()
@@ -875,16 +1077,21 @@ class WatermarkDialog(QDialog):
                 zoom_pct = 100
                 if hasattr(self, "hf_preview_zoom"):
                     zoom_pct = int(self.hf_preview_zoom.value() or 100)
-                scale = 0.35 * (max(50, min(250, zoom_pct)) / 100.0)
+                # Fit-Page: etwas höher rendern, dann auf Label skalieren — 1.8.3
+                if getattr(self, "_hf_fit_page", False):
+                    scale = 0.55
+                else:
+                    scale = 0.35 * (max(50, min(250, zoom_pct)) / 100.0)
                 img = render_page(src, 0, scale=scale, use_cache=True)
                 if img.mode != "RGBA":
                     img = img.convert("RGBA")
                 data = img.tobytes("raw", "RGBA")
                 qimg = QImage(data, img.width, img.height, QImage.Format_RGBA8888)
                 pm = QPixmap.fromImage(qimg.copy())
+                target = self.hf_page_thumb.size()
                 self.hf_page_thumb.setPixmap(
                     pm.scaled(
-                        self.hf_page_thumb.size(),
+                        target,
                         Qt.KeepAspectRatio,
                         Qt.SmoothTransformation,
                     )

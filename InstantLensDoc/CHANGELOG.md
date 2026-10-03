@@ -1,5 +1,23 @@
 # Changelog — InstantLens Doc
 
+## 1.8.3 — Batch Undo DE-Verben·Status-Blink, HF Fit-Page·Mausrad·Esc, Layer Alle ein/aus Undo+Shortcuts, Recovery `_recovered`
+
+Post-Release-Polish nach 1.8.2: **Batch Drehen/Spiegeln** mit **einheitlichen DE-Verben** („gedreht“ / „gespiegelt“) und **Statusleisten-Blink** bei Abschluss; **Kopf-/Fußzeile-Vorschau** mit **Fit-Page**, **Mausrad-Zoom**, **Esc schließt Vorschau-Fenster**; **Layer „Alle ein/aus“** als **ein Undo-Stack-Eintrag** inkl. Shortcuts **Ctrl+Alt+0** / **Ctrl+Alt+Shift+0**; **Crash-Recovery-Kopie** mit Suffix **`_recovered`**, Original-Orphan bleibt bis **Verwerfen**. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### PDF / Seiten
+- Batch Undo-Text: „N Seiten gedreht“ / „N Seiten gespiegelt“ (Historie ebenfalls); Statusleiste blinkt kurz bei Batch-Abschluss
+- Kopf-/Fußzeile: Fit-Page in Vorschau; Mausrad-Zoom; Vorschau-Fenster (Esc schließt)
+
+### Annotationen / Recovery
+- Annotation-Typen „Alle ein/aus“: vorherige Sichtbarkeit als ein Undo-Eintrag (Ctrl+Z); Shortcuts Ctrl+Alt+0 / Ctrl+Alt+Shift+0
+- Crash-Recovery „Als Kopie“: Dateiname `*_recovered`; Orphan bleibt bis Verwerfen
+
+### Packaging / Docs
+- Version **1.8.3** (App / `ild_pdf` / ISS / Smoke / Docs); `docs/VERSION` + `VERSION.txt`
+- Smoke: Batch DE-Verben·Blink, HF Fit-Page·Wheel·Esc, Layer Undo·Shortcuts, Recovery `_recovered`·Orphan bleibt (CLI + Qt)
+
+---
+
 ## 1.8.2 — Batch Flip-Remap·Undo „gedreht/gespiegelt“, HF Zoom·Auf alle/Bereich, Layer Zähler-Filter·Alle ein/aus, Recovery Alter·Als Kopie
 
 Post-Release-Polish nach 1.8.1: **Batch Spiegeln H/V** remappt **Ann.-Koordinaten** (+ Undo); Status/Historie **„N Seiten gedreht/gespiegelt“**; **Kopf-/Fußzeile** **Vorschau-Zoom**, **„Auf alle anwenden“** vs. **Seitenbereich** klar getrennt; **Layer-Zähler** per Klick **filtert Ann.-Liste**, Menü **„Alle ein“ / „Alle aus“**; **Crash-Recovery** zeigt **Snapshot-Alter**, Option **„Als Kopie öffnen“**. Stubs KI/Cloud/Stylus/3D bleiben Stubs.

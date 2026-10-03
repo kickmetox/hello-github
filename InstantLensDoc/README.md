@@ -2,7 +2,7 @@
 
 Moderne Textverarbeitung mit PDF-Annotator, OCR-Bridge und Formulargenerator.
 
-**Version:** 1.8.2  
+**Version:** 1.8.3  
 **Hersteller:** Andreas Meyer · ame@sellerbach.de
 
 ## Quickstart (Windows)
@@ -33,8 +33,8 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an).
 
-## Neu in 1.8.2
+## Neu in 1.8.3
 
-Post-Release-Polish nach **1.8.1**: Batch Spiegel H/V remappt Ann.-Koordinaten · Undo-Text „N Seiten gedreht/gespiegelt“; Kopf-/Fußzeile Vorschau-Zoom · „Auf alle anwenden“ vs. Seitenbereich klar getrennt; Layer-Zähler-Klick filtert Ann.-Liste · „Alle ein“/„Alle aus“; Crash-Recovery Snapshot-Alter · „Als Kopie öffnen“. Stubs KI/Cloud/Stylus/3D unverändert.
+Post-Release-Polish nach **1.8.2**: Batch Undo-Text „gedreht“/„gespiegelt“ · Status-Blink bei Abschluss; HF Fit-Page · Mausrad · Esc schließt Vorschau; Layer Alle ein/aus Undo+Shortcuts Ctrl+Alt+0 / Ctrl+Alt+Shift+0; Recovery-Kopie `_recovered`, Orphan bleibt bis Verwerfen. Stubs KI/Cloud/Stylus/3D unverändert.
 
 Siehe [CHANGELOG.md](CHANGELOG.md), [FEATURES.md](FEATURES.md) und [INFO.md](INFO.md).

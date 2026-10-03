@@ -243,18 +243,19 @@ def restore_orphan_as_copy(
     orphan: RecoveryOrphan, *, dest: str | Path | None = None
 ) -> Path:
     """
-    Snapshot als Kopie öffnen (Originalpfad unberührt) — 1.8.2.
-    Ohne dest: neben Quelle als ``{stem}_recovery{suffix}``.
+    Snapshot als Kopie öffnen (Originalpfad unberührt) — 1.8.3.
+    Ohne dest: neben Quelle als ``{stem}_recovered{suffix}``.
+    Original-Orphan bleibt bis explizitem Verwerfen.
     """
     if dest is not None:
         target = Path(dest)
     else:
         src = Path(orphan.source_path)
-        target = src.with_name(f"{src.stem}_recovery{src.suffix or '.bin'}")
+        target = src.with_name(f"{src.stem}_recovered{src.suffix or '.bin'}")
         if target.exists():
             n = 2
             while True:
-                cand = src.with_name(f"{src.stem}_recovery{n}{src.suffix or '.bin'}")
+                cand = src.with_name(f"{src.stem}_recovered{n}{src.suffix or '.bin'}")
                 if not cand.exists():
                     target = cand
                     break
@@ -265,8 +266,7 @@ def restore_orphan_as_copy(
         target.write_text(text, encoding="utf-8")
     else:
         shutil.copy2(orphan.payload_path, target)
-    # Orphan nach Kopie aufräumen (wie Wiederherstellen)
-    clear_recovery_for(orphan.source_path)
+    # Orphan bewusst behalten — erst „Verwerfen“ räumt auf — 1.8.3
     return target
 
 
