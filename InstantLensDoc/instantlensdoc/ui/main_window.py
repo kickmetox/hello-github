@@ -90,11 +90,19 @@ from instantlensdoc.ui.file_dialogs import (
 )
 from instantlensdoc.ui.pdf_tools_dialog import PdfToolsDialog
 from instantlensdoc.ui.watermark_dialog import WatermarkDialog
+from instantlensdoc.ui.annotation_search_dialog import AnnotationSearchDialog
+from instantlensdoc.ui.batch_rename_dialog import BatchRenameDialog
 from instantlensdoc.ui.compare_dialog import PdfCompareDialog
 from instantlensdoc.ui.text_compare_dialog import TextCompareDialog
 from instantlensdoc.ui.settings_dialog import SettingsDialog
 from instantlensdoc.ui.stubs import show_planned
-from instantlensdoc.ui.theme import apply_theme, load_theme_mode, toggle_theme
+from instantlensdoc.ui.theme import (
+    apply_theme,
+    load_theme_mode,
+    resolve_theme,
+    set_follow_system,
+    toggle_theme,
+)
 from instantlensdoc.ui.keyboard_help import KeyboardHelpDialog
 from instantlensdoc.ui.password_dialog import CompressPdfDialog, SetPasswordDialog
 from instantlensdoc.ui.metadata_dialog import MetadataDialog
@@ -119,6 +127,8 @@ class MainWindow(QMainWindow):
         self._recent_menu = None
         self._workspace_menu = None
         self._theme_action: QAction | None = None
+        self._theme_system_action: QAction | None = None
+        self._ann_search_dialog: AnnotationSearchDialog | None = None
         self._autosave_enabled = bool(get_autosave_enabled())
         self._thumb_lazy_timer: QTimer | None = None
         self._thumb_lazy_queue: list[int] = []
@@ -561,9 +571,9 @@ class MainWindow(QMainWindow):
             return
         if not state.tabs:
             return
-        # Theme aus Session wiederherstellen (0.9.4)
+        # Theme aus Session wiederherstellen (0.9.4); system — 1.4.0
         theme = str(getattr(state, "theme", "") or "").strip().lower()
-        if theme in ("dark", "light"):
+        if theme in ("dark", "light", "system"):
             try:
                 apply_theme(mode=theme)  # type: ignore[arg-type]
                 self._sync_theme_menu()
@@ -1863,11 +1873,19 @@ class MainWindow(QMainWindow):
         act_zoom_default.triggered.connect(self._save_current_zoom_as_default)
         m_view.addAction(act_zoom_default)
         m_view.addSeparator()
+        self._theme_system_action = QAction("System-Theme folgen", self)
+        self._theme_system_action.setCheckable(True)
+        self._theme_system_action.setToolTip(
+            "OS Hell/Dunkel folgen; aus = manueller Override — 1.4.0"
+        )
+        self._theme_system_action.triggered.connect(self._toggle_follow_system)
+        m_view.addAction(self._theme_system_action)
         self._theme_action = QAction("Dunkles Design", self)
         self._theme_action.setCheckable(True)
-        self._theme_action.setChecked(load_theme_mode() == "dark")
+        self._theme_action.setToolTip("Manuell Hell/Dunkel umschalten (Override) — 1.4.0")
         self._theme_action.triggered.connect(self._toggle_theme)
         m_view.addAction(self._theme_action)
+        self._sync_theme_menu()
 
         m_pdf = mb.addMenu("&PDF")
         act_merge = QAction("PDFs zusammenführen / teilen…", self)
@@ -1887,8 +1905,18 @@ class MainWindow(QMainWindow):
         act_wm.triggered.connect(self._watermark_tools)
         m_pdf.addAction(act_wm)
         act_cmp = QAction("Zwei PDFs vergleichen…", self)
+        act_cmp.setToolTip(
+            "Seite-für-Seite + Raster-Diff Overlay und Ähnlichkeit % — 1.4.0"
+        )
         act_cmp.triggered.connect(self._compare_pdfs)
         m_pdf.addAction(act_cmp)
+        act_ann_search = QAction("Annotation-Suche (offene Docs)…", self)
+        act_ann_search.setShortcut(QKeySequence("Ctrl+Shift+F3"))
+        act_ann_search.setToolTip(
+            "Volltext Sidecar-Notizen/Highlights quer durch offene Docs — 1.4.0"
+        )
+        act_ann_search.triggered.connect(self._annotation_search_open_docs)
+        m_pdf.addAction(act_ann_search)
         act_pw = QAction("Passwort setzen…", self)
         act_pw.triggered.connect(self._set_pdf_password)
         m_pdf.addAction(act_pw)
@@ -2056,6 +2084,12 @@ class MainWindow(QMainWindow):
         m_extra.addSeparator()
         a = QAction("Batch-Konvertierung (Ordner)…", self)
         a.triggered.connect(self._batch_convert)
+        m_extra.addAction(a)
+        a = QAction("Batch-Umbenennen (offene Tabs)…", self)
+        a.setToolTip(
+            "Offene Tabs mit Template {stem}_{n} umbenennen inkl. Vorschau — 1.4.0"
+        )
+        a.triggered.connect(self._batch_rename_tabs)
         m_extra.addAction(a)
         a = QAction("OCR (Bild/PDF-Seite)…", self)
         a.triggered.connect(self._run_ocr)
@@ -4549,10 +4583,40 @@ class MainWindow(QMainWindow):
         return base
 
     def _sync_theme_menu(self):
+        pref = load_theme_mode()
+        resolved = resolve_theme(pref)
+        if getattr(self, "_theme_system_action", None) is not None:
+            self._theme_system_action.setChecked(pref == "system")
         if self._theme_action is not None:
-            dark = load_theme_mode() == "dark"
+            dark = resolved == "dark"
             self._theme_action.setChecked(dark)
-            self._theme_action.setText("Helles Design" if dark else "Dunkles Design")
+            if pref == "system":
+                self._theme_action.setText(
+                    "Helles Design (Override)" if dark else "Dunkles Design (Override)"
+                )
+            else:
+                self._theme_action.setText(
+                    "Helles Design" if dark else "Dunkles Design"
+                )
+
+    def _toggle_follow_system(self, checked: bool = False):
+        """System-Theme folgen Toggle — 1.4.0."""
+        follow = bool(checked) if isinstance(checked, bool) else (
+            self._theme_system_action.isChecked()
+            if getattr(self, "_theme_system_action", None)
+            else True
+        )
+        resolved = set_follow_system(follow)
+        self._sync_theme_menu()
+        self._set_status(
+            "Theme: System folgen" if follow else (
+                "Dunkles Design" if resolved == "dark" else "Helles Design"
+            )
+        )
+        try:
+            self._save_session()
+        except Exception:
+            pass
 
     def _toggle_theme(self):
         mode = toggle_theme(self)
@@ -7448,6 +7512,73 @@ class MainWindow(QMainWindow):
     def _compare_pdfs(self):
         left = str(self.pdf_view.pdf_path) if self.pdf_view.pdf_path else None
         PdfCompareDialog(self, left_pdf=left).exec()
+
+    def _batch_rename_tabs(self):
+        """Offene Tabs mit Template {stem}_{n} umbenennen + Vorschau — 1.4.0."""
+        paths = list(self.sidebar.document_paths()) if hasattr(self.sidebar, "document_paths") else []
+        if not paths:
+            self._set_status("Keine offenen Tabs zum Umbenennen")
+            return
+        dlg = BatchRenameDialog(self, paths=paths)
+        if dlg.exec() != dlg.Accepted and not dlg.renamed:
+            return
+        current_key = self._path_key(self.doc.path) if self.doc and self.doc.path else ""
+        reopen = None
+        for old, new in dlg.renamed:
+            try:
+                self.sidebar.update_document_path(old, new)
+            except Exception:
+                pass
+            # View-State / Unsaved Keys migrieren
+            ok = self._path_key(old)
+            nk = self._path_key(new)
+            if ok and nk and ok in self._tab_view_state:
+                self._tab_view_state[nk] = self._tab_view_state.pop(ok)
+            if ok and nk and ok in self._unsaved_paths:
+                self._unsaved_paths.discard(ok)
+                self._unsaved_paths.add(nk)
+            if ok and current_key and ok == current_key:
+                reopen = new
+        if reopen:
+            try:
+                self.open_path(reopen)
+            except Exception as e:
+                self._set_status(f"Umbenannt, Öffnen fehlgeschlagen: {e}")
+        try:
+            self._save_session()
+        except Exception:
+            pass
+        self._refresh_document_dirty_labels()
+        self._set_status(f"Batch-Umbenennen: {len(dlg.renamed)} Datei(en) — 1.4.0")
+
+    def _annotation_search_open_docs(self):
+        """Volltext Sidecar-Notizen/Highlights über offene Docs — 1.4.0."""
+        paths = list(self.sidebar.document_paths()) if hasattr(self.sidebar, "document_paths") else []
+        if self._ann_search_dialog is None:
+            self._ann_search_dialog = AnnotationSearchDialog(self, paths=paths)
+            self._ann_search_dialog.hit_activated.connect(self._on_ann_search_hit)
+        else:
+            self._ann_search_dialog.set_paths(paths)
+        self._ann_search_dialog.show()
+        self._ann_search_dialog.raise_()
+        self._ann_search_dialog.activateWindow()
+
+    def _on_ann_search_hit(self, path: str, page: int, ann_id: str = "") -> None:
+        """Treffer aus Annotation-Suche → Doc öffnen + Seite — 1.4.0."""
+        if not path:
+            return
+        try:
+            if not self.doc or not self.doc.path or self._path_key(self.doc.path) != self._path_key(path):
+                self.open_path(path)
+            if hasattr(self.pdf_view, "goto_page"):
+                self.pdf_view.goto_page(int(page))
+            else:
+                self.pdf_view.page_index = int(page)
+            self._set_status(
+                f"Annotation-Treffer: {Path(path).name} S.{int(page) + 1} — 1.4.0"
+            )
+        except Exception as e:
+            self._set_status(f"Annotation-Suche Sprung fehlgeschlagen: {e}")
 
     def _compare_text_tabs(self):
         """Zwei offene Text-Tabs: Wrap-Blink Dauer/Sound · Änderung i/n · Wrap-around · F7/Shift+F7 · Sync-Scroll · Ignore-Whitespace · Diff-TXT — 1.2.9."""

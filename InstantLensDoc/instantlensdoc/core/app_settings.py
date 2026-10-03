@@ -10,11 +10,11 @@ from instantlensdoc.config import config_dir
 
 SETTINGS_NAME = "ui_settings.json"
 
-ThemeMode = Literal["light", "dark"]
+ThemeMode = Literal["light", "dark", "system"]
 UiLang = Literal["de", "en"]
 
 DEFAULTS: dict[str, Any] = {
-    "theme": "light",
+    "theme": "system",  # System folgen; manuell light/dark Override — 1.4.0
     "ocr_lang": "deu+eng",
     "ocr_dpi": 150,  # OCR-Batch Default-DPI 150|300 — 1.1.6
     "ocr_attach_errors": True,  # OCR-Batch: Fehlerabschnitt anhängen — 1.1.5
@@ -197,12 +197,19 @@ def reset_to_defaults() -> dict[str, Any]:
 
 
 def get_theme() -> ThemeMode:
-    mode = load_settings().get("theme", "light")
-    return "dark" if mode == "dark" else "light"
+    mode = str(load_settings().get("theme", DEFAULTS["theme"]) or "system").strip().lower()
+    if mode == "dark":
+        return "dark"
+    if mode == "light":
+        return "light"
+    return "system"
 
 
-def set_theme(mode: ThemeMode) -> None:
-    save_settings({"theme": mode})
+def set_theme(mode: ThemeMode | str) -> None:
+    m = str(mode or "system").strip().lower()
+    if m not in ("light", "dark", "system"):
+        m = "system"
+    save_settings({"theme": m})
 
 
 def get_ocr_lang() -> str:

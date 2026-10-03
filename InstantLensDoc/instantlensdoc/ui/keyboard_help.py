@@ -99,6 +99,10 @@ SHORTCUTS_HTML = """
 <tr><td>Ann. Export JSON/Flatten</td><td>PDF → Annotationen exportieren (JSON / Flatten)…: Quick-Insert {stem}/{page}/{date}; Ctrl+Z lokal; Reset-Template → Live-Vorschau + Fokus mit Selektion ganzer Default-Text; Bestätigung nur bei Abweichung — 1.2.9</td></tr>
 <tr><td>Text-Diff Panel</td><td>Datei → Text-Diff (offene Tabs)… (Ctrl+Alt+D): Wrap-Blink Dauer kurz/mittel/lang + System-Beep vs. stumm; Status Änderung i/n; F7/Shift+F7 — 1.2.9</td></tr>
 <tr><td>run.bat Deps / pip</td><td>Windows-Start: gewählte Python-Binary als „gefunden: …“ inkl. python --version; %ILD_PYTHON% ungültig/leer → Fallback py -3 → python → python3; --help; .venv; --yes/-y; Exit 0/1 — 1.2.9</td></tr>
+<tr><td>PDF-Vergleich Diff</td><td>PDF → Zwei PDFs vergleichen…: Raster-Diff Overlay + Ähnlichkeit % — 1.4.0</td></tr>
+<tr><td>Batch-Umbenennen</td><td>Extras → Batch-Umbenennen (offene Tabs)…: Template {stem}_{n} + Vorschau — 1.4.0</td></tr>
+<tr><td>Annotation-Suche offen</td><td>PDF → Annotation-Suche (offene Docs)… (Ctrl+Shift+F3): Sidecar Volltext — 1.4.0</td></tr>
+<tr><td>Theme System</td><td>Ansicht → System-Theme folgen + manuell Hell/Dunkel Override — 1.4.0</td></tr>
 <tr><td>AcroForm-Sidebar</td><td>CSV Esc ohne Export; Enter auf OK; Zähler N von M; Default persistiert — 1.3.6</td></tr>
 <tr><td>Redactions anwenden</td><td>Status „Sidecar übersprungen“; Fortsetzen-Option Settings merken — 1.3.6</td></tr>
 <tr><td>Bookmarks ↔ Outlines</td><td>Fehlerdialog Retry-Zähler „Versuch k/3“; max. 3 wie Backup — 1.3.6</td></tr>
@@ -305,6 +309,10 @@ About: Datenschutz-Hinweis (lokal, keine Telemetrie).</p>
 <p><b>Seiten als Bilder:</b> PDF → Seite/Seiten als PNG/JPEG exportieren (aktuell oder alle; DPI 72/150/300).</p>
 <p><b>Thumbnails:</b> in der Sidebar ziehen zum Neuordnen der Seiten (Ctrl+Z rückgängig); Größe in Einstellungen (klein/normal/groß).</p>
 <p><b>Statusleiste:</b> Dateiname · Seite x/y · Seitengröße (mm/inch, klickbar) · Zoom % · Wörter/Ann. · Version · Lizenz.</p>
+<p><b>PDF-Vergleich:</b> Raster-Diff Overlay + Ähnlichkeit % — 1.4.0</p>
+<p><b>Batch-Umbenennen:</b> offene Tabs Template {stem}_{n} + Vorschau — 1.4.0</p>
+<p><b>Annotation-Suche:</b> Sidecar Volltext über offene Docs (Ctrl+Shift+F3) — 1.4.0</p>
+<p><b>Theme:</b> System folgen + manuell Override — 1.4.0</p>
 <p><b>Schwärzung / Redactions:</b> Rechteck ziehen → Sidecar; Status „Sidecar übersprungen“;
 Fortsetzen-Option in Settings merken — 1.3.6</p>
 <p><b>AcroForm:</b> CSV Esc ohne Export; Enter auf OK; Zähler N von M — 1.3.6</p>

@@ -12,6 +12,7 @@ _STRINGS: dict[str, dict[UiLang, str]] = {
     "theme": {"de": "Design", "en": "Theme"},
     "theme_light": {"de": "Hell", "en": "Light"},
     "theme_dark": {"de": "Dunkel", "en": "Dark"},
+    "theme_system": {"de": "System folgen", "en": "Follow system"},
     "ui_lang": {"de": "Oberflächensprache", "en": "UI language"},
     "ocr_lang": {"de": "OCR-Sprache (Standard)", "en": "OCR language (default)"},
     "batch_dir": {"de": "Batch-Ausgabeordner", "en": "Batch output folder"},

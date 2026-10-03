@@ -85,7 +85,7 @@ def _normalize_splitter_sizes(raw) -> List[int]:
 
 def _normalize_theme(raw) -> str:
     t = str(raw or "").strip().lower()
-    if t in ("dark", "light"):
+    if t in ("dark", "light", "system"):
         return t
     return ""
 

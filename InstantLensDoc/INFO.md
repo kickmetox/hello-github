@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **1.3.6** |
+| Version | **1.4.0** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -63,10 +63,10 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an / `checkedonce`)
 
-## Neu in 1.3.6
+## Neu in 1.4.0
 
-- Formulare: CSV-Dialog **Esc** ohne Export; **Enter** auf OK startet Export
-- Redaction: Status **„Sidecar übersprungen“**; Fortsetzen-Option in **Settings** merken
-- Bookmarks/Outlines: Fehlerdialog Retry-Zähler **Versuch k/3**
-- Performance: Prefetch-Label **grau** wenn Lazy aus (unter Schwellwert), sonst aktiv
+- PDF-Vergleich: Seite-für-Seite mit **Raster-Diff Overlay** + grobe **Ähnlichkeit %**
+- Batch-Umbenennen: offene Tabs mit Template **`{stem}_{n}`** und Live-Vorschau
+- Annotation-Suche: Volltext Sidecar-Notizen/Highlights quer durch **offene Docs**
+- Theme: **System folgen** Toggle + manuell Hell/Dunkel Override
 - Stubs KI/Cloud/Stylus/3D unverändert

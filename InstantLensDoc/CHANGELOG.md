@@ -1,5 +1,27 @@
 # Changelog — InstantLens Doc
 
+## 1.4.0 — PDF-Vergleich Raster-Diff, Batch-Umbenennen, Annotation-Suche offen, Theme System+Override
+
+Minor-Release nach 1.3.6: **PDF-Vergleich** Seite-für-Seite mit **Raster-Diff Overlay** (Magenta) und grober **Ähnlichkeit in Prozent**; **Batch-Umbenennen** offener Tabs/Dateiliste mit Template **`{stem}_{n}`** und Live-Vorschau (Sidecars mitumbenennen); **Annotation-Suche** Volltext über Sidecar-Notizen/Highlights quer durch geöffnete Docs; **Dark/Light** mit **System-Theme folgen** und manuellem Override. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### PDF
+- Vergleich: Raster-Diff Overlay + Ähnlichkeit % (Seite neben Seite)
+
+### Dateien / Tabs
+- Batch-Umbenennen: Template `{stem}_{n}` / `{ext}` / `{name}`; Vorschau; Sidecars `.ildann.json` u. a.
+
+### Annotationen
+- Suche über offene Docs: Notizen, Highlights, Tags (Sidecar `*.ildann.json`); Sprung zu Seite
+
+### UI / Theme
+- Design: **System folgen** (Toggle) + manuell Hell/Dunkel Override; Settings + Session
+
+### Packaging / Docs
+- Version **1.4.0** (App / `ild_pdf` / ISS / Smoke / Docs)
+- Smoke: PDF-Diff, Batch-Rename, Ann.-Suche, Theme System (CLI + Qt)
+
+---
+
 ## 1.3.6 — Forms CSV Esc/Enter, Redaction Sidecar übersprungen+Settings, Outlines Versuch k/3, Prefetch Lazy-Farbe
 
 Post-Release-Polish nach 1.3.5: **Forms-CSV** Dialog **Esc** schließt ohne Export, **Enter** startet Export wenn Fokus auf **OK**; **Redactions** bei fortgesetztem Bake Status **„Sidecar übersprungen“**, Fortsetzen-Option in **Settings** merken; **Outlines-Export** Fehlerdialog mit Retry-Zähler **„Versuch k/3“**; Prefetch Live-Label **grau** wenn Lazy aus (Dokument unter Schwellwert), sonst **aktiv**. Stubs KI/Cloud/Stylus/3D bleiben Stubs.

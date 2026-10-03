@@ -1537,6 +1537,25 @@ class Sidebar(QWidget):
                 out[str(Path(str(p)))] = label
         return out
 
+    def update_document_path(self, old_path: str, new_path: str) -> bool:
+        """Dateipfad eines Tabs nach Umbenennen aktualisieren — 1.4.0."""
+        src = str(Path(old_path)) if old_path else ""
+        dst = str(Path(new_path)) if new_path else ""
+        if not src or not dst:
+            return False
+        for i in range(self.files.count()):
+            it = self.files.item(i)
+            if not it:
+                continue
+            p = it.data(256)
+            if not p or str(Path(str(p))) != src:
+                continue
+            it.setData(256, dst)
+            # Custom-Label beibehalten; Anzeige neu aufbauen
+            self._refresh_document_item_text(it)
+            return True
+        return False
+
     def set_document_label(self, path: str, label: str | None) -> bool:
         """
         Anzeige-Label setzen (≠ Dateiname). Leer/None → Dateiname.

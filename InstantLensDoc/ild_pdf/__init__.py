@@ -6,6 +6,7 @@ Basiert auf pypdfium2 (PDFium, lizenzfreundlich). Kein Poppler/GPL.
 
 from .document import PdfDocument, format_page_status
 from .render import render_page, render_pages
+from .diff import RasterDiffResult, align_images, raster_diff
 from .annotate import (
     Annotation,
     AnnotationImportError,
@@ -119,6 +120,9 @@ __all__ = [
     "render_page",
     "render_pages",
     "clear_render_cache",
+    "RasterDiffResult",
+    "align_images",
+    "raster_diff",
     "Annotation",
     "AnnotationImportError",
     "AnnotationStore",
@@ -228,4 +232,4 @@ __all__ = [
     "uri_link_at",
 ]
 
-__version__ = "1.3.6"
+__version__ = "1.4.0"

@@ -251,10 +251,15 @@ class SettingsDialog(QDialog):
 
         form = QFormLayout()
         self.theme_combo = QComboBox()
+        self.theme_combo.addItem(tr("theme_system"), "system")
         self.theme_combo.addItem(tr("theme_light"), "light")
         self.theme_combo.addItem(tr("theme_dark"), "dark")
+        self.theme_combo.setToolTip(
+            "System-Theme folgen oder manuell Hell/Dunkel Override — 1.4.0"
+        )
         cur_theme = get_theme()
-        self.theme_combo.setCurrentIndex(1 if cur_theme == "dark" else 0)
+        theme_idx = {"system": 0, "light": 1, "dark": 2}.get(cur_theme, 0)
+        self.theme_combo.setCurrentIndex(theme_idx)
         form.addRow(tr("theme"), self.theme_combo)
 
         self.ui_lang = QComboBox()
@@ -1797,9 +1802,11 @@ class SettingsDialog(QDialog):
         self.accept()
 
     def _save(self):
-        theme = self.theme_combo.currentData() or "light"
+        theme = self.theme_combo.currentData() or "system"
         lang = self.lang_combo.currentData() or "deu+eng"
-        set_theme("dark" if theme == "dark" else "light")
+        if theme not in ("light", "dark", "system"):
+            theme = "system"
+        set_theme(theme)
         set_ocr_lang(str(lang))
         try:
             dpi_val = int(self.ocr_dpi_combo.currentData() or 150)
