@@ -174,9 +174,13 @@ from instantlensdoc.core.app_settings import (
     get_ocr_defaults_toast_sec,
     get_ocr_dpi,
     get_ocr_lang,
+    get_ocr_table_csv_delimiter,
+    get_ocr_table_csv_utf8_bom,
     get_merge_close_preview_on_edit,
     MERGE_CLOSE_PREVIEW_TOOLTIP,
     OCR_DEFAULTS_TOAST_CHOICES,
+    OCR_TABLE_CSV_DELIMITER_LABELS,
+    OCR_TABLE_CSV_DELIMITERS,
     get_page_size_unit,
     get_pdf_continuous_scroll,
     get_pdf_grayscale,
@@ -286,6 +290,8 @@ from instantlensdoc.core.app_settings import (
     set_ocr_defaults_toast_sec,
     set_ocr_dpi,
     set_ocr_lang,
+    set_ocr_table_csv_delimiter,
+    set_ocr_table_csv_utf8_bom,
     set_merge_close_preview_on_edit,
     set_page_size_unit,
     set_pdf_continuous_scroll,
@@ -413,6 +419,26 @@ class SettingsDialog(QDialog):
             "inkl. Accessibility-Announcement — 1.1.9"
         )
         form.addRow("OCR-Defaults-Toast", self.ocr_toast_sec)
+
+        self.ocr_csv_delim = QComboBox()
+        cur_csv_d = get_ocr_table_csv_delimiter()
+        csv_pick = 0
+        for i, d in enumerate(OCR_TABLE_CSV_DELIMITERS):
+            self.ocr_csv_delim.addItem(OCR_TABLE_CSV_DELIMITER_LABELS.get(d, d), d)
+            if d == cur_csv_d:
+                csv_pick = i
+        self.ocr_csv_delim.setCurrentIndex(csv_pick)
+        self.ocr_csv_delim.setToolTip(
+            "Tabellen-OCR → CSV Trennzeichen (;/,/Tab) — 1.9.1"
+        )
+        form.addRow("Tabellen-OCR CSV-Trennzeichen", self.ocr_csv_delim)
+
+        self.ocr_csv_bom = QCheckBox("Tabellen-OCR CSV: UTF-8 BOM (Excel)")
+        self.ocr_csv_bom.setChecked(get_ocr_table_csv_utf8_bom())
+        self.ocr_csv_bom.setToolTip(
+            "UTF-8 BOM für Tabellen-CSV (abschaltbar) — 1.9.1"
+        )
+        form.addRow(self.ocr_csv_bom)
 
         self.merge_close_preview = QCheckBox(
             "Zusammenführen: Readonly-Vorschau bei „Zum Bearbeiten öffnen“ schließen"
@@ -2232,6 +2258,8 @@ class SettingsDialog(QDialog):
         except (TypeError, ValueError):
             toast_sec = 2
         set_ocr_defaults_toast_sec(toast_sec)
+        set_ocr_table_csv_delimiter(str(self.ocr_csv_delim.currentData() or ";"))
+        set_ocr_table_csv_utf8_bom(self.ocr_csv_bom.isChecked())
         set_merge_close_preview_on_edit(self.merge_close_preview.isChecked())
         set_ui_lang(str(self.ui_lang.currentData() or "de"))
         sync_from_settings()

@@ -1,5 +1,5 @@
 """
-Plugin-Hooks — STUB (1.9.0)
+Plugin-Hooks — STUB (1.9.1)
 
 Kein echtes Plugin-System. Dieser Modul stellt nur einen **internen Event-Bus**
 und einen **no-op Loader** bereit, damit spätere Erweiterungen einen klaren
@@ -9,13 +9,17 @@ Kennzeichnung:
 - ``IS_STUB = True``
 - ``load_plugins()`` lädt niemals Code und gibt immer ``[]`` zurück
 - Listener können intern registriert werden (Tests/App), externe Plugins nicht
+- **nicht produktiv** — About/Menü kennzeichnen den Stub klar
 
-Geplante Events (Dokumentation, noch ohne echte Plugin-API):
-- ``app.started`` — nach QApplication / MainWindow
-- ``document.opened`` — Datei geöffnet
-- ``document.saved`` — Datei gespeichert
-- ``annotation.changed`` — Sidecar-Annotation geändert
-- ``ocr.finished`` — OCR-Lauf beendet
+Dokumentierte Event-Namen (API-Stabilität später; Liste auch in FEATURES.md / Docs):
+
+| Event | Bedeutung |
+|-------|-----------|
+| ``app.started`` | nach QApplication / MainWindow |
+| ``document.opened`` | Datei geöffnet |
+| ``document.saved`` | Datei gespeichert |
+| ``annotation.changed`` | Sidecar-Annotation geändert |
+| ``ocr.finished`` | OCR-Lauf beendet |
 """
 
 from __future__ import annotations
@@ -24,14 +28,15 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any, Callable, DefaultDict, Iterable, List, Optional, Sequence
 
-# Klare Stub-Markierung — kein echtes Plugin-System
+# Klare Stub-Markierung — kein echtes Plugin-System, nicht produktiv
 IS_STUB = True
+NOT_PRODUCTION_READY = True
 STUB_MESSAGE = (
-    "Plugin-Hooks Stub 1.9.0 — interner Event-Bus + no-op Loader; "
-    "kein Plugin-System (Coming soon)."
+    "Plugin-Hooks Stub 1.9.1 — nicht produktiv; "
+    "interner Event-Bus + no-op Loader; kein Plugin-System (Coming soon)."
 )
 
-# Dokumentierte Event-Namen (API-Stabilität später)
+# Dokumentierte Event-Namen (API-Stabilität später) — Docs/FEATURES spiegeln diese Liste
 KNOWN_EVENTS: tuple[str, ...] = (
     "app.started",
     "document.opened",
@@ -39,6 +44,14 @@ KNOWN_EVENTS: tuple[str, ...] = (
     "annotation.changed",
     "ocr.finished",
 )
+
+EVENT_DESCRIPTIONS: dict[str, str] = {
+    "app.started": "nach QApplication / MainWindow",
+    "document.opened": "Datei geöffnet",
+    "document.saved": "Datei gespeichert",
+    "annotation.changed": "Sidecar-Annotation geändert",
+    "ocr.finished": "OCR-Lauf beendet",
+}
 
 Listener = Callable[..., Any]
 
@@ -102,7 +115,7 @@ def emit(event: str, *args: Any, **kwargs: Any) -> int:
 
 def load_plugins(directory: str | Path | None = None) -> list:
     """
-    No-op Plugin-Loader — **STUB**.
+    No-op Plugin-Loader — **STUB / nicht produktiv**.
 
     Akzeptiert optional einen Ordnerpfad, lädt aber niemals Module und
     gibt immer eine leere Liste zurück. Externe Plugins werden bewusst
@@ -119,8 +132,10 @@ def plugin_stub_info() -> dict[str, Any]:
     return {
         "stub": True,
         "is_stub": IS_STUB,
-        "version_marker": "1.9.0",
+        "not_production_ready": NOT_PRODUCTION_READY,
+        "version_marker": "1.9.1",
         "message": STUB_MESSAGE,
         "known_events": list(KNOWN_EVENTS),
+        "event_descriptions": dict(EVENT_DESCRIPTIONS),
         "loader": "no-op",
     }

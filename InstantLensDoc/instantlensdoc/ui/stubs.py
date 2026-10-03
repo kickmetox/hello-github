@@ -14,7 +14,7 @@ PLANNED = {
     "shapes_ai": f"Intelligente Formerkennung — Stub {__version__}",
     "extrude3d": f"3D-Extrusion — Stub {__version__}",
     "plugins": (
-        f"Plugin-Hooks — Stub {__version__} "
+        f"Plugin-Hooks — Stub {__version__} — nicht produktiv "
         "(interner Event-Bus + no-op Loader; kein Plugin-System)"
     ),
     "varfonts": "Variable Fonts (voll) — geplant",
@@ -29,7 +29,7 @@ PLANNED_EN = {
     "shapes_ai": f"Smart shape recognition — stub {__version__}",
     "extrude3d": f"3D extrusion — stub {__version__}",
     "plugins": (
-        f"Plugin hooks — stub {__version__} "
+        f"Plugin hooks — stub {__version__} — not production-ready "
         "(internal event bus + no-op loader; no plugin system)"
     ),
     "varfonts": "Variable fonts (full) — planned",

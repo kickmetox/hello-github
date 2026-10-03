@@ -1,9 +1,10 @@
-"""Dialog: PDF-Anhänge listen, extrahieren und hinzufügen — 1.9.0."""
+"""Dialog: PDF-Anhänge listen, extrahieren und hinzufügen — 1.9.1."""
 
 from __future__ import annotations
 
 from pathlib import Path
 
+from PySide6.QtGui import QDragEnterEvent, QDropEvent
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QDialog,
@@ -30,33 +31,64 @@ from ild_pdf.attachments import (
 from instantlensdoc.core.app_settings import dialog_start_dir, remember_recent_dir
 
 
+def _format_size(size: int) -> str:
+    if not size:
+        return "—"
+    return f"{size:,} B".replace(",", ".")
+
+
+def _attachment_type(info: AttachmentInfo) -> str:
+    """Typ-Spalte: MIME bevorzugt, sonst Dateiendung — 1.9.1."""
+    mime = (info.mime_type or "").strip()
+    if mime:
+        return mime
+    name = info.filename or info.name or ""
+    suf = Path(name).suffix.lower().lstrip(".")
+    return suf.upper() if suf else "—"
+
+
 class AttachmentsDialog(QDialog):
-    """Zeigt eingebettete PDF-Anhänge; Extraktion und Hinzufügen."""
+    """Zeigt eingebettete PDF-Anhänge; Extraktion, Hinzufügen, Drag&Drop."""
 
     def __init__(self, pdf_path: str | Path, parent=None):
         super().__init__(parent)
         self.pdf_path = Path(pdf_path)
         self.setWindowTitle("PDF-Anhänge")
-        self.resize(680, 420)
+        self.resize(720, 440)
+        self.setAcceptDrops(True)
         self._changed = False
         layout = QVBoxLayout(self)
         layout.addWidget(QLabel(f"{self.pdf_path.name} — eingebettete Dateianhänge"))
+        hint = QLabel(
+            "Doppelklick: Auswahl extrahieren · Dateien per Drag&Drop hinzufügen — 1.9.1"
+        )
+        hint.setStyleSheet("color:#555;")
+        hint.setWordWrap(True)
+        layout.addWidget(hint)
 
         self.table = QTableWidget(0, 4)
-        self.table.setHorizontalHeaderLabels(["Name", "Dateiname", "Größe", "MIME / Beschreibung"])
+        self.table.setHorizontalHeaderLabels(["Name", "Dateiname", "Größe", "Typ"])
         self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
         self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
+        self.table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
         self.table.horizontalHeader().setSectionResizeMode(3, QHeaderView.Stretch)
         self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.table.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.table.setAcceptDrops(True)
+        self.table.viewport().setAcceptDrops(True)
+        self.table.itemDoubleClicked.connect(self._on_double_click)
         layout.addWidget(self.table)
 
         row = QHBoxLayout()
         self.btn_add = QPushButton("Hinzufügen…")
-        self.btn_add.setToolTip("Datei als eingebetteten PDF-Anhang hinzufügen (pikepdf) — 1.9.0")
+        self.btn_add.setToolTip(
+            "Datei als eingebetteten PDF-Anhang hinzufügen (pikepdf); "
+            "auch Drag&Drop — 1.9.1"
+        )
         self.btn_add.clicked.connect(self._add)
         self.btn_extract = QPushButton("Auswahl extrahieren…")
+        self.btn_extract.setToolTip("Doppelklick auf Zeile extrahiert ebenfalls — 1.9.1")
         self.btn_extract.clicked.connect(self._extract_selected)
         self.btn_all = QPushButton("Alle extrahieren…")
         self.btn_all.clicked.connect(self._extract_all)
@@ -96,17 +128,15 @@ class AttachmentsDialog(QDialog):
         if not self._items:
             self.table.setRowCount(1)
             self.table.setItem(0, 0, QTableWidgetItem("(keine Anhänge)"))
+            self.table.setItem(0, 2, QTableWidgetItem("—"))
+            self.table.setItem(0, 3, QTableWidgetItem("—"))
             return
         self.table.setRowCount(len(self._items))
         for i, info in enumerate(self._items):
             self.table.setItem(i, 0, QTableWidgetItem(info.name))
             self.table.setItem(i, 1, QTableWidgetItem(info.filename or info.name))
-            size_txt = f"{info.size:,} B".replace(",", ".") if info.size else "—"
-            self.table.setItem(i, 2, QTableWidgetItem(size_txt))
-            extra = info.mime_type or ""
-            if info.description:
-                extra = f"{extra}; {info.description}" if extra else info.description
-            self.table.setItem(i, 3, QTableWidgetItem(extra))
+            self.table.setItem(i, 2, QTableWidgetItem(_format_size(info.size)))
+            self.table.setItem(i, 3, QTableWidgetItem(_attachment_type(info)))
         self.table.selectRow(0)
 
     def _selected_names(self) -> list[str]:
@@ -125,29 +155,62 @@ class AttachmentsDialog(QDialog):
         remember_recent_dir(path)
         return Path(path)
 
+    def _on_double_click(self, _item) -> None:
+        """Doppelklick → Auswahl extrahieren — 1.9.1."""
+        if not self._items:
+            return
+        self._extract_selected()
+
+    def _add_paths(self, paths: list[str | Path]) -> int:
+        added = 0
+        last_info = None
+        for path in paths:
+            p = Path(path)
+            if not p.is_file():
+                continue
+            try:
+                last_info = add_attachment(self.pdf_path, p)
+                added += 1
+            except Exception as e:
+                QMessageBox.warning(self, "Anhang hinzufügen", f"{p.name}: {e}")
+                break
+        if added:
+            self._changed = True
+            remember_recent_dir(str(Path(paths[0]).parent))
+            self._load()
+            msg = f"{added} Datei(en) hinzugefügt"
+            if last_info and added == 1:
+                msg = f"Hinzugefügt: {last_info.name} ({last_info.size} B)"
+            QMessageBox.information(self, "Anhänge", msg)
+        return added
+
     def _add(self):
         start = dialog_start_dir(self.pdf_path.parent)
-        path, _ = QFileDialog.getOpenFileName(
+        paths, _ = QFileDialog.getOpenFileNames(
             self,
             "Datei als Anhang hinzufügen",
             start,
             "Alle Dateien (*.*)",
         )
-        if not path:
+        if not paths:
             return
-        remember_recent_dir(path)
-        try:
-            info = add_attachment(self.pdf_path, path)
-        except Exception as e:
-            QMessageBox.warning(self, "Anhang hinzufügen", str(e))
-            return
-        self._changed = True
-        self._load()
-        QMessageBox.information(
-            self,
-            "Anhänge",
-            f"Hinzugefügt: {info.name} ({info.size} B)",
-        )
+        self._add_paths(paths)
+
+    def dragEnterEvent(self, event: QDragEnterEvent) -> None:
+        if event.mimeData().hasUrls():
+            event.acceptProposedAction()
+        else:
+            super().dragEnterEvent(event)
+
+    def dropEvent(self, event: QDropEvent) -> None:
+        urls = event.mimeData().urls() if event.mimeData() else []
+        paths = [u.toLocalFile() for u in urls if u.isLocalFile()]
+        files = [p for p in paths if p and Path(p).is_file()]
+        if files:
+            event.acceptProposedAction()
+            self._add_paths(files)
+        else:
+            super().dropEvent(event)
 
     def _extract_selected(self):
         names = self._selected_names()

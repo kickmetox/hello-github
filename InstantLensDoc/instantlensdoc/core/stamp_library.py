@@ -1,4 +1,4 @@
-"""Eigene Stempel-Bilder verwalten (Ordner) und als Sidecar-Stempel setzen — 1.9.0."""
+"""Eigene Stempel-Bilder verwalten (Ordner) und als Sidecar-Stempel setzen — 1.9.1."""
 
 from __future__ import annotations
 
@@ -19,9 +19,15 @@ class StampImageInfo:
     path: Path
     name: str
     size: int = 0
+    is_default: bool = False
 
     def to_dict(self) -> dict:
-        return {"path": str(self.path), "name": self.name, "size": self.size}
+        return {
+            "path": str(self.path),
+            "name": self.name,
+            "size": self.size,
+            "is_default": self.is_default,
+        }
 
 
 def stamp_library_dir() -> Path:
@@ -35,11 +41,30 @@ def _is_stamp_image(path: Path) -> bool:
     return path.is_file() and path.suffix.lower() in STAMP_IMAGE_EXTS
 
 
+def get_default_stamp_name() -> str:
+    """Dateiname des Standard-Stempels (leer = keiner) — 1.9.1."""
+    from instantlensdoc.core.app_settings import get_default_stamp_image
+
+    return get_default_stamp_image()
+
+
+def set_default_stamp_name(name: str | None) -> str:
+    """Standard-Stempel setzen (Dateiname im Bibliotheksordner) — 1.9.1."""
+    from instantlensdoc.core.app_settings import set_default_stamp_image
+
+    return set_default_stamp_image(name)
+
+
 def list_stamp_images(directory: str | Path | None = None) -> List[StampImageInfo]:
     """Listet Stempel-Bilder im Bibliotheksordner (sortiert nach Name)."""
     root = Path(directory) if directory else stamp_library_dir()
     if not root.is_dir():
         return []
+    default_name = ""
+    try:
+        default_name = get_default_stamp_name()
+    except Exception:
+        default_name = ""
     items: List[StampImageInfo] = []
     for p in sorted(root.iterdir(), key=lambda x: x.name.lower()):
         if not _is_stamp_image(p):
@@ -48,7 +73,14 @@ def list_stamp_images(directory: str | Path | None = None) -> List[StampImageInf
             size = int(p.stat().st_size)
         except OSError:
             size = 0
-        items.append(StampImageInfo(path=p, name=p.name, size=size))
+        items.append(
+            StampImageInfo(
+                path=p,
+                name=p.name,
+                size=size,
+                is_default=(p.name == default_name),
+            )
+        )
     return items
 
 
@@ -97,7 +129,7 @@ def remove_stamp_image(
     directory: str | Path | None = None,
 ) -> bool:
     """
-    Entfernt ein Bild aus der Bibliothek.
+    Entfernt ein Bild aus der Bibliothek (Löschen).
     ``target`` = Pfad oder Dateiname im Bibliotheksordner.
     """
     root = Path(directory) if directory else stamp_library_dir()
@@ -115,8 +147,79 @@ def remove_stamp_image(
         raise ValueError(f"Datei liegt nicht in der Stempel-Bibliothek: {p}")
     if not _is_stamp_image(p):
         return False
+    name = p.name
     p.unlink(missing_ok=True)
+    try:
+        if get_default_stamp_name() == name:
+            set_default_stamp_name("")
+    except Exception:
+        pass
     return True
+
+
+def rename_stamp_image(
+    target: str | Path,
+    new_name: str,
+    *,
+    directory: str | Path | None = None,
+) -> StampImageInfo:
+    """
+    Benennt ein Stempel-Bild in der Bibliothek um — 1.9.1.
+    ``new_name`` = neuer Dateiname (mit oder ohne Extension).
+    """
+    root = Path(directory) if directory else stamp_library_dir()
+    p = Path(target)
+    if not p.is_file():
+        cand = root / p.name
+        if cand.is_file():
+            p = cand
+        else:
+            raise FileNotFoundError(f"Stempel-Bild nicht gefunden: {target}")
+    try:
+        p.resolve().relative_to(root.resolve())
+    except ValueError:
+        raise ValueError(f"Datei liegt nicht in der Stempel-Bibliothek: {p}")
+    if not _is_stamp_image(p):
+        raise ValueError(f"Kein unterstütztes Stempel-Bild: {p}")
+
+    nn = Path(new_name).name.strip()
+    if not nn:
+        raise ValueError("Neuer Name darf nicht leer sein.")
+    if Path(nn).suffix.lower() not in STAMP_IMAGE_EXTS:
+        nn = f"{Path(nn).stem}{p.suffix.lower()}"
+    if Path(nn).suffix.lower() not in STAMP_IMAGE_EXTS:
+        raise ValueError(f"Ungültige Dateiendung: {nn}")
+    dest = root / nn
+    if dest.resolve() == p.resolve():
+        try:
+            size = int(p.stat().st_size)
+        except OSError:
+            size = 0
+        return StampImageInfo(
+            path=p,
+            name=p.name,
+            size=size,
+            is_default=(p.name == get_default_stamp_name()),
+        )
+    if dest.exists():
+        raise FileExistsError(f"Ziel existiert bereits: {nn}")
+    old_name = p.name
+    p.rename(dest)
+    try:
+        if get_default_stamp_name() == old_name:
+            set_default_stamp_name(dest.name)
+    except Exception:
+        pass
+    try:
+        size = int(dest.stat().st_size)
+    except OSError:
+        size = 0
+    return StampImageInfo(
+        path=dest,
+        name=dest.name,
+        size=size,
+        is_default=(dest.name == get_default_stamp_name()),
+    )
 
 
 def place_library_stamp(

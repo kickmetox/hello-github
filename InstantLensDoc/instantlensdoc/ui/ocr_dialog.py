@@ -23,13 +23,19 @@ from PySide6.QtWidgets import (
 )
 
 from instantlensdoc.core.app_settings import (
+    OCR_TABLE_CSV_DELIMITER_LABELS,
+    OCR_TABLE_CSV_DELIMITERS,
     get_ocr_attach_errors,
     get_ocr_defaults_toast_sec,
     get_ocr_dpi,
     get_ocr_lang,
+    get_ocr_table_csv_delimiter,
+    get_ocr_table_csv_utf8_bom,
     set_ocr_attach_errors,
     set_ocr_dpi,
     set_ocr_lang,
+    set_ocr_table_csv_delimiter,
+    set_ocr_table_csv_utf8_bom,
 )
 from instantlensdoc.core.ocr import (
     DEFAULT_OCR_DPI,
@@ -187,7 +193,7 @@ class OcrDialog(QDialog):
         self.rb_searchable = QRadioButton("Durchsuchbares Bild (PDF + Text-Sidecar)")
         self.rb_table_csv = QRadioButton("Tabelle als CSV (heuristisch)")
         self.rb_table_csv.setToolTip(
-            "Grobe Tabellenerkennung aus OCR → CSV (UTF-8 BOM, `;`) — 1.9.0"
+            "Grobe Tabellenerkennung aus OCR → CSV; Trennzeichen/BOM in Optionen — 1.9.1"
         )
         self.rb_editable.setChecked(True)
         group = QButtonGroup(self)
@@ -199,6 +205,33 @@ class OcrDialog(QDialog):
         mode_box.addWidget(self.rb_searchable)
         mode_box.addWidget(self.rb_table_csv)
         form.addRow("Ausgabe", mode_box)
+
+        # Tabellen-CSV Optionen — 1.9.1
+        self.csv_delim_combo = QComboBox()
+        cur_delim = get_ocr_table_csv_delimiter()
+        delim_pick = 0
+        for i, d in enumerate(OCR_TABLE_CSV_DELIMITERS):
+            self.csv_delim_combo.addItem(
+                OCR_TABLE_CSV_DELIMITER_LABELS.get(d, d), d
+            )
+            if d == cur_delim:
+                delim_pick = i
+        self.csv_delim_combo.setCurrentIndex(delim_pick)
+        self.csv_delim_combo.setToolTip(
+            "CSV-Trennzeichen: Semikolon, Komma oder Tab — 1.9.1"
+        )
+        self.csv_bom_check = QCheckBox("UTF-8 BOM (Excel)")
+        self.csv_bom_check.setChecked(get_ocr_table_csv_utf8_bom())
+        self.csv_bom_check.setToolTip(
+            "UTF-8 mit BOM für Excel-Kompatibilität (abschaltbar) — 1.9.1"
+        )
+        self._csv_opts_label = QLabel("CSV-Optionen")
+        form.addRow(self._csv_opts_label, self.csv_delim_combo)
+        form.addRow("", self.csv_bom_check)
+        self.rb_editable.toggled.connect(self._sync_csv_opts_visible)
+        self.rb_searchable.toggled.connect(self._sync_csv_opts_visible)
+        self.rb_table_csv.toggled.connect(self._sync_csv_opts_visible)
+        self._sync_csv_opts_visible()
 
         if default_label:
             form.addRow("Quelle", QLabel(default_label))
@@ -312,6 +345,12 @@ class OcrDialog(QDialog):
         if path:
             self.selected_path = path
 
+    def _sync_csv_opts_visible(self, *_args) -> None:
+        on = bool(self.rb_table_csv.isChecked())
+        self.csv_delim_combo.setVisible(on)
+        self.csv_bom_check.setVisible(on)
+        self._csv_opts_label.setVisible(on)
+
     def _accept(self):
         if self.need_file and not self.selected_path:
             self._pick()
@@ -319,7 +358,21 @@ class OcrDialog(QDialog):
                 return
         if self._show_page_range and self.range_check.isChecked():
             self._clamp_range()
+        # CSV-Optionen persistieren wenn Tabellen-Modus — 1.9.1
+        if self.rb_table_csv.isChecked():
+            try:
+                set_ocr_table_csv_delimiter(str(self.csv_delimiter()))
+                set_ocr_table_csv_utf8_bom(self.csv_utf8_bom())
+            except Exception:
+                pass
         self.accept()
+
+    def csv_delimiter(self) -> str:
+        data = self.csv_delim_combo.currentData()
+        return str(data) if data is not None else ";"
+
+    def csv_utf8_bom(self) -> bool:
+        return bool(self.csv_bom_check.isChecked())
 
     def lang_code(self) -> str:
         return self.lang_combo.currentData() or "deu+eng"

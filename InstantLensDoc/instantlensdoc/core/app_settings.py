@@ -161,6 +161,10 @@ DEFAULTS: dict[str, Any] = {
     "thumb_prefetch_radius": 2,
     "thumb_prefetch_cancel_ms": 90,
     "forms_csv_visible_only": False,  # CSV-Export Default „nur sichtbare“ — 1.3.5
+    "default_stamp_image": "",  # Standard-Stempel Dateiname in config/stamps/ — 1.9.1
+    "ocr_table_csv_delimiter": ";",  # Tabellen-OCR CSV: ; / , / Tab — 1.9.1
+    "ocr_table_csv_utf8_bom": True,  # Tabellen-OCR CSV UTF-8 BOM — 1.9.1
+    "last_ocr_table_csv_dir": "",  # Zielordner Tabellen-OCR CSV merken — 1.9.1
     "redaction_bake_continue_on_sidecar_skip": True,  # Bake fortsetzen merken — 1.3.6
     "redaction_preview_opacity": 0.90,
     "editor_text_encoding": "auto",
@@ -3953,6 +3957,74 @@ def set_forms_csv_visible_only(enabled: bool) -> bool:
     val = bool(enabled)
     save_settings({"forms_csv_visible_only": val})
     return val
+
+
+# Tabellen-OCR CSV / Stempel-Standard — 1.9.1
+OCR_TABLE_CSV_DELIMITERS: tuple[str, ...] = (";", ",", "\t")
+OCR_TABLE_CSV_DELIMITER_LABELS: dict[str, str] = {
+    ";": "Semikolon (;)",
+    ",": "Komma (,)",
+    "\t": "Tab",
+}
+
+
+def get_default_stamp_image() -> str:
+    """Dateiname des Standard-Stempelbilds (leer = keiner) — 1.9.1."""
+    return str(load_settings().get("default_stamp_image", "") or "").strip()
+
+
+def set_default_stamp_image(name: str | None) -> str:
+    """Standard-Stempel setzen (nur Basename) — 1.9.1."""
+    val = Path(str(name or "")).name.strip() if name else ""
+    save_settings({"default_stamp_image": val})
+    return val
+
+
+def get_ocr_table_csv_delimiter() -> str:
+    """Trennzeichen für Tabellen-OCR→CSV (;/,/Tab) — 1.9.1."""
+    raw = str(load_settings().get("ocr_table_csv_delimiter", ";") or ";")
+    if raw in ("\\t", "tab", "TAB"):
+        raw = "\t"
+    if raw not in OCR_TABLE_CSV_DELIMITERS:
+        return ";"
+    return raw
+
+
+def set_ocr_table_csv_delimiter(delimiter: str) -> str:
+    raw = str(delimiter or ";")
+    if raw in ("\\t", "tab", "TAB"):
+        raw = "\t"
+    if raw not in OCR_TABLE_CSV_DELIMITERS:
+        raw = ";"
+    save_settings({"ocr_table_csv_delimiter": raw})
+    return raw
+
+
+def get_ocr_table_csv_utf8_bom() -> bool:
+    """UTF-8 BOM für Tabellen-OCR→CSV (Default an) — 1.9.1."""
+    return bool(load_settings().get("ocr_table_csv_utf8_bom", True))
+
+
+def set_ocr_table_csv_utf8_bom(enabled: bool) -> bool:
+    val = bool(enabled)
+    save_settings({"ocr_table_csv_utf8_bom": val})
+    return val
+
+
+def get_last_ocr_table_csv_dir() -> Path | None:
+    """Zuletzt genutzter Zielordner für Tabellen-OCR CSV — 1.9.1."""
+    raw = str(load_settings().get("last_ocr_table_csv_dir", "") or "").strip()
+    if not raw:
+        return None
+    p = Path(raw)
+    return p if p.is_dir() else None
+
+
+def set_last_ocr_table_csv_dir(path: str | Path) -> None:
+    p = Path(path)
+    if p.is_file():
+        p = p.parent
+    save_settings({"last_ocr_table_csv_dir": str(p)})
 
 
 def get_redaction_bake_continue_on_sidecar_skip() -> bool:

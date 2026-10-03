@@ -272,6 +272,10 @@ Exit-Codes: 0 OK, 1 allgemein, 2 Git-Fehler. Eigenes Icon in <code>assets</code>
 <h3>Geplante Features</h3>
 <p>KI-Assistent, Cloud-Sync, Stylus/Palm Rejection, 3D u. a. sind im Menü als „Geplant“ markiert
 (Stub {__version__}) — siehe FEATURES.md.</p>
+<p><b>Plugin-Hooks</b> sind ein Stub und <b>nicht produktiv</b> (interner Event-Bus + no-op Loader).
+Dokumentierte Event-Namen: <code>app.started</code>, <code>document.opened</code>,
+<code>document.saved</code>, <code>annotation.changed</code>, <code>ocr.finished</code>
+— siehe FEATURES.md.</p>
 """
 
 
@@ -695,6 +699,36 @@ class AboutDialog(QDialog):
         )
         privacy.setWordWrap(True)
         layout.addWidget(privacy)
+        # Plugin-Hooks Stub: klar „nicht produktiv“ — 1.9.1
+        try:
+            from instantlensdoc.core.plugin_hooks import (
+                KNOWN_EVENTS,
+                STUB_MESSAGE,
+                plugin_stub_info,
+            )
+
+            ev_list = ", ".join(f"<code>{e}</code>" for e in KNOWN_EVENTS)
+            info = plugin_stub_info()
+            plugins_note = QLabel(
+                "<p style='background:#FFF8E1;padding:8px;border:1px solid #FFD54F;'>"
+                "<b>Plugin-Hooks — Stub / nicht produktiv</b><br>"
+                f"{STUB_MESSAGE}<br>"
+                f"Geplante Events: {ev_list}<br>"
+                "Stubs KI/Cloud/Stylus/3D + Plugin-Hooks bewusst ohne produktive Funktion."
+                "</p>"
+            )
+            plugins_note.setWordWrap(True)
+            plugins_note.setToolTip(str(info.get("message") or STUB_MESSAGE))
+            layout.addWidget(plugins_note)
+        except Exception:
+            plugins_note = QLabel(
+                "<p style='background:#FFF8E1;padding:8px;border:1px solid #FFD54F;'>"
+                "<b>Plugin-Hooks — Stub / nicht produktiv</b> "
+                "(interner Event-Bus + no-op Loader; kein Plugin-System)."
+                "</p>"
+            )
+            plugins_note.setWordWrap(True)
+            layout.addWidget(plugins_note)
         # Changelog-Kurzliste — 1.0.0
         cl_lbl = QLabel(changelog_short_html(max_versions=4))
         cl_lbl.setWordWrap(True)
@@ -711,7 +745,8 @@ class AboutDialog(QDialog):
             "<li>Willkommen Drag&amp;Drop/Clear-Recent, Druck-DPI 72/150/300, Trial-Resttage konsistent, Backup-Retry — 1.0.2</li>"
             "<li>Editor: Find/Replace, Snippets, Bracket-Match, Minimap, Zeilen-Lesezeichen</li>"
             "<li>OCR-Bridge, Formulargenerator, Batch, Export · Ann.-Batch-Farbe/Deckkraft</li>"
-            "<li>Lizenz Trial/Keys · lokal, ohne Telemetrie · Stubs: KI, Cloud, Stylus, 3D</li>"
+            "<li>Lizenz Trial/Keys · lokal, ohne Telemetrie · "
+            "Stubs: KI, Cloud, Stylus, 3D, Plugin-Hooks (nicht produktiv)</li>"
             "</ul>"
             "<p>Vollständige Liste: FEATURES.md</p>"
         )

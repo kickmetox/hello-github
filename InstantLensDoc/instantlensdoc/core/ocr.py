@@ -148,10 +148,11 @@ def format_rows_as_csv(
     *,
     delimiter: str = ";",
     dialect: str = "excel",
+    utf8_bom: bool = True,
 ) -> str:
     """
-    Zeilen/Spalten als CSV (Default `;` für DE-Excel) — 1.9.0.
-    UTF-8 mit BOM-Präfix im String (für Excel-kompatibles Speichern).
+    Zeilen/Spalten als CSV (Default `;` für DE-Excel) — 1.9.1.
+    Optional UTF-8 BOM-Präfix im String (Excel-kompatibel).
     """
     import csv
     import io
@@ -160,7 +161,8 @@ def format_rows_as_csv(
     writer = csv.writer(buf, delimiter=delimiter, dialect=dialect, lineterminator="\n")
     for row in rows:
         writer.writerow([str(c) if c is not None else "" for c in row])
-    return "\ufeff" + buf.getvalue()
+    body = buf.getvalue()
+    return ("\ufeff" + body) if utf8_bom else body
 
 
 def write_ocr_table_csv(
@@ -168,11 +170,13 @@ def write_ocr_table_csv(
     rows: List[List[str]],
     *,
     delimiter: str = ";",
+    utf8_bom: bool = True,
 ) -> Path:
-    """Schreibt Tabellen-OCR als CSV (UTF-8 BOM)."""
+    """Schreibt Tabellen-OCR als CSV (UTF-8, optional BOM) — 1.9.1."""
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    text = format_rows_as_csv(rows, delimiter=delimiter)
+    text = format_rows_as_csv(rows, delimiter=delimiter, utf8_bom=utf8_bom)
+    # BOM liegt ggf. schon im String; encoding utf-8 (nicht utf-8-sig) vermeidet Doppel-BOM
     path.write_text(text, encoding="utf-8")
     return path
 
@@ -263,12 +267,13 @@ def ocr_image_to_csv(
     lang: str = "deu+eng",
     *,
     delimiter: str = ";",
+    utf8_bom: bool = True,
 ) -> tuple[str, bool]:
-    """OCR → CSV-String (UTF-8 BOM) + table_like-Flag — 1.9.0."""
+    """OCR → CSV-String (optional UTF-8 BOM) + table_like-Flag — 1.9.1."""
     rows, table_like = ocr_image_table_rows(source, lang=lang)
     if not rows:
-        return "\ufeff", False
-    return format_rows_as_csv(rows, delimiter=delimiter), table_like
+        return ("\ufeff" if utf8_bom else ""), False
+    return format_rows_as_csv(rows, delimiter=delimiter, utf8_bom=utf8_bom), table_like
 
 
 def ocr_image_structured(
@@ -544,13 +549,35 @@ def run_ocr(
     mode: OcrOutputMode = OcrOutputMode.EDITABLE_TEXT,
     out_dir: str | Path | None = None,
     source_label: str = "",
+    csv_delimiter: str | None = None,
+    csv_utf8_bom: bool | None = None,
 ) -> OcrResult:
-    """Einheitlicher OCR-Einstieg inkl. Ausgabe-Modus."""
+    """Einheitlicher OCR-Einstieg inkl. Ausgabe-Modus (CSV-Optionen 1.9.1)."""
     label = source_label or (
         str(source) if isinstance(source, (str, Path)) else "Bild"
     )
     if mode == OcrOutputMode.TABLE_CSV:
-        csv_text, _used = ocr_image_to_csv(source, lang=lang)
+        delim = csv_delimiter
+        bom = csv_utf8_bom
+        if delim is None or bom is None:
+            try:
+                from instantlensdoc.core.app_settings import (
+                    get_ocr_table_csv_delimiter,
+                    get_ocr_table_csv_utf8_bom,
+                )
+
+                if delim is None:
+                    delim = get_ocr_table_csv_delimiter()
+                if bom is None:
+                    bom = get_ocr_table_csv_utf8_bom()
+            except Exception:
+                if delim is None:
+                    delim = ";"
+                if bom is None:
+                    bom = True
+        csv_text, _used = ocr_image_to_csv(
+            source, lang=lang, delimiter=str(delim), utf8_bom=bool(bom)
+        )
         out_dir_p = Path(out_dir) if out_dir else Path.cwd()
         out_dir_p.mkdir(parents=True, exist_ok=True)
         stem = Path(label).stem if label else "ocr"

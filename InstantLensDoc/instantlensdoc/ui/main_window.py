@@ -2479,7 +2479,7 @@ class MainWindow(QMainWindow):
             ("stylus", "Stylus / Palm Rejection (geplant)"),
             ("shapes_ai", "Intelligente Formerkennung (geplant)"),
             ("extrude3d", "3D-Extrusion (geplant)"),
-            ("plugins", "Plugin-Hooks (Stub)"),
+            ("plugins", "Plugin-Hooks (Stub · nicht produktiv)"),
             ("varfonts", "Variable Fonts (geplant)"),
             ("envelope", "Envelope Distort (geplant)"),
             ("esign", "E-Signatur (geplant)"),
@@ -11113,6 +11113,27 @@ class MainWindow(QMainWindow):
 
         lang = dlg.lang_code()
         mode = dlg.output_mode()
+        csv_delim = dlg.csv_delimiter() if mode == ocr_mod.OcrOutputMode.TABLE_CSV else None
+        csv_bom = dlg.csv_utf8_bom() if mode == ocr_mod.OcrOutputMode.TABLE_CSV else None
+        # Tabellen-CSV: gemerkten Zielordner bevorzugen — 1.9.1
+        csv_out_dir = None
+        if mode == ocr_mod.OcrOutputMode.TABLE_CSV:
+            from instantlensdoc.core.app_settings import (
+                get_last_ocr_table_csv_dir,
+                set_last_ocr_table_csv_dir,
+            )
+
+            remembered = get_last_ocr_table_csv_dir()
+            start_csv = dialog_start_dir(remembered)
+            picked = QFileDialog.getExistingDirectory(
+                self, "Zielordner für Tabellen-CSV", start_csv
+            )
+            if picked:
+                csv_out_dir = Path(picked)
+                set_last_ocr_table_csv_dir(csv_out_dir)
+                remember_recent_dir(str(csv_out_dir))
+            elif remembered:
+                csv_out_dir = remembered
         prog = QProgressDialog("OCR läuft…", None, 0, 0, self)
         prog.setWindowTitle("OCR")
         prog.setWindowModality(Qt.WindowModal)
@@ -11129,8 +11150,10 @@ class MainWindow(QMainWindow):
                     self.doc.path,
                     lang=lang,
                     mode=mode,
-                    out_dir=Path(self.doc.path).parent,
+                    out_dir=csv_out_dir or Path(self.doc.path).parent,
                     source_label=source_label,
+                    csv_delimiter=csv_delim,
+                    csv_utf8_bom=csv_bom,
                 )
             elif self.doc and self.doc.kind == DocKind.PDF and self.doc.path:
                 from ild_pdf import render_page
@@ -11143,8 +11166,10 @@ class MainWindow(QMainWindow):
                     img,
                     lang=lang,
                     mode=mode,
-                    out_dir=Path(self.doc.path).parent,
+                    out_dir=csv_out_dir or Path(self.doc.path).parent,
                     source_label=source_label,
+                    csv_delimiter=csv_delim,
+                    csv_utf8_bom=csv_bom,
                 )
             else:
                 path = dlg.selected_path
@@ -11165,9 +11190,15 @@ class MainWindow(QMainWindow):
                     path,
                     lang=lang,
                     mode=mode,
-                    out_dir=Path(path).parent,
+                    out_dir=csv_out_dir or Path(path).parent,
                     source_label=source_label,
+                    csv_delimiter=csv_delim,
+                    csv_utf8_bom=csv_bom,
                 )
+            if mode == ocr_mod.OcrOutputMode.TABLE_CSV and result.sidecar:
+                from instantlensdoc.core.app_settings import set_last_ocr_table_csv_dir
+
+                set_last_ocr_table_csv_dir(Path(result.sidecar).parent)
         except ocr_mod.OcrUnavailable as e:
             QMessageBox.information(self, "OCR — Tesseract fehlt", str(e))
             return

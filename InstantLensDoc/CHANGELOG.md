@@ -1,5 +1,23 @@
 # Changelog — InstantLens Doc
 
+## 1.9.1 — Anhänge Größe/Typ·Doppelklick·DnD, Stempel Rename/Vorschau/Standard, CSV-Trennzeichen·BOM·Ordner, Hooks „nicht produktiv“
+
+Post-Release-Polish nach 1.9.0: **PDF-Anhänge** mit klaren Spalten **Größe/Typ**, **Doppelklick extrahieren**, **Drag&Drop hinzufügen**; **Stempel-Bildbibliothek** mit **Umbenennen/Löschen**, **Vorschau**, **Standard-Stempel ★**; **Tabellen-OCR→CSV** mit **Trennzeichen** (`;`/`,`/Tab) in Settings/Dialog, **Zielordner merken**, **UTF-8-BOM Option**; **Plugin-Hooks Stub** About-Hinweis **„nicht produktiv“** + Event-Namen-Liste in Docs. Stubs KI/Cloud/Stylus/3D + Plugin-Hooks klar als Stub.
+
+### PDF / Anhänge / Stempel
+- Anhänge: Spalten Größe + Typ (MIME/Extension); Doppelklick → Extrahieren; Dateien per Drag&Drop hinzufügen
+- Stempel-Bibliothek: Umbenennen, Löschen, Bildvorschau, Standard-Stempel markieren (★, Settings)
+
+### OCR / Hooks
+- Tabellen-CSV: Trennzeichen Settings/Dialog; letzter Zielordner; BOM an/aus (`format_rows_as_csv(utf8_bom=…)`)
+- Plugin-Hooks Stub: About „nicht produktiv“; dokumentierte Events `app.started` / `document.opened` / `document.saved` / `annotation.changed` / `ocr.finished`
+
+### Packaging / Docs
+- Version **1.9.1** (App / `ild_pdf` / ISS / Smoke / Docs); `docs/VERSION` + `VERSION.txt`
+- Smoke: Anhänge DnD/Doppelklick, Stempel Rename/Default/Vorschau, CSV-Delimiter·BOM·Dir, Hooks About (CLI + Qt)
+
+---
+
 ## 1.9.0 — PDF-Anhänge hinzufügen, Stempel-Bildbibliothek, Tabellen-OCR→CSV, Plugin-Hooks Stub
 
 Minor-Release mit neuen Kernfeatures (Basis **1.8.5**): **PDF-Anhänge** listen/extrahieren/**hinzufügen** (pikepdf Attachments, inkl. Entfernen); **Stempel-Bildbibliothek** unter `config/stamps/` mit Sidecar-Stempel (`img:…`); **Tabellen-OCR** mit grober Heuristik → **CSV** (UTF-8 BOM, `;`); **Plugin-Hooks Stub** mit internem Event-Bus und **no-op Loader** (kein echtes Plugin-System). Stubs KI/Cloud/Stylus/3D bleiben Stubs; Plugin-Hooks zusätzlich als Stub.
