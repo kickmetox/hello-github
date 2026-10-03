@@ -1,5 +1,24 @@
 # Changelog — InstantLens Doc
 
+## 1.5.5 — Metadaten Toast Fokus, Seiten→Bilder Filter-Badge, Signatur Zoom Settings·Reset, CLI list-pages --json
+
+Post-Release-Polish nach 1.5.4: **Metadaten-Toast-Klick** öffnet den Dialog **nur wenn nicht schon offen** (sonst **Fokus/raise**); **Seiten→Bilder**-Footer zeigt Badge **„Filter: übersprungen“** wenn der Filter aktiv ist; **Signatur-Vorschau-Zoom** wird in **Settings persistiert** inkl. **Reset-Zoom**-Button; **CLI** `--list-pages FILE --json` liefert `{pages,path}`, Exit **2** bei fehlender Datei. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### PDF
+- Metadaten: Toast-Klick nur wenn Dialog zu; sonst Fokus/raise
+- Seiten → Bilder: Badge „Filter: übersprungen“ am Footer wenn Filter aktiv
+- Signatur (Bild): Zoom in Settings persistieren; Reset-Zoom in Vorschau
+
+### CLI / Start
+- `python -m instantlensdoc --list-pages FILE [--json]` → Zahl bzw. `{pages,path}`; Exit **2** bei fehlender Datei
+- `--json` in `--help`
+
+### Packaging / Docs
+- Version **1.5.5** (App / `ild_pdf` / ISS / Smoke / Docs)
+- Smoke: Metadaten Toast Fokus/raise, Seiten→Bilder Filter-Badge, Signatur Zoom Settings·Reset, CLI list-pages --json (CLI + Qt)
+
+---
+
 ## 1.5.4 — Metadaten Toast Klick·A11y, Seiten→Bilder Footer-Filter, Signatur Esc-Status·Zoom, CLI --list-pages
 
 Post-Release-Polish nach 1.5.3: **Metadaten-Toast** per **Klick** öffnet den Dialog erneut inkl. **Accessibility-Announcement**; **Seiten→Bilder**-Footer filtert Log auf **übersprungene** (Toggle, analog Split-Log); **Signatur Esc** setzt Status **„Platzieren abgebrochen“** und merkt den **letzten Vorschau-Zoom**; **CLI** `--list-pages FILE` gibt die **Seitenzahl** headless aus (in `--help`). Stubs KI/Cloud/Stylus/3D bleiben Stubs.

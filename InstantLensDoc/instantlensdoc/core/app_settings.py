@@ -801,7 +801,7 @@ def set_signature_aspect_lock(enabled: bool) -> None:
 
 
 def get_last_signature_preview_zoom() -> float:
-    """Zuletzt verwendeter Signatur-Vorschau-Zoom (0.5–3.0) — 1.5.4."""
+    """Zuletzt verwendeter Signatur-Vorschau-Zoom (0.5–3.0), Settings — 1.5.5."""
     try:
         z = float(load_settings().get("last_signature_preview_zoom", 1.0) or 1.0)
     except (TypeError, ValueError):
@@ -810,7 +810,7 @@ def get_last_signature_preview_zoom() -> float:
 
 
 def set_last_signature_preview_zoom(zoom: float) -> None:
-    """Signatur-Vorschau-Zoom merken — 1.5.4."""
+    """Signatur-Vorschau-Zoom in Settings persistieren — 1.5.5."""
     try:
         z = float(zoom)
     except (TypeError, ValueError):

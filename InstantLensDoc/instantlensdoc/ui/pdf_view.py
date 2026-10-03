@@ -6903,7 +6903,7 @@ class PdfViewer(QWidget):
             QMessageBox.warning(self, "Extrahieren", str(e))
 
     def export_pages_as_images(self):
-        """Seiten→Bilder; Footer-Klick Filter übersprungene (Toggle) — 1.5.4."""
+        """Seiten→Bilder; Footer-Filter + Badge „Filter: übersprungen“ — 1.5.5."""
         if not self.pdf_path:
             QMessageBox.information(self, "Export", "Kein PDF geladen.")
             return
@@ -7163,7 +7163,7 @@ class PdfViewer(QWidget):
                     f"{Path(out_dir).name} · {footer}"
                 )
             self.status.emit(status_msg)
-            # Ergebnisdialog: Log + Footer-Toggle Filter übersprungene — 1.5.4
+            # Ergebnisdialog: Log + Footer-Toggle + Badge Filter übersprungen — 1.5.5
             dlg = QDialog(self)
             dlg.setWindowTitle("Export — Seiten als Bilder")
             dlg.resize(560, 420)
@@ -7183,13 +7183,22 @@ class PdfViewer(QWidget):
                 "full_log": full_log,
                 "skipped_pages": list(skipped_pages),
             }
+            footer_row = QHBoxLayout()
             footer_lbl = QLabel(footer)
             footer_lbl.setCursor(Qt.PointingHandCursor)
             footer_lbl.setStyleSheet("color: #555; text-decoration: underline;")
             footer_lbl.setToolTip(
                 "Klick: Log auf übersprungene Einträge filtern (Toggle), "
-                "analog Split-Log — 1.5.4"
+                "analog Split-Log — 1.5.5"
             )
+            filter_badge = QLabel("Filter: übersprungen")
+            filter_badge.setObjectName("pagesExportFilterBadge")
+            filter_badge.setVisible(False)
+            filter_badge.setStyleSheet(
+                "color: #0d47a1; background: #E3F2FD; font-weight: bold; "
+                "padding: 2px 8px; border-radius: 3px;"
+            )
+            filter_badge.setToolTip("Filter aktiv: nur übersprungene Einträge — 1.5.5")
 
             def _update_footer_style() -> None:
                 if state["filter_skipped"]:
@@ -7197,16 +7206,19 @@ class PdfViewer(QWidget):
                         "color: #0d47a1; font-weight: bold; text-decoration: underline;"
                     )
                     footer_lbl.setToolTip(
-                        "Filter aktiv: nur übersprungene. Klick hebt auf — 1.5.4"
+                        "Filter aktiv: nur übersprungene. Klick hebt auf — 1.5.5"
                     )
+                    filter_badge.setText("Filter: übersprungen")
+                    filter_badge.setVisible(True)
                 else:
                     footer_lbl.setStyleSheet(
                         "color: #555; text-decoration: underline;"
                     )
                     footer_lbl.setToolTip(
                         "Klick: Log auf übersprungene Einträge filtern (Toggle), "
-                        "analog Split-Log — 1.5.4"
+                        "analog Split-Log — 1.5.5"
                     )
+                    filter_badge.setVisible(False)
 
             def _apply_filter() -> None:
                 if not state["filter_skipped"]:
@@ -7241,7 +7253,10 @@ class PdfViewer(QWidget):
             footer_lbl.mousePressEvent = (  # type: ignore[method-assign]
                 lambda event: _footer_clicked(event)
             )
-            lay.addWidget(footer_lbl)
+            footer_row.addWidget(footer_lbl)
+            footer_row.addWidget(filter_badge)
+            footer_row.addStretch(1)
+            lay.addLayout(footer_row)
             btn_row = QHBoxLayout()
             btn_folder = QPushButton("Ordner öffnen")
             btn_folder.clicked.connect(
@@ -7265,7 +7280,7 @@ class PdfViewer(QWidget):
         self.status.emit("Signaturfeld: auf die Seite klicken")
 
     def insert_signature_image(self):
-        """Bildstempel-Signatur; Esc→Status abgebrochen; Zoom merken — 1.5.4."""
+        """Bildstempel-Signatur; Zoom Settings·Reset; Esc-Status — 1.5.5."""
         if not self.store or not self.pdf_path:
             QMessageBox.information(self, "Signatur", "Kein PDF geladen.")
             return
@@ -7275,7 +7290,9 @@ class PdfViewer(QWidget):
             QDialogButtonBox,
             QFileDialog,
             QFormLayout,
+            QHBoxLayout,
             QLabel,
+            QPushButton,
             QSlider,
             QVBoxLayout,
         )
@@ -7337,12 +7354,12 @@ class PdfViewer(QWidget):
                 img_aspect = float(iw) / float(ih)
         except Exception:
             pass
-        # Option: Größe/Opacity/Aspect-Lock + Vorschau (Mausrad-Zoom) + Esc — 1.5.4
+        # Option: Größe/Opacity/Aspect-Lock + Vorschau Zoom Settings·Reset — 1.5.5
         zoom_state = {"factor": float(get_last_signature_preview_zoom())}
         preview_holder: dict[str, object] = {}
 
         class _SigPreviewDialog(QDialog):
-            """Esc → Status „Platzieren abgebrochen“; Zoom merken — 1.5.4."""
+            """Esc → Status „Platzieren abgebrochen“; Zoom Settings — 1.5.5."""
 
             def keyPressEvent(self, event: QKeyEvent) -> None:  # noqa: N802
                 if event.key() == _Qt.Key_Escape:
@@ -7376,8 +7393,8 @@ class PdfViewer(QWidget):
         ol = QVBoxLayout(opt)
         ol.addWidget(QLabel(f"Bild: {Path(path).name}"))
         hint_lbl = QLabel(
-            "Vorschau: Mausrad zoomt (letzter Zoom gemerkt) · "
-            "Esc → Platzieren abgebrochen · Bildstempel als Sidecar."
+            "Vorschau: Mausrad zoomt (Zoom in Settings persistiert) · "
+            "Reset-Zoom · Esc → Platzieren abgebrochen · Bildstempel als Sidecar."
         )
         hint_lbl.setWordWrap(True)
         hint_lbl.setStyleSheet("color:#555;")
@@ -7388,8 +7405,26 @@ class PdfViewer(QWidget):
         preview_lbl.setStyleSheet(
             "QLabel { background:#F4F6F8; border:1px solid #CCD5DD; }"
         )
-        preview_lbl.setToolTip("Mausrad: Vorschau zoomen — 1.5.3")
+        preview_lbl.setToolTip("Mausrad: Vorschau zoomen (Settings) — 1.5.5")
         ol.addWidget(preview_lbl)
+        zoom_btn_row = QHBoxLayout()
+        btn_reset_zoom = QPushButton("Reset-Zoom")
+        btn_reset_zoom.setObjectName("sigPreviewResetZoom")
+        btn_reset_zoom.setToolTip(
+            "Vorschau-Zoom auf 100 % zurücksetzen und in Settings speichern — 1.5.5"
+        )
+
+        def _reset_preview_zoom() -> None:
+            zoom_state["factor"] = 1.0
+            set_last_signature_preview_zoom(1.0)
+            updater = preview_holder.get("update")
+            if callable(updater):
+                updater()
+
+        btn_reset_zoom.clicked.connect(_reset_preview_zoom)
+        zoom_btn_row.addWidget(btn_reset_zoom)
+        zoom_btn_row.addStretch(1)
+        ol.addLayout(zoom_btn_row)
         preview_holder["lbl"] = preview_lbl
         form = QFormLayout()
         last_w, last_h = get_last_signature_size()

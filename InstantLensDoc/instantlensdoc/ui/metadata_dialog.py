@@ -1,4 +1,4 @@
-"""Dialog: PDF-Metadaten bearbeiten (Titel/Autor/Betreff/Keywords) — 1.5.4."""
+"""Dialog: PDF-Metadaten bearbeiten (Titel/Autor/Betreff/Keywords) — 1.5.5."""
 
 from __future__ import annotations
 

@@ -22,8 +22,8 @@ class _GermanHelpFormatter(argparse.HelpFormatter):
 
 def parse_cli(argv: list[str] | None = None) -> argparse.Namespace:
     """
-    CLI für ``python -m instantlensdoc`` — 1.5.4.
-    ``--version`` / ``--open FILE`` / ``--list-pages FILE`` /
+    CLI für ``python -m instantlensdoc`` — 1.5.5.
+    ``--version`` / ``--open FILE`` / ``--list-pages FILE`` [``--json``] /
     ``--export-page N --out PATH`` [``--dpi``] [``--format png|jpeg``] / ``--help`` DE.
     """
     from instantlensdoc import __version__
@@ -33,7 +33,7 @@ def parse_cli(argv: list[str] | None = None) -> argparse.Namespace:
         description=(
             "InstantLens Doc — PDF-Annotator, OCR, Formulare.\n"
             "Startet die Desktop-Oberfläche; optional Dateien öffnen.\n"
-            "One-Shot ohne GUI: --list-pages FILE | "
+            "One-Shot ohne GUI: --list-pages FILE [--json] | "
             "--export-page N --out PATH [--dpi DPI] [--format png|jpeg]."
         ),
         epilog=(
@@ -42,6 +42,7 @@ def parse_cli(argv: list[str] | None = None) -> argparse.Namespace:
             "  python -m instantlensdoc --open dokument.pdf\n"
             "  python -m instantlensdoc --open a.pdf --open b.pdf\n"
             "  python -m instantlensdoc --list-pages dokument.pdf\n"
+            "  python -m instantlensdoc --list-pages dokument.pdf --json\n"
             "  python -m instantlensdoc dokument.pdf --export-page 1 --out seite.png\n"
             "  python -m instantlensdoc --open dokument.pdf --export-page 2 "
             "--out /tmp/p2.jpg --dpi 150 --format jpeg\n"
@@ -80,7 +81,14 @@ def parse_cli(argv: list[str] | None = None) -> argparse.Namespace:
         metavar="FILE",
         dest="list_pages",
         default=None,
-        help="Seitenzahl von FILE ausgeben (headless, ohne GUI) — 1.5.4",
+        help="Seitenzahl von FILE ausgeben (headless, ohne GUI) — 1.5.5",
+    )
+    p.add_argument(
+        "--json",
+        action="store_true",
+        dest="cli_json",
+        default=False,
+        help="JSON-Ausgabe (mit --list-pages: {pages,path}) — 1.5.5",
     )
     p.add_argument(
         "--export-page",
@@ -149,11 +157,13 @@ def _collect_open_targets(cli: argparse.Namespace) -> list[Path]:
 
 def _cli_list_pages(cli: argparse.Namespace) -> int:
     """
-    One-Shot Seitenzahl ohne GUI — 1.5.4.
-    ``--list-pages FILE`` gibt die Seitenzahl auf stdout aus.
+    One-Shot Seitenzahl ohne GUI — 1.5.5.
+    ``--list-pages FILE`` [``--json``] gibt Seitenzahl bzw. ``{pages,path}`` aus.
     Headless ok (kein Qt nötig).
     Exitcodes: 0 OK · 1 Fehler · 2 Datei fehlt · -1 nicht angefordert.
     """
+    import json
+
     raw = getattr(cli, "list_pages", None)
     if raw is None:
         return -1
@@ -169,7 +179,14 @@ def _cli_list_pages(cli: argparse.Namespace) -> int:
     except Exception as e:
         print(f"Seitenzahl fehlgeschlagen: {e}", file=sys.stderr)
         return 1
-    print(n)
+    if getattr(cli, "cli_json", False):
+        try:
+            path_out = str(pdf.resolve())
+        except Exception:
+            path_out = str(pdf)
+        print(json.dumps({"pages": n, "path": path_out}, ensure_ascii=False))
+    else:
+        print(n)
     return 0
 
 
@@ -350,7 +367,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"InstantLens Doc {cli.version_str}")
         return 0
 
-    # One-Shot: Seitenzahl / Export ohne GUI (headless ok) — 1.5.4
+    # One-Shot: Seitenzahl / Export ohne GUI (headless ok) — 1.5.5
     list_rc = _cli_list_pages(cli)
     if list_rc >= 0:
         return list_rc

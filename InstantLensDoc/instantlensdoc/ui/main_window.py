@@ -2370,7 +2370,7 @@ class MainWindow(QMainWindow):
         # Metadaten-Toast: Klick öffnet Dialog erneut — 1.5.4
         if getattr(self, "_meta_toast_active", False) and "Metadaten gespeichert" in text:
             self.statusBar().setToolTip(
-                "Klick öffnet Metadaten-Dialog erneut — 1.5.4"
+                "Klick öffnet Metadaten-Dialog erneut — 1.5.5"
             )
             self.statusBar().setCursor(Qt.PointingHandCursor)
         elif getattr(self, "_last_outline_export_dir", None) and "PDF-Outline" in text:
@@ -2383,7 +2383,7 @@ class MainWindow(QMainWindow):
             self.statusBar().unsetCursor()
 
     def _on_status_bar_clicked(self, event) -> None:
-        """Statusleisten-Klick: Metadaten-Toast → Dialog / Outlines-Ordner — 1.5.4."""
+        """Statusleisten-Klick: Metadaten-Toast → Dialog / Outlines-Ordner — 1.5.5."""
         from PySide6.QtGui import QDesktopServices
         from PySide6.QtCore import QUrl
 
@@ -2393,6 +2393,12 @@ class MainWindow(QMainWindow):
             and getattr(self, "_meta_toast_active", False)
             and "Metadaten gespeichert" in cur
         ):
+            # Nur öffnen wenn Dialog nicht schon offen — sonst Fokus/raise — 1.5.5
+            existing = getattr(self, "_meta_dialog", None)
+            if existing is not None and existing.isVisible():
+                existing.raise_()
+                existing.activateWindow()
+                return
             self._meta_toast_active = False
             self.statusBar().unsetCursor()
             self.statusBar().setToolTip("")
@@ -7076,9 +7082,16 @@ class MainWindow(QMainWindow):
         if not self.pdf_view.pdf_path:
             QMessageBox.information(self, "Metadaten", "Bitte zuerst ein PDF öffnen.")
             return
+        # Dialog schon offen → Fokus/raise statt zweites Fenster — 1.5.5
+        existing = getattr(self, "_meta_dialog", None)
+        if existing is not None and existing.isVisible():
+            existing.raise_()
+            existing.activateWindow()
+            return
         dlg = MetadataDialog(self.pdf_view.pdf_path, self)
+        self._meta_dialog = dlg
         if dlg.exec():
-            # Erfolgs-Toast: Dauer OCR-Settings; Klick→Dialog; A11y — 1.5.4
+            # Erfolgs-Toast: Dauer OCR-Settings; Klick→Dialog; A11y — 1.5.5
             from instantlensdoc.core.app_settings import get_ocr_defaults_toast_sec
 
             toast = getattr(dlg, "last_toast", "") or "Metadaten gespeichert"
@@ -7090,7 +7103,7 @@ class MainWindow(QMainWindow):
                 ms = 2000
             self.statusBar().showMessage(toast, ms)
             self.statusBar().setToolTip(
-                "Klick öffnet Metadaten-Dialog erneut — 1.5.4"
+                "Klick öffnet Metadaten-Dialog erneut — 1.5.5"
             )
             self.statusBar().setCursor(Qt.PointingHandCursor)
 
