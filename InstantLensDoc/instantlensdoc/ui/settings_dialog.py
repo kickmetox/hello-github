@@ -401,18 +401,21 @@ class SettingsDialog(QDialog):
         )
         form.addRow("Prefetch-Cancel-Debounce", self.thumb_cancel_ms)
 
-        # Live-Label „aktuell N ms / ±N“ — 1.3.4
+        # Live-Label „aktuell N ms / ±N“ — sofort ohne Apply — 1.3.5
         self.lbl_prefetch_live = QLabel()
         self.lbl_prefetch_live.setStyleSheet("color: #555; font-style: italic;")
         self.lbl_prefetch_live.setToolTip(
-            "Live-Anzeige der gewählten Prefetch-Cancel-Debounce / Radius — 1.3.4"
+            "Live-Anzeige der gewählten Prefetch-Werte — aktualisiert sofort "
+            "bei Änderung, ohne Übernehmen/Apply — 1.3.5"
         )
         self.thumb_prefetch.currentIndexChanged.connect(
             self._update_prefetch_live_label
         )
+        self.thumb_prefetch.activated.connect(self._update_prefetch_live_label)
         self.thumb_cancel_ms.currentIndexChanged.connect(
             self._update_prefetch_live_label
         )
+        self.thumb_cancel_ms.activated.connect(self._update_prefetch_live_label)
         self._update_prefetch_live_label()
         form.addRow("Prefetch aktuell", self.lbl_prefetch_live)
 
@@ -1504,7 +1507,8 @@ class SettingsDialog(QDialog):
             self.spell_dict.setText(path)
 
     def _update_prefetch_live_label(self, *_args) -> None:
-        """Live-Anzeige „aktuell N ms / ±N“ — 1.3.4."""
+        """Live-Anzeige „aktuell N ms / ±N“ aus Combo-Werten, ohne Apply — 1.3.5."""
+        # Immer Widget-Stand (nicht gespeicherte Settings) — sofort bei Slider/Combo
         try:
             ms = int(self.thumb_cancel_ms.currentData() or 90)
         except (TypeError, ValueError):
@@ -1514,6 +1518,9 @@ class SettingsDialog(QDialog):
         except (TypeError, ValueError):
             radius = 2
         self.lbl_prefetch_live.setText(f"aktuell {ms} ms / ±{radius}")
+        self.lbl_prefetch_live.setToolTip(
+            f"Vorschau ohne Übernehmen: Cancel {ms} ms, Prefetch ±{radius} — 1.3.5"
+        )
 
     def _sync_zoom_pct_enabled(self) -> None:
         mode = str(self.zoom_mode.currentData() or DEFAULT_ZOOM_MODE_PERCENT)

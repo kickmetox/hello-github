@@ -29,7 +29,9 @@ from ild_pdf.acroform import (
 )
 from instantlensdoc.core.app_settings import (
     dialog_start_dir,
+    get_forms_csv_visible_only,
     get_last_export_dir,
+    set_forms_csv_visible_only,
     set_last_export_dir,
 )
 from instantlensdoc.ui.file_dialogs import confirm_overwrite_export
@@ -84,7 +86,7 @@ class FormFieldsDialog(QDialog):
         edit_row.addWidget(self.value_edit, 1)
         self.btn_csv = QPushButton("CSV…")
         self.btn_csv.setToolTip(
-            "Feldliste als CSV (UTF-8 BOM); Option nur sichtbare Zeilen — 1.3.4"
+            "Feldliste als CSV; Zähler N von M Zeilen; Default persistiert — 1.3.5"
         )
         self.btn_csv.clicked.connect(self._export_csv)
         edit_row.addWidget(self.btn_csv)
@@ -229,36 +231,41 @@ class FormFieldsDialog(QDialog):
         return out
 
     def _export_csv(self):
-        """CSV UTF-8 BOM; Option nur sichtbare/gefilterte Zeilen — 1.3.4."""
+        """CSV: Zähler N von M Zeilen; Default persistiert — 1.3.5."""
         from PySide6.QtWidgets import QCheckBox
 
         all_fields = list(self._fields)
         visible = self._visible_fields()
-        needle = (self.filter_edit.text() or "").strip()
-        filter_active = bool(needle) and len(visible) < len(all_fields)
+        n_vis = len(visible)
+        n_all = len(all_fields)
 
         box = QMessageBox(self)
         box.setIcon(QMessageBox.Question)
         box.setWindowTitle("Feldliste als CSV")
         box.setText(
-            f"{len(all_fields)} Feld(er) als CSV exportieren (UTF-8 BOM)?\n"
+            f"{n_all} Feld(er) als CSV exportieren (UTF-8 BOM)?\n"
             "Zielordner wird gemerkt."
         )
         cb = QCheckBox("Nur sichtbare/gefilterte Zeilen")
         cb.setToolTip(
-            "Nur die aktuell gefilterten Felder exportieren — 1.3.4"
+            "Nur die aktuell gefilterten Felder; Default wird persistiert — 1.3.5"
         )
-        cb.setChecked(bool(filter_active and visible))
+        prefer_visible = bool(get_forms_csv_visible_only())
+        cb.setChecked(bool(prefer_visible and n_vis > 0))
         cb.setEnabled(bool(self._fields))
-        if filter_active:
-            box.setInformativeText(
-                f"Mit Filter: {len(visible)} von {len(all_fields)} sichtbar."
-            )
+
+        def _sync_csv_count(_checked: bool = False) -> None:
+            n_export = n_vis if cb.isChecked() else n_all
+            box.setInformativeText(f"{n_export} von {n_all} Zeilen")
+
+        cb.toggled.connect(_sync_csv_count)
+        _sync_csv_count(cb.isChecked())
         box.setCheckBox(cb)
         box.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
         box.setDefaultButton(QMessageBox.Yes)
         if box.exec() != QMessageBox.Yes:
             return
+        set_forms_csv_visible_only(cb.isChecked())
         rows = visible if cb.isChecked() else all_fields
         if not rows:
             QMessageBox.information(

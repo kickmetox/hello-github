@@ -102,6 +102,7 @@ DEFAULTS: dict[str, Any] = {
     "thumb_lazy_threshold": 50,
     "thumb_prefetch_radius": 2,
     "thumb_prefetch_cancel_ms": 90,
+    "forms_csv_visible_only": False,  # CSV-Export Default „nur sichtbare“ — 1.3.5
     "redaction_preview_opacity": 0.90,
     "editor_text_encoding": "auto",
     "skip_splash": False,
@@ -2663,6 +2664,17 @@ def set_thumb_prefetch_cancel_ms(ms: int) -> int:
         v = min(THUMB_PREFETCH_CANCEL_MS_CHOICES, key=lambda x: abs(x - v))
     save_settings({"thumb_prefetch_cancel_ms": v})
     return v
+
+
+def get_forms_csv_visible_only() -> bool:
+    """Default für Forms-CSV „nur sichtbare/gefilterte Zeilen“ — 1.3.5."""
+    return bool(load_settings().get("forms_csv_visible_only", False))
+
+
+def set_forms_csv_visible_only(enabled: bool) -> bool:
+    val = bool(enabled)
+    save_settings({"forms_csv_visible_only": val})
+    return val
 
 
 def get_redaction_preview_opacity() -> float:

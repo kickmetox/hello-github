@@ -1,5 +1,27 @@
 # Changelog — InstantLens Doc
 
+## 1.3.5 — Forms CSV Zähler+Default, Redaction Sidecar-Warnung, Outlines Retry max-3, Prefetch Live ohne Apply
+
+Post-Release-Polish nach 1.3.4: **Forms-CSV** Dialog mit Zähler **„N von M Zeilen“** und **persistiertem Default** „nur sichtbar“; **Redactions** bei Sidecar-Schreibfehler **Warnung** mit Option **PDF-Bake fortsetzen**; **Outlines-Export** Retry **max. 3 wie Backup**, danach **Abbruch-Hinweis**; Prefetch Live-Label aktualisiert **sofort bei Slider/Combo ohne Apply**. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### Formulare
+- Feldliste CSV: Zähler **N von M Zeilen** im Dialog; Default „nur sichtbare“ **persistiert**
+
+### PDF / Redaction
+- Sidecar-Write fehlschlägt → **Warnung** + Option **PDF-Bake fortsetzen**
+
+### Bookmarks / Outlines
+- Schreibfehler-Retry: **max. 3** wie Backup; danach **Abbruch-Hinweis**
+
+### Performance
+- Prefetch Live-Label: **sofort** bei Änderung, **ohne Übernehmen/Apply**
+
+### Packaging / Docs
+- Version **1.3.5** (App / `ild_pdf` / ISS / Smoke / Docs)
+- Smoke: Forms CSV Zähler+Default, Redaction Sidecar-Warnung, Outlines Retry max-3, Prefetch Live ohne Apply (CLI + Qt)
+
+---
+
 ## 1.3.4 — Forms CSV BOM+Filter, Redaction Sidecar-Checkbox, Outlines Ordner-Klick+Retry, Prefetch Live-Label
 
 Post-Release-Polish nach 1.3.3: **Forms-CSV** mit **UTF-8 BOM** und Option **nur sichtbare/gefilterte Zeilen**; **Redactions anwenden** Bestätigung mit Checkbox **„Auch Sidecar speichern“** (Default an); **Outlines-Export** Status-**Klick öffnet Zielordner**, Fehlerdialog **Retry**; Prefetch-Settings **Live-Label „aktuell N ms / ±N“**. Stubs KI/Cloud/Stylus/3D bleiben Stubs.

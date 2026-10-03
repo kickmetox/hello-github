@@ -6017,8 +6017,13 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Formularfelder", str(e))
 
     def _on_form_fields_export_csv(self) -> None:
-        """AcroForm CSV UTF-8 BOM; Option nur sichtbare/gefilterte Zeilen — 1.3.4."""
+        """AcroForm CSV: Zähler N von M Zeilen; Default persistiert — 1.3.5."""
         from PySide6.QtWidgets import QCheckBox
+
+        from instantlensdoc.core.app_settings import (
+            get_forms_csv_visible_only,
+            set_forms_csv_visible_only,
+        )
 
         path = self.pdf_view.pdf_path
         if not path:
@@ -6048,29 +6053,37 @@ class MainWindow(QMainWindow):
                 hasattr(self.sidebar, "form_fields_filter_active")
                 and self.sidebar.form_fields_filter_active()
             )
+        n_vis = len(visible)
+        n_all = len(all_fields)
 
         box = QMessageBox(self)
         box.setIcon(QMessageBox.Question)
         box.setWindowTitle("Feldliste als CSV")
         box.setText(
-            f"{len(all_fields)} Feld(er) als CSV exportieren (UTF-8 BOM)?\n"
+            f"{n_all} Feld(er) als CSV exportieren (UTF-8 BOM)?\n"
             "Zielordner wird gemerkt."
         )
         cb = QCheckBox("Nur sichtbare/gefilterte Zeilen")
         cb.setToolTip(
-            "Nur die aktuell in der Sidebar sichtbaren/gefilterten Felder — 1.3.4"
+            "Nur die aktuell in der Sidebar sichtbaren/gefilterten Felder; "
+            "Default wird persistiert — 1.3.5"
         )
-        cb.setChecked(bool(filter_active and visible))
+        prefer_visible = bool(get_forms_csv_visible_only())
+        cb.setChecked(bool(prefer_visible and n_vis > 0))
         cb.setEnabled(True)
-        if filter_active:
-            box.setInformativeText(
-                f"Mit Filter: {len(visible)} von {len(all_fields)} sichtbar."
-            )
+
+        def _sync_csv_count(_checked: bool = False) -> None:
+            n_export = n_vis if cb.isChecked() else n_all
+            box.setInformativeText(f"{n_export} von {n_all} Zeilen")
+
+        cb.toggled.connect(_sync_csv_count)
+        _sync_csv_count(cb.isChecked())
         box.setCheckBox(cb)
         box.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
         box.setDefaultButton(QMessageBox.Yes)
         if box.exec() != QMessageBox.Yes:
             return
+        set_forms_csv_visible_only(cb.isChecked())
         fields = visible if cb.isChecked() else all_fields
         if not fields:
             QMessageBox.information(
@@ -6261,7 +6274,7 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Bookmarks importieren", str(e))
 
     def _export_bookmarks_to_outline(self) -> None:
-        """Outlines-Export: Status-Klick öffnet Ordner; Fehlerdialog Retry — 1.3.4."""
+        """Outlines-Export: Retry max. 3 wie Backup, dann Abbruch-Hinweis — 1.3.5."""
         if not self.pdf_view.pdf_path or self.pdf_view.store is None:
             QMessageBox.information(
                 self, "Bookmarks exportieren", "Bitte zuerst ein PDF öffnen."
@@ -6360,6 +6373,7 @@ class MainWindow(QMainWindow):
             except Exception:
                 label = ""
             entries.append((int(p), label or f"Seite {int(p) + 1}"))
+        # Schreibfehler: max. 3 Versuche wie Backup, danach Abbruch-Hinweis — 1.3.5
         max_attempts = 3
         for attempt in range(1, max_attempts + 1):
             try:
@@ -6386,8 +6400,10 @@ class MainWindow(QMainWindow):
                     QMessageBox.critical(
                         self,
                         "Bookmarks exportieren",
-                        f"Export nach {max_attempts} Versuchen abgebrochen.\n\n"
-                        f"Letzter Fehler:\n{e}",
+                        f"Outlines-Export nach {max_attempts} Versuchen abgebrochen "
+                        f"(max. {max_attempts} wie Backup).\n\n"
+                        f"Letzter Fehler:\n{e}\n\n"
+                        "Bitte Zielpfad, Schreibrechte oder Speicherplatz prüfen.",
                     )
                     self._set_status(
                         f"Outlines-Export abgebrochen nach {max_attempts} Versuchen"
@@ -6399,12 +6415,21 @@ class MainWindow(QMainWindow):
                 err_box.setText("Outlines-Export fehlgeschlagen")
                 err_box.setInformativeText(
                     f"Die Datei konnte nicht geschrieben werden:\n{e}\n\n"
-                    f"Versuch {attempt}/{max_attempts}. Erneut versuchen?"
+                    f"Versuch {attempt}/{max_attempts} (max. {max_attempts} wie Backup). "
+                    "Erneut versuchen?"
                 )
                 err_box.setStandardButtons(QMessageBox.Retry | QMessageBox.Cancel)
                 err_box.setDefaultButton(QMessageBox.Retry)
                 if err_box.exec() != QMessageBox.Retry:
-                    self._set_status("Outlines-Export abgebrochen")
+                    QMessageBox.information(
+                        self,
+                        "Bookmarks exportieren",
+                        f"Outlines-Export abgebrochen "
+                        f"(Versuch {attempt}/{max_attempts}).",
+                    )
+                    self._set_status(
+                        f"Outlines-Export abgebrochen (Versuch {attempt}/{max_attempts})"
+                    )
                     return
             except Exception as e:
                 QMessageBox.warning(self, "Bookmarks exportieren", str(e))

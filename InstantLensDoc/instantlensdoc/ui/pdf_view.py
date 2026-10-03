@@ -6375,8 +6375,8 @@ class PdfViewer(QWidget):
         chk_sidecar = QCheckBox("Auch Sidecar speichern")
         chk_sidecar.setChecked(True)
         chk_sidecar.setToolTip(
-            "Sidecar nach Anwenden speichern; bei neuem PDF zusätzlich "
-            "neben die Zieldatei schreiben — 1.3.4"
+            "Sidecar nach Anwenden speichern; bei Schreibfehler Warnung "
+            "mit Option PDF-Bake fortzusetzen — 1.3.5"
         )
         lay.addWidget(chk_sidecar)
         buttons = QDialogButtonBox(QDialogButtonBox.Yes | QDialogButtonBox.No)
@@ -6413,23 +6413,53 @@ class PdfViewer(QWidget):
                 out_path=dest,
                 remove_from_store=remove,
             )
+            sidecar_ok = True
+            sidecar_err: Exception | None = None
             if save_sidecar:
                 # Quell-Sidecar flushen (falls remove nicht schon gespeichert hat)
                 try:
                     self.schedule_sidecar_save(force=True)
-                except Exception:
-                    pass
-                # Sidecar neben neues PDF schreiben — 1.3.4
+                except Exception as e:
+                    sidecar_ok = False
+                    sidecar_err = e
+                # Sidecar neben neues PDF schreiben — 1.3.4/1.3.5
                 try:
                     if dest.resolve() != src.resolve():
                         side_dest = dest.with_name(dest.stem + ".ildann.json")
                         self.store.save(path=side_dest, force=True)
-                except Exception:
-                    pass
+                except Exception as e:
+                    sidecar_ok = False
+                    sidecar_err = e
+                if not sidecar_ok:
+                    # Sidecar-Fehler: Warnung, PDF-Bake fortsetzen Option — 1.3.5
+                    warn = QMessageBox(self)
+                    warn.setIcon(QMessageBox.Warning)
+                    warn.setWindowTitle("Redactions — Sidecar")
+                    warn.setText("Sidecar konnte nicht geschrieben werden")
+                    warn.setInformativeText(
+                        f"{sidecar_err}\n\n"
+                        f"Das geschwärzte PDF wurde bereits geschrieben:\n{dest}\n\n"
+                        "PDF-Bake trotzdem fortsetzen?"
+                    )
+                    warn.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
+                    warn.setDefaultButton(QMessageBox.Yes)
+                    if warn.exec() != QMessageBox.Yes:
+                        self.status.emit(
+                            f"Redaction PDF geschrieben, Sidecar-Abbruch → {dest.name}"
+                        )
+                        clear_render_cache(self.pdf_path)
+                        self.refresh()
+                        self.annotations_changed.emit()
+                        return
             clear_render_cache(self.pdf_path)
             self.refresh()
             self.annotations_changed.emit()
-            extra = " + Sidecar" if save_sidecar else ""
+            if save_sidecar and sidecar_ok:
+                extra = " + Sidecar"
+            elif save_sidecar:
+                extra = " (Sidecar-Warnung)"
+            else:
+                extra = ""
             self.status.emit(
                 f"{len(reds)} Redaction(s) → {dest.name}{extra}"
             )

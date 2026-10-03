@@ -2,7 +2,7 @@
 
 Moderne Textverarbeitung mit PDF-Annotator, OCR-Bridge und Formulargenerator.
 
-**Version:** 1.3.4  
+**Version:** 1.3.5  
 **Hersteller:** Andreas Meyer · ame@sellerbach.de
 
 ## Quickstart (Windows)
@@ -33,8 +33,8 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an).
 
-## Neu in 1.3.4
+## Neu in 1.3.5
 
-Forms CSV UTF-8 BOM + Option nur sichtbare/gefilterte Zeilen; Redactions-Bestätigung „Auch Sidecar speichern“ (Default an); Outlines Status-Klick öffnet Zielordner + Retry bei Fehler; Prefetch Live-Label „aktuell N ms / ±N“ in Settings. Stubs KI/Cloud/Stylus/3D unverändert.
+Forms CSV Zähler „N von M Zeilen“ + persistierter Default „nur sichtbar“; Redaction Sidecar-Fehler → Warnung + PDF-Bake fortsetzen; Outlines Retry max. 3 wie Backup + Abbruch-Hinweis; Prefetch Live-Label sofort ohne Apply. Stubs KI/Cloud/Stylus/3D unverändert.
 
 Siehe [CHANGELOG.md](CHANGELOG.md), [FEATURES.md](FEATURES.md) und [INFO.md](INFO.md).
