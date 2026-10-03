@@ -1064,7 +1064,7 @@ class MainWindow(QMainWindow):
         self.theme_status_label.setCursor(Qt.PointingHandCursor)
         self.theme_status_label.setToolTip(
             "Klick: Theme-Schnellmenü · Ctrl+Shift+T: "
-            "System → Hell → Dunkel → System — 1.4.4"
+            "Theme zyklisch System → Hell → Dunkel → System — 1.4.5"
         )
         self.theme_status_label.mousePressEvent = (  # type: ignore[method-assign]
             self._on_theme_status_clicked
@@ -1201,11 +1201,11 @@ class MainWindow(QMainWindow):
         act_close_right.triggered.connect(self.close_tabs_right_of_current)
         m_file.addAction(act_close_right)
         act_dup_tab = QAction("Tab duplizieren", self)
-        # Ctrl+Shift+T → Theme-Zyklus (1.4.4); Tab-Duplikat: Ctrl+Alt+Shift+T
+        # Ctrl+Shift+T → Theme-Zyklus (1.4.5); Tab-Duplikat: Ctrl+Alt+Shift+T
         act_dup_tab.setShortcut(QKeySequence("Ctrl+Alt+Shift+T"))
         act_dup_tab.setToolTip(
             "Editor: Inhalt als neues Dokument klonen · Datei mit Pfad: optional erneut öffnen "
-            "(Ctrl+Alt+Shift+T; Ctrl+Shift+T = Theme-Zyklus) — 1.4.4"
+            "(Ctrl+Alt+Shift+T; Ctrl+Shift+T = Theme-Zyklus) — 1.4.5"
         )
         act_dup_tab.triggered.connect(self.duplicate_tab)
         m_file.addAction(act_dup_tab)
@@ -1912,7 +1912,7 @@ class MainWindow(QMainWindow):
         act_theme_cycle.setShortcut(QKeySequence("Ctrl+Shift+T"))
         act_theme_cycle.setToolTip(
             "Theme zyklisch: System → Hell → Dunkel → System "
-            "(Ctrl+Shift+T) — 1.4.4"
+            "(Ctrl+Shift+T); Status-Toast „Theme: …“ — 1.4.5"
         )
         act_theme_cycle.triggered.connect(self._cycle_theme_mode)
         m_view.addAction(act_theme_cycle)
@@ -4701,13 +4701,11 @@ class MainWindow(QMainWindow):
             pass
 
     def _cycle_theme_mode(self) -> None:
-        """Ctrl+Shift+T: System → Hell → Dunkel → System — 1.4.4."""
+        """Ctrl+Shift+T: System → Hell → Dunkel → System; kurzer Status-Toast — 1.4.5."""
         mode = cycle_theme_mode(self)
         self._sync_theme_menu()
-        labels = {"system": "System", "light": "Hell", "dark": "Dunkel"}
-        self._set_status(
-            f"{theme_status_text(mode)} (Zyklus → {labels.get(mode, mode)}) — 1.4.4"
-        )
+        # Kurz „Theme: …“ in der Statusleiste — 1.4.5
+        self.statusBar().showMessage(theme_status_text(mode), 2500)
         try:
             self._save_session()
         except Exception:

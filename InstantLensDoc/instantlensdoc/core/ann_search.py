@@ -1,4 +1,4 @@
-"""Annotation-Volltextsuche über Sidecar-Notizen/Highlights geöffneter Docs — 1.4.3."""
+"""Annotation-Volltextsuche über Sidecar-Notizen/Highlights geöffneter Docs — 1.4.5."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import csv
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Sequence
+from typing import Callable, List, Sequence
 
 # Spalten Doc,Seite,Typ,Text,Snippet — UTF-8 BOM — 1.4.3
 ANN_SEARCH_CSV_FIELDS = (
@@ -105,11 +105,14 @@ def search_annotations_in_paths(
     max_hits: int = 300,
     case_sensitive: bool = False,
     use_regex: bool = False,
+    on_progress: Callable[[int, int, str], bool] | None = None,
 ) -> List[AnnSearchHit]:
     """
     Volltext über *.ildann.json Sidecars (Notizen, Highlights, Tags, Typ)
     quer durch die gelisteten Dokumente (typisch: offene Tabs).
     case_sensitive / use_regex — 1.4.1.
+    on_progress(i, total, name) → False bricht ab (CSV-Neu-Scan) — 1.4.5.
+    Bei Abbruch: bisherige Treffer (UI wertet Cancel selbst aus).
     """
     q = (query or "").strip()
     if not q:
@@ -122,12 +125,12 @@ def search_annotations_in_paths(
             return []  # ungültiges Regex → keine Treffer (UI zeigt Hinweis)
     hits: List[AnnSearchHit] = []
     seen_pdf: set[str] = set()
-
+    # Fortschritt über eindeutige Docs (nicht Roh-Pfadliste)
+    work: list[tuple[Path, Path]] = []
     for raw in paths:
         p = Path(raw)
         if not p.is_file():
             continue
-        # PDF oder direkt Sidecar
         if p.suffix.lower() == ".json" and p.name.endswith(".ildann.json"):
             pdf = Path(str(p)[: -len(".ildann.json")])
             sidecar = p
@@ -140,6 +143,17 @@ def search_annotations_in_paths(
         if key in seen_pdf:
             continue
         seen_pdf.add(key)
+        work.append((pdf, sidecar))
+
+    total = len(work)
+    for idx, (pdf, sidecar) in enumerate(work):
+        if on_progress is not None:
+            try:
+                cont = on_progress(idx, total, pdf.name)
+            except Exception:
+                cont = True
+            if cont is False:
+                break
         if not sidecar.is_file():
             continue
         try:

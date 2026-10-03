@@ -1,4 +1,4 @@
-"""Zwei PDFs Seite-nebeneinander vergleichen + Raster-Diff Overlay — 1.4.4."""
+"""Zwei PDFs Seite-nebeneinander vergleichen + Raster-Diff Overlay — 1.4.5."""
 
 from __future__ import annotations
 
@@ -345,7 +345,7 @@ class PdfCompareDialog(QDialog):
         self._update_png_template_preview()
 
     def _focus_png_template_select_all(self) -> None:
-        """Fokus + Selektion ganzer Default-Text — 1.4.4."""
+        """Fokus + Selektion ganzer Text (wie Ann.-Export-Template) — 1.4.5."""
         edit = self.png_template_edit
         edit.setFocus()
         edit.selectAll()
@@ -355,11 +355,15 @@ class PdfCompareDialog(QDialog):
             edit._saved_sel_len = len(edit.text() or "")
 
     def _reset_png_template(self) -> None:
-        """Template auf Default; Live-Vorschau + Fokus mit Selektion — 1.4.4."""
+        """
+        Template auf Default; Bestätigung nur bei Abweichung;
+        danach Live-Vorschau + Fokus mit Selektion (wie Ann.-Template) — 1.4.5.
+        """
         edit = self.png_template_edit
         default = DIFF_PNG_FILENAME_TEMPLATE
         current = edit.text() or ""
         if current == default:
+            # Bereits Default — keine Bestätigung; Vorschau + Fokus + Selektion
             self._update_png_template_preview()
             QTimer.singleShot(0, self._focus_png_template_select_all)
             return
@@ -375,12 +379,14 @@ class PdfCompareDialog(QDialog):
         if reply != QMessageBox.Yes:
             QTimer.singleShot(0, self._focus_png_template_select_all)
             return
+        # selectAll + insert → ein Undo-Schritt (Ctrl+Z stellt vorherigen Text wieder her)
         edit.selectAll()
         edit.insert(default)
         if isinstance(edit, DiffPngTemplateEdit):
             edit._saved_cursor = edit.cursorPosition()
             edit._saved_sel_start = -1
             edit._saved_sel_len = 0
+        # Live-Vorschau sofort; Fokus + Selektion ganzer Default-Text — 1.4.5
         self._update_png_template_preview()
         QTimer.singleShot(0, self._focus_png_template_select_all)
 

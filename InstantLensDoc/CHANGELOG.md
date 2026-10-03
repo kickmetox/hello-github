@@ -1,5 +1,27 @@
 # Changelog — InstantLens Doc
 
+## 1.4.5 — Diff-PNG Reset Confirm·Fokus, Rename-Undo Skip-Detail, Ann.-CSV Rescan-Progress, Theme-Toast
+
+Post-Release-Polish nach 1.4.4: **Diff-PNG Reset** bestätigt **nur bei Abweichung** und setzt **Fokus+Selektion** wie Ann.-Template; **Batch-Undo** meldet detailliert **„rückgängig X, übersprungen Y“** mit **kopierbarem Text**; **Annotation-Suche CSV Neu-Scan** zeigt bei vielen Docs einen **Fortschrittsdialog** mit **Abbruch**; **Theme-Zyklus** zeigt kurzen Status-Toast **„Theme: …“** und Shortcut in **Hilfe/About**. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### PDF
+- Vergleich Diff-PNG: Reset-Bestätigung nur bei Abweichung; Fokus + Selektion wie Ann.-Template
+
+### Dateien / Tabs
+- Batch-Umbenennen Undo: Meldung „rückgängig X, übersprungen Y“; Text kopierbar (Selektion + Kopieren)
+
+### Annotationen
+- Suche-Treffer-CSV Neu-Scan: Fortschrittsdialog bei vielen Docs; Abbrechen möglich
+
+### UI / Theme
+- Theme-Zyklus Ctrl+Shift+T: kurzer Status-Toast „Theme: …“; Shortcut in Hilfe/About
+
+### Packaging / Docs
+- Version **1.4.5** (App / `ild_pdf` / ISS / Smoke / Docs)
+- Smoke: Diff-PNG Reset Confirm·Fokus, Rename-Undo Skip-Detail, Ann.-CSV Rescan-Progress, Theme-Toast (CLI + Qt)
+
+---
+
 ## 1.4.4 — Diff-PNG Quick-Insert·Reset, Rename-Undo Skip·Invalidate, Ann.-CSV Scope, Theme-Zyklus
 
 Post-Release-Polish nach 1.4.3: **Diff-PNG-Template** mit **Quick-Insert** `{stemA}`/`{stemB}`/`{page}`/`{date}` und **Reset-Template** auf Default; **Batch-Undo** zählt **übersprungene Dateien** und **invalidiert** das Undo-Log danach; **Annotation-Suche CSV** wählbar **„nur aktuelle Trefferliste“** vs. **„alle Docs neu scannen“**; **Theme-Schnellmenü** zusätzlich per **Ctrl+Shift+T** zyklisch System→Hell→Dunkel→System. Stubs KI/Cloud/Stylus/3D bleiben Stubs.

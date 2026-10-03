@@ -46,8 +46,8 @@ SHORTCUTS_HTML = """
 <tr><td>Suchen und Ersetzen</td><td><code>Ctrl+R</code></td></tr>
 <tr><td>Gehe zu Zeile / Seite</td><td><code>Ctrl+G</code> (Editor / PDF)</td></tr>
 <tr><td>Gehe zu Seite (PDF-Menü)</td><td><code>Ctrl+Shift+G</code></td></tr>
-<tr><td>Tab duplizieren</td><td><code>Ctrl+Alt+Shift+T</code> — 1.4.4 (früher Ctrl+Shift+T)</td></tr>
-<tr><td>Theme zyklisch</td><td><code>Ctrl+Shift+T</code> System→Hell→Dunkel→System — 1.4.4</td></tr>
+<tr><td>Tab duplizieren</td><td><code>Ctrl+Alt+Shift+T</code> — 1.4.5 (früher Ctrl+Shift+T)</td></tr>
+<tr><td>Theme zyklisch</td><td><code>Ctrl+Shift+T</code> System→Hell→Dunkel→System; Status-Toast „Theme: …“ — 1.4.5</td></tr>
 <tr><td>Dateien vergleichen (Side-by-Side)</td><td><code>Ctrl+Alt+D</code></td></tr>
 <tr><td>Erneut öffnen</td><td><code>Ctrl+Alt+Shift+O</code></td></tr>
 <tr><td>Zeile / Annotation duplizieren</td><td><code>Ctrl+D</code> (Editor Zeile; PDF Auswahl) — 0.8.2</td></tr>
@@ -100,10 +100,10 @@ SHORTCUTS_HTML = """
 <tr><td>Ann. Export JSON/Flatten</td><td>PDF → Annotationen exportieren (JSON / Flatten)…: Quick-Insert {stem}/{page}/{date}; Ctrl+Z lokal; Reset-Template → Live-Vorschau + Fokus mit Selektion ganzer Default-Text; Bestätigung nur bei Abweichung — 1.2.9</td></tr>
 <tr><td>Text-Diff Panel</td><td>Datei → Text-Diff (offene Tabs)… (Ctrl+Alt+D): Wrap-Blink Dauer kurz/mittel/lang + System-Beep vs. stumm; Status Änderung i/n; F7/Shift+F7 — 1.2.9</td></tr>
 <tr><td>run.bat Deps / pip</td><td>Windows-Start: gewählte Python-Binary als „gefunden: …“ inkl. python --version; %ILD_PYTHON% ungültig/leer → Fallback py -3 → python → python3; --help; .venv; --yes/-y; Exit 0/1 — 1.2.9</td></tr>
-<tr><td>PDF-Vergleich Diff</td><td>Diff-PNG Quick-Insert {stemA}/{stemB}/{page}/{date}; Reset-Template — 1.4.4</td></tr>
-<tr><td>Batch-Umbenennen</td><td>Undo: übersprungene zählen/melden; Log danach invalidieren — 1.4.4</td></tr>
-<tr><td>Annotation-Suche offen</td><td>Ctrl+Shift+F3: CSV Scope aktuelle Trefferliste vs. alle Docs neu scannen — 1.4.4</td></tr>
-<tr><td>Theme System</td><td>Ctrl+Shift+T zyklisch System→Hell→Dunkel; Klick → Schnellmenü — 1.4.4</td></tr>
+<tr><td>PDF-Vergleich Diff</td><td>Diff-PNG Reset: Bestätigung nur bei Abweichung; Fokus+Selektion wie Ann.-Template — 1.4.5</td></tr>
+<tr><td>Batch-Umbenennen</td><td>Undo-Skip: „rückgängig X, übersprungen Y“; kopierbarer Text — 1.4.5</td></tr>
+<tr><td>Annotation-Suche offen</td><td>Ctrl+Shift+F3: CSV Neu-Scan Fortschritt bei vielen Docs + Abbruch — 1.4.5</td></tr>
+<tr><td>Theme System</td><td>Ctrl+Shift+T zyklisch; Status-Toast „Theme: …“; Hilfe/About — 1.4.5</td></tr>
 <tr><td>AcroForm-Sidebar</td><td>CSV Esc ohne Export; Enter auf OK; Zähler N von M; Default persistiert — 1.3.6</td></tr>
 <tr><td>Redactions anwenden</td><td>Status „Sidecar übersprungen“; Fortsetzen-Option Settings merken — 1.3.6</td></tr>
 <tr><td>Bookmarks ↔ Outlines</td><td>Fehlerdialog Retry-Zähler „Versuch k/3“; max. 3 wie Backup — 1.3.6</td></tr>
@@ -258,8 +258,8 @@ bzw. Dialog „zusammenführen / teilen / Bereich“.</p>
 <p><b>Suchen und Ersetzen:</b> Bearbeiten → Ctrl+R (nur Texteditor).</p>
 <p><b>Gehe zu Zeile / Seite:</b> Bearbeiten → Ctrl+G (Editor: Zeile; PDF: Seite);
 PDF → Gehe zu Seite… (Ctrl+Shift+G).</p>
-<p><b>Tab duplizieren:</b> Datei → Ctrl+Alt+Shift+T (Editor-Inhalt klonen) — 1.4.4;
-Theme zyklisch: Ctrl+Shift+T System→Hell→Dunkel; Erneut öffnen: Ctrl+Alt+Shift+O.</p>
+<p><b>Tab duplizieren:</b> Datei → Ctrl+Alt+Shift+T (Editor-Inhalt klonen) — 1.4.5;
+Theme zyklisch: Ctrl+Shift+T System→Hell→Dunkel (Status-Toast „Theme: …“); Erneut öffnen: Ctrl+Alt+Shift+O.</p>
 <p><b>Dateien vergleichen:</b> Datei → Ctrl+Alt+D — zwei Tabs/Dateien Side-by-Side (Zeilen-Diff).</p>
 <p><b>Export-Profil:</b> Datei → Exportieren → Profil speichern/anwenden (DPI/Format/Ziel);
 Vorbefüllung beim Seiten-Bild-Export.</p>
@@ -310,10 +310,10 @@ About: Datenschutz-Hinweis (lokal, keine Telemetrie).</p>
 <p><b>Seiten als Bilder:</b> PDF → Seite/Seiten als PNG/JPEG exportieren (aktuell oder alle; DPI 72/150/300).</p>
 <p><b>Thumbnails:</b> in der Sidebar ziehen zum Neuordnen der Seiten (Ctrl+Z rückgängig); Größe in Einstellungen (klein/normal/groß).</p>
 <p><b>Statusleiste:</b> Dateiname · Seite x/y · Seitengröße (mm/inch, klickbar) · Zoom % · Wörter/Ann. · Version · Lizenz.</p>
-<p><b>PDF-Vergleich:</b> Diff-PNG Quick-Insert {stemA}/{stemB}/{page}/{date}; Reset-Template — 1.4.4</p>
-<p><b>Batch-Umbenennen:</b> Undo übersprungene zählen/melden; Log invalidieren — 1.4.4</p>
-<p><b>Annotation-Suche:</b> CSV aktuelle Trefferliste vs. alle Docs neu scannen — 1.4.4</p>
-<p><b>Theme:</b> Ctrl+Shift+T zyklisch System→Hell→Dunkel; Klick → Schnellmenü — 1.4.4</p>
+<p><b>PDF-Vergleich:</b> Diff-PNG Reset Bestätigung nur bei Abweichung; Fokus+Selektion — 1.4.5</p>
+<p><b>Batch-Umbenennen:</b> Undo „rückgängig X, übersprungen Y“ kopierbar — 1.4.5</p>
+<p><b>Annotation-Suche:</b> CSV Neu-Scan Fortschritt + Abbruch — 1.4.5</p>
+<p><b>Theme:</b> Ctrl+Shift+T zyklisch; Status-Toast „Theme: …“; siehe Hilfe/About — 1.4.5</p>
 <p><b>Schwärzung / Redactions:</b> Rechteck ziehen → Sidecar; Status „Sidecar übersprungen“;
 Fortsetzen-Option in Settings merken — 1.3.6</p>
 <p><b>AcroForm:</b> CSV Esc ohne Export; Enter auf OK; Zähler N von M — 1.3.6</p>

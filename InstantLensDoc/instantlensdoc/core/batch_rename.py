@@ -1,4 +1,4 @@
-"""Batch-Umbenennen offener Tabs: Template {stem}_{n} + Undo-TXT — 1.4.4."""
+"""Batch-Umbenennen offener Tabs: Template {stem}_{n} + Undo-TXT — 1.4.5."""
 
 from __future__ import annotations
 
@@ -283,6 +283,14 @@ def count_skipped_undo_entries(log: RenameUndoLog) -> int:
     """Anzahl übersprungener Undo-Einträge (nicht mehr unter neuem Namen) — 1.4.4."""
     total = len(log.entries or [])
     return max(0, total - len(eligible_undo_entries(log)))
+
+
+def format_undo_skip_summary(undone: int, skipped: int) -> str:
+    """
+    Detaillierte Undo-Skip-Meldung — 1.4.5.
+    Format: ``rückgängig X, übersprungen Y`` (kopierbarer Kurztext).
+    """
+    return f"rückgängig {int(undone)}, übersprungen {int(skipped)}"
 
 
 def is_undo_log_invalidated(path: str | Path) -> bool:

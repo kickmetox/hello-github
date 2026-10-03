@@ -130,8 +130,8 @@ HELP_HTML = f"""
     Statusleisten-Hint „Ctrl+Z · … rückgängig“ (benannt, z. B. Tag umbenennen)</li>
 <li><b>Bearbeiten → Suchen und Ersetzen</b> (Ctrl+R): Find/Replace im Texteditor</li>
 <li><b>Bearbeiten → Gehe zu Zeile / Seite</b> (Ctrl+G): Editor → Zeile; PDF → Seite (auch PDF → Gehe zu Seite…, Ctrl+Shift+G)</li>
-<li><b>Datei → Tab duplizieren</b> (Ctrl+Alt+Shift+T): Editor-Inhalt als neues Dokument klonen — 1.4.4;
-    <b>Ansicht → Theme zyklisch</b> (Ctrl+Shift+T): System→Hell→Dunkel→System;
+<li><b>Datei → Tab duplizieren</b> (Ctrl+Alt+Shift+T): Editor-Inhalt als neues Dokument klonen — 1.4.5;
+    <b>Ansicht → Theme zyklisch</b> (Ctrl+Shift+T): System→Hell→Dunkel→System; Status-Toast „Theme: …“;
     <b>Text-Diff (offene Tabs)</b> (Ctrl+Alt+D): Wrap-Blink Dauer kurz/mittel/lang · System-Beep/stumm · Änderung i/n · Wrap-around · F7/Shift+F7 · Sync-Scroll · Ignore-Whitespace · Diff-TXT — 1.2.9;
     <b>Erneut öffnen</b> (Ctrl+Alt+Shift+O): Datei vom Datenträger neu laden</li>
 <li><b>Bearbeiten → Zeile / Annotation duplizieren</b> (Ctrl+D): Editor Zeile/Auswahl; PDF ausgewählte Annotation (auch Ctrl+Shift+D)</li>
@@ -698,6 +698,8 @@ class AboutDialog(QDialog):
             "<h3>Features (Kurz)</h3>"
             "<ul>"
             "<li>PDF lesen/annotieren (Highlight, Notiz, Stempel, Formen) · Sidecar v4</li>"
+            "<li><b>Theme zyklisch</b> <code>Ctrl+Shift+T</code> "
+            "System→Hell→Dunkel (Status-Toast „Theme: …“) — 1.4.5</li>"
             "<li>Willkommen Drag&amp;Drop/Clear-Recent, Druck-DPI 72/150/300, Trial-Resttage konsistent, Backup-Retry — 1.0.2</li>"
             "<li>Editor: Find/Replace, Snippets, Bracket-Match, Minimap, Zeilen-Lesezeichen</li>"
             "<li>OCR-Bridge, Formulargenerator, Batch, Export · Ann.-Batch-Farbe/Deckkraft</li>"

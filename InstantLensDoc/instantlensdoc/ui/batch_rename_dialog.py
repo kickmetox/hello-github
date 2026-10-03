@@ -1,4 +1,4 @@
-"""Batch-Umbenennen: Dry-Run, Kollision, Undo-TXT, Rückgängig letzte Batch — 1.4.4."""
+"""Batch-Umbenennen: Dry-Run, Kollision, Undo-TXT, Rückgängig letzte Batch — 1.4.5."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ from pathlib import Path
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
+    QApplication,
     QDialog,
     QDialogButtonBox,
     QFileDialog,
@@ -36,6 +37,7 @@ from instantlensdoc.core.batch_rename import (
     count_skipped_undo_entries,
     eligible_undo_entries,
     format_dry_run_list,
+    format_undo_skip_summary,
     invalidate_undo_log,
     is_undo_log_invalidated,
     preview_batch_rename,
@@ -256,29 +258,26 @@ class BatchRenameDialog(QDialog):
         eligible = eligible_undo_entries(log)
         skipped = count_skipped_undo_entries(log)
         if not eligible:
-            QMessageBox.information(
-                self,
+            detail = format_undo_skip_summary(0, skipped)
+            self._show_copyable_message(
                 "Rückgängig letzte Batch",
+                f"{detail}\n"
                 f"Keine der {len(log.entries)} Datei(en) entspricht noch dem "
-                f"neuen Namen — nichts zurückzunehmen.\n"
-                f"Übersprungen: {skipped}\n{log_path}",
+                f"neuen Namen — nichts zurückzunehmen.\n{log_path}",
             )
             # Auch ohne Undo: Log invalidieren (nicht erneut anbieten) — 1.4.4
             self._invalidate_used_undo_log(log_path)
             return
-        msg = (
+        confirm = (
             f"{len(eligible)} Datei(en) noch unter dem neuen Namen "
             f"wirklich zurücknehmen? (NEW → OLD)\n{log_path}"
         )
         if skipped:
-            msg += (
-                f"\n\n{skipped} Datei(en) übersprungen "
-                "(nicht mehr unter neuem Namen)."
-            )
+            confirm += f"\n\n{format_undo_skip_summary(len(eligible), skipped)}"
         reply = QMessageBox.question(
             self,
             "Rückgängig letzte Batch",
-            msg,
+            confirm,
             QMessageBox.Yes | QMessageBox.No,
             QMessageBox.No,
         )
@@ -301,26 +300,49 @@ class BatchRenameDialog(QDialog):
         self._refresh_preview()
         # Log nach Undo invalidieren — 1.4.4
         self._invalidate_used_undo_log(log_path)
-        summary = (
-            f"{len(self.undone)} Datei(en) zurückbenannt.\n"
-            f"Übersprungen: {skipped}"
-        )
+        detail = format_undo_skip_summary(len(self.undone), skipped)
+        summary = f"{detail}\nUndo-Log invalidiert."
         if errors:
-            QMessageBox.warning(
-                self,
+            self._show_copyable_message(
                 "Rückgängig",
                 f"{summary}\n{len(errors)} Fehler:\n" + "\n".join(errors[:8]),
+                icon=QMessageBox.Warning,
             )
         elif self.undone or skipped:
-            QMessageBox.information(
-                self,
+            self._show_copyable_message(
                 "Rückgängig letzte Batch",
-                summary + "\nUndo-Log invalidiert.",
+                summary,
             )
         else:
-            QMessageBox.information(
-                self, "Rückgängig", "Keine Dateien zurückbenannt."
+            self._show_copyable_message(
+                "Rückgängig", "Keine Dateien zurückbenannt."
             )
+
+    def _show_copyable_message(
+        self,
+        title: str,
+        text: str,
+        *,
+        icon=QMessageBox.Information,
+    ) -> None:
+        """Info/Warnung mit selektierbarem Text + Kopieren-Button — 1.4.5."""
+        box = QMessageBox(self)
+        box.setIcon(icon)
+        box.setWindowTitle(title)
+        box.setText(text)
+        box.setStandardButtons(QMessageBox.Ok)
+        copy_btn = box.addButton("Kopieren", QMessageBox.ActionRole)
+        # Labels vor exec selektierbar machen (kopierbarer Text)
+        _ = box.layout()
+        for lbl in box.findChildren(QLabel):
+            lbl.setTextInteractionFlags(
+                Qt.TextSelectableByMouse | Qt.TextSelectableByKeyboard
+            )
+        box.exec()
+        if box.clickedButton() is copy_btn:
+            clip = QApplication.clipboard()
+            if clip is not None:
+                clip.setText(text)
 
     def _apply(self) -> None:
         items = self._current_items()

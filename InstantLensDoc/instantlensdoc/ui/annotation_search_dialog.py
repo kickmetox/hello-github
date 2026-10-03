@@ -1,4 +1,4 @@
-"""Annotation-Suche: klickbare Treffer, Regex-Fehlerstatus, CSV-Export — 1.4.4."""
+"""Annotation-Suche: klickbare Treffer, Regex-Fehlerstatus, CSV-Export — 1.4.5."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ from pathlib import Path
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
+    QApplication,
     QButtonGroup,
     QCheckBox,
     QDialog,
@@ -18,6 +19,7 @@ from PySide6.QtWidgets import (
     QListWidget,
     QListWidgetItem,
     QMessageBox,
+    QProgressDialog,
     QPushButton,
     QRadioButton,
     QVBoxLayout,
@@ -34,9 +36,12 @@ from instantlensdoc.core.app_settings import (
     set_last_export_dir,
 )
 
+# Fortschrittsdialog ab so vielen Docs beim CSV-Neu-Scan — 1.4.5
+CSV_RESCAN_PROGRESS_THRESHOLD = 3
+
 
 class AnnotationSearchDialog(QDialog):
-    """Nicht-modale Trefferliste; Klick → Dokument/Seite — 1.4.4."""
+    """Nicht-modale Trefferliste; Klick → Dokument/Seite — 1.4.5."""
 
     hit_activated = Signal(str, int, str)  # path, page_0based, ann_id
 
@@ -53,7 +58,8 @@ class AnnotationSearchDialog(QDialog):
         root.addWidget(
             QLabel(
                 "Volltext über Sidecar-Notizen/Highlights/Tags aller offenen Docs — "
-                "Treffer klickbar (Doc+Seite); CSV: aktuelle Liste oder Neu-Scan — 1.4.4"
+                "Treffer klickbar (Doc+Seite); CSV: aktuelle Liste oder Neu-Scan "
+                "(Fortschritt/Abbruch bei vielen Docs) — 1.4.5"
             )
         )
 
@@ -79,13 +85,14 @@ class AnnotationSearchDialog(QDialog):
         opts.addStretch()
         self.btn_export_csv = QPushButton("Treffer CSV…")
         self.btn_export_csv.setToolTip(
-            "CSV-Export: aktuelle Trefferliste oder alle Docs neu scannen — 1.4.4"
+            "CSV-Export: aktuelle Trefferliste oder alle Docs neu scannen "
+            "(Fortschritt + Abbrechen bei vielen Docs) — 1.4.5"
         )
         self.btn_export_csv.clicked.connect(self._export_csv)
         opts.addWidget(self.btn_export_csv)
         root.addLayout(opts)
 
-        # CSV-Scope: nur aktuelle Trefferliste vs. alle Docs neu scannen — 1.4.4
+        # CSV-Scope: nur aktuelle Trefferliste vs. alle Docs neu scannen — 1.4.4/1.4.5
         csv_row = QHBoxLayout()
         csv_row.addWidget(QLabel("CSV-Quelle:"))
         self.radio_csv_current = QRadioButton("nur aktuelle Trefferliste")
@@ -94,7 +101,8 @@ class AnnotationSearchDialog(QDialog):
         )
         self.radio_csv_rescan = QRadioButton("alle Docs neu scannen")
         self.radio_csv_rescan.setToolTip(
-            "Vor dem Export Suche über alle gelisteten Docs erneut ausführen — 1.4.4"
+            "Vor dem Export Suche über alle gelisteten Docs erneut ausführen; "
+            "bei vielen Docs Fortschrittsdialog mit Abbrechen — 1.4.5"
         )
         self.radio_csv_current.setChecked(True)
         self._csv_scope_group = QButtonGroup(self)
@@ -143,6 +151,20 @@ class AnnotationSearchDialog(QDialog):
         )
         self.status.setText(text)
 
+    def _populate_hits(self, hits: list[AnnSearchHit]) -> None:
+        self._hits = list(hits)
+        self.list.clear()
+        for h in self._hits:
+            name = Path(h.path).name
+            text = f"{name}  ·  S.{h.page + 1}  [{h.ann_type}]  {h.snippet}"
+            item = QListWidgetItem(text)
+            item.setData(Qt.UserRole, h)
+            item.setToolTip(
+                f"{h.path}\nSeite {h.page + 1}\n{h.text or h.tags}\n"
+                "Klick → Doc+Seite — 1.4.1"
+            )
+            self.list.addItem(item)
+
     def _run_search(self) -> None:
         q = self.query.text().strip()
         self.list.clear()
@@ -163,22 +185,13 @@ class AnnotationSearchDialog(QDialog):
                 self._set_status_error(f"Regex-Fehler: {e}")
                 self.list.addItem(QListWidgetItem(f"Regex-Fehler: {e}"))
                 return
-        self._hits = search_annotations_in_paths(
+        hits = search_annotations_in_paths(
             self._paths,
             q,
             case_sensitive=case_sensitive,
             use_regex=use_regex,
         )
-        for h in self._hits:
-            name = Path(h.path).name
-            text = f"{name}  ·  S.{h.page + 1}  [{h.ann_type}]  {h.snippet}"
-            item = QListWidgetItem(text)
-            item.setData(Qt.UserRole, h)
-            item.setToolTip(
-                f"{h.path}\nSeite {h.page + 1}\n{h.text or h.tags}\n"
-                "Klick → Doc+Seite — 1.4.1"
-            )
-            self.list.addItem(item)
+        self._populate_hits(hits)
         flags = []
         if case_sensitive:
             flags.append("Aa")
@@ -187,21 +200,84 @@ class AnnotationSearchDialog(QDialog):
         flag_s = f" [{', '.join(flags)}]" if flags else ""
         self._set_status_ok(
             f"{len(self._hits)} Treffer in {len(self._paths)} Doc(s)"
-            f"{flag_s} — Klick öffnet Doc+Seite — 1.4.4"
+            f"{flag_s} — Klick öffnet Doc+Seite — 1.4.5"
         )
+
+    def _rescan_hits_with_progress(
+        self,
+        q: str,
+        *,
+        case_sensitive: bool,
+        use_regex: bool,
+    ) -> list[AnnSearchHit] | None:
+        """
+        Neu-Scan über alle Docs; bei vielen Docs Fortschrittsdialog + Abbrechen — 1.4.5.
+        Rückgabe None = abgebrochen; sonst Trefferliste.
+        """
+        paths = list(self._paths)
+        n_docs = len(paths)
+        use_progress = n_docs > CSV_RESCAN_PROGRESS_THRESHOLD
+        cancelled = {"flag": False}
+        prog: QProgressDialog | None = None
+        if use_progress:
+            prog = QProgressDialog(
+                "Annotation-Suche Neu-Scan…", "Abbrechen", 0, n_docs, self
+            )
+            prog.setWindowTitle("CSV Neu-Scan")
+            prog.setWindowModality(Qt.WindowModal)
+            prog.setMinimumDuration(0)
+            prog.setCancelButtonText("Abbrechen")
+            prog.setValue(0)
+            prog.setLabelText(f"0 / {n_docs} Docs…")
+            QApplication.processEvents()
+
+        def on_progress(i: int, total: int, name: str) -> bool:
+            if prog is None:
+                return True
+            if prog.wasCanceled():
+                cancelled["flag"] = True
+                return False
+            prog.setLabelText(f"Scan {i + 1}/{total}: {name}")
+            prog.setValue(i)
+            QApplication.processEvents()
+            if prog.wasCanceled():
+                cancelled["flag"] = True
+                return False
+            return True
+
+        try:
+            hits = search_annotations_in_paths(
+                paths,
+                q,
+                case_sensitive=case_sensitive,
+                use_regex=use_regex,
+                on_progress=on_progress if use_progress else None,
+            )
+        finally:
+            if prog is not None:
+                if not cancelled["flag"]:
+                    prog.setValue(n_docs)
+                prog.close()
+
+        if cancelled["flag"]:
+            self._set_status_ok(
+                f"CSV Neu-Scan abgebrochen ({len(hits)} Treffer bisher) — 1.4.5"
+            )
+            return None
+        return list(hits)
 
     def _hits_for_csv_export(self) -> list[AnnSearchHit] | None:
         """
         Treffer je CSV-Scope.
-        ``current``: aktuelle Liste; ``rescan``: alle Docs neu scannen — 1.4.4.
-        Bei Regex-Fehler: None.
+        ``current``: aktuelle Liste; ``rescan``: alle Docs neu scannen — 1.4.4/1.4.5.
+        Bei Regex-Fehler oder Abbruch: None.
         """
         if self._regex_error:
             return None
         scope = self.csv_export_scope()
         if scope == "current":
             return list(self._hits)
-        # Neu scannen (Liste aktualisieren)
+        # Neu scannen (Liste aktualisieren) — Fortschritt bei vielen Docs — 1.4.5
         q = self.query.text().strip()
         if not q:
             return []
@@ -215,25 +291,16 @@ class AnnotationSearchDialog(QDialog):
                 self._regex_error = str(e)
                 self._set_status_error(f"Regex-Fehler: {e}")
                 return None
-        hits = search_annotations_in_paths(
-            self._paths,
-            q,
-            case_sensitive=case_sensitive,
-            use_regex=use_regex,
+        hits = self._rescan_hits_with_progress(
+            q, case_sensitive=case_sensitive, use_regex=use_regex
         )
-        # UI-Liste an frischen Scan anpassen
-        self._hits = list(hits)
-        self.list.clear()
-        for h in self._hits:
-            name = Path(h.path).name
-            text = f"{name}  ·  S.{h.page + 1}  [{h.ann_type}]  {h.snippet}"
-            item = QListWidgetItem(text)
-            item.setData(Qt.UserRole, h)
-            self.list.addItem(item)
+        if hits is None:
+            return None  # abgebrochen
+        self._populate_hits(hits)
         return list(self._hits)
 
     def _export_csv(self) -> None:
-        """Treffer-Export CSV — aktuelle Liste oder Neu-Scan — 1.4.4."""
+        """Treffer-Export CSV — aktuelle Liste oder Neu-Scan — 1.4.5."""
         if self._regex_error and self.csv_export_scope() == "current":
             QMessageBox.warning(
                 self,
@@ -243,6 +310,9 @@ class AnnotationSearchDialog(QDialog):
             return
         hits = self._hits_for_csv_export()
         if hits is None:
+            if self.csv_export_scope() == "rescan" and not self._regex_error:
+                # Abbruch Neu-Scan — kein Fehlerdialog
+                return
             QMessageBox.warning(
                 self,
                 "Treffer CSV",
@@ -276,7 +346,7 @@ class AnnotationSearchDialog(QDialog):
                 "Neu-Scan" if scope == "rescan" else "aktuelle Trefferliste"
             )
             self._set_status_ok(
-                f"{len(hits)} Treffer als CSV ({scope_lbl}): {dest.name} — 1.4.4"
+                f"{len(hits)} Treffer als CSV ({scope_lbl}): {dest.name} — 1.4.5"
             )
             QMessageBox.information(
                 self,
