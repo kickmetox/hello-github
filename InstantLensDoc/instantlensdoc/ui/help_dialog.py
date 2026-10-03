@@ -221,7 +221,7 @@ HELP_HTML = f"""
     Wiederherstellung beim Start über getrennte Toggles in den Einstellungen
     (Fenstergeometrie / offene Tabs); <b>Last-Page</b> und <b>Scroll-Position</b> pro Tab</li>
 <li><b>Logging</b>: Datei unter <code>%APPDATA%/InstantLensDoc/logs/</code> (Windows) bzw. <code>~/.config/InstantLensDoc/logs/</code></li>
-<li><b>Tastatur-Cheat-Sheet</b>: Hilfe → Tastatur-Cheat-Sheet… / F1; Suche/Filter · Drucken · TXT {date}_shortcuts.txt · Zielordner — 2.4.2</li>
+<li><b>Tastatur-Cheat-Sheet</b>: Hilfe → Tastatur-Cheat-Sheet… / F1; Suche/Filter · Drucken · TXT Live-Vorschau · Quick-Insert {{date}} · Reset Default — 2.4.3</li>
 <li><b>Extras → Batch-Konvertierung</b>: Ordner → PDF oder OCR</li>
 <li><b>Einfügen → Verketteter Textrahmen</b>: Overflow fließt in den Folgeahmen</li>
 <li><b>OCR</b>: Extras → OCR (Seite/Bild) oder <b>OCR gesamtes PDF</b> (Batch mit
@@ -305,7 +305,7 @@ WIZARD_PAGES = (
         "<h3>Editor &amp; weiter</h3>"
         "<ul>"
         "<li>Ctrl+F2: Zeile favorisieren; Sidebar-Liste; Doppelklick → <b>Label</b></li>"
-        "<li>F1: Tastatur-Cheat-Sheet · Suche/Filter · Drucken/TXT {date}_shortcuts.txt · Hilfe… — 2.4.2</li>"
+        "<li>F1: Tastatur-Cheat-Sheet · Live-Vorschau · Quick-Insert {date} · Reset Default · Hilfe… — 2.4.3</li>"
         "<li>Lokal, ohne Telemetrie — Stubs KI/Cloud/Stylus/3D bewusst ohne Funktion</li>"
         "</ul>",
     ),

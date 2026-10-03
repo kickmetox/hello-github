@@ -185,6 +185,8 @@ DEFAULTS: dict[str, Any] = {
     "thumb_lazy_threshold": 50,
     "thumb_cache_max_mb": 100,  # Thumbnail Disk-Cache max Größe MB — 2.4.1
     "thumb_cache_debug_hits": False,  # Hit/Miss optional in Status — 2.4.1
+    "thumb_cache_prune_mode": "on_write",  # on_write | interval — Auto-Prune — 2.4.3
+    "thumb_cache_prune_interval_min": 15,  # Intervall-Minuten wenn mode=interval — 2.4.3
     "sync_scroll_status_indicator": True,  # Sync-Scroll Statusleisten-Indikator — 2.4.1
     "last_ann_template_id": "",  # zuletzt angewandte Annotation-Vorlage — 2.4.2
     "last_shortcuts_txt_dir": "",  # Zielordner F1 Shortcuts-TXT merken — 2.4.2
@@ -4797,6 +4799,14 @@ THUMB_PREFETCH_RADIUS_DEFAULT = 2
 THUMB_PREFETCH_CANCEL_MS_DEFAULT = 90
 THUMB_CACHE_MAX_MB_CHOICES = (25, 50, 100, 200, 500)
 THUMB_CACHE_MAX_MB_DEFAULT = 100
+THUMB_CACHE_PRUNE_MODE_ON_WRITE = "on_write"
+THUMB_CACHE_PRUNE_MODE_INTERVAL = "interval"
+THUMB_CACHE_PRUNE_MODE_CHOICES = (
+    THUMB_CACHE_PRUNE_MODE_ON_WRITE,
+    THUMB_CACHE_PRUNE_MODE_INTERVAL,
+)
+THUMB_CACHE_PRUNE_INTERVAL_MIN_CHOICES = (5, 15, 30, 60)
+THUMB_CACHE_PRUNE_INTERVAL_MIN_DEFAULT = 15
 
 
 def get_thumb_cache_max_mb() -> int:
@@ -4822,11 +4832,11 @@ def set_thumb_cache_max_mb(mb: int) -> int:
     if v not in THUMB_CACHE_MAX_MB_CHOICES:
         v = min(THUMB_CACHE_MAX_MB_CHOICES, key=lambda x: abs(x - v))
     save_settings({"thumb_cache_max_mb": v})
-    # Auto-Prune bei neuem Limit — 2.4.2
+    # Auto-Prune bei neuem Limit + Status/Log — 2.4.3
     try:
         from instantlensdoc.core.thumb_cache import auto_prune_thumb_cache
 
-        auto_prune_thumb_cache()
+        auto_prune_thumb_cache(announce=True)
     except Exception:
         pass
     return v
@@ -4839,6 +4849,60 @@ def get_thumb_cache_debug_hits() -> bool:
 
 def set_thumb_cache_debug_hits(enabled: bool) -> None:
     save_settings({"thumb_cache_debug_hits": bool(enabled)})
+
+
+def get_thumb_cache_prune_mode() -> str:
+    """Auto-Prune: ``on_write`` (Default) oder ``interval`` — 2.4.3."""
+    raw = str(
+        load_settings().get(
+            "thumb_cache_prune_mode", THUMB_CACHE_PRUNE_MODE_ON_WRITE
+        )
+        or THUMB_CACHE_PRUNE_MODE_ON_WRITE
+    ).strip().lower()
+    if raw not in THUMB_CACHE_PRUNE_MODE_CHOICES:
+        return THUMB_CACHE_PRUNE_MODE_ON_WRITE
+    return raw
+
+
+def set_thumb_cache_prune_mode(mode: str) -> str:
+    """Auto-Prune-Modus speichern — 2.4.3."""
+    raw = str(mode or THUMB_CACHE_PRUNE_MODE_ON_WRITE).strip().lower()
+    if raw not in THUMB_CACHE_PRUNE_MODE_CHOICES:
+        raw = THUMB_CACHE_PRUNE_MODE_ON_WRITE
+    save_settings({"thumb_cache_prune_mode": raw})
+    return raw
+
+
+def get_thumb_cache_prune_interval_min() -> int:
+    """Auto-Prune Intervall in Minuten (5/15/30/60) — 2.4.3."""
+    try:
+        v = int(
+            load_settings().get(
+                "thumb_cache_prune_interval_min",
+                THUMB_CACHE_PRUNE_INTERVAL_MIN_DEFAULT,
+            )
+        )
+    except (TypeError, ValueError):
+        v = THUMB_CACHE_PRUNE_INTERVAL_MIN_DEFAULT
+    if v not in THUMB_CACHE_PRUNE_INTERVAL_MIN_CHOICES:
+        return min(
+            THUMB_CACHE_PRUNE_INTERVAL_MIN_CHOICES, key=lambda x: abs(x - v)
+        )
+    return v
+
+
+def set_thumb_cache_prune_interval_min(minutes: int) -> int:
+    """Auto-Prune Intervall speichern — 2.4.3."""
+    try:
+        v = int(minutes)
+    except (TypeError, ValueError):
+        v = THUMB_CACHE_PRUNE_INTERVAL_MIN_DEFAULT
+    if v not in THUMB_CACHE_PRUNE_INTERVAL_MIN_CHOICES:
+        v = min(
+            THUMB_CACHE_PRUNE_INTERVAL_MIN_CHOICES, key=lambda x: abs(x - v)
+        )
+    save_settings({"thumb_cache_prune_interval_min": v})
+    return v
 
 
 def get_sync_scroll_status_indicator() -> bool:
@@ -4922,7 +4986,7 @@ def format_shortcuts_txt_filename(
     """
     F1 Shortcuts-TXT-Dateiname aus Template.
     Platzhalter: ``{date}`` (YYYY-MM-DD).
-    Default ``{date}_shortcuts.txt`` — 2.4.2.
+    Default ``{date}_shortcuts.txt`` — 2.4.2/2.4.3.
     """
     from datetime import date as _date
 
@@ -4939,6 +5003,41 @@ def format_shortcuts_txt_filename(
     if not name.lower().endswith(".txt"):
         name = name + ".txt"
     return name or f"{date_s}_shortcuts.txt"
+
+
+def find_invalid_shortcuts_txt_placeholders(template: str) -> list[str]:
+    """Unbekannte Platzhalter im F1-Shortcuts-TXT-Template — 2.4.3."""
+    seen: set[str] = set()
+    out: list[str] = []
+    for name in _SHORTCUTS_TXT_ANY_PLACEHOLDER_RE.findall(str(template or "")):
+        key = name.strip()
+        if not key or key in SHORTCUTS_TXT_KNOWN_PLACEHOLDERS or key in seen:
+            continue
+        seen.add(key)
+        out.append(key)
+    return out
+
+
+def highlight_shortcuts_txt_template_html(template: str) -> str:
+    """Template als HTML; ungültige Platzhalter rot — 2.4.3."""
+    import html as _html
+
+    raw = str(template or "")
+    parts: list[str] = []
+    last = 0
+    for m in _SHORTCUTS_TXT_ANY_PLACEHOLDER_RE.finditer(raw):
+        parts.append(_html.escape(raw[last : m.start()]))
+        name = m.group(1).strip()
+        token = _html.escape(m.group(0))
+        if name and name not in SHORTCUTS_TXT_KNOWN_PLACEHOLDERS:
+            parts.append(
+                f'<span style="color:#c62828;font-weight:600">{token}</span>'
+            )
+        else:
+            parts.append(token)
+        last = m.end()
+    parts.append(_html.escape(raw[last:]))
+    return "".join(parts) or _html.escape(raw)
 
 
 def get_thumb_lazy_threshold() -> int:

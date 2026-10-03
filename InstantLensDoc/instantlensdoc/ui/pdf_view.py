@@ -1362,15 +1362,27 @@ class PdfCanvas(QLabel):
         super().mouseDoubleClickEvent(event)
 
     def keyPressEvent(self, event):  # noqa: N802
-        """Esc bricht Quick-Stempel-Platzieren ab — 1.9.3."""
+        """Esc: Apply-Modus / Quick-Stempel abbrechen — 2.4.3."""
         if event.key() == Qt.Key_Escape:
             viewer = self.parent()
-            while viewer is not None and not hasattr(viewer, "cancel_quick_stamp"):
+            while viewer is not None and not (
+                hasattr(viewer, "cancel_quick_stamp")
+                or hasattr(viewer, "cancel_quick_ann_template")
+            ):
                 viewer = viewer.parent()
-            if viewer is not None and getattr(viewer, "_quick_stamp_armed", False):
-                viewer.cancel_quick_stamp()
-                event.accept()
-                return
+            if viewer is not None:
+                if getattr(viewer, "_quick_ann_template_armed", False) and callable(
+                    getattr(viewer, "cancel_quick_ann_template", None)
+                ):
+                    viewer.cancel_quick_ann_template()
+                    event.accept()
+                    return
+                if getattr(viewer, "_quick_stamp_armed", False) and callable(
+                    getattr(viewer, "cancel_quick_stamp", None)
+                ):
+                    viewer.cancel_quick_stamp()
+                    event.accept()
+                    return
             self.escape_pressed.emit()
         super().keyPressEvent(event)
 
@@ -1409,6 +1421,8 @@ class PdfViewer(QWidget):
         self._pending_angle: tuple[float, float, float, float, int] | None = None
         self._quick_stamp_armed: bool = False  # Quick-Stempel ohne Dialog — 1.9.2
         self._quick_stamp_payload: dict | None = None
+        self._quick_ann_template_armed: bool = False  # Apply-Modus — 2.4.3
+        self._quick_ann_template_id: str | None = None
         self._zoom_timer = QTimer(self)
         self._zoom_timer.setSingleShot(True)
         self._zoom_timer.setInterval(120)
@@ -1615,9 +1629,21 @@ class PdfViewer(QWidget):
         self.btn_quick_ann_template = QPushButton("Vorlage ★")
         self.btn_quick_ann_template.setObjectName("btnQuickAnnTemplate")
         self.btn_quick_ann_template.setToolTip(
-            "Quick-Apply Annotation-Vorlage: zuletzt verwendet, sonst Standard ★ — 2.4.2"
+            "Links: Quick-Apply zuletzt/Standard ★ · Rechtsklick: Vorlage wählen · "
+            "Esc bricht Apply-Modus ab — 2.4.3"
         )
-        self.btn_quick_ann_template.clicked.connect(self.apply_quick_ann_template)
+        self.btn_quick_ann_template.setAccessibleName("Annotation-Vorlage Quick-Apply")
+        self.btn_quick_ann_template.setAccessibleDescription(
+            "Links: zuletzt verwendete oder Standard-Vorlage anwenden. "
+            "Rechtsklick: Vorlage wählen. Esc bricht Apply-Modus ab."
+        )
+        self.btn_quick_ann_template.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.btn_quick_ann_template.clicked.connect(
+            lambda: self.arm_quick_ann_template()
+        )
+        self.btn_quick_ann_template.customContextMenuRequested.connect(
+            self._quick_ann_template_context_menu
+        )
         btn_rot_ccw = QPushButton("⟲")
         btn_rot_ccw.setToolTip("Aktuelle Seite 90° gegen den Uhrzeigersinn drehen (−90°) und speichern")
         btn_rot_ccw.clicked.connect(lambda: self.rotate_current(-90))
@@ -3451,9 +3477,11 @@ class PdfViewer(QWidget):
         self._pending_callout_anchor = None
         self._pending_callout_page = self.page_index
         self._pending_angle = None
-        # Quick-Stempel nur über arm_quick_stamp(); Werkzeugwechsel löscht — 1.9.2
+        # Quick-Stempel / Apply-Modus nur über arm_*; Werkzeugwechsel löscht — 2.4.3
         self._quick_stamp_armed = False
         self._quick_stamp_payload = None
+        self._quick_ann_template_armed = False
+        self._quick_ann_template_id = None
         if tool is None:
             want = "Auswahl"
             for b in self._tool_buttons:
@@ -8005,13 +8033,20 @@ class PdfViewer(QWidget):
         payload = resolve_standard_stamp()
         self.arm_quick_stamp(payload)
 
-    def apply_quick_ann_template(self) -> bool:
+    def apply_quick_ann_template(self, template=None) -> bool:
+        """API-Compat: Quick-Apply → Apply-Modus armieren — 2.4.3."""
+        return self.arm_quick_ann_template(template)
+
+    def arm_quick_ann_template(self, template=None) -> bool:
         """
-        Toolbar Quick-Apply: zuletzt verwendete Annotation-Vorlage,
-        sonst Standard ★ — Styles setzen, zuletzt verwendet merken — 2.4.2.
+        Toolbar Quick-Apply: Styles setzen + Apply-Modus.
+        Zuletzt verwendet / Standard ★ bzw. explizite Vorlage;
+        Esc bricht Apply-Modus ab — 2.4.3.
         """
         from instantlensdoc.core.ann_templates import (
+            AnnTemplate,
             apply_template,
+            get_default_template_id,
             resolve_quick_ann_template,
         )
         from instantlensdoc.core.app_settings import (
@@ -8019,10 +8054,12 @@ class PdfViewer(QWidget):
             get_ann_pen_color,
         )
 
-        t = resolve_quick_ann_template()
+        t = template if isinstance(template, AnnTemplate) else None
+        if t is None:
+            t = resolve_quick_ann_template()
         if t is None:
             self.status.emit(
-                "Keine Annotation-Vorlage — Standard ★ setzen oder Vorlage anwenden"
+                "Keine Annotation-Vorlage — Standard ★ setzen oder Vorlage wählen"
             )
             return False
         apply_template(t)
@@ -8038,20 +8075,103 @@ class PdfViewer(QWidget):
         except Exception:
             pass
         self.refresh()
-        kind_de = "Stempel" if t.kind == "stamp" else "Highlight"
-        from instantlensdoc.core.ann_templates import get_default_template_id
-
         star = "★ " if t.id == get_default_template_id() else ""
-        self.status.emit(f"Vorlage {star}„{t.name}“ angewandt ({kind_de})")
+        kind_de = "Stempel" if t.kind == "stamp" else "Highlight"
+        if t.kind == "stamp":
+            # Stempel-Vorlage: zusätzlich Platzieren armieren
+            self.arm_quick_stamp(
+                {
+                    "kind": "text",
+                    "text": (t.stamp_text or t.name or "Stempel"),
+                    "color": t.color or "#C0392B",
+                    "image": "",
+                    "path": None,
+                }
+            )
+            # nach _set_tool in arm_quick_stamp erneut setzen — 2.4.3
+            self._quick_ann_template_armed = True
+            self._quick_ann_template_id = t.id
+            self.status.emit(
+                f"Apply-Modus: {star}„{t.name}“ ({kind_de}) — "
+                "Klick platzieren · Esc = Abbruch"
+            )
+        else:
+            try:
+                self._set_tool(AnnotationType.HIGHLIGHT)
+            except Exception:
+                pass
+            self._quick_ann_template_armed = True
+            self._quick_ann_template_id = t.id
+            self.status.emit(
+                f"Apply-Modus: {star}„{t.name}“ ({kind_de}) — Esc = Abbruch"
+            )
+            try:
+                self.canvas.setFocus(Qt.OtherFocusReason)
+            except Exception:
+                pass
         return True
 
+    def cancel_quick_ann_template(self) -> bool:
+        """Esc: Apply-Modus abbrechen; Fokus Toolbar — 2.4.3."""
+        if not self._quick_ann_template_armed:
+            return False
+        self._quick_ann_template_armed = False
+        self._quick_ann_template_id = None
+        # Stempel-Platzieren ggf. mit abbrechen (ohne doppelten Status)
+        if self._quick_stamp_armed or self._quick_stamp_payload:
+            self._remember_quick_stamp_zoom_opacity()
+            self._quick_stamp_armed = False
+            self._quick_stamp_payload = None
+        self.status.emit("Apply-Modus abgebrochen")
+        try:
+            if (
+                hasattr(self, "btn_quick_ann_template")
+                and self.btn_quick_ann_template is not None
+            ):
+                self.btn_quick_ann_template.setFocus(Qt.OtherFocusReason)
+        except Exception:
+            pass
+        return True
+
+    def _quick_ann_template_context_menu(self, pos) -> None:
+        """Rechtsklick Quick-Apply: Vorlage wählen — 2.4.3."""
+        from instantlensdoc.core.ann_templates import (
+            get_default_template_id,
+            load_templates,
+        )
+
+        menu = QMenu(self)
+        act_last = menu.addAction("Zuletzt / Standard (wie Linksklick)")
+        act_last.triggered.connect(lambda: self.arm_quick_ann_template())
+        templates = load_templates()
+        if templates:
+            for t in templates:
+                star = "★ " if t.id == get_default_template_id() else ""
+                kind_de = "Stempel" if t.kind == "stamp" else "Highlight"
+                act = menu.addAction(f"{star}{t.name} ({kind_de})")
+
+                def _arm(checked=False, tmpl=t):
+                    self.arm_quick_ann_template(tmpl)
+
+                act.triggered.connect(_arm)
+        else:
+            empty = menu.addAction("(keine Vorlagen)")
+            empty.setEnabled(False)
+        if self._quick_ann_template_armed:
+            menu.addSeparator()
+            act_cancel = menu.addAction("Apply-Modus abbrechen (Esc)")
+            act_cancel.triggered.connect(self.cancel_quick_ann_template)
+        menu.exec(self.btn_quick_ann_template.mapToGlobal(pos))
+
     def _on_canvas_escape(self) -> None:
-        """Esc: Quick-Stempel / Callout / Winkel-Pending abbrechen — 2.1.0."""
+        """Esc: Apply-Modus / Quick-Stempel / Callout / Winkel abbrechen — 2.4.3."""
         if self.cancel_pending_angle():
             return
         if self._pending_callout_anchor is not None:
             self._pending_callout_anchor = None
             self.status.emit("Platzieren abgebrochen")
+            return
+        if self.cancel_quick_ann_template():
             return
         self.cancel_quick_stamp()
 
@@ -10034,6 +10154,9 @@ class PdfViewer(QWidget):
                 payload = self._quick_stamp_payload
                 self._quick_stamp_armed = False
                 self._quick_stamp_payload = None
+                # Apply-Modus (Vorlage→Stempel) mit beenden — 2.4.3
+                self._quick_ann_template_armed = False
+                self._quick_ann_template_id = None
                 # Zoom/Opacity wie Signatur merken — 1.9.4
                 self._remember_quick_stamp_zoom_opacity()
                 if payload.get("kind") == "image" and payload.get("path"):

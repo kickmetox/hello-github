@@ -1,10 +1,11 @@
-"""Tastaturhilfe-Dialog inkl. Suche/Filter, PDF/TXT-Export und Drucken — 2.4.2."""
+"""Tastaturhilfe-Dialog inkl. Suche/Filter, PDF/TXT-Export und Drucken — 2.4.3."""
 
 from __future__ import annotations
 
 import re
 from pathlib import Path
 
+from PySide6.QtCore import Qt
 from PySide6.QtGui import QTextDocument
 from PySide6.QtPrintSupport import QPrintDialog, QPrinter
 from PySide6.QtWidgets import (
@@ -23,23 +24,27 @@ from PySide6.QtWidgets import (
 from instantlensdoc.core.app_settings import (
     DEFAULT_SHORTCUTS_TXT_FILENAME_TEMPLATE,
     dialog_start_dir,
+    find_invalid_shortcuts_txt_placeholders,
     format_shortcuts_txt_filename,
     get_last_export_dir,
     get_last_shortcuts_txt_dir,
+    get_shortcuts_txt_filename_template,
+    highlight_shortcuts_txt_template_html,
     remember_recent_dir,
     set_last_export_dir,
     set_last_shortcuts_txt_dir,
+    set_shortcuts_txt_filename_template,
 )
 
 SHORTCUTS_HTML = """
 <h2>Tastatur-Cheat-Sheet — InstantLens Doc</h2>
-<p>Shortcut-Liste (DE) — Hilfe → Tastatur-Cheat-Sheet… / <code>F1</code> — Suche/Filter · Drucken · Export TXT ({date}_shortcuts.txt) — 2.4.2</p>
+<p>Shortcut-Liste (DE) — Hilfe → Tastatur-Cheat-Sheet… / <code>F1</code> — Suche/Filter · Drucken · Export TXT Live-Vorschau · Quick-Insert {date} · Reset Default — 2.4.3</p>
 <table cellpadding="4" cellspacing="0">
 <tr><th align="left">Aktion</th><th align="left">Kürzel</th></tr>
-<tr><td>Tastatur-Cheat-Sheet</td><td><code>F1</code> — Shortcut-Liste DE · Suche/Filter · Drucken · TXT Template {date}_shortcuts.txt · Zielordner merken — 2.4.2</td></tr>
-<tr><td>Sync-Scroll (PDF↔PDF)</td><td><code>Ctrl+Alt+\\</code> — nur PDF↔PDF · Status-Klick toggled · Tooltip Shortcut — 2.4.2</td></tr>
-<tr><td>Annotation-Vorlagen</td><td>Toolbar Quick-Apply ★ · zuletzt verwendet · Dialog ildtmpl-v1 — 2.4.2</td></tr>
-<tr><td>Thumbnail Disk-Cache</td><td>Cache leeren Bestätigung · freigegebene MB Status · Auto-Prune bei Limit — 2.4.2</td></tr>
+<tr><td>Tastatur-Cheat-Sheet</td><td><code>F1</code> — Shortcut-Liste DE · Suche/Filter · Drucken · TXT Live-Vorschau · Quick-Insert {date} · Reset Default · Zielordner merken — 2.4.3</td></tr>
+<tr><td>Sync-Scroll (PDF↔PDF)</td><td><code>Ctrl+Alt+\\</code> — nur PDF↔PDF · Status-Klick · Tooltip Zustand an/aus · A11y — 2.4.3</td></tr>
+<tr><td>Annotation-Vorlagen</td><td>Toolbar Quick-Apply ★ · Rechtsklick wählen · Esc Apply-Modus abbrechen — 2.4.3</td></tr>
+<tr><td>Thumbnail Disk-Cache</td><td>Auto-Prune Status „N Dateien / X MB entfernt“ · Settings Intervall oder on-write — 2.4.3</td></tr>
 <tr><td>Neu (leer)</td><td><code>Ctrl+N</code></td></tr>
 <tr><td>Textbaustein 1–3 einfügen</td><td><code>Ctrl+Alt+1</code> … <code>3</code></td></tr>
 <tr><td>Annotationen sperren</td><td><code>Ctrl+Shift+L</code></td></tr>
@@ -577,9 +582,11 @@ class KeyboardHelpDialog(QDialog):
         btn_txt = QPushButton("Als TXT exportieren…")
         btn_txt.setObjectName("shortcutExportTxt")
         btn_txt.setToolTip(
-            f"TXT speichern · Template {DEFAULT_SHORTCUTS_TXT_FILENAME_TEMPLATE} · "
-            "Zielordner merken — 2.4.2"
+            f"TXT speichern · Live-Vorschau · Quick-Insert {{date}} · "
+            f"Reset Default ({DEFAULT_SHORTCUTS_TXT_FILENAME_TEMPLATE}) · "
+            "Zielordner merken — 2.4.3"
         )
+        btn_txt.setAccessibleName("Shortcuts als TXT exportieren")
         btn_txt.clicked.connect(self._export_txt)
         buttons.addButton(btn_txt, QDialogButtonBox.ActionRole)
         btn_pdf = QPushButton("Als PDF exportieren…")
@@ -631,9 +638,133 @@ class KeyboardHelpDialog(QDialog):
             )
 
     def _export_txt(self) -> None:
-        """TXT-Export: Zielordner merken · Template {date}_shortcuts.txt — 2.4.2."""
+        """
+        TXT-Export: Live-Vorschau Dateiname · Quick-Insert {date} ·
+        Reset Default · Zielordner merken — 2.4.3.
+        """
+        from instantlensdoc.ui.template_reset import (
+            EscapeDiscardEditFilter,
+            reset_line_edit_template,
+        )
+
+        opts = QDialog(self)
+        opts.setWindowTitle("Shortcuts als TXT")
+        opts.setAccessibleName("Shortcuts-TXT Export Optionen")
+        ol = QVBoxLayout(opts)
+        ol.addWidget(
+            QLabel(
+                f"Template {DEFAULT_SHORTCUTS_TXT_FILENAME_TEMPLATE} · "
+                "Live-Vorschau · Quick-Insert · Reset Default — 2.4.3"
+            )
+        )
+
+        tpl_row = QHBoxLayout()
+        tpl_row.addWidget(QLabel("Dateiname:"))
+        tpl_edit = QLineEdit(get_shortcuts_txt_filename_template())
+        tpl_edit.setObjectName("shortcutsTxtTemplate")
+        tpl_edit.setPlaceholderText(DEFAULT_SHORTCUTS_TXT_FILENAME_TEMPLATE)
+        tpl_edit.setToolTip(
+            "Live-Dateiname-Template; Platzhalter {date}; "
+            "Quick-Insert; Reset Default (Bestätigung nur bei Abweichung · "
+            "Fokus+Selektion); Esc im Feld verwirft Edit — 2.4.3"
+        )
+        tpl_edit.setAccessibleName("Shortcuts-TXT Dateiname-Template")
+        tpl_row.addWidget(tpl_edit, 1)
+
+        preview = QLabel("")
+        preview.setObjectName("shortcutsTxtPreview")
+        preview.setTextFormat(Qt.RichText)
+        preview.setWordWrap(True)
+        preview.setToolTip(
+            "Live-Vorschau Dateiname; ungültige Platzhalter rot — 2.4.3"
+        )
+        preview.setAccessibleName("Shortcuts-TXT Live-Vorschau Dateiname")
+
+        def _update_preview() -> None:
+            import html as _html
+
+            tpl = tpl_edit.text().strip() or DEFAULT_SHORTCUTS_TXT_FILENAME_TEMPLATE
+            name = format_shortcuts_txt_filename(template=tpl)
+            html = highlight_shortcuts_txt_template_html(tpl)
+            invalid = find_invalid_shortcuts_txt_placeholders(tpl)
+            note = f" → <code>{_html.escape(name)}</code>"
+            if invalid:
+                note += f" · ungültig: {', '.join(invalid)}"
+            preview.setText(f"TXT: {html}{note}")
+            preview.setAccessibleName(f"Shortcuts-TXT Live-Vorschau {name}")
+
+        tpl_esc = EscapeDiscardEditFilter(
+            tpl_edit, on_discard=_update_preview, parent=opts
+        )
+
+        btn_date = QPushButton("{date}")
+        btn_date.setObjectName("shortcutsTxtInsertDate")
+        btn_date.setAutoDefault(False)
+        btn_date.setDefault(False)
+        btn_date.setFocusPolicy(Qt.TabFocus)
+        btn_date.setToolTip("Platzhalter {date} an Cursor einfügen — 2.4.3")
+        btn_date.setAccessibleName("Quick-Insert {date}")
+
+        def _insert_date() -> None:
+            tpl_edit.insert("{date}")
+            tpl_edit.setFocus()
+            _update_preview()
+            tpl_esc.commit()
+
+        btn_date.clicked.connect(_insert_date)
+        tpl_row.addWidget(btn_date)
+
+        btn_reset_tpl = QPushButton("Reset Default")
+        btn_reset_tpl.setObjectName("shortcutsTxtResetDefault")
+        btn_reset_tpl.setAutoDefault(False)
+        btn_reset_tpl.setDefault(False)
+        btn_reset_tpl.setFocusPolicy(Qt.TabFocus)
+        btn_reset_tpl.setToolTip(
+            f"Reset Default ({DEFAULT_SHORTCUTS_TXT_FILENAME_TEMPLATE}) "
+            "Bestätigung nur bei Abweichung; danach Fokus+Selektion — 2.4.3"
+        )
+        btn_reset_tpl.setAccessibleName("Shortcuts-TXT Reset Default")
+        btn_reset_tpl.setAccessibleDescription(
+            "Template auf Default zurücksetzen. Bestätigung nur bei Abweichung; "
+            "danach Fokus und Selektion im Template-Feld — 2.4.3"
+        )
+
+        def _reset_tpl() -> None:
+            default = DEFAULT_SHORTCUTS_TXT_FILENAME_TEMPLATE
+
+            def _after() -> None:
+                _update_preview()
+                tpl_esc.commit(default)
+
+            reset_line_edit_template(
+                opts,
+                tpl_edit,
+                default,
+                title="Reset Default",
+                body_prefix="Shortcuts-TXT-Template auf Default zurücksetzen?",
+                on_updated=_after,
+                after_focus=True,
+            )
+
+        btn_reset_tpl.clicked.connect(_reset_tpl)
+        tpl_row.addWidget(btn_reset_tpl)
+        ol.addLayout(tpl_row)
+        ol.addWidget(preview)
+        tpl_edit.textChanged.connect(lambda _t: _update_preview())
+        _update_preview()
+
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        buttons.button(QDialogButtonBox.Ok).setText("Speichern…")
+        buttons.accepted.connect(opts.accept)
+        buttons.rejected.connect(opts.reject)
+        ol.addWidget(buttons)
+        if opts.exec() != QDialog.Accepted:
+            return
+
+        tpl = tpl_edit.text().strip() or DEFAULT_SHORTCUTS_TXT_FILENAME_TEMPLATE
+        set_shortcuts_txt_filename_template(tpl)
+        default_name = format_shortcuts_txt_filename(template=tpl)
         start = get_last_shortcuts_txt_dir() or get_last_export_dir() or dialog_start_dir()
-        default_name = format_shortcuts_txt_filename()
         path, _ = QFileDialog.getSaveFileName(
             self,
             "Tastatur-Cheat-Sheet als TXT",

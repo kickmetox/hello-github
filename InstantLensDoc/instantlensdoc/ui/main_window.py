@@ -275,6 +275,16 @@ class MainWindow(QMainWindow):
             self._apply_doc_split_sync_scroll()
         self._update_sync_scroll_status_indicator()
         self._update_thumb_cache_debug_status()
+        # Thumb Auto-Prune: Status-Callback + Intervall-Timer — 2.4.3
+        try:
+            from instantlensdoc.core.thumb_cache import set_prune_status_callback
+
+            set_prune_status_callback(self._on_thumb_prune_status)
+        except Exception:
+            pass
+        self._thumb_prune_timer = QTimer(self)
+        self._thumb_prune_timer.timeout.connect(self._thumb_prune_tick)
+        self._sync_thumb_prune_timer()
         self._autosave_timer = QTimer(self)
         self._autosave_timer.setInterval(get_autosave_interval_sec() * 1000)
         self._autosave_timer.timeout.connect(self._autosave_tick)
@@ -1223,14 +1233,19 @@ class MainWindow(QMainWindow):
         self._pending_blink_active = False
         self._pending_was_pending = False
         self._split_scroll_syncing = False
-        # Sync-Scroll Statusleisten-Indikator (PDF↔PDF) — Klick toggled — 2.4.2
+        # Sync-Scroll Statusleisten-Indikator (PDF↔PDF) — Klick · Tooltip Zustand · A11y — 2.4.3
         self.sync_scroll_status_label = QLabel("")
         self.sync_scroll_status_label.setObjectName("syncScrollStatus")
         self.sync_scroll_status_label.setStyleSheet(
             "QLabel#syncScrollStatus { color: #555; padding-right: 8px; font-size: 11px; }"
         )
         self.sync_scroll_status_label.setToolTip(
-            "Sync-Scroll PDF↔PDF — Klick toggled · Shortcut Ctrl+Alt+\\ — 2.4.2"
+            "Sync-Scroll: Zustand aus — Klick toggled · Shortcut Ctrl+Alt+\\ — 2.4.3"
+        )
+        self.sync_scroll_status_label.setAccessibleName("Sync-Scroll Zustand")
+        self.sync_scroll_status_label.setAccessibleDescription(
+            "Sync-Scroll PDF↔PDF. Tooltip zeigt aktuellen Zustand an oder aus. "
+            "Klick toggled. Shortcut Ctrl+Alt+Backslash."
         )
         self.sync_scroll_status_label.setCursor(Qt.PointingHandCursor)
         self.sync_scroll_status_label.mousePressEvent = (  # type: ignore[method-assign]
@@ -4943,8 +4958,44 @@ class MainWindow(QMainWindow):
             set_editor_doc_split_sync_scroll(nxt)
             self._toggle_doc_split_sync_scroll(nxt)
 
+    def _on_thumb_prune_status(self, msg: str) -> None:
+        """Callback: Auto-Prune Status „N Dateien / X MB entfernt“ — 2.4.3."""
+        try:
+            self._set_status(msg or "")
+        except Exception:
+            pass
+
+    def _sync_thumb_prune_timer(self) -> None:
+        """Intervall-Timer für Thumb Auto-Prune starten/stoppen — 2.4.3."""
+        from instantlensdoc.core.app_settings import (
+            THUMB_CACHE_PRUNE_MODE_INTERVAL,
+            get_thumb_cache_prune_interval_min,
+            get_thumb_cache_prune_mode,
+        )
+
+        t = getattr(self, "_thumb_prune_timer", None)
+        if t is None:
+            return
+        mode = get_thumb_cache_prune_mode()
+        if mode == THUMB_CACHE_PRUNE_MODE_INTERVAL:
+            mins = max(1, int(get_thumb_cache_prune_interval_min()))
+            t.setInterval(mins * 60 * 1000)
+            if not t.isActive():
+                t.start()
+        else:
+            t.stop()
+
+    def _thumb_prune_tick(self) -> None:
+        """Periodisches Auto-Prune (Intervall-Modus) — 2.4.3."""
+        try:
+            from instantlensdoc.core.thumb_cache import auto_prune_thumb_cache
+
+            auto_prune_thumb_cache(announce=True)
+        except Exception:
+            pass
+
     def _update_sync_scroll_status_indicator(self) -> None:
-        """Statusleiste: Sync an/aus; Klick toggled · Tooltip Shortcut — 2.4.2."""
+        """Statusleiste: Sync an/aus; Tooltip Zustand · A11y — 2.4.3."""
         if not hasattr(self, "sync_scroll_status_label"):
             return
         from instantlensdoc.core.app_settings import (
@@ -4955,39 +5006,49 @@ class MainWindow(QMainWindow):
         show_pref = get_sync_scroll_status_indicator()
         enabled = get_editor_doc_split_sync_scroll()
         active = bool(enabled and self._split_both_pdf())
-        tip_suffix = " · Klick toggled · Shortcut Ctrl+Alt+\\ — 2.4.2"
+        tip_suffix = " · Klick toggled · Shortcut Ctrl+Alt+\\ — 2.4.3"
         if not show_pref:
             self.sync_scroll_status_label.setVisible(False)
             self.sync_scroll_status_label.setText("")
+            self.sync_scroll_status_label.setAccessibleName("Sync-Scroll ausgeblendet")
             return
         if not enabled:
+            tip = "Sync-Scroll: Zustand aus — nur PDF↔PDF" + tip_suffix
             self.sync_scroll_status_label.setText("Sync aus")
             self.sync_scroll_status_label.setStyleSheet(
                 "QLabel#syncScrollStatus { color: #888; padding-right: 8px; font-size: 11px; }"
             )
-            self.sync_scroll_status_label.setToolTip(
-                "Sync-Scroll aus — nur PDF↔PDF" + tip_suffix
-            )
+            self.sync_scroll_status_label.setToolTip(tip)
+            self.sync_scroll_status_label.setAccessibleName("Sync-Scroll aus")
+            self.sync_scroll_status_label.setAccessibleDescription(tip)
             self.sync_scroll_status_label.setVisible(True)
             return
         if active:
+            tip = (
+                "Sync-Scroll: Zustand an — aktiv (PDF↔PDF Scroll + Seiten)"
+                + tip_suffix
+            )
             self.sync_scroll_status_label.setText("Sync an")
             self.sync_scroll_status_label.setStyleSheet(
                 "QLabel#syncScrollStatus { color: #2d5a27; padding-right: 8px; "
                 "font-size: 11px; font-weight: 500; }"
             )
-            self.sync_scroll_status_label.setToolTip(
-                "Sync-Scroll aktiv (PDF↔PDF Scroll + Seiten)" + tip_suffix
-            )
+            self.sync_scroll_status_label.setToolTip(tip)
+            self.sync_scroll_status_label.setAccessibleName("Sync-Scroll an")
+            self.sync_scroll_status_label.setAccessibleDescription(tip)
             self.sync_scroll_status_label.setVisible(True)
         else:
+            tip = (
+                "Sync-Scroll: Zustand an (bereit) — nur bei zwei PDF-Tabs aktiv"
+                + tip_suffix
+            )
             self.sync_scroll_status_label.setText("Sync bereit")
             self.sync_scroll_status_label.setStyleSheet(
                 "QLabel#syncScrollStatus { color: #a60; padding-right: 8px; font-size: 11px; }"
             )
-            self.sync_scroll_status_label.setToolTip(
-                "Sync-Scroll an, aber nur bei zwei PDF-Tabs aktiv" + tip_suffix
-            )
+            self.sync_scroll_status_label.setToolTip(tip)
+            self.sync_scroll_status_label.setAccessibleName("Sync-Scroll bereit")
+            self.sync_scroll_status_label.setAccessibleDescription(tip)
             self.sync_scroll_status_label.setVisible(True)
 
     def _update_thumb_cache_debug_status(self) -> None:

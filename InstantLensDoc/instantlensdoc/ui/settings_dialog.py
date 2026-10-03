@@ -198,10 +198,15 @@ from instantlensdoc.core.app_settings import (
     get_sync_scroll_status_indicator,
     get_thumb_cache_debug_hits,
     get_thumb_cache_max_mb,
+    get_thumb_cache_prune_interval_min,
+    get_thumb_cache_prune_mode,
     get_thumb_lazy_threshold,
     get_thumb_prefetch_cancel_ms,
     get_thumb_prefetch_radius,
     THUMB_CACHE_MAX_MB_CHOICES,
+    THUMB_CACHE_PRUNE_INTERVAL_MIN_CHOICES,
+    THUMB_CACHE_PRUNE_MODE_INTERVAL,
+    THUMB_CACHE_PRUNE_MODE_ON_WRITE,
     get_pdf_two_page_spread,
     get_editor_current_line_highlight,
     get_editor_indent_guides,
@@ -324,6 +329,8 @@ from instantlensdoc.core.app_settings import (
     set_sync_scroll_status_indicator,
     set_thumb_cache_debug_hits,
     set_thumb_cache_max_mb,
+    set_thumb_cache_prune_interval_min,
+    set_thumb_cache_prune_mode,
     set_thumb_lazy_threshold,
     set_thumb_prefetch_cancel_ms,
     set_thumb_prefetch_radius,
@@ -647,7 +654,7 @@ class SettingsDialog(QDialog):
         self.thumb_cache_max_mb.setCurrentIndex(cache_pick)
         self.thumb_cache_max_mb.setToolTip(
             "Maximale Größe des Thumbnail-Disk-Caches (LRU); "
-            "bei Überschreitung Auto-Prune (älteste zuerst) — 2.4.2"
+            "bei Überschreitung Auto-Prune (älteste zuerst) — 2.4.3"
         )
         form.addRow("Thumb-Cache max. Größe", self.thumb_cache_max_mb)
 
@@ -656,7 +663,7 @@ class SettingsDialog(QDialog):
         self.btn_clear_thumb_cache.setObjectName("thumbCacheClear")
         self.btn_clear_thumb_cache.setToolTip(
             "Gesamten Thumbnail-Disk-Cache leeren (Bestätigung · "
-            "freigegebene MB in Status) · Auto-Prune bei Limit — 2.4.2"
+            "freigegebene MB in Status) · Auto-Prune Status „N Dateien / X MB entfernt“ — 2.4.3"
         )
         self.btn_clear_thumb_cache.clicked.connect(self._clear_thumb_cache)
         cache_row.addWidget(self.btn_clear_thumb_cache)
@@ -666,6 +673,58 @@ class SettingsDialog(QDialog):
         cache_row.addWidget(self.lbl_thumb_cache_stats, 1)
         form.addRow("Thumb-Cache", cache_row)
         self._refresh_thumb_cache_stats_label()
+
+        # Auto-Prune: on-write oder Intervall — 2.4.3
+        self.thumb_cache_prune_mode = QComboBox()
+        self.thumb_cache_prune_mode.setObjectName("thumbCachePruneMode")
+        self.thumb_cache_prune_mode.addItem(
+            "Bei Schreiben (on-write)", THUMB_CACHE_PRUNE_MODE_ON_WRITE
+        )
+        self.thumb_cache_prune_mode.addItem(
+            "Intervall", THUMB_CACHE_PRUNE_MODE_INTERVAL
+        )
+        cur_prune_mode = get_thumb_cache_prune_mode()
+        prune_mode_pick = 0
+        for i in range(self.thumb_cache_prune_mode.count()):
+            if self.thumb_cache_prune_mode.itemData(i) == cur_prune_mode:
+                prune_mode_pick = i
+                break
+        self.thumb_cache_prune_mode.setCurrentIndex(prune_mode_pick)
+        self.thumb_cache_prune_mode.setToolTip(
+            "Auto-Prune bei Limit: sofort beim Cache-Schreiben oder "
+            "periodisch im Intervall — Status „N Dateien / X MB entfernt“ — 2.4.3"
+        )
+        self.thumb_cache_prune_mode.setAccessibleName("Thumb-Cache Auto-Prune Modus")
+        form.addRow("Thumb Auto-Prune", self.thumb_cache_prune_mode)
+
+        self.thumb_cache_prune_interval = QComboBox()
+        self.thumb_cache_prune_interval.setObjectName("thumbCachePruneInterval")
+        cur_prune_iv = get_thumb_cache_prune_interval_min()
+        prune_iv_pick = 0
+        for i, mins in enumerate(THUMB_CACHE_PRUNE_INTERVAL_MIN_CHOICES):
+            self.thumb_cache_prune_interval.addItem(f"{mins} Min.", mins)
+            if mins == cur_prune_iv:
+                prune_iv_pick = i
+        self.thumb_cache_prune_interval.setCurrentIndex(prune_iv_pick)
+        self.thumb_cache_prune_interval.setToolTip(
+            "Intervall für Auto-Prune (nur wenn Modus „Intervall“) — 2.4.3"
+        )
+        self.thumb_cache_prune_interval.setAccessibleName(
+            "Thumb-Cache Auto-Prune Intervall"
+        )
+        form.addRow("Auto-Prune Intervall", self.thumb_cache_prune_interval)
+
+        def _sync_prune_interval_enabled(*_a) -> None:
+            is_iv = (
+                self.thumb_cache_prune_mode.currentData()
+                == THUMB_CACHE_PRUNE_MODE_INTERVAL
+            )
+            self.thumb_cache_prune_interval.setEnabled(bool(is_iv))
+
+        self.thumb_cache_prune_mode.currentIndexChanged.connect(
+            _sync_prune_interval_enabled
+        )
+        _sync_prune_interval_enabled()
 
         self.thumb_cache_debug = QCheckBox("Thumb-Cache Hit/Miss Status (Debug)")
         self.thumb_cache_debug.setObjectName("thumbCacheDebugHits")
@@ -2930,6 +2989,26 @@ class SettingsDialog(QDialog):
                 set_thumb_cache_max_mb(int(self.thumb_cache_max_mb.currentData() or 100))
             except (TypeError, ValueError):
                 set_thumb_cache_max_mb(100)
+        if hasattr(self, "thumb_cache_prune_mode"):
+            set_thumb_cache_prune_mode(
+                str(
+                    self.thumb_cache_prune_mode.currentData()
+                    or THUMB_CACHE_PRUNE_MODE_ON_WRITE
+                )
+            )
+        if hasattr(self, "thumb_cache_prune_interval"):
+            try:
+                set_thumb_cache_prune_interval_min(
+                    int(self.thumb_cache_prune_interval.currentData() or 15)
+                )
+            except (TypeError, ValueError):
+                set_thumb_cache_prune_interval_min(15)
+        try:
+            parent = self.parent()
+            if parent is not None and hasattr(parent, "_sync_thumb_prune_timer"):
+                parent._sync_thumb_prune_timer()
+        except Exception:
+            pass
         if hasattr(self, "thumb_cache_debug"):
             set_thumb_cache_debug_hits(self.thumb_cache_debug.isChecked())
         if hasattr(self, "sync_scroll_indicator"):

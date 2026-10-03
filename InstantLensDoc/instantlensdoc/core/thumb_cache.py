@@ -1,11 +1,12 @@
-"""PDF-Seiten-Thumbnail Disk-Cache — mtime · max MB · Auto-Prune · Hit/Miss — 2.4.2."""
+"""PDF-Seiten-Thumbnail Disk-Cache — mtime · max MB · Auto-Prune · Hit/Miss — 2.4.3."""
 
 from __future__ import annotations
 
 import hashlib
+import logging
 import shutil
 from pathlib import Path
-from typing import Optional, Union
+from typing import Callable, Optional, Union
 
 from PIL import Image
 
@@ -24,6 +25,47 @@ _last_prune: dict = {
     "freed_bytes": 0,
     "freed_mb": 0.0,
 }
+
+# Optionaler Status-Callback (MainWindow) — 2.4.3
+_prune_status_callback: Optional[Callable[[str], None]] = None
+_log = logging.getLogger("instantlensdoc.thumb_cache")
+
+
+def set_prune_status_callback(cb: Optional[Callable[[str], None]]) -> None:
+    """UI-Callback für Auto-Prune Statusmeldungen — 2.4.3."""
+    global _prune_status_callback
+    _prune_status_callback = cb
+
+
+def format_prune_removed_message(stats: dict) -> str:
+    """Status/Log: „N Dateien / X MB entfernt“ — 2.4.3."""
+    n = int(stats.get("removed", 0) or 0)
+    try:
+        mb = float(stats.get("freed_mb", 0.0) or 0.0)
+    except (TypeError, ValueError):
+        mb = 0.0
+    return f"{n} Dateien / {mb:.1f} MB entfernt"
+
+
+def notify_prune_if_removed(stats: dict) -> Optional[str]:
+    """
+    Bei removed>0: Log + optional Status-Callback.
+    Rückgabe: Statuszeile oder None — 2.4.3.
+    """
+    if int(stats.get("removed", 0) or 0) <= 0:
+        return None
+    msg = format_prune_removed_message(stats)
+    try:
+        _log.info("Auto-Prune: %s", msg)
+    except Exception:
+        pass
+    cb = _prune_status_callback
+    if cb is not None:
+        try:
+            cb(f"Thumb Auto-Prune: {msg}")
+        except Exception:
+            pass
+    return msg
 
 
 def thumb_cache_dir() -> Path:
@@ -152,7 +194,7 @@ def put_cached_thumbnail(
     grayscale: bool = False,
     invert: bool = False,
 ) -> Optional[Path]:
-    """Thumbnail als PNG speichern; bei Erfolg Pfad, sonst None. Auto-Prune bei Limit — 2.4.2."""
+    """Thumbnail als PNG speichern; Auto-Prune on-write oder nur Interval — 2.4.3."""
     p = Path(pdf_path)
     if not p.is_file() or image is None:
         return None
@@ -166,7 +208,15 @@ def put_cached_thumbnail(
         if to_save.mode not in ("RGB", "RGBA", "L"):
             to_save = to_save.convert("RGB")
         to_save.save(dest, format="PNG", optimize=True)
-        auto_prune_thumb_cache()
+        try:
+            from instantlensdoc.core.app_settings import get_thumb_cache_prune_mode
+
+            mode = get_thumb_cache_prune_mode()
+        except Exception:
+            mode = "on_write"
+        if mode == "on_write":
+            result = auto_prune_thumb_cache()
+            notify_prune_if_removed(result)
         return dest
     except Exception:
         return None
@@ -312,16 +362,20 @@ def _trim_disk_cache(max_entries: int = _DISK_CACHE_MAX) -> dict:
     return result
 
 
-def auto_prune_thumb_cache() -> dict:
+def auto_prune_thumb_cache(*, announce: bool = False) -> dict:
     """
     Auto-Prune bei Entry-/MB-Limit (älteste zuerst).
-    Rückgabe: removed, freed_bytes, freed_mb — 2.4.2.
+    Rückgabe: removed, freed_bytes, freed_mb.
+    announce=True → Log/Status „N Dateien / X MB entfernt“ — 2.4.3.
     """
-    return _trim_disk_cache()
+    result = _trim_disk_cache()
+    if announce:
+        notify_prune_if_removed(result)
+    return result
 
 
 def last_prune_stats() -> dict:
-    """Letztes Auto-Prune Ergebnis dieser Session — 2.4.2."""
+    """Letztes Auto-Prune Ergebnis dieser Session — 2.4.2/2.4.3."""
     return dict(_last_prune)
 
 

@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **2.4.2** |
+| Version | **2.4.3** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -33,7 +33,7 @@
 
 Skript: [sync-ild.ps1](scripts/sync-ild.ps1) — Branch `cursor/instantlensdoc-2108` (oder `-LocalPack` / Pack-Zip) nach `D:\AI_Temp\InstantLensDoc`, pip, Start. **Nutzer-Icon in `assets` wird nicht überschrieben.**
 
-**FEATURES.md lokal sync:** Nach Sync liegt `FEATURES.md` lokal im App-Ordner (`D:\AI_Temp\InstantLensDoc\FEATURES.md`); About/Stubs öffnen diese lokale Datei — Version **2.4.2**.
+**FEATURES.md lokal sync:** Nach Sync liegt `FEATURES.md` lokal im App-Ordner (`D:\AI_Temp\InstantLensDoc\FEATURES.md`); About/Stubs öffnen diese lokale Datei — Version **2.4.3**.
 
 Ohne Start: `-NoStart` (Alias `-SkipStart`). Exit-Codes: **0** OK · **1** allgemein · **2** Git-Fehler.
 
@@ -62,6 +62,16 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an / `checkedonce`)
+
+## Neu in 2.4.3
+
+Post-Release-Polish nach **2.4.2**:
+
+- **Thumb Auto-Prune:** Log/Status „N Dateien / X MB entfernt“ · Settings Intervall oder on-write
+- **Annotation-Vorlagen:** Quick-Apply Rechtsklick wählen · Esc bricht Apply-Modus ab
+- **Sync-Scroll:** Tooltip zeigt Zustand an/aus · A11y AccessibleName/Description
+- **F1 Cheat-Sheet TXT:** Live-Vorschau Dateiname · Quick-Insert `{date}` · Reset Default
+- Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie klar markiert (Ink ≠ Stylus)
 
 ## Neu in 2.4.2
 

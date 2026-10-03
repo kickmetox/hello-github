@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Nightly/CI Smoke: CLI + Import-Checks für InstantLens Doc — 2.1.0–2.4.2.
+"""Nightly/CI Smoke: CLI + Import-Checks für InstantLens Doc — 2.1.0–2.4.3.
 
 Leichtgewichtig. Exit-Codes:
   0  OK  (ok=true)
@@ -14,12 +14,12 @@ Aufruf:
   python scripts/smoke_ild.py -h
 
 JSON-Schema (--json), Erfolg:
-  {"ok": true, "version": "2.4.2", "duration_ms": 1234,
+  {"ok": true, "version": "2.4.3", "duration_ms": 1234,
    "checks": ["version", "imports", "cli", "measure_diff_import", "changelog"]}
 
 JSON bei Fail: checks[] enthält Objekt mit error-Text (max 200 Zeichen, Truncate …);
 Exitcode spiegelt ok (0↔true, 1↔false) — 2.2.0:
-  {"ok": false, "version": "2.4.2", "duration_ms": 12,
+  {"ok": false, "version": "2.4.3", "duration_ms": 12,
    "checks": ["version", {"name": "imports", "error": "import x: …"}]}
 """
 
@@ -41,7 +41,7 @@ if str(ROOT) not in sys.path:
 # Headless/CI: Qt ohne Display
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-EXPECTED_VERSION = "2.4.2"
+EXPECTED_VERSION = "2.4.3"
 FAIL_ERROR_MAX_LEN = 200
 
 EXIT_OK = 0
@@ -563,6 +563,8 @@ def check_measure_and_diff() -> None:
 
 def check_changelog() -> None:
     cl = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    if "## 2.4.3" not in cl:
+        _fail("CHANGELOG fehlt ## 2.4.3")
     if "## 2.4.2" not in cl:
         _fail("CHANGELOG fehlt ## 2.4.2")
     if "## 2.4.1" not in cl:
@@ -668,11 +670,25 @@ def check_changelog() -> None:
         and "Cache leeren" not in cl
     ):
         _fail("CHANGELOG 2.4.2 fehlt Kernfeature-Hinweis")
+    if (
+        "N Dateien" not in cl
+        and "on-write" not in cl
+        and "Apply-Modus" not in cl
+        and "Rechtsklick" not in cl
+        and "Zustand" not in cl
+        and "Live-Vorschau" not in cl
+        and "Quick-Insert" not in cl
+        and "Reset Default" not in cl
+        and "Intervall" not in cl
+    ):
+        _fail("CHANGELOG 2.4.3 fehlt Kernfeature-Hinweis")
     if "## 2.2.1" not in cl:
         _fail("CHANGELOG fehlt ## 2.2.1")
     if "## 2.2.0" not in cl:
         _fail("CHANGELOG fehlt ## 2.2.0")
     feat = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
+    if "2.4.3" not in feat:
+        _fail("FEATURES.md fehlt 2.4.3")
     if "2.4.2" not in feat:
         _fail("FEATURES.md fehlt 2.4.2")
     if "2.4.0" not in feat:
@@ -725,6 +741,19 @@ def check_changelog() -> None:
         and "2.4.2" not in feat
     ):
         _fail("FEATURES.md fehlt 2.4.2 Polish")
+    if (
+        "N Dateien" not in feat
+        and "on-write" not in feat
+        and "Apply-Modus" not in feat
+        and "Rechtsklick" not in feat
+        and "Zustand" not in feat
+        and "Live-Vorschau" not in feat
+        and "Quick-Insert" not in feat
+        and "Reset Default" not in feat
+        and "Intervall" not in feat
+        and "2.4.3" not in feat
+    ):
+        _fail("FEATURES.md fehlt 2.4.3 Polish")
     if "Telemetrie" not in feat:
         _fail("FEATURES.md fehlt Telemetrie-Stub")
     if "Freihand" not in feat and "ink" not in feat.casefold():
@@ -832,11 +861,11 @@ Exit-Codes:
 Laufzeit: am Ende als „Laufzeit: N ms“ (oder duration_ms im JSON).
 
 Beispiel --json (Erfolg):
-  {"ok": true, "version": "2.4.2", "duration_ms": 1234,
+  {"ok": true, "version": "2.4.3", "duration_ms": 1234,
    "checks": ["version", "imports", "cli", "measure_diff_import", "changelog"]}
 
 Beispiel --json (Fail):
-  {"ok": false, "version": "2.4.2", "duration_ms": 12,
+  {"ok": false, "version": "2.4.3", "duration_ms": 12,
    "checks": ["version", {"name": "imports", "error": "import x: …"}]}
 """.rstrip()
     )

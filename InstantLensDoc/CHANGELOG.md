@@ -1,5 +1,20 @@
 # Changelog — InstantLens Doc
 
+## 2.4.3 — Thumb Auto-Prune Status·Intervall/on-write, Quick-Apply Rechtsklick·Esc, Sync-Scroll Tooltip Zustand·A11y, F1 Live·{date}·Reset
+
+Post-Release-Polish nach **2.4.2**: **Thumbnail Auto-Prune** meldet **„N Dateien / X MB entfernt“** in Log/Status und Settings wählt **Intervall oder on-write**; **Annotation Quick-Apply** per **Rechtsklick Vorlage wählen**, **Esc** bricht Apply-Modus ab; **Sync-Scroll** Tooltip zeigt **Zustand an/aus** inkl. **A11y**; **F1 TXT** mit **Live-Vorschau**, **Quick-Insert `{date}`** und **Reset Default**. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie klar markiert / nicht produktiv (Ink ≠ Stylus).
+
+### Geändert
+- Thumb Auto-Prune: Status/Log „N Dateien / X MB entfernt“ · Settings Intervall oder on-write
+- Annotation-Vorlagen: Quick-Apply Rechtsklick wählen · Esc bricht Apply-Modus ab
+- Sync-Scroll: Tooltip aktueller Zustand an/aus · AccessibleName/Description
+- F1 Cheat-Sheet TXT: Live-Vorschau Dateiname · Quick-Insert `{date}` · Reset Default
+
+### Tests / Qualität
+- Version **2.4.3** (App / `ild_pdf` / ISS / Smoke / Docs); Serie **2.4**; `docs/VERSION` + `VERSION.txt`
+- Smoke: 2.4.3 CLI + Qt (Prune Status/Mode, Quick-Apply RMB/Esc, Sync Tooltip A11y, F1 Live/Insert/Reset)
+- Stubs: KI/Cloud/Stylus/3D/Hooks/Outline/Telemetrie unverändert markiert
+
 ## 2.4.2 — Thumb-Cache freigegebene MB·Auto-Prune, Templates Quick-Apply·zuletzt, Sync-Scroll Klick-Toggle, F1 TXT {date}_shortcuts.txt
 
 Post-Release-Polish nach **2.4.1**: **Thumbnail Disk-Cache** leeren mit Bestätigung und **freigegebenen MB** in der Statusleiste, **Auto-Prune bei Limit**; **Annotation-Templates** Standard/zuletzt verwendet per Toolbar **Quick-Apply**; **Sync-Scroll** Statusleisten-Klick toggled inkl. Tooltip-Shortcut; **F1 Export TXT** merkt Zielordner und nutzt Template **`{date}_shortcuts.txt`**. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie klar markiert / nicht produktiv (Ink ≠ Stylus).
