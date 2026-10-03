@@ -5277,6 +5277,24 @@ class PdfViewer(QWidget):
             QMessageBox.warning(self, "Wiederholen", str(e))
             return False
 
+    def _pixmap_from_rendered_page(self, page_index: int, scale: float):
+        """Seite via pypdfium2 rendern und als QPixmap (mit Ann.) zurückgeben."""
+        from PySide6.QtGui import QImage, QPixmap
+
+        img = render_page(self.pdf_path, page_index, scale=scale)
+        anns = self.store.for_page(page_index) if self.store else []
+        if img.mode != "RGBA":
+            img = img.convert("RGBA")
+        data = img.tobytes("raw", "RGBA")
+        qimg = QImage(data, img.width, img.height, QImage.Format_RGBA8888)
+        pm = QPixmap.fromImage(qimg.copy())
+        # Annotationen auf temporärem Canvas zeichnen
+        self.canvas.set_page_image(img, anns, scale=scale)
+        drawn = self.canvas.pixmap()
+        if drawn is not None and not drawn.isNull():
+            return drawn
+        return pm
+
     def print_current_page(self) -> bool:
         """Aktuelle PDF-Seite (mit Annotationen) über Qt PrintDialog drucken."""
         if not self.pdf_path:
@@ -5286,12 +5304,8 @@ class PdfViewer(QWidget):
             from PySide6.QtGui import QPainter
             from PySide6.QtPrintSupport import QPrintDialog, QPrinter
 
-            # Frisch rendern für Druckqualität
-            img = render_page(self.pdf_path, self.page_index, scale=max(self.scale, 2.0))
-            anns = self.store.for_page(self.page_index) if self.store else []
-            # Temporäres Canvas-Pixmap nutzen
-            self.canvas.set_page_image(img, anns, scale=max(self.scale, 2.0))
-            pm = self.canvas.pixmap()
+            scale = max(float(self.scale or 1.5), 2.0)
+            pm = self._pixmap_from_rendered_page(self.page_index, scale)
             if pm is None or pm.isNull():
                 QMessageBox.warning(self, "Drucken", "Keine Seitenvorschau verfügbar.")
                 self.refresh()
@@ -5323,6 +5337,72 @@ class PdfViewer(QWidget):
             return True
         except Exception as e:
             QMessageBox.critical(self, "Drucken", f"Druck fehlgeschlagen:\n{e}")
+            try:
+                self.refresh()
+            except Exception:
+                pass
+            return False
+
+    def print_document(self) -> bool:
+        """Gesamtes PDF (alle Seiten, Raster via pypdfium2) über QPrintDialog drucken — 1.0.0."""
+        if not self.pdf_path:
+            QMessageBox.information(self, "Drucken", "Kein PDF geladen.")
+            return False
+        try:
+            from PySide6.QtGui import QPainter
+            from PySide6.QtPrintSupport import QPrintDialog, QPrinter
+            from PySide6.QtWidgets import QProgressDialog
+
+            n = int(self.page_count or 0)
+            if n <= 0:
+                QMessageBox.warning(self, "Drucken", "PDF hat keine Seiten.")
+                return False
+
+            printer = QPrinter(QPrinter.HighResolution)
+            printer.setDocName(str(self.pdf_path.stem))
+            dlg = QPrintDialog(printer, self)
+            dlg.setWindowTitle("PDF-Dokument drucken")
+            if dlg.exec() != QPrintDialog.Accepted:
+                return False
+
+            scale = 2.0
+            progress = QProgressDialog("Drucke PDF…", "Abbrechen", 0, n, self)
+            progress.setWindowModality(Qt.WindowModal)
+            progress.setMinimumDuration(0)
+            painter = QPainter(printer)
+            try:
+                for i in range(n):
+                    if progress.wasCanceled():
+                        break
+                    progress.setValue(i)
+                    progress.setLabelText(f"Drucke Seite {i + 1} / {n}…")
+                    pm = self._pixmap_from_rendered_page(i, scale)
+                    if pm is None or pm.isNull():
+                        continue
+                    if i > 0:
+                        printer.newPage()
+                    page_rect = printer.pageRect(QPrinter.DevicePixel)
+                    scaled = pm.scaled(
+                        int(page_rect.width()),
+                        int(page_rect.height()),
+                        Qt.KeepAspectRatio,
+                        Qt.SmoothTransformation,
+                    )
+                    x = int((page_rect.width() - scaled.width()) / 2)
+                    y = int((page_rect.height() - scaled.height()) / 2)
+                    painter.drawPixmap(x, y, scaled)
+                progress.setValue(n)
+            finally:
+                painter.end()
+                try:
+                    progress.close()
+                except Exception:
+                    pass
+            self.refresh()
+            self.status.emit(f"PDF-Dokument gedruckt ({n} Seite(n))")
+            return True
+        except Exception as e:
+            QMessageBox.critical(self, "Drucken", f"Dokumentdruck fehlgeschlagen:\n{e}")
             try:
                 self.refresh()
             except Exception:

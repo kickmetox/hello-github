@@ -31,6 +31,11 @@ from instantlensdoc.core.documents import (
     render_doc_template,
     save_document,
 )
+from instantlensdoc.core.manual_backup import (
+    backup_dir,
+    manual_backup_file,
+    manual_backup_text,
+)
 from instantlensdoc.core import ocr as ocr_mod
 from instantlensdoc.core.layout import LayoutDocument
 from instantlensdoc.core import recent as recent_mod
@@ -45,6 +50,7 @@ from instantlensdoc.ui.license_dialog import LicenseDialog
 from instantlensdoc.ui.ocr_dialog import OcrDialog
 from instantlensdoc.ui.pdf_view import PdfViewer
 from instantlensdoc.ui.sidebar import Sidebar
+from instantlensdoc.ui.welcome import WelcomePage
 from instantlensdoc.core import fulltext as fulltext_mod
 from instantlensdoc.core.app_settings import (
     dialog_start_dir,
@@ -794,11 +800,18 @@ class MainWindow(QMainWindow):
         self.pdf_view.printer_marks_changed.connect(self._sync_printer_marks_action)
         self.image_label = QLabel(alignment=Qt.AlignCenter)
         self.image_label.setText("Bildvorschau")
+        self.welcome_page = WelcomePage()
+        self.welcome_page.open_requested.connect(self.open_dialog)
+        self.welcome_page.new_text_requested.connect(lambda: self.new_doc("empty"))
+        self.welcome_page.recent_activated.connect(self.open_path)
         self.stack.addWidget(self.editor_pane)  # 0
         self.stack.addWidget(self.pdf_view)  # 1
         self.stack.addWidget(self.image_label)  # 2
+        self.stack.addWidget(self.welcome_page)  # 3 — Startseite ohne Tabs (1.0.0)
         self.stack.currentChanged.connect(lambda *_: self._apply_doc_split_sync_scroll())
         self.stack.currentChanged.connect(lambda *_: self._update_doc_status())
+        # Beim Start ohne Session: Willkommen zeigen (nach Session-Restore ggf. überschrieben)
+        self.stack.setCurrentWidget(self.welcome_page)
         # Doc-Split: horizontal (nebeneinander) oder vertikal (übereinander)
         split_orient = (
             Qt.Vertical if get_editor_doc_split_vertical() else Qt.Horizontal
@@ -980,6 +993,17 @@ class MainWindow(QMainWindow):
         act_save_copy.setToolTip("PDF: Datei (+ Sidecar) als Kopie; Editor: Speichern unter")
         act_save_copy.triggered.connect(self.save_as_copy)
         m_file.addAction(act_save_copy)
+        m_file.addSeparator()
+        act_backup_now = QAction("Backup jetzt", self)
+        act_backup_now.setToolTip(
+            "Aktuelles Dokument manuell in den Backup-Ordner kopieren — 1.0.0"
+        )
+        act_backup_now.triggered.connect(self._manual_backup_now)
+        m_file.addAction(act_backup_now)
+        act_backup_folder = QAction("Backup-Ordner öffnen…", self)
+        act_backup_folder.setToolTip("App-Backup-Ordner im Dateimanager öffnen — 1.0.0")
+        act_backup_folder.triggered.connect(self._open_backup_folder)
+        m_file.addAction(act_backup_folder)
         m_file.addSeparator()
         act_close = QAction("Schließen", self)
         act_close.setShortcut(QKeySequence.Close)
@@ -1803,6 +1827,7 @@ class MainWindow(QMainWindow):
             ("Seiten als Bilder exportieren…", lambda: self.pdf_view.export_pages_as_images()),
             ("Bild als neue Seite…", lambda: self.pdf_view.insert_image_page()),
             ("Seite drucken…", lambda: self.pdf_view.print_current_page()),
+            ("Dokument drucken…", lambda: self.pdf_view.print_document()),
             ("PDF als Kopie speichern…", lambda: self.pdf_view.save_pdf_as_copy()),
         ]:
             a = QAction(title, self)
@@ -1926,6 +1951,11 @@ class MainWindow(QMainWindow):
     def _refresh_recent(self):
         entries = recent_mod.load_recent_entries()
         self.sidebar.set_recent(entries)
+        if hasattr(self, "welcome_page") and self.welcome_page is not None:
+            try:
+                self.welcome_page.refresh_recent()
+            except Exception:
+                pass
         if self._recent_menu is None:
             return
         self._recent_menu.clear()
@@ -3937,6 +3967,108 @@ class MainWindow(QMainWindow):
 
             self._set_status(f"Logordner: {log_dir()}")
 
+    def _show_welcome_if_empty(self) -> bool:
+        """Willkommensseite anzeigen wenn keine Tabs / kein Dokument — 1.0.0."""
+        paths = []
+        try:
+            paths = list(self.sidebar.document_paths())
+        except Exception:
+            paths = []
+        if paths or (self.doc and self.doc.path):
+            return False
+        if self.doc is not None and not self.doc.path:
+            if (self.doc.text or "").strip() or getattr(self.doc, "dirty", False):
+                return False
+        try:
+            self.welcome_page.refresh_recent()
+        except Exception:
+            pass
+        self.stack.setCurrentWidget(self.welcome_page)
+        self.setWindowTitle(self._app_title())
+        self._update_doc_status()
+        return True
+
+    def _manual_backup_now(self) -> None:
+        """Aktuelles Dokument manuell in den Backup-Ordner kopieren — 1.0.0."""
+        try:
+            if self.doc and self.doc.path and Path(self.doc.path).is_file():
+                dest = manual_backup_file(self.doc.path)
+                if dest is None:
+                    QMessageBox.warning(self, "Backup", "Backup fehlgeschlagen.")
+                    return
+                self._set_status(f"Backup erstellt: {dest.name}")
+                QMessageBox.information(
+                    self,
+                    "Backup jetzt",
+                    f"Backup gespeichert:\n{dest}\n\nOrdner:\n{backup_dir()}",
+                )
+                return
+            if (
+                self.stack.currentWidget() is self.pdf_view
+                and self.pdf_view.pdf_path
+                and Path(self.pdf_view.pdf_path).is_file()
+            ):
+                dest = manual_backup_file(self.pdf_view.pdf_path)
+                if dest is None:
+                    QMessageBox.warning(self, "Backup", "Backup fehlgeschlagen.")
+                    return
+                self._set_status(f"Backup erstellt: {dest.name}")
+                QMessageBox.information(
+                    self,
+                    "Backup jetzt",
+                    f"Backup gespeichert:\n{dest}\n\nOrdner:\n{backup_dir()}",
+                )
+                return
+            if self.stack.currentWidget() is self.editor_pane or (
+                self.doc is not None and not self.doc.path
+            ):
+                text = self.editor.toPlainText() if hasattr(self, "editor") else ""
+                body = text or (self.doc.text if self.doc else "") or ""
+                if not body.strip():
+                    QMessageBox.information(
+                        self,
+                        "Backup jetzt",
+                        "Kein Dokument zum Sichern (leer / kein Pfad).",
+                    )
+                    return
+                title = (self.doc.title if self.doc else None) or "unbenannt"
+                suffix = (
+                    ".md"
+                    if self.doc and self.doc.kind == DocKind.MARKDOWN
+                    else ".txt"
+                )
+                dest = manual_backup_text(body, title=title, suffix=suffix)
+                self._set_status(f"Backup erstellt: {dest.name}")
+                QMessageBox.information(
+                    self,
+                    "Backup jetzt",
+                    f"Text-Backup gespeichert:\n{dest}\n\nOrdner:\n{backup_dir()}",
+                )
+                return
+            QMessageBox.information(
+                self,
+                "Backup jetzt",
+                "Kein Dokument zum Sichern geöffnet.",
+            )
+        except Exception as e:
+            QMessageBox.critical(self, "Backup", f"Backup fehlgeschlagen:\n{e}")
+
+    def _open_backup_folder(self) -> None:
+        """Backup-Ordner im Dateimanager öffnen — 1.0.0."""
+        from PySide6.QtCore import QUrl
+        from PySide6.QtGui import QDesktopServices
+
+        path = backup_dir()
+        ok = QDesktopServices.openUrl(QUrl.fromLocalFile(str(path)))
+        if ok:
+            self._set_status(f"Backup-Ordner: {path}")
+        else:
+            QMessageBox.information(
+                self,
+                "Backup-Ordner",
+                f"Ordner konnte nicht geöffnet werden.\nPfad:\n{path}",
+            )
+
     def _create_crash_report(self):
         from instantlensdoc.ui.help_dialog import create_crash_report_zip_dialog
 
@@ -4537,6 +4669,7 @@ class MainWindow(QMainWindow):
     def _print(self):
         try:
             if self.stack.currentWidget() is self.pdf_view:
+                # Ctrl+P: aktuelle Seite; gesamtes Dokument über PDF → Dokument drucken…
                 self.pdf_view.print_current_page()
                 return
             if self.stack.currentWidget() is self.editor_pane:
@@ -4553,7 +4686,7 @@ class MainWindow(QMainWindow):
             QMessageBox.information(
                 self,
                 "Drucken",
-                "Drucken ist für Texteditor und PDF-Seite verfügbar.",
+                "Drucken ist für Texteditor und PDF (Seite / Dokument) verfügbar.",
             )
         except Exception as e:
             QMessageBox.critical(self, "Drucken", f"Druck fehlgeschlagen:\n{e}")
@@ -5670,7 +5803,6 @@ class MainWindow(QMainWindow):
         self.sidebar.clear_thumbs()
         self.sidebar.clear_annotations()
         self.sidebar.set_marks([])
-        self.stack.setCurrentWidget(self.editor_pane)
         self.setWindowTitle(self._app_title())
         self._update_doc_status()
         if remaining:
@@ -5678,6 +5810,7 @@ class MainWindow(QMainWindow):
             self.open_path(nxt)
             self._set_status(f"Geschlossen — gewechselt zu {Path(nxt).name}")
         else:
+            self._show_welcome_if_empty()
             self._set_status("Dokument geschlossen")
 
     def _on_document_pin_toggled(self, path: str, pinned: bool) -> None:
@@ -5951,7 +6084,6 @@ class MainWindow(QMainWindow):
         self.sidebar.clear_thumbs()
         self.sidebar.clear_annotations()
         self.sidebar.set_marks([])
-        self.stack.setCurrentWidget(self.editor_pane)
         self.setWindowTitle(self._app_title())
         self._update_doc_status()
         try:
@@ -5960,6 +6092,7 @@ class MainWindow(QMainWindow):
             pass
         self._update_unsaved_status()
         self._refresh_document_dirty_labels()
+        self._show_welcome_if_empty()
         self._set_status("Alle Tabs geschlossen")
 
     def _pdf_page_size(self):

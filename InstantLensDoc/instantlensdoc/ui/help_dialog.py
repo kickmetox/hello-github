@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import re
+from pathlib import Path
+
 from PySide6.QtCore import QUrl
 from PySide6.QtGui import QDesktopServices, QIcon
 from PySide6.QtWidgets import (
@@ -21,6 +24,51 @@ from PySide6.QtWidgets import (
 from instantlensdoc import __version__
 from instantlensdoc.config import CONTACT_EMAIL, DISPLAY_NAME, ROOT, VENDOR, icon_paths_for_qt
 from instantlensdoc.core.logging_setup import log_dir
+
+
+def changelog_short_html(max_versions: int = 4, changelog_path: Path | None = None) -> str:
+    """Kurzliste aus CHANGELOG.md: aktuelle Version + Vorgänger (Bullet-Zeilen)."""
+    path = Path(changelog_path) if changelog_path is not None else ROOT / "CHANGELOG.md"
+    if not path.is_file():
+        return f"<p>CHANGELOG.md nicht gefunden. Version {__version__}.</p>"
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        return f"<p>CHANGELOG.md nicht lesbar. Version {__version__}.</p>"
+    sections: list[tuple[str, list[str]]] = []
+    current_title = ""
+    bullets: list[str] = []
+    for line in text.splitlines():
+        m = re.match(r"^##\s+(\S+)", line)
+        if m:
+            if current_title:
+                sections.append((current_title, bullets))
+                if len(sections) >= max_versions:
+                    current_title = ""
+                    break
+            current_title = m.group(1).strip()
+            bullets = []
+            continue
+        if current_title and line.startswith("- ") and len(bullets) < 4:
+            bullets.append(line[2:].strip())
+    if current_title and len(sections) < max_versions:
+        sections.append((current_title, bullets))
+    if not sections:
+        return f"<p>Keine Changelog-Einträge. Version {__version__}.</p>"
+    parts = ["<h3>Changelog (Kurz)</h3><ul>"]
+    for ver, items in sections[:max_versions]:
+        if items:
+            preview = "; ".join(items[:3])
+            # Markdown-Fett grob entfernen
+            preview = preview.replace("**", "")
+            if len(preview) > 160:
+                preview = preview[:157] + "…"
+            parts.append(f"<li><b>{ver}</b> — {preview}</li>")
+        else:
+            parts.append(f"<li><b>{ver}</b></li>")
+    parts.append("</ul>")
+    parts.append("<p>Vollständig: CHANGELOG.md</p>")
+    return "".join(parts)
 
 
 HELP_HTML = f"""
@@ -52,7 +100,9 @@ HELP_HTML = f"""
 <li><b>Datei → Projekt-Ordner</b>: Workspace wählen (letzte 5); Dialoge starten im aktiven Ordner</li>
 <li><b>Datei → Exportieren</b>: Editor-Inhalt als HTML, DOCX oder PDF (zuletzt genutzter Ordner wird gemerkt);
     <b>Export-Profil</b> speichern/anwenden (DPI / Format / Ziel)</li>
-<li><b>Datei → Drucken</b> (Ctrl+P): Editor oder aktuelle PDF-Seite (Qt Print)</li>
+<li><b>Datei → Drucken</b> (Ctrl+P): Editor oder aktuelle PDF-Seite (Qt Print); <b>PDF → Dokument drucken…</b> alle Seiten (Raster via pypdfium2) — 1.0.0</li>
+<li><b>Datei → Backup jetzt</b> / <b>Backup-Ordner öffnen…</b>: manuelles Backup nach App-Config/backups — 1.0.0</li>
+<li><b>Willkommen</b>: Startseite mit Recent + „Dokument öffnen“ / „Leeres Text“ wenn keine Tabs — 1.0.0</li>
 <li><b>Seitenleiste</b>: Suche (inkl. letzte Suchbegriffe), „Alle Docs“-Volltext, Zuletzt geöffnet, Dokumente,
     Lesezeichen/Outline (+/− hinzufügen/löschen), <b>Annotationen</b> (klickbar, <b>nach Seite gruppiert</b>,
     <b>Filter nach Typ</b>, <b>Textsuche in der Liste</b> (optional <b>Regex</b>), <b>Statistik je Typ</b>,
@@ -484,6 +534,7 @@ class AboutDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle(f"{DISPLAY_NAME} {__version__}")
+        self.resize(560, 640)
         icon = QIcon()
         for p in icon_paths_for_qt():
             icon.addFile(str(p))
@@ -497,19 +548,53 @@ class AboutDialog(QDialog):
         layout.addWidget(
             QLabel(
                 f"<h2>{DISPLAY_NAME} {__version__}</h2>"
-                f"<p>Version {__version__}<br>"
+                f"<p><b>Version</b> {__version__}<br>"
                 f"Hersteller: {VENDOR}<br>"
-                f"Kontakt: {CONTACT_EMAIL}</p>"
+                f"Kontakt: <a href='mailto:{CONTACT_EMAIL}'>{CONTACT_EMAIL}</a></p>"
                 f"<p>PDF-Engine: pypdfium2 / PDFium (lizenzfreundlich)</p>"
                 f"<p>Icon: assets/app.ico · assets/icon.png</p>"
             )
         )
-        # Keygen-Hinweis bei aktiver Trial-Lizenz
+        # Lizenzstatus immer anzeigen — 1.0.0
+        license_html = ""
         trial_hint = ""
         try:
             from instantlensdoc.license import LicenseManager
 
-            st = LicenseManager().status()
+            mgr = None
+            if parent is not None and hasattr(parent, "license_manager"):
+                mgr = parent.license_manager
+            if mgr is None:
+                mgr = LicenseManager()
+            st = mgr.status()
+            mode_lbl = {
+                "trial": "Testversion (Trial)",
+                "licensed": "Lizenziert",
+                "expired": "Abgelaufen",
+            }.get(st.mode, st.mode)
+            exp = ""
+            if st.expires_at is not None:
+                try:
+                    exp = st.expires_at.astimezone().strftime("%d.%m.%Y")
+                except Exception:
+                    exp = str(st.expires_at)[:10]
+            email_line = f"<br>E-Mail: {st.email}" if st.email else ""
+            bg = "#E3F2FD" if st.mode == "licensed" else (
+                "#FFF3CD" if st.mode == "trial" else "#FFEBEE"
+            )
+            border = "#64B5F6" if st.mode == "licensed" else (
+                "#E0C36A" if st.mode == "trial" else "#E57373"
+            )
+            license_html = (
+                f"<p style='background:{bg};padding:8px;border:1px solid {border};'>"
+                f"<b>Lizenzstatus</b>: {mode_lbl}<br>"
+                f"Restlaufzeit: <b>{st.days_remaining}</b> Tag(e)"
+                + (f"<br>Ablauf: {exp}" if exp else "")
+                + email_line
+                + f"<br>{st.message}<br>"
+                f"Kontakt / Key: <a href='mailto:{CONTACT_EMAIL}'>{CONTACT_EMAIL}</a>"
+                f"</p>"
+            )
             if st.mode == "trial":
                 rem = st.days_remaining
                 trial_hint = (
@@ -522,7 +607,16 @@ class AboutDialog(QDialog):
                     f"</p>"
                 )
         except Exception:
+            license_html = (
+                f"<p><b>Lizenzstatus</b>: unbekannt<br>"
+                f"Kontakt: <a href='mailto:{CONTACT_EMAIL}'>{CONTACT_EMAIL}</a></p>"
+            )
             trial_hint = ""
+        if license_html:
+            lic_lbl = QLabel(license_html)
+            lic_lbl.setWordWrap(True)
+            lic_lbl.setOpenExternalLinks(True)
+            layout.addWidget(lic_lbl)
         if trial_hint:
             hint_lbl = QLabel(trial_hint)
             hint_lbl.setWordWrap(True)
@@ -540,14 +634,17 @@ class AboutDialog(QDialog):
         )
         privacy.setWordWrap(True)
         layout.addWidget(privacy)
+        # Changelog-Kurzliste — 1.0.0
+        cl_lbl = QLabel(changelog_short_html(max_versions=4))
+        cl_lbl.setWordWrap(True)
+        layout.addWidget(cl_lbl)
         features_short = QLabel(
             "<h3>Features (Kurz)</h3>"
             "<ul>"
             "<li>PDF lesen/annotieren (Highlight, Notiz, Stempel, Formen) · Sidecar v4</li>"
-            "<li>Seitenlabels, Continuous Scroll, Spread, CropBox · Seiten-Favoriten (Drag-Umsortieren)</li>"
-            "<li>Editor: Find/Replace, Snippets, Bracket-Match, Bracket-Auto-Close, Minimap, Zeilen-Lesezeichen (Sidebar-Liste), Wortlisten-Rechtschreibung</li>"
-            "<li>OCR-Bridge, Formulargenerator, Batch, Export · Ann.-Batch-Farbe/Deckkraft (Sidecar)</li>"
-            "<li>Annotation-Tags, Kommentar-Bericht, Farbe Palette-Zyklus · Crash-Report-ZIP (+ Screenshot optional)</li>"
+            "<li>Willkommen-Startseite, manuelles Backup, PDF-Dokument drucken — 1.0.0</li>"
+            "<li>Editor: Find/Replace, Snippets, Bracket-Match, Minimap, Zeilen-Lesezeichen</li>"
+            "<li>OCR-Bridge, Formulargenerator, Batch, Export · Ann.-Batch-Farbe/Deckkraft</li>"
             "<li>Lizenz Trial/Keys · lokal, ohne Telemetrie · Stubs: KI, Cloud, Stylus, 3D</li>"
             "</ul>"
             "<p>Vollständige Liste: FEATURES.md</p>"
@@ -561,6 +658,10 @@ class AboutDialog(QDialog):
         btn_features.setToolTip("FEATURE-Liste im Standard-Editor / Dateimanager öffnen")
         btn_features.clicked.connect(self._open_features_md)
         btn_row.addWidget(btn_features)
+        btn_cl = QPushButton("CHANGELOG.md öffnen…")
+        btn_cl.setToolTip("Changelog im Standard-Editor / Dateimanager öffnen")
+        btn_cl.clicked.connect(self._open_changelog_md)
+        btn_row.addWidget(btn_cl)
         btn_row.addStretch(1)
         layout.addLayout(btn_row)
 
@@ -583,4 +684,21 @@ class AboutDialog(QDialog):
                 self,
                 "FEATURES.md",
                 f"Konnte FEATURES.md nicht öffnen.\nPfad:\n{path}",
+            )
+
+    def _open_changelog_md(self) -> None:
+        path = ROOT / "CHANGELOG.md"
+        if not path.is_file():
+            QMessageBox.information(
+                self,
+                "CHANGELOG.md",
+                f"CHANGELOG.md nicht gefunden:\n{path}",
+            )
+            return
+        ok = QDesktopServices.openUrl(QUrl.fromLocalFile(str(path)))
+        if not ok:
+            QMessageBox.information(
+                self,
+                "CHANGELOG.md",
+                f"Konnte CHANGELOG.md nicht öffnen.\nPfad:\n{path}",
             )

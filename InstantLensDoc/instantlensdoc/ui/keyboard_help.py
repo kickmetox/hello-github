@@ -88,6 +88,10 @@ SHORTCUTS_HTML = """
 <tr><td>Session Ann.-Werkzeug</td><td>Zuletzt genutztes Annotations-Werkzeug speichern/wiederherstellen — 0.9.7</td></tr>
 <tr><td>Session Ann.-Opacity / Stroke</td><td>Letzte Deckkraft und Strichstärke speichern/wiederherstellen — 0.9.8</td></tr>
 <tr><td>Session Fill-/Stroke-Color</td><td>Letzte Fill- und Stroke-Farb-Defaults speichern/wiederherstellen — 0.9.9</td></tr>
+<tr><td>About Lizenz / Changelog</td><td>Hilfe → Info: Version, Lizenzstatus, Kontakt ame@sellerbach.de, Changelog-Kurzliste — 1.0.0</td></tr>
+<tr><td>Backup jetzt / Ordner</td><td>Datei → Backup jetzt; Backup-Ordner öffnen (Config/backups) — 1.0.0</td></tr>
+<tr><td>PDF Dokument drucken</td><td>PDF → Dokument drucken… (alle Seiten, pypdfium2-Raster, QPrintDialog); Ctrl+P = Seite — 1.0.0</td></tr>
+<tr><td>Willkommen-Startseite</td><td>Ohne Tabs: Recent + Dokument öffnen / Leeres Text — 1.0.0</td></tr>
 <tr><td>PDF-Trefferliste</td><td>Sidebar Seite + Snippet klickbar → Sprung + Highlight — 0.9.1</td></tr>
 <tr><td>Fenster teilen (zwei Docs)</td><td><code>Ctrl+\\</code> — 0.6.3</td></tr>
 <tr><td>Vertikaler Split (übereinander)</td><td><code>Ctrl+Shift+\\</code> (Toggle) — 0.6.5</td></tr>

@@ -2,7 +2,7 @@
 
 Moderne Textverarbeitung mit PDF-Annotator, OCR-Bridge und Formulargenerator.
 
-**Version:** 0.9.9  
+**Version:** 1.0.0  
 **Hersteller:** Andreas Meyer · ame@sellerbach.de
 
 ## Quickstart (Windows)
@@ -32,8 +32,8 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an).
 
-## Neu in 0.9.9
+## Neu in 1.0.0
 
-Autosave optional mit rotierendem `.ildbak`-Backup (Toggle + max. 1–10); PDF-Suche→Highlight mit Tag-Combobox aus zuletzt genutzten Tags; Color-Presets Werksstandard mit Bestätigung und Rückgängig; Session stellt Fill- und Stroke-Farb-Defaults wieder her. Stubs KI/Cloud/Stylus/3D unverändert.
+Major-Release: About mit Lizenzstatus + Changelog-Kurzliste und Kontakt ame@sellerbach.de; manuelles „Backup jetzt“ + Backup-Ordner öffnen; PDF Dokument drucken (QPrintDialog, Raster via pypdfium2); Willkommens-Startseite mit Recent + „Dokument öffnen“ / „Leeres Text“. Stubs KI/Cloud/Stylus/3D unverändert.
 
 Siehe [CHANGELOG.md](CHANGELOG.md), [FEATURES.md](FEATURES.md) und [INFO.md](INFO.md).
