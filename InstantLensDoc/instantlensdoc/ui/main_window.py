@@ -2186,7 +2186,7 @@ class MainWindow(QMainWindow):
         self._high_contrast_action.setCheckable(True)
         self._high_contrast_action.setShortcut(QKeySequence("Ctrl+Alt+H"))
         self._high_contrast_action.setToolTip(
-            "High-Contrast Theme ein/aus (Ctrl+Alt+H) — Toast „High-Contrast an/aus“ — 2.0.3"
+            "High-Contrast Theme ein/aus (Ctrl+Alt+H) — Toast Dauer OCR-Settings · A11y — 2.0.4"
         )
         try:
             from instantlensdoc.core.app_settings import get_high_contrast
@@ -5760,7 +5760,7 @@ class MainWindow(QMainWindow):
             pass
 
     def _toggle_high_contrast(self, checked: bool = False) -> None:
-        """High-Contrast Theme Toggle — Accessibility Ctrl+Alt+H — Toast — 2.0.3."""
+        """High-Contrast Theme Toggle — Ctrl+Alt+H — Toast Dauer OCR-Settings + A11y — 2.0.4."""
         enabled = toggle_high_contrast(self)
         act = getattr(self, "_high_contrast_action", None)
         if act is not None:
@@ -5768,8 +5768,14 @@ class MainWindow(QMainWindow):
             act.setChecked(bool(enabled))
             act.blockSignals(False)
         msg = "High-Contrast an" if enabled else "High-Contrast aus"
-        self.statusBar().showMessage(msg, 2500)
-        self._set_status(msg)
+        try:
+            from instantlensdoc.core.app_settings import get_ocr_defaults_toast_sec
+
+            ms = max(1, int(get_ocr_defaults_toast_sec())) * 1000
+        except Exception:
+            ms = 2000
+        self._announce_status_toast(msg)
+        self.statusBar().showMessage(msg, ms)
 
     def _open_multi_doc_search(self) -> None:
         """Zentrale Multi-Dokument-Suche über alle offenen PDFs — 2.0.0."""

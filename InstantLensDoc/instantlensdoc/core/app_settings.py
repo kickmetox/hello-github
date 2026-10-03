@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Any, Literal
 
@@ -4219,6 +4220,8 @@ def set_last_portfolio_extract_dir(path: str | Path) -> None:
 
 
 DEFAULT_MULTI_DOC_CSV_FILENAME_TEMPLATE = "{date}_multisearch.csv"
+MULTI_DOC_CSV_KNOWN_PLACEHOLDERS = frozenset({"date", "query"})
+_MULTI_DOC_CSV_ANY_PLACEHOLDER_RE = re.compile(r"\{([^{}]+)\}")
 
 
 def get_last_multi_doc_csv_dir() -> Path | None:
@@ -4239,7 +4242,7 @@ def set_last_multi_doc_csv_dir(path: str | Path) -> None:
 
 
 def get_multi_doc_csv_filename_template() -> str:
-    """Dateiname-Template Multi-Doc-CSV, Default ``{date}_multisearch.csv`` — 2.0.3."""
+    """Dateiname-Template Multi-Doc-CSV, Default ``{date}_multisearch.csv`` — 2.0.3/2.0.4."""
     raw = str(
         load_settings().get(
             "multi_doc_csv_filename_template",
@@ -4256,7 +4259,7 @@ def get_multi_doc_csv_filename_template() -> str:
 
 
 def set_multi_doc_csv_filename_template(template: str) -> str:
-    """Multi-Doc-CSV-Template speichern — 2.0.3."""
+    """Multi-Doc-CSV-Template speichern — 2.0.3/2.0.4."""
     raw = str(template or "").strip() or DEFAULT_MULTI_DOC_CSV_FILENAME_TEMPLATE
     raw = raw.replace("/", "_").replace("\\", "_")
     if not raw.lower().endswith(".csv"):
@@ -4265,14 +4268,59 @@ def set_multi_doc_csv_filename_template(template: str) -> str:
     return raw
 
 
+def sanitize_multi_doc_csv_query(query: str | None) -> str:
+    """Suchbegriff für Dateiname sichern (max. 40 Zeichen) — 2.0.4."""
+    raw = str(query or "").strip() or "search"
+    safe = "".join(c if c.isalnum() or c in "-_." else "_" for c in raw)
+    safe = safe.strip("._") or "search"
+    return safe[:40]
+
+
+def find_invalid_multi_doc_csv_placeholders(template: str) -> list[str]:
+    """Unbekannte Platzhalter im Multi-Doc-CSV-Template — 2.0.4."""
+    seen: set[str] = set()
+    out: list[str] = []
+    for name in _MULTI_DOC_CSV_ANY_PLACEHOLDER_RE.findall(str(template or "")):
+        key = name.strip()
+        if not key or key in MULTI_DOC_CSV_KNOWN_PLACEHOLDERS or key in seen:
+            continue
+        seen.add(key)
+        out.append(key)
+    return out
+
+
+def highlight_multi_doc_csv_template_html(template: str) -> str:
+    """Template als HTML; ungültige Platzhalter rot — 2.0.4."""
+    import html as _html
+
+    raw = str(template or "")
+    parts: list[str] = []
+    last = 0
+    for m in _MULTI_DOC_CSV_ANY_PLACEHOLDER_RE.finditer(raw):
+        parts.append(_html.escape(raw[last : m.start()]))
+        name = m.group(1).strip()
+        token = _html.escape(m.group(0))
+        if name and name not in MULTI_DOC_CSV_KNOWN_PLACEHOLDERS:
+            parts.append(
+                f'<span style="color:#c62828;font-weight:600">{token}</span>'
+            )
+        else:
+            parts.append(token)
+        last = m.end()
+    parts.append(_html.escape(raw[last:]))
+    return "".join(parts) or _html.escape(raw)
+
+
 def format_multi_doc_csv_filename(
     *,
     template: str | None = None,
     date: str | None = None,
+    query: str | None = None,
 ) -> str:
     """
     Multi-Doc-CSV-Dateiname aus Template.
-    Platzhalter: ``{date}`` (YYYY-MM-DD). Default ``{date}_multisearch.csv`` — 2.0.3.
+    Platzhalter: ``{date}`` (YYYY-MM-DD), ``{query}`` (sanitized).
+    Default ``{date}_multisearch.csv`` — 2.0.3/2.0.4.
     """
     from datetime import date as _date
 
@@ -4282,9 +4330,10 @@ def format_multi_doc_csv_filename(
         else get_multi_doc_csv_filename_template()
     )
     date_s = (date if date is not None else _date.today().isoformat()).strip()
+    query_s = sanitize_multi_doc_csv_query(query)
     name = str(tpl or DEFAULT_MULTI_DOC_CSV_FILENAME_TEMPLATE).replace(
         "{date}", date_s
-    )
+    ).replace("{query}", query_s)
     name = name.replace("/", "_").replace("\\", "_")
     if not name.lower().endswith(".csv"):
         name = name + ".csv"

@@ -314,16 +314,26 @@ def summarize_extract_status(
 ) -> str:
     """
     Statuszählung Portfolio-Extrakt:
-    ``extrahiert X · umbenannt Y`` (+ Abbruch/offen) — 2.0.3.
+    ``extrahiert X, übersprungen Y`` (+ umbenannt/abgebrochen) — 2.0.4.
     """
     n = len(written or [])
+    skipped = max(0, int(total) - n)
     renamed = count_renamed_extracts(written)
-    parts = [f"extrahiert {n}"]
+    # Footer-Kern: „extrahiert X, übersprungen Y“ — 2.0.4
+    parts = [f"extrahiert {n}, übersprungen {skipped}"]
     if renamed:
         parts.append(f"umbenannt {renamed}")
     if cancelled:
-        remaining = max(0, int(total) - n)
         parts.append(f"abgebrochen ({n} von {max(int(total), n)})")
-        if remaining:
-            parts.append(f"offen {remaining}")
     return " · ".join(parts)
+
+
+def format_extract_footer(
+    written: Sequence[Path],
+    *,
+    total: int,
+) -> str:
+    """Footer-Kurzform ``extrahiert X, übersprungen Y`` — 2.0.4."""
+    n = len(written or [])
+    skipped = max(0, int(total) - n)
+    return f"extrahiert {n}, übersprungen {skipped}"

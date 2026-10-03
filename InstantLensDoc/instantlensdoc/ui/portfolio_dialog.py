@@ -1,11 +1,11 @@
-"""PDF-Portfolio erstellen / öffnen (pikepdf Collection + Attachments) — 2.0.3."""
+"""PDF-Portfolio erstellen / öffnen (pikepdf Collection + Attachments) — 2.0.4."""
 
 from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QKeySequence, QShortcut
+from PySide6.QtCore import Qt, QUrl
+from PySide6.QtGui import QDesktopServices, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QApplication,
@@ -36,6 +36,7 @@ from ild_pdf.portfolio import (
     create_portfolio,
     extract_portfolio,
     extract_portfolio_entries,
+    format_extract_footer,
     open_portfolio,
     summarize_extract_status,
 )
@@ -56,6 +57,7 @@ class PortfolioDialog(QDialog):
         self._files: list[str] = []
         self._entry_names: list[str] = []
         self.extract_progress: QProgressDialog | None = None  # während Extrakt — 2.0.3
+        self._last_extract_dir: str | None = None  # für Ordner öffnen — 2.0.4
 
         layout = QVBoxLayout(self)
         self.tabs = QTabWidget()
@@ -132,7 +134,8 @@ class PortfolioDialog(QDialog):
                 "Bestehendes Portfolio öffnen: Collection/Attachments listen "
                 "und optional extrahieren (alle oder Auswahl). "
                 "Zielordner merken · Namenskollision umbenennen · "
-                "Fortschritt mit Abbruch · Teilergebnis behalten — 2.0.3."
+                "Fortschritt mit Abbruch · Teilergebnis behalten · "
+                "Footer extrahiert X, übersprungen Y · Ordner öffnen — 2.0.4."
             )
         )
         row = QHBoxLayout()
@@ -166,17 +169,40 @@ class PortfolioDialog(QDialog):
         self.open_status.setObjectName("portfolioOpenStatus")
         layout.addWidget(self.open_status)
 
+        # Footer Statuszählung + Ordner öffnen — 2.0.4
+        foot = QHBoxLayout()
+        self.extract_footer = QLabel("")
+        self.extract_footer.setObjectName("portfolioExtractFooter")
+        self.extract_footer.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        self.extract_footer.setToolTip(
+            "Statuszählung: extrahiert X, übersprungen Y — 2.0.4"
+        )
+        self.extract_footer.setStyleSheet("color:#333;padding:2px 0;")
+        self.extract_footer.setVisible(False)
+        foot.addWidget(self.extract_footer, 1)
+        self.btn_open_extract_folder = QPushButton("Ordner öffnen")
+        self.btn_open_extract_folder.setObjectName("portfolioOpenExtractFolder")
+        self.btn_open_extract_folder.setToolTip(
+            "Extrakt-Zielordner im Dateimanager öffnen — 2.0.4"
+        )
+        self.btn_open_extract_folder.setEnabled(False)
+        self.btn_open_extract_folder.clicked.connect(self._open_extract_folder)
+        foot.addWidget(self.btn_open_extract_folder)
+        layout.addLayout(foot)
+
         ex_row = QHBoxLayout()
         btn_extract_sel = QPushButton("Auswahl extrahieren…")
         btn_extract_sel.setObjectName("portfolioExtractSelBtn")
         btn_extract_sel.setToolTip(
-            "Nur ausgewählte Einträge; Abbruch behält Teilergebnis — 2.0.3"
+            "Nur ausgewählte Einträge; Abbruch behält Teilergebnis; "
+            "Footer extrahiert/übersprungen — 2.0.4"
         )
         btn_extract_sel.clicked.connect(self._extract_selected)
         btn_extract = QPushButton("Alle extrahieren…")
         btn_extract.setObjectName("portfolioExtractBtn")
         btn_extract.setToolTip(
-            "Alle Einträge; Fortschritt/Abbruch; Statuszählung — 2.0.3"
+            "Alle Einträge; Fortschritt/Abbruch; "
+            "Footer extrahiert X, übersprungen Y · Ordner öffnen — 2.0.4"
         )
         btn_extract.clicked.connect(self._extract)
         ex_row.addWidget(btn_extract_sel)
@@ -184,6 +210,16 @@ class PortfolioDialog(QDialog):
         ex_row.addStretch(1)
         layout.addLayout(ex_row)
         return w
+
+    def _open_extract_folder(self) -> None:
+        """Extrakt-Zielordner öffnen — 2.0.4."""
+        folder = self._last_extract_dir or ""
+        if not folder or not Path(folder).is_dir():
+            QMessageBox.information(
+                self, "Portfolio", "Kein Extrakt-Ordner vorhanden."
+            )
+            return
+        QDesktopServices.openUrl(QUrl.fromLocalFile(str(folder)))
 
     def _add_files(self) -> None:
         paths, _ = QFileDialog.getOpenFileNames(
@@ -306,12 +342,13 @@ class PortfolioDialog(QDialog):
         if not out:
             return
         set_last_portfolio_extract_dir(out)
+        self._last_extract_dir = out
         total = len(names) if names is not None else len(self._entry_names)
         if total <= 0:
             QMessageBox.information(self, "Portfolio", "Nichts zu extrahieren.")
             return
 
-        # Fortschritt + Abbruch (Teilergebnis behalten) — 2.0.3
+        # Fortschritt + Abbruch (Teilergebnis behalten) — 2.0.3/2.0.4
         prog = QProgressDialog(
             "Portfolio extrahieren…", "Abbrechen", 0, max(1, total), self
         )
@@ -362,6 +399,11 @@ class PortfolioDialog(QDialog):
             status = summarize_extract_status(
                 written, total=total, cancelled=bool(cancelled["v"])
             )
+            footer = format_extract_footer(written, total=total)
+            self.extract_footer.setText(footer)
+            self.extract_footer.setAccessibleName(footer)
+            self.extract_footer.setVisible(True)
+            self.btn_open_extract_folder.setEnabled(True)
             self.open_status.setText(f"{status} → {out}")
             if cancelled["v"]:
                 msg = (

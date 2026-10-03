@@ -1,21 +1,23 @@
-# InstantLens Doc 2.0.3 — Benutzer-Installer (ohne Admin wenn möglich)
+# InstantLens Doc 2.0.4 — Benutzer-Installer (ohne Admin wenn möglich)
 # Startmenü-Shortcut + optional Desktop-Link (User-Profil).
 # Idempotent: vorhandene Verknüpfungen werden aktualisiert.
 # -Uninstall entfernt Startmenü- und Desktop-Shortcuts.
 # Fehlende Shortcuts bei -Uninstall sind kein Fehler (Log-Zeile, Exit 0).
+# -Uninstall schreibt Log-Datei und gibt den Pfad aus; -Quiet unterdrückt Prompts.
 #
 # Beispiele:
 #   powershell -ExecutionPolicy Bypass -File .\scripts\install-ild.ps1
 #   powershell -ExecutionPolicy Bypass -File .\scripts\install-ild.ps1 -DesktopLink
 #   powershell -ExecutionPolicy Bypass -File .\scripts\install-ild.ps1 -AppDir "D:\AI_Temp\InstantLensDoc" -NoDesktop
 #   powershell -ExecutionPolicy Bypass -File .\scripts\install-ild.ps1 -Uninstall
+#   powershell -ExecutionPolicy Bypass -File .\scripts\install-ild.ps1 -Uninstall -Quiet
 #
 # Hinweis Sync (Code aktualisieren):
 #   powershell -ExecutionPolicy Bypass -File "D:\AI_Temp\sync-ild.ps1"
 #   (oder .\scripts\sync-ild.ps1 neben der App / Store-Kopie)
 #
 # Exit-Codes:
-#   0  Erfolg (Install/Update/Uninstall OK; nichts zu entfernen bei -Uninstall = OK)
+#   0  Erfolg (Install/Update/Uninstall OK; nichts zu entfernen bei -Uninstall = OK; Abbruch Prompt = 0)
 #   1  Fehler (App-Ordner fehlt, Shortcut anlegen/entfernen fehlgeschlagen, Parameterkonflikt)
 
 [CmdletBinding()]
@@ -24,16 +26,42 @@ param(
     [switch]$DesktopLink,
     [switch]$NoDesktop,
     [switch]$SkipStartMenu,
-    [switch]$Uninstall
+    [switch]$Uninstall,
+    [switch]$Quiet
 )
 
 $ErrorActionPreference = "Stop"
-$Version = "2.0.3"
+$Version = "2.0.4"
 $AppName = "InstantLens Doc"
 
 function Write-IldInfo([string]$msg) { Write-Host "[ILD $Version] $msg" }
 function Write-IldWarn([string]$msg) { Write-Host "[ILD $Version] Hinweis: $msg" -ForegroundColor Yellow }
 function Write-IldErr([string]$msg) { Write-Host "[ILD $Version] FEHLER: $msg" -ForegroundColor Red }
+
+function Get-IldLogDir {
+    $base = $env:LOCALAPPDATA
+    if (-not $base) { $base = $env:TEMP }
+    if (-not $base) { $base = $env:TMP }
+    if (-not $base) { $base = "." }
+    $dir = Join-Path $base "InstantLensDoc\logs"
+    New-Item -ItemType Directory -Force -Path $dir | Out-Null
+    return $dir
+}
+
+function New-IldUninstallLogPath {
+    $dir = Get-IldLogDir
+    $stamp = Get-Date -Format "yyyyMMdd-HHmmss"
+    return (Join-Path $dir "install-ild-uninstall-$stamp.log")
+}
+
+function Write-IldLogLine {
+    param(
+        [Parameter(Mandatory = $true)][string]$LogPath,
+        [Parameter(Mandatory = $true)][string]$Message
+    )
+    $line = "{0:yyyy-MM-dd HH:mm:ss}  {1}" -f (Get-Date), $Message
+    Add-Content -LiteralPath $LogPath -Value $line -Encoding UTF8
+}
 
 function Get-IldShortcutPaths {
     $paths = @()
@@ -50,6 +78,26 @@ if ($Uninstall) {
     if ($DesktopLink -or $NoDesktop -or $SkipStartMenu) {
         Write-IldWarn "-Uninstall ignoriert -DesktopLink/-NoDesktop/-SkipStartMenu (entfernt Startmenü + Desktop)."
     }
+
+    $logPath = New-IldUninstallLogPath
+    Write-IldInfo "Log-Datei: $logPath"
+    Write-IldLogLine -LogPath $logPath -Message "Uninstall gestartet (Version $Version; Quiet=$Quiet)"
+
+    if (-not $Quiet) {
+        Write-Host ""
+        Write-Host "InstantLens Doc — Shortcuts entfernen (Startmenü + Desktop)." -ForegroundColor Yellow
+        $answer = Read-Host "Fortfahren? (J/N)"
+        if ($answer -notmatch '^[jJyY]') {
+            Write-IldInfo "Uninstall abgebrochen (Prompt). Exit 0."
+            Write-IldLogLine -LogPath $logPath -Message "Uninstall abgebrochen durch Prompt"
+            Write-IldInfo "Log-Datei: $logPath"
+            exit 0
+        }
+    } else {
+        Write-IldInfo "Quiet: Prompt übersprungen."
+        Write-IldLogLine -LogPath $logPath -Message "Quiet: Prompt übersprungen"
+    }
+
     $removed = @()
     $missing = @()
     $failed = @()
@@ -59,23 +107,30 @@ if ($Uninstall) {
                 Remove-Item -LiteralPath $link -Force
                 $removed += $link
                 Write-IldInfo "Shortcut entfernt: $link"
+                Write-IldLogLine -LogPath $logPath -Message "entfernt: $link"
             } catch {
                 $failed += $link
                 Write-IldErr "Entfernen fehlgeschlagen: $link — $_"
+                Write-IldLogLine -LogPath $logPath -Message "FEHLER: $link — $_"
             }
         } else {
             $missing += $link
             Write-IldInfo "Shortcut fehlt bereits (kein Fehler): $link"
+            Write-IldLogLine -LogPath $logPath -Message "fehlt bereits: $link"
         }
     }
     if ($failed.Count -gt 0) {
         Write-IldErr "Uninstall unvollständig ($($failed.Count) Fehler)."
+        Write-IldLogLine -LogPath $logPath -Message "Uninstall unvollständig ($($failed.Count) Fehler)"
+        Write-IldInfo "Log-Datei: $logPath"
         exit 1
     }
     if ($missing.Count -gt 0) {
         Write-IldInfo "fehlende Shortcuts kein Fehler ($($missing.Count) fehlten bereits)."
     }
     Write-IldInfo "Uninstall fertig: $($removed.Count) entfernt, $($missing.Count) fehlten bereits. Exit 0."
+    Write-IldLogLine -LogPath $logPath -Message "Uninstall fertig: $($removed.Count) entfernt, $($missing.Count) fehlten bereits"
+    Write-IldInfo "Log-Datei: $logPath"
     exit 0
 }
 
@@ -195,5 +250,5 @@ $syncLocal = Join-Path $AppDir "scripts\sync-ild.ps1"
 if (Test-Path $syncLocal) {
     Write-Host ("  powershell -ExecutionPolicy Bypass -File `"{0}`"" -f $syncLocal)
 }
-Write-IldInfo "Exit-Codes: 0 OK · 1 Fehler. Deinstallieren: -Uninstall"
+Write-IldInfo "Exit-Codes: 0 OK · 1 Fehler. Deinstallieren: -Uninstall [-Quiet]"
 exit 0

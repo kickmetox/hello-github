@@ -1,5 +1,21 @@
 # Changelog — InstantLens Doc
 
+## 2.0.4 — Multi-Doc Template Quick-Insert {date}/{query}·ungültige rot·Reset Default, Portfolio Footer extrahiert/übersprungen·Ordner öffnen, HC-Toast Dauer OCR·A11y, install-ild Log-Pfad·-Quiet
+
+Post-Release-Polish nach 2.0.3: **Multi-Dokument-Suche CSV-Template** mit **Quick-Insert `{date}`/`{query}`**, **ungültige Platzhalter rot**, Button **Reset Default**; **Portfolio-Extrakt** Footer **„extrahiert X, übersprungen Y“** und Button **Ordner öffnen**; High-Contrast Toast **Dauer aus OCR-Toast-Settings** + **Accessibility-Announcement**; **install-ild.ps1 -Uninstall** gibt **Log-Datei-Pfad** aus, **-Quiet** unterdrückt Prompts. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen unverändert klar markiert / nicht produktiv.
+
+### Suche / Portfolio
+- Multi-Doc-CSV: Quick-Insert `{date}`/`{query}`; ungültige Platzhalter rot in Live-Vorschau; Reset Default
+- Portfolio-Extrakt: Footer „extrahiert X, übersprungen Y“; Button „Ordner öffnen“
+
+### Accessibility / Installer
+- High-Contrast Ctrl+Alt+H: Toast-Dauer aus OCR-Defaults-Toast (Settings 1/2/3 s) + A11y-Announcement
+- `scripts/install-ild.ps1`: `-Uninstall` schreibt Log und gibt Pfad aus; `-Quiet` ohne Prompt
+
+### Version / Docs
+- Version **2.0.4** (App / `ild_pdf` / ISS / Smoke / Docs); `docs/VERSION` + `VERSION.txt`
+- About Serie **2.0**; Smoke: Multi-Doc Quick-Insert/Invalid/Reset, Portfolio Footer/Ordner, HC Toast Dauer/A11y, install-ild Log/Quiet (CLI + Qt)
+
 ## 2.0.3 — Multi-Doc CSV Zielordner·Live-Template, Portfolio Extrakt Abbruch·Teilergebnis·Status, HC-Toast·UI-Reset≠100, install-ild fehlende Shortcuts ok
 
 Post-Release-Polish nach 2.0.2: **Multi-Dokument-Suche CSV** merkt **Zielordner**, Live-Dateiname-Template **`{date}_multisearch.csv`**; **Portfolio-Extrakt** mit **Abbruch**, **Teilergebnis behalten** und **Statuszählung**; High-Contrast Shortcut Toast **„High-Contrast an/aus“**; UI-Skala Reset **Bestätigung nur bei ≠100 %**; **install-ild.ps1 -Uninstall**: fehlende Shortcuts **kein Fehler** (Log-Zeile, Exit 0). Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen unverändert klar markiert / nicht produktiv.

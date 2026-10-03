@@ -1,5 +1,5 @@
 """
-Plugin-Hooks — STUB (2.0.3)
+Plugin-Hooks — STUB (2.0.4)
 
 Kein echtes Plugin-System. Dieser Modul stellt nur einen **internen Event-Bus**
 und einen **no-op Loader** bereit, damit spätere Erweiterungen einen klaren
@@ -32,7 +32,7 @@ from typing import Any, Callable, DefaultDict, Iterable, List, Optional, Sequenc
 IS_STUB = True
 NOT_PRODUCTION_READY = True
 STUB_MESSAGE = (
-    "Plugin-Hooks Stub 2.0.3 — nicht produktiv; "
+    "Plugin-Hooks Stub 2.0.4 — nicht produktiv; "
     "interner Event-Bus + no-op Loader; kein Plugin-System (Coming soon)."
 )
 
@@ -133,7 +133,7 @@ def plugin_stub_info() -> dict[str, Any]:
         "stub": True,
         "is_stub": IS_STUB,
         "not_production_ready": NOT_PRODUCTION_READY,
-        "version_marker": "2.0.3",
+        "version_marker": "2.0.4",
         "message": STUB_MESSAGE,
         "known_events": list(KNOWN_EVENTS),
         "event_descriptions": dict(EVENT_DESCRIPTIONS),

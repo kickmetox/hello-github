@@ -1,10 +1,11 @@
-"""Zentrale Multi-Dokument-Suche: Volltext über alle offenen PDFs — 2.0.3."""
+"""Zentrale Multi-Dokument-Suche: Volltext über alle offenen PDFs — 2.0.4."""
 
 from __future__ import annotations
 
+import html as _html
 from pathlib import Path
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QApplication,
@@ -27,9 +28,11 @@ from PySide6.QtWidgets import (
 from instantlensdoc.core.app_settings import (
     DEFAULT_MULTI_DOC_CSV_FILENAME_TEMPLATE,
     dialog_start_dir,
+    find_invalid_multi_doc_csv_placeholders,
     format_multi_doc_csv_filename,
     get_last_multi_doc_csv_dir,
     get_multi_doc_csv_filename_template,
+    highlight_multi_doc_csv_template_html,
     set_last_multi_doc_csv_dir,
     set_multi_doc_csv_filename_template,
 )
@@ -41,7 +44,8 @@ class MultiDocSearchDialog(QDialog):
     """
     Zentrale Trefferliste: Volltext (Textlayer) über alle offenen/gelisteten PDFs.
     Case / Regex / Whole-word · CSV Doc,Seite,Snippet,Match · BOM · Fortschritt —
-    CSV Zielordner merken · Live-Dateiname-Template ``{date}_multisearch.csv`` — 2.0.3.
+    CSV Zielordner merken · Live-Template Quick-Insert ``{date}``/``{query}`` ·
+    ungültige Platzhalter rot · Reset Default — 2.0.4.
     Doppelklick / Enter → Treffer aktivieren (Signal hit_activated).
     """
 
@@ -67,8 +71,8 @@ class MultiDocSearchDialog(QDialog):
         intro = QLabel(
             "Volltextsuche über alle offenen PDFs (Textlayer). "
             "Optionen Aa / Wort / Regex; CSV Doc,Seite,Snippet,Match; BOM; "
-            "Zielordner merken; Live-Dateiname {date}_multisearch.csv; "
-            "Regex-Fehler im Status."
+            "Zielordner merken; Template Quick-Insert {date}/{query}; "
+            "ungültige Platzhalter rot; Reset Default; Regex-Fehler im Status."
         )
         intro.setWordWrap(True)
         intro.setObjectName("multiDocSearchIntro")
@@ -82,6 +86,7 @@ class MultiDocSearchDialog(QDialog):
         if initial_query:
             self.query_edit.setText(initial_query)
         self.query_edit.returnPressed.connect(self.run_search)
+        self.query_edit.textChanged.connect(self._update_csv_filename_preview)
         self.btn_search = QPushButton("Suchen")
         self.btn_search.setObjectName("multiDocSearchBtn")
         self.btn_search.setDefault(True)
@@ -118,7 +123,7 @@ class MultiDocSearchDialog(QDialog):
         self.btn_export_csv.setObjectName("multiDocSearchExportCsv")
         self.btn_export_csv.setToolTip(
             "Trefferliste CSV: Doc,Seite,Snippet,Match · Zielordner merken · "
-            "Template {date}_multisearch.csv — 2.0.3"
+            "Template Quick-Insert {date}/{query} · Reset Default — 2.0.4"
         )
         self.btn_export_csv.clicked.connect(self._export_csv)
         self.btn_export_csv.setEnabled(False)
@@ -132,18 +137,50 @@ class MultiDocSearchDialog(QDialog):
         self.csv_tpl_edit.setPlaceholderText(DEFAULT_MULTI_DOC_CSV_FILENAME_TEMPLATE)
         self.csv_tpl_edit.setText(get_multi_doc_csv_filename_template())
         self.csv_tpl_edit.setToolTip(
-            "Live-Dateiname-Template; Platzhalter {date} (YYYY-MM-DD); "
-            f"Default {DEFAULT_MULTI_DOC_CSV_FILENAME_TEMPLATE} — 2.0.3"
+            "Live-Dateiname-Template; Platzhalter {date} (YYYY-MM-DD), "
+            "{query} (Suchbegriff); Quick-Insert an Cursor; "
+            "Reset Default ({date}_multisearch.csv); "
+            "ungültige Platzhalter rot — 2.0.4"
         )
         self.csv_tpl_edit.textChanged.connect(self._update_csv_filename_preview)
         tpl_row.addWidget(self.csv_tpl_edit, 1)
+        for token in ("{date}", "{query}"):
+            btn = QPushButton(token)
+            btn.setObjectName(
+                "multiDocSearchInsertDate"
+                if token == "{date}"
+                else "multiDocSearchInsertQuery"
+            )
+            btn.setAutoDefault(False)
+            btn.setDefault(False)
+            btn.setFocusPolicy(Qt.TabFocus)
+            btn.setToolTip(
+                f"Platzhalter {token} an Cursor-Position einfügen — 2.0.4"
+            )
+            btn.clicked.connect(
+                lambda _checked=False, t=token: self._insert_csv_placeholder(t)
+            )
+            tpl_row.addWidget(btn)
+        self.btn_reset_csv_tpl = QPushButton("Reset Default")
+        self.btn_reset_csv_tpl.setObjectName("multiDocSearchCsvReset")
+        self.btn_reset_csv_tpl.setAutoDefault(False)
+        self.btn_reset_csv_tpl.setDefault(False)
+        self.btn_reset_csv_tpl.setFocusPolicy(Qt.TabFocus)
+        self.btn_reset_csv_tpl.setToolTip(
+            f"Template auf Default zurücksetzen "
+            f"({DEFAULT_MULTI_DOC_CSV_FILENAME_TEMPLATE}); "
+            "Bestätigung nur bei Abweichung — 2.0.4"
+        )
+        self.btn_reset_csv_tpl.clicked.connect(self._reset_csv_template)
+        tpl_row.addWidget(self.btn_reset_csv_tpl)
         layout.addLayout(tpl_row)
 
         self.csv_filename_preview = QLabel("")
         self.csv_filename_preview.setObjectName("multiDocSearchCsvPreview")
         self.csv_filename_preview.setWordWrap(True)
+        self.csv_filename_preview.setTextFormat(Qt.RichText)
         self.csv_filename_preview.setToolTip(
-            "Live-Vorschau des CSV-Dateinamens ({date} aufgelöst) — 2.0.3"
+            "Live-Vorschau des CSV-Dateinamens; ungültige Platzhalter rot — 2.0.4"
         )
         layout.addWidget(self.csv_filename_preview)
         self._update_csv_filename_preview()
@@ -187,17 +224,79 @@ class MultiDocSearchDialog(QDialog):
     def set_paths(self, paths: list[str]) -> None:
         self._paths = list(paths or [])
 
+    def _current_query_for_filename(self) -> str:
+        return (self._query or self.query_edit.text() or "").strip()
+
+    def _insert_csv_placeholder(self, token: str) -> None:
+        """Quick-Insert {date}/{query} an Cursor — 2.0.4."""
+        edit = self.csv_tpl_edit
+        edit.insert(str(token or ""))
+        edit.setFocus()
+        self._update_csv_filename_preview()
+
+    def _focus_csv_tpl_select_all(self) -> None:
+        """Fokus + Selektion ganzer Default-Text — 2.0.4."""
+        edit = self.csv_tpl_edit
+        edit.setFocus()
+        edit.selectAll()
+
+    def _reset_csv_template(self) -> None:
+        """
+        Template auf Default; Bestätigung nur bei Abweichung;
+        danach Live-Vorschau + Fokus mit Selektion — 2.0.4.
+        """
+        edit = self.csv_tpl_edit
+        default = DEFAULT_MULTI_DOC_CSV_FILENAME_TEMPLATE
+        current = edit.text() or ""
+        if current == default:
+            self._update_csv_filename_preview()
+            QTimer.singleShot(0, self._focus_csv_tpl_select_all)
+            return
+        reply = QMessageBox.question(
+            self,
+            "Reset Default",
+            f"CSV-Dateiname-Template auf Default zurücksetzen?\n\n"
+            f"Aktuell: {current}\n"
+            f"Default: {default}",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
+        )
+        if reply != QMessageBox.Yes:
+            QTimer.singleShot(0, self._focus_csv_tpl_select_all)
+            return
+        edit.selectAll()
+        edit.insert(default)
+        self._update_csv_filename_preview()
+        QTimer.singleShot(0, self._focus_csv_tpl_select_all)
+
     def _update_csv_filename_preview(self, *_args) -> None:
-        """Live-Vorschau Dateiname mit aufgelöstem {date} — 2.0.3."""
-        tpl = (self.csv_tpl_edit.text() or "").strip() or DEFAULT_MULTI_DOC_CSV_FILENAME_TEMPLATE
-        name = format_multi_doc_csv_filename(template=tpl)
-        self.csv_filename_preview.setText(f"Vorschau: {name}")
+        """Live-Vorschau; ungültige Platzhalter rot — 2.0.4."""
+        tpl = (
+            (self.csv_tpl_edit.text() or "").strip()
+            or DEFAULT_MULTI_DOC_CSV_FILENAME_TEMPLATE
+        )
+        q = self._current_query_for_filename()
+        name = format_multi_doc_csv_filename(template=tpl, query=q)
+        html_tpl = highlight_multi_doc_csv_template_html(tpl)
+        invalid = find_invalid_multi_doc_csv_placeholders(tpl)
+        parts = [html_tpl, f"→ {_html.escape(name)}"]
+        if invalid:
+            listed = ", ".join(_html.escape("{" + n + "}") for n in invalid)
+            parts.append(
+                f'<span style="color:#c62828">Ungültige Platzhalter: {listed}</span>'
+            )
+        self.csv_filename_preview.setText("<br>".join(parts))
         self.csv_filename_preview.setAccessibleName(f"CSV-Dateiname Vorschau {name}")
 
     def _csv_start_path(self) -> str:
-        """Startpfad Save-Dialog: gemerkter Ordner + Live-Template — 2.0.3."""
-        tpl = (self.csv_tpl_edit.text() or "").strip() or DEFAULT_MULTI_DOC_CSV_FILENAME_TEMPLATE
-        name = format_multi_doc_csv_filename(template=tpl)
+        """Startpfad Save-Dialog: gemerkter Ordner + Live-Template — 2.0.4."""
+        tpl = (
+            (self.csv_tpl_edit.text() or "").strip()
+            or DEFAULT_MULTI_DOC_CSV_FILENAME_TEMPLATE
+        )
+        name = format_multi_doc_csv_filename(
+            template=tpl, query=self._current_query_for_filename()
+        )
         remembered = get_last_multi_doc_csv_dir()
         start_dir = dialog_start_dir(remembered)
         return str(Path(start_dir) / name)
@@ -228,6 +327,7 @@ class MultiDocSearchDialog(QDialog):
         self._hits = []
         self.btn_export_csv.setEnabled(False)
         self._clear_status_error()
+        self._update_csv_filename_preview()
         if not query:
             self.status.setText("Leere Suche")
             self.progress.setVisible(False)
@@ -296,7 +396,20 @@ class MultiDocSearchDialog(QDialog):
         if not self._hits:
             QMessageBox.information(self, "Multi-Dokument-Suche", "Keine Treffer zum Export.")
             return
-        tpl = (self.csv_tpl_edit.text() or "").strip() or DEFAULT_MULTI_DOC_CSV_FILENAME_TEMPLATE
+        tpl = (
+            (self.csv_tpl_edit.text() or "").strip()
+            or DEFAULT_MULTI_DOC_CSV_FILENAME_TEMPLATE
+        )
+        invalid = find_invalid_multi_doc_csv_placeholders(tpl)
+        if invalid:
+            listed = ", ".join("{" + n + "}" for n in invalid)
+            QMessageBox.warning(
+                self,
+                "Multi-Dokument-Suche",
+                f"Ungültige Platzhalter im Template:\n{listed}\n\n"
+                f"Erlaubt: {{date}}, {{query}}.",
+            )
+            return
         set_multi_doc_csv_filename_template(tpl)
         start = self._csv_start_path()
         path, _ = QFileDialog.getSaveFileName(
