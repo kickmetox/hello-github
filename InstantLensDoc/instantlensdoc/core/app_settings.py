@@ -585,6 +585,13 @@ def set_presentation_countdown_color(color: str) -> str:
     return key
 
 
+def reset_presentation_countdown_defaults() -> tuple[str, str]:
+    """Countdown Position+Farbe auf Defaults; (pos, color) — 1.7.4."""
+    pos = set_presentation_countdown_position(PRESENTATION_COUNTDOWN_POSITION_DEFAULT)
+    color = set_presentation_countdown_color(PRESENTATION_COUNTDOWN_COLOR_DEFAULT)
+    return pos, color
+
+
 def get_last_update_check_at() -> str:
     """ISO-Zeitstempel des letzten Update-Checks (leer = nie) — 1.7.3."""
     return str(load_settings().get("last_update_check_at") or "").strip()

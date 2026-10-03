@@ -75,15 +75,23 @@ def _record_check_timestamp(iso_ts: str | None = None) -> str:
 
 
 def format_checked_at(iso_ts: str | None, *, lang: str = "de") -> str:
-    """Lesbarer Zeitstempel für Status/Dialog — 1.7.3."""
+    """Lesbarer Zeitstempel TT.MM.JJJJ HH:MM für Status/Dialog — 1.7.4."""
     raw = str(iso_ts or "").strip()
     if not raw:
         return "nie" if not str(lang).startswith("en") else "never"
     try:
         dt = datetime.fromisoformat(raw)
-        return dt.strftime("%d.%m.%Y %H:%M:%S")
+        return dt.strftime("%d.%m.%Y %H:%M")
     except ValueError:
         return raw
+
+
+def format_reference_source_tooltip(source: str | None, *, lang: str = "de") -> str:
+    """Tooltip-Text mit Versionsquelle (docs/VERSION / VERSION.txt) — 1.7.4."""
+    src = str(source or "").strip() or "—"
+    if str(lang).startswith("en"):
+        return f"Source: {src} (docs/VERSION or VERSION.txt)"
+    return f"Quelle: {src} (docs/VERSION oder VERSION.txt)"
 
 
 def _parse_version_from_init(text: str) -> Optional[str]:

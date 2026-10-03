@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
     QDoubleSpinBox,
     QFileDialog,
     QFormLayout,
+    QFrame,
     QGroupBox,
     QHBoxLayout,
     QLabel,
@@ -25,6 +26,66 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
+
+class CountdownPreviewMini(QFrame):
+    """Live-Vorschau Mini-Widget Countdown Position·Farbe — 1.7.4."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setObjectName("countdownPreviewMini")
+        self.setFixedSize(220, 96)
+        self.setFrameShape(QFrame.StyledPanel)
+        self.setStyleSheet(
+            "QFrame#countdownPreviewMini {"
+            " background: #1a1a1a; border: 1px solid #555; border-radius: 4px;"
+            "}"
+        )
+        self._badge = QLabel("5", self)
+        self._badge.setObjectName("countdownPreviewBadge")
+        self._badge.setAlignment(Qt.AlignCenter)
+        self._pos = "bottom-right"
+        self._color = "dark"
+        self.set_preview(self._pos, self._color)
+
+    def set_preview(self, position: str, color: str) -> None:
+        self._pos = position if position == "center" else "bottom-right"
+        self._color = color if color == "light" else "dark"
+        if self._color == "light":
+            self._badge.setStyleSheet(
+                "QLabel#countdownPreviewBadge {"
+                " background: rgba(255,255,255,220); color: #1a1a1a;"
+                " font-size: 18px; font-weight: 600;"
+                " padding: 4px 12px; border-radius: 6px;"
+                " border: 1px solid rgba(0,0,0,40);"
+                "}"
+            )
+        else:
+            self._badge.setStyleSheet(
+                "QLabel#countdownPreviewBadge {"
+                " background: rgba(0,0,0,180); color: #ffffff;"
+                " font-size: 18px; font-weight: 600;"
+                " padding: 4px 12px; border-radius: 6px;"
+                "}"
+            )
+        self._badge.adjustSize()
+        self._reposition()
+
+    def _reposition(self) -> None:
+        margin = 8
+        w, h = self._badge.width(), self._badge.height()
+        if self._pos == "center":
+            x = max(margin, (self.width() - w) // 2)
+            y = max(margin, (self.height() - h) // 2)
+        else:
+            x = max(margin, self.width() - w - margin)
+            y = max(margin, self.height() - h - margin)
+        self._badge.move(x, y)
+        self._badge.raise_()
+
+    def resizeEvent(self, event):  # noqa: N802
+        super().resizeEvent(event)
+        self._reposition()
 
 
 class AnnExportTemplateEdit(QLineEdit):
@@ -156,8 +217,11 @@ from instantlensdoc.core.app_settings import (
     get_presentation_hide_annotations,
     get_presentation_auto_advance_sec,
     get_presentation_black_background,
+    PRESENTATION_COUNTDOWN_COLOR_DEFAULT,
+    PRESENTATION_COUNTDOWN_POSITION_DEFAULT,
     get_presentation_countdown_color,
     get_presentation_countdown_position,
+    reset_presentation_countdown_defaults,
     get_presentation_show_page_number,
     PRESENTATION_AUTO_ADVANCE_CHOICES,
     get_favorites_bar_visible,
@@ -1206,7 +1270,7 @@ class SettingsDialog(QDialog):
         idx_cd_pos = self.presentation_countdown_pos.findData(cur_cd_pos)
         self.presentation_countdown_pos.setCurrentIndex(max(0, idx_cd_pos))
         self.presentation_countdown_pos.setToolTip(
-            "Countdown-Overlay Position: unten-rechts oder mitte — 1.7.3"
+            "Countdown-Overlay Position: unten-rechts oder mitte; Live-Vorschau — 1.7.4"
         )
         form.addRow("Präsentation: Countdown-Position", self.presentation_countdown_pos)
 
@@ -1217,9 +1281,36 @@ class SettingsDialog(QDialog):
         idx_cd_col = self.presentation_countdown_color.findData(cur_cd_col)
         self.presentation_countdown_color.setCurrentIndex(max(0, idx_cd_col))
         self.presentation_countdown_color.setToolTip(
-            "Countdown-Overlay Farbe: hell oder dunkel — 1.7.3"
+            "Countdown-Overlay Farbe: hell oder dunkel; Live-Vorschau — 1.7.4"
         )
         form.addRow("Präsentation: Countdown-Farbe", self.presentation_countdown_color)
+
+        # Live-Vorschau Mini-Widget + Defaults Reset — 1.7.4
+        self.countdown_preview = CountdownPreviewMini(self)
+        self.countdown_preview.setToolTip(
+            "Live-Vorschau Countdown-Overlay (Position · Farbe) — 1.7.4"
+        )
+        self.btn_countdown_defaults = QPushButton("Defaults")
+        self.btn_countdown_defaults.setAutoDefault(False)
+        self.btn_countdown_defaults.setDefault(False)
+        self.btn_countdown_defaults.setToolTip(
+            f"Countdown auf Defaults zurücksetzen "
+            f"(Position {PRESENTATION_COUNTDOWN_POSITION_DEFAULT}, "
+            f"Farbe {PRESENTATION_COUNTDOWN_COLOR_DEFAULT}) — 1.7.4"
+        )
+        self.btn_countdown_defaults.clicked.connect(self._reset_countdown_defaults)
+        cd_prev_row = QHBoxLayout()
+        cd_prev_row.addWidget(self.countdown_preview, 0, Qt.AlignLeft | Qt.AlignVCenter)
+        cd_prev_row.addWidget(self.btn_countdown_defaults, 0, Qt.AlignLeft | Qt.AlignVCenter)
+        cd_prev_row.addStretch(1)
+        form.addRow("Präsentation: Countdown-Vorschau", cd_prev_row)
+        self.presentation_countdown_pos.currentIndexChanged.connect(
+            self._update_countdown_preview
+        )
+        self.presentation_countdown_color.currentIndexChanged.connect(
+            self._update_countdown_preview
+        )
+        self._update_countdown_preview()
 
         self.favorites_bar_chk = QCheckBox("Lesezeichen-Leiste (globale Favoriten)")
         self.favorites_bar_chk.setChecked(get_favorites_bar_visible())
@@ -1380,6 +1471,28 @@ class SettingsDialog(QDialog):
             edit._saved_cursor = 0
             edit._saved_sel_start = 0
             edit._saved_sel_len = len(edit.text() or "")
+
+    def _update_countdown_preview(self, *_args) -> None:
+        """Live-Vorschau Mini-Widget aus Combos — 1.7.4."""
+        prev = getattr(self, "countdown_preview", None)
+        if prev is None:
+            return
+        pos = str(self.presentation_countdown_pos.currentData() or "bottom-right")
+        color = str(self.presentation_countdown_color.currentData() or "dark")
+        prev.set_preview(pos, color)
+
+    def _reset_countdown_defaults(self) -> None:
+        """Countdown Position+Farbe auf Defaults; UI + Persistenz + Vorschau — 1.7.4."""
+        pos, color = reset_presentation_countdown_defaults()
+        idx_p = self.presentation_countdown_pos.findData(pos)
+        idx_c = self.presentation_countdown_color.findData(color)
+        self.presentation_countdown_pos.blockSignals(True)
+        self.presentation_countdown_color.blockSignals(True)
+        self.presentation_countdown_pos.setCurrentIndex(max(0, idx_p))
+        self.presentation_countdown_color.setCurrentIndex(max(0, idx_c))
+        self.presentation_countdown_pos.blockSignals(False)
+        self.presentation_countdown_color.blockSignals(False)
+        self._update_countdown_preview()
 
     def _reset_ann_export_template(self) -> None:
         """Template auf Default; Live-Vorschau + Fokus mit Selektion — 1.2.9."""

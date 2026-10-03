@@ -1,5 +1,23 @@
 # Changelog — InstantLens Doc
 
+## 1.7.4 — Countdown Live-Vorschau·Defaults, Favoriten Esc-Fokus·Enter, Text→PDF Status-Klick·A11y, Update Zeitstempel TT.MM.JJJJ HH:MM·Quellen-Tooltip
+
+Post-Release-Polish nach 1.7.3: **Countdown-Settings** mit **Live-Vorschau Mini-Widget** und **Defaults-Reset**; **Favoriten-Label** Esc stellt **Fokus zurück auf Liste**, **Enter bestätigt Edit**; **Text → PDF Status** **Klick öffnet Ordner** inkl. **A11y-Announcement**; **Update-Zeitstempel** Format **TT.MM.JJJJ HH:MM** mit **Tooltip Quelle** (`docs/VERSION` / `VERSION.txt`). Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### PDF / Präsentation
+- Präsentation: Countdown Live-Vorschau Mini-Widget in Settings; Defaults-Reset (Position unten-rechts, Farbe dunkel)
+- Globale Favoriten: Esc → Fokus zurück auf Liste; Enter bestätigt Label-Edit
+
+### Editor / Export
+- Text → PDF Status: Klick öffnet Zielordner; Accessible-Announcement
+
+### Update / Packaging
+- Update-Hinweis: Zeitstempel TT.MM.JJJJ HH:MM; Tooltip mit Quelle (VERSION.txt / docs/VERSION)
+- Version **1.7.4** (App / `ild_pdf` / ISS / Smoke / Docs); `docs/VERSION` + `VERSION.txt`
+- Smoke: Countdown Preview·Defaults, Favoriten Esc-Fokus/Enter, text_pdf Status-Klick·A11y, update timestamp·source-tooltip (CLI + Qt)
+
+---
+
 ## 1.7.3 — Präsentation Countdown Position·Farbe, Favoriten Doppelklick·Esc·leer, Text→PDF öffnen ohne Sidecar·Status-Pfad, Update Offline·Zeitstempel
 
 Post-Release-Polish nach 1.7.2: **Countdown-Overlay** mit Settings **Position** (unten-rechts/mitte) und **Farbe** (hell/dunkel); **Favoriten-Label** per **Doppelklick**, **Esc bricht ab**, **leerer Label → Dateiname**; **Text → PDF öffnen** legt **kein Sidecar** an und zeigt **Status mit Pfad**; **Update Offline** mit Status **„offline / nicht geprüft“** und **letztem Check-Zeitstempel**. Stubs KI/Cloud/Stylus/3D bleiben Stubs.

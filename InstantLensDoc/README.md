@@ -2,7 +2,7 @@
 
 Moderne Textverarbeitung mit PDF-Annotator, OCR-Bridge und Formulargenerator.
 
-**Version:** 1.7.3  
+**Version:** 1.7.4  
 **Hersteller:** Andreas Meyer · ame@sellerbach.de
 
 ## Quickstart (Windows)
@@ -33,8 +33,8 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an).
 
-## Neu in 1.7.3
+## Neu in 1.7.4
 
-Polish auf **1.7.2**: Präsentation Countdown Position (unten-rechts/mitte) · Farbe hell/dunkel; Favoriten Doppelklick-Label · Esc abbricht · leerer Label → Dateiname; Text→PDF öffnen ohne Sidecar · Status mit Pfad; Update Status „offline / nicht geprüft“ · letzter Check-Zeitstempel. Stubs KI/Cloud/Stylus/3D unverändert.
+Polish auf **1.7.3**: Countdown Live-Vorschau Mini-Widget · Defaults-Reset; Favoriten Esc → Fokus Liste · Enter bestätigt Edit; Text→PDF Status-Klick öffnet Ordner · A11y-Announcement; Update-Zeitstempel TT.MM.JJJJ HH:MM · Tooltip Quelle (VERSION.txt/docs). Stubs KI/Cloud/Stylus/3D unverändert.
 
 Siehe [CHANGELOG.md](CHANGELOG.md), [FEATURES.md](FEATURES.md) und [INFO.md](INFO.md).
