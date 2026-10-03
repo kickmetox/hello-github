@@ -1,11 +1,11 @@
-"""Dialog: Wasserzeichen (Text/Bild, Settings, Seitenbereich, Vorschau, Bake) — 1.6.4."""
+"""Dialog: Wasserzeichen (Text/Bild, Settings, Seitenbereich, Vorschau, Bake) — 1.6.5."""
 
 from __future__ import annotations
 
 import html as _html
 from pathlib import Path
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QImage, QKeySequence, QPixmap
 from PySide6.QtWidgets import (
     QApplication,
@@ -234,12 +234,13 @@ class WatermarkDialog(QDialog):
             )
         )
 
-        # Ausgabe-Pfad Template: Quick-Insert {stem}/{date}; ungültige rot — 1.6.4
+        # Ausgabe-Pfad Template: Quick-Insert + Reset-Template·Fokus/Selektion — 1.6.5
         self.wm_out_tpl = WmOutTemplateEdit(get_watermark_output_template())
         self.wm_out_tpl.setPlaceholderText(DEFAULT_WATERMARK_OUTPUT_TEMPLATE)
         self.wm_out_tpl.setToolTip(
             "Ausgabe-Pfad-Template: {stem}, {name}, {suffix}, {date}. "
-            "Quick-Insert an Cursor; lokales Undo (Ctrl+Z) — 1.6.4"
+            "Quick-Insert an Cursor; lokales Undo (Ctrl+Z); "
+            "Reset-Template auf Default — 1.6.5"
         )
         tpl_row = QHBoxLayout()
         tpl_row.addWidget(self.wm_out_tpl, 1)
@@ -250,19 +251,32 @@ class WatermarkDialog(QDialog):
             btn.setFocusPolicy(Qt.TabFocus)
             btn.setToolTip(
                 f"Platzhalter {token} an Cursor-Position einfügen "
-                "(lokales Undo: Ctrl+Z) — 1.6.4"
+                "(lokales Undo: Ctrl+Z) — 1.6.5"
             )
             btn.clicked.connect(
                 lambda _checked=False, t=token: self._insert_wm_out_placeholder(t)
             )
             tpl_row.addWidget(btn)
+        self.btn_reset_wm_tpl = QPushButton("Reset-Template")
+        self.btn_reset_wm_tpl.setAutoDefault(False)
+        self.btn_reset_wm_tpl.setDefault(False)
+        self.btn_reset_wm_tpl.setFocusPolicy(Qt.TabFocus)
+        self.btn_reset_wm_tpl.setToolTip(
+            f"Template auf Default zurücksetzen "
+            f"({DEFAULT_WATERMARK_OUTPUT_TEMPLATE}); "
+            "Bestätigung nur wenn Feld vom Default abweicht; "
+            "danach Live-Vorschau + Fokus mit Selektion des Default-Texts "
+            "(wie Ann.-Template) — 1.6.5"
+        )
+        self.btn_reset_wm_tpl.clicked.connect(self._reset_wm_out_template)
+        tpl_row.addWidget(self.btn_reset_wm_tpl)
         form.addRow("Ausgabe-Template", tpl_row)
         self.wm_out_preview = QLabel("")
         self.wm_out_preview.setWordWrap(True)
         self.wm_out_preview.setTextFormat(Qt.RichText)
         self.wm_out_preview.setStyleSheet("color:#555;")
         self.wm_out_preview.setToolTip(
-            "Live-Vorschau Dateiname; ungültige Platzhalter rot — 1.6.4"
+            "Live-Vorschau Dateiname; ungültige Platzhalter rot — 1.6.5"
         )
         form.addRow("Vorschau Dateiname", self.wm_out_preview)
         self.wm_out_tpl.textChanged.connect(self._update_wm_out_preview)
@@ -282,7 +296,8 @@ class WatermarkDialog(QDialog):
         run = QPushButton("Wasserzeichen in PDF bakken")
         run.setToolTip(
             "Bake mit Fortschritt/Abbruch; Teilergebnis bei Abbruch; "
-            "Template Quick-Insert {stem}/{date}; ungültige Platzhalter rot — 1.6.4"
+            "Template Quick-Insert {stem}/{date}; Reset-Template·Fokus/Selektion; "
+            "ungültige Platzhalter rot — 1.6.5"
         )
         run.clicked.connect(self._run_wm)
         form.addRow(run)
@@ -332,7 +347,7 @@ class WatermarkDialog(QDialog):
         return str(data or "diagonal")
 
     def _insert_wm_out_placeholder(self, token: str) -> None:
-        """Quick-Insert {stem}/{date} an Cursor — 1.6.4."""
+        """Quick-Insert {stem}/{date} an Cursor — 1.6.4/1.6.5."""
         edit = self.wm_out_tpl
         if isinstance(edit, WmOutTemplateEdit):
             edit.restore_insert_position()
@@ -344,8 +359,56 @@ class WatermarkDialog(QDialog):
             edit._saved_sel_len = 0
         self._update_wm_out_preview()
 
+    def _focus_wm_out_tpl_select_all(self) -> None:
+        """Fokus + Selektion ganzer Default-Text (wie Ann.-Template) — 1.6.5."""
+        if not hasattr(self, "wm_out_tpl"):
+            return
+        edit = self.wm_out_tpl
+        edit.setFocus()
+        edit.selectAll()
+        if isinstance(edit, WmOutTemplateEdit):
+            edit._saved_cursor = 0
+            edit._saved_sel_start = 0
+            edit._saved_sel_len = len(edit.text() or "")
+
+    def _reset_wm_out_template(self) -> None:
+        """
+        Template auf Default; Bestätigung nur bei Abweichung;
+        danach Live-Vorschau + Fokus mit Selektion (wie Ann.-Template) — 1.6.5.
+        """
+        if not hasattr(self, "wm_out_tpl"):
+            return
+        edit = self.wm_out_tpl
+        default = DEFAULT_WATERMARK_OUTPUT_TEMPLATE
+        current = edit.text() or ""
+        if current == default:
+            self._update_wm_out_preview()
+            QTimer.singleShot(0, self._focus_wm_out_tpl_select_all)
+            return
+        reply = QMessageBox.question(
+            self,
+            "Reset-Template",
+            f"Wasserzeichen-Ausgabe-Template auf Default zurücksetzen?\n\n"
+            f"Aktuell: {current}\n"
+            f"Default: {default}",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
+        )
+        if reply != QMessageBox.Yes:
+            QTimer.singleShot(0, self._focus_wm_out_tpl_select_all)
+            return
+        # selectAll + insert → ein Undo-Schritt (Ctrl+Z stellt vorherigen Text wieder her)
+        edit.selectAll()
+        edit.insert(default)
+        if isinstance(edit, WmOutTemplateEdit):
+            edit._saved_cursor = edit.cursorPosition()
+            edit._saved_sel_start = -1
+            edit._saved_sel_len = 0
+        self._update_wm_out_preview()
+        QTimer.singleShot(0, self._focus_wm_out_tpl_select_all)
+
     def _update_wm_out_preview(self, *_args) -> None:
-        """Live-Vorschau; ungültige Platzhalter rot — 1.6.4."""
+        """Live-Vorschau; ungültige Platzhalter rot — 1.6.4/1.6.5."""
         if not hasattr(self, "wm_out_preview"):
             return
         src = (self.wm_src.text().strip() if hasattr(self, "wm_src") else "") or ""

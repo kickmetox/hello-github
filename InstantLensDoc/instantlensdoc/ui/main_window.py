@@ -7247,10 +7247,77 @@ class MainWindow(QMainWindow):
         except Exception as e:
             QMessageBox.warning(self, "Workspace-Layout", str(e))
 
+    def _show_layouts_import_log(self, result, *, mode: str, strat: str = "") -> None:
+        """
+        Import-Log-Dialog: Zusammenfassung importiert/übersprungen/umbenannt;
+        Log kopieren / als TXT — 1.6.5.
+        """
+        from pathlib import Path as _Path
+
+        from PySide6.QtGui import QGuiApplication
+
+        from instantlensdoc.core.app_settings import (
+            dialog_start_dir,
+            export_layouts_import_log_txt,
+            get_last_export_dir,
+            set_last_export_dir,
+        )
+
+        summary = result.summary_text()
+        log_body = result.log_text(include_summary=True).rstrip()
+        while True:
+            box = QMessageBox(self)
+            box.setIcon(QMessageBox.Information)
+            box.setWindowTitle("Workspace-Layout — Import-Log")
+            box.setText(
+                f"{len(result)} Layout(s) geladen "
+                f"(ildlayouts-v1, {mode}{strat}).\n\n"
+                f"Zusammenfassung: {summary}"
+            )
+            box.setInformativeText(log_body)
+            btn_copy = box.addButton("Log kopieren", QMessageBox.ActionRole)
+            btn_txt = box.addButton("Als TXT…", QMessageBox.ActionRole)
+            btn_ok = box.addButton(QMessageBox.Ok)
+            box.setDefaultButton(btn_ok)
+            box.exec()
+            clicked = box.clickedButton()
+            if clicked is btn_copy:
+                QGuiApplication.clipboard().setText(log_body + "\n")
+                self._set_status("Import-Log kopiert")
+                continue
+            if clicked is btn_txt:
+                start = dialog_start_dir(get_last_export_dir())
+                path, _ = QFileDialog.getSaveFileName(
+                    self,
+                    "Import-Log als TXT speichern",
+                    str(_Path(start) / "ildlayouts-import-log.txt"),
+                    "Textdatei (*.txt);;Alle Dateien (*)",
+                )
+                if not path:
+                    continue
+                if not str(path).lower().endswith(".txt"):
+                    path = str(path) + ".txt"
+                try:
+                    out = export_layouts_import_log_txt(path, result, utf8_bom=True)
+                    set_last_export_dir(_Path(out).parent)
+                    self._set_status(f"Import-Log gespeichert: {_Path(out).name}")
+                    QMessageBox.information(
+                        self, "Workspace-Layout", f"Import-Log gespeichert:\n{out}"
+                    )
+                except Exception as exc:
+                    QMessageBox.warning(
+                        self,
+                        "Workspace-Layout",
+                        f"TXT-Export fehlgeschlagen:\n{exc}",
+                    )
+                continue
+            break
+
     def _import_workspace_layouts(self):
         """
         Layouts aus ildlayouts-v1 JSON: Merge vs. Ersetzen;
-        bei Merge Kollision überspringen/umbenennen (_2) + Import-Log — 1.6.4.
+        bei Merge Kollision überspringen/umbenennen (_2);
+        Import-Log mit Zusammenfassung + kopieren/als TXT — 1.6.5.
         """
         from pathlib import Path as _Path
 
@@ -7307,15 +7374,12 @@ class MainWindow(QMainWindow):
             strat = ""
             if merge:
                 strat = " · überspringen" if on_collision == "skip" else " · umbenennen"
-            status = f"Layouts importiert ({mode}{strat}): {len(result)}"
-            self._set_status(status)
-            log_txt = "\n".join(result.log) if result.log else "(keine Einträge)"
-            QMessageBox.information(
-                self,
-                "Workspace-Layout",
-                f"{len(result)} Layout(s) geladen (ildlayouts-v1, {mode}{strat}).\n\n"
-                f"Import-Log:\n{log_txt}",
+            status = (
+                f"Layouts importiert ({mode}{strat}): {len(result)} · "
+                f"{result.summary_text()}"
             )
+            self._set_status(status)
+            self._show_layouts_import_log(result, mode=mode, strat=strat)
         except LayoutsImportError as e:
             QMessageBox.warning(self, "Workspace-Layout", str(e))
         except Exception as e:

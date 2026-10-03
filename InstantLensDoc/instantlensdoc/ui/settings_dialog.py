@@ -1159,14 +1159,14 @@ class SettingsDialog(QDialog):
         open_row.addWidget(btn_o)
         form.addRow(tr("open_dir"), open_row)
 
-        # Crypto Prefill — Warnhinweis + „jetzt ausschalten“ — 1.6.4
+        # Crypto Prefill — Warnhinweis + „jetzt ausschalten“ + Toast — 1.6.5
         self.crypto_prefill = QCheckBox(
             "Passwort beim Neu-Laden vorausfüllen (unsicher)"
         )
         self.crypto_prefill.setChecked(bool(get_crypto_reload_prefill_password()))
         self.crypto_prefill.setToolTip(
             "Speichert das Passwort nur kurz im Speicher für den Reload-Dialog. "
-            "Unsicher — Standard aus. Passwort erscheint nie in Logs. — 1.6.4"
+            "Unsicher — Standard aus. Passwort erscheint nie in Logs. — 1.6.5"
         )
         form.addRow(self.crypto_prefill)
         self.crypto_prefill_warn = QLabel(
@@ -1179,7 +1179,7 @@ class SettingsDialog(QDialog):
         self.crypto_prefill_disable.setAutoDefault(False)
         self.crypto_prefill_disable.setDefault(False)
         self.crypto_prefill_disable.setToolTip(
-            "Prefill sofort ausschalten und speichern — 1.6.4"
+            "Prefill sofort ausschalten, speichern und per Toast bestätigen — 1.6.5"
         )
         self.crypto_prefill_disable.clicked.connect(self._disable_crypto_prefill_now)
         warn_row = QHBoxLayout()
@@ -1189,9 +1189,17 @@ class SettingsDialog(QDialog):
         warn_host = QWidget()
         warn_host.setLayout(warn_row)
         self.crypto_prefill_warn_host = warn_host
-        warn_host.setVisible(self.crypto_prefill.isChecked())
-        self.crypto_prefill.toggled.connect(warn_host.setVisible)
         form.addRow(warn_host)
+        self.crypto_prefill_toast = QLabel("")
+        self.crypto_prefill_toast.setWordWrap(True)
+        self.crypto_prefill_toast.setStyleSheet("color:#2e7d32; font-weight:600;")
+        self.crypto_prefill_toast.setToolTip(
+            "Bestätigungs-Toast nach „jetzt ausschalten“ — 1.6.5"
+        )
+        self.crypto_prefill_toast.setAccessibleName("")
+        form.addRow(self.crypto_prefill_toast)
+        self.crypto_prefill.toggled.connect(self._sync_crypto_prefill_warn)
+        self._sync_crypto_prefill_warn(self.crypto_prefill.isChecked())
 
         layout.addLayout(form)
 
@@ -1322,12 +1330,71 @@ class SettingsDialog(QDialog):
             )
         self.ann_export_preview.setText("<br>".join(parts))
 
+    def _sync_crypto_prefill_warn(self, on: bool) -> None:
+        """Warnzeile Prefill ein-/ausblenden (explizit, robust mit Form-Layout) — 1.6.5."""
+        host = getattr(self, "crypto_prefill_warn_host", None)
+        if host is None:
+            return
+        visible = bool(on)
+        host.setVisible(visible)
+        # QFormLayout-Zeile mitziehen (parent.layout() ist oft der äußere VBox)
+        try:
+            for form in self.findChildren(QFormLayout):
+                for r in range(form.rowCount()):
+                    item = form.itemAt(r, QFormLayout.FieldRole) or form.itemAt(
+                        r, QFormLayout.SpanningRole
+                    )
+                    if item is not None and item.widget() is host:
+                        form.setRowVisible(r, visible)
+                        return
+        except Exception:
+            pass
+
+    def _show_crypto_prefill_toast(self, msg: str) -> None:
+        """Toast-Bestätigung für Prefill-Ausschalten (Label + Statusleiste) — 1.6.5."""
+        ms = 2500
+        self._crypto_prefill_toast_token = (
+            int(getattr(self, "_crypto_prefill_toast_token", 0)) + 1
+        )
+        token = self._crypto_prefill_toast_token
+        if hasattr(self, "crypto_prefill_toast"):
+            self.crypto_prefill_toast.setText(msg)
+            self.crypto_prefill_toast.setAccessibleName(msg)
+            self.crypto_prefill_toast.setAccessibleDescription(msg)
+            try:
+                from PySide6.QtGui import QAccessible, QAccessibleAnnouncementEvent
+
+                ev = QAccessibleAnnouncementEvent(self.crypto_prefill_toast, msg)
+                QAccessible.updateAccessibility(ev)
+            except Exception:
+                pass
+
+            def _clear() -> None:
+                if token != getattr(self, "_crypto_prefill_toast_token", 0):
+                    return
+                if (self.crypto_prefill_toast.text() or "") == msg:
+                    self.crypto_prefill_toast.setText("")
+                    self.crypto_prefill_toast.setAccessibleName("")
+
+            QTimer.singleShot(ms, _clear)
+        parent = self.parent()
+        if parent is not None and hasattr(parent, "statusBar"):
+            try:
+                parent.statusBar().showMessage(msg, ms)
+            except Exception:
+                pass
+        elif parent is not None and hasattr(parent, "_set_status"):
+            try:
+                parent._set_status(msg)
+            except Exception:
+                pass
+
     def _disable_crypto_prefill_now(self) -> None:
-        """Prefill sofort ausschalten und speichern — 1.6.4."""
+        """Prefill sofort ausschalten, speichern + Toast-Bestätigung — 1.6.5."""
         self.crypto_prefill.setChecked(False)
         set_crypto_reload_prefill_password(False)
-        if hasattr(self, "crypto_prefill_warn_host"):
-            self.crypto_prefill_warn_host.setVisible(False)
+        self._sync_crypto_prefill_warn(False)
+        self._show_crypto_prefill_toast("Crypto-Prefill ausgeschaltet und gespeichert")
 
     def _clear_recent_files(self) -> None:
         from instantlensdoc.core import recent as recent_mod

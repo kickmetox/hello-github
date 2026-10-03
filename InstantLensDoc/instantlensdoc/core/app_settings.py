@@ -1596,7 +1596,7 @@ class LayoutsImportError(ValueError):
 
 
 class LayoutsImportResult:
-    """Import-Ergebnis inkl. Log — 1.6.4."""
+    """Import-Ergebnis inkl. Log + Zusammenfassung — 1.6.4/1.6.5."""
 
     def __init__(self, layouts: list[dict], log: list[str] | None = None):
         self.layouts = list(layouts or [])
@@ -1610,6 +1610,64 @@ class LayoutsImportResult:
 
     def __bool__(self) -> bool:
         return bool(self.layouts)
+
+    def summary_counts(self) -> dict[str, int]:
+        """Zähler importiert / übersprungen / umbenannt — 1.6.5."""
+        imported = skipped = renamed = 0
+        for line in self.log:
+            s = str(line or "")
+            if s.startswith("übersprungen:"):
+                skipped += 1
+            elif s.startswith("umbenannt:"):
+                renamed += 1
+            elif s.startswith("importiert:") or s.startswith("ersetzt/importiert:"):
+                imported += 1
+        return {
+            "imported": imported,
+            "skipped": skipped,
+            "renamed": renamed,
+        }
+
+    def summary_text(self) -> str:
+        """Eine Zeile Zusammenfassung DE — 1.6.5."""
+        c = self.summary_counts()
+        return (
+            f"importiert: {c['imported']}, "
+            f"übersprungen: {c['skipped']}, "
+            f"umbenannt: {c['renamed']}"
+        )
+
+    def log_text(self, *, include_summary: bool = True) -> str:
+        """Vollständiges Import-Log als Text (optional mit Zusammenfassung) — 1.6.5."""
+        lines: list[str] = []
+        if include_summary:
+            lines.append(f"Zusammenfassung: {self.summary_text()}")
+            lines.append("")
+        if self.log:
+            lines.extend(str(x) for x in self.log)
+        else:
+            lines.append("(keine Einträge)")
+        return "\n".join(lines) + "\n"
+
+
+def export_layouts_import_log_txt(
+    path: str | Path,
+    result: LayoutsImportResult,
+    *,
+    utf8_bom: bool = True,
+) -> Path:
+    """Import-Log als TXT speichern (Zusammenfassung + Zeilen) — 1.6.5."""
+    path = Path(path)
+    body = (
+        "# InstantLens Doc Workspace-Layouts Import-Log\n"
+        "# schema: ildlayouts-import-log-v1\n"
+        f"# {result.summary_text()}\n"
+        "\n"
+        f"{result.log_text(include_summary=True)}"
+    )
+    data = body.encode("utf-8-sig" if utf8_bom else "utf-8")
+    path.write_bytes(data)
+    return path
 
 
 def _unique_layout_name(base: str, used: set[str]) -> str:

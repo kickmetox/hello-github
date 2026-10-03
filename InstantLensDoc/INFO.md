@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **1.6.4** |
+| Version | **1.6.5** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -63,10 +63,10 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an / `checkedonce`)
 
-## Neu in 1.6.4
+## Neu in 1.6.5
 
-- Wasserzeichen: Template **Quick-Insert `{stem}`/`{date}`**; **ungültige Platzhalter rot**
-- Crypto Prefill: Warnung mit Button **„jetzt ausschalten“**
-- Dokument-Statistik JSON: Dateiname-Template **`{stem}_stats.json` Live-Vorschau**
-- Workspace-Layouts Merge: Kollision **überspringen** / **umbenennen `_2`**; **Import-Log**
+- Wasserzeichen: Template **Reset-Template** + **Fokus/Selektion** (wie Ann.-Template)
+- Crypto Prefill: **„jetzt ausschalten“** sofort speichern + **Toast-Bestätigung**
+- Dokument-Statistik JSON: Template **Quick-Insert `{stem}`/`{date}`**; **ungültige Platzhalter rot**
+- Workspace-Layouts: Import-Log **Zusammenfassung** + **kopieren** / **als TXT**
 - Stubs KI/Cloud/Stylus/3D unverändert

@@ -1,4 +1,4 @@
-"""Panel/Dialog: Dokument-Statistik (Seiten, Wörter, Ann., Dateigröße) — 1.6.4."""
+"""Panel/Dialog: Dokument-Statistik (Seiten, Wörter, Ann., Dateigröße) — 1.6.5."""
 
 from __future__ import annotations
 
@@ -41,7 +41,7 @@ from instantlensdoc.core.app_settings import (
 
 
 class StatsFilenameTemplateEdit(QLineEdit):
-    """Stats-Dateiname-Template: Cursor merken + lokales Undo — 1.6.4."""
+    """Stats-Dateiname-Template: Cursor merken + lokales Undo — 1.6.5."""
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -100,7 +100,8 @@ class DocStatsDialog(QDialog):
         layout = QVBoxLayout(self)
         self.hint = QLabel(
             "Seiten · Wörter (Text-PDF) · Annotationen · Dateigröße — "
-            "Copy/JSON ildstats-v1 · Dateiname-Template Live-Vorschau — 1.6.4"
+            "Copy/JSON ildstats-v1 · Template Quick-Insert {stem}/{date} · "
+            "ungültige Platzhalter rot — 1.6.5"
         )
         self.hint.setWordWrap(True)
         self.hint.setStyleSheet("color:#555;")
@@ -126,12 +127,13 @@ class DocStatsDialog(QDialog):
         form.addRow("Annotationen", self.lbl_ann)
         form.addRow("Dateigröße", self.lbl_size)
 
-        # Dateiname-Template {stem}_stats.json Live-Vorschau — 1.6.4
+        # Dateiname-Template Quick-Insert {stem}/{date}; ungültige rot — 1.6.5
         self.stats_tpl = StatsFilenameTemplateEdit(get_stats_filename_template())
         self.stats_tpl.setPlaceholderText(DEFAULT_STATS_FILENAME_TEMPLATE)
         self.stats_tpl.setToolTip(
             "Dateiname-Template für Stats-JSON. "
-            "Platzhalter: {stem}, {date}. Quick-Insert — 1.6.4"
+            "Platzhalter: {stem}, {date}. Quick-Insert an Cursor; "
+            "lokales Undo (Ctrl+Z); ungültige Platzhalter rot — 1.6.5"
         )
         self.stats_tpl.textChanged.connect(self._update_stats_tpl_preview)
         tpl_row = QHBoxLayout()
@@ -142,7 +144,8 @@ class DocStatsDialog(QDialog):
             btn.setDefault(False)
             btn.setFocusPolicy(Qt.TabFocus)
             btn.setToolTip(
-                f"Platzhalter {token} an Cursor einfügen — 1.6.4"
+                f"Platzhalter {token} an Cursor-Position einfügen "
+                "(lokales Undo: Ctrl+Z) — 1.6.5"
             )
             btn.clicked.connect(
                 lambda _checked=False, t=token: self._insert_stats_placeholder(t)
@@ -153,7 +156,7 @@ class DocStatsDialog(QDialog):
         self.stats_tpl_preview.setWordWrap(True)
         self.stats_tpl_preview.setTextFormat(Qt.RichText)
         self.stats_tpl_preview.setToolTip(
-            "Live-Vorschau Dateiname; ungültige Platzhalter rot — 1.6.4"
+            "Live-Vorschau Dateiname; ungültige Platzhalter rot — 1.6.5"
         )
         form.addRow("Vorschau Dateiname", self.stats_tpl_preview)
         layout.addLayout(form)
@@ -169,7 +172,8 @@ class DocStatsDialog(QDialog):
         btn_row.addWidget(self.btn_copy)
         self.btn_export = QPushButton("JSON exportieren…")
         self.btn_export.setToolTip(
-            "Export als ildstats-v1 JSON; Dateiname aus Template — 1.6.4"
+            "Export als ildstats-v1 JSON; Dateiname aus Template "
+            "Quick-Insert {stem}/{date} — 1.6.5"
         )
         self.btn_export.clicked.connect(self.export_json)
         btn_row.addWidget(self.btn_export)
@@ -183,7 +187,7 @@ class DocStatsDialog(QDialog):
             self.refresh()
 
     def _insert_stats_placeholder(self, token: str) -> None:
-        """Quick-Insert {stem}/{date} — 1.6.4."""
+        """Quick-Insert {stem}/{date} an Cursor — 1.6.5."""
         edit = self.stats_tpl
         if isinstance(edit, StatsFilenameTemplateEdit):
             edit.restore_insert_position()
@@ -196,7 +200,7 @@ class DocStatsDialog(QDialog):
         self._update_stats_tpl_preview()
 
     def _update_stats_tpl_preview(self, *_args) -> None:
-        """Live-Vorschau Stats-JSON-Dateiname — 1.6.4."""
+        """Live-Vorschau; ungültige Platzhalter rot — 1.6.5."""
         if not hasattr(self, "stats_tpl_preview"):
             return
         tpl = self.stats_tpl.text().strip() or DEFAULT_STATS_FILENAME_TEMPLATE
@@ -270,7 +274,7 @@ class DocStatsDialog(QDialog):
         return True
 
     def export_json(self) -> Path | None:
-        """Statistik als ildstats-v1 JSON speichern; Template + Zielordner — 1.6.4."""
+        """Statistik als ildstats-v1 JSON speichern; Template + Zielordner — 1.6.5."""
         stats = self._last_stats or self.refresh()
         if stats is None:
             QMessageBox.information(self, "Dokument-Statistik", "Keine Statistik verfügbar.")

@@ -1,5 +1,23 @@
 # Changelog — InstantLens Doc
 
+## 1.6.5 — WM Reset-Template·Fokus/Selektion, Crypto Prefill Toast, Stats Quick-Insert·ungültige rot, Layouts Import-Log kopieren/TXT·Zusammenfassung
+
+Post-Release-Polish nach 1.6.4: **Wasserzeichen-Template** mit **Reset-Template**-Button und **Fokus/Selektion** wie Ann.-Template; **Crypto „jetzt ausschalten“** speichert sofort und zeigt **Toast-Bestätigung**; **Dokument-Statistik** Template **Quick-Insert `{stem}`/`{date}`** und **ungültige Platzhalter rot**; **Layouts Import-Log** mit **Zusammenfassung** (importiert/übersprungen/umbenannt) sowie **kopieren** / **als TXT**. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### PDF
+- Wasserzeichen: Template Reset-Template + Fokus/Selektion (wie Ann.-Template); Quick-Insert `{stem}`/`{date}` bleibt
+- Verschlüsseln/Entschlüsseln: Prefill „jetzt ausschalten“ → sofort speichern + Toast-Bestätigung
+- Dokument-Statistik: JSON-Dateiname Quick-Insert `{stem}`/`{date}`; ungültige Platzhalter rot
+
+### UI / Workspace
+- Workspace-Layouts: Import-Log Zusammenfassung importiert/übersprungen/umbenannt; Log kopieren / als TXT
+
+### Packaging / Docs
+- Version **1.6.5** (App / `ild_pdf` / ISS / Smoke / Docs)
+- Smoke: WM Reset-Template·Fokus, Crypto disable-toast, Stats Quick-Insert·invalid-red, Layouts Import-Log copy/TXT·summary (CLI + Qt)
+
+---
+
 ## 1.6.4 — WM Template Quick-Insert·ungültige rot, Crypto Prefill „jetzt ausschalten“, Stats Dateiname-Template Live-Vorschau, Layouts Merge Kollision skip/rename·Import-Log
 
 Post-Release-Polish nach 1.6.3: **Wasserzeichen-Template** mit **Quick-Insert `{stem}`/`{date}`** und **ungültigen Platzhaltern rot**; **Crypto-Prefill-Warnung** mit Link/Button **„jetzt ausschalten“**; **Dokument-Statistik JSON** **Dateiname-Template** `{stem}_stats.json` **Live-Vorschau**; **Layouts-Merge** **Kollisionsstrategie** pro Name (**überspringen** / **umbenennen `_2`**) inkl. **Import-Log**. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
