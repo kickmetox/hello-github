@@ -311,11 +311,13 @@ About: Datenschutz-Hinweis (lokal, keine Telemetrie).</p>
 <p><b>Groß-/Kleinschreibung:</b> Bearbeiten → Ctrl+Shift+U (Auswahl).</p>
 <p><b>Einrückung:</b> Bearbeiten → Ctrl+] / Ctrl+[ bzw. Tab / Shift+Tab (Block, aktuelle Zeile oder Auswahl).</p>
 <p><b>Präsentation:</b> Ansicht → Präsentationsmodus (F5): Vollbild-PDF; Pfeiltasten; Esc beendet;
-Space = Timer Pause; Countdown Live-Vorschau Mini-Widget · Defaults-Reset; Position/Farbe; Intervalle 3/5/10/30 s; Nr. Toggle (N) — 1.7.4.</p>
-<p><b>Lesezeichen-Leiste:</b> globale Favoriten (<code>ildfav-v1</code>); Doppelklick Label; Esc → Fokus Liste; Enter bestätigt Edit; leerer Label → Dateiname;
-In neuem Tab öffnen; Duplikat-Pfade verhindert; Drag-Reorder; Export/Import; Ctrl+Alt+Shift+B — 1.7.4.</p>
-<p><b>Text → PDF:</b> Datei → Exportieren → Text → PDF… (Ctrl+Shift+P); Status-Klick öffnet Ordner; A11y-Announcement; ohne Sidecar — 1.7.4.</p>
-<p><b>Update-Hinweis:</b> Hilfe → Jetzt prüfen…; Zeitstempel TT.MM.JJJJ HH:MM; Tooltip Quelle <code>docs/VERSION</code>/<code>VERSION.txt</code>; offline / nicht geprüft — 1.7.4.</p>
+Space = Timer Pause; Countdown Defaults Bestätigung nur bei Abweichung · Live-Vorschau sofort; Position/Farbe; Intervalle 3/5/10/30 s; Nr. Toggle (N) — 1.7.5.</p>
+<p><b>Lesezeichen-Leiste:</b> globale Favoriten (<code>ildfav-v1</code>); Doppelklick Label; Esc → Fokus Liste; Enter bestätigt Edit;
+leerer Edit → Dateiname ohne extra Schritt; In neuem Tab öffnen; Duplikat-Pfade verhindert; Drag-Reorder; Export/Import; Ctrl+Alt+Shift+B — 1.7.5.</p>
+<p><b>Text → PDF:</b> Datei → Exportieren → Text → PDF… (Ctrl+Shift+P); Status-Klick öffnet Ordner;
+fehlender Ordner → Dialog Neu anlegen; A11y; ohne Sidecar — 1.7.5.</p>
+<p><b>Update-Hinweis:</b> Hilfe → Jetzt prüfen…; Zeitstempel TT.MM.JJJJ HH:MM; Tooltip Quelle;
+Status-Klick öffnet <code>docs/VERSION</code>/<code>VERSION.txt</code> im Editor — 1.7.5.</p>
 <p><b>Farben-Favoriten:</b> Toolbar 1/2/3 — Klick = Highlight, Shift+Klick = Stift, Ctrl+Klick = Notiz, Rechtsklick = speichern.</p>
 <p><b>Farbe Palette-Zyklus / Random:</b> Ctrl+Shift+C = nächste Palette-Farbe; Ctrl+Alt+Shift+C = zufällig.</p>
 <p><b>Zeilennummern:</b> Ansicht → Zeilennummern (optional, auch in Einstellungen).</p>
@@ -333,6 +335,7 @@ In neuem Tab öffnen; Duplikat-Pfade verhindert; Drag-Reorder; Export/Import; Ct
 <p><b>PDF verschlüsseln/entschlüsseln:</b> Prefill-Warnung + Button „jetzt ausschalten“ (sofort speichern + Toast) · Passwort nie in Logs · falsches PW klar DE — 1.6.5 (Basis 1.6.4/1.6.3/1.6.2/1.6.1/1.6.0).</p>
 <p><b>Dokument-Statistik:</b> JSON-Dateiname Quick-Insert <code>{stem}</code>/<code>{date}</code> · ungültige Platzhalter rot · Live-Vorschau · Copy · Zielordner · UTF-8 — 1.6.5 (Basis 1.6.4/1.6.3/1.6.2/1.6.1/1.6.0).</p>
 <p><b>Workspace-Layouts:</b> Import-Log Zusammenfassung importiert/übersprungen/umbenannt · kopieren/als TXT · Merge skip/rename · Schema DE — 1.6.5 (Basis 1.6.4/1.6.3/1.6.2/1.6.1/1.6.0).</p>
+<p><b>1.7.5:</b> Countdown Defaults Bestätigung·Live-Vorschau · Favoriten Enter leer→Dateiname · Text→PDF Ordner Neu anlegen · Update Status-Klick VERSION.</p>
 <p><b>1.7.4:</b> Countdown Live-Vorschau·Defaults · Favoriten Esc-Fokus·Enter · Text→PDF Status-Klick·A11y · Update Zeitstempel TT.MM.JJJJ HH:MM·Quellen-Tooltip.</p>
 <p><b>1.7.3:</b> Präsentation Countdown Pos·Farbe · Favoriten Doppelklick·Esc·leer · Text→PDF öffnen ohne Sidecar·Pfad · Update Offline·Zeitstempel.</p>
 <p><b>1.7.2:</b> Präsentation Pause·Countdown·Intervalle · Favoriten Label·Tab·Dup-Pfad · Text→PDF Ordner·öffnen · Update Status·Offline.</p>

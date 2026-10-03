@@ -29,7 +29,7 @@ from PySide6.QtWidgets import (
 
 
 class CountdownPreviewMini(QFrame):
-    """Live-Vorschau Mini-Widget Countdown Position·Farbe — 1.7.4."""
+    """Live-Vorschau Mini-Widget Countdown Position·Farbe — sofort — 1.7.5."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -1270,7 +1270,7 @@ class SettingsDialog(QDialog):
         idx_cd_pos = self.presentation_countdown_pos.findData(cur_cd_pos)
         self.presentation_countdown_pos.setCurrentIndex(max(0, idx_cd_pos))
         self.presentation_countdown_pos.setToolTip(
-            "Countdown-Overlay Position: unten-rechts oder mitte; Live-Vorschau — 1.7.4"
+            "Countdown-Overlay Position: unten-rechts oder mitte; Live-Vorschau sofort — 1.7.5"
         )
         form.addRow("Präsentation: Countdown-Position", self.presentation_countdown_pos)
 
@@ -1281,14 +1281,14 @@ class SettingsDialog(QDialog):
         idx_cd_col = self.presentation_countdown_color.findData(cur_cd_col)
         self.presentation_countdown_color.setCurrentIndex(max(0, idx_cd_col))
         self.presentation_countdown_color.setToolTip(
-            "Countdown-Overlay Farbe: hell oder dunkel; Live-Vorschau — 1.7.4"
+            "Countdown-Overlay Farbe: hell oder dunkel; Live-Vorschau sofort — 1.7.5"
         )
         form.addRow("Präsentation: Countdown-Farbe", self.presentation_countdown_color)
 
         # Live-Vorschau Mini-Widget + Defaults Reset — 1.7.4
         self.countdown_preview = CountdownPreviewMini(self)
         self.countdown_preview.setToolTip(
-            "Live-Vorschau Countdown-Overlay (Position · Farbe) — 1.7.4"
+            "Live-Vorschau Countdown-Overlay (Position · Farbe) — sofort — 1.7.5"
         )
         self.btn_countdown_defaults = QPushButton("Defaults")
         self.btn_countdown_defaults.setAutoDefault(False)
@@ -1296,7 +1296,8 @@ class SettingsDialog(QDialog):
         self.btn_countdown_defaults.setToolTip(
             f"Countdown auf Defaults zurücksetzen "
             f"(Position {PRESENTATION_COUNTDOWN_POSITION_DEFAULT}, "
-            f"Farbe {PRESENTATION_COUNTDOWN_COLOR_DEFAULT}) — 1.7.4"
+            f"Farbe {PRESENTATION_COUNTDOWN_COLOR_DEFAULT}); "
+            f"Bestätigung nur bei Abweichung — 1.7.5"
         )
         self.btn_countdown_defaults.clicked.connect(self._reset_countdown_defaults)
         cd_prev_row = QHBoxLayout()
@@ -1473,7 +1474,7 @@ class SettingsDialog(QDialog):
             edit._saved_sel_len = len(edit.text() or "")
 
     def _update_countdown_preview(self, *_args) -> None:
-        """Live-Vorschau Mini-Widget aus Combos — 1.7.4."""
+        """Live-Vorschau Mini-Widget aus Combos — sofort — 1.7.5."""
         prev = getattr(self, "countdown_preview", None)
         if prev is None:
             return
@@ -1481,9 +1482,8 @@ class SettingsDialog(QDialog):
         color = str(self.presentation_countdown_color.currentData() or "dark")
         prev.set_preview(pos, color)
 
-    def _reset_countdown_defaults(self) -> None:
-        """Countdown Position+Farbe auf Defaults; UI + Persistenz + Vorschau — 1.7.4."""
-        pos, color = reset_presentation_countdown_defaults()
+    def _apply_countdown_defaults_ui(self, pos: str, color: str) -> None:
+        """Combos + Live-Vorschau sofort setzen (ohne Persistenz) — 1.7.5."""
         idx_p = self.presentation_countdown_pos.findData(pos)
         idx_c = self.presentation_countdown_color.findData(color)
         self.presentation_countdown_pos.blockSignals(True)
@@ -1493,6 +1493,35 @@ class SettingsDialog(QDialog):
         self.presentation_countdown_pos.blockSignals(False)
         self.presentation_countdown_color.blockSignals(False)
         self._update_countdown_preview()
+
+    def _reset_countdown_defaults(self) -> None:
+        """
+        Countdown Defaults-Reset: Bestätigung nur bei Abweichung;
+        Live-Vorschau sofort — 1.7.5.
+        """
+        default_pos = PRESENTATION_COUNTDOWN_POSITION_DEFAULT
+        default_color = PRESENTATION_COUNTDOWN_COLOR_DEFAULT
+        cur_pos = str(self.presentation_countdown_pos.currentData() or "")
+        cur_color = str(self.presentation_countdown_color.currentData() or "")
+        if cur_pos == default_pos and cur_color == default_color:
+            # Bereits Default in UI — keine Bestätigung; Persistenz sync + Live-Vorschau sofort
+            reset_presentation_countdown_defaults()
+            self._update_countdown_preview()
+            return
+        reply = QMessageBox.question(
+            self,
+            "Countdown Defaults",
+            "Countdown auf Defaults zurücksetzen?\n\n"
+            f"Aktuell: Position {cur_pos}, Farbe {cur_color}\n"
+            f"Default: Position {default_pos}, Farbe {default_color}",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
+        )
+        if reply != QMessageBox.Yes:
+            self._update_countdown_preview()
+            return
+        pos, color = reset_presentation_countdown_defaults()
+        self._apply_countdown_defaults_ui(pos, color)
 
     def _reset_ann_export_template(self) -> None:
         """Template auf Default; Live-Vorschau + Fokus mit Selektion — 1.2.9."""

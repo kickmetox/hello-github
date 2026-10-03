@@ -87,11 +87,11 @@ def format_checked_at(iso_ts: str | None, *, lang: str = "de") -> str:
 
 
 def format_reference_source_tooltip(source: str | None, *, lang: str = "de") -> str:
-    """Tooltip-Text mit Versionsquelle (docs/VERSION / VERSION.txt) — 1.7.4."""
+    """Tooltip-Text mit Versionsquelle (docs/VERSION / VERSION.txt) — 1.7.4/1.7.5."""
     src = str(source or "").strip() or "—"
     if str(lang).startswith("en"):
-        return f"Source: {src} (docs/VERSION or VERSION.txt)"
-    return f"Quelle: {src} (docs/VERSION oder VERSION.txt)"
+        return f"Source: {src} (docs/VERSION or VERSION.txt; click opens in editor)"
+    return f"Quelle: {src} (docs/VERSION oder VERSION.txt; Klick öffnet im Editor)"
 
 
 def _parse_version_from_init(text: str) -> Optional[str]:

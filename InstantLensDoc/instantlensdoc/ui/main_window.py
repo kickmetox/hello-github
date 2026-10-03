@@ -134,7 +134,7 @@ class GlobalFavoritesList(QListWidget):
             "Globale Favoriten (ildfav-v1) — Klick springt; Doppelklick: Label; "
             "Rechtsklick: Label / neuer Tab; ziehen zum Umsortieren; "
             "Esc → Fokus zurück auf Liste; Enter bestätigt Edit; "
-            "leerer Label → Dateiname — 1.7.4"
+            "leerer Edit → Dateiname ohne extra Schritt — 1.7.5"
         )
         self._reorder_enabled = True
 
@@ -240,6 +240,7 @@ class MainWindow(QMainWindow):
         self._last_text_pdf_status_path = None  # Text→PDF Status-Klick → Ordner — 1.7.4
         self._text_pdf_toast_active = False
         self._update_status_source_tip = ""  # Tooltip Quelle VERSION.txt/docs — 1.7.4
+        self._update_status_reference_path = None  # Klick öffnet lokale VERSION — 1.7.5
 
         self.setAcceptDrops(True)
         self.setWindowTitle(self._app_title())
@@ -2571,14 +2572,16 @@ class MainWindow(QMainWindow):
         # Text→PDF-Toast nur behalten wenn Status dazu passt — 1.7.4
         if "Text → PDF" not in text:
             self._text_pdf_toast_active = False
-        # Update-Quellen-Tooltip nur bei Update-Status — 1.7.4
+        # Update-Quellen-Tooltip nur bei Update-Status — 1.7.4/1.7.5
         if not text.startswith("Update:") and "Update —" not in text:
             if "Update:" not in text:
                 self._update_status_source_tip = ""
+                self._update_status_reference_path = None
         self.statusBar().showMessage(text, 5000)
         # Outlines-Export: Klick-Hinweis wenn Zielordner gemerkt — 1.3.4
         # Metadaten-Toast: Klick öffnet Dialog erneut — 1.5.4
         # Text→PDF: Klick öffnet Ordner — 1.7.4
+        # Update: Klick öffnet VERSION.txt / docs/VERSION — 1.7.5
         if getattr(self, "_meta_toast_active", False) and "Metadaten gespeichert" in text:
             self.statusBar().setToolTip(
                 "Klick öffnet Metadaten-Dialog erneut — 1.5.5"
@@ -2586,7 +2589,8 @@ class MainWindow(QMainWindow):
             self.statusBar().setCursor(Qt.PointingHandCursor)
         elif getattr(self, "_text_pdf_toast_active", False) and "Text → PDF" in text:
             self.statusBar().setToolTip(
-                "Klick öffnet Zielordner (Text → PDF) — 1.7.4"
+                "Klick öffnet Zielordner (Text → PDF); "
+                "fehlender Ordner → Neu anlegen — 1.7.5"
             )
             self.statusBar().setCursor(Qt.PointingHandCursor)
         elif getattr(self, "_last_outline_export_dir", None) and "PDF-Outline" in text:
@@ -2595,14 +2599,69 @@ class MainWindow(QMainWindow):
             )
             self.statusBar().setCursor(Qt.PointingHandCursor)
         elif getattr(self, "_update_status_source_tip", ""):
-            self.statusBar().setToolTip(self._update_status_source_tip)
-            self.statusBar().unsetCursor()
+            tip = self._update_status_source_tip
+            ref = getattr(self, "_update_status_reference_path", None)
+            if ref is not None and Path(ref).is_file():
+                tip = f"{tip} — Klick öffnet {Path(ref).name} im Editor — 1.7.5"
+                self.statusBar().setCursor(Qt.PointingHandCursor)
+            else:
+                self.statusBar().unsetCursor()
+            self.statusBar().setToolTip(tip)
         else:
             self.statusBar().setToolTip("")
             self.statusBar().unsetCursor()
 
+    def _open_text_pdf_status_folder(self, folder: Path) -> bool:
+        """Text→PDF Ordner öffnen; fehlt → Dialog mit Neu anlegen — 1.7.5."""
+        from PySide6.QtGui import QDesktopServices
+        from PySide6.QtCore import QUrl
+
+        if folder.is_dir():
+            QDesktopServices.openUrl(QUrl.fromLocalFile(str(folder)))
+            self._announce_status_toast(f"Ordner geöffnet: {folder}")
+            return True
+        reply = QMessageBox.question(
+            self,
+            "Ordner fehlt",
+            f"Zielordner existiert nicht:\n{folder}\n\nNeu anlegen und öffnen?",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.Yes,
+        )
+        if reply != QMessageBox.Yes:
+            self._announce_status_toast(f"Ordner fehlt: {folder}")
+            return False
+        try:
+            folder.mkdir(parents=True, exist_ok=True)
+        except OSError as e:
+            QMessageBox.warning(
+                self,
+                "Ordner anlegen",
+                f"Ordner konnte nicht angelegt werden:\n{folder}\n\n{e}",
+            )
+            return False
+        QDesktopServices.openUrl(QUrl.fromLocalFile(str(folder)))
+        self._announce_status_toast(f"Ordner angelegt und geöffnet: {folder}")
+        return True
+
+    def _open_update_reference_in_editor(self) -> bool:
+        """Lokale VERSION.txt / docs/VERSION im Editor öffnen — 1.7.5."""
+        ref = getattr(self, "_update_status_reference_path", None)
+        if ref is None:
+            from instantlensdoc.core.update_check import find_embedded_version_file
+
+            ref, _label = find_embedded_version_file()
+        if ref is None or not Path(ref).is_file():
+            self._announce_status_toast(
+                "Keine lokale VERSION.txt / docs/VERSION gefunden"
+            )
+            return False
+        path = Path(ref)
+        self.open_path(str(path))
+        self._announce_status_toast(f"Version geöffnet: {path.name}")
+        return True
+
     def _on_status_bar_clicked(self, event) -> None:
-        """Statusleisten-Klick: Meta / Text→PDF-Ordner / Outlines — 1.7.4."""
+        """Statusleisten-Klick: Meta / Text→PDF-Ordner / Update-VERSION / Outlines — 1.7.5."""
         from PySide6.QtGui import QDesktopServices
         from PySide6.QtCore import QUrl
 
@@ -2623,7 +2682,7 @@ class MainWindow(QMainWindow):
             self.statusBar().setToolTip("")
             self._edit_pdf_metadata()
             return
-        # Text → PDF: Klick öffnet Ordner — 1.7.4
+        # Text → PDF: Klick öffnet Ordner; fehlt → Neu anlegen — 1.7.5
         if (
             event.button() == Qt.LeftButton
             and getattr(self, "_text_pdf_toast_active", False)
@@ -2632,10 +2691,23 @@ class MainWindow(QMainWindow):
             pdf_path = getattr(self, "_last_text_pdf_status_path", None)
             if pdf_path is not None:
                 folder = Path(pdf_path).parent
-                if folder.is_dir():
-                    QDesktopServices.openUrl(QUrl.fromLocalFile(str(folder)))
-                    self._announce_status_toast(f"Ordner geöffnet: {folder}")
-                    return
+                self._open_text_pdf_status_folder(folder)
+                return
+        # Update-Status: Klick öffnet VERSION.txt / docs/VERSION — 1.7.5
+        if (
+            event.button() == Qt.LeftButton
+            and (
+                cur.startswith("Update:")
+                or "Update —" in cur
+                or getattr(self, "_update_status_source_tip", "")
+            )
+            and (
+                getattr(self, "_update_status_reference_path", None) is not None
+                or getattr(self, "_update_status_source_tip", "")
+            )
+        ):
+            if self._open_update_reference_in_editor():
+                return
         folder = getattr(self, "_last_outline_export_dir", None)
         if (
             event.button() == Qt.LeftButton
@@ -8600,10 +8672,15 @@ class MainWindow(QMainWindow):
         status_lbl = result.status_label(lang)
         msg = result.message(lang)
         checked = format_checked_at(getattr(result, "checked_at", ""), lang=lang)
-        # Tooltip mit Quelle (VERSION.txt / docs/VERSION) — 1.7.4
+        # Tooltip mit Quelle; Pfad für Status-Klick → Editor — 1.7.4/1.7.5
+        from instantlensdoc.core.update_check import find_embedded_version_file
+
+        ref_path, ref_label = find_embedded_version_file()
+        src = getattr(result, "reference_source", "") or (ref_label or "")
         self._update_status_source_tip = format_reference_source_tooltip(
-            getattr(result, "reference_source", ""), lang=lang
+            src, lang=lang
         )
+        self._update_status_reference_path = ref_path
         self._set_status(f"Update: {status_lbl} — letzter Check: {checked}")
 
         # Dismiss bis nächste Version — 1.7.1
@@ -8823,7 +8900,7 @@ class MainWindow(QMainWindow):
                 break
 
     def _edit_global_favorite_label(self, path: str, page: int) -> None:
-        """Favoriten-Label: Enter bestätigt; Esc → Fokus Liste; leer → Dateiname — 1.7.4."""
+        """Favoriten-Label: Enter bestätigt; leer → Dateiname ohne extra Schritt — 1.7.5."""
         from PySide6.QtWidgets import QDialog, QDialogButtonBox, QFormLayout, QLineEdit
 
         from instantlensdoc.core.global_favorites import (
@@ -8839,7 +8916,8 @@ class MainWindow(QMainWindow):
             except OSError:
                 same = str(Path(fav.path)) == str(Path(path))
             if same:
-                current = (fav.label or "").strip() or fallback
+                # Echtes Label (kann leer sein) — Dateiname erst bei Enter — 1.7.5
+                current = (fav.label or "").strip()
                 break
 
         dlg = QDialog(self)
@@ -8847,31 +8925,36 @@ class MainWindow(QMainWindow):
         form = QFormLayout(dlg)
         edit = QLineEdit(current)
         edit.setClearButtonEnabled(True)
+        edit.setPlaceholderText(fallback)
         edit.setToolTip(
             "Enter bestätigt Edit; Esc bricht ab (Fokus zurück auf Liste); "
-            "leer = Dateiname — 1.7.4"
+            "leerer Edit → Dateiname ohne extra Schritt — 1.7.5"
         )
-        form.addRow("Anzeigename (Enter = OK, Esc = Abbrechen; leer = Dateiname):", edit)
+        form.addRow(
+            "Anzeigename (Enter = OK / leer = Dateiname; Esc = Abbrechen):", edit
+        )
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         buttons.accepted.connect(dlg.accept)
         buttons.rejected.connect(dlg.reject)
         form.addRow(buttons)
-        # Enter im Feld bestätigt (Default-Button); Esc rejectet — 1.7.4
+        # Enter im Feld bestätigt (Default-Button); Esc rejectet — 1.7.4/1.7.5
         buttons.button(QDialogButtonBox.Ok).setDefault(True)
         buttons.button(QDialogButtonBox.Ok).setAutoDefault(True)
         edit.setFocus(Qt.OtherFocusReason)
-        edit.selectAll()
+        if current:
+            edit.selectAll()
         ok = dlg.exec() == QDialog.Accepted
         if not ok:
             self._set_status("Favoriten-Label: abgebrochen (Esc)")
             QTimer.singleShot(0, lambda: self._focus_favorites_list_item(path, page))
             return
-        text = edit.text()
-        # Leerer Label → Dateiname (persistiert als leer; Anzeige via display_label)
+        text = (edit.text() or "").strip()
+        # Leerer Edit → Dateiname direkt setzen (kein Extra-Schritt) — 1.7.5
+        if not text:
+            text = fallback
         set_global_favorite_label(path, text, page=page)
         self._refresh_favorites_bar()
-        shown = (text or "").strip() or fallback
-        self._set_status(f"Favoriten-Label: {shown[:40]}")
+        self._set_status(f"Favoriten-Label: {text[:40]}")
         QTimer.singleShot(0, lambda: self._focus_favorites_list_item(path, page))
 
     def _export_global_favorites_json(self) -> None:

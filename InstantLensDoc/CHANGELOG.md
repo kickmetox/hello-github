@@ -1,5 +1,23 @@
 # Changelog — InstantLens Doc
 
+## 1.7.5 — Countdown Defaults Bestätigung·Live-Vorschau, Favoriten Enter leer→Dateiname, Text→PDF Ordner Neu anlegen, Update Status-Klick VERSION
+
+Post-Release-Polish nach 1.7.4: **Countdown Defaults-Reset** mit **Bestätigung nur bei Abweichung** und **Live-Vorschau sofort**; **Favoriten Enter** bei **leerem Edit** setzt **Dateiname ohne extra Schritt**; **Text → PDF Ordner-Klick** bei fehlendem Ordner → **Dialog mit Neu anlegen**; **Update-Status-Klick** öffnet **VERSION.txt / docs/VERSION** im Editor falls lokal vorhanden. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### PDF / Präsentation
+- Präsentation: Countdown Defaults-Reset Bestätigung nur bei Abweichung; Live-Vorschau sofort
+- Globale Favoriten: Enter bei leerem Edit setzt Dateiname ohne extra Schritt
+
+### Editor / Export
+- Text → PDF Status: fehlender Ordner → Dialog mit Option „Neu anlegen“
+
+### Update / Packaging
+- Update-Hinweis: Status-Klick öffnet lokale `VERSION.txt` / `docs/VERSION` im Editor
+- Version **1.7.5** (App / `ild_pdf` / ISS / Smoke / Docs); `docs/VERSION` + `VERSION.txt`
+- Smoke: Countdown Defaults-Confirm·Preview, Favoriten Enter-leer→Dateiname, text_pdf Ordner-mkdir, update Status-Klick VERSION (CLI + Qt)
+
+---
+
 ## 1.7.4 — Countdown Live-Vorschau·Defaults, Favoriten Esc-Fokus·Enter, Text→PDF Status-Klick·A11y, Update Zeitstempel TT.MM.JJJJ HH:MM·Quellen-Tooltip
 
 Post-Release-Polish nach 1.7.3: **Countdown-Settings** mit **Live-Vorschau Mini-Widget** und **Defaults-Reset**; **Favoriten-Label** Esc stellt **Fokus zurück auf Liste**, **Enter bestätigt Edit**; **Text → PDF Status** **Klick öffnet Ordner** inkl. **A11y-Announcement**; **Update-Zeitstempel** Format **TT.MM.JJJJ HH:MM** mit **Tooltip Quelle** (`docs/VERSION` / `VERSION.txt`). Stubs KI/Cloud/Stylus/3D bleiben Stubs.
