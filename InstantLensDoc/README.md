@@ -2,7 +2,7 @@
 
 Moderne Textverarbeitung mit PDF-Annotator, OCR-Bridge und Formulargenerator.
 
-**Version:** 1.4.5  
+**Version:** 1.5.0  
 **Hersteller:** Andreas Meyer · ame@sellerbach.de
 
 ## Quickstart (Windows)
@@ -33,8 +33,8 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an).
 
-## Neu in 1.4.5
+## Neu in 1.5.0
 
-Diff-PNG Reset bestätigt nur bei Abweichung und setzt Fokus+Selektion wie Ann.-Template; Batch-Undo meldet „rückgängig X, übersprungen Y“ kopierbar; Ann.-CSV Neu-Scan mit Fortschrittsdialog und Abbruch; Theme-Zyklus mit kurzem Status-Toast „Theme: …“ und Shortcut in Hilfe/About. Stubs KI/Cloud/Stylus/3D unverändert.
+PDF-Metadaten-Editor (Titel/Autor/Betreff/Keywords); Seiten als PNG/JPEG exportieren (aktuell/Bereich/alle, DPI); Signatur-Bildstempel mit optionalem Flatten; CLI `python -m instantlensdoc --open FILE` und `--version`. Stubs KI/Cloud/Stylus/3D unverändert.
 
 Siehe [CHANGELOG.md](CHANGELOG.md), [FEATURES.md](FEATURES.md) und [INFO.md](INFO.md).

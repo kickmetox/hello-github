@@ -40,10 +40,15 @@ _STRINGS: dict[str, dict[UiLang, str]] = {
     "apply_crop": {"de": "Zuschneiden (CropBox)", "en": "Crop (CropBox)"},
     "field_title": {"de": "Titel", "en": "Title"},
     "field_author": {"de": "Autor", "en": "Author"},
-    "field_subject": {"de": "Thema", "en": "Subject"},
-    "field_keywords": {"de": "Stichwörter", "en": "Keywords"},
+    "field_subject": {"de": "Betreff", "en": "Subject"},
+    "field_keywords": {"de": "Keywords", "en": "Keywords"},
     "field_creator": {"de": "Ersteller", "en": "Creator"},
     "field_producer": {"de": "Produzent", "en": "Producer"},
+    "meta_save": {"de": "Speichern", "en": "Save"},
+    "meta_hint": {
+        "de": "Titel, Autor, Betreff und Keywords (DocInfo + XMP) — Speichern schreibt in die PDF-Datei.",
+        "en": "Title, author, subject and keywords (DocInfo + XMP) — Save writes into the PDF.",
+    },
     # Lizenz-Banner — 1.0.9
     "expiry_warn_banner": {
         "de": "Hinweis: Lizenz/Trial läuft in {rest} ab{until} — Enter/Klick: Info/Aktivierung · Esc / Dismiss / × bis morgen",

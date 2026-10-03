@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **1.4.5** |
+| Version | **1.5.0** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -63,10 +63,10 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an / `checkedonce`)
 
-## Neu in 1.4.5
+## Neu in 1.5.0
 
-- Diff-PNG Reset: **Bestätigung nur bei Abweichung**; **Fokus+Selektion** wie Ann.-Template
-- Batch-Umbenennen Undo: detailliert **„rückgängig X, übersprungen Y“**; **kopierbarer Text**
-- Annotation-Suche CSV Neu-Scan: **Fortschrittsdialog** bei vielen Docs; **Abbruch** möglich
-- Theme: Status-Toast kurz **„Theme: …“**; Shortcut in **Hilfe/About**
+- PDF-Metadaten: **Titel/Autor/Betreff/Keywords** lesen+schreiben (pikepdf); Dialog + Speichern
+- Seiten als Bild: **aktuell / Bereich / alle** → PNG/JPEG; **DPI** 72/150/300
+- Signatur-Platzhalter: **Bildstempel** aus Datei (Sidecar + optional **Flatten**)
+- CLI: `python -m instantlensdoc --open FILE` · `--version`
 - Stubs KI/Cloud/Stylus/3D unverändert

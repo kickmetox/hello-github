@@ -1,4 +1,4 @@
-"""Hell/Dunkel/System-Theme für die Qt-Oberfläche — 1.4.5 Zyklus-Toast."""
+"""Hell/Dunkel/System-Theme für die Qt-Oberfläche — 1.5.0 (Zyklus-Toast 1.4.5)."""
 
 from __future__ import annotations
 

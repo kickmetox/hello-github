@@ -328,8 +328,16 @@ def insert_signature_image(
     y: float = 520.0,
     width: float = 180.0,
     height: float = 64.0,
-) -> Path:
-    """Einfache Signatur: Bild als Annotation (Sidecar, img:…)."""
+    flatten: bool = False,
+    flatten_path: str | Path | None = None,
+    flatten_scale: float = 2.0,
+    password: str | None = None,
+) -> Path | tuple[Path, Path]:
+    """
+    Signatur-Platzhalter: Bildstempel als Sidecar-Annotation (img:…).
+    Optional Flatten/Bake der betroffenen Seite in ein neues PDF — 1.5.0.
+    Rückgabe: Bildpfad, oder (Bildpfad, Flatten-PDF) wenn flatten=True.
+    """
     from .annotate import Annotation, AnnotationStore, AnnotationType
 
     pdf_path = Path(pdf_path)
@@ -356,7 +364,24 @@ def insert_signature_image(
         )
     )
     store.save(force=True)
-    return img_path
+    if not flatten:
+        return img_path
+    from .flatten import flatten_annotations_to_pdf
+
+    out = (
+        Path(flatten_path)
+        if flatten_path
+        else pdf_path.with_name(f"{pdf_path.stem}_sig_p{page_index + 1}_flattened.pdf")
+    )
+    flat = flatten_annotations_to_pdf(
+        pdf_path,
+        store,
+        scale=max(0.5, float(flatten_scale)),
+        out_path=out,
+        password=password,
+        page_indices=[int(page_index)],
+    )
+    return img_path, Path(flat)
 
 
 def insert_image_stamp_overlay(

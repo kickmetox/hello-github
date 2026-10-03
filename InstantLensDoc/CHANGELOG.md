@@ -1,5 +1,23 @@
 # Changelog — InstantLens Doc
 
+## 1.5.0 — PDF-Metadaten-Editor, Seiten→Bilder Bereich·DPI, Signatur-Bildstempel·Flatten, CLI --open/--version
+
+Minor-Release mit neuen Kernfeatures: **PDF-Metadaten-Editor** (Titel/Autor/Betreff/Keywords lesen+schreiben via pikepdf, Dialog + Speichern); **Seiten als Bild exportieren** (aktuelle Seite / Seitenbereich `1-3,5` / alle → PNG/JPEG, DPI 72/150/300); **Signatur-Platzhalter** als Bildstempel aus Datei (Sidecar + optional Flatten-PDF); **Kommandozeile** `python -m instantlensdoc --open FILE` und `--version`. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### PDF
+- Metadaten-Dialog: Titel/Autor/Betreff/Keywords (+ Ersteller/Produzent) DocInfo+XMP; Speichern schreibt in die PDF
+- Seiten → Bilder: Scope aktuell / Seitenbereich / alle; Format PNG/JPEG; DPI-Settings
+- Signatur (Bild): Sidecar-Platzhalter; optional Flatten der Seite in neues PDF
+
+### CLI / Start
+- `python -m instantlensdoc --version` (−V); `--open FILE`; positional Datei bleibt kompatibel
+
+### Packaging / Docs
+- Version **1.5.0** (App / `ild_pdf` / ISS / Smoke / Docs)
+- Smoke: Metadaten Editor, Seiten→Bilder Bereich·DPI, Signatur Flatten, CLI --open/--version (CLI + Qt)
+
+---
+
 ## 1.4.5 — Diff-PNG Reset Confirm·Fokus, Rename-Undo Skip-Detail, Ann.-CSV Rescan-Progress, Theme-Toast
 
 Post-Release-Polish nach 1.4.4: **Diff-PNG Reset** bestätigt **nur bei Abweichung** und setzt **Fokus+Selektion** wie Ann.-Template; **Batch-Undo** meldet detailliert **„rückgängig X, übersprungen Y“** mit **kopierbarem Text**; **Annotation-Suche CSV Neu-Scan** zeigt bei vielen Docs einen **Fortschrittsdialog** mit **Abbruch**; **Theme-Zyklus** zeigt kurzen Status-Toast **„Theme: …“** und Shortcut in **Hilfe/About**. Stubs KI/Cloud/Stylus/3D bleiben Stubs.

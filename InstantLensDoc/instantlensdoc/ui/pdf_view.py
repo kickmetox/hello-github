@@ -6950,12 +6950,47 @@ class PdfViewer(QWidget):
             self,
             "Seiten als Bilder",
             "Welche Seiten?",
-            ["Aktuelle Seite", "Alle Seiten"],
-            1,
+            ["Aktuelle Seite", "Seitenbereich…", "Alle Seiten"],
+            0,
             False,
         )
         if not ok:
             return
+        pages: list[int] | None
+        if scope.startswith("Aktuelle"):
+            pages = [self.page_index]
+        elif scope.startswith("Seitenbereich"):
+            from ild_pdf import PdfDocument, flatten_page_indices, parse_page_ranges
+
+            try:
+                with PdfDocument(self.pdf_path, password=self.password) as doc:
+                    n_pages = len(doc)
+            except Exception:
+                n_pages = 1
+            default_spec = (
+                f"{self.page_index + 1}"
+                if n_pages <= 1
+                else f"1-{min(n_pages, max(1, self.page_index + 1))}"
+            )
+            spec, ok = QInputDialog.getText(
+                self,
+                "Seitenbereich",
+                f"Seitenbereich (1…{n_pages}), z. B. 1-3,5,8-10:",
+                text=default_spec,
+            )
+            if not ok:
+                return
+            try:
+                ranges = parse_page_ranges(spec, n_pages, one_based=True)
+                pages = flatten_page_indices(ranges)
+            except ValueError as e:
+                QMessageBox.warning(self, "Seitenbereich", str(e))
+                return
+            if not pages:
+                QMessageBox.information(self, "Seitenbereich", "Keine Seiten ausgewählt.")
+                return
+        else:
+            pages = None
         fmt_items = ["PNG", "JPEG"]
         fmt_idx = 1 if profile and str(profile.get("format")) == "JPEG" else 0
         fmt, ok = QInputDialog.getItem(
@@ -6990,7 +7025,6 @@ class PdfViewer(QWidget):
         out_dir = QFileDialog.getExistingDirectory(self, "Zielordner für Bilder", start_dir)
         if not out_dir:
             return
-        pages = [self.page_index] if scope.startswith("Aktuelle") else None
         try:
             written = extract_pages_as_images(
                 self.pdf_path,
@@ -7018,13 +7052,14 @@ class PdfViewer(QWidget):
         self.status.emit("Signaturfeld: auf die Seite klicken")
 
     def insert_signature_image(self):
-        """Bild-Signatur auf aktuelle Seite setzen (Datei wählen, dann Klickposition)."""
+        """Bildstempel-Signatur (Sidecar); optional Flatten-PDF — 1.5.0."""
         if not self.store or not self.pdf_path:
             QMessageBox.information(self, "Signatur", "Kein PDF geladen.")
             return
-        from PySide6.QtWidgets import QFileDialog
+        from PySide6.QtWidgets import QCheckBox, QDialog, QDialogButtonBox, QFileDialog, QLabel, QVBoxLayout
         from ild_pdf import insert_signature_image
         from instantlensdoc.core.app_settings import dialog_start_dir, remember_recent_dir
+        from instantlensdoc.ui.file_dialogs import confirm_overwrite_export
 
         path, _ = QFileDialog.getOpenFileName(
             self,
@@ -7035,6 +7070,43 @@ class PdfViewer(QWidget):
         if not path:
             return
         remember_recent_dir(path)
+        # Option: Sidecar + Flatten — 1.5.0
+        opt = QDialog(self)
+        opt.setWindowTitle("Signatur platzieren")
+        ol = QVBoxLayout(opt)
+        ol.addWidget(QLabel("Bildstempel als Sidecar-Annotation auf die aktuelle Seite setzen."))
+        chk_flat = QCheckBox("Zusätzlich Flatten-PDF erzeugen (Signatur einbrennen)")
+        chk_flat.setChecked(False)
+        chk_flat.setToolTip(
+            "Schreibt die aktuelle Seite inkl. Signatur in ein neues PDF; Sidecar bleibt."
+        )
+        ol.addWidget(chk_flat)
+        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        btns.accepted.connect(opt.accept)
+        btns.rejected.connect(opt.reject)
+        ol.addWidget(btns)
+        if opt.exec() != QDialog.Accepted:
+            return
+        do_flatten = chk_flat.isChecked()
+        flatten_out = None
+        if do_flatten:
+            default_flat = str(
+                self.pdf_path.with_name(
+                    f"{self.pdf_path.stem}_sig_p{self.page_index + 1}_flattened.pdf"
+                )
+            )
+            flatten_out, _ = QFileDialog.getSaveFileName(
+                self,
+                "Flatten-PDF speichern",
+                default_flat,
+                "PDF (*.pdf)",
+            )
+            if not flatten_out:
+                return
+            if not flatten_out.lower().endswith(".pdf"):
+                flatten_out = flatten_out + ".pdf"
+            if not confirm_overwrite_export(flatten_out, self):
+                return
         # Mitte-unten der Seite als Default
         try:
             from ild_pdf import PdfDocument
@@ -7046,17 +7118,25 @@ class PdfViewer(QWidget):
         except Exception:
             x, y = 80.0, 520.0
         try:
-            insert_signature_image(
+            result = insert_signature_image(
                 self.pdf_path,
                 path,
                 page_index=self.page_index,
                 x=x,
                 y=y,
+                flatten=do_flatten,
+                flatten_path=flatten_out,
+                password=self.password,
             )
             self.store.load()
             self.refresh()
             self.annotations_changed.emit()
-            self.status.emit("Signatur-Bild platziert")
+            if do_flatten and isinstance(result, tuple):
+                _img, flat = result
+                remember_recent_dir(flat)
+                self.status.emit(f"Signatur platziert + Flatten: {Path(flat).name}")
+            else:
+                self.status.emit("Signatur-Bild platziert (Sidecar)")
         except Exception as e:
             QMessageBox.warning(self, "Signatur", str(e))
 

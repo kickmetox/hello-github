@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import argparse
 import sys
 from pathlib import Path
 
@@ -9,6 +10,42 @@ from pathlib import Path
 _ROOT = Path(__file__).resolve().parents[1]
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
+
+
+def parse_cli(argv: list[str] | None = None) -> argparse.Namespace:
+    """
+    CLI für ``python -m instantlensdoc`` — 1.5.0.
+    ``--version`` / ``--open FILE``; positional Datei bleibt kompatibel.
+    """
+    from instantlensdoc import __version__
+
+    p = argparse.ArgumentParser(
+        prog="instantlensdoc",
+        description="InstantLens Doc — PDF-Annotator, OCR, Formulare",
+    )
+    p.add_argument(
+        "--version",
+        "-V",
+        action="store_true",
+        help="Version ausgeben und beenden",
+    )
+    p.add_argument(
+        "--open",
+        metavar="FILE",
+        dest="open_file",
+        default=None,
+        help="Datei beim Start öffnen",
+    )
+    p.add_argument(
+        "file",
+        nargs="?",
+        default=None,
+        help="Datei öffnen (positional, alternativ zu --open)",
+    )
+    args, unknown = p.parse_known_args(list(argv if argv is not None else sys.argv[1:]))
+    args.unknown = unknown
+    args.version_str = __version__
+    return args
 
 
 def _apply_icon(app) -> None:
@@ -80,7 +117,19 @@ def _make_splash(app):
 
 
 def main(argv: list[str] | None = None) -> int:
-    argv = list(sys.argv if argv is None else argv)
+    raw = list(sys.argv if argv is None else argv)
+    cli = parse_cli(raw[1:])
+    if cli.version:
+        print(f"InstantLens Doc {cli.version_str}")
+        return 0
+
+    # Qt-argv: Programmname + unbekannte Args (keine doppelten --open/--version)
+    qt_argv = [raw[0], *list(getattr(cli, "unknown", []) or [])]
+    open_target: Path | None = None
+    for candidate in (cli.open_file, cli.file):
+        if candidate:
+            open_target = Path(candidate)
+            break
 
     from PySide6.QtCore import QTimer
     from PySide6.QtWidgets import QApplication
@@ -96,7 +145,7 @@ def main(argv: list[str] | None = None) -> int:
 
     log_path = setup_logging()
 
-    app = QApplication(argv)
+    app = QApplication(qt_argv)
     apply_theme(app)
     # OS-Theme-Wechsel live nachziehen wenn „System folgen“ — 1.4.2
     install_system_theme_watch()
@@ -152,11 +201,12 @@ def main(argv: list[str] | None = None) -> int:
         if not smoke:
             win.statusBar().showMessage("Abhängigkeiten OK (pypdfium2 / OCR-Check)", 3500)
 
-    # Optionale Datei als Argument
-    if len(argv) > 1 and not argv[1].startswith("-"):
-        p = Path(argv[1])
-        if p.exists():
-            win.open_path(str(p))
+    # Optionale Datei: --open FILE oder positional
+    if open_target is not None:
+        if open_target.exists():
+            win.open_path(str(open_target))
+        else:
+            win.statusBar().showMessage(f"Datei nicht gefunden: {open_target}", 6000)
 
     return app.exec()
 
