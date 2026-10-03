@@ -123,6 +123,7 @@ Seite <b>⟲/⟳ drehen</b>, <b>↔/↕ spiegeln</b>, <b>leere Seite</b>, <b>dup
 Trefferanzahl + <b>klickbare Trefferliste</b> mit <b>Kontext-Snippet</b> («Match» oder …) in der Sidebar;
 Snippet-Länge (Zeichen um Match) und <b>Snippet-Ellipsis-Style</b> («…» / …) in <b>Einstellungen</b>
 (gilt auch für gekürzten Text in der <b>Ann.-Liste</b>);
+Trefferliste als <b>CSV/JSON</b> exportieren (Sidebar-Buttons / Bearbeiten-Menü);
 <b>letzte Suchbegriffe</b> im Dropdown.</p>
 <p><b>Ctrl+S:</b> speichert das Dokument und <b>flusht</b> ausstehendes Sidecar-Debounce sofort.
 Dirty-Indikator am Tab auch während pending Debounce; Tooltip <b>„Speichern ausstehend…“</b>;
@@ -134,7 +135,8 @@ Konfliktliste optional als <b>TXT</b> exportieren).</p>
 <p><b>Duplikate mergen:</b> Vorschau je Paar mit <b>Diff-Kurztext</b> (Text + Tags + Farbe;
 max. Zeichenlänge in <b>Einstellungen</b>);
 Buttons <b>Alle mergen</b> / <b>Alle behalten</b>.</p>
-<p><b>Ann.-Liste:</b> gekürzter Text mit Ellipsis — Hover zeigt <b>vollen Text</b> als Tooltip.</p>
+<p><b>Ann.-Liste:</b> gekürzter Text mit Ellipsis — Hover zeigt <b>vollen Text</b> als Tooltip;
+<b>Filter-Presets</b> speichern/laden (Typ/Farbe/Tags/Seite/Suche).</p>
 <p><b>Annotationen:</b> eigene Liste in der Sidebar — <b>gruppiert nach Seite</b>; Klick springt zur Annotation;
 Filter-Dropdown nach Typ; <b>Nur aktuelle Seite</b>-Checkbox; <b>Tag-Filter Multi-Select</b> (ODER); <b>Tag-Cloud</b> (häufigste Tags); <b>Farben-Chips in der Statistik klickbar</b>; <b>Textsuche in der Liste</b> (optional <b>Regex</b>);
 Text nachträglich editierbar; Deckkraft pro Annotation; <b>Notizfarbe unabhängig von Highlight</b>;
@@ -194,6 +196,7 @@ About: Datenschutz-Hinweis (lokal, keine Telemetrie).</p>
 <p><b>Startup-Deps:</b> beim Start Prüfung pypdfium2 / Tesseract; Dialog wenn etwas fehlt.</p>
 <p><b>Whitespace trim on paste:</b> optional in Einstellungen — Trailing Spaces beim Einfügen entfernen.</p>
 <p><b>Bracket-Match Highlight:</b> passende Klammern ()[]{} am Cursor (Einstellungen, Standard an).</p>
+<p><b>Bracket-Auto-Close:</b> schließende Klammern/Anführungszeichen beim Tippen (Einstellungen, Standard an).</p>
 <p><b>Kommentieren:</b> Bearbeiten → Ctrl+/ (# oder // je nach Dateityp).</p>
 <p><b>Groß-/Kleinschreibung:</b> Bearbeiten → Ctrl+Shift+U (Auswahl).</p>
 <p><b>Einrückung:</b> Bearbeiten → Ctrl+] / Ctrl+[ bzw. Tab / Shift+Tab (Block, aktuelle Zeile oder Auswahl).</p>

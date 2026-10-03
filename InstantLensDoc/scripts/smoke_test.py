@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Smoke-Test 0.7.8 (CLI + optional offscreen Qt). Kernpfade: open/annotate/export/license + ausgewählte 0.6.x-Pfade."""
+"""Smoke-Test 0.7.9 (CLI + optional offscreen Qt). Kernpfade: open/annotate/export/license + ausgewählte 0.6.x-Pfade."""
 
 from __future__ import annotations
 
@@ -122,8 +122,8 @@ def main() -> int:
     from instantlensdoc.core.update_check import check_for_updates
     from instantlensdoc.license import KEY_DAYS, TRIAL_DAYS, generate_key, verify_key
 
-    assert __version__ == "0.7.8", __version__
-    assert ild_ver == "0.7.8", ild_ver
+    assert __version__ == "0.7.9", __version__
+    assert ild_ver == "0.7.9", ild_ver
     assert TRIAL_DAYS == 28 and KEY_DAYS == 32
     key = generate_key("ame@sellerbach.de")
     ok, msg, _ = verify_key(key)
@@ -141,7 +141,7 @@ def main() -> int:
     assert "Settings" in tr("settings")
     set_lang("de")
     upd = check_for_updates(allow_network=False)
-    assert upd.local_version == "0.7.8" and not upd.online
+    assert upd.local_version == "0.7.9" and not upd.online
     assert get_export_jpeg_quality() >= 10
     assert get_ui_lang() in ("de", "en")
     assert 25 <= get_default_zoom_percent() <= 500
@@ -182,7 +182,8 @@ def main() -> int:
     assert get_ann_pen_color() == "#112233"
     assert (ROOT / "CHANGELOG.md").is_file()
     cl = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-    assert "0.7.8" in cl
+    assert "0.7.9" in cl
+    assert "## 0.7.9" in cl
     assert "## 0.7.8" in cl
     assert "## 0.7.6" in cl
     assert "## 0.7.4" in cl
@@ -238,7 +239,7 @@ def main() -> int:
     assert "0.4.9" in cl  # noch in Kurz-Tabelle
     assert "0.3.9" in cl  # noch in Kurz-Tabelle
     assert "0.2.9" in cl  # noch in Kurz-Tabelle
-    assert "0.7.8" in (ROOT / "README.md").read_text(encoding="utf-8")
+    assert "0.7.9" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "run.bat" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "sync-ild.ps1" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "scripts/sync-ild.ps1" in (ROOT / "FEATURES.md").read_text(encoding="utf-8")
@@ -587,13 +588,13 @@ def main() -> int:
 
         assert (ROOT / "installer" / "installer-hinweis.txt").exists()
         iss = (ROOT / "installer" / "instantlensdoc.iss").read_text(encoding="utf-8")
-        assert "0.7.8" in iss and "desktopicon" in iss and "DisableProgramGroupPage=no" in iss
+        assert "0.7.9" in iss and "desktopicon" in iss and "DisableProgramGroupPage=no" in iss
         assert "UninstallDisplayName" in iss and "Uninstallable=yes" in iss
         assert "IncludeKeygen" in iss and "SetupIconFile" in iss
         assert "InstantLensKeygen.exe" in iss
         assert "uninstallexe" in iss
         bw = (ROOT / "build-windows.ps1").read_text(encoding="utf-8")
-        assert "0.7.8" in bw and "NoKeygenInApp" in bw and "--icon" in bw
+        assert "0.7.9" in bw and "NoKeygenInApp" in bw and "--icon" in bw
         assert "InstantLensKeygen.exe" in bw
         bi = (ROOT / "installer" / "build-installer.ps1").read_text(encoding="utf-8")
         assert "InstantLensKeygen.exe" in bi and "IncludeKeygen" in bi
@@ -602,7 +603,7 @@ def main() -> int:
         assert "Installer" in kg_readme
         hinweis = (ROOT / "installer" / "installer-hinweis.txt").read_text(encoding="utf-8")
         assert "InstantLensKeygen.exe" in hinweis or "run-keygen.bat" in hinweis
-        assert "0.7.8" in hinweis
+        assert "0.7.9" in hinweis
         assert "checkedonce" in iss and "Desktop-Verknüpfung" in hinweis
         from ild_pdf.limits import OPEN_TIMEOUT_HINT, OPEN_TIMEOUT_HINT_SEC
 
@@ -614,7 +615,7 @@ def main() -> int:
         assert "QProgressDialog" in (ROOT / "instantlensdoc" / "ui" / "main_window.py").read_text(encoding="utf-8")
 
         assert (ROOT / "examples" / "ild_pdf_demo.py").exists()
-        assert "0.7.8" in (ROOT / "INFO.md").read_text(encoding="utf-8")
+        assert "0.7.9" in (ROOT / "INFO.md").read_text(encoding="utf-8")
         assert (ROOT / "assets" / "app.ico").is_file()
 
         # --- Kernpfade: open / annotate / export / license ---
@@ -747,7 +748,7 @@ def main() -> int:
         assert "| A" in tbl and "| 1" in tbl
         assert ocr_mod.TESSERACT_WIKI_URL.startswith("https://")
 
-        # --- Ausgewählte 0.3.x-/0.4.x-/0.5.x-/0.6.x-Pfade (CLI, Konsolidierung 0.7.0) + 0.7.8 ---
+        # --- Ausgewählte 0.3.x-/0.4.x-/0.5.x-/0.6.x-Pfade (CLI, Konsolidierung 0.7.0) + 0.7.9 ---
         from ild_pdf.annotate import stamp_library_items
         from ild_pdf.attachments import has_attachments, list_attachments
         from ild_pdf.flatten import flatten_annotations_to_pdf
@@ -805,7 +806,7 @@ def main() -> int:
         set_backup_on_save(False)
         assert get_page_size_unit() in ("mm", "inch")
         assert isinstance(get_minimize_to_tray(), bool)
-        assert "0.7.8" in feat and "0.7.7" in feat and "0.7.6" in feat and "0.7.5" in feat and "0.7.4" in feat and "0.7.3" in feat and "0.7.2" in feat and "0.7.1" in feat and "0.6.9" in feat and "0.5.9" in feat and "0.4.9" in feat  # Release + Zeitraum-Feature-Hinweise
+        assert "0.7.9" in feat and "0.7.8" in feat and "0.7.7" in feat and "0.7.6" in feat and "0.7.5" in feat and "0.7.4" in feat and "0.7.3" in feat and "0.7.2" in feat and "0.7.1" in feat and "0.6.9" in feat and "0.5.9" in feat and "0.4.9" in feat  # Release + Zeitraum-Feature-Hinweise
         assert "Batch-OCR" in feat or "OCR gesamtes PDF" in feat
         assert "Tag" in feat
         assert "Projekt-Ordner" in feat or "Workspace" in feat
@@ -2136,6 +2137,105 @@ def main() -> int:
         assert "TXT" in kb078 and "Tooltip" in kb078
         print("0.7.8 CLI dry-run-txt/ann-tooltip/blink-hint/merge-diff-len: OK")
 
+        # 0.7.9 CLI: Such-Export CSV/JSON, Ann.-Filter-Presets, Bracket-Auto-Close
+        from instantlensdoc.core.app_settings import (
+            delete_ann_filter_preset,
+            get_ann_filter_preset,
+            get_ann_filter_presets,
+            get_editor_bracket_auto_close,
+            save_ann_filter_preset,
+            set_editor_bracket_auto_close,
+        )
+        from instantlensdoc.core.fulltext import (
+            export_search_hits_csv,
+            export_search_hits_json,
+            normalize_search_hit_record,
+        )
+
+        set_editor_bracket_auto_close(False)
+        assert get_editor_bracket_auto_close() is False
+        set_editor_bracket_auto_close(True)
+        assert get_editor_bracket_auto_close() is True
+        # Filter-Presets roundtrip
+        for old in list(get_ann_filter_presets()):
+            delete_ann_filter_preset(old["name"])
+        saved079 = save_ann_filter_preset(
+            "Preset079",
+            type="sticky",
+            color="#FFCC00",
+            tags=["Review", "Smoke"],
+            current_page=True,
+            search="note",
+            regex=True,
+        )
+        assert saved079["name"] == "Preset079"
+        assert saved079["type"] == "sticky"
+        assert "Review" in saved079["tags"]
+        loaded079 = get_ann_filter_preset("preset079")
+        assert loaded079 is not None and loaded079["search"] == "note"
+        assert loaded079["regex"] is True and loaded079["current_page"] is True
+        assert any(p["name"] == "Preset079" for p in get_ann_filter_presets())
+        assert delete_ann_filter_preset("Preset079") is True
+        assert get_ann_filter_preset("Preset079") is None
+        # Such-Export CSV/JSON
+        hits079 = [
+            normalize_search_hit_record(
+                {
+                    "label": "doc.pdf S.1: «hello»",
+                    "path": "/tmp/doc.pdf",
+                    "page": 1,
+                    "kind": "pdf",
+                    "query": "hello",
+                    "snippet": "«hello»",
+                },
+                index=1,
+                query="hello",
+            ),
+            {
+                "label": "S.2 Ann.: note",
+                "path": "",
+                "page": 2,
+                "kind": "annotation:sticky",
+                "query": "hello",
+                "snippet": "note",
+            },
+        ]
+        csv079 = td / "search079.csv"
+        json079 = td / "search079.json"
+        out_csv079 = export_search_hits_csv(csv079, hits079, query="hello")
+        out_json079 = export_search_hits_json(json079, hits079, query="hello")
+        assert out_csv079.is_file()
+        csv_body079 = out_csv079.read_text(encoding="utf-8")
+        assert "index,label,path,page" in csv_body079.splitlines()[0]
+        assert "hello" in csv_body079 and "doc.pdf" in csv_body079
+        raw079 = json.loads(out_json079.read_text(encoding="utf-8"))
+        assert raw079["schema"] == "ildsearch-v1" and raw079["count"] == 2
+        assert raw079["query"] == "hello" and len(raw079["hits"]) == 2
+        ed079 = (ROOT / "instantlensdoc" / "ui" / "editor.py").read_text(encoding="utf-8")
+        assert "set_bracket_auto_close_enabled" in ed079 and "_bracket_auto_close" in ed079
+        sd079 = (ROOT / "instantlensdoc" / "ui" / "settings_dialog.py").read_text(
+            encoding="utf-8"
+        )
+        assert "bracket_auto_close" in sd079 and "set_editor_bracket_auto_close" in sd079
+        sb079 = (ROOT / "instantlensdoc" / "ui" / "sidebar.py").read_text(encoding="utf-8")
+        assert "search_hit_records" in sb079 and "ann_filter_preset" in sb079
+        assert "btn_export_search_csv" in sb079 and "save_ann_filter_preset" in sb079
+        mw079 = (ROOT / "instantlensdoc" / "ui" / "main_window.py").read_text(
+            encoding="utf-8"
+        )
+        assert "_on_search_export" in mw079 and "export_search_hits" in mw079
+        feat079 = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
+        assert "0.7.9" in feat079 and "Filter-Presets" in feat079
+        assert "Bracket-Auto-Close" in feat079 and "ildsearch" in feat079
+        cl079 = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+        assert "## 0.7.9" in cl079 and "Suchergebnis" in cl079
+        kb079 = (ROOT / "instantlensdoc" / "ui" / "keyboard_help.py").read_text(
+            encoding="utf-8"
+        )
+        assert "CSV/JSON" in kb079 and "Bracket-Auto-Close" in kb079
+        assert "Filter-Presets" in kb079
+        print("0.7.9 CLI search-export/ann-presets/bracket-auto-close: OK")
+
         set_show_printer_marks(True)
         assert get_show_printer_marks() is True
         set_show_printer_marks(False)
@@ -2268,7 +2368,7 @@ def main() -> int:
         assert "Continuous Scroll" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
         assert "Seitenlabel" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8") or "Seitenlabels" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
         assert "Zwischenablage-Verlauf" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8") or "Clipboard" in (ROOT / "FEATURES.md").read_text(encoding="utf-8")
-        assert "0.7.8" in feat and "0.7.7" in feat and "0.7.6" in feat and "0.7.5" in feat and "0.7.4" in feat and "0.7.3" in feat and "0.7.2" in feat and "0.7.1" in feat and "0.6.9" in feat and "0.5.9" in feat and "0.4.9" in feat
+        assert "0.7.9" in feat and "0.7.8" in feat and "0.7.7" in feat and "0.7.6" in feat and "0.7.5" in feat and "0.7.4" in feat and "0.7.3" in feat and "0.7.2" in feat and "0.7.1" in feat and "0.6.9" in feat and "0.5.9" in feat and "0.4.9" in feat
         # --- 0.4.2 CLI: Outline Goto, Ann Copy/Paste, Flatten Progress ---
         import pikepdf as _pike_ol
 
@@ -2393,7 +2493,7 @@ def main() -> int:
         win._add_chained_frame()
         assert len(win.layout_doc.text_frames) >= 2
         assert "Lizenz:" in win.license_label.text() or "⚠" in win.license_label.text()
-        assert "v0.7.8" in win.version_label.text()
+        assert "v0.7.9" in win.version_label.text()
         # Lizenz <7 Tage: Style prominent
         st_lic = win.license_manager.status()
         if st_lic.allowed and st_lic.days_remaining < 7:
@@ -2574,11 +2674,11 @@ def main() -> int:
             assert win.editor.outdent_selection(4)
             assert win.editor.toPlainText().splitlines()[0] == "alpha"
             # Fenstertitel mit Version
-            assert "0.7.8" in win.windowTitle()
+            assert "0.7.9" in win.windowTitle()
             from instantlensdoc.ui.help_dialog import AboutDialog, HelpDialog, open_log_folder
 
             about = AboutDialog(win)
-            assert "0.7.8" in about.windowTitle()
+            assert "0.7.9" in about.windowTitle()
             help_dlg = HelpDialog(win)
             assert help_dlg.windowTitle() == "Hilfe"
             assert callable(open_log_folder)
@@ -3238,7 +3338,7 @@ def main() -> int:
             win.apply_tray_setting()
             if win._tray is not None:
                 tip = win._tray.toolTip()
-                assert "0.7.8" in tip and "InstantLens Doc" in tip
+                assert "0.7.9" in tip and "InstantLens Doc" in tip
             set_minimize_to_tray(False)
             win.apply_tray_setting()
             print("0.3.9 fit-h/ann-stats/special/tray: OK")
@@ -3251,9 +3351,9 @@ def main() -> int:
             from instantlensdoc.ui.password_dialog import CompressPdfDialog, SetPasswordDialog
             from instantlensdoc.ui.stubs import PLANNED
             assert KeyboardHelpDialog and SetPasswordDialog and CompressPdfDialog
-            assert "0.7.8" in PLANNED["ki"]
+            assert "0.7.9" in PLANNED["ki"]
             assert "Coming soon" in PLANNED["cloud"]
-            assert "0.7.8" in PLANNED["stylus"] and "0.7.8" in PLANNED["extrude3d"]
+            assert "0.7.9" in PLANNED["stylus"] and "0.7.9" in PLANNED["extrude3d"]
             # Toolbar ↔ Menü Sync Graustufen/Nacht
             win.pdf_view.set_grayscale(True)
             assert win._grayscale_action.isChecked()
@@ -3288,7 +3388,7 @@ def main() -> int:
             assert win.editor.toPlainText().splitlines() == ["one", "two"]
             from instantlensdoc.ui.help_dialog import HELP_HTML
 
-            assert "Stub 0.7.8" in HELP_HTML
+            assert "Stub 0.7.9" in HELP_HTML
             assert "scripts/sync-ild.ps1" in HELP_HTML
             assert "Präsentationsmodus" in HELP_HTML or "F5" in (
                 ROOT / "instantlensdoc" / "ui" / "keyboard_help.py"
@@ -5486,10 +5586,90 @@ def main() -> int:
             assert "## 0.7.8" in cl078q
             print("0.7.8 Qt dry-run-txt/ann-tooltip/blink-hint/merge-diff-len: OK")
 
+            # --- 0.7.9 Qt: Such-Export, Ann.-Filter-Presets, Bracket-Auto-Close ---
+            from instantlensdoc.core.app_settings import (
+                delete_ann_filter_preset as del_preset079,
+                get_ann_filter_presets as get_presets079,
+                get_editor_bracket_auto_close as get_ac079,
+                save_ann_filter_preset as save_preset079,
+                set_editor_bracket_auto_close as set_ac079,
+            )
+            from instantlensdoc.core.fulltext import (
+                export_search_hits_csv as exp_csv079q,
+                export_search_hits_json as exp_json079q,
+            )
+            from instantlensdoc.ui.settings_dialog import SettingsDialog as SD079
+
+            set_ac079(False)
+            sd079q = SD079(parent=win)
+            assert hasattr(sd079q, "bracket_auto_close")
+            assert sd079q.bracket_auto_close.isChecked() is False
+            sd079q.bracket_auto_close.setChecked(True)
+            sd079q._save()
+            assert get_ac079() is True
+            assert win.editor.bracket_auto_close_enabled() is True
+            win.editor.set_bracket_auto_close_enabled(False)
+            assert win.editor.bracket_auto_close_enabled() is False
+            win.editor.set_bracket_auto_close_enabled(True)
+            set_ac079(True)
+            # Trefferliste füllen + export records
+            win.sidebar.set_marks(
+                ["doc.pdf S.1: hello", "S.2 Ann.: note"],
+                [
+                    (str(smoke_pdf), 0, "hello"),
+                    Ann071(0, AT071.STICKY, 1, 1, width=10, height=10, text="note"),
+                ],
+            )
+            recs079 = win.sidebar.search_hit_records()
+            assert len(recs079) == 2
+            assert recs079[0]["kind"] == "pdf" and recs079[0]["page"] == 1
+            assert "annotation" in recs079[1]["kind"]
+            csv_q079 = Path(td2) / "qt-search079.csv"
+            json_q079 = Path(td2) / "qt-search079.json"
+            assert exp_csv079q(csv_q079, recs079, query="hello").is_file()
+            assert exp_json079q(json_q079, recs079, query="hello").is_file()
+            assert "hello" in csv_q079.read_text(encoding="utf-8")
+            assert "ildsearch-v1" in json_q079.read_text(encoding="utf-8")
+            assert hasattr(win.sidebar, "btn_export_search_csv")
+            assert hasattr(win.sidebar, "ann_filter_preset")
+            assert callable(win.sidebar.annotation_filter_state)
+            assert callable(win._on_search_export)
+            # Filter-Presets UI roundtrip
+            for old in list(get_presets079()):
+                del_preset079(old["name"])
+            win.sidebar.set_annotation_filter_current_page(True)
+            win.sidebar.set_annotation_color_filter("#FFCC00")
+            win.sidebar.set_annotation_tag_filter(["Review079"])
+            win.sidebar.ann_search.setText("preset")
+            win.sidebar.set_annotation_search_regex(True)
+            state079 = win.sidebar.annotation_filter_state()
+            assert state079["current_page"] is True
+            assert state079["color"].upper() == "#FFCC00"
+            assert state079["search"] == "preset" and state079["regex"] is True
+            save_preset079("QtPreset079", state=state079)
+            win.sidebar.set_annotation_filter_current_page(False)
+            win.sidebar.clear_annotation_color_filter()
+            win.sidebar.set_annotation_tag_filter("")
+            win.sidebar.ann_search.setText("")
+            win.sidebar.set_annotation_search_regex(False)
+            win.sidebar._refresh_ann_filter_preset_combo(keep="QtPreset079")
+            win.sidebar.ann_filter_preset.setCurrentText("QtPreset079")
+            win.sidebar._load_ann_filter_preset_clicked()
+            st2 = win.sidebar.annotation_filter_state()
+            assert st2["current_page"] is True
+            assert st2["color"].upper() == "#FFCC00"
+            assert st2["search"] == "preset" and st2["regex"] is True
+            del_preset079("QtPreset079")
+            feat079q = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
+            assert "0.7.9" in feat079q and "Bracket-Auto-Close" in feat079q
+            cl079q = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+            assert "## 0.7.9" in cl079q
+            print("0.7.9 Qt search-export/ann-presets/bracket-auto-close: OK")
+
             print("0.4.x selected Qt marks/schema/sort/reset: OK")
             print("0.4.2 Qt outline/copy-paste/case/progress: OK")
             print("0.4.1 Qt links/stamp/encoding/drop: OK")
-            print("0.3.x–0.7.8 review OK")
+            print("0.3.x–0.7.9 review OK")
             assert callable(win.pdf_view.bake_redactions)
             assert callable(win.pdf_view.clear_redactions)
             assert callable(win._set_pdf_password)

@@ -10,6 +10,7 @@ from PySide6.QtGui import QColor, QFont, QImage, QPainter, QTextCharFormat, QTex
 from PySide6.QtWidgets import QApplication, QPlainTextEdit, QTextEdit, QWidget
 
 from instantlensdoc.core.app_settings import (
+    get_editor_bracket_auto_close,
     get_editor_bracket_match,
     get_editor_line_numbers,
     get_editor_minimap,
@@ -83,6 +84,7 @@ class TextEditor(QPlainTextEdit):
         self._soft_wrap = bool(get_editor_soft_wrap())
         self._show_special = bool(get_editor_show_special_chars())
         self._bracket_match = bool(get_editor_bracket_match())
+        self._bracket_auto_close = bool(get_editor_bracket_auto_close())
         self._clipboard_history: list[str] = []
         self._find_selections: list = []
         self._mark_selections: list = []
@@ -313,6 +315,13 @@ class TextEditor(QPlainTextEdit):
 
     def bracket_match_enabled(self) -> bool:
         return bool(self._bracket_match)
+
+    def set_bracket_auto_close_enabled(self, enabled: bool) -> None:
+        """Beim Tippen schließende Klammern/Anführungszeichen einfügen."""
+        self._bracket_auto_close = bool(enabled)
+
+    def bracket_auto_close_enabled(self) -> bool:
+        return bool(self._bracket_auto_close)
 
     def _apply_extra_selections(self) -> None:
         merged = (
@@ -1270,6 +1279,44 @@ class TextEditor(QPlainTextEdit):
         if event.key() == Qt.Key_Backtab:
             self.outdent_selection()
             return
+        # Bracket / Quote Auto-Close (Einstellung)
+        if self._bracket_auto_close and not (
+            event.modifiers()
+            & (Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier)
+        ):
+            ch = event.text()
+            pairs = {"(": ")", "[": "]", "{": "}", '"': '"', "'": "'"}
+            if ch in pairs:
+                close = pairs[ch]
+                cur = self.textCursor()
+                if cur.hasSelection():
+                    selected = cur.selectedText().replace("\u2029", "\n")
+                    cur.insertText(ch + selected + close)
+                    return
+                doc = self.document()
+                pos = cur.position()
+                next_ch = ""
+                if pos < doc.characterCount() - 1:
+                    next_ch = doc.characterAt(pos)
+                # Schließendes Zeichen schon da → nur tippen
+                if next_ch == close and ch in "([{":
+                    super().keyPressEvent(event)
+                    return
+                # Quotes: nur auto-schließen am Wortanfang / Whitespace
+                if ch in ('"', "'"):
+                    prev_ch = doc.characterAt(pos - 1) if pos > 0 else ""
+                    if next_ch == ch:
+                        # über vorhandenes Quote springen
+                        cur.movePosition(QTextCursor.Right)
+                        self.setTextCursor(cur)
+                        return
+                    if prev_ch and not prev_ch.isspace() and prev_ch not in "([{:=":
+                        super().keyPressEvent(event)
+                        return
+                cur.insertText(ch + close)
+                cur.movePosition(QTextCursor.Left)
+                self.setTextCursor(cur)
+                return
         super().keyPressEvent(event)
 
     def word_stats(self) -> tuple[int, int]:

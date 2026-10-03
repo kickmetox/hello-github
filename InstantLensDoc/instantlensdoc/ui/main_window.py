@@ -384,6 +384,7 @@ class MainWindow(QMainWindow):
         self.sidebar.search_requested.connect(self._on_search)
         self.sidebar.search_next_requested.connect(self._on_search_next)
         self.sidebar.search_prev_requested.connect(self._on_search_prev)
+        self.sidebar.search_export_requested.connect(self._on_search_export)
         self.sidebar.file_activated.connect(self.open_path)
         self.sidebar.recent_activated.connect(self.open_path)
         self.sidebar.mark_activated.connect(self._on_mark_activated)
@@ -731,6 +732,16 @@ class MainWindow(QMainWindow):
         act_find_repl.setToolTip("Find/Replace im Texteditor")
         act_find_repl.triggered.connect(self._find_replace)
         m_edit.addAction(act_find_repl)
+        act_search_csv = QAction("Suchergebnisse als CSV exportieren…", self)
+        act_search_csv.setToolTip("Aktuelle Trefferliste (Sidebar) als CSV speichern")
+        act_search_csv.triggered.connect(lambda: self._on_search_export("csv"))
+        m_edit.addAction(act_search_csv)
+        act_search_json = QAction("Suchergebnisse als JSON exportieren…", self)
+        act_search_json.setToolTip(
+            "Aktuelle Trefferliste (Sidebar) als JSON speichern (ildsearch-v1)"
+        )
+        act_search_json.triggered.connect(lambda: self._on_search_export("json"))
+        m_edit.addAction(act_search_json)
         act_goto = QAction("Gehe zu Zeile…", self)
         act_goto.setShortcut(QKeySequence("Ctrl+G"))
         act_goto.setToolTip("Editor: Zeile · PDF: Seite (Ctrl+G)")
@@ -3436,6 +3447,50 @@ class MainWindow(QMainWindow):
             )
         except Exception as e:
             QMessageBox.critical(self, "Drucken", f"Druck fehlgeschlagen:\n{e}")
+
+    def _on_search_export(self, fmt: str = "csv"):
+        """Trefferliste der Sidebar als CSV oder JSON exportieren."""
+        kind = str(fmt or "csv").strip().casefold()
+        if kind not in ("csv", "json"):
+            kind = "csv"
+        hits = self.sidebar.search_hit_records()
+        if not hits:
+            self._set_status("Keine Suchergebnisse zum Export")
+            QMessageBox.information(
+                self,
+                "Suchergebnis-Export",
+                "Die Trefferliste ist leer — zuerst suchen.",
+            )
+            return
+        query = self.sidebar.search_text()
+        start = dialog_start_dir(get_last_export_dir())
+        safe_q = "".join(c if c.isalnum() or c in "-_" else "_" for c in (query or "hits"))[
+            :40
+        ] or "hits"
+        if kind == "json":
+            default = str(Path(start) / f"search_{safe_q}.json")
+            path, _ = QFileDialog.getSaveFileName(
+                self,
+                "Suchergebnisse als JSON",
+                default,
+                "JSON (*.json)",
+            )
+            if not path:
+                return
+            dest = fulltext_mod.export_search_hits_json(path, hits, query=query)
+        else:
+            default = str(Path(start) / f"search_{safe_q}.csv")
+            path, _ = QFileDialog.getSaveFileName(
+                self,
+                "Suchergebnisse als CSV",
+                default,
+                "CSV (*.csv)",
+            )
+            if not path:
+                return
+            dest = fulltext_mod.export_search_hits_csv(path, hits, query=query)
+        set_last_export_dir(Path(dest).parent)
+        self._set_status(f"Suchergebnisse exportiert ({len(hits)}): {dest.name}")
 
     def _on_search(self, query: str):
         if not query:

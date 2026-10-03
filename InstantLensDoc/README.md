@@ -2,7 +2,7 @@
 
 Moderne Textverarbeitung mit PDF-Annotator, OCR-Bridge und Formulargenerator.
 
-**Version:** 0.7.8  
+**Version:** 0.7.9  
 **Hersteller:** Andreas Meyer · ame@sellerbach.de
 
 ## Quickstart (Windows)
@@ -32,8 +32,8 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an).
 
-## Neu in 0.7.8
+## Neu in 0.7.9
 
-Dry-Run-Konfliktliste als TXT, Ann.-Listen-Tooltip mit vollem Text, Blink aus mit einmaligem Status-Hinweis, Merge-Diff max. Zeichenlänge in Einstellungen. Stubs KI/Cloud/Stylus/3D unverändert.
+Suchergebnis-Export CSV/JSON, Ann.-Filter-Presets speichern/laden, Bracket-Auto-Close in Einstellungen. Stubs KI/Cloud/Stylus/3D unverändert.
 
 Siehe [CHANGELOG.md](CHANGELOG.md), [FEATURES.md](FEATURES.md) und [INFO.md](INFO.md).

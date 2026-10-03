@@ -298,3 +298,106 @@ def sidebar_document_paths(files_widget) -> List[str]:
         if data:
             out.append(str(data))
     return out
+
+
+SEARCH_HIT_CSV_FIELDS = (
+    "index",
+    "label",
+    "path",
+    "page",
+    "line",
+    "kind",
+    "query",
+    "snippet",
+)
+
+
+def normalize_search_hit_record(raw: dict | None, *, index: int = 1, query: str = "") -> dict:
+    """Eine Trefferzeile für CSV/JSON-Export normalisieren."""
+    src = dict(raw or {})
+    page = src.get("page", "")
+    line = src.get("line", "")
+    if page is None:
+        page = ""
+    if line is None:
+        line = ""
+    if page != "" and not isinstance(page, str):
+        try:
+            page = int(page)
+        except (TypeError, ValueError):
+            page = str(page)
+    if line != "" and not isinstance(line, str):
+        try:
+            line = int(line)
+        except (TypeError, ValueError):
+            line = str(line)
+    return {
+        "index": int(src.get("index") or index),
+        "label": str(src.get("label") or ""),
+        "path": str(src.get("path") or ""),
+        "page": page,
+        "line": line,
+        "kind": str(src.get("kind") or "mark"),
+        "query": str(src.get("query") if src.get("query") is not None else query),
+        "snippet": str(src.get("snippet") or src.get("label") or ""),
+    }
+
+
+def export_search_hits_csv(
+    path: str | Path,
+    hits: Sequence[dict],
+    *,
+    query: str = "",
+) -> Path:
+    """Suchergebnisse als CSV exportieren (UTF-8)."""
+    import csv
+
+    dest = Path(path)
+    if dest.suffix.lower() != ".csv":
+        dest = dest.with_suffix(".csv")
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    rows = [
+        normalize_search_hit_record(h, index=i + 1, query=query)
+        for i, h in enumerate(hits or [])
+    ]
+    with dest.open("w", encoding="utf-8", newline="") as fh:
+        writer = csv.DictWriter(
+            fh, fieldnames=list(SEARCH_HIT_CSV_FIELDS), extrasaction="ignore"
+        )
+        writer.writeheader()
+        for row in rows:
+            writer.writerow({k: row.get(k, "") for k in SEARCH_HIT_CSV_FIELDS})
+    return dest
+
+
+def export_search_hits_json(
+    path: str | Path,
+    hits: Sequence[dict],
+    *,
+    query: str = "",
+) -> Path:
+    """Suchergebnisse als JSON exportieren (Schema ildsearch-v1)."""
+    import json
+    from datetime import datetime, timezone
+
+    dest = Path(path)
+    if dest.suffix.lower() != ".json":
+        dest = dest.with_suffix(".json")
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    rows = [
+        normalize_search_hit_record(h, index=i + 1, query=query)
+        for i, h in enumerate(hits or [])
+    ]
+    payload = {
+        "version": 1,
+        "schema": "ildsearch-v1",
+        "exported_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "query": str(query or ""),
+        "count": len(rows),
+        "hits": rows,
+    }
+    dest.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    return dest

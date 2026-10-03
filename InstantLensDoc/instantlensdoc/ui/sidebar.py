@@ -12,11 +12,13 @@ from PySide6.QtWidgets import (
     QComboBox,
     QCompleter,
     QHBoxLayout,
+    QInputDialog,
     QLabel,
     QLineEdit,
     QListWidget,
     QListWidgetItem,
     QMenu,
+    QMessageBox,
     QPushButton,
     QToolButton,
     QTreeWidget,
@@ -25,7 +27,12 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from instantlensdoc.core.app_settings import pdf_thumbnail_icon_size
+from instantlensdoc.core.app_settings import (
+    delete_ann_filter_preset,
+    get_ann_filter_presets,
+    pdf_thumbnail_icon_size,
+    save_ann_filter_preset,
+)
 
 
 def normalize_ann_color(value: object) -> str:
@@ -232,6 +239,7 @@ class Sidebar(QWidget):
     line_favorite_activated = Signal(int)  # Editor-Zeile 1-basiert
     line_favorite_label_edit = Signal(int)  # Editor-Zeile 1-basiert → Label bearbeiten
     pages_reordered = Signal(list)  # alte Indizes in neuer Reihenfolge
+    search_export_requested = Signal(str)  # "csv" | "json"
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -278,20 +286,41 @@ class Sidebar(QWidget):
         btn_row.addWidget(self.btn_full)
         btn_row.addWidget(self.btn_pdfs)
         layout.addLayout(btn_row)
+        hits_row = QHBoxLayout()
         self.search_hits_label = QLabel("")
         self.search_hits_label.setObjectName("searchHitsLabel")
         self.search_hits_label.setStyleSheet(
             "QLabel#searchHitsLabel { color: #555; font-size: 11px; }"
         )
         self.search_hits_label.setToolTip("Trefferanzahl der letzten Schnellsuche")
-        layout.addWidget(self.search_hits_label)
+        hits_row.addWidget(self.search_hits_label, 1)
+        self.btn_export_search_csv = QPushButton("CSV")
+        self.btn_export_search_csv.setFixedWidth(40)
+        self.btn_export_search_csv.setToolTip(
+            "Suchergebnisse der Trefferliste als CSV exportieren"
+        )
+        self.btn_export_search_csv.clicked.connect(
+            lambda: self.search_export_requested.emit("csv")
+        )
+        self.btn_export_search_json = QPushButton("JSON")
+        self.btn_export_search_json.setFixedWidth(48)
+        self.btn_export_search_json.setToolTip(
+            "Suchergebnisse der Trefferliste als JSON exportieren (ildsearch-v1)"
+        )
+        self.btn_export_search_json.clicked.connect(
+            lambda: self.search_export_requested.emit("json")
+        )
+        hits_row.addWidget(self.btn_export_search_csv)
+        hits_row.addWidget(self.btn_export_search_json)
+        layout.addLayout(hits_row)
 
         layout.addWidget(QLabel("Schnellsuche-Treffer / Markierungen"))
         self.marks = QListWidget()
         self.marks.setObjectName("searchHitsList")
         self.marks.setMaximumHeight(140)
         self.marks.setToolTip(
-            "Schnellsuche-Trefferliste — Klick öffnet Treffer / springt zur Markierung"
+            "Schnellsuche-Trefferliste — Klick öffnet Treffer / springt zur Markierung; "
+            "Export über CSV/JSON"
         )
         self.marks.itemClicked.connect(self._activate_mark)
         self.marks.itemActivated.connect(self._activate_mark)
@@ -362,6 +391,36 @@ class Sidebar(QWidget):
         self.ann_filter.addItem("Alle Typen", "")
         self.ann_filter.currentIndexChanged.connect(self._on_ann_filter_changed)
         layout.addWidget(self.ann_filter)
+        preset_row = QHBoxLayout()
+        self.ann_filter_preset = QComboBox()
+        self.ann_filter_preset.setEditable(True)
+        self.ann_filter_preset.setInsertPolicy(QComboBox.NoInsert)
+        self.ann_filter_preset.setSizeAdjustPolicy(
+            QComboBox.AdjustToMinimumContentsLengthWithIcon
+        )
+        self.ann_filter_preset.setToolTip(
+            "Annotations-Filter-Presets — Name wählen/eingeben, dann Speichern oder Laden"
+        )
+        if self.ann_filter_preset.lineEdit() is not None:
+            self.ann_filter_preset.lineEdit().setPlaceholderText("Filter-Preset…")
+        preset_row.addWidget(self.ann_filter_preset, 1)
+        self.btn_ann_preset_save = QPushButton("Speichern")
+        self.btn_ann_preset_save.setToolTip(
+            "Aktuelle Filter (Typ/Farbe/Tags/Seite/Suche) als Preset speichern"
+        )
+        self.btn_ann_preset_save.clicked.connect(self._save_ann_filter_preset_clicked)
+        self.btn_ann_preset_load = QPushButton("Laden")
+        self.btn_ann_preset_load.setToolTip("Ausgewähltes Filter-Preset laden")
+        self.btn_ann_preset_load.clicked.connect(self._load_ann_filter_preset_clicked)
+        self.btn_ann_preset_del = QPushButton("−")
+        self.btn_ann_preset_del.setFixedWidth(28)
+        self.btn_ann_preset_del.setToolTip("Ausgewähltes Filter-Preset löschen")
+        self.btn_ann_preset_del.clicked.connect(self._delete_ann_filter_preset_clicked)
+        preset_row.addWidget(self.btn_ann_preset_save)
+        preset_row.addWidget(self.btn_ann_preset_load)
+        preset_row.addWidget(self.btn_ann_preset_del)
+        layout.addLayout(preset_row)
+        self._refresh_ann_filter_preset_combo()
         self.ann_current_page = QCheckBox("Nur aktuelle Seite")
         self.ann_current_page.setToolTip(
             "Annotationsliste auf die aktuelle PDF-Seite beschränken"
@@ -876,6 +935,175 @@ class Sidebar(QWidget):
         if path is None:
             return None
         return tuple(int(i) for i in path)
+
+    def search_hit_records(self) -> list[dict]:
+        """Aktuelle Trefferliste als strukturierte Dicts für CSV/JSON-Export."""
+        q_default = self.search_text()
+        out: list[dict] = []
+        for i in range(self.marks.count()):
+            item = self.marks.item(i)
+            if item is None:
+                continue
+            label = item.text() or ""
+            payload = item.data(256)
+            rec: dict = {
+                "index": i + 1,
+                "label": label,
+                "path": "",
+                "page": "",
+                "line": "",
+                "kind": "mark",
+                "query": q_default,
+                "snippet": label,
+            }
+            if ": " in label:
+                rec["snippet"] = label.split(": ", 1)[1]
+            if isinstance(payload, tuple) and len(payload) >= 2:
+                path, page = payload[0], payload[1]
+                query = payload[2] if len(payload) >= 3 else q_default
+                if path in (None, "", "__search__"):
+                    rec["kind"] = "page_highlight"
+                    if page is not None:
+                        try:
+                            rec["page"] = int(page) + 1
+                        except (TypeError, ValueError):
+                            rec["page"] = page
+                else:
+                    rec["path"] = str(path)
+                    suf = Path(str(path)).suffix.lower()
+                    rec["kind"] = "pdf" if suf == ".pdf" else "doc"
+                    if page is not None:
+                        try:
+                            rec["page"] = int(page) + 1
+                        except (TypeError, ValueError):
+                            rec["page"] = page
+                    rec["query"] = str(query or q_default)
+            elif payload is not None and hasattr(payload, "page"):
+                typ = getattr(getattr(payload, "type", None), "value", None) or str(
+                    getattr(payload, "type", "") or "annotation"
+                )
+                rec["kind"] = f"annotation:{typ}"
+                try:
+                    rec["page"] = int(payload.page) + 1
+                except (TypeError, ValueError):
+                    rec["page"] = getattr(payload, "page", "")
+                text = str(getattr(payload, "text", "") or "").strip()
+                if text:
+                    rec["snippet"] = text
+            out.append(rec)
+        return out
+
+    def annotation_filter_state(self) -> dict:
+        """Aktueller Ann.-Filter als Dict (für Presets)."""
+        return {
+            "type": self.annotation_filter_type(),
+            "color": self.annotation_filter_color(),
+            "tags": list(self.annotation_filter_tags()),
+            "current_page": bool(self.annotation_filter_current_page()),
+            "search": self.annotation_search_text(),
+            "regex": bool(self.annotation_search_regex()),
+        }
+
+    def apply_annotation_filter_state(self, state: dict | None) -> None:
+        """Filter-Zustand aus Preset anwenden."""
+        data = dict(state or {})
+        self.set_annotation_filter_current_page(bool(data.get("current_page", False)))
+        typ = str(data.get("type") or "")
+        if hasattr(self, "ann_filter"):
+            idx = self.ann_filter.findData(typ)
+            if idx < 0 and typ:
+                idx = self.ann_filter.findData("")
+            if idx >= 0:
+                self._ann_filter_updating = True
+                self.ann_filter.blockSignals(True)
+                self.ann_filter.setCurrentIndex(idx)
+                self.ann_filter.blockSignals(False)
+                self._ann_filter_updating = False
+        self.set_annotation_color_filter(str(data.get("color") or ""))
+        tags = data.get("tags") or []
+        if isinstance(tags, str):
+            tags = [t.strip() for t in tags.split(",") if t.strip()]
+        self.set_annotation_tag_filter(list(tags) if tags else "")
+        if hasattr(self, "ann_search"):
+            self.ann_search.blockSignals(True)
+            self.ann_search.setText(str(data.get("search") or ""))
+            self.ann_search.blockSignals(False)
+            self._ann_search_query = str(data.get("search") or "").strip()
+        self.set_annotation_search_regex(bool(data.get("regex", False)))
+        self._apply_annotation_filter()
+        self.annotation_filter_changed.emit(self.annotation_filter_type())
+
+    def _refresh_ann_filter_preset_combo(self, *, keep: str | None = None) -> None:
+        combo = getattr(self, "ann_filter_preset", None)
+        if combo is None:
+            return
+        current = (keep if keep is not None else combo.currentText()).strip()
+        combo.blockSignals(True)
+        combo.clear()
+        combo.addItem("")
+        for p in get_ann_filter_presets():
+            combo.addItem(str(p["name"]))
+        if current:
+            idx = combo.findText(current)
+            if idx >= 0:
+                combo.setCurrentIndex(idx)
+            else:
+                combo.setEditText(current)
+        combo.blockSignals(False)
+
+    def _save_ann_filter_preset_clicked(self) -> None:
+        combo = getattr(self, "ann_filter_preset", None)
+        suggested = (combo.currentText() if combo is not None else "").strip()
+        name, ok = QInputDialog.getText(
+            self,
+            "Filter-Preset speichern",
+            "Name:",
+            text=suggested or "Mein Filter",
+        )
+        if not ok:
+            return
+        name = (name or "").strip()
+        if not name:
+            QMessageBox.warning(self, "Filter-Preset", "Name fehlt.")
+            return
+        try:
+            save_ann_filter_preset(name, state=self.annotation_filter_state())
+        except ValueError as exc:
+            QMessageBox.warning(self, "Filter-Preset", str(exc))
+            return
+        self._refresh_ann_filter_preset_combo(keep=name)
+
+    def _load_ann_filter_preset_clicked(self) -> None:
+        combo = getattr(self, "ann_filter_preset", None)
+        name = (combo.currentText() if combo is not None else "").strip()
+        if not name:
+            QMessageBox.information(self, "Filter-Preset", "Kein Preset gewählt.")
+            return
+        from instantlensdoc.core.app_settings import get_ann_filter_preset
+
+        preset = get_ann_filter_preset(name)
+        if preset is None:
+            QMessageBox.warning(self, "Filter-Preset", f"Preset „{name}“ nicht gefunden.")
+            return
+        self.apply_annotation_filter_state(preset)
+        self._refresh_ann_filter_preset_combo(keep=name)
+
+    def _delete_ann_filter_preset_clicked(self) -> None:
+        combo = getattr(self, "ann_filter_preset", None)
+        name = (combo.currentText() if combo is not None else "").strip()
+        if not name:
+            return
+        if (
+            QMessageBox.question(
+                self,
+                "Filter-Preset löschen",
+                f"Preset „{name}“ wirklich löschen?",
+            )
+            != QMessageBox.Yes
+        ):
+            return
+        if delete_ann_filter_preset(name):
+            self._refresh_ann_filter_preset_combo(keep="")
 
     def annotation_filter_type(self) -> str:
         """Aktueller Filter: AnnotationType.value oder '' für alle."""

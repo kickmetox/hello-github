@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **0.7.8** |
+| Version | **0.7.9** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -38,10 +38,9 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Installer-Task: optionale **Desktop-Verknüpfung** (Checkbox, Standard an / `checkedonce`)
 
-## Neu in 0.7.8
+## Neu in 0.7.9
 
-- Vorlagen-Zip Dry-Run: **Konfliktliste als TXT** exportieren
-- Ann.-Liste: bei Ellipsis **Tooltip mit vollem Text**
-- Status-Blink **aus**: einmaliger Status-Hinweis ohne Blink
-- Ann.-Merge-Diff: **max. Zeichenlänge** in Einstellungen
+- **Suchergebnis-Export** CSV/JSON (`ildsearch-v1`) aus der Trefferliste
+- Ann.-**Filter-Presets** speichern / laden / löschen
+- Editor: **Bracket-Auto-Close** Toggle in Einstellungen
 - Stubs KI/Cloud/Stylus/3D unverändert

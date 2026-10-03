@@ -87,7 +87,7 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | PDF leere Seite / duplizieren | fertig | Toolbar + Menü; Annotation-Remap 0.2.4 |
 | PDF neu anordnen | fertig | Dialog + Thumbnail-Drag + Annotation-Remap |
 | Textsuche Seitenleiste | fertig | Editor + PDF-Text + Annotationen; Highlight 0.2.2; **letzte Suchbegriffe** merken 0.2.4 |
-| Annotation-Liste Sidebar | fertig | Klick → Seite + Auswahl 0.2.4; **Filter nach Typ** 0.2.6; **Textsuche** 0.3.0; **Gruppierung nach Seite** 0.3.5; **Statistik je Typ (Footer)** 0.3.9; **Nur aktuelle Seite** 0.4.9; **Tag-Filter** 0.5.1 (**Multi-Select ODER** 0.6.2, **Tag-Cloud** 0.6.3, **setzt Filter** 0.6.4, **umbenennen** 0.6.5, **Rename-Undo** 0.6.6, **Undo-Label** 0.6.7, **Confirm >20** 0.6.8, **Schwelle Settings** 0.6.9); **Regex optional** 0.5.2; **Gruppen Name/Farbe** 0.5.4; **Ellipsis-Style bei gekürztem Text** 0.7.7; **Tooltip voller Text** 0.7.8 |
+| Annotation-Liste Sidebar | fertig | Klick → Seite + Auswahl 0.2.4; **Filter nach Typ** 0.2.6; **Textsuche** 0.3.0; **Gruppierung nach Seite** 0.3.5; **Statistik je Typ (Footer)** 0.3.9; **Nur aktuelle Seite** 0.4.9; **Tag-Filter** 0.5.1 (**Multi-Select ODER** 0.6.2, **Tag-Cloud** 0.6.3, **setzt Filter** 0.6.4, **umbenennen** 0.6.5, **Rename-Undo** 0.6.6, **Undo-Label** 0.6.7, **Confirm >20** 0.6.8, **Schwelle Settings** 0.6.9); **Regex optional** 0.5.2; **Gruppen Name/Farbe** 0.5.4; **Ellipsis-Style bei gekürztem Text** 0.7.7; **Tooltip voller Text** 0.7.8; **Filter-Presets speichern/laden** 0.7.9 |
 | PDF Seitenbereich extrahieren | fertig | von–bis → neues PDF; Menü + Dialog-Tab 0.2.6 |
 | Editor Find/Replace | fertig | Ctrl+R Dialog 0.2.6 |
 | Editor Zeilennummern | fertig | Optional (Ansicht + Einstellungen) 0.2.7; **Zeilen-Lesezeichen/Favoriten** Ctrl+F2 / F2 0.5.7; **Sidebar-Liste** 0.5.8; **Labels editierbar** 0.5.9 |
@@ -107,6 +107,7 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | Editor Trim trailing whitespace | fertig | Optional beim Speichern/Autosave; Einstellung 0.4.5 |
 | Editor Whitespace trim on paste | fertig | Optional Trailing-Spaces beim Einfügen; Einstellung 0.4.7 |
 | Editor Bracket-Match Highlight | fertig | Passende Klammern ()[]{} am Cursor; Einstellung (Standard an) 0.4.8 |
+| Editor Bracket-Auto-Close | fertig | Beim Tippen schließende `()[]{}` / Anführungszeichen; Einstellung (Standard an) **0.7.9** |
 | Editor Rechtschreibung (Wortliste) | fertig | Wörterbuch-Pfad in Einstellungen; F7 prüft ohne Spell-Lib (wellig) 0.5.6 |
 | Editor Zwischenablage-Verlauf | fertig | Letzte 3 Paste-Texte; Menü Bearbeiten 0.4.9 |
 | Editor Kommentar/Unkommentar | fertig | Ctrl+/ für # und // (einfache Sprachen) 0.3.6 |
@@ -116,14 +117,14 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | Zuletzt verwendete Ordner | fertig | Datei-Dialoge merken `recent_dirs` 0.3.2 |
 | Projekt-Ordner / Workspace | fertig | Datei → Projekt-Ordner; letzte 5; Dialog-Startpfad 0.5.1 |
 | Alles speichern (Tabs) | fertig | Datei → Alles speichern; aktuelles Doc + PDF-Sidecars 0.2.7 |
-| Volltextsuche geöffnete Docs | fertig | Sidebar „Alle Docs“; **PDF-Schnellsuche „Alle PDFs“** (eine Open/Datei, Snippet, Sprung+Highlight) 0.7.1; **Trefferanzahl + Weiter/Zurück über Docs** 0.7.2; **klickbare Trefferliste** unter Suche 0.7.3; **Kontext-Snippet Zeichen um Match** 0.7.4; **Snippet-Länge Settings 20–80** 0.7.5; **Snippet-Ellipsis-Style «…»/…** 0.7.6 (auch Ann.-Liste 0.7.7) |
+| Volltextsuche geöffnete Docs | fertig | Sidebar „Alle Docs“; **PDF-Schnellsuche „Alle PDFs“** (eine Open/Datei, Snippet, Sprung+Highlight) 0.7.1; **Trefferanzahl + Weiter/Zurück über Docs** 0.7.2; **klickbare Trefferliste** unter Suche 0.7.3; **Kontext-Snippet Zeichen um Match** 0.7.4; **Snippet-Länge Settings 20–80** 0.7.5; **Snippet-Ellipsis-Style «…»/…** 0.7.6 (auch Ann.-Liste 0.7.7); **Trefferliste CSV/JSON-Export** (`ildsearch-v1`) 0.7.9 |
 | Sidecar-Save Debounce | fertig | Annotation-Sidecar verzögert speichern; Flush bei Wechsel/Close/Autosave 0.7.1; **Intervall in Einstellungen 200–1000 ms** 0.7.2; **Ctrl+S flush** 0.7.3; **Dirty-Indikator Tab bei pending Debounce** 0.7.4; **Tooltip „Speichern ausstehend…“** 0.7.5; **Statusleisten-Blink** 0.7.6; **Blink Dauer/Intensität kurz/aus** 0.7.7; **aus = einmaliger Hinweis ohne Blink** 0.7.8 |
 | Lesezeichen / PDF-Outline | fertig | Baum in Sidebar; Doppelklick/Enter → Seite; **Destination via objgen gehärtet** 0.4.2; hinzufügen/löschen 0.2.5 |
 | PDF als Kopie speichern | fertig | Datei + Sidecar; aktuelles Doc bleibt offen 0.2.5 |
 | Editor Wortzählung | fertig | Statusleiste Wörter · Zeichen 0.2.5 |
 | Batch-Konvertierung Ordner | fertig | Bilder→PDF, OCR-Ordner, PDF-OCR-Text; Fortschrittsbalken; **Abbrechen/Fehler robust** 0.4.2 |
 | PDF zusammenführen / teilen | fertig | Dialog unter Menü PDF |
-| Einstellungen-Dialog | fertig | OCR, Theme, Sprache, Export-Q, Standard-Zoom, **PDF-Thumbnail-Größe** 0.3.8, Autosave, optional Tray-Minimize, **Backup .bak**, **Seitengröße-Einheit**, **Session-Restore Toggle**, **Sonderzeichen** 0.3.9, **Doc-Split Layout H/V** 0.6.6, **Wizard-Reset** 0.6.8, **Tag-Rename-Schwelle** 0.6.9, **Sidecar-Debounce ms** 0.7.2, **Treffer-Snippet-Länge 20–80** 0.7.5, **Snippet-Ellipsis-Style** 0.7.6, **Status-Blink kurz/aus** 0.7.7, **Merge-Diff max. Länge** 0.7.8, Pfade, Update |
+| Einstellungen-Dialog | fertig | OCR, Theme, Sprache, Export-Q, Standard-Zoom, **PDF-Thumbnail-Größe** 0.3.8, Autosave, optional Tray-Minimize, **Backup .bak**, **Seitengröße-Einheit**, **Session-Restore Toggle**, **Sonderzeichen** 0.3.9, **Doc-Split Layout H/V** 0.6.6, **Wizard-Reset** 0.6.8, **Tag-Rename-Schwelle** 0.6.9, **Sidecar-Debounce ms** 0.7.2, **Treffer-Snippet-Länge 20–80** 0.7.5, **Snippet-Ellipsis-Style** 0.7.6, **Status-Blink kurz/aus** 0.7.7, **Merge-Diff max. Länge** 0.7.8, **Bracket-Auto-Close** 0.7.9, Pfade, Update |
 | Markieren im Editor | fertig | Ctrl+H |
 | Bilder JPEG/PNG anzeigen | fertig | |
 | OCR Bild/PDF-Seite | teilweise | Presets + Modi; Tabellen-Heuristik; Fortschrittsdialog 0.2.1 |
@@ -139,27 +140,27 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | Inno-Installer | fertig | Icon, **optionale Desktop-Checkbox** (`desktopicon`/`checkedonce`) 0.6.1, Uninstaller, Keygen optional (`InstantLensKeygen.exe`) 0.2.1 |
 | Sync-Skript Windows | fertig | Repo `scripts/sync-ild.ps1`; Store `docs/sync-ild.ps1`; **-SkipStart** + Exit-Codes 0/1/2 **0.6.2** |
 | Arbeitsverzeichnis öffnen | fertig | Datei-Menü Ctrl+Shift+E; Ordner der Datei bzw. CWD 0.4.8 |
-| In-App Hilfe / About | fertig | Version 0.7.8; Fenstertitel + Splash; Logordner-Button; **Feature-Kurzliste + FEATURES.md** 0.4.9; **Keygen-Hinweis bei Trial** 0.5.3; **Splash überspringbar** 0.5.5; **Privacy: lokal, keine Telemetrie** 0.5.6; **Crash-Report ZIP** 0.5.7; **Screenshot-Pfad optional** 0.5.8; **Erste-Schritte-Wizard (4 Seiten inkl. 0.6 / 0.6.8-Hinweise)** 0.6.9; **skip-once Checkbox + Auto-Show** 0.6.6; **Nicht mehr zeigen (dauerhaft)** 0.6.7; **Reset in Einstellungen** 0.6.8 |
+| In-App Hilfe / About | fertig | Version 0.7.9; Fenstertitel + Splash; Logordner-Button; **Feature-Kurzliste + FEATURES.md** 0.4.9; **Keygen-Hinweis bei Trial** 0.5.3; **Splash überspringbar** 0.5.5; **Privacy: lokal, keine Telemetrie** 0.5.6; **Crash-Report ZIP** 0.5.7; **Screenshot-Pfad optional** 0.5.8; **Erste-Schritte-Wizard (4 Seiten inkl. 0.6 / 0.6.8-Hinweise)** 0.6.9; **skip-once Checkbox + Auto-Show** 0.6.6; **Nicht mehr zeigen (dauerhaft)** 0.6.7; **Reset in Einstellungen** 0.6.8 |
 | Startup-Abhängigkeiten-Check | fertig | pypdfium2 kritisch + Tesseract optional; Dialog bei Problemen 0.5.4 |
 | Quiet Startup / Splash | fertig | Einstellungen: Splash überspringen 0.5.5 |
-| CHANGELOG | fertig | **0.7.8** Dry-Run-TXT / Ann.-Tooltip / Blink-Hinweis / Merge-Diff-Länge; **0.7.7** Status-Blink Settings / Merge-Tags·Farbe / Zip-Dry-Run / Ann.-Ellipsis; **0.7.6** Snippet-Ellipsis / Zip-Konflikt / Merge-Diff / Debounce-Blink; **0.7.5** Snippet-Länge Settings / Alle mergen·behalten / Vorlagen-Zip / Tab-Tooltip Debounce; **0.7.4** Kontext-Snippet / Merge je Paar / Vorlagen-Drag / Dirty-Debounce; **0.7.3** Trefferliste / Vorlagen-Ordner / Merge-Vorschau / Ctrl+S-Flush; **0.7.2** Treffer-Nav / Merge-Undo / Vorlagen-UI / Debounce-Settings; **0.7.1** PDF-Schnellsuche / Ann.-Duplikate / Vorlagen / Sidecar-Debounce; **0.7.0** Konsolidierung 0.6.x |
+| CHANGELOG | fertig | **0.7.9** Such-Export CSV/JSON / Ann.-Filter-Presets / Bracket-Auto-Close; **0.7.8** Dry-Run-TXT / Ann.-Tooltip / Blink-Hinweis / Merge-Diff-Länge; **0.7.7** Status-Blink Settings / Merge-Tags·Farbe / Zip-Dry-Run / Ann.-Ellipsis; **0.7.6** Snippet-Ellipsis / Zip-Konflikt / Merge-Diff / Debounce-Blink; **0.7.5** Snippet-Länge Settings / Alle mergen·behalten / Vorlagen-Zip / Tab-Tooltip Debounce; **0.7.4** Kontext-Snippet / Merge je Paar / Vorlagen-Drag / Dirty-Debounce; **0.7.3** Trefferliste / Vorlagen-Ordner / Merge-Vorschau / Ctrl+S-Flush; **0.7.2** Treffer-Nav / Merge-Undo / Vorlagen-UI / Debounce-Settings; **0.7.1** PDF-Schnellsuche / Ann.-Duplikate / Vorlagen / Sidecar-Debounce; **0.7.0** Konsolidierung 0.6.x |
 | FEATURES.md / INFO.md | fertig | |
 | `ild_pdf` Modul + Beispielskript | fertig | metadata / page size / watermark / redact / acroform / attachments / flatten / **plain text** / **selection_to_highlight_rects** / **selection_to_plain_text** / **export_report** / **page_favorites JSON** |
 | Font-Matching | geplant | |
 | Objekt-/Bildbearbeitung | geplant | |
 | Layout-Erhaltung (Scan→edit) | geplant | |
 | Freihand | geplant | |
-| KI-Assistent | Stub | Menü „Geplant“ 0.7.8 (keine Fake-KI) |
+| KI-Assistent | Stub | Menü „Geplant“ 0.7.9 (keine Fake-KI) |
 | Signieren (rechtssicher) | Stub | |
-| Cloud-Sync | Stub | Menü „Geplant“ 0.7.8 (keine Fake-Cloud) |
+| Cloud-Sync | Stub | Menü „Geplant“ 0.7.9 (keine Fake-Cloud) |
 | Text on Path / Text zu Pfaden | geplant | |
 | Envelope Distort / Text Wrap / Area Type | Stub/geplant | |
 | Schnittmasken | geplant | |
 | Füllungen / Live-Effekte | geplant | |
-| 3D-Extrusion | Stub | Menü „Geplant“ 0.7.8 |
+| 3D-Extrusion | Stub | Menü „Geplant“ 0.7.9 |
 | Variable Fonts (voll) | Stub | |
 | Glyphen-Palette | geplant | |
-| Stylus / Palm Rejection | Stub | Menü „Geplant“ 0.7.8 |
-| Intelligente Formerkennung | Stub | Menü „Geplant“ 0.7.8 |
+| Stylus / Palm Rejection | Stub | Menü „Geplant“ 0.7.9 |
+| Intelligente Formerkennung | Stub | Menü „Geplant“ 0.7.9 |
 
 Nicht behauptet als fertig: Cloud, KI, Stylus, 3D — nur Menü-Stubs + dieser Status.

@@ -37,6 +37,8 @@ DEFAULTS: dict[str, Any] = {
     "pdf_two_page_spread": False,
     "pdf_continuous_scroll": False,
     "editor_bracket_match": True,
+    "editor_bracket_auto_close": True,
+    "ann_filter_presets": [],
     "ann_default_opacity": 1.0,
     "recent_dirs": [],
     "project_workspaces": [],
@@ -328,6 +330,143 @@ def get_editor_bracket_match() -> bool:
 
 def set_editor_bracket_match(enabled: bool) -> None:
     save_settings({"editor_bracket_match": bool(enabled)})
+
+
+def get_editor_bracket_auto_close() -> bool:
+    """Klammern/Anführungszeichen beim Tippen automatisch schließen."""
+    return bool(load_settings().get("editor_bracket_auto_close", True))
+
+
+def set_editor_bracket_auto_close(enabled: bool) -> None:
+    save_settings({"editor_bracket_auto_close": bool(enabled)})
+
+
+ANN_FILTER_PRESETS_MAX = 20
+
+
+def _normalize_ann_filter_preset(raw: object) -> dict | None:
+    """Filter-Preset: name + Typ/Farbe/Tags/Seite/Suche/Regex."""
+    if not isinstance(raw, dict):
+        return None
+    name = str(raw.get("name") or "").strip()
+    if not name:
+        return None
+    tags_raw = raw.get("tags") or []
+    tags: list[str] = []
+    if isinstance(tags_raw, str):
+        tags = [t.strip() for t in tags_raw.split(",") if t.strip()]
+    elif isinstance(tags_raw, (list, tuple)):
+        for t in tags_raw:
+            s = str(t or "").strip()
+            if s and s not in tags:
+                tags.append(s)
+    color = str(raw.get("color") or "").strip()
+    if color and not color.startswith("#"):
+        color = "#" + color
+    return {
+        "name": name,
+        "type": str(raw.get("type") or "").strip(),
+        "color": color,
+        "tags": tags,
+        "current_page": bool(raw.get("current_page", False)),
+        "search": str(raw.get("search") or ""),
+        "regex": bool(raw.get("regex", False)),
+    }
+
+
+def get_ann_filter_presets() -> list[dict]:
+    """Gespeicherte Annotations-Filter-Presets."""
+    raw = load_settings().get("ann_filter_presets") or []
+    if not isinstance(raw, list):
+        return []
+    out: list[dict] = []
+    seen: set[str] = set()
+    for item in raw:
+        p = _normalize_ann_filter_preset(item)
+        if not p:
+            continue
+        key = str(p["name"]).casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(p)
+        if len(out) >= ANN_FILTER_PRESETS_MAX:
+            break
+    return out
+
+
+def get_ann_filter_preset(name: str) -> dict | None:
+    want = (name or "").strip().casefold()
+    if not want:
+        return None
+    for p in get_ann_filter_presets():
+        if str(p["name"]).casefold() == want:
+            return dict(p)
+    return None
+
+
+def save_ann_filter_preset(
+    name: str,
+    *,
+    type: str = "",
+    color: str = "",
+    tags: list[str] | None = None,
+    current_page: bool = False,
+    search: str = "",
+    regex: bool = False,
+    state: dict | None = None,
+) -> dict:
+    """
+    Filter-Preset speichern/überschreiben (gleicher Name → Update).
+    state: optional vollständiges Dict (überschreibt Einzelparameter).
+    """
+    if isinstance(state, dict):
+        type = str(state.get("type") if state.get("type") is not None else type)
+        color = str(state.get("color") if state.get("color") is not None else color)
+        tags = state.get("tags") if state.get("tags") is not None else tags
+        current_page = bool(
+            state.get("current_page")
+            if state.get("current_page") is not None
+            else current_page
+        )
+        search = str(state.get("search") if state.get("search") is not None else search)
+        regex = bool(state.get("regex") if state.get("regex") is not None else regex)
+        if not name:
+            name = str(state.get("name") or "")
+    preset = _normalize_ann_filter_preset(
+        {
+            "name": name,
+            "type": type,
+            "color": color,
+            "tags": tags or [],
+            "current_page": current_page,
+            "search": search,
+            "regex": regex,
+        }
+    )
+    if preset is None:
+        raise ValueError("Preset-Name fehlt")
+    presets = [
+        p
+        for p in get_ann_filter_presets()
+        if str(p["name"]).casefold() != str(preset["name"]).casefold()
+    ]
+    presets.insert(0, preset)
+    presets = presets[:ANN_FILTER_PRESETS_MAX]
+    save_settings({"ann_filter_presets": presets})
+    return dict(preset)
+
+
+def delete_ann_filter_preset(name: str) -> bool:
+    want = (name or "").strip().casefold()
+    if not want:
+        return False
+    presets = get_ann_filter_presets()
+    kept = [p for p in presets if str(p["name"]).casefold() != want]
+    if len(kept) == len(presets):
+        return False
+    save_settings({"ann_filter_presets": kept})
+    return True
 
 
 def get_editor_line_numbers() -> bool:

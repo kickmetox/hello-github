@@ -31,6 +31,7 @@ from instantlensdoc.core.app_settings import (
     PDF_TOOLBAR_GROUP_LABELS,
     get_editor_doc_split_vertical,
     get_editor_text_encoding,
+    get_editor_bracket_auto_close,
     get_editor_bracket_match,
     get_editor_trim_trailing_whitespace,
     get_editor_trim_whitespace_on_paste,
@@ -77,6 +78,7 @@ from instantlensdoc.core.app_settings import (
     set_batch_output_dir,
     set_default_open_dir,
     set_default_zoom_percent,
+    set_editor_bracket_auto_close,
     set_editor_bracket_match,
     set_editor_doc_split_vertical,
     set_editor_line_numbers,
@@ -258,6 +260,13 @@ class SettingsDialog(QDialog):
             "Passende Klammern ()[]{} im Editor hervorheben (Cursor-Position)"
         )
         form.addRow(self.bracket_match)
+
+        self.bracket_auto_close = QCheckBox("Bracket-Auto-Close")
+        self.bracket_auto_close.setChecked(get_editor_bracket_auto_close())
+        self.bracket_auto_close.setToolTip(
+            "Beim Tippen schließende Klammern ()[]{} und Anführungszeichen automatisch einfügen"
+        )
+        form.addRow(self.bracket_auto_close)
 
         self.minimize_tray = QCheckBox("Beim Minimieren in den System-Tray")
         self.minimize_tray.setChecked(get_minimize_to_tray())
@@ -596,6 +605,7 @@ class SettingsDialog(QDialog):
         set_editor_trim_trailing_whitespace(self.trim_trailing.isChecked())
         set_editor_trim_whitespace_on_paste(self.trim_paste.isChecked())
         set_editor_bracket_match(self.bracket_match.isChecked())
+        set_editor_bracket_auto_close(self.bracket_auto_close.isChecked())
         set_pdf_toolbar_groups(
             {k: cb.isChecked() for k, cb in self._toolbar_group_checks.items()}
         )
@@ -650,6 +660,15 @@ class SettingsDialog(QDialog):
         ):
             try:
                 parent.editor.set_bracket_match_enabled(self.bracket_match.isChecked())
+            except Exception:
+                pass
+        if parent is not None and hasattr(parent, "editor") and hasattr(
+            parent.editor, "set_bracket_auto_close_enabled"
+        ):
+            try:
+                parent.editor.set_bracket_auto_close_enabled(
+                    self.bracket_auto_close.isChecked()
+                )
             except Exception:
                 pass
         if parent is not None and hasattr(parent, "editor"):

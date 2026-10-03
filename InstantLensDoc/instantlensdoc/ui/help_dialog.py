@@ -34,6 +34,7 @@ HELP_HTML = f"""
     <b>Standard-Zoom</b>, <b>Autosave-Intervall</b>, Soft-Wrap, <b>Sonderzeichen anzeigen</b>,
     optional <b>Trailing Whitespace trimmen</b>, optional <b>Whitespace trim on paste</b>,
     optional <b>Bracket-Match Highlight</b>,
+    optional <b>Bracket-Auto-Close</b>,
     optional <b>Minimieren in System-Tray</b>,
     optional <b>Backup .bak beim Speichern</b>, <b>Seitengröße-Einheit mm/inch</b>,
     optional <b>letzte Session beim Start</b>, <b>PDF-Toolbar-Gruppen</b> ein-/ausblenden,
@@ -533,7 +534,7 @@ class AboutDialog(QDialog):
             "<ul>"
             "<li>PDF lesen/annotieren (Highlight, Notiz, Stempel, Formen) · Sidecar v4</li>"
             "<li>Seitenlabels, Continuous Scroll, Spread, CropBox · Seiten-Favoriten (Drag-Umsortieren)</li>"
-            "<li>Editor: Find/Replace, Snippets, Bracket-Match, Minimap, Zeilen-Lesezeichen (Sidebar-Liste), Wortlisten-Rechtschreibung</li>"
+            "<li>Editor: Find/Replace, Snippets, Bracket-Match, Bracket-Auto-Close, Minimap, Zeilen-Lesezeichen (Sidebar-Liste), Wortlisten-Rechtschreibung</li>"
             "<li>OCR-Bridge, Formulargenerator, Batch, Export · Ann.-Batch-Farbe/Deckkraft (Sidecar)</li>"
             "<li>Annotation-Tags, Kommentar-Bericht, Farbe Palette-Zyklus · Crash-Report-ZIP (+ Screenshot optional)</li>"
             "<li>Lizenz Trial/Keys · lokal, ohne Telemetrie · Stubs: KI, Cloud, Stylus, 3D</li>"
