@@ -7963,7 +7963,6 @@ class MainWindow(QMainWindow):
         )
         from instantlensdoc.ui.template_reset import (
             EscapeDiscardEditFilter,
-            focus_line_edit_select_all,
             reset_line_edit_template,
         )
 
@@ -7977,7 +7976,7 @@ class MainWindow(QMainWindow):
         ol.addWidget(
             QLabel(
                 f"{len(uris)} URL(s) · Template "
-                f"{DEFAULT_LINKS_TXT_FILENAME_TEMPLATE} — 2.3.4"
+                f"{DEFAULT_LINKS_TXT_FILENAME_TEMPLATE} — 2.3.5"
             )
         )
         chk_bom = QCheckBox("UTF-8 BOM (Excel)")
@@ -7994,7 +7993,7 @@ class MainWindow(QMainWindow):
         tpl_edit.setToolTip(
             "Live-Dateiname-Template; Platzhalter {stem}/{date}; "
             "Quick-Insert; Reset Default (Bestätigung nur bei Abweichung · "
-            "Fokus+Selektion); Esc im Feld verwirft Edit — 2.3.4"
+            "Fokus+Selektion); Esc im Feld verwirft Edit — 2.3.5"
         )
         tpl_row.addWidget(tpl_edit, 1)
         preview = QLabel("")
@@ -8049,11 +8048,13 @@ class MainWindow(QMainWindow):
         btn_reset_tpl.setFocusPolicy(Qt.TabFocus)
         btn_reset_tpl.setToolTip(
             f"Reset Default ({DEFAULT_LINKS_TXT_FILENAME_TEMPLATE}) "
-            "Bestätigung nur bei Abweichung; danach Fokus+Selektion — 2.3.4"
+            "Bestätigung nur bei Abweichung; danach Fokus+Selektion — 2.3.5"
         )
-
-        def _focus_tpl_select_all() -> None:
-            focus_line_edit_select_all(tpl_edit)
+        btn_reset_tpl.setAccessibleName("Links-TXT Reset Default")
+        btn_reset_tpl.setAccessibleDescription(
+            "Template auf Default zurücksetzen. Bestätigung nur bei Abweichung; "
+            "danach Fokus und Selektion im Template-Feld — 2.3.5"
+        )
 
         def _reset_tpl() -> None:
             default = DEFAULT_LINKS_TXT_FILENAME_TEMPLATE
@@ -8062,6 +8063,7 @@ class MainWindow(QMainWindow):
                 _update_preview()
                 tpl_esc.commit(default)
 
+            # Bestätigung nur bei Abweichung; Fokus+Selektion via after_focus — 2.3.5
             reset_line_edit_template(
                 opts,
                 tpl_edit,
@@ -8069,9 +8071,8 @@ class MainWindow(QMainWindow):
                 title="Reset Default",
                 body_prefix="Links-TXT-Template auf Default zurücksetzen?",
                 on_updated=_after,
-                after_focus=False,
+                after_focus=True,
             )
-            QTimer.singleShot(0, _focus_tpl_select_all)
 
         btn_reset_tpl.clicked.connect(_reset_tpl)
         tpl_row.addWidget(btn_reset_tpl)
@@ -9407,6 +9408,8 @@ class MainWindow(QMainWindow):
             )
             status = f"Komprimiert → {out.name}{savings_suffix} · {before_s} → {after_s}"
             self._set_status(status)
+            # Status-% auch für Screenreader announcen — 2.3.5
+            self._announce_status_toast(status)
             # Dialog-Checkbox → Settings merken — 2.3.2/2.3.3
             try:
                 from instantlensdoc.core.app_settings import set_compress_open_after
@@ -9423,18 +9426,22 @@ class MainWindow(QMainWindow):
             if vals.get("open_after") and out.is_file():
                 try:
                     self.open_path(str(out))
-                    self._set_status(
+                    open_status = (
                         f"Komprimiert geöffnet: {out.name}{savings_suffix}"
                     )
+                    self._set_status(open_status)
+                    self._announce_status_toast(open_status)
                 except Exception as open_err:
                     # Bei Öffnen-Fehler trotzdem Status mit % behalten — 2.3.3
                     _log.warning(
                         "Komprimiertes PDF öffnen fehlgeschlagen: %s", open_err
                     )
-                    self._set_status(
+                    fail_open = (
                         f"Komprimiert → {out.name}{savings_suffix} · "
                         f"{before_s} → {after_s} · Öffnen fehlgeschlagen"
                     )
+                    self._set_status(fail_open)
+                    self._announce_status_toast(fail_open)
             try:
                 from instantlensdoc.core.telemetry import report_anonymous_usage
 
@@ -9449,14 +9456,18 @@ class MainWindow(QMainWindow):
                 err_before = locals().get("before_s")
                 err_after = locals().get("after_s")
                 if err_pct is not None and err_before and err_after:
-                    self._set_status(
+                    err_status = (
                         f"Kompression fehlgeschlagen · Ersparnis {err_pct:.1f} % · "
                         f"{err_before} → {err_after}"
                     )
+                    self._set_status(err_status)
+                    self._announce_status_toast(err_status)
                 elif err_before and err_after:
-                    self._set_status(
+                    err_status = (
                         f"Kompression fehlgeschlagen · {err_before} → {err_after}"
                     )
+                    self._set_status(err_status)
+                    self._announce_status_toast(err_status)
             except Exception:
                 pass
             QMessageBox.warning(self, "Kompression", str(e))

@@ -289,12 +289,13 @@ class CompressPdfDialog(QDialog):
         self.open_after.setAccessibleName("Ergebnis nach Kompression öffnen")
         self.open_after.setAccessibleDescription(
             "Öffnet das komprimierte Ergebnis-PDF nach erfolgreicher Speicherung. "
-            "Toggle wird in den Einstellungen gemerkt."
+            "Toggle wird in den Einstellungen gemerkt. "
+            "Ersparnis-% in der Statuszeile wird für Screenreader announced — 2.3.5"
         )
         self.open_after.setChecked(bool(get_compress_open_after()))
         self.open_after.setToolTip(
             "Ergebnis nach Kompression öffnen — Toggle in Einstellungen gemerkt. "
-            "Bei Öffnen-Fehler bleibt Ersparnis-% in Status — 2.3.4"
+            "Ersparnis-% Status wird announced — 2.3.5"
         )
         form.addRow(self.open_after)
 

@@ -1,9 +1,10 @@
-"""Schnellaktionen-Palette (Ctrl+K Command Palette) — 2.3.0–2.3.4.
+"""Schnellaktionen-Palette (Ctrl+K Command Palette) — 2.3.0–2.3.5.
 
 2.3.1: Fuzzy-Filter, letzte Befehle, Esc schließt, Kategorien gruppiert.
 2.3.2: Pin häufige Befehle · Recent-Anzahl Settings 5/10/20.
 2.3.3: Pin-Persistenz · Unpin · max Pins Settings 3/5/10.
 2.3.4: Overflow-Hinweis bei Pin-Limit · Option ältesten Pin ersetzen.
+2.3.5: Pin-ersetzen-Bestätigung mit Namen des zu ersetzenden Pins.
 """
 
 from __future__ import annotations
@@ -235,7 +236,7 @@ class CommandPaletteDialog(QDialog):
             return 5
 
     def _update_pin_overflow_hint(self) -> None:
-        """Overflow-Hinweis wenn Pin-Limit erreicht — 2.3.4."""
+        """Overflow-Hinweis wenn Pin-Limit erreicht — 2.3.5."""
         try:
             from instantlensdoc.core.app_settings import command_palette_pins_at_limit
 
@@ -246,7 +247,7 @@ class CommandPaletteDialog(QDialog):
             lim = self._pin_limit()
             msg = (
                 f"Pin-Limit erreicht ({lim}). "
-                "Neuer Pin: ältesten ersetzen oder zuerst Unpin — 2.3.4"
+                "Neuer Pin: ältesten ersetzen oder zuerst Unpin — 2.3.5"
             )
             self.pin_overflow_hint.setText(msg)
             self.pin_overflow_hint.setToolTip(msg)
@@ -277,7 +278,8 @@ class CommandPaletteDialog(QDialog):
                 act = QAction("Anheften (ältesten Pin ersetzen)…", self)
                 act.setObjectName("commandPalettePinReplaceOldest")
                 act.setToolTip(
-                    "Pin-Limit erreicht — Option: ältesten Pin ersetzen — 2.3.4"
+                    "Pin-Limit erreicht — Bestätigung mit Namen des zu "
+                    "ersetzenden Pins — 2.3.5"
                 )
             else:
                 act = QAction("Anheften (häufiger Befehl)", self)
@@ -290,7 +292,7 @@ class CommandPaletteDialog(QDialog):
         menu.exec(self.list.mapToGlobal(pos))
 
     def _toggle_pin(self, cmd_id: str) -> None:
-        """Pin/Unpin; bei Limit Overflow-Hinweis + Option ältesten ersetzen — 2.3.4."""
+        """Pin/Unpin; bei Limit Bestätigung mit Namen des zu ersetzenden Pins — 2.3.5."""
         try:
             from instantlensdoc.core.app_settings import (
                 get_command_palette_pin_max,
@@ -311,13 +313,18 @@ class CommandPaletteDialog(QDialog):
                         if oldest in self._by_id
                         else (oldest or "—")
                     )
+                    new_title = (
+                        self._by_id[cmd_id].title
+                        if cmd_id in self._by_id
+                        else (cmd_id or "—")
+                    )
                     reply = QMessageBox.question(
                         self,
-                        "Pin-Limit erreicht",
+                        "Pin ersetzen",
                         (
-                            f"Maximal {limit} Pins. "
-                            f"Ältesten Pin ersetzen?\n\n"
-                            f"Wird ersetzt: {oldest_title}"
+                            f"Pin-Limit ({limit}) erreicht.\n\n"
+                            f"Pin „{oldest_title}“ durch „{new_title}“ ersetzen?\n\n"
+                            f"Zu ersetzender Pin: {oldest_title}"
                         ),
                         QMessageBox.Yes | QMessageBox.No,
                         QMessageBox.Yes,

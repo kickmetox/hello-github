@@ -1353,17 +1353,18 @@ class SettingsDialog(QDialog):
         self.telemetry_chk = QCheckBox("Anonym Nutzung melden (Stub — deaktiviert)")
         self.telemetry_chk.setObjectName("telemetryOptIn")
         self.telemetry_chk.setChecked(False)
-        self.telemetry_chk.setEnabled(False)  # Toggle disabled bleibt — 2.3.2–2.3.4
+        self.telemetry_chk.setEnabled(False)  # Toggle disabled bleibt — 2.3.2–2.3.5
         self.telemetry_chk.setToolTip(
-            "Telemetrie-Stub 2.3.4: Toggle bleibt disabled (aus). "
-            "Info: Esc schließt · Button „Stubs öffnen“ — keine Datenübertragung"
+            "Telemetrie-Stub 2.3.5: Toggle bleibt disabled (aus). "
+            "Info: Esc schließt · „Stubs öffnen“ → Fokus erste Stub-Zeile — "
+            "keine Datenübertragung"
         )
         tel_row = QHBoxLayout()
         tel_row.addWidget(self.telemetry_chk, 1)
         self.btn_telemetry_info = QPushButton("Info…")
         self.btn_telemetry_info.setObjectName("telemetryStubInfoBtn")
         self.btn_telemetry_info.setToolTip(
-            "Warum Stub (kurz) · Esc schließt · „Stubs öffnen“ — 2.3.4"
+            "Warum Stub · Esc schließt · „Stubs öffnen“ Fokus erste Zeile — 2.3.5"
         )
         self.btn_telemetry_info.clicked.connect(self._show_telemetry_stub_info)
         tel_row.addWidget(self.btn_telemetry_info)
@@ -1371,14 +1372,14 @@ class SettingsDialog(QDialog):
         tel_hint = QLabel(
             "<b>Stub — keine Datenübertragung:</b> Toggle ist <b>deaktiviert</b> "
             "und bleibt aus. Es werden <b>niemals</b> Nutzungsdaten gesendet — "
-            "kein Netzwerk, keine Queue, kein Fingerprinting (immer no-op) — 2.3.4. "
-            "„Info…“: Esc schließt · Button <b>Stubs öffnen</b>."
+            "kein Netzwerk, keine Queue, kein Fingerprinting (immer no-op) — 2.3.5. "
+            "„Info…“: Esc schließt · <b>Stubs öffnen</b> → Fokus erste Stub-Zeile."
         )
         tel_hint.setWordWrap(True)
         tel_hint.setObjectName("telemetryStubHint")
         tel_hint.setStyleSheet("color: #8a6d00;")
         tel_hint.setToolTip(
-            "Telemetrie bleibt Stub: Toggle disabled · Esc · Stubs öffnen — 2.3.4"
+            "Telemetrie bleibt Stub: Toggle disabled · Esc · Stubs öffnen Fokus — 2.3.5"
         )
         form.addRow(tel_hint)
 
@@ -1387,12 +1388,13 @@ class SettingsDialog(QDialog):
         self.compress_open_chk.setAccessibleName("Ergebnis nach Kompression öffnen")
         self.compress_open_chk.setAccessibleDescription(
             "Öffnet das komprimierte Ergebnis-PDF nach erfolgreicher Speicherung. "
-            "Gleicher Wert wie die Checkbox im Kompressions-Dialog."
+            "Gleicher Wert wie die Checkbox im Kompressions-Dialog. "
+            "Ersparnis-% in der Statuszeile wird für Screenreader announced — 2.3.5"
         )
         self.compress_open_chk.setChecked(bool(get_compress_open_after()))
         self.compress_open_chk.setToolTip(
             "Ergebnis nach Kompression öffnen — Settings-Toggle (gleicher Wert "
-            "wie Dialog-Checkbox). Bei Öffnen-Fehler bleibt Ersparnis-% — 2.3.4"
+            "wie Dialog-Checkbox). Ersparnis-% Status wird announced — 2.3.5"
         )
         form.addRow(self.compress_open_chk)
 
@@ -1894,7 +1896,7 @@ class SettingsDialog(QDialog):
         self._update_ui_font_preview_label()
 
     def _show_telemetry_stub_info(self) -> None:
-        """Info-Dialog: Esc schließt · Button „Stubs öffnen“ — 2.3.4."""
+        """Info-Dialog: Esc schließt · „Stubs öffnen“ → Fokus erste Zeile — 2.3.5."""
         from PySide6.QtGui import QKeySequence, QShortcut
         from PySide6.QtWidgets import QPushButton as _QPushButton
 
@@ -1924,17 +1926,21 @@ class SettingsDialog(QDialog):
         esc = QShortcut(QKeySequence(Qt.Key_Escape), dlg)
         esc.setContext(Qt.WindowShortcut)
         esc.activated.connect(dlg.reject)
-        # Button „Stubs öffnen“ — 2.3.4
+        # Button „Stubs öffnen“ — Dialog schließt, Fokus erste Stub-Zeile — 2.3.5
         btn_stubs = _QPushButton("Stubs öffnen")
         btn_stubs.setObjectName("telemetryGotoStubsBtn")
         btn_stubs.setAccessibleName("Stubs öffnen")
+        btn_stubs.setAccessibleDescription(
+            "Schließt diesen Dialog und öffnet den Tab Stubs mit Fokus "
+            "auf der ersten Stub-Zeile — 2.3.5"
+        )
         btn_stubs.setToolTip(
-            "Einstellungen → Tab Stubs öffnen (Telemetrie-Eintrag) — 2.3.4"
+            "Dialog schließen · Tab Stubs · Fokus erste Stub-Zeile — 2.3.5"
         )
 
         def _goto_stubs() -> None:
-            dlg.accept()
-            self.goto_stubs_tab()
+            dlg.accept()  # Dialog schließt danach
+            self.goto_stubs_tab(focus_first=True)
 
         btn_stubs.clicked.connect(_goto_stubs)
         lay = dlg.layout()
@@ -1942,13 +1948,29 @@ class SettingsDialog(QDialog):
             lay.insertWidget(max(0, lay.count() - 1), btn_stubs)
         dlg.exec()
 
-    def goto_stubs_tab(self) -> None:
-        """Wechselt zum Settings-Tab „Stubs“ — 2.3.3."""
+    def goto_stubs_tab(self, *, focus_first: bool = True) -> None:
+        """Wechselt zum Settings-Tab „Stubs“; optional Fokus erste Zeile — 2.3.5."""
         try:
             for i in range(self.tabs.count()):
                 if self.tabs.tabText(i).strip().casefold() == "stubs":
                     self.tabs.setCurrentIndex(i)
+                    if focus_first:
+                        from PySide6.QtCore import QTimer
+
+                        QTimer.singleShot(0, self._focus_first_stub_row)
                     return
+        except Exception:
+            pass
+
+    def _focus_first_stub_row(self) -> None:
+        """Fokus + Selektion auf erste Stub-Zeile — 2.3.5."""
+        table = getattr(self, "stubs_table", None)
+        if table is None or table.rowCount() < 1:
+            return
+        try:
+            table.setFocus(Qt.OtherFocusReason)
+            table.selectRow(0)
+            table.setCurrentCell(0, 0)
         except Exception:
             pass
 

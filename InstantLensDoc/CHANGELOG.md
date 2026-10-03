@@ -1,5 +1,18 @@
 # Changelog — InstantLens Doc
 
+## 2.3.5 — Kompression A11y·Status-% announced, Links Reset Bestätigung·Fokus+Selektion, Palette Pin-ersetzen mit Namen, Telemetrie Stubs öffnen Fokus erste Zeile
+
+Post-Release-Polish nach **2.3.4**: **PDF-Kompression** Toggle **AccessibleName/Description** und **Status Ersparnis-% announced**; **URL-Links TXT** Template-**Reset Bestätigung nur bei Abweichung** inkl. **Fokus+Selektion**; **Command Palette** Pin-ersetzen-**Bestätigungsdialog mit Namen** des zu ersetzenden Pins; **Telemetrie-Stub** „Stubs öffnen“ → **Fokus erste Stub-Zeile**, Dialog schließt. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie klar markiert / nicht produktiv (Ink ≠ Stylus).
+
+### Geändert
+- PDF-Kompression: Toggle AccessibleName/Description · Status-% Screenreader-Announcement
+- Links TXT: Reset Default Bestätigung nur bei Abweichung · Fokus+Selektion
+- Command Palette: Pin-ersetzen-Dialog mit Namen des zu ersetzenden Pins
+- Telemetrie-Stub: „Stubs öffnen“ Fokus erste Stub-Zeile · Dialog schließt · weiter no-op
+- Version **2.3.5** (App / `ild_pdf` / ISS / Smoke / Docs); Serie **2.3**; `docs/VERSION` + `VERSION.txt`
+- Smoke: 2.3.5 CLI + Qt (Kompression A11y/Status-%, Links Reset Fokus, Palette Pin-Name, Stubs Fokus)
+- Stubs: Telemetrie Fokus erste Zeile; KI/Cloud/Stylus/3D/Hooks/Outline unverändert markiert
+
 ## 2.3.4 — Kompression Label·A11y, Links TXT Live·Quick-Insert·Reset, Palette Pin-Overflow·ältesten ersetzen, Telemetrie Esc·Stubs öffnen
 
 Post-Release-Polish nach **2.3.3**: **PDF-Kompression** Toggle-Label klar **„Ergebnis nach Kompression öffnen“** inkl. **A11y** (AccessibleName/Description); **URL-Links TXT** **Live-Vorschau Dateiname**, **Quick-Insert `{stem}`/`{date}`**, **Reset Default**; **Command Palette** **Overflow-Hinweis** bei Pin-Limit und Option **ältesten Pin ersetzen**; **Telemetrie-Stub** Info-Dialog **Esc schließt** und Button **„Stubs öffnen“**. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie klar markiert / nicht produktiv (Ink ≠ Stylus).
