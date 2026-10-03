@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import io
 from pathlib import Path
-from typing import List, Optional, Union
+from typing import Callable, List, Optional, Union
 
 from PIL import Image
 
@@ -96,6 +96,34 @@ def compress_pdf_as_images(
     return out_path
 
 
+DEFAULT_PAGE_IMAGE_FILENAME_TEMPLATE = "{stem}_p{page}"
+
+
+def format_page_image_filename(
+    stem: str,
+    page: int,
+    *,
+    template: str | None = None,
+    ext: str = ".png",
+) -> str:
+    """
+    Dateiname aus Template bauen — Default ``{stem}_p{page}`` — 1.5.1.
+    Platzhalter: ``{stem}``, ``{page}`` (1-basiert).
+    """
+    tpl = (template or DEFAULT_PAGE_IMAGE_FILENAME_TEMPLATE).strip() or DEFAULT_PAGE_IMAGE_FILENAME_TEMPLATE
+    safe_stem = str(stem or "document").strip() or "document"
+    # unsichere Pfadzeichen
+    safe_stem = "".join(c if c.isalnum() or c in "-_." else "_" for c in safe_stem)[:120]
+    name = tpl.replace("{stem}", safe_stem).replace("{page}", str(int(page)))
+    name = name.replace("/", "_").replace("\\", "_")
+    while "__" in name:
+        name = name.replace("__", "_")
+    ext = ext if ext.startswith(".") else f".{ext}"
+    if not name.lower().endswith((".png", ".jpg", ".jpeg")):
+        name = name + ext
+    return name
+
+
 def extract_page_image(
     pdf_path: str | Path,
     page_index: int = 0,
@@ -107,10 +135,11 @@ def extract_page_image(
     jpeg_quality: int = 90,
     password: str | None = None,
     grayscale: bool = False,
+    filename_template: str | None = None,
 ) -> Path:
     """
     Rendert eine PDF-Seite und speichert sie als Bild.
-    out_path default: <pdf>_p{N}.png
+    out_path default: <pdf>_p{N}.png (Template ``{stem}_p{page}`` — 1.5.1).
     dpi: wenn gesetzt (z. B. 72/150/300), überschreibt scale (dpi/72).
     """
     from .render import render_page
@@ -124,14 +153,17 @@ def extract_page_image(
         password=password,
         grayscale=grayscale,
     )
-    if out_path is None:
-        ext = ".jpg" if format.upper() in ("JPEG", "JPG") else ".png"
-        out_path = pdf_path.with_name(f"{pdf_path.stem}_p{page_index + 1}{ext}")
-    else:
-        out_path = Path(out_path)
     fmt = format.upper()
     if fmt == "JPG":
         fmt = "JPEG"
+    ext = ".jpg" if fmt == "JPEG" else ".png"
+    if out_path is None:
+        name = format_page_image_filename(
+            pdf_path.stem, page_index + 1, template=filename_template, ext=ext
+        )
+        out_path = pdf_path.with_name(name)
+    else:
+        out_path = Path(out_path)
     if fmt == "JPEG" and img.mode == "RGBA":
         img = img.convert("RGB")
     save_kw: dict = {}
@@ -153,11 +185,15 @@ def extract_pages_as_images(
     jpeg_quality: int = 90,
     password: str | None = None,
     grayscale: bool = False,
+    filename_template: str | None = None,
+    on_progress: Optional[Callable[[int, int], bool]] = None,
 ) -> List[Path]:
     """
     Exportiert eine oder mehrere PDF-Seiten als PNG/JPEG in out_dir.
     pages=None → alle Seiten. Rückgabe: Liste geschriebener Pfade.
     dpi: wenn gesetzt, überschreibt scale (siehe extract_page_image).
+    filename_template: Default ``{stem}_p{page}`` — 1.5.1.
+    on_progress: optional ``(current_1based, total) -> bool``; False = Abbruch — 1.5.1.
     """
     from .document import PdfDocument
 
@@ -168,14 +204,25 @@ def extract_pages_as_images(
     if fmt == "JPG":
         fmt = "JPEG"
     ext = ".jpg" if fmt == "JPEG" else ".png"
+    tpl = filename_template or DEFAULT_PAGE_IMAGE_FILENAME_TEMPLATE
     with PdfDocument(pdf_path, password=password) as doc:
         n = len(doc)
     indices = list(pages) if pages is not None else list(range(n))
+    indices = [i for i in indices if 0 <= i < n]
     written: List[Path] = []
-    for i in indices:
-        if i < 0 or i >= n:
-            continue
-        out = out_dir / f"{pdf_path.stem}_p{i + 1}{ext}"
+    total = len(indices)
+    for idx, i in enumerate(indices):
+        if on_progress is not None:
+            try:
+                cont = on_progress(idx + 1, total)
+            except Exception:
+                cont = True
+            if cont is False:
+                break
+        name = format_page_image_filename(
+            pdf_path.stem, i + 1, template=tpl, ext=ext
+        )
+        out = out_dir / name
         written.append(
             extract_page_image(
                 pdf_path,
@@ -187,6 +234,7 @@ def extract_pages_as_images(
                 jpeg_quality=jpeg_quality,
                 password=password,
                 grayscale=grayscale,
+                filename_template=tpl,
             )
         )
     return written
@@ -328,6 +376,7 @@ def insert_signature_image(
     y: float = 520.0,
     width: float = 180.0,
     height: float = 64.0,
+    opacity: float = 1.0,
     flatten: bool = False,
     flatten_path: str | Path | None = None,
     flatten_scale: float = 2.0,
@@ -336,11 +385,19 @@ def insert_signature_image(
     """
     Signatur-Platzhalter: Bildstempel als Sidecar-Annotation (img:…).
     Optional Flatten/Bake der betroffenen Seite in ein neues PDF — 1.5.0.
+    Größe via width/height; Deckkraft via opacity (0.05–1.0) — 1.5.1.
     Rückgabe: Bildpfad, oder (Bildpfad, Flatten-PDF) wenn flatten=True.
     """
     from .annotate import Annotation, AnnotationStore, AnnotationType
 
     pdf_path = Path(pdf_path)
+    try:
+        op = float(opacity)
+    except (TypeError, ValueError):
+        op = 1.0
+    op = max(0.05, min(1.0, op))
+    width = max(20.0, float(width))
+    height = max(12.0, float(height))
     if isinstance(image, Image.Image):
         assets = pdf_path.parent / f"{pdf_path.stem}_signatures"
         assets.mkdir(parents=True, exist_ok=True)
@@ -361,6 +418,7 @@ def insert_signature_image(
             height=height,
             text=f"img:{img_path}",
             color="#2C3E50",
+            opacity=op,
         )
     )
     store.save(force=True)

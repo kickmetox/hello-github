@@ -46,8 +46,25 @@ _STRINGS: dict[str, dict[UiLang, str]] = {
     "field_producer": {"de": "Produzent", "en": "Producer"},
     "meta_save": {"de": "Speichern", "en": "Save"},
     "meta_hint": {
-        "de": "Titel, Autor, Betreff und Keywords (DocInfo + XMP) — Speichern schreibt in die PDF-Datei.",
-        "en": "Title, author, subject and keywords (DocInfo + XMP) — Save writes into the PDF.",
+        "de": "Titel, Autor, Betreff und Keywords (DocInfo + XMP) — Speichern schreibt in die PDF-Datei. Dirty-Markierung · Zurücksetzen · leere Felder löschen — 1.5.1.",
+        "en": "Title, author, subject and keywords (DocInfo + XMP) — Save writes into the PDF. Dirty mark · Reset · delete empty fields — 1.5.1.",
+    },
+    "meta_reset": {"de": "Zurücksetzen", "en": "Reset"},
+    "meta_reset_tip": {
+        "de": "Alle Felder auf die geladenen Originalwerte zurücksetzen — 1.5.1",
+        "en": "Reset all fields to the loaded original values — 1.5.1",
+    },
+    "meta_dirty": {
+        "de": "Ungespeicherte Änderungen (*)",
+        "en": "Unsaved changes (*)",
+    },
+    "meta_delete_empty": {
+        "de": "Leere Felder beim Speichern löschen",
+        "en": "Delete empty fields on save",
+    },
+    "meta_delete_empty_tip": {
+        "de": "An: leere Metadaten-Felder aus DocInfo/XMP entfernen. Aus: leere Strings belassen — 1.5.1",
+        "en": "On: remove empty metadata fields from DocInfo/XMP. Off: keep empty strings — 1.5.1",
     },
     # Lizenz-Banner — 1.0.9
     "expiry_warn_banner": {

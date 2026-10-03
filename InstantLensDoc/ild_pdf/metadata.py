@@ -1,10 +1,29 @@
-"""PDF-Dokumentmetadaten lesen/schreiben (pikepdf)."""
+"""PDF-Dokumentmetadaten lesen/schreiben (pikepdf) — UTF-8 sicher 1.5.1."""
 
 from __future__ import annotations
 
+import unicodedata
 from dataclasses import asdict, dataclass, fields
 from pathlib import Path
 from typing import Optional
+
+
+def utf8_safe(value: object) -> str:
+    """
+    String UTF-8-sicher normalisieren (NFC, ungültige Surrogates entfernen) — 1.5.1.
+    """
+    if value is None:
+        return ""
+    if isinstance(value, bytes):
+        try:
+            s = value.decode("utf-8")
+        except UnicodeDecodeError:
+            s = value.decode("utf-8", errors="replace")
+    else:
+        s = str(value)
+    # Surrogate/ungültige Codepoints bereinigen
+    s = s.encode("utf-8", errors="surrogatepass").decode("utf-8", errors="replace")
+    return unicodedata.normalize("NFC", s)
 
 
 @dataclass
@@ -17,14 +36,14 @@ class PdfMetadata:
     producer: str = ""
 
     def to_dict(self) -> dict[str, str]:
-        return {k: (v or "") for k, v in asdict(self).items()}
+        return {k: utf8_safe(v or "") for k, v in asdict(self).items()}
 
     @classmethod
     def from_dict(cls, data: dict | None) -> "PdfMetadata":
         if not data:
             return cls()
         known = {f.name for f in fields(cls)}
-        return cls(**{k: str(data.get(k) or "") for k in known})
+        return cls(**{k: utf8_safe(data.get(k) or "") for k in known})
 
 
 def _docinfo_str(docinfo, key: str) -> str:
@@ -32,7 +51,7 @@ def _docinfo_str(docinfo, key: str) -> str:
         val = docinfo.get(key)
         if val is None:
             return ""
-        return str(val)
+        return utf8_safe(val)
     except Exception:
         return ""
 
@@ -57,7 +76,7 @@ def get_metadata(path: str | Path) -> PdfMetadata:
                 with pdf.open_metadata() as xmp:
                     t = xmp.get("dc:title")
                     if t:
-                        meta.title = str(t)
+                        meta.title = utf8_safe(t)
             except Exception:
                 pass
         return meta
@@ -68,28 +87,64 @@ def set_metadata(
     meta: PdfMetadata | dict,
     *,
     out_path: str | Path | None = None,
+    delete_empty: bool = True,
 ) -> Path:
-    """Schreibt Metadaten in DocInfo und XMP-Title/Creator."""
+    """
+    Schreibt Metadaten in DocInfo und XMP-Title/Creator.
+    delete_empty=True (Default): leere Felder aus DocInfo/XMP entfernen — 1.5.1.
+    delete_empty=False: leere Felder als leere Strings belassen (nicht löschen).
+    Werte werden UTF-8-sicher (NFC) geschrieben.
+    """
     import pikepdf
 
     path = Path(path)
     out_path = Path(out_path) if out_path else path
     if isinstance(meta, dict):
         meta = PdfMetadata.from_dict(meta)
+    else:
+        meta = PdfMetadata(
+            title=utf8_safe(meta.title),
+            author=utf8_safe(meta.author),
+            subject=utf8_safe(meta.subject),
+            keywords=utf8_safe(meta.keywords),
+            creator=utf8_safe(meta.creator),
+            producer=utf8_safe(meta.producer),
+        )
 
     overwrite = out_path.resolve() == path.resolve()
     with pikepdf.open(path, allow_overwriting_input=overwrite) as pdf:
         with pdf.open_metadata(set_pikepdf_as_editor=False) as xmp:
-            if meta.title:
-                xmp["dc:title"] = meta.title
+            if meta.title or not delete_empty:
+                if meta.title:
+                    xmp["dc:title"] = meta.title
+                elif not delete_empty:
+                    xmp["dc:title"] = ""
+            elif "dc:title" in xmp:
+                try:
+                    del xmp["dc:title"]
+                except Exception:
+                    pass
             if meta.author:
                 xmp["dc:creator"] = [meta.author]
-            if meta.subject:
-                xmp["dc:description"] = meta.subject
-            if meta.keywords:
-                xmp["pdf:Keywords"] = meta.keywords
-            if meta.creator:
-                xmp["xmp:CreatorTool"] = meta.creator
+            elif delete_empty and "dc:creator" in xmp:
+                try:
+                    del xmp["dc:creator"]
+                except Exception:
+                    pass
+            for xkey, val in (
+                ("dc:description", meta.subject),
+                ("pdf:Keywords", meta.keywords),
+                ("xmp:CreatorTool", meta.creator),
+            ):
+                if val:
+                    xmp[xkey] = val
+                elif delete_empty and xkey in xmp:
+                    try:
+                        del xmp[xkey]
+                    except Exception:
+                        pass
+                elif not delete_empty:
+                    xmp[xkey] = ""
         # DocInfo parallel (ältere Reader)
         info = pdf.docinfo
         mapping = {
@@ -98,13 +153,17 @@ def set_metadata(
             "/Subject": meta.subject,
             "/Keywords": meta.keywords,
             "/Creator": meta.creator,
-            "/Producer": meta.producer or "InstantLens Doc",
+            "/Producer": meta.producer or ("InstantLens Doc" if delete_empty else meta.producer),
         }
         for key, val in mapping.items():
             if val:
                 info[key] = val
-            elif key in info:
-                del info[key]
+            elif delete_empty:
+                if key in info:
+                    del info[key]
+            else:
+                # leere Felder behalten (leerer String) — 1.5.1
+                info[key] = ""
         out_path.parent.mkdir(parents=True, exist_ok=True)
         pdf.save(out_path)
     return out_path

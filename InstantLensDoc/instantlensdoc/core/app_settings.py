@@ -40,6 +40,12 @@ DEFAULTS: dict[str, Any] = {
     "pdf_compare_diff_threshold": 18,  # Raster-Diff Pixel-Schwellwert 0–255 — 1.4.1
     "pdf_compare_page_sync": True,  # Seitenwahl Sync (True) / Entkoppelt (False) — 1.4.1
     "last_pdf_diff_png_dir": "",  # letzter Zielordner Diff-PNG-Export — 1.4.2
+    "last_page_image_export_dir": "",  # letzter Zielordner Seiten→Bilder — 1.5.1
+    "page_image_filename_template": "{stem}_p{page}",  # Dateiname-Template — 1.5.1
+    "last_signature_image": "",  # zuletzt verwendetes Signatur-Bild — 1.5.1
+    "last_signature_width": 180.0,  # Signatur-Breite Default — 1.5.1
+    "last_signature_height": 64.0,  # Signatur-Höhe Default — 1.5.1
+    "last_signature_opacity": 1.0,  # Signatur-Deckkraft Default — 1.5.1
     "last_rename_undo_log": "",  # letzter Batch-Rename Undo-Log (TXT) — 1.4.2
     "default_zoom_percent": 150,
     "default_zoom_mode": "percent",  # percent | fit_width | fit_page
@@ -659,6 +665,116 @@ def set_last_pdf_diff_png_dir(path: str | Path) -> None:
     if p.is_file():
         p = p.parent
     save_settings({"last_pdf_diff_png_dir": str(p)})
+
+
+DEFAULT_PAGE_IMAGE_FILENAME_TEMPLATE = "{stem}_p{page}"
+
+
+def get_last_page_image_export_dir() -> Path | None:
+    """Letzter Zielordner für Seiten→Bilder-Export — 1.5.1."""
+    raw = str(load_settings().get("last_page_image_export_dir") or "").strip()
+    if not raw:
+        return None
+    p = Path(raw)
+    return p if p.is_dir() else None
+
+
+def set_last_page_image_export_dir(path: str | Path) -> None:
+    """Zielordner Seiten→Bilder merken — 1.5.1."""
+    p = Path(path)
+    if p.is_file():
+        p = p.parent
+    save_settings({"last_page_image_export_dir": str(p)})
+
+
+def get_page_image_filename_template() -> str:
+    """Dateiname-Template Seiten→Bilder, Default ``{stem}_p{page}`` — 1.5.1."""
+    raw = str(
+        load_settings().get(
+            "page_image_filename_template",
+            DEFAULTS["page_image_filename_template"],
+        )
+        or ""
+    ).strip()
+    if not raw:
+        return DEFAULT_PAGE_IMAGE_FILENAME_TEMPLATE
+    if "{stem}" not in raw:
+        raw = "{stem}_" + raw.lstrip("_")
+    if "{page}" not in raw:
+        raw = raw.rstrip("_") + "_p{page}"
+    raw = raw.replace("/", "_").replace("\\", "_")
+    return raw
+
+
+def set_page_image_filename_template(template: str) -> str:
+    """Template Seiten→Bilder speichern — 1.5.1."""
+    raw = str(template or "").strip() or DEFAULT_PAGE_IMAGE_FILENAME_TEMPLATE
+    if "{stem}" not in raw:
+        raw = "{stem}_" + raw.lstrip("_")
+    if "{page}" not in raw:
+        raw = raw.rstrip("_") + "_p{page}"
+    raw = raw.replace("/", "_").replace("\\", "_")
+    # Extension weglassen — wird je Format gesetzt
+    for suf in (".png", ".jpg", ".jpeg"):
+        if raw.lower().endswith(suf):
+            raw = raw[: -len(suf)]
+            break
+    save_settings({"page_image_filename_template": raw})
+    return raw
+
+
+def get_last_signature_image() -> Path | None:
+    """Zuletzt verwendetes Signatur-Bild — 1.5.1."""
+    raw = str(load_settings().get("last_signature_image") or "").strip()
+    if not raw:
+        return None
+    p = Path(raw)
+    return p if p.is_file() else None
+
+
+def set_last_signature_image(path: str | Path) -> None:
+    """Signatur-Bild-Pfad merken — 1.5.1."""
+    p = Path(path)
+    if p.is_file():
+        save_settings({"last_signature_image": str(p)})
+
+
+def get_last_signature_size() -> tuple[float, float]:
+    """Zuletzt verwendete Signatur-Größe (width, height) — 1.5.1."""
+    try:
+        w = float(load_settings().get("last_signature_width", 180.0) or 180.0)
+    except (TypeError, ValueError):
+        w = 180.0
+    try:
+        h = float(load_settings().get("last_signature_height", 64.0) or 64.0)
+    except (TypeError, ValueError):
+        h = 64.0
+    return max(40.0, min(600.0, w)), max(20.0, min(400.0, h))
+
+
+def set_last_signature_size(width: float, height: float) -> None:
+    """Signatur-Größe merken — 1.5.1."""
+    w = max(40.0, min(600.0, float(width)))
+    h = max(20.0, min(400.0, float(height)))
+    save_settings({"last_signature_width": w, "last_signature_height": h})
+
+
+def get_last_signature_opacity() -> float:
+    """Zuletzt verwendete Signatur-Deckkraft — 1.5.1."""
+    try:
+        op = float(load_settings().get("last_signature_opacity", 1.0) or 1.0)
+    except (TypeError, ValueError):
+        op = 1.0
+    return max(0.05, min(1.0, op))
+
+
+def set_last_signature_opacity(opacity: float) -> None:
+    """Signatur-Deckkraft merken — 1.5.1."""
+    try:
+        op = float(opacity)
+    except (TypeError, ValueError):
+        op = 1.0
+    save_settings({"last_signature_opacity": max(0.05, min(1.0, op))})
 
 
 def get_last_rename_undo_log() -> Path | None:

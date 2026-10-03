@@ -744,6 +744,8 @@ class PdfCanvas(QLabel):
                 if img_path.is_file():
                     pm = QPixmap(str(img_path))
                     if not pm.isNull():
+                        # Signatur-Deckkraft über painter.setOpacity — 1.5.1
+                        painter.setOpacity(opacity)
                         painter.drawPixmap(
                             x,
                             y,
@@ -6901,11 +6903,11 @@ class PdfViewer(QWidget):
             QMessageBox.warning(self, "Extrahieren", str(e))
 
     def export_pages_as_images(self):
-        """Alle (oder aktuelle) PDF-Seiten als PNG/JPEG in einen Ordner exportieren."""
+        """Alle (oder aktuelle) PDF-Seiten als PNG/JPEG; Zielordner·Template·Fortschritt — 1.5.1."""
         if not self.pdf_path:
             QMessageBox.information(self, "Export", "Kein PDF geladen.")
             return
-        from PySide6.QtWidgets import QFileDialog, QInputDialog
+        from PySide6.QtWidgets import QApplication, QFileDialog, QInputDialog, QProgressDialog
         from ild_pdf import extract_pages_as_images
         from instantlensdoc.core.app_settings import (
             EXPORT_RASTER_DPI_CHOICES,
@@ -6915,9 +6917,13 @@ class PdfViewer(QWidget):
             get_export_profile,
             get_export_profiles,
             get_export_raster_dpi,
+            get_last_page_image_export_dir,
+            get_page_image_filename_template,
             remember_recent_dir,
             set_export_raster_dpi,
             set_last_export_dir,
+            set_last_page_image_export_dir,
+            set_page_image_filename_template,
         )
 
         profiles = get_export_profiles()
@@ -7018,7 +7024,20 @@ class PdfViewer(QWidget):
             return
         dpi = int(dpi_str)
         set_export_raster_dpi(dpi)
+        # Dateiname-Template {stem}_p{page} — 1.5.1
+        tpl_default = get_page_image_filename_template()
+        tpl, ok = QInputDialog.getText(
+            self,
+            "Seiten als Bilder",
+            "Dateiname-Template ({stem}, {page}):",
+            text=tpl_default,
+        )
+        if not ok:
+            return
+        tpl = set_page_image_filename_template(tpl or tpl_default)
+        last_img_dir = get_last_page_image_export_dir()
         start_dir = dialog_start_dir(
+            last_img_dir,
             str(profile["target"]) if profile and profile.get("target") else None,
             self.pdf_path.parent,
         )
@@ -7026,6 +7045,41 @@ class PdfViewer(QWidget):
         if not out_dir:
             return
         try:
+            from ild_pdf import PdfDocument as _PdProg
+
+            if pages is None:
+                try:
+                    with _PdProg(self.pdf_path, password=self.password) as doc:
+                        total_export = len(doc)
+                except Exception:
+                    total_export = 1
+            else:
+                total_export = len(pages)
+            progress: QProgressDialog | None = None
+            cancelled = {"v": False}
+            # Fortschritt bei Bereich/Mehrseiten — 1.5.1
+            if total_export > 1:
+                progress = QProgressDialog(
+                    "Seiten als Bilder…", "Abbrechen", 0, total_export, self
+                )
+                progress.setWindowTitle("Export")
+                progress.setMinimumDuration(0)
+                progress.setValue(0)
+
+                def _on_prog(cur: int, total: int) -> bool:
+                    if progress is None:
+                        return True
+                    progress.setMaximum(total)
+                    progress.setValue(cur)
+                    progress.setLabelText(f"Seite {cur} von {total}…")
+                    QApplication.processEvents()
+                    if progress.wasCanceled():
+                        cancelled["v"] = True
+                        return False
+                    return True
+            else:
+                _on_prog = None  # type: ignore[assignment]
+
             written = extract_pages_as_images(
                 self.pdf_path,
                 out_dir,
@@ -7034,15 +7088,30 @@ class PdfViewer(QWidget):
                 format=fmt,
                 password=self.password,
                 grayscale=self._grayscale,
+                filename_template=tpl,
+                on_progress=_on_prog,
             )
+            if progress is not None:
+                progress.close()
             set_last_export_dir(out_dir)
+            set_last_page_image_export_dir(out_dir)
             remember_recent_dir(out_dir)
-            self.status.emit(f"{len(written)} Bild(er) @ {dpi} DPI → {Path(out_dir).name}")
-            QMessageBox.information(
-                self,
-                "Export",
-                f"{len(written)} Seite(n) als {fmt} ({dpi} DPI) exportiert nach:\n{out_dir}",
-            )
+            if cancelled["v"]:
+                self.status.emit(
+                    f"Export abgebrochen ({len(written)}/{total_export}) → {Path(out_dir).name}"
+                )
+                QMessageBox.information(
+                    self,
+                    "Export",
+                    f"Abgebrochen nach {len(written)} von {total_export} Seite(n).\n{out_dir}",
+                )
+            else:
+                self.status.emit(f"{len(written)} Bild(er) @ {dpi} DPI → {Path(out_dir).name}")
+                QMessageBox.information(
+                    self,
+                    "Export",
+                    f"{len(written)} Seite(n) als {fmt} ({dpi} DPI) exportiert nach:\n{out_dir}",
+                )
         except Exception as e:
             QMessageBox.warning(self, "Export", str(e))
 
@@ -7052,29 +7121,92 @@ class PdfViewer(QWidget):
         self.status.emit("Signaturfeld: auf die Seite klicken")
 
     def insert_signature_image(self):
-        """Bildstempel-Signatur (Sidecar); optional Flatten-PDF — 1.5.0."""
+        """Bildstempel-Signatur; Größe/Opacity-Slider; letztes Bild merken — 1.5.1."""
         if not self.store or not self.pdf_path:
             QMessageBox.information(self, "Signatur", "Kein PDF geladen.")
             return
-        from PySide6.QtWidgets import QCheckBox, QDialog, QDialogButtonBox, QFileDialog, QLabel, QVBoxLayout
+        from PySide6.QtWidgets import (
+            QCheckBox,
+            QDialog,
+            QDialogButtonBox,
+            QFileDialog,
+            QFormLayout,
+            QLabel,
+            QSlider,
+            QVBoxLayout,
+        )
+        from PySide6.QtCore import Qt as _Qt
         from ild_pdf import insert_signature_image
-        from instantlensdoc.core.app_settings import dialog_start_dir, remember_recent_dir
+        from instantlensdoc.core.app_settings import (
+            dialog_start_dir,
+            get_last_signature_image,
+            get_last_signature_opacity,
+            get_last_signature_size,
+            remember_recent_dir,
+            set_last_signature_image,
+            set_last_signature_opacity,
+            set_last_signature_size,
+        )
         from instantlensdoc.ui.file_dialogs import confirm_overwrite_export
 
+        last_sig = get_last_signature_image()
+        start = dialog_start_dir(
+            last_sig.parent if last_sig else None,
+            self.pdf_path.parent if self.pdf_path else None,
+        )
         path, _ = QFileDialog.getOpenFileName(
             self,
             "Signatur-Bild",
-            dialog_start_dir(self.pdf_path.parent if self.pdf_path else None),
+            start,
             "Bilder (*.png *.jpg *.jpeg *.bmp)",
         )
+        if not path and last_sig is not None:
+            # Abbruch im Dialog: bei bekanntem letztem Bild nachfragen — 1.5.1
+            from PySide6.QtWidgets import QMessageBox as _MB
+
+            use = _MB.question(
+                self,
+                "Signatur",
+                f"Zuletzt verwendet:\n{last_sig.name}\n\nDieses Bild erneut verwenden?",
+                _MB.Yes | _MB.No,
+                _MB.Yes,
+            )
+            if use == _MB.Yes:
+                path = str(last_sig)
         if not path:
             return
         remember_recent_dir(path)
-        # Option: Sidecar + Flatten — 1.5.0
+        set_last_signature_image(path)
+        # Option: Größe/Opacity + Flatten — 1.5.1
         opt = QDialog(self)
         opt.setWindowTitle("Signatur platzieren")
         ol = QVBoxLayout(opt)
+        ol.addWidget(QLabel(f"Bild: {Path(path).name}"))
         ol.addWidget(QLabel("Bildstempel als Sidecar-Annotation auf die aktuelle Seite setzen."))
+        form = QFormLayout()
+        last_w, last_h = get_last_signature_size()
+        last_op = get_last_signature_opacity()
+        # Größe als Prozent der Default-Breite 180 — Slider 40–300 %
+        size_slider = QSlider(_Qt.Horizontal)
+        size_slider.setRange(40, 300)
+        size_pct = int(round((last_w / 180.0) * 100))
+        size_slider.setValue(max(40, min(300, size_pct)))
+        size_lbl = QLabel(f"{size_slider.value()} %")
+        size_slider.valueChanged.connect(lambda v: size_lbl.setText(f"{v} %"))
+        size_row = QVBoxLayout()
+        size_row.addWidget(size_slider)
+        size_row.addWidget(size_lbl)
+        form.addRow("Größe", size_row)
+        op_slider = QSlider(_Qt.Horizontal)
+        op_slider.setRange(5, 100)
+        op_slider.setValue(int(round(last_op * 100)))
+        op_lbl = QLabel(f"{op_slider.value()} %")
+        op_slider.valueChanged.connect(lambda v: op_lbl.setText(f"{v} %"))
+        op_row = QVBoxLayout()
+        op_row.addWidget(op_slider)
+        op_row.addWidget(op_lbl)
+        form.addRow("Deckkraft", op_row)
+        ol.addLayout(form)
         chk_flat = QCheckBox("Zusätzlich Flatten-PDF erzeugen (Signatur einbrennen)")
         chk_flat.setChecked(False)
         chk_flat.setToolTip(
@@ -7087,6 +7219,12 @@ class PdfViewer(QWidget):
         ol.addWidget(btns)
         if opt.exec() != QDialog.Accepted:
             return
+        scale = size_slider.value() / 100.0
+        width = max(40.0, 180.0 * scale)
+        height = max(20.0, 64.0 * scale)
+        opacity = max(0.05, min(1.0, op_slider.value() / 100.0))
+        set_last_signature_size(width, height)
+        set_last_signature_opacity(opacity)
         do_flatten = chk_flat.isChecked()
         flatten_out = None
         if do_flatten:
@@ -7124,6 +7262,9 @@ class PdfViewer(QWidget):
                 page_index=self.page_index,
                 x=x,
                 y=y,
+                width=width,
+                height=height,
+                opacity=opacity,
                 flatten=do_flatten,
                 flatten_path=flatten_out,
                 password=self.password,
@@ -7136,7 +7277,9 @@ class PdfViewer(QWidget):
                 remember_recent_dir(flat)
                 self.status.emit(f"Signatur platziert + Flatten: {Path(flat).name}")
             else:
-                self.status.emit("Signatur-Bild platziert (Sidecar)")
+                self.status.emit(
+                    f"Signatur-Bild platziert (Sidecar, {int(opacity * 100)} % Deckkraft)"
+                )
         except Exception as e:
             QMessageBox.warning(self, "Signatur", str(e))
 

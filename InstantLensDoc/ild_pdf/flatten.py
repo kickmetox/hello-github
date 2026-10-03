@@ -111,6 +111,16 @@ def draw_annotations_on_image(
                         stamp = Image.open(img_path).convert("RGBA")
                         tw, th = max(int(w), 40), max(int(h), 24)
                         stamp = stamp.resize((tw, th), Image.Resampling.LANCZOS)
+                        # Deckkraft der Signatur/Stempel anwenden — 1.5.1
+                        try:
+                            op = float(getattr(ann, "opacity", 1.0) or 1.0)
+                        except (TypeError, ValueError):
+                            op = 1.0
+                        op = max(0.05, min(1.0, op))
+                        if op < 0.999:
+                            r, g, b, a = stamp.split()
+                            a = a.point(lambda v, o=op: max(0, min(255, int(round(v * o)))))
+                            stamp = Image.merge("RGBA", (r, g, b, a))
                         if rot:
                             stamp = stamp.rotate(-rot, expand=True, resample=Image.Resampling.BICUBIC)
                             tw, th = stamp.size

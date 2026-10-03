@@ -100,10 +100,11 @@ SHORTCUTS_HTML = """
 <tr><td>Ann. Export JSON/Flatten</td><td>PDF → Annotationen exportieren (JSON / Flatten)…: Quick-Insert {stem}/{page}/{date}; Ctrl+Z lokal; Reset-Template → Live-Vorschau + Fokus mit Selektion ganzer Default-Text; Bestätigung nur bei Abweichung — 1.2.9</td></tr>
 <tr><td>Text-Diff Panel</td><td>Datei → Text-Diff (offene Tabs)… (Ctrl+Alt+D): Wrap-Blink Dauer kurz/mittel/lang + System-Beep vs. stumm; Status Änderung i/n; F7/Shift+F7 — 1.2.9</td></tr>
 <tr><td>run.bat Deps / pip</td><td>Windows-Start: gewählte Python-Binary als „gefunden: …“ inkl. python --version; %ILD_PYTHON% ungültig/leer → Fallback py -3 → python → python3; --help; .venv; --yes/-y; Exit 0/1 — 1.2.9</td></tr>
-<tr><td>CLI Start</td><td><code>python -m instantlensdoc --open FILE</code> · <code>--version</code>/−V — 1.5.0</td></tr>
-<tr><td>PDF-Metadaten</td><td>PDF → Metadaten: Titel/Autor/Betreff/Keywords (pikepdf DocInfo+XMP) Speichern — 1.5.0</td></tr>
-<tr><td>Seiten als Bilder</td><td>PDF → aktuell / Seitenbereich (1-3,5) / alle → PNG/JPEG; DPI 72/150/300 — 1.5.0</td></tr>
-<tr><td>Signatur (Bild)</td><td>Bildstempel Sidecar; optional Flatten-PDF — 1.5.0</td></tr>
+<tr><td>CLI Start</td><td><code>python -m instantlensdoc --open DATEI</code> (mehrfach) · <code>--version</code>/−V · <code>--help</code> DE; Exit 2 fehlende Datei — 1.5.1</td></tr>
+<tr><td>CLI/Metadaten/Bilder/Signatur (1.5.0)</td><td>Basis: Metadaten Betreff · Seitenbereich DPI · Signatur Flatten · <code>--open</code>/<code>--version</code> — 1.5.0</td></tr>
+<tr><td>PDF-Metadaten</td><td>PDF → Metadaten: Dirty (*) · Zurücksetzen · UTF-8 · leere Felder löschen Toggle — 1.5.1</td></tr>
+<tr><td>Seiten als Bilder</td><td>PDF → aktuell / Bereich / alle → PNG/JPEG; Zielordner merken; Template <code>{stem}_p{page}</code>; Fortschritt — 1.5.1</td></tr>
+<tr><td>Signatur (Bild)</td><td>Größe-/Opacity-Slider; letztes Bild merken; Sidecar + optional Flatten — 1.5.1</td></tr>
 <tr><td>PDF-Vergleich Diff</td><td>Diff-PNG Reset: Bestätigung nur bei Abweichung; Fokus+Selektion wie Ann.-Template — 1.4.5</td></tr>
 <tr><td>Batch-Umbenennen</td><td>Undo-Skip: „rückgängig X, übersprungen Y“; kopierbarer Text — 1.4.5</td></tr>
 <tr><td>Annotation-Suche offen</td><td>Ctrl+Shift+F3: CSV Neu-Scan Fortschritt bei vielen Docs + Abbruch — 1.4.5</td></tr>
@@ -311,10 +312,10 @@ About: Datenschutz-Hinweis (lokal, keine Telemetrie).</p>
 <p><b>Logordner:</b> Hilfe → Logordner öffnen (Crash-/App-Logs).</p>
 <p><b>Crash-Report:</b> Hilfe → Crash-Report erstellen… (ZIP aus Logordner; optional Screenshot-Pfad-Hinweis).</p>
 <p><b>Lizenz:</b> bei weniger als 7 Resttagen prominent in der Statusleiste.</p>
-<p><b>Seiten als Bilder:</b> PDF → aktuell / Seitenbereich (z. B. 1-3,5) / alle als PNG/JPEG; DPI 72/150/300 — 1.5.0.</p>
-<p><b>PDF-Metadaten:</b> Titel/Autor/Betreff/Keywords lesen+schreiben (pikepdf) — 1.5.0.</p>
-<p><b>Signatur (Bild):</b> Bildstempel Sidecar; optional Flatten — 1.5.0.</p>
-<p><b>CLI:</b> <code>python -m instantlensdoc --open FILE</code> · <code>--version</code> — 1.5.0.</p>
+<p><b>Seiten als Bilder:</b> Zielordner merken; Template <code>{stem}_p{page}</code>; Fortschritt bei Bereich — 1.5.1.</p>
+<p><b>PDF-Metadaten:</b> Dirty-Markierung · Zurücksetzen · UTF-8 sicher · leere Felder löschen — 1.5.1.</p>
+<p><b>Signatur (Bild):</b> Größe-/Opacity-Slider; letztes Bild merken — 1.5.1.</p>
+<p><b>CLI:</b> <code>--help</code> DE · mehrfach <code>--open</code> · Exitcode 2 bei fehlender Datei — 1.5.1.</p>
 <p><b>Thumbnails:</b> in der Sidebar ziehen zum Neuordnen der Seiten (Ctrl+Z rückgängig); Größe in Einstellungen (klein/normal/groß).</p>
 <p><b>Statusleiste:</b> Dateiname · Seite x/y · Seitengröße (mm/inch, klickbar) · Zoom % · Wörter/Ann. · Version · Lizenz.</p>
 <p><b>PDF-Vergleich:</b> Diff-PNG Reset Bestätigung nur bei Abweichung; Fokus+Selektion — 1.4.5</p>

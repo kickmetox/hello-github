@@ -67,11 +67,13 @@ from .outline import (
     write_outline,
 )
 from .images import (
+    DEFAULT_PAGE_IMAGE_FILENAME_TEMPLATE,
     compress_image_for_pdf,
     compress_pdf_as_images,
     extract_page_image,
     extract_pages_as_images,
     extract_embedded_images,
+    format_page_image_filename,
     insert_image_as_page,
     insert_image_stamp_overlay,
     insert_signature_field,
@@ -95,7 +97,14 @@ from .limits import PdfHealth, THUMB_LAZY_THRESHOLD, clamp_render_scale, inspect
 from .render import clear_render_cache
 from .security import needs_password, remove_password, set_password, try_open_password
 from .redact import bake_redactions
-from .metadata import PdfMetadata, get_metadata, sanitize_pdf, set_metadata, strip_metadata
+from .metadata import (
+    PdfMetadata,
+    get_metadata,
+    sanitize_pdf,
+    set_metadata,
+    strip_metadata,
+    utf8_safe,
+)
 from .acroform import (
     FORM_FIELD_CSV_FIELDS,
     FormFieldInfo,
@@ -181,9 +190,11 @@ __all__ = [
     "THUMB_LAZY_THRESHOLD",
     "compress_image_for_pdf",
     "compress_pdf_as_images",
+    "DEFAULT_PAGE_IMAGE_FILENAME_TEMPLATE",
     "extract_page_image",
     "extract_pages_as_images",
     "extract_embedded_images",
+    "format_page_image_filename",
     "insert_image_as_page",
     "insert_image_stamp_overlay",
     "insert_signature_field",
@@ -214,6 +225,7 @@ __all__ = [
     "set_metadata",
     "strip_metadata",
     "sanitize_pdf",
+    "utf8_safe",
     "FormFieldInfo",
     "FORM_FIELD_CSV_FIELDS",
     "has_acroform",
@@ -232,4 +244,4 @@ __all__ = [
     "uri_link_at",
 ]
 
-__version__ = "1.5.0"
+__version__ = "1.5.1"

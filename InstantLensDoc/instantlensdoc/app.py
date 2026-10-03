@@ -12,16 +12,45 @@ if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
 
+class _GermanHelpFormatter(argparse.HelpFormatter):
+    """Hilfe-Texte auf Deutsch belassen (Formatter-Hook) — 1.5.1."""
+
+    def __init__(self, prog: str, **kwargs):
+        kwargs.setdefault("width", 88)
+        super().__init__(prog, **kwargs)
+
+
 def parse_cli(argv: list[str] | None = None) -> argparse.Namespace:
     """
-    CLI für ``python -m instantlensdoc`` — 1.5.0.
-    ``--version`` / ``--open FILE``; positional Datei bleibt kompatibel.
+    CLI für ``python -m instantlensdoc`` — 1.5.1.
+    ``--version`` / ``--open FILE`` (mehrfach) / ``--help`` DE; positional Datei bleibt kompatibel.
     """
     from instantlensdoc import __version__
 
     p = argparse.ArgumentParser(
         prog="instantlensdoc",
-        description="InstantLens Doc — PDF-Annotator, OCR, Formulare",
+        description=(
+            "InstantLens Doc — PDF-Annotator, OCR, Formulare.\n"
+            "Startet die Desktop-Oberfläche; optional Dateien öffnen."
+        ),
+        epilog=(
+            "Beispiele:\n"
+            "  python -m instantlensdoc --version\n"
+            "  python -m instantlensdoc --open dokument.pdf\n"
+            "  python -m instantlensdoc --open a.pdf --open b.pdf\n"
+            "  python -m instantlensdoc dokument.pdf\n"
+            "\n"
+            "Exitcodes: 0 OK · 1 allgemeiner Fehler · 2 Datei nicht gefunden"
+        ),
+        formatter_class=_GermanHelpFormatter,
+        add_help=False,
+    )
+    p.add_argument(
+        "-h",
+        "--help",
+        action="help",
+        default=argparse.SUPPRESS,
+        help="Diese Hilfe anzeigen und beenden",
     )
     p.add_argument(
         "--version",
@@ -31,10 +60,11 @@ def parse_cli(argv: list[str] | None = None) -> argparse.Namespace:
     )
     p.add_argument(
         "--open",
-        metavar="FILE",
-        dest="open_file",
+        metavar="DATEI",
+        dest="open_files",
+        action="append",
         default=None,
-        help="Datei beim Start öffnen",
+        help="Datei beim Start öffnen (mehrfach möglich)",
     )
     p.add_argument(
         "file",
@@ -45,7 +75,29 @@ def parse_cli(argv: list[str] | None = None) -> argparse.Namespace:
     args, unknown = p.parse_known_args(list(argv if argv is not None else sys.argv[1:]))
     args.unknown = unknown
     args.version_str = __version__
+    # Kompatibilität 1.5.0: open_file = erste --open-Datei
+    opens = list(args.open_files or [])
+    args.open_files = opens
+    args.open_file = opens[0] if opens else None
     return args
+
+
+def _collect_open_targets(cli: argparse.Namespace) -> list[Path]:
+    """Alle gewünschten Öffnungsziele (--open* + positional), Reihenfolge erhalten."""
+    targets: list[Path] = []
+    seen: set[str] = set()
+    for candidate in list(cli.open_files or []) + (
+        [cli.file] if cli.file else []
+    ):
+        if not candidate:
+            continue
+        p = Path(candidate)
+        key = str(p.resolve()) if p.exists() else str(p)
+        if key in seen:
+            continue
+        seen.add(key)
+        targets.append(p)
+    return targets
 
 
 def _apply_icon(app) -> None:
@@ -118,18 +170,22 @@ def _make_splash(app):
 
 def main(argv: list[str] | None = None) -> int:
     raw = list(sys.argv if argv is None else argv)
+    # --help wird von argparse behandelt (exit 0)
     cli = parse_cli(raw[1:])
     if cli.version:
         print(f"InstantLens Doc {cli.version_str}")
         return 0
 
+    open_targets = _collect_open_targets(cli)
+    missing = [p for p in open_targets if not p.exists()]
+    # Exitcode 2 bei fehlender Datei — vor Qt, klar für CLI — 1.5.1
+    if missing:
+        for m in missing:
+            print(f"Datei nicht gefunden: {m}", file=sys.stderr)
+        return 2
+
     # Qt-argv: Programmname + unbekannte Args (keine doppelten --open/--version)
     qt_argv = [raw[0], *list(getattr(cli, "unknown", []) or [])]
-    open_target: Path | None = None
-    for candidate in (cli.open_file, cli.file):
-        if candidate:
-            open_target = Path(candidate)
-            break
 
     from PySide6.QtCore import QTimer
     from PySide6.QtWidgets import QApplication
@@ -201,12 +257,12 @@ def main(argv: list[str] | None = None) -> int:
         if not smoke:
             win.statusBar().showMessage("Abhängigkeiten OK (pypdfium2 / OCR-Check)", 3500)
 
-    # Optionale Datei: --open FILE oder positional
-    if open_target is not None:
-        if open_target.exists():
-            win.open_path(str(open_target))
-        else:
-            win.statusBar().showMessage(f"Datei nicht gefunden: {open_target}", 6000)
+    # Dateien öffnen: mehrere --open + positional — 1.5.1
+    for target in open_targets:
+        try:
+            win.open_path(str(target))
+        except Exception as e:
+            win.statusBar().showMessage(f"Öffnen fehlgeschlagen: {target.name}: {e}", 6000)
 
     return app.exec()
 

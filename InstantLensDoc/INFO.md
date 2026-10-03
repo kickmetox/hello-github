@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **1.5.0** |
+| Version | **1.5.1** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -63,10 +63,10 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an / `checkedonce`)
 
-## Neu in 1.5.0
+## Neu in 1.5.1
 
-- PDF-Metadaten: **Titel/Autor/Betreff/Keywords** lesen+schreiben (pikepdf); Dialog + Speichern
-- Seiten als Bild: **aktuell / Bereich / alle** → PNG/JPEG; **DPI** 72/150/300
-- Signatur-Platzhalter: **Bildstempel** aus Datei (Sidecar + optional **Flatten**)
-- CLI: `python -m instantlensdoc --open FILE` · `--version`
+- Metadaten: **Dirty-Markierung**, **Zurücksetzen**, **UTF-8 sicher**, Toggle **leere Felder löschen**
+- Seiten→Bilder: **Zielordner merken**, Template **`{stem}_p{page}`**, **Fortschritt** bei Bereich
+- Signatur: **Größe-/Opacity-Slider**, **zuletzt verwendetes Bild** merken
+- CLI: `--help` DE · mehrere `--open` · Exitcode **2** bei fehlender Datei
 - Stubs KI/Cloud/Stylus/3D unverändert

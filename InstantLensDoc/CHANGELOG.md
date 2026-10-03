@@ -1,5 +1,23 @@
 # Changelog — InstantLens Doc
 
+## 1.5.1 — Metadaten Dirty·Reset·UTF-8·leere Felder, Seiten→Bilder Ordner·Template·Fortschritt, Signatur Größe·Opacity, CLI Help DE·multi-open·Exitcodes
+
+Post-Release-Polish nach 1.5.0: **Metadaten-Dialog** mit **Dirty-Markierung** (*), **Zurücksetzen**, **UTF-8-sicheren** Werten (NFC) und Toggle **„Leere Felder beim Speichern löschen“**; **Seiten→Bilder** merkt **Zielordner**, Dateiname-Template **`{stem}_p{page}`**, **Fortschrittsdialog** bei Bereich/Mehrseiten (Abbrechen); **Signatur** mit **Größe-/Deckkraft-Slider** und **zuletzt verwendetes Bild** merken; **CLI** `--help` auf Deutsch, **mehrere `--open`**, **Exitcode 2** bei fehlender Datei. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### PDF
+- Metadaten: Dirty-Markierung + Reset; UTF-8 (NFC/Surrogate-safe); Toggle leere Felder löschen (DocInfo+XMP)
+- Seiten → Bilder: Zielordner merken; Template `{stem}_p{page}`; Fortschritt + Abbruch bei Bereich
+- Signatur (Bild): Größen- und Opacity-Slider; letztes Signatur-Bild merken
+
+### CLI / Start
+- `python -m instantlensdoc --help` (DE); mehrfach `--open DATEI`; Exit **2** wenn Datei fehlt (stderr)
+
+### Packaging / Docs
+- Version **1.5.1** (App / `ild_pdf` / ISS / Smoke / Docs)
+- Smoke: Metadaten Dirty·Reset·UTF-8·delete-empty, Seiten→Bilder Template·Progress, Signatur Size·Opacity·Remember, CLI help-DE·multi-open·exit2 (CLI + Qt)
+
+---
+
 ## 1.5.0 — PDF-Metadaten-Editor, Seiten→Bilder Bereich·DPI, Signatur-Bildstempel·Flatten, CLI --open/--version
 
 Minor-Release mit neuen Kernfeatures: **PDF-Metadaten-Editor** (Titel/Autor/Betreff/Keywords lesen+schreiben via pikepdf, Dialog + Speichern); **Seiten als Bild exportieren** (aktuelle Seite / Seitenbereich `1-3,5` / alle → PNG/JPEG, DPI 72/150/300); **Signatur-Platzhalter** als Bildstempel aus Datei (Sidecar + optional Flatten-PDF); **Kommandozeile** `python -m instantlensdoc --open FILE` und `--version`. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
