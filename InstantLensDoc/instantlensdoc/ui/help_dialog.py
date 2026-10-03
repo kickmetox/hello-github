@@ -88,7 +88,7 @@ HELP_HTML = f"""
     <b>Druckermarken</b> Overlay (Ctrl+Alt+M)</li>
 <li><b>Datei → Öffnen/Speichern mit Encoding</b>: UTF-8, Latin-1 oder <b>Automatisch</b> (BOM / optional chardet)</li>
 <li><b>Drag &amp; Drop</b>: eine oder mehrere Dateien auf das Fenster ziehen → mehrere Tabs</li>
-<li><b>Autosave</b>: Textdokumente (mit Pfad) und PDF-Annotationen — Intervall in Einstellungen</li>
+<li><b>Autosave</b>: Textdokumente (mit Pfad) und PDF-Annotationen — Intervall 15/30/60/120 s; Status „Gespeichert HH:MM:SS“</li>
 <li><b>PDF</b>: Blättern, Zoom/Fit (debounced + Cache), <b>⟲/⟳ drehen</b> / <b>↔/↕ spiegeln</b> (speichert),
     <b>Graustufen</b> (Ansicht + Bild-Export), <b>Nachtmodus</b> (nur Ansicht, nicht speichern),
     <b>leere Seite / duplizieren</b>, Seite löschen (<b>Undo Ctrl+Z</b> / <b>Historie-Liste</b>), Seiten neu anordnen;

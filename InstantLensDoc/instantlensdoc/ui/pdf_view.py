@@ -2885,6 +2885,27 @@ class PdfViewer(QWidget):
         else:
             self.status.emit(f"Werkzeug: {tool.value}")
 
+    def current_tool_id(self) -> str:
+        """Session-ID des aktuellen Ann.-Werkzeugs ("" = Auswahl) — 0.9.7."""
+        if self.tool is None:
+            return ""
+        try:
+            return str(self.tool.value)
+        except Exception:
+            return ""
+
+    def set_tool_from_id(self, tool_id: str | None) -> None:
+        """Ann.-Werkzeug aus Session-ID wiederherstellen — 0.9.7."""
+        tid = str(tool_id or "").strip().lower()
+        if tid in ("", "select", "none", "auswahl"):
+            self._set_tool(None)
+            return
+        try:
+            tool = AnnotationType(tid)
+        except ValueError:
+            return
+        self._set_tool(tool)
+
     def _on_annotation_selected(self, ann_id: str):
         """Auswahl setzen; Gruppe → alle Mitglieder; Shift+Klick Mehrfachauswahl umschalten."""
         shift = bool(QApplication.keyboardModifiers() & Qt.ShiftModifier)
@@ -3720,11 +3741,47 @@ class PdfViewer(QWidget):
         whole_word: bool | None = None,
         regex: bool | None = None,
     ) -> int:
+        """Suchtreffer der aktuellen Seite als Highlight-Annotationen — 0.9.6."""
+        return self.annotate_search_hits(
+            query,
+            all_pages=False,
+            case_sensitive=case_sensitive,
+            whole_word=whole_word,
+            regex=regex,
+        )
+
+    def annotate_search_hits_all_pages(
+        self,
+        query: str | None = None,
+        *,
+        case_sensitive: bool | None = None,
+        whole_word: bool | None = None,
+        regex: bool | None = None,
+    ) -> int:
+        """Suchtreffer aller Seiten als Highlight-Annotationen (ein Undo) — 0.9.7."""
+        return self.annotate_search_hits(
+            query,
+            all_pages=True,
+            case_sensitive=case_sensitive,
+            whole_word=whole_word,
+            regex=regex,
+        )
+
+    def annotate_search_hits(
+        self,
+        query: str | None = None,
+        *,
+        all_pages: bool = False,
+        case_sensitive: bool | None = None,
+        whole_word: bool | None = None,
+        regex: bool | None = None,
+    ) -> int:
         """
-        Suchtreffer der aktuellen Seite als Highlight-Annotationen anlegen (Batch) — 0.9.6.
-        Nutzt aktuelle Query/Optionen; ein Undo-Schritt via atomic().
+        Suchtreffer als Highlight-Annotationen anlegen (Batch).
+        all_pages=False: aktuelle Seite (0.9.6); True: alle Seiten (0.9.7).
+        Immer ein Undo-Schritt via store.atomic().
         """
-        from ild_pdf.overlay import SearchPatternError
+        from ild_pdf.overlay import SearchPatternError, find_text_rects
 
         if not self.store or not self.pdf_path:
             self.status.emit("Kein PDF geladen")
@@ -3745,45 +3802,88 @@ class PdfViewer(QWidget):
                 regex=regex,
             )
         self._search_query = q
+        color = self._highlight_color or "#FFE066"
+        opacity = float(getattr(self, "_default_opacity", 1.0) or 1.0)
+        pages: list[int]
+        if all_pages:
+            pages = list(range(max(0, int(self.page_count))))
+        else:
+            pages = [int(self.page_index)]
+        # Treffer je Seite sammeln (vor Commit), dann ein atomic
+        page_hits: list[tuple[int, list]] = []
         try:
-            n = self._rebuild_search_rects(keep_index=True)
+            for page in pages:
+                if all_pages:
+                    matches = find_text_rects(
+                        self.pdf_path,
+                        page,
+                        q,
+                        scale=self.scale,
+                        password=self.password,
+                        **self._search_kw(),
+                    )
+                    rects = [
+                        (float(m.x), float(m.y), float(m.width), float(m.height))
+                        for m in matches
+                    ]
+                else:
+                    n = self._rebuild_search_rects(keep_index=True)
+                    if n <= 0 or not self._search_rects:
+                        self.status.emit("Keine Treffer auf dieser Seite")
+                        return 0
+                    rects = list(self._search_rects)
+                if rects:
+                    page_hits.append((page, rects))
         except SearchPatternError as e:
             self.status.emit(f"Regex-Fehler: {e}")
             raise
-        if n <= 0 or not self._search_rects:
-            self.status.emit("Keine Treffer auf dieser Seite")
+        if not page_hits:
+            self.status.emit(
+                "Keine Treffer im Dokument"
+                if all_pages
+                else "Keine Treffer auf dieser Seite"
+            )
             return 0
-        page = int(self.page_index)
-        color = self._highlight_color or "#FFE066"
-        opacity = float(getattr(self, "_default_opacity", 1.0) or 1.0)
         created = 0
-        with self.store.atomic(label="Suche → Highlight"):
-            for i, (rx, ry, rw, rh) in enumerate(self._search_rects):
-                snippet = q if i == 0 else ""
-                self.store.add(
-                    Annotation(
-                        page=page,
-                        type=AnnotationType.HIGHLIGHT,
-                        x=float(rx),
-                        y=float(ry),
-                        width=max(float(rw), 4.0),
-                        height=max(float(rh), 6.0),
-                        color=color,
-                        text=snippet,
-                        opacity=opacity,
+        label = "Suche → Highlight (alle Seiten)" if all_pages else "Suche → Highlight"
+        with self.store.atomic(label=label):
+            for page, rects in page_hits:
+                for i, (rx, ry, rw, rh) in enumerate(rects):
+                    snippet = q if created == 0 and i == 0 else ""
+                    self.store.add(
+                        Annotation(
+                            page=page,
+                            type=AnnotationType.HIGHLIGHT,
+                            x=float(rx),
+                            y=float(ry),
+                            width=max(float(rw), 4.0),
+                            height=max(float(rh), 6.0),
+                            color=color,
+                            text=snippet,
+                            opacity=opacity,
+                        )
                     )
-                )
-                created += 1
+                    created += 1
         try:
             self.schedule_sidecar_save(force=True)
         except Exception as e:
             QMessageBox.warning(self, "Treffer markieren", str(e))
+        # Aktuelle Seite-Highlights aktualisieren
+        try:
+            self._rebuild_search_rects(keep_index=True)
+        except Exception:
+            pass
         self.canvas.set_search_highlights(self._search_rects, self._search_index)
         self.refresh()
         self.annotations_changed.emit()
-        self.status.emit(
-            f"{created} Highlight(s) aus Suche (Seite {page + 1})"
-        )
+        if all_pages:
+            self.status.emit(
+                f"{created} Highlight(s) aus Suche (alle Seiten, {len(page_hits)} Seite(n))"
+            )
+        else:
+            self.status.emit(
+                f"{created} Highlight(s) aus Suche (Seite {pages[0] + 1})"
+            )
         return created
 
     def collect_search_hits(

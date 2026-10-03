@@ -46,6 +46,8 @@ class SessionState:
     search_case: bool = False
     search_whole: bool = False
     search_regex: bool = False
+    # Zuletzt genutztes Ann.-Werkzeug (AnnotationType.value oder "" = Auswahl) — 0.9.7
+    ann_tool: str = ""
 
 
 def session_path() -> Path:
@@ -84,6 +86,38 @@ def _normalize_theme(raw) -> str:
 
 def _normalize_label(raw) -> str:
     return str(raw or "").strip()
+
+
+# Erlaubte Ann.-Werkzeug-IDs für Session ("" = Auswahl) — 0.9.7
+_ANN_TOOL_VALUES = frozenset(
+    {
+        "",
+        "select",
+        "highlight",
+        "redaction",
+        "underline",
+        "sticky",
+        "text_overlay",
+        "stamp",
+        "callout",
+        "rectangle",
+        "line",
+        "arrow",
+        "measure",
+        "signature_field",
+        "text",
+    }
+)
+
+
+def _normalize_ann_tool(raw) -> str:
+    """AnnotationType.value oder select/leer → Session-ID."""
+    t = str(raw or "").strip().lower()
+    if t in ("", "select", "none", "auswahl"):
+        return ""
+    if t in _ANN_TOOL_VALUES:
+        return t
+    return ""
 
 
 def _normalize_panel_flag(raw, default: bool = True) -> bool:
@@ -188,6 +222,7 @@ def load_session() -> SessionState:
     search_regex = _normalize_panel_flag(
         search.get("regex", raw.get("search_regex")), False
     )
+    ann_tool = _normalize_ann_tool(raw.get("ann_tool", raw.get("annotation_tool")))
     return SessionState(
         tabs=tabs,
         active=active,
@@ -203,6 +238,7 @@ def load_session() -> SessionState:
         search_case=search_case,
         search_whole=search_whole,
         search_regex=search_regex,
+        ann_tool=ann_tool,
     )
 
 
@@ -240,6 +276,7 @@ def save_session(state: SessionState) -> None:
             "whole": bool(getattr(state, "search_whole", False)),
             "regex": bool(getattr(state, "search_regex", False)),
         },
+        "ann_tool": _normalize_ann_tool(getattr(state, "ann_tool", "")),
     }
     path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
 
@@ -271,6 +308,7 @@ def build_session(
     search_whole: Optional[bool] = None,
     search_regex: Optional[bool] = None,
     search: Optional[dict] = None,
+    ann_tool: Optional[str] = None,
 ) -> SessionState:
     """
     tab_states: optional {path: {page, scale, scroll_y}} für Last-Page/Zoom/Scroll je Tab (0.9.1/0.9.2).
@@ -279,6 +317,7 @@ def build_session(
     tab_labels: optional {path: Anzeige-Label} — Tab-Titel ≠ Dateiname (0.9.4).
     panels / panel_*: Sidebar Thumb/Ann/Bookmark Sichtbarkeit (0.9.5).
     search / search_*: PDF-Suche Aa/Wort/Regex (0.9.6).
+    ann_tool: zuletzt genutztes Ann.-Werkzeug (AnnotationType.value / "" = Auswahl) — 0.9.7.
     """
     tabs: List[SessionTab] = []
     seen: set[str] = set()
@@ -401,4 +440,5 @@ def build_session(
         search_case=search_map["case"],
         search_whole=search_map["whole"],
         search_regex=search_map["regex"],
+        ann_tool=_normalize_ann_tool(ann_tool),
     )

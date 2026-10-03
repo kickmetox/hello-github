@@ -26,7 +26,7 @@ DEFAULTS: dict[str, Any] = {
     "last_export_dir": "",
     "default_zoom_percent": 150,
     "default_zoom_mode": "percent",  # percent | fit_width | fit_page
-    "autosave_interval_sec": 60,
+    "autosave_interval_sec": 60,  # 15 | 30 | 60 | 120 — 0.9.7
     "autosave_enabled": True,
     "ann_highlight_color": "#FFE066",
     "ann_pen_color": "#2C3E50",
@@ -311,16 +311,42 @@ def get_default_zoom_scale() -> float:
     return get_default_zoom_percent() / 100.0
 
 
+# Feste Autosave-Intervalle in Einstellungen — 0.9.7
+AUTOSAVE_INTERVAL_CHOICES = (15, 30, 60, 120)
+AUTOSAVE_INTERVAL_DEFAULT = 60
+
+
+def normalize_autosave_interval_sec(seconds: int | float | str | None) -> int:
+    """Intervall auf erlaubte Werte 15/30/60/120 s snappen (nächster; bei Gleichstand größer)."""
+    try:
+        v = int(seconds)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return AUTOSAVE_INTERVAL_DEFAULT
+    if v in AUTOSAVE_INTERVAL_CHOICES:
+        return v
+    best = AUTOSAVE_INTERVAL_DEFAULT
+    best_dist = abs(best - v)
+    for choice in AUTOSAVE_INTERVAL_CHOICES:
+        d = abs(choice - v)
+        if d < best_dist or (d == best_dist and choice > best):
+            best = choice
+            best_dist = d
+    return best
+
+
 def get_autosave_interval_sec() -> int:
     try:
-        v = int(load_settings().get("autosave_interval_sec", 60))
+        v = int(load_settings().get("autosave_interval_sec", AUTOSAVE_INTERVAL_DEFAULT))
     except (TypeError, ValueError):
-        v = 60
-    return max(10, min(600, v))
+        v = AUTOSAVE_INTERVAL_DEFAULT
+    return normalize_autosave_interval_sec(v)
 
 
-def set_autosave_interval_sec(seconds: int) -> None:
-    save_settings({"autosave_interval_sec": max(10, min(600, int(seconds)))})
+def set_autosave_interval_sec(seconds: int) -> int:
+    """Autosave-Intervall setzen (15/30/60/120). Rückgabe: gespeicherter Wert — 0.9.7."""
+    v = normalize_autosave_interval_sec(seconds)
+    save_settings({"autosave_interval_sec": v})
+    return v
 
 
 def get_autosave_enabled() -> bool:
@@ -1988,6 +2014,98 @@ def reset_ann_color_preset(index: int) -> list[str]:
 def reset_ann_color_presets() -> list[str]:
     """Alle 6 Color-Presets auf Werkstandard — 0.9.6."""
     return set_ann_color_presets(list(_DEFAULT_ANN_PRESETS))
+
+
+# Color-Presets JSON Export/Import — 0.9.7
+ANN_COLORS_SCHEMA_ID = "ildcolors-v1"
+ANN_COLORS_VERSION = 1
+
+
+class AnnColorsImportError(ValueError):
+    """Ungültiges ildcolors-v1 Preset-JSON."""
+
+
+def export_ann_color_presets_dict() -> dict[str, Any]:
+    """Color-Presets als exportierbares Dict (Schema ildcolors-v1) — 0.9.7."""
+    return {
+        "version": ANN_COLORS_VERSION,
+        "schema": ANN_COLORS_SCHEMA_ID,
+        "colors": get_ann_color_presets(),
+    }
+
+
+def export_ann_color_presets_json(path: str | Path) -> Path:
+    """Color-Presets als JSON-Datei schreiben (ildcolors-v1)."""
+    dest = Path(path)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_text(
+        json.dumps(export_ann_color_presets_dict(), ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    return dest
+
+
+def import_ann_color_presets_dict(
+    data: dict,
+    *,
+    merge: bool = False,
+) -> list[str]:
+    """
+    Color-Presets aus Dict übernehmen (ildcolors-v1).
+    merge=True: nur nicht-leere Einträge der Datei überschreiben.
+    """
+    if not isinstance(data, dict):
+        raise AnnColorsImportError("Color-Presets-JSON muss ein Objekt sein.")
+    ver = data.get("version")
+    schema = data.get("schema")
+    try:
+        ver_i = int(ver)
+    except (TypeError, ValueError):
+        raise AnnColorsImportError(
+            f"Ungültige Version {ver!r} — erwartet {ANN_COLORS_VERSION} ({ANN_COLORS_SCHEMA_ID})."
+        ) from None
+    if ver_i != ANN_COLORS_VERSION:
+        raise AnnColorsImportError(
+            f"Inkompatible Version {ver_i} — erwartet {ANN_COLORS_VERSION} ({ANN_COLORS_SCHEMA_ID})."
+        )
+    if schema is not None and str(schema) != ANN_COLORS_SCHEMA_ID:
+        raise AnnColorsImportError(
+            f"Inkompatibles Schema „{schema}“ — erwartet „{ANN_COLORS_SCHEMA_ID}“."
+        )
+    raw = data.get("colors", data.get("presets"))
+    if not isinstance(raw, (list, tuple)):
+        raise AnnColorsImportError("Feld „colors“ muss eine Liste sein.")
+    current = get_ann_color_presets()
+    defaults = list(_DEFAULT_ANN_PRESETS)
+    out: list[str] = list(current if merge else defaults)
+    for i in range(ANN_COLOR_PRESET_COUNT):
+        if i >= len(raw):
+            if not merge:
+                out[i] = defaults[i]
+            continue
+        c = str(raw[i] or "").strip()
+        if not c:
+            if not merge:
+                out[i] = defaults[i]
+            continue
+        out[i] = _normalize_hex_color(c, defaults[i])
+    return set_ann_color_presets(out)
+
+
+def import_ann_color_presets_json(
+    path: str | Path,
+    *,
+    merge: bool = False,
+) -> list[str]:
+    """Color-Presets aus JSON-Datei laden (ildcolors-v1)."""
+    src = Path(path)
+    try:
+        data = json.loads(src.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as e:
+        raise AnnColorsImportError(f"Ungültiges JSON: {e}") from e
+    except OSError as e:
+        raise AnnColorsImportError(str(e)) from e
+    return import_ann_color_presets_dict(data, merge=merge)
 
 
 def get_restore_session_on_start() -> bool:

@@ -455,7 +455,7 @@ class Sidebar(QWidget):
     annotation_group_filter_changed = Signal(str)  # group_id oder "" für alle
     annotation_group_export_requested = Signal(str)  # group_id → JSON-Export
     search_export_requested = Signal(str)  # "csv" | "json"
-    search_annotate_requested = Signal()  # Treffer aktuelle Seite → Highlight-Anns (0.9.6)
+    search_annotate_requested = Signal(bool)  # all_pages → Highlight-Anns (0.9.6 Seite / 0.9.7 alle)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -547,14 +547,19 @@ class Sidebar(QWidget):
         self.btn_annotate_search = QPushButton("HL")
         self.btn_annotate_search.setFixedWidth(36)
         self.btn_annotate_search.setToolTip(
-            "Suchtreffer der aktuellen Seite als Highlight-Annotationen markieren (Batch) — 0.9.6"
+            "Suchtreffer als Highlight-Annotationen (Batch); "
+            "„alle Seiten“-Checkbox steuert Umfang — 0.9.6/0.9.7"
         )
-        self.btn_annotate_search.clicked.connect(
-            lambda: self.search_annotate_requested.emit()
+        self.btn_annotate_search.clicked.connect(self._emit_search_annotate)
+        self.search_hl_all_pages = QCheckBox("alle Seiten")
+        self.search_hl_all_pages.setToolTip(
+            "HL-Batch auf alle PDF-Seiten (ein Undo-Eintrag) — 0.9.7"
         )
+        self.search_hl_all_pages.setChecked(False)
         hits_row.addWidget(self.btn_export_search_csv)
         hits_row.addWidget(self.btn_export_search_json)
         hits_row.addWidget(self.btn_annotate_search)
+        hits_row.addWidget(self.search_hl_all_pages)
         layout.addLayout(hits_row)
 
         layout.addWidget(QLabel("Schnellsuche-Treffer / Markierungen"))
@@ -859,6 +864,21 @@ class Sidebar(QWidget):
             self.search_regex.blockSignals(True)
             self.search_regex.setChecked(bool(regex))
             self.search_regex.blockSignals(False)
+
+    def search_annotate_all_pages(self) -> bool:
+        """HL-Batch auf alle Seiten — 0.9.7."""
+        if hasattr(self, "search_hl_all_pages"):
+            return bool(self.search_hl_all_pages.isChecked())
+        return False
+
+    def set_search_annotate_all_pages(self, enabled: bool) -> None:
+        if hasattr(self, "search_hl_all_pages"):
+            self.search_hl_all_pages.blockSignals(True)
+            self.search_hl_all_pages.setChecked(bool(enabled))
+            self.search_hl_all_pages.blockSignals(False)
+
+    def _emit_search_annotate(self) -> None:
+        self.search_annotate_requested.emit(self.search_annotate_all_pages())
 
     def search_text(self) -> str:
         return self.search.currentText().strip()

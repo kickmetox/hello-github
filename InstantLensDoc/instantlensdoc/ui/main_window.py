@@ -476,6 +476,11 @@ class MainWindow(QMainWindow):
             search = dict(self.sidebar.search_options())
         except Exception:
             search = {"case": False, "whole": False, "regex": False}
+        ann_tool = ""
+        try:
+            ann_tool = self.pdf_view.current_tool_id()
+        except Exception:
+            ann_tool = ""
         state = session_mod.build_session(
             paths,
             active_path=active,
@@ -492,6 +497,7 @@ class MainWindow(QMainWindow):
             tab_labels=tab_labels or None,
             panels=panels,
             search=search,
+            ann_tool=ann_tool,
         )
         session_mod.save_session(state)
 
@@ -603,6 +609,13 @@ class MainWindow(QMainWindow):
                 )
         except Exception:
             pass
+        # Zuletzt genutztes Ann.-Werkzeug (0.9.7)
+        try:
+            tool_id = str(getattr(state, "ann_tool", "") or "")
+            if hasattr(self.pdf_view, "set_tool_from_id"):
+                self.pdf_view.set_tool_from_id(tool_id)
+        except Exception:
+            pass
         self._set_status(f"Session wiederhergestellt ({len(state.tabs)} Tab(s))")
 
     def _build_ui(self):
@@ -618,7 +631,7 @@ class MainWindow(QMainWindow):
         self.sidebar.search_next_requested.connect(self._on_search_next)
         self.sidebar.search_prev_requested.connect(self._on_search_prev)
         self.sidebar.search_export_requested.connect(self._on_search_export)
-        self.sidebar.search_annotate_requested.connect(self._on_search_annotate_page)
+        self.sidebar.search_annotate_requested.connect(self._on_search_annotate_hits)
         self.sidebar.file_activated.connect(self.open_path)
         self.sidebar.document_close_requested.connect(self.close_tab_path)
         self.sidebar.document_close_others_requested.connect(self.close_other_tabs_keeping)
@@ -1033,8 +1046,18 @@ class MainWindow(QMainWindow):
         act_search_hl.setToolTip(
             "Suchtreffer der aktuellen PDF-Seite als Highlight-Annotationen — 0.9.6"
         )
-        act_search_hl.triggered.connect(self._on_search_annotate_page)
+        act_search_hl.triggered.connect(
+            lambda: self._on_search_annotate_hits(False)
+        )
         m_edit.addAction(act_search_hl)
+        act_search_hl_all = QAction("Treffer als Highlight (alle Seiten)…", self)
+        act_search_hl_all.setToolTip(
+            "Suchtreffer aller PDF-Seiten als Highlight-Annotationen (ein Undo) — 0.9.7"
+        )
+        act_search_hl_all.triggered.connect(
+            lambda: self._on_search_annotate_hits(True)
+        )
+        m_edit.addAction(act_search_hl_all)
         act_goto = QAction("Gehe zu Zeile…", self)
         act_goto.setShortcut(QKeySequence("Ctrl+G"))
         act_goto.setToolTip("Editor: Zeile · PDF: Seite (Ctrl+G)")
@@ -3908,6 +3931,12 @@ class MainWindow(QMainWindow):
             return
         super().dropEvent(event)
 
+    def _autosave_status_saved(self) -> str:
+        """Statuszeile nach Autosave: „Gespeichert HH:MM:SS“ — 0.9.7."""
+        from datetime import datetime
+
+        return f"Gespeichert {datetime.now().strftime('%H:%M:%S')}"
+
     def _autosave_tick(self):
         if not self._autosave_enabled:
             return
@@ -3925,7 +3954,7 @@ class MainWindow(QMainWindow):
                     self.pdf_view.schedule_sidecar_save(force=True)
                     if self.doc.path:
                         self._mark_unsaved(self.doc.path, False)
-                    self._set_status(f"Autosave: Annotationen ({self.doc.display_name})")
+                    self._set_status(self._autosave_status_saved())
                 except Exception:
                     pass
             return
@@ -3938,7 +3967,7 @@ class MainWindow(QMainWindow):
             self.doc.dirty = False
             if self.doc.path:
                 self._mark_unsaved(self.doc.path, False)
-            self._set_status(f"Autosave: {self.doc.display_name}")
+            self._set_status(self._autosave_status_saved())
         except Exception:
             pass
 
@@ -4415,7 +4444,11 @@ class MainWindow(QMainWindow):
         self._set_status(f"Suchergebnisse exportiert ({len(hits)}): {dest.name}")
 
     def _on_search_annotate_page(self):
-        """Suchtreffer der aktuellen PDF-Seite als Highlight-Annotationen (Batch) — 0.9.6."""
+        """Kompatibilität: aktuelle Seite — 0.9.6."""
+        self._on_search_annotate_hits(False)
+
+    def _on_search_annotate_hits(self, all_pages: bool = False):
+        """Suchtreffer als Highlight-Annotationen (Seite oder alle, ein Undo) — 0.9.6/0.9.7."""
         if not self.pdf_view.pdf_path or not self.pdf_view.store:
             self._set_status("Kein PDF geladen")
             QMessageBox.information(
@@ -4432,8 +4465,9 @@ class MainWindow(QMainWindow):
         whole = getattr(self.sidebar, "search_whole_word", lambda: False)()
         regex = getattr(self.sidebar, "search_regex_enabled", lambda: False)()
         try:
-            n = self.pdf_view.annotate_search_hits_current_page(
+            n = self.pdf_view.annotate_search_hits(
                 query,
+                all_pages=bool(all_pages),
                 case_sensitive=case,
                 whole_word=whole,
                 regex=regex,
@@ -4443,12 +4477,21 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Treffer markieren", str(e))
             return
         if n <= 0:
-            self._set_status("Keine Treffer auf der aktuellen Seite")
+            self._set_status(
+                "Keine Treffer im Dokument"
+                if all_pages
+                else "Keine Treffer auf der aktuellen Seite"
+            )
             return
         if self.doc and self.doc.path:
             self._mark_unsaved(self.doc.path, True)
         self._refresh_pdf_marks()
-        self._set_status(f"{n} Highlight(s) aus Suche auf Seite {self.pdf_view.page_index + 1}")
+        if all_pages:
+            self._set_status(f"{n} Highlight(s) aus Suche (alle Seiten)")
+        else:
+            self._set_status(
+                f"{n} Highlight(s) aus Suche auf Seite {self.pdf_view.page_index + 1}"
+            )
 
     def _on_search(self, query: str):
         if not query:

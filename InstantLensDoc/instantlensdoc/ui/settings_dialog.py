@@ -25,9 +25,14 @@ from PySide6.QtWidgets import (
 from ild_pdf.pages import PAGE_SIZE_PRESETS
 from instantlensdoc.core.app_settings import (
     ANN_COLOR_PRESET_COUNT,
+    ANN_COLORS_SCHEMA_ID,
+    AUTOSAVE_INTERVAL_CHOICES,
+    AnnColorsImportError,
+    export_ann_color_presets_json,
     get_ann_color_presets,
     get_autosave_enabled,
     get_autosave_interval_sec,
+    import_ann_color_presets_json,
     get_backup_on_save,
     get_batch_output_dir,
     get_default_open_dir,
@@ -241,12 +246,17 @@ class SettingsDialog(QDialog):
         )
         form.addRow(self.autosave_enabled)
 
-        self.autosave_sec = QSpinBox()
-        self.autosave_sec.setRange(10, 600)
-        self.autosave_sec.setSingleStep(10)
-        self.autosave_sec.setSuffix(" s")
-        self.autosave_sec.setValue(get_autosave_interval_sec())
-        self.autosave_sec.setToolTip("Intervall für Autosave (Editor + Annotationen)")
+        self.autosave_sec = QComboBox()
+        cur_as = get_autosave_interval_sec()
+        as_pick = 0
+        for i, sec in enumerate(AUTOSAVE_INTERVAL_CHOICES):
+            self.autosave_sec.addItem(f"{sec} s", sec)
+            if sec == cur_as:
+                as_pick = i
+        self.autosave_sec.setCurrentIndex(as_pick)
+        self.autosave_sec.setToolTip(
+            "Autosave-Intervall: 15 / 30 / 60 / 120 Sekunden — 0.9.7"
+        )
         self.autosave_sec.setEnabled(self.autosave_enabled.isChecked())
         self.autosave_enabled.toggled.connect(self.autosave_sec.setEnabled)
         form.addRow(tr("autosave_interval"), self.autosave_sec)
@@ -266,6 +276,18 @@ class SettingsDialog(QDialog):
         btn_reset_presets.setToolTip("Alle 6 Color-Presets auf Werkstandard")
         btn_reset_presets.clicked.connect(self._reset_color_presets_ui)
         preset_row.addWidget(btn_reset_presets)
+        btn_export_presets = QPushButton("Export…")
+        btn_export_presets.setToolTip(
+            f"Color-Presets als JSON exportieren ({ANN_COLORS_SCHEMA_ID}) — 0.9.7"
+        )
+        btn_export_presets.clicked.connect(self._export_color_presets_ui)
+        preset_row.addWidget(btn_export_presets)
+        btn_import_presets = QPushButton("Import…")
+        btn_import_presets.setToolTip(
+            f"Color-Presets aus JSON importieren ({ANN_COLORS_SCHEMA_ID}) — 0.9.7"
+        )
+        btn_import_presets.clicked.connect(self._import_color_presets_ui)
+        preset_row.addWidget(btn_import_presets)
         form.addRow("Ann.-Color-Presets", preset_row)
 
         self.line_numbers = QCheckBox("Zeilennummern im Editor")
@@ -786,6 +808,88 @@ class SettingsDialog(QDialog):
         for i, ed in enumerate(getattr(self, "_preset_edits", []) or []):
             ed.setText(presets[i] if i < len(presets) else "#888888")
 
+    def _sync_preset_edits(self, presets: list[str]) -> None:
+        for i, ed in enumerate(getattr(self, "_preset_edits", []) or []):
+            ed.setText(presets[i] if i < len(presets) else "#888888")
+
+    def _export_color_presets_ui(self) -> None:
+        """Color-Presets als ildcolors-v1 JSON speichern — 0.9.7."""
+        from instantlensdoc.core.app_settings import (
+            dialog_start_dir,
+            get_last_export_dir,
+            set_ann_color_presets,
+            set_last_export_dir,
+        )
+
+        # Aktuelle Dialogfelder zuerst übernehmen
+        if getattr(self, "_preset_edits", None):
+            set_ann_color_presets([ed.text().strip() for ed in self._preset_edits])
+        start = dialog_start_dir(get_last_export_dir())
+        path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Color-Presets exportieren",
+            str(Path(start) / "ild-colors.json"),
+            f"Color-Presets JSON (*{ANN_COLORS_SCHEMA_ID}*.json *.json);;JSON (*.json)",
+        )
+        if not path:
+            return
+        try:
+            dest = export_ann_color_presets_json(path)
+        except Exception as e:
+            QMessageBox.warning(self, "Color-Presets Export", str(e))
+            return
+        set_last_export_dir(dest.parent)
+        QMessageBox.information(
+            self,
+            "Color-Presets",
+            f"Exportiert ({ANN_COLORS_SCHEMA_ID}):\n{dest}",
+        )
+
+    def _import_color_presets_ui(self) -> None:
+        """Color-Presets aus ildcolors-v1 JSON laden — 0.9.7."""
+        from instantlensdoc.core.app_settings import (
+            dialog_start_dir,
+            get_last_export_dir,
+            set_last_export_dir,
+        )
+
+        start = dialog_start_dir(get_last_export_dir())
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Color-Presets importieren",
+            str(start),
+            "JSON (*.json);;Alle Dateien (*)",
+        )
+        if not path:
+            return
+        reply = QMessageBox.question(
+            self,
+            "Color-Presets importieren",
+            "Vorhandene Presets ersetzen?\n"
+            "„Nein“ = nur gefüllte Slots aus der Datei übernehmen (Merge).",
+            QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel,
+            QMessageBox.Yes,
+        )
+        if reply == QMessageBox.Cancel:
+            return
+        merge = reply == QMessageBox.No
+        try:
+            presets = import_ann_color_presets_json(path, merge=merge)
+        except AnnColorsImportError as e:
+            QMessageBox.warning(self, "Color-Presets Import", str(e))
+            return
+        except Exception as e:
+            QMessageBox.warning(self, "Color-Presets Import", str(e))
+            return
+        self._sync_preset_edits(presets)
+        set_last_export_dir(Path(path).parent)
+        QMessageBox.information(
+            self,
+            "Color-Presets",
+            f"Importiert ({ANN_COLORS_SCHEMA_ID}, {'Merge' if merge else 'Ersetzen'}):\n"
+            + ", ".join(presets),
+        )
+
     def _reset_wizard(self) -> None:
         """„Nicht mehr zeigen“ aufheben — Wizard erscheint wieder beim Start."""
         if not get_wizard_completed():
@@ -866,7 +970,11 @@ class SettingsDialog(QDialog):
         set_default_zoom_percent(int(self.zoom_pct.value()))
         set_pdf_thumbnail_scale(float(self.thumb_scale.currentData() or 0.18))
         set_autosave_enabled(self.autosave_enabled.isChecked())
-        set_autosave_interval_sec(int(self.autosave_sec.value()))
+        try:
+            as_sec = int(self.autosave_sec.currentData() or 60)
+        except (TypeError, ValueError):
+            as_sec = 60
+        set_autosave_interval_sec(as_sec)
         if getattr(self, "_preset_edits", None):
             set_ann_color_presets([ed.text().strip() for ed in self._preset_edits])
         set_editor_line_numbers(self.line_numbers.isChecked())
