@@ -2135,6 +2135,8 @@ class PdfViewer(QWidget):
         self.canvas.set_show_page_boxes(self._show_page_boxes)
         if self._show_page_boxes:
             self._update_page_box_overlay()
+        else:
+            self.canvas.clear_page_box_rects()
         self._show_page_number_overlay = get_show_page_number_overlay()
         if hasattr(self, "btn_page_num"):
             self.btn_page_num.blockSignals(True)
@@ -2142,8 +2144,6 @@ class PdfViewer(QWidget):
             self.btn_page_num.blockSignals(False)
         self.canvas.set_show_page_number_overlay(self._show_page_number_overlay)
         self._update_page_number_overlay()
-        else:
-            self.canvas.clear_page_box_rects()
         self._show_printer_marks = get_show_printer_marks()
         if hasattr(self, "btn_printer_marks"):
             self.btn_printer_marks.blockSignals(True)
