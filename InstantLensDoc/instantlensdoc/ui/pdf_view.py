@@ -2895,7 +2895,7 @@ class PdfViewer(QWidget):
             n = self.redaction_count()
             self.status.emit(
                 f"Werkzeug: Schwärzen — Rechteck ziehen · {n} offen · "
-                "PDF → Schwärzung einbrennen"
+                "PDF → Redactions anwenden"
             )
         else:
             self.status.emit(f"Werkzeug: {tool.value}")
@@ -6293,31 +6293,41 @@ class PdfViewer(QWidget):
         self.status.emit(f"{len(reds)} Schwärzungs-Annotation(en) gelöscht")
 
     def bake_redactions(self, *, remove_sidecar: bool | None = None):
+        """Redactions anwenden → neues PDF mit schwarzen Flächen (Bake) — 1.3.0."""
         if not self.store or not self.pdf_path:
             return
         reds = [a for a in self.store.annotations if a.type == AnnotationType.REDACTION]
         if not reds:
-            QMessageBox.information(self, "Schwärzung", "Keine Schwärzungs-Annotationen.")
+            QMessageBox.information(self, "Redactions", "Keine Schwärzungs-Annotationen.")
             return
         by_page: dict[int, int] = {}
         for a in reds:
             by_page[a.page] = by_page.get(a.page, 0) + 1
         pages = ", ".join(f"S.{p + 1}:{n}" for p, n in sorted(by_page.items()))
 
-        from PySide6.QtWidgets import QCheckBox, QDialog, QDialogButtonBox, QLabel, QVBoxLayout
+        from PySide6.QtWidgets import (
+            QCheckBox,
+            QDialog,
+            QDialogButtonBox,
+            QFileDialog,
+            QLabel,
+            QVBoxLayout,
+        )
+
+        from instantlensdoc.ui.file_dialogs import confirm_overwrite_export
 
         dlg = QDialog(self)
-        dlg.setWindowTitle("Schwärzung einbrennen")
+        dlg.setWindowTitle("Redactions anwenden")
         lay = QVBoxLayout(dlg)
         lay.addWidget(
             QLabel(
-                f"{len(reds)} Schwärzung(en) dauerhaft als schwarze Flächen schreiben?\n"
+                f"{len(reds)} Schwärzung(en) als schwarze Flächen in ein neues PDF schreiben?\n"
                 f"Verteilung: {pages}\n\n"
                 "Hinweis: Basis-Redaction — Text unter der Fläche kann in der\n"
                 "PDF-Textschicht noch selektierbar sein."
             )
         )
-        chk = QCheckBox("Annotationen nach Einbrennen aus Sidecar entfernen")
+        chk = QCheckBox("Annotationen nach Anwenden aus Sidecar entfernen")
         chk.setChecked(True if remove_sidecar is None else bool(remove_sidecar))
         lay.addWidget(chk)
         buttons = QDialogButtonBox(QDialogButtonBox.Yes | QDialogButtonBox.No)
@@ -6327,6 +6337,21 @@ class PdfViewer(QWidget):
         if dlg.exec() != QDialog.Accepted:
             return
         remove = chk.isChecked()
+        src = Path(self.pdf_path)
+        default_name = f"{src.stem}_redacted.pdf"
+        path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Redactions anwenden — neues PDF",
+            str(src.with_name(default_name)),
+            "PDF (*.pdf)",
+        )
+        if not path:
+            return
+        dest = Path(path)
+        if dest.suffix.lower() != ".pdf":
+            dest = dest.with_suffix(".pdf")
+        if not confirm_overwrite_export(dest, self):
+            return
         try:
             from ild_pdf.redact import bake_redactions as apply_redactions
             from ild_pdf.render import clear_render_cache
@@ -6335,14 +6360,17 @@ class PdfViewer(QWidget):
                 self.pdf_path,
                 self.store,
                 scale=self.scale,
+                out_path=dest,
                 remove_from_store=remove,
             )
             clear_render_cache(self.pdf_path)
             self.refresh()
             self.annotations_changed.emit()
-            self.status.emit(f"{len(reds)} Schwärzung(en) eingebrannt")
+            self.status.emit(
+                f"{len(reds)} Redaction(s) → {dest.name}"
+            )
         except Exception as e:
-            QMessageBox.warning(self, "Schwärzung", str(e))
+            QMessageBox.warning(self, "Redactions", str(e))
 
     def render_thumbnails(self, *, max_pages: int = 40, scale: float | None = None):
         """Kleine Seitenvorschauen (PIL). Begrenzt auf max_pages — bevorzugt lazy via render_thumbnail."""

@@ -102,6 +102,10 @@ HELP_HTML = f"""
     <b>Export-Profil</b> speichern/anwenden (DPI / Format / Ziel)</li>
 <li><b>OCR gesamtes PDF</b>: Button <b>„Als Defaults speichern“</b> → Toast <b>„OCR-Defaults gespeichert“</b> (Dauer Settings <b>1/2/3 s</b> + Accessibility-Announcement) + Feld-Highlight; Defaults vorbelegt; Toggle <b>„Fehler anhängen“</b> Settings-persistiert; Seitenfehler → Abschnitt im TXT; Abbruch behält Teilergebnis; optional <b>Seitenbereich von–bis</b>; Fortschritt → <b>Textdatei-Tab</b> — 1.1.9</li>
 <li><b>PDF zusammenführen</b>: Thumbnail-Klick → Readonly-Tab mit Banner <b>„Vorschau“</b> + <b>„Zum Bearbeiten öffnen“</b>; Toggle Readonly schließen <b>auch im Merge-Dialog</b> (gleicher Persistenz-Tooltip in Settings); Vorschau-Thumbnail; Drag&amp;Drop; Duplikat-Warnung; Doppelklick/Alle/Seiten-Summe — 1.1.9</li>
+<li><b>AcroForm-Sidebar</b>: Feldliste <b>Name/Typ/Wert</b>; Klick → Seite; Textfeld-Wert speichern via <b>pikepdf</b> — 1.3.0</li>
+<li><b>Redactions anwenden</b>: Rechteck → Sidecar; Menü erzeugt <b>neues PDF</b> mit schwarzen Flächen — 1.3.0</li>
+<li><b>Bookmarks ↔ Outlines</b>: Import aus PDF-Outlines / Export als PDF-Outlines — 1.3.0</li>
+<li><b>Thumbnail Lazy-Load</b>: große PDFs <b>&gt;50 Seiten</b> mit Platzhaltern für alle Seiten — 1.3.0</li>
 <li><b>PDF Seitenbereich / Split</b>: Bereiche <b>1-3,5,8-10</b>; Pfad-Log <b>In Tabs öffnen</b>: Status <b>geöffnet X, übersprungen Y</b>; <b>Log-Footer klickbar</b> → Filter übersprungene (Toggle); Pfad kopieren; Mehrfachauswahl; Ordner der Auswahl — 1.2.9</li>
 <li><b>Annotationen exportieren (JSON / Flatten)</b>: Quick-Insert <b>{{stem}}</b>/<b>{{page}}</b>/<b>{{date}}</b>; <b>Ctrl+Z lokal</b>; <b>Reset-Template</b> → Live-Vorschau + Fokus mit Selektion ganzer Default-Text — 1.2.9</li>
 <li><b>Text-Diff Panel</b>: Wrap-Blink Dauer Settings <b>kurz/mittel/lang</b> + <b>System-Beep vs. stumm</b>; Status <b>Änderung i/n</b>; F7/Shift+F7 — 1.2.9</li>
@@ -113,7 +117,8 @@ HELP_HTML = f"""
 <li><b>Willkommen</b>: <b>Weiterarbeiten</b> deaktiviert + Tooltip wenn Session fehlt/leer; sonst Tab-Anzahl + Pfad-Snippet; Esc leert Filter → Fokus Liste; Clear + Treffer; Enter/Entf; Drag&amp;Drop — 1.0.9</li>
 <li><b>Hilfe → Info / Lizenz</b>: Banner <b>Fokus-Ring</b> + <b>Enter → Aktivierung</b> + Esc schließt + AccessibleName; Icon + Dismiss + Schließen-X; Persistenz <b>dismiss_date</b>; Farbe Warnung vs. abgelaufen — 1.0.9</li>
 <li><b>Seitenleiste</b>: Suche (inkl. letzte Suchbegriffe), „Alle Docs“-Volltext, Zuletzt geöffnet, Dokumente,
-    Lesezeichen/Outline (+/− hinzufügen/löschen), <b>Annotationen</b> (klickbar, <b>nach Seite gruppiert</b>,
+    Lesezeichen/Outline (+/− hinzufügen/löschen), <b>Formularfelder (AcroForm)</b> Name/Typ/Wert,
+    <b>Annotationen</b> (klickbar, <b>nach Seite gruppiert</b>,
     <b>Filter nach Typ</b>, <b>Textsuche in der Liste</b> (optional <b>Regex</b>), <b>Statistik je Typ</b>,
     <b>Farben-Chips klickbar filtern</b>, <b>Zeitstempel</b>,
     <b>Filter nur aktuelle Seite</b>), Markierungen/Treffer</li>
@@ -222,6 +227,10 @@ HELP_HTML = f"""
     Toggle „Fehler anhängen“ Settings-persistiert; Seitenfehler-Abschnitt + Teilergebnis — 1.1.9</li>
 <li><b>PDF zusammenführen</b>: Thumbnail-Klick → Readonly-Tab mit Banner „Vorschau“ +
     „Zum Bearbeiten öffnen“; Toggle Readonly schließen auch im Merge-Dialog (gleicher Persistenz-Tooltip in Settings); Drag&amp;Drop; Duplikat-Warnung — 1.1.9</li>
+<li><b>AcroForm-Sidebar</b>: Feldliste <b>Name/Typ/Wert</b>; Klick → Seite; Textfeld-Wert speichern via <b>pikepdf</b> — 1.3.0</li>
+<li><b>Redactions anwenden</b>: Rechteck → Sidecar; Menü erzeugt <b>neues PDF</b> mit schwarzen Flächen — 1.3.0</li>
+<li><b>Bookmarks ↔ Outlines</b>: Import aus PDF-Outlines / Export als PDF-Outlines — 1.3.0</li>
+<li><b>Thumbnail Lazy-Load</b>: große PDFs <b>&gt;50 Seiten</b> mit Platzhaltern für alle Seiten — 1.3.0</li>
 <li><b>PDF Seitenbereich / Split</b>: Bereiche <b>1-3,5,8-10</b>; Pfad-Log <b>In Tabs öffnen</b>: Status <b>geöffnet X, übersprungen Y</b>; <b>Log-Footer klickbar</b> → Filter übersprungene (Toggle); Pfad kopieren; Mehrfachauswahl; Ordner der Auswahl — 1.2.9</li>
 <li><b>Annotationen exportieren (JSON / Flatten)</b>: Quick-Insert <b>{{stem}}</b>/<b>{{page}}</b>/<b>{{date}}</b>; <b>Ctrl+Z lokal</b>; <b>Reset-Template</b> → Live-Vorschau + Fokus mit Selektion ganzer Default-Text — 1.2.9</li>
 <li><b>Text-Diff Panel</b>: Wrap-Blink Dauer Settings <b>kurz/mittel/lang</b> + <b>System-Beep vs. stumm</b>; Status <b>Änderung i/n</b>; F7/Shift+F7 — 1.2.9</li>

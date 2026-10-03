@@ -1,5 +1,27 @@
 # Changelog — InstantLens Doc
 
+## 1.3.0 — AcroForm-Sidebar, Redactions→neues PDF, Bookmarks↔Outlines, Thumb Lazy >50
+
+Minor-Release nach 1.2.9: **AcroForm-Feldliste** in der Sidebar (Name/Typ/Wert) mit Sprung zum Feld und einfacher Textfeld-Wert-Editierung via **pikepdf**; **Redactions anwenden** erzeugt ein **neues PDF** mit eingebrannten schwarzen Flächen (Rechteck-Werkzeug → Sidecar); **Bookmarks** aus PDF-Outlines importieren und als PDF-Outlines exportieren; **Thumbnail-Lazy-Load** für große PDFs (**>50 Seiten**) mit Platzhaltern für alle Seiten. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### Formulare
+- Sidebar **AcroForm-Feldliste** (Name/Typ/Wert); Klick → Seite; Textfeld-Wert speichern via pikepdf
+
+### PDF / Redaction
+- Rechteck-Werkzeug speichert Schwärzung im Sidecar; **Redactions anwenden…** → neues PDF (schwarze Füllung bake)
+
+### Bookmarks / Outlines
+- **Bookmarks aus PDF-Outlines importieren** (→ Seiten-Favoriten); **Bookmarks als PDF-Outlines exportieren** (`write_outline`)
+
+### Performance
+- Thumbnail-Lazy-Load: bei **>50 Seiten** Platzhalter für alle Seiten + Nachladen (kein 40-Seiten-Cap)
+
+### Packaging / Docs
+- Version **1.3.0** (App / `ild_pdf` / ISS / Smoke / Docs)
+- Smoke: AcroForm-Sidebar, Redactions→neues PDF, Bookmarks↔Outlines, Thumb Lazy >50 (CLI + Qt)
+
+---
+
 ## 1.2.9 — Split-Log Footer Filter übersprungen, Ann. Reset Selektion, Diff Wrap-Blink lang/Beep, run.bat --version
 
 Post-Release-Polish nach 1.2.8: **PDF-Split Log-Footer** ist **klickbar** und filtert die Liste auf **übersprungene** Einträge (Toggle); **Ann.-Export Reset-Template** setzt den **Fokus mit Selektion des ganzen Default-Texts** für schnelles Überschreiben; **Text-Diff Wrap-Blink** mit Dauer-Option **lang** und Sound klar als **System-Beep vs. stumm**; **`run.bat`** zeigt in der **gefunden**-Zeile kurz auch **`python --version`**. Stubs KI/Cloud/Stylus/3D bleiben Stubs.

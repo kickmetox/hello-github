@@ -58,7 +58,9 @@ python examples/ild_pdf_demo.py pfad/zu/datei.pdf
 | `AnnotationType` | + **redaction**, signature*, rectangle/line/arrow/measure, text_overlay |
 | `DRAG_TYPES` | Typen für Drag-Zeichnung (UI) |
 | `STAMP_PRESETS` / `STAMP_LIBRARY` / `stamp_with_date` | Stempel-Texte / Bibliothek + Datum |
-| `list_form_fields` / `set_form_values` / `has_acroform` | AcroForm lesen/schreiben |
+| `list_form_fields` / `set_form_values` / `has_acroform` | AcroForm lesen/schreiben (inkl. page_index/rect) |
+| `extract_outline` / `write_outline` / `flatten_outline_pages` | PDF-Outlines lesen/ersetzen / flach |
+| `THUMB_LAZY_THRESHOLD` | Lazy-Thumbs ab >50 Seiten |
 | `list_attachments` / `extract_attachment` / `has_attachments` | PDF-Anhänge auflisten/extrahieren |
 | `extract_text_blocks` | Sichtbaren Text grob als Blöcke lesen |
 | `extract_page_plain_text` / `extract_all_plain_text` | Plaintext Seite / gesamtes PDF → Editor |

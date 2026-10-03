@@ -56,7 +56,15 @@ from .pages import (
     set_crop_box,
 )
 from .flatten import bake_annotations, draw_annotations_on_image, flatten_annotations_to_pdf
-from .outline import OutlineItem, add_outline_item, delete_outline_item, extract_outline
+from .outline import (
+    OutlineItem,
+    add_outline_item,
+    delete_outline_item,
+    extract_outline,
+    flatten_outline_pages,
+    outline_from_pages,
+    write_outline,
+)
 from .images import (
     compress_image_for_pdf,
     compress_pdf_as_images,
@@ -82,7 +90,7 @@ from .overlay import (
     selection_to_plain_text,
 )
 from .watermark import apply_page_numbers, apply_watermark
-from .limits import PdfHealth, clamp_render_scale, inspect_pdf
+from .limits import PdfHealth, THUMB_LAZY_THRESHOLD, clamp_render_scale, inspect_pdf
 from .render import clear_render_cache
 from .security import needs_password, remove_password, set_password, try_open_password
 from .redact import bake_redactions
@@ -161,6 +169,10 @@ __all__ = [
     "extract_outline",
     "add_outline_item",
     "delete_outline_item",
+    "flatten_outline_pages",
+    "outline_from_pages",
+    "write_outline",
+    "THUMB_LAZY_THRESHOLD",
     "compress_image_for_pdf",
     "compress_pdf_as_images",
     "extract_page_image",
@@ -212,4 +224,4 @@ __all__ = [
     "uri_link_at",
 ]
 
-__version__ = "1.2.9"
+__version__ = "1.3.0"

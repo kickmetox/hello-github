@@ -420,6 +420,8 @@ class Sidebar(QWidget):
     outline_activated = Signal(int)  # PDF-Seite 0-basiert
     outline_add_requested = Signal()
     outline_delete_requested = Signal()
+    form_field_activated = Signal(object)  # FormFieldInfo — Sprung zum Feld
+    form_fields_save_requested = Signal(object)  # dict[name→value] Textfelder speichern
     annotation_filter_changed = Signal(str)  # Typ-Wert oder "" für alle
     annotation_color_filter_changed = Signal(str)  # #RRGGBB oder "" für alle
     annotation_page_filter_changed = Signal(bool)  # nur aktuelle Seite
@@ -646,6 +648,32 @@ class Sidebar(QWidget):
         self.outline_btns_host = QWidget()
         self.outline_btns_host.setLayout(ol_btns)
         layout.addWidget(self.outline_btns_host)
+
+        self.lbl_forms = QLabel("Formularfelder (AcroForm)")
+        layout.addWidget(self.lbl_forms)
+        self.form_fields = QTreeWidget()
+        self.form_fields.setHeaderLabels(["Name", "Typ", "Wert"])
+        self.form_fields.setRootIsDecorated(False)
+        self.form_fields.setMaximumHeight(140)
+        self.form_fields.setToolTip(
+            "AcroForm-Felder — Klick springt zur Seite; Textwert unten editieren und Speichern"
+        )
+        self.form_fields.itemClicked.connect(self._activate_form_field)
+        self.form_fields.itemActivated.connect(self._activate_form_field)
+        layout.addWidget(self.form_fields)
+        form_edit_row = QHBoxLayout()
+        self.form_value_edit = QLineEdit()
+        self.form_value_edit.setPlaceholderText("Textfeld-Wert…")
+        self.form_value_edit.setToolTip("Einfache Textfeld-Wert-Editierung (pikepdf)")
+        form_edit_row.addWidget(self.form_value_edit, 1)
+        self.btn_form_save = QPushButton("Speichern")
+        self.btn_form_save.setToolTip("Textfeld-Wert per pikepdf in PDF schreiben")
+        self.btn_form_save.clicked.connect(self._emit_form_fields_save)
+        form_edit_row.addWidget(self.btn_form_save)
+        self.form_edit_host = QWidget()
+        self.form_edit_host.setLayout(form_edit_row)
+        layout.addWidget(self.form_edit_host)
+        self._form_fields_data: list = []
 
         layout.addWidget(QLabel("PDF-Favoriten — ziehen zum Ordnen"))
         self.page_favorites = PageFavoriteList()
@@ -1626,13 +1654,17 @@ class Sidebar(QWidget):
         self.thumbs.clear()
         self._thumb_token = getattr(self, "_thumb_token", 0) + 1
 
-    def prepare_lazy_thumbs(self, page_count: int, *, current: int = 0, max_pages: int = 40):
-        """Platzhalter-Einträge ohne Render — Icons kommen per update_thumb."""
+    def prepare_lazy_thumbs(self, page_count: int, *, current: int = 0, max_pages: int | None = None):
+        """Platzhalter für alle Seiten (Lazy-Load); max_pages begrenzt optional — 1.3.0."""
         self.thumbs.clear()
         self._thumb_token = getattr(self, "_thumb_token", 0) + 1
         w, h = pdf_thumbnail_icon_size()
         self.thumbs.apply_icon_size(w, h)
-        n = max(0, min(int(page_count), int(max_pages)))
+        total = max(0, int(page_count))
+        if max_pages is None:
+            n = total
+        else:
+            n = max(0, min(total, int(max_pages)))
         for i in range(n):
             item = QListWidgetItem(f"S. {i + 1}")
             item.setData(Qt.UserRole, i)
@@ -1743,6 +1775,73 @@ class Sidebar(QWidget):
         if path is None:
             return None
         return tuple(int(i) for i in path)
+
+    def _activate_form_field(self, item: QTreeWidgetItem, _column: int = 0):
+        if item is None or item.isDisabled():
+            return
+        info = item.data(0, Qt.UserRole)
+        if info is None:
+            return
+        # Wert ins Edit-Feld (nur editierbare Textfelder)
+        ftype = str(getattr(info, "field_type", "") or "")
+        ro = bool(getattr(info, "read_only", False))
+        editable = (not ro) and ftype == "text"
+        self.form_value_edit.blockSignals(True)
+        self.form_value_edit.setText(str(getattr(info, "value", "") or ""))
+        self.form_value_edit.blockSignals(False)
+        self.form_value_edit.setEnabled(editable)
+        self.btn_form_save.setEnabled(editable)
+        self.form_field_activated.emit(info)
+
+    def _emit_form_fields_save(self):
+        item = self.form_fields.currentItem()
+        if item is None or item.isDisabled():
+            return
+        info = item.data(0, Qt.UserRole)
+        if info is None:
+            return
+        ftype = str(getattr(info, "field_type", "") or "")
+        if ftype != "text" or bool(getattr(info, "read_only", False)):
+            return
+        name = str(getattr(info, "name", "") or "")
+        if not name:
+            return
+        value = self.form_value_edit.text()
+        self.form_fields_save_requested.emit({name: value})
+
+    def set_form_fields(self, fields) -> None:
+        """AcroForm-Feldliste (Name/Typ/Wert) in der Sidebar — 1.3.0."""
+        self.form_fields.clear()
+        self._form_fields_data = list(fields or [])
+        self.form_value_edit.clear()
+        self.form_value_edit.setEnabled(False)
+        self.btn_form_save.setEnabled(False)
+        if not self._form_fields_data:
+            empty = QTreeWidgetItem(["(keine AcroForm-Felder)", "", ""])
+            empty.setDisabled(True)
+            self.form_fields.addTopLevelItem(empty)
+            return
+        for f in self._form_fields_data:
+            name = str(getattr(f, "name", "") or "")
+            ftype = str(getattr(f, "field_type", "") or "")
+            value = str(getattr(f, "value", "") or "")
+            twi = QTreeWidgetItem([name, ftype, value])
+            twi.setData(0, Qt.UserRole, f)
+            page = getattr(f, "page_index", None)
+            tip = f"{name} ({ftype})"
+            if page is not None:
+                tip += f" — S. {int(page) + 1}"
+            if getattr(f, "read_only", False):
+                tip += " · nur lesen"
+            twi.setToolTip(0, tip)
+            twi.setToolTip(1, tip)
+            twi.setToolTip(2, tip)
+            self.form_fields.addTopLevelItem(twi)
+        for col in (0, 1, 2):
+            self.form_fields.resizeColumnToContents(col)
+
+    def clear_form_fields(self) -> None:
+        self.set_form_fields([])
 
     def search_hit_records(self) -> list[dict]:
         """Aktuelle Trefferliste als strukturierte Dicts für CSV/JSON-Export."""

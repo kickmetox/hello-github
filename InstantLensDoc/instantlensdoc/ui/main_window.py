@@ -837,6 +837,8 @@ class MainWindow(QMainWindow):
         self.sidebar.outline_activated.connect(self._on_outline_jump)
         self.sidebar.outline_add_requested.connect(self._outline_add)
         self.sidebar.outline_delete_requested.connect(self._outline_delete)
+        self.sidebar.form_field_activated.connect(self._on_form_field_jump)
+        self.sidebar.form_fields_save_requested.connect(self._on_form_fields_save)
         self.sidebar.annotation_filter_changed.connect(lambda _t: None)
         self.sidebar.annotation_tag_rename_requested.connect(self._rename_annotation_tag_global)
         self.sidebar.annotation_tag_recolor_requested.connect(self._recolor_annotation_tag_global)
@@ -1996,6 +1998,18 @@ class MainWindow(QMainWindow):
         act_fav_import.setToolTip("Favoritenliste aus JSON laden (ersetzen oder zusammenführen)")
         act_fav_import.triggered.connect(lambda: self.pdf_view.import_page_favorites_json())
         m_pdf.addAction(act_fav_import)
+        act_ol_import = QAction("Bookmarks aus PDF-Outlines importieren…", self)
+        act_ol_import.setToolTip(
+            "PDF-Outline → Seiten-Favoriten (Bookmarks) importieren — 1.3.0"
+        )
+        act_ol_import.triggered.connect(self._import_bookmarks_from_outline)
+        m_pdf.addAction(act_ol_import)
+        act_ol_export = QAction("Bookmarks als PDF-Outlines exportieren…", self)
+        act_ol_export.setToolTip(
+            "Seiten-Favoriten (Bookmarks) als PDF-Outline schreiben — 1.3.0"
+        )
+        act_ol_export.triggered.connect(self._export_bookmarks_to_outline)
+        m_pdf.addAction(act_ol_export)
         m_pdf.addSeparator()
         for title, slot in [
             ("PDF-Text → Overlay…", lambda: self.pdf_view.import_text_overlays()),
@@ -2004,7 +2018,7 @@ class MainWindow(QMainWindow):
             ("Gesamten PDF-Text → Editor", self._extract_all_text_to_editor),
             ("Seitenbild → Editor", self._insert_page_image_to_editor),
             ("Alle Seitenbilder → Editor", self._insert_all_page_images_to_editor),
-            ("Schwärzung einbrennen…", lambda: self.pdf_view.bake_redactions()),
+            ("Redactions anwenden…", lambda: self.pdf_view.bake_redactions()),
             ("Schwärzungs-Annotationen löschen…", lambda: self.pdf_view.clear_redactions()),
             ("Signaturfeld setzen…", lambda: self.pdf_view.place_signature_field()),
             ("Signatur (Bild) einfügen…", lambda: self.pdf_view.insert_signature_image()),
@@ -4873,10 +4887,12 @@ class MainWindow(QMainWindow):
             self._refresh_thumbs()
             self._refresh_outline(self.pdf_view.pdf_path)
             self._refresh_page_favorites()
+            self._refresh_form_fields()
         else:
             self.sidebar.clear_thumbs()
             self.sidebar.clear_annotations()
             self.sidebar.set_outline([])
+            self.sidebar.clear_form_fields()
             self.sidebar.clear_page_favorites()
             self.sidebar.clear_line_favorites()
 
@@ -5895,17 +5911,151 @@ class MainWindow(QMainWindow):
             items = []
         self.sidebar.set_outline(items)
 
+    def _refresh_form_fields(self):
+        """AcroForm-Feldliste Sidebar (Name/Typ/Wert) — 1.3.0."""
+        path = self.pdf_view.pdf_path
+        if not path:
+            self.sidebar.clear_form_fields()
+            return
+        try:
+            from ild_pdf.acroform import list_form_fields
+
+            fields = list_form_fields(path)
+        except Exception as e:
+            _log.debug("Form fields: %s", e)
+            fields = []
+        self.sidebar.set_form_fields(fields)
+
+    def _on_form_field_jump(self, info) -> None:
+        """Sprung zur Seite des AcroForm-Feldes."""
+        if self.stack.currentWidget() is not self.pdf_view or not self.pdf_view.pdf_path:
+            self._set_status("Formularfeld: PDF öffnen")
+            return
+        page = getattr(info, "page_index", None)
+        name = str(getattr(info, "name", "") or "")
+        if page is None:
+            self._set_status(f"Formularfeld „{name}“ ohne Seiten-Ziel")
+            return
+        idx = int(page)
+        n = int(self.pdf_view.page_count or 0)
+        if idx < 0 or idx >= n:
+            self._set_status(f"Formularfeld „{name}“: Seite außerhalb")
+            return
+        self.pdf_view.goto_page(idx)
+        self.sidebar.select_thumb(idx)
+        self._set_status(f"Formularfeld „{name}“ → Seite {idx + 1}")
+
+    def _on_form_fields_save(self, values) -> None:
+        """Textfeld-Werte via pikepdf speichern — 1.3.0."""
+        if not self.pdf_view.pdf_path:
+            self._set_status("Formularfelder speichern: PDF öffnen")
+            return
+        if not isinstance(values, dict) or not values:
+            return
+        try:
+            from ild_pdf.acroform import set_form_values
+            from ild_pdf.render import clear_render_cache
+
+            set_form_values(self.pdf_view.pdf_path, values)
+            clear_render_cache(self.pdf_view.pdf_path)
+            self.pdf_view.refresh()
+            self._refresh_form_fields()
+            names = ", ".join(str(k) for k in values.keys())
+            self._set_status(f"Formularfeld gespeichert: {names}")
+        except Exception as e:
+            QMessageBox.warning(self, "Formularfelder", str(e))
+
+    def _import_bookmarks_from_outline(self) -> None:
+        """PDF-Outlines → Seiten-Favoriten (Bookmarks) — 1.3.0."""
+        if not self.pdf_view.pdf_path or self.pdf_view.store is None:
+            QMessageBox.information(
+                self, "Bookmarks importieren", "Bitte zuerst ein PDF öffnen."
+            )
+            return
+        try:
+            from ild_pdf.outline import extract_outline, flatten_outline_pages
+
+            items = extract_outline(self.pdf_view.pdf_path)
+            pages = flatten_outline_pages(items)
+        except Exception as e:
+            QMessageBox.warning(self, "Bookmarks importieren", str(e))
+            return
+        if not pages:
+            QMessageBox.information(
+                self, "Bookmarks importieren", "Keine Outline-Einträge mit Seiten-Ziel."
+            )
+            return
+        # Seiten in Favoriten übernehmen (Reihenfolge Outline DFS)
+        n = int(self.pdf_view.page_count or 0)
+        order = [p for p, _t in pages if 0 <= int(p) < n]
+        if not order:
+            QMessageBox.information(
+                self, "Bookmarks importieren", "Keine gültigen Outline-Seiten."
+            )
+            return
+        try:
+            self.pdf_view.reorder_page_favorites(order)
+            self._refresh_page_favorites()
+            self._set_status(f"{len(order)} Bookmark(s) aus Outline importiert")
+        except Exception as e:
+            QMessageBox.warning(self, "Bookmarks importieren", str(e))
+
+    def _export_bookmarks_to_outline(self) -> None:
+        """Seiten-Favoriten als PDF-Outlines schreiben — 1.3.0."""
+        if not self.pdf_view.pdf_path or self.pdf_view.store is None:
+            QMessageBox.information(
+                self, "Bookmarks exportieren", "Bitte zuerst ein PDF öffnen."
+            )
+            return
+        favs = self.pdf_view.list_page_favorites()
+        if not favs:
+            QMessageBox.information(
+                self,
+                "Bookmarks exportieren",
+                "Keine Seiten-Favoriten — zuerst Bookmarks setzen oder Outline importieren.",
+            )
+            return
+        entries: list[tuple[int, str]] = []
+        for p in favs:
+            try:
+                label = (
+                    self.pdf_view.page_label(p)
+                    if self.pdf_view.has_page_labels()
+                    else ""
+                )
+            except Exception:
+                label = ""
+            entries.append((int(p), label or f"Seite {int(p) + 1}"))
+        try:
+            from ild_pdf.outline import outline_from_pages, write_outline
+
+            write_outline(self.pdf_view.pdf_path, outline_from_pages(entries))
+            self._refresh_outline(self.pdf_view.pdf_path)
+            self._set_status(f"{len(entries)} Bookmark(s) als PDF-Outline exportiert")
+        except Exception as e:
+            QMessageBox.warning(self, "Bookmarks exportieren", str(e))
+
     def _refresh_thumbs(self):
         if not self.pdf_view.pdf_path:
             self._stop_thumb_lazy()
             self.sidebar.clear_thumbs()
             return
-        # Lazy: Platzhalter sofort, Seiten einzeln nachladen (UI bleibt responsiv)
+        # Lazy: Platzhalter für alle Seiten, Nachladen (bei >50 Seiten kritisch) — 1.3.0
         try:
+            from ild_pdf.limits import THUMB_LAZY_THRESHOLD
+
             page_count = int(self.pdf_view.page_count or 0)
             current = int(self.pdf_view.page_index or 0)
-            token = self.sidebar.prepare_lazy_thumbs(page_count, current=current, max_pages=40)
-            self._start_thumb_lazy(token, page_count=min(page_count, 40), prefer=current)
+            # Alle Seiten als Platzhalter; große PDFs (>Threshold) immer lazy
+            max_pages = page_count if page_count > 0 else 0
+            token = self.sidebar.prepare_lazy_thumbs(
+                page_count, current=current, max_pages=max_pages or page_count
+            )
+            self._start_thumb_lazy(token, page_count=page_count, prefer=current)
+            if page_count > THUMB_LAZY_THRESHOLD:
+                self._set_status(
+                    f"Thumbnails: Lazy-Load {page_count} Seiten (>{THUMB_LAZY_THRESHOLD})"
+                )
         except Exception as e:
             _log.warning("Thumbnails: %s", e)
             self._stop_thumb_lazy()

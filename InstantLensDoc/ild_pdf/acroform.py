@@ -18,6 +18,8 @@ class FormFieldInfo:
     read_only: bool = False
     required: bool = False
     alternate_name: str = ""
+    page_index: Optional[int] = None  # 0-basiert; None wenn nicht auflösbar
+    rect: Optional[tuple[float, float, float, float]] = None  # PDF-UserSpace llx,lly,urx,ury
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -102,8 +104,70 @@ def _options_for(wrapped) -> list[str]:
     return out
 
 
+def _page_index_for_obj(pdf, page_obj) -> Optional[int]:
+    """Seitenindex über objgen (wie Outline)."""
+    if page_obj is None:
+        return None
+    try:
+        target = getattr(page_obj, "objgen", None)
+        if target is None:
+            return None
+        for i, page in enumerate(pdf.pages):
+            if getattr(page.obj, "objgen", None) == target:
+                return i
+    except Exception:
+        return None
+    return None
+
+
+def _widget_page_and_rect(pdf, wrapped) -> tuple[Optional[int], Optional[tuple[float, float, float, float]]]:
+    """Erste Widget-Annotation: Seitenindex + Rect (PDF-Koordinaten)."""
+    obj = getattr(wrapped, "obj", None)
+    if obj is None:
+        return None, None
+
+    def _rect_of(d) -> Optional[tuple[float, float, float, float]]:
+        try:
+            if d is None or "/Rect" not in d:
+                return None
+            r = d["/Rect"]
+            return (float(r[0]), float(r[1]), float(r[2]), float(r[3]))
+        except Exception:
+            return None
+
+    # Direktes Widget
+    page_idx = None
+    try:
+        if "/P" in obj:
+            page_idx = _page_index_for_obj(pdf, obj["/P"])
+    except Exception:
+        page_idx = None
+    rect = _rect_of(obj)
+    if page_idx is not None or rect is not None:
+        return page_idx, rect
+
+    # Parent mit Kids (Radio/Choice)
+    try:
+        kids = obj.get("/Kids") if hasattr(obj, "get") else None
+        if kids:
+            for kid in kids:
+                try:
+                    k = kid.get_object() if hasattr(kid, "get_object") else kid
+                    pi = None
+                    if "/P" in k:
+                        pi = _page_index_for_obj(pdf, k["/P"])
+                    rr = _rect_of(k)
+                    if pi is not None or rr is not None:
+                        return pi, rr
+                except Exception:
+                    continue
+    except Exception:
+        pass
+    return None, None
+
+
 def list_form_fields(path: str | Path) -> list[FormFieldInfo]:
-    """Liest alle AcroForm-Felder (Name, Typ, Wert, Optionen)."""
+    """Liest alle AcroForm-Felder (Name, Typ, Wert, Optionen, Seite/Rect)."""
     import pikepdf
     from pikepdf.form import Form, FormFieldFlag
 
@@ -118,6 +182,7 @@ def list_form_fields(path: str | Path) -> list[FormFieldInfo]:
                 flags = int(getattr(wrapped, "flags", 0) or 0)
             except Exception:
                 flags = 0
+            page_idx, rect = _widget_page_and_rect(pdf, wrapped)
             info = FormFieldInfo(
                 name=str(name),
                 field_type=_field_type_label(wrapped),
@@ -126,6 +191,8 @@ def list_form_fields(path: str | Path) -> list[FormFieldInfo]:
                 read_only=bool(flags & FormFieldFlag.read_only),
                 required=bool(flags & FormFieldFlag.required),
                 alternate_name=str(getattr(wrapped, "alternate_name", "") or ""),
+                page_index=page_idx,
+                rect=rect,
             )
             result.append(info)
     return result

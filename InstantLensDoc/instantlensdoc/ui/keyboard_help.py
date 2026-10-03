@@ -99,6 +99,10 @@ SHORTCUTS_HTML = """
 <tr><td>Ann. Export JSON/Flatten</td><td>PDF → Annotationen exportieren (JSON / Flatten)…: Quick-Insert {stem}/{page}/{date}; Ctrl+Z lokal; Reset-Template → Live-Vorschau + Fokus mit Selektion ganzer Default-Text; Bestätigung nur bei Abweichung — 1.2.9</td></tr>
 <tr><td>Text-Diff Panel</td><td>Datei → Text-Diff (offene Tabs)… (Ctrl+Alt+D): Wrap-Blink Dauer kurz/mittel/lang + System-Beep vs. stumm; Status Änderung i/n; F7/Shift+F7 — 1.2.9</td></tr>
 <tr><td>run.bat Deps / pip</td><td>Windows-Start: gewählte Python-Binary als „gefunden: …“ inkl. python --version; %ILD_PYTHON% ungültig/leer → Fallback py -3 → python → python3; --help; .venv; --yes/-y; Exit 0/1 — 1.2.9</td></tr>
+<tr><td>AcroForm-Sidebar</td><td>Sidebar Formularfelder (Name/Typ/Wert); Klick → Seite; Textwert speichern via pikepdf — 1.3.0</td></tr>
+<tr><td>Redactions anwenden</td><td>Rechteck-Werkzeug → Sidecar; PDF → Redactions anwenden… → neues PDF (schwarze Füllung) — 1.3.0</td></tr>
+<tr><td>Bookmarks ↔ Outlines</td><td>PDF → Bookmarks aus PDF-Outlines importieren… / Bookmarks als PDF-Outlines exportieren… — 1.3.0</td></tr>
+<tr><td>Thumbnail Lazy-Load</td><td>Große PDFs (&gt;50 Seiten): Platzhalter für alle Seiten, Lazy-Nachladen — 1.3.0</td></tr>
 <tr><td>Alle Ann. auf Seite löschen</td><td>Bearbeiten → bei 0 Treffern Sticky-Status Statusleiste bis nächste Ann.-Aktion / Seiten-/Dokumentwechsel / Undo/Redo + i18n DE + Menü/Aktion no-op + Button disabled; Undo „N Annotationen (gefiltert)“ — 1.1.9</td></tr>
 <tr><td>Keygen</td><td>Reveal Auto-Hide 5/10/30 s + Countdown „pausiert“ (Tooltip „Countdown pausiert (Fenster ohne Fokus)“) / Esc maskiert + History maskiert (letzte 4) / Doppelklick kopiert + Clear + .txt + --days — 1.1.9</td></tr>
 <tr><td>Willkommen-Startseite</td><td>Ohne Tabs: Recent + Dokument öffnen / Leeres Text — 1.0.0</td></tr>
@@ -301,8 +305,11 @@ About: Datenschutz-Hinweis (lokal, keine Telemetrie).</p>
 <p><b>Seiten als Bilder:</b> PDF → Seite/Seiten als PNG/JPEG exportieren (aktuell oder alle; DPI 72/150/300).</p>
 <p><b>Thumbnails:</b> in der Sidebar ziehen zum Neuordnen der Seiten (Ctrl+Z rückgängig); Größe in Einstellungen (klein/normal/groß).</p>
 <p><b>Statusleiste:</b> Dateiname · Seite x/y · Seitengröße (mm/inch, klickbar) · Zoom % · Wörter/Ann. · Version · Lizenz.</p>
-<p><b>Schwärzung:</b> Rechteck ziehen → PDF → Schwärzung einbrennen… (Sidecar optional leeren)
-bzw. Schwärzungs-Annotationen löschen…</p>
+<p><b>Schwärzung / Redactions:</b> Rechteck ziehen → Sidecar; PDF → Redactions anwenden… erzeugt neues PDF
+(schwarze Füllung; Sidecar optional leeren) bzw. Schwärzungs-Annotationen löschen… — 1.3.0</p>
+<p><b>AcroForm:</b> Sidebar Formularfelder (Name/Typ/Wert); Klick springt zur Seite; Textwert speichern — 1.3.0</p>
+<p><b>Bookmarks/Outlines:</b> Import Outline→Favoriten; Export Favoriten→PDF-Outline — 1.3.0</p>
+<p><b>Thumbnails:</b> bei &gt;50 Seiten Lazy-Load mit Platzhaltern für alle Seiten — 1.3.0</p>
 <p><b>Export-Overwrite:</b> Existiert die Zieldatei schon, Nachfrage (Default: Nein).</p>
 <p><b>Ann.-Statistik:</b> Sidebar-Footer zeigt Anzahl je Annotationstyp.</p>
 <p><b>Tray:</b> Tooltip enthält App-Version; Update-Hinweis beim Start nur wenn in Einstellungen aktiv.</p>

@@ -189,3 +189,92 @@ def delete_outline_item(pdf_path: str | Path, item_path: Sequence[int]) -> None:
                 raise IndexError(f"Outline-Pfad ungültig: {item_path}")
             del parent[idx]
         pdf.save(pdf_path)
+
+
+def flatten_outline_pages(items: Sequence[OutlineItem]) -> List[Tuple[int, str]]:
+    """
+    Outline-Baum flach: [(page_index, title), …] in DFS-Reihenfolge.
+    Einträge ohne Seiten-Ziel werden übersprungen; doppelte Seiten bleiben.
+    """
+    out: List[Tuple[int, str]] = []
+
+    def walk(nodes: Sequence[OutlineItem]) -> None:
+        for node in nodes or []:
+            if not isinstance(node, OutlineItem):
+                continue
+            if node.page_index is not None and int(node.page_index) >= 0:
+                title = (node.title or "").strip() or f"Seite {int(node.page_index) + 1}"
+                out.append((int(node.page_index), title))
+            if node.children:
+                walk(node.children)
+
+    walk(items)
+    return out
+
+
+def outline_from_pages(
+    pages: Sequence[Tuple[int, str] | int],
+) -> List[OutlineItem]:
+    """Flache Outline-Liste aus Seitenfavoriten [(page, title)|page, …]."""
+    items: List[OutlineItem] = []
+    seen: set[int] = set()
+    for entry in pages or []:
+        if isinstance(entry, (list, tuple)) and len(entry) >= 1:
+            page = int(entry[0])
+            title = str(entry[1]).strip() if len(entry) > 1 else ""
+        else:
+            page = int(entry)
+            title = ""
+        if page < 0 or page in seen:
+            continue
+        seen.add(page)
+        items.append(
+            OutlineItem(
+                title=title or f"Seite {page + 1}",
+                page_index=page,
+            )
+        )
+    return items
+
+
+def write_outline(
+    pdf_path: str | Path,
+    items: Sequence[OutlineItem],
+    *,
+    out_path: str | Path | None = None,
+) -> Path:
+    """
+    Gesamtes PDF-Outline ersetzen (Import/Export-Ziel).
+    Leere Liste → Outline entfernen.
+    """
+    pdf_path = Path(pdf_path)
+    out_path = Path(out_path) if out_path else pdf_path
+    overwrite = out_path.resolve() == pdf_path.resolve()
+
+    def _append_nodes(parent_list, nodes: Sequence[OutlineItem], n_pages: int) -> None:
+        for node in nodes or []:
+            if not isinstance(node, OutlineItem):
+                continue
+            title = (node.title or "").strip() or "Lesezeichen"
+            page = node.page_index
+            if page is None or page < 0 or page >= n_pages:
+                # Kinder ohne gültige Seite: Titelknoten auf Seite 0 falls Kinder existieren
+                if node.children:
+                    page = 0
+                else:
+                    continue
+            oi = pikepdf.OutlineItem(title, int(page))
+            parent_list.append(oi)
+            if node.children:
+                _append_nodes(oi.children, node.children, n_pages)
+
+    with pikepdf.open(pdf_path, allow_overwriting_input=overwrite) as pdf:
+        n = len(pdf.pages)
+        with pdf.open_outline() as outline:
+            outline.root.clear()
+            _append_nodes(outline.root, items, n)
+        if overwrite:
+            pdf.save()
+        else:
+            pdf.save(out_path)
+    return out_path

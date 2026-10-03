@@ -2,7 +2,7 @@
 
 Moderne Textverarbeitung mit PDF-Annotator, OCR-Bridge und Formulargenerator.
 
-**Version:** 1.2.9  
+**Version:** 1.3.0  
 **Hersteller:** Andreas Meyer · ame@sellerbach.de
 
 ## Quickstart (Windows)
@@ -33,8 +33,8 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an).
 
-## Neu in 1.2.9
+## Neu in 1.3.0
 
-PDF-Split: Log-Footer klickbar filtert Liste auf **übersprungene** Einträge (Toggle); Ann.-Export Reset-Template setzt Fokus mit Selektion des ganzen Default-Texts; Text-Diff Wrap-Blink Dauer **lang** + Sound klar als **System-Beep vs. stumm**; `run.bat` **gefunden**-Zeile inkl. kurz **`python --version`**. Stubs KI/Cloud/Stylus/3D unverändert.
+AcroForm-Sidebar (Name/Typ/Wert + Sprung + Textfeld speichern); Redactions anwenden → neues PDF; Bookmarks ↔ PDF-Outlines; Thumbnail-Lazy-Load >50 Seiten mit Platzhaltern. Stubs KI/Cloud/Stylus/3D unverändert.
 
 Siehe [CHANGELOG.md](CHANGELOG.md), [FEATURES.md](FEATURES.md) und [INFO.md](INFO.md).
