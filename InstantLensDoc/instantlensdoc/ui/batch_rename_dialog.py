@@ -1,4 +1,4 @@
-"""Batch-Umbenennen: Dry-Run, Kollision, Undo-TXT, Rückgängig letzte Batch — 1.4.2."""
+"""Batch-Umbenennen: Dry-Run, Kollision, Undo-TXT, Rückgängig letzte Batch — 1.4.3."""
 
 from __future__ import annotations
 
@@ -29,8 +29,10 @@ from instantlensdoc.core.app_settings import (
 from instantlensdoc.core.batch_rename import (
     DEFAULT_BATCH_RENAME_TEMPLATE,
     RenameUndoEntry,
+    RenameUndoLog,
     apply_undo_log,
     count_collisions,
+    eligible_undo_entries,
     format_dry_run_list,
     preview_batch_rename,
     read_undo_log,
@@ -56,7 +58,8 @@ class BatchRenameDialog(QDialog):
             QLabel(
                 "Template-Platzhalter: <code>{stem}</code>, <code>{n}</code>, "
                 "<code>{ext}</code>, <code>{name}</code> — Dry-Run / Kollision / "
-                "Undo-Log TXT / Rückgängig letzte Batch — 1.4.2"
+                "Undo-Log TXT / Rückgängig letzte Batch (nur noch passende Namen) "
+                "— 1.4.3"
             )
         )
 
@@ -109,7 +112,8 @@ class BatchRenameDialog(QDialog):
         actions.addWidget(self.btn_dry_run)
         self.btn_undo_last = QPushButton("Rückgängig letzte Batch")
         self.btn_undo_last.setToolTip(
-            "Letztes Undo-Log (TXT) laden und Umbenennungen zurücknehmen — 1.4.2"
+            "Letztes Undo-Log (TXT): Bestätigung mit Anzahl; greift nur Dateien, "
+            "die noch dem neuen Namen entsprechen — 1.4.3"
         )
         self.btn_undo_last.clicked.connect(self._undo_last_batch)
         actions.addWidget(self.btn_undo_last)
@@ -159,7 +163,7 @@ class BatchRenameDialog(QDialog):
             row.setData(Qt.UserRole, it)
             self.preview.addItem(row)
         self.status.setText(
-            f"Dry-Run: {ok_n} von {len(items)} würden umbenannt — 1.4.2"
+            f"Dry-Run: {ok_n} von {len(items)} würden umbenannt — 1.4.3"
         )
         if col_n:
             self.lbl_collision.setText(
@@ -197,7 +201,10 @@ class BatchRenameDialog(QDialog):
         return None
 
     def _undo_last_batch(self) -> None:
-        """Rückgängig letzte Batch anhand Undo-Log TXT — 1.4.2."""
+        """
+        Rückgängig letzte Batch: Bestätigung mit Anzahl;
+        nur Dateien die noch dem neuen Namen entsprechen — 1.4.3.
+        """
         log_path = self._resolve_undo_log_path()
         if log_path is None:
             path, _ = QFileDialog.getOpenFileName(
@@ -219,17 +226,43 @@ class BatchRenameDialog(QDialog):
                 self, "Rückgängig", "Undo-Log enthält keine Einträge."
             )
             return
+        eligible = eligible_undo_entries(log)
+        skipped = len(log.entries) - len(eligible)
+        if not eligible:
+            QMessageBox.information(
+                self,
+                "Rückgängig letzte Batch",
+                f"Keine der {len(log.entries)} Datei(en) entspricht noch dem "
+                f"neuen Namen — nichts zurückzunehmen.\n{log_path}",
+            )
+            return
+        msg = (
+            f"{len(eligible)} Datei(en) noch unter dem neuen Namen "
+            f"wirklich zurücknehmen? (NEW → OLD)\n{log_path}"
+        )
+        if skipped:
+            msg += (
+                f"\n\n{skipped} Eintrag/Einträge übersprungen "
+                "(nicht mehr unter neuem Namen)."
+            )
         reply = QMessageBox.question(
             self,
             "Rückgängig letzte Batch",
-            f"{len(log.entries)} Umbenennung(en) aus\n{log_path}\n"
-            "wirklich zurücknehmen? (NEW → OLD)",
+            msg,
             QMessageBox.Yes | QMessageBox.No,
             QMessageBox.No,
         )
         if reply != QMessageBox.Yes:
             return
-        results = apply_undo_log(log, also_sidecars=True)
+        # Nur passende Einträge anwenden
+        filtered = RenameUndoLog(
+            created=log.created,
+            template=log.template,
+            entries=list(eligible),
+        )
+        results = apply_undo_log(
+            filtered, also_sidecars=True, only_matching_new_name=True
+        )
         errors = [f"{Path(a).name}: {e}" for a, _b, e in results if e]
         self.undone = [(a, b) for a, b, e in results if e is None]
         # Pfade im Dialog aktualisieren (new→old)

@@ -1054,14 +1054,18 @@ class MainWindow(QMainWindow):
         )
         self.ann_zero_status_label.setVisible(False)
         sb.addPermanentWidget(self.ann_zero_status_label)
-        # Theme folgen: Indicator System / Manuell dunkel/hell — 1.4.2
+        # Theme: Indicator; Klick → Schnellmenü System/Hell/Dunkel — 1.4.3
         self.theme_status_label = QLabel(theme_status_text())
         self.theme_status_label.setObjectName("themeStatus")
         self.theme_status_label.setStyleSheet(
             "QLabel#themeStatus { color: #666; padding-right: 8px; font-size: 11px; }"
         )
+        self.theme_status_label.setCursor(Qt.PointingHandCursor)
         self.theme_status_label.setToolTip(
-            "Theme: System folgen oder manuell Hell/Dunkel — 1.4.2"
+            "Klick: Theme-Schnellmenü (System / Hell / Dunkel) — 1.4.3"
+        )
+        self.theme_status_label.mousePressEvent = (  # type: ignore[method-assign]
+            self._on_theme_status_clicked
         )
         sb.addPermanentWidget(self.theme_status_label)
         self.version_label = QLabel(f"v{__version__}")
@@ -4617,7 +4621,7 @@ class MainWindow(QMainWindow):
         self._refresh_theme_status_label(pref)
 
     def _refresh_theme_status_label(self, pref: str | None = None) -> None:
-        """Statusleisten-Indicator Theme: System / Manuell dunkel/hell — 1.4.2."""
+        """Statusleisten-Indicator Theme; Klick → Schnellmenü — 1.4.3."""
         lbl = getattr(self, "theme_status_label", None)
         if lbl is None:
             return
@@ -4627,12 +4631,61 @@ class MainWindow(QMainWindow):
         if mode == "system":
             tip = (
                 f"Theme: System folgen "
-                f"(aktuell {'dunkel' if resolved == 'dark' else 'hell'}) — 1.4.2"
+                f"(aktuell {'dunkel' if resolved == 'dark' else 'hell'}). "
+                f"Klick: Schnellmenü System/Hell/Dunkel — 1.4.3"
             )
         else:
-            tip = f"{text} (Override) — 1.4.2"
+            tip = f"{text} (Override). Klick: Schnellmenü — 1.4.3"
         lbl.setText(text)
         lbl.setToolTip(tip)
+
+    def _on_theme_status_clicked(self, event) -> None:
+        """Klick auf Theme-Indicator → Schnellmenü System/Hell/Dunkel — 1.4.3."""
+        from PySide6.QtGui import QMouseEvent
+
+        if isinstance(event, QMouseEvent) and event.button() != Qt.LeftButton:
+            QLabel.mousePressEvent(self.theme_status_label, event)
+            return
+        self._show_theme_quick_menu()
+        event.accept()
+
+    def _show_theme_quick_menu(self) -> None:
+        """Theme-Schnellmenü an Statusleisten-Indicator — 1.4.3."""
+        menu = QMenu(self)
+        menu.setTitle("Theme")
+        pref = load_theme_mode()
+        act_sys = menu.addAction("System")
+        act_sys.setCheckable(True)
+        act_sys.setChecked(pref == "system")
+        act_light = menu.addAction("Hell")
+        act_light.setCheckable(True)
+        act_light.setChecked(pref == "light")
+        act_dark = menu.addAction("Dunkel")
+        act_dark.setCheckable(True)
+        act_dark.setChecked(pref == "dark")
+        chosen = menu.exec(self.theme_status_label.mapToGlobal(
+            self.theme_status_label.rect().bottomLeft()
+        ))
+        if chosen is None:
+            return
+        if chosen is act_sys:
+            self._set_theme_mode("system")
+        elif chosen is act_light:
+            self._set_theme_mode("light")
+        elif chosen is act_dark:
+            self._set_theme_mode("dark")
+
+    def _set_theme_mode(self, mode: str) -> None:
+        """Theme setzen (system|light|dark) inkl. Menü/Status — 1.4.3."""
+        if mode not in ("system", "light", "dark"):
+            return
+        apply_theme(mode=mode)  # type: ignore[arg-type]
+        self._sync_theme_menu()
+        self._set_status(theme_status_text(mode))  # type: ignore[arg-type]
+        try:
+            self._save_session()
+        except Exception:
+            pass
 
     def _toggle_follow_system(self, checked: bool = False):
         """System-Theme folgen Toggle — 1.4.0/1.4.2 Status-Indicator."""

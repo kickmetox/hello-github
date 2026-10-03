@@ -1,7 +1,9 @@
-"""Zwei PDFs Seite-nebeneinander vergleichen + Raster-Diff Overlay — 1.4.2."""
+"""Zwei PDFs Seite-nebeneinander vergleichen + Raster-Diff Overlay — 1.4.3."""
 
 from __future__ import annotations
 
+import html as _html
+import re
 from pathlib import Path
 
 from PySide6.QtCore import Qt
@@ -13,6 +15,7 @@ from PySide6.QtWidgets import (
     QFileDialog,
     QHBoxLayout,
     QLabel,
+    QLineEdit,
     QMessageBox,
     QPushButton,
     QScrollArea,
@@ -37,23 +40,67 @@ from instantlensdoc.core.app_settings import (
 
 
 DIFF_PNG_FILENAME_TEMPLATE = "{stemA}_vs_{stemB}_p{page}.png"
+DIFF_PNG_KNOWN_PLACEHOLDERS = frozenset({"stemA", "stemB", "page"})
+_DIFF_PNG_PLACEHOLDER_RE = re.compile(r"\{(stemA|stemB|page)\}")
+_DIFF_PNG_ANY_PLACEHOLDER_RE = re.compile(r"\{([^{}]+)\}")
 
 
-def format_diff_png_filename(stem_a: str, stem_b: str, page: int) -> str:
-    """Dateiname-Template ``{stemA}_vs_{stemB}_p{page}.png`` — 1.4.2."""
+def find_invalid_diff_png_placeholders(template: str) -> list[str]:
+    """
+    Unbekannte ``{…}``-Platzhalter im Diff-PNG-Template (Reihenfolge, unique).
+    Bekannt: stemA, stemB, page. — 1.4.3
+    """
+    seen: set[str] = set()
+    out: list[str] = []
+    for name in _DIFF_PNG_ANY_PLACEHOLDER_RE.findall(str(template or "")):
+        key = name.strip()
+        if not key or key in DIFF_PNG_KNOWN_PLACEHOLDERS or key in seen:
+            continue
+        seen.add(key)
+        out.append(key)
+    return out
+
+
+def highlight_diff_png_template_html(template: str) -> str:
+    """Template als HTML; ungültige Platzhalter rot markiert. — 1.4.3"""
+    raw = str(template or "")
+    parts: list[str] = []
+    last = 0
+    for m in _DIFF_PNG_ANY_PLACEHOLDER_RE.finditer(raw):
+        parts.append(_html.escape(raw[last : m.start()]))
+        name = m.group(1).strip()
+        token = _html.escape(m.group(0))
+        if name and name not in DIFF_PNG_KNOWN_PLACEHOLDERS:
+            parts.append(
+                f'<span style="color:#c62828;font-weight:600">{token}</span>'
+            )
+        else:
+            parts.append(token)
+        last = m.end()
+    parts.append(_html.escape(raw[last:]))
+    return "".join(parts) or _html.escape(raw)
+
+
+def format_diff_png_filename(
+    stem_a: str,
+    stem_b: str,
+    page: int,
+    template: str | None = None,
+) -> str:
+    """
+    Dateiname aus Template ``{stemA}_vs_{stemB}_p{page}.png``.
+    Unbekannte Platzhalter bleiben unverändert (für Live-Vorschau) — 1.4.2/1.4.3.
+    """
     a = (stem_a or "a").strip() or "a"
     b = (stem_b or "b").strip() or "b"
     p = max(1, int(page))
-    return DIFF_PNG_FILENAME_TEMPLATE.format(stemA=a, stemB=b, page=p)
+    tpl = (template or DIFF_PNG_FILENAME_TEMPLATE).strip() or DIFF_PNG_FILENAME_TEMPLATE
+    mapping = {"stemA": a, "stemB": b, "page": str(p)}
 
+    def _sub(m: re.Match) -> str:
+        return mapping.get(m.group(1), m.group(0))
 
-def _pil_to_qpixmap(img) -> QPixmap:
-    if img.mode not in ("RGB", "RGBA"):
-        img = img.convert("RGB")
-    data = img.tobytes("raw", img.mode)
-    fmt = QImage.Format_RGBA8888 if img.mode == "RGBA" else QImage.Format_RGB888
-    qimg = QImage(data, img.width, img.height, fmt).copy()
-    return QPixmap.fromImage(qimg)
+    return _DIFF_PNG_PLACEHOLDER_RE.sub(_sub, tpl)
 
 
 class PdfCompareDialog(QDialog):
@@ -125,7 +172,8 @@ class PdfCompareDialog(QDialog):
         btn_export = QPushButton("Diff PNG…")
         btn_export.setToolTip(
             "Diff-Overlay als PNG: Zielordner merken; "
-            f"Template {DIFF_PNG_FILENAME_TEMPLATE} — 1.4.2"
+            f"Template {DIFF_PNG_FILENAME_TEMPLATE}; "
+            "Live-Vorschau + ungültige Platzhalter rot — 1.4.3"
         )
         btn_export.clicked.connect(self._export_diff_png)
         self.btn_export_diff = btn_export
@@ -143,6 +191,26 @@ class PdfCompareDialog(QDialog):
         nav.addWidget(btn_reload)
         nav.addStretch()
         root.addLayout(nav)
+
+        # Diff-PNG Template: Live-Vorschau Dateiname; ungültige Platzhalter rot — 1.4.3
+        tpl_row = QHBoxLayout()
+        tpl_row.addWidget(QLabel("PNG-Template"))
+        self.png_template_edit = QLineEdit(DIFF_PNG_FILENAME_TEMPLATE)
+        self.png_template_edit.setPlaceholderText(DIFF_PNG_FILENAME_TEMPLATE)
+        self.png_template_edit.setToolTip(
+            "Platzhalter: {stemA}, {stemB}, {page}. "
+            "Live-Vorschau darunter; ungültige rot — 1.4.3"
+        )
+        self.png_template_edit.textChanged.connect(self._update_png_template_preview)
+        tpl_row.addWidget(self.png_template_edit, 1)
+        root.addLayout(tpl_row)
+        self.png_template_preview = QLabel("")
+        self.png_template_preview.setTextFormat(Qt.RichText)
+        self.png_template_preview.setWordWrap(True)
+        self.png_template_preview.setToolTip(
+            "Live-Vorschau Diff-PNG-Dateiname; ungültige Platzhalter rot — 1.4.3"
+        )
+        root.addWidget(self.png_template_preview)
 
         self.lbl_similarity = QLabel("Ähnlichkeit: —")
         self.lbl_similarity.setToolTip(
@@ -188,6 +256,29 @@ class PdfCompareDialog(QDialog):
         if self._right:
             self._load_meta(False)
         self._refresh()
+        self._update_png_template_preview()
+
+    def _current_png_template(self) -> str:
+        return (
+            self.png_template_edit.text().strip() or DIFF_PNG_FILENAME_TEMPLATE
+        )
+
+    def _update_png_template_preview(self, *_args) -> None:
+        """Live-Vorschau Dateiname; ungültige Platzhalter rot — 1.4.3."""
+        tpl = self._current_png_template()
+        page = int(self.spin_left.value()) if hasattr(self, "spin_left") else 1
+        stem_a = Path(self._left).stem if self._left else "a"
+        stem_b = Path(self._right).stem if self._right else "b"
+        sample = format_diff_png_filename(stem_a, stem_b, page, template=tpl)
+        html_tpl = highlight_diff_png_template_html(tpl)
+        invalid = find_invalid_diff_png_placeholders(tpl)
+        parts = [html_tpl, f"→ {_html.escape(sample)}"]
+        if invalid:
+            listed = ", ".join(_html.escape("{" + n + "}") for n in invalid)
+            parts.append(
+                f'<span style="color:#c62828">Ungültige Platzhalter: {listed}</span>'
+            )
+        self.png_template_preview.setText("<br>".join(parts))
 
     def _update_sync_label(self) -> None:
         if self.chk_sync.isChecked():
@@ -209,7 +300,7 @@ class PdfCompareDialog(QDialog):
         self._refresh()
 
     def _export_diff_png(self) -> None:
-        """Diff-PNG: Zielordner merken + Template {stemA}_vs_{stemB}_p{page}.png — 1.4.2."""
+        """Diff-PNG: Zielordner merken + editierbares Template — 1.4.2/1.4.3."""
         if self._diff_overlay is None:
             QMessageBox.information(
                 self,
@@ -223,7 +314,21 @@ class PdfCompareDialog(QDialog):
             page = int(self.spin_left.value())
         stem_a = Path(self._left).stem if self._left else "a"
         stem_b = Path(self._right).stem if self._right else "b"
-        fname = format_diff_png_filename(stem_a, stem_b, page)
+        tpl = self._current_png_template()
+        invalid = find_invalid_diff_png_placeholders(tpl)
+        if invalid:
+            listed = ", ".join("{" + n + "}" for n in invalid)
+            reply = QMessageBox.warning(
+                self,
+                "Diff PNG",
+                f"Ungültige Platzhalter: {listed}\n"
+                "Trotzdem mit diesem Dateinamen speichern?",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No,
+            )
+            if reply != QMessageBox.Yes:
+                return
+        fname = format_diff_png_filename(stem_a, stem_b, page, template=tpl)
         start_dir = dialog_start_dir(get_last_pdf_diff_png_dir())
         default = str(Path(start_dir) / fname)
         path, _ = QFileDialog.getSaveFileName(
@@ -256,6 +361,7 @@ class PdfCompareDialog(QDialog):
             self.lbl_right_path.setText(path)
             self._load_meta(False)
         self._refresh()
+        self._update_png_template_preview()
 
     def _load_meta(self, left: bool):
         path = self._left if left else self._right
@@ -378,3 +484,13 @@ class PdfCompareDialog(QDialog):
                 "Diff aus" if not self.chk_diff.isChecked() else "—"
             )
             self.lbl_similarity.setText("Ähnlichkeit: —")
+        self._update_png_template_preview()
+
+
+def _pil_to_qpixmap(img) -> QPixmap:
+    if img.mode not in ("RGB", "RGBA"):
+        img = img.convert("RGB")
+    data = img.tobytes("raw", img.mode)
+    fmt = QImage.Format_RGBA8888 if img.mode == "RGBA" else QImage.Format_RGB888
+    qimg = QImage(data, img.width, img.height, fmt).copy()
+    return QPixmap.fromImage(qimg)

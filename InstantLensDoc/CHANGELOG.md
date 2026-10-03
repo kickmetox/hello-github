@@ -1,5 +1,27 @@
 # Changelog — InstantLens Doc
 
+## 1.4.3 — Diff-PNG Live-Vorschau, Rename-Undo Bestätigung·Filter, Ann.-CSV Spalten+BOM, Theme-Schnellmenü
+
+Post-Release-Polish nach 1.4.2: **Diff-PNG-Template** mit **Live-Vorschau** des Dateinamens und **ungültigen Platzhaltern in Rot**; **Batch-Undo** mit **Bestätigung inkl. Anzahl** und greift **nur Dateien, die noch dem neuen Namen entsprechen**; **Annotation-Suche CSV** mit Spalten **Doc,Seite,Typ,Text,Snippet** und **UTF-8 BOM**; **Theme-Indicator** öffnet per Klick ein **Schnellmenü** (System / Hell / Dunkel). Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### PDF
+- Vergleich Diff-PNG: editierbares Template; Live-Vorschau Dateiname; ungültige Platzhalter rot
+
+### Dateien / Tabs
+- Batch-Umbenennen: Undo-Bestätigung mit Anzahl; nur Dateien unter dem neuen Namen
+
+### Annotationen
+- Suche-Treffer-CSV: Spalten Doc,Seite,Typ,Text,Snippet; UTF-8 BOM
+
+### UI / Theme
+- Statusleisten-Indicator: Klick → Theme-Schnellmenü System / Hell / Dunkel
+
+### Packaging / Docs
+- Version **1.4.3** (App / `ild_pdf` / ISS / Smoke / Docs)
+- Smoke: Diff-PNG Live-Vorschau·Platzhalter, Rename-Undo Anzahl·Filter, Ann.-CSV Spalten+BOM, Theme-Schnellmenü (CLI + Qt)
+
+---
+
 ## 1.4.2 — PDF-Diff PNG Zielordner·Template, Rename Undo-TXT·Rückgängig, Ann. Regex-Fehler·CSV, Theme-Status
 
 Post-Release-Polish nach 1.4.1: **Diff-PNG** merkt **Zielordner** und nutzt Dateiname-Template **`{stemA}_vs_{stemB}_p{page}.png`**; **Batch-Umbenennen** speichert Undo-Log als **TXT** und bietet **„Rückgängig letzte Batch“**; **Annotation-Suche** zeigt bei ungültigem Regex denselben **Fehlerstatus wie PDF-Suche** (`Regex-Fehler: …`) und exportiert Treffer als **CSV**; **Theme folgen** mit Indicator in der **Statusleiste** (System / Manuell dunkel / Manuell hell). Stubs KI/Cloud/Stylus/3D bleiben Stubs.

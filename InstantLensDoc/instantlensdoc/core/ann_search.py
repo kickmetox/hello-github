@@ -1,4 +1,4 @@
-"""Annotation-Volltextsuche über Sidecar-Notizen/Highlights geöffneter Docs — 1.4.2."""
+"""Annotation-Volltextsuche über Sidecar-Notizen/Highlights geöffneter Docs — 1.4.3."""
 
 from __future__ import annotations
 
@@ -8,15 +8,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Sequence
 
+# Spalten Doc,Seite,Typ,Text,Snippet — UTF-8 BOM — 1.4.3
 ANN_SEARCH_CSV_FIELDS = (
-    "path",
-    "page",
-    "ann_type",
-    "text",
-    "tags",
-    "snippet",
-    "ann_id",
-    "query",
+    "Doc",
+    "Seite",
+    "Typ",
+    "Text",
+    "Snippet",
 )
 
 
@@ -196,7 +194,11 @@ def export_ann_search_hits_csv(
     *,
     query: str = "",
 ) -> Path:
-    """Treffer der Annotation-Suche als CSV (UTF-8 BOM) — 1.4.2."""
+    """
+    Treffer der Annotation-Suche als CSV.
+    Spalten Doc,Seite,Typ,Text,Snippet; Encoding UTF-8 mit BOM — 1.4.3.
+    ``query`` bleibt API-kompatibel (nicht in CSV geschrieben).
+    """
     dest = Path(path)
     if dest.suffix.lower() != ".csv":
         dest = dest.with_suffix(".csv")
@@ -207,16 +209,14 @@ def export_ann_search_hits_csv(
         )
         writer.writeheader()
         for h in hits or []:
+            doc = Path(h.path).name if h.path else ""
             writer.writerow(
                 {
-                    "path": h.path,
-                    "page": int(h.page) + 1,  # 1-basiert für CSV
-                    "ann_type": h.ann_type,
-                    "text": h.text,
-                    "tags": h.tags,
-                    "snippet": h.snippet,
-                    "ann_id": h.ann_id,
-                    "query": query or "",
+                    "Doc": doc,
+                    "Seite": int(h.page) + 1,  # 1-basiert für CSV
+                    "Typ": h.ann_type,
+                    "Text": h.text,
+                    "Snippet": h.snippet,
                 }
             )
     return dest

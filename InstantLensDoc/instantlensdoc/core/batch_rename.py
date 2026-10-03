@@ -1,4 +1,4 @@
-"""Batch-Umbenennen offener Tabs: Template {stem}_{n} + Undo-TXT — 1.4.2."""
+"""Batch-Umbenennen offener Tabs: Template {stem}_{n} + Undo-TXT — 1.4.3."""
 
 from __future__ import annotations
 
@@ -263,14 +263,33 @@ def read_undo_log(path: str | Path) -> RenameUndoLog:
     return RenameUndoLog(created=created, template=template, entries=entries)
 
 
+def entry_still_has_new_name(entry: RenameUndoEntry) -> bool:
+    """
+    True wenn die Datei noch unter dem geloggten neuen Namen liegt — 1.4.3.
+    """
+    src = Path(entry.new_path)
+    if not src.is_file():
+        return False
+    expected = (entry.new_name or src.name).strip() or src.name
+    return src.name == expected
+
+
+def eligible_undo_entries(log: RenameUndoLog) -> List[RenameUndoEntry]:
+    """Einträge deren NEW-Datei noch dem neuen Namen entspricht — 1.4.3."""
+    return [e for e in (log.entries or []) if entry_still_has_new_name(e)]
+
+
 def apply_undo_log(
     log: RenameUndoLog,
     *,
     also_sidecars: bool = True,
+    only_matching_new_name: bool = True,
 ) -> List[tuple[str, str, str | None]]:
     """
     Macht einen Batch-Rename rückgängig: NEW → OLD.
-    Returns: Liste (from_new, to_old, error|None) — 1.4.2.
+    Mit only_matching_new_name (Default): greift nur Dateien, die noch dem
+    neuen Namen entsprechen — 1.4.2/1.4.3.
+    Returns: Liste (from_new, to_old, error|None).
     """
     results: List[tuple[str, str, str | None]] = []
     sidecar_suffixes = (
@@ -279,11 +298,21 @@ def apply_undo_log(
         ".ildfav.json",
         ".ildbm.json",
     )
+    entries = (
+        eligible_undo_entries(log)
+        if only_matching_new_name
+        else list(log.entries or [])
+    )
     # Umgekehrt der Umbenenn-Reihenfolge (weniger Kollisionen)
-    for e in reversed(list(log.entries)):
+    for e in reversed(entries):
         src = Path(e.new_path)
         dst = Path(e.old_path)
         try:
+            if only_matching_new_name and not entry_still_has_new_name(e):
+                results.append(
+                    (e.new_path, e.old_path, "nicht mehr unter neuem Namen")
+                )
+                continue
             if not src.exists():
                 results.append((e.new_path, e.old_path, "Quelle (neu) fehlt"))
                 continue

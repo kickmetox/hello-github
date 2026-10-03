@@ -193,7 +193,7 @@ class AnnotationSearchDialog(QDialog):
             dest = export_ann_search_hits_csv(path, self._hits, query=q)
             set_last_export_dir(dest.parent)
             self._set_status_ok(
-                f"{len(self._hits)} Treffer als CSV exportiert: {dest.name} — 1.4.2"
+                f"{len(self._hits)} Treffer als CSV exportiert: {dest.name} — 1.4.3"
             )
             QMessageBox.information(
                 self, "Treffer CSV", f"{len(self._hits)} Treffer exportiert:\n{dest}"
