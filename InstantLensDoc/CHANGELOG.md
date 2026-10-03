@@ -1,5 +1,23 @@
 # Changelog — InstantLens Doc
 
+## 1.8.1 — Batch-Shortcuts·Ann-Remap, HF Schrift/Rand·Vorschau·Seitenbereich, Layer Session·Shortcuts·Zähler, Recovery Meta·Verwerfen sauber
+
+Post-Release-Polish nach 1.8.0: **Batch Drehen/Spiegeln** mit **Shortcuts** (Ctrl+Alt+←/→/↑/H/Shift+V), Status **„N Seiten“**, **Ann.-Koordinaten Remap** bei 90°/180° (+ Undo); **Kopf-/Fußzeile** **Schriftgröße/Rand Settings**, **Vorschau erste Seite**, **Seitenbereich**; **Layer-Toggles** **Session-Persistenz**, **Shortcut-Menü** Ctrl+Alt+1…4, **Zähler sichtbarer Ann.**; **Crash-Recovery** **Snapshot-Metadaten-Vorschau**, **Verwerfen** löscht Orphan (Meta+Payload) sauber. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### PDF / Seiten
+- Thumbnails/Menü: Batch-Shortcuts; Status „1 Seite“ / „N Seiten“; Ann.-BBox Remap bei Drehung 90/180/−90
+- Kopf-/Fußzeile: Schriftgröße/Rand Settings merken; Text+Thumbnail-Vorschau Seite 1; Seitenbereich (leer=alle)
+
+### Annotationen / Recovery
+- Annotation-Typen: Session-Persistenz; Shortcuts Ctrl+Alt+1…4; Menü-Titel mit Zähler sichtbar/gesamt
+- Crash-Recovery: Dialog zeigt Meta (Art/Größe/Zeit/Pfad/Text-Snippet); Verwerfen löscht Meta+Payload orphan-sauber
+
+### Packaging / Docs
+- Version **1.8.1** (App / `ild_pdf` / ISS / Smoke / Docs); `docs/VERSION` + `VERSION.txt`
+- Smoke: Batch-Shortcuts·Ann-Remap·Status N Seiten, HF Preview·Range, Layer Session·Count, Recovery Meta·Discard (CLI + Qt)
+
+---
+
 ## 1.8.0 — Seiten drehen/spiegeln Batch+Undo, Kopf-/Fußzeile Bake, Ann.-Typ-Layer, Crash-Recovery
 
 Minor-Release mit neuen Kernfeatures (Basis **1.7.5**): **PDF-Seiten Batch drehen/spiegeln** (Auswahl + 90°/180°/Spiegel H/V) mit **Undo**; **Kopf-/Fußzeile** inkl. Seitenzahl und benutzerdefiniertem Text als **pikepdf Content-Bake**; **Annotation-Layer Typ-Toggles** (Highlight/Note/Shape/Redaction) global; **Crash-Recovery** mit Autosave-Snapshot und Wiederherstellen-Dialog beim Start bei dirty Orphans. Stubs KI/Cloud/Stylus/3D bleiben Stubs.

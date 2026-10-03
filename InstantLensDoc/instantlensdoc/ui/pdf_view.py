@@ -2519,12 +2519,14 @@ class PdfViewer(QWidget):
         return get_ann_layer_types_visible()
 
     def set_annotation_type_visible(self, group: str, visible: bool) -> None:
-        """Einen Annotation-Typ global ein-/ausblenden — 1.8.0."""
+        """Einen Annotation-Typ global ein-/ausblenden — 1.8.0; Zähler 1.8.1."""
         types = set_ann_layer_type_visible(group, visible)
         self.canvas.set_ann_type_visible(types)
+        vis_n, total_n = self.count_visible_annotations()
         self.status.emit(
             f"Annotation-Typ „{group}“ "
             + ("sichtbar" if visible else "ausgeblendet")
+            + f" — {vis_n} von {total_n} sichtbar"
         )
         self.annotations_layer_changed.emit(self._annotations_visible)
 
@@ -2532,6 +2534,20 @@ class PdfViewer(QWidget):
         types = set_ann_layer_types_visible(visible)
         self.canvas.set_ann_type_visible(types)
         self.annotations_layer_changed.emit(self._annotations_visible)
+
+    def count_visible_annotations(self) -> tuple[int, int]:
+        """(sichtbar nach Typ-Layer, gesamt) — 1.8.1."""
+        if not self.store:
+            return 0, 0
+        total = len(self.store.annotations)
+        if not self._annotations_visible:
+            return 0, total
+        n = sum(
+            1
+            for a in self.store.annotations
+            if self.canvas._ann_type_is_visible(a)
+        )
+        return n, total
 
     def set_annotations_locked(self, locked: bool):
         """Annotationen sperren — nicht per Drag verschiebbar."""
@@ -5372,10 +5388,17 @@ class PdfViewer(QWidget):
                 idx = int(entry["index"])
                 deg = int(entry.get("degrees", 90))
                 rotate_page(self.pdf_path, idx, -int(deg))
+                if self.store is not None and entry.get("ann_remapped") and self.store.can_undo():
+                    self.store.undo()
+                    try:
+                        self.schedule_sidecar_save(force=True)
+                    except Exception:
+                        pass
                 clear_render_cache(self.pdf_path)
                 if idx != self.page_index:
                     self.page_index = idx
                 self.refresh()
+                self.annotations_changed.emit()
                 self.document_changed.emit()
                 self.status.emit(f"Seitendrehung rückgängig (S. {idx + 1})")
                 return True
@@ -6863,7 +6886,7 @@ class PdfViewer(QWidget):
         return self.rotate_at(self.page_index, degrees)
 
     def rotate_at(self, page_index: int, degrees: int = 90) -> bool:
-        """Seite an Index drehen (−90/90/180/270), speichern, Undo-fähig."""
+        """Seite an Index drehen (−90/90/180/270), speichern, Undo-fähig; Ann.-Remap 1.8.1."""
         if not self.pdf_path:
             return False
         try:
@@ -6872,8 +6895,37 @@ class PdfViewer(QWidget):
                 self.status.emit("Drehen: ungültige Seite")
                 return False
             deg = int(degrees)
+            # Anzeigegröße vor Drehung für Ann.-Koordinaten-Remap — 1.8.1
+            page_w = page_h = 0.0
+            try:
+                from ild_pdf import PdfDocument
+
+                with PdfDocument(self.pdf_path, password=self.password) as doc:
+                    page_w, page_h = doc.page_size(idx)
+            except Exception:
+                page_w = page_h = 0.0
+            ann_remapped = False
+            if self.store is not None and page_w > 0 and page_h > 0:
+                undo_before = len(getattr(self.store, "_undo", []) or [])
+                n_ann = self.store.remap_coords_for_rotation(
+                    idx, deg, page_w=page_w, page_h=page_h, label="Ann. nach Drehung"
+                )
+                undo_after = len(getattr(self.store, "_undo", []) or [])
+                ann_remapped = bool(n_ann) and undo_after > undo_before
+                if n_ann:
+                    try:
+                        self.schedule_sidecar_save(force=True)
+                    except Exception:
+                        pass
             self._page_ops_undo.append(
-                {"kind": "rotate", "index": idx, "degrees": deg}
+                {
+                    "kind": "rotate",
+                    "index": idx,
+                    "degrees": deg,
+                    "ann_remapped": ann_remapped,
+                    "page_w": page_w,
+                    "page_h": page_h,
+                }
             )
             if len(self._page_ops_undo) > 20:
                 self._page_ops_undo.pop(0)
@@ -6885,6 +6937,8 @@ class PdfViewer(QWidget):
                 self.page_index = idx
             self.refresh()
             self.document_changed.emit()
+            if ann_remapped:
+                self.annotations_changed.emit()
             shown = deg % 360
             self.status.emit(
                 f"Seite {idx + 1} gedreht ({shown}°) — Ctrl+Z rückgängig"
@@ -6898,7 +6952,7 @@ class PdfViewer(QWidget):
             return False
 
     def rotate_many(self, page_indices: list[int] | Sequence[int], degrees: int = 90) -> int:
-        """Mehrere Seiten drehen (±90); Undo je Seite Ctrl+Z."""
+        """Mehrere Seiten drehen (±90/180); Undo je Seite Ctrl+Z; Status „N Seiten“ — 1.8.1."""
         if not self.pdf_path:
             return 0
         pages = sorted({int(i) for i in page_indices})
@@ -6910,7 +6964,8 @@ class PdfViewer(QWidget):
             if self.rotate_at(idx, deg):
                 n += 1
         if n:
-            self.status.emit(f"{n} Seite(n) gedreht ({deg:+d}°) — Ctrl+Z rückgängig")
+            label = "1 Seite" if n == 1 else f"{n} Seiten"
+            self.status.emit(f"{label} gedreht ({deg:+d}°) — Ctrl+Z rückgängig")
         return n
 
     def flip_current(self, *, horizontal: bool = False, vertical: bool = False):
@@ -6998,8 +7053,9 @@ class PdfViewer(QWidget):
                 parts.append("H")
             if vertical:
                 parts.append("V")
+            label = "1 Seite" if n == 1 else f"{n} Seiten"
             self.status.emit(
-                f"{n} Seite(n) gespiegelt ({'/'.join(parts)}) — Ctrl+Z rückgängig"
+                f"{label} gespiegelt ({'/'.join(parts)}) — Ctrl+Z rückgängig"
             )
         return n
 

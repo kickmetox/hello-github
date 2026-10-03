@@ -628,6 +628,11 @@ class MainWindow(QMainWindow):
             ann_stroke_color = str(getattr(self.pdf_view, "_pen_color", "") or "").strip()
         except Exception:
             ann_stroke_color = ""
+        ann_layer_types = None
+        try:
+            ann_layer_types = dict(get_ann_layer_types_visible())
+        except Exception:
+            ann_layer_types = None
         state = session_mod.build_session(
             paths,
             active_path=active,
@@ -649,6 +654,7 @@ class MainWindow(QMainWindow):
             ann_stroke_width=ann_stroke_width,
             ann_fill_color=ann_fill_color or None,
             ann_stroke_color=ann_stroke_color or None,
+            ann_layer_types=ann_layer_types,
         )
         session_mod.save_session(state)
 
@@ -822,6 +828,18 @@ class MainWindow(QMainWindow):
                     self.pdf_view, "btn_pen_color"
                 ):
                     self.pdf_view._style_color_btn(self.pdf_view.btn_pen_color, sc)
+        except Exception:
+            pass
+        # Annotation-Layer Typ-Toggles Session — 1.8.1
+        try:
+            layer = getattr(state, "ann_layer_types", None) or {}
+            if isinstance(layer, dict) and layer:
+                from instantlensdoc.core.app_settings import set_ann_layer_types_visible
+
+                set_ann_layer_types_visible(layer)
+                if hasattr(self.pdf_view, "set_annotation_types_visible"):
+                    self.pdf_view.set_annotation_types_visible(layer)
+                self._sync_ann_type_actions()
         except Exception:
             pass
         self._set_status(f"Session wiederhergestellt ({len(state.tabs)} Tab(s))")
@@ -1966,26 +1984,38 @@ class MainWindow(QMainWindow):
         self._ann_layer_action.setShortcut(QKeySequence("Ctrl+Shift+A"))
         self._ann_layer_action.toggled.connect(self._toggle_ann_layer)
         m_view.addAction(self._ann_layer_action)
-        # Typ-Toggles Highlight/Note/Shape/Redaction — 1.8.0
+        # Typ-Toggles Highlight/Note/Shape/Redaction — 1.8.0; Shortcuts·Zähler — 1.8.1
         m_ann_types = m_view.addMenu("Annotation-Typen")
-        m_ann_types.setToolTip("Globale Sichtbarkeit nach Typ (Layer)")
+        m_ann_types.setToolTip(
+            "Globale Sichtbarkeit nach Typ (Layer); Shortcuts Ctrl+Alt+1…4 — 1.8.1"
+        )
         types_vis = get_ann_layer_types_visible()
         self._ann_type_actions: dict[str, QAction] = {}
-        for key, label in (
-            ("highlight", "Markierungen"),
-            ("note", "Notizen"),
-            ("shape", "Formen"),
-            ("redaction", "Schwärzungen"),
-        ):
+        self._ann_type_labels = {
+            "highlight": "Markierungen",
+            "note": "Notizen",
+            "shape": "Formen",
+            "redaction": "Schwärzungen",
+        }
+        type_shortcuts = {
+            "highlight": "Ctrl+Alt+1",
+            "note": "Ctrl+Alt+2",
+            "shape": "Ctrl+Alt+3",
+            "redaction": "Ctrl+Alt+4",
+        }
+        for key, label in self._ann_type_labels.items():
             act = QAction(label, self)
             act.setCheckable(True)
             act.setChecked(bool(types_vis.get(key, True)))
             act.setData(key)
+            act.setShortcut(QKeySequence(type_shortcuts[key]))
+            act.setToolTip(f"{label} ein-/ausblenden ({type_shortcuts[key]})")
             act.toggled.connect(
                 lambda checked, g=key: self._toggle_ann_type_layer(g, checked)
             )
             m_ann_types.addAction(act)
             self._ann_type_actions[key] = act
+        self._m_ann_types = m_ann_types
         from instantlensdoc.core.app_settings import (
             get_annotations_locked,
             get_show_page_boxes,
@@ -2252,6 +2282,47 @@ class MainWindow(QMainWindow):
             a = QAction(title, self)
             a.triggered.connect(slot)
             m_pdf.addAction(a)
+        # Batch Drehen/Spiegeln Shortcuts (Auswahl oder aktuelle Seite) — 1.8.1
+        m_pdf.addSeparator()
+        act_batch_r90 = QAction("Auswahl 90° rechts drehen", self)
+        act_batch_r90.setShortcut(QKeySequence("Ctrl+Alt+Right"))
+        act_batch_r90.setToolTip(
+            "Thumbnail-Auswahl oder aktuelle Seite 90° rechts (Batch) — 1.8.1"
+        )
+        act_batch_r90.triggered.connect(lambda: self._batch_rotate_selection(90))
+        m_pdf.addAction(act_batch_r90)
+        act_batch_l90 = QAction("Auswahl 90° links drehen", self)
+        act_batch_l90.setShortcut(QKeySequence("Ctrl+Alt+Left"))
+        act_batch_l90.setToolTip(
+            "Thumbnail-Auswahl oder aktuelle Seite 90° links (Batch) — 1.8.1"
+        )
+        act_batch_l90.triggered.connect(lambda: self._batch_rotate_selection(-90))
+        m_pdf.addAction(act_batch_l90)
+        act_batch_180 = QAction("Auswahl 180° drehen", self)
+        act_batch_180.setShortcut(QKeySequence("Ctrl+Alt+Up"))
+        act_batch_180.setToolTip(
+            "Thumbnail-Auswahl oder aktuelle Seite 180° (Batch) — 1.8.1"
+        )
+        act_batch_180.triggered.connect(lambda: self._batch_rotate_selection(180))
+        m_pdf.addAction(act_batch_180)
+        act_batch_fh = QAction("Auswahl horizontal spiegeln", self)
+        act_batch_fh.setShortcut(QKeySequence("Ctrl+Alt+H"))
+        act_batch_fh.setToolTip(
+            "Thumbnail-Auswahl oder aktuelle Seite horizontal spiegeln — 1.8.1"
+        )
+        act_batch_fh.triggered.connect(
+            lambda: self._batch_flip_selection(horizontal=True, vertical=False)
+        )
+        m_pdf.addAction(act_batch_fh)
+        act_batch_fv = QAction("Auswahl vertikal spiegeln", self)
+        act_batch_fv.setShortcut(QKeySequence("Ctrl+Alt+Shift+V"))
+        act_batch_fv.setToolTip(
+            "Thumbnail-Auswahl oder aktuelle Seite vertikal spiegeln — 1.8.1"
+        )
+        act_batch_fv.triggered.connect(
+            lambda: self._batch_flip_selection(horizontal=False, vertical=True)
+        )
+        m_pdf.addAction(act_batch_fv)
         act_page_hist = QAction("Seiten-Historie (Undo)…", self)
         act_page_hist.setShortcut(QKeySequence("Ctrl+Shift+H"))
         act_page_hist.setToolTip("Gelöschte/gedrehte Seiten aus dem Undo-Stack wiederherstellen")
@@ -4867,16 +4938,69 @@ class MainWindow(QMainWindow):
         self._sync_ann_layer_action(bool(checked))
 
     def _toggle_ann_type_layer(self, group: str, checked: bool):
-        """Annotation-Typ global ein-/ausblenden — 1.8.0."""
+        """Annotation-Typ global ein-/ausblenden — 1.8.0; Session+Zähler — 1.8.1."""
         self.pdf_view.set_annotation_type_visible(str(group), bool(checked))
         self._sync_ann_type_actions()
+        try:
+            self._save_session()
+        except Exception:
+            pass
 
     def _sync_ann_type_actions(self) -> None:
         vis = get_ann_layer_types_visible()
+        labels = getattr(self, "_ann_type_labels", None) or {
+            "highlight": "Markierungen",
+            "note": "Notizen",
+            "shape": "Formen",
+            "redaction": "Schwärzungen",
+        }
+        vis_n, total_n = (0, 0)
+        try:
+            vis_n, total_n = self.pdf_view.count_visible_annotations()
+        except Exception:
+            vis_n, total_n = 0, 0
         for key, act in (getattr(self, "_ann_type_actions", None) or {}).items():
             act.blockSignals(True)
             act.setChecked(bool(vis.get(key, True)))
+            base = labels.get(key, key)
+            act.setText(base)
             act.blockSignals(False)
+        menu = getattr(self, "_m_ann_types", None)
+        if menu is not None:
+            menu.setTitle(f"Annotation-Typen ({vis_n}/{total_n})")
+
+    def _pages_for_batch_transform(self) -> list[int]:
+        """Thumbnail-Auswahl oder aktuelle Seite — 1.8.1."""
+        pages: list[int] = []
+        try:
+            pages = list(self.sidebar.selected_thumb_pages() or [])
+        except Exception:
+            pages = []
+        if not pages and self.pdf_view.pdf_path:
+            pages = [int(self.pdf_view.page_index)]
+        return pages
+
+    def _batch_rotate_selection(self, degrees: int) -> None:
+        """Batch-Drehen per Shortcut — 1.8.1."""
+        if self.stack.currentWidget() is not self.pdf_view:
+            self.stack.setCurrentWidget(self.pdf_view)
+        if not self.pdf_view.pdf_path:
+            return
+        pages = self._pages_for_batch_transform()
+        if not pages:
+            return
+        self._on_thumbs_batch_rotate(pages, int(degrees))
+
+    def _batch_flip_selection(self, *, horizontal: bool, vertical: bool) -> None:
+        """Batch-Spiegeln per Shortcut — 1.8.1."""
+        if self.stack.currentWidget() is not self.pdf_view:
+            self.stack.setCurrentWidget(self.pdf_view)
+        if not self.pdf_view.pdf_path:
+            return
+        pages = self._pages_for_batch_transform()
+        if not pages:
+            return
+        self._on_thumbs_batch_flip(pages, bool(horizontal), bool(vertical))
 
     def _toggle_ann_lock(self, checked: bool):
         self.pdf_view.set_annotations_locked(bool(checked))
@@ -5573,6 +5697,7 @@ class MainWindow(QMainWindow):
             from instantlensdoc.core.crash_recovery import (
                 discard_orphan,
                 list_orphans,
+                orphan_meta_preview,
                 restore_orphan,
             )
 
@@ -5583,14 +5708,18 @@ class MainWindow(QMainWindow):
             return
         if not orphans:
             return
-        lines = []
-        for o in orphans[:12]:
-            age_m = int(o.age_seconds() // 60)
-            lines.append(f"• {o.label} ({o.kind}, vor {age_m} min)")
-        more = f"\n… und {len(orphans) - 12} weitere" if len(orphans) > 12 else ""
+        # Snapshot-Metadaten-Vorschau — 1.8.1
+        previews = []
+        for o in orphans[:8]:
+            try:
+                previews.append(orphan_meta_preview(o))
+            except Exception:
+                age_m = int(o.age_seconds() // 60)
+                previews.append(f"{o.label} ({o.kind}, vor {age_m} min)")
+        more = f"\n\n… und {len(orphans) - 8} weitere" if len(orphans) > 8 else ""
         msg = (
             "Ungespeicherte Autosave-Snapshots gefunden (Crash-Recovery):\n\n"
-            + "\n".join(lines)
+            + "\n\n".join(previews)
             + more
             + "\n\nWiederherstellen?"
         )
@@ -5621,7 +5750,18 @@ class MainWindow(QMainWindow):
                     discard_orphan(o)
                 except Exception:
                     pass
-            self._set_status("Crash-Recovery: Snapshots verworfen")
+            # Orphan-Dateien sauber weg — Meta+Payload nicht mehr listbar
+            left = []
+            try:
+                left = list_orphans(
+                    max_age_hours=get_crash_recovery_max_age_hours()
+                )
+            except Exception:
+                left = []
+            self._set_status(
+                "Crash-Recovery: Snapshots verworfen"
+                + (f" ({len(left)} Rest)" if left else " (sauber)")
+            )
 
     def _autosave_tick(self):
         if not self._autosave_enabled:

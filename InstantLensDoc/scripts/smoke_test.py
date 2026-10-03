@@ -127,8 +127,8 @@ def main() -> int:
     from instantlensdoc.core.update_check import check_for_updates, check_local_version
     from instantlensdoc.license import KEY_DAYS, TRIAL_DAYS, generate_key, verify_key
 
-    assert __version__ == "1.8.0", __version__
-    assert ild_ver == "1.8.0", ild_ver
+    assert __version__ == "1.8.1", __version__
+    assert ild_ver == "1.8.1", ild_ver
     assert TRIAL_DAYS == 28 and KEY_DAYS == 32
     key = generate_key("ame@sellerbach.de")
     ok, msg, _ = verify_key(key)
@@ -146,19 +146,19 @@ def main() -> int:
     assert "Settings" in tr("settings")
     set_lang("de")
     upd = check_for_updates(allow_network=False)
-    assert upd.local_version == "1.8.0" and not upd.online
+    assert upd.local_version == "1.8.1" and not upd.online
     assert upd.status == "offline"
     assert upd.status_label("de") == "offline / nicht geprüft"
     assert upd.checked_at
     loc = check_local_version()
-    assert loc.local_version == "1.8.0"
-    assert loc.remote_version == "1.8.0"
+    assert loc.local_version == "1.8.1"
+    assert loc.remote_version == "1.8.1"
     assert loc.reference_source in ("docs/VERSION", "VERSION.txt")
     assert loc.newer_available is False
     assert loc.status == "current"
     assert loc.status_label("de") == "aktuell"
-    assert (ROOT / "docs" / "VERSION").read_text(encoding="utf-8").strip().startswith("1.8.0")
-    assert (ROOT / "VERSION.txt").read_text(encoding="utf-8").strip().startswith("1.8.0")
+    assert (ROOT / "docs" / "VERSION").read_text(encoding="utf-8").strip().startswith("1.8.1")
+    assert (ROOT / "VERSION.txt").read_text(encoding="utf-8").strip().startswith("1.8.1")
     assert get_export_jpeg_quality() >= 10
     assert get_ui_lang() in ("de", "en")
     assert 25 <= get_default_zoom_percent() <= 500
@@ -201,8 +201,8 @@ def main() -> int:
     assert get_ann_pen_color() == "#112233"
     assert (ROOT / "CHANGELOG.md").is_file()
     cl = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-    assert "1.8.0" in cl and "1.7.5" in cl and "1.7.4" in cl and "1.7.3" in cl and "1.7.2" in cl and "1.7.1" in cl and "1.7.0" in cl and "1.6.5" in cl and "1.6.4" in cl and "1.6.3" in cl and "1.6.2" in cl and "1.6.1" in cl and "1.6.0" in cl and "1.5.5" in cl and "1.5.4" in cl and "1.5.3" in cl and "1.5.2" in cl and "1.5.1" in cl and "1.5.0" in cl and "1.4.5" in cl and "1.4.4" in cl and "1.4.3" in cl and "1.4.2" in cl and "1.4.1" in cl and "1.4.0" in cl and "1.3.6" in cl and "1.3.5" in cl and "1.3.4" in cl and "1.3.3" in cl and "1.3.2" in cl and "1.3.1" in cl and "1.3.0" in cl and "1.2.9" in cl and "1.2.8" in cl and "1.2.7" in cl and "1.2.6" in cl and "1.2.5" in cl and "1.2.4" in cl and "1.2.3" in cl and "1.2.2" in cl and "1.2.1" in cl and "1.2.0" in cl and "1.1.9" in cl and "1.1.8" in cl and "1.1.7" in cl and "1.1.6" in cl and "1.1.5" in cl and "1.1.4" in cl and "1.1.3" in cl and "1.1.2" in cl and "1.1.1" in cl and "1.1.0" in cl and "1.0.9" in cl and "1.0.8" in cl and "1.0.7" in cl and "1.0.6" in cl and "1.0.5" in cl and "1.0.4" in cl and "1.0.3" in cl and "1.0.2" in cl and "1.0.1" in cl and "1.0.0" in cl and "0.9.9" in cl and "0.9.8" in cl and "0.9.7" in cl and "0.9.6" in cl and "0.9.5" in cl and "0.9.4" in cl and "0.9.3" in cl and "0.9.2" in cl and "0.9.1" in cl and "0.9.0" in cl and "0.8.9" in cl and "0.8.8" in cl and "0.8.7" in cl and "0.8.6" in cl and "0.8.5" in cl and "0.8.4" in cl and "0.8.3" in cl and "0.8.2" in cl and "0.8.1" in cl and "0.8.0" in cl
-    assert "## 1.8.0" in cl and "## 1.7.5" in cl and "## 1.7.4" in cl and "## 1.7.3" in cl and "## 1.7.2" in cl and "## 1.7.1" in cl and "## 1.7.0" in cl and "## 1.6.5" in cl and "## 1.6.4" in cl and "## 1.6.3" in cl and "## 1.6.2" in cl and "## 1.6.1" in cl and "## 1.6.0" in cl and "## 1.5.5" in cl and "## 1.5.4" in cl and "## 1.5.3" in cl and "## 1.5.2" in cl and "## 1.5.1" in cl and "## 1.5.0" in cl and "## 1.4.5" in cl and "## 1.4.4" in cl and "## 1.4.3" in cl and "## 1.4.2" in cl and "## 1.4.1" in cl and "## 1.4.0" in cl and "## 1.3.6" in cl and "## 1.3.5" in cl and "## 1.3.4" in cl and "## 1.3.3" in cl and "## 1.3.2" in cl and "## 1.3.1" in cl and "## 1.3.0" in cl and "## 1.2.9" in cl and "## 1.2.8" in cl and "## 1.2.7" in cl and "## 1.2.6" in cl and "## 1.2.5" in cl and "## 1.2.4" in cl and "## 1.2.3" in cl and "## 1.2.2" in cl and "## 1.2.1" in cl and "## 1.2.0" in cl and "## 1.1.9" in cl and "## 1.1.8" in cl and "## 1.1.7" in cl and "## 1.1.6" in cl and "## 1.1.5" in cl and "## 1.1.4" in cl and "## 1.1.3" in cl and "## 1.1.2" in cl and "## 1.1.1" in cl and "## 1.1.0" in cl and "## 1.0.9" in cl and "## 1.0.8" in cl and "## 1.0.7" in cl and "## 1.0.6" in cl and "## 1.0.5" in cl and "## 1.0.4" in cl and "## 1.0.3" in cl and "## 1.0.2" in cl and "## 1.0.1" in cl and "## 1.0.0" in cl and "## 0.9.9" in cl and "## 0.9.8" in cl and "## 0.9.7" in cl and "## 0.9.6" in cl and "## 0.9.5" in cl and "## 0.9.4" in cl and "## 0.9.3" in cl and "## 0.9.2" in cl and "## 0.9.1" in cl and "## 0.9.0" in cl and "## 0.8.9" in cl and "## 0.8.8" in cl and "## 0.8.7" in cl and "## 0.8.6" in cl and "## 0.8.5" in cl and "## 0.8.4" in cl and "## 0.8.3" in cl and "## 0.8.2" in cl and "## 0.8.1" in cl and "## 0.8.0" in cl
+    assert "1.8.1" in cl and "1.8.0" in cl and "1.7.5" in cl and "1.7.4" in cl and "1.7.3" in cl and "1.7.2" in cl and "1.7.1" in cl and "1.7.0" in cl and "1.6.5" in cl and "1.6.4" in cl and "1.6.3" in cl and "1.6.2" in cl and "1.6.1" in cl and "1.6.0" in cl and "1.5.5" in cl and "1.5.4" in cl and "1.5.3" in cl and "1.5.2" in cl and "1.5.1" in cl and "1.5.0" in cl and "1.4.5" in cl and "1.4.4" in cl and "1.4.3" in cl and "1.4.2" in cl and "1.4.1" in cl and "1.4.0" in cl and "1.3.6" in cl and "1.3.5" in cl and "1.3.4" in cl and "1.3.3" in cl and "1.3.2" in cl and "1.3.1" in cl and "1.3.0" in cl and "1.2.9" in cl and "1.2.8" in cl and "1.2.7" in cl and "1.2.6" in cl and "1.2.5" in cl and "1.2.4" in cl and "1.2.3" in cl and "1.2.2" in cl and "1.2.1" in cl and "1.2.0" in cl and "1.1.9" in cl and "1.1.8" in cl and "1.1.7" in cl and "1.1.6" in cl and "1.1.5" in cl and "1.1.4" in cl and "1.1.3" in cl and "1.1.2" in cl and "1.1.1" in cl and "1.1.0" in cl and "1.0.9" in cl and "1.0.8" in cl and "1.0.7" in cl and "1.0.6" in cl and "1.0.5" in cl and "1.0.4" in cl and "1.0.3" in cl and "1.0.2" in cl and "1.0.1" in cl and "1.0.0" in cl and "0.9.9" in cl and "0.9.8" in cl and "0.9.7" in cl and "0.9.6" in cl and "0.9.5" in cl and "0.9.4" in cl and "0.9.3" in cl and "0.9.2" in cl and "0.9.1" in cl and "0.9.0" in cl and "0.8.9" in cl and "0.8.8" in cl and "0.8.7" in cl and "0.8.6" in cl and "0.8.5" in cl and "0.8.4" in cl and "0.8.3" in cl and "0.8.2" in cl and "0.8.1" in cl and "0.8.0" in cl
+    assert "## 1.8.1" in cl and "## 1.8.0" in cl and "## 1.7.5" in cl and "## 1.7.4" in cl and "## 1.7.3" in cl and "## 1.7.2" in cl and "## 1.7.1" in cl and "## 1.7.0" in cl and "## 1.6.5" in cl and "## 1.6.4" in cl and "## 1.6.3" in cl and "## 1.6.2" in cl and "## 1.6.1" in cl and "## 1.6.0" in cl and "## 1.5.5" in cl and "## 1.5.4" in cl and "## 1.5.3" in cl and "## 1.5.2" in cl and "## 1.5.1" in cl and "## 1.5.0" in cl and "## 1.4.5" in cl and "## 1.4.4" in cl and "## 1.4.3" in cl and "## 1.4.2" in cl and "## 1.4.1" in cl and "## 1.4.0" in cl and "## 1.3.6" in cl and "## 1.3.5" in cl and "## 1.3.4" in cl and "## 1.3.3" in cl and "## 1.3.2" in cl and "## 1.3.1" in cl and "## 1.3.0" in cl and "## 1.2.9" in cl and "## 1.2.8" in cl and "## 1.2.7" in cl and "## 1.2.6" in cl and "## 1.2.5" in cl and "## 1.2.4" in cl and "## 1.2.3" in cl and "## 1.2.2" in cl and "## 1.2.1" in cl and "## 1.2.0" in cl and "## 1.1.9" in cl and "## 1.1.8" in cl and "## 1.1.7" in cl and "## 1.1.6" in cl and "## 1.1.5" in cl and "## 1.1.4" in cl and "## 1.1.3" in cl and "## 1.1.2" in cl and "## 1.1.1" in cl and "## 1.1.0" in cl and "## 1.0.9" in cl and "## 1.0.8" in cl and "## 1.0.7" in cl and "## 1.0.6" in cl and "## 1.0.5" in cl and "## 1.0.4" in cl and "## 1.0.3" in cl and "## 1.0.2" in cl and "## 1.0.1" in cl and "## 1.0.0" in cl and "## 0.9.9" in cl and "## 0.9.8" in cl and "## 0.9.7" in cl and "## 0.9.6" in cl and "## 0.9.5" in cl and "## 0.9.4" in cl and "## 0.9.3" in cl and "## 0.9.2" in cl and "## 0.9.1" in cl and "## 0.9.0" in cl and "## 0.8.9" in cl and "## 0.8.8" in cl and "## 0.8.7" in cl and "## 0.8.6" in cl and "## 0.8.5" in cl and "## 0.8.4" in cl and "## 0.8.3" in cl and "## 0.8.2" in cl and "## 0.8.1" in cl and "## 0.8.0" in cl
     assert "## 0.7.9" in cl
     assert "## 0.7.8" in cl
     assert "## 0.7.6" in cl
@@ -259,7 +259,7 @@ def main() -> int:
     assert "0.4.9" in cl  # noch in Kurz-Tabelle
     assert "0.3.9" in cl  # noch in Kurz-Tabelle
     assert "0.2.9" in cl  # noch in Kurz-Tabelle
-    assert "1.8.0" in (ROOT / "README.md").read_text(encoding="utf-8")
+    assert "1.8.1" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "run.bat" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "sync-ild.ps1" in (ROOT / "README.md").read_text(encoding="utf-8")
     assert "scripts/sync-ild.ps1" in (ROOT / "FEATURES.md").read_text(encoding="utf-8")
@@ -608,13 +608,13 @@ def main() -> int:
 
         assert (ROOT / "installer" / "installer-hinweis.txt").exists()
         iss = (ROOT / "installer" / "instantlensdoc.iss").read_text(encoding="utf-8")
-        assert "1.8.0" in iss and "desktopicon" in iss and "DisableProgramGroupPage=no" in iss
+        assert "1.8.1" in iss and "desktopicon" in iss and "DisableProgramGroupPage=no" in iss
         assert "UninstallDisplayName" in iss and "Uninstallable=yes" in iss
         assert "IncludeKeygen" in iss and "SetupIconFile" in iss
         assert "InstantLensKeygen.exe" in iss
         assert "uninstallexe" in iss
         bw = (ROOT / "build-windows.ps1").read_text(encoding="utf-8")
-        assert "1.8.0" in bw and "NoKeygenInApp" in bw and "--icon" in bw
+        assert "1.8.1" in bw and "NoKeygenInApp" in bw and "--icon" in bw
         assert "InstantLensKeygen.exe" in bw
         bi = (ROOT / "installer" / "build-installer.ps1").read_text(encoding="utf-8")
         assert "InstantLensKeygen.exe" in bi and "IncludeKeygen" in bi
@@ -623,7 +623,7 @@ def main() -> int:
         assert "Installer" in kg_readme
         hinweis = (ROOT / "installer" / "installer-hinweis.txt").read_text(encoding="utf-8")
         assert "InstantLensKeygen.exe" in hinweis or "run-keygen.bat" in hinweis
-        assert "1.8.0" in hinweis
+        assert "1.8.1" in hinweis
         assert "checkedonce" in iss and "Desktop-Verknüpfung" in hinweis
         from ild_pdf.limits import OPEN_TIMEOUT_HINT, OPEN_TIMEOUT_HINT_SEC
 
@@ -635,7 +635,7 @@ def main() -> int:
         assert "QProgressDialog" in (ROOT / "instantlensdoc" / "ui" / "main_window.py").read_text(encoding="utf-8")
 
         assert (ROOT / "examples" / "ild_pdf_demo.py").exists()
-        assert "1.8.0" in (ROOT / "INFO.md").read_text(encoding="utf-8")
+        assert "1.8.1" in (ROOT / "INFO.md").read_text(encoding="utf-8") and "1.8.0" in (ROOT / "INFO.md").read_text(encoding="utf-8")
         assert (ROOT / "assets" / "app.ico").is_file()
 
         # --- Kernpfade: open / annotate / export / license ---
@@ -826,7 +826,7 @@ def main() -> int:
         set_backup_on_save(False)
         assert get_page_size_unit() in ("mm", "inch")
         assert isinstance(get_minimize_to_tray(), bool)
-        assert "1.8.0" in feat and "1.7.5" in feat and "1.7.4" in feat and "1.7.3" in feat and "1.7.2" in feat and "1.7.1" in feat and "1.7.0" in feat and "1.6.5" in feat and "1.6.4" in feat and "1.6.3" in feat and "1.6.2" in feat and "1.6.1" in feat and "1.6.0" in feat and "1.5.5" in feat and "1.5.4" in feat and "1.5.3" in feat and "1.5.2" in feat and "1.5.1" in feat and "1.5.0" in feat and "1.4.5" in feat and "1.4.4" in feat and "1.4.3" in feat and "1.4.2" in feat and "1.4.1" in feat and "1.4.0" in feat and "1.3.6" in feat and "1.3.5" in feat and "1.3.4" in feat and "1.3.3" in feat and "1.3.2" in feat and "1.3.1" in feat and "1.3.0" in feat and "1.2.9" in feat and "1.2.8" in feat and "1.2.7" in feat and "1.2.6" in feat and "1.2.5" in feat and "1.2.4" in feat and "1.2.3" in feat and "1.2.2" in feat and "1.2.1" in feat and "1.2.0" in feat and "1.1.9" in feat and "1.1.8" in feat and "1.1.7" in feat and "1.1.6" in feat and "1.1.5" in feat and "1.1.4" in feat and "1.1.3" in feat and "1.1.2" in feat and "1.1.1" in feat and "1.1.0" in feat and "1.0.9" in feat and "1.0.8" in feat and "1.0.7" in feat and "1.0.6" in feat and "1.0.5" in feat and "1.0.4" in feat and "1.0.3" in feat and "1.0.2" in feat and "1.0.1" in feat and "1.0.0" in feat and "0.9.9" in feat and "0.9.8" in feat and "0.9.7" in feat and "0.9.6" in feat and "0.9.5" in feat and "0.9.4" in feat and "0.9.3" in feat and "0.9.2" in feat and "0.9.1" in feat and "0.9.0" in feat and "0.8.9" in feat and "0.8.8" in feat and "0.8.7" in feat and "0.8.6" in feat and "0.8.5" in feat and "0.8.4" in feat and "0.8.3" in feat and "0.8.2" in feat and "0.8.1" in feat and "0.8.0" in feat and "0.7.9" in feat and "0.7.8" in feat and "0.7.7" in feat and "0.7.6" in feat and "0.7.5" in feat and "0.7.4" in feat and "0.7.3" in feat and "0.7.2" in feat and "0.7.1" in feat and "0.6.9" in feat and "0.5.9" in feat and "0.4.9" in feat  # Release + Zeitraum-Feature-Hinweise
+        assert "1.8.1" in feat and "1.8.0" in feat and "1.7.5" in feat and "1.7.4" in feat and "1.7.3" in feat and "1.7.2" in feat and "1.7.1" in feat and "1.7.0" in feat and "1.6.5" in feat and "1.6.4" in feat and "1.6.3" in feat and "1.6.2" in feat and "1.6.1" in feat and "1.6.0" in feat and "1.5.5" in feat and "1.5.4" in feat and "1.5.3" in feat and "1.5.2" in feat and "1.5.1" in feat and "1.5.0" in feat and "1.4.5" in feat and "1.4.4" in feat and "1.4.3" in feat and "1.4.2" in feat and "1.4.1" in feat and "1.4.0" in feat and "1.3.6" in feat and "1.3.5" in feat and "1.3.4" in feat and "1.3.3" in feat and "1.3.2" in feat and "1.3.1" in feat and "1.3.0" in feat and "1.2.9" in feat and "1.2.8" in feat and "1.2.7" in feat and "1.2.6" in feat and "1.2.5" in feat and "1.2.4" in feat and "1.2.3" in feat and "1.2.2" in feat and "1.2.1" in feat and "1.2.0" in feat and "1.1.9" in feat and "1.1.8" in feat and "1.1.7" in feat and "1.1.6" in feat and "1.1.5" in feat and "1.1.4" in feat and "1.1.3" in feat and "1.1.2" in feat and "1.1.1" in feat and "1.1.0" in feat and "1.0.9" in feat and "1.0.8" in feat and "1.0.7" in feat and "1.0.6" in feat and "1.0.5" in feat and "1.0.4" in feat and "1.0.3" in feat and "1.0.2" in feat and "1.0.1" in feat and "1.0.0" in feat and "0.9.9" in feat and "0.9.8" in feat and "0.9.7" in feat and "0.9.6" in feat and "0.9.5" in feat and "0.9.4" in feat and "0.9.3" in feat and "0.9.2" in feat and "0.9.1" in feat and "0.9.0" in feat and "0.8.9" in feat and "0.8.8" in feat and "0.8.7" in feat and "0.8.6" in feat and "0.8.5" in feat and "0.8.4" in feat and "0.8.3" in feat and "0.8.2" in feat and "0.8.1" in feat and "0.8.0" in feat and "0.7.9" in feat and "0.7.8" in feat and "0.7.7" in feat and "0.7.6" in feat and "0.7.5" in feat and "0.7.4" in feat and "0.7.3" in feat and "0.7.2" in feat and "0.7.1" in feat and "0.6.9" in feat and "0.5.9" in feat and "0.4.9" in feat  # Release + Zeitraum-Feature-Hinweise
         assert "Batch-OCR" in feat or "OCR gesamtes PDF" in feat
         assert "Tag" in feat
         assert "Projekt-Ordner" in feat or "Workspace" in feat
@@ -6595,7 +6595,7 @@ def main() -> int:
             or "offene Docs" in feat140
         )
         cl140 = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-        assert "## 1.8.0" in cl140 and "## 1.7.5" in cl140 and "## 1.7.4" in cl140 and "## 1.7.3" in cl140 and "## 1.7.2" in cl140 and "## 1.7.1" in cl140 and "## 1.7.0" in cl140 and "## 1.6.5" in cl140 and "## 1.6.4" in cl140 and "## 1.6.3" in cl140 and "## 1.6.2" in cl140 and "## 1.6.1" in cl140 and "## 1.6.0" in cl140 and "## 1.5.5" in cl140 and "## 1.5.4" in cl140 and "## 1.5.3" in cl140 and "## 1.5.2" in cl140 and "## 1.5.1" in cl140 and "## 1.5.0" in cl140 and "## 1.4.5" in cl140 and "## 1.4.4" in cl140 and "## 1.4.3" in cl140 and "## 1.4.2" in cl140 and "## 1.4.1" in cl140 and "## 1.4.0" in cl140 and "## 1.3.6" in cl140
+        assert "## 1.8.1" in cl140 and "## 1.8.0" in cl140 and "## 1.7.5" in cl140 and "## 1.7.4" in cl140 and "## 1.7.3" in cl140 and "## 1.7.2" in cl140 and "## 1.7.1" in cl140 and "## 1.7.0" in cl140 and "## 1.6.5" in cl140 and "## 1.6.4" in cl140 and "## 1.6.3" in cl140 and "## 1.6.2" in cl140 and "## 1.6.1" in cl140 and "## 1.6.0" in cl140 and "## 1.5.5" in cl140 and "## 1.5.4" in cl140 and "## 1.5.3" in cl140 and "## 1.5.2" in cl140 and "## 1.5.1" in cl140 and "## 1.5.0" in cl140 and "## 1.4.5" in cl140 and "## 1.4.4" in cl140 and "## 1.4.3" in cl140 and "## 1.4.2" in cl140 and "## 1.4.1" in cl140 and "## 1.4.0" in cl140 and "## 1.3.6" in cl140
         kb140 = (
             ROOT / "instantlensdoc" / "ui" / "keyboard_help.py"
         ).read_text(encoding="utf-8")
@@ -7015,7 +7015,7 @@ def main() -> int:
             or "Ctrl+Shift+T" in feat144
         )
         cl144 = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-        assert "## 1.8.0" in cl144 and "## 1.7.5" in cl144 and "## 1.7.4" in cl144 and "## 1.7.3" in cl144 and "## 1.7.2" in cl144 and "## 1.7.1" in cl144 and "## 1.7.0" in cl144 and "## 1.6.5" in cl144 and "## 1.6.4" in cl144 and "## 1.6.3" in cl144 and "## 1.6.2" in cl144 and "## 1.6.1" in cl144 and "## 1.6.0" in cl144 and "## 1.5.5" in cl144 and "## 1.5.4" in cl144 and "## 1.5.3" in cl144 and "## 1.5.2" in cl144 and "## 1.5.1" in cl144 and "## 1.5.0" in cl144 and "## 1.4.5" in cl144 and "## 1.4.4" in cl144
+        assert "## 1.8.1" in cl144 and "## 1.8.0" in cl144 and "## 1.7.5" in cl144 and "## 1.7.4" in cl144 and "## 1.7.3" in cl144 and "## 1.7.2" in cl144 and "## 1.7.1" in cl144 and "## 1.7.0" in cl144 and "## 1.6.5" in cl144 and "## 1.6.4" in cl144 and "## 1.6.3" in cl144 and "## 1.6.2" in cl144 and "## 1.6.1" in cl144 and "## 1.6.0" in cl144 and "## 1.5.5" in cl144 and "## 1.5.4" in cl144 and "## 1.5.3" in cl144 and "## 1.5.2" in cl144 and "## 1.5.1" in cl144 and "## 1.5.0" in cl144 and "## 1.4.5" in cl144 and "## 1.4.4" in cl144
         kb144 = (ROOT / "instantlensdoc" / "ui" / "keyboard_help.py").read_text(
             encoding="utf-8"
         )
@@ -7160,7 +7160,7 @@ def main() -> int:
             env=_env150,
         )
         assert r_ver.returncode == 0, (r_ver.stdout, r_ver.stderr)
-        assert "1.8.0" in (r_ver.stdout or "")
+        assert "1.8.1" in (r_ver.stdout or "")
 
         sm150(pdf, PM150(title="T150", author="A150", subject="B150", keywords="k1,k2"))
         m150 = gm150(pdf)
@@ -7716,7 +7716,7 @@ def main() -> int:
             or "Footer-Klick" in feat154
         )
         cl154 = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-        assert "## 1.8.0" in cl154 and "## 1.7.5" in cl154 and "## 1.7.4" in cl154 and "## 1.7.3" in cl154 and "## 1.7.2" in cl154 and "## 1.7.1" in cl154 and "## 1.7.0" in cl154 and "## 1.6.5" in cl154 and "## 1.6.4" in cl154 and "## 1.6.3" in cl154 and "## 1.6.2" in cl154 and "## 1.6.1" in cl154 and "## 1.6.0" in cl154 and "## 1.5.5" in cl154 and "## 1.5.4" in cl154 and "## 1.5.3" in cl154
+        assert "## 1.8.1" in cl154 and "## 1.8.0" in cl154 and "## 1.7.5" in cl154 and "## 1.7.4" in cl154 and "## 1.7.3" in cl154 and "## 1.7.2" in cl154 and "## 1.7.1" in cl154 and "## 1.7.0" in cl154 and "## 1.6.5" in cl154 and "## 1.6.4" in cl154 and "## 1.6.3" in cl154 and "## 1.6.2" in cl154 and "## 1.6.1" in cl154 and "## 1.6.0" in cl154 and "## 1.5.5" in cl154 and "## 1.5.4" in cl154 and "## 1.5.3" in cl154
         kb154 = (ROOT / "instantlensdoc" / "ui" / "keyboard_help.py").read_text(
             encoding="utf-8"
         )
@@ -7816,7 +7816,7 @@ def main() -> int:
             or "--json" in feat155
         )
         cl155 = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-        assert "## 1.8.0" in cl155 and "## 1.7.5" in cl155 and "## 1.7.4" in cl155 and "## 1.7.3" in cl155 and "## 1.7.2" in cl155 and "## 1.7.1" in cl155 and "## 1.7.0" in cl155 and "## 1.6.5" in cl155 and "## 1.6.4" in cl155 and "## 1.6.3" in cl155 and "## 1.6.2" in cl155 and "## 1.6.1" in cl155 and "## 1.6.0" in cl155 and "## 1.5.5" in cl155 and "## 1.5.4" in cl155
+        assert "## 1.8.1" in cl155 and "## 1.8.0" in cl155 and "## 1.7.5" in cl155 and "## 1.7.4" in cl155 and "## 1.7.3" in cl155 and "## 1.7.2" in cl155 and "## 1.7.1" in cl155 and "## 1.7.0" in cl155 and "## 1.6.5" in cl155 and "## 1.6.4" in cl155 and "## 1.6.3" in cl155 and "## 1.6.2" in cl155 and "## 1.6.1" in cl155 and "## 1.6.0" in cl155 and "## 1.5.5" in cl155 and "## 1.5.4" in cl155
         kb155 = (ROOT / "instantlensdoc" / "ui" / "keyboard_help.py").read_text(
             encoding="utf-8"
         )
@@ -8454,7 +8454,7 @@ def main() -> int:
             or "Quick-Insert" in feat163
         )
         cl163 = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-        assert "## 1.8.0" in cl163 and "## 1.7.5" in cl163 and "## 1.7.4" in cl163 and "## 1.7.3" in cl163 and "## 1.7.2" in cl163 and "## 1.7.1" in cl163 and "## 1.7.0" in cl163 and "## 1.6.5" in cl163 and "## 1.6.4" in cl163 and "## 1.6.3" in cl163 and "## 1.6.2" in cl163
+        assert "## 1.8.1" in cl163 and "## 1.8.0" in cl163 and "## 1.7.5" in cl163 and "## 1.7.4" in cl163 and "## 1.7.3" in cl163 and "## 1.7.2" in cl163 and "## 1.7.1" in cl163 and "## 1.7.0" in cl163 and "## 1.6.5" in cl163 and "## 1.6.4" in cl163 and "## 1.6.3" in cl163 and "## 1.6.2" in cl163
         kb163 = (ROOT / "instantlensdoc" / "ui" / "keyboard_help.py").read_text(
             encoding="utf-8"
         )
@@ -8621,7 +8621,7 @@ def main() -> int:
             or "{stem}_stats.json" in feat164
         )
         cl164 = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-        assert "## 1.8.0" in cl164 and "## 1.7.5" in cl164 and "## 1.7.4" in cl164 and "## 1.7.3" in cl164 and "## 1.7.2" in cl164 and "## 1.7.1" in cl164 and "## 1.7.0" in cl164 and "## 1.6.5" in cl164 and "## 1.6.4" in cl164 and "## 1.6.3" in cl164
+        assert "## 1.8.1" in cl164 and "## 1.8.0" in cl164 and "## 1.7.5" in cl164 and "## 1.7.4" in cl164 and "## 1.7.3" in cl164 and "## 1.7.2" in cl164 and "## 1.7.1" in cl164 and "## 1.7.0" in cl164 and "## 1.6.5" in cl164 and "## 1.6.4" in cl164 and "## 1.6.3" in cl164
         kb164 = (ROOT / "instantlensdoc" / "ui" / "keyboard_help.py").read_text(
             encoding="utf-8"
         )
@@ -8715,7 +8715,7 @@ def main() -> int:
             or "Zusammenfassung" in feat165
         )
         cl165 = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-        assert "## 1.8.0" in cl165 and "## 1.7.5" in cl165 and "## 1.7.4" in cl165 and "## 1.7.3" in cl165 and "## 1.7.2" in cl165 and "## 1.7.1" in cl165 and "## 1.7.0" in cl165 and "## 1.6.5" in cl165 and "## 1.6.4" in cl165
+        assert "## 1.8.1" in cl165 and "## 1.8.0" in cl165 and "## 1.7.5" in cl165 and "## 1.7.4" in cl165 and "## 1.7.3" in cl165 and "## 1.7.2" in cl165 and "## 1.7.1" in cl165 and "## 1.7.0" in cl165 and "## 1.6.5" in cl165 and "## 1.6.4" in cl165
         kb165 = (ROOT / "instantlensdoc" / "ui" / "keyboard_help.py").read_text(
             encoding="utf-8"
         )
@@ -8785,13 +8785,13 @@ def main() -> int:
         assert page_count_for_text("a\n" * 80) >= 1
         from ild_pdf import __version__ as ild_ver170
 
-        assert ild_ver170 == "1.8.0"
+        assert ild_ver170 == "1.8.1"
         assert "text_to_pdf" in (ROOT / "ild_pdf" / "__init__.py").read_text(encoding="utf-8")
 
         ref_ver, ref_src = read_reference_version()
-        assert ref_ver == "1.8.0" and ref_src in ("docs/VERSION", "VERSION.txt")
+        assert ref_ver == "1.8.1" and ref_src in ("docs/VERSION", "VERSION.txt")
         loc170 = check_loc170()
-        assert loc170.local_version == "1.8.0" and loc170.newer_available is False
+        assert loc170.local_version == "1.8.1" and loc170.newer_available is False
         assert (
             "Auto-Download" in loc170.message_de
             or "Aktuell" in loc170.message_de
@@ -8820,7 +8820,7 @@ def main() -> int:
             or "docs/VERSION" in feat170
         )
         cl170 = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-        assert "## 1.8.0" in cl170 and "## 1.7.5" in cl170 and "## 1.7.4" in cl170 and "## 1.7.3" in cl170 and "## 1.7.2" in cl170 and "## 1.7.1" in cl170 and "## 1.7.0" in cl170 and "## 1.6.5" in cl170
+        assert "## 1.8.1" in cl170 and "## 1.8.0" in cl170 and "## 1.7.5" in cl170 and "## 1.7.4" in cl170 and "## 1.7.3" in cl170 and "## 1.7.2" in cl170 and "## 1.7.1" in cl170 and "## 1.7.0" in cl170 and "## 1.6.5" in cl170
         kb170 = (ROOT / "instantlensdoc" / "ui" / "keyboard_help.py").read_text(
             encoding="utf-8"
         )
@@ -8928,7 +8928,7 @@ def main() -> int:
         set_ud171("9.9.9")
         assert get_ud171() == "9.9.9"
         clear_ud171()
-        assert ild_ver171 == "1.8.0"
+        assert ild_ver171 == "1.8.1"
 
         mw171 = (ROOT / "instantlensdoc" / "ui" / "main_window.py").read_text(
             encoding="utf-8"
@@ -8956,7 +8956,7 @@ def main() -> int:
             or "Seitenvorschau" in feat171
         )
         cl171 = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-        assert "## 1.8.0" in cl171 and "## 1.7.5" in cl171 and "## 1.7.4" in cl171 and "## 1.7.3" in cl171 and "## 1.7.2" in cl171 and "## 1.7.1" in cl171 and "## 1.7.0" in cl171
+        assert "## 1.8.1" in cl171 and "## 1.8.0" in cl171 and "## 1.7.5" in cl171 and "## 1.7.4" in cl171 and "## 1.7.3" in cl171 and "## 1.7.2" in cl171 and "## 1.7.1" in cl171 and "## 1.7.0" in cl171
         kb171 = (ROOT / "instantlensdoc" / "ui" / "keyboard_help.py").read_text(
             encoding="utf-8"
         )
@@ -9030,7 +9030,7 @@ def main() -> int:
         assert get_ltpd172() == tpdf_dir
 
         loc172 = clv172()
-        assert loc172.local_version == "1.8.0"
+        assert loc172.local_version == "1.8.1"
         assert loc172.status == "current"
         assert loc172.status_label("de") == "aktuell"
         assert "aktuell" in loc172.message_de.lower() or "Status: aktuell" in loc172.message_de
@@ -9046,7 +9046,7 @@ def main() -> int:
             "docs/VERSION",
             "VERSION.txt",
         )
-        assert ild_ver172 == "1.8.0"
+        assert ild_ver172 == "1.8.1"
 
         mw172 = (ROOT / "instantlensdoc" / "ui" / "main_window.py").read_text(
             encoding="utf-8"
@@ -9073,7 +9073,7 @@ def main() -> int:
             or "Zielordner" in feat172
         )
         cl172 = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-        assert "## 1.8.0" in cl172 and "## 1.7.5" in cl172 and "## 1.7.4" in cl172 and "## 1.7.3" in cl172 and "## 1.7.2" in cl172 and "## 1.7.1" in cl172
+        assert "## 1.8.1" in cl172 and "## 1.8.0" in cl172 and "## 1.7.5" in cl172 and "## 1.7.4" in cl172 and "## 1.7.3" in cl172 and "## 1.7.2" in cl172 and "## 1.7.1" in cl172
         kb172 = (ROOT / "instantlensdoc" / "ui" / "keyboard_help.py").read_text(
             encoding="utf-8"
         )
@@ -9156,7 +9156,7 @@ def main() -> int:
         assert "Letzter Check" in off173.message_de or fca173(off173.checked_at) != "nie"
         off173b = cfu173(allow_network=False)
         assert off173b.status == "offline"
-        assert ild_ver173 == "1.8.0"
+        assert ild_ver173 == "1.8.1"
 
         mw173 = (ROOT / "instantlensdoc" / "ui" / "main_window.py").read_text(
             encoding="utf-8"
@@ -9179,7 +9179,7 @@ def main() -> int:
             or "nicht geprüft" in feat173
         )
         cl173 = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-        assert "## 1.8.0" in cl173 and "## 1.7.5" in cl173 and "## 1.7.4" in cl173 and "## 1.7.3" in cl173 and "## 1.7.2" in cl173
+        assert "## 1.8.1" in cl173 and "## 1.8.0" in cl173 and "## 1.7.5" in cl173 and "## 1.7.4" in cl173 and "## 1.7.3" in cl173 and "## 1.7.2" in cl173
         kb173 = (ROOT / "instantlensdoc" / "ui" / "keyboard_help.py").read_text(
             encoding="utf-8"
         )
@@ -9230,7 +9230,7 @@ def main() -> int:
         )
         tip174b = frst174("VERSION.txt")
         assert "VERSION.txt" in tip174b
-        assert ild_ver174 == "1.8.0"
+        assert ild_ver174 == "1.8.1"
 
         mw174 = (ROOT / "instantlensdoc" / "ui" / "main_window.py").read_text(
             encoding="utf-8"
@@ -9255,7 +9255,7 @@ def main() -> int:
             or "A11y" in feat174
         )
         cl174 = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-        assert "## 1.8.0" in cl174 and "## 1.7.5" in cl174 and "## 1.7.4" in cl174 and "## 1.7.3" in cl174
+        assert "## 1.8.1" in cl174 and "## 1.8.0" in cl174 and "## 1.7.5" in cl174 and "## 1.7.4" in cl174 and "## 1.7.3" in cl174
         kb174 = (ROOT / "instantlensdoc" / "ui" / "keyboard_help.py").read_text(
             encoding="utf-8"
         )
@@ -9317,7 +9317,7 @@ def main() -> int:
         ref_path175, ref_lbl175 = fevf175()
         assert ref_path175 is not None and ref_path175.is_file()
         assert ref_lbl175 in ("docs/VERSION", "VERSION.txt")
-        assert ild_ver175 == "1.8.0"
+        assert ild_ver175 == "1.8.1"
         feat175 = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
         assert "1.7.5" in feat175 and (
             "Bestätigung nur bei Abweichung" in feat175
@@ -9326,7 +9326,7 @@ def main() -> int:
             or "Status-Klick" in feat175
         )
         cl175 = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-        assert "## 1.8.0" in cl175 and "## 1.7.5" in cl175 and "## 1.7.4" in cl175
+        assert "## 1.8.1" in cl175 and "## 1.8.0" in cl175 and "## 1.7.5" in cl175 and "## 1.7.4" in cl175
         kb175 = (ROOT / "instantlensdoc" / "ui" / "keyboard_help.py").read_text(
             encoding="utf-8"
         )
@@ -9366,7 +9366,7 @@ def main() -> int:
             write_recovery_snapshot,
         )
 
-        assert ild_ver180 == "1.8.0"
+        assert ild_ver180 == "1.8.1"
         pdf180 = td / "hf180.pdf"
         pdf180.write_bytes(Path(pdf).read_bytes())
         out_hf = td / "hf180_out.pdf"
@@ -9446,18 +9446,18 @@ def main() -> int:
             ROOT / "instantlensdoc" / "ui" / "settings_dialog.py"
         ).read_text(encoding="utf-8")
         feat180 = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
-        assert "1.8.0" in feat180 and (
+        assert "1.8.1" in feat180 and "1.8.0" in feat180 and (
             "Kopf-/Fußzeile" in feat180
             or "Crash-Recovery" in feat180
             or "Typ-Toggles" in feat180
             or "Spiegeln" in feat180
         )
         cl180 = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-        assert "## 1.8.0" in cl180 and "## 1.7.5" in cl180
+        assert "## 1.8.1" in cl180 and "## 1.8.0" in cl180 and "## 1.7.5" in cl180
         kb180 = (ROOT / "instantlensdoc" / "ui" / "keyboard_help.py").read_text(
             encoding="utf-8"
         )
-        assert "1.8.0" in kb180 and (
+        assert "1.8.1" in kb180 and "1.8.0" in kb180 and (
             "Kopf-/Fußzeile" in kb180
             or "Crash-Recovery" in kb180
             or "Spiegeln" in kb180
@@ -9467,6 +9467,132 @@ def main() -> int:
             "1.8.0 CLI rotate-flip-batch-undo/"
             "header-footer-bake/"
             "ann-type-layer/crash-recovery-orphans: OK"
+        )
+
+        # 1.8.1 CLI: ann remap 90/180, HF preview·range, layer session keys,
+        # recovery meta preview·discard clean, status N Seiten helpers
+        from ild_pdf import format_header_footer_preview as fmt_hf181
+        from ild_pdf import __version__ as ild_ver181
+        from ild_pdf.annotate import AnnotationStore as AS181, Annotation as Ann181, AnnotationType as AT181
+        from instantlensdoc.core.crash_recovery import (
+            discard_orphan as disc181,
+            list_orphans as list_o181,
+            orphan_meta_preview as omp181,
+            write_recovery_snapshot as wrs181,
+            clear_recovery_for as crf181,
+        )
+        from instantlensdoc.core.app_settings import (
+            get_last_header_footer_settings as get_hf181,
+            set_last_header_footer_settings as set_hf181,
+        )
+        from instantlensdoc.core.session import (
+            _normalize_ann_layer_types as norm_alt181,
+        )
+
+        assert ild_ver181 == "1.8.1"
+        # Ann coord remap 90/180
+        store181 = AS181(None)
+        a181 = Ann181(0, AT181.HIGHLIGHT, 10, 20, width=40, height=10, text="r")
+        store181.annotations = [a181]
+        n_remap = store181.remap_coords_for_rotation(0, 90, page_w=200, page_h=100)
+        assert n_remap == 1
+        # 90 CW: x'=H-y-h=100-20-10=70, y'=x=10, w'=10, h'=40
+        assert abs(a181.x - 70) < 0.01 and abs(a181.y - 10) < 0.01
+        assert abs(a181.width - 10) < 0.01 and abs(a181.height - 40) < 0.01
+        store181.undo()
+        assert abs(store181.annotations[0].x - 10) < 0.01
+        n180 = store181.remap_coords_for_rotation(0, 180, page_w=200, page_h=100)
+        assert n180 == 1
+        assert abs(store181.annotations[0].x - (200 - 10 - 40)) < 0.01
+
+        prev181 = fmt_hf181(
+            header_text="H {stem}",
+            footer_text="F {n}",
+            include_page_numbers=True,
+            page_number_template="{n}/{total}",
+            font_size=12,
+            margin=30,
+            total_pages=3,
+            stem="demo",
+            page_index=0,
+        )
+        assert "Seite 1" in prev181 and "H demo" in prev181 and "12 pt" in prev181
+
+        set_hf181(
+            header_text="Hx",
+            footer_text="Fx",
+            font_size=11,
+            margin=32,
+            page_range="1-2",
+        )
+        hf181 = get_hf181()
+        assert hf181["page_range"] == "1-2"
+        assert float(hf181["font_size"]) == 11.0
+        assert float(hf181["margin"]) == 32.0
+
+        types181 = norm_alt181({"highlight": False, "note": True})
+        assert types181["highlight"] is False and types181["note"] is True
+        assert set(types181) == {"highlight", "note", "shape", "redaction"}
+
+        snap_src181 = td / "recover181.txt"
+        snap_src181.write_text("meta preview body", encoding="utf-8")
+        crf181(snap_src181)
+        meta181 = wrs181(
+            snap_src181, kind="text", text="meta preview body", dirty=True
+        )
+        assert meta181 is not None and meta181.is_file()
+        ors181 = [o for o in list_o181() if o.source_path.endswith("recover181.txt")]
+        assert ors181
+        preview_txt = omp181(ors181[0])
+        assert "recover181.txt" in preview_txt or "meta preview" in preview_txt
+        assert "text" in preview_txt
+        payload181 = ors181[0].payload_path
+        meta_p181 = ors181[0].meta_path
+        disc181(ors181[0])
+        assert not meta_p181.is_file()
+        assert not payload181.is_file()
+        assert not any(
+            o.source_path.endswith("recover181.txt") for o in list_o181()
+        )
+
+        mw181 = (ROOT / "instantlensdoc" / "ui" / "main_window.py").read_text(
+            encoding="utf-8"
+        )
+        assert "_batch_rotate_selection" in mw181
+        assert "_batch_flip_selection" in mw181
+        assert "Ctrl+Alt+Right" in mw181
+        assert "orphan_meta_preview" in mw181
+        assert "count_visible_annotations" in (
+            ROOT / "instantlensdoc" / "ui" / "pdf_view.py"
+        ).read_text(encoding="utf-8")
+        assert "remap_coords_for_rotation" in (
+            ROOT / "ild_pdf" / "annotate.py"
+        ).read_text(encoding="utf-8")
+        assert "_refresh_hf_preview" in (
+            ROOT / "instantlensdoc" / "ui" / "watermark_dialog.py"
+        ).read_text(encoding="utf-8")
+        assert "ann_layer_types" in (
+            ROOT / "instantlensdoc" / "core" / "session.py"
+        ).read_text(encoding="utf-8")
+        feat181 = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
+        assert "1.8.1" in feat181 and (
+            "Remap" in feat181
+            or "Seitenbereich" in feat181
+            or "Metadaten-Vorschau" in feat181
+            or "Ctrl+Alt+1" in feat181
+        )
+        cl181 = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+        assert "## 1.8.1" in cl181 and "## 1.8.0" in cl181
+        kb181 = (ROOT / "instantlensdoc" / "ui" / "keyboard_help.py").read_text(
+            encoding="utf-8"
+        )
+        assert "1.8.1" in kb181 and (
+            "Ctrl+Alt" in kb181 or "Remap" in kb181 or "Vorschau" in kb181
+        )
+        print(
+            "1.8.1 CLI ann-remap-status/"
+            "hf-preview-range/"
+            "layer-session-count/recovery-meta-discard: OK"
         )
 
         set_show_printer_marks(True)
@@ -9726,7 +9852,7 @@ def main() -> int:
         win._add_chained_frame()
         assert len(win.layout_doc.text_frames) >= 2
         assert "Lizenz:" in win.license_label.text() or "⚠" in win.license_label.text()
-        assert "v1.8.0" in win.version_label.text()
+        assert "v1.8.1" in win.version_label.text()
         # Lizenz <7 Tage: Style prominent
         st_lic = win.license_manager.status()
         if st_lic.allowed and st_lic.days_remaining < 7:
@@ -9907,11 +10033,11 @@ def main() -> int:
             assert win.editor.outdent_selection(4)
             assert win.editor.toPlainText().splitlines()[0] == "alpha"
             # Fenstertitel mit Version
-            assert "1.8.0" in win.windowTitle()
+            assert "1.8.1" in win.windowTitle()
             from instantlensdoc.ui.help_dialog import AboutDialog, HelpDialog, open_log_folder
 
             about = AboutDialog(win)
-            assert "1.8.0" in about.windowTitle()
+            assert "1.8.1" in about.windowTitle()
             help_dlg = HelpDialog(win)
             assert help_dlg.windowTitle() == "Hilfe"
             assert callable(open_log_folder)
@@ -10601,10 +10727,10 @@ def main() -> int:
             from instantlensdoc.ui.password_dialog import CompressPdfDialog, SetPasswordDialog
             from instantlensdoc.ui.stubs import PLANNED
             assert KeyboardHelpDialog and SetPasswordDialog and CompressPdfDialog
-            assert "1.8.0" in PLANNED["ki"], PLANNED["ki"]
+            assert "1.8.1" in PLANNED["ki"], PLANNED["ki"]
             assert "Coming soon" in PLANNED["cloud"]
-            assert "1.8.0" in PLANNED["stylus"], PLANNED["stylus"]
-            assert "1.8.0" in PLANNED["extrude3d"], PLANNED["extrude3d"]
+            assert "1.8.1" in PLANNED["stylus"], PLANNED["stylus"]
+            assert "1.8.1" in PLANNED["extrude3d"], PLANNED["extrude3d"]
             # Toolbar ↔ Menü Sync Graustufen/Nacht
             win.pdf_view.set_grayscale(True)
             assert win._grayscale_action.isChecked()
@@ -14339,7 +14465,7 @@ def main() -> int:
             assert win.welcome_page.btn_open is not None
             assert win.welcome_page.btn_empty is not None
             about100 = About100(win)
-            assert "1.8.0" in about100.windowTitle()
+            assert "1.8.1" in about100.windowTitle()
             # Lizenzstatus / Changelog / Kontakt im Dialog-Inhalt
             from PySide6.QtWidgets import QLabel as _QL100
 
@@ -14382,7 +14508,7 @@ def main() -> int:
             assert callable(getattr(win.welcome_page, "_recent_context_menu", None))
             win.welcome_page.refresh_recent()
             about101 = About101(win)
-            assert "1.8.0" in about101.windowTitle()
+            assert "1.8.1" in about101.windowTitle()
             assert getattr(about101, "_btn_activate", None) is not None or hasattr(
                 about101, "_activate_license"
             )
@@ -14439,7 +14565,7 @@ def main() -> int:
             assert prd102q.dpi() == 300
             prd102q.close()
             about102 = About102(win)
-            assert "1.8.0" in about102.windowTitle()
+            assert "1.8.1" in about102.windowTitle()
             # Resttage-Phrase konsistent Status ↔ About
             st102 = win.license_manager.status()
             phrase102 = rp102(st102.days_remaining)
@@ -14491,7 +14617,7 @@ def main() -> int:
             spg103(False)
             sd103.close()
             about103 = About103(win)
-            assert "1.8.0" in about103.windowTitle()
+            assert "1.8.1" in about103.windowTitle()
             st103 = win.license_manager.status()
             if st103.expires_at is not None:
                 ablauf103 = fa103(st103.expires_at)
@@ -14552,7 +14678,7 @@ def main() -> int:
             assert sd104q.backup_log_list.count() >= 1
             sd104q.close()
             about104 = About104(win)
-            assert "1.8.0" in about104.windowTitle()
+            assert "1.8.1" in about104.windowTitle()
             about104.close()
             feat104q = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
             assert "1.0.4" in feat104q
@@ -14597,7 +14723,7 @@ def main() -> int:
             assert hasattr(sd105q, "_clear_backup_log")
             sd105q.close()
             about105 = About105(win)
-            assert "1.8.0" in about105.windowTitle()
+            assert "1.8.1" in about105.windowTitle()
             about105.close()
             feat105q = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
             assert "1.0.5" in feat105q
@@ -14655,7 +14781,7 @@ def main() -> int:
             assert hasattr(sd106q, "print_preview")
             sd106q.close()
             about106 = About106(win)
-            assert "1.8.0" in about106.windowTitle()
+            assert "1.8.1" in about106.windowTitle()
             about106.close()
             feat106q = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
             assert "1.0.6" in feat106q
@@ -14723,7 +14849,7 @@ def main() -> int:
             assert hasattr(sd107q, "_on_backup_log_filter")
             sd107q.close()
             about107 = About107(win)
-            assert "1.8.0" in about107.windowTitle()
+            assert "1.8.1" in about107.windowTitle()
             about107.close()
             feat107q = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
             assert "1.0.7" in feat107q
@@ -14777,7 +14903,7 @@ def main() -> int:
             assert callable(bak108q.default_backup_log_export_name)
             sd108q.close()
             about108 = About108(win)
-            assert "1.8.0" in about108.windowTitle()
+            assert "1.8.1" in about108.windowTitle()
             about108.close()
             feat108q = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
             assert "1.0.8" in feat108q
@@ -14874,7 +15000,7 @@ def main() -> int:
             assert "leer" in tip_empty109.casefold()
             win.welcome_page.refresh_continue_button()
             about109 = About109(win)
-            assert "1.8.0" in about109.windowTitle()
+            assert "1.8.1" in about109.windowTitle()
             about109.close()
             feat109q = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
             assert "1.0.9" in feat109q
@@ -14916,7 +15042,7 @@ def main() -> int:
                 ROOT / "instantlensdoc" / "ui" / "main_window.py"
             ).read_text(encoding="utf-8")
             about110 = About110(win)
-            assert "1.8.0" in about110.windowTitle()
+            assert "1.8.1" in about110.windowTitle()
             about110.close()
             feat110q = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
             assert "1.1.0" in feat110q
@@ -14962,7 +15088,7 @@ def main() -> int:
             kg111q = (ROOT / "keygen" / "__main__.py").read_text(encoding="utf-8")
             assert "validity_label" in kg111q and "Gültigkeit:" in kg111q
             about111 = About111(win)
-            assert "1.8.0" in about111.windowTitle()
+            assert "1.8.1" in about111.windowTitle()
             about111.close()
             feat111q = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
             assert "1.1.1" in feat111q
@@ -15016,7 +15142,7 @@ def main() -> int:
             kg112q = (ROOT / "keygen" / "__main__.py").read_text(encoding="utf-8")
             assert "Speichern als .txt" in kg112q and "--days" in kg112q
             about112 = About112(win)
-            assert "1.8.0" in about112.windowTitle()
+            assert "1.8.1" in about112.windowTitle()
             about112.close()
             feat112q = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
             assert "1.1.2" in feat112q
@@ -15059,7 +15185,7 @@ def main() -> int:
             clear_hist113()
             assert load_hist113() == []
             about113 = About113(win)
-            assert "1.8.0" in about113.windowTitle()
+            assert "1.8.1" in about113.windowTitle()
             about113.close()
             feat113q = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
             assert "1.1.3" in feat113q
@@ -15112,7 +15238,7 @@ def main() -> int:
             assert "_history_copy" in kg114q and "Reveal" in kg114q
 
             about114 = About114(win)
-            assert "1.8.0" in about114.windowTitle()
+            assert "1.8.1" in about114.windowTitle()
             about114.close()
             feat114q = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
             assert "1.1.4" in feat114q
@@ -15159,7 +15285,7 @@ def main() -> int:
             )
 
             about115 = About115(win)
-            assert "1.8.0" in about115.windowTitle()
+            assert "1.8.1" in about115.windowTitle()
             about115.close()
             feat115q = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
             assert "1.1.5" in feat115q
@@ -15212,7 +15338,7 @@ def main() -> int:
             assert "reveal_countdown" in kg116q and "_tick_countdown" in kg116q
 
             about116 = About116(win)
-            assert "1.8.0" in about116.windowTitle()
+            assert "1.8.1" in about116.windowTitle()
             about116.close()
             feat116q = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
             assert "1.1.6" in feat116q
@@ -15286,7 +15412,7 @@ def main() -> int:
             assert "applicationStateChanged" in kg117q
 
             about117 = About117(win)
-            assert "1.8.0" in about117.windowTitle()
+            assert "1.8.1" in about117.windowTitle()
             about117.close()
             feat117q = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
             assert ("1.1.8" in feat117q or "1.1.9" in feat117q)
@@ -15345,7 +15471,7 @@ def main() -> int:
             assert "· pausiert" in kg118q or "pausiert" in kg118q
 
             about118 = About118(win)
-            assert "1.8.0" in about118.windowTitle()
+            assert "1.8.1" in about118.windowTitle()
             about118.close()
             feat118q = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
             assert ("1.1.8" in feat118q or "1.1.9" in feat118q)
@@ -15411,7 +15537,7 @@ def main() -> int:
             assert "Countdown pausiert (Fenster ohne Fokus)" in kg119q
 
             about119 = About119(win)
-            assert "1.8.0" in about119.windowTitle()
+            assert "1.8.1" in about119.windowTitle()
             about119.close()
             feat119q = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
             assert "1.1.9" in feat119q
@@ -15470,7 +15596,7 @@ def main() -> int:
             assert "FEHLER" in runbat_q and "PySide6" in runbat_q
 
             about120 = About120(win)
-            assert "1.8.0" in about120.windowTitle()
+            assert "1.8.1" in about120.windowTitle()
             about120.close()
             feat120q = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
             assert "1.2.0" in feat120q
@@ -15542,7 +15668,7 @@ def main() -> int:
             assert "[J/N]" in runbat_q121 and "pip install -r requirements.txt" in runbat_q121
 
             about121 = About121(win)
-            assert "1.8.0" in about121.windowTitle()
+            assert "1.8.1" in about121.windowTitle()
             about121.close()
             feat121q = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
             assert "1.2.1" in feat121q
@@ -15625,7 +15751,7 @@ def main() -> int:
             assert "Exit-Codes" in runbat_q122
 
             about122 = About122(win)
-            assert "1.8.0" in about122.windowTitle()
+            assert "1.8.1" in about122.windowTitle()
             about122.close()
             feat122q = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
             assert "1.2.2" in feat122q
@@ -15701,7 +15827,7 @@ def main() -> int:
             assert "Hinweis" in runbat_q123 and ".venv" in runbat_q123
 
             about123 = About123(win)
-            assert "1.8.0" in about123.windowTitle()
+            assert "1.8.1" in about123.windowTitle()
             about123.close()
             feat123q = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
             assert "1.2.3" in feat123q
@@ -15786,7 +15912,7 @@ def main() -> int:
             assert "Microsoft Store" in runbat_q124 and "python.org" in runbat_q124
 
             about124 = About124(win)
-            assert "1.8.0" in about124.windowTitle()
+            assert "1.8.1" in about124.windowTitle()
             about124.close()
             feat124q = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
             assert "1.2.4" in feat124q
@@ -15873,7 +15999,7 @@ def main() -> int:
             assert "if defined ILD_PYTHON" in runbat_q125
 
             about125 = About125(win)
-            assert "1.8.0" in about125.windowTitle()
+            assert "1.8.1" in about125.windowTitle()
             about125.close()
             feat125q = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
             assert "1.2.5" in feat125q
@@ -15963,7 +16089,7 @@ def main() -> int:
             assert "ILD_PYTHON" in runbat_q126
 
             about126 = About126(win)
-            assert "1.8.0" in about126.windowTitle()
+            assert "1.8.1" in about126.windowTitle()
             about126.close()
             feat126q = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
             assert "1.2.6" in feat126q
@@ -16059,7 +16185,7 @@ def main() -> int:
             assert "ILD_NEED_FALLBACK" in runbat_q127 or "Fallback" in runbat_q127
 
             about127 = About127(win)
-            assert "1.8.0" in about127.windowTitle()
+            assert "1.8.1" in about127.windowTitle()
             about127.close()
             feat127q = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
             assert "1.2.7" in feat127q
@@ -16156,7 +16282,7 @@ def main() -> int:
             assert "gefunden:" in runbat_q128
 
             about128 = About128(win)
-            assert "1.8.0" in about128.windowTitle()
+            assert "1.8.1" in about128.windowTitle()
             about128.close()
             feat128q = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
             assert "1.2.8" in feat128q
@@ -16261,7 +16387,7 @@ def main() -> int:
             assert "--version" in runbat_q129
 
             about129 = About129(win)
-            assert "1.8.0" in about129.windowTitle()
+            assert "1.8.1" in about129.windowTitle()
             about129.close()
             feat129q = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
             assert "1.2.9" in feat129q
@@ -16400,7 +16526,7 @@ def main() -> int:
             assert TH130 == 50
 
             about130 = About130(win)
-            assert "1.8.0" in about130.windowTitle()
+            assert "1.8.1" in about130.windowTitle()
             about130.close()
             feat130q = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
             assert "1.3.0" in feat130q
@@ -16530,7 +16656,7 @@ def main() -> int:
             sro131(0.90)
 
             about131 = About131(win)
-            assert "1.8.0" in about131.windowTitle()
+            assert "1.8.1" in about131.windowTitle()
             about131.close()
             feat131q = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
             assert "1.3.1" in feat131q
@@ -16684,7 +16810,7 @@ def main() -> int:
             win._stop_thumb_lazy()
 
             about132 = About132(win)
-            assert "1.8.0" in about132.windowTitle()
+            assert "1.8.1" in about132.windowTitle()
             about132.close()
             feat132q = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
             assert "1.3.2" in feat132q
@@ -16859,7 +16985,7 @@ def main() -> int:
             win._stop_thumb_lazy()
 
             about133 = About133(win)
-            assert "1.8.0" in about133.windowTitle()
+            assert "1.8.1" in about133.windowTitle()
             about133.close()
             feat133q = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
             assert "1.3.3" in feat133q
@@ -16958,7 +17084,7 @@ def main() -> int:
             ).read_text(encoding="utf-8")
 
             about134 = About134(win)
-            assert "1.8.0" in about134.windowTitle()
+            assert "1.8.1" in about134.windowTitle()
             about134.close()
             feat134q = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
             assert "1.3.4" in feat134q
@@ -17040,7 +17166,7 @@ def main() -> int:
             assert "Sidecar konnte nicht geschrieben werden" in pv135src
 
             about135 = About135(win)
-            assert "1.8.0" in about135.windowTitle()
+            assert "1.8.1" in about135.windowTitle()
             about135.close()
             feat135q = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
             assert "1.3.5" in feat135q
@@ -17114,7 +17240,7 @@ def main() -> int:
             assert "Sidecar übersprungen" in pv136src
 
             about136 = About136(win)
-            assert "1.8.0" in about136.windowTitle()
+            assert "1.8.1" in about136.windowTitle()
             about136.close()
             feat136q = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
             assert "1.3.6" in feat136q
@@ -17192,7 +17318,7 @@ def main() -> int:
             as140.close()
 
             about140 = About140(win)
-            assert "1.8.0" in about140.windowTitle()
+            assert "1.8.1" in about140.windowTitle()
             about140.close()
             feat140q = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
             assert "1.4.1" in feat140q and "1.4.0" in feat140q
@@ -17263,7 +17389,7 @@ def main() -> int:
             assert callable(isw141)
             assert callable(getattr(win, "_on_system_theme_live", None))
             about141 = About141(win)
-            assert "1.8.0" in about141.windowTitle()
+            assert "1.8.1" in about141.windowTitle()
             about141.close()
             assert "## 1.4.2" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8") and "## 1.4.1" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
             print(
@@ -17319,7 +17445,7 @@ def main() -> int:
             assert "Theme:" in (win.theme_status_label.text() or "")
 
             about142 = About142(win)
-            assert "1.8.0" in about142.windowTitle()
+            assert "1.8.1" in about142.windowTitle()
             about142.close()
             assert "## 1.4.2" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
             print(
@@ -17382,7 +17508,7 @@ def main() -> int:
             assert "System" in (win.theme_status_label.text() or "")
 
             about143 = About143(win)
-            assert "1.8.0" in about143.windowTitle()
+            assert "1.8.1" in about143.windowTitle()
             about143.close()
             assert "## 1.4.3" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
             print(
@@ -17460,7 +17586,7 @@ def main() -> int:
             win._set_theme_mode("system")
 
             about144 = About144(win)
-            assert "1.8.0" in about144.windowTitle()
+            assert "1.8.1" in about144.windowTitle()
             about144.close()
             assert "## 1.5.1" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
             assert "## 1.5.1" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8") and "## 1.5.0" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
@@ -17552,7 +17678,7 @@ def main() -> int:
             win._set_theme_mode("system")
 
             about145 = About145(win)
-            assert "1.8.0" in about145.windowTitle()
+            assert "1.8.1" in about145.windowTitle()
             from PySide6.QtWidgets import QLabel as QL145
 
             about_texts145 = " ".join(
@@ -17593,7 +17719,7 @@ def main() -> int:
             ns150q = pc150q(["--open", str(smoke_pdf)])
             assert ns150q.open_file == str(smoke_pdf)
             about150 = About150(win)
-            assert "1.8.0" in about150.windowTitle()
+            assert "1.8.1" in about150.windowTitle()
             about150.close()
             assert "## 1.5.1" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8") and "## 1.5.0" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
             print(
@@ -17629,7 +17755,7 @@ def main() -> int:
             ns151q = pc151q(["--open", str(smoke_pdf), "--open", str(smoke_pdf)])
             assert ns151q.open_files and ns151q.open_file == str(smoke_pdf)
             about151 = About151(win)
-            assert "1.8.0" in about151.windowTitle()
+            assert "1.8.1" in about151.windowTitle()
             about151.close()
             assert "## 1.5.1" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
             print(
@@ -17674,7 +17800,7 @@ def main() -> int:
             )
             assert ns152q.export_page == 1 and ns152q.export_out == "/tmp/ild152.png"
             about152 = About152(win)
-            assert "1.8.0" in about152.windowTitle()
+            assert "1.8.1" in about152.windowTitle()
             about152.close()
             assert "## 1.5.3" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
             assert "## 1.5.2" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
@@ -17736,7 +17862,7 @@ def main() -> int:
             from instantlensdoc.ui.help_dialog import AboutDialog as About153
 
             about153 = About153(win)
-            assert "1.8.0" in about153.windowTitle()
+            assert "1.8.1" in about153.windowTitle()
             about153.close()
             print(
                 "1.5.3 Qt metadata-toast-max3/"
@@ -17757,7 +17883,7 @@ def main() -> int:
             assert "Filter: übersprungen" in pv_src154q or "filter_skipped" in pv_src154q
             assert "get_last_signature_preview_zoom" in pv_src154q
             about154 = AboutDialog(win)
-            assert "1.8.0" in about154.windowTitle()
+            assert "1.8.1" in about154.windowTitle()
             assert "## 1.5.5" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
             print(
                 "1.5.4 Qt metadata-toast-click-a11y/"
@@ -17779,7 +17905,7 @@ def main() -> int:
             assert "Reset-Zoom" in pv_src155q
             assert "pagesExportFilterBadge" in pv_src155q or "filter_badge" in pv_src155q
             about155 = AboutDialog(win)
-            assert "1.8.0" in about155.windowTitle()
+            assert "1.8.1" in about155.windowTitle()
             assert "## 1.6.0" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
             assert "## 1.5.5" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
             print(
@@ -17843,7 +17969,7 @@ def main() -> int:
             del_wsl160q("QtLayout160")
             win._refresh_workspace_layout_menu()
             about160 = AboutDialog(win)
-            assert "1.8.0" in about160.windowTitle()
+            assert "1.8.1" in about160.windowTitle()
             assert "## 1.6.2" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8") and "## 1.6.0" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
             print(
                 "1.6.0 Qt watermark-preview-image/"
@@ -17922,7 +18048,7 @@ def main() -> int:
             del_wsl161q("QtLayout161b")
             win._refresh_workspace_layout_menu()
             about161 = AboutDialog(win)
-            assert "1.8.0" in about161.windowTitle()
+            assert "1.8.1" in about161.windowTitle()
             assert "## 1.6.2" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8") and "## 1.6.1" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
             print(
                 "1.6.1 Qt watermark-settings-range/"
@@ -18024,7 +18150,7 @@ def main() -> int:
             del_wsl162q("QtLayout162")
             win._refresh_workspace_layout_menu()
             about162 = AboutDialog(win)
-            assert "1.8.0" in about162.windowTitle()
+            assert "1.8.1" in about162.windowTitle()
             assert "## 1.6.2" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
             print(
                 "1.6.2 Qt watermark-progress-template/"
@@ -18100,7 +18226,7 @@ def main() -> int:
                 assert callable(win._import_workspace_layouts)
 
             about163 = AboutDialog(win)
-            assert "1.8.0" in about163.windowTitle()
+            assert "1.8.1" in about163.windowTitle()
             assert "## 1.6.3" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
             print(
                 "1.6.3 Qt watermark-live-preview/"
@@ -18170,7 +18296,7 @@ def main() -> int:
             ).read_text(encoding="utf-8")
 
             about164 = AboutDialog(win)
-            assert "1.8.0" in about164.windowTitle()
+            assert "1.8.1" in about164.windowTitle()
             assert "## 1.6.4" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
             print(
                 "1.6.4 Qt watermark-quick-insert-invalid-red/"
@@ -18242,7 +18368,7 @@ def main() -> int:
             ).read_text(encoding="utf-8")
 
             about165 = AboutDialog(win)
-            assert "1.8.0" in about165.windowTitle()
+            assert "1.8.1" in about165.windowTitle()
             assert "## 1.6.5" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
             print(
                 "1.6.5 Qt watermark-reset-template-focus/"
@@ -18313,7 +18439,7 @@ def main() -> int:
             assert tpdf_q.is_file() and tpdf_q.stat().st_size > 100
 
             locq = clv170q()
-            assert locq.local_version == "1.8.0"
+            assert locq.local_version == "1.8.1"
             assert locq.newer_available is False
             assert locq.reference_source in ("docs/VERSION", "VERSION.txt")
 
@@ -18326,7 +18452,7 @@ def main() -> int:
             sd170q.close()
 
             about170 = AboutDialog(win)
-            assert "1.8.0" in about170.windowTitle()
+            assert "1.8.1" in about170.windowTitle()
             assert "## 1.7.2" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
             assert "## 1.7.1" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
             print(
@@ -18419,7 +18545,7 @@ def main() -> int:
             sd171q.close()
 
             about171 = AboutDialog(win)
-            assert "1.8.0" in about171.windowTitle()
+            assert "1.8.1" in about171.windowTitle()
             assert "## 1.7.2" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
             assert "## 1.7.1" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
             print(
@@ -18489,7 +18615,7 @@ def main() -> int:
             sd172q.close()
 
             about172 = AboutDialog(win)
-            assert "1.8.0" in about172.windowTitle()
+            assert "1.8.1" in about172.windowTitle()
             print(
                 "1.7.2 Qt presentation-pause-countdown-intervals/"
                 "favorites-label-tab-dup/"
@@ -18568,7 +18694,7 @@ def main() -> int:
             sd173q.close()
 
             about173 = AboutDialog(win)
-            assert "1.8.0" in about173.windowTitle()
+            assert "1.8.1" in about173.windowTitle()
             print(
                 "1.7.3 Qt countdown-pos-color/"
                 "favorites-dblclick-empty/"
@@ -18652,7 +18778,7 @@ def main() -> int:
             assert "VERSION.txt" in (win.statusBar().toolTip() or "")
 
             about174 = AboutDialog(win)
-            assert "1.8.0" in about174.windowTitle()
+            assert "1.8.1" in about174.windowTitle()
             print(
                 "1.7.4 Qt countdown-preview-defaults/"
                 "favorites-esc-focus/"
@@ -18725,7 +18851,7 @@ def main() -> int:
             )
 
             about175 = AboutDialog(win)
-            assert "1.8.0" in about175.windowTitle()
+            assert "1.8.1" in about175.windowTitle()
             print(
                 "1.7.5 Qt countdown-defaults-confirm/"
                 "favorites-enter-empty-filename/"
@@ -18776,20 +18902,58 @@ def main() -> int:
             assert hasattr(dlg180, "_run_hf")
             dlg180.reject()
             about180 = AboutDialog(win)
-            assert "1.8.0" in about180.windowTitle()
+            assert "1.8.1" in about180.windowTitle()
             print(
                 "1.8.0 Qt flip-batch-undo/"
                 "header-footer-dialog/"
                 "ann-type-toggles/crash-recovery: OK"
             )
 
+            # 1.8.1 Qt: batch shortcuts, HF preview/range, visible count,
+            # recovery meta preview helper
+            assert callable(getattr(win, "_batch_rotate_selection", None))
+            assert callable(getattr(win, "_batch_flip_selection", None))
+            assert callable(getattr(win.pdf_view, "count_visible_annotations", None))
+            assert callable(
+                getattr(win.pdf_view.store, "remap_coords_for_rotation", None)
+            ) or win.pdf_view.store is None
+            from instantlensdoc.ui.watermark_dialog import WatermarkDialog as WD181
+
+            dlg181 = WD181(
+                win,
+                pdf_path=str(smoke_pdf),
+                page_index=0,
+                page_count=win.pdf_view.page_count or 1,
+            )
+            assert hasattr(dlg181, "_refresh_hf_preview")
+            assert hasattr(dlg181, "hf_range")
+            assert hasattr(dlg181, "hf_preview")
+            dlg181._refresh_hf_preview()
+            assert "Seite 1" in (dlg181.hf_preview.text() or "")
+            dlg181.reject()
+            # Layer count + session sync helpers
+            vis_n, tot_n = win.pdf_view.count_visible_annotations()
+            assert tot_n >= 0 and vis_n <= tot_n
+            win._sync_ann_type_actions()
+            assert "Annotation-Typen" in win._m_ann_types.title()
+            from instantlensdoc.core.crash_recovery import orphan_meta_preview as omp181q
+
+            assert callable(omp181q)
+            about181 = AboutDialog(win)
+            assert "1.8.1" in about181.windowTitle()
+            print(
+                "1.8.1 Qt batch-shortcuts/"
+                "hf-preview-range/"
+                "layer-count/recovery-meta: OK"
+            )
+
             print("0.4.x selected Qt marks/schema/sort/reset: OK")
             print("0.4.2 Qt outline/copy-paste/case/progress: OK")
             print("0.4.1 Qt links/stamp/encoding/drop: OK")
-            print("0.3.x–1.8.0 review OK")
+            print("0.3.x–1.8.1 review OK")
             from instantlensdoc.ui.stubs import PLANNED as PLANNED132
 
-            assert "1.8.0" in PLANNED132["ki"]
+            assert "1.8.1" in PLANNED132["ki"]
             assert callable(win.pdf_view.bake_redactions)
             assert callable(win.pdf_view.clear_redactions)
             assert callable(win._set_pdf_password)

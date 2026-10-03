@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **1.8.0** |
+| Version | **1.8.1** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -63,10 +63,12 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an / `checkedonce`)
 
-## Neu in 1.8.0
+## Neu in 1.8.1
 
-- **Seiten:** Batch drehen 90°/180° · Spiegeln H/V mit Undo (Thumbnails)
-- **Kopf-/Fußzeile:** Seitenzahl + benutzerdefinierter Text bake (pikepdf Content)
-- **Annotation-Layer:** Typ-Toggles Highlight/Note/Shape/Redaction global
-- **Crash-Recovery:** Autosave-Snapshot wiederherstellen Dialog beim Start (dirty orphan)
+Post-Release-Polish nach **1.8.0**:
+
+- **Seiten:** Batch-Shortcuts · Status „N Seiten“ · Ann.-Koordinaten Remap bei 90°/180°
+- **Kopf-/Fußzeile:** Schriftgröße/Rand Settings · Vorschau erste Seite · Seitenbereich
+- **Annotation-Layer:** Session-Persistenz · Shortcut-Menü Ctrl+Alt+1…4 · Zähler sichtbarer Ann.
+- **Crash-Recovery:** Snapshot-Metadaten-Vorschau · Verwerfen löscht Orphan sauber
 - Stubs KI/Cloud/Stylus/3D unverändert

@@ -173,5 +173,101 @@ def restore_orphan(orphan: RecoveryOrphan, *, dest: str | Path | None = None) ->
     return target
 
 
+def orphan_meta_preview(orphan: RecoveryOrphan) -> str:
+    """
+    Lesbare Snapshot-Metadaten für Dialog-Vorschau — 1.8.1.
+    Pfad, Kind, Zeit, Größe, optional Text-Snippet.
+    """
+    from datetime import datetime
+
+    try:
+        ts = datetime.fromtimestamp(float(orphan.saved_at or 0.0)).strftime(
+            "%d.%m.%Y %H:%M"
+        )
+    except Exception:
+        ts = "—"
+    size_b = 0
+    try:
+        if orphan.payload_path.is_file():
+            size_b = int(orphan.payload_path.stat().st_size)
+    except OSError:
+        size_b = 0
+    if size_b >= 1024 * 1024:
+        size_s = f"{size_b / (1024 * 1024):.1f} MB"
+    elif size_b >= 1024:
+        size_s = f"{size_b / 1024:.1f} KB"
+    else:
+        size_s = f"{size_b} B"
+    age_m = int(orphan.age_seconds() // 60)
+    lines = [
+        f"{orphan.label}",
+        f"  Art: {orphan.kind} · {size_s} · {ts} (vor {age_m} min)",
+        f"  Pfad: {orphan.source_path}",
+    ]
+    if orphan.kind == "text" and orphan.payload_path.is_file():
+        try:
+            text = orphan.payload_path.read_text(encoding="utf-8", errors="replace")
+            snippet = " ".join(text.strip().split())
+            if len(snippet) > 80:
+                snippet = snippet[:77] + "…"
+            if snippet:
+                lines.append(f"  Vorschau: {snippet}")
+        except Exception:
+            pass
+    return "\n".join(lines)
+
+
 def discard_orphan(orphan: RecoveryOrphan) -> None:
+    """Verwerfen: Meta + Payload orphan-sauber löschen — 1.8.1."""
+    for p in (orphan.meta_path, orphan.payload_path):
+        if p is None:
+            continue
+        try:
+            if Path(p).is_file():
+                Path(p).unlink()
+        except OSError:
+            pass
+    # Alias-/Key-Varianten ebenfalls entfernen
     clear_recovery_for(orphan.source_path)
+    # Falls Meta-Dateiname vom Key abweicht: leere Payload-Reste am Meta-Stem
+    try:
+        stem = orphan.meta_path.stem if orphan.meta_path else ""
+        if stem:
+            rdir = recovery_dir()
+            for ext in (".txt", ".bin", ".json"):
+                leftover = rdir / f"{stem}{ext}"
+                if leftover.is_file():
+                    try:
+                        leftover.unlink()
+                    except OSError:
+                        pass
+    except Exception:
+        pass
+
+
+def purge_stale_orphans(*, max_age_hours: float = 72.0) -> int:
+    """Orphans älter als max_age_hours inkl. Payload löschen — 1.8.1."""
+    rdir = recovery_dir()
+    cutoff = time.time() - max(1.0, float(max_age_hours)) * 3600.0
+    removed = 0
+    for meta_path in list(rdir.glob("*.json")):
+        try:
+            data = json.loads(meta_path.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        if data.get("schema") != RECOVERY_SCHEMA:
+            continue
+        saved_at = float(data.get("saved_at") or 0.0)
+        if saved_at and saved_at >= cutoff:
+            continue
+        payload_name = str(data.get("payload") or "")
+        for p in (meta_path, rdir / payload_name if payload_name else None):
+            if p is None:
+                continue
+            try:
+                if Path(p).is_file():
+                    Path(p).unlink()
+                    removed += 1
+            except OSError:
+                pass
+    return removed

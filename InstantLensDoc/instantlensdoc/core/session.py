@@ -54,6 +54,8 @@ class SessionState:
     # Letzte Ann.-Standard Fill-/Stroke-Farbe ("" = nicht gesetzt) — 0.9.9
     ann_fill_color: str = ""
     ann_stroke_color: str = ""
+    # Annotation-Layer Typ-Toggles je Session — 1.8.1
+    ann_layer_types: dict = field(default_factory=dict)
 
 
 def session_path() -> Path:
@@ -92,6 +94,20 @@ def _normalize_theme(raw) -> str:
 
 def _normalize_label(raw) -> str:
     return str(raw or "").strip()
+
+
+_ANN_LAYER_TYPE_KEYS = ("highlight", "note", "shape", "redaction")
+
+
+def _normalize_ann_layer_types(raw) -> dict:
+    """Typ-Toggles Highlight/Note/Shape/Redaction — 1.8.1."""
+    out = {k: True for k in _ANN_LAYER_TYPE_KEYS}
+    if not isinstance(raw, dict):
+        return out
+    for key in _ANN_LAYER_TYPE_KEYS:
+        if key in raw:
+            out[key] = bool(raw[key])
+    return out
 
 
 # Erlaubte Ann.-Werkzeug-IDs für Session ("" = Auswahl) — 0.9.7
@@ -283,6 +299,9 @@ def load_session() -> SessionState:
     ann_stroke_color = _normalize_ann_color(
         raw.get("ann_stroke_color", raw.get("annotation_stroke_color"))
     )
+    ann_layer_types = _normalize_ann_layer_types(
+        raw.get("ann_layer_types", raw.get("annotation_layer_types"))
+    )
     return SessionState(
         tabs=tabs,
         active=active,
@@ -303,6 +322,7 @@ def load_session() -> SessionState:
         ann_stroke_width=ann_stroke_width,
         ann_fill_color=ann_fill_color,
         ann_stroke_color=ann_stroke_color,
+        ann_layer_types=ann_layer_types,
     )
 
 
@@ -349,6 +369,9 @@ def save_session(state: SessionState) -> None:
         "ann_stroke_color": _normalize_ann_color(
             getattr(state, "ann_stroke_color", "")
         ),
+        "ann_layer_types": _normalize_ann_layer_types(
+            getattr(state, "ann_layer_types", None)
+        ),
     }
     path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
 
@@ -385,6 +408,7 @@ def build_session(
     ann_stroke_width: Optional[float] = None,
     ann_fill_color: Optional[str] = None,
     ann_stroke_color: Optional[str] = None,
+    ann_layer_types: Optional[dict] = None,
 ) -> SessionState:
     """
     tab_states: optional {path: {page, scale, scroll_y}} für Last-Page/Zoom/Scroll je Tab (0.9.1/0.9.2).
@@ -396,6 +420,7 @@ def build_session(
     ann_tool: zuletzt genutztes Ann.-Werkzeug (AnnotationType.value / "" = Auswahl) — 0.9.7.
     ann_opacity / ann_stroke_width: letzte Ann.-Standards (0 = nicht gesetzt) — 0.9.8.
     ann_fill_color / ann_stroke_color: letzte Ann.-Farb-Defaults ("" = nicht gesetzt) — 0.9.9.
+    ann_layer_types: Typ-Toggles Highlight/Note/Shape/Redaction — 1.8.1.
     """
     tabs: List[SessionTab] = []
     seen: set[str] = set()
@@ -523,4 +548,5 @@ def build_session(
         ann_stroke_width=_normalize_ann_stroke_width(ann_stroke_width),
         ann_fill_color=_normalize_ann_color(ann_fill_color),
         ann_stroke_color=_normalize_ann_color(ann_stroke_color),
+        ann_layer_types=_normalize_ann_layer_types(ann_layer_types),
     )

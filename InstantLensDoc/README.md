@@ -2,7 +2,7 @@
 
 Moderne Textverarbeitung mit PDF-Annotator, OCR-Bridge und Formulargenerator.
 
-**Version:** 1.8.0  
+**Version:** 1.8.1  
 **Hersteller:** Andreas Meyer · ame@sellerbach.de
 
 ## Quickstart (Windows)
@@ -33,8 +33,8 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an).
 
-## Neu in 1.8.0
+## Neu in 1.8.1
 
-Minor auf **1.7.5**: PDF-Seiten Batch drehen (90°/180°) und spiegeln H/V mit Undo; Kopf-/Fußzeile + Seitenzahl bake (pikepdf Content); Annotation-Layer Typ-Toggles Highlight/Note/Shape/Redaction; Crash-Recovery Autosave-Snapshot-Dialog beim Start. Stubs KI/Cloud/Stylus/3D unverändert.
+Post-Release-Polish nach **1.8.0**: Batch Drehen/Spiegeln mit Shortcuts · Status „N Seiten“ · Ann.-Koordinaten Remap bei 90°/180°; Kopf-/Fußzeile Schrift/Rand Settings · Vorschau erste Seite · Seitenbereich; Layer-Toggles Session-Persistenz · Shortcut-Menü · sichtbare-Ann.-Zähler; Crash-Recovery Metadaten-Vorschau · Verwerfen orphan-sauber. Stubs KI/Cloud/Stylus/3D unverändert.
 
 Siehe [CHANGELOG.md](CHANGELOG.md), [FEATURES.md](FEATURES.md) und [INFO.md](INFO.md).

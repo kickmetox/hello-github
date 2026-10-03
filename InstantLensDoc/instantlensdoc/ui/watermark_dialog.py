@@ -38,6 +38,7 @@ from ild_pdf.watermark import (
     apply_page_numbers,
     apply_watermark,
     find_invalid_watermark_placeholders,
+    format_header_footer_preview,
     format_watermark_output_path,
     highlight_watermark_template_html,
     preview_watermark_output_filename,
@@ -665,9 +666,11 @@ class WatermarkDialog(QDialog):
             QMessageBox.critical(self, "Seitennummern", str(e))
 
     def _build_hf_tab(self) -> QWidget:
-        """Kopf-/Fußzeile + Seitenzahl bake — 1.8.0."""
+        """Kopf-/Fußzeile + Seitenzahl bake; Schrift/Rand Settings·Vorschau·Seitenbereich — 1.8.1."""
         w = QWidget()
-        form = QFormLayout(w)
+        root = QHBoxLayout(w)
+        form_host = QWidget()
+        form = QFormLayout(form_host)
         self.hf_src, src_row = self._path_row(self._initial)
         form.addRow("PDF", src_row)
         self.hf_header = QLineEdit(str(self._last_hf.get("header_text") or ""))
@@ -722,18 +725,122 @@ class WatermarkDialog(QDialog):
         self.hf_size = QDoubleSpinBox()
         self.hf_size.setRange(6, 36)
         self.hf_size.setValue(float(self._last_hf.get("font_size") or 10))
+        self.hf_size.setToolTip("Schriftgröße (Settings merken) — 1.8.1")
         form.addRow("Schriftgröße", self.hf_size)
         self.hf_margin = QDoubleSpinBox()
         self.hf_margin.setRange(8, 120)
         self.hf_margin.setValue(float(self._last_hf.get("margin") or 28))
+        self.hf_margin.setToolTip("Rand in pt (Settings merken) — 1.8.1")
         form.addRow("Rand (pt)", self.hf_margin)
+        # Seitenbereich — 1.8.1
+        self.hf_range = QLineEdit(str(self._last_hf.get("page_range") or ""))
+        self.hf_range.setPlaceholderText("leer = alle; z. B. 1-3,5")
+        self.hf_range.setToolTip(
+            "Seitenbereich 1-basiert, z. B. 1-3,5 (Settings merken) — 1.8.1"
+        )
+        form.addRow("Seitenbereich", self.hf_range)
         self.hf_inplace = QCheckBox("Original überschreiben")
         self.hf_inplace.setChecked(True)
         form.addRow("", self.hf_inplace)
         run = QPushButton("Kopf-/Fußzeile bakken")
         run.clicked.connect(self._run_hf)
         form.addRow(run)
+        root.addWidget(form_host, 3)
+        # Vorschau erste Seite — 1.8.1
+        prev_col = QVBoxLayout()
+        prev_col.addWidget(QLabel("Vorschau erste Seite"))
+        self.hf_page_thumb = QLabel()
+        self.hf_page_thumb.setAlignment(Qt.AlignCenter)
+        self.hf_page_thumb.setMinimumSize(180, 220)
+        self.hf_page_thumb.setStyleSheet(
+            "QLabel { background: #f4f4f4; border: 1px solid #ccc; }"
+        )
+        prev_col.addWidget(self.hf_page_thumb, 1)
+        self.hf_preview = QLabel()
+        self.hf_preview.setWordWrap(True)
+        self.hf_preview.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        self.hf_preview.setStyleSheet("QLabel { color: #333; padding: 4px; }")
+        prev_col.addWidget(self.hf_preview)
+        btn_prev = QPushButton("Vorschau aktualisieren")
+        btn_prev.clicked.connect(self._refresh_hf_preview)
+        prev_col.addWidget(btn_prev)
+        prev_host = QWidget()
+        prev_host.setLayout(prev_col)
+        root.addWidget(prev_host, 2)
+        for wdg in (
+            self.hf_header,
+            self.hf_footer,
+            self.hf_num_tpl,
+            self.hf_range,
+        ):
+            wdg.textChanged.connect(lambda *_: self._refresh_hf_preview())
+        self.hf_include_num.toggled.connect(lambda *_: self._refresh_hf_preview())
+        self.hf_size.valueChanged.connect(lambda *_: self._refresh_hf_preview())
+        self.hf_margin.valueChanged.connect(lambda *_: self._refresh_hf_preview())
+        QTimer.singleShot(0, self._refresh_hf_preview)
         return w
+
+    def _resolve_hf_pages(self):
+        """Seitenbereich für HF-Bake; None = alle — 1.8.1."""
+        spec = (self.hf_range.text() or "").strip()
+        if not spec:
+            return None
+        ranges = parse_page_ranges(spec, self._page_count, one_based=True)
+        return flatten_page_indices(ranges)
+
+    def _refresh_hf_preview(self) -> None:
+        """Text + Thumbnail der ersten Seite — 1.8.1."""
+        src = ""
+        if hasattr(self, "hf_src"):
+            src = self.hf_src.text().strip()
+        stem = Path(src).stem if src else "dokument"
+        try:
+            text = format_header_footer_preview(
+                header_text=self.hf_header.text() if hasattr(self, "hf_header") else "",
+                footer_text=self.hf_footer.text() if hasattr(self, "hf_footer") else "",
+                include_page_numbers=(
+                    self.hf_include_num.isChecked()
+                    if hasattr(self, "hf_include_num")
+                    else True
+                ),
+                page_number_template=(
+                    self.hf_num_tpl.text().strip()
+                    if hasattr(self, "hf_num_tpl")
+                    else "{n} / {total}"
+                )
+                or "{n} / {total}",
+                font_size=self.hf_size.value() if hasattr(self, "hf_size") else 10,
+                margin=self.hf_margin.value() if hasattr(self, "hf_margin") else 28,
+                total_pages=self._page_count,
+                stem=stem,
+                page_index=0,
+            )
+            if hasattr(self, "hf_preview"):
+                self.hf_preview.setText(text)
+        except Exception as e:
+            if hasattr(self, "hf_preview"):
+                self.hf_preview.setText(f"Vorschau:\n{e}")
+        if hasattr(self, "hf_page_thumb") and src and Path(src).is_file():
+            try:
+                from ild_pdf.render import render_page
+
+                img = render_page(src, 0, scale=0.35, use_cache=True)
+                if img.mode != "RGBA":
+                    img = img.convert("RGBA")
+                data = img.tobytes("raw", "RGBA")
+                qimg = QImage(data, img.width, img.height, QImage.Format_RGBA8888)
+                pm = QPixmap.fromImage(qimg.copy())
+                self.hf_page_thumb.setPixmap(
+                    pm.scaled(
+                        self.hf_page_thumb.size(),
+                        Qt.KeepAspectRatio,
+                        Qt.SmoothTransformation,
+                    )
+                )
+            except Exception:
+                self.hf_page_thumb.setText("Vorschau n/a")
+        elif hasattr(self, "hf_page_thumb"):
+            self.hf_page_thumb.setText("PDF wählen…")
 
     def _run_hf(self):
         src = self.hf_src.text().strip()
@@ -751,11 +858,17 @@ class WatermarkDialog(QDialog):
             )
             return
         try:
+            pages = self._resolve_hf_pages()
+        except ValueError as e:
+            QMessageBox.warning(self, "Kopf-/Fußzeile — Seitenbereich", str(e))
+            return
+        try:
             path = Path(src)
             out = self._out_path(path, self.hf_inplace.isChecked(), "hf")
             apply_header_footer(
                 path,
                 out_path=out,
+                pages=pages,
                 header_text=header,
                 footer_text=footer,
                 include_page_numbers=include_num,
@@ -776,9 +889,11 @@ class WatermarkDialog(QDialog):
                 page_position=self.hf_page_pos.currentText(),
                 font_size=self.hf_size.value(),
                 margin=self.hf_margin.value(),
+                page_range=self.hf_range.text().strip(),
             )
             self.result_path = str(out)
             QMessageBox.information(self, "Kopf-/Fußzeile", f"Gespeichert:\n{out}")
+            self._refresh_hf_preview()
         except Exception as e:
             QMessageBox.critical(self, "Kopf-/Fußzeile", str(e))
 

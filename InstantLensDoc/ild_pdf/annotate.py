@@ -1336,6 +1336,100 @@ class AnnotationStore:
             items = [a for a in items if a.page == page]
         return items
 
+    @staticmethod
+    def transform_rect_for_rotation(
+        x: float,
+        y: float,
+        w: float,
+        h: float,
+        *,
+        page_w: float,
+        page_h: float,
+        degrees: int,
+    ) -> tuple[float, float, float, float]:
+        """
+        Bounding-Box (Top-Left, y nach unten) nach Seitendrehung 90/180/−90.
+        page_w/page_h = Anzeigegröße *vor* der Drehung — 1.8.1.
+        """
+        deg = int(degrees) % 360
+        if deg == 0:
+            return float(x), float(y), float(w), float(h)
+        if deg == 90:
+            # 90° CW: (x,y,w,h) → (H-y-h, x, h, w)
+            return float(page_h - y - h), float(x), float(h), float(w)
+        if deg == 180:
+            return float(page_w - x - w), float(page_h - y - h), float(w), float(h)
+        if deg == 270:
+            # −90 / 270 CW: (x,y,w,h) → (y, W-x-w, h, w)
+            return float(y), float(page_w - x - w), float(h), float(w)
+        return float(x), float(y), float(w), float(h)
+
+    @staticmethod
+    def transform_point_for_rotation(
+        x: float,
+        y: float,
+        *,
+        page_w: float,
+        page_h: float,
+        degrees: int,
+    ) -> tuple[float, float]:
+        """Punkt (Top-Left-Koordinaten) nach Seitendrehung — 1.8.1."""
+        deg = int(degrees) % 360
+        if deg == 0:
+            return float(x), float(y)
+        if deg == 90:
+            return float(page_h - y), float(x)
+        if deg == 180:
+            return float(page_w - x), float(page_h - y)
+        if deg == 270:
+            return float(y), float(page_w - x)
+        return float(x), float(y)
+
+    def remap_coords_for_rotation(
+        self,
+        page_index: int,
+        degrees: int,
+        *,
+        page_w: float,
+        page_h: float,
+        label: str = "Ann. nach Drehung",
+    ) -> int:
+        """
+        Annotation-Koordinaten auf einer Seite nach 90/180/−90 remappen — 1.8.1.
+        Rückgabe: Anzahl geänderter Annotationen (0 = kein Undo-Eintrag).
+        """
+        deg = int(degrees) % 360
+        if deg not in (90, 180, 270):
+            return 0
+        page = int(page_index)
+        pw, ph = float(page_w), float(page_h)
+        if pw <= 0 or ph <= 0:
+            return 0
+        targets = [a for a in self.annotations if int(a.page) == page]
+        if not targets:
+            return 0
+        self._push_undo(label)
+        n = 0
+        for ann in targets:
+            nx, ny, nw, nh = self.transform_rect_for_rotation(
+                ann.x, ann.y, ann.width, ann.height,
+                page_w=pw, page_h=ph, degrees=deg,
+            )
+            ann.x, ann.y, ann.width, ann.height = nx, ny, nw, nh
+            if ann.callout_x or ann.callout_y:
+                cx, cy = self.transform_point_for_rotation(
+                    ann.callout_x, ann.callout_y,
+                    page_w=pw, page_h=ph, degrees=deg,
+                )
+                ann.callout_x, ann.callout_y = cx, cy
+            if ann.type == AnnotationType.STAMP or float(ann.rotation or 0):
+                ann.rotation = (float(ann.rotation or 0) + float(deg)) % 360.0
+            ann.touch()
+            n += 1
+        if n:
+            self.dirty = True
+        return n
+
     def remap_pages(self, mapping: dict[int, int]) -> None:
         """Seitenindizes nach reorder/delete anpassen; fehlende Keys = Seite entfernt."""
         planned: List[tuple[Annotation, int]] = []

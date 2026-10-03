@@ -100,6 +100,7 @@ from .watermark import (
     apply_header_footer,
     apply_image_watermark,
     apply_page_numbers,
+    format_header_footer_preview,
     apply_watermark,
     find_invalid_watermark_placeholders,
     format_watermark_output_path,
@@ -254,6 +255,7 @@ __all__ = [
     "apply_image_watermark",
     "apply_page_numbers",
     "apply_header_footer",
+    "format_header_footer_preview",
     "find_invalid_watermark_placeholders",
     "format_watermark_output_path",
     "highlight_watermark_template_html",
@@ -309,4 +311,4 @@ __all__ = [
     "page_count_for_text",
 ]
 
-__version__ = "1.8.0"
+__version__ = "1.8.1"

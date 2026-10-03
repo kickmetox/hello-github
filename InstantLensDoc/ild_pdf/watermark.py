@@ -497,6 +497,66 @@ def _format_hf_label(
         return out
 
 
+def format_header_footer_preview(
+    *,
+    header_text: str = "",
+    footer_text: str = "",
+    include_page_numbers: bool = True,
+    page_number_template: str = "{n} / {total}",
+    font_size: float = 10.0,
+    margin: float = 28.0,
+    total_pages: int = 1,
+    stem: str = "dokument",
+    page_index: int = 0,
+    start_at: int = 1,
+) -> str:
+    """
+    Textvorschau Kopf-/Fußzeile für eine Seite (Default: erste) — 1.8.1.
+    """
+    from datetime import date as _date
+
+    total = max(1, int(total_pages))
+    i = max(0, min(int(page_index), total - 1))
+    n = int(start_at) + i
+    today = _date.today().isoformat()
+    lines = [
+        f"Seite {i + 1} von {total} — Schrift {float(font_size):.0f} pt · Rand {float(margin):.0f} pt"
+    ]
+    if str(header_text or "").strip():
+        lines.append(
+            "Kopf: "
+            + _format_hf_label(
+                header_text, n=n, total=total, i=i, stem=stem, date=today
+            )
+        )
+    else:
+        lines.append("Kopf: (leer)")
+    if str(footer_text or "").strip():
+        lines.append(
+            "Fuß: "
+            + _format_hf_label(
+                footer_text, n=n, total=total, i=i, stem=stem, date=today
+            )
+        )
+    else:
+        lines.append("Fuß: (leer)")
+    if include_page_numbers:
+        lines.append(
+            "Nr.: "
+            + _format_hf_label(
+                page_number_template or "{n} / {total}",
+                n=n,
+                total=total,
+                i=i,
+                stem=stem,
+                date=today,
+            )
+        )
+    else:
+        lines.append("Nr.: (aus)")
+    return "\n".join(lines)
+
+
 def _draw_text_line(
     page,
     pdf,

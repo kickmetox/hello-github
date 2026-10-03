@@ -131,6 +131,7 @@ DEFAULTS: dict[str, Any] = {
     "last_footer_text": "",  # Fußzeile Bake — 1.8.0
     "last_hf_include_page_numbers": True,
     "last_hf_page_template": "{n} / {total}",
+    "last_hf_page_range": "",  # Seitenbereich z. B. 1-3,5 — 1.8.1
     "last_hf_header_position": "top-center",
     "last_hf_footer_position": "bottom-center",
     "last_hf_page_position": "bottom-right",
@@ -2662,6 +2663,7 @@ def get_last_header_footer_settings() -> dict[str, Any]:
         "page_position": str(s.get("last_hf_page_position") or "bottom-right"),
         "font_size": float(s.get("last_hf_font_size") or 10.0),
         "margin": float(s.get("last_hf_margin") or 28.0),
+        "page_range": str(s.get("last_hf_page_range") or ""),
     }
 
 
@@ -2676,6 +2678,7 @@ def set_last_header_footer_settings(
     page_position: str = "bottom-right",
     font_size: float = 10.0,
     margin: float = 28.0,
+    page_range: str = "",
 ) -> None:
     save_settings(
         {
@@ -2688,6 +2691,7 @@ def set_last_header_footer_settings(
             "last_hf_page_position": str(page_position or "bottom-right"),
             "last_hf_font_size": float(font_size),
             "last_hf_margin": float(margin),
+            "last_hf_page_range": str(page_range or ""),
         }
     )
 
