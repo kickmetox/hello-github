@@ -6,6 +6,7 @@ from pathlib import Path
 
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import (
+    QAbstractItemView,
     QButtonGroup,
     QCheckBox,
     QComboBox,
@@ -14,10 +15,13 @@ from PySide6.QtWidgets import (
     QFileDialog,
     QFormLayout,
     QHBoxLayout,
+    QHeaderView,
     QLabel,
     QPushButton,
     QRadioButton,
     QSpinBox,
+    QTableWidget,
+    QTableWidgetItem,
     QTextBrowser,
     QVBoxLayout,
 )
@@ -406,3 +410,70 @@ class OcrDialog(QDialog):
         if self.rb_searchable.isChecked():
             return OcrOutputMode.SEARCHABLE_IMAGE
         return OcrOutputMode.EDITABLE_TEXT
+
+
+class CsvPreviewDialog(QDialog):
+    """Vorschau erste N Zeilen Tabellen-CSV vor Speichern; Abbruch möglich — 1.9.2."""
+
+    def __init__(
+        self,
+        rows: list[list[str]] | None,
+        parent=None,
+        *,
+        max_rows: int = 5,
+        delimiter: str = ";",
+        target_hint: str = "",
+    ):
+        super().__init__(parent)
+        self.setWindowTitle("Tabellen-CSV — Vorschau")
+        self.resize(640, 320)
+        self._accepted_save = False
+        layout = QVBoxLayout(self)
+        total = len(rows or [])
+        shown = min(max_rows, total)
+        head = QLabel(
+            f"Vorschau der ersten {shown} von {total} Zeile(n) "
+            f"(Trennzeichen: {repr(delimiter)[1:-1] if delimiter != chr(9) else 'Tab'}). "
+            "Speichern oder Abbrechen — 1.9.2"
+        )
+        head.setWordWrap(True)
+        layout.addWidget(head)
+        if target_hint:
+            hint = QLabel(f"Ziel: {target_hint}")
+            hint.setStyleSheet("color:#555;")
+            hint.setWordWrap(True)
+            layout.addWidget(hint)
+
+        preview_rows = list(rows or [])[:max_rows]
+        cols = max((len(r) for r in preview_rows), default=1)
+        self.table = QTableWidget(len(preview_rows), cols)
+        self.table.setHorizontalHeaderLabels([f"Spalte {i + 1}" for i in range(cols)])
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.table.setSelectionMode(QAbstractItemView.NoSelection)
+        for r_i, row in enumerate(preview_rows):
+            for c_i in range(cols):
+                val = row[c_i] if c_i < len(row) else ""
+                self.table.setItem(r_i, c_i, QTableWidgetItem(str(val)))
+        if not preview_rows:
+            self.table.setRowCount(1)
+            self.table.setColumnCount(1)
+            self.table.setItem(0, 0, QTableWidgetItem("(keine Zeilen erkannt)"))
+        layout.addWidget(self.table)
+
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.Save | QDialogButtonBox.Cancel
+        )
+        buttons.button(QDialogButtonBox.Save).setText("Speichern")
+        buttons.button(QDialogButtonBox.Cancel).setText("Abbrechen")
+        buttons.accepted.connect(self._save)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+    def _save(self) -> None:
+        self._accepted_save = True
+        self.accept()
+
+    @property
+    def save_confirmed(self) -> bool:
+        return bool(self._accepted_save)

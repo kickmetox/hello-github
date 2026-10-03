@@ -1,4 +1,4 @@
-"""Eigene Stempel-Bilder verwalten (Ordner) und als Sidecar-Stempel setzen — 1.9.1."""
+"""Eigene Stempel-Bilder verwalten (Ordner) und als Sidecar-Stempel setzen — 1.9.2."""
 
 from __future__ import annotations
 
@@ -263,3 +263,69 @@ def stamp_library_labels(
     """Anzeige-Labels für UI-Listen."""
     src = items if items is not None else list_stamp_images()
     return [i.name for i in src]
+
+
+def resolve_quick_stamp() -> dict | None:
+    """
+    Payload für Quick-Stempel-Button — 1.9.2.
+
+    Priorität: zuletzt verwendet → Standard-Bild ★ → erster Text-Preset (GENEHMIGT).
+    Rückgabe: ``{"kind": "text"|"image", "text", "color", "image"}`` oder None.
+    """
+    from instantlensdoc.core.app_settings import get_last_used_stamp
+
+    last = get_last_used_stamp()
+    kind = last.get("kind") or ""
+    if kind == "image" and last.get("image"):
+        cand = stamp_library_dir() / Path(last["image"]).name
+        if cand.is_file():
+            return {
+                "kind": "image",
+                "text": "",
+                "color": "#CCCCCC",
+                "image": cand.name,
+                "path": cand,
+            }
+    if kind == "text" and (last.get("text") or "").strip():
+        return {
+            "kind": "text",
+            "text": str(last["text"]),
+            "color": str(last.get("color") or "#C0392B"),
+            "image": "",
+            "path": None,
+        }
+    # Standard-Bild ★
+    default_name = get_default_stamp_name()
+    if default_name:
+        cand = stamp_library_dir() / Path(default_name).name
+        if cand.is_file():
+            return {
+                "kind": "image",
+                "text": "",
+                "color": "#CCCCCC",
+                "image": cand.name,
+                "path": cand,
+            }
+    # Fallback Text-Preset
+    from ild_pdf.annotate import stamp_with_date
+
+    return {
+        "kind": "text",
+        "text": stamp_with_date("GENEHMIGT", include_date=True),
+        "color": "#1E8449",
+        "image": "",
+        "path": None,
+    }
+
+
+def remember_stamp_usage(
+    *,
+    kind: str,
+    text: str = "",
+    color: str = "#C0392B",
+    image: str = "",
+) -> None:
+    """Persistiert zuletzt verwendeten Stempel — 1.9.2."""
+    from instantlensdoc.core.app_settings import set_last_used_stamp
+
+    set_last_used_stamp(kind=kind, text=text, color=color, image=image)

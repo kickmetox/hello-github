@@ -84,6 +84,7 @@ class OcrResult:
     source_label: str = ""
     searchable_pdf: Path | None = None
     sidecar: Path | None = None
+    table_rows: List[List[str]] | None = None  # Rohzeilen Tabellen-CSV — 1.9.2
 
 
 def tesseract_available() -> tuple[bool, str]:
@@ -551,8 +552,9 @@ def run_ocr(
     source_label: str = "",
     csv_delimiter: str | None = None,
     csv_utf8_bom: bool | None = None,
+    write_csv: bool = True,
 ) -> OcrResult:
-    """Einheitlicher OCR-Einstieg inkl. Ausgabe-Modus (CSV-Optionen 1.9.1)."""
+    """Einheitlicher OCR-Einstieg inkl. CSV-Vorschau-Option (write_csv) — 1.9.2."""
     label = source_label or (
         str(source) if isinstance(source, (str, Path)) else "Bild"
     )
@@ -575,20 +577,26 @@ def run_ocr(
                     delim = ";"
                 if bom is None:
                     bom = True
-        csv_text, _used = ocr_image_to_csv(
-            source, lang=lang, delimiter=str(delim), utf8_bom=bool(bom)
+        rows, _used = ocr_image_table_rows(source, lang=lang)
+        csv_text = (
+            format_rows_as_csv(rows, delimiter=str(delim), utf8_bom=bool(bom))
+            if rows
+            else ("\ufeff" if bom else "")
         )
-        out_dir_p = Path(out_dir) if out_dir else Path.cwd()
-        out_dir_p.mkdir(parents=True, exist_ok=True)
-        stem = Path(label).stem if label else "ocr"
-        csv_path = out_dir_p / f"{stem}_table.csv"
-        csv_path.write_text(csv_text, encoding="utf-8")
+        csv_path = None
+        if write_csv:
+            out_dir_p = Path(out_dir) if out_dir else Path.cwd()
+            out_dir_p.mkdir(parents=True, exist_ok=True)
+            stem = Path(label).stem if label else "ocr"
+            csv_path = out_dir_p / f"{stem}_table.csv"
+            csv_path.write_text(csv_text, encoding="utf-8")
         return OcrResult(
             text=csv_text,
             lang=lang,
             mode=mode,
             source_label=label,
             sidecar=csv_path,
+            table_rows=rows or [],
         )
 
     text = ocr_image(source, lang=lang)

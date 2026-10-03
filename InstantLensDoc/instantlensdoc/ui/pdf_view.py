@@ -1231,6 +1231,8 @@ class PdfViewer(QWidget):
         self._tool_buttons: list[QToolButton] = []
         self._pending_callout_anchor: tuple[float, float] | None = None
         self._pending_callout_page: int = 0
+        self._quick_stamp_armed: bool = False  # Quick-Stempel ohne Dialog — 1.9.2
+        self._quick_stamp_payload: dict | None = None
         self._zoom_timer = QTimer(self)
         self._zoom_timer.setSingleShot(True)
         self._zoom_timer.setInterval(120)
@@ -1423,6 +1425,12 @@ class PdfViewer(QWidget):
         btn_stamp_rot = QPushButton("Stempel ↻")
         btn_stamp_rot.setToolTip("Ausgewählten Stempel um 90° drehen")
         btn_stamp_rot.clicked.connect(lambda: self.rotate_selected_stamp(90))
+        self.btn_quick_stamp = QPushButton("Quick-Stempel")
+        self.btn_quick_stamp.setToolTip(
+            "Standard-/zuletzt verwendeten Stempel platzieren "
+            "(Klick auf Seite; merkt zuletzt verwendet) — 1.9.2"
+        )
+        self.btn_quick_stamp.clicked.connect(self.arm_quick_stamp)
         btn_rot_ccw = QPushButton("⟲")
         btn_rot_ccw.setToolTip("Aktuelle Seite 90° gegen den Uhrzeigersinn drehen (−90°) und speichern")
         btn_rot_ccw.clicked.connect(lambda: self.rotate_current(-90))
@@ -1711,6 +1719,7 @@ class PdfViewer(QWidget):
         toolbar.addWidget(btn_group_lock)
         toolbar.addWidget(btn_group_edit)
         toolbar.addWidget(btn_stamp_rot)
+        toolbar.addWidget(self.btn_quick_stamp)
         toolbar.addWidget(btn_zoom_out)
         toolbar.addWidget(self.lbl_zoom)
         toolbar.addWidget(btn_zoom_in)
@@ -1782,6 +1791,7 @@ class PdfViewer(QWidget):
                 btn_group_lock,
                 btn_group_edit,
                 btn_stamp_rot,
+                self.btn_quick_stamp,
             ],
             "zoom": [
                 btn_zoom_out,
@@ -3058,6 +3068,9 @@ class PdfViewer(QWidget):
         self.tool = tool
         self._pending_callout_anchor = None
         self._pending_callout_page = self.page_index
+        # Quick-Stempel nur über arm_quick_stamp(); Werkzeugwechsel löscht — 1.9.2
+        self._quick_stamp_armed = False
+        self._quick_stamp_payload = None
         if tool is None:
             want = "Auswahl"
             for b in self._tool_buttons:
@@ -6890,6 +6903,31 @@ class PdfViewer(QWidget):
         self.status.emit(f"{len(created)} Annotation(en) auf Seite {target + 1} eingefügt")
         return len(created)
 
+    def arm_quick_stamp(self) -> None:
+        """Toolbar Quick-Stempel: Standard/zuletzt verwendet, nächster Klick platziert — 1.9.2."""
+        from instantlensdoc.core.stamp_library import resolve_quick_stamp
+
+        if not self.pdf_path:
+            self.status.emit("Kein PDF für Quick-Stempel")
+            return
+        payload = resolve_quick_stamp()
+        if not payload:
+            QMessageBox.information(
+                self,
+                "Quick-Stempel",
+                "Kein Stempel verfügbar. Bitte zuerst einen Stempel wählen "
+                "oder Standard-Stempel ★ in der Bildbibliothek setzen.",
+            )
+            return
+        self._quick_stamp_payload = payload
+        self._quick_stamp_armed = True
+        self._set_tool(AnnotationType.STAMP)
+        # _set_tool würde Quick nicht löschen (tool==STAMP); Payload bleibt
+        self._quick_stamp_payload = payload
+        self._quick_stamp_armed = True
+        label = payload.get("image") or (payload.get("text") or "Stempel").split("\n")[0]
+        self.status.emit(f"Quick-Stempel bereit: {label} — Klick auf Seite")
+
     def rotate_selected_stamp(self, degrees: int = 90) -> bool:
         """Ausgewählten Stempel um 90°-Schritte drehen (Sidecar)."""
         if not self.store or not self._selected_ann_id:
@@ -8322,14 +8360,56 @@ class PdfViewer(QWidget):
         font_size = 12.0
 
         if self.tool == AnnotationType.STAMP:
-            dlg = StampPickDialog(self)
-            if dlg.exec() != QDialog.Accepted:
-                return
-            picked = dlg.result_stamp()
-            if not picked:
-                return
-            text, color = picked
-            width, height = 150.0, 52.0 if "\n" in text else 40.0
+            # Quick-Stempel: zuletzt verwendet / Standard ★ ohne Dialog — 1.9.2
+            if self._quick_stamp_armed and self._quick_stamp_payload:
+                payload = self._quick_stamp_payload
+                self._quick_stamp_armed = False
+                self._quick_stamp_payload = None
+                if payload.get("kind") == "image" and payload.get("path"):
+                    from instantlensdoc.core.stamp_library import (
+                        place_library_stamp,
+                        remember_stamp_usage,
+                    )
+
+                    try:
+                        place_library_stamp(
+                            self.pdf_path,
+                            payload["path"],
+                            page_index=page,
+                            x=float(x),
+                            y=float(y),
+                        )
+                        remember_stamp_usage(
+                            kind="image", image=str(payload.get("image") or "")
+                        )
+                        if self.store:
+                            self.store.load()
+                        self._render()
+                        self.annotations_changed.emit()
+                        self.status.emit(
+                            f"Quick-Stempel: {payload.get('image') or 'Bild'}"
+                        )
+                    except Exception as e:
+                        QMessageBox.warning(self, "Quick-Stempel", str(e))
+                    return
+                text = str(payload.get("text") or "GENEHMIGT")
+                color = str(payload.get("color") or "#1E8449")
+                width, height = 150.0, 52.0 if "\n" in text else 40.0
+                from instantlensdoc.core.stamp_library import remember_stamp_usage
+
+                remember_stamp_usage(kind="text", text=text, color=color)
+            else:
+                dlg = StampPickDialog(self)
+                if dlg.exec() != QDialog.Accepted:
+                    return
+                picked = dlg.result_stamp()
+                if not picked:
+                    return
+                text, color = picked
+                width, height = 150.0, 52.0 if "\n" in text else 40.0
+                from instantlensdoc.core.stamp_library import remember_stamp_usage
+
+                remember_stamp_usage(kind="text", text=text, color=color)
         elif self.tool == AnnotationType.STICKY:
             prefill = (self.selection_text() or "").strip()
             text, ok = QInputDialog.getMultiLineText(

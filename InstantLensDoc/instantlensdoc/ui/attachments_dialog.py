@@ -1,4 +1,4 @@
-"""Dialog: PDF-Anhänge listen, extrahieren und hinzufügen — 1.9.1."""
+"""Dialog: PDF-Anhänge listen, extrahieren und hinzufügen — 1.9.2."""
 
 from __future__ import annotations
 
@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
     QFileDialog,
     QHBoxLayout,
     QHeaderView,
+    QInputDialog,
     QLabel,
     QMessageBox,
     QPushButton,
@@ -23,10 +24,12 @@ from PySide6.QtWidgets import (
 from ild_pdf.attachments import (
     AttachmentInfo,
     add_attachment,
+    attachment_name_taken,
     extract_all_attachments,
     extract_attachment,
     list_attachments,
     remove_attachment,
+    suggest_attachment_name,
 )
 from instantlensdoc.core.app_settings import dialog_start_dir, remember_recent_dir
 
@@ -48,7 +51,7 @@ def _attachment_type(info: AttachmentInfo) -> str:
 
 
 class AttachmentsDialog(QDialog):
-    """Zeigt eingebettete PDF-Anhänge; Extraktion, Hinzufügen, Drag&Drop."""
+    """Zeigt eingebettete PDF-Anhänge; Extraktion, Mehrfach-DnD, Duplikat-Warnung."""
 
     def __init__(self, pdf_path: str | Path, parent=None):
         super().__init__(parent)
@@ -60,7 +63,8 @@ class AttachmentsDialog(QDialog):
         layout = QVBoxLayout(self)
         layout.addWidget(QLabel(f"{self.pdf_path.name} — eingebettete Dateianhänge"))
         hint = QLabel(
-            "Doppelklick: Auswahl extrahieren · Dateien per Drag&Drop hinzufügen — 1.9.1"
+            "Doppelklick: extrahieren · Mehrfach-Dateien per Drag&Drop · "
+            "Duplikat-Namen: Warnung + Umbenennen — 1.9.2"
         )
         hint.setStyleSheet("color:#555;")
         hint.setWordWrap(True)
@@ -83,8 +87,8 @@ class AttachmentsDialog(QDialog):
         row = QHBoxLayout()
         self.btn_add = QPushButton("Hinzufügen…")
         self.btn_add.setToolTip(
-            "Datei als eingebetteten PDF-Anhang hinzufügen (pikepdf); "
-            "auch Drag&Drop — 1.9.1"
+            "Eine oder mehrere Dateien als PDF-Anhang hinzufügen; "
+            "auch Mehrfach-Drag&Drop; bei Namenskonflikt Warnung + Umbenennen — 1.9.2"
         )
         self.btn_add.clicked.connect(self._add)
         self.btn_extract = QPushButton("Auswahl extrahieren…")
@@ -161,34 +165,105 @@ class AttachmentsDialog(QDialog):
             return
         self._extract_selected()
 
+    def _resolve_attach_name(self, preferred: str, *, batch: bool) -> str | None:
+        """
+        Bei Duplikat: Warnung + Umbenennen / Überspringen / Abbrechen — 1.9.2.
+        Rückgabe: gewählter Name, oder None = diese Datei überspringen.
+        Wirft ``_AbortBatch`` bei Abbruch der Mehrfach-Operation.
+        """
+        name = Path(preferred).name.strip() or preferred.strip() or "anhang"
+        if not attachment_name_taken(self.pdf_path, name):
+            return name
+        suggested = suggest_attachment_name(self.pdf_path, name)
+        msg = QMessageBox(self)
+        msg.setIcon(QMessageBox.Warning)
+        msg.setWindowTitle("Doppelter Anhangsname")
+        msg.setText(
+            f"Ein Anhang „{name}“ existiert bereits.\n\n"
+            "Umbenennen, diese Datei überspringen oder Abbruch?"
+        )
+        msg.setInformativeText(f"Vorschlag: {suggested}")
+        btn_rename = msg.addButton("Umbenennen…", QMessageBox.AcceptRole)
+        btn_skip = msg.addButton("Überspringen", QMessageBox.DestructiveRole)
+        btn_abort = msg.addButton("Abbrechen", QMessageBox.RejectRole)
+        msg.setDefaultButton(btn_rename)
+        msg.exec()
+        clicked = msg.clickedButton()
+        if clicked is btn_abort:
+            raise _AbortBatch()
+        if clicked is btn_skip:
+            return None
+        # Umbenennen
+        new_name, ok = QInputDialog.getText(
+            self,
+            "Anhang umbenennen",
+            "Neuer Name:",
+            text=suggested,
+        )
+        if not ok:
+            if batch:
+                return None
+            raise _AbortBatch()
+        new_name = (new_name or "").strip()
+        if not new_name:
+            return None
+        if attachment_name_taken(self.pdf_path, new_name):
+            # zweiter Vorschlag erzwingen
+            new_name = suggest_attachment_name(self.pdf_path, new_name)
+            QMessageBox.information(
+                self,
+                "Anhänge",
+                f"Name weiterhin belegt — verwende „{new_name}“.",
+            )
+        return new_name
+
     def _add_paths(self, paths: list[str | Path]) -> int:
+        """Mehrere Dateien hinzufügen; Duplikat-Namen mit Warnung — 1.9.2."""
+        files = [Path(p) for p in paths if p and Path(p).is_file()]
+        if not files:
+            return 0
         added = 0
+        skipped = 0
         last_info = None
-        for path in paths:
-            p = Path(path)
-            if not p.is_file():
-                continue
-            try:
-                last_info = add_attachment(self.pdf_path, p)
-                added += 1
-            except Exception as e:
-                QMessageBox.warning(self, "Anhang hinzufügen", f"{p.name}: {e}")
-                break
+        batch = len(files) > 1
+        try:
+            for p in files:
+                try:
+                    resolved = self._resolve_attach_name(p.name, batch=batch)
+                except _AbortBatch:
+                    break
+                if resolved is None:
+                    skipped += 1
+                    continue
+                try:
+                    last_info = add_attachment(self.pdf_path, p, name=resolved)
+                    added += 1
+                except Exception as e:
+                    QMessageBox.warning(self, "Anhang hinzufügen", f"{p.name}: {e}")
+                    break
+        except _AbortBatch:
+            pass
         if added:
             self._changed = True
-            remember_recent_dir(str(Path(paths[0]).parent))
+            remember_recent_dir(str(files[0].parent))
             self._load()
             msg = f"{added} Datei(en) hinzugefügt"
-            if last_info and added == 1:
+            if skipped:
+                msg += f" · {skipped} übersprungen"
+            if last_info and added == 1 and not skipped:
                 msg = f"Hinzugefügt: {last_info.name} ({last_info.size} B)"
             QMessageBox.information(self, "Anhänge", msg)
+        elif skipped and not added:
+            QMessageBox.information(
+                self, "Anhänge", f"{skipped} Datei(en) wegen Namenskonflikt übersprungen."
+            )
         return added
 
     def _add(self):
         start = dialog_start_dir(self.pdf_path.parent)
         paths, _ = QFileDialog.getOpenFileNames(
             self,
-            "Datei als Anhang hinzufügen",
+            "Dateien als Anhang hinzufügen (Mehrfachauswahl)",
             start,
             "Alle Dateien (*.*)",
         )
@@ -274,3 +349,7 @@ class AttachmentsDialog(QDialog):
             self._changed = True
         self._load()
         QMessageBox.information(self, "Anhänge", f"{removed} Anhang/Anhänge entfernt.")
+
+
+class _AbortBatch(Exception):
+    """Mehrfach-Hinzufügen abbrechen — 1.9.2."""

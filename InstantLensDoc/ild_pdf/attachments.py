@@ -1,4 +1,4 @@
-"""PDF-Anhänge (Embedded Files / NameTree) listen, extrahieren und hinzufügen — 1.9.0."""
+"""PDF-Anhänge (Embedded Files / NameTree) listen, extrahieren und hinzufügen — 1.9.2."""
 
 from __future__ import annotations
 
@@ -41,6 +41,43 @@ def _unique_attachment_key(pdf, preferred: str) -> str:
         if cand not in pdf.attachments:
             return cand
         n += 1
+
+
+def attachment_name_taken(path: str | Path, name: str) -> bool:
+    """True, wenn Attachments-Key oder Dateiname bereits existiert — 1.9.2."""
+    want = (name or "").strip()
+    if not want:
+        return False
+    safe = _safe_name(want)
+    try:
+        for info in list_attachments(path):
+            if info.name == want or info.name == safe:
+                return True
+            fn = (info.filename or "").strip()
+            if fn and (fn == want or fn == Path(want).name):
+                return True
+    except Exception:
+        return False
+    return False
+
+
+def suggest_attachment_name(path: str | Path, preferred: str) -> str:
+    """Vorschlag für freien Anhangsnamen bei Kollision — 1.9.2."""
+    import pikepdf
+
+    path = Path(path)
+    base = _safe_name(preferred) or "anhang"
+    try:
+        with pikepdf.open(path) as pdf:
+            return _unique_attachment_key(pdf, base)
+    except Exception:
+        if not attachment_name_taken(path, base):
+            return base
+        stem, suf = Path(base).stem, Path(base).suffix
+        n = 2
+        while attachment_name_taken(path, f"{stem}_{n}{suf}"):
+            n += 1
+        return f"{stem}_{n}{suf}"
 
 
 def has_attachments(path: str | Path) -> bool:

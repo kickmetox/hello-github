@@ -162,6 +162,10 @@ DEFAULTS: dict[str, Any] = {
     "thumb_prefetch_cancel_ms": 90,
     "forms_csv_visible_only": False,  # CSV-Export Default „nur sichtbare“ — 1.3.5
     "default_stamp_image": "",  # Standard-Stempel Dateiname in config/stamps/ — 1.9.1
+    "last_used_stamp_kind": "",  # text | image — Quick-Stempel 1.9.2
+    "last_used_stamp_text": "",  # zuletzt verwendeter Textstempel — 1.9.2
+    "last_used_stamp_color": "#C0392B",  # Farbe zuletzt verwendeter Textstempel — 1.9.2
+    "last_used_stamp_image": "",  # zuletzt verwendetes Stempelbild (Basename) — 1.9.2
     "ocr_table_csv_delimiter": ";",  # Tabellen-OCR CSV: ; / , / Tab — 1.9.1
     "ocr_table_csv_utf8_bom": True,  # Tabellen-OCR CSV UTF-8 BOM — 1.9.1
     "last_ocr_table_csv_dir": "",  # Zielordner Tabellen-OCR CSV merken — 1.9.1
@@ -3978,6 +3982,41 @@ def set_default_stamp_image(name: str | None) -> str:
     val = Path(str(name or "")).name.strip() if name else ""
     save_settings({"default_stamp_image": val})
     return val
+
+
+def get_last_used_stamp() -> dict:
+    """Zuletzt verwendeter Stempel (kind/text/color/image) — 1.9.2."""
+    s = load_settings()
+    kind = str(s.get("last_used_stamp_kind", "") or "").strip().lower()
+    if kind not in ("text", "image"):
+        kind = ""
+    return {
+        "kind": kind,
+        "text": str(s.get("last_used_stamp_text", "") or ""),
+        "color": str(s.get("last_used_stamp_color", "#C0392B") or "#C0392B"),
+        "image": str(s.get("last_used_stamp_image", "") or "").strip(),
+    }
+
+
+def set_last_used_stamp(
+    *,
+    kind: str,
+    text: str = "",
+    color: str = "#C0392B",
+    image: str = "",
+) -> dict:
+    """Merkt zuletzt verwendeten Stempel für Quick-Stempel — 1.9.2."""
+    k = str(kind or "").strip().lower()
+    if k not in ("text", "image"):
+        k = "text" if text else ("image" if image else "")
+    payload = {
+        "last_used_stamp_kind": k,
+        "last_used_stamp_text": str(text or ""),
+        "last_used_stamp_color": str(color or "#C0392B"),
+        "last_used_stamp_image": Path(str(image or "")).name.strip() if image else "",
+    }
+    save_settings(payload)
+    return get_last_used_stamp()
 
 
 def get_ocr_table_csv_delimiter() -> str:

@@ -1,5 +1,23 @@
 # Changelog — InstantLens Doc
 
+## 1.9.2 — Anhänge Mehrfach-DnD·Duplikat-Warnung, Quick-Stempel, CSV 5-Zeilen-Vorschau, Settings-Seite Stubs
+
+Post-Release-Polish nach 1.9.1: **PDF-Anhänge** mit **Mehrfach-Drag&Drop**, **Duplikat-Namen Warnung + Umbenennen**; **Quick-Stempel** in der Toolbar (Standard ★ / zuletzt verwendet merken); **Tabellen-OCR→CSV** mit **Vorschau der ersten 5 Zeilen** vor Speichern und **Abbruch**; **Settings-Seite „Stubs“** listet KI/Cloud/Stylus/3D/Plugin-Hooks mit Status. Stubs klar markiert / nicht produktiv.
+
+### PDF / Anhänge / Stempel
+- Anhänge: Mehrfachdateien per DnD/Dialog; bei Namenskollision Warnung → Umbenennen / Überspringen / Abbrechen
+- Quick-Stempel-Button in PDF-Toolbar; zuletzt verwendeter Stempel wird gemerkt (Fallback: Standard-Bild ★ / GENEHMIGT)
+
+### OCR / Hooks
+- Tabellen-CSV: Dialog-Vorschau erste 5 Zeilen; Speichern oder Abbrechen (kein Schreiben bei Abbruch)
+- Settings-Tab „Stubs“: Status-Tabelle KI / Cloud / Stylus / 3D / Plugin-Hooks + Event-Liste
+
+### Packaging / Docs
+- Version **1.9.2** (App / `ild_pdf` / ISS / Smoke / Docs); `docs/VERSION` + `VERSION.txt`
+- Smoke: Anhänge Duplikat-Warnung, Quick-Stempel, CSV-Vorschau, Settings-Stubs (CLI + Qt)
+
+---
+
 ## 1.9.1 — Anhänge Größe/Typ·Doppelklick·DnD, Stempel Rename/Vorschau/Standard, CSV-Trennzeichen·BOM·Ordner, Hooks „nicht produktiv“
 
 Post-Release-Polish nach 1.9.0: **PDF-Anhänge** mit klaren Spalten **Größe/Typ**, **Doppelklick extrahieren**, **Drag&Drop hinzufügen**; **Stempel-Bildbibliothek** mit **Umbenennen/Löschen**, **Vorschau**, **Standard-Stempel ★**; **Tabellen-OCR→CSV** mit **Trennzeichen** (`;`/`,`/Tab) in Settings/Dialog, **Zielordner merken**, **UTF-8-BOM Option**; **Plugin-Hooks Stub** About-Hinweis **„nicht produktiv“** + Event-Namen-Liste in Docs. Stubs KI/Cloud/Stylus/3D + Plugin-Hooks klar als Stub.

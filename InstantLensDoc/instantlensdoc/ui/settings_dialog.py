@@ -6,6 +6,7 @@ from pathlib import Path
 
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import (
+    QAbstractItemView,
     QCheckBox,
     QComboBox,
     QDialog,
@@ -16,6 +17,7 @@ from PySide6.QtWidgets import (
     QFrame,
     QGroupBox,
     QHBoxLayout,
+    QHeaderView,
     QLabel,
     QLineEdit,
     QListWidget,
@@ -23,6 +25,9 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QSpinBox,
+    QTabWidget,
+    QTableWidget,
+    QTableWidgetItem,
     QVBoxLayout,
     QWidget,
 )
@@ -349,8 +354,11 @@ class SettingsDialog(QDialog):
         super().__init__(parent)
         sync_from_settings()
         self.setWindowTitle(tr("settings"))
-        self.resize(560, 520)
-        layout = QVBoxLayout(self)
+        self.resize(620, 560)
+        outer = QVBoxLayout(self)
+        self.tabs = QTabWidget()
+        general = QWidget()
+        layout = QVBoxLayout(general)
         layout.addWidget(QLabel(tr("settings_title")))
 
         form = QFormLayout()
@@ -1487,10 +1495,83 @@ class SettingsDialog(QDialog):
         reset_row.addStretch()
         layout.addLayout(reset_row)
 
+        stubs_page = self._build_stubs_page()
+        self.tabs.addTab(general, "Allgemein")
+        self.tabs.addTab(stubs_page, "Stubs")
+        outer.addWidget(self.tabs)
+
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         buttons.accepted.connect(self._save)
         buttons.rejected.connect(self.reject)
-        layout.addWidget(buttons)
+        outer.addWidget(buttons)
+
+    def _build_stubs_page(self) -> QWidget:
+        """Settings-Seite „Stubs“: KI/Cloud/Stylus/3D/Hooks mit Status — 1.9.2."""
+        from instantlensdoc import __version__
+        from instantlensdoc.core.plugin_hooks import plugin_stub_info
+        from instantlensdoc.ui.stubs import PLANNED
+
+        page = QWidget()
+        page.setObjectName("stubsSettingsPage")
+        v = QVBoxLayout(page)
+        title = QLabel("Stubs — nicht produktiv / Coming soon")
+        title.setStyleSheet("font-weight:600;")
+        v.addWidget(title)
+        info = QLabel(
+            "Geplante Features sind klar als Stub markiert. "
+            "Kein Fake-KI-/Cloud-Verhalten. Plugin-Hooks: interner Event-Bus + no-op Loader."
+        )
+        info.setWordWrap(True)
+        info.setStyleSheet("color:#555;")
+        v.addWidget(info)
+
+        rows = [
+            ("KI-Assistent", "ki", "Stub · Coming soon"),
+            ("Cloud-Sync", "cloud", "Stub · Coming soon"),
+            ("Stylus / Palm Rejection", "stylus", "Stub"),
+            ("3D-Extrusion", "extrude3d", "Stub"),
+            ("Plugin-Hooks", "plugins", "Stub · nicht produktiv"),
+        ]
+        self.stubs_table = QTableWidget(len(rows), 3)
+        self.stubs_table.setObjectName("stubsStatusTable")
+        self.stubs_table.setHorizontalHeaderLabels(["Feature", "Status", "Hinweis"])
+        self.stubs_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        self.stubs_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
+        self.stubs_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
+        self.stubs_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.stubs_table.setSelectionMode(QAbstractItemView.NoSelection)
+        try:
+            ph = plugin_stub_info()
+            hooks_hint = ph.get("message") or PLANNED.get("plugins", "")
+        except Exception:
+            hooks_hint = PLANNED.get("plugins", f"Plugin-Hooks — Stub {__version__}")
+        for i, (label, key, status) in enumerate(rows):
+            hint = PLANNED.get(key, "")
+            if key == "plugins":
+                hint = hooks_hint
+            self.stubs_table.setItem(i, 0, QTableWidgetItem(label))
+            st = QTableWidgetItem(status)
+            self.stubs_table.setItem(i, 1, st)
+            self.stubs_table.setItem(i, 2, QTableWidgetItem(str(hint)))
+        v.addWidget(self.stubs_table)
+
+        events_box = QGroupBox("Plugin-Hooks Events (dokumentiert, Stub)")
+        ev_layout = QVBoxLayout(events_box)
+        try:
+            from instantlensdoc.core.plugin_hooks import EVENT_DESCRIPTIONS, KNOWN_EVENTS
+
+            lines = [
+                f"• {ev} — {EVENT_DESCRIPTIONS.get(ev, '')}" for ev in KNOWN_EVENTS
+            ]
+            ev_lbl = QLabel("\n".join(lines) if lines else "(keine)")
+        except Exception:
+            ev_lbl = QLabel("app.started / document.opened / document.saved / "
+                            "annotation.changed / ocr.finished")
+        ev_lbl.setWordWrap(True)
+        ev_layout.addWidget(ev_lbl)
+        v.addWidget(events_box)
+        v.addStretch(1)
+        return page
 
     def _insert_ann_export_placeholder(self, token: str) -> None:
         """Quick-Insert {stem}/{page}/{date} an gespeicherter Cursor-Pos — 1.2.5."""

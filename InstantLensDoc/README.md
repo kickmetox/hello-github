@@ -2,7 +2,7 @@
 
 Moderne Textverarbeitung mit PDF-Annotator, OCR-Bridge und Formulargenerator.
 
-**Version:** 1.9.1  
+**Version:** 1.9.2  
 **Hersteller:** Andreas Meyer · ame@sellerbach.de
 
 ## Quickstart (Windows)
@@ -33,8 +33,8 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an).
 
-## Neu in 1.9.1
+## Neu in 1.9.2
 
-Polish nach **1.9.0** (Basis **1.8.5**): Anhänge Größe/Typ·Doppelklick·DnD; Stempel Umbenennen/Löschen·Vorschau·Standard; Tabellen-CSV Trennzeichen·BOM·Zielordner; Plugin-Hooks About „nicht produktiv“ + Event-Liste. Stubs KI/Cloud/Stylus/3D + Plugin-Hooks klar als Stub.
+Polish nach **1.9.1** (Basis **1.9.0** / **1.8.5**): Anhänge Mehrfach-DnD·Duplikat-Warnung+Umbenennen; Quick-Stempel (zuletzt verwendet); Tabellen-CSV 5-Zeilen-Vorschau+Abbruch; Settings-Seite „Stubs“ (KI/Cloud/Stylus/3D/Hooks). Stubs klar markiert.
 
 Siehe [CHANGELOG.md](CHANGELOG.md), [FEATURES.md](FEATURES.md) und [INFO.md](INFO.md).

@@ -295,6 +295,9 @@ class StampLibraryDialog(QDialog):
                 info.path,
                 page_index=self.page_index,
             )
+            from instantlensdoc.core.stamp_library import remember_stamp_usage
+
+            remember_stamp_usage(kind="image", image=info.name)
         except Exception as e:
             QMessageBox.warning(self, "Stempel setzen", str(e))
             return

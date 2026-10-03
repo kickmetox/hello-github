@@ -1,5 +1,5 @@
 """
-Plugin-Hooks — STUB (1.9.1)
+Plugin-Hooks — STUB (1.9.2)
 
 Kein echtes Plugin-System. Dieser Modul stellt nur einen **internen Event-Bus**
 und einen **no-op Loader** bereit, damit spätere Erweiterungen einen klaren
@@ -9,7 +9,7 @@ Kennzeichnung:
 - ``IS_STUB = True``
 - ``load_plugins()`` lädt niemals Code und gibt immer ``[]`` zurück
 - Listener können intern registriert werden (Tests/App), externe Plugins nicht
-- **nicht produktiv** — About/Menü kennzeichnen den Stub klar
+- **nicht produktiv** — About/Menü/Settings-Seite „Stubs“ kennzeichnen klar
 
 Dokumentierte Event-Namen (API-Stabilität später; Liste auch in FEATURES.md / Docs):
 
@@ -32,7 +32,7 @@ from typing import Any, Callable, DefaultDict, Iterable, List, Optional, Sequenc
 IS_STUB = True
 NOT_PRODUCTION_READY = True
 STUB_MESSAGE = (
-    "Plugin-Hooks Stub 1.9.1 — nicht produktiv; "
+    "Plugin-Hooks Stub 1.9.2 — nicht produktiv; "
     "interner Event-Bus + no-op Loader; kein Plugin-System (Coming soon)."
 )
 
@@ -133,7 +133,7 @@ def plugin_stub_info() -> dict[str, Any]:
         "stub": True,
         "is_stub": IS_STUB,
         "not_production_ready": NOT_PRODUCTION_READY,
-        "version_marker": "1.9.1",
+        "version_marker": "1.9.2",
         "message": STUB_MESSAGE,
         "known_events": list(KNOWN_EVENTS),
         "event_descriptions": dict(EVENT_DESCRIPTIONS),

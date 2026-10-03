@@ -11141,6 +11141,8 @@ class MainWindow(QMainWindow):
         prog.setValue(0)
         prog.show()
         QApplication.processEvents()
+        # Tabellen-CSV: erst OCR, dann 5-Zeilen-Vorschau, dann speichern — 1.9.2
+        write_csv_now = mode != ocr_mod.OcrOutputMode.TABLE_CSV
         try:
             if self.doc and self.doc.kind == DocKind.IMAGE and self.doc.path:
                 source_label = Path(self.doc.path).name
@@ -11154,6 +11156,7 @@ class MainWindow(QMainWindow):
                     source_label=source_label,
                     csv_delimiter=csv_delim,
                     csv_utf8_bom=csv_bom,
+                    write_csv=write_csv_now,
                 )
             elif self.doc and self.doc.kind == DocKind.PDF and self.doc.path:
                 from ild_pdf import render_page
@@ -11170,6 +11173,7 @@ class MainWindow(QMainWindow):
                     source_label=source_label,
                     csv_delimiter=csv_delim,
                     csv_utf8_bom=csv_bom,
+                    write_csv=write_csv_now,
                 )
             else:
                 path = dlg.selected_path
@@ -11194,11 +11198,8 @@ class MainWindow(QMainWindow):
                     source_label=source_label,
                     csv_delimiter=csv_delim,
                     csv_utf8_bom=csv_bom,
+                    write_csv=write_csv_now,
                 )
-            if mode == ocr_mod.OcrOutputMode.TABLE_CSV and result.sidecar:
-                from instantlensdoc.core.app_settings import set_last_ocr_table_csv_dir
-
-                set_last_ocr_table_csv_dir(Path(result.sidecar).parent)
         except ocr_mod.OcrUnavailable as e:
             QMessageBox.information(self, "OCR — Tesseract fehlt", str(e))
             return
@@ -11207,6 +11208,43 @@ class MainWindow(QMainWindow):
             return
         finally:
             prog.close()
+
+        if mode == ocr_mod.OcrOutputMode.TABLE_CSV:
+            from instantlensdoc.ui.ocr_dialog import CsvPreviewDialog
+
+            out_base = csv_out_dir
+            if out_base is None:
+                if self.doc and self.doc.path:
+                    out_base = Path(self.doc.path).parent
+                else:
+                    out_base = Path.cwd()
+            stem = Path(source_label).stem if source_label else "ocr"
+            target_csv = Path(out_base) / f"{stem}_table.csv"
+            prev = CsvPreviewDialog(
+                result.table_rows or [],
+                self,
+                max_rows=5,
+                delimiter=str(csv_delim or ";"),
+                target_hint=str(target_csv),
+            )
+            if prev.exec() != QDialog.Accepted or not prev.save_confirmed:
+                self._set_status("Tabellen-CSV abgebrochen (nicht gespeichert)")
+                return
+            try:
+                from instantlensdoc.core.ocr import write_ocr_table_csv
+                from instantlensdoc.core.app_settings import set_last_ocr_table_csv_dir
+
+                written = write_ocr_table_csv(
+                    target_csv,
+                    result.table_rows or [],
+                    delimiter=str(csv_delim or ";"),
+                    utf8_bom=bool(csv_bom if csv_bom is not None else True),
+                )
+                result.sidecar = written
+                set_last_ocr_table_csv_dir(written.parent)
+            except Exception as e:
+                QMessageBox.warning(self, "Tabellen-CSV", f"Speichern fehlgeschlagen:\n{e}")
+                return
 
         self.stack.setCurrentWidget(self.editor_pane)
         self.editor.setPlainText(result.text)

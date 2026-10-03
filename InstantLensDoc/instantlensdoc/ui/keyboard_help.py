@@ -335,6 +335,7 @@ Status-Klick öffnet <code>docs/VERSION</code>/<code>VERSION.txt</code> im Edito
 <p><b>PDF verschlüsseln/entschlüsseln:</b> Prefill-Warnung + Button „jetzt ausschalten“ (sofort speichern + Toast) · Passwort nie in Logs · falsches PW klar DE — 1.6.5 (Basis 1.6.4/1.6.3/1.6.2/1.6.1/1.6.0).</p>
 <p><b>Dokument-Statistik:</b> JSON-Dateiname Quick-Insert <code>{stem}</code>/<code>{date}</code> · ungültige Platzhalter rot · Live-Vorschau · Copy · Zielordner · UTF-8 — 1.6.5 (Basis 1.6.4/1.6.3/1.6.2/1.6.1/1.6.0).</p>
 <p><b>Workspace-Layouts:</b> Import-Log Zusammenfassung importiert/übersprungen/umbenannt · kopieren/als TXT · Merge skip/rename · Schema DE — 1.6.5 (Basis 1.6.4/1.6.3/1.6.2/1.6.1/1.6.0).</p>
+<p><b>1.9.2:</b> Anhänge Mehrfach-DnD·Duplikat-Warnung+Umbenennen · Quick-Stempel (zuletzt verwendet) · Tabellen-CSV 5-Zeilen-Vorschau+Abbruch · Settings-Seite „Stubs“ (KI/Cloud/Stylus/3D/Hooks).</p>
 <p><b>1.9.1:</b> Anhänge Größe/Typ·Doppelklick extrahieren·Drag&amp;Drop · Stempel Umbenennen/Löschen·Vorschau·Standard ★ · Tabellen-CSV Trennzeichen (;/,/Tab)·BOM·Zielordner · Plugin-Hooks Stub „nicht produktiv“ + Event-Namen.</p>
 <p><b>1.9.0:</b> PDF-Anhänge hinzufügen/entfernen · Stempel-Bildbibliothek (Ordner + Sidecar) · Tabellen-OCR→CSV · Plugin-Hooks Stub (Event-Bus + no-op Loader).</p>
 <p><b>1.8.5:</b> Batch Blink aus=einmaliger Status · HF Fit/Zoom nur Vorschau (Bake/„Auf alle“ irrelevant) · Layer Alle ein/aus A11y-Announcement · Recovery Mehrfachauswahl Verwerfen·Alle verwerfen Bestätigung.</p>
