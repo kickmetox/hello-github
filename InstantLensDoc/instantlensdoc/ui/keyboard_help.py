@@ -100,12 +100,12 @@ SHORTCUTS_HTML = """
 <tr><td>Ann. Export JSON/Flatten</td><td>PDF → Annotationen exportieren (JSON / Flatten)…: Quick-Insert {stem}/{page}/{date}; Ctrl+Z lokal; Reset-Template → Live-Vorschau + Fokus mit Selektion ganzer Default-Text; Bestätigung nur bei Abweichung — 1.2.9</td></tr>
 <tr><td>Text-Diff Panel</td><td>Datei → Text-Diff (offene Tabs)… (Ctrl+Alt+D): Wrap-Blink Dauer kurz/mittel/lang + System-Beep vs. stumm; Status Änderung i/n; F7/Shift+F7 — 1.2.9</td></tr>
 <tr><td>run.bat Deps / pip</td><td>Windows-Start: gewählte Python-Binary als „gefunden: …“ inkl. python --version; %ILD_PYTHON% ungültig/leer → Fallback py -3 → python → python3; --help; .venv; --yes/-y; Exit 0/1 — 1.2.9</td></tr>
-<tr><td>CLI Start</td><td><code>python -m instantlensdoc --open DATEI</code> · <code>--export-page N --out PATH</code> One-Shot ohne GUI · <code>--version</code>/−V · <code>--help</code> DE; Exit 2 — 1.5.2</td></tr>
+<tr><td>CLI Start</td><td><code>python -m instantlensdoc --open DATEI</code> · <code>--export-page N --out PATH [--dpi] [--format png|jpeg]</code> One-Shot · <code>--version</code>/−V · <code>--help</code> DE; Exit 0/1/2 — 1.5.3</td></tr>
 <tr><td>CLI/Metadaten/Bilder/Signatur (1.5.0)</td><td>Basis: Metadaten Betreff · Seitenbereich DPI · Signatur Flatten · <code>--open</code>/<code>--version</code> — 1.5.0</td></tr>
 <tr><td>Metadaten/Bilder/Signatur/CLI (1.5.1)</td><td>Dirty/Reset/UTF-8/leere Felder · Template <code>{stem}_p{page}</code>/Fortschritt · Größe/Opacity · <code>--help</code> DE/multi-<code>--open</code>/Exit 2 — 1.5.1</td></tr>
-<tr><td>PDF-Metadaten</td><td>PDF → Metadaten: Backup <code>.ildbak</code> Toggle · Erfolgs-Toast Felder-Kurzinfo · Dirty/Reset/UTF-8 — 1.5.2</td></tr>
-<tr><td>Seiten als Bilder</td><td>PDF → PNG/JPEG; Abbruch behält Dateien + Statuszählung; JPEG-Qualität Settings; Template <code>{stem}_p{page}</code> — 1.5.2</td></tr>
-<tr><td>Signatur (Bild)</td><td>Aspect-Ratio Lock · Vorschau vor Platzieren; Größe/Opacity; Sidecar + optional Flatten — 1.5.2</td></tr>
+<tr><td>PDF-Metadaten</td><td>PDF → Metadaten: Toast-Dauer wie OCR-Settings · max 3 Felder + „…“ · Backup <code>.ildbak</code> — 1.5.3</td></tr>
+<tr><td>Seiten als Bilder</td><td>PDF → PNG/JPEG; Footer „geschrieben X, übersprungen Y“ · Ordner öffnen; Abbruch behält Dateien — 1.5.3</td></tr>
+<tr><td>Signatur (Bild)</td><td>Vorschau Mausrad-Zoom · Esc bricht Platzieren ab · Aspect-Lock · Größe/Opacity — 1.5.3</td></tr>
 <tr><td>PDF-Vergleich Diff</td><td>Diff-PNG Reset: Bestätigung nur bei Abweichung; Fokus+Selektion wie Ann.-Template — 1.4.5</td></tr>
 <tr><td>Batch-Umbenennen</td><td>Undo-Skip: „rückgängig X, übersprungen Y“; kopierbarer Text — 1.4.5</td></tr>
 <tr><td>Annotation-Suche offen</td><td>Ctrl+Shift+F3: CSV Neu-Scan Fortschritt bei vielen Docs + Abbruch — 1.4.5</td></tr>
@@ -313,10 +313,10 @@ About: Datenschutz-Hinweis (lokal, keine Telemetrie).</p>
 <p><b>Logordner:</b> Hilfe → Logordner öffnen (Crash-/App-Logs).</p>
 <p><b>Crash-Report:</b> Hilfe → Crash-Report erstellen… (ZIP aus Logordner; optional Screenshot-Pfad-Hinweis).</p>
 <p><b>Lizenz:</b> bei weniger als 7 Resttagen prominent in der Statusleiste.</p>
-<p><b>Seiten als Bilder:</b> Abbruch behält Dateien + Statuszählung; JPEG-Qualität Settings; Template <code>{stem}_p{page}</code> — 1.5.2.</p>
-<p><b>PDF-Metadaten:</b> Backup <code>.ildbak</code> Toggle · Erfolgs-Toast Felder-Kurzinfo · Dirty/Reset — 1.5.2.</p>
-<p><b>Signatur (Bild):</b> Aspect-Ratio Lock · Vorschau vor Platzieren — 1.5.2.</p>
-<p><b>CLI:</b> <code>--export-page N --out PATH</code> One-Shot ohne GUI · <code>--help</code> DE · Exit 2 — 1.5.2.</p>
+<p><b>Seiten als Bilder:</b> Footer „geschrieben X, übersprungen Y“ · Ordner öffnen; Abbruch behält Dateien — 1.5.3 (Basis 1.5.2).</p>
+<p><b>PDF-Metadaten:</b> Toast-Dauer wie OCR-Settings · max 3 Felder + „…“ · Backup <code>.ildbak</code> — 1.5.3 (Basis 1.5.2).</p>
+<p><b>Signatur (Bild):</b> Vorschau Mausrad-Zoom · Esc bricht Platzieren ab · Aspect-Lock — 1.5.3 (Basis 1.5.2).</p>
+<p><b>CLI:</b> <code>--export-page N --out PATH [--dpi] [--format png|jpeg]</code> · Exit 0/1/2 dokumentiert — 1.5.3 (Basis 1.5.2).</p>
 <p><b>Thumbnails:</b> in der Sidebar ziehen zum Neuordnen der Seiten (Ctrl+Z rückgängig); Größe in Einstellungen (klein/normal/groß).</p>
 <p><b>Statusleiste:</b> Dateiname · Seite x/y · Seitengröße (mm/inch, klickbar) · Zoom % · Wörter/Ann. · Version · Lizenz.</p>
 <p><b>PDF-Vergleich:</b> Diff-PNG Reset Bestätigung nur bei Abweichung; Fokus+Selektion — 1.4.5</p>

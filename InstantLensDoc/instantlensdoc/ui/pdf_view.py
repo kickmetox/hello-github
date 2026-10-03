@@ -6903,11 +6903,16 @@ class PdfViewer(QWidget):
             QMessageBox.warning(self, "Extrahieren", str(e))
 
     def export_pages_as_images(self):
-        """Seiten→Bilder; Abbruch behält Dateien; JPEG-Qualität Settings — 1.5.2."""
+        """Seiten→Bilder; Footer geschrieben/übersprungen + Ordner öffnen — 1.5.3."""
         if not self.pdf_path:
             QMessageBox.information(self, "Export", "Kein PDF geladen.")
             return
-        from PySide6.QtWidgets import QApplication, QFileDialog, QInputDialog, QProgressDialog
+        from PySide6.QtWidgets import (
+            QApplication,
+            QFileDialog,
+            QInputDialog,
+            QProgressDialog,
+        )
         from ild_pdf import extract_pages_as_images
         from instantlensdoc.core.app_settings import (
             EXPORT_RASTER_DPI_CHOICES,
@@ -7120,29 +7125,44 @@ class PdfViewer(QWidget):
             set_last_page_image_export_dir(out_dir)
             remember_recent_dir(out_dir)
             n_ok = len(written)
+            n_skip = max(0, int(total_export) - int(n_ok))
+            footer = f"geschrieben {n_ok}, übersprungen {n_skip}"
+            q_note = f", Q={jpeg_q}" if str(fmt).upper() in ("JPEG", "JPG") else ""
             if cancelled["v"]:
                 status_msg = (
-                    f"Export abgebrochen — {n_ok}/{total_export} behalten → {Path(out_dir).name}"
+                    f"Export abgebrochen — {footer} → {Path(out_dir).name}"
                 )
-                self.status.emit(status_msg)
-                QMessageBox.information(
-                    self,
-                    "Export",
+                body = (
                     f"Abgebrochen.\n"
                     f"Bereits geschrieben und behalten: {n_ok} von {total_export} Seite(n).\n"
-                    f"{out_dir}",
+                    f"{out_dir}\n\n"
+                    f"{footer}"
                 )
             else:
-                q_note = f", Q={jpeg_q}" if str(fmt).upper() in ("JPEG", "JPG") else ""
-                self.status.emit(
-                    f"{n_ok}/{total_export} Bild(er) @ {dpi} DPI{q_note} → {Path(out_dir).name}"
+                status_msg = (
+                    f"{n_ok}/{total_export} Bild(er) @ {dpi} DPI{q_note} → "
+                    f"{Path(out_dir).name} · {footer}"
                 )
-                QMessageBox.information(
-                    self,
-                    "Export",
+                body = (
                     f"{n_ok} Seite(n) als {fmt} ({dpi} DPI"
-                    f"{q_note}) exportiert nach:\n{out_dir}",
+                    f"{q_note}) exportiert nach:\n{out_dir}\n\n"
+                    f"{footer}"
                 )
+            self.status.emit(status_msg)
+            # Ergebnisdialog: Footer + Ordner öffnen — 1.5.3
+            box = QMessageBox(self)
+            box.setIcon(QMessageBox.Information)
+            box.setWindowTitle("Export")
+            box.setText(body)
+            btn_folder = box.addButton("Ordner öffnen", QMessageBox.ActionRole)
+            box.addButton(QMessageBox.Ok)
+            box.setDefaultButton(box.button(QMessageBox.Ok))
+            box.exec()
+            if box.clickedButton() is btn_folder:
+                try:
+                    QDesktopServices.openUrl(QUrl.fromLocalFile(str(out_dir)))
+                except Exception:
+                    pass
         except Exception as e:
             QMessageBox.warning(self, "Export", str(e))
 
@@ -7152,7 +7172,7 @@ class PdfViewer(QWidget):
         self.status.emit("Signaturfeld: auf die Seite klicken")
 
     def insert_signature_image(self):
-        """Bildstempel-Signatur; Aspect-Lock + Vorschau vor Platzieren — 1.5.2."""
+        """Bildstempel-Signatur; Vorschau Mausrad-Zoom; Esc abbricht — 1.5.3."""
         if not self.store or not self.pdf_path:
             QMessageBox.information(self, "Signatur", "Kein PDF geladen.")
             return
@@ -7166,8 +7186,8 @@ class PdfViewer(QWidget):
             QSlider,
             QVBoxLayout,
         )
-        from PySide6.QtCore import Qt as _Qt
-        from PySide6.QtGui import QPixmap
+        from PySide6.QtCore import QEvent, Qt as _Qt
+        from PySide6.QtGui import QKeyEvent, QPixmap, QWheelEvent
         from ild_pdf import insert_signature_image
         from instantlensdoc.core.app_settings import (
             dialog_start_dir,
@@ -7222,19 +7242,57 @@ class PdfViewer(QWidget):
                 img_aspect = float(iw) / float(ih)
         except Exception:
             pass
-        # Option: Größe/Opacity/Aspect-Lock + Vorschau + Flatten — 1.5.2
-        opt = QDialog(self)
+        # Option: Größe/Opacity/Aspect-Lock + Vorschau (Mausrad-Zoom) + Esc — 1.5.3
+        zoom_state = {"factor": 1.0}
+        preview_holder: dict[str, object] = {}
+
+        class _SigPreviewDialog(QDialog):
+            """Esc bricht Platzieren ab; Mausrad zoomt Vorschau — 1.5.3."""
+
+            def keyPressEvent(self, event: QKeyEvent) -> None:  # noqa: N802
+                if event.key() == _Qt.Key_Escape:
+                    self.reject()
+                    event.accept()
+                    return
+                super().keyPressEvent(event)
+
+            def eventFilter(self, obj, event):  # noqa: N802
+                lbl = preview_holder.get("lbl")
+                if obj is lbl and event.type() == QEvent.Type.Wheel:
+                    assert isinstance(event, QWheelEvent)
+                    delta = event.angleDelta().y()
+                    if delta == 0:
+                        delta = event.pixelDelta().y()
+                    if delta > 0:
+                        zoom_state["factor"] = min(3.0, zoom_state["factor"] * 1.15)
+                    elif delta < 0:
+                        zoom_state["factor"] = max(0.5, zoom_state["factor"] / 1.15)
+                    updater = preview_holder.get("update")
+                    if callable(updater):
+                        updater()
+                    event.accept()
+                    return True
+                return super().eventFilter(obj, event)
+
+        opt = _SigPreviewDialog(self)
         opt.setWindowTitle("Signatur platzieren — Vorschau")
         ol = QVBoxLayout(opt)
         ol.addWidget(QLabel(f"Bild: {Path(path).name}"))
-        ol.addWidget(QLabel("Vorschau vor dem Platzieren; Bildstempel als Sidecar-Annotation."))
+        hint_lbl = QLabel(
+            "Vorschau: Mausrad zoomt · Esc bricht Platzieren ab · Bildstempel als Sidecar."
+        )
+        hint_lbl.setWordWrap(True)
+        hint_lbl.setStyleSheet("color:#555;")
+        ol.addWidget(hint_lbl)
         preview_lbl = QLabel()
         preview_lbl.setAlignment(_Qt.AlignCenter)
-        preview_lbl.setMinimumHeight(100)
+        preview_lbl.setMinimumHeight(120)
         preview_lbl.setStyleSheet(
             "QLabel { background:#F4F6F8; border:1px solid #CCD5DD; }"
         )
+        preview_lbl.setToolTip("Mausrad: Vorschau zoomen — 1.5.3")
         ol.addWidget(preview_lbl)
+        preview_holder["lbl"] = preview_lbl
         form = QFormLayout()
         last_w, last_h = get_last_signature_size()
         last_op = get_last_signature_opacity()
@@ -7282,14 +7340,21 @@ class PdfViewer(QWidget):
             size_lbl.setText(f"{size_slider.value()} %")
             op_lbl.setText(f"{op_slider.value()} %")
             w, h = _calc_size()
-            dims_lbl.setText(f"Platzierung: {w:.0f} × {h:.0f} pt")
+            z = zoom_state["factor"]
+            dims_lbl.setText(
+                f"Platzierung: {w:.0f} × {h:.0f} pt · Vorschau-Zoom {z:.0%}"
+            )
             pm = QPixmap(path)
             if pm.isNull():
                 preview_lbl.setText("(Vorschau nicht verfügbar)")
                 return
             op = max(0.05, min(1.0, op_slider.value() / 100.0))
-            # Vorschau skaliert auf max. 280×100, Deckkraft andeuten — 1.5.2
-            scaled = pm.scaled(280, 100, _Qt.KeepAspectRatio, _Qt.SmoothTransformation)
+            # Basis 280×100, Mausrad-Zoom 50–300 % — 1.5.3
+            base_w = max(40, int(round(280 * z)))
+            base_h = max(24, int(round(100 * z)))
+            scaled = pm.scaled(
+                base_w, base_h, _Qt.KeepAspectRatio, _Qt.SmoothTransformation
+            )
             if op < 0.999:
                 canvas = QPixmap(scaled.size())
                 canvas.fill(_Qt.transparent)
@@ -7300,6 +7365,8 @@ class PdfViewer(QWidget):
                 scaled = canvas
             preview_lbl.setPixmap(scaled)
 
+        preview_holder["update"] = _update_preview
+        preview_lbl.installEventFilter(opt)
         size_slider.valueChanged.connect(_update_preview)
         op_slider.valueChanged.connect(_update_preview)
         chk_aspect.toggled.connect(_update_preview)

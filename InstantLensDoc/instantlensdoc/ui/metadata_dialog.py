@@ -1,4 +1,4 @@
-"""Dialog: PDF-Metadaten bearbeiten (Titel/Autor/Betreff/Keywords) — 1.5.2."""
+"""Dialog: PDF-Metadaten bearbeiten (Titel/Autor/Betreff/Keywords) — 1.5.3."""
 
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ from instantlensdoc.core.i18n import tr
 
 
 class MetadataDialog(QDialog):
-    """Liest/schreibt DocInfo+XMP; Dirty/Reset; Backup .ildbak; Erfolgs-Toast — 1.5.2."""
+    """Liest/schreibt DocInfo+XMP; Dirty/Reset; Backup .ildbak; Toast max 3 Felder — 1.5.3."""
 
     def __init__(self, pdf_path: str | Path, parent=None):
         super().__init__(parent)
@@ -158,13 +158,15 @@ class MetadataDialog(QDialog):
         self._refresh_dirty()
 
     def _field_short_info(self, meta: PdfMetadata) -> str:
-        """Kurzinfo gefüllter Felder für Erfolgs-Toast — 1.5.2."""
+        """Kurzinfo gefüllter Felder für Erfolgs-Toast — max 3 + „…“ — 1.5.3."""
         parts: list[str] = []
         mapping = [
             ("title", tr("field_title")),
             ("author", tr("field_author")),
             ("subject", tr("field_subject")),
             ("keywords", tr("field_keywords")),
+            ("creator", tr("field_creator")),
+            ("producer", tr("field_producer")),
         ]
         for attr, label in mapping:
             val = utf8_safe(getattr(meta, attr, "") or "").strip()
@@ -175,6 +177,9 @@ class MetadataDialog(QDialog):
             parts.append(f"{label}: {val}")
         if not parts:
             return tr("meta_toast_empty")
+        # Max. 3 Felder, Rest als „…“ — 1.5.3
+        if len(parts) > 3:
+            return " · ".join(parts[:3]) + " · …"
         return " · ".join(parts)
 
     def _save(self):

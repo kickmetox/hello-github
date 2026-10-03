@@ -22,8 +22,9 @@ class _GermanHelpFormatter(argparse.HelpFormatter):
 
 def parse_cli(argv: list[str] | None = None) -> argparse.Namespace:
     """
-    CLI für ``python -m instantlensdoc`` — 1.5.2.
-    ``--version`` / ``--open FILE`` / ``--export-page N --out PATH`` / ``--help`` DE.
+    CLI für ``python -m instantlensdoc`` — 1.5.3.
+    ``--version`` / ``--open FILE`` / ``--export-page N --out PATH``
+    [``--dpi``] [``--format png|jpeg``] / ``--help`` DE.
     """
     from instantlensdoc import __version__
 
@@ -32,7 +33,7 @@ def parse_cli(argv: list[str] | None = None) -> argparse.Namespace:
         description=(
             "InstantLens Doc — PDF-Annotator, OCR, Formulare.\n"
             "Startet die Desktop-Oberfläche; optional Dateien öffnen.\n"
-            "One-Shot ohne GUI: --export-page N --out PATH."
+            "One-Shot ohne GUI: --export-page N --out PATH [--dpi DPI] [--format png|jpeg]."
         ),
         epilog=(
             "Beispiele:\n"
@@ -40,9 +41,13 @@ def parse_cli(argv: list[str] | None = None) -> argparse.Namespace:
             "  python -m instantlensdoc --open dokument.pdf\n"
             "  python -m instantlensdoc --open a.pdf --open b.pdf\n"
             "  python -m instantlensdoc dokument.pdf --export-page 1 --out seite.png\n"
-            "  python -m instantlensdoc --open dokument.pdf --export-page 2 --out /tmp/p2.jpg\n"
+            "  python -m instantlensdoc --open dokument.pdf --export-page 2 "
+            "--out /tmp/p2.jpg --dpi 150 --format jpeg\n"
             "\n"
-            "Exitcodes: 0 OK · 1 allgemeiner Fehler · 2 Datei nicht gefunden"
+            "Exitcodes:\n"
+            "  0  OK (Export geschrieben / GUI beendet)\n"
+            "  1  allgemeiner Fehler (Argumente, Export, IO)\n"
+            "  2  Datei nicht gefunden (PDF / --open Ziel fehlt)"
         ),
         formatter_class=_GermanHelpFormatter,
         add_help=False,
@@ -81,7 +86,23 @@ def parse_cli(argv: list[str] | None = None) -> argparse.Namespace:
         metavar="PATH",
         dest="export_out",
         default=None,
-        help="Zielpfad für --export-page (PNG/JPEG je nach Endung)",
+        help="Zielpfad für --export-page (PNG/JPEG je nach Endung oder --format)",
+    )
+    p.add_argument(
+        "--dpi",
+        metavar="DPI",
+        dest="export_dpi",
+        type=int,
+        default=None,
+        help="Auflösung für --export-page (72/150/300; Default: Settings)",
+    )
+    p.add_argument(
+        "--format",
+        metavar="FMT",
+        dest="export_format",
+        choices=["png", "jpeg", "jpg", "PNG", "JPEG", "JPG"],
+        default=None,
+        help="Bildformat für --export-page: png oder jpeg (Default: aus --out-Endung)",
     )
     p.add_argument(
         "file",
@@ -119,9 +140,10 @@ def _collect_open_targets(cli: argparse.Namespace) -> list[Path]:
 
 def _cli_export_page(cli: argparse.Namespace) -> int:
     """
-    One-Shot Seitenexport ohne GUI — 1.5.2.
-    ``--export-page N --out PATH`` (+ PDF via --open oder positional).
+    One-Shot Seitenexport ohne GUI — 1.5.3.
+    ``--export-page N --out PATH [--dpi DPI] [--format png|jpeg]``.
     Headless ok (kein Qt nötig).
+    Exitcodes: 0 OK · 1 Fehler · 2 Datei fehlt.
     """
     page_n = cli.export_page
     out_raw = cli.export_out
@@ -148,16 +170,29 @@ def _cli_export_page(cli: argparse.Namespace) -> int:
         print(f"Datei nicht gefunden: {pdf}", file=sys.stderr)
         return 2
     out = Path(out_raw)
-    suffix = out.suffix.lower()
-    if suffix in (".jpg", ".jpeg"):
-        fmt = "JPEG"
-    elif suffix == ".png" or suffix == "":
-        fmt = "PNG"
-        if suffix == "":
-            out = out.with_suffix(".png")
+    # Format: --format hat Vorrang, sonst Endung — 1.5.3
+    fmt_arg = getattr(cli, "export_format", None)
+    if fmt_arg:
+        fmt_norm = str(fmt_arg).upper()
+        if fmt_norm == "JPG":
+            fmt_norm = "JPEG"
+        fmt = fmt_norm
+        if fmt == "JPEG" and out.suffix.lower() not in (".jpg", ".jpeg"):
+            out = out.with_suffix(".jpg")
+        elif fmt == "PNG" and out.suffix.lower() != ".png":
+            if out.suffix == "" or out.suffix.lower() not in (".png", ".jpg", ".jpeg"):
+                out = out.with_suffix(".png")
     else:
-        # unbekannte Endung → PNG erzwingen
-        fmt = "PNG"
+        suffix = out.suffix.lower()
+        if suffix in (".jpg", ".jpeg"):
+            fmt = "JPEG"
+        elif suffix == ".png" or suffix == "":
+            fmt = "PNG"
+            if suffix == "":
+                out = out.with_suffix(".png")
+        else:
+            # unbekannte Endung → PNG erzwingen
+            fmt = "PNG"
     try:
         out.parent.mkdir(parents=True, exist_ok=True)
     except OSError as e:
@@ -165,9 +200,29 @@ def _cli_export_page(cli: argparse.Namespace) -> int:
         return 1
     try:
         from ild_pdf.images import extract_page_image
-        from instantlensdoc.core.app_settings import get_export_jpeg_quality, get_export_raster_dpi
+        from instantlensdoc.core.app_settings import (
+            EXPORT_RASTER_DPI_CHOICES,
+            get_export_jpeg_quality,
+            get_export_raster_dpi,
+            set_export_raster_dpi,
+        )
 
-        dpi = get_export_raster_dpi()
+        dpi_arg = getattr(cli, "export_dpi", None)
+        if dpi_arg is not None:
+            try:
+                dpi = int(dpi_arg)
+            except (TypeError, ValueError):
+                print("Fehler: --dpi muss eine Ganzzahl sein.", file=sys.stderr)
+                return 1
+            if dpi not in EXPORT_RASTER_DPI_CHOICES:
+                print(
+                    f"Fehler: --dpi muss einer von {list(EXPORT_RASTER_DPI_CHOICES)} sein.",
+                    file=sys.stderr,
+                )
+                return 1
+            set_export_raster_dpi(dpi)
+        else:
+            dpi = get_export_raster_dpi()
         jpeg_q = get_export_jpeg_quality()
         written = extract_page_image(
             pdf,
@@ -260,7 +315,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"InstantLens Doc {cli.version_str}")
         return 0
 
-    # One-Shot Export ohne GUI (headless ok) — 1.5.2
+    # One-Shot Export ohne GUI (headless ok) — 1.5.3
     export_rc = _cli_export_page(cli)
     if export_rc >= 0:
         return export_rc

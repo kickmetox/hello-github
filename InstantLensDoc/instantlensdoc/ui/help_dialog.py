@@ -185,16 +185,16 @@ HELP_HTML = f"""
     PDF → Text→Overlay / Overlay einbrennen / <b>Text Seite/alles → Editor</b> /
     <b>Seitenbild(er) → Editor</b>;
     Flatten/Bake mit Fortschrittsdialog (Abbrechen);
-    <b>Signaturfeld</b> (Platzhalter) und <b>Signatur (Bild)</b> Aspect-Lock + Vorschau + Flatten — 1.5.2;
+    <b>Signaturfeld</b> (Platzhalter) und <b>Signatur (Bild)</b> Mausrad-Zoom + Esc + Aspect-Lock + Flatten — 1.5.3;
     <b>PDFs zusammenführen / teilen / Seitenbereich</b>;
     <b>Wasserzeichen / Seitennummern</b>;
     <b>Zwei PDFs vergleichen</b> (Seite neben Seite);
     <b>Passwort setzen/öffnen</b>; <b>Bildkompression</b> (Seiten neu als JPEG);
-    <b>Metadaten bearbeiten</b> Backup <code>.ildbak</code> + Toast — 1.5.2; <b>PDF bereinigen</b> (optional Metadaten strippen);
+    <b>Metadaten bearbeiten</b> Toast-Dauer OCR-Settings · max 3 Felder · Backup <code>.ildbak</code> — 1.5.3; <b>PDF bereinigen</b> (optional Metadaten strippen);
     <b>AcroForm-Formularfelder ausfüllen</b>; <b>Anhänge</b> auflisten/extrahieren;
     <b>Seitengröße / Zuschneiden</b> (Anzeige mm/inch, Statusleiste klickbar / Ctrl+Alt+U);
-    Seite/Seiten als PNG/JPEG exportieren (Abbruch behält Dateien·JPEG-Q Settings·Template <code>{{stem}}_p{{page}}</code>) — 1.5.2 / Bild als neue Seite / Seite drucken; Annotation löschen (Auswahl/letzte, Entf); Statusleiste Seite/Größe/Zoom/Dateiname/Wörter; Thumbnails per Drag neu ordnen (<b>Lazy-Load</b>, Größe in Einstellungen, <b>Ctrl+Z Undo</b>);
-    Start: <code>python -m instantlensdoc --export-page N --out PATH</code> One-Shot / <code>--open</code> / <code>--help</code> DE / <code>--version</code> — 1.5.2;
+    Seite/Seiten als PNG/JPEG exportieren (Footer geschrieben/übersprungen·Ordner öffnen·Template <code>{{stem}}_p{{page}}</code>) — 1.5.3 / Bild als neue Seite / Seite drucken; Annotation löschen (Auswahl/letzte, Entf); Statusleiste Seite/Größe/Zoom/Dateiname/Wörter; Thumbnails per Drag neu ordnen (<b>Lazy-Load</b>, Größe in Einstellungen, <b>Ctrl+Z Undo</b>);
+    Start: <code>python -m instantlensdoc --export-page N --out PATH [--dpi] [--format png|jpeg]</code> One-Shot / <code>--open</code> / <code>--help</code> DE / <code>--version</code> — 1.5.3;
     PDF als Kopie speichern; <b>Seitenbereich extrahieren</b> (z. B. 1-3,5,8-10; DE-Validierung + Vorschau — 1.2.1);
     große PDFs: Warnung / Limits;
     <b>Seiten-Thumbnails</b> in der Sidebar</li>
@@ -700,7 +700,7 @@ class AboutDialog(QDialog):
             "<ul>"
             "<li>PDF lesen/annotieren (Highlight, Notiz, Stempel, Formen) · Sidecar v4</li>"
             "<li><b>Metadaten Backup·Toast · Seiten→Bilder Abbruch/JPEG-Q · Signatur Aspect-Lock · CLI</b> "
-            "<code>--export-page</code> One-Shot · Exit 2 — 1.5.2</li>"
+            "<code>--export-page</code> · <code>--dpi</code>/<code>--format</code> · Exit 0/1/2 — 1.5.3</li>"
             "<li><b>Theme zyklisch</b> <code>Ctrl+Shift+T</code> "
             "System→Hell→Dunkel (Status-Toast „Theme: …“) — 1.4.5</li>"
             "<li>Willkommen Drag&amp;Drop/Clear-Recent, Druck-DPI 72/150/300, Trial-Resttage konsistent, Backup-Retry — 1.0.2</li>"

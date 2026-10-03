@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **1.5.2** |
+| Version | **1.5.3** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -63,10 +63,10 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an / `checkedonce`)
 
-## Neu in 1.5.2
+## Neu in 1.5.3
 
-- Metadaten: Speichern erzeugt **Backup `.ildbak`** (Toggle); **Erfolgs-Toast** mit Felder-Kurzinfo
-- Seiten→Bilder: **Abbruch behält** geschriebene Dateien + Statuszählung; **JPEG-Qualität** aus Settings
-- Signatur: **Aspect-Ratio Lock** Toggle; **Vorschau** vor Platzieren
-- CLI: `--export-page N --out PATH` One-Shot ohne GUI (headless ok)
+- Metadaten: Toast-Dauer wie **OCR-Toast Settings**; Felder-Kurzinfo **max. 3** + „…“
+- Seiten→Bilder: Footer **„geschrieben X, übersprungen Y“**; Button **Ordner öffnen**
+- Signatur: Vorschau **Mausrad-Zoom**; **Esc** bricht Platzieren ab
+- CLI: `--export-page` mit **`--dpi`** und **`--format png|jpeg`**; Exitcodes dokumentiert
 - Stubs KI/Cloud/Stylus/3D unverändert

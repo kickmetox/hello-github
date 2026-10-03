@@ -46,8 +46,8 @@ _STRINGS: dict[str, dict[UiLang, str]] = {
     "field_producer": {"de": "Produzent", "en": "Producer"},
     "meta_save": {"de": "Speichern", "en": "Save"},
     "meta_hint": {
-        "de": "Titel, Autor, Betreff und Keywords (DocInfo + XMP) — Speichern schreibt in die PDF-Datei. Dirty · Reset · Backup .ildbak · Erfolgs-Toast — 1.5.2.",
-        "en": "Title, author, subject and keywords (DocInfo + XMP) — Save writes into the PDF. Dirty · Reset · .ildbak backup · success toast — 1.5.2.",
+        "de": "Titel, Autor, Betreff und Keywords (DocInfo + XMP) — Speichern schreibt in die PDF-Datei. Dirty · Reset · Backup .ildbak · Toast (Dauer wie OCR-Settings, max 3 Felder) — 1.5.3.",
+        "en": "Title, author, subject and keywords (DocInfo + XMP) — Save writes into the PDF. Dirty · Reset · .ildbak backup · toast (OCR duration, max 3 fields) — 1.5.3.",
     },
     "meta_reset": {"de": "Zurücksetzen", "en": "Reset"},
     "meta_reset_tip": {

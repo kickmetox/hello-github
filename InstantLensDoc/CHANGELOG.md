@@ -1,5 +1,24 @@
 # Changelog — InstantLens Doc
 
+## 1.5.3 — Metadaten Toast Dauer·max3, Seiten→Bilder Footer·Ordner, Signatur Zoom·Esc, CLI --dpi/--format
+
+Post-Release-Polish nach 1.5.2: **Metadaten-Toast** nutzt **OCR-Toast-Dauer** aus Settings und zeigt **max. 3 Felder** + „…“; **Seiten→Bilder** zeigt Footer **„geschrieben X, übersprungen Y“** und Button **Ordner öffnen**; **Signatur-Vorschau** mit **Mausrad-Zoom** und **Esc bricht Platzieren ab**; **CLI** `--export-page` mit **`--dpi`** und **`--format png|jpeg`**, Exitcodes dokumentiert. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### PDF
+- Metadaten: Erfolgs-Toast-Dauer wie OCR-Defaults-Toast (1/2/3 s); Felder-Kurzinfo max. 3 + „…“
+- Seiten → Bilder: Footer „geschrieben X, übersprungen Y“; Button Ordner öffnen
+- Signatur (Bild): Vorschau Mausrad-Zoom; Esc bricht Platzieren ab
+
+### CLI / Start
+- `python -m instantlensdoc … --export-page N --out PATH [--dpi 72|150|300] [--format png|jpeg]`
+- Exitcodes dokumentiert: **0** OK · **1** Fehler · **2** Datei fehlt
+
+### Packaging / Docs
+- Version **1.5.3** (App / `ild_pdf` / ISS / Smoke / Docs)
+- Smoke: Metadaten Toast-Dauer·max3, Seiten→Bilder Footer·Ordner, Signatur Zoom·Esc, CLI dpi/format (CLI + Qt)
+
+---
+
 ## 1.5.2 — Metadaten Backup·Toast, Seiten→Bilder Abbruch·JPEG-Q, Signatur Aspect-Lock·Vorschau, CLI --export-page
 
 Post-Release-Polish nach 1.5.1: **Metadaten-Speichern** erzeugt optional **Backup `.ildbak`** (Toggle) und zeigt **Erfolgs-Toast** mit Felder-Kurzinfo; **Seiten→Bilder** behält bei **Abbruch** bereits geschriebene Dateien inkl. **Statuszählung**, **JPEG-Qualität** aus Settings wählbar; **Signatur** mit **Aspect-Ratio Lock** und **Vorschau vor Platzieren**; **CLI** `--export-page N --out PATH` als **One-Shot ohne GUI** (headless ok). Stubs KI/Cloud/Stylus/3D bleiben Stubs.

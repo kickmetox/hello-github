@@ -7037,11 +7037,14 @@ class MainWindow(QMainWindow):
             return
         dlg = MetadataDialog(self.pdf_view.pdf_path, self)
         if dlg.exec():
-            # Erfolgs-Toast mit Felder-Kurzinfo — 1.5.2
+            # Erfolgs-Toast: Dauer wie OCR-Toast Settings (1/2/3 s) — 1.5.3
+            from instantlensdoc.core.app_settings import get_ocr_defaults_toast_sec
+
             toast = getattr(dlg, "last_toast", "") or "PDF-Metadaten gespeichert"
             self._set_status(toast)
             try:
-                self.statusBar().showMessage(toast, 4500)
+                ms = max(1, int(get_ocr_defaults_toast_sec())) * 1000
+                self.statusBar().showMessage(toast, ms)
             except Exception:
                 pass
 
