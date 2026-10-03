@@ -195,9 +195,13 @@ from instantlensdoc.core.app_settings import (
     get_pdf_thumbnail_scale,
     get_redaction_bake_continue_on_sidecar_skip,
     get_redaction_preview_opacity,
+    get_sync_scroll_status_indicator,
+    get_thumb_cache_debug_hits,
+    get_thumb_cache_max_mb,
     get_thumb_lazy_threshold,
     get_thumb_prefetch_cancel_ms,
     get_thumb_prefetch_radius,
+    THUMB_CACHE_MAX_MB_CHOICES,
     get_pdf_two_page_spread,
     get_editor_current_line_highlight,
     get_editor_indent_guides,
@@ -317,6 +321,9 @@ from instantlensdoc.core.app_settings import (
     set_pdf_thumbnail_scale,
     set_redaction_bake_continue_on_sidecar_skip,
     set_redaction_preview_opacity,
+    set_sync_scroll_status_indicator,
+    set_thumb_cache_debug_hits,
+    set_thumb_cache_max_mb,
     set_thumb_lazy_threshold,
     set_thumb_prefetch_cancel_ms,
     set_thumb_prefetch_radius,
@@ -627,6 +634,44 @@ class SettingsDialog(QDialog):
         self.thumb_lazy.activated.connect(self._update_prefetch_live_label)
         self._update_prefetch_live_label()
         form.addRow("Prefetch aktuell", self.lbl_prefetch_live)
+
+        # Thumbnail Disk-Cache max MB · Cache leeren · Hit/Miss Debug — 2.4.1
+        self.thumb_cache_max_mb = QComboBox()
+        self.thumb_cache_max_mb.setObjectName("thumbCacheMaxMb")
+        cur_cache_mb = get_thumb_cache_max_mb()
+        cache_pick = 0
+        for i, mb in enumerate(THUMB_CACHE_MAX_MB_CHOICES):
+            self.thumb_cache_max_mb.addItem(f"{mb} MB", mb)
+            if mb == cur_cache_mb:
+                cache_pick = i
+        self.thumb_cache_max_mb.setCurrentIndex(cache_pick)
+        self.thumb_cache_max_mb.setToolTip(
+            "Maximale Größe des Thumbnail-Disk-Caches (LRU nach mtime) — 2.4.1"
+        )
+        form.addRow("Thumb-Cache max. Größe", self.thumb_cache_max_mb)
+
+        cache_row = QHBoxLayout()
+        self.btn_clear_thumb_cache = QPushButton("Cache leeren")
+        self.btn_clear_thumb_cache.setObjectName("thumbCacheClear")
+        self.btn_clear_thumb_cache.setToolTip(
+            "Gesamten Thumbnail-Disk-Cache unter config/thumb_cache/ löschen — 2.4.1"
+        )
+        self.btn_clear_thumb_cache.clicked.connect(self._clear_thumb_cache)
+        cache_row.addWidget(self.btn_clear_thumb_cache)
+        self.lbl_thumb_cache_stats = QLabel("")
+        self.lbl_thumb_cache_stats.setObjectName("thumbCacheStats")
+        self.lbl_thumb_cache_stats.setStyleSheet("color: #888;")
+        cache_row.addWidget(self.lbl_thumb_cache_stats, 1)
+        form.addRow("Thumb-Cache", cache_row)
+        self._refresh_thumb_cache_stats_label()
+
+        self.thumb_cache_debug = QCheckBox("Thumb-Cache Hit/Miss Status (Debug)")
+        self.thumb_cache_debug.setObjectName("thumbCacheDebugHits")
+        self.thumb_cache_debug.setChecked(get_thumb_cache_debug_hits())
+        self.thumb_cache_debug.setToolTip(
+            "Optional Hit/Miss in der Statusleiste anzeigen (Debug) — 2.4.1"
+        )
+        form.addRow(self.thumb_cache_debug)
 
         self.redact_opacity = QDoubleSpinBox()
         self.redact_opacity.setRange(0.05, 1.0)
@@ -1098,6 +1143,16 @@ class SettingsDialog(QDialog):
             "(gleicher Schalter wie Ansicht → Vertikaler Split / Ctrl+Shift+\\)"
         )
         form.addRow("Doc-Split Layout", self.doc_split_orient)
+
+        self.sync_scroll_indicator = QCheckBox(
+            "Sync-Scroll Statusleisten-Indikator (PDF↔PDF)"
+        )
+        self.sync_scroll_indicator.setObjectName("syncScrollStatusIndicator")
+        self.sync_scroll_indicator.setChecked(get_sync_scroll_status_indicator())
+        self.sync_scroll_indicator.setToolTip(
+            "„Sync an/aus“ in der Statusleiste — nur bei PDF↔PDF Sync-Scroll — 2.4.1"
+        )
+        form.addRow(self.sync_scroll_indicator)
 
         self.tag_rename_confirm = QSpinBox()
         self.tag_rename_confirm.setRange(0, 99999)
@@ -2455,6 +2510,54 @@ class SettingsDialog(QDialog):
         if path:
             self.spell_dict.setText(path)
 
+    def _refresh_thumb_cache_stats_label(self) -> None:
+        """Thumb-Cache Größe/Anzahl anzeigen — 2.4.1."""
+        if not hasattr(self, "lbl_thumb_cache_stats"):
+            return
+        try:
+            from instantlensdoc.core.thumb_cache import thumb_cache_stats
+
+            st = thumb_cache_stats()
+            mb = st["bytes"] / (1024 * 1024)
+            self.lbl_thumb_cache_stats.setText(
+                f"{st['count']} Dateien · {mb:.1f} MB / max {st.get('max_mb', 100)} MB"
+            )
+        except Exception:
+            self.lbl_thumb_cache_stats.setText("")
+
+    def _clear_thumb_cache(self) -> None:
+        """Thumbnail-Disk-Cache leeren — 2.4.1."""
+        from PySide6.QtWidgets import QMessageBox
+
+        from instantlensdoc.core.thumb_cache import clear_thumb_cache, thumb_cache_stats
+
+        st = thumb_cache_stats()
+        if st["count"] <= 0:
+            QMessageBox.information(self, "Thumb-Cache", "Cache ist bereits leer.")
+            self._refresh_thumb_cache_stats_label()
+            return
+        reply = QMessageBox.question(
+            self,
+            "Cache leeren",
+            f"Thumbnail-Cache wirklich leeren?\n"
+            f"{st['count']} Dateien · {st['bytes'] / (1024 * 1024):.1f} MB",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
+        )
+        if reply != QMessageBox.Yes:
+            return
+        n = clear_thumb_cache()
+        self._refresh_thumb_cache_stats_label()
+        QMessageBox.information(
+            self, "Thumb-Cache", f"Cache geleert: {n} Datei(en) gelöscht."
+        )
+        try:
+            parent = self.parent()
+            if parent is not None and hasattr(parent, "_set_status"):
+                parent._set_status(f"Thumb-Cache geleert ({n})")
+        except Exception:
+            pass
+
     def _update_prefetch_live_label(self, *_args) -> None:
         """Live-Anzeige „aktuell N ms / ±N“; grau wenn Lazy aus (unter Schwellwert) — 1.3.6."""
         # Immer Widget-Stand (nicht gespeicherte Settings) — sofort bei Slider/Combo
@@ -2810,6 +2913,23 @@ class SettingsDialog(QDialog):
         set_default_zoom_mode(str(self.zoom_mode.currentData() or DEFAULT_ZOOM_MODE_PERCENT))
         set_default_zoom_percent(int(self.zoom_pct.value()))
         set_pdf_thumbnail_scale(float(self.thumb_scale.currentData() or 0.18))
+        if hasattr(self, "thumb_cache_max_mb"):
+            try:
+                set_thumb_cache_max_mb(int(self.thumb_cache_max_mb.currentData() or 100))
+            except (TypeError, ValueError):
+                set_thumb_cache_max_mb(100)
+        if hasattr(self, "thumb_cache_debug"):
+            set_thumb_cache_debug_hits(self.thumb_cache_debug.isChecked())
+        if hasattr(self, "sync_scroll_indicator"):
+            set_sync_scroll_status_indicator(self.sync_scroll_indicator.isChecked())
+            try:
+                parent = self.parent()
+                if parent is not None and hasattr(
+                    parent, "_update_sync_scroll_status_indicator"
+                ):
+                    parent._update_sync_scroll_status_indicator()
+            except Exception:
+                pass
         try:
             lazy_th = int(self.thumb_lazy.currentData() or 50)
         except (TypeError, ValueError):

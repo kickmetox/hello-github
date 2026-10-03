@@ -273,6 +273,8 @@ class MainWindow(QMainWindow):
         install_system_theme_watch(self._on_system_theme_live)
         if get_editor_doc_split() and get_editor_doc_split_sync_scroll():
             self._apply_doc_split_sync_scroll()
+        self._update_sync_scroll_status_indicator()
+        self._update_thumb_cache_debug_status()
         self._autosave_timer = QTimer(self)
         self._autosave_timer.setInterval(get_autosave_interval_sec() * 1000)
         self._autosave_timer.timeout.connect(self._autosave_tick)
@@ -1221,6 +1223,28 @@ class MainWindow(QMainWindow):
         self._pending_blink_active = False
         self._pending_was_pending = False
         self._split_scroll_syncing = False
+        # Sync-Scroll Statusleisten-Indikator (PDF↔PDF) — 2.4.1
+        self.sync_scroll_status_label = QLabel("")
+        self.sync_scroll_status_label.setObjectName("syncScrollStatus")
+        self.sync_scroll_status_label.setStyleSheet(
+            "QLabel#syncScrollStatus { color: #555; padding-right: 8px; font-size: 11px; }"
+        )
+        self.sync_scroll_status_label.setToolTip(
+            "Sync-Scroll PDF↔PDF — Indikator an/aus in Einstellungen — 2.4.1"
+        )
+        self.sync_scroll_status_label.setVisible(False)
+        sb.addPermanentWidget(self.sync_scroll_status_label)
+        # Thumb-Cache Hit/Miss optional Debug — 2.4.1
+        self.thumb_cache_debug_label = QLabel("")
+        self.thumb_cache_debug_label.setObjectName("thumbCacheDebug")
+        self.thumb_cache_debug_label.setStyleSheet(
+            "QLabel#thumbCacheDebug { color: #777; padding-right: 8px; font-size: 11px; }"
+        )
+        self.thumb_cache_debug_label.setToolTip(
+            "Thumbnail-Cache Hit/Miss (Debug, Einstellungen) — 2.4.1"
+        )
+        self.thumb_cache_debug_label.setVisible(False)
+        sb.addPermanentWidget(self.thumb_cache_debug_label)
         self.undo_hint_label = QLabel("Ctrl+Z · Letzte Aktion rückgängig")
         self.undo_hint_label.setObjectName("undoHint")
         self.undo_hint_label.setStyleSheet(
@@ -1943,8 +1967,8 @@ class MainWindow(QMainWindow):
         self._doc_split_sync_action.setCheckable(True)
         self._doc_split_sync_action.setChecked(get_editor_doc_split_sync_scroll())
         self._doc_split_sync_action.setToolTip(
-            "Sync-Scroll für zwei Docs nebeneinander — bei zwei PDF-Tabs "
-            "zusätzlich Seiten-Sync (Ctrl+Alt+\\) — 2.4.0"
+            "Sync-Scroll nur PDF↔PDF: Scroll-Ratio + Seiten-Sync "
+            "(Ctrl+Alt+\\); Statusleisten-Indikator — 2.4.1"
         )
         self._doc_split_sync_action.setShortcut(QKeySequence("Ctrl+Alt+\\"))
         self._doc_split_sync_action.toggled.connect(self._toggle_doc_split_sync_scroll)
@@ -4625,12 +4649,13 @@ class MainWindow(QMainWindow):
         set_editor_doc_split_sync_scroll(bool(checked))
         self._apply_doc_split_sync_scroll()
         self._save_session()
+        self._update_sync_scroll_status_indicator()
         if checked:
             both_pdf = self._split_both_pdf()
             self._set_status(
-                "Sync-Scroll an (PDF-Tabs + Seiten-Sync)"
+                "Sync-Scroll an (PDF↔PDF + Seiten-Sync)"
                 if both_pdf
-                else "Sync-Scroll an (geteilte Docs)"
+                else "Sync-Scroll an — aktiv nur bei PDF↔PDF"
             )
         else:
             self._set_status("Sync-Scroll aus")
@@ -4869,27 +4894,98 @@ class MainWindow(QMainWindow):
             self._sync_page_hooks = False
 
     def _apply_doc_split_sync_scroll(self) -> None:
-        """Sync-Scroll verbinden wenn Split sichtbar und Einstellung an.
-        Bei zwei PDF-Tabs: Scroll-Ratio + Seiten-Sync — 2.4.0."""
+        """Sync-Scroll nur PDF↔PDF: Scroll-Ratio + Seiten-Sync — 2.4.1."""
         self._disconnect_doc_split_sync_scroll()
         if not hasattr(self, "secondary_wrap") or not self.secondary_wrap.isVisible():
+            self._update_sync_scroll_status_indicator()
             return
         if not get_editor_doc_split_sync_scroll():
+            self._update_sync_scroll_status_indicator()
+            return
+        # Nur PDF↔PDF — kein Sync mit Editor-Panels — 2.4.1
+        if not self._split_both_pdf():
+            self._update_sync_scroll_status_indicator()
             return
         primary = self._primary_scroll_bar()
         secondary = self._secondary_scroll_bar()
         if primary is None or secondary is None:
+            self._update_sync_scroll_status_indicator()
             return
         self._sync_primary_bar = primary
         self._sync_secondary_bar = secondary
         primary.valueChanged.connect(self._on_primary_scroll_sync)
         secondary.valueChanged.connect(self._on_secondary_scroll_sync)
-        if self._split_both_pdf():
-            self.pdf_view.page_changed.connect(self._on_primary_page_sync)
-            self.secondary_pdf.page_changed.connect(self._on_secondary_page_sync)
-            self._sync_page_hooks = True
+        self.pdf_view.page_changed.connect(self._on_primary_page_sync)
+        self.secondary_pdf.page_changed.connect(self._on_secondary_page_sync)
+        self._sync_page_hooks = True
+        self._update_sync_scroll_status_indicator()
+
+    def _update_sync_scroll_status_indicator(self) -> None:
+        """Statusleiste: Sync an/aus nur wenn Indikator aktiv — 2.4.1."""
+        if not hasattr(self, "sync_scroll_status_label"):
+            return
+        from instantlensdoc.core.app_settings import (
+            get_editor_doc_split_sync_scroll,
+            get_sync_scroll_status_indicator,
+        )
+
+        show_pref = get_sync_scroll_status_indicator()
+        enabled = get_editor_doc_split_sync_scroll()
+        active = bool(enabled and self._split_both_pdf())
+        if not show_pref:
+            self.sync_scroll_status_label.setVisible(False)
+            self.sync_scroll_status_label.setText("")
+            return
+        if not enabled:
+            self.sync_scroll_status_label.setText("Sync aus")
+            self.sync_scroll_status_label.setStyleSheet(
+                "QLabel#syncScrollStatus { color: #888; padding-right: 8px; font-size: 11px; }"
+            )
+            self.sync_scroll_status_label.setToolTip(
+                "Sync-Scroll aus (Ctrl+Alt+\\) — nur PDF↔PDF — 2.4.1"
+            )
+            self.sync_scroll_status_label.setVisible(True)
+            return
+        if active:
+            self.sync_scroll_status_label.setText("Sync an")
+            self.sync_scroll_status_label.setStyleSheet(
+                "QLabel#syncScrollStatus { color: #2d5a27; padding-right: 8px; "
+                "font-size: 11px; font-weight: 500; }"
+            )
+            self.sync_scroll_status_label.setToolTip(
+                "Sync-Scroll aktiv (PDF↔PDF Scroll + Seiten) — 2.4.1"
+            )
+            self.sync_scroll_status_label.setVisible(True)
         else:
-            self._sync_page_hooks = False
+            self.sync_scroll_status_label.setText("Sync bereit")
+            self.sync_scroll_status_label.setStyleSheet(
+                "QLabel#syncScrollStatus { color: #a60; padding-right: 8px; font-size: 11px; }"
+            )
+            self.sync_scroll_status_label.setToolTip(
+                "Sync-Scroll an, aber nur bei zwei PDF-Tabs aktiv — 2.4.1"
+            )
+            self.sync_scroll_status_label.setVisible(True)
+
+    def _update_thumb_cache_debug_status(self) -> None:
+        """Optional Hit/Miss in Statusleiste — 2.4.1."""
+        if not hasattr(self, "thumb_cache_debug_label"):
+            return
+        from instantlensdoc.core.app_settings import get_thumb_cache_debug_hits
+        from instantlensdoc.core.thumb_cache import hit_miss_stats
+
+        if not get_thumb_cache_debug_hits():
+            self.thumb_cache_debug_label.setVisible(False)
+            self.thumb_cache_debug_label.setText("")
+            return
+        st = hit_miss_stats()
+        self.thumb_cache_debug_label.setText(
+            f"Cache {st['hits']}✓/{st['misses']}✗ ({st['hit_rate_pct']:.0f}%)"
+        )
+        self.thumb_cache_debug_label.setToolTip(
+            f"Thumb-Cache Hit/Miss Debug: {st['hits']} Hits, {st['misses']} Misses "
+            f"({st['hit_rate_pct']:.1f} %) — 2.4.1"
+        )
+        self.thumb_cache_debug_label.setVisible(True)
 
     def _sync_scroll_ratio(self, source, target) -> None:
         if source is None or target is None or source is target:
@@ -8577,6 +8673,7 @@ class MainWindow(QMainWindow):
         if not self.pdf_view.pdf_path:
             self._stop_thumb_lazy()
             self.sidebar.clear_thumbs()
+            self._update_thumb_cache_debug_status()
             return
         # Lazy: Platzhalter; Prefetch ±N (Settings); Schwellwert Settings — 1.3.3
         self._stop_thumb_lazy()
@@ -8610,10 +8707,12 @@ class MainWindow(QMainWindow):
                     f"Thumbnails: Lazy-Load {page_count} Seiten "
                     f"(>{threshold}, Prefetch ±{radius})"
                 )
+            self._update_thumb_cache_debug_status()
         except Exception as e:
             _log.warning("Thumbnails: %s", e)
             self._stop_thumb_lazy()
             self.sidebar.clear_thumbs()
+            self._update_thumb_cache_debug_status()
 
     def _stop_thumb_lazy(self):
         if self._thumb_lazy_timer is not None:
@@ -8726,6 +8825,9 @@ class MainWindow(QMainWindow):
         except Exception as e:
             _log.debug("Thumb lazy %s: %s", idx, e)
             self._thumb_lazy_loaded.add(idx)
+        # Hit/Miss Debug periodisch aktualisieren — 2.4.1
+        if len(self._thumb_lazy_loaded) % 5 == 0 or not self._thumb_lazy_queue:
+            self._update_thumb_cache_debug_status()
         if not self._thumb_lazy_queue:
             if self._thumb_lazy_timer is not None:
                 try:

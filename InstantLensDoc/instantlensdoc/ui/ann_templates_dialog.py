@@ -1,10 +1,11 @@
-"""Dialog: Annotation-Vorlagen laden/speichern (ildtmpl-v1) — 2.4.0."""
+"""Dialog: Annotation-Vorlagen laden/speichern (ildtmpl-v1) — 2.4.1."""
 
 from __future__ import annotations
 
 from pathlib import Path
 
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QColor, QPainter, QPixmap
 from PySide6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
@@ -27,9 +28,12 @@ from instantlensdoc.core.ann_templates import (
     capture_current_styles,
     delete_template,
     export_templates_json,
+    get_default_template_id,
     import_templates_json,
     load_templates,
+    rename_template,
     save_template,
+    set_default_template_id,
 )
 from instantlensdoc.core.app_settings import (
     dialog_start_dir,
@@ -40,26 +44,46 @@ from instantlensdoc.core.app_settings import (
 
 
 class AnnTemplatesDialog(QDialog):
-    """Gespeicherte Stempel/Highlight-Styles verwalten."""
+    """Gespeicherte Stempel/Highlight-Styles: Umbenennen/Löschen/Vorschau/Standard — 2.4.1."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Annotation-Vorlagen (ildtmpl-v1)")
-        self.resize(480, 420)
+        self.resize(560, 460)
         self.applied: AnnTemplate | None = None
 
         layout = QVBoxLayout(self)
         info = QLabel(
             "Gespeicherte Stempel- und Highlight-Styles. "
-            f"Schema <b>{TMPL_SCHEMA_ID}</b> — laden setzt Farben/Deckkraft."
+            f"Schema <b>{TMPL_SCHEMA_ID}</b> — laden setzt Farben/Deckkraft. "
+            "★ = Standard-Vorlage — 2.4.1"
         )
         info.setWordWrap(True)
         layout.addWidget(info)
 
+        body = QHBoxLayout()
         self.list = QListWidget()
         self.list.setAlternatingRowColors(True)
         self.list.itemDoubleClicked.connect(self._apply_selected)
-        layout.addWidget(self.list, 1)
+        self.list.currentRowChanged.connect(self._update_preview)
+        body.addWidget(self.list, 2)
+
+        prev_col = QVBoxLayout()
+        prev_col.addWidget(QLabel("Vorschau"))
+        self.preview = QLabel("—")
+        self.preview.setAlignment(Qt.AlignCenter)
+        self.preview.setMinimumSize(160, 120)
+        self.preview.setStyleSheet(
+            "background:#f5f5f5;border:1px solid #ccc;color:#666;"
+        )
+        self.preview.setToolTip("Farb-/Style-Vorschau der ausgewählten Vorlage — 2.4.1")
+        prev_col.addWidget(self.preview, 1)
+        self.preview_meta = QLabel("")
+        self.preview_meta.setWordWrap(True)
+        self.preview_meta.setStyleSheet("color:#555;")
+        prev_col.addWidget(self.preview_meta)
+        body.addLayout(prev_col, 1)
+        layout.addLayout(body)
 
         row = QHBoxLayout()
         self.btn_apply = QPushButton("Anwenden")
@@ -79,9 +103,20 @@ class AnnTemplatesDialog(QDialog):
         layout.addLayout(row)
 
         row2 = QHBoxLayout()
+        self.btn_rename = QPushButton("Umbenennen…")
+        self.btn_rename.setToolTip("Ausgewählte Vorlage umbenennen — 2.4.1")
+        self.btn_rename.clicked.connect(self._rename_selected)
+        row2.addWidget(self.btn_rename)
+
         self.btn_delete = QPushButton("Löschen")
+        self.btn_delete.setToolTip("Ausgewählte Vorlage löschen — 2.4.1")
         self.btn_delete.clicked.connect(self._delete_selected)
         row2.addWidget(self.btn_delete)
+
+        self.btn_default = QPushButton("Als Standard")
+        self.btn_default.setToolTip("Ausgewählte Vorlage als Standard markieren (★) — 2.4.1")
+        self.btn_default.clicked.connect(self._mark_default)
+        row2.addWidget(self.btn_default)
 
         self.btn_export = QPushButton("Export JSON…")
         self.btn_export.setToolTip(f"Alle Vorlagen als {TMPL_SCHEMA_ID} exportieren")
@@ -103,18 +138,26 @@ class AnnTemplatesDialog(QDialog):
 
     def _reload(self) -> None:
         self.list.clear()
+        default_id = get_default_template_id()
         for t in load_templates():
             kind_de = "Stempel" if t.kind == "stamp" else "Highlight"
-            label = f"{t.name}  ·  {kind_de}  ·  {t.color}  ·  α={t.opacity:.2f}"
+            star = "★ " if t.id == default_id else ""
+            label = f"{star}{t.name}  ·  {kind_de}  ·  {t.color}  ·  α={t.opacity:.2f}"
             if t.stamp_text:
                 label += f"  ·  „{t.stamp_text[:24]}“"
             item = QListWidgetItem(label)
             item.setData(Qt.UserRole, t.id)
-            item.setToolTip(
+            tip = (
                 f"id={t.id}\nkind={t.kind}\ncolor={t.color}\n"
                 f"opacity={t.opacity}\nstamp_text={t.stamp_text}"
             )
+            if t.id == default_id:
+                tip += "\n★ Standard-Vorlage — 2.4.1"
+            item.setToolTip(tip)
             self.list.addItem(item)
+        if self.list.count() > 0 and self.list.currentRow() < 0:
+            self.list.setCurrentRow(0)
+        self._update_preview()
 
     def _selected_id(self) -> str | None:
         item = self.list.currentItem()
@@ -131,6 +174,43 @@ class AnnTemplatesDialog(QDialog):
                 return t
         return None
 
+    def _swatch_pixmap(self, color: str, fill: str, opacity: float) -> QPixmap:
+        pix = QPixmap(140, 90)
+        pix.fill(QColor("#f5f5f5"))
+        painter = QPainter(pix)
+        try:
+            c = QColor(color)
+            if not c.isValid():
+                c = QColor("#FFE066")
+            c.setAlphaF(max(0.15, min(1.0, float(opacity))))
+            painter.fillRect(12, 12, 116, 66, c)
+            border = QColor(fill if QColor(fill).isValid() else color)
+            painter.setPen(border)
+            painter.drawRect(12, 12, 116, 66)
+        finally:
+            painter.end()
+        return pix
+
+    def _update_preview(self, *_args) -> None:
+        t = self._selected_template()
+        if t is None:
+            self.preview.setPixmap(QPixmap())
+            self.preview.setText("—")
+            self.preview_meta.setText("")
+            return
+        self.preview.setPixmap(self._swatch_pixmap(t.color, t.fill_color, t.opacity))
+        self.preview.setText("")
+        kind_de = "Stempel" if t.kind == "stamp" else "Highlight"
+        star = "★ Standard · " if t.id == get_default_template_id() else ""
+        lines = [
+            f"{star}{t.name}",
+            f"{kind_de} · {t.color} · α={t.opacity:.2f}",
+            f"Strich {t.stroke_width:.1f} · Füllung {t.fill_color}",
+        ]
+        if t.stamp_text:
+            lines.append(f"Text: {t.stamp_text[:40]}")
+        self.preview_meta.setText("\n".join(lines))
+
     def _apply_selected(self) -> None:
         t = self._selected_template()
         if t is None:
@@ -139,6 +219,57 @@ class AnnTemplatesDialog(QDialog):
         apply_template(t)
         self.applied = t
         self.accept()
+
+    def _rename_selected(self) -> None:
+        t = self._selected_template()
+        if t is None:
+            QMessageBox.information(self, "Vorlagen", "Bitte eine Vorlage wählen.")
+            return
+        name, ok = QInputDialog.getText(
+            self,
+            "Vorlage umbenennen",
+            "Neuer Name:",
+            text=t.name,
+        )
+        if not ok:
+            return
+        name = (name or "").strip()
+        if not name:
+            QMessageBox.warning(self, "Vorlagen", "Name darf nicht leer sein.")
+            return
+        try:
+            renamed = rename_template(t.id, name)
+        except AnnTemplateError as e:
+            QMessageBox.warning(self, "Vorlagen", str(e))
+            return
+        if renamed is None:
+            QMessageBox.warning(self, "Vorlagen", "Umbenennen fehlgeschlagen.")
+            return
+        self._reload()
+        for i in range(self.list.count()):
+            if self.list.item(i).data(Qt.UserRole) == renamed.id:
+                self.list.setCurrentRow(i)
+                break
+
+    def _mark_default(self) -> None:
+        tid = self._selected_id()
+        if not tid:
+            QMessageBox.information(self, "Vorlagen", "Bitte eine Vorlage wählen.")
+            return
+        try:
+            # Toggle: gleicher Eintrag nochmals → Standard entfernen
+            if get_default_template_id() == tid:
+                set_default_template_id("")
+            else:
+                set_default_template_id(tid)
+        except AnnTemplateError as e:
+            QMessageBox.warning(self, "Vorlagen", str(e))
+            return
+        self._reload()
+        for i in range(self.list.count()):
+            if self.list.item(i).data(Qt.UserRole) == tid:
+                self.list.setCurrentRow(i)
+                break
 
     def _save_current(self, kind: str) -> None:
         default = "Highlight-Style" if kind == "highlight" else "Stempel-Style"

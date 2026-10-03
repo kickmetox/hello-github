@@ -1,5 +1,20 @@
 # Changelog — InstantLens Doc
 
+## 2.4.1 — Thumb-Cache max MB·leeren·Hit/Miss, Templates Umbenennen/Vorschau/★, Sync-Scroll Status·nur PDF↔PDF, F1 Suche·Drucken·TXT
+
+Post-Release-Polish nach **2.4.0**: **Thumbnail Disk-Cache** max. Größe MB in Settings, „Cache leeren“, optional Hit/Miss Debug in Statusleiste; **Annotation-Templates** Umbenennen/Löschen, Style-Vorschau, Standard-Vorlage ★; **Sync-Scroll** Statusleisten-Indikator an/aus und nur noch **PDF↔PDF**; **F1 Cheat-Sheet** Suche/Filter, Drucken, Export TXT. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie klar markiert / nicht produktiv (Ink ≠ Stylus).
+
+### Geändert
+- Thumb-Cache: max MB Settings · Cache leeren · Hit/Miss Status optional Debug
+- Annotation-Vorlagen: Umbenennen/Löschen · Farb-Vorschau · Standard ★ (`default_id` in ildtmpl-v1)
+- Sync-Scroll: Statusleisten-Indikator an/aus · aktiv nur PDF↔PDF
+- F1 Cheat-Sheet: Suche/Filter Shortcuts · Drucken · Export TXT (+ PDF)
+
+### Tests / Qualität
+- Version **2.4.1** (App / `ild_pdf` / ISS / Smoke / Docs); Serie **2.4**; `docs/VERSION` + `VERSION.txt`
+- Smoke: 2.4.1 CLI + Qt (Thumb-Cache MB/Clear/HitMiss, Templates Rename/Preview/★, Sync PDF↔PDF+Status, F1 Filter/Print/TXT)
+- Stubs: KI/Cloud/Stylus/3D/Hooks/Outline/Telemetrie unverändert markiert
+
 ## 2.4.0 — Thumbnail Disk-Cache, Annotation-Templates ildtmpl-v1, Split-View Sync-Scroll PDF-Tabs, Tastatur-Cheat-Sheet F1
 
 Minor-Bump nach **2.3.5**: **PDF-Seiten-Thumbnail Disk-Cache** (mtime-invalidiert, spürbar bei großen Docs); **Annotation-Templates** Stempel/Highlight-Styles speichern/laden (**ildtmpl-v1**); **Split-View Sync-Scroll** Toggle für zwei PDF-Tabs nebeneinander (Scroll + Seiten-Sync); **Tastatur-Cheat-Sheet** F1 / Hilfe mit Shortcut-Liste DE. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie klar markiert / nicht produktiv (Ink ≠ Stylus).

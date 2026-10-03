@@ -183,6 +183,9 @@ DEFAULTS: dict[str, Any] = {
     "restore_window_geometry_on_start": True,
     "pdf_thumbnail_scale": 0.18,
     "thumb_lazy_threshold": 50,
+    "thumb_cache_max_mb": 100,  # Thumbnail Disk-Cache max Größe MB — 2.4.1
+    "thumb_cache_debug_hits": False,  # Hit/Miss optional in Status — 2.4.1
+    "sync_scroll_status_indicator": True,  # Sync-Scroll Statusleisten-Indikator — 2.4.1
     "thumb_prefetch_radius": 2,
     "thumb_prefetch_cancel_ms": 90,
     "forms_csv_visible_only": False,  # CSV-Export Default „nur sichtbare“ — 1.3.5
@@ -4789,6 +4792,52 @@ THUMB_PREFETCH_RADIUS_CHOICES = (1, 2, 3)
 THUMB_PREFETCH_CANCEL_MS_CHOICES = (50, 90, 150, 250)
 THUMB_PREFETCH_RADIUS_DEFAULT = 2
 THUMB_PREFETCH_CANCEL_MS_DEFAULT = 90
+THUMB_CACHE_MAX_MB_CHOICES = (25, 50, 100, 200, 500)
+THUMB_CACHE_MAX_MB_DEFAULT = 100
+
+
+def get_thumb_cache_max_mb() -> int:
+    """Max. Thumbnail-Disk-Cache Größe in MB (25/50/100/200/500) — 2.4.1."""
+    try:
+        v = int(
+            load_settings().get(
+                "thumb_cache_max_mb", THUMB_CACHE_MAX_MB_DEFAULT
+            )
+        )
+    except (TypeError, ValueError):
+        v = THUMB_CACHE_MAX_MB_DEFAULT
+    if v not in THUMB_CACHE_MAX_MB_CHOICES:
+        return min(THUMB_CACHE_MAX_MB_CHOICES, key=lambda x: abs(x - v))
+    return v
+
+
+def set_thumb_cache_max_mb(mb: int) -> int:
+    try:
+        v = int(mb)
+    except (TypeError, ValueError):
+        v = THUMB_CACHE_MAX_MB_DEFAULT
+    if v not in THUMB_CACHE_MAX_MB_CHOICES:
+        v = min(THUMB_CACHE_MAX_MB_CHOICES, key=lambda x: abs(x - v))
+    save_settings({"thumb_cache_max_mb": v})
+    return v
+
+
+def get_thumb_cache_debug_hits() -> bool:
+    """Hit/Miss optional in Statusleiste anzeigen — 2.4.1."""
+    return bool(load_settings().get("thumb_cache_debug_hits", False))
+
+
+def set_thumb_cache_debug_hits(enabled: bool) -> None:
+    save_settings({"thumb_cache_debug_hits": bool(enabled)})
+
+
+def get_sync_scroll_status_indicator() -> bool:
+    """Sync-Scroll an/aus in Statusleiste anzeigen — 2.4.1."""
+    return bool(load_settings().get("sync_scroll_status_indicator", True))
+
+
+def set_sync_scroll_status_indicator(enabled: bool) -> None:
+    save_settings({"sync_scroll_status_indicator": bool(enabled)})
 
 
 def get_thumb_lazy_threshold() -> int:

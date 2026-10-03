@@ -1,15 +1,19 @@
-"""Tastaturhilfe-Dialog inkl. optionalem PDF-Export des Cheat-Sheets."""
+"""Tastaturhilfe-Dialog inkl. Suche/Filter, PDF/TXT-Export und Drucken — 2.4.1."""
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from PySide6.QtGui import QTextDocument
-from PySide6.QtPrintSupport import QPrinter
+from PySide6.QtPrintSupport import QPrintDialog, QPrinter
 from PySide6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
     QFileDialog,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
     QMessageBox,
     QPushButton,
     QTextBrowser,
@@ -20,13 +24,13 @@ from instantlensdoc.core.app_settings import dialog_start_dir, get_last_export_d
 
 SHORTCUTS_HTML = """
 <h2>Tastatur-Cheat-Sheet — InstantLens Doc</h2>
-<p>Shortcut-Liste (DE) — Hilfe → Tastatur-Cheat-Sheet… / <code>F1</code> — 2.4.0</p>
+<p>Shortcut-Liste (DE) — Hilfe → Tastatur-Cheat-Sheet… / <code>F1</code> — Suche/Filter · Drucken · Export TXT — 2.4.1</p>
 <table cellpadding="4" cellspacing="0">
 <tr><th align="left">Aktion</th><th align="left">Kürzel</th></tr>
-<tr><td>Tastatur-Cheat-Sheet</td><td><code>F1</code> — Shortcut-Liste DE · optional als PDF — 2.4.0</td></tr>
-<tr><td>Sync-Scroll (PDF-Tabs Split)</td><td><code>Ctrl+Alt+\\</code> — zwei PDF-Tabs: Scroll + Seiten-Sync — 2.4.0</td></tr>
-<tr><td>Annotation-Vorlagen</td><td>PDF → Annotation-Vorlagen… (ildtmpl-v1 Stempel/Highlight) — 2.4.0</td></tr>
-<tr><td>Thumbnail Disk-Cache</td><td>automatisch (mtime-invalidiert) — große PDFs — 2.4.0</td></tr>
+<tr><td>Tastatur-Cheat-Sheet</td><td><code>F1</code> — Shortcut-Liste DE · Suche/Filter · Drucken · PDF/TXT — 2.4.1</td></tr>
+<tr><td>Sync-Scroll (PDF↔PDF)</td><td><code>Ctrl+Alt+\\</code> — nur PDF↔PDF: Scroll + Seiten-Sync · Statusleiste — 2.4.1</td></tr>
+<tr><td>Annotation-Vorlagen</td><td>PDF → Annotation-Vorlagen… (ildtmpl-v1) Umbenennen/Löschen/Vorschau/★ — 2.4.1</td></tr>
+<tr><td>Thumbnail Disk-Cache</td><td>max MB Settings · Cache leeren · Hit/Miss Debug — 2.4.1</td></tr>
 <tr><td>Neu (leer)</td><td><code>Ctrl+N</code></td></tr>
 <tr><td>Textbaustein 1–3 einfügen</td><td><code>Ctrl+Alt+1</code> … <code>3</code></td></tr>
 <tr><td>Annotationen sperren</td><td><code>Ctrl+Shift+L</code></td></tr>
@@ -135,7 +139,7 @@ SHORTCUTS_HTML = """
 <tr><td>PDF-Trefferliste</td><td>Sidebar Seite + Snippet klickbar → Sprung + Highlight — 0.9.1</td></tr>
 <tr><td>Fenster teilen (zwei Docs)</td><td><code>Ctrl+\\</code> — 0.6.3</td></tr>
 <tr><td>Vertikaler Split (übereinander)</td><td><code>Ctrl+Shift+\\</code> (Toggle) — 0.6.5</td></tr>
-<tr><td>Sync-Scroll (geteilte Docs / PDF-Tabs)</td><td><code>Ctrl+Alt+\\</code>; Zustand je Session; bei zwei PDF-Tabs + Seiten-Sync — 0.6.4 / 0.6.9 / 2.4.0</td></tr>
+<tr><td>Sync-Scroll (PDF↔PDF)</td><td><code>Ctrl+Alt+\\</code>; nur PDF↔PDF; Statusleisten-Indikator — 0.6.4 / 0.6.9 / 2.4.0 / 2.4.1</td></tr>
 <tr><td>Tag-Cloud Filter</td><td>Klick setzt Filter; <code>Ctrl</code>+Klick Multi-Select — 0.6.4; Rechtsklick → filtern — 0.8.0</td></tr>
 <tr><td>Tag-Cloud Farbe / umbenennen</td><td>Rechtsklick → Farbe ändern / umbenennen; Ctrl+Z; Bestätigung ab Schwelle — 0.6.5–0.6.9 / 0.8.0</td></tr>
 <tr><td>Zeilen-Lesezeichen Export/Import</td><td>Bearbeiten → JSON (<code>ildbm-v1</code>) — 0.8.0; Drag-Reorder + Sidecar — 0.8.1</td></tr>
@@ -193,8 +197,10 @@ SHORTCUTS_HTML = """
 <tr><td>Nächstes / vorheriges Zeilen-Lesezeichen</td><td><code>F2</code> / <code>Shift+F2</code></td></tr>
 <tr><td>Erste Schritte (Wizard)</td><td>Hilfe → Erste Schritte…</td></tr>
 <tr><td>Rechtschreibung prüfen</td><td><code>F7</code></td></tr>
-<tr><td>Tastatur-Cheat-Sheet</td><td><code>F1</code> — Hilfe → Tastatur-Cheat-Sheet… — 2.4.0</td></tr>
+<tr><td>Tastatur-Cheat-Sheet</td><td><code>F1</code> — Hilfe → Tastatur-Cheat-Sheet… · Suche/Filter — 2.4.1</td></tr>
 <tr><td>Cheat-Sheet als PDF</td><td>F1 → „Als PDF exportieren…“</td></tr>
+<tr><td>Cheat-Sheet als TXT</td><td>F1 → „Als TXT exportieren…“ — 2.4.1</td></tr>
+<tr><td>Cheat-Sheet drucken</td><td>F1 → „Drucken…“ — 2.4.1</td></tr>
 </table>
 <p><b>Speichern unter (PDF):</b> speichert die Annotationen als Sidecar
 <code>*.ildann.json</code> (PDF-Datei bleibt unverändert). Auch unter
@@ -406,7 +412,104 @@ Fortsetzen-Option in Settings merken — 1.3.6</p>
 """
 
 
-def export_shortcuts_pdf(path: str | Path) -> Path:
+def _shortcuts_plain_rows() -> list[tuple[str, str]]:
+    """Aktion/Kürzel-Paare aus SHORTCUTS_HTML für Filter/TXT — 2.4.1."""
+    rows: list[tuple[str, str]] = []
+    for m in re.finditer(
+        r"<tr><td>(.*?)</td><td>(.*?)</td></tr>",
+        SHORTCUTS_HTML,
+        flags=re.IGNORECASE | re.DOTALL,
+    ):
+        action = re.sub(r"<[^>]+>", "", m.group(1))
+        shortcut = re.sub(r"<[^>]+>", "", m.group(2))
+        action = (
+            action.replace("&nbsp;", " ")
+            .replace("&amp;", "&")
+            .replace("&lt;", "<")
+            .replace("&gt;", ">")
+            .strip()
+        )
+        shortcut = (
+            shortcut.replace("&nbsp;", " ")
+            .replace("&amp;", "&")
+            .replace("&lt;", "<")
+            .replace("&gt;", ">")
+            .strip()
+        )
+        if action and action != "Aktion":
+            rows.append((action, shortcut))
+    return rows
+
+
+def filter_shortcuts_html(query: str) -> str:
+    """HTML-Cheat-Sheet gefiltert nach Query (Aktion oder Kürzel) — 2.4.1."""
+    q = (query or "").strip().casefold()
+    if not q:
+        return SHORTCUTS_HTML
+    rows = _shortcuts_plain_rows()
+    matched = [(a, s) for a, s in rows if q in a.casefold() or q in s.casefold()]
+    # Header + gefilterte Zeilen aus Original-HTML wiederaufbauen
+    header_end = SHORTCUTS_HTML.find("</tr>")
+    if header_end < 0:
+        return SHORTCUTS_HTML
+    # alles bis inkl. Header-Zeile
+    head = SHORTCUTS_HTML[: header_end + len("</tr>")]
+    # Footer nach </table>
+    table_end = SHORTCUTS_HTML.find("</table>")
+    footer = SHORTCUTS_HTML[table_end:] if table_end >= 0 else "</table>"
+    # Original-Zeilen behalten (HTML), die zum Filter passen
+    body_parts: list[str] = []
+    for m in re.finditer(
+        r"(<tr><td>.*?</td><td>.*?</td></tr>)",
+        SHORTCUTS_HTML,
+        flags=re.IGNORECASE | re.DOTALL,
+    ):
+        row_html = m.group(1)
+        plain = re.sub(r"<[^>]+>", "", row_html).casefold()
+        if "aktion" in plain and "kürzel" in plain:
+            continue
+        if q in plain:
+            body_parts.append(row_html)
+    intro = (
+        f'<p>Filter: <b>{query.strip()}</b> — {len(matched)} Treffer — 2.4.1</p>'
+        if matched
+        else f'<p>Filter: <b>{query.strip()}</b> — keine Treffer — 2.4.1</p>'
+    )
+    # head enthält h2 + p + table start + header row; intro nach erstem <p> ersetzen
+    h2_end = head.find("</h2>")
+    prefix = head[: h2_end + len("</h2>")] if h2_end >= 0 else "<h2>Tastatur-Cheat-Sheet</h2>"
+    table_start = head.find("<table")
+    table_head = head[table_start:] if table_start >= 0 else (
+        '<table cellpadding="4" cellspacing="0">'
+        '<tr><th align="left">Aktion</th><th align="left">Kürzel</th></tr>'
+    )
+    return prefix + intro + table_head + "".join(body_parts) + footer
+
+
+def export_shortcuts_txt(path: str | Path, *, query: str = "") -> Path:
+    """Cheat-Sheet als Klartext TXT exportieren — 2.4.1."""
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    q = (query or "").strip().casefold()
+    rows = _shortcuts_plain_rows()
+    if q:
+        rows = [(a, s) for a, s in rows if q in a.casefold() or q in s.casefold()]
+    lines = [
+        "Tastatur-Cheat-Sheet — InstantLens Doc",
+        "Shortcut-Liste (DE) — 2.4.1",
+    ]
+    if query.strip():
+        lines.append(f"Filter: {query.strip()}")
+    lines.append("")
+    width = max((len(a) for a, _ in rows), default=10)
+    for action, shortcut in rows:
+        lines.append(f"{action.ljust(width)}  {shortcut}")
+    lines.append("")
+    path.write_text("\n".join(lines), encoding="utf-8")
+    return path
+
+
+def export_shortcuts_pdf(path: str | Path, *, html: str | None = None) -> Path:
     """Schreibe das Keyboard-Cheat-Sheet als PDF (Qt QTextDocument)."""
     from PySide6.QtCore import QMarginsF
     from PySide6.QtGui import QPageLayout
@@ -414,7 +517,7 @@ def export_shortcuts_pdf(path: str | Path) -> Path:
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     doc = QTextDocument()
-    doc.setHtml(SHORTCUTS_HTML)
+    doc.setHtml(html if html is not None else SHORTCUTS_HTML)
     printer = QPrinter(QPrinter.HighResolution)
     printer.setOutputFormat(QPrinter.PdfFormat)
     printer.setOutputFileName(str(path))
@@ -430,22 +533,125 @@ class KeyboardHelpDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Tastatur-Cheat-Sheet")
-        self.resize(560, 600)
+        self.resize(620, 640)
         self.setAccessibleName("Tastatur-Cheat-Sheet")
         layout = QVBoxLayout(self)
-        browser = QTextBrowser()
-        browser.setHtml(SHORTCUTS_HTML)
-        browser.setAccessibleName("Shortcut-Liste Deutsch")
-        layout.addWidget(browser)
+
+        filt_row = QHBoxLayout()
+        filt_row.addWidget(QLabel("Suche/Filter:"))
+        self.filter_edit = QLineEdit()
+        self.filter_edit.setObjectName("shortcutFilter")
+        self.filter_edit.setPlaceholderText("Shortcut oder Aktion filtern…")
+        self.filter_edit.setClearButtonEnabled(True)
+        self.filter_edit.setToolTip(
+            "Shortcut-Liste live filtern (Aktion oder Kürzel) — 2.4.1"
+        )
+        self.filter_edit.setAccessibleName("Shortcut-Suche Filter")
+        self.filter_edit.textChanged.connect(self._apply_filter)
+        filt_row.addWidget(self.filter_edit, 1)
+        self.filter_count = QLabel("")
+        self.filter_count.setStyleSheet("color:#666;")
+        filt_row.addWidget(self.filter_count)
+        layout.addLayout(filt_row)
+
+        self.browser = QTextBrowser()
+        self.browser.setHtml(SHORTCUTS_HTML)
+        self.browser.setAccessibleName("Shortcut-Liste Deutsch")
+        layout.addWidget(self.browser)
+
         buttons = QDialogButtonBox(QDialogButtonBox.Close)
+        btn_print = QPushButton("Drucken…")
+        btn_print.setObjectName("shortcutPrint")
+        btn_print.setToolTip("Tastatur-Cheat-Sheet drucken — 2.4.1")
+        btn_print.clicked.connect(self._print)
+        buttons.addButton(btn_print, QDialogButtonBox.ActionRole)
+        btn_txt = QPushButton("Als TXT exportieren…")
+        btn_txt.setObjectName("shortcutExportTxt")
+        btn_txt.setToolTip("Tastatur-Cheat-Sheet als TXT speichern — 2.4.1")
+        btn_txt.clicked.connect(self._export_txt)
+        buttons.addButton(btn_txt, QDialogButtonBox.ActionRole)
         btn_pdf = QPushButton("Als PDF exportieren…")
-        btn_pdf.setToolTip("Tastatur-Cheat-Sheet als PDF speichern — 2.4.0")
+        btn_pdf.setObjectName("shortcutExportPdf")
+        btn_pdf.setToolTip("Tastatur-Cheat-Sheet als PDF speichern — 2.4.1")
         btn_pdf.clicked.connect(self._export_pdf)
         buttons.addButton(btn_pdf, QDialogButtonBox.ActionRole)
         buttons.rejected.connect(self.reject)
-        buttons.accepted.connect(self.accept)
-        buttons.clicked.connect(self.accept)
+        close_btn = buttons.button(QDialogButtonBox.Close)
+        if close_btn:
+            close_btn.clicked.connect(self.accept)
         layout.addWidget(buttons)
+
+    def _current_html(self) -> str:
+        return filter_shortcuts_html(self.filter_edit.text())
+
+    def _apply_filter(self, text: str = "") -> None:
+        html = filter_shortcuts_html(text)
+        self.browser.setHtml(html)
+        q = (text or "").strip()
+        if not q:
+            self.filter_count.setText("")
+            return
+        n = len(
+            [
+                1
+                for a, s in _shortcuts_plain_rows()
+                if q.casefold() in a.casefold() or q.casefold() in s.casefold()
+            ]
+        )
+        self.filter_count.setText(f"{n} Treffer")
+
+    def _print(self) -> None:
+        try:
+            printer = QPrinter(QPrinter.HighResolution)
+            dlg = QPrintDialog(printer, self)
+            dlg.setWindowTitle("Tastatur-Cheat-Sheet drucken")
+            if dlg.exec() != QDialog.Accepted:
+                return
+            doc = QTextDocument()
+            doc.setHtml(self._current_html())
+            doc.print_(printer)
+            QMessageBox.information(
+                self, "Tastatur-Cheat-Sheet", "Druckauftrag gesendet."
+            )
+        except Exception as e:
+            QMessageBox.warning(
+                self, "Tastatur-Cheat-Sheet", f"Drucken fehlgeschlagen:\n{e}"
+            )
+
+    def _export_txt(self) -> None:
+        start = get_last_export_dir() or dialog_start_dir()
+        path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Tastatur-Cheat-Sheet als TXT",
+            str(Path(start) / "InstantLensDoc-Tastatur-Cheat-Sheet.txt"),
+            "Text (*.txt)",
+        )
+        if not path:
+            return
+        if not path.lower().endswith(".txt"):
+            path += ".txt"
+        out = Path(path)
+        if out.exists():
+            reply = QMessageBox.question(
+                self,
+                "Überschreiben?",
+                f"{out.name} existiert bereits. Überschreiben?",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No,
+            )
+            if reply != QMessageBox.Yes:
+                return
+        try:
+            export_shortcuts_txt(out, query=self.filter_edit.text())
+            remember_recent_dir(out)
+            set_last_export_dir(out.parent)
+            QMessageBox.information(
+                self, "Tastatur-Cheat-Sheet", f"TXT gespeichert:\n{out}"
+            )
+        except Exception as e:
+            QMessageBox.warning(
+                self, "Tastatur-Cheat-Sheet", f"TXT-Export fehlgeschlagen:\n{e}"
+            )
 
     def _export_pdf(self):
         start = get_last_export_dir() or dialog_start_dir()
@@ -471,7 +677,7 @@ class KeyboardHelpDialog(QDialog):
             if reply != QMessageBox.Yes:
                 return
         try:
-            export_shortcuts_pdf(out)
+            export_shortcuts_pdf(out, html=self._current_html())
             remember_recent_dir(out)
             set_last_export_dir(out.parent)
             QMessageBox.information(
