@@ -73,7 +73,8 @@ def cli(argv: list[str] | None = None) -> int:
 
 def run_gui(*, days: int | None = None) -> int:
     try:
-        from PySide6.QtCore import Qt
+        from PySide6.QtCore import Qt, QTimer
+        from PySide6.QtGui import QKeySequence, QShortcut
         from PySide6.QtWidgets import (
             QApplication,
             QFileDialog,
@@ -93,6 +94,8 @@ def run_gui(*, days: int | None = None) -> int:
     except ImportError:
         print("PySide6 fehlt — pip install PySide6", file=sys.stderr)
         return 1
+
+    REVEAL_AUTO_HIDE_MS = 10_000  # Reveal Auto-Hide — 1.1.5
 
     class KeygenWindow(QMainWindow):
         def __init__(self):
@@ -154,7 +157,7 @@ def run_gui(*, days: int | None = None) -> int:
             self.reveal_check.setCheckable(True)
             self.reveal_check.setChecked(False)
             self.reveal_check.setToolTip(
-                "Keys in der History unmaskiert anzeigen — 1.1.4"
+                "Keys unmaskiert anzeigen — Auto-Hide nach 10 s; Esc maskiert — 1.1.5"
             )
             self.reveal_check.toggled.connect(self._on_reveal_toggled)
             btn_clear = QPushButton("Clear History")
@@ -169,7 +172,7 @@ def run_gui(*, days: int | None = None) -> int:
             self.history_list = QListWidget()
             self.history_list.setToolTip(
                 "Maskiert (nur letzte 4); Hover/Reveal zeigt Key; "
-                "Doppelklick kopiert — 1.1.4"
+                "Reveal Auto-Hide 10 s / Esc; Doppelklick kopiert — 1.1.5"
             )
             self.history_list.setMaximumHeight(120)
             self.history_list.setMouseTracking(True)
@@ -178,6 +181,13 @@ def run_gui(*, days: int | None = None) -> int:
             self.history_list.viewport().installEventFilter(self)
             layout.addWidget(self.history_list)
             self._history_hover_row = -1
+            self._reveal_timer = QTimer(self)
+            self._reveal_timer.setSingleShot(True)
+            self._reveal_timer.setInterval(REVEAL_AUTO_HIDE_MS)
+            self._reveal_timer.timeout.connect(self._auto_hide_reveal)
+            esc = QShortcut(QKeySequence(Qt.Key_Escape), self)
+            esc.setContext(Qt.WindowShortcut)
+            esc.activated.connect(self._mask_reveal)
 
             layout.addWidget(
                 QLabel(f"Standard: {KEY_DAYS} Tage. Kontakt: ame@sellerbach.de")
@@ -203,7 +213,8 @@ def run_gui(*, days: int | None = None) -> int:
                 item = QListWidgetItem(label)
                 item.setData(Qt.UserRole, entry)
                 item.setToolTip(
-                    "Hover/Reveal zeigt Key · Doppelklick kopiert — 1.1.4"
+                    "Hover/Reveal zeigt Key · Esc/10s maskiert · "
+                    "Doppelklick kopiert — 1.1.5"
                 )
                 self.history_list.addItem(item)
 
@@ -219,7 +230,27 @@ def run_gui(*, days: int | None = None) -> int:
                 reveal = reveal_all or (i == self._history_hover_row)
                 item.setText(self._history_label(entry, reveal=reveal))
 
-        def _on_reveal_toggled(self, _checked: bool = False):
+        def _mask_reveal(self) -> None:
+            """Reveal aus / Keys wieder maskieren (Esc oder Auto-Hide) — 1.1.5."""
+            self._reveal_timer.stop()
+            if self.reveal_check.isChecked():
+                self.reveal_check.setChecked(False)
+            else:
+                self._refresh_history_labels()
+            self.statusBar().showMessage("History wieder maskiert", 2000)
+
+        def _auto_hide_reveal(self) -> None:
+            if self.reveal_check.isChecked():
+                self._mask_reveal()
+
+        def _on_reveal_toggled(self, checked: bool = False):
+            if checked:
+                self._reveal_timer.start(REVEAL_AUTO_HIDE_MS)
+                self.statusBar().showMessage(
+                    "Reveal an — Auto-Hide in 10 s · Esc maskiert", 3000
+                )
+            else:
+                self._reveal_timer.stop()
             self._refresh_history_labels()
 
         def _history_hover_enter(self, item: QListWidgetItem):
@@ -238,6 +269,13 @@ def run_gui(*, days: int | None = None) -> int:
                         self._history_hover_row = -1
                         self._refresh_history_labels()
             return super().eventFilter(obj, event)
+
+        def keyPressEvent(self, event):
+            if event.key() == Qt.Key_Escape and self.reveal_check.isChecked():
+                self._mask_reveal()
+                event.accept()
+                return
+            super().keyPressEvent(event)
 
         def _history_copy(self, item: QListWidgetItem):
             """Doppelklick kopiert Key in die Zwischenablage — 1.1.4."""

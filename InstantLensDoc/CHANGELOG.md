@@ -1,5 +1,27 @@
 # Changelog — InstantLens Doc
 
+## 1.1.5 — OCR Fehler-Persistenz, Merge Preview-Banner, Ann. Menü-No-op, Keygen Reveal-Timer
+
+Post-Release-Polish nach 1.1.4: OCR-Toggle **„Fehler anhängen“** wird in den Einstellungen persistiert (Dialog + Settings); Merge-Readonly-Vorschau zeigt Banner **„Vorschau“** mit Button **„Zum Bearbeiten öffnen“**; gefiltertes Annotationen-Löschen bei 0 Treffern: Menü/Aktion ebenfalls no-op mit Statushinweis; Keygen-Reveal Auto-Hide nach 10 s, Esc maskiert wieder. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### OCR / Batch
+- Toggle **„Fehler anhängen“** in **Settings persistiert** (`ocr_attach_errors`, Default an); Dialog übernimmt den Wert
+
+### PDF
+- **Zusammenführen**: Readonly-Vorschau-Tab mit Banner **„Vorschau“** + **„Zum Bearbeiten öffnen“** (echtes Dokument)
+
+### Annotationen
+- Gefiltertes Löschen: bei **0 Treffern** auch Menü/Aktion **no-op mit Status** (kein Dialog)
+
+### Keygen
+- Reveal: **Auto-Hide nach 10 s**; **Esc** maskiert History wieder
+
+### Packaging / Docs
+- Version **1.1.5** (App / `ild_pdf` / ISS / Smoke / Docs)
+- Smoke: OCR Persistenz, Merge Preview-Banner, Ann. Menü-No-op, Keygen Reveal-Timer (CLI + Qt)
+
+---
+
 ## 1.1.4 — OCR Fehler-Toggle, Merge-Preview-Tab, Ann. 0-Treffer, Keygen Mask/Copy
 
 Post-Release-Polish nach 1.1.3: OCR-Batch-Dialog mit Toggle **„Fehler anhängen“** (Standard an); Merge-Vorschau-Thumbnail per Klick öffnet die Datei als Readonly-Vorschau in neuem Tab; gefiltertes Annotationen-Löschen bei 0 Treffern mit disabled Button + Statushinweis; Keygen-History maskiert Keys (nur letzte 4), Reveal/Hover zeigt Klartext, Doppelklick kopiert. Stubs KI/Cloud/Stylus/3D bleiben Stubs.

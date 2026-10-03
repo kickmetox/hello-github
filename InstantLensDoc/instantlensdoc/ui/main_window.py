@@ -129,6 +129,7 @@ class MainWindow(QMainWindow):
         self._presentation_active = False
         self._presentation_prev: dict | None = None
         self._unsaved_paths: set[str] = set()
+        self._readonly_preview_paths: set[str] = set()  # Merge-Vorschau-Tabs — 1.1.5
         self._secondary_path: str | None = None
         self._secondary_kind: str = ""  # "pdf" | "editor" | "" — Panel-Typ je Session
         self._last_tag_rename: tuple[str, str] | None = None  # (old, new) für einstufiges Undo
@@ -774,6 +775,38 @@ class MainWindow(QMainWindow):
         self.expiry_warn_banner.installEventFilter(self)
         self.expiry_warn_banner.setVisible(False)
         outer.addWidget(self.expiry_warn_banner)
+
+        # Readonly-Vorschau-Banner (Merge-Thumbnail) — 1.1.5
+        self.preview_readonly_banner = QWidget()
+        self.preview_readonly_banner.setObjectName("previewReadonlyBanner")
+        self.preview_readonly_banner.setAccessibleName("Vorschau — schreibgeschützt")
+        self.preview_readonly_banner.setAttribute(Qt.WA_StyledBackground, True)
+        self.preview_readonly_banner.setStyleSheet(
+            "#previewReadonlyBanner {"
+            " background: #E8F0FE; color: #1A3A6B; border-bottom: 1px solid #A8C0E8;"
+            "}"
+        )
+        prev_lay = QHBoxLayout(self.preview_readonly_banner)
+        prev_lay.setContentsMargins(10, 6, 8, 6)
+        prev_lay.setSpacing(10)
+        self.preview_readonly_label = QLabel("Vorschau")
+        self.preview_readonly_label.setToolTip(
+            "Datei ist als Readonly-Vorschau geöffnet — Speichern deaktiviert — 1.1.5"
+        )
+        self.preview_readonly_label.setStyleSheet("font-weight: 600;")
+        prev_lay.addWidget(self.preview_readonly_label)
+        prev_hint = QLabel("Schreibgeschützt — Änderungen werden nicht gespeichert.")
+        prev_hint.setWordWrap(True)
+        prev_lay.addWidget(prev_hint, 1)
+        self.btn_preview_open_edit = QPushButton("Zum Bearbeiten öffnen")
+        self.btn_preview_open_edit.setToolTip(
+            "Dieselbe Datei als normales, bearbeitbares Dokument öffnen — 1.1.5"
+        )
+        self.btn_preview_open_edit.setAccessibleName("Zum Bearbeiten öffnen")
+        self.btn_preview_open_edit.clicked.connect(self._open_preview_for_edit)
+        prev_lay.addWidget(self.btn_preview_open_edit)
+        self.preview_readonly_banner.setVisible(False)
+        outer.addWidget(self.preview_readonly_banner)
 
         root = QHBoxLayout()
         root.setContentsMargins(0, 0, 0, 0)
@@ -1518,8 +1551,8 @@ class MainWindow(QMainWindow):
         m_edit.addAction(act_sel_all_ann)
         act_clear_page_ann = QAction("Alle Annotationen auf Seite löschen…", self)
         act_clear_page_ann.setToolTip(
-            "Alle Annotationen der aktuellen Seite nach Bestätigung löschen "
-            "(Zähler N Annotationen, ein Undo-Schritt, Ctrl+Z) — 1.1.1"
+            "Alle Annotationen der aktuellen Seite nach Bestätigung löschen; "
+            "bei 0 gefilterten Treffern Menü/Aktion no-op mit Status — 1.1.5"
         )
         act_clear_page_ann.triggered.connect(self._clear_annotations_on_page)
         m_edit.addAction(act_clear_page_ann)
@@ -2861,6 +2894,22 @@ class MainWindow(QMainWindow):
         else:
             self._set_status("Auswahl: PDF mit Annotationen öffnen oder Texteditor nutzen")
 
+    def _ann_filter_is_active(self) -> bool:
+        """True wenn Sidebar-Ann.-Filter (Typ/Farbe/Tags/Suche/Gruppe) aktiv — 1.1.5."""
+        if not hasattr(self.sidebar, "annotation_filter_state"):
+            return False
+        try:
+            st = self.sidebar.annotation_filter_state() or {}
+        except Exception:
+            return False
+        return bool(
+            st.get("type")
+            or st.get("color")
+            or st.get("tags")
+            or st.get("search")
+            or st.get("group_id")
+        )
+
     def _clear_annotations_on_page(self):
         """Alle Annotationen der aktuellen PDF-Seite löschen (Bestätigung + Undo)."""
         if self.stack.currentWidget() is self.pdf_view and self.pdf_view.pdf_path:
@@ -2871,6 +2920,21 @@ class MainWindow(QMainWindow):
                     filtered_ids = self.sidebar.visible_annotation_ids(page=page)
                 except Exception:
                     filtered_ids = None
+            # 0 gefilterte Treffer: Menü/Aktion no-op mit Status (wie Yes disabled) — 1.1.5
+            if (
+                filtered_ids is not None
+                and self._ann_filter_is_active()
+                and self.pdf_view.store is not None
+            ):
+                anns = self.pdf_view.store.for_page(page)
+                n_filt = sum(1 for a in anns if str(a.id) in {str(x) for x in filtered_ids})
+                if anns and n_filt <= 0:
+                    msg = (
+                        f"Keine gefilterten Treffer auf Seite {page + 1} — "
+                        "Löschen abgebrochen"
+                    )
+                    self._set_status(msg)
+                    return
             n = self.pdf_view.clear_annotations_on_page(
                 filtered_ids=filtered_ids,
             )
@@ -6217,6 +6281,7 @@ class MainWindow(QMainWindow):
         self.sidebar.set_marks([])
         self.setWindowTitle(self._app_title())
         self._update_doc_status()
+        self._sync_preview_readonly_banner()
         if remaining:
             nxt = remaining[0]
             self.open_path(nxt)
@@ -7126,13 +7191,20 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, "Öffnen", f"Datei konnte nicht geöffnet werden:\n{e}")
             return
 
+        path_key = str(Path(path).resolve()) if path else str(path)
+        # Merge-Vorschau-Pfade bleiben readonly bis „Zum Bearbeiten öffnen“ — 1.1.5
         if readonly:
+            self._readonly_preview_paths.add(path_key)
+        is_preview = bool(readonly or path_key in self._readonly_preview_paths)
+        if is_preview:
             self.doc.meta["readonly"] = True
+        else:
+            self.doc.meta.pop("readonly", None)
         self.sidebar.add_document(path)
-        if not readonly:
+        if not is_preview:
             self._remember_path(path)
         title_name = self.doc.display_name
-        if readonly:
+        if is_preview:
             title_name = f"{title_name} [Vorschau]"
         self.setWindowTitle(self._app_title(title_name))
 
@@ -7180,8 +7252,9 @@ class MainWindow(QMainWindow):
             except Exception:
                 pass
             self._update_doc_status()
+            self._sync_preview_readonly_banner()
             enc = self.doc.meta.get("encoding")
-            if readonly or self.doc.meta.get("readonly"):
+            if is_preview or self.doc.meta.get("readonly"):
                 self._set_status(f"Vorschau (readonly): {path}")
             elif enc:
                 self._set_status(f"Geöffnet: {path} [{enc}]")
@@ -7190,6 +7263,37 @@ class MainWindow(QMainWindow):
         except Exception as e:
             _log.exception("Anzeige fehlgeschlagen: %s", path)
             QMessageBox.critical(self, "Öffnen", f"Anzeige fehlgeschlagen:\n{e}")
+
+    def _sync_preview_readonly_banner(self) -> None:
+        """Banner „Vorschau“ + Bearbeiten-Button bei Readonly-Tab — 1.1.5."""
+        banner = getattr(self, "preview_readonly_banner", None)
+        if banner is None:
+            return
+        is_ro = bool(self.doc and self.doc.meta.get("readonly"))
+        banner.setVisible(is_ro)
+
+    def _open_preview_for_edit(self) -> None:
+        """Readonly-Vorschau → echtes bearbeitbares Dokument — 1.1.5."""
+        if not self.doc or not self.doc.path:
+            self._set_status("Kein Vorschau-Dokument")
+            return
+        if not self.doc.meta.get("readonly"):
+            self._set_status("Dokument ist bereits bearbeitbar")
+            self._sync_preview_readonly_banner()
+            return
+        path = str(self.doc.path)
+        try:
+            path_key = str(Path(path).resolve())
+        except Exception:
+            path_key = path
+        self._readonly_preview_paths.discard(path_key)
+        self.doc.meta.pop("readonly", None)
+        self._remember_path(path)
+        title_name = self.doc.display_name
+        self.setWindowTitle(self._app_title(title_name))
+        self._sync_preview_readonly_banner()
+        self._update_doc_status()
+        self._set_status(f"Zum Bearbeiten geöffnet: {path}")
 
     def save_doc(self) -> bool:
         """Dokument speichern. Rückgabe True bei Erfolg (für Alle-speichern-Fehlerliste)."""
@@ -7669,6 +7773,12 @@ class MainWindow(QMainWindow):
         dpi = dlg.dpi()
         page_from, page_to = dlg.page_range()
         attach_errors = dlg.attach_errors()
+        try:
+            from instantlensdoc.core.app_settings import set_ocr_attach_errors
+
+            set_ocr_attach_errors(attach_errors)
+        except Exception:
+            pass
         cancelled = {"flag": False}
 
         range_hint = (

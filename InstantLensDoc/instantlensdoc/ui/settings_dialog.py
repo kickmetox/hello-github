@@ -62,6 +62,7 @@ from instantlensdoc.core.app_settings import (
     get_export_jpeg_quality,
     get_export_pdf_page,
     get_minimize_to_tray,
+    get_ocr_attach_errors,
     get_ocr_lang,
     get_page_size_unit,
     get_pdf_continuous_scroll,
@@ -140,6 +141,7 @@ from instantlensdoc.core.app_settings import (
     set_spellcheck_dict_path,
     set_minimize_to_tray,
     set_pdf_toolbar_groups,
+    set_ocr_attach_errors,
     set_ocr_lang,
     set_page_size_unit,
     set_pdf_continuous_scroll,
@@ -205,6 +207,14 @@ class SettingsDialog(QDialog):
                 pick = i
         self.lang_combo.setCurrentIndex(pick)
         form.addRow(tr("ocr_lang"), self.lang_combo)
+
+        self.ocr_attach_errors = QCheckBox("OCR: Fehler anhängen")
+        self.ocr_attach_errors.setChecked(get_ocr_attach_errors())
+        self.ocr_attach_errors.setToolTip(
+            "Beim Batch-OCR Seitenfehler als Abschnitt „OCR-Fehler“ anhängen "
+            "(auch im OCR-Dialog) — 1.1.5"
+        )
+        form.addRow(self.ocr_attach_errors)
 
         self.zoom_mode = QComboBox()
         self.zoom_mode.addItem("Prozent", DEFAULT_ZOOM_MODE_PERCENT)
@@ -1361,6 +1371,7 @@ class SettingsDialog(QDialog):
         lang = self.lang_combo.currentData() or "deu+eng"
         set_theme("dark" if theme == "dark" else "light")
         set_ocr_lang(str(lang))
+        set_ocr_attach_errors(self.ocr_attach_errors.isChecked())
         set_ui_lang(str(self.ui_lang.currentData() or "de"))
         sync_from_settings()
         set_update_check_on_start(self.update_chk.isChecked())

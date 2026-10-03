@@ -146,7 +146,7 @@ class PdfToolsDialog(QDialog):
             "QLabel { background: #f0f0f0; border: 1px solid #bbb; }"
         )
         self.merge_preview.setToolTip(
-            "Klick öffnet Datei als Readonly-Vorschau in neuem Tab — 1.1.4"
+            "Klick öffnet Datei als Readonly-Vorschau (Banner + Bearbeiten) — 1.1.5"
         )
         self.merge_preview.setText("Keine Auswahl")
         self.merge_preview.setWordWrap(True)
@@ -396,7 +396,7 @@ class PdfToolsDialog(QDialog):
             self.merge_preview.setPixmap(QPixmap())
             self.merge_preview.setText("Keine Auswahl")
             self.merge_preview.setToolTip(
-                "Klick öffnet Datei als Readonly-Vorschau in neuem Tab — 1.1.4"
+                "Klick öffnet Datei als Readonly-Vorschau (Banner + Bearbeiten) — 1.1.5"
             )
             return
         path = item.text().strip()
@@ -417,7 +417,7 @@ class PdfToolsDialog(QDialog):
             self.merge_preview.setPixmap(pm)
             self.merge_preview.setText("")
             self.merge_preview.setToolTip(
-                f"Klick: {Path(path).name} als Readonly-Vorschau öffnen — 1.1.4"
+                f"Klick: {Path(path).name} als Readonly-Vorschau öffnen — 1.1.5"
             )
         except Exception as e:
             self.merge_preview.setPixmap(QPixmap())
@@ -425,7 +425,7 @@ class PdfToolsDialog(QDialog):
             self.merge_preview.setToolTip(f"Vorschau fehlgeschlagen: {e}")
 
     def _merge_preview_clicked(self, event) -> None:
-        """Thumbnail-Klick → Datei in neuem Tab (readonly) — 1.1.4."""
+        """Thumbnail-Klick → Datei in neuem Tab (readonly + Banner) — 1.1.5."""
         path = self._preview_path
         if not path or not Path(path).is_file():
             if event is not None:

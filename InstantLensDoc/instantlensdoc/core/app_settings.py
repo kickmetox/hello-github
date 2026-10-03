@@ -16,6 +16,7 @@ UiLang = Literal["de", "en"]
 DEFAULTS: dict[str, Any] = {
     "theme": "light",
     "ocr_lang": "deu+eng",
+    "ocr_attach_errors": True,  # OCR-Batch: Fehlerabschnitt anhängen — 1.1.5
     "batch_output_dir": "",
     "default_open_dir": "",
     "ui_lang": "de",
@@ -193,6 +194,15 @@ def get_ocr_lang() -> str:
 
 def set_ocr_lang(code: str) -> None:
     save_settings({"ocr_lang": code or DEFAULTS["ocr_lang"]})
+
+
+def get_ocr_attach_errors() -> bool:
+    """OCR-Batch: Seitenfehler als Abschnitt anhängen (Default an) — 1.1.5."""
+    return bool(load_settings().get("ocr_attach_errors", DEFAULTS["ocr_attach_errors"]))
+
+
+def set_ocr_attach_errors(enabled: bool) -> None:
+    save_settings({"ocr_attach_errors": bool(enabled)})
 
 
 def get_batch_output_dir() -> Path | None:

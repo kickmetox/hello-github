@@ -20,7 +20,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
-from instantlensdoc.core.app_settings import get_ocr_lang
+from instantlensdoc.core.app_settings import get_ocr_attach_errors, get_ocr_lang
 from instantlensdoc.core.ocr import (
     DEFAULT_OCR_DPI,
     INSTALL_HINT_HTML,
@@ -125,13 +125,13 @@ class OcrDialog(QDialog):
             self.page_from.setVisible(False)
             self.page_to.setVisible(False)
 
-        # Batch: Fehlerabschnitt optional anhängen — 1.1.4
+        # Batch: Fehlerabschnitt optional anhängen — Settings-persistiert — 1.1.5
         self.attach_errors_check = QCheckBox("Fehler anhängen")
         self.attach_errors_check.setToolTip(
             "Seitenfehler als Abschnitt „OCR-Fehler“ an das Ergebnis-TXT anhängen "
-            "(Standard an) — 1.1.4"
+            "(Einstellung wird gemerkt) — 1.1.5"
         )
-        self.attach_errors_check.setChecked(True)
+        self.attach_errors_check.setChecked(get_ocr_attach_errors())
         if self._show_page_range:
             form.addRow(self.attach_errors_check)
         else:
@@ -208,7 +208,7 @@ class OcrDialog(QDialog):
         return a, b
 
     def attach_errors(self) -> bool:
-        """True = OCR-Fehler-Abschnitt an Ergebnis anhängen (Default) — 1.1.4."""
+        """True = OCR-Fehler-Abschnitt an Ergebnis anhängen (Settings) — 1.1.5."""
         if not self._show_page_range:
             return True
         return bool(self.attach_errors_check.isChecked())
