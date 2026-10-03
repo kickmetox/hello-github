@@ -1,5 +1,27 @@
 # Changelog — InstantLens Doc
 
+## 1.0.9 — Druckvorschau Tastatur, Banner Fokus·Enter, Backup-Sort, Weiter disabled
+
+Post-Release-Polish nach 1.0.8: Druckvorschau mit Tastatur PageUp/PageDown·Home/End für Seiten und +/- für Zoom; Lizenz-Banner mit sichtbarem Fokus-Ring und Enter öffnet Aktivierung; Backup-Log Sortier-Toggle „Neueste zuerst“ plus Hinweistext bei leerer Liste; Willkommen „Weiterarbeiten“ deaktiviert mit Tooltip wenn Session-Datei fehlt oder leer. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### Willkommen / Start
+- **Weiterarbeiten**: bei fehlender/leerer Session-Datei **deaktiviert** + Tooltip (`_session_file_status`); sichtbar wenn Restore aus
+
+### PDF / Druck
+- **Druckvorschau**: Tastatur **PageUp/PageDown** + **Home/End** für Seiten; **+/-** Zoom (`keyPressEvent`)
+
+### About / Lizenz
+- Banner: **Fokus-Ring** (`:focus`-Stylesheet); **Enter** öffnet About/Aktivierung; Fokus beim Einblenden
+
+### Backup
+- Einstellungen: Toggle **„Neueste zuerst“** (`sort_backup_log`); **Hinweistext** bei leerer Liste / leerem Filter
+
+### Packaging / Docs
+- Version **1.0.9** (App / `ild_pdf` / ISS / Smoke / Docs)
+- Smoke: Preview Keys, Banner Focus·Enter, Backup Sort·Empty, Welcome Disabled (CLI + Qt)
+
+---
+
 ## 1.0.8 — Druckvorschau Fit-Page/Mausrad, Banner Esc·a11y, Backup-Log BOM, Weiter-Tooltip
 
 Post-Release-Polish nach 1.0.7: Druckvorschau mit Fit-Page-Toggle und Mausrad-Zoom; Lizenz-Banner schließt mit Esc und setzt Screenreader-AccessibleName; Backup-Log-TXT mit Zeitstempel im Dateinamen und UTF-8-BOM für Excel; Willkommen-Tooltip „Weiterarbeiten“ mit Tab-Anzahl und Pfad-Snippet der ersten Datei. Stubs KI/Cloud/Stylus/3D bleiben Stubs.

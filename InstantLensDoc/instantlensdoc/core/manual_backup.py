@@ -1,4 +1,4 @@
-"""Manuelles Backup aktueller Dokumente in den App-Backup-Ordner — 1.0.8."""
+"""Manuelles Backup aktueller Dokumente in den App-Backup-Ordner — 1.0.9."""
 
 from __future__ import annotations
 
@@ -120,6 +120,28 @@ def filter_backup_log(
     if key in ("error", "fail", "fehler", "err"):
         return [e for e in items if isinstance(e, dict) and not bool(e.get("ok", True))]
     return [e for e in items if isinstance(e, dict)]
+
+
+def sort_backup_log(
+    entries: list[dict[str, Any]] | None = None,
+    *,
+    newest_first: bool = True,
+) -> list[dict[str, Any]]:
+    """
+    Backup-Log sortieren (neueste zuerst / älteste zuerst) — 1.0.9.
+
+    Sortierschlüssel: ``ts``-String (YYYY-MM-DD HH:MM:SS), Fallback Listenposition.
+    """
+    items = [e for e in (entries if entries is not None else load_backup_log()) if isinstance(e, dict)]
+
+    def _key(pair: tuple[int, dict[str, Any]]) -> tuple[str, int]:
+        i, e = pair
+        ts = str(e.get("ts") or "")
+        return (ts, i)
+
+    indexed = list(enumerate(items))
+    indexed.sort(key=_key, reverse=bool(newest_first))
+    return [e for _i, e in indexed]
 
 
 def default_backup_log_export_name(*, when: datetime | None = None) -> str:

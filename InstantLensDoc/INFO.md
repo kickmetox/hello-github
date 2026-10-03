@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **1.0.8** |
+| Version | **1.0.9** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -22,6 +22,7 @@
 - Warnung **≤3 Tage** vor Ablauf: Banner (nicht modal); **Klick → About/Aktivierung**  
 - Banner: **Icon** + **Dismiss** + **Schließen-X**; Persistenz **`dismiss_date`** (bis morgen)  
 - Banner: **Esc** schließt; **AccessibleName** für Screenreader  
+- Banner: **Fokus-Ring** sichtbar; **Enter** öffnet Aktivierung  
 - Banner-Text **i18n** (DE); Farbe **Warnung** (gelb) vs. **abgelaufen** (rot)  
 - Lizenz-Dialog: Resttage + Ablaufdatum klar  
 - About: Version, **Lizenzstatus**, Kontakt, Changelog-Kurzliste; bei Trial/ungültig **Lizenz aktivieren…**; **Privacy: lokal, keine Telemetrie**
@@ -58,10 +59,10 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an / `checkedonce`)
 
-## Neu in 1.0.8
+## Neu in 1.0.9
 
-- Drucken: Vorschau **Fit-Page** + **Mausrad-Zoom**
-- Lizenz: Banner **Esc** schließt; **AccessibleName** (Screenreader)
-- Backup: Log-Export **Zeitstempel im Dateinamen** + **UTF-8 BOM** (Excel)
-- Willkommen: **Weiterarbeiten**-Tooltip mit **Tab-Anzahl** + **Pfad-Snippet**
+- Drucken: Vorschau **PageUp/Down·Home/End** + **+/- Zoom** (Tastatur)
+- Lizenz: Banner **Fokus-Ring**; **Enter** öffnet Aktivierung
+- Backup: Log **Sortierung neueste zuerst** (Toggle) + **leere-Liste-Hinweis**
+- Willkommen: **Weiterarbeiten** deaktiviert + Tooltip wenn Session fehlt/leer
 - Stubs KI/Cloud/Stylus/3D unverändert

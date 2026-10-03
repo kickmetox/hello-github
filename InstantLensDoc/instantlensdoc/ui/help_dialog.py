@@ -100,10 +100,10 @@ HELP_HTML = f"""
 <li><b>Datei → Projekt-Ordner</b>: Workspace wählen (letzte 5); Dialoge starten im aktiven Ordner</li>
 <li><b>Datei → Exportieren</b>: Editor-Inhalt als HTML, DOCX oder PDF (zuletzt genutzter Ordner wird gemerkt);
     <b>Export-Profil</b> speichern/anwenden (DPI / Format / Ziel)</li>
-<li><b>Datei → Drucken</b> (Ctrl+P): Editor oder aktuelle PDF-Seite (Qt Print); <b>PDF → Dokument drucken…</b> Seitenbereich + DPI + Graustufen; <b>Vorschau Fit-Page + Mausrad-Zoom + Zoom +/- + Seitenwahl</b> bei Mehrseiten; Fortschritt; Abbruch → Cleanup — 1.0.8</li>
-<li><b>Datei → Backup jetzt</b> / <b>Backup-Ordner öffnen…</b>: manuelles Backup; max. 3 Versuche; Log letzte 20; Filter Erfolg/Fehler; <b>Export TXT</b> (Zeitstempel-Name, UTF-8 BOM); Doppelklick öffnet Datei/Ordner — 1.0.8</li>
-<li><b>Willkommen</b>: <b>Weiterarbeiten</b> (Tooltip: Tab-Anzahl + Pfad-Snippet); Esc leert Filter → Fokus Liste; Clear + Treffer; Enter/Entf; Drag&amp;Drop — 1.0.8</li>
-<li><b>Hilfe → Info / Lizenz</b>: Banner <b>Esc schließt</b> + <b>AccessibleName</b>; Icon + Dismiss + Schließen-X; Persistenz <b>dismiss_date</b>; Farbe Warnung vs. abgelaufen — 1.0.8</li>
+<li><b>Datei → Drucken</b> (Ctrl+P): Editor oder aktuelle PDF-Seite (Qt Print); <b>PDF → Dokument drucken…</b> Seitenbereich + DPI + Graustufen; <b>Vorschau PageUp/Down·Home/End + +/- Zoom + Fit-Page + Mausrad + Seitenwahl</b> bei Mehrseiten; Fortschritt; Abbruch → Cleanup — 1.0.9</li>
+<li><b>Datei → Backup jetzt</b> / <b>Backup-Ordner öffnen…</b>: manuelles Backup; max. 3 Versuche; Log letzte 20; Filter Erfolg/Fehler; <b>Sortierung neueste zuerst</b> (Toggle); Hinweis bei leerer Liste; <b>Export TXT</b> (Zeitstempel-Name, UTF-8 BOM); Doppelklick öffnet Datei/Ordner — 1.0.9</li>
+<li><b>Willkommen</b>: <b>Weiterarbeiten</b> deaktiviert + Tooltip wenn Session fehlt/leer; sonst Tab-Anzahl + Pfad-Snippet; Esc leert Filter → Fokus Liste; Clear + Treffer; Enter/Entf; Drag&amp;Drop — 1.0.9</li>
+<li><b>Hilfe → Info / Lizenz</b>: Banner <b>Fokus-Ring</b> + <b>Enter → Aktivierung</b> + Esc schließt + AccessibleName; Icon + Dismiss + Schließen-X; Persistenz <b>dismiss_date</b>; Farbe Warnung vs. abgelaufen — 1.0.9</li>
 <li><b>Seitenleiste</b>: Suche (inkl. letzte Suchbegriffe), „Alle Docs“-Volltext, Zuletzt geöffnet, Dokumente,
     Lesezeichen/Outline (+/− hinzufügen/löschen), <b>Annotationen</b> (klickbar, <b>nach Seite gruppiert</b>,
     <b>Filter nach Typ</b>, <b>Textsuche in der Liste</b> (optional <b>Regex</b>), <b>Statistik je Typ</b>,

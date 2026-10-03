@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import QEvent, Qt, QTimer
 from PySide6.QtGui import QAction, QIcon, QKeySequence
 from PySide6.QtWidgets import (
     QFileDialog,
@@ -721,7 +721,7 @@ class MainWindow(QMainWindow):
         outer.setContentsMargins(0, 0, 0, 0)
         outer.setSpacing(0)
 
-        # Ablaufwarnung-Banner: Esc schließt; AccessibleName — 1.0.8
+        # Ablaufwarnung-Banner: Fokus-Ring; Enter→Aktivierung; Esc schließt — 1.0.9
         from PySide6.QtWidgets import QStyle
 
         from instantlensdoc.core.i18n import tr as _tr_ban
@@ -730,6 +730,7 @@ class MainWindow(QMainWindow):
         self.expiry_warn_banner.setObjectName("expiryWarnBanner")
         self.expiry_warn_banner.setAccessibleName(_tr_ban("expiry_banner_accessible"))
         self.expiry_warn_banner.setFocusPolicy(Qt.StrongFocus)
+        self.expiry_warn_banner.setAttribute(Qt.WA_StyledBackground, True)
         self._expiry_banner_kind = "warn"
         self._apply_expiry_banner_style("warn")
         ban_lay = QHBoxLayout(self.expiry_warn_banner)
@@ -770,6 +771,7 @@ class MainWindow(QMainWindow):
         )
         self.btn_expiry_warn_close.clicked.connect(self._dismiss_expiry_warning)
         ban_lay.addWidget(self.btn_expiry_warn_close)
+        self.expiry_warn_banner.installEventFilter(self)
         self.expiry_warn_banner.setVisible(False)
         outer.addWidget(self.expiry_warn_banner)
 
@@ -2666,6 +2668,25 @@ class MainWindow(QMainWindow):
         self._presentation_prev = None
         self._set_status("Präsentationsmodus beendet")
 
+    def eventFilter(self, obj, event):  # noqa: N802
+        """Banner: Enter öffnet Aktivierung (Fokus auf Banner) — 1.0.9."""
+        banner = getattr(self, "expiry_warn_banner", None)
+        if (
+            banner is not None
+            and obj is banner
+            and event.type() == QEvent.Type.KeyPress
+        ):
+            key = event.key()
+            if key in (Qt.Key_Return, Qt.Key_Enter):
+                self._on_expiry_warn_clicked()
+                event.accept()
+                return True
+            if key == Qt.Key_Escape:
+                self._dismiss_expiry_warning()
+                event.accept()
+                return True
+        return super().eventFilter(obj, event)
+
     def keyPressEvent(self, event):  # noqa: N802
         if self._presentation_active:
             key = event.key()
@@ -2697,11 +2718,16 @@ class MainWindow(QMainWindow):
                 return
             event.accept()
             return
-        # Esc schließt sichtbares Lizenz-Banner — 1.0.8
-        if event.key() == Qt.Key_Escape:
-            banner = getattr(self, "expiry_warn_banner", None)
-            if banner is not None and banner.isVisible():
+        # Banner: Esc schließt; Enter öffnet Aktivierung — 1.0.9
+        banner = getattr(self, "expiry_warn_banner", None)
+        if banner is not None and banner.isVisible():
+            key = event.key()
+            if key == Qt.Key_Escape:
                 self._dismiss_expiry_warning()
+                event.accept()
+                return
+            if key in (Qt.Key_Return, Qt.Key_Enter):
+                self._on_expiry_warn_clicked()
                 event.accept()
                 return
         super().keyPressEvent(event)
@@ -4518,22 +4544,32 @@ class MainWindow(QMainWindow):
             )
 
     def _apply_expiry_banner_style(self, kind: str) -> None:
-        """Warnung = Gelb, abgelaufen = Rot — 1.0.6."""
+        """Warnung = Gelb, abgelaufen = Rot; Fokus-Ring sichtbar — 1.0.9."""
         banner = getattr(self, "expiry_warn_banner", None)
         if banner is None:
             return
         self._expiry_banner_kind = kind
+        # Fokus-Ring (:focus) bleibt sichtbar trotz Background-Stylesheet — 1.0.9
+        focus = (
+            "QWidget#expiryWarnBanner:focus {"
+            " border: 2px solid #0D6EFD;"
+            " outline: 2px solid #0D6EFD;"
+            " outline-offset: 1px;"
+            "}"
+        )
         if kind == "expired":
             banner.setStyleSheet(
                 "QWidget#expiryWarnBanner {"
                 " background: #F8D7DA; border-bottom: 1px solid #C0392B;"
                 "}"
+                + focus
             )
         else:
             banner.setStyleSheet(
                 "QWidget#expiryWarnBanner {"
                 " background: #FFF3CD; border-bottom: 1px solid #E0C36A;"
                 "}"
+                + focus
             )
 
     def _sync_expiry_warn_banner(self, st=None, ablauf: str = "") -> None:
@@ -4588,6 +4624,14 @@ class MainWindow(QMainWindow):
         was_visible = banner.isVisible()
         banner.setVisible(True)
         if not was_visible:
+            # Fokus setzen → Fokus-Ring sichtbar; Enter öffnet Aktivierung — 1.0.9
+            try:
+                banner.setFocus(Qt.OtherFocusReason)
+            except Exception:
+                try:
+                    banner.setFocus()
+                except Exception:
+                    pass
             self.statusBar().showMessage(warn, 8000)
             if (
                 getattr(self, "_tray", None) is not None

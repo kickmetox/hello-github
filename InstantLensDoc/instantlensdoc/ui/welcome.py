@@ -1,4 +1,4 @@
-"""Willkommens-/Startseite wenn keine Dokument-Tabs offen sind — 1.0.8."""
+"""Willkommens-/Startseite wenn keine Dokument-Tabs offen sind — 1.0.9."""
 
 from __future__ import annotations
 
@@ -23,6 +23,12 @@ from instantlensdoc.config import DISPLAY_NAME
 from instantlensdoc.core import recent as recent_mod
 
 _CONTINUE_PATH_SNIPPET_LEN = 48
+_CONTINUE_TIP_MISSING = (
+    "Keine Session-Datei — Weiterarbeiten nicht möglich — 1.0.9"
+)
+_CONTINUE_TIP_EMPTY = (
+    "Session-Datei leer — keine wiederherstellbaren Tabs — 1.0.9"
+)
 
 
 def _path_snippet(path: str, max_len: int = _CONTINUE_PATH_SNIPPET_LEN) -> str:
@@ -35,6 +41,31 @@ def _path_snippet(path: str, max_len: int = _CONTINUE_PATH_SNIPPET_LEN) -> str:
     return "…" + p[-(max_len - 1) :]
 
 
+def _session_file_status() -> tuple[bool, bool, list]:
+    """
+    Session-Datei-Status für Weiterarbeiten — 1.0.9.
+
+    Rückgabe: ``(file_exists, file_nonempty, tabs)``.
+    ``file_nonempty`` = Datei vorhanden und Inhalt (nicht nur Whitespace).
+    """
+    from instantlensdoc.core.session import load_session, session_path
+
+    path = session_path()
+    exists = path.is_file()
+    nonempty = False
+    if exists:
+        try:
+            nonempty = bool(path.read_text(encoding="utf-8").strip())
+        except Exception:
+            nonempty = False
+    tabs: list = []
+    try:
+        tabs = list(load_session().tabs or [])
+    except Exception:
+        tabs = []
+    return exists, nonempty, tabs
+
+
 class WelcomePage(QWidget):
     """Startseite: Recent-Liste + Live-Filter + Weiterarbeiten (Session) + Aktionen."""
 
@@ -44,7 +75,7 @@ class WelcomePage(QWidget):
     recent_remove_requested = Signal(str)
     clear_recent_requested = Signal()
     files_dropped = Signal(list)  # list[str] lokale Dateipfade
-    continue_session_requested = Signal()  # letzte Session-Tabs — 1.0.7/1.0.8
+    continue_session_requested = Signal()  # letzte Session-Tabs — 1.0.7–1.0.9
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -76,10 +107,11 @@ class WelcomePage(QWidget):
         btn_row.addWidget(self.btn_empty)
         self.btn_continue = QPushButton("Weiterarbeiten")
         self.btn_continue.setToolTip(
-            "Letzte Session-Tabs öffnen (wenn „Offene Tabs wiederherstellen“ aus) — 1.0.8"
+            "Letzte Session-Tabs öffnen (wenn „Offene Tabs wiederherstellen“ aus) — 1.0.9"
         )
         self.btn_continue.clicked.connect(self.continue_session_requested.emit)
         self.btn_continue.setVisible(False)
+        self.btn_continue.setEnabled(False)
         btn_row.addWidget(self.btn_continue)
         self.btn_clear_recent = QPushButton("Recent leeren")
         self.btn_clear_recent.setToolTip("Liste der zuletzt geöffneten Dateien leeren")
@@ -116,7 +148,7 @@ class WelcomePage(QWidget):
             "Enter / Doppelklick öffnet; Entf entfernt den Eintrag; "
             "Rechtsklick: Entfernen / Ordner öffnen; Drag & Drop öffnet Dateien; "
             "Filter oben filtert live; Esc leert Filter → Fokus Liste; Trefferanzahl rechts; "
-            "Weiterarbeiten öffnet letzte Session wenn Restore aus — 1.0.8"
+            "Weiterarbeiten: deaktiviert wenn Session fehlt/leer — 1.0.9"
         )
         self.recent_list.setAcceptDrops(True)
         self.recent_list.setContextMenuPolicy(Qt.CustomContextMenu)
@@ -130,42 +162,45 @@ class WelcomePage(QWidget):
         self.refresh_continue_button()
 
     def refresh_continue_button(self) -> None:
-        """„Weiterarbeiten“ + Tooltip mit Tab-Anzahl und erstem Pfad — 1.0.8."""
+        """Weiterarbeiten: disabled + Tooltip wenn Session fehlt/leer — 1.0.9."""
         show = False
-        tabs = []
+        enabled = False
+        tip = (
+            "Letzte Session-Tabs öffnen (wenn „Offene Tabs wiederherstellen“ aus) — 1.0.9"
+        )
+        label = "Weiterarbeiten"
         try:
             from instantlensdoc.core.app_settings import get_restore_session_on_start
-            from instantlensdoc.core.session import load_session
 
             if not get_restore_session_on_start():
-                state = load_session()
-                tabs = list(state.tabs or [])
-                show = bool(tabs)
+                show = True
+                exists, nonempty, tabs = _session_file_status()
+                if not exists:
+                    enabled = False
+                    tip = _CONTINUE_TIP_MISSING
+                elif not nonempty or not tabs:
+                    enabled = False
+                    tip = _CONTINUE_TIP_EMPTY
+                else:
+                    enabled = True
+                    n = len(tabs)
+                    label = f"Weiterarbeiten ({n})" if n > 0 else "Weiterarbeiten"
+                    first = _path_snippet(getattr(tabs[0], "path", "") or "")
+                    if n == 1:
+                        tip = "Weiterarbeiten: 1 Tab"
+                    else:
+                        tip = f"Weiterarbeiten: {n} Tabs"
+                    if first:
+                        tip = f"{tip} — {first}"
+                    tip += " (wenn „Offene Tabs wiederherstellen“ aus) — 1.0.9"
         except Exception:
             show = False
-            tabs = []
+            enabled = False
+            tip = _CONTINUE_TIP_MISSING
         self.btn_continue.setVisible(show)
-        if show:
-            n = len(tabs)
-            self.btn_continue.setText(
-                f"Weiterarbeiten ({n})" if n > 0 else "Weiterarbeiten"
-            )
-            first = ""
-            if tabs:
-                first = _path_snippet(getattr(tabs[0], "path", "") or "")
-            if n == 1:
-                tip = f"Weiterarbeiten: 1 Tab"
-            else:
-                tip = f"Weiterarbeiten: {n} Tabs"
-            if first:
-                tip = f"{tip} — {first}"
-            tip += " (wenn „Offene Tabs wiederherstellen“ aus) — 1.0.8"
-            self.btn_continue.setToolTip(tip)
-        else:
-            self.btn_continue.setText("Weiterarbeiten")
-            self.btn_continue.setToolTip(
-                "Letzte Session-Tabs öffnen (wenn „Offene Tabs wiederherstellen“ aus) — 1.0.8"
-            )
+        self.btn_continue.setEnabled(enabled)
+        self.btn_continue.setText(label)
+        self.btn_continue.setToolTip(tip)
 
     def eventFilter(self, obj, event):  # noqa: N802
         """Esc leert Filter→Liste; Delete entfernt; Enter öffnet — 1.0.6."""

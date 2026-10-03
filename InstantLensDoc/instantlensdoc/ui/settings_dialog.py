@@ -488,14 +488,15 @@ class SettingsDialog(QDialog):
         self.backup_log_list.setMinimumHeight(120)
         self.backup_log_list.setMaximumHeight(180)
         self.backup_log_list.setToolTip(
-            f"Letzte {BACKUP_LOG_MAX} manuellen Backup-Vorgänge (neueste oben); "
-            "Filter Erfolg/Fehler; Export als TXT; "
-            "Doppelklick öffnet Backup-Datei bzw. Ordner — 1.0.7"
+            f"Letzte {BACKUP_LOG_MAX} manuellen Backup-Vorgänge; "
+            "Sortierung neueste zuerst (Toggle); Filter Erfolg/Fehler; Export als TXT; "
+            "Doppelklick öffnet Backup-Datei bzw. Ordner — 1.0.9"
         )
         self.backup_log_list.setAlternatingRowColors(True)
         self.backup_log_list.itemDoubleClicked.connect(self._open_backup_log_entry)
         self._backup_log_entries: list = list(load_backup_log())
         self._backup_log_filter_mode = "all"
+        self._backup_log_newest_first = True
         bak_log_col = QVBoxLayout()
         bak_log_col.setContentsMargins(0, 0, 0, 0)
         filter_row = QHBoxLayout()
@@ -509,7 +510,23 @@ class SettingsDialog(QDialog):
         )
         self.backup_log_filter.currentIndexChanged.connect(self._on_backup_log_filter)
         filter_row.addWidget(self.backup_log_filter, 1)
+        self.backup_log_newest_first = QCheckBox("Neueste zuerst")
+        self.backup_log_newest_first.setChecked(True)
+        self.backup_log_newest_first.setToolTip(
+            "Sortierung: neueste zuerst (an) oder älteste zuerst (aus) — 1.0.9"
+        )
+        self.backup_log_newest_first.toggled.connect(self._on_backup_log_sort)
+        filter_row.addWidget(self.backup_log_newest_first)
         bak_log_col.addLayout(filter_row)
+        self.backup_log_empty_hint = QLabel(
+            "Noch keine Backup-Vorgänge protokolliert."
+        )
+        self.backup_log_empty_hint.setWordWrap(True)
+        self.backup_log_empty_hint.setStyleSheet("color: #666; font-style: italic;")
+        self.backup_log_empty_hint.setToolTip(
+            "Hinweis wenn das Backup-Log leer ist — 1.0.9"
+        )
+        bak_log_col.addWidget(self.backup_log_empty_hint)
         bak_log_col.addWidget(self.backup_log_list)
         bak_log_btns = QHBoxLayout()
         self.btn_backup_log_copy = QPushButton("Eintrag kopieren")
@@ -891,25 +908,49 @@ class SettingsDialog(QDialog):
         self._backup_log_filter_mode = mode
         self._populate_backup_log_list()
 
+    def _on_backup_log_sort(self, checked: bool = True) -> None:
+        """Sortierung neueste zuerst umschalten — 1.0.9."""
+        self._backup_log_newest_first = bool(checked)
+        self._populate_backup_log_list()
+
     def _populate_backup_log_list(self) -> None:
         from PySide6.QtCore import Qt as _Qt
 
         from instantlensdoc.core.manual_backup import (
             filter_backup_log,
             format_backup_log_line,
+            sort_backup_log,
         )
 
         mode = getattr(self, "_backup_log_filter_mode", "all") or "all"
+        newest_first = bool(getattr(self, "_backup_log_newest_first", True))
         entries = getattr(self, "_backup_log_entries", None) or []
         visible = filter_backup_log(entries, mode=mode)
+        visible = sort_backup_log(visible, newest_first=newest_first)
         self._backup_log_visible = visible
         self.backup_log_list.clear()
         for entry in visible:
             item = QListWidgetItem(format_backup_log_line(entry))
             item.setData(_Qt.UserRole, entry)
             self.backup_log_list.addItem(item)
+        # Leere-Liste-Hinweistext (Label + Listenplatzhalter) — 1.0.9
+        empty_all = not entries
+        empty_filter = bool(entries) and not visible
+        if hasattr(self, "backup_log_empty_hint"):
+            if empty_all:
+                self.backup_log_empty_hint.setText(
+                    "Noch keine Backup-Vorgänge protokolliert."
+                )
+                self.backup_log_empty_hint.setVisible(True)
+            elif empty_filter:
+                self.backup_log_empty_hint.setText(
+                    "Keine Einträge für diesen Filter."
+                )
+                self.backup_log_empty_hint.setVisible(True)
+            else:
+                self.backup_log_empty_hint.setVisible(False)
         if self.backup_log_list.count() == 0:
-            if not entries:
+            if empty_all:
                 empty = QListWidgetItem("(noch keine Backup-Vorgänge protokolliert)")
             else:
                 empty = QListWidgetItem("(keine Einträge für diesen Filter)")

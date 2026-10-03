@@ -1,11 +1,11 @@
-"""Druckvorschau: Fit-Page Toggle + Mausrad-Zoom — 1.0.8."""
+"""Druckvorschau: Tastatur PageUp/Down·Home/End + +/- Zoom — 1.0.9."""
 
 from __future__ import annotations
 
 from collections.abc import Callable
 
 from PySide6.QtCore import QEvent, Qt
-from PySide6.QtGui import QPixmap, QWheelEvent
+from PySide6.QtGui import QKeyEvent, QPixmap, QWheelEvent
 from PySide6.QtWidgets import (
     QCheckBox,
     QDialog,
@@ -20,7 +20,7 @@ from PySide6.QtWidgets import (
 
 from instantlensdoc.core.app_settings import get_print_preview, set_print_preview
 
-# Basis-Anzeigegröße; Zoom skaliert relativ dazu — 1.0.7/1.0.8
+# Basis-Anzeigegröße; Zoom skaliert relativ dazu — 1.0.7–1.0.9
 _BASE_W = 360
 _BASE_H = 480
 _ZOOM_MIN = 0.5
@@ -29,7 +29,7 @@ _ZOOM_STEP = 0.25
 
 
 class PrintPreviewDialog(QDialog):
-    """Modaler Dialog: Thumbnail mit Fit-Page, Zoom +/- / Mausrad und Seitenwahl."""
+    """Modaler Dialog: Thumbnail mit Fit-Page, Zoom +/- / Mausrad / Tastatur und Seitenwahl."""
 
     def __init__(
         self,
@@ -71,12 +71,12 @@ class PrintPreviewDialog(QDialog):
         self._info.setWordWrap(True)
         layout.addWidget(self._info)
 
-        # Zoom +/- , Fit-Page und ggf. Seitenwahl — 1.0.7/1.0.8
+        # Zoom +/- , Fit-Page und ggf. Seitenwahl — 1.0.7–1.0.9
         ctrl = QHBoxLayout()
         self.btn_zoom_out = QPushButton("−")
         self.btn_zoom_out.setFixedWidth(32)
         self.btn_zoom_out.setToolTip(
-            "Vorschau verkleinern (auch Mausrad) — 1.0.8"
+            "Vorschau verkleinern (− / Mausrad) — 1.0.9"
         )
         self.btn_zoom_out.clicked.connect(self._zoom_out)
         ctrl.addWidget(self.btn_zoom_out)
@@ -88,7 +88,7 @@ class PrintPreviewDialog(QDialog):
         self.btn_zoom_in = QPushButton("+")
         self.btn_zoom_in.setFixedWidth(32)
         self.btn_zoom_in.setToolTip(
-            "Vorschau vergrößern (auch Mausrad) — 1.0.8"
+            "Vorschau vergrößern (+ / Mausrad) — 1.0.9"
         )
         self.btn_zoom_in.clicked.connect(self._zoom_in)
         ctrl.addWidget(self.btn_zoom_in)
@@ -107,7 +107,9 @@ class PrintPreviewDialog(QDialog):
         if multi:
             self.btn_page_prev = QPushButton("◀")
             self.btn_page_prev.setFixedWidth(32)
-            self.btn_page_prev.setToolTip("Vorherige Druckseite — 1.0.7")
+            self.btn_page_prev.setToolTip(
+                "Vorherige Druckseite (PageUp) — 1.0.9"
+            )
             self.btn_page_prev.clicked.connect(self._page_prev)
             ctrl.addWidget(self.btn_page_prev)
             self.page_spin = QSpinBox()
@@ -115,13 +117,15 @@ class PrintPreviewDialog(QDialog):
             self.page_spin.setValue(1)
             self.page_spin.setPrefix("Seite ")
             self.page_spin.setToolTip(
-                "Seite im gewählten Mehrseiten-Druckbereich wählen — 1.0.7"
+                "Seite wählen — PageUp/PageDown · Home/End — 1.0.9"
             )
             self.page_spin.valueChanged.connect(self._on_page_spin)
             ctrl.addWidget(self.page_spin)
             self.btn_page_next = QPushButton("▶")
             self.btn_page_next.setFixedWidth(32)
-            self.btn_page_next.setToolTip("Nächste Druckseite — 1.0.7")
+            self.btn_page_next.setToolTip(
+                "Nächste Druckseite (PageDown) — 1.0.9"
+            )
             self.btn_page_next.clicked.connect(self._page_next)
             ctrl.addWidget(self.btn_page_next)
             self._page_nav_label = QLabel(f"/ {len(self._pages)}")
@@ -133,7 +137,7 @@ class PrintPreviewDialog(QDialog):
         self._scroll.setWidgetResizable(True)
         self._scroll.setAlignment(Qt.AlignCenter)
         self._scroll.setToolTip(
-            "Mausrad: Zoom; „Seite einpassen“ für Fit-Page — 1.0.8"
+            "Mausrad / +/- : Zoom; PageUp/Down · Home/End: Seiten — 1.0.9"
         )
         self._scroll.viewport().installEventFilter(self)
         self._thumb = QLabel()
@@ -152,7 +156,7 @@ class PrintPreviewDialog(QDialog):
         self.preview_check = QCheckBox("Druckvorschau vor dem Drucken anzeigen")
         self.preview_check.setChecked(preview_on)
         self.preview_check.setToolTip(
-            "Optional: Vorschau-Dialog vor dem Druckerdialog — Einstellung wird gemerkt — 1.0.8"
+            "Optional: Vorschau-Dialog vor dem Druckerdialog — Einstellung wird gemerkt — 1.0.9"
         )
         layout.addWidget(self.preview_check)
 
@@ -165,6 +169,36 @@ class PrintPreviewDialog(QDialog):
         layout.addWidget(buttons)
 
         self._refresh_view()
+
+    def keyPressEvent(self, event: QKeyEvent) -> None:  # noqa: N802
+        """PageUp/Down·Home/End: Seiten; +/- : Zoom — 1.0.9."""
+        key = event.key()
+        multi = len(self._pages) > 1
+        if multi and key == Qt.Key_PageUp:
+            self._page_prev()
+            event.accept()
+            return
+        if multi and key == Qt.Key_PageDown:
+            self._page_next()
+            event.accept()
+            return
+        if multi and key == Qt.Key_Home:
+            self._page_first()
+            event.accept()
+            return
+        if multi and key == Qt.Key_End:
+            self._page_last()
+            event.accept()
+            return
+        if key in (Qt.Key_Plus, Qt.Key_Equal):
+            self._zoom_in()
+            event.accept()
+            return
+        if key in (Qt.Key_Minus, Qt.Key_Underscore):
+            self._zoom_out()
+            event.accept()
+            return
+        super().keyPressEvent(event)
 
     def eventFilter(self, obj, event):  # noqa: N802
         """Mausrad über Vorschau → Zoom — 1.0.8."""
@@ -232,7 +266,7 @@ class PrintPreviewDialog(QDialog):
             self._thumb.setPixmap(scaled)
             self._thumb.setText("")
             self._thumb.setToolTip(
-                f"Druckseite {page_idx + 1} — Zoom {zoom_pct} — 1.0.8"
+                f"Druckseite {page_idx + 1} — Zoom {zoom_pct} — 1.0.9"
             )
         else:
             self._thumb.clear()
@@ -298,6 +332,19 @@ class PrintPreviewDialog(QDialog):
     def _page_next(self) -> None:
         if self._index < len(self._pages) - 1:
             self._index += 1
+            self._refresh_view()
+
+    def _page_first(self) -> None:
+        """Erste Seite im Druckbereich — 1.0.9."""
+        if self._index != 0:
+            self._index = 0
+            self._refresh_view()
+
+    def _page_last(self) -> None:
+        """Letzte Seite im Druckbereich — 1.0.9."""
+        last = len(self._pages) - 1
+        if last >= 0 and self._index != last:
+            self._index = last
             self._refresh_view()
 
     def _on_page_spin(self, value: int) -> None:
