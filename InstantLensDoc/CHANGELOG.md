@@ -1,5 +1,23 @@
 # Changelog — InstantLens Doc
 
+## 1.8.5 — Batch Blink aus=Status einmalig, HF Fit-Zoom nur Vorschau, Layer A11y Alle ein/aus, Recovery Mehrfach-Verwerfen
+
+Post-Release-Polish nach 1.8.4: **Batch Status-Blink „aus“** zeigt **einmaligen Status ohne Blink** (wie Pending-Status-Blink); **HF Fit-/Zoom-Persistenz** klar **nur Vorschau** — **irrelevant für Bake / „Auf alle“**; **Layer Alle ein/aus** mit **Accessibility-Announcement**; **Crash-Recovery** mit **Mehrfachauswahl Verwerfen** und **„Alle verwerfen“ inkl. Bestätigung**. Stubs KI/Cloud/Stylus/3D bleiben Stubs.
+
+### PDF / Seiten
+- Batch Status-Blink: Modus aus = einmaliger Status-Hinweis ohne Blink (Status-Text bleibt/wird erneut gezeigt)
+- Kopf-/Fußzeile: Fit-Page/Zoom-Persistenz nur für Vorschau; Bake und „Auf alle Seiten anwenden“ unberührt
+
+### Annotationen / Recovery
+- Annotation-Typen „Alle ein/aus“: Accessibility-Announcement (Screenreader) bei Status
+- Crash-Recovery: Orphan-Liste mit ExtendedSelection; Auswahl verwerfen; „Alle verwerfen“ mit Bestätigung
+
+### Packaging / Docs
+- Version **1.8.5** (App / `ild_pdf` / ISS / Smoke / Docs); `docs/VERSION` + `VERSION.txt`
+- Smoke: Batch Blink-aus Status, HF Fit nur Vorschau, Layer A11y, Orphan Mehrfach-Verwerfen (CLI + Qt)
+
+---
+
 ## 1.8.4 — Batch Status-Blink Settings, HF Esc-Fokus·Fit merken, Layer Redo·Status, Recovery Orphan-Liste älteste zuerst
 
 Post-Release-Polish nach 1.8.3: **Batch Status-Blink** nutzt **Status-Blink Settings (kurz/aus)**; **Kopf-/Fußzeile-Vorschau** mit **Esc → Fokus zurück auf Dialog** und **Fit-Page speichert Zoom-Modus** für die nächste Vorschau; **Layer Alle ein/aus** mit **Redo (Ctrl+Y)** und Status **„Layer: alle ein/aus“**; **Crash-Recovery** listet **mehrere Orphans** (nummeriert), **älteste zuerst**. Stubs KI/Cloud/Stylus/3D bleiben Stubs.

@@ -888,7 +888,9 @@ class WatermarkDialog(QDialog):
         scope_box.addWidget(scope_lbl)
         saved_range = str(self._last_hf.get("page_range") or "").strip()
         self.hf_scope_all = QRadioButton("Auf alle Seiten anwenden")
-        self.hf_scope_all.setToolTip("Kopf-/Fußzeile auf jede Seite bakken — 1.8.2")
+        self.hf_scope_all.setToolTip(
+            "Kopf-/Fußzeile auf jede Seite bakken — Fit-/Zoom-Vorschau irrelevant — 1.8.5"
+        )
         self.hf_scope_range = QRadioButton("Seitenbereich")
         self.hf_scope_range.setToolTip(
             "Nur angegebenen Bereich bakken (1-basiert) — 1.8.2"
@@ -942,7 +944,8 @@ class WatermarkDialog(QDialog):
         self.hf_preview_zoom.setSuffix(" %")
         self.hf_preview_zoom.setValue(100)
         self.hf_preview_zoom.setToolTip(
-            "Vorschau-Zoom der ersten Seite (Mausrad); Fit-Page beendet manuellen Zoom — 1.8.3"
+            "Nur Vorschau (50–250 %); Fit-Page beendet manuellen Zoom — "
+            "kein Einfluss auf Bake / „Auf alle“ — 1.8.5"
         )
         self.hf_preview_zoom.valueChanged.connect(self._on_hf_zoom_changed)
         zoom_row.addWidget(self.hf_preview_zoom, 1)
@@ -950,7 +953,8 @@ class WatermarkDialog(QDialog):
         self.hf_fit_page = QCheckBox("Seite einpassen")
         self.hf_fit_page.setObjectName("hfFitPage")
         self.hf_fit_page.setToolTip(
-            "Vorschau an Label-Größe anpassen (Fit-Page); merkt Modus für nächste Vorschau — 1.8.4"
+            "Nur Vorschau: Fit-Page merkt Zoom-Modus für nächste Vorschau; "
+            "irrelevant für Bake / „Auf alle Seiten anwenden“ — 1.8.5"
         )
         self.hf_fit_page.toggled.connect(self._on_hf_fit_page_toggled)
         prev_col.addWidget(self.hf_fit_page)
@@ -1067,7 +1071,10 @@ class WatermarkDialog(QDialog):
             pass
 
     def _open_hf_preview_window(self) -> None:
-        """Große HF-Vorschau; Esc → Fokus Dialog; Fit-Page merken — 1.8.4."""
+        """
+        Große HF-Vorschau; Esc → Fokus Dialog; Fit-Page merken — 1.8.4.
+        Fit-/Zoom-Persistenz nur für Vorschau; Bake/„Auf alle“ unberührt — 1.8.5.
+        """
         src = ""
         if hasattr(self, "hf_src"):
             src = self.hf_src.text().strip()
@@ -1082,7 +1089,7 @@ class WatermarkDialog(QDialog):
             self, pdf_path=src, zoom_pct=zoom, fit_page=fit
         )
         dlg.exec()
-        # Zoom-Modus (Fit vs. %) für nächste Vorschau übernehmen — 1.8.4
+        # Zoom-Modus (Fit vs. %) nur für nächste Vorschau — Bake/„Auf alle“ irrelevant — 1.8.5
         try:
             fit_now = bool(dlg.fit_page_enabled())
             self._hf_fit_page = fit_now

@@ -9,6 +9,7 @@ from PySide6.QtCore import QEvent, Qt, QTimer, Signal
 from PySide6.QtGui import QAction, QColor, QIcon, QKeySequence
 from PySide6.QtWidgets import (
     QAbstractItemView,
+    QDialog,
     QFileDialog,
     QFrame,
     QHBoxLayout,
@@ -3041,6 +3042,7 @@ class MainWindow(QMainWindow):
         """
         Statusleiste blinken bei Batch-Abschluss — 1.8.3.
         Dauer/Modus wie Status-Blink Settings (kurz/aus) — 1.8.4.
+        aus: einmaliger Status-Hinweis ohne Blink (wie Pending-Blink) — 1.8.5.
         """
         from PySide6.QtCore import QTimer
 
@@ -3049,14 +3051,20 @@ class MainWindow(QMainWindow):
             get_status_blink_mode,
         )
 
-        if get_status_blink_mode() == STATUS_BLINK_AUS:
-            # Aus: kein Blink (Status-Text vom Batch bleibt sichtbar)
-            self._batch_status_blink_active = False
-            return
-        if getattr(self, "_batch_status_blink_active", False):
-            return
         sb = self.statusBar()
         if sb is None:
+            return
+        if get_status_blink_mode() == STATUS_BLINK_AUS:
+            # Aus: kein Blink, aber einmaliger Status-Hinweis (Rising-Edge)
+            self._batch_status_blink_active = False
+            try:
+                current = sb.currentMessage() or ""
+                if current:
+                    sb.showMessage(current, 1800)
+            except Exception:
+                pass
+            return
+        if getattr(self, "_batch_status_blink_active", False):
             return
         self._batch_status_blink_active = True
         base = sb.styleSheet() or ""
@@ -5030,7 +5038,7 @@ class MainWindow(QMainWindow):
             pass
 
     def _set_all_ann_type_layers(self, visible: bool) -> None:
-        """Alle Layer-Typen ein-/aus; Undo/Redo als ein Stack-Eintrag — 1.8.3/1.8.4."""
+        """Alle Layer-Typen ein-/aus; Undo/Redo; A11y-Announcement — 1.8.3–1.8.5."""
         from instantlensdoc.core.app_settings import (
             ANN_LAYER_TYPE_KEYS,
             get_ann_layer_types_visible,
@@ -5039,8 +5047,10 @@ class MainWindow(QMainWindow):
 
         prev = dict(get_ann_layer_types_visible())
         payload = {k: bool(visible) for k in ANN_LAYER_TYPE_KEYS}
+        status_msg = "Layer: alle ein" if visible else "Layer: alle aus"
         if prev == payload:
-            self._set_status("Layer: alle ein" if visible else "Layer: alle aus")
+            self._set_status(status_msg)
+            self._announce_status_toast(status_msg)
             return
         stack = getattr(self, "_ann_layer_undo", None)
         if stack is None:
@@ -5058,7 +5068,8 @@ class MainWindow(QMainWindow):
             self._save_session()
         except Exception:
             pass
-        self._set_status("Layer: alle ein" if visible else "Layer: alle aus")
+        self._set_status(status_msg)
+        self._announce_status_toast(status_msg)
         self._refresh_undo_hint()
 
     def _undo_ann_type_layers(self) -> bool:
@@ -5890,6 +5901,7 @@ class MainWindow(QMainWindow):
         """
         Beim Start: dirty Autosave-Orphans anbieten — 1.8.0; Alter·Als Kopie — 1.8.2.
         Mehrere Orphans als Liste, älteste zuerst — 1.8.4.
+        Mehrfachauswahl Verwerfen · „Alle verwerfen“ mit Bestätigung — 1.8.5.
         """
         import os
 
@@ -5914,11 +5926,28 @@ class MainWindow(QMainWindow):
             return
         if not orphans:
             return
-        # Liste aller Orphans (älteste zuerst); nummeriert bei mehreren — 1.8.4
-        previews = []
+
         multi = len(orphans) > 1
-        show_n = min(len(orphans), 12)
-        for idx, o in enumerate(orphans[:show_n], start=1):
+        head = (
+            f"{len(orphans)} ungespeicherte Autosave-Snapshots (Crash-Recovery), "
+            "älteste zuerst — Mehrfachauswahl möglich:"
+            if multi
+            else "Ungespeicherter Autosave-Snapshot gefunden (Crash-Recovery):"
+        )
+
+        dlg = QDialog(self)
+        dlg.setWindowTitle("Crash-Recovery")
+        dlg.setMinimumWidth(520)
+        dlg.setMinimumHeight(360)
+        root = QVBoxLayout(dlg)
+        lbl = QLabel(head)
+        lbl.setWordWrap(True)
+        root.addWidget(lbl)
+
+        lst = QListWidget()
+        lst.setSelectionMode(QAbstractItemView.ExtendedSelection)
+        lst.setObjectName("recoveryOrphanList")
+        for idx, o in enumerate(orphans):
             try:
                 body = orphan_meta_preview(o)
             except Exception:
@@ -5927,39 +5956,99 @@ class MainWindow(QMainWindow):
                 except Exception:
                     age_s = "Alter unbekannt"
                 body = f"{o.label} ({o.kind}, {age_s})"
-            if multi:
-                previews.append(f"{idx}. {body}")
-            else:
-                previews.append(body)
-        more = (
-            f"\n\n… und {len(orphans) - show_n} weitere"
-            if len(orphans) > show_n
-            else ""
+            text = f"{idx + 1}. {body}" if multi else body
+            item = QListWidgetItem(text)
+            item.setData(Qt.UserRole, int(idx))
+            lst.addItem(item)
+        lst.selectAll()
+        root.addWidget(lst, 1)
+
+        row = QHBoxLayout()
+        btn_restore = QPushButton("Wiederherstellen")
+        btn_restore.setToolTip("Ausgewählte Snapshots wiederherstellen")
+        btn_copy = QPushButton("Als Kopie öffnen")
+        btn_copy.setToolTip("Ausgewählte Snapshots als Kopie öffnen")
+        btn_discard = QPushButton("Auswahl verwerfen")
+        btn_discard.setToolTip("Nur ausgewählte Snapshots verwerfen — 1.8.5")
+        btn_discard_all = QPushButton("Alle verwerfen")
+        btn_discard_all.setToolTip(
+            "Alle Snapshots verwerfen (mit Bestätigung) — 1.8.5"
         )
-        head = (
-            f"{len(orphans)} ungespeicherte Autosave-Snapshots (Crash-Recovery), "
-            "älteste zuerst:\n\n"
-            if multi
-            else "Ungespeicherter Autosave-Snapshot gefunden (Crash-Recovery):\n\n"
-        )
-        msg = (
-            head
-            + "\n\n".join(previews)
-            + more
-            + "\n\nWiederherstellen, als Kopie öffnen oder verwerfen?"
-        )
-        box = QMessageBox(self)
-        box.setIcon(QMessageBox.Warning)
-        box.setWindowTitle("Crash-Recovery")
-        box.setText(msg)
-        btn_restore = box.addButton("Wiederherstellen", QMessageBox.AcceptRole)
-        btn_copy = box.addButton("Als Kopie öffnen", QMessageBox.ActionRole)
-        btn_discard = box.addButton("Verwerfen", QMessageBox.DestructiveRole)
-        box.addButton("Später", QMessageBox.RejectRole)
-        box.exec()
-        clicked = box.clickedButton()
-        if clicked is btn_restore:
-            for o in orphans:
+        btn_later = QPushButton("Später")
+        for b in (
+            btn_restore,
+            btn_copy,
+            btn_discard,
+            btn_discard_all,
+            btn_later,
+        ):
+            row.addWidget(b)
+        root.addLayout(row)
+
+        action: list[str] = ["later"]
+
+        def _selected_orphans() -> list:
+            idxs = []
+            for it in lst.selectedItems():
+                try:
+                    idxs.append(int(it.data(Qt.UserRole)))
+                except Exception:
+                    pass
+            idxs = sorted(set(idxs))
+            return [orphans[i] for i in idxs if 0 <= i < len(orphans)]
+
+        def _do_restore() -> None:
+            action[0] = "restore"
+            dlg.accept()
+
+        def _do_copy() -> None:
+            action[0] = "copy"
+            dlg.accept()
+
+        def _do_discard() -> None:
+            action[0] = "discard"
+            dlg.accept()
+
+        def _do_discard_all() -> None:
+            n = len(orphans)
+            reply = QMessageBox.question(
+                dlg,
+                "Crash-Recovery — Alle verwerfen",
+                f"Wirklich alle {n} Snapshot(s) unwiderruflich verwerfen?",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No,
+            )
+            if reply != QMessageBox.Yes:
+                return
+            action[0] = "discard_all"
+            dlg.accept()
+
+        def _do_later() -> None:
+            action[0] = "later"
+            dlg.reject()
+
+        btn_restore.clicked.connect(_do_restore)
+        btn_copy.clicked.connect(_do_copy)
+        btn_discard.clicked.connect(_do_discard)
+        btn_discard_all.clicked.connect(_do_discard_all)
+        btn_later.clicked.connect(_do_later)
+        dlg.exec()
+
+        chosen = action[0]
+        if chosen == "later":
+            return
+
+        targets = orphans if chosen == "discard_all" else _selected_orphans()
+        if not targets and chosen in ("restore", "copy", "discard"):
+            QMessageBox.information(
+                self,
+                "Crash-Recovery",
+                "Bitte mindestens einen Snapshot auswählen.",
+            )
+            return
+
+        if chosen == "restore":
+            for o in targets:
                 try:
                     path = restore_orphan(o)
                     self.open_path(str(path))
@@ -5969,10 +6058,12 @@ class MainWindow(QMainWindow):
                         "Crash-Recovery",
                         f"Konnte nicht wiederherstellen:\n{o.source_path}\n{e}",
                     )
-            self._set_status(f"Crash-Recovery: {len(orphans)} Snapshot(s) wiederhergestellt")
-        elif clicked is btn_copy:
+            self._set_status(
+                f"Crash-Recovery: {len(targets)} Snapshot(s) wiederhergestellt"
+            )
+        elif chosen == "copy":
             opened = 0
-            for o in orphans:
+            for o in targets:
                 try:
                     path = restore_orphan_as_copy(o)
                     self.open_path(str(path))
@@ -5986,13 +6077,12 @@ class MainWindow(QMainWindow):
             self._set_status(
                 f"Crash-Recovery: {opened} Snapshot(s) als Kopie geöffnet"
             )
-        elif clicked is btn_discard:
-            for o in orphans:
+        elif chosen in ("discard", "discard_all"):
+            for o in targets:
                 try:
                     discard_orphan(o)
                 except Exception:
                     pass
-            # Orphan-Dateien sauber weg — Meta+Payload nicht mehr listbar
             left = []
             try:
                 left = list_orphans(
@@ -6000,8 +6090,13 @@ class MainWindow(QMainWindow):
                 )
             except Exception:
                 left = []
+            label = (
+                "alle Snapshots verworfen"
+                if chosen == "discard_all"
+                else f"{len(targets)} Snapshot(s) verworfen"
+            )
             self._set_status(
-                "Crash-Recovery: Snapshots verworfen"
+                f"Crash-Recovery: {label}"
                 + (f" ({len(left)} Rest)" if left else " (sauber)")
             )
 

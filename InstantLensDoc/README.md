@@ -2,7 +2,7 @@
 
 Moderne Textverarbeitung mit PDF-Annotator, OCR-Bridge und Formulargenerator.
 
-**Version:** 1.8.4  
+**Version:** 1.8.5  
 **Hersteller:** Andreas Meyer · ame@sellerbach.de
 
 ## Quickstart (Windows)
@@ -33,8 +33,8 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an).
 
-## Neu in 1.8.4
+## Neu in 1.8.5
 
-Post-Release-Polish nach **1.8.3** (Basis **1.8.2**): Batch Status-Blink folgt Settings kurz/aus; HF Esc → Fokus Dialog · Fit-Page merkt Zoom-Modus; Layer Alle ein/aus mit Redo · Status „Layer: alle ein/aus“; Recovery listet mehrere Orphans (älteste zuerst). Stubs KI/Cloud/Stylus/3D unverändert.
+Post-Release-Polish nach **1.8.4** (Basis **1.8.3** / **1.8.2**): Batch Blink „aus“ = einmaliger Status ohne Blink; HF Fit-/Zoom nur Vorschau (Bake/„Auf alle“ irrelevant); Layer Alle ein/aus mit A11y-Announcement; Recovery Mehrfachauswahl Verwerfen · „Alle verwerfen“ mit Bestätigung. Stubs KI/Cloud/Stylus/3D unverändert.
 
 Siehe [CHANGELOG.md](CHANGELOG.md), [FEATURES.md](FEATURES.md) und [INFO.md](INFO.md).
