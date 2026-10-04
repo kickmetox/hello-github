@@ -246,6 +246,18 @@ from .links import (
     sidecar_links_from_annotations,
     uri_link_at,
 )
+from .text_edit import (
+    EditableTextSpan,
+    InlineEditResult,
+    TextStyle,
+    apply_inline_text_edit,
+    detect_text_style_at,
+    hit_test_text,
+    insert_text_at,
+    map_to_standard_font,
+    reflow_lines,
+    text_span_from_selection,
+)
 
 __all__ = [
     "PdfDocument",
@@ -462,6 +474,16 @@ __all__ = [
     "export_links_txt",
     "text_to_pdf",
     "page_count_for_text",
+    "TextStyle",
+    "EditableTextSpan",
+    "InlineEditResult",
+    "map_to_standard_font",
+    "detect_text_style_at",
+    "hit_test_text",
+    "text_span_from_selection",
+    "reflow_lines",
+    "apply_inline_text_edit",
+    "insert_text_at",
 ]
 
-__version__ = "2.6.3"
+__version__ = "2.6.4"

@@ -103,6 +103,19 @@ def default_palette_commands() -> list[PaletteCommand]:
             "drucker scanner geräte network wia twain print refresh",
             "PDF",
         ),
+        PaletteCommand(
+            "inline_text_edit",
+            "Text bearbeiten…",
+            "inline text edit schrift font reflow formatabgleich bearbeiten",
+            "PDF",
+            "Ctrl+Alt+Shift+E",
+        ),
+        PaletteCommand(
+            "selection_text_edit",
+            "Auswahl → Text bearbeiten",
+            "auswahl text edit inline löschen ändern font",
+            "PDF",
+        ),
         PaletteCommand("export", "Exportieren…", "export html docx pdf", "Datei"),
         PaletteCommand("export_page_images", "Seiten als Bilder…", "export png jpeg", "PDF"),
         PaletteCommand(

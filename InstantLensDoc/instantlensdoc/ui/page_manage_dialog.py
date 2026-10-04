@@ -1,4 +1,4 @@
-"""Seitenmanagement: ordnen, einfügen, drehen, löschen, Seiten aus anderen PDFs — 2.6.3."""
+"""Seitenmanagement: ordnen, einfügen, drehen, löschen, Seiten aus anderen PDFs — 2.6.4."""
 
 from __future__ import annotations
 
@@ -44,13 +44,13 @@ class PageManageDialog(QDialog):
         self.setAccessibleName("Seitenmanagement")
         self.setAccessibleDescription(
             "Seiten per Drag-and-Drop neu anordnen, einfügen, drehen, löschen "
-            "oder aus anderen PDFs zusammenfügen — 2.6.3"
+            "oder aus anderen PDFs zusammenfügen — 2.6.4"
         )
 
         layout = QVBoxLayout(self)
         self.hint = QLabel(
             "Seiten per Drag-and-Drop oder ▲/▼ neu anordnen. "
-            "Auswahl: drehen / einfügen / löschen / aus anderem PDF. — 2.6.3"
+            "Auswahl: drehen / einfügen / löschen / aus anderem PDF. — 2.6.4"
         )
         self.hint.setWordWrap(True)
         self.hint.setObjectName("pageManageHint")
@@ -121,7 +121,7 @@ class PageManageDialog(QDialog):
         self.btn_insert_pdf = QPushButton("Seiten aus PDF einfügen…")
         self.btn_insert_pdf.setObjectName("pageManageInsertPdf")
         self.btn_insert_pdf.setToolTip(
-            "Seiten aus einem anderen PDF an gewählter Position einfügen — 2.6.3"
+            "Seiten aus einem anderen PDF an gewählter Position einfügen — 2.6.4"
         )
         self.btn_insert_pdf.clicked.connect(self._insert_from_pdf)
         self.btn_goto = QPushButton("Zur Seite")

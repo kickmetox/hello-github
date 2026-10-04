@@ -62,6 +62,15 @@ from ild_pdf import (
     render_page,
     uri_link_at,
 )
+from ild_pdf.text_edit import (
+    EditableTextSpan,
+    TextStyle,
+    apply_inline_text_edit,
+    hit_test_text,
+    insert_text_at,
+    map_to_standard_font,
+    text_span_from_selection,
+)
 from ild_pdf.pages import (
     delete_pages,
     duplicate_page,
@@ -366,6 +375,85 @@ class TextOverlayEditDialog(QDialog):
         return out
 
 
+class InlineTextEditDialog(QDialog):
+    """Inline-Textbearbeitung mit erkanntem Schriftstil — 2.6.4."""
+
+    def __init__(
+        self,
+        text: str,
+        style: TextStyle,
+        parent=None,
+        *,
+        title: str = "Text bearbeiten",
+        insert_mode: bool = False,
+    ):
+        super().__init__(parent)
+        self.setObjectName("inlineTextEditDialog")
+        self.setWindowTitle(title)
+        self.resize(480, 340)
+        self._insert_mode = bool(insert_mode)
+        layout = QVBoxLayout(self)
+        hint = QLabel(
+            "Text ändern/löschen/hinzufügen · Zeilenumbruch in Box-Breite · "
+            "Schriftart/Größe/Farbe aus Kontext (Standard-14-Mapping) — 2.6.4"
+        )
+        hint.setWordWrap(True)
+        hint.setObjectName("inlineTextEditHint")
+        layout.addWidget(hint)
+        form = QFormLayout()
+        self.text = QPlainTextEdit()
+        self.text.setObjectName("inlineTextEditBody")
+        self.text.setPlainText(text or "")
+        self.text.setMinimumHeight(120)
+        form.addRow("Text:", self.text)
+        self.font_family = QLineEdit(style.font_family or "Helvetica")
+        self.font_family.setObjectName("inlineTextEditFontFamily")
+        self.font_family.setToolTip(
+            f"Erkannt: {style.font_family} → Schreiben als {style.base_font}"
+        )
+        form.addRow("Schriftart:", self.font_family)
+        self.font_size = QDoubleSpinBox()
+        self.font_size.setObjectName("inlineTextEditFontSize")
+        self.font_size.setRange(6, 96)
+        self.font_size.setDecimals(1)
+        self.font_size.setValue(float(style.font_size or 11))
+        form.addRow("Größe (pt):", self.font_size)
+        self.color = QLineEdit(style.color or "#000000")
+        self.color.setObjectName("inlineTextEditColor")
+        self.color.setPlaceholderText("#RRGGBB")
+        form.addRow("Farbe:", self.color)
+        mapped = QLabel(f"PDF-Font: {style.base_font}")
+        mapped.setObjectName("inlineTextEditMappedFont")
+        form.addRow("Mapping:", mapped)
+        self._mapped_label = mapped
+        self.font_family.textChanged.connect(self._refresh_mapping)
+        layout.addLayout(form)
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+    def _refresh_mapping(self, _text: str = "") -> None:
+        base = map_to_standard_font(self.font_family.text().strip() or "Helvetica")
+        self._mapped_label.setText(f"PDF-Font: {base}")
+
+    def values(self) -> tuple[str, TextStyle]:
+        family = self.font_family.text().strip() or "Helvetica"
+        base = map_to_standard_font(family)
+        color = self.color.text().strip() or "#000000"
+        if not color.startswith("#"):
+            color = "#" + color
+        st = TextStyle(
+            font_family=family,
+            font_size=float(self.font_size.value()),
+            color=color.upper() if len(color) == 7 else "#000000",
+            base_font=base,
+            bold="Bold" in base,
+            italic="Italic" in base or "Oblique" in base,
+        )
+        return self.text.toPlainText(), st
+
+
 class PdfCanvas(QLabel):
     """Gerenderte PDF-Seite; Klick/Drag setzt Annotationen."""
 
@@ -374,6 +462,7 @@ class PdfCanvas(QLabel):
     ink_finished = Signal(object)  # list[(x,y)] Freihand-Polyline — 2.2.0
     text_selection_finished = Signal(float, float, float, float)  # Text-Marquee (Auswahl-Modus)
     overlay_edit_requested = Signal(str)  # ann id
+    inline_text_edit_requested = Signal(float, float)  # Klick → Inline-Edit — 2.6.4
     annotation_selected = Signal(str)  # ann id (leer = Auswahl aufheben)
     uri_link_clicked = Signal(str)  # externe http(s)-URL
     annotations_moved = Signal(list, float, float)  # ids, dx, dy
@@ -388,6 +477,7 @@ class PdfCanvas(QLabel):
         self._uri_links: list = []
         self._drag_tool: AnnotationType | None = None
         self._select_mode = False
+        self._inline_edit_mode = False  # Inline-Textbearbeitung — 2.6.4
         self._drag_start: tuple[float, float] | None = None
         self._drag_current: tuple[float, float] | None = None
         self._ink_points: list[tuple[float, float]] | None = None  # Freihand — 2.2.0
@@ -641,9 +731,20 @@ class PdfCanvas(QLabel):
             painter.drawLine(QPointF(mx, my - r), QPointF(mx, my + r))
             painter.drawEllipse(QPointF(mx, my), r * 0.45, r * 0.45)
 
-    def set_drag_tool(self, tool: AnnotationType | None, *, select_mode: bool = False):
-        self._select_mode = bool(select_mode)
-        self._drag_tool = tool if (tool in DRAG_TYPES and not select_mode) else None
+    def set_drag_tool(
+        self,
+        tool: AnnotationType | None,
+        *,
+        select_mode: bool = False,
+        inline_edit_mode: bool = False,
+    ):
+        self._select_mode = bool(select_mode) and not inline_edit_mode
+        self._inline_edit_mode = bool(inline_edit_mode)
+        self._drag_tool = (
+            tool
+            if (tool in DRAG_TYPES and not select_mode and not inline_edit_mode)
+            else None
+        )
         if not self._select_mode and self._move_origin is not None:
             self._move_ids = set()
             self._move_origin = None
@@ -1158,6 +1259,14 @@ class PdfCanvas(QLabel):
                 hit_any = self._hit_annotation(x, y)
                 self.annotation_selected.emit(hit_any.id if hit_any else "")
                 return
+        if self._inline_edit_mode and event.button() == Qt.LeftButton:
+            # Annotation-Doppelpfad: Overlay zuerst, sonst nativer Text — 2.6.4
+            hit = self._hit_overlay(x, y)
+            if hit:
+                self.overlay_edit_requested.emit(hit.id)
+                return
+            self.inline_text_edit_requested.emit(x, y)
+            return
         if self._select_mode and event.button() == Qt.LeftButton:
             link = self._hit_uri_link(x, y)
             if link and not (event.modifiers() & Qt.ShiftModifier):
@@ -1359,6 +1468,10 @@ class PdfCanvas(QLabel):
             hit = self._hit_overlay(*pt)
             if hit:
                 self.overlay_edit_requested.emit(hit.id)
+                return
+            # Doppelklick auf nativen Text → Inline-Edit (Auswahl/Inline-Modus) — 2.6.4
+            if self._select_mode or self._inline_edit_mode:
+                self.inline_text_edit_requested.emit(pt[0], pt[1])
                 return
         super().mouseDoubleClickEvent(event)
 
@@ -1675,13 +1788,13 @@ class PdfViewer(QWidget):
         btn_page_manage = QPushButton("Seiten…")
         btn_page_manage.setObjectName("pageManageToolbarBtn")
         btn_page_manage.setToolTip(
-            "Seitenmanagement: ordnen, einfügen, drehen, löschen, aus PDF zusammenfügen — 2.6.3"
+            "Seitenmanagement: ordnen, einfügen, drehen, löschen, aus PDF zusammenfügen — 2.6.4"
         )
         btn_page_manage.clicked.connect(self.page_manage_dialog)
         btn_scan = QPushButton("Scan…")
         btn_scan.setObjectName("scanImportToolbarBtn")
         btn_scan.setToolTip(
-            "Scannen / Import · Tesseract-OCR · Geräte lokal/Netzwerk — 2.6.3"
+            "Scannen / Import · Tesseract-OCR · Geräte lokal/Netzwerk — 2.6.4"
         )
         btn_scan.clicked.connect(self.scan_import_dialog)
         btn_save_ann = QPushButton("Annot. speichern")
@@ -1716,6 +1829,18 @@ class PdfViewer(QWidget):
         btn_select.clicked.connect(lambda checked: self._set_tool(None))
         self._tool_buttons.append(btn_select)
         toolbar.addWidget(btn_select)
+
+        btn_inline_edit = QToolButton()
+        btn_inline_edit.setText("Text bearbeiten")
+        btn_inline_edit.setObjectName("inlineTextEditToolbarBtn")
+        btn_inline_edit.setCheckable(True)
+        btn_inline_edit.setToolTip(
+            "Inline-Textbearbeitung: Klick auf Text → ändern/löschen; "
+            "leere Fläche → einfügen; Schriftart/Größe/Farbe aus Kontext — 2.6.4"
+        )
+        btn_inline_edit.clicked.connect(lambda checked: self._set_inline_edit_tool())
+        self._tool_buttons.append(btn_inline_edit)
+        toolbar.addWidget(btn_inline_edit)
 
         for t, label in [
             (AnnotationType.HIGHLIGHT, "Highlight"),
@@ -2156,6 +2281,7 @@ class PdfViewer(QWidget):
         self._sync_ink_preview_style()
         self.canvas.text_selection_finished.connect(self._on_text_selection)
         self.canvas.overlay_edit_requested.connect(self._edit_overlay)
+        self.canvas.inline_text_edit_requested.connect(self._on_inline_text_edit_at)
         self.canvas.annotation_selected.connect(self._on_annotation_selected)
         self.canvas.uri_link_clicked.connect(self._open_uri_link)
         self.canvas.annotations_moved.connect(self._on_annotations_moved)
@@ -3512,6 +3638,26 @@ class PdfViewer(QWidget):
                     best = (px, py)
         return best if best is not None else (x, y)
 
+    def _set_inline_edit_tool(self) -> None:
+        """Werkzeug Inline-Textbearbeitung aktivieren — 2.6.4."""
+        self.tool = None
+        self._pending_callout_anchor = None
+        self._pending_callout_page = self.page_index
+        self._pending_angle = None
+        self._quick_stamp_armed = False
+        self._quick_stamp_payload = None
+        self._quick_ann_template_armed = False
+        self._quick_ann_template_id = None
+        self._quick_ann_template_name = ""
+        want = "Text bearbeiten"
+        for b in self._tool_buttons:
+            b.setChecked(b.text() == want)
+        self.canvas.set_drag_tool(None, select_mode=False, inline_edit_mode=True)
+        self.status.emit(
+            "Werkzeug: Text bearbeiten — Klick auf Text zum Ändern/Löschen; "
+            "leere Fläche zum Einfügen (Schrift aus Kontext) — 2.6.4"
+        )
+
     def _set_tool(self, tool: AnnotationType | None):
         self.tool = tool
         self._pending_callout_anchor = None
@@ -3527,14 +3673,16 @@ class PdfViewer(QWidget):
             want = "Auswahl"
             for b in self._tool_buttons:
                 b.setChecked(b.text() == want)
-            self.canvas.set_drag_tool(None, select_mode=True)
+            self.canvas.set_drag_tool(None, select_mode=True, inline_edit_mode=False)
             self.status.emit("Werkzeug: Auswahl — Text aufziehen + Ctrl+C kopieren; Annotation anklicken")
             return
         want = self._tool_label(tool)
         for b in self._tool_buttons:
             b.setChecked(b.text() == want)
         self.canvas.set_drag_tool(
-            tool if tool in DRAG_TYPES else None, select_mode=False
+            tool if tool in DRAG_TYPES else None,
+            select_mode=False,
+            inline_edit_mode=False,
         )
         if tool == AnnotationType.REDACTION:
             n = self.redaction_count()
@@ -7419,6 +7567,168 @@ class PdfViewer(QWidget):
         except Exception as e:
             QMessageBox.warning(self, "Einbrennen", str(e))
 
+    def _on_inline_text_edit_at(self, x: float, y: float) -> None:
+        """Klick im Inline-Edit-Modus / Doppelklick Auswahl — 2.6.4."""
+        self.edit_inline_text_at(x, y)
+
+    def edit_inline_text_at(self, x: float, y: float) -> bool:
+        """Text am Punkt bearbeiten oder neuen Text einfügen — 2.6.4."""
+        if not self.pdf_path:
+            self.status.emit("Kein PDF geöffnet")
+            return False
+        try:
+            span = hit_test_text(
+                self.pdf_path, self.page_index, x, y, scale=self.scale
+            )
+        except Exception as e:
+            QMessageBox.warning(self, "Text bearbeiten", str(e))
+            return False
+        if span is not None:
+            return self._run_inline_text_dialog(span, insert_mode=False)
+        # Einfügen: Style vom nächsten Text (Hit mit größerem Radius via hit_test fallback)
+        nearby = None
+        try:
+            nearby = hit_test_text(
+                self.pdf_path, self.page_index, x, y, scale=self.scale, pad=80.0
+            )
+        except Exception:
+            nearby = None
+        style = nearby.style if nearby is not None else TextStyle()
+        # span-Platzhalter für Dialog-Position
+        synth = EditableTextSpan(
+            page=self.page_index,
+            x=float(x),
+            y=float(y),
+            width=max(280.0, style.font_size * 20),
+            height=max(style.font_size * 1.4, 14.0),
+            text="",
+            style=style,
+        )
+        return self._run_inline_text_dialog(synth, insert_mode=True)
+
+    def edit_inline_text_selection(self) -> bool:
+        """Aktuelle Textauswahl inline bearbeiten — 2.6.4."""
+        if not self.pdf_path:
+            self.status.emit("Kein PDF geöffnet")
+            return False
+        rects = list(self._text_selection_rects or [])
+        if not rects:
+            self.status.emit(
+                "Keine Textauswahl — Auswahl-Werkzeug: Text aufziehen, dann bearbeiten"
+            )
+            return False
+        xs = [r[0] for r in rects]
+        ys = [r[1] for r in rects]
+        x1s = [r[0] + r[2] for r in rects]
+        y1s = [r[1] + r[3] for r in rects]
+        try:
+            span = text_span_from_selection(
+                self.pdf_path,
+                self.page_index,
+                min(xs),
+                min(ys),
+                max(x1s),
+                max(y1s),
+                scale=self.scale,
+            )
+        except Exception as e:
+            QMessageBox.warning(self, "Text bearbeiten", str(e))
+            return False
+        if span is None:
+            self.status.emit("Kein Text in der Auswahl")
+            return False
+        return self._run_inline_text_dialog(span, insert_mode=False)
+
+    def inline_text_edit_dialog(self) -> bool:
+        """Menü/Palette: Inline-Edit starten (Auswahl oder Werkzeug) — 2.6.4."""
+        if not self.pdf_path:
+            self.status.emit("Kein PDF geöffnet")
+            return False
+        if self._text_selection_rects:
+            return self.edit_inline_text_selection()
+        self._set_inline_edit_tool()
+        self.status.emit(
+            "Text bearbeiten aktiv — Klick auf Text zum Ändern, leere Fläche zum Einfügen"
+        )
+        return True
+
+    def _run_inline_text_dialog(
+        self, span: EditableTextSpan, *, insert_mode: bool
+    ) -> bool:
+        """Dialog + apply_inline_text_edit / insert_text_at — 2.6.4."""
+        if not self.pdf_path:
+            return False
+        # font_size im Span ist skaliert; Dialog zeigt PDF-pt
+        style_pt = TextStyle(
+            font_family=span.style.font_family,
+            font_size=max(span.style.font_size / max(self.scale, 0.01), 6.0),
+            color=span.style.color,
+            font_weight=span.style.font_weight,
+            base_font=span.style.base_font,
+            italic=span.style.italic,
+            bold=span.style.bold,
+        )
+        dlg = InlineTextEditDialog(
+            span.text,
+            style_pt,
+            self,
+            title="Text einfügen" if insert_mode else "Text bearbeiten",
+            insert_mode=insert_mode,
+        )
+        if dlg.exec() != QDialog.Accepted:
+            return False
+        new_text, new_style = dlg.values()
+        # Style wieder in Render-Skalierung für apply (font_size wird /scale gerechnet)
+        write_style = TextStyle(
+            font_family=new_style.font_family,
+            font_size=float(new_style.font_size) * float(self.scale),
+            color=new_style.color,
+            font_weight=new_style.font_weight,
+            base_font=new_style.base_font,
+            italic=new_style.italic,
+            bold=new_style.bold,
+        )
+        try:
+            if insert_mode:
+                result = insert_text_at(
+                    self.pdf_path,
+                    self.page_index,
+                    span.x,
+                    span.y,
+                    new_text,
+                    style=write_style,
+                    max_width=max(span.width, 200.0),
+                    scale=self.scale,
+                )
+            else:
+                result = apply_inline_text_edit(
+                    self.pdf_path,
+                    span,
+                    new_text,
+                    style=write_style,
+                    scale=self.scale,
+                    cover=True,
+                )
+            # Textschicht/Render-Cache invalidieren
+            try:
+                from ild_pdf.render import clear_render_cache
+
+                clear_render_cache()
+            except Exception:
+                pass
+            self.refresh()
+            action = "eingefügt" if insert_mode else (
+                "gelöscht" if not (new_text or "").strip() else "aktualisiert"
+            )
+            self.status.emit(
+                f"Text {action} · {result.font_family} {result.font_size:.1f}pt "
+                f"{result.color} · {result.lines_written} Zeile(n)"
+            )
+            return True
+        except Exception as e:
+            QMessageBox.warning(self, "Text bearbeiten", str(e))
+            return False
+
     def redaction_count(self) -> int:
         if not self.store:
             return 0
@@ -10646,7 +10956,7 @@ class PdfViewer(QWidget):
         self.schedule_sidecar_save(force=True)
 
     def page_manage_dialog(self):
-        """Seitenmanagement-Dialog öffnen (ordnen/einfügen/drehen/löschen/zusammenfügen) — 2.6.3."""
+        """Seitenmanagement-Dialog öffnen (ordnen/einfügen/drehen/löschen/zusammenfügen) — 2.6.4."""
         if not self.pdf_path:
             QMessageBox.information(
                 self,
@@ -10659,7 +10969,7 @@ class PdfViewer(QWidget):
         PageManageDialog(self, self).exec()
 
     def scan_import_dialog(self):
-        """Scan/Import mit Tesseract-OCR + Geräteauswahl — 2.6.3."""
+        """Scan/Import mit Tesseract-OCR + Geräteauswahl — 2.6.4."""
         from instantlensdoc.ui.scan_dialog import ScanDialog
 
         parent = self.window() if hasattr(self, "window") else self
@@ -10674,7 +10984,7 @@ class PdfViewer(QWidget):
         at_index: int | None = None,
         one_based: bool = False,
     ) -> list[int]:
-        """Seiten aus anderem PDF einfügen; Annotationen remappen; Viewer neu laden — 2.6.3."""
+        """Seiten aus anderem PDF einfügen; Annotationen remappen; Viewer neu laden — 2.6.4."""
         if not self.pdf_path:
             raise ValueError("Kein PDF geöffnet")
         src = Path(source)

@@ -1,5 +1,22 @@
 # Changelog — InstantLens Doc
 
+## 2.6.4 — Inline-Textbearbeitung + Schriftart-/Formatabgleich
+
+Minor-Feature nach **2.6.3** (Zusatzanforderungen #5): **Inline-Textbearbeitung** — Text direkt im Dokument ändern, löschen oder hinzufügen; praktischer Reflow (Zeilenumbruch in Box-Breite) mit pypdfium2/pikepdf. **Schriftart- & Formatabgleich** erkennt Familie, Größe und Farbe des bestehenden Textes (PDFium) und mappt auf Standard-14 beim Schreiben. UI: Toolbar **Text bearbeiten**, PDF-Menü, Palette, Doppelklick auf Text (Auswahl-Modus), Auswahl → Text bearbeiten. Keine Objektmanipulation, Formulare, Verschlüsselung, Office-Export, KI/Cloud. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie unverändert.
+
+### Neu
+- `ild_pdf.text_edit` — `hit_test_text` · `detect_text_style_at` · `text_span_from_selection` · `reflow_lines` · `apply_inline_text_edit` · `insert_text_at` · `TextStyle` / `EditableTextSpan`
+- Viewer: Werkzeug **Text bearbeiten** · `InlineTextEditDialog` · Doppelklick → Edit
+- PDF-Menü / Palette `inline_text_edit` / `selection_text_edit` · Shortcut Ctrl+Alt+Shift+E
+
+### Geändert
+- Docs/Version **2.6.4**
+
+### Tests / Qualität
+- Version **2.6.4** (App / `ild_pdf` / ISS / Smoke / Docs); Serie **2.6**; `docs/VERSION` + `VERSION.txt`
+- Smoke: 2.6.4 CLI + Qt (inline-text-edit + font-match + UI-Pfad)
+- Stubs: KI/Cloud/Stylus/3D/Hooks/Outline/Telemetrie unverändert markiert
+
 ## 2.6.3 — Erweiterte OCR mit Layout-Erhalt
 
 Minor-Feature nach **2.6.2** (Zusatzanforderungen #4): **Erweiterte OCR** — Scans/Fotos → durchsuchbarer und besser editierbarer Text mit **Layout-Erhalt** (Tesseract-Blöcke, Lesereihenfolge top→bottom/left→right). Ausgabe-Modus **Text mit Layout-Erhalt**; Sidecars `*.ildocr.txt` (Absätze + Block-Metadaten) sowie optional **hOCR** / **TSV**. Integriert in OCR-Dialog (Default) und Scan-/Import-Flow (Default Layout-OCR + hOCR/TSV-Checkboxen). Kein Inline-Textedit, keine Formulare/Verschlüsselung/Office-Export/KI/Cloud. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie unverändert.

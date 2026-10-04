@@ -60,13 +60,13 @@ class ScanDialog(QDialog):
         self.resize(560, 640)
         self.setAccessibleName("Scannen und Import")
         self.setAccessibleDescription(
-            "Scanner wählen oder Bilder importieren, optional OCR mit Layout-Erhalt — 2.6.3"
+            "Scanner wählen oder Bilder importieren, optional OCR mit Layout-Erhalt — 2.6.4"
         )
 
         layout = QVBoxLayout(self)
         self.hint = QLabel(
             "Scanner wählen und scannen, oder Seitenbilder importieren. "
-            "OCR mit Layout-Erhalt (Blöcke / Lesereihenfolge; optional hOCR/TSV). — 2.6.3"
+            "OCR mit Layout-Erhalt (Blöcke / Lesereihenfolge; optional hOCR/TSV). — 2.6.4"
         )
         self.hint.setWordWrap(True)
         self.hint.setObjectName("scanDialogHint")
@@ -140,7 +140,7 @@ class ScanDialog(QDialog):
         self.ocr_enabled.setObjectName("scanOcrEnabled")
         self.ocr_enabled.setChecked(True)
         self.ocr_enabled.setToolTip(
-            "Durchsuchbarer/editierbarer Text mit Blöcken und Lesereihenfolge — 2.6.3"
+            "Durchsuchbarer/editierbarer Text mit Blöcken und Lesereihenfolge — 2.6.4"
         )
         ok_tess, tess_msg = tesseract_available()
         self.ocr_enabled.setEnabled(ok_tess)
@@ -158,11 +158,11 @@ class ScanDialog(QDialog):
         self.layout_hocr = QCheckBox("hOCR Sidecar")
         self.layout_hocr.setObjectName("scanOcrHocr")
         self.layout_hocr.setChecked(True)
-        self.layout_hocr.setToolTip("*.ildocr.hocr mit Bounding-Boxes — 2.6.3")
+        self.layout_hocr.setToolTip("*.ildocr.hocr mit Bounding-Boxes — 2.6.4")
         self.layout_tsv = QCheckBox("TSV Sidecar")
         self.layout_tsv.setObjectName("scanOcrTsv")
         self.layout_tsv.setChecked(True)
-        self.layout_tsv.setToolTip("*.ildocr.tsv (Wörter + Koordinaten) — 2.6.3")
+        self.layout_tsv.setToolTip("*.ildocr.tsv (Wörter + Koordinaten) — 2.6.4")
         self.ocr_enabled.toggled.connect(self._sync_scan_ocr_opts)
         ocr_form.addRow(self.ocr_enabled)
         ocr_form.addRow("OCR-Sprache:", self.lang_combo)

@@ -670,7 +670,7 @@ class Sidebar(QWidget):
         self._thumb_scroll_emit_armed = True
         self.thumbs.setToolTip(
             "Schnellvorschau: Klick → Seite; Shift+Klick Mehrfachauswahl; "
-            "Ziehen zum Neuordnen (Ctrl+Z); Rechtsklick → Drehen/Duplizieren/Löschen — 2.6.3"
+            "Ziehen zum Neuordnen (Ctrl+Z); Rechtsklick → Drehen/Duplizieren/Löschen — 2.6.4"
         )
         layout.addWidget(self.thumbs)
 
@@ -685,7 +685,7 @@ class Sidebar(QWidget):
         self.outline.setMaximumHeight(160)
         self.outline.setToolTip(
             "Inhaltsverzeichnis / PDF-Outline: Klick oder Enter → Seite; "
-            "+/− Lesezeichen bearbeiten — 2.6.3"
+            "+/− Lesezeichen bearbeiten — 2.6.4"
         )
         self.outline.itemClicked.connect(self._activate_outline)
         self.outline.itemDoubleClicked.connect(self._activate_outline)
