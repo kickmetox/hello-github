@@ -2831,7 +2831,7 @@ class SettingsDialog(QDialog):
             self.btn_undo_factory_presets.setEnabled(bool(prev))
 
     def eventFilter(self, obj, event):  # noqa: N802
-        """Swatch L→Hex · Dbl→HL · M→HL · Shift+M→Stift · Ctrl+M→Notiz · R→Menü — 2.5.9–2.5.13."""
+        """Swatch L→Hex · Dbl→HL/Stift/Notiz · M→HL · Shift+M→Stift · Ctrl+M→Notiz · R→Menü — 2.5.9–2.5.14."""
         labels = getattr(self, "_theme_swatch_labels", None) or []
         if obj in labels:
             hex_c = str(obj.property("themeHex") or "").strip()
@@ -2840,8 +2840,14 @@ class SettingsDialog(QDialog):
             if event.type() == QEvent.MouseButtonDblClick:
                 btn = getattr(event, "button", lambda: None)()
                 if btn == Qt.LeftButton:
-                    # Doppelklick: sofort Highlight-Farbe — 2.5.13
-                    self._apply_swatch_as_tool_color(hex_c, "highlight")
+                    # Dbl: HL · Shift→Stift · Ctrl→Notiz — 2.5.13/2.5.14
+                    mods = event.modifiers()
+                    if bool(mods & Qt.ShiftModifier):
+                        self._apply_swatch_as_tool_color(hex_c, "pen")
+                    elif bool(mods & Qt.ControlModifier):
+                        self._apply_swatch_as_tool_color(hex_c, "note")
+                    else:
+                        self._apply_swatch_as_tool_color(hex_c, "highlight")
                     return True
             if event.type() == QEvent.MouseButtonPress:
                 btn = getattr(event, "button", lambda: None)()
@@ -2951,6 +2957,7 @@ class SettingsDialog(QDialog):
                 )
                 sw.setToolTip(
                     f"{name}: {c} · Klick = Hex · Doppelklick = Highlight · "
+                    f"Shift+Doppelklick = Stift · Ctrl+Doppelklick = Notiz · "
                     f"Mittelklick = Highlight · "
                     f"Shift+Mittelklick = Stift · Ctrl+Mittelklick = Notiz · "
                     f"RMB = HL/Stift/Notiz — 2.5.13"
@@ -2977,7 +2984,8 @@ class SettingsDialog(QDialog):
                 extra = " · Default" if name == default else ""
                 hint.setText(
                     f"{name}: {len(colors)} Farben{extra} · {count_txt} · "
-                    "Klick=Hex · Dbl=HL · Mid=HL · Shift+Mid=Stift · Ctrl+Mid=Notiz"
+                    "Klick=Hex · Dbl=HL · Shift+Dbl=Stift · Ctrl+Dbl=Notiz · "
+                    "Mid=HL · Shift+Mid=Stift · Ctrl+Mid=Notiz"
                 )
             elif default:
                 hint.setText(f"Default: {default} · {count_txt}")

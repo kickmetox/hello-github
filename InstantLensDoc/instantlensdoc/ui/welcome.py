@@ -128,8 +128,8 @@ class WelcomePage(QWidget):
         self.recent_filter.setClearButtonEnabled(True)
         self.recent_filter.setToolTip(
             "Live-Filter Pfad oder Dokument-Tags (ildtags-v1) · Tag-Vorschläge · "
-            "Quick-Tag A–Z/Häufigkeit · Tags kopieren/einfügen (Ctrl+C/V) · "
-            "Treffer A11y · Esc → Fokus Liste — 2.5.9"
+            "Quick-Tag A–Z/Häufigkeit · Tags Ctrl+C/V · Pfad Ctrl+Shift+C · "
+            "Treffer A11y · Esc → Fokus Liste — 2.5.14"
         )
         self.recent_filter.textChanged.connect(self._apply_recent_filter)
         self.recent_filter.textChanged.connect(self._persist_recent_filter)
@@ -176,9 +176,9 @@ class WelcomePage(QWidget):
         self.recent_list.setMinimumHeight(180)
         self.recent_list.setToolTip(
             "Enter / Doppelklick öffnet; Entf entfernt den Eintrag; "
-            "Ctrl+C/V Tags kopieren/einfügen; "
-            "Rechtsklick: Tag+/− · Tags kopieren/einfügen · Entfernen / Ordner; "
-            "Quick-Tag A–Z/Häufigkeit (N Docs) · Treffer A11y · Esc → Fokus Liste — 2.5.9"
+            "Ctrl+C/V Tags · Ctrl+Shift+C Pfad; "
+            "Rechtsklick: Tag+/− · Tags/Pfad kopieren · Entfernen / Ordner; "
+            "Quick-Tag A–Z/Häufigkeit (N Docs) · Treffer A11y · Esc → Fokus Liste — 2.5.14"
         )
         self.recent_list.setAcceptDrops(True)
         self.recent_list.setContextMenuPolicy(Qt.CustomContextMenu)
@@ -245,7 +245,7 @@ class WelcomePage(QWidget):
         self.btn_continue.setToolTip(tip)
 
     def eventFilter(self, obj, event):  # noqa: N802
-        """Esc Filter; Del Recent; Shift+Del Tags; F2/F3 Tag±; Ctrl+C/V/X Tags — 2.5.9–2.5.13."""
+        """Esc Filter; Del Recent; Shift+Del Tags; F2/F3 Tag±; Ctrl+C/V/X Tags; Ctrl+Shift+C Pfad — 2.5.9–2.5.14."""
         if event.type() == QEvent.KeyPress:
             assert isinstance(event, QKeyEvent)
             key = event.key()
@@ -278,11 +278,14 @@ class WelcomePage(QWidget):
                     if path:
                         self.recent_remove_requested.emit(str(path))
                         return True
-                # Ctrl+C / Ctrl+V / Ctrl+X: Tags kopieren/einfügen/ausschneiden — 2.5.9/2.5.10
+                # Ctrl+C Tags · Ctrl+Shift+C Pfad · Ctrl+V/X Tags — 2.5.9/2.5.10/2.5.14
                 if item is not None and bool(event.modifiers() & Qt.ControlModifier):
                     path = item.data(Qt.UserRole)
                     if path and key == Qt.Key_C:
-                        self._copy_tags_for_recent(str(path))
+                        if bool(event.modifiers() & Qt.ShiftModifier):
+                            self._copy_path_for_recent(str(path))
+                        else:
+                            self._copy_tags_for_recent(str(path))
                         return True
                     if path and key == Qt.Key_V:
                         self._paste_tags_for_recent(str(path))
@@ -549,6 +552,7 @@ class WelcomePage(QWidget):
         act_copy_tags = menu.addAction("Tags kopieren")
         act_cut_tags = menu.addAction("Tags ausschneiden")
         act_paste_tags = menu.addAction("Tags einfügen")
+        act_copy_path = menu.addAction("Pfad kopieren\tCtrl+Shift+C")
         menu.addSeparator()
         act_remove = menu.addAction("Entfernen")
         act_folder = menu.addAction("Ordner öffnen")
@@ -565,6 +569,8 @@ class WelcomePage(QWidget):
             self._cut_tags_for_recent(str(path))
         elif chosen is act_paste_tags:
             self._paste_tags_for_recent(str(path))
+        elif chosen is act_copy_path:
+            self._copy_path_for_recent(str(path))
         elif chosen is act_remove:
             self.recent_remove_requested.emit(str(path))
         elif chosen is act_folder:
@@ -678,6 +684,35 @@ class WelcomePage(QWidget):
         # Status über Parent-MainWindow wenn vorhanden — 2.5.7
         win = self.window()
         msg = f"Tags kopiert ({len(current)}): {text}"
+        if win is not None and hasattr(win, "_set_status"):
+            try:
+                win._set_status(msg)
+            except Exception:
+                pass
+        if win is not None and hasattr(win, "_announce_status_toast"):
+            try:
+                win._announce_status_toast(msg)
+            except Exception:
+                pass
+        return True
+
+    def _copy_path_for_recent(self, path: str) -> bool:
+        """Recent-Pfad in Zwischenablage (Ctrl+Shift+C) — 2.5.14."""
+        from PySide6.QtWidgets import QApplication, QMessageBox
+
+        text = str(path or "").strip()
+        if not text:
+            return False
+        try:
+            clip = QApplication.clipboard()
+            if clip is None:
+                raise RuntimeError("Zwischenablage nicht verfügbar")
+            clip.setText(text)
+        except Exception as e:
+            QMessageBox.warning(self, "Pfad kopieren", str(e))
+            return False
+        win = self.window()
+        msg = f"Pfad kopiert: {Path(text).name}"
         if win is not None and hasattr(win, "_set_status"):
             try:
                 win._set_status(msg)

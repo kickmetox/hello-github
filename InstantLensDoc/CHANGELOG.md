@@ -1,5 +1,20 @@
 # Changelog — InstantLens Doc
 
+## 2.5.14 — OCR F4-Ordner, Theme Dbl-Stift/Notiz, ildtags Pfad, Export Ctrl+Home/End
+
+Post-Release-Polish nach **2.5.13**: **OCR-Region** Status-**F4 → Ordner**; **Farben-Themes** Swatch-**Shift+Doppelklick → Stift** · **Ctrl+Doppelklick → Notiz**; **ildtags** **Ctrl+Shift+C Pfad kopieren**; **Export-Presets** **Ctrl+Home/End Anfang/Ende**. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie klar markiert / nicht produktiv (Ink ≠ Stylus).
+
+### Geändert
+- OCR-Region: F4 → Ergebnis-Ordner öffnen (Status aktiv · Menü-Hinweis)
+- Farben-Themes: Shift+Doppelklick → Stift · Ctrl+Doppelklick → Notiz
+- Dokument-Tags: Ctrl+Shift+C Pfad kopieren (Recent)
+- Export-Presets: Ctrl+Home/End an Anfang/Ende verschieben
+
+### Tests / Qualität
+- Version **2.5.14** (App / `ild_pdf` / ISS / Smoke / Docs); Serie **2.5**; `docs/VERSION` + `VERSION.txt`
+- Smoke: 2.5.14 CLI + Qt (OCR F4-Ordner, Theme Dbl-Stift/Notiz, ildtags Pfad, Export Ctrl+Home/End)
+- Stubs: KI/Cloud/Stylus/3D/Hooks/Outline/Telemetrie unverändert markiert
+
 ## 2.5.13 — OCR Ctrl+C/Pfad, Theme Dbl-HL, ildtags F3, Export Ctrl+↑↓
 
 Post-Release-Polish nach **2.5.12**: **OCR-Region** Status-**Ctrl+C Text** · **Ctrl+Shift+C Pfad**; **Farben-Themes** Swatch-**Doppelklick → Highlight**; **ildtags** **F3 Tag entfernen**; **Export-Presets** **Ctrl+↑/↓ Reihenfolge**. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie klar markiert / nicht produktiv (Ink ≠ Stylus).

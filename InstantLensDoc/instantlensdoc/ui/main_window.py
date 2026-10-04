@@ -4109,6 +4109,12 @@ class MainWindow(QMainWindow):
                     if self._copy_ocr_region_result_text():
                         event.accept()
                         return
+        # OCR-Region Status: F4 → Ordner öffnen — 2.5.14
+        if event.key() == Qt.Key_F4:
+            if getattr(self, "_ocr_region_toast_active", False):
+                if self._open_ocr_region_result_folder():
+                    event.accept()
+                    return
         super().keyPressEvent(event)
 
     def _duplicate_current(self):
@@ -11673,7 +11679,8 @@ class MainWindow(QMainWindow):
             f"Benannte Presets ({len(profiles)}/{EXPORT_PROFILES_MAX}). "
             "★ aktiv · RMB Zielordner · Summary/Pfad · F2 Umbenennen · "
             "Ctrl+D Duplizieren · Ctrl+Enter Anwenden (offen) · "
-            "Ctrl+↑/↓ Reihenfolge · Entf · Doppelklick Anwenden."
+            "Ctrl+↑/↓ Reihenfolge · Ctrl+Home/End Anfang/Ende · "
+            "Entf · Doppelklick Anwenden."
         )
         lay.addWidget(info)
         lst = QListWidget()
@@ -11682,8 +11689,8 @@ class MainWindow(QMainWindow):
             "Rechtsklick → Zielordner / Summary / Pfad kopieren · "
             "Ctrl+C Summary · Ctrl+Shift+C Pfad · F2 Umbenennen · "
             "Ctrl+D Duplizieren · Ctrl+Enter Anwenden ohne Schließen · "
-            "Ctrl+↑/↓ Reihenfolge · Entf löschen · "
-            "Doppelklick/Enter Anwenden — 2.5.13"
+            "Ctrl+↑/↓ Reihenfolge · Ctrl+Home/End Anfang/Ende · Entf löschen · "
+            "Doppelklick/Enter Anwenden — 2.5.14"
         )
         lst.setContextMenuPolicy(Qt.CustomContextMenu)
         active = {"name": get_active_export_profile_name()}
@@ -11887,6 +11894,35 @@ class MainWindow(QMainWindow):
             direction = "oben" if delta < 0 else "unten"
             self._set_status(f"Export-Preset „{name}“ nach {direction} verschoben")
 
+        def _move_to_edge(to_end: bool) -> None:
+            """Ctrl+Home/End Preset an Anfang/Ende — 2.5.14."""
+            item = lst.currentItem()
+            if item is None:
+                return
+            name = _item_name(item)
+            if not name:
+                return
+            profiles_now = get_export_profiles()
+            idx = next(
+                (
+                    i
+                    for i, p in enumerate(profiles_now)
+                    if str(p["name"]).casefold() == name.casefold()
+                ),
+                -1,
+            )
+            if idx < 0:
+                return
+            if to_end:
+                delta = (len(profiles_now) - 1) - idx
+            else:
+                delta = -idx
+            if delta == 0:
+                return
+            _move(delta)
+            edge = "Ende" if to_end else "Anfang"
+            self._set_status(f"Export-Preset „{name}“ an {edge} verschoben")
+
         def _delete() -> None:
             item = lst.currentItem()
             if item is None:
@@ -12088,6 +12124,8 @@ class MainWindow(QMainWindow):
             act_rename = menu.addAction("Umbenennen…")
             act_up = menu.addAction("Nach oben\tCtrl+↑")
             act_down = menu.addAction("Nach unten\tCtrl+↓")
+            act_top = menu.addAction("An den Anfang\tCtrl+Home")
+            act_bottom = menu.addAction("An das Ende\tCtrl+End")
             act_del = menu.addAction("Löschen…")
             chosen = menu.exec(lst.mapToGlobal(pos))
             if chosen is act_open:
@@ -12108,6 +12146,10 @@ class MainWindow(QMainWindow):
                 _move(-1)
             elif chosen is act_down:
                 _move(1)
+            elif chosen is act_top:
+                _move_to_edge(False)
+            elif chosen is act_bottom:
+                _move_to_edge(True)
             elif chosen is act_del:
                 _delete()
 
@@ -12139,6 +12181,12 @@ class MainWindow(QMainWindow):
                     ):
                         # Ctrl+↑/↓ Reihenfolge — 2.5.13
                         _move(-1 if event.key() == Qt.Key_Up else 1)
+                        return True
+                    if event.key() in (Qt.Key_Home, Qt.Key_End) and bool(
+                        event.modifiers() & Qt.ControlModifier
+                    ):
+                        # Ctrl+Home/End Anfang/Ende — 2.5.14
+                        _move_to_edge(event.key() == Qt.Key_End)
                         return True
                     if event.key() == Qt.Key_C and bool(
                         event.modifiers() & Qt.ControlModifier
@@ -13381,7 +13429,7 @@ class MainWindow(QMainWindow):
         return preview
 
     def _ocr_region_status_tooltip(self) -> str:
-        """Status-Tooltip inkl. Textvorschau — 2.5.9–2.5.13."""
+        """Status-Tooltip inkl. Textvorschau — 2.5.9–2.5.14."""
         path = getattr(self, "_last_ocr_region_path", None) or ""
         tip = (
             "Linksklick → Ergebnis-Tab · Rechtsklick → Menü · "
@@ -13390,7 +13438,8 @@ class MainWindow(QMainWindow):
             "Alt+Klick → Datei öffnen · "
             "Esc → Status schließen · "
             "Enter → Ergebnis-Tab · "
-            "Ctrl+C Text · Ctrl+Shift+C Pfad — 2.5.13"
+            "Ctrl+C Text · Ctrl+Shift+C Pfad · "
+            "F4 → Ordner — 2.5.14"
         )
         if path:
             tip = f"{tip}\n{path}"
@@ -13427,7 +13476,7 @@ class MainWindow(QMainWindow):
             return False
         menu = QMenu(self)
         act_tab = menu.addAction("Ergebnis-Tab fokussieren")
-        act_folder = menu.addAction("Ordner öffnen")
+        act_folder = menu.addAction("Ordner öffnen\tF4")
         act_path = menu.addAction("Pfad kopieren")
         act_text = menu.addAction("Text kopieren")
         act_file = menu.addAction("Datei öffnen")
