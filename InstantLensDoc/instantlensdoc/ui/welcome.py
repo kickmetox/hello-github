@@ -245,7 +245,7 @@ class WelcomePage(QWidget):
         self.btn_continue.setToolTip(tip)
 
     def eventFilter(self, obj, event):  # noqa: N802
-        """Esc Filter; Del Recent; Shift+Del Tags; F2/F3 Tag±; F4 Ordner; F5 Datei; Enter öffnen; Ctrl+C/V/X Tags; Ctrl+Shift+C Pfad — 2.5.9–2.5.19."""
+        """Esc Filter; Del Recent; Shift+Del Tags; F2/F3 Tag±; F4 Ordner; F5 Datei; Enter öffnen; Ctrl+C/V/X Tags; Ctrl+Shift+C Pfad — 2.5.9–2.5.20."""
         if event.type() == QEvent.KeyPress:
             assert isinstance(event, QKeyEvent)
             key = event.key()
@@ -705,6 +705,19 @@ class WelcomePage(QWidget):
             QMessageBox.information(
                 self, "Tag entfernen", "Keine Tags an diesem Dokument."
             )
+            win = self.window()
+            msg = f"Keine Tags zum Entfernen: {Path(path).name}"
+            if win is not None and hasattr(win, "_set_status"):
+                try:
+                    win._set_status(msg)
+                except Exception:
+                    pass
+            # Fail-Path A11y Tag− — 2.5.20
+            if win is not None and hasattr(win, "_announce_status_toast"):
+                try:
+                    win._announce_status_toast(msg)
+                except Exception:
+                    pass
             return
         chosen, ok = QInputDialog.getItem(
             self,
@@ -801,7 +814,20 @@ class WelcomePage(QWidget):
         from PySide6.QtWidgets import QApplication, QMessageBox
 
         text = str(path or "").strip()
+        win = self.window()
         if not text:
+            msg = "Pfad zum Kopieren fehlt"
+            if win is not None and hasattr(win, "_set_status"):
+                try:
+                    win._set_status(msg)
+                except Exception:
+                    pass
+            # Fail-Path A11y Pfad-Copy — 2.5.20
+            if win is not None and hasattr(win, "_announce_status_toast"):
+                try:
+                    win._announce_status_toast(msg)
+                except Exception:
+                    pass
             return False
         try:
             clip = QApplication.clipboard()
@@ -810,8 +836,19 @@ class WelcomePage(QWidget):
             clip.setText(text)
         except Exception as e:
             QMessageBox.warning(self, "Pfad kopieren", str(e))
+            msg = f"Pfad kopieren fehlgeschlagen: {Path(text).name if text else '(leer)'}"
+            if win is not None and hasattr(win, "_set_status"):
+                try:
+                    win._set_status(msg)
+                except Exception:
+                    pass
+            # Fail-Path A11y Pfad-Copy — 2.5.20
+            if win is not None and hasattr(win, "_announce_status_toast"):
+                try:
+                    win._announce_status_toast(msg)
+                except Exception:
+                    pass
             return False
-        win = self.window()
         msg = f"Pfad kopiert: {Path(text).name}"
         if win is not None and hasattr(win, "_set_status"):
             try:
@@ -836,6 +873,19 @@ class WelcomePage(QWidget):
             QMessageBox.information(
                 self, "Tags entfernen", "Keine Tags an diesem Dokument."
             )
+            win = self.window()
+            msg = f"Keine Tags zum Entfernen: {Path(path).name}"
+            if win is not None and hasattr(win, "_set_status"):
+                try:
+                    win._set_status(msg)
+                except Exception:
+                    pass
+            # Fail-Path A11y Tag-Clear — 2.5.20
+            if win is not None and hasattr(win, "_announce_status_toast"):
+                try:
+                    win._announce_status_toast(msg)
+                except Exception:
+                    pass
             return False
         n = len(current)
         try:

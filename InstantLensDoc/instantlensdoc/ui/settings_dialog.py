@@ -935,7 +935,7 @@ class SettingsDialog(QDialog):
             sw.setToolTip(
                 "Theme-Vorschau · Klick=Hex · RMB=HL/Stift/Notiz · "
                 "Focus: Space/H=HL · P=Stift · N=Notiz · C/Ctrl+C=Hex · "
-                "←/→ · Shift+←/→ ±2 · PgUp/PgDn · Home/End · 1–6 — 2.5.19"
+                "←/→ · Shift+←/→ ±2 · PgUp/PgDn · Home/End · 1–6 — 2.5.20"
             )
             sw.setCursor(Qt.PointingHandCursor)
             sw.setFocusPolicy(Qt.StrongFocus)
@@ -2838,7 +2838,7 @@ class SettingsDialog(QDialog):
             self.btn_undo_factory_presets.setEnabled(bool(prev))
 
     def eventFilter(self, obj, event):  # noqa: N802
-        """Swatch L→Hex · Dbl→HL/Stift/Notiz · M→HL · Keys Space/H/P/N/C · ←/→ · Shift+←/→ · PgUp/Dn · Home/End · 1–6 — 2.5.9–2.5.19."""
+        """Swatch L→Hex · Dbl→HL/Stift/Notiz · M→HL · Keys Space/H/P/N/C · Ctrl+Shift+C · ←/→ · Shift+←/→ · PgUp/Dn · Home/End · 1–6 — 2.5.9–2.5.20."""
         labels = getattr(self, "_theme_swatch_labels", None) or []
         if obj in labels:
             hex_c = str(obj.property("themeHex") or "").strip()
@@ -2909,7 +2909,7 @@ class SettingsDialog(QDialog):
                     return True
                 if not hex_c:
                     return super().eventFilter(obj, event)
-                # Space/Enter/H → Highlight · P → Stift · N → Notiz · C/Ctrl+C → Hex — 2.5.15/2.5.18
+                # Space/Enter/H → Highlight · P → Stift · N → Notiz · C/Ctrl+C → Hex · Ctrl+Shift+C → alle Hex — 2.5.15/2.5.18/2.5.20
                 if key in (Qt.Key_Space, Qt.Key_Return, Qt.Key_Enter, Qt.Key_H):
                     self._apply_swatch_as_tool_color(hex_c, "highlight")
                     return True
@@ -2920,7 +2920,10 @@ class SettingsDialog(QDialog):
                     self._apply_swatch_as_tool_color(hex_c, "note")
                     return True
                 if key == Qt.Key_C:
-                    self._copy_single_theme_hex(hex_c)
+                    if bool(mods & Qt.ControlModifier) and bool(mods & Qt.ShiftModifier):
+                        self._copy_ann_theme_hex_ui()
+                    else:
+                        self._copy_single_theme_hex(hex_c)
                     return True
                 return super().eventFilter(obj, event)
             if not hex_c:
@@ -2958,7 +2961,7 @@ class SettingsDialog(QDialog):
         return super().eventFilter(obj, event)
 
     def _show_theme_swatch_menu(self, widget, hex_color: str) -> None:
-        """Swatch-RMB: Hex kopieren · als HL/Stift/Notiz · Mid/Dbl-Hinweise — 2.5.10/2.5.16."""
+        """Swatch-RMB: Hex kopieren · alle Hex · als HL/Stift/Notiz · Mid/Dbl-Hinweise — 2.5.10/2.5.16/2.5.20."""
         from PySide6.QtWidgets import QMenu
 
         hex_c = str(hex_color or "").strip()
@@ -2966,6 +2969,7 @@ class SettingsDialog(QDialog):
             return
         menu = QMenu(self)
         act_copy = menu.addAction(f"Hex kopieren ({hex_c})\tC / Ctrl+C")
+        act_copy_all = menu.addAction("Alle Hex kopieren\tCtrl+Shift+C")
         menu.addSeparator()
         act_hl = menu.addAction("Als Highlight-Farbe setzen\tH / Space / Dbl / Mid")
         act_pen = menu.addAction("Als Stiftfarbe setzen\tP / Shift+Dbl / Shift+Mid")
@@ -2973,6 +2977,8 @@ class SettingsDialog(QDialog):
         chosen = menu.exec(widget.mapToGlobal(widget.rect().bottomLeft()))
         if chosen is act_copy:
             self._copy_single_theme_hex(hex_c)
+        elif chosen is act_copy_all:
+            self._copy_ann_theme_hex_ui()
         elif chosen is act_hl:
             self._apply_swatch_as_tool_color(hex_c, "highlight")
         elif chosen is act_pen:
@@ -3050,12 +3056,14 @@ class SettingsDialog(QDialog):
                     f"Shift+Mittelklick = Stift · Ctrl+Mittelklick = Notiz · "
                     f"RMB = HL/Stift/Notiz · "
                     f"Focus: Space/H=HL · P=Stift · N=Notiz · C/Ctrl+C=Hex · "
-                    f"←/→ · Shift+←/→ ±2 · PgUp/PgDn · Home/End · 1–6 — 2.5.19"
+                    f"Ctrl+Shift+C=alle Hex · "
+                    f"←/→ · Shift+←/→ ±2 · PgUp/PgDn · Home/End · 1–6 — 2.5.20"
                 )
                 sw.setProperty("themeHex", str(c))
                 sw.setAccessibleName(f"Theme-Swatch {i + 1}: {c}")
                 sw.setAccessibleDescription(
                     "Space oder H Highlight, P Stift, N Notiz, C oder Ctrl+C Hex kopieren, "
+                    "Ctrl+Shift+C alle Hex kopieren, "
                     "Pfeiltasten wechseln, Shift+Pfeiltasten ±2 Swatches, "
                     "PageUp/PageDown ±3 Swatches, "
                     "Home/End erster/letzter Swatch, Ziffern 1–6 springen zum Swatch"
@@ -3163,13 +3171,26 @@ class SettingsDialog(QDialog):
                 pass
 
     def _copy_ann_theme_hex_ui(self) -> None:
-        """6 Hex-Farben des gewählten Themes in die Zwischenablage — 2.5.8."""
+        """6 Hex-Farben des gewählten Themes in die Zwischenablage — 2.5.8/2.5.20."""
         from PySide6.QtWidgets import QApplication
 
         from instantlensdoc.core.app_settings import get_ann_color_theme
 
         combo = getattr(self, "ann_theme_combo", None)
+        parent = self.parent()
         if combo is None:
+            msg = "Theme-Hex alle: kein Theme-Combo"
+            if parent is not None and hasattr(parent, "_set_status"):
+                try:
+                    parent._set_status(msg)
+                except Exception:
+                    pass
+            # Fail-Path A11y Hex-All — 2.5.20
+            if parent is not None and hasattr(parent, "_announce_status_toast"):
+                try:
+                    parent._announce_status_toast(msg)
+                except Exception:
+                    pass
             return
         name = str(combo.currentData() or "").strip()
         colors = get_ann_color_theme(name) if name else None
@@ -3177,6 +3198,18 @@ class SettingsDialog(QDialog):
             QMessageBox.information(
                 self, "Farben-Theme", "Bitte ein Theme mit Farben wählen."
             )
+            msg = "Theme-Hex alle fehlt"
+            if parent is not None and hasattr(parent, "_set_status"):
+                try:
+                    parent._set_status(msg)
+                except Exception:
+                    pass
+            # Fail-Path A11y Hex-All — 2.5.20
+            if parent is not None and hasattr(parent, "_announce_status_toast"):
+                try:
+                    parent._announce_status_toast(msg)
+                except Exception:
+                    pass
             return
         text = " · ".join(str(c) for c in colors)
         try:
@@ -3186,9 +3219,20 @@ class SettingsDialog(QDialog):
             clip.setText(text)
         except Exception as e:
             QMessageBox.warning(self, "Farben-Theme", str(e))
+            msg = f"Theme-Hex alle kopieren fehlgeschlagen: {e}"
+            if parent is not None and hasattr(parent, "_set_status"):
+                try:
+                    parent._set_status(msg)
+                except Exception:
+                    pass
+            # Fail-Path A11y Hex-All — 2.5.20
+            if parent is not None and hasattr(parent, "_announce_status_toast"):
+                try:
+                    parent._announce_status_toast(msg)
+                except Exception:
+                    pass
             return
         msg = f"Theme-Hex kopiert ({name}): {text}"
-        parent = self.parent()
         if parent is not None and hasattr(parent, "_set_status"):
             try:
                 parent._set_status(msg)

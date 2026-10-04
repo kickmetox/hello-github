@@ -12133,6 +12133,16 @@ class MainWindow(QMainWindow):
                 clip.setText(text)
             except Exception as e:
                 QMessageBox.warning(dlg, "Export-Preset", str(e))
+                msg = (
+                    f"Export-Preset Summary kopieren fehlgeschlagen: "
+                    f"{name or '(ohne Name)'}"
+                )
+                self._set_status(msg)
+                # Fail-Path A11y Summary-Copy — 2.5.20
+                try:
+                    self._announce_status_toast(msg)
+                except Exception:
+                    pass
                 return
             msg = f"Export-Preset Summary kopiert: {name}"
             self._set_status(msg)
@@ -13510,7 +13520,7 @@ class MainWindow(QMainWindow):
         return preview
 
     def _ocr_region_status_tooltip(self) -> str:
-        """Status-Tooltip inkl. Textvorschau — 2.5.9–2.5.19."""
+        """Status-Tooltip inkl. Textvorschau — 2.5.9–2.5.20."""
         path = getattr(self, "_last_ocr_region_path", None) or ""
         tip = (
             "Linksklick → Ergebnis-Tab · Rechtsklick → Menü · "
@@ -13520,7 +13530,7 @@ class MainWindow(QMainWindow):
             "Esc → Status schließen · "
             "Enter → Ergebnis-Tab · "
             "Ctrl+C Text · Ctrl+Shift+C Pfad · "
-            "F4 → Ordner · F5 → Datei — 2.5.19"
+            "F4 → Ordner · F5 → Datei — 2.5.20"
         )
         if path:
             tip = f"{tip}\n{path}"
@@ -13588,6 +13598,13 @@ class MainWindow(QMainWindow):
         """Status-Klick: OCR-Region Ergebnis-Tab fokussieren — 2.5.5."""
         path = getattr(self, "_last_ocr_region_path", None)
         if not path:
+            msg = "OCR-Region Pfad fehlt"
+            self._set_status(msg)
+            # Fail-Path A11y Open-Pfad fehlt — 2.5.20
+            try:
+                self._announce_status_toast(msg)
+            except Exception:
+                pass
             return False
         target = Path(str(path))
         if not target.is_file():
@@ -13623,6 +13640,13 @@ class MainWindow(QMainWindow):
                 pass
             return True
         except Exception:
+            msg = f"OCR-Region Tab öffnen fehlgeschlagen: {target.name}"
+            self._set_status(msg)
+            # Fail-Path A11y Open-Exception — 2.5.20
+            try:
+                self._announce_status_toast(msg)
+            except Exception:
+                pass
             return False
 
     def _open_ocr_region_result_folder(self) -> bool:
@@ -13632,6 +13656,13 @@ class MainWindow(QMainWindow):
 
         path = getattr(self, "_last_ocr_region_path", None)
         if not path:
+            msg = "OCR-Region Pfad fehlt"
+            self._set_status(msg)
+            # Fail-Path A11y Open-Pfad fehlt — 2.5.20
+            try:
+                self._announce_status_toast(msg)
+            except Exception:
+                pass
             return False
         target = Path(str(path))
         folder = target.parent if target.is_file() else target
@@ -13647,6 +13678,13 @@ class MainWindow(QMainWindow):
                 pass
             return True
         except Exception:
+            msg = f"OCR-Region Ordner öffnen fehlgeschlagen: {folder}"
+            self._set_status(msg)
+            # Fail-Path A11y Open-Exception — 2.5.20
+            try:
+                self._announce_status_toast(msg)
+            except Exception:
+                pass
             return False
 
     def _open_ocr_region_result_file(self) -> bool:
@@ -13656,6 +13694,13 @@ class MainWindow(QMainWindow):
 
         path = getattr(self, "_last_ocr_region_path", None)
         if not path:
+            msg = "OCR-Region Pfad fehlt"
+            self._set_status(msg)
+            # Fail-Path A11y Open-Pfad fehlt — 2.5.20
+            try:
+                self._announce_status_toast(msg)
+            except Exception:
+                pass
             return False
         target = Path(str(path))
         if not target.is_file():
@@ -13670,6 +13715,13 @@ class MainWindow(QMainWindow):
         try:
             QDesktopServices.openUrl(QUrl.fromLocalFile(str(target)))
         except Exception:
+            msg = f"OCR-Region Datei öffnen fehlgeschlagen: {target.name}"
+            self._set_status(msg)
+            # Fail-Path A11y Open-Exception — 2.5.20
+            try:
+                self._announce_status_toast(msg)
+            except Exception:
+                pass
             return False
         self._ocr_region_toast_active = True
         msg = f"OCR-Region Datei geöffnet: {target.name}"

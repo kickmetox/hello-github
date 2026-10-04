@@ -1,5 +1,20 @@
 # Changelog — InstantLens Doc
 
+## 2.5.20 — OCR Open-Fail-A11y, Theme Ctrl+Shift+C·HexAll-Fail, ildtags Tag−/Clear-Fail-A11y, Export Summary-Fail-A11y
+
+Post-Release-Polish nach **2.5.19**: **OCR-Region** Status-**Open Fail-Path A11y** (Tab/Ordner/Datei ohne Pfad · Open-Exception); **Farben-Themes** Swatch-**Ctrl+Shift+C alle Hex** · **Hex-All Fail-A11y**; **ildtags** **Tag−/Clear Fail-A11y** · Pfad-Copy Fail-A11y; **Export-Presets** **Summary-Copy Fail-A11y**. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie klar markiert / nicht produktiv (Ink ≠ Stylus).
+
+### Geändert
+- OCR-Region: Fail-Path A11y bei Öffnen (Pfad fehlt · Open-Exception Tab/Ordner/Datei)
+- Farben-Themes: Swatch Ctrl+Shift+C alle Hex · Hex-All Fail-A11y · Menü/Tooltip 2.5.20
+- Dokument-Tags: Tag entfernen / Alle Tags entfernen Fail-Path A11y · Pfad-Copy Fail-A11y
+- Export-Presets: Summary kopieren Zwischenablage-Fail → A11y Announce
+
+### Tests / Qualität
+- Version **2.5.20** (App / `ild_pdf` / ISS / Smoke / Docs); Serie **2.5**; `docs/VERSION` + `VERSION.txt`
+- Smoke: 2.5.20 CLI + Qt (OCR Open-Fail-A11y, Theme Ctrl+Shift+C·HexAll-Fail, ildtags Tag−/Clear-Fail-A11y, Export Summary-Fail-A11y)
+- Stubs: KI/Cloud/Stylus/3D/Hooks/Outline/Telemetrie unverändert markiert
+
 ## 2.5.19 — OCR Text-Clip-Fail-A11y, Theme Shift+←/→, ildtags Tags-Fail-A11y, Export Pfad/Apply-Fail-A11y
 
 Post-Release-Polish nach **2.5.18**: **OCR-Region** Status-**Text-Copy Clip-Fail A11y**; **Farben-Themes** Swatch-**Shift+←/→ ±2** · **Hex-Copy Fail-A11y**; **ildtags** **Tags-Copy/Paste Fail-A11y**; **Export-Presets** **Pfad-Copy / Apply-fehlt Fail-A11y**. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie klar markiert / nicht produktiv (Ink ≠ Stylus).
