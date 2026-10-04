@@ -2,7 +2,7 @@
 
 Moderne Textverarbeitung mit PDF-Annotator, OCR-Bridge und Formulargenerator.
 
-**Version:** 2.6.25  
+**Version:** 2.6.26  
 **Hersteller:** Andreas Meyer · ame@sellerbach.de
 
 ## Quickstart (Windows)
@@ -29,7 +29,8 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 ```
 
 64-Bit-Python erforderlich. Runnable-Pack ohne EXE: `.\scripts\pack-windows-runnable.ps1`.  
-Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
+Installer-Einzeiler: `powershell -ExecutionPolicy Bypass -File .\scripts\build-windows-installer.ps1` → `dist\InstantLensDoc-Setup-2.6.26.exe`  
+(oder `.\installer\build-installer.ps1`, optional `-NoKeygen`)  
 Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an).  
 User-Shortcuts: `.\scripts\install-ild.ps1` (inkl. Keygen) · Deinstallieren: `-Uninstall [-Quiet]` (Exit **0**/OK · **1**/Fehler; Quiet: Kurz-Summary, Exit 0 auch ohne Shortcuts).
 
@@ -37,12 +38,17 @@ Keygen: `run-keygen.bat` · `python -m keygen kunde@example.com` · siehe `keyge
 
 Nightly-Smoke: `python scripts\smoke_ild.py` · optional `--qt` · `--json` (Summary: `ok`, `checks[]`, `duration_ms`, `version`; Fail: `checks[].error` max 200…, Exit=ok). Siehe **CONTRIBUTING.md**; Workflow-Stub `.github/workflows/smoke-ild.yml` (manual only).
 
+## Neu in 2.6.26
+
+- Polish / Konsolidierung 2.6.20–2.6.25 (keine großen neuen Produktflächen)
+- Windows-Installer gehärtet: VERSION.txt → ISCC, Preflight, CustomMessages DE/EN
+- Einzeiler Setup.exe: `powershell -ExecutionPolicy Bypass -File .\scripts\build-windows-installer.ps1`
+
 ## Neu in 2.6.25
 
-- Hyperlinks: Text → URL oder Dokumentziel (`#anker`, `ild://line/N`); Ctrl+Shift+K; Sidecar `*.ildlinks.json`
-- Grafiken & Medien: Bild skalieren/zuschneiden, Formen, Video-Platzhalter (URL); Textumfluss bleibt
-- EPUB-Export/Import; `ild.insert_hyperlink` / `layout_*` / `export_epub_api`
-- Stubs Stylus/3D/Hooks/Outline/Telemetrie/freier KI-Chat unverändert
+- Stylus / Palm Rejection; Dokumentstruktur-Pane; Script-/Plugin-Hooks
+- Telemetrie Opt-in lokal; 3D Limited Viewer; Inno-Installer-Projekt
+- `ild.hooks_*` / `document_outline_api` / `stylus_status` / `telemetry_*` / `extrude3d_preview`
 
 ## Neu in 2.6.23
 

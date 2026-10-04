@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **2.6.25** |
+| Version | **2.6.26** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -33,7 +33,7 @@
 
 Skript: [sync-ild.ps1](scripts/sync-ild.ps1) — Branch `cursor/instantlensdoc-2108` (oder `-LocalPack` / Pack-Zip) nach `D:\AI_Temp\InstantLensDoc`, pip, Start. **Nutzer-Icon in `assets` wird nicht überschrieben.**
 
-**FEATURES.md lokal sync:** Nach Sync liegt `FEATURES.md` lokal im App-Ordner (`D:\AI_Temp\InstantLensDoc\FEATURES.md`); About/Stubs öffnen diese lokale Datei — Version **2.6.25**.
+**FEATURES.md lokal sync:** Nach Sync liegt `FEATURES.md` lokal im App-Ordner (`D:\AI_Temp\InstantLensDoc\FEATURES.md`); About/Stubs öffnen diese lokale Datei — Version **2.6.26**.
 
 Ohne Start: `-NoStart` (Alias `-SkipStart`). Exit-Codes: **0** OK · **1** allgemein · **2** Git-Fehler.
 
@@ -68,7 +68,7 @@ Python-Layout-Zip (ohne PyInstaller-EXE):
 powershell -ExecutionPolicy Bypass -File .\scripts\pack-windows-runnable.ps1
 ```
 
-Installer: `.\scripts\build-windows-installer.ps1` bzw. `.\installer\build-installer.ps1` (optional `-NoKeygen`) → `dist\InstantLensDoc-Setup-2.6.25.exe`  
+Installer: `.\scripts\build-windows-installer.ps1` bzw. `.\installer\build-installer.ps1` (optional `-NoKeygen`) → `dist\InstantLensDoc-Setup-2.6.26.exe`  
 Desktop-/Keygen-Shortcuts: `.\scripts\install-ild.ps1` (Keygen wenn `run-keygen.bat` / EXE vorhanden; `-SkipKeygen`)  
 Desktop-Verknüpfung Installer: optionale Checkbox (`desktopicon`, Standard an / `checkedonce`)
 
@@ -81,6 +81,16 @@ python -m keygen --verify "ILD1...."
 ```
 
 Trial 28 Tage · Keys 32 Tage (HMAC `ILD1.…`). Details: `keygen/README.md`.
+
+## Neu in 2.6.26
+
+Minor nach **2.6.25** (Stylus / Outline / Hooks / Telemetrie / 3D / Installer):
+
+- **Polish / Konsolidierung:** keine großen neuen Produktflächen; Serie 2.6.20–2.6.25 stabilisiert
+- **Windows-Installer gehärtet:** Version aus `VERSION.txt`, Preflight (run.bat/EXE), ISCC `/DMyAppVersion=`, CustomMessages DE/EN, AppMutex/MinVersion/64-Bit
+- **Einzeiler Setup.exe (Windows x64 + Inno Setup 6):** `powershell -ExecutionPolicy Bypass -File .\scripts\build-windows-installer.ps1` → `dist\InstantLensDoc-Setup-2.6.26.exe`
+- Runnable-/Installer-Pack und Docs/i18n aktualisiert
+- Freier KI-Chat-Stub und Outline-TTS bleiben geplant
 
 ## Neu in 2.6.25
 

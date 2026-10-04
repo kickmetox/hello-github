@@ -1,5 +1,5 @@
 """
-User-/Script-Hooks — produktiv ab 2.6.25.
+User-/Script-Hooks — produktiv ab 2.6.26.
 
 Event-Bus + Laden von User-Skripten (Python ``*.py`` / PowerShell ``*.ps1`` Liste).
 Aufrufbar aus App, ``ild``-API, CLI und PowerShell.
@@ -331,7 +331,7 @@ def write_hook_example(directory: str | Path | None = None) -> Path:
         return dest
     dest.write_text(
         '''\
-"""Beispiel InstantLens Doc Hook — 2.6.25."""
+"""Beispiel InstantLens Doc Hook — 2.6.26."""
 
 def on_document_opened(**payload):
     # payload: path, … — keine PII loggen in Produktion

@@ -1,4 +1,6 @@
-# Changelog — InstantLens Doc
+## 2.6.26 — Polish / Installer-Konsolidierung
+
+Minor nach **2.6.25**: Keine großen neuen Produktflächen. **Windows-Installer gehärtet** — `scripts/build-windows-installer.ps1` + `installer/build-installer.ps1` lesen Version aus `VERSION.txt`, Preflight (run.bat/EXE, ISS-Vollständigkeit), ISCC `/DMyAppVersion=`, CustomMessages DE/EN für Desktop/Startmenü/Launch; ISS mit AppMutex, MinVersion, ArchitecturesAllowed, UsePreviousTasks. **Konsolidierung** der Serie 2.6.20–2.6.25 (Spell/Review/Batch/Share/Hyperlinks/EPUB/Stylus/Outline/Hooks/Telemetrie/3D). Docs/FEATURES/INFO/i18n + Runnable-/Installer-Pack aktualisiert. Setup.exe weiterhin auf Windows x64 mit Inno Setup 6: `powershell -ExecutionPolicy Bypass -File .\scripts\build-windows-installer.ps1` → `dist\InstantLensDoc-Setup-2.6.26.exe`. Freier KI-Chat-Stub und Outline-TTS bleiben.
 
 ## 2.6.25 — Stylus, Outline, Hooks, Telemetrie, 3D
 

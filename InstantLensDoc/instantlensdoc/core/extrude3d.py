@@ -1,4 +1,4 @@
-"""Begrenzter 3D-Extrusions-Viewer / Platzhalter — 2.6.25.
+"""Begrenzter 3D-Extrusions-Viewer / Platzhalter — 2.6.26.
 
 Scope (dokumentiert, bewusst begrenzt):
 - Isometrische Vorschau einer Rechteck-/Ellipsen-Extrusion (QPainter, kein OpenGL)

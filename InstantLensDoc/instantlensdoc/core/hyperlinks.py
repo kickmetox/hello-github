@@ -1,4 +1,4 @@
-"""Hyperlinks: Text → URL oder Dokumentziel — 2.6.25.
+"""Hyperlinks: Text → URL oder Dokumentziel — 2.6.26.
 
 Markdown-Syntax ``[Text](Ziel)`` und HTML ``<a href>``.
 Ziele: ``https://…`` / ``http://…`` (extern) oder ``#anker`` / ``ild://line/N`` /

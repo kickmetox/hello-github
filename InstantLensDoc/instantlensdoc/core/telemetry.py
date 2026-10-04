@@ -1,4 +1,4 @@
-"""Optionale, privacy-respektierende Diagnostik — 2.6.25.
+"""Optionale, privacy-respektierende Diagnostik — 2.6.26.
 
 - **Default aus** (Opt-in)
 - Settings-Toggle aktivierbar

@@ -450,10 +450,10 @@ class Sidebar(QWidget):
     mark_activated = Signal(int)  # Index in Markierungsliste
     annotation_activated = Signal(object)  # Annotation oder id
     outline_activated = Signal(int)  # PDF-Seite 0-basiert
-    outline_line_activated = Signal(int)  # Textzeile 1-basiert — 2.6.25
+    outline_line_activated = Signal(int)  # Textzeile 1-basiert — 2.6.26
     outline_add_requested = Signal()
     outline_delete_requested = Signal()
-    outline_refresh_requested = Signal()  # Dokumentstruktur neu aufbauen — 2.6.25
+    outline_refresh_requested = Signal()  # Dokumentstruktur neu aufbauen — 2.6.26
     form_field_activated = Signal(object)  # FormFieldInfo — Sprung zum Feld
     form_fields_save_requested = Signal(object)  # dict[name→value] Textfelder speichern
     form_fields_export_csv_requested = Signal()  # Feldliste CSV — 1.3.2
@@ -685,7 +685,7 @@ class Sidebar(QWidget):
         self.outline_filter.setPlaceholderText("Struktur filtern…")
         self.outline_filter.setClearButtonEnabled(True)
         self.outline_filter.setToolTip(
-            "Filtert Überschriften/Lesezeichen/Favoriten in der Dokumentstruktur — 2.6.25"
+            "Filtert Überschriften/Lesezeichen/Favoriten in der Dokumentstruktur — 2.6.26"
         )
         self.outline_filter.textChanged.connect(self._filter_document_outline)
         layout.addWidget(self.outline_filter)
@@ -697,7 +697,7 @@ class Sidebar(QWidget):
         self.outline.setMaximumHeight(280)
         self.outline.setToolTip(
             "Dokumentstruktur jenseits TOC: Überschriften, PDF-Lesezeichen, Favoriten — "
-            "Klick → Seite/Zeile; +/− Lesezeichen — 2.6.25"
+            "Klick → Seite/Zeile; +/− Lesezeichen — 2.6.26"
         )
         self.outline.itemClicked.connect(self._activate_outline)
         self.outline.itemDoubleClicked.connect(self._activate_outline)
@@ -712,18 +712,18 @@ class Sidebar(QWidget):
         self.btn_outline_del.setFixedWidth(28)
         self.btn_outline_del.setToolTip("Ausgewähltes Lesezeichen löschen")
         self.btn_outline_del.clicked.connect(self.outline_delete_requested.emit)
-        # Struktur aktualisieren (Outline-Pane) — 2.6.25; TTS-Vorlesen bleibt Stub
+        # Struktur aktualisieren (Outline-Pane) — 2.6.26; TTS-Vorlesen bleibt Stub
         self.btn_outline_refresh = QPushButton("↻")
         self.btn_outline_refresh.setObjectName("outlineRefreshBtn")
         self.btn_outline_refresh.setFixedWidth(28)
         self.btn_outline_refresh.setToolTip(
-            "Dokumentstruktur aktualisieren (Überschriften/Lesezeichen) — 2.6.25"
+            "Dokumentstruktur aktualisieren (Überschriften/Lesezeichen) — 2.6.26"
         )
         self.btn_outline_refresh.clicked.connect(self.outline_refresh_requested.emit)
         self.btn_outline_read = QPushButton("Vorlesen")
         self.btn_outline_read.setObjectName("outlineReadStubBtn")
         self.btn_outline_read.setToolTip(
-            "Document Outline Vorlesen — Stub / TTS geplant — 2.6.25 "
+            "Document Outline Vorlesen — Stub / TTS geplant — 2.6.26 "
             "(Pane selbst produktiv)"
         )
         self.btn_outline_read.setAccessibleName(
@@ -1198,13 +1198,13 @@ class Sidebar(QWidget):
         self.portfolio_empty_hint.setVisible(False)
 
     def _outline_read_stub(self) -> None:
-        """Document Outline Vorlesen — Stub / TTS geplant; Pane produktiv — 2.6.25."""
+        """Document Outline Vorlesen — Stub / TTS geplant; Pane produktiv — 2.6.26."""
         from instantlensdoc.ui.stubs import show_planned
 
         show_planned(self, "outline_read")
 
     def _filter_document_outline(self, text: str = "") -> None:
-        """Filtert Tree-Einträge nach Titel-Substring — 2.6.25."""
+        """Filtert Tree-Einträge nach Titel-Substring — 2.6.26."""
         q = (text or "").strip().casefold()
         root = self.outline.invisibleRootItem()
 
@@ -2082,7 +2082,7 @@ class Sidebar(QWidget):
         bookmarks=None,
         headings: list | None = None,
     ) -> None:
-        """Dokumentstruktur: Überschriften + Lesezeichen (+ Favoriten-Gruppen) — 2.6.25."""
+        """Dokumentstruktur: Überschriften + Lesezeichen (+ Favoriten-Gruppen) — 2.6.26."""
         self.outline.clear()
         self._outline_sections = sections
 
@@ -2187,7 +2187,7 @@ class Sidebar(QWidget):
                 0,
                 "Keine Überschriften oder PDF-Lesezeichen/Outlines. "
                 "Favoriten als Outlines exportieren, Markdown-Überschriften (#) "
-                "oder + für aktuelle Seite — 2.6.25",
+                "oder + für aktuelle Seite — 2.6.26",
             )
             self.outline.addTopLevelItem(empty)
             return

@@ -1,4 +1,4 @@
-"""Stylus / Stift-Eingabe für Annotationen — 2.6.25.
+"""Stylus / Stift-Eingabe für Annotationen — 2.6.26.
 
 Druckempfindlichkeit wenn Tablet/Stylus Druck liefert; sonst verbesserte
 Stift-Integration (gleicher Freihand-Pfad mit optionaler Palm-Rejection).
@@ -102,7 +102,7 @@ def should_reject_palm(
 
 
 def stylus_info() -> dict[str, Any]:
-    """Status für Settings/About/Stubs — produktiv ab 2.6.25."""
+    """Status für Settings/About/Stubs — produktiv ab 2.6.26."""
     return {
         "name": "Stylus / Palm Rejection",
         "stub": False,

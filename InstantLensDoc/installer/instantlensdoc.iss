@@ -1,5 +1,5 @@
-; Inno Setup — InstantLens Doc 2.6.25
-; Voraussetzung: Inno Setup 6 (iscc.exe im PATH oder ISCC_PATH setzen)
+; Inno Setup — InstantLens Doc 2.6.26
+; Voraussetzung: Inno Setup 6 (iscc.exe im PATH oder ISCC_PATH / -IsccPath)
 ;
 ; Build-Varianten:
 ;   A) Python-Portable-Layout (empfohlen für Dev):
@@ -12,17 +12,20 @@
 ;      (build-windows.ps1 kopiert Keygen dorthin; build-installer.ps1 ebenfalls)
 ;
 ; Optionen:
-;   /DIncludeKeygen=1  — Keygen mitpacken (run-keygen.bat bzw. InstantLensKeygen.exe)
-;   /DIncludeKeygen=0  — ohne Keygen-Shortcuts/Dateien
+;   /DMyAppVersion=x.y.z  — Version überschreiben (Default unten; build-*.ps1 setzt aus VERSION.txt)
+;   /DIncludeKeygen=1     — Keygen mitpacken (run-keygen.bat bzw. InstantLensKeygen.exe)
+;   /DIncludeKeygen=0     — ohne Keygen-Shortcuts/Dateien
 ;
 ; Desktop: Task „Desktop-Verknüpfung erstellen“ — optional Checkbox (Flags: checkedonce,
 ;   Standard beim ersten Install aktiv; Nutzer kann abwählen). Shortcuts nur bei Tasks: desktopicon.
 ; Uninstaller: Startmenü + Systemsteuerung (UninstallDisplay*)
 ;
-; Siehe: build-installer.ps1
+; Siehe: build-installer.ps1 · scripts\build-windows-installer.ps1
 
 #define MyAppName "InstantLens Doc"
-#define MyAppVersion "2.6.25"
+#ifndef MyAppVersion
+  #define MyAppVersion "2.6.26"
+#endif
 #define MyAppPublisher "Andreas Meyer"
 #define MyAppURL "mailto:ame@sellerbach.de"
 #ifndef SourceRoot
@@ -43,6 +46,7 @@ AppVerName={#MyAppName} {#MyAppVersion}
 AppPublisher={#MyAppPublisher}
 AppPublisherURL={#MyAppURL}
 AppSupportURL={#MyAppURL}
+AppMutex=InstantLensDoc_Setup_Mutex
 DefaultDirName={autopf}\InstantLensDoc
 DefaultGroupName={#MyAppName}
 ; Startmenü-Gruppe sichtbar lassen (Icons unten)
@@ -54,7 +58,9 @@ Compression=lzma
 SolidCompression=yes
 WizardStyle=modern
 PrivilegesRequired=lowest
+ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
+MinVersion=6.1sp1
 SetupIconFile=..\assets\app.ico
 Uninstallable=yes
 UninstallDisplayName={#MyAppName} {#MyAppVersion}
@@ -68,15 +74,33 @@ VersionInfoProductName={#MyAppName}
 VersionInfoDescription={#MyAppName} Setup
 CloseApplications=yes
 RestartApplications=no
+UsePreviousTasks=yes
+DisableWelcomePage=no
 
 [Languages]
 Name: "german"; MessagesFile: "compiler:Languages\German.isl"
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
+[CustomMessages]
+german.TaskDesktopIcon=Desktop-Verknüpfung erstellen
+german.TaskStartMenu=Einträge im Startmenü belassen
+german.TaskGroup=Verknüpfungen:
+german.LaunchAfterInstall={#MyAppName} jetzt starten
+german.IconAppComment=InstantLens Doc starten
+german.IconKeygenComment=Lizenz-Key erzeugen
+german.IconUninstallComment=InstantLens Doc entfernen
+english.TaskDesktopIcon=Create a desktop shortcut
+english.TaskStartMenu=Keep Start Menu entries
+english.TaskGroup=Additional icons:
+english.LaunchAfterInstall=Launch {#MyAppName} now
+english.IconAppComment=Start InstantLens Doc
+english.IconKeygenComment=Generate license key
+english.IconUninstallComment=Remove InstantLens Doc
+
 [Tasks]
 ; Desktop-Verknüpfung standardmäßig aktiv — abwählbar
-Name: "desktopicon"; Description: "Desktop-Verknüpfung erstellen"; GroupDescription: "Verknüpfungen:"; Flags: checkedonce
-Name: "startmenu"; Description: "Einträge im Startmenü belassen"; GroupDescription: "Verknüpfungen:"; Flags: checkedonce
+Name: "desktopicon"; Description: "{cm:TaskDesktopIcon}"; GroupDescription: "{cm:TaskGroup}"; Flags: checkedonce
+Name: "startmenu"; Description: "{cm:TaskStartMenu}"; GroupDescription: "{cm:TaskGroup}"; Flags: checkedonce
 
 [Files]
 Source: "{#SourceRoot}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
@@ -87,28 +111,28 @@ Source: "..\assets\app.ico"; DestDir: "{app}\assets"; Flags: ignoreversion skipi
 
 [Icons]
 #if UsePythonLauncher == "1"
-Name: "{group}\{#MyAppName}"; Filename: "{app}\run.bat"; WorkingDir: "{app}"; IconFilename: "{app}\assets\app.ico"; Comment: "InstantLens Doc starten"; Tasks: startmenu
+Name: "{group}\{#MyAppName}"; Filename: "{app}\run.bat"; WorkingDir: "{app}"; IconFilename: "{app}\assets\app.ico"; Comment: "{cm:IconAppComment}"; Tasks: startmenu
 #if IncludeKeygen == "1"
-Name: "{group}\Keygenerator"; Filename: "{app}\run-keygen.bat"; WorkingDir: "{app}"; IconFilename: "{app}\assets\app.ico"; Comment: "Lizenz-Key erzeugen"; Tasks: startmenu
+Name: "{group}\Keygenerator"; Filename: "{app}\run-keygen.bat"; WorkingDir: "{app}"; IconFilename: "{app}\assets\app.ico"; Comment: "{cm:IconKeygenComment}"; Tasks: startmenu
 #endif
 Name: "{group}\INFO lesen"; Filename: "{app}\INFO.md"; WorkingDir: "{app}"; Tasks: startmenu
-Name: "{group}\{#MyAppName} deinstallieren"; Filename: "{uninstallexe}"; IconFilename: "{app}\assets\app.ico"; Comment: "InstantLens Doc entfernen"; Tasks: startmenu
-Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\run.bat"; WorkingDir: "{app}"; IconFilename: "{app}\assets\app.ico"; Comment: "InstantLens Doc"; Tasks: desktopicon
+Name: "{group}\{#MyAppName} deinstallieren"; Filename: "{uninstallexe}"; IconFilename: "{app}\assets\app.ico"; Comment: "{cm:IconUninstallComment}"; Tasks: startmenu
+Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\run.bat"; WorkingDir: "{app}"; IconFilename: "{app}\assets\app.ico"; Comment: "{#MyAppName}"; Tasks: desktopicon
 #else
-Name: "{group}\{#MyAppName}"; Filename: "{app}\InstantLensDoc.exe"; WorkingDir: "{app}"; IconFilename: "{app}\assets\app.ico"; Comment: "InstantLens Doc starten"; Tasks: startmenu
+Name: "{group}\{#MyAppName}"; Filename: "{app}\InstantLensDoc.exe"; WorkingDir: "{app}"; IconFilename: "{app}\assets\app.ico"; Comment: "{cm:IconAppComment}"; Tasks: startmenu
 #if IncludeKeygen == "1"
-Name: "{group}\Keygenerator"; Filename: "{app}\InstantLensKeygen.exe"; WorkingDir: "{app}"; IconFilename: "{app}\assets\app.ico"; Comment: "Lizenz-Key erzeugen"; Tasks: startmenu
+Name: "{group}\Keygenerator"; Filename: "{app}\InstantLensKeygen.exe"; WorkingDir: "{app}"; IconFilename: "{app}\assets\app.ico"; Comment: "{cm:IconKeygenComment}"; Tasks: startmenu
 #endif
 Name: "{group}\INFO lesen"; Filename: "{app}\INFO.md"; WorkingDir: "{app}"; Tasks: startmenu
-Name: "{group}\{#MyAppName} deinstallieren"; Filename: "{uninstallexe}"; IconFilename: "{app}\assets\app.ico"; Comment: "InstantLens Doc entfernen"; Tasks: startmenu
-Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\InstantLensDoc.exe"; WorkingDir: "{app}"; IconFilename: "{app}\assets\app.ico"; Comment: "InstantLens Doc"; Tasks: desktopicon
+Name: "{group}\{#MyAppName} deinstallieren"; Filename: "{uninstallexe}"; IconFilename: "{app}\assets\app.ico"; Comment: "{cm:IconUninstallComment}"; Tasks: startmenu
+Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\InstantLensDoc.exe"; WorkingDir: "{app}"; IconFilename: "{app}\assets\app.ico"; Comment: "{#MyAppName}"; Tasks: desktopicon
 #endif
 
 [Run]
 #if UsePythonLauncher == "1"
-Filename: "{app}\run.bat"; Description: "{#MyAppName} jetzt starten"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\run.bat"; Description: "{cm:LaunchAfterInstall}"; Flags: nowait postinstall skipifsilent
 #else
-Filename: "{app}\InstantLensDoc.exe"; Description: "{#MyAppName} jetzt starten"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\InstantLensDoc.exe"; Description: "{cm:LaunchAfterInstall}"; Flags: nowait postinstall skipifsilent
 #endif
 
 [UninstallDelete]

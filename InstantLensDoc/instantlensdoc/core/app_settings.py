@@ -157,9 +157,9 @@ DEFAULTS: dict[str, Any] = {
     "page_labels_txt_utf8_bom": True,  # PageLabels-TXT UTF-8 BOM — 2.2.4
     "last_page_labels_txt_dir": "",  # Zielordner PageLabels-TXT merken — 2.2.4
     "page_labels_txt_filename_template": "{stem}_labels.txt",  # Template — 2.2.4
-    "telemetry_opt_in": False,  # anonym Diagnostik lokal — Opt-in Default aus — 2.6.25
-    "stylus_pressure_enabled": True,  # Stylus-Druck → Strichstärke — 2.6.25
-    "stylus_palm_rejection": True,  # Palm-Rejection Heuristik — 2.6.25
+    "telemetry_opt_in": False,  # anonym Diagnostik lokal — Opt-in Default aus — 2.6.26
+    "stylus_pressure_enabled": True,  # Stylus-Druck → Strichstärke — 2.6.26
+    "stylus_palm_rejection": True,  # Palm-Rejection Heuristik — 2.6.26
     "command_palette_recent": [],  # letzte Command-Palette-Befehle (IDs) — 2.3.1
     "command_palette_recent_max": 10,  # Recent-Anzahl 5/10/20 — 2.3.2
     "command_palette_pinned": [],  # angeheftete Palette-Befehle (IDs) — 2.3.2
@@ -631,7 +631,7 @@ def set_update_check_on_start(enabled: bool) -> None:
 
 
 def get_telemetry_opt_in() -> bool:
-    """Opt-in „anonym Diagnostik (lokal)“ — Default False — 2.6.25."""
+    """Opt-in „anonym Diagnostik (lokal)“ — Default False — 2.6.26."""
     return bool(load_settings().get("telemetry_opt_in", False))
 
 

@@ -1,14 +1,16 @@
-# InstantLens Doc 2.6.25 — Inno-Setup-Installer bauen (Setup.exe)
+# InstantLens Doc 2.6.26 — Inno-Setup-Installer bauen (Setup.exe)
 # Voraussetzung: Inno Setup 6 (iscc.exe) auf Windows x64
-# Aufruf:
-#   powershell -ExecutionPolicy Bypass -File .\installer\build-installer.ps1
+# Aufruf (Einzeiler):
 #   powershell -ExecutionPolicy Bypass -File .\scripts\build-windows-installer.ps1
+# Direkt:
+#   powershell -ExecutionPolicy Bypass -File .\installer\build-installer.ps1
 # Optional:
 #   -SourceRoot D:\path\to\pack
 #   -PythonLauncher   # Shortcuts auf run.bat statt InstantLensDoc.exe
 #   -NoKeygen         # IncludeKeygen=0 (keine Keygen-Shortcuts)
+#   -IsccPath PATH
 #
-# Ergebnis: dist\InstantLensDoc-Setup-2.6.25.exe
+# Ergebnis: dist\InstantLensDoc-Setup-<VERSION>.exe
 #   Startmenü + optional Desktop + Uninstall + 64-Bit
 #
 # Keygen-EXE: Prefer dist\InstantLensKeygen\InstantLensKeygen.exe,
@@ -26,11 +28,29 @@ $ErrorActionPreference = "Stop"
 $InstallerDir = $PSScriptRoot
 $Root = Split-Path -Parent $InstallerDir
 $Iss = Join-Path $InstallerDir "instantlensdoc.iss"
+$Hinweis = Join-Path $InstallerDir "installer-hinweis.txt"
 $Dist = Join-Path $Root "dist"
 $Pack = Join-Path $Dist "InstantLensDoc"
+$VersionFile = Join-Path $Root "VERSION.txt"
+
+function Get-IldVersion {
+    if (-not (Test-Path $VersionFile)) {
+        throw "VERSION.txt fehlt: $VersionFile"
+    }
+    $v = (Get-Content -LiteralPath $VersionFile -Raw).Trim().Split()[0]
+    if ($v -notmatch '^\d+\.\d+\.\d+') {
+        throw "VERSION.txt ungültig: $v"
+    }
+    return $v
+}
+
+$Version = Get-IldVersion
 
 if (-not (Test-Path $Iss)) {
     Write-Error "ISS fehlt: $Iss"
+}
+if (-not (Test-Path $Hinweis)) {
+    Write-Host "WARNUNG: installer-hinweis.txt fehlt — InfoAfterFile kann fehlschlagen."
 }
 
 # Icon prüfen (SetupIconFile)
@@ -61,6 +81,7 @@ if (-not $iscc) {
     Write-Host "FEHLER: Inno Setup 6 (ISCC.exe) nicht gefunden."
     Write-Host "Installieren: https://jrsoftware.org/isinfo.php"
     Write-Host "Oder ISCC_PATH setzen / -IsccPath angeben."
+    Write-Host "Einzeiler nach Sync: powershell -ExecutionPolicy Bypass -File .\scripts\build-windows-installer.ps1"
     exit 1
 }
 
@@ -98,9 +119,32 @@ if (-not (Test-Path $SourceRoot)) {
     Write-Error "SourceRoot fehlt: $SourceRoot"
 }
 
+# Preflight: Python-Layout oder EXE-Layout
+$hasBat = Test-Path (Join-Path $SourceRoot "run.bat")
+$hasExe = Test-Path (Join-Path $SourceRoot "InstantLensDoc.exe")
+if (-not $hasBat -and -not $hasExe) {
+    Write-Error "SourceRoot enthält weder run.bat noch InstantLensDoc.exe: $SourceRoot"
+}
+if ($PythonLauncher -and -not $hasBat) {
+    Write-Host "WARNUNG: -PythonLauncher gesetzt, aber run.bat fehlt — Shortcuts können fehlschlagen."
+}
+if ((-not $PythonLauncher) -and (-not $hasExe) -and $hasBat) {
+    Write-Host "Hinweis: Keine InstantLensDoc.exe — schalte auf PythonLauncher (run.bat)."
+    $PythonLauncher = $true
+}
+if ((-not $NoKeygen) -and $PythonLauncher) {
+    $kgBat = Join-Path $SourceRoot "run-keygen.bat"
+    if (-not (Test-Path $kgBat)) {
+        Write-Host "WARNUNG: run-keygen.bat fehlt — Keygen-Shortcut im Startmenü kann fehlschlagen."
+    }
+}
+
 New-Item -ItemType Directory -Force -Path $Dist | Out-Null
 
-$defs = @("/DSourceRoot=$SourceRoot")
+$defs = @(
+    "/DSourceRoot=$SourceRoot",
+    "/DMyAppVersion=$Version"
+)
 if ($PythonLauncher) {
     $defs += "/DUsePythonLauncher=1"
 }
@@ -110,14 +154,25 @@ if ($NoKeygen) {
     $defs += "/DIncludeKeygen=1"
 }
 
+Write-Host "=== InstantLens Doc build-installer $Version ==="
 Write-Host "ISCC: $iscc"
 Write-Host "SourceRoot: $SourceRoot"
 Write-Host "PythonLauncher: $PythonLauncher"
 Write-Host "IncludeKeygen: $(-not $NoKeygen)"
+Write-Host "MyAppVersion: $Version"
 & $iscc @defs $Iss
 if ($LASTEXITCODE -ne 0) {
     exit $LASTEXITCODE
 }
 
+$SetupName = "InstantLensDoc-Setup-$Version.exe"
+$SetupPath = Join-Path $Dist $SetupName
 Write-Host "Fertig. Setup unter: $Dist"
+if (Test-Path $SetupPath) {
+    $sz = [math]::Round((Get-Item $SetupPath).Length / 1MB, 2)
+    Write-Host "OK: $SetupPath ($sz MB)"
+} else {
+    Write-Host "Hinweis: Erwartete Datei $SetupName prüfen."
+}
 Get-ChildItem $Dist -Filter "InstantLensDoc-Setup-*" | Format-Table Name, Length, LastWriteTime
+exit 0

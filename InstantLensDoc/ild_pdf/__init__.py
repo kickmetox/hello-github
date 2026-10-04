@@ -734,4 +734,4 @@ __all__ = [
     "save_print_settings",
 ]
 
-__version__ = "2.6.25"
+__version__ = "2.6.26"

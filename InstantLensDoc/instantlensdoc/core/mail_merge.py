@@ -1,8 +1,8 @@
-"""Seriendruck: Empfänger aus CSV/Excel → Briefe — 2.6.25 / Polish 2.6.25.
+"""Seriendruck: Empfänger aus CSV/Excel → Briefe — 2.6.26 / Polish 2.6.26.
 
 Platzhalter ``{{Feld}}`` / ``«Feld»`` im Template; lokal, ohne Cloud.
 
-2.6.25: fehlende Felder melden, Delimiter, Preview, HTML/DOCX-Ausgabe,
+2.6.26: fehlende Felder melden, Delimiter, Preview, HTML/DOCX-Ausgabe,
 optional eine Datei mit Trennseiten.
 """
 
@@ -159,7 +159,7 @@ def preview_merge(
     *,
     limit: int = 3,
 ) -> dict[str, Any]:
-    """Vorschau der ersten N Briefe + Feldanalyse — 2.6.25."""
+    """Vorschau der ersten N Briefe + Feldanalyse — 2.6.26."""
     analysis = missing_fields(template, recipients)
     letters = mail_merge(template, list(recipients)[: max(0, int(limit))])
     return {

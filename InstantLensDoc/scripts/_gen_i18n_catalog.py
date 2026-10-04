@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate InstantLens Doc 2.6.25 i18n catalog + locale help stubs."""
+"""Generate InstantLens Doc 2.6.26 i18n catalog + locale help stubs."""
 
 from __future__ import annotations
 
@@ -142,6 +142,10 @@ ROWS: list[tuple[str, ...]] = [
     ("info_contact", "Kontakt", "Contact", "Contact", "Контакт", "Contacto", "联系", "Contacto", "التواصل", "Contatto"),
     ("info_privacy", "Privacy: lokal, keine Telemetrie", "Privacy: local, no telemetry", "Confidentialité : local, pas de télémétrie", "Конфиденциальность: локально, без телеметрии", "Privacidad: local, sin telemetría", "隐私：本地，无遥测", "Privacidade: local, sem telemetria", "الخصوصية: محلي، بلا قياس عن بُعد", "Privacy: locale, nessuna telemetria"),
     ("features_missing", "FEATURES.md nicht gefunden.", "FEATURES.md not found.", "FEATURES.md introuvable.", "FEATURES.md не найден.", "FEATURES.md no encontrado.", "未找到 FEATURES.md。", "FEATURES.md não encontrado.", "FEATURES.md غير موجود.", "FEATURES.md non trovato."),
+    ("installer_desktop_icon", "Desktop-Verknüpfung erstellen", "Create a desktop shortcut", "Créer un raccourci bureau", "Создать ярлык на рабочем столе", "Crear acceso directo en el escritorio", "创建桌面快捷方式", "Criar atalho no ambiente de trabalho", "إنشاء اختصار على سطح المكتب", "Crea collegamento sul desktop"),
+    ("installer_start_menu", "Einträge im Startmenü belassen", "Keep Start Menu entries", "Conserver les entrées du menu Démarrer", "Оставить пункты в меню Пуск", "Mantener entradas del menú Inicio", "保留开始菜单项", "Manter entradas no menu Iniciar", "الإبقاء على إدخالات قائمة ابدأ", "Mantieni voci nel menu Start"),
+    ("installer_launch_now", "InstantLens Doc jetzt starten", "Launch InstantLens Doc now", "Lancer InstantLens Doc maintenant", "Запустить InstantLens Doc сейчас", "Iniciar InstantLens Doc ahora", "立即启动 InstantLens Doc", "Iniciar InstantLens Doc agora", "تشغيل InstantLens Doc الآن", "Avvia InstantLens Doc ora"),
+    ("installer_build_hint", "Setup.exe (Windows x64): powershell -ExecutionPolicy Bypass -File .\\scripts\\build-windows-installer.ps1", "Setup.exe (Windows x64): powershell -ExecutionPolicy Bypass -File .\\scripts\\build-windows-installer.ps1", "Setup.exe (Windows x64) : powershell -ExecutionPolicy Bypass -File .\\scripts\\build-windows-installer.ps1", "Setup.exe (Windows x64): powershell -ExecutionPolicy Bypass -File .\\scripts\\build-windows-installer.ps1", "Setup.exe (Windows x64): powershell -ExecutionPolicy Bypass -File .\\scripts\\build-windows-installer.ps1", "Setup.exe (Windows x64)：powershell -ExecutionPolicy Bypass -File .\\scripts\\build-windows-installer.ps1", "Setup.exe (Windows x64): powershell -ExecutionPolicy Bypass -File .\\scripts\\build-windows-installer.ps1", "Setup.exe (Windows x64): powershell -ExecutionPolicy Bypass -File .\\scripts\\build-windows-installer.ps1", "Setup.exe (Windows x64): powershell -ExecutionPolicy Bypass -File .\\scripts\\build-windows-installer.ps1"),
 ]
 
 # Phrase map: German UI source → translations (for tree retranslate)
@@ -241,7 +245,7 @@ def main() -> None:
         phrases[de] = pack_row(row)
 
     catalog = {
-        "version": "2.6.25",
+        "version": "2.6.26",
         "langs": list(LANGS),
         "rtl": ["ar"],
         "strings": strings,

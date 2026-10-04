@@ -123,7 +123,8 @@ powershell -ExecutionPolicy Bypass -File .\\build-windows.ps1
 ```
 
 Ergebnis: `dist\\InstantLensDoc\\InstantLensDoc.exe` (+ `InstantLensKeygen.exe`).  
-Installer: `installer\\build-installer.ps1`
+Installer-Einzeiler: `powershell -ExecutionPolicy Bypass -File .\\scripts\\build-windows-installer.ps1`  
+→ `dist\\InstantLensDoc-Setup-<VERSION>.exe`
 
 ## Desktop-/Startmenü-Shortcuts
 

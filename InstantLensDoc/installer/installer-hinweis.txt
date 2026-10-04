@@ -1,4 +1,4 @@
-InstantLens Doc 2.6.25 — Installation
+InstantLens Doc 2.6.26 — Installation
 
 Startmenü: Gruppe „InstantLens Doc“ mit Programm, optional Keygenerator, INFO und Deinstallieren.
 
@@ -9,12 +9,14 @@ Desktop-Verknüpfung: optionale Checkbox im Installer-Assistenten
 64-Bit: Installer läuft im 64-Bit-Modus (ArchitecturesInstallIn64BitMode=x64compatible).
   Empfohlen: 64-Bit-Python 3.10+ (Python-Layout) bzw. gebündelte x64-EXE.
 
-Neu in 2.6.25:
-- Stylus / Palm Rejection (Druck → Strichstärke)
-- Dokumentstruktur-Pane (Überschriften / Lesezeichen / Favoriten)
-- Script-/Plugin-Hooks (open/save/export/ocr) via Python/PowerShell ild
-- Telemetrie optional lokal (Opt-in Default aus, kein PII, kein Netzwerk)
-- 3D-Extrusion Limited Viewer (isometrisch; kein Mesh/OpenGL)
+Neu in 2.6.26 (Polish):
+- Installer-Pfad gehärtet: Version aus VERSION.txt, Preflight (run.bat/EXE), CustomMessages DE/EN
+- Konsolidierung 2.6.20–2.6.25 (Stylus, Outline, Hooks, Telemetrie, 3D, Hyperlinks/EPUB, Review)
+- Einzeiler Setup.exe: powershell -ExecutionPolicy Bypass -File .\scripts\build-windows-installer.ps1
+
+Basis 2.6.25:
+- Stylus / Palm Rejection · Dokumentstruktur-Pane · Script-/Plugin-Hooks
+- Telemetrie optional lokal · 3D-Extrusion Limited Viewer
 
 Keygenerator (wenn IncludeKeygen=1):
 - Python-Layout: Startmenü → Keygenerator → {app}\run-keygen.bat

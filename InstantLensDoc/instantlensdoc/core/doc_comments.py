@@ -1,4 +1,4 @@
-"""Lokale Dokument-Kommentare an Textstellen — ildcomments-v1 Sidecar — 2.6.25.
+"""Lokale Dokument-Kommentare an Textstellen — ildcomments-v1 Sidecar — 2.6.26.
 
 Feedback ohne Änderung des Fließtexts. Keine Cloud-Echtzeit-Kollaboration.
 """

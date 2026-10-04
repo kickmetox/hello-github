@@ -1,4 +1,4 @@
-"""Digitale / offizielle Signaturen (zertifikatsbasiert) — 2.6.25.
+"""Digitale / offizielle Signaturen (zertifikatsbasiert) — 2.6.26.
 
 Baut auf Verschlüsselung (2.6.7) auf. eIDAS-Orientierung:
 
@@ -434,7 +434,7 @@ def sign_pdf(
     embed_attachment: bool = True,
     visible_stamp: bool = True,
 ) -> dict[str, Any]:
-    """PDF digital signieren (zertifikatsbasiert wo möglich) — 2.6.25.
+    """PDF digital signieren (zertifikatsbasiert wo möglich) — 2.6.26.
 
     SES: ohne Zertifikat (nur Stempel + Sidecar).
     AES/QES: PKCS#12 erforderlich; QES nur Markierung + Hinweis.

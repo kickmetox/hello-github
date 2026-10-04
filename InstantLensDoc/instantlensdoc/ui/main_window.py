@@ -3012,22 +3012,22 @@ class MainWindow(QMainWindow):
         m_ins.addAction(a)
         a = QAction("Form einfügen…", self)
         a.setObjectName("actInsertShape")
-        a.setToolTip("Formrahmen (Rechteck/Ellipse/…) — 2.6.25")
+        a.setToolTip("Formrahmen (Rechteck/Ellipse/…) — 2.6.26")
         a.triggered.connect(self._insert_shape_frame)
         m_ins.addAction(a)
         a = QAction("Video-Platzhalter (URL)…", self)
         a.setObjectName("actInsertVideo")
-        a.setToolTip("Online-Video als Platzhalter mit URL — 2.6.25")
+        a.setToolTip("Online-Video als Platzhalter mit URL — 2.6.26")
         a.triggered.connect(self._insert_video_placeholder)
         m_ins.addAction(a)
         a = QAction("Bild skalieren…", self)
         a.setObjectName("actScaleImage")
-        a.setToolTip("Bild-/Formrahmen skalieren — 2.6.25")
+        a.setToolTip("Bild-/Formrahmen skalieren — 2.6.26")
         a.triggered.connect(self._scale_image_frame)
         m_ins.addAction(a)
         a = QAction("Bild zuschneiden…", self)
         a.setObjectName("actCropImage")
-        a.setToolTip("Bild zuschneiden (relative Ränder) — 2.6.25")
+        a.setToolTip("Bild zuschneiden (relative Ränder) — 2.6.26")
         a.triggered.connect(self._crop_image_frame)
         m_ins.addAction(a)
         a = QAction("Textumfluss um Bildrahmen…", self)
@@ -3037,7 +3037,7 @@ class MainWindow(QMainWindow):
         a = QAction("Hyperlink…", self)
         a.setObjectName("actHyperlink")
         a.setShortcut(QKeySequence("Ctrl+Shift+K"))
-        a.setToolTip("Text mit URL oder Dokumentziel verknüpfen — Ctrl+Shift+K — 2.6.25")
+        a.setToolTip("Text mit URL oder Dokumentziel verknüpfen — Ctrl+Shift+K — 2.6.26")
         a.triggered.connect(self._insert_hyperlink_dialog)
         m_ins.addAction(a)
         a = QAction("Tabelle einfügen…", self)
@@ -3143,17 +3143,17 @@ class MainWindow(QMainWindow):
         m_extra.addAction(a)
         a = QAction("Stylus / Stift…", self)
         a.setObjectName("actStylusTool")
-        a.setToolTip("Stylus-Druck + Palm-Rejection aktivieren (Freihand) — 2.6.25")
+        a.setToolTip("Stylus-Druck + Palm-Rejection aktivieren (Freihand) — 2.6.26")
         a.triggered.connect(self._activate_stylus_tool)
         m_extra.addAction(a)
         a = QAction("3D-Extrusion (begrenzt)…", self)
         a.setObjectName("actExtrude3d")
-        a.setToolTip("Limited 3D-Viewer: isometrische Extrusion — 2.6.25")
+        a.setToolTip("Limited 3D-Viewer: isometrische Extrusion — 2.6.26")
         a.triggered.connect(self._show_extrude3d_dialog)
         m_extra.addAction(a)
         a = QAction("Script-/Plugin-Hooks…", self)
         a.setObjectName("actPluginHooks")
-        a.setToolTip("User-Hooks open/save/export/ocr — 2.6.25")
+        a.setToolTip("User-Hooks open/save/export/ocr — 2.6.26")
         a.triggered.connect(self._show_hooks_info)
         m_extra.addAction(a)
         for key, title in [
@@ -8507,7 +8507,7 @@ class MainWindow(QMainWindow):
         self._set_status(f"Textumfluss {mode} für Rahmen {fr.id}")
 
     def _insert_hyperlink_dialog(self) -> None:
-        """Hyperlink (URL oder Dokumentziel) in Editor — 2.6.25."""
+        """Hyperlink (URL oder Dokumentziel) in Editor — 2.6.26."""
         from instantlensdoc.ui.hyperlink_dialog import HyperlinkDialog
 
         if self.stack.currentWidget() is not self.editor_pane:
@@ -8538,7 +8538,7 @@ class MainWindow(QMainWindow):
         self._set_status(f"Hyperlink: {dlg.result_target}")
 
     def _insert_shape_frame(self) -> None:
-        """Formrahmen ins Layout — 2.6.25."""
+        """Formrahmen ins Layout — 2.6.26."""
         from PySide6.QtWidgets import QInputDialog
         from instantlensdoc.core.layout import SHAPE_KINDS
 
@@ -8551,7 +8551,7 @@ class MainWindow(QMainWindow):
         self._set_status(f"Form {shape} eingefügt ({fr.id})")
 
     def _insert_video_placeholder(self) -> None:
-        """Video-Platzhalter mit URL — 2.6.25."""
+        """Video-Platzhalter mit URL — 2.6.26."""
         from PySide6.QtWidgets import QInputDialog
 
         url, ok = QInputDialog.getText(
@@ -8570,7 +8570,7 @@ class MainWindow(QMainWindow):
         self._set_status(f"Video-Platzhalter: {fr.video_url} ({fr.id})")
 
     def _scale_image_frame(self) -> None:
-        """Bild-/Formrahmen skalieren — 2.6.25."""
+        """Bild-/Formrahmen skalieren — 2.6.26."""
         from PySide6.QtWidgets import QInputDialog
 
         if not self.layout_doc.image_frames:
@@ -8586,7 +8586,7 @@ class MainWindow(QMainWindow):
         self._set_status(f"Rahmen {fr.id} skaliert ×{factor}")
 
     def _crop_image_frame(self) -> None:
-        """Bild zuschneiden — 2.6.25."""
+        """Bild zuschneiden — 2.6.26."""
         from PySide6.QtWidgets import QInputDialog
 
         if not self.layout_doc.image_frames:
@@ -9663,7 +9663,7 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Lesezeichen löschen", str(e))
 
     def _refresh_outline(self, path: str | Path):
-        """PDF-Lesezeichen + Text-Überschriften → Dokumentstruktur — 2.6.25."""
+        """PDF-Lesezeichen + Text-Überschriften → Dokumentstruktur — 2.6.26."""
         self._refresh_document_outline(pdf_path=path)
 
     def _refresh_document_outline(self, pdf_path: str | Path | None = None) -> None:
@@ -9726,7 +9726,7 @@ class MainWindow(QMainWindow):
                 pass
 
     def _on_outline_line_jump(self, line: int) -> None:
-        """Sprung zu Textzeile aus Dokumentstruktur — 2.6.25."""
+        """Sprung zu Textzeile aus Dokumentstruktur — 2.6.26."""
         if line is None or int(line) < 1:
             self._set_status("Struktur: keine Zeile")
             return
@@ -9750,7 +9750,7 @@ class MainWindow(QMainWindow):
         Extrude3DDialog(self).exec()
 
     def _activate_stylus_tool(self) -> None:
-        """Freihand-Werkzeug + Stylus-Hinweis — 2.6.25."""
+        """Freihand-Werkzeug + Stylus-Hinweis — 2.6.26."""
         try:
             if hasattr(self, "pdf_view") and hasattr(self.pdf_view, "set_tool"):
                 from ild_pdf.annotate import AnnotationType
@@ -9785,7 +9785,7 @@ class MainWindow(QMainWindow):
             pass
 
     def _show_telemetry_settings(self) -> None:
-        """Settings öffnen / Telemetrie-Info — 2.6.25."""
+        """Settings öffnen / Telemetrie-Info — 2.6.26."""
         try:
             self._settings()
         except Exception:
@@ -14740,7 +14740,7 @@ class MainWindow(QMainWindow):
         self.save_as()
 
     def _export_editor(self, fmt: str):
-        """Editor-Inhalt nach HTML / DOCX / XLSX / PDF / TXT / RTF / JPG / EPUB — 2.6.25."""
+        """Editor-Inhalt nach HTML / DOCX / XLSX / PDF / TXT / RTF / JPG / EPUB — 2.6.26."""
         text = ""
         title = "InstantLens Doc"
         editor_kinds = (
