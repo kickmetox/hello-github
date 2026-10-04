@@ -1602,38 +1602,64 @@ class SettingsDialog(QDialog):
         )
         form.addRow(self.update_chk)
 
-        self.telemetry_chk = QCheckBox("Anonym Nutzung melden (Stub — deaktiviert)")
+        self.telemetry_chk = QCheckBox(
+            "Anonym Diagnostik (lokal, Opt-in — Default aus)"
+        )
         self.telemetry_chk.setObjectName("telemetryOptIn")
-        self.telemetry_chk.setChecked(False)
-        self.telemetry_chk.setEnabled(False)  # Toggle disabled bleibt — 2.3.2–2.3.5
+        self.telemetry_chk.setChecked(bool(get_telemetry_opt_in()))
+        self.telemetry_chk.setEnabled(True)  # Opt-in aktivierbar — 2.6.25
         self.telemetry_chk.setToolTip(
-            "Telemetrie-Stub 2.3.5: Toggle bleibt disabled (aus). "
-            "Info: Esc schließt · „Stubs öffnen“ → Fokus erste Stub-Zeile — "
-            "keine Datenübertragung"
+            "2.6.25: Optional lokale Diagnostik (diagnostics.jsonl). "
+            "Kein Netzwerk, kein PII (keine Pfade/Texte/IPs). Default aus."
         )
         tel_row = QHBoxLayout()
         tel_row.addWidget(self.telemetry_chk, 1)
         self.btn_telemetry_info = QPushButton("Info…")
         self.btn_telemetry_info.setObjectName("telemetryStubInfoBtn")
         self.btn_telemetry_info.setToolTip(
-            "Warum Stub · Esc schließt · „Stubs öffnen“ Fokus erste Zeile — 2.3.5"
+            "Telemetrie-Info: lokal · kein Netzwerk · kein PII — 2.6.25"
         )
         self.btn_telemetry_info.clicked.connect(self._show_telemetry_stub_info)
         tel_row.addWidget(self.btn_telemetry_info)
         form.addRow(tel_row)
         tel_hint = QLabel(
-            "<b>Stub — keine Datenübertragung:</b> Toggle ist <b>deaktiviert</b> "
-            "und bleibt aus. Es werden <b>niemals</b> Nutzungsdaten gesendet — "
-            "kein Netzwerk, keine Queue, kein Fingerprinting (immer no-op) — 2.3.5. "
-            "„Info…“: Esc schließt · <b>Stubs öffnen</b> → Fokus erste Stub-Zeile."
+            "<b>Optional · privacy-respektierend:</b> Default <b>aus</b>. "
+            "Bei Opt-in nur lokales Event-Zähler-Log — <b>kein Netzwerk</b>, "
+            "<b>kein PII</b> (keine Dateipfade/Inhalte) — "
+            "<b>keine Datenübertragung</b> ins Internet. — 2.6.25"
         )
         tel_hint.setWordWrap(True)
         tel_hint.setObjectName("telemetryStubHint")
-        tel_hint.setStyleSheet("color: #8a6d00;")
+        tel_hint.setStyleSheet("color: #1b5e20;")
         tel_hint.setToolTip(
-            "Telemetrie bleibt Stub: Toggle disabled · Esc · Stubs öffnen Fokus — 2.3.5"
+            "Telemetrie 2.6.25: Opt-in lokal · Esc · Stubs-Tab Status"
         )
         form.addRow(tel_hint)
+
+        self.stylus_pressure_chk = QCheckBox("Stylus-Druck → Strichstärke")
+        self.stylus_pressure_chk.setObjectName("stylusPressureEnabled")
+        try:
+            from instantlensdoc.core.app_settings import get_stylus_pressure_enabled
+
+            self.stylus_pressure_chk.setChecked(bool(get_stylus_pressure_enabled()))
+        except Exception:
+            self.stylus_pressure_chk.setChecked(True)
+        self.stylus_pressure_chk.setToolTip(
+            "Tablet/Stift: Druck skaliert Freihand-Strichstärke — 2.6.25"
+        )
+        form.addRow(self.stylus_pressure_chk)
+        self.stylus_palm_chk = QCheckBox("Palm-Rejection (Touch verwerfen)")
+        self.stylus_palm_chk.setObjectName("stylusPalmRejection")
+        try:
+            from instantlensdoc.core.app_settings import get_stylus_palm_rejection
+
+            self.stylus_palm_chk.setChecked(bool(get_stylus_palm_rejection()))
+        except Exception:
+            self.stylus_palm_chk.setChecked(True)
+        self.stylus_palm_chk.setToolTip(
+            "Heuristik: Touch/Finger während Stift-Eingabe ignorieren — 2.6.25"
+        )
+        form.addRow(self.stylus_palm_chk)
 
         self.compress_open_chk = QCheckBox("Ergebnis nach Kompression öffnen")
         self.compress_open_chk.setObjectName("compressOpenAfterSettings")
@@ -1923,7 +1949,7 @@ class SettingsDialog(QDialog):
         v.addWidget(title)
         info = QLabel(
             "Geplante Features sind klar als Stub markiert. "
-            "Kein Fake-KI-Verhalten. Cloud-Review: Freigabeordner produktiv (2.6.24). "
+            "Kein Fake-KI-Verhalten. Cloud-Review: Freigabeordner produktiv (2.6.25). "
             "Plugin-Hooks: interner Event-Bus + no-op Loader."
         )
         info.setWordWrap(True)
@@ -2000,20 +2026,32 @@ class SettingsDialog(QDialog):
             (
                 "Gemeinsames Review / Cloud-Ordner",
                 "cloud",
-                "Produktiv 2.6.24 · Freigabeordner + optionaler Endpoint",
+                "Produktiv 2.6.23+ · Freigabeordner + optionaler Endpoint",
             ),
-            ("Stylus / Palm Rejection", "stylus", "Stub · keine Aktion"),
-            ("3D-Extrusion", "extrude3d", "Stub · keine Aktion"),
-            ("Plugin-Hooks", "plugins", "Stub · nicht produktiv · keine Aktion"),
+            (
+                "Stylus / Palm Rejection",
+                "stylus",
+                "Produktiv 2.6.25 · Druck + Palm-Rejection",
+            ),
+            (
+                "3D-Extrusion",
+                "extrude3d",
+                "Produktiv 2.6.25 · Limited Viewer (kein Mesh/OpenGL)",
+            ),
+            (
+                "Plugin-Hooks",
+                "plugins",
+                "Produktiv 2.6.25 · User-Skripte open/save/export/ocr",
+            ),
             (
                 "Document Outline Vorlesen",
                 "outline_read",
-                "Stub · geplant · keine Aktion — 2.0.0",
+                "Stub · TTS geplant · Pane produktiv 2.6.25",
             ),
             (
                 "Telemetrie",
                 "telemetry",
-                "Stub · opt-in Default aus · no-op — keine Datenübertragung — 2.3.1",
+                "Produktiv 2.6.25 · Opt-in lokal · kein Netzwerk/PII",
             ),
         ]
         # Sortierung A–Z nach Feature-Name — 1.9.3
@@ -2056,7 +2094,9 @@ class SettingsDialog(QDialog):
         self.stubs_table.itemDoubleClicked.connect(self._on_stub_double_click)
         v.addWidget(self.stubs_table)
 
-        events_box = QGroupBox("Plugin-Hooks Events (dokumentiert, Stub · keine Aktion)")
+        events_box = QGroupBox(
+            "Plugin-Hooks Events (produktiv 2.6.25 · User-Skripte)"
+        )
         ev_layout = QVBoxLayout(events_box)
         try:
             from instantlensdoc.core.plugin_hooks import EVENT_DESCRIPTIONS, KNOWN_EVENTS
@@ -2066,8 +2106,10 @@ class SettingsDialog(QDialog):
             ]
             ev_lbl = QLabel("\n".join(lines) if lines else "(keine)")
         except Exception:
-            ev_lbl = QLabel("app.started / document.opened / document.saved / "
-                            "annotation.changed / ocr.finished")
+            ev_lbl = QLabel(
+                "app.started / document.opened / document.saved / "
+                "document.exported / ocr.finished / annotation.changed"
+            )
         ev_lbl.setWordWrap(True)
         ev_layout.addWidget(ev_lbl)
         v.addWidget(events_box)
@@ -2165,8 +2207,7 @@ class SettingsDialog(QDialog):
         why = str(info.get("why") or "").strip()
         stubs_ref = str(info.get("stubs_tab_hint") or "").strip()
         short = why or (
-            "Warum Stub: kein Telemetrie-Backend, Privacy lokal — "
-            "Toggle bleibt disabled, immer no-op."
+            "Optional lokal: Opt-in Default aus — kein Netzwerk, kein PII."
         )
         detail = str(info.get("message") or "")
         if stubs_ref:
@@ -2177,7 +2218,8 @@ class SettingsDialog(QDialog):
             title="Telemetrie",
             short=short,
             detail=detail,
-            badge="Stub",
+            badge="2.6.25",
+            note="Produktiv / lokal / Opt-in.",
         )
         dlg.setObjectName("telemetryStubInfoDialog")
         # Esc schließt (explizit zusätzlich zu StubInfoDialog) — 2.3.4
@@ -3910,8 +3952,20 @@ class SettingsDialog(QDialog):
         except Exception:
             pass
         set_update_check_on_start(self.update_chk.isChecked())
-        # Telemetrie: Toggle disabled — immer False speichern — 2.3.2/2.3.3
-        set_telemetry_opt_in(False)
+        # Telemetrie: Opt-in lokal speichern — 2.6.25
+        set_telemetry_opt_in(bool(self.telemetry_chk.isChecked()))
+        try:
+            from instantlensdoc.core.app_settings import (
+                set_stylus_palm_rejection,
+                set_stylus_pressure_enabled,
+            )
+
+            if hasattr(self, "stylus_pressure_chk"):
+                set_stylus_pressure_enabled(bool(self.stylus_pressure_chk.isChecked()))
+            if hasattr(self, "stylus_palm_chk"):
+                set_stylus_palm_rejection(bool(self.stylus_palm_chk.isChecked()))
+        except Exception:
+            pass
         set_compress_open_after(bool(self.compress_open_chk.isChecked()))
         try:
             prm = int(self.palette_recent_max.currentData() or 10)

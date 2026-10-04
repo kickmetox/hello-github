@@ -1,5 +1,9 @@
 # Changelog — InstantLens Doc
 
+## 2.6.25 — Stylus, Outline, Hooks, Telemetrie, 3D
+
+Minor nach **2.6.24**: Verbleibende Stubs durch nutzbare Features ersetzt. **Stylus:** Tablet/Stift-Eingabe für Annotationen mit Druck→Strichstärke und Palm-Rejection (sonst verbesserte Freihand-Integration). **Outline:** Dokumentstruktur-Pane jenseits TOC — Überschriften, PDF-Lesezeichen, Favoriten, Filter, Navigation. **Hooks:** User-/Script-Hooks für `document.opened` / `saved` / `exported` / `ocr.finished` (+ Bus) — Python/PowerShell `ild`. **Telemetrie:** optionale lokale Diagnostik, Opt-in Default aus, kein Netzwerk, kein PII. **3D:** Limited Viewer (isometrische Extrusion einfacher Formen; kein Mesh/OpenGL) statt leerem Stub. Freier KI-Chat-Stub und Outline-TTS bleiben. **ild API** `hooks_*` / `document_outline_api` / `stylus_status` / `telemetry_*` / `extrude3d_preview`. **Windows-Installer:** Inno Setup-Projekt (`installer/instantlensdoc.iss`) + `scripts/build-windows-installer.ps1` → `InstantLensDoc-Setup-2.6.25.exe` (Startmenü, optional Desktop, Uninstall, 64-Bit); Setup.exe auf Windows x64 bauen.
+
 ## 2.6.24 — Hyperlinks, Grafiken/Medien, EPUB
 
 Minor nach **2.6.23**: **Hyperlinks** verknüpfen Text mit URLs oder Dokumentzielen (`#anker`, `ild://line/N`, Überschrift); Markdown/HTML; Dialog Ctrl+Shift+K; Sidecar `*.ildlinks.json`. **Grafiken & Medien:** Bild skalieren/zuschneiden, Formen, Online-Video-Platzhalter (URL); Textumfluss bleibt. **EPUB-Export** (EPUB 2, Kapitel aus H1) inkl. Import-Text. **ild API** `insert_hyperlink` / `extract_hyperlinks` / `layout_scale_image` / `layout_crop_image` / `layout_add_shape_frame` / `layout_add_video_placeholder` / `export_epub_api` · CLI · PS. Stubs Stylus/3D/Hooks/Outline/Telemetrie/freier KI-Chat unverändert.

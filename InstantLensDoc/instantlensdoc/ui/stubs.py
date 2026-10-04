@@ -1,4 +1,4 @@
-"""UI-Stubs für geplante Features (keine Fake-KI / keine Fake-Cloud)."""
+"""UI-Stubs / Live-Umleitungen für geplante bzw. ausgelieferte Features."""
 
 from __future__ import annotations
 
@@ -23,21 +23,28 @@ PLANNED = {
         "Freigabeordner-Sync + optionaler HTTP-Endpoint; Notizen/Markierungen/"
         "Stempel/Kommentare austauschbar (kein gehosteter Cloud-Dienst)"
     ),
-    "stylus": f"Drucksensitiver Stylus / Palm Rejection — Stub {__version__}",
+    "stylus": (
+        f"Stylus / Palm Rejection — {__version__} produktiv: "
+        "Tablet-Stift mit Druck→Strichstärke; Palm-Rejection-Heuristik; "
+        "ohne Druck = verbesserte Freihand-Integration"
+    ),
     "shapes_ai": f"Intelligente Formerkennung — Stub {__version__}",
-    "extrude3d": f"3D-Extrusion — Stub {__version__}",
+    "extrude3d": (
+        f"3D-Extrusion — {__version__} Limited Viewer: isometrische Extrusion "
+        "einfacher Formen (kein Mesh-Import, kein OpenGL)"
+    ),
     "plugins": (
-        f"Plugin-Hooks — Stub {__version__} — nicht produktiv "
-        "(interner Event-Bus + no-op Loader; kein Plugin-System)"
+        f"Plugin-Hooks — {__version__} produktiv: Event-Bus + User-Skripte "
+        "(open/save/export/ocr) via Python/PowerShell ild; kein Marketplace"
     ),
     "outline_read": (
         f"Document Outline Vorlesen — Stub {__version__} "
-        "(TTS/Screenreader-Anbindung geplant; keine Aktion)"
+        "(TTS/Screenreader-Anbindung geplant; Pane selbst produktiv)"
     ),
     "telemetry": (
-        f"Telemetrie — Stub {__version__} — Toggle disabled (bleibt aus), "
-        "immer no-op — keine Datenübertragung — Esc schließt Info · "
-        "„Stubs öffnen“ Fokus erste Zeile — 2.3.5"
+        f"Telemetrie — {__version__} optional lokal: Opt-in Default aus "
+        "(Toggle default disabled), kein Netzwerk, kein PII, keine Datenübertragung "
+        "— nur diagnostics.jsonl; Stubs öffnen · Esc · Fokus · warum lokal"
     ),
     "varfonts": "Variable Fonts (voll) — geplant",
     "envelope": "Envelope Distort (voll) — geplant",
@@ -54,21 +61,28 @@ PLANNED_EN = {
         "shared-folder sync + optional HTTP endpoint; notes/highlights/"
         "stamps/comments exchangeable (no hosted cloud service)"
     ),
-    "stylus": f"Pressure-sensitive stylus / palm rejection — stub {__version__}",
+    "stylus": (
+        f"Stylus / palm rejection — {__version__} live: "
+        "tablet pen with pressure→stroke width; palm-rejection heuristic; "
+        "without pressure = improved freehand integration"
+    ),
     "shapes_ai": f"Smart shape recognition — stub {__version__}",
-    "extrude3d": f"3D extrusion — stub {__version__}",
+    "extrude3d": (
+        f"3D extrusion — {__version__} limited viewer: isometric extrusion "
+        "of simple shapes (no mesh import, no OpenGL)"
+    ),
     "plugins": (
-        f"Plugin hooks — stub {__version__} — not production-ready "
-        "(internal event bus + no-op loader; no plugin system)"
+        f"Plugin hooks — {__version__} live: event bus + user scripts "
+        "(open/save/export/ocr) via Python/PowerShell ild; no marketplace"
     ),
     "outline_read": (
         f"Document outline read-aloud — stub {__version__} "
-        "(TTS/screen reader planned; no action)"
+        "(TTS/screen reader planned; outline pane itself is live)"
     ),
     "telemetry": (
-        f"Telemetry — stub {__version__} — toggle disabled (stays off), "
-        "always no-op — no data transfer — Esc closes info · "
-        "Open Stubs focus first row — 2.3.5"
+        f"Telemetry — {__version__} optional local: opt-in default off "
+        "(toggle default disabled), no network, no PII, no data transfer "
+        "— diagnostics.jsonl only; open Stubs · Esc · focus · why local"
     ),
     "varfonts": "Variable fonts (full) — planned",
     "envelope": "Envelope distort (full) — planned",
@@ -78,26 +92,33 @@ PLANNED_EN = {
     ),
 }
 
-# Kurzbeschreibungen für Info-Dialog — 1.9.5
+# Kurzbeschreibungen für Info-Dialog — 1.9.5 / Live 2.6.25
 STUB_SHORT = {
     "ki": "Lokaler KI-Assistent für Zusammenfassen und Vorschläge — Stub / nicht produktiv.",
     "cloud": (
-        "Gemeinsames Review: Freigabeordner + optionaler Endpoint — produktiv 2.6.24; "
+        "Gemeinsames Review: Freigabeordner + optionaler Endpoint — produktiv 2.6.23+; "
         "kein gehosteter Cloud-Dienst; Offline bleibt nutzbar."
     ),
-    "stylus": "Drucksensitiver Stylus mit Palm Rejection — Stub / keine Aktion.",
+    "stylus": (
+        "Drucksensitiver Stylus mit Palm Rejection — produktiv 2.6.25 "
+        "(Tablet-Druck → Strichstärke; sonst Freihand)."
+    ),
     "shapes_ai": "Intelligente Formerkennung beim Zeichnen — Stub / geplant.",
-    "extrude3d": "3D-Extrusion von Formen — Stub / geplant / keine Aktion.",
+    "extrude3d": (
+        "3D-Extrusion Limited Viewer — produktiv 2.6.25 "
+        "(isometrisch, einfache Formen; kein Mesh/OpenGL)."
+    ),
     "plugins": (
-        "Plugin-Hooks: interner Event-Bus + no-op Loader — Stub / nicht produktiv."
+        "User-/Script-Hooks (open/save/export/ocr) — produktiv 2.6.25; "
+        "Python/PowerShell ild; kein Marketplace-Plugin-System."
     ),
     "outline_read": (
-        "Document Outline Vorlesen (TTS) — Stub / geplant / keine Aktion — 2.0.0."
+        "Document Outline Vorlesen (TTS) — Stub / geplant; "
+        "Struktur-Pane (Überschriften/Lesezeichen) produktiv 2.6.25."
     ),
     "telemetry": (
-        "Anonyme Nutzung melden — Stub / Toggle disabled bleibt aus / immer no-op — "
-        "keine Datenübertragung. Warum Stub: kein Backend, Privacy lokal. "
-        "Info: Esc schließt · „Stubs öffnen“ Fokus erste Stub-Zeile — 2.3.5."
+        "Optionale lokale Diagnostik — produktiv 2.6.25: Opt-in Default aus, "
+        "kein Netzwerk, kein PII, keine Datenübertragung (diagnostics.jsonl)."
     ),
     "varfonts": "Vollständige Variable-Fonts-Unterstützung — geplant.",
     "envelope": "Envelope-Distort-Transformation — geplant.",
@@ -110,22 +131,29 @@ STUB_SHORT = {
 STUB_SHORT_EN = {
     "ki": "Local AI assistant for summaries and suggestions — stub / not production.",
     "cloud": (
-        "Shared review: folder sync + optional endpoint — live in 2.6.24; "
+        "Shared review: folder sync + optional endpoint — live since 2.6.23; "
         "no hosted cloud service; offline remains usable."
     ),
-    "stylus": "Pressure-sensitive stylus with palm rejection — stub / no action.",
+    "stylus": (
+        "Pressure-sensitive stylus with palm rejection — live 2.6.25 "
+        "(tablet pressure → stroke width; else freehand)."
+    ),
     "shapes_ai": "Smart shape recognition while drawing — stub / planned.",
-    "extrude3d": "3D extrusion of shapes — stub / planned / no action.",
+    "extrude3d": (
+        "3D extrusion limited viewer — live 2.6.25 "
+        "(isometric, simple shapes; no mesh/OpenGL)."
+    ),
     "plugins": (
-        "Plugin hooks: internal event bus + no-op loader — stub / not production."
+        "User/script hooks (open/save/export/ocr) — live 2.6.25; "
+        "Python/PowerShell ild; no marketplace plugin system."
     ),
     "outline_read": (
-        "Document outline read-aloud (TTS) — stub / planned / no action — 2.0.0."
+        "Document outline read-aloud (TTS) — stub / planned; "
+        "structure pane (headings/bookmarks) live 2.6.25."
     ),
     "telemetry": (
-        "Report anonymous usage — stub / toggle disabled stays off / always no-op — "
-        "no data transfer. Why stub: no backend, local privacy. "
-        "Info: Esc closes · Open Stubs · focus first row — 2.3.5."
+        "Optional local diagnostics — live 2.6.25: opt-in default off, "
+        "no network, no PII, no data transfer (diagnostics.jsonl)."
     ),
     "varfonts": "Full variable fonts support — planned.",
     "envelope": "Envelope distort transform — planned.",
@@ -163,9 +191,12 @@ STUB_TITLES_EN = {
     "esign": "E-signature",
 }
 
+# Features die live sind und eigene Dialoge öffnen (nicht Coming-soon)
+_LIVE_KEYS = frozenset({"cloud", "stylus", "extrude3d", "plugins", "telemetry"})
+
 
 class StubInfoDialog(QDialog):
-    """Info-Dialog für Stubs: Kurzbeschreibung + Badge „Geplant“; Esc schließt — 1.9.5."""
+    """Info-Dialog für Stubs/Live-Hinweise: Kurzbeschreibung + Badge „Geplant“/Live; Esc schließt."""
 
     def __init__(
         self,
@@ -175,6 +206,7 @@ class StubInfoDialog(QDialog):
         short: str,
         detail: str,
         badge: str = "Geplant",
+        note: str | None = None,
     ):
         super().__init__(parent)
         self.setObjectName("stubInfoDialog")
@@ -192,13 +224,23 @@ class StubInfoDialog(QDialog):
         self.badge = QLabel(badge)
         self.badge.setObjectName("stubInfoBadge")
         self.badge.setAlignment(Qt.AlignCenter)
-        self.badge.setStyleSheet(
-            "QLabel#stubInfoBadge {"
-            " background:#fff3e0; color:#8a5a00; border:1px solid #e0a060;"
-            " border-radius:4px; padding:2px 8px; font-weight:700;"
-            "}"
-        )
-        self.badge.setToolTip("Stub / geplant — keine Aktion — 1.9.5")
+        live = badge.lower() in ("live", "2.6.25", "produktiv") or "2.6.25" in badge
+        if live:
+            self.badge.setStyleSheet(
+                "QLabel#stubInfoBadge {"
+                " background:#e8f5e9; color:#1b5e20; border:1px solid #66bb6a;"
+                " border-radius:4px; padding:2px 8px; font-weight:700;"
+                "}"
+            )
+            self.badge.setToolTip("Produktiv / live — 2.6.25")
+        else:
+            self.badge.setStyleSheet(
+                "QLabel#stubInfoBadge {"
+                " background:#fff3e0; color:#8a5a00; border:1px solid #e0a060;"
+                " border-radius:4px; padding:2px 8px; font-weight:700;"
+                "}"
+            )
+            self.badge.setToolTip("Stub / geplant — keine Aktion — 1.9.5")
         head.addWidget(self.badge, 0)
         layout.addLayout(head)
 
@@ -214,11 +256,22 @@ class StubInfoDialog(QDialog):
         detail_lbl.setStyleSheet("color:#666;margin-top:4px;")
         layout.addWidget(detail_lbl)
 
-        note = QLabel("Stub / nicht produktiv — keine Aktion.")
-        note.setObjectName("stubInfoNote")
-        note.setStyleSheet("color:#8a5a00;font-weight:600;margin-top:8px;")
-        note.setWordWrap(True)
-        layout.addWidget(note)
+        note_txt = note
+        if note_txt is None:
+            note_txt = (
+                "Produktiv / live."
+                if live
+                else "Stub / nicht produktiv — keine Aktion."
+            )
+        note_lbl = QLabel(note_txt)
+        note_lbl.setObjectName("stubInfoNote")
+        note_lbl.setStyleSheet(
+            "color:#1b5e20;font-weight:600;margin-top:8px;"
+            if live
+            else "color:#8a5a00;font-weight:600;margin-top:8px;"
+        )
+        note_lbl.setWordWrap(True)
+        layout.addWidget(note_lbl)
 
         layout.addStretch(1)
         buttons = QDialogButtonBox(QDialogButtonBox.Close)
@@ -230,14 +283,13 @@ class StubInfoDialog(QDialog):
             close_btn.setToolTip("Esc schließt ebenfalls — 1.9.5")
         layout.addWidget(buttons)
 
-        # Esc schließt (zusätzlich zu QDialog-Standard) — 1.9.5
         esc = QShortcut(QKeySequence(Qt.Key_Escape), self)
         esc.setContext(Qt.WindowShortcut)
         esc.activated.connect(self.reject)
 
 
 def show_planned(parent: QWidget | None, key: str) -> None:
-    """Stub-Info; Cloud öffnet Shared-Review-Dialog (2.6.24) statt Coming-soon."""
+    """Stub-Info oder Live-Feature öffnen — 2.6.25."""
     if key == "cloud":
         opener = getattr(parent, "_show_shared_review_dialog", None)
         if callable(opener):
@@ -246,17 +298,46 @@ def show_planned(parent: QWidget | None, key: str) -> None:
                 return
             except Exception:
                 pass
-        # Fallback: Info mit produktivem Hinweis (kein Coming soon)
-        en = get_lang() == "en"
-        dlg = StubInfoDialog(
-            parent,
-            title=(STUB_TITLES_EN if en else STUB_TITLES).get("cloud", "Cloud"),
-            short=(STUB_SHORT_EN if en else STUB_SHORT).get("cloud", ""),
-            detail=(PLANNED_EN if en else PLANNED).get("cloud", ""),
-            badge="2.6.24" if not en else "Live",
-        )
-        dlg.exec()
-        return
+    if key == "extrude3d":
+        opener = getattr(parent, "_show_extrude3d_dialog", None)
+        if callable(opener):
+            try:
+                opener()
+                return
+            except Exception:
+                pass
+        try:
+            from instantlensdoc.ui.extrude3d_dialog import Extrude3DDialog
+
+            Extrude3DDialog(parent).exec()
+            return
+        except Exception:
+            pass
+    if key == "stylus":
+        opener = getattr(parent, "_activate_stylus_tool", None)
+        if callable(opener):
+            try:
+                opener()
+                return
+            except Exception:
+                pass
+    if key == "plugins":
+        opener = getattr(parent, "_show_hooks_info", None)
+        if callable(opener):
+            try:
+                opener()
+                return
+            except Exception:
+                pass
+    if key == "telemetry":
+        opener = getattr(parent, "_show_telemetry_settings", None)
+        if callable(opener):
+            try:
+                opener()
+                return
+            except Exception:
+                pass
+
     en = get_lang() == "en"
     titles = STUB_TITLES_EN if en else STUB_TITLES
     shorts = STUB_SHORT_EN if en else STUB_SHORT
@@ -270,8 +351,13 @@ def show_planned(parent: QWidget | None, key: str) -> None:
     detail = details.get(key) or PLANNED.get(
         key, "Dieses Feature ist geplant und noch nicht implementiert."
     )
-    badge = tr("planned")
+    if key in _LIVE_KEYS:
+        badge = "2.6.25" if not en else "Live"
+        note = "Produktiv / live." if not en else "Live / production."
+    else:
+        badge = tr("planned")
+        note = None
     dlg = StubInfoDialog(
-        parent, title=title, short=short, detail=detail, badge=badge
+        parent, title=title, short=short, detail=detail, badge=badge, note=note
     )
     dlg.exec()

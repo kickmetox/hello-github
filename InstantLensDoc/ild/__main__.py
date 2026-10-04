@@ -862,7 +862,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     s = sub.add_parser(
         "hyperlink",
-        help="Hyperlink in Text einfügen (URL oder #anker) — 2.6.24",
+        help="Hyperlink in Text einfügen (URL oder #anker) — 2.6.25",
     )
     s.add_argument("text", help="Ausgangstext oder @datei")
     s.add_argument("link_text", help="Anzeigetext")
@@ -873,26 +873,26 @@ def build_parser() -> argparse.ArgumentParser:
 
     s = sub.add_parser(
         "hyperlinks",
-        help="Hyperlinks aus Text extrahieren — 2.6.24",
+        help="Hyperlinks aus Text extrahieren — 2.6.25",
     )
     s.add_argument("text", help="Text oder @datei / Dateipfad")
 
     s = sub.add_parser(
         "anchors",
-        help="Überschriften-Anker auflisten — 2.6.24",
+        help="Überschriften-Anker auflisten — 2.6.25",
     )
     s.add_argument("text", help="Text oder Dateipfad")
 
     s = sub.add_parser(
         "resolve-link",
-        help="Internes Hyperlink-Ziel auflösen — 2.6.24",
+        help="Internes Hyperlink-Ziel auflösen — 2.6.25",
     )
     s.add_argument("text", help="Dokumenttext oder Dateipfad")
     s.add_argument("target", help="#anker / ild://heading/… / ild://line/N")
 
     s = sub.add_parser(
         "layout-shape",
-        help="Formrahmen ins Layout — 2.6.24",
+        help="Formrahmen ins Layout — 2.6.25",
     )
     s.add_argument("--shape", default="rectangle")
     s.add_argument("--x", type=float, default=40)
@@ -905,7 +905,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     s = sub.add_parser(
         "layout-video",
-        help="Video-Platzhalter (URL) ins Layout — 2.6.24",
+        help="Video-Platzhalter (URL) ins Layout — 2.6.25",
     )
     s.add_argument("url")
     s.add_argument("--title", default="")
@@ -919,7 +919,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     s = sub.add_parser(
         "layout-scale",
-        help="Bild-/Formrahmen skalieren — 2.6.24",
+        help="Bild-/Formrahmen skalieren — 2.6.25",
     )
     s.add_argument("frame_id")
     s.add_argument("factor", type=float)
@@ -928,7 +928,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     s = sub.add_parser(
         "layout-crop",
-        help="Bild zuschneiden (relative Ränder 0–1) — 2.6.24",
+        help="Bild zuschneiden (relative Ränder 0–1) — 2.6.25",
     )
     s.add_argument("frame_id")
     s.add_argument("--left", type=float, default=0.0)
@@ -940,12 +940,34 @@ def build_parser() -> argparse.ArgumentParser:
 
     s = sub.add_parser(
         "export-epub",
-        help="Text → EPUB — 2.6.24",
+        help="Text → EPUB — 2.6.25",
     )
     s.add_argument("text", help="Text oder Dateipfad")
     s.add_argument("--out", required=True, help="Ziel .epub")
     s.add_argument("--title", default="InstantLens Doc")
     s.add_argument("--author", default="InstantLens Doc")
+
+    s = sub.add_parser("hooks-list", help="User-Hooks auflisten — 2.6.25")
+    s.add_argument("--dir", default=None, help="Hooks-Ordner")
+    s = sub.add_parser("hooks-load", help="User-Hooks laden — 2.6.25")
+    s.add_argument("--dir", default=None, help="Hooks-Ordner")
+    s = sub.add_parser("hooks-emit", help="Hook-Event auslösen — 2.6.25")
+    s.add_argument("event", help="Event-Name z.B. document.opened")
+    s.add_argument("--kind", default="", help="Optional kind=")
+    s = sub.add_parser("hooks-register", help="Hook-Skript installieren — 2.6.25")
+    s.add_argument("source", help="Pfad zu .py/.ps1")
+    s.add_argument("--name", default=None)
+    s = sub.add_parser("doc-outline", help="Dokumentstruktur (Überschriften/Lesezeichen) — 2.6.25")
+    s.add_argument("--text", default=None, help="Markdown/Text")
+    s.add_argument("--path", default=None, help="PDF-Pfad")
+    s.add_argument("--max-level", type=int, default=6)
+    s = sub.add_parser("stylus", help="Stylus-Status — 2.6.25")
+    s = sub.add_parser("telemetry", help="Telemetrie-Status — 2.6.25")
+    s = sub.add_parser("extrude3d", help="3D-Extrusion Preview-Daten — 2.6.25")
+    s.add_argument("--shape", default="rectangle", choices=["rectangle", "ellipse", "triangle"])
+    s.add_argument("--width", type=float, default=120)
+    s.add_argument("--height", type=float, default=80)
+    s.add_argument("--depth", type=float, default=40)
 
     return p
 
@@ -1878,6 +1900,53 @@ def run(argv: list[str] | None = None) -> int:
             )
             _print(data, as_json=js or True)
             return 0
+
+        if args.cmd == "hooks-list":
+            _print(api.hooks_list(getattr(args, "dir", None)), as_json=js or True)
+            return 0
+        if args.cmd == "hooks-load":
+            _print(api.hooks_load(getattr(args, "dir", None)), as_json=js or True)
+            return 0
+        if args.cmd == "hooks-emit":
+            payload = {}
+            if getattr(args, "kind", ""):
+                payload["kind"] = args.kind
+            _print(api.hooks_emit(args.event, **payload), as_json=js or True)
+            return 0
+        if args.cmd == "hooks-register":
+            _print(
+                api.hooks_register(args.source, name=getattr(args, "name", None)),
+                as_json=js or True,
+            )
+            return 0
+        if args.cmd == "doc-outline":
+            _print(
+                api.document_outline_api(
+                    text=getattr(args, "text", None),
+                    path=getattr(args, "path", None),
+                    max_level=getattr(args, "max_level", 6),
+                ),
+                as_json=js or True,
+            )
+            return 0
+        if args.cmd == "stylus":
+            _print(api.stylus_status(), as_json=js or True)
+            return 0
+        if args.cmd == "telemetry":
+            _print(api.telemetry_status(), as_json=js or True)
+            return 0
+        if args.cmd == "extrude3d":
+            _print(
+                api.extrude3d_preview(
+                    shape=getattr(args, "shape", "rectangle"),
+                    width=getattr(args, "width", 120),
+                    height=getattr(args, "height", 80),
+                    depth=getattr(args, "depth", 40),
+                ),
+                as_json=js or True,
+            )
+            return 0
+
         return _fail("unbekanntes Kommando")
     except FileNotFoundError as e:
         return _fail(f"Datei nicht gefunden: {e}", 2)

@@ -250,9 +250,9 @@ SHORTCUTS_HTML = """
 <tr><td>Kommentare</td><td><code>Ctrl+Alt+M</code> — Feedback an Textstelle — 2.6.21</td></tr>
 <tr><td>Versionsverlauf</td><td><code>Ctrl+Alt+Shift+H</code> — Snapshot speichern/wiederherstellen — 2.6.21</td></tr>
 <tr><td>Seriendruck</td><td>Bearbeiten → Review / Ribbon Review — CSV/Excel → Briefe — 2.6.21 / Polish 2.6.22</td></tr>
-<tr><td>Gemeinsames Review</td><td><code>Ctrl+Alt+Shift+C</code> — Freigabeordner/Endpoint · Notizen/Stempel/Kommentare — 2.6.24</td></tr>
-<tr><td>Stapelverarbeitung</td><td>Extras → Stapelverarbeitung… — PDFs konvertieren/Wasserzeichen/komprimieren/verschlüsseln — <b>2.6.24</b></td></tr>
-<tr><td>Digitale Signatur (eIDAS)</td><td><code>Ctrl+Alt+Shift+G</code> — PDF/Extras → Digitale Signatur… · SES/AES/QES-Pfad — <b>2.6.24</b></td></tr>
+<tr><td>Gemeinsames Review</td><td><code>Ctrl+Alt+Shift+C</code> — Freigabeordner/Endpoint · Notizen/Stempel/Kommentare — 2.6.25</td></tr>
+<tr><td>Stapelverarbeitung</td><td>Extras → Stapelverarbeitung… — PDFs konvertieren/Wasserzeichen/komprimieren/verschlüsseln — <b>2.6.25</b></td></tr>
+<tr><td>Digitale Signatur (eIDAS)</td><td><code>Ctrl+Alt+Shift+G</code> — PDF/Extras → Digitale Signatur… · SES/AES/QES-Pfad — <b>2.6.25</b></td></tr>
 <tr><td>Tastatur-Cheat-Sheet</td><td><code>F1</code> — Hilfe → Tastatur-Cheat-Sheet… · Suche/Filter — 2.4.1</td></tr>
 <tr><td>Cheat-Sheet als PDF</td><td>F1 → „Als PDF exportieren…“</td></tr>
 <tr><td>Cheat-Sheet als TXT</td><td>F1 → „Als TXT exportieren…“ · Template {date}_shortcuts.txt · Zielordner merken — 2.4.2</td></tr>

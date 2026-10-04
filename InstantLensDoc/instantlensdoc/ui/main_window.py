@@ -1063,8 +1063,12 @@ class MainWindow(QMainWindow):
         self.sidebar.mark_activated.connect(self._on_mark_activated)
         self.sidebar.annotation_activated.connect(self._on_annotation_activated)
         self.sidebar.outline_activated.connect(self._on_outline_jump)
+        if hasattr(self.sidebar, "outline_line_activated"):
+            self.sidebar.outline_line_activated.connect(self._on_outline_line_jump)
         self.sidebar.outline_add_requested.connect(self._outline_add)
         self.sidebar.outline_delete_requested.connect(self._outline_delete)
+        if hasattr(self.sidebar, "outline_refresh_requested"):
+            self.sidebar.outline_refresh_requested.connect(self._refresh_document_outline)
         self.sidebar.form_field_activated.connect(self._on_form_field_jump)
         self.sidebar.form_fields_save_requested.connect(self._on_form_fields_save)
         self.sidebar.form_fields_export_csv_requested.connect(
@@ -3008,22 +3012,22 @@ class MainWindow(QMainWindow):
         m_ins.addAction(a)
         a = QAction("Form einfügen…", self)
         a.setObjectName("actInsertShape")
-        a.setToolTip("Formrahmen (Rechteck/Ellipse/…) — 2.6.24")
+        a.setToolTip("Formrahmen (Rechteck/Ellipse/…) — 2.6.25")
         a.triggered.connect(self._insert_shape_frame)
         m_ins.addAction(a)
         a = QAction("Video-Platzhalter (URL)…", self)
         a.setObjectName("actInsertVideo")
-        a.setToolTip("Online-Video als Platzhalter mit URL — 2.6.24")
+        a.setToolTip("Online-Video als Platzhalter mit URL — 2.6.25")
         a.triggered.connect(self._insert_video_placeholder)
         m_ins.addAction(a)
         a = QAction("Bild skalieren…", self)
         a.setObjectName("actScaleImage")
-        a.setToolTip("Bild-/Formrahmen skalieren — 2.6.24")
+        a.setToolTip("Bild-/Formrahmen skalieren — 2.6.25")
         a.triggered.connect(self._scale_image_frame)
         m_ins.addAction(a)
         a = QAction("Bild zuschneiden…", self)
         a.setObjectName("actCropImage")
-        a.setToolTip("Bild zuschneiden (relative Ränder) — 2.6.24")
+        a.setToolTip("Bild zuschneiden (relative Ränder) — 2.6.25")
         a.triggered.connect(self._crop_image_frame)
         m_ins.addAction(a)
         a = QAction("Textumfluss um Bildrahmen…", self)
@@ -3033,7 +3037,7 @@ class MainWindow(QMainWindow):
         a = QAction("Hyperlink…", self)
         a.setObjectName("actHyperlink")
         a.setShortcut(QKeySequence("Ctrl+Shift+K"))
-        a.setToolTip("Text mit URL oder Dokumentziel verknüpfen — Ctrl+Shift+K — 2.6.24")
+        a.setToolTip("Text mit URL oder Dokumentziel verknüpfen — Ctrl+Shift+K — 2.6.25")
         a.triggered.connect(self._insert_hyperlink_dialog)
         m_ins.addAction(a)
         a = QAction("Tabelle einfügen…", self)
@@ -3137,12 +3141,24 @@ class MainWindow(QMainWindow):
         )
         a.triggered.connect(self._show_shared_review_dialog)
         m_extra.addAction(a)
+        a = QAction("Stylus / Stift…", self)
+        a.setObjectName("actStylusTool")
+        a.setToolTip("Stylus-Druck + Palm-Rejection aktivieren (Freihand) — 2.6.25")
+        a.triggered.connect(self._activate_stylus_tool)
+        m_extra.addAction(a)
+        a = QAction("3D-Extrusion (begrenzt)…", self)
+        a.setObjectName("actExtrude3d")
+        a.setToolTip("Limited 3D-Viewer: isometrische Extrusion — 2.6.25")
+        a.triggered.connect(self._show_extrude3d_dialog)
+        m_extra.addAction(a)
+        a = QAction("Script-/Plugin-Hooks…", self)
+        a.setObjectName("actPluginHooks")
+        a.setToolTip("User-Hooks open/save/export/ocr — 2.6.25")
+        a.triggered.connect(self._show_hooks_info)
+        m_extra.addAction(a)
         for key, title in [
             ("ki", "KI-Assistent (geplant)"),
-            ("stylus", "Stylus / Palm Rejection (geplant)"),
             ("shapes_ai", "Intelligente Formerkennung (geplant)"),
-            ("extrude3d", "3D-Extrusion (geplant)"),
-            ("plugins", "Plugin-Hooks (Stub · nicht produktiv)"),
             ("varfonts", "Variable Fonts (geplant)"),
             ("envelope", "Envelope Distort (geplant)"),
             ("esign", "E-Signatur QES/QTSP-Trust (Hinweis)"),
@@ -8491,7 +8507,7 @@ class MainWindow(QMainWindow):
         self._set_status(f"Textumfluss {mode} für Rahmen {fr.id}")
 
     def _insert_hyperlink_dialog(self) -> None:
-        """Hyperlink (URL oder Dokumentziel) in Editor — 2.6.24."""
+        """Hyperlink (URL oder Dokumentziel) in Editor — 2.6.25."""
         from instantlensdoc.ui.hyperlink_dialog import HyperlinkDialog
 
         if self.stack.currentWidget() is not self.editor_pane:
@@ -8522,7 +8538,7 @@ class MainWindow(QMainWindow):
         self._set_status(f"Hyperlink: {dlg.result_target}")
 
     def _insert_shape_frame(self) -> None:
-        """Formrahmen ins Layout — 2.6.24."""
+        """Formrahmen ins Layout — 2.6.25."""
         from PySide6.QtWidgets import QInputDialog
         from instantlensdoc.core.layout import SHAPE_KINDS
 
@@ -8535,7 +8551,7 @@ class MainWindow(QMainWindow):
         self._set_status(f"Form {shape} eingefügt ({fr.id})")
 
     def _insert_video_placeholder(self) -> None:
-        """Video-Platzhalter mit URL — 2.6.24."""
+        """Video-Platzhalter mit URL — 2.6.25."""
         from PySide6.QtWidgets import QInputDialog
 
         url, ok = QInputDialog.getText(
@@ -8554,7 +8570,7 @@ class MainWindow(QMainWindow):
         self._set_status(f"Video-Platzhalter: {fr.video_url} ({fr.id})")
 
     def _scale_image_frame(self) -> None:
-        """Bild-/Formrahmen skalieren — 2.6.24."""
+        """Bild-/Formrahmen skalieren — 2.6.25."""
         from PySide6.QtWidgets import QInputDialog
 
         if not self.layout_doc.image_frames:
@@ -8570,7 +8586,7 @@ class MainWindow(QMainWindow):
         self._set_status(f"Rahmen {fr.id} skaliert ×{factor}")
 
     def _crop_image_frame(self) -> None:
-        """Bild zuschneiden — 2.6.24."""
+        """Bild zuschneiden — 2.6.25."""
         from PySide6.QtWidgets import QInputDialog
 
         if not self.layout_doc.image_frames:
@@ -9647,18 +9663,133 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Lesezeichen löschen", str(e))
 
     def _refresh_outline(self, path: str | Path):
+        """PDF-Lesezeichen + Text-Überschriften → Dokumentstruktur — 2.6.25."""
+        self._refresh_document_outline(pdf_path=path)
+
+    def _refresh_document_outline(self, pdf_path: str | Path | None = None) -> None:
+        """Dokumentstruktur-Pane neu aufbauen (Überschriften/Lesezeichen/Favoriten)."""
+        from instantlensdoc.core.doc_outline import build_document_outline
+
+        text = ""
         try:
-            items = extract_outline(path)
+            if self.stack.currentWidget() is self.editor_pane:
+                text = self.editor.toPlainText()
+            elif self.doc and getattr(self.doc, "text", None):
+                text = self.doc.text or ""
         except Exception:
-            items = []
-        self.sidebar.set_outline(items)
-        if not items and hasattr(self, "file_status_label"):
+            text = ""
+        path = pdf_path
+        if path is None:
+            path = getattr(self.pdf_view, "pdf_path", None) if hasattr(self, "pdf_view") else None
+            if path is None and self.doc and getattr(self.doc, "kind", None):
+                from instantlensdoc.core.documents import DocKind as _DK
+
+                if self.doc.kind == _DK.PDF and self.doc.path:
+                    path = self.doc.path
+        favs = None
+        try:
+            # Seitenfavoriten aus Sidebar falls vorhanden
+            if hasattr(self.sidebar, "page_favorites"):
+                favs = list(self.sidebar.page_favorites() or [])
+        except Exception:
+            favs = None
+        data = build_document_outline(
+            text=text or None,
+            pdf_path=path,
+            favorites=favs,
+        )
+        sections = data.get("sections") or []
+        if hasattr(self.sidebar, "set_document_structure"):
+            self.sidebar.set_document_structure(sections=sections)
+        else:
+            try:
+                items = extract_outline(path) if path else []
+            except Exception:
+                items = []
+            self.sidebar.set_outline(items)
+        total = int(data.get("total") or 0)
+        if total == 0 and hasattr(self, "file_status_label"):
             try:
                 self._set_status(
-                    "Keine Outlines — Favoriten exportieren oder + hinzufügen"
+                    "Keine Struktur — Überschriften (#) / Lesezeichen / + hinzufügen"
                 )
             except Exception:
                 pass
+        elif total:
+            try:
+                c = data.get("counts") or {}
+                self._set_status(
+                    f"Struktur: {c.get('heading', 0)} Überschr. · "
+                    f"{c.get('bookmark', 0)} Lesez. · {c.get('favorite', 0)} Fav."
+                )
+            except Exception:
+                pass
+
+    def _on_outline_line_jump(self, line: int) -> None:
+        """Sprung zu Textzeile aus Dokumentstruktur — 2.6.25."""
+        if line is None or int(line) < 1:
+            self._set_status("Struktur: keine Zeile")
+            return
+        try:
+            self.stack.setCurrentWidget(self.editor_pane)
+            block = self.editor.document().findBlockByNumber(int(line) - 1)
+            if block.isValid():
+                cursor = self.editor.textCursor()
+                cursor.setPosition(block.position())
+                self.editor.setTextCursor(cursor)
+                self.editor.setFocus()
+                self._set_status(f"Struktur → Zeile {int(line)}")
+            else:
+                self._set_status(f"Zeile {int(line)} nicht gefunden")
+        except Exception as e:
+            self._set_status(f"Struktur-Sprung: {e}")
+
+    def _show_extrude3d_dialog(self) -> None:
+        from instantlensdoc.ui.extrude3d_dialog import Extrude3DDialog
+
+        Extrude3DDialog(self).exec()
+
+    def _activate_stylus_tool(self) -> None:
+        """Freihand-Werkzeug + Stylus-Hinweis — 2.6.25."""
+        try:
+            if hasattr(self, "pdf_view") and hasattr(self.pdf_view, "set_tool"):
+                from ild_pdf.annotate import AnnotationType
+
+                self.stack.setCurrentWidget(self.pdf_view)
+                self.pdf_view.set_tool(AnnotationType.INK)
+            from instantlensdoc.core.stylus import stylus_info
+
+            info = stylus_info()
+            self._set_status(info.get("message") or "Stylus aktiv")
+            show_planned(self, "stylus")
+        except Exception as e:
+            show_planned(self, "stylus")
+            self._set_status(f"Stylus: {e}")
+
+    def _show_hooks_info(self) -> None:
+        from instantlensdoc.core.plugin_hooks import list_hooks, write_hook_example
+
+        try:
+            write_hook_example()
+        except Exception:
+            pass
+        data = list_hooks()
+        show_planned(self, "plugins")
+        try:
+            self._set_status(
+                f"Hooks: {data.get('hooks_dir')} · "
+                f"{len(data.get('loaded') or [])} geladen · "
+                f"{len(data.get('known_events') or [])} Events"
+            )
+        except Exception:
+            pass
+
+    def _show_telemetry_settings(self) -> None:
+        """Settings öffnen / Telemetrie-Info — 2.6.25."""
+        try:
+            self._settings()
+        except Exception:
+            show_planned(self, "telemetry")
 
     def _refresh_form_fields(self):
         """AcroForm-Feldliste Sidebar (Name/Typ/Wert) — 1.3.0."""
@@ -14337,6 +14468,22 @@ class MainWindow(QMainWindow):
                 self._set_status(f"Geöffnet: {path} [{enc}]")
             else:
                 self._set_status(f"Geöffnet: {path}")
+            try:
+                from instantlensdoc.core.plugin_hooks import emit as emit_hook
+
+                kind = ""
+                if self.doc is not None:
+                    kind = str(getattr(self.doc.kind, "name", self.doc.kind) or "")
+                emit_hook("document.opened", kind=kind[:32])
+            except Exception:
+                pass
+            try:
+                pdf_for_ol = None
+                if self.doc is not None and str(getattr(self.doc.kind, "name", "")) == "PDF":
+                    pdf_for_ol = path
+                self._refresh_document_outline(pdf_path=pdf_for_ol)
+            except Exception:
+                pass
         except Exception as e:
             _log.exception("Anzeige fehlgeschlagen: %s", path)
             QMessageBox.critical(self, "Öffnen", f"Anzeige fehlgeschlagen:\n{e}")
@@ -14443,6 +14590,12 @@ class MainWindow(QMainWindow):
             enc = self.doc.meta.get("encoding")
             suffix = f" [{enc}]" if enc else ""
             self._set_status(f"Gespeichert: {self.doc.path}{suffix}")
+            try:
+                from instantlensdoc.core.plugin_hooks import emit as emit_hook
+
+                emit_hook("document.saved", ok=True)
+            except Exception:
+                pass
             return True
         except Exception as e:
             if not quiet:
@@ -14587,7 +14740,7 @@ class MainWindow(QMainWindow):
         self.save_as()
 
     def _export_editor(self, fmt: str):
-        """Editor-Inhalt nach HTML / DOCX / XLSX / PDF / TXT / RTF / JPG / EPUB — 2.6.24."""
+        """Editor-Inhalt nach HTML / DOCX / XLSX / PDF / TXT / RTF / JPG / EPUB — 2.6.25."""
         text = ""
         title = "InstantLens Doc"
         editor_kinds = (
@@ -14644,6 +14797,12 @@ class MainWindow(QMainWindow):
             set_last_export_dir(path)
             remember_recent_dir(path)
             self._set_status(f"Exportiert: {path}")
+            try:
+                from instantlensdoc.core.plugin_hooks import emit as emit_hook
+
+                emit_hook("document.exported", fmt=str(fmt), ok=True)
+            except Exception:
+                pass
         except Exception as e:
             QMessageBox.critical(self, "Export", f"Export fehlgeschlagen:\n{e}")
 

@@ -1,4 +1,4 @@
-"""Batch-Konvertierung Ordner → PDF / OCR + PDF-Stapel — 2.6.24."""
+"""Batch-Konvertierung Ordner → PDF / OCR + PDF-Stapel — 2.6.25."""
 
 from __future__ import annotations
 
@@ -84,7 +84,7 @@ class BatchConvertDialog(QDialog):
         form.addRow("Modus", self.mode_combo)
         layout.addLayout(form)
 
-        # PDF-Optionen — 2.6.24
+        # PDF-Optionen — 2.6.25
         self.pdf_opts = QWidget()
         self.pdf_opts.setObjectName("batchPdfOpts")
         po = QFormLayout(self.pdf_opts)
@@ -296,5 +296,5 @@ class BatchConvertDialog(QDialog):
             self.log.appendPlainText(f"  [{status}] {item.source.name} → {dest}")
 
 
-# Alias für Klarheit in Menüs — 2.6.24
+# Alias für Klarheit in Menüs — 2.6.25
 BatchPdfDialog = BatchConvertDialog

@@ -1,4 +1,4 @@
-"""Horizontale Dokument-Tabs für offene Dateien — 2.6.24."""
+"""Horizontale Dokument-Tabs für offene Dateien — 2.6.25."""
 
 from __future__ import annotations
 

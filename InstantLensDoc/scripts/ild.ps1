@@ -1061,7 +1061,7 @@ function Get-IldSharedReviewInfo {
 }
 
 function Add-IldHyperlink {
-    # Hyperlink in Text — 2.6.24
+    # Hyperlink in Text — 2.6.25
     param(
         [Parameter(Mandatory = $true)][string]$Text,
         [Parameter(Mandatory = $true)][string]$LinkText,
@@ -1183,4 +1183,39 @@ if (-not $isDotSourced) {
     if ($pass.Count -eq 0) { $pass = @("--help") }
     $code = Invoke-Ild @pass
     exit $code
+}
+
+
+function Get-IldHooks {
+    param([string]$Dir)
+    if ($Dir) { Invoke-Ild @("hooks-list", "--dir", $Dir) } else { Invoke-Ild @("hooks-list") }
+}
+function Invoke-IldHooksLoad {
+    param([string]$Dir)
+    if ($Dir) { Invoke-Ild @("hooks-load", "--dir", $Dir) } else { Invoke-Ild @("hooks-load") }
+}
+function Invoke-IldHookEmit {
+    param([Parameter(Mandatory=$true)][string]$Event, [string]$Kind = "")
+    $args = @("hooks-emit", $Event)
+    if ($Kind) { $args += @("--kind", $Kind) }
+    Invoke-Ild $args
+}
+function Register-IldHook {
+    param([Parameter(Mandatory=$true)][string]$Source, [string]$Name)
+    $args = @("hooks-register", $Source)
+    if ($Name) { $args += @("--name", $Name) }
+    Invoke-Ild $args
+}
+function Get-IldDocumentOutline {
+    param([string]$Text, [string]$Path, [int]$MaxLevel = 6)
+    $args = @("doc-outline", "--max-level", "$MaxLevel")
+    if ($Text) { $args += @("--text", $Text) }
+    if ($Path) { $args += @("--path", $Path) }
+    Invoke-Ild $args
+}
+function Get-IldStylusStatus { Invoke-Ild @("stylus") }
+function Get-IldTelemetryStatus { Invoke-Ild @("telemetry") }
+function Get-IldExtrude3d {
+    param([string]$Shape = "rectangle", [double]$Width = 120, [double]$Height = 80, [double]$Depth = 40)
+    Invoke-Ild @("extrude3d", "--shape", $Shape, "--width", "$Width", "--height", "$Height", "--depth", "$Depth")
 }

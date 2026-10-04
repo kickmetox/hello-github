@@ -1,6 +1,6 @@
 # InstantLens Doc — Features
 
-## 2.6.24
+## 2.6.25
 
 - Gemeinsames Review / Cloud-Ordner (ildshare-v1)
 - Freigabeordner-Sync + optionaler HTTP-Endpoint
@@ -9,5 +9,5 @@
 
 Vollständige Liste: FEATURES.md
 
-## 2.6.24
+## 2.6.25
 Hyperlinks, Grafiken/Medien (Scale/Crop/Formen/Video-URL), EPUB-Export.

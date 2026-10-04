@@ -410,11 +410,11 @@ def main(argv: list[str] | None = None) -> int:
     app.setOrganizationDomain("sellerbach.de")
     _apply_icon(app)
 
-    # Plugin-Hooks Stub: no-op Loader + interner Event-Bus — 1.9.0
+    # Plugin-Hooks: User-Skripte laden + Event-Bus — 2.6.25
     try:
         from instantlensdoc.core import plugin_hooks
 
-        plugin_hooks.load_plugins()  # no-op, gibt []
+        plugin_hooks.load_plugins()
         plugin_hooks.emit("app.started", version=__version__)
     except Exception:
         pass

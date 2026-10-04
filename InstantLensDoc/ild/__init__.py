@@ -1,5 +1,5 @@
 """
-Stabiles Scripting-API für InstantLens Doc (2.6.24).
+Stabiles Scripting-API für InstantLens Doc (2.6.25).
 
 Headless, ohne GUI. Nutzt ``ild_pdf`` + Lizenz/OCR der App.
 
@@ -41,6 +41,12 @@ Headless, ohne GUI. Nutzt ``ild_pdf`` + Lizenz/OCR der App.
     ild.insert_hyperlink("Siehe ", "Beispiel", "https://example.com")
     ild.layout_add_shape_frame(shape="ellipse")
     ild.export_epub_api("# Titel\\nText", "buch.epub")
+    ild.hooks_list()
+    ild.hooks_emit("document.opened", kind="PDF")
+    ild.document_outline_api(text="# A\\n## B")
+    ild.stylus_status()
+    ild.telemetry_status()
+    ild.extrude3d_preview(shape="rectangle")
 
     CLI: ``python -m ild --help`` · PowerShell: ``scripts\\ild.ps1``.
 """
@@ -168,6 +174,15 @@ from ild.api import (
     layout_scale_image,
     layout_crop_image,
     export_epub_api,
+    hooks_list,
+    hooks_load,
+    hooks_emit,
+    hooks_register,
+    document_outline_api,
+    stylus_status,
+    telemetry_status,
+    telemetry_report,
+    extrude3d_preview,
     open_info,
     outline_summary,
     page_count,
@@ -255,6 +270,15 @@ __all__ = [
     "layout_scale_image",
     "layout_crop_image",
     "export_epub_api",
+    "hooks_list",
+    "hooks_load",
+    "hooks_emit",
+    "hooks_register",
+    "document_outline_api",
+    "stylus_status",
+    "telemetry_status",
+    "telemetry_report",
+    "extrude3d_preview",
     "add_redaction",
     "apply_redactions",
     "add_shape",

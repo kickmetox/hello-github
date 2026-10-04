@@ -470,6 +470,20 @@ class Annotation:
                 continue
         return out
 
+    def ink_points_with_pressure(self) -> list[tuple[float, float, float]]:
+        """Polyline mit optionalem Druck (Default 0.5) — Stylus 2.6.25."""
+        out: list[tuple[float, float, float]] = []
+        for pt in self.points or []:
+            if not isinstance(pt, (list, tuple)) or len(pt) < 2:
+                continue
+            try:
+                x, y = float(pt[0]), float(pt[1])
+                pr = float(pt[2]) if len(pt) >= 3 else 0.5
+                out.append((x, y, max(0.0, min(1.0, pr))))
+            except (TypeError, ValueError):
+                continue
+        return out
+
     def sync_bounds_from_points(self) -> None:
         """x/y/width/height aus Polyline setzen (INK)."""
         pts = self.ink_points()
@@ -495,17 +509,30 @@ class Annotation:
         smooth: bool = False,
         smooth_passes: int = 1,
     ) -> "Annotation":
-        """INK-Annotation aus Punktliste; optional Glättung (passes) — 2.2.1/2.2.2."""
+        """INK-Annotation aus Punktliste; optional Glättung (passes) — 2.2.1/2.2.2.
+
+        Punkte: ``[x, y]`` oder ``[x, y, pressure]`` (Stylus 2.6.25).
+        """
         cleaned: list[list[float]] = []
         for pt in points or []:
             if not isinstance(pt, (list, tuple)) or len(pt) < 2:
                 continue
             try:
-                cleaned.append([float(pt[0]), float(pt[1])])
+                row = [float(pt[0]), float(pt[1])]
+                if len(pt) >= 3:
+                    row.append(max(0.0, min(1.0, float(pt[2]))))
+                cleaned.append(row)
             except (TypeError, ValueError):
                 continue
         if smooth:
-            cleaned = smooth_ink_points(cleaned, passes=max(1, int(smooth_passes or 1)))
+            # Glättung nur x/y; Druck linear mitnehmen
+            pressures = [p[2] if len(p) >= 3 else 0.5 for p in cleaned]
+            xy = [[p[0], p[1]] for p in cleaned]
+            xy = smooth_ink_points(xy, passes=max(1, int(smooth_passes or 1)))
+            cleaned = []
+            for i, p in enumerate(xy):
+                pr = pressures[min(i, len(pressures) - 1)] if pressures else 0.5
+                cleaned.append([float(p[0]), float(p[1]), float(pr)])
         ann = cls(
             page=int(page),
             type=AnnotationType.INK,

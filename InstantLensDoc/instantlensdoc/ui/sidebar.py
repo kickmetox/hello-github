@@ -450,8 +450,10 @@ class Sidebar(QWidget):
     mark_activated = Signal(int)  # Index in Markierungsliste
     annotation_activated = Signal(object)  # Annotation oder id
     outline_activated = Signal(int)  # PDF-Seite 0-basiert
+    outline_line_activated = Signal(int)  # Textzeile 1-basiert — 2.6.25
     outline_add_requested = Signal()
     outline_delete_requested = Signal()
+    outline_refresh_requested = Signal()  # Dokumentstruktur neu aufbauen — 2.6.25
     form_field_activated = Signal(object)  # FormFieldInfo — Sprung zum Feld
     form_fields_save_requested = Signal(object)  # dict[name→value] Textfelder speichern
     form_fields_export_csv_requested = Signal()  # Feldliste CSV — 1.3.2
@@ -674,18 +676,28 @@ class Sidebar(QWidget):
         )
         layout.addWidget(self.thumbs)
 
-        self.lbl_outline = QLabel("Inhaltsverzeichnis")
+        self.lbl_outline = QLabel("Dokumentstruktur / Inhaltsverzeichnis")
         self.lbl_outline.setObjectName("sidebarInhaltsverzeichnisLabel")
-        self.lbl_outline.setAccessibleName("Inhaltsverzeichnis")
+        self.lbl_outline.setAccessibleName("Dokumentstruktur / Inhaltsverzeichnis")
         layout.addWidget(self.lbl_outline)
+        self.outline_filter = QLineEdit()
+        self.outline_filter.setObjectName("sidebarOutlineFilter")
+        self.outline_filter.setPlaceholderText("Struktur filtern…")
+        self.outline_filter.setClearButtonEnabled(True)
+        self.outline_filter.setToolTip(
+            "Filtert Überschriften/Lesezeichen/Favoriten in der Dokumentstruktur — 2.6.25"
+        )
+        self.outline_filter.textChanged.connect(self._filter_document_outline)
+        layout.addWidget(self.outline_filter)
         self.outline = QTreeWidget()
         self.outline.setObjectName("sidebarInhaltsverzeichnis")
-        self.outline.setAccessibleName("Inhaltsverzeichnis")
+        self.outline.setAccessibleName("Dokumentstruktur / Inhaltsverzeichnis")
         self.outline.setHeaderHidden(True)
-        self.outline.setMaximumHeight(160)
+        self.outline.setMinimumHeight(120)
+        self.outline.setMaximumHeight(280)
         self.outline.setToolTip(
-            "Inhaltsverzeichnis / PDF-Outline: Klick oder Enter → Seite; "
-            "+/− Lesezeichen bearbeiten — 2.6.5"
+            "Dokumentstruktur jenseits TOC: Überschriften, PDF-Lesezeichen, Favoriten — "
+            "Klick → Seite/Zeile; +/− Lesezeichen — 2.6.25"
         )
         self.outline.itemClicked.connect(self._activate_outline)
         self.outline.itemDoubleClicked.connect(self._activate_outline)
@@ -700,18 +712,27 @@ class Sidebar(QWidget):
         self.btn_outline_del.setFixedWidth(28)
         self.btn_outline_del.setToolTip("Ausgewähltes Lesezeichen löschen")
         self.btn_outline_del.clicked.connect(self.outline_delete_requested.emit)
-        # Document Outline Vorlesen — Stub bleibt (keine TTS) — 2.0.0
+        # Struktur aktualisieren (Outline-Pane) — 2.6.25; TTS-Vorlesen bleibt Stub
+        self.btn_outline_refresh = QPushButton("↻")
+        self.btn_outline_refresh.setObjectName("outlineRefreshBtn")
+        self.btn_outline_refresh.setFixedWidth(28)
+        self.btn_outline_refresh.setToolTip(
+            "Dokumentstruktur aktualisieren (Überschriften/Lesezeichen) — 2.6.25"
+        )
+        self.btn_outline_refresh.clicked.connect(self.outline_refresh_requested.emit)
         self.btn_outline_read = QPushButton("Vorlesen")
         self.btn_outline_read.setObjectName("outlineReadStubBtn")
         self.btn_outline_read.setToolTip(
-            "Document Outline Vorlesen — Stub / geplant / keine Aktion — 2.0.0"
+            "Document Outline Vorlesen — Stub / TTS geplant — 2.6.25 "
+            "(Pane selbst produktiv)"
         )
         self.btn_outline_read.setAccessibleName(
-            "Document Outline Vorlesen Stub — nicht produktiv"
+            "Document Outline Vorlesen Stub — TTS nicht produktiv"
         )
         self.btn_outline_read.clicked.connect(self._outline_read_stub)
         ol_btns.addWidget(self.btn_outline_add)
         ol_btns.addWidget(self.btn_outline_del)
+        ol_btns.addWidget(self.btn_outline_refresh)
         ol_btns.addWidget(self.btn_outline_read)
         ol_btns.addStretch(1)
         self.outline_btns_host = QWidget()
@@ -1177,10 +1198,29 @@ class Sidebar(QWidget):
         self.portfolio_empty_hint.setVisible(False)
 
     def _outline_read_stub(self) -> None:
-        """Document Outline Vorlesen — Stub / keine Aktion — 2.0.0."""
+        """Document Outline Vorlesen — Stub / TTS geplant; Pane produktiv — 2.6.25."""
         from instantlensdoc.ui.stubs import show_planned
 
         show_planned(self, "outline_read")
+
+    def _filter_document_outline(self, text: str = "") -> None:
+        """Filtert Tree-Einträge nach Titel-Substring — 2.6.25."""
+        q = (text or "").strip().casefold()
+        root = self.outline.invisibleRootItem()
+
+        def walk(item: QTreeWidgetItem) -> bool:
+            visible_child = False
+            for i in range(item.childCount()):
+                if walk(item.child(i)):
+                    visible_child = True
+            label = (item.text(0) or "").casefold()
+            match = (not q) or (q in label)
+            show = match or visible_child
+            item.setHidden(not show)
+            return show
+
+        for i in range(root.childCount()):
+            walk(root.child(i))
 
     @property
     def fulltext_mode(self) -> bool:
@@ -1263,6 +1303,13 @@ class Sidebar(QWidget):
     def _activate_outline(self, item: QTreeWidgetItem, _column: int = 0):
         if item is None or item.isDisabled():
             return
+        line = item.data(0, Qt.UserRole + 2)
+        if line is not None:
+            try:
+                self.outline_line_activated.emit(int(line))
+                return
+            except (TypeError, ValueError):
+                pass
         page = item.data(0, Qt.UserRole)
         if page is None:
             # Kein auflösbares Ziel — Signal mit -1 für Statusmeldung in MainWindow
@@ -1873,10 +1920,12 @@ class Sidebar(QWidget):
             self.outline.setVisible(vis)
             if hasattr(self, "lbl_outline"):
                 self.lbl_outline.setVisible(vis)
+            if hasattr(self, "outline_filter"):
+                self.outline_filter.setVisible(vis)
             if hasattr(self, "outline_btns_host"):
                 self.outline_btns_host.setVisible(vis)
             else:
-                for wname in ("btn_outline_add", "btn_outline_del"):
+                for wname in ("btn_outline_add", "btn_outline_del", "btn_outline_refresh"):
                     w = getattr(self, wname, None)
                     if w is not None:
                         w.setVisible(vis)
@@ -2023,47 +2072,128 @@ class Sidebar(QWidget):
             return QPixmap()
 
     def set_outline(self, items, *, _add=None):
-        """items: Liste von OutlineItem (ild_pdf) oder leer."""
+        """items: Liste von OutlineItem (ild_pdf) oder leer — kompatibel vor Struktur-Pane."""
+        self.set_document_structure(bookmarks=items)
+
+    def set_document_structure(
+        self,
+        *,
+        sections: list | None = None,
+        bookmarks=None,
+        headings: list | None = None,
+    ) -> None:
+        """Dokumentstruktur: Überschriften + Lesezeichen (+ Favoriten-Gruppen) — 2.6.25."""
         self.outline.clear()
-        if not items:
-            empty = QTreeWidgetItem(
-                ["(keine Outlines — Favoriten exportieren oder + hinzufügen)"]
-            )
-            empty.setDisabled(True)
-            empty.setToolTip(
-                0,
-                "PDF hat keine Lesezeichen/Outlines. "
-                "Bookmarks als Outlines exportieren oder + für aktuelle Seite — 1.3.2",
-            )
-            self.outline.addTopLevelItem(empty)
-            return
+        self._outline_sections = sections
 
-        def add_nodes(parent_item: QTreeWidgetItem | None, nodes, path: tuple[int, ...] = ()):
-            from ild_pdf.outline import OutlineItem
-
-            for i, node in enumerate(nodes):
-                if not isinstance(node, OutlineItem):
-                    continue
-                item_path = path + (i,)
-                label = node.title
-                if node.page_index is not None:
-                    label += f"  (S. {node.page_index + 1})"
-                twi = QTreeWidgetItem([label])
-                twi.setData(0, Qt.UserRole, node.page_index)
-                twi.setData(0, Qt.UserRole + 1, item_path)
-                if node.page_index is None:
-                    twi.setToolTip(0, "Kein Seiten-Ziel (Destination nicht auflösbar)")
+        def add_struct(parent_item: QTreeWidgetItem | None, nodes, path: tuple[int, ...] = ()):
+            for i, node in enumerate(nodes or []):
+                if isinstance(node, dict):
+                    title = str(node.get("title") or "")
+                    page = node.get("page_index")
+                    line = node.get("line")
+                    kids = node.get("children") or []
+                    kind = str(node.get("kind") or "")
+                    level = int(node.get("level") or 1)
                 else:
-                    twi.setToolTip(0, f"Doppelklick → Seite {node.page_index + 1}")
+                    title = str(getattr(node, "title", "") or "")
+                    page = getattr(node, "page_index", None)
+                    line = getattr(node, "line", None)
+                    kids = getattr(node, "children", None) or []
+                    kind = str(getattr(node, "kind", "") or "")
+                    level = int(getattr(node, "level", 1) or 1)
+                item_path = path + (i,)
+                label = title
+                if page is not None:
+                    label += f"  (S. {int(page) + 1})"
+                elif line is not None:
+                    label += f"  (Z. {int(line)})"
+                twi = QTreeWidgetItem([label])
+                twi.setData(0, Qt.UserRole, page)
+                twi.setData(0, Qt.UserRole + 1, item_path)
+                twi.setData(0, Qt.UserRole + 2, line)
+                tip_bits = []
+                if kind:
+                    tip_bits.append(kind)
+                if page is not None:
+                    tip_bits.append(f"Seite {int(page) + 1}")
+                if line is not None:
+                    tip_bits.append(f"Zeile {int(line)}")
+                twi.setToolTip(0, " · ".join(tip_bits) or title)
+                if level == 0:
+                    font = twi.font(0)
+                    font.setBold(True)
+                    twi.setFont(0, font)
                 if parent_item is None:
                     self.outline.addTopLevelItem(twi)
                 else:
                     parent_item.addChild(twi)
-                if node.children:
-                    add_nodes(twi, node.children, item_path)
+                if kids:
+                    add_struct(twi, kids, item_path)
 
-        add_nodes(None, items)
+        if sections:
+            add_struct(None, sections)
+            self.outline.expandToDepth(1)
+            if hasattr(self, "outline_filter"):
+                self._filter_document_outline(self.outline_filter.text())
+            return
+
+        # Fallback: nur Bookmarks (OutlineItem) und/oder Headings
+        from ild_pdf.outline import OutlineItem
+
+        has_any = False
+        if headings:
+            wrap = QTreeWidgetItem(["Überschriften"])
+            font = wrap.font(0)
+            font.setBold(True)
+            wrap.setFont(0, font)
+            self.outline.addTopLevelItem(wrap)
+            add_struct(wrap, headings)
+            has_any = True
+        if bookmarks:
+            wrap = QTreeWidgetItem(["Lesezeichen"])
+            font = wrap.font(0)
+            font.setBold(True)
+            wrap.setFont(0, font)
+            self.outline.addTopLevelItem(wrap)
+
+            def add_bm(parent_item, nodes, path=()):
+                for i, node in enumerate(nodes or []):
+                    if not isinstance(node, OutlineItem):
+                        continue
+                    item_path = path + (i,)
+                    label = node.title
+                    if node.page_index is not None:
+                        label += f"  (S. {node.page_index + 1})"
+                    twi = QTreeWidgetItem([label])
+                    twi.setData(0, Qt.UserRole, node.page_index)
+                    twi.setData(0, Qt.UserRole + 1, item_path)
+                    if parent_item is None:
+                        self.outline.addTopLevelItem(twi)
+                    else:
+                        parent_item.addChild(twi)
+                    if node.children:
+                        add_bm(twi, node.children, item_path)
+
+            add_bm(wrap, bookmarks)
+            has_any = True
+
+        if not has_any:
+            empty = QTreeWidgetItem(
+                ["(keine Outlines/Struktur — Favoriten exportieren oder + hinzufügen)"]
+            )
+            empty.setDisabled(True)
+            empty.setToolTip(
+                0,
+                "Keine Überschriften oder PDF-Lesezeichen/Outlines. "
+                "Favoriten als Outlines exportieren, Markdown-Überschriften (#) "
+                "oder + für aktuelle Seite — 2.6.25",
+            )
+            self.outline.addTopLevelItem(empty)
+            return
         self.outline.expandToDepth(1)
+        if hasattr(self, "outline_filter"):
+            self._filter_document_outline(self.outline_filter.text())
 
     def selected_outline_path(self) -> tuple[int, ...] | None:
         """Pfad (Indizes) des ausgewählten Lesezeichens, sonst None."""

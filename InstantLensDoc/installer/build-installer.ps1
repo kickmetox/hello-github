@@ -1,11 +1,15 @@
-# InstantLens Doc — Inno-Setup-Installer bauen (eine Datei) 1.0.2
-# Voraussetzung: Inno Setup 6 (iscc.exe)
+# InstantLens Doc 2.6.25 — Inno-Setup-Installer bauen (Setup.exe)
+# Voraussetzung: Inno Setup 6 (iscc.exe) auf Windows x64
 # Aufruf:
 #   powershell -ExecutionPolicy Bypass -File .\installer\build-installer.ps1
+#   powershell -ExecutionPolicy Bypass -File .\scripts\build-windows-installer.ps1
 # Optional:
 #   -SourceRoot D:\path\to\pack
 #   -PythonLauncher   # Shortcuts auf run.bat statt InstantLensDoc.exe
 #   -NoKeygen         # IncludeKeygen=0 (keine Keygen-Shortcuts)
+#
+# Ergebnis: dist\InstantLensDoc-Setup-2.6.25.exe
+#   Startmenü + optional Desktop + Uninstall + 64-Bit
 #
 # Keygen-EXE: Prefer dist\InstantLensKeygen\InstantLensKeygen.exe,
 # Fallback dist\InstantLensDoc\InstantLensKeygen.exe → Pack als InstantLensKeygen.exe
@@ -64,9 +68,10 @@ if (-not $SourceRoot) {
     # Pack-Ordner aus Repo bauen (Python-Launcher-Layout)
     New-Item -ItemType Directory -Force -Path $Pack | Out-Null
     $copyItems = @(
-        "instantlensdoc", "ild_pdf", "keygen", "assets", "scripts",
-        "requirements.txt", "run.bat", "run.ps1", "run-keygen.bat",
-        "FEATURES.md", "INFO.md", "README.md", "CHANGELOG.md"
+        "instantlensdoc", "ild_pdf", "ild", "keygen", "assets", "scripts",
+        "docs", "examples", "requirements.txt", "VERSION.txt",
+        "run.bat", "run.ps1", "run-keygen.bat", "run-ild.bat",
+        "FEATURES.md", "INFO.md", "README.md", "CHANGELOG.md", "CONTRIBUTING.md"
     )
     foreach ($name in $copyItems) {
         $src = Join-Path $Root $name

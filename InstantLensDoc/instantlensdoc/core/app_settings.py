@@ -157,7 +157,9 @@ DEFAULTS: dict[str, Any] = {
     "page_labels_txt_utf8_bom": True,  # PageLabels-TXT UTF-8 BOM — 2.2.4
     "last_page_labels_txt_dir": "",  # Zielordner PageLabels-TXT merken — 2.2.4
     "page_labels_txt_filename_template": "{stem}_labels.txt",  # Template — 2.2.4
-    "telemetry_opt_in": False,  # anonym Nutzung melden — Stub; Toggle disabled bleibt aus — 2.3.2
+    "telemetry_opt_in": False,  # anonym Diagnostik lokal — Opt-in Default aus — 2.6.25
+    "stylus_pressure_enabled": True,  # Stylus-Druck → Strichstärke — 2.6.25
+    "stylus_palm_rejection": True,  # Palm-Rejection Heuristik — 2.6.25
     "command_palette_recent": [],  # letzte Command-Palette-Befehle (IDs) — 2.3.1
     "command_palette_recent_max": 10,  # Recent-Anzahl 5/10/20 — 2.3.2
     "command_palette_pinned": [],  # angeheftete Palette-Befehle (IDs) — 2.3.2
@@ -629,23 +631,39 @@ def set_update_check_on_start(enabled: bool) -> None:
 
 
 def get_telemetry_opt_in() -> bool:
-    """Opt-in „anonym Nutzung melden“ — immer False; Toggle disabled Stub — 2.3.2."""
-    # 2.3.2: Toggle bleibt disabled → Flag wird nicht mehr aktiviert
-    return False
+    """Opt-in „anonym Diagnostik (lokal)“ — Default False — 2.6.25."""
+    return bool(load_settings().get("telemetry_opt_in", False))
 
 
 def set_telemetry_opt_in(enabled: bool) -> None:
-    """Stub: speichert immer False — Toggle disabled, keine Aktivierung — 2.3.2."""
-    save_settings({"telemetry_opt_in": False})
-    # Stub: auch bei True keine Side-Effects / keine Aktivierung
+    """Opt-in speichern; bei Aktivierung lokales Diagnostik-Log (kein Netzwerk)."""
+    save_settings({"telemetry_opt_in": bool(enabled)})
     try:
         from instantlensdoc.core.telemetry import report_anonymous_usage
 
         report_anonymous_usage(
-            "settings.telemetry_opt_in", enabled=False, requested=bool(enabled)
+            "settings.telemetry_opt_in",
+            enabled=bool(enabled),
+            requested=bool(enabled),
         )
     except Exception:
         pass
+
+
+def get_stylus_pressure_enabled() -> bool:
+    return bool(load_settings().get("stylus_pressure_enabled", True))
+
+
+def set_stylus_pressure_enabled(enabled: bool) -> None:
+    save_settings({"stylus_pressure_enabled": bool(enabled)})
+
+
+def get_stylus_palm_rejection() -> bool:
+    return bool(load_settings().get("stylus_palm_rejection", True))
+
+
+def set_stylus_palm_rejection(enabled: bool) -> None:
+    save_settings({"stylus_palm_rejection": bool(enabled)})
 
 
 COMMAND_PALETTE_RECENT_MAX = 10  # Default; Settings 5/10/20 — 2.3.2

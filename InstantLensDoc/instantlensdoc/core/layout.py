@@ -1,4 +1,4 @@
-"""Layout: Textrahmen, verkettete Rahmen, Bildrahmen, Move/Resize, Textumfluss, Ebenen, Medien — 2.6.24."""
+"""Layout: Textrahmen, verkettete Rahmen, Bildrahmen, Move/Resize, Textumfluss, Ebenen, Medien — 2.6.25."""
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ TEXT_WRAP_MODES: tuple[str, ...] = ("none", "bounding_box", "jump_object", "cont
 # Dokument-Ebenen 2.6.19
 LAYER_NAMES: tuple[str, ...] = ("background", "images", "text")
 
-# Medienarten / Formen — 2.6.24
+# Medienarten / Formen — 2.6.25
 MEDIA_KINDS: tuple[str, ...] = ("image", "shape", "video")
 SHAPE_KINDS: tuple[str, ...] = (
     "rectangle",
@@ -117,7 +117,7 @@ class ImageFrame:
     shape: str = "rectangle"  # rectangle | ellipse | triangle | rounded_rect | …
     # Ebenen 2.6.19
     layer: str = "images"
-    # Medien-Polish 2.6.24: crop (0–1 relativ), scale, Video-Placeholder
+    # Medien-Polish 2.6.25: crop (0–1 relativ), scale, Video-Placeholder
     media_kind: str = "image"  # image | shape | video
     crop_left: float = 0.0
     crop_top: float = 0.0
@@ -143,7 +143,7 @@ class ImageFrame:
         self.height = max(8.0, float(height))
 
     def scale_by(self, factor: float) -> None:
-        """Gleichmäßig skalieren (Rahmenmaße) — 2.6.24."""
+        """Gleichmäßig skalieren (Rahmenmaße) — 2.6.25."""
         if self.locked:
             raise ValueError(f"Rahmen {self.id} ist gesperrt")
         f = float(factor)
@@ -160,7 +160,7 @@ class ImageFrame:
         right: float = 0.0,
         bottom: float = 0.0,
     ) -> None:
-        """Zuschneiden relativ 0–1 (Ränder vom Original) — 2.6.24."""
+        """Zuschneiden relativ 0–1 (Ränder vom Original) — 2.6.25."""
         if self.locked:
             raise ValueError(f"Rahmen {self.id} ist gesperrt")
 
@@ -310,7 +310,7 @@ class LayoutDocument:
         stroke_width: float = 1.5,
         text_wrap: str = "bounding_box",
     ) -> ImageFrame:
-        """Formrahmen (ohne Bilddatei) — 2.6.24."""
+        """Formrahmen (ohne Bilddatei) — 2.6.25."""
         sk = (shape or "rectangle").strip().lower()
         if sk not in SHAPE_KINDS:
             raise ValueError(f"Unbekannte Form: {shape} (erlaubt: {', '.join(SHAPE_KINDS)})")
@@ -344,7 +344,7 @@ class LayoutDocument:
         title: str = "",
         text_wrap: str = "bounding_box",
     ) -> ImageFrame:
-        """Online-Video als Platzhalter mit URL (kein Embed-Player) — 2.6.24."""
+        """Online-Video als Platzhalter mit URL (kein Embed-Player) — 2.6.25."""
         from urllib.parse import urlparse
 
         raw = (url or "").strip()
@@ -376,7 +376,7 @@ class LayoutDocument:
         return frame
 
     def scale_image(self, frame_id: str, factor: float) -> ImageFrame:
-        """Bild-/Form-/Video-Rahmen skalieren — 2.6.24."""
+        """Bild-/Form-/Video-Rahmen skalieren — 2.6.25."""
         fr = self._image_frame(frame_id)
         fr.scale_by(factor)
         return fr
@@ -389,7 +389,7 @@ class LayoutDocument:
         right: float = 0.0,
         bottom: float = 0.0,
     ) -> ImageFrame:
-        """Bild zuschneiden (relative Ränder) — 2.6.24."""
+        """Bild zuschneiden (relative Ränder) — 2.6.25."""
         fr = self._image_frame(frame_id)
         if fr.media_kind == "video":
             raise ValueError("Video-Platzhalter können nicht zugeschnitten werden")

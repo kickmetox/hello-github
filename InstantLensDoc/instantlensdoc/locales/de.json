@@ -125,7 +125,7 @@
     "info_version": "Version",
     "info_vendor": "Hersteller",
     "info_contact": "Kontakt",
-    "info_privacy": "Privacy: lokal, keine Telemetrie",
+    "info_privacy": "Privacy: lokal; Telemetrie optional Opt-in (kein PII)",
     "features_missing": "FEATURES.md nicht gefunden.",
     "preflight": "Preflight (Druckprüfung)",
     "bleed": "Anschnitt / Bleed",
@@ -189,7 +189,12 @@
     "shared_review_none": "Keine aktive Session.",
     "shared_review_need_folder": "Bitte Freigabeordner wählen.",
     "shared_review_join_hint": "Freigabeordner oder session.ildshare.json…",
-    "shared_review_open_bundle": "Session öffnen"
+    "shared_review_open_bundle": "Session öffnen",
+    "stylus_tool": "Stylus / Stift",
+    "doc_structure": "Dokumentstruktur",
+    "hooks_menu": "Script-Hooks",
+    "telemetry_opt_in": "Anonym Diagnostik (lokal)",
+    "extrude3d_limited": "3D-Extrusion (begrenzt)"
   },
   "phrases": {
     "&Datei": "&Datei",

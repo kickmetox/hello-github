@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **2.6.24** |
+| Version | **2.6.25** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -33,7 +33,7 @@
 
 Skript: [sync-ild.ps1](scripts/sync-ild.ps1) — Branch `cursor/instantlensdoc-2108` (oder `-LocalPack` / Pack-Zip) nach `D:\AI_Temp\InstantLensDoc`, pip, Start. **Nutzer-Icon in `assets` wird nicht überschrieben.**
 
-**FEATURES.md lokal sync:** Nach Sync liegt `FEATURES.md` lokal im App-Ordner (`D:\AI_Temp\InstantLensDoc\FEATURES.md`); About/Stubs öffnen diese lokale Datei — Version **2.6.24**.
+**FEATURES.md lokal sync:** Nach Sync liegt `FEATURES.md` lokal im App-Ordner (`D:\AI_Temp\InstantLensDoc\FEATURES.md`); About/Stubs öffnen diese lokale Datei — Version **2.6.25**.
 
 Ohne Start: `-NoStart` (Alias `-SkipStart`). Exit-Codes: **0** OK · **1** allgemein · **2** Git-Fehler.
 
@@ -68,7 +68,7 @@ Python-Layout-Zip (ohne PyInstaller-EXE):
 powershell -ExecutionPolicy Bypass -File .\scripts\pack-windows-runnable.ps1
 ```
 
-Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
+Installer: `.\scripts\build-windows-installer.ps1` bzw. `.\installer\build-installer.ps1` (optional `-NoKeygen`) → `dist\InstantLensDoc-Setup-2.6.25.exe`  
 Desktop-/Keygen-Shortcuts: `.\scripts\install-ild.ps1` (Keygen wenn `run-keygen.bat` / EXE vorhanden; `-SkipKeygen`)  
 Desktop-Verknüpfung Installer: optionale Checkbox (`desktopicon`, Standard an / `checkedonce`)
 
@@ -82,6 +82,19 @@ python -m keygen --verify "ILD1...."
 
 Trial 28 Tage · Keys 32 Tage (HMAC `ILD1.…`). Details: `keygen/README.md`.
 
+## Neu in 2.6.25
+
+Minor nach **2.6.24** (Hyperlinks / Medien / EPUB):
+
+- **Stylus / Palm Rejection:** Tablet-Stift mit Druck→Strichstärke; Palm-Rejection; sonst verbesserte Freihand-Integration
+- **Dokumentstruktur (Outline-Pane):** Überschriften, PDF-Lesezeichen, Favoriten, Filter, Navigation (Sidebar) — jenseits reinem TOC
+- **Script-/Plugin-Hooks:** User-Skripte für open/save/export/ocr via Python/PowerShell `ild` (`config_dir()/hooks`)
+- **Telemetrie:** optionale lokale Diagnostik, Opt-in Default aus, kein Netzwerk, kein PII (`diagnostics.jsonl`)
+- **3D-Extrusion Limited Viewer:** isometrische Vorschau einfacher Formen (kein Mesh/OpenGL)
+- **Windows-Installer (Inno):** `scripts\build-windows-installer.ps1` → `InstantLensDoc-Setup-2.6.25.exe` (Startmenü, optional Desktop, Uninstall, 64-Bit; Build auf Windows x64)
+- **ild API:** `hooks_*` / `document_outline_api` / `stylus_status` / `telemetry_*` / `extrude3d_preview`
+- Freier KI-Chat-Stub und Outline-TTS bleiben geplant
+
 ## Neu in 2.6.24
 
 Minor nach **2.6.23** (Gemeinsames Review / Cloud-Ordner):
@@ -91,7 +104,7 @@ Minor nach **2.6.23** (Gemeinsames Review / Cloud-Ordner):
 - **EPUB-Export:** Text/Markdownish → EPUB 2 (Kapitel aus H1); Import als Text
 - **ild API:** `insert_hyperlink` / `extract_hyperlinks` / `layout_scale_image` / `layout_crop_image` / `layout_add_shape_frame` / `layout_add_video_placeholder` / `export_epub_api`
 - CLI `hyperlink`/`hyperlinks`/`anchors`/`layout-shape`/`layout-video`/`layout-scale`/`layout-crop`/`export-epub` · PS `Add-IldHyperlink` / `Export-IldEpub` / …
-- Stubs Stylus/3D/Hooks/Outline/Telemetrie/freier KI-Chat unverändert
+- Stubs Stylus/3D/Hooks/Outline/Telemetrie/freier KI-Chat unverändert (→ 2.6.25)
 
 ## Neu in 2.6.23
 

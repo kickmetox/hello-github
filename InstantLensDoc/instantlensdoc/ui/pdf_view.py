@@ -642,7 +642,7 @@ class PdfCanvas(QLabel):
 
     annotation_placed = Signal(float, float)
     drag_finished = Signal(float, float, float, float)  # x0,y0,x1,y1
-    ink_finished = Signal(object)  # list[(x,y)] Freihand-Polyline — 2.2.0
+    ink_finished = Signal(object)  # list[(x,y)] oder [(x,y,pressure)] — Stylus 2.6.25
     text_selection_finished = Signal(float, float, float, float)  # Text-Marquee (Auswahl-Modus)
     overlay_edit_requested = Signal(str)  # ann id
     inline_text_edit_requested = Signal(float, float)  # Klick → Inline-Edit — 2.6.5
@@ -672,9 +672,10 @@ class PdfCanvas(QLabel):
         self._object_drag_delta: tuple[float, float] = (0.0, 0.0)
         self._drag_start: tuple[float, float] | None = None
         self._drag_current: tuple[float, float] | None = None
-        self._ink_points: list[tuple[float, float]] | None = None  # Freihand — 2.2.0
+        self._ink_points: list[tuple[float, ...]] | None = None  # Freihand / Stylus — 2.6.25
         self._ink_preview_color: str = "#2980B9"  # Strichfarbe Vorschau — 2.2.1
         self._ink_preview_stroke: float = 2.0  # Strichstärke Vorschau — 2.2.1
+        self._stylus_active = False  # Tablet-Stift aktiv — 2.6.25
         self._text_sel_start: tuple[float, float] | None = None
         self._text_sel_current: tuple[float, float] | None = None
         self._scale = 1.5
@@ -1505,16 +1506,48 @@ class PdfCanvas(QLabel):
                 label = ann.text or ann.measure_label(self._scale, unit=unit)
                 painter.drawText(int(mid_x) + 4, int(mid_y) - 4, label)
         elif ann.type == AnnotationType.INK:
-            # Freihand-Polyline (Maus) — 2.2.0
-            pts = [
-                QPointF(float(pt[0]) + dx, float(pt[1]) + dy)
+            # Freihand / Stylus: bei Druck variable Segmentbreite — 2.6.25
+            raw_pts = [
+                pt
                 for pt in (getattr(ann, "points", None) or [])
                 if isinstance(pt, (list, tuple)) and len(pt) >= 2
             ]
-            if len(pts) >= 2:
-                painter.drawPolyline(QPolygonF(pts))
-            elif len(pts) == 1:
-                painter.drawPoint(pts[0])
+            has_pressure = any(len(pt) >= 3 for pt in raw_pts)
+            if has_pressure and len(raw_pts) >= 2:
+                try:
+                    from instantlensdoc.core.stylus import pressure_to_stroke_width
+
+                    base_w = float(getattr(ann, "stroke_width", 2.0) or 2.0)
+                    for i in range(1, len(raw_pts)):
+                        p0, p1 = raw_pts[i - 1], raw_pts[i]
+                        pr = float(p1[2]) if len(p1) >= 3 else (
+                            float(p0[2]) if len(p0) >= 3 else 0.5
+                        )
+                        seg_pen = QPen(painter.pen())
+                        seg_pen.setWidthF(pressure_to_stroke_width(base_w, pr))
+                        seg_pen.setCapStyle(Qt.RoundCap)
+                        seg_pen.setJoinStyle(Qt.RoundJoin)
+                        painter.setPen(seg_pen)
+                        painter.drawLine(
+                            QPointF(float(p0[0]) + dx, float(p0[1]) + dy),
+                            QPointF(float(p1[0]) + dx, float(p1[1]) + dy),
+                        )
+                except Exception:
+                    pts = [
+                        QPointF(float(pt[0]) + dx, float(pt[1]) + dy)
+                        for pt in raw_pts
+                    ]
+                    if len(pts) >= 2:
+                        painter.drawPolyline(QPolygonF(pts))
+            else:
+                pts = [
+                    QPointF(float(pt[0]) + dx, float(pt[1]) + dy)
+                    for pt in raw_pts
+                ]
+                if len(pts) >= 2:
+                    painter.drawPolyline(QPolygonF(pts))
+                elif len(pts) == 1:
+                    painter.drawPoint(pts[0])
         elif ann.type == AnnotationType.LINK:
             # URL-Link Rechteck (Sidecar) — 2.3.0
             painter.setPen(QPen(QColor(ann.color or "#1565C0"), 2, Qt.DashLine))
@@ -1639,7 +1672,10 @@ class PdfCanvas(QLabel):
                 type=AnnotationType.INK,
                 x=0,
                 y=0,
-                points=[[p[0], p[1]] for p in self._ink_points],
+                points=[
+                    list(p[:3]) if len(p) >= 3 else [p[0], p[1]]
+                    for p in self._ink_points
+                ],
                 color=str(getattr(self, "_ink_preview_color", None) or "#2980B9"),
                 stroke_width=float(getattr(self, "_ink_preview_stroke", 2.0) or 2.0),
             )
@@ -1851,7 +1887,18 @@ class PdfCanvas(QLabel):
                 return
         if self._drag_tool and event.button() == Qt.LeftButton:
             if self._drag_tool == AnnotationType.INK:
-                # Freihand: Punkte sammeln — 2.2.0
+                # Palm-Rejection: Touch während Stylus-Modus verwerfen — 2.6.25
+                try:
+                    from instantlensdoc.core.stylus import should_reject_palm
+
+                    src = "mouse"
+                    if hasattr(event, "source") and event.source() == Qt.MouseEventSynthesizedBySystem:
+                        src = "touch"
+                    if should_reject_palm(pointer_type=src) and self._stylus_active:
+                        return
+                except Exception:
+                    pass
+                # Freihand: Punkte sammeln — 2.2.0 / Stylus 2.6.25
                 self._ink_points = [(x, y)]
                 self._drag_start = (x, y)
                 self._drag_current = (x, y)
@@ -2030,6 +2077,101 @@ class PdfCanvas(QLabel):
                 self._repaint_overlay()
             return
         super().mouseReleaseEvent(event)
+
+    def tabletEvent(self, event):  # noqa: N802
+        """Stylus/Tablet: Druck → variable Strichstärke — 2.6.25."""
+        try:
+            from PySide6.QtGui import QTabletEvent
+            from instantlensdoc.core.stylus import (
+                get_stylus_pressure_enabled,
+                should_reject_palm,
+            )
+        except Exception:
+            super().tabletEvent(event)
+            return
+
+        pointer = "pen"
+        try:
+            pt_type = event.pointerType()
+            # Qt6: Pen=1, Eraser=3, Cursor=2; Touch synthesized separately
+            if int(pt_type) in (0,):  # Unknown
+                pointer = "unknown"
+        except Exception:
+            pass
+        try:
+            pressure = float(event.pressure())
+        except Exception:
+            pressure = 0.5
+        if should_reject_palm(pointer_type="touch", pressure=pressure):
+            # Touch-Geräte: nur echte Pen-Events
+            pass
+        if self._drag_tool != AnnotationType.INK:
+            super().tabletEvent(event)
+            return
+
+        self._stylus_active = True
+        # Map Tablet-Position → Seitenkoordinaten (wie Maus)
+        try:
+            local = event.position() if hasattr(event, "position") else event.posF()
+            fake = type("E", (), {"position": lambda self=None: local, "pos": lambda self=None: local.toPoint() if hasattr(local, "toPoint") else local})()
+            # Nutze vorhandenes Mapping über Widget-Koordinaten
+            from PySide6.QtCore import QPoint
+
+            gp = (
+                event.globalPosition().toPoint()
+                if hasattr(event, "globalPosition")
+                else event.globalPos()
+            )
+            lp = self.mapFromGlobal(gp)
+            # _map_to_page erwartet MouseEvent — manuell skalieren
+            pt = None
+            if self._pixmap is not None:
+                pm = self.pixmap()
+                if pm is not None and not pm.isNull():
+                    # QLabel zentriert: Offset berechnen
+                    ox = max(0, (self.width() - pm.width()) // 2)
+                    oy = max(0, (self.height() - pm.height()) // 2)
+                    x = float(lp.x() - ox)
+                    y = float(lp.y() - oy)
+                    if 0 <= x <= pm.width() and 0 <= y <= pm.height():
+                        pt = (x, y)
+        except Exception:
+            pt = None
+
+        if pt is None:
+            event.accept()
+            return
+
+        use_pressure = get_stylus_pressure_enabled()
+        ink_pt = (pt[0], pt[1], pressure) if use_pressure else (pt[0], pt[1])
+        t = event.type()
+        if t == QTabletEvent.Type.TabletPress:
+            self._ink_points = [ink_pt]
+            self._drag_start = (pt[0], pt[1])
+            self._drag_current = (pt[0], pt[1])
+            event.accept()
+            return
+        if t == QTabletEvent.Type.TabletMove and self._ink_points is not None:
+            lx, ly = self._ink_points[-1][0], self._ink_points[-1][1]
+            if abs(pt[0] - lx) >= 0.8 or abs(pt[1] - ly) >= 0.8:
+                self._ink_points.append(ink_pt)
+                self._drag_current = (pt[0], pt[1])
+                self._repaint_overlay()
+            event.accept()
+            return
+        if t == QTabletEvent.Type.TabletRelease and self._ink_points is not None:
+            pts = list(self._ink_points)
+            self._ink_points = None
+            self._drag_start = None
+            self._drag_current = None
+            self._stylus_active = False
+            if len(pts) >= 2:
+                self.ink_finished.emit(pts)
+            else:
+                self._repaint_overlay()
+            event.accept()
+            return
+        event.accept()
 
     def mouseDoubleClickEvent(self, event):
         pt = self._map_to_page(event)
@@ -2511,7 +2653,7 @@ class PdfViewer(QWidget):
             elif t == AnnotationType.INK:
                 b.setToolTip(
                     "Freihand: Maus-Polyline; Strichstärke/Farbe (Stift+Slider); "
-                    "optional Glätten — 2.2.1 (kein Stylus/Druck)"
+                    "optional Glätten; Stylus-Druck wenn verfügbar — 2.6.25"
                 )
             elif t == AnnotationType.LINK:
                 b.setToolTip(
@@ -2528,7 +2670,8 @@ class PdfViewer(QWidget):
         self.btn_ink_smooth.setCheckable(True)
         self.btn_ink_smooth.setChecked(get_ink_smooth())
         self.btn_ink_smooth.setToolTip(
-            "Freihand: Glättung optional; Stärke daneben — 2.2.3 (kein Stylus)"
+            "Freihand/Stylus: Glättung optional; Stärke daneben — "
+            "Stylus-Druck 2.6.25"
         )
         self.btn_ink_smooth.clicked.connect(self._toggle_ink_smooth)
         toolbar.addWidget(self.btn_ink_smooth)
@@ -11665,14 +11808,26 @@ class PdfViewer(QWidget):
             return
         # Punkte auf Startseite mappen (Spread)
         page0, lx0, ly0 = self._spread_resolve(float(raw[0][0]), float(raw[0][1]))
-        mapped: list[list[float]] = [[lx0, ly0]]
+        p0 = [lx0, ly0]
+        if len(raw[0]) >= 3:
+            try:
+                p0.append(max(0.0, min(1.0, float(raw[0][2]))))
+            except (TypeError, ValueError):
+                pass
+        mapped: list[list[float]] = [p0]
         ox, oy = float(raw[0][0]), float(raw[0][1])
         for pt in raw[1:]:
             try:
                 x, y = float(pt[0]), float(pt[1])
             except (TypeError, ValueError, IndexError):
                 continue
-            mapped.append([lx0 + (x - ox), ly0 + (y - oy)])
+            row = [lx0 + (x - ox), ly0 + (y - oy)]
+            if len(pt) >= 3:
+                try:
+                    row.append(max(0.0, min(1.0, float(pt[2]))))
+                except (TypeError, ValueError):
+                    pass
+            mapped.append(row)
         if len(mapped) < 2:
             return
         do_smooth = False
@@ -11687,7 +11842,7 @@ class PdfViewer(QWidget):
             do_smooth = bool(get_ink_smooth())
         strength = get_ink_smooth_strength()
         passes = get_ink_smooth_passes()
-        # Rohstrich zuerst (ohne Glättung) — eigener Undo-Eintrag
+        # Rohstrich zuerst (ohne Glättung) — eigener Undo-Eintrag; Druck optional — 2.6.25
         ann = Annotation.from_ink_points(
             page0,
             mapped,

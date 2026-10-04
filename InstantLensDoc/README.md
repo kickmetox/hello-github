@@ -2,7 +2,7 @@
 
 Moderne Textverarbeitung mit PDF-Annotator, OCR-Bridge und Formulargenerator.
 
-**Version:** 2.6.24  
+**Version:** 2.6.25  
 **Hersteller:** Andreas Meyer · ame@sellerbach.de
 
 ## Quickstart (Windows)
@@ -37,7 +37,7 @@ Keygen: `run-keygen.bat` · `python -m keygen kunde@example.com` · siehe `keyge
 
 Nightly-Smoke: `python scripts\smoke_ild.py` · optional `--qt` · `--json` (Summary: `ok`, `checks[]`, `duration_ms`, `version`; Fail: `checks[].error` max 200…, Exit=ok). Siehe **CONTRIBUTING.md**; Workflow-Stub `.github/workflows/smoke-ild.yml` (manual only).
 
-## Neu in 2.6.24
+## Neu in 2.6.25
 
 - Hyperlinks: Text → URL oder Dokumentziel (`#anker`, `ild://line/N`); Ctrl+Shift+K; Sidecar `*.ildlinks.json`
 - Grafiken & Medien: Bild skalieren/zuschneiden, Formen, Video-Platzhalter (URL); Textumfluss bleibt

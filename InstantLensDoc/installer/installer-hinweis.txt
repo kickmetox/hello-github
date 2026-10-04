@@ -1,4 +1,4 @@
-InstantLens Doc 2.6.24 — Installation
+InstantLens Doc 2.6.25 — Installation
 
 Startmenü: Gruppe „InstantLens Doc“ mit Programm, optional Keygenerator, INFO und Deinstallieren.
 
@@ -6,9 +6,22 @@ Desktop-Verknüpfung: optionale Checkbox im Installer-Assistenten
   (Task „desktopicon“, Flags checkedonce — Standard beim ersten Install aktiv, abwählbar).
   Ohne Haken: kein Desktop-Icon; Startmenü unabhängig über Task „startmenu“.
 
+64-Bit: Installer läuft im 64-Bit-Modus (ArchitecturesInstallIn64BitMode=x64compatible).
+  Empfohlen: 64-Bit-Python 3.10+ (Python-Layout) bzw. gebündelte x64-EXE.
+
+Neu in 2.6.25:
+- Stylus / Palm Rejection (Druck → Strichstärke)
+- Dokumentstruktur-Pane (Überschriften / Lesezeichen / Favoriten)
+- Script-/Plugin-Hooks (open/save/export/ocr) via Python/PowerShell ild
+- Telemetrie optional lokal (Opt-in Default aus, kein PII, kein Netzwerk)
+- 3D-Extrusion Limited Viewer (isometrisch; kein Mesh/OpenGL)
+
 Keygenerator (wenn IncludeKeygen=1):
 - Python-Layout: Startmenü → Keygenerator → {app}\run-keygen.bat
 - EXE-Layout: Startmenü → Keygenerator → {app}\InstantLensKeygen.exe
   (Datei liegt im Installationsordner neben InstantLensDoc.exe)
 
-Deinstallation: Startmenü „InstantLens Doc deinstallieren“ oder Systemsteuerung.
+Deinstallation: Startmenü „InstantLens Doc deinstallieren“ oder Systemsteuerung / Apps.
+
+Build (Windows x64 + Inno Setup 6):
+  powershell -ExecutionPolicy Bypass -File .\scripts\build-windows-installer.ps1
