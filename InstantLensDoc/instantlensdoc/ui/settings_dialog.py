@@ -736,7 +736,7 @@ class SettingsDialog(QDialog):
         self.thumb_cache_prune_toast.setChecked(get_thumb_cache_prune_toast())
         self.thumb_cache_prune_toast.setToolTip(
             "Optionaler Toast bei Auto-Prune „N Dateien / X MB entfernt“ "
-            "(Dauer OCR-Toast-Settings); Status bleibt kopierbar — 2.4.4"
+            "(Dauer OCR-Toast-Settings); Klick kopiert Status erneut — 2.4.5"
         )
         self.thumb_cache_prune_toast.setAccessibleName(
             "Auto-Prune Status-Toast optional"

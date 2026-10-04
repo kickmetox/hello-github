@@ -1423,6 +1423,7 @@ class PdfViewer(QWidget):
         self._quick_stamp_payload: dict | None = None
         self._quick_ann_template_armed: bool = False  # Apply-Modus — 2.4.3
         self._quick_ann_template_id: str | None = None
+        self._quick_ann_template_name: str = ""  # letzter Name für Esc-Status — 2.4.5
         self._zoom_timer = QTimer(self)
         self._zoom_timer.setSingleShot(True)
         self._zoom_timer.setInterval(120)
@@ -1630,7 +1631,7 @@ class PdfViewer(QWidget):
         self.btn_quick_ann_template.setObjectName("btnQuickAnnTemplate")
         self.btn_quick_ann_template.setToolTip(
             "Links: Quick-Apply zuletzt/Standard ★ · Rechtsklick: Vorlage wählen · "
-            "Esc → „Apply abgebrochen“ · Fokus Toolbar — 2.4.4"
+            "Esc → „Apply abgebrochen“ + Vorlagenname · A11y · Fokus Toolbar — 2.4.5"
         )
         self.btn_quick_ann_template.setAccessibleName("Annotation-Vorlage Quick-Apply")
         self.btn_quick_ann_template.setAccessibleDescription(
@@ -3482,6 +3483,7 @@ class PdfViewer(QWidget):
         self._quick_stamp_payload = None
         self._quick_ann_template_armed = False
         self._quick_ann_template_id = None
+        self._quick_ann_template_name = ""
         if tool is None:
             want = "Auswahl"
             for b in self._tool_buttons:
@@ -8091,6 +8093,7 @@ class PdfViewer(QWidget):
             # nach _set_tool in arm_quick_stamp erneut setzen — 2.4.3
             self._quick_ann_template_armed = True
             self._quick_ann_template_id = t.id
+            self._quick_ann_template_name = str(t.name or "").strip()
             self.status.emit(
                 f"Apply-Modus: {star}„{t.name}“ ({kind_de}) — "
                 "Klick platzieren · Esc = Abbruch"
@@ -8102,6 +8105,7 @@ class PdfViewer(QWidget):
                 pass
             self._quick_ann_template_armed = True
             self._quick_ann_template_id = t.id
+            self._quick_ann_template_name = str(t.name or "").strip()
             self.status.emit(
                 f"Apply-Modus: {star}„{t.name}“ ({kind_de}) — Esc = Abbruch"
             )
@@ -8112,17 +8116,33 @@ class PdfViewer(QWidget):
         return True
 
     def cancel_quick_ann_template(self) -> bool:
-        """Esc: Status „Apply abgebrochen“; Fokus Toolbar — 2.4.4."""
+        """
+        Esc: Status „Apply abgebrochen“ + letzter Template-Name;
+        A11y Announcement; Fokus Toolbar — 2.4.5.
+        """
         if not self._quick_ann_template_armed:
             return False
+        last_name = (getattr(self, "_quick_ann_template_name", "") or "").strip()
         self._quick_ann_template_armed = False
         self._quick_ann_template_id = None
+        self._quick_ann_template_name = ""
         # Stempel-Platzieren ggf. mit abbrechen (ohne doppelten Status)
         if self._quick_stamp_armed or self._quick_stamp_payload:
             self._remember_quick_stamp_zoom_opacity()
             self._quick_stamp_armed = False
             self._quick_stamp_payload = None
-        self.status.emit("Apply abgebrochen")
+        if last_name:
+            msg = f"Apply abgebrochen: „{last_name}“"
+        else:
+            msg = "Apply abgebrochen"
+        self.status.emit(msg)
+        # A11y Announcement — 2.4.5
+        try:
+            win = self.window()
+            if win is not None and hasattr(win, "_announce_status_toast"):
+                win._announce_status_toast(msg)
+        except Exception:
+            pass
         try:
             if (
                 hasattr(self, "btn_quick_ann_template")

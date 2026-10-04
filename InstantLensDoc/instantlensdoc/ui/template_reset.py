@@ -1,4 +1,9 @@
-"""Gemeinsame Template-Reset- und Esc-Discard-Helfer — 2.1.5."""
+"""
+Gemeinsame Template-Reset- und Esc-Discard-Helfer — 2.1.5 / 2.4.5.
+
+Genutzt u. a. von Mess-CSV, Diff-TXT, Ann.-Export, Multi-Doc-CSV,
+URL-Links, PageLabels, Watermark und F1 Shortcuts-TXT Reset Default.
+"""
 
 from __future__ import annotations
 
@@ -9,7 +14,7 @@ from PySide6.QtWidgets import QLineEdit, QMessageBox, QWidget
 
 
 def focus_line_edit_select_all(edit: QLineEdit) -> None:
-    """Fokus + Selektion ganzer Text (Mess/Diff/Ann./Multi-Doc) — 2.1.5."""
+    """Fokus + Selektion ganzer Text (Mess/Diff/Ann./Multi-Doc/F1) — 2.4.5."""
     edit.setFocus(Qt.OtherFocusReason)
     edit.selectAll()
 
@@ -25,9 +30,9 @@ def reset_line_edit_template(
     after_focus: bool = True,
 ) -> bool:
     """
-    Template auf Default; Bestätigung nur bei Abweichung;
-    Leer/Whitespace ≡ Default (keine Bestätigung);
-    danach optional Live-Update + Fokus mit Selektion — 2.1.5.
+    Gemeinsamer Template-Reset (Mess/Diff/Links/PageLabels/F1 Shortcuts…):
+    Bestätigung nur bei Abweichung; Leer/Whitespace ≡ Default;
+    danach optional Live-Update + Fokus mit Selektion — 2.4.5.
 
     Returns True wenn Default gesetzt (oder bereits Default), False bei Abbruch.
     """

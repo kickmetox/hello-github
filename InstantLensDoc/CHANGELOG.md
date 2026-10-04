@@ -1,5 +1,20 @@
 # Changelog — InstantLens Doc
 
+## 2.4.5 — Auto-Prune Toast OCR-Dauer·Klick erneut, Apply abgebrochen A11y·Vorlagenname, Sync AccessibleName live an/aus, F1 Reset gemeinsamer Helper
+
+Post-Release-Polish nach **2.4.4**: **Thumbnail Auto-Prune** Toast-**Dauer aus OCR-Toast-Settings**, **Klick kopiert Status erneut**; **Quick-Apply Esc** mit **A11y Announcement** und **letztem Template-Namen** im Status; **Sync-Scroll AccessibleName** aktualisiert **live bei Toggle** (**an/aus** im Namen); **F1 TXT Reset Default** über **gemeinsamen Helper** (`template_reset`) wie andere Template-Resets. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie klar markiert / nicht produktiv (Ink ≠ Stylus).
+
+### Geändert
+- Thumb Auto-Prune: Toast Dauer OCR-Toast-Settings · Klick kopiert Status erneut
+- Annotation-Vorlagen: Esc → „Apply abgebrochen“ + Vorlagenname · A11y Announcement
+- Sync-Scroll: AccessibleName live bei Toggle (an/aus im Namen)
+- F1 Cheat-Sheet TXT: Reset Default über gemeinsamen Helper (`template_reset`)
+
+### Tests / Qualität
+- Version **2.4.5** (App / `ild_pdf` / ISS / Smoke / Docs); Serie **2.4**; `docs/VERSION` + `VERSION.txt`
+- Smoke: 2.4.5 CLI + Qt (Prune OCR-Dauer/Re-Copy, Apply A11y/Name, Sync live Name, F1 Helper)
+- Stubs: KI/Cloud/Stylus/3D/Hooks/Outline/Telemetrie unverändert markiert
+
 ## 2.4.4 — Auto-Prune Status kopierbar·Toast optional, Quick-Apply Esc „Apply abgebrochen“, Sync Announcement·AccessibleName, F1 Reset Bestätigung·Fokus+Selektion
 
 Post-Release-Polish nach **2.4.3**: **Thumbnail Auto-Prune** Status **kopierbar** (Klick → Zwischenablage), **Toast optional** in Settings; **Quick-Apply Esc** setzt Status **„Apply abgebrochen“** und **Fokus Toolbar**; **Sync-Scroll** mit **Announcement bei Toggle** und **AccessibleName** am Status-Widget; **F1 TXT Reset Default** mit **Bestätigung nur bei Abweichung** und **Fokus+Selektion**. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie klar markiert / nicht produktiv (Ink ≠ Stylus).
