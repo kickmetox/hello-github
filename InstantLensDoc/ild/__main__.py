@@ -193,7 +193,7 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--count", type=int, default=0, help="max. Ersetzungen (Text; 0=alle)")
     s.add_argument("--max", type=int, default=50, dest="max_replacements")
 
-    s = sub.add_parser("page-formats", help="Seitenformate-Presets (US/DIN/Buch) — 2.6.11")
+    s = sub.add_parser("page-formats", help="Seitenformate-Presets (US/DIN/Buch) — 2.6.12")
     s.add_argument("--unit", default="mm", choices=("mm", "inch"))
 
     s = sub.add_parser("set-page-format", help="Seitenformat-Preset auf PDF anwenden")
@@ -204,7 +204,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     s = sub.add_parser(
         "header-footer",
-        help="Kopf-/Fußzeile bakken (Titel/Autor/Seitenzahl) — 2.6.11",
+        help="Kopf-/Fußzeile bakken (Titel/Autor/Seitenzahl) — 2.6.12",
     )
     s.add_argument("pdf")
     s.add_argument("--out", default=None)
@@ -226,6 +226,55 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--style", default=None, help="Style-Preset-ID (body/heading1/…)")
 
     s = sub.add_parser("paragraph-styles", help="Style-Presets inkl. Absatzattribute")
+
+    s = sub.add_parser("satzspiegel", help="Satzspiegel für Seitenformat — 2.6.12")
+    s.add_argument("--format", default="A4", dest="page_format")
+    s.add_argument("--columns", type=int, default=1)
+    s.add_argument("--gutter", type=float, default=5.0, help="Spaltenabstand mm")
+
+    s = sub.add_parser("satzspiegel-list", help="Alle Satzspiegel-Presets")
+    s.add_argument("--columns", type=int, default=1)
+
+    s = sub.add_parser("master-pages", help="Musterseiten-Presets auflisten — 2.6.12")
+
+    s = sub.add_parser(
+        "apply-master",
+        help="Musterseite auf PDF bakken (HF/Seitenzahlen) — 2.6.12",
+    )
+    s.add_argument("pdf")
+    s.add_argument("--master", default="Standard", help="Preset: Standard/Buch/Sachbuch/Minimal")
+    s.add_argument("--out", default=None)
+    s.add_argument("--title", default=None)
+    s.add_argument("--author", default=None)
+    s.add_argument("--creator", default=None)
+    s.add_argument("--start-page", type=int, default=None)
+
+    s = sub.add_parser("layout-new", help="Leeres Layout (Frames) — 2.6.12")
+    s.add_argument("--format", default=None, dest="page_format")
+    s.add_argument("--out", default=None, help="JSON-Pfad speichern")
+
+    s = sub.add_parser("layout-flow", help="Text in verkettete Rahmen fließen")
+    s.add_argument("--text", required=True)
+    s.add_argument("--layout", default=None, help="Layout-JSON Pfad")
+    s.add_argument("--columns", type=int, default=None)
+    s.add_argument("--pages", type=int, default=None)
+    s.add_argument("--start", default=None, dest="start_id")
+    s.add_argument("--out", default=None, help="Layout-JSON speichern")
+
+    s = sub.add_parser("layout-move", help="Rahmen verschieben")
+    s.add_argument("--layout", required=True, help="Layout-JSON")
+    s.add_argument("--id", required=True, dest="frame_id")
+    s.add_argument("--x", type=float, required=True)
+    s.add_argument("--y", type=float, required=True)
+
+    s = sub.add_parser("layout-resize", help="Rahmen skalieren")
+    s.add_argument("--layout", required=True, help="Layout-JSON")
+    s.add_argument("--id", required=True, dest="frame_id")
+    s.add_argument("--width", type=float, required=True)
+    s.add_argument("--height", type=float, required=True)
+
+    s = sub.add_parser("layout-frames", help="Rahmen eines Layouts auflisten")
+    s.add_argument("--layout", required=True)
 
     return p
 
@@ -465,6 +514,74 @@ def run(argv: list[str] | None = None) -> int:
             return 0
         if args.cmd == "paragraph-styles":
             data = api.list_paragraph_styles()
+            _print(data, as_json=js or True)
+            return 0
+        if args.cmd == "satzspiegel":
+            data = api.satzspiegel(
+                args.page_format, columns=args.columns, gutter_mm=args.gutter
+            )
+            _print(data, as_json=js or True)
+            return 0
+        if args.cmd == "satzspiegel-list":
+            data = api.list_satzspiegel(columns=args.columns)
+            _print(data, as_json=js or True)
+            return 0
+        if args.cmd == "master-pages":
+            data = api.list_master_pages()
+            _print(data, as_json=js or True)
+            return 0
+        if args.cmd == "apply-master":
+            data = api.apply_master_page(
+                args.pdf,
+                args.master,
+                out=args.out,
+                title=args.title,
+                author=args.author,
+                creator=args.creator,
+                start_page=args.start_page,
+            )
+            _print(data, as_json=js)
+            return 0
+        if args.cmd == "layout-new":
+            data = api.new_layout(format_name=args.page_format)
+            if args.out:
+                from instantlensdoc.core.layout import LayoutDocument
+
+                LayoutDocument.from_dict(data).save(args.out)
+                data = {"path": str(Path(args.out)), "layout": data}
+            _print(data, as_json=js or True)
+            return 0
+        if args.cmd == "layout-flow":
+            from instantlensdoc.core.layout import LayoutDocument
+
+            layout_path = args.layout
+            data = api.layout_flow_text(
+                args.text,
+                start_id=args.start_id,
+                path=layout_path,
+                columns=args.columns,
+                pages=args.pages,
+            )
+            save_to = args.out or layout_path
+            if save_to:
+                LayoutDocument.from_dict(data["layout"]).save(save_to)
+                data["path"] = str(Path(save_to))
+            _print(data, as_json=js or True)
+            return 0
+        if args.cmd == "layout-move":
+            data = api.layout_move_frame(
+                args.frame_id, args.x, args.y, path=args.layout
+            )
+            _print(data, as_json=js or True)
+            return 0
+        if args.cmd == "layout-resize":
+            data = api.layout_resize_frame(
+                args.frame_id, args.width, args.height, path=args.layout
+            )
+            _print(data, as_json=js or True)
+            return 0
+        if args.cmd == "layout-frames":
+            data = api.layout_list_frames(path=args.layout)
             _print(data, as_json=js or True)
             return 0
         return _fail("unbekanntes Kommando")

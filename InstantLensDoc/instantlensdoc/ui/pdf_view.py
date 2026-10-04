@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Optional, Sequence
 
-from PySide6.QtCore import QPointF, Qt, QTimer, Signal, QUrl
+from PySide6.QtCore import QPointF, QRectF, Qt, QTimer, Signal, QUrl
 from PySide6.QtGui import (
     QColor,
     QCursor,
@@ -144,6 +144,9 @@ from instantlensdoc.core.app_settings import (
     get_alignment_grid_snap,
     get_alignment_guides,
     get_ruler_unit,
+    get_show_satzspiegel,
+    get_satzspiegel_format,
+    get_satzspiegel_columns,
     set_measure_unit,
     toggle_measure_snap_to_annotation,
     toggle_measure_unit,
@@ -178,6 +181,9 @@ from instantlensdoc.core.app_settings import (
     set_alignment_grid_snap,
     set_alignment_guides,
     set_ruler_unit,
+    set_show_satzspiegel,
+    set_satzspiegel_format,
+    set_satzspiegel_columns,
 )
 
 # Continuous-Scroll: max. gerenderte Seiten (Speicher)
@@ -689,6 +695,9 @@ class PdfCanvas(QLabel):
         self._show_printer_marks = False
         self._show_rulers = False
         self._show_alignment_grid = False
+        self._show_satzspiegel = False
+        self._satzspiegel_format = "A4"
+        self._satzspiegel_columns = 1
         self._grid_spacing_mm = 5.0
         self._ruler_unit = "mm"
         self._guides: list[dict] = []
@@ -868,6 +877,24 @@ class PdfCanvas(QLabel):
     def show_alignment_grid(self) -> bool:
         return bool(self._show_alignment_grid)
 
+    def set_show_satzspiegel(self, enabled: bool):
+        self._show_satzspiegel = bool(enabled)
+        self._repaint_overlay()
+
+    def show_satzspiegel(self) -> bool:
+        return bool(self._show_satzspiegel)
+
+    def set_satzspiegel_format(self, name: str):
+        self._satzspiegel_format = str(name or "A4")
+        self._repaint_overlay()
+
+    def set_satzspiegel_columns(self, n: int):
+        try:
+            self._satzspiegel_columns = max(1, min(6, int(n)))
+        except (TypeError, ValueError):
+            self._satzspiegel_columns = 1
+        self._repaint_overlay()
+
     def set_grid_spacing_mm(self, mm: float):
         try:
             self._grid_spacing_mm = max(1.0, min(50.0, float(mm)))
@@ -1009,6 +1036,40 @@ class PdfCanvas(QLabel):
             else:
                 py = y + h - pos * scale
                 painter.drawLine(QPointF(x, py), QPointF(x + w, py))
+
+    def _draw_satzspiegel(
+        self, painter: QPainter, rect: tuple[float, float, float, float]
+    ) -> None:
+        """Satzspiegel / Type Area Overlay — 2.6.12."""
+        from ild_pdf.page_layout import satzspiegel_for_format
+
+        x, y, w, h = rect
+        scale = max(float(self._scale), 0.01)
+        ss = satzspiegel_for_format(
+            getattr(self, "_satzspiegel_format", "A4") or "A4",
+            columns=int(getattr(self, "_satzspiegel_columns", 1) or 1),
+        )
+        # An aktuelle Seitengröße anpassen (nicht nur Preset)
+        page_w = w / scale
+        page_h = h / scale
+        m = ss.margins_pt()
+        ax = x + m["left"] * scale
+        ay = y + m["top"] * scale
+        aw = max(1.0, (page_w - m["left"] - m["right"]) * scale)
+        ah = max(1.0, (page_h - m["top"] - m["bottom"]) * scale)
+        painter.setPen(QPen(QColor(40, 120, 90, 200), 1.5, Qt.DashLine))
+        painter.setBrush(QColor(40, 120, 90, 18))
+        painter.drawRect(QRectF(ax, ay, aw, ah))
+        cols = max(1, int(ss.columns))
+        if cols > 1:
+            gutter = max(0.0, float(ss.gutter_mm)) * (72.0 / 25.4) * scale
+            usable = max(1.0, aw - gutter * (cols - 1))
+            col_w = usable / cols
+            pen = QPen(QColor(40, 120, 90, 140), 1, Qt.DotLine)
+            painter.setPen(pen)
+            for i in range(1, cols):
+                cx = ax + i * (col_w + gutter)
+                painter.drawLine(QPointF(cx, ay), QPointF(cx, ay + ah))
 
     def _draw_rulers(
         self, painter: QPainter, rect: tuple[float, float, float, float]
@@ -1510,6 +1571,8 @@ class PdfCanvas(QLabel):
         )
         if self._show_alignment_grid:
             self._draw_alignment_grid(painter, page_rect)
+        if getattr(self, "_show_satzspiegel", False):
+            self._draw_satzspiegel(painter, page_rect)
         if self._guides:
             self._draw_guides(painter, page_rect)
         if self._show_rulers:
@@ -2106,6 +2169,9 @@ class PdfViewer(QWidget):
         self._show_printer_marks = get_show_printer_marks()
         self._show_rulers = get_show_rulers()
         self._show_alignment_grid = get_show_alignment_grid()
+        self._show_satzspiegel = get_show_satzspiegel()
+        self._satzspiegel_format = get_satzspiegel_format()
+        self._satzspiegel_columns = get_satzspiegel_columns()
         self._grid_spacing_mm = get_alignment_grid_spacing_mm()
         self._grid_snap = get_alignment_grid_snap()
         self._ruler_unit = get_ruler_unit()
@@ -2672,6 +2738,15 @@ class PdfViewer(QWidget):
             "Ausrichtungsraster + Guides einblenden — 2.6.11"
         )
         self.btn_grid.toggled.connect(self.set_show_alignment_grid)
+        self.btn_satzspiegel = QToolButton()
+        self.btn_satzspiegel.setObjectName("satzspiegelToolbarBtn")
+        self.btn_satzspiegel.setText("Satzspiegel")
+        self.btn_satzspiegel.setCheckable(True)
+        self.btn_satzspiegel.setChecked(self._show_satzspiegel)
+        self.btn_satzspiegel.setToolTip(
+            "Satzspiegel / Type Area Overlay — 2.6.12"
+        )
+        self.btn_satzspiegel.toggled.connect(self.set_show_satzspiegel)
         toolbar.addWidget(self.btn_hl_color)
         toolbar.addWidget(self.btn_pen_color)
         toolbar.addWidget(self.btn_note_color)
@@ -2713,6 +2788,7 @@ class PdfViewer(QWidget):
         toolbar.addWidget(self.btn_printer_marks)
         toolbar.addWidget(self.btn_rulers)
         toolbar.addWidget(self.btn_grid)
+        toolbar.addWidget(self.btn_satzspiegel)
 
         toolbar.addWidget(btn_prev)
         toolbar.addWidget(self.lbl_page)
@@ -2865,6 +2941,9 @@ class PdfViewer(QWidget):
         self.canvas.set_show_printer_marks(self._show_printer_marks)
         self.canvas.set_show_rulers(self._show_rulers)
         self.canvas.set_show_alignment_grid(self._show_alignment_grid)
+        self.canvas.set_show_satzspiegel(self._show_satzspiegel)
+        self.canvas.set_satzspiegel_format(self._satzspiegel_format)
+        self.canvas.set_satzspiegel_columns(self._satzspiegel_columns)
         self.canvas.set_grid_spacing_mm(self._grid_spacing_mm)
         self.canvas.set_ruler_unit(self._ruler_unit)
         self.canvas.set_guides(self._guides)
@@ -4006,6 +4085,38 @@ class PdfViewer(QWidget):
     def show_alignment_grid(self) -> bool:
         return bool(self._show_alignment_grid)
 
+    def set_show_satzspiegel(self, enabled: bool):
+        """Satzspiegel-Overlay ein-/ausblenden — 2.6.12."""
+        on = bool(enabled)
+        self._show_satzspiegel = on
+        set_show_satzspiegel(on)
+        if hasattr(self, "btn_satzspiegel"):
+            self.btn_satzspiegel.blockSignals(True)
+            self.btn_satzspiegel.setChecked(on)
+            self.btn_satzspiegel.blockSignals(False)
+        self.canvas.set_show_satzspiegel(on)
+        self.canvas.set_satzspiegel_format(self._satzspiegel_format)
+        self.canvas.set_satzspiegel_columns(self._satzspiegel_columns)
+        self._update_layout_overlays()
+        self.status.emit("Satzspiegel an" if on else "Satzspiegel aus")
+
+    def show_satzspiegel(self) -> bool:
+        return bool(self._show_satzspiegel)
+
+    def set_satzspiegel_format(self, name: str) -> str:
+        val = set_satzspiegel_format(name)
+        self._satzspiegel_format = val
+        self.canvas.set_satzspiegel_format(val)
+        self._update_layout_overlays()
+        return val
+
+    def set_satzspiegel_columns(self, n: int) -> int:
+        val = set_satzspiegel_columns(n)
+        self._satzspiegel_columns = val
+        self.canvas.set_satzspiegel_columns(val)
+        self._update_layout_overlays()
+        return val
+
     def set_grid_spacing_mm(self, mm: float) -> float:
         val = set_alignment_grid_spacing_mm(mm)
         self._grid_spacing_mm = val
@@ -4033,11 +4144,14 @@ class PdfViewer(QWidget):
         self._update_layout_overlays()
 
     def _update_layout_overlays(self) -> None:
-        """Seitenmaß an Canvas für Lineal/Raster übergeben."""
+        """Seitenmaß an Canvas für Lineal/Raster/Satzspiegel übergeben."""
         if not getattr(self, "canvas", None):
             return
         self.canvas.set_show_rulers(self._show_rulers)
         self.canvas.set_show_alignment_grid(self._show_alignment_grid)
+        self.canvas.set_show_satzspiegel(getattr(self, "_show_satzspiegel", False))
+        self.canvas.set_satzspiegel_format(getattr(self, "_satzspiegel_format", "A4"))
+        self.canvas.set_satzspiegel_columns(getattr(self, "_satzspiegel_columns", 1))
         self.canvas.set_grid_spacing_mm(self._grid_spacing_mm)
         self.canvas.set_ruler_unit(self._ruler_unit)
         self.canvas.set_guides(self._guides)

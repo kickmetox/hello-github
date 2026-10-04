@@ -1,6 +1,7 @@
-"""Seitenlayout-Hilfen 2.6.11: Buchformate, Lineal/Raster/Guides, Absatzformat, HF-Metadaten.
+"""Seitenlayout-Hilfen 2.6.12: Buchformate, Lineal/Raster, Satzspiegel, Musterseiten, HF.
 
-Kein volles DTP (Musterseiten/CMYK/Frames) — Anzeige- und Bake-Hilfen für Word-Suite/Viewer.
+Frames/Boxen + Textrahmen-Verkettung liegen in ``instantlensdoc.core.layout``.
+Kein CMYK/Bleed/Preflight/PDF/X, kein volles i18n, keine KI-Wizards, kein PDF-Compare.
 """
 
 from __future__ import annotations
@@ -594,4 +595,356 @@ def format_hf_preview_with_meta(
         page_number_template=page_number_template,
         total_pages=total_pages,
         stem=stem,
+    )
+
+
+# --- Satzspiegel (Type Area) — Ränder an Seitenformate gebunden — 2.6.12 ---
+
+
+@dataclass
+class Satzspiegel:
+    """Satzspiegel / Type Area: Ränder in mm, gebunden an Seitenformat-Preset."""
+
+    format_name: str = "A4"
+    margin_top_mm: float = 20.0
+    margin_bottom_mm: float = 25.0
+    margin_inside_mm: float = 25.0  # Bund / innen (bei einseitig = links)
+    margin_outside_mm: float = 20.0
+    columns: int = 1
+    gutter_mm: float = 5.0
+
+    def to_dict(self) -> dict[str, Any]:
+        d = asdict(self)
+        d.update(self.rect_pt())
+        d["margins_pt"] = self.margins_pt()
+        return d
+
+    def margins_pt(self) -> dict[str, float]:
+        return {
+            "top": mm_to_pt(self.margin_top_mm),
+            "bottom": mm_to_pt(self.margin_bottom_mm),
+            "left": mm_to_pt(self.margin_inside_mm),
+            "right": mm_to_pt(self.margin_outside_mm),
+        }
+
+    def page_size_pt(self) -> Tuple[float, float]:
+        try:
+            return resolve_page_format(self.format_name)
+        except KeyError:
+            return LAYOUT_PAGE_PRESETS.get("A4", PAGE_SIZE_PRESETS["A4"])
+
+    def rect_pt(self) -> dict[str, float]:
+        """Type-Area-Rechteck in PDF-Punkten (Ursprung unten-links)."""
+        w, h = self.page_size_pt()
+        m = self.margins_pt()
+        x = m["left"]
+        y = m["bottom"]
+        tw = max(1.0, w - m["left"] - m["right"])
+        th = max(1.0, h - m["top"] - m["bottom"])
+        return {
+            "x": x,
+            "y": y,
+            "width": tw,
+            "height": th,
+            "page_width": w,
+            "page_height": h,
+        }
+
+    def column_rects_pt(self) -> list[dict[str, float]]:
+        """Spaltenrechtecke innerhalb des Satzspiegels."""
+        base = self.rect_pt()
+        cols = max(1, int(self.columns))
+        gutter = mm_to_pt(max(0.0, float(self.gutter_mm)))
+        usable = max(1.0, base["width"] - gutter * (cols - 1))
+        col_w = usable / cols
+        out: list[dict[str, float]] = []
+        for i in range(cols):
+            out.append(
+                {
+                    "x": base["x"] + i * (col_w + gutter),
+                    "y": base["y"],
+                    "width": col_w,
+                    "height": base["height"],
+                    "column": i,
+                }
+            )
+        return out
+
+
+# Empfohlene Ränder (mm) je Formatkategorie — typografische Faustwerte
+_SATZSPIEGEL_DEFAULTS_MM: dict[str, Tuple[float, float, float, float]] = {
+    # top, bottom, inside, outside
+    "Taschenbuch": (15.0, 18.0, 18.0, 14.0),
+    "DINA5": (18.0, 22.0, 20.0, 16.0),
+    "Roman": (16.0, 20.0, 20.0, 15.0),
+    "Sachbuch": (20.0, 24.0, 22.0, 18.0),
+    "DINA4": (20.0, 25.0, 25.0, 20.0),
+    "A4": (20.0, 25.0, 25.0, 20.0),
+    "Quadrat": (18.0, 20.0, 18.0, 18.0),
+    "A5": (18.0, 22.0, 20.0, 16.0),
+    "A3": (25.0, 30.0, 28.0, 22.0),
+    "A6": (12.0, 14.0, 14.0, 12.0),
+    "US Letter": (20.0, 25.0, 25.0, 20.0),
+    "US Legal": (20.0, 25.0, 25.0, 20.0),
+}
+
+
+def satzspiegel_for_format(
+    format_name: str = "A4",
+    *,
+    columns: int = 1,
+    gutter_mm: float = 5.0,
+    margin_top_mm: float | None = None,
+    margin_bottom_mm: float | None = None,
+    margin_inside_mm: float | None = None,
+    margin_outside_mm: float | None = None,
+) -> Satzspiegel:
+    """Satzspiegel-Preset für Seitenformat (Override-Ränder optional)."""
+    key = (format_name or "A4").strip()
+    # Alias-Normalisierung
+    compact = key.replace(" ", "").lower()
+    resolved_name = key
+    for name in LAYOUT_PAGE_PRESETS:
+        if name.replace(" ", "").lower() == compact:
+            resolved_name = name
+            break
+    defaults = _SATZSPIEGEL_DEFAULTS_MM.get(resolved_name)
+    if defaults is None:
+        # Fuzzy ohne Leerzeichen
+        for k, v in _SATZSPIEGEL_DEFAULTS_MM.items():
+            if k.replace(" ", "").lower() == compact:
+                defaults = v
+                resolved_name = k
+                break
+    if defaults is None:
+        defaults = (20.0, 25.0, 25.0, 20.0)
+    top, bottom, inside, outside = defaults
+    return Satzspiegel(
+        format_name=resolved_name,
+        margin_top_mm=float(margin_top_mm if margin_top_mm is not None else top),
+        margin_bottom_mm=float(margin_bottom_mm if margin_bottom_mm is not None else bottom),
+        margin_inside_mm=float(margin_inside_mm if margin_inside_mm is not None else inside),
+        margin_outside_mm=float(
+            margin_outside_mm if margin_outside_mm is not None else outside
+        ),
+        columns=max(1, int(columns)),
+        gutter_mm=float(gutter_mm),
+    )
+
+
+def list_satzspiegel_presets(*, columns: int = 1) -> list[dict[str, Any]]:
+    """Satzspiegel für alle Layout-Seitenformate."""
+    return [satzspiegel_for_format(name, columns=columns).to_dict() for name in LAYOUT_PAGE_PRESETS]
+
+
+# --- Musterseiten (Master Pages) — 2.6.12 ---
+
+
+@dataclass
+class MasterPage:
+    """Musterseite: wiederkehrende Kopf-/Fußzeile + Seitenzahlen + Satzspiegel."""
+
+    name: str = "Standard"
+    header_text: str = "{title}"
+    footer_text: str = "{author} — {n} / {total}"
+    include_page_numbers: bool = True
+    page_number_template: str = "{n} / {total}"
+    font_size: float = 10.0
+    # HF-Abstand vom Seitenrand (pt); an Satzspiegel gekoppelt wenn None
+    header_margin_pt: float | None = None
+    footer_margin_pt: float | None = None
+    satzspiegel: Satzspiegel = field(default_factory=lambda: satzspiegel_for_format("A4"))
+    start_page: int = 1  # 1-basiert; Seiten davor ohne Muster
+    odd_even: bool = False  # bei True: outside/inside spiegeln (einfach)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "name": self.name,
+            "header_text": self.header_text,
+            "footer_text": self.footer_text,
+            "include_page_numbers": self.include_page_numbers,
+            "page_number_template": self.page_number_template,
+            "font_size": self.font_size,
+            "header_margin_pt": self.header_margin_pt,
+            "footer_margin_pt": self.footer_margin_pt,
+            "satzspiegel": self.satzspiegel.to_dict(),
+            "start_page": self.start_page,
+            "odd_even": self.odd_even,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "MasterPage":
+        ss_raw = data.get("satzspiegel") or {}
+        if isinstance(ss_raw, Satzspiegel):
+            ss = ss_raw
+        elif isinstance(ss_raw, dict) and ss_raw:
+            ss = Satzspiegel(
+                format_name=str(ss_raw.get("format_name") or "A4"),
+                margin_top_mm=float(ss_raw.get("margin_top_mm") or 20.0),
+                margin_bottom_mm=float(ss_raw.get("margin_bottom_mm") or 25.0),
+                margin_inside_mm=float(ss_raw.get("margin_inside_mm") or 25.0),
+                margin_outside_mm=float(ss_raw.get("margin_outside_mm") or 20.0),
+                columns=int(ss_raw.get("columns") or 1),
+                gutter_mm=float(ss_raw.get("gutter_mm") or 5.0),
+            )
+        else:
+            fmt = str(data.get("format_name") or "A4")
+            ss = satzspiegel_for_format(fmt)
+        return cls(
+            name=str(data.get("name") or "Standard"),
+            header_text=str(data.get("header_text") or "{title}"),
+            footer_text=str(data.get("footer_text") or "{author} — {n} / {total}"),
+            include_page_numbers=bool(data.get("include_page_numbers", True)),
+            page_number_template=str(data.get("page_number_template") or "{n} / {total}"),
+            font_size=float(data.get("font_size") or 10.0),
+            header_margin_pt=(
+                float(data["header_margin_pt"])
+                if data.get("header_margin_pt") is not None
+                else None
+            ),
+            footer_margin_pt=(
+                float(data["footer_margin_pt"])
+                if data.get("footer_margin_pt") is not None
+                else None
+            ),
+            satzspiegel=ss,
+            start_page=max(1, int(data.get("start_page") or 1)),
+            odd_even=bool(data.get("odd_even", False)),
+        )
+
+
+MASTER_PRESETS: dict[str, dict[str, Any]] = {
+    "Standard": {
+        "name": "Standard",
+        "header_text": "{title}",
+        "footer_text": "{author} — {n} / {total}",
+        "format_name": "A4",
+    },
+    "Buch": {
+        "name": "Buch",
+        "header_text": "{title}",
+        "footer_text": "{n}",
+        "format_name": "Taschenbuch",
+        "page_number_template": "{n}",
+    },
+    "Sachbuch": {
+        "name": "Sachbuch",
+        "header_text": "{author}",
+        "footer_text": "{title} · {n} / {total}",
+        "format_name": "Sachbuch",
+    },
+    "Minimal": {
+        "name": "Minimal",
+        "header_text": "",
+        "footer_text": "{n}",
+        "format_name": "A4",
+        "page_number_template": "{n}",
+    },
+}
+
+
+def list_master_presets() -> list[dict[str, Any]]:
+    """Eingebaute Musterseiten-Presets inkl. Satzspiegel."""
+    out: list[dict[str, Any]] = []
+    for key, raw in MASTER_PRESETS.items():
+        mp = master_page_from_preset(key)
+        d = mp.to_dict()
+        d["id"] = key
+        out.append(d)
+    return out
+
+
+def master_page_from_preset(name: str = "Standard") -> MasterPage:
+    key = (name or "Standard").strip()
+    raw = MASTER_PRESETS.get(key)
+    if raw is None:
+        compact = key.replace(" ", "").lower()
+        for k, v in MASTER_PRESETS.items():
+            if k.replace(" ", "").lower() == compact:
+                raw = v
+                key = k
+                break
+    if raw is None:
+        raw = MASTER_PRESETS["Standard"]
+        key = "Standard"
+    data = dict(raw)
+    fmt = str(data.pop("format_name", "A4"))
+    ss = satzspiegel_for_format(fmt)
+    data["satzspiegel"] = ss
+    data.setdefault("name", key)
+    return MasterPage.from_dict(data)
+
+
+def apply_master_page(
+    pdf_path: str | Path,
+    master: MasterPage | str | dict[str, Any] | None = None,
+    *,
+    out_path: str | Path | None = None,
+    title: str | None = None,
+    author: str | None = None,
+    creator: str | None = None,
+    pages: Optional[Sequence[int]] = None,
+) -> Path:
+    """
+    Musterseite auf PDF anwenden: Kopf-/Fußzeile + Seitenzahlen über Seiten bakken.
+    Baut auf ``apply_header_footer_with_meta`` (2.6.11) auf; Ränder aus Satzspiegel.
+    """
+    if master is None:
+        mp = master_page_from_preset("Standard")
+    elif isinstance(master, MasterPage):
+        mp = master
+    elif isinstance(master, str):
+        mp = master_page_from_preset(master)
+    else:
+        mp = MasterPage.from_dict(master)
+
+    margins = mp.satzspiegel.margins_pt()
+    header_margin = (
+        float(mp.header_margin_pt)
+        if mp.header_margin_pt is not None
+        else max(12.0, margins["top"] * 0.45)
+    )
+    # apply_header_footer nutzt einen gemeinsamen margin — Mittelwert / Header
+    bake_margin = header_margin
+
+    page_indices: Optional[list[int]] = None
+    if pages is not None:
+        page_indices = [int(p) for p in pages]
+    elif mp.start_page > 1:
+        from .document import PdfDocument
+
+        with PdfDocument(pdf_path) as doc:
+            total = len(doc)
+        page_indices = list(range(mp.start_page - 1, total))
+
+    return apply_header_footer_with_meta(
+        pdf_path,
+        out_path=out_path,
+        header_text=mp.header_text,
+        footer_text=mp.footer_text,
+        include_page_numbers=mp.include_page_numbers,
+        page_number_template=mp.page_number_template,
+        title=title,
+        author=author,
+        creator=creator,
+        font_size=mp.font_size,
+        margin=bake_margin,
+        pages=page_indices,
+    )
+
+
+def type_area_guides(satzspiegel: Satzspiegel) -> list[Guide]:
+    """Hilfslinien entlang des Satzspiegel-Rechtecks."""
+    r = satzspiegel.rect_pt()
+    left = r["x"]
+    right = r["x"] + r["width"]
+    bottom = r["y"]
+    top = r["y"] + r["height"]
+    return normalize_guides(
+        [
+            {"orientation": "vertical", "position_pt": left, "id": "ss-left"},
+            {"orientation": "vertical", "position_pt": right, "id": "ss-right"},
+            {"orientation": "horizontal", "position_pt": bottom, "id": "ss-bottom"},
+            {"orientation": "horizontal", "position_pt": top, "id": "ss-top"},
+        ]
     )

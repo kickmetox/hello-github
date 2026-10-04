@@ -134,6 +134,9 @@ HELP_HTML = f"""
 <li><b>Bearbeiten → Inhaltsverzeichnis aktualisieren</b> (Ctrl+Alt+Shift+T): Markdown bzw. PDF-Outline/Sidebar — <b>2.6.10</b></li>
 <li><b>Bearbeiten → Absatzausrichtung</b> (Ctrl+L/E/R/J) + Zeilenabstand: an Style-Presets — <b>2.6.11</b></li>
 <li><b>Ansicht → Lineal / Ausrichtungsraster</b> (Ctrl+Alt+R/G): Layout-Hilfen im PDF-Viewer — <b>2.6.11</b></li>
+<li><b>Ansicht → Satzspiegel</b> (Ctrl+Alt+S): Type-Area-Overlay an Seitenformat-Rändern — <b>2.6.12</b></li>
+<li><b>Einfügen → Textrahmen / Verkettung / Spalten / Move·Resize</b>: Frames/Boxes + Textfluss — <b>2.6.12</b></li>
+<li><b>Einfügen → Musterseite anwenden</b>: Kopf/Fuß + Seitenzahlen über Seiten — <b>2.6.12</b></li>
 <li><b>PDF → Kopf-/Fußzeile</b>: Seitenzahlen, Titel, Ersteller/Autor (<code>{{title}}</code>/<code>{{author}}</code>/<code>{{creator}}</code>) — <b>2.6.11</b></li>
 <li><b>Seitenformate</b>: US Letter, DIN-A, Buchformate (Taschenbuch/Roman/Sachbuch/Quadrat…) — <b>2.6.11</b></li>
 <li><b>Bearbeiten → Gehe zu Zeile / Seite</b> (Ctrl+G): Editor → Zeile; PDF → Seite (auch PDF → Gehe zu Seite…, Ctrl+Shift+G)</li>
@@ -277,8 +280,8 @@ HELP_HTML = f"""
 <h3>PDF-Modul</h3>
 <p>Das Paket <code>ild_pdf</code> kann von anderen Programmen genutzt werden (pypdfium2, kein Poppler).
 Beispiel: <code>examples/ild_pdf_demo.py</code>. API: <code>ild_pdf/README.md</code>.</p>
-<p><b>Scripting 2.6.11:</b> Stabiles Headless-API <code>import ild</code> und CLI <code>python -m ild</code>
-(inkl. <code>page-formats</code>/<code>header-footer</code>/<code>paragraph-format</code>). Basis <b>2.6.10</b>:
+<p><b>Scripting 2.6.12:</b> Stabiles Headless-API <code>import ild</code> und CLI <code>python -m ild</code>
+(inkl. <code>satzspiegel</code>/<code>apply-master</code>/<code>layout-flow</code>/<code>page-formats</code>/<code>header-footer</code>). Basis <b>2.6.11/2.6.10</b>:
 (open/info, Seiten, Export, OCR, Schwärzen, Merge/Split, Lizenz/Keygen, AES-256,
 <code>ann-shape</code> / <code>ann-stamp</code> / <code>ann-highlight-para</code>).
 PowerShell-Wrapper: <code>scripts/ild.ps1</code> bzw. <code>run-ild.bat</code>.

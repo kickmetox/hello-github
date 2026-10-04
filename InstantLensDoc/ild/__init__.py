@@ -1,5 +1,5 @@
 """
-Stabiles Scripting-API für InstantLens Doc (2.6.11).
+Stabiles Scripting-API für InstantLens Doc (2.6.12).
 
 Headless, ohne GUI. Nutzt ``ild_pdf`` + Lizenz/OCR der App.
 
@@ -12,6 +12,9 @@ Headless, ohne GUI. Nutzt ``ild_pdf`` + Lizenz/OCR der App.
     ild.list_system_fonts()
     ild.list_page_formats()
     ild.apply_header_footer("dok.pdf", author="Max", title="Bericht")
+    ild.apply_master_page("dok.pdf", "Buch", title="Roman")
+    ild.satzspiegel("Taschenbuch")
+    ild.layout_flow_text("Langer Text…", columns=2)
 
 CLI: ``python -m ild --help`` · PowerShell: ``scripts\\ild.ps1``.
 """
@@ -28,6 +31,7 @@ from ild.api import (
     add_shape,
     add_stamp,
     apply_header_footer,
+    apply_master_page,
     apply_paragraph_format,
     apply_redactions,
     auto_format_pdf,
@@ -40,13 +44,23 @@ from ild.api import (
     get_encryption_info,
     grid_lines,
     highlight_paragraphs,
+    layout_add_image_frame,
+    layout_add_text_frame,
+    layout_flow_text,
+    layout_link_frames,
+    layout_list_frames,
+    layout_move_frame,
+    layout_resize_frame,
     license_status,
+    list_master_pages,
     list_page_formats,
     list_paragraph_styles,
+    list_satzspiegel,
     list_stamps,
     list_style_presets,
     list_system_fonts,
     merge_pdfs,
+    new_layout,
     ocr_image,
     ocr_pdf_page,
     open_info,
@@ -56,6 +70,7 @@ from ild.api import (
     resolve_page_format,
     rotate_page,
     ruler_ticks,
+    satzspiegel,
     set_page_format,
     split_pdf,
     verify_key,
@@ -94,6 +109,18 @@ __all__ = [
     "list_paragraph_styles",
     "ruler_ticks",
     "grid_lines",
+    "satzspiegel",
+    "list_satzspiegel",
+    "list_master_pages",
+    "apply_master_page",
+    "new_layout",
+    "layout_add_text_frame",
+    "layout_add_image_frame",
+    "layout_move_frame",
+    "layout_resize_frame",
+    "layout_link_frames",
+    "layout_flow_text",
+    "layout_list_frames",
     "generate_key",
     "verify_key",
     "license_status",

@@ -1,4 +1,4 @@
-"""Headless InstantLens-Doc-Operationen für Python- und PowerShell-Scripting — 2.6.11."""
+"""Headless InstantLens-Doc-Operationen für Python- und PowerShell-Scripting — 2.6.12."""
 
 from __future__ import annotations
 
@@ -588,7 +588,7 @@ def outline_summary(path: PathLike) -> list[dict[str, Any]]:
 
 
 def list_page_formats(*, unit: str = "mm") -> list[dict[str, Any]]:
-    """Seitenformate-Presets (US Letter, DIN-A, Buchformate) — 2.6.11."""
+    """Seitenformate-Presets (US Letter, DIN-A, Buchformate) — 2.6.12."""
     from ild_pdf.page_layout import list_page_format_presets
 
     return list_page_format_presets(unit=unit)
@@ -637,7 +637,7 @@ def apply_header_footer(
     author: str | None = None,
     creator: str | None = None,
 ) -> dict[str, Any]:
-    """Kopf-/Fußzeile mit Titel/Ersteller bakken — 2.6.11."""
+    """Kopf-/Fußzeile mit Titel/Ersteller bakken — 2.6.12."""
     from ild_pdf.page_layout import apply_header_footer_with_meta
 
     pdf = _require_file(path)
@@ -665,7 +665,7 @@ def apply_paragraph_format(
     paragraph_index: int | None = None,
     style_id: str | None = None,
 ) -> dict[str, Any]:
-    """Absatzausrichtung/Abstände (Marker) bzw. Style-Defaults — 2.6.11."""
+    """Absatzausrichtung/Abstände (Marker) bzw. Style-Defaults — 2.6.12."""
     from ild_pdf.page_layout import (
         apply_paragraph_format as _apply,
         apply_style_paragraph_defaults,
@@ -707,3 +707,253 @@ def grid_lines(
     from ild_pdf.page_layout import grid_lines as _grid
 
     return _grid(float(width_pt), float(height_pt), spacing_mm=float(spacing_mm))
+
+
+# --- Frames / Musterseiten / Satzspiegel — 2.6.12 ---
+
+
+def satzspiegel(
+    format_name: str = "A4",
+    *,
+    columns: int = 1,
+    gutter_mm: float = 5.0,
+) -> dict[str, Any]:
+    """Satzspiegel (Type Area) für Seitenformat-Preset — 2.6.12."""
+    from ild_pdf.page_layout import satzspiegel_for_format
+
+    return satzspiegel_for_format(
+        format_name, columns=int(columns), gutter_mm=float(gutter_mm)
+    ).to_dict()
+
+
+def list_satzspiegel(*, columns: int = 1) -> list[dict[str, Any]]:
+    from ild_pdf.page_layout import list_satzspiegel_presets
+
+    return list_satzspiegel_presets(columns=int(columns))
+
+
+def list_master_pages() -> list[dict[str, Any]]:
+    """Musterseiten-Presets (Kopf/Fuß + Seitenzahlen + Satzspiegel) — 2.6.12."""
+    from ild_pdf.page_layout import list_master_presets
+
+    return list_master_presets()
+
+
+def apply_master_page(
+    path: PathLike,
+    master: str = "Standard",
+    *,
+    out: PathLike | None = None,
+    title: str | None = None,
+    author: str | None = None,
+    creator: str | None = None,
+    start_page: int | None = None,
+) -> dict[str, Any]:
+    """Musterseite auf PDF bakken (HF + Seitenzahlen über Seiten) — 2.6.12."""
+    from ild_pdf.page_layout import apply_master_page as _apply
+    from ild_pdf.page_layout import master_page_from_preset
+
+    pdf = _require_file(path)
+    mp = master_page_from_preset(master)
+    if start_page is not None:
+        mp.start_page = max(1, int(start_page))
+    dest = _apply(
+        pdf,
+        mp,
+        out_path=_p(out) if out else None,
+        title=title,
+        author=author,
+        creator=creator,
+    )
+    return {
+        "path": str(dest),
+        "master": mp.name,
+        "header": mp.header_text,
+        "footer": mp.footer_text,
+        "satzspiegel": mp.satzspiegel.to_dict(),
+        "title": title,
+        "author": author,
+    }
+
+
+def new_layout(
+    *,
+    page_width: float = 595.0,
+    page_height: float = 842.0,
+    format_name: str | None = None,
+) -> dict[str, Any]:
+    """Leeres LayoutDocument (Frames) — 2.6.12."""
+    from instantlensdoc.core.layout import LayoutDocument
+    from ild_pdf.page_layout import resolve_page_format
+
+    w, h = float(page_width), float(page_height)
+    if format_name:
+        w, h = resolve_page_format(format_name)
+    doc = LayoutDocument(page_width=w, page_height=h)
+    return doc.to_dict()
+
+
+def layout_add_text_frame(
+    layout: dict[str, Any] | None = None,
+    *,
+    text: str = "",
+    x: float = 40,
+    y: float = 40,
+    width: float = 515,
+    height: float = 200,
+    font_size: int = 12,
+    page: int = 0,
+    column: int = 0,
+    path: PathLike | None = None,
+) -> dict[str, Any]:
+    """Textrahmen hinzufügen (Layout-Dict oder JSON-Pfad) — 2.6.12."""
+    from instantlensdoc.core.layout import LayoutDocument
+
+    doc = _load_layout(layout, path)
+    fr = doc.add_text_frame(
+        text=text,
+        x=float(x),
+        y=float(y),
+        width=float(width),
+        height=float(height),
+        font_size=int(font_size),
+        page=int(page),
+        column=int(column),
+    )
+    if path:
+        doc.save(path)
+    return {"layout": doc.to_dict(), "frame": fr.to_dict()}
+
+
+def layout_add_image_frame(
+    layout: dict[str, Any] | None = None,
+    *,
+    image: str,
+    x: float = 40,
+    y: float = 300,
+    width: float = 200,
+    height: float = 150,
+    page: int = 0,
+    path: PathLike | None = None,
+) -> dict[str, Any]:
+    from instantlensdoc.core.layout import LayoutDocument
+
+    doc = _load_layout(layout, path)
+    fr = doc.add_image(
+        image, x=float(x), y=float(y), width=float(width), height=float(height), page=int(page)
+    )
+    if path:
+        doc.save(path)
+    return {"layout": doc.to_dict(), "frame": fr.to_dict()}
+
+
+def layout_move_frame(
+    frame_id: str,
+    x: float,
+    y: float,
+    *,
+    layout: dict[str, Any] | None = None,
+    path: PathLike | None = None,
+) -> dict[str, Any]:
+    """Rahmen verschieben — 2.6.12."""
+    doc = _load_layout(layout, path)
+    fr = doc.move_frame(frame_id, float(x), float(y))
+    if path:
+        doc.save(path)
+    return {"layout": doc.to_dict(), "frame": fr.to_dict()}
+
+
+def layout_resize_frame(
+    frame_id: str,
+    width: float,
+    height: float,
+    *,
+    layout: dict[str, Any] | None = None,
+    path: PathLike | None = None,
+) -> dict[str, Any]:
+    """Rahmen skalieren — 2.6.12."""
+    doc = _load_layout(layout, path)
+    fr = doc.resize_frame(frame_id, float(width), float(height))
+    if path:
+        doc.save(path)
+    return {"layout": doc.to_dict(), "frame": fr.to_dict()}
+
+
+def layout_link_frames(
+    from_id: str,
+    to_id: str,
+    *,
+    layout: dict[str, Any] | None = None,
+    path: PathLike | None = None,
+) -> dict[str, Any]:
+    """Textrahmen verketten (Overflow) — 2.6.12."""
+    doc = _load_layout(layout, path)
+    doc.link_frames(from_id, to_id)
+    if path:
+        doc.save(path)
+    return {"layout": doc.to_dict(), "from": from_id, "to": to_id}
+
+
+def layout_flow_text(
+    text: str,
+    start_id: str | None = None,
+    *,
+    layout: dict[str, Any] | None = None,
+    path: PathLike | None = None,
+    columns: int | None = None,
+    pages: int | None = None,
+) -> dict[str, Any]:
+    """
+    Text in verkettete Rahmen fließen lassen.
+    Optional: Spalten- oder Seitenkette neu anlegen.
+    """
+    doc = _load_layout(layout, path)
+    if columns and int(columns) > 0:
+        frames = doc.create_column_chain(columns=int(columns))
+        start = frames[0]
+    elif pages and int(pages) > 1:
+        frames = doc.create_page_chain(pages=int(pages))
+        start = frames[0]
+    elif start_id:
+        start = doc.frame_by_id(start_id)
+        if start is None:
+            raise KeyError(f"Rahmen nicht gefunden: {start_id}")
+    elif doc.text_frames:
+        start = doc.text_frames[0]
+    else:
+        start = doc.add_text_frame()
+    filled = doc.flow_text_chain(text, start)
+    overflow = filled.pop("__overflow__", "")
+    if path:
+        doc.save(path)
+    return {
+        "layout": doc.to_dict(),
+        "filled": filled,
+        "overflow": overflow,
+        "chain": doc.chain_ids(start.id),
+    }
+
+
+def layout_list_frames(
+    *,
+    layout: dict[str, Any] | None = None,
+    path: PathLike | None = None,
+) -> list[dict[str, Any]]:
+    doc = _load_layout(layout, path)
+    return doc.list_frames()
+
+
+def _load_layout(
+    layout: dict[str, Any] | None,
+    path: PathLike | None,
+):
+    from instantlensdoc.core.layout import LayoutDocument
+
+    if path is not None:
+        p = _p(path)
+        if p.is_file():
+            return LayoutDocument.load(p)
+        return LayoutDocument()
+    if layout is not None:
+        return LayoutDocument.from_dict(layout)
+    return LayoutDocument()

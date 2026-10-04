@@ -1,5 +1,22 @@
 # Changelog — InstantLens Doc
 
+## 2.6.12 — Frames/Boxes, Textrahmen-Verkettung, Musterseiten, Satzspiegel
+
+Minor nach **2.6.11**: **Frames/Boxes** (bewegliche, skalierbare Text- und Bildrahmen), **Textrahmen-Verkettung** (Overflow in nächste Spalte/Seite), **Musterseiten** (wiederkehrende Kopf-/Fußzeilen + Seitenzahlen über Seiten, auf 2.6.11 HF), **Satzspiegel**-Basics (Ränder an Seitenformat-Presets gebunden, Overlay). Scripting: `ild.satzspiegel` / `list_master_pages` / `apply_master_page` / `layout_*` · CLI `satzspiegel` / `master-pages` / `apply-master` / `layout-flow` / `layout-move` / `layout-resize` · PowerShell `Get-IldSatzspiegel` / `Get-IldMasterPages` / `Invoke-IldMasterPage` / `Invoke-IldLayoutFlow` / `Move-IldFrame` / `Resize-IldFrame`. Kein CMYK/Bleed/Preflight/PDF/X, kein volles i18n, keine KI-Wizards, kein PDF-Compare. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie unverändert.
+
+### Neu
+- `instantlensdoc.core.layout` — Move/Resize, Spalten-/Seiten-Ketten, page/column/locked
+- `ild_pdf.page_layout` — `Satzspiegel`, `MasterPage`, `apply_master_page`, Presets
+- UI: Toolbar **Satzspiegel**; Einfügen → Spalten-Rahmen / Rahmen verschieben·skalieren / Musterseite; Ctrl+Alt+S
+
+### Geändert
+- Docs/Version **2.6.12**; ild-API/CLI/PowerShell erweitert
+
+### Tests / Qualität
+- Version **2.6.12** (App / `ild_pdf` / ISS / Smoke / Docs); Serie **2.6**; `docs/VERSION` + `VERSION.txt`
+- Smoke: 2.6.12 CLI+Qt (frames/chain/master/satzspiegel)
+- Stubs: KI/Cloud/Stylus/3D/Hooks/Outline/Telemetrie unverändert markiert
+
 ## 2.6.11 — Lineal, Raster, Kopf/Fuß, Buchformate, Absatzformat
 
 Minor nach **2.6.10**: **Lineal** (horizontal/vertikal, mm/inch), **Ausrichtungsraster + Guides**, **Kopf-/Fußzeilen** mit Seitenzahlen, Titel und **Ersteller/Autor** (`{title}`/`{author}`/`{creator}`), **Seitenformate-Presets** US Letter / DIN-A / Buch (Taschenbuch 125×190, DINA5, Roman 135×215, Sachbuch 170×240, DINA4, Quadrat 210×210 mm), **Absatzformatierung** (Ausrichtung links/zentriert/rechts/Blocksatz, Zeilenabstand) an Style-Presets aus 2.6.10. Scripting: `ild.list_page_formats` / `set_page_format` / `apply_header_footer` / `apply_paragraph_format` / `list_paragraph_styles` · CLI `page-formats` / `set-page-format` / `header-footer` / `paragraph-format` · PowerShell `Get-IldPageFormats` / `Set-IldPageFormat` / `Invoke-IldHeaderFooter` / `Invoke-IldParagraphFormat`. Kein volles DTP (Musterseiten/CMYK/Frames), kein i18n-Pack, keine KI-Wizards, kein PDF-Compare-Ausbau. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie unverändert.

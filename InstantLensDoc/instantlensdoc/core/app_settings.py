@@ -231,6 +231,9 @@ DEFAULTS: dict[str, Any] = {
     "show_alignment_grid": False,
     "alignment_grid_spacing_mm": 5.0,
     "alignment_grid_snap": False,
+    "show_satzspiegel": False,  # Type-Area-Overlay — 2.6.12
+    "satzspiegel_format": "A4",
+    "satzspiegel_columns": 1,
     "alignment_guides": [],
     "ruler_unit": "mm",
     "annotations_locked": False,
@@ -3359,6 +3362,43 @@ def get_alignment_grid_snap() -> bool:
 
 def set_alignment_grid_snap(enabled: bool) -> None:
     save_settings({"alignment_grid_snap": bool(enabled)})
+
+
+def get_show_satzspiegel() -> bool:
+    """Satzspiegel-Overlay — 2.6.12."""
+    return bool(load_settings().get("show_satzspiegel", False))
+
+
+def set_show_satzspiegel(enabled: bool) -> None:
+    save_settings({"show_satzspiegel": bool(enabled)})
+
+
+def get_satzspiegel_format() -> str:
+    raw = load_settings().get("satzspiegel_format", DEFAULTS["satzspiegel_format"])
+    return str(raw or "A4")
+
+
+def set_satzspiegel_format(name: str) -> str:
+    val = str(name or "A4").strip() or "A4"
+    save_settings({"satzspiegel_format": val})
+    return val
+
+
+def get_satzspiegel_columns() -> int:
+    try:
+        n = int(load_settings().get("satzspiegel_columns", 1))
+    except (TypeError, ValueError):
+        n = 1
+    return max(1, min(6, n))
+
+
+def set_satzspiegel_columns(n: int) -> int:
+    try:
+        val = max(1, min(6, int(n)))
+    except (TypeError, ValueError):
+        val = 1
+    save_settings({"satzspiegel_columns": val})
+    return val
 
 
 def get_ruler_unit() -> str:

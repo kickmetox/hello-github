@@ -82,6 +82,18 @@ python -m keygen --verify "ILD1...."
 
 Trial 28 Tage · Keys 32 Tage (HMAC `ILD1.…`). Details: `keygen/README.md`.
 
+## Neu in 2.6.12
+
+Minor nach **2.6.11** (DTP-Schritt: Frames / Musterseiten / Satzspiegel):
+
+- **Frames/Boxes:** bewegliche, skalierbare Text- und Bildrahmen (`move_frame` / `resize_frame`)
+- **Textrahmen-Verkettung:** Overflow fließt in nächste Spalte/Seite (`flow_text_chain`, Spalten-/Seitenketten)
+- **Musterseiten:** wiederkehrende Kopf-/Fußzeilen + Seitenzahlen über Seiten (baut auf 2.6.11 HF)
+- **Satzspiegel:** Ränder an Seitenformat-Presets; Overlay Ctrl+Alt+S / Toolbar
+- Scripting: `ild.satzspiegel` / `apply_master_page` / `layout_flow_text` / `layout_move_frame` / …
+- Kein CMYK/Bleed/Preflight/PDF/X, kein volles i18n, keine KI-Wizards, kein PDF-Compare
+- Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie unverändert
+
 ## Neu in 2.6.11
 
 Minor nach **2.6.10** (Layout-Hilfen / Word-Suite):
@@ -92,7 +104,7 @@ Minor nach **2.6.10** (Layout-Hilfen / Word-Suite):
 - **Seitenformate:** US Letter, DIN-A, Buchformate Taschenbuch/DINA5/Roman/Sachbuch/DINA4/Quadrat
 - **Absatzformatierung:** Ausrichtung + Zeilenabstand, an Style-Presets (2.6.10) angebunden
 - Scripting: `ild.list_page_formats` / `set_page_format` / `apply_header_footer` / `apply_paragraph_format`
-- Kein volles DTP (Musterseiten/CMYK/Frames), kein i18n-Pack, keine KI-Wizards, kein PDF-Compare-Ausbau
+- Kein volles DTP damals (Musterseiten/CMYK/Frames → 2.6.12), kein i18n-Pack, keine KI-Wizards
 - Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie unverändert
 
 ## Neu in 2.6.10

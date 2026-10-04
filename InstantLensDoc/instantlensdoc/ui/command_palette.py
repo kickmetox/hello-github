@@ -140,6 +140,37 @@ def default_palette_commands() -> list[PaletteCommand]:
             "Ansicht",
             "Ctrl+Alt+G",
         ),
+        PaletteCommand(
+            "toggle_satzspiegel",
+            "Satzspiegel ein/aus",
+            "satzspiegel type area margins ränder",
+            "Ansicht",
+            "Ctrl+Alt+S",
+        ),
+        PaletteCommand(
+            "apply_master_page",
+            "Musterseite anwenden…",
+            "musterseite master page kopf fuß seitenzahl",
+            "Einfügen",
+        ),
+        PaletteCommand(
+            "add_column_frames",
+            "Spalten-Rahmen…",
+            "spalten rahmen verkettung columns frames",
+            "Einfügen",
+        ),
+        PaletteCommand(
+            "move_frame",
+            "Rahmen verschieben…",
+            "rahmen verschieben move frame box",
+            "Einfügen",
+        ),
+        PaletteCommand(
+            "resize_frame",
+            "Rahmen skalieren…",
+            "rahmen skalieren resize frame box",
+            "Einfügen",
+        ),
         PaletteCommand("ocr_page", "OCR aktuelle Seite…", "ocr tesseract seite", "OCR"),
         PaletteCommand("ocr_pdf", "OCR gesamtes PDF…", "ocr batch pdf", "OCR"),
         PaletteCommand(

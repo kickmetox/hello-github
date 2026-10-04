@@ -126,6 +126,10 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | Ausrichtungsraster / Guides | fertig | Raster einblendbar + Hilfslinien; Toolbar „Raster“ · Ctrl+Alt+G · `grid_lines` / Snap — **2.6.11** |
 | Absatzformatierung | fertig | Ausrichtung links/zentriert/rechts/Blocksatz · Zeilenabstand; Marker `ild-align`/`ild-spacing`; an Style-Presets — **2.6.11** |
 | Seitenformate-Presets (Buch/DIN/US) | fertig | US Letter · DIN-A · Taschenbuch 125×190 · DINA5 · Roman 135×215 · Sachbuch 170×240 · DINA4 · Quadrat 210×210 — **2.6.11** |
+| Frames / Boxes | fertig | Bewegliche, skalierbare Text- und Bildrahmen; Move/Resize; page/column/locked — **2.6.12** |
+| Textrahmen-Verkettung | fertig | Overflow → nächste Spalte/Seite; `flow_text_chain` · Spalten-/Seitenketten — **2.6.12** |
+| Musterseiten (Master Pages) | fertig | Wiederkehrende Kopf-/Fußzeilen + Seitenzahlen über Seiten; Presets Standard/Buch/Sachbuch/Minimal — **2.6.12** |
+| Satzspiegel (Type Area) | fertig | Ränder an Seitenformat-Presets; Overlay Toolbar + Ctrl+Alt+S; Spaltenhilfen — **2.6.12** |
 | Editor Zeilennummern | fertig | Optional (Ansicht + Einstellungen) 0.2.7; **Zeilen-Lesezeichen/Favoriten** Ctrl+F2 / F2 0.5.7; **Sidebar-Liste** 0.5.8; **Labels editierbar** 0.5.9; **JSON Export/Import ildbm-v1** **0.8.0**; **Drag-Reorder + Sidecar-Persistenz** **0.8.1**; **Toggle persistiert (Ansicht↔Settings)** **0.8.3** |
 | Editor Minimap | fertig | Optional Linien-Übersicht + dickere Scrollbar; Ansicht/Einstellungen; Ctrl+Shift+I 0.5.3 |
 | Editor Soft-Hyphen / NBSP | fertig | Einfügen Ctrl+Shift+- / Ctrl+Shift+Space; Menü Bearbeiten 0.5.4 |

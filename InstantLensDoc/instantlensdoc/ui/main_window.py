@@ -2034,6 +2034,17 @@ class MainWindow(QMainWindow):
         )
         self._grid_action.toggled.connect(self._toggle_alignment_grid)
         m_view.addAction(self._grid_action)
+        self._satzspiegel_action = QAction("Satzspiegel", self)
+        self._satzspiegel_action.setCheckable(True)
+        from instantlensdoc.core.app_settings import get_show_satzspiegel
+
+        self._satzspiegel_action.setChecked(get_show_satzspiegel())
+        self._satzspiegel_action.setShortcut(QKeySequence("Ctrl+Alt+S"))
+        self._satzspiegel_action.setToolTip(
+            "Satzspiegel / Type Area Overlay — 2.6.12"
+        )
+        self._satzspiegel_action.toggled.connect(self._toggle_satzspiegel)
+        m_view.addAction(self._satzspiegel_action)
         self._current_line_hl_action = QAction("Aktuelle Zeile hervorheben", self)
         self._current_line_hl_action.setCheckable(True)
         self._current_line_hl_action.setChecked(get_editor_current_line_highlight())
@@ -2789,8 +2800,26 @@ class MainWindow(QMainWindow):
         a = QAction("Verketteten Textrahmen…", self)
         a.triggered.connect(self._add_chained_frame)
         m_ins.addAction(a)
+        a = QAction("Spalten-Rahmen…", self)
+        a.setToolTip("Verkettete Spalten-Textrahmen — 2.6.12")
+        a.triggered.connect(self._add_column_frames)
+        m_ins.addAction(a)
+        a = QAction("Rahmen verschieben…", self)
+        a.setToolTip("Text-/Bildrahmen verschieben — 2.6.12")
+        a.triggered.connect(self._move_frame_dialog)
+        m_ins.addAction(a)
+        a = QAction("Rahmen skalieren…", self)
+        a.setToolTip("Text-/Bildrahmen skalieren — 2.6.12")
+        a.triggered.connect(self._resize_frame_dialog)
+        m_ins.addAction(a)
         a = QAction("Bild einfügen…", self)
         a.triggered.connect(self._insert_image)
+        m_ins.addAction(a)
+        a = QAction("Musterseite anwenden…", self)
+        a.setToolTip(
+            "Kopf-/Fußzeile + Seitenzahlen über Seiten (Musterseite) — 2.6.12"
+        )
+        a.triggered.connect(self._apply_master_page_dialog)
         m_ins.addAction(a)
 
         m_extra = mb.addMenu("E&xtras")
@@ -7599,6 +7628,15 @@ class MainWindow(QMainWindow):
             self._grid_action.setChecked(on)
             self._grid_action.blockSignals(False)
 
+    def _toggle_satzspiegel(self, checked: bool = False) -> None:
+        on = bool(checked)
+        if hasattr(self.pdf_view, "set_show_satzspiegel"):
+            self.pdf_view.set_show_satzspiegel(on)
+        if hasattr(self, "_satzspiegel_action") and self._satzspiegel_action is not None:
+            self._satzspiegel_action.blockSignals(True)
+            self._satzspiegel_action.setChecked(on)
+            self._satzspiegel_action.blockSignals(False)
+
     def _auto_format_document(self) -> None:
         """Automatische Formatierung Editor oder PDF — 2.6.10."""
         if self.stack.currentWidget() is self.editor_pane:
@@ -10497,6 +10535,13 @@ class MainWindow(QMainWindow):
             "toggle_grid": lambda: self._toggle_alignment_grid(
                 not getattr(self.pdf_view, "_show_alignment_grid", False)
             ),
+            "toggle_satzspiegel": lambda: self._toggle_satzspiegel(
+                not getattr(self.pdf_view, "_show_satzspiegel", False)
+            ),
+            "apply_master_page": self._apply_master_page_dialog,
+            "add_column_frames": self._add_column_frames,
+            "move_frame": self._move_frame_dialog,
+            "resize_frame": self._resize_frame_dialog,
             "ocr_page": self._run_ocr,
             "ocr_pdf": self._run_ocr_document,
             "ocr_region": self._run_ocr_region,
@@ -13569,6 +13614,128 @@ class MainWindow(QMainWindow):
                 lines.append(f"--- Overflow (kein weiterer Rahmen) ---\n{overflow[:400]}")
             self.editor.appendPlainText("\n".join(lines))
         self._set_status(f"Verkettung {f1.id}→{f2.id} ({len(filled)} Rahmen gefüllt)")
+
+    def _add_column_frames(self):
+        """Verkettete Spalten-Rahmen mit Textfluss — 2.6.12."""
+        from PySide6.QtWidgets import QInputDialog
+
+        cols, ok = QInputDialog.getInt(self, "Spalten-Rahmen", "Anzahl Spalten:", 2, 1, 6)
+        if not ok:
+            return
+        source = self.editor.toPlainText() if self.stack.currentWidget() is self.editor_pane else ""
+        if not source.strip():
+            source = ("Spaltenfluss-Beispieltext für InstantLens Doc. " * 20)
+        frames = self.layout_doc.create_column_chain(columns=cols)
+        filled = self.layout_doc.flow_text_chain(source, frames[0])
+        overflow = filled.pop("__overflow__", "")
+        if self.stack.currentWidget() is self.editor_pane:
+            lines = [f"\n=== Spalten-Kette ({cols}) ==="]
+            for fr in frames:
+                lines.append(f"--- Spalte {fr.column + 1} ({fr.id}) ---")
+                lines.append(fr.text or "(leer)")
+            if overflow:
+                lines.append(f"--- Overflow ---\n{overflow[:400]}")
+            self.editor.appendPlainText("\n".join(lines))
+        self._set_status(f"{cols} Spalten verkettet, {len(filled)} gefüllt")
+
+    def _pick_frame_id(self, title: str) -> str | None:
+        from PySide6.QtWidgets import QInputDialog
+
+        frames = self.layout_doc.list_frames()
+        if not frames:
+            QMessageBox.information(self, title, "Keine Rahmen vorhanden.")
+            return None
+        labels = [
+            f"{f.get('kind', '?')} {f.get('id')} @({f.get('x')},{f.get('y')}) "
+            f"{f.get('width')}×{f.get('height')}"
+            for f in frames
+        ]
+        choice, ok = QInputDialog.getItem(self, title, "Rahmen:", labels, 0, False)
+        if not ok:
+            return None
+        idx = labels.index(choice)
+        return str(frames[idx]["id"])
+
+    def _move_frame_dialog(self):
+        from PySide6.QtWidgets import QInputDialog
+
+        fid = self._pick_frame_id("Rahmen verschieben")
+        if not fid:
+            return
+        fr = self.layout_doc.any_frame_by_id(fid)
+        if fr is None:
+            return
+        x, ok = QInputDialog.getDouble(self, "Verschieben", "X (pt):", fr.x, -1000, 5000, 1)
+        if not ok:
+            return
+        y, ok = QInputDialog.getDouble(self, "Verschieben", "Y (pt):", fr.y, -1000, 5000, 1)
+        if not ok:
+            return
+        try:
+            self.layout_doc.move_frame(fid, x, y)
+            self._set_status(f"Rahmen {fid} → ({x:g},{y:g})")
+        except Exception as e:
+            QMessageBox.warning(self, "Verschieben", str(e))
+
+    def _resize_frame_dialog(self):
+        from PySide6.QtWidgets import QInputDialog
+
+        fid = self._pick_frame_id("Rahmen skalieren")
+        if not fid:
+            return
+        fr = self.layout_doc.any_frame_by_id(fid)
+        if fr is None:
+            return
+        w, ok = QInputDialog.getDouble(
+            self, "Skalieren", "Breite (pt):", fr.width, 8, 5000, 1
+        )
+        if not ok:
+            return
+        h, ok = QInputDialog.getDouble(
+            self, "Skalieren", "Höhe (pt):", fr.height, 8, 5000, 1
+        )
+        if not ok:
+            return
+        try:
+            self.layout_doc.resize_frame(fid, w, h)
+            self._set_status(f"Rahmen {fid} → {w:g}×{h:g}")
+        except Exception as e:
+            QMessageBox.warning(self, "Skalieren", str(e))
+
+    def _apply_master_page_dialog(self):
+        """Musterseite (HF + Seitenzahlen) auf aktuelles PDF bakken — 2.6.12."""
+        from PySide6.QtWidgets import QInputDialog
+        from ild_pdf.page_layout import apply_master_page, list_master_presets
+
+        if not self.pdf_view.pdf_path:
+            QMessageBox.information(
+                self, "Musterseite", "Bitte zuerst ein PDF öffnen."
+            )
+            return
+        presets = list_master_presets()
+        names = [str(p.get("name") or p.get("id")) for p in presets]
+        choice, ok = QInputDialog.getItem(
+            self, "Musterseite", "Preset:", names, 0, False
+        )
+        if not ok:
+            return
+        title, ok = QInputDialog.getText(self, "Musterseite", "Titel:", text="")
+        if not ok:
+            return
+        author, ok = QInputDialog.getText(self, "Musterseite", "Autor:", text="")
+        if not ok:
+            return
+        try:
+            dest = apply_master_page(
+                self.pdf_view.pdf_path,
+                choice,
+                title=title or None,
+                author=author or None,
+            )
+            self.pdf_view.load(str(dest))
+            self._set_status(f"Musterseite „{choice}“ angewendet → {dest.name}")
+        except Exception as e:
+            QMessageBox.critical(self, "Musterseite", f"Fehler:\n{e}")
 
     def _insert_image(self):
         path, _ = QFileDialog.getOpenFileName(

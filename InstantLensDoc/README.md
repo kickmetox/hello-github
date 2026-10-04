@@ -37,9 +37,13 @@ Keygen: `run-keygen.bat` · `python -m keygen kunde@example.com` · siehe `keyge
 
 Nightly-Smoke: `python scripts\smoke_ild.py` · optional `--qt` · `--json` (Summary: `ok`, `checks[]`, `duration_ms`, `version`; Fail: `checks[].error` max 200…, Exit=ok). Siehe **CONTRIBUTING.md**; Workflow-Stub `.github/workflows/smoke-ild.yml` (manual only).
 
+## Neu in 2.6.12
+
+Minor nach **2.6.11**: **Frames/Boxes** (Move/Resize), **Textrahmen-Verkettung** (Spalte/Seite), **Musterseiten**, **Satzspiegel**. Scripting `satzspiegel`/`apply-master`/`layout-flow`/`layout-move`/`layout-resize`. Kein CMYK/Bleed/Preflight/PDF/X, kein i18n/KI-Wizards/PDF-Compare. Stubs unverändert.
+
 ## Neu in 2.6.11
 
-Minor nach **2.6.10**: **Lineal**, **Raster/Guides**, **Kopf-/Fußzeilen** (Titel/Autor/Seitenzahl), **Buch-/DIN-/US-Seitenformate**, **Absatzformatierung** (Ausrichtung/Abstand) an Styles. Scripting `page-formats`/`header-footer`/`paragraph-format`. Kein volles DTP/i18n/KI-Wizards. Stubs unverändert.
+Minor nach **2.6.10**: **Lineal**, **Raster/Guides**, **Kopf-/Fußzeilen** (Titel/Autor/Seitenzahl), **Buch-/DIN-/US-Seitenformate**, **Absatzformatierung** (Ausrichtung/Abstand) an Styles. Scripting `page-formats`/`header-footer`/`paragraph-format`. Stubs unverändert.
 
 ## Neu in 2.6.10
 

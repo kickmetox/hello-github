@@ -1,4 +1,4 @@
-"""Beispiel: InstantLens Doc Scripting (Python) — 2.6.11.
+"""Beispiel: InstantLens Doc Scripting (Python) — 2.6.12.
 
 Aufruf aus dem App-Root:
   python examples/ild_scripting_demo.py [pdf]
@@ -55,6 +55,10 @@ def main() -> int:
         print("page formats:", [f["name"] for f in ild.list_page_formats()][:6])
         para = ild.apply_paragraph_format(text="Demo Absatz", alignment="center")
         print("paragraph:", "ild-align" in para.get("text", ""))
+        print("satzspiegel", ild.satzspiegel("A4")["format_name"])
+        print("masters", [m["id"] for m in ild.list_master_pages()])
+        flow = ild.layout_flow_text("Demo " * 40, columns=2)
+        print("layout chain", flow["chain"])
         hf = ild.apply_header_footer(
             src, out=td_p / "hf.pdf", header="{title}", footer="{author}", title="Demo", author="ILD"
         )

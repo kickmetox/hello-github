@@ -1,4 +1,4 @@
-# InstantLens Doc — PowerShell-Scripting 2.6.11
+# InstantLens Doc — PowerShell-Scripting 2.6.12
 # Als CLI:
 #   powershell -ExecutionPolicy Bypass -File .\scripts\ild.ps1 pages D:\dok.pdf
 # Als Modul:
@@ -270,6 +270,93 @@ function Invoke-IldParagraphFormat {
 
 function Get-IldParagraphStyles {
     Invoke-Ild @("--json", "paragraph-styles") | Out-Host
+}
+
+function Get-IldSatzspiegel {
+    param(
+        [string]$Format = "A4",
+        [int]$Columns = 1,
+        [double]$Gutter = 5.0
+    )
+    Invoke-Ild @(
+        "--json", "satzspiegel",
+        "--format", $Format,
+        "--columns", "$Columns",
+        "--gutter", "$Gutter"
+    ) | Out-Host
+}
+
+function Get-IldMasterPages {
+    Invoke-Ild @("--json", "master-pages") | Out-Host
+}
+
+function Invoke-IldMasterPage {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [string]$Master = "Standard",
+        [string]$Out,
+        [string]$Title,
+        [string]$Author,
+        [string]$Creator,
+        [int]$StartPage = 0
+    )
+    $a = @("--json", "apply-master", $Path, "--master", $Master)
+    if ($Out) { $a += @("--out", $Out) }
+    if ($Title) { $a += @("--title", $Title) }
+    if ($Author) { $a += @("--author", $Author) }
+    if ($Creator) { $a += @("--creator", $Creator) }
+    if ($StartPage -gt 0) { $a += @("--start-page", "$StartPage") }
+    Invoke-Ild @a | Out-Host
+}
+
+function Invoke-IldLayoutFlow {
+    param(
+        [Parameter(Mandatory = $true)][string]$Text,
+        [string]$Layout,
+        [int]$Columns = 0,
+        [int]$Pages = 0,
+        [string]$Start,
+        [string]$Out
+    )
+    $a = @("--json", "layout-flow", "--text", $Text)
+    if ($Layout) { $a += @("--layout", $Layout) }
+    if ($Columns -gt 0) { $a += @("--columns", "$Columns") }
+    if ($Pages -gt 0) { $a += @("--pages", "$Pages") }
+    if ($Start) { $a += @("--start", $Start) }
+    if ($Out) { $a += @("--out", $Out) }
+    Invoke-Ild @a | Out-Host
+}
+
+function Move-IldFrame {
+    param(
+        [Parameter(Mandatory = $true)][string]$Layout,
+        [Parameter(Mandatory = $true)][string]$Id,
+        [Parameter(Mandatory = $true)][double]$X,
+        [Parameter(Mandatory = $true)][double]$Y
+    )
+    Invoke-Ild @(
+        "--json", "layout-move",
+        "--layout", $Layout,
+        "--id", $Id,
+        "--x", "$X",
+        "--y", "$Y"
+    ) | Out-Host
+}
+
+function Resize-IldFrame {
+    param(
+        [Parameter(Mandatory = $true)][string]$Layout,
+        [Parameter(Mandatory = $true)][string]$Id,
+        [Parameter(Mandatory = $true)][double]$Width,
+        [Parameter(Mandatory = $true)][double]$Height
+    )
+    Invoke-Ild @(
+        "--json", "layout-resize",
+        "--layout", $Layout,
+        "--id", $Id,
+        "--width", "$Width",
+        "--height", "$Height"
+    ) | Out-Host
 }
 
 function Merge-IldPdf {
