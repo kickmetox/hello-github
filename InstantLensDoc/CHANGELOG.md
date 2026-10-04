@@ -1,5 +1,16 @@
 # Changelog — InstantLens Doc
 
+## 2.6.21 — Review/Track Changes, Kommentare, Versionsverlauf, Seriendruck
+
+Minor nach **2.6.20**: Lokale **Zusammenarbeit** zuerst — **Änderungen nachverfolgen (Review)** mit Autor/Accept/Reject; **Kommentare** an Textstellen ohne Body-Änderung; **Versionsverlauf** speichern/wiederherstellen (``*.ildversions/``); Basis-**Seriendruck** (CSV/Excel → Briefe mit ``{{Feld}}``). Cloud-Echtzeit-Kollaboration und freier KI-Chat bleiben Stubs. eIDAS/rechtssichere Signaturen warten. Scripting: `ild.review_*` / `comment_*` / `version_*` / `mail_merge_run` · CLI · PS `Enable-IldReview` / `Add-IldComment` / `Save-IldVersion` / `Invoke-IldMailMerge`. Ribbon-Tab **Review**. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie unverändert.
+
+- Review-Sidecar `*.ildreview.json` (ildreview-v1); Diff-Protokoll Insert/Delete
+- Kommentar-Sidecar `*.ildcomments.json` (ildcomments-v1); Resolve/Delete
+- Versionsstore `*.ildversions/` (ildversions-v1); Save/Restore/Delete
+- Seriendruck-Basis CSV/XLSX; Platzhalter `{{Name}}` / `«Name»`
+- ild-API/CLI/PowerShell; Ribbon Review; Docs/i18n; Version **2.6.21**
+- Smoke: 2.6.21 CLI+Qt (review/comments/versions/mail-merge)
+
 ## 2.6.20 — Spellcheck/Suggestions, Autocorrect/Bausteine, Ribbon/Tabs, Undo
 
 Minor nach **2.6.19**: **Rechtschreibprüfung** mit **Korrekturvorschlägen** (Edit-Distanz) und leichten **Grammatik-Hinweisen**; Builtin-Wortliste der **UI-Sprache** (+ optionale User-Wortliste). **Autokorrektur** und **Textbaustein-Kürzel** beim Tippen; Editor-Bausteine **9 Slots**. **Ribbon/Workspace-Polish:** Tabs Bearbeiten/Fenster, Drag-Reorder der Dokument-Tabs, optionales **separates Fenster**. **Undo/Redo** vertieft (Annotation-History + Seiten-Ops unbegrenzt, Editor `undoLimit=0`). Scripting: `ild.spellcheck` / `suggest_word` / `autocorrect_text` / `list_snippets` · CLI `spellcheck`/`suggest`/`autocorrect`/`snippets` · PS `Invoke-IldSpellcheck` / `Invoke-IldAutocorrect` / `Get-IldSnippets`. Freier KI-Chat-Stub unverändert. Keine Cloud-Echtzeit-Kollaboration; eIDAS-Signaturen warten. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie unverändert.

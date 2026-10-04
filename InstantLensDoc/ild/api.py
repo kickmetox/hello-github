@@ -1,4 +1,7 @@
-"""Headless InstantLens-Doc-Operationen für Python- und PowerShell-Scripting — 2.6.20."""
+"""Headless InstantLens-Doc-Operationen für Python- und PowerShell-Scripting — 2.6.21.
+
+Review / Kommentare / Versionsverlauf / Seriendruck — lokal.
+"""
 
 from __future__ import annotations
 
@@ -1767,7 +1770,7 @@ def spellcheck(
     max_suggestions: int = 5,
 ) -> dict[str, Any]:
     """
-    Rechtschreibung inkl. Vorschläge + leichte Grammatik-Hints — 2.6.20.
+    Rechtschreibung inkl. Vorschläge + leichte Grammatik-Hints — 2.6.21.
 
     Ohne ``dict_path`` wird die Builtin-Wortliste der UI-Sprache genutzt.
     """
@@ -1792,7 +1795,7 @@ def suggest_word(
     lang: str | None = None,
     max_suggestions: int = 5,
 ) -> dict[str, Any]:
-    """Korrekturvorschläge für ein einzelnes Wort — 2.6.20."""
+    """Korrekturvorschläge für ein einzelnes Wort — 2.6.21."""
     from instantlensdoc.core.spellcheck import (
         resolve_wordlist,
         suggest_corrections,
@@ -1822,7 +1825,7 @@ def autocorrect_text(
     *,
     lang: str | None = None,
 ) -> dict[str, Any]:
-    """Batch-Autokorrektur (Tippfehler + Baustein-Kürzel) — 2.6.20."""
+    """Batch-Autokorrektur (Tippfehler + Baustein-Kürzel) — 2.6.21."""
     from instantlensdoc.core.autocorrect import (
         apply_autocorrect_to_text,
         effective_autocorrect_rules,
@@ -1839,7 +1842,7 @@ def autocorrect_text(
 
 
 def list_autocorrect_rules_api(*, lang: str | None = None) -> dict[str, Any]:
-    """Autokorrektur-/Snippet-Regeln auflisten — 2.6.20."""
+    """Autokorrektur-/Snippet-Regeln auflisten — 2.6.21."""
     from instantlensdoc.core.autocorrect import list_autocorrect_rules
 
     rules = list_autocorrect_rules(lang)
@@ -1847,7 +1850,7 @@ def list_autocorrect_rules_api(*, lang: str | None = None) -> dict[str, Any]:
 
 
 def list_snippets() -> dict[str, Any]:
-    """Editor-Textbausteine (9 Slots) — 2.6.20."""
+    """Editor-Textbausteine (9 Slots) — 2.6.21."""
     from instantlensdoc.core.app_settings import (
         EDITOR_SNIPPET_COUNT,
         get_editor_snippets,
@@ -1867,6 +1870,265 @@ def set_snippet(index: int, text: str) -> dict[str, Any]:
 
     snippets = set_editor_snippet(int(index), text)
     return {"snippets": snippets, "index": int(index), "version": __version__}
+
+
+def review_enable(
+    path: PathLike,
+    *,
+    enabled: bool = True,
+    author: str | None = None,
+) -> dict[str, Any]:
+    """Review-Modus (Track Changes) ein/aus — 2.6.21."""
+    from instantlensdoc.core.review import ReviewStore
+
+    store = ReviewStore.for_doc(path, load=True)
+    if author is not None:
+        store.set_author(author, save=False)
+    store.set_enabled(bool(enabled), save=True)
+    data = store.summary()
+    data["version"] = __version__
+    return data
+
+
+def review_record_diff(
+    path: PathLike,
+    before: str,
+    after: str,
+    *,
+    author: str | None = None,
+) -> dict[str, Any]:
+    """Einfüge-/Lösch-Änderungen aus Text-Diff protokollieren — 2.6.21."""
+    from instantlensdoc.core.review import ReviewStore
+
+    store = ReviewStore.for_doc(path, load=True)
+    created = store.record_diff(before, after, author=author, save=True)
+    data = store.summary()
+    data["recorded"] = len(created)
+    data["changes"] = [c.to_dict() for c in created]
+    data["version"] = __version__
+    return data
+
+
+def review_list(
+    path: PathLike,
+    *,
+    author: str | None = None,
+    pending_only: bool = False,
+    limit: int = 200,
+) -> dict[str, Any]:
+    """Änderungen auflisten — 2.6.21."""
+    from instantlensdoc.core.review import ReviewStore
+
+    store = ReviewStore.for_doc(path, load=True)
+    items = store.list_changes(
+        author=author, pending_only=bool(pending_only), limit=int(limit)
+    )
+    data = store.summary()
+    data["changes"] = [c.to_dict() for c in items]
+    data["version"] = __version__
+    return data
+
+
+def review_accept(
+    path: PathLike,
+    change_id: str | None = None,
+    *,
+    all_pending: bool = False,
+) -> dict[str, Any]:
+    """Änderung(en) annehmen — 2.6.21."""
+    from instantlensdoc.core.review import ReviewStore
+
+    store = ReviewStore.for_doc(path, load=True)
+    if all_pending:
+        n = store.accept_all()
+        ok = n > 0
+    else:
+        ok = store.accept(str(change_id or ""))
+        n = 1 if ok else 0
+    data = store.summary()
+    data["ok"] = bool(ok)
+    data["accepted"] = n
+    data["version"] = __version__
+    return data
+
+
+def review_reject(
+    path: PathLike,
+    change_id: str | None = None,
+    *,
+    all_pending: bool = False,
+) -> dict[str, Any]:
+    """Änderung(en) ablehnen — 2.6.21."""
+    from instantlensdoc.core.review import ReviewStore
+
+    store = ReviewStore.for_doc(path, load=True)
+    if all_pending:
+        n = store.reject_all()
+        ok = n > 0
+    else:
+        ok = store.reject(str(change_id or ""))
+        n = 1 if ok else 0
+    data = store.summary()
+    data["ok"] = bool(ok)
+    data["rejected"] = n
+    data["version"] = __version__
+    return data
+
+
+def comment_add(
+    path: PathLike,
+    body: str,
+    *,
+    start: int = 0,
+    end: int | None = None,
+    anchor_text: str = "",
+    author: str | None = None,
+) -> dict[str, Any]:
+    """Kommentar an Textstelle anhängen (ohne Body-Änderung) — 2.6.21."""
+    from instantlensdoc.core.doc_comments import CommentStore
+
+    store = CommentStore.for_doc(path, load=True)
+    entry = store.add(
+        body,
+        start=int(start),
+        end=end,
+        anchor_text=anchor_text,
+        author=author,
+        save=True,
+    )
+    data = store.summary()
+    data["comment"] = entry.to_dict()
+    data["version"] = __version__
+    return data
+
+
+def comment_list(
+    path: PathLike,
+    *,
+    author: str | None = None,
+    unresolved_only: bool = False,
+    limit: int = 200,
+) -> dict[str, Any]:
+    """Kommentare auflisten — 2.6.21."""
+    from instantlensdoc.core.doc_comments import CommentStore
+
+    store = CommentStore.for_doc(path, load=True)
+    items = store.list_comments(
+        author=author,
+        unresolved_only=bool(unresolved_only),
+        limit=int(limit),
+    )
+    data = store.summary()
+    data["comments"] = [c.to_dict() for c in items]
+    data["version"] = __version__
+    return data
+
+
+def comment_resolve(
+    path: PathLike,
+    comment_id: str,
+    *,
+    resolved: bool = True,
+) -> dict[str, Any]:
+    """Kommentar als erledigt markieren — 2.6.21."""
+    from instantlensdoc.core.doc_comments import CommentStore
+
+    store = CommentStore.for_doc(path, load=True)
+    ok = store.resolve(str(comment_id), resolved=bool(resolved), save=True)
+    data = store.summary()
+    data["ok"] = bool(ok)
+    data["comment_id"] = str(comment_id)
+    data["version"] = __version__
+    return data
+
+
+def version_save(
+    path: PathLike,
+    *,
+    label: str = "",
+    note: str = "",
+    text: str | None = None,
+) -> dict[str, Any]:
+    """Dokumentstand als Version speichern — 2.6.21."""
+    from instantlensdoc.core.version_store import VersionStore
+
+    store = VersionStore.for_doc(path, load=True)
+    p = _p(path)
+    if text is not None:
+        entry = store.save_version(label=label, note=note, text=text)
+    elif p.is_file():
+        entry = store.save_version(label=label, note=note, source=p)
+    else:
+        raise FileNotFoundError(str(p))
+    data = store.summary()
+    data["entry"] = entry.to_dict()
+    data["version"] = __version__
+    return data
+
+
+def version_list(path: PathLike, *, limit: int = 50) -> dict[str, Any]:
+    """Versionsverlauf auflisten — 2.6.21."""
+    from instantlensdoc.core.version_store import VersionStore
+
+    store = VersionStore.for_doc(path, load=True)
+    items = store.list_versions(limit=int(limit))
+    data = store.summary()
+    data["entries"] = [e.to_dict() for e in items]
+    data["version"] = __version__
+    return data
+
+
+def version_restore(
+    path: PathLike,
+    version_id: str,
+    *,
+    dest: PathLike | None = None,
+) -> dict[str, Any]:
+    """Version wiederherstellen — 2.6.21."""
+    from instantlensdoc.core.version_store import VersionStore
+
+    store = VersionStore.for_doc(path, load=True)
+    out = store.restore(str(version_id), dest=dest)
+    data = store.summary()
+    data["restored"] = str(out)
+    data["version_id"] = str(version_id)
+    data["version"] = __version__
+    return data
+
+
+def mail_merge_run(
+    template: PathLike | str,
+    recipients: PathLike,
+    out_dir: PathLike,
+    *,
+    stem: str = "letter",
+    template_is_text: bool = False,
+) -> dict[str, Any]:
+    """Seriendruck: Template + CSV/Excel → Briefe — 2.6.21."""
+    from instantlensdoc.core.mail_merge import (
+        find_placeholders,
+        load_recipients,
+        mail_merge_from_files,
+        mail_merge_to_dir,
+    )
+
+    if template_is_text:
+        recipients_rows = load_recipients(recipients)
+        paths = mail_merge_to_dir(
+            str(template), recipients_rows, out_dir, stem=stem
+        )
+        data = {
+            "count": len(paths),
+            "placeholders": find_placeholders(str(template)),
+            "output": [str(p) for p in paths],
+            "out_dir": str(_p(out_dir)),
+        }
+    else:
+        data = mail_merge_from_files(
+            template, recipients, out_dir, stem=stem
+        )
+    data["version"] = __version__
+    return data
 
 
 def _load_layout(

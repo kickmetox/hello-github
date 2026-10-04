@@ -8,9 +8,9 @@
 - Tabellen / Office I/O — **2.6.14**
 - Annotationen ausbauen — **2.6.9**
 - Vollständige Liste in der App: FEATURES.md
-- Farbmanagement RGB/CMYK, Bleed, Ebenen, Preflight, PDF/X — **2.6.20**
+- Farbmanagement RGB/CMYK, Bleed, Ebenen, Preflight, PDF/X — **2.6.21**
 
 
-## 2.6.20
+## 2.6.21
 
 - Spellcheck suggestions / Autocorrect / Ribbon polish / Unlimited undo

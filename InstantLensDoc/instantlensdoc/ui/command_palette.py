@@ -329,6 +329,33 @@ def default_palette_commands() -> list[PaletteCommand]:
             "detach window separates fenster tabs workspace",
             "Fenster",
         ),
+        PaletteCommand(
+            "review_mode",
+            "Review / Änderungen nachverfolgen…",
+            "review track changes änderungen nachverfolgen accept reject",
+            "Review",
+            "Ctrl+Shift+E",
+        ),
+        PaletteCommand(
+            "doc_comments",
+            "Kommentare…",
+            "comments kommentare feedback anker textstelle",
+            "Review",
+            "Ctrl+Alt+M",
+        ),
+        PaletteCommand(
+            "version_history",
+            "Versionsverlauf…",
+            "version history versionsverlauf snapshot restore wiederherstellen",
+            "Review",
+            "Ctrl+Alt+Shift+H",
+        ),
+        PaletteCommand(
+            "mail_merge",
+            "Seriendruck…",
+            "mail merge seriendruck csv excel empfänger briefe",
+            "Review",
+        ),
         PaletteCommand("ocr_page", "OCR aktuelle Seite…", "ocr tesseract seite", "OCR"),
         PaletteCommand("ocr_pdf", "OCR gesamtes PDF…", "ocr batch pdf", "OCR"),
         PaletteCommand(

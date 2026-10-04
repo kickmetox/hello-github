@@ -132,6 +132,56 @@ class TextEditor(QPlainTextEdit):
         except Exception:
             pass
         self._autocorrect_busy = False
+        # Lokales Review / Track Changes — 2.6.21
+        self._review_enabled = False
+        self._review_path: str | None = None
+        self._review_author = "local"
+        self._review_prev_text: str | None = None
+        self._review_busy = False
+        self.textChanged.connect(self._on_review_text_changed)
+
+    def set_review_tracking(
+        self,
+        enabled: bool,
+        *,
+        path: str | None = None,
+        author: str | None = None,
+    ) -> None:
+        """Review-Modus: Textänderungen als Sidecar protokollieren — 2.6.21."""
+        self._review_enabled = bool(enabled)
+        if path is not None:
+            self._review_path = str(path)
+        if author is not None:
+            self._review_author = str(author or "local").strip() or "local"
+        self._review_prev_text = self.toPlainText() if self._review_enabled else None
+
+    def review_tracking_enabled(self) -> bool:
+        return bool(self._review_enabled)
+
+    def _on_review_text_changed(self) -> None:
+        if not self._review_enabled or self._review_busy or not self._review_path:
+            return
+        after = self.toPlainText()
+        before = self._review_prev_text
+        if before is None:
+            self._review_prev_text = after
+            return
+        if before == after:
+            return
+        self._review_busy = True
+        try:
+            from instantlensdoc.core.review import ReviewStore
+
+            store = ReviewStore.for_doc(self._review_path, load=True)
+            if store.enabled:
+                store.record_diff(
+                    before, after, author=self._review_author, save=True
+                )
+            self._review_prev_text = after
+        except Exception:
+            self._review_prev_text = after
+        finally:
+            self._review_busy = False
 
     def keyPressEvent(self, event):  # noqa: N802
         """Autokorrektur / Baustein-Kürzel nach Space/Satzzeichen — 2.6.20."""

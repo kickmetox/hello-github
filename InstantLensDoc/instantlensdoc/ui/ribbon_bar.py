@@ -1,4 +1,4 @@
-"""Ribbon-ähnliche Werkzeugleiste — 2.6.20 (erweitert aus 2.6.19)."""
+"""Ribbon-ähnliche Werkzeugleiste — 2.6.21 (Review/Kommentare/Versionen)."""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ from PySide6.QtWidgets import (
 class RibbonBar(QWidget):
     """
     Ribbon-Chrome: Kategorie-Tabs + Button-Zeile.
-    Tabs: Start / Bearbeiten / Ansicht / Fenster / PDF — 2.6.20.
+    Tabs: Start / Bearbeiten / Review / Ansicht / Fenster / PDF — 2.6.21.
     """
 
     action_triggered = Signal(str)  # action id
@@ -82,6 +82,15 @@ class RibbonBar(QWidget):
                 ),
             ),
             (
+                "Review",
+                (
+                    ("review_mode", "Änderungen"),
+                    ("doc_comments", "Kommentare"),
+                    ("version_history", "Versionen"),
+                    ("mail_merge", "Seriendruck"),
+                ),
+            ),
+            (
                 "Ansicht",
                 (
                     ("book_layout", "Buch-Layout"),
@@ -126,7 +135,7 @@ class RibbonBar(QWidget):
             for aid, label in buttons:
                 tb = QToolButton()
                 tb.setText(label)
-                tb.setToolTip(f"{label} — Ribbon 2.6.20")
+                tb.setToolTip(f"{label} — Ribbon 2.6.21")
                 tb.setAutoRaise(False)
                 if aid in (
                     "book_layout",
@@ -136,6 +145,7 @@ class RibbonBar(QWidget):
                     "autocorrect_toggle",
                     "doc_split",
                     "toggle_ribbon",
+                    "review_mode",
                 ):
                     tb.setCheckable(True)
                 tb.clicked.connect(

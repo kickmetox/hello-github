@@ -636,6 +636,110 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("index", type=int, help="Slot 0..8")
     s.add_argument("text", help="Inhalt")
 
+    s = sub.add_parser(
+        "review-enable",
+        help="Review/Track-Changes ein/aus — 2.6.21",
+    )
+    s.add_argument("path", help="Dokumentpfad")
+    s.add_argument("--author", default=None)
+    s.add_argument("--off", action="store_true", help="Review aus")
+
+    s = sub.add_parser(
+        "review-diff",
+        help="Änderungen aus before/after Text protokollieren — 2.6.21",
+    )
+    s.add_argument("path", help="Dokumentpfad")
+    s.add_argument("before", help="Alter Text")
+    s.add_argument("after", help="Neuer Text")
+    s.add_argument("--author", default=None)
+
+    s = sub.add_parser(
+        "review-list",
+        help="Änderungen auflisten — 2.6.21",
+    )
+    s.add_argument("path", help="Dokumentpfad")
+    s.add_argument("--author", default=None)
+    s.add_argument("--pending", action="store_true")
+    s.add_argument("--limit", type=int, default=200)
+
+    s = sub.add_parser(
+        "review-accept",
+        help="Änderung annehmen — 2.6.21",
+    )
+    s.add_argument("path")
+    s.add_argument("change_id", nargs="?", default=None)
+    s.add_argument("--all", action="store_true")
+
+    s = sub.add_parser(
+        "review-reject",
+        help="Änderung ablehnen — 2.6.21",
+    )
+    s.add_argument("path")
+    s.add_argument("change_id", nargs="?", default=None)
+    s.add_argument("--all", action="store_true")
+
+    s = sub.add_parser(
+        "comment-add",
+        help="Kommentar an Textstelle — 2.6.21",
+    )
+    s.add_argument("path")
+    s.add_argument("body")
+    s.add_argument("--start", type=int, default=0)
+    s.add_argument("--end", type=int, default=None)
+    s.add_argument("--anchor", default="")
+    s.add_argument("--author", default=None)
+
+    s = sub.add_parser(
+        "comment-list",
+        help="Kommentare auflisten — 2.6.21",
+    )
+    s.add_argument("path")
+    s.add_argument("--author", default=None)
+    s.add_argument("--open", action="store_true", help="Nur offene")
+    s.add_argument("--limit", type=int, default=200)
+
+    s = sub.add_parser(
+        "comment-resolve",
+        help="Kommentar erledigt — 2.6.21",
+    )
+    s.add_argument("path")
+    s.add_argument("comment_id")
+    s.add_argument("--reopen", action="store_true")
+
+    s = sub.add_parser(
+        "version-save",
+        help="Dokumentversion speichern — 2.6.21",
+    )
+    s.add_argument("path")
+    s.add_argument("--label", default="")
+    s.add_argument("--note", default="")
+    s.add_argument("--text", default=None, help="Optional Text statt Dateikopie")
+
+    s = sub.add_parser(
+        "version-list",
+        help="Versionsverlauf auflisten — 2.6.21",
+    )
+    s.add_argument("path")
+    s.add_argument("--limit", type=int, default=50)
+
+    s = sub.add_parser(
+        "version-restore",
+        help="Version wiederherstellen — 2.6.21",
+    )
+    s.add_argument("path")
+    s.add_argument("version_id")
+    s.add_argument("--dest", default=None)
+
+    s = sub.add_parser(
+        "mail-merge",
+        help="Seriendruck Template+CSV/Excel → Briefe — 2.6.21",
+    )
+    s.add_argument("template")
+    s.add_argument("recipients")
+    s.add_argument("out_dir")
+    s.add_argument("--stem", default="letter")
+
+
     return p
 
 
@@ -1272,6 +1376,90 @@ def run(argv: list[str] | None = None) -> int:
             return 0
         if args.cmd == "set-snippet":
             data = api.set_snippet(args.index, args.text)
+            _print(data, as_json=js or True)
+            return 0
+
+        if args.cmd == "review-enable":
+            data = api.review_enable(
+                args.path,
+                enabled=not bool(args.off),
+                author=args.author,
+            )
+            _print(data, as_json=js or True)
+            return 0
+        if args.cmd == "review-diff":
+            data = api.review_record_diff(
+                args.path, args.before, args.after, author=args.author
+            )
+            _print(data, as_json=js or True)
+            return 0
+        if args.cmd == "review-list":
+            data = api.review_list(
+                args.path,
+                author=args.author,
+                pending_only=bool(args.pending),
+                limit=args.limit,
+            )
+            _print(data, as_json=js or True)
+            return 0
+        if args.cmd == "review-accept":
+            data = api.review_accept(
+                args.path, args.change_id, all_pending=bool(args.all)
+            )
+            _print(data, as_json=js or True)
+            return 0
+        if args.cmd == "review-reject":
+            data = api.review_reject(
+                args.path, args.change_id, all_pending=bool(args.all)
+            )
+            _print(data, as_json=js or True)
+            return 0
+        if args.cmd == "comment-add":
+            data = api.comment_add(
+                args.path,
+                args.body,
+                start=args.start,
+                end=args.end,
+                anchor_text=args.anchor,
+                author=args.author,
+            )
+            _print(data, as_json=js or True)
+            return 0
+        if args.cmd == "comment-list":
+            data = api.comment_list(
+                args.path,
+                author=args.author,
+                unresolved_only=bool(args.open),
+                limit=args.limit,
+            )
+            _print(data, as_json=js or True)
+            return 0
+        if args.cmd == "comment-resolve":
+            data = api.comment_resolve(
+                args.path, args.comment_id, resolved=not bool(args.reopen)
+            )
+            _print(data, as_json=js or True)
+            return 0
+        if args.cmd == "version-save":
+            data = api.version_save(
+                args.path, label=args.label, note=args.note, text=args.text
+            )
+            _print(data, as_json=js or True)
+            return 0
+        if args.cmd == "version-list":
+            data = api.version_list(args.path, limit=args.limit)
+            _print(data, as_json=js or True)
+            return 0
+        if args.cmd == "version-restore":
+            data = api.version_restore(
+                args.path, args.version_id, dest=args.dest
+            )
+            _print(data, as_json=js or True)
+            return 0
+        if args.cmd == "mail-merge":
+            data = api.mail_merge_run(
+                args.template, args.recipients, args.out_dir, stem=args.stem
+            )
             _print(data, as_json=js or True)
             return 0
         return _fail("unbekanntes Kommando")

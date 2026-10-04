@@ -1,5 +1,5 @@
 {
-  "version": "2.6.20",
+  "version": "2.6.21",
   "langs": [
     "de",
     "en",
@@ -1543,6 +1543,259 @@
       "pt": "Scroll sincronizado",
       "ar": "تمرير متزامن",
       "it": "Scroll sincronizzato"
+    },
+    "review_mode": {
+      "de": "Review / Änderungen",
+      "en": "Review / Track changes",
+      "fr": "Révision / Suivi",
+      "ru": "Рецензирование",
+      "es": "Revisión / Cambios",
+      "zh": "审阅 / 修订",
+      "pt": "Revisão / Alterações",
+      "ar": "مراجعة / تتبع التغييرات",
+      "it": "Revisione / Modifiche"
+    },
+    "track_changes": {
+      "de": "Änderungen nachverfolgen",
+      "en": "Track changes",
+      "fr": "Suivi des modifications",
+      "ru": "Отслеживание изменений",
+      "es": "Control de cambios",
+      "zh": "跟踪更改",
+      "pt": "Controlar alterações",
+      "ar": "تتبع التغييرات",
+      "it": "Revisioni"
+    },
+    "doc_comments": {
+      "de": "Kommentare",
+      "en": "Comments",
+      "fr": "Commentaires",
+      "ru": "Комментарии",
+      "es": "Comentarios",
+      "zh": "批注",
+      "pt": "Comentários",
+      "ar": "تعليقات",
+      "it": "Commenti"
+    },
+    "version_history": {
+      "de": "Versionsverlauf",
+      "en": "Version history",
+      "fr": "Historique des versions",
+      "ru": "История версий",
+      "es": "Historial de versiones",
+      "zh": "版本历史",
+      "pt": "Histórico de versões",
+      "ar": "سجل الإصدارات",
+      "it": "Cronologia versioni"
+    },
+    "mail_merge": {
+      "de": "Seriendruck",
+      "en": "Mail merge",
+      "fr": "Publipostage",
+      "ru": "Слияние писем",
+      "es": "Combinar correspondencia",
+      "zh": "邮件合并",
+      "pt": "Mala direta",
+      "ar": "دمج المراسلات",
+      "it": "Stampa unione"
+    },
+    "review_author": {
+      "de": "Autor",
+      "en": "Author",
+      "fr": "Auteur",
+      "ru": "Автор",
+      "es": "Autor",
+      "zh": "作者",
+      "pt": "Autor",
+      "ar": "المؤلف",
+      "it": "Autore"
+    },
+    "accept_change": {
+      "de": "Annehmen",
+      "en": "Accept",
+      "fr": "Accepter",
+      "ru": "Принять",
+      "es": "Aceptar",
+      "zh": "接受",
+      "pt": "Aceitar",
+      "ar": "قبول",
+      "it": "Accetta"
+    },
+    "reject_change": {
+      "de": "Ablehnen",
+      "en": "Reject",
+      "fr": "Refuser",
+      "ru": "Отклонить",
+      "es": "Rechazar",
+      "zh": "拒绝",
+      "pt": "Rejeitar",
+      "ar": "رفض",
+      "it": "Rifiuta"
+    },
+    "accept_all": {
+      "de": "Alle annehmen",
+      "en": "Accept all",
+      "fr": "Tout accepter",
+      "ru": "Принять все",
+      "es": "Aceptar todo",
+      "zh": "全部接受",
+      "pt": "Aceitar tudo",
+      "ar": "قبول الكل",
+      "it": "Accetta tutto"
+    },
+    "reject_all": {
+      "de": "Alle ablehnen",
+      "en": "Reject all",
+      "fr": "Tout refuser",
+      "ru": "Отклонить все",
+      "es": "Rechazar todo",
+      "zh": "全部拒绝",
+      "pt": "Rejeitar tudo",
+      "ar": "رفض الكل",
+      "it": "Rifiuta tutto"
+    },
+    "new_comment": {
+      "de": "Neuer Kommentar",
+      "en": "New comment",
+      "fr": "Nouveau commentaire",
+      "ru": "Новый комментарий",
+      "es": "Nuevo comentario",
+      "zh": "新建批注",
+      "pt": "Novo comentário",
+      "ar": "تعليق جديد",
+      "it": "Nuovo commento"
+    },
+    "add_comment": {
+      "de": "Kommentar hinzufügen",
+      "en": "Add comment",
+      "fr": "Ajouter un commentaire",
+      "ru": "Добавить комментарий",
+      "es": "Añadir comentario",
+      "zh": "添加批注",
+      "pt": "Adicionar comentário",
+      "ar": "إضافة تعليق",
+      "it": "Aggiungi commento"
+    },
+    "resolve_comment": {
+      "de": "Erledigt",
+      "en": "Resolve",
+      "fr": "Résolu",
+      "ru": "Готово",
+      "es": "Resuelto",
+      "zh": "已解决",
+      "pt": "Resolvido",
+      "ar": "تم الحل",
+      "it": "Risolto"
+    },
+    "delete_comment": {
+      "de": "Löschen",
+      "en": "Delete",
+      "fr": "Supprimer",
+      "ru": "Удалить",
+      "es": "Eliminar",
+      "zh": "删除",
+      "pt": "Eliminar",
+      "ar": "حذف",
+      "it": "Elimina"
+    },
+    "comment_body_hint": {
+      "de": "Feedback zur Auswahl…",
+      "en": "Feedback on selection…",
+      "fr": "Commentaire sur la sélection…",
+      "ru": "Комментарий к выделению…",
+      "es": "Comentario sobre la selección…",
+      "zh": "对所选内容的反馈…",
+      "pt": "Feedback sobre a seleção…",
+      "ar": "ملاحظات حول التحديد…",
+      "it": "Feedback sulla selezione…"
+    },
+    "comment_empty": {
+      "de": "Bitte Kommentartext eingeben.",
+      "en": "Please enter a comment.",
+      "fr": "Veuillez saisir un commentaire.",
+      "ru": "Введите текст комментария.",
+      "es": "Introduzca un comentario.",
+      "zh": "请输入批注内容。",
+      "pt": "Introduza um comentário.",
+      "ar": "يرجى إدخال تعليق.",
+      "it": "Inserisci un commento."
+    },
+    "version_label": {
+      "de": "Label",
+      "en": "Label",
+      "fr": "Libellé",
+      "ru": "Метка",
+      "es": "Etiqueta",
+      "zh": "标签",
+      "pt": "Etiqueta",
+      "ar": "التسمية",
+      "it": "Etichetta"
+    },
+    "save_version": {
+      "de": "Version speichern",
+      "en": "Save version",
+      "fr": "Enregistrer la version",
+      "ru": "Сохранить версию",
+      "es": "Guardar versión",
+      "zh": "保存版本",
+      "pt": "Guardar versão",
+      "ar": "حفظ الإصدار",
+      "it": "Salva versione"
+    },
+    "restore_version": {
+      "de": "Wiederherstellen",
+      "en": "Restore",
+      "fr": "Restaurer",
+      "ru": "Восстановить",
+      "es": "Restaurar",
+      "zh": "还原",
+      "pt": "Restaurar",
+      "ar": "استعادة",
+      "it": "Ripristina"
+    },
+    "delete_version": {
+      "de": "Löschen",
+      "en": "Delete",
+      "fr": "Supprimer",
+      "ru": "Удалить",
+      "es": "Eliminar",
+      "zh": "删除",
+      "pt": "Eliminar",
+      "ar": "حذف",
+      "it": "Elimina"
+    },
+    "version_no_source": {
+      "de": "Kein Dokumentinhalt zum Speichern.",
+      "en": "No document content to save.",
+      "fr": "Aucun contenu à enregistrer.",
+      "ru": "Нет содержимого для сохранения.",
+      "es": "No hay contenido para guardar.",
+      "zh": "没有可保存的文档内容。",
+      "pt": "Sem conteúdo para guardar.",
+      "ar": "لا يوجد محتوى للحفظ.",
+      "it": "Nessun contenuto da salvare."
+    },
+    "version_restore_confirm": {
+      "de": "Aktuellen Stand durch diese Version ersetzen?",
+      "en": "Replace the current state with this version?",
+      "fr": "Remplacer l'état actuel par cette version ?",
+      "ru": "Заменить текущее состояние этой версией?",
+      "es": "¿Reemplazar el estado actual con esta versión?",
+      "zh": "用此版本替换当前内容？",
+      "pt": "Substituir o estado atual por esta versão?",
+      "ar": "استبدال الحالة الحالية بهذا الإصدار؟",
+      "it": "Sostituire lo stato attuale con questa versione?"
+    },
+    "ribbon_review": {
+      "de": "Review",
+      "en": "Review",
+      "fr": "Révision",
+      "ru": "Рецензия",
+      "es": "Revisión",
+      "zh": "审阅",
+      "pt": "Revisão",
+      "ar": "مراجعة",
+      "it": "Revisione"
     }
   },
   "phrases": {
@@ -2427,6 +2680,29 @@
       "pt": "Janela",
       "ar": "نافذة",
       "it": "Finestra"
-    }
+    },
+    "review_mode": "Review / Änderungen",
+    "track_changes": "Änderungen nachverfolgen",
+    "doc_comments": "Kommentare",
+    "version_history": "Versionsverlauf",
+    "mail_merge": "Seriendruck",
+    "review_author": "Autor",
+    "accept_change": "Annehmen",
+    "reject_change": "Ablehnen",
+    "accept_all": "Alle annehmen",
+    "reject_all": "Alle ablehnen",
+    "new_comment": "Neuer Kommentar",
+    "add_comment": "Kommentar hinzufügen",
+    "resolve_comment": "Erledigt",
+    "delete_comment": "Löschen",
+    "comment_body_hint": "Feedback zur Auswahl…",
+    "comment_empty": "Bitte Kommentartext eingeben.",
+    "version_label": "Label",
+    "save_version": "Version speichern",
+    "restore_version": "Wiederherstellen",
+    "delete_version": "Löschen",
+    "version_no_source": "Kein Dokumentinhalt zum Speichern.",
+    "version_restore_confirm": "Aktuellen Stand durch diese Version ersetzen?",
+    "ribbon_review": "Review"
   }
 }

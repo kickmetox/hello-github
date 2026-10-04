@@ -829,6 +829,103 @@ function Set-IldSnippet {
     Invoke-Ild @("--json", "set-snippet", "$Index", $Text) | Out-Host
 }
 
+function Enable-IldReview {
+    # Review / Track Changes — 2.6.21
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [string]$Author,
+        [switch]$Off
+    )
+    $a = @("--json", "review-enable", $Path)
+    if ($Author) { $a += @("--author", $Author) }
+    if ($Off) { $a += "--off" }
+    Invoke-Ild @a | Out-Host
+}
+
+function Get-IldReview {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [string]$Author,
+        [switch]$Pending,
+        [int]$Limit = 200
+    )
+    $a = @("--json", "review-list", $Path, "--limit", "$Limit")
+    if ($Author) { $a += @("--author", $Author) }
+    if ($Pending) { $a += "--pending" }
+    Invoke-Ild @a | Out-Host
+}
+
+function Add-IldComment {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)][string]$Body,
+        [int]$Start = 0,
+        [int]$End = -1,
+        [string]$Anchor,
+        [string]$Author
+    )
+    $a = @("--json", "comment-add", $Path, $Body, "--start", "$Start")
+    if ($End -ge 0) { $a += @("--end", "$End") }
+    if ($Anchor) { $a += @("--anchor", $Anchor) }
+    if ($Author) { $a += @("--author", $Author) }
+    Invoke-Ild @a | Out-Host
+}
+
+function Get-IldComments {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [switch]$Open,
+        [int]$Limit = 200
+    )
+    $a = @("--json", "comment-list", $Path, "--limit", "$Limit")
+    if ($Open) { $a += "--open" }
+    Invoke-Ild @a | Out-Host
+}
+
+function Save-IldVersion {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [string]$Label,
+        [string]$Note,
+        [string]$Text
+    )
+    $a = @("--json", "version-save", $Path)
+    if ($Label) { $a += @("--label", $Label) }
+    if ($Note) { $a += @("--note", $Note) }
+    if ($Text) { $a += @("--text", $Text) }
+    Invoke-Ild @a | Out-Host
+}
+
+function Get-IldVersions {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [int]$Limit = 50
+    )
+    Invoke-Ild @("--json", "version-list", $Path, "--limit", "$Limit") | Out-Host
+}
+
+function Restore-IldVersion {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)][string]$VersionId,
+        [string]$Dest
+    )
+    $a = @("--json", "version-restore", $Path, $VersionId)
+    if ($Dest) { $a += @("--dest", $Dest) }
+    Invoke-Ild @a | Out-Host
+}
+
+function Invoke-IldMailMerge {
+    param(
+        [Parameter(Mandatory = $true)][string]$Template,
+        [Parameter(Mandatory = $true)][string]$Recipients,
+        [Parameter(Mandatory = $true)][string]$OutDir,
+        [string]$Stem = "letter"
+    )
+    Invoke-Ild @("--json", "mail-merge", $Template, $Recipients, $OutDir, "--stem", $Stem) | Out-Host
+}
+
+
 function Merge-IldPdf {
     param(
         [Parameter(Mandatory = $true)][string[]]$Path,

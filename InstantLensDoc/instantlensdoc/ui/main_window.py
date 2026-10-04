@@ -1867,6 +1867,36 @@ class MainWindow(QMainWindow):
         act_spell_clear.triggered.connect(self._clear_spelling)
         m_edit.addAction(act_spell_clear)
         m_edit.addSeparator()
+        m_review = m_edit.addMenu("Review / Zusammenarbeit")
+        act_review = QAction("Änderungen nachverfolgen…", self)
+        act_review.setShortcut(QKeySequence("Ctrl+Shift+E"))
+        act_review.setToolTip(
+            "Review-Modus: Einfügen/Löschen je Autor protokollieren (lokal) — 2.6.21"
+        )
+        act_review.triggered.connect(self._show_review_dialog)
+        m_review.addAction(act_review)
+        self._review_action = act_review
+        act_comments = QAction("Kommentare…", self)
+        act_comments.setShortcut(QKeySequence("Ctrl+Alt+M"))
+        act_comments.setToolTip(
+            "Feedback an Textstellen ohne Body-Änderung — 2.6.21"
+        )
+        act_comments.triggered.connect(self._show_comments_dialog)
+        m_review.addAction(act_comments)
+        act_versions = QAction("Versionsverlauf…", self)
+        act_versions.setShortcut(QKeySequence("Ctrl+Alt+Shift+H"))
+        act_versions.setToolTip(
+            "Dokumentstände speichern und wiederherstellen (lokal) — 2.6.21"
+        )
+        act_versions.triggered.connect(self._show_version_history_dialog)
+        m_review.addAction(act_versions)
+        act_mail_merge = QAction("Seriendruck…", self)
+        act_mail_merge.setToolTip(
+            "Empfänger aus CSV/Excel → Briefe mit {{Feld}}-Platzhaltern — 2.6.21"
+        )
+        act_mail_merge.triggered.connect(self._run_mail_merge_dialog)
+        m_review.addAction(act_mail_merge)
+        m_edit.addSeparator()
         act_del_ann = QAction("Annotation löschen", self)
         act_del_ann.setShortcut(QKeySequence.Delete)
         act_del_ann.setToolTip("Ausgewählte Annotation oder letzte auf der Seite")
@@ -5213,6 +5243,151 @@ class MainWindow(QMainWindow):
         self.editor.clear_spelling()
         self._set_status("Rechtschreibmarkierungen gelöscht")
 
+    def _collab_doc_path(self) -> str | None:
+        """Pfad für lokale Review-/Kommentar-/Versions-Sidecars — 2.6.21."""
+        if self.doc and self.doc.path:
+            return str(self.doc.path)
+        if getattr(self.pdf_view, "pdf_path", None):
+            return str(self.pdf_view.pdf_path)
+        return None
+
+    def _goto_editor_range(self, start: int, end: int) -> None:
+        from PySide6.QtGui import QTextCursor
+
+        self.stack.setCurrentWidget(self.editor_pane)
+        cur = self.editor.textCursor()
+        cur.setPosition(max(0, int(start)))
+        cur.setPosition(max(0, int(end)), QTextCursor.KeepAnchor)
+        self.editor.setTextCursor(cur)
+        self.editor.setFocus()
+
+    def _show_review_dialog(self):
+        from instantlensdoc.ui.review_dialog import ReviewDialog
+
+        path = self._collab_doc_path()
+        if not path:
+            # Unbenannt: temporärer Sidecar-Anker unter config
+            from instantlensdoc.config import config_dir
+
+            path = str(config_dir() / "untitled.ildreview-anchor.txt")
+            Path(path).parent.mkdir(parents=True, exist_ok=True)
+            if not Path(path).is_file():
+                Path(path).write_text("", encoding="utf-8")
+        dlg = ReviewDialog(
+            path, self, on_goto=self._goto_editor_range
+        )
+        # Review-Toggle → Editor-Tracking
+        if dlg.exec() is not None:
+            pass
+        try:
+            from instantlensdoc.core.review import ReviewStore
+
+            store = ReviewStore.for_doc(path, load=True)
+            if getattr(self, "ribbon_bar", None) is not None:
+                self.ribbon_bar.set_checked("review_mode", store.enabled)
+            if hasattr(self.editor, "set_review_tracking"):
+                self.editor.set_review_tracking(
+                    store.enabled, path=path, author=store.author
+                )
+            self._set_status(
+                f"Review {'ein' if store.enabled else 'aus'} · "
+                f"pending {store.summary()['pending']}"
+            )
+        except Exception as e:
+            self._set_status(f"Review: {e}")
+
+    def _show_comments_dialog(self):
+        from instantlensdoc.ui.comments_dialog import CommentsDialog
+
+        path = self._collab_doc_path()
+        if not path:
+            from instantlensdoc.config import config_dir
+
+            path = str(config_dir() / "untitled.ildcomments-anchor.txt")
+            Path(path).parent.mkdir(parents=True, exist_ok=True)
+            if not Path(path).is_file():
+                Path(path).write_text("", encoding="utf-8")
+        cur = self.editor.textCursor()
+        start, end = cur.selectionStart(), cur.selectionEnd()
+        anchor = cur.selectedText().replace("\u2029", "\n")
+        dlg = CommentsDialog(
+            path,
+            self,
+            selection_start=start,
+            selection_end=end,
+            anchor_text=anchor,
+            on_goto=self._goto_editor_range,
+        )
+        dlg.exec()
+        self._set_status("Kommentare aktualisiert")
+
+    def _show_version_history_dialog(self):
+        from instantlensdoc.ui.version_history_dialog import VersionHistoryDialog
+
+        path = self._collab_doc_path()
+        if not path:
+            from instantlensdoc.config import config_dir
+
+            path = str(config_dir() / "untitled.ildversions-anchor.txt")
+            Path(path).parent.mkdir(parents=True, exist_ok=True)
+            if not Path(path).is_file():
+                Path(path).write_text(
+                    self.editor.toPlainText(), encoding="utf-8"
+                )
+
+        def _restore(text: str) -> None:
+            self.stack.setCurrentWidget(self.editor_pane)
+            self.editor.setPlainText(text)
+            if self.doc is not None:
+                self.doc.text = text
+                self.doc.dirty = True
+            self._set_status("Version wiederhergestellt")
+
+        dlg = VersionHistoryDialog(
+            path,
+            self,
+            current_text=self.editor.toPlainText(),
+            on_restore_text=_restore,
+        )
+        dlg.exec()
+
+    def _run_mail_merge_dialog(self):
+        from PySide6.QtWidgets import QFileDialog, QInputDialog
+
+        from instantlensdoc.core.mail_merge import mail_merge_from_files
+
+        tpl, _ = QFileDialog.getOpenFileName(
+            self,
+            "Seriendruck — Vorlage",
+            "",
+            "Text (*.txt *.md);;Alle (*.*)",
+        )
+        if not tpl:
+            return
+        rec, _ = QFileDialog.getOpenFileName(
+            self,
+            "Seriendruck — Empfänger (CSV/Excel)",
+            "",
+            "Tabellen (*.csv *.xlsx);;Alle (*.*)",
+        )
+        if not rec:
+            return
+        out = QFileDialog.getExistingDirectory(self, "Seriendruck — Ausgabeordner")
+        if not out:
+            return
+        stem, ok = QInputDialog.getText(
+            self, "Seriendruck", "Dateiname-Stamm:", text="letter"
+        )
+        if not ok:
+            return
+        try:
+            data = mail_merge_from_files(tpl, rec, out, stem=stem or "letter")
+            self._set_status(
+                f"Seriendruck: {data['count']} Brief(e) → {data['out_dir']}"
+            )
+        except Exception as e:
+            self._set_status(f"Seriendruck fehlgeschlagen: {e}")
+
     def _insert_soft_hyphen(self):
         if self.stack.currentWidget() is not self.editor_pane:
             self.stack.setCurrentWidget(self.editor_pane)
@@ -6251,7 +6426,7 @@ class MainWindow(QMainWindow):
             self.ribbon_bar.setVisible(bool(checked))
 
     def _on_ribbon_action(self, action_id: str) -> None:
-        """Ribbon-Chrome-Aktionen — 2.6.20."""
+        """Ribbon-Chrome-Aktionen — 2.6.21."""
         handlers = {
             "open": self.open_dialog,
             "save": self.save_doc,
@@ -6262,6 +6437,10 @@ class MainWindow(QMainWindow):
             "redo": self._redo,
             "autocorrect_toggle": self._toggle_autocorrect,
             "insert_snippet": lambda: self._insert_snippet(0),
+            "review_mode": self._show_review_dialog,
+            "doc_comments": self._show_comments_dialog,
+            "version_history": self._show_version_history_dialog,
+            "mail_merge": self._run_mail_merge_dialog,
             "book_layout": lambda: self._toggle_book_layout(
                 not self.pdf_view.book_layout_enabled()
             ),
@@ -11180,6 +11359,10 @@ class MainWindow(QMainWindow):
             "spell_suggestions": self._show_spell_suggestions,
             "autocorrect_toggle": self._toggle_autocorrect,
             "detach_window": self._detach_current_document,
+            "review_mode": self._show_review_dialog,
+            "doc_comments": self._show_comments_dialog,
+            "version_history": self._show_version_history_dialog,
+            "mail_merge": self._run_mail_merge_dialog,
             "hyphenate_en": lambda: self._hyphenate_document("en"),
             "text_wrap": self._set_image_text_wrap,
             "ocr_page": self._run_ocr,

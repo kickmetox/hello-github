@@ -246,6 +246,10 @@ SHORTCUTS_HTML = """
 <tr><td>Rechtschreibvorschläge</td><td><code>Shift+F7</code> — Liste mit Korrekturen — 2.6.20</td></tr>
 <tr><td>Autokorrektur</td><td>Bearbeiten → Autokorrektur / Ribbon — 2.6.20</td></tr>
 <tr><td>Textbausteine</td><td><code>Ctrl+Alt+1…9</code> — 9 Slots — 2.6.20</td></tr>
+<tr><td>Review / Änderungen</td><td><code>Ctrl+Shift+E</code> — Track Changes lokal — 2.6.21</td></tr>
+<tr><td>Kommentare</td><td><code>Ctrl+Alt+M</code> — Feedback an Textstelle — 2.6.21</td></tr>
+<tr><td>Versionsverlauf</td><td><code>Ctrl+Alt+Shift+H</code> — Snapshot speichern/wiederherstellen — 2.6.21</td></tr>
+<tr><td>Seriendruck</td><td>Bearbeiten → Review / Ribbon Review — CSV/Excel → Briefe — 2.6.21</td></tr>
 <tr><td>Tastatur-Cheat-Sheet</td><td><code>F1</code> — Hilfe → Tastatur-Cheat-Sheet… · Suche/Filter — 2.4.1</td></tr>
 <tr><td>Cheat-Sheet als PDF</td><td>F1 → „Als PDF exportieren…“</td></tr>
 <tr><td>Cheat-Sheet als TXT</td><td>F1 → „Als TXT exportieren…“ · Template {date}_shortcuts.txt · Zielordner merken — 2.4.2</td></tr>

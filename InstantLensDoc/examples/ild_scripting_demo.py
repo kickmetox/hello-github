@@ -1,4 +1,4 @@
-"""Beispiel: InstantLens Doc Scripting (Python) — 2.6.20.
+"""Beispiel: InstantLens Doc Scripting (Python) — 2.6.21.
 
 Aufruf aus dem App-Root:
   python examples/ild_scripting_demo.py [pdf]
@@ -82,7 +82,7 @@ def main() -> int:
         print("csv import cols:", imp.get("cols"))
         out_docx = td_p / "demo.docx"
         try:
-            saved = ild.save_document("Hallo 2.6.20", out_docx)
+            saved = ild.save_document("Hallo 2.6.21", out_docx)
             print("save_document:", Path(saved["path"]).exists())
         except Exception as e:
             print("save_document skip:", e)
@@ -104,6 +104,29 @@ def main() -> int:
             src, out=td_p / "hf.pdf", header="{title}", footer="{author}", title="Demo", author="ILD"
         )
         print("header_footer:", Path(hf["path"]).exists())
+        # Review / Kommentare / Versionen / Seriendruck — 2.6.21
+        demo = td_p / "ild_demo_review.txt"
+        demo.write_text("Hallo", encoding="utf-8")
+        print("review:", ild.review_enable(demo, author="Demo")["enabled"])
+        print(
+            "diff:",
+            ild.review_record_diff(demo, "Hallo", "Hallo Welt", author="Demo")[
+                "recorded"
+            ],
+        )
+        print(
+            "comment:",
+            ild.comment_add(demo, "prüfen", start=0, end=5, anchor_text="Hallo")[
+                "open"
+            ],
+        )
+        print("version:", ild.version_save(demo, label="demo")["total"])
+        csv = td_p / "empf.csv"
+        csv.write_text("Name\nMax\n", encoding="utf-8")
+        mm = ild.mail_merge_run(
+            "Hi {{Name}}", csv, td_p / "mm_out", template_is_text=True
+        )
+        print("mail_merge:", mm["count"])
     return 0
 
 

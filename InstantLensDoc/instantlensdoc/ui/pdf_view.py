@@ -193,7 +193,7 @@ from instantlensdoc.core.app_settings import (
 # Continuous-Scroll: max. gerenderte Seiten (Speicher)
 CONTINUOUS_MAX_PAGES = 40
 CONTINUOUS_PAGE_GAP = 12
-# 0 = unbegrenzt (Seiten-Ops Undo-Stack) — 2.6.20
+# 0 = unbegrenzt (Seiten-Ops Undo-Stack) — 2.6.21
 PAGE_OPS_UNDO_LIMIT = 0
 
 

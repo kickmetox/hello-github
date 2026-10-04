@@ -1,5 +1,5 @@
 """
-Stabiles Scripting-API für InstantLens Doc (2.6.20).
+Stabiles Scripting-API für InstantLens Doc (2.6.21).
 
 Headless, ohne GUI. Nutzt ``ild_pdf`` + Lizenz/OCR der App.
 
@@ -29,6 +29,10 @@ Headless, ohne GUI. Nutzt ``ild_pdf`` + Lizenz/OCR der App.
     ild.spellcheck("Hallo Foo Welt")
     ild.autocorrect_text("teh dokument")
     ild.list_snippets()
+    ild.review_enable("dok.txt", author="Anna")
+    ild.comment_add("dok.txt", "Bitte prüfen", start=0, end=5)
+    ild.version_save("dok.txt", label="v1")
+    ild.mail_merge_run("tpl.txt", "empf.csv", "out")
 
     CLI: ``python -m ild --help`` · PowerShell: ``scripts\\ild.ps1``.
 """
@@ -122,6 +126,18 @@ from ild.api import (
     list_autocorrect_rules_api,
     list_snippets,
     set_snippet,
+    review_enable,
+    review_record_diff,
+    review_list,
+    review_accept,
+    review_reject,
+    comment_add,
+    comment_list,
+    comment_resolve,
+    version_save,
+    version_list,
+    version_restore,
+    mail_merge_run,
     open_info,
     outline_summary,
     page_count,
@@ -175,6 +191,18 @@ __all__ = [
     "list_autocorrect_rules_api",
     "list_snippets",
     "set_snippet",
+    "review_enable",
+    "review_record_diff",
+    "review_list",
+    "review_accept",
+    "review_reject",
+    "comment_add",
+    "comment_list",
+    "comment_resolve",
+    "version_save",
+    "version_list",
+    "version_restore",
+    "mail_merge_run",
     "add_redaction",
     "apply_redactions",
     "add_shape",

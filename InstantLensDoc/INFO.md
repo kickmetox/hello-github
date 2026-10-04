@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **2.6.20** |
+| Version | **2.6.21** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -33,7 +33,7 @@
 
 Skript: [sync-ild.ps1](scripts/sync-ild.ps1) — Branch `cursor/instantlensdoc-2108` (oder `-LocalPack` / Pack-Zip) nach `D:\AI_Temp\InstantLensDoc`, pip, Start. **Nutzer-Icon in `assets` wird nicht überschrieben.**
 
-**FEATURES.md lokal sync:** Nach Sync liegt `FEATURES.md` lokal im App-Ordner (`D:\AI_Temp\InstantLensDoc\FEATURES.md`); About/Stubs öffnen diese lokale Datei — Version **2.6.20**.
+**FEATURES.md lokal sync:** Nach Sync liegt `FEATURES.md` lokal im App-Ordner (`D:\AI_Temp\InstantLensDoc\FEATURES.md`); About/Stubs öffnen diese lokale Datei — Version **2.6.21**.
 
 Ohne Start: `-NoStart` (Alias `-SkipStart`). Exit-Codes: **0** OK · **1** allgemein · **2** Git-Fehler.
 
@@ -81,6 +81,19 @@ python -m keygen --verify "ILD1...."
 ```
 
 Trial 28 Tage · Keys 32 Tage (HMAC `ILD1.…`). Details: `keygen/README.md`.
+
+## Neu in 2.6.21
+
+Minor nach **2.6.20** (Spell/Autocorrect/Ribbon/Undo):
+
+- **Review / Track Changes:** Einfügen/Löschen je Autor; Sidecar `*.ildreview.json`; Accept/Reject
+- **Kommentare:** Feedback an Textstellen ohne Body-Änderung; `*.ildcomments.json`
+- **Versionsverlauf:** Snapshots unter `*.ildversions/`; Speichern/Wiederherstellen
+- **Seriendruck (Basis):** Empfänger CSV/Excel → Briefe mit `{{Feld}}` / `«Feld»`
+- **ild API:** `review_*` / `comment_*` / `version_*` / `mail_merge_run`
+- CLI `review-*`/`comment-*`/`version-*`/`mail-merge` · PS `Enable-IldReview` / `Add-IldComment` / `Save-IldVersion` / `Invoke-IldMailMerge`
+- Ribbon-Tab **Review**; freier KI-Chat-Stub unverändert; keine Cloud-Echtzeit-Kollaboration; eIDAS wartet
+- Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie unverändert
 
 ## Neu in 2.6.20
 
