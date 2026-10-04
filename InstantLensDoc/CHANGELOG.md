@@ -1,5 +1,20 @@
 # Changelog — InstantLens Doc
 
+## 2.5.1 — OCR-Region Defaults·Abbruch·leer, Theme-Swatches·Default·JSON, ildtags Recent·Clear·Persistenz, Export-Presets max 10
+
+Post-Release-Polish nach **2.5.0**: **OCR-Region** nutzt **DPI/Sprache aus Defaults**, **Abbruch** (Esc/Progress) und **Hinweis bei leerem Ergebnis**; **Farben-Themes** mit **Vorschau-Swatches**, **Als Default speichern**, **Import/Export JSON**; **ildtags** Tag hinzufügen/entfernen am Recent, **Filter Clear**, **Persistenz**; **Export-Presets** benannt **max. 10**, **Anwenden/Löschen**, **Live-Zusammenfassung**. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie klar markiert / nicht produktiv (Ink ≠ Stylus).
+
+### Geändert
+- OCR-Region: DPI/Sprache aus Defaults · Abbruch Esc/Progress · Hinweis bei leerem Ergebnis
+- Farben-Themes: Vorschau-Swatches · Als Default speichern · Theme Import/Export JSON (`ildcolors-v1`)
+- Dokument-Tags: Tag hinzufügen/entfernen am Recent · Filter Clear · Filter-Persistenz
+- Export-Presets: benannte Presets max. 10 · Anwenden/Löschen · Live-Zusammenfassung DPI/Format/Pfad
+
+### Tests / Qualität
+- Version **2.5.1** (App / `ild_pdf` / ISS / Smoke / Docs); Serie **2.5**; `docs/VERSION` + `VERSION.txt`
+- Smoke: 2.5.1 CLI + Qt (OCR Defaults/Cancel/leer, Theme Swatches/Default/JSON, ildtags Recent/Clear/Persist, Export max10/Apply/Delete/Summary)
+- Stubs: KI/Cloud/Stylus/3D/Hooks/Outline/Telemetrie unverändert markiert
+
 ## 2.5.0 — PDF-OCR-Region, Annotation-Farben-Themes, Dokument-Tags ildtags-v1, Export-Preset Zuletzt
 
 Minor-Bump nach **2.4.5**: **PDF-OCR-Region** Rechteck wählen → nur Region OCR → Text-Tab; **Annotation-Farben-Themes** vordefinierte Paletten Markieren/Corporate laden; **Dokument-Tags global** Schema **ildtags-v1** über Docs hinweg filterbar in Willkommen/Recent; **Export-Preset** letzte Export-Einstellungen (DPI/Format/Pfad) als Preset **„Zuletzt“** speichern. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie klar markiert / nicht produktiv (Ink ≠ Stylus).

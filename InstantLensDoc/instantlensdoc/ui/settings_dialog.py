@@ -871,21 +871,63 @@ class SettingsDialog(QDialog):
         )
         btn_import_presets.clicked.connect(self._import_color_presets_ui)
         preset_row.addWidget(btn_import_presets)
-        from instantlensdoc.core.app_settings import list_ann_color_themes
+        from instantlensdoc.core.app_settings import (
+            get_default_ann_color_theme,
+            list_ann_color_themes,
+        )
 
         self.ann_theme_combo = QComboBox()
         self.ann_theme_combo.addItem("(Theme laden…)", "")
         for theme_name in list_ann_color_themes():
             self.ann_theme_combo.addItem(theme_name, theme_name)
+        default_theme = get_default_ann_color_theme()
+        if default_theme:
+            idx_def = self.ann_theme_combo.findData(default_theme)
+            if idx_def >= 0:
+                self.ann_theme_combo.setCurrentIndex(idx_def)
         self.ann_theme_combo.setToolTip(
-            "Vordefinierte Paletten Markieren/Corporate in die Preset-Felder laden — 2.5.0"
+            "Vordefinierte Paletten Markieren/Corporate — Vorschau-Swatches — 2.5.1"
         )
+        self.ann_theme_combo.currentIndexChanged.connect(self._update_ann_theme_swatches)
         btn_load_theme = QPushButton("Theme laden")
         btn_load_theme.setToolTip("Gewähltes Annotation-Farben-Theme anwenden — 2.5.0")
         btn_load_theme.clicked.connect(self._load_ann_color_theme_ui)
+        btn_theme_default = QPushButton("Als Default")
+        btn_theme_default.setToolTip(
+            "Gewähltes Theme als Default speichern (Combo vorbelegen) — 2.5.1"
+        )
+        btn_theme_default.clicked.connect(self._save_default_ann_color_theme_ui)
+        btn_theme_export = QPushButton("Theme Export…")
+        btn_theme_export.setToolTip(
+            "Farben-Theme als JSON exportieren (ildcolors-v1 + theme) — 2.5.1"
+        )
+        btn_theme_export.clicked.connect(self._export_ann_color_theme_ui)
+        btn_theme_import = QPushButton("Theme Import…")
+        btn_theme_import.setToolTip(
+            "Farben-Theme aus JSON importieren (ildcolors-v1) — 2.5.1"
+        )
+        btn_theme_import.clicked.connect(self._import_ann_color_theme_ui)
         preset_row.addWidget(self.ann_theme_combo)
         preset_row.addWidget(btn_load_theme)
+        preset_row.addWidget(btn_theme_default)
+        preset_row.addWidget(btn_theme_export)
+        preset_row.addWidget(btn_theme_import)
         form.addRow("Ann.-Color-Presets", preset_row)
+        # Theme-Vorschau Swatches — 2.5.1
+        swatch_row = QHBoxLayout()
+        self._theme_swatch_labels: list[QLabel] = []
+        for _i in range(ANN_COLOR_PRESET_COUNT):
+            sw = QLabel("")
+            sw.setFixedSize(22, 22)
+            sw.setFrameShape(QFrame.Box)
+            sw.setToolTip("Theme-Vorschau — 2.5.1")
+            self._theme_swatch_labels.append(sw)
+            swatch_row.addWidget(sw)
+        self.ann_theme_swatch_hint = QLabel("")
+        self.ann_theme_swatch_hint.setStyleSheet("color: #666;")
+        swatch_row.addWidget(self.ann_theme_swatch_hint, 1)
+        form.addRow("Theme-Vorschau", swatch_row)
+        self._update_ann_theme_swatches()
 
         self.line_numbers = QCheckBox("Zeilennummern im Editor")
         from instantlensdoc.core.app_settings import (
@@ -2774,6 +2816,157 @@ class SettingsDialog(QDialog):
         if hasattr(self, "btn_undo_factory_presets"):
             self.btn_undo_factory_presets.setEnabled(bool(prev))
 
+    def _update_ann_theme_swatches(self, *_args) -> None:
+        """Vorschau-Swatches für gewähltes Farben-Theme — 2.5.1."""
+        from instantlensdoc.core.app_settings import (
+            get_ann_color_theme,
+            get_default_ann_color_theme,
+        )
+
+        labels = getattr(self, "_theme_swatch_labels", None) or []
+        combo = getattr(self, "ann_theme_combo", None)
+        name = ""
+        if combo is not None:
+            name = str(combo.currentData() or "").strip()
+        colors = get_ann_color_theme(name) if name else None
+        for i, sw in enumerate(labels):
+            if colors and i < len(colors):
+                c = colors[i]
+                sw.setStyleSheet(
+                    f"background: {c}; border: 1px solid #444; border-radius: 3px;"
+                )
+                sw.setToolTip(f"{name}: {c}")
+                sw.setVisible(True)
+            else:
+                sw.setStyleSheet("background: transparent; border: 1px dashed #bbb;")
+                sw.setToolTip("Kein Theme gewählt")
+                sw.setVisible(True)
+        hint = getattr(self, "ann_theme_swatch_hint", None)
+        if hint is not None:
+            default = get_default_ann_color_theme()
+            if name and colors:
+                extra = " · Default" if name == default else ""
+                hint.setText(f"{name}: {len(colors)} Farben{extra}")
+            elif default:
+                hint.setText(f"Default: {default}")
+            else:
+                hint.setText("Theme wählen für Vorschau")
+
+    def _save_default_ann_color_theme_ui(self) -> None:
+        """Gewähltes Theme als Default speichern — 2.5.1."""
+        from instantlensdoc.core.app_settings import set_default_ann_color_theme
+
+        combo = getattr(self, "ann_theme_combo", None)
+        if combo is None:
+            return
+        name = str(combo.currentData() or "").strip()
+        if not name:
+            QMessageBox.information(
+                self, "Farben-Theme", "Bitte Markieren oder Corporate wählen."
+            )
+            return
+        try:
+            set_default_ann_color_theme(name)
+        except Exception as e:
+            QMessageBox.warning(self, "Farben-Theme", str(e))
+            return
+        self._update_ann_theme_swatches()
+        QMessageBox.information(
+            self, "Farben-Theme", f"Default-Theme gespeichert: {name}"
+        )
+
+    def _export_ann_color_theme_ui(self) -> None:
+        """Farben-Theme als JSON exportieren — 2.5.1."""
+        from instantlensdoc.core.app_settings import (
+            ANN_COLORS_SCHEMA_ID,
+            dialog_start_dir,
+            export_ann_color_theme_json,
+            get_last_export_dir,
+            set_last_export_dir,
+        )
+
+        combo = getattr(self, "ann_theme_combo", None)
+        name = ""
+        if combo is not None:
+            name = str(combo.currentData() or "").strip()
+        start = dialog_start_dir(get_last_export_dir())
+        suggested = f"{(name or 'presets').lower()}.ildcolors.json"
+        path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Farben-Theme exportieren",
+            str(Path(start) / suggested),
+            f"Color-Theme JSON (*{ANN_COLORS_SCHEMA_ID}*.json *.json);;JSON (*.json)",
+        )
+        if not path:
+            return
+        try:
+            dest = export_ann_color_theme_json(path, name or None)
+            set_last_export_dir(str(Path(dest).parent))
+        except Exception as e:
+            QMessageBox.warning(self, "Farben-Theme Export", str(e))
+            return
+        QMessageBox.information(
+            self, "Farben-Theme", f"Exportiert:\n{dest}"
+        )
+
+    def _import_ann_color_theme_ui(self) -> None:
+        """Farben-Theme aus JSON importieren — 2.5.1."""
+        from instantlensdoc.core.app_settings import (
+            ANN_COLORS_SCHEMA_ID,
+            dialog_start_dir,
+            get_last_export_dir,
+            import_ann_color_theme_json,
+            set_last_export_dir,
+        )
+
+        start = dialog_start_dir(get_last_export_dir())
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Farben-Theme importieren",
+            start,
+            f"Color-Theme JSON (*{ANN_COLORS_SCHEMA_ID}*.json *.json);;JSON (*.json)",
+        )
+        if not path:
+            return
+        reply = QMessageBox.question(
+            self,
+            "Farben-Theme importieren",
+            "JSON als Color-Presets übernehmen?\n"
+            "(Optional: Theme-Name als Default, falls vorhanden.)",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.Yes,
+        )
+        if reply != QMessageBox.Yes:
+            return
+        prev = [ed.text().strip() for ed in (getattr(self, "_preset_edits", []) or [])]
+        try:
+            presets = import_ann_color_theme_json(path, set_default=True)
+            set_last_export_dir(str(Path(path).parent))
+        except Exception as e:
+            QMessageBox.warning(self, "Farben-Theme Import", str(e))
+            return
+        self._sync_preset_edits(presets)
+        self._preset_undo = prev
+        if hasattr(self, "btn_undo_factory_presets"):
+            self.btn_undo_factory_presets.setEnabled(bool(prev))
+        # Combo auf importiertes Theme setzen falls bekannt
+        try:
+            import json as _json
+
+            data = _json.loads(Path(path).read_text(encoding="utf-8"))
+            theme_name = str(data.get("theme") or "").strip()
+            combo = getattr(self, "ann_theme_combo", None)
+            if combo is not None and theme_name:
+                idx = combo.findData(theme_name)
+                if idx >= 0:
+                    combo.setCurrentIndex(idx)
+        except Exception:
+            pass
+        self._update_ann_theme_swatches()
+        QMessageBox.information(
+            self, "Farben-Theme", f"Importiert: {len(presets)} Farben"
+        )
+
     def _load_ann_color_theme_ui(self) -> None:
         """Vordefiniertes Theme (Markieren/Corporate) in Preset-Felder — 2.5.0."""
         from instantlensdoc.core.app_settings import apply_ann_color_theme
@@ -2797,6 +2990,7 @@ class SettingsDialog(QDialog):
         self._preset_undo = prev
         if hasattr(self, "btn_undo_factory_presets"):
             self.btn_undo_factory_presets.setEnabled(bool(prev))
+        self._update_ann_theme_swatches()
 
     def _undo_factory_color_presets_ui(self) -> None:
         """Letzte Factory-Änderung in den Preset-Feldern rückgängig — 0.9.9."""

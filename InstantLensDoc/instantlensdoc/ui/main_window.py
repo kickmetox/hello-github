@@ -1480,12 +1480,16 @@ class MainWindow(QMainWindow):
         m_export.addAction(act_text_pdf)
         m_export.addSeparator()
         act_exp_prof_save = QAction("Export-Profil speichern…", self)
-        act_exp_prof_save.setToolTip("DPI / Format / Zielordner als Profil speichern")
+        act_exp_prof_save.setToolTip(
+            "Benanntes Preset speichern (max. 10; DPI/Format/Ziel) — 2.5.1"
+        )
         act_exp_prof_save.triggered.connect(self._save_export_profile)
         m_export.addAction(act_exp_prof_save)
-        act_exp_prof_apply = QAction("Export-Profil anwenden…", self)
-        act_exp_prof_apply.setToolTip("Gespeichertes Profil (DPI/Format/Ziel) aktivieren")
-        act_exp_prof_apply.triggered.connect(self._apply_export_profile)
+        act_exp_prof_apply = QAction("Export-Presets verwalten…", self)
+        act_exp_prof_apply.setToolTip(
+            "Benannte Presets (max. 10): Anwenden / Löschen · Live-Zusammenfassung — 2.5.1"
+        )
+        act_exp_prof_apply.triggered.connect(self._manage_export_presets)
         m_export.addAction(act_exp_prof_apply)
         m_file.addSeparator()
         act_print = QAction("Drucken…", self)
@@ -11444,29 +11448,47 @@ class MainWindow(QMainWindow):
         from PySide6.QtWidgets import QFileDialog, QInputDialog
         from instantlensdoc.core.app_settings import (
             EXPORT_PROFILE_FORMATS,
+            EXPORT_PROFILES_MAX,
             EXPORT_RASTER_DPI_CHOICES,
             LAST_EXPORT_PRESET_NAME,
             dialog_start_dir,
+            export_profile_summary,
+            get_export_profiles,
             get_export_raster_dpi,
             get_last_export_dir,
             get_last_export_format,
             save_export_profile,
         )
 
+        existing = {str(p["name"]).casefold() for p in get_export_profiles()}
+        if len(existing) >= EXPORT_PROFILES_MAX:
+            # Update erlaubt wenn Name bereits existiert
+            pass
         name, ok = QInputDialog.getText(
             self,
-            "Export-Profil",
-            "Name (leer = Zuletzt):",
+            "Export-Preset",
+            f"Name (leer = Zuletzt; max. {EXPORT_PROFILES_MAX}):",
             text=LAST_EXPORT_PRESET_NAME,
         )
         if not ok:
             return
         name = (name or "").strip() or LAST_EXPORT_PRESET_NAME
+        if (
+            name.casefold() not in existing
+            and len(existing) >= EXPORT_PROFILES_MAX
+        ):
+            QMessageBox.warning(
+                self,
+                "Export-Preset",
+                f"Maximal {EXPORT_PROFILES_MAX} benannte Presets.\n"
+                "Bitte zuerst eines löschen (Export-Presets verwalten…).",
+            )
+            return
         dpi_items = [str(d) for d in EXPORT_RASTER_DPI_CHOICES]
         default_dpi = str(get_export_raster_dpi())
         dpi_idx = dpi_items.index(default_dpi) if default_dpi in dpi_items else 1
         dpi_str, ok = QInputDialog.getItem(
-            self, "Export-Profil", "DPI:", dpi_items, dpi_idx, False
+            self, "Export-Preset", "DPI:", dpi_items, dpi_idx, False
         )
         if not ok:
             return
@@ -11474,30 +11496,45 @@ class MainWindow(QMainWindow):
         last_fmt = get_last_export_format()
         fmt_idx = fmt_items.index(last_fmt) if last_fmt in fmt_items else 0
         fmt, ok = QInputDialog.getItem(
-            self, "Export-Profil", "Format:", fmt_items, fmt_idx, False
+            self, "Export-Preset", "Format:", fmt_items, fmt_idx, False
         )
         if not ok:
             return
         start = dialog_start_dir(get_last_export_dir())
-        target = QFileDialog.getExistingDirectory(self, "Zielordner für Profil", start)
+        target = QFileDialog.getExistingDirectory(self, "Zielordner für Preset", start)
         if not target:
-            # Leer erlauben — nur DPI/Format speichern
             target = ""
         try:
             profile = save_export_profile(
                 name, dpi=int(dpi_str), format=fmt, target=target or None
             )
-            tip = f"{profile['dpi']} DPI · {profile['format']}"
-            if profile.get("target"):
-                tip += f" · {Path(str(profile['target'])).name}"
-            self._set_status(f"Export-Profil gespeichert: {profile['name']} ({tip})")
+            tip = export_profile_summary(profile)
+            self._set_status(f"Export-Preset gespeichert: {profile['name']} ({tip})")
         except Exception as e:
-            QMessageBox.warning(self, "Export-Profil", str(e))
+            QMessageBox.warning(self, "Export-Preset", str(e))
 
     def _apply_export_profile(self):
-        from PySide6.QtWidgets import QInputDialog
+        """Kompatibilität: öffnet Preset-Verwaltung — 2.5.1."""
+        self._manage_export_presets()
+
+    def _manage_export_presets(self):
+        """Benannte Export-Presets: Anwenden/Löschen + Live-Zusammenfassung — 2.5.1."""
+        from PySide6.QtWidgets import (
+            QDialog,
+            QDialogButtonBox,
+            QHBoxLayout,
+            QLabel,
+            QListWidget,
+            QListWidgetItem,
+            QPushButton,
+            QVBoxLayout,
+        )
+
         from instantlensdoc.core.app_settings import (
+            EXPORT_PROFILES_MAX,
             apply_export_profile,
+            delete_export_profile,
+            export_profile_summary,
             get_active_export_profile_name,
             get_export_profiles,
         )
@@ -11506,26 +11543,108 @@ class MainWindow(QMainWindow):
         if not profiles:
             QMessageBox.information(
                 self,
-                "Export-Profil",
-                "Keine Profile gespeichert.\nDatei → Exportieren → Export-Profil speichern…",
+                "Export-Presets",
+                "Keine Presets gespeichert.\n"
+                "Datei → Exportieren → Export-Profil speichern…",
             )
             return
-        names = [str(p["name"]) for p in profiles]
-        active = get_active_export_profile_name()
-        idx = names.index(active) if active in names else 0
-        chosen, ok = QInputDialog.getItem(
-            self, "Export-Profil", "Profil anwenden:", names, idx, False
+
+        dlg = QDialog(self)
+        dlg.setWindowTitle(f"Export-Presets (max. {EXPORT_PROFILES_MAX})")
+        dlg.setMinimumWidth(420)
+        lay = QVBoxLayout(dlg)
+        lay.addWidget(
+            QLabel(
+                f"Benannte Presets ({len(profiles)}/{EXPORT_PROFILES_MAX}). "
+                "Auswahl zeigt Live-Zusammenfassung."
+            )
         )
-        if not ok or not chosen:
-            return
-        profile = apply_export_profile(chosen)
-        if not profile:
-            self._set_status("Export-Profil nicht gefunden")
-            return
-        tip = f"{profile['dpi']} DPI · {profile['format']}"
-        if profile.get("target"):
-            tip += f" · {profile['target']}"
-        self._set_status(f"Export-Profil aktiv: {profile['name']} ({tip})")
+        lst = QListWidget()
+        active = get_active_export_profile_name()
+        for p in profiles:
+            item = QListWidgetItem(str(p["name"]))
+            item.setData(Qt.UserRole, dict(p))
+            lst.addItem(item)
+            if str(p["name"]) == active:
+                lst.setCurrentItem(item)
+        if lst.currentRow() < 0 and lst.count() > 0:
+            lst.setCurrentRow(0)
+        lay.addWidget(lst, 1)
+        summary = QLabel("")
+        summary.setWordWrap(True)
+        summary.setStyleSheet("color: #444; padding: 4px 0;")
+        summary.setToolTip("Live-Zusammenfassung DPI · Format · Ziel — 2.5.1")
+        lay.addWidget(summary)
+
+        def _refresh_summary() -> None:
+            item = lst.currentItem()
+            if item is None:
+                summary.setText("(kein Preset gewählt)")
+                return
+            data = item.data(Qt.UserRole) or {}
+            name = str(data.get("name") or item.text())
+            tip = export_profile_summary(data)
+            mark = " ★ aktiv" if name == active else ""
+            summary.setText(f"<b>{name}</b>{mark}<br>{tip}")
+
+        lst.currentItemChanged.connect(lambda *_: _refresh_summary())
+        _refresh_summary()
+
+        btn_row = QHBoxLayout()
+        btn_apply = QPushButton("Anwenden")
+        btn_apply.setDefault(True)
+        btn_delete = QPushButton("Löschen…")
+        btn_row.addWidget(btn_apply)
+        btn_row.addWidget(btn_delete)
+        btn_row.addStretch(1)
+        lay.addLayout(btn_row)
+        buttons = QDialogButtonBox(QDialogButtonBox.Close)
+        buttons.rejected.connect(dlg.reject)
+        buttons.accepted.connect(dlg.accept)
+        lay.addWidget(buttons)
+
+        def _apply() -> None:
+            item = lst.currentItem()
+            if item is None:
+                return
+            name = str(item.text())
+            profile = apply_export_profile(name)
+            if not profile:
+                self._set_status("Export-Preset nicht gefunden")
+                return
+            tip = export_profile_summary(profile)
+            self._set_status(f"Export-Preset aktiv: {profile['name']} ({tip})")
+            dlg.accept()
+
+        def _delete() -> None:
+            item = lst.currentItem()
+            if item is None:
+                return
+            name = str(item.text())
+            reply = QMessageBox.question(
+                dlg,
+                "Export-Preset löschen",
+                f"Preset „{name}“ wirklich löschen?",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No,
+            )
+            if reply != QMessageBox.Yes:
+                return
+            if not delete_export_profile(name):
+                QMessageBox.warning(dlg, "Export-Preset", "Löschen fehlgeschlagen.")
+                return
+            row = lst.currentRow()
+            lst.takeItem(row)
+            self._set_status(f"Export-Preset gelöscht: {name}")
+            if lst.count() == 0:
+                dlg.accept()
+                return
+            lst.setCurrentRow(min(row, lst.count() - 1))
+            _refresh_summary()
+
+        btn_apply.clicked.connect(_apply)
+        btn_delete.clicked.connect(_delete)
+        dlg.exec()
 
     def _rebuild_clipboard_history_menu(self):
         menu = getattr(self, "_clipboard_history_menu", None)
@@ -12717,7 +12836,9 @@ class MainWindow(QMainWindow):
         self._set_status(status)
 
     def _run_ocr_region(self):
-        """OCR-Region: Rechteck wählen → nur Region → Text-Tab — 2.5.0."""
+        """OCR-Region: Rechteck → Defaults DPI/Sprache → Text-Tab — 2.5.1."""
+        from instantlensdoc.core.app_settings import get_ocr_dpi, get_ocr_lang
+
         if not self.doc or self.doc.kind != DocKind.PDF or not self.doc.path:
             QMessageBox.information(
                 self,
@@ -12735,46 +12856,44 @@ class MainWindow(QMainWindow):
             return
         self.stack.setCurrentWidget(self.pdf_view)
         self.pdf_view.setFocus()
-        self._set_status("OCR-Region: Rechteck ziehen (Esc abbrechen)")
+        lang = get_ocr_lang()
+        dpi = get_ocr_dpi()
+        self._set_status(
+            f"OCR-Region: Rechteck ziehen (Esc abbrechen) · Defaults {lang}, {dpi} DPI"
+        )
 
     def _on_ocr_region_finished(
         self, page: int, x: float, y: float, w: float, h: float
     ) -> None:
-        """Callback nach Rechteck-Auswahl: Region OCR → Text-Tab — 2.5.0."""
-        from PySide6.QtWidgets import QApplication, QDialog, QProgressDialog
+        """Callback: Region OCR mit Defaults (DPI/Sprache); Abbruch; leeres Ergebnis — 2.5.1."""
+        from PySide6.QtWidgets import QApplication, QProgressDialog
+
+        from instantlensdoc.core.app_settings import get_ocr_dpi, get_ocr_lang
 
         if not self.doc or self.doc.kind != DocKind.PDF or not self.doc.path:
             return
         pdf_path = Path(self.doc.path)
-        dlg = OcrDialog(
+        # DPI/Sprache aus Settings-Defaults (kein Dialog) — 2.5.1
+        lang = get_ocr_lang()
+        dpi = get_ocr_dpi()
+        prog = QProgressDialog(
+            f"OCR Region ({lang}, {dpi} DPI)…",
+            "Abbrechen",
+            0,
+            0,
             self,
-            need_file=False,
-            default_label=f"{pdf_path.name} Region S.{int(page) + 1}",
-            page_count=1,
-            show_page_range=False,
         )
-        dlg.setWindowTitle("OCR Region — Sprach-Preset / DPI")
-        dlg.rb_editable.setChecked(True)
-        dlg.rb_searchable.setEnabled(False)
-        if dlg.exec() != QDialog.Accepted:
-            self._set_status("OCR-Region abgebrochen")
-            return
-        lang = dlg.lang_code()
-        dpi = dlg.dpi()
-        try:
-            from instantlensdoc.core.app_settings import set_ocr_dpi, set_ocr_lang
-
-            set_ocr_lang(lang)
-            set_ocr_dpi(dpi)
-        except Exception:
-            pass
-        prog = QProgressDialog("OCR Region…", None, 0, 0, self)
         prog.setWindowTitle("OCR Region")
         prog.setWindowModality(Qt.WindowModal)
         prog.setMinimumDuration(0)
+        prog.setCancelButtonText("Abbrechen")
         prog.setValue(0)
         prog.show()
         QApplication.processEvents()
+        if prog.wasCanceled():
+            prog.close()
+            self._set_status("OCR-Region abgebrochen")
+            return
         try:
             result = ocr_mod.ocr_pdf_region(
                 pdf_path,
@@ -12791,7 +12910,24 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "OCR Region", f"OCR fehlgeschlagen:\n{e}")
             return
         finally:
+            cancelled = prog.wasCanceled()
             prog.close()
+        if cancelled:
+            self._set_status("OCR-Region abgebrochen")
+            return
+        text = (result.text or "").strip()
+        if not text:
+            # Leeres Ergebnis: Hinweis, kein leerer Tab — 2.5.1
+            QMessageBox.information(
+                self,
+                "OCR Region",
+                "Kein Text in der gewählten Region erkannt.\n"
+                f"(Defaults: {lang}, {dpi} DPI — Einstellungen → OCR)",
+            )
+            self._set_status(
+                f"OCR-Region: kein Text erkannt (S.{int(page) + 1}, {lang}, {dpi} DPI)"
+            )
+            return
         out_txt = pdf_path.with_name(f"{pdf_path.stem}-ocr-region.txt")
         n = 1
         while out_txt.exists() and n < 1000:

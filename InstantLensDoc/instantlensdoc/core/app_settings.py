@@ -59,6 +59,8 @@ DEFAULTS: dict[str, Any] = {
     "last_pdf_diff_png_dir": "",  # letzter Zielordner Diff-PNG-Export — 1.4.2
     "last_page_image_export_dir": "",  # letzter Zielordner Seiten→Bilder — 1.5.1
     "last_export_format": "PNG",  # letztes Export-Format PNG|JPEG — 2.5.0
+    "default_ann_color_theme": "",  # Default Farben-Theme Name — 2.5.1
+    "welcome_recent_filter": "",  # Welcome Recent-Filter Persistenz — 2.5.1
     "page_image_filename_template": "{stem}_p{page}",  # Dateiname-Template — 1.5.1
     "last_signature_image": "",  # zuletzt verwendetes Signatur-Bild — 1.5.1
     "last_signature_width": 180.0,  # Signatur-Breite Default — 1.5.1
@@ -4467,7 +4469,7 @@ def set_print_preview(enabled: bool) -> None:
 
 
 EXPORT_PROFILE_FORMATS = ("PNG", "JPEG")
-EXPORT_PROFILES_MAX = 12
+EXPORT_PROFILES_MAX = 10  # benannte Export-Presets max. 10 — 2.5.1
 
 
 def _normalize_export_profile(raw: object) -> dict[str, object] | None:
@@ -4577,6 +4579,19 @@ def delete_export_profile(name: str) -> bool:
 
 def get_active_export_profile_name() -> str:
     return str(load_settings().get("active_export_profile") or "").strip()
+
+
+def export_profile_summary(profile: dict[str, object] | None) -> str:
+    """Live-Zusammenfassung DPI · Format · Ziel — 2.5.1."""
+    if not profile:
+        return "(kein Preset)"
+    tip = f"{profile.get('dpi', '?')} DPI · {profile.get('format', '?')}"
+    target = str(profile.get("target") or "").strip()
+    if target:
+        tip += f" · {target}"
+    else:
+        tip += " · (kein Zielordner)"
+    return tip
 
 
 def apply_export_profile(name: str) -> dict[str, object] | None:
@@ -4724,6 +4739,102 @@ def apply_ann_color_theme(name: str) -> list[str]:
         raise ValueError(f"Unbekanntes Farben-Theme: {name!r}")
     set_ann_color_presets(colors)
     return list(get_ann_color_presets())
+
+
+def get_default_ann_color_theme() -> str:
+    """Gespeichertes Default-Farben-Theme (Name) — 2.5.1."""
+    raw = str(load_settings().get("default_ann_color_theme") or "").strip()
+    if raw in ANN_COLOR_THEMES:
+        return raw
+    return ""
+
+
+def set_default_ann_color_theme(name: str) -> str:
+    """Farben-Theme als Default speichern (leer = kein Default) — 2.5.1."""
+    clean = (name or "").strip()
+    if clean and clean not in ANN_COLOR_THEMES:
+        raise ValueError(f"Unbekanntes Farben-Theme: {clean!r}")
+    save_settings({"default_ann_color_theme": clean})
+    return clean
+
+
+def export_ann_color_theme_dict(name: str | None = None) -> dict[str, Any]:
+    """Theme oder aktuelle Presets als ildcolors-v1 Dict (inkl. theme) — 2.5.1."""
+    theme_name = (name or "").strip()
+    if theme_name:
+        colors = get_ann_color_theme(theme_name)
+        if not colors:
+            raise ValueError(f"Unbekanntes Farben-Theme: {theme_name!r}")
+    else:
+        colors = get_ann_color_presets()
+        theme_name = get_default_ann_color_theme()
+    payload: dict[str, Any] = {
+        "version": ANN_COLORS_VERSION,
+        "schema": ANN_COLORS_SCHEMA_ID,
+        "colors": list(colors),
+    }
+    if theme_name:
+        payload["theme"] = theme_name
+    return payload
+
+
+def export_ann_color_theme_json(
+    path: str | Path, name: str | None = None
+) -> Path:
+    """Farben-Theme als JSON exportieren (ildcolors-v1 + theme) — 2.5.1."""
+    dest = Path(path)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_text(
+        json.dumps(export_ann_color_theme_dict(name), ensure_ascii=False, indent=2)
+        + "\n",
+        encoding="utf-8",
+    )
+    return dest
+
+
+def import_ann_color_theme_dict(
+    data: dict,
+    *,
+    set_default: bool = False,
+) -> list[str]:
+    """
+    Farben-Theme aus Dict importieren (ildcolors-v1, optional theme) — 2.5.1.
+
+    Wendet Farben als Presets an; optional Default-Theme-Name setzen.
+    """
+    colors = import_ann_color_presets_dict(data, merge=False)
+    theme_name = str(data.get("theme") or "").strip()
+    if set_default and theme_name and theme_name in ANN_COLOR_THEMES:
+        set_default_ann_color_theme(theme_name)
+    return list(colors)
+
+
+def import_ann_color_theme_json(
+    path: str | Path,
+    *,
+    set_default: bool = False,
+) -> list[str]:
+    """Farben-Theme aus JSON-Datei importieren — 2.5.1."""
+    raw = Path(path).read_text(encoding="utf-8")
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError as e:
+        raise AnnColorsImportError(f"Ungültiges JSON: {e}") from e
+    if not isinstance(data, dict):
+        raise AnnColorsImportError("Color-Theme-JSON muss ein Objekt sein.")
+    return import_ann_color_theme_dict(data, set_default=set_default)
+
+
+def get_welcome_recent_filter() -> str:
+    """Persistierter Welcome-Recent-Filtertext — 2.5.1."""
+    return str(load_settings().get("welcome_recent_filter") or "")
+
+
+def set_welcome_recent_filter(text: str) -> str:
+    """Welcome-Recent-Filter persistieren — 2.5.1."""
+    val = str(text or "")
+    save_settings({"welcome_recent_filter": val})
+    return val
 
 
 def _normalize_hex_color(color: str, fallback: str = "#888888") -> str:

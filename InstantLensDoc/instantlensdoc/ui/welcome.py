@@ -126,14 +126,18 @@ class WelcomePage(QWidget):
         self.recent_filter.setPlaceholderText("Recent filtern (Pfad oder Tag)…")
         self.recent_filter.setClearButtonEnabled(True)
         self.recent_filter.setToolTip(
-            "Live-Filter über Dateiname/Pfad oder Dokument-Tags (ildtags-v1) — "
-            "Esc leert und Fokus zurück auf Liste — 2.5.0"
+            "Live-Filter Pfad oder Dokument-Tags (ildtags-v1) · Persistenz · "
+            "Clear / Esc leert — 2.5.1"
         )
         self.recent_filter.textChanged.connect(self._apply_recent_filter)
+        self.recent_filter.textChanged.connect(self._persist_recent_filter)
         self.recent_filter.installEventFilter(self)
         filter_row.addWidget(self.recent_filter, 1)
-        self.btn_clear_filter = QPushButton("Filter leeren")
-        self.btn_clear_filter.setToolTip("Suchfilter zurücksetzen — 1.0.5/1.0.6")
+        self.btn_clear_filter = QPushButton("Filter Clear")
+        self.btn_clear_filter.setToolTip(
+            "Filter leeren (Clear) und Fokus zurück — Persistenz — 2.5.1"
+        )
+        self.btn_clear_filter.setAccessibleName("Filter Clear")
         self.btn_clear_filter.clicked.connect(self._clear_recent_filter)
         filter_row.addWidget(self.btn_clear_filter)
         self.filter_hits_label = QLabel("0 Treffer")
@@ -147,9 +151,8 @@ class WelcomePage(QWidget):
         self.recent_list.setMinimumHeight(180)
         self.recent_list.setToolTip(
             "Enter / Doppelklick öffnet; Entf entfernt den Eintrag; "
-            "Rechtsklick: Entfernen / Ordner öffnen; Drag & Drop öffnet Dateien; "
-            "Filter oben filtert live; Esc leert Filter → Fokus Liste; Trefferanzahl rechts; "
-            "Weiterarbeiten: deaktiviert wenn Session fehlt/leer — 1.0.9"
+            "Rechtsklick: Tag hinzufügen/entfernen · Entfernen / Ordner öffnen; "
+            "Filter Clear · Persistenz; Esc leert Filter → Fokus Liste — 2.5.1"
         )
         self.recent_list.setAcceptDrops(True)
         self.recent_list.setContextMenuPolicy(Qt.CustomContextMenu)
@@ -161,6 +164,18 @@ class WelcomePage(QWidget):
 
         self.refresh_recent()
         self.refresh_continue_button()
+        # Persistierten Filter wiederherstellen — 2.5.1
+        try:
+            from instantlensdoc.core.app_settings import get_welcome_recent_filter
+
+            saved = get_welcome_recent_filter()
+            if saved:
+                self.recent_filter.blockSignals(True)
+                self.recent_filter.setText(saved)
+                self.recent_filter.blockSignals(False)
+                self._apply_recent_filter()
+        except Exception:
+            pass
 
     def refresh_continue_button(self) -> None:
         """Weiterarbeiten: disabled + Tooltip wenn Session fehlt/leer — 1.0.9."""
@@ -232,14 +247,25 @@ class WelcomePage(QWidget):
         self._apply_recent_filter()
         self.refresh_continue_button()
 
+    def _persist_recent_filter(self, _text: str | None = None) -> None:
+        """Welcome-Recent-Filter in Settings speichern — 2.5.1."""
+        try:
+            from instantlensdoc.core.app_settings import set_welcome_recent_filter
+
+            set_welcome_recent_filter(self.recent_filter.text() or "")
+        except Exception:
+            pass
+
     def _clear_recent_filter(self) -> None:
-        """Filtertext leeren — 1.0.5."""
+        """Filter Clear: Text leeren + Persistenz + Fokus — 2.5.1."""
         self.recent_filter.clear()
+        self._persist_recent_filter("")
         self.recent_filter.setFocus()
 
     def _escape_recent_filter(self) -> None:
-        """Esc: Filter leeren und Fokus zurück auf die Recent-Liste — 1.0.6."""
+        """Esc: Filter Clear und Fokus zurück auf die Recent-Liste — 2.5.1."""
         self.recent_filter.clear()
+        self._persist_recent_filter("")
         self.recent_list.setFocus()
         if self.recent_list.count() > 0 and self.recent_list.currentRow() < 0:
             for i in range(self.recent_list.count()):
@@ -318,13 +344,81 @@ class WelcomePage(QWidget):
         if not path:
             return
         menu = QMenu(self)
+        act_add_tag = menu.addAction("Tag hinzufügen…")
+        act_remove_tag = menu.addAction("Tag entfernen…")
+        menu.addSeparator()
         act_remove = menu.addAction("Entfernen")
         act_folder = menu.addAction("Ordner öffnen")
         chosen = menu.exec(self.recent_list.mapToGlobal(pos))
-        if chosen is act_remove:
+        if chosen is act_add_tag:
+            self._add_tag_for_recent(str(path))
+        elif chosen is act_remove_tag:
+            self._remove_tag_for_recent(str(path))
+        elif chosen is act_remove:
             self.recent_remove_requested.emit(str(path))
         elif chosen is act_folder:
             self._open_containing_folder(str(path))
+
+    def _add_tag_for_recent(self, path: str) -> None:
+        """Dokument-Tag an Recent-Eintrag hinzufügen (ildtags-v1) — 2.5.1."""
+        from PySide6.QtWidgets import QInputDialog, QMessageBox
+
+        from instantlensdoc.core import doc_tags as doc_tags_mod
+        from instantlensdoc.core import recent_tags as recent_tags_mod
+
+        current = doc_tags_mod.load_tags_sidecar(path)
+        text, ok = QInputDialog.getText(
+            self,
+            "Tag hinzufügen",
+            f"Neuer Tag für {Path(path).name}:",
+        )
+        if not ok:
+            return
+        add = doc_tags_mod.normalize_doc_tags(text)
+        if not add:
+            return
+        merged = doc_tags_mod.normalize_doc_tags(list(current) + list(add))
+        try:
+            doc_tags_mod.save_tags_sidecar(path, merged)
+            for t in add:
+                try:
+                    recent_tags_mod.add_recent_tag(t)
+                except Exception:
+                    pass
+        except Exception as e:
+            QMessageBox.warning(self, "Dokument-Tags", str(e))
+            return
+        self.refresh_recent()
+
+    def _remove_tag_for_recent(self, path: str) -> None:
+        """Dokument-Tag von Recent-Eintrag entfernen — 2.5.1."""
+        from PySide6.QtWidgets import QInputDialog, QMessageBox
+
+        from instantlensdoc.core import doc_tags as doc_tags_mod
+
+        current = doc_tags_mod.load_tags_sidecar(path)
+        if not current:
+            QMessageBox.information(
+                self, "Tag entfernen", "Keine Tags an diesem Dokument."
+            )
+            return
+        chosen, ok = QInputDialog.getItem(
+            self,
+            "Tag entfernen",
+            f"Tag entfernen von {Path(path).name}:",
+            current,
+            0,
+            False,
+        )
+        if not ok or not chosen:
+            return
+        remaining = [t for t in current if t.casefold() != str(chosen).casefold()]
+        try:
+            doc_tags_mod.save_tags_sidecar(path, remaining)
+        except Exception as e:
+            QMessageBox.warning(self, "Dokument-Tags", str(e))
+            return
+        self.refresh_recent()
 
     def _open_containing_folder(self, path: str) -> None:
         p = Path(path)

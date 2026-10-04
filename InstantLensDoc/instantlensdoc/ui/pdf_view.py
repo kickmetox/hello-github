@@ -8222,7 +8222,7 @@ class PdfViewer(QWidget):
         self.cancel_quick_stamp()
 
     def begin_ocr_region_select(self) -> bool:
-        """OCR-Region: Rechteck ziehen (kein Annotation-Commit) — 2.5.0."""
+        """OCR-Region: Rechteck ziehen (kein Annotation-Commit) — 2.5.0/2.5.1."""
         if not self.pdf_path:
             return False
         self._ocr_region_pending = True
@@ -8231,16 +8231,31 @@ class PdfViewer(QWidget):
         # Drag-UI wie Rechteck, Commit wird in _on_drag abgefangen
         self.tool = AnnotationType.RECTANGLE
         self.canvas.set_drag_tool(AnnotationType.RECTANGLE, select_mode=False)
-        self.status.emit("OCR-Region: Rechteck auf der Seite ziehen (Esc abbrechen)")
+        try:
+            from instantlensdoc.core.app_settings import get_ocr_dpi, get_ocr_lang
+
+            tip = f" · Defaults {get_ocr_lang()}, {get_ocr_dpi()} DPI"
+        except Exception:
+            tip = ""
+        self.status.emit(
+            f"OCR-Region: Rechteck ziehen (Esc abbrechen){tip}"
+        )
         return True
 
     def cancel_ocr_region_select(self) -> bool:
-        """Esc: OCR-Region-Auswahl abbrechen — 2.5.0."""
+        """Esc: OCR-Region-Auswahl abbrechen — 2.5.0/2.5.1."""
         if not self._ocr_region_pending:
             return False
         self._ocr_region_pending = False
         self.canvas.set_drag_tool(None, select_mode=True)
-        self.status.emit("OCR-Region abgebrochen")
+        msg = "OCR-Region abgebrochen"
+        self.status.emit(msg)
+        try:
+            win = self.window()
+            if win is not None and hasattr(win, "_announce_status_toast"):
+                win._announce_status_toast(msg)
+        except Exception:
+            pass
         return True
 
     def cancel_pending_angle(self) -> bool:
