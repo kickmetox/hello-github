@@ -77,7 +77,8 @@ python examples/ild_pdf_demo.py pfad/zu/datei.pdf
 | `text_to_pdf` / `page_count_for_text` | Plaintext → Mehrseiten-PDF; `font_size`/`margin` — 1.7.1 |
 | `inspect_pdf` / `clamp_render_scale` | Große-PDF-Diagnose / Zoom-Cap |
 | `clear_render_cache` | Render-LRU leeren |
-| `set_password` / `needs_password` | PDF verschlüsseln / prüfen |
+| `set_password` / `needs_password` / `remove_password` | PDF verschlüsseln (AES-256 bevorzugt) / prüfen / entfernen — **2.6.7** |
+| `get_encryption_info` / `get_permissions` / `update_permissions` | Status + Rechte lesen/ändern (`EncryptionInfo`, `PdfPermissionFlags`) — **2.6.7** |
 | `bake_redactions` | Schwärzungen einbrennen |
 | `compress_image_for_pdf` / `compress_pdf_as_images` | Bildkompression |
 | `get_metadata` / `set_metadata` / `PdfMetadata` | Dokument-Metadaten |

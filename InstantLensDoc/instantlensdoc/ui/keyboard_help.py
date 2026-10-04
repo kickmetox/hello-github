@@ -154,6 +154,7 @@ SHORTCUTS_HTML = """
 <tr><td>Text bearbeiten</td><td>PDF → Text bearbeiten… (Ctrl+Alt+Shift+E) / Toolbar / Palette / Doppelklick auf Text: Inline ändern/löschen/einfügen · Schriftart/Größe/Farbe aus Kontext · Reflow in Box-Breite — <b>2.6.4</b></td></tr>
 <tr><td>Objekt bearbeiten</td><td>PDF → Objekt bearbeiten… (Ctrl+Alt+Shift+O) / Toolbar „Objekt“ / Palette: Bild/Vektor/Tabelle wählen · ziehen verschieben · Ecken skalieren · Doppelklick Dialog (spiegeln/ersetzen) — <b>2.6.5</b></td></tr>
 <tr><td>Formularfelder</td><td>PDF → Formularfelder… (Ctrl+Alt+Shift+K) / Toolbar „Formular“ / Palette: Felder ausfüllen · Text/Checkbox/Dropdown anlegen (Rechteck) · erkennen (Labels „:“ / ____ / [ ]) — <b>2.6.6</b></td></tr>
+<tr><td>Verschlüsselung &amp; Rechte</td><td>PDF → Verschlüsselung &amp; Rechte… (Ctrl+Alt+Shift+P) / Palette: Passwort AES-256 · Druck/Kopieren/Ändern sperren · setzen/entfernen · Öffnen mit Passwort-Dialog — <b>2.6.7</b></td></tr>
 <tr><td>Bookmarks ↔ Outlines</td><td>Fehlerdialog Retry-Zähler „Versuch k/3“; max. 3 wie Backup — 1.3.6</td></tr>
 <tr><td>Thumbnail Lazy-Load</td><td>Prefetch-Label grau wenn Lazy aus (unter Schwellwert), sonst aktiv — 1.3.6</td></tr>
 <tr><td>Alle Ann. auf Seite löschen</td><td>Bearbeiten → bei 0 Treffern Sticky-Status Statusleiste bis nächste Ann.-Aktion / Seiten-/Dokumentwechsel / Undo/Redo + i18n DE + Menü/Aktion no-op + Button disabled; Undo „N Annotationen (gefiltert)“ — 1.1.9</td></tr>

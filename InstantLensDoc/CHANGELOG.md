@@ -1,5 +1,21 @@
 # Changelog — InstantLens Doc
 
+## 2.6.7 — Verschlüsselung & Rechte
+
+Minor-Feature nach **2.6.6** (Zusatzanforderungen #8): **Verschlüsselung & Rechte** — Passwortschutz mit **AES-256** (pikepdf/qpdf R=6 / AESV3, Fallback AES-128), granulare Owner-Rechte (Druck, Kopieren/Extrahieren, Ändern, Formulare, Zusammenstellen, Annotationen, Barrierefreiheit), Dialog **Verschlüsselung & Rechte…** (Status, setzen, entfernen, Rechte aktualisieren), Öffnen verschlüsselter PDFs mit Passwort-Dialog. Kein Batch, Office-Export, E-Signatur, KI/Cloud, voller Windows-Installer. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie unverändert.
+
+### Neu
+- `ild_pdf.security` — `EncryptionInfo` · `PdfPermissionFlags` · `get_encryption_info` · `get_permissions` · `update_permissions` · AES-256-bevorzugtes `set_password` · `permissions_from_p` / `algorithm_from_encryption`
+- UI: `PdfSecurityDialog` · erweiterter `SetPasswordDialog` (AES-256, Rechte-Checkboxen) · PDF-Menü / Palette `pdf_security` · Shortcut Ctrl+Alt+Shift+P
+
+### Geändert
+- Docs/Version **2.6.7**; bestehende Verschlüsseln/Entschlüsseln-Menüpunkte bleiben (nutzen gemeinsame Apply-Pfade)
+
+### Tests / Qualität
+- Version **2.6.7** (App / `ild_pdf` / ISS / Smoke / Docs); Serie **2.6**; `docs/VERSION` + `VERSION.txt`
+- Smoke: 2.6.7 CLI + Qt (encrypt AES-256 / permissions update/remove + UI-Pfad)
+- Stubs: KI/Cloud/Stylus/3D/Hooks/Outline/Telemetrie unverändert markiert
+
 ## 2.6.6 — Interaktive Formularerstellung
 
 Minor-Feature nach **2.6.5** (Zusatzanforderungen #7): **Interaktive Formularerstellung** — ausfüllbare AcroForm-Felder (Text, Checkbox, Dropdown) erkennen und erstellen; bestehende Felder ausfüllen/bearbeiten. UI: Toolbar **Formular** (Rechteck ziehen → Feld anlegen), Dialog **Formularfelder…** (ausfüllen, hinzu, löschen, erkennen), PDF-Menü / Palette, Shortcut Ctrl+Alt+Shift+K. Keine Verschlüsselung, E-Signatur, Office-Export, KI/Cloud. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie unverändert.

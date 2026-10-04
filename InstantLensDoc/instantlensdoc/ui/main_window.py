@@ -185,6 +185,7 @@ from instantlensdoc.ui.theme import (
 from instantlensdoc.ui.keyboard_help import KeyboardHelpDialog
 from instantlensdoc.ui.password_dialog import (
     CompressPdfDialog,
+    PdfSecurityDialog,
     RemovePasswordDialog,
     SetPasswordDialog,
 )
@@ -2303,8 +2304,19 @@ class MainWindow(QMainWindow):
         )
         act_ann_search.triggered.connect(self._annotation_search_open_docs)
         m_pdf.addAction(act_ann_search)
+        act_sec = QAction("Verschlüsselung & Rechte…", self)
+        act_sec.setShortcut(QKeySequence("Ctrl+Alt+Shift+P"))
+        act_sec.setToolTip(
+            "Passwortschutz AES-256, Rechte (Druck/Kopieren/…), "
+            "setzen/entfernen — 2.6.7"
+        )
+        act_sec.triggered.connect(self._pdf_security_dialog)
+        m_pdf.addAction(act_sec)
         act_pw = QAction("PDF verschlüsseln…", self)
-        act_pw.setToolTip("Stärke-Hinweis; leeres PW abgelehnt; nach Erfolg neu laden — 1.6.1")
+        act_pw.setToolTip(
+            "Stärke-Hinweis; AES-256; Rechte; leeres PW abgelehnt; "
+            "nach Erfolg neu laden — 2.6.7 / 1.6.1"
+        )
         act_pw.triggered.connect(self._set_pdf_password)
         m_pdf.addAction(act_pw)
         act_pw_rm = QAction("PDF entschlüsseln…", self)
@@ -2477,6 +2489,10 @@ class MainWindow(QMainWindow):
                 "Formularfelder erkennen…",
                 lambda: self.pdf_view.form_field_detect_dialog(),
             ),
+            (
+                "Verschlüsselung & Rechte…",
+                lambda: self._pdf_security_dialog(),
+            ),
             ("Seiten neu anordnen…", lambda: self.pdf_view.reorder_dialog()),
             ("Seite als Bild exportieren…", lambda: self.pdf_view.extract_page_as_image()),
             ("Seiten als Bilder exportieren…", lambda: self.pdf_view.export_pages_as_images()),
@@ -2535,6 +2551,12 @@ class MainWindow(QMainWindow):
                 a.setToolTip(
                     "Heuristik Labels „:“ / ____ / [ ] → Felder anlegen — 2.6.6"
                 )
+            if title == "Verschlüsselung & Rechte…":
+                a.setToolTip(
+                    "AES-256 Passwortschutz · Rechte Druck/Kopieren/Ändern · "
+                    "setzen/entfernen — 2.6.7"
+                )
+                a.setShortcut(QKeySequence("Ctrl+Alt+Shift+P"))
             a.triggered.connect(slot)
             m_pdf.addAction(a)
         # Batch Drehen/Spiegeln Shortcuts (Auswahl oder aktuelle Seite) — 1.8.1
@@ -9444,29 +9466,61 @@ class MainWindow(QMainWindow):
             finally:
                 self._crypto_reload_prefill = None
 
-    def _set_pdf_password(self):
+    def _pdf_security_dialog(self):
+        """Verschlüsselung & Rechte — zentraler Dialog — 2.6.7."""
         if not self.pdf_view.pdf_path:
-            QMessageBox.information(self, "Passwort", "Bitte zuerst ein PDF öffnen.")
+            QMessageBox.information(
+                self, "Verschlüsselung", "Bitte zuerst ein PDF öffnen."
+            )
             return
-        dlg = SetPasswordDialog(self, pdf_name=self.pdf_view.pdf_path.name)
+        dlg = PdfSecurityDialog(
+            self,
+            pdf_path=self.pdf_view.pdf_path,
+            password=getattr(self.pdf_view, "password", None),
+            pdf_name=self.pdf_view.pdf_path.name,
+        )
         if not dlg.exec():
             return
         vals = dlg.values()
+        action = str(vals.get("action") or PdfSecurityDialog.ACTION_NONE)
+        if action == PdfSecurityDialog.ACTION_SET:
+            self._apply_set_password(vals)
+        elif action == PdfSecurityDialog.ACTION_REMOVE:
+            self._apply_remove_password(vals)
+        elif action == PdfSecurityDialog.ACTION_UPDATE_PERMS:
+            self._apply_update_permissions(vals)
+
+    def _apply_set_password(self, vals: dict) -> None:
+        from ild_pdf import set_password
+        from ild_pdf.render import clear_render_cache
+
         user_pw = str(vals.get("user_password") or "")
         if not user_pw.strip():
             QMessageBox.warning(self, "Passwort", "User-Passwort darf nicht leer sein.")
             return
-        prefill = bool(vals.pop("prefill_reload", False))
+        prefill = bool(vals.get("prefill_reload", False))
+        src = self.pdf_view.pdf_path
+        if vals.get("inplace"):
+            out = src
+        else:
+            out = src.with_name(f"{src.stem}_locked.pdf")
+        kwargs = {
+            "user_password": user_pw,
+            "owner_password": vals.get("owner_password"),
+            "out_path": out,
+            "aes256": bool(vals.get("aes256", True)),
+            "open_password": getattr(self.pdf_view, "password", None),
+        }
+        if vals.get("permissions") is not None:
+            kwargs["permissions"] = vals["permissions"]
+        else:
+            kwargs["allow_printing"] = bool(vals.get("allow_printing", True))
+            kwargs["allow_modify"] = bool(vals.get("allow_modify", False))
+            kwargs["allow_extract"] = bool(vals.get("allow_extract", False))
         try:
-            from ild_pdf import set_password
-            from ild_pdf.render import clear_render_cache
-
-            out = self.pdf_view.pdf_path.with_name(
-                f"{self.pdf_view.pdf_path.stem}_locked.pdf"
-            )
-            set_password(self.pdf_view.pdf_path, out_path=out, **vals)
-            clear_render_cache(self.pdf_view.pdf_path)
-            self._set_status(f"Passwort gesetzt → {out.name}")
+            set_password(src, **kwargs)
+            clear_render_cache(src)
+            self._set_status(f"Passwort gesetzt ({'AES-256' if kwargs.get('aes256') else 'AES'}) → {out.name}")
             _log.info("PDF encrypted: %s", out)
             self._offer_reload_pdf(
                 out, title="Passwort", password=user_pw, prefill=prefill
@@ -9475,29 +9529,19 @@ class MainWindow(QMainWindow):
             _log.exception("Passwort setzen fehlgeschlagen")
             QMessageBox.warning(self, "Passwort", str(e))
 
-    def _remove_pdf_password(self):
-        """PDF entschlüsseln / Passwort entfernen — 1.6.0/1.6.2."""
-        if not self.pdf_view.pdf_path:
-            QMessageBox.information(self, "Passwort", "Bitte zuerst ein PDF öffnen.")
-            return
-        dlg = RemovePasswordDialog(self, pdf_name=self.pdf_view.pdf_path.name)
-        if not dlg.exec():
-            return
-        vals = dlg.values()
+    def _apply_remove_password(self, vals: dict) -> None:
+        from ild_pdf import remove_password
+        from ild_pdf.render import clear_render_cache
+        from ild_pdf.security import WRONG_PASSWORD_MSG_DE, is_wrong_password_error
+
         pw = str(vals.get("password") or "")
         if not pw.strip():
             QMessageBox.warning(self, "Passwort", "Passwort darf nicht leer sein.")
             return
-        prefill = bool(vals.pop("prefill_reload", False))
+        prefill = bool(vals.get("prefill_reload", False))
+        src = self.pdf_view.pdf_path
+        out = src if vals.get("inplace") else src.with_name(f"{src.stem}_unlocked.pdf")
         try:
-            from ild_pdf import remove_password
-            from ild_pdf.render import clear_render_cache
-
-            src = self.pdf_view.pdf_path
-            if vals.get("inplace"):
-                out = src
-            else:
-                out = src.with_name(f"{src.stem}_unlocked.pdf")
             remove_password(src, pw, out_path=out)
             clear_render_cache(src)
             self._set_status(f"Passwort entfernt → {out.name}")
@@ -9507,10 +9551,65 @@ class MainWindow(QMainWindow):
             )
         except Exception as e:
             _log.exception("Passwort entfernen fehlgeschlagen")
-            from ild_pdf.security import WRONG_PASSWORD_MSG_DE, is_wrong_password_error
-
             msg = WRONG_PASSWORD_MSG_DE if is_wrong_password_error(e) else str(e)
             QMessageBox.warning(self, "Passwort", msg)
+
+    def _apply_update_permissions(self, vals: dict) -> None:
+        from ild_pdf.security import update_permissions
+        from ild_pdf.render import clear_render_cache
+
+        user_pw = str(vals.get("user_password") or "")
+        owner_pw = str(vals.get("owner_password") or "")
+        if not user_pw.strip() or not owner_pw.strip():
+            QMessageBox.warning(
+                self, "Rechte", "User- und Owner-Passwort erforderlich."
+            )
+            return
+        src = self.pdf_view.pdf_path
+        out = src if vals.get("inplace") else src.with_name(f"{src.stem}_perms.pdf")
+        try:
+            update_permissions(
+                src,
+                user_password=user_pw,
+                owner_password=owner_pw,
+                permissions=vals["permissions"],
+                out_path=out,
+                aes256=bool(vals.get("aes256", True)),
+                open_password=getattr(self.pdf_view, "password", None) or user_pw,
+            )
+            clear_render_cache(src)
+            self._set_status(f"Rechte aktualisiert → {out.name}")
+            _log.info("PDF permissions updated: %s", out)
+            self._offer_reload_pdf(
+                out,
+                title="Rechte",
+                password=user_pw,
+                prefill=bool(vals.get("prefill_reload", False)),
+            )
+        except Exception as e:
+            _log.exception("Rechte aktualisieren fehlgeschlagen")
+            QMessageBox.warning(self, "Rechte", str(e))
+
+    def _set_pdf_password(self):
+        if not self.pdf_view.pdf_path:
+            QMessageBox.information(self, "Passwort", "Bitte zuerst ein PDF öffnen.")
+            return
+        dlg = SetPasswordDialog(self, pdf_name=self.pdf_view.pdf_path.name)
+        if not dlg.exec():
+            return
+        vals = dlg.values()
+        vals["inplace"] = False
+        self._apply_set_password(vals)
+
+    def _remove_pdf_password(self):
+        """PDF entschlüsseln / Passwort entfernen — 1.6.0/1.6.2."""
+        if not self.pdf_view.pdf_path:
+            QMessageBox.information(self, "Passwort", "Bitte zuerst ein PDF öffnen.")
+            return
+        dlg = RemovePasswordDialog(self, pdf_name=self.pdf_view.pdf_path.name)
+        if not dlg.exec():
+            return
+        self._apply_remove_password(dlg.values())
 
     def _sync_doc_stats_panel(self) -> None:
         """Offenes Statistik-Panel bei Doc-Wechsel aktualisieren — 1.6.1."""
@@ -10193,6 +10292,9 @@ class MainWindow(QMainWindow):
             "form_field_detect": lambda: self.pdf_view.form_field_detect_dialog()
             if hasattr(self.pdf_view, "form_field_detect_dialog")
             else None,
+            "pdf_security": self._pdf_security_dialog,
+            "pdf_encrypt": self._set_pdf_password,
+            "pdf_decrypt": self._remove_pdf_password,
             "export": _export_menu,
             "export_page_images": lambda: self.pdf_view.export_pages_as_images()
             if hasattr(self.pdf_view, "export_pages_as_images")

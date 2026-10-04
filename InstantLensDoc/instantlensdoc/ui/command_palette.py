@@ -148,6 +148,25 @@ def default_palette_commands() -> list[PaletteCommand]:
             "formular erkennen detect label underscore checkbox",
             "PDF",
         ),
+        PaletteCommand(
+            "pdf_security",
+            "Verschlüsselung & Rechte…",
+            "passwort encrypt aes256 rechte druck kopieren security entsperren",
+            "PDF",
+            "Ctrl+Alt+Shift+P",
+        ),
+        PaletteCommand(
+            "pdf_encrypt",
+            "PDF verschlüsseln…",
+            "passwort setzen encrypt aes verschlüsseln",
+            "PDF",
+        ),
+        PaletteCommand(
+            "pdf_decrypt",
+            "PDF entschlüsseln…",
+            "passwort entfernen decrypt entsperren unlock",
+            "PDF",
+        ),
         PaletteCommand("export", "Exportieren…", "export html docx pdf", "Datei"),
         PaletteCommand("export_page_images", "Seiten als Bilder…", "export png jpeg", "PDF"),
         PaletteCommand(

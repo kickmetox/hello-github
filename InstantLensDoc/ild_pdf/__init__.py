@@ -183,13 +183,22 @@ from .doc_stats import (
 from .limits import PdfHealth, THUMB_LAZY_THRESHOLD, clamp_render_scale, inspect_pdf
 from .render import clear_render_cache
 from .security import (
+    FALLBACK_ENCRYPTION_R,
+    PREFERRED_ENCRYPTION_R,
     WRONG_PASSWORD_MSG_DE,
+    EncryptionInfo,
+    PdfPermissionFlags,
+    algorithm_from_encryption,
+    get_encryption_info,
+    get_permissions,
     is_wrong_password_error,
     needs_password,
     password_strength,
+    permissions_from_p,
     remove_password,
     set_password,
     try_open_password,
+    update_permissions,
 )
 from .redact import (
     TrueRedactionResult,
@@ -443,11 +452,20 @@ __all__ = [
     "inspect_pdf",
     "clamp_render_scale",
     "WRONG_PASSWORD_MSG_DE",
+    "PREFERRED_ENCRYPTION_R",
+    "FALLBACK_ENCRYPTION_R",
+    "EncryptionInfo",
+    "PdfPermissionFlags",
     "is_wrong_password_error",
     "needs_password",
     "try_open_password",
     "password_strength",
+    "algorithm_from_encryption",
+    "permissions_from_p",
+    "get_encryption_info",
+    "get_permissions",
     "set_password",
+    "update_permissions",
     "remove_password",
     "bake_redactions",
     "apply_true_redactions",
@@ -524,4 +542,4 @@ __all__ = [
     "set_object_rect",
 ]
 
-__version__ = "2.6.6"
+__version__ = "2.6.7"

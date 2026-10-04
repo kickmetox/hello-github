@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **2.6.6** |
+| Version | **2.6.7** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -33,7 +33,7 @@
 
 Skript: [sync-ild.ps1](scripts/sync-ild.ps1) — Branch `cursor/instantlensdoc-2108` (oder `-LocalPack` / Pack-Zip) nach `D:\AI_Temp\InstantLensDoc`, pip, Start. **Nutzer-Icon in `assets` wird nicht überschrieben.**
 
-**FEATURES.md lokal sync:** Nach Sync liegt `FEATURES.md` lokal im App-Ordner (`D:\AI_Temp\InstantLensDoc\FEATURES.md`); About/Stubs öffnen diese lokale Datei — Version **2.6.6**.
+**FEATURES.md lokal sync:** Nach Sync liegt `FEATURES.md` lokal im App-Ordner (`D:\AI_Temp\InstantLensDoc\FEATURES.md`); About/Stubs öffnen diese lokale Datei — Version **2.6.7**.
 
 Ohne Start: `-NoStart` (Alias `-SkipStart`). Exit-Codes: **0** OK · **1** allgemein · **2** Git-Fehler.
 
@@ -63,13 +63,22 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an / `checkedonce`)
 
+## Neu in 2.6.7
+
+Minor-Feature nach **2.6.6** (Zusatzanforderungen #8):
+
+- **Verschlüsselung & Rechte:** Passwortschutz **AES-256** (R=6 / AESV3, Fallback AES-128); Rechte Druck/Kopieren/Ändern/Formulare/…
+- **UI:** Dialog „Verschlüsselung & Rechte…“ (Status · setzen · entfernen · Rechte) · PDF-Menü / Palette · Ctrl+Alt+Shift+P; Öffnen mit Passwort-Dialog
+- Kein Batch / Office-Export / E-Signatur / KI / Cloud / voller Windows-Installer
+- Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie unverändert
+
 ## Neu in 2.6.6
 
 Minor-Feature nach **2.6.5** (Zusatzanforderungen #7):
 
 - **Interaktive Formularerstellung:** AcroForm Textfelder, Checkboxen und Dropdowns erkennen und erstellen; bestehende Felder ausfüllen
 - **UI:** Toolbar „Formular“ (Rechteck ziehen) · Dialog ausfüllen/anlegen/löschen/erkennen · PDF-Menü / Palette · Ctrl+Alt+Shift+K
-- Keine Verschlüsselung / E-Signatur / Office-Export / KI / Cloud
+- Keine E-Signatur / Office-Export / KI / Cloud
 - Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie unverändert
 
 ## Neu in 2.6.5

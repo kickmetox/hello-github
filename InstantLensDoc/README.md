@@ -2,7 +2,7 @@
 
 Moderne Textverarbeitung mit PDF-Annotator, OCR-Bridge und Formulargenerator.
 
-**Version:** 2.6.6  
+**Version:** 2.6.7  
 **Hersteller:** Andreas Meyer · ame@sellerbach.de
 
 ## Quickstart (Windows)
@@ -34,9 +34,13 @@ User-Shortcuts: `.\scripts\install-ild.ps1` · Deinstallieren: `-Uninstall [-Qui
 
 Nightly-Smoke: `python scripts\smoke_ild.py` · optional `--qt` · `--json` (Summary: `ok`, `checks[]`, `duration_ms`, `version`; Fail: `checks[].error` max 200…, Exit=ok). Siehe **CONTRIBUTING.md**; Workflow-Stub `.github/workflows/smoke-ild.yml` (manual only).
 
+## Neu in 2.6.7
+
+Minor-Feature nach **2.6.6** (Zusatzanforderungen #8): **Verschlüsselung & Rechte** — AES-256-Passwortschutz, granulare Rechte (Druck/Kopieren/Ändern/…), Dialog setzen/entfernen/Rechte, Öffnen mit Passwort-Prompt; Ctrl+Alt+Shift+P. Kein Batch/Office/E-Sign/KI/Cloud. Stubs unverändert.
+
 ## Neu in 2.6.6
 
-Minor-Feature nach **2.6.5** (Zusatzanforderungen #7): **Interaktive Formularerstellung** — AcroForm Text/Checkbox/Dropdown erkennen und anlegen; UI ausfüllen/bearbeiten (Dialog + Toolbar „Formular“ + Rechteck ziehen); Ctrl+Alt+Shift+K. Keine Verschlüsselung/E-Sign/Office/KI/Cloud. Stubs unverändert.
+Minor-Feature nach **2.6.5** (Zusatzanforderungen #7): **Interaktive Formularerstellung** — AcroForm Text/Checkbox/Dropdown erkennen und anlegen; UI ausfüllen/bearbeiten (Dialog + Toolbar „Formular“ + Rechteck ziehen); Ctrl+Alt+Shift+K. Keine E-Sign/Office/KI/Cloud. Stubs unverändert.
 
 ## Neu in 2.6.5
 
