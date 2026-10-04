@@ -2820,9 +2820,11 @@ class SettingsDialog(QDialog):
             self.btn_undo_factory_presets.setEnabled(bool(prev))
 
     def _update_ann_theme_swatches(self, *_args) -> None:
-        """Vorschau-Swatches für gewähltes Farben-Theme — 2.5.1."""
+        """Vorschau-Swatches · Combo-Tooltip Hex · Custom N/20 — 2.5.1/2.5.7."""
         from instantlensdoc.core.app_settings import (
+            CUSTOM_ANN_COLOR_THEMES_MAX,
             get_ann_color_theme,
+            get_custom_ann_color_themes,
             get_default_ann_color_theme,
         )
 
@@ -2844,16 +2846,34 @@ class SettingsDialog(QDialog):
                 sw.setStyleSheet("background: transparent; border: 1px dashed #bbb;")
                 sw.setToolTip("Kein Theme gewählt")
                 sw.setVisible(True)
+        custom_n = 0
+        try:
+            custom_n = len(get_custom_ann_color_themes())
+        except Exception:
+            custom_n = 0
         hint = getattr(self, "ann_theme_swatch_hint", None)
         if hint is not None:
             default = get_default_ann_color_theme()
+            count_txt = f"Custom {custom_n}/{CUSTOM_ANN_COLOR_THEMES_MAX}"
             if name and colors:
                 extra = " · Default" if name == default else ""
-                hint.setText(f"{name}: {len(colors)} Farben{extra}")
+                hint.setText(f"{name}: {len(colors)} Farben{extra} · {count_txt}")
             elif default:
-                hint.setText(f"Default: {default}")
+                hint.setText(f"Default: {default} · {count_txt}")
             else:
-                hint.setText("Theme wählen für Vorschau")
+                hint.setText(f"Theme wählen für Vorschau · {count_txt}")
+        # Combo-Tooltip: alle Hex-Farben des gewählten Themes — 2.5.7
+        if combo is not None:
+            base = (
+                "Vordefinierte + Custom Themes · ★ = Default · "
+                f"Custom {custom_n}/{CUSTOM_ANN_COLOR_THEMES_MAX} · "
+                "Custom umbenennen/duplizieren/löschen — 2.5.7"
+            )
+            if name and colors:
+                hex_line = " · ".join(str(c) for c in colors)
+                combo.setToolTip(f"{name}\n{hex_line}\n{base}")
+            else:
+                combo.setToolTip(base)
 
     def _save_default_ann_color_theme_ui(self) -> None:
         """Gewähltes Theme als Default speichern — 2.5.1."""
@@ -2939,10 +2959,8 @@ class SettingsDialog(QDialog):
             if idx >= 0:
                 combo.setCurrentIndex(idx)
         combo.blockSignals(False)
-        combo.setToolTip(
-            "Vordefinierte + Custom Themes · ★ = Default · "
-            "Custom umbenennen/duplizieren/löschen — 2.5.6"
-        )
+        # Tooltip inkl. Hex/Custom-Zähler via Swatch-Update — 2.5.7
+        self._update_ann_theme_swatches()
 
     def _rename_custom_ann_color_theme_ui(self) -> None:
         """Benutzerdefiniertes Farben-Theme umbenennen — 2.5.5."""

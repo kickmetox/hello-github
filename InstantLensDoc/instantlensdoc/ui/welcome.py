@@ -128,7 +128,7 @@ class WelcomePage(QWidget):
         self.recent_filter.setClearButtonEnabled(True)
         self.recent_filter.setToolTip(
             "Live-Filter Pfad oder Dokument-Tags (ildtags-v1) · Tag-Vorschläge · "
-            "Quick-Tag A–Z/Häufigkeit mit Anzahl · Treffer A11y · Esc → Fokus Liste — 2.5.6"
+            "Quick-Tag A–Z/Häufigkeit · Tags kopieren · Treffer A11y · Esc → Fokus Liste — 2.5.7"
         )
         self.recent_filter.textChanged.connect(self._apply_recent_filter)
         self.recent_filter.textChanged.connect(self._persist_recent_filter)
@@ -175,8 +175,8 @@ class WelcomePage(QWidget):
         self.recent_list.setMinimumHeight(180)
         self.recent_list.setToolTip(
             "Enter / Doppelklick öffnet; Entf entfernt den Eintrag; "
-            "Rechtsklick: Tag hinzufügen (Vorschläge) / entfernen · Entfernen / Ordner; "
-            "Quick-Tag A–Z/Häufigkeit (N Docs) · Treffer A11y · Esc → Fokus Liste — 2.5.6"
+            "Rechtsklick: Tag+/− · Tags kopieren · Entfernen / Ordner; "
+            "Quick-Tag A–Z/Häufigkeit (N Docs) · Treffer A11y · Esc → Fokus Liste — 2.5.7"
         )
         self.recent_list.setAcceptDrops(True)
         self.recent_list.setContextMenuPolicy(Qt.CustomContextMenu)
@@ -515,6 +515,7 @@ class WelcomePage(QWidget):
         menu = QMenu(self)
         act_add_tag = menu.addAction("Tag hinzufügen…")
         act_remove_tag = menu.addAction("Tag entfernen…")
+        act_copy_tags = menu.addAction("Tags kopieren")
         menu.addSeparator()
         act_remove = menu.addAction("Entfernen")
         act_folder = menu.addAction("Ordner öffnen")
@@ -523,6 +524,8 @@ class WelcomePage(QWidget):
             self._add_tag_for_recent(str(path))
         elif chosen is act_remove_tag:
             self._remove_tag_for_recent(str(path))
+        elif chosen is act_copy_tags:
+            self._copy_tags_for_recent(str(path))
         elif chosen is act_remove:
             self.recent_remove_requested.emit(str(path))
         elif chosen is act_folder:
@@ -611,6 +614,41 @@ class WelcomePage(QWidget):
             QMessageBox.warning(self, "Dokument-Tags", str(e))
             return
         self.refresh_recent()
+
+    def _copy_tags_for_recent(self, path: str) -> None:
+        """Alle Dokument-Tags des Recent-Eintrags in Zwischenablage — 2.5.7."""
+        from PySide6.QtWidgets import QApplication, QMessageBox
+
+        from instantlensdoc.core import doc_tags as doc_tags_mod
+
+        current = doc_tags_mod.load_tags_sidecar(path)
+        if not current:
+            QMessageBox.information(
+                self, "Tags kopieren", "Keine Tags an diesem Dokument."
+            )
+            return
+        text = ", ".join(str(t) for t in current)
+        try:
+            clip = QApplication.clipboard()
+            if clip is None:
+                raise RuntimeError("Zwischenablage nicht verfügbar")
+            clip.setText(text)
+        except Exception as e:
+            QMessageBox.warning(self, "Tags kopieren", str(e))
+            return
+        # Status über Parent-MainWindow wenn vorhanden — 2.5.7
+        win = self.window()
+        msg = f"Tags kopiert ({len(current)}): {text}"
+        if win is not None and hasattr(win, "_set_status"):
+            try:
+                win._set_status(msg)
+            except Exception:
+                pass
+        if win is not None and hasattr(win, "_announce_status_toast"):
+            try:
+                win._announce_status_toast(msg)
+            except Exception:
+                pass
 
     def _open_containing_folder(self, path: str) -> None:
         p = Path(path)

@@ -1,5 +1,20 @@
 # Changelog — InstantLens Doc
 
+## 2.5.7 — OCR-Region Pfad kopieren, Theme Hex-Tooltip·Custom N/20, ildtags Tags kopieren, Export RMB Ordner·Entf
+
+Post-Release-Polish nach **2.5.6**: **OCR-Region** Status-**Mittelklick/Ctrl+Klick kopiert Ergebnis-Pfad** (Tooltip mit vollem Pfad); **Farben-Themes** Combo-**Tooltip mit 6 Hex-Farben** und **Custom-Zähler N/20**; **ildtags** Kontextmenü **Tags kopieren**; **Export-Presets** **Rechtsklick → Zielordner öffnen** und **Entf löschen**. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie klar markiert / nicht produktiv (Ink ≠ Stylus).
+
+### Geändert
+- OCR-Region: Mittelklick/Ctrl+Klick → Ergebnis-Pfad kopieren · Tooltip mit Pfad
+- Farben-Themes: Combo-Tooltip 6 Hex · Custom-Zähler N/20
+- Dokument-Tags: Kontextmenü „Tags kopieren“ (Zwischenablage)
+- Export-Presets: Rechtsklick → Zielordner · Entf/Backspace löschen
+
+### Tests / Qualität
+- Version **2.5.7** (App / `ild_pdf` / ISS / Smoke / Docs); Serie **2.5**; `docs/VERSION` + `VERSION.txt`
+- Smoke: 2.5.7 CLI + Qt (OCR Pfad-Copy, Theme Hex/N20, ildtags Tags-Copy, Export RMB/Entf)
+- Stubs: KI/Cloud/Stylus/3D/Hooks/Outline/Telemetrie unverändert markiert
+
 ## 2.5.6 — OCR-Region Status-Rechtsklick→Ordner, Theme Custom duplizieren, ildtags Sort A–Z/Häufigkeit, Export Tooltip·Apply A11y
 
 Post-Release-Polish nach **2.5.5**: **OCR-Region** Status-**Rechtsklick öffnet Ergebnis-Ordner** (Linksklick bleibt Tab); **Farben-Themes** **Custom duplizieren**; **ildtags** Quick-Tag **Sort A–Z ↔ Häufigkeit** (persistiert); **Export-Presets** **Listen-Tooltip Summary** und **Apply A11y Announcement**. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie klar markiert / nicht produktiv (Ink ≠ Stylus).
