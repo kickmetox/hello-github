@@ -1,4 +1,4 @@
-"""Headless InstantLens-Doc-Operationen für Python- und PowerShell-Scripting — 2.6.9."""
+"""Headless InstantLens-Doc-Operationen für Python- und PowerShell-Scripting — 2.6.10."""
 
 from __future__ import annotations
 
@@ -476,3 +476,112 @@ def add_custom_stamp_def(
     from ild_pdf.annotate import add_custom_stamp as _add
 
     return _add(label, color=color, path=_p(custom_path) if custom_path else None)
+
+
+def list_style_presets() -> list[dict[str, Any]]:
+    from ild_pdf.auto_format import list_style_presets as _list
+
+    return _list()
+
+
+def auto_format_text(text: str, *, preset: str = "default") -> dict[str, Any]:
+    from ild_pdf.auto_format import auto_format_text as _fmt
+
+    return _fmt(text, preset=preset).to_dict()
+
+
+def auto_format_pdf(
+    path: PathLike,
+    *,
+    out: PathLike | None = None,
+    max_level: int = 3,
+    update_toc: bool = True,
+    password: str | None = None,
+) -> dict[str, Any]:
+    from ild_pdf.auto_format import auto_format_pdf as _fmt
+
+    pdf = _require_file(path)
+    return _fmt(
+        pdf,
+        out_path=_p(out) if out else None,
+        max_level=int(max_level or 3),
+        update_toc=bool(update_toc),
+        password=password,
+    ).to_dict()
+
+
+def generate_toc(
+    path: PathLike | None = None,
+    *,
+    text: str | None = None,
+    out: PathLike | None = None,
+    max_level: int = 3,
+    write: bool = True,
+    password: str | None = None,
+) -> dict[str, Any]:
+    """TOC aus Text (Markdown) oder PDF (Outline)."""
+    from ild_pdf.auto_format import (
+        generate_toc_for_pdf,
+        generate_toc_markdown,
+        insert_toc_into_text,
+    )
+
+    if text is not None:
+        toc = generate_toc_markdown(text, max_level=int(max_level or 3))
+        merged = insert_toc_into_text(text, max_level=int(max_level or 3))
+        return {"toc": toc, "text": merged, "count": toc.count("\n- ")}
+    if path is None:
+        raise ValueError("path oder text erforderlich")
+    pdf = _require_file(path)
+    result = generate_toc_for_pdf(
+        pdf,
+        out_path=_p(out) if out else None,
+        max_level=int(max_level or 3),
+        write=bool(write),
+        password=password,
+    )
+    return result.to_dict()
+
+
+def list_system_fonts(*, include_files: bool = False) -> list[str]:
+    from ild_pdf.auto_format import list_system_fonts as _fonts
+
+    return _fonts(include_files=include_files)
+
+
+def find_replace(
+    *,
+    text: str | None = None,
+    path: PathLike | None = None,
+    find: str,
+    replace: str,
+    case_sensitive: bool = False,
+    count: int = 0,
+    max_replacements: int = 50,
+    password: str | None = None,
+) -> dict[str, Any]:
+    """Suchen/Ersetzen in Text oder PDF."""
+    from ild_pdf.auto_format import find_replace_in_pdf_text, find_replace_text
+
+    if text is not None:
+        new_text, n = find_replace_text(
+            text, find, replace, case_sensitive=case_sensitive, count=count
+        )
+        return {"count": n, "text": new_text}
+    if path is None:
+        raise ValueError("path oder text erforderlich")
+    pdf = _require_file(path)
+    return find_replace_in_pdf_text(
+        pdf,
+        find,
+        replace,
+        case_sensitive=case_sensitive,
+        max_replacements=int(max_replacements or 50),
+        password=password,
+    )
+
+
+def outline_summary(path: PathLike) -> list[dict[str, Any]]:
+    from ild_pdf.auto_format import outline_summary as _sum
+
+    return _sum(_require_file(path))

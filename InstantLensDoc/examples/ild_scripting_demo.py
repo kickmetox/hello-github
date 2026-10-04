@@ -1,4 +1,4 @@
-"""Beispiel: InstantLens Doc Scripting (Python) — 2.6.9.
+"""Beispiel: InstantLens Doc Scripting (Python) — 2.6.10.
 
 Aufruf aus dem App-Root:
   python examples/ild_scripting_demo.py [pdf]
@@ -44,6 +44,14 @@ def main() -> int:
         hl = ild.highlight_paragraphs(src, page=1, x=0, y=0, width=400, height=200)
         print("paragraph highlights:", hl.get("count"))
         print("stamps:", [s.get("label") for s in ild.list_stamps()][:8])
+        fmt = ild.auto_format_text("EINLEITUNG\n\nFließtext Demo.\n")
+        print("auto_format headings:", len(fmt.get("headings") or []))
+        toc = ild.generate_toc(path=src)
+        print("toc outline_count:", toc.get("outline_count"))
+        fonts = ild.list_system_fonts()
+        print("fonts sample:", fonts[:5])
+        fr = ild.find_replace(text="a b a", find="a", replace="X")
+        print("find_replace:", fr.get("count"), fr.get("text"))
     return 0
 
 

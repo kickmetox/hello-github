@@ -1554,10 +1554,44 @@ class MainWindow(QMainWindow):
         act_find_prev.triggered.connect(self._on_search_prev)
         m_edit.addAction(act_find_prev)
         act_find_repl = QAction("Suchen und Ersetzen…", self)
-        act_find_repl.setShortcut(QKeySequence("Ctrl+R"))
-        act_find_repl.setToolTip("Find/Replace im Texteditor")
+        # Word-like Ctrl+H; Ctrl+R bleibt Alias — 2.6.10
+        act_find_repl.setShortcuts(
+            [QKeySequence("Ctrl+H"), QKeySequence("Ctrl+R")]
+        )
+        act_find_repl.setToolTip(
+            "Find/Replace (Word: Ctrl+H · Alias Ctrl+R) — Editor; PDF via Scripting"
+        )
         act_find_repl.triggered.connect(self._find_replace)
         m_edit.addAction(act_find_repl)
+        act_bold = QAction("Fett", self)
+        act_bold.setShortcut(QKeySequence("Ctrl+B"))
+        act_bold.setToolTip("Fett (Markdown **…**) — Word/InDesign-ähnlich — 2.6.10")
+        act_bold.triggered.connect(self._toggle_bold)
+        m_edit.addAction(act_bold)
+        act_italic = QAction("Kursiv", self)
+        act_italic.setShortcut(QKeySequence("Ctrl+I"))
+        act_italic.setToolTip("Kursiv (Markdown *…*) — 2.6.10")
+        act_italic.triggered.connect(self._toggle_italic)
+        m_edit.addAction(act_italic)
+        act_underline = QAction("Unterstrichen", self)
+        act_underline.setShortcut(QKeySequence("Ctrl+U"))
+        act_underline.setToolTip("Unterstrichen (Markdown __…__) — 2.6.10")
+        act_underline.triggered.connect(self._toggle_underline)
+        m_edit.addAction(act_underline)
+        act_auto_fmt = QAction("Automatische Formatierung", self)
+        act_auto_fmt.setShortcut(QKeySequence("Ctrl+Alt+Shift+F"))
+        act_auto_fmt.setToolTip(
+            "Überschriften/Fließtext/Zitate heuristisch setzen (Presets) — 2.6.10"
+        )
+        act_auto_fmt.triggered.connect(self._auto_format_document)
+        m_edit.addAction(act_auto_fmt)
+        act_auto_toc = QAction("Inhaltsverzeichnis aktualisieren", self)
+        act_auto_toc.setShortcut(QKeySequence("Ctrl+Alt+Shift+T"))
+        act_auto_toc.setToolTip(
+            "TOC aus Überschriften: Editor→Markdown · PDF→Outline/Sidebar — 2.6.10"
+        )
+        act_auto_toc.triggered.connect(self._update_auto_toc)
+        m_edit.addAction(act_auto_toc)
         act_palette = QAction("Schnellaktionen…", self)
         act_palette.setShortcut(QKeySequence("Ctrl+K"))
         act_palette.setToolTip(
@@ -1660,7 +1694,9 @@ class MainWindow(QMainWindow):
         act_comment.triggered.connect(self._toggle_line_comment)
         m_edit.addAction(act_comment)
         act_mark = QAction("Auswahl markieren", self)
-        act_mark.setShortcut(QKeySequence("Ctrl+H"))
+        # Ctrl+H = Suchen/Ersetzen (Word); Markieren → Ctrl+Shift+H — 2.6.10
+        act_mark.setShortcut(QKeySequence("Ctrl+Shift+H"))
+        act_mark.setToolTip("Auswahl markieren (früher Ctrl+H) — 2.6.10")
         act_mark.triggered.connect(self._mark_selection)
         m_edit.addAction(act_mark)
         act_toggle_case = QAction("Groß-/Kleinschreibung umschalten", self)
@@ -2315,7 +2351,7 @@ class MainWindow(QMainWindow):
         act_para = QAction("Absatz hervorheben", self)
         act_para.setShortcut(QKeySequence("Ctrl+Alt+Shift+H"))
         act_para.setToolTip(
-            "Highlight ganzer Textabsätze (nicht nur freie Rechtecke) — 2.6.9"
+            "Highlight ganzer Textabsätze (nicht nur freie Rechtecke) — 2.6.10"
         )
         act_para.triggered.connect(
             lambda: self.pdf_view._toggle_paragraph_highlight(True)
@@ -7443,12 +7479,88 @@ class MainWindow(QMainWindow):
         else:
             self.sidebar.search.setFocus()
 
+    def _toggle_bold(self) -> None:
+        if self.stack.currentWidget() is self.editor_pane:
+            self.editor.toggle_bold_selection()
+            self._set_status("Fett (Markdown **)")
+
+    def _toggle_italic(self) -> None:
+        if self.stack.currentWidget() is self.editor_pane:
+            self.editor.toggle_italic_selection()
+            self._set_status("Kursiv (Markdown *)")
+
+    def _toggle_underline(self) -> None:
+        if self.stack.currentWidget() is self.editor_pane:
+            self.editor.toggle_underline_selection()
+            self._set_status("Unterstrichen (Markdown __)")
+
+    def _auto_format_document(self) -> None:
+        """Automatische Formatierung Editor oder PDF — 2.6.10."""
+        if self.stack.currentWidget() is self.editor_pane:
+            n = self.editor.apply_auto_format()
+            if self.doc and self.doc.kind in (
+                DocKind.TEXT,
+                DocKind.MARKDOWN,
+                DocKind.HTML,
+                DocKind.DOCX,
+            ):
+                self.doc.text = self.editor.toPlainText()
+                self.doc.dirty = True
+            self._on_text_changed()
+            self._set_status(f"Automatische Formatierung: {n} Zeile(n) angepasst")
+            return
+        path = getattr(self.pdf_view, "pdf_path", None)
+        if not path:
+            self._set_status("Kein Dokument für Auto-Format")
+            return
+        from ild_pdf.auto_format import auto_format_pdf
+
+        try:
+            result = auto_format_pdf(path, update_toc=True)
+            self._refresh_outline(path)
+            self._set_status(
+                f"Auto-Format PDF: {len(result.headings)} Überschrift(en), "
+                "TOC/Outline aktualisiert"
+            )
+        except Exception as e:
+            self._set_status(f"Auto-Format fehlgeschlagen: {e}")
+
+    def _update_auto_toc(self) -> None:
+        """TOC aktualisieren (Editor Markdown / PDF Outline) — 2.6.10."""
+        if self.stack.currentWidget() is self.editor_pane:
+            self.editor.update_auto_toc()
+            if self.doc and self.doc.kind in (
+                DocKind.TEXT,
+                DocKind.MARKDOWN,
+                DocKind.HTML,
+                DocKind.DOCX,
+            ):
+                self.doc.text = self.editor.toPlainText()
+                self.doc.dirty = True
+            self._on_text_changed()
+            self._set_status("Inhaltsverzeichnis (Markdown) aktualisiert")
+            return
+        path = getattr(self.pdf_view, "pdf_path", None)
+        if not path:
+            self._set_status("Kein PDF für Inhaltsverzeichnis")
+            return
+        from ild_pdf.auto_format import generate_toc_for_pdf
+
+        try:
+            result = generate_toc_for_pdf(path, write=True)
+            self._refresh_outline(path)
+            self._set_status(
+                f"Inhaltsverzeichnis: {result.outline_count} Einträge → Outline/Sidebar"
+            )
+        except Exception as e:
+            self._set_status(f"TOC fehlgeschlagen: {e}")
+
     def _find_replace(self):
         if self.stack.currentWidget() is not self.editor_pane:
             QMessageBox.information(
                 self,
                 "Suchen und Ersetzen",
-                "Find/Replace ist im Texteditor verfügbar.",
+                "Find/Replace ist im Texteditor verfügbar (Ctrl+H / Ctrl+R).",
             )
             return
         from instantlensdoc.ui.find_replace_dialog import FindReplaceDialog
@@ -10265,6 +10377,11 @@ class MainWindow(QMainWindow):
             else None,
             "multi_search": self._open_multi_doc_search,
             "find_replace": self._find_replace,
+            "auto_format": self._auto_format_document,
+            "auto_toc": self._update_auto_toc,
+            "toggle_bold": self._toggle_bold,
+            "toggle_italic": self._toggle_italic,
+            "toggle_underline": self._toggle_underline,
             "ocr_page": self._run_ocr,
             "ocr_pdf": self._run_ocr_document,
             "ocr_region": self._run_ocr_region,

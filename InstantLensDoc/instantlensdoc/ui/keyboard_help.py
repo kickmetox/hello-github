@@ -67,7 +67,10 @@ SHORTCUTS_HTML = """
 <tr><td>Wiederholen</td><td><code>Ctrl+Y</code> / <code>Ctrl+Shift+Z</code></td></tr>
 <tr><td>Suchen</td><td><code>Ctrl+F</code></td></tr>
 <tr><td>Weitersuchen / Rückwärts</td><td><code>F3</code> / <code>Shift+F3</code> — PDF-Treffer-Highlight + Seiten-Nav — 0.9.0</td></tr>
-<tr><td>Suchen und Ersetzen</td><td><code>Ctrl+R</code></td></tr>
+<tr><td>Suchen und Ersetzen</td><td><code>Ctrl+H</code> (Word) / <code>Ctrl+R</code> Alias — <b>2.6.10</b></td></tr>
+<tr><td>Fett / Kursiv / Unterstrichen</td><td><code>Ctrl+B</code> / <code>Ctrl+I</code> / <code>Ctrl+U</code> (Markdown-Marker) — <b>2.6.10</b></td></tr>
+<tr><td>Automatische Formatierung</td><td><code>Ctrl+Alt+Shift+F</code> — Heading/Body/Quote-Presets — <b>2.6.10</b></td></tr>
+<tr><td>Inhaltsverzeichnis aktualisieren</td><td><code>Ctrl+Alt+Shift+T</code> — Editor Markdown · PDF Outline/Sidebar — <b>2.6.10</b></td></tr>
 <tr><td>Multi-Dokument-Suche</td><td><code>Ctrl+Shift+F</code> — zentrale Trefferliste alle offenen PDFs — 2.0.0</td></tr>
 <tr><td>High-Contrast Theme</td><td><code>Ctrl+Alt+H</code> — Toast Dauer OCR-Settings · A11y wie OCR-Toast — 2.0.5</td></tr>
 <tr><td>Gehe zu Zeile / Seite</td><td><code>Ctrl+G</code> (Editor / PDF)</td></tr>
@@ -78,7 +81,7 @@ SHORTCUTS_HTML = """
 <tr><td>Erneut öffnen</td><td><code>Ctrl+Alt+Shift+O</code></td></tr>
 <tr><td>Zeile / Annotation duplizieren</td><td><code>Ctrl+D</code> (Editor Zeile; PDF Auswahl) — 0.8.2</td></tr>
 <tr><td>Zeile kommentieren/auskommentieren</td><td><code>Ctrl+/</code> (# oder //)</td></tr>
-<tr><td>Auswahl markieren</td><td><code>Ctrl+H</code></td></tr>
+<tr><td>Auswahl markieren</td><td><code>Ctrl+Shift+H</code> (früher Ctrl+H; Ctrl+H = Ersetzen) — <b>2.6.10</b></td></tr>
 <tr><td>Groß-/Kleinschreibung umschalten</td><td><code>Ctrl+Shift+U</code></td></tr>
 <tr><td>Einrückung erhöhen</td><td><code>Ctrl+]</code> / <code>Tab</code> (Block)</td></tr>
 <tr><td>Einrückung verringern</td><td><code>Ctrl+[</code> / <code>Shift+Tab</code></td></tr>
@@ -311,7 +314,13 @@ Speichern als <b>.txt</b> + CLI <b>--days</b> — 1.1.9.</p>
 <p><b>PDF bereinigen:</b> PDF → PDF bereinigen — optional Metadaten entfernen, neu speichern.</p>
 <p><b>Seitenbereich:</b> PDF → Seitenbereich extrahieren… (z. B. 1-3,5,8-10; DE-Validierung + Seitenanzahl-Vorschau — 1.2.1)
 bzw. Dialog „zusammenführen / teilen / Bereich“.</p>
-<p><b>Suchen und Ersetzen:</b> Bearbeiten → Ctrl+R (nur Texteditor).</p>
+<p><b>Suchen und Ersetzen:</b> Bearbeiten → <code>Ctrl+H</code> (Word) / <code>Ctrl+R</code> Alias — Texteditor; PDF via Scripting <code>ild find-replace</code> — <b>2.6.10</b>.</p>
+<p><b>Word-/InDesign-ähnliche Shortcuts (2.6.10):</b>
+<code>Ctrl+B/I/U</code> Fett/Kursiv/Unterstrichen · <code>Ctrl+S</code> Speichern ·
+<code>Ctrl+F</code> Suchen · <code>Ctrl+H</code> Ersetzen · <code>Ctrl+Z/Y</code> Undo/Redo ·
+<code>Ctrl+C/V</code> Kopieren/Einfügen · <code>Ctrl+P</code> Drucken ·
+<code>Ctrl+Alt+Shift+F</code> Auto-Format · <code>Ctrl+Alt+Shift+T</code> TOC.
+Vollständige Liste unten / F1-Export.</p>
 <p><b>Gehe zu Zeile / Seite:</b> Bearbeiten → Ctrl+G (Editor: Zeile; PDF: Seite);
 PDF → Gehe zu Seite… (Ctrl+Shift+G).</p>
 <p><b>Tab duplizieren:</b> Datei → Ctrl+Alt+Shift+T (Editor-Inhalt klonen) — 1.4.5;

@@ -161,9 +161,9 @@ class AnnotationType(str, Enum):
     SIGNATURE_FIELD = "signature_field"  # Platzhalter-Rahmen
     SIGNATURE = "signature"  # Bild-Unterschrift (text: img:…)
     REDACTION = "redaction"  # Schwärzung (opakes Rechteck)
-    ELLIPSE = "ellipse"  # Kreis/Ellipse, gefüllt oder Outline — 2.6.9
-    TRIANGLE = "triangle"  # Dreieck — 2.6.9
-    ROUNDED_RECT = "rounded_rect"  # abgerundetes Rechteck — 2.6.9
+    ELLIPSE = "ellipse"  # Kreis/Ellipse, gefüllt oder Outline — 2.6.10
+    TRIANGLE = "triangle"  # Dreieck — 2.6.10
+    ROUNDED_RECT = "rounded_rect"  # abgerundetes Rechteck — 2.6.10
 
 
 # Vordefinierte Stempel-Texte (UI kann erweitern)
@@ -181,7 +181,7 @@ STAMP_PRESETS = (
     "Datum",
 )
 
-# Kern-Bibliothek inkl. definierbare Stempel Paid/Bezahlt/Rechnung/Datum — 2.6.9
+# Kern-Bibliothek inkl. definierbare Stempel Paid/Bezahlt/Rechnung/Datum — 2.6.10
 STAMP_LIBRARY = (
     ("GENEHMIGT", "#1E8449"),
     ("ENTWURF", "#D68910"),
@@ -192,7 +192,7 @@ STAMP_LIBRARY = (
     ("Datum", "#6C3483"),
 )
 
-# Definierbare Text-Stempel (Builtin); Nutzer-Stempel zusätzlich in JSON — 2.6.9
+# Definierbare Text-Stempel (Builtin); Nutzer-Stempel zusätzlich in JSON — 2.6.10
 DEFINABLE_STAMP_PRESETS = (
     ("Paid", "#1E8449"),
     ("Bezahlt", "#1E8449"),

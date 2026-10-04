@@ -28,6 +28,7 @@ from PySide6.QtWidgets import (
     QDialogButtonBox,
     QDoubleSpinBox,
     QFormLayout,
+    QFontComboBox,
     QHBoxLayout,
     QInputDialog,
     QLabel,
@@ -245,7 +246,7 @@ class StampPickDialog(QDialog):
         layout.addWidget(self.custom)
         self.btn_save_custom = QPushButton("Als Stempel speichern")
         self.btn_save_custom.setToolTip(
-            "Eigenen Text dauerhaft in der Stempel-Liste ablegen — 2.6.9"
+            "Eigenen Text dauerhaft in der Stempel-Liste ablegen — 2.6.10"
         )
         self.btn_save_custom.clicked.connect(self._save_custom)
         layout.addWidget(self.btn_save_custom)
@@ -449,10 +450,26 @@ class InlineTextEditDialog(QDialog):
         self.text.setPlainText(text or "")
         self.text.setMinimumHeight(120)
         form.addRow("Text:", self.text)
-        self.font_family = QLineEdit(style.font_family or "Helvetica")
+        self.font_family = QFontComboBox()
         self.font_family.setObjectName("inlineTextEditFontFamily")
+        self.font_family.setEditable(True)
+        # Windows-Systemschriften + Qt-Families — 2.6.10
+        try:
+            from ild_pdf.auto_format import list_system_fonts
+
+            for fam in list_system_fonts():
+                self.font_family.addItem(fam)
+        except Exception:
+            pass
+        current_fam = style.font_family or "Helvetica"
+        idx = self.font_family.findText(current_fam)
+        if idx >= 0:
+            self.font_family.setCurrentIndex(idx)
+        else:
+            self.font_family.setCurrentText(current_fam)
         self.font_family.setToolTip(
-            f"Erkannt: {style.font_family} → Schreiben als {style.base_font}"
+            f"Systemschriften (Windows Fonts/Qt) · Erkannt: {style.font_family} "
+            f"→ PDF {style.base_font} — 2.6.10"
         )
         form.addRow("Schriftart:", self.font_family)
         self.font_size = QDoubleSpinBox()
@@ -469,7 +486,7 @@ class InlineTextEditDialog(QDialog):
         mapped.setObjectName("inlineTextEditMappedFont")
         form.addRow("Mapping:", mapped)
         self._mapped_label = mapped
-        self.font_family.textChanged.connect(self._refresh_mapping)
+        self.font_family.currentTextChanged.connect(self._refresh_mapping)
         layout.addLayout(form)
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         buttons.accepted.connect(self.accept)
@@ -477,11 +494,11 @@ class InlineTextEditDialog(QDialog):
         layout.addWidget(buttons)
 
     def _refresh_mapping(self, _text: str = "") -> None:
-        base = map_to_standard_font(self.font_family.text().strip() or "Helvetica")
+        base = map_to_standard_font(self.font_family.currentText().strip() or "Helvetica")
         self._mapped_label.setText(f"PDF-Font: {base}")
 
     def values(self) -> tuple[str, TextStyle]:
-        family = self.font_family.text().strip() or "Helvetica"
+        family = self.font_family.currentText().strip() or "Helvetica"
         base = map_to_standard_font(family)
         color = self.color.text().strip() or "#000000"
         if not color.startswith("#"):
@@ -2223,14 +2240,14 @@ class PdfViewer(QWidget):
             b.setChecked(t == AnnotationType.HIGHLIGHT)
             if t == AnnotationType.HIGHLIGHT:
                 b.setToolTip(
-                    "Highlight: Text aufziehen; mit „Absatz“ ganze Absätze — 2.6.9"
+                    "Highlight: Text aufziehen; mit „Absatz“ ganze Absätze — 2.6.10"
                 )
             elif t == AnnotationType.ELLIPSE:
-                b.setToolTip("Kreis/Ellipse ziehen; Füllen-Toggle für Fläche oder Outline — 2.6.9")
+                b.setToolTip("Kreis/Ellipse ziehen; Füllen-Toggle für Fläche oder Outline — 2.6.10")
             elif t == AnnotationType.TRIANGLE:
-                b.setToolTip("Dreieck ziehen; Füllen-Toggle — 2.6.9")
+                b.setToolTip("Dreieck ziehen; Füllen-Toggle — 2.6.10")
             elif t == AnnotationType.ROUNDED_RECT:
-                b.setToolTip("Abgerundetes Rechteck; Füllen-Toggle — 2.6.9")
+                b.setToolTip("Abgerundetes Rechteck; Füllen-Toggle — 2.6.10")
             elif t == AnnotationType.MEASURE_AREA:
                 b.setToolTip("Fläche: Rechteck aufziehen — Anzeige mm²/px² (Toggle mm/px) — 2.1.0")
             elif t == AnnotationType.MEASURE_ANGLE:
@@ -2309,13 +2326,13 @@ class PdfViewer(QWidget):
         toolbar.addWidget(self.btn_measure_snap)
 
         self.btn_hl_color = QPushButton("HL")
-        self.btn_hl_color.setToolTip("Highlight-Farbe (Color-Picker) — 2.6.9")
+        self.btn_hl_color.setToolTip("Highlight-Farbe (Color-Picker) — 2.6.10")
         self.btn_hl_color.setFixedWidth(36)
         self.btn_hl_color.clicked.connect(self._pick_highlight_color)
         self._style_color_btn(self.btn_hl_color, self._highlight_color)
         self.btn_pen_color = QPushButton("Stift")
         self.btn_pen_color.setToolTip(
-            "Strichfarbe für Stift/Formen/Freihand (Color-Picker) — 2.6.9"
+            "Strichfarbe für Stift/Formen/Freihand (Color-Picker) — 2.6.10"
         )
         self.btn_pen_color.setFixedWidth(44)
         self.btn_pen_color.clicked.connect(self._pick_pen_color)
@@ -2363,7 +2380,7 @@ class PdfViewer(QWidget):
         self.slider_stroke.setValue(int(round(self._default_stroke_width)))
         self.slider_stroke.setToolTip(
             "Pinsel-/Stiftstärke 1–12 px für Freihand und Formen; ohne Auswahl → Standard "
-            "(Undo beim Loslassen) — 2.6.9"
+            "(Undo beim Loslassen) — 2.6.10"
         )
         self._stroke_slider_dragging = False
         self._stroke_slider_undo_pushed = False
@@ -2373,14 +2390,14 @@ class PdfViewer(QWidget):
         self.slider_stroke.valueChanged.connect(self._on_stroke_slider_changed)
         self.lbl_stroke = QLabel(f"Strich {int(round(self._default_stroke_width))}")
         self.lbl_stroke.setFixedWidth(52)
-        self.lbl_stroke.setToolTip("Aktuelle Pinsel-/Stiftstärke in Pixel — 2.6.9")
+        self.lbl_stroke.setToolTip("Aktuelle Pinsel-/Stiftstärke in Pixel — 2.6.10")
         self.btn_shape_fill = QToolButton()
         self.btn_shape_fill.setText("Füllen")
         self.btn_shape_fill.setObjectName("shapeFillToolbarBtn")
         self.btn_shape_fill.setCheckable(True)
         self.btn_shape_fill.setChecked(self._shape_filled)
         self.btn_shape_fill.setToolTip(
-            "Formen gefüllt (an) oder nur Outline (aus); Füllfarbe über Füllung… — 2.6.9"
+            "Formen gefüllt (an) oder nur Outline (aus); Füllfarbe über Füllung… — 2.6.10"
         )
         self.btn_shape_fill.clicked.connect(self._toggle_shape_fill)
         self.btn_para_hl = QToolButton()
@@ -2389,7 +2406,7 @@ class PdfViewer(QWidget):
         self.btn_para_hl.setCheckable(True)
         self.btn_para_hl.setChecked(False)
         self.btn_para_hl.setToolTip(
-            "Highlight ganzer Absätze/Textabschnitte (nicht nur Zeichen unter dem Rechteck) — 2.6.9"
+            "Highlight ganzer Absätze/Textabschnitte (nicht nur Zeichen unter dem Rechteck) — 2.6.10"
         )
         self.btn_para_hl.clicked.connect(self._toggle_paragraph_highlight)
         self.btn_grayscale = QToolButton()
@@ -3978,7 +3995,7 @@ class PdfViewer(QWidget):
         self.status.emit(f"Messanzeige: {unit}")
 
     def _toggle_shape_fill(self, checked: bool = False) -> None:
-        """Neue Formen gefüllt vs. Outline — 2.6.9."""
+        """Neue Formen gefüllt vs. Outline — 2.6.10."""
         on = bool(checked) if isinstance(checked, bool) else bool(
             getattr(self, "btn_shape_fill", None) and self.btn_shape_fill.isChecked()
         )
@@ -3988,7 +4005,7 @@ class PdfViewer(QWidget):
         self.status.emit("Formen: gefüllt" if on else "Formen: nur Outline")
 
     def _toggle_paragraph_highlight(self, checked: bool = False) -> None:
-        """Highlight ganzer Absätze statt nur Zeichen unter dem Drag — 2.6.9."""
+        """Highlight ganzer Absätze statt nur Zeichen unter dem Drag — 2.6.10."""
         on = bool(checked) if isinstance(checked, bool) else bool(
             getattr(self, "btn_para_hl", None) and self.btn_para_hl.isChecked()
         )
@@ -4318,14 +4335,14 @@ class PdfViewer(QWidget):
             )
         elif tool == AnnotationType.ELLIPSE:
             self.status.emit(
-                "Werkzeug: Kreis/Ellipse — ziehen; Füllen-Toggle Fläche/Outline — 2.6.9"
+                "Werkzeug: Kreis/Ellipse — ziehen; Füllen-Toggle Fläche/Outline — 2.6.10"
             )
         elif tool == AnnotationType.TRIANGLE:
-            self.status.emit("Werkzeug: Dreieck — ziehen; Füllen-Toggle — 2.6.9")
+            self.status.emit("Werkzeug: Dreieck — ziehen; Füllen-Toggle — 2.6.10")
         elif tool == AnnotationType.ROUNDED_RECT:
-            self.status.emit("Werkzeug: Rundrect — ziehen; Füllen-Toggle — 2.6.9")
+            self.status.emit("Werkzeug: Rundrect — ziehen; Füllen-Toggle — 2.6.10")
         elif tool == AnnotationType.HIGHLIGHT and getattr(self, "_paragraph_highlight", False):
-            self.status.emit("Werkzeug: Highlight — ganze Absätze unter der Auswahl — 2.6.9")
+            self.status.emit("Werkzeug: Highlight — ganze Absätze unter der Auswahl — 2.6.10")
         else:
             self.status.emit(f"Werkzeug: {tool.value}")
 

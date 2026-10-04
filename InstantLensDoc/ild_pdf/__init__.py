@@ -296,6 +296,27 @@ from .object_edit import (
     resize_object,
     set_object_rect,
 )
+from .auto_format import (
+    STYLE_PRESETS,
+    AutoFormatResult,
+    HeadingCandidate,
+    apply_style_to_line,
+    auto_format_pdf,
+    auto_format_text,
+    classify_line_style,
+    detect_headings_in_pdf,
+    detect_headings_in_text,
+    find_replace_in_pdf_text,
+    find_replace_text,
+    generate_toc_for_pdf,
+    generate_toc_markdown,
+    get_style_preset,
+    headings_to_outline,
+    insert_toc_into_text,
+    list_style_presets,
+    list_system_fonts,
+    outline_summary,
+)
 
 __all__ = [
     "PdfDocument",
@@ -558,6 +579,25 @@ __all__ = [
     "flip_object",
     "replace_image_object",
     "set_object_rect",
+    "STYLE_PRESETS",
+    "AutoFormatResult",
+    "HeadingCandidate",
+    "list_style_presets",
+    "get_style_preset",
+    "classify_line_style",
+    "apply_style_to_line",
+    "detect_headings_in_text",
+    "detect_headings_in_pdf",
+    "auto_format_text",
+    "auto_format_pdf",
+    "generate_toc_markdown",
+    "generate_toc_for_pdf",
+    "insert_toc_into_text",
+    "headings_to_outline",
+    "find_replace_text",
+    "find_replace_in_pdf_text",
+    "list_system_fonts",
+    "outline_summary",
 ]
 
-__version__ = "2.6.9"
+__version__ = "2.6.10"

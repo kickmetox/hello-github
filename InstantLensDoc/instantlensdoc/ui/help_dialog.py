@@ -128,7 +128,10 @@ HELP_HTML = f"""
     <b>Filter nur aktuelle Seite</b>), Markierungen/Treffer</li>
 <li><b>Bearbeiten → Rückgängig/Wiederholen</b>: Editor-Text <i>oder</i> PDF-Annotationen/Overlay-Text (Ctrl+Z / Ctrl+Y);
     Statusleisten-Hint „Ctrl+Z · … rückgängig“ (benannt, z. B. Tag umbenennen)</li>
-<li><b>Bearbeiten → Suchen und Ersetzen</b> (Ctrl+R): Find/Replace im Texteditor</li>
+<li><b>Bearbeiten → Suchen und Ersetzen</b> (Ctrl+H Word / Ctrl+R Alias): Find/Replace im Texteditor — <b>2.6.10</b></li>
+<li><b>Bearbeiten → Fett/Kursiv/Unterstrichen</b> (Ctrl+B/I/U): Markdown-Marker — Word/InDesign-ähnlich — <b>2.6.10</b></li>
+<li><b>Bearbeiten → Automatische Formatierung</b> (Ctrl+Alt+Shift+F): Heading/Body/Quote-Presets — <b>2.6.10</b></li>
+<li><b>Bearbeiten → Inhaltsverzeichnis aktualisieren</b> (Ctrl+Alt+Shift+T): Markdown bzw. PDF-Outline/Sidebar — <b>2.6.10</b></li>
 <li><b>Bearbeiten → Gehe zu Zeile / Seite</b> (Ctrl+G): Editor → Zeile; PDF → Seite (auch PDF → Gehe zu Seite…, Ctrl+Shift+G)</li>
 <li><b>Datei → Tab duplizieren</b> (Ctrl+Alt+Shift+T): Editor-Inhalt als neues Dokument klonen — 1.4.5;
     <b>Ansicht → Theme zyklisch</b> (Ctrl+Shift+T): System→Hell→Dunkel→System; Status-Toast „Theme: …“;
@@ -137,7 +140,7 @@ HELP_HTML = f"""
 <li><b>Bearbeiten → Zeile / Annotation duplizieren</b> (Ctrl+D): Editor Zeile/Auswahl; PDF ausgewählte Annotation (auch Ctrl+Shift+D)</li>
 <li><b>Bearbeiten → Zeile verschieben</b> (Alt+Up / Alt+Down)</li>
 <li><b>Bearbeiten → Zeilen sortieren (A–Z)</b> (Ctrl+Shift+O): Auswahl alphabetisch</li>
-<li><b>Bearbeiten → Auswahl markieren</b> (Ctrl+H): Markierung im Editor + Eintrag in der Seitenleiste</li>
+<li><b>Bearbeiten → Auswahl markieren</b> (Ctrl+Shift+H): Markierung im Editor + Seitenleiste (Ctrl+H = Ersetzen) — <b>2.6.10</b></li>
 <li><b>Bearbeiten → Groß-/Kleinschreibung umschalten</b> (Ctrl+Shift+U): Auswahl GROSS → klein → Titel</li>
 <li><b>Bearbeiten → Alles groß-/kleinschreiben</b> (Ctrl+Alt+Shift+U / L): gesamte Datei</li>
 <li><b>Bearbeiten → Textbausteine</b>: 3 gespeicherte Snippets (Einfügen Ctrl+Alt+1..3; Auswahl → Slot)</li>
@@ -270,7 +273,7 @@ HELP_HTML = f"""
 <h3>PDF-Modul</h3>
 <p>Das Paket <code>ild_pdf</code> kann von anderen Programmen genutzt werden (pypdfium2, kein Poppler).
 Beispiel: <code>examples/ild_pdf_demo.py</code>. API: <code>ild_pdf/README.md</code>.</p>
-<p><b>Scripting 2.6.9:</b> Stabiles Headless-API <code>import ild</code> und CLI <code>python -m ild</code>
+<p><b>Scripting 2.6.10:</b> Stabiles Headless-API <code>import ild</code> und CLI <code>python -m ild</code>
 (open/info, Seiten, Export, OCR, Schwärzen, Merge/Split, Lizenz/Keygen, AES-256,
 <code>ann-shape</code> / <code>ann-stamp</code> / <code>ann-highlight-para</code>).
 PowerShell-Wrapper: <code>scripts/ild.ps1</code> bzw. <code>run-ild.bat</code>.

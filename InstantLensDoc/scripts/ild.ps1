@@ -1,4 +1,4 @@
-# InstantLens Doc — PowerShell-Scripting 2.6.9
+# InstantLens Doc — PowerShell-Scripting 2.6.10
 # Als CLI:
 #   powershell -ExecutionPolicy Bypass -File .\scripts\ild.ps1 pages D:\dok.pdf
 # Als Modul:
@@ -141,6 +141,73 @@ function Add-IldParagraphHighlight {
 
 function Get-IldStamps {
     Invoke-Ild @("stamp-list", "--json") | Out-Host
+}
+
+function Invoke-IldAutoFormat {
+    param(
+        [string]$Path,
+        [string]$Text,
+        [string]$Out,
+        [int]$MaxLevel = 3,
+        [switch]$NoToc
+    )
+    if ($Text) {
+        Invoke-Ild @("--json", "auto-format", "--text", $Text) | Out-Host
+        return
+    }
+    if (-not $Path) { throw "Path oder Text erforderlich" }
+    $a = @("--json", "auto-format", $Path, "--max-level", "$MaxLevel")
+    if ($Out) { $a += @("--out", $Out) }
+    if ($NoToc) { $a += "--no-toc" }
+    Invoke-Ild @a | Out-Host
+}
+
+function Update-IldToc {
+    param(
+        [string]$Path,
+        [string]$Text,
+        [string]$Out,
+        [int]$MaxLevel = 3,
+        [switch]$DryRun
+    )
+    $a = @("--json", "toc", "--max-level", "$MaxLevel")
+    if ($Text) { $a += @("--text", $Text) }
+    elseif ($Path) { $a += @($Path) }
+    else { throw "Path oder Text erforderlich" }
+    if ($Out) { $a += @("--out", $Out) }
+    if ($DryRun) { $a += "--dry-run" }
+    Invoke-Ild @a | Out-Host
+}
+
+function Get-IldSystemFonts {
+    param([switch]$Files)
+    $a = @("fonts")
+    if ($Files) { $a += "--files" }
+    Invoke-Ild @a | Out-Host
+}
+
+function Get-IldStylePresets {
+    Invoke-Ild @("--json", "styles") | Out-Host
+}
+
+function Invoke-IldFindReplace {
+    param(
+        [string]$Path,
+        [string]$Text,
+        [Parameter(Mandatory = $true)][string]$Find,
+        [Parameter(Mandatory = $true)][string]$Replace,
+        [switch]$CaseSensitive,
+        [int]$Count = 0,
+        [int]$Max = 50
+    )
+    $a = @("--json", "find-replace", "--find", $Find, "--replace", $Replace)
+    if ($Text) { $a += @("--text", $Text) }
+    elseif ($Path) { $a += @($Path) }
+    else { throw "Path oder Text erforderlich" }
+    if ($CaseSensitive) { $a += "--case" }
+    if ($Count -gt 0) { $a += @("--count", "$Count") }
+    if ($Max -gt 0) { $a += @("--max", "$Max") }
+    Invoke-Ild @a | Out-Host
 }
 
 function Merge-IldPdf {

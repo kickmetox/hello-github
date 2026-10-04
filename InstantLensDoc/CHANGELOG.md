@@ -1,5 +1,23 @@
 # Changelog — InstantLens Doc
 
+## 2.6.10 — Auto-Format, TOC, Word-Shortcuts, Fonts
+
+Minor nach **2.6.9**: **Automatische Formatierung** (Style-Presets Heading 1–3 / Fließtext / Zitat + Heuristik), **automatisches Inhaltsverzeichnis** aus Überschriften (Editor-Markdown bzw. PDF-Outline → Sidebar), **Word-/InDesign-ähnliche Tastaturkürzel** (Ctrl+B/I/U, Ctrl+H Ersetzen, Ctrl+S/F/Z/Y/C/V/P — dokumentiert in Hilfe/F1), **Suchen/Ersetzen** (Ctrl+H + Ctrl+R), **Windows-Systemschriften** im Font-Picker. Scripting: `ild.auto_format_text` / `auto_format_pdf` / `generate_toc` / `list_system_fonts` / `find_replace` · CLI `auto-format` / `toc` / `fonts` / `find-replace` · PowerShell `Invoke-IldAutoFormat` / `Update-IldToc` / `Get-IldSystemFonts` / `Invoke-IldFindReplace`. Kein volles DTP (Musterseiten/CMYK), kein i18n-Pack, keine KI-Wizards. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie unverändert.
+
+### Neu
+- `ild_pdf.auto_format` — Presets, Heuristik, TOC-Outline, Systemfonts, Find/Replace
+- UI: Auto-Format / TOC-Menü · Ctrl+B/I/U · Ctrl+H Find/Replace · Inline-`QFontComboBox`
+- Hilfe/Cheat-Sheet: Word-/InDesign-Shortcut-Liste
+
+### Geändert
+- Docs/Version **2.6.10**; „Auswahl markieren“ → Ctrl+Shift+H (Ctrl+H = Ersetzen)
+- Scripting-API / `ild.ps1` / Beispiele erweitert
+
+### Tests / Qualität
+- Version **2.6.10** (App / `ild_pdf` / ISS / Smoke / Docs); Serie **2.6**; `docs/VERSION` + `VERSION.txt`
+- Smoke: 2.6.10 CLI+Qt (auto-format/TOC/fonts/find-replace + Shortcuts)
+- Stubs: KI/Cloud/Stylus/3D/Hooks/Outline/Telemetrie unverändert markiert
+
 ## 2.6.9 — Annotationen ausbauen
 
 Minor nach **2.6.8**: **Annotationen** — einstellbare **Pinsel-/Stiftstärke**, **Color-Picker** für Strich und Füllung, **Formen** (Kreis/Ellipse gefüllt und Outline, Rechteck, Dreieck, Rundrect), **definierbare Stempel** Paid / Bezahlt / Rechnung / Datum plus **benutzerdefinierte** Text-Stempel (`ildstamps-v1`), **Absatz-Highlight** ganzer Textabschnitte (nicht nur Freihand). Scripting: `ild.add_shape` / `add_stamp` / `add_ink` / `highlight_paragraphs` / `list_stamps` · CLI `ann-shape` / `ann-stamp` / `ann-highlight-para`. Keine Word-Suite / i18n / Ribbon / Compare / DTP-Masterpages / Auto-Format / Auto-TOC / Word-InDesign-Shortcuts. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie unverändert.

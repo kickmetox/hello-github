@@ -1,4 +1,4 @@
-"""python -m ild — Scripting-CLI InstantLens Doc 2.6.9."""
+"""python -m ild — Scripting-CLI InstantLens Doc 2.6.10."""
 
 from __future__ import annotations
 
@@ -165,6 +165,34 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("label")
     s.add_argument("--color", default="#C0392B")
 
+    s = sub.add_parser("auto-format", help="Automatische Formatierung (Text oder PDF+TOC)")
+    s.add_argument("source", nargs="?", default=None, help="PDF-Pfad oder weglassen mit --text")
+    s.add_argument("--text", default=None, help="Plaintext/Markdown statt PDF")
+    s.add_argument("--out", default=None)
+    s.add_argument("--max-level", type=int, default=3)
+    s.add_argument("--no-toc", action="store_true")
+
+    s = sub.add_parser("toc", help="Inhaltsverzeichnis erzeugen (PDF-Outline oder Markdown)")
+    s.add_argument("pdf", nargs="?", default=None)
+    s.add_argument("--text", default=None)
+    s.add_argument("--out", default=None)
+    s.add_argument("--max-level", type=int, default=3)
+    s.add_argument("--dry-run", action="store_true", help="Outline nicht schreiben")
+
+    s = sub.add_parser("fonts", help="Systemschriften auflisten (Windows Fonts / Qt)")
+    s.add_argument("--files", action="store_true", help="auch Dateinamen")
+
+    s = sub.add_parser("styles", help="Style-Presets (H1/H2/H3/Body/Quote)")
+
+    s = sub.add_parser("find-replace", help="Suchen/Ersetzen in Text oder PDF")
+    s.add_argument("source", nargs="?", default=None, help="PDF-Pfad")
+    s.add_argument("--text", default=None)
+    s.add_argument("--find", required=True)
+    s.add_argument("--replace", required=True)
+    s.add_argument("--case", action="store_true", help="Groß-/Kleinschreibung beachten")
+    s.add_argument("--count", type=int, default=0, help="max. Ersetzungen (Text; 0=alle)")
+    s.add_argument("--max", type=int, default=50, dest="max_replacements")
+
     return p
 
 
@@ -312,6 +340,54 @@ def run(argv: list[str] | None = None) -> int:
             return 0
         if args.cmd == "stamp-add":
             data = api.add_custom_stamp_def(args.label, color=args.color)
+            _print(data, as_json=js)
+            return 0
+        if args.cmd == "auto-format":
+            if args.text is not None:
+                data = api.auto_format_text(args.text)
+            elif args.source:
+                data = api.auto_format_pdf(
+                    args.source,
+                    out=args.out,
+                    max_level=args.max_level,
+                    update_toc=not args.no_toc,
+                )
+            else:
+                return _fail("source (PDF) oder --text erforderlich")
+            _print(data, as_json=js)
+            return 0
+        if args.cmd == "toc":
+            data = api.generate_toc(
+                path=args.pdf,
+                text=args.text,
+                out=args.out,
+                max_level=args.max_level,
+                write=not args.dry_run,
+            )
+            _print(data, as_json=js)
+            return 0
+        if args.cmd == "fonts":
+            fonts = api.list_system_fonts(include_files=args.files)
+            if js:
+                _print(fonts, as_json=True)
+            else:
+                for name in fonts:
+                    print(name)
+            return 0
+        if args.cmd == "styles":
+            presets = api.list_style_presets()
+            _print(presets, as_json=js or True)
+            return 0
+        if args.cmd == "find-replace":
+            data = api.find_replace(
+                text=args.text,
+                path=args.source,
+                find=args.find,
+                replace=args.replace,
+                case_sensitive=args.case,
+                count=args.count,
+                max_replacements=args.max_replacements,
+            )
             _print(data, as_json=js)
             return 0
         return _fail("unbekanntes Kommando")

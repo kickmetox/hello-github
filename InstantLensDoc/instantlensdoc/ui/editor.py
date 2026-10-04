@@ -1374,6 +1374,58 @@ class TextEditor(QPlainTextEdit):
         cursor.endEditBlock()
         return count
 
+    def wrap_selection_markers(self, left: str, right: str | None = None) -> bool:
+        """Auswahl mit Markern umschließen (Markdown **/*/_ ) — Word-ähnlich Ctrl+B/I/U."""
+        right = left if right is None else right
+        cur = self.textCursor()
+        if not cur.hasSelection():
+            # Wort unter Cursor
+            cur.select(QTextCursor.WordUnderCursor)
+        if not cur.hasSelection():
+            cur.insertText(f"{left}{right}")
+            cur.movePosition(QTextCursor.Left, QTextCursor.MoveAnchor, len(right))
+            self.setTextCursor(cur)
+            return True
+        selected = cur.selectedText().replace("\u2029", "\n")
+        # Toggle: bereits umschlossen → Marker entfernen
+        if (
+            selected.startswith(left)
+            and selected.endswith(right)
+            and len(selected) >= len(left) + len(right)
+        ):
+            inner = selected[len(left) : len(selected) - len(right)]
+            cur.insertText(inner)
+        else:
+            cur.insertText(f"{left}{selected}{right}")
+        self.setTextCursor(cur)
+        return True
+
+    def toggle_bold_selection(self) -> bool:
+        return self.wrap_selection_markers("**")
+
+    def toggle_italic_selection(self) -> bool:
+        return self.wrap_selection_markers("*")
+
+    def toggle_underline_selection(self) -> bool:
+        return self.wrap_selection_markers("__")
+
+    def apply_auto_format(self) -> int:
+        """Automatische Formatierung (Heading/Body/Quote) — 2.6.10."""
+        from ild_pdf.auto_format import auto_format_text
+
+        result = auto_format_text(self.toPlainText())
+        if result.text != self.toPlainText():
+            self.setPlainText(result.text)
+        return int(result.changed_lines)
+
+    def update_auto_toc(self, *, max_level: int = 3) -> str:
+        """Markdown-Inhaltsverzeichnis einfügen/aktualisieren — 2.6.10."""
+        from ild_pdf.auto_format import insert_toc_into_text
+
+        new_text = insert_toc_into_text(self.toPlainText(), max_level=max_level)
+        self.setPlainText(new_text)
+        return new_text
+
     def highlight_selection(self, color: str = "#FFE066") -> bool:
         """Aktuelle Auswahl dauerhaft (als ExtraSelection) markieren."""
         cur = self.textCursor()

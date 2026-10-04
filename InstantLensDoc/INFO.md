@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **2.6.9** |
+| Version | **2.6.10** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -33,7 +33,7 @@
 
 Skript: [sync-ild.ps1](scripts/sync-ild.ps1) — Branch `cursor/instantlensdoc-2108` (oder `-LocalPack` / Pack-Zip) nach `D:\AI_Temp\InstantLensDoc`, pip, Start. **Nutzer-Icon in `assets` wird nicht überschrieben.**
 
-**FEATURES.md lokal sync:** Nach Sync liegt `FEATURES.md` lokal im App-Ordner (`D:\AI_Temp\InstantLensDoc\FEATURES.md`); About/Stubs öffnen diese lokale Datei — Version **2.6.9**.
+**FEATURES.md lokal sync:** Nach Sync liegt `FEATURES.md` lokal im App-Ordner (`D:\AI_Temp\InstantLensDoc\FEATURES.md`); About/Stubs öffnen diese lokale Datei — Version **2.6.10**.
 
 Ohne Start: `-NoStart` (Alias `-SkipStart`). Exit-Codes: **0** OK · **1** allgemein · **2** Git-Fehler.
 
@@ -82,6 +82,19 @@ python -m keygen --verify "ILD1...."
 
 Trial 28 Tage · Keys 32 Tage (HMAC `ILD1.…`). Details: `keygen/README.md`.
 
+## Neu in 2.6.10
+
+Minor nach **2.6.9** (Word-Suite Basis: Auto-Format / TOC / Shortcuts):
+
+- **Automatische Formatierung:** Heading/Body/Quote-Presets + Heuristik (Markdown/Fontgröße/ALL CAPS)
+- **Automatisches Inhaltsverzeichnis:** aus Überschriften → Editor-Markdown bzw. PDF-Outline (Sidebar klickbar)
+- **Word-/InDesign-ähnliche Shortcuts:** Ctrl+B/I/U, Ctrl+S, Ctrl+F, Ctrl+H Ersetzen, Ctrl+Z/Y, Ctrl+C/V, Ctrl+P — Liste in Hilfe/F1
+- **Suchen/Ersetzen:** Ctrl+H (Word) + Ctrl+R Alias; Scripting `ild find-replace`
+- **Windows-Systemschriften** im Inline-Schriftarten-Picker (`QFontComboBox` + `list_system_fonts`)
+- Scripting: `ild.auto_format_*` / `generate_toc` / `list_system_fonts` / `find_replace` · CLI · PowerShell
+- Kein volles DTP (Musterseiten/CMYK), kein i18n-Pack, keine KI-Wizards
+- Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie unverändert
+
 ## Neu in 2.6.9
 
 Minor nach **2.6.8** (Annotationen ausbauen):
@@ -92,7 +105,6 @@ Minor nach **2.6.8** (Annotationen ausbauen):
 - **Stempel:** Paid, Bezahlt, Rechnung, Datum plus benutzerdefinierte Text-Stempel
 - **Absatz-Highlight:** ganze Textabschnitte markieren (Toolbar „Absatz“, Ctrl+Alt+Shift+H)
 - Scripting: `ild.add_shape` / `add_stamp` / `highlight_paragraphs`
-- Keine Word-Suite / i18n / Ribbon / Compare / DTP / Auto-Format / Auto-TOC / Word-Shortcuts
 - Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie unverändert
 
 ## Neu in 2.6.8

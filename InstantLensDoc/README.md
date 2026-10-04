@@ -2,7 +2,7 @@
 
 Moderne Textverarbeitung mit PDF-Annotator, OCR-Bridge und Formulargenerator.
 
-**Version:** 2.6.9  
+**Version:** 2.6.10  
 **Hersteller:** Andreas Meyer · ame@sellerbach.de
 
 ## Quickstart (Windows)
@@ -37,9 +37,13 @@ Keygen: `run-keygen.bat` · `python -m keygen kunde@example.com` · siehe `keyge
 
 Nightly-Smoke: `python scripts\smoke_ild.py` · optional `--qt` · `--json` (Summary: `ok`, `checks[]`, `duration_ms`, `version`; Fail: `checks[].error` max 200…, Exit=ok). Siehe **CONTRIBUTING.md**; Workflow-Stub `.github/workflows/smoke-ild.yml` (manual only).
 
+## Neu in 2.6.10
+
+Minor nach **2.6.9**: **Auto-Format**, **automatisches Inhaltsverzeichnis**, **Word-/InDesign-Shortcuts** (Ctrl+B/I/U, Ctrl+H Ersetzen, …), **Systemschriften**, Suchen/Ersetzen. Scripting `auto-format`/`toc`/`fonts`/`find-replace`. Kein volles DTP/i18n/KI-Wizards. Stubs unverändert.
+
 ## Neu in 2.6.9
 
-Minor nach **2.6.8**: **Annotationen ausbauen** — Pinselstärke, Color-Picker Strich/Füllung, Kreis/Ellipse/Dreieck/Rundrect (gefüllt/Outline), Stempel Paid/Bezahlt/Rechnung/Datum + Custom, Absatz-Highlight. Scripting `ild.add_shape`/`add_stamp`/`highlight_paragraphs`. Keine Word-Suite/i18n/Ribbon/DTP/Auto-TOC. Stubs unverändert.
+Minor nach **2.6.8**: **Annotationen ausbauen** — Pinselstärke, Color-Picker Strich/Füllung, Kreis/Ellipse/Dreieck/Rundrect (gefüllt/Outline), Stempel Paid/Bezahlt/Rechnung/Datum + Custom, Absatz-Highlight. Scripting `ild.add_shape`/`add_stamp`/`highlight_paragraphs`. Stubs unverändert.
 
 ## Neu in 2.6.8
 

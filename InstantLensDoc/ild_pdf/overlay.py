@@ -513,7 +513,7 @@ def extract_text_paragraphs(
     pdf_path: str | Path,
     page_index: int = 0,
 ) -> List[TextBlock]:
-    """Zeilen zu Absätzen gruppieren (vertikaler Abstand) — 2.6.9."""
+    """Zeilen zu Absätzen gruppieren (vertikaler Abstand) — 2.6.10."""
     lines = extract_text_blocks(pdf_path, page_index, merge_lines=True)
     if not lines:
         return []
@@ -541,7 +541,7 @@ def selection_to_paragraph_highlight_rects(
     password: str | None = None,
 ) -> tuple[List[TextMatchRect], str]:
     """
-    Auswahl überdeckt Absätze ganz (nicht nur Zeichen/Zeilen) — 2.6.9.
+    Auswahl überdeckt Absätze ganz (nicht nur Zeichen/Zeilen) — 2.6.10.
     Koordinaten: Render-Pixel bei scale.
     """
     s = float(scale) if scale else 1.0
