@@ -542,4 +542,4 @@ __all__ = [
     "set_object_rect",
 ]
 
-__version__ = "2.6.7"
+__version__ = "2.6.8"

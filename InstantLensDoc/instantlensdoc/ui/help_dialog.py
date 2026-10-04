@@ -255,7 +255,11 @@ HELP_HTML = f"""
     History maskiert (letzte 4); Doppelklick kopiert; Clear History; .txt; --days — 1.1.9</li>
 <li><b>Formulare</b>: Extras → Formulargenerator — mehr Feldtypen, Definition speichern/laden
     (<code>*.ildform.json</code>), Live-Vorschau, Export HTML/PDF</li>
-<li><b>Build (Windows)</b>: <code>build-windows.ps1</code> — PyInstaller App + Keygen</li>
+<li><b>Build (Windows)</b>: <code>build-windows.ps1</code> — PyInstaller App + Keygen (x64, 2.6.8)</li>
+<li><b>Scripting</b>: Headless CLI/API <code>python -m ild</code> / <code>import ild</code> /
+    PowerShell <code>scripts/ild.ps1</code> (open, OCR, Export, Schwärzen, Seiten, Lizenz/Keygen).
+    Anleitung: Store <code>docs/instantlensdoc-scripting.md</code> · Beispiele
+    <code>examples/ild_scripting_demo.py</code></li>
 <li><b>Installer</b>: optionale Desktop-Verknüpfung (Checkbox, Standard an, <code>checkedonce</code>)
     + Startmenü-Gruppe (siehe Inno-Hinweis)</li>
 <li><b>Lizenz</b>: Statusleiste (farbig; bei &lt;7 Tagen Restlaufzeit prominent) + Hilfe → Lizenz — Trial 4 Wochen, Keys 30+2 Tage</li>
@@ -265,6 +269,10 @@ HELP_HTML = f"""
 <h3>PDF-Modul</h3>
 <p>Das Paket <code>ild_pdf</code> kann von anderen Programmen genutzt werden (pypdfium2, kein Poppler).
 Beispiel: <code>examples/ild_pdf_demo.py</code>. API: <code>ild_pdf/README.md</code>.</p>
+<p><b>Scripting 2.6.8:</b> Stabiles Headless-API <code>import ild</code> und CLI <code>python -m ild</code>
+(open/info, Seiten, Export, OCR, Schwärzen, Merge/Split, Lizenz/Keygen, AES-256).
+PowerShell-Wrapper: <code>scripts/ild.ps1</code> bzw. <code>run-ild.bat</code>.
+Deutsche Anleitung im Project-Store: <code>docs/instantlensdoc-scripting.md</code>.</p>
 <h3>Sync / Update</h3>
 <p>Windows: Repo-Skript <code>scripts/sync-ild.ps1</code> bzw. Store <code>docs/sync-ild.ps1</code> — Branch oder Zip nach
 <code>D:\\AI_Temp\\InstantLensDoc</code>, pip, optional Start (<code>-SkipStart</code>/<code>-NoStart</code> unterdrückt Start).

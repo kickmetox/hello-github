@@ -2,7 +2,7 @@
 
 Moderne Textverarbeitung mit PDF-Annotator, OCR-Bridge und Formulargenerator.
 
-**Version:** 2.6.7  
+**Version:** 2.6.8  
 **Hersteller:** Andreas Meyer · ame@sellerbach.de
 
 ## Quickstart (Windows)
@@ -28,11 +28,18 @@ Nur starten (nach Sync/pip): `run.bat`
 powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 ```
 
+64-Bit-Python erforderlich. Runnable-Pack ohne EXE: `.\scripts\pack-windows-runnable.ps1`.  
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an).  
-User-Shortcuts: `.\scripts\install-ild.ps1` · Deinstallieren: `-Uninstall [-Quiet]` (Exit **0**/OK · **1**/Fehler; Quiet: Kurz-Summary, Exit 0 auch ohne Shortcuts).
+User-Shortcuts: `.\scripts\install-ild.ps1` (inkl. Keygen) · Deinstallieren: `-Uninstall [-Quiet]` (Exit **0**/OK · **1**/Fehler; Quiet: Kurz-Summary, Exit 0 auch ohne Shortcuts).
+
+Keygen: `run-keygen.bat` · `python -m keygen kunde@example.com` · siehe `keygen/README.md`.
 
 Nightly-Smoke: `python scripts\smoke_ild.py` · optional `--qt` · `--json` (Summary: `ok`, `checks[]`, `duration_ms`, `version`; Fail: `checks[].error` max 200…, Exit=ok). Siehe **CONTRIBUTING.md**; Workflow-Stub `.github/workflows/smoke-ild.yml` (manual only).
+
+## Neu in 2.6.8
+
+Minor nach **2.6.7**: **Windows-Build + Keygen-Paket + Scripting** — `build-windows.ps1` (x64), `pack-windows-runnable`, Keygen-Shortcut, HMAC-Keys `ILD1.…`, headless `python -m ild` / `scripts/ild.ps1`. Keine Annotationen/Word-Suite. Stubs unverändert.
 
 ## Neu in 2.6.7
 

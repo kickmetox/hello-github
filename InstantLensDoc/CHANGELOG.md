@@ -1,5 +1,23 @@
 # Changelog — InstantLens Doc
 
+## 2.6.8 — Windows-Build + Keygen + Scripting
+
+Minor nach **2.6.7**: **runnable Windows-Build-Pfad**, **Keygenerator** (HMAC/Trial) und **headless Scripting** (Python `ild` + PowerShell `ild.ps1`). `build-windows.ps1` erzwingt **64-Bit-Python** (optional `-Allow32Bit`), packt App + `InstantLensKeygen.exe`; `scripts/pack-windows-runnable.py` erzeugt ein startbares Python-Layout-Zip; `install-ild.ps1` legt optional einen **Keygen-Startmenü-Shortcut** an. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie unverändert; keine Annotationen-/Word-Suite-/i18n-Features.
+
+### Neu
+- `scripts/pack-windows-runnable.py` / `.ps1` — Windows-Runnable-Zip inkl. `WINDOWS-START.md`
+- `build-windows.ps1` — 64-Bit-Check · `Allow32Bit` · VERSION.txt im Dist · Keygen in App-Dist
+- `install-ild.ps1` — Startmenü-Shortcut „Keygenerator“ (`run-keygen.bat` / `InstantLensKeygen.exe`), `-SkipKeygen`
+- Scripting-API `ild` · CLI `python -m ild` · `run-ild.bat` · `scripts/ild.ps1` (open, OCR, Export, Schwärzen, Seiten, Lizenz/Keygen, Encrypt)
+
+### Geändert
+- Docs/Version **2.6.8**; Keygen-README (DE); In-App-Hilfe Scripting-Hinweis
+
+### Tests / Qualität
+- Version **2.6.8** (App / `ild_pdf` / ISS / Smoke / Docs); Serie **2.6**; `docs/VERSION` + `VERSION.txt`
+- Smoke: 2.6.8 CLI (build/pack/keygen HMAC + ild CLI) + Qt (Keygen-Pfade); 2.6.7-Verschlüsselung als Regression
+- Stubs: KI/Cloud/Stylus/3D/Hooks/Outline/Telemetrie unverändert markiert
+
 ## 2.6.7 — Verschlüsselung & Rechte
 
 Minor-Feature nach **2.6.6** (Zusatzanforderungen #8): **Verschlüsselung & Rechte** — Passwortschutz mit **AES-256** (pikepdf/qpdf R=6 / AESV3, Fallback AES-128), granulare Owner-Rechte (Druck, Kopieren/Extrahieren, Ändern, Formulare, Zusammenstellen, Annotationen, Barrierefreiheit), Dialog **Verschlüsselung & Rechte…** (Status, setzen, entfernen, Rechte aktualisieren), Öffnen verschlüsselter PDFs mit Passwort-Dialog. Kein Batch, Office-Export, E-Signatur, KI/Cloud, voller Windows-Installer. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie unverändert.

@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **2.6.7** |
+| Version | **2.6.8** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -33,7 +33,7 @@
 
 Skript: [sync-ild.ps1](scripts/sync-ild.ps1) — Branch `cursor/instantlensdoc-2108` (oder `-LocalPack` / Pack-Zip) nach `D:\AI_Temp\InstantLensDoc`, pip, Start. **Nutzer-Icon in `assets` wird nicht überschrieben.**
 
-**FEATURES.md lokal sync:** Nach Sync liegt `FEATURES.md` lokal im App-Ordner (`D:\AI_Temp\InstantLensDoc\FEATURES.md`); About/Stubs öffnen diese lokale Datei — Version **2.6.7**.
+**FEATURES.md lokal sync:** Nach Sync liegt `FEATURES.md` lokal im App-Ordner (`D:\AI_Temp\InstantLensDoc\FEATURES.md`); About/Stubs öffnen diese lokale Datei — Version **2.6.8**.
 
 Ohne Start: `-NoStart` (Alias `-SkipStart`). Exit-Codes: **0** OK · **1** allgemein · **2** Git-Fehler.
 
@@ -60,8 +60,38 @@ Exit-Codes `run.bat`: **0** OK / Hilfe · **1** Python/Deps/pip-Fehler bzw. Inst
 powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 ```
 
+Voraussetzung: **Python 3.10+ 64-Bit**. Optional: `-Allow32Bit`, `-SkipKeygen`, `-NoKeygenInApp`, `-Clean`.
+
+Python-Layout-Zip (ohne PyInstaller-EXE):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\pack-windows-runnable.ps1
+```
+
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
-Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an / `checkedonce`)
+Desktop-/Keygen-Shortcuts: `.\scripts\install-ild.ps1` (Keygen wenn `run-keygen.bat` / EXE vorhanden; `-SkipKeygen`)  
+Desktop-Verknüpfung Installer: optionale Checkbox (`desktopicon`, Standard an / `checkedonce`)
+
+## Keygen
+
+```bat
+run-keygen.bat
+python -m keygen kunde@example.com
+python -m keygen --verify "ILD1...."
+```
+
+Trial 28 Tage · Keys 32 Tage (HMAC `ILD1.…`). Details: `keygen/README.md`.
+
+## Neu in 2.6.8
+
+Minor nach **2.6.7** (Build + Keygen):
+
+- **Windows-Build:** `build-windows.ps1` mit **64-Bit-Check**, App + `InstantLensKeygen.exe`
+- **Runnable-Pack:** `scripts/pack-windows-runnable.py` → Zip mit `run.bat` + Deps + Keygen + `WINDOWS-START.md`
+- **Keygen:** CLI/GUI HMAC `ILD1.…`; `install-ild` Startmenü-Shortcut
+- **Scripting:** `python -m ild` / `import ild` / `scripts/ild.ps1` (open, OCR, Export, Schwärzen, Seiten, Lizenz)
+- Keine Annotationen-/Word-Suite-/i18n-Features in diesem Minor
+- Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie unverändert
 
 ## Neu in 2.6.7
 

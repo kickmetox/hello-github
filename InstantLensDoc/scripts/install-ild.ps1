@@ -1,7 +1,8 @@
-# InstantLens Doc 2.6.7 — Benutzer-Installer (ohne Admin wenn möglich)
+# InstantLens Doc 2.6.8 — Benutzer-Installer (ohne Admin wenn möglich)
 # Startmenü-Shortcut + optional Desktop-Link (User-Profil).
+# Keygen-Shortcut im Startmenü, wenn run-keygen.bat oder InstantLensKeygen.exe vorhanden.
 # Idempotent: vorhandene Verknüpfungen werden aktualisiert.
-# -Uninstall entfernt Startmenü- und Desktop-Shortcuts.
+# -Uninstall entfernt Startmenü- und Desktop-Shortcuts (inkl. Keygen).
 # Fehlende Shortcuts bei -Uninstall sind kein Fehler (Log-Zeile, Exit 0).
 # -Uninstall schreibt Log-Datei und gibt den Pfad aus; -Quiet unterdrückt Prompts.
 # -Quiet -Uninstall: Exit 0 auch wenn nichts zu entfernen; Kurz-Summary auf stdout.
@@ -27,12 +28,13 @@ param(
     [switch]$DesktopLink,
     [switch]$NoDesktop,
     [switch]$SkipStartMenu,
+    [switch]$SkipKeygen,
     [switch]$Uninstall,
     [switch]$Quiet
 )
 
 $ErrorActionPreference = "Stop"
-$Version = "2.6.7"
+$Version = "2.6.8"
 $AppName = "InstantLens Doc"
 
 function Write-IldInfo([string]$msg) { Write-Host "[ILD $Version] $msg" }
@@ -68,6 +70,7 @@ function Get-IldShortcutPaths {
     $paths = @()
     $startPrograms = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs"
     $paths += Join-Path $startPrograms "$AppName.lnk"
+    $paths += Join-Path $startPrograms "$AppName Keygenerator.lnk"
     $desktop = [Environment]::GetFolderPath("Desktop")
     if (-not $desktop) { $desktop = Join-Path $env:USERPROFILE "Desktop" }
     $paths += Join-Path $desktop "$AppName.lnk"
@@ -229,6 +232,39 @@ if (-not $SkipStartMenu) {
     } catch {
         Write-IldErr "Startmenü-Shortcut fehlgeschlagen: $_"
         exit 1
+    }
+
+    # Keygen-Shortcut (run-keygen.bat oder InstantLensKeygen.exe) — 2.6.8
+    if (-not $SkipKeygen) {
+        $kgExe = Join-Path $AppDir "InstantLensKeygen.exe"
+        $kgBat = Join-Path $AppDir "run-keygen.bat"
+        $kgTarget = $null
+        if (Test-Path -LiteralPath $kgExe) {
+            $kgTarget = $kgExe
+        } elseif (Test-Path -LiteralPath $kgBat) {
+            $kgTarget = $kgBat
+        }
+        if ($kgTarget) {
+            $kgLink = Join-Path $startPrograms "$AppName Keygenerator.lnk"
+            try {
+                $r = New-UserShortcut -LinkPath $kgLink -TargetPath $kgTarget `
+                    -WorkingDirectory $AppDir -IconLocation $iconPath `
+                    -Description "$AppName Keygenerator $Version"
+                if ($r.Updated) {
+                    $updated += $r.Path
+                    Write-IldInfo "Keygen-Shortcut aktualisiert: $($r.Path)"
+                } else {
+                    $created += $r.Path
+                    Write-IldInfo "Keygen-Shortcut angelegt: $($r.Path)"
+                }
+            } catch {
+                Write-IldWarn "Keygen-Shortcut fehlgeschlagen (kein Abbruch): $_"
+            }
+        } else {
+            Write-IldInfo "Keygen-Shortcut übersprungen (weder InstantLensKeygen.exe noch run-keygen.bat)."
+        }
+    } else {
+        Write-IldInfo "Keygen-Shortcut übersprungen (-SkipKeygen)."
     }
 }
 
