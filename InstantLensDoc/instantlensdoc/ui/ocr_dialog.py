@@ -262,6 +262,23 @@ class OcrDialog(QDialog):
         self.rb_table_csv.toggled.connect(self._sync_mode_opts_visible)
         self._sync_mode_opts_visible()
 
+        # OCR → Word-Suite Handoff — 2.6.15
+        self.word_suite_check = QCheckBox("In Word-Suite öffnen/übernehmen")
+        self.word_suite_check.setObjectName("ocrWordSuiteHandoff")
+        self.word_suite_check.setChecked(True)
+        self.word_suite_check.setToolTip(
+            "Erkannten Text (Blöcke/Lesereihenfolge) als editierbares Word-Suite-Dokument "
+            "öffnen — nicht nur Sidecar-Anzeige; weiterformatieren/exportieren — 2.6.15"
+        )
+        self.word_suite_auto_format = QCheckBox("Auto-Format nach Übernahme")
+        self.word_suite_auto_format.setObjectName("ocrWordSuiteAutoFormat")
+        self.word_suite_auto_format.setChecked(True)
+        self.word_suite_auto_format.setToolTip(
+            "Style-Heuristik (Überschriften/Fließtext) aus 2.6.10 anwenden — 2.6.15"
+        )
+        form.addRow(self.word_suite_check)
+        form.addRow("", self.word_suite_auto_format)
+
         if default_label:
             form.addRow("Quelle", QLabel(default_label))
         layout.addLayout(form)
@@ -453,6 +470,13 @@ class OcrDialog(QDialog):
 
     def write_tsv(self) -> bool:
         return bool(self.layout_tsv_check.isChecked())
+
+    def open_in_word_suite(self) -> bool:
+        """True = OCR-Ergebnis in Word-Suite übernehmen — 2.6.15."""
+        return bool(self.word_suite_check.isChecked())
+
+    def word_suite_auto_format_enabled(self) -> bool:
+        return bool(self.word_suite_auto_format.isChecked())
 
 
 class CsvPreviewDialog(QDialog):

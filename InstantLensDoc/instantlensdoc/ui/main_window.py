@@ -2898,6 +2898,15 @@ class MainWindow(QMainWindow):
         )
         a.triggered.connect(self._run_ocr_region)
         m_extra.addAction(a)
+        a = QAction("In Word-Suite öffnen/übernehmen…", self)
+        a.setObjectName("actOcrWordSuite")
+        a.setShortcut("Ctrl+Alt+Shift+W")
+        a.setToolTip(
+            "OCR-/Layout-Ergebnis oder *.ildocr.*-Sidecar als editierbares "
+            "Word-Suite-Dokument übernehmen (Blöcke/Lesereihenfolge) — 2.6.15"
+        )
+        a.triggered.connect(self._ocr_word_suite_action)
+        m_extra.addAction(a)
         a = QAction("Formulargenerator…", self)
         a.triggered.connect(self._forms)
         m_extra.addAction(a)
@@ -10688,6 +10697,7 @@ class MainWindow(QMainWindow):
             "ocr_page": self._run_ocr,
             "ocr_pdf": self._run_ocr_document,
             "ocr_region": self._run_ocr_region,
+            "ocr_word_suite": self._ocr_word_suite_action,
             "doc_tags": self._edit_doc_tags,
             "true_redact": lambda: self.pdf_view.apply_true_redactions()
             if hasattr(self.pdf_view, "apply_true_redactions")
@@ -14082,6 +14092,129 @@ class MainWindow(QMainWindow):
         except Exception:
             pass
 
+    def _handoff_ocr_to_word_suite(
+        self,
+        *,
+        text: str | None = None,
+        result=None,
+        path: str | Path | None = None,
+        title: str | None = None,
+        auto_format: bool = True,
+    ) -> bool:
+        """OCR/Sidecar → editierbares Word-Suite-Dokument — 2.6.15."""
+        from instantlensdoc.core.ocr_word_suite import (
+            handoff_ocr_to_word_suite,
+            import_ildocr_sidecar,
+            ocr_result_to_word_suite,
+        )
+
+        try:
+            if result is not None:
+                doc_ws = ocr_result_to_word_suite(
+                    result, auto_format=auto_format, title=title
+                )
+            elif path is not None:
+                p = Path(path)
+                name_l = p.name.lower()
+                if ".ildocr" in name_l or name_l.endswith((".hocr", ".tsv")):
+                    doc_ws = import_ildocr_sidecar(
+                        p, auto_format=auto_format, title=title
+                    )
+                else:
+                    doc_ws = handoff_ocr_to_word_suite(
+                        p,
+                        auto_format=auto_format,
+                        title=title,
+                        prefer_layout=True,
+                    )
+            elif text is not None:
+                doc_ws = handoff_ocr_to_word_suite(
+                    text=text,
+                    auto_format=auto_format,
+                    title=title or "Word-Suite — OCR",
+                )
+            else:
+                return False
+        except Exception as e:
+            QMessageBox.warning(
+                self,
+                "OCR → Word-Suite",
+                f"Übernahme fehlgeschlagen:\n{e}",
+            )
+            return False
+
+        body = doc_ws.text or ""
+        tab_title = doc_ws.title or "Word-Suite — OCR"
+        self.stack.setCurrentWidget(self.editor_pane)
+        self.editor.setPlainText(body)
+        self.doc = Document(kind=DocKind.MARKDOWN, title=tab_title, text=body)
+        self.setWindowTitle(self._app_title(tab_title))
+        self._last_ocr_word_suite = doc_ws
+        n_blocks = doc_ws.block_count
+        status = (
+            f"Word-Suite: {tab_title} · {n_blocks} Block/Blöcke · "
+            f"{len(body.split())} Wörter"
+        )
+        if doc_ws.auto_formatted:
+            status += " · Auto-Format"
+        if doc_ws.sidecar:
+            status += f" · {Path(doc_ws.sidecar).name}"
+        self._set_status(status)
+        try:
+            from instantlensdoc.core.plugin_hooks import emit as emit_hook
+
+            emit_hook(
+                "ocr.word_suite",
+                mode=doc_ws.mode,
+                lang=doc_ws.lang,
+                blocks=n_blocks,
+            )
+        except Exception:
+            pass
+        return True
+
+    def _ocr_word_suite_action(self) -> None:
+        """Menü/Palette: Sidecar wählen oder letztes OCR → Word-Suite — 2.6.15."""
+        last = getattr(self, "_last_ocr_result", None)
+        last_side = None
+        if last is not None and getattr(last, "sidecar", None):
+            last_side = Path(last.sidecar)
+        # Prefer last OCR result in memory
+        if last is not None:
+            ok = self._handoff_ocr_to_word_suite(
+                result=last,
+                title=f"Word-Suite — {getattr(last, 'source_label', None) or 'OCR'}",
+                auto_format=True,
+            )
+            if ok:
+                return
+        # Sidecar neben aktuellem PDF/Bild?
+        if self.doc and self.doc.path:
+            base = Path(self.doc.path)
+            candidates = [
+                base.with_suffix(base.suffix + ".ildocr.txt"),
+                base.parent / f"{base.stem}.ildocr.txt",
+                base.parent / f"{base.name}.ildocr.txt",
+            ]
+            for c in candidates:
+                if c.is_file():
+                    if self._handoff_ocr_to_word_suite(path=c, auto_format=True):
+                        return
+        if last_side and last_side.is_file():
+            if self._handoff_ocr_to_word_suite(path=last_side, auto_format=True):
+                return
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "OCR → Word-Suite — Sidecar oder Bild",
+            dialog_start_dir(),
+            "OCR Sidecar / Bild (*.ildocr.txt *.ildocr.hocr *.ildocr.tsv "
+            "*.hocr *.tsv *.png *.jpg *.jpeg *.tif *.tiff *.pdf);;Alle (*.*)",
+        )
+        if not path:
+            return
+        remember_recent_dir(path)
+        self._handoff_ocr_to_word_suite(path=path, auto_format=True)
+
     def _run_ocr(self):
         from PySide6.QtWidgets import QApplication, QDialog, QProgressDialog
 
@@ -14108,6 +14241,8 @@ class MainWindow(QMainWindow):
         csv_bom = dlg.csv_utf8_bom() if mode == ocr_mod.OcrOutputMode.TABLE_CSV else None
         write_hocr = bool(getattr(dlg, "write_hocr", lambda: True)())
         write_tsv = bool(getattr(dlg, "write_tsv", lambda: True)())
+        open_ws = bool(getattr(dlg, "open_in_word_suite", lambda: True)())
+        ws_auto = bool(getattr(dlg, "word_suite_auto_format_enabled", lambda: True)())
         # Tabellen-CSV: gemerkten Zielordner bevorzugen — 1.9.1
         csv_out_dir = None
         if mode == ocr_mod.OcrOutputMode.TABLE_CSV:
@@ -14245,6 +14380,39 @@ class MainWindow(QMainWindow):
                 set_last_ocr_table_csv_dir(written.parent)
             except Exception as e:
                 QMessageBox.warning(self, "Tabellen-CSV", f"Speichern fehlgeschlagen:\n{e}")
+                return
+
+        self._last_ocr_result = result
+        # Word-Suite-Handoff (Default an) — editierbarer Text / Layout / Sidecar — 2.6.15
+        if open_ws and mode != ocr_mod.OcrOutputMode.TABLE_CSV:
+            title_suffix = source_label
+            if result.mode == ocr_mod.OcrOutputMode.LAYOUT_PRESERVE:
+                title_suffix = f"Layout — {source_label}"
+            elif result.mode == ocr_mod.OcrOutputMode.SEARCHABLE_IMAGE:
+                title_suffix = f"Sidecar — {source_label}"
+            if self._handoff_ocr_to_word_suite(
+                result=result,
+                title=f"Word-Suite — {title_suffix}",
+                auto_format=ws_auto,
+            ):
+                extra = ""
+                if result.searchable_pdf:
+                    extra = f" · PDF {result.searchable_pdf.name}"
+                if result.sidecar:
+                    extra += f" · {Path(result.sidecar).name}"
+                if result.hocr_path:
+                    extra += f" · {result.hocr_path.name}"
+                if result.tsv_path:
+                    extra += f" · {result.tsv_path.name}"
+                self._set_status(
+                    f"OCR → Word-Suite ({result.lang}, {result.mode.value}){extra}"
+                )
+                try:
+                    from instantlensdoc.core.plugin_hooks import emit as emit_hook
+
+                    emit_hook("ocr.finished", mode=result.mode.value, lang=result.lang)
+                except Exception:
+                    pass
                 return
 
         self.stack.setCurrentWidget(self.editor_pane)

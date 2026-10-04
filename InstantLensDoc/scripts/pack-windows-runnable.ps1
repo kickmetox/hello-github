@@ -1,4 +1,4 @@
-# InstantLens Doc 2.6.14 — Windows-Runnable-Paket (Python-Layout + Keygen)
+# InstantLens Doc 2.6.15 — Windows-Runnable-Paket (Python-Layout + Keygen)
 # Eine Zeile:
 #   powershell -ExecutionPolicy Bypass -File .\scripts\pack-windows-runnable.ps1
 #
@@ -24,6 +24,6 @@ if ($OutPath) {
     $args += @("--out", $OutPath)
 }
 
-Write-Host "=== InstantLens Doc pack-windows-runnable 2.6.14 ==="
+Write-Host "=== InstantLens Doc pack-windows-runnable 2.6.15 ==="
 & $Python @args
 if ($LASTEXITCODE -ne 0) { throw "Pack fehlgeschlagen (Exit $LASTEXITCODE)" }

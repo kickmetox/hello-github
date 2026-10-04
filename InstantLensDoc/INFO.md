@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **2.6.14** |
+| Version | **2.6.15** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -33,7 +33,7 @@
 
 Skript: [sync-ild.ps1](scripts/sync-ild.ps1) — Branch `cursor/instantlensdoc-2108` (oder `-LocalPack` / Pack-Zip) nach `D:\AI_Temp\InstantLensDoc`, pip, Start. **Nutzer-Icon in `assets` wird nicht überschrieben.**
 
-**FEATURES.md lokal sync:** Nach Sync liegt `FEATURES.md` lokal im App-Ordner (`D:\AI_Temp\InstantLensDoc\FEATURES.md`); About/Stubs öffnen diese lokale Datei — Version **2.6.14**.
+**FEATURES.md lokal sync:** Nach Sync liegt `FEATURES.md` lokal im App-Ordner (`D:\AI_Temp\InstantLensDoc\FEATURES.md`); About/Stubs öffnen diese lokale Datei — Version **2.6.15**.
 
 Ohne Start: `-NoStart` (Alias `-SkipStart`). Exit-Codes: **0** OK · **1** allgemein · **2** Git-Fehler.
 
@@ -81,6 +81,17 @@ python -m keygen --verify "ILD1...."
 ```
 
 Trial 28 Tage · Keys 32 Tage (HMAC `ILD1.…`). Details: `keygen/README.md`.
+
+## Neu in 2.6.15
+
+Minor nach **2.6.14** (OCR → Word-Suite):
+
+- **OCR → Word-Suite:** Layout-OCR / `*.ildocr.*`-Sidecars als editierbares Dokument übernehmen
+- UI: Extras → **In Word-Suite öffnen/übernehmen…** (Ctrl+Alt+Shift+W); Checkbox in OCR- & Scan-Dialog
+- Lesereihenfolge/Blöcke bleiben; weiterformatieren/exportieren mit 2.6.10–2.6.14
+- Scripting: `ild.ocr_to_word_suite` / `import_ildocr` · CLI `ocr-word-suite` / `import-ildocr` · PS `Invoke-IldOcrWordSuite`
+- Kein CMYK/Bleed/Preflight/PDF/X, kein volles i18n, keine KI-Wizards, kein PDF-Compare
+- Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie unverändert
 
 ## Neu in 2.6.14
 

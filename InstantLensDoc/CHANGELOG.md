@@ -1,5 +1,22 @@
 # Changelog — InstantLens Doc
 
+## 2.6.15 — OCR → Word-Suite Handoff
+
+Minor nach **2.6.14**: **OCR-/Layout-OCR-Ergebnisse** (Tesseract, `*.ildocr.txt` / hOCR / TSV) als **editierbares Word-Suite-Dokument** übernehmen — nicht nur Sidecar-Anzeige. Lesereihenfolge/Blöcke bleiben so weit praktikabel erhalten; anschließend Formatierung/Export mit den Tools aus 2.6.10–2.6.14. UI: Extras → **In Word-Suite öffnen/übernehmen…** (Ctrl+Alt+Shift+W), Checkbox im OCR- und Scan-Dialog. Scripting: `ild.ocr_to_word_suite` / `import_ildocr` / `handoff_ocr_to_word_suite` · CLI `ocr-word-suite` / `import-ildocr` · PowerShell `Invoke-IldOcrWordSuite` / `Import-IldOcr`. Kein CMYK/Bleed/Preflight/PDF/X, kein volles i18n, keine KI-Wizards, kein PDF-Compare. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie unverändert.
+
+### Neu
+- `instantlensdoc.core.ocr_word_suite` — Sidecar-Parse, Block→Absätze, Auto-Format-Handoff
+- UI: OCR/Scan → Word-Suite; Palette `ocr_word_suite`; Menü Ctrl+Alt+Shift+W
+- ild-API/CLI/PowerShell: `ocr-word-suite` / `import-ildocr`
+
+### Geändert
+- Docs/Version **2.6.15**; OCR-Dialog + Scan-Dialog Handoff-Checkbox
+
+### Tests / Qualität
+- Version **2.6.15** (App / `ild_pdf` / ISS / Smoke / Docs); Serie **2.6**; `docs/VERSION` + `VERSION.txt`
+- Smoke: 2.6.15 CLI+Qt (ocr-word-suite/ildocr-handoff)
+- Stubs: KI/Cloud/Stylus/3D/Hooks/Outline/Telemetrie unverändert markiert
+
 ## 2.6.14 — Tabellen, Daten-Import, Office Speichern/Export/Import
 
 Minor nach **2.6.13**: **Dokument-Tabellen** erstellen, formatieren und sortieren (Markdown/`ild-table`-Marker), **Zahlen/Daten-Import** aus CSV und Excel/`.xlsx` in Tabellen, **Speichern/Export/Import** gängiger Formate inkl. Office: `.docx`, `.xlsx`, `.pdf`, `.txt`, `.rtf` sowie HTML/JPG. Scripting: `ild.create_table` / `format_table` / `sort_table` / `import_table_csv` / `import_table_xlsx` / `export_table` / `save_document` / `import_document` / `list_io_formats` · CLI `table-create` / `table-format` / `table-sort` / `table-import-csv` / `table-import-xlsx` / `save` / `import-doc` · PowerShell `New-IldTable` / `Format-IldTable` / `Sort-IldTable` / `Import-IldTableCsv` / `Import-IldTableXlsx` / `Save-IldDocument` / `Import-IldDocument`. Kein CMYK/Bleed/Preflight/PDF/X, kein volles i18n, keine KI-Wizards, kein PDF-Compare. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie unverändert.

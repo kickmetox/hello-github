@@ -1,4 +1,4 @@
-"""Headless InstantLens-Doc-Operationen für Python- und PowerShell-Scripting — 2.6.14."""
+"""Headless InstantLens-Doc-Operationen für Python- und PowerShell-Scripting — 2.6.15."""
 
 from __future__ import annotations
 
@@ -1332,6 +1332,79 @@ def list_io_formats() -> dict[str, list[dict[str, str]]]:
     from instantlensdoc.core.export import list_export_formats, list_import_formats
 
     return {"export": list_export_formats(), "import": list_import_formats()}
+
+
+# --- OCR → Word-Suite Handoff — 2.6.15 ---
+
+
+def ocr_to_word_suite(
+    source: PathLike | None = None,
+    *,
+    text: str | None = None,
+    page: int = 1,
+    lang: str = "deu+eng",
+    auto_format: bool = True,
+    title: str | None = None,
+    prefer_layout: bool = True,
+    out: PathLike | None = None,
+) -> dict[str, Any]:
+    """OCR/Layout-OCR/ildocr-Sidecar → editierbares Word-Suite-Dokument — 2.6.15."""
+    from instantlensdoc.core.ocr_word_suite import handoff_ocr_to_word_suite
+
+    doc = handoff_ocr_to_word_suite(
+        source,
+        text=text,
+        page=page,
+        lang=lang,
+        auto_format=auto_format,
+        title=title,
+        prefer_layout=prefer_layout,
+        out=out,
+    )
+    return doc.to_dict()
+
+
+def import_ildocr(
+    path: PathLike,
+    *,
+    auto_format: bool = True,
+    title: str | None = None,
+    out: PathLike | None = None,
+) -> dict[str, Any]:
+    """``*.ildocr.txt`` / hOCR / TSV als Word-Suite-Dokument importieren — 2.6.15."""
+    from instantlensdoc.core.ocr_word_suite import import_ildocr_sidecar
+
+    doc = import_ildocr_sidecar(path, auto_format=auto_format, title=title)
+    if out is not None:
+        dest = _p(out)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_text(doc.text or "", encoding="utf-8")
+        doc.meta["out"] = str(dest)
+    return doc.to_dict()
+
+
+def handoff_ocr_to_word_suite(
+    source: PathLike | None = None,
+    *,
+    text: str | None = None,
+    page: int = 1,
+    lang: str = "deu+eng",
+    auto_format: bool = True,
+    title: str | None = None,
+    prefer_layout: bool = True,
+    out: PathLike | None = None,
+) -> dict[str, Any]:
+    """Alias für ocr_to_word_suite — 2.6.15."""
+    return ocr_to_word_suite(
+        source,
+        text=text,
+        page=page,
+        lang=lang,
+        auto_format=auto_format,
+        title=title,
+        prefer_layout=prefer_layout,
+        out=out,
+    )
 
 
 def _load_layout(

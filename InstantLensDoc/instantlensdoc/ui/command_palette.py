@@ -255,6 +255,13 @@ def default_palette_commands() -> list[PaletteCommand]:
             "OCR",
         ),
         PaletteCommand(
+            "ocr_word_suite",
+            "In Word-Suite öffnen/übernehmen…",
+            "ocr word suite ildocr übernehmen handoff editierbar sidecar",
+            "OCR",
+            "Ctrl+Alt+Shift+W",
+        ),
+        PaletteCommand(
             "doc_tags",
             "Dokument-Tags…",
             "tags ildtags dokument label filter",

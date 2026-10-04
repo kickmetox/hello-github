@@ -395,6 +395,36 @@ def build_parser() -> argparse.ArgumentParser:
 
     s = sub.add_parser("io-formats", help="Import-/Export-Formate auflisten — 2.6.14")
 
+    s = sub.add_parser(
+        "ocr-word-suite",
+        help="OCR/Layout/ildocr → Word-Suite-Dokument — 2.6.15",
+    )
+    s.add_argument("source", nargs="?", default=None, help="Bild, PDF oder *.ildocr.*")
+    s.add_argument("--text", default=None, help="Rohtext statt Datei")
+    s.add_argument("--page", type=int, default=1, help="PDF-Seite (1-basiert)")
+    s.add_argument("--lang", default="deu+eng")
+    s.add_argument("--title", default=None)
+    s.add_argument("--out", default=None, help="Optional: Text speichern")
+    s.add_argument(
+        "--no-auto-format",
+        action="store_true",
+        help="Kein Auto-Format (2.6.10)",
+    )
+    s.add_argument(
+        "--no-layout",
+        action="store_true",
+        help="Kein Layout-OCR (nur plain editable)",
+    )
+
+    s = sub.add_parser(
+        "import-ildocr",
+        help="*.ildocr.txt / hOCR / TSV → Word-Suite — 2.6.15",
+    )
+    s.add_argument("path")
+    s.add_argument("--title", default=None)
+    s.add_argument("--out", default=None)
+    s.add_argument("--no-auto-format", action="store_true")
+
     return p
 
 
@@ -831,6 +861,28 @@ def run(argv: list[str] | None = None) -> int:
             return 0
         if args.cmd == "io-formats":
             data = api.list_io_formats()
+            _print(data, as_json=js or True)
+            return 0
+        if args.cmd == "ocr-word-suite":
+            data = api.ocr_to_word_suite(
+                args.source,
+                text=args.text,
+                page=args.page,
+                lang=args.lang,
+                auto_format=not args.no_auto_format,
+                title=args.title,
+                prefer_layout=not args.no_layout,
+                out=args.out,
+            )
+            _print(data, as_json=js or True)
+            return 0
+        if args.cmd == "import-ildocr":
+            data = api.import_ildocr(
+                args.path,
+                auto_format=not args.no_auto_format,
+                title=args.title,
+                out=args.out,
+            )
             _print(data, as_json=js or True)
             return 0
         return _fail("unbekanntes Kommando")

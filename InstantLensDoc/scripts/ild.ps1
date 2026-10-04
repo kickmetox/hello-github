@@ -1,4 +1,4 @@
-# InstantLens Doc — PowerShell-Scripting 2.6.14
+# InstantLens Doc — PowerShell-Scripting 2.6.15
 # Als CLI:
 #   powershell -ExecutionPolicy Bypass -File .\scripts\ild.ps1 pages D:\dok.pdf
 # Als Modul:
@@ -532,6 +532,43 @@ function Import-IldDocument {
 
 function Get-IldIoFormats {
     Invoke-Ild @("--json", "io-formats") | Out-Host
+}
+
+function Invoke-IldOcrWordSuite {
+    param(
+        [string]$Path,
+        [string]$Text,
+        [int]$Page = 1,
+        [string]$Lang = "deu+eng",
+        [string]$Title,
+        [string]$Out,
+        [switch]$NoAutoFormat,
+        [switch]$NoLayout
+    )
+    $a = @("--json", "ocr-word-suite")
+    if ($Path) { $a += $Path }
+    if ($Text) { $a += @("--text", $Text) }
+    if ($PSBoundParameters.ContainsKey("Page")) { $a += @("--page", "$Page") }
+    if ($Lang) { $a += @("--lang", $Lang) }
+    if ($Title) { $a += @("--title", $Title) }
+    if ($Out) { $a += @("--out", $Out) }
+    if ($NoAutoFormat) { $a += "--no-auto-format" }
+    if ($NoLayout) { $a += "--no-layout" }
+    Invoke-Ild @a | Out-Host
+}
+
+function Import-IldOcr {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [string]$Title,
+        [string]$Out,
+        [switch]$NoAutoFormat
+    )
+    $a = @("--json", "import-ildocr", $Path)
+    if ($Title) { $a += @("--title", $Title) }
+    if ($Out) { $a += @("--out", $Out) }
+    if ($NoAutoFormat) { $a += "--no-auto-format" }
+    Invoke-Ild @a | Out-Host
 }
 
 function Merge-IldPdf {

@@ -238,11 +238,16 @@ HELP_HTML = f"""
 <li><b>Tastatur-Cheat-Sheet</b>: Hilfe → Tastatur-Cheat-Sheet… / F1; Suche/Filter · Drucken · TXT Live-Vorschau · Quick-Insert {{date}} · Reset Default gemeinsamer Helper · Fokus+Selektion — 2.4.5</li>
 <li><b>Extras → Batch-Konvertierung</b>: Ordner → PDF oder OCR</li>
 <li><b>Einfügen → Verketteter Textrahmen</b>: Overflow fließt in den Folgeahmen</li>
+<li><b>OCR → Word-Suite</b>: Extras → <b>In Word-Suite öffnen/übernehmen…</b>
+    (Ctrl+Alt+Shift+W) — Layout-OCR / <code>*.ildocr.*</code>-Sidecar als editierbares
+    Dokument (Blöcke/Lesereihenfolge); weiterformatieren/exportieren mit Tools 2.6.10–2.6.14 —
+    <b>2.6.15</b></li>
 <li><b>OCR</b>: Extras → OCR (Seite/Bild) oder <b>OCR gesamtes PDF</b> (Batch mit
     <b>Sprach-Preset</b>-Combobox, Fortschritt/Abbrechen;
     Ergebnis als <b>neue Textdatei-Tab</b> <code>*-ocr.txt</code>) —
     Modus „editierbarer Text“ oder
     „durchsuchbares Bild“ (PDF + <code>*.ildocr.txt</code>); Tabellen-Heuristik als Markdown wo möglich.
+    Optional Checkbox <b>In Word-Suite öffnen/übernehmen</b> — <b>2.6.15</b>.
     Ohne Tesseract: Install-Hinweis mit Link und <b>Pfad-Hilfe</b>
     (<a href="https://github.com/UB-Mannheim/tesseract/wiki">UB-Mannheim Wiki</a>,
     <code>winget install UB-Mannheim.TesseractOCR</code>,
@@ -284,7 +289,8 @@ HELP_HTML = f"""
 <h3>PDF-Modul</h3>
 <p>Das Paket <code>ild_pdf</code> kann von anderen Programmen genutzt werden (pypdfium2, kein Poppler).
 Beispiel: <code>examples/ild_pdf_demo.py</code>. API: <code>ild_pdf/README.md</code>.</p>
-<p><b>Scripting 2.6.14:</b> Tabellen/Office-I/O (<code>create_table</code>/<code>import_table_csv</code>/<code>save_document</code>)
+<p><b>Scripting 2.6.15:</b> OCR→Word-Suite (<code>ocr_to_word_suite</code>/<code>import_ildocr</code>)
++ Tabellen/Office-I/O (<code>create_table</code>/<code>import_table_csv</code>/<code>save_document</code>)
 + Headless-API <code>import ild</code> und CLI <code>python -m ild</code>
 (Typografie/Silbentrennung/Textumfluss: <code>apply_typography</code>/<code>hyphenate</code>/<code>layout_set_text_wrap</code>)
 (inkl. <code>satzspiegel</code>/<code>apply-master</code>/<code>layout-flow</code>/<code>page-formats</code>/<code>header-footer</code>). Basis <b>2.6.11/2.6.10</b>:

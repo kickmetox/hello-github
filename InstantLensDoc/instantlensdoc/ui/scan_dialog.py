@@ -163,11 +163,18 @@ class ScanDialog(QDialog):
         self.layout_tsv.setObjectName("scanOcrTsv")
         self.layout_tsv.setChecked(True)
         self.layout_tsv.setToolTip("*.ildocr.tsv (Wörter + Koordinaten) — 2.6.5")
+        self.word_suite_check = QCheckBox("In Word-Suite öffnen/übernehmen")
+        self.word_suite_check.setObjectName("scanOcrWordSuite")
+        self.word_suite_check.setChecked(True)
+        self.word_suite_check.setToolTip(
+            "OCR-Text als editierbares Word-Suite-Dokument (Absätze/Lesereihenfolge) — 2.6.15"
+        )
         self.ocr_enabled.toggled.connect(self._sync_scan_ocr_opts)
         ocr_form.addRow(self.ocr_enabled)
         ocr_form.addRow("OCR-Sprache:", self.lang_combo)
         ocr_form.addRow(self.layout_hocr)
         ocr_form.addRow(self.layout_tsv)
+        ocr_form.addRow(self.word_suite_check)
         layout.addLayout(ocr_form)
         self._sync_scan_ocr_opts()
 
@@ -196,6 +203,12 @@ class ScanDialog(QDialog):
         self.lang_combo.setEnabled(on)
         self.layout_hocr.setEnabled(on)
         self.layout_tsv.setEnabled(on)
+        if hasattr(self, "word_suite_check"):
+            self.word_suite_check.setEnabled(on)
+
+    def open_in_word_suite(self) -> bool:
+        """OCR-Text in Word-Suite übernehmen — 2.6.15."""
+        return bool(getattr(self, "word_suite_check", None) and self.word_suite_check.isChecked())
 
     def selected_scanner(self) -> DeviceInfo | None:
         item = self.device_list.currentItem()
@@ -442,15 +455,37 @@ class ScanDialog(QDialog):
             msg += "\n\nHinweise:\n" + "\n".join(result.warnings[:3])
         if result.combined_text and hasattr(self.parent(), "_open_text_result"):
             pass
-        # OCR-Text optional an MainWindow übergeben (Editor)
+        # OCR-Text → Word-Suite (Default) oder Editor — 2.6.15
         if result.combined_text:
             mw = self.parent()
-            show_fn = getattr(mw, "_show_scan_ocr_text", None) if mw is not None else None
-            if callable(show_fn):
-                try:
-                    show_fn(result.combined_text, f"Scan-OCR — {target.stem}")
-                except Exception:
-                    pass
+            use_ws = bool(getattr(self, "open_in_word_suite", lambda: True)())
+            if use_ws:
+                ws_fn = getattr(mw, "_handoff_ocr_to_word_suite", None) if mw is not None else None
+                if callable(ws_fn):
+                    try:
+                        ws_fn(
+                            text=result.combined_text,
+                            title=f"Word-Suite — Scan {target.stem}",
+                            auto_format=True,
+                        )
+                    except Exception:
+                        show_fn = getattr(mw, "_show_scan_ocr_text", None)
+                        if callable(show_fn):
+                            show_fn(result.combined_text, f"Scan-OCR — {target.stem}")
+                else:
+                    show_fn = getattr(mw, "_show_scan_ocr_text", None) if mw is not None else None
+                    if callable(show_fn):
+                        try:
+                            show_fn(result.combined_text, f"Scan-OCR — {target.stem}")
+                        except Exception:
+                            pass
+            else:
+                show_fn = getattr(mw, "_show_scan_ocr_text", None) if mw is not None else None
+                if callable(show_fn):
+                    try:
+                        show_fn(result.combined_text, f"Scan-OCR — {target.stem}")
+                    except Exception:
+                        pass
 
         self._last_result = result
         QMessageBox.information(self, "Scan / Import", msg)

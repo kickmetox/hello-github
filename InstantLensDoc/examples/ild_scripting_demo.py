@@ -1,4 +1,4 @@
-"""Beispiel: InstantLens Doc Scripting (Python) — 2.6.14.
+"""Beispiel: InstantLens Doc Scripting (Python) — 2.6.15.
 
 Aufruf aus dem App-Root:
   python examples/ild_scripting_demo.py [pdf]
@@ -82,10 +82,16 @@ def main() -> int:
         print("csv import cols:", imp.get("cols"))
         out_docx = td_p / "demo.docx"
         try:
-            saved = ild.save_document("Hallo 2.6.14", out_docx)
+            saved = ild.save_document("Hallo 2.6.15", out_docx)
             print("save_document:", Path(saved["path"]).exists())
         except Exception as e:
             print("save_document skip:", e)
+        ws = ild.ocr_to_word_suite(
+            text="EINLEITUNG\n\nDemo-Absatz für Word-Suite.",
+            auto_format=False,
+            title="Demo Word-Suite",
+        )
+        print("ocr_to_word_suite blocks:", ws.get("block_count"), "chars:", len(ws.get("text") or ""))
         print("io formats export:", [f["id"] for f in ild.list_io_formats()["export"]])
         hf = ild.apply_header_footer(
             src, out=td_p / "hf.pdf", header="{title}", footer="{author}", title="Demo", author="ILD"
