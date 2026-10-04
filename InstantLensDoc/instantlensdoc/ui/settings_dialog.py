@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import QEvent, Qt, QTimer
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QCheckBox,
@@ -924,14 +924,17 @@ class SettingsDialog(QDialog):
         preset_row.addWidget(btn_theme_delete)
         preset_row.addWidget(btn_theme_hex)
         form.addRow("Ann.-Color-Presets", preset_row)
-        # Theme-Vorschau Swatches — 2.5.1
+        # Theme-Vorschau Swatches · Klick → Hex — 2.5.1/2.5.9
         swatch_row = QHBoxLayout()
         self._theme_swatch_labels: list[QLabel] = []
         for _i in range(ANN_COLOR_PRESET_COUNT):
             sw = QLabel("")
             sw.setFixedSize(22, 22)
             sw.setFrameShape(QFrame.Box)
-            sw.setToolTip("Theme-Vorschau — 2.5.1")
+            sw.setToolTip("Theme-Vorschau · Klick kopiert Hex — 2.5.9")
+            sw.setCursor(Qt.PointingHandCursor)
+            sw.setProperty("themeHex", "")
+            sw.installEventFilter(self)
             self._theme_swatch_labels.append(sw)
             swatch_row.addWidget(sw)
         self.ann_theme_swatch_hint = QLabel("")
@@ -2827,8 +2830,22 @@ class SettingsDialog(QDialog):
         if hasattr(self, "btn_undo_factory_presets"):
             self.btn_undo_factory_presets.setEnabled(bool(prev))
 
+    def eventFilter(self, obj, event):  # noqa: N802
+        """Swatch-Klick kopiert einzelne Hex-Farbe — 2.5.9."""
+        labels = getattr(self, "_theme_swatch_labels", None) or []
+        if (
+            obj in labels
+            and event.type() == QEvent.MouseButtonPress
+            and getattr(event, "button", lambda: None)() == Qt.LeftButton
+        ):
+            hex_c = str(obj.property("themeHex") or "").strip()
+            if hex_c:
+                self._copy_single_theme_hex(hex_c)
+                return True
+        return super().eventFilter(obj, event)
+
     def _update_ann_theme_swatches(self, *_args) -> None:
-        """Vorschau-Swatches · Combo Hex-Tooltip · Custom N/20 · Hex-Copy — 2.5.1/2.5.8."""
+        """Vorschau-Swatches · Combo Hex-Tooltip · Custom N/20 · Hex-Copy — 2.5.1/2.5.9."""
         from instantlensdoc.core.app_settings import (
             CUSTOM_ANN_COLOR_THEMES_MAX,
             get_ann_color_theme,
@@ -2848,11 +2865,15 @@ class SettingsDialog(QDialog):
                 sw.setStyleSheet(
                     f"background: {c}; border: 1px solid #444; border-radius: 3px;"
                 )
-                sw.setToolTip(f"{name}: {c}")
+                sw.setToolTip(f"{name}: {c} · Klick kopiert Hex — 2.5.9")
+                sw.setProperty("themeHex", str(c))
+                sw.setCursor(Qt.PointingHandCursor)
                 sw.setVisible(True)
             else:
                 sw.setStyleSheet("background: transparent; border: 1px dashed #bbb;")
                 sw.setToolTip("Kein Theme gewählt")
+                sw.setProperty("themeHex", "")
+                sw.setCursor(Qt.ArrowCursor)
                 sw.setVisible(True)
         custom_n = 0
         try:
@@ -2865,17 +2886,21 @@ class SettingsDialog(QDialog):
             count_txt = f"Custom {custom_n}/{CUSTOM_ANN_COLOR_THEMES_MAX}"
             if name and colors:
                 extra = " · Default" if name == default else ""
-                hint.setText(f"{name}: {len(colors)} Farben{extra} · {count_txt}")
+                hint.setText(
+                    f"{name}: {len(colors)} Farben{extra} · {count_txt} · "
+                    "Swatch-Klick = Hex"
+                )
             elif default:
                 hint.setText(f"Default: {default} · {count_txt}")
             else:
                 hint.setText(f"Theme wählen für Vorschau · {count_txt}")
-        # Combo-Tooltip: alle Hex-Farben des gewählten Themes — 2.5.7/2.5.8
+        # Combo-Tooltip: alle Hex-Farben des gewählten Themes — 2.5.7/2.5.9
         if combo is not None:
             base = (
                 "Vordefinierte + Custom Themes · ★ = Default · "
                 f"Custom {custom_n}/{CUSTOM_ANN_COLOR_THEMES_MAX} · "
-                "Custom umbenennen/duplizieren/löschen · Hex kopieren — 2.5.8"
+                "Custom umbenennen/duplizieren/löschen · Hex kopieren · "
+                "Swatch-Klick Hex — 2.5.9"
             )
             if name and colors:
                 hex_line = " · ".join(str(c) for c in colors)
@@ -2885,6 +2910,34 @@ class SettingsDialog(QDialog):
         btn_hex = getattr(self, "btn_theme_hex_copy", None)
         if btn_hex is not None:
             btn_hex.setEnabled(bool(name and colors))
+
+    def _copy_single_theme_hex(self, hex_color: str) -> None:
+        """Einzelne Hex-Farbe aus Swatch in Zwischenablage — 2.5.9."""
+        from PySide6.QtWidgets import QApplication
+
+        text = str(hex_color or "").strip()
+        if not text:
+            return
+        try:
+            clip = QApplication.clipboard()
+            if clip is None:
+                raise RuntimeError("Zwischenablage nicht verfügbar")
+            clip.setText(text)
+        except Exception as e:
+            QMessageBox.warning(self, "Farben-Theme", str(e))
+            return
+        msg = f"Theme-Hex kopiert: {text}"
+        parent = self.parent()
+        if parent is not None and hasattr(parent, "_set_status"):
+            try:
+                parent._set_status(msg)
+            except Exception:
+                pass
+        if parent is not None and hasattr(parent, "_announce_status_toast"):
+            try:
+                parent._announce_status_toast(msg)
+            except Exception:
+                pass
 
     def _copy_ann_theme_hex_ui(self) -> None:
         """6 Hex-Farben des gewählten Themes in die Zwischenablage — 2.5.8."""

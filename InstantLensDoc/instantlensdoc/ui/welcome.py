@@ -128,8 +128,8 @@ class WelcomePage(QWidget):
         self.recent_filter.setClearButtonEnabled(True)
         self.recent_filter.setToolTip(
             "Live-Filter Pfad oder Dokument-Tags (ildtags-v1) · Tag-Vorschläge · "
-            "Quick-Tag A–Z/Häufigkeit · Tags kopieren/einfügen · "
-            "Treffer A11y · Esc → Fokus Liste — 2.5.8"
+            "Quick-Tag A–Z/Häufigkeit · Tags kopieren/einfügen (Ctrl+C/V) · "
+            "Treffer A11y · Esc → Fokus Liste — 2.5.9"
         )
         self.recent_filter.textChanged.connect(self._apply_recent_filter)
         self.recent_filter.textChanged.connect(self._persist_recent_filter)
@@ -176,8 +176,9 @@ class WelcomePage(QWidget):
         self.recent_list.setMinimumHeight(180)
         self.recent_list.setToolTip(
             "Enter / Doppelklick öffnet; Entf entfernt den Eintrag; "
+            "Ctrl+C/V Tags kopieren/einfügen; "
             "Rechtsklick: Tag+/− · Tags kopieren/einfügen · Entfernen / Ordner; "
-            "Quick-Tag A–Z/Häufigkeit (N Docs) · Treffer A11y · Esc → Fokus Liste — 2.5.8"
+            "Quick-Tag A–Z/Häufigkeit (N Docs) · Treffer A11y · Esc → Fokus Liste — 2.5.9"
         )
         self.recent_list.setAcceptDrops(True)
         self.recent_list.setContextMenuPolicy(Qt.CustomContextMenu)
@@ -244,7 +245,7 @@ class WelcomePage(QWidget):
         self.btn_continue.setToolTip(tip)
 
     def eventFilter(self, obj, event):  # noqa: N802
-        """Esc leert Filter→Liste; Delete entfernt; Enter öffnet — 1.0.6."""
+        """Esc leert Filter→Liste; Delete entfernt; Enter öffnet; Ctrl+C/V Tags — 2.5.9."""
         if event.type() == QEvent.KeyPress:
             assert isinstance(event, QKeyEvent)
             key = event.key()
@@ -260,6 +261,15 @@ class WelcomePage(QWidget):
                     path = item.data(Qt.UserRole)
                     if path:
                         self.recent_remove_requested.emit(str(path))
+                        return True
+                # Ctrl+C / Ctrl+V: Tags kopieren/einfügen — 2.5.9
+                if item is not None and bool(event.modifiers() & Qt.ControlModifier):
+                    path = item.data(Qt.UserRole)
+                    if path and key == Qt.Key_C:
+                        self._copy_tags_for_recent(str(path))
+                        return True
+                    if path and key == Qt.Key_V:
+                        self._paste_tags_for_recent(str(path))
                         return True
         return super().eventFilter(obj, event)
 

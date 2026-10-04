@@ -2913,14 +2913,7 @@ class MainWindow(QMainWindow):
         elif getattr(self, "_ocr_region_toast_active", False) and (
             "OCR-Region" in text or "OCR Region" in text
         ):
-            path = getattr(self, "_last_ocr_region_path", None) or ""
-            tip = (
-                "Linksklick → Ergebnis-Tab · Rechtsklick → Ordner · "
-                "Mittelklick/Ctrl+Klick → Pfad · "
-                "Shift+Klick → Text kopieren — 2.5.8"
-            )
-            if path:
-                tip = f"{tip}\n{path}"
+            tip = self._ocr_region_status_tooltip()
             self.statusBar().setToolTip(tip)
             self.statusBar().setCursor(Qt.PointingHandCursor)
         elif getattr(self, "_text_pdf_toast_active", False) and "Text → PDF" in text:
@@ -3079,7 +3072,7 @@ class MainWindow(QMainWindow):
         ):
             if self._copy_thumb_prune_status_to_clipboard():
                 return
-        # OCR-Region: L→Tab · R→Ordner · Mittel/Ctrl→Pfad · Shift→Text — 2.5.5–2.5.8
+        # OCR-Region: L→Tab · R→Ordner · Mittel/Ctrl→Pfad · Shift→Text · Alt→Datei — 2.5.5–2.5.9
         if (
             getattr(self, "_ocr_region_toast_active", False)
             and ("OCR-Region" in cur or "OCR Region" in cur)
@@ -3094,6 +3087,11 @@ class MainWindow(QMainWindow):
                 event.modifiers() & Qt.ShiftModifier
             ):
                 if self._copy_ocr_region_result_text():
+                    return
+            elif event.button() == Qt.LeftButton and bool(
+                event.modifiers() & Qt.AltModifier
+            ):
+                if self._open_ocr_region_result_file():
                     return
             elif event.button() == Qt.LeftButton:
                 if self._focus_ocr_region_result_tab():
@@ -11566,7 +11564,7 @@ class MainWindow(QMainWindow):
         self._manage_export_presets()
 
     def _manage_export_presets(self):
-        """Export-Presets: ★ · RMB Ordner · Entf · Summary kopieren · Ctrl+C — 2.5.8."""
+        """Export-Presets: ★ · RMB Ordner · Entf · Summary/Pfad kopieren — 2.5.9."""
         from PySide6.QtCore import QEvent, QObject
         from PySide6.QtGui import QDesktopServices, QKeyEvent, QUrl
         from PySide6.QtWidgets import (
@@ -11649,14 +11647,15 @@ class MainWindow(QMainWindow):
         lay = QVBoxLayout(dlg)
         info = QLabel(
             f"Benannte Presets ({len(profiles)}/{EXPORT_PROFILES_MAX}). "
-            "★ aktiv · RMB Zielordner · Summary kopieren · Entf · Doppelklick Anwenden."
+            "★ aktiv · RMB Zielordner · Summary/Pfad kopieren · Entf · Doppelklick Anwenden."
         )
         lay.addWidget(info)
         lst = QListWidget()
         lst.setToolTip(
             "★ = aktives Preset · Listen-Tooltip Summary DPI/Format/Pfad · "
-            "Rechtsklick → Zielordner / Summary kopieren · Ctrl+C · Entf löschen · "
-            "Doppelklick/Enter Anwenden — 2.5.8"
+            "Rechtsklick → Zielordner / Summary / Pfad kopieren · "
+            "Ctrl+C Summary · Ctrl+Shift+C Pfad · Entf löschen · "
+            "Doppelklick/Enter Anwenden — 2.5.9"
         )
         lst.setContextMenuPolicy(Qt.CustomContextMenu)
         active = {"name": get_active_export_profile_name()}
@@ -11673,7 +11672,7 @@ class MainWindow(QMainWindow):
             active["name"] = get_active_export_profile_name()
             info.setText(
                 f"Benannte Presets ({len(cur)}/{EXPORT_PROFILES_MAX}). "
-                "★ aktiv · RMB Zielordner · Summary kopieren · Entf · Doppelklick Anwenden."
+                "★ aktiv · RMB Zielordner · Summary/Pfad kopieren · Entf · Doppelklick Anwenden."
             )
             for p in cur:
                 name = str(p["name"])
@@ -11738,7 +11737,7 @@ class MainWindow(QMainWindow):
         btn_import = QPushButton("Import JSON…")
         btn_import.setToolTip(
             f"Presets JSON ({EXPORT_PRESETS_SCHEMA_ID}): ungültige überspringen+zählen · "
-            "★ aktiv · RMB Zielordner · Summary kopieren · Entf · Apply A11y — 2.5.8"
+            "★ aktiv · RMB Zielordner · Summary/Pfad kopieren · Entf · Apply A11y — 2.5.9"
         )
         btn_row.addWidget(btn_apply)
         btn_row.addWidget(btn_dup)
@@ -11984,6 +11983,38 @@ class MainWindow(QMainWindow):
             except Exception:
                 pass
 
+        def _copy_path(item: QListWidgetItem | None = None) -> None:
+            """RMB/Ctrl+Shift+C: nur Zielordner-Pfad kopieren — 2.5.9."""
+            it = item if item is not None else lst.currentItem()
+            if it is None:
+                return
+            data = it.data(Qt.UserRole) or {}
+            name = str(data.get("name") or _item_name(it)).strip()
+            path_txt = export_profile_path_preview(data)
+            if not path_txt or path_txt in ("(kein Preset)", "(kein Zielordner)"):
+                path_txt = str(data.get("target") or "").strip()
+            if not path_txt:
+                QMessageBox.information(
+                    dlg,
+                    "Export-Preset",
+                    "Kein Zielordner in diesem Preset gespeichert.",
+                )
+                return
+            try:
+                clip = QApplication.clipboard()
+                if clip is None:
+                    raise RuntimeError("Zwischenablage nicht verfügbar")
+                clip.setText(path_txt)
+            except Exception as e:
+                QMessageBox.warning(dlg, "Export-Preset", str(e))
+                return
+            msg = f"Export-Preset Pfad kopiert: {name}"
+            self._set_status(msg)
+            try:
+                self._announce_status_toast(msg)
+            except Exception:
+                pass
+
         def _on_preset_context(pos) -> None:
             item = lst.itemAt(pos)
             if item is None:
@@ -11992,6 +12023,7 @@ class MainWindow(QMainWindow):
             menu = QMenu(dlg)
             act_open = menu.addAction("Zielordner öffnen")
             act_copy = menu.addAction("Summary kopieren")
+            act_copy_path = menu.addAction("Pfad kopieren")
             act_apply = menu.addAction("Anwenden")
             act_dup = menu.addAction("Duplizieren")
             act_rename = menu.addAction("Umbenennen…")
@@ -12001,6 +12033,8 @@ class MainWindow(QMainWindow):
                 _open_target_folder(item)
             elif chosen is act_copy:
                 _copy_summary(item)
+            elif chosen is act_copy_path:
+                _copy_path(item)
             elif chosen is act_apply:
                 _apply()
             elif chosen is act_dup:
@@ -12017,11 +12051,13 @@ class MainWindow(QMainWindow):
                     if event.key() in (Qt.Key_Delete, Qt.Key_Backspace):
                         _delete()
                         return True
-                    if (
-                        event.key() == Qt.Key_C
-                        and bool(event.modifiers() & Qt.ControlModifier)
+                    if event.key() == Qt.Key_C and bool(
+                        event.modifiers() & Qt.ControlModifier
                     ):
-                        _copy_summary()
+                        if bool(event.modifiers() & Qt.ShiftModifier):
+                            _copy_path()
+                        else:
+                            _copy_summary()
                         return True
                 return False
 
@@ -13229,6 +13265,48 @@ class MainWindow(QMainWindow):
             status += " (abgebrochen, Teilergebnis behalten)"
         self._set_status(status)
 
+    def _ocr_region_text_preview(self, *, max_chars: int = 80) -> str:
+        """Erste Zeilen des OCR-Region-Ergebnisses (ohne Fehlerabschnitt) — 2.5.9."""
+        path = getattr(self, "_last_ocr_region_path", None)
+        if not path:
+            return ""
+        p = Path(str(path))
+        if not p.is_file():
+            return ""
+        try:
+            body = p.read_text(encoding="utf-8")
+        except Exception:
+            return ""
+        marker = "\n--- OCR-Fehler ---"
+        if marker in body:
+            body = body.split(marker, 1)[0]
+        # Header-Zeile überspringen wenn vorhanden
+        lines = [ln.strip() for ln in body.splitlines() if ln.strip()]
+        if lines and lines[0].startswith("--- OCR Region"):
+            lines = lines[1:]
+        preview = " ".join(lines).strip()
+        if not preview:
+            return ""
+        if len(preview) > max_chars:
+            preview = preview[: max_chars - 1] + "…"
+        return preview
+
+    def _ocr_region_status_tooltip(self) -> str:
+        """Status-Tooltip inkl. Textvorschau — 2.5.9."""
+        path = getattr(self, "_last_ocr_region_path", None) or ""
+        tip = (
+            "Linksklick → Ergebnis-Tab · Rechtsklick → Ordner · "
+            "Mittelklick/Ctrl+Klick → Pfad · "
+            "Shift+Klick → Text kopieren · "
+            "Alt+Klick → Datei öffnen — 2.5.9"
+        )
+        if path:
+            tip = f"{tip}\n{path}"
+        preview = self._ocr_region_text_preview()
+        if preview:
+            tip = f"{tip}\nVorschau: {preview}"
+        return tip
+
     def _focus_ocr_region_result_tab(self) -> bool:
         """Status-Klick: OCR-Region Ergebnis-Tab fokussieren — 2.5.5."""
         path = getattr(self, "_last_ocr_region_path", None)
@@ -13287,6 +13365,31 @@ class MainWindow(QMainWindow):
             return True
         except Exception:
             return False
+
+    def _open_ocr_region_result_file(self) -> bool:
+        """Status-Alt+Klick: OCR-Region Ergebnisdatei mit Standardprogramm — 2.5.9."""
+        from PySide6.QtGui import QDesktopServices
+        from PySide6.QtCore import QUrl
+
+        path = getattr(self, "_last_ocr_region_path", None)
+        if not path:
+            return False
+        target = Path(str(path))
+        if not target.is_file():
+            self._set_status(f"OCR-Region Ergebnis fehlt: {target.name}")
+            return False
+        try:
+            QDesktopServices.openUrl(QUrl.fromLocalFile(str(target)))
+        except Exception:
+            return False
+        self._ocr_region_toast_active = True
+        msg = f"OCR-Region Datei geöffnet: {target.name}"
+        self._set_status(msg)
+        try:
+            self._announce_status_toast(msg)
+        except Exception:
+            pass
+        return True
 
     def _copy_ocr_region_result_path(self) -> bool:
         """Status-Mittelklick/Ctrl+Klick: OCR-Region Ergebnis-Pfad kopieren — 2.5.7."""
