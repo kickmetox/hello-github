@@ -126,7 +126,15 @@
     "info_vendor": "Éditeur",
     "info_contact": "Contact",
     "info_privacy": "Confidentialité : local, pas de télémétrie",
-    "features_missing": "FEATURES.md introuvable."
+    "features_missing": "FEATURES.md introuvable.",
+    "preflight": "Contrôle en amont (impression)",
+    "bleed": "Fond perdu",
+    "doc_layers": "Calques du document",
+    "export_pdfx": "Exporter en PDF/X (prêt à imprimer)…",
+    "color_management": "Gestion des couleurs",
+    "layer_background": "Arrière-plan",
+    "layer_images": "Images",
+    "layer_text": "Texte"
   },
   "phrases": {
     "&Datei": "&Fichier",

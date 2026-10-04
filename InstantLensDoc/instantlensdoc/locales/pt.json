@@ -126,7 +126,15 @@
     "info_vendor": "Fabricante",
     "info_contact": "Contacto",
     "info_privacy": "Privacidade: local, sem telemetria",
-    "features_missing": "FEATURES.md não encontrado."
+    "features_missing": "FEATURES.md não encontrado.",
+    "preflight": "Preflight (impressão)",
+    "bleed": "Sangria",
+    "doc_layers": "Camadas do documento",
+    "export_pdfx": "Exportar como PDF/X (pronto para impressão)…",
+    "color_management": "Gestão de cores",
+    "layer_background": "Fundo",
+    "layer_images": "Imagens",
+    "layer_text": "Texto"
   },
   "phrases": {
     "&Datei": "&Ficheiro",

@@ -625,7 +625,7 @@ function New-IldDocumentWizard {
 }
 
 function Get-IldUiLangs {
-    # UI-Sprachen DE/EN/FR/RU/ES/ZH/PT/AR/IT — 2.6.17
+    # UI-Sprachen DE/EN/FR/RU/ES/ZH/PT/AR/IT — 2.6.18
     Invoke-Ild @("--json", "ui-langs") | Out-Host
 }
 
@@ -651,6 +651,109 @@ function Invoke-IldOcrHandwriting {
     )
     $a = @("--json", "ocr-handwriting", $Path, "--lang", $Lang, "--psm", $Psm)
     if ($Out) { $a += @("--out", $Out) }
+    Invoke-Ild @a | Out-Host
+}
+
+function Get-IldColorPalettes {
+    # RGB/CMYK/Spot-Paletten — 2.6.18
+    Invoke-Ild @("--json", "palettes") | Out-Host
+}
+
+function Convert-IldColor {
+    param(
+        [string]$Hex,
+        [string]$Rgb,
+        [string]$Cmyk,
+        [ValidateSet("rgb", "cmyk")][string]$To = "cmyk"
+    )
+    $a = @("--json", "convert-color", "--to", $To)
+    if ($Hex) { $a += @("--hex", $Hex) }
+    if ($Rgb) { $a += @("--rgb", $Rgb) }
+    if ($Cmyk) { $a += @("--cmyk", $Cmyk) }
+    Invoke-Ild @a | Out-Host
+}
+
+function Get-IldBleedPresets {
+    Invoke-Ild @("--json", "bleed-presets") | Out-Host
+}
+
+function Invoke-IldBleed {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [double]$Mm,
+        [ValidateSet("none", "minimal", "standard", "extra")][string]$Preset,
+        [string]$Out,
+        [switch]$PageOnly
+    )
+    $a = @("--json", "apply-bleed", $Path)
+    if ($PSBoundParameters.ContainsKey("Mm")) { $a += @("--mm", "$Mm") }
+    if ($Preset) { $a += @("--preset", $Preset) }
+    if ($Out) { $a += @("--out", $Out) }
+    if ($PageOnly) { $a += "--page-only" }
+    Invoke-Ild @a | Out-Host
+}
+
+function Get-IldBleedInfo {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [int]$Page = 1
+    )
+    Invoke-Ild @("--json", "bleed-info", $Path, "--page", "$Page") | Out-Host
+}
+
+function Get-IldLayers {
+    Invoke-Ild @("--json", "layers") | Out-Host
+}
+
+function Get-IldLayoutLayers {
+    param([string]$Layout)
+    $a = @("--json", "layout-layers")
+    if ($Layout) { $a += @("--layout", $Layout) }
+    Invoke-Ild @a | Out-Host
+}
+
+function Set-IldFrameLayer {
+    param(
+        [Parameter(Mandatory = $true)][string]$FrameId,
+        [Parameter(Mandatory = $true)][ValidateSet("background", "images", "text")][string]$Layer,
+        [string]$Layout,
+        [string]$Out
+    )
+    $a = @("--json", "layout-set-layer", $FrameId, $Layer)
+    if ($Layout) { $a += @("--layout", $Layout) }
+    if ($Out) { $a += @("--out", $Out) }
+    Invoke-Ild @a | Out-Host
+}
+
+function Invoke-IldPreflight {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [double]$MinDpi = 150,
+        [switch]$RequireBleed,
+        [ValidateSet("rgb", "cmyk")][string]$ColorMode,
+        [string]$Out
+    )
+    $a = @("--json", "preflight", $Path, "--min-dpi", "$MinDpi")
+    if ($RequireBleed) { $a += "--require-bleed" }
+    if ($ColorMode) { $a += @("--color-mode", $ColorMode) }
+    if ($Out) { $a += @("--out", $Out) }
+    Invoke-Ild @a | Out-Host
+}
+
+function Export-IldPdfX {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)][string]$Out,
+        [ValidateSet("pdfx1a", "pdfx4", "print_ready")][string]$Profile = "pdfx4",
+        [double]$BleedMm = 3.0,
+        [switch]$NoBleed,
+        [string]$Title,
+        [switch]$Preflight
+    )
+    $a = @("--json", "export-pdfx", $Path, "--out", $Out, "--profile", $Profile)
+    if ($NoBleed) { $a += "--no-bleed" } else { $a += @("--bleed-mm", "$BleedMm") }
+    if ($Title) { $a += @("--title", $Title) }
+    if ($Preflight) { $a += "--preflight" }
     Invoke-Ild @a | Out-Host
 }
 

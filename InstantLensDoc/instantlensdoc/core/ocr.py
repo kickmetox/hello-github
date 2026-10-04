@@ -610,7 +610,7 @@ def ocr_image_layout(
     )
 
 
-# Handschrift-Hook: Tesseract-PSM-Presets (kein separates ML-Modell) — 2.6.17
+# Handschrift-Hook: Tesseract-PSM-Presets (kein separates ML-Modell) — 2.6.18
 HANDWRITING_PSM_PRESETS: Dict[str, int] = {
     "block": 6,  # Uniform block of text
     "line": 7,  # Single text line
@@ -644,7 +644,7 @@ def ocr_image_handwriting(
     psm: int | str = DEFAULT_HANDWRITING_PSM,
 ) -> str:
     """
-    Basis-Handschriftenerkennung über Tesseract-PSM — 2.6.17.
+    Basis-Handschriftenerkennung über Tesseract-PSM — 2.6.18.
 
     Kein separates Handschrift-ML-Modell; nutzt ``--psm`` für Zeilen/Blöcke.
     """
@@ -1005,7 +1005,7 @@ def run_ocr(
     handwriting: bool = False,
     handwriting_psm: int | str = DEFAULT_HANDWRITING_PSM,
 ) -> OcrResult:
-    """Einheitlicher OCR-Einstieg inkl. Layout-Erhalt / CSV / Handschrift — 1.9.2 / 2.6.3 / 2.6.17."""
+    """Einheitlicher OCR-Einstieg inkl. Layout-Erhalt / CSV / Handschrift — 1.9.2 / 2.6.3 / 2.6.18."""
     label = source_label or (
         str(source) if isinstance(source, (str, Path)) else "Bild"
     )

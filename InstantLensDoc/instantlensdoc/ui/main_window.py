@@ -205,7 +205,7 @@ class MainWindow(QMainWindow):
     def __init__(self, license_manager: LicenseManager):
         super().__init__()
         sync_from_settings()
-        apply_ui_language(self)  # Sprache + RTL aus Settings — 2.6.17
+        apply_ui_language(self)  # Sprache + RTL aus Settings — 2.6.18
         self.license_manager = license_manager
         self.doc: Document | None = None
         self.layout_doc = LayoutDocument()
@@ -1484,6 +1484,13 @@ class MainWindow(QMainWindow):
         )
         act_text_pdf.triggered.connect(self._export_text_to_pdf)
         m_export.addAction(act_text_pdf)
+        act_pdfx = QAction("Als PDF/X (druckreif)…", self)
+        act_pdfx.setObjectName("actExportPdfX")
+        act_pdfx.setToolTip(
+            "Druckreifes PDF/X bzw. Print-Ready mit Anschnitt — 2.6.18"
+        )
+        act_pdfx.triggered.connect(self._export_pdfx)
+        m_export.addAction(act_pdfx)
         m_export.addSeparator()
         act_exp_prof_save = QAction("Export-Profil speichern…", self)
         act_exp_prof_save.setToolTip(
@@ -2468,6 +2475,25 @@ class MainWindow(QMainWindow):
         )
         act_compress.triggered.connect(self._compress_pdf_images)
         m_pdf.addAction(act_compress)
+        act_preflight = QAction("Preflight (Druckprüfung)…", self)
+        act_preflight.setObjectName("actPreflight")
+        act_preflight.setToolTip(
+            "Fehlende Schriften, niedrige Bildauflösung, Bleed — 2.6.18"
+        )
+        act_preflight.triggered.connect(self._run_preflight)
+        m_pdf.addAction(act_preflight)
+        act_bleed = QAction("Anschnitt / Bleed setzen…", self)
+        act_bleed.setObjectName("actBleed")
+        act_bleed.setToolTip("BleedBox/TrimBox für Druck — 2.6.18")
+        act_bleed.triggered.connect(self._apply_bleed_dialog)
+        m_pdf.addAction(act_bleed)
+        act_layers = QAction("Dokument-Ebenen…", self)
+        act_layers.setObjectName("actDocLayers")
+        act_layers.setToolTip(
+            "Hintergrund / Bilder / Text — Rahmen-Ebenen — 2.6.18"
+        )
+        act_layers.triggered.connect(self._show_doc_layers)
+        m_pdf.addAction(act_layers)
         act_bake_links = QAction("Link-Annotationen in PDF backen…", self)
         act_bake_links.setToolTip(
             "Sidecar-URL-Links als native PDF Link-Annotationen speichern — 2.3.0"
@@ -2902,7 +2928,7 @@ class MainWindow(QMainWindow):
         a = QAction("Handschriftenerkennung…", self)
         a.setObjectName("actHandwritingOcr")
         a.setToolTip(
-            "Basis-Handschriftenerkennung (Tesseract PSM) — Bild/PDF-Seite → Text — 2.6.17"
+            "Basis-Handschriftenerkennung (Tesseract PSM) — Bild/PDF-Seite → Text — 2.6.18"
         )
         a.triggered.connect(self._run_ocr_handwriting)
         m_extra.addAction(a)
@@ -10709,6 +10735,10 @@ class MainWindow(QMainWindow):
             "import_table_data": self._import_table_data,
             "export_xlsx": lambda: self._export_editor("xlsx"),
             "export_rtf": lambda: self._export_editor("rtf"),
+            "export_pdfx": self._export_pdfx,
+            "preflight": self._run_preflight,
+            "apply_bleed": self._apply_bleed_dialog,
+            "doc_layers": self._show_doc_layers,
             "hyphenate_en": lambda: self._hyphenate_document("en"),
             "text_wrap": self._set_image_text_wrap,
             "ocr_page": self._run_ocr,
@@ -10794,7 +10824,7 @@ class MainWindow(QMainWindow):
     def _settings(self):
         if SettingsDialog(self).exec():
             sync_from_settings()
-            apply_ui_language(self)  # Persistierte Sprache + Retranslate/RTL — 2.6.17
+            apply_ui_language(self)  # Persistierte Sprache + Retranslate/RTL — 2.6.18
             self._sync_theme_menu()
             from instantlensdoc.core.app_settings import (
                 get_editor_current_line_highlight,
@@ -14278,7 +14308,7 @@ class MainWindow(QMainWindow):
         self._handoff_ocr_to_word_suite(path=path, auto_format=True)
 
     def _run_ocr_handwriting(self):
-        """Handschriftenerkennung: OCR-Dialog mit Handschrift-PSM vorausgewählt — 2.6.17."""
+        """Handschriftenerkennung: OCR-Dialog mit Handschrift-PSM vorausgewählt — 2.6.18."""
         from PySide6.QtWidgets import QDialog
 
         need_file = not (
@@ -14298,8 +14328,184 @@ class MainWindow(QMainWindow):
         # Reuse normal OCR path by temporarily storing dialog — call core directly
         self._run_ocr_with_dialog(dlg)
 
+    def _current_pdf_path(self) -> Path | None:
+        """Aktuelles PDF für Druck/Preflight — 2.6.18."""
+        if self.doc and self.doc.path and self.doc.kind == DocKind.PDF:
+            p = Path(self.doc.path)
+            if p.is_file():
+                return p
+        return None
+
+    def _run_preflight(self) -> None:
+        """Preflight-Druckprüfung — 2.6.18."""
+        from ild_pdf.print_prep import preflight_to_text, run_preflight
+
+        pdf = self._current_pdf_path()
+        if pdf is None:
+            QMessageBox.information(
+                self, "Preflight", "Bitte zuerst ein PDF öffnen."
+            )
+            return
+        report = run_preflight(pdf, require_bleed=False, color_mode="cmyk")
+        text = preflight_to_text(report)
+        box = QMessageBox(self)
+        box.setWindowTitle("Preflight (Druckprüfung)")
+        box.setObjectName("preflightResultDialog")
+        box.setText(
+            f"{'OK' if report.ok else 'Probleme gefunden'} — "
+            f"{report.summary.get('errors', 0)} Fehler, "
+            f"{report.summary.get('warnings', 0)} Warnungen"
+        )
+        box.setDetailedText(text)
+        box.setIcon(
+            QMessageBox.Information if report.ok else QMessageBox.Warning
+        )
+        box.exec()
+        self._set_status(
+            f"Preflight: {'OK' if report.ok else 'Fehler'} "
+            f"({report.summary.get('errors', 0)}/{report.summary.get('warnings', 0)})"
+        )
+
+    def _apply_bleed_dialog(self) -> None:
+        """Anschnitt/Bleed setzen — 2.6.18."""
+        from PySide6.QtWidgets import QInputDialog
+        from ild_pdf.print_prep import BleedSettings, apply_bleed_boxes
+
+        pdf = self._current_pdf_path()
+        if pdf is None:
+            QMessageBox.information(
+                self, "Anschnitt", "Bitte zuerst ein PDF öffnen."
+            )
+            return
+        mm, ok = QInputDialog.getDouble(
+            self,
+            "Anschnitt / Bleed",
+            "Anschnitt (mm, alle Seiten):",
+            3.0,
+            0.0,
+            20.0,
+            1,
+        )
+        if not ok:
+            return
+        start = dialog_start_dir(get_last_export_dir() or pdf.parent)
+        dest, _ = QFileDialog.getSaveFileName(
+            self,
+            "PDF mit Anschnitt speichern",
+            str(Path(start) / f"{pdf.stem}_bleed.pdf"),
+            "PDF (*.pdf)",
+        )
+        if not dest:
+            return
+        out = apply_bleed_boxes(pdf, BleedSettings.uniform(mm), out=dest)
+        set_last_export_dir(Path(out).parent)
+        self._set_status(f"Anschnitt {mm:g} mm → {out}")
+        QMessageBox.information(
+            self, "Anschnitt", f"Bleed gesetzt ({mm:g} mm):\n{out}"
+        )
+
+    def _show_doc_layers(self) -> None:
+        """Dokument-Ebenen anzeigen / Rahmen zuordnen — 2.6.18."""
+        from ild_pdf.print_prep import LAYER_LABELS, list_layers
+
+        layers = list_layers()
+        by = {}
+        if hasattr(self, "layout_doc") and self.layout_doc is not None:
+            by = self.layout_doc.frames_by_layer()
+        lines = ["Dokument-Ebenen (Hintergrund / Bilder / Text)", ""]
+        for layer in layers:
+            lid = layer["id"]
+            frames = by.get(lid) or []
+            lines.append(
+                f"• {LAYER_LABELS.get(lid, layer['name'])}: "
+                f"{len(frames)} Rahmen — sichtbar={layer.get('visible')}"
+            )
+            for fr in frames[:8]:
+                lines.append(
+                    f"    - {fr.get('kind', '?')} #{fr.get('id')} "
+                    f"p{int(fr.get('page', 0)) + 1}"
+                )
+            if len(frames) > 8:
+                lines.append(f"    … +{len(frames) - 8} weitere")
+        QMessageBox.information(self, "Dokument-Ebenen", "\n".join(lines))
+
+    def _export_pdfx(self) -> None:
+        """PDF/X bzw. print-ready Export — 2.6.18."""
+        from ild_pdf.print_prep import export_pdfx
+        from ild_pdf.text_pdf import text_to_pdf
+        from instantlensdoc.core.export import resolve_page_size
+
+        pdf = self._current_pdf_path()
+        temp_src: Path | None = None
+        if pdf is None:
+            # Texteditor → temp PDF → PDF/X
+            text = ""
+            title = "InstantLens Doc"
+            if self.stack.currentWidget() is self.editor_pane:
+                text = self.editor.toPlainText()
+                if self.doc:
+                    title = self.doc.title or self.doc.display_name
+            elif self.doc and self.doc.kind in (
+                DocKind.TEXT,
+                DocKind.MARKDOWN,
+                DocKind.HTML,
+                DocKind.DOCX,
+            ):
+                text = self.doc.text or self.editor.toPlainText()
+                title = self.doc.display_name
+            else:
+                QMessageBox.information(
+                    self,
+                    "PDF/X",
+                    "Bitte ein PDF oder einen Text-Tab öffnen.",
+                )
+                return
+            import tempfile
+
+            tmp = Path(tempfile.mkdtemp(prefix="ild-pdfx-")) / "source.pdf"
+            text_to_pdf(text, tmp, title=title, page_size=resolve_page_size(None))
+            pdf = tmp
+            temp_src = tmp
+        start = dialog_start_dir(get_last_export_dir() or pdf.parent)
+        dest, _ = QFileDialog.getSaveFileName(
+            self,
+            "Als PDF/X (druckreif) exportieren",
+            str(Path(start) / f"{pdf.stem}_pdfx.pdf"),
+            "PDF (*.pdf)",
+        )
+        if not dest:
+            return
+        try:
+            result = export_pdfx(
+                pdf,
+                dest,
+                profile="pdfx4",
+                bleed_mm=3.0,
+                title=None,
+                run_preflight_first=True,
+            )
+            set_last_export_dir(Path(dest).parent)
+            pf = result.get("preflight") or {}
+            self._set_status(f"PDF/X exportiert: {dest}")
+            QMessageBox.information(
+                self,
+                "PDF/X",
+                f"Druckreifes PDF gespeichert:\n{dest}\n\n"
+                f"Profil: {result.get('profile')} · Bleed: {result.get('bleed_mm')} mm\n"
+                f"Preflight: {'OK' if pf.get('ok', True) else 'Hinweise vorhanden'}",
+            )
+        except Exception as e:
+            QMessageBox.warning(self, "PDF/X", str(e))
+        finally:
+            if temp_src is not None:
+                try:
+                    temp_src.unlink(missing_ok=True)
+                    temp_src.parent.rmdir()
+                except Exception:
+                    pass
+
     def _run_ocr_with_dialog(self, dlg) -> None:
-        """OCR mit bereits akzeptiertem Dialog (Handschrift/Standard) — 2.6.17."""
+        """OCR mit bereits akzeptiertem Dialog (Handschrift/Standard) — 2.6.18."""
         from PySide6.QtWidgets import QApplication, QDialog, QProgressDialog
 
         ok, msg = ocr_mod.tesseract_available()

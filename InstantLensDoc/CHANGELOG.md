@@ -1,5 +1,23 @@
 # Changelog — InstantLens Doc
 
+## 2.6.18 — Farbmanagement, Bleed, Ebenen, Preflight, PDF/X
+
+Minor nach **2.6.17**: **Druck-/DTP-Ausgabe** — **RGB/CMYK-Farbmanagement** inkl. Custom-Paletten und Spot-Hinweisen, **Bleed/Anschnitt**-Einstellungen (TrimBox/BleedBox), **Dokument-Ebenen** (Hintergrund/Bilder/Text) für Rahmen-Organisation, **Preflight** (fehlende/nicht eingebettete Schriften, niedrige Bildauflösung, Bleed-Hinweise) und **PDF/X** bzw. print-ready Export neben dem bestehenden PDF-Export. Scripting: `ild.list_color_palettes` / `convert_color_api` / `apply_bleed` / `preflight` / `export_pdfx` / `layout_set_layer` · CLI `palettes` / `convert-color` / `apply-bleed` / `preflight` / `export-pdfx` / `layers` · PowerShell `Get-IldColorPalettes` / `Invoke-IldBleed` / `Invoke-IldPreflight` / `Export-IldPdfX`. UI: Datei→Export PDF/X; PDF→Preflight/Bleed/Ebenen; Command-Palette. i18n-Keys für Preflight/Bleed/Ebenen/PDF/X. Freier KI-Chat-Stub unverändert. Kein volles PDF-Compare, kein Ribbon-Overhaul. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie unverändert.
+
+### Neu
+- `ild_pdf.print_prep` — RGB↔CMYK, Paletten, BleedSettings, Ebenen, Preflight, `export_pdfx` / print-ready
+- Layout: Rahmen-Feld `layer` + `set_frame_layer` / `frames_by_layer`
+- UI: Export PDF/X · Preflight · Anschnitt · Dokument-Ebenen; Palette-Commands
+- ild-API/CLI/PowerShell: `palettes` / `convert-color` / `apply-bleed` / `preflight` / `export-pdfx` / `layers`
+
+### Geändert
+- Docs/Version **2.6.18**; FEATURES/INFO/README; i18n-Katalog-Keys
+
+### Tests / Qualität
+- Version **2.6.18** (App / `ild_pdf` / ISS / Smoke / Docs); Serie **2.6**; `docs/VERSION` + `VERSION.txt`
+- Smoke: 2.6.18 CLI+Qt (color/bleed/layers/preflight/pdfx)
+- Stubs: KI/Cloud/Stylus/3D/Hooks/Outline/Telemetrie unverändert markiert
+
 ## 2.6.17 — Volles InstantLens Doc i18n (+ Handschrift-Hook)
 
 Minor nach **2.6.16**: **Gesamtes InstantLens Doc** umschaltbar in den Einstellungen: **Deutsch, English, Français, Русский, Español, 中文, Português, العربية, Italiano**. Betrifft Module/UI (Viewer, OCR, Scan, Annotationen, Formulare, Export, Assistenten, Einstellungen) inkl. **Hilfe** und **Info**. Phrase-Retranslate + Katalog (`locales/catalog.json`); **Arabisch RTL** wo praktikabel; Sprache **persistiert**. Externe Hilfe/Info/Feature-Docs unter Project-Store `docs/i18n/{lang}/`. **Basis-Handschriftenerkennung** (Tesseract-PSM-Hook) in OCR-Dialog/Menü/ild. Freier KI-Chat-Stub unverändert. Kein CMYK/Bleed/Preflight/PDF/X, kein PDF-Compare. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie unverändert.

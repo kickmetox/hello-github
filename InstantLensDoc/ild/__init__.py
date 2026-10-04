@@ -1,5 +1,5 @@
 """
-Stabiles Scripting-API für InstantLens Doc (2.6.17).
+Stabiles Scripting-API für InstantLens Doc (2.6.18).
 
 Headless, ohne GUI. Nutzt ``ild_pdf`` + Lizenz/OCR der App.
 
@@ -101,6 +101,16 @@ from ild.api import (
     set_ui_lang,
     tr,
     ocr_handwriting,
+    list_color_palettes,
+    convert_color_api,
+    list_bleed_presets,
+    apply_bleed,
+    get_bleed,
+    list_doc_layers,
+    layout_set_layer,
+    layout_layers,
+    preflight,
+    export_pdfx,
     open_info,
     outline_summary,
     page_count,
@@ -137,6 +147,16 @@ __all__ = [
     "set_ui_lang",
     "tr",
     "ocr_handwriting",
+    "list_color_palettes",
+    "convert_color_api",
+    "list_bleed_presets",
+    "apply_bleed",
+    "get_bleed",
+    "list_doc_layers",
+    "layout_set_layer",
+    "layout_layers",
+    "preflight",
+    "export_pdfx",
     "add_redaction",
     "apply_redactions",
     "add_shape",

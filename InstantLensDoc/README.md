@@ -2,7 +2,7 @@
 
 Moderne Textverarbeitung mit PDF-Annotator, OCR-Bridge und Formulargenerator.
 
-**Version:** 2.6.17  
+**Version:** 2.6.18  
 **Hersteller:** Andreas Meyer · ame@sellerbach.de
 
 ## Quickstart (Windows)
@@ -37,9 +37,13 @@ Keygen: `run-keygen.bat` · `python -m keygen kunde@example.com` · siehe `keyge
 
 Nightly-Smoke: `python scripts\smoke_ild.py` · optional `--qt` · `--json` (Summary: `ok`, `checks[]`, `duration_ms`, `version`; Fail: `checks[].error` max 200…, Exit=ok). Siehe **CONTRIBUTING.md**; Workflow-Stub `.github/workflows/smoke-ild.yml` (manual only).
 
+## Neu in 2.6.18
+
+Minor nach **2.6.17**: **Druck/DTP** — RGB/CMYK-Farbmanagement + Paletten, Bleed/Anschnitt, Dokument-Ebenen (Hintergrund/Bilder/Text), Preflight (Schriften/Auflösung), PDF/X bzw. print-ready Export. Scripting `palettes`/`apply-bleed`/`preflight`/`export-pdfx`/`layers`. Kein volles PDF-Compare, kein Ribbon-Overhaul. Stubs unverändert.
+
 ## Neu in 2.6.17
 
-Minor nach **2.6.16**: **Volles InstantLens Doc i18n** — Einstellungen: DE/EN/FR/RU/ES/ZH/PT/AR/IT für gesamte UI (Viewer, OCR, Scan, Annotationen, Formulare, Export, Assistenten, Hilfe, Info); Persistenz; Arabisch RTL wo praktikabel; Locale-Katalog + Hilfe-HTML; externe Docs `docs/i18n/`. **Handschriftenerkennung** Basis-Hook (Tesseract PSM). Scripting `ui-langs`/`set-ui-lang`/`ocr-handwriting`. Freier KI-Chat-Stub unverändert. Kein CMYK/Bleed/Preflight/PDF/X, kein PDF-Compare.
+Minor nach **2.6.16**: **Volles InstantLens Doc i18n** — Einstellungen: DE/EN/FR/RU/ES/ZH/PT/AR/IT für gesamte UI (Viewer, OCR, Scan, Annotationen, Formulare, Export, Assistenten, Hilfe, Info); Persistenz; Arabisch RTL wo praktikabel; Locale-Katalog + Hilfe-HTML; externe Docs `docs/i18n/`. **Handschriftenerkennung** Basis-Hook (Tesseract PSM). Scripting `ui-langs`/`set-ui-lang`/`ocr-handwriting`. Freier KI-Chat-Stub unverändert. Kein CMYK/Bleed/Preflight/PDF/X damals, kein PDF-Compare.
 
 ## Neu in 2.6.16
 

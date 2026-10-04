@@ -246,6 +246,30 @@ def default_palette_commands() -> list[PaletteCommand]:
             "export rtf rich text",
             "Datei",
         ),
+        PaletteCommand(
+            "export_pdfx",
+            "Als PDF/X (druckreif)…",
+            "export pdfx print ready druckreif anschnitt bleed cmyk",
+            "Datei",
+        ),
+        PaletteCommand(
+            "preflight",
+            "Preflight (Druckprüfung)…",
+            "preflight druck prüfung schriften auflösung dpi bleed fehlend",
+            "PDF",
+        ),
+        PaletteCommand(
+            "apply_bleed",
+            "Anschnitt / Bleed setzen…",
+            "bleed anschnitt trimbox bleedbox druck",
+            "PDF",
+        ),
+        PaletteCommand(
+            "doc_layers",
+            "Dokument-Ebenen…",
+            "ebenen layers hintergrund bilder text rahmen",
+            "PDF",
+        ),
         PaletteCommand("ocr_page", "OCR aktuelle Seite…", "ocr tesseract seite", "OCR"),
         PaletteCommand("ocr_pdf", "OCR gesamtes PDF…", "ocr batch pdf", "OCR"),
         PaletteCommand(

@@ -249,9 +249,9 @@ HELP_HTML = f"""
     (Stub „KI-Assistent“ bleibt getrennt) — <b>2.6.16</b></li>
 <li><b>UI-Sprache / i18n</b>: Extras → Einstellungen → <b>Oberflächensprache</b>
     (DE/EN/FR/RU/ES/ZH/PT/AR/IT) — gesamte UI inkl. Hilfe/Info; Persistenz;
-    Arabisch RTL wo praktikabel — <b>2.6.17</b></li>
+    Arabisch RTL wo praktikabel — <b>2.6.18</b></li>
 <li><b>Handschriftenerkennung</b>: Extras → <b>Handschriftenerkennung…</b> bzw.
-    OCR-Dialog → Handschrift-Modus (Tesseract PSM) — Basis-Hook — <b>2.6.17</b></li>
+    OCR-Dialog → Handschrift-Modus (Tesseract PSM) — Basis-Hook — <b>2.6.18</b></li>
 <li><b>OCR</b>: Extras → OCR (Seite/Bild) oder <b>OCR gesamtes PDF</b> (Batch mit
     <b>Sprach-Preset</b>-Combobox, Fortschritt/Abbrechen;
     Ergebnis als <b>neue Textdatei-Tab</b> <code>*-ocr.txt</code>) —
@@ -299,7 +299,7 @@ HELP_HTML = f"""
 <h3>PDF-Modul</h3>
 <p>Das Paket <code>ild_pdf</code> kann von anderen Programmen genutzt werden (pypdfium2, kein Poppler).
 Beispiel: <code>examples/ild_pdf_demo.py</code>. API: <code>ild_pdf/README.md</code>.</p>
-<p><b>Scripting 2.6.17:</b> i18n (<code>ui-langs</code>/<code>set-ui-lang</code>/<code>tr</code>)
+<p><b>Scripting 2.6.18:</b> i18n (<code>ui-langs</code>/<code>set-ui-lang</code>/<code>tr</code>)
 + Handschrift (<code>ocr-handwriting</code>)
 + KI-Wizards (<code>generate_ki_document</code>/<code>list_ki_wizards</code>/<code>run_ki_wizard</code>)
 + OCR→Word-Suite (<code>ocr_to_word_suite</code>/<code>import_ildocr</code>)
@@ -605,7 +605,7 @@ class HelpDialog(QDialog):
         layout = QVBoxLayout(self)
         tabs = QTabWidget()
         browser = QTextBrowser()
-        # Lokalisierte Hilfe; Fallback auf Legacy-HELP_HTML — 2.6.17
+        # Lokalisierte Hilfe; Fallback auf Legacy-HELP_HTML — 2.6.18
         html = help_html()
         if not html or len(html) < 40:
             html = HELP_HTML

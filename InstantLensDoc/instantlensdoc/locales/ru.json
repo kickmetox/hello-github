@@ -126,7 +126,15 @@
     "info_vendor": "Производитель",
     "info_contact": "Контакт",
     "info_privacy": "Конфиденциальность: локально, без телеметрии",
-    "features_missing": "FEATURES.md не найден."
+    "features_missing": "FEATURES.md не найден.",
+    "preflight": "Предпечатная проверка",
+    "bleed": "Вылеты",
+    "doc_layers": "Слои документа",
+    "export_pdfx": "Экспорт PDF/X (готово к печати)…",
+    "color_management": "Управление цветом",
+    "layer_background": "Фон",
+    "layer_images": "Изображения",
+    "layer_text": "Текст"
   },
   "phrases": {
     "&Datei": "&Файл",

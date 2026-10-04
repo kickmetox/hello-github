@@ -1,4 +1,4 @@
-"""UI-Mehrsprachigkeit InstantLens Doc — DE/EN/FR/RU/ES/ZH/PT/AR/IT — 2.6.17."""
+"""UI-Mehrsprachigkeit InstantLens Doc — DE/EN/FR/RU/ES/ZH/PT/AR/IT — 2.6.18."""
 
 from __future__ import annotations
 
@@ -214,7 +214,7 @@ def help_html(*, lang: UiLang | None = None) -> str:
 
 
 def apply_layout_direction(widget, *, lang: UiLang | None = None) -> None:
-    """Setzt Qt LayoutDirection LTR/RTL (Arabisch) — 2.6.17."""
+    """Setzt Qt LayoutDirection LTR/RTL (Arabisch) — 2.6.18."""
     if widget is None:
         return
     try:
@@ -299,7 +299,7 @@ def retranslate_tree(root, *, lang: UiLang | None = None) -> int:
     Übersetzt bekannte deutsche UI-Phrasen im Widget-Baum.
 
     Speichert Originaltext in Property ``ild_i18n_src`` (einmalig),
-    damit Sprachwechsel hin und zurück funktioniert — 2.6.17.
+    damit Sprachwechsel hin und zurück funktioniert — 2.6.18.
     """
     _ensure_loaded()
     use = normalize_lang(lang or _current)
@@ -387,7 +387,7 @@ def apply_ui_language(
     persist: bool = False,
 ) -> UiLang:
     """
-    Sprache setzen, optional persistieren, RTL anwenden, UI retranslates — 2.6.17.
+    Sprache setzen, optional persistieren, RTL anwenden, UI retranslates — 2.6.18.
     """
     use = set_lang(lang) if lang is not None else sync_from_settings()
     if persist:

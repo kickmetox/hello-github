@@ -1,4 +1,4 @@
-"""Headless InstantLens-Doc-Operationen für Python- und PowerShell-Scripting — 2.6.17."""
+"""Headless InstantLens-Doc-Operationen für Python- und PowerShell-Scripting — 2.6.18."""
 
 from __future__ import annotations
 
@@ -1466,7 +1466,7 @@ def run_ki_wizard(
 
 
 def list_ui_langs() -> list[dict[str, Any]]:
-    """Unterstützte UI-Sprachen (DE/EN/FR/RU/ES/ZH/PT/AR/IT) — 2.6.17."""
+    """Unterstützte UI-Sprachen (DE/EN/FR/RU/ES/ZH/PT/AR/IT) — 2.6.18."""
     from instantlensdoc.core.i18n import (
         SUPPORTED_LANGS,
         is_rtl,
@@ -1486,14 +1486,14 @@ def list_ui_langs() -> list[dict[str, Any]]:
 
 
 def get_ui_lang() -> str:
-    """Aktuelle UI-Sprache (Settings) — 2.6.17."""
+    """Aktuelle UI-Sprache (Settings) — 2.6.18."""
     from instantlensdoc.core.app_settings import get_ui_lang as _get
 
     return str(_get())
 
 
 def set_ui_lang(lang: str) -> str:
-    """UI-Sprache setzen und persistieren — 2.6.17."""
+    """UI-Sprache setzen und persistieren — 2.6.18."""
     from instantlensdoc.core.app_settings import set_ui_lang as _set
     from instantlensdoc.core.i18n import normalize_lang, set_lang
 
@@ -1504,7 +1504,7 @@ def set_ui_lang(lang: str) -> str:
 
 
 def tr(key: str, *, lang: str | None = None) -> str:
-    """UI-String übersetzen — 2.6.17."""
+    """UI-String übersetzen — 2.6.18."""
     from instantlensdoc.core.i18n import tr as _tr
 
     return _tr(key, lang=lang)  # type: ignore[arg-type]
@@ -1517,7 +1517,7 @@ def ocr_handwriting(
     psm: int | str = 6,
     out: PathLike | None = None,
 ) -> dict[str, Any]:
-    """Basis-Handschriftenerkennung (Tesseract PSM) — 2.6.17."""
+    """Basis-Handschriftenerkennung (Tesseract PSM) — 2.6.18."""
     from instantlensdoc.core.ocr import ocr_image_handwriting, normalize_handwriting_psm
 
     src = _require_file(path)
@@ -1536,6 +1536,180 @@ def ocr_handwriting(
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_text(text or "", encoding="utf-8")
         result["out"] = str(dest.resolve())
+    return result
+
+
+def list_color_palettes() -> list[dict[str, Any]]:
+    """Eingebaute RGB/CMYK/Spot-Paletten — 2.6.18."""
+    from ild_pdf.print_prep import list_palettes
+
+    return list_palettes()
+
+
+def convert_color_api(
+    *,
+    rgb: Sequence[float] | None = None,
+    cmyk: Sequence[float] | None = None,
+    hex_color: str | None = None,
+    to: str = "cmyk",
+) -> dict[str, Any]:
+    """RGB↔CMYK-Konvertierung — 2.6.18."""
+    from ild_pdf.print_prep import convert_color
+
+    mode = (to or "cmyk").strip().lower()
+    if mode not in ("rgb", "cmyk"):
+        mode = "cmyk"
+    return convert_color(rgb=rgb, cmyk=cmyk, hex_color=hex_color, to=mode)  # type: ignore[arg-type]
+
+
+def list_bleed_presets() -> list[dict[str, Any]]:
+    """Anschnitt-Presets (mm) — 2.6.18."""
+    from ild_pdf.print_prep import list_bleed_presets as _list
+
+    return _list()
+
+
+def apply_bleed(
+    path: PathLike,
+    *,
+    bleed_mm: float | None = None,
+    preset: str | None = None,
+    out: PathLike | None = None,
+    all_pages: bool = True,
+) -> dict[str, Any]:
+    """Bleed/Anschnitt auf PDF anwenden — 2.6.18."""
+    from ild_pdf.print_prep import BleedSettings, apply_bleed_boxes, get_bleed_info
+
+    src = _require_file(path)
+    if preset:
+        settings = BleedSettings.from_preset(preset)
+    elif bleed_mm is not None:
+        settings = BleedSettings.uniform(float(bleed_mm))
+    else:
+        settings = BleedSettings.from_preset("standard")
+    dest = apply_bleed_boxes(src, settings, out=out, all_pages=all_pages)
+    info = get_bleed_info(dest, 0)
+    return {
+        "out": str(Path(dest).resolve()),
+        "bleed": settings.to_dict(),
+        "page1": info,
+        "version": __version__,
+    }
+
+
+def get_bleed(path: PathLike, page: int = 1) -> dict[str, Any]:
+    """Bleed/Trim-Info einer Seite — 2.6.18."""
+    from ild_pdf.print_prep import get_bleed_info
+
+    src = _require_file(path)
+    return get_bleed_info(src, max(0, int(page) - 1))
+
+
+def list_doc_layers() -> list[dict[str, Any]]:
+    """Dokument-Ebenen Hintergrund/Bilder/Text — 2.6.18."""
+    from ild_pdf.print_prep import list_layers
+
+    return list_layers()
+
+
+def layout_set_layer(
+    frame_id: str,
+    layer: str,
+    *,
+    layout: dict[str, Any] | None = None,
+    path: PathLike | None = None,
+    out: PathLike | None = None,
+) -> dict[str, Any]:
+    """Rahmen einer Ebene zuordnen — 2.6.18."""
+    doc = _load_layout(layout, path)
+    frame = doc.set_frame_layer(frame_id, layer)
+    result: dict[str, Any] = {
+        "frame": frame.to_dict(),
+        "layers": doc.frames_by_layer(),
+        "version": __version__,
+    }
+    if out is not None:
+        dest = doc.save(_p(out))
+        result["out"] = str(Path(dest).resolve())
+    elif path is not None:
+        dest = doc.save(_p(path))
+        result["out"] = str(Path(dest).resolve())
+    else:
+        result["layout"] = doc.to_dict()
+    return result
+
+
+def layout_layers(
+    *,
+    layout: dict[str, Any] | None = None,
+    path: PathLike | None = None,
+) -> dict[str, Any]:
+    """Rahmen nach Ebenen auflisten — 2.6.18."""
+    doc = _load_layout(layout, path)
+    return {
+        "layers": doc.frames_by_layer(),
+        "defs": list_doc_layers(),
+        "version": __version__,
+    }
+
+
+def preflight(
+    path: PathLike,
+    *,
+    min_dpi: float = 150.0,
+    require_bleed: bool = False,
+    color_mode: str | None = None,
+    out: PathLike | None = None,
+) -> dict[str, Any]:
+    """Preflight: Schriften, Bildauflösung, Bleed — 2.6.18."""
+    from ild_pdf.print_prep import preflight_to_text, run_preflight
+
+    src = _require_file(path)
+    mode = (color_mode or "").strip().lower() or None
+    if mode not in (None, "rgb", "cmyk"):
+        mode = None
+    report = run_preflight(
+        src,
+        min_image_dpi=float(min_dpi),
+        require_bleed=bool(require_bleed),
+        color_mode=mode,  # type: ignore[arg-type]
+    )
+    data = report.to_dict()
+    data["version"] = __version__
+    data["text"] = preflight_to_text(report)
+    if out is not None:
+        dest = _p(out)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_text(data["text"], encoding="utf-8")
+        data["out"] = str(dest.resolve())
+    return data
+
+
+def export_pdfx(
+    path: PathLike,
+    out: PathLike,
+    *,
+    profile: str = "pdfx4",
+    bleed_mm: float | None = 3.0,
+    title: str | None = None,
+    preflight_first: bool = False,
+) -> dict[str, Any]:
+    """PDF/X bzw. print-ready Export — 2.6.18."""
+    from ild_pdf.print_prep import export_pdfx as _export
+
+    src = _require_file(path)
+    prof = (profile or "pdfx4").strip().lower()
+    if prof not in ("pdfx1a", "pdfx4", "print_ready"):
+        prof = "pdfx4"
+    result = _export(
+        src,
+        _p(out),
+        profile=prof,  # type: ignore[arg-type]
+        bleed_mm=bleed_mm,
+        title=title,
+        run_preflight_first=bool(preflight_first),
+    )
+    result["version"] = __version__
     return result
 
 

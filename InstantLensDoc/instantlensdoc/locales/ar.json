@@ -126,7 +126,15 @@
     "info_vendor": "الشركة المصنعة",
     "info_contact": "التواصل",
     "info_privacy": "الخصوصية: محلي، بلا قياس عن بُعد",
-    "features_missing": "FEATURES.md غير موجود."
+    "features_missing": "FEATURES.md غير موجود.",
+    "preflight": "فحص ما قبل الطباعة",
+    "bleed": "هوامش القص",
+    "doc_layers": "طبقات المستند",
+    "export_pdfx": "تصدير PDF/X (جاهز للطباعة)…",
+    "color_management": "إدارة الألوان",
+    "layer_background": "خلفية",
+    "layer_images": "صور",
+    "layer_text": "نص"
   },
   "phrases": {
     "&Datei": "&ملف",

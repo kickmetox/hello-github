@@ -563,7 +563,7 @@ def set_default_open_dir(path: str | Path) -> None:
 
 
 def get_ui_lang() -> UiLang:
-    """UI-Sprache DE/EN/FR/RU/ES/ZH/PT/AR/IT — persistiert — 2.6.17."""
+    """UI-Sprache DE/EN/FR/RU/ES/ZH/PT/AR/IT — persistiert — 2.6.18."""
     from instantlensdoc.core.i18n import normalize_lang
 
     lang = str(load_settings().get("ui_lang", "de") or "de")
@@ -571,7 +571,7 @@ def get_ui_lang() -> UiLang:
 
 
 def set_ui_lang(lang: str) -> None:
-    """UI-Sprache speichern (9 Sprachen) — 2.6.17."""
+    """UI-Sprache speichern (9 Sprachen) — 2.6.18."""
     from instantlensdoc.core.i18n import normalize_lang
 
     save_settings({"ui_lang": normalize_lang(lang)})

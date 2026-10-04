@@ -467,31 +467,109 @@ def build_parser() -> argparse.ArgumentParser:
 
     s = sub.add_parser(
         "ui-langs",
-        help="UI-Sprachen auflisten (DE/EN/FR/RU/ES/ZH/PT/AR/IT) — 2.6.17",
+        help="UI-Sprachen auflisten (DE/EN/FR/RU/ES/ZH/PT/AR/IT) — 2.6.18",
     )
     s = sub.add_parser(
         "get-ui-lang",
-        help="Aktuelle UI-Sprache (Settings) — 2.6.17",
+        help="Aktuelle UI-Sprache (Settings) — 2.6.18",
     )
     s = sub.add_parser(
         "set-ui-lang",
-        help="UI-Sprache setzen/persistieren — 2.6.17",
+        help="UI-Sprache setzen/persistieren — 2.6.18",
     )
     s.add_argument("lang", help="de|en|fr|ru|es|zh|pt|ar|it")
     s = sub.add_parser(
         "tr",
-        help="UI-String übersetzen — 2.6.17",
+        help="UI-String übersetzen — 2.6.18",
     )
     s.add_argument("key", help="i18n-Schlüssel")
     s.add_argument("--lang", default=None, help="Zielsprache")
     s = sub.add_parser(
         "ocr-handwriting",
-        help="Handschriftenerkennung (Tesseract PSM) — 2.6.17",
+        help="Handschriftenerkennung (Tesseract PSM) — 2.6.18",
     )
     s.add_argument("path", help="Bilddatei")
     s.add_argument("--lang", default="deu+eng")
     s.add_argument("--psm", default="6", help="PSM 0–13 oder block|line|word|sparse")
     s.add_argument("--out", default=None, help="Optional: Text speichern")
+
+    s = sub.add_parser(
+        "palettes",
+        help="Farbpaletten (RGB/CMYK/Spot) — 2.6.18",
+    )
+    s = sub.add_parser(
+        "convert-color",
+        help="RGB↔CMYK konvertieren — 2.6.18",
+    )
+    s.add_argument("--hex", default=None, dest="hex_color", help="#RRGGBB")
+    s.add_argument("--rgb", default=None, help="r,g,b (0–1 oder 0–255)")
+    s.add_argument("--cmyk", default=None, help="c,m,y,k (0–1)")
+    s.add_argument("--to", default="cmyk", choices=["rgb", "cmyk"])
+
+    s = sub.add_parser(
+        "bleed-presets",
+        help="Anschnitt-Presets — 2.6.18",
+    )
+    s = sub.add_parser(
+        "apply-bleed",
+        help="Bleed/Anschnitt auf PDF anwenden — 2.6.18",
+    )
+    s.add_argument("pdf", help="PDF-Datei")
+    s.add_argument("--mm", type=float, default=None, help="Anschnitt mm (alle Seiten)")
+    s.add_argument("--preset", default=None, help="none|minimal|standard|extra")
+    s.add_argument("--out", default=None)
+    s.add_argument("--page-only", action="store_true", help="Nur Seite 1")
+
+    s = sub.add_parser(
+        "bleed-info",
+        help="Bleed/Trim-Boxen lesen — 2.6.18",
+    )
+    s.add_argument("pdf", help="PDF-Datei")
+    s.add_argument("--page", type=int, default=1)
+
+    s = sub.add_parser(
+        "layers",
+        help="Dokument-Ebenen (Hintergrund/Bilder/Text) — 2.6.18",
+    )
+    s = sub.add_parser(
+        "layout-layers",
+        help="Rahmen nach Ebenen auflisten — 2.6.18",
+    )
+    s.add_argument("--layout", default=None, help="Layout-JSON-Pfad")
+    s = sub.add_parser(
+        "layout-set-layer",
+        help="Rahmen-Ebene setzen — 2.6.18",
+    )
+    s.add_argument("frame_id")
+    s.add_argument("layer", help="background|images|text")
+    s.add_argument("--layout", default=None)
+    s.add_argument("--out", default=None)
+
+    s = sub.add_parser(
+        "preflight",
+        help="Preflight (Schriften/Auflösung/Bleed) — 2.6.18",
+    )
+    s.add_argument("pdf", help="PDF-Datei")
+    s.add_argument("--min-dpi", type=float, default=150.0)
+    s.add_argument("--require-bleed", action="store_true")
+    s.add_argument("--color-mode", default=None, choices=["rgb", "cmyk"])
+    s.add_argument("--out", default=None, help="Bericht als TXT")
+
+    s = sub.add_parser(
+        "export-pdfx",
+        help="PDF/X bzw. print-ready Export — 2.6.18",
+    )
+    s.add_argument("pdf", help="Quell-PDF")
+    s.add_argument("--out", required=True, help="Ziel-PDF")
+    s.add_argument(
+        "--profile",
+        default="pdfx4",
+        choices=["pdfx1a", "pdfx4", "print_ready"],
+    )
+    s.add_argument("--bleed-mm", type=float, default=3.0)
+    s.add_argument("--no-bleed", action="store_true")
+    s.add_argument("--title", default=None)
+    s.add_argument("--preflight", action="store_true")
 
     return p
 
@@ -1000,6 +1078,82 @@ def run(argv: list[str] | None = None) -> int:
         if args.cmd == "ocr-handwriting":
             data = api.ocr_handwriting(
                 args.path, lang=args.lang, psm=args.psm, out=args.out
+            )
+            _print(data, as_json=js or True)
+            return 0
+        if args.cmd == "palettes":
+            data = api.list_color_palettes()
+            _print(data, as_json=js or True)
+            return 0
+        if args.cmd == "convert-color":
+
+            def _fseq(s: str | None):
+                if not s:
+                    return None
+                return [float(x.strip()) for x in s.split(",")]
+
+            data = api.convert_color_api(
+                rgb=_fseq(args.rgb),
+                cmyk=_fseq(args.cmyk),
+                hex_color=args.hex_color,
+                to=args.to,
+            )
+            _print(data, as_json=js or True)
+            return 0
+        if args.cmd == "bleed-presets":
+            data = api.list_bleed_presets()
+            _print(data, as_json=js or True)
+            return 0
+        if args.cmd == "apply-bleed":
+            data = api.apply_bleed(
+                args.pdf,
+                bleed_mm=args.mm,
+                preset=args.preset,
+                out=args.out,
+                all_pages=not args.page_only,
+            )
+            _print(data, as_json=js or True)
+            return 0
+        if args.cmd == "bleed-info":
+            data = api.get_bleed(args.pdf, page=args.page)
+            _print(data, as_json=js or True)
+            return 0
+        if args.cmd == "layers":
+            data = api.list_doc_layers()
+            _print(data, as_json=js or True)
+            return 0
+        if args.cmd == "layout-layers":
+            data = api.layout_layers(path=args.layout)
+            _print(data, as_json=js or True)
+            return 0
+        if args.cmd == "layout-set-layer":
+            data = api.layout_set_layer(
+                args.frame_id,
+                args.layer,
+                path=args.layout,
+                out=args.out or args.layout,
+            )
+            _print(data, as_json=js or True)
+            return 0
+        if args.cmd == "preflight":
+            data = api.preflight(
+                args.pdf,
+                min_dpi=args.min_dpi,
+                require_bleed=bool(args.require_bleed),
+                color_mode=args.color_mode,
+                out=args.out,
+            )
+            _print(data, as_json=js or True)
+            return 0
+        if args.cmd == "export-pdfx":
+            bleed = None if args.no_bleed else args.bleed_mm
+            data = api.export_pdfx(
+                args.pdf,
+                args.out,
+                profile=args.profile,
+                bleed_mm=bleed,
+                title=args.title,
+                preflight_first=bool(args.preflight),
             )
             _print(data, as_json=js or True)
             return 0

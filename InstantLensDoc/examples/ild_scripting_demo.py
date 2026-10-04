@@ -1,4 +1,4 @@
-"""Beispiel: InstantLens Doc Scripting (Python) — 2.6.17.
+"""Beispiel: InstantLens Doc Scripting (Python) — 2.6.18.
 
 Aufruf aus dem App-Root:
   python examples/ild_scripting_demo.py [pdf]
@@ -82,7 +82,7 @@ def main() -> int:
         print("csv import cols:", imp.get("cols"))
         out_docx = td_p / "demo.docx"
         try:
-            saved = ild.save_document("Hallo 2.6.17", out_docx)
+            saved = ild.save_document("Hallo 2.6.18", out_docx)
             print("save_document:", Path(saved["path"]).exists())
         except Exception as e:
             print("save_document skip:", e)

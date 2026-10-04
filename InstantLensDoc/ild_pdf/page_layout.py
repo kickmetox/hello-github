@@ -2,7 +2,7 @@
 
 Frames/Boxen + Textrahmen-Verkettung + Textumfluss liegen in ``instantlensdoc.core.layout``.
 Typografie (Tracking/Kerning/Leading/Silbentrennung/Drop Caps): ``ild_pdf.typography``.
-Kein CMYK/Bleed/Preflight/PDF/X, kein volles i18n, keine KI-Wizards, kein PDF-Compare.
+Farbmanagement/Bleed/Preflight/PDF/X: ``ild_pdf.print_prep`` (2.6.18).
 """
 
 from __future__ import annotations

@@ -1,4 +1,4 @@
-"""Layout: Textrahmen, verkettete Rahmen, Bildrahmen, Move/Resize, Textumfluss — 2.6.13."""
+"""Layout: Textrahmen, verkettete Rahmen, Bildrahmen, Move/Resize, Textumfluss, Ebenen — 2.6.18."""
 
 from __future__ import annotations
 
@@ -13,6 +13,27 @@ FrameKind = Union["TextFrame", "ImageFrame"]
 
 # Textumfluss um Bild-/Formrahmen
 TEXT_WRAP_MODES: tuple[str, ...] = ("none", "bounding_box", "jump_object", "contour")
+
+# Dokument-Ebenen 2.6.18
+LAYER_NAMES: tuple[str, ...] = ("background", "images", "text")
+
+
+def normalize_frame_layer(name: str | None, *, kind: str = "text") -> str:
+    """Ebenenname normalisieren; Default text bzw. images für Bildrahmen."""
+    key = (name or "").strip().lower()
+    aliases = {
+        "bg": "background",
+        "hintergrund": "background",
+        "image": "images",
+        "bilder": "images",
+        "img": "images",
+        "txt": "text",
+        "texte": "text",
+    }
+    key = aliases.get(key, key)
+    if key in LAYER_NAMES:
+        return key
+    return "images" if kind == "image" else "text"
 
 
 @dataclass
@@ -33,6 +54,8 @@ class TextFrame:
     tracking: float = 0.0
     leading: float = 1.15
     hyphenate_lang: str = ""
+    # Ebenen 2.6.18
+    layer: str = "text"
 
     @property
     def capacity_chars(self) -> int:
@@ -81,6 +104,8 @@ class ImageFrame:
     wrap_padding: float = 8.0
     # Form-Hinweis für contour (rechteckig / ellipse)
     shape: str = "rectangle"  # rectangle | ellipse
+    # Ebenen 2.6.18
+    layer: str = "images"
 
     def move(self, x: float, y: float) -> None:
         if self.locked:
@@ -148,6 +173,26 @@ class LayoutDocument:
         rows = [f.to_dict() for f in self.text_frames]
         rows.extend(f.to_dict() for f in self.image_frames)
         return rows
+
+    def set_frame_layer(self, frame_id: str, layer: str) -> FrameKind:
+        """Rahmen einer Dokument-Ebene zuordnen — 2.6.18."""
+        frame = self.any_frame_by_id(frame_id)
+        if frame is None:
+            raise KeyError(f"Rahmen nicht gefunden: {frame_id}")
+        kind = "image" if isinstance(frame, ImageFrame) else "text"
+        frame.layer = normalize_frame_layer(layer, kind=kind)
+        return frame
+
+    def frames_by_layer(self) -> dict[str, list[dict[str, Any]]]:
+        """Rahmen nach Hintergrund/Bilder/Text gruppieren — 2.6.18."""
+        out: dict[str, list[dict[str, Any]]] = {k: [] for k in LAYER_NAMES}
+        for fr in self.list_frames():
+            kind = str(fr.get("kind") or "text")
+            lid = normalize_frame_layer(fr.get("layer"), kind=kind)
+            row = dict(fr)
+            row["layer"] = lid
+            out[lid].append(row)
+        return out
 
     def add_text_frame(
         self,
@@ -547,9 +592,12 @@ class LayoutDocument:
                     "tracking",
                     "leading",
                     "hyphenate_lang",
+                    "layer",
                 )
                 if k in tf
             }
+            if "layer" in known:
+                known["layer"] = normalize_frame_layer(known["layer"], kind="text")
             doc.text_frames.append(TextFrame(**known))
         for im in data.get("image_frames", []):
             known = {
@@ -566,9 +614,12 @@ class LayoutDocument:
                     "text_wrap",
                     "wrap_padding",
                     "shape",
+                    "layer",
                 )
                 if k in im
             }
+            if "layer" in known:
+                known["layer"] = normalize_frame_layer(known["layer"], kind="image")
             doc.image_frames.append(ImageFrame(**known))
         if doc.text_frames or doc.image_frames:
             max_page = max(

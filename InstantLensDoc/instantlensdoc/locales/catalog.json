@@ -1,5 +1,5 @@
 {
-  "version": "2.6.17",
+  "version": "2.6.18",
   "langs": [
     "de",
     "en",
@@ -1389,6 +1389,94 @@
       "pt": "FEATURES.md não encontrado.",
       "ar": "FEATURES.md غير موجود.",
       "it": "FEATURES.md non trovato."
+    },
+    "preflight": {
+      "de": "Preflight (Druckprüfung)",
+      "en": "Preflight (print check)",
+      "fr": "Contrôle en amont (impression)",
+      "ru": "Предпечатная проверка",
+      "es": "Preflight (impresión)",
+      "zh": "印前检查",
+      "pt": "Preflight (impressão)",
+      "ar": "فحص ما قبل الطباعة",
+      "it": "Preflight (stampa)"
+    },
+    "bleed": {
+      "de": "Anschnitt / Bleed",
+      "en": "Bleed / trim",
+      "fr": "Fond perdu",
+      "ru": "Вылеты",
+      "es": "Sangrado",
+      "zh": "出血",
+      "pt": "Sangria",
+      "ar": "هوامش القص",
+      "it": "Abbondanza"
+    },
+    "doc_layers": {
+      "de": "Dokument-Ebenen",
+      "en": "Document layers",
+      "fr": "Calques du document",
+      "ru": "Слои документа",
+      "es": "Capas del documento",
+      "zh": "文档图层",
+      "pt": "Camadas do documento",
+      "ar": "طبقات المستند",
+      "it": "Livelli documento"
+    },
+    "export_pdfx": {
+      "de": "Als PDF/X (druckreif)…",
+      "en": "Export as PDF/X (print-ready)…",
+      "fr": "Exporter en PDF/X (prêt à imprimer)…",
+      "ru": "Экспорт PDF/X (готово к печати)…",
+      "es": "Exportar como PDF/X (listo para imprimir)…",
+      "zh": "导出为 PDF/X（印刷就绪）…",
+      "pt": "Exportar como PDF/X (pronto para impressão)…",
+      "ar": "تصدير PDF/X (جاهز للطباعة)…",
+      "it": "Esporta come PDF/X (pronto per la stampa)…"
+    },
+    "color_management": {
+      "de": "Farbmanagement",
+      "en": "Color management",
+      "fr": "Gestion des couleurs",
+      "ru": "Управление цветом",
+      "es": "Gestión del color",
+      "zh": "色彩管理",
+      "pt": "Gestão de cores",
+      "ar": "إدارة الألوان",
+      "it": "Gestione colore"
+    },
+    "layer_background": {
+      "de": "Hintergrund",
+      "en": "Background",
+      "fr": "Arrière-plan",
+      "ru": "Фон",
+      "es": "Fondo",
+      "zh": "背景",
+      "pt": "Fundo",
+      "ar": "خلفية",
+      "it": "Sfondo"
+    },
+    "layer_images": {
+      "de": "Bilder",
+      "en": "Images",
+      "fr": "Images",
+      "ru": "Изображения",
+      "es": "Imágenes",
+      "zh": "图像",
+      "pt": "Imagens",
+      "ar": "صور",
+      "it": "Immagini"
+    },
+    "layer_text": {
+      "de": "Text",
+      "en": "Text",
+      "fr": "Texte",
+      "ru": "Текст",
+      "es": "Texto",
+      "zh": "文本",
+      "pt": "Texto",
+      "ar": "نص",
+      "it": "Testo"
     }
   },
   "phrases": {

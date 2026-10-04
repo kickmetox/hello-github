@@ -126,7 +126,15 @@
     "info_vendor": "厂商",
     "info_contact": "联系",
     "info_privacy": "隐私：本地，无遥测",
-    "features_missing": "未找到 FEATURES.md。"
+    "features_missing": "未找到 FEATURES.md。",
+    "preflight": "印前检查",
+    "bleed": "出血",
+    "doc_layers": "文档图层",
+    "export_pdfx": "导出为 PDF/X（印刷就绪）…",
+    "color_management": "色彩管理",
+    "layer_background": "背景",
+    "layer_images": "图像",
+    "layer_text": "文本"
   },
   "phrases": {
     "&Datei": "文件(&F)",

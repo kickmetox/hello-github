@@ -1,1 +1,1 @@
-"""Locale-Katalog und Hilfe-HTML für InstantLens Doc i18n — 2.6.17."""
+"""Locale-Katalog und Hilfe-HTML für InstantLens Doc i18n — 2.6.18."""
