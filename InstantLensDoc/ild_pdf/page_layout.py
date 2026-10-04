@@ -1,6 +1,7 @@
-"""Seitenlayout-Hilfen 2.6.12: Buchformate, Lineal/Raster, Satzspiegel, Musterseiten, HF.
+"""Seitenlayout-Hilfen 2.6.12/2.6.13: Buchformate, Lineal/Raster, Satzspiegel, Musterseiten, HF.
 
-Frames/Boxen + Textrahmen-Verkettung liegen in ``instantlensdoc.core.layout``.
+Frames/Boxen + Textrahmen-Verkettung + Textumfluss liegen in ``instantlensdoc.core.layout``.
+Typografie (Tracking/Kerning/Leading/Silbentrennung/Drop Caps): ``ild_pdf.typography``.
 Kein CMYK/Bleed/Preflight/PDF/X, kein volles i18n, keine KI-Wizards, kein PDF-Compare.
 """
 

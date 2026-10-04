@@ -1,5 +1,22 @@
 # Changelog — InstantLens Doc
 
+## 2.6.13 — Erweiterte Typografie, Textumfluss, Silbentrennung, Drop Caps
+
+Minor nach **2.6.12**: **Erweiterte Typografie** (Tracking, Kerning, Leading; Absatz-/Zeichenstile auf 2.6.10 Presets), **Textumfluss** um Bild-/Formrahmen (`bounding_box` / `contour` / `jump_object`), intelligente **Silbentrennung** (DE/EN + `register_hyphenation_language`-Hook), **Drop Caps**/Initiale. Scripting: `ild.apply_typography` / `apply_drop_cap` / `hyphenate` / `list_character_styles` / `list_typography_styles` / `layout_set_text_wrap` / `layout_flow_text_wrap` · CLI `typography` / `drop-cap` / `hyphenate` / `character-styles` / `layout-text-wrap` / `layout-flow-wrap` · PowerShell `Invoke-IldTypography` / `Invoke-IldDropCap` / `Invoke-IldHyphenate` / `Set-IldTextWrap` / `Invoke-IldLayoutFlowWrap`. Kein CMYK/Bleed/Preflight/PDF/X, kein volles i18n, keine KI-Wizards, kein PDF-Compare. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie unverändert.
+
+### Neu
+- `ild_pdf.typography` — Tracking/Kerning/Leading-Marker, Zeichenstile, Silbentrennung DE/EN + Hook, Drop Caps
+- `instantlensdoc.core.layout` — `text_wrap` an Bildrahmen, `flow_text_around` / `set_text_wrap`
+- UI: Bearbeiten → Tracking/Leading/Drop Cap/Silbentrennung; Einfügen → Textumfluss; Ctrl+Alt+Shift+D/H
+
+### Geändert
+- Docs/Version **2.6.13**; ild-API/CLI/PowerShell erweitert; Style-Presets mit Typo-Defaults
+
+### Tests / Qualität
+- Version **2.6.13** (App / `ild_pdf` / ISS / Smoke / Docs); Serie **2.6**; `docs/VERSION` + `VERSION.txt`
+- Smoke: 2.6.13 CLI+Qt (typography/wrap/hyphenation/dropcaps)
+- Stubs: KI/Cloud/Stylus/3D/Hooks/Outline/Telemetrie unverändert markiert
+
 ## 2.6.12 — Frames/Boxes, Textrahmen-Verkettung, Musterseiten, Satzspiegel
 
 Minor nach **2.6.11**: **Frames/Boxes** (bewegliche, skalierbare Text- und Bildrahmen), **Textrahmen-Verkettung** (Overflow in nächste Spalte/Seite), **Musterseiten** (wiederkehrende Kopf-/Fußzeilen + Seitenzahlen über Seiten, auf 2.6.11 HF), **Satzspiegel**-Basics (Ränder an Seitenformat-Presets gebunden, Overlay). Scripting: `ild.satzspiegel` / `list_master_pages` / `apply_master_page` / `layout_*` · CLI `satzspiegel` / `master-pages` / `apply-master` / `layout-flow` / `layout-move` / `layout-resize` · PowerShell `Get-IldSatzspiegel` / `Get-IldMasterPages` / `Invoke-IldMasterPage` / `Invoke-IldLayoutFlow` / `Move-IldFrame` / `Resize-IldFrame`. Kein CMYK/Bleed/Preflight/PDF/X, kein volles i18n, keine KI-Wizards, kein PDF-Compare. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie unverändert.

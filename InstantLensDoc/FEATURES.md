@@ -130,6 +130,10 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | Textrahmen-Verkettung | fertig | Overflow → nächste Spalte/Seite; `flow_text_chain` · Spalten-/Seitenketten — **2.6.12** |
 | Musterseiten (Master Pages) | fertig | Wiederkehrende Kopf-/Fußzeilen + Seitenzahlen über Seiten; Presets Standard/Buch/Sachbuch/Minimal — **2.6.12** |
 | Satzspiegel (Type Area) | fertig | Ränder an Seitenformat-Presets; Overlay Toolbar + Ctrl+Alt+S; Spaltenhilfen — **2.6.12** |
+| Erweiterte Typografie | fertig | Tracking, Kerning, Leading; Absatz-/Zeichenstile (auf 2.6.10); Marker `ild-typo` — **2.6.13** |
+| Textumfluss (Text Wrap) | fertig | Text fließt um Bild-/Formrahmen; Modi bounding_box/contour/jump_object — **2.6.13** |
+| Silbentrennung | fertig | Intelligent DE/EN (Soft-Hyphens) + Hook `register_hyphenation_language` — **2.6.13** |
+| Drop Caps / Initiale | fertig | Marker `ild-dropcap`; Editor Ctrl+Alt+Shift+D; `ild.apply_drop_cap` — **2.6.13** |
 | Editor Zeilennummern | fertig | Optional (Ansicht + Einstellungen) 0.2.7; **Zeilen-Lesezeichen/Favoriten** Ctrl+F2 / F2 0.5.7; **Sidebar-Liste** 0.5.8; **Labels editierbar** 0.5.9; **JSON Export/Import ildbm-v1** **0.8.0**; **Drag-Reorder + Sidecar-Persistenz** **0.8.1**; **Toggle persistiert (Ansicht↔Settings)** **0.8.3** |
 | Editor Minimap | fertig | Optional Linien-Übersicht + dickere Scrollbar; Ansicht/Einstellungen; Ctrl+Shift+I 0.5.3 |
 | Editor Soft-Hyphen / NBSP | fertig | Einfügen Ctrl+Shift+- / Ctrl+Shift+Space; Menü Bearbeiten 0.5.4 |

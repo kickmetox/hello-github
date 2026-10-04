@@ -1,15 +1,18 @@
-"""Layout: Textrahmen, verkettete Rahmen, Bildrahmen, Move/Resize — 2.6.12."""
+"""Layout: Textrahmen, verkettete Rahmen, Bildrahmen, Move/Resize, Textumfluss — 2.6.13."""
 
 from __future__ import annotations
 
 import json
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 from uuid import uuid4
 
 
 FrameKind = Union["TextFrame", "ImageFrame"]
+
+# Textumfluss um Bild-/Formrahmen
+TEXT_WRAP_MODES: tuple[str, ...] = ("none", "bounding_box", "jump_object", "contour")
 
 
 @dataclass
@@ -26,17 +29,24 @@ class TextFrame:
     page: int = 0  # 0-basierter Seitenindex
     locked: bool = False
     column: int = 0  # Spaltenindex innerhalb der Seite (0 = erste)
+    # Typografie 2.6.13
+    tracking: float = 0.0
+    leading: float = 1.15
+    hyphenate_lang: str = ""
 
     @property
     def capacity_chars(self) -> int:
         """Grobe Kapazität: Zeilen × Zeichen/Zeile aus Frame-Maßen."""
         chars_per_line = max(8, int(self.width / max(self.font_size * 0.55, 4)))
-        lines = max(1, int(self.height / max(self.font_size * 1.35, 8)))
+        line_h = max(self.font_size * max(1.0, float(self.leading)), 8)
+        lines = max(1, int(self.height / line_h))
         return chars_per_line * lines
 
     @property
     def chars_per_line(self) -> int:
-        return max(8, int(self.width / max(self.font_size * 0.55, 4)))
+        # Tracking > 0 verringert effektive Zeichen/Zeile leicht
+        factor = 0.55 + max(0.0, float(self.tracking)) / 1000.0
+        return max(8, int(self.width / max(self.font_size * factor, 4)))
 
     def move(self, x: float, y: float) -> None:
         if self.locked:
@@ -66,6 +76,11 @@ class ImageFrame:
     id: str = field(default_factory=lambda: uuid4().hex[:8])
     page: int = 0
     locked: bool = False
+    # Textumfluss 2.6.13: none | bounding_box | jump_object | contour
+    text_wrap: str = "none"
+    wrap_padding: float = 8.0
+    # Form-Hinweis für contour (rechteckig / ellipse)
+    shape: str = "rectangle"  # rectangle | ellipse
 
     def move(self, x: float, y: float) -> None:
         if self.locked:
@@ -78,6 +93,25 @@ class ImageFrame:
             raise ValueError(f"Rahmen {self.id} ist gesperrt")
         self.width = max(8.0, float(width))
         self.height = max(8.0, float(height))
+
+    def set_text_wrap(self, mode: str, *, padding: float | None = None) -> None:
+        m = (mode or "none").strip().lower()
+        if m not in TEXT_WRAP_MODES:
+            raise ValueError(f"Unbekannter Textumfluss: {mode}")
+        self.text_wrap = m
+        if padding is not None:
+            self.wrap_padding = max(0.0, float(padding))
+
+    def exclusion_rect(self) -> dict[str, float]:
+        """Ausschlusszone inkl. Padding (für bounding_box / contour)."""
+        pad = float(self.wrap_padding or 0.0)
+        return {
+            "x": self.x - pad,
+            "y": self.y - pad,
+            "width": self.width + 2 * pad,
+            "height": self.height + 2 * pad,
+            "shape": self.shape if self.text_wrap == "contour" else "rectangle",
+        }
 
     def to_dict(self) -> dict[str, Any]:
         d = asdict(self)
@@ -305,23 +339,109 @@ class LayoutDocument:
             prev = fr
         return frames
 
+    def set_text_wrap(
+        self,
+        frame_id: str,
+        mode: str = "bounding_box",
+        *,
+        padding: float | None = None,
+    ) -> ImageFrame:
+        """Textumfluss um Bild-/Formrahmen setzen — 2.6.13."""
+        fr = None
+        for f in self.image_frames:
+            if f.id == frame_id:
+                fr = f
+                break
+        if fr is None:
+            raise KeyError(f"Bildrahmen nicht gefunden: {frame_id}")
+        fr.set_text_wrap(mode, padding=padding)
+        return fr
+
+    def wrap_obstacles(self, *, page: int | None = None) -> list[dict[str, Any]]:
+        """Aktive Ausschlusszonen (ImageFrames mit text_wrap ≠ none)."""
+        out: list[dict[str, Any]] = []
+        for im in self.image_frames:
+            if im.text_wrap in ("none", "", None):
+                continue
+            if page is not None and im.page != int(page):
+                continue
+            rect = im.exclusion_rect()
+            rect["id"] = im.id
+            rect["mode"] = im.text_wrap
+            out.append(rect)
+        return out
+
     def flow_text(
         self,
         text: str,
         frame: Optional[TextFrame] = None,
         chars_per_line: int | None = None,
+        *,
+        around_wrap: bool = False,
     ) -> str:
-        """Einfacher Textumfluss in einem Rahmen (Wortgrenzen)."""
+        """Einfacher Textumfluss in einem Rahmen (Wortgrenzen); optional um Hindernisse."""
+        if around_wrap and frame is not None:
+            result = self.flow_text_around(text, frame)
+            return result
         cpl = chars_per_line or (frame.chars_per_line if frame else 70)
         result = _wrap_words(text, cpl)
         if frame is not None:
             frame.text = result
         return result
 
-    def flow_text_chain(self, text: str, start: TextFrame) -> Dict[str, str]:
+    def flow_text_around(self, text: str, frame: TextFrame) -> str:
+        """
+        Text fließt um Bild-/Formrahmen auf derselben Seite (bounding_box / contour / jump).
+        Zeilenweise: bei Überlappung mit Hindernis schmalere cpl oder Zeile überspringen.
+        """
+        obstacles = self.wrap_obstacles(page=frame.page)
+        if not obstacles:
+            wrapped = _wrap_words(text, frame.chars_per_line)
+            frame.text = wrapped
+            return wrapped
+        line_h = max(frame.font_size * max(1.0, float(frame.leading)), 8.0)
+        max_lines = max(1, int(frame.height / line_h))
+        words = text.split()
+        lines: list[str] = []
+        wi = 0
+        for li in range(max_lines):
+            if wi >= len(words):
+                break
+            y = frame.y + li * line_h
+            cpl, skip = _line_capacity_with_obstacles(
+                frame, y, line_h, obstacles, base_cpl=frame.chars_per_line
+            )
+            if skip:
+                lines.append("")
+                continue
+            current = ""
+            while wi < len(words):
+                candidate = (current + " " + words[wi]).strip()
+                if len(candidate) <= cpl:
+                    current = candidate
+                    wi += 1
+                else:
+                    break
+            if current:
+                lines.append(current)
+            elif wi < len(words) and cpl < 8:
+                lines.append("")
+            else:
+                break
+        result = "\n".join(lines)
+        frame.text = result
+        return result
+
+    def flow_text_chain(
+        self,
+        text: str,
+        start: TextFrame,
+        *,
+        around_wrap: bool = False,
+    ) -> Dict[str, str]:
         """
         Verketteter Textumfluss: füllt start, Overflow in next_id-Kette
-        (Spalte → Spalte / Seite → Seite).
+        (Spalte → Spalte / Seite → Seite). Optional Textumfluss um Bildrahmen.
         Rückgabe: {frame_id: text_in_frame}; optional ``__overflow__``.
         """
         remaining = text.strip()
@@ -332,11 +452,29 @@ class LayoutDocument:
             if current.id in visited:
                 break
             visited.add(current.id)
-            capacity = current.capacity_chars
-            cpl = current.chars_per_line
-            chunk, remaining = _take_chars_wrapped(remaining, capacity, cpl)
-            current.text = chunk
-            result[current.id] = chunk
+            if around_wrap and self.wrap_obstacles(page=current.page):
+                chunk = self.flow_text_around(remaining, current)
+                # Overflow schätzen: Wörter die nicht in chunk landeten
+                used = chunk.replace("\n", " ").split()
+                rem_words = remaining.split()
+                if len(used) < len(rem_words):
+                    # Präfix-Match
+                    n = 0
+                    for a, b in zip(used, rem_words):
+                        if a == b:
+                            n += 1
+                        else:
+                            break
+                    remaining = " ".join(rem_words[n:])
+                else:
+                    remaining = ""
+                result[current.id] = chunk
+            else:
+                capacity = current.capacity_chars
+                cpl = current.chars_per_line
+                chunk, remaining = _take_chars_wrapped(remaining, capacity, cpl)
+                current.text = chunk
+                result[current.id] = chunk
             if not remaining:
                 nxt_id = current.next_id
                 while nxt_id and nxt_id not in visited:
@@ -406,6 +544,9 @@ class LayoutDocument:
                     "page",
                     "locked",
                     "column",
+                    "tracking",
+                    "leading",
+                    "hyphenate_lang",
                 )
                 if k in tf
             }
@@ -413,7 +554,19 @@ class LayoutDocument:
         for im in data.get("image_frames", []):
             known = {
                 k: im[k]
-                for k in ("x", "y", "width", "height", "path", "id", "page", "locked")
+                for k in (
+                    "x",
+                    "y",
+                    "width",
+                    "height",
+                    "path",
+                    "id",
+                    "page",
+                    "locked",
+                    "text_wrap",
+                    "wrap_padding",
+                    "shape",
+                )
                 if k in im
             }
             doc.image_frames.append(ImageFrame(**known))
@@ -458,3 +611,45 @@ def _take_chars_wrapped(text: str, capacity: int, chars_per_line: int) -> Tuple[
             return _wrap_words(" ".join(taken), chars_per_line), remaining
         taken.append(w)
     return _wrap_words(" ".join(taken), chars_per_line), ""
+
+
+def _rects_overlap(ax: float, ay: float, aw: float, ah: float, b: dict[str, float]) -> bool:
+    bx, by, bw, bh = float(b["x"]), float(b["y"]), float(b["width"]), float(b["height"])
+    return not (ax + aw <= bx or bx + bw <= ax or ay + ah <= by or by + bh <= ay)
+
+
+def _line_capacity_with_obstacles(
+    frame: TextFrame,
+    line_y: float,
+    line_h: float,
+    obstacles: Sequence[dict[str, Any]],
+    *,
+    base_cpl: int,
+) -> Tuple[int, bool]:
+    """
+    Effektive Zeichen/Zeile unter Berücksichtigung von Hindernissen.
+    Rückgabe: (chars_per_line, skip_line).
+    jump_object → Zeile überspringen wenn Überlappung.
+    bounding_box/contour → cpl reduzieren um Hindernisbreite.
+    """
+    cpl = int(base_cpl)
+    for obs in obstacles:
+        mode = str(obs.get("mode") or "bounding_box")
+        if not _rects_overlap(frame.x, line_y, frame.width, line_h, obs):
+            continue
+        if mode == "jump_object":
+            return 0, True
+        # Hindernis schneidet horizontal den Textrahmen
+        ox = float(obs["x"])
+        ow = float(obs["width"])
+        left = max(0.0, ox - frame.x)
+        right = max(0.0, (frame.x + frame.width) - (ox + ow))
+        usable = max(left, right)
+        if usable < frame.width * 0.15:
+            return 0, True
+        ratio = usable / max(frame.width, 1.0)
+        cpl = max(4, int(base_cpl * ratio))
+        # contour: etwas großzügiger (Ellipse ≈ 0.85 der Box)
+        if mode == "contour" and str(obs.get("shape")) == "ellipse":
+            cpl = max(cpl, int(base_cpl * min(1.0, ratio + 0.1)))
+    return cpl, False

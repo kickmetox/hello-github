@@ -1,4 +1,4 @@
-# InstantLens Doc — PowerShell-Scripting 2.6.12
+# InstantLens Doc — PowerShell-Scripting 2.6.13
 # Als CLI:
 #   powershell -ExecutionPolicy Bypass -File .\scripts\ild.ps1 pages D:\dok.pdf
 # Als Modul:
@@ -357,6 +357,84 @@ function Resize-IldFrame {
         "--width", "$Width",
         "--height", "$Height"
     ) | Out-Host
+}
+
+function Invoke-IldTypography {
+    param(
+        [Parameter(Mandatory = $true)][string]$Text,
+        [double]$Tracking,
+        [double]$Kerning,
+        [double]$Leading,
+        [int]$DropCapLines = -1,
+        [int]$DropCapChars = -1,
+        [string]$CharStyle,
+        [ValidateSet("left", "center", "right", "justify")][string]$Align,
+        [int]$Index = -1
+    )
+    $a = @("--json", "typography", "--text", $Text)
+    if ($PSBoundParameters.ContainsKey("Tracking")) { $a += @("--tracking", "$Tracking") }
+    if ($PSBoundParameters.ContainsKey("Kerning")) { $a += @("--kerning", "$Kerning") }
+    if ($PSBoundParameters.ContainsKey("Leading")) { $a += @("--leading", "$Leading") }
+    if ($DropCapLines -ge 0) { $a += @("--drop-cap-lines", "$DropCapLines") }
+    if ($DropCapChars -ge 0) { $a += @("--drop-cap-chars", "$DropCapChars") }
+    if ($CharStyle) { $a += @("--char-style", $CharStyle) }
+    if ($Align) { $a += @("--align", $Align) }
+    if ($Index -ge 0) { $a += @("--index", "$Index") }
+    Invoke-Ild @a | Out-Host
+}
+
+function Invoke-IldDropCap {
+    param(
+        [Parameter(Mandatory = $true)][string]$Text,
+        [int]$Lines = 3,
+        [int]$Chars = 1,
+        [int]$Index = 0
+    )
+    Invoke-Ild @(
+        "--json", "drop-cap",
+        "--text", $Text,
+        "--lines", "$Lines",
+        "--chars", "$Chars",
+        "--index", "$Index"
+    ) | Out-Host
+}
+
+function Get-IldCharacterStyles {
+    Invoke-Ild @("--json", "character-styles") | Out-Host
+}
+
+function Invoke-IldHyphenate {
+    param(
+        [Parameter(Mandatory = $true)][string]$Text,
+        [string]$Lang = "de"
+    )
+    Invoke-Ild @("--json", "hyphenate", "--text", $Text, "--lang", $Lang) | Out-Host
+}
+
+function Set-IldTextWrap {
+    param(
+        [Parameter(Mandatory = $true)][string]$Layout,
+        [Parameter(Mandatory = $true)][string]$Id,
+        [ValidateSet("none", "bounding_box", "jump_object", "contour")][string]$Mode = "bounding_box",
+        [double]$Padding = -1
+    )
+    $a = @("--json", "layout-text-wrap", "--layout", $Layout, "--id", $Id, "--mode", $Mode)
+    if ($Padding -ge 0) { $a += @("--padding", "$Padding") }
+    Invoke-Ild @a | Out-Host
+}
+
+function Invoke-IldLayoutFlowWrap {
+    param(
+        [Parameter(Mandatory = $true)][string]$Text,
+        [string]$Layout,
+        [string]$Start,
+        [string]$Out
+    )
+    $a = @("--json", "layout-flow-wrap", "--text", $Text)
+    if ($Layout) { $a += @("--layout", $Layout) }
+    if ($Start) { $a += @("--start", $Start) }
+    if ($Out) { $a += @("--out", $Out) }
+    Invoke-Ild @a | Out-Host
 }
 
 function Merge-IldPdf {

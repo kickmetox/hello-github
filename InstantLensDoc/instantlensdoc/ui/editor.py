@@ -1477,6 +1477,59 @@ class TextEditor(QPlainTextEdit):
         self.setPlainText(new_text)
         return True
 
+    def apply_typography(
+        self,
+        *,
+        tracking: float | None = None,
+        kerning: float | None = None,
+        leading: float | None = None,
+        drop_cap_lines: int | None = None,
+        drop_cap_chars: int | None = None,
+        char_style_id: str | None = None,
+        all_paragraphs: bool = False,
+    ) -> bool:
+        """Tracking/Kerning/Leading/Drop-Cap — 2.6.13."""
+        from ild_pdf.typography import apply_typography
+
+        idx = None if all_paragraphs else self.current_paragraph_index()
+        new_text = apply_typography(
+            self.toPlainText(),
+            tracking=tracking,
+            kerning=kerning,
+            leading=leading,
+            drop_cap_lines=drop_cap_lines,
+            drop_cap_chars=drop_cap_chars,
+            char_style_id=char_style_id,
+            paragraph_index=idx,
+        )
+        if new_text == self.toPlainText():
+            return False
+        self.setPlainText(new_text)
+        return True
+
+    def apply_drop_cap(self, *, lines: int = 3, chars: int = 1) -> bool:
+        """Drop Cap auf aktuellen Absatz — 2.6.13."""
+        from ild_pdf.typography import apply_drop_cap
+
+        new_text = apply_drop_cap(
+            self.toPlainText(),
+            lines=int(lines),
+            chars=int(chars),
+            paragraph_index=self.current_paragraph_index(),
+        )
+        if new_text == self.toPlainText():
+            return False
+        self.setPlainText(new_text)
+        return True
+
+    def hyphenate_document(self, *, lang: str = "de") -> int:
+        """Dokument silbentrennen (Soft-Hyphens) — 2.6.13. Rückgabe: Anzahl Trennungen."""
+        from ild_pdf.typography import hyphenate_text
+
+        result = hyphenate_text(self.toPlainText(), lang=lang)
+        self.setPlainText(result["text"])
+        return int(result.get("count") or 0)
+
     def update_auto_toc(self, *, max_level: int = 3) -> str:
         """Markdown-Inhaltsverzeichnis einfügen/aktualisieren — 2.6.10."""
         from ild_pdf.auto_format import insert_toc_into_text

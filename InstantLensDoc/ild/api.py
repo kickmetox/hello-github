@@ -1,4 +1,4 @@
-"""Headless InstantLens-Doc-Operationen für Python- und PowerShell-Scripting — 2.6.12."""
+"""Headless InstantLens-Doc-Operationen für Python- und PowerShell-Scripting — 2.6.13."""
 
 from __future__ import annotations
 
@@ -902,10 +902,11 @@ def layout_flow_text(
     path: PathLike | None = None,
     columns: int | None = None,
     pages: int | None = None,
+    around_wrap: bool = False,
 ) -> dict[str, Any]:
     """
     Text in verkettete Rahmen fließen lassen.
-    Optional: Spalten- oder Seitenkette neu anlegen.
+    Optional: Spalten- oder Seitenkette neu anlegen; Textumfluss um Bildrahmen (2.6.13).
     """
     doc = _load_layout(layout, path)
     if columns and int(columns) > 0:
@@ -922,7 +923,7 @@ def layout_flow_text(
         start = doc.text_frames[0]
     else:
         start = doc.add_text_frame()
-    filled = doc.flow_text_chain(text, start)
+    filled = doc.flow_text_chain(text, start, around_wrap=bool(around_wrap))
     overflow = filled.pop("__overflow__", "")
     if path:
         doc.save(path)
@@ -931,6 +932,7 @@ def layout_flow_text(
         "filled": filled,
         "overflow": overflow,
         "chain": doc.chain_ids(start.id),
+        "obstacles": doc.wrap_obstacles() if around_wrap else [],
     }
 
 
@@ -941,6 +943,134 @@ def layout_list_frames(
 ) -> list[dict[str, Any]]:
     doc = _load_layout(layout, path)
     return doc.list_frames()
+
+
+# --- Typografie / Textumfluss / Silbentrennung — 2.6.13 ---
+
+
+def apply_typography(
+    *,
+    text: str,
+    tracking: float | None = None,
+    kerning: float | None = None,
+    leading: float | None = None,
+    drop_cap_lines: int | None = None,
+    drop_cap_chars: int | None = None,
+    char_style_id: str | None = None,
+    alignment: str | None = None,
+    line_spacing: float | None = None,
+    paragraph_index: int | None = None,
+) -> dict[str, Any]:
+    """Tracking/Kerning/Leading/Drop-Cap/Zeichenstil auf Absätze — 2.6.13."""
+    from ild_pdf.typography import apply_typography as _apply, parse_typography
+
+    new_text = _apply(
+        text,
+        tracking=tracking,
+        kerning=kerning,
+        leading=leading,
+        drop_cap_lines=drop_cap_lines,
+        drop_cap_chars=drop_cap_chars,
+        char_style_id=char_style_id,
+        alignment=alignment,
+        line_spacing=line_spacing,
+        paragraph_index=paragraph_index,
+    )
+    first = new_text.split("\n\n")[0] if new_text else ""
+    return {"text": new_text, "typography": parse_typography(first).to_dict()}
+
+
+def apply_drop_cap(
+    text: str,
+    *,
+    lines: int = 3,
+    chars: int = 1,
+    paragraph_index: int = 0,
+) -> dict[str, Any]:
+    """Initial/Drop Cap auf Absatz — 2.6.13."""
+    from ild_pdf.typography import apply_drop_cap as _dc, parse_typography
+
+    new_text = _dc(
+        text, lines=int(lines), chars=int(chars), paragraph_index=int(paragraph_index)
+    )
+    first = new_text.split("\n\n")[0] if new_text else ""
+    return {"text": new_text, "typography": parse_typography(first).to_dict()}
+
+
+def list_character_styles() -> list[dict[str, Any]]:
+    from ild_pdf.typography import list_character_styles as _list
+
+    return _list()
+
+
+def list_typography_styles() -> list[dict[str, Any]]:
+    """Absatzstile inkl. Typografie-Defaults (Tracking/Leading) — 2.6.13."""
+    from ild_pdf.typography import paragraph_styles_with_typography
+
+    return paragraph_styles_with_typography()
+
+
+def hyphenate(
+    text: str,
+    *,
+    lang: str = "de",
+) -> dict[str, Any]:
+    """Intelligente Silbentrennung (Soft-Hyphens); DE/EN + Hook — 2.6.13."""
+    from ild_pdf.typography import hyphenate_text
+
+    return hyphenate_text(text, lang=lang)
+
+
+def list_hyphenation_languages() -> list[str]:
+    from ild_pdf.typography import list_hyphenation_languages as _list
+
+    return _list()
+
+
+def layout_set_text_wrap(
+    frame_id: str,
+    mode: str = "bounding_box",
+    *,
+    padding: float | None = None,
+    layout: dict[str, Any] | None = None,
+    path: PathLike | None = None,
+) -> dict[str, Any]:
+    """Textumfluss um Bild-/Formrahmen — 2.6.13."""
+    doc = _load_layout(layout, path)
+    fr = doc.set_text_wrap(frame_id, mode, padding=padding)
+    if path:
+        doc.save(path)
+    return {"layout": doc.to_dict(), "frame": fr.to_dict()}
+
+
+def layout_flow_text_wrap(
+    text: str,
+    start_id: str | None = None,
+    *,
+    layout: dict[str, Any] | None = None,
+    path: PathLike | None = None,
+) -> dict[str, Any]:
+    """Text in Rahmen fließen lassen, um Bildrahmen herum — 2.6.13."""
+    doc = _load_layout(layout, path)
+    if start_id:
+        start = doc.frame_by_id(start_id)
+        if start is None:
+            raise KeyError(f"Rahmen nicht gefunden: {start_id}")
+    elif doc.text_frames:
+        start = doc.text_frames[0]
+    else:
+        start = doc.add_text_frame()
+    filled = doc.flow_text_chain(text, start, around_wrap=True)
+    overflow = filled.pop("__overflow__", "")
+    if path:
+        doc.save(path)
+    return {
+        "layout": doc.to_dict(),
+        "filled": filled,
+        "overflow": overflow,
+        "chain": doc.chain_ids(start.id),
+        "obstacles": doc.wrap_obstacles(),
+    }
 
 
 def _load_layout(

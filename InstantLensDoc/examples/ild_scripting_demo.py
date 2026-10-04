@@ -1,4 +1,4 @@
-"""Beispiel: InstantLens Doc Scripting (Python) — 2.6.12.
+"""Beispiel: InstantLens Doc Scripting (Python) — 2.6.13.
 
 Aufruf aus dem App-Root:
   python examples/ild_scripting_demo.py [pdf]
@@ -59,6 +59,17 @@ def main() -> int:
         print("masters", [m["id"] for m in ild.list_master_pages()])
         flow = ild.layout_flow_text("Demo " * 40, columns=2)
         print("layout chain", flow["chain"])
+        typo = ild.apply_typography(text="Typo Demo", tracking=40, leading=1.5)
+        print("typography:", "ild-typo" in typo.get("text", ""))
+        hy = ild.hyphenate("Silbentrennung", lang="de")
+        print("hyphenate count:", hy.get("count"))
+        dc = ild.apply_drop_cap("Kapitelstart mit Initial.", lines=3)
+        print("drop_cap:", "ild-dropcap" in dc.get("text", ""))
+        img_add = ild.layout_add_image_frame(layout=flow["layout"], image="x.png")
+        wrap = ild.layout_set_text_wrap(
+            img_add["frame"]["id"], "bounding_box", layout=img_add["layout"]
+        )
+        print("text_wrap:", wrap["frame"].get("text_wrap"))
         hf = ild.apply_header_footer(
             src, out=td_p / "hf.pdf", header="{title}", footer="{author}", title="Demo", author="ILD"
         )

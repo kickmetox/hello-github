@@ -137,6 +137,8 @@ HELP_HTML = f"""
 <li><b>Ansicht → Satzspiegel</b> (Ctrl+Alt+S): Type-Area-Overlay an Seitenformat-Rändern — <b>2.6.12</b></li>
 <li><b>Einfügen → Textrahmen / Verkettung / Spalten / Move·Resize</b>: Frames/Boxes + Textfluss — <b>2.6.12</b></li>
 <li><b>Einfügen → Musterseite anwenden</b>: Kopf/Fuß + Seitenzahlen über Seiten — <b>2.6.12</b></li>
+<li><b>Bearbeiten → Tracking / Leading / Drop Cap / Silbentrennung</b>: erweiterte Typografie — <b>2.6.13</b></li>
+<li><b>Einfügen → Textumfluss</b>: Text fließt um Bild-/Formrahmen — <b>2.6.13</b></li>
 <li><b>PDF → Kopf-/Fußzeile</b>: Seitenzahlen, Titel, Ersteller/Autor (<code>{{title}}</code>/<code>{{author}}</code>/<code>{{creator}}</code>) — <b>2.6.11</b></li>
 <li><b>Seitenformate</b>: US Letter, DIN-A, Buchformate (Taschenbuch/Roman/Sachbuch/Quadrat…) — <b>2.6.11</b></li>
 <li><b>Bearbeiten → Gehe zu Zeile / Seite</b> (Ctrl+G): Editor → Zeile; PDF → Seite (auch PDF → Gehe zu Seite…, Ctrl+Shift+G)</li>
@@ -280,7 +282,8 @@ HELP_HTML = f"""
 <h3>PDF-Modul</h3>
 <p>Das Paket <code>ild_pdf</code> kann von anderen Programmen genutzt werden (pypdfium2, kein Poppler).
 Beispiel: <code>examples/ild_pdf_demo.py</code>. API: <code>ild_pdf/README.md</code>.</p>
-<p><b>Scripting 2.6.12:</b> Stabiles Headless-API <code>import ild</code> und CLI <code>python -m ild</code>
+<p><b>Scripting 2.6.13:</b> Stabiles Headless-API <code>import ild</code> und CLI <code>python -m ild</code>
+(Typografie/Silbentrennung/Textumfluss: <code>apply_typography</code>/<code>hyphenate</code>/<code>layout_set_text_wrap</code>)
 (inkl. <code>satzspiegel</code>/<code>apply-master</code>/<code>layout-flow</code>/<code>page-formats</code>/<code>header-footer</code>). Basis <b>2.6.11/2.6.10</b>:
 (open/info, Seiten, Export, OCR, Schwärzen, Merge/Split, Lizenz/Keygen, AES-256,
 <code>ann-shape</code> / <code>ann-stamp</code> / <code>ann-highlight-para</code>).

@@ -193,7 +193,7 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--count", type=int, default=0, help="max. Ersetzungen (Text; 0=alle)")
     s.add_argument("--max", type=int, default=50, dest="max_replacements")
 
-    s = sub.add_parser("page-formats", help="Seitenformate-Presets (US/DIN/Buch) — 2.6.12")
+    s = sub.add_parser("page-formats", help="Seitenformate-Presets (US/DIN/Buch) — 2.6.13")
     s.add_argument("--unit", default="mm", choices=("mm", "inch"))
 
     s = sub.add_parser("set-page-format", help="Seitenformat-Preset auf PDF anwenden")
@@ -204,7 +204,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     s = sub.add_parser(
         "header-footer",
-        help="Kopf-/Fußzeile bakken (Titel/Autor/Seitenzahl) — 2.6.12",
+        help="Kopf-/Fußzeile bakken (Titel/Autor/Seitenzahl) — 2.6.13",
     )
     s.add_argument("pdf")
     s.add_argument("--out", default=None)
@@ -227,7 +227,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     s = sub.add_parser("paragraph-styles", help="Style-Presets inkl. Absatzattribute")
 
-    s = sub.add_parser("satzspiegel", help="Satzspiegel für Seitenformat — 2.6.12")
+    s = sub.add_parser("satzspiegel", help="Satzspiegel für Seitenformat — 2.6.13")
     s.add_argument("--format", default="A4", dest="page_format")
     s.add_argument("--columns", type=int, default=1)
     s.add_argument("--gutter", type=float, default=5.0, help="Spaltenabstand mm")
@@ -235,11 +235,11 @@ def build_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("satzspiegel-list", help="Alle Satzspiegel-Presets")
     s.add_argument("--columns", type=int, default=1)
 
-    s = sub.add_parser("master-pages", help="Musterseiten-Presets auflisten — 2.6.12")
+    s = sub.add_parser("master-pages", help="Musterseiten-Presets auflisten — 2.6.13")
 
     s = sub.add_parser(
         "apply-master",
-        help="Musterseite auf PDF bakken (HF/Seitenzahlen) — 2.6.12",
+        help="Musterseite auf PDF bakken (HF/Seitenzahlen) — 2.6.13",
     )
     s.add_argument("pdf")
     s.add_argument("--master", default="Standard", help="Preset: Standard/Buch/Sachbuch/Minimal")
@@ -249,7 +249,7 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--creator", default=None)
     s.add_argument("--start-page", type=int, default=None)
 
-    s = sub.add_parser("layout-new", help="Leeres Layout (Frames) — 2.6.12")
+    s = sub.add_parser("layout-new", help="Leeres Layout (Frames) — 2.6.13")
     s.add_argument("--format", default=None, dest="page_format")
     s.add_argument("--out", default=None, help="JSON-Pfad speichern")
 
@@ -260,6 +260,11 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--pages", type=int, default=None)
     s.add_argument("--start", default=None, dest="start_id")
     s.add_argument("--out", default=None, help="Layout-JSON speichern")
+    s.add_argument(
+        "--around-wrap",
+        action="store_true",
+        help="Textumfluss um Bildrahmen (2.6.13)",
+    )
 
     s = sub.add_parser("layout-move", help="Rahmen verschieben")
     s.add_argument("--layout", required=True, help="Layout-JSON")
@@ -275,6 +280,58 @@ def build_parser() -> argparse.ArgumentParser:
 
     s = sub.add_parser("layout-frames", help="Rahmen eines Layouts auflisten")
     s.add_argument("--layout", required=True)
+
+    s = sub.add_parser(
+        "typography",
+        help="Tracking/Kerning/Leading/Drop-Cap/Zeichenstil — 2.6.13",
+    )
+    s.add_argument("--text", required=True)
+    s.add_argument("--tracking", type=float, default=None)
+    s.add_argument("--kerning", type=float, default=None)
+    s.add_argument("--leading", type=float, default=None)
+    s.add_argument("--drop-cap-lines", type=int, default=None)
+    s.add_argument("--drop-cap-chars", type=int, default=None)
+    s.add_argument("--char-style", default=None)
+    s.add_argument("--align", default=None, choices=("left", "center", "right", "justify"))
+    s.add_argument("--index", type=int, default=None)
+
+    s = sub.add_parser("drop-cap", help="Drop Cap / Initial auf Absatz — 2.6.13")
+    s.add_argument("--text", required=True)
+    s.add_argument("--lines", type=int, default=3)
+    s.add_argument("--chars", type=int, default=1)
+    s.add_argument("--index", type=int, default=0)
+
+    s = sub.add_parser("character-styles", help="Zeichenstile auflisten — 2.6.13")
+
+    s = sub.add_parser("typography-styles", help="Absatzstile inkl. Typo-Defaults — 2.6.13")
+
+    s = sub.add_parser("hyphenate", help="Silbentrennung (Soft-Hyphens) — 2.6.13")
+    s.add_argument("--text", required=True)
+    s.add_argument("--lang", default="de", help="de|en (+ registrierte Sprachen)")
+
+    s = sub.add_parser("hyphenation-langs", help="Verfügbare Silbentrennungs-Sprachen")
+
+    s = sub.add_parser(
+        "layout-text-wrap",
+        help="Textumfluss um Bildrahmen setzen — 2.6.13",
+    )
+    s.add_argument("--layout", required=True)
+    s.add_argument("--id", required=True, dest="frame_id")
+    s.add_argument(
+        "--mode",
+        default="bounding_box",
+        choices=("none", "bounding_box", "jump_object", "contour"),
+    )
+    s.add_argument("--padding", type=float, default=None)
+
+    s = sub.add_parser(
+        "layout-flow-wrap",
+        help="Text um Bildrahmen fließen lassen — 2.6.13",
+    )
+    s.add_argument("--text", required=True)
+    s.add_argument("--layout", default=None)
+    s.add_argument("--start", default=None, dest="start_id")
+    s.add_argument("--out", default=None)
 
     return p
 
@@ -561,6 +618,7 @@ def run(argv: list[str] | None = None) -> int:
                 path=layout_path,
                 columns=args.columns,
                 pages=args.pages,
+                around_wrap=bool(getattr(args, "around_wrap", False)),
             )
             save_to = args.out or layout_path
             if save_to:
@@ -582,6 +640,66 @@ def run(argv: list[str] | None = None) -> int:
             return 0
         if args.cmd == "layout-frames":
             data = api.layout_list_frames(path=args.layout)
+            _print(data, as_json=js or True)
+            return 0
+        if args.cmd == "typography":
+            data = api.apply_typography(
+                text=args.text,
+                tracking=args.tracking,
+                kerning=args.kerning,
+                leading=args.leading,
+                drop_cap_lines=args.drop_cap_lines,
+                drop_cap_chars=args.drop_cap_chars,
+                char_style_id=args.char_style,
+                alignment=args.align,
+                paragraph_index=args.index,
+            )
+            _print(data, as_json=js or True)
+            return 0
+        if args.cmd == "drop-cap":
+            data = api.apply_drop_cap(
+                args.text,
+                lines=args.lines,
+                chars=args.chars,
+                paragraph_index=args.index,
+            )
+            _print(data, as_json=js or True)
+            return 0
+        if args.cmd == "character-styles":
+            data = api.list_character_styles()
+            _print(data, as_json=js or True)
+            return 0
+        if args.cmd == "typography-styles":
+            data = api.list_typography_styles()
+            _print(data, as_json=js or True)
+            return 0
+        if args.cmd == "hyphenate":
+            data = api.hyphenate(args.text, lang=args.lang)
+            _print(data, as_json=js or True)
+            return 0
+        if args.cmd == "hyphenation-langs":
+            data = api.list_hyphenation_languages()
+            _print(data, as_json=js or True)
+            return 0
+        if args.cmd == "layout-text-wrap":
+            data = api.layout_set_text_wrap(
+                args.frame_id,
+                args.mode,
+                padding=args.padding,
+                path=args.layout,
+            )
+            _print(data, as_json=js or True)
+            return 0
+        if args.cmd == "layout-flow-wrap":
+            from instantlensdoc.core.layout import LayoutDocument
+
+            data = api.layout_flow_text_wrap(
+                args.text, start_id=args.start_id, path=args.layout
+            )
+            save_to = args.out or args.layout
+            if save_to:
+                LayoutDocument.from_dict(data["layout"]).save(save_to)
+                data["path"] = str(Path(save_to))
             _print(data, as_json=js or True)
             return 0
         return _fail("unbekanntes Kommando")

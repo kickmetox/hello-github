@@ -1,5 +1,5 @@
 """
-Stabiles Scripting-API für InstantLens Doc (2.6.12).
+Stabiles Scripting-API für InstantLens Doc (2.6.13).
 
 Headless, ohne GUI. Nutzt ``ild_pdf`` + Lizenz/OCR der App.
 
@@ -15,6 +15,9 @@ Headless, ohne GUI. Nutzt ``ild_pdf`` + Lizenz/OCR der App.
     ild.apply_master_page("dok.pdf", "Buch", title="Roman")
     ild.satzspiegel("Taschenbuch")
     ild.layout_flow_text("Langer Text…", columns=2)
+    ild.apply_typography(text="Absatz", tracking=50, leading=1.5)
+    ild.hyphenate("Silbentrennung", lang="de")
+    ild.apply_drop_cap("Einleitungstext …")
 
 CLI: ``python -m ild --help`` · PowerShell: ``scripts\\ild.ps1``.
 """
@@ -30,10 +33,12 @@ from ild.api import (
     add_redaction,
     add_shape,
     add_stamp,
+    apply_drop_cap,
     apply_header_footer,
     apply_master_page,
     apply_paragraph_format,
     apply_redactions,
+    apply_typography,
     auto_format_pdf,
     auto_format_text,
     encrypt_pdf,
@@ -44,14 +49,19 @@ from ild.api import (
     get_encryption_info,
     grid_lines,
     highlight_paragraphs,
+    hyphenate,
     layout_add_image_frame,
     layout_add_text_frame,
     layout_flow_text,
+    layout_flow_text_wrap,
     layout_link_frames,
     layout_list_frames,
     layout_move_frame,
     layout_resize_frame,
+    layout_set_text_wrap,
     license_status,
+    list_character_styles,
+    list_hyphenation_languages,
     list_master_pages,
     list_page_formats,
     list_paragraph_styles,
@@ -59,6 +69,7 @@ from ild.api import (
     list_stamps,
     list_style_presets,
     list_system_fonts,
+    list_typography_styles,
     merge_pdfs,
     new_layout,
     ocr_image,
@@ -121,6 +132,14 @@ __all__ = [
     "layout_link_frames",
     "layout_flow_text",
     "layout_list_frames",
+    "apply_typography",
+    "apply_drop_cap",
+    "list_character_styles",
+    "list_typography_styles",
+    "hyphenate",
+    "list_hyphenation_languages",
+    "layout_set_text_wrap",
+    "layout_flow_text_wrap",
     "generate_key",
     "verify_key",
     "license_status",

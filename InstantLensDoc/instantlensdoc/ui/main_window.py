@@ -1620,6 +1620,27 @@ class MainWindow(QMainWindow):
         act_spacing15 = QAction("Zeilenabstand 1,15 (Standard)", self)
         act_spacing15.triggered.connect(lambda: self._set_paragraph_line_spacing(1.15))
         m_edit.addAction(act_spacing15)
+        act_tracking = QAction("Laufweite +50 (Tracking)", self)
+        act_tracking.setToolTip("Tracking +50/1000 em für aktuellen Absatz — 2.6.13")
+        act_tracking.triggered.connect(lambda: self._set_typography(tracking=50.0))
+        m_edit.addAction(act_tracking)
+        act_leading = QAction("Durchschuss 1,5 (Leading)", self)
+        act_leading.setToolTip("Leading 1,5 für aktuellen Absatz — 2.6.13")
+        act_leading.triggered.connect(lambda: self._set_typography(leading=1.5))
+        m_edit.addAction(act_leading)
+        act_dropcap = QAction("Initial / Drop Cap", self)
+        act_dropcap.setShortcut(QKeySequence("Ctrl+Alt+Shift+D"))
+        act_dropcap.setToolTip("Drop Cap (3 Zeilen, 1 Zeichen) — 2.6.13")
+        act_dropcap.triggered.connect(self._apply_drop_cap)
+        m_edit.addAction(act_dropcap)
+        act_hyphen = QAction("Silbentrennung (DE)…", self)
+        act_hyphen.setShortcut(QKeySequence("Ctrl+Alt+Shift+H"))
+        act_hyphen.setToolTip("Intelligente Silbentrennung Deutsch — 2.6.13")
+        act_hyphen.triggered.connect(lambda: self._hyphenate_document("de"))
+        m_edit.addAction(act_hyphen)
+        act_hyphen_en = QAction("Silbentrennung (EN)", self)
+        act_hyphen_en.triggered.connect(lambda: self._hyphenate_document("en"))
+        m_edit.addAction(act_hyphen_en)
         act_palette = QAction("Schnellaktionen…", self)
         act_palette.setShortcut(QKeySequence("Ctrl+K"))
         act_palette.setToolTip(
@@ -2814,6 +2835,10 @@ class MainWindow(QMainWindow):
         m_ins.addAction(a)
         a = QAction("Bild einfügen…", self)
         a.triggered.connect(self._insert_image)
+        m_ins.addAction(a)
+        a = QAction("Textumfluss um Bildrahmen…", self)
+        a.setToolTip("Text fließt um Bild-/Formrahmen (bounding_box/contour/jump) — 2.6.13")
+        a.triggered.connect(self._set_image_text_wrap)
         m_ins.addAction(a)
         a = QAction("Musterseite anwenden…", self)
         a.setToolTip(
@@ -7610,6 +7635,91 @@ class MainWindow(QMainWindow):
         else:
             self._set_status("Zeilenabstand unverändert")
 
+    def _set_typography(
+        self,
+        *,
+        tracking: float | None = None,
+        kerning: float | None = None,
+        leading: float | None = None,
+    ) -> None:
+        """Tracking/Kerning/Leading — 2.6.13."""
+        if self.stack.currentWidget() is not self.editor_pane:
+            self._set_status("Typografie nur im Editor")
+            return
+        if self.editor.apply_typography(
+            tracking=tracking, kerning=kerning, leading=leading
+        ):
+            if self.doc and self.doc.kind in (
+                DocKind.TEXT,
+                DocKind.MARKDOWN,
+                DocKind.HTML,
+                DocKind.DOCX,
+            ):
+                self.doc.text = self.editor.toPlainText()
+                self.doc.dirty = True
+            self._on_text_changed()
+            parts = []
+            if tracking is not None:
+                parts.append(f"Tracking={tracking:g}")
+            if kerning is not None:
+                parts.append(f"Kerning={kerning:g}")
+            if leading is not None:
+                parts.append(f"Leading={leading:g}")
+            self._set_status("Typografie: " + (", ".join(parts) or "ok"))
+        else:
+            self._set_status("Typografie unverändert")
+
+    def _apply_drop_cap(self) -> None:
+        if self.stack.currentWidget() is not self.editor_pane:
+            self._set_status("Drop Cap nur im Editor")
+            return
+        if self.editor.apply_drop_cap(lines=3, chars=1):
+            if self.doc and self.doc.kind in (
+                DocKind.TEXT,
+                DocKind.MARKDOWN,
+                DocKind.HTML,
+                DocKind.DOCX,
+            ):
+                self.doc.text = self.editor.toPlainText()
+                self.doc.dirty = True
+            self._on_text_changed()
+            self._set_status("Drop Cap gesetzt (3 Zeilen)")
+        else:
+            self._set_status("Drop Cap unverändert")
+
+    def _hyphenate_document(self, lang: str = "de") -> None:
+        if self.stack.currentWidget() is not self.editor_pane:
+            self._set_status("Silbentrennung nur im Editor")
+            return
+        n = self.editor.hyphenate_document(lang=lang)
+        if self.doc and self.doc.kind in (
+            DocKind.TEXT,
+            DocKind.MARKDOWN,
+            DocKind.HTML,
+            DocKind.DOCX,
+        ):
+            self.doc.text = self.editor.toPlainText()
+            self.doc.dirty = True
+        self._on_text_changed()
+        self._set_status(f"Silbentrennung ({lang}): {n} Stellen")
+
+    def _set_image_text_wrap(self) -> None:
+        """Textumfluss für ersten Bildrahmen (Dialog) — 2.6.13."""
+        from PySide6.QtWidgets import QInputDialog
+
+        if not self.layout_doc.image_frames:
+            self._set_status("Kein Bildrahmen im Layout")
+            return
+        modes = ["bounding_box", "contour", "jump_object", "none"]
+        mode, ok = QInputDialog.getItem(
+            self, "Textumfluss", "Modus:", modes, 0, False
+        )
+        if not ok:
+            return
+        fr = self.layout_doc.image_frames[0]
+        self.layout_doc.set_text_wrap(fr.id, mode)
+        self._set_status(f"Textumfluss {mode} für Rahmen {fr.id}")
+
     def _toggle_rulers(self, checked: bool = False) -> None:
         on = bool(checked)
         if hasattr(self.pdf_view, "set_show_rulers"):
@@ -10542,6 +10652,12 @@ class MainWindow(QMainWindow):
             "add_column_frames": self._add_column_frames,
             "move_frame": self._move_frame_dialog,
             "resize_frame": self._resize_frame_dialog,
+            "typo_tracking": lambda: self._set_typography(tracking=50.0),
+            "typo_leading": lambda: self._set_typography(leading=1.5),
+            "drop_cap": self._apply_drop_cap,
+            "hyphenate_de": lambda: self._hyphenate_document("de"),
+            "hyphenate_en": lambda: self._hyphenate_document("en"),
+            "text_wrap": self._set_image_text_wrap,
             "ocr_page": self._run_ocr,
             "ocr_pdf": self._run_ocr_document,
             "ocr_region": self._run_ocr_region,
