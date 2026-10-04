@@ -149,7 +149,8 @@ SHORTCUTS_HTML = """
 <tr><td>AcroForm-Sidebar</td><td>CSV Esc ohne Export; Enter auf OK; Zähler N von M; Default persistiert — 1.3.6</td></tr>
 <tr><td>Redactions anwenden</td><td>Status „Sidecar übersprungen“; Fortsetzen-Option Settings merken — 1.3.6; Overlay-Bake (Text darunter ggf. noch selektierbar)</td></tr>
 <tr><td>Echt schwärzen</td><td>PDF → Echt schwärzen… / Palette: unwiderruflich Content-Stream entfernen (Seite→Bild) + optional Metadaten; Auswahl → Schwärzung; Settings DPI/Meta — <b>2.6.0</b></td></tr>
-<tr><td>Seitenmanagement</td><td>PDF → Seitenmanagement… (Ctrl+Shift+M) / Palette / Toolbar „Seiten…“: Drag-Reorder · einfügen · drehen · löschen · Seiten aus anderem PDF; Sidebar <b>Schnellvorschau</b> + klickbares <b>Inhaltsverzeichnis</b> — <b>2.6.1</b></td></tr>
+<tr><td>Seitenmanagement</td><td>PDF → Seitenmanagement… (Ctrl+Shift+M) / Palette / Toolbar „Seiten…“: Drag-Reorder · einfügen · drehen · löschen · Seiten aus anderem PDF; Sidebar <b>Schnellvorschau</b> + klickbares <b>Inhaltsverzeichnis</b> — <b>2.6.2</b></td></tr>
+<tr><td>Scannen / Import</td><td>PDF → Scannen / Import… (Ctrl+Alt+Shift+I) / Palette: Scanner oder Bilder · Tesseract-OCR · Geräte lokal/Netzwerk · Aktualisieren/Neu suchen; PDF → Drucker &amp; Scanner… — <b>2.6.2</b></td></tr>
 <tr><td>Bookmarks ↔ Outlines</td><td>Fehlerdialog Retry-Zähler „Versuch k/3“; max. 3 wie Backup — 1.3.6</td></tr>
 <tr><td>Thumbnail Lazy-Load</td><td>Prefetch-Label grau wenn Lazy aus (unter Schwellwert), sonst aktiv — 1.3.6</td></tr>
 <tr><td>Alle Ann. auf Seite löschen</td><td>Bearbeiten → bei 0 Treffern Sticky-Status Statusleiste bis nächste Ann.-Aktion / Seiten-/Dokumentwechsel / Undo/Redo + i18n DE + Menü/Aktion no-op + Button disabled; Undo „N Annotationen (gefiltert)“ — 1.1.9</td></tr>

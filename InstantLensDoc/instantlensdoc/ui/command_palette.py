@@ -90,6 +90,19 @@ def default_palette_commands() -> list[PaletteCommand]:
             "PDF",
             "Ctrl+Shift+M",
         ),
+        PaletteCommand(
+            "scan_import",
+            "Scannen / Import…",
+            "scan scanner import ocr tesseract wia twain bild foto seite",
+            "PDF",
+            "Ctrl+Alt+Shift+I",
+        ),
+        PaletteCommand(
+            "devices",
+            "Drucker & Scanner…",
+            "drucker scanner geräte network wia twain print refresh",
+            "PDF",
+        ),
         PaletteCommand("export", "Exportieren…", "export html docx pdf", "Datei"),
         PaletteCommand("export_page_images", "Seiten als Bilder…", "export png jpeg", "PDF"),
         PaletteCommand(

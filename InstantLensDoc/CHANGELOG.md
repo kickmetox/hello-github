@@ -1,5 +1,26 @@
 # Changelog — InstantLens Doc
 
+## 2.6.2 — Scannen mit Tesseract + Drucker-/Scannererkennung
+
+Minor-Feature nach **2.6.1** (Zusatzanforderungen #2): **Scannen / Import** — Seitenbilder vom Scanner (WIA/SANE) oder per Datei-Import in die aktuelle Session; **OCR über Tesseract** (pytesseract) → durchsuchbarer Text / Sidecar `*.ildocr.txt`. **Geräteerkennung** lokal + Netzwerk: Systemdrucker (Qt/Winspool) und Scanner (WIA/PnP bzw. SANE); UI mit Aktualisieren/Neu suchen; Scanner für Scan-Flow, Drucker für Druckziel-Liste. UI **PDF → Scannen / Import…** (Ctrl+Alt+Shift+I) · **Drucker & Scanner…** · Palette · Toolbar „Scan…“. Windows-Deps in Docs (Tesseract winget, WIA). Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie unverändert.
+
+### Neu
+- `instantlensdoc.core.devices` — `discover_devices` / `list_printers` / `list_scanners` (lokal + Netzwerk)
+- `instantlensdoc.core.scan` — Acquire/Import → `insert_scan_pages_into_pdf` + Tesseract-OCR-Bridge
+- Dialog **Scannen / Import** · **Drucker & Scanner** · Command-Palette `scan_import` / `devices`
+- PDF-Menü · Toolbar „Scan…“ · Shortcut Ctrl+Alt+Shift+I
+- Docs: Windows-Install Tesseract (`winget install UB-Mannheim.TesseractOCR`) + WIA-Hinweis
+
+### Geändert
+- Bestehende OCR-Pfade (Seite/Region/Batch) unverändert; Scan nutzt dieselbe Tesseract-Bridge
+- Qt-Druckdialog bleibt; Druckernamen zusätzlich über Geräte-Dialog listbar
+- Docs/Version **2.6.2**
+
+### Tests / Qualität
+- Version **2.6.2** (App / `ild_pdf` / ISS / Smoke / Docs); Serie **2.6**; `docs/VERSION` + `VERSION.txt`
+- Smoke: 2.6.2 CLI + Qt (scan/import + devices + Tesseract-Pfad)
+- Stubs: KI/Cloud/Stylus/3D/Hooks/Outline/Telemetrie unverändert markiert
+
 ## 2.6.1 — Seitenmanagement + Schnellvorschau / Inhaltsverzeichnis
 
 Minor-Feature nach **2.6.0** (Zusatzanforderungen #3; Scan übersprungen): **Seitenmanagement** — Seiten per Drag-and-Drop neu anordnen, einfügen, drehen, löschen und Seiten aus anderen PDFs einfügen/zusammenfügen. Sidebar: **Schnellvorschau** (Seitenminiaturen) und klickbares **Inhaltsverzeichnis** (PDF-Outline → Seite). UI **PDF → Seitenmanagement…** (Ctrl+Shift+M) · Palette · Toolbar „Seiten…“; API `ild_pdf.insert_pages_from_pdf`. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie unverändert; Scan/OCR folgt separat.

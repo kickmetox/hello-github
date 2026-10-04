@@ -783,7 +783,7 @@ class SettingsDialog(QDialog):
         )
         self.true_redact_strip_meta.setChecked(get_true_redact_strip_metadata())
         self.true_redact_strip_meta.setToolTip(
-            "Beim unwiderruflichen Schwärzen DocInfo/XMP entfernen (Default an) — 2.6.1"
+            "Beim unwiderruflichen Schwärzen DocInfo/XMP entfernen (Default an) — 2.6.2"
         )
         form.addRow(self.true_redact_strip_meta)
 
@@ -796,7 +796,7 @@ class SettingsDialog(QDialog):
                 tr_pick = i
         self.true_redact_dpi.setCurrentIndex(tr_pick)
         self.true_redact_dpi.setToolTip(
-            "Raster-Auflösung für echtes Schwärzen (Seite → Bild) — 2.6.1"
+            "Raster-Auflösung für echtes Schwärzen (Seite → Bild) — 2.6.2"
         )
         form.addRow("Echt schwärzen DPI", self.true_redact_dpi)
 
@@ -961,7 +961,7 @@ class SettingsDialog(QDialog):
             sw.setToolTip(
                 "Theme-Vorschau · Klick=Hex · RMB=HL/Stift/Notiz · "
                 "Focus: Space/H=HL · P=Stift · N=Notiz · C/Ctrl+C=Hex · "
-                "←/→ · Shift+←/→ ±2 · PgUp/PgDn · Home/End · 1–6 — 2.6.1"
+                "←/→ · Shift+←/→ ±2 · PgUp/PgDn · Home/End · 1–6 — 2.6.2"
             )
             sw.setCursor(Qt.PointingHandCursor)
             sw.setFocusPolicy(Qt.StrongFocus)
@@ -2864,7 +2864,7 @@ class SettingsDialog(QDialog):
             self.btn_undo_factory_presets.setEnabled(bool(prev))
 
     def eventFilter(self, obj, event):  # noqa: N802
-        """Swatch L→Hex · Dbl→HL/Stift/Notiz · M→HL · Keys Space/H/P/N/C · Ctrl+Shift+C · ←/→ · Shift+←/→ · PgUp/Dn · Home/End · 1–6 — 2.5.9–2.6.1."""
+        """Swatch L→Hex · Dbl→HL/Stift/Notiz · M→HL · Keys Space/H/P/N/C · Ctrl+Shift+C · ←/→ · Shift+←/→ · PgUp/Dn · Home/End · 1–6 — 2.5.9–2.6.2."""
         labels = getattr(self, "_theme_swatch_labels", None) or []
         if obj in labels:
             hex_c = str(obj.property("themeHex") or "").strip()
@@ -3083,7 +3083,7 @@ class SettingsDialog(QDialog):
                     f"RMB = HL/Stift/Notiz · "
                     f"Focus: Space/H=HL · P=Stift · N=Notiz · C/Ctrl+C=Hex · "
                     f"Ctrl+Shift+C=alle Hex · "
-                    f"←/→ · Shift+←/→ ±2 · PgUp/PgDn · Home/End · 1–6 — 2.6.1"
+                    f"←/→ · Shift+←/→ ±2 · PgUp/PgDn · Home/End · 1–6 — 2.6.2"
                 )
                 sw.setProperty("themeHex", str(c))
                 sw.setAccessibleName(f"Theme-Swatch {i + 1}: {c}")
@@ -3211,7 +3211,7 @@ class SettingsDialog(QDialog):
                     parent._set_status(msg)
                 except Exception:
                     pass
-            # Fail-Path A11y Hex-All — 2.6.1
+            # Fail-Path A11y Hex-All — 2.6.2
             if parent is not None and hasattr(parent, "_announce_status_toast"):
                 try:
                     parent._announce_status_toast(msg)
@@ -3230,7 +3230,7 @@ class SettingsDialog(QDialog):
                     parent._set_status(msg)
                 except Exception:
                     pass
-            # Fail-Path A11y Hex-All — 2.6.1
+            # Fail-Path A11y Hex-All — 2.6.2
             if parent is not None and hasattr(parent, "_announce_status_toast"):
                 try:
                     parent._announce_status_toast(msg)
@@ -3251,7 +3251,7 @@ class SettingsDialog(QDialog):
                     parent._set_status(msg)
                 except Exception:
                     pass
-            # Fail-Path A11y Hex-All — 2.6.1
+            # Fail-Path A11y Hex-All — 2.6.2
             if parent is not None and hasattr(parent, "_announce_status_toast"):
                 try:
                     parent._announce_status_toast(msg)

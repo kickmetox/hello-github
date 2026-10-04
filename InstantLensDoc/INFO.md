@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **2.6.1** |
+| Version | **2.6.2** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -33,7 +33,7 @@
 
 Skript: [sync-ild.ps1](scripts/sync-ild.ps1) — Branch `cursor/instantlensdoc-2108` (oder `-LocalPack` / Pack-Zip) nach `D:\AI_Temp\InstantLensDoc`, pip, Start. **Nutzer-Icon in `assets` wird nicht überschrieben.**
 
-**FEATURES.md lokal sync:** Nach Sync liegt `FEATURES.md` lokal im App-Ordner (`D:\AI_Temp\InstantLensDoc\FEATURES.md`); About/Stubs öffnen diese lokale Datei — Version **2.6.1**.
+**FEATURES.md lokal sync:** Nach Sync liegt `FEATURES.md` lokal im App-Ordner (`D:\AI_Temp\InstantLensDoc\FEATURES.md`); About/Stubs öffnen diese lokale Datei — Version **2.6.2**.
 
 Ohne Start: `-NoStart` (Alias `-SkipStart`). Exit-Codes: **0** OK · **1** allgemein · **2** Git-Fehler.
 
@@ -63,6 +63,17 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an / `checkedonce`)
 
+## Neu in 2.6.2
+
+Minor-Feature nach **2.6.1** (Zusatzanforderungen #2):
+
+- **Scannen / Import:** Scanner-Acquire (WIA/SANE) oder Bilder importieren → Seiten in die aktuelle Session
+- **OCR Tesseract:** pytesseract / Tesseract-Binary → durchsuchbarer Text + Sidecar `*.ildocr.txt` (gleiche OCR-Bridge)
+- **Geräteerkennung:** lokale + Netzwerk-Drucker (Qt/Winspool) und Scanner (WIA/PnP bzw. SANE); UI Aktualisieren/Neu suchen
+- **UI:** PDF → Scannen / Import… (Ctrl+Alt+Shift+I) · Drucker & Scanner… · Palette `scan_import` / `devices` · Toolbar „Scan…“
+- **Windows-Deps:** `winget install UB-Mannheim.TesseractOCR` (deu+eng) · `pip install pytesseract` · WIA-Treiber; ohne Hardware: Bildimport
+- Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie unverändert
+
 ## Neu in 2.6.1
 
 Minor-Feature nach **2.6.0** (Zusatzanforderungen #3; Scan übersprungen):
@@ -71,7 +82,7 @@ Minor-Feature nach **2.6.0** (Zusatzanforderungen #3; Scan übersprungen):
 - **UI:** PDF → Seitenmanagement… (Ctrl+Shift+M) · Palette `page_manage` · Toolbar „Seiten…“
 - **Sidebar:** **Schnellvorschau** (Seitenminiaturen) · klickbares **Inhaltsverzeichnis** (PDF-Outline → Seite)
 - **API:** `ild_pdf.insert_pages_from_pdf` · `page_count`
-- Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie unverändert (Scan/OCR folgt separat)
+- Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie unverändert; Scan/OCR in **2.6.2**
 
 ## Neu in 2.6.0
 

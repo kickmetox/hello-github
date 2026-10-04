@@ -2,7 +2,7 @@
 
 Moderne Textverarbeitung mit PDF-Annotator, OCR-Bridge und Formulargenerator.
 
-**Version:** 2.6.1  
+**Version:** 2.6.2  
 **Hersteller:** Andreas Meyer · ame@sellerbach.de
 
 ## Quickstart (Windows)
@@ -34,9 +34,17 @@ User-Shortcuts: `.\scripts\install-ild.ps1` · Deinstallieren: `-Uninstall [-Qui
 
 Nightly-Smoke: `python scripts\smoke_ild.py` · optional `--qt` · `--json` (Summary: `ok`, `checks[]`, `duration_ms`, `version`; Fail: `checks[].error` max 200…, Exit=ok). Siehe **CONTRIBUTING.md**; Workflow-Stub `.github/workflows/smoke-ild.yml` (manual only).
 
+## Neu in 2.6.2
+
+Minor-Feature nach **2.6.1**: **Scannen / Import** (WIA/SANE oder Bilder) + **Tesseract-OCR** → durchsuchbarer Text; **Drucker-/Scannererkennung** lokal + Netzwerk mit Aktualisieren. UI **Scannen / Import…** / **Drucker & Scanner…**. Windows: `winget install UB-Mannheim.TesseractOCR`. Stubs unverändert.
+
 ## Neu in 2.6.1
 
-Minor-Feature nach **2.5.20**: **Echtes Schwärzen** (unwiderruflich, Content-Stream/Textschicht weg) + optional **Metadaten-Bereinigung**; UI **Echt schwärzen…** / **Auswahl → Schwärzung**; Overlay-Bake bleibt. Stubs unverändert; ScanTuxio erst 2.6.1+.
+Minor-Feature nach **2.6.0**: **Seitenmanagement** (Drag-Reorder, einfügen/drehen/löschen, Seiten aus PDF) + Sidebar **Schnellvorschau** / klickbares **Inhaltsverzeichnis**. Stubs unverändert.
+
+## Neu in 2.6.0
+
+Minor-Feature nach **2.5.20**: **Echtes Schwärzen** (unwiderruflich, Content-Stream/Textschicht weg) + optional **Metadaten-Bereinigung**; UI **Echt schwärzen…** / **Auswahl → Schwärzung**; Overlay-Bake bleibt. Stubs unverändert.
 
 ## Neu in 2.5.20
 

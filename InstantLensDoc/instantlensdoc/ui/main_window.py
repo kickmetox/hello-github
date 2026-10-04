@@ -2456,6 +2456,8 @@ class MainWindow(QMainWindow):
                 lambda: self._edit_annotation_group(),
             ),
             ("Seitenmanagement…", lambda: self.pdf_view.page_manage_dialog()),
+            ("Scannen / Import…", lambda: self._run_scan_import()),
+            ("Drucker & Scanner…", lambda: self._show_devices_dialog()),
             ("Seiten neu anordnen…", lambda: self.pdf_view.reorder_dialog()),
             ("Seite als Bild exportieren…", lambda: self.pdf_view.extract_page_as_image()),
             ("Seiten als Bilder exportieren…", lambda: self.pdf_view.export_pages_as_images()),
@@ -2468,9 +2470,19 @@ class MainWindow(QMainWindow):
             if title == "Seitenmanagement…":
                 a.setToolTip(
                     "Seiten ordnen (Drag), einfügen, drehen, löschen, "
-                    "aus anderem PDF zusammenfügen — 2.6.1"
+                    "aus anderem PDF zusammenfügen — 2.6.2"
                 )
                 a.setShortcut(QKeySequence("Ctrl+Shift+M"))
+            if title == "Scannen / Import…":
+                a.setToolTip(
+                    "Scanner oder Bilder importieren · Tesseract-OCR · "
+                    "Geräte lokal/Netzwerk — 2.6.2"
+                )
+                a.setShortcut(QKeySequence("Ctrl+Alt+Shift+I"))
+            if title == "Drucker & Scanner…":
+                a.setToolTip(
+                    "Lokale und Netzwerk-Drucker/Scanner auflisten · Aktualisieren — 2.6.2"
+                )
             a.triggered.connect(slot)
             m_pdf.addAction(a)
         # Batch Drehen/Spiegeln Shortcuts (Auswahl oder aktuelle Seite) — 1.8.1
@@ -2591,11 +2603,11 @@ class MainWindow(QMainWindow):
             if title == "Echt schwärzen…":
                 a.setToolTip(
                     "Unwiderrufliches Schwärzen: Content-Stream/Textschicht entfernen "
-                    "+ optional Metadaten — 2.6.1"
+                    "+ optional Metadaten — 2.6.2"
                 )
             elif title == "Auswahl → Schwärzung":
                 a.setToolTip(
-                    "Textauswahl als Schwärzungs-Rechtecke markieren (Sidecar) — 2.6.1"
+                    "Textauswahl als Schwärzungs-Rechtecke markieren (Sidecar) — 2.6.2"
                 )
             a.triggered.connect(slot)
             m_pdf.addAction(a)
@@ -10106,6 +10118,8 @@ class MainWindow(QMainWindow):
             "page_manage": lambda: self.pdf_view.page_manage_dialog()
             if hasattr(self.pdf_view, "page_manage_dialog")
             else None,
+            "scan_import": self._run_scan_import,
+            "devices": self._show_devices_dialog,
             "export": _export_menu,
             "export_page_images": lambda: self.pdf_view.export_pages_as_images()
             if hasattr(self.pdf_view, "export_pages_as_images")
@@ -12171,7 +12185,7 @@ class MainWindow(QMainWindow):
                     f"{name or '(ohne Name)'}"
                 )
                 self._set_status(msg)
-                # Fail-Path A11y Summary-Copy — 2.6.1
+                # Fail-Path A11y Summary-Copy — 2.6.2
                 try:
                     self._announce_status_toast(msg)
                 except Exception:
@@ -13187,6 +13201,59 @@ class MainWindow(QMainWindow):
             )
         self._set_status(f"Bild eingefügt: {Path(path).name}")
 
+    def _run_scan_import(self):
+        """Scan/Import-Dialog: Scanner oder Bilder · Tesseract-OCR — 2.6.2."""
+        if hasattr(self.pdf_view, "scan_import_dialog"):
+            self.pdf_view.scan_import_dialog()
+        else:
+            from instantlensdoc.ui.scan_dialog import ScanDialog
+
+            ScanDialog(self.pdf_view, self).exec()
+
+    def _show_devices_dialog(self):
+        """Drucker- & Scannerliste mit Aktualisieren (lokal + Netzwerk) — 2.6.2."""
+        from PySide6.QtWidgets import QDialogButtonBox
+
+        from instantlensdoc.ui.scan_dialog import ScanDialog
+
+        dlg = ScanDialog(self.pdf_view, self)
+        dlg.setWindowTitle("Drucker & Scanner")
+        dlg.setObjectName("devicesDialog")
+        dlg.btn_acquire.setVisible(False)
+        dlg.btn_import.setVisible(False)
+        dlg.ocr_enabled.setVisible(False)
+        dlg.lang_combo.setVisible(False)
+        dlg.tess_hint.setVisible(False)
+        dlg.pending_label.setText(
+            "Druckerliste für Druckziele · Scanner für Scan-Dialog. "
+            "Aktualisieren / Neu suchen. — 2.6.2"
+        )
+        bbox = dlg.findChild(QDialogButtonBox)
+        if bbox is not None:
+            ok = bbox.button(QDialogButtonBox.Ok)
+            if ok is not None:
+                ok.setText("Schließen")
+                try:
+                    bbox.accepted.disconnect()
+                except Exception:
+                    pass
+                bbox.accepted.connect(dlg.accept)
+        dlg.exec()
+
+    def _show_scan_ocr_text(self, text: str, title: str = "Scan-OCR") -> None:
+        """OCR-Text aus Scan/Import im Editor zeigen — 2.6.2."""
+        self.stack.setCurrentWidget(self.editor_pane)
+        self.editor.setPlainText(text)
+        self.doc = Document(kind=DocKind.TEXT, title=title, text=text)
+        self.setWindowTitle(self._app_title(title))
+        self._set_status(f"{title}: {len(text.split())} Wörter")
+        try:
+            from instantlensdoc.core.plugin_hooks import emit as emit_hook
+
+            emit_hook("ocr.finished", mode="scan_import", lang="tesseract")
+        except Exception:
+            pass
+
     def _run_ocr(self):
         from PySide6.QtWidgets import QApplication, QDialog, QProgressDialog
 
@@ -13553,7 +13620,7 @@ class MainWindow(QMainWindow):
         return preview
 
     def _ocr_region_status_tooltip(self) -> str:
-        """Status-Tooltip inkl. Textvorschau — 2.5.9–2.6.1."""
+        """Status-Tooltip inkl. Textvorschau — 2.5.9–2.6.2."""
         path = getattr(self, "_last_ocr_region_path", None) or ""
         tip = (
             "Linksklick → Ergebnis-Tab · Rechtsklick → Menü · "
@@ -13563,7 +13630,7 @@ class MainWindow(QMainWindow):
             "Esc → Status schließen · "
             "Enter → Ergebnis-Tab · "
             "Ctrl+C Text · Ctrl+Shift+C Pfad · "
-            "F4 → Ordner · F5 → Datei — 2.6.1"
+            "F4 → Ordner · F5 → Datei — 2.6.2"
         )
         if path:
             tip = f"{tip}\n{path}"
@@ -13633,7 +13700,7 @@ class MainWindow(QMainWindow):
         if not path:
             msg = "OCR-Region Pfad fehlt"
             self._set_status(msg)
-            # Fail-Path A11y Open-Pfad fehlt — 2.6.1
+            # Fail-Path A11y Open-Pfad fehlt — 2.6.2
             try:
                 self._announce_status_toast(msg)
             except Exception:
@@ -13675,7 +13742,7 @@ class MainWindow(QMainWindow):
         except Exception:
             msg = f"OCR-Region Tab öffnen fehlgeschlagen: {target.name}"
             self._set_status(msg)
-            # Fail-Path A11y Open-Exception — 2.6.1
+            # Fail-Path A11y Open-Exception — 2.6.2
             try:
                 self._announce_status_toast(msg)
             except Exception:
@@ -13691,7 +13758,7 @@ class MainWindow(QMainWindow):
         if not path:
             msg = "OCR-Region Pfad fehlt"
             self._set_status(msg)
-            # Fail-Path A11y Open-Pfad fehlt — 2.6.1
+            # Fail-Path A11y Open-Pfad fehlt — 2.6.2
             try:
                 self._announce_status_toast(msg)
             except Exception:
@@ -13713,7 +13780,7 @@ class MainWindow(QMainWindow):
         except Exception:
             msg = f"OCR-Region Ordner öffnen fehlgeschlagen: {folder}"
             self._set_status(msg)
-            # Fail-Path A11y Open-Exception — 2.6.1
+            # Fail-Path A11y Open-Exception — 2.6.2
             try:
                 self._announce_status_toast(msg)
             except Exception:
@@ -13729,7 +13796,7 @@ class MainWindow(QMainWindow):
         if not path:
             msg = "OCR-Region Pfad fehlt"
             self._set_status(msg)
-            # Fail-Path A11y Open-Pfad fehlt — 2.6.1
+            # Fail-Path A11y Open-Pfad fehlt — 2.6.2
             try:
                 self._announce_status_toast(msg)
             except Exception:
@@ -13750,7 +13817,7 @@ class MainWindow(QMainWindow):
         except Exception:
             msg = f"OCR-Region Datei öffnen fehlgeschlagen: {target.name}"
             self._set_status(msg)
-            # Fail-Path A11y Open-Exception — 2.6.1
+            # Fail-Path A11y Open-Exception — 2.6.2
             try:
                 self._announce_status_toast(msg)
             except Exception:

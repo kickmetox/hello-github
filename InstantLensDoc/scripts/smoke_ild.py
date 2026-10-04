@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Nightly/CI Smoke: CLI + Import-Checks für InstantLens Doc — 2.1.0–2.6.1.
+"""Nightly/CI Smoke: CLI + Import-Checks für InstantLens Doc — 2.1.0–2.6.2.
 
 Leichtgewichtig. Exit-Codes:
   0  OK  (ok=true)
@@ -14,12 +14,12 @@ Aufruf:
   python scripts/smoke_ild.py -h
 
 JSON-Schema (--json), Erfolg:
-  {"ok": true, "version": "2.6.1", "duration_ms": 1234,
+  {"ok": true, "version": "2.6.2", "duration_ms": 1234,
    "checks": ["version", "imports", "cli", "measure_diff_import", "changelog"]}
 
 JSON bei Fail: checks[] enthält Objekt mit error-Text (max 200 Zeichen, Truncate …);
 Exitcode spiegelt ok (0↔true, 1↔false) — 2.2.0:
-  {"ok": false, "version": "2.6.1", "duration_ms": 12,
+  {"ok": false, "version": "2.6.2", "duration_ms": 12,
    "checks": ["version", {"name": "imports", "error": "import x: …"}]}
 """
 
@@ -41,7 +41,7 @@ if str(ROOT) not in sys.path:
 # Headless/CI: Qt ohne Display
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-EXPECTED_VERSION = "2.6.1"
+EXPECTED_VERSION = "2.6.2"
 FAIL_ERROR_MAX_LEN = 200
 
 EXIT_OK = 0
@@ -171,6 +171,7 @@ def check_imports(*, with_qt: bool) -> None:
             "page_manage_dialog",
             "insert_pages_from_other_pdf",
             "Seitenmanagement",
+            "scan_import_dialog",
         ),
         ROOT / "instantlensdoc" / "ui" / "page_manage_dialog.py": (
             "PageManageDialog",
@@ -178,6 +179,28 @@ def check_imports(*, with_qt: bool) -> None:
             "Seiten aus PDF einfügen",
             "pageManageDialog",
             "Reihenfolge anwenden",
+        ),
+        ROOT / "instantlensdoc" / "ui" / "scan_dialog.py": (
+            "ScanDialog",
+            "scanDeviceList",
+            "scanDeviceRefresh",
+            "scanDeviceRescan",
+            "scanAcquireBtn",
+            "scanImportBtn",
+            "scanOcrEnabled",
+        ),
+        ROOT / "instantlensdoc" / "core" / "devices.py": (
+            "discover_devices",
+            "list_printers",
+            "list_scanners",
+            "DeviceKind",
+            "WINDOWS_SCAN_DEPS_HINT",
+        ),
+        ROOT / "instantlensdoc" / "core" / "scan.py": (
+            "insert_scan_pages_into_pdf",
+            "import_image_paths",
+            "acquire_from_scanner",
+            "ocr_page_image",
         ),
         ROOT / "instantlensdoc" / "ui" / "page_labels_dialog.py": (
             "PageLabelsDialog",
@@ -202,6 +225,8 @@ def check_imports(*, with_qt: bool) -> None:
             "replace_oldest",
             "page_manage",
             "Seitenmanagement",
+            "scan_import",
+            "devices",
             "Pin-Limit erreicht",
             "Pin ersetzen",
             "Zu ersetzender Pin",
@@ -238,6 +263,12 @@ def check_imports(*, with_qt: bool) -> None:
             "Seitenmanagement…",
             "page_manage",
             "Ctrl+Shift+M",
+            "Scannen / Import…",
+            "scan_import",
+            "_run_scan_import",
+            "_show_devices_dialog",
+            "Drucker & Scanner…",
+            "Ctrl+Alt+Shift+I",
         ),
         ROOT / "instantlensdoc" / "ui" / "password_dialog.py": (
             "compressOpenAfter",
@@ -588,8 +619,8 @@ def check_measure_and_diff() -> None:
 
 def check_changelog() -> None:
     cl = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-    if "## 2.6.1" not in cl:
-        _fail("CHANGELOG fehlt ## 2.6.1")
+    if "## 2.6.2" not in cl:
+        _fail("CHANGELOG fehlt ## 2.6.2")
     if "## 2.6.0" not in cl:
         _fail("CHANGELOG fehlt ## 2.6.0")
     if "## 2.5.20" not in cl:
@@ -850,6 +881,14 @@ def check_changelog() -> None:
     ):
         _fail("CHANGELOG 2.6.1 fehlt Kernfeature-Hinweis")
     if (
+        "Tesseract" not in cl
+        and "Scannen" not in cl
+        and "Scanner" not in cl
+        and "discover_devices" not in cl
+        and "2.6.2" not in cl
+    ):
+        _fail("CHANGELOG 2.6.2 fehlt Kernfeature-Hinweis")
+    if (
         "Open-Fail" not in cl
         and "HexAll" not in cl
         and "Ctrl+Shift+C" not in cl
@@ -972,8 +1011,8 @@ def check_changelog() -> None:
     if "## 2.2.0" not in cl:
         _fail("CHANGELOG fehlt ## 2.2.0")
     feat = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
-    if "2.6.1" not in feat:
-        _fail("FEATURES.md fehlt 2.6.1")
+    if "2.6.2" not in feat:
+        _fail("FEATURES.md fehlt 2.6.2")
     if "2.5.17" not in feat:
         _fail("FEATURES.md fehlt 2.5.17")
     if "2.5.15" not in feat:
@@ -1167,6 +1206,14 @@ def check_changelog() -> None:
         and "Inhaltsverzeichnis" not in feat
     ):
         _fail("FEATURES.md fehlt 2.6.1 Seitenmanagement")
+    if (
+        "2.6.2" not in feat
+        and "Tesseract" not in feat
+        and "Scannen" not in feat
+        and "Scanner" not in feat
+        and "Geräte" not in feat
+    ):
+        _fail("FEATURES.md fehlt 2.6.2 Scan/Geräte")
     if (
         "2.5.20" not in feat
         and "Open-Fail-A11y" not in feat
@@ -1373,11 +1420,11 @@ Exit-Codes:
 Laufzeit: am Ende als „Laufzeit: N ms“ (oder duration_ms im JSON).
 
 Beispiel --json (Erfolg):
-  {"ok": true, "version": "2.6.1", "duration_ms": 1234,
+  {"ok": true, "version": "2.6.2", "duration_ms": 1234,
    "checks": ["version", "imports", "cli", "measure_diff_import", "changelog"]}
 
 Beispiel --json (Fail):
-  {"ok": false, "version": "2.6.1", "duration_ms": 12,
+  {"ok": false, "version": "2.6.2", "duration_ms": 12,
    "checks": ["version", {"name": "imports", "error": "import x: …"}]}
 """.rstrip()
     )
