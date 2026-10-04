@@ -130,7 +130,12 @@
     "installer_desktop_icon": "Создать ярлык на рабочем столе",
     "installer_start_menu": "Оставить пункты в меню Пуск",
     "installer_launch_now": "Запустить InstantLens Doc сейчас",
-    "installer_build_hint": "Setup.exe (Windows x64): powershell -ExecutionPolicy Bypass -File .\\scripts\\build-windows-installer.ps1"
+    "installer_build_hint": "Setup.exe (Windows x64): powershell -ExecutionPolicy Bypass -File .\\scripts\\build-windows-installer.ps1",
+    "installer_sync_hint": "После sync: install-ild.ps1 · опционально build-windows-installer.ps1 / sync-ild.ps1 -BuildInstaller",
+    "installer_post_sync_steps": "1) Ярлыки: .\\scripts\\install-ild.ps1  2) Опционально Setup.exe: .\\scripts\\build-windows-installer.ps1",
+    "keygen_cli_hint": "Keygen: run-keygen.bat · python -m keygen user@example.com · --verify \"ILD1....\"",
+    "scripting_cli_hint": "Scripting: python -m ild --help · run-ild.bat · .\\scripts\\ild.ps1",
+    "wheel_scroll_hint": "Колесо/тачпад прокручивает текст и Word Suite; Shift+колесо — горизонтально; также над номерами/миникартой"
   },
   "phrases": {
     "&Datei": "&Файл",

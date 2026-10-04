@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **2.6.26** |
+| Version | **2.6.27** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -33,7 +33,7 @@
 
 Skript: [sync-ild.ps1](scripts/sync-ild.ps1) — Branch `cursor/instantlensdoc-2108` (oder `-LocalPack` / Pack-Zip) nach `D:\AI_Temp\InstantLensDoc`, pip, Start. **Nutzer-Icon in `assets` wird nicht überschrieben.**
 
-**FEATURES.md lokal sync:** Nach Sync liegt `FEATURES.md` lokal im App-Ordner (`D:\AI_Temp\InstantLensDoc\FEATURES.md`); About/Stubs öffnen diese lokale Datei — Version **2.6.26**.
+**FEATURES.md lokal sync:** Nach Sync liegt `FEATURES.md` lokal im App-Ordner (`D:\AI_Temp\InstantLensDoc\FEATURES.md`); About/Stubs öffnen diese lokale Datei — Version **2.6.27**.
 
 Ohne Start: `-NoStart` (Alias `-SkipStart`). Exit-Codes: **0** OK · **1** allgemein · **2** Git-Fehler.
 
@@ -68,9 +68,19 @@ Python-Layout-Zip (ohne PyInstaller-EXE):
 powershell -ExecutionPolicy Bypass -File .\scripts\pack-windows-runnable.ps1
 ```
 
-Installer: `.\scripts\build-windows-installer.ps1` bzw. `.\installer\build-installer.ps1` (optional `-NoKeygen`) → `dist\InstantLensDoc-Setup-2.6.26.exe`  
+Installer: `.\scripts\build-windows-installer.ps1` bzw. `.\installer\build-installer.ps1` (optional `-NoKeygen`) → `dist\InstantLensDoc-Setup-2.6.27.exe`  
 Desktop-/Keygen-Shortcuts: `.\scripts\install-ild.ps1` (Keygen wenn `run-keygen.bat` / EXE vorhanden; `-SkipKeygen`)  
 Desktop-Verknüpfung Installer: optionale Checkbox (`desktopicon`, Standard an / `checkedonce`)
+
+**Nach Sync (DE, copy-ready):**
+
+```powershell
+cd D:\AI_Temp\InstantLensDoc
+powershell -ExecutionPolicy Bypass -File .\scripts\install-ild.ps1
+powershell -ExecutionPolicy Bypass -File .\scripts\build-windows-installer.ps1   # optional, Inno Setup 6
+```
+
+Oder Sync inkl. optionalem Installer-Build: `…\sync-ild.ps1 -BuildInstaller -SkipStart`
 
 ## Keygen
 
@@ -81,6 +91,26 @@ python -m keygen --verify "ILD1...."
 ```
 
 Trial 28 Tage · Keys 32 Tage (HMAC `ILD1.…`). Details: `keygen/README.md`.
+
+## Scripting
+
+```bat
+python -m ild --help
+run-ild.bat pages dokument.pdf
+powershell -ExecutionPolicy Bypass -File .\scripts\ild.ps1 license generate kunde@example.com
+```
+
+Anleitung: Store `docs/instantlensdoc-scripting.md` · Beispiel `examples/ild_scripting_demo.py`.
+
+## Neu in 2.6.27
+
+Minor nach **2.6.26** (Polish / Installer-Härtung):
+
+- **Installer im Sync/Install-Flow:** `sync-ild.ps1 -BuildInstaller` (optional Setup.exe nach Sync); klare DE-Schritte nach Sync für `install-ild.ps1` + `build-windows-installer.ps1`
+- **Hilfe/Info-Vollständigkeit:** Installer · Keygen · Scripting (DE primary + i18n-Keys)
+- **Mausrad-Scrollen (Text/Word-Suite):** robust über Trackpad (`pixelDelta`) und Mausrad; Shift→horizontal; Scroll auch über Zeilennummern/Minimap; Markdown-Vorschau
+- **Keine großen neuen Produktflächen** — Runnable-/Installer-Pack + Docs aktualisiert
+- Freier KI-Chat-Stub und Outline-TTS bleiben geplant
 
 ## Neu in 2.6.26
 

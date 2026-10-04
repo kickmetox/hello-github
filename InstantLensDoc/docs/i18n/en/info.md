@@ -1,18 +1,28 @@
 # InstantLens Doc — About
 
-## 2.6.26
+## 2.6.27
 
-Polish / installer consolidation.
+Polish / installer in sync flow.
 
 | | |
 |---|---|
 | Product | InstantLens Doc |
-| Version | **2.6.26** |
+| Version | **2.6.27** |
 | Vendor | Andreas Meyer |
 | Contact | ame@sellerbach.de |
 
-New in 2.6.26: Hardened Windows installer (VERSION.txt→ISCC, preflight, CustomMessages DE/EN); consolidation of 2.6.20–2.6.25.
-One-liner Setup.exe: `powershell -ExecutionPolicy Bypass -File .\scripts\build-windows-installer.ps1`
+New in 2.6.27: `sync-ild.ps1 -BuildInstaller` (optional Setup.exe after sync); post-sync steps for `install-ild.ps1` + keygen + scripting; robust mouse-wheel scroll for text/Word Suite; help/info + i18n keys.
+
+After sync:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\install-ild.ps1
+powershell -ExecutionPolicy Bypass -File .\scripts\build-windows-installer.ps1
+```
+
+## 2.6.26
+
+Polish / installer consolidation. Hardened Windows installer (VERSION.txt→ISCC, preflight, CustomMessages DE/EN).
 
 ## 2.6.25
 

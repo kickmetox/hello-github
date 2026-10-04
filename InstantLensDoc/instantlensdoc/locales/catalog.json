@@ -1,5 +1,5 @@
 {
-  "version": "2.6.26",
+  "version": "2.6.27",
   "langs": [
     "de",
     "en",
@@ -1433,6 +1433,61 @@
       "pt": "Setup.exe (Windows x64): powershell -ExecutionPolicy Bypass -File .\\scripts\\build-windows-installer.ps1",
       "ar": "Setup.exe (Windows x64): powershell -ExecutionPolicy Bypass -File .\\scripts\\build-windows-installer.ps1",
       "it": "Setup.exe (Windows x64): powershell -ExecutionPolicy Bypass -File .\\scripts\\build-windows-installer.ps1"
+    },
+    "installer_sync_hint": {
+      "de": "Nach Sync: install-ild.ps1 (Shortcuts) · optional build-windows-installer.ps1 / sync-ild.ps1 -BuildInstaller",
+      "en": "After sync: install-ild.ps1 (shortcuts) · optional build-windows-installer.ps1 / sync-ild.ps1 -BuildInstaller",
+      "fr": "Après sync : install-ild.ps1 · optionnel build-windows-installer.ps1 / sync-ild.ps1 -BuildInstaller",
+      "ru": "После sync: install-ild.ps1 · опционально build-windows-installer.ps1 / sync-ild.ps1 -BuildInstaller",
+      "es": "Tras sync: install-ild.ps1 · opcional build-windows-installer.ps1 / sync-ild.ps1 -BuildInstaller",
+      "zh": "同步后：install-ild.ps1 · 可选 build-windows-installer.ps1 / sync-ild.ps1 -BuildInstaller",
+      "pt": "Após sync: install-ild.ps1 · opcional build-windows-installer.ps1 / sync-ild.ps1 -BuildInstaller",
+      "ar": "بعد المزامنة: install-ild.ps1 · اختياري build-windows-installer.ps1 / sync-ild.ps1 -BuildInstaller",
+      "it": "Dopo sync: install-ild.ps1 · opzionale build-windows-installer.ps1 / sync-ild.ps1 -BuildInstaller"
+    },
+    "installer_post_sync_steps": {
+      "de": "1) Shortcuts: .\\scripts\\install-ild.ps1  2) Optional Setup.exe: .\\scripts\\build-windows-installer.ps1",
+      "en": "1) Shortcuts: .\\scripts\\install-ild.ps1  2) Optional Setup.exe: .\\scripts\\build-windows-installer.ps1",
+      "fr": "1) Raccourcis : .\\scripts\\install-ild.ps1  2) Setup.exe optionnel : .\\scripts\\build-windows-installer.ps1",
+      "ru": "1) Ярлыки: .\\scripts\\install-ild.ps1  2) Опционально Setup.exe: .\\scripts\\build-windows-installer.ps1",
+      "es": "1) Accesos: .\\scripts\\install-ild.ps1  2) Setup.exe opcional: .\\scripts\\build-windows-installer.ps1",
+      "zh": "1) 快捷方式：.\\scripts\\install-ild.ps1  2) 可选 Setup.exe：.\\scripts\\build-windows-installer.ps1",
+      "pt": "1) Atalhos: .\\scripts\\install-ild.ps1  2) Setup.exe opcional: .\\scripts\\build-windows-installer.ps1",
+      "ar": "1) اختصارات: .\\scripts\\install-ild.ps1  2) Setup.exe اختياري: .\\scripts\\build-windows-installer.ps1",
+      "it": "1) Collegamenti: .\\scripts\\install-ild.ps1  2) Setup.exe opzionale: .\\scripts\\build-windows-installer.ps1"
+    },
+    "keygen_cli_hint": {
+      "de": "Keygen: run-keygen.bat · python -m keygen kunde@example.com · --verify \"ILD1....\"",
+      "en": "Keygen: run-keygen.bat · python -m keygen user@example.com · --verify \"ILD1....\"",
+      "fr": "Keygen : run-keygen.bat · python -m keygen user@example.com · --verify \"ILD1....\"",
+      "ru": "Keygen: run-keygen.bat · python -m keygen user@example.com · --verify \"ILD1....\"",
+      "es": "Keygen: run-keygen.bat · python -m keygen user@example.com · --verify \"ILD1....\"",
+      "zh": "Keygen：run-keygen.bat · python -m keygen user@example.com · --verify \"ILD1....\"",
+      "pt": "Keygen: run-keygen.bat · python -m keygen user@example.com · --verify \"ILD1....\"",
+      "ar": "Keygen: run-keygen.bat · python -m keygen user@example.com · --verify \"ILD1....\"",
+      "it": "Keygen: run-keygen.bat · python -m keygen user@example.com · --verify \"ILD1....\""
+    },
+    "scripting_cli_hint": {
+      "de": "Scripting: python -m ild --help · run-ild.bat · .\\scripts\\ild.ps1",
+      "en": "Scripting: python -m ild --help · run-ild.bat · .\\scripts\\ild.ps1",
+      "fr": "Scripting : python -m ild --help · run-ild.bat · .\\scripts\\ild.ps1",
+      "ru": "Scripting: python -m ild --help · run-ild.bat · .\\scripts\\ild.ps1",
+      "es": "Scripting: python -m ild --help · run-ild.bat · .\\scripts\\ild.ps1",
+      "zh": "脚本：python -m ild --help · run-ild.bat · .\\scripts\\ild.ps1",
+      "pt": "Scripting: python -m ild --help · run-ild.bat · .\\scripts\\ild.ps1",
+      "ar": "البرمجة النصية: python -m ild --help · run-ild.bat · .\\scripts\\ild.ps1",
+      "it": "Scripting: python -m ild --help · run-ild.bat · .\\scripts\\ild.ps1"
+    },
+    "wheel_scroll_hint": {
+      "de": "Mausrad/Trackpad scrollt Text und Word-Suite; Shift+Rad horizontal; auch über Zeilennummern/Minimap",
+      "en": "Mouse wheel/trackpad scrolls text and Word Suite; Shift+wheel for horizontal; also over line numbers/minimap",
+      "fr": "Molette/trackpad fait défiler texte et Word Suite ; Maj+molette = horizontal ; aussi sur numéros/minimap",
+      "ru": "Колесо/тачпад прокручивает текст и Word Suite; Shift+колесо — горизонтально; также над номерами/миникартой",
+      "es": "Rueda/trackpad desplaza texto y Word Suite; Mayús+rueda horizontal; también sobre números/minimap",
+      "zh": "鼠标滚轮/触控板滚动文本与 Word Suite；Shift+滚轮横向；行号/迷你图上同样有效",
+      "pt": "Roda/trackpad desloca texto e Word Suite; Shift+roda horizontal; também sobre números/minimap",
+      "ar": "عجلة الماوس/لوحة اللمس تمرّر النص وWord Suite؛ Shift+عجلة أفقياً؛ أيضاً فوق الأرقام/الخريطة المصغرة",
+      "it": "Rotella/trackpad scorre testo e Word Suite; Maiusc+rotella orizzontale; anche su numeri/minimap"
     }
   },
   "phrases": {

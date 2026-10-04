@@ -1,4 +1,4 @@
-"""Digitale Signatur (eIDAS-Pfad) — 2.6.26."""
+"""Digitale Signatur (eIDAS-Pfad) — 2.6.27."""
 
 from __future__ import annotations
 

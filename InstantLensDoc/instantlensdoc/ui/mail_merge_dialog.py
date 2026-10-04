@@ -1,4 +1,4 @@
-"""Seriendruck-Dialog mit Vorschau — 2.6.26 Polish."""
+"""Seriendruck-Dialog mit Vorschau — 2.6.27 Polish."""
 
 from __future__ import annotations
 

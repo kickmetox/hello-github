@@ -410,7 +410,7 @@ def main(argv: list[str] | None = None) -> int:
     app.setOrganizationDomain("sellerbach.de")
     _apply_icon(app)
 
-    # Plugin-Hooks: User-Skripte laden + Event-Bus — 2.6.26
+    # Plugin-Hooks: User-Skripte laden + Event-Bus — 2.6.27
     try:
         from instantlensdoc.core import plugin_hooks
 

@@ -7,7 +7,7 @@ from pathlib import Path
 
 from PySide6.QtCore import QRect, QSize, Qt, Signal
 from PySide6.QtGui import QColor, QFont, QImage, QPainter, QTextCharFormat, QTextCursor, QTextDocument, QTextOption
-from PySide6.QtWidgets import QApplication, QPlainTextEdit, QTextEdit, QWidget
+from PySide6.QtWidgets import QAbstractScrollArea, QApplication, QPlainTextEdit, QTextEdit, QWidget
 
 from instantlensdoc.core.app_settings import (
     get_editor_bracket_auto_close,
@@ -22,6 +22,80 @@ from instantlensdoc.core.app_settings import (
     get_editor_tab_width,
     get_editor_trim_whitespace_on_paste,
 )
+
+
+def apply_wheel_scroll(area: QAbstractScrollArea, event) -> bool:
+    """Robustes Mausrad-/Trackpad-Scrollen für Text-/Dokument-Views — 2.6.27.
+
+    - ``pixelDelta`` (Präzisions-Trackpad) bevorzugt
+    - ``angleDelta`` Fallback (klassisches Mausrad, 120 ≈ 1 Notch)
+    - Shift oder dominante X-Achse → horizontal
+    - funktioniert auch ohne Fokus auf dem Widget (Hover reicht)
+
+    Returns:
+        True wenn der Event verarbeitet wurde.
+    """
+    if area is None or event is None:
+        return False
+    try:
+        pixel = event.pixelDelta()
+        angle = event.angleDelta()
+        px_x = int(pixel.x())
+        px_y = int(pixel.y())
+        ang_x = int(angle.x())
+        ang_y = int(angle.y())
+    except Exception:
+        return False
+
+    mods = event.modifiers()
+    shift = bool(mods & Qt.ShiftModifier)
+    # Horizontales Scrollen: Shift+Rad oder klare X-Dominanz
+    horizontal = shift or (abs(ang_x) > abs(ang_y) and ang_x != 0) or (
+        abs(px_x) > abs(px_y) and px_x != 0 and px_y == 0
+    )
+
+    bar = area.horizontalScrollBar() if horizontal else area.verticalScrollBar()
+    if bar is None or not bar.isEnabled():
+        return False
+
+    if horizontal:
+        if px_x != 0:
+            delta = px_x
+        elif ang_x != 0:
+            steps = ang_x / 120.0
+            delta = int(steps * max(1, bar.singleStep()) * 3)
+        elif shift and (px_y != 0 or ang_y != 0):
+            # Shift+vertikales Rad → horizontal (Windows/Word-üblich)
+            if px_y != 0:
+                delta = px_y
+            else:
+                steps = ang_y / 120.0
+                delta = int(steps * max(1, bar.singleStep()) * 3)
+        else:
+            return False
+    else:
+        if px_y != 0:
+            delta = px_y
+        elif ang_y != 0:
+            steps = ang_y / 120.0
+            delta = int(steps * max(1, bar.singleStep()) * 3)
+        else:
+            return False
+
+    if delta == 0:
+        return False
+
+    # Qt: positives wheel-up → Inhalt nach unten → Scrollbar-Wert verringern
+    new_val = bar.value() - delta
+    new_val = max(bar.minimum(), min(bar.maximum(), new_val))
+    if new_val == bar.value() and bar.maximum() <= bar.minimum():
+        return False
+    bar.setValue(new_val)
+    try:
+        event.accept()
+    except Exception:
+        pass
+    return True
 from instantlensdoc.core.bookmarks import (
     BM_SCHEMA_ID,
     BM_VERSION,
@@ -52,6 +126,12 @@ class _LineNumberArea(QWidget):
             self._editor.toggle_bookmark_at_y(event.position().y())
         super().mousePressEvent(event)
 
+    def wheelEvent(self, event):  # noqa: N802
+        # Mausrad über Zeilennummern → Editor scrollen — 2.6.27
+        if self._editor is not None and apply_wheel_scroll(self._editor, event):
+            return
+        super().wheelEvent(event)
+
 
 class _MinimapArea(QWidget):
     """Einfache Linien-Übersicht (Minimap) rechts neben dem Editor."""
@@ -77,6 +157,12 @@ class _MinimapArea(QWidget):
         if event.buttons() & Qt.LeftButton:
             self._editor.minimap_goto_y(event.position().y())
         super().mouseMoveEvent(event)
+
+    def wheelEvent(self, event):  # noqa: N802
+        # Mausrad über Minimap → Editor scrollen — 2.6.27
+        if self._editor is not None and apply_wheel_scroll(self._editor, event):
+            return
+        super().wheelEvent(event)
 
 
 class TextEditor(QPlainTextEdit):
@@ -139,6 +225,42 @@ class TextEditor(QPlainTextEdit):
         self._review_prev_text: str | None = None
         self._review_busy = False
         self.textChanged.connect(self._on_review_text_changed)
+        # Robustes Mausrad: Viewport-Filter + ScrollPerPixel-Feeling — 2.6.27
+        try:
+            self.viewport().installEventFilter(self)
+        except Exception:
+            pass
+        try:
+            self.setFocusPolicy(Qt.StrongFocus)
+            self.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+            self.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        except Exception:
+            pass
+
+    def eventFilter(self, obj, event):  # noqa: N802
+        """Viewport-Wheel abfangen (auch ohne Fokus) — 2.6.27."""
+        try:
+            from PySide6.QtCore import QEvent
+
+            if obj is self.viewport() and event.type() == QEvent.Type.Wheel:
+                # Ctrl+Wheel: Standard (Zoom/Font) an Qt durchreichen
+                if event.modifiers() & Qt.ControlModifier:
+                    return super().eventFilter(obj, event)
+                if apply_wheel_scroll(self, event):
+                    return True
+        except Exception:
+            pass
+        return super().eventFilter(obj, event)
+
+    def wheelEvent(self, event):  # noqa: N802
+        """Mausrad-/Trackpad-Scroll für Text- und Word-Suite-Dokumente — 2.6.27."""
+        if event.modifiers() & Qt.ControlModifier:
+            # Ctrl+Wheel: Qt-Default (falls Font-Zoom / System)
+            super().wheelEvent(event)
+            return
+        if apply_wheel_scroll(self, event):
+            return
+        super().wheelEvent(event)
 
     def set_review_tracking(
         self,
@@ -2013,6 +2135,31 @@ class RichPreview(QTextEdit):
         super().__init__(parent)
         self.setReadOnly(False)
         self.setAcceptRichText(True)
+        try:
+            self.viewport().installEventFilter(self)
+        except Exception:
+            pass
+
+    def eventFilter(self, obj, event):  # noqa: N802
+        try:
+            from PySide6.QtCore import QEvent
+
+            if obj is self.viewport() and event.type() == QEvent.Type.Wheel:
+                if event.modifiers() & Qt.ControlModifier:
+                    return super().eventFilter(obj, event)
+                if apply_wheel_scroll(self, event):
+                    return True
+        except Exception:
+            pass
+        return super().eventFilter(obj, event)
+
+    def wheelEvent(self, event):  # noqa: N802
+        if event.modifiers() & Qt.ControlModifier:
+            super().wheelEvent(event)
+            return
+        if apply_wheel_scroll(self, event):
+            return
+        super().wheelEvent(event)
 
 
 class EditorPane(QWidget):
@@ -2034,6 +2181,11 @@ class EditorPane(QWidget):
         font = QFont("Georgia", 11)
         font.setStyleHint(QFont.Serif)
         self.preview.setFont(font)
+        # Mausrad auch in Markdown-Vorschau härten — 2.6.27
+        try:
+            self.preview.viewport().installEventFilter(self)
+        except Exception:
+            pass
         self.splitter.addWidget(self.editor)
         self.splitter.addWidget(self.preview)
         self.splitter.setStretchFactor(0, 3)
@@ -2043,6 +2195,23 @@ class EditorPane(QWidget):
         self.preview.setVisible(self._preview_visible)
         self.editor.textChanged.connect(self._sync_preview)
         self._sync_preview()
+
+    def eventFilter(self, obj, event):  # noqa: N802
+        try:
+            from PySide6.QtCore import QEvent
+
+            if (
+                hasattr(self, "preview")
+                and obj is self.preview.viewport()
+                and event.type() == QEvent.Type.Wheel
+            ):
+                if event.modifiers() & Qt.ControlModifier:
+                    return super().eventFilter(obj, event)
+                if apply_wheel_scroll(self.preview, event):
+                    return True
+        except Exception:
+            pass
+        return super().eventFilter(obj, event)
 
     def set_preview_visible(self, visible: bool) -> None:
         from instantlensdoc.core.app_settings import set_editor_markdown_preview

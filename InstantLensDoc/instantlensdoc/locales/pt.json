@@ -130,7 +130,12 @@
     "installer_desktop_icon": "Criar atalho no ambiente de trabalho",
     "installer_start_menu": "Manter entradas no menu Iniciar",
     "installer_launch_now": "Iniciar InstantLens Doc agora",
-    "installer_build_hint": "Setup.exe (Windows x64): powershell -ExecutionPolicy Bypass -File .\\scripts\\build-windows-installer.ps1"
+    "installer_build_hint": "Setup.exe (Windows x64): powershell -ExecutionPolicy Bypass -File .\\scripts\\build-windows-installer.ps1",
+    "installer_sync_hint": "Após sync: install-ild.ps1 · opcional build-windows-installer.ps1 / sync-ild.ps1 -BuildInstaller",
+    "installer_post_sync_steps": "1) Atalhos: .\\scripts\\install-ild.ps1  2) Setup.exe opcional: .\\scripts\\build-windows-installer.ps1",
+    "keygen_cli_hint": "Keygen: run-keygen.bat · python -m keygen user@example.com · --verify \"ILD1....\"",
+    "scripting_cli_hint": "Scripting: python -m ild --help · run-ild.bat · .\\scripts\\ild.ps1",
+    "wheel_scroll_hint": "Roda/trackpad desloca texto e Word Suite; Shift+roda horizontal; também sobre números/minimap"
   },
   "phrases": {
     "&Datei": "&Ficheiro",

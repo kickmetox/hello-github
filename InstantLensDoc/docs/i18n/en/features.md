@@ -1,6 +1,6 @@
 # InstantLens Doc — Features
 
-## 2.6.26
+## 2.6.27
 
 - Polish / consolidation of 2.6.20–2.6.25
 - Hardened Windows installer (VERSION.txt→ISCC, preflight, CustomMessages DE/EN)

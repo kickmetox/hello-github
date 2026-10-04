@@ -471,7 +471,7 @@ class Annotation:
         return out
 
     def ink_points_with_pressure(self) -> list[tuple[float, float, float]]:
-        """Polyline mit optionalem Druck (Default 0.5) — Stylus 2.6.26."""
+        """Polyline mit optionalem Druck (Default 0.5) — Stylus 2.6.27."""
         out: list[tuple[float, float, float]] = []
         for pt in self.points or []:
             if not isinstance(pt, (list, tuple)) or len(pt) < 2:
@@ -511,7 +511,7 @@ class Annotation:
     ) -> "Annotation":
         """INK-Annotation aus Punktliste; optional Glättung (passes) — 2.2.1/2.2.2.
 
-        Punkte: ``[x, y]`` oder ``[x, y, pressure]`` (Stylus 2.6.26).
+        Punkte: ``[x, y]`` oder ``[x, y, pressure]`` (Stylus 2.6.27).
         """
         cleaned: list[list[float]] = []
         for pt in points or []:

@@ -168,6 +168,7 @@ SHORTCUTS_HTML = """
 <tr><td>Formularfelder</td><td>PDF → Formularfelder… (Ctrl+Alt+Shift+K) / Toolbar „Formular“ / Palette: Felder ausfüllen · Text/Checkbox/Dropdown anlegen (Rechteck) · erkennen (Labels „:“ / ____ / [ ]) — <b>2.6.6</b></td></tr>
 <tr><td>Verschlüsselung &amp; Rechte</td><td>PDF → Verschlüsselung &amp; Rechte… (Ctrl+Alt+Shift+P) / Palette: Passwort AES-256 · Druck/Kopieren/Ändern sperren · setzen/entfernen · Öffnen mit Passwort-Dialog — <b>2.6.7</b></td></tr>
 <tr><td>Windows-Build / Keygen / Scripting</td><td><code>build-windows.ps1</code> (x64) · <code>pack-windows-runnable</code> · <code>run-keygen.bat</code> / <code>python -m keygen</code> · <code>python -m ild</code> / <code>scripts/ild.ps1</code> — <b>2.6.8</b></td></tr>
+<tr><td>Mausrad Text/Word-Suite</td><td>Trackpad/<code>pixelDelta</code> + Mausrad · Shift→horizontal · Scroll auch über Zeilennummern/Minimap/Markdown-Vorschau — <b>2.6.27</b></td></tr>
 <tr><td>Annotationen ausbauen</td><td>Pinselstärke (Slider) · Color-Picker Strich/Füllung · Kreis/Ellipse/Dreieck/Rundrect (gefüllt/Outline) · Stempel Paid/Bezahlt/Rechnung/Datum + eigene · Absatz-Highlight — Palette/PDF-Menü Ctrl+Alt+Shift+H · Scripting <code>ild.add_shape</code>/<code>add_stamp</code>/<code>highlight_paragraphs</code> — <b>2.6.9</b></td></tr>
 <tr><td>Layout-Hilfen 2.6.11</td><td>Lineal · Raster/Guides · Kopf/Fuß mit Titel/Autor · Buch-/DIN-/US-Seitenformate · Absatzformat (Align/Spacing) · Scripting <code>ild.list_page_formats</code>/<code>apply_header_footer</code>/<code>apply_paragraph_format</code> — <b>2.6.11</b></td></tr>
 <tr><td>DTP 2.6.12</td><td>Frames/Boxes Move/Resize · Textrahmen-Verkettung Spalte/Seite · Musterseiten · Satzspiegel · <code>ild.apply_master_page</code>/<code>satzspiegel</code>/<code>layout_flow_text</code> — <b>2.6.12</b></td></tr>
@@ -250,9 +251,9 @@ SHORTCUTS_HTML = """
 <tr><td>Kommentare</td><td><code>Ctrl+Alt+M</code> — Feedback an Textstelle — 2.6.21</td></tr>
 <tr><td>Versionsverlauf</td><td><code>Ctrl+Alt+Shift+H</code> — Snapshot speichern/wiederherstellen — 2.6.21</td></tr>
 <tr><td>Seriendruck</td><td>Bearbeiten → Review / Ribbon Review — CSV/Excel → Briefe — 2.6.21 / Polish 2.6.22</td></tr>
-<tr><td>Gemeinsames Review</td><td><code>Ctrl+Alt+Shift+C</code> — Freigabeordner/Endpoint · Notizen/Stempel/Kommentare — 2.6.26</td></tr>
-<tr><td>Stapelverarbeitung</td><td>Extras → Stapelverarbeitung… — PDFs konvertieren/Wasserzeichen/komprimieren/verschlüsseln — <b>2.6.26</b></td></tr>
-<tr><td>Digitale Signatur (eIDAS)</td><td><code>Ctrl+Alt+Shift+G</code> — PDF/Extras → Digitale Signatur… · SES/AES/QES-Pfad — <b>2.6.26</b></td></tr>
+<tr><td>Gemeinsames Review</td><td><code>Ctrl+Alt+Shift+C</code> — Freigabeordner/Endpoint · Notizen/Stempel/Kommentare — 2.6.27</td></tr>
+<tr><td>Stapelverarbeitung</td><td>Extras → Stapelverarbeitung… — PDFs konvertieren/Wasserzeichen/komprimieren/verschlüsseln — <b>2.6.27</b></td></tr>
+<tr><td>Digitale Signatur (eIDAS)</td><td><code>Ctrl+Alt+Shift+G</code> — PDF/Extras → Digitale Signatur… · SES/AES/QES-Pfad — <b>2.6.27</b></td></tr>
 <tr><td>Tastatur-Cheat-Sheet</td><td><code>F1</code> — Hilfe → Tastatur-Cheat-Sheet… · Suche/Filter — 2.4.1</td></tr>
 <tr><td>Cheat-Sheet als PDF</td><td>F1 → „Als PDF exportieren…“</td></tr>
 <tr><td>Cheat-Sheet als TXT</td><td>F1 → „Als TXT exportieren…“ · Template {date}_shortcuts.txt · Zielordner merken — 2.4.2</td></tr>

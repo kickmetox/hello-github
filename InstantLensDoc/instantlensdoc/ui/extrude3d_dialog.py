@@ -1,4 +1,4 @@
-"""Begrenzter 3D-Extrusions-Viewer — 2.6.26."""
+"""Begrenzter 3D-Extrusions-Viewer — 2.6.27."""
 
 from __future__ import annotations
 

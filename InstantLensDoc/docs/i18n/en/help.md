@@ -1,16 +1,31 @@
 # InstantLens Doc — Help
 
-## 2.6.26
+## 2.6.27
 
-Version **2.6.26** — polish / installer consolidation.
+Version **2.6.27** — polish / installer in sync flow.
 
-Windows installer (Setup.exe) on Windows x64 with Inno Setup 6:
+**Sync + shortcuts + optional Setup.exe:**
 
 ```powershell
+powershell -ExecutionPolicy Bypass -File "D:\AI_Temp\sync-ild.ps1" -SkipStart
+cd D:\AI_Temp\InstantLensDoc
+powershell -ExecutionPolicy Bypass -File .\scripts\install-ild.ps1
 powershell -ExecutionPolicy Bypass -File .\scripts\build-windows-installer.ps1
 ```
 
-Result: `dist\InstantLensDoc-Setup-2.6.26.exe` (Start Menu, optional desktop, uninstall, 64-bit).
+Or sync with installer build: `sync-ild.ps1 -BuildInstaller -SkipStart` (needs Inno Setup 6 / ISCC).
+
+**Keygen:** `run-keygen.bat` · `python -m keygen user@example.com` · `--verify "ILD1...."`.
+
+**Scripting:** `python -m ild --help` · `run-ild.bat` · `.\scripts\ild.ps1`.
+
+**Mouse wheel (text/Word Suite):** trackpad/`pixelDelta` + wheel; Shift+wheel → horizontal; also over line numbers/minimap and Markdown preview.
+
+Result: `dist\InstantLensDoc-Setup-2.6.27.exe` (Start Menu, optional desktop, uninstall, 64-bit).
+
+## 2.6.26
+
+Polish / installer consolidation. One-liner: `.\scripts\build-windows-installer.ps1` → `InstantLensDoc-Setup-2.6.26.exe`.
 
 ## 2.6.25
 

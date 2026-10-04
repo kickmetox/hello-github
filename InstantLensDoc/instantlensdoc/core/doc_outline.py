@@ -1,4 +1,4 @@
-"""Dokumentstruktur / Outline-Pane jenseits reiner TOC — 2.6.26.
+"""Dokumentstruktur / Outline-Pane jenseits reiner TOC — 2.6.27.
 
 Kombiniert:
 - Markdown-/Text-Überschriften (H1–H6)

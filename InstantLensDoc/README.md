@@ -2,7 +2,7 @@
 
 Moderne Textverarbeitung mit PDF-Annotator, OCR-Bridge und Formulargenerator.
 
-**Version:** 2.6.26  
+**Version:** 2.6.27  
 **Hersteller:** Andreas Meyer · ame@sellerbach.de
 
 ## Quickstart (Windows)
@@ -29,14 +29,23 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 ```
 
 64-Bit-Python erforderlich. Runnable-Pack ohne EXE: `.\scripts\pack-windows-runnable.ps1`.  
-Installer-Einzeiler: `powershell -ExecutionPolicy Bypass -File .\scripts\build-windows-installer.ps1` → `dist\InstantLensDoc-Setup-2.6.26.exe`  
+Installer-Einzeiler: `powershell -ExecutionPolicy Bypass -File .\scripts\build-windows-installer.ps1` → `dist\InstantLensDoc-Setup-2.6.27.exe`  
 (oder `.\installer\build-installer.ps1`, optional `-NoKeygen`)  
 Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an).  
-User-Shortcuts: `.\scripts\install-ild.ps1` (inkl. Keygen) · Deinstallieren: `-Uninstall [-Quiet]` (Exit **0**/OK · **1**/Fehler; Quiet: Kurz-Summary, Exit 0 auch ohne Shortcuts).
+User-Shortcuts: `.\scripts\install-ild.ps1` (inkl. Keygen) · Deinstallieren: `-Uninstall [-Quiet]` (Exit **0**/OK · **1**/Fehler; Quiet: Kurz-Summary, Exit 0 auch ohne Shortcuts).  
+Sync mit optionalem Installer: `…\sync-ild.ps1 -BuildInstaller -SkipStart`.
 
-Keygen: `run-keygen.bat` · `python -m keygen kunde@example.com` · siehe `keygen/README.md`.
+Keygen: `run-keygen.bat` · `python -m keygen kunde@example.com` · siehe `keygen/README.md`.  
+Scripting: `python -m ild --help` · `.\scripts\ild.ps1` · `run-ild.bat`.
 
 Nightly-Smoke: `python scripts\smoke_ild.py` · optional `--qt` · `--json` (Summary: `ok`, `checks[]`, `duration_ms`, `version`; Fail: `checks[].error` max 200…, Exit=ok). Siehe **CONTRIBUTING.md**; Workflow-Stub `.github/workflows/smoke-ild.yml` (manual only).
+
+## Neu in 2.6.27
+
+- Installer im Sync/Install-Flow: `sync-ild.ps1 -BuildInstaller` + DE-Hinweise nach Sync
+- Hilfe/Info: Installer · Keygen · Scripting vervollständigt (i18n-Keys)
+- Robustes Mausrad-Scrollen in Text-/Dokument-/Word-Suite-Views (Trackpad + Shift→horizontal)
+- Keine großen neuen Produktflächen; Pack/Docs aktualisiert
 
 ## Neu in 2.6.26
 

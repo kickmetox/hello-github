@@ -11,10 +11,12 @@
 #   -LocalPack C:\path\to\InstantLensDoc-pack.zip # Pack-Zip (wird nach WorkDir entpackt)
 #   -NoStart / -SkipStart   # App nach Sync nicht starten (synonym)
 #   -SkipPip
+#   -BuildInstaller         # optional: nach Sync Inno-Setup.exe bauen (braucht ISCC)
+#   -SkipInstallHints       # keine DE-Hinweise zu install-ild / Setup.exe nach Sync
 #
 # Exit-Codes:
-#   0  Erfolg (Sync fertig; optional App gestartet)
-#   1  Allgemeiner Fehler (LocalPack ungültig, Ziel/requirements fehlen, pip-Fehler)
+#   0  Erfolg (Sync fertig; optional App gestartet; Installer-Build optional)
+#   1  Allgemeiner Fehler (LocalPack ungültig, Ziel/requirements fehlen, pip-Fehler, Installer-Build)
 #   2  Git-Sync fehlgeschlagen (Clone/Fetch/Checkout) — Fallback: -LocalPack nutzen
 #
 # Fallback wenn Git-Clone/Fetch fehlschlägt (z. B. 401/Auth):
@@ -22,6 +24,11 @@
 #   2) oder Zip neben dem Skript ablegen: InstantLensDoc-pack.zip
 #   Beispiel:
 #     powershell -ExecutionPolicy Bypass -File .\sync-ild.ps1 -LocalPack D:\AI_Temp\InstantLensDoc-pack.zip -SkipStart
+#
+# Nach Sync (manuell, ohne -BuildInstaller):
+#   cd D:\AI_Temp\InstantLensDoc
+#   powershell -ExecutionPolicy Bypass -File .\scripts\install-ild.ps1
+#   powershell -ExecutionPolicy Bypass -File .\scripts\build-windows-installer.ps1   # optional, Inno Setup 6
 
 param(
     [string]$Destination = "D:\AI_Temp\InstantLensDoc",
@@ -31,7 +38,9 @@ param(
     [string]$WorkDir = "D:\AI_Temp\InstantLensDoc-src",
     [switch]$NoStart,
     [switch]$SkipStart,
-    [switch]$SkipPip
+    [switch]$SkipPip,
+    [switch]$BuildInstaller,
+    [switch]$SkipInstallHints
 )
 
 $ErrorActionPreference = "Stop"
@@ -209,6 +218,40 @@ try {
             Write-Error "pip install fehlgeschlagen (exit $LASTEXITCODE)"
             exit 1
         }
+    }
+
+    # Optional: Inno Setup.exe nach Sync (Windows x64 + ISCC)
+    if ($BuildInstaller) {
+        $buildInst = Join-Path $Destination "scripts\build-windows-installer.ps1"
+        if (-not (Test-Path $buildInst)) {
+            Write-Error "build-windows-installer.ps1 fehlt: $buildInst"
+            exit 1
+        }
+        Write-Host "=== Optional: Windows-Installer bauen (-BuildInstaller) ===" -ForegroundColor Cyan
+        Write-Host "Voraussetzung: Inno Setup 6 (ISCC.exe). Bei Fehler ohne ISCC: Exit 1."
+        Push-Location $Destination
+        try {
+            & powershell -ExecutionPolicy Bypass -File $buildInst
+            if ($LASTEXITCODE -ne 0) {
+                Write-Error "Installer-Build fehlgeschlagen (exit $LASTEXITCODE). Ohne -BuildInstaller syncen und ISCC prüfen."
+                exit 1
+            }
+        } finally {
+            Pop-Location
+        }
+    }
+
+    if (-not $SkipInstallHints) {
+        Write-Host ""
+        Write-Host "=== Nach Sync (Windows) ===" -ForegroundColor Cyan
+        Write-Host "Shortcuts (User-Profil, ohne Admin):"
+        Write-Host '  powershell -ExecutionPolicy Bypass -File .\scripts\install-ild.ps1'
+        Write-Host "Setup.exe (optional, Inno Setup 6):"
+        Write-Host '  powershell -ExecutionPolicy Bypass -File .\scripts\build-windows-installer.ps1'
+        Write-Host "Oder Sync mit Installer-Build:"
+        Write-Host '  powershell -ExecutionPolicy Bypass -File .\sync-ild.ps1 -BuildInstaller -SkipStart'
+        Write-Host "Keygen: run-keygen.bat · Scripting: python -m ild --help · .\scripts\ild.ps1"
+        Write-Host ""
     }
 
     if (-not $NoStart) {

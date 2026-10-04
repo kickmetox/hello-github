@@ -134,6 +134,21 @@ powershell -ExecutionPolicy Bypass -File .\\scripts\\install-ild.ps1
 
 Keygen-Shortcut wird angelegt, wenn `run-keygen.bat` vorhanden ist.
 
+## Nach Sync (empfohlen)
+
+```powershell
+powershell -ExecutionPolicy Bypass -File "D:\\AI_Temp\\sync-ild.ps1" -SkipStart
+cd /d D:\\AI_Temp\\InstantLensDoc
+powershell -ExecutionPolicy Bypass -File .\\scripts\\install-ild.ps1
+powershell -ExecutionPolicy Bypass -File .\\scripts\\build-windows-installer.ps1
+```
+
+Oder Sync inkl. optionalem Installer-Build (Inno Setup 6):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File "D:\\AI_Temp\\sync-ild.ps1" -BuildInstaller -SkipStart
+```
+
 ## Scripting (Python / PowerShell)
 
 ```bat

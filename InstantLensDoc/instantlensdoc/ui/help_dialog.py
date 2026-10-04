@@ -256,7 +256,7 @@ HELP_HTML = f"""
     (<code>Ctrl+Alt+Shift+C</code>) — Session starten/beitreten über Freigabeordner
     (<code>session.ildshare.json</code>) oder optionalen HTTP-Endpoint; Notizen/Markierungen/
     Stempel/Kommentare austauschbar; Auto-Sync/Polling; Offline bleibt nutzbar;
-    kein gehosteter Cloud-Dienst — <b>2.6.26</b></li>
+    kein gehosteter Cloud-Dienst — <b>2.6.27</b></li>
 <li><b>OCR</b>: Extras → OCR (Seite/Bild) oder <b>OCR gesamtes PDF</b> (Batch mit
     <b>Sprach-Preset</b>-Combobox, Fortschritt/Abbrechen;
     Ergebnis als <b>neue Textdatei-Tab</b> <code>*-ocr.txt</code>) —
@@ -289,44 +289,44 @@ HELP_HTML = f"""
     History maskiert (letzte 4); Doppelklick kopiert; Clear History; .txt; --days — 1.1.9</li>
 <li><b>Formulare</b>: Extras → Formulargenerator — mehr Feldtypen, Definition speichern/laden
     (<code>*.ildform.json</code>), Live-Vorschau, Export HTML/PDF</li>
-<li><b>Build (Windows)</b>: <code>build-windows.ps1</code> — PyInstaller App + Keygen (x64, 2.6.8)</li>
+<li><b>Build (Windows)</b>: <code>build-windows.ps1</code> — PyInstaller App + Keygen (x64, 2.6.8);
+    Installer: <code>scripts/build-windows-installer.ps1</code> → <code>InstantLensDoc-Setup-{__version__}.exe</code></li>
 <li><b>Scripting</b>: Headless CLI/API <code>python -m ild</code> / <code>import ild</code> /
-    PowerShell <code>scripts/ild.ps1</code> (open, OCR, Export, Schwärzen, Seiten, Lizenz/Keygen,
-    Annotationen: Formen/Stempel/Absatz-Highlight).
+    PowerShell <code>scripts/ild.ps1</code> / <code>run-ild.bat</code>
+    (open, OCR, Export, Schwärzen, Seiten, Lizenz/Keygen, Annotationen, Review/Batch/Share/Hyperlinks/EPUB, …).
     Anleitung: Store <code>docs/instantlensdoc-scripting.md</code> · Beispiele
     <code>examples/ild_scripting_demo.py</code></li>
 <li><b>Installer</b>: optionale Desktop-Verknüpfung (Checkbox, Standard an, <code>checkedonce</code>)
-    + Startmenü-Gruppe (siehe Inno-Hinweis)</li>
+    + Startmenü-Gruppe; User-Shortcuts ohne Admin: <code>scripts/install-ild.ps1</code>
+    (Keygen-Shortcut wenn <code>run-keygen.bat</code> / EXE vorhanden)</li>
 <li><b>Lizenz</b>: Statusleiste (farbig; bei &lt;7 Tagen Restlaufzeit prominent) + Hilfe → Lizenz — Trial 4 Wochen, Keys 30+2 Tage</li>
-<li><b>Keygen</b>: <code>run-keygen.bat</code> / <code>python -m keygen --gui</code>;
+<li><b>Keygen</b>: <code>run-keygen.bat</code> / <code>python -m keygen --gui</code> /
+    <code>python -m keygen kunde@example.com</code> / <code>--verify</code>;
     Installer-EXE: <code>{{app}}/InstantLensKeygen.exe</code> (siehe <code>keygen/README.md</code>)</li>
 </ul>
 <h3>PDF-Modul</h3>
 <p>Das Paket <code>ild_pdf</code> kann von anderen Programmen genutzt werden (pypdfium2, kein Poppler).
 Beispiel: <code>examples/ild_pdf_demo.py</code>. API: <code>ild_pdf/README.md</code>.</p>
-<p><b>Scripting 2.6.19:</b> i18n (<code>ui-langs</code>/<code>set-ui-lang</code>/<code>tr</code>)
-+ Handschrift (<code>ocr-handwriting</code>)
-+ KI-Wizards (<code>generate_ki_document</code>/<code>list_ki_wizards</code>/<code>run_ki_wizard</code>)
-+ OCR→Word-Suite (<code>ocr_to_word_suite</code>/<code>import_ildocr</code>)
-+ Tabellen/Office-I/O (<code>create_table</code>/<code>import_table_csv</code>/<code>save_document</code>)
-+ Headless-API <code>import ild</code> und CLI <code>python -m ild</code>
-(Typografie/Silbentrennung/Textumfluss: <code>apply_typography</code>/<code>hyphenate</code>/<code>layout_set_text_wrap</code>)
-(inkl. <code>satzspiegel</code>/<code>apply-master</code>/<code>layout-flow</code>/<code>page-formats</code>/<code>header-footer</code>). Basis <b>2.6.11/2.6.10</b>:
-(open/info, Seiten, Export, OCR, Schwärzen, Merge/Split, Lizenz/Keygen, AES-256,
-<code>ann-shape</code> / <code>ann-stamp</code> / <code>ann-highlight-para</code>).
+<p><b>Scripting:</b> Headless-API <code>import ild</code> und CLI <code>python -m ild --help</code>
+(inkl. i18n, OCR→Word-Suite, KI-Wizards, Review/Batch/Share, Hyperlinks/EPUB, Hooks, …).
 PowerShell-Wrapper: <code>scripts/ild.ps1</code> bzw. <code>run-ild.bat</code>.
 Deutsche Anleitung im Project-Store: <code>docs/instantlensdoc-scripting.md</code>.</p>
-<h3>Sync / Update</h3>
+<h3>Sync / Update / Installer</h3>
 <p>Windows: Repo-Skript <code>scripts/sync-ild.ps1</code> bzw. Store <code>docs/sync-ild.ps1</code> — Branch oder Zip nach
 <code>D:\\AI_Temp\\InstantLensDoc</code>, pip, optional Start (<code>-SkipStart</code>/<code>-NoStart</code> unterdrückt Start).
-Exit-Codes: 0 OK, 1 allgemein, 2 Git-Fehler. Eigenes Icon in <code>assets</code> bleibt erhalten.</p>
+Optional <code>-BuildInstaller</code> baut Setup.exe (Inno Setup 6 / ISCC).
+Exit-Codes: 0 OK, 1 allgemein/Installer, 2 Git-Fehler. Eigenes Icon in <code>assets</code> bleibt erhalten.</p>
+<p><b>Nach Sync (DE):</b></p>
+<pre>cd D:\\AI_Temp\\InstantLensDoc
+powershell -ExecutionPolicy Bypass -File .\\scripts\\install-ild.ps1
+powershell -ExecutionPolicy Bypass -File .\\scripts\\build-windows-installer.ps1</pre>
 <h3>Geplante Features</h3>
-<p>KI-Assistent, Cloud-Sync, Stylus/Palm Rejection, 3D u. a. sind im Menü als „Geplant“ markiert
-(Stub {__version__}) — siehe FEATURES.md.</p>
-<p><b>Plugin-Hooks</b> sind ein Stub und <b>nicht produktiv</b> (interner Event-Bus + no-op Loader).
+<p>Freier KI-Chat und Outline-TTS bleiben Stub/geplant (Stub {__version__}) — siehe FEATURES.md.
+Stylus, Outline-Pane, Hooks, Telemetrie (lokal) und 3D-Limited-Viewer sind produktiv.</p>
+<p><b>Plugin-/Script-Hooks</b> sind <b>produktiv</b> (User-Skripte open/save/export/ocr + Event-Bus).
 Dokumentierte Event-Namen: <code>app.started</code>, <code>document.opened</code>,
-<code>document.saved</code>, <code>annotation.changed</code>, <code>ocr.finished</code>
-— siehe FEATURES.md.</p>
+<code>document.saved</code>, <code>document.exported</code>, <code>annotation.changed</code>, <code>ocr.finished</code>
+— siehe FEATURES.md / <code>ild.hooks_*</code>.</p>
 """
 
 
@@ -784,7 +784,7 @@ class AboutDialog(QDialog):
         )
         privacy.setWordWrap(True)
         layout.addWidget(privacy)
-        # Plugin-Hooks Stub: klar „nicht produktiv“ — 1.9.1
+        # Plugin-/Script-Hooks produktiv — 2.6.27 (Basis 2.6.25/2.6.26)
         try:
             from instantlensdoc.core.plugin_hooks import (
                 KNOWN_EVENTS,
@@ -794,12 +794,20 @@ class AboutDialog(QDialog):
 
             ev_list = ", ".join(f"<code>{e}</code>" for e in KNOWN_EVENTS)
             info = plugin_stub_info()
+            live = bool(info.get("live"))
+            title = (
+                "Plugin-/Script-Hooks — produktiv"
+                if live
+                else "Plugin-Hooks — Stub / nicht produktiv"
+            )
+            bg = "#E8F5E9" if live else "#FFF8E1"
+            border = "#81C784" if live else "#FFD54F"
             plugins_note = QLabel(
-                "<p style='background:#FFF8E1;padding:8px;border:1px solid #FFD54F;'>"
-                "<b>Plugin-Hooks — Stub / nicht produktiv</b><br>"
+                f"<p style='background:{bg};padding:8px;border:1px solid {border};'>"
+                f"<b>{title}</b><br>"
                 f"{STUB_MESSAGE}<br>"
-                f"Geplante Events: {ev_list}<br>"
-                "Stubs KI/Cloud/Stylus/3D + Plugin-Hooks bewusst ohne produktive Funktion."
+                f"Events: {ev_list}<br>"
+                "Freier KI-Chat und Outline-TTS bleiben Stub/geplant."
                 "</p>"
             )
             plugins_note.setWordWrap(True)
@@ -807,9 +815,9 @@ class AboutDialog(QDialog):
             layout.addWidget(plugins_note)
         except Exception:
             plugins_note = QLabel(
-                "<p style='background:#FFF8E1;padding:8px;border:1px solid #FFD54F;'>"
-                "<b>Plugin-Hooks — Stub / nicht produktiv</b> "
-                "(interner Event-Bus + no-op Loader; kein Plugin-System)."
+                "<p style='background:#E8F5E9;padding:8px;border:1px solid #81C784;'>"
+                "<b>Plugin-/Script-Hooks — produktiv</b> "
+                "(Event-Bus + User-Skripte; kein Marketplace-Plugin-System)."
                 "</p>"
             )
             plugins_note.setWordWrap(True)
@@ -830,8 +838,12 @@ class AboutDialog(QDialog):
             "<li>Willkommen Drag&amp;Drop/Clear-Recent, Druck-DPI 72/150/300, Trial-Resttage konsistent, Backup-Retry — 1.0.2</li>"
             "<li>Editor: Find/Replace, Snippets, Bracket-Match, Minimap, Zeilen-Lesezeichen</li>"
             "<li>OCR-Bridge, Formulargenerator, Batch, Export · Ann.-Batch-Farbe/Deckkraft</li>"
-            "<li>Lizenz Trial/Keys · lokal, ohne Telemetrie · "
-            "Stubs: KI, Cloud, Stylus, 3D, Plugin-Hooks (nicht produktiv)</li>"
+            "<li>Lizenz Trial/Keys · lokal · Stylus/Outline/Hooks/Telemetrie/3D produktiv · "
+            "Stubs: freier KI-Chat, Outline-TTS</li>"
+            "<li><b>Installer/Sync 2.6.27:</b> <code>sync-ild.ps1 -BuildInstaller</code> · "
+            "<code>install-ild.ps1</code> · Keygen · <code>python -m ild</code></li>"
+            "<li><b>Mausrad Text/Word-Suite:</b> Trackpad + Rad · Shift→horizontal · "
+            "auch Zeilennummern/Minimap — 2.6.27</li>"
             "</ul>"
             "<p>Vollständige Liste: FEATURES.md</p>"
         )

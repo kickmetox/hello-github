@@ -92,7 +92,7 @@ PLANNED_EN = {
     ),
 }
 
-# Kurzbeschreibungen für Info-Dialog — 1.9.5 / Live 2.6.26
+# Kurzbeschreibungen für Info-Dialog — 1.9.5 / Live 2.6.27
 STUB_SHORT = {
     "ki": "Lokaler KI-Assistent für Zusammenfassen und Vorschläge — Stub / nicht produktiv.",
     "cloud": (
@@ -100,24 +100,24 @@ STUB_SHORT = {
         "kein gehosteter Cloud-Dienst; Offline bleibt nutzbar."
     ),
     "stylus": (
-        "Drucksensitiver Stylus mit Palm Rejection — produktiv 2.6.26 "
+        "Drucksensitiver Stylus mit Palm Rejection — produktiv 2.6.27 "
         "(Tablet-Druck → Strichstärke; sonst Freihand)."
     ),
     "shapes_ai": "Intelligente Formerkennung beim Zeichnen — Stub / geplant.",
     "extrude3d": (
-        "3D-Extrusion Limited Viewer — produktiv 2.6.26 "
+        "3D-Extrusion Limited Viewer — produktiv 2.6.27 "
         "(isometrisch, einfache Formen; kein Mesh/OpenGL)."
     ),
     "plugins": (
-        "User-/Script-Hooks (open/save/export/ocr) — produktiv 2.6.26; "
+        "User-/Script-Hooks (open/save/export/ocr) — produktiv 2.6.27; "
         "Python/PowerShell ild; kein Marketplace-Plugin-System."
     ),
     "outline_read": (
         "Document Outline Vorlesen (TTS) — Stub / geplant; "
-        "Struktur-Pane (Überschriften/Lesezeichen) produktiv 2.6.26."
+        "Struktur-Pane (Überschriften/Lesezeichen) produktiv 2.6.27."
     ),
     "telemetry": (
-        "Optionale lokale Diagnostik — produktiv 2.6.26: Opt-in Default aus, "
+        "Optionale lokale Diagnostik — produktiv 2.6.27: Opt-in Default aus, "
         "kein Netzwerk, kein PII, keine Datenübertragung (diagnostics.jsonl)."
     ),
     "varfonts": "Vollständige Variable-Fonts-Unterstützung — geplant.",
@@ -135,24 +135,24 @@ STUB_SHORT_EN = {
         "no hosted cloud service; offline remains usable."
     ),
     "stylus": (
-        "Pressure-sensitive stylus with palm rejection — live 2.6.26 "
+        "Pressure-sensitive stylus with palm rejection — live 2.6.27 "
         "(tablet pressure → stroke width; else freehand)."
     ),
     "shapes_ai": "Smart shape recognition while drawing — stub / planned.",
     "extrude3d": (
-        "3D extrusion limited viewer — live 2.6.26 "
+        "3D extrusion limited viewer — live 2.6.27 "
         "(isometric, simple shapes; no mesh/OpenGL)."
     ),
     "plugins": (
-        "User/script hooks (open/save/export/ocr) — live 2.6.26; "
+        "User/script hooks (open/save/export/ocr) — live 2.6.27; "
         "Python/PowerShell ild; no marketplace plugin system."
     ),
     "outline_read": (
         "Document outline read-aloud (TTS) — stub / planned; "
-        "structure pane (headings/bookmarks) live 2.6.26."
+        "structure pane (headings/bookmarks) live 2.6.27."
     ),
     "telemetry": (
-        "Optional local diagnostics — live 2.6.26: opt-in default off, "
+        "Optional local diagnostics — live 2.6.27: opt-in default off, "
         "no network, no PII, no data transfer (diagnostics.jsonl)."
     ),
     "varfonts": "Full variable fonts support — planned.",
@@ -224,7 +224,7 @@ class StubInfoDialog(QDialog):
         self.badge = QLabel(badge)
         self.badge.setObjectName("stubInfoBadge")
         self.badge.setAlignment(Qt.AlignCenter)
-        live = badge.lower() in ("live", "2.6.26", "produktiv") or "2.6.26" in badge
+        live = badge.lower() in ("live", "2.6.27", "produktiv") or "2.6.27" in badge
         if live:
             self.badge.setStyleSheet(
                 "QLabel#stubInfoBadge {"
@@ -232,7 +232,7 @@ class StubInfoDialog(QDialog):
                 " border-radius:4px; padding:2px 8px; font-weight:700;"
                 "}"
             )
-            self.badge.setToolTip("Produktiv / live — 2.6.26")
+            self.badge.setToolTip("Produktiv / live — 2.6.27")
         else:
             self.badge.setStyleSheet(
                 "QLabel#stubInfoBadge {"
@@ -289,7 +289,7 @@ class StubInfoDialog(QDialog):
 
 
 def show_planned(parent: QWidget | None, key: str) -> None:
-    """Stub-Info oder Live-Feature öffnen — 2.6.26."""
+    """Stub-Info oder Live-Feature öffnen — 2.6.27."""
     if key == "cloud":
         opener = getattr(parent, "_show_shared_review_dialog", None)
         if callable(opener):
@@ -352,7 +352,7 @@ def show_planned(parent: QWidget | None, key: str) -> None:
         key, "Dieses Feature ist geplant und noch nicht implementiert."
     )
     if key in _LIVE_KEYS:
-        badge = "2.6.26" if not en else "Live"
+        badge = "2.6.27" if not en else "Live"
         note = "Produktiv / live." if not en else "Live / production."
     else:
         badge = tr("planned")

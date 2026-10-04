@@ -130,7 +130,12 @@
     "installer_desktop_icon": "Desktop-Verknüpfung erstellen",
     "installer_start_menu": "Einträge im Startmenü belassen",
     "installer_launch_now": "InstantLens Doc jetzt starten",
-    "installer_build_hint": "Setup.exe (Windows x64): powershell -ExecutionPolicy Bypass -File .\\scripts\\build-windows-installer.ps1"
+    "installer_build_hint": "Setup.exe (Windows x64): powershell -ExecutionPolicy Bypass -File .\\scripts\\build-windows-installer.ps1",
+    "installer_sync_hint": "Nach Sync: install-ild.ps1 (Shortcuts) · optional build-windows-installer.ps1 / sync-ild.ps1 -BuildInstaller",
+    "installer_post_sync_steps": "1) Shortcuts: .\\scripts\\install-ild.ps1  2) Optional Setup.exe: .\\scripts\\build-windows-installer.ps1",
+    "keygen_cli_hint": "Keygen: run-keygen.bat · python -m keygen kunde@example.com · --verify \"ILD1....\"",
+    "scripting_cli_hint": "Scripting: python -m ild --help · run-ild.bat · .\\scripts\\ild.ps1",
+    "wheel_scroll_hint": "Mausrad/Trackpad scrollt Text und Word-Suite; Shift+Rad horizontal; auch über Zeilennummern/Minimap"
   },
   "phrases": {
     "&Datei": "&Datei",

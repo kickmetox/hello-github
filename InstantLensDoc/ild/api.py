@@ -1,4 +1,4 @@
-"""Headless InstantLens-Doc-Operationen für Python- und PowerShell-Scripting — 2.6.26.
+"""Headless InstantLens-Doc-Operationen für Python- und PowerShell-Scripting — 2.6.27.
 
 Hyperlinks · Grafiken/Medien (Scale/Crop/Shapes/Video) · EPUB · Shared Review · Batch/eIDAS.
 """
@@ -1305,7 +1305,7 @@ def save_document(
     fmt: str | None = None,
     title: str = "InstantLens Doc",
 ) -> dict[str, Any]:
-    """Dokument speichern/exportieren (docx/xlsx/pdf/txt/rtf/html/jpg/epub) — 2.6.26."""
+    """Dokument speichern/exportieren (docx/xlsx/pdf/txt/rtf/html/jpg/epub) — 2.6.27."""
     from instantlensdoc.core.export import export_document
 
     dest = export_document(text, path, fmt=fmt, title=title)
@@ -2401,7 +2401,7 @@ def shared_review_info() -> dict[str, Any]:
     return data
 
 
-# --- Hyperlinks / Medien / EPUB — 2.6.26 ---
+# --- Hyperlinks / Medien / EPUB — 2.6.27 ---
 
 
 def insert_hyperlink(
@@ -2413,7 +2413,7 @@ def insert_hyperlink(
     end: int | None = None,
     as_html: bool = False,
 ) -> dict[str, Any]:
-    """Hyperlink in Text einfügen (URL oder #anker / ild://…) — 2.6.26."""
+    """Hyperlink in Text einfügen (URL oder #anker / ild://…) — 2.6.27."""
     from instantlensdoc.core.hyperlinks import insert_link_in_text
 
     return insert_link_in_text(
@@ -2422,7 +2422,7 @@ def insert_hyperlink(
 
 
 def extract_hyperlinks(text: str) -> dict[str, Any]:
-    """Markdown-/HTML-Links aus Text lesen — 2.6.26."""
+    """Markdown-/HTML-Links aus Text lesen — 2.6.27."""
     from instantlensdoc.core.hyperlinks import extract_links_from_text, hyperlink_info
 
     links = [lk.to_dict() for lk in extract_links_from_text(text)]
@@ -2436,7 +2436,7 @@ def resolve_hyperlink(
     *,
     bookmarks: Sequence[tuple[int, str]] | None = None,
 ) -> dict[str, Any]:
-    """Internes Hyperlink-Ziel auflösen — 2.6.26."""
+    """Internes Hyperlink-Ziel auflösen — 2.6.27."""
     from instantlensdoc.core.hyperlinks import resolve_internal_target
 
     data = resolve_internal_target(text, target, bookmarks=bookmarks)
@@ -2445,7 +2445,7 @@ def resolve_hyperlink(
 
 
 def list_doc_anchors(text: str) -> dict[str, Any]:
-    """Überschriften-Anker für In-Dokument-Links — 2.6.26."""
+    """Überschriften-Anker für In-Dokument-Links — 2.6.27."""
     from instantlensdoc.core.hyperlinks import list_heading_anchors
 
     anchors = list_heading_anchors(text)
@@ -2458,7 +2458,7 @@ def save_hyperlinks_sidecar(
     *,
     links: Sequence[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
-    """Links als Sidecar speichern (aus Text extrahiert oder übergeben) — 2.6.26."""
+    """Links als Sidecar speichern (aus Text extrahiert oder übergeben) — 2.6.27."""
     from instantlensdoc.core.hyperlinks import (
         extract_links_from_text,
         save_links_sidecar,
@@ -2487,7 +2487,7 @@ def layout_add_shape_frame(
     stroke_color: str = "#1A5276",
     path: PathLike | None = None,
 ) -> dict[str, Any]:
-    """Formrahmen ins Layout — 2.6.26."""
+    """Formrahmen ins Layout — 2.6.27."""
     doc = _load_layout(layout, path)
     fr = doc.add_shape(
         shape,
@@ -2516,7 +2516,7 @@ def layout_add_video_placeholder(
     title: str = "",
     path: PathLike | None = None,
 ) -> dict[str, Any]:
-    """Online-Video-Platzhalter mit URL — 2.6.26."""
+    """Online-Video-Platzhalter mit URL — 2.6.27."""
     doc = _load_layout(layout, path)
     fr = doc.add_video_placeholder(
         url,
@@ -2539,7 +2539,7 @@ def layout_scale_image(
     layout: dict[str, Any] | None = None,
     path: PathLike | None = None,
 ) -> dict[str, Any]:
-    """Bild-/Formrahmen skalieren — 2.6.26."""
+    """Bild-/Formrahmen skalieren — 2.6.27."""
     doc = _load_layout(layout, path)
     fr = doc.scale_image(frame_id, float(factor))
     if path:
@@ -2557,7 +2557,7 @@ def layout_crop_image(
     layout: dict[str, Any] | None = None,
     path: PathLike | None = None,
 ) -> dict[str, Any]:
-    """Bild zuschneiden (relative Ränder 0–1) — 2.6.26."""
+    """Bild zuschneiden (relative Ränder 0–1) — 2.6.27."""
     doc = _load_layout(layout, path)
     fr = doc.crop_image(
         frame_id, left=float(left), top=float(top), right=float(right), bottom=float(bottom)
@@ -2574,7 +2574,7 @@ def export_epub_api(
     title: str = "InstantLens Doc",
     author: str = "InstantLens Doc",
 ) -> dict[str, Any]:
-    """Text → EPUB — 2.6.26."""
+    """Text → EPUB — 2.6.27."""
     from instantlensdoc.core.export import export_epub
 
     dest = export_epub(text, path, title=title, author=author)
@@ -2602,18 +2602,18 @@ def _load_layout(
     return LayoutDocument()
 
 
-# --- Hooks / Outline / Stylus / Telemetrie / 3D — 2.6.26 ---
+# --- Hooks / Outline / Stylus / Telemetrie / 3D — 2.6.27 ---
 
 
 def hooks_list(directory: PathLike | None = None) -> dict[str, Any]:
-    """User-Hooks auflisten — 2.6.26."""
+    """User-Hooks auflisten — 2.6.27."""
     from instantlensdoc.core.plugin_hooks import list_hooks
 
     return list_hooks(directory)
 
 
 def hooks_load(directory: PathLike | None = None) -> dict[str, Any]:
-    """Hooks-Ordner laden — 2.6.26."""
+    """Hooks-Ordner laden — 2.6.27."""
     from instantlensdoc.core.plugin_hooks import load_plugins, list_hooks
 
     loaded = load_plugins(directory)
@@ -2624,7 +2624,7 @@ def hooks_load(directory: PathLike | None = None) -> dict[str, Any]:
 
 
 def hooks_emit(event: str, **payload: Any) -> dict[str, Any]:
-    """Event an Hook-Bus senden — 2.6.26."""
+    """Event an Hook-Bus senden — 2.6.27."""
     from instantlensdoc.core.plugin_hooks import KNOWN_EVENTS, emit
 
     n = emit(str(event), **payload)
@@ -2637,7 +2637,7 @@ def hooks_emit(event: str, **payload: Any) -> dict[str, Any]:
 
 
 def hooks_register(source: PathLike, *, name: str | None = None) -> dict[str, Any]:
-    """Hook-Skript installieren — 2.6.26."""
+    """Hook-Skript installieren — 2.6.27."""
     from instantlensdoc.core.plugin_hooks import register_hook_script
 
     return register_hook_script(source, name=name)
@@ -2649,7 +2649,7 @@ def document_outline_api(
     path: PathLike | None = None,
     max_level: int = 6,
 ) -> dict[str, Any]:
-    """Dokumentstruktur (Überschriften + PDF-Lesezeichen) — 2.6.26."""
+    """Dokumentstruktur (Überschriften + PDF-Lesezeichen) — 2.6.27."""
     from instantlensdoc.core.doc_outline import build_document_outline
 
     return build_document_outline(
@@ -2660,14 +2660,14 @@ def document_outline_api(
 
 
 def stylus_status() -> dict[str, Any]:
-    """Stylus-Einstellungen/Status — 2.6.26."""
+    """Stylus-Einstellungen/Status — 2.6.27."""
     from instantlensdoc.core.stylus import stylus_info
 
     return stylus_info()
 
 
 def telemetry_status() -> dict[str, Any]:
-    """Telemetrie-Status (lokal) — 2.6.26."""
+    """Telemetrie-Status (lokal) — 2.6.27."""
     from instantlensdoc.core.telemetry import diagnostics_summary, telemetry_stub_info
 
     info = telemetry_stub_info()
@@ -2676,7 +2676,7 @@ def telemetry_status() -> dict[str, Any]:
 
 
 def telemetry_report(event: str, **kwargs: Any) -> dict[str, Any]:
-    """Anonymen Diagnostik-Eintrag schreiben (nur bei Opt-in) — 2.6.26."""
+    """Anonymen Diagnostik-Eintrag schreiben (nur bei Opt-in) — 2.6.27."""
     from instantlensdoc.core.telemetry import is_telemetry_opt_in, report_anonymous_usage
 
     report_anonymous_usage(event, **kwargs)
@@ -2696,7 +2696,7 @@ def extrude3d_preview(
     depth: float = 40.0,
     angle_deg: float = 30.0,
 ) -> dict[str, Any]:
-    """Limited 3D-Extrusionsdaten (isometrisch) — 2.6.26."""
+    """Limited 3D-Extrusionsdaten (isometrisch) — 2.6.27."""
     from instantlensdoc.core.extrude3d import ExtrudeParams, extrude_faces, extrude3d_info
 
     faces = extrude_faces(

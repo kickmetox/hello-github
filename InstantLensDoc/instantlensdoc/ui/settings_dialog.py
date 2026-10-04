@@ -1607,9 +1607,9 @@ class SettingsDialog(QDialog):
         )
         self.telemetry_chk.setObjectName("telemetryOptIn")
         self.telemetry_chk.setChecked(bool(get_telemetry_opt_in()))
-        self.telemetry_chk.setEnabled(True)  # Opt-in aktivierbar — 2.6.26
+        self.telemetry_chk.setEnabled(True)  # Opt-in aktivierbar — 2.6.27
         self.telemetry_chk.setToolTip(
-            "2.6.26: Optional lokale Diagnostik (diagnostics.jsonl). "
+            "2.6.27: Optional lokale Diagnostik (diagnostics.jsonl). "
             "Kein Netzwerk, kein PII (keine Pfade/Texte/IPs). Default aus."
         )
         tel_row = QHBoxLayout()
@@ -1617,7 +1617,7 @@ class SettingsDialog(QDialog):
         self.btn_telemetry_info = QPushButton("Info…")
         self.btn_telemetry_info.setObjectName("telemetryStubInfoBtn")
         self.btn_telemetry_info.setToolTip(
-            "Telemetrie-Info: lokal · kein Netzwerk · kein PII — 2.6.26"
+            "Telemetrie-Info: lokal · kein Netzwerk · kein PII — 2.6.27"
         )
         self.btn_telemetry_info.clicked.connect(self._show_telemetry_stub_info)
         tel_row.addWidget(self.btn_telemetry_info)
@@ -1626,13 +1626,13 @@ class SettingsDialog(QDialog):
             "<b>Optional · privacy-respektierend:</b> Default <b>aus</b>. "
             "Bei Opt-in nur lokales Event-Zähler-Log — <b>kein Netzwerk</b>, "
             "<b>kein PII</b> (keine Dateipfade/Inhalte) — "
-            "<b>keine Datenübertragung</b> ins Internet. — 2.6.26"
+            "<b>keine Datenübertragung</b> ins Internet. — 2.6.27"
         )
         tel_hint.setWordWrap(True)
         tel_hint.setObjectName("telemetryStubHint")
         tel_hint.setStyleSheet("color: #1b5e20;")
         tel_hint.setToolTip(
-            "Telemetrie 2.6.26: Opt-in lokal · Esc · Stubs-Tab Status"
+            "Telemetrie 2.6.27: Opt-in lokal · Esc · Stubs-Tab Status"
         )
         form.addRow(tel_hint)
 
@@ -1645,7 +1645,7 @@ class SettingsDialog(QDialog):
         except Exception:
             self.stylus_pressure_chk.setChecked(True)
         self.stylus_pressure_chk.setToolTip(
-            "Tablet/Stift: Druck skaliert Freihand-Strichstärke — 2.6.26"
+            "Tablet/Stift: Druck skaliert Freihand-Strichstärke — 2.6.27"
         )
         form.addRow(self.stylus_pressure_chk)
         self.stylus_palm_chk = QCheckBox("Palm-Rejection (Touch verwerfen)")
@@ -1657,7 +1657,7 @@ class SettingsDialog(QDialog):
         except Exception:
             self.stylus_palm_chk.setChecked(True)
         self.stylus_palm_chk.setToolTip(
-            "Heuristik: Touch/Finger während Stift-Eingabe ignorieren — 2.6.26"
+            "Heuristik: Touch/Finger während Stift-Eingabe ignorieren — 2.6.27"
         )
         form.addRow(self.stylus_palm_chk)
 
@@ -1949,7 +1949,7 @@ class SettingsDialog(QDialog):
         v.addWidget(title)
         info = QLabel(
             "Geplante Features sind klar als Stub markiert. "
-            "Kein Fake-KI-Verhalten. Cloud-Review: Freigabeordner produktiv (2.6.26). "
+            "Kein Fake-KI-Verhalten. Cloud-Review: Freigabeordner produktiv (2.6.27). "
             "Plugin-Hooks: interner Event-Bus + no-op Loader."
         )
         info.setWordWrap(True)
@@ -2031,27 +2031,27 @@ class SettingsDialog(QDialog):
             (
                 "Stylus / Palm Rejection",
                 "stylus",
-                "Produktiv 2.6.26 · Druck + Palm-Rejection",
+                "Produktiv 2.6.27 · Druck + Palm-Rejection",
             ),
             (
                 "3D-Extrusion",
                 "extrude3d",
-                "Produktiv 2.6.26 · Limited Viewer (kein Mesh/OpenGL)",
+                "Produktiv 2.6.27 · Limited Viewer (kein Mesh/OpenGL)",
             ),
             (
                 "Plugin-Hooks",
                 "plugins",
-                "Produktiv 2.6.26 · User-Skripte open/save/export/ocr",
+                "Produktiv 2.6.27 · User-Skripte open/save/export/ocr",
             ),
             (
                 "Document Outline Vorlesen",
                 "outline_read",
-                "Stub · TTS geplant · Pane produktiv 2.6.26",
+                "Stub · TTS geplant · Pane produktiv 2.6.27",
             ),
             (
                 "Telemetrie",
                 "telemetry",
-                "Produktiv 2.6.26 · Opt-in lokal · kein Netzwerk/PII",
+                "Produktiv 2.6.27 · Opt-in lokal · kein Netzwerk/PII",
             ),
         ]
         # Sortierung A–Z nach Feature-Name — 1.9.3
@@ -2095,7 +2095,7 @@ class SettingsDialog(QDialog):
         v.addWidget(self.stubs_table)
 
         events_box = QGroupBox(
-            "Plugin-Hooks Events (produktiv 2.6.26 · User-Skripte)"
+            "Plugin-Hooks Events (produktiv 2.6.27 · User-Skripte)"
         )
         ev_layout = QVBoxLayout(events_box)
         try:
@@ -2218,7 +2218,7 @@ class SettingsDialog(QDialog):
             title="Telemetrie",
             short=short,
             detail=detail,
-            badge="2.6.26",
+            badge="2.6.27",
             note="Produktiv / lokal / Opt-in.",
         )
         dlg.setObjectName("telemetryStubInfoDialog")
@@ -3952,7 +3952,7 @@ class SettingsDialog(QDialog):
         except Exception:
             pass
         set_update_check_on_start(self.update_chk.isChecked())
-        # Telemetrie: Opt-in lokal speichern — 2.6.26
+        # Telemetrie: Opt-in lokal speichern — 2.6.27
         set_telemetry_opt_in(bool(self.telemetry_chk.isChecked()))
         try:
             from instantlensdoc.core.app_settings import (

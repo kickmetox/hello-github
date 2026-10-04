@@ -130,7 +130,12 @@
     "installer_desktop_icon": "إنشاء اختصار على سطح المكتب",
     "installer_start_menu": "الإبقاء على إدخالات قائمة ابدأ",
     "installer_launch_now": "تشغيل InstantLens Doc الآن",
-    "installer_build_hint": "Setup.exe (Windows x64): powershell -ExecutionPolicy Bypass -File .\\scripts\\build-windows-installer.ps1"
+    "installer_build_hint": "Setup.exe (Windows x64): powershell -ExecutionPolicy Bypass -File .\\scripts\\build-windows-installer.ps1",
+    "installer_sync_hint": "بعد المزامنة: install-ild.ps1 · اختياري build-windows-installer.ps1 / sync-ild.ps1 -BuildInstaller",
+    "installer_post_sync_steps": "1) اختصارات: .\\scripts\\install-ild.ps1  2) Setup.exe اختياري: .\\scripts\\build-windows-installer.ps1",
+    "keygen_cli_hint": "Keygen: run-keygen.bat · python -m keygen user@example.com · --verify \"ILD1....\"",
+    "scripting_cli_hint": "البرمجة النصية: python -m ild --help · run-ild.bat · .\\scripts\\ild.ps1",
+    "wheel_scroll_hint": "عجلة الماوس/لوحة اللمس تمرّر النص وWord Suite؛ Shift+عجلة أفقياً؛ أيضاً فوق الأرقام/الخريطة المصغرة"
   },
   "phrases": {
     "&Datei": "&ملف",

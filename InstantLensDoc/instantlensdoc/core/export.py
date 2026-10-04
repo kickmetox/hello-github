@@ -1,4 +1,4 @@
-"""Export/Import: Editor-Inhalt → HTML / DOCX / PDF / TXT / RTF / XLSX / JPG / EPUB — 2.6.26."""
+"""Export/Import: Editor-Inhalt → HTML / DOCX / PDF / TXT / RTF / XLSX / JPG / EPUB — 2.6.27."""
 
 from __future__ import annotations
 
@@ -92,7 +92,7 @@ def _inline_md_to_html(fragment: str) -> str:
 
 
 def _markdownish_body_parts(text: str) -> list[str]:
-    """Markdownish → HTML-Fragmente; Markdown-Links → <a> — 2.6.26."""
+    """Markdownish → HTML-Fragmente; Markdown-Links → <a> — 2.6.27."""
     paras: list[str] = []
     buf: list[str] = []
 
@@ -150,7 +150,7 @@ def export_html(
 ) -> Path:
     """
     Schreibt UTF-8-HTML. Bei as_markdownish: #/## Überschriften, leere Zeile = Absatz.
-    Markdown-Hyperlinks werden zu <a href> — 2.6.26.
+    Markdown-Hyperlinks werden zu <a href> — 2.6.27.
     """
     path = Path(path)
     if as_markdownish:
@@ -190,7 +190,7 @@ def export_epub(
     language: str = "de",
 ) -> Path:
     """
-    EPUB 2.0.1 (ohne externe Abhängigkeit) — Kapitel aus Markdownish-Text — 2.6.26.
+    EPUB 2.0.1 (ohne externe Abhängigkeit) — Kapitel aus Markdownish-Text — 2.6.27.
     Struktur: mimetype + META-INF/container.xml + OEBPS/{content.opf,toc.ncx,chapter*.xhtml}.
     """
     path = Path(path)
@@ -307,7 +307,7 @@ def export_epub(
 
 
 def import_epub(path: str | Path) -> str:
-    """EPUB → Plaintext (Kapitel-Titel + Body) — 2.6.26."""
+    """EPUB → Plaintext (Kapitel-Titel + Body) — 2.6.27."""
     path = Path(path)
     parts: list[str] = []
     with zipfile.ZipFile(path, "r") as zf:
@@ -565,7 +565,7 @@ def export_document(
     page_size: tuple[float, float] | str | None = None,
     author: str = "InstantLens Doc",
 ) -> Path:
-    """Unified Export nach Erweiterung/Format — 2.6.14 / EPUB 2.6.26."""
+    """Unified Export nach Erweiterung/Format — 2.6.14 / EPUB 2.6.27."""
     path = Path(path)
     f = (fmt or path.suffix.lstrip(".")).lower().lstrip(".")
     if f == "jpeg":

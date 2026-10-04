@@ -1061,7 +1061,7 @@ function Get-IldSharedReviewInfo {
 }
 
 function Add-IldHyperlink {
-    # Hyperlink in Text — 2.6.26
+    # Hyperlink in Text — 2.6.27
     param(
         [Parameter(Mandatory = $true)][string]$Text,
         [Parameter(Mandatory = $true)][string]$LinkText,

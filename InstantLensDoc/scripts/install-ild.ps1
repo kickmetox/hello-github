@@ -1,4 +1,4 @@
-# InstantLens Doc 2.6.26 — Benutzer-Installer (ohne Admin wenn möglich)
+# InstantLens Doc 2.6.27 — Benutzer-Installer (ohne Admin wenn möglich)
 # Startmenü-Shortcut + optional Desktop-Link (User-Profil).
 # Keygen-Shortcut im Startmenü, wenn run-keygen.bat oder InstantLensKeygen.exe vorhanden.
 # Idempotent: vorhandene Verknüpfungen werden aktualisiert.
@@ -18,6 +18,13 @@
 #   powershell -ExecutionPolicy Bypass -File "D:\AI_Temp\sync-ild.ps1"
 #   (oder .\scripts\sync-ild.ps1 neben der App / Store-Kopie)
 #
+# Nach Sync — empfohlene Schritte (DE):
+#   1) Shortcuts:  powershell -ExecutionPolicy Bypass -File .\scripts\install-ild.ps1
+#   2) Optional Setup.exe (Inno Setup 6):
+#        powershell -ExecutionPolicy Bypass -File .\scripts\build-windows-installer.ps1
+#   3) Oder Sync+Installer: sync-ild.ps1 -BuildInstaller -SkipStart
+#   Keygen: run-keygen.bat · Scripting: python -m ild --help
+#
 # Exit-Codes:
 #   0  Erfolg (Install/Update/Uninstall OK; nichts zu entfernen bei -Uninstall = OK; Abbruch Prompt = 0)
 #   1  Fehler (App-Ordner fehlt, Shortcut anlegen/entfernen fehlgeschlagen, Parameterkonflikt)
@@ -34,7 +41,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$Version = "2.6.26"
+$Version = "2.6.27"
 $AppName = "InstantLens Doc"
 
 function Write-IldInfo([string]$msg) { Write-Host "[ILD $Version] $msg" }
@@ -234,7 +241,7 @@ if (-not $SkipStartMenu) {
         exit 1
     }
 
-    # Keygen-Shortcut (run-keygen.bat oder InstantLensKeygen.exe) — 2.6.26
+    # Keygen-Shortcut (run-keygen.bat oder InstantLensKeygen.exe) — 2.6.27
     if (-not $SkipKeygen) {
         $kgExe = Join-Path $AppDir "InstantLensKeygen.exe"
         $kgBat = Join-Path $AppDir "run-keygen.bat"
@@ -305,5 +312,9 @@ $syncLocal = Join-Path $AppDir "scripts\sync-ild.ps1"
 if (Test-Path $syncLocal) {
     Write-Host ("  powershell -ExecutionPolicy Bypass -File `"{0}`"" -f $syncLocal)
 }
+Write-IldInfo "Optional Setup.exe (Inno Setup 6, nach Sync):"
+Write-Host '  powershell -ExecutionPolicy Bypass -File .\scripts\build-windows-installer.ps1'
+Write-Host '  powershell -ExecutionPolicy Bypass -File "D:\AI_Temp\sync-ild.ps1" -BuildInstaller -SkipStart'
+Write-IldInfo "Keygen: run-keygen.bat · Scripting: python -m ild --help · .\scripts\ild.ps1"
 Write-IldInfo "Exit-Codes: 0 OK · 1 Fehler. Deinstallieren: -Uninstall [-Quiet]"
 exit 0

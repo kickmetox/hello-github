@@ -642,7 +642,7 @@ class PdfCanvas(QLabel):
 
     annotation_placed = Signal(float, float)
     drag_finished = Signal(float, float, float, float)  # x0,y0,x1,y1
-    ink_finished = Signal(object)  # list[(x,y)] oder [(x,y,pressure)] — Stylus 2.6.26
+    ink_finished = Signal(object)  # list[(x,y)] oder [(x,y,pressure)] — Stylus 2.6.27
     text_selection_finished = Signal(float, float, float, float)  # Text-Marquee (Auswahl-Modus)
     overlay_edit_requested = Signal(str)  # ann id
     inline_text_edit_requested = Signal(float, float)  # Klick → Inline-Edit — 2.6.5
@@ -672,10 +672,10 @@ class PdfCanvas(QLabel):
         self._object_drag_delta: tuple[float, float] = (0.0, 0.0)
         self._drag_start: tuple[float, float] | None = None
         self._drag_current: tuple[float, float] | None = None
-        self._ink_points: list[tuple[float, ...]] | None = None  # Freihand / Stylus — 2.6.26
+        self._ink_points: list[tuple[float, ...]] | None = None  # Freihand / Stylus — 2.6.27
         self._ink_preview_color: str = "#2980B9"  # Strichfarbe Vorschau — 2.2.1
         self._ink_preview_stroke: float = 2.0  # Strichstärke Vorschau — 2.2.1
-        self._stylus_active = False  # Tablet-Stift aktiv — 2.6.26
+        self._stylus_active = False  # Tablet-Stift aktiv — 2.6.27
         self._text_sel_start: tuple[float, float] | None = None
         self._text_sel_current: tuple[float, float] | None = None
         self._scale = 1.5
@@ -1506,7 +1506,7 @@ class PdfCanvas(QLabel):
                 label = ann.text or ann.measure_label(self._scale, unit=unit)
                 painter.drawText(int(mid_x) + 4, int(mid_y) - 4, label)
         elif ann.type == AnnotationType.INK:
-            # Freihand / Stylus: bei Druck variable Segmentbreite — 2.6.26
+            # Freihand / Stylus: bei Druck variable Segmentbreite — 2.6.27
             raw_pts = [
                 pt
                 for pt in (getattr(ann, "points", None) or [])
@@ -1887,7 +1887,7 @@ class PdfCanvas(QLabel):
                 return
         if self._drag_tool and event.button() == Qt.LeftButton:
             if self._drag_tool == AnnotationType.INK:
-                # Palm-Rejection: Touch während Stylus-Modus verwerfen — 2.6.26
+                # Palm-Rejection: Touch während Stylus-Modus verwerfen — 2.6.27
                 try:
                     from instantlensdoc.core.stylus import should_reject_palm
 
@@ -1898,7 +1898,7 @@ class PdfCanvas(QLabel):
                         return
                 except Exception:
                     pass
-                # Freihand: Punkte sammeln — 2.2.0 / Stylus 2.6.26
+                # Freihand: Punkte sammeln — 2.2.0 / Stylus 2.6.27
                 self._ink_points = [(x, y)]
                 self._drag_start = (x, y)
                 self._drag_current = (x, y)
@@ -2079,7 +2079,7 @@ class PdfCanvas(QLabel):
         super().mouseReleaseEvent(event)
 
     def tabletEvent(self, event):  # noqa: N802
-        """Stylus/Tablet: Druck → variable Strichstärke — 2.6.26."""
+        """Stylus/Tablet: Druck → variable Strichstärke — 2.6.27."""
         try:
             from PySide6.QtGui import QTabletEvent
             from instantlensdoc.core.stylus import (
@@ -2653,7 +2653,7 @@ class PdfViewer(QWidget):
             elif t == AnnotationType.INK:
                 b.setToolTip(
                     "Freihand: Maus-Polyline; Strichstärke/Farbe (Stift+Slider); "
-                    "optional Glätten; Stylus-Druck wenn verfügbar — 2.6.26"
+                    "optional Glätten; Stylus-Druck wenn verfügbar — 2.6.27"
                 )
             elif t == AnnotationType.LINK:
                 b.setToolTip(
@@ -2671,7 +2671,7 @@ class PdfViewer(QWidget):
         self.btn_ink_smooth.setChecked(get_ink_smooth())
         self.btn_ink_smooth.setToolTip(
             "Freihand/Stylus: Glättung optional; Stärke daneben — "
-            "Stylus-Druck 2.6.26"
+            "Stylus-Druck 2.6.27"
         )
         self.btn_ink_smooth.clicked.connect(self._toggle_ink_smooth)
         toolbar.addWidget(self.btn_ink_smooth)
@@ -3782,7 +3782,7 @@ class PdfViewer(QWidget):
         return bool(self._page_by_page)
 
     def eventFilter(self, obj, event):  # noqa: N802
-        """Mausrad → Seite blättern im Seite-für-Seite-Modus — 2.6.19."""
+        """Mausrad → Seite blättern im Seite-für-Seite-Modus — 2.6.19 / Trackpad 2.6.27."""
         try:
             from PySide6.QtCore import QEvent
 
@@ -3795,9 +3795,14 @@ class PdfViewer(QWidget):
             ):
                 delta = 0
                 try:
-                    delta = int(event.angleDelta().y())
+                    delta = int(event.pixelDelta().y())
                 except Exception:
                     delta = 0
+                if delta == 0:
+                    try:
+                        delta = int(event.angleDelta().y())
+                    except Exception:
+                        delta = 0
                 if delta > 0:
                     self.prev_page()
                     return True
@@ -11842,7 +11847,7 @@ class PdfViewer(QWidget):
             do_smooth = bool(get_ink_smooth())
         strength = get_ink_smooth_strength()
         passes = get_ink_smooth_passes()
-        # Rohstrich zuerst (ohne Glättung) — eigener Undo-Eintrag; Druck optional — 2.6.26
+        # Rohstrich zuerst (ohne Glättung) — eigener Undo-Eintrag; Druck optional — 2.6.27
         ann = Annotation.from_ink_points(
             page0,
             mapped,

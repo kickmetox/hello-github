@@ -130,7 +130,12 @@
     "installer_desktop_icon": "创建桌面快捷方式",
     "installer_start_menu": "保留开始菜单项",
     "installer_launch_now": "立即启动 InstantLens Doc",
-    "installer_build_hint": "Setup.exe (Windows x64)：powershell -ExecutionPolicy Bypass -File .\\scripts\\build-windows-installer.ps1"
+    "installer_build_hint": "Setup.exe (Windows x64)：powershell -ExecutionPolicy Bypass -File .\\scripts\\build-windows-installer.ps1",
+    "installer_sync_hint": "同步后：install-ild.ps1 · 可选 build-windows-installer.ps1 / sync-ild.ps1 -BuildInstaller",
+    "installer_post_sync_steps": "1) 快捷方式：.\\scripts\\install-ild.ps1  2) 可选 Setup.exe：.\\scripts\\build-windows-installer.ps1",
+    "keygen_cli_hint": "Keygen：run-keygen.bat · python -m keygen user@example.com · --verify \"ILD1....\"",
+    "scripting_cli_hint": "脚本：python -m ild --help · run-ild.bat · .\\scripts\\ild.ps1",
+    "wheel_scroll_hint": "鼠标滚轮/触控板滚动文本与 Word Suite；Shift+滚轮横向；行号/迷你图上同样有效"
   },
   "phrases": {
     "&Datei": "文件(&F)",
