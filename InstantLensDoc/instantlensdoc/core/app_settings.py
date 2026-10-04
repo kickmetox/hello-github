@@ -5134,12 +5134,12 @@ def rename_custom_ann_color_theme(old_name: str, new_name: str) -> dict[str, Any
             updated.append(renamed)
         else:
             updated.append(t)
+    # Default vor Speichern lesen (get_default braucht existierendes Theme) — 2.5.5
+    raw_default = str(load_settings().get("default_ann_color_theme") or "").strip()
+    was_default = raw_default.casefold() == old.casefold()
     _save_custom_ann_color_themes(updated)
-    try:
-        if get_default_ann_color_theme().casefold() == old.casefold():
-            set_default_ann_color_theme(str(renamed["name"]) if renamed else new)
-    except Exception:
-        pass
+    if was_default and renamed is not None:
+        set_default_ann_color_theme(str(renamed["name"]))
     if renamed is None:
         raise ValueError(f"Umbenennen fehlgeschlagen: „{new}“")
     return renamed

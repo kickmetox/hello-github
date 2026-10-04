@@ -11776,7 +11776,7 @@ def main() -> int:
         assert "checks[].error" in smoke214 or '"error"' in smoke214
         assert "_json_checks_on_fail" in smoke214
         assert "Exitcode spiegelt" in smoke214 or "spiegelt ok" in smoke214
-        assert 'EXPECTED_VERSION = "2.5.4"' in smoke214
+        assert 'EXPECTED_VERSION = "2.5.5"' in smoke214
 
         # Fail-Pfad: checks[].error + Exit != 0 wenn ok=false
         import json as _json214
@@ -11877,7 +11877,7 @@ def main() -> int:
         assert "_on_txt_template_esc_discard" in cmp215
 
         smoke215 = (ROOT / "scripts" / "smoke_ild.py").read_text(encoding="utf-8")
-        assert 'EXPECTED_VERSION = "2.5.4"' in smoke215
+        assert 'EXPECTED_VERSION = "2.5.5"' in smoke215
         assert "FAIL_ERROR_MAX_LEN" in smoke215 or "200" in smoke215
         assert "_truncate_fail_error" in smoke215
         assert "…" in smoke215
@@ -14569,7 +14569,7 @@ def main() -> int:
         assert len(win.layout_doc.text_frames) >= 2
         assert "Lizenz:" in win.license_label.text() or "⚠" in win.license_label.text()
         _vl = win.version_label.text()
-        assert "2.5.4" in _vl, (repr(_vl), [hex(ord(c)) for c in _vl])
+        assert "2.5.5" in _vl, (repr(_vl), [hex(ord(c)) for c in _vl])
         # Lizenz <7 Tage: Style prominent
         st_lic = win.license_manager.status()
         if st_lic.allowed and st_lic.days_remaining < 7:
@@ -14750,7 +14750,7 @@ def main() -> int:
             assert win.editor.outdent_selection(4)
             assert win.editor.toPlainText().splitlines()[0] == "alpha"
             # Fenstertitel mit Version
-            assert "2.5.4" in win.windowTitle()
+            assert "2.5.5" in win.windowTitle()
             from instantlensdoc.ui.help_dialog import AboutDialog, HelpDialog, open_log_folder
 
             about = AboutDialog(win)
@@ -15446,9 +15446,9 @@ def main() -> int:
             assert KeyboardHelpDialog and SetPasswordDialog and CompressPdfDialog
             assert "2.5.5" in PLANNED["ki"], PLANNED["ki"]
             assert "Coming soon" in PLANNED["cloud"]
-            assert "2.5.4" in PLANNED["stylus"], PLANNED["stylus"]
-            assert "2.5.4" in PLANNED["extrude3d"], PLANNED["extrude3d"]
-            assert "2.5.4" in PLANNED["plugins"] and "Stub" in PLANNED["plugins"]
+            assert "2.5.5" in PLANNED["stylus"], PLANNED["stylus"]
+            assert "2.5.5" in PLANNED["extrude3d"], PLANNED["extrude3d"]
+            assert "2.5.5" in PLANNED["plugins"] and "Stub" in PLANNED["plugins"]
             # Toolbar ↔ Menü Sync Graustufen/Nacht
             win.pdf_view.set_grayscale(True)
             assert win._grayscale_action.isChecked()
@@ -26567,9 +26567,9 @@ def main() -> int:
             assert any("QtCustom255b" in t for t in labels255)
             assert dcat255q("QtCustom255b") is True
             sd255q.reject()
-            # Welcome tag counts
+            # Welcome tag counts (Qt-Temp td2) — 2.5.5
             assert hasattr(win.welcome_page, "_refresh_tag_filter_combo")
-            tpdf255 = td / "qt255.pdf"
+            tpdf255 = td2 / "qt255.pdf"
             tpdf255.write_bytes(b"%PDF-1.4\n")
             dt255q.save_tags_sidecar(tpdf255, ["QtCount255"])
             win.welcome_page._refresh_tag_filter_combo()
@@ -26579,7 +26579,7 @@ def main() -> int:
             ]
             assert any("QtCount255" in t and "(" in t for t in combo_labels255)
             # Export ★ / dup
-            sep255q("QtDup255", dpi=150, format="PNG", target=str(td))
+            sep255q("QtDup255", dpi=150, format="PNG", target=str(td2))
             aep255q("QtDup255")
             assert gaep255q() == "QtDup255"
             d255q = dup255q("QtDup255")
