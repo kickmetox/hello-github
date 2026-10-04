@@ -355,6 +355,77 @@ def dpi_to_scale(dpi: int) -> float:
     return max(d / 72.0, 1.0)
 
 
+def crop_page_image(
+    img: Image.Image,
+    rect: tuple[float, float, float, float],
+    *,
+    display_scale: float | None = None,
+    render_scale: float | None = None,
+) -> Image.Image:
+    """
+    Rechteck aus gerenderter Seite ausschneiden — 2.5.0.
+
+    ``rect`` = (x, y, w, h) in Anzeige-Pixeln bei ``display_scale``.
+    Wenn ``render_scale`` abweicht, werden die Koordinaten skaliert.
+    """
+    x, y, w, h = (float(rect[0]), float(rect[1]), float(rect[2]), float(rect[3]))
+    if (
+        display_scale
+        and render_scale
+        and display_scale > 0
+        and abs(float(display_scale) - float(render_scale)) > 1e-6
+    ):
+        f = float(render_scale) / float(display_scale)
+        x, y, w, h = x * f, y * f, w * f, h * f
+    left = max(0, int(round(min(x, x + w))))
+    top = max(0, int(round(min(y, y + h))))
+    right = min(img.width, int(round(max(x, x + w))))
+    bottom = min(img.height, int(round(max(y, y + h))))
+    if right - left < 2:
+        right = min(img.width, left + 2)
+    if bottom - top < 2:
+        bottom = min(img.height, top + 2)
+    if right <= left or bottom <= top:
+        raise ValueError("OCR-Region ist leer oder außerhalb der Seite.")
+    return img.crop((left, top, right, bottom))
+
+
+def ocr_pdf_region(
+    pdf_path: str | Path,
+    page_index: int,
+    rect: tuple[float, float, float, float],
+    *,
+    lang: str = "deu+eng",
+    dpi: int | None = None,
+    display_scale: float | None = None,
+) -> OcrResult:
+    """
+    OCR nur auf einem Seiten-Rechteck → editierbarer Text — 2.5.0.
+
+    ``rect`` = (x, y, width, height) in Anzeige-Pixeln (wie Annotationen).
+    """
+    from ild_pdf import render_page
+
+    dpi_eff = int(dpi) if dpi else DEFAULT_OCR_DPI
+    if dpi_eff not in OCR_DPI_CHOICES:
+        dpi_eff = min(OCR_DPI_CHOICES, key=lambda x: abs(x - dpi_eff))
+    scale = dpi_to_scale(dpi_eff)
+    img = render_page(pdf_path, page_index=int(page_index), scale=scale)
+    cropped = crop_page_image(
+        img,
+        rect,
+        display_scale=display_scale if display_scale is not None else scale,
+        render_scale=scale,
+    )
+    label = f"{Path(pdf_path).name} S.{int(page_index) + 1} Region"
+    return run_ocr(
+        cropped,
+        lang=lang,
+        mode=OcrOutputMode.EDITABLE_TEXT,
+        source_label=label,
+    )
+
+
 @dataclass
 class OcrDocumentResult:
     """Ergebnis einer Batch-OCR über PDF-Seiten (optional Bereich)."""

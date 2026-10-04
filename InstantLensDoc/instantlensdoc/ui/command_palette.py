@@ -59,6 +59,18 @@ def default_palette_commands() -> list[PaletteCommand]:
         PaletteCommand("find_replace", "Suchen/Ersetzen…", "ersetzen replace", "Bearbeiten", "Ctrl+R"),
         PaletteCommand("ocr_page", "OCR aktuelle Seite…", "ocr tesseract seite", "OCR"),
         PaletteCommand("ocr_pdf", "OCR gesamtes PDF…", "ocr batch pdf", "OCR"),
+        PaletteCommand(
+            "ocr_region",
+            "OCR Region (Rechteck)…",
+            "ocr region rechteck crop bereich",
+            "OCR",
+        ),
+        PaletteCommand(
+            "doc_tags",
+            "Dokument-Tags…",
+            "tags ildtags dokument label filter",
+            "PDF",
+        ),
         PaletteCommand("export", "Exportieren…", "export html docx pdf", "Datei"),
         PaletteCommand("export_page_images", "Seiten als Bilder…", "export png jpeg", "PDF"),
         PaletteCommand(

@@ -58,6 +58,7 @@ DEFAULTS: dict[str, Any] = {
     "pdf_compare_page_sync": True,  # Seitenwahl Sync (True) / Entkoppelt (False) — 1.4.1
     "last_pdf_diff_png_dir": "",  # letzter Zielordner Diff-PNG-Export — 1.4.2
     "last_page_image_export_dir": "",  # letzter Zielordner Seiten→Bilder — 1.5.1
+    "last_export_format": "PNG",  # letztes Export-Format PNG|JPEG — 2.5.0
     "page_image_filename_template": "{stem}_p{page}",  # Dateiname-Template — 1.5.1
     "last_signature_image": "",  # zuletzt verwendetes Signatur-Bild — 1.5.1
     "last_signature_width": 180.0,  # Signatur-Breite Default — 1.5.1
@@ -4579,15 +4580,73 @@ def get_active_export_profile_name() -> str:
 
 
 def apply_export_profile(name: str) -> dict[str, object] | None:
-    """Profil anwenden: DPI setzen, Zielordner als last_export_dir merken."""
+    """Profil anwenden: DPI/Format setzen, Zielordner merken — 2.5.0 Format."""
     profile = get_export_profile(name)
     if not profile:
         return None
     set_export_raster_dpi(int(profile["dpi"]))
+    fmt = str(profile.get("format") or "PNG").strip().upper()
+    if fmt in ("JPG", "JPEG"):
+        fmt = "JPEG"
+    if fmt not in EXPORT_PROFILE_FORMATS:
+        fmt = "PNG"
+    set_last_export_format(fmt)
     target = str(profile.get("target") or "").strip()
     if target and Path(target).is_dir():
         set_last_export_dir(target)
+        set_last_page_image_export_dir(target)
     save_settings({"active_export_profile": str(profile["name"])})
+    return profile
+
+
+LAST_EXPORT_PRESET_NAME = "Zuletzt"
+
+
+def get_last_export_format() -> str:
+    """Letztes Bild-Export-Format PNG|JPEG — 2.5.0."""
+    raw = str(load_settings().get("last_export_format") or "PNG").strip().upper()
+    if raw in ("JPG", "JPEG"):
+        return "JPEG"
+    return "PNG" if raw not in EXPORT_PROFILE_FORMATS else raw
+
+
+def set_last_export_format(fmt: str) -> str:
+    """Export-Format merken (PNG|JPEG) — 2.5.0."""
+    f = str(fmt or "PNG").strip().upper()
+    if f in ("JPG", "JPEG"):
+        f = "JPEG"
+    if f not in EXPORT_PROFILE_FORMATS:
+        f = "PNG"
+    save_settings({"last_export_format": f})
+    return f
+
+
+def remember_last_export_preset(
+    *,
+    dpi: int | None = None,
+    format: str | None = None,
+    target: str | Path | None = None,
+) -> dict[str, object]:
+    """
+    Letzte Export-Einstellungen als Preset „Zuletzt“ speichern — 2.5.0.
+
+    Speichert DPI/Format/Pfad und setzt das Profil aktiv.
+    """
+    if dpi is None:
+        dpi = get_export_raster_dpi()
+    if format is None:
+        format = get_last_export_format()
+    profile = save_export_profile(
+        LAST_EXPORT_PRESET_NAME,
+        dpi=int(dpi),
+        format=format,
+        target=target,
+    )
+    set_last_export_format(str(profile["format"]))
+    t = str(profile.get("target") or "").strip()
+    if t:
+        set_last_export_dir(t)
+        set_last_page_image_export_dir(t)
     return profile
 
 
@@ -4619,10 +4678,52 @@ _DEFAULT_ANN_PRESETS = [
 # Werksfarben (unveränderliche Factory-Defaults) — 0.9.8
 ANN_COLOR_PRESET_FACTORY = tuple(_DEFAULT_ANN_PRESETS)
 
+# Vordefinierte Annotation-Farben-Themes (laden → 6 Presets) — 2.5.0
+ANN_COLOR_THEMES: dict[str, tuple[str, ...]] = {
+    "Markieren": (
+        "#FFE066",
+        "#FF9F1C",
+        "#FF6B6B",
+        "#FF85A1",
+        "#C3F584",
+        "#7BDFF2",
+    ),
+    "Corporate": (
+        "#1B4F72",
+        "#2E86C1",
+        "#148F77",
+        "#5D6D7E",
+        "#B7950B",
+        "#922B21",
+    ),
+}
+
 
 def factory_ann_color_presets() -> list[str]:
     """Werksstandard der 6 Color-Presets (Kopie) — 0.9.8."""
     return list(ANN_COLOR_PRESET_FACTORY)
+
+
+def list_ann_color_themes() -> list[str]:
+    """Namen der vordefinierten Annotation-Farben-Themes — 2.5.0."""
+    return list(ANN_COLOR_THEMES.keys())
+
+
+def get_ann_color_theme(name: str) -> list[str] | None:
+    """Theme-Farben (6) oder None — 2.5.0."""
+    colors = ANN_COLOR_THEMES.get((name or "").strip())
+    if not colors:
+        return None
+    return list(colors)
+
+
+def apply_ann_color_theme(name: str) -> list[str]:
+    """Theme laden und als Color-Presets speichern (ildcolors-v1) — 2.5.0."""
+    colors = get_ann_color_theme(name)
+    if not colors:
+        raise ValueError(f"Unbekanntes Farben-Theme: {name!r}")
+    set_ann_color_presets(colors)
+    return list(get_ann_color_presets())
 
 
 def _normalize_hex_color(color: str, fallback: str = "#888888") -> str:

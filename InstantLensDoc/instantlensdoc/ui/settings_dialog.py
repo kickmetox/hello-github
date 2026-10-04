@@ -871,6 +871,20 @@ class SettingsDialog(QDialog):
         )
         btn_import_presets.clicked.connect(self._import_color_presets_ui)
         preset_row.addWidget(btn_import_presets)
+        from instantlensdoc.core.app_settings import list_ann_color_themes
+
+        self.ann_theme_combo = QComboBox()
+        self.ann_theme_combo.addItem("(Theme laden…)", "")
+        for theme_name in list_ann_color_themes():
+            self.ann_theme_combo.addItem(theme_name, theme_name)
+        self.ann_theme_combo.setToolTip(
+            "Vordefinierte Paletten Markieren/Corporate in die Preset-Felder laden — 2.5.0"
+        )
+        btn_load_theme = QPushButton("Theme laden")
+        btn_load_theme.setToolTip("Gewähltes Annotation-Farben-Theme anwenden — 2.5.0")
+        btn_load_theme.clicked.connect(self._load_ann_color_theme_ui)
+        preset_row.addWidget(self.ann_theme_combo)
+        preset_row.addWidget(btn_load_theme)
         form.addRow("Ann.-Color-Presets", preset_row)
 
         self.line_numbers = QCheckBox("Zeilennummern im Editor")
@@ -2755,6 +2769,30 @@ class SettingsDialog(QDialog):
             return
         prev = [ed.text().strip() for ed in (getattr(self, "_preset_edits", []) or [])]
         presets = factory_ann_color_presets()
+        self._sync_preset_edits(presets)
+        self._preset_undo = prev
+        if hasattr(self, "btn_undo_factory_presets"):
+            self.btn_undo_factory_presets.setEnabled(bool(prev))
+
+    def _load_ann_color_theme_ui(self) -> None:
+        """Vordefiniertes Theme (Markieren/Corporate) in Preset-Felder — 2.5.0."""
+        from instantlensdoc.core.app_settings import apply_ann_color_theme
+
+        combo = getattr(self, "ann_theme_combo", None)
+        if combo is None:
+            return
+        name = str(combo.currentData() or combo.currentText() or "").strip()
+        if not name or name.startswith("("):
+            QMessageBox.information(
+                self, "Farben-Theme", "Bitte Markieren oder Corporate wählen."
+            )
+            return
+        prev = [ed.text().strip() for ed in (getattr(self, "_preset_edits", []) or [])]
+        try:
+            presets = apply_ann_color_theme(name)
+        except Exception as e:
+            QMessageBox.warning(self, "Farben-Theme", str(e))
+            return
         self._sync_preset_edits(presets)
         self._preset_undo = prev
         if hasattr(self, "btn_undo_factory_presets"):

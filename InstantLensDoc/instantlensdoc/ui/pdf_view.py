@@ -1403,6 +1403,8 @@ class PdfViewer(QWidget):
     printer_marks_changed = Signal(bool)
     two_page_spread_changed = Signal(bool)
     continuous_scroll_changed = Signal(bool)
+    # OCR-Region: page (0-basiert), x, y, w, h in Anzeige-Pixeln — 2.5.0
+    ocr_region_finished = Signal(int, float, float, float, float)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -1424,6 +1426,7 @@ class PdfViewer(QWidget):
         self._quick_ann_template_armed: bool = False  # Apply-Modus — 2.4.3
         self._quick_ann_template_id: str | None = None
         self._quick_ann_template_name: str = ""  # letzter Name für Esc-Status — 2.4.5
+        self._ocr_region_pending: bool = False  # Rechteck → OCR Region — 2.5.0
         self._zoom_timer = QTimer(self)
         self._zoom_timer.setSingleShot(True)
         self._zoom_timer.setInterval(120)
@@ -2370,15 +2373,36 @@ class PdfViewer(QWidget):
             self.status.emit(f"Highlight-Farbe (Preset {index + 1}): {color}")
 
     def _color_preset_context_menu(self, btn: QPushButton, index: int, pos) -> None:
-        """Rechtsklick: Preset speichern / auf Standard zurücksetzen — 0.9.6."""
+        """Rechtsklick: Preset speichern / zurücksetzen / Theme laden — 2.5.0."""
+        from instantlensdoc.core.app_settings import list_ann_color_themes
+
         menu = QMenu(self)
         act_save = menu.addAction("Preset speichern…")
         act_reset = menu.addAction("Preset zurücksetzen")
+        theme_menu = menu.addMenu("Theme laden…")
+        theme_actions: dict[object, str] = {}
+        for theme_name in list_ann_color_themes():
+            act = theme_menu.addAction(theme_name)
+            theme_actions[act] = theme_name
         chosen = menu.exec(btn.mapToGlobal(pos))
         if chosen == act_save:
             self._save_color_preset(index)
         elif chosen == act_reset:
             self._reset_color_preset(index)
+        elif chosen in theme_actions:
+            self._apply_ann_color_theme(theme_actions[chosen])
+
+    def _apply_ann_color_theme(self, name: str) -> None:
+        """Vordefiniertes Annotation-Farben-Theme laden — 2.5.0."""
+        from instantlensdoc.core.app_settings import apply_ann_color_theme
+
+        try:
+            colors = apply_ann_color_theme(name)
+        except Exception as e:
+            QMessageBox.warning(self, "Farben-Theme", str(e))
+            return
+        self._refresh_preset_btns()
+        self.status.emit(f"Farben-Theme geladen: {name} ({len(colors)} Presets)")
 
     def _save_color_preset(self, index: int):
         # Bei Auswahl: aktuelle Strichfarbe speichern, sonst Highlight (Settings)
@@ -8184,7 +8208,9 @@ class PdfViewer(QWidget):
         menu.exec(self.btn_quick_ann_template.mapToGlobal(pos))
 
     def _on_canvas_escape(self) -> None:
-        """Esc: Apply-Modus / Quick-Stempel / Callout / Winkel abbrechen — 2.4.3."""
+        """Esc: OCR-Region / Apply / Quick-Stempel / Callout / Winkel — 2.5.0."""
+        if self.cancel_ocr_region_select():
+            return
         if self.cancel_pending_angle():
             return
         if self._pending_callout_anchor is not None:
@@ -8194,6 +8220,28 @@ class PdfViewer(QWidget):
         if self.cancel_quick_ann_template():
             return
         self.cancel_quick_stamp()
+
+    def begin_ocr_region_select(self) -> bool:
+        """OCR-Region: Rechteck ziehen (kein Annotation-Commit) — 2.5.0."""
+        if not self.pdf_path:
+            return False
+        self._ocr_region_pending = True
+        self._quick_ann_template_armed = False
+        self._quick_stamp_armed = False
+        # Drag-UI wie Rechteck, Commit wird in _on_drag abgefangen
+        self.tool = AnnotationType.RECTANGLE
+        self.canvas.set_drag_tool(AnnotationType.RECTANGLE, select_mode=False)
+        self.status.emit("OCR-Region: Rechteck auf der Seite ziehen (Esc abbrechen)")
+        return True
+
+    def cancel_ocr_region_select(self) -> bool:
+        """Esc: OCR-Region-Auswahl abbrechen — 2.5.0."""
+        if not self._ocr_region_pending:
+            return False
+        self._ocr_region_pending = False
+        self.canvas.set_drag_tool(None, select_mode=True)
+        self.status.emit("OCR-Region abgebrochen")
+        return True
 
     def cancel_pending_angle(self) -> bool:
         """Esc: Winkel-Zweitklick abbrechen — 2.1.0."""
@@ -8659,7 +8707,12 @@ class PdfViewer(QWidget):
         dpi = int(dpi_str)
         set_export_raster_dpi(dpi)
 
-        prefer_jpeg = bool(profile and str(profile.get("format")) == "JPEG")
+        from instantlensdoc.core.app_settings import get_last_export_format
+
+        prefer_jpeg = bool(
+            (profile and str(profile.get("format")) == "JPEG")
+            or (not profile and get_last_export_format() == "JPEG")
+        )
         start_dir = dialog_start_dir(
             str(profile["target"]) if profile and profile.get("target") else None,
             self.pdf_path.parent,
@@ -8695,6 +8748,14 @@ class PdfViewer(QWidget):
             )
             set_last_export_dir(Path(out).parent)
             remember_recent_dir(Path(out).parent)
+            try:
+                from instantlensdoc.core.app_settings import remember_last_export_preset
+
+                remember_last_export_preset(
+                    dpi=dpi, format=fmt, target=Path(out).parent
+                )
+            except Exception:
+                pass
             self.status.emit(f"Seite exportiert ({dpi} DPI): {out.name}")
         except Exception as e:
             QMessageBox.warning(self, "Extrahieren", str(e))
@@ -8808,8 +8869,16 @@ class PdfViewer(QWidget):
                 return
         else:
             pages = None
+        from instantlensdoc.core.app_settings import get_last_export_format
+
         fmt_items = ["PNG", "JPEG"]
-        fmt_idx = 1 if profile and str(profile.get("format")) == "JPEG" else 0
+        last_fmt = get_last_export_format()
+        if profile and str(profile.get("format")) == "JPEG":
+            fmt_idx = 1
+        elif not profile and last_fmt == "JPEG":
+            fmt_idx = 1
+        else:
+            fmt_idx = 0
         fmt, ok = QInputDialog.getItem(
             self,
             "Seiten als Bilder",
@@ -8933,6 +9002,14 @@ class PdfViewer(QWidget):
             set_last_export_dir(out_dir)
             set_last_page_image_export_dir(out_dir)
             remember_recent_dir(out_dir)
+            try:
+                from instantlensdoc.core.app_settings import remember_last_export_preset
+
+                remember_last_export_preset(
+                    dpi=dpi, format=fmt, target=out_dir
+                )
+            except Exception:
+                pass
             n_ok = len(written)
             skipped_pages = planned[n_ok:]  # Rest bei Abbruch = übersprungen
             n_skip = len(skipped_pages)
@@ -10000,6 +10077,19 @@ class PdfViewer(QWidget):
         dlg.exec()
 
     def _on_drag(self, x0: float, y0: float, x1: float, y1: float):
+        # OCR-Region: ephemeral Rechteck → Signal, kein Store — 2.5.0
+        if self._ocr_region_pending:
+            page0, lx0, ly0 = self._spread_resolve(x0, y0)
+            lx1 = lx0 + (x1 - x0)
+            ly1 = ly0 + (y1 - y0)
+            rx = min(lx0, lx1)
+            ry = min(ly0, ly1)
+            rw = max(abs(lx1 - lx0), 8.0)
+            rh = max(abs(ly1 - ly0), 8.0)
+            self._ocr_region_pending = False
+            self.canvas.set_drag_tool(None, select_mode=True)
+            self.ocr_region_finished.emit(int(page0), float(rx), float(ry), float(rw), float(rh))
+            return
         if not self.store or self.tool is None or self.tool not in DRAG_TYPES:
             return
         if self.tool == AnnotationType.INK:

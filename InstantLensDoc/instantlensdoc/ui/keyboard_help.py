@@ -99,7 +99,10 @@ SHORTCUTS_HTML = """
 <tr><td>Stroke-Width Slider</td><td>Toolbar 1–12 px für ausgewähltes Shape; Undo beim Loslassen — 0.9.2</td></tr>
 <tr><td>Fill-Color Picker</td><td>Toolbar „Füllung…“ für ausgewähltes Shape; Commit + Undo — 0.9.3</td></tr>
 <tr><td>Stroke-Color Picker</td><td>Toolbar „Strich…“ Strichfarbe getrennt von Füllung; Commit + Undo — 0.9.4</td></tr>
-<tr><td>Color-Presets Quick-Bar</td><td>6 Farben: Auswahl Klick=Strich · Shift=Füllung (Undo); ohne Auswahl HL/Stift/Notiz — 0.9.5; Rechtsklick speichern/zurücksetzen + Settings — 0.9.6; Export/Import JSON <code>ildcolors-v1</code> — 0.9.7; Alle zurücksetzen + Werksstandard (Factory) in Settings — 0.9.8; Factory-Bestätigung + Rückgängig — 0.9.9</td></tr>
+<tr><td>Color-Presets Quick-Bar</td><td>6 Farben: Auswahl Klick=Strich · Shift=Füllung (Undo); ohne Auswahl HL/Stift/Notiz — 0.9.5; Rechtsklick speichern/zurücksetzen + Settings — 0.9.6; Export/Import JSON <code>ildcolors-v1</code> — 0.9.7; Alle zurücksetzen + Werksstandard (Factory) in Settings — 0.9.8; Factory-Bestätigung + Rückgängig — 0.9.9; Themes <b>Markieren</b>/<b>Corporate</b> laden (RMB/Settings) — <b>2.5.0</b></td></tr>
+<tr><td>OCR Region (Rechteck)</td><td>Extras → OCR Region…: Rechteck auf PDF-Seite → nur Region OCR → Text-Tab (<code>-ocr-region.txt</code>); Esc bricht ab — <b>2.5.0</b></td></tr>
+<tr><td>Dokument-Tags ildtags-v1</td><td>PDF → Dokument-Tags…: Sidecar <code>*.ildtags.json</code>; Welcome/Recent filtert Pfad <b>oder</b> Tag — <b>2.5.0</b></td></tr>
+<tr><td>Export-Preset „Zuletzt“</td><td>Nach Seiten→Bilder/Seite-als-Bild: DPI/Format/Pfad als Profil <code>Zuletzt</code> speichern; Vorbefüllung nächster Export — <b>2.5.0</b></td></tr>
 <tr><td>PDF-Suche Aa / Wort</td><td>Suchleisten-Toggles Case-sensitive + Whole-word — 0.9.2</td></tr>
 <tr><td>PDF-Suche Regex</td><td>Suchleisten-Toggle `.*`; Fehlerstatus in Statusleiste — 0.9.3</td></tr>
 <tr><td>PDF-Suche CSV-Export</td><td>Treffer als CSV: Seite, Offset, Snippet — 0.9.4</td></tr>

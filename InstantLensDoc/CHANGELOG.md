@@ -1,5 +1,20 @@
 # Changelog — InstantLens Doc
 
+## 2.5.0 — PDF-OCR-Region, Annotation-Farben-Themes, Dokument-Tags ildtags-v1, Export-Preset Zuletzt
+
+Minor-Bump nach **2.4.5**: **PDF-OCR-Region** Rechteck wählen → nur Region OCR → Text-Tab; **Annotation-Farben-Themes** vordefinierte Paletten Markieren/Corporate laden; **Dokument-Tags global** Schema **ildtags-v1** über Docs hinweg filterbar in Willkommen/Recent; **Export-Preset** letzte Export-Einstellungen (DPI/Format/Pfad) als Preset **„Zuletzt“** speichern. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie klar markiert / nicht produktiv (Ink ≠ Stylus).
+
+### Neu / verbessert
+- PDF-OCR-Region: Extras → OCR Region (Rechteck)… · Rechteck auf Seite · nur Region OCR · Text-Tab `-ocr-region.txt` · Esc abbricht
+- Annotation-Farben-Themes: Markieren / Corporate → 6 Color-Presets (`ildcolors-v1`) · Settings + Toolbar-RMB
+- Dokument-Tags: Sidecar `*.ildtags.json` Schema **ildtags-v1** · Welcome/Recent filtert Pfad oder Tag · Anzeige in Liste
+- Export-Preset „Zuletzt“: nach Seiten→Bilder / Seite-als-Bild DPI/Format/Pfad speichern · Vorbefüllung nächster Export
+
+### Tests / Qualität
+- Version **2.5.0** (App / `ild_pdf` / ISS / Smoke / Docs); Serie **2.5**; `docs/VERSION` + `VERSION.txt`
+- Smoke: 2.5.0 CLI + Qt (OCR-Region, Farben-Themes, ildtags-v1, Export Zuletzt)
+- Stubs: KI/Cloud/Stylus/3D/Hooks/Outline/Telemetrie unverändert markiert
+
 ## 2.4.5 — Auto-Prune Toast OCR-Dauer·Klick erneut, Apply abgebrochen A11y·Vorlagenname, Sync AccessibleName live an/aus, F1 Reset gemeinsamer Helper
 
 Post-Release-Polish nach **2.4.4**: **Thumbnail Auto-Prune** Toast-**Dauer aus OCR-Toast-Settings**, **Klick kopiert Status erneut**; **Quick-Apply Esc** mit **A11y Announcement** und **letztem Template-Namen** im Status; **Sync-Scroll AccessibleName** aktualisiert **live bei Toggle** (**an/aus** im Namen); **F1 TXT Reset Default** über **gemeinsamen Helper** (`template_reset`) wie andere Template-Resets. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie klar markiert / nicht produktiv (Ink ≠ Stylus).

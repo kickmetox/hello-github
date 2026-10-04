@@ -1087,6 +1087,7 @@ class MainWindow(QMainWindow):
         self.editor.cursorPositionChanged.connect(self._on_editor_cursor_changed)
         self.pdf_view = PdfViewer()
         self.pdf_view.status.connect(self._on_pdf_view_status)
+        self.pdf_view.ocr_region_finished.connect(self._on_ocr_region_finished)
         self.pdf_view.annotations_changed.connect(self._refresh_pdf_marks)
         self.pdf_view.annotations_changed.connect(self._refresh_undo_hint)
         # Toolbar-Undo/Redo: Layer-Alle-ein/aus · Tag-Rename-Filter — 1.8.3/1.8.4
@@ -2327,6 +2328,12 @@ class MainWindow(QMainWindow):
         act_meta = QAction("Metadaten bearbeiten…", self)
         act_meta.triggered.connect(self._edit_pdf_metadata)
         m_pdf.addAction(act_meta)
+        act_doc_tags = QAction("Dokument-Tags…", self)
+        act_doc_tags.setToolTip(
+            "Globale Dokument-Tags (ildtags-v1) für Welcome/Recent-Filter — 2.5.0"
+        )
+        act_doc_tags.triggered.connect(self._edit_doc_tags)
+        m_pdf.addAction(act_doc_tags)
         act_sanitize = QAction("PDF bereinigen…", self)
         act_sanitize.setToolTip("PDF neu speichern; optional Metadaten entfernen")
         act_sanitize.triggered.connect(self._sanitize_pdf)
@@ -2599,6 +2606,12 @@ class MainWindow(QMainWindow):
             "→ neue Textdatei-Tab — 1.1.2"
         )
         a.triggered.connect(self._run_ocr_document)
+        m_extra.addAction(a)
+        a = QAction("OCR Region (Rechteck)…", self)
+        a.setToolTip(
+            "Rechteck auf der PDF-Seite wählen → nur Region OCR → Text-Tab — 2.5.0"
+        )
+        a.triggered.connect(self._run_ocr_region)
         m_extra.addAction(a)
         a = QAction("Formulargenerator…", self)
         a.triggered.connect(self._forms)
@@ -9983,6 +9996,8 @@ class MainWindow(QMainWindow):
             "find_replace": self._find_replace,
             "ocr_page": self._run_ocr,
             "ocr_pdf": self._run_ocr_document,
+            "ocr_region": self._run_ocr_region,
+            "doc_tags": self._edit_doc_tags,
             "export": _export_menu,
             "export_page_images": lambda: self.pdf_view.export_pages_as_images()
             if hasattr(self.pdf_view, "export_pages_as_images")
@@ -11430,15 +11445,23 @@ class MainWindow(QMainWindow):
         from instantlensdoc.core.app_settings import (
             EXPORT_PROFILE_FORMATS,
             EXPORT_RASTER_DPI_CHOICES,
+            LAST_EXPORT_PRESET_NAME,
             dialog_start_dir,
             get_export_raster_dpi,
             get_last_export_dir,
+            get_last_export_format,
             save_export_profile,
         )
 
-        name, ok = QInputDialog.getText(self, "Export-Profil", "Name:")
-        if not ok or not (name or "").strip():
+        name, ok = QInputDialog.getText(
+            self,
+            "Export-Profil",
+            "Name (leer = Zuletzt):",
+            text=LAST_EXPORT_PRESET_NAME,
+        )
+        if not ok:
             return
+        name = (name or "").strip() or LAST_EXPORT_PRESET_NAME
         dpi_items = [str(d) for d in EXPORT_RASTER_DPI_CHOICES]
         default_dpi = str(get_export_raster_dpi())
         dpi_idx = dpi_items.index(default_dpi) if default_dpi in dpi_items else 1
@@ -11448,7 +11471,11 @@ class MainWindow(QMainWindow):
         if not ok:
             return
         fmt_items = list(EXPORT_PROFILE_FORMATS)
-        fmt, ok = QInputDialog.getItem(self, "Export-Profil", "Format:", fmt_items, 0, False)
+        last_fmt = get_last_export_format()
+        fmt_idx = fmt_items.index(last_fmt) if last_fmt in fmt_items else 0
+        fmt, ok = QInputDialog.getItem(
+            self, "Export-Profil", "Format:", fmt_items, fmt_idx, False
+        )
         if not ok:
             return
         start = dialog_start_dir(get_last_export_dir())
@@ -11458,7 +11485,7 @@ class MainWindow(QMainWindow):
             target = ""
         try:
             profile = save_export_profile(
-                name.strip(), dpi=int(dpi_str), format=fmt, target=target or None
+                name, dpi=int(dpi_str), format=fmt, target=target or None
             )
             tip = f"{profile['dpi']} DPI · {profile['format']}"
             if profile.get("target"):
@@ -12688,6 +12715,148 @@ class MainWindow(QMainWindow):
         if result.cancelled:
             status += " (abgebrochen, Teilergebnis behalten)"
         self._set_status(status)
+
+    def _run_ocr_region(self):
+        """OCR-Region: Rechteck wählen → nur Region → Text-Tab — 2.5.0."""
+        if not self.doc or self.doc.kind != DocKind.PDF or not self.doc.path:
+            QMessageBox.information(
+                self,
+                "OCR Region",
+                "Bitte zuerst ein PDF öffnen.",
+            )
+            return
+        ok, msg = ocr_mod.tesseract_available()
+        if not ok:
+            QMessageBox.information(self, "OCR — Tesseract fehlt", msg)
+            self._set_status("OCR nicht verfügbar")
+            return
+        if not self.pdf_view.begin_ocr_region_select():
+            QMessageBox.information(self, "OCR Region", "Kein PDF geladen.")
+            return
+        self.stack.setCurrentWidget(self.pdf_view)
+        self.pdf_view.setFocus()
+        self._set_status("OCR-Region: Rechteck ziehen (Esc abbrechen)")
+
+    def _on_ocr_region_finished(
+        self, page: int, x: float, y: float, w: float, h: float
+    ) -> None:
+        """Callback nach Rechteck-Auswahl: Region OCR → Text-Tab — 2.5.0."""
+        from PySide6.QtWidgets import QApplication, QDialog, QProgressDialog
+
+        if not self.doc or self.doc.kind != DocKind.PDF or not self.doc.path:
+            return
+        pdf_path = Path(self.doc.path)
+        dlg = OcrDialog(
+            self,
+            need_file=False,
+            default_label=f"{pdf_path.name} Region S.{int(page) + 1}",
+            page_count=1,
+            show_page_range=False,
+        )
+        dlg.setWindowTitle("OCR Region — Sprach-Preset / DPI")
+        dlg.rb_editable.setChecked(True)
+        dlg.rb_searchable.setEnabled(False)
+        if dlg.exec() != QDialog.Accepted:
+            self._set_status("OCR-Region abgebrochen")
+            return
+        lang = dlg.lang_code()
+        dpi = dlg.dpi()
+        try:
+            from instantlensdoc.core.app_settings import set_ocr_dpi, set_ocr_lang
+
+            set_ocr_lang(lang)
+            set_ocr_dpi(dpi)
+        except Exception:
+            pass
+        prog = QProgressDialog("OCR Region…", None, 0, 0, self)
+        prog.setWindowTitle("OCR Region")
+        prog.setWindowModality(Qt.WindowModal)
+        prog.setMinimumDuration(0)
+        prog.setValue(0)
+        prog.show()
+        QApplication.processEvents()
+        try:
+            result = ocr_mod.ocr_pdf_region(
+                pdf_path,
+                int(page),
+                (float(x), float(y), float(w), float(h)),
+                lang=lang,
+                dpi=dpi,
+                display_scale=float(getattr(self.pdf_view, "scale", 1.5) or 1.5),
+            )
+        except ocr_mod.OcrUnavailable as e:
+            QMessageBox.information(self, "OCR — Tesseract fehlt", str(e))
+            return
+        except Exception as e:
+            QMessageBox.warning(self, "OCR Region", f"OCR fehlgeschlagen:\n{e}")
+            return
+        finally:
+            prog.close()
+        out_txt = pdf_path.with_name(f"{pdf_path.stem}-ocr-region.txt")
+        n = 1
+        while out_txt.exists() and n < 1000:
+            out_txt = pdf_path.with_name(f"{pdf_path.stem}-ocr-region-{n}.txt")
+            n += 1
+        try:
+            out_txt.write_text(result.text or "", encoding="utf-8")
+        except Exception as e:
+            QMessageBox.warning(
+                self,
+                "OCR Region",
+                f"OCR-Text konnte nicht gespeichert werden:\n{e}",
+            )
+            return
+        self.open_path(str(out_txt))
+        self._set_status(
+            f"OCR-Region ({result.lang}, {dpi} DPI) S.{int(page) + 1} → Tab {out_txt.name}"
+        )
+
+    def _edit_doc_tags(self):
+        """Dokument-Tags (ildtags-v1) bearbeiten — 2.5.0."""
+        from PySide6.QtWidgets import QInputDialog
+
+        from instantlensdoc.core import doc_tags as doc_tags_mod
+        from instantlensdoc.core import recent_tags as recent_tags_mod
+
+        if not self.doc or not self.doc.path:
+            QMessageBox.information(
+                self,
+                "Dokument-Tags",
+                "Bitte zuerst ein Dokument öffnen.",
+            )
+            return
+        path = Path(self.doc.path)
+        current = doc_tags_mod.load_tags_sidecar(path)
+        suggestions = recent_tags_mod.load_recent_tags()
+        tip = ""
+        if suggestions:
+            tip = "\nVorschläge: " + ", ".join(suggestions[:8])
+        text, ok = QInputDialog.getText(
+            self,
+            "Dokument-Tags",
+            f"Tags für {path.name} (Komma-getrennt):{tip}",
+            text=", ".join(current),
+        )
+        if not ok:
+            return
+        tags = doc_tags_mod.normalize_doc_tags(text)
+        try:
+            doc_tags_mod.save_tags_sidecar(path, tags)
+            for t in tags:
+                try:
+                    recent_tags_mod.add_recent_tag(t)
+                except Exception:
+                    pass
+        except Exception as e:
+            QMessageBox.warning(self, "Dokument-Tags", str(e))
+            return
+        if hasattr(self, "welcome_page") and self.welcome_page is not None:
+            try:
+                self.welcome_page.refresh_recent()
+            except Exception:
+                pass
+        label = ", ".join(tags) if tags else "(keine)"
+        self._set_status(f"Dokument-Tags gespeichert: {label}")
 
     def _sanitize_pdf(self):
         """Schnellaktion: PDF bereinigen, optional Metadaten strippen."""

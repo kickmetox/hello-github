@@ -123,10 +123,11 @@ class WelcomePage(QWidget):
         lay.addWidget(QLabel("<b>Zuletzt geöffnet</b>"))
         filter_row = QHBoxLayout()
         self.recent_filter = QLineEdit()
-        self.recent_filter.setPlaceholderText("Recent filtern…")
+        self.recent_filter.setPlaceholderText("Recent filtern (Pfad oder Tag)…")
         self.recent_filter.setClearButtonEnabled(True)
         self.recent_filter.setToolTip(
-            "Live-Filter über Dateiname/Pfad — Esc leert und Fokus zurück auf Liste — 1.0.6"
+            "Live-Filter über Dateiname/Pfad oder Dokument-Tags (ildtags-v1) — "
+            "Esc leert und Fokus zurück auf Liste — 2.5.0"
         )
         self.recent_filter.textChanged.connect(self._apply_recent_filter)
         self.recent_filter.installEventFilter(self)
@@ -248,7 +249,7 @@ class WelcomePage(QWidget):
                     break
 
     def _apply_recent_filter(self, _text: str | None = None) -> None:
-        """Live-Filter der Recent-Liste; Trefferanzahl aktualisieren — 1.0.5."""
+        """Live-Filter Pfad oder Dokument-Tags (ildtags-v1) — 2.5.0."""
         self.recent_list.clear()
         entries = self._recent_entries
         total = len(entries)
@@ -261,15 +262,31 @@ class WelcomePage(QWidget):
             return
         needle = (self.recent_filter.text() or "").strip().casefold()
         self.btn_clear_filter.setEnabled(bool(needle) or total > 0)
+        # Tags für Recent-Pfade (Index + Sidecar) — 2.5.0
+        tags_by_path: dict[str, list[str]] = {}
+        try:
+            from instantlensdoc.core import doc_tags as doc_tags_mod
+
+            doc_tags_mod.refresh_index_for_paths([p for p, _ in entries])
+            for path, _exists in entries:
+                tags_by_path[str(path)] = doc_tags_mod.tags_for_path(path)
+        except Exception:
+            tags_by_path = {}
         shown = 0
         for path, exists in entries:
             hay = str(path).casefold()
-            if needle and needle not in hay:
+            tags = tags_by_path.get(str(path)) or []
+            tag_hay = " ".join(tags).casefold()
+            if needle and needle not in hay and needle not in tag_hay:
                 continue
             label = str(path) if exists else f"{path} (fehlt)"
+            if tags:
+                label = f"{label}  ·  {', '.join(tags[:6])}"
             item = QListWidgetItem(label)
             item.setData(Qt.UserRole, str(path))
             item.setData(Qt.UserRole + 1, bool(exists))
+            if tags:
+                item.setToolTip(f"Tags: {', '.join(tags)}")
             if not exists:
                 item.setForeground(QColor("#888888"))
             self.recent_list.addItem(item)
