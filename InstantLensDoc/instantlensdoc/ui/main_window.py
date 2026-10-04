@@ -4115,6 +4115,12 @@ class MainWindow(QMainWindow):
                 if self._open_ocr_region_result_folder():
                     event.accept()
                     return
+        # OCR-Region Status: F5 → Datei öffnen — 2.5.15
+        if event.key() == Qt.Key_F5:
+            if getattr(self, "_ocr_region_toast_active", False):
+                if self._open_ocr_region_result_file():
+                    event.accept()
+                    return
         super().keyPressEvent(event)
 
     def _duplicate_current(self):
@@ -12115,18 +12121,18 @@ class MainWindow(QMainWindow):
                 return
             lst.setCurrentItem(item)
             menu = QMenu(dlg)
-            act_open = menu.addAction("Zielordner öffnen")
-            act_copy = menu.addAction("Summary kopieren")
-            act_copy_path = menu.addAction("Pfad kopieren")
+            act_open = menu.addAction("Zielordner öffnen\tF4")
+            act_copy = menu.addAction("Summary kopieren\tCtrl+C")
+            act_copy_path = menu.addAction("Pfad kopieren\tCtrl+Shift+C")
             act_apply = menu.addAction("Anwenden")
             act_apply_keep = menu.addAction("Anwenden (offen lassen)\tCtrl+Enter")
-            act_dup = menu.addAction("Duplizieren")
-            act_rename = menu.addAction("Umbenennen…")
+            act_dup = menu.addAction("Duplizieren\tCtrl+D")
+            act_rename = menu.addAction("Umbenennen…\tF2")
             act_up = menu.addAction("Nach oben\tCtrl+↑")
             act_down = menu.addAction("Nach unten\tCtrl+↓")
             act_top = menu.addAction("An den Anfang\tCtrl+Home")
             act_bottom = menu.addAction("An das Ende\tCtrl+End")
-            act_del = menu.addAction("Löschen…")
+            act_del = menu.addAction("Löschen…\tEntf")
             chosen = menu.exec(lst.mapToGlobal(pos))
             if chosen is act_open:
                 _open_target_folder(item)
@@ -12187,6 +12193,10 @@ class MainWindow(QMainWindow):
                     ):
                         # Ctrl+Home/End Anfang/Ende — 2.5.14
                         _move_to_edge(event.key() == Qt.Key_End)
+                        return True
+                    if event.key() == Qt.Key_F4:
+                        # F4 Zielordner öffnen — 2.5.15
+                        _open_target_folder()
                         return True
                     if event.key() == Qt.Key_C and bool(
                         event.modifiers() & Qt.ControlModifier
@@ -13429,7 +13439,7 @@ class MainWindow(QMainWindow):
         return preview
 
     def _ocr_region_status_tooltip(self) -> str:
-        """Status-Tooltip inkl. Textvorschau — 2.5.9–2.5.14."""
+        """Status-Tooltip inkl. Textvorschau — 2.5.9–2.5.15."""
         path = getattr(self, "_last_ocr_region_path", None) or ""
         tip = (
             "Linksklick → Ergebnis-Tab · Rechtsklick → Menü · "
@@ -13439,7 +13449,7 @@ class MainWindow(QMainWindow):
             "Esc → Status schließen · "
             "Enter → Ergebnis-Tab · "
             "Ctrl+C Text · Ctrl+Shift+C Pfad · "
-            "F4 → Ordner — 2.5.14"
+            "F4 → Ordner · F5 → Datei — 2.5.15"
         )
         if path:
             tip = f"{tip}\n{path}"
@@ -13475,13 +13485,13 @@ class MainWindow(QMainWindow):
         if not path and not getattr(self, "_ocr_region_toast_active", False):
             return False
         menu = QMenu(self)
-        act_tab = menu.addAction("Ergebnis-Tab fokussieren")
+        act_tab = menu.addAction("Ergebnis-Tab fokussieren\tEnter")
         act_folder = menu.addAction("Ordner öffnen\tF4")
-        act_path = menu.addAction("Pfad kopieren")
-        act_text = menu.addAction("Text kopieren")
-        act_file = menu.addAction("Datei öffnen")
+        act_path = menu.addAction("Pfad kopieren\tCtrl+Shift+C")
+        act_text = menu.addAction("Text kopieren\tCtrl+C")
+        act_file = menu.addAction("Datei öffnen\tF5")
         menu.addSeparator()
-        act_dismiss = menu.addAction("Status schließen")
+        act_dismiss = menu.addAction("Status schließen\tEsc")
         if not path:
             for a in (act_tab, act_folder, act_path, act_text, act_file):
                 a.setEnabled(False)

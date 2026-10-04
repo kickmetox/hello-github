@@ -1,5 +1,20 @@
 # Changelog — InstantLens Doc
 
+## 2.5.15 — OCR F5-Datei, Theme Swatch-Keys, ildtags F4-Ordner, Export F4-Ordner
+
+Post-Release-Polish nach **2.5.14**: **OCR-Region** Status-**F5 → Datei**; **Farben-Themes** Swatch-**Tastatur Space/H/P/N/C · ←/→ · AccessibleName**; **ildtags** **F4 → Ordner**; **Export-Presets** **F4 → Zielordner**. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie klar markiert / nicht produktiv (Ink ≠ Stylus).
+
+### Geändert
+- OCR-Region: F5 → Ergebnisdatei öffnen (Status aktiv · Menü-Hinweis Esc/Enter/Ctrl+C/F5)
+- Farben-Themes: Swatch fokusierbar · Space/H→HL · P→Stift · N→Notiz · C→Hex · ←/→ · A11y
+- Dokument-Tags: F4 Ordner öffnen (Recent · Menü · Status/A11y)
+- Export-Presets: F4 Zielordner öffnen (Liste fokussiert · Menü)
+
+### Tests / Qualität
+- Version **2.5.15** (App / `ild_pdf` / ISS / Smoke / Docs); Serie **2.5**; `docs/VERSION` + `VERSION.txt`
+- Smoke: 2.5.15 CLI + Qt (OCR F5-Datei, Theme Swatch-Keys, ildtags F4-Ordner, Export F4-Ordner)
+- Stubs: KI/Cloud/Stylus/3D/Hooks/Outline/Telemetrie unverändert markiert
+
 ## 2.5.14 — OCR F4-Ordner, Theme Dbl-Stift/Notiz, ildtags Pfad, Export Ctrl+Home/End
 
 Post-Release-Polish nach **2.5.13**: **OCR-Region** Status-**F4 → Ordner**; **Farben-Themes** Swatch-**Shift+Doppelklick → Stift** · **Ctrl+Doppelklick → Notiz**; **ildtags** **Ctrl+Shift+C Pfad kopieren**; **Export-Presets** **Ctrl+Home/End Anfang/Ende**. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie klar markiert / nicht produktiv (Ink ≠ Stylus).

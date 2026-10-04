@@ -245,7 +245,7 @@ class WelcomePage(QWidget):
         self.btn_continue.setToolTip(tip)
 
     def eventFilter(self, obj, event):  # noqa: N802
-        """Esc Filter; Del Recent; Shift+Del Tags; F2/F3 Tag±; Ctrl+C/V/X Tags; Ctrl+Shift+C Pfad — 2.5.9–2.5.14."""
+        """Esc Filter; Del Recent; Shift+Del Tags; F2/F3 Tag±; F4 Ordner; Ctrl+C/V/X Tags; Ctrl+Shift+C Pfad — 2.5.9–2.5.15."""
         if event.type() == QEvent.KeyPress:
             assert isinstance(event, QKeyEvent)
             key = event.key()
@@ -268,6 +268,12 @@ class WelcomePage(QWidget):
                     path = item.data(Qt.UserRole)
                     if path:
                         self._remove_tag_for_recent(str(path))
+                        return True
+                if item is not None and key == Qt.Key_F4:
+                    # F4: Ordner öffnen — 2.5.15
+                    path = item.data(Qt.UserRole)
+                    if path:
+                        self._open_containing_folder(str(path))
                         return True
                 if item is not None and key in (Qt.Key_Delete, Qt.Key_Backspace):
                     path = item.data(Qt.UserRole)
@@ -549,13 +555,13 @@ class WelcomePage(QWidget):
         act_add_tag = menu.addAction("Tag hinzufügen…\tF2")
         act_remove_tag = menu.addAction("Tag entfernen…\tF3")
         act_clear_tags = menu.addAction("Alle Tags entfernen\tShift+Entf")
-        act_copy_tags = menu.addAction("Tags kopieren")
-        act_cut_tags = menu.addAction("Tags ausschneiden")
-        act_paste_tags = menu.addAction("Tags einfügen")
+        act_copy_tags = menu.addAction("Tags kopieren\tCtrl+C")
+        act_cut_tags = menu.addAction("Tags ausschneiden\tCtrl+X")
+        act_paste_tags = menu.addAction("Tags einfügen\tCtrl+V")
         act_copy_path = menu.addAction("Pfad kopieren\tCtrl+Shift+C")
         menu.addSeparator()
         act_remove = menu.addAction("Entfernen")
-        act_folder = menu.addAction("Ordner öffnen")
+        act_folder = menu.addAction("Ordner öffnen\tF4")
         chosen = menu.exec(self.recent_list.mapToGlobal(pos))
         if chosen is act_add_tag:
             self._add_tag_for_recent(str(path))
@@ -851,11 +857,36 @@ class WelcomePage(QWidget):
                 pass
 
     def _open_containing_folder(self, path: str) -> None:
+        """Ordner öffnen (Menü · F4) + Status/A11y — 2.5.15."""
         p = Path(path)
         folder = p if p.is_dir() else p.parent
         if not folder.is_dir():
+            msg = f"Ordner fehlt: {folder}"
+            win = self.window()
+            if win is not None and hasattr(win, "_set_status"):
+                try:
+                    win._set_status(msg)
+                except Exception:
+                    pass
+            if win is not None and hasattr(win, "_announce_status_toast"):
+                try:
+                    win._announce_status_toast(msg)
+                except Exception:
+                    pass
             return
         QDesktopServices.openUrl(QUrl.fromLocalFile(str(folder)))
+        msg = f"Ordner geöffnet: {folder}"
+        win = self.window()
+        if win is not None and hasattr(win, "_set_status"):
+            try:
+                win._set_status(msg)
+            except Exception:
+                pass
+        if win is not None and hasattr(win, "_announce_status_toast"):
+            try:
+                win._announce_status_toast(msg)
+            except Exception:
+                pass
 
     def _local_paths_from_mime(self, mime) -> list[str]:
         paths: list[str] = []

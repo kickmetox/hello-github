@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from PySide6.QtCore import QEvent, Qt, QTimer
+from PySide6.QtGui import QKeyEvent
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QCheckBox,
@@ -924,16 +925,21 @@ class SettingsDialog(QDialog):
         preset_row.addWidget(btn_theme_delete)
         preset_row.addWidget(btn_theme_hex)
         form.addRow("Ann.-Color-Presets", preset_row)
-        # Theme-Vorschau Swatches · Klick → Hex — 2.5.1/2.5.9
+        # Theme-Vorschau Swatches · Klick → Hex · Tastatur H/P/N — 2.5.1/2.5.9/2.5.15
         swatch_row = QHBoxLayout()
         self._theme_swatch_labels: list[QLabel] = []
         for _i in range(ANN_COLOR_PRESET_COUNT):
             sw = QLabel("")
             sw.setFixedSize(22, 22)
             sw.setFrameShape(QFrame.Box)
-            sw.setToolTip("Theme-Vorschau · Klick=Hex · RMB=HL/Stift/Notiz — 2.5.10")
+            sw.setToolTip(
+                "Theme-Vorschau · Klick=Hex · RMB=HL/Stift/Notiz · "
+                "Focus: Space/H=HL · P=Stift · N=Notiz · C=Hex · ←/→ — 2.5.15"
+            )
             sw.setCursor(Qt.PointingHandCursor)
+            sw.setFocusPolicy(Qt.StrongFocus)
             sw.setProperty("themeHex", "")
+            sw.setAccessibleName(f"Theme-Swatch {_i + 1}")
             sw.installEventFilter(self)
             self._theme_swatch_labels.append(sw)
             swatch_row.addWidget(sw)
@@ -2831,10 +2837,44 @@ class SettingsDialog(QDialog):
             self.btn_undo_factory_presets.setEnabled(bool(prev))
 
     def eventFilter(self, obj, event):  # noqa: N802
-        """Swatch L→Hex · Dbl→HL/Stift/Notiz · M→HL · Shift+M→Stift · Ctrl+M→Notiz · R→Menü — 2.5.9–2.5.14."""
+        """Swatch L→Hex · Dbl→HL/Stift/Notiz · M→HL · Keys Space/H/P/N/C · ←/→ — 2.5.9–2.5.15."""
         labels = getattr(self, "_theme_swatch_labels", None) or []
         if obj in labels:
             hex_c = str(obj.property("themeHex") or "").strip()
+            if event.type() == QEvent.KeyPress:
+                assert isinstance(event, QKeyEvent)
+                key = event.key()
+                # ←/→ zwischen Swatches — 2.5.15
+                if key in (Qt.Key_Left, Qt.Key_Right):
+                    try:
+                        idx = labels.index(obj)
+                    except ValueError:
+                        return True
+                    step = -1 if key == Qt.Key_Left else 1
+                    nxt = idx + step
+                    while 0 <= nxt < len(labels):
+                        other = labels[nxt]
+                        if str(other.property("themeHex") or "").strip():
+                            other.setFocus(Qt.TabFocusReason)
+                            return True
+                        nxt += step
+                    return True
+                if not hex_c:
+                    return super().eventFilter(obj, event)
+                # Space/Enter/H → Highlight · P → Stift · N → Notiz · C → Hex — 2.5.15
+                if key in (Qt.Key_Space, Qt.Key_Return, Qt.Key_Enter, Qt.Key_H):
+                    self._apply_swatch_as_tool_color(hex_c, "highlight")
+                    return True
+                if key == Qt.Key_P:
+                    self._apply_swatch_as_tool_color(hex_c, "pen")
+                    return True
+                if key == Qt.Key_N:
+                    self._apply_swatch_as_tool_color(hex_c, "note")
+                    return True
+                if key == Qt.Key_C:
+                    self._copy_single_theme_hex(hex_c)
+                    return True
+                return super().eventFilter(obj, event)
             if not hex_c:
                 return super().eventFilter(obj, event)
             if event.type() == QEvent.MouseButtonDblClick:
@@ -2877,11 +2917,11 @@ class SettingsDialog(QDialog):
         if not hex_c:
             return
         menu = QMenu(self)
-        act_copy = menu.addAction(f"Hex kopieren ({hex_c})")
+        act_copy = menu.addAction(f"Hex kopieren ({hex_c})\tC")
         menu.addSeparator()
-        act_hl = menu.addAction("Als Highlight-Farbe setzen")
-        act_pen = menu.addAction("Als Stiftfarbe setzen")
-        act_note = menu.addAction("Als Notizfarbe setzen")
+        act_hl = menu.addAction("Als Highlight-Farbe setzen\tH / Space")
+        act_pen = menu.addAction("Als Stiftfarbe setzen\tP")
+        act_note = menu.addAction("Als Notizfarbe setzen\tN")
         chosen = menu.exec(widget.mapToGlobal(widget.rect().bottomLeft()))
         if chosen is act_copy:
             self._copy_single_theme_hex(hex_c)
@@ -2960,16 +3000,26 @@ class SettingsDialog(QDialog):
                     f"Shift+Doppelklick = Stift · Ctrl+Doppelklick = Notiz · "
                     f"Mittelklick = Highlight · "
                     f"Shift+Mittelklick = Stift · Ctrl+Mittelklick = Notiz · "
-                    f"RMB = HL/Stift/Notiz — 2.5.13"
+                    f"RMB = HL/Stift/Notiz · "
+                    f"Focus: Space/H=HL · P=Stift · N=Notiz · C=Hex · ←/→ — 2.5.15"
                 )
                 sw.setProperty("themeHex", str(c))
+                sw.setAccessibleName(f"Theme-Swatch {i + 1}: {c}")
+                sw.setAccessibleDescription(
+                    "Space oder H Highlight, P Stift, N Notiz, C Hex kopieren, "
+                    "Pfeiltasten wechseln"
+                )
                 sw.setCursor(Qt.PointingHandCursor)
+                sw.setFocusPolicy(Qt.StrongFocus)
                 sw.setVisible(True)
             else:
                 sw.setStyleSheet("background: transparent; border: 1px dashed #bbb;")
                 sw.setToolTip("Kein Theme gewählt")
                 sw.setProperty("themeHex", "")
+                sw.setAccessibleName(f"Theme-Swatch {i + 1}: leer")
+                sw.setAccessibleDescription("")
                 sw.setCursor(Qt.ArrowCursor)
+                sw.setFocusPolicy(Qt.NoFocus)
                 sw.setVisible(True)
         custom_n = 0
         try:
