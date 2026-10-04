@@ -16,7 +16,8 @@ from uuid import uuid4
 SIDECAR_VERSION = 4
 SCHEMA_ID = "ildann-v4"
 # v4: PDF-Highlight-kompatibel (rects/quadPoints + colorRGB/opacity für Interop)
-HISTORY_LIMIT = 40
+# 0 = unbegrenzt (praktisch für Word-Suite Undo/Redo) — 2.6.20
+HISTORY_LIMIT = 0
 # Seiten-Favoriten Export/Import (eigenes JSON, unabhängig vom Sidecar)
 FAV_SCHEMA_ID = "ildfav-v1"
 FAV_VERSION = 1
@@ -884,7 +885,8 @@ class AnnotationStore:
             return
         self._undo.append(self._snapshot())
         self._undo_labels.append(str(label or "Annotation"))
-        if len(self._undo) > HISTORY_LIMIT:
+        # HISTORY_LIMIT 0 = unbegrenzt — 2.6.20
+        if HISTORY_LIMIT and len(self._undo) > HISTORY_LIMIT:
             self._undo.pop(0)
             if self._undo_labels:
                 self._undo_labels.pop(0)

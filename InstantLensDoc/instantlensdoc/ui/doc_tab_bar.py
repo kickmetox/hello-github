@@ -1,18 +1,20 @@
-"""Horizontale Dokument-Tabs für offene Dateien — 2.6.19 (partiell)."""
+"""Horizontale Dokument-Tabs für offene Dateien — 2.6.20."""
 
 from __future__ import annotations
 
 from pathlib import Path
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtWidgets import QTabBar, QWidget, QHBoxLayout, QLabel
+from PySide6.QtWidgets import QHBoxLayout, QLabel, QMenu, QTabBar, QWidget
 
 
 class DocumentTabBar(QWidget):
-    """QTabBar über dem Viewer — synchron mit Sidebar-Dokumentliste."""
+    """QTabBar über dem Viewer — Sync mit Sidebar; Kontext: trennen/teilen."""
 
     tab_activated = Signal(str)  # path
     tab_close_requested = Signal(str)  # path
+    tab_detach_requested = Signal(str)  # path — separates Fenster
+    tab_reorder_requested = Signal(list)  # neue Pfad-Reihenfolge
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -39,18 +41,22 @@ class DocumentTabBar(QWidget):
         self._hint = QLabel("Tabs")
         self._hint.setStyleSheet("color: #667; font-size: 11px; font-weight: 600;")
         self._hint.setToolTip(
-            "Offene Dokumente als Tabs — Klick wechselt, × schließt — 2.6.19"
+            "Offene Dokumente als Tabs — Klick wechselt, × schließt, "
+            "Rechtsklick: Separates Fenster — 2.6.20"
         )
         lay.addWidget(self._hint)
         self.tabs = QTabBar()
         self.tabs.setTabsClosable(True)
-        self.tabs.setMovable(False)
+        self.tabs.setMovable(True)  # Drag-Reorder — 2.6.20
         self.tabs.setExpanding(False)
         self.tabs.setDrawBase(False)
         self.tabs.setElideMode(Qt.ElideMiddle)
         self.tabs.setUsesScrollButtons(True)
+        self.tabs.setContextMenuPolicy(Qt.CustomContextMenu)
         self.tabs.currentChanged.connect(self._on_current_changed)
         self.tabs.tabCloseRequested.connect(self._on_close)
+        self.tabs.tabMoved.connect(self._on_tab_moved)
+        self.tabs.customContextMenuRequested.connect(self._on_context)
         lay.addWidget(self.tabs, 1)
         self._paths: list[str] = []
         self._syncing = False
@@ -94,6 +100,14 @@ class DocumentTabBar(QWidget):
         finally:
             self._syncing = False
 
+    def _sync_paths_from_tabs(self) -> None:
+        paths: list[str] = []
+        for i in range(self.tabs.count()):
+            data = self.tabs.tabData(i)
+            if data:
+                paths.append(str(data))
+        self._paths = paths
+
     def _on_current_changed(self, index: int) -> None:
         if self._syncing or index < 0 or index >= len(self._paths):
             return
@@ -103,3 +117,23 @@ class DocumentTabBar(QWidget):
         if index < 0 or index >= len(self._paths):
             return
         self.tab_close_requested.emit(self._paths[index])
+
+    def _on_tab_moved(self, _from: int, _to: int) -> None:
+        if self._syncing:
+            return
+        self._sync_paths_from_tabs()
+        self.tab_reorder_requested.emit(list(self._paths))
+
+    def _on_context(self, pos) -> None:
+        idx = self.tabs.tabAt(pos)
+        if idx < 0 or idx >= len(self._paths):
+            return
+        path = self._paths[idx]
+        menu = QMenu(self)
+        act_detach = menu.addAction("In separatem Fenster öffnen")
+        act_close = menu.addAction("Schließen")
+        chosen = menu.exec(self.tabs.mapToGlobal(pos))
+        if chosen is act_detach:
+            self.tab_detach_requested.emit(path)
+        elif chosen is act_close:
+            self.tab_close_requested.emit(path)

@@ -216,5 +216,14 @@
     "KI-Assistent (geplant)": "Asistente IA (planificado)",
     "Cloud-Sync (geplant)": "Sincronización en la nube (planificado)",
     "Geplant": "Planificado"
+  },
+  "ui": {
+    "spellcheck": "Corrector ortográfico",
+    "spell_suggestions": "Sugerencias ortográficas",
+    "autocorrect": "Autocorrección",
+    "text_snippets": "Fragmentos de texto",
+    "detach_window": "Ventana separada",
+    "ribbon_edit": "Editar",
+    "ribbon_window": "Ventana"
   }
 }

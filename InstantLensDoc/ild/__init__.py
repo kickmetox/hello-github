@@ -1,5 +1,5 @@
 """
-Stabiles Scripting-API für InstantLens Doc (2.6.19).
+Stabiles Scripting-API für InstantLens Doc (2.6.20).
 
 Headless, ohne GUI. Nutzt ``ild_pdf`` + Lizenz/OCR der App.
 
@@ -26,8 +26,11 @@ Headless, ohne GUI. Nutzt ``ild_pdf`` + Lizenz/OCR der App.
     ild.list_ki_wizards()
     ild.generate_ki_document("anschreiben", fields={"betreff": "Anfrage"})
     ild.compare_pdfs("a.pdf", "b.pdf", out_png="diff.png")
+    ild.spellcheck("Hallo Foo Welt")
+    ild.autocorrect_text("teh dokument")
+    ild.list_snippets()
 
-CLI: ``python -m ild --help`` · PowerShell: ``scripts\\ild.ps1``.
+    CLI: ``python -m ild --help`` · PowerShell: ``scripts\\ild.ps1``.
 """
 
 from __future__ import annotations
@@ -113,6 +116,12 @@ from ild.api import (
     preflight,
     export_pdfx,
     compare_pdfs,
+    spellcheck,
+    suggest_word,
+    autocorrect_text,
+    list_autocorrect_rules_api,
+    list_snippets,
+    set_snippet,
     open_info,
     outline_summary,
     page_count,
@@ -160,6 +169,12 @@ __all__ = [
     "preflight",
     "export_pdfx",
     "compare_pdfs",
+    "spellcheck",
+    "suggest_word",
+    "autocorrect_text",
+    "list_autocorrect_rules_api",
+    "list_snippets",
+    "set_snippet",
     "add_redaction",
     "apply_redactions",
     "add_shape",

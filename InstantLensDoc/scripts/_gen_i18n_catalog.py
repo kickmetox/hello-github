@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate InstantLens Doc 2.6.19 i18n catalog + locale help stubs."""
+"""Generate InstantLens Doc 2.6.20 i18n catalog + locale help stubs."""
 
 from __future__ import annotations
 
@@ -240,7 +240,7 @@ def main() -> None:
         phrases[de] = pack_row(row)
 
     catalog = {
-        "version": "2.6.19",
+        "version": "2.6.20",
         "langs": list(LANGS),
         "rtl": ["ar"],
         "strings": strings,

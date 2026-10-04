@@ -126,6 +126,59 @@ class TextEditor(QPlainTextEdit):
         self.set_indent_guides_visible(self._indent_guides)
         self.set_current_line_highlight(self._current_line_highlight)
         self.set_special_chars_visible(self._show_special)
+        # Unbegrenzter Editor-Undo-Stack — 2.6.20
+        try:
+            self.document().setUndoLimit(0)
+        except Exception:
+            pass
+        self._autocorrect_busy = False
+
+    def keyPressEvent(self, event):  # noqa: N802
+        """Autokorrektur / Baustein-Kürzel nach Space/Satzzeichen — 2.6.20."""
+        key = event.key()
+        text = event.text()
+        trigger = key in (
+            Qt.Key_Space,
+            Qt.Key_Return,
+            Qt.Key_Enter,
+            Qt.Key_Tab,
+        ) or (text and text in ".,;:!?")
+        super().keyPressEvent(event)
+        if not trigger or self._autocorrect_busy:
+            return
+        try:
+            from instantlensdoc.core.app_settings import (
+                get_autocorrect_enabled,
+                get_autocorrect_expand_snippets,
+            )
+            from instantlensdoc.core.autocorrect import (
+                apply_autocorrect_at_cursor,
+                effective_autocorrect_rules,
+            )
+
+            if not get_autocorrect_enabled():
+                return
+            rules = effective_autocorrect_rules()
+            pos = self.textCursor().position()
+            look = max(0, pos - 1)
+            result = apply_autocorrect_at_cursor(
+                self.toPlainText(),
+                look,
+                rules,
+                expand_snippets=bool(get_autocorrect_expand_snippets()),
+            )
+            if not result:
+                return
+            self._autocorrect_busy = True
+            try:
+                c = self.textCursor()
+                c.setPosition(int(result["start"]))
+                c.setPosition(int(result["end"]), QTextCursor.KeepAnchor)
+                c.insertText(str(result["new"]))
+            finally:
+                self._autocorrect_busy = False
+        except Exception:
+            self._autocorrect_busy = False
 
     def line_number_area_width(self) -> int:
         if not self._line_numbers:
@@ -1203,29 +1256,69 @@ class TextEditor(QPlainTextEdit):
 
     def check_spelling(self, dict_path: str | None = None) -> int:
         """
-        Lokale Wortliste laden und unbekannte Wörter wellig markieren.
-        Ohne Spell-Lib — reine Wortlisten-Prüfung. Rückgabe: Anzahl Markierungen.
+        Wortliste + Builtin der UI-Sprache; unbekannte Wörter wellig markieren.
+        Tooltip zeigt Korrekturvorschläge. Rückgabe: Anzahl Markierungen — 2.6.20.
         """
         from pathlib import Path
 
-        from instantlensdoc.core.app_settings import get_spellcheck_dict_path
-        from instantlensdoc.core.spellcheck import spellcheck_text
+        from instantlensdoc.core.app_settings import (
+            get_spellcheck_dict_path,
+            get_spellcheck_grammar_hints,
+            get_spellcheck_use_builtin,
+        )
+        from instantlensdoc.core.spellcheck import spellcheck_with_suggestions
 
         path = (dict_path or get_spellcheck_dict_path() or "").strip()
-        if not path:
-            self.clear_spelling()
-            raise FileNotFoundError("Kein Wörterbuch-Pfad gesetzt")
-        if not Path(path).is_file():
+        use_builtin = bool(get_spellcheck_use_builtin())
+        if path and not Path(path).is_file():
             self.clear_spelling()
             raise FileNotFoundError(f"Wörterbuch nicht gefunden: {path}")
+        if not path and not use_builtin:
+            self.clear_spelling()
+            raise FileNotFoundError(
+                "Kein Wörterbuch-Pfad gesetzt und Builtin-Wörterbuch deaktiviert"
+            )
         text = self.toPlainText()
-        spans = spellcheck_text(text, path)
-        fmt = QTextCharFormat()
-        fmt.setUnderlineColor(QColor("#C0392B"))
-        fmt.setUnderlineStyle(QTextCharFormat.WaveUnderline)
-        fmt.setToolTip("Unbekanntes Wort (lokale Wortliste)")
+        result = spellcheck_with_suggestions(
+            text,
+            path or None,
+            include_builtin=use_builtin,
+            include_grammar=bool(get_spellcheck_grammar_hints()),
+        )
+        self._last_spell_result = result
         selections: list = []
-        for start, end, _word in spans:
+        for item in result.get("unknown") or []:
+            start = int(item["start"])
+            end = int(item["end"])
+            word = str(item.get("word") or "")
+            sugg = item.get("suggestions") or []
+            tip = f"Unbekannt: {word}"
+            if sugg:
+                tip += " → " + ", ".join(str(s) for s in sugg[:5])
+            fmt = QTextCharFormat()
+            fmt.setUnderlineColor(QColor("#C0392B"))
+            fmt.setUnderlineStyle(QTextCharFormat.WaveUnderline)
+            fmt.setToolTip(tip)
+            sel = QTextEdit.ExtraSelection()
+            c = QTextCursor(self.document())
+            c.setPosition(start)
+            c.setPosition(end, QTextCursor.KeepAnchor)
+            sel.cursor = c
+            sel.format = fmt
+            selections.append(sel)
+        # Grammar: gestrichelte blaue Unterstreichung
+        for gh in result.get("grammar") or []:
+            start = int(gh.get("start", 0))
+            end = int(gh.get("end", start))
+            if end <= start:
+                continue
+            fmt = QTextCharFormat()
+            fmt.setUnderlineColor(QColor("#2471A3"))
+            fmt.setUnderlineStyle(QTextCharFormat.DashUnderline)
+            tip = str(gh.get("message") or "Grammatik")
+            if gh.get("suggestion"):
+                tip += f" → {gh['suggestion']}"
+            fmt.setToolTip(tip)
             sel = QTextEdit.ExtraSelection()
             c = QTextCursor(self.document())
             c.setPosition(start)
@@ -1235,7 +1328,21 @@ class TextEditor(QPlainTextEdit):
             selections.append(sel)
         self._spell_selections = selections
         self._apply_extra_selections()
-        return len(selections)
+        return int(result.get("count") or 0)
+
+    def last_spell_result(self) -> dict:
+        """Letztes spellcheck_with_suggestions-Ergebnis — 2.6.20."""
+        return dict(getattr(self, "_last_spell_result", None) or {})
+
+    def apply_spell_suggestion(self, start: int, end: int, replacement: str) -> bool:
+        """Ersetzt Span durch Vorschlag (ein Undo-Schritt)."""
+        if start < 0 or end <= start:
+            return False
+        c = self.textCursor()
+        c.setPosition(int(start))
+        c.setPosition(int(end), c.KeepAnchor)
+        c.insertText(str(replacement))
+        return True
 
     @staticmethod
     def _find_flags(*, case_sensitive: bool = False) -> QTextDocument.FindFlag:

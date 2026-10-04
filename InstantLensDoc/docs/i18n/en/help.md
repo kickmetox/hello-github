@@ -1,6 +1,6 @@
 # InstantLens Doc — Help
 
-Version **2.6.19**.
+Version **2.6.20**.
 
 ## Language
 

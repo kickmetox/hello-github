@@ -303,6 +303,32 @@ def default_palette_commands() -> list[PaletteCommand]:
             "ribbon toolbar chrome workspace",
             "Ansicht",
         ),
+        PaletteCommand(
+            "spellcheck",
+            "Rechtschreibung prüfen…",
+            "spellcheck rechtschreibung vorschläge grammar wörterbuch f7",
+            "Bearbeiten",
+            "F7",
+        ),
+        PaletteCommand(
+            "spell_suggestions",
+            "Rechtschreibvorschläge…",
+            "spell suggestions korrektur vorschläge shift+f7",
+            "Bearbeiten",
+            "Shift+F7",
+        ),
+        PaletteCommand(
+            "autocorrect_toggle",
+            "Autokorrektur ein/aus",
+            "autocorrect autokorrektur tippfehler bausteine kürzel",
+            "Bearbeiten",
+        ),
+        PaletteCommand(
+            "detach_window",
+            "Dokument in separatem Fenster",
+            "detach window separates fenster tabs workspace",
+            "Fenster",
+        ),
         PaletteCommand("ocr_page", "OCR aktuelle Seite…", "ocr tesseract seite", "OCR"),
         PaletteCommand("ocr_pdf", "OCR gesamtes PDF…", "ocr batch pdf", "OCR"),
         PaletteCommand(

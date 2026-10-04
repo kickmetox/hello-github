@@ -242,7 +242,10 @@ SHORTCUTS_HTML = """
 <tr><td>Zeilenfavorit-Label</td><td>Sidebar Doppelklick / Rechtsklick</td></tr>
 <tr><td>Nächstes / vorheriges Zeilen-Lesezeichen</td><td><code>F2</code> / <code>Shift+F2</code></td></tr>
 <tr><td>Erste Schritte (Wizard)</td><td>Hilfe → Erste Schritte…</td></tr>
-<tr><td>Rechtschreibung prüfen</td><td><code>F7</code></td></tr>
+<tr><td>Rechtschreibung prüfen</td><td><code>F7</code> — Vorschläge im Tooltip; Builtin der UI-Sprache — 2.6.20</td></tr>
+<tr><td>Rechtschreibvorschläge</td><td><code>Shift+F7</code> — Liste mit Korrekturen — 2.6.20</td></tr>
+<tr><td>Autokorrektur</td><td>Bearbeiten → Autokorrektur / Ribbon — 2.6.20</td></tr>
+<tr><td>Textbausteine</td><td><code>Ctrl+Alt+1…9</code> — 9 Slots — 2.6.20</td></tr>
 <tr><td>Tastatur-Cheat-Sheet</td><td><code>F1</code> — Hilfe → Tastatur-Cheat-Sheet… · Suche/Filter — 2.4.1</td></tr>
 <tr><td>Cheat-Sheet als PDF</td><td>F1 → „Als PDF exportieren…“</td></tr>
 <tr><td>Cheat-Sheet als TXT</td><td>F1 → „Als TXT exportieren…“ · Template {date}_shortcuts.txt · Zielordner merken — 2.4.2</td></tr>

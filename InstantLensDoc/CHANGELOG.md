@@ -1,5 +1,23 @@
 # Changelog — InstantLens Doc
 
+## 2.6.20 — Spellcheck/Suggestions, Autocorrect/Bausteine, Ribbon/Tabs, Undo
+
+Minor nach **2.6.19**: **Rechtschreibprüfung** mit **Korrekturvorschlägen** (Edit-Distanz) und leichten **Grammatik-Hinweisen**; Builtin-Wortliste der **UI-Sprache** (+ optionale User-Wortliste). **Autokorrektur** und **Textbaustein-Kürzel** beim Tippen; Editor-Bausteine **9 Slots**. **Ribbon/Workspace-Polish:** Tabs Bearbeiten/Fenster, Drag-Reorder der Dokument-Tabs, optionales **separates Fenster**. **Undo/Redo** vertieft (Annotation-History + Seiten-Ops unbegrenzt, Editor `undoLimit=0`). Scripting: `ild.spellcheck` / `suggest_word` / `autocorrect_text` / `list_snippets` · CLI `spellcheck`/`suggest`/`autocorrect`/`snippets` · PS `Invoke-IldSpellcheck` / `Invoke-IldAutocorrect` / `Get-IldSnippets`. Freier KI-Chat-Stub unverändert. Keine Cloud-Echtzeit-Kollaboration; eIDAS-Signaturen warten. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie unverändert.
+
+### Neu
+- `spellcheck_with_suggestions` / Grammar-Hints; F7 + Shift+F7 Vorschlagsdialog
+- `autocorrect` + Baustein-Kürzel (UI-Sprache); Settings Toggle
+- Ribbon: Bearbeiten/Fenster; Tabs Drag + Separates Fenster
+- ild-API/CLI/PowerShell: `spellcheck` / `suggest` / `autocorrect` / `snippets`
+
+### Geändert
+- Undo-Stacks praktisch unbegrenzt; Textbausteine 3→9; Docs/Version **2.6.20**; i18n-Keys
+
+### Tests / Qualität
+- Version **2.6.20** (App / `ild_pdf` / ISS / Smoke / Docs); Serie **2.6**; `docs/VERSION` + `VERSION.txt`
+- Smoke: 2.6.20 CLI+Qt (spell/autocorrect/ribbon/undo)
+- Stubs: KI/Cloud/Stylus/3D/Hooks/Outline/Telemetrie unverändert markiert
+
 ## 2.6.19 — Document Comparison, Book Layout, Page-Scroll, Ribbon/Tabs
 
 Minor nach **2.6.18**: **Document Comparison** — Side-by-Side-PDF-Vergleich mit **Drag-and-Drop**, **Sync-Scroll** der Panes, Raster-/Textlayer-Diff-Highlight; **ild.compare_pdfs** / CLI `compare` / PowerShell `Invoke-IldCompare`. **Enhanced Viewing:** **Buch-Layout** (Cover allein, danach Doppelseiten) und **Seite-für-Seite-Scroll** (Mausrad blättert). **Workspace (partiell):** horizontale **Dokument-Tabs** + leichte **Ribbon-Chrome** (Start/Ansicht/PDF). Keine volle Cloud-Kollaboration. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie unverändert.

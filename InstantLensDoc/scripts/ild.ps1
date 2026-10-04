@@ -787,6 +787,48 @@ function Invoke-IldCompare {
     Invoke-Ild @a | Out-Host
 }
 
+function Invoke-IldSpellcheck {
+    # Rechtschreibung inkl. Vorschläge — 2.6.20
+    param(
+        [Parameter(Mandatory = $true)][string]$Text,
+        [string]$Dict,
+        [string]$Lang,
+        [switch]$NoBuiltin,
+        [switch]$NoGrammar,
+        [int]$MaxSuggestions = 5
+    )
+    $a = @("--json", "spellcheck", $Text, "--max-suggestions", "$MaxSuggestions")
+    if ($Dict) { $a += @("--dict", $Dict) }
+    if ($Lang) { $a += @("--lang", $Lang) }
+    if ($NoBuiltin) { $a += "--no-builtin" }
+    if ($NoGrammar) { $a += "--no-grammar" }
+    Invoke-Ild @a | Out-Host
+}
+
+function Invoke-IldAutocorrect {
+    # Autokorrektur / Bausteine — 2.6.20
+    param(
+        [Parameter(Mandatory = $true)][string]$Text,
+        [string]$Lang
+    )
+    $a = @("--json", "autocorrect", $Text)
+    if ($Lang) { $a += @("--lang", $Lang) }
+    Invoke-Ild @a | Out-Host
+}
+
+function Get-IldSnippets {
+    # Textbausteine (9 Slots) — 2.6.20
+    Invoke-Ild @("--json", "snippets") | Out-Host
+}
+
+function Set-IldSnippet {
+    param(
+        [Parameter(Mandatory = $true)][int]$Index,
+        [Parameter(Mandatory = $true)][string]$Text
+    )
+    Invoke-Ild @("--json", "set-snippet", "$Index", $Text) | Out-Host
+}
+
 function Merge-IldPdf {
     param(
         [Parameter(Mandatory = $true)][string[]]$Path,

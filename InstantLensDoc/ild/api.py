@@ -1,4 +1,4 @@
-"""Headless InstantLens-Doc-Operationen für Python- und PowerShell-Scripting — 2.6.19."""
+"""Headless InstantLens-Doc-Operationen für Python- und PowerShell-Scripting — 2.6.20."""
 
 from __future__ import annotations
 
@@ -1755,6 +1755,118 @@ def compare_pdfs(
     )
     data["version"] = __version__
     return data
+
+
+def spellcheck(
+    text: str,
+    *,
+    dict_path: PathLike | None = None,
+    lang: str | None = None,
+    include_builtin: bool = True,
+    include_grammar: bool = True,
+    max_suggestions: int = 5,
+) -> dict[str, Any]:
+    """
+    Rechtschreibung inkl. Vorschläge + leichte Grammatik-Hints — 2.6.20.
+
+    Ohne ``dict_path`` wird die Builtin-Wortliste der UI-Sprache genutzt.
+    """
+    from instantlensdoc.core.spellcheck import spellcheck_with_suggestions
+
+    data = spellcheck_with_suggestions(
+        text or "",
+        dict_path,
+        lang=lang,
+        include_builtin=bool(include_builtin),
+        include_grammar=bool(include_grammar),
+        max_suggestions=int(max_suggestions),
+    )
+    data["version"] = __version__
+    return data
+
+
+def suggest_word(
+    word: str,
+    *,
+    dict_path: PathLike | None = None,
+    lang: str | None = None,
+    max_suggestions: int = 5,
+) -> dict[str, Any]:
+    """Korrekturvorschläge für ein einzelnes Wort — 2.6.20."""
+    from instantlensdoc.core.spellcheck import (
+        resolve_wordlist,
+        suggest_corrections,
+    )
+
+    if lang is None:
+        try:
+            from instantlensdoc.core.i18n import get_lang
+
+            lang = get_lang()
+        except Exception:
+            lang = "de"
+    words = resolve_wordlist(dict_path, lang=lang, include_builtin=True)
+    sugg = suggest_corrections(
+        word or "", words, max_suggestions=int(max_suggestions)
+    )
+    return {
+        "word": word,
+        "suggestions": sugg,
+        "lang": lang,
+        "version": __version__,
+    }
+
+
+def autocorrect_text(
+    text: str,
+    *,
+    lang: str | None = None,
+) -> dict[str, Any]:
+    """Batch-Autokorrektur (Tippfehler + Baustein-Kürzel) — 2.6.20."""
+    from instantlensdoc.core.autocorrect import (
+        apply_autocorrect_to_text,
+        effective_autocorrect_rules,
+    )
+
+    rules = effective_autocorrect_rules(lang)
+    new, n = apply_autocorrect_to_text(text or "", rules)
+    return {
+        "text": new,
+        "replacements": n,
+        "lang": lang,
+        "version": __version__,
+    }
+
+
+def list_autocorrect_rules_api(*, lang: str | None = None) -> dict[str, Any]:
+    """Autokorrektur-/Snippet-Regeln auflisten — 2.6.20."""
+    from instantlensdoc.core.autocorrect import list_autocorrect_rules
+
+    rules = list_autocorrect_rules(lang)
+    return {"rules": rules, "count": len(rules), "version": __version__}
+
+
+def list_snippets() -> dict[str, Any]:
+    """Editor-Textbausteine (9 Slots) — 2.6.20."""
+    from instantlensdoc.core.app_settings import (
+        EDITOR_SNIPPET_COUNT,
+        get_editor_snippets,
+    )
+
+    snippets = get_editor_snippets()
+    return {
+        "snippets": snippets,
+        "count": EDITOR_SNIPPET_COUNT,
+        "version": __version__,
+    }
+
+
+def set_snippet(index: int, text: str) -> dict[str, Any]:
+    """Textbaustein-Slot setzen (0..8) — 2.6.20."""
+    from instantlensdoc.core.app_settings import set_editor_snippet
+
+    snippets = set_editor_snippet(int(index), text)
+    return {"snippets": snippets, "index": int(index), "version": __version__}
 
 
 def _load_layout(

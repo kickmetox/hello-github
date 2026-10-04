@@ -2,7 +2,7 @@
 
 Moderne Textverarbeitung mit PDF-Annotator, OCR-Bridge und Formulargenerator.
 
-**Version:** 2.6.19  
+**Version:** 2.6.20  
 **Hersteller:** Andreas Meyer · ame@sellerbach.de
 
 ## Quickstart (Windows)
@@ -36,6 +36,13 @@ User-Shortcuts: `.\scripts\install-ild.ps1` (inkl. Keygen) · Deinstallieren: `-
 Keygen: `run-keygen.bat` · `python -m keygen kunde@example.com` · siehe `keygen/README.md`.
 
 Nightly-Smoke: `python scripts\smoke_ild.py` · optional `--qt` · `--json` (Summary: `ok`, `checks[]`, `duration_ms`, `version`; Fail: `checks[].error` max 200…, Exit=ok). Siehe **CONTRIBUTING.md**; Workflow-Stub `.github/workflows/smoke-ild.yml` (manual only).
+
+## Neu in 2.6.20
+
+- Rechtschreibung mit Vorschlägen + leichte Grammatik-Hints (UI-Sprache)
+- Autokorrektur & Textbausteine (9 Slots, Kürzel beim Tippen)
+- Ribbon-Polish (Bearbeiten/Fenster), Tabs Drag, separates Fenster
+- Undo/Redo praktisch unbegrenzt; `ild.spellcheck` / `autocorrect` / `snippets`
 
 ## Neu in 2.6.19
 

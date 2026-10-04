@@ -591,6 +591,51 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--out-png", default=None, help="Diff-Overlay PNG")
     s.add_argument("--out-txt", default=None, help="Textlayer Diff TXT")
 
+    s = sub.add_parser(
+        "spellcheck",
+        help="Rechtschreibung inkl. Vorschläge/Grammatik — 2.6.20",
+    )
+    s.add_argument("text", help="Zu prüfender Text")
+    s.add_argument("--dict", default=None, help="Pfad Wortliste")
+    s.add_argument("--lang", default=None, help="UI-Sprache (de/en/…)")
+    s.add_argument("--no-builtin", action="store_true")
+    s.add_argument("--no-grammar", action="store_true")
+    s.add_argument("--max-suggestions", type=int, default=5)
+
+    s = sub.add_parser(
+        "suggest",
+        help="Korrekturvorschläge für ein Wort — 2.6.20",
+    )
+    s.add_argument("word", help="Wort")
+    s.add_argument("--dict", default=None)
+    s.add_argument("--lang", default=None)
+    s.add_argument("--max-suggestions", type=int, default=5)
+
+    s = sub.add_parser(
+        "autocorrect",
+        help="Autokorrektur / Baustein-Kürzel auf Text — 2.6.20",
+    )
+    s.add_argument("text", help="Text")
+    s.add_argument("--lang", default=None)
+
+    s = sub.add_parser(
+        "autocorrect-rules",
+        help="Autokorrektur-/Snippet-Regeln auflisten — 2.6.20",
+    )
+    s.add_argument("--lang", default=None)
+
+    s = sub.add_parser(
+        "snippets",
+        help="Textbausteine auflisten (9 Slots) — 2.6.20",
+    )
+
+    s = sub.add_parser(
+        "set-snippet",
+        help="Textbaustein-Slot setzen (0..8) — 2.6.20",
+    )
+    s.add_argument("index", type=int, help="Slot 0..8")
+    s.add_argument("text", help="Inhalt")
+
     return p
 
 
@@ -1191,6 +1236,42 @@ def run(argv: list[str] | None = None) -> int:
                 out_png=args.out_png,
                 out_txt=args.out_txt,
             )
+            _print(data, as_json=js or True)
+            return 0
+        if args.cmd == "spellcheck":
+            data = api.spellcheck(
+                args.text,
+                dict_path=args.dict,
+                lang=args.lang,
+                include_builtin=not bool(args.no_builtin),
+                include_grammar=not bool(args.no_grammar),
+                max_suggestions=args.max_suggestions,
+            )
+            _print(data, as_json=js or True)
+            return 0
+        if args.cmd == "suggest":
+            data = api.suggest_word(
+                args.word,
+                dict_path=args.dict,
+                lang=args.lang,
+                max_suggestions=args.max_suggestions,
+            )
+            _print(data, as_json=js or True)
+            return 0
+        if args.cmd == "autocorrect":
+            data = api.autocorrect_text(args.text, lang=args.lang)
+            _print(data, as_json=js or True)
+            return 0
+        if args.cmd == "autocorrect-rules":
+            data = api.list_autocorrect_rules_api(lang=args.lang)
+            _print(data, as_json=js or True)
+            return 0
+        if args.cmd == "snippets":
+            data = api.list_snippets()
+            _print(data, as_json=js or True)
+            return 0
+        if args.cmd == "set-snippet":
+            data = api.set_snippet(args.index, args.text)
             _print(data, as_json=js or True)
             return 0
         return _fail("unbekanntes Kommando")

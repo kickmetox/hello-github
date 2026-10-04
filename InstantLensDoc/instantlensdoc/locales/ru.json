@@ -216,5 +216,14 @@
     "KI-Assistent (geplant)": "ИИ-ассистент (планируется)",
     "Cloud-Sync (geplant)": "Облачная синхронизация (планируется)",
     "Geplant": "Запланировано"
+  },
+  "ui": {
+    "spellcheck": "Проверка орфографии",
+    "spell_suggestions": "Варианты исправления",
+    "autocorrect": "Автокоррекция",
+    "text_snippets": "Текстовые блоки",
+    "detach_window": "Отдельное окно",
+    "ribbon_edit": "Правка",
+    "ribbon_window": "Окно"
   }
 }

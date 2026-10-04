@@ -1,4 +1,4 @@
-"""Ribbon-ähnliche Werkzeugleiste (partiell) — 2.6.19."""
+"""Ribbon-ähnliche Werkzeugleiste — 2.6.20 (erweitert aus 2.6.19)."""
 
 from __future__ import annotations
 
@@ -18,8 +18,8 @@ from PySide6.QtWidgets import (
 
 class RibbonBar(QWidget):
     """
-    Leichte Ribbon-Chrome: Kategorie-Tabs + Button-Zeile.
-    Kein volles Office-Ribbon — Startpunkt für Workspace-UI.
+    Ribbon-Chrome: Kategorie-Tabs + Button-Zeile.
+    Tabs: Start / Bearbeiten / Ansicht / Fenster / PDF — 2.6.20.
     """
 
     action_triggered = Signal(str)  # action id
@@ -67,6 +67,18 @@ class RibbonBar(QWidget):
                     ("save", "Speichern"),
                     ("compare_pdfs", "Vergleichen"),
                     ("find_replace", "Suchen"),
+                    ("spellcheck", "Rechtschreibung"),
+                ),
+            ),
+            (
+                "Bearbeiten",
+                (
+                    ("undo", "Rückgängig"),
+                    ("redo", "Wiederholen"),
+                    ("spellcheck", "Rechtschreibung"),
+                    ("autocorrect_toggle", "Autokorrektur"),
+                    ("insert_snippet", "Baustein"),
+                    ("find_replace", "Suchen/Ersetzen"),
                 ),
             ),
             (
@@ -76,6 +88,15 @@ class RibbonBar(QWidget):
                     ("page_by_page", "Seite-für-Seite"),
                     ("continuous_scroll", "Continuous"),
                     ("toggle_doc_tabs", "Dokument-Tabs"),
+                    ("toggle_ribbon", "Ribbon"),
+                ),
+            ),
+            (
+                "Fenster",
+                (
+                    ("doc_split", "Teilen"),
+                    ("detach_window", "Separates Fenster"),
+                    ("toggle_doc_tabs", "Tabs"),
                 ),
             ),
             (
@@ -105,14 +126,21 @@ class RibbonBar(QWidget):
             for aid, label in buttons:
                 tb = QToolButton()
                 tb.setText(label)
-                tb.setToolTip(f"{label} — Ribbon 2.6.19")
+                tb.setToolTip(f"{label} — Ribbon 2.6.20")
                 tb.setAutoRaise(False)
-                if aid in ("book_layout", "page_by_page", "continuous_scroll", "toggle_doc_tabs"):
+                if aid in (
+                    "book_layout",
+                    "page_by_page",
+                    "continuous_scroll",
+                    "toggle_doc_tabs",
+                    "autocorrect_toggle",
+                    "doc_split",
+                    "toggle_ribbon",
+                ):
                     tb.setCheckable(True)
                 tb.clicked.connect(
                     lambda _checked=False, a=aid: self.action_triggered.emit(a)
                 )
-                # Erste Instanz merken (Toggle-Sync); Duplikate feuern nur Signal
                 self._actions.setdefault(aid, tb)
                 row.addWidget(tb)
             row.addStretch(1)
@@ -129,6 +157,14 @@ class RibbonBar(QWidget):
             b.blockSignals(True)
             b.setChecked(i == index)
             b.blockSignals(False)
+
+    def select_category(self, index: int) -> None:
+        """Öffentliche Kategorie-Wahl (Smoke/Alt-Ribbon)."""
+        if 0 <= index < self._stack.count():
+            self._select_cat(index)
+
+    def category_count(self) -> int:
+        return self._stack.count()
 
     def set_checked(self, action_id: str, checked: bool) -> None:
         btn = self._actions.get(action_id)

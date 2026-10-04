@@ -1,5 +1,5 @@
 {
-  "version": "2.6.19",
+  "version": "2.6.20",
   "langs": [
     "de",
     "en",
@@ -2348,6 +2348,85 @@
       "pt": "Planeado",
       "ar": "مخطط",
       "it": "Pianificato"
+    }
+  },
+  "ui": {
+    "spellcheck": {
+      "de": "Rechtschreibung prüfen",
+      "en": "Spell check",
+      "fr": "Vérification orthographique",
+      "ru": "Проверка орфографии",
+      "es": "Corrector ortográfico",
+      "zh": "拼写检查",
+      "pt": "Verificação ortográfica",
+      "ar": "تدقيق إملائي",
+      "it": "Controllo ortografico"
+    },
+    "spell_suggestions": {
+      "de": "Rechtschreibvorschläge",
+      "en": "Spelling suggestions",
+      "fr": "Suggestions orthographiques",
+      "ru": "Варианты исправления",
+      "es": "Sugerencias ortográficas",
+      "zh": "拼写建议",
+      "pt": "Sugestões ortográficas",
+      "ar": "اقتراحات إملائية",
+      "it": "Suggerimenti ortografici"
+    },
+    "autocorrect": {
+      "de": "Autokorrektur",
+      "en": "Autocorrect",
+      "fr": "Correction automatique",
+      "ru": "Автокоррекция",
+      "es": "Autocorrección",
+      "zh": "自动更正",
+      "pt": "Correção automática",
+      "ar": "تصحيح تلقائي",
+      "it": "Correzione automatica"
+    },
+    "text_snippets": {
+      "de": "Textbausteine",
+      "en": "Text snippets",
+      "fr": "Extraits de texte",
+      "ru": "Текстовые блоки",
+      "es": "Fragmentos de texto",
+      "zh": "文本片段",
+      "pt": "Blocos de texto",
+      "ar": "قوالب نصية",
+      "it": "Blocchi di testo"
+    },
+    "detach_window": {
+      "de": "Separates Fenster",
+      "en": "Separate window",
+      "fr": "Fenêtre séparée",
+      "ru": "Отдельное окно",
+      "es": "Ventana separada",
+      "zh": "独立窗口",
+      "pt": "Janela separada",
+      "ar": "نافذة منفصلة",
+      "it": "Finestra separata"
+    },
+    "ribbon_edit": {
+      "de": "Bearbeiten",
+      "en": "Edit",
+      "fr": "Modifier",
+      "ru": "Правка",
+      "es": "Editar",
+      "zh": "编辑",
+      "pt": "Editar",
+      "ar": "تحرير",
+      "it": "Modifica"
+    },
+    "ribbon_window": {
+      "de": "Fenster",
+      "en": "Window",
+      "fr": "Fenêtre",
+      "ru": "Окно",
+      "es": "Ventana",
+      "zh": "窗口",
+      "pt": "Janela",
+      "ar": "نافذة",
+      "it": "Finestra"
     }
   }
 }

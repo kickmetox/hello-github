@@ -193,6 +193,8 @@ from instantlensdoc.core.app_settings import (
 # Continuous-Scroll: max. gerenderte Seiten (Speicher)
 CONTINUOUS_MAX_PAGES = 40
 CONTINUOUS_PAGE_GAP = 12
+# 0 = unbegrenzt (Seiten-Ops Undo-Stack) — 2.6.20
+PAGE_OPS_UNDO_LIMIT = 0
 
 
 class PageReorderDialog(QDialog):
@@ -10372,7 +10374,8 @@ class PdfViewer(QWidget):
                     "page_h": page_h,
                 }
             )
-            if len(self._page_ops_undo) > 20:
+            # 0 = unbegrenzt — 2.6.20
+            if PAGE_OPS_UNDO_LIMIT and len(self._page_ops_undo) > PAGE_OPS_UNDO_LIMIT:
                 self._page_ops_undo.pop(0)
             rotate_page(self.pdf_path, idx, deg)
             from ild_pdf.render import clear_render_cache
@@ -10473,7 +10476,8 @@ class PdfViewer(QWidget):
                     "page_h": page_h,
                 }
             )
-            if len(self._page_ops_undo) > 20:
+            # 0 = unbegrenzt — 2.6.20
+            if PAGE_OPS_UNDO_LIMIT and len(self._page_ops_undo) > PAGE_OPS_UNDO_LIMIT:
                 self._page_ops_undo.pop(0)
             flip_page(
                 self.pdf_path,
@@ -12537,7 +12541,8 @@ class PdfViewer(QWidget):
                     "ann_remapped": ann_remapped,
                 }
             )
-            if len(self._page_ops_undo) > 20:
+            # 0 = unbegrenzt — 2.6.20
+            if PAGE_OPS_UNDO_LIMIT and len(self._page_ops_undo) > PAGE_OPS_UNDO_LIMIT:
                 self._page_ops_undo.pop(0)
             from ild_pdf import PdfDocument
             from ild_pdf.render import clear_render_cache
@@ -12625,7 +12630,8 @@ class PdfViewer(QWidget):
                     "page_groups": groups_before,
                 }
             )
-            if len(self._page_ops_undo) > 20:
+            # 0 = unbegrenzt — 2.6.20
+            if PAGE_OPS_UNDO_LIMIT and len(self._page_ops_undo) > PAGE_OPS_UNDO_LIMIT:
                 self._page_ops_undo.pop(0)
             delete_pages(self.pdf_path, [deleted])
             if self.store:
@@ -12799,7 +12805,8 @@ class PdfViewer(QWidget):
                         "ann_remapped": ann_remapped,
                     }
                 )
-                if len(self._page_ops_undo) > 20:
+                # 0 = unbegrenzt — 2.6.20
+                if PAGE_OPS_UNDO_LIMIT and len(self._page_ops_undo) > PAGE_OPS_UNDO_LIMIT:
                     self._page_ops_undo.pop(0)
             self.page_index = 0
             self._selected_ann_id = None

@@ -1030,8 +1030,10 @@ class MainWindow(QMainWindow):
         self.doc_tab_bar = DocumentTabBar(self)
         self.doc_tab_bar.tab_activated.connect(self._on_doc_tab_activated)
         self.doc_tab_bar.tab_close_requested.connect(self.close_tab_path)
+        self.doc_tab_bar.tab_detach_requested.connect(self._detach_document_window)
         self.doc_tab_bar.setVisible(get_doc_tabs_visible())
         outer.addWidget(self.doc_tab_bar)
+        self._detached_windows: list = []
 
         root = QHBoxLayout()
         root.setContentsMargins(0, 0, 0, 0)
@@ -1797,18 +1799,31 @@ class MainWindow(QMainWindow):
         act_all_lower.triggered.connect(lambda: self._transform_document_case("lower"))
         m_edit.addAction(act_all_lower)
         m_snippets = m_edit.addMenu("Textbausteine")
-        for i in range(3):
+        for i in range(9):
             a_ins = QAction(f"Einfügen {i + 1}", self)
-            a_ins.setShortcut(QKeySequence(f"Ctrl+Alt+{i + 1}"))
+            if i < 9:
+                # Ctrl+Alt+1..9 — Slot 1–9 — 2.6.20
+                a_ins.setShortcut(QKeySequence(f"Ctrl+Alt+{i + 1}"))
             a_ins.setToolTip(f"Gespeicherten Textbaustein {i + 1} an Cursor einfügen")
             a_ins.triggered.connect(lambda checked=False, idx=i: self._insert_snippet(idx))
             m_snippets.addAction(a_ins)
         m_snippets.addSeparator()
-        for i in range(3):
+        for i in range(9):
             a_save = QAction(f"Auswahl → Slot {i + 1}", self)
             a_save.setToolTip(f"Aktuelle Auswahl (oder Zeile) als Textbaustein {i + 1} speichern")
             a_save.triggered.connect(lambda checked=False, idx=i: self._save_snippet(idx))
             m_snippets.addAction(a_save)
+        act_ac = QAction("Autokorrektur", self)
+        act_ac.setCheckable(True)
+        from instantlensdoc.core.app_settings import get_autocorrect_enabled as _gae_init
+
+        act_ac.setChecked(bool(_gae_init()))
+        act_ac.setToolTip(
+            "Tippfehler und Baustein-Kürzel beim Tippen ersetzen (Space/Satzzeichen) — 2.6.20"
+        )
+        act_ac.triggered.connect(self._toggle_autocorrect)
+        m_edit.addAction(act_ac)
+        self._autocorrect_action = act_ac
         act_indent = QAction("Einrückung erhöhen", self)
         act_indent.setShortcut(QKeySequence("Ctrl+]"))
         act_indent.setToolTip("Zeilen/Block einrücken (auch Tab)")
@@ -1838,10 +1853,16 @@ class MainWindow(QMainWindow):
         act_spell = QAction("Rechtschreibung prüfen…", self)
         act_spell.setShortcut(QKeySequence("F7"))
         act_spell.setToolTip(
-            "Wortliste aus Einstellungen laden und unbekannte Wörter markieren (ohne Spell-Lib)"
+            "Wortliste + Builtin der UI-Sprache; Vorschläge im Tooltip; "
+            "leichte Grammatik-Hinweise — 2.6.20"
         )
         act_spell.triggered.connect(self._check_spelling)
         m_edit.addAction(act_spell)
+        act_spell_sugg = QAction("Rechtschreibvorschläge…", self)
+        act_spell_sugg.setShortcut(QKeySequence("Shift+F7"))
+        act_spell_sugg.setToolTip("Unbekannte Wörter mit Korrekturvorschlägen auflisten — 2.6.20")
+        act_spell_sugg.triggered.connect(self._show_spell_suggestions)
+        m_edit.addAction(act_spell_sugg)
         act_spell_clear = QAction("Rechtschreibmarkierungen löschen", self)
         act_spell_clear.triggered.connect(self._clear_spelling)
         m_edit.addAction(act_spell_clear)
@@ -5057,22 +5078,25 @@ class MainWindow(QMainWindow):
     def _check_spelling(self):
         if self.stack.currentWidget() is not self.editor_pane:
             self.stack.setCurrentWidget(self.editor_pane)
-        from instantlensdoc.core.app_settings import get_spellcheck_dict_path
+        from instantlensdoc.core.app_settings import (
+            get_spellcheck_dict_path,
+            get_spellcheck_use_builtin,
+        )
 
         path = get_spellcheck_dict_path()
-        if not path:
+        if not path and not get_spellcheck_use_builtin():
             from PySide6.QtWidgets import QMessageBox
 
             QMessageBox.information(
                 self,
                 "Rechtschreibung",
-                "Kein Wörterbuch-Pfad gesetzt.\n"
+                "Kein Wörterbuch-Pfad gesetzt und Builtin deaktiviert.\n"
                 "Extras → Einstellungen → Rechtschreibwörterbuch (Wortliste).",
             )
-            self._set_status("Rechtschreibung: kein Wörterbuch-Pfad")
+            self._set_status("Rechtschreibung: kein Wörterbuch")
             return
         try:
-            n = self.editor.check_spelling(path)
+            n = self.editor.check_spelling(path or None)
         except FileNotFoundError as e:
             from PySide6.QtWidgets import QMessageBox
 
@@ -5084,11 +5108,106 @@ class MainWindow(QMainWindow):
 
             QMessageBox.warning(self, "Rechtschreibung", str(e))
             return
+        result = self.editor.last_spell_result()
+        g = int(result.get("grammar_count") or 0)
+        extra = f", {g} Grammatik-Hinweis(e)" if g else ""
         self._set_status(
-            f"Rechtschreibung: {n} unbekannt(e) Wort(e)"
-            if n
+            f"Rechtschreibung: {n} unbekannt(e) Wort(e){extra}"
+            if n or g
             else "Rechtschreibung: keine unbekannten Wörter"
         )
+
+    def _show_spell_suggestions(self):
+        """Dialog mit unbekannten Wörtern + Vorschlägen — 2.6.20."""
+        if self.stack.currentWidget() is not self.editor_pane:
+            self.stack.setCurrentWidget(self.editor_pane)
+        self._check_spelling()
+        result = self.editor.last_spell_result()
+        unknown = list(result.get("unknown") or [])
+        from PySide6.QtWidgets import (
+            QDialog,
+            QDialogButtonBox,
+            QHBoxLayout,
+            QLabel,
+            QListWidget,
+            QListWidgetItem,
+            QPushButton,
+            QVBoxLayout,
+        )
+
+        dlg = QDialog(self)
+        dlg.setWindowTitle("Rechtschreibvorschläge — 2.6.20")
+        dlg.resize(520, 360)
+        lay = QVBoxLayout(dlg)
+        lay.addWidget(
+            QLabel(
+                f"Sprache: {result.get('lang', '?')} · "
+                f"{len(unknown)} unbekannt · "
+                f"{int(result.get('grammar_count') or 0)} Grammatik"
+            )
+        )
+        lst = QListWidget()
+        for item in unknown:
+            word = item.get("word") or ""
+            sugg = item.get("suggestions") or []
+            line = word
+            if sugg:
+                line += " → " + ", ".join(str(s) for s in sugg[:5])
+            wi = QListWidgetItem(line)
+            wi.setData(Qt.UserRole, item)
+            lst.addItem(wi)
+        lay.addWidget(lst, 1)
+        row = QHBoxLayout()
+        btn_apply = QPushButton("Ersten Vorschlag anwenden")
+        btn_apply.setToolTip("Ersetzt das markierte Wort durch den ersten Vorschlag")
+        row.addWidget(btn_apply)
+        row.addStretch(1)
+        lay.addLayout(row)
+        buttons = QDialogButtonBox(QDialogButtonBox.Close)
+        buttons.rejected.connect(dlg.reject)
+        buttons.accepted.connect(dlg.accept)
+        lay.addWidget(buttons)
+
+        def _apply():
+            cur = lst.currentItem()
+            if cur is None:
+                return
+            data = cur.data(Qt.UserRole) or {}
+            sugg = data.get("suggestions") or []
+            if not sugg:
+                self._set_status("Kein Vorschlag für dieses Wort")
+                return
+            ok = self.editor.apply_spell_suggestion(
+                int(data["start"]), int(data["end"]), str(sugg[0])
+            )
+            if ok:
+                self._set_status(f"Ersetzt: {data.get('word')} → {sugg[0]}")
+                self._check_spelling()
+                dlg.accept()
+
+        btn_apply.clicked.connect(_apply)
+        dlg.exec()
+
+    def _toggle_autocorrect(self, checked: bool = False):
+        from instantlensdoc.core.app_settings import (
+            get_autocorrect_enabled,
+            set_autocorrect_enabled,
+        )
+
+        if isinstance(checked, bool) and self.sender() is getattr(
+            self, "_autocorrect_action", None
+        ):
+            want = bool(checked)
+        else:
+            want = not get_autocorrect_enabled()
+        set_autocorrect_enabled(want)
+        if getattr(self, "_autocorrect_action", None) is not None:
+            self._autocorrect_action.blockSignals(True)
+            self._autocorrect_action.setChecked(want)
+            self._autocorrect_action.blockSignals(False)
+        if getattr(self, "ribbon_bar", None) is not None:
+            self.ribbon_bar.set_checked("autocorrect_toggle", want)
+        self._set_status("Autokorrektur ein" if want else "Autokorrektur aus")
 
     def _clear_spelling(self):
         self.editor.clear_spelling()
@@ -6132,12 +6251,17 @@ class MainWindow(QMainWindow):
             self.ribbon_bar.setVisible(bool(checked))
 
     def _on_ribbon_action(self, action_id: str) -> None:
-        """Ribbon-Chrome-Aktionen — 2.6.19."""
+        """Ribbon-Chrome-Aktionen — 2.6.20."""
         handlers = {
             "open": self.open_dialog,
             "save": self.save_doc,
             "compare_pdfs": self._compare_pdfs,
             "find_replace": self._find_replace,
+            "spellcheck": self._check_spelling,
+            "undo": self._undo,
+            "redo": self._redo,
+            "autocorrect_toggle": self._toggle_autocorrect,
+            "insert_snippet": lambda: self._insert_snippet(0),
             "book_layout": lambda: self._toggle_book_layout(
                 not self.pdf_view.book_layout_enabled()
             ),
@@ -6153,6 +6277,14 @@ class MainWindow(QMainWindow):
                     and self.doc_tab_bar.isVisible()
                 )
             ),
+            "toggle_ribbon": lambda: self._toggle_ribbon(
+                not (
+                    getattr(self, "ribbon_bar", None) is not None
+                    and self.ribbon_bar.isVisible()
+                )
+            ),
+            "doc_split": self._toggle_doc_split_from_ribbon,
+            "detach_window": self._detach_current_document,
             "preflight": self._run_preflight,
             "apply_bleed": self._apply_bleed_dialog,
             "export_pdfx": self._export_pdfx,
@@ -6160,6 +6292,105 @@ class MainWindow(QMainWindow):
         fn = handlers.get(action_id)
         if callable(fn):
             fn()
+
+    def _toggle_doc_split_from_ribbon(self) -> None:
+        """Ribbon-Toggle für Fenster teilen — 2.6.20."""
+        act = getattr(self, "_doc_split_action", None)
+        if act is not None:
+            act.trigger()
+        else:
+            from instantlensdoc.core.app_settings import (
+                get_editor_doc_split,
+                set_editor_doc_split,
+            )
+
+            want = not get_editor_doc_split()
+            set_editor_doc_split(want)
+            if getattr(self, "secondary_wrap", None) is not None:
+                self.secondary_wrap.setVisible(want)
+            if getattr(self, "ribbon_bar", None) is not None:
+                self.ribbon_bar.set_checked("doc_split", want)
+            self._set_status("Fenster geteilt" if want else "Fenster ungeteilt")
+
+    def _detach_current_document(self) -> None:
+        path = None
+        if self.doc and self.doc.path:
+            path = str(self.doc.path)
+        elif getattr(self.pdf_view, "pdf_path", None):
+            path = str(self.pdf_view.pdf_path)
+        if path:
+            self._detach_document_window(path)
+        else:
+            self._set_status("Kein Dokument zum Trennen")
+
+    def _detach_document_window(self, path: str) -> None:
+        """Dokument in separatem Viewer-Fenster öffnen — 2.6.20."""
+        if not path:
+            return
+        from pathlib import Path as _P
+
+        from PySide6.QtWidgets import QLabel, QMainWindow, QVBoxLayout, QWidget
+
+        p = _P(path)
+        if not p.is_file():
+            self._set_status(f"Datei fehlt: {path}")
+            return
+        win = QMainWindow(None)
+        win.setWindowTitle(f"InstantLens Doc — {p.name}")
+        win.resize(900, 700)
+        central = QWidget()
+        lay = QVBoxLayout(central)
+        info = QLabel(
+            f"<b>{p.name}</b><br><span style='color:#556'>{p}</span><br><br>"
+            "Separates Fenster (2.6.20). Volleditor bleibt im Hauptfenster."
+        )
+        info.setWordWrap(True)
+        info.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        lay.addWidget(info)
+        # PDF: leichte Seitenansicht; sonst Hinweis
+        if p.suffix.lower() == ".pdf":
+            try:
+                from ild_pdf.render import render_page
+                from PySide6.QtGui import QPixmap
+                from PySide6.QtWidgets import QScrollArea
+
+                img = render_page(p, 0, scale=1.0)
+                pix = QPixmap.fromImage(img) if hasattr(img, "bits") else None
+                if pix is None:
+                    # PIL → QImage
+                    from PySide6.QtGui import QImage
+                    import io as _io
+
+                    buf = _io.BytesIO()
+                    img.save(buf, format="PNG")
+                    qimg = QImage.fromData(buf.getvalue())
+                    pix = QPixmap.fromImage(qimg)
+                lab = QLabel()
+                lab.setPixmap(pix)
+                lab.setAlignment(Qt.AlignCenter)
+                scroll = QScrollArea()
+                scroll.setWidget(lab)
+                scroll.setWidgetResizable(True)
+                lay.addWidget(scroll, 1)
+            except Exception as e:
+                lay.addWidget(QLabel(f"Vorschau nicht verfügbar: {e}"))
+        else:
+            try:
+                preview = p.read_text(encoding="utf-8", errors="replace")[:8000]
+            except Exception:
+                preview = "(nicht lesbar)"
+            from PySide6.QtWidgets import QPlainTextEdit
+
+            te = QPlainTextEdit()
+            te.setReadOnly(True)
+            te.setPlainText(preview)
+            lay.addWidget(te, 1)
+        win.setCentralWidget(central)
+        win.show()
+        if not hasattr(self, "_detached_windows"):
+            self._detached_windows = []
+        self._detached_windows.append(win)
+        self._set_status(f"Separates Fenster: {p.name}")
 
     def _on_doc_tab_activated(self, path: str) -> None:
         if path:
@@ -6532,8 +6763,10 @@ class MainWindow(QMainWindow):
             return
         from instantlensdoc.core.app_settings import get_editor_snippets
 
+        from instantlensdoc.core.app_settings import EDITOR_SNIPPET_COUNT
+
         snippets = get_editor_snippets()
-        i = max(0, min(2, int(index)))
+        i = max(0, min(EDITOR_SNIPPET_COUNT - 1, int(index)))
         text = snippets[i] if i < len(snippets) else ""
         if not text:
             self._set_status(f"Textbaustein {i + 1} ist leer")
@@ -6545,7 +6778,10 @@ class MainWindow(QMainWindow):
         if self.stack.currentWidget() is not self.editor_pane:
             self._set_status("Textbausteine nur im Editor")
             return
-        from instantlensdoc.core.app_settings import set_editor_snippet
+        from instantlensdoc.core.app_settings import (
+            EDITOR_SNIPPET_COUNT,
+            set_editor_snippet,
+        )
 
         cur = self.editor.textCursor()
         text = cur.selectedText().replace("\u2029", "\n")
@@ -6555,7 +6791,7 @@ class MainWindow(QMainWindow):
 
             cur.select(QTextCursor.LineUnderCursor)
             text = cur.selectedText().replace("\u2029", "\n")
-        i = max(0, min(2, int(index)))
+        i = max(0, min(EDITOR_SNIPPET_COUNT - 1, int(index)))
         set_editor_snippet(i, text)
         preview = (text[:40] + "…") if len(text) > 40 else text.replace("\n", "⏎")
         self._set_status(f"Textbaustein {i + 1} gespeichert: {preview}")
@@ -10940,6 +11176,10 @@ class MainWindow(QMainWindow):
                     and self.ribbon_bar.isVisible()
                 )
             ),
+            "spellcheck": self._check_spelling,
+            "spell_suggestions": self._show_spell_suggestions,
+            "autocorrect_toggle": self._toggle_autocorrect,
+            "detach_window": self._detach_current_document,
             "hyphenate_en": lambda: self._hyphenate_document("en"),
             "text_wrap": self._set_image_text_wrap,
             "ocr_page": self._run_ocr,

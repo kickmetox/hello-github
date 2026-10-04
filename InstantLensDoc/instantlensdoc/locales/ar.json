@@ -216,5 +216,14 @@
     "KI-Assistent (geplant)": "مساعد الذكاء الاصطناعي (مخطط)",
     "Cloud-Sync (geplant)": "مزامنة سحابية (مخطط)",
     "Geplant": "مخطط"
+  },
+  "ui": {
+    "spellcheck": "تدقيق إملائي",
+    "spell_suggestions": "اقتراحات إملائية",
+    "autocorrect": "تصحيح تلقائي",
+    "text_snippets": "قوالب نصية",
+    "detach_window": "نافذة منفصلة",
+    "ribbon_edit": "تحرير",
+    "ribbon_window": "نافذة"
   }
 }

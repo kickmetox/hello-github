@@ -218,6 +218,11 @@ DEFAULTS: dict[str, Any] = {
     "editor_text_encoding": "auto",
     "skip_splash": False,
     "spellcheck_dict_path": "",
+    "spellcheck_use_builtin": True,  # Builtin-Wortliste der UI-Sprache — 2.6.20
+    "spellcheck_grammar_hints": True,  # leichte Grammatik-Hinweise — 2.6.20
+    "autocorrect_enabled": True,  # Autokorrektur beim Tippen — 2.6.20
+    "autocorrect_expand_snippets": True,  # Kürzel→Bausteine — 2.6.20
+    "autocorrect_user_rules": {},  # {trigger: replacement} — 2.6.20
     "show_page_boxes": False,
     "show_page_number_overlay": False,
     "page_number_overlay_opacity": 0.59,
@@ -241,6 +246,12 @@ DEFAULTS: dict[str, Any] = {
         "Sehr geehrte Damen und Herren,\n\n",
         "Mit freundlichen Grüßen\n",
         "— Notiz —\n",
+        "Best regards,\n",
+        "Vielen Dank im Voraus.\n",
+        "Anbei das Dokument zur Prüfung.\n",
+        "Bitte um kurze Rückmeldung.\n",
+        "Freundliche Grüße\n",
+        "— Textbaustein —\n",
     ],
     "user_doc_templates": [],
     "sidecar_save_debounce_ms": 400,
@@ -3480,16 +3491,22 @@ def set_annotations_locked(locked: bool) -> None:
     save_settings({"annotations_locked": bool(locked)})
 
 
-EDITOR_SNIPPET_COUNT = 3
+EDITOR_SNIPPET_COUNT = 9  # erweitert 3→9 — 2.6.20
 _DEFAULT_EDITOR_SNIPPETS = [
     "Sehr geehrte Damen und Herren,\n\n",
     "Mit freundlichen Grüßen\n",
     "— Notiz —\n",
+    "Best regards,\n",
+    "Vielen Dank im Voraus.\n",
+    "Anbei das Dokument zur Prüfung.\n",
+    "Bitte um kurze Rückmeldung.\n",
+    "Freundliche Grüße\n",
+    "— Textbaustein —\n",
 ]
 
 
 def get_editor_snippets() -> list[str]:
-    """Drei gespeicherte Textbausteine für den Editor."""
+    """Neun gespeicherte Textbausteine für den Editor — 2.6.20."""
     raw = load_settings().get("editor_snippets")
     defaults = list(_DEFAULT_EDITOR_SNIPPETS)
     if not isinstance(raw, list):
@@ -3510,17 +3527,82 @@ def set_editor_snippets(snippets: list[str]) -> list[str]:
         if i < len(snippets) and snippets[i] is not None:
             cleaned.append(str(snippets[i]))
         else:
-            cleaned.append(defaults[i])
+            cleaned.append(defaults[i] if i < len(defaults) else "")
     save_settings({"editor_snippets": cleaned})
     return cleaned
 
 
 def set_editor_snippet(index: int, text: str) -> list[str]:
-    """Einzelnen Textbaustein-Slot (0..2) setzen."""
+    """Einzelnen Textbaustein-Slot (0..8) setzen — 2.6.20."""
     snippets = get_editor_snippets()
     i = max(0, min(EDITOR_SNIPPET_COUNT - 1, int(index)))
     snippets[i] = str(text if text is not None else "")
     return set_editor_snippets(snippets)
+
+
+def get_spellcheck_use_builtin() -> bool:
+    return bool(load_settings().get("spellcheck_use_builtin", True))
+
+
+def set_spellcheck_use_builtin(enabled: bool) -> None:
+    save_settings({"spellcheck_use_builtin": bool(enabled)})
+
+
+def get_spellcheck_grammar_hints() -> bool:
+    return bool(load_settings().get("spellcheck_grammar_hints", True))
+
+
+def set_spellcheck_grammar_hints(enabled: bool) -> None:
+    save_settings({"spellcheck_grammar_hints": bool(enabled)})
+
+
+def get_autocorrect_enabled() -> bool:
+    return bool(load_settings().get("autocorrect_enabled", True))
+
+
+def set_autocorrect_enabled(enabled: bool) -> None:
+    save_settings({"autocorrect_enabled": bool(enabled)})
+
+
+def get_autocorrect_expand_snippets() -> bool:
+    return bool(load_settings().get("autocorrect_expand_snippets", True))
+
+
+def set_autocorrect_expand_snippets(enabled: bool) -> None:
+    save_settings({"autocorrect_expand_snippets": bool(enabled)})
+
+
+def get_autocorrect_user_rules() -> dict[str, str]:
+    raw = load_settings().get("autocorrect_user_rules")
+    if not isinstance(raw, dict):
+        return {}
+    out: dict[str, str] = {}
+    for k, v in raw.items():
+        key = str(k or "").strip().casefold()
+        if key and v is not None:
+            out[key] = str(v)
+    return out
+
+
+def set_autocorrect_user_rules(rules: dict[str, str] | None) -> dict[str, str]:
+    cleaned: dict[str, str] = {}
+    for k, v in (rules or {}).items():
+        key = str(k or "").strip().casefold()
+        if key and v is not None and str(v) != "":
+            cleaned[key] = str(v)
+    save_settings({"autocorrect_user_rules": cleaned})
+    return cleaned
+
+
+def set_autocorrect_user_rule(trigger: str, replacement: str) -> dict[str, str]:
+    rules = get_autocorrect_user_rules()
+    key = str(trigger or "").strip().casefold()
+    if key:
+        if replacement is None or str(replacement) == "":
+            rules.pop(key, None)
+        else:
+            rules[key] = str(replacement)
+    return set_autocorrect_user_rules(rules)
 
 
 USER_DOC_TEMPLATE_LIMIT = 20
