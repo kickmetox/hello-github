@@ -128,7 +128,8 @@ class WelcomePage(QWidget):
         self.recent_filter.setClearButtonEnabled(True)
         self.recent_filter.setToolTip(
             "Live-Filter Pfad oder Dokument-Tags (ildtags-v1) · Tag-Vorschläge · "
-            "Quick-Tag A–Z/Häufigkeit · Tags kopieren · Treffer A11y · Esc → Fokus Liste — 2.5.7"
+            "Quick-Tag A–Z/Häufigkeit · Tags kopieren/einfügen · "
+            "Treffer A11y · Esc → Fokus Liste — 2.5.8"
         )
         self.recent_filter.textChanged.connect(self._apply_recent_filter)
         self.recent_filter.textChanged.connect(self._persist_recent_filter)
@@ -175,8 +176,8 @@ class WelcomePage(QWidget):
         self.recent_list.setMinimumHeight(180)
         self.recent_list.setToolTip(
             "Enter / Doppelklick öffnet; Entf entfernt den Eintrag; "
-            "Rechtsklick: Tag+/− · Tags kopieren · Entfernen / Ordner; "
-            "Quick-Tag A–Z/Häufigkeit (N Docs) · Treffer A11y · Esc → Fokus Liste — 2.5.7"
+            "Rechtsklick: Tag+/− · Tags kopieren/einfügen · Entfernen / Ordner; "
+            "Quick-Tag A–Z/Häufigkeit (N Docs) · Treffer A11y · Esc → Fokus Liste — 2.5.8"
         )
         self.recent_list.setAcceptDrops(True)
         self.recent_list.setContextMenuPolicy(Qt.CustomContextMenu)
@@ -516,6 +517,7 @@ class WelcomePage(QWidget):
         act_add_tag = menu.addAction("Tag hinzufügen…")
         act_remove_tag = menu.addAction("Tag entfernen…")
         act_copy_tags = menu.addAction("Tags kopieren")
+        act_paste_tags = menu.addAction("Tags einfügen")
         menu.addSeparator()
         act_remove = menu.addAction("Entfernen")
         act_folder = menu.addAction("Ordner öffnen")
@@ -526,6 +528,8 @@ class WelcomePage(QWidget):
             self._remove_tag_for_recent(str(path))
         elif chosen is act_copy_tags:
             self._copy_tags_for_recent(str(path))
+        elif chosen is act_paste_tags:
+            self._paste_tags_for_recent(str(path))
         elif chosen is act_remove:
             self.recent_remove_requested.emit(str(path))
         elif chosen is act_folder:
@@ -639,6 +643,65 @@ class WelcomePage(QWidget):
         # Status über Parent-MainWindow wenn vorhanden — 2.5.7
         win = self.window()
         msg = f"Tags kopiert ({len(current)}): {text}"
+        if win is not None and hasattr(win, "_set_status"):
+            try:
+                win._set_status(msg)
+            except Exception:
+                pass
+        if win is not None and hasattr(win, "_announce_status_toast"):
+            try:
+                win._announce_status_toast(msg)
+            except Exception:
+                pass
+
+    def _paste_tags_for_recent(self, path: str) -> None:
+        """Zwischenablage-Tags (Komma/;/Zeile) an Dokument anhängen — 2.5.8."""
+        from PySide6.QtWidgets import QApplication, QMessageBox
+
+        from instantlensdoc.core import doc_tags as doc_tags_mod
+        from instantlensdoc.core import recent_tags as recent_tags_mod
+
+        try:
+            clip = QApplication.clipboard()
+            raw = (clip.text() if clip is not None else "") or ""
+        except Exception:
+            raw = ""
+        # Zeilenumbrüche wie Komma behandeln — 2.5.8
+        raw = raw.replace("\r\n", "\n").replace("\r", "\n").replace("\n", ",")
+        add = doc_tags_mod.normalize_doc_tags(raw)
+        if not add:
+            QMessageBox.information(
+                self,
+                "Tags einfügen",
+                "Zwischenablage enthält keine gültigen Tags "
+                "(Komma, Semikolon oder Zeilen).",
+            )
+            return
+        current = doc_tags_mod.load_tags_sidecar(path)
+        before = {t.casefold() for t in current}
+        merged = doc_tags_mod.normalize_doc_tags(list(current) + list(add))
+        new_only = [t for t in merged if t.casefold() not in before]
+        if not new_only:
+            QMessageBox.information(
+                self,
+                "Tags einfügen",
+                "Alle Tags aus der Zwischenablage sind bereits vorhanden.",
+            )
+            return
+        try:
+            doc_tags_mod.save_tags_sidecar(path, merged)
+            for t in new_only:
+                try:
+                    recent_tags_mod.add_recent_tag(t)
+                except Exception:
+                    pass
+        except Exception as e:
+            QMessageBox.warning(self, "Tags einfügen", str(e))
+            return
+        self.refresh_recent()
+        win = self.window()
+        text = ", ".join(new_only)
+        msg = f"Tags eingefügt ({len(new_only)}): {text}"
         if win is not None and hasattr(win, "_set_status"):
             try:
                 win._set_status(msg)

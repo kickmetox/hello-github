@@ -2916,7 +2916,8 @@ class MainWindow(QMainWindow):
             path = getattr(self, "_last_ocr_region_path", None) or ""
             tip = (
                 "Linksklick → Ergebnis-Tab · Rechtsklick → Ordner · "
-                "Mittelklick/Ctrl+Klick → Pfad kopieren — 2.5.7"
+                "Mittelklick/Ctrl+Klick → Pfad · "
+                "Shift+Klick → Text kopieren — 2.5.8"
             )
             if path:
                 tip = f"{tip}\n{path}"
@@ -3078,7 +3079,7 @@ class MainWindow(QMainWindow):
         ):
             if self._copy_thumb_prune_status_to_clipboard():
                 return
-        # OCR-Region: L → Tab · R → Ordner · Mittel/Ctrl → Pfad — 2.5.5–2.5.7
+        # OCR-Region: L→Tab · R→Ordner · Mittel/Ctrl→Pfad · Shift→Text — 2.5.5–2.5.8
         if (
             getattr(self, "_ocr_region_toast_active", False)
             and ("OCR-Region" in cur or "OCR Region" in cur)
@@ -3088,6 +3089,11 @@ class MainWindow(QMainWindow):
                 and bool(event.modifiers() & Qt.ControlModifier)
             ):
                 if self._copy_ocr_region_result_path():
+                    return
+            elif event.button() == Qt.LeftButton and bool(
+                event.modifiers() & Qt.ShiftModifier
+            ):
+                if self._copy_ocr_region_result_text():
                     return
             elif event.button() == Qt.LeftButton:
                 if self._focus_ocr_region_result_tab():
@@ -11560,10 +11566,11 @@ class MainWindow(QMainWindow):
         self._manage_export_presets()
 
     def _manage_export_presets(self):
-        """Export-Presets: ★ · Tooltip · RMB Ordner · Entf · Apply A11y — 2.5.7."""
+        """Export-Presets: ★ · RMB Ordner · Entf · Summary kopieren · Ctrl+C — 2.5.8."""
         from PySide6.QtCore import QEvent, QObject
         from PySide6.QtGui import QDesktopServices, QKeyEvent, QUrl
         from PySide6.QtWidgets import (
+            QApplication,
             QDialog,
             QDialogButtonBox,
             QFileDialog,
@@ -11642,14 +11649,14 @@ class MainWindow(QMainWindow):
         lay = QVBoxLayout(dlg)
         info = QLabel(
             f"Benannte Presets ({len(profiles)}/{EXPORT_PROFILES_MAX}). "
-            "★ aktiv · Tooltip · RMB Zielordner · Entf löschen · Doppelklick Anwenden."
+            "★ aktiv · RMB Zielordner · Summary kopieren · Entf · Doppelklick Anwenden."
         )
         lay.addWidget(info)
         lst = QListWidget()
         lst.setToolTip(
             "★ = aktives Preset · Listen-Tooltip Summary DPI/Format/Pfad · "
-            "Rechtsklick → Zielordner · Entf löschen · "
-            "Doppelklick/Enter Anwenden — 2.5.7"
+            "Rechtsklick → Zielordner / Summary kopieren · Ctrl+C · Entf löschen · "
+            "Doppelklick/Enter Anwenden — 2.5.8"
         )
         lst.setContextMenuPolicy(Qt.CustomContextMenu)
         active = {"name": get_active_export_profile_name()}
@@ -11666,7 +11673,7 @@ class MainWindow(QMainWindow):
             active["name"] = get_active_export_profile_name()
             info.setText(
                 f"Benannte Presets ({len(cur)}/{EXPORT_PROFILES_MAX}). "
-                "★ aktiv · Tooltip · RMB Zielordner · Entf löschen · Doppelklick Anwenden."
+                "★ aktiv · RMB Zielordner · Summary kopieren · Entf · Doppelklick Anwenden."
             )
             for p in cur:
                 name = str(p["name"])
@@ -11731,7 +11738,7 @@ class MainWindow(QMainWindow):
         btn_import = QPushButton("Import JSON…")
         btn_import.setToolTip(
             f"Presets JSON ({EXPORT_PRESETS_SCHEMA_ID}): ungültige überspringen+zählen · "
-            "★ aktiv · RMB Zielordner · Entf · Apply A11y — 2.5.7"
+            "★ aktiv · RMB Zielordner · Summary kopieren · Entf · Apply A11y — 2.5.8"
         )
         btn_row.addWidget(btn_apply)
         btn_row.addWidget(btn_dup)
@@ -11952,6 +11959,31 @@ class MainWindow(QMainWindow):
             except Exception:
                 pass
 
+        def _copy_summary(item: QListWidgetItem | None = None) -> None:
+            """RMB/Ctrl+C: Preset-Summary (DPI·Format·Pfad) kopieren — 2.5.8."""
+            it = item if item is not None else lst.currentItem()
+            if it is None:
+                return
+            data = it.data(Qt.UserRole) or {}
+            name = str(data.get("name") or _item_name(it)).strip()
+            tip = export_profile_summary(data)
+            path_txt = export_profile_path_preview(data)
+            text = f"{name}\n{tip}\nPfad: {path_txt}".strip()
+            try:
+                clip = QApplication.clipboard()
+                if clip is None:
+                    raise RuntimeError("Zwischenablage nicht verfügbar")
+                clip.setText(text)
+            except Exception as e:
+                QMessageBox.warning(dlg, "Export-Preset", str(e))
+                return
+            msg = f"Export-Preset Summary kopiert: {name}"
+            self._set_status(msg)
+            try:
+                self._announce_status_toast(msg)
+            except Exception:
+                pass
+
         def _on_preset_context(pos) -> None:
             item = lst.itemAt(pos)
             if item is None:
@@ -11959,6 +11991,7 @@ class MainWindow(QMainWindow):
             lst.setCurrentItem(item)
             menu = QMenu(dlg)
             act_open = menu.addAction("Zielordner öffnen")
+            act_copy = menu.addAction("Summary kopieren")
             act_apply = menu.addAction("Anwenden")
             act_dup = menu.addAction("Duplizieren")
             act_rename = menu.addAction("Umbenennen…")
@@ -11966,6 +11999,8 @@ class MainWindow(QMainWindow):
             chosen = menu.exec(lst.mapToGlobal(pos))
             if chosen is act_open:
                 _open_target_folder(item)
+            elif chosen is act_copy:
+                _copy_summary(item)
             elif chosen is act_apply:
                 _apply()
             elif chosen is act_dup:
@@ -11981,6 +12016,12 @@ class MainWindow(QMainWindow):
                     assert isinstance(event, QKeyEvent)
                     if event.key() in (Qt.Key_Delete, Qt.Key_Backspace):
                         _delete()
+                        return True
+                    if (
+                        event.key() == Qt.Key_C
+                        and bool(event.modifiers() & Qt.ControlModifier)
+                    ):
+                        _copy_summary()
                         return True
                 return False
 
@@ -13267,6 +13308,43 @@ class MainWindow(QMainWindow):
         # Toast aktiv lassen (L/R bleiben nutzbar) — 2.5.7
         self._ocr_region_toast_active = True
         msg = f"OCR-Region Pfad kopiert: {Path(text).name}"
+        self._set_status(msg)
+        try:
+            self._announce_status_toast(msg)
+        except Exception:
+            pass
+        return True
+
+    def _copy_ocr_region_result_text(self) -> bool:
+        """Status-Shift+Klick: OCR-Region Ergebnistext in Zwischenablage — 2.5.8."""
+        path = getattr(self, "_last_ocr_region_path", None)
+        if not path:
+            return False
+        p = Path(str(path))
+        if not p.is_file():
+            return False
+        try:
+            body = p.read_text(encoding="utf-8")
+        except Exception:
+            return False
+        # Fehlerabschnitt weglassen (wie Batch-OCR) — 2.5.8
+        marker = "\n--- OCR-Fehler ---"
+        if marker in body:
+            body = body.split(marker, 1)[0].rstrip()
+        if not body.strip():
+            return False
+        try:
+            from PySide6.QtWidgets import QApplication
+
+            clip = QApplication.clipboard()
+            if clip is None:
+                return False
+            clip.setText(body)
+        except Exception:
+            return False
+        self._ocr_region_toast_active = True
+        words = len([w for w in body.split() if w])
+        msg = f"OCR-Region Text kopiert ({words} Wörter): {p.name}"
         self._set_status(msg)
         try:
             self._announce_status_toast(msg)

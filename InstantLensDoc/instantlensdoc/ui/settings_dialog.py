@@ -907,6 +907,13 @@ class SettingsDialog(QDialog):
             "Benutzerdefiniertes Farben-Theme löschen (Builtins geschützt) — 2.5.4"
         )
         btn_theme_delete.clicked.connect(self._delete_custom_ann_color_theme_ui)
+        btn_theme_hex = QPushButton("Hex kopieren")
+        btn_theme_hex.setToolTip(
+            "6 Hex-Farben des gewählten Themes in die Zwischenablage — 2.5.8"
+        )
+        btn_theme_hex.setAccessibleName("Theme Hex kopieren")
+        btn_theme_hex.clicked.connect(self._copy_ann_theme_hex_ui)
+        self.btn_theme_hex_copy = btn_theme_hex
         preset_row.addWidget(self.ann_theme_combo)
         preset_row.addWidget(btn_load_theme)
         preset_row.addWidget(btn_theme_default)
@@ -915,6 +922,7 @@ class SettingsDialog(QDialog):
         preset_row.addWidget(btn_theme_rename)
         preset_row.addWidget(btn_theme_dup)
         preset_row.addWidget(btn_theme_delete)
+        preset_row.addWidget(btn_theme_hex)
         form.addRow("Ann.-Color-Presets", preset_row)
         # Theme-Vorschau Swatches — 2.5.1
         swatch_row = QHBoxLayout()
@@ -2820,7 +2828,7 @@ class SettingsDialog(QDialog):
             self.btn_undo_factory_presets.setEnabled(bool(prev))
 
     def _update_ann_theme_swatches(self, *_args) -> None:
-        """Vorschau-Swatches · Combo-Tooltip Hex · Custom N/20 — 2.5.1/2.5.7."""
+        """Vorschau-Swatches · Combo Hex-Tooltip · Custom N/20 · Hex-Copy — 2.5.1/2.5.8."""
         from instantlensdoc.core.app_settings import (
             CUSTOM_ANN_COLOR_THEMES_MAX,
             get_ann_color_theme,
@@ -2862,18 +2870,60 @@ class SettingsDialog(QDialog):
                 hint.setText(f"Default: {default} · {count_txt}")
             else:
                 hint.setText(f"Theme wählen für Vorschau · {count_txt}")
-        # Combo-Tooltip: alle Hex-Farben des gewählten Themes — 2.5.7
+        # Combo-Tooltip: alle Hex-Farben des gewählten Themes — 2.5.7/2.5.8
         if combo is not None:
             base = (
                 "Vordefinierte + Custom Themes · ★ = Default · "
                 f"Custom {custom_n}/{CUSTOM_ANN_COLOR_THEMES_MAX} · "
-                "Custom umbenennen/duplizieren/löschen — 2.5.7"
+                "Custom umbenennen/duplizieren/löschen · Hex kopieren — 2.5.8"
             )
             if name and colors:
                 hex_line = " · ".join(str(c) for c in colors)
                 combo.setToolTip(f"{name}\n{hex_line}\n{base}")
             else:
                 combo.setToolTip(base)
+        btn_hex = getattr(self, "btn_theme_hex_copy", None)
+        if btn_hex is not None:
+            btn_hex.setEnabled(bool(name and colors))
+
+    def _copy_ann_theme_hex_ui(self) -> None:
+        """6 Hex-Farben des gewählten Themes in die Zwischenablage — 2.5.8."""
+        from PySide6.QtWidgets import QApplication
+
+        from instantlensdoc.core.app_settings import get_ann_color_theme
+
+        combo = getattr(self, "ann_theme_combo", None)
+        if combo is None:
+            return
+        name = str(combo.currentData() or "").strip()
+        colors = get_ann_color_theme(name) if name else None
+        if not name or not colors:
+            QMessageBox.information(
+                self, "Farben-Theme", "Bitte ein Theme mit Farben wählen."
+            )
+            return
+        text = " · ".join(str(c) for c in colors)
+        try:
+            clip = QApplication.clipboard()
+            if clip is None:
+                raise RuntimeError("Zwischenablage nicht verfügbar")
+            clip.setText(text)
+        except Exception as e:
+            QMessageBox.warning(self, "Farben-Theme", str(e))
+            return
+        msg = f"Theme-Hex kopiert ({name}): {text}"
+        parent = self.parent()
+        if parent is not None and hasattr(parent, "_set_status"):
+            try:
+                parent._set_status(msg)
+            except Exception:
+                pass
+        if parent is not None and hasattr(parent, "_announce_status_toast"):
+            try:
+                parent._announce_status_toast(msg)
+            except Exception:
+                pass
+        # Kein Success-Dialog (wie OCR/Tags-Copy) — Status reicht — 2.5.8
 
     def _save_default_ann_color_theme_ui(self) -> None:
         """Gewähltes Theme als Default speichern — 2.5.1."""
