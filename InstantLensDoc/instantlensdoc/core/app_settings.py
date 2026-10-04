@@ -4758,6 +4758,55 @@ def delete_export_profile(name: str) -> bool:
     return True
 
 
+def rename_export_profile(old_name: str, new_name: str) -> dict[str, object]:
+    """Export-Preset umbenennen (Duplikat ablehnen) — 2.5.4."""
+    old = (old_name or "").strip()
+    new = (new_name or "").strip()
+    if not old:
+        raise ValueError("Alter Preset-Name fehlt")
+    if not new:
+        raise ValueError("Neuer Preset-Name fehlt")
+    existing = get_export_profile(old)
+    if existing is None:
+        raise ValueError(f"Preset „{old}“ nicht gefunden")
+    if old.casefold() == new.casefold():
+        # Nur Groß/Klein geändert → Namen aktualisieren, Rest behalten
+        if str(existing["name"]) == new:
+            return dict(existing)
+    else:
+        clash = get_export_profile(new)
+        if clash is not None:
+            raise ValueError(
+                f"Preset-Name „{new}“ existiert bereits. "
+                "Bitte anderen Namen wählen."
+            )
+    was_active = get_active_export_profile_name().casefold() == old.casefold()
+    profiles = get_export_profiles()
+    updated: list[dict[str, object]] = []
+    for p in profiles:
+        if str(p["name"]).casefold() == old.casefold():
+            renamed = _normalize_export_profile(
+                {
+                    "name": new,
+                    "dpi": p.get("dpi"),
+                    "format": p.get("format"),
+                    "target": p.get("target"),
+                }
+            )
+            assert renamed is not None
+            updated.append(renamed)
+        else:
+            updated.append(p)
+    payload: dict[str, Any] = {"export_profiles": updated}
+    if was_active:
+        payload["active_export_profile"] = new
+    save_settings(payload)
+    out = get_export_profile(new)
+    if out is None:
+        raise ValueError(f"Umbenennen fehlgeschlagen: „{new}“")
+    return out
+
+
 def get_active_export_profile_name() -> str:
     return str(load_settings().get("active_export_profile") or "").strip()
 
@@ -4987,6 +5036,34 @@ def list_ann_color_themes() -> list[str]:
     for t in get_custom_ann_color_themes():
         names.append(str(t["name"]))
     return names
+
+
+def is_builtin_ann_color_theme(name: str) -> bool:
+    """True wenn Theme fest eingebaut (Markieren/Corporate) — 2.5.4."""
+    clean = (name or "").strip()
+    return clean in ANN_COLOR_THEMES
+
+
+def delete_custom_ann_color_theme(name: str) -> bool:
+    """Benutzerdefiniertes Farben-Theme löschen (Builtins geschützt) — 2.5.4."""
+    clean = (name or "").strip()
+    if not clean:
+        return False
+    if clean in ANN_COLOR_THEMES:
+        raise ValueError(
+            f"Eingebautes Theme „{clean}“ kann nicht gelöscht werden."
+        )
+    themes = get_custom_ann_color_themes()
+    kept = [t for t in themes if str(t["name"]).casefold() != clean.casefold()]
+    if len(kept) == len(themes):
+        return False
+    _save_custom_ann_color_themes(kept)
+    try:
+        if get_default_ann_color_theme().casefold() == clean.casefold():
+            set_default_ann_color_theme("")
+    except Exception:
+        pass
+    return True
 
 
 def get_ann_color_theme(name: str) -> list[str] | None:

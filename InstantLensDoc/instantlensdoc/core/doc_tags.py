@@ -216,6 +216,27 @@ def tags_match_filter(tags: Iterable[str], needle: str) -> bool:
     return False
 
 
+def collect_known_tags(max_items: int = 48) -> list[str]:
+    """Bekannte Dokument-Tags aus Index (dedup, sortiert) — 2.5.4."""
+    seen: set[str] = set()
+    out: list[str] = []
+    for tags in load_index().values():
+        if not isinstance(tags, (list, tuple)):
+            continue
+        for raw in tags:
+            t = str(raw).strip()
+            if not t:
+                continue
+            key = t.casefold()
+            if key in seen:
+                continue
+            seen.add(key)
+            out.append(t)
+    out.sort(key=lambda s: s.casefold())
+    limit = max(1, int(max_items or 48))
+    return out[:limit]
+
+
 def refresh_index_for_paths(paths: Sequence[str | Path]) -> dict[str, list[str]]:
     """Sidecars für Recent-Pfade einlesen und Index aktualisieren."""
     entries = load_index()

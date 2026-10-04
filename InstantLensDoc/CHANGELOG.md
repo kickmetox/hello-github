@@ -1,5 +1,20 @@
 # Changelog — InstantLens Doc
 
+## 2.5.4 — OCR-Region Wörter/Zeichen·A11y, Theme Custom löschen·★ Default, ildtags Vorschläge·Quick-Tag, Export-Presets Umbenennen·Doppelklick
+
+Post-Release-Polish nach **2.5.3**: **OCR-Region** Status mit **Wörter/Zeichen** und **A11y Announcement**; **Farben-Themes** **Custom löschen** und **★ Default** in der Combo; **ildtags** **Tag-Vorschläge** beim Hinzufügen und **Quick-Tag-Filter**; **Export-Presets** **Umbenennen** und **Doppelklick Anwenden**. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie klar markiert / nicht produktiv (Ink ≠ Stylus).
+
+### Geändert
+- OCR-Region: Wörter/Zeichen im Status · A11y Announcement nach Erfolg
+- Farben-Themes: Custom löschen (Builtins geschützt) · ★ Default in Combo
+- Dokument-Tags: Tag-Vorschläge (Recent/Index) · Quick-Tag-Filter Combo
+- Export-Presets: Umbenennen · Doppelklick/Enter Anwenden
+
+### Tests / Qualität
+- Version **2.5.4** (App / `ild_pdf` / ISS / Smoke / Docs); Serie **2.5**; `docs/VERSION` + `VERSION.txt`
+- Smoke: 2.5.4 CLI + Qt (OCR Stats/A11y, Theme Delete/★, ildtags Suggest/Quick-Tag, Export Rename/DblClick)
+- Stubs: KI/Cloud/Stylus/3D/Hooks/Outline/Telemetrie unverändert markiert
+
 ## 2.5.3 — OCR-Region Ellipsis·Tooltip·Fehlerabschnitt, Theme Merge skip/rename·Import-Log, ildtags Esc-Fokus·Treffer A11y, Export-Presets Live-Pfad·ungültige zählen
 
 Post-Release-Polish nach **2.5.2**: **OCR-Region** Tab-Titel mit **Ellipsis** und **Tooltip voll**, **Fehlerabschnitt wie Batch-OCR**; **Farben-Theme Merge** mit **Kollisionsstrategie skip/rename (_2)** und **Import-Log**; **ildtags** Esc setzt **Fokus zurück auf Liste**, **Trefferanzahl A11y**; **Export-Presets JSON** mit **Live-Pfad-Vorschau**, **ungültige Einträge überspringen + zählen**. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie klar markiert / nicht produktiv (Ink ≠ Stylus).

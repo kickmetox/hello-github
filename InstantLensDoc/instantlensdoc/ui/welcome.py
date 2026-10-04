@@ -7,6 +7,7 @@ from pathlib import Path
 from PySide6.QtCore import QEvent, Qt, QUrl, Signal
 from PySide6.QtGui import QColor, QDesktopServices, QKeyEvent
 from PySide6.QtWidgets import (
+    QComboBox,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -126,13 +127,22 @@ class WelcomePage(QWidget):
         self.recent_filter.setPlaceholderText("Recent filtern (Pfad oder Tag)…")
         self.recent_filter.setClearButtonEnabled(True)
         self.recent_filter.setToolTip(
-            "Live-Filter Pfad oder Dokument-Tags (ildtags-v1) · Trefferanzahl A11y · "
-            "Clear / Esc → Fokus Liste · fehlende getaggte Recent grau — 2.5.3"
+            "Live-Filter Pfad oder Dokument-Tags (ildtags-v1) · Tag-Vorschläge · "
+            "Quick-Tag-Filter · Treffer A11y · Esc → Fokus Liste — 2.5.4"
         )
         self.recent_filter.textChanged.connect(self._apply_recent_filter)
         self.recent_filter.textChanged.connect(self._persist_recent_filter)
         self.recent_filter.installEventFilter(self)
         filter_row.addWidget(self.recent_filter, 1)
+        # Quick-Tag-Filter aus bekannten ildtags — 2.5.4
+        self.tag_filter_combo = QComboBox()
+        self.tag_filter_combo.setMinimumWidth(140)
+        self.tag_filter_combo.setToolTip(
+            "Schnellfilter: bekanntes Dokument-Tag wählen (ildtags-Index) — 2.5.4"
+        )
+        self.tag_filter_combo.setAccessibleName("Quick-Tag-Filter")
+        self.tag_filter_combo.activated.connect(self._on_tag_filter_chosen)
+        filter_row.addWidget(self.tag_filter_combo)
         self.btn_clear_filter = QPushButton("Filter Clear")
         self.btn_clear_filter.setToolTip(
             "Filter leeren (Clear) und Fokus zurück — Persistenz — 2.5.2"
@@ -157,9 +167,8 @@ class WelcomePage(QWidget):
         self.recent_list.setMinimumHeight(180)
         self.recent_list.setToolTip(
             "Enter / Doppelklick öffnet; Entf entfernt den Eintrag; "
-            "Rechtsklick: Tag hinzufügen/entfernen · Entfernen / Ordner öffnen; "
-            "Trefferanzahl A11y · Esc leert Filter → Fokus Liste; "
-            "fehlende getaggte Recent grau — 2.5.3"
+            "Rechtsklick: Tag hinzufügen (Vorschläge) / entfernen · Entfernen / Ordner; "
+            "Quick-Tag-Filter · Treffer A11y · Esc → Fokus Liste — 2.5.4"
         )
         self.recent_list.setAcceptDrops(True)
         self.recent_list.setContextMenuPolicy(Qt.CustomContextMenu)
@@ -251,8 +260,56 @@ class WelcomePage(QWidget):
         self.btn_clear_recent.setEnabled(has_entries)
         self.recent_filter.setEnabled(has_entries)
         self.btn_clear_filter.setEnabled(has_entries)
+        if hasattr(self, "tag_filter_combo"):
+            self.tag_filter_combo.setEnabled(has_entries)
+        self._refresh_tag_filter_combo()
         self._apply_recent_filter()
         self.refresh_continue_button()
+
+    def _refresh_tag_filter_combo(self) -> None:
+        """Quick-Tag-Filter-Combo aus Index + Recent-Tags — 2.5.4."""
+        combo = getattr(self, "tag_filter_combo", None)
+        if combo is None:
+            return
+        current = str(combo.currentData() or "").strip()
+        tags: list[str] = []
+        try:
+            from instantlensdoc.core import doc_tags as doc_tags_mod
+            from instantlensdoc.core import recent_tags as recent_tags_mod
+
+            known = list(doc_tags_mod.collect_known_tags(max_items=40))
+            recent = list(recent_tags_mod.load_recent_tags())
+            seen: set[str] = set()
+            for t in known + recent:
+                key = str(t).casefold()
+                if key in seen:
+                    continue
+                seen.add(key)
+                tags.append(str(t))
+        except Exception:
+            tags = []
+        combo.blockSignals(True)
+        combo.clear()
+        combo.addItem("(Tag-Filter…)", "")
+        for t in tags:
+            combo.addItem(t, t)
+        if current:
+            idx = combo.findData(current)
+            if idx >= 0:
+                combo.setCurrentIndex(idx)
+        combo.blockSignals(False)
+
+    def _on_tag_filter_chosen(self, index: int) -> None:
+        """Quick-Tag gewählt → Filtertext setzen — 2.5.4."""
+        combo = getattr(self, "tag_filter_combo", None)
+        if combo is None:
+            return
+        tag = str(combo.itemData(index) or "").strip()
+        if not tag:
+            return
+        self.recent_filter.setText(tag)
+        self._persist_recent_filter(tag)
+        self.recent_list.setFocus()
 
     def _persist_recent_filter(self, _text: str | None = None) -> None:
         """Welcome-Recent-Filter in Settings speichern — 2.5.1."""
@@ -263,16 +320,27 @@ class WelcomePage(QWidget):
         except Exception:
             pass
 
+    def _reset_tag_filter_combo(self) -> None:
+        """Quick-Tag-Combo auf Platzhalter zurücksetzen — 2.5.4."""
+        combo = getattr(self, "tag_filter_combo", None)
+        if combo is None:
+            return
+        combo.blockSignals(True)
+        combo.setCurrentIndex(0)
+        combo.blockSignals(False)
+
     def _clear_recent_filter(self) -> None:
         """Filter Clear: Text leeren + Persistenz + Fokus — 2.5.1."""
         self.recent_filter.clear()
         self._persist_recent_filter("")
+        self._reset_tag_filter_combo()
         self.recent_filter.setFocus()
 
     def _escape_recent_filter(self) -> None:
         """Esc: Filter leeren und Fokus zurück auf die Recent-Liste — 2.5.2/2.5.3."""
         self.recent_filter.clear()
         self._persist_recent_filter("")
+        self._reset_tag_filter_combo()
         self.recent_list.setFocus()
         if self.recent_list.count() > 0 and self.recent_list.currentRow() < 0:
             for i in range(self.recent_list.count()):
@@ -387,18 +455,41 @@ class WelcomePage(QWidget):
             self._open_containing_folder(str(path))
 
     def _add_tag_for_recent(self, path: str) -> None:
-        """Dokument-Tag an Recent-Eintrag hinzufügen (ildtags-v1) — 2.5.1."""
+        """Dokument-Tag hinzufügen mit Vorschlägen (Recent/Index) — 2.5.4."""
         from PySide6.QtWidgets import QInputDialog, QMessageBox
 
         from instantlensdoc.core import doc_tags as doc_tags_mod
         from instantlensdoc.core import recent_tags as recent_tags_mod
 
         current = doc_tags_mod.load_tags_sidecar(path)
-        text, ok = QInputDialog.getText(
-            self,
-            "Tag hinzufügen",
-            f"Neuer Tag für {Path(path).name}:",
-        )
+        suggestions: list[str] = []
+        try:
+            known = list(doc_tags_mod.collect_known_tags(max_items=32))
+            recent = list(recent_tags_mod.load_recent_tags())
+            seen: set[str] = {t.casefold() for t in current}
+            for t in recent + known:
+                key = str(t).casefold()
+                if key in seen:
+                    continue
+                seen.add(key)
+                suggestions.append(str(t))
+        except Exception:
+            suggestions = []
+        if suggestions:
+            text, ok = QInputDialog.getItem(
+                self,
+                "Tag hinzufügen",
+                f"Tag für {Path(path).name} (Vorschläge oder neu):",
+                suggestions,
+                0,
+                True,  # editable
+            )
+        else:
+            text, ok = QInputDialog.getText(
+                self,
+                "Tag hinzufügen",
+                f"Neuer Tag für {Path(path).name}:",
+            )
         if not ok:
             return
         add = doc_tags_mod.normalize_doc_tags(text)

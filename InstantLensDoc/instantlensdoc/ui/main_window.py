@@ -11528,12 +11528,13 @@ class MainWindow(QMainWindow):
         self._manage_export_presets()
 
     def _manage_export_presets(self):
-        """Export-Presets: Live-Pfad · Import überspringt ungültige — 2.5.3."""
+        """Export-Presets: Umbenennen · Doppelklick Anwenden · Live-Pfad — 2.5.4."""
         from PySide6.QtWidgets import (
             QDialog,
             QDialogButtonBox,
             QFileDialog,
             QHBoxLayout,
+            QInputDialog,
             QLabel,
             QListWidget,
             QListWidgetItem,
@@ -11555,6 +11556,7 @@ class MainWindow(QMainWindow):
             get_export_profiles,
             get_last_export_dir,
             import_export_presets_json,
+            rename_export_profile,
             set_last_export_dir,
         )
 
@@ -11604,10 +11606,13 @@ class MainWindow(QMainWindow):
         lay = QVBoxLayout(dlg)
         info = QLabel(
             f"Benannte Presets ({len(profiles)}/{EXPORT_PROFILES_MAX}). "
-            "Duplikat-Namen abgelehnt · JSON Export/Import · Live-Pfad."
+            "Umbenennen · Doppelklick Anwenden · Live-Pfad."
         )
         lay.addWidget(info)
         lst = QListWidget()
+        lst.setToolTip(
+            "Doppelklick oder Enter: Preset anwenden · Umbenennen-Button — 2.5.4"
+        )
         active = {"name": get_active_export_profile_name()}
 
         def _reload_list() -> None:
@@ -11616,7 +11621,7 @@ class MainWindow(QMainWindow):
             active["name"] = get_active_export_profile_name()
             info.setText(
                 f"Benannte Presets ({len(cur)}/{EXPORT_PROFILES_MAX}). "
-                "Duplikat-Namen abgelehnt · JSON Export/Import · Live-Pfad."
+                "Umbenennen · Doppelklick Anwenden · Live-Pfad."
             )
             for p in cur:
                 item = QListWidgetItem(str(p["name"]))
@@ -11664,6 +11669,8 @@ class MainWindow(QMainWindow):
         btn_row = QHBoxLayout()
         btn_apply = QPushButton("Anwenden")
         btn_apply.setDefault(True)
+        btn_rename = QPushButton("Umbenennen…")
+        btn_rename.setToolTip("Gewähltes Export-Preset umbenennen — 2.5.4")
         btn_delete = QPushButton("Löschen…")
         btn_export = QPushButton("Export JSON…")
         btn_export.setToolTip(
@@ -11672,9 +11679,10 @@ class MainWindow(QMainWindow):
         btn_import = QPushButton("Import JSON…")
         btn_import.setToolTip(
             f"Presets JSON ({EXPORT_PRESETS_SCHEMA_ID}): ungültige überspringen+zählen · "
-            "Live-Pfad — 2.5.3"
+            "Umbenennen · Doppelklick Anwenden — 2.5.4"
         )
         btn_row.addWidget(btn_apply)
+        btn_row.addWidget(btn_rename)
         btn_row.addWidget(btn_delete)
         btn_row.addWidget(btn_export)
         btn_row.addWidget(btn_import)
@@ -11697,6 +11705,41 @@ class MainWindow(QMainWindow):
             tip = export_profile_summary(profile)
             self._set_status(f"Export-Preset aktiv: {profile['name']} ({tip})")
             dlg.accept()
+
+        def _rename() -> None:
+            item = lst.currentItem()
+            if item is None:
+                return
+            old = str(item.text())
+            new_name, ok = QInputDialog.getText(
+                dlg,
+                "Export-Preset umbenennen",
+                f"Neuer Name für „{old}“:",
+                text=old,
+            )
+            if not ok:
+                return
+            new_name = (new_name or "").strip()
+            if not new_name:
+                QMessageBox.warning(dlg, "Export-Preset", "Name darf nicht leer sein.")
+                return
+            try:
+                renamed = rename_export_profile(old, new_name)
+            except ValueError as e:
+                QMessageBox.warning(dlg, "Export-Preset umbenennen", str(e))
+                return
+            except Exception as e:
+                QMessageBox.warning(dlg, "Export-Preset umbenennen", str(e))
+                return
+            self._set_status(f"Export-Preset umbenannt: {old} → {renamed['name']}")
+            _reload_list()
+            # Fokus auf umbenanntes Preset
+            for i in range(lst.count()):
+                it = lst.item(i)
+                if it and str(it.text()) == str(renamed["name"]):
+                    lst.setCurrentItem(it)
+                    break
+            _refresh_summary()
 
         def _delete() -> None:
             item = lst.currentItem()
@@ -11794,9 +11837,13 @@ class MainWindow(QMainWindow):
             _refresh_summary()
 
         btn_apply.clicked.connect(_apply)
+        btn_rename.clicked.connect(_rename)
         btn_delete.clicked.connect(_delete)
         btn_export.clicked.connect(_export_json)
         btn_import.clicked.connect(_import_json)
+        # Doppelklick / Enter → Anwenden — 2.5.4
+        lst.itemDoubleClicked.connect(lambda *_: _apply())
+        lst.itemActivated.connect(lambda *_: _apply())
         dlg.exec()
 
     def _rebuild_clipboard_history_menu(self):
@@ -13138,6 +13185,26 @@ class MainWindow(QMainWindow):
             self._set_status("OCR-Region abgebrochen")
             return
 
+        def _ocr_region_text_stats(raw: str) -> str:
+            """Zeichen/Wörter ohne Header/Fehlerabschnitt — 2.5.4."""
+            lines = (raw or "").splitlines()
+            content_lines: list[str] = []
+            in_errors = False
+            for ln in lines:
+                if ln.startswith("--- OCR-Fehler"):
+                    in_errors = True
+                    continue
+                if in_errors:
+                    continue
+                if ln.startswith("--- OCR"):
+                    continue
+                if ln.strip():
+                    content_lines.append(ln)
+            content = "\n".join(content_lines).strip()
+            words = len([w for w in content.split() if w])
+            chars = len(content)
+            return f"{words} Wörter · {chars} Zeichen"
+
         def _write_and_open(body: str, *, status_extra: str = "") -> None:
             out_txt = pdf_path.with_name(f"{pdf_path.stem}-ocr-region.txt")
             n = 1
@@ -13177,12 +13244,20 @@ class MainWindow(QMainWindow):
             except Exception:
                 pass
             self.setWindowTitle(self._app_title(full_title))
+            # Zeichen/Wörter + A11y Announcement — 2.5.4
+            stats = _ocr_region_text_stats(body)
             msg = (
                 f"OCR-Region ({lang}, {dpi} DPI) {region_label} → Tab „{tab_title}“"
             )
+            if stats:
+                msg += f" · {stats}"
             if status_extra:
                 msg += f" · {status_extra}"
             self._set_status(msg)
+            try:
+                self._announce_status_toast(msg)
+            except Exception:
+                pass
 
         if ocr_error:
             if attach_errors:

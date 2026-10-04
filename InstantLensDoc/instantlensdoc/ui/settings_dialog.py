@@ -871,24 +871,9 @@ class SettingsDialog(QDialog):
         )
         btn_import_presets.clicked.connect(self._import_color_presets_ui)
         preset_row.addWidget(btn_import_presets)
-        from instantlensdoc.core.app_settings import (
-            get_default_ann_color_theme,
-            list_ann_color_themes,
-        )
-
         self.ann_theme_combo = QComboBox()
-        self.ann_theme_combo.addItem("(Theme laden…)", "")
-        for theme_name in list_ann_color_themes():
-            self.ann_theme_combo.addItem(theme_name, theme_name)
-        default_theme = get_default_ann_color_theme()
-        if default_theme:
-            idx_def = self.ann_theme_combo.findData(default_theme)
-            if idx_def >= 0:
-                self.ann_theme_combo.setCurrentIndex(idx_def)
-        self.ann_theme_combo.setToolTip(
-            "Vordefinierte Paletten Markieren/Corporate — Vorschau-Swatches — 2.5.1"
-        )
         self.ann_theme_combo.currentIndexChanged.connect(self._update_ann_theme_swatches)
+        self._refresh_ann_theme_combo()
         btn_load_theme = QPushButton("Theme laden")
         btn_load_theme.setToolTip("Gewähltes Annotation-Farben-Theme anwenden — 2.5.0")
         btn_load_theme.clicked.connect(self._load_ann_color_theme_ui)
@@ -907,11 +892,17 @@ class SettingsDialog(QDialog):
             "Farben-Theme JSON (ildcolors-theme-v1) · Merge skip/rename (_2) · Import-Log — 2.5.3"
         )
         btn_theme_import.clicked.connect(self._import_ann_color_theme_ui)
+        btn_theme_delete = QPushButton("Custom löschen…")
+        btn_theme_delete.setToolTip(
+            "Benutzerdefiniertes Farben-Theme löschen (Builtins geschützt) — 2.5.4"
+        )
+        btn_theme_delete.clicked.connect(self._delete_custom_ann_color_theme_ui)
         preset_row.addWidget(self.ann_theme_combo)
         preset_row.addWidget(btn_load_theme)
         preset_row.addWidget(btn_theme_default)
         preset_row.addWidget(btn_theme_export)
         preset_row.addWidget(btn_theme_import)
+        preset_row.addWidget(btn_theme_delete)
         form.addRow("Ann.-Color-Presets", preset_row)
         # Theme-Vorschau Swatches — 2.5.1
         swatch_row = QHBoxLayout()
@@ -2870,6 +2861,7 @@ class SettingsDialog(QDialog):
         except Exception as e:
             QMessageBox.warning(self, "Farben-Theme", str(e))
             return
+        self._refresh_ann_theme_combo()
         self._update_ann_theme_swatches()
         QMessageBox.information(
             self, "Farben-Theme", f"Default-Theme gespeichert: {name}"
@@ -2912,7 +2904,7 @@ class SettingsDialog(QDialog):
         )
 
     def _refresh_ann_theme_combo(self) -> None:
-        """Theme-Combo Builtins + Custom neu aufbauen — 2.5.3."""
+        """Theme-Combo Builtins + Custom; Default mit ★ — 2.5.4."""
         from instantlensdoc.core.app_settings import (
             get_default_ann_color_theme,
             list_ann_color_themes,
@@ -2922,17 +2914,70 @@ class SettingsDialog(QDialog):
         if combo is None:
             return
         current = str(combo.currentData() or "").strip()
+        default = get_default_ann_color_theme()
         combo.blockSignals(True)
         combo.clear()
         combo.addItem("(Theme laden…)", "")
         for theme_name in list_ann_color_themes():
-            combo.addItem(theme_name, theme_name)
-        pick = current or get_default_ann_color_theme()
+            label = f"{theme_name} ★" if theme_name == default else theme_name
+            combo.addItem(label, theme_name)
+        pick = current or default
         if pick:
             idx = combo.findData(pick)
             if idx >= 0:
                 combo.setCurrentIndex(idx)
         combo.blockSignals(False)
+        combo.setToolTip(
+            "Vordefinierte + Custom Themes · ★ = Default · Custom löschen — 2.5.4"
+        )
+
+    def _delete_custom_ann_color_theme_ui(self) -> None:
+        """Benutzerdefiniertes Farben-Theme löschen — 2.5.4."""
+        from instantlensdoc.core.app_settings import (
+            delete_custom_ann_color_theme,
+            is_builtin_ann_color_theme,
+        )
+
+        combo = getattr(self, "ann_theme_combo", None)
+        if combo is None:
+            return
+        name = str(combo.currentData() or "").strip()
+        if not name:
+            QMessageBox.information(
+                self, "Farben-Theme", "Bitte ein Custom-Theme wählen."
+            )
+            return
+        if is_builtin_ann_color_theme(name):
+            QMessageBox.information(
+                self,
+                "Farben-Theme",
+                f"„{name}“ ist eingebaut und kann nicht gelöscht werden.",
+            )
+            return
+        reply = QMessageBox.question(
+            self,
+            "Custom-Theme löschen",
+            f"Custom-Theme „{name}“ wirklich löschen?",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
+        )
+        if reply != QMessageBox.Yes:
+            return
+        try:
+            ok = delete_custom_ann_color_theme(name)
+        except Exception as e:
+            QMessageBox.warning(self, "Farben-Theme", str(e))
+            return
+        if not ok:
+            QMessageBox.warning(
+                self, "Farben-Theme", f"Theme „{name}“ nicht gefunden."
+            )
+            return
+        self._refresh_ann_theme_combo()
+        self._update_ann_theme_swatches()
+        QMessageBox.information(
+            self, "Farben-Theme", f"Custom-Theme gelöscht: {name}"
+        )
 
     def _show_ann_theme_import_log(self, result, *, mode: str, strat: str = "") -> None:
         """Import-Log: Zusammenfassung + kopieren/als TXT — 2.5.3."""
