@@ -4807,6 +4807,30 @@ def rename_export_profile(old_name: str, new_name: str) -> dict[str, object]:
     return out
 
 
+def duplicate_export_profile(
+    name: str, new_name: str | None = None
+) -> dict[str, object]:
+    """Export-Preset duplizieren (neuer Name, max. Limit) — 2.5.5."""
+    src = get_export_profile(name)
+    if src is None:
+        raise ValueError(f"Preset „{(name or '').strip()}“ nicht gefunden")
+    base = (new_name or "").strip() or f"{src['name']} Kopie"
+    # Freien Namen finden wenn Kollision
+    candidate = base
+    n = 2
+    while get_export_profile(candidate) is not None:
+        candidate = f"{base}_{n}"
+        n += 1
+        if n > 100:
+            raise ValueError("Kein freier Preset-Name für Duplikat gefunden")
+    return save_export_profile(
+        candidate,
+        dpi=int(src.get("dpi") or 150),
+        format=str(src.get("format") or "PNG"),
+        target=str(src.get("target") or ""),
+    )
+
+
 def get_active_export_profile_name() -> str:
     return str(load_settings().get("active_export_profile") or "").strip()
 
@@ -5064,6 +5088,61 @@ def delete_custom_ann_color_theme(name: str) -> bool:
     except Exception:
         pass
     return True
+
+
+def rename_custom_ann_color_theme(old_name: str, new_name: str) -> dict[str, Any]:
+    """Benutzerdefiniertes Farben-Theme umbenennen (Builtins geschützt) — 2.5.5."""
+    old = (old_name or "").strip()
+    new = (new_name or "").strip()
+    if not old:
+        raise ValueError("Alter Theme-Name fehlt")
+    if not new:
+        raise ValueError("Neuer Theme-Name fehlt")
+    if old in ANN_COLOR_THEMES:
+        raise ValueError(
+            f"Eingebautes Theme „{old}“ kann nicht umbenannt werden."
+        )
+    if new in ANN_COLOR_THEMES:
+        raise ValueError(
+            f"Name „{new}“ ist für ein eingebautes Theme reserviert."
+        )
+    themes = get_custom_ann_color_themes()
+    existing: dict[str, Any] | None = None
+    for t in themes:
+        if str(t["name"]).casefold() == old.casefold():
+            existing = t
+            break
+    if existing is None:
+        raise ValueError(f"Custom-Theme „{old}“ nicht gefunden")
+    if old.casefold() != new.casefold():
+        for t in themes:
+            if str(t["name"]).casefold() == new.casefold():
+                raise ValueError(
+                    f"Theme-Name „{new}“ existiert bereits. "
+                    "Bitte anderen Namen wählen."
+                )
+    updated: list[dict[str, Any]] = []
+    renamed: dict[str, Any] | None = None
+    for t in themes:
+        if str(t["name"]).casefold() == old.casefold():
+            colors = list(t.get("colors") or [])
+            renamed = _normalize_custom_ann_color_theme(
+                {"name": new, "colors": colors}
+            )
+            if renamed is None:
+                raise ValueError(f"Umbenennen fehlgeschlagen: „{new}“")
+            updated.append(renamed)
+        else:
+            updated.append(t)
+    _save_custom_ann_color_themes(updated)
+    try:
+        if get_default_ann_color_theme().casefold() == old.casefold():
+            set_default_ann_color_theme(str(renamed["name"]) if renamed else new)
+    except Exception:
+        pass
+    if renamed is None:
+        raise ValueError(f"Umbenennen fehlgeschlagen: „{new}“")
+    return renamed
 
 
 def get_ann_color_theme(name: str) -> list[str] | None:

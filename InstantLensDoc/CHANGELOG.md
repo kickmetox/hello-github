@@ -1,5 +1,20 @@
 # Changelog — InstantLens Doc
 
+## 2.5.5 — OCR-Region Status-Klick→Tab, Theme Custom umbenennen, ildtags Tag-Anzahl A–Z, Export ★ aktiv·Duplizieren
+
+Post-Release-Polish nach **2.5.4**: **OCR-Region** **Status-Klick fokussiert Ergebnis-Tab**; **Farben-Themes** **Custom umbenennen**; **ildtags** Quick-Tag **A–Z mit Doc-Anzahl (N)**; **Export-Presets** **★ aktiv** in der Liste und **Duplizieren**. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie klar markiert / nicht produktiv (Ink ≠ Stylus).
+
+### Geändert
+- OCR-Region: Status-Klick → Ergebnis-Tab fokussieren
+- Farben-Themes: Custom umbenennen (Builtins geschützt)
+- Dokument-Tags: Quick-Tag A–Z · Tag-Anzahl (N Docs)
+- Export-Presets: ★ aktiv in Liste · Duplizieren
+
+### Tests / Qualität
+- Version **2.5.5** (App / `ild_pdf` / ISS / Smoke / Docs); Serie **2.5**; `docs/VERSION` + `VERSION.txt`
+- Smoke: 2.5.5 CLI + Qt (OCR Status-Klick, Theme Rename, ildtags Counts, Export ★/Dup)
+- Stubs: KI/Cloud/Stylus/3D/Hooks/Outline/Telemetrie unverändert markiert
+
 ## 2.5.4 — OCR-Region Wörter/Zeichen·A11y, Theme Custom löschen·★ Default, ildtags Vorschläge·Quick-Tag, Export-Presets Umbenennen·Doppelklick
 
 Post-Release-Polish nach **2.5.3**: **OCR-Region** Status mit **Wörter/Zeichen** und **A11y Announcement**; **Farben-Themes** **Custom löschen** und **★ Default** in der Combo; **ildtags** **Tag-Vorschläge** beim Hinzufügen und **Quick-Tag-Filter**; **Export-Presets** **Umbenennen** und **Doppelklick Anwenden**. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie klar markiert / nicht produktiv (Ink ≠ Stylus).

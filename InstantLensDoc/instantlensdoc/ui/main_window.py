@@ -2871,6 +2871,9 @@ class MainWindow(QMainWindow):
         # Auto-Prune Status kopierbar nur behalten wenn Status dazu passt — 2.4.5
         if "Thumb Auto-Prune" not in text and "Auto-Prune Status kopiert" not in text:
             self._thumb_prune_status_active = False
+        # OCR-Region Status-Klick nur behalten wenn Status dazu passt — 2.5.5
+        if "OCR-Region" not in text and "OCR Region" not in text:
+            self._ocr_region_toast_active = False
         # Update-Quellen-Tooltip nur bei Update-Status — 1.7.4/1.7.5
         if not text.startswith("Update:") and "Update —" not in text:
             if "Update:" not in text:
@@ -2905,6 +2908,13 @@ class MainWindow(QMainWindow):
             self.statusBar().setToolTip(
                 "Klick kopiert Auto-Prune Status erneut "
                 "(Dauer OCR-Toast-Settings) — 2.4.5"
+            )
+            self.statusBar().setCursor(Qt.PointingHandCursor)
+        elif getattr(self, "_ocr_region_toast_active", False) and (
+            "OCR-Region" in text or "OCR Region" in text
+        ):
+            self.statusBar().setToolTip(
+                "Klick fokussiert OCR-Region Ergebnis-Tab — 2.5.5"
             )
             self.statusBar().setCursor(Qt.PointingHandCursor)
         elif getattr(self, "_text_pdf_toast_active", False) and "Text → PDF" in text:
@@ -3062,6 +3072,14 @@ class MainWindow(QMainWindow):
             )
         ):
             if self._copy_thumb_prune_status_to_clipboard():
+                return
+        # OCR-Region: Klick fokussiert Ergebnis-Tab — 2.5.5
+        if (
+            event.button() == Qt.LeftButton
+            and getattr(self, "_ocr_region_toast_active", False)
+            and ("OCR-Region" in cur or "OCR Region" in cur)
+        ):
+            if self._focus_ocr_region_result_tab():
                 return
         # Ink-Toast: Klick fokussiert Ink-/Freihand-Werkzeug — 2.2.5
         if (
@@ -11528,7 +11546,7 @@ class MainWindow(QMainWindow):
         self._manage_export_presets()
 
     def _manage_export_presets(self):
-        """Export-Presets: Umbenennen · Doppelklick Anwenden · Live-Pfad — 2.5.4."""
+        """Export-Presets: ★ aktiv · Duplizieren · Umbenennen · DblClick — 2.5.5."""
         from PySide6.QtWidgets import (
             QDialog,
             QDialogButtonBox,
@@ -11549,6 +11567,7 @@ class MainWindow(QMainWindow):
             apply_export_profile,
             delete_export_profile,
             dialog_start_dir,
+            duplicate_export_profile,
             export_export_presets_json,
             export_profile_path_preview,
             export_profile_summary,
@@ -11602,18 +11621,25 @@ class MainWindow(QMainWindow):
 
         dlg = QDialog(self)
         dlg.setWindowTitle(f"Export-Presets (max. {EXPORT_PROFILES_MAX})")
-        dlg.setMinimumWidth(440)
+        dlg.setMinimumWidth(480)
         lay = QVBoxLayout(dlg)
         info = QLabel(
             f"Benannte Presets ({len(profiles)}/{EXPORT_PROFILES_MAX}). "
-            "Umbenennen · Doppelklick Anwenden · Live-Pfad."
+            "★ aktiv · Duplizieren · Umbenennen · Doppelklick Anwenden."
         )
         lay.addWidget(info)
         lst = QListWidget()
         lst.setToolTip(
-            "Doppelklick oder Enter: Preset anwenden · Umbenennen-Button — 2.5.4"
+            "★ = aktives Preset · Doppelklick/Enter Anwenden · "
+            "Duplizieren — 2.5.5"
         )
         active = {"name": get_active_export_profile_name()}
+
+        def _item_name(item: QListWidgetItem | None) -> str:
+            if item is None:
+                return ""
+            data = item.data(Qt.UserRole) or {}
+            return str(data.get("name") or "").strip()
 
         def _reload_list() -> None:
             lst.clear()
@@ -11621,13 +11647,15 @@ class MainWindow(QMainWindow):
             active["name"] = get_active_export_profile_name()
             info.setText(
                 f"Benannte Presets ({len(cur)}/{EXPORT_PROFILES_MAX}). "
-                "Umbenennen · Doppelklick Anwenden · Live-Pfad."
+                "★ aktiv · Duplizieren · Umbenennen · Doppelklick Anwenden."
             )
             for p in cur:
-                item = QListWidgetItem(str(p["name"]))
+                name = str(p["name"])
+                label = f"{name} ★" if name == active["name"] else name
+                item = QListWidgetItem(label)
                 item.setData(Qt.UserRole, dict(p))
                 lst.addItem(item)
-                if str(p["name"]) == active["name"]:
+                if name == active["name"]:
                     lst.setCurrentItem(item)
             if lst.currentRow() < 0 and lst.count() > 0:
                 lst.setCurrentRow(0)
@@ -11654,7 +11682,7 @@ class MainWindow(QMainWindow):
                 path_preview.setAccessibleDescription("Kein Preset gewählt")
                 return
             data = item.data(Qt.UserRole) or {}
-            name = str(data.get("name") or item.text())
+            name = str(data.get("name") or _item_name(item))
             tip = export_profile_summary(data)
             mark = " ★ aktiv" if name == active["name"] else ""
             summary.setText(f"<b>{name}</b>{mark}<br>{tip}")
@@ -11669,6 +11697,8 @@ class MainWindow(QMainWindow):
         btn_row = QHBoxLayout()
         btn_apply = QPushButton("Anwenden")
         btn_apply.setDefault(True)
+        btn_dup = QPushButton("Duplizieren")
+        btn_dup.setToolTip("Gewähltes Export-Preset als Kopie anlegen — 2.5.5")
         btn_rename = QPushButton("Umbenennen…")
         btn_rename.setToolTip("Gewähltes Export-Preset umbenennen — 2.5.4")
         btn_delete = QPushButton("Löschen…")
@@ -11679,9 +11709,10 @@ class MainWindow(QMainWindow):
         btn_import = QPushButton("Import JSON…")
         btn_import.setToolTip(
             f"Presets JSON ({EXPORT_PRESETS_SCHEMA_ID}): ungültige überspringen+zählen · "
-            "Umbenennen · Doppelklick Anwenden — 2.5.4"
+            "★ aktiv · Duplizieren — 2.5.5"
         )
         btn_row.addWidget(btn_apply)
+        btn_row.addWidget(btn_dup)
         btn_row.addWidget(btn_rename)
         btn_row.addWidget(btn_delete)
         btn_row.addWidget(btn_export)
@@ -11697,7 +11728,7 @@ class MainWindow(QMainWindow):
             item = lst.currentItem()
             if item is None:
                 return
-            name = str(item.text())
+            name = _item_name(item)
             profile = apply_export_profile(name)
             if not profile:
                 self._set_status("Export-Preset nicht gefunden")
@@ -11706,11 +11737,35 @@ class MainWindow(QMainWindow):
             self._set_status(f"Export-Preset aktiv: {profile['name']} ({tip})")
             dlg.accept()
 
+        def _duplicate() -> None:
+            item = lst.currentItem()
+            if item is None:
+                return
+            name = _item_name(item)
+            try:
+                dup = duplicate_export_profile(name)
+            except ValueError as e:
+                QMessageBox.warning(dlg, "Export-Preset duplizieren", str(e))
+                return
+            except Exception as e:
+                QMessageBox.warning(dlg, "Export-Preset duplizieren", str(e))
+                return
+            self._set_status(
+                f"Export-Preset dupliziert: {name} → {dup['name']}"
+            )
+            _reload_list()
+            for i in range(lst.count()):
+                it = lst.item(i)
+                if it and _item_name(it) == str(dup["name"]):
+                    lst.setCurrentItem(it)
+                    break
+            _refresh_summary()
+
         def _rename() -> None:
             item = lst.currentItem()
             if item is None:
                 return
-            old = str(item.text())
+            old = _item_name(item)
             new_name, ok = QInputDialog.getText(
                 dlg,
                 "Export-Preset umbenennen",
@@ -11736,7 +11791,7 @@ class MainWindow(QMainWindow):
             # Fokus auf umbenanntes Preset
             for i in range(lst.count()):
                 it = lst.item(i)
-                if it and str(it.text()) == str(renamed["name"]):
+                if it and _item_name(it) == str(renamed["name"]):
                     lst.setCurrentItem(it)
                     break
             _refresh_summary()
@@ -11745,7 +11800,7 @@ class MainWindow(QMainWindow):
             item = lst.currentItem()
             if item is None:
                 return
-            name = str(item.text())
+            name = _item_name(item)
             reply = QMessageBox.question(
                 dlg,
                 "Export-Preset löschen",
@@ -11837,6 +11892,7 @@ class MainWindow(QMainWindow):
             _refresh_summary()
 
         btn_apply.clicked.connect(_apply)
+        btn_dup.clicked.connect(_duplicate)
         btn_rename.clicked.connect(_rename)
         btn_delete.clicked.connect(_delete)
         btn_export.clicked.connect(_export_json)
@@ -13035,6 +13091,41 @@ class MainWindow(QMainWindow):
             status += " (abgebrochen, Teilergebnis behalten)"
         self._set_status(status)
 
+    def _focus_ocr_region_result_tab(self) -> bool:
+        """Status-Klick: OCR-Region Ergebnis-Tab fokussieren — 2.5.5."""
+        path = getattr(self, "_last_ocr_region_path", None)
+        if not path:
+            return False
+        target = Path(str(path))
+        if not target.is_file():
+            self._set_status(f"OCR-Region Ergebnis fehlt: {target.name}")
+            return False
+        try:
+            # Bereits offen → Tab wählen, sonst öffnen
+            opened = False
+            if hasattr(self, "sidebar") and self.sidebar is not None:
+                for i in range(self.sidebar.files.count()):
+                    it = self.sidebar.files.item(i)
+                    if not it:
+                        continue
+                    p = it.data(256)
+                    if p and str(Path(str(p))) == str(target):
+                        self.sidebar.files.setCurrentItem(it)
+                        opened = True
+                        break
+            if not opened:
+                self.open_path(str(target))
+            self.stack.setCurrentWidget(self.editor_pane)
+            self.editor.setFocus()
+            self._set_status(f"OCR-Region Tab fokussiert: {target.name}")
+            try:
+                self._announce_status_toast(f"OCR-Region Tab: {target.name}")
+            except Exception:
+                pass
+            return True
+        except Exception:
+            return False
+
     def _run_ocr_region(self):
         """OCR-Region: Rechteck → Defaults DPI/Sprache → Text-Tab — 2.5.1."""
         from instantlensdoc.core.app_settings import get_ocr_dpi, get_ocr_lang
@@ -13244,7 +13335,7 @@ class MainWindow(QMainWindow):
             except Exception:
                 pass
             self.setWindowTitle(self._app_title(full_title))
-            # Zeichen/Wörter + A11y Announcement — 2.5.4
+            # Zeichen/Wörter + A11y · Status-Klick → Tab — 2.5.4/2.5.5
             stats = _ocr_region_text_stats(body)
             msg = (
                 f"OCR-Region ({lang}, {dpi} DPI) {region_label} → Tab „{tab_title}“"
@@ -13253,6 +13344,8 @@ class MainWindow(QMainWindow):
                 msg += f" · {stats}"
             if status_extra:
                 msg += f" · {status_extra}"
+            self._last_ocr_region_path = str(out_txt)
+            self._ocr_region_toast_active = True
             self._set_status(msg)
             try:
                 self._announce_status_toast(msg)

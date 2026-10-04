@@ -892,6 +892,11 @@ class SettingsDialog(QDialog):
             "Farben-Theme JSON (ildcolors-theme-v1) · Merge skip/rename (_2) · Import-Log — 2.5.3"
         )
         btn_theme_import.clicked.connect(self._import_ann_color_theme_ui)
+        btn_theme_rename = QPushButton("Umbenennen…")
+        btn_theme_rename.setToolTip(
+            "Benutzerdefiniertes Farben-Theme umbenennen (Builtins geschützt) — 2.5.5"
+        )
+        btn_theme_rename.clicked.connect(self._rename_custom_ann_color_theme_ui)
         btn_theme_delete = QPushButton("Custom löschen…")
         btn_theme_delete.setToolTip(
             "Benutzerdefiniertes Farben-Theme löschen (Builtins geschützt) — 2.5.4"
@@ -902,6 +907,7 @@ class SettingsDialog(QDialog):
         preset_row.addWidget(btn_theme_default)
         preset_row.addWidget(btn_theme_export)
         preset_row.addWidget(btn_theme_import)
+        preset_row.addWidget(btn_theme_rename)
         preset_row.addWidget(btn_theme_delete)
         form.addRow("Ann.-Color-Presets", preset_row)
         # Theme-Vorschau Swatches — 2.5.1
@@ -2928,7 +2934,62 @@ class SettingsDialog(QDialog):
                 combo.setCurrentIndex(idx)
         combo.blockSignals(False)
         combo.setToolTip(
-            "Vordefinierte + Custom Themes · ★ = Default · Custom löschen — 2.5.4"
+            "Vordefinierte + Custom Themes · ★ = Default · "
+            "Custom umbenennen/löschen — 2.5.5"
+        )
+
+    def _rename_custom_ann_color_theme_ui(self) -> None:
+        """Benutzerdefiniertes Farben-Theme umbenennen — 2.5.5."""
+        from PySide6.QtWidgets import QInputDialog
+
+        from instantlensdoc.core.app_settings import (
+            is_builtin_ann_color_theme,
+            rename_custom_ann_color_theme,
+        )
+
+        combo = getattr(self, "ann_theme_combo", None)
+        if combo is None:
+            return
+        name = str(combo.currentData() or "").strip()
+        if not name:
+            QMessageBox.information(
+                self, "Farben-Theme", "Bitte ein Custom-Theme wählen."
+            )
+            return
+        if is_builtin_ann_color_theme(name):
+            QMessageBox.information(
+                self,
+                "Farben-Theme",
+                f"„{name}“ ist eingebaut und kann nicht umbenannt werden.",
+            )
+            return
+        new_name, ok = QInputDialog.getText(
+            self,
+            "Custom-Theme umbenennen",
+            f"Neuer Name für „{name}“:",
+            text=name,
+        )
+        if not ok:
+            return
+        new_name = (new_name or "").strip()
+        if not new_name:
+            QMessageBox.warning(self, "Farben-Theme", "Name darf nicht leer sein.")
+            return
+        try:
+            renamed = rename_custom_ann_color_theme(name, new_name)
+        except Exception as e:
+            QMessageBox.warning(self, "Farben-Theme umbenennen", str(e))
+            return
+        self._refresh_ann_theme_combo()
+        # Fokus auf umbenanntes Theme
+        idx = combo.findData(str(renamed.get("name") or new_name))
+        if idx >= 0:
+            combo.setCurrentIndex(idx)
+        self._update_ann_theme_swatches()
+        QMessageBox.information(
+            self,
+            "Farben-Theme",
+            f"Custom-Theme umbenannt: {name} → {renamed.get('name')}",
         )
 
     def _delete_custom_ann_color_theme_ui(self) -> None:

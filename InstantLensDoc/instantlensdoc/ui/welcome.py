@@ -128,17 +128,17 @@ class WelcomePage(QWidget):
         self.recent_filter.setClearButtonEnabled(True)
         self.recent_filter.setToolTip(
             "Live-Filter Pfad oder Dokument-Tags (ildtags-v1) · Tag-Vorschläge · "
-            "Quick-Tag-Filter · Treffer A11y · Esc → Fokus Liste — 2.5.4"
+            "Quick-Tag A–Z mit Anzahl · Treffer A11y · Esc → Fokus Liste — 2.5.5"
         )
         self.recent_filter.textChanged.connect(self._apply_recent_filter)
         self.recent_filter.textChanged.connect(self._persist_recent_filter)
         self.recent_filter.installEventFilter(self)
         filter_row.addWidget(self.recent_filter, 1)
-        # Quick-Tag-Filter aus bekannten ildtags — 2.5.4
+        # Quick-Tag-Filter A–Z · Tag-Anzahl (N Docs) — 2.5.5
         self.tag_filter_combo = QComboBox()
-        self.tag_filter_combo.setMinimumWidth(140)
+        self.tag_filter_combo.setMinimumWidth(160)
         self.tag_filter_combo.setToolTip(
-            "Schnellfilter: bekanntes Dokument-Tag wählen (ildtags-Index) — 2.5.4"
+            "Schnellfilter: bekanntes Dokument-Tag (A–Z, N Docs) — 2.5.5"
         )
         self.tag_filter_combo.setAccessibleName("Quick-Tag-Filter")
         self.tag_filter_combo.activated.connect(self._on_tag_filter_chosen)
@@ -168,7 +168,7 @@ class WelcomePage(QWidget):
         self.recent_list.setToolTip(
             "Enter / Doppelklick öffnet; Entf entfernt den Eintrag; "
             "Rechtsklick: Tag hinzufügen (Vorschläge) / entfernen · Entfernen / Ordner; "
-            "Quick-Tag-Filter · Treffer A11y · Esc → Fokus Liste — 2.5.4"
+            "Quick-Tag A–Z (N Docs) · Treffer A11y · Esc → Fokus Liste — 2.5.5"
         )
         self.recent_list.setAcceptDrops(True)
         self.recent_list.setContextMenuPolicy(Qt.CustomContextMenu)
@@ -267,17 +267,22 @@ class WelcomePage(QWidget):
         self.refresh_continue_button()
 
     def _refresh_tag_filter_combo(self) -> None:
-        """Quick-Tag-Filter-Combo aus Index + Recent-Tags — 2.5.4."""
+        """Quick-Tag-Filter: A–Z · Tag-Anzahl (N Docs) — 2.5.5."""
         combo = getattr(self, "tag_filter_combo", None)
         if combo is None:
             return
         current = str(combo.currentData() or "").strip()
-        tags: list[str] = []
+        # (display_label, tag_value)
+        entries: list[tuple[str, str]] = []
         try:
             from instantlensdoc.core import doc_tags as doc_tags_mod
             from instantlensdoc.core import recent_tags as recent_tags_mod
 
-            known = list(doc_tags_mod.collect_known_tags(max_items=40))
+            counted = list(
+                doc_tags_mod.collect_known_tags_with_counts(max_items=40)
+            )
+            counts = {str(t).casefold(): int(n) for t, n in counted}
+            known = [t for t, _n in counted]
             recent = list(recent_tags_mod.load_recent_tags())
             seen: set[str] = set()
             for t in known + recent:
@@ -285,19 +290,30 @@ class WelcomePage(QWidget):
                 if key in seen:
                     continue
                 seen.add(key)
-                tags.append(str(t))
+                n = counts.get(key, 0)
+                label = f"{t} ({n})" if n > 0 else str(t)
+                entries.append((label, str(t)))
+            # A–Z nach Tag-Wert
+            entries.sort(key=lambda pair: pair[1].casefold())
         except Exception:
-            tags = []
+            entries = []
         combo.blockSignals(True)
         combo.clear()
         combo.addItem("(Tag-Filter…)", "")
-        for t in tags:
-            combo.addItem(t, t)
+        for label, tag in entries:
+            combo.addItem(label, tag)
         if current:
             idx = combo.findData(current)
             if idx >= 0:
                 combo.setCurrentIndex(idx)
         combo.blockSignals(False)
+        combo.setToolTip(
+            "Schnellfilter: bekanntes Dokument-Tag (A–Z, N Docs) — 2.5.5"
+        )
+        combo.setAccessibleName("Quick-Tag-Filter")
+        combo.setAccessibleDescription(
+            "Dokument-Tags A–Z mit Anzahl Docs im Index"
+        )
 
     def _on_tag_filter_chosen(self, index: int) -> None:
         """Quick-Tag gewählt → Filtertext setzen — 2.5.4."""

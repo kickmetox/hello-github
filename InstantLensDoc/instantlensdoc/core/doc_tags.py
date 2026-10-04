@@ -218,23 +218,38 @@ def tags_match_filter(tags: Iterable[str], needle: str) -> bool:
 
 def collect_known_tags(max_items: int = 48) -> list[str]:
     """Bekannte Dokument-Tags aus Index (dedup, sortiert) — 2.5.4."""
-    seen: set[str] = set()
-    out: list[str] = []
-    for tags in load_index().values():
+    return [t for t, _n in collect_known_tags_with_counts(max_items=max_items)]
+
+
+def collect_known_tags_with_counts(max_items: int = 48) -> list[tuple[str, int]]:
+    """Bekannte Tags mit Doc-Anzahl (A–Z), dedupliziert — 2.5.5.
+
+    Zählt eindeutige Dokument-Pfade pro Tag (resolved + Rohpfad werden
+    zusammengeführt, damit dieselbe Datei nicht doppelt zählt).
+    """
+    # tag_key → (display_name, set of path keys)
+    buckets: dict[str, tuple[str, set[str]]] = {}
+    for path_key, tags in load_index().items():
         if not isinstance(tags, (list, tuple)):
             continue
+        # Pfad-Normalisierung für Dedup (resolved vs. roh)
+        try:
+            path_norm = str(Path(path_key).resolve())
+        except OSError:
+            path_norm = str(path_key)
         for raw in tags:
             t = str(raw).strip()
             if not t:
                 continue
             key = t.casefold()
-            if key in seen:
-                continue
-            seen.add(key)
-            out.append(t)
-    out.sort(key=lambda s: s.casefold())
+            if key not in buckets:
+                buckets[key] = (t, {path_norm})
+            else:
+                buckets[key][1].add(path_norm)
+    items = [(name, len(paths)) for name, paths in buckets.values()]
+    items.sort(key=lambda pair: pair[0].casefold())
     limit = max(1, int(max_items or 48))
-    return out[:limit]
+    return items[:limit]
 
 
 def refresh_index_for_paths(paths: Sequence[str | Path]) -> dict[str, list[str]]:
