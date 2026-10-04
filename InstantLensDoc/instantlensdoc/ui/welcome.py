@@ -245,7 +245,7 @@ class WelcomePage(QWidget):
         self.btn_continue.setToolTip(tip)
 
     def eventFilter(self, obj, event):  # noqa: N802
-        """Esc Filter; Del Recent; Shift+Del Tags; F2/F3 Tag±; F4 Ordner; F5 Datei; Enter öffnen; Ctrl+C/V/X Tags; Ctrl+Shift+C Pfad — 2.5.9–2.5.18."""
+        """Esc Filter; Del Recent; Shift+Del Tags; F2/F3 Tag±; F4 Ordner; F5 Datei; Enter öffnen; Ctrl+C/V/X Tags; Ctrl+Shift+C Pfad — 2.5.9–2.5.19."""
         if event.type() == QEvent.KeyPress:
             assert isinstance(event, QKeyEvent)
             key = event.key()
@@ -744,10 +744,23 @@ class WelcomePage(QWidget):
         from instantlensdoc.core import doc_tags as doc_tags_mod
 
         current = doc_tags_mod.load_tags_sidecar(path)
+        win = self.window()
         if not current:
             QMessageBox.information(
                 self, "Tags kopieren", "Keine Tags an diesem Dokument."
             )
+            msg = f"Keine Tags zum Kopieren: {Path(path).name}"
+            if win is not None and hasattr(win, "_set_status"):
+                try:
+                    win._set_status(msg)
+                except Exception:
+                    pass
+            # Fail-Path A11y Tags-Copy — 2.5.19
+            if win is not None and hasattr(win, "_announce_status_toast"):
+                try:
+                    win._announce_status_toast(msg)
+                except Exception:
+                    pass
             return False
         text = ", ".join(str(t) for t in current)
         try:
@@ -757,9 +770,19 @@ class WelcomePage(QWidget):
             clip.setText(text)
         except Exception as e:
             QMessageBox.warning(self, "Tags kopieren", str(e))
+            msg = f"Tags kopieren fehlgeschlagen: {Path(path).name}"
+            if win is not None and hasattr(win, "_set_status"):
+                try:
+                    win._set_status(msg)
+                except Exception:
+                    pass
+            if win is not None and hasattr(win, "_announce_status_toast"):
+                try:
+                    win._announce_status_toast(msg)
+                except Exception:
+                    pass
             return False
         # Status über Parent-MainWindow wenn vorhanden — 2.5.7
-        win = self.window()
         msg = f"Tags kopiert ({len(current)}): {text}"
         if win is not None and hasattr(win, "_set_status"):
             try:
@@ -883,6 +906,7 @@ class WelcomePage(QWidget):
         # Zeilenumbrüche wie Komma behandeln — 2.5.8
         raw = raw.replace("\r\n", "\n").replace("\r", "\n").replace("\n", ",")
         add = doc_tags_mod.normalize_doc_tags(raw)
+        win = self.window()
         if not add:
             QMessageBox.information(
                 self,
@@ -890,6 +914,18 @@ class WelcomePage(QWidget):
                 "Zwischenablage enthält keine gültigen Tags "
                 "(Komma, Semikolon oder Zeilen).",
             )
+            msg = f"Keine Tags in Zwischenablage: {Path(path).name}"
+            if win is not None and hasattr(win, "_set_status"):
+                try:
+                    win._set_status(msg)
+                except Exception:
+                    pass
+            # Fail-Path A11y Tags-Paste — 2.5.19
+            if win is not None and hasattr(win, "_announce_status_toast"):
+                try:
+                    win._announce_status_toast(msg)
+                except Exception:
+                    pass
             return
         current = doc_tags_mod.load_tags_sidecar(path)
         before = {t.casefold() for t in current}
@@ -901,6 +937,17 @@ class WelcomePage(QWidget):
                 "Tags einfügen",
                 "Alle Tags aus der Zwischenablage sind bereits vorhanden.",
             )
+            msg = f"Tags bereits vorhanden: {Path(path).name}"
+            if win is not None and hasattr(win, "_set_status"):
+                try:
+                    win._set_status(msg)
+                except Exception:
+                    pass
+            if win is not None and hasattr(win, "_announce_status_toast"):
+                try:
+                    win._announce_status_toast(msg)
+                except Exception:
+                    pass
             return
         try:
             doc_tags_mod.save_tags_sidecar(path, merged)

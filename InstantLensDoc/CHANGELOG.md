@@ -1,5 +1,20 @@
 # Changelog — InstantLens Doc
 
+## 2.5.19 — OCR Text-Clip-Fail-A11y, Theme Shift+←/→, ildtags Tags-Fail-A11y, Export Pfad/Apply-Fail-A11y
+
+Post-Release-Polish nach **2.5.18**: **OCR-Region** Status-**Text-Copy Clip-Fail A11y**; **Farben-Themes** Swatch-**Shift+←/→ ±2** · **Hex-Copy Fail-A11y**; **ildtags** **Tags-Copy/Paste Fail-A11y**; **Export-Presets** **Pfad-Copy / Apply-fehlt Fail-A11y**. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie klar markiert / nicht produktiv (Ink ≠ Stylus).
+
+### Geändert
+- OCR-Region: Fail-Path A11y bei Text kopieren (fehlt/Zwischenablage)
+- Farben-Themes: Swatch Shift+←/→ (±2) · Hex-Copy Fail-A11y · Tooltip/A11y 2.5.19
+- Dokument-Tags: Tags kopieren/einfügen Fail-Path A11y (leer/bereits vorhanden)
+- Export-Presets: Pfad kopieren ohne Ziel · Apply fehlt → A11y Announce
+
+### Tests / Qualität
+- Version **2.5.19** (App / `ild_pdf` / ISS / Smoke / Docs); Serie **2.5**; `docs/VERSION` + `VERSION.txt`
+- Smoke: 2.5.19 CLI + Qt (OCR Text-Clip-Fail-A11y, Theme Shift+←/→, ildtags Tags-Fail-A11y, Export Pfad/Apply-Fail-A11y)
+- Stubs: KI/Cloud/Stylus/3D/Hooks/Outline/Telemetrie unverändert markiert
+
 ## 2.5.18 — OCR Pfad-Fail-A11y, Theme PgUp/Dn·Ctrl+C, ildtags Öffnen⏎, Export JSON-A11y
 
 Post-Release-Polish nach **2.5.17**: **OCR-Region** Status-**Pfad-Copy Fail-Path A11y**; **Farben-Themes** Swatch-**PageUp/PageDown** · **Ctrl+C Hex**; **ildtags** **Öffnen⏎Enter** · Fail-A11y; **Export-Presets** **JSON Imp/Exp A11y** · Ordner-fehlt Fail-A11y. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie klar markiert / nicht produktiv (Ink ≠ Stylus).

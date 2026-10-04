@@ -935,7 +935,7 @@ class SettingsDialog(QDialog):
             sw.setToolTip(
                 "Theme-Vorschau · Klick=Hex · RMB=HL/Stift/Notiz · "
                 "Focus: Space/H=HL · P=Stift · N=Notiz · C/Ctrl+C=Hex · "
-                "←/→ · PgUp/PgDn · Home/End · 1–6 — 2.5.18"
+                "←/→ · Shift+←/→ ±2 · PgUp/PgDn · Home/End · 1–6 — 2.5.19"
             )
             sw.setCursor(Qt.PointingHandCursor)
             sw.setFocusPolicy(Qt.StrongFocus)
@@ -2838,14 +2838,15 @@ class SettingsDialog(QDialog):
             self.btn_undo_factory_presets.setEnabled(bool(prev))
 
     def eventFilter(self, obj, event):  # noqa: N802
-        """Swatch L→Hex · Dbl→HL/Stift/Notiz · M→HL · Keys Space/H/P/N/C · ←/→ · PgUp/Dn · Home/End · 1–6 — 2.5.9–2.5.18."""
+        """Swatch L→Hex · Dbl→HL/Stift/Notiz · M→HL · Keys Space/H/P/N/C · ←/→ · Shift+←/→ · PgUp/Dn · Home/End · 1–6 — 2.5.9–2.5.19."""
         labels = getattr(self, "_theme_swatch_labels", None) or []
         if obj in labels:
             hex_c = str(obj.property("themeHex") or "").strip()
             if event.type() == QEvent.KeyPress:
                 assert isinstance(event, QKeyEvent)
                 key = event.key()
-                # ←/→ zwischen Swatches — 2.5.15; Home/End · PageUp/Down — 2.5.16/2.5.18
+                mods = event.modifiers()
+                # ←/→ zwischen Swatches — 2.5.15; Shift+←/→ ±2 — 2.5.19; Home/End · PageUp/Down — 2.5.16/2.5.18
                 if key in (
                     Qt.Key_Left,
                     Qt.Key_Right,
@@ -2871,8 +2872,13 @@ class SettingsDialog(QDialog):
                         start = min(len(labels) - 1, idx + 3)
                         candidates = range(start, len(labels))
                     else:
-                        step = -1 if key == Qt.Key_Left else 1
-                        candidates = range(idx + step, -1 if step < 0 else len(labels), step)
+                        # Shift+←/→: ±2 Swatches — 2.5.19
+                        jump = 2 if bool(mods & Qt.ShiftModifier) else 1
+                        step = -jump if key == Qt.Key_Left else jump
+                        if step < 0:
+                            candidates = range(idx + step, -1, -1)
+                        else:
+                            candidates = range(idx + step, len(labels))
                     for nxt in candidates:
                         other = labels[nxt]
                         if str(other.property("themeHex") or "").strip():
@@ -3044,13 +3050,14 @@ class SettingsDialog(QDialog):
                     f"Shift+Mittelklick = Stift · Ctrl+Mittelklick = Notiz · "
                     f"RMB = HL/Stift/Notiz · "
                     f"Focus: Space/H=HL · P=Stift · N=Notiz · C/Ctrl+C=Hex · "
-                    f"←/→ · PgUp/PgDn · Home/End · 1–6 — 2.5.18"
+                    f"←/→ · Shift+←/→ ±2 · PgUp/PgDn · Home/End · 1–6 — 2.5.19"
                 )
                 sw.setProperty("themeHex", str(c))
                 sw.setAccessibleName(f"Theme-Swatch {i + 1}: {c}")
                 sw.setAccessibleDescription(
                     "Space oder H Highlight, P Stift, N Notiz, C oder Ctrl+C Hex kopieren, "
-                    "Pfeiltasten wechseln, PageUp/PageDown ±3 Swatches, "
+                    "Pfeiltasten wechseln, Shift+Pfeiltasten ±2 Swatches, "
+                    "PageUp/PageDown ±3 Swatches, "
                     "Home/End erster/letzter Swatch, Ziffern 1–6 springen zum Swatch"
                 )
                 sw.setCursor(Qt.PointingHandCursor)
@@ -3108,6 +3115,19 @@ class SettingsDialog(QDialog):
 
         text = str(hex_color or "").strip()
         if not text:
+            msg = "Theme-Hex fehlt"
+            parent = self.parent()
+            if parent is not None and hasattr(parent, "_set_status"):
+                try:
+                    parent._set_status(msg)
+                except Exception:
+                    pass
+            # Fail-Path A11y Hex-Copy — 2.5.19
+            if parent is not None and hasattr(parent, "_announce_status_toast"):
+                try:
+                    parent._announce_status_toast(msg)
+                except Exception:
+                    pass
             return
         try:
             clip = QApplication.clipboard()
@@ -3116,6 +3136,18 @@ class SettingsDialog(QDialog):
             clip.setText(text)
         except Exception as e:
             QMessageBox.warning(self, "Farben-Theme", str(e))
+            msg = f"Theme-Hex kopieren fehlgeschlagen: {e}"
+            parent = self.parent()
+            if parent is not None and hasattr(parent, "_set_status"):
+                try:
+                    parent._set_status(msg)
+                except Exception:
+                    pass
+            if parent is not None and hasattr(parent, "_announce_status_toast"):
+                try:
+                    parent._announce_status_toast(msg)
+                except Exception:
+                    pass
             return
         msg = f"Theme-Hex kopiert: {text}"
         parent = self.parent()

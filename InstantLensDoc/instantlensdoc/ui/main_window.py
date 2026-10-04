@@ -11800,7 +11800,13 @@ class MainWindow(QMainWindow):
             name = _item_name(item)
             profile = apply_export_profile(name)
             if not profile:
-                self._set_status("Export-Preset nicht gefunden")
+                msg = "Export-Preset nicht gefunden"
+                self._set_status(msg)
+                # Fail-Path A11y Apply fehlt — 2.5.19
+                try:
+                    self._announce_status_toast(msg)
+                except Exception:
+                    pass
                 return
             tip = export_profile_summary(profile)
             msg = f"Export-Preset aktiv ★: {profile['name']} ({tip})"
@@ -12151,6 +12157,13 @@ class MainWindow(QMainWindow):
                     "Export-Preset",
                     "Kein Zielordner in diesem Preset gespeichert.",
                 )
+                msg = f"Export-Preset ohne Zielordner: {name or '(ohne Name)'}"
+                self._set_status(msg)
+                # Fail-Path A11y Pfad-Copy — 2.5.19
+                try:
+                    self._announce_status_toast(msg)
+                except Exception:
+                    pass
                 return
             try:
                 clip = QApplication.clipboard()
@@ -12159,6 +12172,12 @@ class MainWindow(QMainWindow):
                 clip.setText(path_txt)
             except Exception as e:
                 QMessageBox.warning(dlg, "Export-Preset", str(e))
+                msg = f"Export-Preset Pfad kopieren fehlgeschlagen: {name or '(ohne Name)'}"
+                self._set_status(msg)
+                try:
+                    self._announce_status_toast(msg)
+                except Exception:
+                    pass
                 return
             msg = f"Export-Preset Pfad kopiert: {name}"
             self._set_status(msg)
@@ -13491,7 +13510,7 @@ class MainWindow(QMainWindow):
         return preview
 
     def _ocr_region_status_tooltip(self) -> str:
-        """Status-Tooltip inkl. Textvorschau — 2.5.9–2.5.18."""
+        """Status-Tooltip inkl. Textvorschau — 2.5.9–2.5.19."""
         path = getattr(self, "_last_ocr_region_path", None) or ""
         tip = (
             "Linksklick → Ergebnis-Tab · Rechtsklick → Menü · "
@@ -13501,7 +13520,7 @@ class MainWindow(QMainWindow):
             "Esc → Status schließen · "
             "Enter → Ergebnis-Tab · "
             "Ctrl+C Text · Ctrl+Shift+C Pfad · "
-            "F4 → Ordner · F5 → Datei — 2.5.18"
+            "F4 → Ordner · F5 → Datei — 2.5.19"
         )
         if path:
             tip = f"{tip}\n{path}"
@@ -13717,6 +13736,13 @@ class MainWindow(QMainWindow):
         """Status-Shift+Klick: OCR-Region Ergebnistext in Zwischenablage — 2.5.8."""
         path = getattr(self, "_last_ocr_region_path", None)
         if not path:
+            msg = "OCR-Region Text fehlt"
+            self._set_status(msg)
+            # Fail-Path A11y Text-Copy Clip/fehlt — 2.5.19
+            try:
+                self._announce_status_toast(msg)
+            except Exception:
+                pass
             return False
         p = Path(str(path))
         if not p.is_file():
@@ -13755,9 +13781,22 @@ class MainWindow(QMainWindow):
 
             clip = QApplication.clipboard()
             if clip is None:
+                msg = "OCR-Region Text: Zwischenablage nicht verfügbar"
+                self._set_status(msg)
+                # Fail-Path A11y Text-Copy Clip — 2.5.19
+                try:
+                    self._announce_status_toast(msg)
+                except Exception:
+                    pass
                 return False
             clip.setText(body)
         except Exception:
+            msg = "OCR-Region Text kopieren fehlgeschlagen"
+            self._set_status(msg)
+            try:
+                self._announce_status_toast(msg)
+            except Exception:
+                pass
             return False
         self._ocr_region_toast_active = True
         words = len([w for w in body.split() if w])
