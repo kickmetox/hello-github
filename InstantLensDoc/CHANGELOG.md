@@ -1,5 +1,15 @@
 # Changelog — InstantLens Doc
 
+## 2.6.22 — Stapelverarbeitung, Digitale Signaturen (eIDAS), Seriendruck-Polish
+
+Minor nach **2.6.21**: **Stapelverarbeitung** für viele PDFs in einem Job — Konvertieren (→PNG), Wasserzeichen, Komprimieren, Verschlüsseln (AES-256); UI + `ild.run_batch_job` / CLI `batch` / PS `Invoke-IldBatch`. **Digitale Signaturen** (eIDAS-Pfad): SES-Stempel, AES mit PKCS#12 (Dokument-Hash + Attachment + Sidecar `*.ildesign.json`), QES als QTSP-Import-Pfad; baut auf Verschlüsselung **2.6.7**. **Seriendruck-Polish**: Vorschau, fehlende Felder, Delimiter, HTML/DOCX, kombinierte Datei. Cloud-Echtzeit-Kollaboration bleibt Stub (→ 2.6.23). Freier KI-Chat-Stub unverändert.
+
+- `run_pdf_batch` / BatchMode PDF_CONVERT/WATERMARK/COMPRESS/ENCRYPT + Pipeline
+- `ild_pdf.esign` — Zertifikat, Sign/Verify/List, eIDAS-Info; UI `ESignDialog`
+- Seriendruck-Dialog mit Preview; `mail_merge_preview` / fmt/combined/strict
+- ild-API/CLI/PowerShell; Docs/i18n; Version **2.6.22**
+- Smoke: 2.6.22 CLI+Qt (batch/esign/mail-merge-polish)
+
 ## 2.6.21 — Review/Track Changes, Kommentare, Versionsverlauf, Seriendruck
 
 Minor nach **2.6.20**: Lokale **Zusammenarbeit** zuerst — **Änderungen nachverfolgen (Review)** mit Autor/Accept/Reject; **Kommentare** an Textstellen ohne Body-Änderung; **Versionsverlauf** speichern/wiederherstellen (``*.ildversions/``); Basis-**Seriendruck** (CSV/Excel → Briefe mit ``{{Feld}}``). Cloud-Echtzeit-Kollaboration und freier KI-Chat bleiben Stubs. eIDAS/rechtssichere Signaturen warten. Scripting: `ild.review_*` / `comment_*` / `version_*` / `mail_merge_run` · CLI · PS `Enable-IldReview` / `Add-IldComment` / `Save-IldVersion` / `Invoke-IldMailMerge`. Ribbon-Tab **Review**. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie unverändert.

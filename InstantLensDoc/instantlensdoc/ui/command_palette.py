@@ -353,8 +353,21 @@ def default_palette_commands() -> list[PaletteCommand]:
         PaletteCommand(
             "mail_merge",
             "Seriendruck…",
-            "mail merge seriendruck csv excel empfänger briefe",
+            "mail merge seriendruck csv excel empfänger briefe vorschau",
             "Review",
+        ),
+        PaletteCommand(
+            "batch_pdf",
+            "Stapelverarbeitung (Batch)…",
+            "batch stapel convert watermark compress encrypt pdf ordner",
+            "PDF",
+        ),
+        PaletteCommand(
+            "esign",
+            "Digitale Signatur (eIDAS)…",
+            "esign signature signatur zertifikat eidas aes qes p12",
+            "PDF",
+            "Ctrl+Alt+Shift+G",
         ),
         PaletteCommand("ocr_page", "OCR aktuelle Seite…", "ocr tesseract seite", "OCR"),
         PaletteCommand("ocr_pdf", "OCR gesamtes PDF…", "ocr batch pdf", "OCR"),

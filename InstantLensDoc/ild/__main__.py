@@ -732,13 +732,95 @@ def build_parser() -> argparse.ArgumentParser:
 
     s = sub.add_parser(
         "mail-merge",
-        help="Seriendruck Template+CSV/Excel → Briefe — 2.6.21",
+        help="Seriendruck Template+CSV/Excel → Briefe — 2.6.22",
     )
     s.add_argument("template")
     s.add_argument("recipients")
     s.add_argument("out_dir")
     s.add_argument("--stem", default="letter")
+    s.add_argument("--fmt", default="txt", choices=["txt", "html", "docx"])
+    s.add_argument("--combined", action="store_true")
+    s.add_argument("--delimiter", default=None)
+    s.add_argument("--strict", action="store_true")
 
+    s = sub.add_parser(
+        "mail-merge-preview",
+        help="Seriendruck-Vorschau — 2.6.22",
+    )
+    s.add_argument("template")
+    s.add_argument("recipients")
+    s.add_argument("--limit", type=int, default=3)
+    s.add_argument("--delimiter", default=None)
+
+    s = sub.add_parser(
+        "batch",
+        help="PDF-Stapel: convert/watermark/compress/encrypt — 2.6.22",
+    )
+    s.add_argument("--folder", default=None, help="Quellordner mit PDFs")
+    s.add_argument("--paths", nargs="*", default=None, help="Explizite PDF-Pfade")
+    s.add_argument("--out-dir", required=True)
+    s.add_argument(
+        "--ops",
+        nargs="+",
+        default=None,
+        help="convert watermark compress encrypt",
+    )
+    s.add_argument("--mode", default=None, help="BatchMode-Wert alternativ")
+    s.add_argument("--wm-text", default="CONFIDENTIAL")
+    s.add_argument("--wm-opacity", type=float, default=0.25)
+    s.add_argument("--quality", type=int, default=70)
+    s.add_argument("--password", default="")
+    s.add_argument("--owner-password", default=None)
+    s.add_argument("--no-aes256", action="store_true")
+    s.add_argument("--dpi", type=int, default=150)
+    s.add_argument("--fmt", default="png", choices=["png", "jpeg", "jpg"])
+
+    s = sub.add_parser(
+        "sign",
+        help="PDF digital signieren (eIDAS SES/AES/QES-Pfad) — 2.6.22",
+    )
+    s.add_argument("pdf")
+    s.add_argument("--level", default="AES", choices=["SES", "AES", "QES"])
+    s.add_argument("--p12", default=None)
+    s.add_argument("--p12-password", default="")
+    s.add_argument("--signer", default="")
+    s.add_argument("--reason", default="")
+    s.add_argument("--location", default="")
+    s.add_argument("--page", type=int, default=1)
+    s.add_argument("--out", default=None)
+    s.add_argument("--no-stamp", action="store_true")
+    s.add_argument("--no-attach", action="store_true")
+
+    s = sub.add_parser(
+        "sign-verify",
+        help="Digitale Signatur prüfen — 2.6.22",
+    )
+    s.add_argument("pdf")
+    s.add_argument("--p12", default=None)
+    s.add_argument("--p12-password", default="")
+    s.add_argument("--id", default=None, dest="signature_id")
+
+    s = sub.add_parser(
+        "sign-list",
+        help="Signaturen eines PDFs auflisten — 2.6.22",
+    )
+    s.add_argument("pdf")
+
+    s = sub.add_parser(
+        "sign-cert",
+        help="Selbstsigniertes PKCS#12 erzeugen — 2.6.22",
+    )
+    s.add_argument("common_name")
+    s.add_argument("--out", required=True)
+    s.add_argument("--password", required=True)
+    s.add_argument("--email", default="")
+    s.add_argument("--days", type=int, default=825)
+
+    s = sub.add_parser(
+        "eidas",
+        help="eIDAS-Stufen-Info — 2.6.22",
+    )
+    s.add_argument("--level", default="AES", choices=["SES", "AES", "QES"])
 
     return p
 
@@ -1458,8 +1540,85 @@ def run(argv: list[str] | None = None) -> int:
             return 0
         if args.cmd == "mail-merge":
             data = api.mail_merge_run(
-                args.template, args.recipients, args.out_dir, stem=args.stem
+                args.template,
+                args.recipients,
+                args.out_dir,
+                stem=args.stem,
+                fmt=args.fmt,
+                combined=bool(args.combined),
+                delimiter=args.delimiter,
+                strict=bool(args.strict),
             )
+            _print(data, as_json=js or True)
+            return 0
+        if args.cmd == "mail-merge-preview":
+            data = api.mail_merge_preview(
+                args.template,
+                args.recipients,
+                limit=args.limit,
+                delimiter=args.delimiter,
+            )
+            _print(data, as_json=js or True)
+            return 0
+        if args.cmd == "batch":
+            data = api.run_batch_job(
+                args.out_dir,
+                folder=args.folder,
+                paths=args.paths,
+                ops=args.ops,
+                mode=args.mode,
+                watermark_text=args.wm_text,
+                watermark_opacity=args.wm_opacity,
+                compress_quality=args.quality,
+                user_password=args.password or "",
+                owner_password=args.owner_password,
+                aes256=not bool(args.no_aes256),
+                convert_dpi=args.dpi,
+                convert_fmt=args.fmt,
+            )
+            _print(data, as_json=js or True)
+            return 0
+        if args.cmd == "sign":
+            data = api.sign_pdf_api(
+                args.pdf,
+                level=args.level,
+                p12=args.p12,
+                p12_password=args.p12_password,
+                signer_name=args.signer,
+                reason=args.reason,
+                location=args.location,
+                page=args.page,
+                out=args.out,
+                visible_stamp=not bool(args.no_stamp),
+                embed_attachment=not bool(args.no_attach),
+            )
+            _print(data, as_json=js or True)
+            return 0
+        if args.cmd == "sign-verify":
+            data = api.verify_signature_api(
+                args.pdf,
+                p12=args.p12,
+                p12_password=args.p12_password,
+                signature_id=args.signature_id,
+            )
+            _print(data, as_json=js or True)
+            return 0
+        if args.cmd == "sign-list":
+            data = api.list_signatures_api(args.pdf)
+            _print(data, as_json=js or True)
+            return 0
+        if args.cmd == "sign-cert":
+            data = api.generate_signing_cert(
+                args.common_name,
+                args.out,
+                password=args.password,
+                email=args.email,
+                days=args.days,
+            )
+            _print(data, as_json=js or True)
+            return 0
+        if args.cmd == "eidas":
+            data = api.eidas_info(args.level)
             _print(data, as_json=js or True)
             return 0
         return _fail("unbekanntes Kommando")

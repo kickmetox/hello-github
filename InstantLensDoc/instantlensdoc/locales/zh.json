@@ -270,6 +270,13 @@
     "delete_version": "删除",
     "version_no_source": "没有可保存的文档内容。",
     "version_restore_confirm": "用此版本替换当前内容？",
-    "ribbon_review": "审阅"
+    "ribbon_review": "审阅",
+    "batch_pdf": "批处理",
+    "esign": "数字签名",
+    "esign_eidas": "数字签名 (eIDAS)",
+    "mail_merge_preview": "邮件合并预览",
+    "batch_encrypt": "加密 PDF",
+    "batch_watermark": "PDF 水印",
+    "batch_compress": "压缩 PDF"
   }
 }

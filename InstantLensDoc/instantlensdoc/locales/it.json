@@ -270,6 +270,13 @@
     "delete_version": "Elimina",
     "version_no_source": "Nessun contenuto da salvare.",
     "version_restore_confirm": "Sostituire lo stato attuale con questa versione?",
-    "ribbon_review": "Revisione"
+    "ribbon_review": "Revisione",
+    "batch_pdf": "Elaborazione batch",
+    "esign": "Firma digitale",
+    "esign_eidas": "Firma digitale (eIDAS)",
+    "mail_merge_preview": "Anteprima stampa unione",
+    "batch_encrypt": "Crittografa PDF",
+    "batch_watermark": "Filigrana PDF",
+    "batch_compress": "Comprimi PDF"
   }
 }

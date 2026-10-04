@@ -270,6 +270,13 @@
     "delete_version": "Eliminar",
     "version_no_source": "Sem conteúdo para guardar.",
     "version_restore_confirm": "Substituir o estado atual por esta versão?",
-    "ribbon_review": "Revisão"
+    "ribbon_review": "Revisão",
+    "batch_pdf": "Processamento em lote",
+    "esign": "Assinatura digital",
+    "esign_eidas": "Assinatura digital (eIDAS)",
+    "mail_merge_preview": "Pré-visualização mala direta",
+    "batch_encrypt": "Encriptar PDF",
+    "batch_watermark": "Marca d'água PDF",
+    "batch_compress": "Comprimir PDF"
   }
 }

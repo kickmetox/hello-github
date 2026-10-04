@@ -1,6 +1,7 @@
-"""Headless InstantLens-Doc-Operationen für Python- und PowerShell-Scripting — 2.6.21.
+"""Headless InstantLens-Doc-Operationen für Python- und PowerShell-Scripting — 2.6.22.
 
-Review / Kommentare / Versionsverlauf / Seriendruck — lokal.
+Stapelverarbeitung (PDF Convert/WM/Compress/Encrypt) · Digitale Signaturen (eIDAS) ·
+Seriendruck-Polish — lokal.
 """
 
 from __future__ import annotations
@@ -2103,30 +2104,231 @@ def mail_merge_run(
     *,
     stem: str = "letter",
     template_is_text: bool = False,
+    fmt: str = "txt",
+    combined: bool = False,
+    delimiter: str | None = None,
+    strict: bool = False,
 ) -> dict[str, Any]:
-    """Seriendruck: Template + CSV/Excel → Briefe — 2.6.21."""
+    """Seriendruck: Template + CSV/Excel → Briefe — 2.6.21 / Polish 2.6.22."""
     from instantlensdoc.core.mail_merge import (
         find_placeholders,
         load_recipients,
         mail_merge_from_files,
         mail_merge_to_dir,
+        missing_fields,
     )
 
     if template_is_text:
-        recipients_rows = load_recipients(recipients)
+        recipients_rows = load_recipients(recipients, delimiter=delimiter)
+        analysis = missing_fields(str(template), recipients_rows)
+        if strict and analysis["missing_columns"]:
+            raise ValueError(
+                "Fehlende Spalten: " + ", ".join(analysis["missing_columns"])
+            )
         paths = mail_merge_to_dir(
-            str(template), recipients_rows, out_dir, stem=stem
+            str(template),
+            recipients_rows,
+            out_dir,
+            stem=stem,
+            fmt=fmt,
+            combined=combined,
         )
         data = {
-            "count": len(paths),
+            "count": len(recipients_rows),
+            "files": len(paths),
             "placeholders": find_placeholders(str(template)),
+            "missing_columns": analysis["missing_columns"],
+            "fmt": fmt,
+            "combined": combined,
             "output": [str(p) for p in paths],
             "out_dir": str(_p(out_dir)),
         }
     else:
         data = mail_merge_from_files(
-            template, recipients, out_dir, stem=stem
+            template,
+            recipients,
+            out_dir,
+            stem=stem,
+            fmt=fmt,
+            combined=combined,
+            delimiter=delimiter,
+            strict=strict,
         )
+    data["version"] = __version__
+    return data
+
+
+def mail_merge_preview(
+    template: PathLike | str,
+    recipients: PathLike,
+    *,
+    limit: int = 3,
+    delimiter: str | None = None,
+    template_is_text: bool = False,
+) -> dict[str, Any]:
+    """Seriendruck-Vorschau — 2.6.22."""
+    from instantlensdoc.core.mail_merge import load_recipients, preview_merge
+
+    tpl = str(template) if template_is_text else _require_file(template).read_text(
+        encoding="utf-8"
+    )
+    rows = load_recipients(recipients, delimiter=delimiter)
+    data = preview_merge(tpl, rows, limit=limit)
+    data["version"] = __version__
+    return data
+
+
+def run_batch_job(
+    out_dir: PathLike,
+    *,
+    folder: PathLike | None = None,
+    paths: Sequence[PathLike] | None = None,
+    ops: Sequence[str] | None = None,
+    mode: str | None = None,
+    watermark_text: str = "CONFIDENTIAL",
+    watermark_opacity: float = 0.25,
+    compress_quality: int = 70,
+    user_password: str = "",
+    owner_password: str | None = None,
+    aes256: bool = True,
+    convert_dpi: int = 150,
+    convert_fmt: str = "png",
+) -> dict[str, Any]:
+    """PDF-/Ordner-Stapelverarbeitung — 2.6.22.
+
+    ``ops``: convert|watermark|compress|encrypt (Liste, Pipeline).
+    Alternativ ``mode`` = BatchMode-Wert (inkl. Bilder/OCR).
+    """
+    from instantlensdoc.core.batch import (
+        BatchMode,
+        PdfBatchOp,
+        PdfBatchOptions,
+        run_batch,
+        run_pdf_batch,
+    )
+
+    opts = PdfBatchOptions(
+        watermark_text=watermark_text,
+        watermark_opacity=float(watermark_opacity),
+        compress_quality=int(compress_quality),
+        user_password=user_password or "",
+        owner_password=owner_password,
+        aes256=bool(aes256),
+        convert_dpi=int(convert_dpi),
+        convert_fmt=convert_fmt or "png",
+    )
+    if ops:
+        result = run_pdf_batch(
+            folder=folder,
+            paths=paths,
+            out_dir=out_dir,
+            ops=list(ops),
+            options=opts,
+        )
+    elif mode:
+        if not folder:
+            raise ValueError("folder erforderlich für mode=")
+        result = run_batch(
+            folder, out_dir, BatchMode(mode), options=opts
+        )
+    else:
+        raise ValueError("ops= oder mode= angeben")
+    data = result.to_dict()
+    data["version"] = __version__
+    data["ops"] = list(ops) if ops else [mode]
+    return data
+
+
+def sign_pdf_api(
+    path: PathLike,
+    *,
+    level: str = "AES",
+    p12: PathLike | None = None,
+    p12_password: str = "",
+    signer_name: str = "",
+    reason: str = "",
+    location: str = "",
+    page: int = 1,
+    out: PathLike | None = None,
+    visible_stamp: bool = True,
+    embed_attachment: bool = True,
+) -> dict[str, Any]:
+    """PDF digital signieren (eIDAS-Pfad) — 2.6.22."""
+    from ild_pdf.esign import sign_pdf
+
+    pdf = _require_file(path)
+    data = sign_pdf(
+        pdf,
+        level=level,
+        p12_path=p12,
+        p12_password=p12_password,
+        signer_name=signer_name,
+        reason=reason,
+        location=location,
+        page=max(0, int(page) - 1),
+        out_path=out,
+        visible_stamp=visible_stamp,
+        embed_attachment=embed_attachment,
+    )
+    data["version"] = __version__
+    return data
+
+
+def verify_signature_api(
+    path: PathLike,
+    *,
+    p12: PathLike | None = None,
+    p12_password: str = "",
+    signature_id: str | None = None,
+) -> dict[str, Any]:
+    """Signatur prüfen — 2.6.22."""
+    from ild_pdf.esign import verify_signature
+
+    data = verify_signature(
+        _require_file(path),
+        p12_path=p12,
+        p12_password=p12_password,
+        signature_id=signature_id,
+    )
+    data["version"] = __version__
+    return data
+
+
+def list_signatures_api(path: PathLike) -> dict[str, Any]:
+    from ild_pdf.esign import list_signatures
+
+    data = list_signatures(_require_file(path))
+    data["version"] = __version__
+    return data
+
+
+def generate_signing_cert(
+    common_name: str,
+    out_p12: PathLike,
+    *,
+    password: str,
+    email: str = "",
+    days: int = 825,
+) -> dict[str, Any]:
+    """Selbstsigniertes PKCS#12 für AES-Tests erzeugen — 2.6.22."""
+    from ild_pdf.esign import generate_self_signed_cert
+
+    data = generate_self_signed_cert(
+        common_name,
+        out_p12=out_p12,
+        password=password,
+        email=email,
+        days=days,
+    )
+    data["version"] = __version__
+    return data
+
+
+def eidas_info(level: str = "AES") -> dict[str, Any]:
+    from ild_pdf.esign import eidas_level_info, EIDAS_LEVELS
+
+    data = eidas_level_info(level)
+    data["levels"] = list(EIDAS_LEVELS)
     data["version"] = __version__
     return data
 

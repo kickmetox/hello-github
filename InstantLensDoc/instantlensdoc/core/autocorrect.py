@@ -1,4 +1,4 @@
-"""Autokorrektur und Textbaustein-Kürzel — 2.6.21.
+"""Autokorrektur und Textbaustein-Kürzel — 2.6.22.
 
 Tippfehler-Ersetzung beim Tippen (Space/Satzzeichen) und Snippet-Trigger
 (z. B. ``mfg`` → Mit freundlichen Grüßen). UI-Sprache steuert Defaults.

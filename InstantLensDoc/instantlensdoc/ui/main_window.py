@@ -113,6 +113,8 @@ from instantlensdoc.core.app_settings import (
     toggle_page_size_unit,
 )
 from instantlensdoc.ui.batch_dialog import BatchConvertDialog
+from instantlensdoc.ui.esign_dialog import ESignDialog
+from instantlensdoc.ui.mail_merge_dialog import MailMergeDialog
 from instantlensdoc.ui.file_dialogs import (
     confirm_overwrite_export,
     resolve_template_zip_conflicts,
@@ -2562,6 +2564,14 @@ class MainWindow(QMainWindow):
         )
         act_sec.triggered.connect(self._pdf_security_dialog)
         m_pdf.addAction(act_sec)
+        act_esign = QAction("Digitale Signatur (eIDAS)…", self)
+        act_esign.setObjectName("actionPdfESign")
+        act_esign.setShortcut(QKeySequence("Ctrl+Alt+Shift+G"))
+        act_esign.setToolTip(
+            "Offizielle/digitale Signatur — Zertifikat AES/QES-Pfad, SES-Stempel — 2.6.22"
+        )
+        act_esign.triggered.connect(self._run_esign_dialog)
+        m_pdf.addAction(act_esign)
         act_para = QAction("Absatz hervorheben", self)
         act_para.setShortcut(QKeySequence("Ctrl+Alt+Shift+H"))
         act_para.setToolTip(
@@ -3019,8 +3029,19 @@ class MainWindow(QMainWindow):
         a.triggered.connect(self._settings)
         m_extra.addAction(a)
         m_extra.addSeparator()
-        a = QAction("Batch-Konvertierung (Ordner)…", self)
+        a = QAction("Stapelverarbeitung (Batch)…", self)
+        a.setToolTip(
+            "Viele Dateien: Bilder→PDF, OCR, PDFs konvertieren/"
+            "Wasserzeichen/komprimieren/verschlüsseln — 2.6.22"
+        )
         a.triggered.connect(self._batch_convert)
+        m_extra.addAction(a)
+        a = QAction("Digitale Signatur (eIDAS)…", self)
+        a.setObjectName("actionESign")
+        a.setToolTip(
+            "Zertifikatsbasierte Signatur (AES/QES-Pfad) bzw. SES — 2.6.22"
+        )
+        a.triggered.connect(self._run_esign_dialog)
         m_extra.addAction(a)
         a = QAction("Batch-Umbenennen (offene Tabs)…", self)
         a.setToolTip(
@@ -3082,7 +3103,7 @@ class MainWindow(QMainWindow):
             ("plugins", "Plugin-Hooks (Stub · nicht produktiv)"),
             ("varfonts", "Variable Fonts (geplant)"),
             ("envelope", "Envelope Distort (geplant)"),
-            ("esign", "E-Signatur (geplant)"),
+            ("esign", "E-Signatur QES/QTSP-Trust (Hinweis)"),
         ]:
             a = QAction(title, self)
             a.triggered.connect(lambda checked=False, k=key: show_planned(self, k))
@@ -5352,41 +5373,26 @@ class MainWindow(QMainWindow):
         dlg.exec()
 
     def _run_mail_merge_dialog(self):
-        from PySide6.QtWidgets import QFileDialog, QInputDialog
-
-        from instantlensdoc.core.mail_merge import mail_merge_from_files
-
-        tpl, _ = QFileDialog.getOpenFileName(
-            self,
-            "Seriendruck — Vorlage",
-            "",
-            "Text (*.txt *.md);;Alle (*.*)",
-        )
-        if not tpl:
-            return
-        rec, _ = QFileDialog.getOpenFileName(
-            self,
-            "Seriendruck — Empfänger (CSV/Excel)",
-            "",
-            "Tabellen (*.csv *.xlsx);;Alle (*.*)",
-        )
-        if not rec:
-            return
-        out = QFileDialog.getExistingDirectory(self, "Seriendruck — Ausgabeordner")
-        if not out:
-            return
-        stem, ok = QInputDialog.getText(
-            self, "Seriendruck", "Dateiname-Stamm:", text="letter"
-        )
-        if not ok:
-            return
-        try:
-            data = mail_merge_from_files(tpl, rec, out, stem=stem or "letter")
+        tpl_text = None
+        if self.stack.currentWidget() is self.editor_pane:
+            text = self.editor.toPlainText().strip()
+            if text and ("{{" in text or "«" in text):
+                tpl_text = text
+        dlg = MailMergeDialog(self, template_text=tpl_text)
+        dlg.exec()
+        data = dlg.result_data()
+        if data:
             self._set_status(
-                f"Seriendruck: {data['count']} Brief(e) → {data['out_dir']}"
+                f"Seriendruck: {data.get('count', 0)} Brief(e) → {data.get('out_dir')}"
             )
-        except Exception as e:
-            self._set_status(f"Seriendruck fehlgeschlagen: {e}")
+
+    def _run_esign_dialog(self):
+        pdf = str(self.pdf_view.pdf_path) if self.pdf_view.pdf_path else None
+        dlg = ESignDialog(self, pdf_path=pdf)
+        dlg.exec()
+        data = dlg.result_data()
+        if data and data.get("out"):
+            self._set_status(f"Signiert: {data['out']}")
 
     def _insert_soft_hyphen(self):
         if self.stack.currentWidget() is not self.editor_pane:
@@ -6441,6 +6447,8 @@ class MainWindow(QMainWindow):
             "doc_comments": self._show_comments_dialog,
             "version_history": self._show_version_history_dialog,
             "mail_merge": self._run_mail_merge_dialog,
+            "batch_pdf": self._batch_convert,
+            "esign": self._run_esign_dialog,
             "book_layout": lambda: self._toggle_book_layout(
                 not self.pdf_view.book_layout_enabled()
             ),
@@ -11363,6 +11371,8 @@ class MainWindow(QMainWindow):
             "doc_comments": self._show_comments_dialog,
             "version_history": self._show_version_history_dialog,
             "mail_merge": self._run_mail_merge_dialog,
+            "batch_pdf": self._batch_convert,
+            "esign": self._run_esign_dialog,
             "hyphenate_en": lambda: self._hyphenate_document("en"),
             "text_wrap": self._set_image_text_wrap,
             "ocr_page": self._run_ocr,

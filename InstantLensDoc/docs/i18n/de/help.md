@@ -1,6 +1,11 @@
 # InstantLens Doc — Hilfe
 
-Version **2.6.21**.
+## 2.6.22
+
+- Stapelverarbeitung: PDFs konvertieren / Wasserzeichen / komprimieren / verschlüsseln
+- Digitale Signaturen (eIDAS SES/AES/QES-Pfad)
+- Seriendruck-Polish (Vorschau, HTML/DOCX)
+Version **2.6.22**.
 
 ## Sprache
 

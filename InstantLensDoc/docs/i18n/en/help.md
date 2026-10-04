@@ -1,6 +1,11 @@
 # InstantLens Doc — Help
 
-Version **2.6.21**.
+## 2.6.22
+
+- Batch processing: convert / watermark / compress / encrypt PDFs
+- Digital signatures (eIDAS SES/AES/QES path)
+- Mail-merge polish (preview, HTML/DOCX)
+Version **2.6.22**.
 
 ## Language
 

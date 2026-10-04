@@ -37,7 +37,10 @@ PLANNED = {
     ),
     "varfonts": "Variable Fonts (voll) — geplant",
     "envelope": "Envelope Distort (voll) — geplant",
-    "esign": "E-Signatur (rechtssicher) — geplant",
+    "esign": (
+        f"E-Signatur QES/QTSP-Trust — Hinweis {__version__}: "
+        "AES/SES-Pfad produktiv (PKCS#12); volle QES-Validierung bleibt QTSP"
+    ),
 }
 
 PLANNED_EN = {
@@ -61,7 +64,10 @@ PLANNED_EN = {
     ),
     "varfonts": "Variable fonts (full) — planned",
     "envelope": "Envelope distort (full) — planned",
-    "esign": "E-signature (legally binding) — planned",
+    "esign": (
+        f"E-signature QES/QTSP trust — note {__version__}: "
+        "AES/SES path live (PKCS#12); full QES validation stays with QTSP"
+    ),
 }
 
 # Kurzbeschreibungen für Info-Dialog — 1.9.5
@@ -84,7 +90,10 @@ STUB_SHORT = {
     ),
     "varfonts": "Vollständige Variable-Fonts-Unterstützung — geplant.",
     "envelope": "Envelope-Distort-Transformation — geplant.",
-    "esign": "Rechtssichere E-Signatur — geplant.",
+    "esign": (
+        "AES/SES-Pfad produktiv (PKCS#12, Sidecar); volle QES-/QTSP-Trust-Validierung "
+        "extern — Extras/PDF → Digitale Signatur."
+    ),
 }
 
 STUB_SHORT_EN = {
@@ -106,7 +115,10 @@ STUB_SHORT_EN = {
     ),
     "varfonts": "Full variable fonts support — planned.",
     "envelope": "Envelope distort transform — planned.",
-    "esign": "Legally binding e-signature — planned.",
+    "esign": (
+        "AES/SES path live (PKCS#12, sidecar); full QES/QTSP trust validation "
+        "external — Extras/PDF → Digital signature."
+    ),
 }
 
 STUB_TITLES = {

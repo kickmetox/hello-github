@@ -270,6 +270,13 @@
     "delete_version": "Löschen",
     "version_no_source": "Kein Dokumentinhalt zum Speichern.",
     "version_restore_confirm": "Aktuellen Stand durch diese Version ersetzen?",
-    "ribbon_review": "Review"
+    "ribbon_review": "Review",
+    "batch_pdf": "Stapelverarbeitung",
+    "esign": "Digitale Signatur",
+    "esign_eidas": "Digitale Signatur (eIDAS)",
+    "mail_merge_preview": "Seriendruck-Vorschau",
+    "batch_encrypt": "PDFs verschlüsseln",
+    "batch_watermark": "PDFs Wasserzeichen",
+    "batch_compress": "PDFs komprimieren"
   }
 }

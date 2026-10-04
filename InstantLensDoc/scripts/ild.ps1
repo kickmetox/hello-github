@@ -830,7 +830,7 @@ function Set-IldSnippet {
 }
 
 function Enable-IldReview {
-    # Review / Track Changes — 2.6.21
+    # Review / Track Changes — 2.6.22
     param(
         [Parameter(Mandatory = $true)][string]$Path,
         [string]$Author,
@@ -920,9 +920,99 @@ function Invoke-IldMailMerge {
         [Parameter(Mandatory = $true)][string]$Template,
         [Parameter(Mandatory = $true)][string]$Recipients,
         [Parameter(Mandatory = $true)][string]$OutDir,
-        [string]$Stem = "letter"
+        [string]$Stem = "letter",
+        [ValidateSet("txt", "html", "docx")][string]$Fmt = "txt",
+        [switch]$Combined,
+        [string]$Delimiter,
+        [switch]$Strict
     )
-    Invoke-Ild @("--json", "mail-merge", $Template, $Recipients, $OutDir, "--stem", $Stem) | Out-Host
+    $a = @("--json", "mail-merge", $Template, $Recipients, $OutDir, "--stem", $Stem, "--fmt", $Fmt)
+    if ($Combined) { $a += "--combined" }
+    if ($Delimiter) { $a += @("--delimiter", $Delimiter) }
+    if ($Strict) { $a += "--strict" }
+    Invoke-Ild @a | Out-Host
+}
+
+function Invoke-IldBatch {
+    param(
+        [Parameter(Mandatory = $true)][string]$OutDir,
+        [string]$Folder,
+        [string[]]$Path,
+        [string[]]$Ops = @("watermark"),
+        [string]$Mode,
+        [string]$WatermarkText = "CONFIDENTIAL",
+        [double]$WatermarkOpacity = 0.25,
+        [int]$Quality = 70,
+        [string]$Password,
+        [switch]$NoAes256
+    )
+    $a = @("--json", "batch", "--out-dir", $OutDir)
+    if ($Folder) { $a += @("--folder", $Folder) }
+    if ($Path) { $a += @("--paths") + $Path }
+    if ($Mode) { $a += @("--mode", $Mode) }
+    elseif ($Ops) { $a += @("--ops") + $Ops }
+    $a += @("--wm-text", $WatermarkText, "--wm-opacity", "$WatermarkOpacity", "--quality", "$Quality")
+    if ($Password) { $a += @("--password", $Password) }
+    if ($NoAes256) { $a += "--no-aes256" }
+    Invoke-Ild @a | Out-Host
+}
+
+function Invoke-IldSign {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [ValidateSet("SES", "AES", "QES")][string]$Level = "AES",
+        [string]$P12,
+        [string]$P12Password,
+        [string]$Signer,
+        [string]$Reason,
+        [string]$Location,
+        [int]$Page = 1,
+        [string]$Out,
+        [switch]$NoStamp,
+        [switch]$NoAttach
+    )
+    $a = @("--json", "sign", $Path, "--level", $Level, "--page", "$Page")
+    if ($P12) { $a += @("--p12", $P12) }
+    if ($P12Password) { $a += @("--p12-password", $P12Password) }
+    if ($Signer) { $a += @("--signer", $Signer) }
+    if ($Reason) { $a += @("--reason", $Reason) }
+    if ($Location) { $a += @("--location", $Location) }
+    if ($Out) { $a += @("--out", $Out) }
+    if ($NoStamp) { $a += "--no-stamp" }
+    if ($NoAttach) { $a += "--no-attach" }
+    Invoke-Ild @a | Out-Host
+}
+
+function Test-IldSignature {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [string]$P12,
+        [string]$P12Password,
+        [string]$Id
+    )
+    $a = @("--json", "sign-verify", $Path)
+    if ($P12) { $a += @("--p12", $P12) }
+    if ($P12Password) { $a += @("--p12-password", $P12Password) }
+    if ($Id) { $a += @("--id", $Id) }
+    Invoke-Ild @a | Out-Host
+}
+
+function Get-IldSignatures {
+    param([Parameter(Mandatory = $true)][string]$Path)
+    Invoke-Ild @("--json", "sign-list", $Path) | Out-Host
+}
+
+function New-IldSigningCert {
+    param(
+        [Parameter(Mandatory = $true)][string]$CommonName,
+        [Parameter(Mandatory = $true)][string]$Out,
+        [Parameter(Mandatory = $true)][string]$Password,
+        [string]$Email,
+        [int]$Days = 825
+    )
+    $a = @("--json", "sign-cert", $CommonName, "--out", $Out, "--password", $Password, "--days", "$Days")
+    if ($Email) { $a += @("--email", $Email) }
+    Invoke-Ild @a | Out-Host
 }
 
 

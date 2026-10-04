@@ -270,6 +270,13 @@
     "delete_version": "Удалить",
     "version_no_source": "Нет содержимого для сохранения.",
     "version_restore_confirm": "Заменить текущее состояние этой версией?",
-    "ribbon_review": "Рецензия"
+    "ribbon_review": "Рецензия",
+    "batch_pdf": "Пакетная обработка",
+    "esign": "Цифровая подпись",
+    "esign_eidas": "Цифровая подпись (eIDAS)",
+    "mail_merge_preview": "Предпросмотр слияния",
+    "batch_encrypt": "Зашифровать PDF",
+    "batch_watermark": "Водяной знак PDF",
+    "batch_compress": "Сжать PDF"
   }
 }

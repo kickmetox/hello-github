@@ -270,6 +270,13 @@
     "delete_version": "Delete",
     "version_no_source": "No document content to save.",
     "version_restore_confirm": "Replace the current state with this version?",
-    "ribbon_review": "Review"
+    "ribbon_review": "Review",
+    "batch_pdf": "Batch processing",
+    "esign": "Digital signature",
+    "esign_eidas": "Digital signature (eIDAS)",
+    "mail_merge_preview": "Mail merge preview",
+    "batch_encrypt": "Encrypt PDFs",
+    "batch_watermark": "Watermark PDFs",
+    "batch_compress": "Compress PDFs"
   }
 }

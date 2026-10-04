@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Nightly/CI Smoke: CLI + Import-Checks für InstantLens Doc — 2.1.0–2.6.21.
+"""Nightly/CI Smoke: CLI + Import-Checks für InstantLens Doc — 2.1.0–2.6.22.
 
 Leichtgewichtig. Exit-Codes:
   0  OK  (ok=true)
@@ -14,12 +14,12 @@ Aufruf:
   python scripts/smoke_ild.py -h
 
 JSON-Schema (--json), Erfolg:
-  {"ok": true, "version": "2.6.21", "duration_ms": 1234,
+  {"ok": true, "version": "2.6.22", "duration_ms": 1234,
    "checks": ["version", "imports", "cli", "measure_diff_import", "changelog"]}
 
 JSON bei Fail: checks[] enthält Objekt mit error-Text (max 200 Zeichen, Truncate …);
 Exitcode spiegelt ok (0↔true, 1↔false) — 2.2.0:
-  {"ok": false, "version": "2.6.21", "duration_ms": 12,
+  {"ok": false, "version": "2.6.22", "duration_ms": 12,
    "checks": ["version", {"name": "imports", "error": "import x: …"}]}
 """
 
@@ -41,7 +41,7 @@ if str(ROOT) not in sys.path:
 # Headless/CI: Qt ohne Display
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-EXPECTED_VERSION = "2.6.21"
+EXPECTED_VERSION = "2.6.22"
 FAIL_ERROR_MAX_LEN = 200
 
 EXIT_OK = 0
@@ -82,7 +82,7 @@ def check_version() -> None:
         _fail(f"docs/VERSION={docs_ver!r}")
     bw = (ROOT / "build-windows.ps1").read_text(encoding="utf-8")
     if EXPECTED_VERSION not in bw or "Allow32Bit" not in bw:
-        _fail("build-windows.ps1 fehlt 2.6.21/Allow32Bit")
+        _fail("build-windows.ps1 fehlt 2.6.22/Allow32Bit")
     if not (ROOT / "scripts" / "pack-windows-runnable.py").is_file():
         _fail("scripts/pack-windows-runnable.py fehlt")
     if not (ROOT / "run-keygen.bat").is_file():
@@ -110,7 +110,10 @@ def check_imports(*, with_qt: bool) -> None:
         "instantlensdoc.core.ki_wizards",
         "instantlensdoc.core.spellcheck",
         "instantlensdoc.core.autocorrect",
+        "instantlensdoc.core.batch",
+        "instantlensdoc.core.mail_merge",
         "ild_pdf.print_prep",
+        "ild_pdf.esign",
         "ild",
         "ild.api",
     ]
@@ -155,20 +158,20 @@ def check_imports(*, with_qt: bool) -> None:
             "tab_activated",
             "tab_close_requested",
             "tab_detach_requested",
-            "2.6.21",
+            "2.6.22",
         ),
         ROOT / "instantlensdoc" / "core" / "autocorrect.py": (
             "effective_autocorrect_rules",
             "apply_autocorrect_to_text",
             "default_snippet_triggers",
-            "2.6.21",
+            "2.6.22",
         ),
         ROOT / "instantlensdoc" / "core" / "spellcheck.py": (
             "spellcheck_with_suggestions",
             "suggest_corrections",
             "grammar_hints",
             "builtin_wordlist",
-            "2.6.21",
+            "2.6.22",
         ),
         ROOT / "instantlensdoc" / "ui" / "ribbon_bar.py": (
             "RibbonBar",
@@ -176,7 +179,7 @@ def check_imports(*, with_qt: bool) -> None:
             "book_layout",
             "detach_window",
             "autocorrect_toggle",
-            "2.6.21",
+            "2.6.22",
         ),
         ROOT / "instantlensdoc" / "ui" / "pdf_view.py": (
             "import_native_pdf_comments",
@@ -389,6 +392,41 @@ def check_imports(*, with_qt: bool) -> None:
             "_ki_document_wizard_action",
             "Ctrl+Alt+Shift+Q",
             "Dokument erstellen… (KI-Wizard)",
+            "_run_esign_dialog",
+            "_batch_convert",
+            "Digitale Signatur (eIDAS)",
+            "Stapelverarbeitung",
+            "Ctrl+Alt+Shift+G",
+        ),
+        ROOT / "instantlensdoc" / "ui" / "batch_dialog.py": (
+            "BatchConvertDialog",
+            "PDF_WATERMARK",
+            "PDF_COMPRESS",
+            "PDF_ENCRYPT",
+            "pipeline_wm_comp_enc",
+            "batchUserPassword",
+            "2.6.22",
+        ),
+        ROOT / "instantlensdoc" / "ui" / "esign_dialog.py": (
+            "ESignDialog",
+            "esignDialog",
+            "esignLevel",
+            "esignSignBtn",
+            "2.6.22",
+        ),
+        ROOT / "instantlensdoc" / "ui" / "mail_merge_dialog.py": (
+            "MailMergeDialog",
+            "mailMergePreview",
+            "mailMergeRunBtn",
+            "2.6.22",
+        ),
+        ROOT / "ild_pdf" / "esign.py": (
+            "sign_pdf",
+            "verify_signature",
+            "generate_self_signed_cert",
+            "ildesign-v1",
+            "eidas_level_info",
+            "2.6.22",
         ),
         ROOT / "ild" / "__main__.py": (
             "license",
@@ -403,6 +441,11 @@ def check_imports(*, with_qt: bool) -> None:
             "import-ildocr",
             "ki-wizard",
             "ki-wizards",
+            "batch",
+            "sign-verify",
+            "sign-cert",
+            "eidas",
+            "mail-merge-preview",
         ),
         ROOT / "instantlensdoc" / "ui" / "help_dialog.py": (
             "python -m ild",
@@ -777,6 +820,8 @@ def check_measure_and_diff() -> None:
 
 def check_changelog() -> None:
     cl = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    if "## 2.6.22" not in cl:
+        _fail("CHANGELOG fehlt ## 2.6.22")
     if "## 2.6.21" not in cl:
         _fail("CHANGELOG fehlt ## 2.6.21")
     if "## 2.6.19" not in cl:
@@ -1222,6 +1267,15 @@ def check_changelog() -> None:
     ):
         _fail("CHANGELOG 2.6.21 fehlt Review/Kommentare/Versionen-Hinweis")
     if (
+        "Stapelverarbeitung" not in cl
+        and "Digitale Signatur" not in cl
+        and "eIDAS" not in cl
+        and "run_pdf_batch" not in cl
+        and "ildesign" not in cl
+        and "2.6.22" not in cl
+    ):
+        _fail("CHANGELOG 2.6.22 fehlt Batch/eSign-Hinweis")
+    if (
         "Open-Fail" not in cl
         and "HexAll" not in cl
         and "Ctrl+Shift+C" not in cl
@@ -1344,8 +1398,8 @@ def check_changelog() -> None:
     if "## 2.2.0" not in cl:
         _fail("CHANGELOG fehlt ## 2.2.0")
     feat = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
-    if "2.6.21" not in feat:
-        _fail("FEATURES.md fehlt 2.6.21")
+    if "2.6.22" not in feat:
+        _fail("FEATURES.md fehlt 2.6.22")
     if "2.6.13" not in feat:
         _fail("FEATURES.md fehlt 2.6.13")
     if (
@@ -1429,6 +1483,13 @@ def check_changelog() -> None:
         and "Dokument-Kommentare" not in feat
     ):
         _fail("FEATURES.md fehlt 2.6.21 Review/Kommentare/Versionen")
+    if (
+        "Stapelverarbeitung" not in feat
+        and "Digitale Signaturen" not in feat
+        and "eIDAS" not in feat
+        and "run_batch_job" not in feat
+    ):
+        _fail("FEATURES.md fehlt 2.6.22 Batch/eSign")
     if "Automatische Formatierung" not in feat and "Systemschriften" not in feat:
         _fail("FEATURES.md fehlt 2.6.10 Auto-Format/Fonts")
     if "2.6.10" not in feat:
@@ -1867,11 +1928,11 @@ Exit-Codes:
 Laufzeit: am Ende als „Laufzeit: N ms“ (oder duration_ms im JSON).
 
 Beispiel --json (Erfolg):
-  {"ok": true, "version": "2.6.21", "duration_ms": 1234,
+  {"ok": true, "version": "2.6.22", "duration_ms": 1234,
    "checks": ["version", "imports", "cli", "measure_diff_import", "changelog"]}
 
 Beispiel --json (Fail):
-  {"ok": false, "version": "2.6.21", "duration_ms": 12,
+  {"ok": false, "version": "2.6.22", "duration_ms": 12,
    "checks": ["version", {"name": "imports", "error": "import x: …"}]}
 """.rstrip()
     )

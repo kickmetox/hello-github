@@ -1,5 +1,5 @@
 {
-  "version": "2.6.21",
+  "version": "2.6.22",
   "langs": [
     "de",
     "en",
@@ -1796,6 +1796,83 @@
       "pt": "Revisão",
       "ar": "مراجعة",
       "it": "Revisione"
+    },
+    "batch_pdf": {
+      "de": "Stapelverarbeitung",
+      "en": "Batch processing",
+      "fr": "Traitement par lots",
+      "ru": "Пакетная обработка",
+      "es": "Procesamiento por lotes",
+      "zh": "批处理",
+      "pt": "Processamento em lote",
+      "ar": "معالجة دفعات",
+      "it": "Elaborazione batch"
+    },
+    "esign": {
+      "de": "Digitale Signatur",
+      "en": "Digital signature",
+      "fr": "Signature numérique",
+      "ru": "Цифровая подпись",
+      "es": "Firma digital",
+      "zh": "数字签名",
+      "pt": "Assinatura digital",
+      "ar": "توقيع رقمي",
+      "it": "Firma digitale"
+    },
+    "esign_eidas": {
+      "de": "Digitale Signatur (eIDAS)",
+      "en": "Digital signature (eIDAS)",
+      "fr": "Signature numérique (eIDAS)",
+      "ru": "Цифровая подпись (eIDAS)",
+      "es": "Firma digital (eIDAS)",
+      "zh": "数字签名 (eIDAS)",
+      "pt": "Assinatura digital (eIDAS)",
+      "ar": "توقيع رقمي (eIDAS)",
+      "it": "Firma digitale (eIDAS)"
+    },
+    "mail_merge_preview": {
+      "de": "Seriendruck-Vorschau",
+      "en": "Mail merge preview",
+      "fr": "Aperçu publipostage",
+      "ru": "Предпросмотр слияния",
+      "es": "Vista previa de combinación",
+      "zh": "邮件合并预览",
+      "pt": "Pré-visualização mala direta",
+      "ar": "معاينة دمج المراسلات",
+      "it": "Anteprima stampa unione"
+    },
+    "batch_encrypt": {
+      "de": "PDFs verschlüsseln",
+      "en": "Encrypt PDFs",
+      "fr": "Chiffrer les PDF",
+      "ru": "Зашифровать PDF",
+      "es": "Cifrar PDF",
+      "zh": "加密 PDF",
+      "pt": "Encriptar PDF",
+      "ar": "تشفير PDF",
+      "it": "Crittografa PDF"
+    },
+    "batch_watermark": {
+      "de": "PDFs Wasserzeichen",
+      "en": "Watermark PDFs",
+      "fr": "Filigrane PDF",
+      "ru": "Водяной знак PDF",
+      "es": "Marca de agua PDF",
+      "zh": "PDF 水印",
+      "pt": "Marca d'água PDF",
+      "ar": "علامة مائية PDF",
+      "it": "Filigrana PDF"
+    },
+    "batch_compress": {
+      "de": "PDFs komprimieren",
+      "en": "Compress PDFs",
+      "fr": "Compresser les PDF",
+      "ru": "Сжать PDF",
+      "es": "Comprimir PDF",
+      "zh": "压缩 PDF",
+      "pt": "Comprimir PDF",
+      "ar": "ضغط PDF",
+      "it": "Comprimi PDF"
     }
   },
   "phrases": {
@@ -2703,6 +2780,13 @@
     "delete_version": "Löschen",
     "version_no_source": "Kein Dokumentinhalt zum Speichern.",
     "version_restore_confirm": "Aktuellen Stand durch diese Version ersetzen?",
-    "ribbon_review": "Review"
+    "ribbon_review": "Review",
+    "batch_pdf": "Stapelverarbeitung",
+    "esign": "Digitale Signatur",
+    "esign_eidas": "Digitale Signatur (eIDAS)",
+    "mail_merge_preview": "Seriendruck-Vorschau",
+    "batch_encrypt": "PDFs verschlüsseln",
+    "batch_watermark": "PDFs Wasserzeichen",
+    "batch_compress": "PDFs komprimieren"
   }
 }

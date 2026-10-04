@@ -270,6 +270,13 @@
     "delete_version": "حذف",
     "version_no_source": "لا يوجد محتوى للحفظ.",
     "version_restore_confirm": "استبدال الحالة الحالية بهذا الإصدار؟",
-    "ribbon_review": "مراجعة"
+    "ribbon_review": "مراجعة",
+    "batch_pdf": "معالجة دفعات",
+    "esign": "توقيع رقمي",
+    "esign_eidas": "توقيع رقمي (eIDAS)",
+    "mail_merge_preview": "معاينة دمج المراسلات",
+    "batch_encrypt": "تشفير PDF",
+    "batch_watermark": "علامة مائية PDF",
+    "batch_compress": "ضغط PDF"
   }
 }
