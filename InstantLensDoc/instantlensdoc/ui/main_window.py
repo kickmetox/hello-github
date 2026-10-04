@@ -1696,14 +1696,34 @@ class MainWindow(QMainWindow):
         act_dropcap.setToolTip("Drop Cap (3 Zeilen, 1 Zeichen) — 2.6.13")
         act_dropcap.triggered.connect(self._apply_drop_cap)
         m_edit.addAction(act_dropcap)
-        act_hyphen = QAction("Silbentrennung (DE)…", self)
-        act_hyphen.setShortcut(QKeySequence("Ctrl+Alt+Shift+H"))
-        act_hyphen.setToolTip("Intelligente Silbentrennung Deutsch — 2.6.13")
-        act_hyphen.triggered.connect(lambda: self._hyphenate_document("de"))
-        m_edit.addAction(act_hyphen)
-        act_hyphen_en = QAction("Silbentrennung (EN)", self)
-        act_hyphen_en.triggered.connect(lambda: self._hyphenate_document("en"))
-        m_edit.addAction(act_hyphen_en)
+        # Silbentrennung: Menü aller 9 UI-Sprachen (Engine seit 2.6.28) — 2.6.29
+        from ild_pdf.typography import HYPHENATION_UI_LANGS
+
+        _hyphen_labels = {
+            "de": "Deutsch (DE)",
+            "en": "English (EN)",
+            "fr": "Français (FR)",
+            "ru": "Русский (RU)",
+            "es": "Español (ES)",
+            "zh": "中文 (ZH, no-break)",
+            "pt": "Português (PT)",
+            "ar": "العربية (AR, no-break)",
+            "it": "Italiano (IT)",
+        }
+        m_hyphen = m_edit.addMenu("Silbentrennung")
+        m_hyphen.setToolTip(
+            "Intelligente Silbentrennung — alle 9 UI-Sprachen (ZH/AR no-break) — 2.6.29"
+        )
+        for _lang in HYPHENATION_UI_LANGS:
+            _label = _hyphen_labels.get(_lang, _lang.upper())
+            _act = QAction(_label, self)
+            if _lang == "de":
+                _act.setShortcut(QKeySequence("Ctrl+Alt+Shift+H"))
+            _act.setToolTip(f"Silbentrennung {_label} — 2.6.29")
+            _act.triggered.connect(
+                lambda _checked=False, lang=_lang: self._hyphenate_document(lang)
+            )
+            m_hyphen.addAction(_act)
         act_palette = QAction("Schnellaktionen…", self)
         act_palette.setShortcut(QKeySequence("Ctrl+K"))
         act_palette.setToolTip(
@@ -11731,6 +11751,14 @@ class MainWindow(QMainWindow):
             "typo_leading": lambda: self._set_typography(leading=1.5),
             "drop_cap": self._apply_drop_cap,
             "hyphenate_de": lambda: self._hyphenate_document("de"),
+            "hyphenate_en": lambda: self._hyphenate_document("en"),
+            "hyphenate_fr": lambda: self._hyphenate_document("fr"),
+            "hyphenate_ru": lambda: self._hyphenate_document("ru"),
+            "hyphenate_es": lambda: self._hyphenate_document("es"),
+            "hyphenate_zh": lambda: self._hyphenate_document("zh"),
+            "hyphenate_pt": lambda: self._hyphenate_document("pt"),
+            "hyphenate_ar": lambda: self._hyphenate_document("ar"),
+            "hyphenate_it": lambda: self._hyphenate_document("it"),
             "insert_table": self._insert_table_dialog,
             "format_table": self._format_table_dialog,
             "sort_table": self._sort_table_dialog,
@@ -11778,7 +11806,6 @@ class MainWindow(QMainWindow):
             "mail_merge": self._run_mail_merge_dialog,
             "batch_pdf": self._batch_convert,
             "esign": self._run_esign_dialog,
-            "hyphenate_en": lambda: self._hyphenate_document("en"),
             "text_wrap": self._set_image_text_wrap,
             "ocr_page": self._run_ocr,
             "ocr_pdf": self._run_ocr_document,

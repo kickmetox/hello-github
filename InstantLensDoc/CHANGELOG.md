@@ -1,3 +1,7 @@
+## 2.6.29 — Silbentrennung Menü/Palette (9 Sprachen)
+
+Minor nach **2.6.28**: **Silbentrennung-UI** für alle 9 UI-Sprachen (DE/EN/FR/RU/ES/ZH/PT/AR/IT) im Bearbeiten-Menü und der Command-Palette; Engine/Hook unverändert aus **2.6.28** (ZH/AR no-break). FEATURES: Signieren-Zeile an eIDAS-Trust-Pfad angeglichen; veraltete „Mehrsprach-UI DE/EN teilweise“-Zeile bereinigt. Pack/Docs aktualisiert.
+
 ## 2.6.28 — Audit-Closure Word-Suite / DTP / Mausrad
 
 Minor nach **2.6.27**: Schließt die offenen Word-/DTP-Audit-Lücken. **Mausrad:** Default-Einzelseiten-PDF blättert per Rad (bei Zoom-Overflow natives Scrollen); Frame/Canvas-Wheel; Continuous/1S/Editor/`apply_wheel_scroll` (**2.6.27**) unverändert. **Abbildungs- & Stichwortverzeichnis** auto wie TOC (`ILD-LOF-*` / `ILD-IDX-*`). **F12 Speichern unter** + Ribbon Save-as + Alt+1…6. **`.pptx`** Export/Import. **Abschnittsumbrüche** (`ildsections-v1`) + Spalten-Pagination. **Grammatik** DE/EN (`grammar_check`). **Silbentrennung** 9 UI-Sprachen. **Pantone-ähnlich/Spot**, Web-PDF, Print-Preview. **eIDAS Trust-Pfad** ohne bezahlte TSA. **Echtzeit-Hub** lokal (CRDT-lite). **Handschrift** Multi-PSM + Preprocess. Freier KI-Chat-Stub und Outline-TTS bleiben. Gehostete Cloud/QES-TSA = externe Abhängigkeit.

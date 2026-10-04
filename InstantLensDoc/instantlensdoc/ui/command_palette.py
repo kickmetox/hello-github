@@ -1,10 +1,11 @@
-"""Schnellaktionen-Palette (Ctrl+K Command Palette) — 2.3.0–2.3.5.
+"""Schnellaktionen-Palette (Ctrl+K Command Palette) — 2.3.0–2.3.5 / 2.6.29.
 
 2.3.1: Fuzzy-Filter, letzte Befehle, Esc schließt, Kategorien gruppiert.
 2.3.2: Pin häufige Befehle · Recent-Anzahl Settings 5/10/20.
 2.3.3: Pin-Persistenz · Unpin · max Pins Settings 3/5/10.
 2.3.4: Overflow-Hinweis bei Pin-Limit · Option ältesten Pin ersetzen.
 2.3.5: Pin-ersetzen-Bestätigung mit Namen des zu ersetzenden Pins.
+2.6.29: Silbentrennung-Befehle für alle 9 UI-Sprachen (FR/RU/ES/ZH/PT/AR/IT).
 """
 
 from __future__ import annotations
@@ -222,6 +223,48 @@ def default_palette_commands() -> list[PaletteCommand]:
             "hyphenate_en",
             "Silbentrennung (EN)",
             "hyphenation english silbentrennung en",
+            "Bearbeiten",
+        ),
+        PaletteCommand(
+            "hyphenate_fr",
+            "Silbentrennung (FR)",
+            "hyphenation francais silbentrennung fr",
+            "Bearbeiten",
+        ),
+        PaletteCommand(
+            "hyphenate_ru",
+            "Silbentrennung (RU)",
+            "hyphenation russian silbentrennung ru",
+            "Bearbeiten",
+        ),
+        PaletteCommand(
+            "hyphenate_es",
+            "Silbentrennung (ES)",
+            "hyphenation espanol silbentrennung es",
+            "Bearbeiten",
+        ),
+        PaletteCommand(
+            "hyphenate_zh",
+            "Silbentrennung (ZH, no-break)",
+            "hyphenation chinese silbentrennung zh cjk",
+            "Bearbeiten",
+        ),
+        PaletteCommand(
+            "hyphenate_pt",
+            "Silbentrennung (PT)",
+            "hyphenation portugues silbentrennung pt",
+            "Bearbeiten",
+        ),
+        PaletteCommand(
+            "hyphenate_ar",
+            "Silbentrennung (AR, no-break)",
+            "hyphenation arabic silbentrennung ar",
+            "Bearbeiten",
+        ),
+        PaletteCommand(
+            "hyphenate_it",
+            "Silbentrennung (IT)",
+            "hyphenation italiano silbentrennung it",
             "Bearbeiten",
         ),
         PaletteCommand(
