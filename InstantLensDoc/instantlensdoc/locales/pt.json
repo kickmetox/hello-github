@@ -134,7 +134,13 @@
     "color_management": "Gestão de cores",
     "layer_background": "Fundo",
     "layer_images": "Imagens",
-    "layer_text": "Texto"
+    "layer_text": "Texto",
+    "compare_pdfs": "Comparar dois PDFs…",
+    "book_layout": "Layout de livro",
+    "page_by_page": "Deslocamento página a página",
+    "doc_tabs": "Separadores de documentos",
+    "ribbon_bar": "Barra Ribbon",
+    "sync_scroll_compare": "Scroll sincronizado"
   },
   "phrases": {
     "&Datei": "&Ficheiro",

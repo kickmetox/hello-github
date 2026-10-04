@@ -8,4 +8,4 @@
 - Tables / Office I/O — **2.6.14**
 - Annotations upgrade — **2.6.9**
 - Full list in the app: FEATURES.md
-- Farbmanagement RGB/CMYK, Bleed, Ebenen, Preflight, PDF/X — **2.6.18**
+- Farbmanagement RGB/CMYK, Bleed, Ebenen, Preflight, PDF/X — **2.6.19**

@@ -473,7 +473,7 @@ class SettingsDialog(QDialog):
         cur_ui = get_ui_lang()
         pick_ui = 0
         for i, code in enumerate(supported_langs()):
-            # Native name + translated label — 2.6.18
+            # Native name + translated label — 2.6.19
             label = f"{lang_native_name(code)} ({tr(f'lang_{code}')})"
             self.ui_lang.addItem(label, code)
             if code == cur_ui:
@@ -481,7 +481,7 @@ class SettingsDialog(QDialog):
         self.ui_lang.setCurrentIndex(pick_ui)
         self.ui_lang.setToolTip(
             "Oberflächensprache DE/EN/FR/RU/ES/ZH/PT/AR/IT — Persistenz; "
-            "Arabisch RTL wo praktikabel — 2.6.18"
+            "Arabisch RTL wo praktikabel — 2.6.19"
         )
         form.addRow(tr("ui_lang"), self.ui_lang)
 
@@ -3895,7 +3895,7 @@ class SettingsDialog(QDialog):
         set_merge_close_preview_on_edit(self.merge_close_preview.isChecked())
         set_ui_lang(str(self.ui_lang.currentData() or "de"))
         sync_from_settings()
-        # Sprache + RTL auf Parent-Hauptfenster anwenden — 2.6.18
+        # Sprache + RTL auf Parent-Hauptfenster anwenden — 2.6.19
         try:
             from instantlensdoc.core.i18n import apply_ui_language
 

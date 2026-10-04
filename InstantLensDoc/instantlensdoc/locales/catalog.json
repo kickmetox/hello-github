@@ -1,5 +1,5 @@
 {
-  "version": "2.6.18",
+  "version": "2.6.19",
   "langs": [
     "de",
     "en",
@@ -1477,6 +1477,72 @@
       "pt": "Texto",
       "ar": "نص",
       "it": "Testo"
+    },
+    "compare_pdfs": {
+      "de": "Zwei PDFs vergleichen…",
+      "en": "Compare two PDFs…",
+      "fr": "Comparer deux PDF…",
+      "ru": "Сравнить два PDF…",
+      "es": "Comparar dos PDF…",
+      "zh": "比较两个 PDF…",
+      "pt": "Comparar dois PDFs…",
+      "ar": "مقارنة ملفي PDF…",
+      "it": "Confronta due PDF…"
+    },
+    "book_layout": {
+      "de": "Buch-Layout",
+      "en": "Book Layout",
+      "fr": "Mise en page livre",
+      "ru": "Книжный макет",
+      "es": "Diseño de libro",
+      "zh": "书籍版式",
+      "pt": "Layout de livro",
+      "ar": "تخطيط الكتاب",
+      "it": "Layout libro"
+    },
+    "page_by_page": {
+      "de": "Seite-für-Seite-Scrollen",
+      "en": "Page-by-page scrolling",
+      "fr": "Défilement page par page",
+      "ru": "Постраничная прокрутка",
+      "es": "Desplazamiento página a página",
+      "zh": "逐页滚动",
+      "pt": "Deslocamento página a página",
+      "ar": "تمرير صفحة بصفحة",
+      "it": "Scorrimento pagina per pagina"
+    },
+    "doc_tabs": {
+      "de": "Dokument-Tabs",
+      "en": "Document tabs",
+      "fr": "Onglets de documents",
+      "ru": "Вкладки документов",
+      "es": "Pestañas de documentos",
+      "zh": "文档标签",
+      "pt": "Separadores de documentos",
+      "ar": "علامات تبويب المستندات",
+      "it": "Schede documenti"
+    },
+    "ribbon_bar": {
+      "de": "Ribbon-Leiste",
+      "en": "Ribbon bar",
+      "fr": "Barre Ruban",
+      "ru": "Лента Ribbon",
+      "es": "Barra Ribbon",
+      "zh": "功能区",
+      "pt": "Barra Ribbon",
+      "ar": "شريط Ribbon",
+      "it": "Barra Ribbon"
+    },
+    "sync_scroll_compare": {
+      "de": "Sync-Scroll",
+      "en": "Sync scroll",
+      "fr": "Défilement sync",
+      "ru": "Синхр. прокрутка",
+      "es": "Scroll sincronizado",
+      "zh": "同步滚动",
+      "pt": "Scroll sincronizado",
+      "ar": "تمرير متزامن",
+      "it": "Scroll sincronizzato"
     }
   },
   "phrases": {

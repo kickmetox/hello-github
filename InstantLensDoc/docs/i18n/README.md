@@ -1,6 +1,6 @@
 # InstantLens Doc — Localized docs (external)
 
-Structure for Help / Info / Feature list — **2.6.18**.
+Structure for Help / Info / Feature list — **2.6.19**.
 
 | Lang | Help | Info | Features |
 |------|------|------|----------|

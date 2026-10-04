@@ -134,7 +134,13 @@
     "color_management": "色彩管理",
     "layer_background": "背景",
     "layer_images": "图像",
-    "layer_text": "文本"
+    "layer_text": "文本",
+    "compare_pdfs": "比较两个 PDF…",
+    "book_layout": "书籍版式",
+    "page_by_page": "逐页滚动",
+    "doc_tabs": "文档标签",
+    "ribbon_bar": "功能区",
+    "sync_scroll_compare": "同步滚动"
   },
   "phrases": {
     "&Datei": "文件(&F)",

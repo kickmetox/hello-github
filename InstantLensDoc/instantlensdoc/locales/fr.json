@@ -134,7 +134,13 @@
     "color_management": "Gestion des couleurs",
     "layer_background": "Arrière-plan",
     "layer_images": "Images",
-    "layer_text": "Texte"
+    "layer_text": "Texte",
+    "compare_pdfs": "Comparer deux PDF…",
+    "book_layout": "Mise en page livre",
+    "page_by_page": "Défilement page par page",
+    "doc_tabs": "Onglets de documents",
+    "ribbon_bar": "Barre Ruban",
+    "sync_scroll_compare": "Défilement sync"
   },
   "phrases": {
     "&Datei": "&Fichier",

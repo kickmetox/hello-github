@@ -1,4 +1,4 @@
-"""Headless InstantLens-Doc-Operationen für Python- und PowerShell-Scripting — 2.6.18."""
+"""Headless InstantLens-Doc-Operationen für Python- und PowerShell-Scripting — 2.6.19."""
 
 from __future__ import annotations
 
@@ -1466,7 +1466,7 @@ def run_ki_wizard(
 
 
 def list_ui_langs() -> list[dict[str, Any]]:
-    """Unterstützte UI-Sprachen (DE/EN/FR/RU/ES/ZH/PT/AR/IT) — 2.6.18."""
+    """Unterstützte UI-Sprachen (DE/EN/FR/RU/ES/ZH/PT/AR/IT) — 2.6.19."""
     from instantlensdoc.core.i18n import (
         SUPPORTED_LANGS,
         is_rtl,
@@ -1486,14 +1486,14 @@ def list_ui_langs() -> list[dict[str, Any]]:
 
 
 def get_ui_lang() -> str:
-    """Aktuelle UI-Sprache (Settings) — 2.6.18."""
+    """Aktuelle UI-Sprache (Settings) — 2.6.19."""
     from instantlensdoc.core.app_settings import get_ui_lang as _get
 
     return str(_get())
 
 
 def set_ui_lang(lang: str) -> str:
-    """UI-Sprache setzen und persistieren — 2.6.18."""
+    """UI-Sprache setzen und persistieren — 2.6.19."""
     from instantlensdoc.core.app_settings import set_ui_lang as _set
     from instantlensdoc.core.i18n import normalize_lang, set_lang
 
@@ -1504,7 +1504,7 @@ def set_ui_lang(lang: str) -> str:
 
 
 def tr(key: str, *, lang: str | None = None) -> str:
-    """UI-String übersetzen — 2.6.18."""
+    """UI-String übersetzen — 2.6.19."""
     from instantlensdoc.core.i18n import tr as _tr
 
     return _tr(key, lang=lang)  # type: ignore[arg-type]
@@ -1517,7 +1517,7 @@ def ocr_handwriting(
     psm: int | str = 6,
     out: PathLike | None = None,
 ) -> dict[str, Any]:
-    """Basis-Handschriftenerkennung (Tesseract PSM) — 2.6.18."""
+    """Basis-Handschriftenerkennung (Tesseract PSM) — 2.6.19."""
     from instantlensdoc.core.ocr import ocr_image_handwriting, normalize_handwriting_psm
 
     src = _require_file(path)
@@ -1540,7 +1540,7 @@ def ocr_handwriting(
 
 
 def list_color_palettes() -> list[dict[str, Any]]:
-    """Eingebaute RGB/CMYK/Spot-Paletten — 2.6.18."""
+    """Eingebaute RGB/CMYK/Spot-Paletten — 2.6.19."""
     from ild_pdf.print_prep import list_palettes
 
     return list_palettes()
@@ -1553,7 +1553,7 @@ def convert_color_api(
     hex_color: str | None = None,
     to: str = "cmyk",
 ) -> dict[str, Any]:
-    """RGB↔CMYK-Konvertierung — 2.6.18."""
+    """RGB↔CMYK-Konvertierung — 2.6.19."""
     from ild_pdf.print_prep import convert_color
 
     mode = (to or "cmyk").strip().lower()
@@ -1563,7 +1563,7 @@ def convert_color_api(
 
 
 def list_bleed_presets() -> list[dict[str, Any]]:
-    """Anschnitt-Presets (mm) — 2.6.18."""
+    """Anschnitt-Presets (mm) — 2.6.19."""
     from ild_pdf.print_prep import list_bleed_presets as _list
 
     return _list()
@@ -1577,7 +1577,7 @@ def apply_bleed(
     out: PathLike | None = None,
     all_pages: bool = True,
 ) -> dict[str, Any]:
-    """Bleed/Anschnitt auf PDF anwenden — 2.6.18."""
+    """Bleed/Anschnitt auf PDF anwenden — 2.6.19."""
     from ild_pdf.print_prep import BleedSettings, apply_bleed_boxes, get_bleed_info
 
     src = _require_file(path)
@@ -1598,7 +1598,7 @@ def apply_bleed(
 
 
 def get_bleed(path: PathLike, page: int = 1) -> dict[str, Any]:
-    """Bleed/Trim-Info einer Seite — 2.6.18."""
+    """Bleed/Trim-Info einer Seite — 2.6.19."""
     from ild_pdf.print_prep import get_bleed_info
 
     src = _require_file(path)
@@ -1606,7 +1606,7 @@ def get_bleed(path: PathLike, page: int = 1) -> dict[str, Any]:
 
 
 def list_doc_layers() -> list[dict[str, Any]]:
-    """Dokument-Ebenen Hintergrund/Bilder/Text — 2.6.18."""
+    """Dokument-Ebenen Hintergrund/Bilder/Text — 2.6.19."""
     from ild_pdf.print_prep import list_layers
 
     return list_layers()
@@ -1620,7 +1620,7 @@ def layout_set_layer(
     path: PathLike | None = None,
     out: PathLike | None = None,
 ) -> dict[str, Any]:
-    """Rahmen einer Ebene zuordnen — 2.6.18."""
+    """Rahmen einer Ebene zuordnen — 2.6.19."""
     doc = _load_layout(layout, path)
     frame = doc.set_frame_layer(frame_id, layer)
     result: dict[str, Any] = {
@@ -1644,7 +1644,7 @@ def layout_layers(
     layout: dict[str, Any] | None = None,
     path: PathLike | None = None,
 ) -> dict[str, Any]:
-    """Rahmen nach Ebenen auflisten — 2.6.18."""
+    """Rahmen nach Ebenen auflisten — 2.6.19."""
     doc = _load_layout(layout, path)
     return {
         "layers": doc.frames_by_layer(),
@@ -1661,7 +1661,7 @@ def preflight(
     color_mode: str | None = None,
     out: PathLike | None = None,
 ) -> dict[str, Any]:
-    """Preflight: Schriften, Bildauflösung, Bleed — 2.6.18."""
+    """Preflight: Schriften, Bildauflösung, Bleed — 2.6.19."""
     from ild_pdf.print_prep import preflight_to_text, run_preflight
 
     src = _require_file(path)
@@ -1694,7 +1694,7 @@ def export_pdfx(
     title: str | None = None,
     preflight_first: bool = False,
 ) -> dict[str, Any]:
-    """PDF/X bzw. print-ready Export — 2.6.18."""
+    """PDF/X bzw. print-ready Export — 2.6.19."""
     from ild_pdf.print_prep import export_pdfx as _export
 
     src = _require_file(path)
@@ -1711,6 +1711,50 @@ def export_pdfx(
     )
     result["version"] = __version__
     return result
+
+
+def compare_pdfs(
+    left: PathLike,
+    right: PathLike,
+    *,
+    left_page: int = 1,
+    right_page: int = 1,
+    threshold: int = 18,
+    scale: float = 1.0,
+    mode: str = "raster",
+    ignore_whitespace: bool = False,
+    only_differences: bool = False,
+    out_png: PathLike | None = None,
+    out_txt: PathLike | None = None,
+    left_password: str | None = None,
+    right_password: str | None = None,
+) -> dict[str, Any]:
+    """
+    Zwei PDFs seitenweise vergleichen (Raster-Diff / Textlayer) — 2.6.19.
+
+    Seiten 1-basiert. ``mode``: raster | text | both.
+    """
+    from ild_pdf.diff import compare_pdf_pages
+
+    src_l = _require_file(left)
+    src_r = _require_file(right)
+    data = compare_pdf_pages(
+        src_l,
+        src_r,
+        left_page=max(0, int(left_page) - 1),
+        right_page=max(0, int(right_page) - 1),
+        threshold=int(threshold),
+        scale=float(scale),
+        mode=mode,
+        ignore_whitespace=bool(ignore_whitespace),
+        only_differences=bool(only_differences),
+        out_png=out_png,
+        out_txt=out_txt,
+        left_password=left_password,
+        right_password=right_password,
+    )
+    data["version"] = __version__
+    return data
 
 
 def _load_layout(

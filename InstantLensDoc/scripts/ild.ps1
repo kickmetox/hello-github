@@ -757,6 +757,36 @@ function Export-IldPdfX {
     Invoke-Ild @a | Out-Host
 }
 
+function Invoke-IldCompare {
+    # PDF-Vergleich Raster/Textlayer — 2.6.19
+    param(
+        [Parameter(Mandatory = $true)][string]$Left,
+        [Parameter(Mandatory = $true)][string]$Right,
+        [int]$LeftPage = 1,
+        [int]$RightPage = 1,
+        [int]$Threshold = 18,
+        [double]$Scale = 1.0,
+        [ValidateSet("raster", "text", "both")][string]$Mode = "raster",
+        [switch]$IgnoreWhitespace,
+        [switch]$OnlyDiff,
+        [string]$OutPng,
+        [string]$OutTxt
+    )
+    $a = @(
+        "--json", "compare", $Left, $Right,
+        "--left-page", "$LeftPage",
+        "--right-page", "$RightPage",
+        "--threshold", "$Threshold",
+        "--scale", "$Scale",
+        "--mode", $Mode
+    )
+    if ($IgnoreWhitespace) { $a += "--ignore-whitespace" }
+    if ($OnlyDiff) { $a += "--only-diff" }
+    if ($OutPng) { $a += @("--out-png", $OutPng) }
+    if ($OutTxt) { $a += @("--out-txt", $OutTxt) }
+    Invoke-Ild @a | Out-Host
+}
+
 function Merge-IldPdf {
     param(
         [Parameter(Mandatory = $true)][string[]]$Path,

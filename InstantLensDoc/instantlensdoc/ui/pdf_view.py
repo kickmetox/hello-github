@@ -115,7 +115,9 @@ from instantlensdoc.core.app_settings import (
     get_annotations_visible,
     get_default_zoom_mode,
     get_default_zoom_scale,
+    get_pdf_book_layout,
     get_pdf_continuous_scroll,
+    get_pdf_page_by_page,
     get_pdf_grayscale,
     get_pdf_night_mode,
     get_pdf_two_page_spread,
@@ -168,7 +170,9 @@ from instantlensdoc.core.app_settings import (
     set_page_number_overlay_position,
     set_page_number_overlay_skip_edges,
     set_page_number_overlay_start,
+    set_pdf_book_layout,
     set_pdf_continuous_scroll,
+    set_pdf_page_by_page,
     set_pdf_grayscale,
     set_pdf_night_mode,
     set_pdf_two_page_spread,
@@ -2084,6 +2088,8 @@ class PdfViewer(QWidget):
     printer_marks_changed = Signal(bool)
     two_page_spread_changed = Signal(bool)
     continuous_scroll_changed = Signal(bool)
+    book_layout_changed = Signal(bool)
+    page_by_page_changed = Signal(bool)
     # OCR-Region: page (0-basiert), x, y, w, h in Anzeige-Pixeln — 2.5.0
     ocr_region_finished = Signal(int, float, float, float, float)
 
@@ -2129,10 +2135,22 @@ class PdfViewer(QWidget):
         self._night_mode = get_pdf_night_mode()
         self._two_page_spread = get_pdf_two_page_spread()
         self._continuous_scroll = get_pdf_continuous_scroll()
+        self._book_layout = get_pdf_book_layout()
+        self._page_by_page = get_pdf_page_by_page()
+        if self._book_layout:
+            # Buch-Layout impliziert Spread (Cover + Doppelseiten) — 2.6.19
+            self._two_page_spread = True
+            set_pdf_two_page_spread(True)
         if self._continuous_scroll and self._two_page_spread:
             # Mutual exclusive: Continuous bevorzugt wenn beide gesetzt
             self._two_page_spread = False
             set_pdf_two_page_spread(False)
+            self._book_layout = False
+            set_pdf_book_layout(False)
+        if self._page_by_page and self._continuous_scroll:
+            # Seite-für-Seite schließt Continuous aus — 2.6.19
+            self._page_by_page = False
+            set_pdf_page_by_page(False)
         self._spread_left_width = 0.0
         self._spread_gap = 12
         self._continuous_offsets: list[tuple[int, float, float]] = []  # page, y0, height
@@ -2663,6 +2681,15 @@ class PdfViewer(QWidget):
             "Zwei-Seiten-Ansicht (Spread): aktuelle + nächste Seite nebeneinander"
         )
         self.btn_spread.toggled.connect(self.set_two_page_spread)
+        self.btn_book = QToolButton()
+        self.btn_book.setText("Buch")
+        self.btn_book.setCheckable(True)
+        self.btn_book.setChecked(self._book_layout)
+        self.btn_book.setToolTip(
+            "Buch-Layout: Cover allein, danach Doppelseiten (Book Layout) — 2.6.19"
+        )
+        self.btn_book.setObjectName("btnBookLayout")
+        self.btn_book.toggled.connect(self.set_book_layout)
         self.btn_continuous = QToolButton()
         self.btn_continuous.setText("CS")
         self.btn_continuous.setCheckable(True)
@@ -2671,6 +2698,15 @@ class PdfViewer(QWidget):
             "Continuous Scroll: Seiten untereinander (statt Einzelseite; schließt Spread aus)"
         )
         self.btn_continuous.toggled.connect(self.set_continuous_scroll)
+        self.btn_page_by_page = QToolButton()
+        self.btn_page_by_page.setText("1S")
+        self.btn_page_by_page.setCheckable(True)
+        self.btn_page_by_page.setChecked(self._page_by_page)
+        self.btn_page_by_page.setToolTip(
+            "Seite-für-Seite: Mausrad blättert Seiten (kein Continuous) — 2.6.19"
+        )
+        self.btn_page_by_page.setObjectName("btnPageByPage")
+        self.btn_page_by_page.toggled.connect(self.set_page_by_page)
         self.btn_ann_layer = QToolButton()
         self.btn_ann_layer.setText("Ann.")
         self.btn_ann_layer.setCheckable(True)
@@ -2779,7 +2815,9 @@ class PdfViewer(QWidget):
         toolbar.addWidget(self.btn_grayscale)
         toolbar.addWidget(self.btn_night)
         toolbar.addWidget(self.btn_spread)
+        toolbar.addWidget(self.btn_book)
         toolbar.addWidget(self.btn_continuous)
+        toolbar.addWidget(self.btn_page_by_page)
         toolbar.addWidget(self.btn_ann_layer)
         toolbar.addWidget(self.btn_ann_lock)
         toolbar.addWidget(self.btn_page_boxes)
@@ -2858,7 +2896,9 @@ class PdfViewer(QWidget):
                 self.btn_grayscale,
                 self.btn_night,
                 self.btn_spread,
+                self.btn_book,
                 self.btn_continuous,
+                self.btn_page_by_page,
                 self.btn_ann_layer,
                 self.btn_ann_lock,
                 self.btn_page_boxes,
@@ -2964,6 +3004,7 @@ class PdfViewer(QWidget):
         self.canvas.escape_pressed.connect(self._on_canvas_escape)
         self.scroll.setWidget(self.canvas)
         self.scroll.verticalScrollBar().valueChanged.connect(self._on_continuous_scroll)
+        self.scroll.viewport().installEventFilter(self)
         layout.addWidget(self.scroll)
         self.canvas.set_drag_tool(AnnotationType.HIGHLIGHT, select_mode=False)
         self._text_selection_text = ""
@@ -3535,6 +3576,8 @@ class PdfViewer(QWidget):
             self.btn_spread.blockSignals(False)
         if not enabled:
             self._spread_left_width = 0.0
+            if self._book_layout:
+                self.set_book_layout(False)
         if changed and self.pdf_path:
             self.refresh()
         if changed:
@@ -3546,11 +3589,89 @@ class PdfViewer(QWidget):
     def two_page_spread_enabled(self) -> bool:
         return bool(self._two_page_spread)
 
+    def set_book_layout(self, enabled: bool):
+        """Buch-Layout: Cover allein, danach Doppelseiten — 2.6.19."""
+        enabled = bool(enabled)
+        if enabled and self._continuous_scroll:
+            self.set_continuous_scroll(False)
+        changed = self._book_layout != enabled
+        self._book_layout = enabled
+        set_pdf_book_layout(enabled)
+        if hasattr(self, "btn_book"):
+            self.btn_book.blockSignals(True)
+            self.btn_book.setChecked(enabled)
+            self.btn_book.blockSignals(False)
+        if enabled and not self._two_page_spread:
+            self.set_two_page_spread(True)
+        if enabled and self.page_index > 0 and self.page_index % 2 == 0:
+            # Gerade Index > 0 → auf ungerade Pair-Start (1,3,5…) — 2.6.19
+            self.page_index = max(1, self.page_index - 1)
+        if changed and self.pdf_path:
+            self.refresh()
+        if changed:
+            self.book_layout_changed.emit(enabled)
+            self.status.emit("Buch-Layout an" if enabled else "Buch-Layout aus")
+
+    def book_layout_enabled(self) -> bool:
+        return bool(self._book_layout)
+
+    def set_page_by_page(self, enabled: bool):
+        """Seite-für-Seite: Mausrad blättert Seiten — 2.6.19."""
+        enabled = bool(enabled)
+        if enabled and self._continuous_scroll:
+            self.set_continuous_scroll(False)
+        changed = self._page_by_page != enabled
+        self._page_by_page = enabled
+        set_pdf_page_by_page(enabled)
+        if hasattr(self, "btn_page_by_page"):
+            self.btn_page_by_page.blockSignals(True)
+            self.btn_page_by_page.setChecked(enabled)
+            self.btn_page_by_page.blockSignals(False)
+        if changed:
+            self.page_by_page_changed.emit(enabled)
+            self.status.emit(
+                "Seite-für-Seite an" if enabled else "Seite-für-Seite aus"
+            )
+
+    def page_by_page_enabled(self) -> bool:
+        return bool(self._page_by_page)
+
+    def eventFilter(self, obj, event):  # noqa: N802
+        """Mausrad → Seite blättern im Seite-für-Seite-Modus — 2.6.19."""
+        try:
+            from PySide6.QtCore import QEvent
+
+            if (
+                obj is self.scroll.viewport()
+                and event.type() == QEvent.Type.Wheel
+                and self._page_by_page
+                and not self._continuous_scroll
+                and self.pdf_path
+            ):
+                delta = 0
+                try:
+                    delta = int(event.angleDelta().y())
+                except Exception:
+                    delta = 0
+                if delta > 0:
+                    self.prev_page()
+                    return True
+                if delta < 0:
+                    self.next_page()
+                    return True
+        except Exception:
+            pass
+        return super().eventFilter(obj, event)
+
     def set_continuous_scroll(self, enabled: bool):
         """Continuous Scroll: Seiten untereinander statt Einzelseite."""
         enabled = bool(enabled)
         if enabled and self._two_page_spread:
             self.set_two_page_spread(False)
+        if enabled and self._book_layout:
+            self.set_book_layout(False)
+        if enabled and self._page_by_page:
+            self.set_page_by_page(False)
         changed = self._continuous_scroll != enabled
         self._continuous_scroll = enabled
         set_pdf_continuous_scroll(enabled)
@@ -5259,10 +5380,13 @@ class PdfViewer(QWidget):
             self._continuous_offsets = []
             facing = self.page_index + 1
             use_continuous = bool(self._continuous_scroll)
+            # Buch-Layout: Cover (Seite 1 / Index 0) allein — 2.6.19
+            cover_alone = bool(self._book_layout) and self.page_index == 0
             use_spread = (
                 (not use_continuous)
                 and self._two_page_spread
                 and facing < self.page_count
+                and not cover_alone
             )
             if use_continuous:
                 from ild_pdf.limits import MAX_RENDER_PIXELS
@@ -5463,6 +5587,18 @@ class PdfViewer(QWidget):
         if self._continuous_scroll:
             self.goto_page(self.page_index - 1)
             return
+        if self._book_layout:
+            # Cover ← Pair-Start: 1→0, 3→1, … — 2.6.19
+            if self.page_index == 1:
+                target = 0
+            else:
+                target = max(0, self.page_index - 2)
+            self.page_index = target
+            if self._search_query:
+                self._rebuild_search_rects(keep_index=False)
+            self.refresh()
+            self.page_changed.emit(self.page_index)
+            return
         step = 2 if self._two_page_spread else 1
         self.page_index = max(0, self.page_index - step)
         if self._search_query:
@@ -5475,6 +5611,22 @@ class PdfViewer(QWidget):
             return
         if self._continuous_scroll:
             self.goto_page(self.page_index + 1)
+            return
+        if self._book_layout:
+            # Cover → erste Doppelseite (Index 1); danach +2 — 2.6.19
+            if self.page_index == 0:
+                target = 1 if self.page_count > 1 else 0
+            else:
+                target = self.page_index + 2
+                if target >= self.page_count:
+                    target = self.page_index + 1
+            if target >= self.page_count or target == self.page_index:
+                return
+            self.page_index = target
+            if self._search_query:
+                self._rebuild_search_rects(keep_index=False)
+            self.refresh()
+            self.page_changed.emit(self.page_index)
             return
         step = 2 if self._two_page_spread else 1
         target = self.page_index + step

@@ -1,5 +1,23 @@
 # Changelog — InstantLens Doc
 
+## 2.6.19 — Document Comparison, Book Layout, Page-Scroll, Ribbon/Tabs
+
+Minor nach **2.6.18**: **Document Comparison** — Side-by-Side-PDF-Vergleich mit **Drag-and-Drop**, **Sync-Scroll** der Panes, Raster-/Textlayer-Diff-Highlight; **ild.compare_pdfs** / CLI `compare` / PowerShell `Invoke-IldCompare`. **Enhanced Viewing:** **Buch-Layout** (Cover allein, danach Doppelseiten) und **Seite-für-Seite-Scroll** (Mausrad blättert). **Workspace (partiell):** horizontale **Dokument-Tabs** + leichte **Ribbon-Chrome** (Start/Ansicht/PDF). Keine volle Cloud-Kollaboration. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie unverändert.
+
+### Neu
+- `ild_pdf.diff.compare_pdf_pages` + `ild.compare_pdfs` / CLI `compare` / PS `Invoke-IldCompare`
+- Compare-Dialog: Drag-and-Drop, Sync-Scroll, Diff-Highlight
+- PDF-Viewer: Buch-Layout, Seite-für-Seite; Toolbar/Menü/Palette
+- UI: `DocumentTabBar`, `RibbonBar` (partiell)
+
+### Geändert
+- Docs/Version **2.6.19**; FEATURES/INFO/README; i18n-Keys Compare/Book/Tabs/Ribbon
+
+### Tests / Qualität
+- Version **2.6.19** (App / `ild_pdf` / ISS / Smoke / Docs); Serie **2.6**; `docs/VERSION` + `VERSION.txt`
+- Smoke: 2.6.19 CLI+Qt (compare/book-layout/page-by-page/tabs/ribbon)
+- Stubs: KI/Cloud/Stylus/3D/Hooks/Outline/Telemetrie unverändert markiert
+
 ## 2.6.18 — Farbmanagement, Bleed, Ebenen, Preflight, PDF/X
 
 Minor nach **2.6.17**: **Druck-/DTP-Ausgabe** — **RGB/CMYK-Farbmanagement** inkl. Custom-Paletten und Spot-Hinweisen, **Bleed/Anschnitt**-Einstellungen (TrimBox/BleedBox), **Dokument-Ebenen** (Hintergrund/Bilder/Text) für Rahmen-Organisation, **Preflight** (fehlende/nicht eingebettete Schriften, niedrige Bildauflösung, Bleed-Hinweise) und **PDF/X** bzw. print-ready Export neben dem bestehenden PDF-Export. Scripting: `ild.list_color_palettes` / `convert_color_api` / `apply_bleed` / `preflight` / `export_pdfx` / `layout_set_layer` · CLI `palettes` / `convert-color` / `apply-bleed` / `preflight` / `export-pdfx` / `layers` · PowerShell `Get-IldColorPalettes` / `Invoke-IldBleed` / `Invoke-IldPreflight` / `Export-IldPdfX`. UI: Datei→Export PDF/X; PDF→Preflight/Bleed/Ebenen; Command-Palette. i18n-Keys für Preflight/Bleed/Ebenen/PDF/X. Freier KI-Chat-Stub unverändert. Kein volles PDF-Compare, kein Ribbon-Overhaul. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie unverändert.

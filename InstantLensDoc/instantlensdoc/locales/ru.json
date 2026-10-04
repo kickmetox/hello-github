@@ -134,7 +134,13 @@
     "color_management": "Управление цветом",
     "layer_background": "Фон",
     "layer_images": "Изображения",
-    "layer_text": "Текст"
+    "layer_text": "Текст",
+    "compare_pdfs": "Сравнить два PDF…",
+    "book_layout": "Книжный макет",
+    "page_by_page": "Постраничная прокрутка",
+    "doc_tabs": "Вкладки документов",
+    "ribbon_bar": "Лента Ribbon",
+    "sync_scroll_compare": "Синхр. прокрутка"
   },
   "phrases": {
     "&Datei": "&Файл",

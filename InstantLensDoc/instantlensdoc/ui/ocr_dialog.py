@@ -279,7 +279,7 @@ class OcrDialog(QDialog):
         form.addRow(self.word_suite_check)
         form.addRow("", self.word_suite_auto_format)
 
-        # Handschriftenerkennung (Basis-Hook Tesseract PSM) — 2.6.18
+        # Handschriftenerkennung (Basis-Hook Tesseract PSM) — 2.6.19
         from instantlensdoc.core.i18n import tr as _tr_hw
         from instantlensdoc.core.ocr import HANDWRITING_PSM_PRESETS, DEFAULT_HANDWRITING_PSM
 
@@ -498,7 +498,7 @@ class OcrDialog(QDialog):
         return bool(self.word_suite_auto_format.isChecked())
 
     def handwriting_enabled(self) -> bool:
-        """True = Handschrift-PSM-Hook — 2.6.18."""
+        """True = Handschrift-PSM-Hook — 2.6.19."""
         return bool(getattr(self, "handwriting_check", None) and self.handwriting_check.isChecked())
 
     def handwriting_psm_value(self) -> int:

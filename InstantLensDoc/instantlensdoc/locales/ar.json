@@ -134,7 +134,13 @@
     "color_management": "إدارة الألوان",
     "layer_background": "خلفية",
     "layer_images": "صور",
-    "layer_text": "نص"
+    "layer_text": "نص",
+    "compare_pdfs": "مقارنة ملفي PDF…",
+    "book_layout": "تخطيط الكتاب",
+    "page_by_page": "تمرير صفحة بصفحة",
+    "doc_tabs": "علامات تبويب المستندات",
+    "ribbon_bar": "شريط Ribbon",
+    "sync_scroll_compare": "تمرير متزامن"
   },
   "phrases": {
     "&Datei": "&ملف",

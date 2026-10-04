@@ -13,6 +13,7 @@ from .diff import (
     RasterDiffResult,
     TextLayerDiffResult,
     align_images,
+    compare_pdf_pages,
     export_text_layer_diff_txt,
     format_side_by_side_diff,
     raster_diff,
@@ -397,6 +398,7 @@ __all__ = [
     "align_images",
     "raster_diff",
     "text_layer_diff",
+    "compare_pdf_pages",
     "export_text_layer_diff_txt",
     "format_side_by_side_diff",
     "DIFF_FORMAT_UNIFIED",
@@ -732,4 +734,4 @@ __all__ = [
     "save_print_settings",
 ]
 
-__version__ = "2.6.18"
+__version__ = "2.6.19"

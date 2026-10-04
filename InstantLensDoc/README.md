@@ -2,7 +2,7 @@
 
 Moderne Textverarbeitung mit PDF-Annotator, OCR-Bridge und Formulargenerator.
 
-**Version:** 2.6.18  
+**Version:** 2.6.19  
 **Hersteller:** Andreas Meyer · ame@sellerbach.de
 
 ## Quickstart (Windows)
@@ -36,6 +36,10 @@ User-Shortcuts: `.\scripts\install-ild.ps1` (inkl. Keygen) · Deinstallieren: `-
 Keygen: `run-keygen.bat` · `python -m keygen kunde@example.com` · siehe `keygen/README.md`.
 
 Nightly-Smoke: `python scripts\smoke_ild.py` · optional `--qt` · `--json` (Summary: `ok`, `checks[]`, `duration_ms`, `version`; Fail: `checks[].error` max 200…, Exit=ok). Siehe **CONTRIBUTING.md**; Workflow-Stub `.github/workflows/smoke-ild.yml` (manual only).
+
+## Neu in 2.6.19
+
+Minor nach **2.6.18**: **Document Comparison** (Side-by-Side, Drag-and-Drop, Sync-Scroll, Diff-Highlight) · **Buch-Layout** + **Seite-für-Seite-Scroll** · partielle **Dokument-Tabs** + **Ribbon-Chrome**. Scripting `ild.compare_pdfs` / CLI `compare` / PS `Invoke-IldCompare`. Keine Cloud-Kollab. Stubs unverändert.
 
 ## Neu in 2.6.18
 

@@ -467,26 +467,26 @@ def build_parser() -> argparse.ArgumentParser:
 
     s = sub.add_parser(
         "ui-langs",
-        help="UI-Sprachen auflisten (DE/EN/FR/RU/ES/ZH/PT/AR/IT) — 2.6.18",
+        help="UI-Sprachen auflisten (DE/EN/FR/RU/ES/ZH/PT/AR/IT) — 2.6.19",
     )
     s = sub.add_parser(
         "get-ui-lang",
-        help="Aktuelle UI-Sprache (Settings) — 2.6.18",
+        help="Aktuelle UI-Sprache (Settings) — 2.6.19",
     )
     s = sub.add_parser(
         "set-ui-lang",
-        help="UI-Sprache setzen/persistieren — 2.6.18",
+        help="UI-Sprache setzen/persistieren — 2.6.19",
     )
     s.add_argument("lang", help="de|en|fr|ru|es|zh|pt|ar|it")
     s = sub.add_parser(
         "tr",
-        help="UI-String übersetzen — 2.6.18",
+        help="UI-String übersetzen — 2.6.19",
     )
     s.add_argument("key", help="i18n-Schlüssel")
     s.add_argument("--lang", default=None, help="Zielsprache")
     s = sub.add_parser(
         "ocr-handwriting",
-        help="Handschriftenerkennung (Tesseract PSM) — 2.6.18",
+        help="Handschriftenerkennung (Tesseract PSM) — 2.6.19",
     )
     s.add_argument("path", help="Bilddatei")
     s.add_argument("--lang", default="deu+eng")
@@ -495,11 +495,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     s = sub.add_parser(
         "palettes",
-        help="Farbpaletten (RGB/CMYK/Spot) — 2.6.18",
+        help="Farbpaletten (RGB/CMYK/Spot) — 2.6.19",
     )
     s = sub.add_parser(
         "convert-color",
-        help="RGB↔CMYK konvertieren — 2.6.18",
+        help="RGB↔CMYK konvertieren — 2.6.19",
     )
     s.add_argument("--hex", default=None, dest="hex_color", help="#RRGGBB")
     s.add_argument("--rgb", default=None, help="r,g,b (0–1 oder 0–255)")
@@ -508,11 +508,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     s = sub.add_parser(
         "bleed-presets",
-        help="Anschnitt-Presets — 2.6.18",
+        help="Anschnitt-Presets — 2.6.19",
     )
     s = sub.add_parser(
         "apply-bleed",
-        help="Bleed/Anschnitt auf PDF anwenden — 2.6.18",
+        help="Bleed/Anschnitt auf PDF anwenden — 2.6.19",
     )
     s.add_argument("pdf", help="PDF-Datei")
     s.add_argument("--mm", type=float, default=None, help="Anschnitt mm (alle Seiten)")
@@ -522,23 +522,23 @@ def build_parser() -> argparse.ArgumentParser:
 
     s = sub.add_parser(
         "bleed-info",
-        help="Bleed/Trim-Boxen lesen — 2.6.18",
+        help="Bleed/Trim-Boxen lesen — 2.6.19",
     )
     s.add_argument("pdf", help="PDF-Datei")
     s.add_argument("--page", type=int, default=1)
 
     s = sub.add_parser(
         "layers",
-        help="Dokument-Ebenen (Hintergrund/Bilder/Text) — 2.6.18",
+        help="Dokument-Ebenen (Hintergrund/Bilder/Text) — 2.6.19",
     )
     s = sub.add_parser(
         "layout-layers",
-        help="Rahmen nach Ebenen auflisten — 2.6.18",
+        help="Rahmen nach Ebenen auflisten — 2.6.19",
     )
     s.add_argument("--layout", default=None, help="Layout-JSON-Pfad")
     s = sub.add_parser(
         "layout-set-layer",
-        help="Rahmen-Ebene setzen — 2.6.18",
+        help="Rahmen-Ebene setzen — 2.6.19",
     )
     s.add_argument("frame_id")
     s.add_argument("layer", help="background|images|text")
@@ -547,7 +547,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     s = sub.add_parser(
         "preflight",
-        help="Preflight (Schriften/Auflösung/Bleed) — 2.6.18",
+        help="Preflight (Schriften/Auflösung/Bleed) — 2.6.19",
     )
     s.add_argument("pdf", help="PDF-Datei")
     s.add_argument("--min-dpi", type=float, default=150.0)
@@ -557,7 +557,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     s = sub.add_parser(
         "export-pdfx",
-        help="PDF/X bzw. print-ready Export — 2.6.18",
+        help="PDF/X bzw. print-ready Export — 2.6.19",
     )
     s.add_argument("pdf", help="Quell-PDF")
     s.add_argument("--out", required=True, help="Ziel-PDF")
@@ -570,6 +570,26 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--no-bleed", action="store_true")
     s.add_argument("--title", default=None)
     s.add_argument("--preflight", action="store_true")
+
+    s = sub.add_parser(
+        "compare",
+        help="Zwei PDFs vergleichen (Raster/Textlayer Diff) — 2.6.19",
+    )
+    s.add_argument("left", help="Linkes PDF")
+    s.add_argument("right", help="Rechtes PDF")
+    s.add_argument("--left-page", type=int, default=1)
+    s.add_argument("--right-page", type=int, default=1)
+    s.add_argument("--threshold", type=int, default=18)
+    s.add_argument("--scale", type=float, default=1.0)
+    s.add_argument(
+        "--mode",
+        default="raster",
+        choices=["raster", "text", "both"],
+    )
+    s.add_argument("--ignore-whitespace", action="store_true")
+    s.add_argument("--only-diff", action="store_true")
+    s.add_argument("--out-png", default=None, help="Diff-Overlay PNG")
+    s.add_argument("--out-txt", default=None, help="Textlayer Diff TXT")
 
     return p
 
@@ -1154,6 +1174,22 @@ def run(argv: list[str] | None = None) -> int:
                 bleed_mm=bleed,
                 title=args.title,
                 preflight_first=bool(args.preflight),
+            )
+            _print(data, as_json=js or True)
+            return 0
+        if args.cmd == "compare":
+            data = api.compare_pdfs(
+                args.left,
+                args.right,
+                left_page=args.left_page,
+                right_page=args.right_page,
+                threshold=args.threshold,
+                scale=args.scale,
+                mode=args.mode,
+                ignore_whitespace=bool(args.ignore_whitespace),
+                only_differences=bool(args.only_diff),
+                out_png=args.out_png,
+                out_txt=args.out_txt,
             )
             _print(data, as_json=js or True)
             return 0

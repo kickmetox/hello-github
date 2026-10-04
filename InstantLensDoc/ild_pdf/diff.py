@@ -327,3 +327,102 @@ def export_text_layer_diff_txt(
         body = result.unified_diff or "(identischer Textlayer — kein Diff)"
     dest.write_text("\n".join(header) + body + "\n", encoding="utf-8")
     return dest
+
+
+def compare_pdf_pages(
+    left_pdf: str | Path,
+    right_pdf: str | Path,
+    *,
+    left_page: int = 0,
+    right_page: int = 0,
+    threshold: int = 18,
+    scale: float = 1.0,
+    mode: str = "raster",
+    ignore_whitespace: bool = False,
+    only_differences: bool = False,
+    out_png: str | Path | None = None,
+    out_txt: str | Path | None = None,
+    left_password: str | None = None,
+    right_password: str | None = None,
+) -> dict:
+    """
+    PDF-Seiten vergleichen (Raster und/oder Textlayer) — 2.6.19.
+
+    ``mode``: ``raster`` | ``text`` | ``both``.
+    Liefert Ähnlichkeit, Diff-Statistik und optional Overlay-PNG / Diff-TXT.
+    """
+    from .render import render_page
+
+    left_pdf = Path(left_pdf)
+    right_pdf = Path(right_pdf)
+    lp = max(0, int(left_page))
+    rp = max(0, int(right_page))
+    thr = max(0, min(255, int(threshold)))
+    sc = max(0.25, min(4.0, float(scale or 1.0)))
+    m = (mode or "raster").strip().lower()
+    if m not in ("raster", "text", "both"):
+        m = "raster"
+
+    result: dict = {
+        "left": str(left_pdf.resolve()),
+        "right": str(right_pdf.resolve()),
+        "left_page": lp + 1,
+        "right_page": rp + 1,
+        "mode": m,
+        "threshold": thr,
+        "scale": sc,
+    }
+
+    if m in ("raster", "both"):
+        left_img = render_page(
+            left_pdf, lp, scale=sc, password=left_password
+        )
+        right_img = render_page(
+            right_pdf, rp, scale=sc, password=right_password
+        )
+        rd = raster_diff(left_img, right_img, threshold=thr)
+        result["raster"] = {
+            "similarity_percent": rd.similarity_percent,
+            "different_pixels": rd.different_pixels,
+            "total_pixels": rd.total_pixels,
+        }
+        if out_png is not None:
+            dest = Path(out_png)
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            if dest.suffix.lower() != ".png":
+                dest = dest.with_suffix(".png")
+            rd.overlay.save(str(dest), "PNG")
+            result["out_png"] = str(dest.resolve())
+
+    if m in ("text", "both"):
+        td = text_layer_diff(
+            left_pdf,
+            right_pdf,
+            left_page=lp,
+            right_page=rp,
+            left_password=left_password,
+            right_password=right_password,
+            ignore_whitespace=bool(ignore_whitespace),
+            only_differences=bool(only_differences),
+            diff_format=DIFF_FORMAT_UNIFIED,
+        )
+        result["text"] = {
+            "similarity_percent": td.similarity_percent,
+            "left_lines": td.left_lines,
+            "right_lines": td.right_lines,
+            "changed_hunks": td.changed_hunks,
+            "ignore_whitespace": td.ignore_whitespace,
+            "only_differences": td.only_differences,
+        }
+        if out_txt is not None:
+            dest_t = export_text_layer_diff_txt(td, out_txt)
+            result["out_txt"] = str(Path(dest_t).resolve())
+
+    # Kompakte Top-Level-Ähnlichkeit
+    if "raster" in result:
+        result["similarity_percent"] = result["raster"]["similarity_percent"]
+    elif "text" in result:
+        result["similarity_percent"] = result["text"]["similarity_percent"]
+    else:
+        result["similarity_percent"] = 100.0
+    return result

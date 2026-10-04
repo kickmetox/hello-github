@@ -1,4 +1,4 @@
-"""Layout: Textrahmen, verkettete Rahmen, Bildrahmen, Move/Resize, Textumfluss, Ebenen — 2.6.18."""
+"""Layout: Textrahmen, verkettete Rahmen, Bildrahmen, Move/Resize, Textumfluss, Ebenen — 2.6.19."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ FrameKind = Union["TextFrame", "ImageFrame"]
 # Textumfluss um Bild-/Formrahmen
 TEXT_WRAP_MODES: tuple[str, ...] = ("none", "bounding_box", "jump_object", "contour")
 
-# Dokument-Ebenen 2.6.18
+# Dokument-Ebenen 2.6.19
 LAYER_NAMES: tuple[str, ...] = ("background", "images", "text")
 
 
@@ -54,7 +54,7 @@ class TextFrame:
     tracking: float = 0.0
     leading: float = 1.15
     hyphenate_lang: str = ""
-    # Ebenen 2.6.18
+    # Ebenen 2.6.19
     layer: str = "text"
 
     @property
@@ -104,7 +104,7 @@ class ImageFrame:
     wrap_padding: float = 8.0
     # Form-Hinweis für contour (rechteckig / ellipse)
     shape: str = "rectangle"  # rectangle | ellipse
-    # Ebenen 2.6.18
+    # Ebenen 2.6.19
     layer: str = "images"
 
     def move(self, x: float, y: float) -> None:
@@ -175,7 +175,7 @@ class LayoutDocument:
         return rows
 
     def set_frame_layer(self, frame_id: str, layer: str) -> FrameKind:
-        """Rahmen einer Dokument-Ebene zuordnen — 2.6.18."""
+        """Rahmen einer Dokument-Ebene zuordnen — 2.6.19."""
         frame = self.any_frame_by_id(frame_id)
         if frame is None:
             raise KeyError(f"Rahmen nicht gefunden: {frame_id}")
@@ -184,7 +184,7 @@ class LayoutDocument:
         return frame
 
     def frames_by_layer(self) -> dict[str, list[dict[str, Any]]]:
-        """Rahmen nach Hintergrund/Bilder/Text gruppieren — 2.6.18."""
+        """Rahmen nach Hintergrund/Bilder/Text gruppieren — 2.6.19."""
         out: dict[str, list[dict[str, Any]]] = {k: [] for k in LAYER_NAMES}
         for fr in self.list_frames():
             kind = str(fr.get("kind") or "text")

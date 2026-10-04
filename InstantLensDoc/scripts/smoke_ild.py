@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Nightly/CI Smoke: CLI + Import-Checks für InstantLens Doc — 2.1.0–2.6.18.
+"""Nightly/CI Smoke: CLI + Import-Checks für InstantLens Doc — 2.1.0–2.6.19.
 
 Leichtgewichtig. Exit-Codes:
   0  OK  (ok=true)
@@ -14,12 +14,12 @@ Aufruf:
   python scripts/smoke_ild.py -h
 
 JSON-Schema (--json), Erfolg:
-  {"ok": true, "version": "2.6.18", "duration_ms": 1234,
+  {"ok": true, "version": "2.6.19", "duration_ms": 1234,
    "checks": ["version", "imports", "cli", "measure_diff_import", "changelog"]}
 
 JSON bei Fail: checks[] enthält Objekt mit error-Text (max 200 Zeichen, Truncate …);
 Exitcode spiegelt ok (0↔true, 1↔false) — 2.2.0:
-  {"ok": false, "version": "2.6.18", "duration_ms": 12,
+  {"ok": false, "version": "2.6.19", "duration_ms": 12,
    "checks": ["version", {"name": "imports", "error": "import x: …"}]}
 """
 
@@ -41,7 +41,7 @@ if str(ROOT) not in sys.path:
 # Headless/CI: Qt ohne Display
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-EXPECTED_VERSION = "2.6.18"
+EXPECTED_VERSION = "2.6.19"
 FAIL_ERROR_MAX_LEN = 200
 
 EXIT_OK = 0
@@ -82,7 +82,7 @@ def check_version() -> None:
         _fail(f"docs/VERSION={docs_ver!r}")
     bw = (ROOT / "build-windows.ps1").read_text(encoding="utf-8")
     if EXPECTED_VERSION not in bw or "Allow32Bit" not in bw:
-        _fail("build-windows.ps1 fehlt 2.6.18/Allow32Bit")
+        _fail("build-windows.ps1 fehlt 2.6.19/Allow32Bit")
     if not (ROOT / "scripts" / "pack-windows-runnable.py").is_file():
         _fail("scripts/pack-windows-runnable.py fehlt")
     if not (ROOT / "run-keygen.bat").is_file():
@@ -142,6 +142,23 @@ def check_imports(*, with_qt: bool) -> None:
             "reset_line_edit_template",
             "EscapeDiscardEditFilter",
             "Esc im Feld",
+            "_PdfDropPane",
+            "chk_scroll_sync",
+            "_on_pane_scroll",
+            "setAcceptDrops",
+            "2.6.19",
+        ),
+        ROOT / "instantlensdoc" / "ui" / "doc_tab_bar.py": (
+            "DocumentTabBar",
+            "tab_activated",
+            "tab_close_requested",
+            "2.6.19",
+        ),
+        ROOT / "instantlensdoc" / "ui" / "ribbon_bar.py": (
+            "RibbonBar",
+            "action_triggered",
+            "book_layout",
+            "2.6.19",
         ),
         ROOT / "instantlensdoc" / "ui" / "pdf_view.py": (
             "import_native_pdf_comments",
@@ -177,6 +194,10 @@ def check_imports(*, with_qt: bool) -> None:
             "Klick fokussiert Statusleiste",
             "get_ocr_defaults_toast_sec",
             "_show_smooth_status_toast",
+            "set_book_layout",
+            "set_page_by_page",
+            "btnBookLayout",
+            "btnPageByPage",
             "_announce_smooth_status_toast",
             "_focus_ink_tool_from_toast",
             "Klick fokussiert Ink",
@@ -465,11 +486,16 @@ def check_measure_and_diff() -> None:
         Annotation,
         AnnotationType,
         DIFF_FORMAT_SIDE_BY_SIDE,
+        compare_pdf_pages,
         export_text_layer_diff_txt,
         format_side_by_side_diff,
         text_layer_diff,
         text_to_pdf,
     )
+    import ild as _ild_cmp
+
+    assert callable(compare_pdf_pages)
+    assert callable(_ild_cmp.compare_pdfs)
     from ild_pdf.pdf_ann_import import (
         import_native_into_store,
         import_native_pdf_annotations,
@@ -733,8 +759,8 @@ def check_measure_and_diff() -> None:
 
 def check_changelog() -> None:
     cl = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-    if "## 2.6.18" not in cl:
-        _fail("CHANGELOG fehlt ## 2.6.18")
+    if "## 2.6.19" not in cl:
+        _fail("CHANGELOG fehlt ## 2.6.19")
     if "## 2.6.17" not in cl:
         _fail("CHANGELOG fehlt ## 2.6.17")
     if "## 2.6.16" not in cl:
@@ -1151,6 +1177,14 @@ def check_changelog() -> None:
     ):
         _fail("CHANGELOG 2.6.18 fehlt CMYK/Bleed/Preflight/PDF/X-Hinweis")
     if (
+        "Document Comparison" not in cl
+        and "compare_pdfs" not in cl
+        and "Buch-Layout" not in cl
+        and "Seite-für-Seite" not in cl
+        and "2.6.19" not in cl
+    ):
+        _fail("CHANGELOG 2.6.19 fehlt Compare/Book-Layout-Hinweis")
+    if (
         "Open-Fail" not in cl
         and "HexAll" not in cl
         and "Ctrl+Shift+C" not in cl
@@ -1273,8 +1307,8 @@ def check_changelog() -> None:
     if "## 2.2.0" not in cl:
         _fail("CHANGELOG fehlt ## 2.2.0")
     feat = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
-    if "2.6.18" not in feat:
-        _fail("FEATURES.md fehlt 2.6.18")
+    if "2.6.19" not in feat:
+        _fail("FEATURES.md fehlt 2.6.19")
     if "2.6.13" not in feat:
         _fail("FEATURES.md fehlt 2.6.13")
     if (
@@ -1335,6 +1369,14 @@ def check_changelog() -> None:
         and "Dokument-Ebenen" not in feat
     ):
         _fail("FEATURES.md fehlt 2.6.18 CMYK/Bleed/Preflight/PDF/X")
+    if (
+        "Buch-Layout" not in feat
+        and "Document Comparison" not in feat
+        and "Seite-für-Seite" not in feat
+        and "Ribbon-Chrome" not in feat
+        and "Dokument-Tabs" not in feat
+    ):
+        _fail("FEATURES.md fehlt 2.6.19 Compare/Book/Tabs/Ribbon")
     if "Automatische Formatierung" not in feat and "Systemschriften" not in feat:
         _fail("FEATURES.md fehlt 2.6.10 Auto-Format/Fonts")
     if "2.6.10" not in feat:
@@ -1773,11 +1815,11 @@ Exit-Codes:
 Laufzeit: am Ende als „Laufzeit: N ms“ (oder duration_ms im JSON).
 
 Beispiel --json (Erfolg):
-  {"ok": true, "version": "2.6.18", "duration_ms": 1234,
+  {"ok": true, "version": "2.6.19", "duration_ms": 1234,
    "checks": ["version", "imports", "cli", "measure_diff_import", "changelog"]}
 
 Beispiel --json (Fail):
-  {"ok": false, "version": "2.6.18", "duration_ms": 12,
+  {"ok": false, "version": "2.6.19", "duration_ms": 12,
    "checks": ["version", {"name": "imports", "error": "import x: …"}]}
 """.rstrip()
     )

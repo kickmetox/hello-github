@@ -168,6 +168,8 @@ from instantlensdoc.ui.watermark_dialog import WatermarkDialog
 from instantlensdoc.ui.annotation_search_dialog import AnnotationSearchDialog
 from instantlensdoc.ui.batch_rename_dialog import BatchRenameDialog
 from instantlensdoc.ui.compare_dialog import PdfCompareDialog
+from instantlensdoc.ui.doc_tab_bar import DocumentTabBar
+from instantlensdoc.ui.ribbon_bar import RibbonBar
 from instantlensdoc.ui.text_compare_dialog import TextCompareDialog
 from instantlensdoc.ui.settings_dialog import SettingsDialog
 from instantlensdoc.ui.stubs import show_planned
@@ -438,6 +440,7 @@ class MainWindow(QMainWindow):
     def _on_documents_reordered(self):
         """Session-Tab-Reihenfolge nach Drag in der Dokumentliste speichern (0.9.3)."""
         self._save_session()
+        self._refresh_doc_tab_bar()
 
     def _on_document_renamed(self, _path: str = "") -> None:
         """Tab-Anzeige-Label geändert → Session speichern (0.9.4)."""
@@ -1014,6 +1017,22 @@ class MainWindow(QMainWindow):
         outer.addWidget(self.favorites_bar)
         QTimer.singleShot(0, self._refresh_favorites_bar)
 
+        # Ribbon-Chrome (partiell) + Dokument-Tabs — 2.6.19
+        from instantlensdoc.core.app_settings import (
+            get_doc_tabs_visible,
+            get_ribbon_visible,
+        )
+
+        self.ribbon_bar = RibbonBar(self)
+        self.ribbon_bar.action_triggered.connect(self._on_ribbon_action)
+        self.ribbon_bar.setVisible(get_ribbon_visible())
+        outer.addWidget(self.ribbon_bar)
+        self.doc_tab_bar = DocumentTabBar(self)
+        self.doc_tab_bar.tab_activated.connect(self._on_doc_tab_activated)
+        self.doc_tab_bar.tab_close_requested.connect(self.close_tab_path)
+        self.doc_tab_bar.setVisible(get_doc_tabs_visible())
+        outer.addWidget(self.doc_tab_bar)
+
         root = QHBoxLayout()
         root.setContentsMargins(0, 0, 0, 0)
         outer.addLayout(root, 1)
@@ -1130,6 +1149,8 @@ class MainWindow(QMainWindow):
         self.pdf_view.night_mode_changed.connect(self._sync_night_action)
         self.pdf_view.two_page_spread_changed.connect(self._sync_spread_action)
         self.pdf_view.continuous_scroll_changed.connect(self._sync_continuous_action)
+        self.pdf_view.book_layout_changed.connect(self._sync_book_layout_action)
+        self.pdf_view.page_by_page_changed.connect(self._sync_page_by_page_action)
         self.pdf_view.annotations_layer_changed.connect(self._sync_ann_layer_action)
         self.pdf_view.annotations_lock_changed.connect(self._sync_ann_lock_action)
         self.pdf_view.page_boxes_changed.connect(self._sync_page_boxes_action)
@@ -2187,6 +2208,23 @@ class MainWindow(QMainWindow):
         self._spread_action.setShortcut(QKeySequence("Ctrl+2"))
         self._spread_action.toggled.connect(self._toggle_two_page_spread)
         m_view.addAction(self._spread_action)
+        from instantlensdoc.core.app_settings import (
+            get_pdf_book_layout,
+            get_pdf_page_by_page,
+            get_doc_tabs_visible as _get_doc_tabs,
+            get_ribbon_visible as _get_ribbon,
+        )
+
+        self._book_layout_action = QAction("Buch-Layout (Book Layout)", self)
+        self._book_layout_action.setCheckable(True)
+        self._book_layout_action.setChecked(get_pdf_book_layout())
+        self._book_layout_action.setObjectName("actBookLayout")
+        self._book_layout_action.setToolTip(
+            "Buch-Layout: Cover allein, danach Doppelseiten (Ctrl+Alt+2) — 2.6.19"
+        )
+        self._book_layout_action.setShortcut(QKeySequence("Ctrl+Alt+2"))
+        self._book_layout_action.toggled.connect(self._toggle_book_layout)
+        m_view.addAction(self._book_layout_action)
         self._continuous_action = QAction("Continuous Scroll", self)
         self._continuous_action.setCheckable(True)
         self._continuous_action.setChecked(get_pdf_continuous_scroll())
@@ -2196,6 +2234,34 @@ class MainWindow(QMainWindow):
         self._continuous_action.setShortcut(QKeySequence("Ctrl+3"))
         self._continuous_action.toggled.connect(self._toggle_continuous_scroll)
         m_view.addAction(self._continuous_action)
+        self._page_by_page_action = QAction("Seite-für-Seite-Scrollen", self)
+        self._page_by_page_action.setCheckable(True)
+        self._page_by_page_action.setChecked(get_pdf_page_by_page())
+        self._page_by_page_action.setObjectName("actPageByPage")
+        self._page_by_page_action.setToolTip(
+            "Mausrad blättert Seiten (kein Continuous) — Ctrl+Alt+3 — 2.6.19"
+        )
+        self._page_by_page_action.setShortcut(QKeySequence("Ctrl+Alt+3"))
+        self._page_by_page_action.toggled.connect(self._toggle_page_by_page)
+        m_view.addAction(self._page_by_page_action)
+        self._doc_tabs_action = QAction("Dokument-Tabs", self)
+        self._doc_tabs_action.setCheckable(True)
+        self._doc_tabs_action.setChecked(_get_doc_tabs())
+        self._doc_tabs_action.setObjectName("actDocTabs")
+        self._doc_tabs_action.setToolTip(
+            "Horizontale Tabs für offene Dokumente ein-/ausblenden — 2.6.19"
+        )
+        self._doc_tabs_action.toggled.connect(self._toggle_doc_tabs)
+        m_view.addAction(self._doc_tabs_action)
+        self._ribbon_action = QAction("Ribbon-Leiste", self)
+        self._ribbon_action.setCheckable(True)
+        self._ribbon_action.setChecked(_get_ribbon())
+        self._ribbon_action.setObjectName("actRibbon")
+        self._ribbon_action.setToolTip(
+            "Ribbon-ähnliche Werkzeugleiste (partiell) — 2.6.19"
+        )
+        self._ribbon_action.toggled.connect(self._toggle_ribbon)
+        m_view.addAction(self._ribbon_action)
         self._ann_layer_action = QAction("Annotation-Layer", self)
         self._ann_layer_action.setCheckable(True)
         self._ann_layer_action.setChecked(get_annotations_visible())
@@ -2422,9 +2488,11 @@ class MainWindow(QMainWindow):
         act_wm.triggered.connect(self._watermark_tools)
         m_pdf.addAction(act_wm)
         act_cmp = QAction("Zwei PDFs vergleichen…", self)
+        act_cmp.setShortcut(QKeySequence("Ctrl+Alt+Shift+V"))
+        act_cmp.setObjectName("actComparePdfs")
         act_cmp.setToolTip(
-            "Seite-für-Seite + Raster-Diff; Sync/Entkoppelt, Diff-Schwelle, "
-            "PNG-Export — 1.4.1"
+            "Dokumentvergleich: Side-by-Side, Drag-and-Drop, Sync-Scroll, "
+            "Diff-Highlight — 2.6.19"
         )
         act_cmp.triggered.connect(self._compare_pdfs)
         m_pdf.addAction(act_cmp)
@@ -6020,11 +6088,103 @@ class MainWindow(QMainWindow):
         self.pdf_view.set_two_page_spread(bool(checked))
         self._sync_spread_action(bool(checked))
         self._sync_continuous_action()
+        self._sync_book_layout_action()
+
+    def _toggle_book_layout(self, checked: bool):
+        self.pdf_view.set_book_layout(bool(checked))
+        self._sync_book_layout_action(bool(checked))
+        self._sync_spread_action()
+        self._sync_continuous_action()
+        if getattr(self, "ribbon_bar", None) is not None:
+            self.ribbon_bar.set_checked("book_layout", bool(checked))
 
     def _toggle_continuous_scroll(self, checked: bool):
         self.pdf_view.set_continuous_scroll(bool(checked))
         self._sync_continuous_action(bool(checked))
         self._sync_spread_action()
+        self._sync_book_layout_action()
+        self._sync_page_by_page_action()
+
+    def _toggle_page_by_page(self, checked: bool):
+        self.pdf_view.set_page_by_page(bool(checked))
+        self._sync_page_by_page_action(bool(checked))
+        self._sync_continuous_action()
+        if getattr(self, "ribbon_bar", None) is not None:
+            self.ribbon_bar.set_checked("page_by_page", bool(checked))
+
+    def _toggle_doc_tabs(self, checked: bool):
+        from instantlensdoc.core.app_settings import set_doc_tabs_visible
+
+        set_doc_tabs_visible(bool(checked))
+        if getattr(self, "doc_tab_bar", None) is not None:
+            if checked:
+                self._refresh_doc_tab_bar()
+            else:
+                self.doc_tab_bar.setVisible(False)
+        if getattr(self, "ribbon_bar", None) is not None:
+            self.ribbon_bar.set_checked("toggle_doc_tabs", bool(checked))
+
+    def _toggle_ribbon(self, checked: bool):
+        from instantlensdoc.core.app_settings import set_ribbon_visible
+
+        set_ribbon_visible(bool(checked))
+        if getattr(self, "ribbon_bar", None) is not None:
+            self.ribbon_bar.setVisible(bool(checked))
+
+    def _on_ribbon_action(self, action_id: str) -> None:
+        """Ribbon-Chrome-Aktionen — 2.6.19."""
+        handlers = {
+            "open": self.open_dialog,
+            "save": self.save_doc,
+            "compare_pdfs": self._compare_pdfs,
+            "find_replace": self._find_replace,
+            "book_layout": lambda: self._toggle_book_layout(
+                not self.pdf_view.book_layout_enabled()
+            ),
+            "page_by_page": lambda: self._toggle_page_by_page(
+                not self.pdf_view.page_by_page_enabled()
+            ),
+            "continuous_scroll": lambda: self._toggle_continuous_scroll(
+                not self.pdf_view.continuous_scroll_enabled()
+            ),
+            "toggle_doc_tabs": lambda: self._toggle_doc_tabs(
+                not (
+                    getattr(self, "doc_tab_bar", None) is not None
+                    and self.doc_tab_bar.isVisible()
+                )
+            ),
+            "preflight": self._run_preflight,
+            "apply_bleed": self._apply_bleed_dialog,
+            "export_pdfx": self._export_pdfx,
+        }
+        fn = handlers.get(action_id)
+        if callable(fn):
+            fn()
+
+    def _on_doc_tab_activated(self, path: str) -> None:
+        if path:
+            self.open_path(path)
+
+    def _refresh_doc_tab_bar(self) -> None:
+        """Dokument-Tabs aus Sidebar synchronisieren — 2.6.19."""
+        if getattr(self, "doc_tab_bar", None) is None:
+            return
+        from instantlensdoc.core.app_settings import get_doc_tabs_visible
+
+        if not get_doc_tabs_visible():
+            self.doc_tab_bar.setVisible(False)
+            return
+        paths = (
+            list(self.sidebar.document_paths())
+            if hasattr(self.sidebar, "document_paths")
+            else []
+        )
+        active = None
+        if self.doc and self.doc.path:
+            active = str(self.doc.path)
+        elif getattr(self.pdf_view, "pdf_path", None):
+            active = str(self.pdf_view.pdf_path)
+        self.doc_tab_bar.set_documents(paths, active=active)
 
     def _toggle_panel_thumbs(self, checked: bool):
         """Sidebar-Panel Vorschaubilder — Session (0.9.5)."""
@@ -6303,6 +6463,26 @@ class MainWindow(QMainWindow):
             self._spread_action.setChecked(bool(enabled))
             self._spread_action.blockSignals(False)
 
+    def _sync_book_layout_action(self, enabled: bool | None = None):
+        if enabled is None:
+            enabled = self.pdf_view.book_layout_enabled()
+        if hasattr(self, "_book_layout_action") and self._book_layout_action is not None:
+            self._book_layout_action.blockSignals(True)
+            self._book_layout_action.setChecked(bool(enabled))
+            self._book_layout_action.blockSignals(False)
+        if getattr(self, "ribbon_bar", None) is not None:
+            self.ribbon_bar.set_checked("book_layout", bool(enabled))
+
+    def _sync_page_by_page_action(self, enabled: bool | None = None):
+        if enabled is None:
+            enabled = self.pdf_view.page_by_page_enabled()
+        if hasattr(self, "_page_by_page_action") and self._page_by_page_action is not None:
+            self._page_by_page_action.blockSignals(True)
+            self._page_by_page_action.setChecked(bool(enabled))
+            self._page_by_page_action.blockSignals(False)
+        if getattr(self, "ribbon_bar", None) is not None:
+            self.ribbon_bar.set_checked("page_by_page", bool(enabled))
+
     def _sync_continuous_action(self, enabled: bool | None = None):
         if enabled is None:
             enabled = self.pdf_view.continuous_scroll_enabled()
@@ -6310,6 +6490,8 @@ class MainWindow(QMainWindow):
             self._continuous_action.blockSignals(True)
             self._continuous_action.setChecked(bool(enabled))
             self._continuous_action.blockSignals(False)
+        if getattr(self, "ribbon_bar", None) is not None:
+            self.ribbon_bar.set_checked("continuous_scroll", bool(enabled))
 
     def _sync_ann_layer_action(self, enabled: bool):
         if hasattr(self, "_ann_layer_action") and self._ann_layer_action is not None:
@@ -10739,6 +10921,25 @@ class MainWindow(QMainWindow):
             "preflight": self._run_preflight,
             "apply_bleed": self._apply_bleed_dialog,
             "doc_layers": self._show_doc_layers,
+            "compare_pdfs": self._compare_pdfs,
+            "book_layout": lambda: self._toggle_book_layout(
+                not self.pdf_view.book_layout_enabled()
+            ),
+            "page_by_page": lambda: self._toggle_page_by_page(
+                not self.pdf_view.page_by_page_enabled()
+            ),
+            "toggle_doc_tabs": lambda: self._toggle_doc_tabs(
+                not (
+                    getattr(self, "doc_tab_bar", None) is not None
+                    and self.doc_tab_bar.isVisible()
+                )
+            ),
+            "toggle_ribbon": lambda: self._toggle_ribbon(
+                not (
+                    getattr(self, "ribbon_bar", None) is not None
+                    and self.ribbon_bar.isVisible()
+                )
+            ),
             "hyphenate_en": lambda: self._hyphenate_document("en"),
             "text_wrap": self._set_image_text_wrap,
             "ocr_page": self._run_ocr,
@@ -11125,6 +11326,8 @@ class MainWindow(QMainWindow):
         else:
             self._set_status(f"Tab gelöst: {name}")
         self._refresh_document_dirty_labels()
+
+        self._refresh_doc_tab_bar()
 
     def close_tab_path(self, path: str) -> None:
         """Sidebar-Tab schließen (Mittelklick / Kontextmenü) — dirty → Speichern-Dialog."""
@@ -13428,6 +13631,7 @@ class MainWindow(QMainWindow):
         else:
             self.doc.meta.pop("readonly", None)
         self.sidebar.add_document(path)
+        self._refresh_doc_tab_bar()
         if not is_preview:
             self._remember_path(path)
         title_name = self.doc.display_name

@@ -1,4 +1,7 @@
-"""Zwei PDFs Seite-nebeneinander vergleichen + Raster-Diff Overlay — 1.4.5."""
+"""Zwei PDFs Seite-nebeneinander vergleichen + Raster-Diff Overlay — 2.6.19.
+
+2.6.19: Drag-and-Drop PDFs, synchrones Scrollen der Panes, Diff-Highlight.
+"""
 
 from __future__ import annotations
 
@@ -7,8 +10,8 @@ import re
 from datetime import date as _date
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QTimer
-from PySide6.QtGui import QFont, QImage, QKeySequence, QPixmap
+from PySide6.QtCore import Qt, QTimer, QEvent
+from PySide6.QtGui import QFont, QImage, QKeySequence, QPixmap, QDragEnterEvent, QDropEvent
 from PySide6.QtWidgets import (
     QCheckBox,
     QDialog,
@@ -24,6 +27,7 @@ from PySide6.QtWidgets import (
     QSpinBox,
     QStackedWidget,
     QVBoxLayout,
+    QWidget,
 )
 
 from ild_pdf.diff import (
@@ -66,6 +70,45 @@ DIFF_TXT_FILENAME_TEMPLATE = DEFAULT_TEXTLAYER_DIFF_TXT_TEMPLATE
 DIFF_PNG_KNOWN_PLACEHOLDERS = frozenset({"stemA", "stemB", "page", "date"})
 _DIFF_PNG_PLACEHOLDER_RE = re.compile(r"\{(stemA|stemB|page|date)\}")
 _DIFF_PNG_ANY_PLACEHOLDER_RE = re.compile(r"\{([^{}]+)\}")
+
+
+class _PdfDropPane(QScrollArea):
+    """ScrollArea mit PDF-Drag-and-Drop — 2.6.19."""
+
+    def __init__(self, on_drop, parent=None):
+        super().__init__(parent)
+        self._on_drop = on_drop
+        self.setAcceptDrops(True)
+        self.setWidgetResizable(True)
+
+    def dragEnterEvent(self, event: QDragEnterEvent):
+        if event.mimeData() and event.mimeData().hasUrls():
+            for url in event.mimeData().urls():
+                if str(url.toLocalFile()).lower().endswith(".pdf"):
+                    event.acceptProposedAction()
+                    return
+        event.ignore()
+
+    def dragMoveEvent(self, event):
+        if event.mimeData() and event.mimeData().hasUrls():
+            event.acceptProposedAction()
+        else:
+            event.ignore()
+
+    def dropEvent(self, event: QDropEvent):
+        if not event.mimeData() or not event.mimeData().hasUrls():
+            event.ignore()
+            return
+        for url in event.mimeData().urls():
+            path = str(url.toLocalFile() or "")
+            if path.lower().endswith(".pdf") and Path(path).is_file():
+                try:
+                    self._on_drop(path)
+                except Exception:
+                    pass
+                event.acceptProposedAction()
+                return
+        event.ignore()
 
 
 class DiffPngTemplateEdit(QLineEdit):
@@ -177,8 +220,9 @@ class PdfCompareDialog(QDialog):
         right_pdf: str | None = None,
     ):
         super().__init__(parent)
-        self.setWindowTitle("PDF vergleichen (Seite neben Seite + Diff)")
+        self.setWindowTitle("PDF vergleichen (Seite neben Seite + Diff) — 2.6.19")
         self.resize(1100, 720)
+        self.setAcceptDrops(True)
         self._left = left_pdf or ""
         self._right = right_pdf or ""
         self._left_pages = 0
@@ -188,13 +232,21 @@ class PdfCompareDialog(QDialog):
         self._right_img = None
         self._diff_overlay = None  # PIL Image für PNG-Export — 1.4.1
         self._text_diff_result = None  # TextLayerDiffResult — 2.1.0
+        self._scroll_syncing = False
 
         root = QVBoxLayout(self)
+        drop_hint = QLabel(
+            "PDFs per Drag-and-Drop auf die linke/rechte Pane legen · "
+            "Sync-Scroll koppelt vertikales Scrollen — 2.6.19"
+        )
+        drop_hint.setWordWrap(True)
+        drop_hint.setStyleSheet("color: #445; font-size: 11px;")
+        root.addWidget(drop_hint)
         pick = QHBoxLayout()
         self.btn_left = QPushButton("Linkes PDF…")
         self.btn_right = QPushButton("Rechtes PDF…")
-        self.lbl_left_path = QLabel(self._left or "—")
-        self.lbl_right_path = QLabel(self._right or "—")
+        self.lbl_left_path = QLabel(self._left or "— (PDF hierher ziehen)")
+        self.lbl_right_path = QLabel(self._right or "— (PDF hierher ziehen)")
         self.lbl_left_path.setWordWrap(True)
         self.lbl_right_path.setWordWrap(True)
         self.btn_left.clicked.connect(lambda: self._pick(True))
@@ -220,6 +272,12 @@ class PdfCompareDialog(QDialog):
             "Links/Rechts unabhängig — 1.4.1"
         )
         self.chk_sync.toggled.connect(self._on_sync_toggled)
+        self.chk_scroll_sync = QCheckBox("Sync-Scroll")
+        self.chk_scroll_sync.setChecked(True)
+        self.chk_scroll_sync.setToolTip(
+            "Vertikales Scrollen der linken/rechten Pane synchronisieren — 2.6.19"
+        )
+        self.chk_scroll_sync.setObjectName("compareScrollSync")
         self.chk_diff = QCheckBox("Raster-Diff Overlay")
         self.chk_diff.setChecked(True)
         self.chk_diff.setToolTip(
@@ -283,6 +341,7 @@ class PdfCompareDialog(QDialog):
         nav.addWidget(QLabel("Rechts Seite"))
         nav.addWidget(self.spin_right)
         nav.addWidget(self.chk_sync)
+        nav.addWidget(self.chk_scroll_sync)
         nav.addWidget(self.chk_diff)
         nav.addWidget(self.chk_text_diff)
         nav.addWidget(self.chk_ignore_ws)
@@ -430,12 +489,21 @@ class PdfCompareDialog(QDialog):
         sl_diff_img.setWidget(self.view_diff)
         self.diff_stack.addWidget(sl_diff_img)  # 0 = Raster
         self.diff_stack.addWidget(self.diff_text)  # 1 = Text
-        sl = QScrollArea()
-        sr = QScrollArea()
-        sl.setWidgetResizable(True)
-        sr.setWidgetResizable(True)
+        # Drag-and-Drop-Panes + Sync-Scroll — 2.6.19
+        sl = _PdfDropPane(lambda p: self._set_pdf_path(True, p))
+        sr = _PdfDropPane(lambda p: self._set_pdf_path(False, p))
         sl.setWidget(self.view_left)
         sr.setWidget(self.view_right)
+        sl.setToolTip("Linkes PDF — Datei hierher ziehen — 2.6.19")
+        sr.setToolTip("Rechtes PDF — Datei hierher ziehen — 2.6.19")
+        self.scroll_left = sl
+        self.scroll_right = sr
+        sl.verticalScrollBar().valueChanged.connect(
+            lambda v: self._on_pane_scroll(True, v)
+        )
+        sr.verticalScrollBar().valueChanged.connect(
+            lambda v: self._on_pane_scroll(False, v)
+        )
         panes.addWidget(sl)
         panes.addWidget(sr)
         panes.addWidget(self.diff_stack)
@@ -639,6 +707,68 @@ class PdfCompareDialog(QDialog):
         else:
             self._refresh()
 
+    def _on_pane_scroll(self, left: bool, value: int) -> None:
+        """Vertikales Sync-Scroll zwischen Panes — 2.6.19."""
+        if self._scroll_syncing:
+            return
+        if not getattr(self, "chk_scroll_sync", None) or not self.chk_scroll_sync.isChecked():
+            return
+        other = self.scroll_right if left else self.scroll_left
+        bar = other.verticalScrollBar()
+        if bar is None:
+            return
+        self._scroll_syncing = True
+        try:
+            bar.setValue(int(value))
+        finally:
+            self._scroll_syncing = False
+
+    def _set_pdf_path(self, left: bool, path: str) -> None:
+        """PDF-Pfad setzen (Dialog oder Drag-and-Drop) — 2.6.19."""
+        if not path:
+            return
+        p = str(Path(path))
+        if left:
+            self._left = p
+            self.lbl_left_path.setText(p)
+            self._load_meta(True)
+        else:
+            self._right = p
+            self.lbl_right_path.setText(p)
+            self._load_meta(False)
+        self._refresh()
+        self._update_png_template_preview()
+        self._update_txt_template_preview()
+
+    def dragEnterEvent(self, event: QDragEnterEvent):
+        if event.mimeData() and event.mimeData().hasUrls():
+            for url in event.mimeData().urls():
+                if str(url.toLocalFile()).lower().endswith(".pdf"):
+                    event.acceptProposedAction()
+                    return
+        event.ignore()
+
+    def dropEvent(self, event: QDropEvent):
+        """Dialog-Drop: erstes PDF links, zweites rechts — 2.6.19."""
+        if not event.mimeData() or not event.mimeData().hasUrls():
+            event.ignore()
+            return
+        pdfs = []
+        for url in event.mimeData().urls():
+            path = str(url.toLocalFile() or "")
+            if path.lower().endswith(".pdf") and Path(path).is_file():
+                pdfs.append(path)
+        if not pdfs:
+            event.ignore()
+            return
+        self._set_pdf_path(True, pdfs[0])
+        if len(pdfs) >= 2:
+            self._set_pdf_path(False, pdfs[1])
+        elif not self._right:
+            # Ein PDF und rechte Seite leer → rechts bleibt leer
+            pass
+        event.acceptProposedAction()
+
     def _on_threshold_changed(self, value: int = 0) -> None:
         set_pdf_compare_diff_threshold(int(value))
         self._refresh()
@@ -747,16 +877,7 @@ class PdfCompareDialog(QDialog):
         path, _ = QFileDialog.getOpenFileName(self, "PDF wählen", "", "PDF (*.pdf)")
         if not path:
             return
-        if left:
-            self._left = path
-            self.lbl_left_path.setText(path)
-            self._load_meta(True)
-        else:
-            self._right = path
-            self.lbl_right_path.setText(path)
-            self._load_meta(False)
-        self._refresh()
-        self._update_png_template_preview()
+        self._set_pdf_path(left, path)
 
     def _load_meta(self, left: bool):
         path = self._left if left else self._right

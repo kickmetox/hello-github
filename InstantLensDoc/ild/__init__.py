@@ -1,5 +1,5 @@
 """
-Stabiles Scripting-API für InstantLens Doc (2.6.18).
+Stabiles Scripting-API für InstantLens Doc (2.6.19).
 
 Headless, ohne GUI. Nutzt ``ild_pdf`` + Lizenz/OCR der App.
 
@@ -25,6 +25,7 @@ Headless, ohne GUI. Nutzt ``ild_pdf`` + Lizenz/OCR der App.
     ild.import_ildocr("scan.ildocr.txt")
     ild.list_ki_wizards()
     ild.generate_ki_document("anschreiben", fields={"betreff": "Anfrage"})
+    ild.compare_pdfs("a.pdf", "b.pdf", out_png="diff.png")
 
 CLI: ``python -m ild --help`` · PowerShell: ``scripts\\ild.ps1``.
 """
@@ -111,6 +112,7 @@ from ild.api import (
     layout_layers,
     preflight,
     export_pdfx,
+    compare_pdfs,
     open_info,
     outline_summary,
     page_count,
@@ -157,6 +159,7 @@ __all__ = [
     "layout_layers",
     "preflight",
     "export_pdfx",
+    "compare_pdfs",
     "add_redaction",
     "apply_redactions",
     "add_shape",

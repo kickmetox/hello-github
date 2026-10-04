@@ -563,7 +563,7 @@ def set_default_open_dir(path: str | Path) -> None:
 
 
 def get_ui_lang() -> UiLang:
-    """UI-Sprache DE/EN/FR/RU/ES/ZH/PT/AR/IT — persistiert — 2.6.18."""
+    """UI-Sprache DE/EN/FR/RU/ES/ZH/PT/AR/IT — persistiert — 2.6.19."""
     from instantlensdoc.core.i18n import normalize_lang
 
     lang = str(load_settings().get("ui_lang", "de") or "de")
@@ -571,7 +571,7 @@ def get_ui_lang() -> UiLang:
 
 
 def set_ui_lang(lang: str) -> None:
-    """UI-Sprache speichern (9 Sprachen) — 2.6.18."""
+    """UI-Sprache speichern (9 Sprachen) — 2.6.19."""
     from instantlensdoc.core.i18n import normalize_lang
 
     save_settings({"ui_lang": normalize_lang(lang)})
@@ -1816,6 +1816,42 @@ def get_pdf_two_page_spread() -> bool:
 
 def set_pdf_two_page_spread(enabled: bool) -> None:
     save_settings({"pdf_two_page_spread": bool(enabled)})
+
+
+def get_pdf_book_layout() -> bool:
+    """Buch-Layout: Spread + Cover-Seite allein — 2.6.19."""
+    return bool(load_settings().get("pdf_book_layout", False))
+
+
+def set_pdf_book_layout(enabled: bool) -> None:
+    save_settings({"pdf_book_layout": bool(enabled)})
+
+
+def get_pdf_page_by_page() -> bool:
+    """Seite-für-Seite-Scroll: Mausrad blättert Seiten — 2.6.19."""
+    return bool(load_settings().get("pdf_page_by_page", False))
+
+
+def set_pdf_page_by_page(enabled: bool) -> None:
+    save_settings({"pdf_page_by_page": bool(enabled)})
+
+
+def get_doc_tabs_visible() -> bool:
+    """Horizontale Dokument-Tabs sichtbar — 2.6.19."""
+    return bool(load_settings().get("doc_tabs_visible", True))
+
+
+def set_doc_tabs_visible(enabled: bool) -> None:
+    save_settings({"doc_tabs_visible": bool(enabled)})
+
+
+def get_ribbon_visible() -> bool:
+    """Ribbon-Chrome sichtbar (partiell) — 2.6.19."""
+    return bool(load_settings().get("ribbon_visible", True))
+
+
+def set_ribbon_visible(enabled: bool) -> None:
+    save_settings({"ribbon_visible": bool(enabled)})
 
 
 def get_pdf_continuous_scroll() -> bool:
