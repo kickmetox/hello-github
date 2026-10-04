@@ -934,7 +934,8 @@ class SettingsDialog(QDialog):
             sw.setFrameShape(QFrame.Box)
             sw.setToolTip(
                 "Theme-Vorschau · Klick=Hex · RMB=HL/Stift/Notiz · "
-                "Focus: Space/H=HL · P=Stift · N=Notiz · C=Hex · ←/→ · Home/End · 1–6 — 2.5.17"
+                "Focus: Space/H=HL · P=Stift · N=Notiz · C/Ctrl+C=Hex · "
+                "←/→ · PgUp/PgDn · Home/End · 1–6 — 2.5.18"
             )
             sw.setCursor(Qt.PointingHandCursor)
             sw.setFocusPolicy(Qt.StrongFocus)
@@ -2837,15 +2838,22 @@ class SettingsDialog(QDialog):
             self.btn_undo_factory_presets.setEnabled(bool(prev))
 
     def eventFilter(self, obj, event):  # noqa: N802
-        """Swatch L→Hex · Dbl→HL/Stift/Notiz · M→HL · Keys Space/H/P/N/C · ←/→ · Home/End · 1–6 — 2.5.9–2.5.17."""
+        """Swatch L→Hex · Dbl→HL/Stift/Notiz · M→HL · Keys Space/H/P/N/C · ←/→ · PgUp/Dn · Home/End · 1–6 — 2.5.9–2.5.18."""
         labels = getattr(self, "_theme_swatch_labels", None) or []
         if obj in labels:
             hex_c = str(obj.property("themeHex") or "").strip()
             if event.type() == QEvent.KeyPress:
                 assert isinstance(event, QKeyEvent)
                 key = event.key()
-                # ←/→ zwischen Swatches — 2.5.15; Home/End erster/letzter — 2.5.16
-                if key in (Qt.Key_Left, Qt.Key_Right, Qt.Key_Home, Qt.Key_End):
+                # ←/→ zwischen Swatches — 2.5.15; Home/End · PageUp/Down — 2.5.16/2.5.18
+                if key in (
+                    Qt.Key_Left,
+                    Qt.Key_Right,
+                    Qt.Key_Home,
+                    Qt.Key_End,
+                    Qt.Key_PageUp,
+                    Qt.Key_PageDown,
+                ):
                     try:
                         idx = labels.index(obj)
                     except ValueError:
@@ -2854,13 +2862,26 @@ class SettingsDialog(QDialog):
                         candidates = range(0, len(labels))
                     elif key == Qt.Key_End:
                         candidates = range(len(labels) - 1, -1, -1)
+                    elif key == Qt.Key_PageUp:
+                        # PageUp: bis zu 3 Swatches zurück — 2.5.18
+                        start = max(0, idx - 3)
+                        candidates = range(start, -1, -1)
+                    elif key == Qt.Key_PageDown:
+                        # PageDown: bis zu 3 Swatches vor — 2.5.18
+                        start = min(len(labels) - 1, idx + 3)
+                        candidates = range(start, len(labels))
                     else:
                         step = -1 if key == Qt.Key_Left else 1
                         candidates = range(idx + step, -1 if step < 0 else len(labels), step)
                     for nxt in candidates:
                         other = labels[nxt]
                         if str(other.property("themeHex") or "").strip():
-                            if key in (Qt.Key_Home, Qt.Key_End) or nxt != idx:
+                            if key in (
+                                Qt.Key_Home,
+                                Qt.Key_End,
+                                Qt.Key_PageUp,
+                                Qt.Key_PageDown,
+                            ) or nxt != idx:
                                 other.setFocus(Qt.TabFocusReason)
                             return True
                     return True
@@ -2882,7 +2903,7 @@ class SettingsDialog(QDialog):
                     return True
                 if not hex_c:
                     return super().eventFilter(obj, event)
-                # Space/Enter/H → Highlight · P → Stift · N → Notiz · C → Hex — 2.5.15
+                # Space/Enter/H → Highlight · P → Stift · N → Notiz · C/Ctrl+C → Hex — 2.5.15/2.5.18
                 if key in (Qt.Key_Space, Qt.Key_Return, Qt.Key_Enter, Qt.Key_H):
                     self._apply_swatch_as_tool_color(hex_c, "highlight")
                     return True
@@ -2938,7 +2959,7 @@ class SettingsDialog(QDialog):
         if not hex_c:
             return
         menu = QMenu(self)
-        act_copy = menu.addAction(f"Hex kopieren ({hex_c})\tC")
+        act_copy = menu.addAction(f"Hex kopieren ({hex_c})\tC / Ctrl+C")
         menu.addSeparator()
         act_hl = menu.addAction("Als Highlight-Farbe setzen\tH / Space / Dbl / Mid")
         act_pen = menu.addAction("Als Stiftfarbe setzen\tP / Shift+Dbl / Shift+Mid")
@@ -3022,15 +3043,15 @@ class SettingsDialog(QDialog):
                     f"Mittelklick = Highlight · "
                     f"Shift+Mittelklick = Stift · Ctrl+Mittelklick = Notiz · "
                     f"RMB = HL/Stift/Notiz · "
-                    f"Focus: Space/H=HL · P=Stift · N=Notiz · C=Hex · "
-                    f"←/→ · Home/End · 1–6 — 2.5.17"
+                    f"Focus: Space/H=HL · P=Stift · N=Notiz · C/Ctrl+C=Hex · "
+                    f"←/→ · PgUp/PgDn · Home/End · 1–6 — 2.5.18"
                 )
                 sw.setProperty("themeHex", str(c))
                 sw.setAccessibleName(f"Theme-Swatch {i + 1}: {c}")
                 sw.setAccessibleDescription(
-                    "Space oder H Highlight, P Stift, N Notiz, C Hex kopieren, "
-                    "Pfeiltasten wechseln, Home/End erster/letzter Swatch, "
-                    "Ziffern 1–6 springen zum Swatch"
+                    "Space oder H Highlight, P Stift, N Notiz, C oder Ctrl+C Hex kopieren, "
+                    "Pfeiltasten wechseln, PageUp/PageDown ±3 Swatches, "
+                    "Home/End erster/letzter Swatch, Ziffern 1–6 springen zum Swatch"
                 )
                 sw.setCursor(Qt.PointingHandCursor)
                 sw.setFocusPolicy(Qt.StrongFocus)

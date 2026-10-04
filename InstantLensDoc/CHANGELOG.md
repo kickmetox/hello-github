@@ -1,5 +1,20 @@
 # Changelog — InstantLens Doc
 
+## 2.5.18 — OCR Pfad-Fail-A11y, Theme PgUp/Dn·Ctrl+C, ildtags Öffnen⏎, Export JSON-A11y
+
+Post-Release-Polish nach **2.5.17**: **OCR-Region** Status-**Pfad-Copy Fail-Path A11y**; **Farben-Themes** Swatch-**PageUp/PageDown** · **Ctrl+C Hex**; **ildtags** **Öffnen⏎Enter** · Fail-A11y; **Export-Presets** **JSON Imp/Exp A11y** · Ordner-fehlt Fail-A11y. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie klar markiert / nicht produktiv (Ink ≠ Stylus).
+
+### Geändert
+- OCR-Region: Fail-Path A11y bei Pfad kopieren (fehlt/leer/Zwischenablage)
+- Farben-Themes: Swatch PageUp/PageDown (±3) · Menü/Tooltip C/Ctrl+C · 2.5.18
+- Dokument-Tags: Menü Öffnen\tEnter · `_open_recent_in_app` Fail-A11y
+- Export-Presets: JSON Export/Import A11y Announce · Zielordner-fehlt Fail-A11y
+
+### Tests / Qualität
+- Version **2.5.18** (App / `ild_pdf` / ISS / Smoke / Docs); Serie **2.5**; `docs/VERSION` + `VERSION.txt`
+- Smoke: 2.5.18 CLI + Qt (OCR Pfad-Fail-A11y, Theme PgUp/Dn, ildtags Öffnen⏎, Export JSON-A11y)
+- Stubs: KI/Cloud/Stylus/3D/Hooks/Outline/Telemetrie unverändert markiert
+
 ## 2.5.17 — OCR Text-Fail-A11y, Theme Digits 1–6, ildtags F5-Datei, Export CRUD-A11y
 
 Post-Release-Polish nach **2.5.16**: **OCR-Region** Status-**Text-Copy Fail-Path A11y**; **Farben-Themes** Swatch-**Ziffern 1–6**; **ildtags** **F5 → Datei** · **Menü Entf**; **Export-Presets** **CRUD A11y** (Duplizieren/Umbenennen/Löschen). Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie klar markiert / nicht produktiv (Ink ≠ Stylus).

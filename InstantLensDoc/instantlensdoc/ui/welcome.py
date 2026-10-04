@@ -245,7 +245,7 @@ class WelcomePage(QWidget):
         self.btn_continue.setToolTip(tip)
 
     def eventFilter(self, obj, event):  # noqa: N802
-        """Esc Filter; Del Recent; Shift+Del Tags; F2/F3 Tag±; F4 Ordner; F5 Datei; Ctrl+C/V/X Tags; Ctrl+Shift+C Pfad — 2.5.9–2.5.17."""
+        """Esc Filter; Del Recent; Shift+Del Tags; F2/F3 Tag±; F4 Ordner; F5 Datei; Enter öffnen; Ctrl+C/V/X Tags; Ctrl+Shift+C Pfad — 2.5.9–2.5.18."""
         if event.type() == QEvent.KeyPress:
             assert isinstance(event, QKeyEvent)
             key = event.key()
@@ -255,7 +255,7 @@ class WelcomePage(QWidget):
             if obj is self.recent_list:
                 item = self.recent_list.currentItem()
                 if item is not None and key in (Qt.Key_Return, Qt.Key_Enter):
-                    self._on_recent_dbl(item)
+                    self._open_recent_in_app(str(item.data(Qt.UserRole) or ""))
                     return True
                 if item is not None and key == Qt.Key_F2:
                     # F2: Tag hinzufügen — 2.5.12
@@ -546,9 +546,40 @@ class WelcomePage(QWidget):
         path = item.data(Qt.UserRole)
         if not path:
             return
-        if not Path(str(path)).is_file():
-            return
+        self._open_recent_in_app(str(path))
+
+    def _open_recent_in_app(self, path: str) -> bool:
+        """Recent in InstantLens Doc öffnen (Enter · Menü · Doppelklick) + Fail-A11y — 2.5.18."""
+        p = Path(path) if path else None
+        win = self.window()
+        if p is None or not str(path).strip():
+            return False
+        if not p.is_file():
+            msg = f"Datei fehlt: {p.name}"
+            if win is not None and hasattr(win, "_set_status"):
+                try:
+                    win._set_status(msg)
+                except Exception:
+                    pass
+            if win is not None and hasattr(win, "_announce_status_toast"):
+                try:
+                    win._announce_status_toast(msg)
+                except Exception:
+                    pass
+            return False
         self.recent_activated.emit(str(path))
+        msg = f"Geöffnet: {p.name}"
+        if win is not None and hasattr(win, "_set_status"):
+            try:
+                win._set_status(msg)
+            except Exception:
+                pass
+        if win is not None and hasattr(win, "_announce_status_toast"):
+            try:
+                win._announce_status_toast(msg)
+            except Exception:
+                pass
+        return True
 
     def _recent_context_menu(self, pos) -> None:
         item = self.recent_list.itemAt(pos)
@@ -558,6 +589,8 @@ class WelcomePage(QWidget):
         if not path:
             return
         menu = QMenu(self)
+        act_open = menu.addAction("Öffnen\tEnter")
+        menu.addSeparator()
         act_add_tag = menu.addAction("Tag hinzufügen…\tF2")
         act_remove_tag = menu.addAction("Tag entfernen…\tF3")
         act_clear_tags = menu.addAction("Alle Tags entfernen\tShift+Entf")
@@ -570,7 +603,9 @@ class WelcomePage(QWidget):
         act_folder = menu.addAction("Ordner öffnen\tF4")
         act_file = menu.addAction("Datei öffnen\tF5")
         chosen = menu.exec(self.recent_list.mapToGlobal(pos))
-        if chosen is act_add_tag:
+        if chosen is act_open:
+            self._open_recent_in_app(str(path))
+        elif chosen is act_add_tag:
             self._add_tag_for_recent(str(path))
         elif chosen is act_remove_tag:
             self._remove_tag_for_recent(str(path))

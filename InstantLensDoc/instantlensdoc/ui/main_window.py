@@ -11994,7 +11994,13 @@ class MainWindow(QMainWindow):
                 "Export-Presets",
                 f"Exportiert ({EXPORT_PRESETS_SCHEMA_ID}):\n{dest}",
             )
-            self._set_status(f"Export-Presets exportiert: {dest.name}")
+            msg = f"Export-Presets exportiert: {dest.name}"
+            self._set_status(msg)
+            # A11y Announce JSON-Export — 2.5.18
+            try:
+                self._announce_status_toast(msg)
+            except Exception:
+                pass
 
         def _import_json() -> None:
             start = dialog_start_dir(get_last_export_dir())
@@ -12035,9 +12041,15 @@ class MainWindow(QMainWindow):
                 f"Import ({EXPORT_PRESETS_SCHEMA_ID}, {mode}):\n"
                 f"{imported.summary_text()}",
             )
-            self._set_status(
+            msg = (
                 f"Export-Presets importiert: {imported.summary_text()} ({mode})"
             )
+            self._set_status(msg)
+            # A11y Announce JSON-Import — 2.5.18
+            try:
+                self._announce_status_toast(msg)
+            except Exception:
+                pass
             if not imported:
                 dlg.accept()
                 return
@@ -12050,6 +12062,7 @@ class MainWindow(QMainWindow):
             if it is None:
                 return
             data = it.data(Qt.UserRole) or {}
+            name = str(data.get("name") or _item_name(it)).strip()
             target = str(data.get("target") or "").strip()
             if not target:
                 QMessageBox.information(
@@ -12057,6 +12070,13 @@ class MainWindow(QMainWindow):
                     "Export-Preset",
                     "Kein Zielordner in diesem Preset gespeichert.",
                 )
+                msg = f"Export-Preset ohne Zielordner: {name or '(ohne Name)'}"
+                self._set_status(msg)
+                # Fail-Path A11y Ordner fehlt — 2.5.18
+                try:
+                    self._announce_status_toast(msg)
+                except Exception:
+                    pass
                 return
             folder = Path(target)
             if not folder.is_dir():
@@ -12065,11 +12085,23 @@ class MainWindow(QMainWindow):
                     "Export-Preset",
                     f"Zielordner fehlt:\n{folder}",
                 )
+                msg = f"Export-Preset Zielordner fehlt: {folder}"
+                self._set_status(msg)
+                try:
+                    self._announce_status_toast(msg)
+                except Exception:
+                    pass
                 return
             try:
                 QDesktopServices.openUrl(QUrl.fromLocalFile(str(folder)))
             except Exception as e:
                 QMessageBox.warning(dlg, "Export-Preset", str(e))
+                msg = f"Export-Preset Ordner öffnen fehlgeschlagen: {folder}"
+                self._set_status(msg)
+                try:
+                    self._announce_status_toast(msg)
+                except Exception:
+                    pass
                 return
             msg = f"Export-Preset Ordner geöffnet: {folder}"
             self._set_status(msg)
@@ -13459,7 +13491,7 @@ class MainWindow(QMainWindow):
         return preview
 
     def _ocr_region_status_tooltip(self) -> str:
-        """Status-Tooltip inkl. Textvorschau — 2.5.9–2.5.17."""
+        """Status-Tooltip inkl. Textvorschau — 2.5.9–2.5.18."""
         path = getattr(self, "_last_ocr_region_path", None) or ""
         tip = (
             "Linksklick → Ergebnis-Tab · Rechtsklick → Menü · "
@@ -13469,7 +13501,7 @@ class MainWindow(QMainWindow):
             "Esc → Status schließen · "
             "Enter → Ergebnis-Tab · "
             "Ctrl+C Text · Ctrl+Shift+C Pfad · "
-            "F4 → Ordner · F5 → Datei — 2.5.17"
+            "F4 → Ordner · F5 → Datei — 2.5.18"
         )
         if path:
             tip = f"{tip}\n{path}"
@@ -13633,18 +13665,43 @@ class MainWindow(QMainWindow):
         """Status-Mittelklick/Ctrl+Klick: OCR-Region Ergebnis-Pfad kopieren — 2.5.7."""
         path = getattr(self, "_last_ocr_region_path", None)
         if not path:
+            msg = "OCR-Region Pfad fehlt"
+            self._set_status(msg)
+            # Fail-Path A11y Pfad-Copy — 2.5.18
+            try:
+                self._announce_status_toast(msg)
+            except Exception:
+                pass
             return False
         text = str(path).strip()
         if not text:
+            msg = "OCR-Region Pfad leer"
+            self._set_status(msg)
+            try:
+                self._announce_status_toast(msg)
+            except Exception:
+                pass
             return False
         try:
             from PySide6.QtWidgets import QApplication
 
             clip = QApplication.clipboard()
             if clip is None:
+                msg = "OCR-Region Pfad: Zwischenablage nicht verfügbar"
+                self._set_status(msg)
+                try:
+                    self._announce_status_toast(msg)
+                except Exception:
+                    pass
                 return False
             clip.setText(text)
         except Exception:
+            msg = "OCR-Region Pfad kopieren fehlgeschlagen"
+            self._set_status(msg)
+            try:
+                self._announce_status_toast(msg)
+            except Exception:
+                pass
             return False
         # Toast aktiv lassen (L/R bleiben nutzbar) — 2.5.7
         self._ocr_region_toast_active = True
