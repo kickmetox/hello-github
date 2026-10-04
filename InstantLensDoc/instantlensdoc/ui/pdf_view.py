@@ -7759,6 +7759,198 @@ class PdfViewer(QWidget):
         except Exception as e:
             QMessageBox.warning(self, "Redactions", str(e))
 
+    def redactions_from_text_selection(self) -> int:
+        """Aktuelle Textauswahl → REDACTION-Annotationen (Sidecar) — 2.6.0."""
+        if not self.store or not self.pdf_path:
+            QMessageBox.information(
+                self, "Auswahl → Schwärzung", "Bitte zuerst ein PDF öffnen."
+            )
+            return 0
+        rects = list(getattr(self, "_text_selection_rects", None) or [])
+        if not rects:
+            QMessageBox.information(
+                self,
+                "Auswahl → Schwärzung",
+                "Keine Textauswahl. Im Auswahl-Werkzeug Text aufziehen, "
+                "dann erneut „Auswahl → Schwärzung“.",
+            )
+            return 0
+        page = int(self.current_page)
+        added = 0
+        with self.store.atomic():
+            for rx, ry, rw, rh in rects:
+                ann = Annotation(
+                    page=page,
+                    type=AnnotationType.REDACTION,
+                    x=float(rx),
+                    y=float(ry),
+                    width=max(float(rw), 4.0),
+                    height=max(float(rh), 4.0),
+                    color="#000000",
+                    text="REDACT",
+                )
+                self.store.add(ann)
+                added += 1
+            self.store.dirty = True
+        try:
+            self.schedule_sidecar_save(force=True)
+        except Exception:
+            pass
+        self.refresh()
+        self.annotations_changed.emit()
+        self.status.emit(f"{added} Schwärzung(en) aus Textauswahl — 2.6.0")
+        return added
+
+    def apply_true_redactions(self, *, remove_sidecar: bool | None = None):
+        """Echtes Schwärzen → neues PDF ohne Textschicht in Zonen + Meta — 2.6.0."""
+        if not self.store or not self.pdf_path:
+            QMessageBox.information(
+                self, "Echt schwärzen", "Bitte zuerst ein PDF öffnen."
+            )
+            return None
+        reds = [a for a in self.store.annotations if a.type == AnnotationType.REDACTION]
+        if not reds:
+            # Optional: Textauswahl zuerst in Redactions umwandeln
+            n_sel = len(getattr(self, "_text_selection_rects", None) or [])
+            if n_sel > 0:
+                reply = QMessageBox.question(
+                    self,
+                    "Echt schwärzen",
+                    f"Keine Schwärzungs-Annotationen, aber Textauswahl "
+                    f"({n_sel} Rechteck(e)).\n"
+                    "Auswahl jetzt als Schwärzung markieren und fortfahren?",
+                )
+                if reply != QMessageBox.Yes:
+                    return None
+                self.redactions_from_text_selection()
+                reds = [
+                    a
+                    for a in self.store.annotations
+                    if a.type == AnnotationType.REDACTION
+                ]
+            if not reds:
+                QMessageBox.information(
+                    self,
+                    "Echt schwärzen",
+                    "Keine Schwärzungs-Annotationen.\n"
+                    "Werkzeug „Schwärzen“ oder „Auswahl → Schwärzung“ nutzen.",
+                )
+                return None
+
+        by_page: dict[int, int] = {}
+        for a in reds:
+            by_page[a.page] = by_page.get(a.page, 0) + 1
+        pages = ", ".join(f"S.{p + 1}:{n}" for p, n in sorted(by_page.items()))
+
+        from PySide6.QtWidgets import (
+            QCheckBox,
+            QDialog,
+            QDialogButtonBox,
+            QFileDialog,
+            QLabel,
+            QVBoxLayout,
+        )
+
+        from instantlensdoc.core.app_settings import (
+            get_true_redact_dpi,
+            get_true_redact_strip_metadata,
+            set_true_redact_strip_metadata,
+        )
+        from instantlensdoc.ui.file_dialogs import confirm_overwrite_export
+
+        dlg = QDialog(self)
+        dlg.setWindowTitle("Echt schwärzen — unwiderruflich")
+        lay = QVBoxLayout(dlg)
+        lay.addWidget(
+            QLabel(
+                f"{len(reds)} Schwärzung(en) unwiderruflich aus dem Content-Stream "
+                f"entfernen?\n"
+                f"Verteilung: {pages}\n\n"
+                "Betroffene Seiten werden gerastert (Textschicht weg).\n"
+                "Dies ist nicht rückgängig machbar — Ausgabe als neues PDF."
+            )
+        )
+        chk = QCheckBox("Annotationen nach Anwenden aus Sidecar entfernen")
+        chk.setChecked(True if remove_sidecar is None else bool(remove_sidecar))
+        lay.addWidget(chk)
+        chk_meta = QCheckBox("Metadaten bereinigen (DocInfo/XMP)")
+        chk_meta.setChecked(get_true_redact_strip_metadata())
+        chk_meta.setToolTip("Titel/Autor/Keywords/XMP entfernen — 2.6.0")
+        lay.addWidget(chk_meta)
+        chk_sidecar = QCheckBox("Auch Sidecar speichern")
+        chk_sidecar.setChecked(True)
+        lay.addWidget(chk_sidecar)
+        buttons = QDialogButtonBox(QDialogButtonBox.Yes | QDialogButtonBox.No)
+        buttons.accepted.connect(dlg.accept)
+        buttons.rejected.connect(dlg.reject)
+        lay.addWidget(buttons)
+        if dlg.exec() != QDialog.Accepted:
+            return None
+
+        remove = chk.isChecked()
+        strip_meta = chk_meta.isChecked()
+        set_true_redact_strip_metadata(strip_meta)
+        save_sidecar = chk_sidecar.isChecked()
+        src = Path(self.pdf_path)
+        default_name = f"{src.stem}_redacted.pdf"
+        path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Echt schwärzen — neues PDF",
+            str(src.with_name(default_name)),
+            "PDF (*.pdf)",
+        )
+        if not path:
+            return None
+        dest = Path(path)
+        if dest.suffix.lower() != ".pdf":
+            dest = dest.with_suffix(".pdf")
+        if not confirm_overwrite_export(dest, self):
+            return None
+        try:
+            from ild_pdf.redact import apply_true_redactions
+            from ild_pdf.render import clear_render_cache
+
+            result = apply_true_redactions(
+                self.pdf_path,
+                self.store,
+                scale=self.scale,
+                out_path=dest,
+                remove_from_store=remove,
+                strip_meta=strip_meta,
+                render_dpi=get_true_redact_dpi(),
+                password=self.password,
+            )
+            if save_sidecar:
+                try:
+                    self.schedule_sidecar_save(force=True)
+                    if dest.resolve() != src.resolve():
+                        side_dest = dest.with_name(dest.stem + ".ildann.json")
+                        self.store.save(path=side_dest, force=True)
+                except Exception as e:
+                    QMessageBox.warning(
+                        self,
+                        "Echt schwärzen — Sidecar",
+                        f"Sidecar-Warnung: {e}\nPDF wurde geschrieben:\n{dest}",
+                    )
+            clear_render_cache(self.pdf_path)
+            self.refresh()
+            self.annotations_changed.emit()
+            meta_note = " + Meta bereinigt" if result.metadata_stripped else ""
+            self.status.emit(
+                f"Echt geschwärzt: {result.rect_count} Zone(n) / "
+                f"{result.pages_redacted} Seite(n) → {dest.name}{meta_note}"
+            )
+            QMessageBox.information(
+                self,
+                "Echt schwärzen",
+                f"{result.rect_count} Zone(n) auf {result.pages_redacted} Seite(n) "
+                f"unwiderruflich entfernt{meta_note}.\n{dest}",
+            )
+            return Path(result.out_path)
+        except Exception as e:
+            QMessageBox.warning(self, "Echt schwärzen", str(e))
+            return None
+
     def render_thumbnails(self, *, max_pages: int = 40, scale: float | None = None):
         """Kleine Seitenvorschauen (PIL). Begrenzt auf max_pages — bevorzugt lazy via render_thumbnail."""
         if not self.pdf_path or self.page_count <= 0:

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Nightly/CI Smoke: CLI + Import-Checks für InstantLens Doc — 2.1.0–2.5.20.
+"""Nightly/CI Smoke: CLI + Import-Checks für InstantLens Doc — 2.1.0–2.6.0.
 
 Leichtgewichtig. Exit-Codes:
   0  OK  (ok=true)
@@ -14,12 +14,12 @@ Aufruf:
   python scripts/smoke_ild.py -h
 
 JSON-Schema (--json), Erfolg:
-  {"ok": true, "version": "2.5.20", "duration_ms": 1234,
+  {"ok": true, "version": "2.6.0", "duration_ms": 1234,
    "checks": ["version", "imports", "cli", "measure_diff_import", "changelog"]}
 
 JSON bei Fail: checks[] enthält Objekt mit error-Text (max 200 Zeichen, Truncate …);
 Exitcode spiegelt ok (0↔true, 1↔false) — 2.2.0:
-  {"ok": false, "version": "2.5.20", "duration_ms": 12,
+  {"ok": false, "version": "2.6.0", "duration_ms": 12,
    "checks": ["version", {"name": "imports", "error": "import x: …"}]}
 """
 
@@ -41,7 +41,7 @@ if str(ROOT) not in sys.path:
 # Headless/CI: Qt ohne Display
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-EXPECTED_VERSION = "2.5.20"
+EXPECTED_VERSION = "2.6.0"
 FAIL_ERROR_MAX_LEN = 200
 
 EXIT_OK = 0
@@ -165,6 +165,9 @@ def check_imports(*, with_qt: bool) -> None:
             "_announce_smooth_status_toast",
             "_focus_ink_tool_from_toast",
             "Klick fokussiert Ink",
+            "apply_true_redactions",
+            "redactions_from_text_selection",
+            "Echt schwärzen",
         ),
         ROOT / "instantlensdoc" / "ui" / "page_labels_dialog.py": (
             "PageLabelsDialog",
@@ -563,8 +566,12 @@ def check_measure_and_diff() -> None:
 
 def check_changelog() -> None:
     cl = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    if "## 2.6.0" not in cl:
+        _fail("CHANGELOG fehlt ## 2.6.0")
     if "## 2.5.20" not in cl:
         _fail("CHANGELOG fehlt ## 2.5.20")
+    if "## 2.5.19" not in cl:
+        _fail("CHANGELOG fehlt ## 2.5.19")
     if "## 2.5.18" not in cl:
         _fail("CHANGELOG fehlt ## 2.5.18")
     if "## 2.5.17" not in cl:
@@ -803,6 +810,14 @@ def check_changelog() -> None:
     ):
         _fail("CHANGELOG 2.5.8 fehlt Kernfeature-Hinweis")
     if (
+        "Echt schwärzen" not in cl
+        and "apply_true_redactions" not in cl
+        and "Content-Stream" not in cl
+        and "Metadaten" not in cl
+        and "2.6.0" not in cl
+    ):
+        _fail("CHANGELOG 2.6.0 fehlt Kernfeature-Hinweis")
+    if (
         "Open-Fail" not in cl
         and "HexAll" not in cl
         and "Ctrl+Shift+C" not in cl
@@ -925,8 +940,8 @@ def check_changelog() -> None:
     if "## 2.2.0" not in cl:
         _fail("CHANGELOG fehlt ## 2.2.0")
     feat = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
-    if "2.5.20" not in feat:
-        _fail("FEATURES.md fehlt 2.5.20")
+    if "2.6.0" not in feat:
+        _fail("FEATURES.md fehlt 2.6.0")
     if "2.5.17" not in feat:
         _fail("FEATURES.md fehlt 2.5.17")
     if "2.5.15" not in feat:
@@ -1105,6 +1120,13 @@ def check_changelog() -> None:
         and "Summary kopieren" not in feat
     ):
         _fail("FEATURES.md fehlt 2.5.8 Polish")
+    if (
+        "2.6.0" not in feat
+        and "Echt schwärzen" not in feat
+        and "apply_true_redactions" not in feat
+        and "Content-Stream" not in feat
+    ):
+        _fail("FEATURES.md fehlt 2.6.0 Echtes Schwärzen")
     if (
         "2.5.20" not in feat
         and "Open-Fail-A11y" not in feat
@@ -1311,11 +1333,11 @@ Exit-Codes:
 Laufzeit: am Ende als „Laufzeit: N ms“ (oder duration_ms im JSON).
 
 Beispiel --json (Erfolg):
-  {"ok": true, "version": "2.5.20", "duration_ms": 1234,
+  {"ok": true, "version": "2.6.0", "duration_ms": 1234,
    "checks": ["version", "imports", "cli", "measure_diff_import", "changelog"]}
 
 Beispiel --json (Fail):
-  {"ok": false, "version": "2.5.20", "duration_ms": 12,
+  {"ok": false, "version": "2.6.0", "duration_ms": 12,
    "checks": ["version", {"name": "imports", "error": "import x: …"}]}
 """.rstrip()
     )

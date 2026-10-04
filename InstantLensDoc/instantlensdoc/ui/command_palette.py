@@ -71,6 +71,18 @@ def default_palette_commands() -> list[PaletteCommand]:
             "tags ildtags dokument label filter",
             "PDF",
         ),
+        PaletteCommand(
+            "true_redact",
+            "Echt schwärzen…",
+            "schwärzen redaction redact meta content-stream unwiderruflich",
+            "PDF",
+        ),
+        PaletteCommand(
+            "selection_redact",
+            "Auswahl → Schwärzung",
+            "schwärzen auswahl text redaction",
+            "PDF",
+        ),
         PaletteCommand("export", "Exportieren…", "export html docx pdf", "Datei"),
         PaletteCommand("export_page_images", "Seiten als Bilder…", "export png jpeg", "PDF"),
         PaletteCommand(

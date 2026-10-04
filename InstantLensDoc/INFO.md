@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **2.5.20** |
+| Version | **2.6.0** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -33,7 +33,7 @@
 
 Skript: [sync-ild.ps1](scripts/sync-ild.ps1) — Branch `cursor/instantlensdoc-2108` (oder `-LocalPack` / Pack-Zip) nach `D:\AI_Temp\InstantLensDoc`, pip, Start. **Nutzer-Icon in `assets` wird nicht überschrieben.**
 
-**FEATURES.md lokal sync:** Nach Sync liegt `FEATURES.md` lokal im App-Ordner (`D:\AI_Temp\InstantLensDoc\FEATURES.md`); About/Stubs öffnen diese lokale Datei — Version **2.5.20**.
+**FEATURES.md lokal sync:** Nach Sync liegt `FEATURES.md` lokal im App-Ordner (`D:\AI_Temp\InstantLensDoc\FEATURES.md`); About/Stubs öffnen diese lokale Datei — Version **2.6.0**.
 
 Ohne Start: `-NoStart` (Alias `-SkipStart`). Exit-Codes: **0** OK · **1** allgemein · **2** Git-Fehler.
 
@@ -62,6 +62,16 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 
 Installer: `.\installer\build-installer.ps1` (optional `-NoKeygen`)  
 Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an / `checkedonce`)
+
+## Neu in 2.6.0
+
+Minor-Feature nach **2.5.20** (Zusatzanforderungen #1):
+
+- **Echtes Schwärzen:** Unwiderrufliche Redaktion — betroffene Seiten werden gerastert, Zonen schwarz, Content-Stream/Textschicht entfernt (nicht nur Overlay)
+- **Metadaten-Bereinigung:** Optional DocInfo/XMP strippen (Default an; Settings)
+- **UI:** PDF → Echt schwärzen… · Auswahl → Schwärzung · Palette `true_redact` / `selection_redact` · Overlay-Bake bleibt
+- **Settings:** Echt-schwärzen DPI (72/150/300) · Meta-Checkbox
+- Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie unverändert (ScanTuxio erst 2.6.1+)
 
 ## Neu in 2.5.20
 

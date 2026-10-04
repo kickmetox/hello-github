@@ -189,7 +189,12 @@ from .security import (
     set_password,
     try_open_password,
 )
-from .redact import bake_redactions
+from .redact import (
+    TrueRedactionResult,
+    apply_true_redactions,
+    bake_redactions,
+    redaction_rects_cover_text,
+)
 from .metadata import (
     PdfMetadata,
     get_metadata,
@@ -409,6 +414,9 @@ __all__ = [
     "set_password",
     "remove_password",
     "bake_redactions",
+    "apply_true_redactions",
+    "TrueRedactionResult",
+    "redaction_rects_cover_text",
     "PdfMetadata",
     "get_metadata",
     "set_metadata",
@@ -452,4 +460,4 @@ __all__ = [
     "page_count_for_text",
 ]
 
-__version__ = "2.5.20"
+__version__ = "2.6.0"

@@ -1,5 +1,23 @@
 # Changelog — InstantLens Doc
 
+## 2.6.0 — Echtes Schwärzen (Redaktion) + Metadaten-Bereinigung
+
+Minor-Feature nach **2.5.20** (Zusatzanforderungen #1): **Echtes Schwärzen** entfernt ausgewählte Inhalte unwiderruflich aus dem PDF-Content-Stream (Seite→Bild mit schwarzen Zonen; Textschicht weg) — nicht nur Overlay-Balken; optional **Metadaten-Bereinigung** (DocInfo/XMP); UI **Echt schwärzen…** / **Auswahl → Schwärzung** / Palette; Overlay-Bake „Redactions anwenden“ bleibt. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie unverändert; ScanTuxio-Scan erst **2.6.1+**.
+
+### Neu
+- `ild_pdf.apply_true_redactions` / `TrueRedactionResult` — irreversibles Schwärzen + optional Meta-Strip
+- PDF-Menü **Echt schwärzen…** · **Auswahl → Schwärzung** · Command-Palette
+- Settings: Echt-schwärzen DPI · Metadaten bereinigen (Default an)
+
+### Geändert
+- `bake_redactions` bleibt Overlay-Modus (Hinweis auf echtes Schwärzen)
+- Docs/Version Serie **2.6**
+
+### Tests / Qualität
+- Version **2.6.0** (App / `ild_pdf` / ISS / Smoke / Docs); Serie **2.6**; `docs/VERSION` + `VERSION.txt`
+- Smoke: 2.6.0 CLI + Qt (true-redact + meta-strip + UI-Pfad)
+- Stubs: KI/Cloud/Stylus/3D/Hooks/Outline/Telemetrie unverändert markiert
+
 ## 2.5.20 — OCR Open-Fail-A11y, Theme Ctrl+Shift+C·HexAll-Fail, ildtags Tag−/Clear-Fail-A11y, Export Summary-Fail-A11y
 
 Post-Release-Polish nach **2.5.19**: **OCR-Region** Status-**Open Fail-Path A11y** (Tab/Ordner/Datei ohne Pfad · Open-Exception); **Farben-Themes** Swatch-**Ctrl+Shift+C alle Hex** · **Hex-All Fail-A11y**; **ildtags** **Tag−/Clear Fail-A11y** · Pfad-Copy Fail-A11y; **Export-Presets** **Summary-Copy Fail-A11y**. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie klar markiert / nicht produktiv (Ink ≠ Stylus).

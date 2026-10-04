@@ -196,6 +196,8 @@ from instantlensdoc.core.app_settings import (
     get_pdf_thumbnail_scale,
     get_redaction_bake_continue_on_sidecar_skip,
     get_redaction_preview_opacity,
+    get_true_redact_dpi,
+    get_true_redact_strip_metadata,
     get_sync_scroll_status_indicator,
     get_thumb_cache_debug_hits,
     get_thumb_cache_max_mb,
@@ -328,6 +330,8 @@ from instantlensdoc.core.app_settings import (
     set_pdf_thumbnail_scale,
     set_redaction_bake_continue_on_sidecar_skip,
     set_redaction_preview_opacity,
+    set_true_redact_dpi,
+    set_true_redact_strip_metadata,
     set_sync_scroll_status_indicator,
     set_thumb_cache_debug_hits,
     set_thumb_cache_max_mb,
@@ -774,6 +778,28 @@ class SettingsDialog(QDialog):
         )
         form.addRow(self.redact_bake_continue)
 
+        self.true_redact_strip_meta = QCheckBox(
+            "Echt schwärzen: Metadaten bereinigen"
+        )
+        self.true_redact_strip_meta.setChecked(get_true_redact_strip_metadata())
+        self.true_redact_strip_meta.setToolTip(
+            "Beim unwiderruflichen Schwärzen DocInfo/XMP entfernen (Default an) — 2.6.0"
+        )
+        form.addRow(self.true_redact_strip_meta)
+
+        self.true_redact_dpi = QComboBox()
+        cur_tr_dpi = get_true_redact_dpi()
+        tr_pick = 1
+        for i, d in enumerate((72, 150, 300)):
+            self.true_redact_dpi.addItem(f"{d} DPI", d)
+            if d == cur_tr_dpi:
+                tr_pick = i
+        self.true_redact_dpi.setCurrentIndex(tr_pick)
+        self.true_redact_dpi.setToolTip(
+            "Raster-Auflösung für echtes Schwärzen (Seite → Bild) — 2.6.0"
+        )
+        form.addRow("Echt schwärzen DPI", self.true_redact_dpi)
+
         self.autosave_enabled = QCheckBox("Autosave aktiv")
         self.autosave_enabled.setChecked(get_autosave_enabled())
         self.autosave_enabled.setToolTip(
@@ -935,7 +961,7 @@ class SettingsDialog(QDialog):
             sw.setToolTip(
                 "Theme-Vorschau · Klick=Hex · RMB=HL/Stift/Notiz · "
                 "Focus: Space/H=HL · P=Stift · N=Notiz · C/Ctrl+C=Hex · "
-                "←/→ · Shift+←/→ ±2 · PgUp/PgDn · Home/End · 1–6 — 2.5.20"
+                "←/→ · Shift+←/→ ±2 · PgUp/PgDn · Home/End · 1–6 — 2.6.0"
             )
             sw.setCursor(Qt.PointingHandCursor)
             sw.setFocusPolicy(Qt.StrongFocus)
@@ -2838,7 +2864,7 @@ class SettingsDialog(QDialog):
             self.btn_undo_factory_presets.setEnabled(bool(prev))
 
     def eventFilter(self, obj, event):  # noqa: N802
-        """Swatch L→Hex · Dbl→HL/Stift/Notiz · M→HL · Keys Space/H/P/N/C · Ctrl+Shift+C · ←/→ · Shift+←/→ · PgUp/Dn · Home/End · 1–6 — 2.5.9–2.5.20."""
+        """Swatch L→Hex · Dbl→HL/Stift/Notiz · M→HL · Keys Space/H/P/N/C · Ctrl+Shift+C · ←/→ · Shift+←/→ · PgUp/Dn · Home/End · 1–6 — 2.5.9–2.6.0."""
         labels = getattr(self, "_theme_swatch_labels", None) or []
         if obj in labels:
             hex_c = str(obj.property("themeHex") or "").strip()
@@ -2909,7 +2935,7 @@ class SettingsDialog(QDialog):
                     return True
                 if not hex_c:
                     return super().eventFilter(obj, event)
-                # Space/Enter/H → Highlight · P → Stift · N → Notiz · C/Ctrl+C → Hex · Ctrl+Shift+C → alle Hex — 2.5.15/2.5.18/2.5.20
+                # Space/Enter/H → Highlight · P → Stift · N → Notiz · C/Ctrl+C → Hex · Ctrl+Shift+C → alle Hex — 2.5.15/2.5.18/2.6.0
                 if key in (Qt.Key_Space, Qt.Key_Return, Qt.Key_Enter, Qt.Key_H):
                     self._apply_swatch_as_tool_color(hex_c, "highlight")
                     return True
@@ -2961,7 +2987,7 @@ class SettingsDialog(QDialog):
         return super().eventFilter(obj, event)
 
     def _show_theme_swatch_menu(self, widget, hex_color: str) -> None:
-        """Swatch-RMB: Hex kopieren · alle Hex · als HL/Stift/Notiz · Mid/Dbl-Hinweise — 2.5.10/2.5.16/2.5.20."""
+        """Swatch-RMB: Hex kopieren · alle Hex · als HL/Stift/Notiz · Mid/Dbl-Hinweise — 2.5.10/2.5.16/2.6.0."""
         from PySide6.QtWidgets import QMenu
 
         hex_c = str(hex_color or "").strip()
@@ -3057,7 +3083,7 @@ class SettingsDialog(QDialog):
                     f"RMB = HL/Stift/Notiz · "
                     f"Focus: Space/H=HL · P=Stift · N=Notiz · C/Ctrl+C=Hex · "
                     f"Ctrl+Shift+C=alle Hex · "
-                    f"←/→ · Shift+←/→ ±2 · PgUp/PgDn · Home/End · 1–6 — 2.5.20"
+                    f"←/→ · Shift+←/→ ±2 · PgUp/PgDn · Home/End · 1–6 — 2.6.0"
                 )
                 sw.setProperty("themeHex", str(c))
                 sw.setAccessibleName(f"Theme-Swatch {i + 1}: {c}")
@@ -3171,7 +3197,7 @@ class SettingsDialog(QDialog):
                 pass
 
     def _copy_ann_theme_hex_ui(self) -> None:
-        """6 Hex-Farben des gewählten Themes in die Zwischenablage — 2.5.8/2.5.20."""
+        """6 Hex-Farben des gewählten Themes in die Zwischenablage — 2.5.8/2.6.0."""
         from PySide6.QtWidgets import QApplication
 
         from instantlensdoc.core.app_settings import get_ann_color_theme
@@ -3185,7 +3211,7 @@ class SettingsDialog(QDialog):
                     parent._set_status(msg)
                 except Exception:
                     pass
-            # Fail-Path A11y Hex-All — 2.5.20
+            # Fail-Path A11y Hex-All — 2.6.0
             if parent is not None and hasattr(parent, "_announce_status_toast"):
                 try:
                     parent._announce_status_toast(msg)
@@ -3204,7 +3230,7 @@ class SettingsDialog(QDialog):
                     parent._set_status(msg)
                 except Exception:
                     pass
-            # Fail-Path A11y Hex-All — 2.5.20
+            # Fail-Path A11y Hex-All — 2.6.0
             if parent is not None and hasattr(parent, "_announce_status_toast"):
                 try:
                     parent._announce_status_toast(msg)
@@ -3225,7 +3251,7 @@ class SettingsDialog(QDialog):
                     parent._set_status(msg)
                 except Exception:
                     pass
-            # Fail-Path A11y Hex-All — 2.5.20
+            # Fail-Path A11y Hex-All — 2.6.0
             if parent is not None and hasattr(parent, "_announce_status_toast"):
                 try:
                     parent._announce_status_toast(msg)
@@ -3956,6 +3982,12 @@ class SettingsDialog(QDialog):
         set_redaction_bake_continue_on_sidecar_skip(
             self.redact_bake_continue.isChecked()
         )
+        set_true_redact_strip_metadata(self.true_redact_strip_meta.isChecked())
+        try:
+            tr_dpi = int(self.true_redact_dpi.currentData() or 150)
+        except (TypeError, ValueError):
+            tr_dpi = 150
+        set_true_redact_dpi(tr_dpi)
         set_autosave_enabled(self.autosave_enabled.isChecked())
         try:
             as_sec = int(self.autosave_sec.currentData() or 60)

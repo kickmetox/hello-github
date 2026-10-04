@@ -147,7 +147,8 @@ SHORTCUTS_HTML = """
 <tr><td>Annotation-Suche offen</td><td>Ctrl+Shift+F3: CSV Neu-Scan Fortschritt bei vielen Docs + Abbruch — 1.4.5</td></tr>
 <tr><td>Theme System</td><td>Ctrl+Shift+T zyklisch; Status-Toast „Theme: …“; Hilfe/About — 1.4.5</td></tr>
 <tr><td>AcroForm-Sidebar</td><td>CSV Esc ohne Export; Enter auf OK; Zähler N von M; Default persistiert — 1.3.6</td></tr>
-<tr><td>Redactions anwenden</td><td>Status „Sidecar übersprungen“; Fortsetzen-Option Settings merken — 1.3.6</td></tr>
+<tr><td>Redactions anwenden</td><td>Status „Sidecar übersprungen“; Fortsetzen-Option Settings merken — 1.3.6; Overlay-Bake (Text darunter ggf. noch selektierbar)</td></tr>
+<tr><td>Echt schwärzen</td><td>PDF → Echt schwärzen… / Palette: unwiderruflich Content-Stream entfernen (Seite→Bild) + optional Metadaten; Auswahl → Schwärzung; Settings DPI/Meta — <b>2.6.0</b></td></tr>
 <tr><td>Bookmarks ↔ Outlines</td><td>Fehlerdialog Retry-Zähler „Versuch k/3“; max. 3 wie Backup — 1.3.6</td></tr>
 <tr><td>Thumbnail Lazy-Load</td><td>Prefetch-Label grau wenn Lazy aus (unter Schwellwert), sonst aktiv — 1.3.6</td></tr>
 <tr><td>Alle Ann. auf Seite löschen</td><td>Bearbeiten → bei 0 Treffern Sticky-Status Statusleiste bis nächste Ann.-Aktion / Seiten-/Dokumentwechsel / Undo/Redo + i18n DE + Menü/Aktion no-op + Button disabled; Undo „N Annotationen (gefiltert)“ — 1.1.9</td></tr>
@@ -418,8 +419,9 @@ Status-Klick öffnet <code>docs/VERSION</code>/<code>VERSION.txt</code> im Edito
 <p><b>Batch-Umbenennen:</b> Undo „rückgängig X, übersprungen Y“ kopierbar — 1.4.5</p>
 <p><b>Annotation-Suche:</b> CSV Neu-Scan Fortschritt + Abbruch — 1.4.5</p>
 <p><b>Theme:</b> Ctrl+Shift+T zyklisch; Status-Toast „Theme: …“; siehe Hilfe/About — 1.4.5</p>
-<p><b>Schwärzung / Redactions:</b> Rechteck ziehen → Sidecar; Status „Sidecar übersprungen“;
-Fortsetzen-Option in Settings merken — 1.3.6</p>
+<p><b>Schwärzung / Redactions:</b> Rechteck ziehen → Sidecar; Overlay-Bake „Redactions anwenden“;
+<b>Echt schwärzen</b> unwiderruflich (Content-Stream/Textschicht weg + Meta) — <b>2.6.0</b>;
+Auswahl → Schwärzung; Status „Sidecar übersprungen“ / Settings — 1.3.6</p>
 <p><b>AcroForm:</b> CSV Esc ohne Export; Enter auf OK; Zähler N von M — 1.3.6</p>
 <p><b>Bookmarks/Outlines:</b> Fehlerdialog Retry-Zähler „Versuch k/3“ — 1.3.6</p>
 <p><b>Thumbnails:</b> Prefetch-Label grau wenn Lazy aus (unter Schwellwert), sonst aktiv — 1.3.6</p>

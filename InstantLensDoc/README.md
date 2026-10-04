@@ -2,7 +2,7 @@
 
 Moderne Textverarbeitung mit PDF-Annotator, OCR-Bridge und Formulargenerator.
 
-**Version:** 2.5.20  
+**Version:** 2.6.0  
 **Hersteller:** Andreas Meyer · ame@sellerbach.de
 
 ## Quickstart (Windows)
@@ -33,6 +33,10 @@ Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an).
 User-Shortcuts: `.\scripts\install-ild.ps1` · Deinstallieren: `-Uninstall [-Quiet]` (Exit **0**/OK · **1**/Fehler; Quiet: Kurz-Summary, Exit 0 auch ohne Shortcuts).
 
 Nightly-Smoke: `python scripts\smoke_ild.py` · optional `--qt` · `--json` (Summary: `ok`, `checks[]`, `duration_ms`, `version`; Fail: `checks[].error` max 200…, Exit=ok). Siehe **CONTRIBUTING.md**; Workflow-Stub `.github/workflows/smoke-ild.yml` (manual only).
+
+## Neu in 2.6.0
+
+Minor-Feature nach **2.5.20**: **Echtes Schwärzen** (unwiderruflich, Content-Stream/Textschicht weg) + optional **Metadaten-Bereinigung**; UI **Echt schwärzen…** / **Auswahl → Schwärzung**; Overlay-Bake bleibt. Stubs unverändert; ScanTuxio erst 2.6.1+.
 
 ## Neu in 2.5.20
 

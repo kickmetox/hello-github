@@ -213,6 +213,8 @@ DEFAULTS: dict[str, Any] = {
     "multi_doc_csv_filename_template": "{date}_multisearch.csv",  # Live-Template — 2.0.3
     "redaction_bake_continue_on_sidecar_skip": True,  # Bake fortsetzen merken — 1.3.6
     "redaction_preview_opacity": 0.90,
+    "true_redact_strip_metadata": True,  # Echtes Schwärzen: Meta strippen — 2.6.0
+    "true_redact_dpi": 150,  # Raster-DPI für echtes Schwärzen — 2.6.0
     "editor_text_encoding": "auto",
     "skip_splash": False,
     "spellcheck_dict_path": "",
@@ -6430,6 +6432,38 @@ def get_redaction_preview_opacity() -> float:
     except (TypeError, ValueError):
         v = 0.90
     return max(0.05, min(1.0, v))
+
+
+def get_true_redact_strip_metadata() -> bool:
+    """Metadaten beim echten Schwärzen entfernen — Default an — 2.6.0."""
+    return bool(load_settings().get("true_redact_strip_metadata", True))
+
+
+def set_true_redact_strip_metadata(enabled: bool) -> bool:
+    """Persistiert true_redact_strip_metadata — 2.6.0."""
+    val = bool(enabled)
+    save_settings({"true_redact_strip_metadata": val})
+    return val
+
+
+def get_true_redact_dpi() -> int:
+    """Raster-DPI für echtes Schwärzen (72–600, Default 150) — 2.6.0."""
+    try:
+        v = int(load_settings().get("true_redact_dpi", 150))
+    except (TypeError, ValueError):
+        v = 150
+    return max(72, min(600, v))
+
+
+def set_true_redact_dpi(dpi: int) -> int:
+    """Persistiert true_redact_dpi — 2.6.0."""
+    try:
+        v = int(dpi)
+    except (TypeError, ValueError):
+        v = 150
+    v = max(72, min(600, v))
+    save_settings({"true_redact_dpi": v})
+    return v
 
 
 def set_redaction_preview_opacity(opacity: float) -> float:
