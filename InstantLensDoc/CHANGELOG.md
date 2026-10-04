@@ -1,5 +1,20 @@
 # Changelog — InstantLens Doc
 
+## 2.5.16 — OCR Fail-A11y, Theme Home/End·RMB-Hints, ildtags Tag±-A11y, Export Reorder-A11y
+
+Post-Release-Polish nach **2.5.15**: **OCR-Region** Status-**Fail-Path A11y** (Ergebnis fehlt); **Farben-Themes** Swatch-**Home/End** · **RMB Mid/Dbl-Hinweise**; **ildtags** **Tag± Status/A11y**; **Export-Presets** **Reorder A11y** · **Menü Anwenden⏎**. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie klar markiert / nicht produktiv (Ink ≠ Stylus).
+
+### Geändert
+- OCR-Region: Fail-Path A11y wenn Ergebnisdatei fehlt (Tab/Datei öffnen)
+- Farben-Themes: Swatch Home/End · RMB-Menü Mid/Dbl/Shift-Hinweise · Tooltip 2.5.16
+- Dokument-Tags: Tag hinzufügen/entfernen → Status + A11y Announce
+- Export-Presets: Reorder Ctrl+↑↓/Home/End → A11y Announce · Menü Anwenden⏎Enter
+
+### Tests / Qualität
+- Version **2.5.16** (App / `ild_pdf` / ISS / Smoke / Docs); Serie **2.5**; `docs/VERSION` + `VERSION.txt`
+- Smoke: 2.5.16 CLI + Qt (OCR Fail-A11y, Theme Home/End·RMB, ildtags Tag±-A11y, Export Reorder-A11y)
+- Stubs: KI/Cloud/Stylus/3D/Hooks/Outline/Telemetrie unverändert markiert
+
 ## 2.5.15 — OCR F5-Datei, Theme Swatch-Keys, ildtags F4-Ordner, Export F4-Ordner
 
 Post-Release-Polish nach **2.5.14**: **OCR-Region** Status-**F5 → Datei**; **Farben-Themes** Swatch-**Tastatur Space/H/P/N/C · ←/→ · AccessibleName**; **ildtags** **F4 → Ordner**; **Export-Presets** **F4 → Zielordner**. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie klar markiert / nicht produktiv (Ink ≠ Stylus).

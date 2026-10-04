@@ -635,6 +635,20 @@ class WelcomePage(QWidget):
             QMessageBox.warning(self, "Dokument-Tags", str(e))
             return
         self.refresh_recent()
+        # Status + A11y wie Copy/Cut/Paste — 2.5.16
+        win = self.window()
+        text = ", ".join(add)
+        msg = f"Tag hinzugefügt ({len(add)}): {text}"
+        if win is not None and hasattr(win, "_set_status"):
+            try:
+                win._set_status(msg)
+            except Exception:
+                pass
+        if win is not None and hasattr(win, "_announce_status_toast"):
+            try:
+                win._announce_status_toast(msg)
+            except Exception:
+                pass
 
     def _remove_tag_for_recent(self, path: str) -> None:
         """Dokument-Tag von Recent-Eintrag entfernen — 2.5.1."""
@@ -665,6 +679,19 @@ class WelcomePage(QWidget):
             QMessageBox.warning(self, "Dokument-Tags", str(e))
             return
         self.refresh_recent()
+        # Status + A11y wie Copy/Cut/Paste — 2.5.16
+        win = self.window()
+        msg = f"Tag entfernt: {chosen}"
+        if win is not None and hasattr(win, "_set_status"):
+            try:
+                win._set_status(msg)
+            except Exception:
+                pass
+        if win is not None and hasattr(win, "_announce_status_toast"):
+            try:
+                win._announce_status_toast(msg)
+            except Exception:
+                pass
 
     def _copy_tags_for_recent(self, path: str) -> bool:
         """Alle Dokument-Tags des Recent-Eintrags in Zwischenablage — 2.5.7."""

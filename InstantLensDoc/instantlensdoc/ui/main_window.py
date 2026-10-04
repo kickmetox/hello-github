@@ -11880,8 +11880,8 @@ class MainWindow(QMainWindow):
                     break
             _refresh_summary()
 
-        def _move(delta: int) -> None:
-            """Ctrl+↑/↓ Preset-Reihenfolge — 2.5.13."""
+        def _move(delta: int, *, status_msg: str | None = None) -> None:
+            """Ctrl+↑/↓ Preset-Reihenfolge — 2.5.13; A11y Announce — 2.5.16."""
             item = lst.currentItem()
             if item is None:
                 return
@@ -11898,10 +11898,15 @@ class MainWindow(QMainWindow):
                     break
             _refresh_summary()
             direction = "oben" if delta < 0 else "unten"
-            self._set_status(f"Export-Preset „{name}“ nach {direction} verschoben")
+            msg = status_msg or f"Export-Preset „{name}“ nach {direction} verschoben"
+            self._set_status(msg)
+            try:
+                self._announce_status_toast(msg)
+            except Exception:
+                pass
 
         def _move_to_edge(to_end: bool) -> None:
-            """Ctrl+Home/End Preset an Anfang/Ende — 2.5.14."""
+            """Ctrl+Home/End Preset an Anfang/Ende — 2.5.14; A11y — 2.5.16."""
             item = lst.currentItem()
             if item is None:
                 return
@@ -11925,9 +11930,8 @@ class MainWindow(QMainWindow):
                 delta = -idx
             if delta == 0:
                 return
-            _move(delta)
             edge = "Ende" if to_end else "Anfang"
-            self._set_status(f"Export-Preset „{name}“ an {edge} verschoben")
+            _move(delta, status_msg=f"Export-Preset „{name}“ an {edge} verschoben")
 
         def _delete() -> None:
             item = lst.currentItem()
@@ -12124,7 +12128,7 @@ class MainWindow(QMainWindow):
             act_open = menu.addAction("Zielordner öffnen\tF4")
             act_copy = menu.addAction("Summary kopieren\tCtrl+C")
             act_copy_path = menu.addAction("Pfad kopieren\tCtrl+Shift+C")
-            act_apply = menu.addAction("Anwenden")
+            act_apply = menu.addAction("Anwenden\tEnter")
             act_apply_keep = menu.addAction("Anwenden (offen lassen)\tCtrl+Enter")
             act_dup = menu.addAction("Duplizieren\tCtrl+D")
             act_rename = menu.addAction("Umbenennen…\tF2")
@@ -13439,7 +13443,7 @@ class MainWindow(QMainWindow):
         return preview
 
     def _ocr_region_status_tooltip(self) -> str:
-        """Status-Tooltip inkl. Textvorschau — 2.5.9–2.5.15."""
+        """Status-Tooltip inkl. Textvorschau — 2.5.9–2.5.16."""
         path = getattr(self, "_last_ocr_region_path", None) or ""
         tip = (
             "Linksklick → Ergebnis-Tab · Rechtsklick → Menü · "
@@ -13449,7 +13453,7 @@ class MainWindow(QMainWindow):
             "Esc → Status schließen · "
             "Enter → Ergebnis-Tab · "
             "Ctrl+C Text · Ctrl+Shift+C Pfad · "
-            "F4 → Ordner · F5 → Datei — 2.5.15"
+            "F4 → Ordner · F5 → Datei — 2.5.16"
         )
         if path:
             tip = f"{tip}\n{path}"
@@ -13520,7 +13524,13 @@ class MainWindow(QMainWindow):
             return False
         target = Path(str(path))
         if not target.is_file():
-            self._set_status(f"OCR-Region Ergebnis fehlt: {target.name}")
+            msg = f"OCR-Region Ergebnis fehlt: {target.name}"
+            self._set_status(msg)
+            # Fail-Path A11y — 2.5.16
+            try:
+                self._announce_status_toast(msg)
+            except Exception:
+                pass
             return False
         try:
             # Bereits offen → Tab wählen, sonst öffnen
@@ -13582,7 +13592,13 @@ class MainWindow(QMainWindow):
             return False
         target = Path(str(path))
         if not target.is_file():
-            self._set_status(f"OCR-Region Ergebnis fehlt: {target.name}")
+            msg = f"OCR-Region Ergebnis fehlt: {target.name}"
+            self._set_status(msg)
+            # Fail-Path A11y — 2.5.16
+            try:
+                self._announce_status_toast(msg)
+            except Exception:
+                pass
             return False
         try:
             QDesktopServices.openUrl(QUrl.fromLocalFile(str(target)))
