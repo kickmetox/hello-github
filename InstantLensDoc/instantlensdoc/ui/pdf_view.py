@@ -18,6 +18,7 @@ from PySide6.QtGui import (
     QPixmap,
     QPolygonF,
     QShortcut,
+    QBrush,
 )
 from PySide6.QtWidgets import (
     QApplication,
@@ -47,16 +48,21 @@ from PySide6.QtWidgets import (
 
 from ild_pdf import (
     DRAG_TYPES,
+    FILLABLE_SHAPE_TYPES,
     Annotation,
     AnnotationStore,
     AnnotationType,
     STAMP_LIBRARY,
     STAMP_PRESETS,
+    add_custom_stamp,
+    list_definable_stamps,
     stamp_library_items,
+    stamp_text_for_label,
     stamp_with_date,
     bake_text_overlays,
     find_text_rects,
     selection_to_highlight_rects,
+    selection_to_paragraph_highlight_rects,
     selection_to_plain_text,
     import_page_text_as_overlays,
     list_page_uri_links,
@@ -237,6 +243,12 @@ class StampPickDialog(QDialog):
         self.custom = QLineEdit()
         self.custom.setPlaceholderText("Oder eigenen Text…")
         layout.addWidget(self.custom)
+        self.btn_save_custom = QPushButton("Als Stempel speichern")
+        self.btn_save_custom.setToolTip(
+            "Eigenen Text dauerhaft in der Stempel-Liste ablegen — 2.6.9"
+        )
+        self.btn_save_custom.clicked.connect(self._save_custom)
+        layout.addWidget(self.btn_save_custom)
         self.btn_images = QPushButton("Eigene Stempel-Bilder…")
         self.btn_images.setToolTip(
             "Stempel-Bildbibliothek verwalten (Ordner) und als Sidecar-Stempel setzen — 1.9.0"
@@ -285,11 +297,31 @@ class StampPickDialog(QDialog):
         for preset in STAMP_PRESETS:
             if preset in lib_labels:
                 continue
-            text = stamp_with_date(preset, include_date=include)
+            text = stamp_text_for_label(preset, include_date=include)
             self._items.append((text, "#C0392B"))
             self.list.addItem(text.replace("\n", " · "))
+        for rec in list_definable_stamps():
+            lab = str(rec.get("label") or "")
+            if not lab or lab in lib_labels or lab in STAMP_PRESETS:
+                continue
+            text = stamp_text_for_label(lab, include_date=include)
+            self._items.append((text, str(rec.get("color") or "#C0392B")))
+            self.list.addItem(("★ " if rec.get("custom") else "") + text.replace("\n", " · "))
         if self.list.count():
             self.list.setCurrentRow(0)
+
+    def _save_custom(self) -> None:
+        custom = self.custom.text().strip()
+        if not custom:
+            QMessageBox.information(self, "Stempel", "Bitte eigenen Text eingeben.")
+            return
+        rec = add_custom_stamp(custom)
+        self.custom.clear()
+        self._rebuild()
+        # letzten Eintrag wählen
+        if self.list.count():
+            self.list.setCurrentRow(self.list.count() - 1)
+        self.setWindowTitle(f"Stempel — gespeichert: {rec.get('label')}")
 
     def result_stamp(self) -> tuple[str, str] | None:
         """(text, color) oder None."""
@@ -1187,6 +1219,34 @@ class PdfCanvas(QLabel):
                     unit = "mm"
                 label = ann.text or ann.measure_label(self._scale, unit=unit)
                 painter.drawText(x + 4, y + 14, label)
+        elif ann.type in (
+            AnnotationType.ELLIPSE,
+            AnnotationType.TRIANGLE,
+            AnnotationType.ROUNDED_RECT,
+        ):
+            fill_src = str(getattr(ann, "fill_color", "") or "").strip()
+            if fill_src:
+                fc = QColor(fill_src)
+                fc.setAlpha(_a(110))
+                painter.setBrush(fc)
+            else:
+                painter.setBrush(Qt.NoBrush)
+            ww, hh = max(w, 4), max(h, 4)
+            if ann.type == AnnotationType.ELLIPSE:
+                painter.drawEllipse(x, y, ww, hh)
+            elif ann.type == AnnotationType.ROUNDED_RECT:
+                rad = max(4, int(min(ww, hh) * 0.18))
+                painter.drawRoundedRect(x, y, ww, hh, rad, rad)
+            else:
+                tri = QPolygonF(
+                    [
+                        QPointF(x + ww / 2.0, y),
+                        QPointF(x, y + hh),
+                        QPointF(x + ww, y + hh),
+                    ]
+                )
+                painter.drawPolygon(tri)
+            painter.setBrush(Qt.NoBrush)
         elif ann.type == AnnotationType.MEASURE_ANGLE:
             x2, y2 = ann.end_point()
             x2, y2 = x2 + dx, y2 + dy
@@ -1849,6 +1909,8 @@ class PdfViewer(QWidget):
             self._default_fill_color = get_ann_default_fill_color()
         except Exception:
             self._default_fill_color = "#FFE066"
+        self._shape_filled = bool(str(self._default_fill_color or "").strip())
+        self._paragraph_highlight = False
         self._suppress_default_zoom = False  # Session Zoom pro Tab (0.9.2)
         self._search_case_sensitive = False
         self._search_whole_word = False
@@ -2143,6 +2205,9 @@ class PdfViewer(QWidget):
             (AnnotationType.STAMP, "Stempel"),
             (AnnotationType.CALLOUT, "Callout"),
             (AnnotationType.RECTANGLE, "Rechteck"),
+            (AnnotationType.ELLIPSE, "Kreis"),
+            (AnnotationType.TRIANGLE, "Dreieck"),
+            (AnnotationType.ROUNDED_RECT, "Rundrect"),
             (AnnotationType.LINE, "Linie"),
             (AnnotationType.ARROW, "Pfeil"),
             (AnnotationType.MEASURE, "Lineal"),
@@ -2158,8 +2223,14 @@ class PdfViewer(QWidget):
             b.setChecked(t == AnnotationType.HIGHLIGHT)
             if t == AnnotationType.HIGHLIGHT:
                 b.setToolTip(
-                    "Highlight: Text aufziehen (Selection→Highlight) oder freies Rechteck — speichert Annotation"
+                    "Highlight: Text aufziehen; mit „Absatz“ ganze Absätze — 2.6.9"
                 )
+            elif t == AnnotationType.ELLIPSE:
+                b.setToolTip("Kreis/Ellipse ziehen; Füllen-Toggle für Fläche oder Outline — 2.6.9")
+            elif t == AnnotationType.TRIANGLE:
+                b.setToolTip("Dreieck ziehen; Füllen-Toggle — 2.6.9")
+            elif t == AnnotationType.ROUNDED_RECT:
+                b.setToolTip("Abgerundetes Rechteck; Füllen-Toggle — 2.6.9")
             elif t == AnnotationType.MEASURE_AREA:
                 b.setToolTip("Fläche: Rechteck aufziehen — Anzeige mm²/px² (Toggle mm/px) — 2.1.0")
             elif t == AnnotationType.MEASURE_ANGLE:
@@ -2238,13 +2309,13 @@ class PdfViewer(QWidget):
         toolbar.addWidget(self.btn_measure_snap)
 
         self.btn_hl_color = QPushButton("HL")
-        self.btn_hl_color.setToolTip("Highlight-Farbe")
+        self.btn_hl_color.setToolTip("Highlight-Farbe (Color-Picker) — 2.6.9")
         self.btn_hl_color.setFixedWidth(36)
         self.btn_hl_color.clicked.connect(self._pick_highlight_color)
         self._style_color_btn(self.btn_hl_color, self._highlight_color)
         self.btn_pen_color = QPushButton("Stift")
         self.btn_pen_color.setToolTip(
-            "Stift-Farbe (Linie/Pfeil/Rechteck/Unterstreichen/Freihand) — 2.2.1"
+            "Strichfarbe für Stift/Formen/Freihand (Color-Picker) — 2.6.9"
         )
         self.btn_pen_color.setFixedWidth(44)
         self.btn_pen_color.clicked.connect(self._pick_pen_color)
@@ -2291,8 +2362,8 @@ class PdfViewer(QWidget):
         self.slider_stroke.setFixedWidth(72)
         self.slider_stroke.setValue(int(round(self._default_stroke_width)))
         self.slider_stroke.setToolTip(
-            "Strichstärke (px) des ausgewählten Shapes; ohne Auswahl → Standard "
-            "(Undo beim Loslassen)"
+            "Pinsel-/Stiftstärke 1–12 px für Freihand und Formen; ohne Auswahl → Standard "
+            "(Undo beim Loslassen) — 2.6.9"
         )
         self._stroke_slider_dragging = False
         self._stroke_slider_undo_pushed = False
@@ -2302,7 +2373,25 @@ class PdfViewer(QWidget):
         self.slider_stroke.valueChanged.connect(self._on_stroke_slider_changed)
         self.lbl_stroke = QLabel(f"Strich {int(round(self._default_stroke_width))}")
         self.lbl_stroke.setFixedWidth(52)
-        self.lbl_stroke.setToolTip("Aktuelle Strichstärke in Pixel")
+        self.lbl_stroke.setToolTip("Aktuelle Pinsel-/Stiftstärke in Pixel — 2.6.9")
+        self.btn_shape_fill = QToolButton()
+        self.btn_shape_fill.setText("Füllen")
+        self.btn_shape_fill.setObjectName("shapeFillToolbarBtn")
+        self.btn_shape_fill.setCheckable(True)
+        self.btn_shape_fill.setChecked(self._shape_filled)
+        self.btn_shape_fill.setToolTip(
+            "Formen gefüllt (an) oder nur Outline (aus); Füllfarbe über Füllung… — 2.6.9"
+        )
+        self.btn_shape_fill.clicked.connect(self._toggle_shape_fill)
+        self.btn_para_hl = QToolButton()
+        self.btn_para_hl.setText("Absatz")
+        self.btn_para_hl.setObjectName("paragraphHighlightToolbarBtn")
+        self.btn_para_hl.setCheckable(True)
+        self.btn_para_hl.setChecked(False)
+        self.btn_para_hl.setToolTip(
+            "Highlight ganzer Absätze/Textabschnitte (nicht nur Zeichen unter dem Rechteck) — 2.6.9"
+        )
+        self.btn_para_hl.clicked.connect(self._toggle_paragraph_highlight)
         self.btn_grayscale = QToolButton()
         self.btn_grayscale.setText("Grau")
         self.btn_grayscale.setCheckable(True)
@@ -2409,6 +2498,8 @@ class PdfViewer(QWidget):
         toolbar.addWidget(self.slider_opacity)
         toolbar.addWidget(self.lbl_stroke)
         toolbar.addWidget(self.slider_stroke)
+        toolbar.addWidget(self.btn_shape_fill)
+        toolbar.addWidget(self.btn_para_hl)
         toolbar.addWidget(self.btn_grayscale)
         toolbar.addWidget(self.btn_night)
         toolbar.addWidget(self.btn_spread)
@@ -3860,6 +3951,9 @@ class PdfViewer(QWidget):
             AnnotationType.STAMP: "Stempel",
             AnnotationType.CALLOUT: "Callout",
             AnnotationType.RECTANGLE: "Rechteck",
+            AnnotationType.ELLIPSE: "Kreis",
+            AnnotationType.TRIANGLE: "Dreieck",
+            AnnotationType.ROUNDED_RECT: "Rundrect",
             AnnotationType.LINE: "Linie",
             AnnotationType.ARROW: "Pfeil",
             AnnotationType.MEASURE: "Lineal",
@@ -3882,6 +3976,35 @@ class PdfViewer(QWidget):
                 self.annotations_changed.emit()
         self.refresh()
         self.status.emit(f"Messanzeige: {unit}")
+
+    def _toggle_shape_fill(self, checked: bool = False) -> None:
+        """Neue Formen gefüllt vs. Outline — 2.6.9."""
+        on = bool(checked) if isinstance(checked, bool) else bool(
+            getattr(self, "btn_shape_fill", None) and self.btn_shape_fill.isChecked()
+        )
+        self._shape_filled = on
+        if hasattr(self, "btn_shape_fill"):
+            self.btn_shape_fill.setChecked(on)
+        self.status.emit("Formen: gefüllt" if on else "Formen: nur Outline")
+
+    def _toggle_paragraph_highlight(self, checked: bool = False) -> None:
+        """Highlight ganzer Absätze statt nur Zeichen unter dem Drag — 2.6.9."""
+        on = bool(checked) if isinstance(checked, bool) else bool(
+            getattr(self, "btn_para_hl", None) and self.btn_para_hl.isChecked()
+        )
+        self._paragraph_highlight = on
+        if hasattr(self, "btn_para_hl"):
+            self.btn_para_hl.setChecked(on)
+        if on:
+            self._set_tool(AnnotationType.HIGHLIGHT)
+        self.status.emit(
+            "Highlight: ganze Absätze" if on else "Highlight: Auswahl/Zeichen"
+        )
+
+    def _new_shape_fill_color(self) -> str:
+        if not getattr(self, "_shape_filled", False):
+            return ""
+        return str(getattr(self, "_default_fill_color", "") or self._pen_color or "").strip()
 
     def _toggle_measure_snap(self) -> None:
         """Snap-to-Annotation für Messung umschalten — 2.1.1."""
@@ -4193,6 +4316,16 @@ class PdfViewer(QWidget):
             self.status.emit(
                 "Werkzeug: Link — Rechteck ziehen, dann URL eingeben (http/https) — 2.3.0"
             )
+        elif tool == AnnotationType.ELLIPSE:
+            self.status.emit(
+                "Werkzeug: Kreis/Ellipse — ziehen; Füllen-Toggle Fläche/Outline — 2.6.9"
+            )
+        elif tool == AnnotationType.TRIANGLE:
+            self.status.emit("Werkzeug: Dreieck — ziehen; Füllen-Toggle — 2.6.9")
+        elif tool == AnnotationType.ROUNDED_RECT:
+            self.status.emit("Werkzeug: Rundrect — ziehen; Füllen-Toggle — 2.6.9")
+        elif tool == AnnotationType.HIGHLIGHT and getattr(self, "_paragraph_highlight", False):
+            self.status.emit("Werkzeug: Highlight — ganze Absätze unter der Auswahl — 2.6.9")
         else:
             self.status.emit(f"Werkzeug: {tool.value}")
 
@@ -10682,7 +10815,12 @@ class PdfViewer(QWidget):
         if not self.store or not self.pdf_path:
             return False
         try:
-            rects, text = selection_to_highlight_rects(
+            hl_fn = (
+                selection_to_paragraph_highlight_rects
+                if getattr(self, "_paragraph_highlight", False)
+                else selection_to_highlight_rects
+            )
+            rects, text = hl_fn(
                 self.pdf_path,
                 page,
                 x0,
@@ -11333,6 +11471,9 @@ class PdfViewer(QWidget):
                 text="REDACT",
             )
         elif self.tool == AnnotationType.RECTANGLE:
+            fill_c = self._new_shape_fill_color()
+            if not fill_c:
+                fill_c = str(getattr(self, "_default_fill_color", "") or "").strip()
             ann = Annotation(
                 page=page,
                 type=AnnotationType.RECTANGLE,
@@ -11341,7 +11482,24 @@ class PdfViewer(QWidget):
                 width=max(abs(x1 - x0), 8),
                 height=max(abs(y1 - y0), 8),
                 color=self._pen_color,
-                fill_color=str(getattr(self, "_default_fill_color", "") or "").strip(),
+                fill_color=fill_c,
+                stroke_width=float(getattr(self, "_default_stroke_width", 2.0) or 2.0),
+            )
+        elif self.tool in (
+            AnnotationType.ELLIPSE,
+            AnnotationType.TRIANGLE,
+            AnnotationType.ROUNDED_RECT,
+        ):
+            ann = Annotation(
+                page=page,
+                type=self.tool,
+                x=min(x0, x1),
+                y=min(y0, y1),
+                width=max(abs(x1 - x0), 8),
+                height=max(abs(y1 - y0), 8),
+                color=self._pen_color,
+                fill_color=self._new_shape_fill_color(),
+                stroke_width=float(getattr(self, "_default_stroke_width", 2.0) or 2.0),
             )
         elif self.tool == AnnotationType.LINK:
             uri = self._ask_link_uri(initial="https://")

@@ -1,4 +1,4 @@
-"""Headless InstantLens-Doc-Operationen für Python- und PowerShell-Scripting — 2.6.8."""
+"""Headless InstantLens-Doc-Operationen für Python- und PowerShell-Scripting — 2.6.9."""
 
 from __future__ import annotations
 
@@ -305,3 +305,174 @@ def get_encryption_info(path: PathLike, *, password: str | None = None) -> dict[
 
 def dumps_json(obj: Any) -> str:
     return json.dumps(obj, ensure_ascii=False, indent=2, default=str)
+
+
+def _ann_store(path: PathLike):
+    from ild_pdf.annotate import AnnotationStore
+
+    pdf = _require_file(path)
+    return AnnotationStore(pdf)
+
+
+def add_shape(
+    path: PathLike,
+    *,
+    page: int,
+    kind: str,
+    x: float,
+    y: float,
+    width: float,
+    height: float,
+    color: str = "#2980B9",
+    fill_color: str = "",
+    stroke_width: float = 2.0,
+    filled: bool | None = None,
+) -> dict[str, Any]:
+    """Form-Annotation ins Sidecar (Seite 1-basiert). kind: ellipse|rectangle|triangle|rounded_rect."""
+    from ild_pdf.annotate import Annotation, AnnotationType, FILLABLE_SHAPE_TYPES
+
+    aliases = {
+        "circle": "ellipse",
+        "ellipse": "ellipse",
+        "oval": "ellipse",
+        "rect": "rectangle",
+        "rectangle": "rectangle",
+        "triangle": "triangle",
+        "rounded": "rounded_rect",
+        "rounded_rect": "rounded_rect",
+        "rundrect": "rounded_rect",
+    }
+    raw = aliases.get(str(kind or "").strip().lower(), str(kind or "").strip().lower())
+    try:
+        at = AnnotationType(raw)
+    except ValueError as e:
+        raise ValueError(f"Unbekannter Formtyp: {kind!r}") from e
+    if at not in FILLABLE_SHAPE_TYPES:
+        raise ValueError(f"Kein Formtyp: {kind!r} (ellipse/rectangle/triangle/rounded_rect)")
+    fc = str(fill_color or "").strip()
+    if filled is True and not fc:
+        fc = color
+    if filled is False:
+        fc = ""
+    store = _ann_store(path)
+    ann = Annotation(
+        int(page) - 1,
+        at,
+        float(x),
+        float(y),
+        width=float(width),
+        height=float(height),
+        color=color or "#2980B9",
+        fill_color=fc,
+        stroke_width=float(stroke_width or 2.0),
+    )
+    store.add(ann)
+    store.save()
+    return {"id": ann.id, "type": at.value, "sidecar": str(store.sidecar_path)}
+
+
+def add_stamp(
+    path: PathLike,
+    *,
+    page: int,
+    text: str,
+    x: float = 72.0,
+    y: float = 72.0,
+    color: str = "#C0392B",
+    include_date: bool = False,
+    width: float = 140.0,
+    height: float = 48.0,
+) -> dict[str, Any]:
+    from ild_pdf.annotate import Annotation, AnnotationStore, AnnotationType, stamp_text_for_label
+
+    pdf = _require_file(path)
+    store = AnnotationStore(pdf)
+    label = stamp_text_for_label(text, include_date=include_date)
+    ann = Annotation(
+        int(page) - 1,
+        AnnotationType.STAMP,
+        float(x),
+        float(y),
+        width=float(width),
+        height=float(height),
+        text=label,
+        color=color or "#C0392B",
+    )
+    store.add(ann)
+    store.save()
+    return {"id": ann.id, "text": ann.text, "sidecar": str(store.sidecar_path)}
+
+
+def add_ink(
+    path: PathLike,
+    *,
+    page: int,
+    points: Sequence[Sequence[float]],
+    color: str = "#2980B9",
+    stroke_width: float = 2.0,
+) -> dict[str, Any]:
+    from ild_pdf.annotate import Annotation, AnnotationStore
+
+    pdf = _require_file(path)
+    store = AnnotationStore(pdf)
+    ann = Annotation.from_ink_points(
+        int(page) - 1, points, color=color, stroke_width=float(stroke_width or 2.0)
+    )
+    store.add(ann)
+    store.save()
+    return {"id": ann.id, "type": "ink", "sidecar": str(store.sidecar_path)}
+
+
+def highlight_paragraphs(
+    path: PathLike,
+    *,
+    page: int,
+    x: float,
+    y: float,
+    width: float,
+    height: float,
+    color: str = "#FFFF00",
+    scale: float = 1.0,
+) -> dict[str, Any]:
+    """Ganze Absätze unter dem Rechteck als Highlight (Seite 1-basiert)."""
+    from ild_pdf.annotate import Annotation, AnnotationStore, AnnotationType
+    from ild_pdf.overlay import selection_to_paragraph_highlight_rects
+
+    pdf = _require_file(path)
+    store = AnnotationStore(pdf)
+    x1 = float(x) + float(width)
+    y1 = float(y) + float(height)
+    rects, text = selection_to_paragraph_highlight_rects(
+        pdf, int(page) - 1, float(x), float(y), x1, y1, scale=float(scale or 1.0)
+    )
+    ids: list[str] = []
+    with store.atomic():
+        for r in rects:
+            ann = Annotation(
+                int(page) - 1,
+                AnnotationType.HIGHLIGHT,
+                float(r.x),
+                float(r.y),
+                width=max(float(r.width), 4.0),
+                height=max(float(r.height), 6.0),
+                color=color or "#FFFF00",
+                text=r.text or "",
+            )
+            store.add(ann)
+            ids.append(ann.id)
+    store.save()
+    return {"count": len(ids), "ids": ids, "text": text, "sidecar": str(store.sidecar_path)}
+
+
+def list_stamps(*, custom_path: PathLike | None = None) -> list[dict[str, Any]]:
+    from ild_pdf.annotate import list_definable_stamps
+
+    return list_definable_stamps(path=_p(custom_path) if custom_path else None)
+
+
+def add_custom_stamp_def(
+    label: str, *, color: str = "#C0392B", custom_path: PathLike | None = None
+) -> dict[str, Any]:
+    from ild_pdf.annotate import add_custom_stamp as _add
+
+    return _add(label, color=color, path=_p(custom_path) if custom_path else None)

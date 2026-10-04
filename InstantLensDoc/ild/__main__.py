@@ -1,4 +1,4 @@
-"""python -m ild — Scripting-CLI InstantLens Doc 2.6.8."""
+"""python -m ild — Scripting-CLI InstantLens Doc 2.6.9."""
 
 from __future__ import annotations
 
@@ -128,6 +128,43 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--password", required=True)
     s.add_argument("--out", default=None)
 
+    s = sub.add_parser("ann-shape", help="Form-Annotation (ellipse/rectangle/triangle/rounded_rect)")
+    s.add_argument("pdf")
+    s.add_argument("--page", type=int, required=True)
+    s.add_argument("--type", dest="kind", required=True)
+    s.add_argument("--x", type=float, required=True)
+    s.add_argument("--y", type=float, required=True)
+    s.add_argument("--width", type=float, required=True)
+    s.add_argument("--height", type=float, required=True)
+    s.add_argument("--color", default="#2980B9")
+    s.add_argument("--fill", default="", dest="fill_color")
+    s.add_argument("--stroke", type=float, default=2.0)
+    s.add_argument("--filled", action="store_true")
+
+    s = sub.add_parser("ann-stamp", help="Text-Stempel (Paid/Bezahlt/Rechnung/Datum/custom)")
+    s.add_argument("pdf")
+    s.add_argument("--page", type=int, default=1)
+    s.add_argument("--text", required=True)
+    s.add_argument("--x", type=float, default=72)
+    s.add_argument("--y", type=float, default=72)
+    s.add_argument("--color", default="#C0392B")
+    s.add_argument("--date", action="store_true")
+
+    s = sub.add_parser("ann-highlight-para", help="Absatz-Highlight unter Rechteck")
+    s.add_argument("pdf")
+    s.add_argument("--page", type=int, required=True)
+    s.add_argument("--x", type=float, required=True)
+    s.add_argument("--y", type=float, required=True)
+    s.add_argument("--width", type=float, required=True)
+    s.add_argument("--height", type=float, required=True)
+    s.add_argument("--color", default="#FFFF00")
+    s.add_argument("--scale", type=float, default=1.0)
+
+    s = sub.add_parser("stamp-list", help="Definierbare Stempel (Builtin + custom)")
+    s = sub.add_parser("stamp-add", help="Benutzer-Stempel anlegen")
+    s.add_argument("label")
+    s.add_argument("--color", default="#C0392B")
+
     return p
 
 
@@ -222,6 +259,60 @@ def run(argv: list[str] | None = None) -> int:
         if args.cmd == "decrypt":
             dest = api.remove_password(args.pdf, args.password, out=args.out)
             _print({"out": str(dest)}, as_json=js)
+            return 0
+        if args.cmd == "ann-shape":
+            data = api.add_shape(
+                args.pdf,
+                page=args.page,
+                kind=args.kind,
+                x=args.x,
+                y=args.y,
+                width=args.width,
+                height=args.height,
+                color=args.color,
+                fill_color=args.fill_color,
+                stroke_width=args.stroke,
+                filled=True if args.filled else None,
+            )
+            _print(data, as_json=js)
+            return 0
+        if args.cmd == "ann-stamp":
+            data = api.add_stamp(
+                args.pdf,
+                page=args.page,
+                text=args.text,
+                x=args.x,
+                y=args.y,
+                color=args.color,
+                include_date=args.date,
+            )
+            _print(data, as_json=js)
+            return 0
+        if args.cmd == "ann-highlight-para":
+            data = api.highlight_paragraphs(
+                args.pdf,
+                page=args.page,
+                x=args.x,
+                y=args.y,
+                width=args.width,
+                height=args.height,
+                color=args.color,
+                scale=args.scale,
+            )
+            _print(data, as_json=js)
+            return 0
+        if args.cmd == "stamp-list":
+            items = api.list_stamps()
+            if js:
+                _print(items, as_json=True)
+            else:
+                for rec in items:
+                    kind = "custom" if rec.get("custom") else "builtin"
+                    print(f"{rec.get('label')}\t{rec.get('color')}\t{kind}")
+            return 0
+        if args.cmd == "stamp-add":
+            data = api.add_custom_stamp_def(args.label, color=args.color)
+            _print(data, as_json=js)
             return 0
         return _fail("unbekanntes Kommando")
     except FileNotFoundError as e:

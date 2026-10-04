@@ -161,6 +161,9 @@ class AnnotationType(str, Enum):
     SIGNATURE_FIELD = "signature_field"  # Platzhalter-Rahmen
     SIGNATURE = "signature"  # Bild-Unterschrift (text: img:…)
     REDACTION = "redaction"  # Schwärzung (opakes Rechteck)
+    ELLIPSE = "ellipse"  # Kreis/Ellipse, gefüllt oder Outline — 2.6.9
+    TRIANGLE = "triangle"  # Dreieck — 2.6.9
+    ROUNDED_RECT = "rounded_rect"  # abgerundetes Rechteck — 2.6.9
 
 
 # Vordefinierte Stempel-Texte (UI kann erweitern)
@@ -172,13 +175,41 @@ STAMP_PRESETS = (
     "FREIGEGEBEN",
     "KOPIE",
     "ERLEDIGT",
+    "Paid",
+    "Bezahlt",
+    "Rechnung",
+    "Datum",
 )
 
-# Kern-Bibliothek: Genehmigt / Entwurf / Vertraulich (+ optionales Datum)
+# Kern-Bibliothek inkl. definierbare Stempel Paid/Bezahlt/Rechnung/Datum — 2.6.9
 STAMP_LIBRARY = (
     ("GENEHMIGT", "#1E8449"),
     ("ENTWURF", "#D68910"),
     ("VERTRAULICH", "#C0392B"),
+    ("Paid", "#1E8449"),
+    ("Bezahlt", "#1E8449"),
+    ("Rechnung", "#2471A3"),
+    ("Datum", "#6C3483"),
+)
+
+# Definierbare Text-Stempel (Builtin); Nutzer-Stempel zusätzlich in JSON — 2.6.9
+DEFINABLE_STAMP_PRESETS = (
+    ("Paid", "#1E8449"),
+    ("Bezahlt", "#1E8449"),
+    ("Rechnung", "#2471A3"),
+    ("Datum", "#6C3483"),
+)
+CUSTOM_STAMPS_SCHEMA = "ildstamps-v1"
+CUSTOM_STAMPS_VERSION = 1
+
+# Formen mit optionaler Füllung (fill_color leer = nur Outline)
+FILLABLE_SHAPE_TYPES = frozenset(
+    {
+        AnnotationType.RECTANGLE,
+        AnnotationType.ELLIPSE,
+        AnnotationType.TRIANGLE,
+        AnnotationType.ROUNDED_RECT,
+    }
 )
 
 
@@ -209,10 +240,148 @@ def stamp_library_items(*, include_date: bool = True) -> list[tuple[str, str, st
         items.append((text.replace("\n", " · "), text, color))
     return items
 
+
+def _custom_stamps_path(path: Path | None = None) -> Path:
+    if path is not None:
+        return Path(path)
+    try:
+        from instantlensdoc.config import config_dir
+
+        return config_dir() / "text_stamps.json"
+    except Exception:
+        return Path.home() / ".instantlensdoc" / "text_stamps.json"
+
+
+def load_custom_stamps(path: Path | None = None) -> list[dict]:
+    """Benutzerdefinierte Text-Stempel aus JSON (ildstamps-v1)."""
+    p = _custom_stamps_path(path)
+    if not p.is_file():
+        return []
+    try:
+        data = json.loads(p.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return []
+    if not isinstance(data, dict):
+        return []
+    raw = data.get("stamps")
+    if not isinstance(raw, list):
+        return []
+    out: list[dict] = []
+    seen: set[str] = set()
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        label = str(item.get("label") or item.get("text") or "").strip()
+        if not label:
+            continue
+        color = str(item.get("color") or "#C0392B").strip() or "#C0392B"
+        if not color.startswith("#"):
+            color = "#" + color
+        sid = str(item.get("id") or label).strip() or label
+        key = sid.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append({"id": sid, "label": label, "color": color.upper(), "custom": True})
+    return out
+
+
+def save_custom_stamps(stamps: Sequence[dict], path: Path | None = None) -> Path:
+    p = _custom_stamps_path(path)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "version": CUSTOM_STAMPS_VERSION,
+        "schema": CUSTOM_STAMPS_SCHEMA,
+        "stamps": [
+            {
+                "id": str(s.get("id") or s.get("label") or ""),
+                "label": str(s.get("label") or ""),
+                "color": str(s.get("color") or "#C0392B"),
+            }
+            for s in stamps
+            if str(s.get("label") or "").strip()
+        ],
+    }
+    p.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    return p
+
+
+def add_custom_stamp(
+    label: str,
+    *,
+    color: str = "#C0392B",
+    path: Path | None = None,
+) -> dict:
+    """Nutzer-Stempel anlegen (Persistenz JSON)."""
+    lab = (label or "").strip()
+    if not lab:
+        raise ValueError("Stempel-Text darf nicht leer sein.")
+    col = (color or "#C0392B").strip() or "#C0392B"
+    if not col.startswith("#"):
+        col = "#" + col
+    col = col.upper()
+    items = load_custom_stamps(path)
+    sid = lab
+    existing_ids = {str(i.get("id") or "").casefold() for i in items}
+    if sid.casefold() in existing_ids:
+        n = 2
+        while f"{lab}_{n}".casefold() in existing_ids:
+            n += 1
+        sid = f"{lab}_{n}"
+    rec = {"id": sid, "label": lab, "color": col, "custom": True}
+    items.append(rec)
+    save_custom_stamps(items, path)
+    return rec
+
+
+def remove_custom_stamp(stamp_id: str, path: Path | None = None) -> bool:
+    sid = (stamp_id or "").strip().casefold()
+    if not sid:
+        return False
+    items = load_custom_stamps(path)
+    keep = [i for i in items if str(i.get("id") or i.get("label") or "").casefold() != sid]
+    if len(keep) == len(items):
+        return False
+    save_custom_stamps(keep, path)
+    return True
+
+
+def list_definable_stamps(
+    *,
+    include_custom: bool = True,
+    path: Path | None = None,
+) -> list[dict]:
+    """Builtin Paid/Bezahlt/Rechnung/Datum plus Nutzer-Stempel."""
+    out: list[dict] = []
+    for lab, col in DEFINABLE_STAMP_PRESETS:
+        out.append({"id": lab, "label": lab, "color": col, "custom": False})
+    if include_custom:
+        out.extend(load_custom_stamps(path))
+    return out
+
+
+def stamp_text_for_label(
+    label: str,
+    *,
+    include_date: bool = False,
+    when: datetime | None = None,
+) -> str:
+    """Stempeltext; Label „Datum“ → nur Datum wenn include_date."""
+    lab = (label or "STEMPEL").strip() or "STEMPEL"
+    if lab.casefold() == "datum":
+        dt = when or datetime.now()
+        if include_date:
+            return dt.strftime("%d.%m.%Y")
+        return "Datum"
+    return stamp_with_date(lab, include_date=include_date, when=when)
+
 # Werkzeuge die per Drag (Press→Release) gezeichnet werden
 DRAG_TYPES = frozenset(
     {
         AnnotationType.RECTANGLE,
+        AnnotationType.ELLIPSE,
+        AnnotationType.TRIANGLE,
+        AnnotationType.ROUNDED_RECT,
         AnnotationType.LINE,
         AnnotationType.ARROW,
         AnnotationType.MEASURE,
@@ -245,6 +414,9 @@ REPORT_TYPE_LABELS: dict[str, str] = {
     "signature_field": "Signaturfeld",
     "signature": "Signatur",
     "redaction": "Schwärzung",
+    "ellipse": "Kreis/Ellipse",
+    "triangle": "Dreieck",
+    "rounded_rect": "Rundrect",
 }
 
 

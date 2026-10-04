@@ -2312,6 +2312,15 @@ class MainWindow(QMainWindow):
         )
         act_sec.triggered.connect(self._pdf_security_dialog)
         m_pdf.addAction(act_sec)
+        act_para = QAction("Absatz hervorheben", self)
+        act_para.setShortcut(QKeySequence("Ctrl+Alt+Shift+H"))
+        act_para.setToolTip(
+            "Highlight ganzer Textabsätze (nicht nur freie Rechtecke) — 2.6.9"
+        )
+        act_para.triggered.connect(
+            lambda: self.pdf_view._toggle_paragraph_highlight(True)
+        )
+        m_pdf.addAction(act_para)
         act_pw = QAction("PDF verschlüsseln…", self)
         act_pw.setToolTip(
             "Stärke-Hinweis; AES-256; Rechte; leeres PW abgelehnt; "
@@ -10295,6 +10304,14 @@ class MainWindow(QMainWindow):
             "pdf_security": self._pdf_security_dialog,
             "pdf_encrypt": self._set_pdf_password,
             "pdf_decrypt": self._remove_pdf_password,
+            "paragraph_highlight": lambda: self.pdf_view._toggle_paragraph_highlight(True)
+            if hasattr(self.pdf_view, "_toggle_paragraph_highlight")
+            else None,
+            "stamp_pick": lambda: self.pdf_view._set_tool(
+                __import__("ild_pdf.annotate", fromlist=["AnnotationType"]).AnnotationType.STAMP
+            )
+            if hasattr(self.pdf_view, "_set_tool")
+            else None,
             "export": _export_menu,
             "export_page_images": lambda: self.pdf_view.export_pages_as_images()
             if hasattr(self.pdf_view, "export_pages_as_images")

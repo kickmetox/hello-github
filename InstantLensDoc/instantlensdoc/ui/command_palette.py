@@ -167,6 +167,18 @@ def default_palette_commands() -> list[PaletteCommand]:
             "passwort entfernen decrypt entsperren unlock",
             "PDF",
         ),
+        PaletteCommand(
+            "paragraph_highlight",
+            "Absatz-Highlight…",
+            "annotation highlight absatz paragraph textabschnitt markieren",
+            "PDF",
+        ),
+        PaletteCommand(
+            "stamp_pick",
+            "Stempel setzen…",
+            "stempel paid bezahlt rechnung datum custom stamp",
+            "PDF",
+        ),
         PaletteCommand("export", "Exportieren…", "export html docx pdf", "Datei"),
         PaletteCommand("export_page_images", "Seiten als Bilder…", "export png jpeg", "PDF"),
         PaletteCommand(

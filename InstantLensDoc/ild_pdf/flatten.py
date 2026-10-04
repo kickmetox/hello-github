@@ -178,12 +178,37 @@ def draw_annotations_on_image(
             draw.line([x, y + box_h, cx, cy], fill=stroke, width=2)
             draw.ellipse([cx - 3, cy - 3, cx + 3, cy + 3], fill=stroke)
         elif ann.type == AnnotationType.RECTANGLE:
-            draw.rectangle(
-                [x, y, x + w, y + h],
-                fill=_parse_color(ann.color, _opacity_alpha(ann, 40)),
-                outline=stroke,
-                width=sw,
-            )
+            fill_src = str(getattr(ann, "fill_color", "") or "").strip()
+            if fill_src:
+                fill = _parse_color(fill_src, _opacity_alpha(ann, 90))
+            else:
+                fill = _parse_color(ann.color, _opacity_alpha(ann, 40))
+            draw.rectangle([x, y, x + w, y + h], fill=fill, outline=stroke, width=sw)
+        elif ann.type in (AnnotationType.ELLIPSE, AnnotationType.TRIANGLE, AnnotationType.ROUNDED_RECT):
+            fill_src = str(getattr(ann, "fill_color", "") or "").strip()
+            fill = _parse_color(fill_src, _opacity_alpha(ann, 110)) if fill_src else None
+            box = [x, y, x + max(w, 4), y + max(h, 4)]
+            if ann.type == AnnotationType.ELLIPSE:
+                if fill:
+                    draw.ellipse(box, fill=fill, outline=stroke, width=sw)
+                else:
+                    draw.ellipse(box, outline=stroke, width=sw)
+            elif ann.type == AnnotationType.ROUNDED_RECT:
+                rad = max(4, int(min(max(w, 4), max(h, 4)) * 0.18))
+                if fill:
+                    draw.rounded_rectangle(box, radius=rad, fill=fill, outline=stroke, width=sw)
+                else:
+                    draw.rounded_rectangle(box, radius=rad, outline=stroke, width=sw)
+            else:
+                pts = [
+                    (x + max(w, 4) / 2.0, y),
+                    (x, y + max(h, 4)),
+                    (x + max(w, 4), y + max(h, 4)),
+                ]
+                if fill:
+                    draw.polygon(pts, fill=fill, outline=stroke)
+                else:
+                    draw.polygon(pts, outline=stroke)
         elif ann.type == AnnotationType.MEASURE_AREA:
             draw.rectangle(
                 [x, y, x + w, y + h],

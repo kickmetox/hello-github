@@ -1,4 +1,4 @@
-# InstantLens Doc — PowerShell-Scripting 2.6.8
+# InstantLens Doc — PowerShell-Scripting 2.6.9
 # Als CLI:
 #   powershell -ExecutionPolicy Bypass -File .\scripts\ild.ps1 pages D:\dok.pdf
 # Als Modul:
@@ -91,6 +91,56 @@ function Invoke-IldRedact {
     $a = @("redact-apply", $Path)
     if ($Out) { $a += @("--out", $Out) }
     Invoke-Ild @a | Out-Host
+}
+
+function Add-IldShape {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [int]$Page = 1,
+        [Parameter(Mandatory = $true)][string]$Type,
+        [double]$X,
+        [double]$Y,
+        [double]$Width,
+        [double]$Height,
+        [string]$Color = "#2980B9",
+        [string]$Fill = "",
+        [double]$Stroke = 2,
+        [switch]$Filled
+    )
+    $a = @("ann-shape", $Path, "--page", "$Page", "--type", $Type, "--x", "$X", "--y", "$Y", "--width", "$Width", "--height", "$Height", "--color", $Color, "--stroke", "$Stroke")
+    if ($Fill) { $a += @("--fill", $Fill) }
+    if ($Filled) { $a += "--filled" }
+    Invoke-Ild @a | Out-Host
+}
+
+function Add-IldStamp {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)][string]$Text,
+        [int]$Page = 1,
+        [double]$X = 72,
+        [double]$Y = 72,
+        [switch]$Date
+    )
+    $a = @("ann-stamp", $Path, "--page", "$Page", "--text", $Text, "--x", "$X", "--y", "$Y")
+    if ($Date) { $a += "--date" }
+    Invoke-Ild @a | Out-Host
+}
+
+function Add-IldParagraphHighlight {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [int]$Page = 1,
+        [double]$X,
+        [double]$Y,
+        [double]$Width,
+        [double]$Height
+    )
+    Invoke-Ild @("ann-highlight-para", $Path, "--page", "$Page", "--x", "$X", "--y", "$Y", "--width", "$Width", "--height", "$Height") | Out-Host
+}
+
+function Get-IldStamps {
+    Invoke-Ild @("stamp-list", "--json") | Out-Host
 }
 
 function Merge-IldPdf {

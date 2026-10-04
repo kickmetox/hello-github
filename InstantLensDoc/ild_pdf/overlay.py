@@ -489,6 +489,105 @@ def selection_to_highlight_rects(
     return rects, combined
 
 
+def _merge_text_blocks(blocks: Sequence[TextBlock]) -> TextBlock:
+    if len(blocks) == 1:
+        return blocks[0]
+    x0 = min(b.x for b in blocks)
+    y0 = min(b.y for b in blocks)
+    x1 = max(b.x + b.width for b in blocks)
+    y1 = max(b.y + b.height for b in blocks)
+    text = "\n".join(b.text for b in blocks if (b.text or "").strip())
+    fs = max((b.font_size for b in blocks), default=12.0)
+    return TextBlock(
+        page=int(blocks[0].page),
+        x=x0,
+        y=y0,
+        width=max(x1 - x0, 20),
+        height=max(y1 - y0, fs),
+        text=text,
+        font_size=fs,
+    )
+
+
+def extract_text_paragraphs(
+    pdf_path: str | Path,
+    page_index: int = 0,
+) -> List[TextBlock]:
+    """Zeilen zu Absätzen gruppieren (vertikaler Abstand) — 2.6.9."""
+    lines = extract_text_blocks(pdf_path, page_index, merge_lines=True)
+    if not lines:
+        return []
+    paras: list[list[TextBlock]] = [[lines[0]]]
+    for ln in lines[1:]:
+        prev = paras[-1][-1]
+        gap = float(ln.y) - (float(prev.y) + float(prev.height))
+        thresh = max(float(prev.font_size), float(ln.font_size), 8.0) * 0.85
+        if gap > thresh:
+            paras.append([ln])
+        else:
+            paras[-1].append(ln)
+    return [_merge_text_blocks(g) for g in paras]
+
+
+def selection_to_paragraph_highlight_rects(
+    pdf_path: str | Path,
+    page_index: int,
+    x0: float,
+    y0: float,
+    x1: float,
+    y1: float,
+    *,
+    scale: float = 1.0,
+    password: str | None = None,
+) -> tuple[List[TextMatchRect], str]:
+    """
+    Auswahl überdeckt Absätze ganz (nicht nur Zeichen/Zeilen) — 2.6.9.
+    Koordinaten: Render-Pixel bei scale.
+    """
+    s = float(scale) if scale else 1.0
+    if s <= 0:
+        s = 1.0
+    rx0, rx1 = sorted((float(x0) / s, float(x1) / s))
+    ry0, ry1 = sorted((float(y0) / s, float(y1) / s))
+    try:
+        paras = extract_text_paragraphs(pdf_path, page_index)
+    except Exception:
+        paras = []
+    if not paras:
+        return selection_to_highlight_rects(
+            pdf_path,
+            page_index,
+            x0,
+            y0,
+            x1,
+            y1,
+            scale=scale,
+            password=password,
+        )
+    rects: List[TextMatchRect] = []
+    texts: list[str] = []
+    for p in paras:
+        ox0 = max(p.x, rx0)
+        oy0 = max(p.y, ry0)
+        ox1 = min(p.x + p.width, rx1)
+        oy1 = min(p.y + p.height, ry1)
+        if ox1 <= ox0 or oy1 <= oy0:
+            continue
+        rect = TextMatchRect(
+            page=page_index,
+            x=p.x,
+            y=p.y,
+            width=max(p.width, 8.0),
+            height=max(p.height, 8.0),
+            text=(p.text or "").strip(),
+        )
+        rects.append(rect.scaled(s) if s != 1.0 else rect)
+        if p.text:
+            texts.append(p.text.strip())
+    combined = "\n\n".join(texts).strip()
+    return rects, combined
+
+
 def selection_to_plain_text(
     pdf_path: str | Path,
     page_index: int,

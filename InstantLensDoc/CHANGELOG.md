@@ -1,5 +1,23 @@
 # Changelog — InstantLens Doc
 
+## 2.6.9 — Annotationen ausbauen
+
+Minor nach **2.6.8**: **Annotationen** — einstellbare **Pinsel-/Stiftstärke**, **Color-Picker** für Strich und Füllung, **Formen** (Kreis/Ellipse gefüllt und Outline, Rechteck, Dreieck, Rundrect), **definierbare Stempel** Paid / Bezahlt / Rechnung / Datum plus **benutzerdefinierte** Text-Stempel (`ildstamps-v1`), **Absatz-Highlight** ganzer Textabschnitte (nicht nur Freihand). Scripting: `ild.add_shape` / `add_stamp` / `add_ink` / `highlight_paragraphs` / `list_stamps` · CLI `ann-shape` / `ann-stamp` / `ann-highlight-para`. Keine Word-Suite / i18n / Ribbon / Compare / DTP-Masterpages / Auto-Format / Auto-TOC / Word-InDesign-Shortcuts. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie unverändert.
+
+### Neu
+- AnnotationType `ellipse` / `triangle` / `rounded_rect`; Toolbar Kreis/Dreieck/Rundrect; Toggle **Füllen** (Outline vs. Fläche)
+- Stempel-Presets **Paid**, **Bezahlt**, **Rechnung**, **Datum**; „Als Stempel speichern“ für Custom-Texte
+- Toolbar **Absatz** + Menü/Palette Ctrl+Alt+Shift+H: Highlight ganzer Absätze unter der Auswahl
+- `selection_to_paragraph_highlight_rects` / `extract_text_paragraphs`
+
+### Geändert
+- Docs/Version **2.6.9**; Pinsel-Slider/Color-Picker-Tooltips; Scripting-API erweitert
+
+### Tests / Qualität
+- Version **2.6.9** (App / `ild_pdf` / ISS / Smoke / Docs); Serie **2.6**; `docs/VERSION` + `VERSION.txt`
+- Smoke: 2.6.9 CLI+Qt (shapes/stamps/paragraph-highlight + ild API)
+- Stubs: KI/Cloud/Stylus/3D/Hooks/Outline/Telemetrie unverändert markiert
+
 ## 2.6.8 — Windows-Build + Keygen + Scripting
 
 Minor nach **2.6.7**: **runnable Windows-Build-Pfad**, **Keygenerator** (HMAC/Trial) und **headless Scripting** (Python `ild` + PowerShell `ild.ps1`). `build-windows.ps1` erzwingt **64-Bit-Python** (optional `-Allow32Bit`), packt App + `InstantLensKeygen.exe`; `scripts/pack-windows-runnable.py` erzeugt ein startbares Python-Layout-Zip; `install-ild.ps1` legt optional einen **Keygen-Startmenü-Shortcut** an. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie unverändert; keine Annotationen-/Word-Suite-/i18n-Features.

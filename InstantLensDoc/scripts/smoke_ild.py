@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Nightly/CI Smoke: CLI + Import-Checks für InstantLens Doc — 2.1.0–2.6.8.
+"""Nightly/CI Smoke: CLI + Import-Checks für InstantLens Doc — 2.1.0–2.6.9.
 
 Leichtgewichtig. Exit-Codes:
   0  OK  (ok=true)
@@ -14,12 +14,12 @@ Aufruf:
   python scripts/smoke_ild.py -h
 
 JSON-Schema (--json), Erfolg:
-  {"ok": true, "version": "2.6.8", "duration_ms": 1234,
+  {"ok": true, "version": "2.6.9", "duration_ms": 1234,
    "checks": ["version", "imports", "cli", "measure_diff_import", "changelog"]}
 
 JSON bei Fail: checks[] enthält Objekt mit error-Text (max 200 Zeichen, Truncate …);
 Exitcode spiegelt ok (0↔true, 1↔false) — 2.2.0:
-  {"ok": false, "version": "2.6.8", "duration_ms": 12,
+  {"ok": false, "version": "2.6.9", "duration_ms": 12,
    "checks": ["version", {"name": "imports", "error": "import x: …"}]}
 """
 
@@ -41,7 +41,7 @@ if str(ROOT) not in sys.path:
 # Headless/CI: Qt ohne Display
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-EXPECTED_VERSION = "2.6.8"
+EXPECTED_VERSION = "2.6.9"
 FAIL_ERROR_MAX_LEN = 200
 
 EXIT_OK = 0
@@ -82,7 +82,7 @@ def check_version() -> None:
         _fail(f"docs/VERSION={docs_ver!r}")
     bw = (ROOT / "build-windows.ps1").read_text(encoding="utf-8")
     if EXPECTED_VERSION not in bw or "Allow32Bit" not in bw:
-        _fail("build-windows.ps1 fehlt 2.6.8/Allow32Bit")
+        _fail("build-windows.ps1 fehlt 2.6.9/Allow32Bit")
     if not (ROOT / "scripts" / "pack-windows-runnable.py").is_file():
         _fail("scripts/pack-windows-runnable.py fehlt")
     if not (ROOT / "run-keygen.bat").is_file():
@@ -199,6 +199,12 @@ def check_imports(*, with_qt: bool) -> None:
             "form_field_detect_dialog",
             "_set_form_field_tool",
             "begin_form_field_select",
+            "shapeFillToolbarBtn",
+            "paragraphHighlightToolbarBtn",
+            "AnnotationType.ELLIPSE",
+            "AnnotationType.TRIANGLE",
+            "AnnotationType.ROUNDED_RECT",
+            "selection_to_paragraph_highlight_rects",
         ),
         ROOT / "instantlensdoc" / "ui" / "form_fields_dialog.py": (
             "FormFieldsDialog",
@@ -273,6 +279,8 @@ def check_imports(*, with_qt: bool) -> None:
             "form_fields",
             "form_field_create",
             "form_field_detect",
+            "paragraph_highlight",
+            "stamp_pick",
             "Pin-Limit erreicht",
             "Pin ersetzen",
             "Zu ersetzender Pin",
@@ -330,12 +338,18 @@ def check_imports(*, with_qt: bool) -> None:
             "_pdf_security_dialog",
             "Ctrl+Alt+Shift+P",
             "pdf_security",
+            "Ctrl+Alt+Shift+H",
+            "paragraph_highlight",
         ),
         ROOT / "ild" / "__main__.py": (
             "license",
             "redact-apply",
             "export",
             "python -m ild",
+            "ann-shape",
+            "ann-stamp",
+            "ann-highlight-para",
+            "stamp-list",
         ),
         ROOT / "instantlensdoc" / "ui" / "help_dialog.py": (
             "python -m ild",
@@ -705,8 +719,8 @@ def check_measure_and_diff() -> None:
 
 def check_changelog() -> None:
     cl = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-    if "## 2.6.8" not in cl:
-        _fail("CHANGELOG fehlt ## 2.6.8")
+    if "## 2.6.9" not in cl:
+        _fail("CHANGELOG fehlt ## 2.6.9")
     if "## 2.6.7" not in cl:
         _fail("CHANGELOG fehlt ## 2.6.7")
     if "## 2.6.6" not in cl:
@@ -1026,6 +1040,14 @@ def check_changelog() -> None:
     ):
         _fail("CHANGELOG 2.6.8 fehlt Build/Keygen-Hinweis")
     if (
+        "Absatz" not in cl
+        and "ellipse" not in cl
+        and "Bezahlt" not in cl
+        and "Color-Picker" not in cl
+        and "2.6.9" not in cl
+    ):
+        _fail("CHANGELOG 2.6.9 fehlt Annotations-Hinweis")
+    if (
         "Open-Fail" not in cl
         and "HexAll" not in cl
         and "Ctrl+Shift+C" not in cl
@@ -1148,8 +1170,8 @@ def check_changelog() -> None:
     if "## 2.2.0" not in cl:
         _fail("CHANGELOG fehlt ## 2.2.0")
     feat = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
-    if "2.6.8" not in feat:
-        _fail("FEATURES.md fehlt 2.6.8")
+    if "2.6.9" not in feat:
+        _fail("FEATURES.md fehlt 2.6.9")
     if "2.6.6" not in feat:
         _fail("FEATURES.md fehlt 2.6.6")
     if "2.6.5" not in feat:
@@ -1582,11 +1604,11 @@ Exit-Codes:
 Laufzeit: am Ende als „Laufzeit: N ms“ (oder duration_ms im JSON).
 
 Beispiel --json (Erfolg):
-  {"ok": true, "version": "2.6.8", "duration_ms": 1234,
+  {"ok": true, "version": "2.6.9", "duration_ms": 1234,
    "checks": ["version", "imports", "cli", "measure_diff_import", "changelog"]}
 
 Beispiel --json (Fail):
-  {"ok": false, "version": "2.6.8", "duration_ms": 12,
+  {"ok": false, "version": "2.6.9", "duration_ms": 12,
    "checks": ["version", {"name": "imports", "error": "import x: …"}]}
 """.rstrip()
     )

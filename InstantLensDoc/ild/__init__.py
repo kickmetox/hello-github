@@ -1,5 +1,5 @@
 """
-Stabiles Scripting-API für InstantLens Doc (2.6.8).
+Stabiles Scripting-API für InstantLens Doc (2.6.9).
 
 Headless, ohne GUI. Nutzt ``ild_pdf`` + Lizenz/OCR der App.
 
@@ -17,13 +17,19 @@ from instantlensdoc import __version__ as version
 
 from ild.api import (
     activate_license,
+    add_custom_stamp_def,
+    add_ink,
     add_redaction,
+    add_shape,
+    add_stamp,
     apply_redactions,
     encrypt_pdf,
     export_page,
     generate_key,
     get_encryption_info,
+    highlight_paragraphs,
     license_status,
+    list_stamps,
     merge_pdfs,
     ocr_image,
     ocr_pdf_page,
@@ -47,6 +53,12 @@ __all__ = [
     "ocr_pdf_page",
     "add_redaction",
     "apply_redactions",
+    "add_shape",
+    "add_stamp",
+    "add_ink",
+    "highlight_paragraphs",
+    "list_stamps",
+    "add_custom_stamp_def",
     "generate_key",
     "verify_key",
     "license_status",

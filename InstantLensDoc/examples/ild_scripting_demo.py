@@ -1,4 +1,4 @@
-"""Beispiel: InstantLens Doc Scripting (Python) — 2.6.8.
+"""Beispiel: InstantLens Doc Scripting (Python) — 2.6.9.
 
 Aufruf aus dem App-Root:
   python examples/ild_scripting_demo.py [pdf]
@@ -35,6 +35,15 @@ def main() -> int:
         print("key:", key[:20] + "…")
         print("verify:", ild.verify_key(key)["ok"])
         print("license:", ild.license_status()["mode"])
+        shape = ild.add_shape(
+            src, page=1, kind="ellipse", x=20, y=20, width=80, height=40, filled=True
+        )
+        print("shape:", shape.get("type"), shape.get("id"))
+        stamp = ild.add_stamp(src, page=1, text="Paid")
+        print("stamp:", stamp.get("text"))
+        hl = ild.highlight_paragraphs(src, page=1, x=0, y=0, width=400, height=200)
+        print("paragraph highlights:", hl.get("count"))
+        print("stamps:", [s.get("label") for s in ild.list_stamps()][:8])
     return 0
 
 
