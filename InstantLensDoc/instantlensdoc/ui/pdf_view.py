@@ -70,6 +70,7 @@ from ild_pdf.pages import (
     flip_page,
     insert_blank_page,
     insert_page_from_bytes,
+    insert_pages_from_pdf,
     reorder_pages,
     rotate_page,
 )
@@ -1671,6 +1672,12 @@ class PdfViewer(QWidget):
         btn_reorder = QPushButton("Neu anordnen…")
         btn_reorder.setToolTip("Seitenreihenfolge ändern")
         btn_reorder.clicked.connect(self.reorder_dialog)
+        btn_page_manage = QPushButton("Seiten…")
+        btn_page_manage.setObjectName("pageManageToolbarBtn")
+        btn_page_manage.setToolTip(
+            "Seitenmanagement: ordnen, einfügen, drehen, löschen, aus PDF zusammenfügen — 2.6.1"
+        )
+        btn_page_manage.clicked.connect(self.page_manage_dialog)
         btn_save_ann = QPushButton("Annot. speichern")
         btn_save_ann.setToolTip("Annotationen in Sidecar *.ildann.json speichern")
         btn_save_ann.clicked.connect(self.save_annotations)
@@ -2031,6 +2038,7 @@ class PdfViewer(QWidget):
         toolbar.addWidget(btn_dup)
         toolbar.addWidget(btn_del)
         toolbar.addWidget(btn_reorder)
+        toolbar.addWidget(btn_page_manage)
         toolbar.addWidget(btn_save_ann)
         toolbar.addWidget(btn_reload_ann)
         toolbar.addWidget(btn_extract)
@@ -10619,6 +10627,77 @@ class PdfViewer(QWidget):
             mapping[i] = i if i < insert_at else i + 1
         self.store.remap_pages(mapping)
         self.schedule_sidecar_save(force=True)
+
+    def _remap_insert_many(self, insert_at: int, count: int) -> None:
+        """Annotation-Seitenindizes nach Einfügen von count Seiten bei insert_at anpassen."""
+        if not self.store or count <= 0:
+            return
+        mapping = {}
+        for i in range(self.page_count):
+            mapping[i] = i if i < insert_at else i + int(count)
+        self.store.remap_pages(mapping)
+        self.schedule_sidecar_save(force=True)
+
+    def page_manage_dialog(self):
+        """Seitenmanagement-Dialog öffnen (ordnen/einfügen/drehen/löschen/zusammenfügen) — 2.6.1."""
+        if not self.pdf_path:
+            QMessageBox.information(
+                self,
+                "Seitenmanagement",
+                "Bitte zuerst ein PDF öffnen.",
+            )
+            return
+        from instantlensdoc.ui.page_manage_dialog import PageManageDialog
+
+        PageManageDialog(self, self).exec()
+
+    def insert_pages_from_other_pdf(
+        self,
+        source: str | Path,
+        *,
+        page_indices: list[int] | Sequence[int] | None = None,
+        page_spec: str | None = None,
+        at_index: int | None = None,
+        one_based: bool = False,
+    ) -> list[int]:
+        """Seiten aus anderem PDF einfügen; Annotationen remappen; Viewer neu laden — 2.6.1."""
+        if not self.pdf_path:
+            raise ValueError("Kein PDF geöffnet")
+        src = Path(source)
+        insert_at = (
+            int(self.page_count)
+            if at_index is None
+            else int(at_index)
+        )
+        inserted = insert_pages_from_pdf(
+            self.pdf_path,
+            src,
+            page_indices=page_indices,
+            at_index=insert_at,
+            page_spec=page_spec,
+            one_based=one_based,
+        )
+        self._remap_insert_many(insert_at, len(inserted))
+        from ild_pdf import PdfDocument
+        from ild_pdf.render import clear_render_cache
+
+        clear_render_cache(self.pdf_path)
+        with PdfDocument(self.pdf_path, password=self.password) as doc:
+            self.page_count = len(doc)
+            self._reload_page_labels()
+        if inserted:
+            self.page_index = inserted[0]
+        self._selected_ann_id = None
+        self._selected_ann_ids = set()
+        self.canvas.set_selected_id(None)
+        self.refresh()
+        self.annotations_changed.emit()
+        self.page_changed.emit(self.page_index)
+        self.document_changed.emit()
+        self.status.emit(
+            f"{len(inserted)} Seite(n) aus „{src.name}“ eingefügt"
+        )
+        return list(inserted)
 
     def insert_blank_after_current(self):
         """Leere Seite nach der aktuellen einfügen und speichern."""

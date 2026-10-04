@@ -85,7 +85,9 @@ from .pages import (
     extract_page_bytes,
     flatten_page_indices,
     insert_page_from_bytes,
+    insert_pages_from_pdf,
     merge_pdfs,
+    page_count,
     parse_page_ranges,
     preview_page_range_count,
     split_into_single_page_pdfs,
@@ -320,6 +322,8 @@ __all__ = [
     "extract_page_range",
     "extract_pages",
     "merge_pdfs",
+    "insert_pages_from_pdf",
+    "page_count",
     "split_into_single_page_pdfs",
     "split_pdf",
     "flatten_annotations_to_pdf",
@@ -460,4 +464,4 @@ __all__ = [
     "page_count_for_text",
 ]
 
-__version__ = "2.6.0"
+__version__ = "2.6.1"

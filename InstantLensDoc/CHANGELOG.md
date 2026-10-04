@@ -1,8 +1,28 @@
 # Changelog — InstantLens Doc
 
+## 2.6.1 — Seitenmanagement + Schnellvorschau / Inhaltsverzeichnis
+
+Minor-Feature nach **2.6.0** (Zusatzanforderungen #3; Scan übersprungen): **Seitenmanagement** — Seiten per Drag-and-Drop neu anordnen, einfügen, drehen, löschen und Seiten aus anderen PDFs einfügen/zusammenfügen. Sidebar: **Schnellvorschau** (Seitenminiaturen) und klickbares **Inhaltsverzeichnis** (PDF-Outline → Seite). UI **PDF → Seitenmanagement…** (Ctrl+Shift+M) · Palette · Toolbar „Seiten…“; API `ild_pdf.insert_pages_from_pdf`. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie unverändert; Scan/OCR folgt separat.
+
+### Neu
+- `ild_pdf.insert_pages_from_pdf` / `page_count` — Seiten aus anderem PDF an Position einfügen
+- Dialog **Seitenmanagement** (Drag-Reorder · ▲▼ · drehen · leere Seite · duplizieren · löschen · aus PDF einfügen)
+- PDF-Menü **Seitenmanagement…** · Command-Palette `page_manage` · Toolbar-Button · Shortcut Ctrl+Shift+M
+- Sidebar **Schnellvorschau** (Thumbnails) · **Inhaltsverzeichnis** (Klick/Enter → Seite)
+
+### Geändert
+- Bestehende Einzelaktionen (drehen/löschen/reorder/merge-Dialog) bleiben; zentrales Seitenmanagement bündelt sie
+- Outline-Label/Navigation: Klick springt zur Seite (neben Doppelklick/Enter)
+- Docs/Version **2.6.1**
+
+### Tests / Qualität
+- Version **2.6.1** (App / `ild_pdf` / ISS / Smoke / Docs); Serie **2.6**; `docs/VERSION` + `VERSION.txt`
+- Smoke: 2.6.1 CLI + Qt (page-manage + insert-from-pdf + Schnellvorschau/TOC + UI-Pfad)
+- Stubs: KI/Cloud/Stylus/3D/Hooks/Outline/Telemetrie unverändert markiert
+
 ## 2.6.0 — Echtes Schwärzen (Redaktion) + Metadaten-Bereinigung
 
-Minor-Feature nach **2.5.20** (Zusatzanforderungen #1): **Echtes Schwärzen** entfernt ausgewählte Inhalte unwiderruflich aus dem PDF-Content-Stream (Seite→Bild mit schwarzen Zonen; Textschicht weg) — nicht nur Overlay-Balken; optional **Metadaten-Bereinigung** (DocInfo/XMP); UI **Echt schwärzen…** / **Auswahl → Schwärzung** / Palette; Overlay-Bake „Redactions anwenden“ bleibt. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie unverändert; ScanTuxio-Scan erst **2.6.1+**.
+Minor-Feature nach **2.5.20** (Zusatzanforderungen #1): **Echtes Schwärzen** entfernt ausgewählte Inhalte unwiderruflich aus dem PDF-Content-Stream (Seite→Bild mit schwarzen Zonen; Textschicht weg) — nicht nur Overlay-Balken; optional **Metadaten-Bereinigung** (DocInfo/XMP); UI **Echt schwärzen…** / **Auswahl → Schwärzung** / Palette; Overlay-Bake „Redactions anwenden“ bleibt. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie unverändert; Seitenmanagement **2.6.1**.
 
 ### Neu
 - `ild_pdf.apply_true_redactions` / `TrueRedactionResult` — irreversibles Schwärzen + optional Meta-Strip

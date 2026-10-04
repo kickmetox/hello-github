@@ -83,6 +83,13 @@ def default_palette_commands() -> list[PaletteCommand]:
             "schwärzen auswahl text redaction",
             "PDF",
         ),
+        PaletteCommand(
+            "page_manage",
+            "Seitenmanagement…",
+            "seiten ordnen drag drehen löschen einfügen zusammenfügen merge reorder",
+            "PDF",
+            "Ctrl+Shift+M",
+        ),
         PaletteCommand("export", "Exportieren…", "export html docx pdf", "Datei"),
         PaletteCommand("export_page_images", "Seiten als Bilder…", "export png jpeg", "PDF"),
         PaletteCommand(

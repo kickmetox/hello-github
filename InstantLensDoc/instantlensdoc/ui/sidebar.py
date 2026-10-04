@@ -653,9 +653,13 @@ class Sidebar(QWidget):
         self.files.document_label_reset_requested.connect(self._reset_document_label)
         layout.addWidget(self.files)
 
-        self.lbl_thumbs = QLabel("Seiten (Vorschaubilder) — ziehen zum Ordnen")
+        self.lbl_thumbs = QLabel("Schnellvorschau — Seiten ziehen zum Ordnen")
+        self.lbl_thumbs.setObjectName("sidebarSchnellvorschauLabel")
+        self.lbl_thumbs.setAccessibleName("Schnellvorschau")
         layout.addWidget(self.lbl_thumbs)
         self.thumbs = ThumbnailList()
+        self.thumbs.setObjectName("sidebarSchnellvorschau")
+        self.thumbs.setAccessibleName("Schnellvorschau Seitenminiaturen")
         self.thumbs.itemClicked.connect(self._activate_thumb)
         self.thumbs.pages_reordered.connect(self.pages_reordered.emit)
         self.thumbs.setContextMenuPolicy(Qt.CustomContextMenu)
@@ -665,17 +669,25 @@ class Sidebar(QWidget):
         self._thumb_scroll_last_v = 0
         self._thumb_scroll_emit_armed = True
         self.thumbs.setToolTip(
-            "Klick → Seite; Shift+Klick Mehrfachauswahl; "
-            "Ziehen zum Neuordnen (Ctrl+Z); Rechtsklick → Drehen/Duplizieren/Löschen"
+            "Schnellvorschau: Klick → Seite; Shift+Klick Mehrfachauswahl; "
+            "Ziehen zum Neuordnen (Ctrl+Z); Rechtsklick → Drehen/Duplizieren/Löschen — 2.6.1"
         )
         layout.addWidget(self.thumbs)
 
-        self.lbl_outline = QLabel("Lesezeichen / Outline")
+        self.lbl_outline = QLabel("Inhaltsverzeichnis")
+        self.lbl_outline.setObjectName("sidebarInhaltsverzeichnisLabel")
+        self.lbl_outline.setAccessibleName("Inhaltsverzeichnis")
         layout.addWidget(self.lbl_outline)
         self.outline = QTreeWidget()
+        self.outline.setObjectName("sidebarInhaltsverzeichnis")
+        self.outline.setAccessibleName("Inhaltsverzeichnis")
         self.outline.setHeaderHidden(True)
-        self.outline.setMaximumHeight(120)
-        self.outline.setToolTip("Doppelklick oder Enter → Seite; +/− zum Bearbeiten")
+        self.outline.setMaximumHeight(160)
+        self.outline.setToolTip(
+            "Inhaltsverzeichnis / PDF-Outline: Klick oder Enter → Seite; "
+            "+/− Lesezeichen bearbeiten — 2.6.1"
+        )
+        self.outline.itemClicked.connect(self._activate_outline)
         self.outline.itemDoubleClicked.connect(self._activate_outline)
         self.outline.itemActivated.connect(self._activate_outline)
         layout.addWidget(self.outline)

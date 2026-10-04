@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Nightly/CI Smoke: CLI + Import-Checks für InstantLens Doc — 2.1.0–2.6.0.
+"""Nightly/CI Smoke: CLI + Import-Checks für InstantLens Doc — 2.1.0–2.6.1.
 
 Leichtgewichtig. Exit-Codes:
   0  OK  (ok=true)
@@ -14,12 +14,12 @@ Aufruf:
   python scripts/smoke_ild.py -h
 
 JSON-Schema (--json), Erfolg:
-  {"ok": true, "version": "2.6.0", "duration_ms": 1234,
+  {"ok": true, "version": "2.6.1", "duration_ms": 1234,
    "checks": ["version", "imports", "cli", "measure_diff_import", "changelog"]}
 
 JSON bei Fail: checks[] enthält Objekt mit error-Text (max 200 Zeichen, Truncate …);
 Exitcode spiegelt ok (0↔true, 1↔false) — 2.2.0:
-  {"ok": false, "version": "2.6.0", "duration_ms": 12,
+  {"ok": false, "version": "2.6.1", "duration_ms": 12,
    "checks": ["version", {"name": "imports", "error": "import x: …"}]}
 """
 
@@ -41,7 +41,7 @@ if str(ROOT) not in sys.path:
 # Headless/CI: Qt ohne Display
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-EXPECTED_VERSION = "2.6.0"
+EXPECTED_VERSION = "2.6.1"
 FAIL_ERROR_MAX_LEN = 200
 
 EXIT_OK = 0
@@ -168,6 +168,16 @@ def check_imports(*, with_qt: bool) -> None:
             "apply_true_redactions",
             "redactions_from_text_selection",
             "Echt schwärzen",
+            "page_manage_dialog",
+            "insert_pages_from_other_pdf",
+            "Seitenmanagement",
+        ),
+        ROOT / "instantlensdoc" / "ui" / "page_manage_dialog.py": (
+            "PageManageDialog",
+            "InternalMove",
+            "Seiten aus PDF einfügen",
+            "pageManageDialog",
+            "Reihenfolge anwenden",
         ),
         ROOT / "instantlensdoc" / "ui" / "page_labels_dialog.py": (
             "PageLabelsDialog",
@@ -190,9 +200,18 @@ def check_imports(*, with_qt: bool) -> None:
             "max Pins",
             "commandPalettePinOverflow",
             "replace_oldest",
+            "page_manage",
+            "Seitenmanagement",
             "Pin-Limit erreicht",
             "Pin ersetzen",
             "Zu ersetzender Pin",
+        ),
+        ROOT / "instantlensdoc" / "ui" / "sidebar.py": (
+            "Schnellvorschau",
+            "Inhaltsverzeichnis",
+            "sidebarSchnellvorschau",
+            "sidebarInhaltsverzeichnis",
+            "itemClicked",
         ),
         ROOT / "instantlensdoc" / "ui" / "main_window.py": (
             "_focus_import_status_toast_target",
@@ -216,6 +235,9 @@ def check_imports(*, with_qt: bool) -> None:
             "_announce_status_toast",
             "Ctrl+K",
             "Downsample",
+            "Seitenmanagement…",
+            "page_manage",
+            "Ctrl+Shift+M",
         ),
         ROOT / "instantlensdoc" / "ui" / "password_dialog.py": (
             "compressOpenAfter",
@@ -566,6 +588,8 @@ def check_measure_and_diff() -> None:
 
 def check_changelog() -> None:
     cl = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    if "## 2.6.1" not in cl:
+        _fail("CHANGELOG fehlt ## 2.6.1")
     if "## 2.6.0" not in cl:
         _fail("CHANGELOG fehlt ## 2.6.0")
     if "## 2.5.20" not in cl:
@@ -818,6 +842,14 @@ def check_changelog() -> None:
     ):
         _fail("CHANGELOG 2.6.0 fehlt Kernfeature-Hinweis")
     if (
+        "Seitenmanagement" not in cl
+        and "insert_pages_from_pdf" not in cl
+        and "Schnellvorschau" not in cl
+        and "Inhaltsverzeichnis" not in cl
+        and "2.6.1" not in cl
+    ):
+        _fail("CHANGELOG 2.6.1 fehlt Kernfeature-Hinweis")
+    if (
         "Open-Fail" not in cl
         and "HexAll" not in cl
         and "Ctrl+Shift+C" not in cl
@@ -940,8 +972,8 @@ def check_changelog() -> None:
     if "## 2.2.0" not in cl:
         _fail("CHANGELOG fehlt ## 2.2.0")
     feat = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
-    if "2.6.0" not in feat:
-        _fail("FEATURES.md fehlt 2.6.0")
+    if "2.6.1" not in feat:
+        _fail("FEATURES.md fehlt 2.6.1")
     if "2.5.17" not in feat:
         _fail("FEATURES.md fehlt 2.5.17")
     if "2.5.15" not in feat:
@@ -1127,6 +1159,14 @@ def check_changelog() -> None:
         and "Content-Stream" not in feat
     ):
         _fail("FEATURES.md fehlt 2.6.0 Echtes Schwärzen")
+    if (
+        "2.6.1" not in feat
+        and "Seitenmanagement" not in feat
+        and "insert_pages_from_pdf" not in feat
+        and "Schnellvorschau" not in feat
+        and "Inhaltsverzeichnis" not in feat
+    ):
+        _fail("FEATURES.md fehlt 2.6.1 Seitenmanagement")
     if (
         "2.5.20" not in feat
         and "Open-Fail-A11y" not in feat
@@ -1333,11 +1373,11 @@ Exit-Codes:
 Laufzeit: am Ende als „Laufzeit: N ms“ (oder duration_ms im JSON).
 
 Beispiel --json (Erfolg):
-  {"ok": true, "version": "2.6.0", "duration_ms": 1234,
+  {"ok": true, "version": "2.6.1", "duration_ms": 1234,
    "checks": ["version", "imports", "cli", "measure_diff_import", "changelog"]}
 
 Beispiel --json (Fail):
-  {"ok": false, "version": "2.6.0", "duration_ms": 12,
+  {"ok": false, "version": "2.6.1", "duration_ms": 12,
    "checks": ["version", {"name": "imports", "error": "import x: …"}]}
 """.rstrip()
     )

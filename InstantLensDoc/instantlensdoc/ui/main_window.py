@@ -2455,6 +2455,7 @@ class MainWindow(QMainWindow):
                 "Annotationsgruppe umbenennen/Farbe…",
                 lambda: self._edit_annotation_group(),
             ),
+            ("Seitenmanagement…", lambda: self.pdf_view.page_manage_dialog()),
             ("Seiten neu anordnen…", lambda: self.pdf_view.reorder_dialog()),
             ("Seite als Bild exportieren…", lambda: self.pdf_view.extract_page_as_image()),
             ("Seiten als Bilder exportieren…", lambda: self.pdf_view.export_pages_as_images()),
@@ -2464,6 +2465,12 @@ class MainWindow(QMainWindow):
             ("PDF als Kopie speichern…", lambda: self.pdf_view.save_pdf_as_copy()),
         ]:
             a = QAction(title, self)
+            if title == "Seitenmanagement…":
+                a.setToolTip(
+                    "Seiten ordnen (Drag), einfügen, drehen, löschen, "
+                    "aus anderem PDF zusammenfügen — 2.6.1"
+                )
+                a.setShortcut(QKeySequence("Ctrl+Shift+M"))
             a.triggered.connect(slot)
             m_pdf.addAction(a)
         # Batch Drehen/Spiegeln Shortcuts (Auswahl oder aktuelle Seite) — 1.8.1
@@ -2584,11 +2591,11 @@ class MainWindow(QMainWindow):
             if title == "Echt schwärzen…":
                 a.setToolTip(
                     "Unwiderrufliches Schwärzen: Content-Stream/Textschicht entfernen "
-                    "+ optional Metadaten — 2.6.0"
+                    "+ optional Metadaten — 2.6.1"
                 )
             elif title == "Auswahl → Schwärzung":
                 a.setToolTip(
-                    "Textauswahl als Schwärzungs-Rechtecke markieren (Sidecar) — 2.6.0"
+                    "Textauswahl als Schwärzungs-Rechtecke markieren (Sidecar) — 2.6.1"
                 )
             a.triggered.connect(slot)
             m_pdf.addAction(a)
@@ -10096,6 +10103,9 @@ class MainWindow(QMainWindow):
             "selection_redact": lambda: self.pdf_view.redactions_from_text_selection()
             if hasattr(self.pdf_view, "redactions_from_text_selection")
             else None,
+            "page_manage": lambda: self.pdf_view.page_manage_dialog()
+            if hasattr(self.pdf_view, "page_manage_dialog")
+            else None,
             "export": _export_menu,
             "export_page_images": lambda: self.pdf_view.export_pages_as_images()
             if hasattr(self.pdf_view, "export_pages_as_images")
@@ -12161,7 +12171,7 @@ class MainWindow(QMainWindow):
                     f"{name or '(ohne Name)'}"
                 )
                 self._set_status(msg)
-                # Fail-Path A11y Summary-Copy — 2.6.0
+                # Fail-Path A11y Summary-Copy — 2.6.1
                 try:
                     self._announce_status_toast(msg)
                 except Exception:
@@ -13543,7 +13553,7 @@ class MainWindow(QMainWindow):
         return preview
 
     def _ocr_region_status_tooltip(self) -> str:
-        """Status-Tooltip inkl. Textvorschau — 2.5.9–2.6.0."""
+        """Status-Tooltip inkl. Textvorschau — 2.5.9–2.6.1."""
         path = getattr(self, "_last_ocr_region_path", None) or ""
         tip = (
             "Linksklick → Ergebnis-Tab · Rechtsklick → Menü · "
@@ -13553,7 +13563,7 @@ class MainWindow(QMainWindow):
             "Esc → Status schließen · "
             "Enter → Ergebnis-Tab · "
             "Ctrl+C Text · Ctrl+Shift+C Pfad · "
-            "F4 → Ordner · F5 → Datei — 2.6.0"
+            "F4 → Ordner · F5 → Datei — 2.6.1"
         )
         if path:
             tip = f"{tip}\n{path}"
@@ -13623,7 +13633,7 @@ class MainWindow(QMainWindow):
         if not path:
             msg = "OCR-Region Pfad fehlt"
             self._set_status(msg)
-            # Fail-Path A11y Open-Pfad fehlt — 2.6.0
+            # Fail-Path A11y Open-Pfad fehlt — 2.6.1
             try:
                 self._announce_status_toast(msg)
             except Exception:
@@ -13665,7 +13675,7 @@ class MainWindow(QMainWindow):
         except Exception:
             msg = f"OCR-Region Tab öffnen fehlgeschlagen: {target.name}"
             self._set_status(msg)
-            # Fail-Path A11y Open-Exception — 2.6.0
+            # Fail-Path A11y Open-Exception — 2.6.1
             try:
                 self._announce_status_toast(msg)
             except Exception:
@@ -13681,7 +13691,7 @@ class MainWindow(QMainWindow):
         if not path:
             msg = "OCR-Region Pfad fehlt"
             self._set_status(msg)
-            # Fail-Path A11y Open-Pfad fehlt — 2.6.0
+            # Fail-Path A11y Open-Pfad fehlt — 2.6.1
             try:
                 self._announce_status_toast(msg)
             except Exception:
@@ -13703,7 +13713,7 @@ class MainWindow(QMainWindow):
         except Exception:
             msg = f"OCR-Region Ordner öffnen fehlgeschlagen: {folder}"
             self._set_status(msg)
-            # Fail-Path A11y Open-Exception — 2.6.0
+            # Fail-Path A11y Open-Exception — 2.6.1
             try:
                 self._announce_status_toast(msg)
             except Exception:
@@ -13719,7 +13729,7 @@ class MainWindow(QMainWindow):
         if not path:
             msg = "OCR-Region Pfad fehlt"
             self._set_status(msg)
-            # Fail-Path A11y Open-Pfad fehlt — 2.6.0
+            # Fail-Path A11y Open-Pfad fehlt — 2.6.1
             try:
                 self._announce_status_toast(msg)
             except Exception:
@@ -13740,7 +13750,7 @@ class MainWindow(QMainWindow):
         except Exception:
             msg = f"OCR-Region Datei öffnen fehlgeschlagen: {target.name}"
             self._set_status(msg)
-            # Fail-Path A11y Open-Exception — 2.6.0
+            # Fail-Path A11y Open-Exception — 2.6.1
             try:
                 self._announce_status_toast(msg)
             except Exception:

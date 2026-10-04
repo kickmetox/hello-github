@@ -251,6 +251,83 @@ def merge_pdfs(sources: Sequence[str | Path], dest: str | Path) -> None:
     out.save(dest)
 
 
+def insert_pages_from_pdf(
+    dest: str | Path,
+    source: str | Path,
+    page_indices: Sequence[int] | None = None,
+    *,
+    at_index: int | None = None,
+    page_spec: str | None = None,
+    one_based: bool = False,
+) -> list[int]:
+    """
+    Seiten aus einem anderen PDF in dest einfügen und speichern — 2.6.1.
+
+    - ``page_indices``: 0-basiert (Reihenfolge bleibt; Duplikate werden entfernt)
+    - oder ``page_spec``: z. B. ``1-3,5`` (``one_based=True`` üblich)
+    - ``None``/leer: alle Seiten der Quelle
+    - ``at_index``: Einfügeposition in dest (0-basiert); None = Ans Ende
+
+    Rückgabe: Indizes der eingefügten Seiten in dest (nach dem Einfügen).
+    """
+    dest = Path(dest)
+    source = Path(source)
+    if dest.resolve() == source.resolve():
+        raise ValueError("Quelle und Ziel dürfen nicht dieselbe Datei sein")
+    with pikepdf.open(source) as src_pdf:
+        src_n = len(src_pdf.pages)
+        if src_n == 0:
+            raise ValueError("Quell-PDF hat keine Seiten")
+        if page_spec is not None and str(page_spec).strip():
+            ranges = parse_page_ranges(str(page_spec), src_n, one_based=one_based)
+            indices = flatten_page_indices(ranges)
+        elif page_indices is not None:
+            raw = [int(p) for p in page_indices]
+            if one_based:
+                raw = [p - 1 for p in raw]
+            seen: set[int] = set()
+            indices = []
+            for p in raw:
+                if p in seen:
+                    continue
+                seen.add(p)
+                indices.append(p)
+        else:
+            indices = list(range(src_n))
+        if not indices:
+            raise ValueError("Keine Seiten ausgewählt")
+        for p in indices:
+            if p < 0 or p >= src_n:
+                raise ValueError(f"Ungültiger Seitenindex {p + 1} (1..{src_n})")
+        # Seiten zuerst in Temp-PDF kopieren (saubere Objekte)
+        tmp = pikepdf.Pdf.new()
+        for p in indices:
+            tmp.pages.append(src_pdf.pages[p])
+    with pikepdf.open(dest, allow_overwriting_input=True) as pdf:
+        n = len(pdf.pages)
+        insert_at = n if at_index is None else int(at_index)
+        if insert_at < 0 or insert_at > n:
+            raise IndexError(f"Einfügeposition {insert_at} ungültig (0..{n})")
+        inserted: list[int] = []
+        for offset, page in enumerate(tmp.pages):
+            pos = insert_at + offset
+            if pos >= len(pdf.pages):
+                pdf.pages.append(page)
+                inserted.append(len(pdf.pages) - 1)
+            else:
+                pdf.pages.insert(pos, page)
+                inserted.append(pos)
+        pdf.save(dest)
+    return inserted
+
+
+def page_count(path: str | Path) -> int:
+    """Anzahl Seiten eines PDFs."""
+    path = Path(path)
+    with pikepdf.open(path) as pdf:
+        return len(pdf.pages)
+
+
 def parse_page_ranges(
     spec: str,
     page_count: int,
