@@ -1481,13 +1481,13 @@ class MainWindow(QMainWindow):
         m_export.addSeparator()
         act_exp_prof_save = QAction("Export-Profil speichern…", self)
         act_exp_prof_save.setToolTip(
-            "Benanntes Preset speichern (max. 10; DPI/Format/Ziel) — 2.5.1"
+            "Benanntes Preset speichern (max. 10; Duplikate abgelehnt) — 2.5.2"
         )
         act_exp_prof_save.triggered.connect(self._save_export_profile)
         m_export.addAction(act_exp_prof_save)
         act_exp_prof_apply = QAction("Export-Presets verwalten…", self)
         act_exp_prof_apply.setToolTip(
-            "Benannte Presets (max. 10): Anwenden / Löschen · Live-Zusammenfassung — 2.5.1"
+            "Benannte Presets (max. 10): Anwenden/Löschen · Export/Import JSON — 2.5.2"
         )
         act_exp_prof_apply.triggered.connect(self._manage_export_presets)
         m_export.addAction(act_exp_prof_apply)
@@ -11461,18 +11461,28 @@ class MainWindow(QMainWindow):
         )
 
         existing = {str(p["name"]).casefold() for p in get_export_profiles()}
-        if len(existing) >= EXPORT_PROFILES_MAX:
-            # Update erlaubt wenn Name bereits existiert
-            pass
         name, ok = QInputDialog.getText(
             self,
             "Export-Preset",
-            f"Name (leer = Zuletzt; max. {EXPORT_PROFILES_MAX}):",
+            f"Name (leer = Zuletzt; max. {EXPORT_PROFILES_MAX}; "
+            "Duplikate abgelehnt):",
             text=LAST_EXPORT_PRESET_NAME,
         )
         if not ok:
             return
         name = (name or "").strip() or LAST_EXPORT_PRESET_NAME
+        # Duplikat-Namen ablehnen (außer „Zuletzt“) — 2.5.2
+        if (
+            name.casefold() != LAST_EXPORT_PRESET_NAME.casefold()
+            and name.casefold() in existing
+        ):
+            QMessageBox.warning(
+                self,
+                "Export-Preset",
+                f"Preset-Name „{name}“ existiert bereits.\n"
+                "Bitte anderen Namen wählen oder das bestehende Preset löschen.",
+            )
+            return
         if (
             name.casefold() not in existing
             and len(existing) >= EXPORT_PROFILES_MAX
@@ -11518,10 +11528,11 @@ class MainWindow(QMainWindow):
         self._manage_export_presets()
 
     def _manage_export_presets(self):
-        """Benannte Export-Presets: Anwenden/Löschen + Live-Zusammenfassung — 2.5.1."""
+        """Export-Presets: Anwenden/Löschen · Export/Import JSON — 2.5.2."""
         from PySide6.QtWidgets import (
             QDialog,
             QDialogButtonBox,
+            QFileDialog,
             QHBoxLayout,
             QLabel,
             QListWidget,
@@ -11531,44 +11542,90 @@ class MainWindow(QMainWindow):
         )
 
         from instantlensdoc.core.app_settings import (
+            EXPORT_PRESETS_SCHEMA_ID,
             EXPORT_PROFILES_MAX,
+            ExportPresetsImportError,
             apply_export_profile,
             delete_export_profile,
+            dialog_start_dir,
+            export_export_presets_json,
             export_profile_summary,
             get_active_export_profile_name,
             get_export_profiles,
+            get_last_export_dir,
+            import_export_presets_json,
+            set_last_export_dir,
         )
 
         profiles = get_export_profiles()
         if not profiles:
-            QMessageBox.information(
+            # Auch ohne Presets Import erlauben — 2.5.2
+            reply = QMessageBox.question(
                 self,
                 "Export-Presets",
                 "Keine Presets gespeichert.\n"
-                "Datei → Exportieren → Export-Profil speichern…",
+                "Presets aus JSON importieren?",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.Yes,
             )
-            return
+            if reply != QMessageBox.Yes:
+                return
+            start = dialog_start_dir(get_last_export_dir())
+            path, _ = QFileDialog.getOpenFileName(
+                self,
+                "Export-Presets importieren",
+                start,
+                f"Export-Presets JSON (*{EXPORT_PRESETS_SCHEMA_ID}*.json *.json);;JSON (*.json)",
+            )
+            if not path:
+                return
+            try:
+                imported = import_export_presets_json(path, merge=False)
+                set_last_export_dir(str(Path(path).parent))
+            except ExportPresetsImportError as e:
+                QMessageBox.warning(self, "Export-Presets Import", str(e))
+                return
+            except Exception as e:
+                QMessageBox.warning(self, "Export-Presets Import", str(e))
+                return
+            self._set_status(
+                f"Export-Presets importiert: {len(imported)} "
+                f"({EXPORT_PRESETS_SCHEMA_ID})"
+            )
+            if not imported:
+                return
+            profiles = get_export_profiles()
 
         dlg = QDialog(self)
         dlg.setWindowTitle(f"Export-Presets (max. {EXPORT_PROFILES_MAX})")
-        dlg.setMinimumWidth(420)
+        dlg.setMinimumWidth(440)
         lay = QVBoxLayout(dlg)
-        lay.addWidget(
-            QLabel(
-                f"Benannte Presets ({len(profiles)}/{EXPORT_PROFILES_MAX}). "
-                "Auswahl zeigt Live-Zusammenfassung."
-            )
+        info = QLabel(
+            f"Benannte Presets ({len(profiles)}/{EXPORT_PROFILES_MAX}). "
+            "Duplikat-Namen abgelehnt · JSON Export/Import."
         )
+        lay.addWidget(info)
         lst = QListWidget()
-        active = get_active_export_profile_name()
-        for p in profiles:
-            item = QListWidgetItem(str(p["name"]))
-            item.setData(Qt.UserRole, dict(p))
-            lst.addItem(item)
-            if str(p["name"]) == active:
-                lst.setCurrentItem(item)
-        if lst.currentRow() < 0 and lst.count() > 0:
-            lst.setCurrentRow(0)
+        active = {"name": get_active_export_profile_name()}
+
+        def _reload_list() -> None:
+            lst.clear()
+            cur = get_export_profiles()
+            active["name"] = get_active_export_profile_name()
+            info.setText(
+                f"Benannte Presets ({len(cur)}/{EXPORT_PROFILES_MAX}). "
+                "Duplikat-Namen abgelehnt · JSON Export/Import."
+            )
+            for p in cur:
+                item = QListWidgetItem(str(p["name"]))
+                item.setData(Qt.UserRole, dict(p))
+                lst.addItem(item)
+                if str(p["name"]) == active["name"]:
+                    lst.setCurrentItem(item)
+            if lst.currentRow() < 0 and lst.count() > 0:
+                lst.setCurrentRow(0)
+
+        _reload_list()
         lay.addWidget(lst, 1)
         summary = QLabel("")
         summary.setWordWrap(True)
@@ -11584,7 +11641,7 @@ class MainWindow(QMainWindow):
             data = item.data(Qt.UserRole) or {}
             name = str(data.get("name") or item.text())
             tip = export_profile_summary(data)
-            mark = " ★ aktiv" if name == active else ""
+            mark = " ★ aktiv" if name == active["name"] else ""
             summary.setText(f"<b>{name}</b>{mark}<br>{tip}")
 
         lst.currentItemChanged.connect(lambda *_: _refresh_summary())
@@ -11594,8 +11651,19 @@ class MainWindow(QMainWindow):
         btn_apply = QPushButton("Anwenden")
         btn_apply.setDefault(True)
         btn_delete = QPushButton("Löschen…")
+        btn_export = QPushButton("Export JSON…")
+        btn_export.setToolTip(
+            f"Alle Presets als JSON exportieren ({EXPORT_PRESETS_SCHEMA_ID}) — 2.5.2"
+        )
+        btn_import = QPushButton("Import JSON…")
+        btn_import.setToolTip(
+            f"Alle Presets aus JSON importieren ({EXPORT_PRESETS_SCHEMA_ID}, "
+            "Merge/Ersetzen) — 2.5.2"
+        )
         btn_row.addWidget(btn_apply)
         btn_row.addWidget(btn_delete)
+        btn_row.addWidget(btn_export)
+        btn_row.addWidget(btn_import)
         btn_row.addStretch(1)
         lay.addLayout(btn_row)
         buttons = QDialogButtonBox(QDialogButtonBox.Close)
@@ -11633,17 +11701,87 @@ class MainWindow(QMainWindow):
             if not delete_export_profile(name):
                 QMessageBox.warning(dlg, "Export-Preset", "Löschen fehlgeschlagen.")
                 return
-            row = lst.currentRow()
-            lst.takeItem(row)
             self._set_status(f"Export-Preset gelöscht: {name}")
-            if lst.count() == 0:
+            if not get_export_profiles():
                 dlg.accept()
                 return
-            lst.setCurrentRow(min(row, lst.count() - 1))
+            _reload_list()
+            _refresh_summary()
+
+        def _export_json() -> None:
+            start = dialog_start_dir(get_last_export_dir())
+            path, _ = QFileDialog.getSaveFileName(
+                dlg,
+                "Export-Presets exportieren",
+                str(Path(start) / "ild-export-presets.json"),
+                f"Export-Presets JSON (*{EXPORT_PRESETS_SCHEMA_ID}*.json *.json);;JSON (*.json)",
+            )
+            if not path:
+                return
+            try:
+                dest = export_export_presets_json(path)
+                set_last_export_dir(str(Path(dest).parent))
+            except Exception as e:
+                QMessageBox.warning(dlg, "Export-Presets Export", str(e))
+                return
+            QMessageBox.information(
+                dlg,
+                "Export-Presets",
+                f"Exportiert ({EXPORT_PRESETS_SCHEMA_ID}):\n{dest}",
+            )
+            self._set_status(f"Export-Presets exportiert: {dest.name}")
+
+        def _import_json() -> None:
+            start = dialog_start_dir(get_last_export_dir())
+            path, _ = QFileDialog.getOpenFileName(
+                dlg,
+                "Export-Presets importieren",
+                start,
+                f"Export-Presets JSON (*{EXPORT_PRESETS_SCHEMA_ID}*.json *.json);;JSON (*.json)",
+            )
+            if not path:
+                return
+            reply = QMessageBox.question(
+                dlg,
+                "Export-Presets importieren",
+                "Vorhandene Presets ersetzen?\n"
+                "„Nein“ = Merge (neue Namen anhängen, Duplikate überspringen).\n"
+                f"Schema: {EXPORT_PRESETS_SCHEMA_ID}",
+                QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel,
+                QMessageBox.Yes,
+            )
+            if reply == QMessageBox.Cancel:
+                return
+            merge = reply == QMessageBox.No
+            try:
+                imported = import_export_presets_json(path, merge=merge)
+                set_last_export_dir(str(Path(path).parent))
+            except ExportPresetsImportError as e:
+                QMessageBox.warning(dlg, "Export-Presets Import", str(e))
+                return
+            except Exception as e:
+                QMessageBox.warning(dlg, "Export-Presets Import", str(e))
+                return
+            mode = "Merge" if merge else "Ersetzen"
+            QMessageBox.information(
+                dlg,
+                "Export-Presets",
+                f"Importiert ({EXPORT_PRESETS_SCHEMA_ID}, {mode}): "
+                f"{len(imported)} Presets",
+            )
+            self._set_status(
+                f"Export-Presets importiert: {len(imported)} ({mode})"
+            )
+            if not imported:
+                dlg.accept()
+                return
+            _reload_list()
             _refresh_summary()
 
         btn_apply.clicked.connect(_apply)
         btn_delete.clicked.connect(_delete)
+        btn_export.clicked.connect(_export_json)
+        btn_import.clicked.connect(_import_json)
         dlg.exec()
 
     def _rebuild_clipboard_history_menu(self):
@@ -12865,10 +13003,23 @@ class MainWindow(QMainWindow):
     def _on_ocr_region_finished(
         self, page: int, x: float, y: float, w: float, h: float
     ) -> None:
-        """Callback: Region OCR mit Defaults (DPI/Sprache); Abbruch; leeres Ergebnis — 2.5.1."""
-        from PySide6.QtWidgets import QApplication, QProgressDialog
+        """Callback: Fortschritt · Tab Titel Seite/Region · Fehler anhängen — 2.5.2."""
+        from PySide6.QtWidgets import (
+            QApplication,
+            QCheckBox,
+            QDialog,
+            QDialogButtonBox,
+            QLabel,
+            QProgressDialog,
+            QVBoxLayout,
+        )
 
-        from instantlensdoc.core.app_settings import get_ocr_dpi, get_ocr_lang
+        from instantlensdoc.core.app_settings import (
+            get_ocr_attach_errors,
+            get_ocr_dpi,
+            get_ocr_lang,
+            set_ocr_attach_errors,
+        )
 
         if not self.doc or self.doc.kind != DocKind.PDF or not self.doc.path:
             return
@@ -12876,11 +13027,47 @@ class MainWindow(QMainWindow):
         # DPI/Sprache aus Settings-Defaults (kein Dialog) — 2.5.1
         lang = get_ocr_lang()
         dpi = get_ocr_dpi()
+        page_1 = int(page) + 1
+        rx, ry = int(round(float(x))), int(round(float(y)))
+        rw, rh = max(1, int(round(float(w)))), max(1, int(round(float(h))))
+        region_label = f"S.{page_1} Region {rx},{ry} {rw}×{rh}"
+
+        # Fehler-anhängen-Toggle vor OCR (Settings-persistiert) — 2.5.2
+        opt = QDialog(self)
+        opt.setWindowTitle("OCR Region")
+        opt_lay = QVBoxLayout(opt)
+        opt_lay.addWidget(
+            QLabel(
+                f"OCR Region · {region_label}\n"
+                f"Defaults: {lang}, {dpi} DPI"
+            )
+        )
+        attach_cb = QCheckBox("Fehler anhängen")
+        attach_cb.setToolTip(
+            "OCR-Fehler als Abschnitt „OCR-Fehler“ an das Ergebnis-TXT anhängen "
+            "(Einstellung wird gemerkt) — 2.5.2"
+        )
+        attach_cb.setChecked(get_ocr_attach_errors())
+        opt_lay.addWidget(attach_cb)
+        opt_btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        opt_btns.accepted.connect(opt.accept)
+        opt_btns.rejected.connect(opt.reject)
+        opt_lay.addWidget(opt_btns)
+        if opt.exec() != QDialog.Accepted:
+            self._set_status("OCR-Region abgebrochen")
+            return
+        attach_errors = bool(attach_cb.isChecked())
+        try:
+            set_ocr_attach_errors(attach_errors)
+        except Exception:
+            pass
+
+        # Bestimmter Fortschritt: Vorbereiten → Rendern/OCR → Speichern — 2.5.2
         prog = QProgressDialog(
             f"OCR Region ({lang}, {dpi} DPI)…",
             "Abbrechen",
             0,
-            0,
+            3,
             self,
         )
         prog.setWindowTitle("OCR Region")
@@ -12888,33 +13075,99 @@ class MainWindow(QMainWindow):
         prog.setMinimumDuration(0)
         prog.setCancelButtonText("Abbrechen")
         prog.setValue(0)
+        prog.setLabelText(f"Vorbereiten… ({region_label})")
         prog.show()
         QApplication.processEvents()
         if prog.wasCanceled():
             prog.close()
             self._set_status("OCR-Region abgebrochen")
             return
+
+        result = None
+        ocr_error: str | None = None
+        cancelled = False
         try:
-            result = ocr_mod.ocr_pdf_region(
-                pdf_path,
-                int(page),
-                (float(x), float(y), float(w), float(h)),
-                lang=lang,
-                dpi=dpi,
-                display_scale=float(getattr(self.pdf_view, "scale", 1.5) or 1.5),
-            )
+            prog.setValue(1)
+            prog.setLabelText(f"Region OCR… ({region_label} @ {dpi} DPI)")
+            QApplication.processEvents()
+            if prog.wasCanceled():
+                cancelled = True
+            else:
+                result = ocr_mod.ocr_pdf_region(
+                    pdf_path,
+                    int(page),
+                    (float(x), float(y), float(w), float(h)),
+                    lang=lang,
+                    dpi=dpi,
+                    display_scale=float(getattr(self.pdf_view, "scale", 1.5) or 1.5),
+                )
+                prog.setValue(2)
+                prog.setLabelText(f"Ergebnis speichern… ({region_label})")
+                QApplication.processEvents()
+                if prog.wasCanceled():
+                    cancelled = True
         except ocr_mod.OcrUnavailable as e:
+            prog.close()
             QMessageBox.information(self, "OCR — Tesseract fehlt", str(e))
             return
         except Exception as e:
-            QMessageBox.warning(self, "OCR Region", f"OCR fehlgeschlagen:\n{e}")
-            return
+            ocr_error = str(e)
         finally:
-            cancelled = prog.wasCanceled()
+            if prog.wasCanceled():
+                cancelled = True
+            if not cancelled:
+                prog.setValue(3)
             prog.close()
+
         if cancelled:
             self._set_status("OCR-Region abgebrochen")
             return
+
+        def _write_and_open(body: str, *, status_extra: str = "") -> None:
+            out_txt = pdf_path.with_name(f"{pdf_path.stem}-ocr-region.txt")
+            n = 1
+            while out_txt.exists() and n < 1000:
+                out_txt = pdf_path.with_name(f"{pdf_path.stem}-ocr-region-{n}.txt")
+                n += 1
+            try:
+                out_txt.write_text(body, encoding="utf-8")
+            except Exception as e:
+                QMessageBox.warning(
+                    self,
+                    "OCR Region",
+                    f"OCR-Text konnte nicht gespeichert werden:\n{e}",
+                )
+                return
+            self.open_path(str(out_txt))
+            # Ergebnis-Tab Titel mit Seite/Region — 2.5.2
+            tab_title = f"OCR {region_label}"
+            try:
+                self.sidebar.set_document_label(str(out_txt), tab_title)
+            except Exception:
+                pass
+            self.setWindowTitle(self._app_title(tab_title))
+            msg = (
+                f"OCR-Region ({lang}, {dpi} DPI) {region_label} → Tab „{tab_title}“"
+            )
+            if status_extra:
+                msg += f" · {status_extra}"
+            self._set_status(msg)
+
+        if ocr_error:
+            if attach_errors:
+                err_body = (
+                    f"--- OCR Region {region_label} ---\n\n"
+                    f"--- OCR-Fehler ---\n"
+                    f"Seite {page_1}: {ocr_error.strip().replace(chr(10), ' ')[:200]}\n"
+                )
+                _write_and_open(err_body, status_extra="Fehler angehängt")
+            else:
+                QMessageBox.warning(
+                    self, "OCR Region", f"OCR fehlgeschlagen:\n{ocr_error}"
+                )
+            return
+
+        assert result is not None
         text = (result.text or "").strip()
         if not text:
             # Leeres Ergebnis: Hinweis, kein leerer Tab — 2.5.1
@@ -12925,27 +13178,15 @@ class MainWindow(QMainWindow):
                 f"(Defaults: {lang}, {dpi} DPI — Einstellungen → OCR)",
             )
             self._set_status(
-                f"OCR-Region: kein Text erkannt (S.{int(page) + 1}, {lang}, {dpi} DPI)"
+                f"OCR-Region: kein Text erkannt ({region_label}, {lang}, {dpi} DPI)"
             )
             return
-        out_txt = pdf_path.with_name(f"{pdf_path.stem}-ocr-region.txt")
-        n = 1
-        while out_txt.exists() and n < 1000:
-            out_txt = pdf_path.with_name(f"{pdf_path.stem}-ocr-region-{n}.txt")
-            n += 1
-        try:
-            out_txt.write_text(result.text or "", encoding="utf-8")
-        except Exception as e:
-            QMessageBox.warning(
-                self,
-                "OCR Region",
-                f"OCR-Text konnte nicht gespeichert werden:\n{e}",
-            )
-            return
-        self.open_path(str(out_txt))
-        self._set_status(
-            f"OCR-Region ({result.lang}, {dpi} DPI) S.{int(page) + 1} → Tab {out_txt.name}"
-        )
+
+        header = f"--- OCR Region {region_label} ({result.lang}, {dpi} DPI) ---\n\n"
+        body = header + (result.text or "")
+        if not body.endswith("\n"):
+            body += "\n"
+        _write_and_open(body)
 
     def _edit_doc_tags(self):
         """Dokument-Tags (ildtags-v1) bearbeiten — 2.5.0."""

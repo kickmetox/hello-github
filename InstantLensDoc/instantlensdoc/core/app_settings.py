@@ -4470,6 +4470,7 @@ def set_print_preview(enabled: bool) -> None:
 
 EXPORT_PROFILE_FORMATS = ("PNG", "JPEG")
 EXPORT_PROFILES_MAX = 10  # benannte Export-Presets max. 10 — 2.5.1
+LAST_EXPORT_PRESET_NAME = "Zuletzt"
 
 
 def _normalize_export_profile(raw: object) -> dict[str, object] | None:
@@ -4530,11 +4531,23 @@ def save_export_profile(
     dpi: int | None = None,
     format: str | None = None,
     target: str | Path | None = None,
+    allow_replace: bool = False,
 ) -> dict[str, object]:
-    """Profil speichern/überschreiben (DPI/Format/Ziel)."""
+    """
+    Profil speichern (DPI/Format/Ziel).
+
+    Duplikat-Namen werden abgelehnt (außer ``allow_replace`` oder Preset „Zuletzt“) — 2.5.2.
+    """
     clean_name = (name or "").strip()
     if not clean_name:
         raise ValueError("Profilname fehlt")
+    is_last = clean_name.casefold() == LAST_EXPORT_PRESET_NAME.casefold()
+    existing = get_export_profile(clean_name)
+    if existing is not None and not allow_replace and not is_last:
+        raise ValueError(
+            f"Preset-Name „{clean_name}“ existiert bereits. "
+            "Bitte anderen Namen wählen oder das bestehende Preset löschen."
+        )
     if dpi is None:
         dpi = get_export_raster_dpi()
     if format is None:
@@ -4554,11 +4567,136 @@ def save_export_profile(
         {"name": clean_name, "dpi": dpi, "format": fmt, "target": target_s}
     )
     assert profile is not None
-    profiles = [p for p in get_export_profiles() if str(p["name"]).casefold() != clean_name.casefold()]
+    profiles = [
+        p
+        for p in get_export_profiles()
+        if str(p["name"]).casefold() != clean_name.casefold()
+    ]
     profiles.insert(0, profile)
     profiles = profiles[:EXPORT_PROFILES_MAX]
     save_settings({"export_profiles": profiles, "active_export_profile": clean_name})
     return profile
+
+
+# Export-Presets JSON Export/Import — 2.5.2
+EXPORT_PRESETS_SCHEMA_ID = "ildexportpresets-v1"
+EXPORT_PRESETS_VERSION = 1
+
+
+class ExportPresetsImportError(ValueError):
+    """Ungültiges ildexportpresets-v1 JSON."""
+
+
+def export_export_presets_dict() -> dict[str, Any]:
+    """Alle Export-Presets als Dict (Schema ildexportpresets-v1) — 2.5.2."""
+    return {
+        "version": EXPORT_PRESETS_VERSION,
+        "schema": EXPORT_PRESETS_SCHEMA_ID,
+        "presets": get_export_profiles(),
+        "active": get_active_export_profile_name(),
+    }
+
+
+def export_export_presets_json(path: str | Path) -> Path:
+    """Alle Export-Presets als JSON schreiben — 2.5.2."""
+    dest = Path(path)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_text(
+        json.dumps(export_export_presets_dict(), ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    return dest
+
+
+def import_export_presets_dict(
+    data: dict,
+    *,
+    merge: bool = False,
+) -> list[dict[str, object]]:
+    """
+    Export-Presets aus Dict übernehmen (ildexportpresets-v1) — 2.5.2.
+
+    merge=True: bestehende behalten, neue Namen anhängen (Duplikate überspringen).
+    merge=False: alle Presets ersetzen.
+    """
+    if not isinstance(data, dict):
+        raise ExportPresetsImportError(
+            "Export-Presets-JSON muss ein Objekt sein "
+            f"(Schema „{EXPORT_PRESETS_SCHEMA_ID}“)."
+        )
+    ver = data.get("version")
+    schema = data.get("schema")
+    try:
+        ver_i = int(ver)
+    except (TypeError, ValueError):
+        raise ExportPresetsImportError(
+            f"Ungültige Version {ver!r} — erwartet {EXPORT_PRESETS_VERSION} "
+            f"(„{EXPORT_PRESETS_SCHEMA_ID}“)."
+        ) from None
+    if ver_i != EXPORT_PRESETS_VERSION:
+        raise ExportPresetsImportError(
+            f"Inkompatible Version {ver_i} — erwartet {EXPORT_PRESETS_VERSION} "
+            f"(„{EXPORT_PRESETS_SCHEMA_ID}“)."
+        )
+    if schema is None or str(schema) != EXPORT_PRESETS_SCHEMA_ID:
+        raise ExportPresetsImportError(
+            f"Ungültiges oder fehlendes Schema „{schema}“ — "
+            f"erwartet „{EXPORT_PRESETS_SCHEMA_ID}“."
+        )
+    raw = data.get("presets", data.get("profiles"))
+    if not isinstance(raw, (list, tuple)):
+        raise ExportPresetsImportError("Feld „presets“ muss eine Liste sein.")
+    incoming: list[dict[str, object]] = []
+    seen: set[str] = set()
+    for item in raw:
+        p = _normalize_export_profile(item)
+        if not p:
+            continue
+        key = str(p["name"]).casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        incoming.append(p)
+    if merge:
+        existing = get_export_profiles()
+        existing_keys = {str(p["name"]).casefold() for p in existing}
+        merged = list(existing)
+        for p in incoming:
+            if str(p["name"]).casefold() in existing_keys:
+                continue  # Duplikat-Namen überspringen
+            merged.append(p)
+            existing_keys.add(str(p["name"]).casefold())
+            if len(merged) >= EXPORT_PROFILES_MAX:
+                break
+        out = merged[:EXPORT_PROFILES_MAX]
+    else:
+        out = incoming[:EXPORT_PROFILES_MAX]
+    active = str(data.get("active") or "").strip()
+    if active and not any(str(p["name"]).casefold() == active.casefold() for p in out):
+        active = str(out[0]["name"]) if out else ""
+    elif not active:
+        active = str(out[0]["name"]) if out else ""
+    save_settings({"export_profiles": out, "active_export_profile": active})
+    return out
+
+
+def import_export_presets_json(
+    path: str | Path,
+    *,
+    merge: bool = False,
+) -> list[dict[str, object]]:
+    """Export-Presets aus JSON-Datei laden — 2.5.2."""
+    src = Path(path)
+    try:
+        data = json.loads(src.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as e:
+        raise ExportPresetsImportError(
+            f"Ungültiges JSON — Datei ist kein gültiges "
+            f"„{EXPORT_PRESETS_SCHEMA_ID}“: {e}"
+        ) from e
+    except OSError as e:
+        raise ExportPresetsImportError(str(e)) from e
+    return import_export_presets_dict(data, merge=merge)
 
 
 def delete_export_profile(name: str) -> bool:
@@ -4612,9 +4750,6 @@ def apply_export_profile(name: str) -> dict[str, object] | None:
         set_last_page_image_export_dir(target)
     save_settings({"active_export_profile": str(profile["name"])})
     return profile
-
-
-LAST_EXPORT_PRESET_NAME = "Zuletzt"
 
 
 def get_last_export_format() -> str:
@@ -4758,8 +4893,13 @@ def set_default_ann_color_theme(name: str) -> str:
     return clean
 
 
+# Farben-Theme JSON (eigenes Schema, getrennt von Color-Presets) — 2.5.2
+ANN_COLORS_THEME_SCHEMA_ID = "ildcolors-theme-v1"
+ANN_COLORS_THEME_VERSION = 1
+
+
 def export_ann_color_theme_dict(name: str | None = None) -> dict[str, Any]:
-    """Theme oder aktuelle Presets als ildcolors-v1 Dict (inkl. theme) — 2.5.1."""
+    """Theme oder aktuelle Presets als ildcolors-theme-v1 Dict — 2.5.2."""
     theme_name = (name or "").strip()
     if theme_name:
         colors = get_ann_color_theme(theme_name)
@@ -4769,8 +4909,8 @@ def export_ann_color_theme_dict(name: str | None = None) -> dict[str, Any]:
         colors = get_ann_color_presets()
         theme_name = get_default_ann_color_theme()
     payload: dict[str, Any] = {
-        "version": ANN_COLORS_VERSION,
-        "schema": ANN_COLORS_SCHEMA_ID,
+        "version": ANN_COLORS_THEME_VERSION,
+        "schema": ANN_COLORS_THEME_SCHEMA_ID,
         "colors": list(colors),
     }
     if theme_name:
@@ -4781,7 +4921,7 @@ def export_ann_color_theme_dict(name: str | None = None) -> dict[str, Any]:
 def export_ann_color_theme_json(
     path: str | Path, name: str | None = None
 ) -> Path:
-    """Farben-Theme als JSON exportieren (ildcolors-v1 + theme) — 2.5.1."""
+    """Farben-Theme als JSON exportieren (ildcolors-theme-v1) — 2.5.2."""
     dest = Path(path)
     dest.parent.mkdir(parents=True, exist_ok=True)
     dest.write_text(
@@ -4792,17 +4932,71 @@ def export_ann_color_theme_json(
     return dest
 
 
+def _validate_ann_color_theme_dict(data: dict) -> None:
+    """Schema ildcolors-theme-v1 prüfen — klare DE-Fehler — 2.5.2."""
+    if not isinstance(data, dict):
+        raise AnnColorsImportError(
+            "Farben-Theme-JSON muss ein Objekt sein "
+            f"(Schema „{ANN_COLORS_THEME_SCHEMA_ID}“)."
+        )
+    ver = data.get("version")
+    schema = data.get("schema")
+    try:
+        ver_i = int(ver)
+    except (TypeError, ValueError):
+        raise AnnColorsImportError(
+            f"Ungültige Version {ver!r} — erwartet {ANN_COLORS_THEME_VERSION} "
+            f"(„{ANN_COLORS_THEME_SCHEMA_ID}“)."
+        ) from None
+    if ver_i != ANN_COLORS_THEME_VERSION:
+        raise AnnColorsImportError(
+            f"Inkompatible Version {ver_i} — erwartet {ANN_COLORS_THEME_VERSION} "
+            f"(„{ANN_COLORS_THEME_SCHEMA_ID}“)."
+        )
+    if schema is None or str(schema) != ANN_COLORS_THEME_SCHEMA_ID:
+        raise AnnColorsImportError(
+            f"Ungültiges oder fehlendes Schema „{schema}“ — "
+            f"erwartet „{ANN_COLORS_THEME_SCHEMA_ID}“. "
+            f"(Color-Presets nutzen „{ANN_COLORS_SCHEMA_ID}“.)"
+        )
+    raw = data.get("colors", data.get("presets"))
+    if not isinstance(raw, (list, tuple)):
+        raise AnnColorsImportError(
+            "Feld „colors“ fehlt oder ist ungültig — erwartet eine Liste mit 6 Farben."
+        )
+
+
 def import_ann_color_theme_dict(
     data: dict,
     *,
+    merge: bool = False,
     set_default: bool = False,
 ) -> list[str]:
     """
-    Farben-Theme aus Dict importieren (ildcolors-v1, optional theme) — 2.5.1.
+    Farben-Theme aus Dict importieren (ildcolors-theme-v1) — 2.5.2.
 
-    Wendet Farben als Presets an; optional Default-Theme-Name setzen.
+    merge=True: nur gefüllte Slots überschreiben; merge=False: ersetzen.
+    Optional Default-Theme-Name setzen.
     """
-    colors = import_ann_color_presets_dict(data, merge=False)
+    _validate_ann_color_theme_dict(data)
+    # Farben übernehmen ohne erneute Schema-Prüfung von ildcolors-v1
+    raw = data.get("colors", data.get("presets"))
+    assert isinstance(raw, (list, tuple))
+    current = get_ann_color_presets()
+    defaults = list(_DEFAULT_ANN_PRESETS)
+    out: list[str] = list(current if merge else defaults)
+    for i in range(ANN_COLOR_PRESET_COUNT):
+        if i >= len(raw):
+            if not merge:
+                out[i] = defaults[i]
+            continue
+        c = str(raw[i] or "").strip()
+        if not c:
+            if not merge:
+                out[i] = defaults[i]
+            continue
+        out[i] = _normalize_hex_color(c, defaults[i])
+    colors = set_ann_color_presets(out)
     theme_name = str(data.get("theme") or "").strip()
     if set_default and theme_name and theme_name in ANN_COLOR_THEMES:
         set_default_ann_color_theme(theme_name)
@@ -4812,17 +5006,31 @@ def import_ann_color_theme_dict(
 def import_ann_color_theme_json(
     path: str | Path,
     *,
+    merge: bool = False,
     set_default: bool = False,
 ) -> list[str]:
-    """Farben-Theme aus JSON-Datei importieren — 2.5.1."""
-    raw = Path(path).read_text(encoding="utf-8")
+    """Farben-Theme aus JSON-Datei importieren — 2.5.2."""
+    try:
+        raw = Path(path).read_text(encoding="utf-8")
+    except OSError as e:
+        raise AnnColorsImportError(
+            f"Farben-Theme-Datei konnte nicht gelesen werden: {e}"
+        ) from e
     try:
         data = json.loads(raw)
     except json.JSONDecodeError as e:
-        raise AnnColorsImportError(f"Ungültiges JSON: {e}") from e
+        raise AnnColorsImportError(
+            f"Ungültiges JSON — Datei ist kein gültiges "
+            f"„{ANN_COLORS_THEME_SCHEMA_ID}“: {e}"
+        ) from e
     if not isinstance(data, dict):
-        raise AnnColorsImportError("Color-Theme-JSON muss ein Objekt sein.")
-    return import_ann_color_theme_dict(data, set_default=set_default)
+        raise AnnColorsImportError(
+            "Farben-Theme-JSON muss ein Objekt sein "
+            f"(Schema „{ANN_COLORS_THEME_SCHEMA_ID}“)."
+        )
+    return import_ann_color_theme_dict(
+        data, merge=merge, set_default=set_default
+    )
 
 
 def get_welcome_recent_filter() -> str:

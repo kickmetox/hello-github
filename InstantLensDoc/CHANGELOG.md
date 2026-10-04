@@ -1,5 +1,20 @@
 # Changelog — InstantLens Doc
 
+## 2.5.2 — OCR-Region Fortschritt·Tab-Titel·Fehler-Toggle, Theme ildcolors-theme-v1 Merge/Ersetzen, ildtags Treffer·Esc·fehlende grau, Export-Presets Duplikat·JSON
+
+Post-Release-Polish nach **2.5.1**: **OCR-Region** mit **bestimmtem Fortschritt**, **Ergebnis-Tab-Titel Seite/Region**, **Fehler anhängen Toggle**; **Farben-Theme JSON** Schema **ildcolors-theme-v1**, **ungültig klar DE**, **Merge vs Ersetzen**; **ildtags-Filter** mit **Trefferanzahl**, **Esc leert Filter**, **fehlende getaggte Recent grau**; **Export-Presets** **Duplikat-Namen ablehnen**, **Export/Import aller Presets JSON** (`ildexportpresets-v1`). Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie klar markiert / nicht produktiv (Ink ≠ Stylus).
+
+### Geändert
+- OCR-Region: Fortschritt (Schritte) · Ergebnis-Tab Titel mit Seite/Region · Fehler anhängen Toggle (persistiert)
+- Farben-Themes: Schema `ildcolors-theme-v1` · ungültig klar DE · Import Merge vs Ersetzen
+- Dokument-Tags-Filter: Trefferanzahl · Esc leert Filter · fehlende getaggte Recent grau
+- Export-Presets: Duplikat-Namen ablehnen · Export/Import aller Presets JSON (`ildexportpresets-v1`)
+
+### Tests / Qualität
+- Version **2.5.2** (App / `ild_pdf` / ISS / Smoke / Docs); Serie **2.5**; `docs/VERSION` + `VERSION.txt`
+- Smoke: 2.5.2 CLI + Qt (OCR Fortschritt/Titel/Fehler-Toggle, Theme Schema/Merge, ildtags Treffer/Esc/grau, Export Duplikat/JSON)
+- Stubs: KI/Cloud/Stylus/3D/Hooks/Outline/Telemetrie unverändert markiert
+
 ## 2.5.1 — OCR-Region Defaults·Abbruch·leer, Theme-Swatches·Default·JSON, ildtags Recent·Clear·Persistenz, Export-Presets max 10
 
 Post-Release-Polish nach **2.5.0**: **OCR-Region** nutzt **DPI/Sprache aus Defaults**, **Abbruch** (Esc/Progress) und **Hinweis bei leerem Ergebnis**; **Farben-Themes** mit **Vorschau-Swatches**, **Als Default speichern**, **Import/Export JSON**; **ildtags** Tag hinzufügen/entfernen am Recent, **Filter Clear**, **Persistenz**; **Export-Presets** benannt **max. 10**, **Anwenden/Löschen**, **Live-Zusammenfassung**. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie klar markiert / nicht produktiv (Ink ≠ Stylus).

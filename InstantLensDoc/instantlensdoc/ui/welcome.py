@@ -126,8 +126,8 @@ class WelcomePage(QWidget):
         self.recent_filter.setPlaceholderText("Recent filtern (Pfad oder Tag)…")
         self.recent_filter.setClearButtonEnabled(True)
         self.recent_filter.setToolTip(
-            "Live-Filter Pfad oder Dokument-Tags (ildtags-v1) · Persistenz · "
-            "Clear / Esc leert — 2.5.1"
+            "Live-Filter Pfad oder Dokument-Tags (ildtags-v1) · Trefferanzahl · "
+            "Clear / Esc leert · fehlende getaggte Recent grau — 2.5.2"
         )
         self.recent_filter.textChanged.connect(self._apply_recent_filter)
         self.recent_filter.textChanged.connect(self._persist_recent_filter)
@@ -135,7 +135,7 @@ class WelcomePage(QWidget):
         filter_row.addWidget(self.recent_filter, 1)
         self.btn_clear_filter = QPushButton("Filter Clear")
         self.btn_clear_filter.setToolTip(
-            "Filter leeren (Clear) und Fokus zurück — Persistenz — 2.5.1"
+            "Filter leeren (Clear) und Fokus zurück — Persistenz — 2.5.2"
         )
         self.btn_clear_filter.setAccessibleName("Filter Clear")
         self.btn_clear_filter.clicked.connect(self._clear_recent_filter)
@@ -144,7 +144,10 @@ class WelcomePage(QWidget):
         self.filter_hits_label.setMinimumWidth(90)
         self.filter_hits_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         self.filter_hits_label.setStyleSheet("color: #555; padding-left: 6px;")
-        self.filter_hits_label.setToolTip("Angezeigte Treffer / Einträge in der Recent-Liste")
+        self.filter_hits_label.setToolTip(
+            "Trefferanzahl: angezeigte Treffer / Einträge in der Recent-Liste — 2.5.2"
+        )
+        self.filter_hits_label.setAccessibleName("Trefferanzahl Recent-Filter")
         filter_row.addWidget(self.filter_hits_label)
         lay.addLayout(filter_row)
         self.recent_list = QListWidget()
@@ -152,7 +155,8 @@ class WelcomePage(QWidget):
         self.recent_list.setToolTip(
             "Enter / Doppelklick öffnet; Entf entfernt den Eintrag; "
             "Rechtsklick: Tag hinzufügen/entfernen · Entfernen / Ordner öffnen; "
-            "Filter Clear · Persistenz; Esc leert Filter → Fokus Liste — 2.5.1"
+            "Trefferanzahl · Esc leert Filter → Fokus Liste; "
+            "fehlende getaggte Recent grau — 2.5.2"
         )
         self.recent_list.setAcceptDrops(True)
         self.recent_list.setContextMenuPolicy(Qt.CustomContextMenu)
@@ -263,7 +267,7 @@ class WelcomePage(QWidget):
         self.recent_filter.setFocus()
 
     def _escape_recent_filter(self) -> None:
-        """Esc: Filter Clear und Fokus zurück auf die Recent-Liste — 2.5.1."""
+        """Esc: Filter leeren und Fokus zurück auf die Recent-Liste — 2.5.2."""
         self.recent_filter.clear()
         self._persist_recent_filter("")
         self.recent_list.setFocus()
@@ -275,7 +279,7 @@ class WelcomePage(QWidget):
                     break
 
     def _apply_recent_filter(self, _text: str | None = None) -> None:
-        """Live-Filter Pfad oder Dokument-Tags (ildtags-v1) — 2.5.0."""
+        """Live-Filter · Trefferanzahl · fehlende getaggte Recent grau — 2.5.2."""
         self.recent_list.clear()
         entries = self._recent_entries
         total = len(entries)
@@ -311,8 +315,15 @@ class WelcomePage(QWidget):
             item = QListWidgetItem(label)
             item.setData(Qt.UserRole, str(path))
             item.setData(Qt.UserRole + 1, bool(exists))
+            item.setData(Qt.UserRole + 2, list(tags))
             if tags:
-                item.setToolTip(f"Tags: {', '.join(tags)}")
+                tip = f"Tags: {', '.join(tags)}"
+                if not exists:
+                    tip = f"Datei fehlt · {tip}"
+                item.setToolTip(tip)
+            elif not exists:
+                item.setToolTip("Datei fehlt")
+            # Fehlende Recent (auch getaggte) grau — 2.5.2
             if not exists:
                 item.setForeground(QColor("#888888"))
             self.recent_list.addItem(item)
@@ -321,12 +332,15 @@ class WelcomePage(QWidget):
             item = QListWidgetItem("(keine Treffer für Filter)")
             item.setFlags(Qt.NoItemFlags)
             self.recent_list.addItem(item)
+        # Trefferanzahl — 2.5.2
         if needle:
-            self.filter_hits_label.setText(f"{shown} / {total} Treffer")
+            hits = f"{shown} / {total} Treffer"
         else:
-            self.filter_hits_label.setText(
-                f"{total} Treffer" if total != 1 else "1 Treffer"
-            )
+            hits = f"{total} Treffer" if total != 1 else "1 Treffer"
+        self.filter_hits_label.setText(hits)
+        self.filter_hits_label.setToolTip(
+            f"Trefferanzahl: {hits} (Pfad oder Tag-Filter)"
+        )
 
     def _on_recent_dbl(self, item: QListWidgetItem) -> None:
         path = item.data(Qt.UserRole)

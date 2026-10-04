@@ -899,12 +899,12 @@ class SettingsDialog(QDialog):
         btn_theme_default.clicked.connect(self._save_default_ann_color_theme_ui)
         btn_theme_export = QPushButton("Theme Export…")
         btn_theme_export.setToolTip(
-            "Farben-Theme als JSON exportieren (ildcolors-v1 + theme) — 2.5.1"
+            "Farben-Theme als JSON exportieren (ildcolors-theme-v1) — 2.5.2"
         )
         btn_theme_export.clicked.connect(self._export_ann_color_theme_ui)
         btn_theme_import = QPushButton("Theme Import…")
         btn_theme_import.setToolTip(
-            "Farben-Theme aus JSON importieren (ildcolors-v1) — 2.5.1"
+            "Farben-Theme aus JSON importieren (ildcolors-theme-v1 · Merge/Ersetzen) — 2.5.2"
         )
         btn_theme_import.clicked.connect(self._import_ann_color_theme_ui)
         preset_row.addWidget(self.ann_theme_combo)
@@ -2876,9 +2876,9 @@ class SettingsDialog(QDialog):
         )
 
     def _export_ann_color_theme_ui(self) -> None:
-        """Farben-Theme als JSON exportieren — 2.5.1."""
+        """Farben-Theme als JSON exportieren (ildcolors-theme-v1) — 2.5.2."""
         from instantlensdoc.core.app_settings import (
-            ANN_COLORS_SCHEMA_ID,
+            ANN_COLORS_THEME_SCHEMA_ID,
             dialog_start_dir,
             export_ann_color_theme_json,
             get_last_export_dir,
@@ -2890,12 +2890,12 @@ class SettingsDialog(QDialog):
         if combo is not None:
             name = str(combo.currentData() or "").strip()
         start = dialog_start_dir(get_last_export_dir())
-        suggested = f"{(name or 'presets').lower()}.ildcolors.json"
+        suggested = f"{(name or 'theme').lower()}.ildcolors-theme.json"
         path, _ = QFileDialog.getSaveFileName(
             self,
             "Farben-Theme exportieren",
             str(Path(start) / suggested),
-            f"Color-Theme JSON (*{ANN_COLORS_SCHEMA_ID}*.json *.json);;JSON (*.json)",
+            f"Color-Theme JSON (*{ANN_COLORS_THEME_SCHEMA_ID}*.json *.json);;JSON (*.json)",
         )
         if not path:
             return
@@ -2906,13 +2906,16 @@ class SettingsDialog(QDialog):
             QMessageBox.warning(self, "Farben-Theme Export", str(e))
             return
         QMessageBox.information(
-            self, "Farben-Theme", f"Exportiert:\n{dest}"
+            self,
+            "Farben-Theme",
+            f"Exportiert ({ANN_COLORS_THEME_SCHEMA_ID}):\n{dest}",
         )
 
     def _import_ann_color_theme_ui(self) -> None:
-        """Farben-Theme aus JSON importieren — 2.5.1."""
+        """Farben-Theme aus JSON importieren · Merge vs Ersetzen — 2.5.2."""
         from instantlensdoc.core.app_settings import (
-            ANN_COLORS_SCHEMA_ID,
+            ANN_COLORS_THEME_SCHEMA_ID,
+            AnnColorsImportError,
             dialog_start_dir,
             get_last_export_dir,
             import_ann_color_theme_json,
@@ -2924,24 +2927,35 @@ class SettingsDialog(QDialog):
             self,
             "Farben-Theme importieren",
             start,
-            f"Color-Theme JSON (*{ANN_COLORS_SCHEMA_ID}*.json *.json);;JSON (*.json)",
+            f"Color-Theme JSON (*{ANN_COLORS_THEME_SCHEMA_ID}*.json *.json);;JSON (*.json)",
         )
         if not path:
             return
         reply = QMessageBox.question(
             self,
             "Farben-Theme importieren",
-            "JSON als Color-Presets übernehmen?\n"
-            "(Optional: Theme-Name als Default, falls vorhanden.)",
-            QMessageBox.Yes | QMessageBox.No,
+            "Vorhandene Color-Presets ersetzen?\n"
+            "„Nein“ = nur gefüllte Slots aus der Datei übernehmen (Merge).\n"
+            f"Schema: {ANN_COLORS_THEME_SCHEMA_ID}",
+            QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel,
             QMessageBox.Yes,
         )
-        if reply != QMessageBox.Yes:
+        if reply == QMessageBox.Cancel:
             return
+        merge = reply == QMessageBox.No
         prev = [ed.text().strip() for ed in (getattr(self, "_preset_edits", []) or [])]
         try:
-            presets = import_ann_color_theme_json(path, set_default=True)
+            presets = import_ann_color_theme_json(
+                path, merge=merge, set_default=True
+            )
             set_last_export_dir(str(Path(path).parent))
+        except AnnColorsImportError as e:
+            QMessageBox.warning(
+                self,
+                "Farben-Theme Import",
+                f"Ungültiges Farben-Theme:\n{e}",
+            )
+            return
         except Exception as e:
             QMessageBox.warning(self, "Farben-Theme Import", str(e))
             return
@@ -2963,8 +2977,11 @@ class SettingsDialog(QDialog):
         except Exception:
             pass
         self._update_ann_theme_swatches()
+        mode = "Merge" if merge else "Ersetzen"
         QMessageBox.information(
-            self, "Farben-Theme", f"Importiert: {len(presets)} Farben"
+            self,
+            "Farben-Theme",
+            f"Importiert ({ANN_COLORS_THEME_SCHEMA_ID}, {mode}): {len(presets)} Farben",
         )
 
     def _load_ann_color_theme_ui(self) -> None:
