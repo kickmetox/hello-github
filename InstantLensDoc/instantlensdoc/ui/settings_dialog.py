@@ -897,6 +897,11 @@ class SettingsDialog(QDialog):
             "Benutzerdefiniertes Farben-Theme umbenennen (Builtins geschützt) — 2.5.5"
         )
         btn_theme_rename.clicked.connect(self._rename_custom_ann_color_theme_ui)
+        btn_theme_dup = QPushButton("Duplizieren")
+        btn_theme_dup.setToolTip(
+            "Benutzerdefiniertes Farben-Theme duplizieren (Builtins geschützt) — 2.5.6"
+        )
+        btn_theme_dup.clicked.connect(self._duplicate_custom_ann_color_theme_ui)
         btn_theme_delete = QPushButton("Custom löschen…")
         btn_theme_delete.setToolTip(
             "Benutzerdefiniertes Farben-Theme löschen (Builtins geschützt) — 2.5.4"
@@ -908,6 +913,7 @@ class SettingsDialog(QDialog):
         preset_row.addWidget(btn_theme_export)
         preset_row.addWidget(btn_theme_import)
         preset_row.addWidget(btn_theme_rename)
+        preset_row.addWidget(btn_theme_dup)
         preset_row.addWidget(btn_theme_delete)
         form.addRow("Ann.-Color-Presets", preset_row)
         # Theme-Vorschau Swatches — 2.5.1
@@ -2935,7 +2941,7 @@ class SettingsDialog(QDialog):
         combo.blockSignals(False)
         combo.setToolTip(
             "Vordefinierte + Custom Themes · ★ = Default · "
-            "Custom umbenennen/löschen — 2.5.5"
+            "Custom umbenennen/duplizieren/löschen — 2.5.6"
         )
 
     def _rename_custom_ann_color_theme_ui(self) -> None:
@@ -2990,6 +2996,45 @@ class SettingsDialog(QDialog):
             self,
             "Farben-Theme",
             f"Custom-Theme umbenannt: {name} → {renamed.get('name')}",
+        )
+
+    def _duplicate_custom_ann_color_theme_ui(self) -> None:
+        """Benutzerdefiniertes Farben-Theme duplizieren — 2.5.6."""
+        from instantlensdoc.core.app_settings import (
+            duplicate_custom_ann_color_theme,
+            is_builtin_ann_color_theme,
+        )
+
+        combo = getattr(self, "ann_theme_combo", None)
+        if combo is None:
+            return
+        name = str(combo.currentData() or "").strip()
+        if not name:
+            QMessageBox.information(
+                self, "Farben-Theme", "Bitte ein Custom-Theme wählen."
+            )
+            return
+        if is_builtin_ann_color_theme(name):
+            QMessageBox.information(
+                self,
+                "Farben-Theme",
+                f"„{name}“ ist eingebaut und kann nicht dupliziert werden.",
+            )
+            return
+        try:
+            dup = duplicate_custom_ann_color_theme(name)
+        except Exception as e:
+            QMessageBox.warning(self, "Farben-Theme duplizieren", str(e))
+            return
+        self._refresh_ann_theme_combo()
+        idx = combo.findData(str(dup.get("name") or ""))
+        if idx >= 0:
+            combo.setCurrentIndex(idx)
+        self._update_ann_theme_swatches()
+        QMessageBox.information(
+            self,
+            "Farben-Theme",
+            f"Custom-Theme dupliziert: {name} → {dup.get('name')}",
         )
 
     def _delete_custom_ann_color_theme_ui(self) -> None:

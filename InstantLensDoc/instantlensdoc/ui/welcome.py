@@ -128,21 +128,29 @@ class WelcomePage(QWidget):
         self.recent_filter.setClearButtonEnabled(True)
         self.recent_filter.setToolTip(
             "Live-Filter Pfad oder Dokument-Tags (ildtags-v1) · Tag-Vorschläge · "
-            "Quick-Tag A–Z mit Anzahl · Treffer A11y · Esc → Fokus Liste — 2.5.5"
+            "Quick-Tag A–Z/Häufigkeit mit Anzahl · Treffer A11y · Esc → Fokus Liste — 2.5.6"
         )
         self.recent_filter.textChanged.connect(self._apply_recent_filter)
         self.recent_filter.textChanged.connect(self._persist_recent_filter)
         self.recent_filter.installEventFilter(self)
         filter_row.addWidget(self.recent_filter, 1)
-        # Quick-Tag-Filter A–Z · Tag-Anzahl (N Docs) — 2.5.5
+        # Quick-Tag-Filter A–Z/Häufigkeit · Tag-Anzahl (N Docs) — 2.5.5/2.5.6
         self.tag_filter_combo = QComboBox()
         self.tag_filter_combo.setMinimumWidth(160)
         self.tag_filter_combo.setToolTip(
-            "Schnellfilter: bekanntes Dokument-Tag (A–Z, N Docs) — 2.5.5"
+            "Schnellfilter: bekanntes Dokument-Tag (A–Z oder Häufigkeit, N Docs) — 2.5.6"
         )
         self.tag_filter_combo.setAccessibleName("Quick-Tag-Filter")
         self.tag_filter_combo.activated.connect(self._on_tag_filter_chosen)
         filter_row.addWidget(self.tag_filter_combo)
+        self.btn_tag_sort = QPushButton("A–Z")
+        self.btn_tag_sort.setMinimumWidth(72)
+        self.btn_tag_sort.setToolTip(
+            "Quick-Tag Sortierung umschalten: A–Z ↔ Häufigkeit (persistiert) — 2.5.6"
+        )
+        self.btn_tag_sort.setAccessibleName("Quick-Tag Sortierung")
+        self.btn_tag_sort.clicked.connect(self._toggle_tag_filter_sort)
+        filter_row.addWidget(self.btn_tag_sort)
         self.btn_clear_filter = QPushButton("Filter Clear")
         self.btn_clear_filter.setToolTip(
             "Filter leeren (Clear) und Fokus zurück — Persistenz — 2.5.2"
@@ -168,7 +176,7 @@ class WelcomePage(QWidget):
         self.recent_list.setToolTip(
             "Enter / Doppelklick öffnet; Entf entfernt den Eintrag; "
             "Rechtsklick: Tag hinzufügen (Vorschläge) / entfernen · Entfernen / Ordner; "
-            "Quick-Tag A–Z (N Docs) · Treffer A11y · Esc → Fokus Liste — 2.5.5"
+            "Quick-Tag A–Z/Häufigkeit (N Docs) · Treffer A11y · Esc → Fokus Liste — 2.5.6"
         )
         self.recent_list.setAcceptDrops(True)
         self.recent_list.setContextMenuPolicy(Qt.CustomContextMenu)
@@ -262,24 +270,71 @@ class WelcomePage(QWidget):
         self.btn_clear_filter.setEnabled(has_entries)
         if hasattr(self, "tag_filter_combo"):
             self.tag_filter_combo.setEnabled(has_entries)
+        if hasattr(self, "btn_tag_sort"):
+            self.btn_tag_sort.setEnabled(has_entries)
         self._refresh_tag_filter_combo()
         self._apply_recent_filter()
         self.refresh_continue_button()
 
+    def _tag_filter_sort_mode(self) -> str:
+        """Aktuelle Quick-Tag Sortierung (az|freq) — 2.5.6."""
+        try:
+            from instantlensdoc.core.app_settings import get_welcome_tag_filter_sort
+
+            return get_welcome_tag_filter_sort()
+        except Exception:
+            return "az"
+
+    def _sync_tag_sort_button(self) -> None:
+        """Sort-Button Label/Tooltip an Mode anpassen — 2.5.6."""
+        btn = getattr(self, "btn_tag_sort", None)
+        if btn is None:
+            return
+        mode = self._tag_filter_sort_mode()
+        if mode == "freq":
+            btn.setText("Häufig")
+            tip = "Sortierung: Häufigkeit (Klick → A–Z) — 2.5.6"
+            desc = "Quick-Tag Sortierung: Häufigkeit absteigend"
+        else:
+            btn.setText("A–Z")
+            tip = "Sortierung: A–Z (Klick → Häufigkeit) — 2.5.6"
+            desc = "Quick-Tag Sortierung: alphabetisch A–Z"
+        btn.setToolTip(tip)
+        btn.setAccessibleName("Quick-Tag Sortierung")
+        btn.setAccessibleDescription(desc)
+
+    def _toggle_tag_filter_sort(self) -> None:
+        """Quick-Tag Sort A–Z ↔ Häufigkeit umschalten — 2.5.6."""
+        try:
+            from instantlensdoc.core.app_settings import (
+                get_welcome_tag_filter_sort,
+                set_welcome_tag_filter_sort,
+            )
+
+            cur = get_welcome_tag_filter_sort()
+            set_welcome_tag_filter_sort("az" if cur == "freq" else "freq")
+        except Exception:
+            pass
+        self._refresh_tag_filter_combo()
+
     def _refresh_tag_filter_combo(self) -> None:
-        """Quick-Tag-Filter: A–Z · Tag-Anzahl (N Docs) — 2.5.5."""
+        """Quick-Tag-Filter: A–Z/Häufigkeit · Tag-Anzahl (N Docs) — 2.5.5/2.5.6."""
         combo = getattr(self, "tag_filter_combo", None)
         if combo is None:
             return
         current = str(combo.currentData() or "").strip()
-        # (display_label, tag_value)
-        entries: list[tuple[str, str]] = []
+        sort_mode = self._tag_filter_sort_mode()
+        self._sync_tag_sort_button()
+        # (display_label, tag_value, count)
+        entries: list[tuple[str, str, int]] = []
         try:
             from instantlensdoc.core import doc_tags as doc_tags_mod
             from instantlensdoc.core import recent_tags as recent_tags_mod
 
             counted = list(
-                doc_tags_mod.collect_known_tags_with_counts(max_items=40)
+                doc_tags_mod.collect_known_tags_with_counts(
+                    max_items=40, sort=sort_mode
+                )
             )
             counts = {str(t).casefold(): int(n) for t, n in counted}
             known = [t for t, _n in counted]
@@ -292,27 +347,30 @@ class WelcomePage(QWidget):
                 seen.add(key)
                 n = counts.get(key, 0)
                 label = f"{t} ({n})" if n > 0 else str(t)
-                entries.append((label, str(t)))
-            # A–Z nach Tag-Wert
-            entries.sort(key=lambda pair: pair[1].casefold())
+                entries.append((label, str(t), n))
+            if sort_mode == "freq":
+                entries.sort(key=lambda pair: (-int(pair[2]), pair[1].casefold()))
+            else:
+                entries.sort(key=lambda pair: pair[1].casefold())
         except Exception:
             entries = []
         combo.blockSignals(True)
         combo.clear()
         combo.addItem("(Tag-Filter…)", "")
-        for label, tag in entries:
+        for label, tag, _n in entries:
             combo.addItem(label, tag)
         if current:
             idx = combo.findData(current)
             if idx >= 0:
                 combo.setCurrentIndex(idx)
         combo.blockSignals(False)
+        sort_label = "Häufigkeit" if sort_mode == "freq" else "A–Z"
         combo.setToolTip(
-            "Schnellfilter: bekanntes Dokument-Tag (A–Z, N Docs) — 2.5.5"
+            f"Schnellfilter: bekanntes Dokument-Tag ({sort_label}, N Docs) — 2.5.6"
         )
         combo.setAccessibleName("Quick-Tag-Filter")
         combo.setAccessibleDescription(
-            "Dokument-Tags A–Z mit Anzahl Docs im Index"
+            f"Dokument-Tags {sort_label} mit Anzahl Docs im Index"
         )
 
     def _on_tag_filter_chosen(self, index: int) -> None:

@@ -62,6 +62,7 @@ DEFAULTS: dict[str, Any] = {
     "default_ann_color_theme": "",  # Default Farben-Theme Name — 2.5.1
     "custom_ann_color_themes": [],  # benutzerdefinierte Farben-Themes — 2.5.3
     "welcome_recent_filter": "",  # Welcome Recent-Filter Persistenz — 2.5.1
+    "welcome_tag_filter_sort": "az",  # Quick-Tag Sort A–Z|freq — 2.5.6
     "page_image_filename_template": "{stem}_p{page}",  # Dateiname-Template — 1.5.1
     "last_signature_image": "",  # zuletzt verwendetes Signatur-Bild — 1.5.1
     "last_signature_width": 180.0,  # Signatur-Breite Default — 1.5.1
@@ -5145,6 +5146,43 @@ def rename_custom_ann_color_theme(old_name: str, new_name: str) -> dict[str, Any
     return renamed
 
 
+def duplicate_custom_ann_color_theme(
+    name: str, new_name: str | None = None
+) -> dict[str, Any]:
+    """Benutzerdefiniertes Farben-Theme duplizieren (Builtins geschützt) — 2.5.6."""
+    src_name = (name or "").strip()
+    if not src_name:
+        raise ValueError("Theme-Name fehlt")
+    if src_name in ANN_COLOR_THEMES:
+        raise ValueError(
+            f"Eingebautes Theme „{src_name}“ kann nicht dupliziert werden."
+        )
+    themes = get_custom_ann_color_themes()
+    src: dict[str, Any] | None = None
+    for t in themes:
+        if str(t["name"]).casefold() == src_name.casefold():
+            src = t
+            break
+    if src is None:
+        raise ValueError(f"Custom-Theme „{src_name}“ nicht gefunden")
+    if len(themes) >= CUSTOM_ANN_COLOR_THEMES_MAX:
+        raise ValueError(
+            f"Maximal {CUSTOM_ANN_COLOR_THEMES_MAX} Custom-Themes erlaubt."
+        )
+    used = {str(t["name"]).casefold() for t in themes}
+    used.update(k.casefold() for k in ANN_COLOR_THEMES)
+    base = (new_name or "").strip() or f"{src['name']} Kopie"
+    candidate = _unique_ann_theme_name(base, used)
+    dup = _normalize_custom_ann_color_theme(
+        {"name": candidate, "colors": list(src.get("colors") or [])}
+    )
+    if dup is None:
+        raise ValueError(f"Duplizieren fehlgeschlagen: „{candidate}“")
+    updated = list(themes) + [dup]
+    _save_custom_ann_color_themes(updated)
+    return dup
+
+
 def get_ann_color_theme(name: str) -> list[str] | None:
     """Theme-Farben (6) oder None — 2.5.0/2.5.3."""
     clean = (name or "").strip()
@@ -5532,6 +5570,24 @@ def set_welcome_recent_filter(text: str) -> str:
     """Welcome-Recent-Filter persistieren — 2.5.1."""
     val = str(text or "")
     save_settings({"welcome_recent_filter": val})
+    return val
+
+
+WELCOME_TAG_FILTER_SORT_CHOICES: tuple[str, ...] = ("az", "freq")
+
+
+def get_welcome_tag_filter_sort() -> str:
+    """Quick-Tag Sortierung: az | freq — 2.5.6."""
+    raw = str(load_settings().get("welcome_tag_filter_sort") or "az").strip().casefold()
+    return raw if raw in WELCOME_TAG_FILTER_SORT_CHOICES else "az"
+
+
+def set_welcome_tag_filter_sort(mode: str) -> str:
+    """Quick-Tag Sortierung speichern (az|freq) — 2.5.6."""
+    val = str(mode or "az").strip().casefold()
+    if val not in WELCOME_TAG_FILTER_SORT_CHOICES:
+        val = "az"
+    save_settings({"welcome_tag_filter_sort": val})
     return val
 
 

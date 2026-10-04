@@ -1,5 +1,20 @@
 # Changelog — InstantLens Doc
 
+## 2.5.6 — OCR-Region Status-Rechtsklick→Ordner, Theme Custom duplizieren, ildtags Sort A–Z/Häufigkeit, Export Tooltip·Apply A11y
+
+Post-Release-Polish nach **2.5.5**: **OCR-Region** Status-**Rechtsklick öffnet Ergebnis-Ordner** (Linksklick bleibt Tab); **Farben-Themes** **Custom duplizieren**; **ildtags** Quick-Tag **Sort A–Z ↔ Häufigkeit** (persistiert); **Export-Presets** **Listen-Tooltip Summary** und **Apply A11y Announcement**. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie klar markiert / nicht produktiv (Ink ≠ Stylus).
+
+### Geändert
+- OCR-Region: Status-Rechtsklick → Ordner öffnen (Linksklick → Tab)
+- Farben-Themes: Custom duplizieren (Builtins geschützt)
+- Dokument-Tags: Quick-Tag Sort A–Z / Häufigkeit (persistiert)
+- Export-Presets: Listen-Tooltip DPI·Format·Pfad · Apply A11y
+
+### Tests / Qualität
+- Version **2.5.6** (App / `ild_pdf` / ISS / Smoke / Docs); Serie **2.5**; `docs/VERSION` + `VERSION.txt`
+- Smoke: 2.5.6 CLI + Qt (OCR Ordner-RMB, Theme Dup, ildtags Sort, Export Tooltip/A11y)
+- Stubs: KI/Cloud/Stylus/3D/Hooks/Outline/Telemetrie unverändert markiert
+
 ## 2.5.5 — OCR-Region Status-Klick→Tab, Theme Custom umbenennen, ildtags Tag-Anzahl A–Z, Export ★ aktiv·Duplizieren
 
 Post-Release-Polish nach **2.5.4**: **OCR-Region** **Status-Klick fokussiert Ergebnis-Tab**; **Farben-Themes** **Custom umbenennen**; **ildtags** Quick-Tag **A–Z mit Doc-Anzahl (N)**; **Export-Presets** **★ aktiv** in der Liste und **Duplizieren**. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie klar markiert / nicht produktiv (Ink ≠ Stylus).

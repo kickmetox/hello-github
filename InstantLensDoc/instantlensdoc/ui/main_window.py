@@ -2914,7 +2914,7 @@ class MainWindow(QMainWindow):
             "OCR-Region" in text or "OCR Region" in text
         ):
             self.statusBar().setToolTip(
-                "Klick fokussiert OCR-Region Ergebnis-Tab — 2.5.5"
+                "Linksklick → Ergebnis-Tab · Rechtsklick → Ordner öffnen — 2.5.6"
             )
             self.statusBar().setCursor(Qt.PointingHandCursor)
         elif getattr(self, "_text_pdf_toast_active", False) and "Text → PDF" in text:
@@ -3073,14 +3073,17 @@ class MainWindow(QMainWindow):
         ):
             if self._copy_thumb_prune_status_to_clipboard():
                 return
-        # OCR-Region: Klick fokussiert Ergebnis-Tab — 2.5.5
+        # OCR-Region: Linksklick → Tab · Rechtsklick → Ordner — 2.5.5/2.5.6
         if (
-            event.button() == Qt.LeftButton
-            and getattr(self, "_ocr_region_toast_active", False)
+            getattr(self, "_ocr_region_toast_active", False)
             and ("OCR-Region" in cur or "OCR Region" in cur)
         ):
-            if self._focus_ocr_region_result_tab():
-                return
+            if event.button() == Qt.LeftButton:
+                if self._focus_ocr_region_result_tab():
+                    return
+            elif event.button() == Qt.RightButton:
+                if self._open_ocr_region_result_folder():
+                    return
         # Ink-Toast: Klick fokussiert Ink-/Freihand-Werkzeug — 2.2.5
         if (
             event.button() == Qt.LeftButton
@@ -11546,7 +11549,7 @@ class MainWindow(QMainWindow):
         self._manage_export_presets()
 
     def _manage_export_presets(self):
-        """Export-Presets: ★ aktiv · Duplizieren · Umbenennen · DblClick — 2.5.5."""
+        """Export-Presets: ★ aktiv · Tooltip · Apply A11y · Duplizieren — 2.5.6."""
         from PySide6.QtWidgets import (
             QDialog,
             QDialogButtonBox,
@@ -11625,13 +11628,13 @@ class MainWindow(QMainWindow):
         lay = QVBoxLayout(dlg)
         info = QLabel(
             f"Benannte Presets ({len(profiles)}/{EXPORT_PROFILES_MAX}). "
-            "★ aktiv · Duplizieren · Umbenennen · Doppelklick Anwenden."
+            "★ aktiv · Tooltip Summary · Duplizieren · Umbenennen · Doppelklick Anwenden."
         )
         lay.addWidget(info)
         lst = QListWidget()
         lst.setToolTip(
-            "★ = aktives Preset · Doppelklick/Enter Anwenden · "
-            "Duplizieren — 2.5.5"
+            "★ = aktives Preset · Hover = DPI/Format/Pfad · "
+            "Doppelklick/Enter Anwenden · Duplizieren — 2.5.6"
         )
         active = {"name": get_active_export_profile_name()}
 
@@ -11647,13 +11650,16 @@ class MainWindow(QMainWindow):
             active["name"] = get_active_export_profile_name()
             info.setText(
                 f"Benannte Presets ({len(cur)}/{EXPORT_PROFILES_MAX}). "
-                "★ aktiv · Duplizieren · Umbenennen · Doppelklick Anwenden."
+                "★ aktiv · Tooltip Summary · Duplizieren · Umbenennen · Doppelklick Anwenden."
             )
             for p in cur:
                 name = str(p["name"])
                 label = f"{name} ★" if name == active["name"] else name
                 item = QListWidgetItem(label)
                 item.setData(Qt.UserRole, dict(p))
+                tip = export_profile_summary(p)
+                mark = " ★ aktiv" if name == active["name"] else ""
+                item.setToolTip(f"{name}{mark}\n{tip}")
                 lst.addItem(item)
                 if name == active["name"]:
                     lst.setCurrentItem(item)
@@ -11709,7 +11715,7 @@ class MainWindow(QMainWindow):
         btn_import = QPushButton("Import JSON…")
         btn_import.setToolTip(
             f"Presets JSON ({EXPORT_PRESETS_SCHEMA_ID}): ungültige überspringen+zählen · "
-            "★ aktiv · Duplizieren — 2.5.5"
+            "★ aktiv · Tooltip Summary · Apply A11y — 2.5.6"
         )
         btn_row.addWidget(btn_apply)
         btn_row.addWidget(btn_dup)
@@ -11734,7 +11740,12 @@ class MainWindow(QMainWindow):
                 self._set_status("Export-Preset nicht gefunden")
                 return
             tip = export_profile_summary(profile)
-            self._set_status(f"Export-Preset aktiv: {profile['name']} ({tip})")
+            msg = f"Export-Preset aktiv ★: {profile['name']} ({tip})"
+            self._set_status(msg)
+            try:
+                self._announce_status_toast(msg)
+            except Exception:
+                pass
             dlg.accept()
 
         def _duplicate() -> None:
@@ -13120,6 +13131,30 @@ class MainWindow(QMainWindow):
             self._set_status(f"OCR-Region Tab fokussiert: {target.name}")
             try:
                 self._announce_status_toast(f"OCR-Region Tab: {target.name}")
+            except Exception:
+                pass
+            return True
+        except Exception:
+            return False
+
+    def _open_ocr_region_result_folder(self) -> bool:
+        """Status-Rechtsklick: OCR-Region Ergebnis-Ordner öffnen — 2.5.6."""
+        from PySide6.QtGui import QDesktopServices
+        from PySide6.QtCore import QUrl
+
+        path = getattr(self, "_last_ocr_region_path", None)
+        if not path:
+            return False
+        target = Path(str(path))
+        folder = target.parent if target.is_file() else target
+        if not folder.is_dir():
+            # Wie Text→PDF: fehlt → Neu anlegen anbieten
+            return self._open_text_pdf_status_folder(folder)
+        try:
+            QDesktopServices.openUrl(QUrl.fromLocalFile(str(folder)))
+            self._set_status(f"OCR-Region Ordner geöffnet: {folder}")
+            try:
+                self._announce_status_toast(f"OCR-Region Ordner: {folder}")
             except Exception:
                 pass
             return True

@@ -221,11 +221,16 @@ def collect_known_tags(max_items: int = 48) -> list[str]:
     return [t for t, _n in collect_known_tags_with_counts(max_items=max_items)]
 
 
-def collect_known_tags_with_counts(max_items: int = 48) -> list[tuple[str, int]]:
-    """Bekannte Tags mit Doc-Anzahl (A–Z), dedupliziert — 2.5.5.
+def collect_known_tags_with_counts(
+    max_items: int = 48,
+    *,
+    sort: str = "az",
+) -> list[tuple[str, int]]:
+    """Bekannte Tags mit Doc-Anzahl, dedupliziert — 2.5.5/2.5.6.
 
     Zählt eindeutige Dokument-Pfade pro Tag (resolved + Rohpfad werden
     zusammengeführt, damit dieselbe Datei nicht doppelt zählt).
+    ``sort``: ``az`` (A–Z, Default) oder ``freq`` (Häufigkeit absteigend) — 2.5.6.
     """
     # tag_key → (display_name, set of path keys)
     buckets: dict[str, tuple[str, set[str]]] = {}
@@ -247,7 +252,12 @@ def collect_known_tags_with_counts(max_items: int = 48) -> list[tuple[str, int]]
             else:
                 buckets[key][1].add(path_norm)
     items = [(name, len(paths)) for name, paths in buckets.values()]
-    items.sort(key=lambda pair: pair[0].casefold())
+    mode = (sort or "az").strip().casefold()
+    if mode == "freq":
+        # Häufigkeit absteigend, bei Gleichstand A–Z — 2.5.6
+        items.sort(key=lambda pair: (-int(pair[1]), pair[0].casefold()))
+    else:
+        items.sort(key=lambda pair: pair[0].casefold())
     limit = max(1, int(max_items or 48))
     return items[:limit]
 
