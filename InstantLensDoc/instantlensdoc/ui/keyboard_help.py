@@ -76,6 +76,7 @@ SHORTCUTS_HTML = """
 <tr><td>Satzspiegel</td><td><code>Ctrl+Alt+S</code> Type-Area-Overlay — <b>2.6.12</b></td></tr>
 <tr><td>Drop Cap</td><td><code>Ctrl+Alt+Shift+D</code> Initial — <b>2.6.13</b></td></tr>
 <tr><td>Silbentrennung</td><td><code>Ctrl+Alt+Shift+H</code> Soft-Hyphens DE — <b>2.6.13</b></td></tr>
+<tr><td>Tabelle einfügen</td><td><code>Ctrl+Alt+Shift+T</code> Markdown-Tabelle — <b>2.6.14</b></td></tr>
 <tr><td>Multi-Dokument-Suche</td><td><code>Ctrl+Shift+F</code> — zentrale Trefferliste alle offenen PDFs — 2.0.0</td></tr>
 <tr><td>High-Contrast Theme</td><td><code>Ctrl+Alt+H</code> — Toast Dauer OCR-Settings · A11y wie OCR-Toast — 2.0.5</td></tr>
 <tr><td>Gehe zu Zeile / Seite</td><td><code>Ctrl+G</code> (Editor / PDF)</td></tr>
@@ -168,6 +169,7 @@ SHORTCUTS_HTML = """
 <tr><td>Layout-Hilfen 2.6.11</td><td>Lineal · Raster/Guides · Kopf/Fuß mit Titel/Autor · Buch-/DIN-/US-Seitenformate · Absatzformat (Align/Spacing) · Scripting <code>ild.list_page_formats</code>/<code>apply_header_footer</code>/<code>apply_paragraph_format</code> — <b>2.6.11</b></td></tr>
 <tr><td>DTP 2.6.12</td><td>Frames/Boxes Move/Resize · Textrahmen-Verkettung Spalte/Seite · Musterseiten · Satzspiegel · <code>ild.apply_master_page</code>/<code>satzspiegel</code>/<code>layout_flow_text</code> — <b>2.6.12</b></td></tr>
 <tr><td>Typografie 2.6.13</td><td>Tracking/Kerning/Leading · Absatz-/Zeichenstile · Textumfluss · Silbentrennung DE/EN · Drop Caps · <code>ild.apply_typography</code>/<code>hyphenate</code>/<code>layout_set_text_wrap</code> — <b>2.6.13</b></td></tr>
+<tr><td>Tabellen &amp; Office-I/O 2.6.14</td><td>Tabellen erstellen/formatieren/sortieren · CSV/XLSX-Import · Export DOCX/XLSX/PDF/TXT/RTF/HTML/JPG · <code>ild.create_table</code>/<code>import_table_csv</code>/<code>save_document</code> — <b>2.6.14</b></td></tr>
 <tr><td>Bookmarks ↔ Outlines</td><td>Fehlerdialog Retry-Zähler „Versuch k/3“; max. 3 wie Backup — 1.3.6</td></tr>
 <tr><td>Thumbnail Lazy-Load</td><td>Prefetch-Label grau wenn Lazy aus (unter Schwellwert), sonst aktiv — 1.3.6</td></tr>
 <tr><td>Alle Ann. auf Seite löschen</td><td>Bearbeiten → bei 0 Treffern Sticky-Status Statusleiste bis nächste Ann.-Aktion / Seiten-/Dokumentwechsel / Undo/Redo + i18n DE + Menü/Aktion no-op + Button disabled; Undo „N Annotationen (gefiltert)“ — 1.1.9</td></tr>
@@ -326,6 +328,7 @@ bzw. Dialog „zusammenführen / teilen / Bereich“.</p>
 <p><b>Layout 2.6.11:</b> Lineal/Raster (Ctrl+Alt+R/G) · Absatz Ctrl+L/E/R/J · Kopf/Fuß <code>{title}</code>/<code>{author}</code> · Buchformate.</p>
 <p><b>DTP 2.6.12:</b> Frames Move/Resize · Verkettung Spalte/Seite · Musterseiten · Satzspiegel (Ctrl+Alt+S).</p>
 <p><b>Typografie 2.6.13:</b> Tracking/Kerning/Leading · Textumfluss · Silbentrennung DE/EN · Drop Caps (Ctrl+Alt+Shift+D/H).</p>
+<p><b>Tabellen &amp; Office-I/O 2.6.14:</b> Tabellen (Ctrl+Alt+Shift+T) · CSV/Excel-Import · Speichern/Export DOCX/XLSX/PDF/TXT/RTF/HTML/JPG.</p>
 <p><b>Word-/InDesign-ähnliche Shortcuts (2.6.10/2.6.11):</b>
 <code>Ctrl+B/I/U</code> Fett/Kursiv/Unterstrichen · <code>Ctrl+S</code> Speichern ·
 <code>Ctrl+F</code> Suchen · <code>Ctrl+H</code> Ersetzen · <code>Ctrl+Z/Y</code> Undo/Redo ·

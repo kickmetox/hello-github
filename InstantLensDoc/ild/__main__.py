@@ -193,7 +193,7 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--count", type=int, default=0, help="max. Ersetzungen (Text; 0=alle)")
     s.add_argument("--max", type=int, default=50, dest="max_replacements")
 
-    s = sub.add_parser("page-formats", help="Seitenformate-Presets (US/DIN/Buch) — 2.6.13")
+    s = sub.add_parser("page-formats", help="Seitenformate-Presets (US/DIN/Buch) — 2.6.14")
     s.add_argument("--unit", default="mm", choices=("mm", "inch"))
 
     s = sub.add_parser("set-page-format", help="Seitenformat-Preset auf PDF anwenden")
@@ -204,7 +204,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     s = sub.add_parser(
         "header-footer",
-        help="Kopf-/Fußzeile bakken (Titel/Autor/Seitenzahl) — 2.6.13",
+        help="Kopf-/Fußzeile bakken (Titel/Autor/Seitenzahl) — 2.6.14",
     )
     s.add_argument("pdf")
     s.add_argument("--out", default=None)
@@ -227,7 +227,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     s = sub.add_parser("paragraph-styles", help="Style-Presets inkl. Absatzattribute")
 
-    s = sub.add_parser("satzspiegel", help="Satzspiegel für Seitenformat — 2.6.13")
+    s = sub.add_parser("satzspiegel", help="Satzspiegel für Seitenformat — 2.6.14")
     s.add_argument("--format", default="A4", dest="page_format")
     s.add_argument("--columns", type=int, default=1)
     s.add_argument("--gutter", type=float, default=5.0, help="Spaltenabstand mm")
@@ -235,11 +235,11 @@ def build_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("satzspiegel-list", help="Alle Satzspiegel-Presets")
     s.add_argument("--columns", type=int, default=1)
 
-    s = sub.add_parser("master-pages", help="Musterseiten-Presets auflisten — 2.6.13")
+    s = sub.add_parser("master-pages", help="Musterseiten-Presets auflisten — 2.6.14")
 
     s = sub.add_parser(
         "apply-master",
-        help="Musterseite auf PDF bakken (HF/Seitenzahlen) — 2.6.13",
+        help="Musterseite auf PDF bakken (HF/Seitenzahlen) — 2.6.14",
     )
     s.add_argument("pdf")
     s.add_argument("--master", default="Standard", help="Preset: Standard/Buch/Sachbuch/Minimal")
@@ -249,7 +249,7 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--creator", default=None)
     s.add_argument("--start-page", type=int, default=None)
 
-    s = sub.add_parser("layout-new", help="Leeres Layout (Frames) — 2.6.13")
+    s = sub.add_parser("layout-new", help="Leeres Layout (Frames) — 2.6.14")
     s.add_argument("--format", default=None, dest="page_format")
     s.add_argument("--out", default=None, help="JSON-Pfad speichern")
 
@@ -263,7 +263,7 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument(
         "--around-wrap",
         action="store_true",
-        help="Textumfluss um Bildrahmen (2.6.13)",
+        help="Textumfluss um Bildrahmen (2.6.14)",
     )
 
     s = sub.add_parser("layout-move", help="Rahmen verschieben")
@@ -283,7 +283,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     s = sub.add_parser(
         "typography",
-        help="Tracking/Kerning/Leading/Drop-Cap/Zeichenstil — 2.6.13",
+        help="Tracking/Kerning/Leading/Drop-Cap/Zeichenstil — 2.6.14",
     )
     s.add_argument("--text", required=True)
     s.add_argument("--tracking", type=float, default=None)
@@ -295,17 +295,17 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--align", default=None, choices=("left", "center", "right", "justify"))
     s.add_argument("--index", type=int, default=None)
 
-    s = sub.add_parser("drop-cap", help="Drop Cap / Initial auf Absatz — 2.6.13")
+    s = sub.add_parser("drop-cap", help="Drop Cap / Initial auf Absatz — 2.6.14")
     s.add_argument("--text", required=True)
     s.add_argument("--lines", type=int, default=3)
     s.add_argument("--chars", type=int, default=1)
     s.add_argument("--index", type=int, default=0)
 
-    s = sub.add_parser("character-styles", help="Zeichenstile auflisten — 2.6.13")
+    s = sub.add_parser("character-styles", help="Zeichenstile auflisten — 2.6.14")
 
-    s = sub.add_parser("typography-styles", help="Absatzstile inkl. Typo-Defaults — 2.6.13")
+    s = sub.add_parser("typography-styles", help="Absatzstile inkl. Typo-Defaults — 2.6.14")
 
-    s = sub.add_parser("hyphenate", help="Silbentrennung (Soft-Hyphens) — 2.6.13")
+    s = sub.add_parser("hyphenate", help="Silbentrennung (Soft-Hyphens) — 2.6.14")
     s.add_argument("--text", required=True)
     s.add_argument("--lang", default="de", help="de|en (+ registrierte Sprachen)")
 
@@ -313,7 +313,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     s = sub.add_parser(
         "layout-text-wrap",
-        help="Textumfluss um Bildrahmen setzen — 2.6.13",
+        help="Textumfluss um Bildrahmen setzen — 2.6.14",
     )
     s.add_argument("--layout", required=True)
     s.add_argument("--id", required=True, dest="frame_id")
@@ -326,12 +326,74 @@ def build_parser() -> argparse.ArgumentParser:
 
     s = sub.add_parser(
         "layout-flow-wrap",
-        help="Text um Bildrahmen fließen lassen — 2.6.13",
+        help="Text um Bildrahmen fließen lassen — 2.6.14",
     )
     s.add_argument("--text", required=True)
     s.add_argument("--layout", default=None)
     s.add_argument("--start", default=None, dest="start_id")
     s.add_argument("--out", default=None)
+
+    s = sub.add_parser("table-create", help="Tabelle erstellen — 2.6.14")
+    s.add_argument("--rows", type=int, default=3)
+    s.add_argument("--cols", type=int, default=3)
+    s.add_argument("--id", default="t1", dest="table_id")
+    s.add_argument("--align", default="")
+    s.add_argument("--style", default="default")
+    s.add_argument("--no-header", action="store_true")
+    s.add_argument("--data-json", default=None, help="JSON-Array von Zeilen")
+
+    s = sub.add_parser("table-format", help="Tabelle formatieren — 2.6.14")
+    s.add_argument("--text", required=True)
+    s.add_argument("--align", default=None)
+    s.add_argument("--style", default=None)
+    s.add_argument("--border", default=None, choices=("0", "1"))
+    s.add_argument("--header", default=None, choices=("0", "1"))
+
+    s = sub.add_parser("table-sort", help="Tabelle sortieren — 2.6.14")
+    s.add_argument("--text", required=True)
+    s.add_argument("--column", type=int, default=0)
+    s.add_argument("--reverse", action="store_true")
+    s.add_argument("--alpha", action="store_true", help="alphabetisch statt numerisch")
+
+    s = sub.add_parser("table-import-csv", help="CSV in Tabelle importieren — 2.6.14")
+    s.add_argument("path")
+    s.add_argument("--delimiter", default=None)
+    s.add_argument("--id", default="csv1", dest="table_id")
+
+    s = sub.add_parser("table-import-xlsx", help="Excel/.xlsx in Tabelle — 2.6.14")
+    s.add_argument("path")
+    s.add_argument("--sheet", default="0")
+    s.add_argument("--id", default="xlsx1", dest="table_id")
+
+    s = sub.add_parser("table-export", help="Tabelle als CSV/XLSX/MD/HTML — 2.6.14")
+    s.add_argument("--text", required=True)
+    s.add_argument("--out", required=True)
+    s.add_argument("--fmt", default=None)
+
+    s = sub.add_parser("table-styles", help="Tabellenstile auflisten — 2.6.14")
+
+    s = sub.add_parser(
+        "save",
+        help="Dokument speichern/exportieren (docx/xlsx/pdf/txt/rtf/html/jpg) — 2.6.14",
+    )
+    s.add_argument("--text", required=True)
+    s.add_argument("--out", required=True)
+    s.add_argument("--fmt", default=None)
+    s.add_argument("--title", default="InstantLens Doc")
+
+    s = sub.add_parser(
+        "export-doc",
+        help="Dokument exportieren (Alias save) — 2.6.14",
+    )
+    s.add_argument("--text", required=True)
+    s.add_argument("--out", required=True)
+    s.add_argument("--fmt", default=None)
+    s.add_argument("--title", default="InstantLens Doc")
+
+    s = sub.add_parser("import-doc", help="Dokument importieren → Text — 2.6.14")
+    s.add_argument("path")
+
+    s = sub.add_parser("io-formats", help="Import-/Export-Formate auflisten — 2.6.14")
 
     return p
 
@@ -700,6 +762,75 @@ def run(argv: list[str] | None = None) -> int:
             if save_to:
                 LayoutDocument.from_dict(data["layout"]).save(save_to)
                 data["path"] = str(Path(save_to))
+            _print(data, as_json=js or True)
+            return 0
+        if args.cmd == "table-create":
+            data_rows = None
+            if args.data_json:
+                data_rows = json.loads(args.data_json)
+            data = api.create_table(
+                args.rows,
+                args.cols,
+                header=not args.no_header,
+                data=data_rows,
+                table_id=args.table_id,
+                align=args.align,
+                style=args.style,
+            )
+            _print(data, as_json=js or True)
+            return 0
+        if args.cmd == "table-format":
+            data = api.format_table(
+                text=args.text,
+                align=args.align,
+                style=args.style,
+                border=None if args.border is None else args.border == "1",
+                header=None if args.header is None else args.header == "1",
+            )
+            _print(data, as_json=js or True)
+            return 0
+        if args.cmd == "table-sort":
+            data = api.sort_table(
+                text=args.text,
+                column=args.column,
+                reverse=bool(args.reverse),
+                numeric=not bool(args.alpha),
+            )
+            _print(data, as_json=js or True)
+            return 0
+        if args.cmd == "table-import-csv":
+            data = api.import_table_csv(
+                args.path, delimiter=args.delimiter, table_id=args.table_id
+            )
+            _print(data, as_json=js or True)
+            return 0
+        if args.cmd == "table-import-xlsx":
+            sheet: str | int = args.sheet
+            if isinstance(sheet, str) and sheet.isdigit():
+                sheet = int(sheet)
+            data = api.import_table_xlsx(args.path, sheet=sheet, table_id=args.table_id)
+            _print(data, as_json=js or True)
+            return 0
+        if args.cmd == "table-export":
+            data = api.export_table(text=args.text, out=args.out, fmt=args.fmt)
+            _print(data, as_json=js or True)
+            return 0
+        if args.cmd == "table-styles":
+            data = api.list_table_styles()
+            _print(data, as_json=js or True)
+            return 0
+        if args.cmd in ("save", "export-doc"):
+            data = api.save_document(
+                args.text, args.out, fmt=args.fmt, title=args.title
+            )
+            _print(data, as_json=js or True)
+            return 0
+        if args.cmd == "import-doc":
+            data = api.import_document(args.path)
+            _print(data, as_json=js or True)
+            return 0
+        if args.cmd == "io-formats":
+            data = api.list_io_formats()
             _print(data, as_json=js or True)
             return 0
         return _fail("unbekanntes Kommando")

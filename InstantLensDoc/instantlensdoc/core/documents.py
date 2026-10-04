@@ -157,6 +157,8 @@ class DocKind(str, Enum):
     MARKDOWN = "markdown"
     HTML = "html"
     DOCX = "docx"
+    RTF = "rtf"
+    XLSX = "xlsx"
     PDF = "pdf"
     IMAGE = "image"
     UNKNOWN = "unknown"
@@ -193,6 +195,10 @@ def detect_kind(path: Path) -> DocKind:
         return DocKind.HTML
     if ext == ".docx":
         return DocKind.DOCX
+    if ext == ".rtf":
+        return DocKind.RTF
+    if ext == ".xlsx":
+        return DocKind.XLSX
     if ext == ".pdf":
         return DocKind.PDF
     if ext in {".png", ".jpg", ".jpeg", ".bmp", ".gif", ".webp"}:
@@ -226,13 +232,31 @@ def open_document(path: str | Path, *, encoding: str | None = None) -> Document:
         doc.meta["encoding"] = enc
     elif kind == DocKind.DOCX:
         try:
-            from docx import Document as DocxDocument
+            from instantlensdoc.core.export import import_document_text
 
-            d = DocxDocument(str(path))
-            doc.text = "\n".join(p.text for p in d.paragraphs)
-        except ImportError:
-            doc.text = "[python-docx nicht installiert]"
-            doc.meta["error"] = "python-docx fehlt"
+            loaded = import_document_text(path)
+            doc.text = loaded.get("text") or ""
+            doc.meta.update(loaded.get("meta") or {})
+        except Exception:
+            try:
+                from docx import Document as DocxDocument
+
+                d = DocxDocument(str(path))
+                doc.text = "\n".join(p.text for p in d.paragraphs)
+            except ImportError:
+                doc.text = "[python-docx nicht installiert]"
+                doc.meta["error"] = "python-docx fehlt"
+    elif kind == DocKind.RTF:
+        from instantlensdoc.core.export import import_rtf
+
+        doc.text = import_rtf(path)
+        doc.meta["encoding"] = "utf-8"
+    elif kind == DocKind.XLSX:
+        from ild_pdf.tables import import_xlsx, table_to_markdown
+
+        table = import_xlsx(path)
+        doc.text = table_to_markdown(table)
+        doc.meta["table"] = table.to_dict()
     elif kind == DocKind.PDF:
         doc.text = ""  # PDF wird über Viewer gerendert
         doc.meta["pdf"] = str(path)
@@ -344,6 +368,14 @@ def save_document(
         from instantlensdoc.core.export import export_docx
 
         export_docx(doc.text, target, title=doc.title)
+    elif kind == DocKind.RTF:
+        from instantlensdoc.core.export import export_rtf
+
+        export_rtf(doc.text, target, title=doc.title)
+    elif kind == DocKind.XLSX:
+        from instantlensdoc.core.export import export_xlsx_from_text
+
+        export_xlsx_from_text(doc.text, target)
     elif kind == DocKind.HTML:
         stripped = (doc.text or "").lstrip().lower()
         if stripped.startswith("<!doctype") or stripped.startswith("<html"):
@@ -363,7 +395,6 @@ def save_document(
     else:
         target.write_text(doc.text, encoding=enc, errors="replace")
         doc.meta["encoding"] = enc
-
     doc.path = target
     doc.kind = kind
     doc.dirty = False

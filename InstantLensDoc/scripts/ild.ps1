@@ -1,4 +1,4 @@
-# InstantLens Doc — PowerShell-Scripting 2.6.13
+# InstantLens Doc — PowerShell-Scripting 2.6.14
 # Als CLI:
 #   powershell -ExecutionPolicy Bypass -File .\scripts\ild.ps1 pages D:\dok.pdf
 # Als Modul:
@@ -435,6 +435,103 @@ function Invoke-IldLayoutFlowWrap {
     if ($Start) { $a += @("--start", $Start) }
     if ($Out) { $a += @("--out", $Out) }
     Invoke-Ild @a | Out-Host
+}
+
+function New-IldTable {
+    param(
+        [int]$Rows = 3,
+        [int]$Cols = 3,
+        [string]$Id = "t1",
+        [string]$Align = "",
+        [string]$Style = "default",
+        [switch]$NoHeader,
+        [string]$DataJson
+    )
+    $a = @("--json", "table-create", "--rows", "$Rows", "--cols", "$Cols", "--id", $Id, "--align", $Align, "--style", $Style)
+    if ($NoHeader) { $a += "--no-header" }
+    if ($DataJson) { $a += @("--data-json", $DataJson) }
+    Invoke-Ild @a | Out-Host
+}
+
+function Format-IldTable {
+    param(
+        [Parameter(Mandatory = $true)][string]$Text,
+        [string]$Align,
+        [string]$Style,
+        [ValidateSet("0", "1")][string]$Border,
+        [ValidateSet("0", "1")][string]$Header
+    )
+    $a = @("--json", "table-format", "--text", $Text)
+    if ($Align) { $a += @("--align", $Align) }
+    if ($Style) { $a += @("--style", $Style) }
+    if ($Border) { $a += @("--border", $Border) }
+    if ($Header) { $a += @("--header", $Header) }
+    Invoke-Ild @a | Out-Host
+}
+
+function Sort-IldTable {
+    param(
+        [Parameter(Mandatory = $true)][string]$Text,
+        [int]$Column = 0,
+        [switch]$Reverse,
+        [switch]$Alpha
+    )
+    $a = @("--json", "table-sort", "--text", $Text, "--column", "$Column")
+    if ($Reverse) { $a += "--reverse" }
+    if ($Alpha) { $a += "--alpha" }
+    Invoke-Ild @a | Out-Host
+}
+
+function Import-IldTableCsv {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [string]$Delimiter,
+        [string]$Id = "csv1"
+    )
+    $a = @("--json", "table-import-csv", $Path, "--id", $Id)
+    if ($Delimiter) { $a += @("--delimiter", $Delimiter) }
+    Invoke-Ild @a | Out-Host
+}
+
+function Import-IldTableXlsx {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [string]$Sheet = "0",
+        [string]$Id = "xlsx1"
+    )
+    Invoke-Ild @("--json", "table-import-xlsx", $Path, "--sheet", $Sheet, "--id", $Id) | Out-Host
+}
+
+function Export-IldTable {
+    param(
+        [Parameter(Mandatory = $true)][string]$Text,
+        [Parameter(Mandatory = $true)][string]$Out,
+        [string]$Fmt
+    )
+    $a = @("--json", "table-export", "--text", $Text, "--out", $Out)
+    if ($Fmt) { $a += @("--fmt", $Fmt) }
+    Invoke-Ild @a | Out-Host
+}
+
+function Save-IldDocument {
+    param(
+        [Parameter(Mandatory = $true)][string]$Text,
+        [Parameter(Mandatory = $true)][string]$Out,
+        [string]$Fmt,
+        [string]$Title = "InstantLens Doc"
+    )
+    $a = @("--json", "save", "--text", $Text, "--out", $Out, "--title", $Title)
+    if ($Fmt) { $a += @("--fmt", $Fmt) }
+    Invoke-Ild @a | Out-Host
+}
+
+function Import-IldDocument {
+    param([Parameter(Mandatory = $true)][string]$Path)
+    Invoke-Ild @("--json", "import-doc", $Path) | Out-Host
+}
+
+function Get-IldIoFormats {
+    Invoke-Ild @("--json", "io-formats") | Out-Host
 }
 
 function Merge-IldPdf {

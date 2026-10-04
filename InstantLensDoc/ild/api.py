@@ -1,4 +1,4 @@
-"""Headless InstantLens-Doc-Operationen für Python- und PowerShell-Scripting — 2.6.13."""
+"""Headless InstantLens-Doc-Operationen für Python- und PowerShell-Scripting — 2.6.14."""
 
 from __future__ import annotations
 
@@ -1071,6 +1071,267 @@ def layout_flow_text_wrap(
         "chain": doc.chain_ids(start.id),
         "obstacles": doc.wrap_obstacles(),
     }
+
+
+# --- Tabellen / Office-I/O — 2.6.14 ---
+
+
+def create_table(
+    rows: int = 3,
+    cols: int = 3,
+    *,
+    header: bool = True,
+    data: list[list[Any]] | None = None,
+    table_id: str = "t1",
+    align: str = "",
+    border: bool = True,
+    style: str = "default",
+    as_markdown: bool = True,
+) -> dict[str, Any]:
+    """Tabelle erstellen (Markdown + Struktur) — 2.6.14."""
+    from ild_pdf.tables import create_table as _ct, table_to_html, table_to_markdown
+
+    t = _ct(
+        rows,
+        cols,
+        header=header,
+        data=data,
+        table_id=table_id,
+        align=align,
+        border=border,
+        style=style,
+    )
+    out = t.to_dict()
+    out["markdown"] = table_to_markdown(t)
+    out["html"] = table_to_html(t)
+    if as_markdown:
+        out["text"] = out["markdown"]
+    return out
+
+
+def format_table(
+    *,
+    text: str | None = None,
+    table: dict[str, Any] | None = None,
+    align: str | None = None,
+    border: bool | None = None,
+    header: bool | None = None,
+    header_bold: bool | None = None,
+    style: str | None = None,
+) -> dict[str, Any]:
+    """Tabelle formatieren — 2.6.14."""
+    from ild_pdf.tables import (
+        DocumentTable,
+        TableFormat,
+        format_table as _ft,
+        parse_table,
+        table_to_html,
+        table_to_markdown,
+    )
+
+    if text is not None:
+        src = parse_table(text)
+    elif table is not None:
+        fmt = table.get("format") or {}
+        src = DocumentTable(
+            cells=list(table.get("cells") or []),
+            format=TableFormat(
+                header=bool(fmt.get("header", True)),
+                border=bool(fmt.get("border", True)),
+                align=str(fmt.get("align") or ""),
+                header_bold=bool(fmt.get("header_bold", True)),
+                style=str(fmt.get("style") or "default"),
+            ),
+            table_id=str(table.get("id") or "t1"),
+        )
+    else:
+        raise ValueError("text oder table erforderlich")
+    t = _ft(
+        src,
+        align=align,
+        border=border,
+        header=header,
+        header_bold=header_bold,
+        style=style,
+    )
+    out = t.to_dict()
+    out["markdown"] = table_to_markdown(t)
+    out["html"] = table_to_html(t)
+    out["text"] = out["markdown"]
+    return out
+
+
+def sort_table(
+    *,
+    text: str | None = None,
+    table: dict[str, Any] | None = None,
+    column: int = 0,
+    reverse: bool = False,
+    numeric: bool = True,
+) -> dict[str, Any]:
+    """Tabelle nach Spalte sortieren — 2.6.14."""
+    from ild_pdf.tables import (
+        DocumentTable,
+        TableFormat,
+        parse_table,
+        sort_table as _st,
+        table_to_html,
+        table_to_markdown,
+    )
+
+    if text is not None:
+        src = parse_table(text)
+    elif table is not None:
+        fmt = table.get("format") or {}
+        src = DocumentTable(
+            cells=list(table.get("cells") or []),
+            format=TableFormat(
+                header=bool(fmt.get("header", True)),
+                border=bool(fmt.get("border", True)),
+                align=str(fmt.get("align") or ""),
+                style=str(fmt.get("style") or "default"),
+            ),
+            table_id=str(table.get("id") or "t1"),
+        )
+    else:
+        raise ValueError("text oder table erforderlich")
+    t = _st(src, column=int(column), reverse=bool(reverse), numeric=bool(numeric))
+    out = t.to_dict()
+    out["markdown"] = table_to_markdown(t)
+    out["html"] = table_to_html(t)
+    out["text"] = out["markdown"]
+    return out
+
+
+def import_table_csv(
+    path: PathLike,
+    *,
+    delimiter: str | None = None,
+    encoding: str = "utf-8-sig",
+    header: bool = True,
+    table_id: str = "csv1",
+) -> dict[str, Any]:
+    """CSV in Tabelle importieren — 2.6.14."""
+    from ild_pdf.tables import import_csv, table_to_html, table_to_markdown
+
+    t = import_csv(path, delimiter=delimiter, encoding=encoding, header=header, table_id=table_id)
+    out = t.to_dict()
+    out["markdown"] = table_to_markdown(t)
+    out["html"] = table_to_html(t)
+    out["text"] = out["markdown"]
+    return out
+
+
+def import_table_xlsx(
+    path: PathLike,
+    *,
+    sheet: str | int | None = 0,
+    header: bool = True,
+    table_id: str = "xlsx1",
+) -> dict[str, Any]:
+    """Excel/.xlsx in Tabelle importieren — 2.6.14."""
+    from ild_pdf.tables import import_xlsx, table_to_html, table_to_markdown
+
+    t = import_xlsx(path, sheet=sheet, header=header, table_id=table_id)
+    out = t.to_dict()
+    out["markdown"] = table_to_markdown(t)
+    out["html"] = table_to_html(t)
+    out["text"] = out["markdown"]
+    return out
+
+
+def export_table(
+    *,
+    text: str | None = None,
+    table: dict[str, Any] | None = None,
+    out: PathLike,
+    fmt: str | None = None,
+) -> dict[str, Any]:
+    """Tabelle als CSV/XLSX/Markdown/HTML speichern — 2.6.14."""
+    from ild_pdf.tables import (
+        DocumentTable,
+        TableFormat,
+        export_table_csv,
+        export_table_xlsx,
+        parse_table,
+        table_to_html,
+        table_to_markdown,
+    )
+
+    dest = _p(out)
+    if text is not None:
+        src = parse_table(text)
+    elif table is not None:
+        fmt_d = table.get("format") or {}
+        src = DocumentTable(
+            cells=list(table.get("cells") or []),
+            format=TableFormat(
+                header=bool(fmt_d.get("header", True)),
+                border=bool(fmt_d.get("border", True)),
+                align=str(fmt_d.get("align") or ""),
+                style=str(fmt_d.get("style") or "default"),
+            ),
+            table_id=str(table.get("id") or "t1"),
+        )
+    else:
+        raise ValueError("text oder table erforderlich")
+    f = (fmt or dest.suffix.lstrip(".")).lower()
+    if f in ("csv",):
+        export_table_csv(src, dest)
+    elif f in ("xlsx", "xls"):
+        export_table_xlsx(src, dest)
+    elif f in ("html", "htm"):
+        dest.write_text(table_to_html(src), encoding="utf-8")
+    elif f in ("md", "markdown", "txt"):
+        dest.write_text(table_to_markdown(src), encoding="utf-8")
+    else:
+        raise ValueError(f"Unbekanntes Tabellen-Export-Format: {f}")
+    return {"path": str(dest), "format": f, "rows": src.rows, "cols": src.cols}
+
+
+def list_table_styles() -> list[dict[str, Any]]:
+    from ild_pdf.tables import list_table_styles as _list
+
+    return _list()
+
+
+def save_document(
+    text: str,
+    path: PathLike,
+    *,
+    fmt: str | None = None,
+    title: str = "InstantLens Doc",
+) -> dict[str, Any]:
+    """Dokument speichern/exportieren (docx/xlsx/pdf/txt/rtf/html/jpg) — 2.6.14."""
+    from instantlensdoc.core.export import export_document
+
+    dest = export_document(text, path, fmt=fmt, title=title)
+    return {"path": str(dest), "format": (fmt or dest.suffix.lstrip(".")).lower()}
+
+
+def export_document_fmt(
+    text: str,
+    path: PathLike,
+    *,
+    fmt: str | None = None,
+    title: str = "InstantLens Doc",
+) -> dict[str, Any]:
+    """Alias für save_document — 2.6.14."""
+    return save_document(text, path, fmt=fmt, title=title)
+
+
+def import_document(path: PathLike) -> dict[str, Any]:
+    """Dokument importieren → Text (+ Meta/Tabelle) — 2.6.14."""
+    from instantlensdoc.core.export import import_document_text
+
+    return import_document_text(path)
+
+
+def list_io_formats() -> dict[str, list[dict[str, str]]]:
+    """Unterstützte Import-/Export-Formate — 2.6.14."""
+    from instantlensdoc.core.export import list_export_formats, list_import_formats
+
+    return {"export": list_export_formats(), "import": list_import_formats()}
 
 
 def _load_layout(

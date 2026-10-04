@@ -662,4 +662,4 @@ __all__ = [
     "outline_summary",
 ]
 
-__version__ = "2.6.13"
+__version__ = "2.6.14"

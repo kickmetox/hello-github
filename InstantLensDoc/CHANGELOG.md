@@ -1,5 +1,22 @@
 # Changelog — InstantLens Doc
 
+## 2.6.14 — Tabellen, Daten-Import, Office Speichern/Export/Import
+
+Minor nach **2.6.13**: **Dokument-Tabellen** erstellen, formatieren und sortieren (Markdown/`ild-table`-Marker), **Zahlen/Daten-Import** aus CSV und Excel/`.xlsx` in Tabellen, **Speichern/Export/Import** gängiger Formate inkl. Office: `.docx`, `.xlsx`, `.pdf`, `.txt`, `.rtf` sowie HTML/JPG. Scripting: `ild.create_table` / `format_table` / `sort_table` / `import_table_csv` / `import_table_xlsx` / `export_table` / `save_document` / `import_document` / `list_io_formats` · CLI `table-create` / `table-format` / `table-sort` / `table-import-csv` / `table-import-xlsx` / `save` / `import-doc` · PowerShell `New-IldTable` / `Format-IldTable` / `Sort-IldTable` / `Import-IldTableCsv` / `Import-IldTableXlsx` / `Save-IldDocument` / `Import-IldDocument`. Kein CMYK/Bleed/Preflight/PDF/X, kein volles i18n, keine KI-Wizards, kein PDF-Compare. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie unverändert.
+
+### Neu
+- `ild_pdf.tables` — create/format/sort, CSV/XLSX-Import, Markdown-/HTML-Darstellung
+- `instantlensdoc.core.export` — RTF/TXT/XLSX/JPG + unified `export_document` / `import_document_text`
+- UI: Einfügen → Tabelle / formatieren / sortieren / Daten importieren; Export-Menü XLSX/TXT/RTF/JPG; Ctrl+Alt+Shift+T
+
+### Geändert
+- Docs/Version **2.6.14**; ild-API/CLI/PowerShell erweitert; Speichern-unter-Filter inkl. RTF/XLSX/PDF
+
+### Tests / Qualität
+- Version **2.6.14** (App / `ild_pdf` / ISS / Smoke / Docs); Serie **2.6**; `docs/VERSION` + `VERSION.txt`
+- Smoke: 2.6.14 CLI+Qt (tables/csv-xlsx/office-io)
+- Stubs: KI/Cloud/Stylus/3D/Hooks/Outline/Telemetrie unverändert markiert
+
 ## 2.6.13 — Erweiterte Typografie, Textumfluss, Silbentrennung, Drop Caps
 
 Minor nach **2.6.12**: **Erweiterte Typografie** (Tracking, Kerning, Leading; Absatz-/Zeichenstile auf 2.6.10 Presets), **Textumfluss** um Bild-/Formrahmen (`bounding_box` / `contour` / `jump_object`), intelligente **Silbentrennung** (DE/EN + `register_hyphenation_language`-Hook), **Drop Caps**/Initiale. Scripting: `ild.apply_typography` / `apply_drop_cap` / `hyphenate` / `list_character_styles` / `list_typography_styles` / `layout_set_text_wrap` / `layout_flow_text_wrap` · CLI `typography` / `drop-cap` / `hyphenate` / `character-styles` / `layout-text-wrap` / `layout-flow-wrap` · PowerShell `Invoke-IldTypography` / `Invoke-IldDropCap` / `Invoke-IldHyphenate` / `Set-IldTextWrap` / `Invoke-IldLayoutFlowWrap`. Kein CMYK/Bleed/Preflight/PDF/X, kein volles i18n, keine KI-Wizards, kein PDF-Compare. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie unverändert.

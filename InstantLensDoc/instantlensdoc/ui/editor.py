@@ -1530,6 +1530,86 @@ class TextEditor(QPlainTextEdit):
         self.setPlainText(result["text"])
         return int(result.get("count") or 0)
 
+    def insert_table(
+        self,
+        rows: int = 3,
+        cols: int = 3,
+        *,
+        header: bool = True,
+        align: str = "",
+        style: str = "default",
+    ) -> bool:
+        """Markdown-Tabelle an Cursor einfügen — 2.6.14."""
+        from ild_pdf.tables import create_table, insert_table_into_text
+
+        cur = self.textCursor()
+        at = cur.position()
+        table = create_table(rows, cols, header=header, align=align, style=style)
+        new_text = insert_table_into_text(self.toPlainText(), table, at=at)
+        self.setPlainText(new_text)
+        return True
+
+    def sort_current_table(self, column: int = 0, *, reverse: bool = False) -> bool:
+        """Erste/aktuelle Tabelle im Dokument sortieren — 2.6.14."""
+        from ild_pdf.tables import find_tables_in_text, insert_table_into_text, sort_table
+
+        text = self.toPlainText()
+        found = find_tables_in_text(text)
+        if not found:
+            return False
+        # Tabelle am Cursor bevorzugen
+        pos = self.textCursor().position()
+        idx = 0
+        for i, (a, b, _) in enumerate(found):
+            if a <= pos <= b:
+                idx = i
+                break
+        sorted_t = sort_table(found[idx][2], column=int(column), reverse=reverse)
+        self.setPlainText(insert_table_into_text(text, sorted_t, replace_index=idx))
+        return True
+
+    def format_current_table(
+        self,
+        *,
+        align: str | None = None,
+        style: str | None = None,
+        border: bool | None = None,
+    ) -> bool:
+        """Aktuelle Tabelle formatieren — 2.6.14."""
+        from ild_pdf.tables import find_tables_in_text, format_table, insert_table_into_text
+
+        text = self.toPlainText()
+        found = find_tables_in_text(text)
+        if not found:
+            return False
+        pos = self.textCursor().position()
+        idx = 0
+        for i, (a, b, _) in enumerate(found):
+            if a <= pos <= b:
+                idx = i
+                break
+        formatted = format_table(found[idx][2], align=align, style=style, border=border)
+        self.setPlainText(insert_table_into_text(text, formatted, replace_index=idx))
+        return True
+
+    def import_table_file(self, path: str, *, kind: str | None = None) -> bool:
+        """CSV/XLSX als Tabelle einfügen — 2.6.14."""
+        from pathlib import Path
+
+        from ild_pdf.tables import import_csv, import_xlsx, insert_table_into_text
+
+        p = Path(path)
+        ext = (kind or p.suffix.lstrip(".")).lower()
+        if ext == "csv":
+            table = import_csv(p)
+        elif ext in ("xlsx", "xls"):
+            table = import_xlsx(p)
+        else:
+            raise ValueError(f"Kein Tabellenformat: {ext}")
+        at = self.textCursor().position()
+        self.setPlainText(insert_table_into_text(self.toPlainText(), table, at=at))
+        return True
+
     def update_auto_toc(self, *, max_level: int = 3) -> str:
         """Markdown-Inhaltsverzeichnis einfügen/aktualisieren — 2.6.10."""
         from ild_pdf.auto_format import insert_toc_into_text

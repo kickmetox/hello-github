@@ -134,6 +134,8 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | Textumfluss (Text Wrap) | fertig | Text fließt um Bild-/Formrahmen; Modi bounding_box/contour/jump_object — **2.6.13** |
 | Silbentrennung | fertig | Intelligent DE/EN (Soft-Hyphens) + Hook `register_hyphenation_language` — **2.6.13** |
 | Drop Caps / Initiale | fertig | Marker `ild-dropcap`; Editor Ctrl+Alt+Shift+D; `ild.apply_drop_cap` — **2.6.13** |
+| Dokument-Tabellen | fertig | Erstellen/formatieren/sortieren (Markdown/`ild-table`); Ctrl+Alt+Shift+T; CSV/XLSX-Import — **2.6.14** |
+| Office Speichern/Export/Import | fertig | `.docx` `.xlsx` `.pdf` `.txt` `.rtf` (+ HTML/JPG); `ild.save_document` / `import_document` — **2.6.14** |
 | Editor Zeilennummern | fertig | Optional (Ansicht + Einstellungen) 0.2.7; **Zeilen-Lesezeichen/Favoriten** Ctrl+F2 / F2 0.5.7; **Sidebar-Liste** 0.5.8; **Labels editierbar** 0.5.9; **JSON Export/Import ildbm-v1** **0.8.0**; **Drag-Reorder + Sidecar-Persistenz** **0.8.1**; **Toggle persistiert (Ansicht↔Settings)** **0.8.3** |
 | Editor Minimap | fertig | Optional Linien-Übersicht + dickere Scrollbar; Ansicht/Einstellungen; Ctrl+Shift+I 0.5.3 |
 | Editor Soft-Hyphen / NBSP | fertig | Einfügen Ctrl+Shift+- / Ctrl+Shift+Space; Menü Bearbeiten 0.5.4 |

@@ -209,6 +209,43 @@ def default_palette_commands() -> list[PaletteCommand]:
             "textumfluss wrap image shape contour bounding",
             "Einfügen",
         ),
+        PaletteCommand(
+            "insert_table",
+            "Tabelle einfügen…",
+            "tabelle table erstellen grid",
+            "Einfügen",
+            "Ctrl+Alt+Shift+T",
+        ),
+        PaletteCommand(
+            "format_table",
+            "Tabelle formatieren…",
+            "tabelle format align stil border",
+            "Einfügen",
+        ),
+        PaletteCommand(
+            "sort_table",
+            "Tabelle sortieren…",
+            "tabelle sortieren sort column",
+            "Einfügen",
+        ),
+        PaletteCommand(
+            "import_table_data",
+            "Zahlen/Daten importieren (CSV/Excel)…",
+            "csv excel xlsx import tabelle daten",
+            "Einfügen",
+        ),
+        PaletteCommand(
+            "export_xlsx",
+            "Als XLSX exportieren…",
+            "export excel xlsx tabelle",
+            "Datei",
+        ),
+        PaletteCommand(
+            "export_rtf",
+            "Als RTF exportieren…",
+            "export rtf rich text",
+            "Datei",
+        ),
         PaletteCommand("ocr_page", "OCR aktuelle Seite…", "ocr tesseract seite", "OCR"),
         PaletteCommand("ocr_pdf", "OCR gesamtes PDF…", "ocr batch pdf", "OCR"),
         PaletteCommand(

@@ -1,5 +1,5 @@
 """
-Stabiles Scripting-API für InstantLens Doc (2.6.13).
+Stabiles Scripting-API für InstantLens Doc (2.6.14).
 
 Headless, ohne GUI. Nutzt ``ild_pdf`` + Lizenz/OCR der App.
 
@@ -18,6 +18,9 @@ Headless, ohne GUI. Nutzt ``ild_pdf`` + Lizenz/OCR der App.
     ild.apply_typography(text="Absatz", tracking=50, leading=1.5)
     ild.hyphenate("Silbentrennung", lang="de")
     ild.apply_drop_cap("Einleitungstext …")
+    ild.create_table(3, 3)
+    ild.import_table_csv("daten.csv")
+    ild.save_document("Hallo", "out.docx")
 
 CLI: ``python -m ild --help`` · PowerShell: ``scripts\\ild.ps1``.
 """
@@ -41,15 +44,22 @@ from ild.api import (
     apply_typography,
     auto_format_pdf,
     auto_format_text,
+    create_table,
     encrypt_pdf,
+    export_document_fmt,
     export_page,
+    export_table,
     find_replace,
+    format_table,
     generate_key,
     generate_toc,
     get_encryption_info,
     grid_lines,
     highlight_paragraphs,
     hyphenate,
+    import_document,
+    import_table_csv,
+    import_table_xlsx,
     layout_add_image_frame,
     layout_add_text_frame,
     layout_flow_text,
@@ -62,6 +72,7 @@ from ild.api import (
     license_status,
     list_character_styles,
     list_hyphenation_languages,
+    list_io_formats,
     list_master_pages,
     list_page_formats,
     list_paragraph_styles,
@@ -69,6 +80,7 @@ from ild.api import (
     list_stamps,
     list_style_presets,
     list_system_fonts,
+    list_table_styles,
     list_typography_styles,
     merge_pdfs,
     new_layout,
@@ -82,7 +94,9 @@ from ild.api import (
     rotate_page,
     ruler_ticks,
     satzspiegel,
+    save_document,
     set_page_format,
+    sort_table,
     split_pdf,
     verify_key,
 )
@@ -140,6 +154,17 @@ __all__ = [
     "list_hyphenation_languages",
     "layout_set_text_wrap",
     "layout_flow_text_wrap",
+    "create_table",
+    "format_table",
+    "sort_table",
+    "import_table_csv",
+    "import_table_xlsx",
+    "export_table",
+    "list_table_styles",
+    "save_document",
+    "export_document_fmt",
+    "import_document",
+    "list_io_formats",
     "generate_key",
     "verify_key",
     "license_status",

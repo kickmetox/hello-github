@@ -1467,7 +1467,11 @@ class MainWindow(QMainWindow):
         for title, fmt in [
             ("Als HTML…", "html"),
             ("Als DOCX…", "docx"),
+            ("Als XLSX…", "xlsx"),
             ("Als PDF…", "pdf"),
+            ("Als TXT…", "txt"),
+            ("Als RTF…", "rtf"),
+            ("Als JPG…", "jpg"),
         ]:
             a = QAction(title, self)
             a.triggered.connect(lambda checked=False, f=fmt: self._export_editor(f))
@@ -2839,6 +2843,23 @@ class MainWindow(QMainWindow):
         a = QAction("Textumfluss um Bildrahmen…", self)
         a.setToolTip("Text fließt um Bild-/Formrahmen (bounding_box/contour/jump) — 2.6.13")
         a.triggered.connect(self._set_image_text_wrap)
+        m_ins.addAction(a)
+        a = QAction("Tabelle einfügen…", self)
+        a.setShortcut(QKeySequence("Ctrl+Alt+Shift+T"))
+        a.setToolTip("Markdown-Tabelle erstellen (Zeilen/Spalten) — 2.6.14")
+        a.triggered.connect(self._insert_table_dialog)
+        m_ins.addAction(a)
+        a = QAction("Tabelle formatieren…", self)
+        a.setToolTip("Ausrichtung/Stil/Rahmen der aktuellen Tabelle — 2.6.14")
+        a.triggered.connect(self._format_table_dialog)
+        m_ins.addAction(a)
+        a = QAction("Tabelle sortieren…", self)
+        a.setToolTip("Aktuelle Tabelle nach Spalte sortieren — 2.6.14")
+        a.triggered.connect(self._sort_table_dialog)
+        m_ins.addAction(a)
+        a = QAction("Zahlen/Daten importieren (CSV/Excel)…", self)
+        a.setToolTip("CSV oder .xlsx in Tabelle übernehmen — 2.6.14")
+        a.triggered.connect(self._import_table_data)
         m_ins.addAction(a)
         a = QAction("Musterseite anwenden…", self)
         a.setToolTip(
@@ -10656,6 +10677,12 @@ class MainWindow(QMainWindow):
             "typo_leading": lambda: self._set_typography(leading=1.5),
             "drop_cap": self._apply_drop_cap,
             "hyphenate_de": lambda: self._hyphenate_document("de"),
+            "insert_table": self._insert_table_dialog,
+            "format_table": self._format_table_dialog,
+            "sort_table": self._sort_table_dialog,
+            "import_table_data": self._import_table_data,
+            "export_xlsx": lambda: self._export_editor("xlsx"),
+            "export_rtf": lambda: self._export_editor("rtf"),
             "hyphenate_en": lambda: self._hyphenate_document("en"),
             "text_wrap": self._set_image_text_wrap,
             "ocr_page": self._run_ocr,
@@ -13618,12 +13645,20 @@ class MainWindow(QMainWindow):
             self,
             "Speichern unter",
             str(Path(dialog_start_dir()) / self.doc.display_name),
-            "Text (*.txt);;Markdown (*.md);;HTML (*.html);;DOCX (*.docx);;Alle (*.*)",
+            "Text (*.txt);;Markdown (*.md);;HTML (*.html);;DOCX (*.docx);;"
+            "RTF (*.rtf);;Excel (*.xlsx);;PDF (*.pdf);;Alle (*.*)",
         )
         if not path:
             return
         remember_recent_dir(path)
-        if self.doc.kind in (DocKind.TEXT, DocKind.MARKDOWN, DocKind.HTML, DocKind.DOCX):
+        if self.doc.kind in (
+            DocKind.TEXT,
+            DocKind.MARKDOWN,
+            DocKind.HTML,
+            DocKind.DOCX,
+            DocKind.RTF,
+            DocKind.XLSX,
+        ):
             self._sync_editor_text_before_save()
             self.doc.text = self.editor.toPlainText()
         try:
@@ -13646,28 +13681,44 @@ class MainWindow(QMainWindow):
         self.save_as()
 
     def _export_editor(self, fmt: str):
-        """Editor-Inhalt nach HTML / DOCX / PDF exportieren."""
+        """Editor-Inhalt nach HTML / DOCX / XLSX / PDF / TXT / RTF / JPG — 2.6.14."""
         text = ""
         title = "InstantLens Doc"
+        editor_kinds = (
+            DocKind.TEXT,
+            DocKind.MARKDOWN,
+            DocKind.HTML,
+            DocKind.DOCX,
+            DocKind.RTF,
+            DocKind.XLSX,
+        )
         if self.stack.currentWidget() is self.editor_pane:
             text = self.editor.toPlainText()
             if self.doc:
                 title = self.doc.title or self.doc.display_name
-        elif self.doc and self.doc.kind in (DocKind.TEXT, DocKind.MARKDOWN, DocKind.HTML, DocKind.DOCX):
+        elif self.doc and self.doc.kind in editor_kinds:
             text = self.doc.text or self.editor.toPlainText()
             title = self.doc.display_name
         else:
             QMessageBox.information(
                 self,
                 "Export",
-                "Export gilt für den Texteditor.\nBitte TXT/MD/HTML/DOCX öffnen oder Text eingeben.",
+                "Export gilt für den Texteditor.\n"
+                "Bitte TXT/MD/HTML/DOCX/RTF/XLSX öffnen oder Text eingeben.",
             )
             return
         filters = {
             "html": ("HTML (*.html)", ".html"),
             "docx": ("DOCX (*.docx)", ".docx"),
+            "xlsx": ("Excel (*.xlsx)", ".xlsx"),
             "pdf": ("PDF (*.pdf)", ".pdf"),
+            "txt": ("Text (*.txt)", ".txt"),
+            "rtf": ("RTF (*.rtf)", ".rtf"),
+            "jpg": ("JPEG (*.jpg)", ".jpg"),
         }
+        if fmt not in filters:
+            QMessageBox.warning(self, "Export", f"Unbekanntes Format: {fmt}")
+            return
         filt, ext = filters[fmt]
         default_name = (self.doc.display_name if self.doc else "export") + ext
         if "." in default_name and not default_name.lower().endswith(ext):
@@ -13682,17 +13733,85 @@ class MainWindow(QMainWindow):
         try:
             from instantlensdoc.core import export as exp
 
-            if fmt == "html":
-                exp.export_html(text, path, title=title)
-            elif fmt == "docx":
-                exp.export_docx(text, path, title=title)
-            else:
-                exp.export_pdf(text, path, title=title)
+            exp.export_document(text, path, fmt=fmt, title=title)
             set_last_export_dir(path)
             remember_recent_dir(path)
             self._set_status(f"Exportiert: {path}")
         except Exception as e:
             QMessageBox.critical(self, "Export", f"Export fehlgeschlagen:\n{e}")
+
+    def _insert_table_dialog(self) -> None:
+        """Tabelle einfügen — 2.6.14."""
+        from PySide6.QtWidgets import QInputDialog
+
+        if self.stack.currentWidget() is not self.editor_pane:
+            self.stack.setCurrentWidget(self.editor_pane)
+        rows, ok = QInputDialog.getInt(self, "Tabelle", "Zeilen:", 3, 1, 200)
+        if not ok:
+            return
+        cols, ok = QInputDialog.getInt(self, "Tabelle", "Spalten:", 3, 1, 50)
+        if not ok:
+            return
+        if self.editor.insert_table(rows, cols):
+            self._set_status(f"Tabelle {rows}×{cols} eingefügt")
+        else:
+            self._set_status("Tabelle nicht eingefügt")
+
+    def _format_table_dialog(self) -> None:
+        from PySide6.QtWidgets import QInputDialog
+
+        if self.stack.currentWidget() is not self.editor_pane:
+            self.stack.setCurrentWidget(self.editor_pane)
+        align, ok = QInputDialog.getText(
+            self, "Tabelle formatieren", "Ausrichtung (z. B. lcr):", text="lcr"
+        )
+        if not ok:
+            return
+        style, ok = QInputDialog.getItem(
+            self,
+            "Tabelle formatieren",
+            "Stil:",
+            ["default", "striped", "compact"],
+            0,
+            False,
+        )
+        if not ok:
+            return
+        if self.editor.format_current_table(align=align or None, style=style or None):
+            self._set_status(f"Tabelle formatiert ({style})")
+        else:
+            self._set_status("Keine Tabelle im Dokument")
+
+    def _sort_table_dialog(self) -> None:
+        from PySide6.QtWidgets import QInputDialog
+
+        if self.stack.currentWidget() is not self.editor_pane:
+            self.stack.setCurrentWidget(self.editor_pane)
+        col, ok = QInputDialog.getInt(self, "Tabelle sortieren", "Spalte (0-basiert):", 0, 0, 49)
+        if not ok:
+            return
+        if self.editor.sort_current_table(col):
+            self._set_status(f"Tabelle nach Spalte {col} sortiert")
+        else:
+            self._set_status("Keine Tabelle im Dokument")
+
+    def _import_table_data(self) -> None:
+        if self.stack.currentWidget() is not self.editor_pane:
+            self.stack.setCurrentWidget(self.editor_pane)
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Zahlen/Daten importieren",
+            str(dialog_start_dir()),
+            "Tabellen (*.csv *.xlsx);;CSV (*.csv);;Excel (*.xlsx);;Alle (*.*)",
+        )
+        if not path:
+            return
+        try:
+            self.editor.import_table_file(path)
+            remember_recent_dir(path)
+            self._set_status(f"Tabelle importiert: {Path(path).name}")
+        except Exception as e:
+            QMessageBox.warning(self, "Tabellen-Import", str(e))
 
     def _add_text_frame(self):
         text = self.editor.toPlainText() if self.stack.currentWidget() is self.editor_pane else ""

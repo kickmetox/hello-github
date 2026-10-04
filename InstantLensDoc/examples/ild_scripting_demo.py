@@ -1,4 +1,4 @@
-"""Beispiel: InstantLens Doc Scripting (Python) — 2.6.13.
+"""Beispiel: InstantLens Doc Scripting (Python) — 2.6.14.
 
 Aufruf aus dem App-Root:
   python examples/ild_scripting_demo.py [pdf]
@@ -70,6 +70,23 @@ def main() -> int:
             img_add["frame"]["id"], "bounding_box", layout=img_add["layout"]
         )
         print("text_wrap:", wrap["frame"].get("text_wrap"))
+        tbl = ild.create_table(
+            data=[["Name", "Wert"], ["A", "2"], ["B", "10"]], align="lr"
+        )
+        print("table rows:", tbl.get("rows"), "md:", "ild-table" in tbl.get("markdown", ""))
+        sorted_t = ild.sort_table(text=tbl["markdown"], column=1)
+        print("sorted first data:", sorted_t["cells"][1] if sorted_t.get("cells") else None)
+        csv_p = td_p / "demo.csv"
+        csv_p.write_text("X;Y\n1;9\n2;3\n", encoding="utf-8")
+        imp = ild.import_table_csv(csv_p)
+        print("csv import cols:", imp.get("cols"))
+        out_docx = td_p / "demo.docx"
+        try:
+            saved = ild.save_document("Hallo 2.6.14", out_docx)
+            print("save_document:", Path(saved["path"]).exists())
+        except Exception as e:
+            print("save_document skip:", e)
+        print("io formats export:", [f["id"] for f in ild.list_io_formats()["export"]])
         hf = ild.apply_header_footer(
             src, out=td_p / "hf.pdf", header="{title}", footer="{author}", title="Demo", author="ILD"
         )
