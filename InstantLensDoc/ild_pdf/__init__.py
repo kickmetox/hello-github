@@ -207,12 +207,21 @@ from .metadata import (
 )
 from .acroform import (
     FORM_FIELD_CSV_FIELDS,
+    FormCreateResult,
+    FormFieldCandidate,
     FormFieldInfo,
+    apply_form_candidates,
+    create_form_field,
+    delete_form_field,
+    detect_form_candidates,
     export_form_fields_csv,
     get_form_values,
     has_acroform,
     list_form_fields,
+    pdf_rect_to_viewer,
     set_form_values,
+    update_form_field,
+    viewer_rect_to_pdf,
 )
 from .attachments import (
     AttachmentInfo,
@@ -451,12 +460,21 @@ __all__ = [
     "sanitize_pdf",
     "utf8_safe",
     "FormFieldInfo",
+    "FormFieldCandidate",
+    "FormCreateResult",
     "FORM_FIELD_CSV_FIELDS",
     "has_acroform",
     "list_form_fields",
     "get_form_values",
     "set_form_values",
     "export_form_fields_csv",
+    "create_form_field",
+    "update_form_field",
+    "delete_form_field",
+    "detect_form_candidates",
+    "apply_form_candidates",
+    "viewer_rect_to_pdf",
+    "pdf_rect_to_viewer",
     "AttachmentInfo",
     "has_attachments",
     "list_attachments",
@@ -506,4 +524,4 @@ __all__ = [
     "set_object_rect",
 ]
 
-__version__ = "2.6.5"
+__version__ = "2.6.6"

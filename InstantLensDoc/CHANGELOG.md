@@ -1,5 +1,22 @@
 # Changelog — InstantLens Doc
 
+## 2.6.6 — Interaktive Formularerstellung
+
+Minor-Feature nach **2.6.5** (Zusatzanforderungen #7): **Interaktive Formularerstellung** — ausfüllbare AcroForm-Felder (Text, Checkbox, Dropdown) erkennen und erstellen; bestehende Felder ausfüllen/bearbeiten. UI: Toolbar **Formular** (Rechteck ziehen → Feld anlegen), Dialog **Formularfelder…** (ausfüllen, hinzu, löschen, erkennen), PDF-Menü / Palette, Shortcut Ctrl+Alt+Shift+K. Keine Verschlüsselung, E-Signatur, Office-Export, KI/Cloud. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie unverändert.
+
+### Neu
+- `ild_pdf.acroform` — `create_form_field` · `update_form_field` · `delete_form_field` · `detect_form_candidates` · `apply_form_candidates` · `viewer_rect_to_pdf` / `pdf_rect_to_viewer` · `FormFieldCandidate` / `FormCreateResult`
+- Viewer: Werkzeug **Formular** · `FormFieldEditDialog` · erweiterter `FormFieldsDialog` (Checkbox/Dropdown ausfüllen)
+- PDF-Menü / Palette `form_fields` · `form_field_create` · `form_field_detect` · Shortcut Ctrl+Alt+Shift+K
+
+### Geändert
+- Docs/Version **2.6.6**; Formularfelder-Dialog auch ohne vorhandenes AcroForm
+
+### Tests / Qualität
+- Version **2.6.6** (App / `ild_pdf` / ISS / Smoke / Docs); Serie **2.6**; `docs/VERSION` + `VERSION.txt`
+- Smoke: 2.6.6 CLI + Qt (form create/detect/fill + UI-Pfad)
+- Stubs: KI/Cloud/Stylus/3D/Hooks/Outline/Telemetrie unverändert markiert
+
 ## 2.6.5 — Objektmanipulation (Bilder/Vektoren/Tabellen)
 
 Minor-Feature nach **2.6.4** (Zusatzanforderungen #6): **Objektmanipulation** — Bilder, Vektorgrafiken und Tabellen im Dokument verschieben, skalieren, spiegeln oder ersetzen, soweit praktisch mit dem pypdfium2/pikepdf-Stack (PageObjects transformieren + `gen_content`, Bildersatz via Jpeg/Bitmap). UI im Viewer: Werkzeug **Objekt**, Auswahlrahmen mit Handles, Ziehen = Verschieben, Ecken = Skalieren, Dialog für Flip/Ersetzen. Keine Formulare, Verschlüsselung, Office-Export, KI/Cloud. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie unverändert.

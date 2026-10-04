@@ -129,6 +129,25 @@ def default_palette_commands() -> list[PaletteCommand]:
             "objekt dialog flip spiegeln ersetzen transform",
             "PDF",
         ),
+        PaletteCommand(
+            "form_fields",
+            "Formularfelder…",
+            "formular acroform felder ausfüllen checkbox dropdown create",
+            "PDF",
+            "Ctrl+Alt+Shift+K",
+        ),
+        PaletteCommand(
+            "form_field_create",
+            "Formularfeld anlegen…",
+            "formular feld anlegen text checkbox dropdown rechteck",
+            "PDF",
+        ),
+        PaletteCommand(
+            "form_field_detect",
+            "Formularfelder erkennen…",
+            "formular erkennen detect label underscore checkbox",
+            "PDF",
+        ),
         PaletteCommand("export", "Exportieren…", "export html docx pdf", "Datei"),
         PaletteCommand("export_page_images", "Seiten als Bilder…", "export png jpeg", "PDF"),
         PaletteCommand(

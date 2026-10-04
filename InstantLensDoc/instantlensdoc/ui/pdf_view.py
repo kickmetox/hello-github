@@ -1808,6 +1808,7 @@ class PdfViewer(QWidget):
         self._quick_ann_template_id: str | None = None
         self._quick_ann_template_name: str = ""  # letzter Name für Esc-Status — 2.4.5
         self._ocr_region_pending: bool = False  # Rechteck → OCR Region — 2.5.0
+        self._form_field_pending: bool = False  # Rechteck → Formularfeld — 2.6.6
         self._zoom_timer = QTimer(self)
         self._zoom_timer.setSingleShot(True)
         self._zoom_timer.setInterval(120)
@@ -2120,6 +2121,18 @@ class PdfViewer(QWidget):
         btn_object_edit.clicked.connect(lambda checked: self._set_object_edit_tool())
         self._tool_buttons.append(btn_object_edit)
         toolbar.addWidget(btn_object_edit)
+
+        btn_form_edit = QToolButton()
+        btn_form_edit.setText("Formular")
+        btn_form_edit.setObjectName("formFieldToolbarBtn")
+        btn_form_edit.setCheckable(True)
+        btn_form_edit.setToolTip(
+            "Formularfeld: Rechteck ziehen → Text/Checkbox/Dropdown anlegen; "
+            "Dialog zum Ausfüllen/Erkennen — 2.6.6"
+        )
+        btn_form_edit.clicked.connect(lambda checked: self._set_form_field_tool())
+        self._tool_buttons.append(btn_form_edit)
+        toolbar.addWidget(btn_form_edit)
 
         for t, label in [
             (AnnotationType.HIGHLIGHT, "Highlight"),
@@ -3945,6 +3958,7 @@ class PdfViewer(QWidget):
 
     def _set_object_edit_tool(self) -> None:
         """Werkzeug Objektmanipulation aktivieren — 2.6.5."""
+        self._form_field_pending = False
         self.tool = None
         self._pending_callout_anchor = None
         self._pending_callout_page = self.page_index
@@ -3965,8 +3979,170 @@ class PdfViewer(QWidget):
             "Ecken skalieren; Doppelklick öffnet Dialog — 2.6.5"
         )
 
+    def _set_form_field_tool(self) -> None:
+        """Werkzeug Formularfeld-Rechteck aktivieren — 2.6.6."""
+        self.begin_form_field_select()
+
+    def begin_form_field_select(self) -> bool:
+        """Formular: Rechteck ziehen → Feld anlegen — 2.6.6."""
+        if not self.pdf_path:
+            self.status.emit("Kein PDF geöffnet")
+            return False
+        self._ocr_region_pending = False
+        self._form_field_pending = True
+        self._quick_ann_template_armed = False
+        self._quick_stamp_armed = False
+        self._pending_callout_anchor = None
+        self._pending_angle = None
+        self.tool = AnnotationType.RECTANGLE
+        want = "Formular"
+        for b in self._tool_buttons:
+            b.setChecked(b.text() == want)
+        self.canvas.set_drag_tool(
+            AnnotationType.RECTANGLE,
+            select_mode=False,
+            inline_edit_mode=False,
+            object_edit_mode=False,
+        )
+        self.status.emit(
+            "Formularfeld: Rechteck ziehen (Esc abbrechen) → Typ/Name wählen — 2.6.6"
+        )
+        return True
+
+    def cancel_form_field_select(self) -> bool:
+        """Esc: Formularfeld-Platzierung abbrechen — 2.6.6."""
+        if not self._form_field_pending:
+            return False
+        self._form_field_pending = False
+        self.canvas.set_drag_tool(None, select_mode=True)
+        self.status.emit("Formularfeld abgebrochen")
+        return True
+
+    def _create_form_field_at(
+        self, page: int, x: float, y: float, w: float, h: float
+    ) -> bool:
+        """Dialog + create_form_field aus Viewer-Rect — 2.6.6."""
+        if not self.pdf_path:
+            return False
+        from ild_pdf.acroform import create_form_field, viewer_rect_to_pdf
+        from instantlensdoc.ui.form_field_edit_dialog import FormFieldEditDialog
+
+        default_type = "checkbox" if (w <= 28 and h <= 28) else "text"
+        dlg = FormFieldEditDialog(
+            self,
+            title="Formularfeld anlegen",
+            name=f"Feld_{page + 1}",
+            field_type=default_type,
+            hint=f"Seite {page + 1} · {w:.0f}×{h:.0f} px — 2.6.6",
+        )
+        if dlg.exec() != QDialog.Accepted:
+            self.status.emit("Formularfeld verworfen — weiter Rechteck ziehen oder Esc")
+            return False
+        vals = dlg.values()
+        try:
+            pdf_rect = viewer_rect_to_pdf(
+                self.pdf_path, page, x, y, w, h, scale=self.scale
+            )
+            res = create_form_field(
+                self.pdf_path,
+                page,
+                pdf_rect,
+                vals["name"],
+                vals["field_type"],
+                options=vals["options"],
+                value=vals["value"],
+                required=vals["required"],
+            )
+            try:
+                from ild_pdf.render import clear_render_cache
+
+                clear_render_cache(self.pdf_path)
+            except Exception:
+                pass
+            self.refresh()
+            self.status.emit(
+                f"Feld „{res.name}“ ({res.field_type}) angelegt — weiter ziehen oder Esc"
+            )
+            return True
+        except Exception as e:
+            QMessageBox.warning(self, "Formularfeld", str(e))
+            return False
+
+    def form_field_dialog(self) -> bool:
+        """Menü/Palette: Formular-Dialog (ausfüllen/anlegen/erkennen) — 2.6.6."""
+        if not self.pdf_path:
+            self.status.emit("Kein PDF geöffnet")
+            return False
+        from instantlensdoc.ui.form_fields_dialog import FormFieldsDialog
+
+        dlg = FormFieldsDialog(self.pdf_path, self, page_index=self.page_index)
+        accepted = dlg.exec() == QDialog.Accepted
+        try:
+            from ild_pdf.render import clear_render_cache
+
+            clear_render_cache(self.pdf_path)
+        except Exception:
+            pass
+        self.refresh()
+        if accepted:
+            self.status.emit("Formularfelder gespeichert")
+        return accepted
+
+    def form_field_create_dialog(self) -> bool:
+        """Werkzeug aktivieren (Rechteck ziehen) — 2.6.6."""
+        return self.begin_form_field_select()
+
+    def form_field_detect_dialog(self) -> bool:
+        """Kandidaten erkennen und optional anlegen — 2.6.6."""
+        if not self.pdf_path:
+            self.status.emit("Kein PDF geöffnet")
+            return False
+        from ild_pdf.acroform import apply_form_candidates, detect_form_candidates
+
+        try:
+            cands = detect_form_candidates(self.pdf_path, self.page_index)
+        except Exception as e:
+            QMessageBox.warning(self, "Felder erkennen", str(e))
+            return False
+        if not cands:
+            QMessageBox.information(
+                self,
+                "Felder erkennen",
+                "Keine Kandidaten auf dieser Seite (Labels „:“, ____, [ ]).",
+            )
+            return False
+        summary = "\n".join(
+            f"· {c.suggested_type}: {c.suggested_name} ({c.reason})" for c in cands[:12]
+        )
+        more = "" if len(cands) <= 12 else f"\n… +{len(cands) - 12} weitere"
+        if (
+            QMessageBox.question(
+                self,
+                "Felder erkennen",
+                f"{len(cands)} Kandidat(en) anlegen?\n\n{summary}{more}",
+            )
+            != QMessageBox.StandardButton.Yes
+        ):
+            return False
+        try:
+            apply_form_candidates(self.pdf_path, cands)
+            try:
+                from ild_pdf.render import clear_render_cache
+
+                clear_render_cache(self.pdf_path)
+            except Exception:
+                pass
+            self.refresh()
+            self.status.emit(f"{len(cands)} Formularfeld(er) erkannt/angelegt")
+            return True
+        except Exception as e:
+            QMessageBox.warning(self, "Felder erkennen", str(e))
+            return False
+
     def _set_tool(self, tool: AnnotationType | None):
         self.tool = tool
+        self._form_field_pending = False
+        self._ocr_region_pending = False
         self._pending_callout_anchor = None
         self._pending_callout_page = self.page_index
         self._pending_angle = None
@@ -9194,7 +9370,9 @@ class PdfViewer(QWidget):
         menu.exec(self.btn_quick_ann_template.mapToGlobal(pos))
 
     def _on_canvas_escape(self) -> None:
-        """Esc: OCR-Region / Apply / Quick-Stempel / Callout / Winkel — 2.5.0."""
+        """Esc: OCR-Region / Formular / Apply / Quick-Stempel / Callout / Winkel — 2.6.6."""
+        if self.cancel_form_field_select():
+            return
         if self.cancel_ocr_region_select():
             return
         if self.cancel_pending_angle():
@@ -11090,6 +11268,26 @@ class PdfViewer(QWidget):
             self._ocr_region_pending = False
             self.canvas.set_drag_tool(None, select_mode=True)
             self.ocr_region_finished.emit(int(page0), float(rx), float(ry), float(rw), float(rh))
+            return
+        # Formularfeld: Rechteck → AcroForm anlegen — 2.6.6
+        if self._form_field_pending:
+            page0, lx0, ly0 = self._spread_resolve(x0, y0)
+            lx1 = lx0 + (x1 - x0)
+            ly1 = ly0 + (y1 - y0)
+            rx = min(lx0, lx1)
+            ry = min(ly0, ly1)
+            rw = max(abs(lx1 - lx0), 8.0)
+            rh = max(abs(ly1 - ly0), 8.0)
+            self._form_field_pending = False
+            # Werkzeug aktiv halten für weitere Felder
+            self.canvas.set_drag_tool(
+                AnnotationType.RECTANGLE,
+                select_mode=False,
+                inline_edit_mode=False,
+                object_edit_mode=False,
+            )
+            self._form_field_pending = True
+            self._create_form_field_at(int(page0), float(rx), float(ry), float(rw), float(rh))
             return
         if not self.store or self.tool is None or self.tool not in DRAG_TYPES:
             return

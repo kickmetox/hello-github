@@ -2468,6 +2468,15 @@ class MainWindow(QMainWindow):
                 "Objekt-Dialog…",
                 lambda: self.pdf_view.object_transform_dialog(),
             ),
+            ("Formularfelder…", lambda: self.pdf_view.form_field_dialog()),
+            (
+                "Formularfeld anlegen…",
+                lambda: self.pdf_view.form_field_create_dialog(),
+            ),
+            (
+                "Formularfelder erkennen…",
+                lambda: self.pdf_view.form_field_detect_dialog(),
+            ),
             ("Seiten neu anordnen…", lambda: self.pdf_view.reorder_dialog()),
             ("Seite als Bild exportieren…", lambda: self.pdf_view.extract_page_as_image()),
             ("Seiten als Bilder exportieren…", lambda: self.pdf_view.export_pages_as_images()),
@@ -2512,6 +2521,19 @@ class MainWindow(QMainWindow):
             if title == "Objekt-Dialog…":
                 a.setToolTip(
                     "Transform-Dialog für aktuelle Objektauswahl (Flip/Ersetzen) — 2.6.5"
+                )
+            if title == "Formularfelder…":
+                a.setToolTip(
+                    "AcroForm: ausfüllen, anlegen, löschen, erkennen — 2.6.6"
+                )
+                a.setShortcut(QKeySequence("Ctrl+Alt+Shift+K"))
+            if title == "Formularfeld anlegen…":
+                a.setToolTip(
+                    "Werkzeug: Rechteck ziehen → Text/Checkbox/Dropdown — 2.6.6"
+                )
+            if title == "Formularfelder erkennen…":
+                a.setToolTip(
+                    "Heuristik Labels „:“ / ____ / [ ] → Felder anlegen — 2.6.6"
                 )
             a.triggered.connect(slot)
             m_pdf.addAction(a)
@@ -10162,6 +10184,15 @@ class MainWindow(QMainWindow):
             "object_transform": lambda: self.pdf_view.object_transform_dialog()
             if hasattr(self.pdf_view, "object_transform_dialog")
             else None,
+            "form_fields": lambda: self.pdf_view.form_field_dialog()
+            if hasattr(self.pdf_view, "form_field_dialog")
+            else None,
+            "form_field_create": lambda: self.pdf_view.form_field_create_dialog()
+            if hasattr(self.pdf_view, "form_field_create_dialog")
+            else None,
+            "form_field_detect": lambda: self.pdf_view.form_field_detect_dialog()
+            if hasattr(self.pdf_view, "form_field_detect_dialog")
+            else None,
             "export": _export_menu,
             "export_page_images": lambda: self.pdf_view.export_pages_as_images()
             if hasattr(self.pdf_view, "export_pages_as_images")
@@ -10333,22 +10364,24 @@ class MainWindow(QMainWindow):
         if not self.pdf_view.pdf_path:
             QMessageBox.information(self, "Formularfelder", "Bitte zuerst ein PDF öffnen.")
             return
-        from ild_pdf import has_acroform
-
-        if not has_acroform(self.pdf_view.pdf_path):
-            QMessageBox.information(
-                self,
-                "Formularfelder",
-                "Dieses PDF enthält keine AcroForm-Felder.\n"
-                "Nur bestehende Formularfelder können ausgefüllt werden.",
-            )
-            return
-        if FormFieldsDialog(self.pdf_view.pdf_path, self).exec():
+        # 2.6.6: Dialog auch ohne bestehende Felder (anlegen/erkennen)
+        page = int(getattr(self.pdf_view, "page_index", 0) or 0)
+        if FormFieldsDialog(self.pdf_view.pdf_path, self, page_index=page).exec():
             from ild_pdf.render import clear_render_cache
 
             clear_render_cache(self.pdf_view.pdf_path)
             self.pdf_view.refresh()
+            self._refresh_form_fields()
             self._set_status("Formularfelder gespeichert")
+        else:
+            try:
+                from ild_pdf.render import clear_render_cache
+
+                clear_render_cache(self.pdf_view.pdf_path)
+            except Exception:
+                pass
+            self.pdf_view.refresh()
+            self._refresh_form_fields()
 
     def _pdf_attachments(self):
         if not self.pdf_view.pdf_path:
