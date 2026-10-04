@@ -1,5 +1,20 @@
 # Changelog — InstantLens Doc
 
+## 2.5.3 — OCR-Region Ellipsis·Tooltip·Fehlerabschnitt, Theme Merge skip/rename·Import-Log, ildtags Esc-Fokus·Treffer A11y, Export-Presets Live-Pfad·ungültige zählen
+
+Post-Release-Polish nach **2.5.2**: **OCR-Region** Tab-Titel mit **Ellipsis** und **Tooltip voll**, **Fehlerabschnitt wie Batch-OCR**; **Farben-Theme Merge** mit **Kollisionsstrategie skip/rename (_2)** und **Import-Log**; **ildtags** Esc setzt **Fokus zurück auf Liste**, **Trefferanzahl A11y**; **Export-Presets JSON** mit **Live-Pfad-Vorschau**, **ungültige Einträge überspringen + zählen**. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie klar markiert / nicht produktiv (Ink ≠ Stylus).
+
+### Geändert
+- OCR-Region: Tab-Titel Ellipsis + Tooltip voll · Fehlerabschnitt wie Batch-OCR (`--- OCR-Fehler ---`)
+- Farben-Themes: Merge Kollision skip/rename (`_2`) · Import-Log (kopieren/als TXT)
+- Dokument-Tags-Filter: Esc → Fokus Liste · Trefferanzahl AccessibleName/Description
+- Export-Presets: Live-Pfad-Vorschau · ungültige JSON-Einträge überspringen + zählen
+
+### Tests / Qualität
+- Version **2.5.3** (App / `ild_pdf` / ISS / Smoke / Docs); Serie **2.5**; `docs/VERSION` + `VERSION.txt`
+- Smoke: 2.5.3 CLI + Qt (OCR Ellipsis/Fehlerabschnitt, Theme skip/rename/Log, ildtags Esc/A11y, Export Live-Pfad/skip-count)
+- Stubs: KI/Cloud/Stylus/3D/Hooks/Outline/Telemetrie unverändert markiert
+
 ## 2.5.2 — OCR-Region Fortschritt·Tab-Titel·Fehler-Toggle, Theme ildcolors-theme-v1 Merge/Ersetzen, ildtags Treffer·Esc·fehlende grau, Export-Presets Duplikat·JSON
 
 Post-Release-Polish nach **2.5.1**: **OCR-Region** mit **bestimmtem Fortschritt**, **Ergebnis-Tab-Titel Seite/Region**, **Fehler anhängen Toggle**; **Farben-Theme JSON** Schema **ildcolors-theme-v1**, **ungültig klar DE**, **Merge vs Ersetzen**; **ildtags-Filter** mit **Trefferanzahl**, **Esc leert Filter**, **fehlende getaggte Recent grau**; **Export-Presets** **Duplikat-Namen ablehnen**, **Export/Import aller Presets JSON** (`ildexportpresets-v1`). Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie klar markiert / nicht produktiv (Ink ≠ Stylus).

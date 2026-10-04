@@ -11528,7 +11528,7 @@ class MainWindow(QMainWindow):
         self._manage_export_presets()
 
     def _manage_export_presets(self):
-        """Export-Presets: Anwenden/Löschen · Export/Import JSON — 2.5.2."""
+        """Export-Presets: Live-Pfad · Import überspringt ungültige — 2.5.3."""
         from PySide6.QtWidgets import (
             QDialog,
             QDialogButtonBox,
@@ -11549,6 +11549,7 @@ class MainWindow(QMainWindow):
             delete_export_profile,
             dialog_start_dir,
             export_export_presets_json,
+            export_profile_path_preview,
             export_profile_summary,
             get_active_export_profile_name,
             get_export_profiles,
@@ -11556,6 +11557,10 @@ class MainWindow(QMainWindow):
             import_export_presets_json,
             set_last_export_dir,
         )
+
+        def _import_status_msg(result) -> str:
+            msg = result.summary_text()
+            return f"{msg} ({EXPORT_PRESETS_SCHEMA_ID})"
 
         profiles = get_export_profiles()
         if not profiles:
@@ -11588,10 +11593,7 @@ class MainWindow(QMainWindow):
             except Exception as e:
                 QMessageBox.warning(self, "Export-Presets Import", str(e))
                 return
-            self._set_status(
-                f"Export-Presets importiert: {len(imported)} "
-                f"({EXPORT_PRESETS_SCHEMA_ID})"
-            )
+            self._set_status(f"Export-Presets importiert: {_import_status_msg(imported)}")
             if not imported:
                 return
             profiles = get_export_profiles()
@@ -11602,7 +11604,7 @@ class MainWindow(QMainWindow):
         lay = QVBoxLayout(dlg)
         info = QLabel(
             f"Benannte Presets ({len(profiles)}/{EXPORT_PROFILES_MAX}). "
-            "Duplikat-Namen abgelehnt · JSON Export/Import."
+            "Duplikat-Namen abgelehnt · JSON Export/Import · Live-Pfad."
         )
         lay.addWidget(info)
         lst = QListWidget()
@@ -11614,7 +11616,7 @@ class MainWindow(QMainWindow):
             active["name"] = get_active_export_profile_name()
             info.setText(
                 f"Benannte Presets ({len(cur)}/{EXPORT_PROFILES_MAX}). "
-                "Duplikat-Namen abgelehnt · JSON Export/Import."
+                "Duplikat-Namen abgelehnt · JSON Export/Import · Live-Pfad."
             )
             for p in cur:
                 item = QListWidgetItem(str(p["name"]))
@@ -11632,17 +11634,29 @@ class MainWindow(QMainWindow):
         summary.setStyleSheet("color: #444; padding: 4px 0;")
         summary.setToolTip("Live-Zusammenfassung DPI · Format · Ziel — 2.5.1")
         lay.addWidget(summary)
+        path_preview = QLabel("")
+        path_preview.setWordWrap(True)
+        path_preview.setStyleSheet("color: #333; font-family: monospace; padding: 2px 0;")
+        path_preview.setToolTip("Live-Pfad-Vorschau Zielordner — 2.5.3")
+        path_preview.setAccessibleName("Live-Pfad-Vorschau Export-Preset")
+        lay.addWidget(path_preview)
 
         def _refresh_summary() -> None:
             item = lst.currentItem()
             if item is None:
                 summary.setText("(kein Preset gewählt)")
+                path_preview.setText("Pfad: (kein Preset)")
+                path_preview.setAccessibleDescription("Kein Preset gewählt")
                 return
             data = item.data(Qt.UserRole) or {}
             name = str(data.get("name") or item.text())
             tip = export_profile_summary(data)
             mark = " ★ aktiv" if name == active["name"] else ""
             summary.setText(f"<b>{name}</b>{mark}<br>{tip}")
+            path_txt = export_profile_path_preview(data)
+            path_preview.setText(f"Pfad: {path_txt}")
+            path_preview.setToolTip(f"Live-Pfad-Vorschau: {path_txt}")
+            path_preview.setAccessibleDescription(f"Zielordner: {path_txt}")
 
         lst.currentItemChanged.connect(lambda *_: _refresh_summary())
         _refresh_summary()
@@ -11657,8 +11671,8 @@ class MainWindow(QMainWindow):
         )
         btn_import = QPushButton("Import JSON…")
         btn_import.setToolTip(
-            f"Alle Presets aus JSON importieren ({EXPORT_PRESETS_SCHEMA_ID}, "
-            "Merge/Ersetzen) — 2.5.2"
+            f"Presets JSON ({EXPORT_PRESETS_SCHEMA_ID}): ungültige überspringen+zählen · "
+            "Live-Pfad — 2.5.3"
         )
         btn_row.addWidget(btn_apply)
         btn_row.addWidget(btn_delete)
@@ -11746,6 +11760,7 @@ class MainWindow(QMainWindow):
                 "Export-Presets importieren",
                 "Vorhandene Presets ersetzen?\n"
                 "„Nein“ = Merge (neue Namen anhängen, Duplikate überspringen).\n"
+                "Ungültige Einträge werden übersprungen und gezählt.\n"
                 f"Schema: {EXPORT_PRESETS_SCHEMA_ID}",
                 QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel,
                 QMessageBox.Yes,
@@ -11766,11 +11781,11 @@ class MainWindow(QMainWindow):
             QMessageBox.information(
                 dlg,
                 "Export-Presets",
-                f"Importiert ({EXPORT_PRESETS_SCHEMA_ID}, {mode}): "
-                f"{len(imported)} Presets",
+                f"Import ({EXPORT_PRESETS_SCHEMA_ID}, {mode}):\n"
+                f"{imported.summary_text()}",
             )
             self._set_status(
-                f"Export-Presets importiert: {len(imported)} ({mode})"
+                f"Export-Presets importiert: {imported.summary_text()} ({mode})"
             )
             if not imported:
                 dlg.accept()
@@ -13139,13 +13154,29 @@ class MainWindow(QMainWindow):
                 )
                 return
             self.open_path(str(out_txt))
-            # Ergebnis-Tab Titel mit Seite/Region — 2.5.2
-            tab_title = f"OCR {region_label}"
+            # Tab-Titel: Ellipsis + Tooltip voll — 2.5.3
+            full_title = f"OCR {region_label}"
+            max_tab = 40
+            tab_title = (
+                full_title
+                if len(full_title) <= max_tab
+                else full_title[: max_tab - 1] + "…"
+            )
             try:
                 self.sidebar.set_document_label(str(out_txt), tab_title)
+                target = str(out_txt)
+                for i in range(self.sidebar.files.count()):
+                    it = self.sidebar.files.item(i)
+                    if not it:
+                        continue
+                    p = it.data(256)
+                    if p and str(Path(str(p))) == target:
+                        tip_parts = [str(p), f"Titel: {full_title}"]
+                        it.setToolTip("\n".join(tip_parts))
+                        break
             except Exception:
                 pass
-            self.setWindowTitle(self._app_title(tab_title))
+            self.setWindowTitle(self._app_title(full_title))
             msg = (
                 f"OCR-Region ({lang}, {dpi} DPI) {region_label} → Tab „{tab_title}“"
             )
@@ -13155,11 +13186,11 @@ class MainWindow(QMainWindow):
 
         if ocr_error:
             if attach_errors:
-                err_body = (
-                    f"--- OCR Region {region_label} ---\n\n"
-                    f"--- OCR-Fehler ---\n"
-                    f"Seite {page_1}: {ocr_error.strip().replace(chr(10), ' ')[:200]}\n"
+                # Fehlerabschnitt wie Batch-OCR — 2.5.3
+                err_section = ocr_mod._format_ocr_errors_section(
+                    [(page_1, str(ocr_error))]
                 )
+                err_body = f"--- OCR Region {region_label} ---\n\n{err_section}"
                 _write_and_open(err_body, status_extra="Fehler angehängt")
             else:
                 QMessageBox.warning(

@@ -60,6 +60,7 @@ DEFAULTS: dict[str, Any] = {
     "last_page_image_export_dir": "",  # letzter Zielordner Seiten→Bilder — 1.5.1
     "last_export_format": "PNG",  # letztes Export-Format PNG|JPEG — 2.5.0
     "default_ann_color_theme": "",  # Default Farben-Theme Name — 2.5.1
+    "custom_ann_color_themes": [],  # benutzerdefinierte Farben-Themes — 2.5.3
     "welcome_recent_filter": "",  # Welcome Recent-Filter Persistenz — 2.5.1
     "page_image_filename_template": "{stem}_p{page}",  # Dateiname-Template — 1.5.1
     "last_signature_image": "",  # zuletzt verwendetes Signatur-Bild — 1.5.1
@@ -4587,6 +4588,38 @@ class ExportPresetsImportError(ValueError):
     """Ungültiges ildexportpresets-v1 JSON."""
 
 
+class ExportPresetsImportResult:
+    """Import-Ergebnis inkl. übersprungener ungültiger Einträge — 2.5.3."""
+
+    def __init__(
+        self,
+        presets: list[dict[str, object]],
+        *,
+        skipped_invalid: int = 0,
+        skipped_duplicate: int = 0,
+    ):
+        self.presets = list(presets or [])
+        self.skipped_invalid = int(skipped_invalid or 0)
+        self.skipped_duplicate = int(skipped_duplicate or 0)
+
+    def __iter__(self):
+        return iter(self.presets)
+
+    def __len__(self) -> int:
+        return len(self.presets)
+
+    def __bool__(self) -> bool:
+        return bool(self.presets)
+
+    def summary_text(self) -> str:
+        parts = [f"importiert: {len(self.presets)}"]
+        if self.skipped_invalid:
+            parts.append(f"ungültig übersprungen: {self.skipped_invalid}")
+        if self.skipped_duplicate:
+            parts.append(f"Duplikate übersprungen: {self.skipped_duplicate}")
+        return ", ".join(parts)
+
+
 def export_export_presets_dict() -> dict[str, Any]:
     """Alle Export-Presets als Dict (Schema ildexportpresets-v1) — 2.5.2."""
     return {
@@ -4612,12 +4645,13 @@ def import_export_presets_dict(
     data: dict,
     *,
     merge: bool = False,
-) -> list[dict[str, object]]:
+) -> ExportPresetsImportResult:
     """
-    Export-Presets aus Dict übernehmen (ildexportpresets-v1) — 2.5.2.
+    Export-Presets aus Dict übernehmen (ildexportpresets-v1) — 2.5.2/2.5.3.
 
     merge=True: bestehende behalten, neue Namen anhängen (Duplikate überspringen).
     merge=False: alle Presets ersetzen.
+    Ungültige Einträge werden übersprungen und gezählt — 2.5.3.
     """
     if not isinstance(data, dict):
         raise ExportPresetsImportError(
@@ -4648,12 +4682,16 @@ def import_export_presets_dict(
         raise ExportPresetsImportError("Feld „presets“ muss eine Liste sein.")
     incoming: list[dict[str, object]] = []
     seen: set[str] = set()
+    skipped_invalid = 0
+    skipped_duplicate = 0
     for item in raw:
         p = _normalize_export_profile(item)
         if not p:
+            skipped_invalid += 1
             continue
         key = str(p["name"]).casefold()
         if key in seen:
+            skipped_duplicate += 1
             continue
         seen.add(key)
         incoming.append(p)
@@ -4663,6 +4701,7 @@ def import_export_presets_dict(
         merged = list(existing)
         for p in incoming:
             if str(p["name"]).casefold() in existing_keys:
+                skipped_duplicate += 1
                 continue  # Duplikat-Namen überspringen
             merged.append(p)
             existing_keys.add(str(p["name"]).casefold())
@@ -4677,15 +4716,19 @@ def import_export_presets_dict(
     elif not active:
         active = str(out[0]["name"]) if out else ""
     save_settings({"export_profiles": out, "active_export_profile": active})
-    return out
+    return ExportPresetsImportResult(
+        out,
+        skipped_invalid=skipped_invalid,
+        skipped_duplicate=skipped_duplicate,
+    )
 
 
 def import_export_presets_json(
     path: str | Path,
     *,
     merge: bool = False,
-) -> list[dict[str, object]]:
-    """Export-Presets aus JSON-Datei laden — 2.5.2."""
+) -> ExportPresetsImportResult:
+    """Export-Presets aus JSON-Datei laden — 2.5.2/2.5.3."""
     src = Path(path)
     try:
         data = json.loads(src.read_text(encoding="utf-8"))
@@ -4730,6 +4773,16 @@ def export_profile_summary(profile: dict[str, object] | None) -> str:
     else:
         tip += " · (kein Zielordner)"
     return tip
+
+
+def export_profile_path_preview(profile: dict[str, object] | None) -> str:
+    """Live-Pfad-Vorschau Zielordner eines Export-Presets — 2.5.3."""
+    if not profile:
+        return "(kein Preset)"
+    target = str(profile.get("target") or "").strip()
+    if not target:
+        return "(kein Zielordner)"
+    return target
 
 
 def apply_export_profile(name: str) -> dict[str, object] | None:
@@ -4847,6 +4900,7 @@ ANN_COLOR_THEMES: dict[str, tuple[str, ...]] = {
         "#922B21",
     ),
 }
+CUSTOM_ANN_COLOR_THEMES_MAX = 20  # benutzerdefinierte Themes max. — 2.5.3
 
 
 def factory_ann_color_presets() -> list[str]:
@@ -4854,17 +4908,97 @@ def factory_ann_color_presets() -> list[str]:
     return list(ANN_COLOR_PRESET_FACTORY)
 
 
+def _normalize_custom_ann_color_theme(raw: object) -> dict[str, Any] | None:
+    """Ein Custom-Theme {name, colors[6]} normalisieren — 2.5.3."""
+    if not isinstance(raw, dict):
+        return None
+    name = str(raw.get("name") or raw.get("theme") or "").strip()
+    if not name:
+        return None
+    colors_raw = raw.get("colors", raw.get("presets"))
+    if not isinstance(colors_raw, (list, tuple)):
+        return None
+    defaults = list(_DEFAULT_ANN_PRESETS)
+    colors: list[str] = []
+    for i in range(ANN_COLOR_PRESET_COUNT):
+        if i < len(colors_raw) and str(colors_raw[i] or "").strip():
+            colors.append(_normalize_hex_color(str(colors_raw[i]), defaults[i]))
+        else:
+            colors.append(defaults[i])
+    return {"name": name, "colors": colors}
+
+
+def get_custom_ann_color_themes() -> list[dict[str, Any]]:
+    """Benutzerdefinierte Farben-Themes — 2.5.3."""
+    raw = load_settings().get("custom_ann_color_themes") or []
+    if not isinstance(raw, list):
+        return []
+    out: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for item in raw:
+        theme = _normalize_custom_ann_color_theme(item)
+        if not theme:
+            continue
+        key = str(theme["name"]).casefold()
+        if key in seen or key in {k.casefold() for k in ANN_COLOR_THEMES}:
+            continue
+        seen.add(key)
+        out.append(theme)
+        if len(out) >= CUSTOM_ANN_COLOR_THEMES_MAX:
+            break
+    return out
+
+
+def _save_custom_ann_color_themes(themes: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Custom-Themes speichern (max. Limit) — 2.5.3."""
+    clean: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for item in themes:
+        theme = _normalize_custom_ann_color_theme(item)
+        if not theme:
+            continue
+        key = str(theme["name"]).casefold()
+        if key in seen or key in {k.casefold() for k in ANN_COLOR_THEMES}:
+            continue
+        seen.add(key)
+        clean.append(theme)
+        if len(clean) >= CUSTOM_ANN_COLOR_THEMES_MAX:
+            break
+    save_settings({"custom_ann_color_themes": clean})
+    return clean
+
+
+def _unique_ann_theme_name(base: str, used: set[str]) -> str:
+    """Nächsten freien Theme-Namen ``base``, ``base_2``, … — 2.5.3."""
+    name = (base or "Theme").strip() or "Theme"
+    if name.casefold() not in used:
+        return name
+    n = 2
+    while True:
+        candidate = f"{name}_{n}"
+        if candidate.casefold() not in used:
+            return candidate
+        n += 1
+
+
 def list_ann_color_themes() -> list[str]:
-    """Namen der vordefinierten Annotation-Farben-Themes — 2.5.0."""
-    return list(ANN_COLOR_THEMES.keys())
+    """Namen vordefinierter + Custom Farben-Themes — 2.5.0/2.5.3."""
+    names = list(ANN_COLOR_THEMES.keys())
+    for t in get_custom_ann_color_themes():
+        names.append(str(t["name"]))
+    return names
 
 
 def get_ann_color_theme(name: str) -> list[str] | None:
-    """Theme-Farben (6) oder None — 2.5.0."""
-    colors = ANN_COLOR_THEMES.get((name or "").strip())
-    if not colors:
-        return None
-    return list(colors)
+    """Theme-Farben (6) oder None — 2.5.0/2.5.3."""
+    clean = (name or "").strip()
+    colors = ANN_COLOR_THEMES.get(clean)
+    if colors:
+        return list(colors)
+    for t in get_custom_ann_color_themes():
+        if str(t["name"]).casefold() == clean.casefold():
+            return list(t["colors"])
+    return None
 
 
 def apply_ann_color_theme(name: str) -> list[str]:
@@ -4879,7 +5013,7 @@ def apply_ann_color_theme(name: str) -> list[str]:
 def get_default_ann_color_theme() -> str:
     """Gespeichertes Default-Farben-Theme (Name) — 2.5.1."""
     raw = str(load_settings().get("default_ann_color_theme") or "").strip()
-    if raw in ANN_COLOR_THEMES:
+    if raw and get_ann_color_theme(raw) is not None:
         return raw
     return ""
 
@@ -4887,7 +5021,7 @@ def get_default_ann_color_theme() -> str:
 def set_default_ann_color_theme(name: str) -> str:
     """Farben-Theme als Default speichern (leer = kein Default) — 2.5.1."""
     clean = (name or "").strip()
-    if clean and clean not in ANN_COLOR_THEMES:
+    if clean and get_ann_color_theme(clean) is None:
         raise ValueError(f"Unbekanntes Farben-Theme: {clean!r}")
     save_settings({"default_ann_color_theme": clean})
     return clean
@@ -4896,6 +5030,83 @@ def set_default_ann_color_theme(name: str) -> str:
 # Farben-Theme JSON (eigenes Schema, getrennt von Color-Presets) — 2.5.2
 ANN_COLORS_THEME_SCHEMA_ID = "ildcolors-theme-v1"
 ANN_COLORS_THEME_VERSION = 1
+
+
+class AnnColorsThemeImportResult:
+    """Theme-Import inkl. Log + Zusammenfassung — 2.5.3."""
+
+    def __init__(
+        self,
+        colors: list[str],
+        themes: list[dict[str, Any]] | None = None,
+        log: list[str] | None = None,
+    ):
+        self.colors = list(colors or [])
+        self.themes = list(themes or [])
+        self.log = list(log or [])
+
+    def __iter__(self):
+        return iter(self.colors)
+
+    def __len__(self) -> int:
+        return len(self.colors)
+
+    def __bool__(self) -> bool:
+        return bool(self.colors)
+
+    def summary_counts(self) -> dict[str, int]:
+        imported = skipped = renamed = 0
+        for line in self.log:
+            s = str(line or "")
+            if s.startswith("übersprungen:"):
+                skipped += 1
+            elif s.startswith("umbenannt:"):
+                renamed += 1
+            elif s.startswith("importiert:") or s.startswith("ersetzt/importiert:"):
+                imported += 1
+        return {
+            "imported": imported,
+            "skipped": skipped,
+            "renamed": renamed,
+        }
+
+    def summary_text(self) -> str:
+        c = self.summary_counts()
+        return (
+            f"importiert: {c['imported']}, "
+            f"übersprungen: {c['skipped']}, "
+            f"umbenannt: {c['renamed']}"
+        )
+
+    def log_text(self, *, include_summary: bool = True) -> str:
+        lines: list[str] = []
+        if include_summary:
+            lines.append(f"Zusammenfassung: {self.summary_text()}")
+            lines.append("")
+        if self.log:
+            lines.extend(str(x) for x in self.log)
+        else:
+            lines.append("(keine Einträge)")
+        return "\n".join(lines) + "\n"
+
+
+def export_ann_colors_theme_import_log_txt(
+    path: str | Path,
+    result: AnnColorsThemeImportResult,
+    *,
+    utf8_bom: bool = True,
+) -> Path:
+    """Theme Import-Log als TXT speichern — 2.5.3."""
+    path = Path(path)
+    body = (
+        "# InstantLens Doc Farben-Themes Import-Log\n"
+        f"# schema: {ANN_COLORS_THEME_SCHEMA_ID}-import-log\n"
+        f"# {result.summary_text()}\n"
+        "\n"
+        f"{result.log_text(include_summary=True)}"
+    )
+    path.write_bytes(body.encode("utf-8-sig" if utf8_bom else "utf-8"))
+    return path
 
 
 def export_ann_color_theme_dict(name: str | None = None) -> dict[str, Any]:
@@ -4933,7 +5144,7 @@ def export_ann_color_theme_json(
 
 
 def _validate_ann_color_theme_dict(data: dict) -> None:
-    """Schema ildcolors-theme-v1 prüfen — klare DE-Fehler — 2.5.2."""
+    """Schema ildcolors-theme-v1 prüfen — klare DE-Fehler — 2.5.2/2.5.3."""
     if not isinstance(data, dict):
         raise AnnColorsImportError(
             "Farben-Theme-JSON muss ein Objekt sein "
@@ -4959,11 +5170,60 @@ def _validate_ann_color_theme_dict(data: dict) -> None:
             f"erwartet „{ANN_COLORS_THEME_SCHEMA_ID}“. "
             f"(Color-Presets nutzen „{ANN_COLORS_SCHEMA_ID}“.)"
         )
+    themes_raw = data.get("themes")
+    if themes_raw is not None:
+        if not isinstance(themes_raw, (list, tuple)):
+            raise AnnColorsImportError(
+                "Feld „themes“ muss eine Liste sein "
+                f"(Schema „{ANN_COLORS_THEME_SCHEMA_ID}“)."
+            )
+        return
     raw = data.get("colors", data.get("presets"))
     if not isinstance(raw, (list, tuple)):
         raise AnnColorsImportError(
-            "Feld „colors“ fehlt oder ist ungültig — erwartet eine Liste mit 6 Farben."
+            "Feld „colors“ fehlt oder ist ungültig — erwartet eine Liste mit 6 Farben "
+            "oder Feld „themes“."
         )
+
+
+def _extract_incoming_ann_themes(data: dict) -> list[dict[str, Any]]:
+    """Einzel- oder Mehrfach-Themes aus Import-Dict — 2.5.3."""
+    themes_raw = data.get("themes")
+    incoming: list[dict[str, Any]] = []
+    if isinstance(themes_raw, (list, tuple)):
+        for item in themes_raw:
+            theme = _normalize_custom_ann_color_theme(item)
+            if theme:
+                incoming.append(theme)
+        return incoming
+    # Einzeltheme: colors + optional theme-Name
+    raw = data.get("colors", data.get("presets"))
+    name = str(data.get("theme") or data.get("name") or "Import").strip() or "Import"
+    theme = _normalize_custom_ann_color_theme({"name": name, "colors": raw})
+    if theme:
+        incoming.append(theme)
+    return incoming
+
+
+def _apply_theme_colors_to_presets(
+    colors_raw: list[str], *, merge: bool
+) -> list[str]:
+    """6 Farben in Color-Presets übernehmen (Merge-Slots oder Ersetzen) — 2.5.2."""
+    current = get_ann_color_presets()
+    defaults = list(_DEFAULT_ANN_PRESETS)
+    out: list[str] = list(current if merge else defaults)
+    for i in range(ANN_COLOR_PRESET_COUNT):
+        if i >= len(colors_raw):
+            if not merge:
+                out[i] = defaults[i]
+            continue
+        c = str(colors_raw[i] or "").strip()
+        if not c:
+            if not merge:
+                out[i] = defaults[i]
+            continue
+        out[i] = _normalize_hex_color(c, defaults[i])
+    return set_ann_color_presets(out)
 
 
 def import_ann_color_theme_dict(
@@ -4971,36 +5231,109 @@ def import_ann_color_theme_dict(
     *,
     merge: bool = False,
     set_default: bool = False,
-) -> list[str]:
+    on_collision: str = "skip",
+) -> AnnColorsThemeImportResult:
     """
-    Farben-Theme aus Dict importieren (ildcolors-theme-v1) — 2.5.2.
+    Farben-Theme(s) aus Dict importieren (ildcolors-theme-v1) — 2.5.2/2.5.3.
 
-    merge=True: nur gefüllte Slots überschreiben; merge=False: ersetzen.
-    Optional Default-Theme-Name setzen.
+    merge=True: Custom-Themes anhängen; bei Namenskollision skip/rename (_2);
+    merge=False: Custom-Themes ersetzen.
+    Color-Presets: erster akzeptierter Theme wird angewandt (Slots Merge/Ersetzen).
+    Rückgabe: AnnColorsThemeImportResult (Farben + Import-Log).
     """
     _validate_ann_color_theme_dict(data)
-    # Farben übernehmen ohne erneute Schema-Prüfung von ildcolors-v1
-    raw = data.get("colors", data.get("presets"))
-    assert isinstance(raw, (list, tuple))
-    current = get_ann_color_presets()
-    defaults = list(_DEFAULT_ANN_PRESETS)
-    out: list[str] = list(current if merge else defaults)
-    for i in range(ANN_COLOR_PRESET_COUNT):
-        if i >= len(raw):
-            if not merge:
-                out[i] = defaults[i]
-            continue
-        c = str(raw[i] or "").strip()
-        if not c:
-            if not merge:
-                out[i] = defaults[i]
-            continue
-        out[i] = _normalize_hex_color(c, defaults[i])
-    colors = set_ann_color_presets(out)
-    theme_name = str(data.get("theme") or "").strip()
-    if set_default and theme_name and theme_name in ANN_COLOR_THEMES:
+    incoming = _extract_incoming_ann_themes(data)
+    if not incoming:
+        raise AnnColorsImportError(
+            "Keine gültigen Farben-Themes im Import "
+            f"(Schema „{ANN_COLORS_THEME_SCHEMA_ID}“)."
+        )
+
+    mode = str(on_collision or "skip").strip().lower()
+    if mode not in ("reject", "skip", "rename"):
+        mode = "skip"
+
+    log: list[str] = []
+    builtin_keys = {k.casefold() for k in ANN_COLOR_THEMES}
+    existing = get_custom_ann_color_themes()
+    apply_colors: list[str] | None = None
+
+    if merge:
+        existing_keys = {str(t["name"]).casefold() for t in existing} | builtin_keys
+        accepted: list[dict[str, Any]] = []
+        for theme in incoming:
+            orig = str(theme["name"])
+            key = orig.casefold()
+            if key in existing_keys:
+                if mode == "reject":
+                    raise AnnColorsImportError(f"Name bereits vergeben: {orig}")
+                if mode == "skip":
+                    log.append(f"übersprungen: {orig}")
+                    # Bei Skip trotzdem Presets aus erstem Theme anwenden wenn noch keins
+                    if apply_colors is None and key in builtin_keys:
+                        apply_colors = list(theme["colors"])
+                    continue
+                new_name = _unique_ann_theme_name(orig, existing_keys)
+                theme = dict(theme)
+                theme["name"] = new_name
+                log.append(f"umbenannt: {orig} → {new_name}")
+                existing_keys.add(new_name.casefold())
+                accepted.append(theme)
+                if apply_colors is None:
+                    apply_colors = list(theme["colors"])
+            else:
+                log.append(f"importiert: {orig}")
+                existing_keys.add(key)
+                accepted.append(theme)
+                if apply_colors is None:
+                    apply_colors = list(theme["colors"])
+        combined = existing + accepted
+        if len(combined) > CUSTOM_ANN_COLOR_THEMES_MAX:
+            combined = combined[:CUSTOM_ANN_COLOR_THEMES_MAX]
+        themes = _save_custom_ann_color_themes(combined)
+    else:
+        # Ersetzen: Custom-Themes verwerfen, Builtins bleiben
+        accepted = []
+        used: set[str] = set(builtin_keys)
+        for theme in incoming:
+            orig = str(theme["name"])
+            key = orig.casefold()
+            if key in used:
+                if mode == "skip":
+                    log.append(f"übersprungen: {orig}")
+                    if apply_colors is None and key in builtin_keys:
+                        apply_colors = list(theme["colors"])
+                    continue
+                if mode == "rename":
+                    new_name = _unique_ann_theme_name(orig, used)
+                    theme = dict(theme)
+                    theme["name"] = new_name
+                    log.append(f"umbenannt: {orig} → {new_name}")
+                    used.add(new_name.casefold())
+                    accepted.append(theme)
+                    if apply_colors is None:
+                        apply_colors = list(theme["colors"])
+                    continue
+                # reject → Builtin-Namen als Custom überspringen, Farben trotzdem anwenden
+                log.append(f"übersprungen: {orig}")
+                if apply_colors is None:
+                    apply_colors = list(theme["colors"])
+                continue
+            log.append(f"ersetzt/importiert: {orig}")
+            used.add(key)
+            accepted.append(theme)
+            if apply_colors is None:
+                apply_colors = list(theme["colors"])
+        themes = _save_custom_ann_color_themes(accepted)
+
+    if apply_colors is None and incoming:
+        apply_colors = list(incoming[0]["colors"])
+    colors = _apply_theme_colors_to_presets(apply_colors or [], merge=merge)
+
+    theme_name = str(data.get("theme") or data.get("name") or "").strip()
+    if set_default and theme_name and get_ann_color_theme(theme_name) is not None:
         set_default_ann_color_theme(theme_name)
-    return list(colors)
+    return AnnColorsThemeImportResult(list(colors), themes, log)
 
 
 def import_ann_color_theme_json(
@@ -5008,8 +5341,9 @@ def import_ann_color_theme_json(
     *,
     merge: bool = False,
     set_default: bool = False,
-) -> list[str]:
-    """Farben-Theme aus JSON-Datei importieren — 2.5.2."""
+    on_collision: str = "skip",
+) -> AnnColorsThemeImportResult:
+    """Farben-Theme aus JSON-Datei importieren — 2.5.2/2.5.3."""
     try:
         raw = Path(path).read_text(encoding="utf-8")
     except OSError as e:
@@ -5029,7 +5363,7 @@ def import_ann_color_theme_json(
             f"(Schema „{ANN_COLORS_THEME_SCHEMA_ID}“)."
         )
     return import_ann_color_theme_dict(
-        data, merge=merge, set_default=set_default
+        data, merge=merge, set_default=set_default, on_collision=on_collision
     )
 
 

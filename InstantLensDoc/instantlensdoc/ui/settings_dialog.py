@@ -904,7 +904,7 @@ class SettingsDialog(QDialog):
         btn_theme_export.clicked.connect(self._export_ann_color_theme_ui)
         btn_theme_import = QPushButton("Theme Import…")
         btn_theme_import.setToolTip(
-            "Farben-Theme aus JSON importieren (ildcolors-theme-v1 · Merge/Ersetzen) — 2.5.2"
+            "Farben-Theme JSON (ildcolors-theme-v1) · Merge skip/rename (_2) · Import-Log — 2.5.3"
         )
         btn_theme_import.clicked.connect(self._import_ann_color_theme_ui)
         preset_row.addWidget(self.ann_theme_combo)
@@ -2911,8 +2911,92 @@ class SettingsDialog(QDialog):
             f"Exportiert ({ANN_COLORS_THEME_SCHEMA_ID}):\n{dest}",
         )
 
+    def _refresh_ann_theme_combo(self) -> None:
+        """Theme-Combo Builtins + Custom neu aufbauen — 2.5.3."""
+        from instantlensdoc.core.app_settings import (
+            get_default_ann_color_theme,
+            list_ann_color_themes,
+        )
+
+        combo = getattr(self, "ann_theme_combo", None)
+        if combo is None:
+            return
+        current = str(combo.currentData() or "").strip()
+        combo.blockSignals(True)
+        combo.clear()
+        combo.addItem("(Theme laden…)", "")
+        for theme_name in list_ann_color_themes():
+            combo.addItem(theme_name, theme_name)
+        pick = current or get_default_ann_color_theme()
+        if pick:
+            idx = combo.findData(pick)
+            if idx >= 0:
+                combo.setCurrentIndex(idx)
+        combo.blockSignals(False)
+
+    def _show_ann_theme_import_log(self, result, *, mode: str, strat: str = "") -> None:
+        """Import-Log: Zusammenfassung + kopieren/als TXT — 2.5.3."""
+        from pathlib import Path as _Path
+
+        from PySide6.QtGui import QGuiApplication
+
+        from instantlensdoc.core.app_settings import (
+            dialog_start_dir,
+            export_ann_colors_theme_import_log_txt,
+            get_last_export_dir,
+            set_last_export_dir,
+        )
+
+        summary = result.summary_text()
+        log_body = result.log_text(include_summary=True).rstrip()
+        while True:
+            box = QMessageBox(self)
+            box.setIcon(QMessageBox.Information)
+            box.setWindowTitle("Farben-Theme — Import-Log")
+            box.setText(
+                f"{len(result)} Farben geladen "
+                f"(ildcolors-theme-v1, {mode}{strat}).\n\n"
+                f"Zusammenfassung: {summary}"
+            )
+            box.setInformativeText(log_body)
+            btn_copy = box.addButton("Log kopieren", QMessageBox.ActionRole)
+            btn_txt = box.addButton("Als TXT…", QMessageBox.ActionRole)
+            btn_ok = box.addButton(QMessageBox.Ok)
+            box.setDefaultButton(btn_ok)
+            box.exec()
+            clicked = box.clickedButton()
+            if clicked is btn_copy:
+                QGuiApplication.clipboard().setText(log_body + "\n")
+                continue
+            if clicked is btn_txt:
+                start = dialog_start_dir(get_last_export_dir())
+                path, _ = QFileDialog.getSaveFileName(
+                    self,
+                    "Import-Log als TXT speichern",
+                    str(_Path(start) / "ildcolors-theme-import-log.txt"),
+                    "Textdatei (*.txt);;Alle Dateien (*)",
+                )
+                if not path:
+                    continue
+                if not str(path).lower().endswith(".txt"):
+                    path = str(path) + ".txt"
+                try:
+                    out = export_ann_colors_theme_import_log_txt(
+                        path, result, utf8_bom=True
+                    )
+                    set_last_export_dir(_Path(out).parent)
+                    QMessageBox.information(
+                        self, "Farben-Theme", f"Import-Log gespeichert:\n{out}"
+                    )
+                except Exception as exc:
+                    QMessageBox.warning(
+                        self, "Farben-Theme", f"TXT-Export fehlgeschlagen:\n{exc}"
+                    )
+                continue
+            break
+
     def _import_ann_color_theme_ui(self) -> None:
-        """Farben-Theme aus JSON importieren · Merge vs Ersetzen — 2.5.2."""
+        """Farben-Theme JSON · Merge skip/rename (_2) · Import-Log — 2.5.3."""
         from instantlensdoc.core.app_settings import (
             ANN_COLORS_THEME_SCHEMA_ID,
             AnnColorsImportError,
@@ -2934,8 +3018,9 @@ class SettingsDialog(QDialog):
         reply = QMessageBox.question(
             self,
             "Farben-Theme importieren",
-            "Vorhandene Color-Presets ersetzen?\n"
-            "„Nein“ = nur gefüllte Slots aus der Datei übernehmen (Merge).\n"
+            "Vorhandene Custom-Themes ersetzen?\n"
+            "„Ja“ = Ersetzen (Custom-Themes verwerfen).\n"
+            "„Nein“ = Merge (Kollisionsstrategie wählen).\n"
             f"Schema: {ANN_COLORS_THEME_SCHEMA_ID}",
             QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel,
             QMessageBox.Yes,
@@ -2943,10 +3028,27 @@ class SettingsDialog(QDialog):
         if reply == QMessageBox.Cancel:
             return
         merge = reply == QMessageBox.No
+        on_collision = "skip"
+        if merge:
+            coll = QMessageBox.question(
+                self,
+                "Namenskollision",
+                "Bei gleichem Theme-Namen:\n"
+                "„Ja“ = überspringen\n"
+                "„Nein“ = umbenennen (_2, _3, …)",
+                QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel,
+                QMessageBox.Yes,
+            )
+            if coll == QMessageBox.Cancel:
+                return
+            on_collision = "skip" if coll == QMessageBox.Yes else "rename"
         prev = [ed.text().strip() for ed in (getattr(self, "_preset_edits", []) or [])]
         try:
-            presets = import_ann_color_theme_json(
-                path, merge=merge, set_default=True
+            result = import_ann_color_theme_json(
+                path,
+                merge=merge,
+                set_default=True,
+                on_collision=on_collision,
             )
             set_last_export_dir(str(Path(path).parent))
         except AnnColorsImportError as e:
@@ -2959,30 +3061,37 @@ class SettingsDialog(QDialog):
         except Exception as e:
             QMessageBox.warning(self, "Farben-Theme Import", str(e))
             return
+        presets = list(result.colors)
         self._sync_preset_edits(presets)
         self._preset_undo = prev
         if hasattr(self, "btn_undo_factory_presets"):
             self.btn_undo_factory_presets.setEnabled(bool(prev))
-        # Combo auf importiertes Theme setzen falls bekannt
+        self._refresh_ann_theme_combo()
         try:
             import json as _json
 
             data = _json.loads(Path(path).read_text(encoding="utf-8"))
-            theme_name = str(data.get("theme") or "").strip()
+            theme_name = str(data.get("theme") or data.get("name") or "").strip()
             combo = getattr(self, "ann_theme_combo", None)
             if combo is not None and theme_name:
                 idx = combo.findData(theme_name)
+                if idx < 0:
+                    # ggf. umbenannt → ersten Custom-Eintrag aus Log
+                    for line in result.log:
+                        if line.startswith(f"umbenannt: {theme_name} → "):
+                            theme_name = line.split(" → ", 1)[1].strip()
+                            break
+                    idx = combo.findData(theme_name)
                 if idx >= 0:
                     combo.setCurrentIndex(idx)
         except Exception:
             pass
         self._update_ann_theme_swatches()
         mode = "Merge" if merge else "Ersetzen"
-        QMessageBox.information(
-            self,
-            "Farben-Theme",
-            f"Importiert ({ANN_COLORS_THEME_SCHEMA_ID}, {mode}): {len(presets)} Farben",
-        )
+        strat = ""
+        if merge:
+            strat = " · überspringen" if on_collision == "skip" else " · umbenennen"
+        self._show_ann_theme_import_log(result, mode=mode, strat=strat)
 
     def _load_ann_color_theme_ui(self) -> None:
         """Vordefiniertes Theme (Markieren/Corporate) in Preset-Felder — 2.5.0."""
