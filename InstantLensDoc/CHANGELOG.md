@@ -1,5 +1,20 @@
 # Changelog — InstantLens Doc
 
+## 2.5.17 — OCR Text-Fail-A11y, Theme Digits 1–6, ildtags F5-Datei, Export CRUD-A11y
+
+Post-Release-Polish nach **2.5.16**: **OCR-Region** Status-**Text-Copy Fail-Path A11y**; **Farben-Themes** Swatch-**Ziffern 1–6**; **ildtags** **F5 → Datei** · **Menü Entf**; **Export-Presets** **CRUD A11y** (Duplizieren/Umbenennen/Löschen). Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie klar markiert / nicht produktiv (Ink ≠ Stylus).
+
+### Geändert
+- OCR-Region: Fail-Path A11y bei Text kopieren (Ergebnis fehlt/leer)
+- Farben-Themes: Swatch-Tasten 1–6 → Fokus Swatch · Tooltip/A11y 2.5.17
+- Dokument-Tags: F5 Datei öffnen (Recent · Menü) · Entfernen\tEntf
+- Export-Presets: Duplizieren/Umbenennen/Löschen → A11y Announce
+
+### Tests / Qualität
+- Version **2.5.17** (App / `ild_pdf` / ISS / Smoke / Docs); Serie **2.5**; `docs/VERSION` + `VERSION.txt`
+- Smoke: 2.5.17 CLI + Qt (OCR Text-Fail-A11y, Theme Digits, ildtags F5-Datei, Export CRUD-A11y)
+- Stubs: KI/Cloud/Stylus/3D/Hooks/Outline/Telemetrie unverändert markiert
+
 ## 2.5.16 — OCR Fail-A11y, Theme Home/End·RMB-Hints, ildtags Tag±-A11y, Export Reorder-A11y
 
 Post-Release-Polish nach **2.5.15**: **OCR-Region** Status-**Fail-Path A11y** (Ergebnis fehlt); **Farben-Themes** Swatch-**Home/End** · **RMB Mid/Dbl-Hinweise**; **ildtags** **Tag± Status/A11y**; **Export-Presets** **Reorder A11y** · **Menü Anwenden⏎**. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie klar markiert / nicht produktiv (Ink ≠ Stylus).

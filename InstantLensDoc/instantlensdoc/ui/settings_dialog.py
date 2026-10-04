@@ -934,7 +934,7 @@ class SettingsDialog(QDialog):
             sw.setFrameShape(QFrame.Box)
             sw.setToolTip(
                 "Theme-Vorschau · Klick=Hex · RMB=HL/Stift/Notiz · "
-                "Focus: Space/H=HL · P=Stift · N=Notiz · C=Hex · ←/→ · Home/End — 2.5.16"
+                "Focus: Space/H=HL · P=Stift · N=Notiz · C=Hex · ←/→ · Home/End · 1–6 — 2.5.17"
             )
             sw.setCursor(Qt.PointingHandCursor)
             sw.setFocusPolicy(Qt.StrongFocus)
@@ -2837,7 +2837,7 @@ class SettingsDialog(QDialog):
             self.btn_undo_factory_presets.setEnabled(bool(prev))
 
     def eventFilter(self, obj, event):  # noqa: N802
-        """Swatch L→Hex · Dbl→HL/Stift/Notiz · M→HL · Keys Space/H/P/N/C · ←/→ · Home/End — 2.5.9–2.5.16."""
+        """Swatch L→Hex · Dbl→HL/Stift/Notiz · M→HL · Keys Space/H/P/N/C · ←/→ · Home/End · 1–6 — 2.5.9–2.5.17."""
         labels = getattr(self, "_theme_swatch_labels", None) or []
         if obj in labels:
             hex_c = str(obj.property("themeHex") or "").strip()
@@ -2863,6 +2863,22 @@ class SettingsDialog(QDialog):
                             if key in (Qt.Key_Home, Qt.Key_End) or nxt != idx:
                                 other.setFocus(Qt.TabFocusReason)
                             return True
+                    return True
+                # Ziffern 1–6 → Swatch-Index (1-basiert) — 2.5.17
+                digit_keys = (
+                    Qt.Key_1,
+                    Qt.Key_2,
+                    Qt.Key_3,
+                    Qt.Key_4,
+                    Qt.Key_5,
+                    Qt.Key_6,
+                )
+                if key in digit_keys:
+                    target = digit_keys.index(key)
+                    if target < len(labels):
+                        other = labels[target]
+                        if str(other.property("themeHex") or "").strip():
+                            other.setFocus(Qt.TabFocusReason)
                     return True
                 if not hex_c:
                     return super().eventFilter(obj, event)
@@ -3007,13 +3023,14 @@ class SettingsDialog(QDialog):
                     f"Shift+Mittelklick = Stift · Ctrl+Mittelklick = Notiz · "
                     f"RMB = HL/Stift/Notiz · "
                     f"Focus: Space/H=HL · P=Stift · N=Notiz · C=Hex · "
-                    f"←/→ · Home/End — 2.5.16"
+                    f"←/→ · Home/End · 1–6 — 2.5.17"
                 )
                 sw.setProperty("themeHex", str(c))
                 sw.setAccessibleName(f"Theme-Swatch {i + 1}: {c}")
                 sw.setAccessibleDescription(
                     "Space oder H Highlight, P Stift, N Notiz, C Hex kopieren, "
-                    "Pfeiltasten wechseln, Home/End erster/letzter Swatch"
+                    "Pfeiltasten wechseln, Home/End erster/letzter Swatch, "
+                    "Ziffern 1–6 springen zum Swatch"
                 )
                 sw.setCursor(Qt.PointingHandCursor)
                 sw.setFocusPolicy(Qt.StrongFocus)

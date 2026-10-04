@@ -245,7 +245,7 @@ class WelcomePage(QWidget):
         self.btn_continue.setToolTip(tip)
 
     def eventFilter(self, obj, event):  # noqa: N802
-        """Esc Filter; Del Recent; Shift+Del Tags; F2/F3 Tag±; F4 Ordner; Ctrl+C/V/X Tags; Ctrl+Shift+C Pfad — 2.5.9–2.5.15."""
+        """Esc Filter; Del Recent; Shift+Del Tags; F2/F3 Tag±; F4 Ordner; F5 Datei; Ctrl+C/V/X Tags; Ctrl+Shift+C Pfad — 2.5.9–2.5.17."""
         if event.type() == QEvent.KeyPress:
             assert isinstance(event, QKeyEvent)
             key = event.key()
@@ -274,6 +274,12 @@ class WelcomePage(QWidget):
                     path = item.data(Qt.UserRole)
                     if path:
                         self._open_containing_folder(str(path))
+                        return True
+                if item is not None and key == Qt.Key_F5:
+                    # F5: Datei mit Standardprogramm — 2.5.17
+                    path = item.data(Qt.UserRole)
+                    if path:
+                        self._open_recent_file_external(str(path))
                         return True
                 if item is not None and key in (Qt.Key_Delete, Qt.Key_Backspace):
                     path = item.data(Qt.UserRole)
@@ -560,8 +566,9 @@ class WelcomePage(QWidget):
         act_paste_tags = menu.addAction("Tags einfügen\tCtrl+V")
         act_copy_path = menu.addAction("Pfad kopieren\tCtrl+Shift+C")
         menu.addSeparator()
-        act_remove = menu.addAction("Entfernen")
+        act_remove = menu.addAction("Entfernen\tEntf")
         act_folder = menu.addAction("Ordner öffnen\tF4")
+        act_file = menu.addAction("Datei öffnen\tF5")
         chosen = menu.exec(self.recent_list.mapToGlobal(pos))
         if chosen is act_add_tag:
             self._add_tag_for_recent(str(path))
@@ -581,6 +588,8 @@ class WelcomePage(QWidget):
             self.recent_remove_requested.emit(str(path))
         elif chosen is act_folder:
             self._open_containing_folder(str(path))
+        elif chosen is act_file:
+            self._open_recent_file_external(str(path))
 
     def _add_tag_for_recent(self, path: str) -> None:
         """Dokument-Tag hinzufügen mit Vorschlägen (Recent/Index) — 2.5.4."""
@@ -914,6 +923,51 @@ class WelcomePage(QWidget):
                 win._announce_status_toast(msg)
             except Exception:
                 pass
+
+    def _open_recent_file_external(self, path: str) -> bool:
+        """Recent-Datei mit Standardprogramm öffnen (Menü · F5) + Status/A11y — 2.5.17."""
+        p = Path(path)
+        win = self.window()
+        if not p.is_file():
+            msg = f"Datei fehlt: {p.name}"
+            if win is not None and hasattr(win, "_set_status"):
+                try:
+                    win._set_status(msg)
+                except Exception:
+                    pass
+            if win is not None and hasattr(win, "_announce_status_toast"):
+                try:
+                    win._announce_status_toast(msg)
+                except Exception:
+                    pass
+            return False
+        try:
+            QDesktopServices.openUrl(QUrl.fromLocalFile(str(p)))
+        except Exception:
+            msg = f"Datei öffnen fehlgeschlagen: {p.name}"
+            if win is not None and hasattr(win, "_set_status"):
+                try:
+                    win._set_status(msg)
+                except Exception:
+                    pass
+            if win is not None and hasattr(win, "_announce_status_toast"):
+                try:
+                    win._announce_status_toast(msg)
+                except Exception:
+                    pass
+            return False
+        msg = f"Datei geöffnet: {p.name}"
+        if win is not None and hasattr(win, "_set_status"):
+            try:
+                win._set_status(msg)
+            except Exception:
+                pass
+        if win is not None and hasattr(win, "_announce_status_toast"):
+            try:
+                win._announce_status_toast(msg)
+            except Exception:
+                pass
+        return True
 
     def _local_paths_from_mime(self, mime) -> list[str]:
         paths: list[str] = []

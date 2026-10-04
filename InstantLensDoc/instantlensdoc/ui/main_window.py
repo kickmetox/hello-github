@@ -11834,9 +11834,13 @@ class MainWindow(QMainWindow):
             except Exception as e:
                 QMessageBox.warning(dlg, "Export-Preset duplizieren", str(e))
                 return
-            self._set_status(
-                f"Export-Preset dupliziert: {name} → {dup['name']}"
-            )
+            msg = f"Export-Preset dupliziert: {name} → {dup['name']}"
+            self._set_status(msg)
+            # A11y Announce Duplizieren — 2.5.17
+            try:
+                self._announce_status_toast(msg)
+            except Exception:
+                pass
             _reload_list()
             for i in range(lst.count()):
                 it = lst.item(i)
@@ -11870,7 +11874,13 @@ class MainWindow(QMainWindow):
             except Exception as e:
                 QMessageBox.warning(dlg, "Export-Preset umbenennen", str(e))
                 return
-            self._set_status(f"Export-Preset umbenannt: {old} → {renamed['name']}")
+            msg = f"Export-Preset umbenannt: {old} → {renamed['name']}"
+            self._set_status(msg)
+            # A11y Announce Umbenennen — 2.5.17
+            try:
+                self._announce_status_toast(msg)
+            except Exception:
+                pass
             _reload_list()
             # Fokus auf umbenanntes Preset
             for i in range(lst.count()):
@@ -11950,7 +11960,13 @@ class MainWindow(QMainWindow):
             if not delete_export_profile(name):
                 QMessageBox.warning(dlg, "Export-Preset", "Löschen fehlgeschlagen.")
                 return
-            self._set_status(f"Export-Preset gelöscht: {name}")
+            msg = f"Export-Preset gelöscht: {name}"
+            self._set_status(msg)
+            # A11y Announce Löschen — 2.5.17
+            try:
+                self._announce_status_toast(msg)
+            except Exception:
+                pass
             if not get_export_profiles():
                 dlg.accept()
                 return
@@ -13443,7 +13459,7 @@ class MainWindow(QMainWindow):
         return preview
 
     def _ocr_region_status_tooltip(self) -> str:
-        """Status-Tooltip inkl. Textvorschau — 2.5.9–2.5.16."""
+        """Status-Tooltip inkl. Textvorschau — 2.5.9–2.5.17."""
         path = getattr(self, "_last_ocr_region_path", None) or ""
         tip = (
             "Linksklick → Ergebnis-Tab · Rechtsklick → Menü · "
@@ -13453,7 +13469,7 @@ class MainWindow(QMainWindow):
             "Esc → Status schließen · "
             "Enter → Ergebnis-Tab · "
             "Ctrl+C Text · Ctrl+Shift+C Pfad · "
-            "F4 → Ordner · F5 → Datei — 2.5.16"
+            "F4 → Ordner · F5 → Datei — 2.5.17"
         )
         if path:
             tip = f"{tip}\n{path}"
@@ -13647,16 +13663,35 @@ class MainWindow(QMainWindow):
             return False
         p = Path(str(path))
         if not p.is_file():
+            msg = f"OCR-Region Ergebnis fehlt: {p.name}"
+            self._set_status(msg)
+            # Fail-Path A11y Text-Copy — 2.5.17
+            try:
+                self._announce_status_toast(msg)
+            except Exception:
+                pass
             return False
         try:
             body = p.read_text(encoding="utf-8")
         except Exception:
+            msg = f"OCR-Region Ergebnis fehlt: {p.name}"
+            self._set_status(msg)
+            try:
+                self._announce_status_toast(msg)
+            except Exception:
+                pass
             return False
         # Fehlerabschnitt weglassen (wie Batch-OCR) — 2.5.8
         marker = "\n--- OCR-Fehler ---"
         if marker in body:
             body = body.split(marker, 1)[0].rstrip()
         if not body.strip():
+            msg = f"OCR-Region Text leer: {p.name}"
+            self._set_status(msg)
+            try:
+                self._announce_status_toast(msg)
+            except Exception:
+                pass
             return False
         try:
             from PySide6.QtWidgets import QApplication
