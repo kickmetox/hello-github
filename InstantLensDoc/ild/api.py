@@ -1,4 +1,4 @@
-"""Headless InstantLens-Doc-Operationen für Python- und PowerShell-Scripting — 2.6.16."""
+"""Headless InstantLens-Doc-Operationen für Python- und PowerShell-Scripting — 2.6.17."""
 
 from __future__ import annotations
 
@@ -1463,6 +1463,80 @@ def run_ki_wizard(
         use_llm=use_llm,
         out=out,
     )
+
+
+def list_ui_langs() -> list[dict[str, Any]]:
+    """Unterstützte UI-Sprachen (DE/EN/FR/RU/ES/ZH/PT/AR/IT) — 2.6.17."""
+    from instantlensdoc.core.i18n import (
+        SUPPORTED_LANGS,
+        is_rtl,
+        lang_native_name,
+        tr,
+    )
+
+    return [
+        {
+            "code": code,
+            "native": lang_native_name(code),
+            "label": tr(f"lang_{code}", lang="de"),
+            "rtl": is_rtl(code),
+        }
+        for code in SUPPORTED_LANGS
+    ]
+
+
+def get_ui_lang() -> str:
+    """Aktuelle UI-Sprache (Settings) — 2.6.17."""
+    from instantlensdoc.core.app_settings import get_ui_lang as _get
+
+    return str(_get())
+
+
+def set_ui_lang(lang: str) -> str:
+    """UI-Sprache setzen und persistieren — 2.6.17."""
+    from instantlensdoc.core.app_settings import set_ui_lang as _set
+    from instantlensdoc.core.i18n import normalize_lang, set_lang
+
+    code = normalize_lang(lang)
+    _set(code)
+    set_lang(code)
+    return code
+
+
+def tr(key: str, *, lang: str | None = None) -> str:
+    """UI-String übersetzen — 2.6.17."""
+    from instantlensdoc.core.i18n import tr as _tr
+
+    return _tr(key, lang=lang)  # type: ignore[arg-type]
+
+
+def ocr_handwriting(
+    path: PathLike,
+    *,
+    lang: str = "deu+eng",
+    psm: int | str = 6,
+    out: PathLike | None = None,
+) -> dict[str, Any]:
+    """Basis-Handschriftenerkennung (Tesseract PSM) — 2.6.17."""
+    from instantlensdoc.core.ocr import ocr_image_handwriting, normalize_handwriting_psm
+
+    src = _require_file(path)
+    psm_n = normalize_handwriting_psm(psm)
+    text = ocr_image_handwriting(src, lang=lang, psm=psm_n)
+    result: dict[str, Any] = {
+        "path": str(src.resolve()),
+        "lang": lang,
+        "psm": psm_n,
+        "text": text,
+        "handwriting": True,
+        "version": __version__,
+    }
+    if out is not None:
+        dest = _p(out)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_text(text or "", encoding="utf-8")
+        result["out"] = str(dest.resolve())
+    return result
 
 
 def _load_layout(

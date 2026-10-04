@@ -194,7 +194,7 @@ from instantlensdoc.ui.doc_stats_dialog import DocStatsDialog
 from instantlensdoc.ui.form_fields_dialog import FormFieldsDialog
 from instantlensdoc.ui.page_size_dialog import PageSizeDialog
 from instantlensdoc.core import session as session_mod
-from instantlensdoc.core.i18n import sync_from_settings
+from instantlensdoc.core.i18n import apply_ui_language, sync_from_settings
 from ild_pdf.outline import extract_outline
 import logging
 
@@ -205,6 +205,7 @@ class MainWindow(QMainWindow):
     def __init__(self, license_manager: LicenseManager):
         super().__init__()
         sync_from_settings()
+        apply_ui_language(self)  # Sprache + RTL aus Settings — 2.6.17
         self.license_manager = license_manager
         self.doc: Document | None = None
         self.layout_doc = LayoutDocument()
@@ -2897,6 +2898,13 @@ class MainWindow(QMainWindow):
             "Rechteck auf der PDF-Seite wählen → nur Region OCR → Text-Tab — 2.5.0"
         )
         a.triggered.connect(self._run_ocr_region)
+        m_extra.addAction(a)
+        a = QAction("Handschriftenerkennung…", self)
+        a.setObjectName("actHandwritingOcr")
+        a.setToolTip(
+            "Basis-Handschriftenerkennung (Tesseract PSM) — Bild/PDF-Seite → Text — 2.6.17"
+        )
+        a.triggered.connect(self._run_ocr_handwriting)
         m_extra.addAction(a)
         a = QAction("In Word-Suite öffnen/übernehmen…", self)
         a.setObjectName("actOcrWordSuite")
@@ -10707,6 +10715,8 @@ class MainWindow(QMainWindow):
             "ocr_pdf": self._run_ocr_document,
             "ocr_region": self._run_ocr_region,
             "ocr_word_suite": self._ocr_word_suite_action,
+            "ocr_handwriting": self._run_ocr_handwriting,
+            "settings_ui_lang": self._settings,
             "ki_document_wizard": self._ki_document_wizard_action,
             "doc_tags": self._edit_doc_tags,
             "true_redact": lambda: self.pdf_view.apply_true_redactions()
@@ -10784,6 +10794,7 @@ class MainWindow(QMainWindow):
     def _settings(self):
         if SettingsDialog(self).exec():
             sync_from_settings()
+            apply_ui_language(self)  # Persistierte Sprache + Retranslate/RTL — 2.6.17
             self._sync_theme_menu()
             from instantlensdoc.core.app_settings import (
                 get_editor_current_line_highlight,
@@ -14266,6 +14277,115 @@ class MainWindow(QMainWindow):
         remember_recent_dir(path)
         self._handoff_ocr_to_word_suite(path=path, auto_format=True)
 
+    def _run_ocr_handwriting(self):
+        """Handschriftenerkennung: OCR-Dialog mit Handschrift-PSM vorausgewählt — 2.6.17."""
+        from PySide6.QtWidgets import QDialog
+
+        need_file = not (
+            self.doc and self.doc.path and self.doc.kind in (DocKind.IMAGE, DocKind.PDF)
+        )
+        dlg = OcrDialog(
+            self,
+            need_file=need_file,
+            default_label=Path(self.doc.path).name if self.doc and self.doc.path else "",
+        )
+        if hasattr(dlg, "handwriting_check"):
+            dlg.handwriting_check.setChecked(True)
+        if hasattr(dlg, "rb_editable"):
+            dlg.rb_editable.setChecked(True)
+        if dlg.exec() != QDialog.Accepted:
+            return
+        # Reuse normal OCR path by temporarily storing dialog — call core directly
+        self._run_ocr_with_dialog(dlg)
+
+    def _run_ocr_with_dialog(self, dlg) -> None:
+        """OCR mit bereits akzeptiertem Dialog (Handschrift/Standard) — 2.6.17."""
+        from PySide6.QtWidgets import QApplication, QDialog, QProgressDialog
+
+        ok, msg = ocr_mod.tesseract_available()
+        if not ok:
+            QMessageBox.information(self, "OCR — Tesseract fehlt", msg)
+            self._set_status("OCR nicht verfügbar")
+            return
+        lang = dlg.lang_code()
+        mode = dlg.output_mode()
+        hw = bool(getattr(dlg, "handwriting_enabled", lambda: False)())
+        hw_psm = int(getattr(dlg, "handwriting_psm_value", lambda: 6)())
+        open_ws = bool(getattr(dlg, "open_in_word_suite", lambda: True)())
+        ws_auto = bool(getattr(dlg, "word_suite_auto_format_enabled", lambda: True)())
+        prog = QProgressDialog("OCR läuft…", None, 0, 0, self)
+        prog.setWindowTitle("OCR")
+        prog.setWindowModality(Qt.WindowModal)
+        prog.setMinimumDuration(0)
+        prog.setValue(0)
+        prog.show()
+        QApplication.processEvents()
+        try:
+            if self.doc and self.doc.kind == DocKind.IMAGE and self.doc.path:
+                source_label = Path(self.doc.path).name
+                result = ocr_mod.run_ocr(
+                    self.doc.path,
+                    lang=lang,
+                    mode=mode,
+                    source_label=source_label,
+                    handwriting=hw,
+                    handwriting_psm=hw_psm,
+                )
+            elif self.doc and self.doc.kind == DocKind.PDF and self.doc.path:
+                from ild_pdf import render_page
+
+                source_label = f"{Path(self.doc.path).name} Seite {self.pdf_view.page_index + 1}"
+                img = render_page(self.doc.path, self.pdf_view.page_index, scale=2.0)
+                result = ocr_mod.run_ocr(
+                    img,
+                    lang=lang,
+                    mode=mode,
+                    source_label=source_label,
+                    handwriting=hw,
+                    handwriting_psm=hw_psm,
+                )
+            else:
+                path = dlg.selected_path
+                if not path:
+                    return
+                source_label = Path(path).name
+                result = ocr_mod.run_ocr(
+                    path,
+                    lang=lang,
+                    mode=mode,
+                    source_label=source_label,
+                    handwriting=hw,
+                    handwriting_psm=hw_psm,
+                )
+        except ocr_mod.OcrUnavailable as e:
+            QMessageBox.information(self, "OCR — Tesseract fehlt", str(e))
+            return
+        except Exception as e:
+            QMessageBox.warning(self, "OCR", f"OCR fehlgeschlagen:\n{e}")
+            return
+        finally:
+            prog.close()
+        text = result.text or ""
+        title_suffix = f"Handschrift — {source_label}" if hw else source_label
+        if open_ws and text.strip():
+            try:
+                self._handoff_ocr_to_word_suite(
+                    text=text, auto_format=ws_auto, title=f"Word-Suite — {title_suffix}"
+                )
+                self._set_status(f"OCR → Word-Suite ({result.lang})")
+                return
+            except Exception:
+                pass
+        self.stack.setCurrentWidget(self.editor_pane)
+        self.editor.setPlainText(text)
+        self.doc = Document(
+            kind=DocKind.TEXT,
+            title=f"OCR — {title_suffix}",
+            text=text,
+        )
+        self.setWindowTitle(self._app_title(f"OCR — {title_suffix}"))
+        self._set_status(f"OCR ({result.lang}, handwriting={hw})")
+
     def _run_ocr(self):
         from PySide6.QtWidgets import QApplication, QDialog, QProgressDialog
 
@@ -14294,6 +14414,8 @@ class MainWindow(QMainWindow):
         write_tsv = bool(getattr(dlg, "write_tsv", lambda: True)())
         open_ws = bool(getattr(dlg, "open_in_word_suite", lambda: True)())
         ws_auto = bool(getattr(dlg, "word_suite_auto_format_enabled", lambda: True)())
+        hw = bool(getattr(dlg, "handwriting_enabled", lambda: False)())
+        hw_psm = int(getattr(dlg, "handwriting_psm_value", lambda: 6)())
         # Tabellen-CSV: gemerkten Zielordner bevorzugen — 1.9.1
         csv_out_dir = None
         if mode == ocr_mod.OcrOutputMode.TABLE_CSV:
@@ -14338,6 +14460,8 @@ class MainWindow(QMainWindow):
                     write_csv=write_csv_now,
                     write_hocr=write_hocr,
                     write_tsv=write_tsv,
+                    handwriting=hw,
+                    handwriting_psm=hw_psm,
                 )
             elif self.doc and self.doc.kind == DocKind.PDF and self.doc.path:
                 from ild_pdf import render_page
@@ -14357,6 +14481,8 @@ class MainWindow(QMainWindow):
                     write_csv=write_csv_now,
                     write_hocr=write_hocr,
                     write_tsv=write_tsv,
+                    handwriting=hw,
+                    handwriting_psm=hw_psm,
                 )
             else:
                 path = dlg.selected_path
@@ -14384,6 +14510,8 @@ class MainWindow(QMainWindow):
                     write_csv=write_csv_now,
                     write_hocr=write_hocr,
                     write_tsv=write_tsv,
+                    handwriting=hw,
+                    handwriting_psm=hw_psm,
                 )
         except ocr_mod.OcrUnavailable as e:
             QMessageBox.information(self, "OCR — Tesseract fehlt", str(e))

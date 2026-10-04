@@ -2,7 +2,7 @@
 
 Moderne Textverarbeitung mit PDF-Annotator, OCR-Bridge und Formulargenerator.
 
-**Version:** 2.6.16  
+**Version:** 2.6.17  
 **Hersteller:** Andreas Meyer · ame@sellerbach.de
 
 ## Quickstart (Windows)
@@ -36,6 +36,10 @@ User-Shortcuts: `.\scripts\install-ild.ps1` (inkl. Keygen) · Deinstallieren: `-
 Keygen: `run-keygen.bat` · `python -m keygen kunde@example.com` · siehe `keygen/README.md`.
 
 Nightly-Smoke: `python scripts\smoke_ild.py` · optional `--qt` · `--json` (Summary: `ok`, `checks[]`, `duration_ms`, `version`; Fail: `checks[].error` max 200…, Exit=ok). Siehe **CONTRIBUTING.md**; Workflow-Stub `.github/workflows/smoke-ild.yml` (manual only).
+
+## Neu in 2.6.17
+
+Minor nach **2.6.16**: **Volles InstantLens Doc i18n** — Einstellungen: DE/EN/FR/RU/ES/ZH/PT/AR/IT für gesamte UI (Viewer, OCR, Scan, Annotationen, Formulare, Export, Assistenten, Hilfe, Info); Persistenz; Arabisch RTL wo praktikabel; Locale-Katalog + Hilfe-HTML; externe Docs `docs/i18n/`. **Handschriftenerkennung** Basis-Hook (Tesseract PSM). Scripting `ui-langs`/`set-ui-lang`/`ocr-handwriting`. Freier KI-Chat-Stub unverändert. Kein CMYK/Bleed/Preflight/PDF/X, kein PDF-Compare.
 
 ## Neu in 2.6.16
 

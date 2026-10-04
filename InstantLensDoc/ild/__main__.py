@@ -465,6 +465,34 @@ def build_parser() -> argparse.ArgumentParser:
         help="Unternehmensmodus erzwingen",
     )
 
+    s = sub.add_parser(
+        "ui-langs",
+        help="UI-Sprachen auflisten (DE/EN/FR/RU/ES/ZH/PT/AR/IT) — 2.6.17",
+    )
+    s = sub.add_parser(
+        "get-ui-lang",
+        help="Aktuelle UI-Sprache (Settings) — 2.6.17",
+    )
+    s = sub.add_parser(
+        "set-ui-lang",
+        help="UI-Sprache setzen/persistieren — 2.6.17",
+    )
+    s.add_argument("lang", help="de|en|fr|ru|es|zh|pt|ar|it")
+    s = sub.add_parser(
+        "tr",
+        help="UI-String übersetzen — 2.6.17",
+    )
+    s.add_argument("key", help="i18n-Schlüssel")
+    s.add_argument("--lang", default=None, help="Zielsprache")
+    s = sub.add_parser(
+        "ocr-handwriting",
+        help="Handschriftenerkennung (Tesseract PSM) — 2.6.17",
+    )
+    s.add_argument("path", help="Bilddatei")
+    s.add_argument("--lang", default="deu+eng")
+    s.add_argument("--psm", default="6", help="PSM 0–13 oder block|line|word|sparse")
+    s.add_argument("--out", default=None, help="Optional: Text speichern")
+
     return p
 
 
@@ -950,6 +978,28 @@ def run(argv: list[str] | None = None) -> int:
                 title=args.title,
                 use_llm=bool(args.use_llm),
                 out=args.out,
+            )
+            _print(data, as_json=js or True)
+            return 0
+        if args.cmd == "ui-langs":
+            data = api.list_ui_langs()
+            _print(data, as_json=js or True)
+            return 0
+        if args.cmd == "get-ui-lang":
+            data = {"ui_lang": api.get_ui_lang()}
+            _print(data, as_json=js or True)
+            return 0
+        if args.cmd == "set-ui-lang":
+            code = api.set_ui_lang(args.lang)
+            _print({"ui_lang": code}, as_json=js or True)
+            return 0
+        if args.cmd == "tr":
+            data = {"key": args.key, "lang": args.lang, "text": api.tr(args.key, lang=args.lang)}
+            _print(data, as_json=js or True)
+            return 0
+        if args.cmd == "ocr-handwriting":
+            data = api.ocr_handwriting(
+                args.path, lang=args.lang, psm=args.psm, out=args.out
             )
             _print(data, as_json=js or True)
             return 0

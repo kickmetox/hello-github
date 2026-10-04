@@ -1,4 +1,4 @@
-InstantLens Doc 2.6.16 — Installation
+InstantLens Doc 2.6.17 — Installation
 
 Startmenü: Gruppe „InstantLens Doc“ mit Programm, optional Keygenerator, INFO und Deinstallieren.
 

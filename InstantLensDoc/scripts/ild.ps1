@@ -624,6 +624,36 @@ function New-IldDocumentWizard {
     Invoke-IldKiWizard @p
 }
 
+function Get-IldUiLangs {
+    # UI-Sprachen DE/EN/FR/RU/ES/ZH/PT/AR/IT — 2.6.17
+    Invoke-Ild @("--json", "ui-langs") | Out-Host
+}
+
+function Get-IldUiLang {
+    Invoke-Ild @("--json", "get-ui-lang") | Out-Host
+}
+
+function Set-IldUiLang {
+    param(
+        [Parameter(Mandatory = $true)]
+        [ValidateSet("de", "en", "fr", "ru", "es", "zh", "pt", "ar", "it")]
+        [string]$Lang
+    )
+    Invoke-Ild @("--json", "set-ui-lang", $Lang) | Out-Host
+}
+
+function Invoke-IldOcrHandwriting {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [string]$Lang = "deu+eng",
+        [string]$Psm = "6",
+        [string]$Out
+    )
+    $a = @("--json", "ocr-handwriting", $Path, "--lang", $Lang, "--psm", $Psm)
+    if ($Out) { $a += @("--out", $Out) }
+    Invoke-Ild @a | Out-Host
+}
+
 function Merge-IldPdf {
     param(
         [Parameter(Mandatory = $true)][string[]]$Path,

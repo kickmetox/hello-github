@@ -1,5 +1,23 @@
 # Changelog — InstantLens Doc
 
+## 2.6.17 — Volles InstantLens Doc i18n (+ Handschrift-Hook)
+
+Minor nach **2.6.16**: **Gesamtes InstantLens Doc** umschaltbar in den Einstellungen: **Deutsch, English, Français, Русский, Español, 中文, Português, العربية, Italiano**. Betrifft Module/UI (Viewer, OCR, Scan, Annotationen, Formulare, Export, Assistenten, Einstellungen) inkl. **Hilfe** und **Info**. Phrase-Retranslate + Katalog (`locales/catalog.json`); **Arabisch RTL** wo praktikabel; Sprache **persistiert**. Externe Hilfe/Info/Feature-Docs unter Project-Store `docs/i18n/{lang}/`. **Basis-Handschriftenerkennung** (Tesseract-PSM-Hook) in OCR-Dialog/Menü/ild. Freier KI-Chat-Stub unverändert. Kein CMYK/Bleed/Preflight/PDF/X, kein PDF-Compare. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie unverändert.
+
+### Neu
+- `instantlensdoc.core.i18n` — 9 Sprachen, RTL, `apply_ui_language` / `retranslate_tree` / `help_html`
+- `instantlensdoc/locales/` — `catalog.json`, `{lang}.json`, `help/{lang}.html`
+- OCR: `ocr_image_handwriting` / Handschrift-PSM im OCR-Dialog; Menü/Palette
+- ild-API/CLI/PowerShell: `ui-langs` / `set-ui-lang` / `tr` / `ocr-handwriting`
+
+### Geändert
+- Settings-Sprachwahl 9 Einträge; Hilfe/About lokalisiert; Docs/Version **2.6.17**
+
+### Tests / Qualität
+- Version **2.6.17** (App / `ild_pdf` / ISS / Smoke / Docs); Serie **2.6**; `docs/VERSION` + `VERSION.txt`
+- Smoke: 2.6.17 CLI+Qt (full-i18n + handwriting-hook)
+- Stubs: freier KI-Assistent unverändert getrennt
+
 ## 2.6.16 — Isolierte KI-Dokument-Wizards
 
 Minor nach **2.6.15**: **Geführte KI-Standardabläufe** als isolierte User-Abfragen (kein freier Chat): **Formular**, **Anschreiben**, **Kaufvertrag**, **Rechnungsformular** — generisch oder unternehmensbezogen (Firma, Adresse, USt-Id, IBAN …). Ausgabe als editierbares InstantLens-Doc / Word-Suite-Dokument. Lokal template-/regelbasiert; optionaler LLM-Hook nur hinter dem Wizard. UI: Extras → **Dokument erstellen… (KI-Wizard)** (Ctrl+Alt+Shift+Q); Palette `ki_document_wizard`. Scripting: `ild.generate_ki_document` / `run_ki_wizard` / `list_ki_wizards` · CLI `ki-wizard` / `ki-wizards` · PowerShell `Invoke-IldKiWizard` / `New-IldDocumentWizard` / `Get-IldKiWizards`. Freier KI-Assistent-Stub unverändert getrennt. Kein CMYK/Bleed/Preflight/PDF/X, kein volles i18n, kein PDF-Compare. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie unverändert.

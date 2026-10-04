@@ -464,9 +464,25 @@ class SettingsDialog(QDialog):
         form.addRow("Live-Vorschau", self.ui_font_preview)
 
         self.ui_lang = QComboBox()
-        self.ui_lang.addItem(tr("lang_de"), "de")
-        self.ui_lang.addItem(tr("lang_en"), "en")
-        self.ui_lang.setCurrentIndex(1 if get_ui_lang() == "en" else 0)
+        self.ui_lang.setObjectName("settingsUiLang")
+        from instantlensdoc.core.i18n import (
+            lang_native_name,
+            supported_langs,
+        )
+
+        cur_ui = get_ui_lang()
+        pick_ui = 0
+        for i, code in enumerate(supported_langs()):
+            # Native name + translated label — 2.6.17
+            label = f"{lang_native_name(code)} ({tr(f'lang_{code}')})"
+            self.ui_lang.addItem(label, code)
+            if code == cur_ui:
+                pick_ui = i
+        self.ui_lang.setCurrentIndex(pick_ui)
+        self.ui_lang.setToolTip(
+            "Oberflächensprache DE/EN/FR/RU/ES/ZH/PT/AR/IT — Persistenz; "
+            "Arabisch RTL wo praktikabel — 2.6.17"
+        )
         form.addRow(tr("ui_lang"), self.ui_lang)
 
         self.lang_combo = QComboBox()
@@ -3879,6 +3895,14 @@ class SettingsDialog(QDialog):
         set_merge_close_preview_on_edit(self.merge_close_preview.isChecked())
         set_ui_lang(str(self.ui_lang.currentData() or "de"))
         sync_from_settings()
+        # Sprache + RTL auf Parent-Hauptfenster anwenden — 2.6.17
+        try:
+            from instantlensdoc.core.i18n import apply_ui_language
+
+            parent = self.parent()
+            apply_ui_language(parent, lang=str(self.ui_lang.currentData() or "de"))
+        except Exception:
+            pass
         set_update_check_on_start(self.update_chk.isChecked())
         # Telemetrie: Toggle disabled — immer False speichern — 2.3.2/2.3.3
         set_telemetry_opt_in(False)

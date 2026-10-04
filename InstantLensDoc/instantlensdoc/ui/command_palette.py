@@ -262,11 +262,23 @@ def default_palette_commands() -> list[PaletteCommand]:
             "Ctrl+Alt+Shift+W",
         ),
         PaletteCommand(
+            "ocr_handwriting",
+            "Handschriftenerkennung…",
+            "ocr handwriting handschrift psm tesseract schreiben",
+            "OCR",
+        ),
+        PaletteCommand(
             "ki_document_wizard",
             "Dokument erstellen… (KI-Wizard)",
             "ki wizard formular anschreiben kaufvertrag rechnung dokument erstellen isoliert",
             "KI",
             "Ctrl+Alt+Shift+Q",
+        ),
+        PaletteCommand(
+            "settings_ui_lang",
+            "Einstellungen… (Oberflächensprache)",
+            "settings sprache language i18n locale ui lang deutsch english français",
+            "Extras",
         ),
         PaletteCommand(
             "doc_tags",

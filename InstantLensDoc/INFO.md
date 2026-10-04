@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **2.6.16** |
+| Version | **2.6.17** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -33,7 +33,7 @@
 
 Skript: [sync-ild.ps1](scripts/sync-ild.ps1) — Branch `cursor/instantlensdoc-2108` (oder `-LocalPack` / Pack-Zip) nach `D:\AI_Temp\InstantLensDoc`, pip, Start. **Nutzer-Icon in `assets` wird nicht überschrieben.**
 
-**FEATURES.md lokal sync:** Nach Sync liegt `FEATURES.md` lokal im App-Ordner (`D:\AI_Temp\InstantLensDoc\FEATURES.md`); About/Stubs öffnen diese lokale Datei — Version **2.6.16**.
+**FEATURES.md lokal sync:** Nach Sync liegt `FEATURES.md` lokal im App-Ordner (`D:\AI_Temp\InstantLensDoc\FEATURES.md`); About/Stubs öffnen diese lokale Datei — Version **2.6.17**.
 
 Ohne Start: `-NoStart` (Alias `-SkipStart`). Exit-Codes: **0** OK · **1** allgemein · **2** Git-Fehler.
 
@@ -81,6 +81,19 @@ python -m keygen --verify "ILD1...."
 ```
 
 Trial 28 Tage · Keys 32 Tage (HMAC `ILD1.…`). Details: `keygen/README.md`.
+
+## Neu in 2.6.17
+
+Minor nach **2.6.16** (volles InstantLens Doc i18n + Handschrift-Hook):
+
+- **UI-Sprachen:** DE, EN, FR, RU, ES, ZH, PT, AR, IT — Einstellungen → Oberflächensprache (persistiert)
+- **Module:** Viewer, OCR, Scan, Annotationen, Formulare, Export, Assistenten, Einstellungen inkl. Hilfe/Info
+- **RTL** für Arabisch wo praktikabel; Locale-Katalog `instantlensdoc/locales/`
+- **Externe Docs:** `docs/i18n/{lang}/` (DE+EN vollständig, übrige scaffolded)
+- **Handschriftenerkennung:** Basis-Hook Tesseract PSM (OCR-Dialog / Menü / `ild.ocr_handwriting`)
+- Scripting: `ui-langs` / `set-ui-lang` / `tr` / `ocr-handwriting` · PS `Get-IldUiLangs` / `Set-IldUiLang` / `Invoke-IldOcrHandwriting`
+- Freier KI-Chat-Stub unverändert; kein CMYK/Bleed/Preflight/PDF/X, kein PDF-Compare
+- Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie unverändert
 
 ## Neu in 2.6.16
 

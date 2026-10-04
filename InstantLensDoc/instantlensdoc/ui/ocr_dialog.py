@@ -279,6 +279,25 @@ class OcrDialog(QDialog):
         form.addRow(self.word_suite_check)
         form.addRow("", self.word_suite_auto_format)
 
+        # Handschriftenerkennung (Basis-Hook Tesseract PSM) — 2.6.17
+        from instantlensdoc.core.i18n import tr as _tr_hw
+        from instantlensdoc.core.ocr import HANDWRITING_PSM_PRESETS, DEFAULT_HANDWRITING_PSM
+
+        self.handwriting_check = QCheckBox(_tr_hw("handwriting_title"))
+        self.handwriting_check.setObjectName("ocrHandwritingMode")
+        self.handwriting_check.setChecked(False)
+        self.handwriting_check.setToolTip(_tr_hw("handwriting_hint"))
+        self.handwriting_psm = QComboBox()
+        self.handwriting_psm.setObjectName("ocrHandwritingPsm")
+        for name, code in HANDWRITING_PSM_PRESETS.items():
+            self.handwriting_psm.addItem(f"{name} (PSM {code})", int(code))
+        self.handwriting_psm.setCurrentIndex(0)
+        self.handwriting_psm.setEnabled(False)
+        self.handwriting_check.toggled.connect(self.handwriting_psm.setEnabled)
+        form.addRow(self.handwriting_check)
+        form.addRow(_tr_hw("handwriting_mode"), self.handwriting_psm)
+        _ = DEFAULT_HANDWRITING_PSM
+
         if default_label:
             form.addRow("Quelle", QLabel(default_label))
         layout.addLayout(form)
@@ -477,6 +496,18 @@ class OcrDialog(QDialog):
 
     def word_suite_auto_format_enabled(self) -> bool:
         return bool(self.word_suite_auto_format.isChecked())
+
+    def handwriting_enabled(self) -> bool:
+        """True = Handschrift-PSM-Hook — 2.6.17."""
+        return bool(getattr(self, "handwriting_check", None) and self.handwriting_check.isChecked())
+
+    def handwriting_psm_value(self) -> int:
+        from instantlensdoc.core.ocr import DEFAULT_HANDWRITING_PSM, normalize_handwriting_psm
+
+        if not hasattr(self, "handwriting_psm"):
+            return DEFAULT_HANDWRITING_PSM
+        data = self.handwriting_psm.currentData()
+        return normalize_handwriting_psm(data)
 
 
 class CsvPreviewDialog(QDialog):

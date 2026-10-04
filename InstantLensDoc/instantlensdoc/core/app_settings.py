@@ -12,7 +12,7 @@ from instantlensdoc.config import config_dir
 SETTINGS_NAME = "ui_settings.json"
 
 ThemeMode = Literal["light", "dark", "system"]
-UiLang = Literal["de", "en"]
+UiLang = Literal["de", "en", "fr", "ru", "es", "zh", "pt", "ar", "it"]
 
 DEFAULTS: dict[str, Any] = {
     "theme": "system",  # System folgen; manuell light/dark Override — 1.4.0
@@ -563,12 +563,18 @@ def set_default_open_dir(path: str | Path) -> None:
 
 
 def get_ui_lang() -> UiLang:
-    lang = str(load_settings().get("ui_lang", "de")).lower()
-    return "en" if lang.startswith("en") else "de"
+    """UI-Sprache DE/EN/FR/RU/ES/ZH/PT/AR/IT — persistiert — 2.6.17."""
+    from instantlensdoc.core.i18n import normalize_lang
+
+    lang = str(load_settings().get("ui_lang", "de") or "de")
+    return normalize_lang(lang)  # type: ignore[return-value]
 
 
 def set_ui_lang(lang: str) -> None:
-    save_settings({"ui_lang": "en" if str(lang).lower().startswith("en") else "de"})
+    """UI-Sprache speichern (9 Sprachen) — 2.6.17."""
+    from instantlensdoc.core.i18n import normalize_lang
+
+    save_settings({"ui_lang": normalize_lang(lang)})
 
 
 def get_export_jpeg_quality() -> int:

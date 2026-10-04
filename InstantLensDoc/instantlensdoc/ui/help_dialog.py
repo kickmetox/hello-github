@@ -247,6 +247,11 @@ HELP_HTML = f"""
     Rechnungsformular (generisch oder unternehmensbezogen: Firma/Adresse/USt-Id).
     Ausgabe als editierbares Word-Suite-Dokument. <b>Kein</b> freier KI-Chat
     (Stub „KI-Assistent“ bleibt getrennt) — <b>2.6.16</b></li>
+<li><b>UI-Sprache / i18n</b>: Extras → Einstellungen → <b>Oberflächensprache</b>
+    (DE/EN/FR/RU/ES/ZH/PT/AR/IT) — gesamte UI inkl. Hilfe/Info; Persistenz;
+    Arabisch RTL wo praktikabel — <b>2.6.17</b></li>
+<li><b>Handschriftenerkennung</b>: Extras → <b>Handschriftenerkennung…</b> bzw.
+    OCR-Dialog → Handschrift-Modus (Tesseract PSM) — Basis-Hook — <b>2.6.17</b></li>
 <li><b>OCR</b>: Extras → OCR (Seite/Bild) oder <b>OCR gesamtes PDF</b> (Batch mit
     <b>Sprach-Preset</b>-Combobox, Fortschritt/Abbrechen;
     Ergebnis als <b>neue Textdatei-Tab</b> <code>*-ocr.txt</code>) —
@@ -294,7 +299,9 @@ HELP_HTML = f"""
 <h3>PDF-Modul</h3>
 <p>Das Paket <code>ild_pdf</code> kann von anderen Programmen genutzt werden (pypdfium2, kein Poppler).
 Beispiel: <code>examples/ild_pdf_demo.py</code>. API: <code>ild_pdf/README.md</code>.</p>
-<p><b>Scripting 2.6.16:</b> KI-Wizards (<code>generate_ki_document</code>/<code>list_ki_wizards</code>/<code>run_ki_wizard</code>)
+<p><b>Scripting 2.6.17:</b> i18n (<code>ui-langs</code>/<code>set-ui-lang</code>/<code>tr</code>)
++ Handschrift (<code>ocr-handwriting</code>)
++ KI-Wizards (<code>generate_ki_document</code>/<code>list_ki_wizards</code>/<code>run_ki_wizard</code>)
 + OCR→Word-Suite (<code>ocr_to_word_suite</code>/<code>import_ildocr</code>)
 + Tabellen/Office-I/O (<code>create_table</code>/<code>import_table_csv</code>/<code>save_document</code>)
 + Headless-API <code>import ild</code> und CLI <code>python -m ild</code>
@@ -584,29 +591,57 @@ def create_crash_report_zip_dialog(parent=None):
 class HelpDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Hilfe")
+        from instantlensdoc.core.i18n import (
+            apply_layout_direction,
+            get_lang,
+            help_html,
+            is_rtl,
+            tr,
+        )
+
+        self.setWindowTitle(tr("help"))
         self.resize(580, 480)
+        apply_layout_direction(self)
         layout = QVBoxLayout(self)
         tabs = QTabWidget()
         browser = QTextBrowser()
-        browser.setHtml(HELP_HTML)
-        tabs.addTab(browser, "Bedienung")
+        # Lokalisierte Hilfe; Fallback auf Legacy-HELP_HTML — 2.6.17
+        html = help_html()
+        if not html or len(html) < 40:
+            html = HELP_HTML
+        if is_rtl():
+            html = f'<div dir="rtl">{html}</div>'
+        browser.setHtml(html)
+        tabs.addTab(browser, tr("help_tab_usage"))
 
+        # Features: lokalisierte Datei unter locales/ oder FEATURES.md
         features_path = ROOT / "FEATURES.md"
+        loc_feat = (
+            Path(__file__).resolve().parents[1]
+            / "locales"
+            / get_lang()
+            / "features.md"
+        )
+        # optional: docs/i18n style under package locales/{lang}.features.md
+        alt_feat = Path(__file__).resolve().parents[1] / "locales" / f"features_{get_lang()}.md"
         feat = QTextBrowser()
-        if features_path.exists():
+        if loc_feat.is_file():
+            feat.setPlainText(loc_feat.read_text(encoding="utf-8"))
+        elif alt_feat.is_file():
+            feat.setPlainText(alt_feat.read_text(encoding="utf-8"))
+        elif features_path.exists():
             feat.setPlainText(features_path.read_text(encoding="utf-8"))
         else:
-            feat.setPlainText("FEATURES.md nicht gefunden.")
-        tabs.addTab(feat, "Features")
+            feat.setPlainText(tr("features_missing"))
+        tabs.addTab(feat, tr("help_tab_features"))
         layout.addWidget(tabs)
 
         btn_row = QHBoxLayout()
-        btn_logs = QPushButton("Logordner öffnen")
+        btn_logs = QPushButton(tr("help_open_logs"))
         btn_logs.setToolTip("Crash-/App-Logordner im Dateimanager öffnen")
         btn_logs.clicked.connect(lambda: open_log_folder(self))
         btn_row.addWidget(btn_logs)
-        btn_crash = QPushButton("Crash-Report…")
+        btn_crash = QPushButton(tr("help_crash_report"))
         btn_crash.setToolTip("Logordner als ZIP speichern (Support / Diagnose)")
         btn_crash.clicked.connect(lambda: create_crash_report_zip_dialog(self))
         btn_row.addWidget(btn_crash)
@@ -637,13 +672,17 @@ class AboutDialog(QDialog):
         if not icon.isNull():
             icon_lbl.setPixmap(icon.pixmap(64, 64))
             layout.addWidget(icon_lbl)
+        from instantlensdoc.core.i18n import apply_layout_direction, tr as _tr_about
+
+        apply_layout_direction(self)
         layout.addWidget(
             QLabel(
                 f"<h2>{DISPLAY_NAME} {__series__}</h2>"
-                f"<p><b>Version</b> {__version__} · Serie <b>{__series__}</b><br>"
-                f"Hersteller: {VENDOR}<br>"
-                f"Kontakt: <a href='mailto:{CONTACT_EMAIL}'>{CONTACT_EMAIL}</a></p>"
+                f"<p><b>{_tr_about('info_version')}</b> {__version__} · Serie <b>{__series__}</b><br>"
+                f"{_tr_about('info_vendor')}: {VENDOR}<br>"
+                f"{_tr_about('info_contact')}: <a href='mailto:{CONTACT_EMAIL}'>{CONTACT_EMAIL}</a></p>"
                 f"<p>PDF-Engine: pypdfium2 / PDFium (lizenzfreundlich)</p>"
+                f"<p>{_tr_about('info_privacy')}</p>"
                 f"<p>Icon: assets/app.ico · assets/icon.png</p>"
             )
         )

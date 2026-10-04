@@ -610,12 +610,76 @@ def ocr_image_layout(
     )
 
 
+# Handschrift-Hook: Tesseract-PSM-Presets (kein separates ML-Modell) — 2.6.17
+HANDWRITING_PSM_PRESETS: Dict[str, int] = {
+    "block": 6,  # Uniform block of text
+    "line": 7,  # Single text line
+    "word": 8,  # Single word
+    "sparse": 11,  # Sparse text
+}
+DEFAULT_HANDWRITING_PSM = 6
+
+
+def normalize_handwriting_psm(psm: int | str | None) -> int:
+    """PSM 0–13 oder Preset-Name → gültiger PSM für Handschrift."""
+    if isinstance(psm, str):
+        key = psm.strip().lower()
+        if key in HANDWRITING_PSM_PRESETS:
+            return int(HANDWRITING_PSM_PRESETS[key])
+        try:
+            psm = int(key)
+        except (TypeError, ValueError):
+            return DEFAULT_HANDWRITING_PSM
+    try:
+        n = int(psm) if psm is not None else DEFAULT_HANDWRITING_PSM
+    except (TypeError, ValueError):
+        n = DEFAULT_HANDWRITING_PSM
+    return max(0, min(13, n))
+
+
+def ocr_image_handwriting(
+    source: Union[str, Path, Image.Image],
+    lang: str = "deu+eng",
+    *,
+    psm: int | str = DEFAULT_HANDWRITING_PSM,
+) -> str:
+    """
+    Basis-Handschriftenerkennung über Tesseract-PSM — 2.6.17.
+
+    Kein separates Handschrift-ML-Modell; nutzt ``--psm`` für Zeilen/Blöcke.
+    """
+    ok, msg = tesseract_available()
+    if not ok:
+        raise OcrUnavailable(msg)
+
+    import pytesseract
+
+    img = _load_image(source)
+    psm_n = normalize_handwriting_psm(psm)
+    config = f"--psm {psm_n}"
+    try:
+        text = pytesseract.image_to_string(img, lang=lang, config=config)
+        if text and str(text).strip():
+            return str(text)
+    except Exception:
+        pass
+    try:
+        return pytesseract.image_to_string(img, lang=lang, config=config)
+    except Exception:
+        try:
+            return pytesseract.image_to_string(img, lang="eng", config=config)
+        except Exception:
+            return pytesseract.image_to_string(img, lang="eng")
+
+
 def ocr_image(
     source: Union[str, Path, Image.Image],
     lang: str = "deu+eng",
     *,
     table_layout: bool = True,
     preserve_layout: bool = False,
+    handwriting: bool = False,
+    handwriting_psm: int | str = DEFAULT_HANDWRITING_PSM,
 ) -> str:
     ok, msg = tesseract_available()
     if not ok:
@@ -624,6 +688,8 @@ def ocr_image(
     import pytesseract
 
     img = _load_image(source)
+    if handwriting:
+        return ocr_image_handwriting(img, lang=lang, psm=handwriting_psm)
     if preserve_layout:
         try:
             layout = ocr_image_layout(img, lang=lang, include_hocr=False, include_tsv=False)
@@ -936,11 +1002,21 @@ def run_ocr(
     preserve_layout: bool = False,
     write_hocr: bool = True,
     write_tsv: bool = True,
+    handwriting: bool = False,
+    handwriting_psm: int | str = DEFAULT_HANDWRITING_PSM,
 ) -> OcrResult:
-    """Einheitlicher OCR-Einstieg inkl. Layout-Erhalt / CSV — 1.9.2 / 2.6.3."""
+    """Einheitlicher OCR-Einstieg inkl. Layout-Erhalt / CSV / Handschrift — 1.9.2 / 2.6.3 / 2.6.17."""
     label = source_label or (
         str(source) if isinstance(source, (str, Path)) else "Bild"
     )
+    if handwriting:
+        text = ocr_image_handwriting(source, lang=lang, psm=handwriting_psm)
+        return OcrResult(
+            text=text,
+            lang=lang,
+            mode=OcrOutputMode.EDITABLE_TEXT,
+            source_label=label + " [Handschrift]",
+        )
     if mode == OcrOutputMode.TABLE_CSV:
         delim = csv_delimiter
         bom = csv_utf8_bom
