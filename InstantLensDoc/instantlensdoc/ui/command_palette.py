@@ -262,6 +262,13 @@ def default_palette_commands() -> list[PaletteCommand]:
             "Ctrl+Alt+Shift+W",
         ),
         PaletteCommand(
+            "ki_document_wizard",
+            "Dokument erstellen… (KI-Wizard)",
+            "ki wizard formular anschreiben kaufvertrag rechnung dokument erstellen isoliert",
+            "KI",
+            "Ctrl+Alt+Shift+Q",
+        ),
+        PaletteCommand(
             "doc_tags",
             "Dokument-Tags…",
             "tags ildtags dokument label filter",

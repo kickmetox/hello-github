@@ -2,7 +2,7 @@
 
 Moderne Textverarbeitung mit PDF-Annotator, OCR-Bridge und Formulargenerator.
 
-**Version:** 2.6.15  
+**Version:** 2.6.16  
 **Hersteller:** Andreas Meyer · ame@sellerbach.de
 
 ## Quickstart (Windows)
@@ -36,6 +36,10 @@ User-Shortcuts: `.\scripts\install-ild.ps1` (inkl. Keygen) · Deinstallieren: `-
 Keygen: `run-keygen.bat` · `python -m keygen kunde@example.com` · siehe `keygen/README.md`.
 
 Nightly-Smoke: `python scripts\smoke_ild.py` · optional `--qt` · `--json` (Summary: `ok`, `checks[]`, `duration_ms`, `version`; Fail: `checks[].error` max 200…, Exit=ok). Siehe **CONTRIBUTING.md**; Workflow-Stub `.github/workflows/smoke-ild.yml` (manual only).
+
+## Neu in 2.6.16
+
+Minor nach **2.6.15**: **Isolierte KI-Dokument-Wizards** — Formular/Anschreiben/Kaufvertrag/Rechnung (generisch oder Firma/USt-Id); UI Ctrl+Alt+Shift+Q; lokal templatebasiert, optionaler LLM-Hook nur hinter dem Wizard; **kein** freier Chat. Scripting `ki-wizard`/`generate_ki_document`. Kein CMYK/Bleed/Preflight/PDF/X, kein i18n/PDF-Compare. Stubs (freier KI-Assistent) unverändert.
 
 ## Neu in 2.6.15
 

@@ -1,4 +1,4 @@
-"""Beispiel: InstantLens Doc Scripting (Python) — 2.6.15.
+"""Beispiel: InstantLens Doc Scripting (Python) — 2.6.16.
 
 Aufruf aus dem App-Root:
   python examples/ild_scripting_demo.py [pdf]
@@ -82,7 +82,7 @@ def main() -> int:
         print("csv import cols:", imp.get("cols"))
         out_docx = td_p / "demo.docx"
         try:
-            saved = ild.save_document("Hallo 2.6.15", out_docx)
+            saved = ild.save_document("Hallo 2.6.16", out_docx)
             print("save_document:", Path(saved["path"]).exists())
         except Exception as e:
             print("save_document skip:", e)
@@ -92,6 +92,13 @@ def main() -> int:
             title="Demo Word-Suite",
         )
         print("ocr_to_word_suite blocks:", ws.get("block_count"), "chars:", len(ws.get("text") or ""))
+        print("ki wizards:", [w["id"] for w in ild.list_ki_wizards()])
+        ki = ild.generate_ki_document(
+            "anschreiben",
+            fields={"betreff": "Demo-Anfrage", "anliegen": "Bitte um Rückruf."},
+            company={"firma": "Demo GmbH", "ust_id": "DE000"},
+        )
+        print("ki_wizard:", ki.get("kind"), "chars:", ki.get("char_count"))
         print("io formats export:", [f["id"] for f in ild.list_io_formats()["export"]])
         hf = ild.apply_header_footer(
             src, out=td_p / "hf.pdf", header="{title}", footer="{author}", title="Demo", author="ILD"

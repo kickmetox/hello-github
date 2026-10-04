@@ -425,6 +425,46 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--out", default=None)
     s.add_argument("--no-auto-format", action="store_true")
 
+    s = sub.add_parser(
+        "ki-wizards",
+        help="Isolierte KI-Dokument-Wizards auflisten — 2.6.16",
+    )
+
+    s = sub.add_parser(
+        "ki-wizard",
+        help="KI-Wizard: Formular/Anschreiben/Kaufvertrag/Rechnung — 2.6.16",
+    )
+    s.add_argument(
+        "kind",
+        help="formular | anschreiben | kaufvertrag | rechnung",
+    )
+    s.add_argument(
+        "--field",
+        action="append",
+        default=[],
+        metavar="KEY=VALUE",
+        help="Feld setzen (mehrfach); z.B. --field betreff=Anfrage",
+    )
+    s.add_argument(
+        "--company",
+        action="append",
+        default=[],
+        metavar="KEY=VALUE",
+        help="Unternehmensfeld (firma/adresse/ust_id/…)",
+    )
+    s.add_argument("--title", default=None)
+    s.add_argument("--out", default=None, help="Optional: Text speichern")
+    s.add_argument(
+        "--use-llm",
+        action="store_true",
+        help="Optionalen LLM-Hook nutzen (nur wenn registriert)",
+    )
+    s.add_argument(
+        "--company-mode",
+        action="store_true",
+        help="Unternehmensmodus erzwingen",
+    )
+
     return p
 
 
@@ -881,6 +921,34 @@ def run(argv: list[str] | None = None) -> int:
                 args.path,
                 auto_format=not args.no_auto_format,
                 title=args.title,
+                out=args.out,
+            )
+            _print(data, as_json=js or True)
+            return 0
+        if args.cmd == "ki-wizards":
+            data = api.list_ki_wizards()
+            _print(data, as_json=js or True)
+            return 0
+        if args.cmd == "ki-wizard":
+
+            def _kv_list(items):
+                out = {}
+                for item in items or []:
+                    if "=" not in item:
+                        raise ValueError(f"Erwarte KEY=VALUE, got {item!r}")
+                    k, v = item.split("=", 1)
+                    out[k.strip()] = v.strip()
+                return out
+
+            fields = _kv_list(args.field)
+            company = _kv_list(args.company)
+            data = api.generate_ki_document(
+                args.kind,
+                fields=fields or None,
+                company=company or None,
+                company_mode=True if args.company_mode or company else None,
+                title=args.title,
+                use_llm=bool(args.use_llm),
                 out=args.out,
             )
             _print(data, as_json=js or True)

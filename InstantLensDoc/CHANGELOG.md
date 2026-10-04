@@ -1,5 +1,22 @@
 # Changelog — InstantLens Doc
 
+## 2.6.16 — Isolierte KI-Dokument-Wizards
+
+Minor nach **2.6.15**: **Geführte KI-Standardabläufe** als isolierte User-Abfragen (kein freier Chat): **Formular**, **Anschreiben**, **Kaufvertrag**, **Rechnungsformular** — generisch oder unternehmensbezogen (Firma, Adresse, USt-Id, IBAN …). Ausgabe als editierbares InstantLens-Doc / Word-Suite-Dokument. Lokal template-/regelbasiert; optionaler LLM-Hook nur hinter dem Wizard. UI: Extras → **Dokument erstellen… (KI-Wizard)** (Ctrl+Alt+Shift+Q); Palette `ki_document_wizard`. Scripting: `ild.generate_ki_document` / `run_ki_wizard` / `list_ki_wizards` · CLI `ki-wizard` / `ki-wizards` · PowerShell `Invoke-IldKiWizard` / `New-IldDocumentWizard` / `Get-IldKiWizards`. Freier KI-Assistent-Stub unverändert getrennt. Kein CMYK/Bleed/Preflight/PDF/X, kein volles i18n, kein PDF-Compare. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie unverändert.
+
+### Neu
+- `instantlensdoc.core.ki_wizards` — Template-Generierung + optionaler `register_llm_hook`
+- UI: `KiDocumentWizardDialog`; Menü/Palette Ctrl+Alt+Shift+Q
+- ild-API/CLI/PowerShell: `ki-wizard` / `ki-wizards`
+
+### Geändert
+- Docs/Version **2.6.16**; Hilfe/Cheat-Sheet/FEATURES
+
+### Tests / Qualität
+- Version **2.6.16** (App / `ild_pdf` / ISS / Smoke / Docs); Serie **2.6**; `docs/VERSION` + `VERSION.txt`
+- Smoke: 2.6.16 CLI+Qt (ki-document-wizards)
+- Stubs: KI/Cloud/Stylus/3D/Hooks/Outline/Telemetrie unverändert markiert (freier Chat bleibt Stub)
+
 ## 2.6.15 — OCR → Word-Suite Handoff
 
 Minor nach **2.6.14**: **OCR-/Layout-OCR-Ergebnisse** (Tesseract, `*.ildocr.txt` / hOCR / TSV) als **editierbares Word-Suite-Dokument** übernehmen — nicht nur Sidecar-Anzeige. Lesereihenfolge/Blöcke bleiben so weit praktikabel erhalten; anschließend Formatierung/Export mit den Tools aus 2.6.10–2.6.14. UI: Extras → **In Word-Suite öffnen/übernehmen…** (Ctrl+Alt+Shift+W), Checkbox im OCR- und Scan-Dialog. Scripting: `ild.ocr_to_word_suite` / `import_ildocr` / `handoff_ocr_to_word_suite` · CLI `ocr-word-suite` / `import-ildocr` · PowerShell `Invoke-IldOcrWordSuite` / `Import-IldOcr`. Kein CMYK/Bleed/Preflight/PDF/X, kein volles i18n, keine KI-Wizards, kein PDF-Compare. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie unverändert.

@@ -1,5 +1,5 @@
 """
-Stabiles Scripting-API für InstantLens Doc (2.6.15).
+Stabiles Scripting-API für InstantLens Doc (2.6.16).
 
 Headless, ohne GUI. Nutzt ``ild_pdf`` + Lizenz/OCR der App.
 
@@ -23,6 +23,8 @@ Headless, ohne GUI. Nutzt ``ild_pdf`` + Lizenz/OCR der App.
     ild.save_document("Hallo", "out.docx")
     ild.ocr_to_word_suite("scan.png")
     ild.import_ildocr("scan.ildocr.txt")
+    ild.list_ki_wizards()
+    ild.generate_ki_document("anschreiben", fields={"betreff": "Anfrage"})
 
 CLI: ``python -m ild --help`` · PowerShell: ``scripts\\ild.ps1``.
 """
@@ -91,6 +93,9 @@ from ild.api import (
     ocr_to_word_suite,
     handoff_ocr_to_word_suite,
     import_ildocr,
+    list_ki_wizards,
+    generate_ki_document,
+    run_ki_wizard,
     open_info,
     outline_summary,
     page_count,
@@ -119,6 +124,9 @@ __all__ = [
     "ocr_to_word_suite",
     "handoff_ocr_to_word_suite",
     "import_ildocr",
+    "list_ki_wizards",
+    "generate_ki_document",
+    "run_ki_wizard",
     "add_redaction",
     "apply_redactions",
     "add_shape",

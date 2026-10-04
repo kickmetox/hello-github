@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Nightly/CI Smoke: CLI + Import-Checks für InstantLens Doc — 2.1.0–2.6.15.
+"""Nightly/CI Smoke: CLI + Import-Checks für InstantLens Doc — 2.1.0–2.6.16.
 
 Leichtgewichtig. Exit-Codes:
   0  OK  (ok=true)
@@ -14,12 +14,12 @@ Aufruf:
   python scripts/smoke_ild.py -h
 
 JSON-Schema (--json), Erfolg:
-  {"ok": true, "version": "2.6.15", "duration_ms": 1234,
+  {"ok": true, "version": "2.6.16", "duration_ms": 1234,
    "checks": ["version", "imports", "cli", "measure_diff_import", "changelog"]}
 
 JSON bei Fail: checks[] enthält Objekt mit error-Text (max 200 Zeichen, Truncate …);
 Exitcode spiegelt ok (0↔true, 1↔false) — 2.2.0:
-  {"ok": false, "version": "2.6.15", "duration_ms": 12,
+  {"ok": false, "version": "2.6.16", "duration_ms": 12,
    "checks": ["version", {"name": "imports", "error": "import x: …"}]}
 """
 
@@ -41,7 +41,7 @@ if str(ROOT) not in sys.path:
 # Headless/CI: Qt ohne Display
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-EXPECTED_VERSION = "2.6.15"
+EXPECTED_VERSION = "2.6.16"
 FAIL_ERROR_MAX_LEN = 200
 
 EXIT_OK = 0
@@ -82,7 +82,7 @@ def check_version() -> None:
         _fail(f"docs/VERSION={docs_ver!r}")
     bw = (ROOT / "build-windows.ps1").read_text(encoding="utf-8")
     if EXPECTED_VERSION not in bw or "Allow32Bit" not in bw:
-        _fail("build-windows.ps1 fehlt 2.6.15/Allow32Bit")
+        _fail("build-windows.ps1 fehlt 2.6.16/Allow32Bit")
     if not (ROOT / "scripts" / "pack-windows-runnable.py").is_file():
         _fail("scripts/pack-windows-runnable.py fehlt")
     if not (ROOT / "run-keygen.bat").is_file():
@@ -107,6 +107,7 @@ def check_imports(*, with_qt: bool) -> None:
         "instantlensdoc.core.app_settings",
         "instantlensdoc.core.text_diff",
         "instantlensdoc.core.ocr_word_suite",
+        "instantlensdoc.core.ki_wizards",
         "ild",
         "ild.api",
     ]
@@ -345,6 +346,9 @@ def check_imports(*, with_qt: bool) -> None:
             "_ocr_word_suite_action",
             "Ctrl+Alt+Shift+W",
             "In Word-Suite öffnen/übernehmen",
+            "_ki_document_wizard_action",
+            "Ctrl+Alt+Shift+Q",
+            "Dokument erstellen… (KI-Wizard)",
         ),
         ROOT / "ild" / "__main__.py": (
             "license",
@@ -357,6 +361,8 @@ def check_imports(*, with_qt: bool) -> None:
             "stamp-list",
             "ocr-word-suite",
             "import-ildocr",
+            "ki-wizard",
+            "ki-wizards",
         ),
         ROOT / "instantlensdoc" / "ui" / "help_dialog.py": (
             "python -m ild",
@@ -726,6 +732,8 @@ def check_measure_and_diff() -> None:
 
 def check_changelog() -> None:
     cl = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    if "## 2.6.16" not in cl:
+        _fail("CHANGELOG fehlt ## 2.6.16")
     if "## 2.6.15" not in cl:
         _fail("CHANGELOG fehlt ## 2.6.15")
     if "## 2.6.13" not in cl:
@@ -1111,6 +1119,16 @@ def check_changelog() -> None:
     ):
         _fail("CHANGELOG 2.6.15 fehlt OCR→Word-Suite-Hinweis")
     if (
+        "KI-Wizard" not in cl
+        and "KI-Wizards" not in cl
+        and "Dokument erstellen" not in cl
+        and "generate_ki_document" not in cl
+        and "Anschreiben" not in cl
+        and "Kaufvertrag" not in cl
+        and "2.6.16" not in cl
+    ):
+        _fail("CHANGELOG 2.6.16 fehlt KI-Wizard-Hinweis")
+    if (
         "Open-Fail" not in cl
         and "HexAll" not in cl
         and "Ctrl+Shift+C" not in cl
@@ -1233,8 +1251,8 @@ def check_changelog() -> None:
     if "## 2.2.0" not in cl:
         _fail("CHANGELOG fehlt ## 2.2.0")
     feat = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
-    if "2.6.15" not in feat:
-        _fail("FEATURES.md fehlt 2.6.15")
+    if "2.6.16" not in feat:
+        _fail("FEATURES.md fehlt 2.6.16")
     if "2.6.13" not in feat:
         _fail("FEATURES.md fehlt 2.6.13")
     if (
@@ -1273,6 +1291,13 @@ def check_changelog() -> None:
         and "ocr_to_word_suite" not in feat
     ):
         _fail("FEATURES.md fehlt 2.6.15 OCR→Word-Suite")
+    if (
+        "KI-Dokument-Wizards" not in feat
+        and "KI-Wizard" not in feat
+        and "generate_ki_document" not in feat
+        and "Dokument erstellen" not in feat
+    ):
+        _fail("FEATURES.md fehlt 2.6.16 KI-Wizards")
     if "Automatische Formatierung" not in feat and "Systemschriften" not in feat:
         _fail("FEATURES.md fehlt 2.6.10 Auto-Format/Fonts")
     if "2.6.10" not in feat:
@@ -1711,11 +1736,11 @@ Exit-Codes:
 Laufzeit: am Ende als „Laufzeit: N ms“ (oder duration_ms im JSON).
 
 Beispiel --json (Erfolg):
-  {"ok": true, "version": "2.6.15", "duration_ms": 1234,
+  {"ok": true, "version": "2.6.16", "duration_ms": 1234,
    "checks": ["version", "imports", "cli", "measure_diff_import", "changelog"]}
 
 Beispiel --json (Fail):
-  {"ok": false, "version": "2.6.15", "duration_ms": 12,
+  {"ok": false, "version": "2.6.16", "duration_ms": 12,
    "checks": ["version", {"name": "imports", "error": "import x: …"}]}
 """.rstrip()
     )

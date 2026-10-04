@@ -571,6 +571,59 @@ function Import-IldOcr {
     Invoke-Ild @a | Out-Host
 }
 
+function Get-IldKiWizards {
+    Invoke-Ild @("--json", "ki-wizards") | Out-Host
+}
+
+function Invoke-IldKiWizard {
+    param(
+        [Parameter(Mandatory = $true)][ValidateSet("formular", "anschreiben", "kaufvertrag", "rechnung")]
+        [string]$Kind,
+        [hashtable]$Fields,
+        [hashtable]$Company,
+        [string]$Title,
+        [string]$Out,
+        [switch]$UseLlm,
+        [switch]$CompanyMode
+    )
+    $a = @("--json", "ki-wizard", $Kind)
+    if ($Fields) {
+        foreach ($k in $Fields.Keys) { $a += @("--field", ("{0}={1}" -f $k, $Fields[$k])) }
+    }
+    if ($Company) {
+        foreach ($k in $Company.Keys) { $a += @("--company", ("{0}={1}" -f $k, $Company[$k])) }
+    }
+    if ($Title) { $a += @("--title", $Title) }
+    if ($Out) { $a += @("--out", $Out) }
+    if ($UseLlm) { $a += "--use-llm" }
+    if ($CompanyMode) { $a += "--company-mode" }
+    Invoke-Ild @a | Out-Host
+}
+
+function New-IldDocumentWizard {
+    # Alias für Invoke-IldKiWizard — 2.6.16
+    param(
+        [Parameter(Mandatory = $true)][ValidateSet("formular", "anschreiben", "kaufvertrag", "rechnung")]
+        [string]$Kind,
+        [hashtable]$Fields,
+        [hashtable]$Company,
+        [string]$Title,
+        [string]$Out,
+        [switch]$UseLlm,
+        [switch]$CompanyMode
+    )
+    $p = @{
+        Kind = $Kind
+    }
+    if ($Fields) { $p.Fields = $Fields }
+    if ($Company) { $p.Company = $Company }
+    if ($Title) { $p.Title = $Title }
+    if ($Out) { $p.Out = $Out }
+    if ($UseLlm) { $p.UseLlm = $true }
+    if ($CompanyMode) { $p.CompanyMode = $true }
+    Invoke-IldKiWizard @p
+}
+
 function Merge-IldPdf {
     param(
         [Parameter(Mandatory = $true)][string[]]$Path,

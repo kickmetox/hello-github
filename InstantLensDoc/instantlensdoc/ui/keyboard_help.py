@@ -171,6 +171,7 @@ SHORTCUTS_HTML = """
 <tr><td>Typografie 2.6.13</td><td>Tracking/Kerning/Leading · Absatz-/Zeichenstile · Textumfluss · Silbentrennung DE/EN · Drop Caps · <code>ild.apply_typography</code>/<code>hyphenate</code>/<code>layout_set_text_wrap</code> — <b>2.6.13</b></td></tr>
 <tr><td>Tabellen &amp; Office-I/O 2.6.14</td><td>Tabellen erstellen/formatieren/sortieren · CSV/XLSX-Import · Export DOCX/XLSX/PDF/TXT/RTF/HTML/JPG · <code>ild.create_table</code>/<code>import_table_csv</code>/<code>save_document</code> — <b>2.6.14</b></td></tr>
 <tr><td>OCR → Word-Suite</td><td><code>Ctrl+Alt+Shift+W</code> · Extras → In Word-Suite öffnen/übernehmen · <code>*.ildocr.*</code> / Layout-OCR → editierbares Dokument · <code>ild.ocr_to_word_suite</code> — <b>2.6.15</b></td></tr>
+<tr><td>KI-Dokument-Wizards</td><td><code>Ctrl+Alt+Shift+Q</code> · Extras → Dokument erstellen… · Formular/Anschreiben/Kaufvertrag/Rechnung · generisch oder Firma/USt-Id · <code>ild.generate_ki_document</code> — isoliert, kein freier Chat — <b>2.6.16</b></td></tr>
 <tr><td>Bookmarks ↔ Outlines</td><td>Fehlerdialog Retry-Zähler „Versuch k/3“; max. 3 wie Backup — 1.3.6</td></tr>
 <tr><td>Thumbnail Lazy-Load</td><td>Prefetch-Label grau wenn Lazy aus (unter Schwellwert), sonst aktiv — 1.3.6</td></tr>
 <tr><td>Alle Ann. auf Seite löschen</td><td>Bearbeiten → bei 0 Treffern Sticky-Status Statusleiste bis nächste Ann.-Aktion / Seiten-/Dokumentwechsel / Undo/Redo + i18n DE + Menü/Aktion no-op + Button disabled; Undo „N Annotationen (gefiltert)“ — 1.1.9</td></tr>
@@ -331,6 +332,7 @@ bzw. Dialog „zusammenführen / teilen / Bereich“.</p>
 <p><b>Typografie 2.6.13:</b> Tracking/Kerning/Leading · Textumfluss · Silbentrennung DE/EN · Drop Caps (Ctrl+Alt+Shift+D/H).</p>
 <p><b>Tabellen &amp; Office-I/O 2.6.14:</b> Tabellen (Ctrl+Alt+Shift+T) · CSV/Excel-Import · Speichern/Export DOCX/XLSX/PDF/TXT/RTF/HTML/JPG.</p>
 <p><b>OCR → Word-Suite 2.6.15:</b> Ctrl+Alt+Shift+W · Sidecar/Layout-OCR als editierbares Dokument · Scripting <code>ocr_to_word_suite</code>/<code>import_ildocr</code>.</p>
+<p><b>KI-Wizards 2.6.16:</b> Ctrl+Alt+Shift+Q · Formular/Anschreiben/Kaufvertrag/Rechnung · isoliert (kein freier Chat) · <code>generate_ki_document</code>/<code>list_ki_wizards</code>.</p>
 <p><b>Word-/InDesign-ähnliche Shortcuts (2.6.10/2.6.11):</b>
 <code>Ctrl+B/I/U</code> Fett/Kursiv/Unterstrichen · <code>Ctrl+S</code> Speichern ·
 <code>Ctrl+F</code> Suchen · <code>Ctrl+H</code> Ersetzen · <code>Ctrl+Z/Y</code> Undo/Redo ·

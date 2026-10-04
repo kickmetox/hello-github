@@ -1,4 +1,4 @@
-"""Headless InstantLens-Doc-Operationen für Python- und PowerShell-Scripting — 2.6.15."""
+"""Headless InstantLens-Doc-Operationen für Python- und PowerShell-Scripting — 2.6.16."""
 
 from __future__ import annotations
 
@@ -1403,6 +1403,64 @@ def handoff_ocr_to_word_suite(
         auto_format=auto_format,
         title=title,
         prefer_layout=prefer_layout,
+        out=out,
+    )
+
+
+def list_ki_wizards() -> list[dict[str, Any]]:
+    """Isolierte KI-Dokument-Wizards auflisten — 2.6.16."""
+    from instantlensdoc.core.ki_wizards import list_ki_wizards as _list
+
+    return _list()
+
+
+def generate_ki_document(
+    kind: str,
+    *,
+    fields: dict[str, Any] | None = None,
+    company: dict[str, Any] | None = None,
+    company_mode: bool | None = None,
+    title: str | None = None,
+    use_llm: bool = False,
+    out: PathLike | None = None,
+) -> dict[str, Any]:
+    """KI-Wizard: Formular/Anschreiben/Kaufvertrag/Rechnung → editierbares Dokument — 2.6.16.
+
+    Lokal templatebasiert; optionaler LLM-Hook nur bei ``use_llm=True``
+    (kein freier Chat).
+    """
+    from instantlensdoc.core.ki_wizards import generate_ki_document as _gen
+
+    doc = _gen(
+        kind,
+        fields=fields,
+        company=company,
+        company_mode=company_mode,
+        title=title,
+        use_llm=use_llm,
+        out=out,
+    )
+    return doc.to_dict()
+
+
+def run_ki_wizard(
+    kind: str,
+    *,
+    fields: dict[str, Any] | None = None,
+    company: dict[str, Any] | None = None,
+    company_mode: bool | None = None,
+    title: str | None = None,
+    use_llm: bool = False,
+    out: PathLike | None = None,
+) -> dict[str, Any]:
+    """Alias für generate_ki_document — 2.6.16."""
+    return generate_ki_document(
+        kind,
+        fields=fields,
+        company=company,
+        company_mode=company_mode,
+        title=title,
+        use_llm=use_llm,
         out=out,
     )
 

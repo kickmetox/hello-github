@@ -2907,6 +2907,15 @@ class MainWindow(QMainWindow):
         )
         a.triggered.connect(self._ocr_word_suite_action)
         m_extra.addAction(a)
+        a = QAction("Dokument erstellen… (KI-Wizard)", self)
+        a.setObjectName("actKiDocumentWizard")
+        a.setShortcut("Ctrl+Alt+Shift+Q")
+        a.setToolTip(
+            "Geführte KI-Standardabläufe: Formular, Anschreiben, Kaufvertrag, "
+            "Rechnung — isoliert, kein freier Chat — 2.6.16"
+        )
+        a.triggered.connect(self._ki_document_wizard_action)
+        m_extra.addAction(a)
         a = QAction("Formulargenerator…", self)
         a.triggered.connect(self._forms)
         m_extra.addAction(a)
@@ -10698,6 +10707,7 @@ class MainWindow(QMainWindow):
             "ocr_pdf": self._run_ocr_document,
             "ocr_region": self._run_ocr_region,
             "ocr_word_suite": self._ocr_word_suite_action,
+            "ki_document_wizard": self._ki_document_wizard_action,
             "doc_tags": self._edit_doc_tags,
             "true_redact": lambda: self.pdf_view.apply_true_redactions()
             if hasattr(self.pdf_view, "apply_true_redactions")
@@ -14172,6 +14182,47 @@ class MainWindow(QMainWindow):
         except Exception:
             pass
         return True
+
+    def _open_ki_wizard_document(self, doc_ws) -> bool:
+        """Wizard-Ergebnis als editierbares Word-Suite-/Editor-Dokument öffnen — 2.6.16."""
+        if doc_ws is None:
+            return False
+        body = getattr(doc_ws, "text", None) or ""
+        if isinstance(doc_ws, dict):
+            body = doc_ws.get("text") or ""
+            tab_title = doc_ws.get("title") or "Word-Suite — KI-Wizard"
+        else:
+            tab_title = getattr(doc_ws, "title", None) or "Word-Suite — KI-Wizard"
+        self.stack.setCurrentWidget(self.editor_pane)
+        self.editor.setPlainText(body)
+        self.doc = Document(kind=DocKind.MARKDOWN, title=tab_title, text=body)
+        self.setWindowTitle(self._app_title(tab_title))
+        self._last_ki_wizard_doc = doc_ws
+        kind = getattr(doc_ws, "kind", None) or (
+            doc_ws.get("kind") if isinstance(doc_ws, dict) else ""
+        )
+        mode = getattr(doc_ws, "mode", None) or (
+            doc_ws.get("mode") if isinstance(doc_ws, dict) else "template"
+        )
+        self._set_status(
+            f"KI-Wizard: {tab_title} · {kind} · {mode} · {len(body.split())} Wörter"
+        )
+        try:
+            from instantlensdoc.core.plugin_hooks import emit as emit_hook
+
+            emit_hook("ki.wizard", kind=kind, mode=mode)
+        except Exception:
+            pass
+        return True
+
+    def _ki_document_wizard_action(self) -> None:
+        """Extras/Palette: isolierter KI-Dokument-Wizard — 2.6.16."""
+        from instantlensdoc.ui.ki_wizard_dialog import run_ki_document_wizard
+
+        doc_ws = run_ki_document_wizard(self)
+        if doc_ws is None:
+            return
+        self._open_ki_wizard_document(doc_ws)
 
     def _ocr_word_suite_action(self) -> None:
         """Menü/Palette: Sidecar wählen oder letztes OCR → Word-Suite — 2.6.15."""

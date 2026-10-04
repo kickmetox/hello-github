@@ -242,6 +242,11 @@ HELP_HTML = f"""
     (Ctrl+Alt+Shift+W) — Layout-OCR / <code>*.ildocr.*</code>-Sidecar als editierbares
     Dokument (Blöcke/Lesereihenfolge); weiterformatieren/exportieren mit Tools 2.6.10–2.6.14 —
     <b>2.6.15</b></li>
+<li><b>KI-Dokument-Wizards</b>: Extras → <b>Dokument erstellen… (KI-Wizard)</b>
+    (Ctrl+Alt+Shift+Q) — geführte Abfragen für Formular, Anschreiben, Kaufvertrag,
+    Rechnungsformular (generisch oder unternehmensbezogen: Firma/Adresse/USt-Id).
+    Ausgabe als editierbares Word-Suite-Dokument. <b>Kein</b> freier KI-Chat
+    (Stub „KI-Assistent“ bleibt getrennt) — <b>2.6.16</b></li>
 <li><b>OCR</b>: Extras → OCR (Seite/Bild) oder <b>OCR gesamtes PDF</b> (Batch mit
     <b>Sprach-Preset</b>-Combobox, Fortschritt/Abbrechen;
     Ergebnis als <b>neue Textdatei-Tab</b> <code>*-ocr.txt</code>) —
@@ -289,7 +294,8 @@ HELP_HTML = f"""
 <h3>PDF-Modul</h3>
 <p>Das Paket <code>ild_pdf</code> kann von anderen Programmen genutzt werden (pypdfium2, kein Poppler).
 Beispiel: <code>examples/ild_pdf_demo.py</code>. API: <code>ild_pdf/README.md</code>.</p>
-<p><b>Scripting 2.6.15:</b> OCR→Word-Suite (<code>ocr_to_word_suite</code>/<code>import_ildocr</code>)
+<p><b>Scripting 2.6.16:</b> KI-Wizards (<code>generate_ki_document</code>/<code>list_ki_wizards</code>/<code>run_ki_wizard</code>)
++ OCR→Word-Suite (<code>ocr_to_word_suite</code>/<code>import_ildocr</code>)
 + Tabellen/Office-I/O (<code>create_table</code>/<code>import_table_csv</code>/<code>save_document</code>)
 + Headless-API <code>import ild</code> und CLI <code>python -m ild</code>
 (Typografie/Silbentrennung/Textumfluss: <code>apply_typography</code>/<code>hyphenate</code>/<code>layout_set_text_wrap</code>)

@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **2.6.15** |
+| Version | **2.6.16** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -33,7 +33,7 @@
 
 Skript: [sync-ild.ps1](scripts/sync-ild.ps1) — Branch `cursor/instantlensdoc-2108` (oder `-LocalPack` / Pack-Zip) nach `D:\AI_Temp\InstantLensDoc`, pip, Start. **Nutzer-Icon in `assets` wird nicht überschrieben.**
 
-**FEATURES.md lokal sync:** Nach Sync liegt `FEATURES.md` lokal im App-Ordner (`D:\AI_Temp\InstantLensDoc\FEATURES.md`); About/Stubs öffnen diese lokale Datei — Version **2.6.15**.
+**FEATURES.md lokal sync:** Nach Sync liegt `FEATURES.md` lokal im App-Ordner (`D:\AI_Temp\InstantLensDoc\FEATURES.md`); About/Stubs öffnen diese lokale Datei — Version **2.6.16**.
 
 Ohne Start: `-NoStart` (Alias `-SkipStart`). Exit-Codes: **0** OK · **1** allgemein · **2** Git-Fehler.
 
@@ -81,6 +81,18 @@ python -m keygen --verify "ILD1...."
 ```
 
 Trial 28 Tage · Keys 32 Tage (HMAC `ILD1.…`). Details: `keygen/README.md`.
+
+## Neu in 2.6.16
+
+Minor nach **2.6.15** (isolierte KI-Dokument-Wizards):
+
+- **KI-Wizards:** Formular, Anschreiben, Kaufvertrag, Rechnungsformular — geführte Abfragen
+- Generisch oder unternehmensbezogen (Firma, Adresse, USt-Id, IBAN …)
+- UI: Extras → **Dokument erstellen… (KI-Wizard)** (Ctrl+Alt+Shift+Q); kein freier Chat
+- Lokal templatebasiert; optionaler LLM-Hook nur hinter dem Wizard
+- Scripting: `ild.generate_ki_document` / `list_ki_wizards` · CLI `ki-wizard` · PS `Invoke-IldKiWizard`
+- Kein CMYK/Bleed/Preflight/PDF/X, kein volles i18n, kein PDF-Compare
+- Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie unverändert (freier Assistent bleibt Stub)
 
 ## Neu in 2.6.15
 
