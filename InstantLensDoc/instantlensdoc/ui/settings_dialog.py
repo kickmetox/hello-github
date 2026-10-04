@@ -2831,7 +2831,7 @@ class SettingsDialog(QDialog):
             self.btn_undo_factory_presets.setEnabled(bool(prev))
 
     def eventFilter(self, obj, event):  # noqa: N802
-        """Swatch L→Hex · M→Highlight · R→HL/Stift/Notiz — 2.5.9–2.5.11."""
+        """Swatch L→Hex · M→HL · Shift+M→Stift · Ctrl+M→Notiz · R→Menü — 2.5.9–2.5.12."""
         labels = getattr(self, "_theme_swatch_labels", None) or []
         if obj in labels and event.type() == QEvent.MouseButtonPress:
             btn = getattr(event, "button", lambda: None)()
@@ -2842,8 +2842,14 @@ class SettingsDialog(QDialog):
                 self._copy_single_theme_hex(hex_c)
                 return True
             if btn == Qt.MiddleButton:
-                # Mittelklick: sofort Highlight-Farbe — 2.5.11
-                self._apply_swatch_as_tool_color(hex_c, "highlight")
+                # Mittelklick: HL · Shift→Stift · Ctrl→Notiz — 2.5.11/2.5.12
+                mods = event.modifiers()
+                if bool(mods & Qt.ShiftModifier):
+                    self._apply_swatch_as_tool_color(hex_c, "pen")
+                elif bool(mods & Qt.ControlModifier):
+                    self._apply_swatch_as_tool_color(hex_c, "note")
+                else:
+                    self._apply_swatch_as_tool_color(hex_c, "highlight")
                 return True
             if btn == Qt.RightButton:
                 self._show_theme_swatch_menu(obj, hex_c)
@@ -2938,7 +2944,8 @@ class SettingsDialog(QDialog):
                 )
                 sw.setToolTip(
                     f"{name}: {c} · Klick = Hex · Mittelklick = Highlight · "
-                    f"RMB = HL/Stift/Notiz — 2.5.11"
+                    f"Shift+Mittelklick = Stift · Ctrl+Mittelklick = Notiz · "
+                    f"RMB = HL/Stift/Notiz — 2.5.12"
                 )
                 sw.setProperty("themeHex", str(c))
                 sw.setCursor(Qt.PointingHandCursor)
@@ -2962,7 +2969,7 @@ class SettingsDialog(QDialog):
                 extra = " · Default" if name == default else ""
                 hint.setText(
                     f"{name}: {len(colors)} Farben{extra} · {count_txt} · "
-                    "Klick=Hex · RMB=HL/Stift/Notiz"
+                    "Klick=Hex · Mid=HL · Shift+Mid=Stift · Ctrl+Mid=Notiz"
                 )
             elif default:
                 hint.setText(f"Default: {default} · {count_txt}")

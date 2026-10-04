@@ -1,5 +1,20 @@
 # Changelog — InstantLens Doc
 
+## 2.5.12 — OCR Enter→Tab, Theme Mid-Stift/Notiz, ildtags F2, Export Ctrl+Enter
+
+Post-Release-Polish nach **2.5.11**: **OCR-Region** Status-**Enter → Ergebnis-Tab**; **Farben-Themes** Swatch-**Shift+Mittelklick → Stift** · **Ctrl+Mittelklick → Notiz**; **ildtags** **F2 Tag hinzufügen**; **Export-Presets** **Ctrl+Enter Anwenden ohne Schließen**. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie klar markiert / nicht produktiv (Ink ≠ Stylus).
+
+### Geändert
+- OCR-Region: Enter → Ergebnis-Tab fokussieren
+- Farben-Themes: Shift+Mittelklick → Stift · Ctrl+Mittelklick → Notiz
+- Dokument-Tags: F2 Tag hinzufügen (Recent)
+- Export-Presets: Ctrl+Enter Anwenden ohne Schließen
+
+### Tests / Qualität
+- Version **2.5.12** (App / `ild_pdf` / ISS / Smoke / Docs); Serie **2.5**; `docs/VERSION` + `VERSION.txt`
+- Smoke: 2.5.12 CLI + Qt (OCR Enter-Tab, Theme Mid-Stift/Notiz, ildtags F2, Export Ctrl+Enter)
+- Stubs: KI/Cloud/Stylus/3D/Hooks/Outline/Telemetrie unverändert markiert
+
 ## 2.5.11 — OCR Esc-Dismiss, Theme Swatch-Mittelklick, ildtags Shift+Entf, Export Ctrl+D
 
 Post-Release-Polish nach **2.5.10**: **OCR-Region** Status-**Esc / Menü „Status schließen“**; **Farben-Themes** Swatch-**Mittelklick → Highlight**; **ildtags** **Shift+Entf** Alle Tags entfernen; **Export-Presets** **Ctrl+D Duplizieren**. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie klar markiert / nicht produktiv (Ink ≠ Stylus).

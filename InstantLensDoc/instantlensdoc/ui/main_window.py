@@ -4092,6 +4092,12 @@ class MainWindow(QMainWindow):
                 if self._dismiss_ocr_region_status():
                     event.accept()
                     return
+        # OCR-Region Status: Enter → Ergebnis-Tab — 2.5.12
+        if event.key() in (Qt.Key_Return, Qt.Key_Enter):
+            if getattr(self, "_ocr_region_toast_active", False):
+                if self._focus_ocr_region_result_tab():
+                    event.accept()
+                    return
         super().keyPressEvent(event)
 
     def _duplicate_current(self):
@@ -11654,7 +11660,7 @@ class MainWindow(QMainWindow):
         info = QLabel(
             f"Benannte Presets ({len(profiles)}/{EXPORT_PROFILES_MAX}). "
             "★ aktiv · RMB Zielordner · Summary/Pfad · F2 Umbenennen · "
-            "Ctrl+D Duplizieren · Entf · Doppelklick Anwenden."
+            "Ctrl+D Duplizieren · Ctrl+Enter Anwenden (offen) · Entf · Doppelklick Anwenden."
         )
         lay.addWidget(info)
         lst = QListWidget()
@@ -11662,8 +11668,8 @@ class MainWindow(QMainWindow):
             "★ = aktives Preset · Listen-Tooltip Summary DPI/Format/Pfad · "
             "Rechtsklick → Zielordner / Summary / Pfad kopieren · "
             "Ctrl+C Summary · Ctrl+Shift+C Pfad · F2 Umbenennen · "
-            "Ctrl+D Duplizieren · Entf löschen · "
-            "Doppelklick/Enter Anwenden — 2.5.11"
+            "Ctrl+D Duplizieren · Ctrl+Enter Anwenden ohne Schließen · Entf löschen · "
+            "Doppelklick/Enter Anwenden — 2.5.12"
         )
         lst.setContextMenuPolicy(Qt.CustomContextMenu)
         active = {"name": get_active_export_profile_name()}
@@ -11760,7 +11766,7 @@ class MainWindow(QMainWindow):
         buttons.accepted.connect(dlg.accept)
         lay.addWidget(buttons)
 
-        def _apply() -> None:
+        def _apply(*, close: bool = True) -> None:
             item = lst.currentItem()
             if item is None:
                 return
@@ -11776,7 +11782,17 @@ class MainWindow(QMainWindow):
                 self._announce_status_toast(msg)
             except Exception:
                 pass
-            dlg.accept()
+            if close:
+                dlg.accept()
+            else:
+                # Ctrl+Enter: ★ setzen, Dialog bleibt offen — 2.5.12
+                _reload_list()
+                for i in range(lst.count()):
+                    it = lst.item(i)
+                    if it and _item_name(it) == str(profile["name"]):
+                        lst.setCurrentItem(it)
+                        break
+                _refresh_summary()
 
         def _duplicate() -> None:
             item = lst.currentItem()
@@ -12033,6 +12049,7 @@ class MainWindow(QMainWindow):
             act_copy = menu.addAction("Summary kopieren")
             act_copy_path = menu.addAction("Pfad kopieren")
             act_apply = menu.addAction("Anwenden")
+            act_apply_keep = menu.addAction("Anwenden (offen lassen)\tCtrl+Enter")
             act_dup = menu.addAction("Duplizieren")
             act_rename = menu.addAction("Umbenennen…")
             act_del = menu.addAction("Löschen…")
@@ -12045,6 +12062,8 @@ class MainWindow(QMainWindow):
                 _copy_path(item)
             elif chosen is act_apply:
                 _apply()
+            elif chosen is act_apply_keep:
+                _apply(close=False)
             elif chosen is act_dup:
                 _duplicate()
             elif chosen is act_rename:
@@ -12068,6 +12087,12 @@ class MainWindow(QMainWindow):
                     ):
                         # Ctrl+D Duplizieren — 2.5.11
                         _duplicate()
+                        return True
+                    if event.key() in (Qt.Key_Return, Qt.Key_Enter) and bool(
+                        event.modifiers() & Qt.ControlModifier
+                    ):
+                        # Ctrl+Enter Anwenden ohne Schließen — 2.5.12
+                        _apply(close=False)
                         return True
                     if event.key() == Qt.Key_C and bool(
                         event.modifiers() & Qt.ControlModifier
@@ -13310,14 +13335,15 @@ class MainWindow(QMainWindow):
         return preview
 
     def _ocr_region_status_tooltip(self) -> str:
-        """Status-Tooltip inkl. Textvorschau — 2.5.9–2.5.11."""
+        """Status-Tooltip inkl. Textvorschau — 2.5.9–2.5.12."""
         path = getattr(self, "_last_ocr_region_path", None) or ""
         tip = (
             "Linksklick → Ergebnis-Tab · Rechtsklick → Menü · "
             "Mittelklick/Ctrl+Klick → Pfad · "
             "Shift+Klick → Text kopieren · "
             "Alt+Klick → Datei öffnen · "
-            "Esc → Status schließen — 2.5.11"
+            "Esc → Status schließen · "
+            "Enter → Ergebnis-Tab — 2.5.12"
         )
         if path:
             tip = f"{tip}\n{path}"
