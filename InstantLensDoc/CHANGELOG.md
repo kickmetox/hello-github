@@ -1,5 +1,22 @@
 # Changelog — InstantLens Doc
 
+## 2.6.5 — Objektmanipulation (Bilder/Vektoren/Tabellen)
+
+Minor-Feature nach **2.6.4** (Zusatzanforderungen #6): **Objektmanipulation** — Bilder, Vektorgrafiken und Tabellen im Dokument verschieben, skalieren, spiegeln oder ersetzen, soweit praktisch mit dem pypdfium2/pikepdf-Stack (PageObjects transformieren + `gen_content`, Bildersatz via Jpeg/Bitmap). UI im Viewer: Werkzeug **Objekt**, Auswahlrahmen mit Handles, Ziehen = Verschieben, Ecken = Skalieren, Dialog für Flip/Ersetzen. Keine Formulare, Verschlüsselung, Office-Export, KI/Cloud. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie unverändert.
+
+### Neu
+- `ild_pdf.object_edit` — `list_page_objects` · `hit_test_object` · `move_object` · `resize_object` · `flip_object` · `replace_image_object` · `set_object_rect` · `DocumentObject` / `ObjectEditResult`
+- Viewer: Werkzeug **Objekt** · `ObjectTransformDialog` · Auswahlrahmen/Handles
+- PDF-Menü / Palette `object_edit` · Shortcut Ctrl+Alt+Shift+O
+
+### Geändert
+- Docs/Version **2.6.5**
+
+### Tests / Qualität
+- Version **2.6.5** (App / `ild_pdf` / ISS / Smoke / Docs); Serie **2.6**; `docs/VERSION` + `VERSION.txt`
+- Smoke: 2.6.5 CLI + Qt (object-edit move/resize/flip/replace + UI-Pfad)
+- Stubs: KI/Cloud/Stylus/3D/Hooks/Outline/Telemetrie unverändert markiert
+
 ## 2.6.4 — Inline-Textbearbeitung + Schriftart-/Formatabgleich
 
 Minor-Feature nach **2.6.3** (Zusatzanforderungen #5): **Inline-Textbearbeitung** — Text direkt im Dokument ändern, löschen oder hinzufügen; praktischer Reflow (Zeilenumbruch in Box-Breite) mit pypdfium2/pikepdf. **Schriftart- & Formatabgleich** erkennt Familie, Größe und Farbe des bestehenden Textes (PDFium) und mappt auf Standard-14 beim Schreiben. UI: Toolbar **Text bearbeiten**, PDF-Menü, Palette, Doppelklick auf Text (Auswahl-Modus), Auswahl → Text bearbeiten. Keine Objektmanipulation, Formulare, Verschlüsselung, Office-Export, KI/Cloud. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie unverändert.

@@ -197,7 +197,7 @@ class OcrDialog(QDialog):
         self.rb_layout = QRadioButton("Text mit Layout-Erhalt (Blöcke / Lesereihenfolge)")
         self.rb_layout.setObjectName("ocrModeLayoutPreserve")
         self.rb_layout.setToolTip(
-            "Tesseract-Blöcke in Lesereihenfolge; Sidecar *.ildocr.txt + optional hOCR/TSV — 2.6.4"
+            "Tesseract-Blöcke in Lesereihenfolge; Sidecar *.ildocr.txt + optional hOCR/TSV — 2.6.5"
         )
         self.rb_searchable = QRadioButton("Durchsuchbares Bild (PDF + Text-Sidecar)")
         self.rb_table_csv = QRadioButton("Tabelle als CSV (heuristisch)")
@@ -217,18 +217,18 @@ class OcrDialog(QDialog):
         mode_box.addWidget(self.rb_table_csv)
         form.addRow("Ausgabe", mode_box)
 
-        # Layout-Sidecars — 2.6.4
+        # Layout-Sidecars — 2.6.5
         self.layout_hocr_check = QCheckBox("hOCR Sidecar (*.ildocr.hocr)")
         self.layout_hocr_check.setObjectName("ocrLayoutHocr")
         self.layout_hocr_check.setChecked(True)
         self.layout_hocr_check.setToolTip(
-            "Tesseract hOCR mit Bounding-Boxes neben dem Text speichern — 2.6.4"
+            "Tesseract hOCR mit Bounding-Boxes neben dem Text speichern — 2.6.5"
         )
         self.layout_tsv_check = QCheckBox("TSV Sidecar (*.ildocr.tsv)")
         self.layout_tsv_check.setObjectName("ocrLayoutTsv")
         self.layout_tsv_check.setChecked(True)
         self.layout_tsv_check.setToolTip(
-            "Tesseract TSV (Wörter + Koordinaten) speichern — 2.6.4"
+            "Tesseract TSV (Wörter + Koordinaten) speichern — 2.6.5"
         )
         self._layout_opts_label = QLabel("Layout-Sidecars")
         form.addRow(self._layout_opts_label, self.layout_hocr_check)
@@ -375,7 +375,7 @@ class OcrDialog(QDialog):
             self.selected_path = path
 
     def _sync_csv_opts_visible(self, *_args) -> None:
-        """Kompatibel: leitet auf Mode-Opts um — 2.6.4."""
+        """Kompatibel: leitet auf Mode-Opts um — 2.6.5."""
         self._sync_mode_opts_visible()
 
     def _sync_mode_opts_visible(self, *_args) -> None:

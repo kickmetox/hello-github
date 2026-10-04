@@ -42,6 +42,7 @@ from PySide6.QtWidgets import (
     QToolButton,
     QVBoxLayout,
     QWidget,
+    QCheckBox,
 )
 
 from ild_pdf import (
@@ -70,6 +71,16 @@ from ild_pdf.text_edit import (
     insert_text_at,
     map_to_standard_font,
     text_span_from_selection,
+)
+from ild_pdf.object_edit import (
+    DocumentObject,
+    flip_object,
+    hit_test_object,
+    list_page_objects,
+    move_object,
+    replace_image_object,
+    resize_object,
+    set_object_rect,
 )
 from ild_pdf.pages import (
     delete_pages,
@@ -376,7 +387,7 @@ class TextOverlayEditDialog(QDialog):
 
 
 class InlineTextEditDialog(QDialog):
-    """Inline-Textbearbeitung mit erkanntem Schriftstil — 2.6.4."""
+    """Inline-Textbearbeitung mit erkanntem Schriftstil — 2.6.5."""
 
     def __init__(
         self,
@@ -395,7 +406,7 @@ class InlineTextEditDialog(QDialog):
         layout = QVBoxLayout(self)
         hint = QLabel(
             "Text ändern/löschen/hinzufügen · Zeilenumbruch in Box-Breite · "
-            "Schriftart/Größe/Farbe aus Kontext (Standard-14-Mapping) — 2.6.4"
+            "Schriftart/Größe/Farbe aus Kontext (Standard-14-Mapping) — 2.6.5"
         )
         hint.setWordWrap(True)
         hint.setObjectName("inlineTextEditHint")
@@ -454,6 +465,105 @@ class InlineTextEditDialog(QDialog):
         return self.text.toPlainText(), st
 
 
+class ObjectTransformDialog(QDialog):
+    """Objekt verschieben/skalieren/spiegeln/ersetzen — 2.6.5."""
+
+    def __init__(self, obj: DocumentObject, parent=None):
+        super().__init__(parent)
+        self.setObjectName("objectTransformDialog")
+        self.setWindowTitle(f"Objekt: {obj.label or obj.kind}")
+        self.resize(420, 320)
+        self._obj = obj
+        self._replace_path: str | None = None
+        layout = QVBoxLayout(self)
+        kind_de = {"image": "Bild", "vector": "Vektorgrafik", "table": "Tabelle"}.get(
+            obj.kind, obj.kind
+        )
+        hint = QLabel(
+            f"{kind_de} · verschieben / skalieren / spiegeln"
+            + (" / Bild ersetzen" if obj.kind == "image" else "")
+            + " — 2.6.5"
+        )
+        hint.setWordWrap(True)
+        hint.setObjectName("objectTransformHint")
+        layout.addWidget(hint)
+        form = QFormLayout()
+        self.spin_x = QDoubleSpinBox()
+        self.spin_x.setObjectName("objectTransformX")
+        self.spin_x.setRange(-10000, 10000)
+        self.spin_x.setDecimals(1)
+        self.spin_x.setValue(float(obj.x))
+        form.addRow("X (px):", self.spin_x)
+        self.spin_y = QDoubleSpinBox()
+        self.spin_y.setObjectName("objectTransformY")
+        self.spin_y.setRange(-10000, 10000)
+        self.spin_y.setDecimals(1)
+        self.spin_y.setValue(float(obj.y))
+        form.addRow("Y (px):", self.spin_y)
+        self.spin_w = QDoubleSpinBox()
+        self.spin_w.setObjectName("objectTransformW")
+        self.spin_w.setRange(4, 20000)
+        self.spin_w.setDecimals(1)
+        self.spin_w.setValue(max(float(obj.width), 4.0))
+        form.addRow("Breite:", self.spin_w)
+        self.spin_h = QDoubleSpinBox()
+        self.spin_h.setObjectName("objectTransformH")
+        self.spin_h.setRange(4, 20000)
+        self.spin_h.setDecimals(1)
+        self.spin_h.setValue(max(float(obj.height), 4.0))
+        form.addRow("Höhe:", self.spin_h)
+        self.chk_flip_h = QCheckBox("Horizontal spiegeln")
+        self.chk_flip_h.setObjectName("objectTransformFlipH")
+        self.chk_flip_v = QCheckBox("Vertikal spiegeln")
+        self.chk_flip_v.setObjectName("objectTransformFlipV")
+        form.addRow("Spiegeln:", self.chk_flip_h)
+        form.addRow("", self.chk_flip_v)
+        layout.addLayout(form)
+        if obj.kind == "image":
+            row = QHBoxLayout()
+            self.btn_replace = QPushButton("Bild ersetzen…")
+            self.btn_replace.setObjectName("objectTransformReplaceBtn")
+            self.btn_replace.clicked.connect(self._pick_replace)
+            self.replace_label = QLabel("—")
+            self.replace_label.setObjectName("objectTransformReplaceLabel")
+            self.replace_label.setWordWrap(True)
+            row.addWidget(self.btn_replace)
+            row.addWidget(self.replace_label, 1)
+            layout.addLayout(row)
+        else:
+            self.btn_replace = None
+            self.replace_label = None
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+    def _pick_replace(self) -> None:
+        from PySide6.QtWidgets import QFileDialog
+
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Ersatzbild wählen",
+            "",
+            "Bilder (*.png *.jpg *.jpeg *.bmp *.webp);;Alle (*)",
+        )
+        if path:
+            self._replace_path = path
+            if self.replace_label is not None:
+                self.replace_label.setText(Path(path).name)
+
+    def values(self) -> dict:
+        return {
+            "x": float(self.spin_x.value()),
+            "y": float(self.spin_y.value()),
+            "width": float(self.spin_w.value()),
+            "height": float(self.spin_h.value()),
+            "flip_h": bool(self.chk_flip_h.isChecked()),
+            "flip_v": bool(self.chk_flip_v.isChecked()),
+            "replace_path": self._replace_path,
+        }
+
+
 class PdfCanvas(QLabel):
     """Gerenderte PDF-Seite; Klick/Drag setzt Annotationen."""
 
@@ -462,7 +572,11 @@ class PdfCanvas(QLabel):
     ink_finished = Signal(object)  # list[(x,y)] Freihand-Polyline — 2.2.0
     text_selection_finished = Signal(float, float, float, float)  # Text-Marquee (Auswahl-Modus)
     overlay_edit_requested = Signal(str)  # ann id
-    inline_text_edit_requested = Signal(float, float)  # Klick → Inline-Edit — 2.6.4
+    inline_text_edit_requested = Signal(float, float)  # Klick → Inline-Edit — 2.6.5
+    object_edit_requested = Signal(float, float)  # Klick → Objekt wählen — 2.6.5
+    object_moved = Signal(float, float)  # dx, dy nach Drag — 2.6.5
+    object_resized = Signal(float, float)  # new w,h — 2.6.5
+    object_dialog_requested = Signal()  # Doppelklick/Enter Dialog — 2.6.5
     annotation_selected = Signal(str)  # ann id (leer = Auswahl aufheben)
     uri_link_clicked = Signal(str)  # externe http(s)-URL
     annotations_moved = Signal(list, float, float)  # ids, dx, dy
@@ -477,7 +591,12 @@ class PdfCanvas(QLabel):
         self._uri_links: list = []
         self._drag_tool: AnnotationType | None = None
         self._select_mode = False
-        self._inline_edit_mode = False  # Inline-Textbearbeitung — 2.6.4
+        self._inline_edit_mode = False  # Inline-Textbearbeitung — 2.6.5
+        self._object_edit_mode = False  # Objektmanipulation — 2.6.5
+        self._object_sel: DocumentObject | None = None
+        self._object_drag_mode: str | None = None  # move|br|None
+        self._object_drag_origin: tuple[float, float] | None = None
+        self._object_drag_delta: tuple[float, float] = (0.0, 0.0)
         self._drag_start: tuple[float, float] | None = None
         self._drag_current: tuple[float, float] | None = None
         self._ink_points: list[tuple[float, float]] | None = None  # Freihand — 2.2.0
@@ -737,14 +856,21 @@ class PdfCanvas(QLabel):
         *,
         select_mode: bool = False,
         inline_edit_mode: bool = False,
+        object_edit_mode: bool = False,
     ):
-        self._select_mode = bool(select_mode) and not inline_edit_mode
-        self._inline_edit_mode = bool(inline_edit_mode)
+        exclusive = bool(inline_edit_mode) or bool(object_edit_mode)
+        self._select_mode = bool(select_mode) and not exclusive
+        self._inline_edit_mode = bool(inline_edit_mode) and not object_edit_mode
+        self._object_edit_mode = bool(object_edit_mode) and not inline_edit_mode
         self._drag_tool = (
             tool
-            if (tool in DRAG_TYPES and not select_mode and not inline_edit_mode)
+            if (tool in DRAG_TYPES and not select_mode and not exclusive)
             else None
         )
+        if not self._object_edit_mode:
+            self._object_drag_mode = None
+            self._object_drag_origin = None
+            self._object_drag_delta = (0.0, 0.0)
         if not self._select_mode and self._move_origin is not None:
             self._move_ids = set()
             self._move_origin = None
@@ -754,6 +880,33 @@ class PdfCanvas(QLabel):
             self._text_sel_current = None
             self._ink_points = None
             self._repaint_overlay()
+
+    def set_object_selection(self, obj: DocumentObject | None) -> None:
+        """Auswahlrahmen für Objektmanipulation — 2.6.5."""
+        self._object_sel = obj
+        self._object_drag_mode = None
+        self._object_drag_origin = None
+        self._object_drag_delta = (0.0, 0.0)
+        self._repaint_overlay()
+
+    def _object_handle_rects(self, obj: DocumentObject) -> dict[str, tuple[float, float, float, float]]:
+        hs = 8.0
+        x, y, w, h = obj.x, obj.y, obj.width, obj.height
+        return {
+            "br": (x + w - hs * 0.5, y + h - hs * 0.5, hs, hs),
+            "tr": (x + w - hs * 0.5, y - hs * 0.5, hs, hs),
+            "bl": (x - hs * 0.5, y + h - hs * 0.5, hs, hs),
+            "tl": (x - hs * 0.5, y - hs * 0.5, hs, hs),
+        }
+
+    def _hit_object_handle(self, x: float, y: float) -> str | None:
+        obj = self._object_sel
+        if obj is None:
+            return None
+        for name, (hx, hy, hw, hh) in self._object_handle_rects(obj).items():
+            if hx <= x <= hx + hw and hy <= y <= hy + hh:
+                return name
+        return None
 
     def set_selected_id(self, ann_id: str | None):
         self._selected_id = ann_id
@@ -1232,6 +1385,56 @@ class PdfCanvas(QLabel):
             painter.setPen(QPen(QColor(40, 90, 200), 1, Qt.DashLine))
             painter.setBrush(Qt.NoBrush)
             painter.drawRect(int(rx), int(ry), max(int(rw), 2), max(int(rh), 2))
+        # Objektauswahl + Drag-Vorschau — 2.6.5
+        if self._object_sel is not None:
+            o = self._object_sel
+            odx, ody = (
+                self._object_drag_delta
+                if self._object_drag_mode == "move"
+                else (0.0, 0.0)
+            )
+            ox, oy, ow, oh = o.x + odx, o.y + ody, o.width, o.height
+            if self._object_drag_mode in ("br", "tr", "bl", "tl") and self._object_drag_origin:
+                # Resize-Vorschau vom Ursprung
+                rx0, ry0 = self._object_drag_origin
+                cx = rx0 + self._object_drag_delta[0]
+                cy = ry0 + self._object_drag_delta[1]
+                if self._object_drag_mode == "br":
+                    ow = max(8.0, cx - o.x)
+                    oh = max(8.0, cy - o.y)
+                    ox, oy = o.x, o.y
+                elif self._object_drag_mode == "tr":
+                    ow = max(8.0, cx - o.x)
+                    oh = max(8.0, o.y + o.height - cy)
+                    ox, oy = o.x, cy
+                elif self._object_drag_mode == "bl":
+                    ow = max(8.0, o.x + o.width - cx)
+                    oh = max(8.0, cy - o.y)
+                    ox, oy = cx, o.y
+                elif self._object_drag_mode == "tl":
+                    ow = max(8.0, o.x + o.width - cx)
+                    oh = max(8.0, o.y + o.height - cy)
+                    ox, oy = cx, cy
+            painter.setPen(QPen(QColor(16, 140, 90), 2, Qt.DashLine))
+            painter.setBrush(QColor(16, 140, 90, 28))
+            painter.drawRect(int(ox), int(oy), max(int(ow), 2), max(int(oh), 2))
+            preview = DocumentObject(
+                page=o.page,
+                index=o.index,
+                kind=o.kind,
+                x=ox,
+                y=oy,
+                width=ow,
+                height=oh,
+                label=o.label,
+            )
+            for hx, hy, hw, hh in self._object_handle_rects(preview).values():
+                painter.fillRect(
+                    int(hx), int(hy), int(hw), int(hh), QColor(16, 140, 90)
+                )
+                painter.setPen(QPen(QColor(255, 255, 255), 1))
+                painter.setBrush(Qt.NoBrush)
+                painter.drawRect(int(hx), int(hy), int(hw), int(hh))
         painter.end()
         self.setPixmap(pm)
         self.adjustSize()
@@ -1259,8 +1462,27 @@ class PdfCanvas(QLabel):
                 hit_any = self._hit_annotation(x, y)
                 self.annotation_selected.emit(hit_any.id if hit_any else "")
                 return
+        if self._object_edit_mode and event.button() == Qt.LeftButton:
+            # Handle / Move / Neu wählen — 2.6.5
+            handle = self._hit_object_handle(x, y)
+            if handle and self._object_sel is not None:
+                self._object_drag_mode = handle
+                self._object_drag_origin = (x, y)
+                self._object_drag_delta = (0.0, 0.0)
+                self.setCursor(QCursor(Qt.SizeFDiagCursor))
+                return
+            if self._object_sel is not None:
+                o = self._object_sel
+                if o.x <= x <= o.x + o.width and o.y <= y <= o.y + o.height:
+                    self._object_drag_mode = "move"
+                    self._object_drag_origin = (x, y)
+                    self._object_drag_delta = (0.0, 0.0)
+                    self.setCursor(QCursor(Qt.ClosedHandCursor))
+                    return
+            self.object_edit_requested.emit(x, y)
+            return
         if self._inline_edit_mode and event.button() == Qt.LeftButton:
-            # Annotation-Doppelpfad: Overlay zuerst, sonst nativer Text — 2.6.4
+            # Annotation-Doppelpfad: Overlay zuerst, sonst nativer Text — 2.6.5
             hit = self._hit_overlay(x, y)
             if hit:
                 self.overlay_edit_requested.emit(hit.id)
@@ -1336,6 +1558,13 @@ class PdfCanvas(QLabel):
         super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event):
+        if self._object_drag_mode is not None and self._object_drag_origin is not None:
+            pt = self._map_to_page(event)
+            if pt:
+                ox, oy = self._object_drag_origin
+                self._object_drag_delta = (pt[0] - ox, pt[1] - oy)
+                self._repaint_overlay()
+            return
         if self._move_origin is not None:
             pt = self._map_to_page(event)
             if pt:
@@ -1401,6 +1630,40 @@ class PdfCanvas(QLabel):
         super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event):
+        if self._object_drag_mode is not None and event.button() == Qt.LeftButton:
+            mode = self._object_drag_mode
+            dx, dy = self._object_drag_delta
+            origin = self._object_drag_origin
+            self._object_drag_mode = None
+            self._object_drag_origin = None
+            self._object_drag_delta = (0.0, 0.0)
+            self.unsetCursor()
+            if self._object_sel is None or origin is None:
+                self._repaint_overlay()
+                return
+            o = self._object_sel
+            if mode == "move":
+                if abs(dx) > 2 or abs(dy) > 2:
+                    self.object_moved.emit(float(dx), float(dy))
+                else:
+                    self._repaint_overlay()
+                return
+            # resize via corner
+            cx = origin[0] + dx
+            cy = origin[1] + dy
+            if mode == "br":
+                nw, nh = max(8.0, cx - o.x), max(8.0, cy - o.y)
+            elif mode == "tr":
+                nw, nh = max(8.0, cx - o.x), max(8.0, o.y + o.height - cy)
+            elif mode == "bl":
+                nw, nh = max(8.0, o.x + o.width - cx), max(8.0, cy - o.y)
+            else:
+                nw, nh = max(8.0, o.x + o.width - cx), max(8.0, o.y + o.height - cy)
+            if abs(nw - o.width) > 2 or abs(nh - o.height) > 2:
+                self.object_resized.emit(float(nw), float(nh))
+            else:
+                self._repaint_overlay()
+            return
         if self._move_origin is not None and event.button() == Qt.LeftButton:
             dx, dy = self._move_delta
             ids = list(self._move_ids)
@@ -1469,7 +1732,11 @@ class PdfCanvas(QLabel):
             if hit:
                 self.overlay_edit_requested.emit(hit.id)
                 return
-            # Doppelklick auf nativen Text → Inline-Edit (Auswahl/Inline-Modus) — 2.6.4
+            if self._object_edit_mode:
+                self.object_edit_requested.emit(pt[0], pt[1])
+                self.object_dialog_requested.emit()
+                return
+            # Doppelklick auf nativen Text → Inline-Edit (Auswahl/Inline-Modus) — 2.6.5
             if self._select_mode or self._inline_edit_mode:
                 self.inline_text_edit_requested.emit(pt[0], pt[1])
                 return
@@ -1788,13 +2055,13 @@ class PdfViewer(QWidget):
         btn_page_manage = QPushButton("Seiten…")
         btn_page_manage.setObjectName("pageManageToolbarBtn")
         btn_page_manage.setToolTip(
-            "Seitenmanagement: ordnen, einfügen, drehen, löschen, aus PDF zusammenfügen — 2.6.4"
+            "Seitenmanagement: ordnen, einfügen, drehen, löschen, aus PDF zusammenfügen — 2.6.5"
         )
         btn_page_manage.clicked.connect(self.page_manage_dialog)
         btn_scan = QPushButton("Scan…")
         btn_scan.setObjectName("scanImportToolbarBtn")
         btn_scan.setToolTip(
-            "Scannen / Import · Tesseract-OCR · Geräte lokal/Netzwerk — 2.6.4"
+            "Scannen / Import · Tesseract-OCR · Geräte lokal/Netzwerk — 2.6.5"
         )
         btn_scan.clicked.connect(self.scan_import_dialog)
         btn_save_ann = QPushButton("Annot. speichern")
@@ -1836,11 +2103,23 @@ class PdfViewer(QWidget):
         btn_inline_edit.setCheckable(True)
         btn_inline_edit.setToolTip(
             "Inline-Textbearbeitung: Klick auf Text → ändern/löschen; "
-            "leere Fläche → einfügen; Schriftart/Größe/Farbe aus Kontext — 2.6.4"
+            "leere Fläche → einfügen; Schriftart/Größe/Farbe aus Kontext — 2.6.5"
         )
         btn_inline_edit.clicked.connect(lambda checked: self._set_inline_edit_tool())
         self._tool_buttons.append(btn_inline_edit)
         toolbar.addWidget(btn_inline_edit)
+
+        btn_object_edit = QToolButton()
+        btn_object_edit.setText("Objekt")
+        btn_object_edit.setObjectName("objectEditToolbarBtn")
+        btn_object_edit.setCheckable(True)
+        btn_object_edit.setToolTip(
+            "Objektmanipulation: Bild/Vektor/Tabelle wählen · ziehen = verschieben · "
+            "Ecken = skalieren · Doppelklick = Dialog (spiegeln/ersetzen) — 2.6.5"
+        )
+        btn_object_edit.clicked.connect(lambda checked: self._set_object_edit_tool())
+        self._tool_buttons.append(btn_object_edit)
+        toolbar.addWidget(btn_object_edit)
 
         for t, label in [
             (AnnotationType.HIGHLIGHT, "Highlight"),
@@ -2282,6 +2561,10 @@ class PdfViewer(QWidget):
         self.canvas.text_selection_finished.connect(self._on_text_selection)
         self.canvas.overlay_edit_requested.connect(self._edit_overlay)
         self.canvas.inline_text_edit_requested.connect(self._on_inline_text_edit_at)
+        self.canvas.object_edit_requested.connect(self._on_object_edit_at)
+        self.canvas.object_moved.connect(self._on_object_moved)
+        self.canvas.object_resized.connect(self._on_object_resized)
+        self.canvas.object_dialog_requested.connect(self.object_transform_dialog)
         self.canvas.annotation_selected.connect(self._on_annotation_selected)
         self.canvas.uri_link_clicked.connect(self._open_uri_link)
         self.canvas.annotations_moved.connect(self._on_annotations_moved)
@@ -3639,7 +3922,7 @@ class PdfViewer(QWidget):
         return best if best is not None else (x, y)
 
     def _set_inline_edit_tool(self) -> None:
-        """Werkzeug Inline-Textbearbeitung aktivieren — 2.6.4."""
+        """Werkzeug Inline-Textbearbeitung aktivieren — 2.6.5."""
         self.tool = None
         self._pending_callout_anchor = None
         self._pending_callout_page = self.page_index
@@ -3652,10 +3935,34 @@ class PdfViewer(QWidget):
         want = "Text bearbeiten"
         for b in self._tool_buttons:
             b.setChecked(b.text() == want)
-        self.canvas.set_drag_tool(None, select_mode=False, inline_edit_mode=True)
+        self.canvas.set_drag_tool(
+            None, select_mode=False, inline_edit_mode=True, object_edit_mode=False
+        )
         self.status.emit(
             "Werkzeug: Text bearbeiten — Klick auf Text zum Ändern/Löschen; "
-            "leere Fläche zum Einfügen (Schrift aus Kontext) — 2.6.4"
+            "leere Fläche zum Einfügen (Schrift aus Kontext) — 2.6.5"
+        )
+
+    def _set_object_edit_tool(self) -> None:
+        """Werkzeug Objektmanipulation aktivieren — 2.6.5."""
+        self.tool = None
+        self._pending_callout_anchor = None
+        self._pending_callout_page = self.page_index
+        self._pending_angle = None
+        self._quick_stamp_armed = False
+        self._quick_stamp_payload = None
+        self._quick_ann_template_armed = False
+        self._quick_ann_template_id = None
+        self._quick_ann_template_name = ""
+        want = "Objekt"
+        for b in self._tool_buttons:
+            b.setChecked(b.text() == want)
+        self.canvas.set_drag_tool(
+            None, select_mode=False, inline_edit_mode=False, object_edit_mode=True
+        )
+        self.status.emit(
+            "Werkzeug: Objekt — Klick wählt Bild/Vektor/Tabelle; ziehen verschiebt; "
+            "Ecken skalieren; Doppelklick öffnet Dialog — 2.6.5"
         )
 
     def _set_tool(self, tool: AnnotationType | None):
@@ -7568,11 +7875,11 @@ class PdfViewer(QWidget):
             QMessageBox.warning(self, "Einbrennen", str(e))
 
     def _on_inline_text_edit_at(self, x: float, y: float) -> None:
-        """Klick im Inline-Edit-Modus / Doppelklick Auswahl — 2.6.4."""
+        """Klick im Inline-Edit-Modus / Doppelklick Auswahl — 2.6.5."""
         self.edit_inline_text_at(x, y)
 
     def edit_inline_text_at(self, x: float, y: float) -> bool:
-        """Text am Punkt bearbeiten oder neuen Text einfügen — 2.6.4."""
+        """Text am Punkt bearbeiten oder neuen Text einfügen — 2.6.5."""
         if not self.pdf_path:
             self.status.emit("Kein PDF geöffnet")
             return False
@@ -7607,7 +7914,7 @@ class PdfViewer(QWidget):
         return self._run_inline_text_dialog(synth, insert_mode=True)
 
     def edit_inline_text_selection(self) -> bool:
-        """Aktuelle Textauswahl inline bearbeiten — 2.6.4."""
+        """Aktuelle Textauswahl inline bearbeiten — 2.6.5."""
         if not self.pdf_path:
             self.status.emit("Kein PDF geöffnet")
             return False
@@ -7640,7 +7947,7 @@ class PdfViewer(QWidget):
         return self._run_inline_text_dialog(span, insert_mode=False)
 
     def inline_text_edit_dialog(self) -> bool:
-        """Menü/Palette: Inline-Edit starten (Auswahl oder Werkzeug) — 2.6.4."""
+        """Menü/Palette: Inline-Edit starten (Auswahl oder Werkzeug) — 2.6.5."""
         if not self.pdf_path:
             self.status.emit("Kein PDF geöffnet")
             return False
@@ -7655,7 +7962,7 @@ class PdfViewer(QWidget):
     def _run_inline_text_dialog(
         self, span: EditableTextSpan, *, insert_mode: bool
     ) -> bool:
-        """Dialog + apply_inline_text_edit / insert_text_at — 2.6.4."""
+        """Dialog + apply_inline_text_edit / insert_text_at — 2.6.5."""
         if not self.pdf_path:
             return False
         # font_size im Span ist skaliert; Dialog zeigt PDF-pt
@@ -7727,6 +8034,168 @@ class PdfViewer(QWidget):
             return True
         except Exception as e:
             QMessageBox.warning(self, "Text bearbeiten", str(e))
+            return False
+
+    def _on_object_edit_at(self, x: float, y: float) -> None:
+        """Klick im Objekt-Modus — 2.6.5."""
+        self.select_object_at(x, y)
+
+    def select_object_at(self, x: float, y: float) -> bool:
+        if not self.pdf_path:
+            self.status.emit("Kein PDF geöffnet")
+            return False
+        try:
+            obj = hit_test_object(
+                self.pdf_path, self.page_index, x, y, scale=self.scale
+            )
+        except Exception as e:
+            QMessageBox.warning(self, "Objekt", str(e))
+            return False
+        self.canvas.set_object_selection(obj)
+        if obj is None:
+            self.status.emit("Kein Objekt unter dem Klick (Bild/Vektor/Tabelle)")
+            return False
+        kind_de = {"image": "Bild", "vector": "Vektor", "table": "Tabelle"}.get(
+            obj.kind, obj.kind
+        )
+        self.status.emit(
+            f"{obj.label} ({kind_de}) gewählt — ziehen/Ecken oder Doppelklick"
+        )
+        return True
+
+    def _on_object_moved(self, dx: float, dy: float) -> None:
+        obj = getattr(self.canvas, "_object_sel", None)
+        if not self.pdf_path or obj is None:
+            return
+        try:
+            move_object(
+                self.pdf_path,
+                self.page_index,
+                obj.index,
+                dx,
+                dy,
+                scale=self.scale,
+            )
+            try:
+                from ild_pdf.render import clear_render_cache
+
+                clear_render_cache()
+            except Exception:
+                pass
+            self.refresh()
+            objs = list_page_objects(
+                self.pdf_path, self.page_index, scale=self.scale
+            )
+            sel = next((o for o in objs if o.index == obj.index), None)
+            self.canvas.set_object_selection(sel)
+            self.status.emit(f"{obj.label} verschoben ({dx:.0f},{dy:.0f})")
+        except Exception as e:
+            QMessageBox.warning(self, "Objekt verschieben", str(e))
+
+    def _on_object_resized(self, width: float, height: float) -> None:
+        obj = getattr(self.canvas, "_object_sel", None)
+        if not self.pdf_path or obj is None:
+            return
+        try:
+            resize_object(
+                self.pdf_path,
+                self.page_index,
+                obj.index,
+                width,
+                height,
+                scale=self.scale,
+                anchor="top-left",
+            )
+            try:
+                from ild_pdf.render import clear_render_cache
+
+                clear_render_cache()
+            except Exception:
+                pass
+            self.refresh()
+            objs = list_page_objects(
+                self.pdf_path, self.page_index, scale=self.scale
+            )
+            sel = next((o for o in objs if o.index == obj.index), None)
+            self.canvas.set_object_selection(sel)
+            self.status.emit(f"{obj.label} skaliert → {width:.0f}×{height:.0f}")
+        except Exception as e:
+            QMessageBox.warning(self, "Objekt skalieren", str(e))
+
+    def object_edit_dialog(self) -> bool:
+        """Menü/Palette: Objekt-Werkzeug aktivieren — 2.6.5."""
+        if not self.pdf_path:
+            self.status.emit("Kein PDF geöffnet")
+            return False
+        self._set_object_edit_tool()
+        self.status.emit(
+            "Objekt aktiv — Klick wählt; ziehen/Ecken transformieren; "
+            "Doppelklick öffnet Dialog"
+        )
+        return True
+
+    def object_transform_dialog(self) -> bool:
+        """Dialog Flip/Ersetzen/Position für aktuelle Auswahl — 2.6.5."""
+        if not self.pdf_path:
+            self.status.emit("Kein PDF geöffnet")
+            return False
+        obj = getattr(self.canvas, "_object_sel", None)
+        if obj is None:
+            self.status.emit("Kein Objekt gewählt — zuerst anklicken")
+            return False
+        dlg = ObjectTransformDialog(obj, self)
+        if dlg.exec() != QDialog.Accepted:
+            return False
+        vals = dlg.values()
+        try:
+            if (
+                abs(vals["x"] - obj.x) > 0.5
+                or abs(vals["y"] - obj.y) > 0.5
+                or abs(vals["width"] - obj.width) > 0.5
+                or abs(vals["height"] - obj.height) > 0.5
+            ):
+                set_object_rect(
+                    self.pdf_path,
+                    self.page_index,
+                    obj.index,
+                    vals["x"],
+                    vals["y"],
+                    vals["width"],
+                    vals["height"],
+                    scale=self.scale,
+                )
+            if vals["flip_h"] or vals["flip_v"]:
+                flip_object(
+                    self.pdf_path,
+                    self.page_index,
+                    obj.index,
+                    horizontal=vals["flip_h"],
+                    vertical=vals["flip_v"],
+                )
+            if vals.get("replace_path") and obj.kind == "image":
+                replace_image_object(
+                    self.pdf_path,
+                    self.page_index,
+                    obj.index,
+                    vals["replace_path"],
+                    keep_size=True,
+                )
+            try:
+                from ild_pdf.render import clear_render_cache
+
+                clear_render_cache()
+            except Exception:
+                pass
+            self.refresh()
+            objs = list_page_objects(
+                self.pdf_path, self.page_index, scale=self.scale
+            )
+            sel = next((o for o in objs if o.index == obj.index), None)
+            self.canvas.set_object_selection(sel)
+            self.status.emit(f"{obj.label} aktualisiert")
+            return True
+        except Exception as e:
+            QMessageBox.warning(self, "Objekt", str(e))
             return False
 
     def redaction_count(self) -> int:
@@ -10956,7 +11425,7 @@ class PdfViewer(QWidget):
         self.schedule_sidecar_save(force=True)
 
     def page_manage_dialog(self):
-        """Seitenmanagement-Dialog öffnen (ordnen/einfügen/drehen/löschen/zusammenfügen) — 2.6.4."""
+        """Seitenmanagement-Dialog öffnen (ordnen/einfügen/drehen/löschen/zusammenfügen) — 2.6.5."""
         if not self.pdf_path:
             QMessageBox.information(
                 self,
@@ -10969,7 +11438,7 @@ class PdfViewer(QWidget):
         PageManageDialog(self, self).exec()
 
     def scan_import_dialog(self):
-        """Scan/Import mit Tesseract-OCR + Geräteauswahl — 2.6.4."""
+        """Scan/Import mit Tesseract-OCR + Geräteauswahl — 2.6.5."""
         from instantlensdoc.ui.scan_dialog import ScanDialog
 
         parent = self.window() if hasattr(self, "window") else self
@@ -10984,7 +11453,7 @@ class PdfViewer(QWidget):
         at_index: int | None = None,
         one_based: bool = False,
     ) -> list[int]:
-        """Seiten aus anderem PDF einfügen; Annotationen remappen; Viewer neu laden — 2.6.4."""
+        """Seiten aus anderem PDF einfügen; Annotationen remappen; Viewer neu laden — 2.6.5."""
         if not self.pdf_path:
             raise ValueError("Kein PDF geöffnet")
         src = Path(source)

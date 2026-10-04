@@ -2463,6 +2463,11 @@ class MainWindow(QMainWindow):
                 "Auswahl → Text bearbeiten",
                 lambda: self.pdf_view.edit_inline_text_selection(),
             ),
+            ("Objekt bearbeiten…", lambda: self.pdf_view.object_edit_dialog()),
+            (
+                "Objekt-Dialog…",
+                lambda: self.pdf_view.object_transform_dialog(),
+            ),
             ("Seiten neu anordnen…", lambda: self.pdf_view.reorder_dialog()),
             ("Seite als Bild exportieren…", lambda: self.pdf_view.extract_page_as_image()),
             ("Seiten als Bilder exportieren…", lambda: self.pdf_view.export_pages_as_images()),
@@ -2475,28 +2480,38 @@ class MainWindow(QMainWindow):
             if title == "Seitenmanagement…":
                 a.setToolTip(
                     "Seiten ordnen (Drag), einfügen, drehen, löschen, "
-                    "aus anderem PDF zusammenfügen — 2.6.4"
+                    "aus anderem PDF zusammenfügen — 2.6.5"
                 )
                 a.setShortcut(QKeySequence("Ctrl+Shift+M"))
             if title == "Scannen / Import…":
                 a.setToolTip(
                     "Scanner oder Bilder importieren · Tesseract-OCR · "
-                    "Geräte lokal/Netzwerk — 2.6.4"
+                    "Geräte lokal/Netzwerk — 2.6.5"
                 )
                 a.setShortcut(QKeySequence("Ctrl+Alt+Shift+I"))
             if title == "Drucker & Scanner…":
                 a.setToolTip(
-                    "Lokale und Netzwerk-Drucker/Scanner auflisten · Aktualisieren — 2.6.4"
+                    "Lokale und Netzwerk-Drucker/Scanner auflisten · Aktualisieren — 2.6.5"
                 )
             if title == "Text bearbeiten…":
                 a.setToolTip(
                     "Inline-Textbearbeitung: Klick/Doppelklick auf Text · "
-                    "Schriftart/Größe/Farbe aus Kontext · Reflow — 2.6.4"
+                    "Schriftart/Größe/Farbe aus Kontext · Reflow — 2.6.5"
                 )
                 a.setShortcut(QKeySequence("Ctrl+Alt+Shift+E"))
             if title == "Auswahl → Text bearbeiten":
                 a.setToolTip(
-                    "Aktuelle Textauswahl inline ändern/löschen (Formatabgleich) — 2.6.4"
+                    "Aktuelle Textauswahl inline ändern/löschen (Formatabgleich) — 2.6.5"
+                )
+            if title == "Objekt bearbeiten…":
+                a.setToolTip(
+                    "Objektmanipulation: Bild/Vektor/Tabelle wählen, "
+                    "verschieben/skalieren/spiegeln/ersetzen — 2.6.5"
+                )
+                a.setShortcut(QKeySequence("Ctrl+Alt+Shift+O"))
+            if title == "Objekt-Dialog…":
+                a.setToolTip(
+                    "Transform-Dialog für aktuelle Objektauswahl (Flip/Ersetzen) — 2.6.5"
                 )
             a.triggered.connect(slot)
             m_pdf.addAction(a)
@@ -2618,11 +2633,11 @@ class MainWindow(QMainWindow):
             if title == "Echt schwärzen…":
                 a.setToolTip(
                     "Unwiderrufliches Schwärzen: Content-Stream/Textschicht entfernen "
-                    "+ optional Metadaten — 2.6.4"
+                    "+ optional Metadaten — 2.6.5"
                 )
             elif title == "Auswahl → Schwärzung":
                 a.setToolTip(
-                    "Textauswahl als Schwärzungs-Rechtecke markieren (Sidecar) — 2.6.4"
+                    "Textauswahl als Schwärzungs-Rechtecke markieren (Sidecar) — 2.6.5"
                 )
             a.triggered.connect(slot)
             m_pdf.addAction(a)
@@ -10141,6 +10156,12 @@ class MainWindow(QMainWindow):
             "selection_text_edit": lambda: self.pdf_view.edit_inline_text_selection()
             if hasattr(self.pdf_view, "edit_inline_text_selection")
             else None,
+            "object_edit": lambda: self.pdf_view.object_edit_dialog()
+            if hasattr(self.pdf_view, "object_edit_dialog")
+            else None,
+            "object_transform": lambda: self.pdf_view.object_transform_dialog()
+            if hasattr(self.pdf_view, "object_transform_dialog")
+            else None,
             "export": _export_menu,
             "export_page_images": lambda: self.pdf_view.export_pages_as_images()
             if hasattr(self.pdf_view, "export_pages_as_images")
@@ -12206,7 +12227,7 @@ class MainWindow(QMainWindow):
                     f"{name or '(ohne Name)'}"
                 )
                 self._set_status(msg)
-                # Fail-Path A11y Summary-Copy — 2.6.4
+                # Fail-Path A11y Summary-Copy — 2.6.5
                 try:
                     self._announce_status_toast(msg)
                 except Exception:
@@ -13223,7 +13244,7 @@ class MainWindow(QMainWindow):
         self._set_status(f"Bild eingefügt: {Path(path).name}")
 
     def _run_scan_import(self):
-        """Scan/Import-Dialog: Scanner oder Bilder · Tesseract-OCR — 2.6.4."""
+        """Scan/Import-Dialog: Scanner oder Bilder · Tesseract-OCR — 2.6.5."""
         if hasattr(self.pdf_view, "scan_import_dialog"):
             self.pdf_view.scan_import_dialog()
         else:
@@ -13232,7 +13253,7 @@ class MainWindow(QMainWindow):
             ScanDialog(self.pdf_view, self).exec()
 
     def _show_devices_dialog(self):
-        """Drucker- & Scannerliste mit Aktualisieren (lokal + Netzwerk) — 2.6.4."""
+        """Drucker- & Scannerliste mit Aktualisieren (lokal + Netzwerk) — 2.6.5."""
         from PySide6.QtWidgets import QDialogButtonBox
 
         from instantlensdoc.ui.scan_dialog import ScanDialog
@@ -13247,7 +13268,7 @@ class MainWindow(QMainWindow):
         dlg.tess_hint.setVisible(False)
         dlg.pending_label.setText(
             "Druckerliste für Druckziele · Scanner für Scan-Dialog. "
-            "Aktualisieren / Neu suchen. — 2.6.4"
+            "Aktualisieren / Neu suchen. — 2.6.5"
         )
         bbox = dlg.findChild(QDialogButtonBox)
         if bbox is not None:
@@ -13262,7 +13283,7 @@ class MainWindow(QMainWindow):
         dlg.exec()
 
     def _show_scan_ocr_text(self, text: str, title: str = "Scan-OCR") -> None:
-        """OCR-Text aus Scan/Import im Editor zeigen — 2.6.4."""
+        """OCR-Text aus Scan/Import im Editor zeigen — 2.6.5."""
         self.stack.setCurrentWidget(self.editor_pane)
         self.editor.setPlainText(text)
         self.doc = Document(kind=DocKind.TEXT, title=title, text=text)
@@ -13670,7 +13691,7 @@ class MainWindow(QMainWindow):
             "Esc → Status schließen · "
             "Enter → Ergebnis-Tab · "
             "Ctrl+C Text · Ctrl+Shift+C Pfad · "
-            "F4 → Ordner · F5 → Datei — 2.6.4"
+            "F4 → Ordner · F5 → Datei — 2.6.5"
         )
         if path:
             tip = f"{tip}\n{path}"
@@ -13740,7 +13761,7 @@ class MainWindow(QMainWindow):
         if not path:
             msg = "OCR-Region Pfad fehlt"
             self._set_status(msg)
-            # Fail-Path A11y Open-Pfad fehlt — 2.6.4
+            # Fail-Path A11y Open-Pfad fehlt — 2.6.5
             try:
                 self._announce_status_toast(msg)
             except Exception:
@@ -13782,7 +13803,7 @@ class MainWindow(QMainWindow):
         except Exception:
             msg = f"OCR-Region Tab öffnen fehlgeschlagen: {target.name}"
             self._set_status(msg)
-            # Fail-Path A11y Open-Exception — 2.6.4
+            # Fail-Path A11y Open-Exception — 2.6.5
             try:
                 self._announce_status_toast(msg)
             except Exception:
@@ -13798,7 +13819,7 @@ class MainWindow(QMainWindow):
         if not path:
             msg = "OCR-Region Pfad fehlt"
             self._set_status(msg)
-            # Fail-Path A11y Open-Pfad fehlt — 2.6.4
+            # Fail-Path A11y Open-Pfad fehlt — 2.6.5
             try:
                 self._announce_status_toast(msg)
             except Exception:
@@ -13820,7 +13841,7 @@ class MainWindow(QMainWindow):
         except Exception:
             msg = f"OCR-Region Ordner öffnen fehlgeschlagen: {folder}"
             self._set_status(msg)
-            # Fail-Path A11y Open-Exception — 2.6.4
+            # Fail-Path A11y Open-Exception — 2.6.5
             try:
                 self._announce_status_toast(msg)
             except Exception:
@@ -13836,7 +13857,7 @@ class MainWindow(QMainWindow):
         if not path:
             msg = "OCR-Region Pfad fehlt"
             self._set_status(msg)
-            # Fail-Path A11y Open-Pfad fehlt — 2.6.4
+            # Fail-Path A11y Open-Pfad fehlt — 2.6.5
             try:
                 self._announce_status_toast(msg)
             except Exception:
@@ -13857,7 +13878,7 @@ class MainWindow(QMainWindow):
         except Exception:
             msg = f"OCR-Region Datei öffnen fehlgeschlagen: {target.name}"
             self._set_status(msg)
-            # Fail-Path A11y Open-Exception — 2.6.4
+            # Fail-Path A11y Open-Exception — 2.6.5
             try:
                 self._announce_status_toast(msg)
             except Exception:

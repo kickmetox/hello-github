@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Nightly/CI Smoke: CLI + Import-Checks für InstantLens Doc — 2.1.0–2.6.4.
+"""Nightly/CI Smoke: CLI + Import-Checks für InstantLens Doc — 2.1.0–2.6.5.
 
 Leichtgewichtig. Exit-Codes:
   0  OK  (ok=true)
@@ -14,12 +14,12 @@ Aufruf:
   python scripts/smoke_ild.py -h
 
 JSON-Schema (--json), Erfolg:
-  {"ok": true, "version": "2.6.4", "duration_ms": 1234,
+  {"ok": true, "version": "2.6.5", "duration_ms": 1234,
    "checks": ["version", "imports", "cli", "measure_diff_import", "changelog"]}
 
 JSON bei Fail: checks[] enthält Objekt mit error-Text (max 200 Zeichen, Truncate …);
 Exitcode spiegelt ok (0↔true, 1↔false) — 2.2.0:
-  {"ok": false, "version": "2.6.4", "duration_ms": 12,
+  {"ok": false, "version": "2.6.5", "duration_ms": 12,
    "checks": ["version", {"name": "imports", "error": "import x: …"}]}
 """
 
@@ -41,7 +41,7 @@ if str(ROOT) not in sys.path:
 # Headless/CI: Qt ohne Display
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-EXPECTED_VERSION = "2.6.4"
+EXPECTED_VERSION = "2.6.5"
 FAIL_ERROR_MAX_LEN = 200
 
 EXIT_OK = 0
@@ -93,6 +93,7 @@ def check_imports(*, with_qt: bool) -> None:
         "ild_pdf.doc_history",
         "ild_pdf.overlay",
         "ild_pdf.text_edit",
+        "ild_pdf.object_edit",
         "ild_pdf.render",
         "instantlensdoc",
         "instantlensdoc.core.app_settings",
@@ -177,6 +178,11 @@ def check_imports(*, with_qt: bool) -> None:
             "InlineTextEditDialog",
             "edit_inline_text_at",
             "inline_text_edit_dialog",
+            "objectEditToolbarBtn",
+            "ObjectTransformDialog",
+            "object_edit_dialog",
+            "object_transform_dialog",
+            "_set_object_edit_tool",
         ),
         ROOT / "instantlensdoc" / "ui" / "page_manage_dialog.py": (
             "PageManageDialog",
@@ -234,6 +240,8 @@ def check_imports(*, with_qt: bool) -> None:
             "devices",
             "inline_text_edit",
             "selection_text_edit",
+            "object_edit",
+            "object_transform",
             "Pin-Limit erreicht",
             "Pin ersetzen",
             "Zu ersetzender Pin",
@@ -279,6 +287,9 @@ def check_imports(*, with_qt: bool) -> None:
             "Text bearbeiten…",
             "inline_text_edit",
             "Ctrl+Alt+Shift+E",
+            "Objekt bearbeiten…",
+            "object_edit",
+            "Ctrl+Alt+Shift+O",
         ),
         ROOT / "instantlensdoc" / "ui" / "password_dialog.py": (
             "compressOpenAfter",
@@ -629,8 +640,8 @@ def check_measure_and_diff() -> None:
 
 def check_changelog() -> None:
     cl = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-    if "## 2.6.4" not in cl:
-        _fail("CHANGELOG fehlt ## 2.6.4")
+    if "## 2.6.5" not in cl:
+        _fail("CHANGELOG fehlt ## 2.6.5")
     if "## 2.6.3" not in cl:
         _fail("CHANGELOG fehlt ## 2.6.3")
     if "## 2.6.2" not in cl:
@@ -917,9 +928,9 @@ def check_changelog() -> None:
         and "Textbearbeitung" not in cl
         and "Formatabgleich" not in cl
         and "Schriftart" not in cl
-        and "2.6.4" not in cl
+        and "2.6.5" not in cl
     ):
-        _fail("CHANGELOG 2.6.4 fehlt Inline-Text-Hinweis")
+        _fail("CHANGELOG 2.6.5 fehlt Inline-Text-Hinweis")
     if (
         "Open-Fail" not in cl
         and "HexAll" not in cl
@@ -1043,8 +1054,8 @@ def check_changelog() -> None:
     if "## 2.2.0" not in cl:
         _fail("CHANGELOG fehlt ## 2.2.0")
     feat = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
-    if "2.6.4" not in feat:
-        _fail("FEATURES.md fehlt 2.6.4")
+    if "2.6.5" not in feat:
+        _fail("FEATURES.md fehlt 2.6.5")
     if "2.5.17" not in feat:
         _fail("FEATURES.md fehlt 2.5.17")
     if "2.5.15" not in feat:
@@ -1254,12 +1265,12 @@ def check_changelog() -> None:
     ):
         _fail("FEATURES.md fehlt 2.6.3 Layout-OCR")
     if (
-        "2.6.4" not in feat
+        "2.6.5" not in feat
         and "Inline-Textbearbeitung" not in feat
         and "Formatabgleich" not in feat
         and "Schriftart" not in feat
     ):
-        _fail("FEATURES.md fehlt 2.6.4 Inline-Text")
+        _fail("FEATURES.md fehlt 2.6.5 Inline-Text")
     if (
         "2.5.20" not in feat
         and "Open-Fail-A11y" not in feat
@@ -1466,11 +1477,11 @@ Exit-Codes:
 Laufzeit: am Ende als „Laufzeit: N ms“ (oder duration_ms im JSON).
 
 Beispiel --json (Erfolg):
-  {"ok": true, "version": "2.6.4", "duration_ms": 1234,
+  {"ok": true, "version": "2.6.5", "duration_ms": 1234,
    "checks": ["version", "imports", "cli", "measure_diff_import", "changelog"]}
 
 Beispiel --json (Fail):
-  {"ok": false, "version": "2.6.4", "duration_ms": 12,
+  {"ok": false, "version": "2.6.5", "duration_ms": 12,
    "checks": ["version", {"name": "imports", "error": "import x: …"}]}
 """.rstrip()
     )

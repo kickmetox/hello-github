@@ -261,7 +261,7 @@ def insert_pages_from_pdf(
     one_based: bool = False,
 ) -> list[int]:
     """
-    Seiten aus einem anderen PDF in dest einfügen und speichern — 2.6.4.
+    Seiten aus einem anderen PDF in dest einfügen und speichern — 2.6.5.
 
     - ``page_indices``: 0-basiert (Reihenfolge bleibt; Duplikate werden entfernt)
     - oder ``page_spec``: z. B. ``1-3,5`` (``one_based=True`` üblich)

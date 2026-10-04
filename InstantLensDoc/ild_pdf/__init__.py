@@ -258,6 +258,17 @@ from .text_edit import (
     reflow_lines,
     text_span_from_selection,
 )
+from .object_edit import (
+    DocumentObject,
+    ObjectEditResult,
+    flip_object,
+    hit_test_object,
+    list_page_objects,
+    move_object,
+    replace_image_object,
+    resize_object,
+    set_object_rect,
+)
 
 __all__ = [
     "PdfDocument",
@@ -484,6 +495,15 @@ __all__ = [
     "reflow_lines",
     "apply_inline_text_edit",
     "insert_text_at",
+    "DocumentObject",
+    "ObjectEditResult",
+    "list_page_objects",
+    "hit_test_object",
+    "move_object",
+    "resize_object",
+    "flip_object",
+    "replace_image_object",
+    "set_object_rect",
 ]
 
-__version__ = "2.6.4"
+__version__ = "2.6.5"

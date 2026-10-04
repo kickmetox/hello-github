@@ -116,6 +116,19 @@ def default_palette_commands() -> list[PaletteCommand]:
             "auswahl text edit inline löschen ändern font",
             "PDF",
         ),
+        PaletteCommand(
+            "object_edit",
+            "Objekt bearbeiten…",
+            "objekt bild vektor tabelle verschieben skalieren spiegeln ersetzen",
+            "PDF",
+            "Ctrl+Alt+Shift+O",
+        ),
+        PaletteCommand(
+            "object_transform",
+            "Objekt-Dialog…",
+            "objekt dialog flip spiegeln ersetzen transform",
+            "PDF",
+        ),
         PaletteCommand("export", "Exportieren…", "export html docx pdf", "Datei"),
         PaletteCommand("export_page_images", "Seiten als Bilder…", "export png jpeg", "PDF"),
         PaletteCommand(
