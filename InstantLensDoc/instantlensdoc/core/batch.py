@@ -1,4 +1,4 @@
-"""Batch-Konvertierung und PDF-Stapelverarbeitung — 2.6.23.
+"""Batch-Konvertierung und PDF-Stapelverarbeitung — 2.6.24.
 
 Bilder→PDF / OCR (Bestand) plus **viele PDFs** in einem Job:
 Konvertieren (→PNG), Wasserzeichen, Komprimieren, Verschlüsseln.
@@ -27,7 +27,7 @@ class BatchMode(str, Enum):
     IMAGES_TO_PDF_EACH = "images_pdf_each"
     OCR_FOLDER = "ocr_folder"
     PDF_OCR_PAGES = "pdf_ocr_pages"
-    # PDF-Stapel — 2.6.23
+    # PDF-Stapel — 2.6.24
     PDF_CONVERT_PNG = "pdf_convert_png"
     PDF_WATERMARK = "pdf_watermark"
     PDF_COMPRESS = "pdf_compress"
@@ -35,7 +35,7 @@ class BatchMode(str, Enum):
 
 
 class PdfBatchOp(str, Enum):
-    """Einzelne Operation für ``run_pdf_batch`` — 2.6.23."""
+    """Einzelne Operation für ``run_pdf_batch`` — 2.6.24."""
 
     CONVERT = "convert"  # PDF → PNG-Seiten
     WATERMARK = "watermark"
@@ -81,7 +81,7 @@ class BatchResult:
 
 @dataclass
 class PdfBatchOptions:
-    """Optionen für PDF-Stapeljobs — 2.6.23."""
+    """Optionen für PDF-Stapeljobs — 2.6.24."""
 
     watermark_text: str = "CONFIDENTIAL"
     watermark_opacity: float = 0.25
@@ -276,7 +276,7 @@ def run_pdf_batch(
     options: PdfBatchOptions | None = None,
     progress: ProgressCb | None = None,
 ) -> BatchResult:
-    """Viele PDFs mit einer oder mehreren Ops in einem Job verarbeiten — 2.6.23.
+    """Viele PDFs mit einer oder mehreren Ops in einem Job verarbeiten — 2.6.24.
 
     Ops werden pro Datei in Reihenfolge ausgeführt (Pipeline). Zwischen-
     ergebnisse landen im Ausgabeordner; die letzte erfolgreiche Datei ist
@@ -377,7 +377,7 @@ def run_batch(
             progress(msg)
         # InterruptedError aus progress durchlassen (kein TypeError)
 
-    # PDF-Stapel-Modi → run_pdf_batch — 2.6.23
+    # PDF-Stapel-Modi → run_pdf_batch — 2.6.24
     mode_to_op = {
         BatchMode.PDF_CONVERT_PNG: PdfBatchOp.CONVERT,
         BatchMode.PDF_WATERMARK: PdfBatchOp.WATERMARK,

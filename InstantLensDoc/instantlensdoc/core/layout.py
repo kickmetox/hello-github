@@ -1,4 +1,4 @@
-"""Layout: Textrahmen, verkettete Rahmen, Bildrahmen, Move/Resize, Textumfluss, Ebenen — 2.6.19."""
+"""Layout: Textrahmen, verkettete Rahmen, Bildrahmen, Move/Resize, Textumfluss, Ebenen, Medien — 2.6.24."""
 
 from __future__ import annotations
 
@@ -16,6 +16,17 @@ TEXT_WRAP_MODES: tuple[str, ...] = ("none", "bounding_box", "jump_object", "cont
 
 # Dokument-Ebenen 2.6.19
 LAYER_NAMES: tuple[str, ...] = ("background", "images", "text")
+
+# Medienarten / Formen — 2.6.24
+MEDIA_KINDS: tuple[str, ...] = ("image", "shape", "video")
+SHAPE_KINDS: tuple[str, ...] = (
+    "rectangle",
+    "ellipse",
+    "triangle",
+    "rounded_rect",
+    "line",
+    "arrow",
+)
 
 
 def normalize_frame_layer(name: str | None, *, kind: str = "text") -> str:
@@ -102,10 +113,22 @@ class ImageFrame:
     # Textumfluss 2.6.13: none | bounding_box | jump_object | contour
     text_wrap: str = "none"
     wrap_padding: float = 8.0
-    # Form-Hinweis für contour (rechteckig / ellipse)
-    shape: str = "rectangle"  # rectangle | ellipse
+    # Form-Hinweis für contour / Shape-Rahmen
+    shape: str = "rectangle"  # rectangle | ellipse | triangle | rounded_rect | …
     # Ebenen 2.6.19
     layer: str = "images"
+    # Medien-Polish 2.6.24: crop (0–1 relativ), scale, Video-Placeholder
+    media_kind: str = "image"  # image | shape | video
+    crop_left: float = 0.0
+    crop_top: float = 0.0
+    crop_right: float = 0.0
+    crop_bottom: float = 0.0
+    scale: float = 1.0
+    video_url: str = ""
+    video_title: str = ""
+    fill_color: str = ""
+    stroke_color: str = "#333333"
+    stroke_width: float = 1.0
 
     def move(self, x: float, y: float) -> None:
         if self.locked:
@@ -118,6 +141,38 @@ class ImageFrame:
             raise ValueError(f"Rahmen {self.id} ist gesperrt")
         self.width = max(8.0, float(width))
         self.height = max(8.0, float(height))
+
+    def scale_by(self, factor: float) -> None:
+        """Gleichmäßig skalieren (Rahmenmaße) — 2.6.24."""
+        if self.locked:
+            raise ValueError(f"Rahmen {self.id} ist gesperrt")
+        f = float(factor)
+        if f <= 0:
+            raise ValueError("Skalierungsfaktor muss > 0 sein")
+        self.width = max(8.0, self.width * f)
+        self.height = max(8.0, self.height * f)
+        self.scale = max(0.01, float(self.scale or 1.0) * f)
+
+    def set_crop(
+        self,
+        left: float = 0.0,
+        top: float = 0.0,
+        right: float = 0.0,
+        bottom: float = 0.0,
+    ) -> None:
+        """Zuschneiden relativ 0–1 (Ränder vom Original) — 2.6.24."""
+        if self.locked:
+            raise ValueError(f"Rahmen {self.id} ist gesperrt")
+
+        def _clamp(v: float) -> float:
+            return max(0.0, min(0.49, float(v)))
+
+        self.crop_left = _clamp(left)
+        self.crop_top = _clamp(top)
+        self.crop_right = _clamp(right)
+        self.crop_bottom = _clamp(bottom)
+        if self.crop_left + self.crop_right >= 0.99 or self.crop_top + self.crop_bottom >= 0.99:
+            raise ValueError("Zuschneiden würde Bild vollständig entfernen")
 
     def set_text_wrap(self, mode: str, *, padding: float | None = None) -> None:
         m = (mode or "none").strip().lower()
@@ -235,10 +290,117 @@ class LayoutDocument:
             height=height,
             path=path,
             page=max(0, int(page)),
+            media_kind="image",
         )
         self.image_frames.append(frame)
         self.page_count = max(self.page_count, frame.page + 1)
         return frame
+
+    def add_shape(
+        self,
+        shape: str = "rectangle",
+        x: float = 40,
+        y: float = 300,
+        width: float = 120,
+        height: float = 80,
+        page: int = 0,
+        *,
+        fill_color: str = "#D0E8FF",
+        stroke_color: str = "#1A5276",
+        stroke_width: float = 1.5,
+        text_wrap: str = "bounding_box",
+    ) -> ImageFrame:
+        """Formrahmen (ohne Bilddatei) — 2.6.24."""
+        sk = (shape or "rectangle").strip().lower()
+        if sk not in SHAPE_KINDS:
+            raise ValueError(f"Unbekannte Form: {shape} (erlaubt: {', '.join(SHAPE_KINDS)})")
+        frame = ImageFrame(
+            x=x,
+            y=y,
+            width=width,
+            height=height,
+            path="",
+            page=max(0, int(page)),
+            shape=sk,
+            media_kind="shape",
+            fill_color=fill_color or "",
+            stroke_color=stroke_color or "#333333",
+            stroke_width=float(stroke_width),
+            text_wrap=text_wrap if text_wrap in TEXT_WRAP_MODES else "bounding_box",
+        )
+        self.image_frames.append(frame)
+        self.page_count = max(self.page_count, frame.page + 1)
+        return frame
+
+    def add_video_placeholder(
+        self,
+        url: str,
+        x: float = 40,
+        y: float = 300,
+        width: float = 320,
+        height: float = 180,
+        page: int = 0,
+        *,
+        title: str = "",
+        text_wrap: str = "bounding_box",
+    ) -> ImageFrame:
+        """Online-Video als Platzhalter mit URL (kein Embed-Player) — 2.6.24."""
+        from urllib.parse import urlparse
+
+        raw = (url or "").strip()
+        if not raw:
+            raise ValueError("Video-URL darf nicht leer sein")
+        if "://" not in raw and "." in raw:
+            raw = "https://" + raw
+        parsed = urlparse(raw)
+        if parsed.scheme not in ("http", "https") or not parsed.netloc:
+            raise ValueError("Video-URL muss http(s) sein")
+        frame = ImageFrame(
+            x=x,
+            y=y,
+            width=width,
+            height=height,
+            path="",
+            page=max(0, int(page)),
+            media_kind="video",
+            video_url=raw,
+            video_title=(title or parsed.netloc or "Video").strip(),
+            shape="rectangle",
+            fill_color="#1C1C1C",
+            stroke_color="#E74C3C",
+            stroke_width=2.0,
+            text_wrap=text_wrap if text_wrap in TEXT_WRAP_MODES else "bounding_box",
+        )
+        self.image_frames.append(frame)
+        self.page_count = max(self.page_count, frame.page + 1)
+        return frame
+
+    def scale_image(self, frame_id: str, factor: float) -> ImageFrame:
+        """Bild-/Form-/Video-Rahmen skalieren — 2.6.24."""
+        fr = self._image_frame(frame_id)
+        fr.scale_by(factor)
+        return fr
+
+    def crop_image(
+        self,
+        frame_id: str,
+        left: float = 0.0,
+        top: float = 0.0,
+        right: float = 0.0,
+        bottom: float = 0.0,
+    ) -> ImageFrame:
+        """Bild zuschneiden (relative Ränder) — 2.6.24."""
+        fr = self._image_frame(frame_id)
+        if fr.media_kind == "video":
+            raise ValueError("Video-Platzhalter können nicht zugeschnitten werden")
+        fr.set_crop(left=left, top=top, right=right, bottom=bottom)
+        return fr
+
+    def _image_frame(self, frame_id: str) -> ImageFrame:
+        for f in self.image_frames:
+            if f.id == frame_id:
+                return f
+        raise KeyError(f"Bildrahmen nicht gefunden: {frame_id}")
 
     def move_frame(self, frame_id: str, x: float, y: float) -> FrameKind:
         frame = self.any_frame_by_id(frame_id)
@@ -615,11 +777,25 @@ class LayoutDocument:
                     "wrap_padding",
                     "shape",
                     "layer",
+                    "media_kind",
+                    "crop_left",
+                    "crop_top",
+                    "crop_right",
+                    "crop_bottom",
+                    "scale",
+                    "video_url",
+                    "video_title",
+                    "fill_color",
+                    "stroke_color",
+                    "stroke_width",
                 )
                 if k in im
             }
             if "layer" in known:
                 known["layer"] = normalize_frame_layer(known["layer"], kind="image")
+            if "media_kind" in known:
+                mk = str(known["media_kind"] or "image").lower()
+                known["media_kind"] = mk if mk in MEDIA_KINDS else "image"
             doc.image_frames.append(ImageFrame(**known))
         if doc.text_frames or doc.image_frames:
             max_page = max(

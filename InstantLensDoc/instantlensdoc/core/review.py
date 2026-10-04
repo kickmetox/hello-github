@@ -1,4 +1,4 @@
-"""Lokales Review / Track Changes — ildreview-v1 Sidecar — 2.6.23.
+"""Lokales Review / Track Changes — ildreview-v1 Sidecar — 2.6.24.
 
 Protokolliert Einfügungen und Löschungen je Autor, ohne Cloud-Kollaboration.
 """

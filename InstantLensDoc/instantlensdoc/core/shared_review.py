@@ -1,4 +1,4 @@
-"""Gemeinsames Review / Shared Collaboration — ildshare-v1 — 2.6.23.
+"""Gemeinsames Review / Shared Collaboration — ildshare-v1 — 2.6.24.
 
 Praktische Kollaboration ohne Pflicht-Cloud:
 - Lokaler Freigabeordner (NAS / OneDrive / SMB / USB) mit Bundle ``session.ildshare.json``

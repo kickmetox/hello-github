@@ -1,5 +1,5 @@
 {
-  "version": "2.6.23",
+  "version": "2.6.24",
   "langs": [
     "de",
     "en",
@@ -2082,6 +2082,61 @@
       "pt": "Abrir sessão",
       "ar": "فتح الجلسة",
       "it": "Apri sessione"
+    },
+    "hyperlink": {
+      "de": "Hyperlink",
+      "en": "Hyperlink",
+      "fr": "Hyperlien",
+      "ru": "Гиперссылка",
+      "es": "Hipervínculo",
+      "zh": "超链接",
+      "pt": "Hiperligação",
+      "ar": "ارتباط تشعبي",
+      "it": "Collegamento"
+    },
+    "hyperlink_insert": {
+      "de": "Hyperlink einfügen…",
+      "en": "Insert hyperlink…",
+      "fr": "Insérer un hyperlien…",
+      "ru": "Вставить гиперссылку…",
+      "es": "Insertar hipervínculo…",
+      "zh": "插入超链接…",
+      "pt": "Inserir hiperligação…",
+      "ar": "إدراج ارتباط…",
+      "it": "Inserisci collegamento…"
+    },
+    "export_epub": {
+      "de": "Als EPUB exportieren…",
+      "en": "Export as EPUB…",
+      "fr": "Exporter en EPUB…",
+      "ru": "Экспорт в EPUB…",
+      "es": "Exportar como EPUB…",
+      "zh": "导出为 EPUB…",
+      "pt": "Exportar como EPUB…",
+      "ar": "تصدير EPUB…",
+      "it": "Esporta come EPUB…"
+    },
+    "insert_shape": {
+      "de": "Form einfügen…",
+      "en": "Insert shape…",
+      "fr": "Insérer une forme…",
+      "ru": "Вставить фигуру…",
+      "es": "Insertar forma…",
+      "zh": "插入形状…",
+      "pt": "Inserir forma…",
+      "ar": "إدراج شكل…",
+      "it": "Inserisci forma…"
+    },
+    "video_placeholder": {
+      "de": "Video-Platzhalter (URL)…",
+      "en": "Video placeholder (URL)…",
+      "fr": "Espace réservé vidéo (URL)…",
+      "ru": "Заглушка видео (URL)…",
+      "es": "Marcador de vídeo (URL)…",
+      "zh": "视频占位符（URL）…",
+      "pt": "Marcador de vídeo (URL)…",
+      "ar": "عنصر نائب للفيديو (URL)…",
+      "it": "Segnaposto video (URL)…"
     }
   },
   "phrases": {

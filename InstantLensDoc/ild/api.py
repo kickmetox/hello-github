@@ -1,7 +1,6 @@
-"""Headless InstantLens-Doc-Operationen für Python- und PowerShell-Scripting — 2.6.23.
+"""Headless InstantLens-Doc-Operationen für Python- und PowerShell-Scripting — 2.6.24.
 
-Stapelverarbeitung (PDF Convert/WM/Compress/Encrypt) · Digitale Signaturen (eIDAS) ·
-Seriendruck-Polish — lokal.
+Hyperlinks · Grafiken/Medien (Scale/Crop/Shapes/Video) · EPUB · Shared Review · Batch/eIDAS.
 """
 
 from __future__ import annotations
@@ -1306,7 +1305,7 @@ def save_document(
     fmt: str | None = None,
     title: str = "InstantLens Doc",
 ) -> dict[str, Any]:
-    """Dokument speichern/exportieren (docx/xlsx/pdf/txt/rtf/html/jpg) — 2.6.14."""
+    """Dokument speichern/exportieren (docx/xlsx/pdf/txt/rtf/html/jpg/epub) — 2.6.24."""
     from instantlensdoc.core.export import export_document
 
     dest = export_document(text, path, fmt=fmt, title=title)
@@ -2400,6 +2399,191 @@ def shared_review_info() -> dict[str, Any]:
     data = shared_review_limitations()
     data["version"] = __version__
     return data
+
+
+# --- Hyperlinks / Medien / EPUB — 2.6.24 ---
+
+
+def insert_hyperlink(
+    text: str,
+    link_text: str,
+    target: str,
+    *,
+    start: int | None = None,
+    end: int | None = None,
+    as_html: bool = False,
+) -> dict[str, Any]:
+    """Hyperlink in Text einfügen (URL oder #anker / ild://…) — 2.6.24."""
+    from instantlensdoc.core.hyperlinks import insert_link_in_text
+
+    return insert_link_in_text(
+        text, link_text, target, start=start, end=end, as_html=as_html
+    )
+
+
+def extract_hyperlinks(text: str) -> dict[str, Any]:
+    """Markdown-/HTML-Links aus Text lesen — 2.6.24."""
+    from instantlensdoc.core.hyperlinks import extract_links_from_text, hyperlink_info
+
+    links = [lk.to_dict() for lk in extract_links_from_text(text)]
+    info = hyperlink_info()
+    return {"links": links, "count": len(links), "info": info, "version": __version__}
+
+
+def resolve_hyperlink(
+    text: str,
+    target: str,
+    *,
+    bookmarks: Sequence[tuple[int, str]] | None = None,
+) -> dict[str, Any]:
+    """Internes Hyperlink-Ziel auflösen — 2.6.24."""
+    from instantlensdoc.core.hyperlinks import resolve_internal_target
+
+    data = resolve_internal_target(text, target, bookmarks=bookmarks)
+    data["version"] = __version__
+    return data
+
+
+def list_doc_anchors(text: str) -> dict[str, Any]:
+    """Überschriften-Anker für In-Dokument-Links — 2.6.24."""
+    from instantlensdoc.core.hyperlinks import list_heading_anchors
+
+    anchors = list_heading_anchors(text)
+    return {"anchors": anchors, "count": len(anchors), "version": __version__}
+
+
+def save_hyperlinks_sidecar(
+    path: PathLike,
+    text: str | None = None,
+    *,
+    links: Sequence[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    """Links als Sidecar speichern (aus Text extrahiert oder übergeben) — 2.6.24."""
+    from instantlensdoc.core.hyperlinks import (
+        extract_links_from_text,
+        save_links_sidecar,
+    )
+
+    p = _p(path)
+    if links is None:
+        body = text if text is not None else (p.read_text(encoding="utf-8") if p.is_file() else "")
+        rows = extract_links_from_text(body)
+    else:
+        rows = list(links)
+    out = save_links_sidecar(p, rows, source=p.name)
+    return {"path": str(out), "count": len(rows), "version": __version__}
+
+
+def layout_add_shape_frame(
+    layout: dict[str, Any] | None = None,
+    *,
+    shape: str = "rectangle",
+    x: float = 40,
+    y: float = 300,
+    width: float = 120,
+    height: float = 80,
+    page: int = 0,
+    fill_color: str = "#D0E8FF",
+    stroke_color: str = "#1A5276",
+    path: PathLike | None = None,
+) -> dict[str, Any]:
+    """Formrahmen ins Layout — 2.6.24."""
+    doc = _load_layout(layout, path)
+    fr = doc.add_shape(
+        shape,
+        x=float(x),
+        y=float(y),
+        width=float(width),
+        height=float(height),
+        page=int(page),
+        fill_color=fill_color,
+        stroke_color=stroke_color,
+    )
+    if path:
+        doc.save(path)
+    return {"layout": doc.to_dict(), "frame": fr.to_dict(), "version": __version__}
+
+
+def layout_add_video_placeholder(
+    layout: dict[str, Any] | None = None,
+    *,
+    url: str,
+    x: float = 40,
+    y: float = 300,
+    width: float = 320,
+    height: float = 180,
+    page: int = 0,
+    title: str = "",
+    path: PathLike | None = None,
+) -> dict[str, Any]:
+    """Online-Video-Platzhalter mit URL — 2.6.24."""
+    doc = _load_layout(layout, path)
+    fr = doc.add_video_placeholder(
+        url,
+        x=float(x),
+        y=float(y),
+        width=float(width),
+        height=float(height),
+        page=int(page),
+        title=title,
+    )
+    if path:
+        doc.save(path)
+    return {"layout": doc.to_dict(), "frame": fr.to_dict(), "version": __version__}
+
+
+def layout_scale_image(
+    frame_id: str,
+    factor: float,
+    *,
+    layout: dict[str, Any] | None = None,
+    path: PathLike | None = None,
+) -> dict[str, Any]:
+    """Bild-/Formrahmen skalieren — 2.6.24."""
+    doc = _load_layout(layout, path)
+    fr = doc.scale_image(frame_id, float(factor))
+    if path:
+        doc.save(path)
+    return {"layout": doc.to_dict(), "frame": fr.to_dict(), "version": __version__}
+
+
+def layout_crop_image(
+    frame_id: str,
+    *,
+    left: float = 0.0,
+    top: float = 0.0,
+    right: float = 0.0,
+    bottom: float = 0.0,
+    layout: dict[str, Any] | None = None,
+    path: PathLike | None = None,
+) -> dict[str, Any]:
+    """Bild zuschneiden (relative Ränder 0–1) — 2.6.24."""
+    doc = _load_layout(layout, path)
+    fr = doc.crop_image(
+        frame_id, left=float(left), top=float(top), right=float(right), bottom=float(bottom)
+    )
+    if path:
+        doc.save(path)
+    return {"layout": doc.to_dict(), "frame": fr.to_dict(), "version": __version__}
+
+
+def export_epub_api(
+    text: str,
+    path: PathLike,
+    *,
+    title: str = "InstantLens Doc",
+    author: str = "InstantLens Doc",
+) -> dict[str, Any]:
+    """Text → EPUB — 2.6.24."""
+    from instantlensdoc.core.export import export_epub
+
+    dest = export_epub(text, path, title=title, author=author)
+    return {
+        "path": str(dest),
+        "format": "epub",
+        "title": title,
+        "version": __version__,
+    }
 
 
 def _load_layout(

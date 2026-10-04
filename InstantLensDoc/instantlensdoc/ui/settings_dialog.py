@@ -1923,7 +1923,7 @@ class SettingsDialog(QDialog):
         v.addWidget(title)
         info = QLabel(
             "Geplante Features sind klar als Stub markiert. "
-            "Kein Fake-KI-Verhalten. Cloud-Review: Freigabeordner produktiv (2.6.23). "
+            "Kein Fake-KI-Verhalten. Cloud-Review: Freigabeordner produktiv (2.6.24). "
             "Plugin-Hooks: interner Event-Bus + no-op Loader."
         )
         info.setWordWrap(True)
@@ -2000,7 +2000,7 @@ class SettingsDialog(QDialog):
             (
                 "Gemeinsames Review / Cloud-Ordner",
                 "cloud",
-                "Produktiv 2.6.23 · Freigabeordner + optionaler Endpoint",
+                "Produktiv 2.6.24 · Freigabeordner + optionaler Endpoint",
             ),
             ("Stylus / Palm Rejection", "stylus", "Stub · keine Aktion"),
             ("3D-Extrusion", "extrude3d", "Stub · keine Aktion"),

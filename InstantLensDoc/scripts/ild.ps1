@@ -1060,6 +1060,83 @@ function Get-IldSharedReviewInfo {
     Invoke-Ild @("--json", "share-info") | Out-Host
 }
 
+function Add-IldHyperlink {
+    # Hyperlink in Text — 2.6.24
+    param(
+        [Parameter(Mandatory = $true)][string]$Text,
+        [Parameter(Mandatory = $true)][string]$LinkText,
+        [Parameter(Mandatory = $true)][string]$Target,
+        [int]$Start,
+        [int]$End,
+        [switch]$Html
+    )
+    $a = @("--json", "hyperlink", $Text, $LinkText, $Target)
+    if ($PSBoundParameters.ContainsKey("Start")) { $a += @("--start", "$Start") }
+    if ($PSBoundParameters.ContainsKey("End")) { $a += @("--end", "$End") }
+    if ($Html) { $a += "--html" }
+    Invoke-Ild @a | Out-Host
+}
+
+function Get-IldHyperlinks {
+    param([Parameter(Mandatory = $true)][string]$Text)
+    Invoke-Ild @("--json", "hyperlinks", $Text) | Out-Host
+}
+
+function Get-IldAnchors {
+    param([Parameter(Mandatory = $true)][string]$Text)
+    Invoke-Ild @("--json", "anchors", $Text) | Out-Host
+}
+
+function Resolve-IldHyperlink {
+    param(
+        [Parameter(Mandatory = $true)][string]$Text,
+        [Parameter(Mandatory = $true)][string]$Target
+    )
+    Invoke-Ild @("--json", "resolve-link", $Text, $Target) | Out-Host
+}
+
+function Add-IldLayoutShape {
+    param(
+        [string]$Shape = "rectangle",
+        [double]$X = 40,
+        [double]$Y = 300,
+        [double]$Width = 120,
+        [double]$Height = 80,
+        [int]$Page = 0,
+        [string]$Out
+    )
+    $a = @("--json", "layout-shape", "--shape", $Shape, "--x", "$X", "--y", "$Y", "--width", "$Width", "--height", "$Height", "--page", "$Page")
+    if ($Out) { $a += @("--out", $Out) }
+    Invoke-Ild @a | Out-Host
+}
+
+function Add-IldLayoutVideo {
+    param(
+        [Parameter(Mandatory = $true)][string]$Url,
+        [string]$Title,
+        [double]$X = 40,
+        [double]$Y = 300,
+        [double]$Width = 320,
+        [double]$Height = 180,
+        [int]$Page = 0,
+        [string]$Out
+    )
+    $a = @("--json", "layout-video", $Url, "--x", "$X", "--y", "$Y", "--width", "$Width", "--height", "$Height", "--page", "$Page")
+    if ($Title) { $a += @("--title", $Title) }
+    if ($Out) { $a += @("--out", $Out) }
+    Invoke-Ild @a | Out-Host
+}
+
+function Export-IldEpub {
+    param(
+        [Parameter(Mandatory = $true)][string]$Text,
+        [Parameter(Mandatory = $true)][string]$Out,
+        [string]$Title = "InstantLens Doc",
+        [string]$Author = "InstantLens Doc"
+    )
+    Invoke-Ild @("--json", "export-epub", $Text, "--out", $Out, "--title", $Title, "--author", $Author) | Out-Host
+}
+
 
 function Merge-IldPdf {
     param(

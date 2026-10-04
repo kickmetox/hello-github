@@ -1,11 +1,14 @@
-"""Export/Import: Editor-Inhalt → HTML / DOCX / PDF / TXT / RTF / XLSX / JPG — 2.6.14."""
+"""Export/Import: Editor-Inhalt → HTML / DOCX / PDF / TXT / RTF / XLSX / JPG / EPUB — 2.6.24."""
 
 from __future__ import annotations
 
 import html
 import re
+import zipfile
+from io import BytesIO
 from pathlib import Path
 from typing import Any, Optional
+from uuid import uuid4
 
 SUPPORTED_EXPORT_FORMATS: tuple[str, ...] = (
     "docx",
@@ -16,6 +19,7 @@ SUPPORTED_EXPORT_FORMATS: tuple[str, ...] = (
     "html",
     "jpg",
     "jpeg",
+    "epub",
 )
 SUPPORTED_IMPORT_FORMATS: tuple[str, ...] = (
     "docx",
@@ -31,6 +35,7 @@ SUPPORTED_IMPORT_FORMATS: tuple[str, ...] = (
     "jpg",
     "jpeg",
     "png",
+    "epub",
 )
 
 
@@ -47,6 +52,7 @@ def list_export_formats() -> list[dict[str, str]]:
         {"id": "rtf", "ext": ".rtf", "name": "Rich Text Format"},
         {"id": "html", "ext": ".html", "name": "HTML"},
         {"id": "jpg", "ext": ".jpg", "name": "JPEG-Bild"},
+        {"id": "epub", "ext": ".epub", "name": "EPUB (E-Book)"},
     ]
 
 
@@ -61,7 +67,79 @@ def list_import_formats() -> list[dict[str, str]]:
         {"id": "html", "ext": ".html", "name": "HTML"},
         {"id": "md", "ext": ".md", "name": "Markdown"},
         {"id": "jpg", "ext": ".jpg", "name": "JPEG/PNG Bild"},
+        {"id": "epub", "ext": ".epub", "name": "EPUB (E-Book Text)"},
     ]
+
+def _inline_md_to_html(fragment: str) -> str:
+    """Escape + Markdown-Links → <a>."""
+    from instantlensdoc.core.hyperlinks import _MD_LINK_RE, validate_hyperlink
+
+    parts: list[str] = []
+    pos = 0
+    for m in _MD_LINK_RE.finditer(fragment or ""):
+        parts.append(html.escape((fragment or "")[pos : m.start()]))
+        label, tgt = m.group(1), m.group(2)
+        ok, norm, _k, _e = validate_hyperlink(label, tgt)
+        if ok:
+            parts.append(
+                f'<a href="{html.escape(norm, quote=True)}">{html.escape(label)}</a>'
+            )
+        else:
+            parts.append(html.escape(m.group(0)))
+        pos = m.end()
+    parts.append(html.escape((fragment or "")[pos:]))
+    return "".join(parts)
+
+
+def _markdownish_body_parts(text: str) -> list[str]:
+    """Markdownish → HTML-Fragmente; Markdown-Links → <a> — 2.6.24."""
+    paras: list[str] = []
+    buf: list[str] = []
+
+    def flush():
+        nonlocal buf
+        if not buf:
+            return
+        joined = " ".join(buf).strip()
+        buf = []
+        if not joined:
+            return
+        if joined.startswith("### "):
+            paras.append(f"<h3>{_inline_md_to_html(joined[4:])}</h3>")
+        elif joined.startswith("## "):
+            paras.append(f"<h2>{_inline_md_to_html(joined[3:])}</h2>")
+        elif joined.startswith("# "):
+            paras.append(f"<h1>{_inline_md_to_html(joined[2:])}</h1>")
+        elif joined.startswith("- "):
+            paras.append(f"<li>{_inline_md_to_html(joined[2:])}</li>")
+        else:
+            paras.append(f"<p>{_inline_md_to_html(joined)}</p>")
+
+    for line in _lines(text):
+        if not line.strip():
+            flush()
+        else:
+            if line.strip().startswith("- ") and buf:
+                flush()
+            buf.append(line.strip())
+    flush()
+    out: list[str] = []
+    in_ul = False
+    for p in paras:
+        if p.startswith("<li>"):
+            if not in_ul:
+                out.append("<ul>")
+                in_ul = True
+            out.append(p)
+        else:
+            if in_ul:
+                out.append("</ul>")
+                in_ul = False
+            out.append(p)
+    if in_ul:
+        out.append("</ul>")
+    return out
+
 
 def export_html(
     text: str,
@@ -72,58 +150,11 @@ def export_html(
 ) -> Path:
     """
     Schreibt UTF-8-HTML. Bei as_markdownish: #/## Überschriften, leere Zeile = Absatz.
+    Markdown-Hyperlinks werden zu <a href> — 2.6.24.
     """
     path = Path(path)
-    body_parts: list[str] = []
     if as_markdownish:
-        paras: list[str] = []
-        buf: list[str] = []
-
-        def flush():
-            nonlocal buf
-            if not buf:
-                return
-            joined = " ".join(buf).strip()
-            buf = []
-            if not joined:
-                return
-            if joined.startswith("### "):
-                paras.append(f"<h3>{html.escape(joined[4:])}</h3>")
-            elif joined.startswith("## "):
-                paras.append(f"<h2>{html.escape(joined[3:])}</h2>")
-            elif joined.startswith("# "):
-                paras.append(f"<h1>{html.escape(joined[2:])}</h1>")
-            elif joined.startswith("- "):
-                paras.append(f"<li>{html.escape(joined[2:])}</li>")
-            else:
-                paras.append(f"<p>{html.escape(joined)}</p>")
-
-        for line in _lines(text):
-            if not line.strip():
-                flush()
-            else:
-                # Listenzeilen einzeln flushen
-                if line.strip().startswith("- ") and buf:
-                    flush()
-                buf.append(line.strip())
-        flush()
-        # li ohne ul wrappen
-        out: list[str] = []
-        in_ul = False
-        for p in paras:
-            if p.startswith("<li>"):
-                if not in_ul:
-                    out.append("<ul>")
-                    in_ul = True
-                out.append(p)
-            else:
-                if in_ul:
-                    out.append("</ul>")
-                    in_ul = False
-                out.append(p)
-        if in_ul:
-            out.append("</ul>")
-        body_parts = out
+        body_parts = _markdownish_body_parts(text)
     else:
         body_parts = [f"<pre>{html.escape(text)}</pre>"]
 
@@ -138,6 +169,7 @@ body {{ font-family: Georgia, 'Times New Roman', serif; max-width: 42rem;
        margin: 2rem auto; padding: 0 1rem; line-height: 1.55; color: #1a1a1a; }}
 h1,h2,h3 {{ font-family: 'Segoe UI', system-ui, sans-serif; }}
 pre {{ white-space: pre-wrap; font-family: Consolas, monospace; }}
+a {{ color: #0b5cab; }}
 </style>
 </head>
 <body>
@@ -147,6 +179,162 @@ pre {{ white-space: pre-wrap; font-family: Consolas, monospace; }}
 """
     path.write_text(doc, encoding="utf-8")
     return path
+
+
+def export_epub(
+    text: str,
+    path: str | Path,
+    *,
+    title: str = "InstantLens Doc",
+    author: str = "InstantLens Doc",
+    language: str = "de",
+) -> Path:
+    """
+    EPUB 2.0.1 (ohne externe Abhängigkeit) — Kapitel aus Markdownish-Text — 2.6.24.
+    Struktur: mimetype + META-INF/container.xml + OEBPS/{content.opf,toc.ncx,chapter*.xhtml}.
+    """
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    book_id = f"urn:uuid:{uuid4()}"
+    # Kapitel an H1 splitten, sonst ein Kapitel
+    raw = (text or "").replace("\r\n", "\n")
+    chunks: list[tuple[str, str]] = []
+    current_title = title or "Kapitel 1"
+    current_lines: list[str] = []
+    for line in raw.split("\n"):
+        if line.startswith("# ") and not line.startswith("## "):
+            if current_lines and any(x.strip() for x in current_lines):
+                chunks.append((current_title, "\n".join(current_lines).strip()))
+            current_title = line[2:].strip() or f"Kapitel {len(chunks) + 1}"
+            current_lines = []
+        else:
+            current_lines.append(line)
+    if current_lines and any(x.strip() for x in current_lines):
+        chunks.append((current_title, "\n".join(current_lines).strip()))
+    if not chunks:
+        chunks = [(title or "Inhalt", raw or "")]
+
+    chapters: list[tuple[str, str, str]] = []  # id, title, xhtml_body
+    for i, (ch_title, ch_text) in enumerate(chunks, start=1):
+        cid = f"chap{i:02d}"
+        body = "".join(_markdownish_body_parts(ch_text if ch_text.strip() else ch_title))
+        xhtml = (
+            '<?xml version="1.0" encoding="utf-8"?>\n'
+            '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN" '
+            '"http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">\n'
+            '<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="'
+            + html.escape(language)
+            + '">\n<head><title>'
+            + html.escape(ch_title)
+            + "</title>"
+            "<style type=\"text/css\">body{font-family:serif;line-height:1.5;margin:1em;}"
+            "a{color:#0b5cab;}</style></head>\n<body>\n"
+            f"<h1 id=\"{cid}\">{html.escape(ch_title)}</h1>\n"
+            f"{body}\n</body></html>\n"
+        )
+        chapters.append((cid, ch_title, xhtml))
+
+    manifest_items = []
+    spine_items = []
+    nav_points = []
+    for i, (cid, ch_title, _x) in enumerate(chapters, start=1):
+        href = f"{cid}.xhtml"
+        manifest_items.append(
+            f'<item id="{cid}" href="{href}" media-type="application/xhtml+xml"/>'
+        )
+        spine_items.append(f'<itemref idref="{cid}"/>')
+        nav_points.append(
+            f'<navPoint id="nav{i}" playOrder="{i}">'
+            f"<navLabel><text>{html.escape(ch_title)}</text></navLabel>"
+            f'<content src="{href}"/>'
+            f"</navPoint>"
+        )
+
+    opf = f"""<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://www.idpf.org/2007/opf" unique-identifier="BookId" version="2.0">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:opf="http://www.idpf.org/2007/opf">
+    <dc:title>{html.escape(title)}</dc:title>
+    <dc:creator opf:role="aut">{html.escape(author or "InstantLens Doc")}</dc:creator>
+    <dc:language>{html.escape(language)}</dc:language>
+    <dc:identifier id="BookId">{html.escape(book_id)}</dc:identifier>
+    <meta name="generator" content="InstantLens Doc"/>
+  </metadata>
+  <manifest>
+    <item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/>
+    {"".join(manifest_items)}
+  </manifest>
+  <spine toc="ncx">
+    {"".join(spine_items)}
+  </spine>
+</package>
+"""
+    ncx = f"""<?xml version="1.0" encoding="utf-8"?>
+<ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1">
+  <head>
+    <meta name="dtb:uid" content="{html.escape(book_id)}"/>
+    <meta name="dtb:depth" content="1"/>
+    <meta name="dtb:totalPageCount" content="0"/>
+    <meta name="dtb:maxPageNumber" content="0"/>
+  </head>
+  <docTitle><text>{html.escape(title)}</text></docTitle>
+  <navMap>
+    {"".join(nav_points)}
+  </navMap>
+</ncx>
+"""
+    container = """<?xml version="1.0" encoding="utf-8"?>
+<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
+  <rootfiles>
+    <rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/>
+  </rootfiles>
+</container>
+"""
+    buf = BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        # mimetype muss unkomprimiert und erstes Entry sein
+        zf.writestr("mimetype", "application/epub+zip", compress_type=zipfile.ZIP_STORED)
+        zf.writestr("META-INF/container.xml", container, compress_type=zipfile.ZIP_DEFLATED)
+        zf.writestr("OEBPS/content.opf", opf, compress_type=zipfile.ZIP_DEFLATED)
+        zf.writestr("OEBPS/toc.ncx", ncx, compress_type=zipfile.ZIP_DEFLATED)
+        for cid, _t, xhtml in chapters:
+            zf.writestr(
+                f"OEBPS/{cid}.xhtml",
+                xhtml.encode("utf-8"),
+                compress_type=zipfile.ZIP_DEFLATED,
+            )
+    path.write_bytes(buf.getvalue())
+    return path
+
+
+def import_epub(path: str | Path) -> str:
+    """EPUB → Plaintext (Kapitel-Titel + Body) — 2.6.24."""
+    path = Path(path)
+    parts: list[str] = []
+    with zipfile.ZipFile(path, "r") as zf:
+        names = [
+            n
+            for n in zf.namelist()
+            if n.lower().endswith((".xhtml", ".html", ".htm"))
+            and "meta-inf" not in n.lower()
+        ]
+        names.sort()
+        for name in names:
+            raw = zf.read(name).decode("utf-8", errors="replace")
+            # Tags grob entfernen
+            t = re.sub(r"(?is)<script[^>]*>.*?</script>", "", raw)
+            t = re.sub(r"(?is)<style[^>]*>.*?</style>", "", t)
+            t = re.sub(r"(?i)<br\s*/?>", "\n", t)
+            t = re.sub(r"(?i)</p>", "\n\n", t)
+            t = re.sub(r"(?i)</h[1-6]>", "\n\n", t)
+            t = re.sub(r"(?i)<h1[^>]*>", "# ", t)
+            t = re.sub(r"(?i)<h2[^>]*>", "## ", t)
+            t = re.sub(r"(?i)<h3[^>]*>", "### ", t)
+            t = re.sub(r"<[^>]+>", "", t)
+            t = html.unescape(t)
+            t = re.sub(r"\n{3,}", "\n\n", t).strip()
+            if t:
+                parts.append(t)
+    return "\n\n".join(parts).strip() + ("\n" if parts else "")
 
 
 def export_docx(text: str, path: str | Path, *, title: Optional[str] = None) -> Path:
@@ -375,8 +563,9 @@ def export_document(
     fmt: str | None = None,
     title: str = "InstantLens Doc",
     page_size: tuple[float, float] | str | None = None,
+    author: str = "InstantLens Doc",
 ) -> Path:
-    """Unified Export nach Erweiterung/Format — 2.6.14."""
+    """Unified Export nach Erweiterung/Format — 2.6.14 / EPUB 2.6.24."""
     path = Path(path)
     f = (fmt or path.suffix.lstrip(".")).lower().lstrip(".")
     if f == "jpeg":
@@ -397,6 +586,8 @@ def export_document(
         return export_xlsx_from_text(text, path)
     if f == "jpg":
         return export_jpg(text, path, title=title)
+    if f == "epub":
+        return export_epub(text, path, title=title, author=author)
     raise ValueError(f"Unbekanntes Export-Format: {f}")
 
 
@@ -409,6 +600,8 @@ def import_document_text(path: str | Path) -> dict[str, Any]:
         raise FileNotFoundError(path)
     ext = path.suffix.lower().lstrip(".")
     meta: dict[str, Any] = {"path": str(path), "format": ext}
+    if ext == "epub":
+        return {"text": import_epub(path), "meta": meta}
     if ext in ("txt", "log", "md", "markdown", "html", "htm", "csv"):
         if ext == "csv":
             table = import_csv(path)

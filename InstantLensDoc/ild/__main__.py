@@ -860,6 +860,93 @@ def build_parser() -> argparse.ArgumentParser:
         help="Shared-Review-Einschränkungen/Modi — 2.6.23",
     )
 
+    s = sub.add_parser(
+        "hyperlink",
+        help="Hyperlink in Text einfügen (URL oder #anker) — 2.6.24",
+    )
+    s.add_argument("text", help="Ausgangstext oder @datei")
+    s.add_argument("link_text", help="Anzeigetext")
+    s.add_argument("target", help="https://… oder #anker oder ild://line/N")
+    s.add_argument("--start", type=int, default=None)
+    s.add_argument("--end", type=int, default=None)
+    s.add_argument("--html", action="store_true")
+
+    s = sub.add_parser(
+        "hyperlinks",
+        help="Hyperlinks aus Text extrahieren — 2.6.24",
+    )
+    s.add_argument("text", help="Text oder @datei / Dateipfad")
+
+    s = sub.add_parser(
+        "anchors",
+        help="Überschriften-Anker auflisten — 2.6.24",
+    )
+    s.add_argument("text", help="Text oder Dateipfad")
+
+    s = sub.add_parser(
+        "resolve-link",
+        help="Internes Hyperlink-Ziel auflösen — 2.6.24",
+    )
+    s.add_argument("text", help="Dokumenttext oder Dateipfad")
+    s.add_argument("target", help="#anker / ild://heading/… / ild://line/N")
+
+    s = sub.add_parser(
+        "layout-shape",
+        help="Formrahmen ins Layout — 2.6.24",
+    )
+    s.add_argument("--shape", default="rectangle")
+    s.add_argument("--x", type=float, default=40)
+    s.add_argument("--y", type=float, default=300)
+    s.add_argument("--width", type=float, default=120)
+    s.add_argument("--height", type=float, default=80)
+    s.add_argument("--page", type=int, default=0)
+    s.add_argument("--layout", default=None, help="Layout-JSON-Datei")
+    s.add_argument("--out", default=None, help="Layout speichern")
+
+    s = sub.add_parser(
+        "layout-video",
+        help="Video-Platzhalter (URL) ins Layout — 2.6.24",
+    )
+    s.add_argument("url")
+    s.add_argument("--title", default="")
+    s.add_argument("--x", type=float, default=40)
+    s.add_argument("--y", type=float, default=300)
+    s.add_argument("--width", type=float, default=320)
+    s.add_argument("--height", type=float, default=180)
+    s.add_argument("--page", type=int, default=0)
+    s.add_argument("--layout", default=None)
+    s.add_argument("--out", default=None)
+
+    s = sub.add_parser(
+        "layout-scale",
+        help="Bild-/Formrahmen skalieren — 2.6.24",
+    )
+    s.add_argument("frame_id")
+    s.add_argument("factor", type=float)
+    s.add_argument("--layout", default=None)
+    s.add_argument("--out", default=None)
+
+    s = sub.add_parser(
+        "layout-crop",
+        help="Bild zuschneiden (relative Ränder 0–1) — 2.6.24",
+    )
+    s.add_argument("frame_id")
+    s.add_argument("--left", type=float, default=0.0)
+    s.add_argument("--top", type=float, default=0.0)
+    s.add_argument("--right", type=float, default=0.0)
+    s.add_argument("--bottom", type=float, default=0.0)
+    s.add_argument("--layout", default=None)
+    s.add_argument("--out", default=None)
+
+    s = sub.add_parser(
+        "export-epub",
+        help="Text → EPUB — 2.6.24",
+    )
+    s.add_argument("text", help="Text oder Dateipfad")
+    s.add_argument("--out", required=True, help="Ziel .epub")
+    s.add_argument("--title", default="InstantLens Doc")
+    s.add_argument("--author", default="InstantLens Doc")
+
     return p
 
 
@@ -1690,6 +1777,105 @@ def run(argv: list[str] | None = None) -> int:
             return 0
         if args.cmd == "share-info":
             data = api.shared_review_info()
+            _print(data, as_json=js or True)
+            return 0
+
+        def _read_text_arg(raw: str) -> str:
+            if raw.startswith("@"):
+                return Path(raw[1:]).read_text(encoding="utf-8")
+            p = Path(raw)
+            if p.is_file() and len(raw) < 512:
+                return p.read_text(encoding="utf-8")
+            return raw
+
+        if args.cmd == "hyperlink":
+            body = _read_text_arg(args.text)
+            data = api.insert_hyperlink(
+                body,
+                args.link_text,
+                args.target,
+                start=args.start,
+                end=args.end,
+                as_html=bool(args.html),
+            )
+            _print(data, as_json=js or True)
+            return 0
+        if args.cmd == "hyperlinks":
+            data = api.extract_hyperlinks(_read_text_arg(args.text))
+            _print(data, as_json=js or True)
+            return 0
+        if args.cmd == "anchors":
+            data = api.list_doc_anchors(_read_text_arg(args.text))
+            _print(data, as_json=js or True)
+            return 0
+        if args.cmd == "resolve-link":
+            data = api.resolve_hyperlink(_read_text_arg(args.text), args.target)
+            _print(data, as_json=js or True)
+            return 0
+        if args.cmd == "layout-shape":
+            lay = None
+            if args.layout:
+                lay = json.loads(Path(args.layout).read_text(encoding="utf-8"))
+            data = api.layout_add_shape_frame(
+                lay,
+                shape=args.shape,
+                x=args.x,
+                y=args.y,
+                width=args.width,
+                height=args.height,
+                page=args.page,
+                path=args.out,
+            )
+            _print(data, as_json=js or True)
+            return 0
+        if args.cmd == "layout-video":
+            lay = None
+            if args.layout:
+                lay = json.loads(Path(args.layout).read_text(encoding="utf-8"))
+            data = api.layout_add_video_placeholder(
+                lay,
+                url=args.url,
+                title=args.title,
+                x=args.x,
+                y=args.y,
+                width=args.width,
+                height=args.height,
+                page=args.page,
+                path=args.out,
+            )
+            _print(data, as_json=js or True)
+            return 0
+        if args.cmd == "layout-scale":
+            lay = None
+            if args.layout:
+                lay = json.loads(Path(args.layout).read_text(encoding="utf-8"))
+            data = api.layout_scale_image(
+                args.frame_id, args.factor, layout=lay, path=args.out
+            )
+            _print(data, as_json=js or True)
+            return 0
+        if args.cmd == "layout-crop":
+            lay = None
+            if args.layout:
+                lay = json.loads(Path(args.layout).read_text(encoding="utf-8"))
+            data = api.layout_crop_image(
+                args.frame_id,
+                left=args.left,
+                top=args.top,
+                right=args.right,
+                bottom=args.bottom,
+                layout=lay,
+                path=args.out,
+            )
+            _print(data, as_json=js or True)
+            return 0
+        if args.cmd == "export-epub":
+            data = api.export_epub_api(
+                _read_text_arg(args.text),
+                args.out,
+                title=args.title,
+                author=args.author,
+            )
             _print(data, as_json=js or True)
             return 0
         return _fail("unbekanntes Kommando")

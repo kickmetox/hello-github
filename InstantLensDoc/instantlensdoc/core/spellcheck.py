@@ -1,4 +1,4 @@
-"""Rechtschreibprüfung mit Vorschlägen + leichten Grammatik-Hinweisen — 2.6.23.
+"""Rechtschreibprüfung mit Vorschlägen + leichten Grammatik-Hinweisen — 2.6.24.
 
 Lokale Wortlisten (ohne externe Spell-Lib). UI-Sprache steuert eingebaute
 Minimal-Wörterbücher und Autokorrektur-Defaults wo möglich.

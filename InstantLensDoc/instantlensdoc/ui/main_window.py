@@ -1498,6 +1498,7 @@ class MainWindow(QMainWindow):
             ("Als TXT…", "txt"),
             ("Als RTF…", "rtf"),
             ("Als JPG…", "jpg"),
+            ("Als EPUB…", "epub"),
         ]:
             a = QAction(title, self)
             a.triggered.connect(lambda checked=False, f=fmt: self._export_editor(f))
@@ -3005,9 +3006,35 @@ class MainWindow(QMainWindow):
         a = QAction("Bild einfügen…", self)
         a.triggered.connect(self._insert_image)
         m_ins.addAction(a)
+        a = QAction("Form einfügen…", self)
+        a.setObjectName("actInsertShape")
+        a.setToolTip("Formrahmen (Rechteck/Ellipse/…) — 2.6.24")
+        a.triggered.connect(self._insert_shape_frame)
+        m_ins.addAction(a)
+        a = QAction("Video-Platzhalter (URL)…", self)
+        a.setObjectName("actInsertVideo")
+        a.setToolTip("Online-Video als Platzhalter mit URL — 2.6.24")
+        a.triggered.connect(self._insert_video_placeholder)
+        m_ins.addAction(a)
+        a = QAction("Bild skalieren…", self)
+        a.setObjectName("actScaleImage")
+        a.setToolTip("Bild-/Formrahmen skalieren — 2.6.24")
+        a.triggered.connect(self._scale_image_frame)
+        m_ins.addAction(a)
+        a = QAction("Bild zuschneiden…", self)
+        a.setObjectName("actCropImage")
+        a.setToolTip("Bild zuschneiden (relative Ränder) — 2.6.24")
+        a.triggered.connect(self._crop_image_frame)
+        m_ins.addAction(a)
         a = QAction("Textumfluss um Bildrahmen…", self)
         a.setToolTip("Text fließt um Bild-/Formrahmen (bounding_box/contour/jump) — 2.6.13")
         a.triggered.connect(self._set_image_text_wrap)
+        m_ins.addAction(a)
+        a = QAction("Hyperlink…", self)
+        a.setObjectName("actHyperlink")
+        a.setShortcut(QKeySequence("Ctrl+Shift+K"))
+        a.setToolTip("Text mit URL oder Dokumentziel verknüpfen — Ctrl+Shift+K — 2.6.24")
+        a.triggered.connect(self._insert_hyperlink_dialog)
         m_ins.addAction(a)
         a = QAction("Tabelle einfügen…", self)
         a.setShortcut(QKeySequence("Ctrl+Alt+Shift+T"))
@@ -8463,6 +8490,115 @@ class MainWindow(QMainWindow):
         self.layout_doc.set_text_wrap(fr.id, mode)
         self._set_status(f"Textumfluss {mode} für Rahmen {fr.id}")
 
+    def _insert_hyperlink_dialog(self) -> None:
+        """Hyperlink (URL oder Dokumentziel) in Editor — 2.6.24."""
+        from instantlensdoc.ui.hyperlink_dialog import HyperlinkDialog
+
+        if self.stack.currentWidget() is not self.editor_pane:
+            self.stack.setCurrentWidget(self.editor_pane)
+        cursor = self.editor.textCursor()
+        selected = cursor.selectedText().replace("\u2029", "\n").strip()
+        dlg = HyperlinkDialog(
+            self,
+            initial_text=selected,
+            document_text=self.editor.toPlainText(),
+        )
+        if dlg.exec() != dlg.Accepted:
+            return
+        snippet = dlg.result_snippet
+        if selected and cursor.hasSelection():
+            cursor.insertText(snippet)
+        else:
+            self.editor.insertPlainText(snippet if not selected else snippet)
+        if self.doc and self.doc.kind in (
+            DocKind.TEXT,
+            DocKind.MARKDOWN,
+            DocKind.HTML,
+            DocKind.DOCX,
+        ):
+            self.doc.text = self.editor.toPlainText()
+            self.doc.dirty = True
+        self._on_text_changed()
+        self._set_status(f"Hyperlink: {dlg.result_target}")
+
+    def _insert_shape_frame(self) -> None:
+        """Formrahmen ins Layout — 2.6.24."""
+        from PySide6.QtWidgets import QInputDialog
+        from instantlensdoc.core.layout import SHAPE_KINDS
+
+        shape, ok = QInputDialog.getItem(
+            self, "Form", "Formart:", list(SHAPE_KINDS), 0, False
+        )
+        if not ok:
+            return
+        fr = self.layout_doc.add_shape(shape)
+        self._set_status(f"Form {shape} eingefügt ({fr.id})")
+
+    def _insert_video_placeholder(self) -> None:
+        """Video-Platzhalter mit URL — 2.6.24."""
+        from PySide6.QtWidgets import QInputDialog
+
+        url, ok = QInputDialog.getText(
+            self, "Video-Platzhalter", "Video-URL (http/https):", text="https://"
+        )
+        if not ok or not (url or "").strip():
+            return
+        title, ok2 = QInputDialog.getText(self, "Video-Platzhalter", "Titel (optional):")
+        if not ok2:
+            title = ""
+        try:
+            fr = self.layout_doc.add_video_placeholder(url.strip(), title=title or "")
+        except ValueError as e:
+            QMessageBox.warning(self, "Video", str(e))
+            return
+        self._set_status(f"Video-Platzhalter: {fr.video_url} ({fr.id})")
+
+    def _scale_image_frame(self) -> None:
+        """Bild-/Formrahmen skalieren — 2.6.24."""
+        from PySide6.QtWidgets import QInputDialog
+
+        if not self.layout_doc.image_frames:
+            self._set_status("Kein Bild-/Formrahmen im Layout")
+            return
+        factor, ok = QInputDialog.getDouble(
+            self, "Skalieren", "Faktor:", 1.25, 0.1, 10.0, 2
+        )
+        if not ok:
+            return
+        fr = self.layout_doc.image_frames[0]
+        self.layout_doc.scale_image(fr.id, float(factor))
+        self._set_status(f"Rahmen {fr.id} skaliert ×{factor}")
+
+    def _crop_image_frame(self) -> None:
+        """Bild zuschneiden — 2.6.24."""
+        from PySide6.QtWidgets import QInputDialog
+
+        if not self.layout_doc.image_frames:
+            self._set_status("Kein Bildrahmen im Layout")
+            return
+        fr = self.layout_doc.image_frames[0]
+        if getattr(fr, "media_kind", "image") == "video":
+            QMessageBox.information(self, "Zuschneiden", "Video-Platzhalter nicht zuschneidbar.")
+            return
+        left, ok = QInputDialog.getDouble(self, "Zuschneiden", "Links (0–0.49):", 0.05, 0, 0.49, 2)
+        if not ok:
+            return
+        top, ok = QInputDialog.getDouble(self, "Zuschneiden", "Oben (0–0.49):", 0.05, 0, 0.49, 2)
+        if not ok:
+            return
+        right, ok = QInputDialog.getDouble(self, "Zuschneiden", "Rechts (0–0.49):", 0.05, 0, 0.49, 2)
+        if not ok:
+            return
+        bottom, ok = QInputDialog.getDouble(self, "Zuschneiden", "Unten (0–0.49):", 0.05, 0, 0.49, 2)
+        if not ok:
+            return
+        try:
+            self.layout_doc.crop_image(fr.id, left=left, top=top, right=right, bottom=bottom)
+        except ValueError as e:
+            QMessageBox.warning(self, "Zuschneiden", str(e))
+            return
+        self._set_status(f"Rahmen {fr.id} zugeschnitten")
+
     def _toggle_rulers(self, checked: bool = False) -> None:
         on = bool(checked)
         if hasattr(self.pdf_view, "set_show_rulers"):
@@ -11405,6 +11541,12 @@ class MainWindow(QMainWindow):
             "import_table_data": self._import_table_data,
             "export_xlsx": lambda: self._export_editor("xlsx"),
             "export_rtf": lambda: self._export_editor("rtf"),
+            "export_epub": lambda: self._export_editor("epub"),
+            "insert_hyperlink": self._insert_hyperlink_dialog,
+            "insert_shape": self._insert_shape_frame,
+            "insert_video": self._insert_video_placeholder,
+            "scale_image": self._scale_image_frame,
+            "crop_image": self._crop_image_frame,
             "export_pdfx": self._export_pdfx,
             "preflight": self._run_preflight,
             "apply_bleed": self._apply_bleed_dialog,
@@ -14445,7 +14587,7 @@ class MainWindow(QMainWindow):
         self.save_as()
 
     def _export_editor(self, fmt: str):
-        """Editor-Inhalt nach HTML / DOCX / XLSX / PDF / TXT / RTF / JPG — 2.6.14."""
+        """Editor-Inhalt nach HTML / DOCX / XLSX / PDF / TXT / RTF / JPG / EPUB — 2.6.24."""
         text = ""
         title = "InstantLens Doc"
         editor_kinds = (
@@ -14479,6 +14621,7 @@ class MainWindow(QMainWindow):
             "txt": ("Text (*.txt)", ".txt"),
             "rtf": ("RTF (*.rtf)", ".rtf"),
             "jpg": ("JPEG (*.jpg)", ".jpg"),
+            "epub": ("EPUB (*.epub)", ".epub"),
         }
         if fmt not in filters:
             QMessageBox.warning(self, "Export", f"Unbekanntes Format: {fmt}")

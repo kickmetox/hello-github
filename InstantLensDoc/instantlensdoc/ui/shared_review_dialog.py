@@ -1,4 +1,4 @@
-"""Dialog: Gemeinsames Review starten/beitreten — 2.6.23."""
+"""Dialog: Gemeinsames Review starten/beitreten — 2.6.24."""
 
 from __future__ import annotations
 

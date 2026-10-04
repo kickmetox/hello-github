@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **2.6.23** |
+| Version | **2.6.24** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -33,7 +33,7 @@
 
 Skript: [sync-ild.ps1](scripts/sync-ild.ps1) — Branch `cursor/instantlensdoc-2108` (oder `-LocalPack` / Pack-Zip) nach `D:\AI_Temp\InstantLensDoc`, pip, Start. **Nutzer-Icon in `assets` wird nicht überschrieben.**
 
-**FEATURES.md lokal sync:** Nach Sync liegt `FEATURES.md` lokal im App-Ordner (`D:\AI_Temp\InstantLensDoc\FEATURES.md`); About/Stubs öffnen diese lokale Datei — Version **2.6.23**.
+**FEATURES.md lokal sync:** Nach Sync liegt `FEATURES.md` lokal im App-Ordner (`D:\AI_Temp\InstantLensDoc\FEATURES.md`); About/Stubs öffnen diese lokale Datei — Version **2.6.24**.
 
 Ohne Start: `-NoStart` (Alias `-SkipStart`). Exit-Codes: **0** OK · **1** allgemein · **2** Git-Fehler.
 
@@ -81,6 +81,17 @@ python -m keygen --verify "ILD1...."
 ```
 
 Trial 28 Tage · Keys 32 Tage (HMAC `ILD1.…`). Details: `keygen/README.md`.
+
+## Neu in 2.6.24
+
+Minor nach **2.6.23** (Gemeinsames Review / Cloud-Ordner):
+
+- **Hyperlinks:** Text mit URL oder Dokumentziel (`#anker`, `ild://line/N`, Überschrift); Markdown/HTML; Dialog Ctrl+Shift+K; Sidecar `*.ildlinks.json`
+- **Grafiken & Medien:** Bild skalieren/zuschneiden; Formen; Online-Video-Platzhalter (URL); Textumfluss bleibt
+- **EPUB-Export:** Text/Markdownish → EPUB 2 (Kapitel aus H1); Import als Text
+- **ild API:** `insert_hyperlink` / `extract_hyperlinks` / `layout_scale_image` / `layout_crop_image` / `layout_add_shape_frame` / `layout_add_video_placeholder` / `export_epub_api`
+- CLI `hyperlink`/`hyperlinks`/`anchors`/`layout-shape`/`layout-video`/`layout-scale`/`layout-crop`/`export-epub` · PS `Add-IldHyperlink` / `Export-IldEpub` / …
+- Stubs Stylus/3D/Hooks/Outline/Telemetrie/freier KI-Chat unverändert
 
 ## Neu in 2.6.23
 

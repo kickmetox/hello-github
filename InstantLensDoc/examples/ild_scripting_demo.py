@@ -1,4 +1,4 @@
-"""Beispiel: InstantLens Doc Scripting (Python) — 2.6.23.
+"""Beispiel: InstantLens Doc Scripting (Python) — 2.6.24.
 
 Aufruf aus dem App-Root:
   python examples/ild_scripting_demo.py [pdf]
@@ -82,7 +82,7 @@ def main() -> int:
         print("csv import cols:", imp.get("cols"))
         out_docx = td_p / "demo.docx"
         try:
-            saved = ild.save_document("Hallo 2.6.23", out_docx)
+            saved = ild.save_document("Hallo 2.6.24", out_docx)
             print("save_document:", Path(saved["path"]).exists())
         except Exception as e:
             print("save_document skip:", e)
@@ -104,7 +104,7 @@ def main() -> int:
             src, out=td_p / "hf.pdf", header="{title}", footer="{author}", title="Demo", author="ILD"
         )
         print("header_footer:", Path(hf["path"]).exists())
-        # Review / Kommentare / Versionen / Seriendruck — 2.6.23
+        # Review / Kommentare / Versionen / Seriendruck — 2.6.24
         demo = td_p / "ild_demo_review.txt"
         demo.write_text("Hallo", encoding="utf-8")
         print("review:", ild.review_enable(demo, author="Demo")["enabled"])
@@ -141,7 +141,7 @@ def main() -> int:
                 src, level="SES", signer_name="Demo", out=td_p / "signed_ses.pdf"
             )
             print("sign SES:", Path(ses["out"]).exists())
-        # Shared Review — 2.6.23
+        # Shared Review — 2.6.24
         share = td_p / "share_demo"
         print(
             "share:",

@@ -247,6 +247,43 @@ def default_palette_commands() -> list[PaletteCommand]:
             "Datei",
         ),
         PaletteCommand(
+            "export_epub",
+            "Als EPUB exportieren…",
+            "export epub ebook e-book hyperlink kapitel",
+            "Datei",
+        ),
+        PaletteCommand(
+            "insert_hyperlink",
+            "Hyperlink einfügen…",
+            "hyperlink link url anker bookmark website",
+            "Einfügen",
+            "Ctrl+Shift+K",
+        ),
+        PaletteCommand(
+            "insert_shape",
+            "Form einfügen…",
+            "shape form rectangle ellipse dreieck grafik",
+            "Einfügen",
+        ),
+        PaletteCommand(
+            "insert_video",
+            "Video-Platzhalter (URL)…",
+            "video online youtube url placeholder medien",
+            "Einfügen",
+        ),
+        PaletteCommand(
+            "scale_image",
+            "Bild skalieren…",
+            "scale skalieren bild grafik medien",
+            "Einfügen",
+        ),
+        PaletteCommand(
+            "crop_image",
+            "Bild zuschneiden…",
+            "crop zuschneiden bild grafik medien",
+            "Einfügen",
+        ),
+        PaletteCommand(
             "export_pdfx",
             "Als PDF/X (druckreif)…",
             "export pdfx print ready druckreif anschnitt bleed cmyk",

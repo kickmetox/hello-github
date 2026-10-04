@@ -1,5 +1,9 @@
 # Changelog — InstantLens Doc
 
+## 2.6.24 — Hyperlinks, Grafiken/Medien, EPUB
+
+Minor nach **2.6.23**: **Hyperlinks** verknüpfen Text mit URLs oder Dokumentzielen (`#anker`, `ild://line/N`, Überschrift); Markdown/HTML; Dialog Ctrl+Shift+K; Sidecar `*.ildlinks.json`. **Grafiken & Medien:** Bild skalieren/zuschneiden, Formen, Online-Video-Platzhalter (URL); Textumfluss bleibt. **EPUB-Export** (EPUB 2, Kapitel aus H1) inkl. Import-Text. **ild API** `insert_hyperlink` / `extract_hyperlinks` / `layout_scale_image` / `layout_crop_image` / `layout_add_shape_frame` / `layout_add_video_placeholder` / `export_epub_api` · CLI · PS. Stubs Stylus/3D/Hooks/Outline/Telemetrie/freier KI-Chat unverändert.
+
 ## 2.6.23 — Gemeinsames Review / Cloud-Ordner-Kollaboration
 
 Minor nach **2.6.22**: **Gemeinsames Review** ersetzt den Cloud-Stub. Notizen, Markierungen, Stempel und Kommentare sind zwischen Nutzern austauschbar über einen **lokalen Freigabeordner** (`session.ildshare.json` / ildshare-v1) und optional einen **einfachen HTTP-Endpoint** (GET/PUT JSON). Integriert Review/Kommentare (**2.6.21**) und Annotationen/Stempel (**2.6.9**). UI zum Starten/Beitreten inkl. dokumentierter Einschränkungen; Polling wo sinnvoll. **ild API** `shared_review_*` · CLI `share-*` · PS `Start-/Join-/Sync-IldSharedReview`. Offline bleibt nutzbar. Freier KI-Chat-Stub unverändert; kein gehosteter Cloud-Dienst / kein CRDT.

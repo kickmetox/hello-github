@@ -82,7 +82,7 @@ PLANNED_EN = {
 STUB_SHORT = {
     "ki": "Lokaler KI-Assistent für Zusammenfassen und Vorschläge — Stub / nicht produktiv.",
     "cloud": (
-        "Gemeinsames Review: Freigabeordner + optionaler Endpoint — produktiv 2.6.23; "
+        "Gemeinsames Review: Freigabeordner + optionaler Endpoint — produktiv 2.6.24; "
         "kein gehosteter Cloud-Dienst; Offline bleibt nutzbar."
     ),
     "stylus": "Drucksensitiver Stylus mit Palm Rejection — Stub / keine Aktion.",
@@ -110,7 +110,7 @@ STUB_SHORT = {
 STUB_SHORT_EN = {
     "ki": "Local AI assistant for summaries and suggestions — stub / not production.",
     "cloud": (
-        "Shared review: folder sync + optional endpoint — live in 2.6.23; "
+        "Shared review: folder sync + optional endpoint — live in 2.6.24; "
         "no hosted cloud service; offline remains usable."
     ),
     "stylus": "Pressure-sensitive stylus with palm rejection — stub / no action.",
@@ -237,7 +237,7 @@ class StubInfoDialog(QDialog):
 
 
 def show_planned(parent: QWidget | None, key: str) -> None:
-    """Stub-Info; Cloud öffnet Shared-Review-Dialog (2.6.23) statt Coming-soon."""
+    """Stub-Info; Cloud öffnet Shared-Review-Dialog (2.6.24) statt Coming-soon."""
     if key == "cloud":
         opener = getattr(parent, "_show_shared_review_dialog", None)
         if callable(opener):
@@ -253,7 +253,7 @@ def show_planned(parent: QWidget | None, key: str) -> None:
             title=(STUB_TITLES_EN if en else STUB_TITLES).get("cloud", "Cloud"),
             short=(STUB_SHORT_EN if en else STUB_SHORT).get("cloud", ""),
             detail=(PLANNED_EN if en else PLANNED).get("cloud", ""),
-            badge="2.6.23" if not en else "Live",
+            badge="2.6.24" if not en else "Live",
         )
         dlg.exec()
         return

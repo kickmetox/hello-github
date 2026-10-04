@@ -1,5 +1,5 @@
 """
-Stabiles Scripting-API für InstantLens Doc (2.6.23).
+Stabiles Scripting-API für InstantLens Doc (2.6.24).
 
 Headless, ohne GUI. Nutzt ``ild_pdf`` + Lizenz/OCR der App.
 
@@ -38,6 +38,9 @@ Headless, ohne GUI. Nutzt ``ild_pdf`` + Lizenz/OCR der App.
     ild.sign_pdf_api("dok.pdf", level="AES", p12="signer.p12", p12_password="x")
     ild.shared_review_start("dok.pdf", "share/", author="Anna")
     ild.shared_review_sync("share/", "dok.pdf", author="Anna")
+    ild.insert_hyperlink("Siehe ", "Beispiel", "https://example.com")
+    ild.layout_add_shape_frame(shape="ellipse")
+    ild.export_epub_api("# Titel\\nText", "buch.epub")
 
     CLI: ``python -m ild --help`` · PowerShell: ``scripts\\ild.ps1``.
 """
@@ -155,6 +158,16 @@ from ild.api import (
     shared_review_sync,
     shared_review_status_api,
     shared_review_info,
+    insert_hyperlink,
+    extract_hyperlinks,
+    resolve_hyperlink,
+    list_doc_anchors,
+    save_hyperlinks_sidecar,
+    layout_add_shape_frame,
+    layout_add_video_placeholder,
+    layout_scale_image,
+    layout_crop_image,
+    export_epub_api,
     open_info,
     outline_summary,
     page_count,
@@ -232,6 +245,16 @@ __all__ = [
     "shared_review_sync",
     "shared_review_status_api",
     "shared_review_info",
+    "insert_hyperlink",
+    "extract_hyperlinks",
+    "resolve_hyperlink",
+    "list_doc_anchors",
+    "save_hyperlinks_sidecar",
+    "layout_add_shape_frame",
+    "layout_add_video_placeholder",
+    "layout_scale_image",
+    "layout_crop_image",
+    "export_epub_api",
     "add_redaction",
     "apply_redactions",
     "add_shape",
