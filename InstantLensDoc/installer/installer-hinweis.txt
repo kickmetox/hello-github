@@ -1,0 +1,14 @@
+InstantLens Doc 2.5.13 — Installation
+
+Startmenü: Gruppe „InstantLens Doc“ mit Programm, optional Keygenerator, INFO und Deinstallieren.
+
+Desktop-Verknüpfung: optionale Checkbox im Installer-Assistenten
+  (Task „desktopicon“, Flags checkedonce — Standard beim ersten Install aktiv, abwählbar).
+  Ohne Haken: kein Desktop-Icon; Startmenü unabhängig über Task „startmenu“.
+
+Keygenerator (wenn IncludeKeygen=1):
+- Python-Layout: Startmenü → Keygenerator → {app}\run-keygen.bat
+- EXE-Layout: Startmenü → Keygenerator → {app}\InstantLensKeygen.exe
+  (Datei liegt im Installationsordner neben InstantLensDoc.exe)
+
+Deinstallation: Startmenü „InstantLens Doc deinstallieren“ oder Systemsteuerung.

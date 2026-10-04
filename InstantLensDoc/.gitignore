@@ -1,0 +1,12 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+dist/
+build/
+*.egg-info/
+.smoke_license.json
+_smoke*
+*.ildann.json
+.DS_Store
+Thumbs.db
