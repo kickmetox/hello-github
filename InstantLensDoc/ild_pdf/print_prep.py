@@ -50,6 +50,136 @@ SPOT_SWATCHES: dict[str, dict[str, Any]] = {
     "paper": {"name": "Papierweiß", "cmyk": (0.0, 0.0, 0.0, 0.0), "spot": False},
 }
 
+# Pantone-ähnlich / unlicensed approximations — KEINE offizielle Pantone-Lizenz.
+# CMYK-Werte sind praxisübliche Näherungen für Layout/Preview, nicht farbverbindlich.
+PANTONE_DISCLAIMER = (
+    "Pantone-ähnlich / unlicensed approximations — keine offizielle Pantone-Lizenz; "
+    "nur Layout-/Preview-Hilfen, nicht farbverbindlich."
+)
+
+PANTONE_BASIC: dict[str, dict[str, Any]] = {
+    "p185c": {
+        "name": "Pantone-like 185 C",
+        "cmyk": (0.0, 0.91, 0.76, 0.0),
+        "spot": True,
+        "spot_name": "Pantone-like 185 C",
+    },
+    "p286c": {
+        "name": "Pantone-like 286 C",
+        "cmyk": (1.0, 0.75, 0.0, 0.0),
+        "spot": True,
+        "spot_name": "Pantone-like 286 C",
+    },
+    "p348c": {
+        "name": "Pantone-like 348 C",
+        "cmyk": (1.0, 0.0, 0.85, 0.24),
+        "spot": True,
+        "spot_name": "Pantone-like 348 C",
+    },
+    "p021c": {
+        "name": "Pantone-like 021 C",
+        "cmyk": (0.0, 0.53, 1.0, 0.0),
+        "spot": True,
+        "spot_name": "Pantone-like 021 C",
+    },
+    "pcoolgray9": {
+        "name": "Pantone-like Cool Gray 9",
+        "cmyk": (0.0, 0.0, 0.0, 0.60),
+        "spot": True,
+        "spot_name": "Pantone-like Cool Gray 9 C",
+    },
+    "p012c": {
+        "name": "Pantone-like 012 C",
+        "cmyk": (0.0, 0.10, 1.0, 0.0),
+        "spot": True,
+        "spot_name": "Pantone-like 012 C",
+    },
+    "p485c": {
+        "name": "Pantone-like 485 C",
+        "cmyk": (0.0, 0.95, 1.0, 0.0),
+        "spot": True,
+        "spot_name": "Pantone-like 485 C",
+    },
+    "p072c": {
+        "name": "Pantone-like 072 C",
+        "cmyk": (1.0, 0.88, 0.0, 0.0),
+        "spot": True,
+        "spot_name": "Pantone-like 072 C",
+    },
+    "p354c": {
+        "name": "Pantone-like 354 C",
+        "cmyk": (0.91, 0.0, 0.86, 0.0),
+        "spot": True,
+        "spot_name": "Pantone-like 354 C",
+    },
+    "p116c": {
+        "name": "Pantone-like 116 C",
+        "cmyk": (0.0, 0.21, 0.93, 0.0),
+        "spot": True,
+        "spot_name": "Pantone-like 116 C",
+    },
+    "p300c": {
+        "name": "Pantone-like 300 C",
+        "cmyk": (1.0, 0.56, 0.0, 0.0),
+        "spot": True,
+        "spot_name": "Pantone-like 300 C",
+    },
+    "p151c": {
+        "name": "Pantone-like 151 C",
+        "cmyk": (0.0, 0.48, 0.95, 0.0),
+        "spot": True,
+        "spot_name": "Pantone-like 151 C",
+    },
+    "p368c": {
+        "name": "Pantone-like 368 C",
+        "cmyk": (0.57, 0.0, 1.0, 0.0),
+        "spot": True,
+        "spot_name": "Pantone-like 368 C",
+    },
+    "p266c": {
+        "name": "Pantone-like 266 C",
+        "cmyk": (0.70, 0.90, 0.0, 0.0),
+        "spot": True,
+        "spot_name": "Pantone-like 266 C",
+    },
+    "p877c": {
+        "name": "Pantone-like 877 C (Silver)",
+        "cmyk": (0.0, 0.0, 0.0, 0.40),
+        "spot": True,
+        "spot_name": "Pantone-like 877 C",
+    },
+    "p871c": {
+        "name": "Pantone-like 871 C (Gold)",
+        "cmyk": (0.0, 0.18, 0.60, 0.22),
+        "spot": True,
+        "spot_name": "Pantone-like 871 C",
+    },
+    "pblackc": {
+        "name": "Pantone-like Black C",
+        "cmyk": (0.0, 0.0, 0.0, 1.0),
+        "spot": True,
+        "spot_name": "Pantone-like Black C",
+    },
+    "pwarmgray8": {
+        "name": "Pantone-like Warm Gray 8",
+        "cmyk": (0.0, 0.12, 0.20, 0.45),
+        "spot": True,
+        "spot_name": "Pantone-like Warm Gray 8 C",
+    },
+    "p7466c": {
+        "name": "Pantone-like 7466 C",
+        "cmyk": (0.85, 0.10, 0.0, 0.0),
+        "spot": True,
+        "spot_name": "Pantone-like 7466 C",
+    },
+    "p232c": {
+        "name": "Pantone-like 232 C",
+        "cmyk": (0.05, 0.70, 0.0, 0.0),
+        "spot": True,
+        "spot_name": "Pantone-like 232 C",
+    },
+}
+
 
 def _clamp01(v: float) -> float:
     return max(0.0, min(1.0, float(v)))
@@ -194,8 +324,33 @@ class ColorPalette:
         return None
 
 
+def spot_library() -> list[dict[str, Any]]:
+    """~20 gängige Spot-Farben als Pantone-ähnliche CMYK-Näherungen.
+
+    Explizit **keine** offizielle Pantone-Lizenz — siehe ``PANTONE_DISCLAIMER``.
+    """
+    out: list[dict[str, Any]] = []
+    for sid, meta in PANTONE_BASIC.items():
+        c, m, y, k = meta["cmyk"]
+        sw = ColorSwatch.from_cmyk(
+            sid,
+            str(meta["name"]),
+            float(c),
+            float(m),
+            float(y),
+            float(k),
+            spot=True,
+            spot_name=str(meta.get("spot_name") or meta["name"]),
+        )
+        row = sw.to_dict()
+        row["approximation"] = True
+        row["disclaimer"] = PANTONE_DISCLAIMER
+        out.append(row)
+    return out
+
+
 def built_in_palettes() -> list[ColorPalette]:
-    """Eingebaute Paletten: RGB Screen, CMYK Process, Spot-Hinweise."""
+    """Eingebaute Paletten: RGB Screen, CMYK Process, Spot-Hinweise, Pantone-ähnlich."""
     rgb = ColorPalette(
         id="rgb_screen",
         name="RGB Bildschirm",
@@ -260,7 +415,29 @@ def built_in_palettes() -> list[ColorPalette]:
             ),
         ],
     )
-    return [rgb, cmyk, spot]
+    # Pantone-ähnlich / unlicensed — spot_basic palette
+    spot_basic_sw: list[ColorSwatch] = []
+    for sid, meta in PANTONE_BASIC.items():
+        c, m, y, k = meta["cmyk"]
+        spot_basic_sw.append(
+            ColorSwatch.from_cmyk(
+                sid,
+                str(meta["name"]),
+                float(c),
+                float(m),
+                float(y),
+                float(k),
+                spot=True,
+                spot_name=str(meta.get("spot_name") or meta["name"]),
+            )
+        )
+    spot_basic = ColorPalette(
+        id="spot_basic",
+        name="Pantone-ähnlich (unlicensed approximations)",
+        mode="cmyk",
+        swatches=spot_basic_sw,
+    )
+    return [rgb, cmyk, spot, spot_basic]
 
 
 def list_palettes() -> list[dict[str, Any]]:
@@ -975,6 +1152,122 @@ def export_print_ready(
         title=title,
         run_preflight_first=False,
     )
+
+
+def export_web_pdf(
+    path: PathLike,
+    out: PathLike,
+    *,
+    title: str | None = None,
+    page_mode: str = "UseOutlines",
+    open_action_first_page: bool = True,
+    preserve_links: bool = True,
+    preserve_forms: bool = True,
+) -> dict[str, Any]:
+    """
+    Interaktives / web-optimiertes PDF-Profil.
+
+    Setzt Viewer-Flags für Outlines/Links/Forms und optional OpenAction (Seite 1).
+    Kein erneutes Rendern — Metadaten/Catalog am bestehenden PDF. Kein Bleed/PDF/X.
+    """
+    import pikepdf
+    import shutil
+    from pikepdf import Dictionary, Name, Array
+
+    src = Path(path)
+    dest = Path(out)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    if dest.resolve() != src.resolve():
+        shutil.copy2(src, dest)
+
+    mode_key = (page_mode or "UseOutlines").strip()
+    if not mode_key.startswith("/"):
+        mode_name = Name(f"/{mode_key}")
+    else:
+        mode_name = Name(mode_key)
+
+    flags: dict[str, bool] = {
+        "links": bool(preserve_links),
+        "outlines": True,
+        "forms": bool(preserve_forms),
+        "open_action": bool(open_action_first_page),
+    }
+
+    with pikepdf.open(dest, allow_overwriting_input=True) as pdf:
+        try:
+            pdf.Root[Name("/PageMode")] = mode_name
+        except Exception:
+            pass
+        # PageLayout für Web: Einzelseite
+        try:
+            pdf.Root[Name("/PageLayout")] = Name("/OneColumn")
+        except Exception:
+            pass
+        if open_action_first_page and len(pdf.pages) > 0:
+            try:
+                # OpenAction → erste Seite (Fit)
+                pdf.Root[Name("/OpenAction")] = Array(
+                    [pdf.pages[0].obj, Name("/Fit")]
+                )
+            except Exception:
+                flags["open_action"] = False
+        # ViewerPreferences: UI für Outlines/Forms behalten
+        try:
+            vp = pdf.Root.get("/ViewerPreferences")
+            if vp is None:
+                vp = Dictionary()
+                pdf.Root[Name("/ViewerPreferences")] = vp
+            vp[Name("/DisplayDocTitle")] = True
+        except Exception:
+            pass
+        if title:
+            try:
+                with pdf.open_metadata(set_pikepdf_as_editor=False) as meta:
+                    meta["dc:title"] = title
+            except Exception:
+                pass
+            try:
+                if pdf.docinfo is None:
+                    pdf.docinfo = Dictionary()
+                pdf.docinfo[Name("/Title")] = title
+            except Exception:
+                pass
+        # Hinweis-Metadatum: web-optimized profile
+        try:
+            if pdf.docinfo is None:
+                pdf.docinfo = Dictionary()
+            pdf.docinfo[Name("/ILD_Profile")] = "web_pdf"
+        except Exception:
+            pass
+        # Links/Annots und AcroForm bleiben unangetastet (preserve_*)
+        has_outlines = pdf.Root.get("/Outlines") is not None
+        has_forms = pdf.Root.get("/AcroForm") is not None
+        has_annots = False
+        try:
+            for page in pdf.pages:
+                if page.get("/Annots") is not None:
+                    has_annots = True
+                    break
+        except Exception:
+            pass
+        pdf.save(dest)
+
+    return {
+        "out": str(dest.resolve()),
+        "source": str(src.resolve()),
+        "profile": "web_pdf",
+        "web_optimized": True,
+        "page_mode": str(mode_key).lstrip("/"),
+        "flags": flags,
+        "has_outlines": has_outlines,
+        "has_forms": has_forms,
+        "has_annotations": has_annots,
+        "title": title,
+        "note": (
+            "Web-PDF-Profil: PageMode/OpenAction gesetzt; "
+            "Links, Outlines und Forms bleiben erhalten (keine Flatten-Op)."
+        ),
+    }
 
 
 # Sidecar für Dokument-Farb-/Bleed-Einstellungen

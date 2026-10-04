@@ -1,5 +1,5 @@
 """
-Stabiles Scripting-API für InstantLens Doc (2.6.27).
+Stabiles Scripting-API für InstantLens Doc (2.6.28).
 
 Headless, ohne GUI. Nutzt ``ild_pdf`` + Lizenz/OCR der App.
 
@@ -41,6 +41,9 @@ Headless, ohne GUI. Nutzt ``ild_pdf`` + Lizenz/OCR der App.
     ild.insert_hyperlink("Siehe ", "Beispiel", "https://example.com")
     ild.layout_add_shape_frame(shape="ellipse")
     ild.export_epub_api("# Titel\\nText", "buch.epub")
+    ild.export_pptx_api("# Folie\\nPunkt", "deck.pptx")
+    ild.section_add("dok.pdf", start_page=1, preset="A4", orientation="landscape")
+    ild.grammar_check_api("Ich denke das er kommt.", lang="de")
     ild.hooks_list()
     ild.hooks_emit("document.opened", kind="PDF")
     ild.document_outline_api(text="# A\\n## B")
@@ -78,6 +81,8 @@ from ild.api import (
     find_replace,
     format_table,
     generate_key,
+    generate_index,
+    generate_lof,
     generate_toc,
     get_encryption_info,
     grid_lines,
@@ -123,7 +128,9 @@ from ild.api import (
     set_ui_lang,
     tr,
     ocr_handwriting,
+    handwriting_recognize_api,
     list_color_palettes,
+    spot_library_api,
     convert_color_api,
     list_bleed_presets,
     apply_bleed,
@@ -133,6 +140,7 @@ from ild.api import (
     layout_layers,
     preflight,
     export_pdfx,
+    export_web_pdf_api,
     compare_pdfs,
     spellcheck,
     suggest_word,
@@ -159,6 +167,10 @@ from ild.api import (
     list_signatures_api,
     generate_signing_cert,
     eidas_info,
+    eidas_trust_info_api,
+    verify_trust_path_api,
+    realtime_start_hub,
+    realtime_status,
     shared_review_start,
     shared_review_join,
     shared_review_sync,
@@ -174,6 +186,13 @@ from ild.api import (
     layout_scale_image,
     layout_crop_image,
     export_epub_api,
+    export_pptx_api,
+    import_pptx_api,
+    grammar_check_api,
+    section_add,
+    section_list,
+    section_apply,
+    section_paginate,
     hooks_list,
     hooks_load,
     hooks_emit,
@@ -219,7 +238,9 @@ __all__ = [
     "set_ui_lang",
     "tr",
     "ocr_handwriting",
+    "handwriting_recognize_api",
     "list_color_palettes",
+    "spot_library_api",
     "convert_color_api",
     "list_bleed_presets",
     "apply_bleed",
@@ -229,6 +250,7 @@ __all__ = [
     "layout_layers",
     "preflight",
     "export_pdfx",
+    "export_web_pdf_api",
     "compare_pdfs",
     "spellcheck",
     "suggest_word",
@@ -255,6 +277,10 @@ __all__ = [
     "list_signatures_api",
     "generate_signing_cert",
     "eidas_info",
+    "eidas_trust_info_api",
+    "verify_trust_path_api",
+    "realtime_start_hub",
+    "realtime_status",
     "shared_review_start",
     "shared_review_join",
     "shared_review_sync",
@@ -270,6 +296,13 @@ __all__ = [
     "layout_scale_image",
     "layout_crop_image",
     "export_epub_api",
+    "export_pptx_api",
+    "import_pptx_api",
+    "grammar_check_api",
+    "section_add",
+    "section_list",
+    "section_apply",
+    "section_paginate",
     "hooks_list",
     "hooks_load",
     "hooks_emit",
@@ -290,6 +323,8 @@ __all__ = [
     "auto_format_text",
     "auto_format_pdf",
     "generate_toc",
+    "generate_lof",
+    "generate_index",
     "list_style_presets",
     "list_system_fonts",
     "find_replace",

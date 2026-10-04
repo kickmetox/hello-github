@@ -1,4 +1,4 @@
-"""Hyperlink einfügen/bearbeiten — URL oder Dokumentziel — 2.6.27."""
+"""Hyperlink einfügen/bearbeiten — URL oder Dokumentziel — 2.6.27. — 2.6.28."""
 
 from __future__ import annotations
 

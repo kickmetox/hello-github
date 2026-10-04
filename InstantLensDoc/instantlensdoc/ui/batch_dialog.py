@@ -1,4 +1,4 @@
-"""Batch-Konvertierung Ordner → PDF / OCR + PDF-Stapel — 2.6.27."""
+"""Batch-Konvertierung Ordner → PDF / OCR + PDF-Stapel — 2.6.27. — 2.6.28."""
 
 from __future__ import annotations
 

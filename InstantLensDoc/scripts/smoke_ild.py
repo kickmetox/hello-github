@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Nightly/CI Smoke: CLI + Import-Checks für InstantLens Doc — 2.1.0–2.6.27.
+"""Nightly/CI Smoke: CLI + Import-Checks für InstantLens Doc — 2.1.0–2.6.28.
 
 Leichtgewichtig. Exit-Codes:
   0  OK  (ok=true)
@@ -14,12 +14,12 @@ Aufruf:
   python scripts/smoke_ild.py -h
 
 JSON-Schema (--json), Erfolg:
-  {"ok": true, "version": "2.6.27", "duration_ms": 1234,
+  {"ok": true, "version": "2.6.28", "duration_ms": 1234,
    "checks": ["version", "imports", "cli", "measure_diff_import", "changelog"]}
 
 JSON bei Fail: checks[] enthält Objekt mit error-Text (max 200 Zeichen, Truncate …);
 Exitcode spiegelt ok (0↔true, 1↔false) — 2.2.0:
-  {"ok": false, "version": "2.6.27", "duration_ms": 12,
+  {"ok": false, "version": "2.6.28", "duration_ms": 12,
    "checks": ["version", {"name": "imports", "error": "import x: …"}]}
 """
 
@@ -41,7 +41,7 @@ if str(ROOT) not in sys.path:
 # Headless/CI: Qt ohne Display
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-EXPECTED_VERSION = "2.6.27"
+EXPECTED_VERSION = "2.6.28"
 FAIL_ERROR_MAX_LEN = 200
 
 EXIT_OK = 0
@@ -82,7 +82,7 @@ def check_version() -> None:
         _fail(f"docs/VERSION={docs_ver!r}")
     bw = (ROOT / "build-windows.ps1").read_text(encoding="utf-8")
     if EXPECTED_VERSION not in bw or "Allow32Bit" not in bw:
-        _fail("build-windows.ps1 fehlt 2.6.27/Allow32Bit")
+        _fail("build-windows.ps1 fehlt 2.6.28/Allow32Bit")
     if not (ROOT / "scripts" / "pack-windows-runnable.py").is_file():
         _fail("scripts/pack-windows-runnable.py fehlt")
     if not (ROOT / "run-keygen.bat").is_file():
@@ -125,10 +125,14 @@ def check_imports(*, with_qt: bool) -> None:
         "instantlensdoc.core.batch",
         "instantlensdoc.core.mail_merge",
         "instantlensdoc.core.shared_review",
+        "instantlensdoc.core.realtime_collab",
         "instantlensdoc.core.hyperlinks",
         "instantlensdoc.core.export",
         "ild_pdf.print_prep",
         "ild_pdf.esign",
+        "ild_pdf.sections",
+        "ild_pdf.auto_format",
+        "ild_pdf.typography",
         "ild",
         "ild.api",
     ]
@@ -173,20 +177,21 @@ def check_imports(*, with_qt: bool) -> None:
             "tab_activated",
             "tab_close_requested",
             "tab_detach_requested",
-            "2.6.27",
+            "2.6.28",
         ),
         ROOT / "instantlensdoc" / "core" / "autocorrect.py": (
             "effective_autocorrect_rules",
             "apply_autocorrect_to_text",
             "default_snippet_triggers",
-            "2.6.27",
+            "2.6.28",
         ),
         ROOT / "instantlensdoc" / "core" / "spellcheck.py": (
             "spellcheck_with_suggestions",
             "suggest_corrections",
             "grammar_hints",
+            "grammar_check",
             "builtin_wordlist",
-            "2.6.27",
+            "2.6.28",
         ),
         ROOT / "instantlensdoc" / "ui" / "ribbon_bar.py": (
             "RibbonBar",
@@ -197,7 +202,28 @@ def check_imports(*, with_qt: bool) -> None:
             "shared_review",
             "insert_hyperlink",
             "export_epub",
-            "2.6.27",
+            "export_pptx",
+            "save_as",
+            "auto_lof",
+            "auto_index",
+            "ALT_CATEGORY_KEYS",
+            "2.6.28",
+        ),
+        ROOT / "instantlensdoc" / "core" / "realtime_collab.py": (
+            "RealtimeHub",
+            "start_local_hub",
+            "realtime_status",
+            "apply_ops",
+            "CRDT",
+            "2.6.28",
+        ),
+        ROOT / "ild_pdf" / "sections.py": (
+            "ildsections-v1",
+            "add_section_break",
+            "list_sections",
+            "paginate_text_columns",
+            "SectionBreak",
+            "2.6.28",
         ),
         ROOT / "instantlensdoc" / "core" / "shared_review.py": (
             "ildshare-v1",
@@ -205,35 +231,38 @@ def check_imports(*, with_qt: bool) -> None:
             "join_shared_review",
             "sync_shared_review",
             "session.ildshare.json",
-            "2.6.27",
+            "2.6.28",
         ),
         ROOT / "instantlensdoc" / "ui" / "shared_review_dialog.py": (
             "SharedReviewDialog",
             "btnSharedReviewStart",
             "btnSharedReviewJoin",
             "btnSharedReviewSync",
-            "2.6.27",
+            "2.6.28",
         ),
         ROOT / "instantlensdoc" / "core" / "hyperlinks.py": (
             "ildlinks-v1",
             "insert_link_in_text",
             "extract_links_from_text",
             "resolve_internal_target",
-            "2.6.27",
+            "2.6.28",
         ),
         ROOT / "instantlensdoc" / "ui" / "hyperlink_dialog.py": (
             "HyperlinkDialog",
             "hyperlinkDialog",
             "hyperlinkTarget",
-            "2.6.27",
+            "2.6.28",
         ),
         ROOT / "instantlensdoc" / "core" / "export.py": (
             "export_epub",
             "import_epub",
             "epub",
-            "2.6.27",
+            "2.6.28",
         ),
         ROOT / "instantlensdoc" / "ui" / "pdf_view.py": (
+            "_handle_page_wheel",
+            "_wheel_should_flip_page",
+            "wheelEvent",
             "import_native_pdf_comments",
             "MEASURE_AREA",
             "MEASURE_ANGLE",
@@ -457,6 +486,11 @@ def check_imports(*, with_qt: bool) -> None:
             "_crop_image_frame",
             "Ctrl+Shift+K",
             "Als EPUB",
+            "Abbildungsverzeichnis aktualisieren",
+            "Stichwortverzeichnis aktualisieren",
+            "F12",
+            "_update_figure_list",
+            "_update_index",
         ),
         ROOT / "instantlensdoc" / "ui" / "batch_dialog.py": (
             "BatchConvertDialog",
@@ -465,20 +499,20 @@ def check_imports(*, with_qt: bool) -> None:
             "PDF_ENCRYPT",
             "pipeline_wm_comp_enc",
             "batchUserPassword",
-            "2.6.27",
+            "2.6.28",
         ),
         ROOT / "instantlensdoc" / "ui" / "esign_dialog.py": (
             "ESignDialog",
             "esignDialog",
             "esignLevel",
             "esignSignBtn",
-            "2.6.27",
+            "2.6.28",
         ),
         ROOT / "instantlensdoc" / "ui" / "mail_merge_dialog.py": (
             "MailMergeDialog",
             "mailMergePreview",
             "mailMergeRunBtn",
-            "2.6.27",
+            "2.6.28",
         ),
         ROOT / "ild_pdf" / "esign.py": (
             "sign_pdf",
@@ -486,7 +520,7 @@ def check_imports(*, with_qt: bool) -> None:
             "generate_self_signed_cert",
             "ildesign-v1",
             "eidas_level_info",
-            "2.6.27",
+            "2.6.28",
         ),
         ROOT / "ild" / "__main__.py": (
             "license",
@@ -893,8 +927,8 @@ def check_measure_and_diff() -> None:
 
 def check_changelog() -> None:
     cl = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-    if "## 2.6.27" not in cl:
-        _fail("CHANGELOG fehlt ## 2.6.27")
+    if "## 2.6.28" not in cl:
+        _fail("CHANGELOG fehlt ## 2.6.28")
     if "## 2.6.25" not in cl:
         _fail("CHANGELOG fehlt ## 2.6.25")
     if "## 2.6.21" not in cl:
@@ -1371,9 +1405,25 @@ def check_changelog() -> None:
         and "Installer" not in cl
         and "Konsolidierung" not in cl
         and "CustomMessages" not in cl
+        and "2.6.26" not in cl
+    ):
+        _fail("CHANGELOG 2.6.26 fehlt Polish/Installer-Hinweis")
+    if (
+        "Sync-Flow" not in cl
+        and "BuildInstaller" not in cl
+        and "apply_wheel_scroll" not in cl
+        and "Mausrad" not in cl
         and "2.6.27" not in cl
     ):
-        _fail("CHANGELOG 2.6.27 fehlt Polish/Installer-Hinweis")
+        _fail("CHANGELOG 2.6.27 fehlt Sync/Mausrad-Hinweis")
+    if (
+        "Mausrad" not in cl
+        and "Abbildungs" not in cl
+        and "pptx" not in cl
+        and "Audit-Closure" not in cl
+        and "2.6.28" not in cl
+    ):
+        _fail("CHANGELOG 2.6.28 fehlt Audit-Closure/Mausrad/pptx-Hinweis")
     if (
         "Stylus" not in cl
         and "Palm" not in cl
@@ -1505,8 +1555,8 @@ def check_changelog() -> None:
     if "## 2.2.0" not in cl:
         _fail("CHANGELOG fehlt ## 2.2.0")
     feat = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
-    if "2.6.27" not in feat:
-        _fail("FEATURES.md fehlt 2.6.27")
+    if "2.6.28" not in feat:
+        _fail("FEATURES.md fehlt 2.6.28")
     if "2.6.13" not in feat:
         _fail("FEATURES.md fehlt 2.6.13")
     if (
@@ -1616,7 +1666,15 @@ def check_changelog() -> None:
         and "build-windows-installer" not in feat
         and "CustomMessages" not in feat
     ):
-        _fail("FEATURES.md fehlt 2.6.27 Installer-Hinweis")
+        _fail("FEATURES.md fehlt 2.6.28 Installer-Hinweis")
+    if (
+        "Abbildungsverzeichnis" not in feat
+        and "Stichwortverzeichnis" not in feat
+        and "pptx" not in feat.lower()
+        and "Default-Mausrad" not in feat
+        and "realtime_collab" not in feat
+    ):
+        _fail("FEATURES.md fehlt 2.6.28 Audit-Closure (Verzeichnisse/pptx/Mausrad)")
     if "Automatische Formatierung" not in feat and "Systemschriften" not in feat:
         _fail("FEATURES.md fehlt 2.6.10 Auto-Format/Fonts")
     if "2.6.10" not in feat:
@@ -2055,11 +2113,11 @@ Exit-Codes:
 Laufzeit: am Ende als „Laufzeit: N ms“ (oder duration_ms im JSON).
 
 Beispiel --json (Erfolg):
-  {"ok": true, "version": "2.6.27", "duration_ms": 1234,
+  {"ok": true, "version": "2.6.28", "duration_ms": 1234,
    "checks": ["version", "imports", "cli", "measure_diff_import", "changelog"]}
 
 Beispiel --json (Fail):
-  {"ok": false, "version": "2.6.27", "duration_ms": 12,
+  {"ok": false, "version": "2.6.28", "duration_ms": 12,
    "checks": ["version", {"name": "imports", "error": "import x: …"}]}
 """.rstrip()
     )

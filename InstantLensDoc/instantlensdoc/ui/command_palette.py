@@ -99,6 +99,27 @@ def default_palette_commands() -> list[PaletteCommand]:
             "Ctrl+Alt+Shift+T",
         ),
         PaletteCommand(
+            "auto_lof",
+            "Abbildungsverzeichnis aktualisieren",
+            "lof abbildungsverzeichnis figure caption verzeichnis",
+            "Bearbeiten",
+            "Ctrl+Alt+Shift+A",
+        ),
+        PaletteCommand(
+            "auto_index",
+            "Stichwortverzeichnis aktualisieren",
+            "index stichwortverzeichnis keywords verzeichnis",
+            "Bearbeiten",
+            "Ctrl+Alt+Shift+X",
+        ),
+        PaletteCommand(
+            "save_as",
+            "Speichern unter…",
+            "save as speichern unter f12",
+            "Datei",
+            "F12",
+        ),
+        PaletteCommand(
             "para_align_left",
             "Absatz links",
             "absatz align left ausrichtung",
@@ -250,6 +271,12 @@ def default_palette_commands() -> list[PaletteCommand]:
             "export_epub",
             "Als EPUB exportieren…",
             "export epub ebook e-book hyperlink kapitel",
+            "Datei",
+        ),
+        PaletteCommand(
+            "export_pptx",
+            "Als PPTX exportieren…",
+            "export pptx powerpoint presentation folie slides",
             "Datei",
         ),
         PaletteCommand(

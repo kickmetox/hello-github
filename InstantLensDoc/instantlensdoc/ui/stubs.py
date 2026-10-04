@@ -21,7 +21,9 @@ PLANNED = {
     "cloud": (
         f"Gemeinsames Review / Cloud-Ordner — {__version__} produktiv: "
         "Freigabeordner-Sync + optionaler HTTP-Endpoint; Notizen/Markierungen/"
-        "Stempel/Kommentare austauschbar (kein gehosteter Cloud-Dienst)"
+        "Stempel/Kommentare austauschbar (kein gehosteter Cloud-Dienst); "
+        "lokaler Realtime-Hub (TCP JSON-Lines CRDT-lite) via realtime_collab / "
+        "realtime_start_hub verfügbar"
     ),
     "stylus": (
         f"Stylus / Palm Rejection — {__version__} produktiv: "
@@ -49,8 +51,9 @@ PLANNED = {
     "varfonts": "Variable Fonts (voll) — geplant",
     "envelope": "Envelope Distort (voll) — geplant",
     "esign": (
-        f"E-Signatur QES/QTSP-Trust — Hinweis {__version__}: "
-        "AES/SES-Pfad produktiv (PKCS#12); volle QES-Validierung bleibt QTSP"
+        f"E-Signatur QES/QTSP-Trust — {__version__}: "
+        "AES/SES produktiv; Trust-Pfad (verify_trust_path / eidas_trust_info) "
+        "ohne bezahlte TSA; volle QES/Zeitstempel bleibt QTSP"
     ),
 }
 
@@ -59,7 +62,9 @@ PLANNED_EN = {
     "cloud": (
         f"Shared review / cloud folder — {__version__} live: "
         "shared-folder sync + optional HTTP endpoint; notes/highlights/"
-        "stamps/comments exchangeable (no hosted cloud service)"
+        "stamps/comments exchangeable (no hosted cloud service); "
+        "local realtime hub (TCP JSON-lines CRDT-lite) available via "
+        "realtime_collab / realtime_start_hub"
     ),
     "stylus": (
         f"Stylus / palm rejection — {__version__} live: "
@@ -87,37 +92,39 @@ PLANNED_EN = {
     "varfonts": "Variable fonts (full) — planned",
     "envelope": "Envelope distort (full) — planned",
     "esign": (
-        f"E-signature QES/QTSP trust — note {__version__}: "
-        "AES/SES path live (PKCS#12); full QES validation stays with QTSP"
+        f"E-signature QES/QTSP trust — {__version__}: "
+        "AES/SES live; trust path (verify_trust_path / eidas_trust_info) "
+        "without paid TSA; full QES/timestamp remains QTSP"
     ),
 }
 
-# Kurzbeschreibungen für Info-Dialog — 1.9.5 / Live 2.6.27
+# Kurzbeschreibungen für Info-Dialog — 1.9.5 / Live 2.6.28
 STUB_SHORT = {
     "ki": "Lokaler KI-Assistent für Zusammenfassen und Vorschläge — Stub / nicht produktiv.",
     "cloud": (
         "Gemeinsames Review: Freigabeordner + optionaler Endpoint — produktiv 2.6.23+; "
-        "kein gehosteter Cloud-Dienst; Offline bleibt nutzbar."
+        "kein gehosteter Cloud-Dienst; lokaler Realtime-Hub (CRDT-lite) verfügbar; "
+        "Offline bleibt nutzbar."
     ),
     "stylus": (
-        "Drucksensitiver Stylus mit Palm Rejection — produktiv 2.6.27 "
+        "Drucksensitiver Stylus mit Palm Rejection — produktiv 2.6.28 "
         "(Tablet-Druck → Strichstärke; sonst Freihand)."
     ),
     "shapes_ai": "Intelligente Formerkennung beim Zeichnen — Stub / geplant.",
     "extrude3d": (
-        "3D-Extrusion Limited Viewer — produktiv 2.6.27 "
+        "3D-Extrusion Limited Viewer — produktiv 2.6.28 "
         "(isometrisch, einfache Formen; kein Mesh/OpenGL)."
     ),
     "plugins": (
-        "User-/Script-Hooks (open/save/export/ocr) — produktiv 2.6.27; "
+        "User-/Script-Hooks (open/save/export/ocr) — produktiv 2.6.28; "
         "Python/PowerShell ild; kein Marketplace-Plugin-System."
     ),
     "outline_read": (
         "Document Outline Vorlesen (TTS) — Stub / geplant; "
-        "Struktur-Pane (Überschriften/Lesezeichen) produktiv 2.6.27."
+        "Struktur-Pane (Überschriften/Lesezeichen) produktiv 2.6.28."
     ),
     "telemetry": (
-        "Optionale lokale Diagnostik — produktiv 2.6.27: Opt-in Default aus, "
+        "Optionale lokale Diagnostik — produktiv 2.6.28: Opt-in Default aus, "
         "kein Netzwerk, kein PII, keine Datenübertragung (diagnostics.jsonl)."
     ),
     "varfonts": "Vollständige Variable-Fonts-Unterstützung — geplant.",
@@ -132,27 +139,28 @@ STUB_SHORT_EN = {
     "ki": "Local AI assistant for summaries and suggestions — stub / not production.",
     "cloud": (
         "Shared review: folder sync + optional endpoint — live since 2.6.23; "
-        "no hosted cloud service; offline remains usable."
+        "no hosted cloud service; local realtime hub (CRDT-lite) available; "
+        "offline remains usable."
     ),
     "stylus": (
-        "Pressure-sensitive stylus with palm rejection — live 2.6.27 "
+        "Pressure-sensitive stylus with palm rejection — live 2.6.28 "
         "(tablet pressure → stroke width; else freehand)."
     ),
     "shapes_ai": "Smart shape recognition while drawing — stub / planned.",
     "extrude3d": (
-        "3D extrusion limited viewer — live 2.6.27 "
+        "3D extrusion limited viewer — live 2.6.28 "
         "(isometric, simple shapes; no mesh/OpenGL)."
     ),
     "plugins": (
-        "User/script hooks (open/save/export/ocr) — live 2.6.27; "
+        "User/script hooks (open/save/export/ocr) — live 2.6.28; "
         "Python/PowerShell ild; no marketplace plugin system."
     ),
     "outline_read": (
         "Document outline read-aloud (TTS) — stub / planned; "
-        "structure pane (headings/bookmarks) live 2.6.27."
+        "structure pane (headings/bookmarks) live 2.6.28."
     ),
     "telemetry": (
-        "Optional local diagnostics — live 2.6.27: opt-in default off, "
+        "Optional local diagnostics — live 2.6.28: opt-in default off, "
         "no network, no PII, no data transfer (diagnostics.jsonl)."
     ),
     "varfonts": "Full variable fonts support — planned.",
@@ -224,7 +232,7 @@ class StubInfoDialog(QDialog):
         self.badge = QLabel(badge)
         self.badge.setObjectName("stubInfoBadge")
         self.badge.setAlignment(Qt.AlignCenter)
-        live = badge.lower() in ("live", "2.6.27", "produktiv") or "2.6.27" in badge
+        live = badge.lower() in ("live", "2.6.28", "produktiv") or "2.6.28" in badge
         if live:
             self.badge.setStyleSheet(
                 "QLabel#stubInfoBadge {"
@@ -232,7 +240,7 @@ class StubInfoDialog(QDialog):
                 " border-radius:4px; padding:2px 8px; font-weight:700;"
                 "}"
             )
-            self.badge.setToolTip("Produktiv / live — 2.6.27")
+            self.badge.setToolTip("Produktiv / live — 2.6.28")
         else:
             self.badge.setStyleSheet(
                 "QLabel#stubInfoBadge {"
@@ -289,7 +297,7 @@ class StubInfoDialog(QDialog):
 
 
 def show_planned(parent: QWidget | None, key: str) -> None:
-    """Stub-Info oder Live-Feature öffnen — 2.6.27."""
+    """Stub-Info oder Live-Feature öffnen — 2.6.28."""
     if key == "cloud":
         opener = getattr(parent, "_show_shared_review_dialog", None)
         if callable(opener):
@@ -352,7 +360,7 @@ def show_planned(parent: QWidget | None, key: str) -> None:
         key, "Dieses Feature ist geplant und noch nicht implementiert."
     )
     if key in _LIVE_KEYS:
-        badge = "2.6.27" if not en else "Live"
+        badge = "2.6.28" if not en else "Live"
         note = "Produktiv / live." if not en else "Live / production."
     else:
         badge = tr("planned")

@@ -23,6 +23,13 @@ DEFAULTS: dict[str, Any] = {
     "ocr_dpi": 150,  # OCR-Batch Default-DPI 150|300 — 1.1.6
     "ocr_attach_errors": True,  # OCR-Batch: Fehlerabschnitt anhängen — 1.1.5
     "ocr_defaults_toast_sec": 2,  # OCR-Defaults-Toast Dauer 1|2|3 s — 1.1.9
+    # Handschrift-OCR: Preprocess + Multi-PSM (ild.ocr_handwriting Alias)
+    "ocr_handwriting": {
+        "preprocess": True,
+        "multi_psm": True,
+        "psm": 6,
+        "engine": "tesseract",
+    },
     "merge_close_preview_on_edit": False,  # Vorschau-Tab bei „Zum Bearbeiten“ schließen — 1.1.6
     "keygen_reveal_auto_hide_sec": 10,  # Reveal Auto-Hide 5|10|30 — 1.1.6
     "batch_output_dir": "",
@@ -157,9 +164,9 @@ DEFAULTS: dict[str, Any] = {
     "page_labels_txt_utf8_bom": True,  # PageLabels-TXT UTF-8 BOM — 2.2.4
     "last_page_labels_txt_dir": "",  # Zielordner PageLabels-TXT merken — 2.2.4
     "page_labels_txt_filename_template": "{stem}_labels.txt",  # Template — 2.2.4
-    "telemetry_opt_in": False,  # anonym Diagnostik lokal — Opt-in Default aus — 2.6.27
-    "stylus_pressure_enabled": True,  # Stylus-Druck → Strichstärke — 2.6.27
-    "stylus_palm_rejection": True,  # Palm-Rejection Heuristik — 2.6.27
+    "telemetry_opt_in": False,  # anonym Diagnostik lokal — Opt-in Default aus — 2.6.26
+    "stylus_pressure_enabled": True,  # Stylus-Druck → Strichstärke — 2.6.26
+    "stylus_palm_rejection": True,  # Palm-Rejection Heuristik — 2.6.26
     "command_palette_recent": [],  # letzte Command-Palette-Befehle (IDs) — 2.3.1
     "command_palette_recent_max": 10,  # Recent-Anzahl 5/10/20 — 2.3.2
     "command_palette_pinned": [],  # angeheftete Palette-Befehle (IDs) — 2.3.2
@@ -631,7 +638,7 @@ def set_update_check_on_start(enabled: bool) -> None:
 
 
 def get_telemetry_opt_in() -> bool:
-    """Opt-in „anonym Diagnostik (lokal)“ — Default False — 2.6.27."""
+    """Opt-in „anonym Diagnostik (lokal)“ — Default False — 2.6.26."""
     return bool(load_settings().get("telemetry_opt_in", False))
 
 

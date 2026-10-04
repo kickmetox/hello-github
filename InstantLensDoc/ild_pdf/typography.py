@@ -320,16 +320,38 @@ def apply_tracking_visual(text: str, tracking: float) -> str:
     return result.rstrip("\u200a\u2009")
 
 
-# --- Silbentrennung ---
+# --- Silbentrennung (alle 9 UI-Sprachen) ---
 
 HyphenPatternFn = Callable[[str], List[int]]
 
+# Kanonische UI-Sprach-IDs (identisch zu i18n.SUPPORTED_LANGS)
+HYPHENATION_UI_LANGS: tuple[str, ...] = (
+    "de",
+    "en",
+    "fr",
+    "ru",
+    "es",
+    "zh",
+    "pt",
+    "ar",
+    "it",
+)
+
 # Einfache Muster: Positionen NACH dem Index (0-basiert), an denen getrennt werden darf.
-# DE: typische Konsonantencluster / Vokal-Konsonant-Regeln (heuristisch, kein TeX-Liang).
+# Heuristisch (kein TeX-Liang); praktische VC-Regeln pro Sprache.
 _DE_VOWELS = set("aeiouäöüAEIOUÄÖÜyY")
 _EN_VOWELS = set("aeiouyAEIOUY")
+_FR_VOWELS = set("aeiouyàâäéèêëïîôöùûüœæAEIOUYÀÂÄÉÈÊËÏÎÔÖÙÛÜŒÆ")
+_ES_VOWELS = set("aeiouáéíóúüAEIOUÁÉÍÓÚÜyY")
+_PT_VOWELS = set("aeiouáàâãéêíóôõúüAEIOUÁÀÂÃÉÊÍÓÔÕÚÜyY")
+_IT_VOWELS = set("aeiouàèéìíîòóùúAEIOUÀÈÉÌÍÎÒÓÙÚyY")
+# Kyrillische Vokale (RU) + lateinische Fallback
+_RU_VOWELS = set(
+    "аеёиоуыэюяАЕЁИОУЫЭЮЯ"
+    "aeiouyAEIOUY"
+)
 
-# Ausnahmewörter (keine Trennung / feste Trennpunkte)
+# Ausnahmewörter (feste Trennpunkte)
 _DE_EXCEPTIONS: dict[str, tuple[int, ...]] = {
     "instantlens": (8,),
     "dokument": (3,),
@@ -344,6 +366,35 @@ _EN_EXCEPTIONS: dict[str, tuple[int, ...]] = {
     "document": (3,),
     "instantlens": (8,),
 }
+_FR_EXCEPTIONS: dict[str, tuple[int, ...]] = {
+    "typographie": (4,),
+    "document": (3,),
+    "publication": (3, 7),
+    "instantlens": (8,),
+}
+_ES_EXCEPTIONS: dict[str, tuple[int, ...]] = {
+    "tipografia": (4,),
+    "documento": (3,),
+    "publicacion": (4,),
+    "instantlens": (8,),
+}
+_PT_EXCEPTIONS: dict[str, tuple[int, ...]] = {
+    "tipografia": (4,),
+    "documento": (3,),
+    "publicacao": (4,),
+    "instantlens": (8,),
+}
+_IT_EXCEPTIONS: dict[str, tuple[int, ...]] = {
+    "tipografia": (4,),
+    "documento": (3,),
+    "pubblicazione": (3, 7),
+    "instantlens": (8,),
+}
+_RU_EXCEPTIONS: dict[str, tuple[int, ...]] = {
+    "типографика": (4,),
+    "документ": (3,),
+    "публикация": (4,),
+}
 
 
 def _vowel_consonant_breaks(word: str, vowels: set[str]) -> list[int]:
@@ -356,9 +407,9 @@ def _vowel_consonant_breaks(word: str, vowels: set[str]) -> list[int]:
     for i in range(2, n - 2):
         left, right = w[i - 1], w[i]
         if left in vowels and right not in vowels:
-            # ck/ch/sch nicht mitten trennen
+            # ck/ch/sch nicht mitten trennen (lateinische Digraphen)
             digraph = w[i : i + 2].lower()
-            if digraph in ("ck", "ch", "sch"[:2]):
+            if digraph in ("ck", "ch", "sch"[:2], "ll", "rr", "qu"):
                 continue
             if w[i + 1 : i + 2] and (w[i + 1] in vowels or w[i + 1].isalpha()):
                 breaks.append(i)
@@ -379,14 +430,82 @@ def _hyphenate_en(word: str) -> list[int]:
     return _vowel_consonant_breaks(word, _EN_VOWELS)
 
 
-_HYPHENATORS: dict[str, HyphenPatternFn] = {
-    "de": _hyphenate_de,
-    "deu": _hyphenate_de,
-    "german": _hyphenate_de,
-    "en": _hyphenate_en,
-    "eng": _hyphenate_en,
-    "english": _hyphenate_en,
-}
+def _hyphenate_fr(word: str) -> list[int]:
+    """FR: VC-Heuristik; vermeidet Trennung nach stummem e am Wortende."""
+    key = word.lower()
+    if key in _FR_EXCEPTIONS:
+        return list(_FR_EXCEPTIONS[key])
+    breaks = _vowel_consonant_breaks(word, _FR_VOWELS)
+    # Keine Trennung direkt vor End-e / End-es (sehr grob)
+    n = len(word)
+    if n >= 3 and word[-1].lower() == "e":
+        breaks = [b for b in breaks if b < n - 2]
+    return breaks
+
+
+def _hyphenate_es(word: str) -> list[int]:
+    key = word.lower()
+    if key in _ES_EXCEPTIONS:
+        return list(_ES_EXCEPTIONS[key])
+    return _vowel_consonant_breaks(word, _ES_VOWELS)
+
+
+def _hyphenate_pt(word: str) -> list[int]:
+    key = word.lower()
+    if key in _PT_EXCEPTIONS:
+        return list(_PT_EXCEPTIONS[key])
+    return _vowel_consonant_breaks(word, _PT_VOWELS)
+
+
+def _hyphenate_it(word: str) -> list[int]:
+    key = word.lower()
+    if key in _IT_EXCEPTIONS:
+        return list(_IT_EXCEPTIONS[key])
+    return _vowel_consonant_breaks(word, _IT_VOWELS)
+
+
+def _hyphenate_ru(word: str) -> list[int]:
+    """RU: kyrillisch-bewusste Vokal-Konsonant-Trennung."""
+    key = word.lower()
+    if key in _RU_EXCEPTIONS:
+        return list(_RU_EXCEPTIONS[key])
+    return _vowel_consonant_breaks(word, _RU_VOWELS)
+
+
+def _hyphenate_ar(word: str) -> list[int]:
+    """AR: leicht / No-Op — Arabisch wird typografisch nicht per Soft-Hyphen gebrochen."""
+    return []
+
+
+def _hyphenate_zh(word: str) -> list[int]:
+    """ZH: Identity / No-Break — CJK braucht keine Silbentrennung."""
+    return []
+
+
+_HYPHENATORS: dict[str, HyphenPatternFn] = {}
+
+# Alias-Gruppen → kanonische Funktion
+_HYPHEN_ALIAS_GROUPS: tuple[tuple[tuple[str, ...], HyphenPatternFn], ...] = (
+    (("de", "deu", "ger", "german"), _hyphenate_de),
+    (("en", "eng", "english"), _hyphenate_en),
+    (("fr", "fra", "fre", "french"), _hyphenate_fr),
+    (("es", "spa", "spanish"), _hyphenate_es),
+    (("pt", "por", "portuguese"), _hyphenate_pt),
+    (("it", "ita", "italian"), _hyphenate_it),
+    (("ru", "rus", "russian"), _hyphenate_ru),
+    (("ar", "ara", "arabic"), _hyphenate_ar),
+    (("zh", "zho", "chi", "cn", "chinese"), _hyphenate_zh),
+)
+
+
+def _register_builtin_hyphenators() -> None:
+    """Auto-Register aller 9 UI-Sprachen (+ Aliase) beim Import."""
+    for aliases, fn in _HYPHEN_ALIAS_GROUPS:
+        for key in aliases:
+            _HYPHENATORS[key] = fn
+
+
+_register_builtin_hyphenators()
 
 
 def register_hyphenation_language(lang: str, fn: HyphenPatternFn) -> None:
@@ -400,16 +519,45 @@ def register_hyphenation_language(lang: str, fn: HyphenPatternFn) -> None:
 
 
 def list_hyphenation_languages() -> list[str]:
-    # kanonische IDs zuerst
-    canon = ["de", "en"]
-    extras = sorted(k for k in _HYPHENATORS if k not in canon and k not in ("deu", "eng", "german", "english"))
+    """Kanonische UI-Sprach-IDs (9) zuerst, danach manuell registrierte Extras."""
+    canon = list(HYPHENATION_UI_LANGS)
+    alias_skip = {
+        "deu",
+        "ger",
+        "german",
+        "eng",
+        "english",
+        "fra",
+        "fre",
+        "french",
+        "spa",
+        "spanish",
+        "por",
+        "portuguese",
+        "ita",
+        "italian",
+        "rus",
+        "russian",
+        "ara",
+        "arabic",
+        "zho",
+        "chi",
+        "cn",
+        "chinese",
+    }
+    extras = sorted(
+        k for k in _HYPHENATORS if k not in canon and k not in alias_skip
+    )
     return canon + extras
 
 
 def hyphenate_word(word: str, *, lang: str = "de") -> str:
     """Wort mit Soft-Hyphens an Trennstellen zurückgeben."""
     raw = word or ""
-    if len(raw) < 5 or not raw.isalpha():
+    if len(raw) < 5:
+        return raw
+    # isalpha() deckt Kyrillisch/Latein ab; Arabisch/CJK bewusst kein Soft-Hyphen
+    if not raw.isalpha():
         return raw
     key = (lang or "de").strip().lower()
     fn = _HYPHENATORS.get(key)
@@ -431,11 +579,19 @@ def hyphenate_word(word: str, *, lang: str = "de") -> str:
     return "".join(parts)
 
 
-_WORD_RE = re.compile(r"[A-Za-zÄÖÜäöüßÉéÈèÂâÊêÎîÔôÛûÀàÇçÑñ]+")
+# Latein (inkl. Akzente) + Kyrillisch; Arabisch/CJK bewusst nicht (No-Op-Hyphenatoren)
+_WORD_RE = re.compile(
+    r"[A-Za-zÄÖÜäöüßÀ-ÖØ-öø-ÿĀ-ſ"
+    r"А-Яа-яЁёІіЇїЄєҐґ]+"
+)
 
 
 def hyphenate_text(text: str, *, lang: str = "de") -> dict[str, Any]:
-    """Text silbentrennen (Soft-Hyphens). Rückgabe: text, count, lang."""
+    """Text silbentrennen (Soft-Hyphens). Rückgabe: text, count, lang.
+
+    Unterstützt alle 9 UI-Sprachen out of the box (``lang='fr'`` etc.).
+    ``zh``/``ar``: keine Soft-Hyphens (Identity / No-Op).
+    """
     count = 0
 
     def _repl(m: re.Match[str]) -> str:

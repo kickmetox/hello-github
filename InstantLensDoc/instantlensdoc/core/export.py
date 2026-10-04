@@ -1,4 +1,4 @@
-"""Export/Import: Editor-Inhalt → HTML / DOCX / PDF / TXT / RTF / XLSX / JPG / EPUB — 2.6.27."""
+"""Export/Import: Editor-Inhalt → HTML / DOCX / PDF / TXT / RTF / XLSX / JPG / EPUB / PPTX. — 2.6.28."""
 
 from __future__ import annotations
 
@@ -9,6 +9,7 @@ from io import BytesIO
 from pathlib import Path
 from typing import Any, Optional
 from uuid import uuid4
+from xml.etree import ElementTree as ET
 
 SUPPORTED_EXPORT_FORMATS: tuple[str, ...] = (
     "docx",
@@ -20,6 +21,7 @@ SUPPORTED_EXPORT_FORMATS: tuple[str, ...] = (
     "jpg",
     "jpeg",
     "epub",
+    "pptx",
 )
 SUPPORTED_IMPORT_FORMATS: tuple[str, ...] = (
     "docx",
@@ -36,6 +38,7 @@ SUPPORTED_IMPORT_FORMATS: tuple[str, ...] = (
     "jpeg",
     "png",
     "epub",
+    "pptx",
 )
 
 
@@ -53,6 +56,7 @@ def list_export_formats() -> list[dict[str, str]]:
         {"id": "html", "ext": ".html", "name": "HTML"},
         {"id": "jpg", "ext": ".jpg", "name": "JPEG-Bild"},
         {"id": "epub", "ext": ".epub", "name": "EPUB (E-Book)"},
+        {"id": "pptx", "ext": ".pptx", "name": "Microsoft PowerPoint"},
     ]
 
 
@@ -68,6 +72,7 @@ def list_import_formats() -> list[dict[str, str]]:
         {"id": "md", "ext": ".md", "name": "Markdown"},
         {"id": "jpg", "ext": ".jpg", "name": "JPEG/PNG Bild"},
         {"id": "epub", "ext": ".epub", "name": "EPUB (E-Book Text)"},
+        {"id": "pptx", "ext": ".pptx", "name": "Microsoft PowerPoint"},
     ]
 
 def _inline_md_to_html(fragment: str) -> str:
@@ -92,7 +97,7 @@ def _inline_md_to_html(fragment: str) -> str:
 
 
 def _markdownish_body_parts(text: str) -> list[str]:
-    """Markdownish → HTML-Fragmente; Markdown-Links → <a> — 2.6.27."""
+    """Markdownish → HTML-Fragmente; Markdown-Links → <a> — 2.6.26."""
     paras: list[str] = []
     buf: list[str] = []
 
@@ -150,7 +155,7 @@ def export_html(
 ) -> Path:
     """
     Schreibt UTF-8-HTML. Bei as_markdownish: #/## Überschriften, leere Zeile = Absatz.
-    Markdown-Hyperlinks werden zu <a href> — 2.6.27.
+    Markdown-Hyperlinks werden zu <a href> — 2.6.26.
     """
     path = Path(path)
     if as_markdownish:
@@ -190,7 +195,7 @@ def export_epub(
     language: str = "de",
 ) -> Path:
     """
-    EPUB 2.0.1 (ohne externe Abhängigkeit) — Kapitel aus Markdownish-Text — 2.6.27.
+    EPUB 2.0.1 (ohne externe Abhängigkeit) — Kapitel aus Markdownish-Text — 2.6.26.
     Struktur: mimetype + META-INF/container.xml + OEBPS/{content.opf,toc.ncx,chapter*.xhtml}.
     """
     path = Path(path)
@@ -307,7 +312,7 @@ def export_epub(
 
 
 def import_epub(path: str | Path) -> str:
-    """EPUB → Plaintext (Kapitel-Titel + Body) — 2.6.27."""
+    """EPUB → Plaintext (Kapitel-Titel + Body) — 2.6.26."""
     path = Path(path)
     parts: list[str] = []
     with zipfile.ZipFile(path, "r") as zf:
@@ -334,6 +339,468 @@ def import_epub(path: str | Path) -> str:
             t = re.sub(r"\n{3,}", "\n\n", t).strip()
             if t:
                 parts.append(t)
+    return "\n\n".join(parts).strip() + ("\n" if parts else "")
+
+
+def _split_pptx_slides(text: str, *, default_title: str = "Folie") -> list[tuple[str, list[str]]]:
+    """Text → Folien: Split an Markdown-H1 oder ``---``; Body → Bullet-Zeilen."""
+    raw = (text or "").replace("\r\n", "\n").strip()
+    if not raw:
+        return [(default_title, [])]
+
+    chunks: list[str] = []
+    buf: list[str] = []
+    for line in raw.split("\n"):
+        if line.strip() == "---":
+            chunks.append("\n".join(buf).strip())
+            buf = []
+            continue
+        if line.startswith("# ") and not line.startswith("## "):
+            if buf and any(x.strip() for x in buf):
+                chunks.append("\n".join(buf).strip())
+            buf = [line]
+            continue
+        buf.append(line)
+    if buf and any(x.strip() for x in buf):
+        chunks.append("\n".join(buf).strip())
+    if not chunks:
+        chunks = [raw]
+
+    slides: list[tuple[str, list[str]]] = []
+    for i, chunk in enumerate(chunks):
+        lines = chunk.split("\n")
+        title = f"{default_title} {i + 1}"
+        body_lines = lines
+        if lines and lines[0].startswith("# ") and not lines[0].startswith("## "):
+            title = lines[0][2:].strip() or title
+            body_lines = lines[1:]
+        bullets: list[str] = []
+        para_buf: list[str] = []
+
+        def flush_para() -> None:
+            nonlocal para_buf
+            joined = " ".join(para_buf).strip()
+            para_buf = []
+            if joined:
+                bullets.append(joined)
+
+        for ln in body_lines:
+            s = ln.strip()
+            if not s:
+                flush_para()
+                continue
+            if s.startswith("## "):
+                flush_para()
+                bullets.append(s[3:].strip())
+                continue
+            if s.startswith("### "):
+                flush_para()
+                bullets.append(s[4:].strip())
+                continue
+            m = re.match(r"^[-*+]\s+(.+)$", s) or re.match(r"^\d+\.\s+(.+)$", s)
+            if m:
+                flush_para()
+                bullets.append(m.group(1).strip())
+            else:
+                para_buf.append(s)
+        flush_para()
+        slides.append((title, bullets))
+    return slides
+
+
+def _pptx_escape(s: str) -> str:
+    return html.escape(s or "", quote=False)
+
+
+def _pptx_text_runs_xml(lines: list[str], *, font_size_hundredths: int = 1800) -> str:
+    """a:p Blöcke für Folienkörper."""
+    if not lines:
+        return (
+            '<a:p><a:pPr marL="0"/><a:r><a:rPr lang="de-DE" dirty="0" sz="1400"/>'
+            "<a:t> </a:t></a:r></a:p>"
+        )
+    parts: list[str] = []
+    for line in lines:
+        parts.append(
+            "<a:p>"
+            '<a:pPr marL="342900" indent="-342900">'
+            '<a:buFont typeface="Arial"/><a:buChar char="•"/>'
+            "</a:pPr>"
+            f'<a:r><a:rPr lang="de-DE" dirty="0" sz="{font_size_hundredths}"/>'
+            f"<a:t>{_pptx_escape(line)}</a:t></a:r></a:p>"
+        )
+    return "".join(parts)
+
+
+def _pptx_slide_xml(title: str, bullets: list[str]) -> str:
+    title_xml = (
+        "<a:p><a:r>"
+        '<a:rPr lang="de-DE" dirty="0" sz="3200" b="1"/>'
+        f"<a:t>{_pptx_escape(title)}</a:t></a:r></a:p>"
+    )
+    body_xml = _pptx_text_runs_xml(bullets)
+    return f"""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+ xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+ xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
+  <p:cSld>
+    <p:spTree>
+      <p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>
+      <p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/>
+        <a:chOff x="0" y="0"/><a:chExt cx="0" cy="0"/></a:xfrm></p:grpSpPr>
+      <p:sp>
+        <p:nvSpPr><p:cNvPr id="2" name="Title 1"/><p:cNvSpPr><a:spLocks noGrp="1"/>
+          </p:cNvSpPr><p:nvPr><p:ph type="title"/></p:nvPr></p:nvSpPr>
+        <p:spPr/>
+        <p:txBody><a:bodyPr/><a:lstStyle/>{title_xml}</p:txBody>
+      </p:sp>
+      <p:sp>
+        <p:nvSpPr><p:cNvPr id="3" name="Content 2"/><p:cNvSpPr><a:spLocks noGrp="1"/>
+          </p:cNvSpPr><p:nvPr><p:ph type="body" idx="1"/></p:nvPr></p:nvSpPr>
+        <p:spPr/>
+        <p:txBody><a:bodyPr/><a:lstStyle/>{body_xml}</p:txBody>
+      </p:sp>
+    </p:spTree>
+  </p:cSld>
+  <p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr>
+</p:sld>
+"""
+
+
+_PPTX_THEME = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" name="InstantLens">
+  <a:themeElements>
+    <a:clrScheme name="Office">
+      <a:dk1><a:sysClr val="windowText" lastClr="000000"/></a:dk1>
+      <a:lt1><a:sysClr val="window" lastClr="FFFFFF"/></a:lt1>
+      <a:dk2><a:srgbClr val="1F497D"/></a:dk2>
+      <a:lt2><a:srgbClr val="EEECE1"/></a:lt2>
+      <a:accent1><a:srgbClr val="4F81BD"/></a:accent1>
+      <a:accent2><a:srgbClr val="C0504D"/></a:accent2>
+      <a:accent3><a:srgbClr val="9BBB59"/></a:accent3>
+      <a:accent4><a:srgbClr val="8064A2"/></a:accent4>
+      <a:accent5><a:srgbClr val="4BACC6"/></a:accent5>
+      <a:accent6><a:srgbClr val="F79646"/></a:accent6>
+      <a:hlink><a:srgbClr val="0000FF"/></a:hlink>
+      <a:folHlink><a:srgbClr val="800080"/></a:folHlink>
+    </a:clrScheme>
+    <a:fontScheme name="Office">
+      <a:majorFont><a:latin typeface="Calibri"/><a:ea typeface=""/><a:cs typeface=""/></a:majorFont>
+      <a:minorFont><a:latin typeface="Calibri"/><a:ea typeface=""/><a:cs typeface=""/></a:minorFont>
+    </a:fontScheme>
+    <a:fmtScheme name="Office">
+      <a:fillStyleLst>
+        <a:solidFill><a:schemeClr val="phClr"/></a:solidFill>
+        <a:solidFill><a:schemeClr val="phClr"/></a:solidFill>
+        <a:solidFill><a:schemeClr val="phClr"/></a:solidFill>
+      </a:fillStyleLst>
+      <a:lnStyleLst>
+        <a:ln w="9525"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:prstDash val="solid"/></a:ln>
+        <a:ln w="9525"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:prstDash val="solid"/></a:ln>
+        <a:ln w="9525"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:prstDash val="solid"/></a:ln>
+      </a:lnStyleLst>
+      <a:effectStyleLst>
+        <a:effectStyle><a:effectLst/></a:effectStyle>
+        <a:effectStyle><a:effectLst/></a:effectStyle>
+        <a:effectStyle><a:effectLst/></a:effectStyle>
+      </a:effectStyleLst>
+      <a:bgFillStyleLst>
+        <a:solidFill><a:schemeClr val="phClr"/></a:solidFill>
+        <a:solidFill><a:schemeClr val="phClr"/></a:solidFill>
+        <a:solidFill><a:schemeClr val="phClr"/></a:solidFill>
+      </a:bgFillStyleLst>
+    </a:fmtScheme>
+  </a:themeElements>
+</a:theme>
+"""
+
+_PPTX_SLIDE_MASTER = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<p:sldMaster xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+ xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+ xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
+  <p:cSld>
+    <p:bg><p:bgRef idx="1001"><a:schemeClr val="bg1"/></p:bgRef></p:bg>
+    <p:spTree>
+      <p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>
+      <p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/>
+        <a:chOff x="0" y="0"/><a:chExt cx="0" cy="0"/></a:xfrm></p:grpSpPr>
+      <p:sp>
+        <p:nvSpPr><p:cNvPr id="2" name="Title Placeholder"/><p:cNvSpPr><a:spLocks noGrp="1"/>
+          </p:cNvSpPr><p:nvPr><p:ph type="title"/></p:nvPr></p:nvSpPr>
+        <p:spPr><a:xfrm><a:off x="457200" y="274638"/><a:ext cx="8229600" cy="1143000"/>
+          </a:xfrm></p:spPr>
+        <p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:r><a:t>Title</a:t></a:r></a:p></p:txBody>
+      </p:sp>
+      <p:sp>
+        <p:nvSpPr><p:cNvPr id="3" name="Body Placeholder"/><p:cNvSpPr><a:spLocks noGrp="1"/>
+          </p:cNvSpPr><p:nvPr><p:ph type="body" idx="1"/></p:nvPr></p:nvSpPr>
+        <p:spPr><a:xfrm><a:off x="457200" y="1600200"/><a:ext cx="8229600" cy="4525963"/>
+          </a:xfrm></p:spPr>
+        <p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:r><a:t></a:t></a:r></a:p></p:txBody>
+      </p:sp>
+    </p:spTree>
+  </p:cSld>
+  <p:clrMap bg1="lt1" tx1="dk1" bg2="lt2" tx2="dk2" accent1="accent1" accent2="accent2"
+    accent3="accent3" accent4="accent4" accent5="accent5" accent6="accent6"
+    hlink="hlink" folHlink="folHlink"/>
+  <p:sldLayoutIdLst><p:sldLayoutId id="2147483649" r:id="rId1"/></p:sldLayoutIdLst>
+</p:sldMaster>
+"""
+
+_PPTX_SLIDE_LAYOUT = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<p:sldLayout xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+ xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+ xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" type="titleAndContent" preserve="1">
+  <p:cSld name="Title and Content">
+    <p:spTree>
+      <p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>
+      <p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/>
+        <a:chOff x="0" y="0"/><a:chExt cx="0" cy="0"/></a:xfrm></p:grpSpPr>
+      <p:sp>
+        <p:nvSpPr><p:cNvPr id="2" name="Title 1"/><p:cNvSpPr><a:spLocks noGrp="1"/>
+          </p:cNvSpPr><p:nvPr><p:ph type="title"/></p:nvPr></p:nvSpPr>
+        <p:spPr><a:xfrm><a:off x="457200" y="274638"/><a:ext cx="8229600" cy="1143000"/>
+          </a:xfrm></p:spPr>
+        <p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:r><a:t></a:t></a:r></a:p></p:txBody>
+      </p:sp>
+      <p:sp>
+        <p:nvSpPr><p:cNvPr id="3" name="Content Placeholder 2"/><p:cNvSpPr><a:spLocks noGrp="1"/>
+          </p:cNvSpPr><p:nvPr><p:ph type="body" idx="1"/></p:nvPr></p:nvSpPr>
+        <p:spPr><a:xfrm><a:off x="457200" y="1600200"/><a:ext cx="8229600" cy="4525963"/>
+          </a:xfrm></p:spPr>
+        <p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:pPr lvl="0"/><a:r><a:t></a:t></a:r></a:p></p:txBody>
+      </p:sp>
+    </p:spTree>
+  </p:cSld>
+  <p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr>
+</p:sldLayout>
+"""
+
+
+def export_pptx(
+    text: str,
+    path: str | Path,
+    *,
+    title: str = "InstantLens Doc",
+) -> Path:
+    """
+    PowerPoint OOXML (.pptx) ohne python-pptx — Folien aus H1/``---``.
+
+    Praktische Treue: Titel + Bullet-Body; Stdlib zipfile+XML.
+    """
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    slides = _split_pptx_slides(text, default_title=title or "Folie")
+
+    slide_overrides = []
+    sld_id_lst = []
+    pres_rels = [
+        '<Relationship Id="rId1" '
+        'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideMaster" '
+        'Target="slideMasters/slideMaster1.xml"/>'
+    ]
+    for i in range(len(slides)):
+        sid = i + 2  # rId2+ for slides
+        rid = f"rId{sid}"
+        slide_overrides.append(
+            f'<Override PartName="/ppt/slides/slide{i + 1}.xml" '
+            'ContentType="application/vnd.openxmlformats-officedocument.'
+            'presentationml.slide+xml"/>'
+        )
+        sld_id_lst.append(f'<p:sldId id="{256 + i}" r:id="{rid}"/>')
+        pres_rels.append(
+            f'<Relationship Id="{rid}" '
+            'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" '
+            f'Target="slides/slide{i + 1}.xml"/>'
+        )
+
+    content_types = f"""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/ppt/presentation.xml"
+    ContentType="application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"/>
+  <Override PartName="/ppt/slideMasters/slideMaster1.xml"
+    ContentType="application/vnd.openxmlformats-officedocument.presentationml.slideMaster+xml"/>
+  <Override PartName="/ppt/slideLayouts/slideLayout1.xml"
+    ContentType="application/vnd.openxmlformats-officedocument.presentationml.slideLayout+xml"/>
+  <Override PartName="/ppt/theme/theme1.xml"
+    ContentType="application/vnd.openxmlformats-officedocument.theme+xml"/>
+  <Override PartName="/docProps/core.xml"
+    ContentType="application/vnd.openxmlformats-package.core-properties+xml"/>
+  <Override PartName="/docProps/app.xml"
+    ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/>
+  {"".join(slide_overrides)}
+</Types>
+"""
+    root_rels = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1"
+    Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument"
+    Target="ppt/presentation.xml"/>
+  <Relationship Id="rId2"
+    Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties"
+    Target="docProps/core.xml"/>
+  <Relationship Id="rId3"
+    Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties"
+    Target="docProps/app.xml"/>
+</Relationships>
+"""
+    presentation = f"""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<p:presentation xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+ xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+ xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
+  <p:sldMasterIdLst>
+    <p:sldMasterId id="2147483648" r:id="rId1"/>
+  </p:sldMasterIdLst>
+  <p:sldIdLst>
+    {"".join(sld_id_lst)}
+  </p:sldIdLst>
+  <p:sldSz cx="9144000" cy="6858000" type="screen4x3"/>
+  <p:notesSz cx="6858000" cy="9144000"/>
+</p:presentation>
+"""
+    pres_rels_xml = (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'
+        '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">\n'
+        + "\n".join(f"  {r}" for r in pres_rels)
+        + "\n</Relationships>\n"
+    )
+    master_rels = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1"
+    Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideLayout"
+    Target="../slideLayouts/slideLayout1.xml"/>
+  <Relationship Id="rId2"
+    Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme"
+    Target="../theme/theme1.xml"/>
+</Relationships>
+"""
+    layout_rels = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1"
+    Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideMaster"
+    Target="../slideMasters/slideMaster1.xml"/>
+</Relationships>
+"""
+    slide_rel = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1"
+    Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideLayout"
+    Target="../slideLayouts/slideLayout1.xml"/>
+</Relationships>
+"""
+    core = f"""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties"
+ xmlns:dc="http://purl.org/dc/elements/1.1/"
+ xmlns:dcterms="http://purl.org/dc/terms/"
+ xmlns:dcmitype="http://purl.org/dc/dcmitype/"
+ xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <dc:title>{_pptx_escape(title)}</dc:title>
+  <dc:creator>InstantLens Doc</dc:creator>
+  <cp:lastModifiedBy>InstantLens Doc</cp:lastModifiedBy>
+</cp:coreProperties>
+"""
+    app = f"""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"
+ xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes">
+  <Application>InstantLens Doc</Application>
+  <Slides>{len(slides)}</Slides>
+  <PresentationFormat>On-screen Show (4:3)</PresentationFormat>
+</Properties>
+"""
+
+    buf = BytesIO()
+    with zipfile.ZipFile(buf, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr("[Content_Types].xml", content_types)
+        zf.writestr("_rels/.rels", root_rels)
+        zf.writestr("ppt/presentation.xml", presentation)
+        zf.writestr("ppt/_rels/presentation.xml.rels", pres_rels_xml)
+        zf.writestr("ppt/slideMasters/slideMaster1.xml", _PPTX_SLIDE_MASTER)
+        zf.writestr("ppt/slideMasters/_rels/slideMaster1.xml.rels", master_rels)
+        zf.writestr("ppt/slideLayouts/slideLayout1.xml", _PPTX_SLIDE_LAYOUT)
+        zf.writestr("ppt/slideLayouts/_rels/slideLayout1.xml.rels", layout_rels)
+        zf.writestr("ppt/theme/theme1.xml", _PPTX_THEME)
+        zf.writestr("docProps/core.xml", core)
+        zf.writestr("docProps/app.xml", app)
+        for i, (slide_title, bullets) in enumerate(slides, start=1):
+            zf.writestr(f"ppt/slides/slide{i}.xml", _pptx_slide_xml(slide_title, bullets))
+            zf.writestr(f"ppt/slides/_rels/slide{i}.xml.rels", slide_rel)
+    path.write_bytes(buf.getvalue())
+    return path
+
+
+def import_pptx(path: str | Path) -> str:
+    """PowerPoint .pptx → Markdown (``# Titel`` + Body) — praktische Treue."""
+    path = Path(path)
+    ns = {
+        "a": "http://schemas.openxmlformats.org/drawingml/2006/main",
+        "p": "http://schemas.openxmlformats.org/presentationml/2006/main",
+        "r": "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
+    }
+    parts: list[str] = []
+    with zipfile.ZipFile(path, "r") as zf:
+        # Folienreihenfolge aus presentation.xml
+        slide_targets: list[str] = []
+        try:
+            pres = zf.read("ppt/presentation.xml")
+            root = ET.fromstring(pres)
+            rels_root = ET.fromstring(zf.read("ppt/_rels/presentation.xml.rels"))
+            rid_to_target = {
+                rel.get("Id"): rel.get("Target")
+                for rel in rels_root
+                if rel.get("Id") and rel.get("Target")
+            }
+            for sld in root.findall(".//p:sldId", ns):
+                rid = sld.get(
+                    "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id"
+                )
+                tgt = rid_to_target.get(rid or "")
+                if tgt:
+                    if tgt.startswith("/"):
+                        slide_targets.append(tgt.lstrip("/"))
+                    elif tgt.startswith("ppt/"):
+                        slide_targets.append(tgt)
+                    else:
+                        slide_targets.append("ppt/" + tgt.lstrip("./"))
+        except Exception:
+            slide_targets = []
+        if not slide_targets:
+            slide_targets = sorted(
+                n for n in zf.namelist() if re.search(r"ppt/slides/slide\d+\.xml$", n, re.I)
+            )
+
+        for name in slide_targets:
+            try:
+                raw = zf.read(name)
+            except KeyError:
+                continue
+            try:
+                sroot = ET.fromstring(raw)
+            except ET.ParseError:
+                continue
+            texts: list[str] = []
+            for t_el in sroot.findall(".//a:t", ns):
+                if t_el.text and t_el.text.strip():
+                    texts.append(t_el.text.strip())
+            if not texts:
+                # Fallback: Regex
+                decoded = raw.decode("utf-8", errors="replace")
+                texts = [
+                    html.unescape(m)
+                    for m in re.findall(r"<a:t[^>]*>(.*?)</a:t>", decoded)
+                    if m.strip()
+                ]
+            if not texts:
+                continue
+            title = texts[0]
+            body = texts[1:]
+            block = f"# {title}"
+            if body:
+                block += "\n\n" + "\n".join(
+                    (f"- {b}" if not b.startswith("- ") else b) for b in body
+                )
+            parts.append(block)
     return "\n\n".join(parts).strip() + ("\n" if parts else "")
 
 
@@ -565,7 +1032,7 @@ def export_document(
     page_size: tuple[float, float] | str | None = None,
     author: str = "InstantLens Doc",
 ) -> Path:
-    """Unified Export nach Erweiterung/Format — 2.6.14 / EPUB 2.6.27."""
+    """Unified Export nach Erweiterung/Format — 2.6.14 / EPUB 2.6.26."""
     path = Path(path)
     f = (fmt or path.suffix.lstrip(".")).lower().lstrip(".")
     if f == "jpeg":
@@ -588,13 +1055,13 @@ def export_document(
         return export_jpg(text, path, title=title)
     if f == "epub":
         return export_epub(text, path, title=title, author=author)
+    if f == "pptx":
+        return export_pptx(text, path, title=title)
     raise ValueError(f"Unbekanntes Export-Format: {f}")
 
 
 def import_document_text(path: str | Path) -> dict[str, Any]:
     """Unified Import → Plaintext (+ Meta) — 2.6.14."""
-    from ild_pdf.tables import import_csv, import_xlsx, table_to_markdown
-
     path = Path(path)
     if not path.is_file():
         raise FileNotFoundError(path)
@@ -602,8 +1069,12 @@ def import_document_text(path: str | Path) -> dict[str, Any]:
     meta: dict[str, Any] = {"path": str(path), "format": ext}
     if ext == "epub":
         return {"text": import_epub(path), "meta": meta}
+    if ext == "pptx":
+        return {"text": import_pptx(path), "meta": meta}
     if ext in ("txt", "log", "md", "markdown", "html", "htm", "csv"):
         if ext == "csv":
+            from ild_pdf.tables import import_csv, table_to_markdown
+
             table = import_csv(path)
             return {"text": table_to_markdown(table), "meta": {**meta, "table": table.to_dict()}}
         text = path.read_text(encoding="utf-8", errors="replace")
@@ -627,6 +1098,8 @@ def import_document_text(path: str | Path) -> dict[str, Any]:
         except ImportError as e:
             raise RuntimeError("python-docx fehlt zum DOCX-Import") from e
     if ext == "xlsx":
+        from ild_pdf.tables import import_xlsx, table_to_markdown
+
         table = import_xlsx(path)
         return {"text": table_to_markdown(table), "meta": {**meta, "table": table.to_dict()}}
     if ext == "pdf":

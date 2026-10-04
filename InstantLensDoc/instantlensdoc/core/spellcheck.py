@@ -1,4 +1,5 @@
-"""Rechtschreibprüfung mit Vorschlägen + leichten Grammatik-Hinweisen — 2.6.27.
+"""Rechtschreibprüfung mit Vorschlägen + leichten Grammatik-Hinweisen — 2.6.26.
+Grammatik DE/EN — 2.6.28.
 
 Lokale Wortlisten (ohne externe Spell-Lib). UI-Sprache steuert eingebaute
 Minimal-Wörterbücher und Autokorrektur-Defaults wo möglich.
@@ -269,69 +270,515 @@ def suggest_corrections(
     return out
 
 
-def grammar_hints(text: str, *, lang: str | None = None) -> list[dict]:
-    """
-    Leichte Grammatik-/Typografie-Hinweise (heuristisch, keine volle Grammar-Engine).
+def _grammar_issue(
+    *,
+    type: str,
+    start: int,
+    end: int,
+    message: str,
+    suggestion: str | None = None,
+    severity: str = "hint",
+    lang: str = "",
+    **extra: object,
+) -> dict:
+    d: dict = {
+        "type": type,
+        "start": start,
+        "end": end,
+        "message": message,
+        "severity": severity,
+    }
+    if suggestion is not None:
+        d["suggestion"] = suggestion
+    if lang:
+        d["lang"] = lang
+    for k, v in extra.items():
+        if v is not None:
+            d[k] = v
+    return d
 
-    Typen: double_space, repeated_word, missing_space_after_punct, lowercase_sentence
-    """
+
+def _grammar_base_hints(text: str, *, lang: str | None = None) -> list[dict]:
+    """Basis-Typografie (rückwärtskompatibel)."""
     hints: list[dict] = []
     raw = text or ""
     if not raw:
         return hints
-    # Doppelte Leerzeichen
+    code = (lang or "de").split("-")[0].lower()
     for m in re.finditer(r" {2,}", raw):
         hints.append(
-            {
-                "type": "double_space",
-                "start": m.start(),
-                "end": m.end(),
-                "message": "Doppeltes Leerzeichen",
-                "suggestion": " ",
-            }
+            _grammar_issue(
+                type="double_space",
+                start=m.start(),
+                end=m.end(),
+                message="Doppeltes Leerzeichen",
+                suggestion=" ",
+                lang=code,
+            )
         )
-    # Wiederholte Wörter
     for m in re.finditer(
         r"\b([A-Za-zÀ-ÖØ-öø-ÿĀ-ž]{2,})\s+\1\b", raw, flags=re.IGNORECASE
     ):
         hints.append(
-            {
-                "type": "repeated_word",
-                "start": m.start(),
-                "end": m.end(),
-                "message": "Wiederholtes Wort",
-                "suggestion": m.group(1),
-                "word": m.group(1),
-            }
+            _grammar_issue(
+                type="repeated_word",
+                start=m.start(),
+                end=m.end(),
+                message="Wiederholtes Wort",
+                suggestion=m.group(1),
+                word=m.group(1),
+                lang=code,
+            )
         )
-    # Fehlendes Leerzeichen nach .!? (außer Abkürzungen/Zahlen)
     for m in re.finditer(r"([.!?])([A-Za-zÀ-ÖØ-öø-ÿ])", raw):
         hints.append(
-            {
-                "type": "missing_space_after_punct",
-                "start": m.start(),
-                "end": m.end(),
-                "message": "Leerzeichen nach Satzzeichen fehlt",
-                "suggestion": f"{m.group(1)} {m.group(2)}",
-            }
+            _grammar_issue(
+                type="missing_space_after_punct",
+                start=m.start(),
+                end=m.end(),
+                message="Leerzeichen nach Satzzeichen fehlt",
+                suggestion=f"{m.group(1)} {m.group(2)}",
+                lang=code,
+            )
         )
-    # Satzanfang kleingeschrieben (nach .!? + Leerzeichen)
-    for m in re.finditer(r"(^|[.!?]\s+)([a-zà-öø-ÿ])", raw):
-        # Skip wenn UI-Sprache CJK
-        code = (lang or "de").split("-")[0].lower()
-        if code in ("zh",):
-            continue
-        start = m.start(2)
-        hints.append(
-            {
-                "type": "lowercase_sentence",
-                "start": start,
-                "end": start + 1,
-                "message": "Satzanfang kleingeschrieben",
-                "suggestion": m.group(2).upper(),
-            }
-        )
+    if code not in ("zh",):
+        for m in re.finditer(r"(^|[.!?]\s+)([a-zà-öø-ÿ])", raw):
+            start = m.start(2)
+            hints.append(
+                _grammar_issue(
+                    type="lowercase_sentence",
+                    start=start,
+                    end=start + 1,
+                    message="Satzanfang kleingeschrieben",
+                    suggestion=m.group(2).upper(),
+                    lang=code,
+                )
+            )
     return hints
+
+
+_DE_ARTICLES = ("der", "die", "das", "ein", "eine", "einem", "einer", "eines", "den", "dem")
+_EN_VOWEL_SOUND = re.compile(r"^[aeiouAEIOU]")
+_EN_CONSONANT_U = re.compile(r"^(?:uni|eu|use|user|one)\b", re.I)
+
+
+def _grammar_de(text: str) -> list[dict]:
+    """Deutsche Heuristiken: das/dass, seit/seid, tod/tot, Komma, Einheiten, …"""
+    hints: list[dict] = []
+    raw = text or ""
+    if not raw:
+        return hints
+
+    # das/dass vor Nebensatz-Verben (sehr grob: "das … [verb]t/en" → oft "dass")
+    for m in re.finditer(
+        r"\bdas\s+(?=(?:ich|du|er|sie|es|wir|ihr|man)\b)",
+        raw,
+        flags=re.IGNORECASE,
+    ):
+        hints.append(
+            _grammar_issue(
+                type="de_das_dass",
+                start=m.start(),
+                end=m.start() + 3,
+                message='Möglicherweise „dass“ statt „das“ (Nebensatz)',
+                suggestion="dass",
+                severity="warning",
+                lang="de",
+            )
+        )
+
+    # seit/seid
+    for m in re.finditer(r"\bseid\s+(?:dem|wann|Jahren?|Tagen?|Monaten?)\b", raw, re.I):
+        hints.append(
+            _grammar_issue(
+                type="de_seit_seid",
+                start=m.start(),
+                end=m.start() + 4,
+                message='Zeitangabe: „seit“ statt „seid“',
+                suggestion="seit",
+                severity="warning",
+                lang="de",
+            )
+        )
+    for m in re.finditer(r"\bseit\s+(?:ihr|Ihr)\b", raw):
+        hints.append(
+            _grammar_issue(
+                type="de_seit_seid",
+                start=m.start(),
+                end=m.start() + 4,
+                message='Verbform: „seid“ statt „seit“',
+                suggestion="seid",
+                severity="warning",
+                lang="de",
+            )
+        )
+
+    # tod/tot
+    for m in re.finditer(r"\btod\b", raw):
+        # Nomen „Tod“ groß; kleines „tod“ oft Fehler für „tot“
+        if m.group(0) == "tod":
+            hints.append(
+                _grammar_issue(
+                    type="de_tod_tot",
+                    start=m.start(),
+                    end=m.end(),
+                    message='Adjektiv „tot“ oder Nomen „Tod“? (kleines „tod“ unüblich)',
+                    suggestion="tot",
+                    severity="hint",
+                    lang="de",
+                )
+            )
+
+    # Artikel + kleingeschriebenes Nomen (heuristisch)
+    for m in re.finditer(
+        r"\b(" + "|".join(_DE_ARTICLES) + r")\s+([a-zäöüß][a-zäöüß\-]{3,})\b",
+        raw,
+        flags=re.IGNORECASE,
+    ):
+        noun = m.group(2)
+        if not noun[:1].islower():
+            continue
+        # Skip häufige Adjektive/Adverbien
+        if noun.endswith(("lich", "ig", "isch", "sam", "bar", "end", "ern", "eln", "en", "st", "te")):
+            continue
+        if noun.casefold() in {
+            "auch", "aber", "oder", "noch", "schon", "sehr", "mehr", "nur", "dann",
+            "wenn", "weil", "dass", "nicht", "kein", "keine", "einen", "einem",
+        }:
+            continue
+        hints.append(
+            _grammar_issue(
+                type="de_article_noun_case",
+                start=m.start(2),
+                end=m.end(2),
+                message="Artikel + kleingeschriebenes Wort — Nomen groß?",
+                suggestion=noun[:1].upper() + noun[1:],
+                severity="hint",
+                lang="de",
+                word=noun,
+            )
+        )
+
+    # Komma vor dass/weil/obwohl fehlt
+    for m in re.finditer(r"(?<![,\n])\s+\b(dass|weil|obwohl)\b", raw, re.I):
+        # Skip Satzanfang
+        before = raw[: m.start()].rstrip()
+        if not before or before[-1] in ".!?;:":
+            continue
+        # Wenn direkt nach Artikel/Präposition oft ok ohne Komma — nur bei Verb-Ende davor
+        if re.search(r"[a-zäöüß]{3,}e[nt]?$", before, re.I) or re.search(
+            r"\b(?:ist|sind|war|waren|hat|haben|wird|kann|muss|soll)\s*$", before, re.I
+        ):
+            conj = m.group(1)
+            # Position des Konjunkts
+            cm = re.search(r"\b(dass|weil|obwohl)\b", m.group(0), re.I)
+            if not cm:
+                continue
+            start = m.start() + cm.start()
+            hints.append(
+                _grammar_issue(
+                    type="de_comma_subordinate",
+                    start=start - 1 if start > 0 and raw[start - 1] == " " else start,
+                    end=start + len(conj),
+                    message=f'Komma vor „{conj.lower()}“ prüfen',
+                    suggestion=f", {conj.lower()}",
+                    severity="hint",
+                    lang="de",
+                )
+            )
+
+    # Doppelte Verneinung (leicht): nicht + kein/nichts/nie
+    for m in re.finditer(
+        r"\bnicht\s+(kein|keine|keinen|keinem|keiner|nichts|nie|niemand)\b",
+        raw,
+        re.I,
+    ):
+        hints.append(
+            _grammar_issue(
+                type="de_double_negation",
+                start=m.start(),
+                end=m.end(),
+                message="Mögliche doppelte Verneinung",
+                suggestion=m.group(1),
+                severity="hint",
+                lang="de",
+            )
+        )
+
+    # Leerzeichen vor Einheiten (10km → 10 km)
+    for m in re.finditer(
+        r"\b(\d+(?:[.,]\d+)?)(km|mm|cm|kg|mg|ml|m|g|l|€|%|°C|°F)\b",
+        raw,
+    ):
+        hints.append(
+            _grammar_issue(
+                type="de_space_before_unit",
+                start=m.start(),
+                end=m.end(),
+                message="Leerzeichen vor Einheit empfohlen",
+                suggestion=f"{m.group(1)} {m.group(2)}",
+                severity="hint",
+                lang="de",
+            )
+        )
+
+    # Subject-Verb Abstand: "Ergeht" / fehlendes Leerzeichen nach Pronomen+Verb (sehr leicht)
+    for m in re.finditer(
+        r"\b(Ich|Du|Er|Sie|Es|Wir|Ihr|Man)([a-zäöüß]{3,})\b",
+        raw,
+    ):
+        hints.append(
+            _grammar_issue(
+                type="de_subject_verb_space",
+                start=m.start(),
+                end=m.end(),
+                message="Leerzeichen zwischen Subjekt und Verb fehlt?",
+                suggestion=f"{m.group(1)} {m.group(2)}",
+                severity="hint",
+                lang="de",
+            )
+        )
+
+    return hints
+
+
+def _grammar_en(text: str) -> list[dict]:
+    """English heuristics: its/it's, your/you're, a/an, S-V agreement, …"""
+    hints: list[dict] = []
+    raw = text or ""
+    if not raw:
+        return hints
+
+    # its / it's
+    for m in re.finditer(r"\bits\s+(?:a|an|the|my|your|his|her|our|their)\b", raw, re.I):
+        hints.append(
+            _grammar_issue(
+                type="en_its_its",
+                start=m.start(),
+                end=m.start() + 3,
+                message='Possibly "it\'s" (it is) instead of "its"',
+                suggestion="it's",
+                severity="warning",
+                lang="en",
+            )
+        )
+    for m in re.finditer(r"\bit's\s+(?:own|color|colour|name|place|way)\b", raw, re.I):
+        hints.append(
+            _grammar_issue(
+                type="en_its_its",
+                start=m.start(),
+                end=m.start() + 4,
+                message='Possessive "its" instead of "it\'s"?',
+                suggestion="its",
+                severity="hint",
+                lang="en",
+            )
+        )
+
+    # your / you're
+    for m in re.finditer(r"\byour\s+(?:welcome|right|wrong|going|here|there)\b", raw, re.I):
+        hints.append(
+            _grammar_issue(
+                type="en_your_youre",
+                start=m.start(),
+                end=m.start() + 4,
+                message='Possibly "you\'re" (you are) instead of "your"',
+                suggestion="you're",
+                severity="warning",
+                lang="en",
+            )
+        )
+    for m in re.finditer(r"\byou're\s+(?:name|house|car|book|idea)\b", raw, re.I):
+        hints.append(
+            _grammar_issue(
+                type="en_your_youre",
+                start=m.start(),
+                end=m.start() + 6,
+                message='Possessive "your" instead of "you\'re"?',
+                suggestion="your",
+                severity="hint",
+                lang="en",
+            )
+        )
+
+    # their / there / they're
+    for m in re.finditer(r"\btheir\s+(?:is|are|was|were|will)\b", raw, re.I):
+        hints.append(
+            _grammar_issue(
+                type="en_their_there",
+                start=m.start(),
+                end=m.start() + 5,
+                message='Possibly "there" instead of "their"',
+                suggestion="there",
+                severity="warning",
+                lang="en",
+            )
+        )
+    for m in re.finditer(r"\bthere\s+(?:book|house|car|idea|name)\b", raw, re.I):
+        hints.append(
+            _grammar_issue(
+                type="en_their_there",
+                start=m.start(),
+                end=m.start() + 5,
+                message='Possibly "their" (possessive) instead of "there"',
+                suggestion="their",
+                severity="hint",
+                lang="en",
+            )
+        )
+    for m in re.finditer(r"\bthey're\s+(?:book|house|car|idea|name)\b", raw, re.I):
+        hints.append(
+            _grammar_issue(
+                type="en_theyre",
+                start=m.start(),
+                end=m.start() + 7,
+                message='Possibly "their" instead of "they\'re"',
+                suggestion="their",
+                severity="hint",
+                lang="en",
+            )
+        )
+
+    # a / an before vowels
+    for m in re.finditer(r"\b(a)\s+([A-Za-z][A-Za-z\-']*)\b", raw, re.I):
+        word = m.group(2)
+        if _EN_VOWEL_SOUND.match(word) and not _EN_CONSONANT_U.match(word):
+            hints.append(
+                _grammar_issue(
+                    type="en_a_an",
+                    start=m.start(1),
+                    end=m.end(1),
+                    message=f'Use "an" before "{word}"',
+                    suggestion="an",
+                    severity="warning",
+                    lang="en",
+                    word=word,
+                )
+            )
+    for m in re.finditer(r"\b(an)\s+([A-Za-z][A-Za-z\-']*)\b", raw, re.I):
+        word = m.group(2)
+        if (not _EN_VOWEL_SOUND.match(word)) or word.lower().startswith(
+            ("uni", "eu", "one", "use", "user")
+        ):
+            hints.append(
+                _grammar_issue(
+                    type="en_a_an",
+                    start=m.start(1),
+                    end=m.end(1),
+                    message=f'Use "a" before "{word}"',
+                    suggestion="a",
+                    severity="warning",
+                    lang="en",
+                    word=word,
+                )
+            )
+
+    # Subject-verb: he/she/it + bare verb (go → goes) light
+    for m in re.finditer(
+        r"\b(he|she|it)\s+(go|do|have|want|need|like|make|take|come|say|get|know|think|see)\b",
+        raw,
+        re.I,
+    ):
+        verb = m.group(2).lower()
+        sugg = {
+            "go": "goes",
+            "do": "does",
+            "have": "has",
+            "want": "wants",
+            "need": "needs",
+            "like": "likes",
+            "make": "makes",
+            "take": "takes",
+            "come": "comes",
+            "say": "says",
+            "get": "gets",
+            "know": "knows",
+            "think": "thinks",
+            "see": "sees",
+        }.get(verb, verb + "s")
+        hints.append(
+            _grammar_issue(
+                type="en_subject_verb",
+                start=m.start(2),
+                end=m.end(2),
+                message=f'Subject-verb agreement: "{m.group(1)} {sugg}"?',
+                suggestion=sugg,
+                severity="warning",
+                lang="en",
+            )
+        )
+
+    # Double negatives (allow one intervening word: don't know nothing)
+    for m in re.finditer(
+        r"\b(don't|doesn't|didn't|won't|can't|cannot|never|not)\s+"
+        r"(?:\w+\s+)?"
+        r"(no|nobody|nothing|never|nowhere|none)\b",
+        raw,
+        re.I,
+    ):
+        hints.append(
+            _grammar_issue(
+                type="en_double_negative",
+                start=m.start(),
+                end=m.end(),
+                message="Possible double negative",
+                severity="hint",
+                lang="en",
+            )
+        )
+
+    # Comma splice light: ", and" missing — clause, clause with capital mid-sentence after comma?skip
+    # Pattern: word, Word (two independent-looking clauses) — ", He" after lowercase
+    for m in re.finditer(r"([a-z])\s*,\s*([A-Z][a-z]+)\s+(is|are|was|were|has|have|will|can)\b", raw):
+        hints.append(
+            _grammar_issue(
+                type="en_comma_splice",
+                start=m.start() + 1,
+                end=m.start(2),
+                message="Possible comma splice — consider semicolon or conjunction",
+                suggestion="; ",
+                severity="hint",
+                lang="en",
+            )
+        )
+
+    return hints
+
+
+def grammar_check(text: str, *, lang: str | None = None) -> list[dict]:
+    """
+    Reichhaltigere Grammatik-/Stil-Hinweise (heuristisch).
+
+    Kombiniert Basis-Typografie mit sprachspezifischen Regeln (DE/EN).
+    Rückgabe: Liste von Issue-Dicts mit type/start/end/message/suggestion/…
+    """
+    if lang is None:
+        try:
+            from instantlensdoc.core.i18n import get_lang
+
+            lang = get_lang()
+        except Exception:
+            lang = "de"
+    code = (lang or "de").split("-")[0].lower()
+    issues = _grammar_base_hints(text, lang=code)
+    if code == "de":
+        issues.extend(_grammar_de(text))
+    elif code == "en":
+        issues.extend(_grammar_en(text))
+    # Sort by position for stable UI
+    issues.sort(key=lambda d: (int(d.get("start", 0)), int(d.get("end", 0)), str(d.get("type", ""))))
+    return issues
+
+
+def grammar_hints(text: str, *, lang: str | None = None) -> list[dict]:
+    """
+    Grammatik-/Typografie-Hinweise (heuristisch).
+
+    Rückwärtskompatibel: enthält weiterhin double_space, repeated_word,
+    missing_space_after_punct, lowercase_sentence — plus erweiterte DE/EN-Typen
+    aus ``grammar_check``.
+    """
+    return grammar_check(text, lang=lang)
 
 
 def spellcheck_text(
@@ -398,7 +845,7 @@ def spellcheck_with_suggestions(
                 ),
             }
         )
-    grammar = grammar_hints(text, lang=lang) if include_grammar else []
+    grammar = grammar_check(text, lang=lang) if include_grammar else []
     return {
         "lang": lang,
         "unknown": unknown,

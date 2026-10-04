@@ -1,17 +1,17 @@
 # InstantLens Doc — About
 
-## 2.6.27
+## 2.6.28
 
 Polish / installer in sync flow.
 
 | | |
 |---|---|
 | Product | InstantLens Doc |
-| Version | **2.6.27** |
+| Version | **2.6.28** |
 | Vendor | Andreas Meyer |
 | Contact | ame@sellerbach.de |
 
-New in 2.6.27: `sync-ild.ps1 -BuildInstaller` (optional Setup.exe after sync); post-sync steps for `install-ild.ps1` + keygen + scripting; robust mouse-wheel scroll for text/Word Suite; help/info + i18n keys.
+New in 2.6.28: `sync-ild.ps1 -BuildInstaller` (optional Setup.exe after sync); post-sync steps for `install-ild.ps1` + keygen + scripting; robust mouse-wheel scroll for text/Word Suite; help/info + i18n keys.
 
 After sync:
 

@@ -1897,6 +1897,29 @@ class TextEditor(QPlainTextEdit):
         self.setPlainText(new_text)
         return new_text
 
+    def update_figure_list(self) -> str:
+        """Abbildungsverzeichnis einfügen/aktualisieren — 2.6.28."""
+        from ild_pdf.auto_format import insert_lof_into_text
+
+        new_text = insert_lof_into_text(self.toPlainText())
+        self.setPlainText(new_text)
+        return new_text
+
+    def update_index(self, *, lang: str | None = None) -> str:
+        """Stichwortverzeichnis einfügen/aktualisieren — 2.6.28."""
+        from ild_pdf.auto_format import insert_index_into_text
+
+        if lang is None:
+            try:
+                from instantlensdoc.core.i18n import get_lang
+
+                lang = get_lang()
+            except Exception:
+                lang = "de"
+        new_text = insert_index_into_text(self.toPlainText(), lang=lang or "de")
+        self.setPlainText(new_text)
+        return new_text
+
     def highlight_selection(self, color: str = "#FFE066") -> bool:
         """Aktuelle Auswahl dauerhaft (als ExtraSelection) markieren."""
         cur = self.textCursor()

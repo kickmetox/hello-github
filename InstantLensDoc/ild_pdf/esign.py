@@ -1,6 +1,6 @@
-"""Digitale / offizielle Signaturen (zertifikatsbasiert) — 2.6.27.
+"""Digitale / offizielle Signaturen (zertifikatsbasiert) — 2.6.28.
 
-Baut auf Verschlüsselung (2.6.7) auf. eIDAS-Orientierung:
+Baut auf Verschlüsselung (2.6.28) auf. eIDAS-Orientierung:
 
 - **SES** (einfache elektronische Signatur): Bild-/Namensstempel
 - **AES** (fortgeschritten): Zertifikat + kryptografische Signatur des
@@ -434,7 +434,7 @@ def sign_pdf(
     embed_attachment: bool = True,
     visible_stamp: bool = True,
 ) -> dict[str, Any]:
-    """PDF digital signieren (zertifikatsbasiert wo möglich) — 2.6.27.
+    """PDF digital signieren (zertifikatsbasiert wo möglich) — 2.6.28.
 
     SES: ohne Zertifikat (nur Stempel + Sidecar).
     AES/QES: PKCS#12 erforderlich; QES nur Markierung + Hinweis.
@@ -615,3 +615,435 @@ def list_signatures(pdf_path: str | Path) -> dict[str, Any]:
     data = store.summary()
     data["eidas_levels"] = {lvl: eidas_level_info(lvl) for lvl in EIDAS_LEVELS}
     return data
+
+
+# --- eIDAS QES Trust-Pfad (best-effort, ohne bezahlte TSA) ---
+
+TRUST_STORE_ENV = "ILD_TRUST_STORE"
+DEFAULT_TRUST_DIR_NAMES = (
+    "ild_trust",
+    "trust",
+    "certs",
+)
+
+
+def eidas_trust_info() -> dict[str, Any]:
+    """Dokumentation der eIDAS-/Trust-Grenzen in InstantLens Doc.
+
+    Qualifizierte Zeitstempel (TSA) und volle QTSP-Trust-List-Validierung
+    erfordern externe Dienste — hier nur lokal/best-effort.
+    """
+    return {
+        "ok": True,
+        "ses": "Bild-/Namensstempel; keine Zertifikatskette",
+        "aes": (
+            "PKCS#12 lokal; Kettenprüfung best-effort gegen System-/PEM-Trust-Store"
+        ),
+        "qes_claimed": (
+            "Level-Markierung QES nur bei explizitem Import eines QTSP-P12; "
+            "keine Fake-QES, keine automatische EU-Trusted-List"
+        ),
+        "timestamp": (
+            "Qualifizierter Zeitstempel (TSA) erfordert externen QTSP — "
+            "ohne bezahlte/angeschlossene TSA ist timestamp_present i. d. R. false"
+        ),
+        "chain_validation": "best-effort (Issuer vorhanden, Signatur der Kette, Daten gültig)",
+        "trust_store": (
+            f"System-CA (certifi/ssl) + optionales lokales PEM-Verzeichnis "
+            f"(${TRUST_STORE_ENV} oder ./ild_trust|trust|certs)"
+        ),
+        "limitations": (
+            "Keine vollständige eIDAS-QES-Validierung, keine EU Trusted List, "
+            "kein eingebetteter TSA-Token ohne externen QTSP. "
+            "Für rechtsverbindliche QES: QTSP-Werkzeug / Validierungsdienst nutzen."
+        ),
+        "levels": list(EIDAS_LEVELS),
+    }
+
+
+def _iter_trust_pem_dirs(extra: Sequence[str | Path] | None = None) -> list[Path]:
+    dirs: list[Path] = []
+    import os
+
+    env = (os.environ.get(TRUST_STORE_ENV) or "").strip()
+    if env:
+        dirs.append(Path(env))
+    if extra:
+        for e in extra:
+            if e:
+                dirs.append(Path(e))
+    # lokale Projekt-/CWD-Ordner
+    cwd = Path.cwd()
+    for name in DEFAULT_TRUST_DIR_NAMES:
+        dirs.append(cwd / name)
+    # neben diesem Modul
+    here = Path(__file__).resolve().parent
+    for name in DEFAULT_TRUST_DIR_NAMES:
+        dirs.append(here / name)
+    # dedupe, existierende zuerst behalten
+    seen: set[str] = set()
+    out: list[Path] = []
+    for d in dirs:
+        key = str(d.resolve()) if d.exists() else str(d)
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(d)
+    return out
+
+
+def load_trust_store(
+    *,
+    pem_dirs: Sequence[str | Path] | None = None,
+    include_system: bool = True,
+) -> dict[str, Any]:
+    """Trust-Store laden: System-CAs + PEM-Dateien aus lokalen Verzeichnissen.
+
+    Rückgabe: certs (cryptography-Objekte), paths, count, source_notes.
+    """
+    from cryptography import x509
+
+    certs: list[Any] = []
+    paths: list[str] = []
+    notes: list[str] = []
+
+    if include_system:
+        # 1) certifi
+        try:
+            import certifi
+
+            ca_path = Path(certifi.where())
+            if ca_path.is_file():
+                blob = ca_path.read_bytes()
+                for pem in _split_pems(blob):
+                    try:
+                        certs.append(x509.load_pem_x509_certificate(pem))
+                        paths.append(str(ca_path))
+                    except Exception:
+                        continue
+                notes.append(f"system:certifi:{ca_path}")
+        except Exception:
+            notes.append("system:certifi:unavailable")
+        # 2) ssl.get_default_verify_paths
+        try:
+            import ssl
+
+            v = ssl.get_default_verify_paths()
+            for candidate in (v.cafile, v.openssl_cafile):
+                if not candidate:
+                    continue
+                p = Path(candidate)
+                if not p.is_file():
+                    continue
+                blob = p.read_bytes()
+                n_before = len(certs)
+                for pem in _split_pems(blob):
+                    try:
+                        certs.append(x509.load_pem_x509_certificate(pem))
+                        paths.append(str(p))
+                    except Exception:
+                        continue
+                if len(certs) > n_before:
+                    notes.append(f"system:ssl:{p}")
+        except Exception:
+            notes.append("system:ssl:unavailable")
+
+    for d in _iter_trust_pem_dirs(pem_dirs):
+        if not d.is_dir():
+            continue
+        found = 0
+        for f in sorted(d.glob("**/*")):
+            if f.suffix.lower() not in (".pem", ".crt", ".cer", ".cert"):
+                continue
+            try:
+                blob = f.read_bytes()
+                loaded = False
+                for pem in _split_pems(blob):
+                    try:
+                        certs.append(x509.load_pem_x509_certificate(pem))
+                        paths.append(str(f))
+                        loaded = True
+                        found += 1
+                    except Exception:
+                        continue
+                if not loaded:
+                    # DER fallback
+                    try:
+                        certs.append(x509.load_der_x509_certificate(blob))
+                        paths.append(str(f))
+                        found += 1
+                    except Exception:
+                        pass
+            except Exception:
+                continue
+        if found:
+            notes.append(f"local:{d}:{found}")
+
+    return {
+        "certs": certs,
+        "paths": sorted(set(paths)),
+        "count": len(certs),
+        "notes": notes,
+    }
+
+
+def _split_pems(blob: bytes) -> list[bytes]:
+    text = blob.decode("utf-8", errors="ignore")
+    marker = "-----BEGIN CERTIFICATE-----"
+    if marker not in text:
+        # gesamter Blob als ein PEM versuchen
+        return [blob] if b"BEGIN CERTIFICATE" in blob else []
+    parts: list[bytes] = []
+    chunks = text.split(marker)
+    for chunk in chunks[1:]:
+        end = "-----END CERTIFICATE-----"
+        if end not in chunk:
+            continue
+        body, _rest = chunk.split(end, 1)
+        parts.append((marker + body + end).encode("utf-8"))
+    return parts
+
+
+def _parse_iso_dt(value: str) -> datetime | None:
+    if not value:
+        return None
+    s = str(value).strip()
+    if not s:
+        return None
+    try:
+        if s.endswith("Z"):
+            s = s[:-1] + "+00:00"
+        return datetime.fromisoformat(s)
+    except Exception:
+        return None
+
+
+def _cert_dates_valid(not_before: str, not_after: str, *, now: datetime | None = None) -> bool:
+    nb = _parse_iso_dt(not_before)
+    na = _parse_iso_dt(not_after)
+    if nb is None or na is None:
+        return False
+    cur = now or datetime.now(timezone.utc)
+    if nb.tzinfo is None:
+        nb = nb.replace(tzinfo=timezone.utc)
+    if na.tzinfo is None:
+        na = na.replace(tzinfo=timezone.utc)
+    if cur.tzinfo is None:
+        cur = cur.replace(tzinfo=timezone.utc)
+    return nb <= cur <= na
+
+
+def validate_cert_chain(
+    cert,
+    *,
+    intermediates: Sequence[Any] | None = None,
+    trust_certs: Sequence[Any] | None = None,
+) -> dict[str, Any]:
+    """Best-effort Kettenprüfung: Issuer vorhanden, Signatur der Eltern, Self-signed ok.
+
+    Keine vollständige RFC-5280-/QTSP-Validierung.
+    """
+    from cryptography.hazmat.primitives.asymmetric import padding, ec, rsa
+    from cryptography.hazmat.primitives import hashes
+    from cryptography.exceptions import InvalidSignature
+
+    issuer_present = False
+    chain_ok = False
+    matched_trust = False
+    detail = ""
+
+    store = list(trust_certs or [])
+    inter = list(intermediates or [])
+    candidates = inter + store
+
+    # Self-signed?
+    try:
+        self_issued = cert.subject == cert.issuer
+    except Exception:
+        self_issued = False
+
+    def _verify_child_with_parent(child, parent) -> bool:
+        pub = parent.public_key()
+        try:
+            if isinstance(pub, rsa.RSAPublicKey):
+                pub.verify(
+                    child.signature,
+                    child.tbs_certificate_bytes,
+                    padding.PKCS1v15(),
+                    child.signature_hash_algorithm,
+                )
+                return True
+            if isinstance(pub, ec.EllipticCurvePublicKey):
+                pub.verify(
+                    child.signature,
+                    child.tbs_certificate_bytes,
+                    ec.ECDSA(child.signature_hash_algorithm),
+                )
+                return True
+        except InvalidSignature:
+            return False
+        except Exception:
+            return False
+        return False
+
+    if self_issued:
+        issuer_present = True
+        try:
+            chain_ok = _verify_child_with_parent(cert, cert)
+            detail = "self-signed"
+        except Exception:
+            chain_ok = False
+            detail = "self-signed verify failed"
+    else:
+        for parent in candidates:
+            try:
+                if parent.subject == cert.issuer:
+                    issuer_present = True
+                    if _verify_child_with_parent(cert, parent):
+                        chain_ok = True
+                        matched_trust = parent in store
+                        detail = "issuer matched + signature ok"
+                        break
+                    detail = "issuer matched, signature failed"
+            except Exception:
+                continue
+        if not issuer_present:
+            detail = "issuer not in trust store / intermediates"
+
+    return {
+        "issuer_present": issuer_present,
+        "chain_ok": chain_ok,
+        "matched_trust": matched_trust,
+        "self_signed": self_issued,
+        "detail": detail,
+        "best_effort": True,
+    }
+
+
+def verify_trust_path(
+    entry: SignatureEntry | dict[str, Any] | Any | None = None,
+    *,
+    cert=None,
+    p12_path: str | Path | None = None,
+    p12_password: str = "",
+    pem_dirs: Sequence[str | Path] | None = None,
+    level: str | None = None,
+) -> dict[str, Any]:
+    """Strukturierter Trust-Status für Signatur-Eintrag oder Zertifikat.
+
+    Felder: SES/AES/QES_claimed, cert_valid_dates, issuer_present, chain_ok
+    (best-effort), timestamp_present (meist false), limitations.
+    """
+    trust_info = eidas_trust_info()
+    limitations = trust_info["limitations"]
+
+    # Entry normalisieren
+    ent: dict[str, Any] = {}
+    if isinstance(entry, SignatureEntry):
+        ent = entry.to_dict()
+    elif isinstance(entry, dict):
+        ent = dict(entry)
+    elif entry is not None and hasattr(entry, "to_dict"):
+        try:
+            ent = dict(entry.to_dict())
+        except Exception:
+            ent = {}
+
+    lvl = (level or ent.get("level") or "SES")
+    lvl = str(lvl).upper()
+    if lvl not in EIDAS_LEVELS:
+        lvl = "SES"
+
+    # Zertifikat laden falls nötig
+    loaded_cert = cert
+    if loaded_cert is None and p12_path:
+        try:
+            _key, loaded_cert = _load_p12(p12_path, p12_password)
+        except Exception:
+            loaded_cert = None
+
+    meta: dict[str, str] = {}
+    if loaded_cert is not None:
+        try:
+            meta = _cert_meta(loaded_cert)
+        except Exception:
+            meta = {}
+    else:
+        meta = {
+            "cert_subject": str(ent.get("cert_subject") or ""),
+            "cert_issuer": str(ent.get("cert_issuer") or ""),
+            "cert_serial": str(ent.get("cert_serial") or ""),
+            "cert_not_before": str(ent.get("cert_not_before") or ""),
+            "cert_not_after": str(ent.get("cert_not_after") or ""),
+        }
+
+    cert_valid_dates = False
+    if meta.get("cert_not_before") and meta.get("cert_not_after"):
+        cert_valid_dates = _cert_dates_valid(
+            meta["cert_not_before"], meta["cert_not_after"]
+        )
+
+    issuer_present = bool(meta.get("cert_issuer"))
+    chain_ok = False
+    chain_detail = ""
+
+    if lvl == "SES" and loaded_cert is None and not meta.get("cert_subject"):
+        # reine SES ohne Zertifikat
+        return {
+            "ok": True,
+            "level": "SES",
+            "SES": True,
+            "AES": False,
+            "QES_claimed": False,
+            "cert_valid_dates": False,
+            "issuer_present": False,
+            "chain_ok": False,
+            "timestamp_present": False,
+            "limitations": limitations,
+            "detail": "SES — keine Zertifikatskette",
+            "trust_info": trust_info,
+        }
+
+    if loaded_cert is not None:
+        store = load_trust_store(pem_dirs=pem_dirs, include_system=True)
+        chain = validate_cert_chain(loaded_cert, trust_certs=store.get("certs") or [])
+        issuer_present = bool(chain.get("issuer_present"))
+        chain_ok = bool(chain.get("chain_ok"))
+        chain_detail = str(chain.get("detail") or "")
+    elif issuer_present:
+        # Nur Metadaten aus Sidecar — Kette nicht prüfbar
+        chain_detail = "cert object unavailable; issuer string present in sidecar"
+        chain_ok = False
+
+    # Zeitstempel: Sidecar hat kein TSA-Feld → meist false
+    timestamp_present = bool(
+        ent.get("timestamp")
+        or ent.get("timestamp_token")
+        or ent.get("tsa")
+        or ent.get("qualified_timestamp")
+    )
+
+    qes_claimed = lvl == "QES"
+    return {
+        "ok": True,
+        "level": lvl,
+        "SES": lvl == "SES",
+        "AES": lvl == "AES",
+        "QES_claimed": qes_claimed,
+        "cert_valid_dates": cert_valid_dates,
+        "issuer_present": issuer_present,
+        "chain_ok": chain_ok,
+        "timestamp_present": timestamp_present,
+        "limitations": limitations,
+        "detail": chain_detail,
+        "cert_subject": meta.get("cert_subject", ""),
+        "cert_issuer": meta.get("cert_issuer", ""),
+        "cert_serial": meta.get("cert_serial", ""),
+        "cert_not_before": meta.get("cert_not_before", ""),
+        "cert_not_after": meta.get("cert_not_after", ""),
+        "trust_info": trust_info,
+        "note": (
+            "Qualifizierter TSA-Zeitstempel erfordert externen QTSP — "
+            "ohne Anbindung bleibt timestamp_present false."
+        ),
+    }

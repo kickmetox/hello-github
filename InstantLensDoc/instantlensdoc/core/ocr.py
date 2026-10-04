@@ -610,7 +610,7 @@ def ocr_image_layout(
     )
 
 
-# Handschrift-Hook: Tesseract-PSM-Presets (kein separates ML-Modell) — 2.6.19
+# Handschrift: Tesseract-PSM + Preprocess + Multi-PSM — kein separates ML-Modell
 HANDWRITING_PSM_PRESETS: Dict[str, int] = {
     "block": 6,  # Uniform block of text
     "line": 7,  # Single text line
@@ -618,6 +618,37 @@ HANDWRITING_PSM_PRESETS: Dict[str, int] = {
     "sparse": 11,  # Sparse text
 }
 DEFAULT_HANDWRITING_PSM = 6
+# PSM-Kandidaten für Auto-Auswahl (beste Confidence / Textlänge)
+HANDWRITING_PSM_CANDIDATES: tuple[int, ...] = (6, 7, 8, 11, 4, 13)
+
+HANDWRITING_UPGRADE_PATH = (
+    "Upgrade-Pfad: externes Handschrift-ML (z. B. TrOCR / Kraken / lokale "
+    "ONNX-Modelle) über Plugin-Hook oder ``ild.ocr_handwriting.engine=external``; "
+    "derzeit verbessert über Preprocess + Multi-PSM, kein eingebettetes Netz."
+)
+
+
+def _handwriting_settings() -> dict:
+    """Optionale Settings unter ``ild.ocr_handwriting`` / app_settings."""
+    defaults = {
+        "preprocess": True,
+        "multi_psm": True,
+        "psm": DEFAULT_HANDWRITING_PSM,
+        "engine": "tesseract",
+    }
+    try:
+        from instantlensdoc.core.app_settings import load_settings
+
+        raw = load_settings().get("ocr_handwriting") or load_settings().get(
+            "ild.ocr_handwriting"
+        )
+        if isinstance(raw, dict):
+            out = dict(defaults)
+            out.update(raw)
+            return out
+    except Exception:
+        pass
+    return dict(defaults)
 
 
 def normalize_handwriting_psm(psm: int | str | None) -> int:
@@ -637,32 +668,192 @@ def normalize_handwriting_psm(psm: int | str | None) -> int:
     return max(0, min(13, n))
 
 
+def _preprocess_handwriting(img: Image.Image) -> Image.Image:
+    """Leichtes Preprocess: Graustufen, Kontrast, Schwellwert, Deskew (PIL)."""
+    try:
+        from PIL import ImageEnhance, ImageOps, ImageFilter
+    except Exception:
+        return img
+
+    try:
+        work = img.convert("L")
+    except Exception:
+        return img
+
+    try:
+        work = ImageOps.autocontrast(work, cutoff=2)
+    except Exception:
+        pass
+    try:
+        work = ImageEnhance.Contrast(work).enhance(1.6)
+    except Exception:
+        pass
+    try:
+        work = work.filter(ImageFilter.MedianFilter(size=3))
+    except Exception:
+        pass
+    # Einfacher Schwellwert
+    try:
+        work = work.point(lambda p: 255 if p > 160 else 0)
+    except Exception:
+        pass
+    # Leichtes Deskew über extrem grobe Schätzung (nur kleine Winkel)
+    try:
+        work = _deskew_light(work)
+    except Exception:
+        pass
+    return work
+
+
+def _deskew_light(img: Image.Image) -> Image.Image:
+    """Sehr leichtes Deskew: nur ±3° testen, beste Projektions-Varianz."""
+    try:
+        import statistics
+    except Exception:
+        return img
+
+    best = img
+    best_score = -1.0
+    for angle in (0, -2, 2, -3, 3):
+        try:
+            rotated = img.rotate(angle, expand=False, fillcolor=255) if angle else img
+            # horizontale Projektion: Varianz der Zeilenmittel
+            w, h = rotated.size
+            if w < 8 or h < 8:
+                return img
+            pix = rotated.load()
+            rows = []
+            step = max(1, h // 64)
+            for y in range(0, h, step):
+                s = 0
+                for x in range(0, w, max(1, w // 64)):
+                    s += 1 if pix[x, y] < 128 else 0
+                rows.append(s)
+            if len(rows) < 3:
+                continue
+            score = float(statistics.pvariance(rows))
+            if score > best_score:
+                best_score = score
+                best = rotated
+        except Exception:
+            continue
+    return best
+
+
+def _score_ocr_result(text: str, conf_avg: float | None) -> float:
+    """Score aus Textlänge + optionaler mittlerer Confidence."""
+    t = (text or "").strip()
+    if not t:
+        return -1.0
+    # alnum-Anteil belohnen, reine Müllzeichen bestrafen
+    alnum = sum(1 for c in t if c.isalnum())
+    length_score = min(len(t), 500) + alnum * 0.5
+    conf = float(conf_avg) if conf_avg is not None else 40.0
+    return length_score * (0.5 + max(0.0, min(conf, 100.0)) / 200.0)
+
+
+def _ocr_with_psm(
+    img: Image.Image,
+    lang: str,
+    psm_n: int,
+) -> tuple[str, float | None]:
+    import pytesseract
+
+    config = f"--psm {psm_n}"
+    text = ""
+    conf_avg: float | None = None
+    try:
+        text = str(pytesseract.image_to_string(img, lang=lang, config=config) or "")
+    except Exception:
+        try:
+            text = str(pytesseract.image_to_string(img, lang="eng", config=config) or "")
+        except Exception:
+            text = ""
+    try:
+        data = pytesseract.image_to_data(
+            img, lang=lang, config=config, output_type=pytesseract.Output.DICT
+        )
+        confs = []
+        for c in data.get("conf") or []:
+            try:
+                v = float(c)
+                if v >= 0:
+                    confs.append(v)
+            except (TypeError, ValueError):
+                continue
+        if confs:
+            conf_avg = sum(confs) / len(confs)
+    except Exception:
+        conf_avg = None
+    return text, conf_avg
+
+
 def ocr_image_handwriting(
     source: Union[str, Path, Image.Image],
     lang: str = "deu+eng",
     *,
-    psm: int | str = DEFAULT_HANDWRITING_PSM,
+    psm: int | str | None = None,
+    preprocess: bool | None = None,
+    multi_psm: bool | None = None,
 ) -> str:
     """
-    Basis-Handschriftenerkennung über Tesseract-PSM — 2.6.19.
+    Handschriftenerkennung — verbessert gegenüber reinem PSM-Hook.
 
-    Kein separates Handschrift-ML-Modell; nutzt ``--psm`` für Zeilen/Blöcke.
+    Verbesserungen vs. reiner ``--psm``-Aufruf:
+    - optionales PIL-Preprocess (Kontrast, Schwellwert, leichtes Deskew)
+    - Multi-PSM: mehrere Modi (6/7/8/11/…) → beste Confidence/Textlänge
+    - Settings ``ocr_handwriting`` / ``ild.ocr_handwriting`` (preprocess, multi_psm, psm)
+
+    Kein eingebettetes Handschrift-ML-Netz; siehe ``HANDWRITING_UPGRADE_PATH``.
     """
     ok, msg = tesseract_available()
     if not ok:
         raise OcrUnavailable(msg)
 
-    import pytesseract
+    settings = _handwriting_settings()
+    do_prep = settings.get("preprocess", True) if preprocess is None else bool(preprocess)
+    do_multi = settings.get("multi_psm", True) if multi_psm is None else bool(multi_psm)
+    if psm is None:
+        psm = settings.get("psm", DEFAULT_HANDWRITING_PSM)
 
     img = _load_image(source)
-    psm_n = normalize_handwriting_psm(psm)
-    config = f"--psm {psm_n}"
     try:
-        text = pytesseract.image_to_string(img, lang=lang, config=config)
-        if text and str(text).strip():
-            return str(text)
+        img = img.convert("RGB") if img.mode not in ("RGB", "L") else img
     except Exception:
         pass
+
+    work = _preprocess_handwriting(img) if do_prep else img
+
+    psm_n = normalize_handwriting_psm(psm)
+    candidates: list[int] = [psm_n]
+    if do_multi:
+        for c in HANDWRITING_PSM_CANDIDATES:
+            if c not in candidates:
+                candidates.append(c)
+
+    best_text = ""
+    best_score = -1.0
+    for cand in candidates:
+        text, conf = _ocr_with_psm(work, lang, cand)
+        score = _score_ocr_result(text, conf)
+        if score > best_score:
+            best_score = score
+            best_text = text
+        # Wenn Preprocess schwach: einmal Original versuchen (erster Kandidat)
+        if cand == psm_n and do_prep and best_score < 5:
+            text2, conf2 = _ocr_with_psm(img, lang, cand)
+            score2 = _score_ocr_result(text2, conf2)
+            if score2 > best_score:
+                best_score = score2
+                best_text = text2
+
+    if best_text and str(best_text).strip():
+        return str(best_text)
+
+    # letzter Fallback wie zuvor
+    import pytesseract
+
+    config = f"--psm {psm_n}"
     try:
         return pytesseract.image_to_string(img, lang=lang, config=config)
     except Exception:
@@ -671,6 +862,38 @@ def ocr_image_handwriting(
         except Exception:
             return pytesseract.image_to_string(img, lang="eng")
 
+
+def handwriting_recognize(
+    image_path: Union[str, Path, Image.Image],
+    lang: str = "deu+eng",
+    *,
+    psm: int | str | None = None,
+) -> dict:
+    """
+    Handschrift erkennen — strukturierte API über ``ocr_image_handwriting``.
+
+    Verbessert vs. reiner PSM-Hook: Preprocess + Multi-PSM-Auswahl.
+    ``upgrade_path`` beschreibt den Weg zu externen ML-Modellen.
+    """
+    text = ocr_image_handwriting(image_path, lang=lang, psm=psm)
+    settings = _handwriting_settings()
+    return {
+        "ok": True,
+        "text": text,
+        "lang": lang,
+        "psm": normalize_handwriting_psm(
+            psm if psm is not None else settings.get("psm")
+        ),
+        "preprocess": bool(settings.get("preprocess", True)),
+        "multi_psm": bool(settings.get("multi_psm", True)),
+        "engine": str(settings.get("engine") or "tesseract"),
+        "improved_vs_pure_psm": True,
+        "upgrade_path": HANDWRITING_UPGRADE_PATH,
+        "note": (
+            "Preprocess (Kontrast/Schwellwert/Deskew) + Multi-PSM Confidence-Pick; "
+            "kein eingebettetes Handschrift-ML."
+        ),
+    }
 
 def ocr_image(
     source: Union[str, Path, Image.Image],

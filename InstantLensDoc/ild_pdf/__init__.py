@@ -124,6 +124,8 @@ from .print_prep import (
     DEFAULT_MIN_IMAGE_DPI,
     LAYER_LABELS,
     LAYER_ORDER,
+    PANTONE_BASIC,
+    PANTONE_DISCLAIMER,
     PRINT_MIN_IMAGE_DPI,
     BleedSettings,
     ColorPalette,
@@ -139,6 +141,7 @@ from .print_prep import (
     default_layers,
     export_pdfx,
     export_print_ready,
+    export_web_pdf,
     get_bleed_info,
     get_palette,
     list_bleed_presets,
@@ -153,6 +156,7 @@ from .print_prep import (
     rgb_to_hex,
     run_preflight,
     save_print_settings,
+    spot_library,
 )
 from .flatten import bake_annotations, draw_annotations_on_image, flatten_annotations_to_pdf
 from .outline import (
@@ -385,6 +389,21 @@ from .auto_format import (
     list_style_presets,
     list_system_fonts,
     outline_summary,
+)
+from .sections import (
+    SECTIONS_SCHEMA_ID,
+    SECTIONS_VERSION,
+    SectionBreak,
+    SectionError,
+    SectionModel,
+    add_section_break,
+    apply_section_page_sizes,
+    list_sections,
+    load_sections_sidecar,
+    paginate_text_columns,
+    save_sections_sidecar,
+    section_for_page,
+    sidecar_path_for as sections_sidecar_path_for,
 )
 
 __all__ = [
@@ -703,6 +722,8 @@ __all__ = [
     "DEFAULT_MIN_IMAGE_DPI",
     "LAYER_LABELS",
     "LAYER_ORDER",
+    "PANTONE_BASIC",
+    "PANTONE_DISCLAIMER",
     "PRINT_MIN_IMAGE_DPI",
     "BleedSettings",
     "ColorPalette",
@@ -718,6 +739,7 @@ __all__ = [
     "default_layers",
     "export_pdfx",
     "export_print_ready",
+    "export_web_pdf",
     "get_bleed_info",
     "get_palette",
     "list_bleed_presets",
@@ -732,6 +754,20 @@ __all__ = [
     "rgb_to_hex",
     "run_preflight",
     "save_print_settings",
+    "spot_library",
+    "SECTIONS_SCHEMA_ID",
+    "SECTIONS_VERSION",
+    "SectionBreak",
+    "SectionError",
+    "SectionModel",
+    "add_section_break",
+    "apply_section_page_sizes",
+    "list_sections",
+    "load_sections_sidecar",
+    "paginate_text_columns",
+    "save_sections_sidecar",
+    "section_for_page",
+    "sections_sidecar_path_for",
 ]
 
-__version__ = "2.6.27"
+__version__ = "2.6.28"

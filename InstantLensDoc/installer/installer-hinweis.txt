@@ -1,4 +1,4 @@
-InstantLens Doc 2.6.27 — Installation
+InstantLens Doc 2.6.28 — Installation
 
 Startmenü: Gruppe „InstantLens Doc“ mit Programm, optional Keygenerator, INFO und Deinstallieren.
 
@@ -9,15 +9,17 @@ Desktop-Verknüpfung: optionale Checkbox im Installer-Assistenten
 64-Bit: Installer läuft im 64-Bit-Modus (ArchitecturesInstallIn64BitMode=x64compatible).
   Empfohlen: 64-Bit-Python 3.10+ (Python-Layout) bzw. gebündelte x64-EXE.
 
-Neu in 2.6.27 (Polish):
-- Sync-Flow: sync-ild.ps1 -BuildInstaller (optional Setup.exe nach Sync)
-- Nach Sync: install-ild.ps1 (Shortcuts) · build-windows-installer.ps1 (Setup.exe)
-- Hilfe/Info: Installer · Keygen · Scripting vervollständigt
-- Mausrad Text/Word-Suite: Trackpad + Rad · Shift→horizontal · Zeilennummern/Minimap
+Neu in 2.6.28 (Audit-Closure):
+- Mausrad Default-PDF + Frame/Canvas; Abbildungs-/Stichwortverzeichnis; F12 Speichern unter
+- .pptx · Abschnittsumbrüche · Grammatik DE/EN · Silbentrennung 9 Sprachen
+- Pantone-ähnlich/Spot · Web-PDF · Print-Preview · eIDAS Trust-Pfad · Realtime-Hub · Handschrift
+- Einzeiler Setup.exe: powershell -ExecutionPolicy Bypass -File .\scripts\build-windows-installer.ps1
+
+Basis 2.6.27:
+- Sync-Flow: sync-ild.ps1 -BuildInstaller; Mausrad Text (`apply_wheel_scroll`)
 
 Basis 2.6.26:
 - Installer-Pfad gehärtet: Version aus VERSION.txt, Preflight, CustomMessages DE/EN
-- Konsolidierung 2.6.20–2.6.25 (Stylus, Outline, Hooks, Telemetrie, 3D, Hyperlinks/EPUB, Review)
 
 Keygenerator (wenn IncludeKeygen=1):
 - Python-Layout: Startmenü → Keygenerator → {app}\run-keygen.bat
@@ -28,5 +30,3 @@ Deinstallation: Startmenü „InstantLens Doc deinstallieren“ oder Systemsteue
 
 Build (Windows x64 + Inno Setup 6):
   powershell -ExecutionPolicy Bypass -File .\scripts\build-windows-installer.ps1
-  # oder nach Sync:
-  powershell -ExecutionPolicy Bypass -File .\sync-ild.ps1 -BuildInstaller -SkipStart

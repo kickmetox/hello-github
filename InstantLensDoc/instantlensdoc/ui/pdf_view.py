@@ -719,6 +719,62 @@ class PdfCanvas(QLabel):
         self.setMouseTracking(True)
         self.setFocusPolicy(Qt.StrongFocus)
 
+    def wheelEvent(self, event):  # noqa: N802
+        """Frame/Canvas-Mausrad: Viewer-Scroll oder Seitenwechsel — 2.6.28.
+
+        Layout-Frames liegen auf dem Canvas. Rad scrollt die umgebende
+        ``QScrollArea``; ohne Overflow wird an den ``PdfViewer`` zum
+        Seitenwechsel delegiert (Default-Einzelseite / 1S). Continuous bleibt.
+        Trackpad: ``pixelDelta`` wie 2.6.27.
+        """
+        pdf_viewer = None
+        scroll = None
+        cur = self.parentWidget() if hasattr(self, "parentWidget") else None
+        depth = 0
+        while cur is not None and depth < 12:
+            if hasattr(cur, "_handle_page_wheel") and hasattr(cur, "scroll"):
+                pdf_viewer = cur
+                scroll = getattr(cur, "scroll", None)
+                break
+            cur = cur.parentWidget() if hasattr(cur, "parentWidget") else None
+            depth += 1
+        delta = 0
+        try:
+            delta = int(event.pixelDelta().y())
+        except Exception:
+            delta = 0
+        if delta == 0:
+            try:
+                delta = int(event.angleDelta().y())
+            except Exception:
+                delta = 0
+        if scroll is not None:
+            try:
+                bar = scroll.verticalScrollBar()
+                if bar is not None and int(bar.maximum()) > 0 and delta != 0:
+                    step = max(24, int(bar.singleStep()) * 3)
+                    # pixelDelta already in pixels; angleDelta uses step
+                    try:
+                        px = int(event.pixelDelta().y())
+                    except Exception:
+                        px = 0
+                    if px != 0:
+                        bar.setValue(int(bar.value()) - px)
+                    else:
+                        bar.setValue(int(bar.value()) + (-step if delta > 0 else step))
+                    event.accept()
+                    return
+            except Exception:
+                pass
+        if pdf_viewer is not None:
+            try:
+                if pdf_viewer._handle_page_wheel(event):
+                    event.accept()
+                    return
+            except Exception:
+                pass
+        super().wheelEvent(event)
+
     def set_redaction_preview_opacity(self, opacity: float):
         try:
             op = float(opacity)
@@ -3781,33 +3837,54 @@ class PdfViewer(QWidget):
     def page_by_page_enabled(self) -> bool:
         return bool(self._page_by_page)
 
+    def _wheel_should_flip_page(self) -> bool:
+        """True wenn Rad Seiten wechseln soll (1S oder Default-Einzelseite) — 2.6.28."""
+        if not self.pdf_path or self._continuous_scroll:
+            return False
+        if self._page_by_page:
+            return True
+        # Default-Einzelseite (weder CS noch 1S): Rad → Seite, außer Zoom-Overflow
+        try:
+            bar = self.scroll.verticalScrollBar()
+            if bar is not None and int(bar.maximum()) > 0:
+                return False  # Zoom/Overflow: natives Scrollen behalten
+        except Exception:
+            pass
+        return True
+
+    def _handle_page_wheel(self, event) -> bool:
+        """Mausrad → prev/next page. True wenn verarbeitet — 2.6.28 / Trackpad 2.6.27."""
+        if not self._wheel_should_flip_page():
+            return False
+        delta = 0
+        try:
+            delta = int(event.pixelDelta().y())
+        except Exception:
+            delta = 0
+        if delta == 0:
+            try:
+                delta = int(event.angleDelta().y())
+            except Exception:
+                delta = 0
+        if delta > 0:
+            self.prev_page()
+            return True
+        if delta < 0:
+            self.next_page()
+            return True
+        return False
+
     def eventFilter(self, obj, event):  # noqa: N802
-        """Mausrad → Seite blättern im Seite-für-Seite-Modus — 2.6.19 / Trackpad 2.6.27."""
+        """Mausrad → Seite blättern (1S + Default-Einzelseite) — 2.6.28 / Trackpad 2.6.27."""
         try:
             from PySide6.QtCore import QEvent
 
             if (
                 obj is self.scroll.viewport()
                 and event.type() == QEvent.Type.Wheel
-                and self._page_by_page
-                and not self._continuous_scroll
                 and self.pdf_path
             ):
-                delta = 0
-                try:
-                    delta = int(event.pixelDelta().y())
-                except Exception:
-                    delta = 0
-                if delta == 0:
-                    try:
-                        delta = int(event.angleDelta().y())
-                    except Exception:
-                        delta = 0
-                if delta > 0:
-                    self.prev_page()
-                    return True
-                if delta < 0:
-                    self.next_page()
+                if self._handle_page_wheel(event):
                     return True
         except Exception:
             pass

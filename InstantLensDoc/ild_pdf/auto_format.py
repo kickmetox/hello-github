@@ -321,6 +321,254 @@ def insert_toc_into_text(
     return block + "\n\n" + text.lstrip()
 
 
+# --- Abbildungs- & Stichwortverzeichnis (wie TOC) — 2.6.28 ---
+
+_FIGURE_CAPTION_RE = re.compile(
+    r"^(?:!\[([^\]]*)\]\([^)]+\)|"
+    r"(?:\*\*|__)?(?:"
+    r"Abbildung|Abb\.|Figure|Fig\.|Bild|Image|Tabla|Tableau|Figura|Рисунок|图|Figura"
+    r")\s*(\d+[\w.]*)?(?:\*\*|__)?\s*[:.––—-]?\s*(.*))$",
+    re.IGNORECASE,
+)
+
+
+@dataclass
+class FigureCandidate:
+    """Erkannte Abbildungsunterschrift."""
+
+    caption: str
+    number: str = ""
+    line_index: int = -1
+    page_index: Optional[int] = None
+    source: str = "caption"
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass
+class IndexEntry:
+    """Stichwort mit Vorkommen (Zeilen)."""
+
+    term: str
+    lines: list[int] = field(default_factory=list)
+    count: int = 0
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"term": self.term, "lines": list(self.lines), "count": int(self.count)}
+
+
+def detect_figures_in_text(text: str) -> list[FigureCandidate]:
+    """Abbildungsunterschriften / Markdown-Bilder mit Alt-Text erkennen."""
+    figs: list[FigureCandidate] = []
+    for i, line in enumerate((text or "").splitlines()):
+        s = line.strip()
+        if not s:
+            continue
+        m = _FIGURE_CAPTION_RE.match(s)
+        if not m:
+            continue
+        alt = (m.group(1) or "").strip()
+        num = (m.group(2) or "").strip()
+        rest = (m.group(3) or "").strip()
+        if alt:
+            caption = alt
+            source = "markdown_image"
+        else:
+            caption = rest or (f"Abbildung {num}".strip() if num else s)
+            source = "caption"
+        if len(caption) < 1:
+            continue
+        figs.append(
+            FigureCandidate(
+                caption=caption[:200],
+                number=num,
+                line_index=i,
+                source=source,
+            )
+        )
+    return figs
+
+
+def generate_lof_markdown(
+    text: str,
+    *,
+    title: str = "Abbildungsverzeichnis",
+) -> str:
+    """Abbildungsverzeichnis als Markdown (wie TOC)."""
+    figs = detect_figures_in_text(text)
+    lines = [f"# {title}", ""]
+    if not figs:
+        lines.append("_Keine Abbildungen gefunden._")
+    else:
+        for n, f in enumerate(figs, 1):
+            label = f.number or str(n)
+            lines.append(f"- **Abb. {label}:** {f.caption}")
+    return "\n".join(lines) + "\n"
+
+
+def insert_lof_into_text(
+    text: str,
+    *,
+    replace_existing: bool = True,
+) -> str:
+    """Abbildungsverzeichnis zwischen ILD-LOF-Markern einfügen/aktualisieren."""
+    begin = "<!-- ILD-LOF-BEGIN -->"
+    end = "<!-- ILD-LOF-END -->"
+    lof = generate_lof_markdown(text).rstrip()
+    block = f"{begin}\n{lof}\n{end}"
+    if begin in text and end in text and replace_existing:
+        pre, rest = text.split(begin, 1)
+        _, post = rest.split(end, 1)
+        return pre.rstrip() + "\n\n" + block + "\n" + post.lstrip("\n")
+    if begin in text:
+        return text
+    # Nach TOC einfügen, sonst ans Ende / Anfang
+    toc_end = "<!-- ILD-TOC-END -->"
+    if toc_end in text:
+        pre, post = text.split(toc_end, 1)
+        return pre + toc_end + "\n\n" + block + "\n" + post.lstrip("\n")
+    if not text.strip():
+        return block + "\n"
+    return text.rstrip() + "\n\n" + block + "\n"
+
+
+_INDEX_STOP_DE = frozenset(
+    "der die das den dem des ein eine einer eines und oder aber wenn weil dass mit von zu "
+    "im in auf für als ist sind war wird werden nicht auch nur noch so zu zum zur am "
+    "bei nach vor über unter aus ein".split()
+)
+_INDEX_STOP_EN = frozenset(
+    "the a an and or but if because that with from to in on for as is are was were be "
+    "been not also only so at by after before over under out of".split()
+)
+_INDEX_WORD_RE = re.compile(
+    r"[A-Za-zÄÖÜäöüßÀ-ÖØ-öø-ÿĀ-žА-Яа-яЁё]{4,}",
+    re.UNICODE,
+)
+
+
+def detect_index_terms(
+    text: str,
+    *,
+    min_count: int = 2,
+    max_terms: int = 80,
+    lang: str = "de",
+    extra_terms: Sequence[str] | None = None,
+) -> list[IndexEntry]:
+    """Stichwörter aus Fließtext (Häufigkeit) + optionale manuelle Begriffe."""
+    stop = _INDEX_STOP_DE if (lang or "de").lower().startswith("de") else _INDEX_STOP_EN
+    # Text ohne Verzeichnis-Blöcke
+    scrub = text or ""
+    for b, e in (
+        ("<!-- ILD-TOC-BEGIN -->", "<!-- ILD-TOC-END -->"),
+        ("<!-- ILD-LOF-BEGIN -->", "<!-- ILD-LOF-END -->"),
+        ("<!-- ILD-IDX-BEGIN -->", "<!-- ILD-IDX-END -->"),
+    ):
+        if b in scrub and e in scrub:
+            pre, rest = scrub.split(b, 1)
+            _, post = rest.split(e, 1)
+            scrub = pre + post
+    lines = scrub.splitlines()
+    freq: dict[str, list[int]] = {}
+    for i, line in enumerate(lines):
+        for m in _INDEX_WORD_RE.finditer(line):
+            w = m.group(0)
+            key = w.casefold()
+            if key in stop:
+                continue
+            freq.setdefault(key, []).append(i)
+    if extra_terms:
+        for t in extra_terms:
+            key = (t or "").strip().casefold()
+            if not key:
+                continue
+            if key not in freq:
+                # Suche explizit
+                hits = [
+                    i
+                    for i, line in enumerate(lines)
+                    if key in line.casefold()
+                ]
+                if hits:
+                    freq[key] = hits
+    entries: list[IndexEntry] = []
+    for key, locs in freq.items():
+        if len(locs) < int(min_count):
+            continue
+        # Anzeigeschreibweise: erstes Vorkommen
+        display = key
+        for loc in locs:
+            for m in _INDEX_WORD_RE.finditer(lines[loc]):
+                if m.group(0).casefold() == key:
+                    display = m.group(0)
+                    break
+            else:
+                continue
+            break
+        uniq = sorted(set(locs))
+        entries.append(IndexEntry(term=display, lines=uniq, count=len(locs)))
+    entries.sort(key=lambda e: e.term.casefold())
+    return entries[: int(max_terms)]
+
+
+def generate_index_markdown(
+    text: str,
+    *,
+    title: str = "Stichwortverzeichnis",
+    min_count: int = 2,
+    max_terms: int = 80,
+    lang: str = "de",
+    extra_terms: Sequence[str] | None = None,
+) -> str:
+    """Stichwortverzeichnis als Markdown (wie TOC)."""
+    entries = detect_index_terms(
+        text, min_count=min_count, max_terms=max_terms, lang=lang, extra_terms=extra_terms
+    )
+    lines = [f"# {title}", ""]
+    if not entries:
+        lines.append("_Keine Stichwörter gefunden._")
+    else:
+        for e in entries:
+            # Zeilen 1-basiert für Leser
+            refs = ", ".join(str(n + 1) for n in e.lines[:12])
+            if len(e.lines) > 12:
+                refs += ", …"
+            lines.append(f"- **{e.term}** — {refs}")
+    return "\n".join(lines) + "\n"
+
+
+def insert_index_into_text(
+    text: str,
+    *,
+    replace_existing: bool = True,
+    min_count: int = 2,
+    max_terms: int = 80,
+    lang: str = "de",
+    extra_terms: Sequence[str] | None = None,
+) -> str:
+    """Stichwortverzeichnis zwischen ILD-IDX-Markern einfügen/aktualisieren."""
+    begin = "<!-- ILD-IDX-BEGIN -->"
+    end = "<!-- ILD-IDX-END -->"
+    idx = generate_index_markdown(
+        text,
+        min_count=min_count,
+        max_terms=max_terms,
+        lang=lang,
+        extra_terms=extra_terms,
+    ).rstrip()
+    block = f"{begin}\n{idx}\n{end}"
+    if begin in text and end in text and replace_existing:
+        pre, rest = text.split(begin, 1)
+        _, post = rest.split(end, 1)
+        return pre.rstrip() + "\n\n" + block + "\n" + post.lstrip("\n")
+    if begin in text:
+        return text
+    if not text.strip():
+        return block + "\n"
+    return text.rstrip() + "\n\n" + block + "\n"
+
+
 def detect_headings_in_pdf(
     pdf_path: str | Path,
     *,

@@ -1,10 +1,11 @@
-"""Ribbon-ähnliche Werkzeugleiste — 2.6.27 (Shared Review / Cloud-Ordner)."""
+"""Ribbon-ähnliche Werkzeugleiste — 2.6.28 (F12/Save-as, Alt-Parity, Verzeichnisse)."""
 
 from __future__ import annotations
 
 from typing import Callable
 
 from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
@@ -19,10 +20,14 @@ from PySide6.QtWidgets import (
 class RibbonBar(QWidget):
     """
     Ribbon-Chrome: Kategorie-Tabs + Button-Zeile.
-    Tabs: Start / Bearbeiten / Review / Ansicht / Fenster / PDF — 2.6.27.
+    Tabs: Start / Bearbeiten / Review / Ansicht / Fenster / PDF — 2.6.28.
+    Alt+1…6 wählt Kategorien (Office-ähnliche Alt-Parity, vereinfacht).
     """
 
     action_triggered = Signal(str)  # action id
+
+    # Alt-Mnemonic → Kategorie-Index (Smoke/Alt-Ribbon)
+    ALT_CATEGORY_KEYS = ("1", "2", "3", "4", "5", "6")
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -65,6 +70,7 @@ class RibbonBar(QWidget):
                 (
                     ("open", "Öffnen"),
                     ("save", "Speichern"),
+                    ("save_as", "Speichern unter"),
                     ("compare_pdfs", "Vergleichen"),
                     ("find_replace", "Suchen"),
                     ("spellcheck", "Rechtschreibung"),
@@ -79,9 +85,13 @@ class RibbonBar(QWidget):
                     ("autocorrect_toggle", "Autokorrektur"),
                     ("insert_snippet", "Baustein"),
                     ("find_replace", "Suchen/Ersetzen"),
+                    ("auto_toc", "Inhaltsverz."),
+                    ("auto_lof", "Abbildungsverz."),
+                    ("auto_index", "Stichwortverz."),
                     ("insert_hyperlink", "Hyperlink"),
                     ("insert_shape", "Form"),
                     ("export_epub", "EPUB"),
+                    ("export_pptx", "PPTX"),
                 ),
             ),
             (
@@ -124,10 +134,17 @@ class RibbonBar(QWidget):
         )
 
         for i, (title, buttons) in enumerate(panels):
+            # Alt-Parity: sichtbarer Shortcut-Hinweis in Tooltip
+            mnemonic = self.ALT_CATEGORY_KEYS[i] if i < len(self.ALT_CATEGORY_KEYS) else ""
             btn = QPushButton(title)
             btn.setObjectName("ribbonCat")
             btn.setCheckable(True)
             btn.setChecked(i == 0)
+            tip = f"{title} — Ribbon 2.6.28"
+            if mnemonic:
+                tip += f" (Alt+{mnemonic})"
+            btn.setToolTip(tip)
+            btn.setProperty("altMnemonic", mnemonic)
             btn.clicked.connect(lambda _=False, idx=i: self._select_cat(idx))
             cats.addWidget(btn)
             self._cat_buttons.append(btn)
@@ -139,7 +156,7 @@ class RibbonBar(QWidget):
             for aid, label in buttons:
                 tb = QToolButton()
                 tb.setText(label)
-                tb.setToolTip(f"{label} — Ribbon 2.6.27")
+                tb.setToolTip(f"{label} — Ribbon 2.6.28")
                 tb.setAutoRaise(False)
                 if aid in (
                     "book_layout",
@@ -164,6 +181,16 @@ class RibbonBar(QWidget):
         root.addLayout(cats)
         root.addWidget(self._stack)
         self._select_cat(0)
+        self._install_alt_shortcuts()
+
+    def _install_alt_shortcuts(self) -> None:
+        """Alt+1…6 → Ribbon-Kategorie (praktische Alt-Parity) — 2.6.28."""
+        self._alt_shortcuts: list[QShortcut] = []
+        for i, key in enumerate(self.ALT_CATEGORY_KEYS):
+            sc = QShortcut(QKeySequence(f"Alt+{key}"), self)
+            sc.setContext(Qt.ShortcutContext.ApplicationShortcut)
+            sc.activated.connect(lambda idx=i: self.select_category(idx))
+            self._alt_shortcuts.append(sc)
 
     def _select_cat(self, index: int) -> None:
         self._stack.setCurrentIndex(index)

@@ -1,8 +1,8 @@
 # InstantLens Doc — Hilfe
 
-## 2.6.27
+## 2.6.28
 
-Version **2.6.27** — Polish / Installer im Sync-Flow.
+Version **2.6.28** — Polish / Installer im Sync-Flow.
 
 **Sync + Shortcuts + optional Setup.exe:**
 
@@ -21,7 +21,7 @@ Oder Sync mit Installer-Build: `sync-ild.ps1 -BuildInstaller -SkipStart` (brauch
 
 **Mausrad (Text/Word-Suite):** Trackpad/`pixelDelta` + Mausrad; Shift+Rad → horizontal; Scroll auch über Zeilennummern/Minimap und Markdown-Vorschau.
 
-Ergebnis Setup: `dist\InstantLensDoc-Setup-2.6.27.exe` (Startmenü, optional Desktop, Uninstall, 64-Bit).
+Ergebnis Setup: `dist\InstantLensDoc-Setup-2.6.28.exe` (Startmenü, optional Desktop, Uninstall, 64-Bit).
 
 ## 2.6.26
 

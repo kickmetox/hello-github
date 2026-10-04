@@ -1,4 +1,4 @@
-"""Headless InstantLens-Doc-Operationen für Python- und PowerShell-Scripting — 2.6.27.
+"""Headless InstantLens-Doc-Operationen für Python- und PowerShell-Scripting — 2.6.26.
 
 Hyperlinks · Grafiken/Medien (Scale/Crop/Shapes/Video) · EPUB · Shared Review · Batch/eIDAS.
 """
@@ -546,6 +546,52 @@ def generate_toc(
     return result.to_dict()
 
 
+def generate_lof(*, text: str) -> dict[str, Any]:
+    """Abbildungsverzeichnis aus Text (Markdown-Marker) — 2.6.28."""
+    from ild_pdf.auto_format import (
+        detect_figures_in_text,
+        generate_lof_markdown,
+        insert_lof_into_text,
+    )
+
+    figs = detect_figures_in_text(text or "")
+    lof = generate_lof_markdown(text or "")
+    merged = insert_lof_into_text(text or "")
+    return {"lof": lof, "text": merged, "count": len(figs)}
+
+
+def generate_index(
+    *,
+    text: str,
+    lang: str = "de",
+    min_count: int = 2,
+    max_terms: int = 80,
+) -> dict[str, Any]:
+    """Stichwortverzeichnis aus Text (Markdown-Marker) — 2.6.28."""
+    from ild_pdf.auto_format import (
+        detect_index_terms,
+        generate_index_markdown,
+        insert_index_into_text,
+    )
+
+    entries = detect_index_terms(
+        text or "", min_count=int(min_count), max_terms=int(max_terms), lang=lang or "de"
+    )
+    idx = generate_index_markdown(
+        text or "",
+        min_count=int(min_count),
+        max_terms=int(max_terms),
+        lang=lang or "de",
+    )
+    merged = insert_index_into_text(
+        text or "",
+        min_count=int(min_count),
+        max_terms=int(max_terms),
+        lang=lang or "de",
+    )
+    return {"index": idx, "text": merged, "count": len(entries)}
+
+
 def list_system_fonts(*, include_files: bool = False) -> list[str]:
     from ild_pdf.auto_format import list_system_fonts as _fonts
 
@@ -1018,7 +1064,7 @@ def hyphenate(
     *,
     lang: str = "de",
 ) -> dict[str, Any]:
-    """Intelligente Silbentrennung (Soft-Hyphens); DE/EN + Hook — 2.6.13."""
+    """Intelligente Silbentrennung (Soft-Hyphens); alle 9 UI-Sprachen + Hook."""
     from ild_pdf.typography import hyphenate_text
 
     return hyphenate_text(text, lang=lang)
@@ -1305,7 +1351,7 @@ def save_document(
     fmt: str | None = None,
     title: str = "InstantLens Doc",
 ) -> dict[str, Any]:
-    """Dokument speichern/exportieren (docx/xlsx/pdf/txt/rtf/html/jpg/epub) — 2.6.27."""
+    """Dokument speichern/exportieren (docx/xlsx/pdf/txt/rtf/html/jpg/epub/pptx)."""
     from instantlensdoc.core.export import export_document
 
     dest = export_document(text, path, fmt=fmt, title=title)
@@ -1520,18 +1566,22 @@ def ocr_handwriting(
     psm: int | str = 6,
     out: PathLike | None = None,
 ) -> dict[str, Any]:
-    """Basis-Handschriftenerkennung (Tesseract PSM) — 2.6.19."""
-    from instantlensdoc.core.ocr import ocr_image_handwriting, normalize_handwriting_psm
+    """Handschriftenerkennung (Preprocess + Multi-PSM) — verbessert vs. reiner PSM-Hook."""
+    from instantlensdoc.core.ocr import handwriting_recognize
 
     src = _require_file(path)
-    psm_n = normalize_handwriting_psm(psm)
-    text = ocr_image_handwriting(src, lang=lang, psm=psm_n)
+    meta = handwriting_recognize(src, lang=lang, psm=psm)
+    text = str(meta.get("text") or "")
     result: dict[str, Any] = {
         "path": str(src.resolve()),
         "lang": lang,
-        "psm": psm_n,
+        "psm": meta.get("psm"),
         "text": text,
         "handwriting": True,
+        "improved_vs_pure_psm": True,
+        "upgrade_path": meta.get("upgrade_path"),
+        "preprocess": meta.get("preprocess"),
+        "multi_psm": meta.get("multi_psm"),
         "version": __version__,
     }
     if out is not None:
@@ -1542,12 +1592,42 @@ def ocr_handwriting(
     return result
 
 
+def handwriting_recognize_api(
+    path: PathLike,
+    *,
+    lang: str = "deu+eng",
+    psm: int | str | None = None,
+) -> dict[str, Any]:
+    """Handschrift erkennen (strukturiert) — Preprocess + Multi-PSM + upgrade_path."""
+    from instantlensdoc.core.ocr import handwriting_recognize
+
+    src = _require_file(path)
+    data = handwriting_recognize(src, lang=lang, psm=psm)
+    data["path"] = str(src.resolve())
+    data["version"] = __version__
+    return data
+
+
 def list_color_palettes() -> list[dict[str, Any]]:
     """Eingebaute RGB/CMYK/Spot-Paletten — 2.6.19."""
     from ild_pdf.print_prep import list_palettes
 
     return list_palettes()
 
+
+def spot_library_api() -> dict[str, Any]:
+    """Pantone-ähnliche Spot-Bibliothek (unlicensed approximations)."""
+    from ild_pdf.print_prep import spot_library, PANTONE_DISCLAIMER
+
+    swatches = spot_library()
+    return {
+        "ok": True,
+        "palette_id": "spot_basic",
+        "disclaimer": PANTONE_DISCLAIMER,
+        "count": len(swatches),
+        "swatches": swatches,
+        "version": __version__,
+    }
 
 def convert_color_api(
     *,
@@ -1716,6 +1796,29 @@ def export_pdfx(
     return result
 
 
+def export_web_pdf_api(
+    path: PathLike,
+    out: PathLike,
+    *,
+    title: str | None = None,
+    page_mode: str = "UseOutlines",
+    open_action_first_page: bool = True,
+) -> dict[str, Any]:
+    """Interaktives / web-optimiertes PDF (Links/Outlines/Forms, OpenAction)."""
+    from ild_pdf.print_prep import export_web_pdf
+
+    src = _require_file(path)
+    result = export_web_pdf(
+        src,
+        _p(out),
+        title=title,
+        page_mode=page_mode,
+        open_action_first_page=bool(open_action_first_page),
+    )
+    result["version"] = __version__
+    return result
+
+
 def compare_pdfs(
     left: PathLike,
     right: PathLike,
@@ -1770,7 +1873,7 @@ def spellcheck(
     max_suggestions: int = 5,
 ) -> dict[str, Any]:
     """
-    Rechtschreibung inkl. Vorschläge + leichte Grammatik-Hints — 2.6.21.
+    Rechtschreibung inkl. Vorschläge + Grammatik-Hints (DE/EN erweitert).
 
     Ohne ``dict_path`` wird die Builtin-Wortliste der UI-Sprache genutzt.
     """
@@ -2324,10 +2427,83 @@ def generate_signing_cert(
 
 
 def eidas_info(level: str = "AES") -> dict[str, Any]:
-    from ild_pdf.esign import eidas_level_info, EIDAS_LEVELS
+    from ild_pdf.esign import eidas_level_info, EIDAS_LEVELS, eidas_trust_info
 
     data = eidas_level_info(level)
     data["levels"] = list(EIDAS_LEVELS)
+    data["trust"] = eidas_trust_info()
+    data["version"] = __version__
+    return data
+
+
+def eidas_trust_info_api() -> dict[str, Any]:
+    """eIDAS Trust-Pfad Limits (ohne bezahlte TSA / QTSP-Cloud)."""
+    from ild_pdf.esign import eidas_trust_info
+
+    data = eidas_trust_info()
+    data["version"] = __version__
+    return data
+
+
+def verify_trust_path_api(
+    path: PathLike | None = None,
+    *,
+    signature_id: str | None = None,
+    p12_path: PathLike | None = None,
+    p12_password: str = "",
+    level: str | None = None,
+) -> dict[str, Any]:
+    """Trust-Pfad prüfen (SES/AES/QES_claimed, Kette best-effort, TSA meist false)."""
+    from ild_pdf.esign import (
+        SignatureStore,
+        verify_trust_path,
+        eidas_trust_info,
+    )
+
+    entry = None
+    if path is not None:
+        src = _require_file(path)
+        store = SignatureStore.for_pdf(src, load=True)
+        entries = store.entries
+        if signature_id:
+            entries = [e for e in entries if e.id == signature_id]
+        entry = entries[0] if entries else None
+        if entry is None:
+            return {
+                "ok": False,
+                "message": "Keine Signatur im Sidecar",
+                "trust_info": eidas_trust_info(),
+                "version": __version__,
+            }
+    data = verify_trust_path(
+        entry,
+        p12_path=p12_path,
+        p12_password=p12_password,
+        level=level,
+    )
+    data["version"] = __version__
+    return data
+
+
+def realtime_start_hub(
+    host: str = "127.0.0.1",
+    port: int = 8765,
+    *,
+    restart: bool = False,
+) -> dict[str, Any]:
+    """Lokalen Echtzeit-Kollaborations-Hub starten (TCP JSON-Lines)."""
+    from instantlensdoc.core.realtime_collab import start_local_hub
+
+    data = start_local_hub(host=host, port=port, restart=bool(restart))
+    data["version"] = __version__
+    return data
+
+
+def realtime_status() -> dict[str, Any]:
+    """Status des lokalen Realtime-Hubs."""
+    from instantlensdoc.core.realtime_collab import realtime_status as _status
+
+    data = _status()
     data["version"] = __version__
     return data
 
@@ -2401,7 +2577,7 @@ def shared_review_info() -> dict[str, Any]:
     return data
 
 
-# --- Hyperlinks / Medien / EPUB — 2.6.27 ---
+# --- Hyperlinks / Medien / EPUB — 2.6.26 ---
 
 
 def insert_hyperlink(
@@ -2413,7 +2589,7 @@ def insert_hyperlink(
     end: int | None = None,
     as_html: bool = False,
 ) -> dict[str, Any]:
-    """Hyperlink in Text einfügen (URL oder #anker / ild://…) — 2.6.27."""
+    """Hyperlink in Text einfügen (URL oder #anker / ild://…) — 2.6.26."""
     from instantlensdoc.core.hyperlinks import insert_link_in_text
 
     return insert_link_in_text(
@@ -2422,7 +2598,7 @@ def insert_hyperlink(
 
 
 def extract_hyperlinks(text: str) -> dict[str, Any]:
-    """Markdown-/HTML-Links aus Text lesen — 2.6.27."""
+    """Markdown-/HTML-Links aus Text lesen — 2.6.26."""
     from instantlensdoc.core.hyperlinks import extract_links_from_text, hyperlink_info
 
     links = [lk.to_dict() for lk in extract_links_from_text(text)]
@@ -2436,7 +2612,7 @@ def resolve_hyperlink(
     *,
     bookmarks: Sequence[tuple[int, str]] | None = None,
 ) -> dict[str, Any]:
-    """Internes Hyperlink-Ziel auflösen — 2.6.27."""
+    """Internes Hyperlink-Ziel auflösen — 2.6.26."""
     from instantlensdoc.core.hyperlinks import resolve_internal_target
 
     data = resolve_internal_target(text, target, bookmarks=bookmarks)
@@ -2445,7 +2621,7 @@ def resolve_hyperlink(
 
 
 def list_doc_anchors(text: str) -> dict[str, Any]:
-    """Überschriften-Anker für In-Dokument-Links — 2.6.27."""
+    """Überschriften-Anker für In-Dokument-Links — 2.6.26."""
     from instantlensdoc.core.hyperlinks import list_heading_anchors
 
     anchors = list_heading_anchors(text)
@@ -2458,7 +2634,7 @@ def save_hyperlinks_sidecar(
     *,
     links: Sequence[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
-    """Links als Sidecar speichern (aus Text extrahiert oder übergeben) — 2.6.27."""
+    """Links als Sidecar speichern (aus Text extrahiert oder übergeben) — 2.6.26."""
     from instantlensdoc.core.hyperlinks import (
         extract_links_from_text,
         save_links_sidecar,
@@ -2487,7 +2663,7 @@ def layout_add_shape_frame(
     stroke_color: str = "#1A5276",
     path: PathLike | None = None,
 ) -> dict[str, Any]:
-    """Formrahmen ins Layout — 2.6.27."""
+    """Formrahmen ins Layout — 2.6.26."""
     doc = _load_layout(layout, path)
     fr = doc.add_shape(
         shape,
@@ -2516,7 +2692,7 @@ def layout_add_video_placeholder(
     title: str = "",
     path: PathLike | None = None,
 ) -> dict[str, Any]:
-    """Online-Video-Platzhalter mit URL — 2.6.27."""
+    """Online-Video-Platzhalter mit URL — 2.6.26."""
     doc = _load_layout(layout, path)
     fr = doc.add_video_placeholder(
         url,
@@ -2539,7 +2715,7 @@ def layout_scale_image(
     layout: dict[str, Any] | None = None,
     path: PathLike | None = None,
 ) -> dict[str, Any]:
-    """Bild-/Formrahmen skalieren — 2.6.27."""
+    """Bild-/Formrahmen skalieren — 2.6.26."""
     doc = _load_layout(layout, path)
     fr = doc.scale_image(frame_id, float(factor))
     if path:
@@ -2557,7 +2733,7 @@ def layout_crop_image(
     layout: dict[str, Any] | None = None,
     path: PathLike | None = None,
 ) -> dict[str, Any]:
-    """Bild zuschneiden (relative Ränder 0–1) — 2.6.27."""
+    """Bild zuschneiden (relative Ränder 0–1) — 2.6.26."""
     doc = _load_layout(layout, path)
     fr = doc.crop_image(
         frame_id, left=float(left), top=float(top), right=float(right), bottom=float(bottom)
@@ -2574,7 +2750,7 @@ def export_epub_api(
     title: str = "InstantLens Doc",
     author: str = "InstantLens Doc",
 ) -> dict[str, Any]:
-    """Text → EPUB — 2.6.27."""
+    """Text → EPUB — 2.6.26."""
     from instantlensdoc.core.export import export_epub
 
     dest = export_epub(text, path, title=title, author=author)
@@ -2582,6 +2758,131 @@ def export_epub_api(
         "path": str(dest),
         "format": "epub",
         "title": title,
+        "version": __version__,
+    }
+
+
+def export_pptx_api(
+    text: str,
+    path: PathLike,
+    *,
+    title: str = "InstantLens Doc",
+) -> dict[str, Any]:
+    """Text → PowerPoint .pptx (OOXML, Folien aus H1/---)."""
+    from instantlensdoc.core.export import export_pptx
+
+    dest = export_pptx(text, path, title=title)
+    return {
+        "path": str(dest),
+        "format": "pptx",
+        "title": title,
+        "version": __version__,
+    }
+
+
+def import_pptx_api(path: PathLike) -> dict[str, Any]:
+    """PowerPoint .pptx → Markdown-Text."""
+    from instantlensdoc.core.export import import_pptx
+
+    p = _require_file(path)
+    return {"text": import_pptx(p), "path": str(p), "format": "pptx", "version": __version__}
+
+
+def grammar_check_api(text: str, *, lang: str | None = None) -> dict[str, Any]:
+    """Erweiterte Grammatik-Hinweise DE/EN."""
+    from instantlensdoc.core.spellcheck import grammar_check
+
+    issues = grammar_check(text or "", lang=lang)
+    resolved = lang
+    if not resolved and issues:
+        resolved = str(issues[0].get("lang") or "")
+    return {
+        "lang": resolved or "de",
+        "issues": issues,
+        "count": len(issues),
+        "version": __version__,
+    }
+
+
+def section_add(
+    path: PathLike,
+    *,
+    start_page: int = 1,
+    preset: str | None = "A4",
+    orientation: str = "portrait",
+    columns: int = 1,
+    width_pt: float | None = None,
+    height_pt: float | None = None,
+) -> dict[str, Any]:
+    """Abschnittsumbruch hinzufügen (Sidecar ``*.ildsections.json``). start_page 1-basiert."""
+    from ild_pdf.sections import (
+        add_section_break,
+        list_sections,
+        load_sections_sidecar,
+        save_sections_sidecar,
+    )
+
+    pdf = _require_file(path)
+    model = load_sections_sidecar(pdf)
+    page_size = None
+    if width_pt is not None and height_pt is not None:
+        page_size = (float(width_pt), float(height_pt))
+    ori = orientation if orientation in ("portrait", "landscape") else "portrait"
+    model = add_section_break(
+        model,
+        start_page=max(0, int(start_page) - 1),
+        page_size=page_size,
+        preset=preset,
+        orientation=ori,  # type: ignore[arg-type]
+        columns=int(columns),
+    )
+    save_sections_sidecar(pdf, model)
+    return {
+        "path": str(pdf),
+        "sections": list_sections(model),
+        "version": __version__,
+    }
+
+
+def section_list(path: PathLike) -> dict[str, Any]:
+    """Abschnittsumbrüche aus Sidecar auflisten."""
+    from ild_pdf.sections import list_sections, load_sections_sidecar
+
+    pdf = _require_file(path)
+    model = load_sections_sidecar(pdf)
+    return {"path": str(pdf), "sections": list_sections(model), "version": __version__}
+
+
+def section_apply(path: PathLike, *, out: PathLike | None = None) -> dict[str, Any]:
+    """Abschnitts-Seitengrößen auf PDF anwenden."""
+    from ild_pdf.sections import apply_section_page_sizes, list_sections, load_sections_sidecar
+
+    pdf = _require_file(path)
+    model = load_sections_sidecar(pdf)
+    dest = apply_section_page_sizes(pdf, model, out_path=_p(out) if out else None)
+    return {
+        "path": str(dest),
+        "sections": list_sections(model),
+        "version": __version__,
+    }
+
+
+def section_paginate(
+    text: str,
+    *,
+    columns: int = 2,
+    page_height_chars: int = 40,
+) -> dict[str, Any]:
+    """Text in Spalten/Seiten paginieren (einfacher Helper)."""
+    from ild_pdf.sections import paginate_text_columns
+
+    pages = paginate_text_columns(
+        text or "", columns=int(columns), page_height_chars=int(page_height_chars)
+    )
+    return {
+        "pages": pages,
+        "page_count": len(pages),
+        "columns": int(columns),
         "version": __version__,
     }
 
@@ -2602,18 +2903,18 @@ def _load_layout(
     return LayoutDocument()
 
 
-# --- Hooks / Outline / Stylus / Telemetrie / 3D — 2.6.27 ---
+# --- Hooks / Outline / Stylus / Telemetrie / 3D — 2.6.26 ---
 
 
 def hooks_list(directory: PathLike | None = None) -> dict[str, Any]:
-    """User-Hooks auflisten — 2.6.27."""
+    """User-Hooks auflisten — 2.6.26."""
     from instantlensdoc.core.plugin_hooks import list_hooks
 
     return list_hooks(directory)
 
 
 def hooks_load(directory: PathLike | None = None) -> dict[str, Any]:
-    """Hooks-Ordner laden — 2.6.27."""
+    """Hooks-Ordner laden — 2.6.26."""
     from instantlensdoc.core.plugin_hooks import load_plugins, list_hooks
 
     loaded = load_plugins(directory)
@@ -2624,7 +2925,7 @@ def hooks_load(directory: PathLike | None = None) -> dict[str, Any]:
 
 
 def hooks_emit(event: str, **payload: Any) -> dict[str, Any]:
-    """Event an Hook-Bus senden — 2.6.27."""
+    """Event an Hook-Bus senden — 2.6.26."""
     from instantlensdoc.core.plugin_hooks import KNOWN_EVENTS, emit
 
     n = emit(str(event), **payload)
@@ -2637,7 +2938,7 @@ def hooks_emit(event: str, **payload: Any) -> dict[str, Any]:
 
 
 def hooks_register(source: PathLike, *, name: str | None = None) -> dict[str, Any]:
-    """Hook-Skript installieren — 2.6.27."""
+    """Hook-Skript installieren — 2.6.26."""
     from instantlensdoc.core.plugin_hooks import register_hook_script
 
     return register_hook_script(source, name=name)
@@ -2649,7 +2950,7 @@ def document_outline_api(
     path: PathLike | None = None,
     max_level: int = 6,
 ) -> dict[str, Any]:
-    """Dokumentstruktur (Überschriften + PDF-Lesezeichen) — 2.6.27."""
+    """Dokumentstruktur (Überschriften + PDF-Lesezeichen) — 2.6.26."""
     from instantlensdoc.core.doc_outline import build_document_outline
 
     return build_document_outline(
@@ -2660,14 +2961,14 @@ def document_outline_api(
 
 
 def stylus_status() -> dict[str, Any]:
-    """Stylus-Einstellungen/Status — 2.6.27."""
+    """Stylus-Einstellungen/Status — 2.6.26."""
     from instantlensdoc.core.stylus import stylus_info
 
     return stylus_info()
 
 
 def telemetry_status() -> dict[str, Any]:
-    """Telemetrie-Status (lokal) — 2.6.27."""
+    """Telemetrie-Status (lokal) — 2.6.26."""
     from instantlensdoc.core.telemetry import diagnostics_summary, telemetry_stub_info
 
     info = telemetry_stub_info()
@@ -2676,7 +2977,7 @@ def telemetry_status() -> dict[str, Any]:
 
 
 def telemetry_report(event: str, **kwargs: Any) -> dict[str, Any]:
-    """Anonymen Diagnostik-Eintrag schreiben (nur bei Opt-in) — 2.6.27."""
+    """Anonymen Diagnostik-Eintrag schreiben (nur bei Opt-in) — 2.6.26."""
     from instantlensdoc.core.telemetry import is_telemetry_opt_in, report_anonymous_usage
 
     report_anonymous_usage(event, **kwargs)
@@ -2696,7 +2997,7 @@ def extrude3d_preview(
     depth: float = 40.0,
     angle_deg: float = 30.0,
 ) -> dict[str, Any]:
-    """Limited 3D-Extrusionsdaten (isometrisch) — 2.6.27."""
+    """Limited 3D-Extrusionsdaten (isometrisch) — 2.6.26."""
     from instantlensdoc.core.extrude3d import ExtrudeParams, extrude_faces, extrude3d_info
 
     faces = extrude_faces(

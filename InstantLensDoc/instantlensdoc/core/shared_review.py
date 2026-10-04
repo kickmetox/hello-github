@@ -1,4 +1,4 @@
-"""Gemeinsames Review / Shared Collaboration — ildshare-v1 — 2.6.27.
+"""Gemeinsames Review / Shared Collaboration — ildshare-v1 — 2.6.28.
 
 Praktische Kollaboration ohne Pflicht-Cloud:
 - Lokaler Freigabeordner (NAS / OneDrive / SMB / USB) mit Bundle ``session.ildshare.json``
@@ -39,10 +39,13 @@ ShareKind = Literal[
 
 LIMITATIONS_DE = (
     "Lokaler Freigabeordner und optionaler HTTP-Endpoint — kein gehosteter "
-    "InstantLens-Cloud-Dienst. Kein simultanes Bearbeiten desselben Textes "
-    "(kein CRDT); Konfliktlösung: letzte Änderung gewinnt (updated_at). "
+    "InstantLens-Cloud-Dienst. Ordner-Sync: kein simultanes Bearbeiten desselben "
+    "Textes (kein volles CRDT); Konfliktlösung: letzte Änderung gewinnt (updated_at). "
     "Polling ≈ alle 8 s wenn Auto-Sync aktiv. Offline: lokale Sidecars bleiben "
-    "nutzbar; Sync später. Freier KI-Chat bleibt Stub."
+    "nutzbar; Sync später. Freier KI-Chat bleibt Stub. "
+    "Echtzeit: lokaler TCP-JSON-Hub (instantlensdoc.core.realtime_collab / "
+    "ild.realtime_start_hub) mit CRDT-lite Op-Log verfügbar — gehostete Cloud "
+    "braucht Credentials/Deployment."
 )
 
 
@@ -691,11 +694,19 @@ def shared_review_limitations() -> dict[str, Any]:
         "ok": True,
         "schema": SHARE_SCHEMA_ID,
         "limitations": LIMITATIONS_DE,
-        "modes": ["folder", "endpoint"],
-        "realtime": "polling",
+        "modes": ["folder", "endpoint", "realtime_local_hub"],
+        "realtime": "polling + local_hub (realtime_collab)",
+        "realtime_hub": (
+            "Lokaler TCP JSON-Lines Hub (127.0.0.1) via "
+            "instantlensdoc.core.realtime_collab — CRDT-lite Op-Log; "
+            "gehostete Cloud benötigt Credentials/Deployment"
+        ),
         "poll_default_sec": POLL_DEFAULT_SEC,
         "offline": True,
-        "integrates": ["ildcomments", "ildreview", "ildann"],
+        "integrates": ["ildcomments", "ildreview", "ildann", "realtime_collab"],
+        "planned": (
+            "Gehostete Multi-User-Cloud optional; lokal: realtime_start_hub verfügbar"
+        ),
     }
 
 

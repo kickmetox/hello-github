@@ -1,4 +1,7 @@
-"""Druckvorschau: Tastatur PageUp/Down·Home/End + +/- Zoom — 1.0.9."""
+"""Druckvorschau: Tastatur PageUp/Down·Home/End + +/- Zoom — 1.0.9.
+
+Hardening: Fit-Page Default, Seitenformat aus aktuellem Abschnitt, Null-Safety.
+"""
 
 from __future__ import annotations
 
@@ -26,6 +29,8 @@ _BASE_H = 480
 _ZOOM_MIN = 0.5
 _ZOOM_MAX = 3.0
 _ZOOM_STEP = 0.25
+# A4 Fallback (pt) wenn kein Seitenformat übergeben
+_DEFAULT_PAGE_SIZE_PT = (595.28, 841.89)
 
 
 class PrintPreviewDialog(QDialog):
@@ -43,30 +48,56 @@ class PrintPreviewDialog(QDialog):
         default_preview: bool | None = None,
         pages: list[int] | None = None,
         pixmap_provider: Callable[[int], QPixmap | None] | None = None,
+        default_fit_page: bool | None = None,
+        page_size_pt: tuple[float, float] | None = None,
     ):
         super().__init__(parent)
         self.setWindowTitle("Druckvorschau")
         self.setWindowModality(Qt.WindowModal)
         self.resize(480, 580)
 
-        self._pages = list(pages) if pages else [0]
+        # Null-sichere Seitenliste
+        raw_pages = list(pages) if pages else [0]
+        self._pages = [int(p) for p in raw_pages if p is not None]
         if not self._pages:
             self._pages = [0]
-        self._page_count = max(1, int(page_count or len(self._pages)))
+        try:
+            self._page_count = max(1, int(page_count or len(self._pages)))
+        except (TypeError, ValueError):
+            self._page_count = max(1, len(self._pages))
         self._pixmap_provider = pixmap_provider
         self._zoom = 1.0
-        self._fit_page = False  # Fit-Page Toggle — 1.0.8
+        # Fit-Page: Default True im Druckpfad (explizit); API/Tests ohne Arg → False
+        # Checkbox und _fit_page bleiben immer synchron.
+        if default_fit_page is None:
+            self._fit_page = False
+        else:
+            self._fit_page = bool(default_fit_page)
         self._index = 0  # Index in self._pages
         self._cache: dict[int, QPixmap] = {}
+        # Seitenformat (pt) aus aktuellem Abschnitt / MediaBox
+        self._page_size_pt = self._normalize_page_size(page_size_pt)
         if pixmap is not None and not pixmap.isNull():
-            self._cache[self._pages[0]] = pixmap
+            try:
+                self._cache[self._pages[0]] = pixmap
+            except Exception:
+                pass
 
         layout = QVBoxLayout(self)
 
         gray_lbl = ", Graustufen" if grayscale else ""
+        try:
+            dpi_n = int(dpi) if dpi is not None else 150
+        except (TypeError, ValueError):
+            dpi_n = 150
+        size_lbl = (
+            f", {self._page_size_pt[0]:.0f}×{self._page_size_pt[1]:.0f} pt"
+            if self._page_size_pt
+            else ""
+        )
         self._info = QLabel(
-            f"Druckvorschau ({page_label})"
-            f" — {self._page_count} Seite(n), {dpi} DPI{gray_lbl}"
+            f"Druckvorschau ({page_label or 'Seite 1'})"
+            f" — {self._page_count} Seite(n), {dpi_n} DPI{gray_lbl}{size_lbl}"
         )
         self._info.setWordWrap(True)
         layout.addWidget(self._info)
@@ -94,8 +125,9 @@ class PrintPreviewDialog(QDialog):
         ctrl.addWidget(self.btn_zoom_in)
         self.fit_page_check = QCheckBox("Seite einpassen")
         self.fit_page_check.setToolTip(
-            "Vorschau an sichtbaren Bereich anpassen (Fit-Page) — 1.0.8"
+            "Vorschau an sichtbaren Bereich anpassen (Fit-Page) — Default ein"
         )
+        self.fit_page_check.setChecked(self._fit_page)
         self.fit_page_check.toggled.connect(self._on_fit_page_toggled)
         ctrl.addWidget(self.fit_page_check)
         ctrl.addSpacing(16)
@@ -150,7 +182,10 @@ class PrintPreviewDialog(QDialog):
         layout.addWidget(self._scroll, 1)
 
         if default_preview is None:
-            preview_on = bool(get_print_preview())
+            try:
+                preview_on = bool(get_print_preview())
+            except Exception:
+                preview_on = True
         else:
             preview_on = bool(default_preview)
         self.preview_check = QCheckBox("Druckvorschau vor dem Drucken anzeigen")
@@ -163,15 +198,43 @@ class PrintPreviewDialog(QDialog):
         buttons = QDialogButtonBox(
             QDialogButtonBox.Ok | QDialogButtonBox.Cancel
         )
-        buttons.button(QDialogButtonBox.Ok).setText("Drucken…")
+        ok_btn = buttons.button(QDialogButtonBox.Ok)
+        if ok_btn is not None:
+            ok_btn.setText("Drucken…")
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
 
         self._refresh_view()
 
+    @staticmethod
+    def _normalize_page_size(
+        page_size_pt: tuple[float, float] | list[float] | None,
+    ) -> tuple[float, float]:
+        """Seitenformat (pt) null-sicher normalisieren; Fallback A4."""
+        try:
+            if page_size_pt is not None and len(page_size_pt) >= 2:
+                w = float(page_size_pt[0])
+                h = float(page_size_pt[1])
+                if w > 1.0 and h > 1.0:
+                    return (w, h)
+        except (TypeError, ValueError, IndexError):
+            pass
+        return _DEFAULT_PAGE_SIZE_PT
+
+    def page_size_pt(self) -> tuple[float, float]:
+        """Aktuelles Seitenformat in Punkten."""
+        return self._page_size_pt
+
+    def set_page_size_pt(self, width_pt: float, height_pt: float) -> None:
+        """Seitenformat aktualisieren (z. B. nach Abschnittswechsel)."""
+        self._page_size_pt = self._normalize_page_size((width_pt, height_pt))
+        self._refresh_view()
+
     def keyPressEvent(self, event: QKeyEvent) -> None:  # noqa: N802
         """PageUp/Down·Home/End: Seiten; +/- : Zoom — 1.0.9."""
+        if event is None:
+            return
         key = event.key()
         multi = len(self._pages) > 1
         if multi and key == Qt.Key_PageUp:
@@ -202,7 +265,7 @@ class PrintPreviewDialog(QDialog):
 
     def eventFilter(self, obj, event):  # noqa: N802
         """Mausrad über Vorschau → Zoom — 1.0.8."""
-        if obj is self._scroll.viewport() and event.type() == QEvent.Type.Wheel:
+        if obj is self._scroll.viewport() and event is not None and event.type() == QEvent.Type.Wheel:
             assert isinstance(event, QWheelEvent)
             delta = event.angleDelta().y()
             if delta == 0:
@@ -221,7 +284,13 @@ class PrintPreviewDialog(QDialog):
             self._refresh_view()
 
     def _current_page_index(self) -> int:
-        return int(self._pages[self._index])
+        if not self._pages:
+            return 0
+        idx = max(0, min(self._index, len(self._pages) - 1))
+        try:
+            return int(self._pages[idx])
+        except (TypeError, ValueError, IndexError):
+            return 0
 
     def _get_pixmap(self, page_idx: int) -> QPixmap | None:
         cached = self._cache.get(page_idx)
@@ -238,12 +307,28 @@ class PrintPreviewDialog(QDialog):
         return None
 
     def _fit_target_size(self) -> tuple[int, int]:
-        """Zielgröße für Fit-Page (Viewport minus Rand) — 1.0.8."""
-        vp = self._scroll.viewport()
+        """Zielgröße für Fit-Page (Viewport minus Rand) — 1.0.8.
+
+        Berücksichtigt Seitenformat-Seitenverhältnis wenn verfügbar.
+        """
+        vp = self._scroll.viewport() if self._scroll is not None else None
         if vp is not None:
             w = max(80, vp.width() - 16)
             h = max(100, vp.height() - 16)
+            # Aspect aus Seitenformat beibehalten
+            pw, ph = self._page_size_pt
+            if pw > 0 and ph > 0:
+                aspect = pw / ph
+                if w / max(h, 1) > aspect:
+                    w = max(80, int(h * aspect))
+                else:
+                    h = max(100, int(w / aspect))
             return w, h
+        # Fallback: Seitenformat → Basis-Anzeige skalieren
+        pw, ph = self._page_size_pt
+        if pw > 0 and ph > 0:
+            scale = min(_BASE_W / pw, _BASE_H / ph)
+            return max(80, int(pw * scale)), max(100, int(ph * scale))
         return _BASE_W, _BASE_H
 
     def _refresh_view(self) -> None:
@@ -253,8 +338,16 @@ class PrintPreviewDialog(QDialog):
             tw, th = self._fit_target_size()
             zoom_pct = "Fit"
         else:
-            tw = max(80, int(_BASE_W * self._zoom))
-            th = max(100, int(_BASE_H * self._zoom))
+            # Basis an Seitenformat anpassen wenn abweichend von A4-ähnlich
+            pw, ph = self._page_size_pt
+            if pw > 1 and ph > 1:
+                base_scale = min(_BASE_W / pw, _BASE_H / ph)
+                bw = max(80, int(pw * base_scale))
+                bh = max(100, int(ph * base_scale))
+            else:
+                bw, bh = _BASE_W, _BASE_H
+            tw = max(80, int(bw * self._zoom))
+            th = max(100, int(bh * self._zoom))
             zoom_pct = f"{int(round(self._zoom * 100))} %"
         if pm is not None and not pm.isNull():
             scaled = pm.scaled(
@@ -289,19 +382,21 @@ class PrintPreviewDialog(QDialog):
         if self.btn_page_next is not None:
             self.btn_page_next.setEnabled(self._index < len(self._pages) - 1)
         # Info-Label aktualisieren
-        base = self._info.text().split(" — ", 1)
-        suffix = base[1] if len(base) > 1 else ""
-        head = f"Druckvorschau (Seite {page_idx + 1})"
-        self._info.setText(f"{head} — {suffix}" if suffix else head)
+        if self._info is not None:
+            base = (self._info.text() or "").split(" — ", 1)
+            suffix = base[1] if len(base) > 1 else ""
+            head = f"Druckvorschau (Seite {page_idx + 1})"
+            self._info.setText(f"{head} — {suffix}" if suffix else head)
 
     def _clear_fit_page(self) -> None:
         """Manueller Zoom beendet Fit-Page — 1.0.8."""
         if not self._fit_page:
             return
         self._fit_page = False
-        self.fit_page_check.blockSignals(True)
-        self.fit_page_check.setChecked(False)
-        self.fit_page_check.blockSignals(False)
+        if self.fit_page_check is not None:
+            self.fit_page_check.blockSignals(True)
+            self.fit_page_check.setChecked(False)
+            self.fit_page_check.blockSignals(False)
 
     def _on_fit_page_toggled(self, checked: bool) -> None:
         self._fit_page = bool(checked)
@@ -348,14 +443,20 @@ class PrintPreviewDialog(QDialog):
             self._refresh_view()
 
     def _on_page_spin(self, value: int) -> None:
-        idx = max(0, min(int(value) - 1, len(self._pages) - 1))
+        try:
+            idx = max(0, min(int(value) - 1, len(self._pages) - 1))
+        except (TypeError, ValueError):
+            idx = 0
         if idx != self._index:
             self._index = idx
             self._refresh_view()
 
     def preview_enabled(self) -> bool:
         """Ob Vorschau künftig gezeigt werden soll."""
-        return bool(self.preview_check.isChecked())
+        try:
+            return bool(self.preview_check.isChecked())
+        except Exception:
+            return True
 
     def accept(self) -> None:  # noqa: D401
         try:

@@ -179,6 +179,14 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--max-level", type=int, default=3)
     s.add_argument("--dry-run", action="store_true", help="Outline nicht schreiben")
 
+    s = sub.add_parser("lof", help="Abbildungsverzeichnis erzeugen (Markdown) — 2.6.28")
+    s.add_argument("--text", required=True, help="Dokumenttext / Markdown")
+
+    s = sub.add_parser("index", help="Stichwortverzeichnis erzeugen (Markdown) — 2.6.28")
+    s.add_argument("--text", required=True)
+    s.add_argument("--lang", default="de")
+    s.add_argument("--min-count", type=int, default=2)
+
     s = sub.add_parser("fonts", help="Systemschriften auflisten (Windows Fonts / Qt)")
     s.add_argument("--files", action="store_true", help="auch Dateinamen")
 
@@ -862,7 +870,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     s = sub.add_parser(
         "hyperlink",
-        help="Hyperlink in Text einfügen (URL oder #anker) — 2.6.27",
+        help="Hyperlink in Text einfügen (URL oder #anker) — 2.6.26",
     )
     s.add_argument("text", help="Ausgangstext oder @datei")
     s.add_argument("link_text", help="Anzeigetext")
@@ -873,26 +881,26 @@ def build_parser() -> argparse.ArgumentParser:
 
     s = sub.add_parser(
         "hyperlinks",
-        help="Hyperlinks aus Text extrahieren — 2.6.27",
+        help="Hyperlinks aus Text extrahieren — 2.6.26",
     )
     s.add_argument("text", help="Text oder @datei / Dateipfad")
 
     s = sub.add_parser(
         "anchors",
-        help="Überschriften-Anker auflisten — 2.6.27",
+        help="Überschriften-Anker auflisten — 2.6.26",
     )
     s.add_argument("text", help="Text oder Dateipfad")
 
     s = sub.add_parser(
         "resolve-link",
-        help="Internes Hyperlink-Ziel auflösen — 2.6.27",
+        help="Internes Hyperlink-Ziel auflösen — 2.6.26",
     )
     s.add_argument("text", help="Dokumenttext oder Dateipfad")
     s.add_argument("target", help="#anker / ild://heading/… / ild://line/N")
 
     s = sub.add_parser(
         "layout-shape",
-        help="Formrahmen ins Layout — 2.6.27",
+        help="Formrahmen ins Layout — 2.6.26",
     )
     s.add_argument("--shape", default="rectangle")
     s.add_argument("--x", type=float, default=40)
@@ -905,7 +913,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     s = sub.add_parser(
         "layout-video",
-        help="Video-Platzhalter (URL) ins Layout — 2.6.27",
+        help="Video-Platzhalter (URL) ins Layout — 2.6.26",
     )
     s.add_argument("url")
     s.add_argument("--title", default="")
@@ -919,7 +927,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     s = sub.add_parser(
         "layout-scale",
-        help="Bild-/Formrahmen skalieren — 2.6.27",
+        help="Bild-/Formrahmen skalieren — 2.6.26",
     )
     s.add_argument("frame_id")
     s.add_argument("factor", type=float)
@@ -928,7 +936,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     s = sub.add_parser(
         "layout-crop",
-        help="Bild zuschneiden (relative Ränder 0–1) — 2.6.27",
+        help="Bild zuschneiden (relative Ränder 0–1) — 2.6.26",
     )
     s.add_argument("frame_id")
     s.add_argument("--left", type=float, default=0.0)
@@ -940,30 +948,75 @@ def build_parser() -> argparse.ArgumentParser:
 
     s = sub.add_parser(
         "export-epub",
-        help="Text → EPUB — 2.6.27",
+        help="Text → EPUB — 2.6.26",
     )
     s.add_argument("text", help="Text oder Dateipfad")
     s.add_argument("--out", required=True, help="Ziel .epub")
     s.add_argument("--title", default="InstantLens Doc")
     s.add_argument("--author", default="InstantLens Doc")
 
-    s = sub.add_parser("hooks-list", help="User-Hooks auflisten — 2.6.27")
+    s = sub.add_parser(
+        "export-pptx",
+        help="Text → PowerPoint .pptx (H1/--- Folien)",
+    )
+    s.add_argument("text", help="Text oder Dateipfad")
+    s.add_argument("--out", required=True, help="Ziel .pptx")
+    s.add_argument("--title", default="InstantLens Doc")
+
+    s = sub.add_parser(
+        "import-pptx",
+        help="PowerPoint .pptx → Markdown-Text",
+    )
+    s.add_argument("path", help="Pfad zur .pptx")
+
+    s = sub.add_parser(
+        "grammar-check",
+        help="Erweiterte Grammatik-Hinweise (DE/EN)",
+    )
+    s.add_argument("text", help="Text oder Dateipfad")
+    s.add_argument("--lang", default=None, help="de|en …")
+
+    s = sub.add_parser(
+        "section-add",
+        help="Abschnittsumbruch (ildsections-v1 Sidecar)",
+    )
+    s.add_argument("path", help="PDF-Pfad")
+    s.add_argument("--start-page", type=int, default=1, help="1-basierte Startseite")
+    s.add_argument("--preset", default="A4")
+    s.add_argument("--orientation", default="portrait", choices=["portrait", "landscape"])
+    s.add_argument("--columns", type=int, default=1)
+    s.add_argument("--width-pt", type=float, default=None)
+    s.add_argument("--height-pt", type=float, default=None)
+
+    s = sub.add_parser("section-list", help="Abschnittsumbrüche auflisten")
+    s.add_argument("path", help="PDF-Pfad")
+
+    s = sub.add_parser("section-apply", help="Abschnitts-Seitengrößen auf PDF anwenden")
+    s.add_argument("path", help="PDF-Pfad")
+    s.add_argument("--out", default=None)
+
+    s = sub.add_parser("section-paginate", help="Text in Spalten/Seiten paginieren")
+    s.add_argument("text", help="Text oder Dateipfad")
+    s.add_argument("--columns", type=int, default=2)
+    s.add_argument("--page-height-chars", type=int, default=40)
+
+    s = sub.add_parser("hooks-list", help="User-Hooks auflisten — 2.6.26")
     s.add_argument("--dir", default=None, help="Hooks-Ordner")
-    s = sub.add_parser("hooks-load", help="User-Hooks laden — 2.6.27")
+    s = sub.add_parser("hooks-load", help="User-Hooks laden — 2.6.26")
     s.add_argument("--dir", default=None, help="Hooks-Ordner")
-    s = sub.add_parser("hooks-emit", help="Hook-Event auslösen — 2.6.27")
+    s = sub.add_parser("hooks-emit", help="Hook-Event auslösen — 2.6.26")
     s.add_argument("event", help="Event-Name z.B. document.opened")
     s.add_argument("--kind", default="", help="Optional kind=")
-    s = sub.add_parser("hooks-register", help="Hook-Skript installieren — 2.6.27")
+    s = sub.add_parser("hooks-register", help="Hook-Skript installieren — 2.6.26")
     s.add_argument("source", help="Pfad zu .py/.ps1")
     s.add_argument("--name", default=None)
-    s = sub.add_parser("doc-outline", help="Dokumentstruktur (Überschriften/Lesezeichen) — 2.6.27")
+    s = sub.add_parser("doc-outline", help="Dokumentstruktur (Überschriften/Lesezeichen) — 2.6.26")
     s.add_argument("--text", default=None, help="Markdown/Text")
     s.add_argument("--path", default=None, help="PDF-Pfad")
     s.add_argument("--max-level", type=int, default=6)
-    s = sub.add_parser("stylus", help="Stylus-Status — 2.6.27")
-    s = sub.add_parser("telemetry", help="Telemetrie-Status — 2.6.27")
-    s = sub.add_parser("extrude3d", help="3D-Extrusion Preview-Daten — 2.6.27")
+    s = sub.add_parser("stylus", help="Stylus-Status — 2.6.26")
+    s = sub.add_parser("telemetry", help="Telemetrie-Status — 2.6.26")
+    s = sub.add_parser("extrude3d", help="3D-Extrusion Preview-Daten — 2.6.26")
     s.add_argument("--shape", default="rectangle", choices=["rectangle", "ellipse", "triangle"])
     s.add_argument("--width", type=float, default=120)
     s.add_argument("--height", type=float, default=80)
@@ -1139,6 +1192,16 @@ def run(argv: list[str] | None = None) -> int:
                 out=args.out,
                 max_level=args.max_level,
                 write=not args.dry_run,
+            )
+            _print(data, as_json=js)
+            return 0
+        if args.cmd == "lof":
+            data = api.generate_lof(text=args.text)
+            _print(data, as_json=js)
+            return 0
+        if args.cmd == "index":
+            data = api.generate_index(
+                text=args.text, lang=args.lang, min_count=args.min_count
             )
             _print(data, as_json=js)
             return 0
@@ -1897,6 +1960,54 @@ def run(argv: list[str] | None = None) -> int:
                 args.out,
                 title=args.title,
                 author=args.author,
+            )
+            _print(data, as_json=js or True)
+            return 0
+        if args.cmd == "export-pptx":
+            data = api.export_pptx_api(
+                _read_text_arg(args.text),
+                args.out,
+                title=args.title,
+            )
+            _print(data, as_json=js or True)
+            return 0
+        if args.cmd == "import-pptx":
+            data = api.import_pptx_api(args.path)
+            _print(data, as_json=js or True)
+            return 0
+        if args.cmd == "grammar-check":
+            data = api.grammar_check_api(
+                _read_text_arg(args.text),
+                lang=getattr(args, "lang", None),
+            )
+            _print(data, as_json=js or True)
+            return 0
+        if args.cmd == "section-add":
+            data = api.section_add(
+                args.path,
+                start_page=args.start_page,
+                preset=args.preset,
+                orientation=args.orientation,
+                columns=args.columns,
+                width_pt=getattr(args, "width_pt", None),
+                height_pt=getattr(args, "height_pt", None),
+            )
+            _print(data, as_json=js or True)
+            return 0
+        if args.cmd == "section-list":
+            _print(api.section_list(args.path), as_json=js or True)
+            return 0
+        if args.cmd == "section-apply":
+            _print(
+                api.section_apply(args.path, out=getattr(args, "out", None)),
+                as_json=js or True,
+            )
+            return 0
+        if args.cmd == "section-paginate":
+            data = api.section_paginate(
+                _read_text_arg(args.text),
+                columns=args.columns,
+                page_height_chars=args.page_height_chars,
             )
             _print(data, as_json=js or True)
             return 0

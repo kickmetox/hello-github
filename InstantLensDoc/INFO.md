@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **2.6.27** |
+| Version | **2.6.28** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -33,7 +33,7 @@
 
 Skript: [sync-ild.ps1](scripts/sync-ild.ps1) — Branch `cursor/instantlensdoc-2108` (oder `-LocalPack` / Pack-Zip) nach `D:\AI_Temp\InstantLensDoc`, pip, Start. **Nutzer-Icon in `assets` wird nicht überschrieben.**
 
-**FEATURES.md lokal sync:** Nach Sync liegt `FEATURES.md` lokal im App-Ordner (`D:\AI_Temp\InstantLensDoc\FEATURES.md`); About/Stubs öffnen diese lokale Datei — Version **2.6.27**.
+**FEATURES.md lokal sync:** Nach Sync liegt `FEATURES.md` lokal im App-Ordner (`D:\AI_Temp\InstantLensDoc\FEATURES.md`); About/Stubs öffnen diese lokale Datei — Version **2.6.28**.
 
 Ohne Start: `-NoStart` (Alias `-SkipStart`). Exit-Codes: **0** OK · **1** allgemein · **2** Git-Fehler.
 
@@ -68,7 +68,7 @@ Python-Layout-Zip (ohne PyInstaller-EXE):
 powershell -ExecutionPolicy Bypass -File .\scripts\pack-windows-runnable.ps1
 ```
 
-Installer: `.\scripts\build-windows-installer.ps1` bzw. `.\installer\build-installer.ps1` (optional `-NoKeygen`) → `dist\InstantLensDoc-Setup-2.6.27.exe`  
+Installer: `.\scripts\build-windows-installer.ps1` bzw. `.\installer\build-installer.ps1` (optional `-NoKeygen`) → `dist\InstantLensDoc-Setup-2.6.28.exe`  
 Desktop-/Keygen-Shortcuts: `.\scripts\install-ild.ps1` (Keygen wenn `run-keygen.bat` / EXE vorhanden; `-SkipKeygen`)  
 Desktop-Verknüpfung Installer: optionale Checkbox (`desktopicon`, Standard an / `checkedonce`)
 
@@ -102,15 +102,26 @@ powershell -ExecutionPolicy Bypass -File .\scripts\ild.ps1 license generate kund
 
 Anleitung: Store `docs/instantlensdoc-scripting.md` · Beispiel `examples/ild_scripting_demo.py`.
 
+## Neu in 2.6.28
+
+Minor nach **2.6.27** (Installer-Sync + Mausrad):
+
+- **Mausrad Default-PDF / Frames:** Rad blättert Einzelseite; Canvas-Wheel; CS/1S/Editor/`apply_wheel_scroll` bleiben
+- **Abbildungs- & Stichwortverzeichnis** (`ILD-LOF-*` / `ILD-IDX-*`)
+- **F12 Speichern unter** + Ribbon Save-as + Alt+1…6
+- **`.pptx`** Export/Import · Abschnittsumbrüche · Grammatik DE/EN
+- **Silbentrennung** 9 Sprachen · Pantone-ähnlich/Spot · Web-PDF · Print-Preview
+- **eIDAS Trust-Pfad** (ohne TSA) · lokaler Realtime-Hub · Handschrift Multi-PSM
+- Freier KI-Chat-Stub / Outline-TTS / gehostete Cloud+QES-TSA = externe Abhängigkeit
+
 ## Neu in 2.6.27
 
-Minor nach **2.6.26** (Polish / Installer-Härtung):
+Minor nach **2.6.26** (Polish / Installer):
 
-- **Installer im Sync/Install-Flow:** `sync-ild.ps1 -BuildInstaller` (optional Setup.exe nach Sync); klare DE-Schritte nach Sync für `install-ild.ps1` + `build-windows-installer.ps1`
-- **Hilfe/Info-Vollständigkeit:** Installer · Keygen · Scripting (DE primary + i18n-Keys)
-- **Mausrad-Scrollen (Text/Word-Suite):** robust über Trackpad (`pixelDelta`) und Mausrad; Shift→horizontal; Scroll auch über Zeilennummern/Minimap; Markdown-Vorschau
-- **Keine großen neuen Produktflächen** — Runnable-/Installer-Pack + Docs aktualisiert
-- Freier KI-Chat-Stub und Outline-TTS bleiben geplant
+- Installer im Sync-Flow (`sync-ild.ps1 -BuildInstaller`)
+- Mausrad-Härtung Text/Word-Suite (`apply_wheel_scroll`, Trackpad pixelDelta)
+- Hilfe/Info Installer+Keygen+Scripting
+
 
 ## Neu in 2.6.26
 
