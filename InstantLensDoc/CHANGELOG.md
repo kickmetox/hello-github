@@ -1,5 +1,20 @@
 # Changelog — InstantLens Doc
 
+## 2.5.10 — OCR-Region Status-Menü, Theme Swatch→HL/Stift/Notiz, ildtags Ctrl+X, Export F2
+
+Post-Release-Polish nach **2.5.9**: **OCR-Region** Status-**Rechtsklick-Kontextmenü** (Tab/Ordner/Pfad/Text/Datei); **Farben-Themes** Swatch-**RMB → Highlight/Stift/Notiz setzen**; **ildtags** **Ctrl+X** Tags ausschneiden · **Alle Tags entfernen**; **Export-Presets** **F2 Umbenennen**. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie klar markiert / nicht produktiv (Ink ≠ Stylus).
+
+### Geändert
+- OCR-Region: Status-Rechtsklick → Kontextmenü (Tab · Ordner · Pfad · Text · Datei)
+- Farben-Themes: Swatch-RMB → als Highlight-/Stift-/Notizfarbe setzen
+- Dokument-Tags: Ctrl+X Tags ausschneiden · „Alle Tags entfernen“
+- Export-Presets: F2 Umbenennen
+
+### Tests / Qualität
+- Version **2.5.10** (App / `ild_pdf` / ISS / Smoke / Docs); Serie **2.5**; `docs/VERSION` + `VERSION.txt`
+- Smoke: 2.5.10 CLI + Qt (OCR Status-Menü, Theme Swatch-Tool, ildtags Cut, Export F2)
+- Stubs: KI/Cloud/Stylus/3D/Hooks/Outline/Telemetrie unverändert markiert
+
 ## 2.5.9 — OCR-Region Alt→Datei·Vorschau, Theme Swatch-Hex, ildtags Ctrl+C/V, Export Pfad kopieren
 
 Post-Release-Polish nach **2.5.8**: **OCR-Region** Status-**Alt+Klick öffnet Ergebnisdatei** und **Tooltip mit Textvorschau**; **Farben-Themes** **Swatch-Klick kopiert einzelne Hex**; **ildtags** **Ctrl+C/Ctrl+V** Tags kopieren/einfügen; **Export-Presets** **Pfad kopieren** (Rechtsklick · Ctrl+Shift+C). Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie klar markiert / nicht produktiv (Ink ≠ Stylus).

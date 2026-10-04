@@ -3072,7 +3072,7 @@ class MainWindow(QMainWindow):
         ):
             if self._copy_thumb_prune_status_to_clipboard():
                 return
-        # OCR-Region: L→Tab · R→Ordner · Mittel/Ctrl→Pfad · Shift→Text · Alt→Datei — 2.5.5–2.5.9
+        # OCR-Region: L→Tab · R→Menü · Mittel/Ctrl→Pfad · Shift→Text · Alt→Datei — 2.5.5–2.5.10
         if (
             getattr(self, "_ocr_region_toast_active", False)
             and ("OCR-Region" in cur or "OCR Region" in cur)
@@ -3097,7 +3097,8 @@ class MainWindow(QMainWindow):
                 if self._focus_ocr_region_result_tab():
                     return
             elif event.button() == Qt.RightButton:
-                if self._open_ocr_region_result_folder():
+                # RMB: Kontextmenü aller Aktionen (statt sofort Ordner) — 2.5.10
+                if self._show_ocr_region_status_menu():
                     return
         # Ink-Toast: Klick fokussiert Ink-/Freihand-Werkzeug — 2.2.5
         if (
@@ -11647,15 +11648,16 @@ class MainWindow(QMainWindow):
         lay = QVBoxLayout(dlg)
         info = QLabel(
             f"Benannte Presets ({len(profiles)}/{EXPORT_PROFILES_MAX}). "
-            "★ aktiv · RMB Zielordner · Summary/Pfad kopieren · Entf · Doppelklick Anwenden."
+            "★ aktiv · RMB Zielordner · Summary/Pfad · F2 Umbenennen · "
+            "Entf · Doppelklick Anwenden."
         )
         lay.addWidget(info)
         lst = QListWidget()
         lst.setToolTip(
             "★ = aktives Preset · Listen-Tooltip Summary DPI/Format/Pfad · "
             "Rechtsklick → Zielordner / Summary / Pfad kopieren · "
-            "Ctrl+C Summary · Ctrl+Shift+C Pfad · Entf löschen · "
-            "Doppelklick/Enter Anwenden — 2.5.9"
+            "Ctrl+C Summary · Ctrl+Shift+C Pfad · F2 Umbenennen · Entf löschen · "
+            "Doppelklick/Enter Anwenden — 2.5.10"
         )
         lst.setContextMenuPolicy(Qt.CustomContextMenu)
         active = {"name": get_active_export_profile_name()}
@@ -12050,6 +12052,10 @@ class MainWindow(QMainWindow):
                     assert isinstance(event, QKeyEvent)
                     if event.key() in (Qt.Key_Delete, Qt.Key_Backspace):
                         _delete()
+                        return True
+                    if event.key() == Qt.Key_F2:
+                        # F2 Umbenennen — 2.5.10
+                        _rename()
                         return True
                     if event.key() == Qt.Key_C and bool(
                         event.modifiers() & Qt.ControlModifier
@@ -13292,13 +13298,13 @@ class MainWindow(QMainWindow):
         return preview
 
     def _ocr_region_status_tooltip(self) -> str:
-        """Status-Tooltip inkl. Textvorschau — 2.5.9."""
+        """Status-Tooltip inkl. Textvorschau — 2.5.9/2.5.10."""
         path = getattr(self, "_last_ocr_region_path", None) or ""
         tip = (
-            "Linksklick → Ergebnis-Tab · Rechtsklick → Ordner · "
+            "Linksklick → Ergebnis-Tab · Rechtsklick → Menü · "
             "Mittelklick/Ctrl+Klick → Pfad · "
             "Shift+Klick → Text kopieren · "
-            "Alt+Klick → Datei öffnen — 2.5.9"
+            "Alt+Klick → Datei öffnen — 2.5.10"
         )
         if path:
             tip = f"{tip}\n{path}"
@@ -13306,6 +13312,33 @@ class MainWindow(QMainWindow):
         if preview:
             tip = f"{tip}\nVorschau: {preview}"
         return tip
+
+    def _show_ocr_region_status_menu(self) -> bool:
+        """Status-Rechtsklick: Kontextmenü Tab/Ordner/Pfad/Text/Datei — 2.5.10."""
+        path = getattr(self, "_last_ocr_region_path", None)
+        if not path:
+            return False
+        menu = QMenu(self)
+        act_tab = menu.addAction("Ergebnis-Tab fokussieren")
+        act_folder = menu.addAction("Ordner öffnen")
+        act_path = menu.addAction("Pfad kopieren")
+        act_text = menu.addAction("Text kopieren")
+        act_file = menu.addAction("Datei öffnen")
+        # An Statusleiste verankern
+        bar = self.statusBar()
+        pos = bar.mapToGlobal(bar.rect().bottomLeft()) if bar is not None else None
+        chosen = menu.exec(pos) if pos is not None else menu.exec()
+        if chosen is act_tab:
+            return self._focus_ocr_region_result_tab()
+        if chosen is act_folder:
+            return self._open_ocr_region_result_folder()
+        if chosen is act_path:
+            return self._copy_ocr_region_result_path()
+        if chosen is act_text:
+            return self._copy_ocr_region_result_text()
+        if chosen is act_file:
+            return self._open_ocr_region_result_file()
+        return True  # Menü gezeigt (auch bei Abbruch)
 
     def _focus_ocr_region_result_tab(self) -> bool:
         """Status-Klick: OCR-Region Ergebnis-Tab fokussieren — 2.5.5."""

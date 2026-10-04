@@ -931,7 +931,7 @@ class SettingsDialog(QDialog):
             sw = QLabel("")
             sw.setFixedSize(22, 22)
             sw.setFrameShape(QFrame.Box)
-            sw.setToolTip("Theme-Vorschau · Klick kopiert Hex — 2.5.9")
+            sw.setToolTip("Theme-Vorschau · Klick=Hex · RMB=HL/Stift/Notiz — 2.5.10")
             sw.setCursor(Qt.PointingHandCursor)
             sw.setProperty("themeHex", "")
             sw.installEventFilter(self)
@@ -2831,18 +2831,85 @@ class SettingsDialog(QDialog):
             self.btn_undo_factory_presets.setEnabled(bool(prev))
 
     def eventFilter(self, obj, event):  # noqa: N802
-        """Swatch-Klick kopiert einzelne Hex-Farbe — 2.5.9."""
+        """Swatch L→Hex · R→Highlight/Stift/Notiz setzen — 2.5.9/2.5.10."""
         labels = getattr(self, "_theme_swatch_labels", None) or []
-        if (
-            obj in labels
-            and event.type() == QEvent.MouseButtonPress
-            and getattr(event, "button", lambda: None)() == Qt.LeftButton
-        ):
+        if obj in labels and event.type() == QEvent.MouseButtonPress:
+            btn = getattr(event, "button", lambda: None)()
             hex_c = str(obj.property("themeHex") or "").strip()
-            if hex_c:
+            if not hex_c:
+                return super().eventFilter(obj, event)
+            if btn == Qt.LeftButton:
                 self._copy_single_theme_hex(hex_c)
                 return True
+            if btn == Qt.RightButton:
+                self._show_theme_swatch_menu(obj, hex_c)
+                return True
         return super().eventFilter(obj, event)
+
+    def _show_theme_swatch_menu(self, widget, hex_color: str) -> None:
+        """Swatch-RMB: Hex kopieren · als HL/Stift/Notiz setzen — 2.5.10."""
+        from PySide6.QtWidgets import QMenu
+
+        hex_c = str(hex_color or "").strip()
+        if not hex_c:
+            return
+        menu = QMenu(self)
+        act_copy = menu.addAction(f"Hex kopieren ({hex_c})")
+        menu.addSeparator()
+        act_hl = menu.addAction("Als Highlight-Farbe setzen")
+        act_pen = menu.addAction("Als Stiftfarbe setzen")
+        act_note = menu.addAction("Als Notizfarbe setzen")
+        chosen = menu.exec(widget.mapToGlobal(widget.rect().bottomLeft()))
+        if chosen is act_copy:
+            self._copy_single_theme_hex(hex_c)
+        elif chosen is act_hl:
+            self._apply_swatch_as_tool_color(hex_c, "highlight")
+        elif chosen is act_pen:
+            self._apply_swatch_as_tool_color(hex_c, "pen")
+        elif chosen is act_note:
+            self._apply_swatch_as_tool_color(hex_c, "note")
+
+    def _apply_swatch_as_tool_color(self, hex_color: str, kind: str) -> None:
+        """Swatch-Farbe als Highlight/Stift/Notiz-Default speichern — 2.5.10."""
+        from instantlensdoc.core.app_settings import (
+            set_ann_highlight_color,
+            set_ann_note_color,
+            set_ann_pen_color,
+        )
+
+        text = str(hex_color or "").strip()
+        if not text:
+            return
+        labels = {
+            "highlight": "Highlight",
+            "pen": "Stift",
+            "note": "Notiz",
+        }
+        try:
+            if kind == "highlight":
+                set_ann_highlight_color(text)
+            elif kind == "pen":
+                set_ann_pen_color(text)
+            elif kind == "note":
+                set_ann_note_color(text)
+            else:
+                return
+        except Exception as e:
+            QMessageBox.warning(self, "Farben-Theme", str(e))
+            return
+        label = labels.get(kind, kind)
+        msg = f"Theme-Swatch als {label}-Farbe: {text}"
+        parent = self.parent()
+        if parent is not None and hasattr(parent, "_set_status"):
+            try:
+                parent._set_status(msg)
+            except Exception:
+                pass
+        if parent is not None and hasattr(parent, "_announce_status_toast"):
+            try:
+                parent._announce_status_toast(msg)
+            except Exception:
+                pass
 
     def _update_ann_theme_swatches(self, *_args) -> None:
         """Vorschau-Swatches · Combo Hex-Tooltip · Custom N/20 · Hex-Copy — 2.5.1/2.5.9."""
@@ -2865,7 +2932,9 @@ class SettingsDialog(QDialog):
                 sw.setStyleSheet(
                     f"background: {c}; border: 1px solid #444; border-radius: 3px;"
                 )
-                sw.setToolTip(f"{name}: {c} · Klick kopiert Hex — 2.5.9")
+                sw.setToolTip(
+                    f"{name}: {c} · Klick = Hex · RMB = HL/Stift/Notiz — 2.5.10"
+                )
                 sw.setProperty("themeHex", str(c))
                 sw.setCursor(Qt.PointingHandCursor)
                 sw.setVisible(True)
@@ -2888,7 +2957,7 @@ class SettingsDialog(QDialog):
                 extra = " · Default" if name == default else ""
                 hint.setText(
                     f"{name}: {len(colors)} Farben{extra} · {count_txt} · "
-                    "Swatch-Klick = Hex"
+                    "Klick=Hex · RMB=HL/Stift/Notiz"
                 )
             elif default:
                 hint.setText(f"Default: {default} · {count_txt}")
@@ -2900,7 +2969,7 @@ class SettingsDialog(QDialog):
                 "Vordefinierte + Custom Themes · ★ = Default · "
                 f"Custom {custom_n}/{CUSTOM_ANN_COLOR_THEMES_MAX} · "
                 "Custom umbenennen/duplizieren/löschen · Hex kopieren · "
-                "Swatch-Klick Hex — 2.5.9"
+                "Swatch-Klick Hex · RMB HL/Stift/Notiz — 2.5.10"
             )
             if name and colors:
                 hex_line = " · ".join(str(c) for c in colors)

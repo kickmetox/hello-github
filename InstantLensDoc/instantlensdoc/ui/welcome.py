@@ -245,7 +245,7 @@ class WelcomePage(QWidget):
         self.btn_continue.setToolTip(tip)
 
     def eventFilter(self, obj, event):  # noqa: N802
-        """Esc leert Filter→Liste; Delete entfernt; Enter öffnet; Ctrl+C/V Tags — 2.5.9."""
+        """Esc Filter; Del Recent; Enter öffnen; Ctrl+C/V/X Tags — 2.5.9/2.5.10."""
         if event.type() == QEvent.KeyPress:
             assert isinstance(event, QKeyEvent)
             key = event.key()
@@ -262,7 +262,7 @@ class WelcomePage(QWidget):
                     if path:
                         self.recent_remove_requested.emit(str(path))
                         return True
-                # Ctrl+C / Ctrl+V: Tags kopieren/einfügen — 2.5.9
+                # Ctrl+C / Ctrl+V / Ctrl+X: Tags kopieren/einfügen/ausschneiden — 2.5.9/2.5.10
                 if item is not None and bool(event.modifiers() & Qt.ControlModifier):
                     path = item.data(Qt.UserRole)
                     if path and key == Qt.Key_C:
@@ -270,6 +270,9 @@ class WelcomePage(QWidget):
                         return True
                     if path and key == Qt.Key_V:
                         self._paste_tags_for_recent(str(path))
+                        return True
+                    if path and key == Qt.Key_X:
+                        self._cut_tags_for_recent(str(path))
                         return True
         return super().eventFilter(obj, event)
 
@@ -526,7 +529,9 @@ class WelcomePage(QWidget):
         menu = QMenu(self)
         act_add_tag = menu.addAction("Tag hinzufügen…")
         act_remove_tag = menu.addAction("Tag entfernen…")
+        act_clear_tags = menu.addAction("Alle Tags entfernen")
         act_copy_tags = menu.addAction("Tags kopieren")
+        act_cut_tags = menu.addAction("Tags ausschneiden")
         act_paste_tags = menu.addAction("Tags einfügen")
         menu.addSeparator()
         act_remove = menu.addAction("Entfernen")
@@ -536,8 +541,12 @@ class WelcomePage(QWidget):
             self._add_tag_for_recent(str(path))
         elif chosen is act_remove_tag:
             self._remove_tag_for_recent(str(path))
+        elif chosen is act_clear_tags:
+            self._clear_tags_for_recent(str(path))
         elif chosen is act_copy_tags:
             self._copy_tags_for_recent(str(path))
+        elif chosen is act_cut_tags:
+            self._cut_tags_for_recent(str(path))
         elif chosen is act_paste_tags:
             self._paste_tags_for_recent(str(path))
         elif chosen is act_remove:
@@ -629,7 +638,7 @@ class WelcomePage(QWidget):
             return
         self.refresh_recent()
 
-    def _copy_tags_for_recent(self, path: str) -> None:
+    def _copy_tags_for_recent(self, path: str) -> bool:
         """Alle Dokument-Tags des Recent-Eintrags in Zwischenablage — 2.5.7."""
         from PySide6.QtWidgets import QApplication, QMessageBox
 
@@ -640,7 +649,7 @@ class WelcomePage(QWidget):
             QMessageBox.information(
                 self, "Tags kopieren", "Keine Tags an diesem Dokument."
             )
-            return
+            return False
         text = ", ".join(str(t) for t in current)
         try:
             clip = QApplication.clipboard()
@@ -649,7 +658,7 @@ class WelcomePage(QWidget):
             clip.setText(text)
         except Exception as e:
             QMessageBox.warning(self, "Tags kopieren", str(e))
-            return
+            return False
         # Status über Parent-MainWindow wenn vorhanden — 2.5.7
         win = self.window()
         msg = f"Tags kopiert ({len(current)}): {text}"
@@ -663,6 +672,73 @@ class WelcomePage(QWidget):
                 win._announce_status_toast(msg)
             except Exception:
                 pass
+        return True
+
+    def _clear_tags_for_recent(self, path: str) -> bool:
+        """Alle Dokument-Tags am Recent-Eintrag entfernen — 2.5.10."""
+        from PySide6.QtWidgets import QMessageBox
+
+        from instantlensdoc.core import doc_tags as doc_tags_mod
+
+        current = doc_tags_mod.load_tags_sidecar(path)
+        if not current:
+            QMessageBox.information(
+                self, "Tags entfernen", "Keine Tags an diesem Dokument."
+            )
+            return False
+        n = len(current)
+        try:
+            doc_tags_mod.save_tags_sidecar(path, [])
+        except Exception as e:
+            QMessageBox.warning(self, "Tags entfernen", str(e))
+            return False
+        self.refresh_recent()
+        win = self.window()
+        msg = f"Alle Tags entfernt ({n}): {Path(path).name}"
+        if win is not None and hasattr(win, "_set_status"):
+            try:
+                win._set_status(msg)
+            except Exception:
+                pass
+        if win is not None and hasattr(win, "_announce_status_toast"):
+            try:
+                win._announce_status_toast(msg)
+            except Exception:
+                pass
+        return True
+
+    def _cut_tags_for_recent(self, path: str) -> bool:
+        """Tags kopieren und am Dokument entfernen (Ctrl+X) — 2.5.10."""
+        if not self._copy_tags_for_recent(path):
+            return False
+        # Ohne erneute „keine Tags“-Meldung leeren
+        from instantlensdoc.core import doc_tags as doc_tags_mod
+
+        try:
+            current = doc_tags_mod.load_tags_sidecar(path)
+            if not current:
+                return True
+            n = len(current)
+            doc_tags_mod.save_tags_sidecar(path, [])
+        except Exception as e:
+            from PySide6.QtWidgets import QMessageBox
+
+            QMessageBox.warning(self, "Tags ausschneiden", str(e))
+            return False
+        self.refresh_recent()
+        win = self.window()
+        msg = f"Tags ausgeschnitten ({n}): {Path(path).name}"
+        if win is not None and hasattr(win, "_set_status"):
+            try:
+                win._set_status(msg)
+            except Exception:
+                pass
+        if win is not None and hasattr(win, "_announce_status_toast"):
+            try:
+                win._announce_status_toast(msg)
+            except Exception:
+                pass
+        return True
 
     def _paste_tags_for_recent(self, path: str) -> None:
         """Zwischenablage-Tags (Komma/;/Zeile) an Dokument anhängen — 2.5.8."""
