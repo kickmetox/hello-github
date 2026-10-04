@@ -1918,21 +1918,23 @@ class SettingsDialog(QDialog):
         page = QWidget()
         page.setObjectName("stubsSettingsPage")
         v = QVBoxLayout(page)
-        title = QLabel("Stubs — nicht produktiv / Coming soon")
+        title = QLabel("Stubs / geplante Features — Status")
         title.setStyleSheet("font-weight:600;")
         v.addWidget(title)
         info = QLabel(
             "Geplante Features sind klar als Stub markiert. "
-            "Kein Fake-KI-/Cloud-Verhalten. Plugin-Hooks: interner Event-Bus + no-op Loader."
+            "Kein Fake-KI-Verhalten. Cloud-Review: Freigabeordner produktiv (2.6.23). "
+            "Plugin-Hooks: interner Event-Bus + no-op Loader."
         )
         info.setWordWrap(True)
         info.setStyleSheet("color:#555;")
         v.addWidget(info)
 
         no_action = QLabel(
-            "Keine Aktion — reine Statusanzeige. "
-            "Einträge sind Stubs / nicht produktiv und lösen keine Funktion aus. "
-            "Doppelklick → Info-Dialog (Kurzbeschreibung + Badge „Geplant“, Esc schließt)."
+            "Keine Aktion — reine Statusanzeige für Stubs. "
+            "Stubs / nicht produktiv lösen keine Funktion aus "
+            "(Ausnahme: Gemeinsames Review öffnet den Sync-Dialog). "
+            "Doppelklick → Info-Dialog (Kurzbeschreibung + Badge, Esc schließt)."
         )
         no_action.setObjectName("stubsNoActionHint")
         no_action.setWordWrap(True)
@@ -1995,7 +1997,11 @@ class SettingsDialog(QDialog):
 
         rows = [
             ("KI-Assistent", "ki", "Stub · Coming soon · keine Aktion"),
-            ("Cloud-Sync", "cloud", "Stub · Coming soon · keine Aktion"),
+            (
+                "Gemeinsames Review / Cloud-Ordner",
+                "cloud",
+                "Produktiv 2.6.23 · Freigabeordner + optionaler Endpoint",
+            ),
             ("Stylus / Palm Rejection", "stylus", "Stub · keine Aktion"),
             ("3D-Extrusion", "extrude3d", "Stub · keine Aktion"),
             ("Plugin-Hooks", "plugins", "Stub · nicht produktiv · keine Aktion"),

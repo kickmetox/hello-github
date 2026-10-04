@@ -1015,6 +1015,51 @@ function New-IldSigningCert {
     Invoke-Ild @a | Out-Host
 }
 
+function Start-IldSharedReview {
+    # Gemeinsames Review / Freigabeordner — 2.6.23
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)][string]$ShareDir,
+        [string]$Author = "local",
+        [string]$Title,
+        [string]$Endpoint
+    )
+    $a = @("--json", "share-start", $Path, $ShareDir, "--author", $Author)
+    if ($Title) { $a += @("--title", $Title) }
+    if ($Endpoint) { $a += @("--endpoint", $Endpoint) }
+    Invoke-Ild @a | Out-Host
+}
+
+function Join-IldSharedReview {
+    param(
+        [Parameter(Mandatory = $true)][string]$Share,
+        [Parameter(Mandatory = $true)][string]$Path,
+        [string]$Author = "local",
+        [switch]$NoApply
+    )
+    $a = @("--json", "share-join", $Share, $Path, "--author", $Author)
+    if ($NoApply) { $a += "--no-apply" }
+    Invoke-Ild @a | Out-Host
+}
+
+function Sync-IldSharedReview {
+    param(
+        [Parameter(Mandatory = $true)][string]$Share,
+        [Parameter(Mandatory = $true)][string]$Path,
+        [string]$Author = "local"
+    )
+    Invoke-Ild @("--json", "share-sync", $Share, $Path, "--author", $Author) | Out-Host
+}
+
+function Get-IldSharedReview {
+    param([Parameter(Mandatory = $true)][string]$Share)
+    Invoke-Ild @("--json", "share-status", $Share) | Out-Host
+}
+
+function Get-IldSharedReviewInfo {
+    Invoke-Ild @("--json", "share-info") | Out-Host
+}
+
 
 function Merge-IldPdf {
     param(

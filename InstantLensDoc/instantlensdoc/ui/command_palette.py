@@ -357,6 +357,13 @@ def default_palette_commands() -> list[PaletteCommand]:
             "Review",
         ),
         PaletteCommand(
+            "shared_review",
+            "Gemeinsames Review / Cloud-Ordner…",
+            "shared review cloud sync freigabeordner kollaboration kommentare stempel highlights",
+            "Review",
+            "Ctrl+Alt+Shift+C",
+        ),
+        PaletteCommand(
             "batch_pdf",
             "Stapelverarbeitung (Batch)…",
             "batch stapel convert watermark compress encrypt pdf ordner",

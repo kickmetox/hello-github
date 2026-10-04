@@ -1,5 +1,5 @@
 {
-  "version": "2.6.22",
+  "version": "2.6.23",
   "langs": [
     "de",
     "en",
@@ -1873,6 +1873,215 @@
       "pt": "Comprimir PDF",
       "ar": "ضغط PDF",
       "it": "Comprimi PDF"
+    },
+    "shared_review": {
+      "de": "Gemeinsames Review / Cloud-Ordner",
+      "en": "Shared review / cloud folder",
+      "fr": "Revue partagée / dossier cloud",
+      "ru": "Совместный обзор / облачная папка",
+      "es": "Revisión compartida / carpeta cloud",
+      "zh": "共享审阅 / 云文件夹",
+      "pt": "Revisão partilhada / pasta cloud",
+      "ar": "مراجعة مشتركة / مجلد سحابي",
+      "it": "Revisione condivisa / cartella cloud"
+    },
+    "shared_review_start": {
+      "de": "Starten",
+      "en": "Start",
+      "fr": "Démarrer",
+      "ru": "Запуск",
+      "es": "Iniciar",
+      "zh": "开始",
+      "pt": "Iniciar",
+      "ar": "بدء",
+      "it": "Avvia"
+    },
+    "shared_review_join": {
+      "de": "Beitreten",
+      "en": "Join",
+      "fr": "Rejoindre",
+      "ru": "Присоединиться",
+      "es": "Unirse",
+      "zh": "加入",
+      "pt": "Aderir",
+      "ar": "انضمام",
+      "it": "Partecipa"
+    },
+    "shared_review_active": {
+      "de": "Aktiv",
+      "en": "Active",
+      "fr": "Actif",
+      "ru": "Активно",
+      "es": "Activo",
+      "zh": "活动",
+      "pt": "Ativo",
+      "ar": "نشط",
+      "it": "Attivo"
+    },
+    "shared_review_limits": {
+      "de": "Einschränkungen",
+      "en": "Limitations",
+      "fr": "Limitations",
+      "ru": "Ограничения",
+      "es": "Limitaciones",
+      "zh": "限制",
+      "pt": "Limitações",
+      "ar": "القيود",
+      "it": "Limitazioni"
+    },
+    "shared_review_folder": {
+      "de": "Freigabeordner",
+      "en": "Shared folder",
+      "fr": "Dossier partagé",
+      "ru": "Общая папка",
+      "es": "Carpeta compartida",
+      "zh": "共享文件夹",
+      "pt": "Pasta partilhada",
+      "ar": "مجلد مشترك",
+      "it": "Cartella condivisa"
+    },
+    "shared_review_folder_hint": {
+      "de": "Freigabeordner (NAS / OneDrive / SMB)…",
+      "en": "Shared folder (NAS / OneDrive / SMB)…",
+      "fr": "Dossier partagé (NAS / OneDrive / SMB)…",
+      "ru": "Общая папка (NAS / OneDrive / SMB)…",
+      "es": "Carpeta compartida (NAS / OneDrive / SMB)…",
+      "zh": "共享文件夹（NAS / OneDrive / SMB）…",
+      "pt": "Pasta partilhada (NAS / OneDrive / SMB)…",
+      "ar": "مجلد مشترك (NAS / OneDrive / SMB)…",
+      "it": "Cartella condivisa (NAS / OneDrive / SMB)…"
+    },
+    "shared_review_endpoint": {
+      "de": "Cloud-Endpoint",
+      "en": "Cloud endpoint",
+      "fr": "Point de terminaison cloud",
+      "ru": "Облачный endpoint",
+      "es": "Endpoint cloud",
+      "zh": "云端点",
+      "pt": "Endpoint cloud",
+      "ar": "نقطة سحابية",
+      "it": "Endpoint cloud"
+    },
+    "shared_review_endpoint_hint": {
+      "de": "Optional: https://host/review-bundle.json",
+      "en": "Optional: https://host/review-bundle.json",
+      "fr": "Optionnel : https://host/review-bundle.json",
+      "ru": "Необязательно: https://host/review-bundle.json",
+      "es": "Opcional: https://host/review-bundle.json",
+      "zh": "可选：https://host/review-bundle.json",
+      "pt": "Opcional: https://host/review-bundle.json",
+      "ar": "اختياري: https://host/review-bundle.json",
+      "it": "Opzionale: https://host/review-bundle.json"
+    },
+    "shared_review_start_btn": {
+      "de": "Session starten",
+      "en": "Start session",
+      "fr": "Démarrer la session",
+      "ru": "Запустить сеанс",
+      "es": "Iniciar sesión",
+      "zh": "开始会话",
+      "pt": "Iniciar sessão",
+      "ar": "بدء الجلسة",
+      "it": "Avvia sessione"
+    },
+    "shared_review_join_btn": {
+      "de": "Session beitreten",
+      "en": "Join session",
+      "fr": "Rejoindre la session",
+      "ru": "Присоединиться к сеансу",
+      "es": "Unirse a la sesión",
+      "zh": "加入会话",
+      "pt": "Aderir à sessão",
+      "ar": "الانضمام إلى الجلسة",
+      "it": "Partecipa alla sessione"
+    },
+    "shared_review_sync": {
+      "de": "Jetzt synchronisieren",
+      "en": "Sync now",
+      "fr": "Synchroniser maintenant",
+      "ru": "Синхронизировать сейчас",
+      "es": "Sincronizar ahora",
+      "zh": "立即同步",
+      "pt": "Sincronizar agora",
+      "ar": "مزامنة الآن",
+      "it": "Sincronizza ora"
+    },
+    "shared_review_leave": {
+      "de": "Session verlassen",
+      "en": "Leave session",
+      "fr": "Quitter la session",
+      "ru": "Покинуть сеанс",
+      "es": "Salir de la sesión",
+      "zh": "离开会话",
+      "pt": "Sair da sessão",
+      "ar": "مغادرة الجلسة",
+      "it": "Lascia sessione"
+    },
+    "shared_review_auto": {
+      "de": "Auto-Sync (Polling)",
+      "en": "Auto-sync (polling)",
+      "fr": "Sync auto (polling)",
+      "ru": "Автосинхронизация (опрос)",
+      "es": "Auto-sync (polling)",
+      "zh": "自动同步（轮询）",
+      "pt": "Sincronização automática (polling)",
+      "ar": "مزامنة تلقائية (استطلاع)",
+      "it": "Sincronizzazione automatica (polling)"
+    },
+    "shared_review_interval": {
+      "de": "Intervall (s)",
+      "en": "Interval (s)",
+      "fr": "Intervalle (s)",
+      "ru": "Интервал (с)",
+      "es": "Intervalo (s)",
+      "zh": "间隔（秒）",
+      "pt": "Intervalo (s)",
+      "ar": "الفاصل (ث)",
+      "it": "Intervallo (s)"
+    },
+    "shared_review_none": {
+      "de": "Keine aktive Session.",
+      "en": "No active session.",
+      "fr": "Aucune session active.",
+      "ru": "Нет активной сессии.",
+      "es": "Ninguna sesión activa.",
+      "zh": "无活动会话。",
+      "pt": "Nenhuma sessão ativa.",
+      "ar": "لا توجد جلسة نشطة.",
+      "it": "Nessuna sessione attiva."
+    },
+    "shared_review_need_folder": {
+      "de": "Bitte Freigabeordner wählen.",
+      "en": "Please choose a shared folder.",
+      "fr": "Veuillez choisir un dossier partagé.",
+      "ru": "Выберите общую папку.",
+      "es": "Elija una carpeta compartida.",
+      "zh": "请选择共享文件夹。",
+      "pt": "Escolha uma pasta partilhada.",
+      "ar": "يرجى اختيار مجلد مشترك.",
+      "it": "Scegliere una cartella condivisa."
+    },
+    "shared_review_join_hint": {
+      "de": "Freigabeordner oder session.ildshare.json…",
+      "en": "Shared folder or session.ildshare.json…",
+      "fr": "Dossier partagé ou session.ildshare.json…",
+      "ru": "Общая папка или session.ildshare.json…",
+      "es": "Carpeta compartida o session.ildshare.json…",
+      "zh": "共享文件夹或 session.ildshare.json…",
+      "pt": "Pasta partilhada ou session.ildshare.json…",
+      "ar": "مجلد مشترك أو session.ildshare.json…",
+      "it": "Cartella condivisa o session.ildshare.json…"
+    },
+    "shared_review_open_bundle": {
+      "de": "Session öffnen",
+      "en": "Open session",
+      "fr": "Ouvrir la session",
+      "ru": "Открыть сеанс",
+      "es": "Abrir sesión",
+      "zh": "打开会话",
+      "pt": "Abrir sessão",
+      "ar": "فتح الجلسة",
+      "it": "Apri sessione"
     }
   },
   "phrases": {
@@ -2658,15 +2867,15 @@
       "it": "Assistente IA (pianificato)"
     },
     "Cloud-Sync (geplant)": {
-      "de": "Cloud-Sync (geplant)",
-      "en": "Cloud sync (planned)",
-      "fr": "Sync cloud (prévu)",
-      "ru": "Облачная синхронизация (планируется)",
-      "es": "Sincronización en la nube (planificado)",
-      "zh": "云同步（计划中）",
-      "pt": "Sincronização na nuvem (planeado)",
-      "ar": "مزامنة سحابية (مخطط)",
-      "it": "Sincronizzazione cloud (pianificata)"
+      "de": "Gemeinsames Review / Cloud-Ordner…",
+      "en": "Shared review / cloud folder…",
+      "fr": "Revue partagée / dossier cloud…",
+      "ru": "Совместный обзор / облачная папка…",
+      "es": "Revisión compartida / carpeta cloud…",
+      "zh": "共享审阅 / 云文件夹…",
+      "pt": "Revisão partilhada / pasta cloud…",
+      "ar": "مراجعة مشتركة / مجلد سحابي…",
+      "it": "Revisione condivisa / cartella cloud…"
     },
     "Geplant": {
       "de": "Geplant",
@@ -2678,6 +2887,17 @@
       "pt": "Planeado",
       "ar": "مخطط",
       "it": "Pianificato"
+    },
+    "Gemeinsames Review / Cloud-Ordner…": {
+      "de": "Gemeinsames Review / Cloud-Ordner…",
+      "en": "Shared review / cloud folder…",
+      "fr": "Revue partagée / dossier cloud…",
+      "ru": "Совместный обзор / облачная папка…",
+      "es": "Revisión compartida / carpeta cloud…",
+      "zh": "共享审阅 / 云文件夹…",
+      "pt": "Revisão partilhada / pasta cloud…",
+      "ar": "مراجعة مشتركة / مجلد سحابي…",
+      "it": "Revisione condivisa / cartella cloud…"
     }
   },
   "ui": {

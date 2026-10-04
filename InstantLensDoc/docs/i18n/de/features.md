@@ -1,21 +1,10 @@
-# InstantLens Doc — Feature-Liste (DE)
+# InstantLens Doc — Features
 
-## 2.6.22
+## 2.6.23
 
-- Stapelverarbeitung: PDFs konvertieren / Wasserzeichen / komprimieren / verschlüsseln
-- Digitale Signaturen (eIDAS SES/AES/QES-Pfad)
-- Seriendruck-Polish (Vorschau, HTML/DOCX)
-- UI i18n: DE/EN/FR/RU/ES/ZH/PT/AR/IT — **2.6.17**
-- Hilfe/Info lokalisiert — **2.6.17**
-- Handschriftenerkennung (Tesseract PSM) — **2.6.17**
-- KI-Dokument-Wizards (kein freier Chat) — **2.6.16**
-- OCR → Word-Suite — **2.6.15**
-- Tabellen / Office I/O — **2.6.14**
-- Annotationen ausbauen — **2.6.9**
-- Vollständige Liste in der App: FEATURES.md
-- Farbmanagement RGB/CMYK, Bleed, Ebenen, Preflight, PDF/X — **2.6.21**
+- Gemeinsames Review / Cloud-Ordner (ildshare-v1)
+- Freigabeordner-Sync + optionaler HTTP-Endpoint
+- Integration Kommentare/Review/Annotationen/Stempel
+- ild API `shared_review_*` · CLI `share-*`
 
-
-## 2.6.21
-
-- Spellcheck suggestions / Autocorrect / Ribbon polish / Unlimited undo
+Vollständige Liste: FEATURES.md

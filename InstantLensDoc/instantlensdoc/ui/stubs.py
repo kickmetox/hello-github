@@ -18,7 +18,11 @@ from instantlensdoc.core.i18n import get_lang, tr
 
 PLANNED = {
     "ki": f"KI-Assistent — Stub {__version__} (Coming soon)",
-    "cloud": f"Cloud-Sync — Stub {__version__} (Coming soon)",
+    "cloud": (
+        f"Gemeinsames Review / Cloud-Ordner — {__version__} produktiv: "
+        "Freigabeordner-Sync + optionaler HTTP-Endpoint; Notizen/Markierungen/"
+        "Stempel/Kommentare austauschbar (kein gehosteter Cloud-Dienst)"
+    ),
     "stylus": f"Drucksensitiver Stylus / Palm Rejection — Stub {__version__}",
     "shapes_ai": f"Intelligente Formerkennung — Stub {__version__}",
     "extrude3d": f"3D-Extrusion — Stub {__version__}",
@@ -45,7 +49,11 @@ PLANNED = {
 
 PLANNED_EN = {
     "ki": f"AI assistant — stub {__version__} (Coming soon)",
-    "cloud": f"Cloud sync — stub {__version__} (Coming soon)",
+    "cloud": (
+        f"Shared review / cloud folder — {__version__} live: "
+        "shared-folder sync + optional HTTP endpoint; notes/highlights/"
+        "stamps/comments exchangeable (no hosted cloud service)"
+    ),
     "stylus": f"Pressure-sensitive stylus / palm rejection — stub {__version__}",
     "shapes_ai": f"Smart shape recognition — stub {__version__}",
     "extrude3d": f"3D extrusion — stub {__version__}",
@@ -73,7 +81,10 @@ PLANNED_EN = {
 # Kurzbeschreibungen für Info-Dialog — 1.9.5
 STUB_SHORT = {
     "ki": "Lokaler KI-Assistent für Zusammenfassen und Vorschläge — Stub / nicht produktiv.",
-    "cloud": "Optionale Cloud-Synchronisation — Stub / Coming soon / keine Aktion.",
+    "cloud": (
+        "Gemeinsames Review: Freigabeordner + optionaler Endpoint — produktiv 2.6.23; "
+        "kein gehosteter Cloud-Dienst; Offline bleibt nutzbar."
+    ),
     "stylus": "Drucksensitiver Stylus mit Palm Rejection — Stub / keine Aktion.",
     "shapes_ai": "Intelligente Formerkennung beim Zeichnen — Stub / geplant.",
     "extrude3d": "3D-Extrusion von Formen — Stub / geplant / keine Aktion.",
@@ -98,7 +109,10 @@ STUB_SHORT = {
 
 STUB_SHORT_EN = {
     "ki": "Local AI assistant for summaries and suggestions — stub / not production.",
-    "cloud": "Optional cloud sync — stub / Coming soon / no action.",
+    "cloud": (
+        "Shared review: folder sync + optional endpoint — live in 2.6.23; "
+        "no hosted cloud service; offline remains usable."
+    ),
     "stylus": "Pressure-sensitive stylus with palm rejection — stub / no action.",
     "shapes_ai": "Smart shape recognition while drawing — stub / planned.",
     "extrude3d": "3D extrusion of shapes — stub / planned / no action.",
@@ -123,7 +137,7 @@ STUB_SHORT_EN = {
 
 STUB_TITLES = {
     "ki": "KI-Assistent",
-    "cloud": "Cloud-Sync",
+    "cloud": "Gemeinsames Review / Cloud-Ordner",
     "stylus": "Stylus / Palm Rejection",
     "shapes_ai": "Intelligente Formerkennung",
     "extrude3d": "3D-Extrusion",
@@ -137,7 +151,7 @@ STUB_TITLES = {
 
 STUB_TITLES_EN = {
     "ki": "AI assistant",
-    "cloud": "Cloud sync",
+    "cloud": "Shared review / cloud folder",
     "stylus": "Stylus / palm rejection",
     "shapes_ai": "Smart shape recognition",
     "extrude3d": "3D extrusion",
@@ -223,7 +237,26 @@ class StubInfoDialog(QDialog):
 
 
 def show_planned(parent: QWidget | None, key: str) -> None:
-    """Stub-Info mit Kurzbeschreibung + Badge „Geplant“; Esc schließt — 1.9.5."""
+    """Stub-Info; Cloud öffnet Shared-Review-Dialog (2.6.23) statt Coming-soon."""
+    if key == "cloud":
+        opener = getattr(parent, "_show_shared_review_dialog", None)
+        if callable(opener):
+            try:
+                opener()
+                return
+            except Exception:
+                pass
+        # Fallback: Info mit produktivem Hinweis (kein Coming soon)
+        en = get_lang() == "en"
+        dlg = StubInfoDialog(
+            parent,
+            title=(STUB_TITLES_EN if en else STUB_TITLES).get("cloud", "Cloud"),
+            short=(STUB_SHORT_EN if en else STUB_SHORT).get("cloud", ""),
+            detail=(PLANNED_EN if en else PLANNED).get("cloud", ""),
+            badge="2.6.23" if not en else "Live",
+        )
+        dlg.exec()
+        return
     en = get_lang() == "en"
     titles = STUB_TITLES_EN if en else STUB_TITLES
     shorts = STUB_SHORT_EN if en else STUB_SHORT

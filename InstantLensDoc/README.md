@@ -2,7 +2,7 @@
 
 Moderne Textverarbeitung mit PDF-Annotator, OCR-Bridge und Formulargenerator.
 
-**Version:** 2.6.22  
+**Version:** 2.6.23  
 **Hersteller:** Andreas Meyer · ame@sellerbach.de
 
 ## Quickstart (Windows)
@@ -36,6 +36,13 @@ User-Shortcuts: `.\scripts\install-ild.ps1` (inkl. Keygen) · Deinstallieren: `-
 Keygen: `run-keygen.bat` · `python -m keygen kunde@example.com` · siehe `keygen/README.md`.
 
 Nightly-Smoke: `python scripts\smoke_ild.py` · optional `--qt` · `--json` (Summary: `ok`, `checks[]`, `duration_ms`, `version`; Fail: `checks[].error` max 200…, Exit=ok). Siehe **CONTRIBUTING.md**; Workflow-Stub `.github/workflows/smoke-ild.yml` (manual only).
+
+## Neu in 2.6.23
+
+- Gemeinsames Review / Cloud-Ordner: Notizen, Markierungen, Stempel, Kommentare austauschbar
+- Freigabeordner-Sync (`session.ildshare.json`) + optionaler HTTP-Endpoint; Polling
+- UI Starten/Beitreten/Sync; `ild.shared_review_*` / CLI `share-*` / PS `Start-/Join-/Sync-IldSharedReview`
+- Offline bleibt nutzbar; freier KI-Chat-Stub unverändert
 
 ## Neu in 2.6.22
 

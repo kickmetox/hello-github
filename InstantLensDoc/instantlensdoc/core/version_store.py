@@ -1,4 +1,4 @@
-"""Lokaler Versionsverlauf (Snapshots) — ildversions-v1 — 2.6.22.
+"""Lokaler Versionsverlauf (Snapshots) — ildversions-v1 — 2.6.23.
 
 Speichert/restored Dokumentstände neben der Datei unter ``*.ildversions/``.
 """

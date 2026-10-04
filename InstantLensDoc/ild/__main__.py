@@ -822,6 +822,44 @@ def build_parser() -> argparse.ArgumentParser:
     )
     s.add_argument("--level", default="AES", choices=["SES", "AES", "QES"])
 
+    s = sub.add_parser(
+        "share-start",
+        help="Gemeinsames Review starten (Freigabeordner) — 2.6.23",
+    )
+    s.add_argument("path", help="Dokumentpfad")
+    s.add_argument("share_dir", help="Freigabeordner")
+    s.add_argument("--author", default="local")
+    s.add_argument("--title", default="")
+    s.add_argument("--endpoint", default=None)
+
+    s = sub.add_parser(
+        "share-join",
+        help="Gemeinsamem Review beitreten — 2.6.23",
+    )
+    s.add_argument("share", help="Freigabeordner oder session.ildshare.json")
+    s.add_argument("path", help="Lokaler Dokumentpfad")
+    s.add_argument("--author", default="local")
+    s.add_argument("--no-apply", action="store_true")
+
+    s = sub.add_parser(
+        "share-sync",
+        help="Shared Review synchronisieren — 2.6.23",
+    )
+    s.add_argument("share")
+    s.add_argument("path")
+    s.add_argument("--author", default="local")
+
+    s = sub.add_parser(
+        "share-status",
+        help="Shared-Review-Session-Status — 2.6.23",
+    )
+    s.add_argument("share")
+
+    s = sub.add_parser(
+        "share-info",
+        help="Shared-Review-Einschränkungen/Modi — 2.6.23",
+    )
+
     return p
 
 
@@ -1619,6 +1657,39 @@ def run(argv: list[str] | None = None) -> int:
             return 0
         if args.cmd == "eidas":
             data = api.eidas_info(args.level)
+            _print(data, as_json=js or True)
+            return 0
+        if args.cmd == "share-start":
+            data = api.shared_review_start(
+                args.path,
+                args.share_dir,
+                author=args.author,
+                title=args.title,
+                endpoint=args.endpoint,
+            )
+            _print(data, as_json=js or True)
+            return 0
+        if args.cmd == "share-join":
+            data = api.shared_review_join(
+                args.share,
+                args.path,
+                author=args.author,
+                apply=not bool(args.no_apply),
+            )
+            _print(data, as_json=js or True)
+            return 0
+        if args.cmd == "share-sync":
+            data = api.shared_review_sync(
+                args.share, args.path, author=args.author
+            )
+            _print(data, as_json=js or True)
+            return 0
+        if args.cmd == "share-status":
+            data = api.shared_review_status_api(args.share)
+            _print(data, as_json=js or True)
+            return 0
+        if args.cmd == "share-info":
+            data = api.shared_review_info()
             _print(data, as_json=js or True)
             return 0
         return _fail("unbekanntes Kommando")

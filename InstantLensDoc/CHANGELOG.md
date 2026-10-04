@@ -1,5 +1,9 @@
 # Changelog — InstantLens Doc
 
+## 2.6.23 — Gemeinsames Review / Cloud-Ordner-Kollaboration
+
+Minor nach **2.6.22**: **Gemeinsames Review** ersetzt den Cloud-Stub. Notizen, Markierungen, Stempel und Kommentare sind zwischen Nutzern austauschbar über einen **lokalen Freigabeordner** (`session.ildshare.json` / ildshare-v1) und optional einen **einfachen HTTP-Endpoint** (GET/PUT JSON). Integriert Review/Kommentare (**2.6.21**) und Annotationen/Stempel (**2.6.9**). UI zum Starten/Beitreten inkl. dokumentierter Einschränkungen; Polling wo sinnvoll. **ild API** `shared_review_*` · CLI `share-*` · PS `Start-/Join-/Sync-IldSharedReview`. Offline bleibt nutzbar. Freier KI-Chat-Stub unverändert; kein gehosteter Cloud-Dienst / kein CRDT.
+
 ## 2.6.22 — Stapelverarbeitung, Digitale Signaturen (eIDAS), Seriendruck-Polish
 
 Minor nach **2.6.21**: **Stapelverarbeitung** für viele PDFs in einem Job — Konvertieren (→PNG), Wasserzeichen, Komprimieren, Verschlüsseln (AES-256); UI + `ild.run_batch_job` / CLI `batch` / PS `Invoke-IldBatch`. **Digitale Signaturen** (eIDAS-Pfad): SES-Stempel, AES mit PKCS#12 (Dokument-Hash + Attachment + Sidecar `*.ildesign.json`), QES als QTSP-Import-Pfad; baut auf Verschlüsselung **2.6.7**. **Seriendruck-Polish**: Vorschau, fehlende Felder, Delimiter, HTML/DOCX, kombinierte Datei. Cloud-Echtzeit-Kollaboration bleibt Stub (→ 2.6.23). Freier KI-Chat-Stub unverändert.

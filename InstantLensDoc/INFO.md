@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **2.6.22** |
+| Version | **2.6.23** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -33,7 +33,7 @@
 
 Skript: [sync-ild.ps1](scripts/sync-ild.ps1) — Branch `cursor/instantlensdoc-2108` (oder `-LocalPack` / Pack-Zip) nach `D:\AI_Temp\InstantLensDoc`, pip, Start. **Nutzer-Icon in `assets` wird nicht überschrieben.**
 
-**FEATURES.md lokal sync:** Nach Sync liegt `FEATURES.md` lokal im App-Ordner (`D:\AI_Temp\InstantLensDoc\FEATURES.md`); About/Stubs öffnen diese lokale Datei — Version **2.6.22**.
+**FEATURES.md lokal sync:** Nach Sync liegt `FEATURES.md` lokal im App-Ordner (`D:\AI_Temp\InstantLensDoc\FEATURES.md`); About/Stubs öffnen diese lokale Datei — Version **2.6.23**.
 
 Ohne Start: `-NoStart` (Alias `-SkipStart`). Exit-Codes: **0** OK · **1** allgemein · **2** Git-Fehler.
 
@@ -82,6 +82,18 @@ python -m keygen --verify "ILD1...."
 
 Trial 28 Tage · Keys 32 Tage (HMAC `ILD1.…`). Details: `keygen/README.md`.
 
+## Neu in 2.6.23
+
+Minor nach **2.6.22** (Stapel/eIDAS/Seriendruck-Polish):
+
+- **Gemeinsames Review / Cloud-Ordner:** Notizen, Markierungen, Stempel und Kommentare zwischen Nutzern austauschbar
+- **Freigabeordner-Sync:** `session.ildshare.json` (ildshare-v1) — NAS/OneDrive/SMB/USB
+- **Optionaler HTTP-Endpoint:** einfaches GET/PUT JSON-Bundle; Polling (Auto-Sync)
+- **Integration:** Kommentare/Review (2.6.21) + Annotationen/Stempel (2.6.9)
+- **UI:** Starten/Beitreten/Sync + dokumentierte Einschränkungen; Ribbon/Palette/Extras
+- **ild API:** `shared_review_start/join/sync/status/info` · CLI `share-*` · PS `Start-/Join-/Sync-IldSharedReview`
+- Offline bleibt voll nutzbar; freier KI-Chat-Stub unverändert; kein gehosteter Cloud-Dienst
+
 ## Neu in 2.6.22
 
 Minor nach **2.6.21** (Review/Kommentare/Versionen/Seriendruck):
@@ -91,7 +103,7 @@ Minor nach **2.6.21** (Review/Kommentare/Versionen/Seriendruck):
 - **Seriendruck-Polish:** Vorschau, fehlende Felder, Delimiter, HTML/DOCX, kombinierte Datei
 - **ild API:** `run_batch_job` / `sign_pdf_api` / `verify_signature_api` / `mail_merge_preview`
 - CLI `batch`/`sign`/`sign-verify`/`eidas` · PS `Invoke-IldBatch` / `Invoke-IldSign` / `Test-IldSignature`
-- Cloud-Echtzeit-Kollaboration bleibt Stub (geplant 2.6.23); freier KI-Chat-Stub unverändert
+- Cloud-Echtzeit-Kollaboration damals noch Stub (→ 2.6.23); freier KI-Chat-Stub unverändert
 - Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie unverändert
 
 ## Neu in 2.6.21

@@ -252,6 +252,11 @@ HELP_HTML = f"""
     Arabisch RTL wo praktikabel — <b>2.6.19</b></li>
 <li><b>Handschriftenerkennung</b>: Extras → <b>Handschriftenerkennung…</b> bzw.
     OCR-Dialog → Handschrift-Modus (Tesseract PSM) — Basis-Hook — <b>2.6.19</b></li>
+<li><b>Gemeinsames Review / Cloud-Ordner</b>: Bearbeiten → Review → <b>Gemeinsames Review…</b>
+    (<code>Ctrl+Alt+Shift+C</code>) — Session starten/beitreten über Freigabeordner
+    (<code>session.ildshare.json</code>) oder optionalen HTTP-Endpoint; Notizen/Markierungen/
+    Stempel/Kommentare austauschbar; Auto-Sync/Polling; Offline bleibt nutzbar;
+    kein gehosteter Cloud-Dienst — <b>2.6.23</b></li>
 <li><b>OCR</b>: Extras → OCR (Seite/Bild) oder <b>OCR gesamtes PDF</b> (Batch mit
     <b>Sprach-Preset</b>-Combobox, Fortschritt/Abbrechen;
     Ergebnis als <b>neue Textdatei-Tab</b> <code>*-ocr.txt</code>) —

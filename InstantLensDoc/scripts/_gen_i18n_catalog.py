@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate InstantLens Doc 2.6.22 i18n catalog + locale help stubs."""
+"""Generate InstantLens Doc 2.6.23 i18n catalog + locale help stubs."""
 
 from __future__ import annotations
 
@@ -217,6 +217,7 @@ PHRASES: list[tuple[str, ...]] = [
     ("Bildvorschau", "Image preview", "Aperçu image", "Просмотр изображения", "Vista previa de imagen", "图像预览", "Pré-visualização da imagem", "معاينة الصورة", "Anteprima immagine"),
     ("Zum Bearbeiten öffnen", "Open for editing", "Ouvrir pour édition", "Открыть для правки", "Abrir para editar", "打开以编辑", "Abrir para editar", "فتح للتحرير", "Apri per modificare"),
     ("KI-Assistent (geplant)", "AI assistant (planned)", "Assistant IA (prévu)", "ИИ-ассистент (планируется)", "Asistente IA (planificado)", "AI 助手（计划中）", "Assistente IA (planeado)", "مساعد الذكاء الاصطناعي (مخطط)", "Assistente IA (pianificato)"),
+    ("Gemeinsames Review / Cloud-Ordner…", "Shared review / cloud folder…", "Revue partagée / dossier cloud…", "Совместный обзор / облачная папка…", "Revisión compartida / carpeta cloud…", "共享审阅 / 云文件夹…", "Revisão partilhada / pasta cloud…", "مراجعة مشتركة / مجلد سحابي…", "Revisione condivisa / cartella cloud…"),
     ("Cloud-Sync (geplant)", "Cloud sync (planned)", "Sync cloud (prévu)", "Облачная синхронизация (планируется)", "Sincronización en la nube (planificado)", "云同步（计划中）", "Sincronização na nuvem (planeado)", "مزامنة سحابية (مخطط)", "Sincronizzazione cloud (pianificata)"),
     ("Geplant", "Planned", "Prévu", "Запланировано", "Planificado", "计划中", "Planeado", "مخطط", "Pianificato"),
 ]
@@ -240,7 +241,7 @@ def main() -> None:
         phrases[de] = pack_row(row)
 
     catalog = {
-        "version": "2.6.22",
+        "version": "2.6.23",
         "langs": list(LANGS),
         "rtl": ["ar"],
         "strings": strings,

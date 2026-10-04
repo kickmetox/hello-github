@@ -1870,6 +1870,15 @@ class MainWindow(QMainWindow):
         m_edit.addAction(act_spell_clear)
         m_edit.addSeparator()
         m_review = m_edit.addMenu("Review / Zusammenarbeit")
+        act_shared = QAction("Gemeinsames Review…", self)
+        act_shared.setObjectName("actSharedReview")
+        act_shared.setShortcut(QKeySequence("Ctrl+Alt+Shift+C"))
+        act_shared.setToolTip(
+            "Review-Session starten/beitreten: Freigabeordner oder optionaler "
+            "HTTP-Endpoint — Notizen/Markierungen/Stempel/Kommentare — 2.6.23"
+        )
+        act_shared.triggered.connect(self._show_shared_review_dialog)
+        m_review.addAction(act_shared)
         act_review = QAction("Änderungen nachverfolgen…", self)
         act_review.setShortcut(QKeySequence("Ctrl+Shift+E"))
         act_review.setToolTip(
@@ -3094,9 +3103,15 @@ class MainWindow(QMainWindow):
         a.triggered.connect(self._forms)
         m_extra.addAction(a)
         m_extra.addSeparator()
+        a = QAction("Gemeinsames Review / Cloud-Ordner…", self)
+        a.setObjectName("actCloudSharedReview")
+        a.setToolTip(
+            "Shared Review: Freigabeordner-Sync + optionaler Endpoint — 2.6.23"
+        )
+        a.triggered.connect(self._show_shared_review_dialog)
+        m_extra.addAction(a)
         for key, title in [
             ("ki", "KI-Assistent (geplant)"),
-            ("cloud", "Cloud-Sync (geplant)"),
             ("stylus", "Stylus / Palm Rejection (geplant)"),
             ("shapes_ai", "Intelligente Formerkennung (geplant)"),
             ("extrude3d", "3D-Extrusion (geplant)"),
@@ -5317,6 +5332,55 @@ class MainWindow(QMainWindow):
         except Exception as e:
             self._set_status(f"Review: {e}")
 
+    def _show_shared_review_dialog(self):
+        """Gemeinsames Review starten/beitreten — Freigabeordner/Endpoint — 2.6.23."""
+        from instantlensdoc.ui.shared_review_dialog import SharedReviewDialog
+
+        path = self._collab_doc_path()
+        if not path:
+            from instantlensdoc.config import config_dir
+
+            path = str(config_dir() / "untitled.ildshare-anchor.txt")
+            Path(path).parent.mkdir(parents=True, exist_ok=True)
+            if not Path(path).is_file():
+                Path(path).write_text("", encoding="utf-8")
+        author = "local"
+        try:
+            from instantlensdoc.core.review import ReviewStore
+
+            author = ReviewStore.for_doc(path, load=True).author or "local"
+        except Exception:
+            pass
+
+        def _on_synced(result: dict) -> None:
+            n = result.get("item_count")
+            action = result.get("action")
+            self._set_status(
+                f"Shared Review {action}: {n} Items · "
+                f"{result.get('participant_count', 0)} Teilnehmer"
+            )
+            # Annotation-/Kommentar-UI aktualisieren falls vorhanden
+            try:
+                if hasattr(self, "pdf_view") and self.pdf_view is not None:
+                    store = getattr(self.pdf_view, "store", None)
+                    if store is not None and hasattr(store, "load"):
+                        store.load()
+                        if hasattr(self.pdf_view, "refresh"):
+                            self.pdf_view.refresh()
+                        elif hasattr(self.pdf_view, "_redraw"):
+                            self.pdf_view._redraw()
+            except Exception:
+                pass
+            try:
+                self._refresh_pdf_marks()
+            except Exception:
+                pass
+
+        dlg = SharedReviewDialog(
+            path, self, author=author, on_synced=_on_synced
+        )
+        dlg.exec()
+
     def _show_comments_dialog(self):
         from instantlensdoc.ui.comments_dialog import CommentsDialog
 
@@ -6445,6 +6509,7 @@ class MainWindow(QMainWindow):
             "insert_snippet": lambda: self._insert_snippet(0),
             "review_mode": self._show_review_dialog,
             "doc_comments": self._show_comments_dialog,
+            "shared_review": self._show_shared_review_dialog,
             "version_history": self._show_version_history_dialog,
             "mail_merge": self._run_mail_merge_dialog,
             "batch_pdf": self._batch_convert,
@@ -11369,6 +11434,7 @@ class MainWindow(QMainWindow):
             "detach_window": self._detach_current_document,
             "review_mode": self._show_review_dialog,
             "doc_comments": self._show_comments_dialog,
+            "shared_review": self._show_shared_review_dialog,
             "version_history": self._show_version_history_dialog,
             "mail_merge": self._run_mail_merge_dialog,
             "batch_pdf": self._batch_convert,

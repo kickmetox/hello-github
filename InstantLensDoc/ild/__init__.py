@@ -1,5 +1,5 @@
 """
-Stabiles Scripting-API für InstantLens Doc (2.6.22).
+Stabiles Scripting-API für InstantLens Doc (2.6.23).
 
 Headless, ohne GUI. Nutzt ``ild_pdf`` + Lizenz/OCR der App.
 
@@ -36,6 +36,8 @@ Headless, ohne GUI. Nutzt ``ild_pdf`` + Lizenz/OCR der App.
     ild.run_batch_job("out", folder="pdfs", ops=["watermark", "compress", "encrypt"],
                       user_password="geheim")
     ild.sign_pdf_api("dok.pdf", level="AES", p12="signer.p12", p12_password="x")
+    ild.shared_review_start("dok.pdf", "share/", author="Anna")
+    ild.shared_review_sync("share/", "dok.pdf", author="Anna")
 
     CLI: ``python -m ild --help`` · PowerShell: ``scripts\\ild.ps1``.
 """
@@ -148,6 +150,11 @@ from ild.api import (
     list_signatures_api,
     generate_signing_cert,
     eidas_info,
+    shared_review_start,
+    shared_review_join,
+    shared_review_sync,
+    shared_review_status_api,
+    shared_review_info,
     open_info,
     outline_summary,
     page_count,
@@ -220,6 +227,11 @@ __all__ = [
     "list_signatures_api",
     "generate_signing_cert",
     "eidas_info",
+    "shared_review_start",
+    "shared_review_join",
+    "shared_review_sync",
+    "shared_review_status_api",
+    "shared_review_info",
     "add_redaction",
     "apply_redactions",
     "add_shape",

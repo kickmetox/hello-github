@@ -1,4 +1,4 @@
-"""Headless InstantLens-Doc-Operationen für Python- und PowerShell-Scripting — 2.6.22.
+"""Headless InstantLens-Doc-Operationen für Python- und PowerShell-Scripting — 2.6.23.
 
 Stapelverarbeitung (PDF Convert/WM/Compress/Encrypt) · Digitale Signaturen (eIDAS) ·
 Seriendruck-Polish — lokal.
@@ -2109,7 +2109,7 @@ def mail_merge_run(
     delimiter: str | None = None,
     strict: bool = False,
 ) -> dict[str, Any]:
-    """Seriendruck: Template + CSV/Excel → Briefe — 2.6.21 / Polish 2.6.22."""
+    """Seriendruck: Template + CSV/Excel → Briefe — 2.6.21 / Polish 2.6.23."""
     from instantlensdoc.core.mail_merge import (
         find_placeholders,
         load_recipients,
@@ -2166,7 +2166,7 @@ def mail_merge_preview(
     delimiter: str | None = None,
     template_is_text: bool = False,
 ) -> dict[str, Any]:
-    """Seriendruck-Vorschau — 2.6.22."""
+    """Seriendruck-Vorschau — 2.6.23."""
     from instantlensdoc.core.mail_merge import load_recipients, preview_merge
 
     tpl = str(template) if template_is_text else _require_file(template).read_text(
@@ -2194,7 +2194,7 @@ def run_batch_job(
     convert_dpi: int = 150,
     convert_fmt: str = "png",
 ) -> dict[str, Any]:
-    """PDF-/Ordner-Stapelverarbeitung — 2.6.22.
+    """PDF-/Ordner-Stapelverarbeitung — 2.6.23.
 
     ``ops``: convert|watermark|compress|encrypt (Liste, Pipeline).
     Alternativ ``mode`` = BatchMode-Wert (inkl. Bilder/OCR).
@@ -2253,7 +2253,7 @@ def sign_pdf_api(
     visible_stamp: bool = True,
     embed_attachment: bool = True,
 ) -> dict[str, Any]:
-    """PDF digital signieren (eIDAS-Pfad) — 2.6.22."""
+    """PDF digital signieren (eIDAS-Pfad) — 2.6.23."""
     from ild_pdf.esign import sign_pdf
 
     pdf = _require_file(path)
@@ -2281,7 +2281,7 @@ def verify_signature_api(
     p12_password: str = "",
     signature_id: str | None = None,
 ) -> dict[str, Any]:
-    """Signatur prüfen — 2.6.22."""
+    """Signatur prüfen — 2.6.23."""
     from ild_pdf.esign import verify_signature
 
     data = verify_signature(
@@ -2310,7 +2310,7 @@ def generate_signing_cert(
     email: str = "",
     days: int = 825,
 ) -> dict[str, Any]:
-    """Selbstsigniertes PKCS#12 für AES-Tests erzeugen — 2.6.22."""
+    """Selbstsigniertes PKCS#12 für AES-Tests erzeugen — 2.6.23."""
     from ild_pdf.esign import generate_self_signed_cert
 
     data = generate_self_signed_cert(
@@ -2329,6 +2329,75 @@ def eidas_info(level: str = "AES") -> dict[str, Any]:
 
     data = eidas_level_info(level)
     data["levels"] = list(EIDAS_LEVELS)
+    data["version"] = __version__
+    return data
+
+
+def shared_review_start(
+    path: PathLike,
+    share_dir: PathLike,
+    *,
+    author: str = "local",
+    title: str = "",
+    endpoint: str | None = None,
+) -> dict[str, Any]:
+    """Gemeinsames Review starten (Freigabeordner) — 2.6.23."""
+    from instantlensdoc.core.shared_review import start_shared_review
+
+    data = start_shared_review(
+        path,
+        share_dir,
+        author=author,
+        title=title,
+        endpoint=endpoint,
+    )
+    data["version"] = __version__
+    return data
+
+
+def shared_review_join(
+    share: PathLike,
+    path: PathLike,
+    *,
+    author: str = "local",
+    apply: bool = True,
+) -> dict[str, Any]:
+    """Gemeinsamem Review beitreten — 2.6.23."""
+    from instantlensdoc.core.shared_review import join_shared_review
+
+    data = join_shared_review(share, path, author=author, apply=bool(apply))
+    data["version"] = __version__
+    return data
+
+
+def shared_review_sync(
+    share: PathLike,
+    path: PathLike,
+    *,
+    author: str = "local",
+) -> dict[str, Any]:
+    """Shared Review synchronisieren (publish+pull) — 2.6.23."""
+    from instantlensdoc.core.shared_review import sync_shared_review
+
+    data = sync_shared_review(share, path, author=author)
+    data["version"] = __version__
+    return data
+
+
+def shared_review_status_api(share: PathLike) -> dict[str, Any]:
+    """Session-Status — 2.6.23."""
+    from instantlensdoc.core.shared_review import shared_review_status
+
+    data = shared_review_status(share)
+    data["version"] = __version__
+    return data
+
+
+def shared_review_info() -> dict[str, Any]:
+    """Einschränkungen / Modi der Shared-Review-Kollaboration — 2.6.23."""
+    from instantlensdoc.core.shared_review import shared_review_limitations
+
+    data = shared_review_limitations()
     data["version"] = __version__
     return data
 
