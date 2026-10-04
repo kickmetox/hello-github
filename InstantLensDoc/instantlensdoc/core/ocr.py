@@ -20,6 +20,7 @@ class OcrOutputMode(str, Enum):
     EDITABLE_TEXT = "editable_text"  # reiner Text → Editor
     SEARCHABLE_IMAGE = "searchable_image"  # Bildseite + Textlayer-Sidecar
     TABLE_CSV = "table_csv"  # Tabellen-Heuristik → CSV — 1.9.0
+    LAYOUT_PRESERVE = "layout_preserve"  # Text + Blöcke/Lesereihenfolge · hOCR/TSV — 2.6.3
 
 
 # UI-Presets: Anzeigename → Tesseract-lang
@@ -77,6 +78,34 @@ INSTALL_HINT_HTML = (
 
 
 @dataclass
+class OcrLayoutBlock:
+    """Ein Textblock aus Tesseract (Lesereihenfolge / BBox) — 2.6.3."""
+
+    block_num: int
+    reading_order: int
+    left: int
+    top: int
+    width: int
+    height: int
+    lines: List[str] = field(default_factory=list)
+    text: str = ""
+    conf: float = -1.0
+
+
+@dataclass
+class OcrLayoutPage:
+    """Layout-OCR einer Seite: Text + Blöcke + optional hOCR/TSV — 2.6.3."""
+
+    text: str
+    blocks: List[OcrLayoutBlock] = field(default_factory=list)
+    hocr: str = ""
+    tsv: str = ""
+    lang: str = "deu+eng"
+    width: int = 0
+    height: int = 0
+
+
+@dataclass
 class OcrResult:
     text: str
     lang: str
@@ -85,6 +114,10 @@ class OcrResult:
     searchable_pdf: Path | None = None
     sidecar: Path | None = None
     table_rows: List[List[str]] | None = None  # Rohzeilen Tabellen-CSV — 1.9.2
+    blocks: List[OcrLayoutBlock] | None = None  # Layout-Blöcke — 2.6.3
+    hocr_path: Path | None = None
+    tsv_path: Path | None = None
+    layout: OcrLayoutPage | None = None
 
 
 def tesseract_available() -> tuple[bool, str]:
@@ -309,11 +342,280 @@ def ocr_image_structured(
     return "\n".join(plain_lines), table_like
 
 
+def _blocks_from_tesseract_data(
+    data: dict,
+    *,
+    min_conf: int = 0,
+) -> List[OcrLayoutBlock]:
+    """
+    Baut Textblöcke aus ``image_to_data`` in Lesereihenfolge (top→bottom, left→right).
+
+    Level: 2=Block, 4=Zeile, 5=Wort. Blöcke werden nach Top/Left sortiert — 2.6.3.
+    """
+    n = len(data.get("text") or [])
+    if n == 0:
+        return []
+
+    # Zeilen → Wörter sammeln
+    line_words: dict[tuple[int, int, int], list[tuple[int, str, float]]] = {}
+    line_bbox: dict[tuple[int, int, int], tuple[int, int, int, int]] = {}
+    block_bbox: dict[int, list[tuple[int, int, int, int]]] = {}
+
+    for i in range(n):
+        try:
+            level = int(data["level"][i])
+        except Exception:
+            continue
+        try:
+            block_num = int(data["block_num"][i])
+        except Exception:
+            continue
+        left = int(data["left"][i])
+        top = int(data["top"][i])
+        width = int(data["width"][i])
+        height = int(data["height"][i])
+
+        if level == 2:  # Block
+            block_bbox.setdefault(block_num, []).append((left, top, width, height))
+            continue
+        if level == 4:  # Zeile
+            par = int(data.get("par_num", [0] * n)[i] or 0)
+            line = int(data.get("line_num", [0] * n)[i] or 0)
+            line_bbox[(block_num, par, line)] = (left, top, width, height)
+            continue
+        if level != 5:
+            continue
+        word = (data["text"][i] or "").strip()
+        if not word:
+            continue
+        conf_raw = data["conf"][i]
+        try:
+            conf = float(conf_raw)
+        except Exception:
+            conf = -1.0
+        if conf >= 0 and conf < min_conf:
+            continue
+        par = int(data.get("par_num", [0] * n)[i] or 0)
+        line = int(data.get("line_num", [0] * n)[i] or 0)
+        key = (block_num, par, line)
+        line_words.setdefault(key, []).append((left, word, conf))
+
+    if not line_words and not block_bbox:
+        return []
+
+    # Blöcke aus Zeilen-Keys ableiten
+    block_ids = sorted(
+        {k[0] for k in line_words.keys()} | set(block_bbox.keys()),
+        key=lambda b: (
+            min(
+                (bb[1] for bb in block_bbox.get(b, [(0, 10**9, 0, 0)])),
+                default=10**9,
+            ),
+            min(
+                (bb[0] for bb in block_bbox.get(b, [(10**9, 0, 0, 0)])),
+                default=10**9,
+            ),
+            b,
+        ),
+    )
+
+    blocks: List[OcrLayoutBlock] = []
+    for order, block_num in enumerate(block_ids):
+        keys = sorted(
+            [k for k in line_words if k[0] == block_num],
+            key=lambda k: (
+                line_bbox.get(k, (0, 10**9, 0, 0))[1],
+                line_bbox.get(k, (10**9, 0, 0, 0))[0],
+                k[1],
+                k[2],
+            ),
+        )
+        lines: List[str] = []
+        confs: List[float] = []
+        for key in keys:
+            words = sorted(line_words[key], key=lambda t: t[0])
+            line_txt = " ".join(w for _, w, _ in words).strip()
+            if line_txt:
+                lines.append(line_txt)
+            for _, _, c in words:
+                if c >= 0:
+                    confs.append(c)
+        if not lines:
+            continue
+        bbs = block_bbox.get(block_num) or []
+        if bbs:
+            left = min(b[0] for b in bbs)
+            top = min(b[1] for b in bbs)
+            right = max(b[0] + b[2] for b in bbs)
+            bottom = max(b[1] + b[3] for b in bbs)
+            width = max(0, right - left)
+            height = max(0, bottom - top)
+        else:
+            # Fallback aus Zeilen-BBoxes
+            lbs = [line_bbox[k] for k in keys if k in line_bbox]
+            if lbs:
+                left = min(b[0] for b in lbs)
+                top = min(b[1] for b in lbs)
+                right = max(b[0] + b[2] for b in lbs)
+                bottom = max(b[1] + b[3] for b in lbs)
+                width = max(0, right - left)
+                height = max(0, bottom - top)
+            else:
+                left = top = width = height = 0
+        avg_conf = sum(confs) / len(confs) if confs else -1.0
+        text = "\n".join(lines)
+        blocks.append(
+            OcrLayoutBlock(
+                block_num=block_num,
+                reading_order=order,
+                left=left,
+                top=top,
+                width=width,
+                height=height,
+                lines=lines,
+                text=text,
+                conf=avg_conf,
+            )
+        )
+    # Lesereihenfolge nach Top/Left (praktisch für Spalten/Fotos)
+    blocks.sort(key=lambda b: (b.top, b.left, b.block_num))
+    for i, b in enumerate(blocks):
+        b.reading_order = i
+    return blocks
+
+
+def format_layout_text(blocks: List[OcrLayoutBlock], *, block_gap: str = "\n\n") -> str:
+    """Blöcke in Lesereihenfolge als editierbarer Text (Absätze) — 2.6.3."""
+    parts = [b.text.strip() for b in blocks if b.text and b.text.strip()]
+    return block_gap.join(parts).strip()
+
+
+def write_layout_sidecars(
+    out_dir: str | Path,
+    stem: str,
+    layout: OcrLayoutPage,
+    *,
+    lang: str = "deu+eng",
+    write_hocr: bool = True,
+    write_tsv: bool = True,
+) -> tuple[Path, Path | None, Path | None]:
+    """
+    Schreibt Layout-Sidecars neben dem Dokument:
+
+    - ``{stem}.ildocr.txt`` — editierbarer Text mit Layout-Absätzen + Block-Metadaten-Header
+    - optional ``{stem}.ildocr.hocr`` / ``{stem}.ildocr.tsv``
+
+    Rückgabe: (txt_path, hocr_path|None, tsv_path|None) — 2.6.3.
+    """
+    out_dir_p = Path(out_dir)
+    out_dir_p.mkdir(parents=True, exist_ok=True)
+    safe = Path(stem).stem or "ocr"
+    txt_path = out_dir_p / f"{safe}.ildocr.txt"
+    header_lines = [
+        "# InstantLens Doc OCR (Layout)",
+        f"# lang={lang}",
+        "# mode=layout_preserve",
+        f"# blocks={len(layout.blocks)}",
+        f"# size={layout.width}x{layout.height}",
+        "",
+    ]
+    # Kompakte Block-Übersicht für spätere Edit-/Suche
+    if layout.blocks:
+        header_lines.append("# --- Blöcke (Lesereihenfolge) ---")
+        for b in layout.blocks:
+            header_lines.append(
+                f"# block#{b.reading_order} id={b.block_num} "
+                f"bbox={b.left},{b.top},{b.width},{b.height} "
+                f"conf={b.conf:.1f} lines={len(b.lines)}"
+            )
+        header_lines.append("")
+    txt_path.write_text("\n".join(header_lines) + (layout.text or "") + "\n", encoding="utf-8")
+
+    hocr_path: Path | None = None
+    tsv_path: Path | None = None
+    if write_hocr and layout.hocr:
+        hocr_path = out_dir_p / f"{safe}.ildocr.hocr"
+        hocr_path.write_text(layout.hocr, encoding="utf-8")
+    if write_tsv and layout.tsv:
+        tsv_path = out_dir_p / f"{safe}.ildocr.tsv"
+        tsv_path.write_text(layout.tsv, encoding="utf-8")
+    return txt_path, hocr_path, tsv_path
+
+
+def ocr_image_layout(
+    source: Union[str, Path, Image.Image],
+    lang: str = "deu+eng",
+    *,
+    include_hocr: bool = True,
+    include_tsv: bool = True,
+) -> OcrLayoutPage:
+    """
+    Erweiterte OCR mit Layout-Erhalt: Blöcke, Lesereihenfolge, optional hOCR/TSV — 2.6.3.
+
+    Nutzt Tesseract ``image_to_data`` (+ ``image_to_pdf_or_hocr`` / TSV).
+    """
+    ok, msg = tesseract_available()
+    if not ok:
+        raise OcrUnavailable(msg)
+
+    import pytesseract
+
+    img = _load_image(source)
+    width, height = img.size
+    blocks: List[OcrLayoutBlock] = []
+    text = ""
+    hocr = ""
+    tsv = ""
+
+    try:
+        data = pytesseract.image_to_data(
+            img, lang=lang, output_type=pytesseract.Output.DICT
+        )
+        blocks = _blocks_from_tesseract_data(data)
+        text = format_layout_text(blocks)
+    except Exception:
+        blocks = []
+        text = ""
+
+    if not text.strip():
+        try:
+            text = pytesseract.image_to_string(img, lang=lang).strip()
+        except Exception:
+            text = pytesseract.image_to_string(img, lang="eng").strip()
+
+    if include_hocr:
+        try:
+            raw = pytesseract.image_to_pdf_or_hocr(img, lang=lang, extension="hocr")
+            if isinstance(raw, bytes):
+                hocr = raw.decode("utf-8", errors="replace")
+            else:
+                hocr = str(raw)
+        except Exception:
+            hocr = ""
+
+    if include_tsv:
+        try:
+            tsv = pytesseract.image_to_data(img, lang=lang, output_type=pytesseract.Output.STRING)
+        except Exception:
+            tsv = ""
+
+    return OcrLayoutPage(
+        text=text,
+        blocks=blocks,
+        hocr=hocr,
+        tsv=tsv or "",
+        lang=lang,
+        width=width,
+        height=height,
+    )
+
+
 def ocr_image(
     source: Union[str, Path, Image.Image],
     lang: str = "deu+eng",
     *,
     table_layout: bool = True,
+    preserve_layout: bool = False,
 ) -> str:
     ok, msg = tesseract_available()
     if not ok:
@@ -322,6 +624,13 @@ def ocr_image(
     import pytesseract
 
     img = _load_image(source)
+    if preserve_layout:
+        try:
+            layout = ocr_image_layout(img, lang=lang, include_hocr=False, include_tsv=False)
+            if layout.text.strip():
+                return layout.text
+        except Exception:
+            pass
     if table_layout:
         try:
             text, used = ocr_image_structured(img, lang=lang)
@@ -624,8 +933,11 @@ def run_ocr(
     csv_delimiter: str | None = None,
     csv_utf8_bom: bool | None = None,
     write_csv: bool = True,
+    preserve_layout: bool = False,
+    write_hocr: bool = True,
+    write_tsv: bool = True,
 ) -> OcrResult:
-    """Einheitlicher OCR-Einstieg inkl. CSV-Vorschau-Option (write_csv) — 1.9.2."""
+    """Einheitlicher OCR-Einstieg inkl. Layout-Erhalt / CSV — 1.9.2 / 2.6.3."""
     label = source_label or (
         str(source) if isinstance(source, (str, Path)) else "Bild"
     )
@@ -670,15 +982,71 @@ def run_ocr(
             table_rows=rows or [],
         )
 
-    text = ocr_image(source, lang=lang)
+    # Layout-Erhalt-Modus oder preserve_layout-Flag — 2.6.3
+    use_layout = mode == OcrOutputMode.LAYOUT_PRESERVE or preserve_layout
+    layout: OcrLayoutPage | None = None
+    if use_layout:
+        layout = ocr_image_layout(
+            source,
+            lang=lang,
+            include_hocr=write_hocr or mode == OcrOutputMode.LAYOUT_PRESERVE,
+            include_tsv=write_tsv or mode == OcrOutputMode.LAYOUT_PRESERVE,
+        )
+        text = layout.text
+    else:
+        text = ocr_image(source, lang=lang)
+
     if mode == OcrOutputMode.EDITABLE_TEXT:
-        return OcrResult(text=text, lang=lang, mode=mode, source_label=label)
+        return OcrResult(
+            text=text,
+            lang=lang,
+            mode=mode,
+            source_label=label,
+            blocks=list(layout.blocks) if layout else None,
+            layout=layout,
+        )
+
+    if mode == OcrOutputMode.LAYOUT_PRESERVE:
+        out_dir_p = Path(out_dir) if out_dir else Path.cwd()
+        stem = Path(label).stem if label else "ocr"
+        assert layout is not None
+        txt_path, hocr_path, tsv_path = write_layout_sidecars(
+            out_dir_p,
+            stem,
+            layout,
+            lang=lang,
+            write_hocr=write_hocr,
+            write_tsv=write_tsv,
+        )
+        return OcrResult(
+            text=text,
+            lang=lang,
+            mode=mode,
+            source_label=label,
+            sidecar=txt_path,
+            blocks=list(layout.blocks),
+            hocr_path=hocr_path,
+            tsv_path=tsv_path,
+            layout=layout,
+        )
 
     out_dir_p = Path(out_dir) if out_dir else Path.cwd()
     out_dir_p.mkdir(parents=True, exist_ok=True)
     stem = Path(label).stem if label else "ocr"
     out_pdf = out_dir_p / f"{stem}_searchable.pdf"
     pdf_path, sidecar = make_searchable_image_pdf(source, text, out_pdf, lang=lang)
+    hocr_path = tsv_path = None
+    if layout is not None and (write_hocr or write_tsv):
+        _txt, hocr_path, tsv_path = write_layout_sidecars(
+            out_dir_p,
+            stem + "_searchable",
+            layout,
+            lang=lang,
+            write_hocr=write_hocr,
+            write_tsv=write_tsv,
+        )
+        # Primäres Sidecar bleibt das searchable ildocr.txt; Layout-TXT zusätzlich
+        _ = _txt
     return OcrResult(
         text=text,
         lang=lang,
@@ -686,6 +1054,10 @@ def run_ocr(
         source_label=label,
         searchable_pdf=pdf_path,
         sidecar=sidecar,
+        blocks=list(layout.blocks) if layout else None,
+        hocr_path=hocr_path,
+        tsv_path=tsv_path,
+        layout=layout,
     )
 
 

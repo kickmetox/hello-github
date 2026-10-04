@@ -1,4 +1,4 @@
-"""Scan/Import-Dialog + Geräteauswahl (Drucker/Scanner) — 2.6.2."""
+"""Scan/Import-Dialog + Geräteauswahl (Drucker/Scanner) — 2.6.2 / Layout-OCR 2.6.3."""
 
 from __future__ import annotations
 
@@ -30,7 +30,12 @@ from instantlensdoc.core.devices import (
     DeviceScope,
     discover_devices,
 )
-from instantlensdoc.core.ocr import INSTALL_HINT_DE, LANG_PRESETS, tesseract_available
+from instantlensdoc.core.ocr import (
+    INSTALL_HINT_DE,
+    LANG_PRESETS,
+    OcrOutputMode,
+    tesseract_available,
+)
 from instantlensdoc.core.scan import (
     acquire_from_scanner,
     import_image_paths,
@@ -55,13 +60,13 @@ class ScanDialog(QDialog):
         self.resize(560, 640)
         self.setAccessibleName("Scannen und Import")
         self.setAccessibleDescription(
-            "Scanner wählen oder Bilder importieren, optional OCR mit Tesseract — 2.6.2"
+            "Scanner wählen oder Bilder importieren, optional OCR mit Layout-Erhalt — 2.6.3"
         )
 
         layout = QVBoxLayout(self)
         self.hint = QLabel(
             "Scanner wählen und scannen, oder Seitenbilder importieren. "
-            "OCR über Tesseract erzeugt durchsuchbaren Text (Sidecar). — 2.6.2"
+            "OCR mit Layout-Erhalt (Blöcke / Lesereihenfolge; optional hOCR/TSV). — 2.6.3"
         )
         self.hint.setWordWrap(True)
         self.hint.setObjectName("scanDialogHint")
@@ -131,9 +136,12 @@ class ScanDialog(QDialog):
 
         # --- OCR ---
         ocr_form = QFormLayout()
-        self.ocr_enabled = QCheckBox("OCR mit Tesseract (durchsuchbarer Text)")
+        self.ocr_enabled = QCheckBox("OCR mit Tesseract (Layout-Erhalt)")
         self.ocr_enabled.setObjectName("scanOcrEnabled")
         self.ocr_enabled.setChecked(True)
+        self.ocr_enabled.setToolTip(
+            "Durchsuchbarer/editierbarer Text mit Blöcken und Lesereihenfolge — 2.6.3"
+        )
         ok_tess, tess_msg = tesseract_available()
         self.ocr_enabled.setEnabled(ok_tess)
         if not ok_tess:
@@ -147,9 +155,21 @@ class ScanDialog(QDialog):
         idx = self.lang_combo.findData("deu+eng")
         if idx >= 0:
             self.lang_combo.setCurrentIndex(idx)
+        self.layout_hocr = QCheckBox("hOCR Sidecar")
+        self.layout_hocr.setObjectName("scanOcrHocr")
+        self.layout_hocr.setChecked(True)
+        self.layout_hocr.setToolTip("*.ildocr.hocr mit Bounding-Boxes — 2.6.3")
+        self.layout_tsv = QCheckBox("TSV Sidecar")
+        self.layout_tsv.setObjectName("scanOcrTsv")
+        self.layout_tsv.setChecked(True)
+        self.layout_tsv.setToolTip("*.ildocr.tsv (Wörter + Koordinaten) — 2.6.3")
+        self.ocr_enabled.toggled.connect(self._sync_scan_ocr_opts)
         ocr_form.addRow(self.ocr_enabled)
         ocr_form.addRow("OCR-Sprache:", self.lang_combo)
+        ocr_form.addRow(self.layout_hocr)
+        ocr_form.addRow(self.layout_tsv)
         layout.addLayout(ocr_form)
+        self._sync_scan_ocr_opts()
 
         self.tess_hint = QLabel(
             tess_msg if ok_tess else INSTALL_HINT_DE.split("\n\n")[0]
@@ -170,6 +190,12 @@ class ScanDialog(QDialog):
         layout.addWidget(buttons)
 
         self.refresh_devices()
+
+    def _sync_scan_ocr_opts(self, *_args) -> None:
+        on = bool(self.ocr_enabled.isChecked()) and self.ocr_enabled.isEnabled()
+        self.lang_combo.setEnabled(on)
+        self.layout_hocr.setEnabled(on)
+        self.layout_tsv.setEnabled(on)
 
     def selected_scanner(self) -> DeviceInfo | None:
         item = self.device_list.currentItem()
@@ -330,6 +356,8 @@ class ScanDialog(QDialog):
             return
         lang = self.lang_combo.currentData() or "deu+eng"
         do_ocr = bool(self.ocr_enabled.isChecked())
+        write_hocr = bool(self.layout_hocr.isChecked())
+        write_tsv = bool(self.layout_tsv.isChecked())
         at_index = None
         if getattr(self.pdf_view, "pdf_path", None) and target.resolve() == Path(
             self.pdf_view.pdf_path
@@ -365,6 +393,9 @@ class ScanDialog(QDialog):
                 at_index=at_index,
                 ocr=do_ocr,
                 lang=str(lang),
+                ocr_mode=OcrOutputMode.LAYOUT_PRESERVE,
+                write_hocr=write_hocr,
+                write_tsv=write_tsv,
                 on_progress=_progress,
             )
         except Exception as e:

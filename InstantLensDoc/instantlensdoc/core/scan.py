@@ -1,7 +1,7 @@
-"""Scan-/Import-Pipeline mit Tesseract-OCR — 2.6.2.
+"""Scan-/Import-Pipeline mit Tesseract-OCR — 2.6.2 / Layout-Erhalt 2.6.3.
 
 Seitenbilder (Scanner-Acquire, Datei-Import, Fotos) → optional OCR →
-PDF-Seiten in die aktuelle Session + ``*.ildocr.txt`` Sidecar.
+PDF-Seiten in die aktuelle Session + ``*.ildocr.txt`` (+ optional hOCR/TSV).
 """
 
 from __future__ import annotations
@@ -192,11 +192,13 @@ def ocr_page_image(
     image: Union[str, Path, Image.Image],
     *,
     lang: str = "deu+eng",
-    mode: OcrOutputMode = OcrOutputMode.SEARCHABLE_IMAGE,
+    mode: OcrOutputMode = OcrOutputMode.LAYOUT_PRESERVE,
     out_dir: str | Path | None = None,
     source_label: str = "",
+    write_hocr: bool = True,
+    write_tsv: bool = True,
 ) -> OcrResult:
-    """OCR über bestehende Tesseract-Bridge."""
+    """OCR über Tesseract-Bridge (Default: Layout-Erhalt) — 2.6.3."""
     ok, msg = ocr_mod.tesseract_available()
     if not ok:
         raise OcrUnavailable(msg)
@@ -206,6 +208,10 @@ def ocr_page_image(
         mode=mode,
         out_dir=out_dir,
         source_label=source_label,
+        write_hocr=write_hocr,
+        write_tsv=write_tsv,
+        preserve_layout=mode
+        in (OcrOutputMode.LAYOUT_PRESERVE, OcrOutputMode.SEARCHABLE_IMAGE),
     )
 
 
@@ -216,13 +222,16 @@ def insert_scan_pages_into_pdf(
     at_index: Optional[int] = None,
     ocr: bool = True,
     lang: str = "deu+eng",
-    ocr_mode: OcrOutputMode = OcrOutputMode.SEARCHABLE_IMAGE,
+    ocr_mode: OcrOutputMode = OcrOutputMode.LAYOUT_PRESERVE,
+    write_hocr: bool = True,
+    write_tsv: bool = True,
     on_progress: Optional[Callable[[int, int, str], None]] = None,
 ) -> ScanSessionResult:
     """
-    Fügt Bildseiten in ``pdf_path`` ein; bei OCR zusätzlich Sidecar / Text.
+    Fügt Bildseiten in ``pdf_path`` ein; bei OCR Layout-Text + Sidecars.
 
     ``at_index``: Einfügeposition (0-based); ``None`` = ans Ende.
+    Default-OCR: Layout-Erhalt (Blöcke / Lesereihenfolge / hOCR+TSV) — 2.6.3.
     """
     from ild_pdf.images import insert_image_as_page
     from ild_pdf.pages import page_count
@@ -265,6 +274,8 @@ def insert_scan_pages_into_pdf(
                         mode=ocr_mode,
                         out_dir=pdf_path.parent,
                         source_label=Path(label).name,
+                        write_hocr=write_hocr,
+                        write_tsv=write_tsv,
                     )
                     page.ocr = ocr_res
                     page.sidecar = ocr_res.sidecar
@@ -290,19 +301,52 @@ def insert_scan_pages_into_pdf(
             else:
                 page.page_index = max(0, after - 1)
 
-            # Sidecar am PDF-Seitennamen zusätzlich ablegen wenn searchable
+            # Sidecar am PDF-Seitennamen zusätzlich ablegen (Layout + optional hOCR/TSV)
             if page.ocr and page.ocr.text and page.page_index is not None:
-                side = pdf_path.with_suffix(
-                    pdf_path.suffix + f".p{page.page_index + 1}.ildocr.txt"
-                )
-                header = (
-                    f"# InstantLens Doc Scan OCR\n"
-                    f"# lang={lang}\n"
-                    f"# page={page.page_index + 1}\n"
-                    f"# source={Path(label).name}\n\n"
-                )
-                side.write_text(header + page.ocr.text, encoding="utf-8")
-                page.sidecar = side
+                stem = f"{pdf_path.stem}.p{page.page_index + 1}"
+                if page.ocr.layout is not None:
+                    txt_p, hocr_p, tsv_p = ocr_mod.write_layout_sidecars(
+                        pdf_path.parent,
+                        stem,
+                        page.ocr.layout,
+                        lang=lang,
+                        write_hocr=write_hocr,
+                        write_tsv=write_tsv,
+                    )
+                    # Header-Seite ergänzen
+                    body = txt_p.read_text(encoding="utf-8")
+                    page_header = (
+                        f"# page={page.page_index + 1}\n"
+                        f"# source={Path(label).name}\n"
+                    )
+                    if "# page=" not in body:
+                        # nach erstem Header-Block einfügen
+                        lines = body.splitlines()
+                        insert_at_line = 0
+                        for li, ln in enumerate(lines):
+                            if ln.startswith("#"):
+                                insert_at_line = li + 1
+                            else:
+                                break
+                        lines.insert(insert_at_line, page_header.rstrip())
+                        txt_p.write_text("\n".join(lines) + "\n", encoding="utf-8")
+                    page.sidecar = txt_p
+                    if hocr_p:
+                        page.ocr.hocr_path = hocr_p
+                    if tsv_p:
+                        page.ocr.tsv_path = tsv_p
+                else:
+                    side = pdf_path.with_suffix(
+                        pdf_path.suffix + f".p{page.page_index + 1}.ildocr.txt"
+                    )
+                    header = (
+                        f"# InstantLens Doc Scan OCR\n"
+                        f"# lang={lang}\n"
+                        f"# page={page.page_index + 1}\n"
+                        f"# source={Path(label).name}\n\n"
+                    )
+                    side.write_text(header + page.ocr.text, encoding="utf-8")
+                    page.sidecar = side
             _ = before  # quiet linters
         except Exception as e:
             page.error = str(e)

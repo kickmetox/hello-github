@@ -1675,13 +1675,13 @@ class PdfViewer(QWidget):
         btn_page_manage = QPushButton("Seiten…")
         btn_page_manage.setObjectName("pageManageToolbarBtn")
         btn_page_manage.setToolTip(
-            "Seitenmanagement: ordnen, einfügen, drehen, löschen, aus PDF zusammenfügen — 2.6.2"
+            "Seitenmanagement: ordnen, einfügen, drehen, löschen, aus PDF zusammenfügen — 2.6.3"
         )
         btn_page_manage.clicked.connect(self.page_manage_dialog)
         btn_scan = QPushButton("Scan…")
         btn_scan.setObjectName("scanImportToolbarBtn")
         btn_scan.setToolTip(
-            "Scannen / Import · Tesseract-OCR · Geräte lokal/Netzwerk — 2.6.2"
+            "Scannen / Import · Tesseract-OCR · Geräte lokal/Netzwerk — 2.6.3"
         )
         btn_scan.clicked.connect(self.scan_import_dialog)
         btn_save_ann = QPushButton("Annot. speichern")
@@ -10646,7 +10646,7 @@ class PdfViewer(QWidget):
         self.schedule_sidecar_save(force=True)
 
     def page_manage_dialog(self):
-        """Seitenmanagement-Dialog öffnen (ordnen/einfügen/drehen/löschen/zusammenfügen) — 2.6.2."""
+        """Seitenmanagement-Dialog öffnen (ordnen/einfügen/drehen/löschen/zusammenfügen) — 2.6.3."""
         if not self.pdf_path:
             QMessageBox.information(
                 self,
@@ -10659,7 +10659,7 @@ class PdfViewer(QWidget):
         PageManageDialog(self, self).exec()
 
     def scan_import_dialog(self):
-        """Scan/Import mit Tesseract-OCR + Geräteauswahl — 2.6.2."""
+        """Scan/Import mit Tesseract-OCR + Geräteauswahl — 2.6.3."""
         from instantlensdoc.ui.scan_dialog import ScanDialog
 
         parent = self.window() if hasattr(self, "window") else self
@@ -10674,7 +10674,7 @@ class PdfViewer(QWidget):
         at_index: int | None = None,
         one_based: bool = False,
     ) -> list[int]:
-        """Seiten aus anderem PDF einfügen; Annotationen remappen; Viewer neu laden — 2.6.2."""
+        """Seiten aus anderem PDF einfügen; Annotationen remappen; Viewer neu laden — 2.6.3."""
         if not self.pdf_path:
             raise ValueError("Kein PDF geöffnet")
         src = Path(source)

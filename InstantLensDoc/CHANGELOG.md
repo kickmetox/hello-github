@@ -1,5 +1,23 @@
 # Changelog — InstantLens Doc
 
+## 2.6.3 — Erweiterte OCR mit Layout-Erhalt
+
+Minor-Feature nach **2.6.2** (Zusatzanforderungen #4): **Erweiterte OCR** — Scans/Fotos → durchsuchbarer und besser editierbarer Text mit **Layout-Erhalt** (Tesseract-Blöcke, Lesereihenfolge top→bottom/left→right). Ausgabe-Modus **Text mit Layout-Erhalt**; Sidecars `*.ildocr.txt` (Absätze + Block-Metadaten) sowie optional **hOCR** / **TSV**. Integriert in OCR-Dialog (Default) und Scan-/Import-Flow (Default Layout-OCR + hOCR/TSV-Checkboxen). Kein Inline-Textedit, keine Formulare/Verschlüsselung/Office-Export/KI/Cloud. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie unverändert.
+
+### Neu
+- `OcrOutputMode.LAYOUT_PRESERVE` · `ocr_image_layout` · `OcrLayoutBlock` / `OcrLayoutPage` · `write_layout_sidecars`
+- OCR-Dialog: Modus **Text mit Layout-Erhalt** (Default) · Checkboxen hOCR/TSV
+- Scan/Import: Layout-OCR Default · hOCR/TSV-Optionen · Sidecars `*.pN.ildocr.{txt,hocr,tsv}`
+
+### Geändert
+- Scan-Pipeline Default-OCR von searchable_image → layout_preserve
+- Docs/Version **2.6.3**
+
+### Tests / Qualität
+- Version **2.6.3** (App / `ild_pdf` / ISS / Smoke / Docs); Serie **2.6**; `docs/VERSION` + `VERSION.txt`
+- Smoke: 2.6.3 CLI + Qt (layout-OCR + hOCR/TSV + Scan/OCR-UI)
+- Stubs: KI/Cloud/Stylus/3D/Hooks/Outline/Telemetrie unverändert markiert
+
 ## 2.6.2 — Scannen mit Tesseract + Drucker-/Scannererkennung
 
 Minor-Feature nach **2.6.1** (Zusatzanforderungen #2): **Scannen / Import** — Seitenbilder vom Scanner (WIA/SANE) oder per Datei-Import in die aktuelle Session; **OCR über Tesseract** (pytesseract) → durchsuchbarer Text / Sidecar `*.ildocr.txt`. **Geräteerkennung** lokal + Netzwerk: Systemdrucker (Qt/Winspool) und Scanner (WIA/PnP bzw. SANE); UI mit Aktualisieren/Neu suchen; Scanner für Scan-Flow, Drucker für Druckziel-Liste. UI **PDF → Scannen / Import…** (Ctrl+Alt+Shift+I) · **Drucker & Scanner…** · Palette · Toolbar „Scan…“. Windows-Deps in Docs (Tesseract winget, WIA). Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie unverändert.

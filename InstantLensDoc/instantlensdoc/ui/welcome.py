@@ -245,7 +245,7 @@ class WelcomePage(QWidget):
         self.btn_continue.setToolTip(tip)
 
     def eventFilter(self, obj, event):  # noqa: N802
-        """Esc Filter; Del Recent; Shift+Del Tags; F2/F3 Tag±; F4 Ordner; F5 Datei; Enter öffnen; Ctrl+C/V/X Tags; Ctrl+Shift+C Pfad — 2.5.9–2.6.2."""
+        """Esc Filter; Del Recent; Shift+Del Tags; F2/F3 Tag±; F4 Ordner; F5 Datei; Enter öffnen; Ctrl+C/V/X Tags; Ctrl+Shift+C Pfad — 2.5.9–2.6.3."""
         if event.type() == QEvent.KeyPress:
             assert isinstance(event, QKeyEvent)
             key = event.key()
@@ -712,7 +712,7 @@ class WelcomePage(QWidget):
                     win._set_status(msg)
                 except Exception:
                     pass
-            # Fail-Path A11y Tag− — 2.6.2
+            # Fail-Path A11y Tag− — 2.6.3
             if win is not None and hasattr(win, "_announce_status_toast"):
                 try:
                     win._announce_status_toast(msg)
@@ -822,7 +822,7 @@ class WelcomePage(QWidget):
                     win._set_status(msg)
                 except Exception:
                     pass
-            # Fail-Path A11y Pfad-Copy — 2.6.2
+            # Fail-Path A11y Pfad-Copy — 2.6.3
             if win is not None and hasattr(win, "_announce_status_toast"):
                 try:
                     win._announce_status_toast(msg)
@@ -842,7 +842,7 @@ class WelcomePage(QWidget):
                     win._set_status(msg)
                 except Exception:
                     pass
-            # Fail-Path A11y Pfad-Copy — 2.6.2
+            # Fail-Path A11y Pfad-Copy — 2.6.3
             if win is not None and hasattr(win, "_announce_status_toast"):
                 try:
                     win._announce_status_toast(msg)
@@ -880,7 +880,7 @@ class WelcomePage(QWidget):
                     win._set_status(msg)
                 except Exception:
                     pass
-            # Fail-Path A11y Tag-Clear — 2.6.2
+            # Fail-Path A11y Tag-Clear — 2.6.3
             if win is not None and hasattr(win, "_announce_status_toast"):
                 try:
                     win._announce_status_toast(msg)

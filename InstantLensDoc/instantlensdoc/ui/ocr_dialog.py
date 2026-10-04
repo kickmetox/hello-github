@@ -194,21 +194,45 @@ class OcrDialog(QDialog):
             self.attach_errors_check.setVisible(False)
 
         self.rb_editable = QRadioButton("Editierbarer Text (Editor)")
+        self.rb_layout = QRadioButton("Text mit Layout-Erhalt (Blöcke / Lesereihenfolge)")
+        self.rb_layout.setObjectName("ocrModeLayoutPreserve")
+        self.rb_layout.setToolTip(
+            "Tesseract-Blöcke in Lesereihenfolge; Sidecar *.ildocr.txt + optional hOCR/TSV — 2.6.3"
+        )
         self.rb_searchable = QRadioButton("Durchsuchbares Bild (PDF + Text-Sidecar)")
         self.rb_table_csv = QRadioButton("Tabelle als CSV (heuristisch)")
         self.rb_table_csv.setToolTip(
             "Grobe Tabellenerkennung aus OCR → CSV; Trennzeichen/BOM in Optionen — 1.9.1"
         )
-        self.rb_editable.setChecked(True)
+        self.rb_layout.setChecked(True)
         group = QButtonGroup(self)
         group.addButton(self.rb_editable)
+        group.addButton(self.rb_layout)
         group.addButton(self.rb_searchable)
         group.addButton(self.rb_table_csv)
         mode_box = QVBoxLayout()
         mode_box.addWidget(self.rb_editable)
+        mode_box.addWidget(self.rb_layout)
         mode_box.addWidget(self.rb_searchable)
         mode_box.addWidget(self.rb_table_csv)
         form.addRow("Ausgabe", mode_box)
+
+        # Layout-Sidecars — 2.6.3
+        self.layout_hocr_check = QCheckBox("hOCR Sidecar (*.ildocr.hocr)")
+        self.layout_hocr_check.setObjectName("ocrLayoutHocr")
+        self.layout_hocr_check.setChecked(True)
+        self.layout_hocr_check.setToolTip(
+            "Tesseract hOCR mit Bounding-Boxes neben dem Text speichern — 2.6.3"
+        )
+        self.layout_tsv_check = QCheckBox("TSV Sidecar (*.ildocr.tsv)")
+        self.layout_tsv_check.setObjectName("ocrLayoutTsv")
+        self.layout_tsv_check.setChecked(True)
+        self.layout_tsv_check.setToolTip(
+            "Tesseract TSV (Wörter + Koordinaten) speichern — 2.6.3"
+        )
+        self._layout_opts_label = QLabel("Layout-Sidecars")
+        form.addRow(self._layout_opts_label, self.layout_hocr_check)
+        form.addRow("", self.layout_tsv_check)
 
         # Tabellen-CSV Optionen — 1.9.1
         self.csv_delim_combo = QComboBox()
@@ -232,10 +256,11 @@ class OcrDialog(QDialog):
         self._csv_opts_label = QLabel("CSV-Optionen")
         form.addRow(self._csv_opts_label, self.csv_delim_combo)
         form.addRow("", self.csv_bom_check)
-        self.rb_editable.toggled.connect(self._sync_csv_opts_visible)
-        self.rb_searchable.toggled.connect(self._sync_csv_opts_visible)
-        self.rb_table_csv.toggled.connect(self._sync_csv_opts_visible)
-        self._sync_csv_opts_visible()
+        self.rb_editable.toggled.connect(self._sync_mode_opts_visible)
+        self.rb_layout.toggled.connect(self._sync_mode_opts_visible)
+        self.rb_searchable.toggled.connect(self._sync_mode_opts_visible)
+        self.rb_table_csv.toggled.connect(self._sync_mode_opts_visible)
+        self._sync_mode_opts_visible()
 
         if default_label:
             form.addRow("Quelle", QLabel(default_label))
@@ -350,10 +375,20 @@ class OcrDialog(QDialog):
             self.selected_path = path
 
     def _sync_csv_opts_visible(self, *_args) -> None:
-        on = bool(self.rb_table_csv.isChecked())
-        self.csv_delim_combo.setVisible(on)
-        self.csv_bom_check.setVisible(on)
-        self._csv_opts_label.setVisible(on)
+        """Kompatibel: leitet auf Mode-Opts um — 2.6.3."""
+        self._sync_mode_opts_visible()
+
+    def _sync_mode_opts_visible(self, *_args) -> None:
+        csv_on = bool(self.rb_table_csv.isChecked())
+        self.csv_delim_combo.setVisible(csv_on)
+        self.csv_bom_check.setVisible(csv_on)
+        self._csv_opts_label.setVisible(csv_on)
+        layout_on = bool(
+            self.rb_layout.isChecked() or self.rb_searchable.isChecked()
+        )
+        self.layout_hocr_check.setVisible(layout_on)
+        self.layout_tsv_check.setVisible(layout_on)
+        self._layout_opts_label.setVisible(layout_on)
 
     def _accept(self):
         if self.need_file and not self.selected_path:
@@ -409,7 +444,15 @@ class OcrDialog(QDialog):
             return OcrOutputMode.TABLE_CSV
         if self.rb_searchable.isChecked():
             return OcrOutputMode.SEARCHABLE_IMAGE
+        if self.rb_layout.isChecked():
+            return OcrOutputMode.LAYOUT_PRESERVE
         return OcrOutputMode.EDITABLE_TEXT
+
+    def write_hocr(self) -> bool:
+        return bool(self.layout_hocr_check.isChecked())
+
+    def write_tsv(self) -> bool:
+        return bool(self.layout_tsv_check.isChecked())
 
 
 class CsvPreviewDialog(QDialog):
