@@ -823,12 +823,16 @@ class WatermarkDialog(QDialog):
         self.hf_src, src_row = self._path_row(self._initial)
         form.addRow("PDF", src_row)
         self.hf_header = QLineEdit(str(self._last_hf.get("header_text") or ""))
-        self.hf_header.setPlaceholderText("z. B. {stem} — vertraulich")
-        self.hf_header.setToolTip("Platzhalter: {n} {total} {page} {stem} {date}")
+        self.hf_header.setPlaceholderText("z. B. {title} — {author}")
+        self.hf_header.setToolTip(
+            "Platzhalter: {n} {total} {page} {stem} {date} {title} {author} {creator} — 2.6.11"
+        )
         form.addRow("Kopfzeile", self.hf_header)
         self.hf_footer = QLineEdit(str(self._last_hf.get("footer_text") or ""))
-        self.hf_footer.setPlaceholderText("z. B. Entwurf {date}")
-        self.hf_footer.setToolTip("Platzhalter: {n} {total} {page} {stem} {date}")
+        self.hf_footer.setPlaceholderText("z. B. {author} · {n}/{total}")
+        self.hf_footer.setToolTip(
+            "Platzhalter: {n} {total} {page} {stem} {date} {title} {author} {creator} — 2.6.11"
+        )
         form.addRow("Fußzeile", self.hf_footer)
         self.hf_include_num = QCheckBox("Seitenzahl bakken")
         self.hf_include_num.setChecked(

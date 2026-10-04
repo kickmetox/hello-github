@@ -477,8 +477,14 @@ def _format_hf_label(
     i: int,
     stem: str = "",
     date: str = "",
+    title: str = "",
+    author: str = "",
+    creator: str = "",
 ) -> str:
-    """Header/Footer-Text mit Platzhaltern {n}/{total}/{i}/{page}/{stem}/{date} — 1.8.0."""
+    """Header/Footer-Text mit Platzhaltern — 1.8.0 / 2.6.11.
+
+    Bekannt: {n}/{total}/{i}/{page}/{stem}/{date}/{title}/{author}/{creator}.
+    """
     tpl = template if template is not None else ""
     mapping = {
         "n": n,
@@ -487,6 +493,9 @@ def _format_hf_label(
         "page": n,
         "stem": stem,
         "date": date,
+        "title": title,
+        "author": author,
+        "creator": creator or author,
     }
     try:
         return tpl.format(**mapping)
@@ -509,9 +518,12 @@ def format_header_footer_preview(
     stem: str = "dokument",
     page_index: int = 0,
     start_at: int = 1,
+    title: str = "",
+    author: str = "",
+    creator: str = "",
 ) -> str:
     """
-    Textvorschau Kopf-/Fußzeile für eine Seite (Default: erste) — 1.8.1.
+    Textvorschau Kopf-/Fußzeile für eine Seite (Default: erste) — 1.8.1 / 2.6.11.
     """
     from datetime import date as _date
 
@@ -519,6 +531,13 @@ def format_header_footer_preview(
     i = max(0, min(int(page_index), total - 1))
     n = int(start_at) + i
     today = _date.today().isoformat()
+    meta_kw = dict(
+        stem=stem,
+        date=today,
+        title=title or stem,
+        author=author,
+        creator=creator or author,
+    )
     lines = [
         f"Seite {i + 1} von {total} — Schrift {float(font_size):.0f} pt · Rand {float(margin):.0f} pt"
     ]
@@ -526,7 +545,7 @@ def format_header_footer_preview(
         lines.append(
             "Kopf: "
             + _format_hf_label(
-                header_text, n=n, total=total, i=i, stem=stem, date=today
+                header_text, n=n, total=total, i=i, **meta_kw
             )
         )
     else:
@@ -535,7 +554,7 @@ def format_header_footer_preview(
         lines.append(
             "Fuß: "
             + _format_hf_label(
-                footer_text, n=n, total=total, i=i, stem=stem, date=today
+                footer_text, n=n, total=total, i=i, **meta_kw
             )
         )
     else:
@@ -548,8 +567,7 @@ def format_header_footer_preview(
                 n=n,
                 total=total,
                 i=i,
-                stem=stem,
-                date=today,
+                **meta_kw,
             )
         )
     else:
@@ -621,11 +639,14 @@ def apply_header_footer(
     font_size: float = 10.0,
     margin: float = 28.0,
     start_at: int = 1,
+    title: str = "",
+    author: str = "",
+    creator: str = "",
     on_progress: Optional[Callable[[int, int], bool]] = None,
 ) -> Path:
     """
-    Kopf-/Fußzeile + optionale Seitenzahl in PDF bakken (pikepdf Content) — 1.8.0.
-    Platzhalter: {n}, {total}, {i}, {page}, {stem}, {date}.
+    Kopf-/Fußzeile + optionale Seitenzahl in PDF bakken (pikepdf Content) — 1.8.0 / 2.6.11.
+    Platzhalter: {n}, {total}, {i}, {page}, {stem}, {date}, {title}, {author}, {creator}.
     """
     import pikepdf
     from datetime import date as _date
@@ -637,6 +658,31 @@ def apply_header_footer(
     header_tpl = str(header_text or "")
     footer_tpl = str(footer_text or "")
     num_tpl = str(page_number_template or "{n} / {total}")
+    # Metadaten nachladen wenn Platzhalter genutzt und Felder leer
+    meta_title = str(title or "")
+    meta_author = str(author or "")
+    meta_creator = str(creator or "")
+    needs_meta = any(
+        tok in (header_tpl + footer_tpl + num_tpl)
+        for tok in ("{title}", "{author}", "{creator}")
+    )
+    if needs_meta and not (meta_title and meta_author):
+        try:
+            from .metadata import get_metadata
+
+            meta = get_metadata(pdf_path)
+            meta_title = meta_title or (meta.title or "")
+            meta_author = meta_author or (meta.author or "")
+            meta_creator = meta_creator or (meta.creator or meta_author or "")
+        except Exception:
+            pass
+    meta_kw = dict(
+        stem=stem,
+        date=today,
+        title=meta_title or stem,
+        author=meta_author,
+        creator=meta_creator or meta_author,
+    )
 
     with pikepdf.open(pdf_path, allow_overwriting_input=True) as pdf:
         total = len(pdf.pages)
@@ -656,7 +702,7 @@ def apply_header_footer(
             n = start_at + i
             if header_tpl.strip():
                 label = _format_hf_label(
-                    header_tpl, n=n, total=total, i=i, stem=stem, date=today
+                    header_tpl, n=n, total=total, i=i, **meta_kw
                 )
                 _draw_text_line(
                     page,
@@ -670,7 +716,7 @@ def apply_header_footer(
                 )
             if footer_tpl.strip():
                 label = _format_hf_label(
-                    footer_tpl, n=n, total=total, i=i, stem=stem, date=today
+                    footer_tpl, n=n, total=total, i=i, **meta_kw
                 )
                 _draw_text_line(
                     page,
@@ -684,7 +730,7 @@ def apply_header_footer(
                 )
             if include_page_numbers:
                 label = _format_hf_label(
-                    num_tpl, n=n, total=total, i=i, stem=stem, date=today
+                    num_tpl, n=n, total=total, i=i, **meta_kw
                 )
                 _draw_text_line(
                     page,

@@ -1,4 +1,4 @@
-# InstantLens Doc — PowerShell-Scripting 2.6.10
+# InstantLens Doc — PowerShell-Scripting 2.6.11
 # Als CLI:
 #   powershell -ExecutionPolicy Bypass -File .\scripts\ild.ps1 pages D:\dok.pdf
 # Als Modul:
@@ -208,6 +208,68 @@ function Invoke-IldFindReplace {
     if ($Count -gt 0) { $a += @("--count", "$Count") }
     if ($Max -gt 0) { $a += @("--max", "$Max") }
     Invoke-Ild @a | Out-Host
+}
+
+function Get-IldPageFormats {
+    param([ValidateSet("mm", "inch")][string]$Unit = "mm")
+    Invoke-Ild @("--json", "page-formats", "--unit", $Unit) | Out-Host
+}
+
+function Set-IldPageFormat {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)][string]$Format,
+        [int]$Page = 1,
+        [switch]$AllPages
+    )
+    $a = @("--json", "set-page-format", $Path, "--format", $Format, "--page", "$Page")
+    if ($AllPages) { $a += "--all" }
+    Invoke-Ild @a | Out-Host
+}
+
+function Invoke-IldHeaderFooter {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [string]$Out,
+        [string]$Header = "{title}",
+        [string]$Footer = "{author} — {n} / {total}",
+        [string]$Title,
+        [string]$Author,
+        [string]$Creator,
+        [switch]$NoPageNumbers,
+        [string]$PageTemplate = "{n} / {total}"
+    )
+    $a = @("--json", "header-footer", $Path, "--header", $Header, "--footer", $Footer, "--page-template", $PageTemplate)
+    if ($Out) { $a += @("--out", $Out) }
+    if ($Title) { $a += @("--title", $Title) }
+    if ($Author) { $a += @("--author", $Author) }
+    if ($Creator) { $a += @("--creator", $Creator) }
+    if ($NoPageNumbers) { $a += "--no-page-numbers" }
+    Invoke-Ild @a | Out-Host
+}
+
+function Invoke-IldParagraphFormat {
+    param(
+        [Parameter(Mandatory = $true)][string]$Text,
+        [ValidateSet("left", "center", "right", "justify")][string]$Align,
+        [double]$LineSpacing,
+        [double]$SpaceBefore,
+        [double]$SpaceAfter,
+        [int]$Index = -1,
+        [string]$Style
+    )
+    $a = @("--json", "paragraph-format", "--text", $Text)
+    if ($Align) { $a += @("--align", $Align) }
+    if ($PSBoundParameters.ContainsKey("LineSpacing")) { $a += @("--line-spacing", "$LineSpacing") }
+    if ($PSBoundParameters.ContainsKey("SpaceBefore")) { $a += @("--space-before", "$SpaceBefore") }
+    if ($PSBoundParameters.ContainsKey("SpaceAfter")) { $a += @("--space-after", "$SpaceAfter") }
+    if ($Index -ge 0) { $a += @("--index", "$Index") }
+    if ($Style) { $a += @("--style", $Style) }
+    Invoke-Ild @a | Out-Host
+}
+
+function Get-IldParagraphStyles {
+    Invoke-Ild @("--json", "paragraph-styles") | Out-Host
 }
 
 function Merge-IldPdf {

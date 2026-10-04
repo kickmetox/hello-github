@@ -37,6 +37,10 @@ Keygen: `run-keygen.bat` · `python -m keygen kunde@example.com` · siehe `keyge
 
 Nightly-Smoke: `python scripts\smoke_ild.py` · optional `--qt` · `--json` (Summary: `ok`, `checks[]`, `duration_ms`, `version`; Fail: `checks[].error` max 200…, Exit=ok). Siehe **CONTRIBUTING.md**; Workflow-Stub `.github/workflows/smoke-ild.yml` (manual only).
 
+## Neu in 2.6.11
+
+Minor nach **2.6.10**: **Lineal**, **Raster/Guides**, **Kopf-/Fußzeilen** (Titel/Autor/Seitenzahl), **Buch-/DIN-/US-Seitenformate**, **Absatzformatierung** (Ausrichtung/Abstand) an Styles. Scripting `page-formats`/`header-footer`/`paragraph-format`. Kein volles DTP/i18n/KI-Wizards. Stubs unverändert.
+
 ## Neu in 2.6.10
 
 Minor nach **2.6.9**: **Auto-Format**, **automatisches Inhaltsverzeichnis**, **Word-/InDesign-Shortcuts** (Ctrl+B/I/U, Ctrl+H Ersetzen, …), **Systemschriften**, Suchen/Ersetzen. Scripting `auto-format`/`toc`/`fonts`/`find-replace`. Kein volles DTP/i18n/KI-Wizards. Stubs unverändert.

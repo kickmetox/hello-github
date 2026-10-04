@@ -1,5 +1,23 @@
 # Changelog — InstantLens Doc
 
+## 2.6.11 — Lineal, Raster, Kopf/Fuß, Buchformate, Absatzformat
+
+Minor nach **2.6.10**: **Lineal** (horizontal/vertikal, mm/inch), **Ausrichtungsraster + Guides**, **Kopf-/Fußzeilen** mit Seitenzahlen, Titel und **Ersteller/Autor** (`{title}`/`{author}`/`{creator}`), **Seitenformate-Presets** US Letter / DIN-A / Buch (Taschenbuch 125×190, DINA5, Roman 135×215, Sachbuch 170×240, DINA4, Quadrat 210×210 mm), **Absatzformatierung** (Ausrichtung links/zentriert/rechts/Blocksatz, Zeilenabstand) an Style-Presets aus 2.6.10. Scripting: `ild.list_page_formats` / `set_page_format` / `apply_header_footer` / `apply_paragraph_format` / `list_paragraph_styles` · CLI `page-formats` / `set-page-format` / `header-footer` / `paragraph-format` · PowerShell `Get-IldPageFormats` / `Set-IldPageFormat` / `Invoke-IldHeaderFooter` / `Invoke-IldParagraphFormat`. Kein volles DTP (Musterseiten/CMYK/Frames), kein i18n-Pack, keine KI-Wizards, kein PDF-Compare-Ausbau. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie unverändert.
+
+### Neu
+- `ild_pdf.page_layout` — Buchformate, Lineal-Ticks, Raster/Guides, Absatz-Marker, HF mit Metadaten
+- UI: Toolbar **Lineal** / **Raster**; Ansicht Ctrl+Alt+R/G; Editor Ctrl+L/E/R/J Ausrichtung
+- Kopf-/Fußzeile-Platzhalter `{title}` `{author}` `{creator}` (Metadaten)
+
+### Geändert
+- Docs/Version **2.6.11**; `PAGE_SIZE_PRESETS` um Buch-/DIN-Formate; Style-Presets mit alignment/line_spacing
+- Ctrl+R = Absatz rechts (Ersetzen bleibt Ctrl+H)
+
+### Tests / Qualität
+- Version **2.6.11** (App / `ild_pdf` / ISS / Smoke / Docs); Serie **2.6**; `docs/VERSION` + `VERSION.txt`
+- Smoke: 2.6.11 CLI+Qt (lineal/raster/page-formats/header-footer/paragraph)
+- Stubs: KI/Cloud/Stylus/3D/Hooks/Outline/Telemetrie unverändert markiert
+
 ## 2.6.10 — Auto-Format, TOC, Word-Shortcuts, Fonts
 
 Minor nach **2.6.9**: **Automatische Formatierung** (Style-Presets Heading 1–3 / Fließtext / Zitat + Heuristik), **automatisches Inhaltsverzeichnis** aus Überschriften (Editor-Markdown bzw. PDF-Outline → Sidebar), **Word-/InDesign-ähnliche Tastaturkürzel** (Ctrl+B/I/U, Ctrl+H Ersetzen, Ctrl+S/F/Z/Y/C/V/P — dokumentiert in Hilfe/F1), **Suchen/Ersetzen** (Ctrl+H + Ctrl+R), **Windows-Systemschriften** im Font-Picker. Scripting: `ild.auto_format_text` / `auto_format_pdf` / `generate_toc` / `list_system_fonts` / `find_replace` · CLI `auto-format` / `toc` / `fonts` / `find-replace` · PowerShell `Invoke-IldAutoFormat` / `Update-IldToc` / `Get-IldSystemFonts` / `Invoke-IldFindReplace`. Kein volles DTP (Musterseiten/CMYK), kein i18n-Pack, keine KI-Wizards. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie unverändert.

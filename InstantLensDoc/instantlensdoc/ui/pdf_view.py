@@ -138,6 +138,12 @@ from instantlensdoc.core.app_settings import (
     get_show_page_boxes,
     get_show_page_number_overlay,
     get_show_printer_marks,
+    get_show_rulers,
+    get_show_alignment_grid,
+    get_alignment_grid_spacing_mm,
+    get_alignment_grid_snap,
+    get_alignment_guides,
+    get_ruler_unit,
     set_measure_unit,
     toggle_measure_snap_to_annotation,
     toggle_measure_unit,
@@ -166,6 +172,12 @@ from instantlensdoc.core.app_settings import (
     set_show_page_boxes,
     set_show_page_number_overlay,
     set_show_printer_marks,
+    set_show_rulers,
+    set_show_alignment_grid,
+    set_alignment_grid_spacing_mm,
+    set_alignment_grid_snap,
+    set_alignment_guides,
+    set_ruler_unit,
 )
 
 # Continuous-Scroll: max. gerenderte Seiten (Speicher)
@@ -675,6 +687,12 @@ class PdfCanvas(QLabel):
         self._page_number_overlay_format = "{page} / {pages}"
         self._redaction_preview_opacity = 0.90
         self._show_printer_marks = False
+        self._show_rulers = False
+        self._show_alignment_grid = False
+        self._grid_spacing_mm = 5.0
+        self._ruler_unit = "mm"
+        self._guides: list[dict] = []
+        self._page_size_pt: tuple[float, float] = (595.28, 841.89)
         # Pixel-Rects (x,y,w,h) für MediaBox / CropBox / Druckermarken
         self._mediabox_rect: tuple[float, float, float, float] | None = None
         self._cropbox_rect: tuple[float, float, float, float] | None = None
@@ -836,6 +854,40 @@ class PdfCanvas(QLabel):
     def show_printer_marks(self) -> bool:
         return bool(self._show_printer_marks)
 
+    def set_show_rulers(self, enabled: bool):
+        self._show_rulers = bool(enabled)
+        self._repaint_overlay()
+
+    def show_rulers(self) -> bool:
+        return bool(self._show_rulers)
+
+    def set_show_alignment_grid(self, enabled: bool):
+        self._show_alignment_grid = bool(enabled)
+        self._repaint_overlay()
+
+    def show_alignment_grid(self) -> bool:
+        return bool(self._show_alignment_grid)
+
+    def set_grid_spacing_mm(self, mm: float):
+        try:
+            self._grid_spacing_mm = max(1.0, min(50.0, float(mm)))
+        except (TypeError, ValueError):
+            self._grid_spacing_mm = 5.0
+        self._repaint_overlay()
+
+    def set_ruler_unit(self, unit: str):
+        u = str(unit or "mm").lower()
+        self._ruler_unit = "inch" if u in ("in", "inch", "inches") else "mm"
+        self._repaint_overlay()
+
+    def set_guides(self, guides: list | None):
+        self._guides = list(guides or [])
+        self._repaint_overlay()
+
+    def set_page_size_pt(self, width_pt: float, height_pt: float):
+        self._page_size_pt = (max(1.0, float(width_pt)), max(1.0, float(height_pt)))
+        self._repaint_overlay()
+
     def set_page_box_rects(
         self,
         mediabox: tuple[float, float, float, float] | None = None,
@@ -898,6 +950,101 @@ class PdfCanvas(QLabel):
             painter.drawLine(QPointF(mx - r, my), QPointF(mx + r, my))
             painter.drawLine(QPointF(mx, my - r), QPointF(mx, my + r))
             painter.drawEllipse(QPointF(mx, my), r * 0.45, r * 0.45)
+
+    def _draw_alignment_grid(
+        self, painter: QPainter, rect: tuple[float, float, float, float]
+    ) -> None:
+        """Ausrichtungsraster über der Seite — 2.6.11."""
+        from ild_pdf.page_layout import grid_lines
+        from ild_pdf.pages import mm_to_pt
+
+        x, y, w, h = rect
+        scale = max(float(self._scale), 0.01)
+        spacing_mm = max(1.0, float(self._grid_spacing_mm))
+        # Raster in Seitenkoordinaten (pt), dann → Pixel
+        page_w = w / scale
+        page_h = h / scale
+        lines = grid_lines(page_w, page_h, spacing_mm=spacing_mm)
+        pen = QPen(QColor(74, 144, 217, 90), 1, Qt.DotLine)
+        painter.setPen(pen)
+        for vx in lines["vertical"]:
+            px = x + vx * scale
+            painter.drawLine(QPointF(px, y), QPointF(px, y + h))
+        for hy_pt in lines["horizontal"]:
+            # PDF Y von unten → Pixel Y von oben
+            py = y + h - hy_pt * scale
+            painter.drawLine(QPointF(x, py), QPointF(x + w, py))
+        # Major alle 5 Schritte etwas kräftiger
+        major_step = mm_to_pt(spacing_mm * 5)
+        if major_step > 0:
+            pen2 = QPen(QColor(74, 144, 217, 140), 1, Qt.DashLine)
+            painter.setPen(pen2)
+            mx = 0.0
+            while mx <= page_w + 0.01:
+                px = x + mx * scale
+                painter.drawLine(QPointF(px, y), QPointF(px, y + h))
+                mx += major_step
+            my = 0.0
+            while my <= page_h + 0.01:
+                py = y + h - my * scale
+                painter.drawLine(QPointF(x, py), QPointF(x + w, py))
+                my += major_step
+
+    def _draw_guides(
+        self, painter: QPainter, rect: tuple[float, float, float, float]
+    ) -> None:
+        x, y, w, h = rect
+        scale = max(float(self._scale), 0.01)
+        pen = QPen(QColor(220, 80, 40, 200), 1.2, Qt.DashLine)
+        painter.setPen(pen)
+        for g in self._guides:
+            ori = str(g.get("orientation") or "horizontal").lower()
+            try:
+                pos = float(g.get("position_pt") or 0.0)
+            except (TypeError, ValueError):
+                continue
+            if ori == "vertical":
+                px = x + pos * scale
+                painter.drawLine(QPointF(px, y), QPointF(px, y + h))
+            else:
+                py = y + h - pos * scale
+                painter.drawLine(QPointF(x, py), QPointF(x + w, py))
+
+    def _draw_rulers(
+        self, painter: QPainter, rect: tuple[float, float, float, float]
+    ) -> None:
+        """Horizontales (oben) und vertikales (links) Lineal — 2.6.11."""
+        from ild_pdf.page_layout import ruler_ticks
+
+        x, y, w, h = rect
+        scale = max(float(self._scale), 0.01)
+        page_w = w / scale
+        page_h = h / scale
+        band = 18.0
+        # Hintergrund-Bänder
+        painter.fillRect(int(x), int(y), max(int(w), 1), int(band), QColor(245, 245, 248, 210))
+        painter.fillRect(int(x), int(y), int(band), max(int(h), 1), QColor(245, 245, 248, 210))
+        painter.setPen(QPen(QColor(60, 60, 70, 200), 1))
+        font = QFont()
+        font.setPointSize(7)
+        painter.setFont(font)
+        h_ticks = ruler_ticks(page_w, unit=self._ruler_unit, major_every=10)
+        for t in h_ticks:
+            px = x + float(t["pos_pt"]) * scale
+            major = bool(t.get("major"))
+            tick_h = 10.0 if major else 5.0
+            painter.drawLine(QPointF(px, y), QPointF(px, y + tick_h))
+            if major and t.get("label"):
+                painter.drawText(QPointF(px + 2, y + 14), str(t["label"]))
+        v_ticks = ruler_ticks(page_h, unit=self._ruler_unit, major_every=10)
+        for t in v_ticks:
+            # von oben gemessen für Anzeige
+            py = y + float(t["pos_pt"]) * scale
+            major = bool(t.get("major"))
+            tick_w = 10.0 if major else 5.0
+            painter.drawLine(QPointF(x, py), QPointF(x + tick_w, py))
+            if major and t.get("label"):
+                painter.drawText(QPointF(x + 2, py + 10), str(t["label"]))
 
     def set_drag_tool(
         self,
@@ -1354,6 +1501,19 @@ class PdfCanvas(QLabel):
         # Optional: Seitenrand-Druckermarken (Crop/Registration)
         if self._show_printer_marks and self._printer_marks_rect:
             self._draw_printer_marks(painter, self._printer_marks_rect)
+        # Lineal + Ausrichtungsraster / Guides — 2.6.11
+        page_rect = self._mediabox_rect or (
+            0.0,
+            0.0,
+            float(pm.width()),
+            float(pm.height()),
+        )
+        if self._show_alignment_grid:
+            self._draw_alignment_grid(painter, page_rect)
+        if self._guides:
+            self._draw_guides(painter, page_rect)
+        if self._show_rulers:
+            self._draw_rulers(painter, page_rect)
         # Optional: Seitennummer-Overlay (HUD unten-/oben-mitte)
         if self._show_page_number_overlay and self._page_number_text:
             label = self._page_number_text
@@ -1944,6 +2104,12 @@ class PdfViewer(QWidget):
         self._page_number_overlay_skip_edges = get_page_number_overlay_skip_edges()
         self._redaction_preview_opacity = get_redaction_preview_opacity()
         self._show_printer_marks = get_show_printer_marks()
+        self._show_rulers = get_show_rulers()
+        self._show_alignment_grid = get_show_alignment_grid()
+        self._grid_spacing_mm = get_alignment_grid_spacing_mm()
+        self._grid_snap = get_alignment_grid_snap()
+        self._ruler_unit = get_ruler_unit()
+        self._guides = get_alignment_guides()
         self._search_query = ""
         self._search_rects: list[tuple[float, float, float, float]] = []
         self._search_index = -1
@@ -2488,6 +2654,24 @@ class PdfViewer(QWidget):
             "Seitenrand-Druckermarken (Crop/Registration) als Overlay anzeigen"
         )
         self.btn_printer_marks.toggled.connect(self.set_show_printer_marks)
+        self.btn_rulers = QToolButton()
+        self.btn_rulers.setObjectName("rulersToolbarBtn")
+        self.btn_rulers.setText("Lineal")
+        self.btn_rulers.setCheckable(True)
+        self.btn_rulers.setChecked(self._show_rulers)
+        self.btn_rulers.setToolTip(
+            "Horizontales/vertikales Lineal (mm/inch) — 2.6.11"
+        )
+        self.btn_rulers.toggled.connect(self.set_show_rulers)
+        self.btn_grid = QToolButton()
+        self.btn_grid.setObjectName("alignmentGridToolbarBtn")
+        self.btn_grid.setText("Raster")
+        self.btn_grid.setCheckable(True)
+        self.btn_grid.setChecked(self._show_alignment_grid)
+        self.btn_grid.setToolTip(
+            "Ausrichtungsraster + Guides einblenden — 2.6.11"
+        )
+        self.btn_grid.toggled.connect(self.set_show_alignment_grid)
         toolbar.addWidget(self.btn_hl_color)
         toolbar.addWidget(self.btn_pen_color)
         toolbar.addWidget(self.btn_note_color)
@@ -2527,6 +2711,8 @@ class PdfViewer(QWidget):
         toolbar.addWidget(self.btn_page_num)
         toolbar.addWidget(self.spin_page_num_opacity)
         toolbar.addWidget(self.btn_printer_marks)
+        toolbar.addWidget(self.btn_rulers)
+        toolbar.addWidget(self.btn_grid)
 
         toolbar.addWidget(btn_prev)
         toolbar.addWidget(self.lbl_page)
@@ -2603,6 +2789,8 @@ class PdfViewer(QWidget):
                 self.btn_page_num,
                 self.spin_page_num_opacity,
                 self.btn_printer_marks,
+                self.btn_rulers,
+                self.btn_grid,
             ],
             "nav": [btn_prev, self.lbl_page, btn_next],
             "history": [
@@ -2675,6 +2863,11 @@ class PdfViewer(QWidget):
         self.canvas.set_page_number_overlay_format(self._page_number_overlay_format)
         self.canvas.set_redaction_preview_opacity(self._redaction_preview_opacity)
         self.canvas.set_show_printer_marks(self._show_printer_marks)
+        self.canvas.set_show_rulers(self._show_rulers)
+        self.canvas.set_show_alignment_grid(self._show_alignment_grid)
+        self.canvas.set_grid_spacing_mm(self._grid_spacing_mm)
+        self.canvas.set_ruler_unit(self._ruler_unit)
+        self.canvas.set_guides(self._guides)
         self.canvas.annotation_placed.connect(self._on_place)
         self.canvas.drag_finished.connect(self._on_drag)
         self.canvas.ink_finished.connect(self._on_ink)
@@ -3778,6 +3971,93 @@ class PdfViewer(QWidget):
     def show_printer_marks(self) -> bool:
         return bool(self._show_printer_marks)
 
+    def set_show_rulers(self, enabled: bool):
+        """Lineal-Overlay ein-/ausblenden — 2.6.11."""
+        on = bool(enabled)
+        self._show_rulers = on
+        set_show_rulers(on)
+        if hasattr(self, "btn_rulers"):
+            self.btn_rulers.blockSignals(True)
+            self.btn_rulers.setChecked(on)
+            self.btn_rulers.blockSignals(False)
+        self.canvas.set_show_rulers(on)
+        self.canvas.set_ruler_unit(self._ruler_unit)
+        self._update_layout_overlays()
+        self.status.emit("Lineal an" if on else "Lineal aus")
+
+    def show_rulers(self) -> bool:
+        return bool(self._show_rulers)
+
+    def set_show_alignment_grid(self, enabled: bool):
+        """Ausrichtungsraster ein-/ausblenden — 2.6.11."""
+        on = bool(enabled)
+        self._show_alignment_grid = on
+        set_show_alignment_grid(on)
+        if hasattr(self, "btn_grid"):
+            self.btn_grid.blockSignals(True)
+            self.btn_grid.setChecked(on)
+            self.btn_grid.blockSignals(False)
+        self.canvas.set_show_alignment_grid(on)
+        self.canvas.set_grid_spacing_mm(self._grid_spacing_mm)
+        self.canvas.set_guides(self._guides)
+        self._update_layout_overlays()
+        self.status.emit("Raster an" if on else "Raster aus")
+
+    def show_alignment_grid(self) -> bool:
+        return bool(self._show_alignment_grid)
+
+    def set_grid_spacing_mm(self, mm: float) -> float:
+        val = set_alignment_grid_spacing_mm(mm)
+        self._grid_spacing_mm = val
+        self.canvas.set_grid_spacing_mm(val)
+        self._update_layout_overlays()
+        return val
+
+    def add_guide(self, orientation: str, position_pt: float) -> dict:
+        ori = "vertical" if str(orientation).lower().startswith("v") else "horizontal"
+        guide = {
+            "orientation": ori,
+            "position_pt": float(position_pt),
+            "id": f"g{len(self._guides) + 1}",
+        }
+        self._guides = list(self._guides) + [guide]
+        set_alignment_guides(self._guides)
+        self.canvas.set_guides(self._guides)
+        self._update_layout_overlays()
+        return guide
+
+    def clear_guides(self) -> None:
+        self._guides = []
+        set_alignment_guides([])
+        self.canvas.set_guides([])
+        self._update_layout_overlays()
+
+    def _update_layout_overlays(self) -> None:
+        """Seitenmaß an Canvas für Lineal/Raster übergeben."""
+        if not getattr(self, "canvas", None):
+            return
+        self.canvas.set_show_rulers(self._show_rulers)
+        self.canvas.set_show_alignment_grid(self._show_alignment_grid)
+        self.canvas.set_grid_spacing_mm(self._grid_spacing_mm)
+        self.canvas.set_ruler_unit(self._ruler_unit)
+        self.canvas.set_guides(self._guides)
+        if not self.pdf_path:
+            return
+        try:
+            from ild_pdf.pages import get_page_boxes
+
+            boxes = get_page_boxes(self.pdf_path, self.page_index)
+            mb = boxes["mediabox"]
+            pw = float(mb[2] - mb[0])
+            ph = float(mb[3] - mb[1])
+            self.canvas.set_page_size_pt(pw, ph)
+            # MediaBox als Bezugsrect wenn nicht schon gesetzt
+            if not self.canvas._mediabox_rect:
+                rect = self._pdf_box_to_pixel_rect(mb, ph, self.scale)
+                self.canvas.set_page_box_rects(rect, None)
+        except Exception:
+            pass
+
     @staticmethod
     def _pdf_box_to_pixel_rect(
         box: tuple[float, float, float, float],
@@ -3940,6 +4220,20 @@ class PdfViewer(QWidget):
             self._update_printer_marks_overlay()
         else:
             self.canvas.clear_printer_marks_rect()
+        self._show_rulers = get_show_rulers()
+        self._show_alignment_grid = get_show_alignment_grid()
+        self._grid_spacing_mm = get_alignment_grid_spacing_mm()
+        self._ruler_unit = get_ruler_unit()
+        self._guides = get_alignment_guides()
+        if hasattr(self, "btn_rulers"):
+            self.btn_rulers.blockSignals(True)
+            self.btn_rulers.setChecked(self._show_rulers)
+            self.btn_rulers.blockSignals(False)
+        if hasattr(self, "btn_grid"):
+            self.btn_grid.blockSignals(True)
+            self.btn_grid.setChecked(self._show_alignment_grid)
+            self.btn_grid.blockSignals(False)
+        self._update_layout_overlays()
         if self.pdf_path:
             self.refresh()
 
@@ -5001,6 +5295,7 @@ class PdfViewer(QWidget):
             self.canvas.set_uri_links(links)
             self._update_page_box_overlay()
             self._update_printer_marks_overlay()
+            self._update_layout_overlays()
             self._update_page_number_overlay()
             if self._search_rects:
                 self.canvas.set_search_highlights(self._search_rects, self._search_index)

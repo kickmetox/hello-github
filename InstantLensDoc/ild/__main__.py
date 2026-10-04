@@ -193,6 +193,40 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--count", type=int, default=0, help="max. Ersetzungen (Text; 0=alle)")
     s.add_argument("--max", type=int, default=50, dest="max_replacements")
 
+    s = sub.add_parser("page-formats", help="Seitenformate-Presets (US/DIN/Buch) — 2.6.11")
+    s.add_argument("--unit", default="mm", choices=("mm", "inch"))
+
+    s = sub.add_parser("set-page-format", help="Seitenformat-Preset auf PDF anwenden")
+    s.add_argument("pdf")
+    s.add_argument("--format", required=True, dest="page_format")
+    s.add_argument("--page", type=int, default=1)
+    s.add_argument("--all", action="store_true", dest="all_pages")
+
+    s = sub.add_parser(
+        "header-footer",
+        help="Kopf-/Fußzeile bakken (Titel/Autor/Seitenzahl) — 2.6.11",
+    )
+    s.add_argument("pdf")
+    s.add_argument("--out", default=None)
+    s.add_argument("--header", default="{title}")
+    s.add_argument("--footer", default="{author} — {n} / {total}")
+    s.add_argument("--title", default=None)
+    s.add_argument("--author", default=None)
+    s.add_argument("--creator", default=None)
+    s.add_argument("--no-page-numbers", action="store_true")
+    s.add_argument("--page-template", default="{n} / {total}")
+
+    s = sub.add_parser("paragraph-format", help="Absatzausrichtung/Abstände (Text)")
+    s.add_argument("--text", required=True)
+    s.add_argument("--align", default=None, choices=("left", "center", "right", "justify"))
+    s.add_argument("--line-spacing", type=float, default=None)
+    s.add_argument("--space-before", type=float, default=None)
+    s.add_argument("--space-after", type=float, default=None)
+    s.add_argument("--index", type=int, default=None, help="Absatzindex 0-basiert")
+    s.add_argument("--style", default=None, help="Style-Preset-ID (body/heading1/…)")
+
+    s = sub.add_parser("paragraph-styles", help="Style-Presets inkl. Absatzattribute")
+
     return p
 
 
@@ -389,6 +423,49 @@ def run(argv: list[str] | None = None) -> int:
                 max_replacements=args.max_replacements,
             )
             _print(data, as_json=js)
+            return 0
+        if args.cmd == "page-formats":
+            data = api.list_page_formats(unit=args.unit)
+            _print(data, as_json=js or True)
+            return 0
+        if args.cmd == "set-page-format":
+            data = api.set_page_format(
+                args.pdf,
+                args.page_format,
+                page=args.page,
+                all_pages=args.all_pages,
+            )
+            _print(data, as_json=js)
+            return 0
+        if args.cmd == "header-footer":
+            data = api.apply_header_footer(
+                args.pdf,
+                out=args.out,
+                header=args.header,
+                footer=args.footer,
+                include_page_numbers=not args.no_page_numbers,
+                page_template=args.page_template,
+                title=args.title,
+                author=args.author,
+                creator=args.creator,
+            )
+            _print(data, as_json=js)
+            return 0
+        if args.cmd == "paragraph-format":
+            data = api.apply_paragraph_format(
+                text=args.text,
+                alignment=args.align,
+                line_spacing=args.line_spacing,
+                space_before_pt=args.space_before,
+                space_after_pt=args.space_after,
+                paragraph_index=args.index,
+                style_id=args.style,
+            )
+            _print(data, as_json=js)
+            return 0
+        if args.cmd == "paragraph-styles":
+            data = api.list_paragraph_styles()
+            _print(data, as_json=js or True)
             return 0
         return _fail("unbekanntes Kommando")
     except FileNotFoundError as e:

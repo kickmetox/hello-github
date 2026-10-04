@@ -128,10 +128,14 @@ HELP_HTML = f"""
     <b>Filter nur aktuelle Seite</b>), Markierungen/Treffer</li>
 <li><b>Bearbeiten → Rückgängig/Wiederholen</b>: Editor-Text <i>oder</i> PDF-Annotationen/Overlay-Text (Ctrl+Z / Ctrl+Y);
     Statusleisten-Hint „Ctrl+Z · … rückgängig“ (benannt, z. B. Tag umbenennen)</li>
-<li><b>Bearbeiten → Suchen und Ersetzen</b> (Ctrl+H Word / Ctrl+R Alias): Find/Replace im Texteditor — <b>2.6.10</b></li>
+<li><b>Bearbeiten → Suchen und Ersetzen</b> (Ctrl+H Word): Find/Replace im Texteditor — <b>2.6.10</b></li>
 <li><b>Bearbeiten → Fett/Kursiv/Unterstrichen</b> (Ctrl+B/I/U): Markdown-Marker — Word/InDesign-ähnlich — <b>2.6.10</b></li>
 <li><b>Bearbeiten → Automatische Formatierung</b> (Ctrl+Alt+Shift+F): Heading/Body/Quote-Presets — <b>2.6.10</b></li>
 <li><b>Bearbeiten → Inhaltsverzeichnis aktualisieren</b> (Ctrl+Alt+Shift+T): Markdown bzw. PDF-Outline/Sidebar — <b>2.6.10</b></li>
+<li><b>Bearbeiten → Absatzausrichtung</b> (Ctrl+L/E/R/J) + Zeilenabstand: an Style-Presets — <b>2.6.11</b></li>
+<li><b>Ansicht → Lineal / Ausrichtungsraster</b> (Ctrl+Alt+R/G): Layout-Hilfen im PDF-Viewer — <b>2.6.11</b></li>
+<li><b>PDF → Kopf-/Fußzeile</b>: Seitenzahlen, Titel, Ersteller/Autor (<code>{{title}}</code>/<code>{{author}}</code>/<code>{{creator}}</code>) — <b>2.6.11</b></li>
+<li><b>Seitenformate</b>: US Letter, DIN-A, Buchformate (Taschenbuch/Roman/Sachbuch/Quadrat…) — <b>2.6.11</b></li>
 <li><b>Bearbeiten → Gehe zu Zeile / Seite</b> (Ctrl+G): Editor → Zeile; PDF → Seite (auch PDF → Gehe zu Seite…, Ctrl+Shift+G)</li>
 <li><b>Datei → Tab duplizieren</b> (Ctrl+Alt+Shift+T): Editor-Inhalt als neues Dokument klonen — 1.4.5;
     <b>Ansicht → Theme zyklisch</b> (Ctrl+Shift+T): System→Hell→Dunkel→System; Status-Toast „Theme: …“;
@@ -273,7 +277,8 @@ HELP_HTML = f"""
 <h3>PDF-Modul</h3>
 <p>Das Paket <code>ild_pdf</code> kann von anderen Programmen genutzt werden (pypdfium2, kein Poppler).
 Beispiel: <code>examples/ild_pdf_demo.py</code>. API: <code>ild_pdf/README.md</code>.</p>
-<p><b>Scripting 2.6.10:</b> Stabiles Headless-API <code>import ild</code> und CLI <code>python -m ild</code>
+<p><b>Scripting 2.6.11:</b> Stabiles Headless-API <code>import ild</code> und CLI <code>python -m ild</code>
+(inkl. <code>page-formats</code>/<code>header-footer</code>/<code>paragraph-format</code>). Basis <b>2.6.10</b>:
 (open/info, Seiten, Export, OCR, Schwärzen, Merge/Split, Lizenz/Keygen, AES-256,
 <code>ann-shape</code> / <code>ann-stamp</code> / <code>ann-highlight-para</code>).
 PowerShell-Wrapper: <code>scripts/ild.ps1</code> bzw. <code>run-ild.bat</code>.

@@ -67,10 +67,12 @@ SHORTCUTS_HTML = """
 <tr><td>Wiederholen</td><td><code>Ctrl+Y</code> / <code>Ctrl+Shift+Z</code></td></tr>
 <tr><td>Suchen</td><td><code>Ctrl+F</code></td></tr>
 <tr><td>Weitersuchen / Rückwärts</td><td><code>F3</code> / <code>Shift+F3</code> — PDF-Treffer-Highlight + Seiten-Nav — 0.9.0</td></tr>
-<tr><td>Suchen und Ersetzen</td><td><code>Ctrl+H</code> (Word) / <code>Ctrl+R</code> Alias — <b>2.6.10</b></td></tr>
+<tr><td>Suchen und Ersetzen</td><td><code>Ctrl+H</code> (Word) — <b>2.6.10</b></td></tr>
 <tr><td>Fett / Kursiv / Unterstrichen</td><td><code>Ctrl+B</code> / <code>Ctrl+I</code> / <code>Ctrl+U</code> (Markdown-Marker) — <b>2.6.10</b></td></tr>
 <tr><td>Automatische Formatierung</td><td><code>Ctrl+Alt+Shift+F</code> — Heading/Body/Quote-Presets — <b>2.6.10</b></td></tr>
 <tr><td>Inhaltsverzeichnis aktualisieren</td><td><code>Ctrl+Alt+Shift+T</code> — Editor Markdown · PDF Outline/Sidebar — <b>2.6.10</b></td></tr>
+<tr><td>Absatzausrichtung</td><td><code>Ctrl+L</code>/<code>E</code>/<code>R</code>/<code>J</code> links/zentriert/rechts/Blocksatz — <b>2.6.11</b></td></tr>
+<tr><td>Lineal / Raster</td><td><code>Ctrl+Alt+R</code> Lineal · <code>Ctrl+Alt+G</code> Ausrichtungsraster — <b>2.6.11</b></td></tr>
 <tr><td>Multi-Dokument-Suche</td><td><code>Ctrl+Shift+F</code> — zentrale Trefferliste alle offenen PDFs — 2.0.0</td></tr>
 <tr><td>High-Contrast Theme</td><td><code>Ctrl+Alt+H</code> — Toast Dauer OCR-Settings · A11y wie OCR-Toast — 2.0.5</td></tr>
 <tr><td>Gehe zu Zeile / Seite</td><td><code>Ctrl+G</code> (Editor / PDF)</td></tr>
@@ -160,6 +162,7 @@ SHORTCUTS_HTML = """
 <tr><td>Verschlüsselung &amp; Rechte</td><td>PDF → Verschlüsselung &amp; Rechte… (Ctrl+Alt+Shift+P) / Palette: Passwort AES-256 · Druck/Kopieren/Ändern sperren · setzen/entfernen · Öffnen mit Passwort-Dialog — <b>2.6.7</b></td></tr>
 <tr><td>Windows-Build / Keygen / Scripting</td><td><code>build-windows.ps1</code> (x64) · <code>pack-windows-runnable</code> · <code>run-keygen.bat</code> / <code>python -m keygen</code> · <code>python -m ild</code> / <code>scripts/ild.ps1</code> — <b>2.6.8</b></td></tr>
 <tr><td>Annotationen ausbauen</td><td>Pinselstärke (Slider) · Color-Picker Strich/Füllung · Kreis/Ellipse/Dreieck/Rundrect (gefüllt/Outline) · Stempel Paid/Bezahlt/Rechnung/Datum + eigene · Absatz-Highlight — Palette/PDF-Menü Ctrl+Alt+Shift+H · Scripting <code>ild.add_shape</code>/<code>add_stamp</code>/<code>highlight_paragraphs</code> — <b>2.6.9</b></td></tr>
+<tr><td>Layout-Hilfen 2.6.11</td><td>Lineal · Raster/Guides · Kopf/Fuß mit Titel/Autor · Buch-/DIN-/US-Seitenformate · Absatzformat (Align/Spacing) · Scripting <code>ild.list_page_formats</code>/<code>apply_header_footer</code>/<code>apply_paragraph_format</code> — <b>2.6.11</b></td></tr>
 <tr><td>Bookmarks ↔ Outlines</td><td>Fehlerdialog Retry-Zähler „Versuch k/3“; max. 3 wie Backup — 1.3.6</td></tr>
 <tr><td>Thumbnail Lazy-Load</td><td>Prefetch-Label grau wenn Lazy aus (unter Schwellwert), sonst aktiv — 1.3.6</td></tr>
 <tr><td>Alle Ann. auf Seite löschen</td><td>Bearbeiten → bei 0 Treffern Sticky-Status Statusleiste bis nächste Ann.-Aktion / Seiten-/Dokumentwechsel / Undo/Redo + i18n DE + Menü/Aktion no-op + Button disabled; Undo „N Annotationen (gefiltert)“ — 1.1.9</td></tr>
@@ -314,8 +317,9 @@ Speichern als <b>.txt</b> + CLI <b>--days</b> — 1.1.9.</p>
 <p><b>PDF bereinigen:</b> PDF → PDF bereinigen — optional Metadaten entfernen, neu speichern.</p>
 <p><b>Seitenbereich:</b> PDF → Seitenbereich extrahieren… (z. B. 1-3,5,8-10; DE-Validierung + Seitenanzahl-Vorschau — 1.2.1)
 bzw. Dialog „zusammenführen / teilen / Bereich“.</p>
-<p><b>Suchen und Ersetzen:</b> Bearbeiten → <code>Ctrl+H</code> (Word) / <code>Ctrl+R</code> Alias — Texteditor; PDF via Scripting <code>ild find-replace</code> — <b>2.6.10</b>.</p>
-<p><b>Word-/InDesign-ähnliche Shortcuts (2.6.10):</b>
+<p><b>Suchen und Ersetzen:</b> Bearbeiten → <code>Ctrl+H</code> (Word) — Texteditor; PDF via Scripting <code>ild find-replace</code> — <b>2.6.10</b>.</p>
+<p><b>Layout 2.6.11:</b> Lineal/Raster (Ctrl+Alt+R/G) · Absatz Ctrl+L/E/R/J · Kopf/Fuß <code>{title}</code>/<code>{author}</code> · Buchformate.</p>
+<p><b>Word-/InDesign-ähnliche Shortcuts (2.6.10/2.6.11):</b>
 <code>Ctrl+B/I/U</code> Fett/Kursiv/Unterstrichen · <code>Ctrl+S</code> Speichern ·
 <code>Ctrl+F</code> Suchen · <code>Ctrl+H</code> Ersetzen · <code>Ctrl+Z/Y</code> Undo/Redo ·
 <code>Ctrl+C/V</code> Kopieren/Einfügen · <code>Ctrl+P</code> Drucken ·

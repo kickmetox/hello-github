@@ -1,5 +1,5 @@
 """
-Stabiles Scripting-API für InstantLens Doc (2.6.10).
+Stabiles Scripting-API für InstantLens Doc (2.6.11).
 
 Headless, ohne GUI. Nutzt ``ild_pdf`` + Lizenz/OCR der App.
 
@@ -10,6 +10,8 @@ Headless, ohne GUI. Nutzt ``ild_pdf`` + Lizenz/OCR der App.
     ild.auto_format_pdf("dok.pdf")
     ild.generate_toc(path="dok.pdf")
     ild.list_system_fonts()
+    ild.list_page_formats()
+    ild.apply_header_footer("dok.pdf", author="Max", title="Bericht")
 
 CLI: ``python -m ild --help`` · PowerShell: ``scripts\\ild.ps1``.
 """
@@ -25,6 +27,8 @@ from ild.api import (
     add_redaction,
     add_shape,
     add_stamp,
+    apply_header_footer,
+    apply_paragraph_format,
     apply_redactions,
     auto_format_pdf,
     auto_format_text,
@@ -34,8 +38,11 @@ from ild.api import (
     generate_key,
     generate_toc,
     get_encryption_info,
+    grid_lines,
     highlight_paragraphs,
     license_status,
+    list_page_formats,
+    list_paragraph_styles,
     list_stamps,
     list_style_presets,
     list_system_fonts,
@@ -46,7 +53,10 @@ from ild.api import (
     outline_summary,
     page_count,
     remove_password,
+    resolve_page_format,
     rotate_page,
+    ruler_ticks,
+    set_page_format,
     split_pdf,
     verify_key,
 )
@@ -76,6 +86,14 @@ __all__ = [
     "list_system_fonts",
     "find_replace",
     "outline_summary",
+    "list_page_formats",
+    "resolve_page_format",
+    "set_page_format",
+    "apply_header_footer",
+    "apply_paragraph_format",
+    "list_paragraph_styles",
+    "ruler_ticks",
+    "grid_lines",
     "generate_key",
     "verify_key",
     "license_status",

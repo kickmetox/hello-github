@@ -82,6 +82,19 @@ python -m keygen --verify "ILD1...."
 
 Trial 28 Tage · Keys 32 Tage (HMAC `ILD1.…`). Details: `keygen/README.md`.
 
+## Neu in 2.6.11
+
+Minor nach **2.6.10** (Layout-Hilfen / Word-Suite):
+
+- **Lineal:** horizontal/vertikal (mm/inch), Toolbar + Ctrl+Alt+R
+- **Raster / Guides:** Ausrichtungsraster einblendbar, Hilfslinien, optional Snap — Ctrl+Alt+G
+- **Kopf-/Fußzeilen:** Seitenzahlen, Titel, **Ersteller/Autor** (`{title}`/`{author}`/`{creator}`)
+- **Seitenformate:** US Letter, DIN-A, Buchformate Taschenbuch/DINA5/Roman/Sachbuch/DINA4/Quadrat
+- **Absatzformatierung:** Ausrichtung + Zeilenabstand, an Style-Presets (2.6.10) angebunden
+- Scripting: `ild.list_page_formats` / `set_page_format` / `apply_header_footer` / `apply_paragraph_format`
+- Kein volles DTP (Musterseiten/CMYK/Frames), kein i18n-Pack, keine KI-Wizards, kein PDF-Compare-Ausbau
+- Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie unverändert
+
 ## Neu in 2.6.10
 
 Minor nach **2.6.9** (Word-Suite Basis: Auto-Format / TOC / Shortcuts):
@@ -89,7 +102,7 @@ Minor nach **2.6.9** (Word-Suite Basis: Auto-Format / TOC / Shortcuts):
 - **Automatische Formatierung:** Heading/Body/Quote-Presets + Heuristik (Markdown/Fontgröße/ALL CAPS)
 - **Automatisches Inhaltsverzeichnis:** aus Überschriften → Editor-Markdown bzw. PDF-Outline (Sidebar klickbar)
 - **Word-/InDesign-ähnliche Shortcuts:** Ctrl+B/I/U, Ctrl+S, Ctrl+F, Ctrl+H Ersetzen, Ctrl+Z/Y, Ctrl+C/V, Ctrl+P — Liste in Hilfe/F1
-- **Suchen/Ersetzen:** Ctrl+H (Word) + Ctrl+R Alias; Scripting `ild find-replace`
+- **Suchen/Ersetzen:** Ctrl+H (Word); Scripting `ild find-replace`
 - **Windows-Systemschriften** im Inline-Schriftarten-Picker (`QFontComboBox` + `list_system_fonts`)
 - Scripting: `ild.auto_format_*` / `generate_toc` / `list_system_fonts` / `find_replace` · CLI · PowerShell
 - Kein volles DTP (Musterseiten/CMYK), kein i18n-Pack, keine KI-Wizards

@@ -1,4 +1,4 @@
-"""Headless InstantLens-Doc-Operationen für Python- und PowerShell-Scripting — 2.6.10."""
+"""Headless InstantLens-Doc-Operationen für Python- und PowerShell-Scripting — 2.6.11."""
 
 from __future__ import annotations
 
@@ -585,3 +585,125 @@ def outline_summary(path: PathLike) -> list[dict[str, Any]]:
     from ild_pdf.auto_format import outline_summary as _sum
 
     return _sum(_require_file(path))
+
+
+def list_page_formats(*, unit: str = "mm") -> list[dict[str, Any]]:
+    """Seitenformate-Presets (US Letter, DIN-A, Buchformate) — 2.6.11."""
+    from ild_pdf.page_layout import list_page_format_presets
+
+    return list_page_format_presets(unit=unit)
+
+
+def resolve_page_format(name: str) -> dict[str, float]:
+    from ild_pdf.page_layout import resolve_page_format as _resolve
+    from ild_pdf.pages import pt_to_mm
+
+    w, h = _resolve(name)
+    return {
+        "name": name,
+        "width_pt": float(w),
+        "height_pt": float(h),
+        "width_mm": round(pt_to_mm(w), 1),
+        "height_mm": round(pt_to_mm(h), 1),
+    }
+
+
+def set_page_format(
+    path: PathLike,
+    name: str,
+    *,
+    page: int = 1,
+    all_pages: bool = False,
+) -> dict[str, Any]:
+    """Seitenformat-Preset auf PDF anwenden (1-basierte Seite)."""
+    from ild_pdf.page_layout import resolve_page_format as _resolve
+    from ild_pdf.pages import set_page_size
+
+    pdf = _require_file(path)
+    w, h = _resolve(name)
+    set_page_size(pdf, int(page) - 1, float(w), float(h), all_pages=bool(all_pages))
+    return {"path": str(pdf), "format": name, "width_pt": w, "height_pt": h, "all_pages": bool(all_pages)}
+
+
+def apply_header_footer(
+    path: PathLike,
+    *,
+    out: PathLike | None = None,
+    header: str = "{title}",
+    footer: str = "{author} — {n} / {total}",
+    include_page_numbers: bool = True,
+    page_template: str = "{n} / {total}",
+    title: str | None = None,
+    author: str | None = None,
+    creator: str | None = None,
+) -> dict[str, Any]:
+    """Kopf-/Fußzeile mit Titel/Ersteller bakken — 2.6.11."""
+    from ild_pdf.page_layout import apply_header_footer_with_meta
+
+    pdf = _require_file(path)
+    dest = apply_header_footer_with_meta(
+        pdf,
+        out_path=_p(out) if out else None,
+        header_text=header,
+        footer_text=footer,
+        include_page_numbers=include_page_numbers,
+        page_number_template=page_template,
+        title=title,
+        author=author,
+        creator=creator,
+    )
+    return {"path": str(dest), "header": header, "footer": footer, "author": author, "title": title}
+
+
+def apply_paragraph_format(
+    *,
+    text: str,
+    alignment: str | None = None,
+    line_spacing: float | None = None,
+    space_before_pt: float | None = None,
+    space_after_pt: float | None = None,
+    paragraph_index: int | None = None,
+    style_id: str | None = None,
+) -> dict[str, Any]:
+    """Absatzausrichtung/Abstände (Marker) bzw. Style-Defaults — 2.6.11."""
+    from ild_pdf.page_layout import (
+        apply_paragraph_format as _apply,
+        apply_style_paragraph_defaults,
+        parse_paragraph_format,
+    )
+
+    if style_id:
+        new_text = apply_style_paragraph_defaults(text, style_id=style_id)
+    else:
+        new_text = _apply(
+            text,
+            alignment=alignment,
+            line_spacing=line_spacing,
+            space_before_pt=space_before_pt,
+            space_after_pt=space_after_pt,
+            paragraph_index=paragraph_index,
+        )
+    fmt = parse_paragraph_format(new_text.split("\n\n")[0] if new_text else "")
+    return {"text": new_text, "format": fmt.to_dict()}
+
+
+def list_paragraph_styles() -> list[dict[str, Any]]:
+    from ild_pdf.page_layout import list_paragraph_formats_from_styles
+
+    return list_paragraph_formats_from_styles()
+
+
+def ruler_ticks(
+    length_pt: float, *, unit: str = "mm", major_every: int = 10
+) -> list[dict[str, Any]]:
+    from ild_pdf.page_layout import ruler_ticks as _ticks
+
+    return _ticks(float(length_pt), unit=unit, major_every=int(major_every))
+
+
+def grid_lines(
+    width_pt: float, height_pt: float, *, spacing_mm: float = 5.0
+) -> dict[str, list[float]]:
+    from ild_pdf.page_layout import grid_lines as _grid
+
+    return _grid(float(width_pt), float(height_pt), spacing_mm=float(spacing_mm))

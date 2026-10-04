@@ -9,12 +9,22 @@ from typing import List, Sequence, Tuple
 import pikepdf
 
 # Breite × Höhe in PDF-Punkten (1 pt = 1/72 Zoll)
+# Buchformate / weitere DIN-A werden von page_layout.ensure_layout_presets_in_page_sizes() ergänzt (2.6.11).
 PAGE_SIZE_PRESETS: dict[str, Tuple[float, float]] = {
     "A4": (595.28, 841.89),
     "A5": (419.53, 595.28),
+    "A6": (297.64, 419.53),  # 105×148 mm
     "Letter": (612.0, 792.0),
     "Legal": (612.0, 1008.0),
     "A3": (841.89, 1190.55),
+    # Buchformate (mm → pt, Hochformat) — 2.6.11
+    "Taschenbuch": (354.33, 538.58),  # 125×190
+    "DINA5": (419.53, 595.28),  # 148×210 (= A5)
+    "Roman": (382.68, 609.45),  # 135×215
+    "Sachbuch": (481.89, 680.31),  # 170×240
+    "DINA4": (595.28, 841.89),  # 210×297 (= A4)
+    "Quadrat": (595.28, 595.28),  # 210×210
+    "US Letter": (612.0, 792.0),
 }
 
 PT_PER_INCH = 72.0

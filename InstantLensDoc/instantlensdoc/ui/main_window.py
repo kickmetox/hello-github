@@ -1554,12 +1554,10 @@ class MainWindow(QMainWindow):
         act_find_prev.triggered.connect(self._on_search_prev)
         m_edit.addAction(act_find_prev)
         act_find_repl = QAction("Suchen und Ersetzen…", self)
-        # Word-like Ctrl+H; Ctrl+R bleibt Alias — 2.6.10
-        act_find_repl.setShortcuts(
-            [QKeySequence("Ctrl+H"), QKeySequence("Ctrl+R")]
-        )
+        # Word-like Ctrl+H; Ctrl+R = Absatz rechts (2.6.11)
+        act_find_repl.setShortcut(QKeySequence("Ctrl+H"))
         act_find_repl.setToolTip(
-            "Find/Replace (Word: Ctrl+H · Alias Ctrl+R) — Editor; PDF via Scripting"
+            "Find/Replace (Word: Ctrl+H) — Editor; PDF via Scripting"
         )
         act_find_repl.triggered.connect(self._find_replace)
         m_edit.addAction(act_find_repl)
@@ -1592,6 +1590,36 @@ class MainWindow(QMainWindow):
         )
         act_auto_toc.triggered.connect(self._update_auto_toc)
         m_edit.addAction(act_auto_toc)
+        m_edit.addSeparator()
+        act_align_l = QAction("Absatz links", self)
+        act_align_l.setShortcut(QKeySequence("Ctrl+L"))
+        act_align_l.setToolTip("Absatzausrichtung links — 2.6.11")
+        act_align_l.triggered.connect(lambda: self._set_paragraph_alignment("left"))
+        m_edit.addAction(act_align_l)
+        act_align_c = QAction("Absatz zentriert", self)
+        act_align_c.setShortcut(QKeySequence("Ctrl+E"))
+        act_align_c.setToolTip("Absatzausrichtung zentriert — 2.6.11")
+        act_align_c.triggered.connect(lambda: self._set_paragraph_alignment("center"))
+        m_edit.addAction(act_align_c)
+        act_align_r = QAction("Absatz rechts", self)
+        act_align_r.setShortcut(QKeySequence("Ctrl+R"))
+        act_align_r.setToolTip(
+            "Absatzausrichtung rechts (Ctrl+R; Ersetzen: Ctrl+H) — 2.6.11"
+        )
+        act_align_r.triggered.connect(lambda: self._set_paragraph_alignment("right"))
+        m_edit.addAction(act_align_r)
+        act_align_j = QAction("Absatz Blocksatz", self)
+        act_align_j.setShortcut(QKeySequence("Ctrl+J"))
+        act_align_j.setToolTip("Absatzausrichtung Blocksatz — 2.6.11")
+        act_align_j.triggered.connect(lambda: self._set_paragraph_alignment("justify"))
+        m_edit.addAction(act_align_j)
+        act_spacing = QAction("Zeilenabstand 1,5", self)
+        act_spacing.setToolTip("Zeilenabstand 1,5 für aktuellen Absatz — 2.6.11")
+        act_spacing.triggered.connect(lambda: self._set_paragraph_line_spacing(1.5))
+        m_edit.addAction(act_spacing)
+        act_spacing15 = QAction("Zeilenabstand 1,15 (Standard)", self)
+        act_spacing15.triggered.connect(lambda: self._set_paragraph_line_spacing(1.15))
+        m_edit.addAction(act_spacing15)
         act_palette = QAction("Schnellaktionen…", self)
         act_palette.setShortcut(QKeySequence("Ctrl+K"))
         act_palette.setToolTip(
@@ -1983,6 +2011,29 @@ class MainWindow(QMainWindow):
         )
         self._indent_guides_action.toggled.connect(self._toggle_indent_guides)
         m_view.addAction(self._indent_guides_action)
+        self._rulers_action = QAction("Lineal", self)
+        self._rulers_action.setCheckable(True)
+        from instantlensdoc.core.app_settings import (
+            get_show_rulers,
+            get_show_alignment_grid,
+        )
+
+        self._rulers_action.setChecked(get_show_rulers())
+        self._rulers_action.setShortcut(QKeySequence("Ctrl+Alt+R"))
+        self._rulers_action.setToolTip(
+            "Horizontales/vertikales Lineal im PDF-Viewer — 2.6.11"
+        )
+        self._rulers_action.toggled.connect(self._toggle_rulers)
+        m_view.addAction(self._rulers_action)
+        self._grid_action = QAction("Ausrichtungsraster", self)
+        self._grid_action.setCheckable(True)
+        self._grid_action.setChecked(get_show_alignment_grid())
+        self._grid_action.setShortcut(QKeySequence("Ctrl+Alt+G"))
+        self._grid_action.setToolTip(
+            "Raster + Guides zur Ausrichtung — 2.6.11"
+        )
+        self._grid_action.toggled.connect(self._toggle_alignment_grid)
+        m_view.addAction(self._grid_action)
         self._current_line_hl_action = QAction("Aktuelle Zeile hervorheben", self)
         self._current_line_hl_action.setCheckable(True)
         self._current_line_hl_action.setChecked(get_editor_current_line_highlight())
@@ -7494,6 +7545,60 @@ class MainWindow(QMainWindow):
             self.editor.toggle_underline_selection()
             self._set_status("Unterstrichen (Markdown __)")
 
+    def _set_paragraph_alignment(self, alignment: str) -> None:
+        if self.stack.currentWidget() is not self.editor_pane:
+            self._set_status("Absatzformat nur im Editor")
+            return
+        if self.editor.set_paragraph_alignment(alignment):
+            if self.doc and self.doc.kind in (
+                DocKind.TEXT,
+                DocKind.MARKDOWN,
+                DocKind.HTML,
+                DocKind.DOCX,
+            ):
+                self.doc.text = self.editor.toPlainText()
+                self.doc.dirty = True
+            self._on_text_changed()
+            self._set_status(f"Absatzausrichtung: {alignment}")
+        else:
+            self._set_status(f"Absatzausrichtung unverändert ({alignment})")
+
+    def _set_paragraph_line_spacing(self, line_spacing: float) -> None:
+        if self.stack.currentWidget() is not self.editor_pane:
+            self._set_status("Zeilenabstand nur im Editor")
+            return
+        if self.editor.set_paragraph_spacing(line_spacing=line_spacing):
+            if self.doc and self.doc.kind in (
+                DocKind.TEXT,
+                DocKind.MARKDOWN,
+                DocKind.HTML,
+                DocKind.DOCX,
+            ):
+                self.doc.text = self.editor.toPlainText()
+                self.doc.dirty = True
+            self._on_text_changed()
+            self._set_status(f"Zeilenabstand: {line_spacing:g}")
+        else:
+            self._set_status("Zeilenabstand unverändert")
+
+    def _toggle_rulers(self, checked: bool = False) -> None:
+        on = bool(checked)
+        if hasattr(self.pdf_view, "set_show_rulers"):
+            self.pdf_view.set_show_rulers(on)
+        if hasattr(self, "_rulers_action") and self._rulers_action is not None:
+            self._rulers_action.blockSignals(True)
+            self._rulers_action.setChecked(on)
+            self._rulers_action.blockSignals(False)
+
+    def _toggle_alignment_grid(self, checked: bool = False) -> None:
+        on = bool(checked)
+        if hasattr(self.pdf_view, "set_show_alignment_grid"):
+            self.pdf_view.set_show_alignment_grid(on)
+        if hasattr(self, "_grid_action") and self._grid_action is not None:
+            self._grid_action.blockSignals(True)
+            self._grid_action.setChecked(on)
+            self._grid_action.blockSignals(False)
+
     def _auto_format_document(self) -> None:
         """Automatische Formatierung Editor oder PDF — 2.6.10."""
         if self.stack.currentWidget() is self.editor_pane:
@@ -10382,6 +10487,16 @@ class MainWindow(QMainWindow):
             "toggle_bold": self._toggle_bold,
             "toggle_italic": self._toggle_italic,
             "toggle_underline": self._toggle_underline,
+            "para_align_left": lambda: self._set_paragraph_alignment("left"),
+            "para_align_center": lambda: self._set_paragraph_alignment("center"),
+            "para_align_right": lambda: self._set_paragraph_alignment("right"),
+            "para_align_justify": lambda: self._set_paragraph_alignment("justify"),
+            "toggle_rulers": lambda: self._toggle_rulers(
+                not getattr(self.pdf_view, "_show_rulers", False)
+            ),
+            "toggle_grid": lambda: self._toggle_alignment_grid(
+                not getattr(self.pdf_view, "_show_alignment_grid", False)
+            ),
             "ocr_page": self._run_ocr,
             "ocr_pdf": self._run_ocr_document,
             "ocr_region": self._run_ocr_region,

@@ -1418,6 +1418,65 @@ class TextEditor(QPlainTextEdit):
             self.setPlainText(result.text)
         return int(result.changed_lines)
 
+    def current_paragraph_index(self) -> int:
+        """0-basierter Absatzindex unter dem Cursor (Leerzeilen-getrennt)."""
+        text = self.toPlainText().replace("\r\n", "\n")
+        pos = self.textCursor().position()
+        before = text[:pos]
+        # Absätze = Blöcke getrennt durch Leerzeile
+        parts = before.split("\n\n")
+        return max(0, len(parts) - 1)
+
+    def set_paragraph_alignment(self, alignment: str, *, all_paragraphs: bool = False) -> bool:
+        """Absatzausrichtung (left/center/right/justify) via Marker — 2.6.11."""
+        from ild_pdf.page_layout import apply_paragraph_format, PARAGRAPH_ALIGNMENTS
+
+        align = (alignment or "left").lower().strip()
+        if align not in PARAGRAPH_ALIGNMENTS:
+            return False
+        idx = None if all_paragraphs else self.current_paragraph_index()
+        new_text = apply_paragraph_format(
+            self.toPlainText(), alignment=align, paragraph_index=idx
+        )
+        if new_text == self.toPlainText():
+            return False
+        self.setPlainText(new_text)
+        return True
+
+    def set_paragraph_spacing(
+        self,
+        *,
+        line_spacing: float | None = None,
+        space_before_pt: float | None = None,
+        space_after_pt: float | None = None,
+        all_paragraphs: bool = False,
+    ) -> bool:
+        """Zeilen-/Absatzabstand via Marker — 2.6.11."""
+        from ild_pdf.page_layout import apply_paragraph_format
+
+        idx = None if all_paragraphs else self.current_paragraph_index()
+        new_text = apply_paragraph_format(
+            self.toPlainText(),
+            line_spacing=line_spacing,
+            space_before_pt=space_before_pt,
+            space_after_pt=space_after_pt,
+            paragraph_index=idx,
+        )
+        if new_text == self.toPlainText():
+            return False
+        self.setPlainText(new_text)
+        return True
+
+    def apply_style_paragraph(self, style_id: str = "body") -> bool:
+        """Absatzattribute eines Style-Presets anwenden — 2.6.11."""
+        from ild_pdf.page_layout import apply_style_paragraph_defaults
+
+        new_text = apply_style_paragraph_defaults(self.toPlainText(), style_id=style_id)
+        if new_text == self.toPlainText():
+            return False
+        self.setPlainText(new_text)
+        return True
+
     def update_auto_toc(self, *, max_level: int = 3) -> str:
         """Markdown-Inhaltsverzeichnis einfügen/aktualisieren — 2.6.10."""
         from ild_pdf.auto_format import insert_toc_into_text

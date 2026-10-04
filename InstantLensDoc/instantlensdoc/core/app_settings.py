@@ -227,6 +227,12 @@ DEFAULTS: dict[str, Any] = {
     "page_number_overlay_start": 1,
     "page_number_overlay_skip_edges": False,
     "show_printer_marks": False,
+    "show_rulers": False,
+    "show_alignment_grid": False,
+    "alignment_grid_spacing_mm": 5.0,
+    "alignment_grid_snap": False,
+    "alignment_guides": [],
+    "ruler_unit": "mm",
     "annotations_locked": False,
     "editor_snippets": [
         "Sehr geehrte Damen und Herren,\n\n",
@@ -3308,6 +3314,79 @@ def get_show_printer_marks() -> bool:
 
 def set_show_printer_marks(enabled: bool) -> None:
     save_settings({"show_printer_marks": bool(enabled)})
+
+
+def get_show_rulers() -> bool:
+    """Horizontales/vertikales Lineal im PDF-Viewer — 2.6.11."""
+    return bool(load_settings().get("show_rulers", False))
+
+
+def set_show_rulers(enabled: bool) -> None:
+    save_settings({"show_rulers": bool(enabled)})
+
+
+def get_show_alignment_grid() -> bool:
+    """Ausrichtungsraster einblenden — 2.6.11."""
+    return bool(load_settings().get("show_alignment_grid", False))
+
+
+def set_show_alignment_grid(enabled: bool) -> None:
+    save_settings({"show_alignment_grid": bool(enabled)})
+
+
+def get_alignment_grid_spacing_mm() -> float:
+    raw = load_settings().get("alignment_grid_spacing_mm", DEFAULTS["alignment_grid_spacing_mm"])
+    try:
+        val = float(raw)
+    except (TypeError, ValueError):
+        val = float(DEFAULTS["alignment_grid_spacing_mm"])
+    return max(1.0, min(50.0, val))
+
+
+def set_alignment_grid_spacing_mm(mm: float) -> float:
+    try:
+        val = float(mm)
+    except (TypeError, ValueError):
+        val = float(DEFAULTS["alignment_grid_spacing_mm"])
+    val = max(1.0, min(50.0, val))
+    save_settings({"alignment_grid_spacing_mm": val})
+    return val
+
+
+def get_alignment_grid_snap() -> bool:
+    return bool(load_settings().get("alignment_grid_snap", False))
+
+
+def set_alignment_grid_snap(enabled: bool) -> None:
+    save_settings({"alignment_grid_snap": bool(enabled)})
+
+
+def get_ruler_unit() -> str:
+    u = str(load_settings().get("ruler_unit", DEFAULTS["ruler_unit"]) or "mm").lower()
+    return "inch" if u in ("in", "inch", "inches") else "mm"
+
+
+def set_ruler_unit(unit: str) -> str:
+    u = "inch" if str(unit or "").lower() in ("in", "inch", "inches") else "mm"
+    save_settings({"ruler_unit": u})
+    return u
+
+
+def get_alignment_guides() -> list[dict]:
+    raw = load_settings().get("alignment_guides", [])
+    if not isinstance(raw, list):
+        return []
+    out: list[dict] = []
+    for item in raw:
+        if isinstance(item, dict):
+            out.append(dict(item))
+    return out
+
+
+def set_alignment_guides(guides: list[dict] | None) -> list[dict]:
+    data = list(guides or [])
+    save_settings({"alignment_guides": data})
+    return data
 
 
 def get_annotations_locked() -> bool:
