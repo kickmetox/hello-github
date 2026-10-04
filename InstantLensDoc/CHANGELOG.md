@@ -1,5 +1,20 @@
 # Changelog — InstantLens Doc
 
+## 2.5.11 — OCR Esc-Dismiss, Theme Swatch-Mittelklick, ildtags Shift+Entf, Export Ctrl+D
+
+Post-Release-Polish nach **2.5.10**: **OCR-Region** Status-**Esc / Menü „Status schließen“**; **Farben-Themes** Swatch-**Mittelklick → Highlight**; **ildtags** **Shift+Entf** Alle Tags entfernen; **Export-Presets** **Ctrl+D Duplizieren**. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie klar markiert / nicht produktiv (Ink ≠ Stylus).
+
+### Geändert
+- OCR-Region: Esc / Menü → Status schließen
+- Farben-Themes: Swatch-Mittelklick → Highlight-Farbe setzen
+- Dokument-Tags: Shift+Entf/Backspace → Alle Tags entfernen
+- Export-Presets: Ctrl+D Duplizieren
+
+### Tests / Qualität
+- Version **2.5.11** (App / `ild_pdf` / ISS / Smoke / Docs); Serie **2.5**; `docs/VERSION` + `VERSION.txt`
+- Smoke: 2.5.11 CLI + Qt (OCR Esc-Dismiss, Theme Mid-HL, ildtags Shift+Entf, Export Ctrl+D)
+- Stubs: KI/Cloud/Stylus/3D/Hooks/Outline/Telemetrie unverändert markiert
+
 ## 2.5.10 — OCR-Region Status-Menü, Theme Swatch→HL/Stift/Notiz, ildtags Ctrl+X, Export F2
 
 Post-Release-Polish nach **2.5.9**: **OCR-Region** Status-**Rechtsklick-Kontextmenü** (Tab/Ordner/Pfad/Text/Datei); **Farben-Themes** Swatch-**RMB → Highlight/Stift/Notiz setzen**; **ildtags** **Ctrl+X** Tags ausschneiden · **Alle Tags entfernen**; **Export-Presets** **F2 Umbenennen**. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie klar markiert / nicht produktiv (Ink ≠ Stylus).

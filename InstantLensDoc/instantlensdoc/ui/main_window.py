@@ -4087,6 +4087,11 @@ class MainWindow(QMainWindow):
                     pv.cancel_quick_stamp()
                     event.accept()
                     return
+            # OCR-Region Status-Toast schließen — 2.5.11
+            if getattr(self, "_ocr_region_toast_active", False):
+                if self._dismiss_ocr_region_status():
+                    event.accept()
+                    return
         super().keyPressEvent(event)
 
     def _duplicate_current(self):
@@ -11649,15 +11654,16 @@ class MainWindow(QMainWindow):
         info = QLabel(
             f"Benannte Presets ({len(profiles)}/{EXPORT_PROFILES_MAX}). "
             "★ aktiv · RMB Zielordner · Summary/Pfad · F2 Umbenennen · "
-            "Entf · Doppelklick Anwenden."
+            "Ctrl+D Duplizieren · Entf · Doppelklick Anwenden."
         )
         lay.addWidget(info)
         lst = QListWidget()
         lst.setToolTip(
             "★ = aktives Preset · Listen-Tooltip Summary DPI/Format/Pfad · "
             "Rechtsklick → Zielordner / Summary / Pfad kopieren · "
-            "Ctrl+C Summary · Ctrl+Shift+C Pfad · F2 Umbenennen · Entf löschen · "
-            "Doppelklick/Enter Anwenden — 2.5.10"
+            "Ctrl+C Summary · Ctrl+Shift+C Pfad · F2 Umbenennen · "
+            "Ctrl+D Duplizieren · Entf löschen · "
+            "Doppelklick/Enter Anwenden — 2.5.11"
         )
         lst.setContextMenuPolicy(Qt.CustomContextMenu)
         active = {"name": get_active_export_profile_name()}
@@ -12056,6 +12062,12 @@ class MainWindow(QMainWindow):
                     if event.key() == Qt.Key_F2:
                         # F2 Umbenennen — 2.5.10
                         _rename()
+                        return True
+                    if event.key() == Qt.Key_D and bool(
+                        event.modifiers() & Qt.ControlModifier
+                    ):
+                        # Ctrl+D Duplizieren — 2.5.11
+                        _duplicate()
                         return True
                     if event.key() == Qt.Key_C and bool(
                         event.modifiers() & Qt.ControlModifier
@@ -13298,13 +13310,14 @@ class MainWindow(QMainWindow):
         return preview
 
     def _ocr_region_status_tooltip(self) -> str:
-        """Status-Tooltip inkl. Textvorschau — 2.5.9/2.5.10."""
+        """Status-Tooltip inkl. Textvorschau — 2.5.9–2.5.11."""
         path = getattr(self, "_last_ocr_region_path", None) or ""
         tip = (
             "Linksklick → Ergebnis-Tab · Rechtsklick → Menü · "
             "Mittelklick/Ctrl+Klick → Pfad · "
             "Shift+Klick → Text kopieren · "
-            "Alt+Klick → Datei öffnen — 2.5.10"
+            "Alt+Klick → Datei öffnen · "
+            "Esc → Status schließen — 2.5.11"
         )
         if path:
             tip = f"{tip}\n{path}"
@@ -13313,10 +13326,31 @@ class MainWindow(QMainWindow):
             tip = f"{tip}\nVorschau: {preview}"
         return tip
 
+    def _dismiss_ocr_region_status(self) -> bool:
+        """Esc / Menü: OCR-Region Status-Toast schließen — 2.5.11."""
+        if not getattr(self, "_ocr_region_toast_active", False):
+            return False
+        self._ocr_region_toast_active = False
+        try:
+            sb = self.statusBar()
+            if sb is not None:
+                sb.clearMessage()
+                sb.unsetCursor()
+                sb.setToolTip("")
+        except Exception:
+            pass
+        msg = "OCR-Region Status geschlossen"
+        self._set_status(msg)
+        try:
+            self._announce_status_toast(msg)
+        except Exception:
+            pass
+        return True
+
     def _show_ocr_region_status_menu(self) -> bool:
-        """Status-Rechtsklick: Kontextmenü Tab/Ordner/Pfad/Text/Datei — 2.5.10."""
+        """Status-Rechtsklick: Kontextmenü Tab/Ordner/Pfad/Text/Datei/Schließen — 2.5.10/2.5.11."""
         path = getattr(self, "_last_ocr_region_path", None)
-        if not path:
+        if not path and not getattr(self, "_ocr_region_toast_active", False):
             return False
         menu = QMenu(self)
         act_tab = menu.addAction("Ergebnis-Tab fokussieren")
@@ -13324,6 +13358,11 @@ class MainWindow(QMainWindow):
         act_path = menu.addAction("Pfad kopieren")
         act_text = menu.addAction("Text kopieren")
         act_file = menu.addAction("Datei öffnen")
+        menu.addSeparator()
+        act_dismiss = menu.addAction("Status schließen")
+        if not path:
+            for a in (act_tab, act_folder, act_path, act_text, act_file):
+                a.setEnabled(False)
         # An Statusleiste verankern
         bar = self.statusBar()
         pos = bar.mapToGlobal(bar.rect().bottomLeft()) if bar is not None else None
@@ -13338,6 +13377,8 @@ class MainWindow(QMainWindow):
             return self._copy_ocr_region_result_text()
         if chosen is act_file:
             return self._open_ocr_region_result_file()
+        if chosen is act_dismiss:
+            return self._dismiss_ocr_region_status()
         return True  # Menü gezeigt (auch bei Abbruch)
 
     def _focus_ocr_region_result_tab(self) -> bool:

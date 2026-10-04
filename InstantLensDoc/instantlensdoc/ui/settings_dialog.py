@@ -2831,7 +2831,7 @@ class SettingsDialog(QDialog):
             self.btn_undo_factory_presets.setEnabled(bool(prev))
 
     def eventFilter(self, obj, event):  # noqa: N802
-        """Swatch L→Hex · R→Highlight/Stift/Notiz setzen — 2.5.9/2.5.10."""
+        """Swatch L→Hex · M→Highlight · R→HL/Stift/Notiz — 2.5.9–2.5.11."""
         labels = getattr(self, "_theme_swatch_labels", None) or []
         if obj in labels and event.type() == QEvent.MouseButtonPress:
             btn = getattr(event, "button", lambda: None)()
@@ -2840,6 +2840,10 @@ class SettingsDialog(QDialog):
                 return super().eventFilter(obj, event)
             if btn == Qt.LeftButton:
                 self._copy_single_theme_hex(hex_c)
+                return True
+            if btn == Qt.MiddleButton:
+                # Mittelklick: sofort Highlight-Farbe — 2.5.11
+                self._apply_swatch_as_tool_color(hex_c, "highlight")
                 return True
             if btn == Qt.RightButton:
                 self._show_theme_swatch_menu(obj, hex_c)
@@ -2933,7 +2937,8 @@ class SettingsDialog(QDialog):
                     f"background: {c}; border: 1px solid #444; border-radius: 3px;"
                 )
                 sw.setToolTip(
-                    f"{name}: {c} · Klick = Hex · RMB = HL/Stift/Notiz — 2.5.10"
+                    f"{name}: {c} · Klick = Hex · Mittelklick = Highlight · "
+                    f"RMB = HL/Stift/Notiz — 2.5.11"
                 )
                 sw.setProperty("themeHex", str(c))
                 sw.setCursor(Qt.PointingHandCursor)

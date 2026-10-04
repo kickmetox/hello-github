@@ -245,7 +245,7 @@ class WelcomePage(QWidget):
         self.btn_continue.setToolTip(tip)
 
     def eventFilter(self, obj, event):  # noqa: N802
-        """Esc Filter; Del Recent; Enter öffnen; Ctrl+C/V/X Tags — 2.5.9/2.5.10."""
+        """Esc Filter; Del Recent; Shift+Del Tags; Ctrl+C/V/X Tags — 2.5.9–2.5.11."""
         if event.type() == QEvent.KeyPress:
             assert isinstance(event, QKeyEvent)
             key = event.key()
@@ -259,6 +259,10 @@ class WelcomePage(QWidget):
                     return True
                 if item is not None and key in (Qt.Key_Delete, Qt.Key_Backspace):
                     path = item.data(Qt.UserRole)
+                    if path and bool(event.modifiers() & Qt.ShiftModifier):
+                        # Shift+Entf/Backspace: Alle Tags entfernen — 2.5.11
+                        self._clear_tags_for_recent(str(path))
+                        return True
                     if path:
                         self.recent_remove_requested.emit(str(path))
                         return True
@@ -529,7 +533,7 @@ class WelcomePage(QWidget):
         menu = QMenu(self)
         act_add_tag = menu.addAction("Tag hinzufügen…")
         act_remove_tag = menu.addAction("Tag entfernen…")
-        act_clear_tags = menu.addAction("Alle Tags entfernen")
+        act_clear_tags = menu.addAction("Alle Tags entfernen\tShift+Entf")
         act_copy_tags = menu.addAction("Tags kopieren")
         act_cut_tags = menu.addAction("Tags ausschneiden")
         act_paste_tags = menu.addAction("Tags einfügen")
