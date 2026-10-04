@@ -4759,6 +4759,27 @@ def delete_export_profile(name: str) -> bool:
     return True
 
 
+def move_export_profile(name: str, delta: int) -> bool:
+    """Export-Preset in der Liste um ``delta`` Positionen verschieben — 2.5.13."""
+    want = (name or "").strip().casefold()
+    if not want or not delta:
+        return False
+    profiles = get_export_profiles()
+    idx = next(
+        (i for i, p in enumerate(profiles) if str(p["name"]).casefold() == want),
+        -1,
+    )
+    if idx < 0:
+        return False
+    new_idx = idx + int(delta)
+    if new_idx < 0 or new_idx >= len(profiles):
+        return False
+    item = profiles.pop(idx)
+    profiles.insert(new_idx, item)
+    save_settings({"export_profiles": profiles})
+    return True
+
+
 def rename_export_profile(old_name: str, new_name: str) -> dict[str, object]:
     """Export-Preset umbenennen (Duplikat ablehnen) — 2.5.4."""
     old = (old_name or "").strip()

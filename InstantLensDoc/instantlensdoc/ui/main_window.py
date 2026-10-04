@@ -4098,6 +4098,17 @@ class MainWindow(QMainWindow):
                 if self._focus_ocr_region_result_tab():
                     event.accept()
                     return
+        # OCR-Region Status: Ctrl+C Text · Ctrl+Shift+C Pfad — 2.5.13
+        if event.key() == Qt.Key_C and bool(event.modifiers() & Qt.ControlModifier):
+            if getattr(self, "_ocr_region_toast_active", False):
+                if bool(event.modifiers() & Qt.ShiftModifier):
+                    if self._copy_ocr_region_result_path():
+                        event.accept()
+                        return
+                else:
+                    if self._copy_ocr_region_result_text():
+                        event.accept()
+                        return
         super().keyPressEvent(event)
 
     def _duplicate_current(self):
@@ -11609,6 +11620,7 @@ class MainWindow(QMainWindow):
             get_export_profiles,
             get_last_export_dir,
             import_export_presets_json,
+            move_export_profile,
             rename_export_profile,
             set_last_export_dir,
         )
@@ -11660,7 +11672,8 @@ class MainWindow(QMainWindow):
         info = QLabel(
             f"Benannte Presets ({len(profiles)}/{EXPORT_PROFILES_MAX}). "
             "★ aktiv · RMB Zielordner · Summary/Pfad · F2 Umbenennen · "
-            "Ctrl+D Duplizieren · Ctrl+Enter Anwenden (offen) · Entf · Doppelklick Anwenden."
+            "Ctrl+D Duplizieren · Ctrl+Enter Anwenden (offen) · "
+            "Ctrl+↑/↓ Reihenfolge · Entf · Doppelklick Anwenden."
         )
         lay.addWidget(info)
         lst = QListWidget()
@@ -11668,8 +11681,9 @@ class MainWindow(QMainWindow):
             "★ = aktives Preset · Listen-Tooltip Summary DPI/Format/Pfad · "
             "Rechtsklick → Zielordner / Summary / Pfad kopieren · "
             "Ctrl+C Summary · Ctrl+Shift+C Pfad · F2 Umbenennen · "
-            "Ctrl+D Duplizieren · Ctrl+Enter Anwenden ohne Schließen · Entf löschen · "
-            "Doppelklick/Enter Anwenden — 2.5.12"
+            "Ctrl+D Duplizieren · Ctrl+Enter Anwenden ohne Schließen · "
+            "Ctrl+↑/↓ Reihenfolge · Entf löschen · "
+            "Doppelklick/Enter Anwenden — 2.5.13"
         )
         lst.setContextMenuPolicy(Qt.CustomContextMenu)
         active = {"name": get_active_export_profile_name()}
@@ -11852,6 +11866,26 @@ class MainWindow(QMainWindow):
                     lst.setCurrentItem(it)
                     break
             _refresh_summary()
+
+        def _move(delta: int) -> None:
+            """Ctrl+↑/↓ Preset-Reihenfolge — 2.5.13."""
+            item = lst.currentItem()
+            if item is None:
+                return
+            name = _item_name(item)
+            if not name:
+                return
+            if not move_export_profile(name, delta):
+                return
+            _reload_list()
+            for i in range(lst.count()):
+                it = lst.item(i)
+                if it and _item_name(it) == name:
+                    lst.setCurrentItem(it)
+                    break
+            _refresh_summary()
+            direction = "oben" if delta < 0 else "unten"
+            self._set_status(f"Export-Preset „{name}“ nach {direction} verschoben")
 
         def _delete() -> None:
             item = lst.currentItem()
@@ -12052,6 +12086,8 @@ class MainWindow(QMainWindow):
             act_apply_keep = menu.addAction("Anwenden (offen lassen)\tCtrl+Enter")
             act_dup = menu.addAction("Duplizieren")
             act_rename = menu.addAction("Umbenennen…")
+            act_up = menu.addAction("Nach oben\tCtrl+↑")
+            act_down = menu.addAction("Nach unten\tCtrl+↓")
             act_del = menu.addAction("Löschen…")
             chosen = menu.exec(lst.mapToGlobal(pos))
             if chosen is act_open:
@@ -12068,6 +12104,10 @@ class MainWindow(QMainWindow):
                 _duplicate()
             elif chosen is act_rename:
                 _rename()
+            elif chosen is act_up:
+                _move(-1)
+            elif chosen is act_down:
+                _move(1)
             elif chosen is act_del:
                 _delete()
 
@@ -12093,6 +12133,12 @@ class MainWindow(QMainWindow):
                     ):
                         # Ctrl+Enter Anwenden ohne Schließen — 2.5.12
                         _apply(close=False)
+                        return True
+                    if event.key() in (Qt.Key_Up, Qt.Key_Down) and bool(
+                        event.modifiers() & Qt.ControlModifier
+                    ):
+                        # Ctrl+↑/↓ Reihenfolge — 2.5.13
+                        _move(-1 if event.key() == Qt.Key_Up else 1)
                         return True
                     if event.key() == Qt.Key_C and bool(
                         event.modifiers() & Qt.ControlModifier
@@ -13335,7 +13381,7 @@ class MainWindow(QMainWindow):
         return preview
 
     def _ocr_region_status_tooltip(self) -> str:
-        """Status-Tooltip inkl. Textvorschau — 2.5.9–2.5.12."""
+        """Status-Tooltip inkl. Textvorschau — 2.5.9–2.5.13."""
         path = getattr(self, "_last_ocr_region_path", None) or ""
         tip = (
             "Linksklick → Ergebnis-Tab · Rechtsklick → Menü · "
@@ -13343,7 +13389,8 @@ class MainWindow(QMainWindow):
             "Shift+Klick → Text kopieren · "
             "Alt+Klick → Datei öffnen · "
             "Esc → Status schließen · "
-            "Enter → Ergebnis-Tab — 2.5.12"
+            "Enter → Ergebnis-Tab · "
+            "Ctrl+C Text · Ctrl+Shift+C Pfad — 2.5.13"
         )
         if path:
             tip = f"{tip}\n{path}"

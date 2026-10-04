@@ -1,5 +1,20 @@
 # Changelog — InstantLens Doc
 
+## 2.5.13 — OCR Ctrl+C/Pfad, Theme Dbl-HL, ildtags F3, Export Ctrl+↑↓
+
+Post-Release-Polish nach **2.5.12**: **OCR-Region** Status-**Ctrl+C Text** · **Ctrl+Shift+C Pfad**; **Farben-Themes** Swatch-**Doppelklick → Highlight**; **ildtags** **F3 Tag entfernen**; **Export-Presets** **Ctrl+↑/↓ Reihenfolge**. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie klar markiert / nicht produktiv (Ink ≠ Stylus).
+
+### Geändert
+- OCR-Region: Ctrl+C → Text kopieren · Ctrl+Shift+C → Pfad (Status aktiv)
+- Farben-Themes: Doppelklick Swatch → Highlight-Farbe setzen
+- Dokument-Tags: F3 Tag entfernen (Recent)
+- Export-Presets: Ctrl+↑/↓ Reihenfolge verschieben
+
+### Tests / Qualität
+- Version **2.5.13** (App / `ild_pdf` / ISS / Smoke / Docs); Serie **2.5**; `docs/VERSION` + `VERSION.txt`
+- Smoke: 2.5.13 CLI + Qt (OCR Ctrl+C/Pfad, Theme Dbl-HL, ildtags F3, Export Ctrl+↑↓)
+- Stubs: KI/Cloud/Stylus/3D/Hooks/Outline/Telemetrie unverändert markiert
+
 ## 2.5.12 — OCR Enter→Tab, Theme Mid-Stift/Notiz, ildtags F2, Export Ctrl+Enter
 
 Post-Release-Polish nach **2.5.11**: **OCR-Region** Status-**Enter → Ergebnis-Tab**; **Farben-Themes** Swatch-**Shift+Mittelklick → Stift** · **Ctrl+Mittelklick → Notiz**; **ildtags** **F2 Tag hinzufügen**; **Export-Presets** **Ctrl+Enter Anwenden ohne Schließen**. Stubs KI/Cloud/Stylus/3D/Plugin-Hooks/Outline-Vorlesen/Telemetrie klar markiert / nicht produktiv (Ink ≠ Stylus).
