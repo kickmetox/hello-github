@@ -1,3 +1,9 @@
+## 2.6.39 - Large-PDF Open/Edit Performance
+
+Patch nach **2.6.38**: Nutzerbericht — 536-Seiten-PDF oeffnet mit Dialog "Grosses PDF", haengt danach beim Laden/Bearbeiten. Ursachen: UI-Thread blockiert durch Voll-Scan PageLabels, 536× Thumbnail-Platzhalter mit eigenen Pixmaps, Lazy-Queue rendert alle Seiten im Hintergrund, Doppel-Refresh Thumbs/Outline nach Open, Volltext-Extraktion ohne Cap.
+
+Fix: **cancelbarer Open** mit Progress-Dialog (1. Seite sofort); **PageLabels-Scan** fuer grosse Docs uebersprungen; **Thumbnails virtualisiert** (Shared-Placeholder, Chunked Add, Viewport±Prefetch ohne Rest-Queue ab `THUMB_VIRTUAL_THRESHOLD`); **Edit/Text page-scoped** (Warn-Dialog ab Soft-Warn, Cancel, Doc-Stats Sample); Open-Generation bricht veraltete Folgearbeit ab. Pack `InstantLensDoc-2.6.39-pack.zip`; VERSION **2.6.39**.
+
 ## 2.6.38 - Scanner/Drucker-Erkennung Windows-Haertung
 
 Patch nach **2.6.36**: Nutzer meldete fehlendes Scanner-Modul sowie kaputte Geraete-/Drucker-Erkennung trotz startender App. Fix: **Windows-Discovery** haertet Drucker (Qt + Winspool + Get-Printer + win32print) und Scanner (WIA + PnP + TWAIN-Quellen); PowerShell ohne Konsolenfenster, robustes JSON/ERR-Parsing; klare DE-Hinweise wenn Treiber fehlen. **Scan-Acquire** crasht nicht ohne Geraet (`last_acquire_error`); Tesseract sucht Standard-Windows-Pfade. UI: Menue **Geraete** (Scanner / Drucker / Erkennen); PyInstaller hidden-imports fuer PrintSupport/devices/scan/ocr. Pack `InstantLensDoc-2.6.38-pack.zip`; VERSION **2.6.38**.

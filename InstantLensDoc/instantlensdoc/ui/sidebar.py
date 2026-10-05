@@ -1985,8 +1985,23 @@ class Sidebar(QWidget):
         self.thumbs.clear()
         self._thumb_token = getattr(self, "_thumb_token", 0) + 1
 
-    def prepare_lazy_thumbs(self, page_count: int, *, current: int = 0, max_pages: int | None = None):
-        """Platzhalter für alle Seiten (Lazy-Load); max_pages begrenzt optional — 1.3.0."""
+    def prepare_lazy_thumbs(
+        self,
+        page_count: int,
+        *,
+        current: int = 0,
+        max_pages: int | None = None,
+        cancel_check=None,
+    ):
+        """Platzhalter für Seiten (Lazy-Load).
+
+        Shared Placeholder-Icon + Chunked Add (UI bleibt responsiv) — 2.6.37.
+        max_pages begrenzt optional. cancel_check(): bool → Abbruch.
+        """
+        from PySide6.QtWidgets import QApplication
+
+        from ild_pdf.limits import THUMB_PLACEHOLDER_CHUNK
+
         bar = self.thumbs.verticalScrollBar()
         prev_armed = getattr(self, "_thumb_scroll_emit_armed", True)
         self._thumb_scroll_emit_armed = False
@@ -1995,6 +2010,7 @@ class Sidebar(QWidget):
         try:
             self.thumbs.clear()
             self._thumb_token = getattr(self, "_thumb_token", 0) + 1
+            token = self._thumb_token
             w, h = pdf_thumbnail_icon_size()
             self.thumbs.apply_icon_size(w, h)
             total = max(0, int(page_count))
@@ -2002,15 +2018,23 @@ class Sidebar(QWidget):
                 n = total
             else:
                 n = max(0, min(total, int(max_pages)))
+            # Ein gemeinsames Placeholder — 536× QPixmap kostet sonst spürbar — 2.6.37
+            pm = QPixmap(w, h)
+            pm.fill(Qt.lightGray)
+            shared_icon = QIcon(pm)
+            chunk = max(8, int(THUMB_PLACEHOLDER_CHUNK))
             for i in range(n):
+                if cancel_check is not None and cancel_check():
+                    break
+                if token != getattr(self, "_thumb_token", None):
+                    break
                 item = QListWidgetItem(f"S. {i + 1}")
                 item.setData(Qt.UserRole, i)
                 item.setToolTip(f"Seite {i + 1} — laden…")
-                # hellgraues Platzhalter-Icon
-                pm = QPixmap(w, h)
-                pm.fill(Qt.lightGray)
-                item.setIcon(QIcon(pm))
+                item.setIcon(shared_icon)
                 self.thumbs.addItem(item)
+                if (i + 1) % chunk == 0:
+                    QApplication.processEvents()
             self.select_thumb(current)
         finally:
             self.thumbs.blockSignals(False)

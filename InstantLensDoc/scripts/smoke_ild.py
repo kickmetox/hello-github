@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Nightly/CI Smoke: CLI + Import-Checks für InstantLens Doc — 2.1.0–2.6.38.
+"""Nightly/CI Smoke: CLI + Import-Checks für InstantLens Doc — 2.1.0–2.6.39.
 
 Leichtgewichtig. Exit-Codes:
   0  OK  (ok=true)
@@ -14,12 +14,12 @@ Aufruf:
   python scripts/smoke_ild.py -h
 
 JSON-Schema (--json), Erfolg:
-  {"ok": true, "version": "2.6.38", "duration_ms": 1234,
+  {"ok": true, "version": "2.6.39", "duration_ms": 1234,
    "checks": ["version", "imports", "cli", "measure_diff_import", "changelog"]}
 
 JSON bei Fail: checks[] enthält Objekt mit error-Text (max 200 Zeichen, Truncate …);
 Exitcode spiegelt ok (0↔true, 1↔false) — 2.2.0:
-  {"ok": false, "version": "2.6.38", "duration_ms": 12,
+  {"ok": false, "version": "2.6.39", "duration_ms": 12,
    "checks": ["version", {"name": "imports", "error": "import x: …"}]}
 """
 
@@ -41,7 +41,7 @@ if str(ROOT) not in sys.path:
 # Headless/CI: Qt ohne Display
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-EXPECTED_VERSION = "2.6.38"
+EXPECTED_VERSION = "2.6.39"
 FAIL_ERROR_MAX_LEN = 200
 
 EXIT_OK = 0
@@ -82,7 +82,7 @@ def check_version() -> None:
         _fail(f"docs/VERSION={docs_ver!r}")
     bw = (ROOT / "build-windows.ps1").read_text(encoding="utf-8")
     if EXPECTED_VERSION not in bw or "Allow32Bit" not in bw:
-        _fail("build-windows.ps1 fehlt 2.6.38/Allow32Bit")
+        _fail("build-windows.ps1 fehlt 2.6.39/Allow32Bit")
     if not (ROOT / "scripts" / "pack-windows-runnable.py").is_file():
         _fail("scripts/pack-windows-runnable.py fehlt")
     if not (ROOT / "run-keygen.bat").is_file():
@@ -181,6 +181,40 @@ def check_version() -> None:
     spec.loader.exec_module(mod)
     if not callable(getattr(mod, "main", None)):
         _fail("run_instantlensdoc.main nicht callable")
+    # 2.6.39: Large-PDF perf constants + APIs
+    from ild_pdf.limits import (
+        THUMB_VIRTUAL_THRESHOLD,
+        THUMB_PLACEHOLDER_CHUNK,
+        PAGE_LABELS_SCAN_THRESHOLD,
+        TEXT_EXTRACT_ALL_WARN_PAGES,
+        STATS_WORD_SAMPLE_PAGES,
+    )
+    if int(THUMB_VIRTUAL_THRESHOLD) < 50:
+        _fail("THUMB_VIRTUAL_THRESHOLD zu klein (2.6.39)")
+    if int(THUMB_PLACEHOLDER_CHUNK) < 8:
+        _fail("THUMB_PLACEHOLDER_CHUNK zu klein (2.6.39)")
+    if int(PAGE_LABELS_SCAN_THRESHOLD) < 50:
+        _fail("PAGE_LABELS_SCAN_THRESHOLD zu klein (2.6.39)")
+    if int(TEXT_EXTRACT_ALL_WARN_PAGES) < 50:
+        _fail("TEXT_EXTRACT_ALL_WARN_PAGES zu klein (2.6.39)")
+    if int(STATS_WORD_SAMPLE_PAGES) < 1:
+        _fail("STATS_WORD_SAMPLE_PAGES ungültig (2.6.39)")
+    from ild_pdf.overlay import extract_plain_text_pages
+    if not callable(extract_plain_text_pages):
+        _fail("extract_plain_text_pages fehlt (2.6.39)")
+    mw = (ROOT / "instantlensdoc" / "ui" / "main_window.py").read_text(encoding="utf-8")
+    if "virtual_only" not in mw or "THUMB_VIRTUAL_THRESHOLD" not in mw:
+        _fail("main_window fehlt virtual thumb queue (2.6.39)")
+    if "TEXT_EXTRACT_ALL_WARN_PAGES" not in mw:
+        _fail("main_window fehlt page-scoped extract warn (2.6.39)")
+    pv = (ROOT / "instantlensdoc" / "ui" / "pdf_view.py").read_text(encoding="utf-8")
+    if "QProgressDialog" not in pv or "_open_generation" not in pv:
+        _fail("pdf_view.load fehlt Progress/Cancel Open (2.6.39)")
+    if "scan_native" not in pv:
+        _fail("pdf_view fehlt lazy page labels (2.6.39)")
+    sb = (ROOT / "instantlensdoc" / "ui" / "sidebar.py").read_text(encoding="utf-8")
+    if "shared_icon" not in sb and "THUMB_PLACEHOLDER_CHUNK" not in sb:
+        _fail("sidebar.prepare_lazy_thumbs fehlt shared/chunked placeholders (2.6.39)")
     _ok(f"version {EXPECTED_VERSION}")
 
 
@@ -497,7 +531,7 @@ def check_imports(*, with_qt: bool) -> None:
             "Zu ersetzender Pin",
             "hyphenate_fr",
             "hyphenate_it",
-            "2.6.38",
+            "2.6.39",
         ),
         ROOT / "instantlensdoc" / "ui" / "sidebar.py": (
             "Schnellvorschau",
@@ -585,7 +619,7 @@ def check_imports(*, with_qt: bool) -> None:
             "_update_index",
             "HYPHENATION_UI_LANGS",
             "hyphenate_fr",
-            "2.6.38",
+            "2.6.39",
         ),
         ROOT / "instantlensdoc" / "ui" / "batch_dialog.py": (
             "BatchConvertDialog",
@@ -1022,6 +1056,8 @@ def check_measure_and_diff() -> None:
 
 def check_changelog() -> None:
     cl = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    if "## 2.6.39" not in cl:
+        _fail("CHANGELOG fehlt ## 2.6.39")
     if "## 2.6.38" not in cl:
         _fail("CHANGELOG fehlt ## 2.6.38")
     if "## 2.6.36" not in cl:
@@ -1565,11 +1601,13 @@ def check_changelog() -> None:
     ):
         _fail("CHANGELOG 2.6.36 fehlt EXE Relative-Import/Entry-Hinweis")
     if (
-        "Get-Printer" not in cl
-        and "Scanner" not in cl
-        and "2.6.38" not in cl
+        "Large-PDF" not in cl
+        and "Thumbnails virtual" not in cl
+        and "Viewport" not in cl
+        and "THUMB_VIRTUAL" not in cl
+        and "2.6.39" not in cl
     ):
-        _fail("CHANGELOG 2.6.38 fehlt Scanner/Drucker-Hinweis")
+        _fail("CHANGELOG 2.6.39 fehlt Large-PDF/Perf-Hinweis")
     if (
         "Silbentrennung" not in cl
         and "Hyphen" not in cl
@@ -1708,7 +1746,7 @@ def check_changelog() -> None:
     if "## 2.2.0" not in cl:
         _fail("CHANGELOG fehlt ## 2.2.0")
     feat = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
-    if "2.6.38" not in feat:
+    if "2.6.39" not in feat:
         _fail("FEATURES.md fehlt 2.6.36")
     if "2.6.28" not in feat:
         _fail("FEATURES.md fehlt 2.6.28")
@@ -1864,11 +1902,11 @@ def check_changelog() -> None:
     ):
         _fail("FEATURES.md fehlt 2.6.36 EXE Relative-Import/Entry-Hinweis")
     if (
-        "Get-Printer" not in feat
-        and "Geräte" not in feat
-        and "2.6.38" not in feat
+        "Large-PDF" not in feat
+        and "lazy/virtual" not in feat
+        and "2.6.39" not in feat
     ):
-        _fail("FEATURES.md fehlt 2.6.38 Scanner/Drucker-Hinweis")
+        _fail("FEATURES.md fehlt 2.6.39 Large-PDF Perf-Hinweis")
     if (
         "Silbentrennung" not in feat
         and "Menü/Palette" not in feat
@@ -2313,11 +2351,11 @@ Exit-Codes:
 Laufzeit: am Ende als „Laufzeit: N ms“ (oder duration_ms im JSON).
 
 Beispiel --json (Erfolg):
-  {"ok": true, "version": "2.6.38", "duration_ms": 1234,
+  {"ok": true, "version": "2.6.39", "duration_ms": 1234,
    "checks": ["version", "imports", "cli", "measure_diff_import", "changelog"]}
 
 Beispiel --json (Fail):
-  {"ok": false, "version": "2.6.38", "duration_ms": 12,
+  {"ok": false, "version": "2.6.39", "duration_ms": 12,
    "checks": ["version", {"name": "imports", "error": "import x: …"}]}
 """.rstrip()
     )

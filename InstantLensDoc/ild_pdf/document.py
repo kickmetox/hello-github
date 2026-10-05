@@ -67,9 +67,15 @@ class PdfDocument:
             return ""
         return str(label or "").strip()
 
-    def page_labels(self) -> list[str]:
-        """Alle Seitenlabels (leere Strings wenn keine PageLabels-Dict im PDF)."""
-        return [self.page_label(i) for i in range(self.page_count)]
+    def page_labels(self, *, max_pages: int | None = None) -> list[str]:
+        """Seitenlabels (leere Strings wenn keine PageLabels-Dict im PDF).
+
+        max_pages: optionaler Cap — bei großen PDFs teuer (pro Seite PDFium-Call).
+        """
+        n = self.page_count
+        if max_pages is not None:
+            n = max(0, min(n, int(max_pages)))
+        return [self.page_label(i) for i in range(n)]
 
     def __enter__(self) -> "PdfDocument":
         return self

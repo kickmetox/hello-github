@@ -1,4 +1,4 @@
-"""Schnellaktionen-Palette (Ctrl+K Command Palette) — 2.3.0–2.3.5 / 2.6.38.
+"""Schnellaktionen-Palette (Ctrl+K Command Palette) — 2.3.0–2.3.5 / 2.6.39.
 
 2.3.1: Fuzzy-Filter, letzte Befehle, Esc schließt, Kategorien gruppiert.
 2.3.2: Pin häufige Befehle · Recent-Anzahl Settings 5/10/20.
@@ -6,7 +6,8 @@
 2.3.4: Overflow-Hinweis bei Pin-Limit · Option ältesten Pin ersetzen.
 2.3.5: Pin-ersetzen-Bestätigung mit Namen des zu ersetzenden Pins.
 2.6.29: Silbentrennung-Befehle für alle 9 UI-Sprachen (FR/RU/ES/ZH/PT/AR/IT).
-2.6.38: Windows-Build-PS Encoding-Fix (Version-Marker).
+2.6.38: Scanner/Drucker-Discovery UI-Marker.
+2.6.39: Large-PDF Perf Version-Marker.
 """
 
 from __future__ import annotations

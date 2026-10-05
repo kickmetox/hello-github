@@ -228,6 +228,7 @@ class MainWindow(QMainWindow):
         self._thumb_lazy_token: int | None = None
         self._thumb_lazy_loaded: set[int] = set()
         self._thumb_lazy_page_count: int = 0
+        self._thumb_lazy_virtual: bool = False
         self._tray: QSystemTrayIcon | None = None
         self._tray_menu: QMenu | None = None
         self._force_quit = False
@@ -8392,10 +8393,20 @@ class MainWindow(QMainWindow):
         self._clear_ann_zero_sticky_status()
         self._update_doc_status()
         if self.pdf_view.pdf_path:
-            self._refresh_thumbs()
-            self._refresh_outline(self.pdf_view.pdf_path)
-            self._refresh_page_favorites()
-            self._refresh_form_fields()
+            # Thumbs/Outline nach Erst-Render deferren — Open bleibt flüssig — 2.6.37
+            open_gen = int(getattr(self.pdf_view, "_open_generation", 0) or 0)
+
+            def _deferred_sidebar():
+                if not self.pdf_view.pdf_path:
+                    return
+                if int(getattr(self.pdf_view, "_open_generation", 0) or 0) != open_gen:
+                    return
+                self._refresh_thumbs()
+                self._refresh_outline(self.pdf_view.pdf_path)
+                self._refresh_page_favorites()
+                self._refresh_form_fields()
+
+            QTimer.singleShot(0, _deferred_sidebar)
         else:
             self.sidebar.clear_thumbs()
             self.sidebar.clear_annotations()
@@ -9023,16 +9034,54 @@ class MainWindow(QMainWindow):
         if not self.pdf_view.pdf_path:
             self._set_status("Kein PDF geladen")
             return
-        from ild_pdf import extract_all_plain_text
+        from PySide6.QtWidgets import QApplication, QProgressDialog
 
+        from ild_pdf import extract_all_plain_text
+        from ild_pdf.limits import TEXT_EXTRACT_ALL_WARN_PAGES
+
+        n = int(self.pdf_view.page_count or 0)
+        # Große PDFs: Bestätigung — Default nur aktuelle Seite — 2.6.37
+        if n >= int(TEXT_EXTRACT_ALL_WARN_PAGES):
+            r = QMessageBox.question(
+                self,
+                "Großes PDF — Text extrahieren",
+                f"Dieses PDF hat {n} Seiten.\n\n"
+                "Alle Seiten extrahieren kann lange dauern und viel Speicher brauchen.\n\n"
+                "Ja = alle Seiten\n"
+                "Nein = nur aktuelle Seite\n"
+                "Abbrechen = nichts",
+                QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel,
+                QMessageBox.No,
+            )
+            if r == QMessageBox.Cancel:
+                return
+            if r == QMessageBox.No:
+                self._extract_page_text_to_editor()
+                return
+
+        prog = QProgressDialog(
+            f"Text wird extrahiert ({n} Seite(n))…", "Abbrechen", 0, 0, self
+        )
+        prog.setWindowTitle("Text extrahieren")
+        prog.setWindowModality(Qt.WindowModal)
+        prog.setMinimumDuration(150)
+        prog.show()
+        QApplication.processEvents()
         try:
             text = extract_all_plain_text(
                 self.pdf_view.pdf_path,
                 password=self.pdf_view.password,
                 page_headers=True,
+                cancel_check=lambda: bool(prog.wasCanceled()),
             )
         except Exception as e:
+            prog.close()
             QMessageBox.warning(self, "Text extrahieren", str(e))
+            return
+        canceled = bool(prog.wasCanceled())
+        prog.close()
+        if canceled:
+            self._set_status("Text-Extraktion abgebrochen")
             return
         self.editor.setPlainText(text)
         self.stack.setCurrentWidget(self.editor_pane)
@@ -10630,10 +10679,10 @@ class MainWindow(QMainWindow):
             self.sidebar.clear_thumbs()
             self._update_thumb_cache_debug_status()
             return
-        # Lazy: Platzhalter; Prefetch ±N (Settings); Schwellwert Settings — 1.3.3
+        # Lazy: Platzhalter; Prefetch ±N; große PDFs nur Viewport (virtual) — 2.6.37
         self._stop_thumb_lazy()
         try:
-            from ild_pdf.limits import THUMB_LAZY_THRESHOLD
+            from ild_pdf.limits import THUMB_LAZY_THRESHOLD, THUMB_VIRTUAL_THRESHOLD
             from instantlensdoc.core.app_settings import (
                 get_thumb_lazy_threshold,
                 get_thumb_prefetch_radius,
@@ -10649,17 +10698,29 @@ class MainWindow(QMainWindow):
                 radius = 2
             page_count = int(self.pdf_view.page_count or 0)
             current = int(self.pdf_view.page_index or 0)
-            # Alle Seiten als Platzhalter; große PDFs (>Threshold) immer lazy
+            open_gen = int(getattr(self.pdf_view, "_open_generation", 0) or 0)
             max_pages = page_count if page_count > 0 else 0
             token = self.sidebar.prepare_lazy_thumbs(
-                page_count, current=current, max_pages=max_pages or page_count
+                page_count,
+                current=current,
+                max_pages=max_pages or page_count,
+                cancel_check=lambda: int(
+                    getattr(self.pdf_view, "_open_generation", 0) or 0
+                )
+                != open_gen,
             )
+            virtual = page_count >= int(THUMB_VIRTUAL_THRESHOLD)
             self._start_thumb_lazy(
-                token, page_count=page_count, prefer=current, radius=radius
+                token,
+                page_count=page_count,
+                prefer=current,
+                radius=radius,
+                virtual_only=virtual,
             )
             if page_count > threshold and hasattr(self, "file_status_label"):
+                mode = "Viewport±Prefetch" if virtual else "Lazy-Load"
                 self._set_status(
-                    f"Thumbnails: Lazy-Load {page_count} Seiten "
+                    f"Thumbnails: {mode} {page_count} Seiten "
                     f"(>{threshold}, Prefetch ±{radius})"
                 )
             self._update_thumb_cache_debug_status()
@@ -10680,6 +10741,7 @@ class MainWindow(QMainWindow):
         self._thumb_lazy_token = None
         self._thumb_lazy_loaded = set()
         self._thumb_lazy_page_count = 0
+        self._thumb_lazy_virtual = False
 
     def _cancel_thumb_lazy_queue(self) -> None:
         """Warteschlange leeren (Token/Timer behalten) — schneller Scroll — 1.3.2."""
@@ -10723,7 +10785,13 @@ class MainWindow(QMainWindow):
         self._prefetch_thumbs_around(int(center), cancel=bool(cancel_fast))
 
     def _start_thumb_lazy(
-        self, token: int, *, page_count: int, prefer: int = 0, radius: int | None = None
+        self,
+        token: int,
+        *,
+        page_count: int,
+        prefer: int = 0,
+        radius: int | None = None,
+        virtual_only: bool | None = None,
     ):
         self._stop_thumb_lazy()
         if page_count <= 0:
@@ -10736,13 +10804,22 @@ class MainWindow(QMainWindow):
             except Exception:
                 radius = 2
         radius = max(1, min(3, int(radius)))
-        # Aktuelle Seite zuerst, dann Prefetch ±N, dann Rest — 1.3.3
+        if virtual_only is None:
+            try:
+                from ild_pdf.limits import THUMB_VIRTUAL_THRESHOLD
+
+                virtual_only = page_count >= int(THUMB_VIRTUAL_THRESHOLD)
+            except Exception:
+                virtual_only = page_count >= 80
+        # Aktuelle Seite zuerst, dann Prefetch ±N.
+        # Große PDFs: KEIN Rest-Queue (Scroll/Prefetch holt nach) — 2.6.37
         order: list[int] = []
         seen: set[int] = set()
         near = [prefer]
         for d in range(1, radius + 1):
             near.extend([prefer - d, prefer + d])
-        for i in near + list(range(page_count)):
+        rest = [] if virtual_only else list(range(page_count))
+        for i in near + rest:
             if 0 <= i < page_count and i not in seen:
                 seen.add(i)
                 order.append(i)
@@ -10750,6 +10827,7 @@ class MainWindow(QMainWindow):
         self._thumb_lazy_token = token
         self._thumb_lazy_loaded = set()
         self._thumb_lazy_page_count = page_count
+        self._thumb_lazy_virtual = bool(virtual_only)
         self._thumb_lazy_timer = QTimer(self)
         self._thumb_lazy_timer.setInterval(16)
         self._thumb_lazy_timer.timeout.connect(self._thumb_lazy_tick)
@@ -14551,9 +14629,8 @@ class MainWindow(QMainWindow):
                 if not self.pdf_view.load(path):
                     self.sidebar.clear_thumbs()
                     return
+                # Thumbs/Outline kommen deferred via document_changed — kein Doppel-Work — 2.6.37
                 self._refresh_pdf_marks()
-                self._refresh_outline(path)
-                self._refresh_thumbs()
                 self._refresh_portfolio_sidebar(path)
                 _log.info("PDF geöffnet: %s", path)
             elif self.doc.kind == DocKind.IMAGE:
@@ -14612,10 +14689,13 @@ class MainWindow(QMainWindow):
             except Exception:
                 pass
             try:
-                pdf_for_ol = None
-                if self.doc is not None and str(getattr(self.doc.kind, "name", "")) == "PDF":
-                    pdf_for_ol = path
-                self._refresh_document_outline(pdf_path=pdf_for_ol)
+                # PDF-Outline bereits deferred via document_changed — Text/Editor hier — 2.6.37
+                is_pdf = (
+                    self.doc is not None
+                    and str(getattr(self.doc.kind, "name", "")) == "PDF"
+                )
+                if not is_pdf:
+                    self._refresh_document_outline(pdf_path=None)
             except Exception:
                 pass
         except Exception as e:

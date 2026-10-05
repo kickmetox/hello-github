@@ -3933,19 +3933,32 @@ class PdfViewer(QWidget):
         """True wenn mindestens ein nicht-leeres PDF-Seitenlabel vorhanden."""
         return any(bool(x) for x in (getattr(self, "_page_labels", None) or []))
 
-    def _reload_page_labels(self) -> None:
-        """PageLabels aus PDF + Sidecar-Custom laden (Custom überschreibt) — 2.2.0."""
+    def _reload_page_labels(self, *, scan_native: bool | None = None) -> None:
+        """PageLabels aus PDF + Sidecar-Custom laden (Custom überschreibt) — 2.2.0/2.6.37.
+
+        Große PDFs: nativen get_page_label-Scan überspringen (pro Seite teuer).
+        """
         self._page_labels = []
         if not self.pdf_path or self.page_count <= 0:
             return
         n = int(self.page_count or 0)
-        try:
-            from ild_pdf import PdfDocument
+        from ild_pdf.limits import PAGE_LABELS_SCAN_THRESHOLD
 
-            with PdfDocument(self.pdf_path, password=self.password) as doc:
-                native = list(doc.page_labels())
-        except Exception:
-            native = [""] * n
+        do_native = scan_native
+        if do_native is None:
+            do_native = n < int(PAGE_LABELS_SCAN_THRESHOLD)
+        native: list[str] = [""] * n
+        if do_native:
+            try:
+                from ild_pdf import PdfDocument
+
+                with PdfDocument(self.pdf_path, password=self.password) as doc:
+                    labels = list(doc.page_labels())
+                if len(labels) < n:
+                    labels = labels + [""] * (n - len(labels))
+                native = labels[:n]
+            except Exception:
+                native = [""] * n
         custom: list[str] = []
         if self.store is not None:
             try:
@@ -5398,16 +5411,21 @@ class PdfViewer(QWidget):
                 self.annotations_changed.emit()
 
     def load(self, path: str | Path, password: str | None = None) -> bool:
-        from PySide6.QtWidgets import QApplication
+        """PDF öffnen — lazy (1. Seite), Progress+Cancel, kein Full-Thumbs — 2.6.37."""
+        from PySide6.QtWidgets import QApplication, QProgressDialog
 
-        from ild_pdf.limits import OPEN_TIMEOUT_HINT, inspect_pdf
+        from ild_pdf.limits import OPEN_TIMEOUT_HINT, SOFT_PAGE_WARN, inspect_pdf
         from ild_pdf.render import clear_render_cache
         from ild_pdf.security import needs_password
         from instantlensdoc.ui.password_dialog import ask_pdf_password
 
         # Vorheriges Sidecar flushen bevor Store gewechselt wird
         self.flush_sidecar_save()
-        QApplication.setOverrideCursor(Qt.WaitCursor)
+        # Open-Generation: verzögerte Folgearbeit kann abbrechen — 2.6.37
+        self._open_generation = int(getattr(self, "_open_generation", 0) or 0) + 1
+        open_gen = self._open_generation
+        prog: QProgressDialog | None = None
+        cursor_overridden = False
         try:
             path = Path(path)
             if not path.is_file():
@@ -5444,6 +5462,20 @@ class PdfViewer(QWidget):
                 )
                 return False
 
+            prog = QProgressDialog(
+                "PDF wird geprüft…", "Abbrechen", 0, 5, self.window()
+            )
+            prog.setWindowTitle("PDF öffnen")
+            prog.setWindowModality(Qt.WindowModal)
+            prog.setMinimumDuration(200)
+            prog.setValue(0)
+            QApplication.processEvents()
+
+            def _canceled() -> bool:
+                return bool(prog is not None and prog.wasCanceled()) or (
+                    int(getattr(self, "_open_generation", 0) or 0) != open_gen
+                )
+
             try:
                 health = inspect_pdf(path, password=pw)
             except Exception as e:
@@ -5453,6 +5485,11 @@ class PdfViewer(QWidget):
                     f"PDF-Diagnose fehlgeschlagen:\n{e}\n\n{OPEN_TIMEOUT_HINT}",
                 )
                 return False
+            if _canceled():
+                return False
+            prog.setValue(1)
+            prog.setLabelText("PDF-Diagnose…")
+            QApplication.processEvents()
 
             if health.errors:
                 # ggf. nochmal Passwort versuchen — klarer DE-Fehler — 1.6.2
@@ -5463,6 +5500,8 @@ class PdfViewer(QWidget):
 
                 pw_err = any(is_wrong_password_error(e) for e in health.errors)
                 if pw_err:
+                    if prog is not None:
+                        prog.hide()
                     pw2 = ask_pdf_password(
                         self,
                         path,
@@ -5472,6 +5511,8 @@ class PdfViewer(QWidget):
                     if pw2 is None:
                         return False
                     pw = pw2
+                    if prog is not None:
+                        prog.show()
                     try:
                         health = inspect_pdf(path, password=pw)
                     except Exception as e:
@@ -5501,6 +5542,8 @@ class PdfViewer(QWidget):
                     self.password = None
                     return False
             if health.warnings:
+                if prog is not None:
+                    prog.hide()
                 r = QMessageBox.warning(
                     self,
                     "Großes PDF",
@@ -5510,7 +5553,14 @@ class PdfViewer(QWidget):
                 )
                 if r != QMessageBox.Yes:
                     return False
+                if prog is not None:
+                    prog.show()
+            if _canceled():
+                return False
 
+            prog.setValue(2)
+            prog.setLabelText("PDF wird geladen…")
+            QApplication.processEvents()
             clear_render_cache(path)
             self.pdf_path = path
             self.password = pw
@@ -5519,9 +5569,24 @@ class PdfViewer(QWidget):
             self.clear_page_ops_undo()
             from ild_pdf import PdfDocument
 
-            with PdfDocument(self.pdf_path, password=self.password) as doc:
-                self.page_count = len(doc)
-            self._reload_page_labels()
+            # Seiteanzahl: Prefer Diagnose; sonst einmal öffnen — kein Doppel-Open unnötig
+            pages = int(getattr(health, "page_count", 0) or 0)
+            if pages <= 0:
+                with PdfDocument(self.pdf_path, password=self.password) as doc:
+                    pages = len(doc)
+            self.page_count = pages
+            if _canceled():
+                self.pdf_path = None
+                self.store = None
+                self.password = None
+                self.page_count = 0
+                return False
+
+            prog.setValue(3)
+            prog.setLabelText("Seite 1 wird gerendert…")
+            QApplication.processEvents()
+            # Große PDFs: kein nativer PageLabel-Vollscan beim Open — 2.6.37
+            self._reload_page_labels(scan_native=pages < int(SOFT_PAGE_WARN))
             self.page_index = 0
             self._pending_callout_anchor = None
             self._pending_scale = None
@@ -5529,6 +5594,12 @@ class PdfViewer(QWidget):
             self.scale = get_default_zoom_scale()
             self.clear_search_highlights()
             self.refresh()
+            if _canceled():
+                return False
+
+            prog.setValue(4)
+            prog.setLabelText("Oberfläche aktualisieren…")
+            QApplication.processEvents()
             self.annotations_changed.emit()
             self.page_changed.emit(self.page_index)
             self.zoom_changed.emit(self.scale)
@@ -5537,6 +5608,7 @@ class PdfViewer(QWidget):
             mode = get_default_zoom_mode()
             if mode in ("fit_width", "fit_page"):
                 QTimer.singleShot(0, self.apply_default_zoom)
+            prog.setValue(5)
             return True
         except MemoryError:
             QMessageBox.critical(
@@ -5561,7 +5633,13 @@ class PdfViewer(QWidget):
             self.password = None
             return False
         finally:
-            QApplication.restoreOverrideCursor()
+            if prog is not None:
+                try:
+                    prog.close()
+                except Exception:
+                    pass
+            if cursor_overridden:
+                QApplication.restoreOverrideCursor()
 
     def refresh(self):
         if not self.pdf_path:

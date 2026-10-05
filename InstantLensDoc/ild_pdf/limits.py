@@ -13,6 +13,16 @@ SOFT_SIZE_MB = 80.0
 HARD_SIZE_MB = 512.0
 # Thumbnail-Lazy-Load: Default-Schwellwert (Settings: 25/50/100) — 1.3.1
 THUMB_LAZY_THRESHOLD = 50
+# Ab diesem Schwellwert: nur Viewport±Prefetch rendern (kein Voll-Queue) — 2.6.37
+THUMB_VIRTUAL_THRESHOLD = 80
+# Platzhalter-Icons in Chunks anlegen (UI bleibt responsiv) — 2.6.37
+THUMB_PLACEHOLDER_CHUNK = 40
+# Native PageLabels-Scan beim Open überspringen (pro Seite get_page_label) — 2.6.37
+PAGE_LABELS_SCAN_THRESHOLD = 120
+# Volltext-Extraktion (alle Seiten) erst nach Bestätigung — 2.6.37
+TEXT_EXTRACT_ALL_WARN_PAGES = SOFT_PAGE_WARN
+# Doc-Stats: Wörter nur auf den ersten N Seiten schätzen (große PDFs) — 2.6.37
+STATS_WORD_SAMPLE_PAGES = 8
 # Hinweis für langsame/hängende Öffnungen (kein harter Kill — nur UX)
 OPEN_TIMEOUT_HINT_SEC = 30
 OPEN_TIMEOUT_HINT = (

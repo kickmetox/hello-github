@@ -179,15 +179,17 @@ def extract_page_plain_text(
         doc.close()
 
 
-def extract_all_plain_text(
+def extract_plain_text_pages(
     pdf_path: str | Path,
+    page_indices: list[int] | range | None = None,
     *,
     password: str | None = None,
     page_headers: bool = True,
+    cancel_check=None,
 ) -> str:
     """
-    Text aller Seiten als Plaintext.
-    Mit page_headers: Abschnitte „--- Seite N ---“ zwischen den Seiten.
+    Text ausgewählter Seiten als Plaintext (page-scoped).
+    page_indices=None → alle Seiten. cancel_check(): bool → Abbruch.
     """
     import pypdfium2 as pdfium
 
@@ -197,8 +199,15 @@ def extract_all_plain_text(
         kwargs["password"] = password
     doc = pdfium.PdfDocument(str(pdf_path), **kwargs)
     try:
+        n = len(doc)
+        if page_indices is None:
+            indices = list(range(n))
+        else:
+            indices = [int(i) for i in page_indices if 0 <= int(i) < n]
         parts: list[str] = []
-        for i in range(len(doc)):
+        for i in indices:
+            if cancel_check is not None and cancel_check():
+                break
             page = doc[i]
             try:
                 tp = page.get_textpage()
@@ -215,6 +224,36 @@ def extract_all_plain_text(
         return "\n\n".join(parts).strip() + ("\n" if parts else "")
     finally:
         doc.close()
+
+
+def extract_all_plain_text(
+    pdf_path: str | Path,
+    *,
+    password: str | None = None,
+    page_headers: bool = True,
+    max_pages: int | None = None,
+    cancel_check=None,
+) -> str:
+    """
+    Text aller Seiten als Plaintext.
+    Mit page_headers: Abschnitte „--- Seite N ---“ zwischen den Seiten.
+    max_pages: optional nur die ersten N Seiten (große PDFs) — 2.6.37.
+    """
+    if max_pages is not None:
+        return extract_plain_text_pages(
+            pdf_path,
+            range(max(0, int(max_pages))),
+            password=password,
+            page_headers=page_headers,
+            cancel_check=cancel_check,
+        )
+    return extract_plain_text_pages(
+        pdf_path,
+        None,
+        password=password,
+        page_headers=page_headers,
+        cancel_check=cancel_check,
+    )
 
 
 @dataclass

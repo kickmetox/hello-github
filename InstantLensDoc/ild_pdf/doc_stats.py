@@ -148,11 +148,15 @@ def collect_document_stats(
     pdf_path: str | Path,
     *,
     annotation_count: int | None = None,
+    password: str | None = None,
+    sample_pages: int | None = None,
 ) -> DocumentStats:
     """
     Seiten + Wörter (sichtbarer Text), Ann.-Anzahl, Dateigröße.
     annotation_count: optional von Sidecar/Store; sonst Sidecar laden.
+    Große PDFs: nur erste N Seiten für Wortschätzung (kein Full-Extract) — 2.6.37.
     """
+    from .limits import SOFT_PAGE_WARN, STATS_WORD_SAMPLE_PAGES
     from .overlay import extract_all_plain_text
 
     pdf_path = Path(pdf_path)
@@ -161,7 +165,10 @@ def collect_document_stats(
     try:
         import pypdfium2 as pdfium
 
-        doc = pdfium.PdfDocument(str(pdf_path))
+        kwargs = {}
+        if password:
+            kwargs["password"] = password
+        doc = pdfium.PdfDocument(str(pdf_path), **kwargs)
         try:
             pages = len(doc)
         finally:
@@ -171,7 +178,19 @@ def collect_document_stats(
 
     text = ""
     try:
-        text = extract_all_plain_text(pdf_path) or ""
+        # Große Docs: Sample statt alle Seiten — UI bleibt nutzbar — 2.6.37
+        cap = sample_pages
+        if cap is None and pages >= int(SOFT_PAGE_WARN):
+            cap = int(STATS_WORD_SAMPLE_PAGES)
+        text = (
+            extract_all_plain_text(
+                pdf_path,
+                password=password,
+                page_headers=False,
+                max_pages=cap,
+            )
+            or ""
+        )
     except Exception:
         text = ""
     words = count_words(text)

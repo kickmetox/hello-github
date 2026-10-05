@@ -192,6 +192,7 @@ from .overlay import (
     bake_text_overlays,
     extract_all_plain_text,
     extract_page_plain_text,
+    extract_plain_text_pages,
     extract_text_blocks,
     extract_text_paragraphs,
     find_text_rects,
@@ -544,6 +545,7 @@ __all__ = [
     "extract_text_paragraphs",
     "extract_page_plain_text",
     "extract_all_plain_text",
+    "extract_plain_text_pages",
     "find_text_rects",
     "import_page_text_as_overlays",
     "selection_to_highlight_rects",
@@ -770,4 +772,4 @@ __all__ = [
     "sections_sidecar_path_for",
 ]
 
-__version__ = "2.6.38"
+__version__ = "2.6.39"
