@@ -1258,6 +1258,11 @@ class MainWindow(QMainWindow):
 
         sb = QStatusBar()
         self.setStatusBar(sb)
+        # Viele permanente Labels summierten sich auf ~1300 px Mindestbreite und
+        # zwangen das Fenster breiter als kleine Monitore — 2.6.52
+        from PySide6.QtWidgets import QSizePolicy as _QSizePolicy
+
+        sb.setSizePolicy(_QSizePolicy.Ignored, _QSizePolicy.Fixed)
         # Status-Klick: Outlines-Export-Zielordner öffnen — 1.3.4
         sb.mousePressEvent = self._on_status_bar_clicked  # type: ignore[method-assign]
         self.file_status_label = QLabel("—")
@@ -9825,20 +9830,47 @@ class MainWindow(QMainWindow):
             return
 
     def _mark_selection(self):
+        """Textmarker im Editor (Text/DOCX/HTML) — PDF nutzt das Highlight-Werkzeug — 2.6.52."""
+        if self.stack.currentWidget() is self.pdf_view:
+            # PDF: Highlight-Werkzeug der PDF-Leiste aktivieren statt Dialog
+            try:
+                self.pdf_view.set_tool_from_id("highlight")
+                self._set_status(
+                    "PDF: Highlight-Werkzeug aktiv — Bereich auf der Seite aufziehen"
+                )
+                return
+            except Exception:
+                pass
         if self.stack.currentWidget() is not self.editor_pane:
             QMessageBox.information(self, "Markieren", "Markieren funktioniert im Texteditor.")
             return
+        was_marked = False
+        try:
+            was_marked = bool(self.editor.selection_highlighted())
+        except Exception:
+            was_marked = False
         if not self.editor.highlight_selection():
             QMessageBox.information(self, "Markieren", "Bitte Text auswählen.")
+            return
+        self._sync_editor_rich_meta()
+        if was_marked:
+            self._set_status("Markierung entfernt")
             return
         snip = self.editor.selected_snippet() or "Auswahl"
         label = f"Markierung: {snip}"
         self._editor_marks.append(label)
         self.sidebar.append_mark(label)
-        self._set_status("Auswahl markiert")
+        self._set_status("Auswahl markiert (Textmarker, wird mit DOCX/HTML gespeichert)")
 
     def _clear_editor_marks(self):
         self.editor.clear_extra_selections()
+        removed = 0
+        try:
+            removed = int(self.editor.clear_highlight_formats())
+        except Exception:
+            removed = 0
+        if removed:
+            self._sync_editor_rich_meta()
         self._editor_marks.clear()
         if self.stack.currentWidget() is self.pdf_view:
             self._refresh_pdf_marks()
@@ -12440,6 +12472,9 @@ class MainWindow(QMainWindow):
                 pending = bool(getattr(self.pdf_view, "_sidecar_save_pending", False))
             return bool(store.dirty or pending)
         if self.doc.kind in (DocKind.TEXT, DocKind.MARKDOWN, DocKind.HTML, DocKind.DOCX):
+            if bool(getattr(self, "_loading_document", False)):
+                # Während open_path ist der Editor-Inhalt noch das alte Dokument
+                return bool(self.doc.dirty)
             current = self.editor.toPlainText()
             if current != (self.doc.text or ""):
                 self.doc.dirty = True
@@ -14900,17 +14935,32 @@ class MainWindow(QMainWindow):
                 self.sidebar.clear_annotations()
                 self._refresh_portfolio_sidebar(None)
             else:
-                self.stack.setCurrentWidget(self.editor_pane)
-                self.editor.blockSignals(True)
-                html = (self.doc.meta or {}).get("html")
-                if html and self.doc.kind in (DocKind.DOCX, DocKind.HTML):
-                    try:
-                        self.editor.set_rich_html(str(html))
-                    except Exception:
+                # Inhalt VOR dem Stack-Wechsel laden: currentChanged → _update_doc_status
+                # → _current_is_dirty verglich sonst alten Editor-Text mit neuem Doc und
+                # setzte doc.dirty dauerhaft („wurde geändert“ direkt nach Öffnen) — 2.6.52
+                self._loading_document = True
+                try:
+                    self.editor.blockSignals(True)
+                    html = (self.doc.meta or {}).get("html")
+                    if html and self.doc.kind in (DocKind.DOCX, DocKind.HTML):
+                        try:
+                            self.editor.set_rich_html(str(html))
+                        except Exception:
+                            self.editor.setPlainText(self.doc.text)
+                    else:
                         self.editor.setPlainText(self.doc.text)
-                else:
-                    self.editor.setPlainText(self.doc.text)
-                self.editor.blockSignals(False)
+                    self.editor.blockSignals(False)
+                    # Rich-Text: Plaintext des Docs an Qt-Normalisierung angleichen
+                    if html and self.doc.kind in (DocKind.DOCX, DocKind.HTML):
+                        try:
+                            self.doc.text = self.editor.toPlainText()
+                        except Exception:
+                            pass
+                    self.doc.dirty = False
+                    self.stack.setCurrentWidget(self.editor_pane)
+                finally:
+                    self._loading_document = False
+                self.doc.dirty = False
                 self.editor.clear_extra_selections()
                 self._suppress_bookmark_persist = True
                 try:

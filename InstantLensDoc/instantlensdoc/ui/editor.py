@@ -6,7 +6,17 @@ import tempfile
 from pathlib import Path
 
 from PySide6.QtCore import QRect, QSize, Qt, Signal
-from PySide6.QtGui import QColor, QFont, QImage, QPainter, QTextCharFormat, QTextCursor, QTextDocument, QTextOption
+from PySide6.QtGui import (
+    QBrush,
+    QColor,
+    QFont,
+    QImage,
+    QPainter,
+    QTextCharFormat,
+    QTextCursor,
+    QTextDocument,
+    QTextOption,
+)
 from PySide6.QtWidgets import QAbstractScrollArea, QApplication, QPlainTextEdit, QTextEdit, QWidget
 
 from instantlensdoc.core.app_settings import (
@@ -1421,6 +1431,23 @@ class TextEditor(QPlainTextEdit):
         self._spell_selections = []
         self._apply_extra_selections()
 
+    def setPlainText(self, text: str) -> None:  # noqa: N802
+        """Plaintext laden ohne Zeichenformat-Erbe aus dem vorherigen Dokument.
+
+        ``QWidgetTextControl.setContent`` wendet das zuletzt aktive Cursor-
+        Zeichenformat auf den gesamten neuen Text an — nach einem fetten/
+        unterstrichenen DOCX wäre die nächste TXT-Datei komplett fett — 2.6.52.
+        """
+        try:
+            self.setCurrentCharFormat(QTextCharFormat())
+        except Exception:
+            pass
+        super().setPlainText(text)
+        try:
+            self.setCurrentCharFormat(QTextCharFormat())
+        except Exception:
+            pass
+
     def clear_spelling(self) -> None:
         """Nur Rechtschreibmarkierungen entfernen."""
         self._spell_selections = []
@@ -1739,7 +1766,10 @@ class TextEditor(QPlainTextEdit):
             return True
         cur.mergeCharFormat(fmt)
         self.setTextCursor(cur)
-        self.setCurrentCharFormat(fmt)
+        # NICHT setCurrentCharFormat(fmt): das ruft QTextCursor.setCharFormat auf
+        # der Auswahl auf und ERSETZT das komplette Zeichenformat durch das
+        # Teilformat (Fett löschte Unterstrichen und umgekehrt) — 2.6.52
+        self.mergeCurrentCharFormat(fmt)
         return True
 
     def toggle_bold_selection(self) -> bool:
@@ -1995,19 +2025,70 @@ class TextEditor(QPlainTextEdit):
         self.setPlainText(new_text)
         return new_text
 
+    #: Standard-Markierfarbe (Textmarker) — wird in HTML/DOCX als Hintergrund gespeichert
+    HIGHLIGHT_COLOR = "#FFE066"
+
     def highlight_selection(self, color: str = "#FFE066") -> bool:
-        """Aktuelle Auswahl dauerhaft (als ExtraSelection) markieren."""
+        """Auswahl als Textmarker markieren — persistent als Zeichenformat — 2.6.52.
+
+        Bis 2.6.51 war die Markierung nur eine flüchtige ``ExtraSelection``
+        (verschwand beim Tab-Wechsel/Speichern, nie im DOCX/HTML). Jetzt wird
+        ``QTextCharFormat.background`` per ``mergeCharFormat`` gesetzt — Fett/
+        Kursiv/Unterstrichen bleiben erhalten, DOCX-Export schreibt Highlight.
+        Erneuter Aufruf auf bereits markiertem Text hebt die Markierung auf.
+        """
         cur = self.textCursor()
         if not cur.hasSelection():
             return False
+        qcolor = QColor(color or self.HIGHLIGHT_COLOR)
+        if not qcolor.isValid():
+            qcolor = QColor(self.HIGHLIGHT_COLOR)
+        probe = self._selection_probe_format(cur)
+        already = (
+            probe.background().style() != Qt.NoBrush
+            and probe.background().color().name().lower() == qcolor.name().lower()
+        )
         fmt = QTextCharFormat()
-        fmt.setBackground(QColor(color))
-        sel = QTextEdit.ExtraSelection()
-        sel.cursor = QTextCursor(cur)
-        sel.format = fmt
-        self._mark_selections.append(sel)
-        self._apply_extra_selections()
+        if already:
+            fmt.setBackground(QBrush(Qt.NoBrush))
+        else:
+            fmt.setBackground(QBrush(qcolor))
+        cur.mergeCharFormat(fmt)
+        self.setTextCursor(cur)
         return True
+
+    def selection_highlighted(self) -> bool:
+        """True wenn die Auswahl (bzw. Cursor) einen Markier-Hintergrund trägt."""
+        probe = self._selection_probe_format(self.textCursor())
+        return probe.background().style() != Qt.NoBrush
+
+    def clear_highlight_formats(self) -> int:
+        """Alle Textmarker-Hintergründe im Dokument entfernen; Anzahl Fragmente."""
+        doc = self.document()
+        cur = QTextCursor(doc)
+        cur.beginEditBlock()
+        n = 0
+        try:
+            block = doc.begin()
+            while block.isValid():
+                it = block.begin()
+                while not it.atEnd():
+                    frag = it.fragment()
+                    if frag.isValid():
+                        f = frag.charFormat()
+                        if f.background().style() != Qt.NoBrush:
+                            c = QTextCursor(doc)
+                            c.setPosition(frag.position())
+                            c.setPosition(frag.position() + frag.length(), QTextCursor.KeepAnchor)
+                            clear = QTextCharFormat()
+                            clear.setBackground(QBrush(Qt.NoBrush))
+                            c.mergeCharFormat(clear)
+                            n += 1
+                    it += 1
+                block = block.next()
+        finally:
+            cur.endEditBlock()
+        return n
 
     def selected_snippet(self, max_len: int = 80) -> str:
         cur = self.textCursor()
