@@ -1115,6 +1115,9 @@ class MainWindow(QMainWindow):
         self.editor.textChanged.connect(self._on_text_changed)
         self.editor.line_bookmarks_changed.connect(self._on_line_bookmarks_changed)
         self.editor.cursorPositionChanged.connect(self._on_editor_cursor_changed)
+        # Word-Suite / Text-Toolbar (Auswahl…Markierungen) — 2.6.44
+        if hasattr(self.editor_pane, "tool_action"):
+            self.editor_pane.tool_action.connect(self._on_editor_toolbar_action)
         self.pdf_view = PdfViewer()
         self.pdf_view.status.connect(self._on_pdf_view_status)
         self.pdf_view.ocr_region_finished.connect(self._on_ocr_region_finished)
@@ -1185,8 +1188,10 @@ class MainWindow(QMainWindow):
         self.stack.addWidget(self.welcome_page)  # 3 — Startseite ohne Tabs (1.0.0)
         self.stack.currentChanged.connect(lambda *_: self._apply_doc_split_sync_scroll())
         self.stack.currentChanged.connect(lambda *_: self._update_doc_status())
+        self.stack.currentChanged.connect(lambda *_: self._sync_editor_toolbar_for_stack())
         # Beim Start ohne Session: Willkommen zeigen (nach Session-Restore ggf. überschrieben)
         self.stack.setCurrentWidget(self.welcome_page)
+        self._sync_editor_toolbar_for_stack()
         # Doc-Split: horizontal (nebeneinander) oder vertikal (übereinander)
         split_orient = (
             Qt.Vertical if get_editor_doc_split_vertical() else Qt.Horizontal
@@ -9628,6 +9633,64 @@ class MainWindow(QMainWindow):
                 self._set_status("Keine weiteren Treffer auf aktueller Seite")
             return
         self._set_status("Suche: Editor oder PDF öffnen")
+
+    def _sync_editor_toolbar_for_stack(self) -> None:
+        """Text/DOCX: Editor-Toolbar sichtbar; PDF behält eigene Ann.-Leiste — 2.6.44."""
+        pane = getattr(self, "editor_pane", None)
+        if pane is None or not hasattr(pane, "set_toolbar_visible"):
+            return
+        on_editor = self.stack.currentWidget() is pane
+        # Toolbar liegt im EditorPane → bei PDF-Tab ohnehin unsichtbar; explizit syncen
+        pane.set_toolbar_visible(True)
+        if on_editor:
+            try:
+                pane.set_active_tool(pane.active_tool() or "select")
+            except Exception:
+                try:
+                    pane.set_active_tool("select")
+                except Exception:
+                    pass
+        # PDF-Toolbar-Gruppen aus Settings wiederherstellen (auch nach Tab-Wechsel)
+        try:
+            if hasattr(self, "pdf_view") and hasattr(self.pdf_view, "apply_toolbar_groups"):
+                self.pdf_view.apply_toolbar_groups()
+        except Exception:
+            pass
+
+    def _on_editor_toolbar_action(self, action_id: str) -> None:
+        """Word-Suite-Bearbeitungsleiste → Editor-Aktionen — 2.6.44."""
+        aid = str(action_id or "").strip().lower()
+        if self.stack.currentWidget() is not self.editor_pane:
+            self.stack.setCurrentWidget(self.editor_pane)
+        if aid == "select":
+            self._set_status("Werkzeug: Auswahl — Text markieren, dann Markierungen/Format")
+            return
+        if aid == "edit":
+            try:
+                self.editor.setReadOnly(False)
+                self.editor.setFocus(Qt.OtherFocusReason)
+            except Exception:
+                pass
+            self._set_status("Werkzeug: Text bearbeiten — Tippen im Dokument")
+            return
+        if aid == "mark":
+            self._mark_selection()
+            return
+        if aid == "underline":
+            self._toggle_underline()
+            return
+        if aid == "bold":
+            self._toggle_bold()
+            return
+        if aid == "italic":
+            self._toggle_italic()
+            return
+        if aid == "clear_marks":
+            self._clear_editor_marks()
+            return
+        if aid == "find":
+            self._find_replace()
+            return
 
     def _mark_selection(self):
         if self.stack.currentWidget() is not self.editor_pane:

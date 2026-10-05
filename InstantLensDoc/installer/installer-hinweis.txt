@@ -1,4 +1,9 @@
-InstantLens Doc 2.6.43 - Installation
+InstantLens Doc 2.6.44 - Installation
+
+Neu in 2.6.44:
+- Bearbeitungsleiste fuer Text/DOCX/Word-Suite (Auswahl … Markierungen)
+- Tab-Wechsel PDF <-> Text aktualisiert Toolbar korrekt
+- PDF-only-Werkzeuge (Schwaerzen/Objekt/Formular) bleiben PDF-Tab
 
 Neu in 2.6.43:
 - Speichern unter: Dokumentfilter .ild/.txt/.docx/.pdf/.rtf/.html (kein .py-Default)
@@ -6,7 +11,7 @@ Neu in 2.6.43:
 Neu in 2.6.42:
 - OCR nutzt ScanTuxio-Tesseract-Runtime (kein separates Tesseract noetig)
 - Lookup: {app}\vendor\tesseract, {app}\tesseract, D:\AI_Temp\ScanTuxio Win\...
-- TESSDATA_PREFIX = tessdata neben tesseract.exe
+- TESSDATA_PREFIX = tessdata die neben tesseract.exe liegt
 - Copy-Hint in build-windows.ps1 (build-keygen)
 
 Neu in 2.6.41 (inkl. 2.6.40):

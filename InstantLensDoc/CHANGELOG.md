@@ -1,3 +1,7 @@
+## 2.6.44 - Bearbeitungsleiste für Nicht-PDF / Word-Suite
+
+Patch nach **2.6.43** (Speichern-unter Dokumentfilter): Nutzerbericht — bei Text/DOCX/Word-Suite fehlte die Bearbeitungsleiste von **Auswahl** bis **Markierungen** (bei PDF sichtbar). Ursache: Toolbar lebte nur in ``PdfViewer``; ``EditorPane`` hatte keine eigene Leiste. Fix: **``ildEditorToolbar``** in ``EditorPane`` mit textrelevanten Werkzeugen (Auswahl, Text bearbeiten, Markierungen, Unterstreichen, Fett/Kursiv, Markierungen löschen, Suchen) — ohne PDF-only (Schwärzen/Objekt/Formular). Tab-Wechsel PDF↔Text synchronisiert Toolbar (``_sync_editor_toolbar_for_stack`` / ``_on_editor_toolbar_action``). Pack `InstantLensDoc-2.6.44-pack.zip`; VERSION **2.6.44**.
+
 ## 2.6.43 - Speichern unter: Dokumentformate statt .py-Default
 
 Patch nach **2.6.42** (Tesseract-Runtime): Nutzerbericht — neu eingegebener Text ließ sich unter Windows oft nur als ``*.py`` speichern (Save/Speichern unter). Ursache: Vorschlagsname ``Unbenannt`` ohne Endung; unter ``python.exe`` setzt der native Windows-Dialog dann die Host-Endung ``.py``.

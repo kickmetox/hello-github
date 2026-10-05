@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Nightly/CI Smoke: CLI + Import-Checks für InstantLens Doc — 2.1.0–2.6.43.
+"""Nightly/CI Smoke: CLI + Import-Checks für InstantLens Doc — 2.1.0–2.6.44.
 
 Leichtgewichtig. Exit-Codes:
   0  OK  (ok=true)
@@ -14,12 +14,12 @@ Aufruf:
   python scripts/smoke_ild.py -h
 
 JSON-Schema (--json), Erfolg:
-  {"ok": true, "version": "2.6.43", "duration_ms": 1234,
+  {"ok": true, "version": "2.6.44", "duration_ms": 1234,
    "checks": ["version", "imports", "cli", "measure_diff_import", "changelog"]}
 
 JSON bei Fail: checks[] enthält Objekt mit error-Text (max 200 Zeichen, Truncate …);
 Exitcode spiegelt ok (0↔true, 1↔false) — 2.2.0:
-  {"ok": false, "version": "2.6.43", "duration_ms": 12,
+  {"ok": false, "version": "2.6.44", "duration_ms": 12,
    "checks": ["version", {"name": "imports", "error": "import x: …"}]}
 """
 
@@ -41,7 +41,7 @@ if str(ROOT) not in sys.path:
 # Headless/CI: Qt ohne Display
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-EXPECTED_VERSION = "2.6.43"
+EXPECTED_VERSION = "2.6.44"
 FAIL_ERROR_MAX_LEN = 200
 
 EXIT_OK = 0
@@ -82,7 +82,7 @@ def check_version() -> None:
         _fail(f"docs/VERSION={docs_ver!r}")
     bw = (ROOT / "build-windows.ps1").read_text(encoding="utf-8")
     if EXPECTED_VERSION not in bw or "Allow32Bit" not in bw:
-        _fail("build-windows.ps1 fehlt 2.6.43/Allow32Bit")
+        _fail("build-windows.ps1 fehlt 2.6.44/Allow32Bit")
     if not (ROOT / "scripts" / "pack-windows-runnable.py").is_file():
         _fail("scripts/pack-windows-runnable.py fehlt")
     if not (ROOT / "run-keygen.bat").is_file():
@@ -676,6 +676,20 @@ def check_imports(*, with_qt: bool) -> None:
             "sidebarInhaltsverzeichnis",
             "itemClicked",
         ),
+        ROOT / "instantlensdoc" / "ui" / "editor.py": (
+            "EditorPane",
+            "ildEditorToolbar",
+            "tool_action",
+            "set_active_tool",
+            "set_toolbar_visible",
+            "editorToolbar_select",
+            "editorToolbar_edit",
+            "editorToolbar_mark",
+            "Auswahl",
+            "Text bearbeiten",
+            "Markierungen",
+            "2.6.44",
+        ),
         ROOT / "instantlensdoc" / "ui" / "main_window.py": (
             "_focus_import_status_toast_target",
             "_import_status_toast_active",
@@ -714,6 +728,9 @@ def check_imports(*, with_qt: bool) -> None:
             "SCAN_START_HINT_DE",
             "scan_requested",
             "2.6.41",
+            "_on_editor_toolbar_action",
+            "_sync_editor_toolbar_for_stack",
+            "2.6.44",
             "Text bearbeiten…",
             "inline_text_edit",
             "Ctrl+Alt+Shift+E",
@@ -1195,6 +1212,8 @@ def check_measure_and_diff() -> None:
 
 def check_changelog() -> None:
     cl = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    if "## 2.6.44" not in cl:
+        _fail("CHANGELOG fehlt ## 2.6.44")
     if "## 2.6.43" not in cl:
         _fail("CHANGELOG fehlt ## 2.6.43")
     if "## 2.6.42" not in cl:
@@ -1775,6 +1794,13 @@ def check_changelog() -> None:
     ):
         _fail("CHANGELOG 2.6.43 fehlt Speichern-unter/.py-Hinweis")
     if (
+        "ildEditorToolbar" not in cl
+        and "Nicht-PDF" not in cl
+        and "Markierungen" not in cl
+        and "2.6.44" not in cl
+    ):
+        _fail("CHANGELOG 2.6.44 fehlt Non-PDF-Toolbar-Hinweis")
+    if (
         "Silbentrennung" not in cl
         and "Hyphen" not in cl
         and "Menü" not in cl
@@ -2085,6 +2111,13 @@ def check_changelog() -> None:
         ".py" not in feat and ".ild" not in feat and "Speichern unter" not in feat
     ):
         _fail("FEATURES.md fehlt 2.6.43 Speichern-unter/Dokumentfilter-Hinweis")
+    if "2.6.44" not in feat or (
+        "ildEditorToolbar" not in feat
+        and "Markierungen" not in feat
+        and "Nicht-PDF" not in feat
+        and "Bearbeitungsleiste" not in feat
+    ):
+        _fail("FEATURES.md fehlt 2.6.44 Non-PDF-Toolbar-Hinweis")
     if (
         "ScanTuxio" not in feat
         and "vendor/tesseract" not in feat
@@ -2535,11 +2568,11 @@ Exit-Codes:
 Laufzeit: am Ende als „Laufzeit: N ms“ (oder duration_ms im JSON).
 
 Beispiel --json (Erfolg):
-  {"ok": true, "version": "2.6.43", "duration_ms": 1234,
+  {"ok": true, "version": "2.6.44", "duration_ms": 1234,
    "checks": ["version", "imports", "cli", "measure_diff_import", "changelog"]}
 
 Beispiel --json (Fail):
-  {"ok": false, "version": "2.6.43", "duration_ms": 12,
+  {"ok": false, "version": "2.6.44", "duration_ms": 12,
    "checks": ["version", {"name": "imports", "error": "import x: …"}]}
 """.rstrip()
     )

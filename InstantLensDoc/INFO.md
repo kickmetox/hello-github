@@ -104,6 +104,15 @@ powershell -ExecutionPolicy Bypass -File .\scripts\ild.ps1 license generate kund
 
 Anleitung: Store `docs/instantlensdoc-scripting.md` · Beispiel `examples/ild_scripting_demo.py`.
 
+## Neu in 2.6.44
+
+Patch nach **2.6.43** (Speichern-unter Dokumentfilter) — Bearbeitungsleiste für Nicht-PDF:
+
+- **Text/DOCX/Word-Suite:** Toolbar `ildEditorToolbar` — Auswahl · Text bearbeiten · Markierungen · Unterstreichen · Fett/Kursiv · Markierungen löschen · Suchen
+- **Kein PDF-only** in der Text-Leiste (Schwärzen/Objekt/Formular bleiben PDF-Tab)
+- Tab-Wechsel PDF ↔ Text aktualisiert die passende Toolbar
+- Pack: `InstantLensDoc-2.6.44-pack.zip`
+
 ## Neu in 2.6.43
 
 Patch nach **2.6.42** (Tesseract-Runtime) — Speichern unter für Text/Word-Suite:

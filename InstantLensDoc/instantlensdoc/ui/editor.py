@@ -2186,16 +2186,23 @@ class RichPreview(QTextEdit):
 
 
 class EditorPane(QWidget):
-    """Texteditor mit optionaler Markdown-Vorschau (Split)."""
+    """Texteditor mit Bearbeitungsleiste (Word-Suite) und Markdown-Vorschau — 2.6.44."""
+
+    # action id: select|edit|mark|underline|bold|italic|clear_marks|find
+    tool_action = Signal(str)
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        from PySide6.QtWidgets import QSplitter, QTextBrowser, QVBoxLayout
+        from PySide6.QtWidgets import QSplitter, QTextBrowser, QToolButton, QVBoxLayout
 
         from instantlensdoc.core.app_settings import get_editor_markdown_preview
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        self._tool_buttons: dict[str, "QToolButton"] = {}
+        self._active_tool = "select"
+        self._build_edit_toolbar(layout)
         self.splitter = QSplitter(Qt.Horizontal)
         self.editor = TextEditor()
         self.preview = QTextBrowser()
@@ -2213,11 +2220,127 @@ class EditorPane(QWidget):
         self.splitter.addWidget(self.preview)
         self.splitter.setStretchFactor(0, 3)
         self.splitter.setStretchFactor(1, 2)
-        layout.addWidget(self.splitter)
+        layout.addWidget(self.splitter, 1)
         self._preview_visible = bool(get_editor_markdown_preview())
         self.preview.setVisible(self._preview_visible)
         self.editor.textChanged.connect(self._sync_preview)
         self._sync_preview()
+        self.set_active_tool("select")
+
+    def _build_edit_toolbar(self, parent_layout) -> None:
+        """Bearbeitungsleiste Auswahl…Markierungen für Text/DOCX/Word-Suite — 2.6.44."""
+        from PySide6.QtWidgets import QFrame, QHBoxLayout, QToolButton
+
+        host = QFrame()
+        host.setObjectName("ildEditorToolbar")
+        host.setAttribute(Qt.WA_StyledBackground, True)
+        host.setStyleSheet(
+            "#ildEditorToolbar {"
+            " background: qlineargradient(x1:0,y1:0,x2:0,y2:1,"
+            " stop:0 #F7F9FC, stop:1 #E9EEF5);"
+            " border-bottom: 1px solid #C5CCD6;"
+            "}"
+            "#ildEditorToolbar QToolButton {"
+            " background: #FFFFFF; border: 1px solid #C5CCD6;"
+            " border-radius: 3px; padding: 4px 8px; margin: 1px;"
+            "}"
+            "#ildEditorToolbar QToolButton:hover {"
+            " background: #F0F5FB; border-color: #8FA3C0;"
+            "}"
+            "#ildEditorToolbar QToolButton:checked {"
+            " background: #D9E6F8; border-color: #3B6DB5;"
+            "}"
+        )
+        row = QHBoxLayout(host)
+        row.setContentsMargins(6, 3, 6, 3)
+        row.setSpacing(4)
+        self.toolbar = host
+
+        # Nur Text-relevante Werkzeuge (keine PDF-only: Schwärzen/Objekt/Formular/…)
+        specs = (
+            ("select", "Auswahl", True, "Auswahl-Modus — Text markieren, dann Markierungen/Format"),
+            (
+                "edit",
+                "Text bearbeiten",
+                True,
+                "Textbearbeitung — Tippen/Einfügen im Dokument (Word-Suite) — 2.6.44",
+            ),
+            (
+                "mark",
+                "Markierungen",
+                False,
+                "Auswahl markieren (Highlight) — entspricht PDF-Highlight — 2.6.44",
+            ),
+            (
+                "underline",
+                "Unterstreichen",
+                False,
+                "Auswahl unterstreichen (Markdown __…__) — 2.6.44",
+            ),
+            ("bold", "Fett", False, "Fett (Markdown **) — Ctrl+B"),
+            ("italic", "Kursiv", False, "Kursiv (Markdown *) — Ctrl+I"),
+            (
+                "clear_marks",
+                "Markierungen löschen",
+                False,
+                "Alle Text-Markierungen entfernen — 2.6.44",
+            ),
+            ("find", "Suchen", False, "Suchen/Ersetzen — Ctrl+H"),
+        )
+        for aid, label, checkable, tip in specs:
+            btn = QToolButton()
+            btn.setText(label)
+            btn.setObjectName(f"editorToolbar_{aid}")
+            btn.setCheckable(bool(checkable))
+            btn.setToolTip(tip)
+            btn.setAutoRaise(False)
+            btn.clicked.connect(lambda _=False, a=aid: self._on_tool_clicked(a))
+            self._tool_buttons[aid] = btn
+            row.addWidget(btn)
+        row.addStretch(1)
+        parent_layout.addWidget(host)
+
+    def _on_tool_clicked(self, action_id: str) -> None:
+        aid = str(action_id or "").strip().lower()
+        if aid in ("select", "edit"):
+            self.set_active_tool(aid)
+            if aid == "select":
+                try:
+                    self.editor.setFocus(Qt.OtherFocusReason)
+                except Exception:
+                    pass
+            elif aid == "edit":
+                try:
+                    self.editor.setReadOnly(False)
+                    self.editor.setFocus(Qt.OtherFocusReason)
+                except Exception:
+                    pass
+        self.tool_action.emit(aid)
+
+    def set_active_tool(self, action_id: str) -> None:
+        """Checkable Modus-Buttons (Auswahl / Text bearbeiten) synchronisieren."""
+        aid = str(action_id or "select").strip().lower()
+        if aid not in ("select", "edit"):
+            aid = "select"
+        self._active_tool = aid
+        for key, btn in self._tool_buttons.items():
+            if not btn.isCheckable():
+                continue
+            btn.blockSignals(True)
+            btn.setChecked(key == aid)
+            btn.blockSignals(False)
+
+    def active_tool(self) -> str:
+        return str(getattr(self, "_active_tool", "select") or "select")
+
+    def set_toolbar_visible(self, visible: bool) -> None:
+        tb = getattr(self, "toolbar", None)
+        if tb is not None:
+            tb.setVisible(bool(visible))
+
+    def toolbar_visible(self) -> bool:
+        tb = getattr(self, "toolbar", None)
+        return bool(tb is not None and tb.isVisible())
 
     def eventFilter(self, obj, event):  # noqa: N802
         try:
