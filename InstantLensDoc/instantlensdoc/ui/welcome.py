@@ -72,6 +72,7 @@ class WelcomePage(QWidget):
 
     open_requested = Signal()
     new_text_requested = Signal()
+    scan_requested = Signal()  # Scan/Import-Dialog — 2.6.41
     recent_activated = Signal(str)
     recent_remove_requested = Signal(str)
     clear_recent_requested = Signal()
@@ -106,6 +107,14 @@ class WelcomePage(QWidget):
         self.btn_empty.setToolTip("Neues leeres Textdokument")
         self.btn_empty.clicked.connect(self.new_text_requested.emit)
         btn_row.addWidget(self.btn_empty)
+        self.btn_scan = QPushButton("Scannen…")
+        self.btn_scan.setObjectName("welcomeScanBtn")
+        self.btn_scan.setToolTip(
+            "Scan-Dialog öffnen (Geräte → Scanner / Scannen… · "
+            "Ctrl+Alt+Shift+I · WIA/NAPS2 oder Bilder) — 2.6.41"
+        )
+        self.btn_scan.clicked.connect(self.scan_requested.emit)
+        btn_row.addWidget(self.btn_scan)
         self.btn_continue = QPushButton("Weiterarbeiten")
         self.btn_continue.setToolTip(
             "Letzte Session-Tabs öffnen (wenn „Offene Tabs wiederherstellen“ aus) — 1.0.9"

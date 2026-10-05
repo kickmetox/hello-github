@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **2.6.40** |
+| Version | **2.6.41** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -33,7 +33,7 @@
 
 Skript: [sync-ild.ps1](scripts/sync-ild.ps1) — Branch `cursor/instantlensdoc-2108` (oder `-LocalPack` / Pack-Zip) nach `D:\AI_Temp\InstantLensDoc`, pip, Start. **Nutzer-Icon in `assets` wird nicht überschrieben.**
 
-**FEATURES.md lokal sync:** Nach Sync liegt `FEATURES.md` lokal im App-Ordner (`D:\AI_Temp\InstantLensDoc\FEATURES.md`); About/Stubs öffnen diese lokale Datei — Version **2.6.40**.
+**FEATURES.md lokal sync:** Nach Sync liegt `FEATURES.md` lokal im App-Ordner (`D:\AI_Temp\InstantLensDoc\FEATURES.md`); About/Stubs öffnen diese lokale Datei — Version **2.6.41**.
 
 Ohne Start: `-NoStart` (Alias `-SkipStart`). Exit-Codes: **0** OK · **1** allgemein · **2** Git-Fehler.
 
@@ -68,7 +68,7 @@ Python-Layout-Zip (ohne PyInstaller-EXE):
 powershell -ExecutionPolicy Bypass -File .\scripts\pack-windows-runnable.ps1
 ```
 
-Installer: `.\scripts\build-windows-installer.ps1` bzw. `.\installer\build-installer.ps1` (optional `-NoKeygen`) → `dist\InstantLensDoc-Setup-2.6.40.exe`  
+Installer: `.\scripts\build-windows-installer.ps1` bzw. `.\installer\build-installer.ps1` (optional `-NoKeygen`) → `dist\InstantLensDoc-Setup-2.6.41.exe`  
 Desktop-/Keygen-Shortcuts: `.\scripts\install-ild.ps1` (Keygen wenn `run-keygen.bat` / EXE vorhanden; `-SkipKeygen`)  
 Desktop-Verknüpfung Installer: optionale Checkbox (`desktopicon`, Standard an / `checkedonce`)
 
@@ -104,17 +104,24 @@ powershell -ExecutionPolicy Bypass -File .\scripts\ild.ps1 license generate kund
 
 Anleitung: Store `docs/instantlensdoc-scripting.md` · Beispiel `examples/ild_scripting_demo.py`.
 
+## Neu in 2.6.41
+
+Patch nach **2.6.40** (Blank-View/Build Guard) — enthaelt dessen Fixes:
+
+- **Scannen starten:** Menü **Geräte → Scanner / Scannen…** · PDF → Scannen / Import… · Toolbar **Scan…** · Welcome **Scannen…** · Ctrl+Alt+Shift+I
+- **ScanTuxio-Port:** `instantlensdoc/core/scantuxio/` (NAPS2 WIA/TWAIN, native-eSCL, SANE, mDNS, Qt/CUPS-Druck)
+- Acquire: ScanTuxio dispatch → WIA-Fallback; leere Geräteliste mit DE-Status
+- Enthaelt **2.6.40**: `_ensure_page_painted`, Pack-Entry `run_instantlensdoc.py`, EXE-Build-Guard
+- Pack: `InstantLensDoc-2.6.41-pack.zip`
+Pack: `InstantLensDoc-2.6.41-pack.zip`
+
 ## Neu in 2.6.40
 
-Patch nach **2.6.39** (Large-PDF Perf):
-
-- **Hauptansicht:** Seite wird nach Open/Thumb-Klick gerendert (Zoom-Fallback bei Render-Fehler; kein weisses Viewport mehr)
-- **Windows-Build:** Pack inkl. `run_instantlensdoc.py` (fehlte in 2.6.39 → Setup ~2–3 MB); EXE-Pflicht vor Inno; Setup < 15 MB = Fehler
+- Blank PDF View: `_ensure_page_painted` + Thumb-Klick erzwingt Paint
+- Windows Build Guard: Pack inkl. `run_instantlensdoc.py`; EXE-Preflight; kleines Setup = Fehler
 - Pack: `InstantLensDoc-2.6.40-pack.zip`
 
 ## Neu in 2.6.39
-
-Patch nach **2.6.38** (Scanner/Drucker):
 
 - **Large-PDF:** cancelbarer Open mit Progress; 1. Seite sofort gerendert
 - **Thumbnails:** Shared-Placeholder, Chunked Add, Viewport±Prefetch (kein Voll-Queue ab Threshold)

@@ -1,4 +1,4 @@
-"""Schnellaktionen-Palette (Ctrl+K Command Palette) — 2.3.0–2.3.5 / 2.6.39.
+"""Schnellaktionen-Palette (Ctrl+K Command Palette) — 2.3.0–2.3.5 / 2.6.41.
 
 2.3.1: Fuzzy-Filter, letzte Befehle, Esc schließt, Kategorien gruppiert.
 2.3.2: Pin häufige Befehle · Recent-Anzahl Settings 5/10/20.
@@ -7,7 +7,7 @@
 2.3.5: Pin-ersetzen-Bestätigung mit Namen des zu ersetzenden Pins.
 2.6.29: Silbentrennung-Befehle für alle 9 UI-Sprachen (FR/RU/ES/ZH/PT/AR/IT).
 2.6.38: Scanner/Drucker-Discovery UI-Marker.
-2.6.39: Large-PDF Perf Version-Marker.
+2.6.41: Large-PDF Perf Version-Marker.
 """
 
 from __future__ import annotations
@@ -547,14 +547,14 @@ def default_palette_commands() -> list[PaletteCommand]:
         PaletteCommand(
             "scan_import",
             "Scannen / Import…",
-            "scan scanner import ocr tesseract wia twain bild foto seite",
+            "scan scanner import ocr tesseract wia twain naps2 bild foto seite geräte",
             "PDF",
             "Ctrl+Alt+Shift+I",
         ),
         PaletteCommand(
             "devices",
             "Drucker & Scanner…",
-            "drucker scanner geräte network wia twain print refresh",
+            "drucker scanner geräte network wia twain naps2 get-printer print refresh",
             "PDF",
         ),
         PaletteCommand(

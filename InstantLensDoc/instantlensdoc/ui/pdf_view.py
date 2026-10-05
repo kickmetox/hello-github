@@ -2591,7 +2591,8 @@ class PdfViewer(QWidget):
         btn_scan = QPushButton("Scan…")
         btn_scan.setObjectName("scanImportToolbarBtn")
         btn_scan.setToolTip(
-            "Scannen / Import · Tesseract-OCR · Geräte lokal/Netzwerk — 2.6.5"
+            "Scannen / Import · Menü Geräte → Scanner / Scannen… · "
+            "Ctrl+Alt+Shift+I · WIA/NAPS2 — 2.6.41"
         )
         btn_scan.clicked.connect(self.scan_import_dialog)
         btn_save_ann = QPushButton("Annot. speichern")

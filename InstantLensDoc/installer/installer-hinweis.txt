@@ -1,34 +1,22 @@
-InstantLens Doc 2.6.38 - Installation
+InstantLens Doc 2.6.41 - Installation
 
-Neu in 2.6.38:
-- Scanner/Drucker-Erkennung Windows gehaertet (Get-Printer, WIA/PnP/TWAIN)
-- Menue Geraete (Scanner / Drucker / Erkennen); klare DE-Treiberhinweise
-- Scan-Acquire ohne Crash; Tesseract-Pfad-Autodetect; PyInstaller PrintSupport/devices
+Neu in 2.6.41 (inkl. 2.6.40):
+- ScanTuxio-Port: NAPS2/eSCL/SANE/mDNS + Drucker Qt/CUPS
+- Scan-Einstiege: Menue Geraete -> Scanner / Scannen…
+  PDF -> Scannen / Import…, Toolbar Scan…, Welcome Scannen…, Ctrl+Alt+Shift+I
+- Blank PDF View: _ensure_page_painted + Thumb-Klick erzwingt Paint (2.6.40)
+- Build Guard: Pack inkl. run_instantlensdoc.py; EXE-Preflight; kleines Setup = Fehler (2.6.40)
+
+Basis 2.6.39/2.6.38:
+- Large-PDF lazy/virtual Thumbs + cancel Open
+- Scanner/Drucker Windows-Haertung (Get-Printer, WIA/PnP/TWAIN)
 
 Basis 2.6.36/2.6.35:
 - EXE Relative-Import Fix (run_instantlensdoc.py); Sync -Dest Fresh / Ordner-Sperre
 
-Basis 2.6.34/2.6.33:
-- Keygen PYTHONPATH Parent/Vendor; run.bat ASCII-safe; EXE-Layout Prefer
-
-Basis 2.6.32:
-- Windows-Build/Installer-Skripte: UTF-8 BOM + ASCII-Punctuation (PowerShell 5.1 Parser-Fix)
-
 Startmenue: Gruppe "InstantLens Doc" mit Programm, optional Keygenerator, INFO und Deinstallieren.
-
-Desktop-Verknuepfung: optionale Checkbox im Installer-Assistenten
-  (Task "desktopicon", Flags checkedonce - Standard beim ersten Install aktiv, abwaehlbar).
-  Ohne Haken: kein Desktop-Icon; Startmenue unabhaengig ueber Task "startmenu".
-
-64-Bit: Installer laeuft im 64-Bit-Modus (ArchitecturesInstallIn64BitMode=x64compatible).
-  Empfohlen: 64-Bit-Python 3.10+ (Python-Layout) bzw. gebuendelte x64-EXE.
-
-Keygenerator (wenn IncludeKeygen=1):
-- Python-Layout: Startmenue -> Keygenerator -> {app}\run-keygen.bat
-- EXE-Layout: Startmenue -> Keygenerator -> {app}\InstantLensKeygen.exe
-  (Datei liegt im Installationsordner neben InstantLensDoc.exe)
-
-Deinstallation: Startmenue "InstantLens Doc deinstallieren" oder Systemsteuerung / Apps.
+Desktop-Verknuepfung: optionale Checkbox (Task "desktopicon").
+64-Bit: ArchitecturesInstallIn64BitMode=x64compatible.
 
 Build (Windows x64 + Inno Setup 6):
   powershell -ExecutionPolicy Bypass -File .\scripts\build-windows-installer.ps1

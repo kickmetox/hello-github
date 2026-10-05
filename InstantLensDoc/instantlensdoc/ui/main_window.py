@@ -1172,6 +1172,8 @@ class MainWindow(QMainWindow):
         self.welcome_page = WelcomePage()
         self.welcome_page.open_requested.connect(self.open_dialog)
         self.welcome_page.new_text_requested.connect(lambda: self.new_doc("empty"))
+        if hasattr(self.welcome_page, "scan_requested"):
+            self.welcome_page.scan_requested.connect(self._run_scan_import)
         self.welcome_page.recent_activated.connect(self.open_path)
         self.welcome_page.recent_remove_requested.connect(self._remove_recent_path)
         self.welcome_page.clear_recent_requested.connect(self._clear_recent)
@@ -2858,13 +2860,14 @@ class MainWindow(QMainWindow):
             if title == "Scannen / Import…":
                 a.setToolTip(
                     "Scanner oder Bilder importieren · Tesseract-OCR · "
-                    "Geräte lokal/Netzwerk — 2.6.38"
+                    "Geräte → Scanner / Scannen… · Toolbar Scan… — 2.6.41"
                 )
                 a.setShortcut(QKeySequence("Ctrl+Alt+Shift+I"))
                 a.setObjectName("actScanImport")
             if title == "Drucker & Scanner…":
                 a.setToolTip(
-                    "Lokale und Netzwerk-Drucker/Scanner auflisten · Aktualisieren — 2.6.38"
+                    "Lokale und Netzwerk-Drucker/Scanner auflisten · "
+                    "Menü Geräte → Geräte erkennen… — 2.6.41"
                 )
                 a.setObjectName("actDevicesDialog")
             if title == "Text bearbeiten…":
@@ -3035,24 +3038,25 @@ class MainWindow(QMainWindow):
             a.triggered.connect(slot)
             m_pdf.addAction(a)
 
-        # Geraete-Menue: Scanner / Drucker / Erkennung — 2.6.38
+        # Geraete-Menue: Scanner / Drucker / Erkennung — 2.6.38 / UX 2.6.41
         m_devices = mb.addMenu("&Geräte")
         m_devices.setObjectName("menuDevices")
         m_devices.setToolTip(
-            "Scanner, Drucker und lokale/Netzwerk-Geraeteerkennung — 2.6.38"
+            "Scanner, Drucker und lokale/Netzwerk-Geraeteerkennung — 2.6.41"
         )
         act_dev_scan = QAction("Scanner / Scannen…", self)
         act_dev_scan.setObjectName("actDevicesScanner")
+        act_dev_scan.setShortcut(QKeySequence("Ctrl+Alt+Shift+I"))
         act_dev_scan.setToolTip(
-            "Scan-Dialog: WIA/SANE oder Bilder · Tesseract-OCR "
-            "(Shortcut: Ctrl+Alt+Shift+I) — 2.6.38"
+            "Scan-Dialog: WIA/NAPS2/SANE oder Bilder · Tesseract-OCR "
+            "(Shortcut: Ctrl+Alt+Shift+I) — 2.6.41"
         )
         act_dev_scan.triggered.connect(self._run_scan_import)
         m_devices.addAction(act_dev_scan)
         act_dev_printers = QAction("Drucker…", self)
         act_dev_printers.setObjectName("actDevicesPrinters")
         act_dev_printers.setToolTip(
-            "Lokale und Netzwerk-Drucker auflisten (Qt/Winspool/Get-Printer) — 2.6.38"
+            "Lokale und Netzwerk-Drucker auflisten (Qt/Winspool/Get-Printer) — 2.6.41"
         )
         act_dev_printers.triggered.connect(
             lambda: self._show_devices_dialog(filter_kind="printer")
@@ -3061,18 +3065,24 @@ class MainWindow(QMainWindow):
         act_dev_all = QAction("Geräte erkennen…", self)
         act_dev_all.setObjectName("actDevicesDiscover")
         act_dev_all.setToolTip(
-            "Drucker & Scanner neu suchen (lokal + Netzwerk) — 2.6.38"
+            "Drucker & Scanner neu suchen (WIA/PnP/TWAIN/NAPS2/Get-Printer) — 2.6.41"
         )
         act_dev_all.triggered.connect(self._show_devices_dialog)
         m_devices.addAction(act_dev_all)
         m_devices.addSeparator()
         act_dev_refresh = QAction("Aktualisieren / Neu suchen", self)
         act_dev_refresh.setObjectName("actDevicesRefresh")
-        act_dev_refresh.setToolTip("Geräteliste sofort neu laden — 2.6.38")
+        act_dev_refresh.setToolTip("Geräteliste sofort neu laden — 2.6.41")
         act_dev_refresh.triggered.connect(
             lambda: self._show_devices_dialog(auto_refresh=True)
         )
         m_devices.addAction(act_dev_refresh)
+        try:
+            from instantlensdoc.core.devices import SCAN_START_HINT_DE
+
+            self._set_status(SCAN_START_HINT_DE)
+        except Exception:
+            pass
 
         m_ins = mb.addMenu("&Einfügen")
         a = QAction("Textrahmen", self)
@@ -15328,7 +15338,13 @@ class MainWindow(QMainWindow):
         self._set_status(f"Bild eingefügt: {Path(path).name}")
 
     def _run_scan_import(self):
-        """Scan/Import-Dialog: Scanner oder Bilder · Tesseract-OCR — 2.6.38."""
+        """Scan/Import-Dialog: Scanner oder Bilder · Tesseract-OCR — 2.6.41."""
+        try:
+            from instantlensdoc.core.devices import SCAN_START_HINT_DE
+
+            self._set_status(SCAN_START_HINT_DE)
+        except Exception:
+            pass
         try:
             if hasattr(self.pdf_view, "scan_import_dialog"):
                 self.pdf_view.scan_import_dialog()
@@ -15343,7 +15359,8 @@ class MainWindow(QMainWindow):
                 self,
                 "Scannen / Import",
                 f"Scan-Dialog konnte nicht geöffnet werden:\n{e}\n\n"
-                "Bitte Tesseract/WIA-Treiber prüfen oder App neu starten.",
+                "Menü Geräte → Scanner / Scannen… · oder Bilder importieren.\n"
+                "Shortcut: Ctrl+Alt+Shift+I",
             )
 
     def _show_devices_dialog(self, filter_kind: str | None = None, auto_refresh: bool = False):

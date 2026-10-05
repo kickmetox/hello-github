@@ -1,4 +1,4 @@
-"""Scan/Import-Dialog + Geräteauswahl (Drucker/Scanner) — 2.6.2 / Layout-OCR 2.6.3."""
+"""Scan/Import-Dialog + Geräteauswahl (Drucker/Scanner) — 2.6.2 / 2.6.41."""
 
 from __future__ import annotations
 
@@ -23,6 +23,8 @@ from PySide6.QtWidgets import (
 )
 
 from instantlensdoc.core.devices import (
+    NO_DEVICE_STATUS_DE,
+    SCAN_START_HINT_DE,
     WINDOWS_PRINTER_DRIVER_HINT_DE,
     WINDOWS_SCAN_DEPS_HINT,
     WINDOWS_SCANNER_DRIVER_HINT_DE,
@@ -64,17 +66,30 @@ class ScanDialog(QDialog):
         self.resize(560, 640)
         self.setAccessibleName("Scannen und Import")
         self.setAccessibleDescription(
-            "Scanner wählen oder Bilder importieren, optional OCR mit Layout-Erhalt — 2.6.38"
+            "Scanner wählen oder Bilder importieren, optional OCR mit Layout-Erhalt — 2.6.41"
         )
 
         layout = QVBoxLayout(self)
         self.hint = QLabel(
             "Scanner wählen und scannen, oder Seitenbilder importieren. "
-            "OCR mit Layout-Erhalt (Blöcke / Lesereihenfolge; optional hOCR/TSV). — 2.6.38"
+            "OCR mit Layout-Erhalt (Blöcke / Lesereihenfolge; optional hOCR/TSV).\n"
+            f"{SCAN_START_HINT_DE} — 2.6.41"
         )
         self.hint.setWordWrap(True)
         self.hint.setObjectName("scanDialogHint")
         layout.addWidget(self.hint)
+
+        self.entry_banner = QLabel(
+            "<b>Einstieg:</b> Menü <b>Geräte → Scanner / Scannen…</b> · "
+            "PDF → Scannen / Import… · Toolbar <b>Scan…</b> · "
+            "Ctrl+Alt+Shift+I"
+        )
+        self.entry_banner.setWordWrap(True)
+        self.entry_banner.setObjectName("scanEntryBanner")
+        self.entry_banner.setStyleSheet(
+            "background:#eef5ff; color:#1a3a5c; padding:8px; border-radius:4px;"
+        )
+        layout.addWidget(self.entry_banner)
 
         # --- Geräte ---
         dev_box = QGroupBox("Geräte (Drucker & Scanner)")
@@ -122,7 +137,9 @@ class ScanDialog(QDialog):
         act_btns = QHBoxLayout()
         self.btn_acquire = QPushButton("Vom Scanner…")
         self.btn_acquire.setObjectName("scanAcquireBtn")
-        self.btn_acquire.setToolTip("Seite vom ausgewählten Scanner erfassen (WIA/SANE)")
+        self.btn_acquire.setToolTip(
+            "Seite vom ausgewählten Scanner erfassen (WIA / NAPS2 / SANE) — 2.6.41"
+        )
         self.btn_acquire.clicked.connect(self._acquire_scan)
         self.btn_import = QPushButton("Bilder importieren…")
         self.btn_import.setObjectName("scanImportBtn")
@@ -267,12 +284,12 @@ class ScanDialog(QDialog):
         )
         # Leere Liste: klare DE-Hinweise (Treiber) ohne Crash
         if not self._discovery.printers and not self._discovery.scanners:
-            tip = WINDOWS_SCAN_DEPS_HINT
-            if not self._discovery.printers:
-                tip = WINDOWS_PRINTER_DRIVER_HINT_DE + "\n\n" + tip
-            if not self._discovery.scanners:
-                tip = WINDOWS_SCANNER_DRIVER_HINT_DE + "\n\n" + tip
+            tip = WINDOWS_SCAN_DEPS_HINT + "\n\n" + SCAN_START_HINT_DE
+            tip = WINDOWS_PRINTER_DRIVER_HINT_DE + "\n\n" + tip
+            tip = WINDOWS_SCANNER_DRIVER_HINT_DE + "\n\n" + tip
             self.device_status.setToolTip(tip)
+            if not (self.device_status.text() or "").strip():
+                self.device_status.setText(NO_DEVICE_STATUS_DE)
 
     def _populate_device_list(self) -> None:
         filt = self.filter_combo.currentData() or "all"
@@ -288,6 +305,18 @@ class ScanDialog(QDialog):
                 for d in (self._discovery.scanners + self._discovery.printers)
                 if d.scope == DeviceScope.NETWORK
             ]
+        if not devices:
+            placeholder = QListWidgetItem(
+                "Kein Gerät in diesem Filter — „Aktualisieren“ oder "
+                "„Bilder importieren…“ · Menü Geräte → Scanner / Scannen…"
+            )
+            placeholder.setFlags(Qt.ItemIsEnabled)  # nicht wählbar als Scan-Ziel
+            placeholder.setData(Qt.UserRole, None)
+            placeholder.setToolTip(
+                WINDOWS_SCANNER_DRIVER_HINT_DE + "\n\n" + SCAN_START_HINT_DE
+            )
+            self.device_list.addItem(placeholder)
+            return
         for d in devices:
             item = QListWidgetItem(d.label())
             item.setData(Qt.UserRole, d)

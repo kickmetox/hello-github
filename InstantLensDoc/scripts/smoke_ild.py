@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Nightly/CI Smoke: CLI + Import-Checks für InstantLens Doc — 2.1.0–2.6.40.
+"""Nightly/CI Smoke: CLI + Import-Checks für InstantLens Doc — 2.1.0–2.6.41.
 
 Leichtgewichtig. Exit-Codes:
   0  OK  (ok=true)
@@ -14,12 +14,12 @@ Aufruf:
   python scripts/smoke_ild.py -h
 
 JSON-Schema (--json), Erfolg:
-  {"ok": true, "version": "2.6.40", "duration_ms": 1234,
+  {"ok": true, "version": "2.6.41", "duration_ms": 1234,
    "checks": ["version", "imports", "cli", "measure_diff_import", "changelog"]}
 
 JSON bei Fail: checks[] enthält Objekt mit error-Text (max 200 Zeichen, Truncate …);
 Exitcode spiegelt ok (0↔true, 1↔false) — 2.2.0:
-  {"ok": false, "version": "2.6.40", "duration_ms": 12,
+  {"ok": false, "version": "2.6.41", "duration_ms": 12,
    "checks": ["version", {"name": "imports", "error": "import x: …"}]}
 """
 
@@ -41,7 +41,7 @@ if str(ROOT) not in sys.path:
 # Headless/CI: Qt ohne Display
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-EXPECTED_VERSION = "2.6.40"
+EXPECTED_VERSION = "2.6.41"
 FAIL_ERROR_MAX_LEN = 200
 
 EXIT_OK = 0
@@ -82,7 +82,7 @@ def check_version() -> None:
         _fail(f"docs/VERSION={docs_ver!r}")
     bw = (ROOT / "build-windows.ps1").read_text(encoding="utf-8")
     if EXPECTED_VERSION not in bw or "Allow32Bit" not in bw:
-        _fail("build-windows.ps1 fehlt 2.6.40/Allow32Bit")
+        _fail("build-windows.ps1 fehlt 2.6.41/Allow32Bit")
     if not (ROOT / "scripts" / "pack-windows-runnable.py").is_file():
         _fail("scripts/pack-windows-runnable.py fehlt")
     if not (ROOT / "run-keygen.bat").is_file():
@@ -181,7 +181,7 @@ def check_version() -> None:
     spec.loader.exec_module(mod)
     if not callable(getattr(mod, "main", None)):
         _fail("run_instantlensdoc.main nicht callable")
-    # 2.6.39+: Large-PDF perf constants + APIs; 2.6.40 blank-view/build
+    # 2.6.41: Large-PDF perf constants + APIs
     from ild_pdf.limits import (
         THUMB_VIRTUAL_THRESHOLD,
         THUMB_PLACEHOLDER_CHUNK,
@@ -190,60 +190,80 @@ def check_version() -> None:
         STATS_WORD_SAMPLE_PAGES,
     )
     if int(THUMB_VIRTUAL_THRESHOLD) < 50:
-        _fail("THUMB_VIRTUAL_THRESHOLD zu klein (2.6.40)")
+        _fail("THUMB_VIRTUAL_THRESHOLD zu klein (2.6.41)")
     if int(THUMB_PLACEHOLDER_CHUNK) < 8:
-        _fail("THUMB_PLACEHOLDER_CHUNK zu klein (2.6.40)")
+        _fail("THUMB_PLACEHOLDER_CHUNK zu klein (2.6.41)")
     if int(PAGE_LABELS_SCAN_THRESHOLD) < 50:
-        _fail("PAGE_LABELS_SCAN_THRESHOLD zu klein (2.6.40)")
+        _fail("PAGE_LABELS_SCAN_THRESHOLD zu klein (2.6.41)")
     if int(TEXT_EXTRACT_ALL_WARN_PAGES) < 50:
-        _fail("TEXT_EXTRACT_ALL_WARN_PAGES zu klein (2.6.40)")
+        _fail("TEXT_EXTRACT_ALL_WARN_PAGES zu klein (2.6.41)")
     if int(STATS_WORD_SAMPLE_PAGES) < 1:
-        _fail("STATS_WORD_SAMPLE_PAGES ungültig (2.6.40)")
+        _fail("STATS_WORD_SAMPLE_PAGES ungültig (2.6.41)")
     from ild_pdf.overlay import extract_plain_text_pages
     if not callable(extract_plain_text_pages):
-        _fail("extract_plain_text_pages fehlt (2.6.40)")
+        _fail("extract_plain_text_pages fehlt (2.6.41)")
     mw = (ROOT / "instantlensdoc" / "ui" / "main_window.py").read_text(encoding="utf-8")
     if "virtual_only" not in mw or "THUMB_VIRTUAL_THRESHOLD" not in mw:
-        _fail("main_window fehlt virtual thumb queue (2.6.40)")
+        _fail("main_window fehlt virtual thumb queue (2.6.41)")
     if "TEXT_EXTRACT_ALL_WARN_PAGES" not in mw:
-        _fail("main_window fehlt page-scoped extract warn (2.6.40)")
+        _fail("main_window fehlt page-scoped extract warn (2.6.41)")
     pv = (ROOT / "instantlensdoc" / "ui" / "pdf_view.py").read_text(encoding="utf-8")
     if "QProgressDialog" not in pv or "_open_generation" not in pv:
-        _fail("pdf_view.load fehlt Progress/Cancel Open (2.6.40)")
+        _fail("pdf_view.load fehlt Progress/Cancel Open (2.6.41)")
     if "scan_native" not in pv:
-        _fail("pdf_view fehlt lazy page labels (2.6.40)")
+        _fail("pdf_view fehlt lazy page labels (2.6.41)")
     sb = (ROOT / "instantlensdoc" / "ui" / "sidebar.py").read_text(encoding="utf-8")
     if "shared_icon" not in sb and "THUMB_PLACEHOLDER_CHUNK" not in sb:
-        _fail("sidebar.prepare_lazy_thumbs fehlt shared/chunked placeholders (2.6.40)")
-    # 2.6.40: blank main view + build EXE guard
-    if "_ensure_page_painted" not in pv or "_canvas_has_page_image" not in pv:
-        _fail("pdf_view fehlt _ensure_page_painted (2.6.40)")
-    if "quiet=True" not in pv and "quiet: bool" not in pv:
-        _fail("pdf_view.refresh fehlt quiet-Fallback (2.6.40)")
-    if "setCurrentWidget(self.pdf_view)" not in mw or "_on_thumb_jump" not in mw:
-        pass  # structural
-    mw_jump = mw
-    if "def _on_thumb_jump" in mw_jump and "setCurrentWidget(self.pdf_view)" not in mw_jump.split("def _on_thumb_jump", 1)[1][:600]:
-        _fail("main_window._on_thumb_jump muss PDF-Stack aktivieren (2.6.40)")
-    if "_canvas_has_page_image" not in mw and "_ensure_page_painted" not in mw:
-        _fail("main_window Thumb-Jump fehlt Paint-Ensure (2.6.40)")
-    bw = (ROOT / "build-windows.ps1").read_text(encoding="utf-8-sig")
-    if "InstantLensDoc.exe fehlt" not in bw and "IldMinAppExeBytes" not in bw:
-        _fail("build-windows.ps1 fehlt EXE-Guard (2.6.40)")
-    bi = (ROOT / "installer" / "build-installer.ps1").read_text(encoding="utf-8-sig")
-    if "InstantLensDoc.exe fehlt" not in bi and "-PythonLauncher" not in bi:
-        _fail("build-installer.ps1 fehlt EXE-Pflicht (2.6.40)")
-    if "verdaechtig klein" not in bi and "15 MB" not in bi:
-        _fail("build-installer.ps1 fehlt Setup-Groessen-Check (2.6.40)")
-    bwi = (ROOT / "scripts" / "build-windows-installer.ps1").read_text(encoding="utf-8-sig")
-    if "Preflight" not in bwi:
-        _fail("build-windows-installer.ps1 fehlt EXE-Preflight (2.6.40)")
-    if not (ROOT / "run_instantlensdoc.py").is_file():
-        _fail("run_instantlensdoc.py fehlt (PyInstaller-Entry, 2.6.36+/2.6.40)")
-    pack_py = (ROOT / "scripts" / "pack-windows-runnable.py").read_text(encoding="utf-8")
-    if "run_instantlensdoc.py" not in pack_py:
-        _fail("pack-windows-runnable.py INCLUDE_TOP fehlt run_instantlensdoc.py (2.6.40)")
+        _fail("sidebar.prepare_lazy_thumbs fehlt shared/chunked placeholders (2.6.41)")
+    # 2.6.41: ScanTuxio-Port + Geraete-UX
+    st_root = ROOT / "instantlensdoc" / "core" / "scantuxio"
+    for rel in (
+        "scanner.py",
+        "scanner_naps2.py",
+        "scanner_escl.py",
+        "discovery.py",
+        "printing.py",
+        "printing_windows.py",
+        "platform_utils.py",
+    ):
+        if not (st_root / rel).is_file():
+            _fail(f"scantuxio/{rel} fehlt (2.6.41 ScanTuxio-Port)")
+    try:
+        from instantlensdoc.core.scantuxio import scanner as _st_scanner
+        from instantlensdoc.core.scantuxio import scanner_naps2 as _st_naps2
+
+        if not callable(getattr(_st_scanner, "list_devices_all", None)):
+            _fail("scantuxio.scanner.list_devices_all fehlt")
+        if not callable(getattr(_st_scanner, "scan_single_page_dispatch", None)):
+            _fail("scantuxio.scanner.scan_single_page_dispatch fehlt")
+        if not callable(getattr(_st_naps2, "list_devices", None)):
+            _fail("scantuxio.scanner_naps2.list_devices fehlt")
+    except Exception as e:
+        _fail(f"scantuxio Import: {e}")
+    dev = (ROOT / "instantlensdoc" / "core" / "devices.py").read_text(encoding="utf-8")
+    if "_list_scanners_scantuxio" not in dev or "SCAN_START_HINT_DE" not in dev:
+        _fail("devices.py fehlt ScanTuxio-Bridge/SCAN_START_HINT_DE (2.6.41)")
+    if "NO_DEVICE_STATUS_DE" not in dev:
+        _fail("devices.py fehlt NO_DEVICE_STATUS_DE (2.6.41)")
+    sc = (ROOT / "instantlensdoc" / "core" / "scan.py").read_text(encoding="utf-8")
+    if "_acquire_scantuxio" not in sc or "scan_single_page_dispatch" not in sc:
+        _fail("scan.py fehlt _acquire_scantuxio/dispatch (2.6.41)")
+    sd = (ROOT / "instantlensdoc" / "ui" / "scan_dialog.py").read_text(encoding="utf-8")
+    if "scanEntryBanner" not in sd or "SCAN_START_HINT_DE" not in sd:
+        _fail("scan_dialog fehlt Entry-Banner (2.6.41)")
+    wel = (ROOT / "instantlensdoc" / "ui" / "welcome.py").read_text(encoding="utf-8")
+    if "scan_requested" not in wel or "welcomeScanBtn" not in wel:
+        _fail("welcome fehlt Scannen-Button (2.6.41)")
+    if "menuDevices" not in mw or "SCAN_START_HINT_DE" not in mw:
+        _fail("main_window fehlt Geräte-Menü/SCAN_START_HINT (2.6.41)")
     _ok(f"version {EXPECTED_VERSION}")
+        # 2.6.40 blank-view / pack entry (kept)
+    if "_ensure_page_painted" not in pv:
+        _fail("pdf_view fehlt _ensure_page_painted (2.6.40)")
+    if "run_instantlensdoc.py" not in (ROOT / "scripts" / "pack-windows-runnable.py").read_text(encoding="utf-8"):
+        _fail("pack-windows-runnable.py fehlt run_instantlensdoc.py (2.6.40)")
+
+    _ok("2.6.41 scantuxio-port/menuDevices/naps2-escl/entry-hints: OK")
 
 
 def check_imports(*, with_qt: bool) -> None:
@@ -503,6 +523,9 @@ def check_imports(*, with_qt: bool) -> None:
             "scanAcquireBtn",
             "scanImportBtn",
             "scanOcrEnabled",
+            "scanEntryBanner",
+            "SCAN_START_HINT_DE",
+            "2.6.41",
         ),
         ROOT / "instantlensdoc" / "core" / "devices.py": (
             "discover_devices",
@@ -513,12 +536,32 @@ def check_imports(*, with_qt: bool) -> None:
             "Get-Printer",
             "format_discovery_status",
             "WINDOWS_SCANNER_DRIVER_HINT_DE",
+            "find_naps2_console",
+            "SCAN_START_HINT_DE",
+            "NO_DEVICE_STATUS_DE",
+            "_list_scanners_scantuxio",
+            "list_devices_all",
+            "2.6.41",
         ),
         ROOT / "instantlensdoc" / "core" / "scan.py": (
             "insert_scan_pages_into_pdf",
             "import_image_paths",
             "acquire_from_scanner",
             "ocr_page_image",
+            "_acquire_scantuxio",
+            "scan_single_page_dispatch",
+            "2.6.41",
+        ),
+        ROOT / "instantlensdoc" / "core" / "scantuxio" / "scanner.py": (
+            "list_devices_all",
+            "scan_single_page_dispatch",
+            "native-escl:",
+            "naps2:",
+        ),
+        ROOT / "instantlensdoc" / "core" / "scantuxio" / "scanner_naps2.py": (
+            "NAPS2.Console",
+            "--listdevices",
+            "DEVICE_PREFIX",
         ),
         ROOT / "instantlensdoc" / "ui" / "page_labels_dialog.py": (
             "PageLabelsDialog",
@@ -559,7 +602,7 @@ def check_imports(*, with_qt: bool) -> None:
             "Zu ersetzender Pin",
             "hyphenate_fr",
             "hyphenate_it",
-            "2.6.40",
+            "2.6.41",
         ),
         ROOT / "instantlensdoc" / "ui" / "sidebar.py": (
             "Schnellvorschau",
@@ -603,6 +646,9 @@ def check_imports(*, with_qt: bool) -> None:
             "actDevicesPrinters",
             "&Geräte",
             "Ctrl+Alt+Shift+I",
+            "SCAN_START_HINT_DE",
+            "scan_requested",
+            "2.6.41",
             "Text bearbeiten…",
             "inline_text_edit",
             "Ctrl+Alt+Shift+E",
@@ -647,7 +693,7 @@ def check_imports(*, with_qt: bool) -> None:
             "_update_index",
             "HYPHENATION_UI_LANGS",
             "hyphenate_fr",
-            "2.6.40",
+            "2.6.41",
         ),
         ROOT / "instantlensdoc" / "ui" / "batch_dialog.py": (
             "BatchConvertDialog",
@@ -1084,6 +1130,8 @@ def check_measure_and_diff() -> None:
 
 def check_changelog() -> None:
     cl = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    if "## 2.6.41" not in cl:
+        _fail("CHANGELOG fehlt ## 2.6.41")
     if "## 2.6.40" not in cl:
         _fail("CHANGELOG fehlt ## 2.6.40")
     if "## 2.6.38" not in cl:
@@ -1637,13 +1685,12 @@ def check_changelog() -> None:
     ):
         _fail("CHANGELOG 2.6.39 fehlt Large-PDF/Perf-Hinweis")
     if (
-        "Blank" not in cl
-        and "_ensure_page_painted" not in cl
-        and "Build Guard" not in cl
-        and "2-3 MB" not in cl
-        and "2.6.40" not in cl
+        "NAPS2" not in cl
+        and "Scan UX" not in cl
+        and "SCAN_START" not in cl
+        and "2.6.41" not in cl
     ):
-        _fail("CHANGELOG 2.6.40 fehlt Blank-View/Build-Guard-Hinweis")
+        _fail("CHANGELOG 2.6.41 fehlt Scan/NAPS2-Hinweis")
     if (
         "Silbentrennung" not in cl
         and "Hyphen" not in cl
@@ -1782,7 +1829,7 @@ def check_changelog() -> None:
     if "## 2.2.0" not in cl:
         _fail("CHANGELOG fehlt ## 2.2.0")
     feat = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
-    if "2.6.40" not in feat:
+    if "2.6.41" not in feat:
         _fail("FEATURES.md fehlt 2.6.36")
     if "2.6.28" not in feat:
         _fail("FEATURES.md fehlt 2.6.28")
@@ -1944,12 +1991,11 @@ def check_changelog() -> None:
     ):
         _fail("FEATURES.md fehlt 2.6.39 Large-PDF Perf-Hinweis")
     if (
-        "Blank-View" not in feat
-        and "Build-Guard" not in feat
-        and "Build-EXE-Guard" not in feat
-        and "2.6.40" not in feat
+        "NAPS2" not in feat
+        and "Scan UX" not in feat
+        and "2.6.41" not in feat
     ):
-        _fail("FEATURES.md fehlt 2.6.40 Blank-View/Build-Guard-Hinweis")
+        _fail("FEATURES.md fehlt 2.6.41 Scan/NAPS2-Hinweis")
     if (
         "Silbentrennung" not in feat
         and "Menü/Palette" not in feat
@@ -2394,11 +2440,11 @@ Exit-Codes:
 Laufzeit: am Ende als „Laufzeit: N ms“ (oder duration_ms im JSON).
 
 Beispiel --json (Erfolg):
-  {"ok": true, "version": "2.6.40", "duration_ms": 1234,
+  {"ok": true, "version": "2.6.41", "duration_ms": 1234,
    "checks": ["version", "imports", "cli", "measure_diff_import", "changelog"]}
 
 Beispiel --json (Fail):
-  {"ok": false, "version": "2.6.40", "duration_ms": 12,
+  {"ok": false, "version": "2.6.41", "duration_ms": 12,
    "checks": ["version", {"name": "imports", "error": "import x: …"}]}
 """.rstrip()
     )

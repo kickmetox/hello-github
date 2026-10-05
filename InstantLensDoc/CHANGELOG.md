@@ -1,3 +1,7 @@
+## 2.6.41 - ScanTuxio Scan/Print-Module portiert + Geräte-UX
+
+Patch nach **2.6.40** (Blank-View/Build Guard enthalten): Nutzer auf **2.6.36** ohne Menü **Geräte**; ScanTuxio-Quellen nachgeliefert (`docs/ScanTuxio-Win.zip` → `scantuxio/`). **Vendored** unter `instantlensdoc/core/scantuxio/`: `discovery`, `scanner`, `scanner_naps2`, `scanner_escl`, `printing`, `printing_windows`, `platform_utils`. Discovery/Acquire nutzen ScanTuxio ``list_devices_all`` / ``scan_single_page_dispatch`` (NAPS2 WIA/TWAIN, native-eSCL/zeroconf, SANE); Drucker via ScanTuxio-Qt/CUPS + bestehende Winspool/Get-Printer. UI-Einstiege: Menü **Geräte → Scanner / Scannen…**, PDF → Scannen / Import…, Toolbar **Scan…**, Welcome **Scannen…**, Ctrl+Alt+Shift+I, Status `SCAN_START_HINT_DE`, leere Geräteliste mit DE-Hinweis. Pack `InstantLensDoc-2.6.41-pack.zip`; VERSION **2.6.41**.
+
 ## 2.6.40 - Blank PDF View + Windows Build Guard
 
 Patch nach **2.6.39**: Nutzerbericht — Setup nur ~2.9 MB (statt ~49 MB), `dist\InstantLensDoc\InstantLensDoc.exe` fehlt; PDF-Hauptansicht weiss trotz Schnellvorschau-Thumbs, Klick auf Thumbs zeigt keine Seite.

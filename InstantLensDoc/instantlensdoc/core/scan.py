@@ -1,7 +1,10 @@
-"""Scan-/Import-Pipeline mit Tesseract-OCR — 2.6.2 / Layout-Erhalt 2.6.3.
+"""Scan-/Import-Pipeline mit Tesseract-OCR — 2.6.2 / Layout-Erhalt 2.6.3 / 2.6.41.
 
 Seitenbilder (Scanner-Acquire, Datei-Import, Fotos) → optional OCR →
 PDF-Seiten in die aktuelle Session + ``*.ildocr.txt`` (+ optional hOCR/TSV).
+
+Acquire: primaer ScanTuxio ``scan_single_page_dispatch`` (NAPS2 / native-eSCL /
+SANE); Fallback WIA Common Dialog unter Windows.
 """
 
 from __future__ import annotations
@@ -10,6 +13,7 @@ import platform
 import shutil
 import subprocess
 import tempfile
+import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, List, Optional, Sequence, Union
@@ -77,6 +81,33 @@ def last_acquire_error() -> str:
     return _LAST_ACQUIRE_ERROR
 
 
+def _scantuxio_device_id(device: Optional[DeviceInfo]) -> str:
+    """Mappt ILD-DeviceInfo auf ScanTuxio device_id (naps2:/native-escl:/…)."""
+    if not device:
+        return ""
+    did = (device.device_id or "").strip()
+    if did.startswith(("naps2:", "native-escl:", "escl:", "airscan:", "net:")):
+        return did
+    # Legacy ILD-IDs
+    if did.startswith("NAPS2:"):
+        rest = did[len("NAPS2:") :]
+        if rest.lower().startswith(("wia:", "twain:")):
+            return "naps2:" + rest
+        return f"naps2:wia:{rest}" if rest else ""
+    if did.startswith("TWAIN"):
+        name = (device.name or did.replace("TWAIN:", "").replace("TWAIN-DS:", "")).strip()
+        return f"naps2:twain:{name}" if name else ""
+    backend = (device.backend or "").upper()
+    if "NAPS2" in backend:
+        drv = "wia"
+        if "TWAIN" in backend:
+            drv = "twain"
+        return f"naps2:{drv}:{(device.name or did).strip()}"
+    if "ESCL" in backend or "MDNS" in backend:
+        return did
+    return did
+
+
 def acquire_from_scanner(
     device: Optional[DeviceInfo] = None,
     *,
@@ -85,8 +116,8 @@ def acquire_from_scanner(
     """
     Versucht einen Scan vom gewählten Gerät.
 
-    Windows: WIA Common Dialog (falls COM verfügbar).
-    Linux: ``scanimage`` mit Geräte-ID.
+    Primaer: ScanTuxio ``scan_single_page_dispatch`` (NAPS2/eSCL/SANE).
+    Windows-Fallback: WIA Common Dialog.
     Ohne Hardware/Backend: leere Liste (UI fällt auf Datei-Import zurück).
     Wirft nicht — Fehler in ``last_acquire_error()``.
     """
@@ -96,17 +127,79 @@ def acquire_from_scanner(
         out = Path(out_dir) if out_dir else Path(tempfile.mkdtemp(prefix="ild-scan-"))
         out.mkdir(parents=True, exist_ok=True)
         system = platform.system()
-        if device and device.device_id.startswith("TWAIN"):
+        st_id = _scantuxio_device_id(device)
+        if st_id:
+            paths = _acquire_scantuxio(st_id, out)
+            if paths:
+                return paths
+        if device and (device.device_id or "").startswith("TWAIN"):
             _LAST_ACQUIRE_ERROR = (
-                "TWAIN-Quelle erkannt, Acquire laeuft ueber WIA-Dialog. "
-                "Falls leer: Bilder importieren oder WIA-Treiber installieren."
+                "TWAIN-Quelle: ScanTuxio/NAPS2 ohne Bild — Fallback WIA. "
+                "Falls leer: Bilder importieren oder NAPS2/WIA-Treiber prüfen."
             )
         if system == "Windows":
-            return _acquire_wia_windows(device, out)
+            paths = _acquire_wia_windows(device, out)
+            if paths:
+                return paths
+            # Letzter Versuch: ScanTuxio NAPS2 ohne feste ID (erstes WIA-Gerät)
+            if not st_id:
+                try:
+                    from instantlensdoc.core.scantuxio import scanner_naps2 as st_naps2
+
+                    for d in st_naps2.list_devices(timeout=15) or []:
+                        paths = _acquire_scantuxio(d.device_id, out)
+                        if paths:
+                            return paths
+                        break
+                except Exception:
+                    pass
+            return []
+        if st_id:
+            return []
         return _acquire_sane(device, out)
     except Exception as e:
         _LAST_ACQUIRE_ERROR = f"Scan fehlgeschlagen: {e}"
         return []
+
+
+def _acquire_scantuxio(device_id: str, out_dir: Path) -> List[Path]:
+    """Scan über ScanTuxio ``scan_single_page_dispatch``."""
+    global _LAST_ACQUIRE_ERROR
+    if not device_id:
+        return []
+    try:
+        from instantlensdoc.core.scantuxio import scanner as st_scanner
+    except Exception as e:
+        _LAST_ACQUIRE_ERROR = f"ScanTuxio nicht ladbar: {e}"
+        return []
+    token = uuid.uuid4().hex[:8]
+    dest = out_dir / f"scan_st_{token}.png"
+    try:
+        st_scanner.scan_single_page_dispatch(
+            device_id,
+            str(dest),
+            mode="Color",
+            resolution="300",
+            source=None,
+            timeout=180,
+        )
+    except Exception as e:
+        _LAST_ACQUIRE_ERROR = str(e)[:240]
+        return []
+    if dest.is_file() and dest.stat().st_size > 32:
+        _LAST_ACQUIRE_ERROR = ""
+        return [dest]
+    alts = [
+        p
+        for p in out_dir.glob(f"scan_st_{token}*")
+        if p.is_file() and p.stat().st_size > 32
+    ]
+    if alts:
+        _LAST_ACQUIRE_ERROR = ""
+        return alts[:1]
+    if not _LAST_ACQUIRE_ERROR:
+        _LAST_ACQUIRE_ERROR = "ScanTuxio lieferte kein Bild."
+    return []
 
 
 def _acquire_wia_windows(device: Optional[DeviceInfo], out_dir: Path) -> List[Path]:

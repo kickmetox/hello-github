@@ -1,9 +1,13 @@
-"""Lokale und Netzwerk-Drucker-/Scanner-Erkennung — 2.6.2 / Haertung 2.6.38.
+"""Lokale und Netzwerk-Drucker-/Scanner-Erkennung — 2.6.2 / 2.6.38 / 2.6.41.
 
-Windows: Systemdrucker (Qt / Winspool / Get-Printer / win32print),
-Scanner via WIA / PnP / TWAIN-Quellen wo verfuegbar.
-Linux/macOS: Qt-Drucker; Scanner ueber SANE (`scanimage -L`) falls vorhanden.
-Netzwerk: Qt ``isRemote`` / UNC-Freigaben / erkannte Netzwerk-PnP-Geraete.
+Windows: Systemdrucker (Qt / Winspool / Get-Printer / win32print / ScanTuxio-Qt),
+Scanner via **ScanTuxio**-Backends (NAPS2 WIA/TWAIN, native-eSCL/zeroconf)
+plus WIA/PnP/TWAIN-Registry-Fallback.
+Linux/macOS: Qt-Drucker; Scanner ueber SANE (`scanimage -L`) + ScanTuxio-SANE.
+Netzwerk: mDNS/zeroconf (ScanTuxio discovery) · Qt ``isRemote`` · UNC/PnP.
+
+Primaerquelle: vendored ``instantlensdoc.core.scantuxio`` (Upload
+``docs/ScanTuxio-Win``).
 """
 
 from __future__ import annotations
@@ -88,8 +92,23 @@ WINDOWS_SCANNER_DRIVER_HINT_DE = (
     "Keine Scanner erkannt. Bitte pruefen:\n"
     "  • WIA-Treiber des Scanners (Windows-Geraetemanager → Bildverarbeitungsgeraete)\n"
     "  • Optional: TWAIN-Datenquelle des Herstellers\n"
+    "  • Optional: NAPS2 installieren (NAPS2.Console --listdevices)\n"
     "  • PowerShell: Get-PnpDevice -Class Image\n"
     "  • Ohne Hardware: im Scan-Dialog „Bilder importieren…“ nutzen"
+)
+
+# Offensichtliche UI-Einstiege (DE) — Statusleiste / Dialog / Hilfe — 2.6.41
+SCAN_START_HINT_DE = (
+    "Scannen starten: Menü Geräte → Scanner / Scannen… "
+    "· oder PDF → Scannen / Import… "
+    "· oder Toolbar „Scan…“ "
+    "· Shortcut Ctrl+Alt+Shift+I"
+)
+
+NO_DEVICE_STATUS_DE = (
+    "0 Scanner · 0 Drucker — Kein Gerät erkannt. "
+    "Treiber prüfen oder „Bilder importieren…“ nutzen. "
+    + SCAN_START_HINT_DE
 )
 
 
@@ -461,11 +480,207 @@ try {
     return out, []
 
 
-def _list_scanners_windows() -> tuple[List[DeviceInfo], List[str], List[str]]:
-    """Windows-Scanner: WIA-Geräte + PnP Image-Klasse + TWAIN-Quellen."""
+def find_naps2_console() -> Optional[str]:
+    """Pfad zu NAPS2.Console.exe — ScanTuxio ``scanner_naps2``."""
+    try:
+        from instantlensdoc.core.scantuxio import scanner_naps2 as st_naps2
+
+        return st_naps2._naps2_console_path()
+    except Exception:
+        pass
+    if platform.system() != "Windows":
+        return shutil.which("naps2.console") or shutil.which("naps2-console")
+    which = shutil.which("NAPS2.Console") or shutil.which("naps2.console")
+    return which
+
+
+def _list_scanners_scantuxio() -> tuple[List[DeviceInfo], List[str], List[str]]:
+    """ScanTuxio ``list_devices_all``: SANE + NAPS2(WIA/TWAIN) + native-eSCL."""
     warnings: List[str] = []
-    notes: List[str] = ["Windows: WIA/PnP/TWAIN-Scannererkennung"]
+    notes: List[str] = ["ScanTuxio: list_devices_all"]
     out: List[DeviceInfo] = []
+    try:
+        from instantlensdoc.core.scantuxio import scanner as st_scanner
+    except Exception as e:
+        return [], [f"ScanTuxio scanner: {e}"], notes
+    try:
+        devices = st_scanner.list_devices_all(timeout=25)
+    except Exception as e:
+        return [], [f"ScanTuxio list_devices_all: {e}"], notes
+    for d in devices or []:
+        try:
+            did = str(getattr(d, "device_id", "") or "").strip()
+            name = str(getattr(d, "description", "") or did).strip()
+        except Exception:
+            continue
+        if not did and not name:
+            continue
+        backend = "ScanTuxio"
+        scope = DeviceScope.LOCAL
+        low = did.lower()
+        if low.startswith("naps2:"):
+            backend = "ScanTuxio/NAPS2"
+            # naps2:wia:Name → Anzeigename kürzen
+            rest = did[len("naps2:") :]
+            if ":" in rest:
+                drv, nm = rest.split(":", 1)
+                backend = f"ScanTuxio/NAPS2/{drv.upper()}"
+                if nm:
+                    name = f"{nm} ({drv.upper()})"
+        elif low.startswith("native-escl:") or low.startswith("escl:"):
+            backend = "ScanTuxio/eSCL"
+            scope = DeviceScope.NETWORK
+        elif any(x in low for x in ("net:", "airscan:", "http:", "escl:")):
+            scope = DeviceScope.NETWORK
+            backend = "ScanTuxio/SANE"
+        else:
+            backend = "ScanTuxio/SANE"
+        out.append(
+            DeviceInfo(
+                kind=DeviceKind.SCANNER,
+                name=name or did,
+                device_id=did or name,
+                scope=scope,
+                backend=backend,
+            )
+        )
+    if out:
+        notes.append(f"ScanTuxio-Scanner: {len(out)}")
+    else:
+        notes.append("ScanTuxio: 0 Scanner (NAPS2/SANE/eSCL)")
+    return _dedupe(out), warnings, notes
+
+
+def _list_network_scantuxio() -> tuple[List[DeviceInfo], List[str], List[str]]:
+    """ScanTuxio mDNS/zeroconf Netzwerk-Drucker/Scanner (Anzeige + eSCL-IDs)."""
+    warnings: List[str] = []
+    notes: List[str] = []
+    out: List[DeviceInfo] = []
+    try:
+        from instantlensdoc.core.scantuxio import discovery as st_discovery
+        from instantlensdoc.core.scantuxio import scanner_escl as st_escl
+    except Exception as e:
+        return [], [f"ScanTuxio discovery: {e}"], []
+    net_devs = []
+    try:
+        if hasattr(st_discovery, "discover_network_devices"):
+            net_devs.extend(st_discovery.discover_network_devices(timeout=4) or [])
+    except Exception as e:
+        notes.append(f"avahi: {e}")
+    try:
+        if hasattr(st_discovery, "discover_network_devices_zeroconf"):
+            net_devs.extend(st_discovery.discover_network_devices_zeroconf(timeout=3.0) or [])
+    except Exception as e:
+        notes.append(f"zeroconf: {e}")
+    seen: set[tuple[str, str]] = set()
+    for nd in net_devs:
+        try:
+            name = str(getattr(nd, "name", "") or "").strip()
+            kind = str(getattr(nd, "kind", "") or "").strip()
+            host = str(getattr(nd, "address", "") or getattr(nd, "host", "") or "").strip()
+            port = str(getattr(nd, "port", "") or "").strip()
+            stype = str(getattr(nd, "service_type", "") or "")
+        except Exception:
+            continue
+        key = (name, host)
+        if key in seen or not name:
+            continue
+        seen.add(key)
+        if kind == "Scanner" or re.search(r"uscan|scanner|escl", stype, re.I):
+            did = ""
+            if host and port:
+                use_https = "uscans" in stype.lower()
+                try:
+                    did = st_escl.build_device_id(host, port, use_https=use_https)
+                except Exception:
+                    did = f"native-escl:http://{host}:{port}"
+            out.append(
+                DeviceInfo(
+                    kind=DeviceKind.SCANNER,
+                    name=f"{name} (Netzwerk, eSCL)",
+                    device_id=did or f"mdns:{host}:{port}",
+                    scope=DeviceScope.NETWORK,
+                    backend="ScanTuxio/mDNS",
+                    details=f"{stype} {host}:{port}".strip(),
+                )
+            )
+        elif kind == "Drucker" or re.search(r"ipp|printer|pdl", stype, re.I):
+            out.append(
+                DeviceInfo(
+                    kind=DeviceKind.PRINTER,
+                    name=name,
+                    device_id=f"ipp://{host}:{port}" if host else name,
+                    scope=DeviceScope.NETWORK,
+                    backend="ScanTuxio/mDNS",
+                    details=f"{stype} {host}:{port}".strip(),
+                )
+            )
+    if out:
+        notes.append(f"ScanTuxio-mDNS: {len(out)}")
+    return out, warnings, notes
+
+
+def _list_printers_scantuxio() -> tuple[List[DeviceInfo], List[str]]:
+    """ScanTuxio printing (Qt unter Windows / CUPS unter Linux)."""
+    try:
+        from instantlensdoc.core.scantuxio import printing as st_print
+    except Exception as e:
+        return [], [f"ScanTuxio printing: {e}"]
+    try:
+        printers = st_print.list_printers(timeout=10)
+    except TypeError:
+        try:
+            printers = st_print.list_printers()
+        except Exception as e:
+            return [], [f"ScanTuxio list_printers: {e}"]
+    except Exception as e:
+        return [], [f"ScanTuxio list_printers: {e}"]
+    out: List[DeviceInfo] = []
+    for p in printers or []:
+        try:
+            name = str(getattr(p, "name", "") or "").strip()
+            state = str(getattr(p, "state", "") or "")
+            is_def = bool(getattr(p, "is_default", False))
+        except Exception:
+            continue
+        if not name:
+            continue
+        out.append(
+            DeviceInfo(
+                kind=DeviceKind.PRINTER,
+                name=name + (" (Standard)" if is_def else ""),
+                device_id=name,
+                scope=_scope_from_name(name),
+                backend="ScanTuxio",
+                details=state,
+            )
+        )
+    return out, []
+
+
+def _list_scanners_windows() -> tuple[List[DeviceInfo], List[str], List[str]]:
+    """Windows-Scanner: ScanTuxio (NAPS2/eSCL) zuerst, dann WIA/PnP/TWAIN."""
+    warnings: List[str] = []
+    notes: List[str] = ["Windows: ScanTuxio + WIA/PnP/TWAIN"]
+    out: List[DeviceInfo] = []
+
+    # 0) ScanTuxio-Backends (NAPS2 WIA/TWAIN + native-eSCL)
+    try:
+        st_devs, st_warn, st_notes = _list_scanners_scantuxio()
+        out.extend(st_devs)
+        warnings.extend(st_warn)
+        notes.extend(st_notes)
+    except Exception as e:
+        warnings.append(f"ScanTuxio: {e}")
+    try:
+        net_devs, net_warn, net_notes = _list_network_scantuxio()
+        for d in net_devs:
+            if d.kind == DeviceKind.SCANNER:
+                out.append(d)
+        warnings.extend(net_warn)
+        notes.extend(net_notes)
+    except Exception as e:
+        notes.append(f"ScanTuxio-mDNS: {e}")
 
     # 1) WIA DeviceManager (COM via PowerShell) — alle Scanner-Typen
     wia_script = r"""
@@ -671,6 +886,51 @@ if (-not $items) { '[]' } else { $items | Select-Object -Unique Name, DeviceID, 
         except Exception:
             pass
 
+    # 5) Win32_ImageDevice / Scanner CIM (zusaetzlich zu PnP)
+    cim_script = r"""
+$ErrorActionPreference = 'SilentlyContinue'
+$items = @()
+try {
+  $items += @(Get-CimInstance -ClassName Win32_ImageDevice -ErrorAction SilentlyContinue |
+    Select-Object @{N='Name';E={$_.Name}}, @{N='DeviceID';E={$_.DeviceID}}, @{N='Status';E={$_.Status}})
+} catch {}
+try {
+  $items += @(Get-CimInstance -ClassName Win32_PnPEntity -ErrorAction SilentlyContinue |
+    Where-Object { $_.PNPClass -eq 'Image' -or $_.Name -match 'Scanner|Scan|WIA|TWAIN' } |
+    Select-Object @{N='Name';E={$_.Name}}, @{N='DeviceID';E={$_.PNPDeviceID}}, @{N='Status';E={$_.Status}})
+} catch {}
+$items = $items | Where-Object { $_.Name } | Select-Object -Unique Name, DeviceID, Status
+if (-not $items) { '[]' } else { $items | ConvertTo-Json -Compress -Depth 3 }
+"""
+    data_cim, err_cim = _powershell_json(cim_script, timeout=20.0)
+    if err_cim:
+        notes.append(f"CIM-Image: {err_cim}")
+    else:
+        rows_cim = data_cim if isinstance(data_cim, list) else ([data_cim] if data_cim else [])
+        for row in rows_cim:
+            if not isinstance(row, dict):
+                continue
+            name = str(row.get("Name") or "").strip()
+            did = str(row.get("DeviceID") or name).strip()
+            if not name:
+                continue
+            if re.search(r"\b(webcam|camera|integrated)\b", name, re.I) and not re.search(
+                r"scan|wia|twain", name, re.I
+            ):
+                continue
+            out.append(
+                DeviceInfo(
+                    kind=DeviceKind.SCANNER,
+                    name=name,
+                    device_id=did or f"CIM:{name}",
+                    scope=DeviceScope.LOCAL,
+                    backend="CIM",
+                    details=str(row.get("Status") or ""),
+                )
+            )
+        if rows_cim:
+            notes.append("Win32_ImageDevice/CIM")
+
     if not out:
         warnings.append(WINDOWS_SCANNER_DRIVER_HINT_DE)
     return _dedupe(out), warnings, notes
@@ -723,7 +983,40 @@ def list_scanners() -> tuple[List[DeviceInfo], List[str], List[str]]:
     try:
         if system == "Windows":
             return _list_scanners_windows()
-        return _list_scanners_sane()
+        # Linux: ScanTuxio (SANE + eSCL) + klassisches scanimage
+        out: List[DeviceInfo] = []
+        warnings: List[str] = []
+        notes: List[str] = []
+        try:
+            st_devs, st_warn, st_notes = _list_scanners_scantuxio()
+            out.extend(st_devs)
+            warnings.extend(st_warn)
+            notes.extend(st_notes)
+        except Exception as e:
+            warnings.append(f"ScanTuxio: {e}")
+        try:
+            sane_devs, sane_warn, sane_notes = _list_scanners_sane()
+            out.extend(sane_devs)
+            warnings.extend(sane_warn)
+            notes.extend(sane_notes)
+        except Exception as e:
+            warnings.append(f"SANE: {e}")
+        try:
+            net_devs, net_warn, net_notes = _list_network_scantuxio()
+            for d in net_devs:
+                if d.kind == DeviceKind.SCANNER:
+                    out.append(d)
+            warnings.extend(net_warn)
+            notes.extend(net_notes)
+        except Exception as e:
+            notes.append(f"mDNS: {e}")
+        out = _dedupe(out)
+        if not out:
+            warnings.append(
+                "Keine Scanner erkannt (SANE/scanimage bzw. eSCL). "
+                "Optional: sane-utils / NAPS2."
+            )
+        return out, warnings, notes
     except Exception as e:
         return [], [f"Scanner-Erkennung fehlgeschlagen: {e}"], ["error"]
 
@@ -731,6 +1024,12 @@ def list_scanners() -> tuple[List[DeviceInfo], List[str], List[str]]:
 def list_printers() -> tuple[List[DeviceInfo], List[str]]:
     printers: List[DeviceInfo] = []
     warnings: List[str] = []
+    try:
+        p_st, w_st = _list_printers_scantuxio()
+        printers.extend(p_st)
+        warnings.extend(w_st)
+    except Exception as e:
+        warnings.append(f"ScanTuxio-Drucker: {e}")
     try:
         p_qt, w_qt = list_printers_qt()
         printers.extend(p_qt)
@@ -755,6 +1054,14 @@ def list_printers() -> tuple[List[DeviceInfo], List[str]]:
         warnings.extend(w_w32)
     except Exception as e:
         warnings.append(f"win32print: {e}")
+    try:
+        net_devs, net_warn, _net_notes = _list_network_scantuxio()
+        for d in net_devs:
+            if d.kind == DeviceKind.PRINTER:
+                printers.append(d)
+        warnings.extend(net_warn)
+    except Exception as e:
+        warnings.append(f"mDNS-Drucker: {e}")
     printers = _dedupe(printers)
     if not printers and platform.system() == "Windows":
         warnings.append(WINDOWS_PRINTER_DRIVER_HINT_DE)
@@ -809,9 +1116,14 @@ def format_discovery_status(result: DeviceDiscoveryResult) -> str:
     """Kurzer DE-Status fuer UI."""
     n_p = len(result.printers)
     n_s = len(result.scanners)
+    if n_p == 0 and n_s == 0:
+        return NO_DEVICE_STATUS_DE
     msg = f"{n_s} Scanner · {n_p} Drucker"
+    if n_s == 0:
+        msg += " — Kein Scanner · Bilder importieren oder Treiber prüfen"
     if result.warnings:
         # Erste Warnung kompakt (ohne mehrzeiligen Hint voll)
         first = result.warnings[0].splitlines()[0]
-        msg += f" — {first}"
+        if first and first not in msg:
+            msg += f" — {first}"
     return msg
