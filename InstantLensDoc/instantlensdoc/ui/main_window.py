@@ -7890,9 +7890,10 @@ class MainWindow(QMainWindow):
         if not self._guard_editor_action("Groß-/Kleinschreibung"):
             return
         if self.editor.toggle_case_selection():
-            self._set_status("Schreibweise umgeschaltet")
+            scope = "Auswahl" if self.editor.textCursor().hasSelection() else "Dokument"
+            self._set_status(f"Schreibweise umgeschaltet ({scope})")
         else:
-            self._set_status("Keine Textauswahl")
+            self._set_status("Keine Änderung")
 
     def _transform_document_case(self, mode: str):
         if not self._guard_editor_action("Alles groß/klein"):
@@ -10678,7 +10679,7 @@ class MainWindow(QMainWindow):
         except Exception:
             was_marked = False
         if not self.editor.highlight_selection():
-            QMessageBox.information(self, "Markieren", "Bitte Text auswählen.")
+            QMessageBox.information(self, "Markieren", "Kein Text im Editor.")
             return
         self._sync_editor_rich_meta()
         if was_marked:
@@ -17089,7 +17090,12 @@ class MainWindow(QMainWindow):
             pass
 
     def _present_word_suite_document(self, doc_ws, *, status: str | None = None) -> bool:
-        """Word-Suite-/OCR-Dokument als rich QTextDocument (DocKind.DOCX) öffnen."""
+        """Word-Suite-/OCR-Dokument im gleichen Editor wie geöffnetes DOCX zeigen.
+
+        Stack → ``editor_pane``, ``self.editor`` (rich QTextDocument, DocKind.DOCX).
+        Bearbeiten/Ribbon treffen danach dieselbe Instanz: Auswahl → Tool auf
+        Selektion, keine Auswahl → gesamter OCR-Text.
+        """
         from instantlensdoc.core.ocr_word_suite import (
             WordSuiteDocument,
             word_suite_to_document,
@@ -17105,6 +17111,18 @@ class MainWindow(QMainWindow):
             ws = None
         else:
             return False
+        try:
+            self._capture_current_tab_view_state()
+        except Exception:
+            pass
+        try:
+            self._doc_cache_store_current()
+        except Exception:
+            pass
+        try:
+            self._stop_thumb_lazy()
+        except Exception:
+            pass
         html = str((doc.meta or {}).get("html") or (getattr(ws, "html", "") if ws else "") or "")
         body = doc.text or ""
         tab_title = doc.title or "Word-Suite — OCR"
@@ -17132,6 +17150,34 @@ class MainWindow(QMainWindow):
                 self.editor.blockSignals(False)
             except Exception:
                 pass
+        try:
+            self.editor.clear_extra_selections()
+        except Exception:
+            pass
+        try:
+            self.editor.clear_line_bookmarks()
+        except Exception:
+            pass
+        try:
+            self._editor_marks.clear()
+            self.sidebar.set_marks([])
+            self.sidebar.clear_thumbs()
+            self.sidebar.clear_annotations()
+            self._refresh_portfolio_sidebar(None)
+        except Exception:
+            pass
+        try:
+            from PySide6.QtGui import QTextCursor
+
+            cur = self.editor.textCursor()
+            cur.movePosition(QTextCursor.Start)
+            self.editor.setTextCursor(cur)
+        except Exception:
+            pass
+        try:
+            self.editor.setFocus(Qt.OtherFocusReason)
+        except Exception:
+            pass
         self.setWindowTitle(self._app_title(tab_title))
         self._last_ocr_word_suite = ws if ws is not None else getattr(self, "_last_ocr_word_suite", None)
         n_blocks = 0
@@ -17151,9 +17197,15 @@ class MainWindow(QMainWindow):
                 status += f" · {Path(str(sidecar)).name}"
         self._set_status(status)
         try:
+            self._sync_preview_readonly_banner()
+        except Exception:
+            pass
+        try:
+            self._sync_pdf_page_shortcuts()
             self._sync_editor_only_actions()
             self._sync_menu_enablement()
             self._update_doc_status()
+            self._refresh_doc_tab_bar()
         except Exception:
             pass
         try:

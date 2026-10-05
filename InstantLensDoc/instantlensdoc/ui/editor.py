@@ -1674,10 +1674,24 @@ class TextEditor(QPlainTextEdit):
             include_grammar=bool(get_spellcheck_grammar_hints()),
         )
         self._last_spell_result = result
+        sel_cur = self.textCursor()
+        sel_start = sel_end = None
+        if sel_cur.hasSelection():
+            sel_start = min(sel_cur.selectionStart(), sel_cur.selectionEnd())
+            sel_end = max(sel_cur.selectionStart(), sel_cur.selectionEnd())
+
+        def _in_scope(start: int, end: int) -> bool:
+            if sel_start is None or sel_end is None:
+                return True
+            return not (end <= sel_start or start >= sel_end)
+
         selections: list = []
+        applied_unknown = 0
         for item in result.get("unknown") or []:
             start = int(item["start"])
             end = int(item["end"])
+            if not _in_scope(start, end):
+                continue
             word = str(item.get("word") or "")
             sugg = item.get("suggestions") or []
             tip = f"Unbekannt: {word}"
@@ -1694,11 +1708,12 @@ class TextEditor(QPlainTextEdit):
             sel.cursor = c
             sel.format = fmt
             selections.append(sel)
+            applied_unknown += 1
         # Grammar: gestrichelte blaue Unterstreichung
         for gh in result.get("grammar") or []:
             start = int(gh.get("start", 0))
             end = int(gh.get("end", start))
-            if end <= start:
+            if end <= start or not _in_scope(start, end):
                 continue
             fmt = QTextCharFormat()
             fmt.setUnderlineColor(QColor("#2471A3"))
@@ -1716,6 +1731,8 @@ class TextEditor(QPlainTextEdit):
             selections.append(sel)
         self._spell_selections = selections
         self._apply_extra_selections()
+        if sel_start is not None:
+            return applied_unknown
         return int(result.get("count") or 0)
 
     def last_spell_result(self) -> dict:
@@ -1934,6 +1951,45 @@ class TextEditor(QPlainTextEdit):
             cur.select(QTextCursor.WordUnderCursor)
         return cur
 
+    def selection_or_document_cursor(self) -> QTextCursor:
+        """Auswahl, sonst gesamtes Dokument — Word-Suite/OCR: Tool ohne Selektion = global."""
+        cur = QTextCursor(self.textCursor())
+        if cur.hasSelection():
+            return cur
+        wrap = QTextCursor(self.document())
+        wrap.select(QTextCursor.Document)
+        return wrap
+
+    def _selected_or_document_plain(self) -> tuple[QTextCursor, str, bool]:
+        """``(cursor, plain, whole_document)`` — Selektion oder gesamter Editortext."""
+        cur = self.textCursor()
+        if cur.hasSelection():
+            text = cur.selectedText().replace("\u2029", "\n")
+            return cur, text, False
+        wrap = QTextCursor(self.document())
+        wrap.select(QTextCursor.Document)
+        return wrap, self.toPlainText(), True
+
+    def _replace_selection_or_document_text(self, new_text: str) -> bool:
+        """Auswahl ersetzen, ohne Auswahl den gesamten Dokumenttext — ein Undo-Schritt."""
+        _cur, old, whole = self._selected_or_document_plain()
+        if new_text == old:
+            return False
+        if whole:
+            self._replace_all_text_undoable(new_text)
+            return True
+        start = _cur.selectionStart()
+        _cur.beginEditBlock()
+        try:
+            _cur.insertText(new_text)
+        finally:
+            _cur.endEditBlock()
+        restored = QTextCursor(self.document())
+        restored.setPosition(start)
+        restored.setPosition(start + len(new_text), QTextCursor.KeepAnchor)
+        self.setTextCursor(restored)
+        return True
+
     def _selection_probe_format(self, cur: QTextCursor) -> QTextCharFormat:
         """Zeichenformat am Anfang der Auswahl (oder CurrentFormat ohne Auswahl)."""
         if not cur.hasSelection():
@@ -2042,12 +2098,13 @@ class TextEditor(QPlainTextEdit):
             pass
 
     def apply_auto_format(self) -> int:
-        """Automatische Formatierung (Heading/Body/Quote) — 2.6.10."""
+        """Automatische Formatierung (Heading/Body/Quote) — Auswahl oder gesamtes Dokument."""
         from ild_pdf.auto_format import auto_format_text
 
-        result = auto_format_text(self.toPlainText())
-        if result.text != self.toPlainText():
-            self._replace_all_text_undoable(result.text)
+        _cur, text, _whole = self._selected_or_document_plain()
+        result = auto_format_text(text)
+        if result.text != text:
+            self._replace_selection_or_document_text(result.text)
         return int(result.changed_lines)
 
     def current_paragraph_index(self) -> int:
@@ -2155,11 +2212,14 @@ class TextEditor(QPlainTextEdit):
         return True
 
     def hyphenate_document(self, *, lang: str = "de") -> int:
-        """Dokument silbentrennen (Soft-Hyphens) — 2.6.13. Rückgabe: Anzahl Trennungen."""
+        """Silbentrennung auf Auswahl, sonst gesamtes Dokument — 2.6.13."""
         from ild_pdf.typography import hyphenate_text
 
-        result = hyphenate_text(self.toPlainText(), lang=lang)
-        self._replace_all_text_undoable(result["text"])
+        _cur, text, _whole = self._selected_or_document_plain()
+        result = hyphenate_text(text, lang=lang)
+        new_text = result["text"]
+        if new_text != text:
+            self._replace_selection_or_document_text(new_text)
         return int(result.get("count") or 0)
 
     def insert_table(
@@ -2277,7 +2337,7 @@ class TextEditor(QPlainTextEdit):
     HIGHLIGHT_COLOR = "#FFE066"
 
     def highlight_selection(self, color: str = "#FFE066") -> bool:
-        """Auswahl als Textmarker markieren — persistent als Zeichenformat — 2.6.52.
+        """Auswahl als Textmarker markieren; ohne Auswahl das ganze Dokument — 2.6.52.
 
         Bis 2.6.51 war die Markierung nur eine flüchtige ``ExtraSelection``
         (verschwand beim Tab-Wechsel/Speichern, nie im DOCX/HTML). Jetzt wird
@@ -2285,7 +2345,8 @@ class TextEditor(QPlainTextEdit):
         Kursiv/Unterstrichen bleiben erhalten, DOCX-Export schreibt Highlight.
         Erneuter Aufruf auf bereits markiertem Text hebt die Markierung auf.
         """
-        cur = self.textCursor()
+        had_sel = self.textCursor().hasSelection()
+        cur = self.selection_or_document_cursor()
         if not cur.hasSelection():
             return False
         qcolor = QColor(color or self.HIGHLIGHT_COLOR)
@@ -2302,7 +2363,8 @@ class TextEditor(QPlainTextEdit):
         else:
             fmt.setBackground(QBrush(qcolor))
         cur.mergeCharFormat(fmt)
-        self.setTextCursor(cur)
+        if had_sel:
+            self.setTextCursor(cur)
         return True
 
     def selection_highlighted(self) -> bool:
@@ -2347,13 +2409,10 @@ class TextEditor(QPlainTextEdit):
 
     def toggle_case_selection(self) -> bool:
         """
-        Groß-/Kleinschreibung der Auswahl umschalten.
+        Groß-/Kleinschreibung der Auswahl umschalten; ohne Auswahl das ganze Dokument.
         Zyklus: GROSS → klein → Titel → GROSS.
         """
-        cur = self.textCursor()
-        if not cur.hasSelection():
-            return False
-        text = cur.selectedText().replace("\u2029", "\n")
+        _cur, text, whole = self._selected_or_document_plain()
         if not text:
             return False
         letters = [c for c in text if c.isalpha()]
@@ -2363,39 +2422,36 @@ class TextEditor(QPlainTextEdit):
             new = text.title()
         else:
             new = text.upper()
-        start = cur.selectionStart()
-        cur.insertText(new)
-        # Auswahl wiederherstellen
-        cur.setPosition(start)
-        cur.setPosition(start + len(new), QTextCursor.KeepAnchor)
-        self.setTextCursor(cur)
+        if new == text:
+            return False
+        if not self._replace_selection_or_document_text(new):
+            return False
+        if whole:
+            cur = self.textCursor()
+            cur.clearSelection()
+            self.setTextCursor(cur)
         return True
 
     def transform_document_case(self, mode: str) -> bool:
         """
-        Gesamten Dokumenttext umwandeln.
+        Text umwandeln: Auswahl, sonst gesamtes Dokument.
         mode: 'upper' | 'lower'
         """
         mode = (mode or "").strip().lower()
         if mode not in ("upper", "lower"):
             return False
-        text = self.toPlainText()
+        _cur, text, whole = self._selected_or_document_plain()
         if not text:
             return False
         new = text.upper() if mode == "upper" else text.lower()
         if new == text:
             return False
-        cur = self.textCursor()
-        pos = cur.position()
-        cur.beginEditBlock()
-        cur.select(QTextCursor.Document)
-        cur.insertText(new)
-        cur.endEditBlock()
-        # Cursor-Position soweit möglich erhalten
-        new_cur = self.textCursor()
-        new_cur.setPosition(min(pos, len(new)))
-        self.setTextCursor(new_cur)
-        return True
+        ok = self._replace_selection_or_document_text(new)
+        if ok and whole:
+            cur = self.textCursor()
+            cur.clearSelection()
+            self.setTextCursor(cur)
+        return ok
 
     def indent_selection(self, spaces: int | None = None) -> bool:
         """Einrückung der ausgewählten Zeilen erhöhen (Soft-Tabs oder echte Tabs)."""

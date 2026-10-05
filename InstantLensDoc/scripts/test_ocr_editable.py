@@ -18,6 +18,8 @@ from pathlib import Path
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 os.environ["ILD_SMOKE_QT"] = "1"
 os.environ.setdefault("ILD_SKIP_DEPS_CHECK", "1")
+os.environ.setdefault("ILD_NO_SESSION", "1")
+os.environ.setdefault("ILD_NO_SPLASH", "1")
 os.environ["XDG_CONFIG_HOME"] = tempfile.mkdtemp(prefix="ild-ocr-editable-cfg-")
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -195,8 +197,104 @@ def test_editor_ocr_bold_find_save() -> None:
             _fail(f"Bold-Run nach OCR→Editor→DOCX verloren: {flags}")
 
     _ok("qt: OCR-Fixture → Editor (DOCX/rich) → Fett/Finden/save docx")
+
+    test_ocr_selection_or_document_on_editor(win)
+
     assert app is not None
-    win.close()
+
+
+def test_ocr_selection_or_document_on_editor(win) -> None:
+    """Auswahl → Tool nur auf Selektion; keine Auswahl → gesamter OCR-Text.
+
+    Bearbeiten/Ribbon laufen über ``self.editor`` nach ``_present_word_suite_document``.
+    """
+    from PySide6.QtCore import Qt
+    from PySide6.QtGui import QTextCursor
+
+    from instantlensdoc.core.documents import DocKind
+
+    if win.stack.currentWidget() is not win.editor_pane:
+        _fail("OCR-Dokument nicht im gleichen Editor-Stack (editor_pane)")
+    if win.doc is None or win.doc.kind != DocKind.DOCX:
+        _fail(f"OCR-Dokument kind={getattr(win.doc, 'kind', None)}")
+    if not win._editor_document_active() or win._pdf_tab_active():
+        _fail("Bearbeiten/Ribbon treffen OCR nicht (_editor_document_active)")
+    if not callable(getattr(win.editor, "selection_or_document_cursor", None)):
+        _fail("Editor ohne selection_or_document_cursor")
+
+    try:
+        win.editor.setFocus(Qt.OtherFocusReason)
+    except Exception:
+        pass
+
+    original = win.editor.toPlainText()
+    needle = "durchsuchbar"
+    if needle not in original:
+        _fail("Fixture-Needle fehlt für Auswahl-Test")
+
+    idx = original.index(needle)
+    cur = win.editor.textCursor()
+    cur.setPosition(idx)
+    cur.setPosition(idx + len(needle), QTextCursor.KeepAnchor)
+    win.editor.setTextCursor(cur)
+    if not win.editor.transform_document_case("upper"):
+        _fail("transform_document_case auf OCR-Auswahl fehlgeschlagen")
+    after_sel = win.editor.toPlainText()
+    if needle.upper() not in after_sel:
+        _fail("Auswahl nicht umgewandelt")
+    if "EINLEITUNG" not in after_sel:
+        _fail("ohne-Auswahl-Text außerhalb der Selektion verändert (EINLEITUNG weg)")
+    if after_sel.replace(needle.upper(), needle) != original:
+        _fail("Case-Tool auf Auswahl hat Text außerhalb der Selektion verändert")
+
+    cur = win.editor.textCursor()
+    cur.clearSelection()
+    cur.setPosition(0)
+    win.editor.setTextCursor(cur)
+    if cur.hasSelection():
+        _fail("Selektion nicht geleert")
+    if not win.editor.transform_document_case("lower"):
+        _fail("transform_document_case ohne Auswahl (ganzes OCR) fehlgeschlagen")
+    after_all = win.editor.toPlainText()
+    if after_all != original.lower():
+        _fail(f"ohne Auswahl nicht gesamter OCR-Text: {after_all[:180]!r}")
+
+    # Highlight: Selektion vs. gesamtes OCR-Dokument
+    win.editor.clear_highlight_formats()
+    idx = after_all.index("einleitung")
+    cur = win.editor.textCursor()
+    cur.setPosition(idx)
+    cur.setPosition(idx + len("einleitung"), QTextCursor.KeepAnchor)
+    win.editor.setTextCursor(cur)
+    if not win.editor.highlight_selection():
+        _fail("highlight_selection auf OCR-Auswahl fehlgeschlagen")
+    if not win.editor.selection_highlighted():
+        _fail("OCR-Auswahl nicht markiert")
+    win.editor.clear_highlight_formats()
+    cur = win.editor.textCursor()
+    cur.clearSelection()
+    cur.setPosition(0)
+    win.editor.setTextCursor(cur)
+    if not win.editor.highlight_selection():
+        _fail("highlight_selection ohne Auswahl (ganzes OCR) fehlgeschlagen")
+    probe = QTextCursor(win.editor.document())
+    probe.setPosition(0)
+    probe.setPosition(min(8, len(after_all)), QTextCursor.KeepAnchor)
+    p2 = win.editor._selection_probe_format(probe)
+    if p2.background().style() == Qt.NoBrush:
+        _fail("ohne Auswahl kein Highlight auf gesamtem OCR-Text")
+
+    # Bearbeiten-Menü-Pfad (Fett) trifft denselben Editor
+    idx = win.editor.toPlainText().index("fazit") if "fazit" in win.editor.toPlainText() else 0
+    cur = win.editor.textCursor()
+    cur.setPosition(idx)
+    cur.setPosition(idx + 5, QTextCursor.KeepAnchor)
+    win.editor.setTextCursor(cur)
+    win._toggle_bold()
+    if not win.editor.selection_font_bold():
+        _fail("Bearbeiten-Fett (_toggle_bold) trifft OCR-Editor nicht")
+
+    _ok("qt: OCR Auswahl→Selektion / keine Auswahl→gesamter Text + Bearbeiten-Hit")
 
 
 def test_pdf_extract_kind_not_pdf() -> None:

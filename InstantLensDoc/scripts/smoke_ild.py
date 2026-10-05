@@ -613,8 +613,15 @@ def check_version() -> None:
         _fail("ocr_word_suite fehlt Seitenumbrüche/Quell-Kommentar")
     if "def open_ocr_result" not in mw or "_present_word_suite_document" not in mw:
         _fail("main_window fehlt open_ocr_result/_present_word_suite_document")
-    if "set_rich_html" not in mw.split("def _present_word_suite_document", 1)[-1].split("def ", 1)[0]:
+    present_src = mw.split("def _present_word_suite_document", 1)[-1].split("def ", 1)[0]
+    if "set_rich_html" not in present_src:
         _fail("_present_word_suite_document setzt kein set_rich_html")
+    if "setFocus" not in present_src or "editor_pane" not in present_src:
+        _fail("_present_word_suite_document aktiviert den Word-Suite-Editor nicht (setFocus/editor_pane)")
+    if "selection_or_document_cursor" not in (ROOT / "instantlensdoc" / "ui" / "editor.py").read_text(
+        encoding="utf-8"
+    ):
+        _fail("editor.py fehlt selection_or_document_cursor (Auswahl vs. gesamter OCR-Text)")
     scan_src = (ROOT / "instantlensdoc" / "core" / "scan.py").read_text(encoding="utf-8")
     if "to_word_suite_document" not in scan_src:
         _fail("scan.py fehlt to_word_suite_document (Scan-OCR→Editor)")
