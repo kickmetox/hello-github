@@ -5906,6 +5906,11 @@ class PdfViewer(QWidget):
             pass
         self.page_changed.emit(self.page_index)
         self.status.emit(f"{n} Seiten erkannt")
+        # Toolbar-Label „1 / N“ ohne erneuten Render nachziehen — 2.6.53
+        try:
+            self.lbl_page.setText(self.format_page_label_text())
+        except Exception:
+            pass
         # Thumbs/Outline an echte Seitenzahl anbinden — 2.6.47
         self.document_changed.emit()
         if not self._canvas_has_page_image():
