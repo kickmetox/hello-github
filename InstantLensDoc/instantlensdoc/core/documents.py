@@ -244,6 +244,17 @@ def open_document(path: str | Path, *, encoding: str | None = None) -> Document:
             doc.text = plain
             doc.meta["html"] = html
             doc.meta["rich_text"] = True
+            # Standardschrift (Normal-Stil/docDefaults) für den Editor — 2.6.53
+            try:
+                from instantlensdoc.core.richtext_docx import docx_default_font
+
+                fam, size_pt = docx_default_font(path)
+                if fam:
+                    doc.meta["font_family"] = str(fam)
+                if size_pt:
+                    doc.meta["font_size_pt"] = float(size_pt)
+            except Exception:
+                pass
         except Exception as rich_err:
             # Nicht still degradieren: Grund loggen + im Meta vermerken — 2.6.52
             import logging

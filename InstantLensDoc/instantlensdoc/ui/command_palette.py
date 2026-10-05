@@ -208,6 +208,12 @@ def default_palette_commands() -> list[PaletteCommand]:
             "Bearbeiten",
         ),
         PaletteCommand(
+            "page_layout",
+            "Seitenlayout… (Format, Ränder, Ausrichtung)",
+            "seitenlayout seitenformat a4 letter ränder hochformat querformat page layout",
+            "Ansicht",
+        ),
+        PaletteCommand(
             "drop_cap",
             "Initial / Drop Cap",
             "drop cap initial versalbuchstabe typografie",

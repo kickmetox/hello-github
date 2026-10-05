@@ -147,6 +147,88 @@ def _effective_size_pt(run: Any, para: Any) -> float | None:
     return None
 
 
+def _effective_font_name(run: Any, para: Any) -> str | None:
+    """Explizite Schriftart am Run bzw. Zeichenstil (None = Dokument-Standard) — 2.6.53."""
+    name = _font_attr(getattr(run, "font", None), "name")
+    if name:
+        return str(name)
+    for st in _style_chain(getattr(run, "style", None)):
+        v = _font_attr(getattr(st, "font", None), "name")
+        if v:
+            return str(v)
+    return None
+
+
+def _docx_default_font_from_styles_xml(d: Any) -> tuple[str | None, float | None]:
+    """docDefaults ``w:rPrDefault`` (rFonts/ sz) — python-docx hat dafür kein API."""
+    try:
+        styles_el = d.styles.element
+        ns = styles_el.nsmap.get("w") or "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+        rpr = styles_el.find(f"{{{ns}}}docDefaults/{{{ns}}}rPrDefault/{{{ns}}}rPr")
+        if rpr is None:
+            return None, None
+        fam = None
+        fonts = rpr.find(f"{{{ns}}}rFonts")
+        if fonts is not None:
+            fam = fonts.get(f"{{{ns}}}ascii") or fonts.get(f"{{{ns}}}hAnsi")
+            if not fam:
+                theme = fonts.get(f"{{{ns}}}asciiTheme") or ""
+                # Word-Theme-Defaults (Office 2013+): minor = Calibri, major = Calibri Light
+                if theme.startswith("minor"):
+                    fam = "Calibri"
+                elif theme.startswith("major"):
+                    fam = "Calibri Light"
+        size = None
+        sz = rpr.find(f"{{{ns}}}sz")
+        if sz is not None:
+            try:
+                size = float(sz.get(f"{{{ns}}}val")) / 2.0
+            except (TypeError, ValueError):
+                size = None
+        return fam, size
+    except Exception:
+        return None, None
+
+
+def docx_default_font(path: str | Path) -> tuple[str | None, float | None]:
+    """(Schriftfamilie, Größe pt) des Normal-Stils bzw. der docDefaults — 2.6.53.
+
+    Der Editor nutzt dies als ``QTextDocument.defaultFont`` statt der Editor-
+    Monospace-Schrift (Feld: „DOCX-Fließtext sieht aus wie Plaintext/Consolas“).
+    """
+    try:
+        from docx import Document as DocxDocument
+    except ImportError:
+        return None, None
+    try:
+        d = DocxDocument(str(path))
+    except Exception:
+        return None, None
+    fam: str | None = None
+    size: float | None = None
+    try:
+        normal = d.styles["Normal"]
+        for st in _style_chain(normal):
+            if fam is None:
+                v = _font_attr(getattr(st, "font", None), "name")
+                if v:
+                    fam = str(v)
+            if size is None:
+                sz = _font_attr(getattr(st, "font", None), "size")
+                if sz is not None:
+                    try:
+                        size = float(sz.pt)
+                    except Exception:
+                        size = None
+    except Exception:
+        pass
+    if fam is None or size is None:
+        fam2, size2 = _docx_default_font_from_styles_xml(d)
+        fam = fam or fam2
+        size = size or size2
+    return fam, size
+
+
 def _effective_color_hex(run: Any) -> str | None:
     try:
         color = run.font.color
@@ -187,6 +269,12 @@ def _run_to_html(run: Any, para: Any = None) -> str:
         return ""
     piece = _escape(text)
     styles: list[str] = []
+    try:
+        fam = _effective_font_name(run, para)
+        if fam and re.fullmatch(r"[\w .+-]{1,60}", fam):
+            styles.append(f"font-family:'{fam}'")
+    except Exception:
+        pass
     try:
         size = _effective_size_pt(run, para)
         if size and 4.0 <= size <= 200.0:
@@ -482,6 +570,12 @@ class _HtmlToDocxParser(HTMLParser):
                 run.font.highlight_color = _closest_highlight_index(str(bg))
         except Exception:
             pass
+        try:
+            fam = extra.get("font")
+            if fam:
+                run.font.name = str(fam)
+        except Exception:
+            pass
 
     def _style_flags(self, style: str) -> tuple[bool, bool, bool]:
         s = (style or "").lower().replace(" ", "")
@@ -500,7 +594,15 @@ class _HtmlToDocxParser(HTMLParser):
     def _style_extra(style: str) -> dict[str, Any]:
         """color / font-size / background-color aus einem style-Attribut."""
         s = (style or "").lower()
-        out: dict[str, Any] = {"color": None, "size": None, "background": None}
+        out: dict[str, Any] = {"color": None, "size": None, "background": None, "font": None}
+        # Schriftfamilie (erste Familie, ohne generische Fallbacks) — 2.6.53
+        m = re.search(r"font-family\s*:\s*([^;]+)", style or "", re.IGNORECASE)
+        if m:
+            first = m.group(1).split(",")[0].strip().strip("'\"")
+            if first and first.lower() not in {
+                "serif", "sans-serif", "monospace", "cursive", "fantasy", "system-ui",
+            }:
+                out["font"] = first
         m = re.search(r"(?<![\w-])color\s*:\s*(#[0-9a-f]{6}|#[0-9a-f]{3})", s)
         if m:
             out["color"] = _expand_hex(m.group(1))

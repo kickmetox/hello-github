@@ -86,6 +86,7 @@ class RibbonBar(QWidget):
                     ("autocorrect_toggle", "Autokorrektur"),
                     ("insert_snippet", "Baustein"),
                     ("find_replace", "Suchen/Ersetzen"),
+                    ("page_layout", "Seitenlayout…"),
                     ("auto_toc", "Inhaltsverz."),
                     ("auto_lof", "Abbildungsverz."),
                     ("auto_index", "Stichwortverz."),
@@ -108,6 +109,7 @@ class RibbonBar(QWidget):
             (
                 "Ansicht",
                 (
+                    ("page_layout", "Seitenlayout…"),
                     ("book_layout", "Buch-Layout"),
                     ("page_by_page", "Seite-für-Seite"),
                     ("continuous_scroll", "Continuous"),
@@ -152,7 +154,7 @@ class RibbonBar(QWidget):
             btn.setObjectName("ribbonCat")
             btn.setCheckable(True)
             btn.setChecked(i == 0)
-            tip = f"{title} — Ribbon 2.6.52"
+            tip = f"{title} — Ribbon 2.6.53"
             if mnemonic:
                 tip += f" (Alt+{mnemonic})"
             btn.setToolTip(tip)
@@ -171,7 +173,7 @@ class RibbonBar(QWidget):
             for aid, label in buttons:
                 tb = QToolButton()
                 tb.setText(label)
-                tb.setToolTip(f"{label} — Ribbon 2.6.52")
+                tb.setToolTip(f"{label} — Ribbon 2.6.53")
                 tb.setAutoRaise(False)
                 if aid in (
                     "book_layout",

@@ -206,6 +206,22 @@ class TextEditor(QPlainTextEdit):
         self._line_bookmarks: set[int] = set()  # 0-basierte Blocknummern
         self._line_bookmark_order: list[int] = []  # Anzeige-/Persistenz-Reihenfolge (Blocks)
         self._line_bookmark_labels: dict[int, str] = {}  # Block → editierbares Label
+        # Rich-Dokument (DOCX/HTML/Word-Suite) → erzwungener Umbruch + proportionale
+        # Schrift; Seitenlayout (DTP-Preset) → Textspalte in Seitenbreite — 2.6.53
+        self._rich_mode = False
+        self._rich_base_font: QFont | None = None
+        self._page_layout = None
+        self._page_extra_px = 0
+        self._page_top_px = 0
+        self._page_bg_active = False
+        self._base_autofill = bool(self.autoFillBackground())
+        self._in_margin_update = False
+        try:
+            from instantlensdoc.core.editor_page_layout import EditorPageLayout
+
+            self._page_layout = EditorPageLayout.from_settings()
+        except Exception:
+            self._page_layout = None
         self._line_number_area = _LineNumberArea(self)
         self._minimap_area = _MinimapArea(self)
         self.blockCountChanged.connect(self._update_side_areas)
@@ -222,6 +238,7 @@ class TextEditor(QPlainTextEdit):
         self.set_indent_guides_visible(self._indent_guides)
         self.set_current_line_highlight(self._current_line_highlight)
         self.set_special_chars_visible(self._show_special)
+        self._apply_page_layout()
         # Unbegrenzter Editor-Undo-Stack — 2.6.20
         try:
             self.document().setUndoLimit(0)
@@ -244,6 +261,23 @@ class TextEditor(QPlainTextEdit):
             self.setFocusPolicy(Qt.StrongFocus)
             self.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
             self.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        except Exception:
+            pass
+
+    def changeEvent(self, event):  # noqa: N802
+        """Widget-Font-Wechsel (Ctrl+Rad-Zoom) darf im Rich-Modus nicht auf Monospace zurückfallen — 2.6.53."""
+        super().changeEvent(event)
+        try:
+            from PySide6.QtCore import QEvent
+
+            if event.type() == QEvent.Type.FontChange and bool(getattr(self, "_rich_mode", False)):
+                base = getattr(self, "_rich_base_font", None)
+                if base is not None:
+                    f = QFont(base)
+                    size = float(self.font().pointSizeF() or 0.0)
+                    if size > 0:
+                        f.setPointSizeF(size)
+                    self.document().setDefaultFont(f)
         except Exception:
             pass
 
@@ -625,13 +659,77 @@ class TextEditor(QPlainTextEdit):
         return bool(self._minimap)
 
     def set_soft_wrap(self, enabled: bool) -> None:
-        """Zeilenumbruch am Fensterrand (Soft-Wrap) ein/aus."""
+        """Zeilenumbruch am Fensterrand (Soft-Wrap) ein/aus.
+
+        Rich-Dokumente (DOCX/HTML) brechen **immer** um — ein Absatz als eine
+        kilometerlange Zeile mit horizontalem Scroll ist nie gewollt — 2.6.53.
+        """
         self._soft_wrap = bool(enabled)
-        if self._soft_wrap:
+        if self._soft_wrap or bool(getattr(self, "_rich_mode", False)):
             self.setLineWrapMode(QPlainTextEdit.WidgetWidth)
             self.setWordWrapMode(QTextOption.WrapAtWordBoundaryOrAnywhere)
         else:
             self.setLineWrapMode(QPlainTextEdit.NoWrap)
+
+    # ---- Rich-Modus / Seitenlayout — 2.6.53 --------------------------------
+    def rich_mode(self) -> bool:
+        return bool(getattr(self, "_rich_mode", False))
+
+    def _default_rich_font(self) -> QFont:
+        """Proportionale Standardschrift für Word-/DOCX-Dokumente (Calibri 11 → Fallback Sans)."""
+        f = QFont("Calibri", 11)
+        f.setStyleHint(QFont.SansSerif)
+        return f
+
+    def set_page_layout(self, layout) -> None:
+        """Seitenlayout (``core.editor_page_layout.EditorPageLayout``) setzen + anwenden."""
+        self._page_layout = layout
+        self._apply_page_layout()
+
+    def page_layout(self):
+        return getattr(self, "_page_layout", None)
+
+    def page_layout_active(self) -> bool:
+        lay = getattr(self, "_page_layout", None)
+        if lay is None:
+            return False
+        try:
+            return bool(lay.applies_to(self.rich_mode()))
+        except Exception:
+            return False
+
+    def page_column_width_px(self) -> int:
+        """Aktuelle Textspaltenbreite (Viewport) in Pixel."""
+        try:
+            return int(self.viewport().width())
+        except Exception:
+            return 0
+
+    def _apply_page_layout(self) -> None:
+        from PySide6.QtCore import QSizeF
+        from PySide6.QtGui import QPalette
+
+        doc = self.document()
+        active = self.page_layout_active()
+        lay = getattr(self, "_page_layout", None)
+        if active and lay is not None:
+            dpi = float(self.logicalDpiX() or 96.0)
+            w_px, h_px = lay.page_size_px(dpi)
+            doc.setPageSize(QSizeF(w_px, h_px))
+            if not self._page_bg_active:
+                pal = QPalette(self.palette())
+                pal.setColor(QPalette.Window, QColor("#D7DBE1"))
+                self.setPalette(pal)
+                self.setAutoFillBackground(True)
+                self._page_bg_active = True
+        else:
+            doc.setPageSize(QSizeF(-1.0, -1.0))
+            if self._page_bg_active:
+                self.setPalette(QPalette())
+                self.setAutoFillBackground(self._base_autofill)
+                self._page_bg_active = False
+        self._update_side_areas()
+        self.viewport().update()
 
     def soft_wrap_enabled(self) -> bool:
         return bool(self._soft_wrap)
@@ -1220,10 +1318,55 @@ class TextEditor(QPlainTextEdit):
         self._update_side_areas()
 
     def _update_side_areas(self, _new_block_count: int = 0) -> None:
-        left = self.line_number_area_width()
-        right = self.minimap_width()
-        self.setViewportMargins(left, 0, right, 0)
-        self._layout_side_areas()
+        if getattr(self, "_in_margin_update", False):
+            return
+        self._in_margin_update = True
+        try:
+            left = self.line_number_area_width()
+            right = self.minimap_width()
+            extra = 0
+            top = 0
+            # Seitenlayout: Textspalte in Seitenbreite zentrieren — 2.6.53
+            lay = getattr(self, "_page_layout", None)
+            if lay is not None and self.page_layout_active():
+                dpi = float(self.logicalDpiX() or 96.0)
+                col = int(round(lay.text_width_px(dpi)))
+                avail = int(self.contentsRect().width()) - left - right
+                if avail > 0 and col < avail:
+                    extra = max(0, (avail - col) // 2)
+                m_top = lay.margins_px(dpi)[0]
+                top = int(min(max(0.0, m_top), 48.0))
+            self._page_extra_px = int(extra)
+            self._page_top_px = int(top)
+            before_w = int(self.viewport().width())
+            self.setViewportMargins(left + extra, top, right + extra, 0)
+            after_w = int(self.viewport().width())
+            if after_w != before_w and after_w > 0:
+                # Qt liefert beim Rand-Wechsel während show()/resizeEvent keinen
+                # Resize mit neuer Breite → QPlainTextDocumentLayout behält die alte
+                # Textbreite (DOCX überbreit, horizontaler Scroll). Explizit nachziehen.
+                self._relayout_document_width(after_w, before_w)
+            self._layout_side_areas()
+        finally:
+            self._in_margin_update = False
+
+    def _relayout_document_width(self, width_px: int, old_width_px: int = -1) -> None:
+        """``QPlainTextEdit::resizeEvent`` mit geänderter Breite erzwingen.
+
+        PySide6 exportiert ``QPlainTextDocumentLayout::setTextWidth`` nicht; ein
+        synthetischer Resize mit abweichender alter Breite löst Qt-intern
+        ``relayoutDocument()`` aus (Textbreite = Viewport).
+        """
+        try:
+            from PySide6.QtCore import QSize
+            from PySide6.QtGui import QResizeEvent
+
+            vp = self.viewport()
+            h = max(1, int(vp.height()))
+            old_w = int(old_width_px) if int(old_width_px) >= 0 and int(old_width_px) != int(width_px) else -1
+            QApplication.sendEvent(vp, QResizeEvent(QSize(int(width_px), h), QSize(old_w, h)))
+        except Exception:
+            pass
 
     def _update_line_number_area(self, rect: QRect, dy: int) -> None:
         if dy:
@@ -1245,15 +1388,23 @@ class TextEditor(QPlainTextEdit):
 
     def resizeEvent(self, event):  # noqa: N802
         super().resizeEvent(event)
-        self._layout_side_areas()
+        if getattr(self, "_page_layout", None) is not None and self.page_layout_active():
+            # Spaltenbreite hängt von der Fensterbreite ab → Ränder neu berechnen
+            self._update_side_areas()
+        else:
+            self._layout_side_areas()
 
     def _layout_side_areas(self) -> None:
         cr = self.contentsRect()
         ln_w = self.line_number_area_width()
         mm_w = self.minimap_width()
-        self._line_number_area.setGeometry(QRect(cr.left(), cr.top(), ln_w, cr.height()))
+        extra = int(getattr(self, "_page_extra_px", 0) or 0)
+        top = int(getattr(self, "_page_top_px", 0) or 0)
+        self._line_number_area.setGeometry(
+            QRect(cr.left() + extra, cr.top() + top, ln_w, cr.height() - top)
+        )
         self._minimap_area.setGeometry(
-            QRect(cr.right() - mm_w + 1, cr.top(), mm_w, cr.height())
+            QRect(cr.right() - mm_w - extra + 1, cr.top() + top, mm_w, cr.height() - top)
         )
 
     def paint_line_number_area(self, event) -> None:
@@ -1442,11 +1593,24 @@ class TextEditor(QPlainTextEdit):
             self.setCurrentCharFormat(QTextCharFormat())
         except Exception:
             pass
+        # Zurück in den Plaintext-Modus: Monospace-Standardschrift, Soft-Wrap
+        # wieder laut Einstellung, Seitenlayout nur falls scope == all — 2.6.53
+        was_rich = bool(getattr(self, "_rich_mode", False))
+        self._rich_mode = False
+        self._rich_base_font = None
+        if was_rich:
+            try:
+                self.document().setDefaultFont(self.font())
+            except Exception:
+                pass
         super().setPlainText(text)
         try:
             self.setCurrentCharFormat(QTextCharFormat())
         except Exception:
             pass
+        if was_rich:
+            self.set_soft_wrap(self._soft_wrap)
+            self._apply_page_layout()
 
     def clear_spelling(self) -> None:
         """Nur Rechtschreibmarkierungen entfernen."""
@@ -1706,9 +1870,34 @@ class TextEditor(QPlainTextEdit):
         self.setTextCursor(cur)
         return True
 
-    def set_rich_html(self, html: str) -> None:
-        """HTML mit Zeichenformaten in das Dokument laden (DOCX/Word-Suite) — 2.6.49."""
-        self.document().setHtml(html or "")
+    def set_rich_html(self, html: str, base_font: QFont | None = None) -> None:
+        """HTML mit Zeichenformaten in das Dokument laden (DOCX/Word-Suite) — 2.6.49.
+
+        2.6.53: Rich-Dokumente brechen immer am Spaltenrand um (``WidgetWidth``),
+        bekommen eine proportionale Standardschrift (DOCX-Normal-Stil bzw. Calibri 11
+        statt Editor-Monospace) und — wenn aktiv — das Seitenlayout (Textspalte in
+        Seitenbreite, ``QTextDocument.pageSize``).
+        """
+        self._rich_mode = True
+        self.set_soft_wrap(self._soft_wrap)  # erzwingt WidgetWidth im Rich-Modus
+        try:
+            self.setCurrentCharFormat(QTextCharFormat())
+        except Exception:
+            pass
+        doc = self.document()
+        font = QFont(base_font) if base_font is not None else self._default_rich_font()
+        if font.pointSizeF() <= 0 and font.pixelSize() <= 0:
+            font.setPointSize(11)
+        self._rich_base_font = QFont(font)
+        # Vor setHtml: Importer leitet Standardgrößen vom Dokument-Default ab
+        doc.setDefaultFont(font)
+        doc.setHtml(html or "")
+        doc.setDefaultFont(font)
+        try:
+            self.setCurrentCharFormat(QTextCharFormat())
+        except Exception:
+            pass
+        self._apply_page_layout()
 
     def to_rich_html(self) -> str:
         """Aktuelles Dokument als HTML (Bold/Italic/Underline erhalten)."""

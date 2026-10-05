@@ -128,6 +128,19 @@ DEFAULTS: dict[str, Any] = {
     "wizard_skip_once": False,
     "selection_note_with_highlight": False,
     "editor_soft_wrap": True,
+    # Seitenlayout Texteditor (DTP-Preset, Ausrichtung, Ränder mm, Geltung) — 2.6.53
+    "editor_page_layout": {
+        "enabled": True,
+        "scope": "rich",  # rich (DOCX/HTML/Word-Suite) | all | off
+        "preset": "A4",
+        "width_pt": 595.28,
+        "height_pt": 841.89,
+        "orientation": "portrait",
+        "margin_top_mm": 25.0,
+        "margin_bottom_mm": 20.0,
+        "margin_left_mm": 25.0,
+        "margin_right_mm": 20.0,
+    },
     "editor_tab_width": 4,
     "editor_soft_tabs": True,
     "editor_indent_guides": True,
@@ -3108,6 +3121,19 @@ def get_editor_soft_wrap() -> bool:
 
 def set_editor_soft_wrap(enabled: bool) -> None:
     save_settings({"editor_soft_wrap": bool(enabled)})
+
+
+def get_editor_page_layout() -> dict:
+    """Seitenlayout des Texteditors (dict, siehe ``core.editor_page_layout``) — 2.6.53."""
+    base = dict(DEFAULTS.get("editor_page_layout") or {})
+    raw = load_settings().get("editor_page_layout")
+    if isinstance(raw, dict):
+        base.update(raw)
+    return base
+
+
+def set_editor_page_layout(layout: dict) -> None:
+    save_settings({"editor_page_layout": dict(layout or {})})
 
 
 def get_editor_show_special_chars() -> bool:

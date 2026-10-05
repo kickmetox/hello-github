@@ -2413,6 +2413,14 @@ class MainWindow(QMainWindow):
         self._soft_wrap_action.setShortcut(QKeySequence("Ctrl+Shift+W"))
         self._soft_wrap_action.toggled.connect(self._toggle_soft_wrap)
         m_view.addAction(self._soft_wrap_action)
+        self._page_layout_action = QAction("Seitenlayout…", self)
+        self._page_layout_action.setObjectName("actPageLayout")
+        self._page_layout_action.setToolTip(
+            "Seitenformat (A4/Letter/Buchformate), Ausrichtung und Ränder für den "
+            "Texteditor — Text bricht in Seitenbreite um (DOCX/Word-Suite) — 2.6.53"
+        )
+        self._page_layout_action.triggered.connect(self._show_page_layout_dialog)
+        m_view.addAction(self._page_layout_action)
         self._special_chars_action = QAction("Sonderzeichen anzeigen", self)
         self._special_chars_action.setCheckable(True)
         from instantlensdoc.core.app_settings import get_editor_show_special_chars
@@ -6770,6 +6778,7 @@ class MainWindow(QMainWindow):
             ),
             "doc_split": self._toggle_doc_split_from_ribbon,
             "detach_window": self._detach_current_document,
+            "page_layout": self._show_page_layout_dialog,
             "preflight": self._run_preflight,
             "apply_bleed": self._apply_bleed_dialog,
             "export_pdfx": self._export_pdfx,
@@ -6781,6 +6790,54 @@ class MainWindow(QMainWindow):
         fn = handlers.get(action_id)
         if callable(fn):
             fn()
+
+    def _rich_base_font_for_doc(self):
+        """Standardschrift des aktuellen Rich-Dokuments (DOCX Normal-Stil) — 2.6.53."""
+        from PySide6.QtGui import QFont
+
+        meta = (self.doc.meta if self.doc is not None else None) or {}
+        fam = str(meta.get("font_family") or "").strip() or "Calibri"
+        try:
+            size = float(meta.get("font_size_pt") or 0.0)
+        except (TypeError, ValueError):
+            size = 0.0
+        if not (6.0 <= size <= 72.0):
+            size = 11.0
+        font = QFont(fam)
+        font.setPointSizeF(size)
+        font.setStyleHint(QFont.SansSerif)
+        return font
+
+    def _show_page_layout_dialog(self) -> None:
+        """Seitenlayout des Texteditors (DTP-Presets, Ränder, Ausrichtung) — 2.6.53."""
+        from instantlensdoc.ui.page_layout_dialog import PageLayoutDialog
+
+        current = self.editor.page_layout()
+        dlg = PageLayoutDialog(current, self, rich_document=self.editor.rich_mode())
+        if dlg.exec() != QDialog.Accepted:
+            return
+        layout = dlg.result_layout()
+        try:
+            layout.save()
+        except Exception as e:
+            _log.warning("Seitenlayout konnte nicht gespeichert werden: %s", e)
+        self.editor.set_page_layout(layout)
+        try:
+            sec = getattr(self, "secondary_editor", None)
+            if sec is not None and hasattr(sec, "set_page_layout"):
+                sec.set_page_layout(layout)
+        except Exception:
+            pass
+        if self.editor.page_layout_active():
+            self._set_status(
+                f"Seitenlayout: {layout.describe()} · Spalte {self.editor.page_column_width_px()} px"
+            )
+        elif not layout.enabled or layout.scope == "off":
+            self._set_status("Seitenlayout aus — Text bricht am Fensterrand um")
+        else:
+            self._set_status(
+                f"Seitenlayout gespeichert ({layout.describe()}) — gilt für Word-/DOCX-Dokumente"
+            )
 
     def _toggle_doc_split_from_ribbon(self) -> None:
         """Ribbon-Toggle für Fenster teilen — 2.6.20."""
@@ -12154,6 +12211,7 @@ class MainWindow(QMainWindow):
             "export_pdfx": self._export_pdfx,
             "preflight": self._run_preflight,
             "apply_bleed": self._apply_bleed_dialog,
+            "page_layout": self._show_page_layout_dialog,
             "doc_layers": self._show_doc_layers,
             "compare_pdfs": self._compare_pdfs,
             "book_layout": lambda: self._toggle_book_layout(
@@ -14944,7 +15002,9 @@ class MainWindow(QMainWindow):
                     html = (self.doc.meta or {}).get("html")
                     if html and self.doc.kind in (DocKind.DOCX, DocKind.HTML):
                         try:
-                            self.editor.set_rich_html(str(html))
+                            self.editor.set_rich_html(
+                                str(html), base_font=self._rich_base_font_for_doc()
+                            )
                         except Exception:
                             self.editor.setPlainText(self.doc.text)
                     else:
@@ -16473,7 +16533,9 @@ class MainWindow(QMainWindow):
         try:
             import pypdfium2 as pdfium
 
-            _doc = pdfium.PdfDocument(str(pdf_path))
+            from ild_pdf.pdfium_open import open_pdfium
+
+            _doc = open_pdfium(pdf_path)
             total = len(_doc)
             _doc.close()
         except Exception:
