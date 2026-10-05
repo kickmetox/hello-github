@@ -14,14 +14,14 @@ _SUBTYPE_MAP: dict[str, AnnotationType] = {
     "Highlight": AnnotationType.HIGHLIGHT,
     "Underline": AnnotationType.UNDERLINE,
     "Squiggly": AnnotationType.UNDERLINE,
-    "StrikeOut": AnnotationType.UNDERLINE,
+    "StrikeOut": AnnotationType.STRIKEOUT,
     "Text": AnnotationType.STICKY,
     "FreeText": AnnotationType.TEXT,
     "Stamp": AnnotationType.STAMP,
     "Square": AnnotationType.RECTANGLE,
-    "Circle": AnnotationType.RECTANGLE,
+    "Circle": AnnotationType.ELLIPSE,
     "Line": AnnotationType.LINE,
-    "Ink": AnnotationType.LINE,
+    "Ink": AnnotationType.INK,
     "Caret": AnnotationType.STICKY,
     "Polygon": AnnotationType.RECTANGLE,
     "PolyLine": AnnotationType.LINE,
@@ -179,6 +179,25 @@ def _line_endpoints(
         return None
 
 
+def _ink_points_list(obj, page_h: float, scale: float) -> list[list[float]]:
+    """/InkList → [[x,y], ...] in UI-Koordinaten (Y oben)."""
+    out: list[list[float]] = []
+    try:
+        ink = obj.get("/InkList")
+        if ink is None or len(ink) < 1:
+            return out
+        pts = ink[0]
+        if pts is None or len(pts) < 4:
+            return out
+        for i in range(0, len(pts) - 1, 2):
+            x = float(pts[i]) * scale
+            y = (page_h - float(pts[i + 1])) * scale
+            out.append([x, y])
+    except Exception:
+        return []
+    return out
+
+
 def _ink_endpoints(
     obj, page_h: float, scale: float
 ) -> Optional[tuple[float, float, float, float]]:
@@ -326,7 +345,31 @@ def import_native_pdf_annotations(
                         op = 1.0
                     op = max(0.05, min(1.0, op))
 
-                    if atype == AnnotationType.LINE:
+                    if atype == AnnotationType.INK:
+                        ink_pts = _ink_points_list(obj, page_h, scale)
+                        if ink_pts and len(ink_pts) >= 2:
+                            ann = Annotation.from_ink_points(
+                                page_index,
+                                ink_pts,
+                                color=color,
+                            )
+                            ann.text = text
+                            ann.opacity = op
+                            ann.tags = ["pdf-import", name.lower()]
+                        else:
+                            ann = Annotation(
+                                page=page_index,
+                                type=atype,
+                                x=x,
+                                y=y,
+                                width=w,
+                                height=h,
+                                text=text,
+                                color=color,
+                                opacity=op,
+                                tags=["pdf-import", name.lower()],
+                            )
+                    elif atype == AnnotationType.LINE:
                         ends = _line_endpoints(obj, page_h, scale) or _ink_endpoints(
                             obj, page_h, scale
                         )
@@ -361,7 +404,7 @@ def import_native_pdf_annotations(
                                 opacity=op,
                                 tags=["pdf-import", name.lower()],
                             )
-                    elif atype in (AnnotationType.HIGHLIGHT, AnnotationType.UNDERLINE):
+                    elif atype in (AnnotationType.HIGHLIGHT, AnnotationType.UNDERLINE, AnnotationType.STRIKEOUT):
                         # QuadPoints → erstes Quad als Box (grob)
                         try:
                             qp = obj.get("/QuadPoints")

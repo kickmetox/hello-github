@@ -1254,6 +1254,7 @@ class MainWindow(QMainWindow):
         self.pdf_view.ocr_region_finished.connect(self._on_ocr_region_finished)
         self.pdf_view.annotations_changed.connect(self._refresh_pdf_marks)
         self.pdf_view.annotations_changed.connect(self._refresh_undo_hint)
+        self.pdf_view.undo_state_changed.connect(self._on_pdf_undo_state)
         # Toolbar-Undo/Redo: Layer-Alle-ein/aus · Tag-Rename-Filter — 1.8.3/1.8.4
         self._ann_layer_undo: list[dict[str, bool]] = []
         self._ann_layer_redo: list[dict[str, bool]] = []
@@ -1334,6 +1335,7 @@ class MainWindow(QMainWindow):
         self.stack.currentChanged.connect(lambda *_: self._sync_editor_toolbar_for_stack())
         self.stack.currentChanged.connect(lambda *_: self._sync_pdf_page_shortcuts())
         self.stack.currentChanged.connect(lambda *_: self._sync_menu_enablement())
+        self.stack.currentChanged.connect(lambda *_: self._sync_undo_redo_ui())
         # Beim Start ohne Session: Willkommen zeigen (nach Session-Restore ggf. überschrieben)
         self.stack.setCurrentWidget(self.welcome_page)
         self._sync_editor_toolbar_for_stack()
@@ -1834,6 +1836,8 @@ class MainWindow(QMainWindow):
         m_edit.addAction(act_redo)
         self._undo_action = act_undo
         self._redo_action = act_redo
+        self._edit_undo_action = act_undo
+        self._edit_redo_action = act_redo
         try:
             self.editor.undoAvailable.connect(lambda _a: self._sync_undo_redo_enabled())
             self.editor.redoAvailable.connect(lambda _a: self._sync_undo_redo_enabled())
@@ -9901,6 +9905,69 @@ class MainWindow(QMainWindow):
             f"Gesamter PDF-Text ({self.pdf_view.page_count} Seite(n)) → Editor ({words} Wörter)"
         )
 
+    def _on_pdf_undo_state(self, can_u: bool, tu: str, can_r: bool, tr: str) -> None:
+        if getattr(self, "stack", None) is None:
+            return
+        if self.stack.currentWidget() is not self.pdf_view:
+            return
+        self._apply_undo_redo_ui(can_u, tu, can_r, tr)
+
+    def _sync_undo_redo_ui(self) -> None:
+        if getattr(self, "stack", None) is None:
+            return
+        if self.stack.currentWidget() is self.pdf_view:
+            try:
+                can_u, tu, can_r, tr = self.pdf_view.undo_ui_state()
+            except Exception:
+                can_u, tu, can_r, tr = True, "", True, ""
+            self._apply_undo_redo_ui(can_u, tu, can_r, tr)
+            return
+        try:
+            in_editor = self.stack.currentWidget() is self.editor_pane
+        except Exception:
+            in_editor = False
+        if in_editor:
+            doc = self.editor.document()
+            can_u = bool(doc.isUndoAvailable())
+            can_r = bool(doc.isRedoAvailable())
+            self._apply_undo_redo_ui(can_u, "", can_r, "")
+            return
+        self._apply_undo_redo_ui(True, "", True, "")
+
+    def _apply_undo_redo_ui(self, can_u: bool, tu: str, can_r: bool, tr: str) -> None:
+        u_tip = f"Rückgängig: {tu}" if tu else "Rückgängig (Ctrl+Z)"
+        r_tip = f"Wiederholen: {tr}" if tr else "Wiederholen (Ctrl+Y / Ctrl+Shift+Z)"
+        seen: set[int] = set()
+        for act, en, tip in (
+            (getattr(self, "_edit_undo_action", None), can_u, u_tip),
+            (getattr(self, "_edit_redo_action", None), can_r, r_tip),
+            (getattr(self, "_undo_action", None), can_u, u_tip),
+            (getattr(self, "_redo_action", None), can_r, r_tip),
+        ):
+            if act is None:
+                continue
+            ident = id(act)
+            if ident in seen:
+                continue
+            seen.add(ident)
+            try:
+                act.setEnabled(bool(en))
+                act.setToolTip(tip)
+            except Exception:
+                pass
+        rb = getattr(self, "ribbon_bar", None)
+        if rb is None:
+            return
+        if hasattr(rb, "set_action_enabled"):
+            rb.set_action_enabled("undo", bool(can_u))
+            rb.set_action_enabled("redo", bool(can_r))
+        elif hasattr(rb, "set_enabled"):
+            rb.set_enabled("undo", bool(can_u))
+            rb.set_enabled("redo", bool(can_r))
+        if hasattr(rb, "set_action_tooltip"):
+            rb.set_action_tooltip("undo", u_tip)
+            rb.set_action_tooltip("redo", r_tip)
+
     def _undo(self):
         if self.stack.currentWidget() is self.pdf_view:
             # Sticky Clear bei Ann.-Undo (zusätzlich Seite/Dokument) — 1.1.9
@@ -9917,27 +9984,8 @@ class MainWindow(QMainWindow):
             self.editor.redo()
 
     def _sync_undo_redo_enabled(self) -> None:
-        """Menü- und Ribbon-Pfeile „Rückgängig/Wiederholen“ an den Editor-Stack koppeln — 2.6.54.
-
-        Im PDF-Modus bleiben beide aktiv (Annotations-/Seiten-Undo hat eigene Stacks).
-        """
-        try:
-            in_editor = self.stack.currentWidget() is self.editor_pane
-        except Exception:
-            in_editor = True
-        if in_editor:
-            doc = self.editor.document()
-            can_undo = bool(doc.isUndoAvailable())
-            can_redo = bool(doc.isRedoAvailable())
-        else:
-            can_undo = can_redo = True
-        for act, on in ((getattr(self, "_undo_action", None), can_undo), (getattr(self, "_redo_action", None), can_redo)):
-            if act is not None:
-                act.setEnabled(on)
-        ribbon = getattr(self, "ribbon_bar", None)
-        if ribbon is not None and hasattr(ribbon, "set_enabled"):
-            ribbon.set_enabled("undo", can_undo)
-            ribbon.set_enabled("redo", can_redo)
+        """Menü- und Ribbon-Pfeile an Editor- bzw. PDF-Undo-Stack koppeln — 2.6.54."""
+        self._sync_undo_redo_ui()
 
     def _show_getting_started_wizard(self) -> None:
         """Wizard manuell öffnen (Hilfe-Menü)."""

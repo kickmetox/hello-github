@@ -13,8 +13,8 @@ from .document import PdfDocument
 from .limits import clamp_render_scale
 from .pdfium_open import PDFIUM_LOCK, clear_pdfium_bytes_cache, open_pdfium
 
-# LRU: (path_str, mtime_ns, page, scale_key, grayscale, invert) → PIL Image
-_CACHE: "OrderedDict[Tuple[str, int, int, float, bool, bool], Image.Image]" = OrderedDict()
+# LRU: (path_str, mtime_ns, page, scale_key, grayscale, invert, draw_annots, may_draw_forms) → PIL Image
+_CACHE: "OrderedDict[Tuple[str, int, int, float, bool, bool, bool, bool], Image.Image]" = OrderedDict()
 _CACHE_MAX = 24
 
 
@@ -38,7 +38,7 @@ def _mtime_ns(path: Path) -> int:
         return 0
 
 
-def _cache_get(key: Tuple[str, int, int, float, bool, bool]) -> Optional[Image.Image]:
+def _cache_get(key: Tuple[str, int, int, float, bool, bool, bool, bool]) -> Optional[Image.Image]:
     img = _CACHE.get(key)
     if img is None:
         return None
@@ -46,7 +46,7 @@ def _cache_get(key: Tuple[str, int, int, float, bool, bool]) -> Optional[Image.I
     return img.copy()
 
 
-def _cache_put(key: Tuple[str, int, int, float, bool, bool], img: Image.Image) -> None:
+def _cache_put(key: Tuple[str, int, int, float, bool, bool, bool, bool], img: Image.Image) -> None:
     _CACHE[key] = img.copy()
     _CACHE.move_to_end(key)
     while len(_CACHE) > _CACHE_MAX:
@@ -116,12 +116,18 @@ def render_page(
     password: Optional[str] = None,
     grayscale: bool = False,
     invert: bool = False,
+    draw_annots: bool = False,
+    may_draw_forms: bool = True,
 ) -> Image.Image:
     """
     Eine Seite als PIL-Image rendern (optional LRU-Cache, Graustufen, Invert).
 
     ``invert`` ist für die Nachtmodus-Ansicht gedacht und sollte bei
     Speichern/Export nicht gesetzt werden.
+
+    ``draw_annots``: native PDF-Annots (FPDF_ANNOT). Default False, weil die
+    PDF-Ansicht Sidecar-Overlays zeichnet — sonst Doppel-Highlights nach Save.
+    Tests/Export setzen ``draw_annots=True``.
     """
     # PDFium ist nicht threadsicher: Open+Render+Close als Einheit sperren — 2.6.53
     with PDFIUM_LOCK:
@@ -133,6 +139,8 @@ def render_page(
             password=password,
             grayscale=grayscale,
             invert=invert,
+            draw_annots=draw_annots,
+            may_draw_forms=may_draw_forms,
         )
 
 
@@ -145,6 +153,8 @@ def _render_page_locked(
     password: Optional[str],
     grayscale: bool,
     invert: bool,
+    draw_annots: bool = False,
+    may_draw_forms: bool = True,
 ) -> Image.Image:
     own = False
     path_for_cache: Optional[Path] = None
@@ -168,7 +178,7 @@ def _render_page_locked(
             scale_key = round(eff_scale, 3)
             gray = bool(grayscale)
             inv = bool(invert)
-            cache_key: Optional[Tuple[str, int, int, float, bool, bool]] = None
+            cache_key: Optional[Tuple[str, int, int, float, bool, bool, bool, bool]] = None
             if use_cache and path_for_cache is not None:
                 try:
                     resolved = str(path_for_cache.resolve())
@@ -181,6 +191,8 @@ def _render_page_locked(
                     scale_key,
                     gray,
                     inv,
+                    bool(draw_annots),
+                    bool(may_draw_forms),
                 )
                 hit = _cache_get(cache_key)
                 if hit is not None:
@@ -190,10 +202,19 @@ def _render_page_locked(
                 bitmap = page.render(
                     scale=eff_scale,
                     fill_color=(255, 255, 255, 255),
+                    draw_annots=bool(draw_annots),
+                    may_draw_forms=bool(may_draw_forms),
                 )
             except TypeError:
-                # Ältere pypdfium2 ohne fill_color
-                bitmap = page.render(scale=eff_scale)
+                # Ältere pypdfium2 ohne fill_color / draw_annots
+                try:
+                    bitmap = page.render(
+                        scale=eff_scale,
+                        draw_annots=bool(draw_annots),
+                        may_draw_forms=bool(may_draw_forms),
+                    )
+                except TypeError:
+                    bitmap = page.render(scale=eff_scale)
             try:
                 img = bitmap.to_pil()
                 img = _detach_pil_from_pdfium(img)

@@ -75,8 +75,8 @@ class RibbonBar(QWidget):
                     ("open", "Öffnen"),
                     ("save", "Speichern"),
                     ("save_as", "Speichern unter"),
-                    ("undo", "Rückgängig"),
-                    ("redo", "Wiederholen"),
+                    ("undo", "↶ Rückgängig"),
+                    ("redo", "↷ Wiederholen"),
                     ("compare_pdfs", "Vergleichen"),
                     ("find_replace", "Suchen"),
                     ("spellcheck", "Rechtschreibung"),
@@ -85,8 +85,8 @@ class RibbonBar(QWidget):
             (
                 "Bearbeiten",
                 (
-                    ("undo", "Rückgängig"),
-                    ("redo", "Wiederholen"),
+                    ("undo", "↶ Rückgängig"),
+                    ("redo", "↷ Wiederholen"),
                     ("spellcheck", "Rechtschreibung"),
                     ("autocorrect_toggle", "Autokorrektur"),
                     ("insert_snippet", "Baustein"),
@@ -193,6 +193,7 @@ class RibbonBar(QWidget):
             for aid, label in buttons:
                 tb = QToolButton()
                 tb.setText(label)
+                tb.setObjectName(f"ribbonAction_{aid}")
                 tb.setToolTip(f"{label} — Ribbon 2.6.54")
                 tb.setAutoRaise(False)
                 if aid in (
@@ -207,8 +208,8 @@ class RibbonBar(QWidget):
                 ):
                     tb.setCheckable(True)
                 if aid in ("undo", "redo"):
-                    # Sichtbare Pfeile „vor/zurück“; Enabled-Zustand folgt dem Editor-
-                    # Undo-Stack (MainWindow._sync_undo_redo_enabled) — 2.6.54
+                    # Sichtbare Pfeile „vor/zurück“; Enabled-Zustand folgt Editor-
+                    # bzw. PDF-Undo-Stack (MainWindow._sync_undo_redo_ui) — 2.6.54
                     icon = self.style().standardIcon(
                         QStyle.SP_ArrowBack if aid == "undo" else QStyle.SP_ArrowForward
                     )
@@ -274,6 +275,18 @@ class RibbonBar(QWidget):
 
     def buttons(self, action_id: str) -> list[QToolButton]:
         return list(self._action_buttons.get(action_id, ()))
+
+    def set_action_enabled(self, action_id: str, enabled: bool) -> None:
+        """Alias für PDF-Undo-Tooltips / Annotation-Tests — 2.6.54."""
+        self.set_enabled(action_id, enabled)
+
+    def set_action_tooltip(self, action_id: str, text: str) -> None:
+        tip = str(text or "")
+        for tb in self._action_buttons.get(action_id, ()) or ():
+            try:
+                tb.setToolTip(tip)
+            except Exception:
+                pass
 
     def bind(self, handlers: dict[str, Callable[[], None]]) -> None:
         """Optional: direkte Handler statt Signal (Smoke/Tests)."""

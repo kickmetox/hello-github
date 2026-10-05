@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Offscreen End-to-End 2.6.54 — ungültiges Save-As-PDF, Diagnose, Minimap, Undo.
+"""Offscreen End-to-End 2.6.54 — Save-As-PDF, Minimap, Undo + PDF-Annotationen.
 
 Feldbefund 2.6.53 (Windows): ``Dunning_Kruger_Effekt_1.pdf`` (25 226 Byte)
 ``PK 03 04`` = unverändertes Word-DOCX (Application: Microsoft Office Word).
@@ -14,6 +14,12 @@ Dieser Test beweist:
 3. 0-Byte / HTML-mit-.pdf: Diagnosetext mit Größe + Header-Hex (Schritt 0).
 4. Minimap Standard aus, Toggle in Ansicht, in DOCX unsichtbar, Textbreite zurück.
 5. Tippen → Fett → Undo zweimal → Originaltext; Ribbon/Menü Rückgängig/Wiederholen.
+6. Highlight bleibt nach Zoom (Koordinaten = PDF-Punkte, Anzeige × Scale).
+7. Werkzeug „Stift“ aktiviert Ink, nicht Highlight (objectName annTool_ink).
+8. Objekte verschiebbar; /Rect wird ins PDF geschrieben und ändert sich.
+9. FreeText-Edit schreibt /Contents zurück.
+10. QUndoStack: Anlegen → Undo weg → Redo zurück; Verschieben → Undo stellt /Rect her.
+11. Ribbon Start+Bearbeiten: ↶ Rückgängig / ↷ Wiederholen inkl. Tooltip.
 
 Aufruf: ``QT_QPA_PLATFORM=offscreen python3 scripts/test_ui_audit_2654.py``
 """
@@ -37,12 +43,15 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "scripts"))
 
+from test_pdf_canvas_not_blank import _make_multipage_pdf  # noqa: E402
 from test_ui_audit_2652 import _pump  # noqa: E402
 
 USER_PDF = Path(
     "/cursor/stores/bc-b08b150e-66b9-4e56-8bf8-50c583a73b7e/inbox/"
     "Dunning_Kruger_Effekt_1.pdf"
 )
+STORE = Path("/cursor/stores/bc-b08b150e-66b9-4e56-8bf8-50c583a73b7e")
+SHOT_DIR = STORE / "media" / "instantlensdoc-2654"
 
 
 def _make_docx(path: Path) -> None:
@@ -79,6 +88,232 @@ def _assert_valid_pdf(path: Path, *, must_contain: str | None = None) -> None:
             finally:
                 doc.close()
         assert must_contain.lower() in txt.lower(), f"PDF-Text ohne {must_contain!r}: {txt[:200]!r}"
+
+
+def _close(a, b, tol: float = 0.75) -> bool:
+    return abs(float(a) - float(b)) <= tol
+
+
+def test_pdf_roundtrip_move_and_freetext(td: Path) -> None:
+    from ild_pdf import (
+        Annotation,
+        AnnotationStore,
+        AnnotationType,
+        read_ild_annots,
+        write_annotations_to_pdf,
+    )
+
+    pdf = td / "ann_roundtrip.pdf"
+    _make_multipage_pdf(pdf, ["AnnPageAAA"])
+    store = AnnotationStore(pdf)
+    rect = Annotation(
+        page=0,
+        type=AnnotationType.RECTANGLE,
+        x=40.0,
+        y=50.0,
+        width=80.0,
+        height=30.0,
+        color="#C0392B",
+    )
+    ft = Annotation(
+        page=0,
+        type=AnnotationType.TEXT,
+        x=20.0,
+        y=120.0,
+        width=140.0,
+        height=28.0,
+        text="Hallo",
+        color="#1A1A1A",
+    )
+    store.add(rect)
+    store.add(ft)
+    write_annotations_to_pdf(pdf, store)
+    native = read_ild_annots(pdf, page_index=0)
+    by_nm = {n["nm"]: n for n in native}
+    assert f"ild:{rect.id}" in by_nm, native
+    assert f"ild:{ft.id}" in by_nm, native
+    assert by_nm[f"ild:{ft.id}"]["subtype"] == "FreeText"
+    assert by_nm[f"ild:{ft.id}"]["contents"] == "Hallo"
+    before = list(by_nm[f"ild:{rect.id}"]["rect"])
+    moved = store.move_by([rect.id], 25.0, 12.0)
+    assert moved == 1
+    write_annotations_to_pdf(pdf, store)
+    after = read_ild_annots(pdf, page_index=0)
+    after_rect = next(n["rect"] for n in after if n["nm"] == f"ild:{rect.id}")
+    assert after_rect != before, f"Rect unverändert nach Verschieben: {before}"
+    store.undo()
+    write_annotations_to_pdf(pdf, store)
+    restored = next(
+        n["rect"] for n in read_ild_annots(pdf, page_index=0) if n["nm"] == f"ild:{rect.id}"
+    )
+    assert all(_close(a, b) for a, b in zip(restored, before)), (
+        f"Undo stellte /Rect nicht her: {restored} vs {before}"
+    )
+    store.update(ft.id, text="Geändert")
+    write_annotations_to_pdf(pdf, store)
+    contents = next(
+        n["contents"] for n in read_ild_annots(pdf, page_index=0) if n["nm"] == f"ild:{ft.id}"
+    )
+    assert contents == "Geändert", contents
+
+
+def test_viewer_tools_undo_zoom(app, td: Path) -> None:
+    from PySide6.QtWidgets import QToolButton
+
+    from ild_pdf import Annotation, AnnotationType
+    from instantlensdoc.ui.pdf_view import ANN_TOOL_ACTION_MAP, PdfViewer
+
+    pdf = td / "viewer_ann.pdf"
+    _make_multipage_pdf(pdf, ["ZoomHlAAA", "PageTwoBBB"])
+    v = PdfViewer()
+    v.resize(960, 720)
+    v.show()
+    app.processEvents()
+    assert v.load(pdf), f"load fehlgeschlagen: {v._last_refresh_error!r}"
+    v._suppress_default_zoom = True
+    _pump(app, 1.2, until=lambda: v._canvas_has_page_image())
+    v.set_scale(1.5, immediate=True)
+    _pump(app, 0.4)
+    assert _close(v.scale, 1.5, 0.05), v.scale
+
+    mapping = v.annotation_tool_map()
+    assert mapping["annTool_ink"] == "ink"
+    assert mapping["annTool_highlight"] == "highlight"
+    assert mapping["annTool_select"] == "select"
+    for oid, tid in ANN_TOOL_ACTION_MAP:
+        assert mapping[oid] == tid, (oid, mapping.get(oid), tid)
+
+    ink_btn = v.findChild(QToolButton, "annTool_ink")
+    hl_btn = v.findChild(QToolButton, "annTool_highlight")
+    assert ink_btn is not None and ink_btn.text() == "Stift"
+    assert hl_btn is not None and "Highlight" in hl_btn.text()
+    assert v.btn_pen_color.text() == "Strich"
+    v.set_tool_from_id("pen")
+    assert v.current_tool_id() == "ink", v.current_tool_id()
+    assert v.tool == AnnotationType.INK
+    ink_btn.click()
+    _pump(app, 0.1)
+    assert v.current_tool_id() == "ink"
+    assert not hl_btn.isChecked()
+    assert ink_btn.isChecked()
+
+    n0 = len(v.store.annotations) if v.store else 0
+    v._commit_ann(
+        Annotation(
+            page=0,
+            type=AnnotationType.HIGHLIGHT,
+            x=30.0,
+            y=40.0,
+            width=90.0,
+            height=18.0,
+            color="#FFE066",
+        )
+    )
+    _pump(app, 0.2)
+    assert v.store is not None
+    assert len(v.store.annotations) == n0 + 1
+    stored = v.store.annotations[-1]
+    assert stored.type == AnnotationType.HIGHLIGHT
+    s = v._view_scale()
+    assert _close(stored.x, 30.0 / s, 0.5), (stored.x, s)
+    assert v._undo_stack.canUndo()
+    can_u, tu, can_r, tr = v.undo_ui_state()
+    assert can_u, (can_u, tu, can_r, tr)
+    assert "highlight" in tu.lower() or "hinzufügen" in tu.lower() or tu
+
+    v.set_scale(2.0, immediate=True)
+    _pump(app, 0.4)
+    disp = v._display_anns_for_page(0)
+    hl = [a for a in disp if a.type == AnnotationType.HIGHLIGHT]
+    assert hl, "Highlight nach Zoom 200% nicht in der Anzeige"
+    assert _close(hl[0].x, stored.x * 2.0, 1.0), (hl[0].x, stored.x)
+    canvas_hl = [a for a in v.canvas._annotations if a.type == AnnotationType.HIGHLIGHT]
+    assert canvas_hl, "Canvas-Overlay verlor Highlight nach Zoom"
+
+    v.undo_annotation()
+    _pump(app, 0.2)
+    assert len(v.store.annotations) == n0
+    assert not [a for a in v._display_anns_for_page(0) if a.type == AnnotationType.HIGHLIGHT]
+    v.redo_annotation()
+    _pump(app, 0.2)
+    assert len(v.store.annotations) == n0 + 1
+
+    rect = Annotation(
+        page=0,
+        type=AnnotationType.RECTANGLE,
+        x=60.0,
+        y=80.0,
+        width=50.0,
+        height=24.0,
+        color="#2980B9",
+    )
+    v._commit_ann(rect)
+    _pump(app, 0.2)
+    rid = v.store.annotations[-1].id
+    before = (v.store.get(rid).x, v.store.get(rid).y)
+    v._on_annotations_moved([rid], 30.0, 15.0)  # view pixels → store /scale
+    after = (v.store.get(rid).x, v.store.get(rid).y)
+    assert after != before
+    v.undo_annotation()
+    _pump(app, 0.2)
+    back = (v.store.get(rid).x, v.store.get(rid).y)
+    assert _close(back[0], before[0], 0.4) and _close(back[1], before[1], 0.4)
+
+    v.save_annotations()
+    from ild_pdf import read_ild_annots
+
+    native = read_ild_annots(pdf, page_index=0)
+    assert native, "save_annotations schrieb keine /Annots"
+    assert any(n["subtype"] == "Highlight" for n in native)
+
+    SHOT_DIR.mkdir(parents=True, exist_ok=True)
+    v.set_scale(1.5, immediate=True)
+    _pump(app, 0.3)
+    img = v.canvas.grab()
+    out = SHOT_DIR / "annotations.png"
+    assert img.save(str(out)), out
+    assert out.is_file() and out.stat().st_size > 200, out
+    v.close()
+
+
+def test_ribbon_undo_arrows() -> None:
+    from instantlensdoc.ui.ribbon_bar import RibbonBar
+
+    rb = RibbonBar()
+    undos = rb._action_buttons.get("undo") or []
+    redos = rb._action_buttons.get("redo") or []
+    assert len(undos) >= 2, "Undo fehlt in Start und/oder Bearbeiten"
+    assert len(redos) >= 2, "Redo fehlt in Start und/oder Bearbeiten"
+    assert any("↶" in b.text() for b in undos)
+    assert any("↷" in b.text() for b in redos)
+    rb.set_action_tooltip("undo", "Rückgängig: Rechteck verschieben")
+    rb.set_action_enabled("undo", False)
+    assert all("Rechteck verschieben" in b.toolTip() for b in undos)
+    assert all(not b.isEnabled() for b in undos)
+    rb.set_action_enabled("undo", True)
+
+
+def test_mainwindow_shortcuts(app) -> None:
+    from PySide6.QtGui import QKeySequence
+
+    from instantlensdoc.license import LicenseManager
+    from instantlensdoc.ui.main_window import MainWindow
+
+    lm = LicenseManager()
+    lm.ensure_trial_started()
+    win = MainWindow(lm)
+    win.resize(1200, 800)
+    win.show()
+    _pump(app, 0.3)
+    act_u = getattr(win, "_edit_undo_action", None)
+    act_r = getattr(win, "_edit_redo_action", None)
+    assert act_u is not None and act_r is not None
+    sc = [s.toString() for s in act_r.shortcuts()]
+    joined = " ".join(sc)
+    assert "Ctrl+Shift+Z" in joined or QKeySequence("Ctrl+Shift+Z") in act_r.shortcuts()
+    rb = win.ribbon_bar
+    assert "undo" in rb._action_buttons
+    win.close()
 
 
 def main() -> int:  # noqa: C901
@@ -290,6 +525,17 @@ def main() -> int:  # noqa: C901
         assert ed.toPlainText() == before
         print("OK  5 undo/redo type→bold→undo×2 + table one-step + ribbon arrows")
 
+        # ---- 6–11) PDF-Annotationen --------------------------------------------
+        test_pdf_roundtrip_move_and_freetext(tdp)
+        print("OK  6 native /Rect /Contents + Undo-Rect")
+        test_viewer_tools_undo_zoom(app, tdp)
+        print("OK  7 viewer Stift/Highlight/Zoom/QUndoStack")
+        test_ribbon_undo_arrows()
+        print("OK  8 ribbon ↶/↷")
+        test_mainwindow_shortcuts(app)
+        print("OK  9 menü Ctrl+Shift+Z")
+
+    win.close()
     print("OK test_ui_audit_2654")
     return 0
 

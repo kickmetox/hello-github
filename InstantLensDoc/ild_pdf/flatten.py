@@ -7,9 +7,11 @@ import math
 from pathlib import Path
 from typing import List, Sequence
 
+from copy import deepcopy
+
 from PIL import Image, ImageDraw, ImageFont
 
-from .annotate import Annotation, AnnotationStore, AnnotationType
+from .annotate import Annotation, AnnotationStore, AnnotationType, scale_annotation
 from .document import PdfDocument
 from .render import render_page
 
@@ -82,6 +84,9 @@ def draw_annotations_on_image(
             draw.rectangle([x, y, x + rw, y + rh], outline=(220, 50, 50, 255), width=sw)
         elif ann.type == AnnotationType.UNDERLINE:
             draw.line([x, y + h, x + w, y + h], fill=stroke, width=sw)
+        elif ann.type == AnnotationType.STRIKEOUT:
+            my = y + max(h, 2) / 2.0
+            draw.line([x, my, x + w, my], fill=stroke, width=max(sw, 2))
         elif ann.type == AnnotationType.STICKY:
             bw, bh = max(w, 80), max(h, 60)
             draw.rectangle([x, y, x + bw, y + bh], fill=(255, 255, 150, _opacity_alpha(ann, 200)))
@@ -290,14 +295,17 @@ def flatten_annotations_to_pdf(
     else:
         out_path = Path(out_path)
 
+    space = "render_pixels"
     if isinstance(store, AnnotationStore):
         anns = list(store.annotations)
+        space = str((store._meta or {}).get("coord_space") or "render_pixels")
     else:
         anns = list(store)
 
     by_page: dict[int, list[Annotation]] = {}
     for a in anns:
         by_page.setdefault(int(a.page), []).append(a)
+    pts_space = str(space).strip().lower() in ("pdf_points", "pdf-pt", "pt")
 
     scale = max(float(scale), 0.5)
     pages_out: List[Image.Image] = []
@@ -350,6 +358,13 @@ def flatten_annotations_to_pdf(
         )
         page_anns = by_page.get(i, [])
         if page_anns:
+            if pts_space and abs(scale - 1.0) > 1e-9:
+                drawn: list[Annotation] = []
+                for a in page_anns:
+                    d = deepcopy(a)
+                    scale_annotation(d, scale)
+                    drawn.append(d)
+                page_anns = drawn
             raw = draw_annotations_on_image(raw, page_anns, scale=scale)
         elif raw.mode != "RGB":
             raw = raw.convert("RGB")

@@ -165,6 +165,7 @@ class AnnotationType(str, Enum):
     ELLIPSE = "ellipse"  # Kreis/Ellipse, gefüllt oder Outline — 2.6.10
     TRIANGLE = "triangle"  # Dreieck — 2.6.10
     ROUNDED_RECT = "rounded_rect"  # abgerundetes Rechteck — 2.6.10
+    STRIKEOUT = "strikeout"  # Durchstreichen — 2.6.54
 
 
 # Vordefinierte Stempel-Texte (UI kann erweitern)
@@ -391,6 +392,8 @@ DRAG_TYPES = frozenset(
         AnnotationType.INK,  # Polyline Press→Move→Release — 2.2.0
         AnnotationType.LINK,  # Rechteck + URI — 2.3.0
         AnnotationType.HIGHLIGHT,
+        AnnotationType.UNDERLINE,
+        AnnotationType.STRIKEOUT,
         AnnotationType.REDACTION,
     }
 )
@@ -399,6 +402,7 @@ DRAG_TYPES = frozenset(
 REPORT_TYPE_LABELS: dict[str, str] = {
     "highlight": "Markierung",
     "underline": "Unterstreichung",
+    "strikeout": "Durchstreichung",
     "sticky": "Notiz",
     "text": "Text",
     "stamp": "Stempel",
@@ -630,13 +634,16 @@ class Annotation:
         if fc and not fc.startswith("#"):
             fc = "#" + fc
         d["fill_color"] = fc.upper() if fc else ""
-        # Ink-Punkte normalisieren — 2.2.0
+        # Ink-Punkte normalisieren — 2.2.0; Druck (3. Wert) erhalten — 2.6.54
         pts_out: list[list[float]] = []
         for pt in d.get("points") or []:
             if not isinstance(pt, (list, tuple)) or len(pt) < 2:
                 continue
             try:
-                pts_out.append([round(float(pt[0]), 2), round(float(pt[1]), 2)])
+                row = [round(float(pt[0]), 2), round(float(pt[1]), 2)]
+                if len(pt) >= 3:
+                    row.append(round(max(0.0, min(1.0, float(pt[2]))), 3))
+                pts_out.append(row)
             except (TypeError, ValueError):
                 continue
         d["points"] = pts_out
@@ -679,7 +686,7 @@ class Annotation:
     def to_export_dict(self) -> dict:
         """Sidecar-Feld + PDF-Highlight-Interop (Schema v4)."""
         d = self.to_dict()
-        if self.type in (AnnotationType.HIGHLIGHT, AnnotationType.UNDERLINE):
+        if self.type in (AnnotationType.HIGHLIGHT, AnnotationType.UNDERLINE, AnnotationType.STRIKEOUT):
             d["rects"] = self.highlight_rects()
             d["quadPoints"] = self.highlight_quad_points()
             d["colorRGB"] = self.color_rgb()
@@ -700,7 +707,9 @@ class Annotation:
         if "type" not in data and isinstance(data.get("pdf_highlight"), dict):
             ph = data["pdf_highlight"]
             subtype = str(ph.get("subtype") or "Highlight").lower()
-            data["type"] = "highlight" if "under" not in subtype else "underline"
+            data["type"] = "highlight" if "under" not in subtype and "strike" not in subtype else (
+                "strikeout" if "strike" in subtype else "underline"
+            )
             if "text" not in data and "contents" in ph:
                 data["text"] = ph.get("contents") or ""
             if "color" not in data and ph.get("colorRGB"):
@@ -745,7 +754,10 @@ class Annotation:
             if not isinstance(pt, (list, tuple)) or len(pt) < 2:
                 continue
             try:
-                pts_in.append([float(pt[0]), float(pt[1])])
+                row = [float(pt[0]), float(pt[1])]
+                if len(pt) >= 3:
+                    row.append(max(0.0, min(1.0, float(pt[2]))))
+                pts_in.append(row)
             except (TypeError, ValueError):
                 continue
         data["points"] = pts_in
@@ -768,8 +780,7 @@ class Annotation:
             rot = float(data.get("rotation", 0.0) or 0.0)
         except (TypeError, ValueError):
             rot = 0.0
-        # Einfache Stempel-Rotation: auf 0/90/180/270 normalisieren
-        data["rotation"] = float(int(round(rot / 90.0)) % 4 * 90)
+        data["rotation"] = float(rot) % 360.0
         data["tags"] = normalize_tags(data.get("tags"))
         gid = data.get("group_id")
         if gid is None:
@@ -782,6 +793,91 @@ class Annotation:
         known = {f.name for f in cls.__dataclass_fields__.values()}  # type: ignore[attr-defined]
         data = {k: v for k, v in data.items() if k in known}
         return cls(**data)
+
+
+def scale_annotation(ann: Annotation, factor: float) -> Annotation:
+    """Geometrie in-place mit ``factor`` skalieren (Pixel ↔ PDF-Punkte). Druck bleibt."""
+    f = float(factor)
+    if abs(f - 1.0) < 1e-12:
+        return ann
+    ann.x = float(ann.x) * f
+    ann.y = float(ann.y) * f
+    ann.width = float(ann.width) * f
+    ann.height = float(ann.height) * f
+    if ann.callout_x or ann.callout_y:
+        ann.callout_x = float(ann.callout_x) * f
+        ann.callout_y = float(ann.callout_y) * f
+    if ann.p3_x or ann.p3_y:
+        ann.p3_x = float(ann.p3_x) * f
+        ann.p3_y = float(ann.p3_y) * f
+    if ann.points:
+        new_pts: list[list[float]] = []
+        for pt in ann.points:
+            if not isinstance(pt, (list, tuple)) or len(pt) < 2:
+                continue
+            try:
+                row = [float(pt[0]) * f, float(pt[1]) * f]
+                if len(pt) >= 3:
+                    row.append(float(pt[2]))
+                new_pts.append(row)
+            except (TypeError, ValueError):
+                continue
+        ann.points = new_pts
+    return ann
+
+
+def map_annotation_rect(
+    ann: Annotation,
+    x: float,
+    y: float,
+    width: float,
+    height: float,
+    *,
+    proportional: bool = False,
+) -> Annotation:
+    """Annotation auf neues Bounding-Rect mappen (Punkte, Callout, Ink)."""
+    old_x, old_y = float(ann.x), float(ann.y)
+    old_w = max(float(ann.width), 1e-6)
+    old_h = max(float(ann.height), 1e-6)
+    nw = max(float(width), 1.0)
+    nh = max(float(height), 1.0)
+    if proportional:
+        ratio = old_w / old_h
+        if nw / nh > ratio:
+            nw = nh * ratio
+        else:
+            nh = nw / ratio
+    sx = nw / old_w
+    sy = nh / old_h
+    nx, ny = float(x), float(y)
+
+    def _map(px: float, py: float) -> tuple[float, float]:
+        return nx + (float(px) - old_x) * sx, ny + (float(py) - old_y) * sy
+
+    if ann.callout_x or ann.callout_y:
+        ann.callout_x, ann.callout_y = _map(ann.callout_x, ann.callout_y)
+    if ann.p3_x or ann.p3_y:
+        ann.p3_x, ann.p3_y = _map(ann.p3_x, ann.p3_y)
+    if ann.points:
+        new_pts: list[list[float]] = []
+        for pt in ann.points:
+            if not isinstance(pt, (list, tuple)) or len(pt) < 2:
+                continue
+            mx, my = _map(float(pt[0]), float(pt[1]))
+            row = [mx, my]
+            if len(pt) >= 3:
+                try:
+                    row.append(float(pt[2]))
+                except (TypeError, ValueError):
+                    pass
+            new_pts.append(row)
+        ann.points = new_pts
+    ann.x = nx
+    ann.y = ny
+    ann.width = nw
+    ann.height = nh
+    ann.touch()
+    return ann
 
 
 def smooth_ink_points(
@@ -835,6 +931,8 @@ class AnnotationStore:
         self._undo_labels: List[str] = []
         self._redo_labels: List[str] = []
         self._recording = True
+        self._meta.setdefault("coord_space", "pdf_points")
+        self._meta.setdefault("y_origin", "top")
         if self.pdf_path and self.sidecar_path.exists():
             try:
                 self.load()
@@ -919,6 +1017,12 @@ class AnnotationStore:
                 self._undo_labels.pop(0)
         self._redo.clear()
         self._redo_labels.clear()
+        cb = getattr(self, "on_undo_pushed", None)
+        if callable(cb):
+            try:
+                cb(str(label or "Annotation"))
+            except Exception:
+                pass
 
     @contextmanager
     def atomic(self, label: str = "Annotation") -> Iterator[None]:
@@ -949,8 +1053,8 @@ class AnnotationStore:
         self._restore(self._redo.pop())
         return True
 
-    def add(self, ann: Annotation) -> Annotation:
-        self._push_undo()
+    def add(self, ann: Annotation, *, undo_label: str | None = None) -> Annotation:
+        self._push_undo(undo_label or f"{ann.type.value} hinzufügen")
         self.annotations.append(ann)
         self.dirty = True
         return ann
@@ -1078,7 +1182,7 @@ class AnnotationStore:
         ]
         if not targets:
             return 0
-        self._push_undo()
+        self._push_undo("Verschieben")
         for a in targets:
             a.x = float(a.x) + float(dx)
             a.y = float(a.y) + float(dy)
@@ -1089,14 +1193,69 @@ class AnnotationStore:
                 a.p3_x = float(a.p3_x) + float(dx)
                 a.p3_y = float(a.p3_y) + float(dy)
             if a.points:
-                a.points = [
-                    [float(pt[0]) + float(dx), float(pt[1]) + float(dy)]
-                    for pt in a.points
-                    if isinstance(pt, (list, tuple)) and len(pt) >= 2
-                ]
+                shifted: list[list[float]] = []
+                for pt in a.points:
+                    if not isinstance(pt, (list, tuple)) or len(pt) < 2:
+                        continue
+                    try:
+                        row = [float(pt[0]) + float(dx), float(pt[1]) + float(dy)]
+                        if len(pt) >= 3:
+                            row.append(float(pt[2]))
+                        shifted.append(row)
+                    except (TypeError, ValueError):
+                        continue
+                a.points = shifted
             a.touch()
         self.dirty = True
         return len(targets)
+
+    def resize_to(
+        self,
+        ann_id: str,
+        x: float,
+        y: float,
+        width: float,
+        height: float,
+        *,
+        proportional: bool = False,
+        undo_label: str = "Größe ändern",
+    ) -> Optional[Annotation]:
+        """Eine Annotation auf neues Rect mappen (eine Undo-Stufe) — 2.6.54."""
+        ann = self.get(ann_id)
+        if ann is None or bool(getattr(ann, "locked", False)):
+            return None
+        self._push_undo(undo_label)
+        map_annotation_rect(ann, x, y, width, height, proportional=proportional)
+        self.dirty = True
+        return ann
+
+    def bring_to_front(self, ann_ids: Sequence[str]) -> int:
+        """Auswahl in der Z-Reihenfolge nach vorn (Listende) — 2.6.54."""
+        ids = [str(i) for i in ann_ids if i]
+        if not ids:
+            return 0
+        moving = [a for a in self.annotations if a.id in set(ids)]
+        if not moving:
+            return 0
+        self._push_undo("Nach vorn")
+        rest = [a for a in self.annotations if a.id not in set(ids)]
+        self.annotations = rest + moving
+        self.dirty = True
+        return len(moving)
+
+    def send_to_back(self, ann_ids: Sequence[str]) -> int:
+        """Auswahl in der Z-Reihenfolge nach hinten (Listenanfang) — 2.6.54."""
+        ids = [str(i) for i in ann_ids if i]
+        if not ids:
+            return 0
+        moving = [a for a in self.annotations if a.id in set(ids)]
+        if not moving:
+            return 0
+        self._push_undo("Nach hinten")
+        rest = [a for a in self.annotations if a.id not in set(ids)]
+        self.annotations = moving + rest
+        self.dirty = True
+        return len(moving)
 
     def _apply_dx(self, ann: Annotation, dx: float) -> None:
         """Horizontale Verschiebung inkl. Callout-/Winkel-Endpunkte (ohne Undo)."""
@@ -1108,11 +1267,18 @@ class AnnotationStore:
         if ann.p3_x or ann.p3_y:
             ann.p3_x = float(ann.p3_x) + float(dx)
         if ann.points:
-            ann.points = [
-                [float(pt[0]) + float(dx), float(pt[1])]
-                for pt in ann.points
-                if isinstance(pt, (list, tuple)) and len(pt) >= 2
-            ]
+            shifted: list[list[float]] = []
+            for pt in ann.points:
+                if not isinstance(pt, (list, tuple)) or len(pt) < 2:
+                    continue
+                try:
+                    row = [float(pt[0]) + float(dx), float(pt[1])]
+                    if len(pt) >= 3:
+                        row.append(float(pt[2]))
+                    shifted.append(row)
+                except (TypeError, ValueError):
+                    continue
+            ann.points = shifted
         ann.touch()
 
     def _apply_dy(self, ann: Annotation, dy: float) -> None:
@@ -1125,11 +1291,18 @@ class AnnotationStore:
         if ann.p3_x or ann.p3_y:
             ann.p3_y = float(ann.p3_y) + float(dy)
         if ann.points:
-            ann.points = [
-                [float(pt[0]), float(pt[1]) + float(dy)]
-                for pt in ann.points
-                if isinstance(pt, (list, tuple)) and len(pt) >= 2
-            ]
+            shifted: list[list[float]] = []
+            for pt in ann.points:
+                if not isinstance(pt, (list, tuple)) or len(pt) < 2:
+                    continue
+                try:
+                    row = [float(pt[0]), float(pt[1]) + float(dy)]
+                    if len(pt) >= 3:
+                        row.append(float(pt[2]))
+                    shifted.append(row)
+                except (TypeError, ValueError):
+                    continue
+            ann.points = shifted
         ann.touch()
 
     def align(
@@ -1571,7 +1744,7 @@ class AnnotationStore:
         before = len(self.annotations)
         if not any(a.id == ann_id for a in self.annotations):
             return False
-        self._push_undo()
+        self._push_undo("Löschen")
         self.annotations = [a for a in self.annotations if a.id != ann_id]
         changed = len(self.annotations) < before
         if changed:
@@ -2449,7 +2622,7 @@ class AnnotationStore:
         now = datetime.now(timezone.utc).isoformat(timespec="seconds")
         meta = dict(self._meta)
         meta.setdefault("y_origin", "top")  # Sidecar-Y: oben; PDF-Y: unten
-        meta.setdefault("coord_space", "render_pixels")
+        meta.setdefault("coord_space", "pdf_points")
         anns = [
             (a.to_export_dict() if export else a.to_dict()) for a in self.annotations
         ]
@@ -2486,8 +2659,28 @@ class AnnotationStore:
         data = json.loads(target.read_text(encoding="utf-8"))
         self._meta = dict(data.get("meta") or {})
         self.annotations = [Annotation.from_dict(a) for a in data.get("annotations", [])]
+        self._ensure_pdf_point_coords()
         self.dirty = False
         self.clear_history()
+
+    def _ensure_pdf_point_coords(self) -> None:
+        """Alte Sidecars (Render-Pixel) → PDF-Punkte (Y oben) — 2.6.54."""
+        space = str((self._meta or {}).get("coord_space") or "render_pixels").strip().lower()
+        if space in ("pdf_points", "pdf-pt", "pt"):
+            self._meta["coord_space"] = "pdf_points"
+            self._meta.setdefault("y_origin", "top")
+            return
+        try:
+            scale = float((self._meta or {}).get("render_scale") or 1.5)
+        except (TypeError, ValueError):
+            scale = 1.5
+        scale = max(0.25, min(8.0, scale))
+        if abs(scale - 1.0) > 1e-6:
+            for ann in self.annotations:
+                scale_annotation(ann, 1.0 / scale)
+        self._meta["coord_space"] = "pdf_points"
+        self._meta["y_origin"] = "top"
+        self._meta["render_scale_converted_from"] = scale
 
     def export_backup(self, path: str | Path) -> Path:
         """Kopie der Sidecar unter anderem Namen (Backup)."""

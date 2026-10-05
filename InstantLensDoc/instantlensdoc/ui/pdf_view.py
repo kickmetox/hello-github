@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 import threading
 import time
+from copy import copy, deepcopy
 from typing import Optional, Sequence
 
 from PySide6.QtCore import QPointF, QRectF, Qt, QTimer, Signal, QUrl
@@ -21,6 +22,8 @@ from PySide6.QtGui import (
     QPolygonF,
     QShortcut,
     QBrush,
+    QUndoCommand,
+    QUndoStack,
 )
 from PySide6.QtWidgets import (
     QApplication,
@@ -49,6 +52,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
     QCheckBox,
+    QButtonGroup,
 )
 
 from ild_pdf import (
@@ -73,6 +77,8 @@ from ild_pdf import (
     list_page_uri_links,
     render_page,
     uri_link_at,
+    scale_annotation,
+    write_annotations_to_pdf,
 )
 from ild_pdf.text_edit import (
     EditableTextSpan,
@@ -199,6 +205,95 @@ CONTINUOUS_MAX_PAGES = 40
 CONTINUOUS_PAGE_GAP = 12
 # 0 = unbegrenzt (Seiten-Ops Undo-Stack) — 2.6.21
 PAGE_OPS_UNDO_LIMIT = 0
+
+# UI-Werkzeuge ohne AnnotationType — 2.6.54
+UI_TOOL_SELECT = "select"
+UI_TOOL_HAND = "hand"
+UI_TOOL_TEXT_MARK = "text_mark"
+UI_TOOL_ERASER = "eraser"
+
+# objectName → erwartete tool-id (Offscreen-Mapping-Test)
+ANN_TOOL_ACTION_MAP = (
+    ("annTool_select", "select"),
+    ("annTool_hand", "hand"),
+    ("annTool_text_mark", "text_mark"),
+    ("annTool_highlight", "highlight"),
+    ("annTool_ink", "ink"),
+    ("annTool_underline", "underline"),
+    ("annTool_strikeout", "strikeout"),
+    ("annTool_rectangle", "rectangle"),
+    ("annTool_ellipse", "ellipse"),
+    ("annTool_arrow", "arrow"),
+    ("annTool_line", "line"),
+    ("annTool_sticky", "sticky"),
+    ("annTool_text", "text"),
+    ("annTool_stamp", "stamp"),
+    ("annTool_eraser", "eraser"),
+    ("annTool_redaction", "redaction"),
+    ("annTool_text_overlay", "text_overlay"),
+    ("annTool_callout", "callout"),
+    ("annTool_triangle", "triangle"),
+    ("annTool_rounded_rect", "rounded_rect"),
+    ("annTool_measure", "measure"),
+    ("annTool_measure_area", "measure_area"),
+    ("annTool_measure_angle", "measure_angle"),
+    ("annTool_link", "link"),
+    ("annTool_signature_field", "signature_field"),
+)
+
+
+class _StoreUndoCommand(QUndoCommand):
+    """Eine Store-Mutation, die bereits angewandt ist; undo/redo über Snapshots."""
+
+    def __init__(self, viewer: "PdfViewer", label: str):
+        super().__init__(str(label or "Annotation"))
+        self._viewer = viewer
+        self._virgin = True
+
+    def undo(self):  # noqa: A003
+        store = getattr(self._viewer, "store", None)
+        if store is not None and store.can_undo():
+            store.undo()
+        self._viewer._after_history_change()
+
+    def redo(self):  # noqa: A003
+        if self._virgin:
+            self._virgin = False
+            return
+        store = getattr(self._viewer, "store", None)
+        if store is not None and store.can_redo():
+            store.redo()
+        self._viewer._after_history_change()
+
+
+class _PageOpUndoCommand(QUndoCommand):
+    """Seiten-Op: Undo über bestehenden page-ops-Stack; Redo best-effort."""
+
+    def __init__(self, viewer: "PdfViewer", label: str, entry: dict):
+        super().__init__(str(label or "Seite"))
+        self._viewer = viewer
+        self._entry = dict(entry or {})
+        self._virgin = True
+
+    def undo(self):  # noqa: A003
+        self._viewer._history_replaying = True
+        try:
+            self._viewer.undo_page_op()
+        finally:
+            self._viewer._history_replaying = False
+        self._viewer._after_history_change(skip_stack=True)
+
+    def redo(self):  # noqa: A003
+        if self._virgin:
+            self._virgin = False
+            return
+        self._viewer._history_replaying = True
+        try:
+            self._viewer._reapply_page_op(self._entry)
+        finally:
+            self._viewer._history_replaying = False
+        self._viewer._after_history_change(skip_stack=True)
+
 
 
 class PageReorderDialog(QDialog):
@@ -657,6 +752,10 @@ class PdfCanvas(QLabel):
     annotation_selected = Signal(str)  # ann id (leer = Auswahl aufheben)
     uri_link_clicked = Signal(str)  # externe http(s)-URL
     annotations_moved = Signal(list, float, float)  # ids, dx, dy
+    annotations_resized = Signal(str, float, float, float, float, bool)  # id, x, y, w, h, proportional
+    rubber_band_finished = Signal(float, float, float, float)
+    annotation_erase_hit = Signal(str)
+    context_menu_at = Signal(float, float)  # page px
     escape_pressed = Signal()  # Esc → z. B. Quick-Stempel abbrechen — 1.9.3
 
     def __init__(self, parent=None):
@@ -668,6 +767,9 @@ class PdfCanvas(QLabel):
         self._uri_links: list = []
         self._drag_tool: AnnotationType | None = None
         self._select_mode = False
+        self._hand_mode = False
+        self._eraser_mode = False
+        self._text_mark_mode = False
         self._inline_edit_mode = False  # Inline-Textbearbeitung — 2.6.5
         self._object_edit_mode = False  # Objektmanipulation — 2.6.5
         self._object_sel: DocumentObject | None = None
@@ -720,8 +822,18 @@ class PdfCanvas(QLabel):
         self._move_ids: set[str] = set()
         self._move_origin: tuple[float, float] | None = None
         self._move_delta: tuple[float, float] = (0.0, 0.0)
+        self._band_start: tuple[float, float] | None = None
+        self._band_current: tuple[float, float] | None = None
+        self._resize_id: str | None = None
+        self._resize_handle: str | None = None
+        self._resize_origin: tuple[float, float] | None = None
+        self._resize_start: tuple[float, float, float, float] | None = None
+        self._resize_preview: tuple[float, float, float, float] | None = None
+        self._hand_origin: tuple[float, float] | None = None
+        self._hand_scroll: tuple[int, int] | None = None
         self.setMouseTracking(True)
         self.setFocusPolicy(Qt.StrongFocus)
+        self.setContextMenuPolicy(Qt.CustomContextMenu)
 
     def clear(self) -> None:  # noqa: A003 — QLabel.clear + interner Stand
         """Anzeige und internes Seitenpixmap leeren — 2.6.48."""
@@ -1184,16 +1296,24 @@ class PdfCanvas(QLabel):
         select_mode: bool = False,
         inline_edit_mode: bool = False,
         object_edit_mode: bool = False,
+        hand_mode: bool = False,
+        eraser_mode: bool = False,
+        text_mark_mode: bool = False,
     ):
         exclusive = bool(inline_edit_mode) or bool(object_edit_mode)
-        self._select_mode = bool(select_mode) and not exclusive
+        self._hand_mode = bool(hand_mode) and not exclusive
+        self._eraser_mode = bool(eraser_mode) and not exclusive and not self._hand_mode
+        self._text_mark_mode = bool(text_mark_mode) and not exclusive
+        self._select_mode = bool(select_mode) and not exclusive and not self._hand_mode and not self._eraser_mode
         self._inline_edit_mode = bool(inline_edit_mode) and not object_edit_mode
         self._object_edit_mode = bool(object_edit_mode) and not inline_edit_mode
         self._drag_tool = (
             tool
-            if (tool in DRAG_TYPES and not select_mode and not exclusive)
+            if (tool in DRAG_TYPES and not select_mode and not exclusive and not self._hand_mode and not self._eraser_mode)
             else None
         )
+        if self._text_mark_mode:
+            self._drag_tool = AnnotationType.HIGHLIGHT
         if not self._object_edit_mode:
             self._object_drag_mode = None
             self._object_drag_origin = None
@@ -1202,10 +1322,20 @@ class PdfCanvas(QLabel):
             self._move_ids = set()
             self._move_origin = None
             self._move_delta = (0.0, 0.0)
+        self._band_start = None
+        self._band_current = None
+        self._resize_id = None
+        self._resize_handle = None
+        self._resize_origin = None
+        self._resize_start = None
+        self._resize_preview = None
+        self._hand_origin = None
         if not self._select_mode:
             self._text_sel_start = None
             self._text_sel_current = None
             self._ink_points = None
+            self._repaint_overlay()
+        else:
             self._repaint_overlay()
 
     def set_object_selection(self, obj: DocumentObject | None) -> None:
@@ -1402,6 +1532,9 @@ class PdfCanvas(QLabel):
             AnnotationType.CALLOUT,
             AnnotationType.STAMP,
             AnnotationType.SIGNATURE_FIELD,
+            AnnotationType.HIGHLIGHT,
+            AnnotationType.UNDERLINE,
+            AnnotationType.STRIKEOUT,
         )
         for ann in reversed(self._annotations):
             if ann.type not in editable:
@@ -1459,6 +1592,73 @@ class PdfCanvas(QLabel):
                 return ann
         return None
 
+    def _ann_handle_rects(
+        self, ann: Annotation, *, dx: float = 0.0, dy: float = 0.0
+    ) -> dict[str, tuple[float, float, float, float]]:
+        x0, y0, x1, y1 = self._ann_bounds(ann)
+        x0, y0, x1, y1 = x0 + dx, y0 + dy, x1 + dx, y1 + dy
+        hs = 8.0
+        mx, my = (x0 + x1) / 2.0, (y0 + y1) / 2.0
+        return {
+            "tl": (x0 - hs * 0.5, y0 - hs * 0.5, hs, hs),
+            "t": (mx - hs * 0.5, y0 - hs * 0.5, hs, hs),
+            "tr": (x1 - hs * 0.5, y0 - hs * 0.5, hs, hs),
+            "r": (x1 - hs * 0.5, my - hs * 0.5, hs, hs),
+            "br": (x1 - hs * 0.5, y1 - hs * 0.5, hs, hs),
+            "b": (mx - hs * 0.5, y1 - hs * 0.5, hs, hs),
+            "bl": (x0 - hs * 0.5, y1 - hs * 0.5, hs, hs),
+            "l": (x0 - hs * 0.5, my - hs * 0.5, hs, hs),
+        }
+
+    def _hit_ann_handle(self, x: float, y: float) -> tuple[str, Annotation] | None:
+        if not self._select_mode or self._annotations_locked:
+            return None
+        selected = self._selected_ids or ({self._selected_id} if self._selected_id else set())
+        if len(selected) != 1:
+            return None
+        sid = next(iter(selected))
+        for ann in reversed(self._annotations):
+            if ann.id != sid:
+                continue
+            if bool(getattr(ann, "locked", False)):
+                return None
+            for name, (hx, hy, hw, hh) in self._ann_handle_rects(ann).items():
+                if hx <= x <= hx + hw and hy <= y <= hy + hh:
+                    return name, ann
+        return None
+
+    @staticmethod
+    def _apply_handle_resize(
+        start: tuple[float, float, float, float],
+        handle: str,
+        cx: float,
+        cy: float,
+        *,
+        proportional: bool = False,
+    ) -> tuple[float, float, float, float]:
+        x0, y0, w, h = start
+        x1, y1 = x0 + w, y0 + h
+        if "l" in handle:
+            x0 = min(cx, x1 - 4.0)
+        if "r" in handle:
+            x1 = max(cx, x0 + 4.0)
+        if handle in ("t", "tl", "tr"):
+            y0 = min(cy, y1 - 4.0)
+        if handle in ("b", "bl", "br"):
+            y1 = max(cy, y0 + 4.0)
+        nw, nh = max(4.0, x1 - x0), max(4.0, y1 - y0)
+        if proportional and w > 0 and h > 0:
+            ratio = w / h
+            if nw / nh > ratio:
+                nw = nh * ratio
+            else:
+                nh = nw / ratio
+            if "l" in handle:
+                x0 = x1 - nw
+            if handle in ("t", "tl", "tr"):
+                y0 = y1 - nh
+        return x0, y0, nw, nh
+
     def _draw_ann(self, painter: QPainter, ann: Annotation, *, dx: float = 0.0, dy: float = 0.0):
         try:
             opacity = float(getattr(ann, "opacity", 1.0) or 1.0)
@@ -1507,6 +1707,9 @@ class PdfCanvas(QLabel):
                 painter.drawText(x + 3, y + min(14, rh - 2), "REDACT")
         elif ann.type == AnnotationType.UNDERLINE:
             painter.drawLine(x, y + h, x + w, y + h)
+        elif ann.type == AnnotationType.STRIKEOUT:
+            my = y + max(h, 2) // 2
+            painter.drawLine(x, my, x + w, my)
         elif ann.type == AnnotationType.STICKY:
             fill = QColor(ann.color if ann.color else "#FFEB3B")
             fill.setAlpha(_a(200))
@@ -1829,12 +2032,37 @@ class PdfCanvas(QLabel):
                 if ann.id in self._selected_ids or (
                     self._selected_id and ann.id == self._selected_id
                 ):
-                    x0, y0, x1, y1 = self._ann_bounds(ann)
-                    x0, y0, x1, y1 = x0 + dx, y0 + dy, x1 + dx, y1 + dy
+                    if self._resize_preview and ann.id == self._resize_id:
+                        rx, ry, rw, rh = self._resize_preview
+                        x0, y0, x1, y1 = rx, ry, rx + rw, ry + rh
+                    else:
+                        x0, y0, x1, y1 = self._ann_bounds(ann)
+                        x0, y0, x1, y1 = x0 + dx, y0 + dy, x1 + dx, y1 + dy
                     sel = QPen(QColor(30, 144, 255), 2, Qt.DashLine)
                     painter.setPen(sel)
                     painter.setBrush(Qt.NoBrush)
                     painter.drawRect(int(x0) - 2, int(y0) - 2, int(x1 - x0) + 4, int(y1 - y0) + 4)
+                    if (
+                        self._select_mode
+                        and not self._annotations_locked
+                        and len(self._selected_ids) <= 1
+                    ):
+                        painter.setBrush(QColor(30, 144, 255))
+                        painter.setPen(QPen(QColor(255, 255, 255), 1))
+                        dummy = Annotation(
+                            page=ann.page,
+                            type=ann.type,
+                            x=x0,
+                            y=y0,
+                            width=max(x1 - x0, 1),
+                            height=max(y1 - y0, 1),
+                        )
+                        for hx, hy, hw, hh in self._ann_handle_rects(dummy).values():
+                            painter.fillRect(int(hx), int(hy), int(hw), int(hh), QColor(30, 144, 255))
+                            painter.setPen(QPen(QColor(255, 255, 255), 1))
+                            painter.setBrush(Qt.NoBrush)
+                            painter.drawRect(int(hx), int(hy), int(hw), int(hh))
+                            painter.setBrush(QColor(30, 144, 255))
         # Drag-Vorschau (auch bei ausgeblendetem Layer sichtbar)
         if self._ink_points and len(self._ink_points) >= 1 and self._drag_tool == AnnotationType.INK:
             preview = Annotation(
@@ -1895,6 +2123,18 @@ class PdfCanvas(QLabel):
                 int(rx), int(ry), max(int(rw), 2), max(int(rh), 2), QColor(70, 130, 230, 70)
             )
             painter.setPen(QPen(QColor(40, 90, 200), 1, Qt.DashLine))
+            painter.setBrush(Qt.NoBrush)
+            painter.drawRect(int(rx), int(ry), max(int(rw), 2), max(int(rh), 2))
+        # Gummiband-Mehrfachauswahl — 2.6.54
+        if self._band_start and self._band_current:
+            bx0, by0 = self._band_start
+            bx1, by1 = self._band_current
+            rx, ry = min(bx0, bx1), min(by0, by1)
+            rw, rh = abs(bx1 - bx0), abs(by1 - by0)
+            painter.fillRect(
+                int(rx), int(ry), max(int(rw), 2), max(int(rh), 2), QColor(30, 144, 255, 40)
+            )
+            painter.setPen(QPen(QColor(30, 144, 255), 1, Qt.DashLine))
             painter.setBrush(Qt.NoBrush)
             painter.drawRect(int(rx), int(ry), max(int(rw), 2), max(int(rh), 2))
         # Objektauswahl + Drag-Vorschau — 2.6.5
@@ -1970,10 +2210,11 @@ class PdfCanvas(QLabel):
             if hit:
                 self.overlay_edit_requested.emit(hit.id)
                 return
-            # Rechtsklick: Annotation auswählen (für Löschen)
+            # Rechtsklick: Annotation auswählen + Kontextmenü — 2.6.54
             if event.button() == Qt.RightButton:
                 hit_any = self._hit_annotation(x, y)
                 self.annotation_selected.emit(hit_any.id if hit_any else "")
+                self.context_menu_at.emit(x, y)
                 return
         if self._object_edit_mode and event.button() == Qt.LeftButton:
             # Handle / Move / Neu wählen — 2.6.5
@@ -2002,10 +2243,49 @@ class PdfCanvas(QLabel):
                 return
             self.inline_text_edit_requested.emit(x, y)
             return
+        if self._hand_mode and event.button() == Qt.LeftButton:
+            self._hand_origin = (event.position().x(), event.position().y())
+            scroll = None
+            cur = self.parentWidget() if hasattr(self, "parentWidget") else None
+            depth = 0
+            while cur is not None and depth < 8:
+                if hasattr(cur, "scroll"):
+                    scroll = getattr(cur, "scroll", None)
+                    break
+                cur = cur.parentWidget() if hasattr(cur, "parentWidget") else None
+                depth += 1
+            if scroll is not None:
+                try:
+                    self._hand_scroll = (
+                        int(scroll.horizontalScrollBar().value()),
+                        int(scroll.verticalScrollBar().value()),
+                    )
+                except Exception:
+                    self._hand_scroll = (0, 0)
+            else:
+                self._hand_scroll = (0, 0)
+            self.setCursor(QCursor(Qt.ClosedHandCursor))
+            return
+        if self._eraser_mode and event.button() == Qt.LeftButton:
+            hit_any = self._hit_annotation(x, y)
+            if hit_any:
+                self.annotation_erase_hit.emit(hit_any.id)
+            return
         if self._select_mode and event.button() == Qt.LeftButton:
             link = self._hit_uri_link(x, y)
             if link and not (event.modifiers() & Qt.ShiftModifier):
                 self.uri_link_clicked.emit(link.uri)
+                return
+            handle_hit = self._hit_ann_handle(x, y)
+            if handle_hit is not None:
+                hname, hann = handle_hit
+                self._resize_id = hann.id
+                self._resize_handle = hname
+                self._resize_origin = (x, y)
+                bx0, by0, bx1, by1 = self._ann_bounds(hann)
+                self._resize_start = (bx0, by0, bx1 - bx0, by1 - by0)
+                self._resize_preview = self._resize_start
+                self.setCursor(QCursor(Qt.SizeFDiagCursor))
                 return
             hit_any = self._hit_annotation(x, y)
             # Sidecar-LINK: Klick öffnet Browser (ohne Shift) — 2.3.0
@@ -2044,12 +2324,12 @@ class PdfCanvas(QLabel):
                         self._move_delta = (0.0, 0.0)
                         self.setCursor(QCursor(Qt.ClosedHandCursor))
                 return
-            # Leere Fläche → Text-Auswahl-Marquee (Kopieren in Zwischenablage)
+            # Leere Fläche → Gummiband-Mehrfachauswahl (Text markieren = eigenes Werkzeug)
             if not (event.modifiers() & Qt.ShiftModifier):
                 self.annotation_selected.emit("")
-                self._text_sel_start = (x, y)
-                self._text_sel_current = (x, y)
-                self._repaint_overlay()
+            self._band_start = (x, y)
+            self._band_current = (x, y)
+            self._repaint_overlay()
             return
         if event.button() == Qt.LeftButton and event.modifiers() & Qt.ShiftModifier:
             hit_any = self._hit_annotation(x, y)
@@ -2082,6 +2362,47 @@ class PdfCanvas(QLabel):
         super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event):
+        if self._hand_mode and self._hand_origin is not None:
+            dx = event.position().x() - self._hand_origin[0]
+            dy = event.position().y() - self._hand_origin[1]
+            cur = self.parentWidget() if hasattr(self, "parentWidget") else None
+            depth = 0
+            scroll = None
+            while cur is not None and depth < 8:
+                if hasattr(cur, "scroll"):
+                    scroll = getattr(cur, "scroll", None)
+                    break
+                cur = cur.parentWidget() if hasattr(cur, "parentWidget") else None
+                depth += 1
+            if scroll is not None and self._hand_scroll is not None:
+                try:
+                    scroll.horizontalScrollBar().setValue(int(self._hand_scroll[0] - dx))
+                    scroll.verticalScrollBar().setValue(int(self._hand_scroll[1] - dy))
+                except Exception:
+                    pass
+            return
+        if self._resize_handle is not None and self._resize_start is not None:
+            pt = self._map_to_page(event)
+            if pt:
+                proportional = bool(event.modifiers() & Qt.ShiftModifier)
+                self._resize_preview = self._apply_handle_resize(
+                    self._resize_start, self._resize_handle, pt[0], pt[1], proportional=proportional
+                )
+                self._repaint_overlay()
+            return
+        if self._band_start is not None:
+            pt = self._map_to_page(event)
+            if pt:
+                self._band_current = pt
+                self._repaint_overlay()
+            return
+        if self._eraser_mode and event.buttons() & Qt.LeftButton:
+            pt = self._map_to_page(event)
+            if pt:
+                hit = self._hit_annotation(*pt)
+                if hit:
+                    self.annotation_erase_hit.emit(hit.id)
+            return
         if self._object_drag_mode is not None and self._object_drag_origin is not None:
             pt = self._map_to_page(event)
             if pt:
@@ -2154,6 +2475,37 @@ class PdfCanvas(QLabel):
         super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event):
+        if self._hand_mode and event.button() == Qt.LeftButton:
+            self._hand_origin = None
+            self._hand_scroll = None
+            self.setCursor(QCursor(Qt.OpenHandCursor))
+            return
+        if self._resize_handle is not None and event.button() == Qt.LeftButton:
+            preview = self._resize_preview
+            aid = self._resize_id
+            proportional = bool(event.modifiers() & Qt.ShiftModifier)
+            self._resize_handle = None
+            self._resize_origin = None
+            self._resize_start = None
+            self._resize_preview = None
+            self._resize_id = None
+            self.unsetCursor()
+            if aid and preview:
+                x, y, w, h = preview
+                self.annotations_resized.emit(aid, float(x), float(y), float(w), float(h), proportional)
+            else:
+                self._repaint_overlay()
+            return
+        if self._band_start is not None and event.button() == Qt.LeftButton:
+            pt = self._map_to_page(event) or self._band_current
+            x0, y0 = self._band_start
+            self._band_start = None
+            self._band_current = None
+            if pt and (abs(pt[0] - x0) > 3 or abs(pt[1] - y0) > 3):
+                self.rubber_band_finished.emit(x0, y0, pt[0], pt[1])
+            else:
+                self._repaint_overlay()
+            return
         if self._object_drag_mode is not None and event.button() == Qt.LeftButton:
             mode = self._object_drag_mode
             dx, dy = self._object_drag_delta
@@ -2362,7 +2714,7 @@ class PdfCanvas(QLabel):
         super().mouseDoubleClickEvent(event)
 
     def keyPressEvent(self, event):  # noqa: N802
-        """Esc: Apply-Modus / Quick-Stempel abbrechen — 2.4.3. Bild auf/ab → Seite — 2.6.54."""
+        """Esc: Apply-Modus / Quick-Stempel abbrechen — 2.4.3. Bild auf/ab → Seite; Pfeile: Nudge — 2.6.54."""
         if event.key() in (Qt.Key_PageDown, Qt.Key_PageUp):
             viewer = self.parent()
             while viewer is not None and not hasattr(viewer, "next_page"):
@@ -2395,6 +2747,27 @@ class PdfCanvas(QLabel):
                     event.accept()
                     return
             self.escape_pressed.emit()
+            event.accept()
+            return
+        if self._select_mode and not self._annotations_locked:
+            step = 10.0 if event.modifiers() & Qt.ShiftModifier else 1.0
+            dx = dy = 0.0
+            if event.key() == Qt.Key_Left:
+                dx = -step
+            elif event.key() == Qt.Key_Right:
+                dx = step
+            elif event.key() == Qt.Key_Up:
+                dy = -step
+            elif event.key() == Qt.Key_Down:
+                dy = step
+            if dx or dy:
+                ids = list(self._selected_ids) if self._selected_ids else (
+                    [self._selected_id] if self._selected_id else []
+                )
+                if ids:
+                    self.annotations_moved.emit(ids, float(dx), float(dy))
+                    event.accept()
+                    return
         super().keyPressEvent(event)
 
 
@@ -2420,6 +2793,7 @@ class PdfViewer(QWidget):
     ocr_region_finished = Signal(int, float, float, float, float)
     # Worker-Thread → GUI: (page_count, open_generation, path, error) — 2.6.52
     _page_count_ready = Signal(int, int, str, str)
+    undo_state_changed = Signal(bool, str, bool, str)  # can_undo, undo_text, can_redo, redo_text
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -2430,9 +2804,14 @@ class PdfViewer(QWidget):
         self.page_count = 0
         self._page_labels: list[str] = []
         self.scale = get_default_zoom_scale()
-        self.tool: AnnotationType | None = AnnotationType.HIGHLIGHT
+        self.tool: AnnotationType | str | None = None  # Auswahl default — 2.6.54
         self.store: Optional[AnnotationStore] = None
         self.password: Optional[str] = None
+        self._undo_stack = QUndoStack(self)
+        self._undo_stack.setUndoLimit(0)
+        self._history_replaying = False
+        self._suppress_store_stack = False
+        self._tool_button_by_id: dict[str, QToolButton] = {}
         self._blank_view_fallback_active = False
         self._last_render_blank_ok = False
         self._last_viewport_wh: tuple[int, int] = (0, 0)
@@ -2579,11 +2958,15 @@ class PdfViewer(QWidget):
         btn_fit_h.setToolTip("Seitenhöhe einpassen (Ctrl+8)")
         btn_fit_h.clicked.connect(self.fit_height)
         btn_undo = QPushButton("↶")
-        btn_undo.setToolTip("Annotation / Seite rückgängig (Ctrl+Z)")
+        btn_undo.setObjectName("pdfUndoBtn")
+        btn_undo.setToolTip("Rückgängig (Ctrl+Z)")
         btn_undo.clicked.connect(self.undo_annotation)
+        self.btn_undo = btn_undo
         btn_redo = QPushButton("↷")
-        btn_redo.setToolTip("Annotation wiederholen (Ctrl+Y)")
+        btn_redo.setObjectName("pdfRedoBtn")
+        btn_redo.setToolTip("Wiederholen (Ctrl+Y / Ctrl+Shift+Z)")
         btn_redo.clicked.connect(self.redo_annotation)
+        self.btn_redo = btn_redo
         btn_hist = QPushButton("Historie…")
         btn_hist.setToolTip(
             "PDF-Undo-Stack: Seiten-Ops + Annotationen (z. B. Tag umbenennen) wiederherstellen"
@@ -2768,17 +3151,38 @@ class PdfViewer(QWidget):
         btn_bake.setToolTip("TEXT_OVERLAY in PDF-Content schreiben (Helvetica)")
         btn_bake.clicked.connect(self.bake_overlays)
 
-        # Auswahl-Werkzeug (tool=None)
-        btn_select = QToolButton()
-        btn_select.setText("Auswahl")
-        btn_select.setCheckable(True)
-        btn_select.setToolTip(
-            "Annotation anklicken zum Auswählen; Entf löscht; "
-            "PDF-Links (http/https) öffnen; Ctrl+Klick öffnet Link auch mit anderem Werkzeug"
+        # Annotation-Werkzeuge — QButtonGroup, feste objectNames (Stift ≠ Highlight) — 2.6.54
+        self._tool_group = QButtonGroup(self)
+        self._tool_group.setExclusive(True)
+
+        def _add_ann_tool(tool_id: str, label: str, tool, tooltip: str, *, checked: bool = False) -> QToolButton:
+            b = QToolButton()
+            b.setText(label)
+            b.setObjectName(f"annTool_{tool_id}")
+            b.setCheckable(True)
+            b.setChecked(checked)
+            b.setToolTip(tooltip)
+            b.clicked.connect(lambda _c=False, t=tool: self._set_tool(t))
+            self._tool_group.addButton(b)
+            self._tool_buttons.append(b)
+            self._tool_button_by_id[tool_id] = b
+            toolbar.addWidget(b)
+            return b
+
+        _add_ann_tool(
+            "select",
+            "Auswahl",
+            None,
+            "Auswahl: Klick / Gummiband; ziehen = verschieben; Griffe = Größe; "
+            "Pfeiltasten rücken; Entf löscht; Doppelklick bearbeitet — 2.6.54",
+            checked=True,
         )
-        btn_select.clicked.connect(lambda checked: self._set_tool(None))
-        self._tool_buttons.append(btn_select)
-        toolbar.addWidget(btn_select)
+        _add_ann_tool(
+            "hand",
+            "Hand",
+            UI_TOOL_HAND,
+            "Hand: Seite schieben (Pan) — 2.6.54",
+        )
 
         btn_inline_edit = QToolButton()
         btn_inline_edit.setText("Text bearbeiten")
@@ -2789,6 +3193,7 @@ class PdfViewer(QWidget):
             "leere Fläche → einfügen; Schriftart/Größe/Farbe aus Kontext — 2.6.5"
         )
         btn_inline_edit.clicked.connect(lambda checked: self._set_inline_edit_tool())
+        self._tool_group.addButton(btn_inline_edit)
         self._tool_buttons.append(btn_inline_edit)
         toolbar.addWidget(btn_inline_edit)
 
@@ -2801,6 +3206,7 @@ class PdfViewer(QWidget):
             "Ecken = skalieren · Doppelklick = Dialog (spiegeln/ersetzen) — 2.6.5"
         )
         btn_object_edit.clicked.connect(lambda checked: self._set_object_edit_tool())
+        self._tool_group.addButton(btn_object_edit)
         self._tool_buttons.append(btn_object_edit)
         toolbar.addWidget(btn_object_edit)
 
@@ -2813,66 +3219,58 @@ class PdfViewer(QWidget):
             "Dialog zum Ausfüllen/Erkennen — 2.6.6"
         )
         btn_form_edit.clicked.connect(lambda checked: self._set_form_field_tool())
+        self._tool_group.addButton(btn_form_edit)
         self._tool_buttons.append(btn_form_edit)
         toolbar.addWidget(btn_form_edit)
 
-        for t, label in [
-            (AnnotationType.HIGHLIGHT, "Highlight"),
-            (AnnotationType.REDACTION, "Schwärzen"),
-            (AnnotationType.UNDERLINE, "Unterstreichen"),
-            (AnnotationType.STICKY, "Notiz"),
-            (AnnotationType.TEXT_OVERLAY, "Text-Overlay"),
-            (AnnotationType.STAMP, "Stempel"),
-            (AnnotationType.CALLOUT, "Callout"),
-            (AnnotationType.RECTANGLE, "Rechteck"),
-            (AnnotationType.ELLIPSE, "Kreis"),
-            (AnnotationType.TRIANGLE, "Dreieck"),
-            (AnnotationType.ROUNDED_RECT, "Rundrect"),
-            (AnnotationType.LINE, "Linie"),
-            (AnnotationType.ARROW, "Pfeil"),
-            (AnnotationType.MEASURE, "Lineal"),
-            (AnnotationType.MEASURE_AREA, "Fläche"),
-            (AnnotationType.MEASURE_ANGLE, "Winkel"),
-            (AnnotationType.INK, "Freihand"),
-            (AnnotationType.LINK, "Link"),
-            (AnnotationType.SIGNATURE_FIELD, "Signaturfeld"),
-        ]:
-            b = QToolButton()
-            b.setText(label)
-            b.setCheckable(True)
-            b.setChecked(t == AnnotationType.HIGHLIGHT)
-            if t == AnnotationType.HIGHLIGHT:
-                b.setToolTip(
-                    "Highlight: Text aufziehen; mit „Absatz“ ganze Absätze — 2.6.10"
-                )
-            elif t == AnnotationType.ELLIPSE:
-                b.setToolTip("Kreis/Ellipse ziehen; Füllen-Toggle für Fläche oder Outline — 2.6.10")
-            elif t == AnnotationType.TRIANGLE:
-                b.setToolTip("Dreieck ziehen; Füllen-Toggle — 2.6.10")
-            elif t == AnnotationType.ROUNDED_RECT:
-                b.setToolTip("Abgerundetes Rechteck; Füllen-Toggle — 2.6.10")
-            elif t == AnnotationType.MEASURE_AREA:
-                b.setToolTip("Fläche: Rechteck aufziehen — Anzeige mm²/px² (Toggle mm/px) — 2.1.0")
-            elif t == AnnotationType.MEASURE_ANGLE:
-                b.setToolTip(
-                    "Winkel: ersten Strahl ziehen, dann zweiten Endpunkt klicken — 2.1.0"
-                )
-            elif t == AnnotationType.MEASURE:
-                b.setToolTip("Lineal: Distanz ziehen — Anzeige mm/px (Toggle) — 2.1.0")
-            elif t == AnnotationType.INK:
-                b.setToolTip(
-                    "Freihand: Maus-Polyline; Strichstärke/Farbe (Stift+Slider); "
-                    "optional Glätten; Stylus-Druck wenn verfügbar — 2.6.27"
-                )
-            elif t == AnnotationType.LINK:
-                b.setToolTip(
-                    "URL-Link: Rechteck ziehen, URI mit Live-Validierung; "
-                    "Hover-Tooltip; Sidebar Liste Bearbeiten/Löschen; "
-                    "Klick öffnet Browser; optional Bake — 2.3.1"
-                )
-            b.clicked.connect(lambda checked, tool=t: self._set_tool(tool))
-            self._tool_buttons.append(b)
-            toolbar.addWidget(b)
+        _add_ann_tool(
+            "text_mark",
+            "Text markieren",
+            UI_TOOL_TEXT_MARK,
+            "Text markieren: Passage aufziehen → Highlight über ganze Zeilen — 2.6.54",
+        )
+        _add_ann_tool(
+            "highlight",
+            "Highlight",
+            AnnotationType.HIGHLIGHT,
+            "Freihand-Highlight: Rechteck aufziehen (bleibt nach Zoom/Scroll/Speichern) — 2.6.54",
+        )
+        _add_ann_tool(
+            "ink",
+            "Stift",
+            AnnotationType.INK,
+            "Stift / Freihand: Maus-Polyline; Strichstärke/Farbe; optional Glätten — 2.6.54",
+        )
+        _add_ann_tool(
+            "underline",
+            "Unterstreichen",
+            AnnotationType.UNDERLINE,
+            "Unterstreichen: Bereich aufziehen — 2.6.54",
+        )
+        _add_ann_tool(
+            "strikeout",
+            "Durchstreichen",
+            AnnotationType.STRIKEOUT,
+            "Durchstreichen: Bereich aufziehen — 2.6.54",
+        )
+        _add_ann_tool("rectangle", "Rechteck", AnnotationType.RECTANGLE, "Rechteck ziehen; Füllen-Toggle — 2.6.10")
+        _add_ann_tool("ellipse", "Ellipse", AnnotationType.ELLIPSE, "Ellipse/Kreis ziehen; Füllen-Toggle — 2.6.54")
+        _add_ann_tool("arrow", "Pfeil", AnnotationType.ARROW, "Pfeil ziehen")
+        _add_ann_tool("line", "Linie", AnnotationType.LINE, "Linie ziehen")
+        _add_ann_tool("sticky", "Notiz", AnnotationType.STICKY, "Notiz (Sticky Note) platzieren")
+        _add_ann_tool("text", "Freitext", AnnotationType.TEXT, "Freitext-Feld platzieren; Doppelklick bearbeitet — 2.6.54")
+        _add_ann_tool("stamp", "Stempel", AnnotationType.STAMP, "Stempel platzieren")
+        _add_ann_tool("eraser", "Radierer", UI_TOOL_ERASER, "Radierer: Annotation anklicken/überstreichen löscht — 2.6.54")
+        _add_ann_tool("redaction", "Schwärzen", AnnotationType.REDACTION, "Schwärzen — Rechteck ziehen")
+        _add_ann_tool("text_overlay", "Text-Overlay", AnnotationType.TEXT_OVERLAY, "Text-Overlay platzieren")
+        _add_ann_tool("callout", "Callout", AnnotationType.CALLOUT, "Callout: zwei Klicks")
+        _add_ann_tool("triangle", "Dreieck", AnnotationType.TRIANGLE, "Dreieck ziehen; Füllen-Toggle — 2.6.10")
+        _add_ann_tool("rounded_rect", "Rundrect", AnnotationType.ROUNDED_RECT, "Abgerundetes Rechteck; Füllen-Toggle")
+        _add_ann_tool("measure", "Lineal", AnnotationType.MEASURE, "Lineal: Distanz ziehen")
+        _add_ann_tool("measure_area", "Fläche", AnnotationType.MEASURE_AREA, "Flächenmessung")
+        _add_ann_tool("measure_angle", "Winkel", AnnotationType.MEASURE_ANGLE, "Winkelmessung")
+        _add_ann_tool("link", "Link", AnnotationType.LINK, "URL-Link: Rechteck ziehen")
+        _add_ann_tool("signature_field", "Signaturfeld", AnnotationType.SIGNATURE_FIELD, "Signaturfeld platzieren")
 
         self.btn_ink_smooth = QToolButton()
         self.btn_ink_smooth.setText("Glätten")
@@ -2934,9 +3332,9 @@ class PdfViewer(QWidget):
         self.btn_hl_color.setFixedWidth(36)
         self.btn_hl_color.clicked.connect(self._pick_highlight_color)
         self._style_color_btn(self.btn_hl_color, self._highlight_color)
-        self.btn_pen_color = QPushButton("Stift")
+        self.btn_pen_color = QPushButton("Strich")
         self.btn_pen_color.setToolTip(
-            "Strichfarbe für Stift/Formen/Freihand (Color-Picker) — 2.6.10"
+            "Strichfarbe für Stift/Formen/Freihand (Color-Picker) — nicht das Stift-Werkzeug — 2.6.54"
         )
         self.btn_pen_color.setFixedWidth(44)
         self.btn_pen_color.clicked.connect(self._pick_pen_color)
@@ -3371,12 +3769,16 @@ class PdfViewer(QWidget):
         self.canvas.annotation_selected.connect(self._on_annotation_selected)
         self.canvas.uri_link_clicked.connect(self._open_uri_link)
         self.canvas.annotations_moved.connect(self._on_annotations_moved)
+        self.canvas.annotations_resized.connect(self._on_annotations_resized)
+        self.canvas.rubber_band_finished.connect(self._on_rubber_band)
+        self.canvas.annotation_erase_hit.connect(self._on_erase_hit)
+        self.canvas.context_menu_at.connect(self._on_ann_context_menu)
         self.canvas.escape_pressed.connect(self._on_canvas_escape)
         self.scroll.setWidget(self.canvas)
         self.scroll.verticalScrollBar().valueChanged.connect(self._on_continuous_scroll)
         self.scroll.viewport().installEventFilter(self)
         layout.addWidget(self.scroll)
-        self.canvas.set_drag_tool(AnnotationType.HIGHLIGHT, select_mode=False)
+        self.canvas.set_drag_tool(None, select_mode=True)
         self._text_selection_text = ""
         self._text_selection_rects: list[tuple[float, float, float, float]] = []
         paste_sc = QShortcut(QKeySequence.Paste, self)
@@ -3416,6 +3818,18 @@ class PdfViewer(QWidget):
         pgup = QShortcut(QKeySequence(Qt.Key_PageUp), self)
         pgup.setContext(Qt.WidgetWithChildrenShortcut)
         pgup.activated.connect(self.prev_page)
+        undo_sc = QShortcut(QKeySequence.Undo, self)
+        undo_sc.setContext(Qt.WidgetWithChildrenShortcut)
+        undo_sc.activated.connect(self.undo_annotation)
+        redo_sc = QShortcut(QKeySequence.Redo, self)
+        redo_sc.setContext(Qt.WidgetWithChildrenShortcut)
+        redo_sc.activated.connect(self.redo_annotation)
+        redo_sc2 = QShortcut(QKeySequence("Ctrl+Shift+Z"), self)
+        redo_sc2.setContext(Qt.WidgetWithChildrenShortcut)
+        redo_sc2.activated.connect(self.redo_annotation)
+        dup_sc = QShortcut(QKeySequence("Ctrl+D"), self)
+        dup_sc.setContext(Qt.WidgetWithChildrenShortcut)
+        dup_sc.activated.connect(self.duplicate_selected_annotation)
 
     def apply_toolbar_groups(self) -> None:
         """Sichtbarkeit der PDF-Toolbar-Gruppen aus den Einstellungen anwenden."""
@@ -4808,7 +5222,8 @@ class PdfViewer(QWidget):
         if not self.store or self._annotations_locked:
             self.refresh()
             return
-        n = self.store.move_by(ids, dx, dy)
+        s = self._view_scale()
+        n = self.store.move_by(ids, float(dx) / s, float(dy) / s)
         if n:
             try:
                 self.schedule_sidecar_save(force=True)
@@ -4819,6 +5234,306 @@ class PdfViewer(QWidget):
             self.status.emit(f"{n} Annotation(en) verschoben")
         else:
             self.refresh()
+
+    def _view_scale(self) -> float:
+        return max(float(getattr(self, "scale", 1.0) or 1.0), 0.01)
+
+    def _ann_to_view_at(
+        self,
+        ann: Annotation,
+        scale: float,
+        *,
+        x_off: float = 0.0,
+        y_off: float = 0.0,
+    ) -> Annotation:
+        disp = deepcopy(ann)
+        scale_annotation(disp, max(float(scale), 0.01))
+        if x_off or y_off:
+            disp.x = float(disp.x) + x_off
+            disp.y = float(disp.y) + y_off
+            if disp.callout_x or disp.callout_y:
+                disp.callout_x = float(disp.callout_x) + x_off
+                disp.callout_y = float(disp.callout_y) + y_off
+            if disp.p3_x or disp.p3_y:
+                disp.p3_x = float(disp.p3_x) + x_off
+                disp.p3_y = float(disp.p3_y) + y_off
+            if disp.points:
+                shifted: list[list[float]] = []
+                for pt in disp.points:
+                    if not isinstance(pt, (list, tuple)) or len(pt) < 2:
+                        continue
+                    row = [float(pt[0]) + x_off, float(pt[1]) + y_off]
+                    if len(pt) >= 3:
+                        try:
+                            row.append(float(pt[2]))
+                        except (TypeError, ValueError):
+                            pass
+                    shifted.append(row)
+                disp.points = shifted
+        return disp
+
+    def _ann_to_view(self, ann: Annotation) -> Annotation:
+        return self._ann_to_view_at(ann, self._view_scale())
+
+    def _canvas_to_store(self, ann: Annotation) -> Annotation:
+        """Anzeige-Pixel → PDF-Punkte (Y oben) — 2.6.54."""
+        s = self._view_scale()
+        if abs(s - 1.0) > 1e-9:
+            scale_annotation(ann, 1.0 / s)
+        return ann
+
+    def _display_anns_for_page(self, page: int) -> list[Annotation]:
+        if not self.store:
+            return []
+        return [self._ann_to_view(a) for a in self.store.for_page(page)]
+
+    def _on_store_undo_pushed(self, label: str) -> None:
+        if getattr(self, "_suppress_store_stack", False):
+            return
+        self._note_undo_step(label)
+
+    def _bind_store_undo(self, store: AnnotationStore | None) -> None:
+        if store is None:
+            return
+        store.on_undo_pushed = self._on_store_undo_pushed
+
+    def _write_native_annots(self) -> bool:
+        if not self.store or not self.pdf_path:
+            return False
+        try:
+            write_annotations_to_pdf(self.pdf_path, self.store, password=self.password)
+            try:
+                from ild_pdf.render import clear_render_cache
+
+                clear_render_cache(self.pdf_path)
+            except Exception:
+                pass
+            return True
+        except Exception as e:
+            QMessageBox.warning(self, "Annotationen in PDF", str(e))
+            return False
+
+    def _maybe_import_native_annots(self) -> None:
+        if not self.store or not self.pdf_path or self.store.annotations:
+            return
+        try:
+            from ild_pdf import import_native_into_store
+
+            self._suppress_store_stack = True
+            try:
+                import_native_into_store(
+                    self.store,
+                    self.pdf_path,
+                    scale=1.0,
+                    password=self.password,
+                    duplicate_strategy="skip",
+                )
+            finally:
+                self._suppress_store_stack = False
+            self.store.clear_history()
+            self.store._meta["coord_space"] = "pdf_points"
+            self.store._meta.setdefault("y_origin", "top")
+        except Exception:
+            pass
+
+    def _note_undo_step(self, label: str) -> None:
+        if getattr(self, "_history_replaying", False):
+            return
+        stack = getattr(self, "_undo_stack", None)
+        if stack is None:
+            return
+        stack.push(_StoreUndoCommand(self, label))
+        self._emit_undo_state()
+
+    def _note_page_op_step(self, label: str, entry: dict) -> None:
+        if getattr(self, "_history_replaying", False):
+            return
+        stack = getattr(self, "_undo_stack", None)
+        if stack is None:
+            return
+        stack.push(_PageOpUndoCommand(self, label, entry))
+        self._emit_undo_state()
+
+    def _emit_undo_state(self) -> None:
+        can_u, tu, can_r, tr = self.undo_ui_state()
+        try:
+            self.undo_state_changed.emit(can_u, tu, can_r, tr)
+        except Exception:
+            pass
+        for btn, enabled, tip in (
+            (getattr(self, "btn_undo", None), can_u, f"Rückgängig: {tu}" if tu else "Rückgängig"),
+            (getattr(self, "btn_redo", None), can_r, f"Wiederholen: {tr}" if tr else "Wiederholen"),
+        ):
+            if btn is None:
+                continue
+            try:
+                btn.setEnabled(bool(enabled))
+                btn.setToolTip(tip)
+            except Exception:
+                pass
+
+    def undo_ui_state(self) -> tuple[bool, str, bool, str]:
+        stack = getattr(self, "_undo_stack", None)
+        can_u = bool(stack is not None and stack.canUndo())
+        can_r = bool(stack is not None and stack.canRedo())
+        tu = str(stack.undoText() or "") if stack is not None else ""
+        tr = str(stack.redoText() or "") if stack is not None else ""
+        if not can_u and self.can_undo_page_op():
+            can_u = True
+            tu = tu or "Seite"
+        if not can_u and self.store and self.store.can_undo():
+            can_u = True
+            tu = tu or (self.store.peek_undo_label() or "Annotation")
+        if not can_r and self.store and self.store.can_redo():
+            can_r = True
+            tr = tr or (self.store.peek_redo_label() or "Annotation")
+        return can_u, tu, can_r, tr
+
+    def _after_history_change(self, *, skip_stack: bool = False) -> None:
+        try:
+            self.schedule_sidecar_save(force=True)
+        except Exception:
+            pass
+        self.refresh()
+        self.annotations_changed.emit()
+        if not skip_stack:
+            self._emit_undo_state()
+        else:
+            self._emit_undo_state()
+
+    def _on_annotations_resized(
+        self, ann_id: str, x: float, y: float, w: float, h: float, proportional: bool
+    ) -> None:
+        if not self.store or self._annotations_locked:
+            self.refresh()
+            return
+        s = self._view_scale()
+        updated = self.store.resize_to(
+            ann_id, x / s, y / s, w / s, h / s, proportional=bool(proportional)
+        )
+        if updated is None:
+            self.refresh()
+            return
+        try:
+            self.schedule_sidecar_save(force=True)
+        except Exception as e:
+            QMessageBox.warning(self, "Größe ändern", str(e))
+        self.refresh()
+        self.annotations_changed.emit()
+        self.status.emit("Größe geändert")
+
+    def _on_rubber_band(self, x0: float, y0: float, x1: float, y1: float) -> None:
+        if not self.store:
+            return
+        rx0, ry0 = min(x0, x1), min(y0, y1)
+        rx1, ry1 = max(x0, x1), max(y0, y1)
+        ids: list[str] = []
+        for ann in self._display_anns_for_page(self.page_index):
+            ax0, ay0, ax1, ay1 = self.canvas._ann_bounds(ann)
+            if ax1 < rx0 or ax0 > rx1 or ay1 < ry0 or ay0 > ry1:
+                continue
+            ids.append(ann.id)
+        self._selected_ann_ids = set(ids)
+        self._selected_ann_id = ids[0] if ids else None
+        self.canvas.set_selected_ids(ids)
+        n = len(ids)
+        self.status.emit(f"{n} Annotation(en) ausgewählt" if n else "Auswahl aufgehoben")
+
+    def _on_erase_hit(self, ann_id: str) -> None:
+        if not self.store or not ann_id:
+            return
+        if self.store.remove(ann_id):
+            if ann_id in self._selected_ann_ids:
+                self._selected_ann_ids.discard(ann_id)
+            if self._selected_ann_id == ann_id:
+                self._selected_ann_id = next(iter(self._selected_ann_ids), None)
+            self.canvas.set_selected_ids(self._selected_ann_ids)
+            try:
+                self.schedule_sidecar_save(force=True)
+            except Exception:
+                pass
+            self.refresh()
+            self.annotations_changed.emit()
+            self.status.emit("Annotation gelöscht")
+
+    def _on_ann_context_menu(self, x: float, y: float) -> None:
+        if not self.store:
+            return
+        menu = QMenu(self)
+        ids = list(self._selected_ann_ids) if self._selected_ann_ids else (
+            [self._selected_ann_id] if self._selected_ann_id else []
+        )
+        act_edit = menu.addAction("Bearbeiten…")
+        act_dup = menu.addAction("Duplizieren\tCtrl+D")
+        act_copy = menu.addAction("Kopieren\tCtrl+C")
+        act_paste = menu.addAction("Einfügen\tCtrl+V")
+        menu.addSeparator()
+        act_front = menu.addAction("Nach vorn")
+        act_back = menu.addAction("Nach hinten")
+        act_rot = menu.addAction("90° drehen")
+        menu.addSeparator()
+        act_color = menu.addAction("Farbe…")
+        act_op = menu.addAction("Deckkraft…")
+        act_sw = menu.addAction("Strichstärke…")
+        menu.addSeparator()
+        act_del = menu.addAction("Löschen\tEntf")
+        chosen = menu.exec(QCursor.pos())
+        if chosen is None:
+            return
+        if chosen is act_edit and self._selected_ann_id:
+            self._edit_overlay(self._selected_ann_id)
+        elif chosen is act_dup:
+            self.duplicate_selected_annotation()
+        elif chosen is act_copy:
+            self.copy_selected_annotations()
+        elif chosen is act_paste:
+            self.paste_annotations_on_page()
+        elif chosen is act_front and ids:
+            n = self.store.bring_to_front(ids)
+            if n:
+                self.schedule_sidecar_save(force=True)
+                self.refresh()
+                self.annotations_changed.emit()
+        elif chosen is act_back and ids:
+            n = self.store.send_to_back(ids)
+            if n:
+                self.schedule_sidecar_save(force=True)
+                self.refresh()
+                self.annotations_changed.emit()
+        elif chosen is act_rot:
+            self.rotate_selected_stamp(90)
+        elif chosen is act_color:
+            self.recolor_stroke_selected_annotations()
+        elif chosen is act_op:
+            self.set_opacity_selected_annotations()
+        elif chosen is act_sw:
+            val, ok = QInputDialog.getInt(self, "Strichstärke", "Pixel 1–12:", 2, 1, 12)
+            if ok and ids:
+                self.store.set_stroke_widths(ids, float(val))
+                self.schedule_sidecar_save(force=True)
+                self.refresh()
+                self.annotations_changed.emit()
+        elif chosen is act_del:
+            self.delete_annotation()
+
+    def _reapply_page_op(self, entry: dict) -> bool:
+        """Redo einer Seiten-Op (best effort) — 2.6.54."""
+        kind = (entry or {}).get("kind")
+        try:
+            if kind == "rotate":
+                return self.rotate_at(int(entry.get("index", 0)), int(entry.get("degrees", 90)))
+            if kind == "flip":
+                return self.flip_at(
+                    int(entry.get("index", 0)),
+                    horizontal=bool(entry.get("horizontal")),
+                    vertical=bool(entry.get("vertical")),
+                )
+            if kind == "duplicate":
+                src = int(entry.get("source", max(0, int(entry.get("index", 1)) - 1)))
+                return bool(self.duplicate_at(src))
+        except Exception:
+            return False
+        return False
 
     def apply_settings_colors(self):
         self._highlight_color = get_ann_highlight_color()
@@ -4952,13 +5667,14 @@ class PdfViewer(QWidget):
             AnnotationType.HIGHLIGHT: "Highlight",
             AnnotationType.REDACTION: "Schwärzen",
             AnnotationType.UNDERLINE: "Unterstreichen",
+            AnnotationType.STRIKEOUT: "Durchstreichen",
             AnnotationType.STICKY: "Notiz",
-            AnnotationType.TEXT: "Textfeld",
+            AnnotationType.TEXT: "Freitext",
             AnnotationType.TEXT_OVERLAY: "Text-Overlay",
             AnnotationType.STAMP: "Stempel",
             AnnotationType.CALLOUT: "Callout",
             AnnotationType.RECTANGLE: "Rechteck",
-            AnnotationType.ELLIPSE: "Kreis",
+            AnnotationType.ELLIPSE: "Ellipse",
             AnnotationType.TRIANGLE: "Dreieck",
             AnnotationType.ROUNDED_RECT: "Rundrect",
             AnnotationType.LINE: "Linie",
@@ -4966,7 +5682,7 @@ class PdfViewer(QWidget):
             AnnotationType.MEASURE: "Lineal",
             AnnotationType.MEASURE_AREA: "Fläche",
             AnnotationType.MEASURE_ANGLE: "Winkel",
-            AnnotationType.INK: "Freihand",
+            AnnotationType.INK: "Stift",
             AnnotationType.LINK: "Link",
             AnnotationType.SIGNATURE_FIELD: "Signaturfeld",
         }.get(tool, tool.value)
@@ -5269,29 +5985,71 @@ class PdfViewer(QWidget):
             QMessageBox.warning(self, "Felder erkennen", str(e))
             return False
 
-    def _set_tool(self, tool: AnnotationType | None):
-        self.tool = tool
+    def _sync_tool_buttons(self, tool_id: str) -> None:
+        for tid, b in (getattr(self, "_tool_button_by_id", {}) or {}).items():
+            try:
+                b.blockSignals(True)
+                b.setChecked(tid == tool_id)
+                b.blockSignals(False)
+            except Exception:
+                pass
+        for b in self._tool_buttons:
+            name = str(b.objectName() or "")
+            if name in ("inlineTextEditToolbarBtn", "objectEditToolbarBtn", "formFieldToolbarBtn"):
+                try:
+                    b.blockSignals(True)
+                    b.setChecked(False)
+                    b.blockSignals(False)
+                except Exception:
+                    pass
+
+    def _set_tool(self, tool: AnnotationType | str | None):
         self._form_field_pending = False
         self._ocr_region_pending = False
         self._pending_callout_anchor = None
         self._pending_callout_page = self.page_index
         self._pending_angle = None
-        # Quick-Stempel / Apply-Modus nur über arm_*; Werkzeugwechsel löscht — 2.4.3
         self._quick_stamp_armed = False
         self._quick_stamp_payload = None
         self._quick_ann_template_armed = False
         self._quick_ann_template_id = None
         self._quick_ann_template_name = ""
-        if tool is None:
-            want = "Auswahl"
-            for b in self._tool_buttons:
-                b.setChecked(b.text() == want)
+        if tool in (None, "", UI_TOOL_SELECT, "none", "auswahl"):
+            self.tool = None
+            self._sync_tool_buttons("select")
             self.canvas.set_drag_tool(None, select_mode=True, inline_edit_mode=False)
-            self.status.emit("Werkzeug: Auswahl — Text aufziehen + Ctrl+C kopieren; Annotation anklicken")
+            self.status.emit(
+                "Werkzeug: Auswahl — Klick/Gummiband, ziehen, Griffe, Pfeiltasten, Entf"
+            )
             return
-        want = self._tool_label(tool)
-        for b in self._tool_buttons:
-            b.setChecked(b.text() == want)
+        if tool == UI_TOOL_HAND or tool == "pan":
+            self.tool = UI_TOOL_HAND
+            self._sync_tool_buttons("hand")
+            self.canvas.set_drag_tool(None, hand_mode=True)
+            self.status.emit("Werkzeug: Hand — Seite schieben")
+            return
+        if tool == UI_TOOL_ERASER:
+            self.tool = UI_TOOL_ERASER
+            self._sync_tool_buttons("eraser")
+            self.canvas.set_drag_tool(None, eraser_mode=True)
+            self.status.emit("Werkzeug: Radierer — Annotation anklicken oder überstreichen")
+            return
+        if tool == UI_TOOL_TEXT_MARK:
+            self.tool = UI_TOOL_TEXT_MARK
+            self._sync_tool_buttons("text_mark")
+            self.canvas.set_drag_tool(
+                AnnotationType.HIGHLIGHT, select_mode=False, text_mark_mode=True
+            )
+            self.status.emit("Werkzeug: Text markieren — Passage aufziehen")
+            return
+        if isinstance(tool, str):
+            try:
+                tool = AnnotationType(tool)
+            except ValueError:
+                return
+        self.tool = tool
+        tid = str(tool.value)
+        self._sync_tool_buttons(tid)
         self.canvas.set_drag_tool(
             tool if tool in DRAG_TYPES else None,
             select_mode=False,
@@ -5317,7 +6075,7 @@ class PdfViewer(QWidget):
             )
         elif tool == AnnotationType.INK:
             self.status.emit(
-                "Werkzeug: Freihand — Maus ziehen (Polyline); Ctrl+Z = Undo — 2.2.0"
+                "Werkzeug: Stift — ziehen (Polyline); Ctrl+Z = Undo — 2.6.54"
             )
         elif tool == AnnotationType.LINK:
             self.status.emit(
@@ -5325,31 +6083,58 @@ class PdfViewer(QWidget):
             )
         elif tool == AnnotationType.ELLIPSE:
             self.status.emit(
-                "Werkzeug: Kreis/Ellipse — ziehen; Füllen-Toggle Fläche/Outline — 2.6.10"
+                "Werkzeug: Ellipse — ziehen; Füllen-Toggle Fläche/Outline — 2.6.54"
             )
         elif tool == AnnotationType.TRIANGLE:
             self.status.emit("Werkzeug: Dreieck — ziehen; Füllen-Toggle — 2.6.10")
         elif tool == AnnotationType.ROUNDED_RECT:
             self.status.emit("Werkzeug: Rundrect — ziehen; Füllen-Toggle — 2.6.10")
+        elif tool == AnnotationType.STRIKEOUT:
+            self.status.emit("Werkzeug: Durchstreichen — Bereich aufziehen — 2.6.54")
         elif tool == AnnotationType.HIGHLIGHT and getattr(self, "_paragraph_highlight", False):
             self.status.emit("Werkzeug: Highlight — ganze Absätze unter der Auswahl — 2.6.10")
         else:
-            self.status.emit(f"Werkzeug: {tool.value}")
+            self.status.emit(f"Werkzeug: {self._tool_label(tool)}")
+
+    def set_tool(self, tool: AnnotationType | str | None) -> None:
+        """Öffentliche Alias-API (Ribbon/Stylus/Tests) — 2.6.54."""
+        self._set_tool(tool)
+
+    def annotation_tool_map(self) -> dict[str, str]:
+        """objectName → tool-id (Offscreen-Test: Stift aktiviert ink, nicht highlight)."""
+        out: dict[str, str] = {}
+        for oid, tid in ANN_TOOL_ACTION_MAP:
+            out[oid] = tid
+        return out
 
     def current_tool_id(self) -> str:
-        """Session-ID des aktuellen Ann.-Werkzeugs ("" = Auswahl) — 0.9.7."""
+        """Session-ID des aktuellen Ann.-Werkzeugs (select = Auswahl) — 2.6.54."""
         if self.tool is None:
-            return ""
+            return UI_TOOL_SELECT
+        if isinstance(self.tool, str):
+            return self.tool
         try:
             return str(self.tool.value)
         except Exception:
-            return ""
+            return UI_TOOL_SELECT
 
     def set_tool_from_id(self, tool_id: str | None) -> None:
-        """Ann.-Werkzeug aus Session-ID wiederherstellen — 0.9.7."""
+        """Ann.-Werkzeug aus Session-ID wiederherstellen — 0.9.7 / 2.6.54."""
         tid = str(tool_id or "").strip().lower()
         if tid in ("", "select", "none", "auswahl"):
             self._set_tool(None)
+            return
+        if tid in ("hand", "pan"):
+            self._set_tool(UI_TOOL_HAND)
+            return
+        if tid in ("eraser", "radierer"):
+            self._set_tool(UI_TOOL_ERASER)
+            return
+        if tid in ("text_mark", "textmark", "markieren"):
+            self._set_tool(UI_TOOL_TEXT_MARK)
+            return
+        if tid in ("pen", "stift", "freihand"):
+            self._set_tool(AnnotationType.INK)
             return
         try:
             tool = AnnotationType(tid)
@@ -5745,8 +6530,15 @@ class PdfViewer(QWidget):
             self._blank_view_fallback_active = False
             self._last_render_blank_ok = False
             self.store = AnnotationStore(self.pdf_path)
+            self._bind_store_undo(self.store)
             self.store.clear_history()
             self.clear_page_ops_undo()
+            try:
+                self._undo_stack.clear()
+            except Exception:
+                pass
+            self._maybe_import_native_annots()
+            self._emit_undo_state()
 
             # Kein Katalog-/PDFium-Wait vor Seite 1 — provisional 1, Refresh im BG — 2.6.45
             pages = 1
@@ -6182,7 +6974,11 @@ class PdfViewer(QWidget):
                 grayscale=self._grayscale,
                 invert=self._night_mode,
             )
-            anns = list(self.store.for_page(self.page_index) if self.store else [])
+            anns = (
+                [self._ann_to_view(a) for a in self.store.for_page(self.page_index)]
+                if self.store
+                else []
+            )
             links: list = []
             try:
                 links = list(
@@ -6257,11 +7053,9 @@ class PdfViewer(QWidget):
                         self._continuous_offsets.append((pi, y_off, ph))
                         if self.store:
                             for ann in self.store.for_page(pi):
-                                disp = copy(ann)
-                                disp.y = float(ann.y) + y_off
-                                if ann.callout_x or ann.callout_y:
-                                    disp.callout_y = float(ann.callout_y) + y_off
-                                all_anns.append(disp)
+                                all_anns.append(
+                                    self._ann_to_view_at(ann, self.scale, y_off=y_off)
+                                )
                         try:
                             page_links = list_page_uri_links(
                                 self.pdf_path,
@@ -6318,11 +7112,7 @@ class PdfViewer(QWidget):
                 ox = float(left_w + gap)
                 if self.store:
                     for ann in self.store.for_page(facing):
-                        disp = copy(ann)
-                        disp.x = float(ann.x) + ox
-                        if ann.callout_x or ann.callout_y:
-                            disp.callout_x = float(ann.callout_x) + ox
-                        anns.append(disp)
+                        anns.append(self._ann_to_view_at(ann, self.scale, x_off=ox))
                 try:
                     right_links = list_page_uri_links(
                         self.pdf_path,
@@ -7248,7 +8038,13 @@ class PdfViewer(QWidget):
             QMessageBox.warning(self, "Zoom", str(e))
 
     def undo_annotation(self) -> bool:
-        # Zuerst Seiten-Ops (Löschen/Drehen), danach Annotation-History
+        stack = getattr(self, "_undo_stack", None)
+        if stack is not None and stack.canUndo():
+            label = str(stack.undoText() or "Aktion")
+            stack.undo()
+            self.status.emit(f"{label} rückgängig")
+            return True
+        # Fallback: Seiten-Ops, danach Annotation-History
         if self.can_undo_page_op():
             return self.undo_page_op()
         if not self.store or not self.store.can_undo():
@@ -7260,6 +8056,7 @@ class PdfViewer(QWidget):
             self.schedule_sidecar_save(force=True)
             self.refresh()
             self.annotations_changed.emit()
+            self._emit_undo_state()
             self.status.emit(f"{label} rückgängig")
             return True
         except Exception as e:
@@ -8264,6 +9061,15 @@ class PdfViewer(QWidget):
             return False
 
     def redo_annotation(self) -> bool:
+        stack = getattr(self, "_undo_stack", None)
+        if stack is not None and stack.canRedo():
+            label = str(stack.redoText() or "Aktion")
+            stack.redo()
+            if label == "Freihand glätten":
+                self._show_smooth_status_toast("Glättung angewandt")
+            else:
+                self.status.emit(f"{label} wiederholt")
+            return True
         if not self.store or not self.store.can_redo():
             self.status.emit("Nichts zu wiederholen")
             return False
@@ -8277,7 +9083,7 @@ class PdfViewer(QWidget):
             self.schedule_sidecar_save(force=True)
             self.refresh()
             self.annotations_changed.emit()
-            # Nach Redo von Glätten denselben Toast wie beim Anwenden — 2.2.4
+            self._emit_undo_state()
             if label == "Freihand glätten":
                 self._show_smooth_status_toast("Glättung angewandt")
             else:
@@ -8295,7 +9101,11 @@ class PdfViewer(QWidget):
 
         gray = bool(self._grayscale if grayscale is None else grayscale)
         img = render_page(self.pdf_path, page_index, scale=scale, grayscale=gray)
-        anns = self.store.for_page(page_index) if self.store else []
+        anns = (
+            [self._ann_to_view_at(a, scale) for a in self.store.for_page(page_index)]
+            if self.store
+            else []
+        )
         pm = pil_to_qpixmap(img)
         # Annotationen auf temporärem Canvas zeichnen
         self.canvas.set_page_image(img, anns, scale=scale)
@@ -8583,8 +9393,10 @@ class PdfViewer(QWidget):
             self._sidecar_save_timer.stop()
             self._sidecar_save_pending = False
             path = self.store.save(force=True)
+            native_ok = self._write_native_annots()
+            extra = " · PDF /Annots" if native_ok else ""
             self.status.emit(
-                f"Sidecar gespeichert: {path.name} ({len(self.store.annotations)})"
+                f"Sidecar gespeichert: {path.name} ({len(self.store.annotations)}){extra}"
             )
             self.annotations_changed.emit()
             return True
@@ -11277,9 +12089,13 @@ class PdfViewer(QWidget):
             ann_remapped = False
             if self.store is not None and page_w > 0 and page_h > 0:
                 undo_before = len(getattr(self.store, "_undo", []) or [])
-                n_ann = self.store.remap_coords_for_rotation(
-                    idx, deg, page_w=page_w, page_h=page_h, label="Ann. nach Drehung"
-                )
+                self._suppress_store_stack = True
+                try:
+                    n_ann = self.store.remap_coords_for_rotation(
+                        idx, deg, page_w=page_w, page_h=page_h, label="Ann. nach Drehung"
+                    )
+                finally:
+                    self._suppress_store_stack = False
                 undo_after = len(getattr(self.store, "_undo", []) or [])
                 ann_remapped = bool(n_ann) and undo_after > undo_before
                 if n_ann:
@@ -11297,6 +12113,7 @@ class PdfViewer(QWidget):
                     "page_h": page_h,
                 }
             )
+            self._note_page_op_step("Seite drehen", self._page_ops_undo[-1])
             # 0 = unbegrenzt — 2.6.20
             if PAGE_OPS_UNDO_LIMIT and len(self._page_ops_undo) > PAGE_OPS_UNDO_LIMIT:
                 self._page_ops_undo.pop(0)
@@ -11373,14 +12190,18 @@ class PdfViewer(QWidget):
             ann_remapped = False
             if self.store is not None and page_w > 0 and page_h > 0:
                 undo_before = len(getattr(self.store, "_undo", []) or [])
-                n_ann = self.store.remap_coords_for_flip(
-                    idx,
-                    horizontal=bool(horizontal),
-                    vertical=bool(vertical),
-                    page_w=page_w,
-                    page_h=page_h,
-                    label="Ann. nach Spiegeln",
-                )
+                self._suppress_store_stack = True
+                try:
+                    n_ann = self.store.remap_coords_for_flip(
+                        idx,
+                        horizontal=bool(horizontal),
+                        vertical=bool(vertical),
+                        page_w=page_w,
+                        page_h=page_h,
+                        label="Ann. nach Spiegeln",
+                    )
+                finally:
+                    self._suppress_store_stack = False
                 undo_after = len(getattr(self.store, "_undo", []) or [])
                 ann_remapped = bool(n_ann) and undo_after > undo_before
                 if n_ann:
@@ -11399,6 +12220,7 @@ class PdfViewer(QWidget):
                     "page_h": page_h,
                 }
             )
+            self._note_page_op_step("Seite spiegeln", self._page_ops_undo[-1])
             # 0 = unbegrenzt — 2.6.20
             if PAGE_OPS_UNDO_LIMIT and len(self._page_ops_undo) > PAGE_OPS_UNDO_LIMIT:
                 self._page_ops_undo.pop(0)
@@ -12340,16 +13162,17 @@ class PdfViewer(QWidget):
         if not rects:
             return False
         created: list[Annotation] = []
-        with self.store.atomic():
+        inv = 1.0 / self._view_scale()
+        with self.store.atomic("Text-Highlight"):
             for i, r in enumerate(rects):
                 snippet = (r.text or "").strip() or (text if i == 0 else "")
                 ann = Annotation(
                     page=page,
                     type=AnnotationType.HIGHLIGHT,
-                    x=r.x,
-                    y=r.y,
-                    width=max(r.width, 4.0),
-                    height=max(r.height, 6.0),
+                    x=float(r.x) * inv,
+                    y=float(r.y) * inv,
+                    width=max(float(r.width) * inv, 4.0 * inv),
+                    height=max(float(r.height) * inv, 6.0 * inv),
                     color=self._highlight_color,
                     text=snippet,
                     opacity=self._default_opacity,
@@ -12532,18 +13355,18 @@ class PdfViewer(QWidget):
 
         hl_created = False
         if also_hl and self._text_selection_rects:
-            # Highlight aus gespeicherten Auswahl-Rechtecken
-            with self.store.atomic():
+            inv = 1.0 / self._view_scale()
+            with self.store.atomic("Highlight + Notiz"):
                 for i, (rx, ry, rw, rh) in enumerate(self._text_selection_rects):
                     snippet = text if i == 0 else ""
                     self.store.add(
                         Annotation(
                             page=page,
                             type=AnnotationType.HIGHLIGHT,
-                            x=float(rx),
-                            y=float(ry),
-                            width=max(float(rw), 4.0),
-                            height=max(float(rh), 6.0),
+                            x=float(rx) * inv,
+                            y=float(ry) * inv,
+                            width=max(float(rw) * inv, 4.0 * inv),
+                            height=max(float(rh) * inv, 6.0 * inv),
                             color=self._highlight_color,
                             text=snippet,
                             opacity=self._default_opacity,
@@ -12944,7 +13767,26 @@ class PdfViewer(QWidget):
             self._form_field_pending = True
             self._create_form_field_at(int(page0), float(rx), float(ry), float(rw), float(rh))
             return
-        if not self.store or self.tool is None or self.tool not in DRAG_TYPES:
+        if not self.store:
+            return
+        if self.tool == UI_TOOL_TEXT_MARK:
+            page0, lx0, ly0 = self._spread_resolve(x0, y0)
+            lx1 = lx0 + (x1 - x0)
+            ly1 = ly0 + (y1 - y0)
+            if self.pdf_path and self._highlight_from_text_selection(page0, lx0, ly0, lx1, ly1):
+                return
+            ann = Annotation(
+                page=page0,
+                type=AnnotationType.HIGHLIGHT,
+                x=min(lx0, lx1),
+                y=min(ly0, ly1),
+                width=max(abs(lx1 - lx0), 8),
+                height=max(abs(ly1 - ly0), 8),
+                color=self._highlight_color,
+            )
+            self._commit_ann(ann)
+            return
+        if self.tool is None or self.tool not in DRAG_TYPES:
             return
         if self.tool == AnnotationType.INK:
             return  # über ink_finished
@@ -13064,6 +13906,16 @@ class PdfViewer(QWidget):
             )
             if self.tool == AnnotationType.MEASURE:
                 ann.text = ann.measure_label(self.scale, unit=self._measure_unit())
+        elif self.tool in (AnnotationType.UNDERLINE, AnnotationType.STRIKEOUT):
+            ann = Annotation(
+                page=page,
+                type=self.tool,
+                x=min(x0, x1),
+                y=min(y0, y1),
+                width=max(abs(x1 - x0), 8),
+                height=max(abs(y1 - y0), 8),
+                color=self._pen_color,
+            )
         else:
             return
         self._commit_ann(ann)
@@ -13258,6 +14110,7 @@ class PdfViewer(QWidget):
                     ann.fill_color = fc
         except Exception:
             pass
+        self._canvas_to_store(ann)
         self.store.add(ann)
         try:
             self.schedule_sidecar_save()
@@ -13463,7 +14316,11 @@ class PdfViewer(QWidget):
                 favs_before = list(self.store._meta.get("page_favorites") or [])
             undo_before = len(getattr(self.store, "_undo", []) or []) if self.store else 0
             new_idx = duplicate_page(self.pdf_path, src, after=True)
-            self._remap_insert(new_idx)
+            self._suppress_store_stack = True
+            try:
+                self._remap_insert(new_idx)
+            finally:
+                self._suppress_store_stack = False
             undo_after = len(getattr(self.store, "_undo", []) or []) if self.store else 0
             ann_remapped = undo_after > undo_before
             self._page_ops_undo.append(
@@ -13476,6 +14333,7 @@ class PdfViewer(QWidget):
                     "ann_remapped": ann_remapped,
                 }
             )
+            self._note_page_op_step("Seite duplizieren", self._page_ops_undo[-1])
             # 0 = unbegrenzt — 2.6.20
             if PAGE_OPS_UNDO_LIMIT and len(self._page_ops_undo) > PAGE_OPS_UNDO_LIMIT:
                 self._page_ops_undo.pop(0)
@@ -13565,6 +14423,7 @@ class PdfViewer(QWidget):
                     "page_groups": groups_before,
                 }
             )
+            self._note_page_op_step("Seite löschen", self._page_ops_undo[-1])
             # 0 = unbegrenzt — 2.6.20
             if PAGE_OPS_UNDO_LIMIT and len(self._page_ops_undo) > PAGE_OPS_UNDO_LIMIT:
                 self._page_ops_undo.pop(0)
@@ -13577,57 +14436,61 @@ class PdfViewer(QWidget):
                     elif i > deleted:
                         mapping[i] = i - 1
                 # Eine Undo-Stufe für Annotation-Remap (wird bei Seiten-Undo mit restored)
-                with self.store.atomic():
-                    planned = []
-                    changed = False
-                    for ann in list(self.store.annotations):
-                        if ann.page in mapping:
-                            new_page = mapping[ann.page]
-                            if new_page != ann.page:
-                                changed = True
-                            planned.append((ann, new_page))
-                        else:
-                            changed = True
-                    if changed or len(planned) != len(self.store.annotations):
-                        kept = []
-                        for ann, new_page in planned:
-                            if ann.page != new_page:
-                                ann.page = new_page
-                                ann.touch()
-                            kept.append(ann)
-                        self.store.annotations = kept
-                        groups = dict(self.store._meta.get("page_groups") or {})
-                        if groups:
-                            new_groups = {}
-                            for key, val in groups.items():
-                                try:
-                                    old_p = int(key)
-                                except (TypeError, ValueError):
-                                    continue
-                                if old_p in mapping:
-                                    new_groups[str(mapping[old_p])] = val
-                            self.store._meta["page_groups"] = new_groups
-                        favs = list(self.store._meta.get("page_favorites") or [])
-                        if favs:
-                            remapped = []
-                            seen = set()
-                            for raw in favs:
-                                try:
-                                    old_p = int(raw)
-                                except (TypeError, ValueError):
-                                    continue
-                                if old_p not in mapping:
-                                    continue
-                                new_p = int(mapping[old_p])
-                                if new_p not in seen:
-                                    seen.add(new_p)
-                                    remapped.append(new_p)
-                            remapped.sort()
-                            if remapped:
-                                self.store._meta["page_favorites"] = remapped
+                self._suppress_store_stack = True
+                try:
+                    with self.store.atomic():
+                        planned = []
+                        changed = False
+                        for ann in list(self.store.annotations):
+                            if ann.page in mapping:
+                                new_page = mapping[ann.page]
+                                if new_page != ann.page:
+                                    changed = True
+                                planned.append((ann, new_page))
                             else:
-                                self.store._meta.pop("page_favorites", None)
-                        self.store.dirty = True
+                                changed = True
+                        if changed or len(planned) != len(self.store.annotations):
+                            kept = []
+                            for ann, new_page in planned:
+                                if ann.page != new_page:
+                                    ann.page = new_page
+                                    ann.touch()
+                                kept.append(ann)
+                            self.store.annotations = kept
+                            groups = dict(self.store._meta.get("page_groups") or {})
+                            if groups:
+                                new_groups = {}
+                                for key, val in groups.items():
+                                    try:
+                                        old_p = int(key)
+                                    except (TypeError, ValueError):
+                                        continue
+                                    if old_p in mapping:
+                                        new_groups[str(mapping[old_p])] = val
+                                self.store._meta["page_groups"] = new_groups
+                            favs = list(self.store._meta.get("page_favorites") or [])
+                            if favs:
+                                remapped = []
+                                seen = set()
+                                for raw in favs:
+                                    try:
+                                        old_p = int(raw)
+                                    except (TypeError, ValueError):
+                                        continue
+                                    if old_p not in mapping:
+                                        continue
+                                    new_p = int(mapping[old_p])
+                                    if new_p not in seen:
+                                        seen.add(new_p)
+                                        remapped.append(new_p)
+                                remapped.sort()
+                                if remapped:
+                                    self.store._meta["page_favorites"] = remapped
+                                else:
+                                    self.store._meta.pop("page_favorites", None)
+                            self.store.dirty = True
+                finally:
+                    self._suppress_store_stack = False
                 self.schedule_sidecar_save(force=True)
             self.page_count -= 1
             self.page_index = min(self.page_index, self.page_count - 1)

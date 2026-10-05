@@ -28,6 +28,11 @@ from .pdf_ann_import import (
     import_native_pdf_annotations,
     plan_duplicate_actions,
 )
+from .pdf_ann_export import (
+    ILD_ANN_NM_PREFIX,
+    read_ild_annots,
+    write_annotations_to_pdf,
+)
 from .page_labels import (
     LABEL_PREVIEW_SCROLL_LIMIT,
     apply_label_range,
@@ -76,6 +81,8 @@ from .annotate import (
     load_custom_stamps,
     normalize_tags,
     remove_custom_stamp,
+    scale_annotation,
+    map_annotation_rect,
     smooth_ink_points,
     tags_to_str,
     validate_annotation_import_data,
@@ -441,6 +448,9 @@ __all__ = [
     "plan_duplicate_actions",
     "import_native_pdf_annotations",
     "import_native_into_store",
+    "write_annotations_to_pdf",
+    "read_ild_annots",
+    "ILD_ANN_NM_PREFIX",
     "merge_labels",
     "apply_label_range",
     "arabic_reset_labels",
@@ -472,6 +482,8 @@ __all__ = [
     "AnnotationType",
     "ink_smooth_passes_for_strength",
     "smooth_ink_points",
+    "scale_annotation",
+    "map_annotation_rect",
     "validate_annotation_import_data",
     "DRAG_TYPES",
     "FAV_SCHEMA_ID",
