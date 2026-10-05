@@ -1,4 +1,4 @@
-﻿# InstantLens Doc - Windows-Build (PyInstaller App + Keygen) 2.6.34
+﻿# InstantLens Doc - Windows-Build (PyInstaller App + Keygen) 2.6.35
 # Eine Zeile:
 #   powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 #
@@ -30,10 +30,10 @@ $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $Root
 
-Write-Host "=== InstantLens Doc Build 2.6.34 (Windows x64) ==="
+Write-Host "=== InstantLens Doc Build 2.6.35 (Windows x64) ==="
 Write-Host "Root: $Root"
 
-# 64-Bit Python erzwingen (bevorzugt für Release)
+# 64-Bit Python erzwingen (bevorzugt fuer Release)
 $archLine = & $Python -c "import struct,platform; print(struct.calcsize('P')*8); print(platform.machine())"
 if ($LASTEXITCODE -ne 0) {
     throw "Python nicht startbar: $Python"
@@ -51,7 +51,7 @@ if ($bits -ne 64 -and $Allow32Bit) {
     Write-Host "WARNUNG: 32-Bit Python (-Allow32Bit) - Release bevorzugt x64." -ForegroundColor Yellow
 }
 
-# Icon Pflicht für Release-Build (Fallback PNG)
+# Icon Pflicht fuer Release-Build (Fallback PNG)
 $IconIco = Join-Path $Root "assets\app.ico"
 $IconPng = Join-Path $Root "assets\icon.png"
 $Icon = $null
@@ -66,11 +66,47 @@ if (Test-Path $IconIco) {
 $IconArgs = @()
 if ($Icon) { $IconArgs = @("--icon", $Icon) }
 
-# PyInstaller verfügbar?
-& $Python -c "import PyInstaller" 2>$null
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "Installiere PyInstaller..."
-    & $Python -m pip install --upgrade pyinstaller
+function Test-PyInstallerImport {
+    param([string]$Py)
+    # stderr darf bei Stop nicht als NativeCommandError abbrechen
+    $prev = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    $out = & $Py -c "import PyInstaller; print(getattr(PyInstaller, '__version__', 'ok'))" 2>&1
+    $code = $LASTEXITCODE
+    $ErrorActionPreference = $prev
+    $text = (($out | ForEach-Object { "$_" }) -join "`n").Trim()
+    return [pscustomobject]@{ Ok = ($code -eq 0); Code = $code; Text = $text }
+}
+
+# PyInstaller verfuegbar? (klare Meldung + pip install)
+$probe = Test-PyInstallerImport -Py $Python
+if (-not $probe.Ok) {
+    Write-Host "PyInstaller Import fehlgeschlagen (exit $($probe.Code))." -ForegroundColor Yellow
+    if ($probe.Text) {
+        Write-Host "Import-Fehler:" -ForegroundColor Yellow
+        Write-Host $probe.Text
+    } else {
+        Write-Host "(keine stderr/stdout vom Import-Check)" -ForegroundColor DarkYellow
+    }
+    Write-Host "Installiere PyInstaller: $Python -m pip install --upgrade pyinstaller"
+    $prevPip = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    $pipOut = & $Python -m pip install --upgrade pyinstaller 2>&1
+    $pipCode = $LASTEXITCODE
+    $ErrorActionPreference = $prevPip
+    Write-Host (($pipOut | ForEach-Object { "$_" }) -join "`n")
+    if ($pipCode -ne 0) {
+        throw "pip install pyinstaller fehlgeschlagen (exit $pipCode). Bitte manuell: $Python -m pip install --upgrade pyinstaller"
+    }
+    $probe2 = Test-PyInstallerImport -Py $Python
+    if (-not $probe2.Ok) {
+        Write-Host "Import nach pip weiterhin fehlgeschlagen:" -ForegroundColor Red
+        Write-Host $probe2.Text
+        throw "PyInstaller nach pip install nicht importierbar. Siehe Fehlermeldung oben."
+    }
+    Write-Host "PyInstaller OK: $($probe2.Text)"
+} else {
+    Write-Host "PyInstaller OK: $($probe.Text)"
 }
 
 if ($Clean) {
@@ -116,7 +152,7 @@ if (-not $SkipApp) {
     )
     & $Python -m PyInstaller @appArgs
     if ($LASTEXITCODE -ne 0) { throw "App-Build fehlgeschlagen" }
-    # Assets/Docs zusätzlich absichern (falls --add-data auf Host anders mappt)
+    # Assets/Docs zusaetzlich absichern (falls --add-data auf Host anders mappt)
     New-Item -ItemType Directory -Force -Path (Join-Path $AppDist "assets") | Out-Null
     if (Test-Path $IconIco) {
         Copy-Item -Force $IconIco (Join-Path $AppDist "assets\app.ico")
@@ -160,10 +196,10 @@ if (-not $SkipKeygen) {
         }
     }
 } else {
-    Write-Host "Keygen übersprungen (-SkipKeygen)"
+    Write-Host "Keygen uebersprungen (-SkipKeygen)"
 }
 
-Write-Host "Fertig (2.6.34). Optional:"
+Write-Host "Fertig (2.6.35). Optional:"
 Write-Host '  powershell -ExecutionPolicy Bypass -File .\installer\build-installer.ps1'
 Write-Host "  (ohne Keygen: -SkipKeygen bzw. ISCC /DIncludeKeygen=0)"
 Write-Host '  python scripts\pack-windows-runnable.py   # Python-Layout-Zip ohne EXE'

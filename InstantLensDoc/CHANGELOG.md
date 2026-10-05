@@ -1,3 +1,7 @@
+## 2.6.35 - Sync Ordner-Sperre / Fresh-Dest / PyInstaller-Probe
+
+Patch nach **2.6.34**: Windows-Sync scheiterte wenn `D:\AI_Temp\InstantLensDoc` (oft `InstantLensDoc-keygen`) durch `python.exe`/`cmd.exe` gesperrt war; ForceClean/Rename brach ab; gemischte Baeume (z. B. 2.6.32) ohne `scripts\build-windows-installer.ps1`. Fix: **`scripts/sync-ild.ps1`** erkennt gesperrte Pfade, loescht Kinder einzeln mit Retry, Keygen-Unterordner skip-or-retry, klare DE-Hinweise (`taskkill`/`handle`, Keygen-Fenster schliessen); **`-Dest`** (Alias) fuer frischen Ordner z. B. `D:\AI_Temp\InstantLensDoc-2635` plus optional **`-Swap`**; Sync verlangt `scripts\build-windows-installer.ps1`. **`build-windows.ps1`**: PyInstaller-Import ohne opaken NativeCommandError; bei Fehlen klares `pip install pyinstaller` + echte Import-Fehlertexte. Pack `InstantLensDoc-2.6.35-pack.zip` inkl. Installer-Skript; VERSION **2.6.35**.
+
 ## 2.6.34 - Keygen PYTHONPATH / nested+standalone Import-Fix
 
 Patch nach **2.6.33**: Store-/Nested-Keygen (`InstantLensDoc-keygen` unter App-Root) und Standalone-Zip scheiterten mit `ModuleNotFoundError: No module named 'instantlensdoc'`, weil `sys.path` nur den Keygen-Ordner enthielt. Fix: **`run-keygen.bat` / `run-keygen.ps1`** setzen `PYTHONPATH` auf Keygen-Ordner **und** Parent; klare DE-Fehlermeldung wenn Paket fehlt; **`keygen/__main__.py`** sucht App-Root (Parent) + vendored `instantlensdoc`; History-Fallback ohne `config`; Standalone-Zip mit Minimal-Vendor `instantlensdoc.license`. Pack `InstantLensDoc-2.6.34-pack.zip` + Store-Keygen aktualisiert.

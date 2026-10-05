@@ -1,9 +1,12 @@
-InstantLens Doc 2.6.34 - Installation
+InstantLens Doc 2.6.35 - Installation
 
-Neu in 2.6.34:
-- Installer/Launcher: run.bat ASCII-safe (kein UTF-8-Mojibake in cmd.exe)
-- Post-Install startet gebuendelte EXE wenn vorhanden (nicht kaputtes run.bat)
-- build-installer bevorzugt dist\InstantLensDoc EXE-Layout nach build-windows.ps1
+Neu in 2.6.35:
+- Sync: -Dest frischer Ordner (z.B. InstantLensDoc-2635) wenn Altbau gesperrt
+- ForceClean: Keygen skip-or-retry; build-windows-installer.ps1 im Pack Pflicht
+- build-windows.ps1: PyInstaller-Probe mit klarem pip install + Import-Fehlertext
+
+Basis 2.6.34/2.6.33:
+- Keygen PYTHONPATH Parent/Vendor; run.bat ASCII-safe; EXE-Layout Prefer
 
 Basis 2.6.32:
 - Windows-Build/Installer-Skripte: UTF-8 BOM + ASCII-Punctuation (PowerShell 5.1 Parser-Fix)

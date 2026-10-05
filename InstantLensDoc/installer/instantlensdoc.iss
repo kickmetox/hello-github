@@ -1,4 +1,4 @@
-; Inno Setup - InstantLens Doc 2.6.34
+; Inno Setup - InstantLens Doc 2.6.35
 ; Voraussetzung: Inno Setup 6 (iscc.exe im PATH oder ISCC_PATH / -IsccPath)
 ;
 ; Build-Varianten:
@@ -24,7 +24,7 @@
 
 #define MyAppName "InstantLens Doc"
 #ifndef MyAppVersion
-  #define MyAppVersion "2.6.34"
+  #define MyAppVersion "2.6.35"
 #endif
 #define MyAppPublisher "Andreas Meyer"
 #define MyAppURL "mailto:ame@sellerbach.de"
@@ -130,7 +130,7 @@ Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\InstantLensDoc.exe"; Workin
 
 [Run]
 #if UsePythonLauncher == "1"
-; run.bat is ASCII-safe as of 2.6.34; still prefer nowait + skipifsilent
+; run.bat is ASCII-safe as of 2.6.35; still prefer nowait + skipifsilent
 Filename: "{app}\run.bat"; Description: "{cm:LaunchAfterInstall}"; Flags: nowait postinstall skipifsilent
 #else
 Filename: "{app}\InstantLensDoc.exe"; Description: "{cm:LaunchAfterInstall}"; Flags: nowait postinstall skipifsilent

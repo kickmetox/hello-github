@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **2.6.34** |
+| Version | **2.6.35** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -33,7 +33,7 @@
 
 Skript: [sync-ild.ps1](scripts/sync-ild.ps1) — Branch `cursor/instantlensdoc-2108` (oder `-LocalPack` / Pack-Zip) nach `D:\AI_Temp\InstantLensDoc`, pip, Start. **Nutzer-Icon in `assets` wird nicht überschrieben.**
 
-**FEATURES.md lokal sync:** Nach Sync liegt `FEATURES.md` lokal im App-Ordner (`D:\AI_Temp\InstantLensDoc\FEATURES.md`); About/Stubs öffnen diese lokale Datei — Version **2.6.34**.
+**FEATURES.md lokal sync:** Nach Sync liegt `FEATURES.md` lokal im App-Ordner (`D:\AI_Temp\InstantLensDoc\FEATURES.md`); About/Stubs öffnen diese lokale Datei — Version **2.6.35**.
 
 Ohne Start: `-NoStart` (Alias `-SkipStart`). Exit-Codes: **0** OK · **1** allgemein · **2** Git-Fehler.
 
@@ -68,7 +68,7 @@ Python-Layout-Zip (ohne PyInstaller-EXE):
 powershell -ExecutionPolicy Bypass -File .\scripts\pack-windows-runnable.ps1
 ```
 
-Installer: `.\scripts\build-windows-installer.ps1` bzw. `.\installer\build-installer.ps1` (optional `-NoKeygen`) → `dist\InstantLensDoc-Setup-2.6.34.exe`  
+Installer: `.\scripts\build-windows-installer.ps1` bzw. `.\installer\build-installer.ps1` (optional `-NoKeygen`) → `dist\InstantLensDoc-Setup-2.6.35.exe`  
 Desktop-/Keygen-Shortcuts: `.\scripts\install-ild.ps1` (Keygen wenn `run-keygen.bat` / EXE vorhanden; `-SkipKeygen`)  
 Desktop-Verknüpfung Installer: optionale Checkbox (`desktopicon`, Standard an / `checkedonce`)
 
@@ -104,6 +104,16 @@ powershell -ExecutionPolicy Bypass -File .\scripts\ild.ps1 license generate kund
 
 Anleitung: Store `docs/instantlensdoc-scripting.md` · Beispiel `examples/ild_scripting_demo.py`.
 
+## Neu in 2.6.35
+
+Patch nach **2.6.34** (Keygen Import):
+
+- **`sync-ild.ps1`:** Ordner-Sperre haerten (Kinder einzeln, Keygen skip-or-retry, DE `taskkill`/`handle`)
+- **`-Dest`** frischer Ordner (z. B. `D:\AI_Temp\InstantLensDoc-2635`) + optional **`-Swap`**
+- Sync verlangt `scripts\build-windows-installer.ps1` (kein gemischter Alt-Tree)
+- **`build-windows.ps1`:** PyInstaller-Probe ohne opaken stderr-Abbruch; klares `pip install`
+- Pack: `InstantLensDoc-2.6.35-pack.zip`
+
 ## Neu in 2.6.34
 
 Patch nach **2.6.33** (Installer/run.bat cmd-Loop):
@@ -120,7 +130,7 @@ Patch nach **2.6.32** (Build-PS Encoding):
 - **`run.bat` / `run-ild.bat` / `run-keygen.bat`:** pure ASCII (kein UTF-8-Mojibake in cmd.exe)
 - **`installer/build-installer.ps1`:** bevorzugt EXE-Layout nach `build-windows.ps1` (Post-Install = `InstantLensDoc.exe`)
 - ISS / `installer-hinweis.txt` ASCII-safe
-- Pack: `InstantLensDoc-2.6.34-pack.zip`
+- Pack: `InstantLensDoc-2.6.33-pack.zip`
 
 ## Neu in 2.6.32
 
