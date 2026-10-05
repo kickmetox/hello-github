@@ -263,7 +263,17 @@ from .doc_stats import (
     highlight_stats_template_html,
     preview_stats_filename,
 )
-from .limits import PdfHealth, THUMB_LAZY_THRESHOLD, clamp_render_scale, inspect_pdf
+from .limits import (
+    FORM_SCAN_PAGE_THRESHOLD,
+    INSPECT_TIMEOUT_SEC,
+    PASSWORD_PROBE_TIMEOUT_SEC,
+    PdfHealth,
+    THUMB_LAZY_THRESHOLD,
+    catalog_page_count,
+    clamp_render_scale,
+    inspect_pdf,
+    size_only_health,
+)
 from .render import clear_render_cache
 from .security import (
     FALLBACK_ENCRYPTION_R,
@@ -772,4 +782,4 @@ __all__ = [
     "sections_sidecar_path_for",
 ]
 
-__version__ = "2.6.44"
+__version__ = "2.6.45"

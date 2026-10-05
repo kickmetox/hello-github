@@ -550,6 +550,8 @@ class MainWindow(QMainWindow):
                 self.pdf_view.set_scale(scale, immediate=True)
             else:
                 self.pdf_view.refresh()
+            if not self.pdf_view._canvas_has_page_image():
+                self.pdf_view._ensure_page_painted(warn=False)
 
             def _apply_scroll(sy: int = scroll_y) -> None:
                 try:
@@ -8410,6 +8412,7 @@ class MainWindow(QMainWindow):
         if self.pdf_view.pdf_path:
             # Thumbs/Outline nach Erst-Render deferren — Open bleibt flüssig — 2.6.37
             open_gen = int(getattr(self.pdf_view, "_open_generation", 0) or 0)
+            pages = int(getattr(self.pdf_view, "page_count", 0) or 0)
 
             def _deferred_sidebar():
                 if not self.pdf_view.pdf_path:
@@ -8419,7 +8422,20 @@ class MainWindow(QMainWindow):
                 self._refresh_thumbs()
                 self._refresh_outline(self.pdf_view.pdf_path)
                 self._refresh_page_favorites()
-                self._refresh_form_fields()
+                # AcroForm-Vollscan nicht beim Open großer PDFs — 2.6.45
+                try:
+                    from ild_pdf.limits import FORM_SCAN_PAGE_THRESHOLD
+
+                    form_ok = pages < int(FORM_SCAN_PAGE_THRESHOLD)
+                except Exception:
+                    form_ok = pages < 80
+                if form_ok:
+                    self._refresh_form_fields()
+                else:
+                    try:
+                        self.sidebar.clear_form_fields()
+                    except Exception:
+                        pass
 
             QTimer.singleShot(0, _deferred_sidebar)
         else:
@@ -10961,7 +10977,7 @@ class MainWindow(QMainWindow):
         self.pdf_view.goto_page(idx)
         # Falls goto short-circuited / Render fehlschlug: Hauptansicht nachziehen
         if not self.pdf_view._canvas_has_page_image():
-            self.pdf_view._ensure_page_painted()
+            self.pdf_view._ensure_page_painted(warn=False)
         self.sidebar.select_thumb(idx)
         self._prefetch_thumbs_around(idx, cancel=False)
 
@@ -14717,9 +14733,33 @@ class MainWindow(QMainWindow):
         try:
             if self.doc.kind == DocKind.PDF:
                 self.stack.setCurrentWidget(self.pdf_view)
+                self.pdf_view.show()
                 if not self.pdf_view.load(path):
                     self.sidebar.clear_thumbs()
                     return
+                # Nach Open immer PDF-Stack + erste Seite in der zentralen Ansicht — 2.6.45
+                self.stack.setCurrentWidget(self.pdf_view)
+                self.pdf_view.show()
+                try:
+                    from PySide6.QtWidgets import QApplication
+
+                    QApplication.processEvents()
+                except Exception:
+                    pass
+                if not self.pdf_view._canvas_has_page_image():
+                    self.pdf_view._ensure_page_painted(warn=False)
+                open_gen = int(getattr(self.pdf_view, "_open_generation", 0) or 0)
+
+                def _repaint_central() -> None:
+                    if int(getattr(self.pdf_view, "_open_generation", 0) or 0) != open_gen:
+                        return
+                    if self.stack.currentWidget() is not self.pdf_view:
+                        self.stack.setCurrentWidget(self.pdf_view)
+                    if self.pdf_view.pdf_path and not self.pdf_view._canvas_has_page_image():
+                        self.pdf_view._ensure_page_painted(warn=False)
+
+                QTimer.singleShot(0, _repaint_central)
+                QTimer.singleShot(80, _repaint_central)
                 # Thumbs/Outline kommen deferred via document_changed — kein Doppel-Work — 2.6.37
                 self._refresh_pdf_marks()
                 self._refresh_portfolio_sidebar(path)

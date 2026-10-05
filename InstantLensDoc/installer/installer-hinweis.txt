@@ -1,6 +1,6 @@
-InstantLens Doc 2.6.44 - Installation
+InstantLens Doc 2.6.45 - Installation
 
-Neu in 2.6.44:
+Neu in 2.6.45:
 - Bearbeitungsleiste fuer Text/DOCX/Word-Suite (Auswahl … Markierungen)
 - Tab-Wechsel PDF <-> Text aktualisiert Toolbar korrekt
 - PDF-only-Werkzeuge (Schwaerzen/Objekt/Formular) bleiben PDF-Tab

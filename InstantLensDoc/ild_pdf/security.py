@@ -120,21 +120,69 @@ def password_strength(password: str) -> tuple[str, int]:
     return labels.get(score, "schwach"), score
 
 
-def needs_password(path: str | Path) -> bool:
-    """True, wenn das PDF ohne Passwort nicht öffnet."""
-    path = Path(path)
-    try:
-        import pypdfium2 as pdfium
+def needs_password(
+    path: str | Path,
+    *,
+    timeout_sec: float | None = None,
+) -> bool:
+    """True, wenn das PDF ohne Passwort nicht öffnet.
 
-        doc = pdfium.PdfDocument(str(path))
+    Timeout (Default aus limits.PASSWORD_PROBE_TIMEOUT_SEC): bei Hang → False
+    (Open versucht Seite 1; Passwort-Dialog bei Render-Fehler) — 2.6.45.
+    """
+    import threading
+
+    path = Path(path)
+    if timeout_sec is None:
         try:
-            _ = len(doc)
-        finally:
-            doc.close()
+            from .limits import PASSWORD_PROBE_TIMEOUT_SEC
+
+            timeout_sec = float(PASSWORD_PROBE_TIMEOUT_SEC)
+        except Exception:
+            timeout_sec = 1.5
+
+    box: dict = {}
+
+    def _probe() -> None:
+        try:
+            import pikepdf
+            from pikepdf import PasswordError
+
+            try:
+                with pikepdf.open(str(path)):
+                    box["v"] = False
+                    return
+            except PasswordError:
+                box["v"] = True
+                return
+            except Exception as e:
+                msg = str(e).lower()
+                box["v"] = (
+                    "password" in msg or "passwd" in msg or "passwort" in msg
+                )
+                return
+        except Exception:
+            pass
+        try:
+            import pypdfium2 as pdfium
+
+            doc = pdfium.PdfDocument(str(path))
+            try:
+                _ = len(doc)
+            finally:
+                doc.close()
+            box["v"] = False
+        except Exception as e:
+            msg = str(e).lower()
+            box["v"] = "password" in msg or "passwd" in msg
+
+    t = threading.Thread(target=_probe, daemon=True, name="ild-pw-probe")
+    t.start()
+    t.join(max(0.05, float(timeout_sec)))
+    if t.is_alive():
+        # Hang → nicht blockieren; Open zeigt Passwort bei Bedarf
         return False
-    except Exception as e:
-        msg = str(e).lower()
-        return "password" in msg or "passwd" in msg
+    return bool(box.get("v", False))
 
 
 WRONG_PASSWORD_MSG_DE = "Falsches Passwort. Bitte erneut eingeben."

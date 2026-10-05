@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from pathlib import Path
+import threading
+import time
 from typing import Optional, Sequence
 
 from PySide6.QtCore import QPointF, QRectF, Qt, QTimer, Signal, QUrl
@@ -4721,11 +4723,13 @@ class PdfViewer(QWidget):
         mode = get_default_zoom_mode()
         if mode == "fit_width":
             self.fit_width()
-            return
-        if mode == "fit_page":
+        elif mode == "fit_page":
             self.fit_page()
-            return
-        self.set_scale(get_default_zoom_scale(), immediate=True)
+        else:
+            self.set_scale(get_default_zoom_scale(), immediate=True)
+        # Fit/Session-Zoom darf die Hauptansicht nicht leer lassen — 2.6.45
+        if self.pdf_path and not self._canvas_has_page_image():
+            self._ensure_page_painted(warn=False)
 
     def _tool_label(self, tool: AnnotationType) -> str:
         return {
@@ -5412,10 +5416,13 @@ class PdfViewer(QWidget):
                 self.annotations_changed.emit()
 
     def load(self, path: str | Path, password: str | None = None) -> bool:
-        """PDF öffnen — lazy (1. Seite), Progress+Cancel, kein Full-Thumbs — 2.6.37."""
+        """PDF öffnen — Seite 1 sofort; Preflight nie UI-blockierend (auch kleine PDFs) — 2.6.45."""
         from PySide6.QtWidgets import QApplication, QProgressDialog
 
-        from ild_pdf.limits import OPEN_TIMEOUT_HINT, SOFT_PAGE_WARN, inspect_pdf
+        from ild_pdf.limits import (
+            OPEN_TIMEOUT_HINT,
+            size_only_health,
+        )
         from ild_pdf.render import clear_render_cache
         from ild_pdf.security import needs_password
         from instantlensdoc.ui.password_dialog import ask_pdf_password
@@ -5449,7 +5456,32 @@ class PdfViewer(QWidget):
             except Exception:
                 prefill = ""
 
-            # Passwort nachfragen wenn nötig
+            # Nur Dateigröße synchron (kein pikepdf/PDFium) — 2.6.45
+            health = size_only_health(path)
+            if health.errors:
+                QMessageBox.critical(
+                    self,
+                    "PDF öffnen",
+                    "\n".join(health.errors) + "\n\n" + OPEN_TIMEOUT_HINT,
+                )
+                return False
+            soft_warns = [
+                w
+                for w in (health.warnings or [])
+                if "Große Datei" in w or "Viele Seiten" in w
+            ]
+            if soft_warns:
+                r = QMessageBox.warning(
+                    self,
+                    "Großes PDF",
+                    "\n".join(soft_warns) + "\n\nTrotzdem öffnen?",
+                    QMessageBox.Yes | QMessageBox.No,
+                    QMessageBox.Yes,
+                )
+                if r != QMessageBox.Yes:
+                    return False
+
+            # Passwort-Probe mit Timeout (Hang → False, Dialog später bei Render) — 2.6.45
             try:
                 if pw is None and needs_password(path):
                     pw = ask_pdf_password(self, path, prefill=prefill)
@@ -5464,12 +5496,16 @@ class PdfViewer(QWidget):
                 return False
 
             prog = QProgressDialog(
-                "PDF wird geprüft…", "Abbrechen", 0, 5, self.window()
+                "PDF wird geladen…", "Abbrechen", 0, 4, self.window()
             )
             prog.setWindowTitle("PDF öffnen")
             prog.setWindowModality(Qt.WindowModal)
-            prog.setMinimumDuration(200)
+            prog.setMinimumDuration(0)
             prog.setValue(0)
+            prog.setAutoClose(False)
+            prog.setAutoReset(False)
+            # Label kurz „geprüft“, aber ohne Warte-Scan — 2.6.45
+            prog.setLabelText("PDF wird geprüft… (schnell, abbrechbar)")
             QApplication.processEvents()
 
             def _canceled() -> bool:
@@ -5477,89 +5513,9 @@ class PdfViewer(QWidget):
                     int(getattr(self, "_open_generation", 0) or 0) != open_gen
                 )
 
-            try:
-                health = inspect_pdf(path, password=pw)
-            except Exception as e:
-                QMessageBox.critical(
-                    self,
-                    "PDF öffnen",
-                    f"PDF-Diagnose fehlgeschlagen:\n{e}\n\n{OPEN_TIMEOUT_HINT}",
-                )
-                return False
             if _canceled():
                 return False
             prog.setValue(1)
-            prog.setLabelText("PDF-Diagnose…")
-            QApplication.processEvents()
-
-            if health.errors:
-                # ggf. nochmal Passwort versuchen — klarer DE-Fehler — 1.6.2
-                from ild_pdf.security import (
-                    WRONG_PASSWORD_MSG_DE,
-                    is_wrong_password_error,
-                )
-
-                pw_err = any(is_wrong_password_error(e) for e in health.errors)
-                if pw_err:
-                    if prog is not None:
-                        prog.hide()
-                    pw2 = ask_pdf_password(
-                        self,
-                        path,
-                        prefill=prefill if prefill else "",
-                        wrong_password=True,
-                    )
-                    if pw2 is None:
-                        return False
-                    pw = pw2
-                    if prog is not None:
-                        prog.show()
-                    try:
-                        health = inspect_pdf(path, password=pw)
-                    except Exception as e:
-                        QMessageBox.critical(
-                            self,
-                            "PDF öffnen",
-                            f"PDF-Diagnose fehlgeschlagen:\n{e}\n\n{OPEN_TIMEOUT_HINT}",
-                        )
-                        return False
-                if health.errors:
-                    # Nochmals Passwort? Sonst klare DE-Meldung — 1.6.2
-                    if any(is_wrong_password_error(e) for e in health.errors):
-                        QMessageBox.critical(
-                            self,
-                            "PDF öffnen",
-                            WRONG_PASSWORD_MSG_DE,
-                        )
-                    else:
-                        QMessageBox.critical(
-                            self,
-                            "PDF öffnen",
-                            "PDF kann nicht geöffnet werden:\n\n"
-                            + "\n".join(health.errors),
-                        )
-                    self.pdf_path = None
-                    self.store = None
-                    self.password = None
-                    return False
-            if health.warnings:
-                if prog is not None:
-                    prog.hide()
-                r = QMessageBox.warning(
-                    self,
-                    "Großes PDF",
-                    "\n".join(health.warnings) + "\n\nTrotzdem öffnen?",
-                    QMessageBox.Yes | QMessageBox.No,
-                    QMessageBox.Yes,
-                )
-                if r != QMessageBox.Yes:
-                    return False
-                if prog is not None:
-                    prog.show()
-            if _canceled():
-                return False
-
-            prog.setValue(2)
             prog.setLabelText("PDF wird geladen…")
             QApplication.processEvents()
             clear_render_cache(path)
@@ -5568,14 +5524,11 @@ class PdfViewer(QWidget):
             self.store = AnnotationStore(self.pdf_path)
             self.store.clear_history()
             self.clear_page_ops_undo()
-            from ild_pdf import PdfDocument
 
-            # Seiteanzahl: Prefer Diagnose; sonst einmal öffnen — kein Doppel-Open unnötig
-            pages = int(getattr(health, "page_count", 0) or 0)
-            if pages <= 0:
-                with PdfDocument(self.pdf_path, password=self.password) as doc:
-                    pages = len(doc)
+            # Kein Katalog-/PDFium-Wait vor Seite 1 — provisional 1, Refresh im BG — 2.6.45
+            pages = 1
             self.page_count = pages
+            self.status.emit("Seite 1 wird angezeigt — Seitenanzahl folgt…")
             if _canceled():
                 self.pdf_path = None
                 self.store = None
@@ -5583,19 +5536,58 @@ class PdfViewer(QWidget):
                 self.page_count = 0
                 return False
 
-            prog.setValue(3)
+            prog.setValue(2)
             prog.setLabelText("Seite 1 wird gerendert…")
             QApplication.processEvents()
-            # Große PDFs: kein nativer PageLabel-Vollscan beim Open — 2.6.37
-            self._reload_page_labels(scan_native=pages < int(SOFT_PAGE_WARN))
+            # Kein PageLabel-Scan beim Fast-Open
+            self._reload_page_labels(scan_native=False)
             self.page_index = 0
             self._pending_callout_anchor = None
             self._pending_scale = None
             self._zoom_timer.stop()
             self.scale = get_default_zoom_scale()
             self.clear_search_highlights()
-            # Erste Seite MUSS in die Hauptansicht — Fallback-Zoom bei Render-Fehler — 2.6.40
-            painted = self._ensure_page_painted()
+            # Erste Seite in die Hauptansicht — Fallback-Zoom; Warn erst nach Show — 2.6.45
+            painted = self._ensure_page_painted(warn=False)
+            # Passwort-Fehler beim ersten Render → Dialog, Retry
+            if not painted:
+                from ild_pdf.security import (
+                    WRONG_PASSWORD_MSG_DE,
+                    is_wrong_password_error,
+                )
+
+                err = str(getattr(self, "_last_refresh_error", "") or "")
+                if is_wrong_password_error(err) or (
+                    pw is None and "password" in err.lower()
+                ):
+                    if prog is not None:
+                        prog.hide()
+                    pw2 = ask_pdf_password(
+                        self,
+                        path,
+                        prefill=prefill if prefill else "",
+                        wrong_password=bool(err),
+                    )
+                    if pw2 is None:
+                        self.pdf_path = None
+                        self.store = None
+                        self.password = None
+                        self.page_count = 0
+                        return False
+                    pw = pw2
+                    self.password = pw
+                    if prog is not None:
+                        prog.show()
+                    painted = self._ensure_page_painted(warn=False)
+                    if not painted and is_wrong_password_error(
+                        getattr(self, "_last_refresh_error", None)
+                    ):
+                        QMessageBox.critical(self, "PDF öffnen", WRONG_PASSWORD_MSG_DE)
+                        self.pdf_path = None
+                        self.store = None
+                        self.password = None
+                        self.page_count = 0
+                        return False
             # Open-Generation-Abort (neuer Open) bleibt hart; Progress-Cancel nach
             # Nesting-Modal („Großes PDF“) kann spurios wasCanceled() setzen — 2.6.40
             if int(getattr(self, "_open_generation", 0) or 0) != open_gen:
@@ -5607,7 +5599,7 @@ class PdfViewer(QWidget):
                 self.page_count = 0
                 return False
 
-            prog.setValue(4)
+            prog.setValue(3)
             prog.setLabelText("Oberfläche aktualisieren…")
             QApplication.processEvents()
             self.annotations_changed.emit()
@@ -5618,7 +5610,20 @@ class PdfViewer(QWidget):
             mode = get_default_zoom_mode()
             if mode in ("fit_width", "fit_page"):
                 QTimer.singleShot(0, self.apply_default_zoom)
-            prog.setValue(5)
+            # Seitenanzahl + Soft-Warn im Hintergrund — nie vor Seite 1 warten — 2.6.45
+            self._schedule_page_count_refresh(open_gen)
+            prog.setValue(4)
+            # Nach Progress-Close erneut malen (Viewport erst dann gültig) — 2.6.45
+            def _paint_after_open() -> None:
+                if int(getattr(self, "_open_generation", 0) or 0) != open_gen:
+                    return
+                if not self.pdf_path:
+                    return
+                if not self._canvas_has_page_image():
+                    self._ensure_page_painted(warn=False)
+
+            QTimer.singleShot(0, _paint_after_open)
+            QTimer.singleShot(50, _paint_after_open)
             if not painted:
                 self.status.emit(
                     "Hauptansicht leer — Zoom verringern oder Seite erneut wählen"
@@ -5655,6 +5660,54 @@ class PdfViewer(QWidget):
             if cursor_overridden:
                 QApplication.restoreOverrideCursor()
 
+    def _schedule_page_count_refresh(self, open_gen: int) -> None:
+        """Seitenanzahl im Hintergrund nachziehen (nie vor Seite 1) — 2.6.45."""
+
+        path = self.pdf_path
+        pw = self.password
+        if path is None:
+            return
+
+        def _work() -> None:
+            try:
+                from ild_pdf.limits import catalog_page_count
+
+                n, _err = catalog_page_count(path, password=pw)
+                if n is None or int(n) <= 0:
+                    from ild_pdf import PdfDocument
+
+                    with PdfDocument(path, password=pw) as doc:
+                        n = int(len(doc))
+            except Exception:
+                return
+            if int(n) <= 1:
+                return
+
+            def _apply() -> None:
+                if int(getattr(self, "_open_generation", 0) or 0) != open_gen:
+                    return
+                if self.pdf_path != path:
+                    return
+                self.page_count = int(n)
+                try:
+                    from ild_pdf.limits import SOFT_PAGE_WARN
+
+                    self._reload_page_labels(
+                        scan_native=int(n) < int(SOFT_PAGE_WARN)
+                    )
+                except Exception:
+                    pass
+                self.page_changed.emit(self.page_index)
+                self.status.emit(f"{int(n)} Seiten erkannt")
+                if not self._canvas_has_page_image():
+                    self._ensure_page_painted(warn=False)
+
+            QTimer.singleShot(0, _apply)
+
+        threading.Thread(
+            target=_work, daemon=True, name="ild-page-count-refresh"
+        ).start()
+
     def _canvas_has_page_image(self) -> bool:
         """True wenn die zentrale Ansicht ein gerendertes Seitenbild trägt — 2.6.40."""
         try:
@@ -5666,14 +5719,18 @@ class PdfViewer(QWidget):
         except Exception:
             return False
 
-    def _ensure_page_painted(self) -> bool:
-        """Aktuelle Seite in die Hauptansicht rendern; bei Fehler Zoom-Fallback — 2.6.40.
+    def _ensure_page_painted(self, *, warn: bool = True) -> bool:
+        """Aktuelle Seite in die Hauptansicht rendern; bei Fehler Zoom-Fallback — 2.6.40/2.6.45.
 
         Virtual-Thumbs/Lazy-Open dürfen die zentrale Ansicht nicht leer lassen.
         Bildlastige Seiten scheitern oft bei Default-Zoom, Thumbs (kleiner Scale) nicht.
         """
         if not self.pdf_path:
             return False
+        try:
+            self.show()
+        except Exception:
+            pass
         if self.refresh(quiet=True):
             return True
         saved = float(self.scale or 1.0)
@@ -5694,6 +5751,8 @@ class PdfViewer(QWidget):
         self.scale = saved
         if self._canvas_has_page_image():
             return True
+        if not warn:
+            return False
         msg = last_err or "Seite konnte nicht gerendert werden."
         QMessageBox.warning(
             self,
@@ -6555,7 +6614,8 @@ class PdfViewer(QWidget):
             self.scale = scale
             if self._search_query:
                 self._rebuild_search_rects(keep_index=True)
-            self.refresh()
+            if not self.refresh(quiet=True):
+                self._ensure_page_painted(warn=False)
             return
         # Debounce: schnelle Zoom-Schritte nur Label, Render verzögert
         self._pending_scale = scale
@@ -6569,7 +6629,8 @@ class PdfViewer(QWidget):
         self.zoom_changed.emit(self.scale)
         if self._search_query:
             self._rebuild_search_rects(keep_index=True)
-        self.refresh()
+        if not self.refresh(quiet=True):
+            self._ensure_page_painted(warn=False)
 
     def zoom_in(self):
         base = self._pending_scale if self._pending_scale is not None else self.scale

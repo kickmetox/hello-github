@@ -1,3 +1,9 @@
+## 2.6.45 - PDF-Open: „PDF wird geprüft“ nie UI-blockierend
+
+Patch nach **2.6.44** (Non-PDF-Toolbar): Nutzerbericht — Open hängt bei **„PDF wird geprüft…“** auch bei kurzen PDFs. Ursache: Preflight rief synchron `inspect_pdf`/`needs_password` (PDFium-`len(doc)` / pikepdf) auf dem UI-Thread auf.
+
+Fix: Open-Fast-Path nur **Dateigröße** synchron (`size_only_health`); Passwort-Probe mit **Timeout** im Worker; **keine** Katalog-/PDFium-Wartezeit vor Seite 1; provisional `page_count=1`, `_schedule_page_count_refresh` im Hintergrund; AcroForm-Vollscan beim Open ab `FORM_SCAN_PAGE_THRESHOLD` übersprungen. Nach Open: **PDF-Stack** + **`_ensure_page_painted`** (auch nach Fit/Session-Zoom), damit die zentrale Ansicht nicht weiß bleibt während Thumbs funktionieren. Progress abbrechbar. Pack `InstantLensDoc-2.6.45-pack.zip`; VERSION **2.6.45**.
+
 ## 2.6.44 - Bearbeitungsleiste für Nicht-PDF / Word-Suite
 
 Patch nach **2.6.43** (Speichern-unter Dokumentfilter): Nutzerbericht — bei Text/DOCX/Word-Suite fehlte die Bearbeitungsleiste von **Auswahl** bis **Markierungen** (bei PDF sichtbar). Ursache: Toolbar lebte nur in ``PdfViewer``; ``EditorPane`` hatte keine eigene Leiste. Fix: **``ildEditorToolbar``** in ``EditorPane`` mit textrelevanten Werkzeugen (Auswahl, Text bearbeiten, Markierungen, Unterstreichen, Fett/Kursiv, Markierungen löschen, Suchen) — ohne PDF-only (Schwärzen/Objekt/Formular). Tab-Wechsel PDF↔Text synchronisiert Toolbar (``_sync_editor_toolbar_for_stack`` / ``_on_editor_toolbar_action``). Pack `InstantLensDoc-2.6.44-pack.zip`; VERSION **2.6.44**.

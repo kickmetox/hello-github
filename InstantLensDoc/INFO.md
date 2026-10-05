@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **2.6.43** |
+| Version | **2.6.45** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -33,7 +33,7 @@
 
 Skript: [sync-ild.ps1](scripts/sync-ild.ps1) — Branch `cursor/instantlensdoc-2108` (oder `-LocalPack` / Pack-Zip) nach `D:\AI_Temp\InstantLensDoc`, pip, Start. **Nutzer-Icon in `assets` wird nicht überschrieben.**
 
-**FEATURES.md lokal sync:** Nach Sync liegt `FEATURES.md` lokal im App-Ordner (`D:\AI_Temp\InstantLensDoc\FEATURES.md`); About/Stubs öffnen diese lokale Datei — Version **2.6.43**.
+**FEATURES.md lokal sync:** Nach Sync liegt `FEATURES.md` lokal im App-Ordner (`D:\AI_Temp\InstantLensDoc\FEATURES.md`); About/Stubs öffnen diese lokale Datei — Version **2.6.45**.
 
 Ohne Start: `-NoStart` (Alias `-SkipStart`). Exit-Codes: **0** OK · **1** allgemein · **2** Git-Fehler.
 
@@ -111,7 +111,7 @@ Patch nach **2.6.43** (Speichern-unter Dokumentfilter) — Bearbeitungsleiste f�
 - **Text/DOCX/Word-Suite:** Toolbar `ildEditorToolbar` — Auswahl · Text bearbeiten · Markierungen · Unterstreichen · Fett/Kursiv · Markierungen löschen · Suchen
 - **Kein PDF-only** in der Text-Leiste (Schwärzen/Objekt/Formular bleiben PDF-Tab)
 - Tab-Wechsel PDF ↔ Text aktualisiert die passende Toolbar
-- Pack: `InstantLensDoc-2.6.44-pack.zip`
+- Pack: `InstantLensDoc-2.6.45-pack.zip`
 
 ## Neu in 2.6.43
 

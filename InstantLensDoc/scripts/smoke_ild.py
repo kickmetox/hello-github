@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Nightly/CI Smoke: CLI + Import-Checks für InstantLens Doc — 2.1.0–2.6.44.
+"""Nightly/CI Smoke: CLI + Import-Checks für InstantLens Doc — 2.1.0–2.6.45.
 
 Leichtgewichtig. Exit-Codes:
   0  OK  (ok=true)
@@ -14,12 +14,12 @@ Aufruf:
   python scripts/smoke_ild.py -h
 
 JSON-Schema (--json), Erfolg:
-  {"ok": true, "version": "2.6.44", "duration_ms": 1234,
+  {"ok": true, "version": "2.6.45", "duration_ms": 1234,
    "checks": ["version", "imports", "cli", "measure_diff_import", "changelog"]}
 
 JSON bei Fail: checks[] enthält Objekt mit error-Text (max 200 Zeichen, Truncate …);
 Exitcode spiegelt ok (0↔true, 1↔false) — 2.2.0:
-  {"ok": false, "version": "2.6.44", "duration_ms": 12,
+  {"ok": false, "version": "2.6.45", "duration_ms": 12,
    "checks": ["version", {"name": "imports", "error": "import x: …"}]}
 """
 
@@ -41,7 +41,7 @@ if str(ROOT) not in sys.path:
 # Headless/CI: Qt ohne Display
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-EXPECTED_VERSION = "2.6.44"
+EXPECTED_VERSION = "2.6.45"
 FAIL_ERROR_MAX_LEN = 200
 
 EXIT_OK = 0
@@ -82,7 +82,7 @@ def check_version() -> None:
         _fail(f"docs/VERSION={docs_ver!r}")
     bw = (ROOT / "build-windows.ps1").read_text(encoding="utf-8")
     if EXPECTED_VERSION not in bw or "Allow32Bit" not in bw:
-        _fail("build-windows.ps1 fehlt 2.6.44/Allow32Bit")
+        _fail("build-windows.ps1 fehlt 2.6.45/Allow32Bit")
     if not (ROOT / "scripts" / "pack-windows-runnable.py").is_file():
         _fail("scripts/pack-windows-runnable.py fehlt")
     if not (ROOT / "run-keygen.bat").is_file():
@@ -317,6 +317,44 @@ def check_version() -> None:
     docs_py = (ROOT / "instantlensdoc" / "core" / "documents.py").read_text(encoding="utf-8")
     if '".ild"' not in docs_py and "'.ild'" not in docs_py:
         _fail("detect_kind erkennt .ild nicht (2.6.43)")
+    # 2.6.45: Open-Preflight nie UI-blockierend (auch kleine PDFs)
+    from ild_pdf.limits import (
+        FORM_SCAN_PAGE_THRESHOLD,
+        INSPECT_TIMEOUT_SEC,
+        PASSWORD_PROBE_TIMEOUT_SEC,
+        size_only_health,
+    )
+    import inspect as _insp
+    import tempfile
+    from pathlib import Path as _P
+
+    if not callable(size_only_health):
+        _fail("size_only_health fehlt (2.6.45)")
+    if float(INSPECT_TIMEOUT_SEC) > 5.0:
+        _fail("INSPECT_TIMEOUT_SEC zu groß für Open-Fast-Path (2.6.45)")
+    if float(PASSWORD_PROBE_TIMEOUT_SEC) > 5.0:
+        _fail("PASSWORD_PROBE_TIMEOUT_SEC zu groß (2.6.45)")
+    if int(FORM_SCAN_PAGE_THRESHOLD) < 20:
+        _fail("FORM_SCAN_PAGE_THRESHOLD ungültig (2.6.45)")
+    if "size_only_health" not in pv or "_schedule_page_count_refresh" not in pv:
+        _fail("pdf_view.load fehlt Fast-Open size_only/_schedule_page_count (2.6.45)")
+    if "_ensure_page_painted(warn=False)" not in pv and "warn=False" not in pv:
+        _fail("pdf_view._ensure_page_painted fehlt quiet-Retry nach Open (2.6.45)")
+    if "_repaint_central" not in mw and "setCurrentWidget(self.pdf_view)" not in mw:
+        _fail("main_window.open_path fehlt PDF-Stack nach Open (2.6.45)")
+    if "FORM_SCAN_PAGE_THRESHOLD" not in mw:
+        _fail("main_window fehlt FORM_SCAN skip (2.6.45)")
+    np_src = _insp.getsource(
+        __import__("ild_pdf.security", fromlist=["needs_password"]).needs_password
+    )
+    if "timeout" not in np_src.lower() or "Thread" not in np_src:
+        _fail("needs_password fehlt Timeout/Worker (2.6.45)")
+    with tempfile.TemporaryDirectory() as _td:
+        tiny = _P(_td) / "tiny.pdf"
+        tiny.write_bytes(b"%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n")
+        h = size_only_health(tiny)
+        if h.errors or h.probe != "size":
+            _fail(f"size_only_health tiny unexpected: {h}")
     _ok(f"version {EXPECTED_VERSION}")
     # 2.6.40 blank-view / pack entry (kept)
     if "_ensure_page_painted" not in pv:
@@ -327,6 +365,7 @@ def check_version() -> None:
     _ok("2.6.41 scantuxio-port/menuDevices/naps2-escl/entry-hints: OK")
     _ok("2.6.42 tesseract-runtime/vendor/TESSDATA_PREFIX/ScanTuxio-Win: OK")
     _ok("2.6.43 document-save-filters/no-py-default: OK")
+    _ok("2.6.45 open-preflight-async/size_only/page-count-bg: OK")
 
 
 def check_imports(*, with_qt: bool) -> None:
@@ -1212,6 +1251,8 @@ def check_measure_and_diff() -> None:
 
 def check_changelog() -> None:
     cl = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    if "## 2.6.45" not in cl:
+        _fail("CHANGELOG fehlt ## 2.6.45")
     if "## 2.6.44" not in cl:
         _fail("CHANGELOG fehlt ## 2.6.44")
     if "## 2.6.43" not in cl:
@@ -1801,6 +1842,13 @@ def check_changelog() -> None:
     ):
         _fail("CHANGELOG 2.6.44 fehlt Non-PDF-Toolbar-Hinweis")
     if (
+        "PDF wird geprüft" not in cl
+        and "size_only_health" not in cl
+        and "Preflight" not in cl
+        and "2.6.45" not in cl
+    ):
+        _fail("CHANGELOG 2.6.45 fehlt Open-Preflight/Hang-Hinweis")
+    if (
         "Silbentrennung" not in cl
         and "Hyphen" not in cl
         and "Menü" not in cl
@@ -2111,6 +2159,12 @@ def check_changelog() -> None:
         ".py" not in feat and ".ild" not in feat and "Speichern unter" not in feat
     ):
         _fail("FEATURES.md fehlt 2.6.43 Speichern-unter/Dokumentfilter-Hinweis")
+    if "2.6.45" not in feat or (
+        "PDF wird geprüft" not in feat
+        and "size_only" not in feat
+        and "Open-Preflight" not in feat
+    ):
+        _fail("FEATURES.md fehlt 2.6.45 Open-Preflight/Hang-Hinweis")
     if "2.6.44" not in feat or (
         "ildEditorToolbar" not in feat
         and "Markierungen" not in feat
@@ -2568,11 +2622,11 @@ Exit-Codes:
 Laufzeit: am Ende als „Laufzeit: N ms“ (oder duration_ms im JSON).
 
 Beispiel --json (Erfolg):
-  {"ok": true, "version": "2.6.44", "duration_ms": 1234,
+  {"ok": true, "version": "2.6.45", "duration_ms": 1234,
    "checks": ["version", "imports", "cli", "measure_diff_import", "changelog"]}
 
 Beispiel --json (Fail):
-  {"ok": false, "version": "2.6.44", "duration_ms": 12,
+  {"ok": false, "version": "2.6.45", "duration_ms": 12,
    "checks": ["version", {"name": "imports", "error": "import x: …"}]}
 """.rstrip()
     )
