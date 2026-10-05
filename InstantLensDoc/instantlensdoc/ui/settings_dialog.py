@@ -1003,10 +1003,11 @@ class SettingsDialog(QDialog):
         self.line_numbers.setToolTip("Optionale Zeilennummern im Texteditor")
         form.addRow(self.line_numbers)
 
-        self.minimap = QCheckBox("Editor-Minimap (Linien-Übersicht)")
+        self.minimap = QCheckBox("Editor-Minimap (nur Text/Code, Standard aus)")
         self.minimap.setChecked(get_editor_minimap())
         self.minimap.setToolTip(
-            "Einfache Minimap rechts + dickere Scrollbar (optional)"
+            "Schmale Linien-Übersicht rechts neben Plaintext/Code. "
+            "In DOCX/HTML-Dokumenten nie sichtbar — 2.6.54"
         )
         form.addRow(self.minimap)
 

@@ -973,6 +973,7 @@ class MainWindow(QMainWindow):
         prev_lay.addWidget(self.preview_readonly_label)
         prev_hint = QLabel("Schreibgeschützt — Änderungen werden nicht gespeichert.")
         prev_hint.setWordWrap(True)
+        self.preview_readonly_hint = prev_hint
         prev_lay.addWidget(prev_hint, 1)
         self.btn_preview_open_edit = QPushButton("Zum Bearbeiten öffnen")
         self.btn_preview_open_edit.setToolTip(
@@ -1686,14 +1687,34 @@ class MainWindow(QMainWindow):
         m_file.addAction(act_quit)
 
         m_edit = mb.addMenu("&Bearbeiten")
-        act_undo = QAction("Rückgängig", self)
+        # Sichtbares Vor/Zurück: Pfeil-Icons, Ctrl+Z / Ctrl+Y / Ctrl+Shift+Z, Enabled-
+        # Zustand folgt dem Undo-Stack des aktiven Editors (undoAvailable/redoAvailable);
+        # dieselben Aktionen bedienen die Ribbon-Pfeile (Start + Bearbeiten) — 2.6.54
+        from PySide6.QtWidgets import QStyle
+
+        act_undo = QAction(self.style().standardIcon(QStyle.SP_ArrowBack), "Rückgängig", self)
         act_undo.setShortcut(QKeySequence.Undo)
+        act_undo.setToolTip("Letzte Änderung rückgängig (Ctrl+Z)")
         act_undo.triggered.connect(self._undo)
         m_edit.addAction(act_undo)
-        act_redo = QAction("Wiederholen", self)
-        act_redo.setShortcut(QKeySequence.Redo)
+        act_redo = QAction(self.style().standardIcon(QStyle.SP_ArrowForward), "Wiederholen", self)
+        redo_keys: list[QKeySequence] = []
+        for ks in [*QKeySequence.keyBindings(QKeySequence.Redo), QKeySequence("Ctrl+Y"), QKeySequence("Ctrl+Shift+Z")]:
+            if ks.toString() and all(ks.toString() != k.toString() for k in redo_keys):
+                redo_keys.append(ks)
+        act_redo.setShortcuts(redo_keys)
+        act_redo.setToolTip("Rückgängig gemachte Änderung wiederholen (Ctrl+Y / Ctrl+Shift+Z)")
         act_redo.triggered.connect(self._redo)
         m_edit.addAction(act_redo)
+        self._undo_action = act_undo
+        self._redo_action = act_redo
+        try:
+            self.editor.undoAvailable.connect(lambda _a: self._sync_undo_redo_enabled())
+            self.editor.redoAvailable.connect(lambda _a: self._sync_undo_redo_enabled())
+            self.stack.currentChanged.connect(lambda _i: self._sync_undo_redo_enabled())
+        except Exception:
+            pass
+        QTimer.singleShot(0, self._sync_undo_redo_enabled)
         m_edit.addSeparator()
         for name, slot in [
             ("Ausschneiden", self.editor.cut),
@@ -2351,13 +2372,15 @@ class MainWindow(QMainWindow):
         )
         self._current_line_hl_action.toggled.connect(self._toggle_current_line_highlight)
         m_view.addAction(self._current_line_hl_action)
-        self._minimap_action = QAction("Editor-Minimap", self)
+        self._minimap_action = QAction("Editor-Minimap (nur Text/Code)", self)
         self._minimap_action.setCheckable(True)
         self._minimap_action.setChecked(get_editor_minimap())
         self._minimap_action.setToolTip(
-            "Einfache Linien-Übersicht rechts + dickere Scrollbar (optional)"
+            "Schmale Linien-Übersicht rechts neben Plaintext/Code (Standard: aus). "
+            "In DOCX/HTML-Dokumenten nie sichtbar. Einstellung wird gespeichert."
         )
-        self._minimap_action.setShortcut(QKeySequence("Ctrl+Shift+I"))
+        # Kein Ctrl+Shift+I mehr: lag neben Kursiv (Ctrl+I) und schaltete die Minimap
+        # unbemerkt dauerhaft ein (Feldbefund 2.6.53) — 2.6.54
         self._minimap_action.toggled.connect(self._toggle_minimap)
         m_view.addAction(self._minimap_action)
         self._md_preview_action = QAction("Markdown-Vorschau", self)
@@ -9315,6 +9338,29 @@ class MainWindow(QMainWindow):
         else:
             self.editor.redo()
 
+    def _sync_undo_redo_enabled(self) -> None:
+        """Menü- und Ribbon-Pfeile „Rückgängig/Wiederholen“ an den Editor-Stack koppeln — 2.6.54.
+
+        Im PDF-Modus bleiben beide aktiv (Annotations-/Seiten-Undo hat eigene Stacks).
+        """
+        try:
+            in_editor = self.stack.currentWidget() is self.editor_pane
+        except Exception:
+            in_editor = True
+        if in_editor:
+            doc = self.editor.document()
+            can_undo = bool(doc.isUndoAvailable())
+            can_redo = bool(doc.isRedoAvailable())
+        else:
+            can_undo = can_redo = True
+        for act, on in ((getattr(self, "_undo_action", None), can_undo), (getattr(self, "_redo_action", None), can_redo)):
+            if act is not None:
+                act.setEnabled(on)
+        ribbon = getattr(self, "ribbon_bar", None)
+        if ribbon is not None and hasattr(ribbon, "set_enabled"):
+            ribbon.set_enabled("undo", can_undo)
+            ribbon.set_enabled("redo", can_redo)
+
     def _show_getting_started_wizard(self) -> None:
         """Wizard manuell öffnen (Hilfe-Menü)."""
         GettingStartedWizard(self).exec()
@@ -14934,7 +14980,8 @@ class MainWindow(QMainWindow):
         is_preview = bool(readonly or path_key in self._readonly_preview_paths)
         if is_preview:
             self.doc.meta["readonly"] = True
-        else:
+        elif not self.doc.meta.get("kind_mismatch"):
+            # Falsche Endung (.pdf mit DOCX-Inhalt) bleibt schreibgeschützt — 2.6.54
             self.doc.meta.pop("readonly", None)
         self.sidebar.add_document(path)
         self._refresh_doc_tab_bar()
@@ -15043,7 +15090,14 @@ class MainWindow(QMainWindow):
             self._update_doc_status()
             self._sync_preview_readonly_banner()
             enc = self.doc.meta.get("encoding")
-            if is_preview or self.doc.meta.get("readonly"):
+            mismatch = self.doc.meta.get("kind_mismatch")
+            if mismatch:
+                real = self.doc.meta.get("kind_mismatch_kind", "")
+                self._set_status(
+                    f"Endung .pdf, Inhalt {real}: als {real} geöffnet (schreibgeschützt) — {Path(path).name}"
+                )
+                _log.warning("Falsche Endung: %s", mismatch)
+            elif is_preview or self.doc.meta.get("readonly"):
                 self._set_status(f"Vorschau (readonly): {path}")
             elif enc:
                 self._set_status(f"Geöffnet: {path} [{enc}]")
@@ -15078,7 +15132,72 @@ class MainWindow(QMainWindow):
         if banner is None:
             return
         is_ro = bool(self.doc and self.doc.meta.get("readonly"))
+        mismatch = str((self.doc.meta.get("kind_mismatch") if self.doc else "") or "")
+        label = getattr(self, "preview_readonly_label", None)
+        hint = getattr(self, "preview_readonly_hint", None)
+        btn = getattr(self, "btn_preview_open_edit", None)
+        if mismatch:
+            # .pdf-Datei mit DOCX/HTML/Text-Inhalt: Inhalt ist geladen, Datei trägt die
+            # falsche Endung → Banner erklärt das und bietet das Speichern unter der
+            # richtigen Endung an — 2.6.54
+            real = str(self.doc.meta.get("kind_mismatch_kind", "") or "")
+            if label is not None:
+                label.setText("Falsche Dateiendung")
+            if hint is not None:
+                hint.setText(mismatch)
+            if btn is not None:
+                ext = {
+                    "DOCX": ".docx",
+                    "HTML": ".html",
+                    "RTF": ".rtf",
+                    "TEXT": ".txt",
+                    "IMAGE": ".png",
+                }.get(real, "")
+                btn.setText(f"Als {ext or 'richtige Endung'} speichern…")
+                try:
+                    btn.clicked.disconnect()
+                except Exception:
+                    pass
+                btn.clicked.connect(self._save_mismatched_with_real_extension)
+        else:
+            if label is not None:
+                label.setText("Vorschau")
+            if hint is not None:
+                hint.setText("Schreibgeschützt — Änderungen werden nicht gespeichert.")
+            if btn is not None and btn.text() != "Zum Bearbeiten öffnen":
+                btn.setText("Zum Bearbeiten öffnen")
+                try:
+                    btn.clicked.disconnect()
+                except Exception:
+                    pass
+                btn.clicked.connect(self._open_preview_for_edit)
         banner.setVisible(is_ro)
+
+    def _save_mismatched_with_real_extension(self) -> None:
+        """Falsch benannte .pdf (Inhalt DOCX/HTML/…) unter richtiger Endung kopieren — 2.6.54."""
+        if not self.doc or not self.doc.path or not self.doc.meta.get("kind_mismatch"):
+            self._set_status("Keine falsch benannte Datei geöffnet")
+            return
+        from ild_pdf.pdf_sniff import recover_misnamed_file, sniff_file
+
+        src = Path(self.doc.path)
+        sn = sniff_file(src)
+        ext = sn.suggested_extension or ".bin"
+        suggested = src.with_suffix(ext)
+        filt = f"{ext.lstrip('.').upper()} (*{ext});;Alle (*.*)"
+        path, _sel = QFileDialog.getSaveFileName(
+            self, "Unter richtiger Endung speichern", str(suggested), filt
+        )
+        if not path:
+            return
+        try:
+            out = recover_misnamed_file(src, path)
+            if out is None:
+                raise RuntimeError("Dateityp hat keine sichere Endung")
+            self._set_status(f"Kopie mit richtiger Endung gespeichert: {out}")
+            self.open_path(str(out))
+        except Exception as e:
+            QMessageBox.critical(self, "Speichern", f"Kopie fehlgeschlagen:\n{e}")
 
     def _open_preview_for_edit(self) -> None:
         """Readonly-Vorschau → echtes bearbeitbares Dokument — 1.1.5/1.1.6."""
@@ -15139,6 +15258,18 @@ class MainWindow(QMainWindow):
         if not self.doc:
             return False
         if self.doc.meta.get("readonly"):
+            if self.doc.meta.get("kind_mismatch"):
+                real = self.doc.meta.get("kind_mismatch_kind", "")
+                if not quiet:
+                    QMessageBox.information(
+                        self,
+                        "Falsche Dateiendung",
+                        f"Die Datei trägt die Endung .pdf, enthält aber {real}.\n"
+                        "Speichern unter diesem Namen ist gesperrt — bitte über die Leiste "
+                        "„Als … speichern…“ oder „Speichern unter“ mit der richtigen Endung sichern.",
+                    )
+                self._set_status("Falsche Endung (.pdf) — Speichern unter richtiger Endung nötig")
+                return False
             if not quiet:
                 QMessageBox.information(
                     self,
@@ -15319,21 +15450,35 @@ class MainWindow(QMainWindow):
             self.doc.text = self.editor.toPlainText()
         try:
             dest = Path(path)
-            # Text → PDF über Export (kein leeres Copy ohne Quell-PDF)
+            # Text → PDF ausschließlich über den PDF-Exporter — nie über save_document
+            # (≤ 2.6.42 kopierte das die DOCX-Bytes unter .pdf-Namen → „Data format
+            # error“ in PDFium/Edge). Formatiertes HTML (DOCX/HTML) geht mit — 2.6.54
             if dest.suffix.lower() == ".pdf" and self.doc.kind != DocKind.PDF:
+                from ild_pdf.pdf_sniff import validate_pdf_file
                 from instantlensdoc.core import export as exp
 
+                self._sync_editor_rich_meta()
                 title = self.doc.title or self.doc.display_name or "InstantLens Doc"
+                rich_html = (self.doc.meta or {}).get("html") if self.doc.kind in (
+                    DocKind.DOCX,
+                    DocKind.HTML,
+                    DocKind.RTF,
+                ) or (self.doc.meta or {}).get("rich_text") else None
                 exp.export_document(
                     self.doc.text or "",
                     dest,
                     fmt="pdf",
                     title=title,
+                    html=str(rich_html) if rich_html else None,
                 )
+                check = validate_pdf_file(dest)
+                if not check.ok:
+                    raise RuntimeError(check.message_de())
                 self.doc.path = dest
                 self.doc.kind = DocKind.PDF
                 self.doc.dirty = False
                 self.doc.title = dest.name
+                self._set_status(f"PDF gespeichert: {dest} ({check.page_count} Seite(n))")
             else:
                 save_document(self.doc, dest)
             self.sidebar.add_document(str(dest))
@@ -15409,7 +15554,21 @@ class MainWindow(QMainWindow):
         try:
             from instantlensdoc.core import export as exp
 
-            exp.export_document(text, path, fmt=fmt, title=title)
+            # Formatierter Inhalt (DOCX/HTML-Editor) für PDF/DOCX/RTF mitgeben — 2.6.54
+            rich_html = None
+            if fmt in ("pdf", "docx", "rtf") and self.stack.currentWidget() is self.editor_pane:
+                try:
+                    if self.editor.rich_mode():
+                        rich_html = self.editor.to_rich_html()
+                except Exception:
+                    rich_html = None
+            exp.export_document(text, path, fmt=fmt, title=title, html=rich_html)
+            if fmt == "pdf":
+                from ild_pdf.pdf_sniff import validate_pdf_file
+
+                check = validate_pdf_file(path)
+                if not check.ok:
+                    raise RuntimeError(check.message_de())
             set_last_export_dir(path)
             remember_recent_dir(path)
             self._set_status(f"Exportiert: {path}")

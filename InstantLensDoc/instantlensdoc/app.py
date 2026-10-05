@@ -455,6 +455,17 @@ def main(argv: list[str] | None = None) -> int:
     lm = LicenseManager()
     lm.ensure_trial_started()
 
+    # Einmalige Einstellungs-Korrekturen (z. B. Minimap aus) — 2.6.54
+    try:
+        import logging as _logging
+
+        from instantlensdoc.core.app_settings import apply_one_time_migrations
+
+        for note in apply_one_time_migrations():
+            _logging.getLogger("instantlensdoc.app").info("Einstellung migriert: %s", note)
+    except Exception:
+        pass
+
     # Startup-Check Abhängigkeiten (pypdfium2 kritisch, Tesseract optional)
     dep_statuses = check_runtime_dependencies()
     skip_deps_dialog = smoke or os.environ.get("ILD_SKIP_DEPS_CHECK") == "1"

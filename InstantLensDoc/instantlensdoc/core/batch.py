@@ -122,6 +122,13 @@ def collect_pdfs(
         for raw in paths:
             p = Path(raw)
             if p.is_file() and p.suffix.lower() == ".pdf":
+                try:
+                    from ild_pdf.pdf_sniff import sniff_file
+
+                    if not sniff_file(p).is_pdf_like:
+                        continue
+                except Exception:
+                    pass
                 key = str(p.resolve())
                 if key not in seen:
                     seen.add(key)
@@ -139,6 +146,14 @@ def _images_to_pdf(sources: Sequence[Path], dest: Path) -> None:
     from ild_pdf.pages import merge_pdfs
 
     if len(sources) == 1 and sources[0].suffix.lower() == ".pdf":
+        from ild_pdf.pdf_sniff import sniff_file
+
+        sn = sniff_file(sources[0])
+        if not sn.is_pdf_like:
+            raise ValueError(
+                f"{sources[0].name} ist kein gültiges PDF ({sn.label_de}) — "
+                "Batch kopiert keine DOCX/HTML-Bytes unter .pdf-Namen"
+            )
         dest.write_bytes(sources[0].read_bytes())
         return
     tmp_pdfs: List[Path] = []

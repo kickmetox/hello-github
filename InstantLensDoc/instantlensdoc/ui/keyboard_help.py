@@ -410,7 +410,8 @@ Status-Klick öffnet <code>docs/VERSION</code>/<code>VERSION.txt</code> im Edito
 <p><b>Farben-Favoriten:</b> Toolbar 1/2/3 — Klick = Highlight, Shift+Klick = Stift, Ctrl+Klick = Notiz, Rechtsklick = speichern.</p>
 <p><b>Farbe Palette-Zyklus / Random:</b> Ctrl+Shift+C = nächste Palette-Farbe; Ctrl+Alt+Shift+C = zufällig.</p>
 <p><b>Zeilennummern:</b> Ansicht → Zeilennummern (optional, auch in Einstellungen).</p>
-<p><b>Editor-Minimap:</b> Ansicht → Editor-Minimap (Ctrl+Shift+I) — Linien-Übersicht + dickere Scrollbar.</p>
+<p><b>Editor-Minimap:</b> Ansicht → Editor-Minimap (nur Text/Code) — Standard aus, kein Shortcut (seit 2.6.54); in DOCX/HTML nie sichtbar.</p>
+<p><b>Rückgängig / Wiederholen:</b> Ctrl+Z · Ctrl+Y oder Ctrl+Shift+Z — Pfeile im Ribbon (Start/Bearbeiten) und Menü Bearbeiten; aktiv nur, wenn ein Schritt vorhanden ist (seit 2.6.54).</p>
 <p><b>PDF Graustufen:</b> Ansicht → PDF Graustufen / Toolbar „Grau“ (Ansicht + Export).</p>
 <p><b>PDF Nachtmodus:</b> Ansicht → PDF Nachtmodus / Toolbar „Nacht“ (nur Invert-Ansicht, nicht speichern).</p>
 <p><b>Logordner:</b> Hilfe → Logordner öffnen (Crash-/App-Logs).</p>

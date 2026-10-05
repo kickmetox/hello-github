@@ -191,16 +191,18 @@ def main() -> int:  # noqa: C901 - ein Skript, bewusst linear
         print("OK  1b damaged pdf repaired via pikepdf")
 
         # ---- 1c) Totalausfall → Banner mit Schritten, Exception, Versionen -------
+        # Kaputtes PDF mit echtem Header: alle drei Parser-Schritte scheitern.
+        # (0-Byte-Dateien stoppen seit 2.6.54 schon in Schritt 0 — siehe test_ui_audit_2654.)
         empty = tdp / "leer.pdf"
-        empty.write_bytes(b"")
+        empty.write_bytes(b"%PDF-1.4\n" + b"\x00garbage" * 64 + b"\n%%EOF\n")
         try:
             open_pdfium(empty)
-            raise AssertionError("0-Byte-PDF wurde geöffnet")
+            raise AssertionError("Schrott-PDF wurde geöffnet")
         except PdfiumOpenError as e:
             msg = str(e)
             for need in ("Schritt 1", "Schritt 2", "Schritt 3", "pypdfium2", "Data format error", "leer.pdf"):
                 assert need in msg, f"Fehlertext ohne {need!r}:\n{msg}"
-            assert len(e.steps) == 3, e.steps
+            assert [s for s, _ in e.steps] == ["bytes", "path", "pikepdf-repair"], e.steps
         assert "pypdfium2" in pdfium_version_info() and "PDFium" in pdfium_version_info()
         win.open_path(str(empty))
         _pump(app, 0.8)

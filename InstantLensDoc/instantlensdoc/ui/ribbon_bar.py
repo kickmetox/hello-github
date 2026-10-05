@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QSizePolicy,
     QStackedWidget,
+    QStyle,
     QToolButton,
     QVBoxLayout,
     QWidget,
@@ -64,6 +65,8 @@ class RibbonBar(QWidget):
         self._cat_buttons: list[QPushButton] = []
         self._stack = QStackedWidget()
         self._actions: dict[str, QToolButton] = {}
+        # Alle Buttons je Aktion (undo/redo liegen in Start **und** Bearbeiten) — 2.6.54
+        self._action_buttons: dict[str, list[QToolButton]] = {}
 
         panels = (
             (
@@ -72,6 +75,8 @@ class RibbonBar(QWidget):
                     ("open", "Öffnen"),
                     ("save", "Speichern"),
                     ("save_as", "Speichern unter"),
+                    ("undo", "Rückgängig"),
+                    ("redo", "Wiederholen"),
                     ("compare_pdfs", "Vergleichen"),
                     ("find_replace", "Suchen"),
                     ("spellcheck", "Rechtschreibung"),
@@ -186,10 +191,22 @@ class RibbonBar(QWidget):
                     "review_mode",
                 ):
                     tb.setCheckable(True)
+                if aid in ("undo", "redo"):
+                    # Sichtbare Pfeile „vor/zurück“; Enabled-Zustand folgt dem Editor-
+                    # Undo-Stack (MainWindow._sync_undo_redo_enabled) — 2.6.54
+                    icon = self.style().standardIcon(
+                        QStyle.SP_ArrowBack if aid == "undo" else QStyle.SP_ArrowForward
+                    )
+                    tb.setIcon(icon)
+                    tb.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
+                    tb.setToolTip(
+                        "Rückgängig (Ctrl+Z)" if aid == "undo" else "Wiederholen (Ctrl+Y / Ctrl+Shift+Z)"
+                    )
                 tb.clicked.connect(
                     lambda _checked=False, a=aid: self.action_triggered.emit(a)
                 )
                 self._actions.setdefault(aid, tb)
+                self._action_buttons.setdefault(aid, []).append(tb)
                 row.addWidget(tb)
             row.addStretch(1)
             self._stack.addWidget(panel)
@@ -230,6 +247,18 @@ class RibbonBar(QWidget):
             btn.blockSignals(True)
             btn.setChecked(bool(checked))
             btn.blockSignals(False)
+
+    def set_enabled(self, action_id: str, enabled: bool) -> None:
+        """Alle Buttons einer Aktion (in allen Tabs) aktivieren/deaktivieren — 2.6.54."""
+        for btn in self._action_buttons.get(action_id, ()):
+            btn.setEnabled(bool(enabled))
+
+    def is_enabled(self, action_id: str) -> bool:
+        btns = self._action_buttons.get(action_id, ())
+        return bool(btns) and all(b.isEnabled() for b in btns)
+
+    def buttons(self, action_id: str) -> list[QToolButton]:
+        return list(self._action_buttons.get(action_id, ()))
 
     def bind(self, handlers: dict[str, Callable[[], None]]) -> None:
         """Optional: direkte Handler statt Signal (Smoke/Tests)."""

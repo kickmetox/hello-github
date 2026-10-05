@@ -20121,7 +20121,8 @@ def main() -> int:
             assert "Kommentar-Bericht" in feat053 or "Minimap" in feat053
             assert "Palette-Zyklus" in feat053 or "Random" in feat053
             kh053 = (ROOT / "instantlensdoc" / "ui" / "keyboard_help.py").read_text(encoding="utf-8")
-            assert "Ctrl+Shift+C" in kh053 and "Ctrl+Shift+I" in kh053
+            # 2.6.54: Minimap ohne Shortcut (Ctrl+Shift+I lag neben Kursiv) — Eintrag bleibt
+            assert "Ctrl+Shift+C" in kh053 and "Editor-Minimap" in kh053
             cl053 = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
             assert "0.5.3" in cl053 and "## 0.5.3" not in cl053
             print("0.5.3 Qt report/color/minimap/about-keygen: OK")

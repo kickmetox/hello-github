@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import html
+import logging
 import re
 import zipfile
 from io import BytesIO
@@ -897,26 +898,107 @@ def resolve_page_size(name_or_size: str | tuple[float, float] | None = None) -> 
     return PAGE_SIZE_PRESETS.get(str(name), PAGE_SIZE_PRESETS["A4"])
 
 
+PDF_RICH_CREATOR = "InstantLens Doc (QTextDocument → QPdfWriter)"
+
+
+def _export_pdf_rich_qt(
+    html: str,
+    dest: Path,
+    *,
+    title: str,
+    page_size_pt: tuple[float, float],
+) -> Path | None:
+    """Formatiertes HTML (DOCX/HTML-Editor) über Qt als PDF setzen — 2.6.54.
+
+    Liefert ``None``, wenn keine ``QGuiApplication`` läuft (CLI/Tests ohne Qt) —
+    der Aufrufer fällt dann auf ``text_to_pdf`` zurück. Schreibt in eine Temp-Datei,
+    validiert (Header/EOF/pikepdf) und ersetzt erst dann das Ziel.
+    """
+    import os
+
+    try:
+        from PySide6.QtCore import QMarginsF, QSizeF
+        from PySide6.QtGui import (
+            QFont,
+            QGuiApplication,
+            QPageLayout,
+            QPageSize,
+            QPdfWriter,
+            QTextDocument,
+        )
+    except Exception:
+        return None
+    if QGuiApplication.instance() is None:
+        return None
+    from ild_pdf.pdf_sniff import assert_valid_pdf
+
+    tmp = dest.with_name(f".{dest.name}.ild-tmp{os.getpid()}")
+    try:
+        writer = QPdfWriter(str(tmp))
+        writer.setTitle(str(title or "InstantLens Doc"))
+        writer.setCreator(PDF_RICH_CREATOR)
+        writer.setPageSize(QPageSize(QSizeF(float(page_size_pt[0]), float(page_size_pt[1])), QPageSize.Point))
+        writer.setPageMargins(QMarginsF(20.0, 20.0, 20.0, 20.0), QPageLayout.Millimeter)
+        doc = QTextDocument()
+        base = QFont("Calibri", 11)
+        base.setStyleHint(QFont.SansSerif)
+        doc.setDefaultFont(base)
+        doc.setHtml(html or "")
+        if not doc.toPlainText().strip():
+            # Leeres HTML → leere Seite wäre ok, aber Plaintext-Pfad ist klarer
+            return None
+        doc.print_(writer)
+        # QPdfWriter schreibt beim Painter-Ende; Objekt freigeben, bevor gelesen wird
+        del doc
+        del writer
+        assert_valid_pdf(tmp, remove_invalid=True)
+        os.replace(tmp, dest)
+        return dest
+    except Exception as e:
+        logging.getLogger("instantlensdoc.export").warning(
+            "Rich-PDF über QPdfWriter fehlgeschlagen (%s) — Fallback Text→PDF", e
+        )
+        return None
+    finally:
+        try:
+            if tmp.exists():
+                tmp.unlink()
+        except OSError:
+            pass
+
+
 def export_pdf(
     text: str,
     path: str | Path,
     *,
     title: str = "InstantLens Doc",
     page_size: tuple[float, float] | str | None = None,
+    html: Optional[str] = None,
 ) -> Path:
     """
-    Einfaches Mehrseiten-PDF aus Plaintext (Helvetica via pikepdf Seiten).
-    Delegiert an ild_pdf.text_pdf.text_to_pdf — 1.7.0.
+    Mehrseiten-PDF aus dem Editor-Inhalt — 1.7.0 / 2.6.54.
+
+    ``html`` (DOCX/HTML-Dokument mit Zeichenformaten) wird — wenn eine Qt-GUI läuft —
+    über ``QTextDocument`` + ``QPdfWriter`` gesetzt (Fett/Kursiv/Überschriften/
+    Schriften erhalten). Sonst bzw. als Fallback: Plaintext via
+    ``ild_pdf.text_pdf.text_to_pdf`` (Helvetica/pikepdf).
+    Jede Ausgabe wird nach dem Schreiben validiert (``%PDF-``, ``%%EOF``, pikepdf) —
+    es bleibt nie eine Datei mit .pdf-Endung und fremdem Inhalt zurück.
     page_size: Tupel, Preset-Name oder None (= Einstellung/A4).
     """
+    from ild_pdf.pdf_sniff import assert_valid_pdf
     from ild_pdf.text_pdf import text_to_pdf
 
-    return text_to_pdf(
-        text,
-        path,
-        title=title,
-        page_size=resolve_page_size(page_size),
-    )
+    dest = Path(path)
+    size_pt = resolve_page_size(page_size)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    if html and str(html).strip():
+        out = _export_pdf_rich_qt(str(html), dest, title=title, page_size_pt=size_pt)
+        if out is not None:
+            return out
+    out = text_to_pdf(text or "", dest, title=title, page_size=size_pt)
+    assert_valid_pdf(out)
+    return out
 
 
 def export_txt(text: str, path: str | Path, *, encoding: str = "utf-8") -> Path:
@@ -1082,8 +1164,13 @@ def export_document(
     title: str = "InstantLens Doc",
     page_size: tuple[float, float] | str | None = None,
     author: str = "InstantLens Doc",
+    html: Optional[str] = None,
 ) -> Path:
-    """Unified Export nach Erweiterung/Format — 2.6.14 / EPUB 2.6.26."""
+    """Unified Export nach Erweiterung/Format — 2.6.14 / EPUB 2.6.26 / Rich-PDF 2.6.54.
+
+    ``html``: formatierter Editor-Inhalt (DOCX/HTML) — PDF/DOCX/RTF nutzen ihn,
+    um Zeichenformate zu erhalten; andere Formate ignorieren ihn.
+    """
     path = Path(path)
     f = (fmt or path.suffix.lstrip(".")).lower().lstrip(".")
     if f == "jpeg":
@@ -1093,13 +1180,13 @@ def export_document(
     if f == "html":
         return export_html(text, path, title=title)
     if f == "docx":
-        return export_docx(text, path, title=title)
+        return export_docx(text, path, title=title, html=html)
     if f == "pdf":
-        return export_pdf(text, path, title=title, page_size=page_size)
+        return export_pdf(text, path, title=title, page_size=page_size, html=html)
     if f == "txt":
         return export_txt(text, path)
     if f == "rtf":
-        return export_rtf(text, path, title=title)
+        return export_rtf(text, path, title=title, html=html)
     if f == "xlsx":
         return export_xlsx_from_text(text, path)
     if f == "jpg":

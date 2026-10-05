@@ -116,7 +116,9 @@ from instantlensdoc.core.bookmarks import (
 )
 
 CLIPBOARD_HISTORY_MAX = 3
-MINIMAP_WIDTH = 56
+# Minimap (nur Plaintext/Code, Standard aus): schmaler und dezenter als bis 2.6.53
+# (56 px, kräftige Balken, dicke Scrollbar) — Feldrückmeldung „graue Balken, nutzlos“
+MINIMAP_WIDTH = 36
 MINIMAP_SCROLLBAR_WIDTH = 14
 
 
@@ -629,7 +631,29 @@ class TextEditor(QPlainTextEdit):
         return False
 
     def minimap_width(self) -> int:
-        return MINIMAP_WIDTH if self._minimap else 0
+        """Breite der Minimap-Spalte; 0 wenn aus **oder** im Rich-Modus (DOCX/HTML).
+
+        Eine Code-Minimap (Zeilen → Striche) ist für Fließtext unlesbar und stahl neben
+        der DOCX-Spalte Platz — Rich-Dokumente zeigen sie nie — 2.6.54.
+        """
+        if not self._minimap or bool(getattr(self, "_rich_mode", False)):
+            return 0
+        return MINIMAP_WIDTH
+
+    def minimap_effective(self) -> bool:
+        """Minimap tatsächlich sichtbar (Einstellung an **und** Plaintext-Modus)."""
+        return self.minimap_width() > 0
+
+    def _sync_minimap_visibility(self) -> None:
+        eff = self.minimap_effective()
+        self._minimap_area.setVisible(eff)
+        sb = self.verticalScrollBar()
+        if eff:
+            sb.setStyleSheet(
+                f"QScrollBar:vertical {{ width: {MINIMAP_SCROLLBAR_WIDTH}px; min-width: {MINIMAP_SCROLLBAR_WIDTH}px; }}"
+            )
+        else:
+            sb.setStyleSheet("")
 
     def set_line_numbers_visible(self, visible: bool) -> None:
         self._line_numbers = bool(visible)
@@ -641,16 +665,9 @@ class TextEditor(QPlainTextEdit):
         return self._line_numbers
 
     def set_minimap_visible(self, visible: bool) -> None:
-        """Optionale Minimap (Linien-Übersicht) + dickere Scrollbar."""
+        """Optionale Minimap (Linien-Übersicht, nur Plaintext) + dickere Scrollbar."""
         self._minimap = bool(visible)
-        self._minimap_area.setVisible(self._minimap)
-        sb = self.verticalScrollBar()
-        if self._minimap:
-            sb.setStyleSheet(
-                f"QScrollBar:vertical {{ width: {MINIMAP_SCROLLBAR_WIDTH}px; min-width: {MINIMAP_SCROLLBAR_WIDTH}px; }}"
-            )
-        else:
-            sb.setStyleSheet("")
+        self._sync_minimap_visibility()
         self._update_side_areas()
         self._minimap_area.update()
         self.viewport().update()
@@ -728,6 +745,11 @@ class TextEditor(QPlainTextEdit):
                 self.setPalette(QPalette())
                 self.setAutoFillBackground(self._base_autofill)
                 self._page_bg_active = False
+        # Rich ↔ Plain gewechselt: Minimap folgt dem Modus (nie neben DOCX) — 2.6.54
+        try:
+            self._sync_minimap_visibility()
+        except Exception:
+            pass
         self._update_side_areas()
         self.viewport().update()
 
@@ -1377,7 +1399,7 @@ class TextEditor(QPlainTextEdit):
             self._update_side_areas()
 
     def _update_minimap_area(self, rect: QRect, dy: int) -> None:
-        if not self._minimap:
+        if not self.minimap_effective():
             return
         if dy:
             self._minimap_area.scroll(0, dy)
@@ -1440,10 +1462,12 @@ class TextEditor(QPlainTextEdit):
             block_number += 1
 
     def paint_minimap_area(self, event) -> None:
-        if not self._minimap:
+        if not self.minimap_effective():
             return
         painter = QPainter(self._minimap_area)
-        painter.fillRect(event.rect(), QColor("#F0F3F6"))
+        # Dezenter als bis 2.6.53: Hintergrund wie Viewport, Striche hell, sichtbarer
+        # Bereich nur als zarter Rahmen — Übersicht ohne „graue Balken“-Wand
+        painter.fillRect(event.rect(), self.palette().base().color())
         h = max(1, self._minimap_area.height())
         w = max(1, self._minimap_area.width())
         doc = self.document()
@@ -1455,27 +1479,28 @@ class TextEditor(QPlainTextEdit):
         vpage = max(1, sb.pageStep())
         vis_top = int(h * (vval / (vmax + vpage)))
         vis_h = max(4, int(h * (vpage / (vmax + vpage))))
-        painter.fillRect(0, vis_top, w, vis_h, QColor(70, 130, 180, 55))
-        painter.setPen(QColor(70, 130, 180, 120))
+        painter.fillRect(0, vis_top, w, vis_h, QColor(70, 130, 180, 28))
+        painter.setPen(QColor(70, 130, 180, 90))
         painter.drawRect(0, vis_top, w - 1, vis_h)
-        # Linien-Übersicht: Inhalt → Strichbreite
+        # Linien-Übersicht: Inhalt → Strichbreite (max. 1 px hoch, hellgrau)
         painter.setPen(Qt.NoPen)
+        bar_color = QColor("#B4BEC8")
         block = doc.firstBlock()
         i = 0
         while block.isValid():
             text = block.text().rstrip()
             if text:
                 dens = min(1.0, len(text) / 80.0)
-                bar_w = max(2, int((w - 6) * dens))
+                bar_w = max(2, int((w - 8) * dens))
                 y = int(i * h / n)
-                yh = max(1, int(h / n))
-                painter.fillRect(3, y, bar_w, yh, QColor("#6A7A8A"))
+                yh = max(1, min(2, int(h / n)))
+                painter.fillRect(4, y, bar_w, yh, bar_color)
             block = block.next()
             i += 1
 
     def minimap_goto_y(self, y: float) -> None:
         """Minimap-Klick → relative Dokumentposition."""
-        if not self._minimap:
+        if not self.minimap_effective():
             return
         h = max(1, self._minimap_area.height())
         ratio = max(0.0, min(1.0, float(y) / float(h)))
@@ -1953,12 +1978,18 @@ class TextEditor(QPlainTextEdit):
         if not cur.hasSelection():
             self.mergeCurrentCharFormat(fmt)
             return True
-        cur.mergeCharFormat(fmt)
-        self.setTextCursor(cur)
-        # NICHT setCurrentCharFormat(fmt): das ruft QTextCursor.setCharFormat auf
-        # der Auswahl auf und ERSETZT das komplette Zeichenformat durch das
-        # Teilformat (Fett löschte Unterstrichen und umgekehrt) — 2.6.52
-        self.mergeCurrentCharFormat(fmt)
+        # Ein Undo-Schritt: mergeCharFormat + mergeCurrentCharFormat (Qt wendet das
+        # Format intern erneut auf die Auswahl an) im selben Edit-Block — 2.6.54
+        cur.beginEditBlock()
+        try:
+            cur.mergeCharFormat(fmt)
+            self.setTextCursor(cur)
+            # NICHT setCurrentCharFormat(fmt): das ruft QTextCursor.setCharFormat auf
+            # der Auswahl auf und ERSETZT das komplette Zeichenformat durch das
+            # Teilformat (Fett löschte Unterstrichen und umgekehrt) — 2.6.52
+            self.mergeCurrentCharFormat(fmt)
+        finally:
+            cur.endEditBlock()
         return True
 
     def toggle_bold_selection(self) -> bool:
@@ -1982,13 +2013,41 @@ class TextEditor(QPlainTextEdit):
     def selection_font_underline(self) -> bool:
         return bool(self._selection_probe_format(self.textCursor()).fontUnderline())
 
+    def _replace_all_text_undoable(self, new_text: str) -> None:
+        """Gesamten Text ersetzen als **ein** Undo-Schritt — ohne den Verlauf zu löschen.
+
+        ``setPlainText``/``setHtml`` setzen den Undo/Redo-Stack von ``QTextDocument``
+        zurück — nach „Absatz zentrieren“ oder „Tabelle einfügen“ war Ctrl+Z tot.
+        Hier: Alles auswählen + ``insertText`` in einem Edit-Block; Cursorposition und
+        Scroll bleiben soweit möglich erhalten — 2.6.54.
+        """
+        text = str(new_text if new_text is not None else "")
+        if text == self.toPlainText():
+            return
+        old_pos = self.textCursor().position()
+        vbar = self.verticalScrollBar()
+        old_scroll = vbar.value()
+        cur = self.textCursor()
+        cur.beginEditBlock()
+        try:
+            cur.select(QTextCursor.Document)
+            cur.insertText(text)
+        finally:
+            cur.endEditBlock()
+        cur.setPosition(max(0, min(old_pos, len(text))))
+        self.setTextCursor(cur)
+        try:
+            vbar.setValue(min(old_scroll, vbar.maximum()))
+        except Exception:
+            pass
+
     def apply_auto_format(self) -> int:
         """Automatische Formatierung (Heading/Body/Quote) — 2.6.10."""
         from ild_pdf.auto_format import auto_format_text
 
         result = auto_format_text(self.toPlainText())
         if result.text != self.toPlainText():
-            self.setPlainText(result.text)
+            self._replace_all_text_undoable(result.text)
         return int(result.changed_lines)
 
     def current_paragraph_index(self) -> int:
@@ -2013,7 +2072,7 @@ class TextEditor(QPlainTextEdit):
         )
         if new_text == self.toPlainText():
             return False
-        self.setPlainText(new_text)
+        self._replace_all_text_undoable(new_text)
         return True
 
     def set_paragraph_spacing(
@@ -2037,7 +2096,7 @@ class TextEditor(QPlainTextEdit):
         )
         if new_text == self.toPlainText():
             return False
-        self.setPlainText(new_text)
+        self._replace_all_text_undoable(new_text)
         return True
 
     def apply_style_paragraph(self, style_id: str = "body") -> bool:
@@ -2047,7 +2106,7 @@ class TextEditor(QPlainTextEdit):
         new_text = apply_style_paragraph_defaults(self.toPlainText(), style_id=style_id)
         if new_text == self.toPlainText():
             return False
-        self.setPlainText(new_text)
+        self._replace_all_text_undoable(new_text)
         return True
 
     def apply_typography(
@@ -2077,7 +2136,7 @@ class TextEditor(QPlainTextEdit):
         )
         if new_text == self.toPlainText():
             return False
-        self.setPlainText(new_text)
+        self._replace_all_text_undoable(new_text)
         return True
 
     def apply_drop_cap(self, *, lines: int = 3, chars: int = 1) -> bool:
@@ -2092,7 +2151,7 @@ class TextEditor(QPlainTextEdit):
         )
         if new_text == self.toPlainText():
             return False
-        self.setPlainText(new_text)
+        self._replace_all_text_undoable(new_text)
         return True
 
     def hyphenate_document(self, *, lang: str = "de") -> int:
@@ -2100,7 +2159,7 @@ class TextEditor(QPlainTextEdit):
         from ild_pdf.typography import hyphenate_text
 
         result = hyphenate_text(self.toPlainText(), lang=lang)
-        self.setPlainText(result["text"])
+        self._replace_all_text_undoable(result["text"])
         return int(result.get("count") or 0)
 
     def insert_table(
@@ -2119,7 +2178,7 @@ class TextEditor(QPlainTextEdit):
         at = cur.position()
         table = create_table(rows, cols, header=header, align=align, style=style)
         new_text = insert_table_into_text(self.toPlainText(), table, at=at)
-        self.setPlainText(new_text)
+        self._replace_all_text_undoable(new_text)
         return True
 
     def sort_current_table(self, column: int = 0, *, reverse: bool = False) -> bool:
@@ -2138,7 +2197,7 @@ class TextEditor(QPlainTextEdit):
                 idx = i
                 break
         sorted_t = sort_table(found[idx][2], column=int(column), reverse=reverse)
-        self.setPlainText(insert_table_into_text(text, sorted_t, replace_index=idx))
+        self._replace_all_text_undoable(insert_table_into_text(text, sorted_t, replace_index=idx))
         return True
 
     def format_current_table(
@@ -2162,7 +2221,7 @@ class TextEditor(QPlainTextEdit):
                 idx = i
                 break
         formatted = format_table(found[idx][2], align=align, style=style, border=border)
-        self.setPlainText(insert_table_into_text(text, formatted, replace_index=idx))
+        self._replace_all_text_undoable(insert_table_into_text(text, formatted, replace_index=idx))
         return True
 
     def import_table_file(self, path: str, *, kind: str | None = None) -> bool:
@@ -2180,7 +2239,7 @@ class TextEditor(QPlainTextEdit):
         else:
             raise ValueError(f"Kein Tabellenformat: {ext}")
         at = self.textCursor().position()
-        self.setPlainText(insert_table_into_text(self.toPlainText(), table, at=at))
+        self._replace_all_text_undoable(insert_table_into_text(self.toPlainText(), table, at=at))
         return True
 
     def update_auto_toc(self, *, max_level: int = 3) -> str:
@@ -2188,7 +2247,7 @@ class TextEditor(QPlainTextEdit):
         from ild_pdf.auto_format import insert_toc_into_text
 
         new_text = insert_toc_into_text(self.toPlainText(), max_level=max_level)
-        self.setPlainText(new_text)
+        self._replace_all_text_undoable(new_text)
         return new_text
 
     def update_figure_list(self) -> str:
@@ -2196,7 +2255,7 @@ class TextEditor(QPlainTextEdit):
         from ild_pdf.auto_format import insert_lof_into_text
 
         new_text = insert_lof_into_text(self.toPlainText())
-        self.setPlainText(new_text)
+        self._replace_all_text_undoable(new_text)
         return new_text
 
     def update_index(self, *, lang: str | None = None) -> str:
@@ -2211,7 +2270,7 @@ class TextEditor(QPlainTextEdit):
             except Exception:
                 lang = "de"
         new_text = insert_index_into_text(self.toPlainText(), lang=lang or "de")
-        self.setPlainText(new_text)
+        self._replace_all_text_undoable(new_text)
         return new_text
 
     #: Standard-Markierfarbe (Textmarker) — wird in HTML/DOCX als Hintergrund gespeichert

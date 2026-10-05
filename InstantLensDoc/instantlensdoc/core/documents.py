@@ -207,6 +207,39 @@ def detect_kind(path: Path) -> DocKind:
     return DocKind.UNKNOWN
 
 
+_SNIFF_KIND_TO_DOCKIND = {
+    "zip-docx": DocKind.DOCX,
+    "html": DocKind.HTML,
+    "rtf": DocKind.RTF,
+    "text": DocKind.TEXT,
+    "png": DocKind.IMAGE,
+    "jpeg": DocKind.IMAGE,
+}
+
+
+def detect_kind_mismatch(path: Path) -> tuple[DocKind, str] | None:
+    """Datei mit ``.pdf``-Endung, deren **Inhalt** kein PDF ist (DOCX/HTML/RTF/Text/Bild).
+
+    Rückgabe ``(echter DocKind, deutscher Hinweis)`` oder ``None``. Feldfall 2.6.53:
+    ``Dunning_Kruger_Effekt_1.pdf`` war ein byte-identisches Word-DOCX — statt
+    „Data format error“ wird die Datei mit ihrem echten Typ geöffnet — 2.6.54.
+    """
+    if path.suffix.lower() != ".pdf":
+        return None
+    try:
+        from ild_pdf.pdf_sniff import describe_non_pdf_de, sniff_file
+
+        sn = sniff_file(path)
+    except Exception:
+        return None
+    if sn.is_pdf_like or sn.kind in ("empty", "unreadable"):
+        return None
+    real = _SNIFF_KIND_TO_DOCKIND.get(sn.kind)
+    if real is None:
+        return None
+    return real, describe_non_pdf_de(sn)
+
+
 def open_document(path: str | Path, *, encoding: str | None = None) -> Document:
     path = Path(path)
     if not path.exists():
@@ -214,7 +247,25 @@ def open_document(path: str | Path, *, encoding: str | None = None) -> Document:
     if not path.is_file():
         raise IsADirectoryError(f"Kein Dateipfad: {path}")
     kind = detect_kind(path)
+    mismatch = detect_kind_mismatch(path)
     doc = Document(path=path, kind=kind, title=path.name)
+    if mismatch is not None:
+        real_kind, hint = mismatch
+        import logging
+
+        logging.getLogger("instantlensdoc.documents").warning(
+            "Endung .pdf, Inhalt %s — Datei wird als %s geöffnet: %s",
+            real_kind.name,
+            real_kind.name,
+            path,
+        )
+        kind = real_kind
+        doc.kind = kind
+        doc.meta["kind_mismatch"] = hint
+        doc.meta["kind_mismatch_kind"] = real_kind.name
+        # Speichern (Strg+S) würde den falsch benannten .pdf-Namen weiter als DOCX/HTML
+        # beschreiben → Nutzer soll „Speichern unter“ mit richtiger Endung wählen
+        doc.meta["readonly"] = True
 
     if encoding is None:
         try:
@@ -435,9 +486,32 @@ def save_document(
 
             export_html(doc.text, target, title=doc.title or target.stem)
     elif kind == DocKind.PDF:
-        # PDF-Inhalt wird über Annotation-Sidecar / pikepdf verwaltet
-        if doc.path and doc.path.resolve() != target.resolve():
-            shutil.copy2(doc.path, target)
+        # Ziel .pdf: NIE eine Nicht-PDF-Quelle byte-identisch kopieren. Genau das
+        # erzeugte im Feld (≤ 2.6.42: „Speichern unter … .pdf“ aus einem DOCX) eine
+        # Datei mit .pdf-Endung und ZIP-Inhalt → PDFium „Data format error“, pikepdf
+        # „unable to find trailer dictionary“, Edge „ungültiges Dateiformat“ — 2.6.54
+        from ild_pdf.pdf_sniff import assert_valid_pdf, sniff_file
+
+        src_is_pdf = False
+        if doc.kind == DocKind.PDF and doc.path and doc.path.is_file():
+            src_is_pdf = sniff_file(doc.path).is_pdf_like
+        if src_is_pdf:
+            # Echte PDF-Datei: Inhalt wird über Annotation-Sidecar / pikepdf verwaltet
+            if doc.path.resolve() != target.resolve():
+                shutil.copy2(doc.path, target)
+                assert_valid_pdf(target)
+        else:
+            # Editor-Dokument (TXT/MD/HTML/DOCX/RTF …) → echtes PDF über den Exporter;
+            # formatiertes HTML (DOCX/HTML) wird — wenn Qt läuft — mit Formaten gesetzt.
+            from instantlensdoc.core.export import export_pdf
+
+            html = (doc.meta or {}).get("html") if doc.kind != DocKind.PDF else None
+            export_pdf(
+                doc.text or "",
+                target,
+                title=doc.title or target.stem,
+                html=str(html) if html else None,
+            )
     elif kind == DocKind.IMAGE:
         if doc.path and doc.path.resolve() != target.resolve():
             shutil.copy2(doc.path, target)

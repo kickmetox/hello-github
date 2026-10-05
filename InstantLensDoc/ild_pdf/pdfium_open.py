@@ -18,8 +18,10 @@ obwohl Textsuche/pikepdf dieselbe Datei lesen. Mögliche Ursachen, alle hier abg
    Open; Worker-Threads nutzen nur noch pikepdf (siehe ``security.needs_password``,
    ``pdf_view._schedule_page_count_refresh``).
 
-Kette: Bytes → str-Pfad → pikepdf-Reparatur → aussagekräftiger Fehler, der jeden
-Schritt mit exakter Exception sowie pypdfium2-/PDFium-Version nennt.
+Kette: Header-Sniff (Schritt 0, 2.6.54: DOCX/HTML/Text/0 Byte mit .pdf-Namen → sofort
+konkrete Diagnose statt „Data format error“) → Bytes → str-Pfad → pikepdf-Reparatur →
+aussagekräftiger Fehler, der jeden Schritt mit exakter Exception sowie
+pypdfium2-/PDFium-Version nennt.
 """
 
 from __future__ import annotations
@@ -51,6 +53,7 @@ _BYTES_CACHE: "OrderedDict[tuple[str, int, int], tuple[bytes, bool]]" = OrderedD
 # Letzter erfolgreicher Schritt je Datei (für Status/Log/Diagnose)
 _LAST_OPEN_STEP: dict[str, str] = {}
 
+STEP_HEADER = "header"
 STEP_BYTES = "bytes"
 STEP_PATH = "path"
 STEP_REPAIR = "pikepdf-repair"
@@ -62,11 +65,25 @@ class PdfiumOpenError(RuntimeError):
     ``steps`` enthält ``(schritt, fehlertext)`` in Reihenfolge der Versuche.
     """
 
-    def __init__(self, path: Path, steps: list[tuple[str, str]], *, password_error: bool = False):
+    def __init__(
+        self,
+        path: Path,
+        steps: list[tuple[str, str]],
+        *,
+        password_error: bool = False,
+        sniff: Any = None,
+    ):
         self.path = Path(path)
         self.steps = list(steps)
         self.password_error = bool(password_error)
+        # ``pdf_sniff.SniffResult`` — gesetzt, wenn die Datei gar kein PDF ist
+        self.sniff = sniff
         super().__init__(format_open_failure(self.path, self.steps))
+
+    @property
+    def not_a_pdf(self) -> bool:
+        """Datei-Inhalt ist kein PDF (DOCX/HTML/Text/leer …) — kein Parser-Fehler."""
+        return self.sniff is not None and not getattr(self.sniff, "is_pdf_like", True)
 
 
 def pdfium_version_info() -> str:
@@ -102,6 +119,7 @@ def pdfium_version_info() -> str:
 def format_open_failure(path: Path, steps: list[tuple[str, str]]) -> str:
     """Mehrzeiliger Fehlertext: Datei, jeder Schritt mit exakter Exception, Versionen."""
     names = {
+        STEP_HEADER: "Schritt 0 (Datei-Header)",
         STEP_BYTES: "Schritt 1 (Bytes → FPDF_LoadMemDocument)",
         STEP_PATH: "Schritt 2 (str-Pfad → FPDF_LoadDocument)",
         STEP_REPAIR: "Schritt 3 (pikepdf-Reparatur → Bytes)",
@@ -239,6 +257,25 @@ def open_pdfium(
     if allow_repair:
         order = order + (STEP_REPAIR,)
 
+    # Schritt 0: Inhalt statt Endung prüfen. Ein DOCX/HTML/Text mit .pdf-Namen oder
+    # eine 0-Byte-Datei bekommt eine konkrete Diagnose (Typ, Größe, Header-Hex) statt
+    # dreimal „Data format error“ — Feldfall 2.6.53 — 2.6.54
+    sniff = None
+    try:
+        from .pdf_sniff import describe_non_pdf_de, sniff_file
+
+        sniff = sniff_file(p)
+        if not sniff.is_pdf_like:
+            msg = describe_non_pdf_de(sniff)
+            _log.warning("PDF-Öffnung abgebrochen (kein PDF): %s", msg)
+            raise PdfiumOpenError(p, [(STEP_HEADER, msg)], sniff=sniff)
+        if not sniff.is_clean_pdf:
+            steps.append((STEP_HEADER, f"{sniff.label_de}: {sniff.detail} — Reparatur wird versucht"))
+    except PdfiumOpenError:
+        raise
+    except Exception as e:  # pragma: no cover - Sniff darf das Öffnen nie verhindern
+        _log.debug("Header-Sniff fehlgeschlagen: %s", e)
+
     with PDFIUM_LOCK:
         for step in order:
             try:
@@ -272,7 +309,7 @@ def open_pdfium(
                     "; ".join(f"{s}: {m}" for s, m in steps) or "-",
                 )
             return doc
-    raise PdfiumOpenError(p, steps)
+    raise PdfiumOpenError(p, steps, sniff=sniff)
 
 
 def open_pdfium_steps_summary(path: str | Path) -> str:

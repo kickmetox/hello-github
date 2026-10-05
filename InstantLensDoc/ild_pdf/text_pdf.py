@@ -7,6 +7,10 @@ from typing import Tuple
 
 from .pages import PAGE_SIZE_PRESETS
 
+# Producer/CreatorTool in jeder Text→PDF-Ausgabe: macht eigene Dateien im Feld
+# (pdf_doctor, Edge/Adobe-Eigenschaften) eindeutig zuordenbar — 2.6.54
+PRODUCER = "InstantLens Doc (ild_pdf.text_pdf / pikepdf)"
+
 
 def _resolve_page_size(
     page_size: Tuple[float, float] | str | None,
@@ -72,6 +76,8 @@ def text_to_pdf(
     Zeilenumbruch nach Zeichenzahl — kein Layout-Engine.
     Schriftgröße/Rand seit 1.7.1 parametrisch.
     """
+    import os
+
     import pikepdf
     from pikepdf import Dictionary, Name, Stream
 
@@ -92,10 +98,13 @@ def text_to_pdf(
         return s.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
 
     pdf = pikepdf.Pdf.new()
+    # WinAnsiEncoding: Umlaute/ß/€ aus dem cp1252-Bereich landen auf den richtigen
+    # Glyphen (StandardEncoding zeigte z. B. „ä“ als Fremdzeichen) — 2.6.54
     font = Dictionary(
         Type=Name.Font,
         Subtype=Name.Type1,
         BaseFont=Name.Helvetica,
+        Encoding=Name.WinAnsiEncoding,
     )
     for plines in pages_lines:
         parts = [
@@ -111,16 +120,32 @@ def text_to_pdf(
             else:
                 parts.append(f"0 {-line_h:.2f} Td ({esc(line)}) Tj")
         parts.append("ET")
-        content = "\n".join(parts).encode("latin-1", errors="replace")
+        content = "\n".join(parts).encode("cp1252", errors="replace")
         page = pdf.add_blank_page(page_size=(page_w, page_h))
         page[Name.Resources] = Dictionary(Font=Dictionary(F1=font))
         page[Name.Contents] = Stream(pdf, content)
 
-    if title:
-        with pdf.open_metadata() as meta:
+    with pdf.open_metadata(set_pikepdf_as_editor=False) as meta:
+        if title:
             meta["dc:title"] = title
+        meta["pdf:Producer"] = PRODUCER
+        meta["xmp:CreatorTool"] = PRODUCER
     dest.parent.mkdir(parents=True, exist_ok=True)
-    pdf.save(dest)
+    # Erst in eine Temp-Datei im Zielordner, dann atomar ersetzen: ein Absturz oder
+    # Fehler mitten im Schreiben hinterlässt nie eine halbe .pdf — 2.6.54
+    tmp = dest.with_name(f".{dest.name}.ild-tmp{os.getpid()}")
+    try:
+        pdf.save(tmp)
+        from .pdf_sniff import assert_valid_pdf
+
+        assert_valid_pdf(tmp, remove_invalid=True)
+        os.replace(tmp, dest)
+    finally:
+        try:
+            if tmp.exists():
+                tmp.unlink()
+        except OSError:
+            pass
     return dest
 
 

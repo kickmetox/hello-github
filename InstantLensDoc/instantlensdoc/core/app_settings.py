@@ -2754,12 +2754,41 @@ def set_editor_line_numbers(enabled: bool) -> None:
 
 
 def get_editor_minimap() -> bool:
-    """Optionale Editor-Minimap (Linien-Übersicht + dickere Scrollbar)."""
+    """Optionale Editor-Minimap (Linien-Übersicht) — Standard **aus**.
+
+    Gilt nur für Plaintext/Code (TXT/MD/…); Rich-Dokumente (DOCX/HTML) zeigen nie eine
+    Minimap (``TextEditor.minimap_width`` → 0 im Rich-Modus) — 2.6.54.
+    """
     return bool(load_settings().get("editor_minimap", False))
 
 
 def set_editor_minimap(enabled: bool) -> None:
     save_settings({"editor_minimap": bool(enabled)})
+
+
+MINIMAP_RESET_MARKER = "editor_minimap_reset_2654"
+
+
+def apply_one_time_migrations() -> list[str]:
+    """Einmalige Einstellungs-Korrekturen beim Start (idempotent) — 2.6.54.
+
+    * ``editor_minimap``: Im Feld war die Code-Minimap neben DOCX-Text aktiv („graue
+      Balken, unlesbar, nutzlos“), ohne dass sie bewusst eingeschaltet wurde (Shortcut
+      Ctrl+Shift+I lag neben Kursiv). Einmalig auf **aus** setzen; danach gilt wieder
+      die Nutzerwahl (Ansicht → Editor-Minimap / Einstellungen).
+    """
+    done: list[str] = []
+    try:
+        data = load_settings()
+        if not bool(data.get(MINIMAP_RESET_MARKER, False)):
+            updates: dict[str, Any] = {MINIMAP_RESET_MARKER: True}
+            if bool(data.get("editor_minimap", False)):
+                updates["editor_minimap"] = False
+                done.append("editor_minimap → aus")
+            save_settings(updates)
+    except Exception:
+        pass
+    return done
 
 
 # Feste Annotation-Palette für Zyklus/Randomizer (Highlight/Stift/Notiz)

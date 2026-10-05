@@ -566,6 +566,47 @@ def check_version() -> None:
     if "def docx_default_font" not in rt or "font-family" not in rt:
         _fail("richtext_docx fehlt Standardschrift/Run-Fonts (2.6.53)")
     _ok("2.6.53 pdfium-fallback-chain/no-worker-pdfium/docx-wrap/page-layout: OK")
+    # 2.6.54 (Code auf diesem Branch; Versionsnummer unverändert bis zum Bump):
+    # Save-As-.pdf nie DOCX-Kopie, Header-Sniff, pdf_doctor, Minimap aus, Undo-Pfeile
+    sniff_py = ROOT / "ild_pdf" / "pdf_sniff.py"
+    if not sniff_py.is_file():
+        _fail("ild_pdf/pdf_sniff.py fehlt (2.6.54)")
+    sniff_src = sniff_py.read_text(encoding="utf-8")
+    for need in ("def sniff_file", "def describe_non_pdf_de", "def validate_pdf_file", "KIND_ZIP_DOCX"):
+        if need not in sniff_src:
+            _fail(f"pdf_sniff fehlt {need} (2.6.54)")
+    po_src = (ROOT / "ild_pdf" / "pdfium_open.py").read_text(encoding="utf-8")
+    if "STEP_HEADER" not in po_src or "describe_non_pdf_de" not in po_src:
+        _fail("pdfium_open fehlt Header-Schritt 0 (2.6.54)")
+    docs_src = (ROOT / "instantlensdoc" / "core" / "documents.py").read_text(encoding="utf-8")
+    if "detect_kind_mismatch" not in docs_src or "NIE eine Nicht-PDF-Quelle" not in docs_src:
+        _fail("documents.save_document kopiert .pdf ohne Inhaltssniff (2.6.54)")
+    exp_src = (ROOT / "instantlensdoc" / "core" / "export.py").read_text(encoding="utf-8")
+    if "QPdfWriter" not in exp_src or "html: Optional[str]" not in exp_src:
+        _fail("export_pdf fehlt QPdfWriter/html (2.6.54)")
+    tpdf = (ROOT / "ild_pdf" / "text_pdf.py").read_text(encoding="utf-8")
+    if "assert_valid_pdf" not in tpdf or "os.replace" not in tpdf:
+        _fail("text_to_pdf ohne Validierung/atomares Replace (2.6.54)")
+    if "fmt=\"pdf\"" not in mw and "fmt='pdf'" not in mw:
+        pass
+    if "kind_mismatch" not in mw or "validate_pdf_file" not in mw:
+        _fail("main_window.save_as fehlt PDF-Validierung/Mismatch-Banner (2.6.54)")
+    if "_sync_undo_redo_enabled" not in mw or "Ctrl+Shift+Z" not in mw:
+        _fail("main_window fehlt Undo/Redo-Sync (2.6.54)")
+    ed_src = (ROOT / "instantlensdoc" / "ui" / "editor.py").read_text(encoding="utf-8")
+    if "_replace_all_text_undoable" not in ed_src or "minimap_effective" not in ed_src:
+        _fail("editor fehlt Undo-Block/Minimap-Rich-Guard (2.6.54)")
+    rb = (ROOT / "instantlensdoc" / "ui" / "ribbon_bar.py").read_text(encoding="utf-8")
+    if '("undo", "Rückgängig")' not in rb or "def set_enabled" not in rb:
+        _fail("Ribbon fehlt Start-Undo-Pfeile (2.6.54)")
+    if not (ROOT / "scripts" / "pdf_doctor.py").is_file():
+        _fail("scripts/pdf_doctor.py fehlt (2.6.54)")
+    if not (ROOT / "scripts" / "test_ui_audit_2654.py").is_file():
+        _fail("scripts/test_ui_audit_2654.py fehlt (2.6.54)")
+    as_src = (ROOT / "instantlensdoc" / "core" / "app_settings.py").read_text(encoding="utf-8")
+    if "apply_one_time_migrations" not in as_src or "editor_minimap_reset_2654" not in as_src:
+        _fail("app_settings fehlt Minimap-Reset-Migration (2.6.54)")
+    _ok("2.6.54 pdf-sniff/save-as-export/pdf_doctor/minimap-off/undo-arrows: OK")
 
 
 def check_imports(*, with_qt: bool) -> None:
