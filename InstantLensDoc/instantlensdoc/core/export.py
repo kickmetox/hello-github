@@ -804,8 +804,20 @@ def import_pptx(path: str | Path) -> str:
     return "\n\n".join(parts).strip() + ("\n" if parts else "")
 
 
-def export_docx(text: str, path: str | Path, *, title: Optional[str] = None) -> Path:
-    """DOCX mit Absätzen; Zeilen mit # werden Heading-Styles."""
+def export_docx(text: str, path: str | Path, *, title: Optional[str] = None, html: Optional[str] = None) -> Path:
+    """DOCX mit Absätzen; optional HTML mit Bold/Italic/Underline — 2.6.49."""
+    if html:
+        from instantlensdoc.core.richtext_docx import html_to_docx
+
+        return html_to_docx(html, path, title=title)
+
+    # Markdown-ähnliche Marker im Plaintext → echte Runs
+    stripped = (text or "").lstrip().lower()
+    if "<b>" in stripped or "<i>" in stripped or "<u>" in stripped or "<p" in stripped:
+        from instantlensdoc.core.richtext_docx import html_to_docx
+
+        return html_to_docx(text, path, title=title)
+
     try:
         from docx import Document as DocxDocument
         from docx.shared import Pt
@@ -834,9 +846,38 @@ def export_docx(text: str, path: str | Path, *, title: Optional[str] = None) -> 
         elif re.match(r"^[-*]\s+", raw):
             d.add_paragraph(re.sub(r"^[-*]\s+", "", raw), style="List Bullet")
         else:
-            d.add_paragraph(raw)
+            # Inline **bold** / *italic* / __underline__ → echte Runs
+            _add_paragraph_with_md_runs(d, raw)
     d.save(str(path))
     return path
+
+
+def _add_paragraph_with_md_runs(doc: Any, raw: str) -> None:
+    """Konvertiert einfache Markdown-Inline-Marker in DOCX-Runs (Export-Hilfe)."""
+    para = doc.add_paragraph("")
+    # **bold** | __underline__ | *italic* (nicht gierig)
+    pattern = re.compile(r"(\*\*[^*]+\*\*|__[^_]+__|\*[^*]+\*)")
+    pos = 0
+    for m in pattern.finditer(raw or ""):
+        if m.start() > pos:
+            para.add_run(raw[pos : m.start()])
+        token = m.group(0)
+        if token.startswith("**") and token.endswith("**"):
+            run = para.add_run(token[2:-2])
+            run.bold = True
+        elif token.startswith("__") and token.endswith("__"):
+            run = para.add_run(token[2:-2])
+            run.underline = True
+        elif token.startswith("*") and token.endswith("*"):
+            run = para.add_run(token[1:-1])
+            run.italic = True
+        else:
+            para.add_run(token)
+        pos = m.end()
+    if pos < len(raw or ""):
+        para.add_run(raw[pos:])
+    if pos == 0 and not (raw or ""):
+        para.add_run("")
 
 
 def resolve_page_size(name_or_size: str | tuple[float, float] | None = None) -> tuple[float, float]:
@@ -902,8 +943,18 @@ def _rtf_escape(s: str) -> str:
     return "".join(out)
 
 
-def export_rtf(text: str, path: str | Path, *, title: Optional[str] = None) -> Path:
-    """Einfaches RTF (Absätze, Überschriften #/##) — 2.6.14."""
+def export_rtf(text: str, path: str | Path, *, title: Optional[str] = None, html: Optional[str] = None) -> Path:
+    """Einfaches RTF (Absätze, Überschriften #/##); optional HTML mit Formaten — 2.6.49."""
+    if html:
+        from instantlensdoc.core.richtext_docx import html_to_rtf
+
+        return html_to_rtf(html, path, title=title)
+    stripped = (text or "").lstrip().lower()
+    if "<b>" in stripped or "<i>" in stripped or "<u>" in stripped or "font-weight" in stripped:
+        from instantlensdoc.core.richtext_docx import html_to_rtf
+
+        return html_to_rtf(text, path, title=title)
+
     path = Path(path)
     parts = [
         r"{\rtf1\ansi\deff0",
@@ -1083,20 +1134,29 @@ def import_document_text(path: str | Path) -> dict[str, Any]:
         return {"text": import_rtf(path), "meta": meta}
     if ext == "docx":
         try:
-            from docx import Document as DocxDocument
+            from instantlensdoc.core.richtext_docx import docx_plain_and_html
 
-            from ild_pdf.tables import create_table, table_to_markdown
+            plain, html = docx_plain_and_html(path)
+            return {
+                "text": plain,
+                "meta": {**meta, "html": html, "rich_text": True},
+            }
+        except Exception:
+            try:
+                from docx import Document as DocxDocument
 
-            d = DocxDocument(str(path))
-            parts: list[str] = [p.text for p in d.paragraphs]
-            for ti, tbl in enumerate(d.tables):
-                cells = [[(c.text or "") for c in row.cells] for row in tbl.rows]
-                parts.append(
-                    table_to_markdown(create_table(data=cells, table_id=f"docx{ti + 1}"))
-                )
-            return {"text": "\n".join(parts), "meta": meta}
-        except ImportError as e:
-            raise RuntimeError("python-docx fehlt zum DOCX-Import") from e
+                from ild_pdf.tables import create_table, table_to_markdown
+
+                d = DocxDocument(str(path))
+                parts: list[str] = [p.text for p in d.paragraphs]
+                for ti, tbl in enumerate(d.tables):
+                    cells = [[(c.text or "") for c in row.cells] for row in tbl.rows]
+                    parts.append(
+                        table_to_markdown(create_table(data=cells, table_id=f"docx{ti + 1}"))
+                    )
+                return {"text": "\n".join(parts), "meta": meta}
+            except ImportError as e:
+                raise RuntimeError("python-docx fehlt zum DOCX-Import") from e
     if ext == "xlsx":
         from ild_pdf.tables import import_xlsx, table_to_markdown
 

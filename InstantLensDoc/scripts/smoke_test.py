@@ -31915,13 +31915,20 @@ def main() -> int:
             win.editor.update_auto_toc()
             assert "ILD-TOC-BEGIN" in win.editor.toPlainText() or "Inhaltsverzeichnis" in win.editor.toPlainText()
             win.editor.setPlainText("wort")
-            from PySide6.QtGui import QTextCursor as _TC2610
+            from PySide6.QtGui import QTextCursor as _TC2610, QFont as _QF2610
 
             cur_b = win.editor.textCursor()
             cur_b.select(_TC2610.Document)
             win.editor.setTextCursor(cur_b)
             assert win.editor.toggle_bold_selection()
-            assert "**wort**" in win.editor.toPlainText()
+            # 2.6.49: echte QTextCharFormat, keine Markdown-Asterisks
+            assert "**wort**" not in win.editor.toPlainText()
+            assert "wort" in win.editor.toPlainText()
+            assert "*" not in win.editor.toPlainText()
+            _probe_b = win.editor.textCursor()
+            _probe_b.setPosition(0)
+            _probe_b.setPosition(4, _TC2610.KeepAnchor)
+            assert _probe_b.charFormat().fontWeight() >= _QF2610.Bold
             dlg_font = InlineTextEditDialog("Hi", TS2610(font_family="Arial"), win)
             assert dlg_font.font_family.objectName() == "inlineTextEditFontFamily"
             assert dlg_font.font_family.count() >= 1 or bool(dlg_font.font_family.currentText())

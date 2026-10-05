@@ -1654,7 +1654,7 @@ class TextEditor(QPlainTextEdit):
         return count
 
     def wrap_selection_markers(self, left: str, right: str | None = None) -> bool:
-        """Auswahl mit Markern umschließen (Markdown **/*/_ ) — Word-ähnlich Ctrl+B/I/U."""
+        """Auswahl mit Markern umschließen (Markdown **/*/_ ) — optional, nicht Toolbar."""
         right = left if right is None else right
         cur = self.textCursor()
         if not cur.hasSelection():
@@ -1679,14 +1679,89 @@ class TextEditor(QPlainTextEdit):
         self.setTextCursor(cur)
         return True
 
+    def set_rich_html(self, html: str) -> None:
+        """HTML mit Zeichenformaten in das Dokument laden (DOCX/Word-Suite) — 2.6.49."""
+        self.document().setHtml(html or "")
+
+    def to_rich_html(self) -> str:
+        """Aktuelles Dokument als HTML (Bold/Italic/Underline erhalten)."""
+        return self.document().toHtml()
+
+    def _selection_or_word_cursor(self) -> QTextCursor:
+        cur = self.textCursor()
+        if not cur.hasSelection():
+            cur.select(QTextCursor.WordUnderCursor)
+        return cur
+
+    def _selection_probe_format(self, cur: QTextCursor) -> QTextCharFormat:
+        """Zeichenformat am Anfang der Auswahl (oder CurrentFormat ohne Auswahl)."""
+        if not cur.hasSelection():
+            return QTextCharFormat(self.currentCharFormat())
+        start = min(cur.selectionStart(), cur.selectionEnd())
+        end = max(cur.selectionStart(), cur.selectionEnd())
+        probe = QTextCursor(self.document())
+        probe.setPosition(start)
+        if end > start:
+            probe.setPosition(min(start + 1, end), QTextCursor.KeepAnchor)
+            return QTextCharFormat(probe.charFormat())
+        return QTextCharFormat(self.currentCharFormat())
+
+    def toggle_char_format(
+        self,
+        *,
+        bold: bool | None = None,
+        italic: bool | None = None,
+        underline: bool | None = None,
+    ) -> bool:
+        """QTextCharFormat auf Auswahl toggeln — nie Markdown-Marker — 2.6.49."""
+        cur = self._selection_or_word_cursor()
+        probe = self._selection_probe_format(cur)
+        fmt = QTextCharFormat()
+        if bold is not None:
+            make_on = bold
+            if bold is True:
+                # Toggle: wenn bereits fett → aus
+                make_on = probe.fontWeight() < QFont.Bold
+            fmt.setFontWeight(QFont.Bold if make_on else QFont.Normal)
+        if italic is not None:
+            make_on = italic
+            if italic is True:
+                make_on = not bool(probe.fontItalic())
+            fmt.setFontItalic(bool(make_on))
+        if underline is not None:
+            make_on = underline
+            if underline is True:
+                make_on = not bool(probe.fontUnderline())
+            # Unterstreicht Buchstaben inkl. Selection — nicht nur Whitespace
+            fmt.setFontUnderline(bool(make_on))
+        if not cur.hasSelection():
+            self.mergeCurrentCharFormat(fmt)
+            return True
+        cur.mergeCharFormat(fmt)
+        self.setTextCursor(cur)
+        self.setCurrentCharFormat(fmt)
+        return True
+
     def toggle_bold_selection(self) -> bool:
-        return self.wrap_selection_markers("**")
+        """Fett via QTextCharFormat (kein ``**``) — 2.6.49."""
+        return self.toggle_char_format(bold=True)
 
     def toggle_italic_selection(self) -> bool:
-        return self.wrap_selection_markers("*")
+        """Kursiv via QTextCharFormat (kein ``*``) — 2.6.49."""
+        return self.toggle_char_format(italic=True)
 
     def toggle_underline_selection(self) -> bool:
-        return self.wrap_selection_markers("__")
+        """Unterstrichen via QTextCharFormat (kein ``__``) — 2.6.49."""
+        return self.toggle_char_format(underline=True)
+
+    def selection_font_bold(self) -> bool:
+        return self._selection_probe_format(self.textCursor()).fontWeight() >= QFont.Bold
+
+    def selection_font_italic(self) -> bool:
+        return bool(self._selection_probe_format(self.textCursor()).fontItalic())
+
+    def selection_font_underline(self) -> bool:
+        return bool(self._selection_probe_format(self.textCursor()).fontUnderline())
 
     def apply_auto_format(self) -> int:
         """Automatische Formatierung (Heading/Body/Quote) — 2.6.10."""
@@ -2275,10 +2350,10 @@ class EditorPane(QWidget):
                 "underline",
                 "Unterstreichen",
                 False,
-                "Auswahl unterstreichen (Markdown __…__) — 2.6.44",
+                "Auswahl unterstreichen (QTextCharFormat) — Buchstaben inkl. — 2.6.49",
             ),
-            ("bold", "Fett", False, "Fett (Markdown **) — Ctrl+B"),
-            ("italic", "Kursiv", False, "Kursiv (Markdown *) — Ctrl+I"),
+            ("bold", "Fett", False, "Fett (QTextCharFormat) — Ctrl+B — 2.6.49"),
+            ("italic", "Kursiv", False, "Kursiv (QTextCharFormat) — Ctrl+I — 2.6.49"),
             (
                 "clear_marks",
                 "Markierungen löschen",

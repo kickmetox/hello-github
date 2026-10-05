@@ -1,3 +1,7 @@
+## 2.6.49 - Word-Suite/DOCX: echte Rich-Text-Formate (kein Markdown)
+
+Patch nach **2.6.48** (PDFium-Buffer): Nutzerbericht — DOCX öffnete als Plaintext ohne Fett/Kursiv/Absätze; Toolbar Fett/Kursiv setzte `**`/`*`-Marker; Unterstreichen wirkte nur auf Lücken/`__`. Fix: **`richtext_docx`** lädt DOCX via python-docx → HTML mit `<b>/<i>/<u>`; Editor **`QTextCharFormat`** (fontWeight/italic/underline) statt Markdown-Wrapper; Underline auf Buchstaben; Speichern DOCX/HTML/RTF erhält Formate aus `meta.html`. Smoke `scripts/test_docx_richtext.py`. Pack `InstantLensDoc-2.6.49-pack.zip`; VERSION **2.6.49**.
+
 ## 2.6.48 - Weiße Hauptansicht/Thumbs: PDFium-Buffer detach + sichtbarer Paint
 
 Patch nach **2.6.47** (sichtbarer Fallback): Feldbericht — Text geladen, zentrale Ansicht **weiter weiß**, Schnellvorschau-Thumb grau, **kein** Fallback-Banner. Ursache: `bitmap.to_pil()` teilt bei RGBA/BGRA den PDFium-Buffer; nach `page`/`doc`/`bitmap.close()` Use-after-free → oft weißes Ghost-Pixmap, das als „Erfolg“ zählte (`_canvas_has_page_image` nur internes `_pixmap`). Thumbs blieben Platzhalter.

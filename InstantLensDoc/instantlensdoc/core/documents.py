@@ -228,30 +228,44 @@ def open_document(path: str | Path, *, encoding: str | None = None) -> Document:
     if requested == "auto":
         doc.meta["encoding_detected"] = True
 
-    if kind in (DocKind.TEXT, DocKind.MARKDOWN, DocKind.HTML):
+    if kind in (DocKind.TEXT, DocKind.MARKDOWN):
         doc.text = path.read_text(encoding=enc, errors="replace")
         doc.meta["encoding"] = enc
+    elif kind == DocKind.HTML:
+        doc.text = path.read_text(encoding=enc, errors="replace")
+        doc.meta["encoding"] = enc
+        doc.meta["html"] = doc.text
+        doc.meta["rich_text"] = True
     elif kind == DocKind.DOCX:
         try:
-            from instantlensdoc.core.export import import_document_text
+            from instantlensdoc.core.richtext_docx import docx_plain_and_html
 
-            loaded = import_document_text(path)
-            doc.text = loaded.get("text") or ""
-            doc.meta.update(loaded.get("meta") or {})
+            plain, html = docx_plain_and_html(path)
+            doc.text = plain
+            doc.meta["html"] = html
+            doc.meta["rich_text"] = True
         except Exception:
             try:
-                from docx import Document as DocxDocument
+                from instantlensdoc.core.export import import_document_text
 
-                d = DocxDocument(str(path))
-                doc.text = "\n".join(p.text for p in d.paragraphs)
-            except ImportError:
-                doc.text = "[python-docx nicht installiert]"
-                doc.meta["error"] = "python-docx fehlt"
+                loaded = import_document_text(path)
+                doc.text = loaded.get("text") or ""
+                doc.meta.update(loaded.get("meta") or {})
+            except Exception:
+                try:
+                    from docx import Document as DocxDocument
+
+                    d = DocxDocument(str(path))
+                    doc.text = "\n".join(p.text for p in d.paragraphs)
+                except ImportError:
+                    doc.text = "[python-docx nicht installiert]"
+                    doc.meta["error"] = "python-docx fehlt"
     elif kind == DocKind.RTF:
         from instantlensdoc.core.export import import_rtf
 
         doc.text = import_rtf(path)
         doc.meta["encoding"] = "utf-8"
+        # RTF-Import bleibt plaintext; Editor-Formate beim Speichern via meta.html
     elif kind == DocKind.XLSX:
         from ild_pdf.tables import import_xlsx, table_to_markdown
 
@@ -366,22 +380,36 @@ def save_document(
         enc = normalize_text_encoding(doc.meta.get("encoding"))
 
     if kind == DocKind.DOCX:
-        from instantlensdoc.core.export import export_docx
+        html = (doc.meta or {}).get("html")
+        if html:
+            from instantlensdoc.core.richtext_docx import html_to_docx
 
-        export_docx(doc.text, target, title=doc.title)
+            html_to_docx(str(html), target, title=doc.title)
+        else:
+            from instantlensdoc.core.export import export_docx
+
+            export_docx(doc.text, target, title=doc.title)
     elif kind == DocKind.RTF:
-        from instantlensdoc.core.export import export_rtf
+        html = (doc.meta or {}).get("html")
+        if html:
+            from instantlensdoc.core.richtext_docx import html_to_rtf
 
-        export_rtf(doc.text, target, title=doc.title)
+            html_to_rtf(str(html), target, title=doc.title)
+        else:
+            from instantlensdoc.core.export import export_rtf
+
+            export_rtf(doc.text, target, title=doc.title)
     elif kind == DocKind.XLSX:
         from instantlensdoc.core.export import export_xlsx_from_text
 
         export_xlsx_from_text(doc.text, target)
     elif kind == DocKind.HTML:
-        stripped = (doc.text or "").lstrip().lower()
-        if stripped.startswith("<!doctype") or stripped.startswith("<html"):
-            target.write_text(doc.text, encoding=enc, errors="replace")
+        html = (doc.meta or {}).get("html") or doc.text or ""
+        stripped = (html or "").lstrip().lower()
+        if stripped.startswith("<!doctype") or stripped.startswith("<html") or "<p" in stripped or "<b" in stripped:
+            target.write_text(html, encoding=enc, errors="replace")
             doc.meta["encoding"] = enc
+            doc.meta["html"] = html
         else:
             from instantlensdoc.core.export import export_html
 

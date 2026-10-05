@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Nightly/CI Smoke: CLI + Import-Checks für InstantLens Doc — 2.1.0–2.6.48.
+"""Nightly/CI Smoke: CLI + Import-Checks für InstantLens Doc — 2.1.0–2.6.49.
 
 Leichtgewichtig. Exit-Codes:
   0  OK  (ok=true)
@@ -14,12 +14,12 @@ Aufruf:
   python scripts/smoke_ild.py -h
 
 JSON-Schema (--json), Erfolg:
-  {"ok": true, "version": "2.6.48", "duration_ms": 1234,
+  {"ok": true, "version": "2.6.49", "duration_ms": 1234,
    "checks": ["version", "imports", "cli", "measure_diff_import", "changelog"]}
 
 JSON bei Fail: checks[] enthält Objekt mit error-Text (max 200 Zeichen, Truncate …);
 Exitcode spiegelt ok (0↔true, 1↔false) — 2.2.0:
-  {"ok": false, "version": "2.6.48", "duration_ms": 12,
+  {"ok": false, "version": "2.6.49", "duration_ms": 12,
    "checks": ["version", {"name": "imports", "error": "import x: …"}]}
 """
 
@@ -41,7 +41,7 @@ if str(ROOT) not in sys.path:
 # Headless/CI: Qt ohne Display
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-EXPECTED_VERSION = "2.6.48"
+EXPECTED_VERSION = "2.6.49"
 FAIL_ERROR_MAX_LEN = 200
 
 EXIT_OK = 0
@@ -82,7 +82,7 @@ def check_version() -> None:
         _fail(f"docs/VERSION={docs_ver!r}")
     bw = (ROOT / "build-windows.ps1").read_text(encoding="utf-8")
     if EXPECTED_VERSION not in bw or "Allow32Bit" not in bw:
-        _fail("build-windows.ps1 fehlt 2.6.48/Allow32Bit")
+        _fail("build-windows.ps1 fehlt 2.6.49/Allow32Bit")
     if not (ROOT / "scripts" / "pack-windows-runnable.py").is_file():
         _fail("scripts/pack-windows-runnable.py fehlt")
     if not (ROOT / "run-keygen.bat").is_file():
@@ -427,6 +427,29 @@ def check_version() -> None:
     if not test_canvas.is_file():
         _fail("scripts/test_pdf_canvas_not_blank.py fehlt (2.6.48)")
     _ok("2.6.48 pdfium-buffer-detach/canvas-ink/thumb-same-path: OK")
+    # 2.6.49: DOCX/Word-Suite echte QTextCharFormat (kein Markdown)
+    rt = ROOT / "instantlensdoc" / "core" / "richtext_docx.py"
+    if not rt.is_file():
+        _fail("richtext_docx.py fehlt (2.6.49)")
+    rt_src = rt.read_text(encoding="utf-8")
+    if "docx_to_html" not in rt_src or "html_to_docx" not in rt_src:
+        _fail("richtext_docx fehlt docx_to_html/html_to_docx (2.6.49)")
+    ed_src = (ROOT / "instantlensdoc" / "ui" / "editor.py").read_text(encoding="utf-8")
+    if "toggle_char_format" not in ed_src or "setFontUnderline" not in ed_src:
+        _fail("editor fehlt QTextCharFormat-Toggle (2.6.49)")
+    if 'wrap_selection_markers("**")' in ed_src and "toggle_bold_selection" in ed_src:
+        # bold must not call markdown wrappers
+        bold_fn = ed_src.split("def toggle_bold_selection", 1)[-1].split("def ", 1)[0]
+        if "wrap_selection_markers" in bold_fn:
+            _fail("toggle_bold_selection nutzt noch Markdown-Wrapper (2.6.49)")
+    if "set_rich_html" not in ed_src or "to_rich_html" not in ed_src:
+        _fail("editor fehlt set_rich_html/to_rich_html (2.6.49)")
+    if "richtext_docx" not in mw and "set_rich_html" not in mw:
+        _fail("main_window fehlt Rich-Text DOCX-Pfad (2.6.49)")
+    test_rt = ROOT / "scripts" / "test_docx_richtext.py"
+    if not test_rt.is_file():
+        _fail("scripts/test_docx_richtext.py fehlt (2.6.49)")
+    _ok("2.6.49 docx-richtext/qtextcharformat-no-markdown: OK")
 
 
 def check_imports(*, with_qt: bool) -> None:
@@ -455,6 +478,7 @@ def check_imports(*, with_qt: bool) -> None:
         "instantlensdoc.core.realtime_collab",
         "instantlensdoc.core.hyperlinks",
         "instantlensdoc.core.export",
+        "instantlensdoc.core.richtext_docx",
         "ild_pdf.print_prep",
         "ild_pdf.esign",
         "ild_pdf.sections",
@@ -1320,6 +1344,8 @@ def check_measure_and_diff() -> None:
 
 def check_changelog() -> None:
     cl = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    if "## 2.6.49" not in cl:
+        _fail("CHANGELOG fehlt ## 2.6.49")
     if "## 2.6.48" not in cl:
         _fail("CHANGELOG fehlt ## 2.6.48")
     if "## 2.6.46" not in cl:
@@ -1944,6 +1970,13 @@ def check_changelog() -> None:
     ):
         _fail("CHANGELOG 2.6.48 fehlt PDFium-Buffer/Canvas-Paint-Hinweis")
     if (
+        "QTextCharFormat" not in cl
+        and "richtext" not in cl.lower()
+        and "DOCX" not in cl
+        and "2.6.49" not in cl
+    ):
+        _fail("CHANGELOG 2.6.49 fehlt DOCX/Rich-Text/QTextCharFormat-Hinweis")
+    if (
         "Silbentrennung" not in cl
         and "Hyphen" not in cl
         and "Menü" not in cl
@@ -2279,6 +2312,13 @@ def check_changelog() -> None:
         and "pixmap" not in feat.lower()
     ):
         _fail("FEATURES.md fehlt 2.6.48 Canvas/Buffer-Paint-Hinweis")
+    if "2.6.49" not in feat or (
+        "QTextCharFormat" not in feat
+        and "richtext" not in feat.lower()
+        and "DOCX" not in feat
+        and "Word-Suite" not in feat
+    ):
+        _fail("FEATURES.md fehlt 2.6.49 DOCX/Rich-Text-Hinweis")
     if "2.6.44" not in feat or (
         "ildEditorToolbar" not in feat
         and "Markierungen" not in feat
@@ -2736,11 +2776,11 @@ Exit-Codes:
 Laufzeit: am Ende als „Laufzeit: N ms“ (oder duration_ms im JSON).
 
 Beispiel --json (Erfolg):
-  {"ok": true, "version": "2.6.48", "duration_ms": 1234,
+  {"ok": true, "version": "2.6.49", "duration_ms": 1234,
    "checks": ["version", "imports", "cli", "measure_diff_import", "changelog"]}
 
 Beispiel --json (Fail):
-  {"ok": false, "version": "2.6.48", "duration_ms": 12,
+  {"ok": false, "version": "2.6.49", "duration_ms": 12,
    "checks": ["version", {"name": "imports", "error": "import x: …"}]}
 """.rstrip()
     )

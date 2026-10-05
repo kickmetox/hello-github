@@ -104,6 +104,16 @@ powershell -ExecutionPolicy Bypass -File .\scripts\ild.ps1 license generate kund
 
 Anleitung: Store `docs/instantlensdoc-scripting.md` · Beispiel `examples/ild_scripting_demo.py`.
 
+## Neu in 2.6.49
+
+Patch nach **2.6.48** (PDFium-Buffer/Canvas) — Word-Suite / DOCX-Textbearbeitung:
+
+- DOCX öffnet mit echten Zeichen-/Absatzformaten (python-docx → HTML → QTextDocument), kein Plaintext-Dump
+- Toolbar/Menü Fett · Kursiv · Unterstrichen: `QTextCharFormat` (nie `**`/`*`/`__` Markdown)
+- Underline gilt für Buchstaben der Auswahl; Speichern DOCX/HTML/RTF erhält Formate (`meta.html`)
+- Smoke: `scripts/test_docx_richtext.py`
+- Pack: `InstantLensDoc-2.6.49-pack.zip`
+
 ## Neu in 2.6.48
 
 Patch nach **2.6.47** — weiße Hauptansicht + graue Thumbs trotz geladenem Text:

@@ -1622,17 +1622,17 @@ class MainWindow(QMainWindow):
         m_edit.addAction(act_find_repl)
         act_bold = QAction("Fett", self)
         act_bold.setShortcut(QKeySequence("Ctrl+B"))
-        act_bold.setToolTip("Fett (Markdown **…**) — Word/InDesign-ähnlich — 2.6.10")
+        act_bold.setToolTip("Fett (QTextCharFormat) — Word/InDesign — 2.6.49")
         act_bold.triggered.connect(self._toggle_bold)
         m_edit.addAction(act_bold)
         act_italic = QAction("Kursiv", self)
         act_italic.setShortcut(QKeySequence("Ctrl+I"))
-        act_italic.setToolTip("Kursiv (Markdown *…*) — 2.6.10")
+        act_italic.setToolTip("Kursiv (QTextCharFormat) — 2.6.49")
         act_italic.triggered.connect(self._toggle_italic)
         m_edit.addAction(act_italic)
         act_underline = QAction("Unterstrichen", self)
         act_underline.setShortcut(QKeySequence("Ctrl+U"))
-        act_underline.setToolTip("Unterstrichen (Markdown __…__) — 2.6.10")
+        act_underline.setToolTip("Unterstrichen (QTextCharFormat, Buchstaben inkl.) — 2.6.49")
         act_underline.triggered.connect(self._toggle_underline)
         m_edit.addAction(act_underline)
         act_auto_fmt = QAction("Automatische Formatierung", self)
@@ -8394,9 +8394,14 @@ class MainWindow(QMainWindow):
             pass
 
     def _on_text_changed(self):
-        if self.doc and self.doc.kind in (DocKind.TEXT, DocKind.MARKDOWN, DocKind.HTML, DocKind.DOCX):
-            self.doc.text = self.editor.toPlainText()
-            self.doc.dirty = True
+        if self.doc and self.doc.kind in (
+            DocKind.TEXT,
+            DocKind.MARKDOWN,
+            DocKind.HTML,
+            DocKind.DOCX,
+            DocKind.RTF,
+        ):
+            self._sync_editor_rich_meta()
             if self.doc.path:
                 self._mark_unsaved(self.doc.path, True)
             else:
@@ -8504,17 +8509,46 @@ class MainWindow(QMainWindow):
     def _toggle_bold(self) -> None:
         if self.stack.currentWidget() is self.editor_pane:
             self.editor.toggle_bold_selection()
-            self._set_status("Fett (Markdown **)")
+            self._sync_editor_rich_meta()
+            self._set_status("Fett (Zeichenformat)")
 
     def _toggle_italic(self) -> None:
         if self.stack.currentWidget() is self.editor_pane:
             self.editor.toggle_italic_selection()
-            self._set_status("Kursiv (Markdown *)")
+            self._sync_editor_rich_meta()
+            self._set_status("Kursiv (Zeichenformat)")
 
     def _toggle_underline(self) -> None:
         if self.stack.currentWidget() is self.editor_pane:
             self.editor.toggle_underline_selection()
-            self._set_status("Unterstrichen (Markdown __)")
+            self._sync_editor_rich_meta()
+            self._set_status("Unterstrichen (Zeichenformat)")
+
+    def _sync_editor_rich_meta(self) -> None:
+        """Plaintext + HTML-Meta aus dem Editor für DOCX/HTML/RTF-Speichern — 2.6.49."""
+        if not self.doc:
+            return
+        if self.doc.kind not in (
+            DocKind.TEXT,
+            DocKind.MARKDOWN,
+            DocKind.HTML,
+            DocKind.DOCX,
+            DocKind.RTF,
+        ):
+            return
+        try:
+            self.doc.text = self.editor.toPlainText()
+        except Exception:
+            return
+        if self.doc.kind in (DocKind.DOCX, DocKind.HTML, DocKind.RTF) or self.doc.meta.get(
+            "rich_text"
+        ):
+            try:
+                self.doc.meta["html"] = self.editor.to_rich_html()
+                self.doc.meta["rich_text"] = True
+            except Exception:
+                pass
+        self.doc.dirty = True
 
     def _set_paragraph_alignment(self, alignment: str) -> None:
         if self.stack.currentWidget() is not self.editor_pane:
@@ -14786,7 +14820,14 @@ class MainWindow(QMainWindow):
             else:
                 self.stack.setCurrentWidget(self.editor_pane)
                 self.editor.blockSignals(True)
-                self.editor.setPlainText(self.doc.text)
+                html = (self.doc.meta or {}).get("html")
+                if html and self.doc.kind in (DocKind.DOCX, DocKind.HTML):
+                    try:
+                        self.editor.set_rich_html(str(html))
+                    except Exception:
+                        self.editor.setPlainText(self.doc.text)
+                else:
+                    self.editor.setPlainText(self.doc.text)
                 self.editor.blockSignals(False)
                 self.editor.clear_extra_selections()
                 self._suppress_bookmark_persist = True
@@ -14930,9 +14971,9 @@ class MainWindow(QMainWindow):
         if not self.doc.path:
             self.save_as()
             return not self._current_is_dirty()
-        if self.doc.kind in (DocKind.TEXT, DocKind.MARKDOWN, DocKind.HTML, DocKind.DOCX):
+        if self.doc.kind in (DocKind.TEXT, DocKind.MARKDOWN, DocKind.HTML, DocKind.DOCX, DocKind.RTF):
             self._sync_editor_text_before_save()
-        self.doc.text = self.editor.toPlainText()
+        self._sync_editor_rich_meta()
         try:
             save_document(self.doc)
             self._remember_path(self.doc.path)
