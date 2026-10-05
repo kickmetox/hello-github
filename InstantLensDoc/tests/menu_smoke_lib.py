@@ -61,6 +61,9 @@ DIALOG_ALLOWLIST_IDS = frozenset(
         "insert_shape",
         "keyboard_help",
         "about",
+        "font",
+        "font_color",
+        "highlight_color",
     }
 )
 

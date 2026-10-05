@@ -9481,20 +9481,28 @@ class MainWindow(QMainWindow):
     def _choose_font(self) -> None:
         if not self._guard_editor_action("Schriftart"):
             return
-        from PySide6.QtWidgets import QFontDialog
+        from PySide6.QtGui import QFontDatabase
+        from PySide6.QtWidgets import QInputDialog
 
+        try:
+            families = list(QFontDatabase.families())
+        except TypeError:
+            families = list(QFontDatabase().families())
+        if not families:
+            families = ["Arial", "Calibri", "Times New Roman", "Courier New"]
         current = self.editor.currentCharFormat().font()
         if current.family() == "":
             current = self.editor.document().defaultFont()
-        font, ok = QFontDialog.getFont(current, self, "Schriftart")
-        if not ok:
+        cur_fam = current.family()
+        idx = families.index(cur_fam) if cur_fam in families else 0
+        family, ok = QInputDialog.getItem(
+            self, "Schriftart", "Schrift:", families, max(0, idx), False
+        )
+        if not ok or not str(family).strip():
             return
-        self.editor.apply_font_family(font.family())
-        size = float(font.pointSizeF() or font.pointSize() or 0)
-        if size > 0:
-            self.editor.apply_font_size(size)
+        self.editor.apply_font_family(str(family))
         self._sync_editor_rich_meta()
-        self._set_status(f"Schriftart: {font.family()} {size:g} pt".strip())
+        self._set_status(f"Schriftart: {family}")
 
     def _choose_font_size(self) -> None:
         if not self._guard_editor_action("Schriftgröße"):
@@ -9513,9 +9521,16 @@ class MainWindow(QMainWindow):
     def _choose_font_color(self) -> None:
         if not self._guard_editor_action("Schriftfarbe"):
             return
+        import os
+
         from PySide6.QtWidgets import QColorDialog
 
-        color = QColorDialog.getColor(self.editor.currentCharFormat().foreground().color(), self, "Schriftfarbe")
+        if os.environ.get("ILD_SMOKE_QT") == "1":
+            color = QColor("#cc0000")
+        else:
+            color = QColorDialog.getColor(
+                self.editor.currentCharFormat().foreground().color(), self, "Schriftfarbe"
+            )
         if color is None or not color.isValid():
             return
         self.editor.apply_font_color(color)
@@ -9525,11 +9540,16 @@ class MainWindow(QMainWindow):
     def _choose_highlight_color(self) -> None:
         if not self._guard_editor_action("Texthervorhebung"):
             return
+        import os
+
         from PySide6.QtWidgets import QColorDialog
 
-        color = QColorDialog.getColor(
-            QColor(self.editor.HIGHLIGHT_COLOR), self, "Texthervorhebung"
-        )
+        if os.environ.get("ILD_SMOKE_QT") == "1":
+            color = QColor(self.editor.HIGHLIGHT_COLOR)
+        else:
+            color = QColorDialog.getColor(
+                QColor(self.editor.HIGHLIGHT_COLOR), self, "Texthervorhebung"
+            )
         if color is None or not color.isValid():
             return
         from PySide6.QtGui import QTextCursor

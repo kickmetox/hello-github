@@ -2141,7 +2141,10 @@ class TextEditor(QPlainTextEdit):
             return False
         self._ensure_rich_mode()
         fmt = QTextCharFormat()
-        fmt.setFontFamily(name)
+        try:
+            fmt.setFontFamilies([name])
+        except Exception:
+            fmt.setFontFamily(name)
         return self._merge_char_format(fmt)
 
     def apply_font_size(self, point_size: float) -> bool:
