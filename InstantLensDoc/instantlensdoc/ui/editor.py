@@ -1948,6 +1948,7 @@ class TextEditor(QPlainTextEdit):
         return self.document().toHtml()
 
     def _selection_or_word_cursor(self) -> QTextCursor:
+        """Nur noch intern: Wort unter Cursor, wenn nichts markiert ist."""
         cur = self.textCursor()
         if not cur.hasSelection():
             cur.select(QTextCursor.WordUnderCursor)
@@ -1992,6 +1993,24 @@ class TextEditor(QPlainTextEdit):
         self.setTextCursor(restored)
         return True
 
+    def _global_format_cursor(self) -> tuple[QTextCursor, QTextCursor, bool]:
+        """Auswahl, sonst ganzes Dokument. Caret bleibt erhalten (expanded=True)."""
+        restore = QTextCursor(self.textCursor())
+        work = QTextCursor(restore)
+        expanded = False
+        if not work.hasSelection():
+            work.select(QTextCursor.Document)
+            expanded = True
+        return work, restore, expanded
+
+    def _restore_format_cursor(
+        self, work: QTextCursor, restore: QTextCursor, expanded: bool
+    ) -> None:
+        if expanded:
+            self.setTextCursor(restore)
+        else:
+            self.setTextCursor(work)
+
     def _selection_probe_format(self, cur: QTextCursor) -> QTextCharFormat:
         """Zeichenformat am Anfang der Auswahl (oder CurrentFormat ohne Auswahl)."""
         if not cur.hasSelection():
@@ -2018,10 +2037,16 @@ class TextEditor(QPlainTextEdit):
         except Exception:
             pass
 
-    def _iter_selected_blocks(self):
-        """Blöcke der Auswahl bzw. der Cursorzeile (QTextDocument)."""
+    def _iter_selected_blocks(self, *, empty_means_document: bool = True, all_blocks: bool = False):
+        """Blöcke der Auswahl; ohne Auswahl das ganze Dokument (außer empty_means_document=False)."""
         cur = self.textCursor()
         doc = self.document()
+        if all_blocks or (empty_means_document and not cur.hasSelection()):
+            block = doc.firstBlock()
+            while block.isValid():
+                yield block
+                block = block.next()
+            return
         if cur.hasSelection():
             start = min(cur.selectionStart(), cur.selectionEnd())
             end = max(cur.selectionStart(), cur.selectionEnd())
@@ -2037,14 +2062,18 @@ class TextEditor(QPlainTextEdit):
             yield block
             block = block.next()
 
-    def _apply_to_selected_blocks(self, mutator) -> int:
-        """``mutator(QTextBlockFormat) -> QTextBlockFormat`` auf Auswahl-Blöcke."""
+    def _apply_to_selected_blocks(
+        self, mutator, *, empty_means_document: bool = True, all_blocks: bool = False
+    ) -> int:
+        """``mutator(QTextBlockFormat)`` auf Auswahl-Blöcke bzw. das ganze Dokument."""
         self._ensure_rich_mode()
         n = 0
         cur = self.textCursor()
         cur.beginEditBlock()
         try:
-            for block in self._iter_selected_blocks():
+            for block in self._iter_selected_blocks(
+                empty_means_document=empty_means_document, all_blocks=all_blocks
+            ):
                 bcur = QTextCursor(block)
                 fmt = QTextBlockFormat(block.blockFormat())
                 mutator(fmt)
@@ -2062,10 +2091,11 @@ class TextEditor(QPlainTextEdit):
         underline: bool | None = None,
         strike: bool | None = None,
     ) -> bool:
-        """QTextCharFormat auf Auswahl toggeln — nie Markdown-Marker — 2.6.49."""
+        """QTextCharFormat auf Auswahl toggeln, ohne Auswahl auf das ganze Dokument."""
         self._ensure_rich_mode()
-        cur = self._selection_or_word_cursor()
-        probe = self._selection_probe_format(cur)
+        work, restore, expanded = self._global_format_cursor()
+        probe_src = restore if expanded else work
+        probe = self._selection_probe_format(probe_src)
         fmt = QTextCharFormat()
         if bold is not None:
             make_on = bold
@@ -2089,21 +2119,17 @@ class TextEditor(QPlainTextEdit):
             if strike is True:
                 make_on = not bool(probe.fontStrikeOut())
             fmt.setFontStrikeOut(bool(make_on))
-        if not cur.hasSelection():
-            self.mergeCurrentCharFormat(fmt)
-            return True
-        # Ein Undo-Schritt: mergeCharFormat + mergeCurrentCharFormat (Qt wendet das
-        # Format intern erneut auf die Auswahl an) im selben Edit-Block — 2.6.54
-        cur.beginEditBlock()
+        work.beginEditBlock()
         try:
-            cur.mergeCharFormat(fmt)
-            self.setTextCursor(cur)
-            # NICHT setCurrentCharFormat(fmt): das ruft QTextCursor.setCharFormat auf
-            # der Auswahl auf und ERSETZT das komplette Zeichenformat durch das
-            # Teilformat (Fett löschte Unterstrichen und umgekehrt) — 2.6.52
-            self.mergeCurrentCharFormat(fmt)
+            work.mergeCharFormat(fmt)
+            if expanded:
+                self.mergeCurrentCharFormat(fmt)
+            else:
+                self.setTextCursor(work)
+                self.mergeCurrentCharFormat(fmt)
         finally:
-            cur.endEditBlock()
+            work.endEditBlock()
+        self._restore_format_cursor(work, restore, expanded)
         return True
 
     def toggle_bold_selection(self) -> bool:
@@ -2178,25 +2204,24 @@ class TextEditor(QPlainTextEdit):
         return self._merge_char_format(fmt)
 
     def _merge_char_format(self, fmt: QTextCharFormat) -> bool:
-        cur = self._selection_or_word_cursor()
-        if not cur.hasSelection():
-            self.mergeCurrentCharFormat(fmt)
-            return True
-        cur.beginEditBlock()
+        work, restore, expanded = self._global_format_cursor()
+        work.beginEditBlock()
         try:
-            cur.mergeCharFormat(fmt)
-            self.setTextCursor(cur)
-            self.mergeCurrentCharFormat(fmt)
+            work.mergeCharFormat(fmt)
+            if expanded:
+                self.mergeCurrentCharFormat(fmt)
+            else:
+                self.setTextCursor(work)
+                self.mergeCurrentCharFormat(fmt)
         finally:
-            cur.endEditBlock()
+            work.endEditBlock()
+        self._restore_format_cursor(work, restore, expanded)
         return True
 
     def clear_formatting(self) -> bool:
-        """Zeichen- und Absatzformat der Auswahl auf Dokument-Default — 2.6.55."""
+        """Zeichen- und Absatzformat: Auswahl, sonst ganzes Dokument."""
         self._ensure_rich_mode()
-        cur = self.textCursor()
-        if not cur.hasSelection():
-            cur.select(QTextCursor.BlockUnderCursor)
+        work, restore, expanded = self._global_format_cursor()
         base = QFont(self.document().defaultFont())
         char = QTextCharFormat()
         char.setFont(base)
@@ -2208,10 +2233,11 @@ class TextEditor(QPlainTextEdit):
         char.setAnchorHref("")
         char.setForeground(QBrush())
         char.setBackground(QBrush(Qt.NoBrush))
-        cur.beginEditBlock()
+        work.beginEditBlock()
         try:
-            cur.setCharFormat(char)
-            self.setTextCursor(cur)
+            work.setCharFormat(char)
+            if not expanded:
+                self.setTextCursor(work)
             self.setCurrentCharFormat(char)
 
             def _reset(fmt: QTextBlockFormat) -> None:
@@ -2225,7 +2251,8 @@ class TextEditor(QPlainTextEdit):
 
             self._apply_to_selected_blocks(_reset)
         finally:
-            cur.endEditBlock()
+            work.endEditBlock()
+        self._restore_format_cursor(work, restore, expanded)
         return True
 
     @staticmethod
@@ -2303,15 +2330,11 @@ class TextEditor(QPlainTextEdit):
         align = mapping.get((alignment or "left").lower().strip())
         if align is None:
             return False
-        if all_paragraphs:
-            cur = self.textCursor()
-            cur.select(QTextCursor.Document)
-            self.setTextCursor(cur)
 
         def _mut(fmt: QTextBlockFormat) -> None:
             fmt.setAlignment(align)
 
-        return self._apply_to_selected_blocks(_mut) > 0
+        return self._apply_to_selected_blocks(_mut, all_blocks=bool(all_paragraphs)) > 0
 
     def set_paragraph_spacing(
         self,
@@ -2322,11 +2345,6 @@ class TextEditor(QPlainTextEdit):
         all_paragraphs: bool = False,
     ) -> bool:
         """Zeilen-/Absatzabstand via QTextBlockFormat — 2.6.55."""
-        if all_paragraphs:
-            cur = self.textCursor()
-            cur.select(QTextCursor.Document)
-            self.setTextCursor(cur)
-
         def _mut(fmt: QTextBlockFormat) -> None:
             if line_spacing is not None:
                 self._set_block_line_height(fmt, float(line_spacing))
@@ -2337,7 +2355,7 @@ class TextEditor(QPlainTextEdit):
 
         if line_spacing is None and space_before_pt is None and space_after_pt is None:
             return False
-        return self._apply_to_selected_blocks(_mut) > 0
+        return self._apply_to_selected_blocks(_mut, all_blocks=bool(all_paragraphs)) > 0
 
     def apply_style_paragraph(self, style_id: str = "body") -> bool:
         """Absatzstil (Normal/Überschrift/Zitat) als QText-Formate — 2.6.55."""
@@ -2364,13 +2382,12 @@ class TextEditor(QPlainTextEdit):
             char.setForeground(QBrush(QColor("#4B5563")))
         align_name = str(spec["align"])
         indent = float(spec["indent"])
-        cur = self.textCursor()
-        if not cur.hasSelection():
-            cur.select(QTextCursor.BlockUnderCursor)
-        cur.beginEditBlock()
+        work, restore, expanded = self._global_format_cursor()
+        work.beginEditBlock()
         try:
-            cur.mergeCharFormat(char)
-            self.setTextCursor(cur)
+            work.mergeCharFormat(char)
+            if not expanded:
+                self.setTextCursor(work)
 
             def _mut(fmt: QTextBlockFormat) -> None:
                 mapping = {
@@ -2384,7 +2401,8 @@ class TextEditor(QPlainTextEdit):
 
             self._apply_to_selected_blocks(_mut)
         finally:
-            cur.endEditBlock()
+            work.endEditBlock()
+        self._restore_format_cursor(work, restore, expanded)
         return True
 
     def apply_typography(
@@ -2432,9 +2450,12 @@ class TextEditor(QPlainTextEdit):
         return bool(changed)
 
     def apply_drop_cap(self, *, lines: int = 3, chars: int = 1) -> bool:
-        """Erstes Zeichen des Absatzes visuell vergrößern — 2.6.55."""
+        """Drop Cap nur auf ausgewählten Absatz/Text — ohne Auswahl no-op."""
+        cur = self.textCursor()
+        if not cur.hasSelection():
+            return False
         self._ensure_rich_mode()
-        block = self.textCursor().block()
+        block = self.document().findBlock(min(cur.selectionStart(), cur.selectionEnd()))
         text = block.text() or ""
         n = max(1, int(chars))
         i = 0
@@ -2443,17 +2464,17 @@ class TextEditor(QPlainTextEdit):
         if i >= len(text):
             return False
         take = min(n, len(text) - i)
-        cur = QTextCursor(block)
-        cur.setPosition(block.position() + i)
-        cur.setPosition(block.position() + i + take, QTextCursor.KeepAnchor)
-        probe = self._selection_probe_format(cur)
+        dcur = QTextCursor(block)
+        dcur.setPosition(block.position() + i)
+        dcur.setPosition(block.position() + i + take, QTextCursor.KeepAnchor)
+        probe = self._selection_probe_format(dcur)
         base = float(probe.fontPointSize() or 0.0)
         if base <= 0:
             base = float(self.document().defaultFont().pointSizeF() or 11.0)
         fmt = QTextCharFormat()
         fmt.setFontPointSize(max(18.0, base * max(2.0, float(lines))))
         fmt.setFontWeight(QFont.Bold)
-        cur.mergeCharFormat(fmt)
+        dcur.mergeCharFormat(fmt)
         return True
 
     def adjust_block_indent(self, delta_px: float = 24.0) -> bool:
@@ -2469,7 +2490,7 @@ class TextEditor(QPlainTextEdit):
         """Aufzählung oder Nummerierung als sichtbare Präfixe — 2.6.55."""
         import re
 
-        blocks = list(self._iter_selected_blocks())
+        blocks = list(self._iter_selected_blocks(empty_means_document=False))
         if not blocks:
             return False
         bullet_re = re.compile(r"^(\s*)(?:[•\-\*]\s|\d+\.\s)")
@@ -2570,21 +2591,27 @@ class TextEditor(QPlainTextEdit):
         self._replace_all_text_undoable(new_text)
         return True
 
+    def _table_index_at_cursor(self, found: list) -> int | None:
+        """Index der Tabelle unter Cursor/Auswahl; ohne Treffer None (kein First-Table-Fallback)."""
+        if not found:
+            return None
+        cur = self.textCursor()
+        start = cur.selectionStart() if cur.hasSelection() else cur.position()
+        end = cur.selectionEnd() if cur.hasSelection() else cur.position()
+        for i, (a, b, _) in enumerate(found):
+            if start <= b and end >= a:
+                return i
+        return None
+
     def sort_current_table(self, column: int = 0, *, reverse: bool = False) -> bool:
-        """Erste/aktuelle Tabelle im Dokument sortieren — 2.6.14."""
+        """Ausgewählte/aktuelle Tabelle sortieren — ohne Tabellen-Treffer no-op."""
         from ild_pdf.tables import find_tables_in_text, insert_table_into_text, sort_table
 
         text = self.toPlainText()
         found = find_tables_in_text(text)
-        if not found:
+        idx = self._table_index_at_cursor(found)
+        if idx is None:
             return False
-        # Tabelle am Cursor bevorzugen
-        pos = self.textCursor().position()
-        idx = 0
-        for i, (a, b, _) in enumerate(found):
-            if a <= pos <= b:
-                idx = i
-                break
         sorted_t = sort_table(found[idx][2], column=int(column), reverse=reverse)
         self._replace_all_text_undoable(insert_table_into_text(text, sorted_t, replace_index=idx))
         return True
@@ -2596,19 +2623,14 @@ class TextEditor(QPlainTextEdit):
         style: str | None = None,
         border: bool | None = None,
     ) -> bool:
-        """Aktuelle Tabelle formatieren — 2.6.14."""
+        """Ausgewählte/aktuelle Tabelle formatieren — ohne Tabellen-Treffer no-op."""
         from ild_pdf.tables import find_tables_in_text, format_table, insert_table_into_text
 
         text = self.toPlainText()
         found = find_tables_in_text(text)
-        if not found:
+        idx = self._table_index_at_cursor(found)
+        if idx is None:
             return False
-        pos = self.textCursor().position()
-        idx = 0
-        for i, (a, b, _) in enumerate(found):
-            if a <= pos <= b:
-                idx = i
-                break
         formatted = format_table(found[idx][2], align=align, style=style, border=border)
         self._replace_all_text_undoable(insert_table_into_text(text, formatted, replace_index=idx))
         return True
@@ -2673,15 +2695,13 @@ class TextEditor(QPlainTextEdit):
         ``QTextCharFormat.background`` per ``mergeCharFormat`` gesetzt — Fett/
         Kursiv/Unterstrichen bleiben erhalten, DOCX-Export schreibt Highlight.
         Erneuter Aufruf auf bereits markiertem Text hebt die Markierung auf.
+        Ohne Auswahl gilt der Textmarker für das ganze Dokument.
         """
-        had_sel = self.textCursor().hasSelection()
-        cur = self.selection_or_document_cursor()
-        if not cur.hasSelection():
-            return False
         qcolor = QColor(color or self.HIGHLIGHT_COLOR)
         if not qcolor.isValid():
             qcolor = QColor(self.HIGHLIGHT_COLOR)
-        probe = self._selection_probe_format(cur)
+        work, restore, expanded = self._global_format_cursor()
+        probe = self._selection_probe_format(restore if expanded else work)
         already = (
             probe.background().style() != Qt.NoBrush
             and probe.background().color().name().lower() == qcolor.name().lower()
@@ -2691,9 +2711,8 @@ class TextEditor(QPlainTextEdit):
             fmt.setBackground(QBrush(Qt.NoBrush))
         else:
             fmt.setBackground(QBrush(qcolor))
-        cur.mergeCharFormat(fmt)
-        if had_sel:
-            self.setTextCursor(cur)
+        work.mergeCharFormat(fmt)
+        self._restore_format_cursor(work, restore, expanded)
         return True
 
     def selection_highlighted(self) -> bool:

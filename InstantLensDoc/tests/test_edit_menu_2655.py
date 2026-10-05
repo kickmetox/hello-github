@@ -155,6 +155,7 @@ def _assert_formats_work(win) -> None:
     assert ed.apply_style_paragraph("h1")
     assert ed.toggle_list(ordered=False)
     assert "• " in ed.toPlainText()
+    _select_all_text(win)
     assert ed.apply_drop_cap(lines=3, chars=1)
     assert ed.insert_break("line")
     assert ed.insert_hyperlink("Link", "https://example.com")
@@ -263,4 +264,71 @@ def test_native_char_and_block_format_unit(qapp) -> None:
     ed.apply_font_color(QColor("#112233"))
     ed.clear_formatting()
     assert not ed.selection_font_strike()
+    ed.deleteLater()
+
+
+def _probe_bold_at(ed, pos: int) -> bool:
+    cur = QTextCursor(ed.document())
+    cur.setPosition(pos)
+    cur.setPosition(min(pos + 1, ed.document().characterCount() - 1), QTextCursor.KeepAnchor)
+    return ed._selection_probe_format(cur).fontWeight() >= QFont.Bold
+
+
+def test_no_selection_applies_global_tools_to_document(qapp) -> None:
+    from instantlensdoc.ui.editor import TextEditor
+
+    ed = TextEditor()
+    ed.setPlainText("Alpha\n\nBeta")
+    cur = ed.textCursor()
+    cur.setPosition(0)
+    ed.setTextCursor(cur)
+    assert not cur.hasSelection()
+    assert ed.toggle_bold_selection()
+    assert _probe_bold_at(ed, 0)
+    assert _probe_bold_at(ed, ed.toPlainText().index("B"))
+    ed.set_paragraph_alignment("center")
+    assert ed.current_block_alignment() == "center"
+    cur = ed.textCursor()
+    cur.setPosition(ed.toPlainText().index("B"))
+    ed.setTextCursor(cur)
+    assert ed.current_block_alignment() == "center"
+    ed.apply_font_size(18)
+    probe = ed._selection_probe_format(ed.textCursor())
+    assert probe.fontPointSize() == 18
+    ed.deleteLater()
+
+
+def test_selection_keeps_format_local(qapp) -> None:
+    from instantlensdoc.ui.editor import TextEditor
+
+    ed = TextEditor()
+    ed.setPlainText("Alpha Beta")
+    cur = ed.textCursor()
+    cur.setPosition(0)
+    cur.setPosition(5, QTextCursor.KeepAnchor)
+    ed.setTextCursor(cur)
+    ed.toggle_bold_selection()
+    assert _probe_bold_at(ed, 0)
+    beta = ed.toPlainText().index("B")
+    assert not _probe_bold_at(ed, beta)
+    ed.deleteLater()
+
+
+def test_drop_cap_and_table_require_object_selection(qapp) -> None:
+    from instantlensdoc.ui.editor import TextEditor
+
+    ed = TextEditor()
+    ed.setPlainText("Hallo Dropcap Absatz.")
+    cur = ed.textCursor()
+    cur.setPosition(0)
+    ed.setTextCursor(cur)
+    assert ed.apply_drop_cap(lines=3, chars=1) is False
+    cur.select(QTextCursor.WordUnderCursor)
+    ed.setTextCursor(cur)
+    assert ed.apply_drop_cap(lines=3, chars=1) is True
+    ed.setPlainText("kein tabellen text")
+    assert ed.format_current_table(style="striped") is False
+    ed.insert_table(2, 2)
+    # Cursor liegt in der eingefügten Tabelle
+    assert ed.format_current_table(style="striped") is True
     ed.deleteLater()

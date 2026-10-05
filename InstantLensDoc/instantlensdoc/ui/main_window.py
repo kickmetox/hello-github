@@ -9552,15 +9552,10 @@ class MainWindow(QMainWindow):
             )
         if color is None or not color.isValid():
             return
-        from PySide6.QtGui import QTextCursor
-
-        cur = self.editor.textCursor()
-        if not cur.hasSelection():
-            cur.select(QTextCursor.WordUnderCursor)
-            self.editor.setTextCursor(cur)
         self.editor.apply_highlight_color(color)
         self._sync_editor_rich_meta()
-        self._set_status(f"Texthervorhebung: {color.name()}")
+        scope = "Auswahl" if self.editor.textCursor().hasSelection() else "Dokument"
+        self._set_status(f"Texthervorhebung ({scope}): {color.name()}")
 
     def _clear_formatting(self) -> None:
         if not self._guard_editor_action("Formatierungen löschen"):
@@ -9705,6 +9700,8 @@ class MainWindow(QMainWindow):
             self._sync_editor_rich_meta()
             self._on_text_changed()
             self._set_status("Drop Cap gesetzt (3 Zeilen)")
+        elif not self.editor.textCursor().hasSelection():
+            self._set_status("Drop Cap: bitte Text auswählen")
         else:
             self._set_status("Drop Cap unverändert")
 
@@ -10983,17 +10980,19 @@ class MainWindow(QMainWindow):
         except Exception:
             was_marked = False
         if not self.editor.highlight_selection():
-            QMessageBox.information(self, "Markieren", "Kein Text im Editor.")
             return
         self._sync_editor_rich_meta()
         if was_marked:
             self._set_status("Markierung entfernt")
             return
-        snip = self.editor.selected_snippet() or "Auswahl"
-        label = f"Markierung: {snip}"
-        self._editor_marks.append(label)
-        self.sidebar.append_mark(label)
-        self._set_status("Auswahl markiert (Textmarker, wird mit DOCX/HTML gespeichert)")
+        if self.editor.textCursor().hasSelection():
+            snip = self.editor.selected_snippet() or "Auswahl"
+            label = f"Markierung: {snip}"
+            self._editor_marks.append(label)
+            self.sidebar.append_mark(label)
+            self._set_status("Auswahl markiert (Textmarker, wird mit DOCX/HTML gespeichert)")
+        else:
+            self._set_status("Dokument markiert (Textmarker)")
 
     def _clear_editor_marks(self):
         if self.stack.currentWidget() is self.pdf_view:
@@ -17048,7 +17047,7 @@ class MainWindow(QMainWindow):
         if self.editor.format_current_table(align=align or None, style=style or None):
             self._set_status(f"Tabelle formatiert ({style})")
         else:
-            self._set_status("Keine Tabelle im Dokument")
+            self._set_status("Tabelle: bitte Tabelle auswählen")
 
     def _sort_table_dialog(self) -> None:
         from PySide6.QtWidgets import QInputDialog
@@ -17062,7 +17061,7 @@ class MainWindow(QMainWindow):
             if self.editor.sort_current_table(col):
                 self._set_status(f"Tabelle nach Spalte {col} sortiert")
             else:
-                self._set_status("Keine Tabelle im Dokument")
+                self._set_status("Tabelle: bitte Tabelle auswählen")
         except Exception as e:
             self._set_status(f"Tabelle sortieren: {e}")
 

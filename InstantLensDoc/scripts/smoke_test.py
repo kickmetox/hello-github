@@ -32024,9 +32024,12 @@ def main() -> int:
             assert win.editor.apply_typography(tracking=30, leading=1.5)
             _ty_fmt = win.editor.currentCharFormat()
             assert float(_ty_fmt.fontLetterSpacing() or 100.0) != 0.0
-            assert win.editor.apply_drop_cap(lines=3, chars=1)
             from PySide6.QtGui import QTextCursor as _TC2613, QFont as _QF2613
 
+            _sel = win.editor.textCursor()
+            _sel.select(_TC2613.Document)
+            win.editor.setTextCursor(_sel)
+            assert win.editor.apply_drop_cap(lines=3, chars=1)
             _dc = win.editor.textCursor()
             _dc.setPosition(0)
             _dc.setPosition(1, _TC2613.KeepAnchor)
