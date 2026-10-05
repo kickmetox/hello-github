@@ -1,3 +1,9 @@
+## 2.6.51 - Geräte/Scan-UI wiederhergestellt (Menü + Discovery)
+
+Patch nach **2.6.50** (PDF-Canvas-Härtung) auf Tip inkl. **2.6.49** DOCX Rich-Text: Nutzerbericht — **Geräte**/Scan-Erkennung „nicht mehr vorhanden“ (Menüs/Features weg oder tot). Audit: Menü **Geräte** hing hinter dem riesigen PDF-Menü; Toolbar-**Scan…** ohne Toolbar-Gruppe; ScanDialog hart an `scantuxio_ui`→`ocr`/PIL; Ribbon ohne Geräte; PyInstaller ohne ScanTuxio-Hidden-Imports; Menüleiste nach `restoreState` nicht erzwungen sichtbar.
+
+Fix: `_ensure_devices_menu` früh (vor PDF) + idempotent; Menüleiste nach Build/Geometry sichtbar; Ribbon-Tab **Geräte**; Toolbar-Gruppe `scan`; ScanDialog/ScanTuxio-UI-Bridge resilient; Discovery unverändert nie werfend; Pack `InstantLensDoc-2.6.51-pack.zip`; VERSION **2.6.51**.
+
 ## 2.6.50 - PDF-Hauptansicht weiter weiß: harter Detach + PDFium-Packaging
 
 Feldbericht nach **2.6.48/2.6.49**: PDFs in der Hauptansicht **weiter nicht sichtbar** (vermutlich kein Rebuild und/oder Fix unvollständig). Nachschärfung:

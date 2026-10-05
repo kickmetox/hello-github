@@ -278,6 +278,7 @@ DEFAULTS: dict[str, Any] = {
         "history": True,
         "zoom": True,
         "pages": True,
+        "scan": True,
         "io": True,
     },
 }
@@ -290,6 +291,7 @@ PDF_TOOLBAR_GROUP_LABELS: dict[str, str] = {
     "history": "Undo & Annotation",
     "zoom": "Zoom & Einpassen",
     "pages": "Seitenoperationen",
+    "scan": "Scannen / Import",
     "io": "Export / Import / Bake",
 }
 

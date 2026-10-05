@@ -1,4 +1,4 @@
-﻿# InstantLens Doc - Windows-Build (PyInstaller App + Keygen) 2.6.50
+﻿# InstantLens Doc - Windows-Build (PyInstaller App + Keygen) 2.6.51
 # Eine Zeile:
 #   powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 #
@@ -33,7 +33,7 @@ $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $Root
 
-Write-Host "=== InstantLens Doc Build 2.6.50 (Windows x64) ==="
+Write-Host "=== InstantLens Doc Build 2.6.51 (Windows x64) ==="
 Write-Host "Root: $Root"
 
 # Mindestgroesse: leere/stub EXE und fehlgeschlagenes onedir entlarven (~49 MB Setup)
@@ -173,6 +173,14 @@ $Common = @(
     "--hidden-import", "instantlensdoc.core.devices",
     "--hidden-import", "instantlensdoc.core.scan",
     "--hidden-import", "instantlensdoc.core.ocr",
+    "--hidden-import", "instantlensdoc.core.scantuxio_ui",
+    "--hidden-import", "instantlensdoc.core.scantuxio",
+    "--hidden-import", "instantlensdoc.core.scantuxio.scanner",
+    "--hidden-import", "instantlensdoc.core.scantuxio.scanner_naps2",
+    "--hidden-import", "instantlensdoc.core.scantuxio.scanner_escl",
+    "--hidden-import", "instantlensdoc.core.scantuxio.discovery",
+    "--hidden-import", "instantlensdoc.core.scantuxio.printing",
+    "--hidden-import", "instantlensdoc.core.scantuxio.printing_windows",
     "--hidden-import", "instantlensdoc.ui.scan_dialog",
     "--hidden-import", "ild_pdf",
     "--hidden-import", "ild",
@@ -245,7 +253,7 @@ Pruefe PyInstaller-Log oben. Erwartet: dist\InstantLensDoc\InstantLensDoc.exe
         throw "App-Build: InstantLensDoc.exe zu klein ($exeLen Bytes < $script:IldMinAppExeBytes) - Output unvollstaendig."
     }
     Write-Host ("OK: {0} ({1} MB)" -f $appExe, [math]::Round($exeLen / 1MB, 2))
-    # PDFium-Binary muss im onedir-Output liegen — sonst weisse Canvas/Thumbs — 2.6.50
+    # PDFium-Binary muss im onedir-Output liegen — sonst weisse Canvas/Thumbs — 2.6.51
     $pdfiumHits = @(Get-ChildItem -Path $AppDist -Recurse -ErrorAction SilentlyContinue |
         Where-Object {
             $_.Name -match '(?i)^pdfium(\.dll|\.so|\.dylib)?$' -or
@@ -301,7 +309,7 @@ if (-not $SkipKeygen) {
     Write-Host "Keygen uebersprungen (-SkipKeygen)"
 }
 
-Write-Host "Fertig (2.6.50). Optional:"
+Write-Host "Fertig (2.6.51). Optional:"
 Write-Host '  powershell -ExecutionPolicy Bypass -File .\installer\build-installer.ps1'
 Write-Host "  (ohne Keygen: -SkipKeygen bzw. ISCC /DIncludeKeygen=0)"
 Write-Host '  python scripts\pack-windows-runnable.py   # Python-Layout-Zip ohne EXE'

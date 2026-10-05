@@ -48,18 +48,36 @@ from instantlensdoc.core.scan import (
     insert_scan_pages_into_pdf,
     last_acquire_error,
 )
-from instantlensdoc.core.scantuxio_ui import (
-    build_launch,
-    collect_new_scan_files,
-    default_watch_dirs,
-    find_scantuxio_install,
-    launch_scantuxio_process,
-    missing_scantuxio_hint_de,
-    prepare_handshake_dir,
-    read_handoff_manifest,
-    snapshot_scan_files,
-    wia_busy_user_hint_de,
-)
+
+# ScanTuxio-UI lazy: Dialog bleibt nutzbar wenn UI-Bridge fehlt — 2.6.51
+try:
+    from instantlensdoc.core.scantuxio_ui import (
+        build_launch,
+        collect_new_scan_files,
+        default_watch_dirs,
+        find_scantuxio_install,
+        launch_scantuxio_process,
+        missing_scantuxio_hint_de,
+        prepare_handshake_dir,
+        read_handoff_manifest,
+        snapshot_scan_files,
+        wia_busy_user_hint_de,
+    )
+except Exception:  # pragma: no cover - Defensiv ohne ScanTuxio-UI
+    build_launch = None  # type: ignore
+    collect_new_scan_files = None  # type: ignore
+    default_watch_dirs = None  # type: ignore
+    find_scantuxio_install = None  # type: ignore
+    launch_scantuxio_process = None  # type: ignore
+    missing_scantuxio_hint_de = None  # type: ignore
+    prepare_handshake_dir = None  # type: ignore
+    read_handoff_manifest = None  # type: ignore
+    snapshot_scan_files = None  # type: ignore
+    wia_busy_user_hint_de = None  # type: ignore
+
+
+def _st_ui_available() -> bool:
+    return callable(find_scantuxio_install) and callable(launch_scantuxio_process)
 
 
 class ScanDialog(QDialog):
@@ -416,6 +434,12 @@ class ScanDialog(QDialog):
             return False
 
     def _launch_scantuxio_ui(self, force: bool = False) -> None:
+        if not _st_ui_available():
+            self._set_acquire_status(
+                "ScanTuxio-UI-Bridge nicht verfügbar.\n"
+                "Bitte „Bilder importieren…“ nutzen oder InstantLens Doc neu installieren (2.6.51)."
+            )
+            return
         if self._scantuxio_alive() and not force:
             self._set_acquire_status(
                 "ScanTuxio läuft bereits. Bitte dort speichern, dann „Scan übernehmen“. "
@@ -425,7 +449,12 @@ class ScanDialog(QDialog):
             return
         inst = find_scantuxio_install()
         if inst is None:
-            self._set_acquire_status(missing_scantuxio_hint_de())
+            hint = (
+                missing_scantuxio_hint_de()
+                if callable(missing_scantuxio_hint_de)
+                else "ScanTuxio nicht gefunden. Bilder importieren…"
+            )
+            self._set_acquire_status(hint)
             return
         try:
             handshake = prepare_handshake_dir()
@@ -435,9 +464,13 @@ class ScanDialog(QDialog):
             self._st_snapshot = snapshot_scan_files(self._st_watch)
             self._st_proc = launch_scantuxio_process(launch)
         except Exception as e:
+            hint = (
+                missing_scantuxio_hint_de()
+                if callable(missing_scantuxio_hint_de)
+                else "ScanTuxio starten fehlgeschlagen."
+            )
             self._set_acquire_status(
-                f"ScanTuxio konnte nicht gestartet werden: {e}\n\n"
-                + missing_scantuxio_hint_de()
+                f"ScanTuxio konnte nicht gestartet werden: {e}\n\n" + hint
             )
             return
         self._set_acquire_status(
@@ -448,7 +481,7 @@ class ScanDialog(QDialog):
         self._st_timer.start()
 
     def _poll_scantuxio_output(self) -> None:
-        if not self._st_watch:
+        if not self._st_watch or not callable(collect_new_scan_files):
             return
         found = self._collect_scantuxio_output(quiet=True)
         if found:
@@ -463,6 +496,12 @@ class ScanDialog(QDialog):
                 self._collect_scantuxio_output(quiet=False)
 
     def _collect_scantuxio_output(self, quiet: bool = False) -> bool:
+        if not callable(collect_new_scan_files) or not callable(snapshot_scan_files):
+            if not quiet:
+                self._set_acquire_status(
+                    "ScanTuxio-Übergabe nicht verfügbar — bitte Bilder importieren."
+                )
+            return False
         handshake = self._st_handshake
         roots = list(self._st_watch or [])
         if handshake and handshake not in roots:
@@ -474,7 +513,7 @@ class ScanDialog(QDialog):
                 )
             return False
         snap = self._st_snapshot or {}
-        paths = list(read_handoff_manifest(handshake) if handshake else [])
+        paths = list(read_handoff_manifest(handshake) if handshake and callable(read_handoff_manifest) else [])
         paths.extend(collect_new_scan_files(roots, snap))
         # dedupe
         seen: set[str] = set()
@@ -524,11 +563,16 @@ class ScanDialog(QDialog):
             )
             return
         if scanner is None and not self._discovery.scanners:
+            st_hint = (
+                missing_scantuxio_hint_de()
+                if callable(missing_scantuxio_hint_de)
+                else "Optional: ScanTuxio unter D:\\AI_Temp\\ScanTuxio Win installieren."
+            )
             self._set_acquire_status(
                 "Kein Scanner erkannt.\n\n"
                 + WINDOWS_SCANNER_DRIVER_HINT_DE
                 + "\n\n"
-                + missing_scantuxio_hint_de()
+                + st_hint
             )
             return
         try:
@@ -542,7 +586,14 @@ class ScanDialog(QDialog):
         if not paths:
             detail = last_acquire_error()
             if "ausgelastet" in (detail or "").lower() or "busy" in (detail or "").lower():
-                body = wia_busy_user_hint_de(detail)
+                body = (
+                    wia_busy_user_hint_de(detail)
+                    if callable(wia_busy_user_hint_de)
+                    else (
+                        "WIA-Gerät ausgelastet. Bitte ScanTuxio / Windows Fax und Scan schließen.\n"
+                        + (detail or "")
+                    )
+                )
             else:
                 body = "Kein Bild vom Scanner erhalten.\n\n"
                 if detail:

@@ -17,8 +17,50 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import List, Optional, Sequence
 
-from instantlensdoc.core.ocr import SCANTUXIO_WIN_ROOTS, _ild_app_roots, _join_win_or_posix
-from instantlensdoc.core.scan import IMAGE_SUFFIXES
+# Kein Import von ocr.py (PIL) — Scan-UI-Bridge muss auch ohne Pillow laden — 2.6.51
+try:
+    from instantlensdoc.core.ocr import (  # type: ignore
+        SCANTUXIO_WIN_ROOTS as _OCR_ROOTS,
+        _ild_app_roots as _ocr_ild_roots,
+        _join_win_or_posix as _ocr_join,
+    )
+
+    SCANTUXIO_WIN_ROOTS = _OCR_ROOTS
+    _ild_app_roots = _ocr_ild_roots
+    _join_win_or_posix = _ocr_join
+except Exception:  # pragma: no cover
+    SCANTUXIO_WIN_ROOTS = (
+        r"D:\AI_Temp\ScanTuxio Win",
+        r"D:\AI_Temp\ScanTuxio-Win",
+        r"D:\AI_Temp\ScanTuxioWin",
+    )
+
+    def _ild_app_roots() -> List[Path]:
+        roots: List[Path] = []
+        if getattr(sys, "frozen", False):
+            roots.append(Path(sys.executable).parent)
+        meipass = getattr(sys, "_MEIPASS", None)
+        if meipass:
+            roots.append(Path(str(meipass)))
+        roots.append(Path(__file__).resolve().parents[2])
+        roots.append(Path.cwd())
+        out: List[Path] = []
+        for r in roots:
+            if r not in out:
+                out.append(r)
+        return out
+
+    def _join_win_or_posix(root: str, *parts: str) -> str:
+        p = Path(root)
+        for part in parts:
+            p = p / part
+        return str(p)
+
+
+try:
+    from instantlensdoc.core.scan import IMAGE_SUFFIXES
+except Exception:  # pragma: no cover
+    IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp", ".webp"}
 
 
 HANDOFF_ENV = "ILD_SCAN_HANDOFF"

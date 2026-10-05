@@ -1,9 +1,13 @@
 # InstantLens Doc — Kurzinfo
 
+### 2.6.51 — Geräte/Scan wiederhergestellt
+
+Menü **Geräte** (Scanner / Scannen…, Drucker, Erkennen), PDF → Scannen, Toolbar **Scan…**, Ribbon Geräte; Windows Discovery (Get-Printer/WIA/NAPS2/ScanTuxio). Pack `InstantLensDoc-2.6.51-pack.zip`.
+
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **2.6.50** |
+| Version | **2.6.51** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |

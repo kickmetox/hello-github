@@ -1,4 +1,9 @@
-InstantLens Doc 2.6.50 - Installation
+InstantLens Doc 2.6.51 - Installation
+
+Neu in 2.6.51:
+- Menue Geraete wiederhergestellt (Scanner/Scannen, Drucker, Erkennen)
+- Toolbar Scan… in Gruppe scan; Ribbon-Tab Geraete
+- ScanDialog/ScanTuxio-UI-Bridge resilient; PyInstaller scantuxio hidden-imports
 
 Neu in 2.6.50:
 - PDF-Canvas weiter weiss nach 2.6.48: harter PDFium-Detach (frombytes+RGB)

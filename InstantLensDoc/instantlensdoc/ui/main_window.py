@@ -268,7 +268,27 @@ class MainWindow(QMainWindow):
 
         self._build_ui()
         self._build_menus()
+        # Geräte/Scan-Menü nach Build absichern + Menüleiste sichtbar — 2.6.51
+        try:
+            self._ensure_devices_menu(self.menuBar())
+        except Exception:
+            pass
+        try:
+            if not self._presentation_active:
+                self.menuBar().setVisible(True)
+        except Exception:
+            pass
+        try:
+            apply_ui_language(self)
+        except Exception:
+            pass
         self._restore_window_geometry()
+        # restoreState darf Menüleiste nicht dauerhaft verstecken — 2.6.51
+        try:
+            if not self._presentation_active:
+                self.menuBar().setVisible(True)
+        except Exception:
+            pass
         self.apply_tray_setting()
         self._refresh_recent()
         self._refresh_workspaces()
@@ -1349,6 +1369,104 @@ class MainWindow(QMainWindow):
         self.license_label = QLabel()
         sb.addPermanentWidget(self.license_label)
         self._update_doc_status()
+
+    def _ensure_devices_menu(self, mb=None):
+        """Menü Geräte (Scanner/Drucker/Erkennen) — idempotent, früh + nach PDF — 2.6.51."""
+        from PySide6.QtGui import QAction, QKeySequence
+
+        if mb is None:
+            mb = self.menuBar()
+        existing = None
+        try:
+            existing = self.findChild(QMenu, "menuDevices")
+        except Exception:
+            existing = None
+        if existing is None:
+            try:
+                for act in mb.actions():
+                    menu = act.menu() if hasattr(act, "menu") else None
+                    if menu is not None and menu.objectName() == "menuDevices":
+                        existing = menu
+                        break
+            except Exception:
+                existing = None
+        if existing is not None:
+            m_devices = existing
+            try:
+                if any(
+                    a.objectName() == "actDevicesScanner" for a in m_devices.actions()
+                ):
+                    return m_devices
+            except Exception:
+                pass
+        else:
+            m_devices = QMenu("&Geräte", self)
+            m_devices.setObjectName("menuDevices")
+            insert_before = None
+            try:
+                for act in mb.actions():
+                    menu = act.menu() if hasattr(act, "menu") else None
+                    title = ""
+                    try:
+                        title = (menu.title() if menu is not None else act.text()) or ""
+                    except Exception:
+                        title = act.text() or ""
+                    if "PDF" in title.replace("&", ""):
+                        insert_before = act
+                        break
+            except Exception:
+                insert_before = None
+            if insert_before is not None:
+                mb.insertMenu(insert_before, m_devices)
+            else:
+                mb.addMenu(m_devices)
+        m_devices.setToolTip(
+            "Scanner, Drucker und lokale/Netzwerk-Geräteerkennung — 2.6.51"
+        )
+        try:
+            m_devices.clear()
+        except Exception:
+            pass
+        act_dev_scan = QAction("Scanner / Scannen…", self)
+        act_dev_scan.setObjectName("actDevicesScanner")
+        act_dev_scan.setShortcut(QKeySequence("Ctrl+Alt+Shift+I"))
+        act_dev_scan.setToolTip(
+            "ScanTuxio-Hauptfenster öffnen und Scan nach InstantLens Doc übernehmen "
+            "(Shortcut: Ctrl+Alt+Shift+I) — 2.6.51"
+        )
+        act_dev_scan.triggered.connect(self._run_scan_import)
+        m_devices.addAction(act_dev_scan)
+        act_dev_printers = QAction("Drucker…", self)
+        act_dev_printers.setObjectName("actDevicesPrinters")
+        act_dev_printers.setToolTip(
+            "Lokale und Netzwerk-Drucker auflisten (Qt/Winspool/Get-Printer) — 2.6.51"
+        )
+        act_dev_printers.triggered.connect(
+            lambda: self._show_devices_dialog(filter_kind="printer")
+        )
+        m_devices.addAction(act_dev_printers)
+        act_dev_all = QAction("Geräte erkennen…", self)
+        act_dev_all.setObjectName("actDevicesDiscover")
+        act_dev_all.setToolTip(
+            "Drucker & Scanner neu suchen (WIA/PnP/TWAIN/NAPS2/Get-Printer) — 2.6.51"
+        )
+        act_dev_all.triggered.connect(self._show_devices_dialog)
+        m_devices.addAction(act_dev_all)
+        m_devices.addSeparator()
+        act_dev_refresh = QAction("Aktualisieren / Neu suchen", self)
+        act_dev_refresh.setObjectName("actDevicesRefresh")
+        act_dev_refresh.setToolTip("Geräteliste sofort neu laden — 2.6.51")
+        act_dev_refresh.triggered.connect(
+            lambda: self._show_devices_dialog(auto_refresh=True)
+        )
+        m_devices.addAction(act_dev_refresh)
+        try:
+            from instantlensdoc.core.devices import SCAN_START_HINT_DE
+
+            self._set_status(SCAN_START_HINT_DE)
+        except Exception:
+            pass
+        return m_devices
 
     def _build_menus(self):
         mb = self.menuBar()
@@ -2588,6 +2706,9 @@ class MainWindow(QMainWindow):
         m_view.addAction(self._high_contrast_action)
         self._sync_theme_menu()
 
+        # Geräte VOR dem großen PDF-Menü — sichtbar + robust — 2.6.51
+        self._ensure_devices_menu(mb)
+
         m_pdf = mb.addMenu("&PDF")
         act_merge = QAction("PDFs zusammenführen / teilen…", self)
         act_merge.triggered.connect(self._pdf_tools)
@@ -3045,51 +3166,8 @@ class MainWindow(QMainWindow):
             a.triggered.connect(slot)
             m_pdf.addAction(a)
 
-        # Geraete-Menue: Scanner / Drucker / Erkennung — 2.6.38 / UX 2.6.41
-        m_devices = mb.addMenu("&Geräte")
-        m_devices.setObjectName("menuDevices")
-        m_devices.setToolTip(
-            "Scanner, Drucker und lokale/Netzwerk-Geraeteerkennung — 2.6.41"
-        )
-        act_dev_scan = QAction("Scanner / Scannen…", self)
-        act_dev_scan.setObjectName("actDevicesScanner")
-        act_dev_scan.setShortcut(QKeySequence("Ctrl+Alt+Shift+I"))
-        act_dev_scan.setToolTip(
-            "ScanTuxio-Hauptfenster öffnen und Scan nach InstantLens Doc übernehmen "
-            "(Shortcut: Ctrl+Alt+Shift+I) — 2.6.46"
-        )
-        act_dev_scan.triggered.connect(self._run_scan_import)
-        m_devices.addAction(act_dev_scan)
-        act_dev_printers = QAction("Drucker…", self)
-        act_dev_printers.setObjectName("actDevicesPrinters")
-        act_dev_printers.setToolTip(
-            "Lokale und Netzwerk-Drucker auflisten (Qt/Winspool/Get-Printer) — 2.6.41"
-        )
-        act_dev_printers.triggered.connect(
-            lambda: self._show_devices_dialog(filter_kind="printer")
-        )
-        m_devices.addAction(act_dev_printers)
-        act_dev_all = QAction("Geräte erkennen…", self)
-        act_dev_all.setObjectName("actDevicesDiscover")
-        act_dev_all.setToolTip(
-            "Drucker & Scanner neu suchen (WIA/PnP/TWAIN/NAPS2/Get-Printer) — 2.6.41"
-        )
-        act_dev_all.triggered.connect(self._show_devices_dialog)
-        m_devices.addAction(act_dev_all)
-        m_devices.addSeparator()
-        act_dev_refresh = QAction("Aktualisieren / Neu suchen", self)
-        act_dev_refresh.setObjectName("actDevicesRefresh")
-        act_dev_refresh.setToolTip("Geräteliste sofort neu laden — 2.6.41")
-        act_dev_refresh.triggered.connect(
-            lambda: self._show_devices_dialog(auto_refresh=True)
-        )
-        m_devices.addAction(act_dev_refresh)
-        try:
-            from instantlensdoc.core.devices import SCAN_START_HINT_DE
-
-            self._set_status(SCAN_START_HINT_DE)
-        except Exception:
-            pass
+        # Geräte-Menü idempotent nachziehen — 2.6.51
+        self._ensure_devices_menu(mb)
 
         m_ins = mb.addMenu("&Einfügen")
         a = QAction("Textrahmen", self)
@@ -6690,6 +6768,10 @@ class MainWindow(QMainWindow):
             "preflight": self._run_preflight,
             "apply_bleed": self._apply_bleed_dialog,
             "export_pdfx": self._export_pdfx,
+            "scan_import": self._run_scan_import,
+            "devices_discover": self._show_devices_dialog,
+            "devices_printers": lambda: self._show_devices_dialog(filter_kind="printer"),
+            "devices_refresh": lambda: self._show_devices_dialog(auto_refresh=True),
         }
         fn = handlers.get(action_id)
         if callable(fn):

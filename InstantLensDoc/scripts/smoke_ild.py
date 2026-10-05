@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Nightly/CI Smoke: CLI + Import-Checks für InstantLens Doc — 2.1.0–2.6.50.
+"""Nightly/CI Smoke: CLI + Import-Checks für InstantLens Doc — 2.1.0–2.6.51.
 
 Leichtgewichtig. Exit-Codes:
   0  OK  (ok=true)
@@ -14,12 +14,12 @@ Aufruf:
   python scripts/smoke_ild.py -h
 
 JSON-Schema (--json), Erfolg:
-  {"ok": true, "version": "2.6.50", "duration_ms": 1234,
+  {"ok": true, "version": "2.6.51", "duration_ms": 1234,
    "checks": ["version", "imports", "cli", "measure_diff_import", "changelog"]}
 
 JSON bei Fail: checks[] enthält Objekt mit error-Text (max 200 Zeichen, Truncate …);
 Exitcode spiegelt ok (0↔true, 1↔false) — 2.2.0:
-  {"ok": false, "version": "2.6.50", "duration_ms": 12,
+  {"ok": false, "version": "2.6.51", "duration_ms": 12,
    "checks": ["version", {"name": "imports", "error": "import x: …"}]}
 """
 
@@ -41,7 +41,7 @@ if str(ROOT) not in sys.path:
 # Headless/CI: Qt ohne Display
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-EXPECTED_VERSION = "2.6.50"
+EXPECTED_VERSION = "2.6.51"
 FAIL_ERROR_MAX_LEN = 200
 
 EXIT_OK = 0
@@ -82,7 +82,7 @@ def check_version() -> None:
         _fail(f"docs/VERSION={docs_ver!r}")
     bw = (ROOT / "build-windows.ps1").read_text(encoding="utf-8")
     if EXPECTED_VERSION not in bw or "Allow32Bit" not in bw:
-        _fail("build-windows.ps1 fehlt 2.6.50/Allow32Bit")
+        _fail("build-windows.ps1 fehlt 2.6.51/Allow32Bit")
     if not (ROOT / "scripts" / "pack-windows-runnable.py").is_file():
         _fail("scripts/pack-windows-runnable.py fehlt")
     if not (ROOT / "run-keygen.bat").is_file():
@@ -472,6 +472,30 @@ def check_version() -> None:
     if "_make_multipage_pdf" not in test_canvas.read_text(encoding="utf-8"):
         _fail("test_pdf_canvas_not_blank fehlt multipage PDF (2.6.50)")
     _ok("2.6.50 hard-detach/rgb32/pdfium-pack/render-probe: OK")
+    # 2.6.51: Geräte/Scan-UI Restore (rebased on 2.6.50 tip)
+    mw = (ROOT / "instantlensdoc" / "ui" / "main_window.py").read_text(encoding="utf-8")
+    if "_ensure_devices_menu" not in mw or "menuDevices" not in mw:
+        _fail("main_window fehlt _ensure_devices_menu/menuDevices (2.6.51)")
+    if "actDevicesScanner" not in mw or "actDevicesDiscover" not in mw:
+        _fail("main_window fehlt Geräte-Aktionen (2.6.51)")
+    rb = (ROOT / "instantlensdoc" / "ui" / "ribbon_bar.py").read_text(encoding="utf-8")
+    if "Geräte" not in rb:
+        _fail("ribbon_bar fehlt Geräte-Tab (2.6.51)")
+    if "scan_import" not in rb or "devices_discover" not in rb:
+        _fail("ribbon_bar fehlt Scan/Geräte-Aktionen (2.6.51)")
+    sd = (ROOT / "instantlensdoc" / "ui" / "scan_dialog.py").read_text(encoding="utf-8")
+    if "_st_ui_available" not in sd:
+        _fail("scan_dialog fehlt _st_ui_available (2.6.51)")
+    stui = (ROOT / "instantlensdoc" / "core" / "scantuxio_ui.py").read_text(encoding="utf-8")
+    if "Kein Import von ocr.py" not in stui and "ohne Pillow" not in stui:
+        _fail("scantuxio_ui fehlt PIL-freier Fallback (2.6.51)")
+    asrc = (ROOT / "instantlensdoc" / "core" / "app_settings.py").read_text(encoding="utf-8")
+    if '"scan": True' not in asrc:
+        _fail("app_settings fehlt Toolbar-Gruppe scan (2.6.51)")
+    bw = (ROOT / "build-windows.ps1").read_text(encoding="utf-8")
+    if "instantlensdoc.core.scantuxio_ui" not in bw:
+        _fail("build-windows.ps1 fehlt scantuxio_ui hidden-import (2.6.51)")
+    _ok("2.6.51 devices-menu-restore/ribbon-scan/scantuxio-resilient: OK")
 
 
 def check_imports(*, with_qt: bool) -> None:
@@ -1368,6 +1392,8 @@ def check_changelog() -> None:
     cl = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
     if "## 2.6.49" not in cl:
         _fail("CHANGELOG fehlt ## 2.6.49")
+    if "## 2.6.51" not in cl:
+        _fail("CHANGELOG fehlt ## 2.6.51")
     if "## 2.6.50" not in cl:
         _fail("CHANGELOG fehlt ## 2.6.50")
     if "## 2.6.48" not in cl:
@@ -2002,6 +2028,15 @@ def check_changelog() -> None:
     ):
         _fail("CHANGELOG 2.6.50 fehlt hard-Detach/pdfium-pack-Hinweis")
     if (
+        "2.6.51" not in cl
+        or (
+            "_ensure_devices_menu" not in cl
+            and "Geräte" not in cl
+            and "Scan" not in cl
+        )
+    ):
+        _fail("CHANGELOG 2.6.51 fehlt Geräte/Scan-Restore-Hinweis")
+    if (
         "QTextCharFormat" not in cl
         and "richtext" not in cl.lower()
         and "DOCX" not in cl
@@ -2359,6 +2394,12 @@ def check_changelog() -> None:
         and "Detach" not in feat
     ):
         _fail("FEATURES.md fehlt 2.6.50 hard-detach/pdfium-pack-Hinweis")
+    if "2.6.51" not in feat or (
+        "Geräte" not in feat
+        and "Scan" not in feat
+        and "Ribbon" not in feat
+    ):
+        _fail("FEATURES.md fehlt 2.6.51 Geräte/Scan-Restore-Hinweis")
     if "2.6.44" not in feat or (
         "ildEditorToolbar" not in feat
         and "Markierungen" not in feat
@@ -2816,11 +2857,11 @@ Exit-Codes:
 Laufzeit: am Ende als „Laufzeit: N ms“ (oder duration_ms im JSON).
 
 Beispiel --json (Erfolg):
-  {"ok": true, "version": "2.6.50", "duration_ms": 1234,
+  {"ok": true, "version": "2.6.51", "duration_ms": 1234,
    "checks": ["version", "imports", "cli", "measure_diff_import", "changelog"]}
 
 Beispiel --json (Fail):
-  {"ok": false, "version": "2.6.50", "duration_ms": 12,
+  {"ok": false, "version": "2.6.51", "duration_ms": 12,
    "checks": ["version", {"name": "imports", "error": "import x: …"}]}
 """.rstrip()
     )

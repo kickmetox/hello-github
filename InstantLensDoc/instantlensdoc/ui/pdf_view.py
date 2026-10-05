@@ -3255,7 +3255,9 @@ class PdfViewer(QWidget):
                 btn_dup,
                 btn_del,
                 btn_reorder,
+                btn_page_manage,
             ],
+            "scan": [btn_scan],
             "io": [
                 btn_save_ann,
                 btn_reload_ann,
