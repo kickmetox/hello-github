@@ -1,4 +1,9 @@
-InstantLens Doc 2.6.28 — Installation
+InstantLens Doc 2.6.32 — Installation
+
+Neu in 2.6.32:
+- Windows-Build/Installer-Skripte: UTF-8 BOM + ASCII-Punctuation (PowerShell 5.1 Parser-Fix)
+
+Basis 2.6.28 — Installation
 
 Startmenü: Gruppe „InstantLens Doc“ mit Programm, optional Keygenerator, INFO und Deinstallieren.
 

@@ -1,4 +1,4 @@
-# InstantLens Doc 2.6.31 — Inno-Setup-Installer bauen (Setup.exe)
+﻿# InstantLens Doc 2.6.32 - Inno-Setup-Installer bauen (Setup.exe)
 # Voraussetzung: Inno Setup 6 (iscc.exe) auf Windows x64
 # Aufruf (Einzeiler):
 #   powershell -ExecutionPolicy Bypass -File .\scripts\build-windows-installer.ps1
@@ -14,7 +14,7 @@
 #   Startmenü + optional Desktop + Uninstall + 64-Bit
 #
 # Keygen-EXE: Prefer dist\InstantLensKeygen\InstantLensKeygen.exe,
-# Fallback dist\InstantLensDoc\InstantLensKeygen.exe → Pack als InstantLensKeygen.exe
+# Fallback dist\InstantLensDoc\InstantLensKeygen.exe -> Pack als InstantLensKeygen.exe
 # Installiert: {app}\InstantLensKeygen.exe (+ Startmenü, wenn IncludeKeygen=1)
 
 param(
@@ -50,13 +50,13 @@ if (-not (Test-Path $Iss)) {
     Write-Error "ISS fehlt: $Iss"
 }
 if (-not (Test-Path $Hinweis)) {
-    Write-Host "WARNUNG: installer-hinweis.txt fehlt — InfoAfterFile kann fehlschlagen."
+    Write-Host "WARNUNG: installer-hinweis.txt fehlt - InfoAfterFile kann fehlschlagen."
 }
 
 # Icon prüfen (SetupIconFile)
 $Icon = Join-Path $Root "assets\app.ico"
 if (-not (Test-Path $Icon)) {
-    Write-Host "WARNUNG: assets\app.ico fehlt — Inno SetupIconFile kann fehlschlagen."
+    Write-Host "WARNUNG: assets\app.ico fehlt - Inno SetupIconFile kann fehlschlagen."
 }
 
 # iscc finden
@@ -126,16 +126,16 @@ if (-not $hasBat -and -not $hasExe) {
     Write-Error "SourceRoot enthält weder run.bat noch InstantLensDoc.exe: $SourceRoot"
 }
 if ($PythonLauncher -and -not $hasBat) {
-    Write-Host "WARNUNG: -PythonLauncher gesetzt, aber run.bat fehlt — Shortcuts können fehlschlagen."
+    Write-Host "WARNUNG: -PythonLauncher gesetzt, aber run.bat fehlt - Shortcuts können fehlschlagen."
 }
 if ((-not $PythonLauncher) -and (-not $hasExe) -and $hasBat) {
-    Write-Host "Hinweis: Keine InstantLensDoc.exe — schalte auf PythonLauncher (run.bat)."
+    Write-Host "Hinweis: Keine InstantLensDoc.exe - schalte auf PythonLauncher (run.bat)."
     $PythonLauncher = $true
 }
 if ((-not $NoKeygen) -and $PythonLauncher) {
     $kgBat = Join-Path $SourceRoot "run-keygen.bat"
     if (-not (Test-Path $kgBat)) {
-        Write-Host "WARNUNG: run-keygen.bat fehlt — Keygen-Shortcut im Startmenü kann fehlschlagen."
+        Write-Host "WARNUNG: run-keygen.bat fehlt - Keygen-Shortcut im Startmenü kann fehlschlagen."
     }
 }
 

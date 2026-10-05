@@ -1,4 +1,4 @@
-# InstantLens Doc — PowerShell-Scripting 2.6.15
+﻿# InstantLens Doc - PowerShell-Scripting 2.6.15
 # Als CLI:
 #   powershell -ExecutionPolicy Bypass -File .\scripts\ild.ps1 pages D:\dok.pdf
 # Als Modul:
@@ -232,7 +232,7 @@ function Invoke-IldHeaderFooter {
         [Parameter(Mandatory = $true)][string]$Path,
         [string]$Out,
         [string]$Header = "{title}",
-        [string]$Footer = "{author} — {n} / {total}",
+        [string]$Footer = "{author} - {n} / {total}",
         [string]$Title,
         [string]$Author,
         [string]$Creator,
@@ -601,7 +601,7 @@ function Invoke-IldKiWizard {
 }
 
 function New-IldDocumentWizard {
-    # Alias für Invoke-IldKiWizard — 2.6.16
+    # Alias für Invoke-IldKiWizard - 2.6.16
     param(
         [Parameter(Mandatory = $true)][ValidateSet("formular", "anschreiben", "kaufvertrag", "rechnung")]
         [string]$Kind,
@@ -625,7 +625,7 @@ function New-IldDocumentWizard {
 }
 
 function Get-IldUiLangs {
-    # UI-Sprachen DE/EN/FR/RU/ES/ZH/PT/AR/IT — 2.6.18
+    # UI-Sprachen DE/EN/FR/RU/ES/ZH/PT/AR/IT - 2.6.18
     Invoke-Ild @("--json", "ui-langs") | Out-Host
 }
 
@@ -655,7 +655,7 @@ function Invoke-IldOcrHandwriting {
 }
 
 function Get-IldColorPalettes {
-    # RGB/CMYK/Spot-Paletten — 2.6.18
+    # RGB/CMYK/Spot-Paletten - 2.6.18
     Invoke-Ild @("--json", "palettes") | Out-Host
 }
 
@@ -758,7 +758,7 @@ function Export-IldPdfX {
 }
 
 function Invoke-IldCompare {
-    # PDF-Vergleich Raster/Textlayer — 2.6.19
+    # PDF-Vergleich Raster/Textlayer - 2.6.19
     param(
         [Parameter(Mandatory = $true)][string]$Left,
         [Parameter(Mandatory = $true)][string]$Right,
@@ -788,7 +788,7 @@ function Invoke-IldCompare {
 }
 
 function Invoke-IldSpellcheck {
-    # Rechtschreibung inkl. Vorschläge — 2.6.20
+    # Rechtschreibung inkl. Vorschläge - 2.6.20
     param(
         [Parameter(Mandatory = $true)][string]$Text,
         [string]$Dict,
@@ -806,7 +806,7 @@ function Invoke-IldSpellcheck {
 }
 
 function Invoke-IldAutocorrect {
-    # Autokorrektur / Bausteine — 2.6.20
+    # Autokorrektur / Bausteine - 2.6.20
     param(
         [Parameter(Mandatory = $true)][string]$Text,
         [string]$Lang
@@ -817,7 +817,7 @@ function Invoke-IldAutocorrect {
 }
 
 function Get-IldSnippets {
-    # Textbausteine (9 Slots) — 2.6.20
+    # Textbausteine (9 Slots) - 2.6.20
     Invoke-Ild @("--json", "snippets") | Out-Host
 }
 
@@ -830,7 +830,7 @@ function Set-IldSnippet {
 }
 
 function Enable-IldReview {
-    # Review / Track Changes — 2.6.22
+    # Review / Track Changes - 2.6.22
     param(
         [Parameter(Mandatory = $true)][string]$Path,
         [string]$Author,
@@ -1016,7 +1016,7 @@ function New-IldSigningCert {
 }
 
 function Start-IldSharedReview {
-    # Gemeinsames Review / Freigabeordner — 2.6.23
+    # Gemeinsames Review / Freigabeordner - 2.6.23
     param(
         [Parameter(Mandatory = $true)][string]$Path,
         [Parameter(Mandatory = $true)][string]$ShareDir,
@@ -1061,7 +1061,7 @@ function Get-IldSharedReviewInfo {
 }
 
 function Add-IldHyperlink {
-    # Hyperlink in Text — 2.6.27
+    # Hyperlink in Text - 2.6.27
     param(
         [Parameter(Mandatory = $true)][string]$Text,
         [Parameter(Mandatory = $true)][string]$LinkText,

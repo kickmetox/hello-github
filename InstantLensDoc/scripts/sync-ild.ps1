@@ -116,7 +116,7 @@ function Write-DestinationLockedHint {
     Write-Host "  cd $safe"
     Write-Host "  # optional Backup/Rename wenn noch Reste:"
     Write-Host "  # Rename-Item '$Dest' ('${Dest}.bak-' + (Get-Date -Format 'yyyyMMdd-HHmmss'))"
-    Write-Host '  powershell -ExecutionPolicy Bypass -File .\sync-ild.ps1 -LocalPack D:\AI_Temp\InstantLensDoc-2.6.31-pack.zip -SkipStart'
+    Write-Host '  powershell -ExecutionPolicy Bypass -File .\sync-ild.ps1 -LocalPack D:\AI_Temp\InstantLensDoc-2.6.32-pack.zip -SkipStart'
     Write-Host "Exit-Code 1 = Ziel gesperrt oder Sync-Fehler."
     Write-Host ""
 }
@@ -238,7 +238,7 @@ function Write-LocalPackHint {
     Write-Host ""
     Write-Host "=== Git-Sync fehlgeschlagen ($Reason) ===" -ForegroundColor Yellow
     Write-Host "Fallback: lokales Pack nutzen:"
-    Write-Host '  powershell -ExecutionPolicy Bypass -File .\sync-ild.ps1 -LocalPack D:\AI_Temp\InstantLensDoc-2.6.31-pack.zip -SkipStart'
+    Write-Host '  powershell -ExecutionPolicy Bypass -File .\sync-ild.ps1 -LocalPack D:\AI_Temp\InstantLensDoc-2.6.32-pack.zip -SkipStart'
     Write-Host "oder entpackten Ordner:"
     Write-Host '  powershell -ExecutionPolicy Bypass -File .\sync-ild.ps1 -LocalPack D:\AI_Temp\InstantLensDoc-pack -SkipStart'
     Write-Host "Pack-Zip: InstantLensDoc-*-pack.zip (Store docs / Agent-Ausgabe)."
@@ -276,8 +276,10 @@ try {
         $sideCandidates = @(
             (Join-Path $scriptDir "InstantLensDoc-pack.zip"),
             (Join-Path $parentDir "InstantLensDoc-pack.zip"),
+            (Join-Path $parentDir "InstantLensDoc-2.6.32-pack.zip"),
             (Join-Path $parentDir "InstantLensDoc-2.6.31-pack.zip"),
             (Join-Path $parentDir "InstantLensDoc-2.6.30-pack.zip"),
+            "D:\AI_Temp\InstantLensDoc-2.6.32-pack.zip",
             "D:\AI_Temp\InstantLensDoc-2.6.31-pack.zip",
             "D:\AI_Temp\InstantLensDoc-2.6.30-pack.zip",
             "D:\AI_Temp\InstantLensDoc-pack.zip"

@@ -1,4 +1,4 @@
-# InstantLens Doc 2.6.28 — Benutzer-Installer (ohne Admin wenn möglich)
+﻿# InstantLens Doc 2.6.32 - Benutzer-Installer (ohne Admin wenn möglich)
 # Startmenü-Shortcut + optional Desktop-Link (User-Profil).
 # Keygen-Shortcut im Startmenü, wenn run-keygen.bat oder InstantLensKeygen.exe vorhanden.
 # Idempotent: vorhandene Verknüpfungen werden aktualisiert.
@@ -18,12 +18,12 @@
 #   powershell -ExecutionPolicy Bypass -File "D:\AI_Temp\sync-ild.ps1"
 #   (oder .\scripts\sync-ild.ps1 neben der App / Store-Kopie)
 #
-# Nach Sync — empfohlene Schritte (DE):
+# Nach Sync - empfohlene Schritte (DE):
 #   1) Shortcuts:  powershell -ExecutionPolicy Bypass -File .\scripts\install-ild.ps1
 #   2) Optional Setup.exe (Inno Setup 6):
 #        powershell -ExecutionPolicy Bypass -File .\scripts\build-windows-installer.ps1
 #   3) Oder Sync+Installer: sync-ild.ps1 -BuildInstaller -SkipStart
-#   Keygen: run-keygen.bat · Scripting: python -m ild --help
+#   Keygen: run-keygen.bat  /  Scripting: python -m ild --help
 #
 # Exit-Codes:
 #   0  Erfolg (Install/Update/Uninstall OK; nichts zu entfernen bei -Uninstall = OK; Abbruch Prompt = 0)
@@ -41,7 +41,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$Version = "2.6.28"
+$Version = "2.6.32"
 $AppName = "InstantLens Doc"
 
 function Write-IldInfo([string]$msg) { Write-Host "[ILD $Version] $msg" }
@@ -98,7 +98,7 @@ if ($Uninstall) {
 
     if (-not $Quiet) {
         Write-Host ""
-        Write-Host "InstantLens Doc — Shortcuts entfernen (Startmenü + Desktop)." -ForegroundColor Yellow
+        Write-Host "InstantLens Doc - Shortcuts entfernen (Startmenü + Desktop)." -ForegroundColor Yellow
         $answer = Read-Host "Fortfahren? (J/N)"
         if ($answer -notmatch '^[jJyY]') {
             Write-IldInfo "Uninstall abgebrochen (Prompt). Exit 0."
@@ -124,8 +124,8 @@ if ($Uninstall) {
                 Write-IldLogLine -LogPath $logPath -Message "entfernt: $link"
             } catch {
                 $failed += $link
-                Write-IldErr "Entfernen fehlgeschlagen: $link — $_"
-                Write-IldLogLine -LogPath $logPath -Message "FEHLER: $link — $_"
+                Write-IldErr "Entfernen fehlgeschlagen: $link - $_"
+                Write-IldLogLine -LogPath $logPath -Message "FEHLER: $link - $_"
             }
         } else {
             $missing += $link
@@ -138,14 +138,14 @@ if ($Uninstall) {
     if ($failed.Count -gt 0) {
         Write-IldErr "Uninstall unvollständig ($($failed.Count) Fehler)."
         Write-IldLogLine -LogPath $logPath -Message "Uninstall unvollständig ($($failed.Count) Fehler)"
-        # Kurz-Summary auch bei Fehler — 2.0.5
+        # Kurz-Summary auch bei Fehler - 2.0.5
         Write-Host "Uninstall: entfernt=$($removed.Count) fehlend=$($missing.Count) fehler=$($failed.Count) Exit=1"
         Write-IldInfo "Log-Datei: $logPath"
         exit 1
     }
-    # Nichts zu entfernen (alles fehlte bereits) = Exit 0 — 2.0.5
+    # Nichts zu entfernen (alles fehlte bereits) = Exit 0 - 2.0.5
     if ($removed.Count -eq 0) {
-        Write-IldLogLine -LogPath $logPath -Message "nichts zu entfernen ($($missing.Count) fehlten bereits) — Exit 0"
+        Write-IldLogLine -LogPath $logPath -Message "nichts zu entfernen ($($missing.Count) fehlten bereits) - Exit 0"
     }
     if (-not $Quiet) {
         if ($missing.Count -gt 0) {
@@ -155,7 +155,7 @@ if ($Uninstall) {
         Write-IldInfo "Log-Datei: $logPath"
     }
     Write-IldLogLine -LogPath $logPath -Message "Uninstall fertig: $($removed.Count) entfernt, $($missing.Count) fehlten bereits"
-    # Kurz-Summary immer auf stdout (Quiet: einzige Erfolgszeile) — 2.0.5
+    # Kurz-Summary immer auf stdout (Quiet: einzige Erfolgszeile) - 2.0.5
     Write-Host "Uninstall: entfernt=$($removed.Count) fehlend=$($missing.Count) Exit=0"
     if ($Quiet) {
         Write-Host "Log: $logPath"
@@ -163,7 +163,7 @@ if ($Uninstall) {
     exit 0
 }
 
-# App-Wurzel ermitteln (Skript liegt unter …/InstantLensDoc/scripts/)
+# App-Wurzel ermitteln (Skript liegt unter .../InstantLensDoc/scripts/)
 if (-not $AppDir) {
     $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
     $candidate = Split-Path -Parent $scriptRoot
@@ -221,7 +221,7 @@ function New-UserShortcut {
 $created = @()
 $updated = @()
 
-# Startmenü (Benutzer, kein Admin) — %APPDATA%\Microsoft\Windows\Start Menu\Programs
+# Startmenü (Benutzer, kein Admin) - %APPDATA%\Microsoft\Windows\Start Menu\Programs
 if (-not $SkipStartMenu) {
     $startPrograms = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs"
     $startLink = Join-Path $startPrograms "$AppName.lnk"
@@ -241,7 +241,7 @@ if (-not $SkipStartMenu) {
         exit 1
     }
 
-    # Keygen-Shortcut (run-keygen.bat oder InstantLensKeygen.exe) — 2.6.28
+    # Keygen-Shortcut (run-keygen.bat oder InstantLensKeygen.exe) - 2.6.32
     if (-not $SkipKeygen) {
         $kgExe = Join-Path $AppDir "InstantLensKeygen.exe"
         $kgBat = Join-Path $AppDir "run-keygen.bat"
@@ -296,7 +296,7 @@ if ($wantDesktop) {
         }
     } catch {
         Write-IldErr "Desktop-Link fehlgeschlagen: $_"
-        # Desktop optional — kein harter Abbruch wenn Startmenü schon ok
+        # Desktop optional - kein harter Abbruch wenn Startmenü schon ok
         if (($created.Count + $updated.Count) -eq 0) { exit 1 }
     }
 } else {
@@ -315,6 +315,6 @@ if (Test-Path $syncLocal) {
 Write-IldInfo "Optional Setup.exe (Inno Setup 6, nach Sync):"
 Write-Host '  powershell -ExecutionPolicy Bypass -File .\scripts\build-windows-installer.ps1'
 Write-Host '  powershell -ExecutionPolicy Bypass -File "D:\AI_Temp\sync-ild.ps1" -BuildInstaller -SkipStart'
-Write-IldInfo "Keygen: run-keygen.bat · Scripting: python -m ild --help · .\scripts\ild.ps1"
-Write-IldInfo "Exit-Codes: 0 OK · 1 Fehler. Deinstallieren: -Uninstall [-Quiet]"
+Write-IldInfo "Keygen: run-keygen.bat  /  Scripting: python -m ild --help  /  .\scripts\ild.ps1"
+Write-IldInfo "Exit-Codes: 0 OK  /  1 Fehler. Deinstallieren: -Uninstall [-Quiet]"
 exit 0

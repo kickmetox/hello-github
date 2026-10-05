@@ -1,3 +1,7 @@
+## 2.6.32 - Build-Skripte Windows-Parser/Encoding-Fix
+
+Patch nach **2.6.31**: **`build-windows.ps1`**, **`scripts/build-windows-installer.ps1`**, **`installer/build-installer.ps1`** und weitere Pack-`.ps1` parsen unter Windows PowerShell 5.1 wieder (UTF-8 ohne BOM + Em-Dash/Ellipsis/Pfeile in Strings erzeugten Mojibake und Folgefehler um Klammern/`else`). Fancy Unicode durch ASCII ersetzt; Dateien UTF-8 **mit BOM**. Pack `InstantLensDoc-2.6.32-pack.zip` + Store-Kopie aktualisiert.
+
 ## 2.6.31 - Sync-Skript Windows-Parser/Encoding-Fix
 
 Patch nach **2.6.30**: **`scripts/sync-ild.ps1`** parst unter Windows PowerShell 5.1 wieder (UTF-8 ohne BOM + Em-Dash/Smart-Quotes in Strings erzeugten Mojibake `â€"` und Folgefehler Try/Catch/Klammern). Fancy Unicode durch ASCII ersetzt; Datei UTF-8 **mit BOM**. Pack `InstantLensDoc-2.6.31-pack.zip` + Store-Kopie aktualisiert.
