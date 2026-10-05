@@ -1,6 +1,15 @@
-## 2.6.54 - DTP-Layout-Modus & geplante Extras (Code; Pack folgt)
+## 2.6.54 - Release: PDF-Export/Minimap, Scan, Tabs, Annotationen, DTP, Menü-Audit
 
-Neuer **Layout-Modus** und Umsetzung der Extras-Einträge, die bisher `(geplant)` / `(Hinweis)` / `(begrenzt)` waren. **VERSION.txt bleibt 2.6.53** in diesem Lauf (kein Pack).
+Sechs auf dem Branch gelandete Arbeitspakete. Pack `InstantLensDoc-2.6.54-pack.zip`; VERSION **2.6.54**.
+
+- **PDF-Export / Diagnose / Minimap:** Speichern unter `.pdf` schreibt echte PDFs (`export_pdf` / `QPdfWriter` / `text_to_pdf`), nie DOCX-Bytes unter PDF-Namen. Header-Sniff (`ild_pdf/pdf_sniff.py`); Diagnose `scripts/pdf_doctor.py`; Minimap Standard aus; Ribbon-Undo-Pfeile im Editor.
+- **Scan-Übertragung:** ein Scan-Dialog, konfigurierbares Backend, WIA/NAPS2/eSCL nach ScanTuxio-Ablauf — das Bild landet im Dokument (`core/scan_transfer.py`).
+- **Tab / Nav / Recents / Editor-Guard:** Tab-X nicht-blockierend, Welcome-Sync, per-Tab-Navigation, Recents leerbar, Mausrad blättert, Editor-Aktionen no-op auf PDF.
+- **Annotationen:** Highlight/Stift/Objekte bleiben (PDF-Punkte), native `/Annots`, `QUndoStack`, Stift ≠ Highlight.
+- **DTP / (geplant):** Layout-Modus (`instantlensdoc/dtp/`), Extras ohne `(geplant)` / `(Hinweis)` / `(begrenzt)`.
+- **Menü-Audit:** Enablement (701 Einträge), 131 Editor-Aktionen bei PDF aus; Telemetrie ohne Stub-Dialog (`QMessageBox`); Outline-Vorlesen disabled ohne `show_planned`.
+
+Neuer **Layout-Modus** und Umsetzung der Extras-Einträge, die bisher `(geplant)` / `(Hinweis)` / `(begrenzt)` waren.
 
 - **DTP-Canvas** `instantlensdoc/dtp/`: Seiten-/Musterseitenmodell, Textrahmen/Bildrahmen/Formen frei platzierbar, Verkettung, Lineal mit ziehbaren Guides, Raster/Snap, Spalten/Stege, Bleed/Satzspiegel, Align/Distribute, Ebenen, Absatz-/Objektstile, Buchpresets (Taschenbuch/A5/Roman/Sachbuch/A4/Quadrat). Ribbon-Tab **DTP**, Ansicht → **Layout-Modus**.
 - **Export:** Vektor-PDF über **QPdfWriter/QPainter** (nicht `ild_pdf`-Writer), plus DOCX/ODT.

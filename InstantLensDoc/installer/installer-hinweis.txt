@@ -1,4 +1,16 @@
-InstantLens Doc 2.6.53 - Installation
+InstantLens Doc 2.6.54 - Installation
+
+Neu in 2.6.54:
+- Speichern unter .pdf schreibt echte PDFs (kein DOCX unter PDF-Namen)
+- pdf_doctor.py: Diagnose und Recovery falsch benannter Dateien
+- Minimap Standard aus; Ribbon-Undo-Pfeile
+- Scan: ein Dialog, Bild landet im Dokument (WIA/NAPS2/eSCL)
+- Tab schliessen nicht-blockierend; per-Tab-Nav; Recents leerbar
+- PDF-Annotationen bleiben (Highlight/Stift/Objekte, QUndoStack)
+- DTP-Layout-Modus; Extras ohne "(geplant)"
+- Menue-Audit: 701 Eintraege Enablement; Editor-Aktionen bei PDF deaktiviert
+- Telemetrie ohne Stub-Dialog; Outline-Vorlesen ohne show_planned
+- Pack InstantLensDoc-2.6.54-pack.zip
 
 Neu in 2.6.53:
 - PDF-Oeffnen robust: Bytes -> Pfad -> pikepdf-Reparatur (Windows "Data format

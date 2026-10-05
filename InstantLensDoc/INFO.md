@@ -1,8 +1,8 @@
 # InstantLens Doc — Kurzinfo
 
-### 2.6.54 — DTP-Layout-Modus & geplante Funktionen
+### 2.6.54 — Release
 
-Ansicht → **Layout-Modus** (Ctrl+Alt+L, Ribbon DTP): echter DTP-Canvas mit Rahmen, Lineal, Raster, Musterseiten, Buchformaten, Text auf Pfad, Schnittmasken, Live-Füllungen, Glyphen-Palette. Extras ohne „(geplant)“: KI-Assistent (auch offline), Formerkennung, Variable Fonts, Envelope Distort, 3D-Extrusion, PAdES-B/QES-Hinweis, Stylus, Plugin-Hooks (`on_open`/`on_save`/`on_scan`). VERSION-Pack bleibt 2.6.53 in diesem Lauf.
+PDF-Export statt DOCX-Kopie, `pdf_doctor`, Minimap aus; Scan-Übertragung ins Dokument; Tab/Nav/Recents/Editor-Guard; Annotationen persistieren; DTP-Layout-Modus + Extras ohne „(geplant)“; Menü-Audit (701 Einträge, Telemetrie ohne Stub-Dialog). Ansicht → **Layout-Modus** (Ctrl+Alt+L, Ribbon DTP): Canvas mit Rahmen, Lineal, Raster, Musterseiten, Buchformaten, Text auf Pfad, Schnittmasken, Live-Füllungen, Glyphen-Palette. Pack `InstantLensDoc-2.6.54-pack.zip`. VERSION **2.6.54**.
 
 ### 2.6.53 — PDFium „Data format error“, DOCX-Umbruch/-Schrift, Seitenlayout
 
@@ -19,7 +19,7 @@ Menü **Geräte** (Scanner / Scannen…, Drucker, Erkennen), PDF → Scannen, To
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **2.6.53** |
+| Version | **2.6.54** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
