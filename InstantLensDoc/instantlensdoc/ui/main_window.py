@@ -15977,6 +15977,16 @@ class MainWindow(QMainWindow):
                 def _repaint_central() -> None:
                     if int(getattr(self.pdf_view, "_open_generation", 0) or 0) != open_gen:
                         return
+                    # Anderes Dokument (DOCX/Tab) inzwischen aktiv: Stack nicht zurückstehlen — 2.6.54
+                    if getattr(self.doc, "kind", None) != DocKind.PDF:
+                        return
+                    cur_p = str(getattr(self.doc, "path", "") or "")
+                    try:
+                        if Path(cur_p).resolve() != Path(path).resolve():
+                            return
+                    except Exception:
+                        if cur_p != str(path):
+                            return
                     if self.stack.currentWidget() is not self.pdf_view:
                         self.stack.setCurrentWidget(self.pdf_view)
                     if self.pdf_view.pdf_path and not self.pdf_view._canvas_has_page_image():

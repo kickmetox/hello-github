@@ -596,7 +596,7 @@ def check_version() -> None:
     if "_replace_all_text_undoable" not in ed_src or "minimap_effective" not in ed_src:
         _fail("editor fehlt Undo-Block/Minimap-Rich-Guard (2.6.54)")
     rb = (ROOT / "instantlensdoc" / "ui" / "ribbon_bar.py").read_text(encoding="utf-8")
-    if '("undo", "Rückgängig")' not in rb or "def set_enabled" not in rb:
+    if '("undo", "↶ Rückgängig")' not in rb or "def set_enabled" not in rb:
         _fail("Ribbon fehlt Start-Undo-Pfeile (2.6.54)")
     if not (ROOT / "scripts" / "pdf_doctor.py").is_file():
         _fail("scripts/pdf_doctor.py fehlt (2.6.54)")

@@ -4,7 +4,7 @@ Sechs auf dem Branch gelandete Arbeitspakete. Pack `InstantLensDoc-2.6.54-pack.z
 
 - **PDF-Export / Diagnose / Minimap:** Speichern unter `.pdf` schreibt echte PDFs (`export_pdf` / `QPdfWriter` / `text_to_pdf`), nie DOCX-Bytes unter PDF-Namen. Header-Sniff (`ild_pdf/pdf_sniff.py`); Diagnose `scripts/pdf_doctor.py`; Minimap Standard aus; Ribbon-Undo-Pfeile im Editor.
 - **Scan-Übertragung:** ein Scan-Dialog, konfigurierbares Backend, WIA/NAPS2/eSCL nach ScanTuxio-Ablauf — das Bild landet im Dokument (`core/scan_transfer.py`).
-- **Tab / Nav / Recents / Editor-Guard:** Tab-X nicht-blockierend, Welcome-Sync, per-Tab-Navigation, Recents leerbar, Mausrad blättert, Editor-Aktionen no-op auf PDF.
+- **Tab / Nav / Recents / Editor-Guard:** Tab-X nicht-blockierend, Welcome-Sync, per-Tab-Navigation, Recents leerbar, Mausrad blättert, Editor-Aktionen no-op auf PDF. PDF-Open-Timer stiehlt den Stack nach DOCX-Open nicht mehr.
 - **Annotationen:** Highlight/Stift/Objekte bleiben (PDF-Punkte), native `/Annots`, `QUndoStack`, Stift ≠ Highlight.
 - **DTP / (geplant):** Layout-Modus (`instantlensdoc/dtp/`), Extras ohne `(geplant)` / `(Hinweis)` / `(begrenzt)`.
 - **Menü-Audit:** Enablement (701 Einträge), 131 Editor-Aktionen bei PDF aus; Telemetrie ohne Stub-Dialog (`QMessageBox`); Outline-Vorlesen disabled ohne `show_planned`.
