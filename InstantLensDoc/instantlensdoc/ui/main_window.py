@@ -1364,9 +1364,10 @@ class MainWindow(QMainWindow):
         self.secondary_pane.preview.setVisible(False)
         self.secondary_pdf = PdfViewer()
         self.secondary_pdf.status.connect(self._set_status)
-        # Zweit-Panel: nur Anzeige (Annotationen gesperrt)
+        # Zweit-Panel: nur Anzeige (lokal gesperrt, Setting unangetastet)
         try:
-            self.secondary_pdf.set_annotations_locked(True)
+            self.secondary_pdf._persist_ann_lock = False
+            self.secondary_pdf.set_annotations_locked(True, persist=False)
         except Exception:
             pass
         self.secondary_stack.addWidget(self.secondary_pane)  # 0 Editor
@@ -7028,7 +7029,8 @@ class MainWindow(QMainWindow):
                 ok = bool(self.secondary_pdf.load(pick))
                 if ok:
                     try:
-                        self.secondary_pdf.set_annotations_locked(True)
+                        self.secondary_pdf._persist_ann_lock = False
+                        self.secondary_pdf.set_annotations_locked(True, persist=False)
                     except Exception:
                         pass
                     self.secondary_title.setText(f"Rechts: {name} (PDF)")

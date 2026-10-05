@@ -2888,6 +2888,7 @@ class PdfViewer(QWidget):
         self._search_whole_word = False
         self._search_regex = False
         self._annotations_visible = get_annotations_visible()
+        self._persist_ann_lock = True
         self._annotations_locked = get_annotations_locked()
         self._show_page_boxes = get_show_page_boxes()
         self._show_page_number_overlay = get_show_page_number_overlay()
@@ -4776,12 +4777,17 @@ class PdfViewer(QWidget):
             out[g] = out.get(g, 0) + 1
         return out
 
-    def set_annotations_locked(self, locked: bool):
-        """Annotationen sperren — nicht per Drag verschiebbar."""
+    def set_annotations_locked(self, locked: bool, persist: bool = True):
+        """Annotationen sperren — nicht per Drag verschiebbar.
+
+        persist=False: nur dieser Viewer (Zweit-Panel), ohne globale Setting
+        und ohne das Hauptfenster mitzusperren — 2.6.54.
+        """
         enabled = bool(locked)
         changed = self._annotations_locked != enabled
         self._annotations_locked = enabled
-        set_annotations_locked(enabled)
+        if persist and getattr(self, "_persist_ann_lock", True):
+            set_annotations_locked(enabled)
         if hasattr(self, "btn_ann_lock"):
             self.btn_ann_lock.blockSignals(True)
             self.btn_ann_lock.setChecked(enabled)
@@ -5580,7 +5586,8 @@ class PdfViewer(QWidget):
             self.btn_ann_layer.blockSignals(False)
         self.canvas.set_annotations_visible(self._annotations_visible)
         self.canvas.set_ann_type_visible(get_ann_layer_types_visible())
-        self._annotations_locked = get_annotations_locked()
+        if getattr(self, "_persist_ann_lock", True):
+            self._annotations_locked = get_annotations_locked()
         if hasattr(self, "btn_ann_lock"):
             self.btn_ann_lock.blockSignals(True)
             self.btn_ann_lock.setChecked(self._annotations_locked)

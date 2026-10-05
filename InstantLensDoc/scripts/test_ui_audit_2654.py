@@ -170,6 +170,7 @@ def test_viewer_tools_undo_zoom(app, td: Path) -> None:
     v.show()
     app.processEvents()
     assert v.load(pdf), f"load fehlgeschlagen: {v._last_refresh_error!r}"
+    v.set_annotations_locked(False)
     v._suppress_default_zoom = True
     _pump(app, 1.2, until=lambda: v._canvas_has_page_image())
     v.set_scale(1.5, immediate=True)
@@ -293,18 +294,11 @@ def test_ribbon_undo_arrows() -> None:
     rb.set_action_enabled("undo", True)
 
 
-def test_mainwindow_shortcuts(app) -> None:
+def test_mainwindow_shortcuts(win) -> None:
     from PySide6.QtGui import QKeySequence
 
-    from instantlensdoc.license import LicenseManager
-    from instantlensdoc.ui.main_window import MainWindow
+    from instantlensdoc.core.app_settings import get_annotations_locked
 
-    lm = LicenseManager()
-    lm.ensure_trial_started()
-    win = MainWindow(lm)
-    win.resize(1200, 800)
-    win.show()
-    _pump(app, 0.3)
     act_u = getattr(win, "_edit_undo_action", None)
     act_r = getattr(win, "_edit_redo_action", None)
     assert act_u is not None and act_r is not None
@@ -313,7 +307,8 @@ def test_mainwindow_shortcuts(app) -> None:
     assert "Ctrl+Shift+Z" in joined or QKeySequence("Ctrl+Shift+Z") in act_r.shortcuts()
     rb = win.ribbon_bar
     assert "undo" in rb._action_buttons
-    win.close()
+    assert get_annotations_locked() is False, "Zweit-Panel darf Annotationen-Sperre nicht global setzen"
+    assert win.pdf_view.annotations_locked() is False
 
 
 def main() -> int:  # noqa: C901
@@ -532,10 +527,9 @@ def main() -> int:  # noqa: C901
         print("OK  7 viewer Stift/Highlight/Zoom/QUndoStack")
         test_ribbon_undo_arrows()
         print("OK  8 ribbon ↶/↷")
-        test_mainwindow_shortcuts(app)
+        test_mainwindow_shortcuts(win)
         print("OK  9 menü Ctrl+Shift+Z")
 
-    win.close()
     print("OK test_ui_audit_2654")
     return 0
 
