@@ -764,6 +764,7 @@ class DtpPane(QWidget):
         _btn("Verketten", self.link_selected, "Zwei Textrahmen verketten und umbrechen")
         _btn("Import", self.import_text, "TXT/MD/DOCX/OCR in Rahmen")
         _btn("Bild…", self.replace_image, "Bild in ausgewählten Rahmen")
+        _btn("Grafik", self.import_graphic, "AI/IDML/EPS/SVG/PSD/TIFF/KRA")
         _btn("Spalten", self.make_columns, "Spaltenkette auf der Seite")
         _btn("Raster", self.toggle_grid, "Raster ein/aus")
         _btn("Links", lambda: self.align("left"), "Links ausrichten")
@@ -808,6 +809,10 @@ class DtpPane(QWidget):
         self._ink_btn = _btn("Stift", self.toggle_ink, "Drucksensitiver Stift")
         self._ink_btn.setCheckable(True)
         _btn("Erkennen", self.recognize_selected_ink, "Tinte → Form")
+        _btn("Schweißen", self.weld_selected, "Boolean-Union, kein Gruppe")
+        _btn("Symbol", self.symbol_from_selection, "Verknüpfter Master-Klon")
+        _btn("Preflight", self.run_preflight, "Schriften/Low-Res")
+        _btn("PDF/X", self.export_pdfx_dialog, "PDF/X-3")
         _btn("PDF", self.export_pdf_dialog, "Layout als PDF (QPdfWriter)")
         bar.addStretch(1)
         self._info = QLabel("")
@@ -1264,13 +1269,29 @@ class DtpPane(QWidget):
         if not path:
             return
         sel = self.scene.selected_frames()
-        images = [f for f in sel if f.kind in ("image", "shape")]
+        images = [f for f in sel if f.kind in ("image", "render")]
         if images:
             self.doc.set_image(images[0].id, path)
         else:
             self.doc.add_image_frame(path, page=self.doc.current_page)
         self.scene.rebuild()
         self.statusMessage.emit("Bildrahmen aktualisiert")
+
+    def import_graphic(self, path: str | None = None) -> None:
+        if not path:
+            path, _ = QFileDialog.getOpenFileName(
+                self,
+                "Grafik importieren",
+                "",
+                "Grafik (*.svg *.tif *.tiff *.png *.jpg *.jpeg *.psd *.kra *.ai *.eps *.idml *.pdf);;Alle (*.*)",
+            )
+        if not path:
+            return
+        from instantlensdoc.dtp.import_graphics import import_graphic as _imp
+
+        _imp(self.doc, path, page=self.doc.current_page)
+        self.scene.rebuild()
+        self.statusMessage.emit(f"Grafik: {path}")
 
     def _on_preset(self, _index: int = 0) -> None:
         if self._block_preset:
@@ -1545,3 +1566,39 @@ class DtpPane(QWidget):
         if not data.startswith(b"%PDF"):
             raise RuntimeError("Export lieferte kein gültiges PDF")
         return str(dest)
+
+    def weld_selected(self) -> DtpFrame | None:
+        ids = [f.id for f in self.scene.selected_frames() if f.kind != "text"]
+        if len(ids) < 2:
+            self.statusMessage.emit("Schweißen: zwei Form-/Bildrahmen wählen")
+            return None
+        fr = self.doc.weld_frames(ids)
+        self.scene.rebuild()
+        self.statusMessage.emit(f"Geschweißt {fr.id}")
+        return fr
+
+    def symbol_from_selection(self) -> None:
+        sel = self.scene.selected_frames()
+        if not sel:
+            self.statusMessage.emit("Symbol: Rahmen wählen")
+            return
+        sym = self.doc.register_symbol(sel[0].id, name=sel[0].kind)
+        clone = self.doc.place_symbol(sym.id, x=sel[0].x + 12, y=sel[0].y + 12)
+        self.scene.rebuild()
+        self.statusMessage.emit(f"Symbol {sym.id} + Klon {clone.id}")
+
+    def run_preflight(self):
+        from instantlensdoc.dtp.preflight import run_dtp_preflight
+
+        report = run_dtp_preflight(self.doc)
+        self.statusMessage.emit(report.to_text().split("\n")[0])
+        return report
+
+    def export_pdfx_dialog(self) -> None:
+        path, _ = QFileDialog.getSaveFileName(self, "DTP als PDF/X-3", "layout-x3.pdf", "PDF (*.pdf)")
+        if not path:
+            return
+        from instantlensdoc.dtp.export import export_pdfx3
+
+        dest = export_pdfx3(self.doc, path)
+        self.statusMessage.emit(f"PDF/X-3: {dest}")

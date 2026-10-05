@@ -57,6 +57,16 @@ def _qfont_for_frame(doc, fr) -> QFont:
 def _shape_path(fr) -> QPainterPath:
     from .extrude import path_for_shape
 
+    pts = getattr(fr, "weld_path", None) or []
+    if pts and isinstance(pts[0], (list, tuple)) and len(pts[0]) >= 2:
+        path = QPainterPath()
+        path.moveTo(float(pts[0][0]), float(pts[0][1]))
+        for pt in pts[1:]:
+            if isinstance(pt, (list, tuple)) and len(pt) >= 2:
+                path.lineTo(float(pt[0]), float(pt[1]))
+        path.closeSubpath()
+        if path.elementCount() > 2:
+            return path
     return path_for_shape(fr.shape if fr.kind == "shape" else "rectangle", fr.width, fr.height)
 
 
@@ -87,14 +97,22 @@ def paint_page(painter: QPainter, doc, page: int, *, overlays: bool = False) -> 
         painter.setPen(QColor("#444444"))
         n, total = page + 1, max(1, doc.page_count)
         hr = QRectF(g.margin_left_pt, 8.0, g.width_pt - g.margin_left_pt - g.margin_right_pt, g.margin_top_pt - 10)
-        painter.drawText(hr, Qt.AlignLeft | Qt.AlignVCenter, master.header_for(n, total, title=doc.title))
+        painter.drawText(
+            hr,
+            Qt.AlignLeft | Qt.AlignVCenter,
+            master.header_for(n, total, title=doc.title, number_system=getattr(doc, "number_system", "latin")),
+        )
         fr = QRectF(
             g.margin_left_pt,
             g.height_pt - g.margin_bottom_pt + 4,
             g.width_pt - g.margin_left_pt - g.margin_right_pt,
             g.margin_bottom_pt - 8,
         )
-        painter.drawText(fr, Qt.AlignRight | Qt.AlignVCenter, master.footer_for(n, total, title=doc.title))
+        painter.drawText(
+            fr,
+            Qt.AlignRight | Qt.AlignVCenter,
+            master.footer_for(n, total, title=doc.title, number_system=getattr(doc, "number_system", "latin")),
+        )
         painter.restore()
 
     if overlays and doc.grid_visible:
@@ -241,8 +259,36 @@ def paint_frame_local(painter: QPainter, doc, fr) -> None:
     painter.restore()
 
 
+def _blend_modes_qt() -> dict[str, object]:
+    try:
+        C = QPainter.CompositionMode
+        return {
+            "multiply": C.CompositionMode_Multiply,
+            "screen": C.CompositionMode_Screen,
+            "overlay": C.CompositionMode_Overlay,
+            "darken": C.CompositionMode_Darken,
+            "lighten": C.CompositionMode_Lighten,
+            "color_dodge": C.CompositionMode_ColorDodge,
+            "color_burn": C.CompositionMode_ColorBurn,
+        }
+    except Exception:
+        return {}
+
+
+_BLEND_QT = _blend_modes_qt()
+
+
 def _paint_frame(painter: QPainter, doc, fr) -> None:
     painter.save()
+    ly = next((l for l in getattr(doc, "layers", []) if l.id == fr.layer_id), None)
+    if ly is not None:
+        try:
+            painter.setOpacity(painter.opacity() * max(0.05, min(1.0, float(ly.opacity))))
+        except Exception:
+            pass
+        mode = _BLEND_QT.get(str(getattr(ly, "blend_mode", "") or "").lower())
+        if mode is not None:
+            painter.setCompositionMode(mode)
     painter.translate(fr.x, fr.y)
     paint_frame_local(painter, doc, fr)
     painter.restore()
@@ -371,4 +417,62 @@ def export_odt(doc, path: str | Path) -> Path:
         zf.writestr("content.xml", content)
         zf.writestr("styles.xml", styles)
         zf.writestr("META-INF/manifest.xml", manifest)
+    return dest
+
+
+def export_pdfx3(doc, path: str | Path, *, min_dpi: float = 150.0) -> Path:
+    """PDF/X-3: DTP-PDF + OutputIntent / GTS_PDFXVersion (pikepdf)."""
+    from instantlensdoc.dtp.preflight import run_dtp_preflight
+
+    dest = Path(path)
+    report = run_dtp_preflight(doc, min_dpi=min_dpi)
+    if not report.ok:
+        raise ValueError(report.to_text())
+    export_pdf(doc, dest)
+    import pikepdf
+    from pikepdf import Dictionary, Name, String
+
+    with pikepdf.open(dest, allow_overwriting_input=True) as pdf:
+        pdf.docinfo["/GTS_PDFXVersion"] = String("PDF/X-3:2003")
+        pdf.docinfo["/Title"] = String(getattr(doc, "title", "") or "InstantLens Doc")
+        pdf.Root.OutputIntents = [
+            Dictionary(
+                {
+                    "/Type": Name.OutputIntent,
+                    "/S": Name.GTS_PDFX,
+                    "/OutputConditionIdentifier": String("Custom"),
+                    "/Info": String("InstantLens Doc DTP PDF/X-3"),
+                    "/RegistryName": String("http://www.color.org"),
+                }
+            )
+        ]
+        pdf.save(dest, min_version="1.4")
+    return dest
+
+
+def export_pdf_versions(doc, path: str | Path, versions: tuple[str, ...] = ("1.4", "1.7")) -> dict[str, Path]:
+    """Multi-Version-PDF: stem-14.pdf und stem-17.pdf."""
+    import pikepdf
+
+    base = Path(path)
+    src = export_pdf(doc, base)
+    raw = src.read_bytes()
+    out: dict[str, Path] = {}
+    for ver in versions:
+        dest = base.with_name(f"{base.stem}-{ver.replace('.', '')}{base.suffix}")
+        dest.write_bytes(raw)
+        with pikepdf.open(dest, allow_overwriting_input=True) as pdf:
+            pdf.save(dest, min_version=ver)
+        out[ver] = dest
+    return out
+
+
+def export_interactive_pdf(doc, path: str | Path) -> Path:
+    """PDF mit AcroForm-Widgets (Text, Combo, Präsentation)."""
+    from instantlensdoc.dtp.interactive import attach_widgets_to_pdf
+
+    dest = export_pdf(doc, path)
+    widgets = list(getattr(doc, "widgets", []) or [])
+    if widgets:
+        attach_widgets_to_pdf(dest, widgets, list(doc.frames))
     return dest

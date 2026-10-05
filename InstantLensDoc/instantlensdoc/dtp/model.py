@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any, Optional
 from uuid import uuid4
 
-from .geometry import column_rects, snap_point
+from .geometry import column_rects, snap_point, snap_to_guide_mm, snap_baseline
 from .presets import BOOK_PRESETS_MM, apply_book_preset, mm_to_pt
 
 
@@ -28,6 +28,7 @@ class PageGeometry:
     bleed_pt: float = 8.5
     columns: int = 1
     gutter_pt: float = 14.17
+    baseline_grid_mm: float = 4.233
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -57,6 +58,8 @@ class DtpLayer:
     visible: bool = True
     locked: bool = False
     z: int = 0
+    blend_mode: str = "normal"
+    opacity: float = 1.0
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -74,6 +77,7 @@ class StyleSheet:
     stretch: int = 100
     italic: bool = False
     tracking: float = 0.0
+    kerning: float = 0.0
     leading: float = 1.2
     color: str = "#111111"
     alignment: str = "left"
@@ -101,6 +105,9 @@ def default_styles() -> dict[str, StyleSheet]:
         ),
         "caption": StyleSheet(
             id="caption", kind="paragraph", font_size=9.0, italic=True, color="#444444"
+        ),
+        "emphasis": StyleSheet(
+            id="emphasis", kind="character", font_size=11.0, italic=True, weight=600
         ),
         "object": StyleSheet(id="object", kind="object", fill="#D0E8FF", stroke="#1A5276"),
     }
@@ -148,7 +155,7 @@ class ExtrudeSpec:
 @dataclass
 class DtpFrame:
     id: str = field(default_factory=_nid)
-    kind: str = "text"  # text | image | shape | ink
+    kind: str = "text"  # text | image | render | shape | ink  — Layout-Box, Inhalt über content_id
     page: int = 0
     x: float = 40.0
     y: float = 40.0
@@ -189,6 +196,13 @@ class DtpFrame:
     shadow_dx: float = 3.0
     shadow_dy: float = 3.0
     shadow_color: str = "#00000066"
+    content_id: str = ""
+    symbol_id: str = ""
+    linked: bool = False
+    weld_path: list = field(default_factory=list)
+    color_space: str = "rgb"
+    spot_name: str = ""
+    kerning_pairs: dict[str, float] = field(default_factory=dict)
 
     def move(self, x: float, y: float) -> None:
         if self.locked:
@@ -236,22 +250,30 @@ class DtpMaster:
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
-    def header_for(self, page_1based: int, total: int, *, title: str = "") -> str:
-        return _subst(self.header_text, page_1based, total, title)
+    def header_for(
+        self, page_1based: int, total: int, *, title: str = "", number_system: str = "latin"
+    ) -> str:
+        return _subst(self.header_text, page_1based, total, title, number_system)
 
-    def footer_for(self, page_1based: int, total: int, *, title: str = "") -> str:
+    def footer_for(
+        self, page_1based: int, total: int, *, title: str = "", number_system: str = "latin"
+    ) -> str:
         txt = self.footer_text
         if self.include_page_numbers and "{n}" not in txt:
             txt = (txt + "  {n} / {total}").strip()
-        return _subst(txt, page_1based, total, title)
+        return _subst(txt, page_1based, total, title, number_system)
 
 
-def _subst(template: str, n: int, total: int, title: str) -> str:
+def _subst(template: str, n: int, total: int, title: str, number_system: str = "latin") -> str:
+    from .type_extras import format_number
+
+    ns = format_number(n, number_system)
+    ts = format_number(total, number_system)
     return (
         (template or "")
-        .replace("{n}", str(n))
-        .replace("{page}", str(n))
-        .replace("{total}", str(total))
+        .replace("{n}", ns)
+        .replace("{page}", ns)
+        .replace("{total}", ts)
         .replace("{title}", title or "")
     )
 
@@ -273,6 +295,13 @@ class DtpDocument:
     title: str = "Ohne Titel"
     current_page: int = 0
     active_story_id: str = ""
+    library: Any = None
+    footnotes: list = field(default_factory=list)
+    endnotes: list = field(default_factory=list)
+    variables: dict[str, str] = field(default_factory=dict)
+    cross_refs: list = field(default_factory=list)
+    widgets: list = field(default_factory=list)
+    number_system: str = "latin"
 
     def __post_init__(self) -> None:
         if not self.layers:
@@ -285,6 +314,10 @@ class DtpDocument:
             self.styles = default_styles()
         if not self.masters:
             self.masters = [DtpMaster()]
+        if self.library is None:
+            from .assets import AssetLibrary
+
+            self.library = AssetLibrary()
         self._sync_page_master()
 
     def _sync_page_master(self) -> None:
@@ -385,6 +418,31 @@ class DtpDocument:
             height=height,
             image_path=path,
             wrap=wrap,
+            layer_id="images",
+            z=len(self.frames),
+        )
+        self.frames.append(fr)
+        self.page_count = max(self.page_count, fr.page + 1)
+        return fr
+
+    def add_render_frame(
+        self,
+        path: str = "",
+        *,
+        x: float = 80.0,
+        y: float = 200.0,
+        width: float = 200.0,
+        height: float = 140.0,
+        page: int = 0,
+    ) -> DtpFrame:
+        fr = DtpFrame(
+            kind="render",
+            page=max(0, int(page)),
+            x=x,
+            y=y,
+            width=width,
+            height=height,
+            image_path=path,
             layer_id="images",
             z=len(self.frames),
         )
@@ -505,7 +563,9 @@ class DtpDocument:
             return
         grid = self.grid_pt() if self.grid_snap else 0.0
         guides = self.guides if self.guides_snap else ()
-        x, y = snap_point(fr.x, fr.y, grid_pt=grid, guides=guides)
+        x, y = snap_point(fr.x, fr.y, grid_pt=grid, guides=guides, threshold=mm_to_pt(1.0))
+        if self.geometry.baseline_grid_mm and fr.kind == "text":
+            y = snap_baseline(y, mm_to_pt(self.geometry.baseline_grid_mm))
         fr.x, fr.y = x, y
 
     def _wrap_words(self, text: str, cpl: int) -> str:
@@ -883,7 +943,7 @@ class DtpDocument:
         if fr is None:
             raise KeyError(frame_id)
         if fr.kind != "text":
-            fr.kind = "text"
+            raise ValueError("Schrift gilt nur auf Textrahmen (Layout ≠ Inhalt)")
         if family:
             fr.font_family = family
         if size is not None:
@@ -933,7 +993,8 @@ class DtpDocument:
         fr = self.frame_by_id(frame_id)
         if fr is None:
             return self.add_image_frame(path, page=self.current_page)
-        fr.kind = "image"
+        if fr.kind not in ("image", "render"):
+            raise ValueError("Bild nur in Bild-/Render-Rahmen (Layout ≠ Inhalt)")
         fr.image_path = str(path or "")
         fr.layer_id = fr.layer_id or "images"
         return fr
@@ -944,6 +1005,8 @@ class DtpDocument:
         fr = self.frame_by_id(frame_id)
         if fr is None:
             fr = self.add_text_frame("", page=self.current_page)
+        if fr.kind != "text":
+            raise ValueError("Import nur in Textrahmen")
         fr.kind = "text"
         fr.text = read_import_text(path)
         self.reflow_chain(fr, auto_extend=auto_extend)
@@ -974,6 +1037,20 @@ class DtpDocument:
             if ly.id == layer_id:
                 ly.locked = bool(locked)
 
+    def set_layer_blend(self, layer_id: str, blend_mode: str, *, opacity: float | None = None) -> DtpLayer:
+        from .color import BLEND_MODES
+
+        mode = (blend_mode or "normal").lower()
+        if mode not in BLEND_MODES:
+            mode = "normal"
+        for ly in self.layers:
+            if ly.id == layer_id:
+                ly.blend_mode = mode
+                if opacity is not None:
+                    ly.opacity = max(0.05, min(1.0, float(opacity)))
+                return ly
+        raise KeyError(layer_id)
+
     def apply_preset(self, name: str) -> None:
         apply_book_preset(self, name)
 
@@ -994,6 +1071,13 @@ class DtpDocument:
             "grid_visible": self.grid_visible,
             "grid_snap": self.grid_snap,
             "guides_snap": self.guides_snap,
+            "number_system": self.number_system,
+            "variables": dict(self.variables),
+            "library": self.library.to_dict() if self.library is not None else {},
+            "footnotes": [n.to_dict() if hasattr(n, "to_dict") else n for n in self.footnotes],
+            "endnotes": [n.to_dict() if hasattr(n, "to_dict") else n for n in self.endnotes],
+            "cross_refs": [c.to_dict() if hasattr(c, "to_dict") else c for c in self.cross_refs],
+            "widgets": [w.to_dict() if hasattr(w, "to_dict") else w for w in self.widgets],
         }
 
     def save(self, path: str | Path) -> Path:
@@ -1024,6 +1108,38 @@ class DtpDocument:
         if data.get("masters"):
             doc.masters = [DtpMaster(**m) for m in data["masters"] if isinstance(m, dict)]
         doc.page_master = list(data.get("page_master") or [])
+        doc.number_system = str(data.get("number_system") or "latin")
+        doc.variables = dict(data.get("variables") or {})
+        if data.get("library"):
+            from .assets import AssetLibrary
+
+            doc.library = AssetLibrary.from_dict(data["library"])
+        from .type_extras import CrossRef, DtpNote
+        from .interactive import DtpWidget
+
+        def _notes(raw):
+            out = []
+            for n in raw or []:
+                if isinstance(n, dict):
+                    out.append(DtpNote(**{k: n[k] for k in n if k in DtpNote.__dataclass_fields__}))
+                else:
+                    out.append(n)
+            return out
+
+        doc.footnotes = _notes(data.get("footnotes"))
+        doc.endnotes = _notes(data.get("endnotes"))
+        doc.cross_refs = [
+            CrossRef(**{k: c[k] for k in c if k in CrossRef.__dataclass_fields__})
+            if isinstance(c, dict)
+            else c
+            for c in (data.get("cross_refs") or [])
+        ]
+        doc.widgets = [
+            DtpWidget(**{k: w[k] for k in w if k in DtpWidget.__dataclass_fields__})
+            if isinstance(w, dict)
+            else w
+            for w in (data.get("widgets") or [])
+        ]
         doc._sync_page_master()
         return doc
 
@@ -1074,6 +1190,107 @@ class DtpDocument:
         doc._sync_page_master()
         return doc
 
+    def weld_frames(self, frame_ids: list[str]) -> DtpFrame:
+        from .boolean import weld_frames as _weld
+
+        return _weld(self, frame_ids)
+
+    def register_symbol(self, frame_id: str, name: str = "") -> Any:
+        from .assets import register_symbol
+
+        fr = self.frame_by_id(frame_id)
+        if fr is None:
+            raise KeyError(frame_id)
+        return register_symbol(self.library, fr, name=name)
+
+    def place_symbol(self, symbol_id: str, *, x: float, y: float, page: int | None = None) -> DtpFrame:
+        from .assets import place_symbol
+
+        return place_symbol(self, symbol_id, x=x, y=y, page=self.current_page if page is None else page)
+
+    def add_footnote(self, frame_id: str, body: str, *, marker: str = "") -> Any:
+        return self._add_note(frame_id, body, kind="footnote", marker=marker)
+
+    def add_endnote(self, frame_id: str, body: str, *, marker: str = "") -> Any:
+        return self._add_note(frame_id, body, kind="endnote", marker=marker)
+
+    def _add_note(self, frame_id: str, body: str, *, kind: str, marker: str = "") -> Any:
+        from .type_extras import DtpNote
+        from uuid import uuid4
+
+        fr = self.frame_by_id(frame_id)
+        bucket = self.footnotes if kind == "footnote" else self.endnotes
+        note = DtpNote(
+            id=uuid4().hex[:8],
+            kind=kind,
+            marker=marker or str(len(bucket) + 1),
+            body=body,
+            frame_id=frame_id,
+            page=fr.page if fr else 0,
+        )
+        bucket.append(note)
+        if fr is not None and fr.kind == "text":
+            fr.text = (fr.text or "") + f"{{{note.marker}}}"
+        return note
+
+    def add_cross_ref(self, target_frame_id: str, fmt: str = "S. {page}") -> Any:
+        from .type_extras import CrossRef
+        from uuid import uuid4
+
+        cref = CrossRef(id=uuid4().hex[:8], target_frame_id=target_frame_id, fmt=fmt)
+        self.cross_refs.append(cref)
+        return cref
+
+    def add_widget(
+        self,
+        frame_id: str,
+        kind: str = "text",
+        *,
+        name: str = "",
+        value: str = "",
+        options: list[str] | None = None,
+    ) -> Any:
+        from .interactive import DtpWidget
+
+        fr = self.frame_by_id(frame_id)
+        w = DtpWidget(
+            kind=kind,
+            frame_id=frame_id,
+            name=name or kind,
+            value=value,
+            options=list(options or []),
+            page=fr.page if fr else 0,
+        )
+        self.widgets.append(w)
+        return w
+
+    def apply_kerning(self, frame_id: str, pairs: dict[str, float]) -> DtpFrame:
+        fr = self.frame_by_id(frame_id)
+        if fr is None:
+            raise KeyError(frame_id)
+        if fr.kind != "text":
+            raise ValueError("Kerning gilt nur auf Textrahmen")
+        fr.kerning_pairs.update(pairs or {})
+        return fr
+
+    def import_graphic(self, path: str, *, page: int | None = None):
+        from .import_graphics import import_graphic
+
+        return import_graphic(self, path, page=self.current_page if page is None else page)
+
+    def expand_frame_variables(self, fr: DtpFrame) -> str:
+        from .type_extras import expand_variables
+
+        return expand_variables(
+            fr.text or "",
+            page=fr.page + 1,
+            total=self.page_count,
+            title=self.title,
+            variables=self.variables,
+            notes=list(self.footnotes) + list(self.endnotes),
+            number_system=self.number_system,
+        )
+
     @classmethod
     def sample(cls, preset: str = "A5") -> "DtpDocument":
         """Beispiel-Buchseite für Tests/Screenshots."""
@@ -1091,8 +1308,8 @@ class DtpDocument:
         img = doc.add_image_frame("", x=doc.geometry.margin_left_pt, y=doc.geometry.height_pt * 0.62,
                                   width=160, height=90, page=0, wrap="bounding_box")
         img.fill = "#CFE8F3"
-        img.kind = "shape"
-        img.shape = "ellipse"
+        doc.add_shape("ellipse", x=doc.geometry.margin_left_pt + 170, y=doc.geometry.height_pt * 0.62,
+                      width=70, height=70, page=0, fill="#AED6F1", stroke="#1A5276")
         doc.add_shape("triangle", x=doc.geometry.width_pt * 0.55, y=doc.geometry.height_pt * 0.62,
                       width=90, height=70, page=0)
         doc.add_guide("vertical", doc.geometry.margin_left_pt)

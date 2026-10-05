@@ -7313,10 +7313,15 @@ class MainWindow(QMainWindow):
             "dtp_export_pdf": self._dtp_export_pdf_dialog,
             "dtp_import": self._dtp_import_text,
             "dtp_image": self._dtp_replace_image,
+            "dtp_graphic": self._dtp_import_graphic,
             "dtp_fill": self._dtp_apply_fill,
             "dtp_stroke": self._dtp_apply_stroke,
             "dtp_font": self._dtp_apply_font,
             "dtp_wrap": self._dtp_apply_wrap,
+            "dtp_weld": self._dtp_weld,
+            "dtp_symbol": self._dtp_symbol,
+            "dtp_preflight": self._dtp_preflight,
+            "dtp_pdfx": self._dtp_export_pdfx,
             "dtp_text_path": self._dtp_text_on_path,
             "dtp_glyphs": self._dtp_glyph_palette,
             "dtp_clip": self._dtp_clip_mask,
@@ -11148,6 +11153,26 @@ class MainWindow(QMainWindow):
     def _dtp_replace_image(self) -> None:
         self._enter_layout_mode()
         self.dtp_pane.replace_image()
+
+    def _dtp_import_graphic(self) -> None:
+        self._enter_layout_mode()
+        self.dtp_pane.import_graphic()
+
+    def _dtp_weld(self) -> None:
+        self._enter_layout_mode()
+        self.dtp_pane.weld_selected()
+
+    def _dtp_symbol(self) -> None:
+        self._enter_layout_mode()
+        self.dtp_pane.symbol_from_selection()
+
+    def _dtp_preflight(self) -> None:
+        self._enter_layout_mode()
+        self.dtp_pane.run_preflight()
+
+    def _dtp_export_pdfx(self) -> None:
+        self._enter_layout_mode()
+        self.dtp_pane.export_pdfx_dialog()
 
     def _show_ki_assistant(self) -> None:
         from instantlensdoc.features.ki_panel import KiAssistantDialog

@@ -7,7 +7,9 @@ from .geometry import (
     align_frames,
     column_rects,
     distribute_frames,
+    snap_mm,
     snap_point,
+    snap_to_guide_mm,
     snap_value,
 )
 from .model import (
@@ -40,6 +42,8 @@ __all__ = [
     "column_rects",
     "distribute_frames",
     "snap_point",
+    "snap_to_guide_mm",
+    "snap_mm",
     "snap_value",
 ]
 
@@ -58,5 +62,17 @@ def export_docx(*args, **kwargs):
 
 def export_odt(*args, **kwargs):
     from .export import export_odt as _fn
+
+    return _fn(*args, **kwargs)
+
+
+def export_pdfx3(*args, **kwargs):
+    from .export import export_pdfx3 as _fn
+
+    return _fn(*args, **kwargs)
+
+
+def export_sla(*args, **kwargs):
+    from .sla import export_sla as _fn
 
     return _fn(*args, **kwargs)

@@ -142,6 +142,48 @@ def column_rects(
     return out
 
 
+def mm_to_pt(mm: float) -> float:
+    return float(mm) * 72.0 / 25.4
+
+
+def pt_to_mm(pt: float) -> float:
+    return float(pt) * 25.4 / 72.0
+
+
+def snap_mm(value_pt: float, spacing_mm: float, threshold_mm: float = 1.0) -> float:
+    """Snap in Millimetern (Hilfslinie/Raster)."""
+    return snap_value(
+        float(value_pt),
+        mm_to_pt(spacing_mm),
+        threshold=mm_to_pt(threshold_mm),
+    )
+
+
+def snap_to_guide_mm(
+    x_pt: float,
+    y_pt: float,
+    guides: Sequence[Any] = (),
+    *,
+    threshold_mm: float = 1.0,
+) -> tuple[float, float]:
+    """Snap gegen Guides; Schwellwert in mm."""
+    return snap_point(
+        x_pt,
+        y_pt,
+        grid_pt=0.0,
+        guides=guides,
+        threshold=mm_to_pt(threshold_mm),
+    )
+
+
+def snap_baseline(y_pt: float, grid_pt: float, offset_pt: float = 0.0) -> float:
+    g = float(grid_pt)
+    if g <= 0:
+        return float(y_pt)
+    rel = float(y_pt) - float(offset_pt)
+    return float(offset_pt) + round(rel / g) * g
+
+
 def bleed_rect(width_pt: float, height_pt: float, bleed_pt: float) -> dict[str, float]:
     b = max(0.0, float(bleed_pt))
     return {
