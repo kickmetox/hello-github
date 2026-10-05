@@ -53,6 +53,24 @@ class ScanSessionResult:
                 parts.append(f"--- Seite {i}: {p.source_label} ---\n{p.ocr.text.strip()}")
         return "\n\n".join(parts)
 
+    def to_word_suite_document(self, *, auto_format: bool = True, title: str | None = None):
+        """OCR-Text der Scan-Sitzung als Word-Suite-/DOCX-Dokument — Editor-Import."""
+        from instantlensdoc.core.ocr_word_suite import (
+            open_ocr_result,
+            scan_session_to_word_suite,
+        )
+
+        if title is None:
+            stem = Path(str(self.pdf_path)).stem if self.pdf_path else "Scan"
+            title = f"Word-Suite — Scan {stem}"
+        try:
+            return open_ocr_result(scan=self, auto_format=auto_format, title=title)
+        except Exception:
+            ws = scan_session_to_word_suite(self, auto_format=auto_format, title=title)
+            from instantlensdoc.core.ocr_word_suite import word_suite_to_document
+
+            return word_suite_to_document(ws)
+
 
 def _load_rgb(path: Union[str, Path, Image.Image]) -> Image.Image:
     if isinstance(path, Image.Image):

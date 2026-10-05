@@ -606,6 +606,24 @@ def check_version() -> None:
     if "apply_one_time_migrations" not in as_src or "editor_minimap_reset_2654" not in as_src:
         _fail("app_settings fehlt Minimap-Reset-Migration (2.6.54)")
     _ok("2.6.54 pdf-sniff/save-as-export/pdf_doctor/minimap-off/undo-arrows: OK")
+    ocr_ws = (ROOT / "instantlensdoc" / "core" / "ocr_word_suite.py").read_text(encoding="utf-8")
+    if "def open_ocr_result" not in ocr_ws or "blocks_to_word_suite_html" not in ocr_ws:
+        _fail("ocr_word_suite fehlt open_ocr_result/blocks_to_word_suite_html (OCR→DOCX)")
+    if "page-break-before" not in ocr_ws or "source_comment" not in ocr_ws:
+        _fail("ocr_word_suite fehlt Seitenumbrüche/Quell-Kommentar")
+    if "def open_ocr_result" not in mw or "_present_word_suite_document" not in mw:
+        _fail("main_window fehlt open_ocr_result/_present_word_suite_document")
+    if "set_rich_html" not in mw.split("def _present_word_suite_document", 1)[-1].split("def ", 1)[0]:
+        _fail("_present_word_suite_document setzt kein set_rich_html")
+    scan_src = (ROOT / "instantlensdoc" / "core" / "scan.py").read_text(encoding="utf-8")
+    if "to_word_suite_document" not in scan_src:
+        _fail("scan.py fehlt to_word_suite_document (Scan-OCR→Editor)")
+    test_ocr = ROOT / "scripts" / "test_ocr_editable.py"
+    if not test_ocr.is_file():
+        _fail("scripts/test_ocr_editable.py fehlt")
+    if not (ROOT / "tests" / "fixtures" / "ocr_sample.ildocr.txt").is_file():
+        _fail("tests/fixtures/ocr_sample.ildocr.txt fehlt")
+    _ok("2.6.54 ocr-editable Word-Suite QTextDocument: OK")
 
 
 def check_imports(*, with_qt: bool) -> None:
@@ -1037,6 +1055,8 @@ def check_imports(*, with_qt: bool) -> None:
             "paragraph_highlight",
             "_handoff_ocr_to_word_suite",
             "_ocr_word_suite_action",
+            "open_ocr_result",
+            "_present_word_suite_document",
             "Ctrl+Alt+Shift+W",
             "In Word-Suite öffnen/übernehmen",
             "_ki_document_wizard_action",

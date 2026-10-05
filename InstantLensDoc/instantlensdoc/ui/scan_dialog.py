@@ -933,27 +933,36 @@ class ScanDialog(QDialog):
         if result.combined_text:
             mw = self.parent()
             use_ws = bool(getattr(self, "open_in_word_suite", lambda: True)())
+            imported = False
             if use_ws:
-                ws_fn = getattr(mw, "_handoff_ocr_to_word_suite", None) if mw is not None else None
-                if callable(ws_fn):
+                present = getattr(mw, "open_ocr_result", None) if mw is not None else None
+                if callable(present):
                     try:
-                        ws_fn(
-                            text=result.combined_text,
-                            title=f"Word-Suite — Scan {target.stem}",
-                            auto_format=True,
+                        imported = bool(
+                            present(
+                                scan=result,
+                                title=f"Word-Suite — Scan {target.stem}",
+                                auto_format=True,
+                            )
                         )
                     except Exception:
-                        show_fn = getattr(mw, "_show_scan_ocr_text", None)
-                        if callable(show_fn):
-                            show_fn(result.combined_text, f"Scan-OCR — {target.stem}")
-                else:
-                    show_fn = getattr(mw, "_show_scan_ocr_text", None) if mw is not None else None
-                    if callable(show_fn):
+                        imported = False
+                if not imported:
+                    ws_fn = getattr(mw, "_handoff_ocr_to_word_suite", None) if mw is not None else None
+                    if callable(ws_fn):
                         try:
-                            show_fn(result.combined_text, f"Scan-OCR — {target.stem}")
+                            imported = bool(
+                                ws_fn(
+                                    scan=result,
+                                    text=result.combined_text,
+                                    title=f"Word-Suite — Scan {target.stem}",
+                                    auto_format=True,
+                                    source_path=str(target),
+                                )
+                            )
                         except Exception:
-                            pass
-            else:
+                            imported = False
+            if not imported:
                 show_fn = getattr(mw, "_show_scan_ocr_text", None) if mw is not None else None
                 if callable(show_fn):
                     try:

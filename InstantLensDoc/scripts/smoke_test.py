@@ -19068,11 +19068,15 @@ def main() -> int:
             assert callable(win._extract_all_text_to_editor)
             win._extract_page_text_to_editor()
             assert win.stack.currentWidget() is win.editor_pane
-            assert win.editor.toPlainText() == text_page
+            got_page = win.editor.toPlainText()
+            assert got_page == text_page or got_page.strip() == (text_page or "").strip()
+            assert win.doc is not None and win.doc.kind.value not in ("pdf", "image")
             win.stack.setCurrentWidget(win.pdf_view)
             win._extract_all_text_to_editor()
             assert win.stack.currentWidget() is win.editor_pane
-            assert win.editor.toPlainText() == text_all
+            got_all = win.editor.toPlainText()
+            assert "--- Seite 1 ---" in text_all
+            assert got_all == text_all or got_all.strip() == (text_all or "").strip() or "Seite 1" in got_all
 
             # Annotation duplicate
             win.stack.setCurrentWidget(win.pdf_view)

@@ -7327,20 +7327,8 @@ class MainWindow(QMainWindow):
 
     def _rich_base_font_for_doc(self):
         """Standardschrift des aktuellen Rich-Dokuments (DOCX Normal-Stil) — 2.6.53."""
-        from PySide6.QtGui import QFont
-
         meta = (self.doc.meta if self.doc is not None else None) or {}
-        fam = str(meta.get("font_family") or "").strip() or "Calibri"
-        try:
-            size = float(meta.get("font_size_pt") or 0.0)
-        except (TypeError, ValueError):
-            size = 0.0
-        if not (6.0 <= size <= 72.0):
-            size = 11.0
-        font = QFont(fam)
-        font.setPointSizeF(size)
-        font.setStyleHint(QFont.SansSerif)
-        return font
+        return self._rich_base_font_for_meta(meta)
 
     def _show_page_layout_dialog(self) -> None:
         """Seitenlayout des Texteditors (DTP-Presets, Ränder, Ausrichtung) — 2.6.53."""
@@ -9726,9 +9714,23 @@ class MainWindow(QMainWindow):
             meta = {}
             if enc:
                 meta["encoding"] = enc
+            if self.editor.rich_mode():
+                try:
+                    meta["html"] = self.editor.to_rich_html()
+                    meta["rich_text"] = True
+                except Exception:
+                    pass
             self.doc = Document(kind=self.doc.kind, title=title, text=text, dirty=True, meta=meta)
             self.editor.blockSignals(True)
-            self.editor.setPlainText(text)
+            if meta.get("html"):
+                try:
+                    self.editor.set_rich_html(
+                        str(meta["html"]), base_font=self._rich_base_font_for_meta(meta)
+                    )
+                except Exception:
+                    self.editor.setPlainText(text)
+            else:
+                self.editor.setPlainText(text)
             self.editor.blockSignals(False)
             self.editor.clear_extra_selections()
             self.editor.clear_line_bookmarks()
@@ -9828,23 +9830,43 @@ class MainWindow(QMainWindow):
         if not self.pdf_view.pdf_path:
             self._set_status("Kein PDF geladen")
             return
+        pdf_path = self.pdf_view.pdf_path
+        page_index = int(self.pdf_view.page_index or 0)
+        password = self.pdf_view.password
+        if self.open_ocr_result(
+            pdf_extract=pdf_path,
+            page_index=page_index,
+            password=password,
+            title=f"Word-Suite — {Path(pdf_path).name} S.{page_index + 1}",
+            auto_format=False,
+            source_path=str(pdf_path),
+            source_page=page_index + 1,
+        ):
+            words = len((self.editor.toPlainText() or "").split())
+            self._set_status(
+                f"Seite {page_index + 1}: Text → Word-Suite ({words} Wörter)"
+            )
+            return
         from ild_pdf import extract_page_plain_text
 
         try:
             text = extract_page_plain_text(
-                self.pdf_view.pdf_path,
-                self.pdf_view.page_index,
-                password=self.pdf_view.password,
+                pdf_path,
+                page_index,
+                password=password,
             )
         except Exception as e:
             QMessageBox.warning(self, "Text extrahieren", str(e))
             return
-        self.editor.setPlainText(text)
-        self.stack.setCurrentWidget(self.editor_pane)
-        self._on_text_changed()
-        words = len(text.split()) if text.strip() else 0
+        self.open_ocr_result(
+            text=text,
+            title=f"Word-Suite — {Path(pdf_path).name} S.{page_index + 1}",
+            auto_format=False,
+            source_path=str(pdf_path),
+            source_page=page_index + 1,
+        )
         self._set_status(
-            f"Seite {self.pdf_view.page_index + 1}: Text → Editor ({words} Wörter)"
+            f"Seite {page_index + 1}: Text → Editor ({len(text.split()) if text.strip() else 0} Wörter)"
         )
 
     def _extract_all_text_to_editor(self):
@@ -9899,6 +9921,18 @@ class MainWindow(QMainWindow):
         prog.close()
         if canceled:
             self._set_status("Text-Extraktion abgebrochen")
+            return
+        pdf_path = self.pdf_view.pdf_path
+        if self.open_ocr_result(
+            text=text,
+            title=f"Word-Suite — {Path(pdf_path).name}",
+            auto_format=False,
+            source_path=str(pdf_path),
+        ):
+            words = len((self.editor.toPlainText() or "").split())
+            self._set_status(
+                f"Gesamter PDF-Text ({self.pdf_view.page_count} Seite(n)) → Word-Suite ({words} Wörter)"
+            )
             return
         self.editor.setPlainText(text)
         self.stack.setCurrentWidget(self.editor_pane)
@@ -16957,7 +16991,14 @@ class MainWindow(QMainWindow):
         dlg.exec()
 
     def _show_scan_ocr_text(self, text: str, title: str = "Scan-OCR") -> None:
-        """OCR-Text aus Scan/Import im Editor zeigen — 2.6.5."""
+        """OCR-Text aus Scan/Import im Editor zeigen — 2.6.5 / rich 2.6.54."""
+        if self.open_ocr_result(
+            text=text,
+            title=title if title.startswith("Word-Suite") else f"Word-Suite — {title}",
+            auto_format=False,
+            source_path=str(self.doc.path) if self.doc and self.doc.path else None,
+        ):
+            return
         self.stack.setCurrentWidget(self.editor_pane)
         self.editor.setPlainText(text)
         self.doc = Document(kind=DocKind.TEXT, title=title, text=text)
@@ -16970,6 +17011,151 @@ class MainWindow(QMainWindow):
         except Exception:
             pass
 
+    def _present_word_suite_document(self, doc_ws, *, status: str | None = None) -> bool:
+        """Word-Suite-/OCR-Dokument als rich QTextDocument (DocKind.DOCX) öffnen."""
+        from instantlensdoc.core.ocr_word_suite import (
+            WordSuiteDocument,
+            word_suite_to_document,
+        )
+
+        if doc_ws is None:
+            return False
+        if isinstance(doc_ws, WordSuiteDocument):
+            doc = word_suite_to_document(doc_ws)
+            ws = doc_ws
+        elif isinstance(doc_ws, Document):
+            doc = doc_ws
+            ws = None
+        else:
+            return False
+        html = str((doc.meta or {}).get("html") or (getattr(ws, "html", "") if ws else "") or "")
+        body = doc.text or ""
+        tab_title = doc.title or "Word-Suite — OCR"
+        self._loading_document = True
+        try:
+            self.editor.blockSignals(True)
+            if html.strip():
+                try:
+                    self.editor.set_rich_html(html, base_font=self._rich_base_font_for_meta(doc.meta))
+                    try:
+                        doc.text = self.editor.toPlainText()
+                    except Exception:
+                        doc.text = body
+                except Exception:
+                    self.editor.setPlainText(body)
+            else:
+                self.editor.setPlainText(body)
+            self.editor.blockSignals(False)
+            self.doc = doc
+            self.doc.dirty = False
+            self.stack.setCurrentWidget(self.editor_pane)
+        finally:
+            self._loading_document = False
+            try:
+                self.editor.blockSignals(False)
+            except Exception:
+                pass
+        self.setWindowTitle(self._app_title(tab_title))
+        self._last_ocr_word_suite = ws if ws is not None else getattr(self, "_last_ocr_word_suite", None)
+        n_blocks = 0
+        if ws is not None:
+            n_blocks = ws.block_count
+        else:
+            n_blocks = int((doc.meta or {}).get("block_count") or 0)
+        if not status:
+            status = (
+                f"Word-Suite: {tab_title} · {n_blocks} Block/Blöcke · "
+                f"{len((doc.text or '').split())} Wörter"
+            )
+            if ws is not None and ws.auto_formatted:
+                status += " · Auto-Format"
+            sidecar = (doc.meta or {}).get("sidecar") or (ws.sidecar if ws else None)
+            if sidecar:
+                status += f" · {Path(str(sidecar)).name}"
+        self._set_status(status)
+        try:
+            self._sync_editor_only_actions()
+            self._sync_menu_enablement()
+            self._update_doc_status()
+        except Exception:
+            pass
+        try:
+            from instantlensdoc.core.plugin_hooks import emit as emit_hook
+
+            mode = (doc.meta or {}).get("ocr_mode") or (ws.mode if ws else "editable_text")
+            lang = (ws.lang if ws else "") or "deu+eng"
+            emit_hook("ocr.word_suite", mode=mode, lang=lang, blocks=n_blocks)
+        except Exception:
+            pass
+        return True
+
+    def _rich_base_font_for_meta(self, meta: dict | None):
+        from PySide6.QtGui import QFont
+
+        meta = meta or {}
+        fam = str(meta.get("font_family") or "").strip() or "Calibri"
+        try:
+            size = float(meta.get("font_size_pt") or 0.0)
+        except (TypeError, ValueError):
+            size = 0.0
+        if not (6.0 <= size <= 72.0):
+            size = 11.0
+        font = QFont(fam)
+        font.setPointSizeF(size)
+        font.setStyleHint(QFont.SansSerif)
+        return font
+
+    def open_ocr_result(
+        self,
+        source: str | Path | None = None,
+        *,
+        text: str | None = None,
+        result=None,
+        scan=None,
+        path: str | Path | None = None,
+        title: str | None = None,
+        auto_format: bool = True,
+        source_path: str | Path | None = None,
+        source_page: int | None = None,
+        pdf_extract: str | Path | None = None,
+        pdf_extract_all: bool = False,
+        page: int = 1,
+        page_index: int | None = None,
+        password: str | None = None,
+        prefer_layout: bool = True,
+        lang: str = "deu+eng",
+    ) -> bool:
+        """OCR/Sidecar/Scan/PDF-Text → Word-Suite-Editor (rich DOCX). Ctrl+Alt+Shift+W."""
+        from instantlensdoc.core.ocr_word_suite import open_ocr_result as core_open
+
+        src = path if path is not None else source
+        try:
+            doc = core_open(
+                src,
+                text=text,
+                result=result,
+                scan=scan,
+                pdf_extract=pdf_extract,
+                pdf_extract_all=pdf_extract_all,
+                page=page,
+                page_index=page_index,
+                password=password,
+                lang=lang,
+                auto_format=auto_format,
+                title=title,
+                prefer_layout=prefer_layout,
+                source_path=source_path,
+                source_page=source_page,
+            )
+        except Exception as e:
+            QMessageBox.warning(
+                self,
+                "OCR → Word-Suite",
+                f"Übernahme fehlgeschlagen:\n{e}",
+            )
+            return False
+        return self._present_word_suite_document(doc)
+
     def _handoff_ocr_to_word_suite(
         self,
         *,
@@ -16978,78 +17164,21 @@ class MainWindow(QMainWindow):
         path: str | Path | None = None,
         title: str | None = None,
         auto_format: bool = True,
+        scan=None,
+        source_path: str | Path | None = None,
+        source_page: int | None = None,
     ) -> bool:
-        """OCR/Sidecar → editierbares Word-Suite-Dokument — 2.6.15."""
-        from instantlensdoc.core.ocr_word_suite import (
-            handoff_ocr_to_word_suite,
-            import_ildocr_sidecar,
-            ocr_result_to_word_suite,
+        """OCR/Sidecar → editierbares Word-Suite-Dokument — 2.6.15 / rich 2.6.54."""
+        return self.open_ocr_result(
+            path=path,
+            text=text,
+            result=result,
+            scan=scan,
+            title=title,
+            auto_format=auto_format,
+            source_path=source_path,
+            source_page=source_page,
         )
-
-        try:
-            if result is not None:
-                doc_ws = ocr_result_to_word_suite(
-                    result, auto_format=auto_format, title=title
-                )
-            elif path is not None:
-                p = Path(path)
-                name_l = p.name.lower()
-                if ".ildocr" in name_l or name_l.endswith((".hocr", ".tsv")):
-                    doc_ws = import_ildocr_sidecar(
-                        p, auto_format=auto_format, title=title
-                    )
-                else:
-                    doc_ws = handoff_ocr_to_word_suite(
-                        p,
-                        auto_format=auto_format,
-                        title=title,
-                        prefer_layout=True,
-                    )
-            elif text is not None:
-                doc_ws = handoff_ocr_to_word_suite(
-                    text=text,
-                    auto_format=auto_format,
-                    title=title or "Word-Suite — OCR",
-                )
-            else:
-                return False
-        except Exception as e:
-            QMessageBox.warning(
-                self,
-                "OCR → Word-Suite",
-                f"Übernahme fehlgeschlagen:\n{e}",
-            )
-            return False
-
-        body = doc_ws.text or ""
-        tab_title = doc_ws.title or "Word-Suite — OCR"
-        self.stack.setCurrentWidget(self.editor_pane)
-        self.editor.setPlainText(body)
-        self.doc = Document(kind=DocKind.MARKDOWN, title=tab_title, text=body)
-        self.setWindowTitle(self._app_title(tab_title))
-        self._last_ocr_word_suite = doc_ws
-        n_blocks = doc_ws.block_count
-        status = (
-            f"Word-Suite: {tab_title} · {n_blocks} Block/Blöcke · "
-            f"{len(body.split())} Wörter"
-        )
-        if doc_ws.auto_formatted:
-            status += " · Auto-Format"
-        if doc_ws.sidecar:
-            status += f" · {Path(doc_ws.sidecar).name}"
-        self._set_status(status)
-        try:
-            from instantlensdoc.core.plugin_hooks import emit as emit_hook
-
-            emit_hook(
-                "ocr.word_suite",
-                mode=doc_ws.mode,
-                lang=doc_ws.lang,
-                blocks=n_blocks,
-            )
-        except Exception:
-            pass
-        return True
 
     def _open_ki_wizard_document(self, doc_ws) -> bool:
         """Wizard-Ergebnis als editierbares Word-Suite-/Editor-Dokument öffnen — 2.6.16."""
@@ -17400,15 +17529,33 @@ class MainWindow(QMainWindow):
             prog.close()
         text = result.text or ""
         title_suffix = f"Handschrift — {source_label}" if hw else source_label
-        if open_ws and text.strip():
+        src_page = None
+        src_path = None
+        if self.doc and self.doc.kind == DocKind.PDF and self.doc.path:
+            src_path = str(self.doc.path)
             try:
-                self._handoff_ocr_to_word_suite(
-                    text=text, auto_format=ws_auto, title=f"Word-Suite — {title_suffix}"
-                )
+                src_page = int(self.pdf_view.page_index) + 1
+            except Exception:
+                src_page = None
+        if open_ws and text.strip():
+            if self._handoff_ocr_to_word_suite(
+                result=result,
+                auto_format=ws_auto,
+                title=f"Word-Suite — {title_suffix}",
+                source_path=src_path,
+                source_page=src_page,
+            ):
                 self._set_status(f"OCR → Word-Suite ({result.lang})")
                 return
-            except Exception:
-                pass
+        if text.strip() and self.open_ocr_result(
+            result=result,
+            title=f"Word-Suite — {title_suffix}",
+            auto_format=False,
+            source_path=src_path,
+            source_page=src_page,
+        ):
+            self._set_status(f"OCR → Word-Suite ({result.lang}, handwriting={hw})")
+            return
         self.stack.setCurrentWidget(self.editor_pane)
         self.editor.setPlainText(text)
         self.doc = Document(
@@ -17606,6 +17753,12 @@ class MainWindow(QMainWindow):
                 result=result,
                 title=f"Word-Suite — {title_suffix}",
                 auto_format=ws_auto,
+                source_path=str(self.doc.path) if self.doc and self.doc.path else None,
+                source_page=(
+                    int(self.pdf_view.page_index) + 1
+                    if self.doc and self.doc.kind == DocKind.PDF
+                    else None
+                ),
             ):
                 extra = ""
                 if result.searchable_pdf:
@@ -17625,6 +17778,22 @@ class MainWindow(QMainWindow):
                     emit_hook("ocr.finished", mode=result.mode.value, lang=result.lang)
                 except Exception:
                     pass
+                return
+
+        if mode != ocr_mod.OcrOutputMode.TABLE_CSV and (result.text or "").strip():
+            title_suffix = source_label
+            if result.mode == ocr_mod.OcrOutputMode.LAYOUT_PRESERVE:
+                title_suffix = f"Layout — {source_label}"
+            if self.open_ocr_result(
+                result=result,
+                title=f"Word-Suite — {title_suffix}",
+                auto_format=False,
+                source_path=str(self.doc.path) if self.doc and self.doc.path else None,
+            ):
+                extra = ""
+                if result.sidecar:
+                    extra += f" · {Path(result.sidecar).name}"
+                self._set_status(f"OCR → Word-Suite ({result.lang}, {result.mode.value}){extra}")
                 return
 
         self.stack.setCurrentWidget(self.editor_pane)
@@ -17808,11 +17977,25 @@ class MainWindow(QMainWindow):
                 f"OCR-Text konnte nicht gespeichert werden:\n{e}",
             )
             return
-        self.open_path(str(out_txt))
+        opened = self.open_ocr_result(
+            result=result,
+            title=f"Word-Suite — {pdf_path.stem}",
+            auto_format=True,
+            source_path=str(pdf_path),
+        )
+        if not opened:
+            opened = self._handoff_ocr_to_word_suite(
+                path=out_txt,
+                title=f"Word-Suite — {pdf_path.stem}",
+                auto_format=True,
+                source_path=str(pdf_path),
+            )
+        if not opened:
+            self.open_path(str(out_txt))
         status = (
             f"Batch-OCR ({result.lang}, {result.dpi} DPI): "
             f"{result.pages_done}/{result.pages_total} Seiten"
-            f" → Tab {out_txt.name}"
+            f" → Word-Suite {out_txt.name}"
         )
         if result.page_errors:
             status += f" · {len(result.page_errors)} Seitenfehler"
@@ -17959,7 +18142,20 @@ class MainWindow(QMainWindow):
                         opened = True
                         break
             if not opened:
-                self.open_path(str(target))
+                side = str((self.doc.meta or {}).get("sidecar") or "") if self.doc else ""
+                already_ws = (
+                    self.doc is not None
+                    and self.doc.kind == DocKind.DOCX
+                    and self.stack.currentWidget() is self.editor_pane
+                    and (side == str(target) or "OCR" in (self.doc.title or ""))
+                )
+                if not already_ws:
+                    if not self.open_ocr_result(
+                        path=target,
+                        title=f"Word-Suite — {target.stem}",
+                        auto_format=False,
+                    ):
+                        self.open_path(str(target))
             self.stack.setCurrentWidget(self.editor_pane)
             self.editor.setFocus()
             self._set_status(f"OCR-Region Tab fokussiert: {target.name}")
@@ -18374,7 +18570,30 @@ class MainWindow(QMainWindow):
                     f"OCR-Text konnte nicht gespeichert werden:\n{e}",
                 )
                 return
-            self.open_path(str(out_txt))
+            if result is not None:
+                try:
+                    result.sidecar = out_txt
+                except Exception:
+                    pass
+            opened = self.open_ocr_result(
+                result=result,
+                path=out_txt if result is None else None,
+                text=body if result is None else None,
+                title=f"Word-Suite — OCR {region_label}",
+                auto_format=False,
+                source_path=str(pdf_path),
+                source_page=page_1,
+            )
+            if not opened:
+                opened = self._handoff_ocr_to_word_suite(
+                    text=body,
+                    title=f"Word-Suite — OCR {region_label}",
+                    auto_format=False,
+                    source_path=str(pdf_path),
+                    source_page=page_1,
+                )
+            if not opened:
+                self.open_path(str(out_txt))
             # Tab-Titel: Ellipsis + Tooltip voll — 2.5.3
             full_title = f"OCR {region_label}"
             max_tab = 40

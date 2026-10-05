@@ -1456,6 +1456,53 @@ def handoff_ocr_to_word_suite(
     )
 
 
+def open_ocr_result(
+    source: PathLike | None = None,
+    *,
+    text: str | None = None,
+    page: int = 1,
+    lang: str = "deu+eng",
+    auto_format: bool = True,
+    title: str | None = None,
+    prefer_layout: bool = True,
+    out: PathLike | None = None,
+    source_path: PathLike | None = None,
+    source_page: int | None = None,
+) -> dict[str, Any]:
+    """OCR/Sidecar/PDF-Text → Word-Suite-``Document`` (DOCX/HTML) — 2.6.54."""
+    from instantlensdoc.core.ocr_word_suite import open_ocr_result as _open
+    from instantlensdoc.core.documents import Document
+
+    doc = _open(
+        source,
+        text=text,
+        page=page,
+        lang=lang,
+        auto_format=auto_format,
+        title=title,
+        prefer_layout=prefer_layout,
+        out=out,
+        source_path=source_path,
+        source_page=source_page,
+    )
+    data: dict[str, Any] = {
+        "title": doc.title,
+        "text": doc.text,
+        "kind": getattr(doc.kind, "value", str(doc.kind)),
+        "html": (doc.meta or {}).get("html") or "",
+        "rich_text": True,
+        "sidecar": (doc.meta or {}).get("sidecar"),
+        "source_path": (doc.meta or {}).get("source_path"),
+        "source_page": (doc.meta or {}).get("source_page"),
+        "source_comment": (doc.meta or {}).get("source_comment"),
+        "meta": dict(doc.meta or {}),
+        "version": __version__,
+    }
+    if isinstance(doc, Document):
+        data["block_count"] = int((doc.meta or {}).get("block_count") or 0)
+    return data
+
+
 def list_ki_wizards() -> list[dict[str, Any]]:
     """Isolierte KI-Dokument-Wizards auflisten — 2.6.16."""
     from instantlensdoc.core.ki_wizards import list_ki_wizards as _list
