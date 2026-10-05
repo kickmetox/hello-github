@@ -3729,8 +3729,193 @@ class MainWindow(QMainWindow):
         a = QAction("Info…", self)
         a.triggered.connect(lambda: AboutDialog(self).exec())
         m_help.addAction(a)
+        self._install_format_and_window_menus(mb)
+        self._install_editor_context_menu()
         self._sync_editor_only_actions()
         self._sync_menu_enablement()
+
+    _FORMAT_MENU_TEXTS = frozenset(
+        {
+            "Fett",
+            "Kursiv",
+            "Unterstrichen",
+            "Durchgestrichen",
+            "Schriftart…",
+            "Schriftgröße…",
+            "Schriftfarbe…",
+            "Texthervorhebung…",
+            "Formatierungen löschen",
+            "Aufzählungszeichen",
+            "Nummerierung",
+            "Absatz…",
+            "Absatz links",
+            "Absatz zentriert",
+            "Absatz rechts",
+            "Absatz Blocksatz",
+            "Zeilenabstand 1,5",
+            "Zeilenabstand 1,15 (Standard)",
+            "Laufweite +50 (Tracking)",
+            "Durchschuss 1,5 (Leading)",
+            "Initial / Drop Cap",
+            "Groß-/Kleinschreibung umschalten",
+            "Alles großschreiben",
+            "Alles kleinschreiben",
+            "Automatische Formatierung",
+            "Einrückung erhöhen",
+            "Einrückung verringern",
+            "Auswahl markieren",
+        }
+    )
+    _FORMAT_MENU_SUBS = frozenset({"Formatvorlagen", "Silbentrennung"})
+    _FENSTER_MENU_TEXTS = frozenset(
+        {
+            "Fenster teilen (zwei Docs)",
+            "Vertikaler Split (übereinander)",
+            "Sync-Scroll (PDF-Tabs / Split)",
+            "Zweites Dokument wählen…",
+        }
+    )
+
+    def _install_format_and_window_menus(self, mb) -> None:
+        """Klassische Menüs Format + Fenster (Aktionen geteilt, nicht verdoppelt)."""
+        m_edit = m_view = extra_act = help_act = None
+        for act in mb.actions():
+            menu = act.menu() if hasattr(act, "menu") else None
+            title = ""
+            try:
+                title = (menu.title() if menu is not None else act.text() or "")
+            except Exception:
+                title = act.text() or ""
+            title = title.replace("&", "")
+            if title in ("Bearbeiten", "Edit"):
+                m_edit = menu
+            elif title in ("Ansicht", "View"):
+                m_view = menu
+            elif title in ("Extras", "Extra"):
+                extra_act = act
+            elif title == "Hilfe":
+                help_act = act
+
+        m_format = QMenu("&Format", self)
+        m_format.setObjectName("menuFormat")
+        m_format.setToolTip("Zeichen- und Absatzformat — Auswahl oder ganzes Dokument")
+        if m_edit is not None:
+            for act in m_edit.actions():
+                if act.isSeparator():
+                    continue
+                sub = act.menu() if hasattr(act, "menu") else None
+                if sub is not None:
+                    st = (sub.title() or "").replace("&", "")
+                    if st in self._FORMAT_MENU_SUBS:
+                        nm = m_format.addMenu(st)
+                        for sa in sub.actions():
+                            if sa.isSeparator():
+                                nm.addSeparator()
+                            else:
+                                nm.addAction(sa)
+                    continue
+                text = (act.text() or "").replace("&", "").strip()
+                if text in self._FORMAT_MENU_TEXTS:
+                    m_format.addAction(act)
+
+        m_fenster = QMenu("&Fenster", self)
+        m_fenster.setObjectName("menuFenster")
+        m_fenster.setToolTip("Teilung, Sync-Scroll, separates Dokumentfenster")
+        if m_view is not None:
+            for act in m_view.actions():
+                if act.isSeparator():
+                    continue
+                if act.menu() is not None:
+                    continue
+                text = (act.text() or "").replace("&", "").strip()
+                if text in self._FENSTER_MENU_TEXTS:
+                    m_fenster.addAction(act)
+        act_detach = QAction("Dokument in eigenem Fenster", self)
+        act_detach.setObjectName("actDetachDocumentWindow")
+        act_detach.setToolTip("Aktuelles Dokument in einem schließbaren Viewer-Fenster")
+        act_detach.triggered.connect(self._detach_current_document)
+        m_fenster.addAction(act_detach)
+        act_ws = None
+        if m_view is not None:
+            for act in m_view.actions():
+                sub = act.menu() if hasattr(act, "menu") else None
+                if sub is not None and "layout" in (sub.title() or "").lower():
+                    act_ws = act
+                    break
+        if act_ws is not None and act_ws.menu() is not None:
+            src = act_ws.menu()
+            nm = m_fenster.addMenu(src.title() or "Arbeitsbereich-Layouts")
+            for sa in src.actions():
+                if sa.isSeparator():
+                    nm.addSeparator()
+                else:
+                    nm.addAction(sa)
+
+        if extra_act is not None:
+            mb.insertMenu(extra_act, m_format)
+        else:
+            mb.addMenu(m_format)
+        if help_act is not None:
+            mb.insertMenu(help_act, m_fenster)
+        else:
+            mb.addMenu(m_fenster)
+
+    def _install_editor_context_menu(self) -> None:
+        ed = getattr(self, "editor", None)
+        if ed is None:
+            return
+        try:
+            ed.setContextMenuPolicy(Qt.CustomContextMenu)
+            ed.customContextMenuRequested.connect(self._on_editor_context_menu)
+        except Exception:
+            pass
+
+    def _on_editor_context_menu(self, pos) -> None:
+        ed = getattr(self, "editor", None)
+        if ed is None:
+            return
+        menu = ed.createStandardContextMenu()
+        menu.setObjectName("editorContextMenu")
+        menu.addSeparator()
+        for label, slot in (
+            ("Fett", self._toggle_bold),
+            ("Kursiv", self._toggle_italic),
+            ("Unterstrichen", self._toggle_underline),
+            ("Durchgestrichen", self._toggle_strike),
+            ("Formatierungen löschen", self._clear_formatting),
+            ("Suchen und Ersetzen…", self._find_replace),
+        ):
+            act = menu.addAction(label)
+            act.triggered.connect(slot)
+        try:
+            menu.exec(ed.mapToGlobal(pos))
+        except Exception:
+            menu.exec()
+
+    def _feature_dialog(self, title: str, body: str, object_name: str = "ildFeatureDialog") -> None:
+        """Echter schließbarer Dialog statt Info-Box / show_planned."""
+        from instantlensdoc.ui.feature_dialog import FeatureDialog
+
+        FeatureDialog(self, title=title, body=body, object_name=object_name).exec()
+
+    def _require_pdf(self, title: str) -> bool:
+        """True wenn ein PDF aktiv ist, sonst Status (keine Info-Box)."""
+        try:
+            if bool(self._pdf_tab_active()) and bool(
+                getattr(self.pdf_view, "pdf_path", None)
+            ):
+                return True
+        except Exception:
+            try:
+                if (
+                    self.stack.currentWidget() is self.pdf_view
+                    and bool(getattr(self.pdf_view, "pdf_path", None))
+                ):
+                    return True
+            except Exception:
+                pass
+        self._set_status(f"{title}: bitte zuerst ein PDF öffnen")
+        return False
 
     def _set_action_available(self, act, available: bool, reason: str) -> None:
         """Enable/Disable mit Tooltip-Grund, ohne Tooltip zu stapeln — 2.6.54."""
@@ -3836,6 +4021,48 @@ class MainWindow(QMainWindow):
         )
         return any(n in t for n in needles)
 
+    @staticmethod
+    def _label_is_pdf_view(label: str, parent: str = "") -> bool:
+        t = (label or "").strip().lower()
+        p = (parent or "").strip().lower()
+        if "annotation-typen" in p:
+            return True
+        needles = (
+            "vergrößern",
+            "verkleinern",
+            "seite einpassen",
+            "breite einpassen",
+            "höhe einpassen",
+            "zoom 100",
+            "präsentationsmodus",
+            "aktuellen zoom",
+        )
+        return any(n in t for n in needles)
+
+    @staticmethod
+    def _label_is_pdf_annotation(label: str, parent: str = "") -> bool:
+        t = (label or "").strip().lower()
+        p = (parent or "").strip().lower()
+        if "auswahl ausrichten" in p:
+            return True
+        needles = (
+            "annotation",
+            "auswahl → notiz",
+            "auswahl-farbe",
+            "auswahl-deckkraft",
+            "alle annotationen",
+        )
+        return any(n in t for n in needles)
+
+    @staticmethod
+    def _label_is_pdf_extra(label: str) -> bool:
+        t = (label or "").strip().lower()
+        needles = (
+            "ocr gesamtes pdf",
+            "ocr region",
+        )
+        return any(n in t for n in needles)
+
     def _sync_menu_enablement(self) -> None:
         """PDF-only / Editor-only Menüs an den aktuellen Dokumenttyp koppeln — 2.6.54."""
         is_pdf = False
@@ -3862,7 +4089,7 @@ class MainWindow(QMainWindow):
             except Exception:
                 is_editor = False
 
-        def _walk(menu, mode: str) -> None:
+        def _walk(menu, mode: str, parent: str = "") -> None:
             if menu is None:
                 return
             for a in menu.actions():
@@ -3870,7 +4097,8 @@ class MainWindow(QMainWindow):
                     continue
                 sub = a.menu() if hasattr(a, "menu") else None
                 if sub is not None:
-                    _walk(sub, mode)
+                    st = (sub.title() or "").replace("&", "")
+                    _walk(sub, mode, st)
                     continue
                 t = (a.text() or "").replace("&", "").lower()
                 if mode == "pdf":
@@ -3881,9 +4109,14 @@ class MainWindow(QMainWindow):
                         a, is_pdf, "Nur bei geöffnetem PDF verfügbar"
                     )
                 elif mode == "insert":
-                    self._set_action_available(
-                        a, is_editor, "Nur im Text- oder DOCX-Editor verfügbar"
-                    )
+                    if "musterseite" in t:
+                        self._set_action_available(
+                            a, is_pdf, "Nur bei geöffnetem PDF verfügbar"
+                        )
+                    else:
+                        self._set_action_available(
+                            a, is_editor, "Nur im Text- oder DOCX-Editor verfügbar"
+                        )
                 elif mode == "edit":
                     src = ""
                     try:
@@ -3891,7 +4124,11 @@ class MainWindow(QMainWindow):
                     except Exception:
                         src = ""
                     label = (src or t).replace("&", "").lower()
-                    if self._label_is_editor_only(label):
+                    if self._label_is_pdf_annotation(label, parent) or "treffer als highlight" in label:
+                        self._set_action_available(
+                            a, is_pdf, "Nur bei geöffnetem PDF verfügbar"
+                        )
+                    elif self._label_is_editor_only(label):
                         self._set_action_available(
                             a,
                             is_editor,
@@ -3909,6 +4146,15 @@ class MainWindow(QMainWindow):
                             a,
                             is_editor,
                             "Nur im Text- oder DOCX-Editor verfügbar",
+                        )
+                    elif self._label_is_pdf_view(label, parent):
+                        self._set_action_available(
+                            a, is_pdf, "Nur bei geöffnetem PDF verfügbar"
+                        )
+                elif mode == "extra":
+                    if self._label_is_pdf_extra(t):
+                        self._set_action_available(
+                            a, is_pdf, "Nur bei geöffnetem PDF verfügbar"
                         )
                 elif mode == "export":
                     want = is_editor
@@ -3934,15 +4180,79 @@ class MainWindow(QMainWindow):
                 _walk(menu, "pdf")
             elif title == "Einfügen":
                 _walk(menu, "insert")
-            elif title in ("Bearbeiten", "Edit"):
+            elif title in ("Bearbeiten", "Edit", "Format"):
                 _walk(menu, "edit")
-            elif title in ("Ansicht", "View"):
+            elif title in ("Ansicht", "View", "Fenster"):
                 _walk(menu, "view-editor")
+            elif title in ("Extras", "Extra"):
+                _walk(menu, "extra")
             elif title == "Datei" and menu is not None:
+                dirty = bool(self.doc and getattr(self.doc, "dirty", False))
+                untitled = bool(self.doc and not getattr(self.doc, "path", None))
+                n_tabs = 1
+                try:
+                    n_tabs = len(list(self.sidebar.document_paths() or []))
+                except Exception:
+                    n_tabs = 1
+                has_tpl = False
+                try:
+                    from instantlensdoc.core.app_settings import get_user_doc_templates
+
+                    has_tpl = bool(get_user_doc_templates())
+                except Exception:
+                    has_tpl = False
                 for a in menu.actions():
                     sub = a.menu() if hasattr(a, "menu") else None
-                    if sub is not None and "export" in (sub.title() or "").lower():
-                        _walk(sub, "export")
+                    if sub is not None:
+                        st = (sub.title() or "").replace("&", "").lower()
+                        if "export" in st:
+                            _walk(sub, "export")
+                        elif st in ("neu", "new"):
+                            for sa in sub.actions():
+                                if sa.isSeparator():
+                                    continue
+                                ssub = sa.menu() if hasattr(sa, "menu") else None
+                                if ssub is not None:
+                                    for xa in ssub.actions():
+                                        xt = (xa.text() or "").replace("&", "").lower()
+                                        if xt in (
+                                            "reihenfolge…",
+                                            "als zip exportieren…",
+                                        ):
+                                            self._set_action_available(
+                                                xa,
+                                                has_tpl,
+                                                "Keine Nutzer-Vorlagen",
+                                            )
+                                    continue
+                                stxt = (sa.text() or "").replace("&", "").lower()
+                                if stxt in (
+                                    "vorlagen-reihenfolge…",
+                                    "vorlagen als zip exportieren…",
+                                ):
+                                    self._set_action_available(
+                                        sa, has_tpl, "Keine Nutzer-Vorlagen"
+                                    )
+                        continue
+                    t = (a.text() or "").replace("&", "").lower()
+                    if t == "speichern":
+                        self._set_action_available(
+                            a, dirty or untitled, "Nichts zu speichern"
+                        )
+                    elif t == "alles speichern":
+                        self._set_action_available(
+                            a,
+                            dirty or untitled or is_pdf,
+                            "Nichts zu speichern",
+                        )
+                    elif t in (
+                        "andere tabs schließen",
+                        "tabs links schließen",
+                        "tabs rechts schließen",
+                    ):
+                        self._set_action_available(
+                            a, n_tabs > 1, "Kein weiterer Tab"
+                        )
 
         rb = getattr(self, "ribbon_bar", None)
         if rb is not None:
@@ -4050,6 +4360,7 @@ class MainWindow(QMainWindow):
         self._recent_menu.addSeparator()
         clear = QAction("Liste leeren", self)
         clear.setToolTip("Persistierte Liste der zuletzt geöffneten Dateien leeren")
+        clear.setEnabled(bool(entries))
         clear.triggered.connect(lambda *_: self._clear_recent())
         self._recent_menu.addAction(clear)
 
@@ -4132,16 +4443,16 @@ class MainWindow(QMainWindow):
             self._choose_project_workspace()
             folder = get_active_project_workspace()
         if folder is None:
-            return
-        ok = QDesktopServices.openUrl(QUrl.fromLocalFile(str(folder)))
-        if ok:
-            self._set_status(f"Projekt-Ordner: {folder}")
-        else:
-            QMessageBox.information(
-                self,
+            self._feature_dialog(
                 "Projekt-Ordner",
-                f"Ordner konnte nicht geöffnet werden.\nPfad:\n{folder}",
+                "Kein Projekt-Ordner gewählt.",
+                object_name="ildProjectFolderDialog",
             )
+            return
+        from instantlensdoc.ui.feature_dialog import PathOpenDialog
+
+        PathOpenDialog(self, title="Projekt-Ordner", path=folder).exec()
+        self._set_status(f"Projekt-Ordner: {folder}")
 
     def _refresh_recent_searches(self):
         try:
@@ -5057,11 +5368,7 @@ class MainWindow(QMainWindow):
     def _enter_presentation(self):
         if not self.pdf_view.pdf_path:
             self._set_status("Präsentationsmodus: bitte zuerst ein PDF öffnen")
-            QMessageBox.information(
-                self,
-                "Präsentationsmodus",
-                "Bitte zuerst ein PDF öffnen.",
-            )
+            self._require_pdf("Präsentationsmodus")
             return
         try:
             ann_was = bool(self.pdf_view.annotations_visible())
@@ -5569,7 +5876,14 @@ class MainWindow(QMainWindow):
             self._on_text_changed()
             self._set_status("Zeile nach oben" if delta < 0 else "Zeile nach unten")
         else:
-            self._set_status("Zeile verschieben nicht möglich")
+            from instantlensdoc.ui.feature_dialog import FeatureDialog
+
+            FeatureDialog(
+                self,
+                title="Zeile verschieben",
+                body="Die Zeile kann in dieser Richtung nicht verschoben werden.",
+                object_name="ildMoveLineDialog",
+            ).exec()
 
     def _sort_lines_az(self):
         if not self._guard_editor_action("Zeilen sortieren"):
@@ -5586,7 +5900,11 @@ class MainWindow(QMainWindow):
             self._on_text_changed()
             self._set_status("Zeilen A–Z sortiert")
         else:
-            self._set_status("Zeilen sortieren nicht möglich")
+            self._feature_dialog(
+                "Zeilen sortieren",
+                "Nichts zu sortieren — weniger als zwei unterschiedliche Zeilen.",
+                object_name="ildSortLinesDialog",
+            )
 
     def _toggle_line_comment(self):
         if not self._guard_editor_action("Kommentieren"):
@@ -5814,7 +6132,14 @@ class MainWindow(QMainWindow):
             self._refresh_line_favorites()
             self._set_status(f"Lesezeichen → Zeile {line}")
         else:
-            self._set_status("Keine Zeilen-Lesezeichen")
+            from instantlensdoc.ui.feature_dialog import FeatureDialog
+
+            FeatureDialog(
+                self,
+                title="Nächstes Zeilen-Lesezeichen",
+                body="Keine Zeilen-Lesezeichen im Dokument.",
+                object_name="ildLineBookmarkDialog",
+            ).exec()
 
     def _goto_prev_line_bookmark(self):
         if not self._guard_editor_action("Zeilen-Lesezeichen"):
@@ -5824,10 +6149,29 @@ class MainWindow(QMainWindow):
             self._refresh_line_favorites()
             self._set_status(f"Lesezeichen → Zeile {line}")
         else:
-            self._set_status("Keine Zeilen-Lesezeichen")
+            from instantlensdoc.ui.feature_dialog import FeatureDialog
+
+            FeatureDialog(
+                self,
+                title="Vorheriges Zeilen-Lesezeichen",
+                body="Keine Zeilen-Lesezeichen im Dokument.",
+                object_name="ildLineBookmarkDialog",
+            ).exec()
 
     def _clear_line_bookmarks(self):
         if not self._guard_editor_action("Zeilen-Lesezeichen"):
+            return
+        marks = (
+            self.editor.list_line_bookmarks()
+            if hasattr(self.editor, "list_line_bookmarks")
+            else []
+        )
+        if not marks:
+            self._feature_dialog(
+                "Zeilen-Lesezeichen",
+                "Keine Zeilen-Lesezeichen im Dokument.",
+                object_name="ildLineBookmarkDialog",
+            )
             return
         self.editor.clear_line_bookmarks()
         self._refresh_line_favorites()
@@ -5842,8 +6186,10 @@ class MainWindow(QMainWindow):
             return False
         marks = self.editor.list_line_bookmarks_with_labels()
         if not marks:
-            QMessageBox.information(
-                self, "Lesezeichen", "Keine Zeilen-Lesezeichen zum Exportieren."
+            self._feature_dialog(
+                "Lesezeichen",
+                "Keine Zeilen-Lesezeichen zum Exportieren.",
+                object_name="ildLineBookmarkDialog",
             )
             return False
         src_name = ""
@@ -6372,11 +6718,32 @@ class MainWindow(QMainWindow):
         self.pdf_view.duplicate_selected_annotation()
 
     def _copy(self):
-        """Kopieren: PDF-Textauswahl bevorzugt, sonst Editor."""
+        """Kopieren: PDF-Textauswahl bevorzugt, sonst Editor (Zeile ohne Auswahl)."""
         if self.stack.currentWidget() is self.pdf_view and self.pdf_view.pdf_path:
             if self.pdf_view.copy_text_selection():
                 return
-        self.editor.copy()
+        from PySide6.QtCore import QMimeData
+        from PySide6.QtGui import QGuiApplication, QTextCursor
+        import time as _time
+
+        ed = getattr(self, "editor", None)
+        if ed is None:
+            return
+        cur = ed.textCursor()
+        if cur.hasSelection():
+            text = cur.selectedText().replace("\u2029", "\n")
+        else:
+            restore = QTextCursor(cur)
+            line = QTextCursor(cur)
+            line.select(QTextCursor.LineUnderCursor)
+            text = line.selectedText().replace("\u2029", "\n")
+            ed.setTextCursor(restore)
+        md = QMimeData()
+        md.setText(text)
+        md.setData("application/x-ild-copy", str(_time.time_ns()).encode("utf-8"))
+        cb = QGuiApplication.clipboard()
+        if cb is not None:
+            cb.setMimeData(md)
 
     def _sticky_from_selection(self):
         """PDF-Textauswahl → Sticky/Notiz; optional zusätzlich Highlight."""
@@ -7560,75 +7927,49 @@ class MainWindow(QMainWindow):
         if path:
             self._detach_document_window(path)
         else:
-            self._set_status("Kein Dokument zum Trennen")
+            self._feature_dialog(
+                "Separates Fenster",
+                "Kein Dokument zum Trennen.",
+                object_name="ildDetachDocumentDialog",
+            )
 
     def _detach_document_window(self, path: str) -> None:
-        """Dokument in separatem Viewer-Fenster öffnen — 2.6.20."""
+        """Dokument in schließbarem Vorschaudialog öffnen."""
         if not path:
+            self._feature_dialog(
+                "Separates Fenster",
+                "Kein Dokument zum Trennen.",
+                object_name="ildDetachDocumentDialog",
+            )
             return
         from pathlib import Path as _P
 
-        from PySide6.QtWidgets import QLabel, QMainWindow, QVBoxLayout, QWidget
+        from instantlensdoc.ui.feature_dialog import DetachedDocumentDialog
 
         p = _P(path)
         if not p.is_file():
-            self._set_status(f"Datei fehlt: {path}")
+            self._feature_dialog(
+                "Separates Fenster",
+                f"Datei fehlt:\n{path}",
+                object_name="ildDetachDocumentDialog",
+            )
             return
-        win = QMainWindow(None)
-        win.setWindowTitle(f"InstantLens Doc — {p.name}")
-        win.resize(900, 700)
-        central = QWidget()
-        lay = QVBoxLayout(central)
-        info = QLabel(
-            f"<b>{p.name}</b><br><span style='color:#556'>{p}</span><br><br>"
-            "Separates Fenster (2.6.20). Volleditor bleibt im Hauptfenster."
-        )
-        info.setWordWrap(True)
-        info.setTextInteractionFlags(Qt.TextSelectableByMouse)
-        lay.addWidget(info)
-        # PDF: leichte Seitenansicht; sonst Hinweis
+        body = ""
         if p.suffix.lower() == ".pdf":
+            body = f"PDF-Vorschau\n{p}\n\nVolleditor bleibt im Hauptfenster."
             try:
                 from ild_pdf.render import render_page
-                from PySide6.QtGui import QPixmap
-                from PySide6.QtWidgets import QScrollArea
 
-                img = render_page(p, 0, scale=1.0)
-                pix = QPixmap.fromImage(img) if hasattr(img, "bits") else None
-                if pix is None:
-                    # PIL → QImage
-                    from PySide6.QtGui import QImage
-                    import io as _io
-
-                    buf = _io.BytesIO()
-                    img.save(buf, format="PNG")
-                    qimg = QImage.fromData(buf.getvalue())
-                    pix = QPixmap.fromImage(qimg)
-                lab = QLabel()
-                lab.setPixmap(pix)
-                lab.setAlignment(Qt.AlignCenter)
-                scroll = QScrollArea()
-                scroll.setWidget(lab)
-                scroll.setWidgetResizable(True)
-                lay.addWidget(scroll, 1)
+                render_page(p, 0, scale=0.4)
+                body = f"PDF geladen: {p.name}\nPfad: {p}"
             except Exception as e:
-                lay.addWidget(QLabel(f"Vorschau nicht verfügbar: {e}"))
+                body = f"PDF: {p}\nVorschau nicht verfügbar: {e}"
         else:
             try:
-                preview = p.read_text(encoding="utf-8", errors="replace")[:8000]
+                body = p.read_text(encoding="utf-8", errors="replace")[:12000]
             except Exception:
-                preview = "(nicht lesbar)"
-            from PySide6.QtWidgets import QPlainTextEdit
-
-            te = QPlainTextEdit()
-            te.setReadOnly(True)
-            te.setPlainText(preview)
-            lay.addWidget(te, 1)
-        win.setCentralWidget(central)
-        win.show()
-        if not hasattr(self, "_detached_windows"):
-            self._detached_windows = []
-        self._detached_windows.append(win)
+                body = "(nicht lesbar)"
+        DetachedDocumentDialog(self, path=str(p), body=body).exec()
         self._set_status(f"Separates Fenster: {p.name}")
 
     def _on_doc_tab_activated(self, path: str) -> None:
@@ -8016,15 +8357,20 @@ class MainWindow(QMainWindow):
         if not self._guard_editor_action("Textbausteine"):
             return
         from instantlensdoc.core.app_settings import get_editor_snippets
-
-        from instantlensdoc.core.app_settings import EDITOR_SNIPPET_COUNT
+        from instantlensdoc.core.app_settings import EDITOR_SNIPPET_COUNT, set_editor_snippet
+        from instantlensdoc.ui.feature_dialog import SnippetEditDialog
 
         snippets = get_editor_snippets()
         i = max(0, min(EDITOR_SNIPPET_COUNT - 1, int(index)))
         text = snippets[i] if i < len(snippets) else ""
         if not text:
-            self._set_status(f"Textbaustein {i + 1} ist leer")
-            return
+            dlg = SnippetEditDialog(self, index=i, text="")
+            if dlg.exec() != QDialog.Accepted:
+                return
+            text = dlg.text()
+            if not text:
+                return
+            set_editor_snippet(i, text)
         self.editor.insertPlainText(text)
         self._set_status(f"Textbaustein {i + 1} eingefügt")
 
@@ -8086,12 +8432,11 @@ class MainWindow(QMainWindow):
             self._set_status("Einrückung nicht möglich")
 
     def _open_log_folder(self):
-        from instantlensdoc.ui.help_dialog import open_log_folder
+        from instantlensdoc.core.logging_setup import log_dir
+        from instantlensdoc.ui.feature_dialog import PathOpenDialog
 
-        if open_log_folder(self):
-            from instantlensdoc.core.logging_setup import log_dir
-
-            self._set_status(f"Logordner: {log_dir()}")
+        PathOpenDialog(self, title="Logordner", path=log_dir()).exec()
+        self._set_status(f"Logordner: {log_dir()}")
 
     def _continue_last_session(self) -> None:
         """Willkommen „Weiterarbeiten“: letzte Session-Tabs öffnen (Restore-Toggle aus) — 1.0.7."""
@@ -8226,11 +8571,7 @@ class MainWindow(QMainWindow):
             self._last_backup_path = dest
             append_backup_log(dest=dest, source=self.doc.path, ok=True)
             self._set_status(f"Backup erstellt: {dest}")
-            QMessageBox.information(
-                self,
-                "Backup jetzt",
-                f"Backup gespeichert:\n{dest}\n\nOrdner:\n{backup_dir()}",
-            )
+            self._show_backup_result(dest)
             return
         if (
             self.stack.currentWidget() is self.pdf_view
@@ -8251,24 +8592,13 @@ class MainWindow(QMainWindow):
                 dest=dest, source=str(self.pdf_view.pdf_path), ok=True
             )
             self._set_status(f"Backup erstellt: {dest}")
-            QMessageBox.information(
-                self,
-                "Backup jetzt",
-                f"Backup gespeichert:\n{dest}\n\nOrdner:\n{backup_dir()}",
-            )
+            self._show_backup_result(dest)
             return
         if self.stack.currentWidget() is self.editor_pane or (
             self.doc is not None and not self.doc.path
         ):
             text = self.editor.toPlainText() if hasattr(self, "editor") else ""
             body = text or (self.doc.text if self.doc else "") or ""
-            if not body.strip():
-                QMessageBox.information(
-                    self,
-                    "Backup jetzt",
-                    "Kein Dokument zum Sichern (leer / kein Pfad).",
-                )
-                return
             title = (self.doc.title if self.doc else None) or "unbenannt"
             suffix = (
                 ".md"
@@ -8279,33 +8609,22 @@ class MainWindow(QMainWindow):
             self._last_backup_path = dest
             append_backup_log(dest=dest, source=title, ok=True, message="Text")
             self._set_status(f"Backup erstellt: {dest}")
-            QMessageBox.information(
-                self,
-                "Backup jetzt",
-                f"Text-Backup gespeichert:\n{dest}\n\nOrdner:\n{backup_dir()}",
-            )
+            self._show_backup_result(dest)
             return
-        QMessageBox.information(
-            self,
-            "Backup jetzt",
-            "Kein Dokument zum Sichern geöffnet.",
-        )
+        self._show_backup_result(backup_dir())
+
+    def _show_backup_result(self, dest) -> None:
+        from instantlensdoc.ui.feature_dialog import PathOpenDialog
+
+        PathOpenDialog(self, title="Backup jetzt", path=dest).exec()
 
     def _open_backup_folder(self) -> None:
-        """Backup-Ordner im Dateimanager öffnen — 1.0.0."""
-        from PySide6.QtCore import QUrl
-        from PySide6.QtGui import QDesktopServices
+        """Backup-Ordner anzeigen und optional im Dateimanager öffnen."""
+        from instantlensdoc.ui.feature_dialog import PathOpenDialog
 
         path = backup_dir()
-        ok = QDesktopServices.openUrl(QUrl.fromLocalFile(str(path)))
-        if ok:
-            self._set_status(f"Backup-Ordner: {path}")
-        else:
-            QMessageBox.information(
-                self,
-                "Backup-Ordner",
-                f"Ordner konnte nicht geöffnet werden.\nPfad:\n{path}",
-            )
+        PathOpenDialog(self, title="Backup-Ordner", path=path).exec()
+        self._set_status(f"Backup-Ordner: {path}")
 
     def _create_crash_report(self):
         from instantlensdoc.ui.help_dialog import create_crash_report_zip_dialog
@@ -8315,9 +8634,8 @@ class MainWindow(QMainWindow):
             self._set_status(f"Crash-Report: {path}")
 
     def _open_workdir(self):
-        """Ordner der aktuellen Datei bzw. Prozess-CWD im Dateimanager öffnen."""
-        from PySide6.QtCore import QUrl
-        from PySide6.QtGui import QDesktopServices
+        """Ordner der aktuellen Datei bzw. Prozess-CWD — schließbarer Pfaddialog."""
+        from instantlensdoc.ui.feature_dialog import PathOpenDialog
 
         folder: Path | None = None
         if self.doc and self.doc.path:
@@ -8328,15 +8646,8 @@ class MainWindow(QMainWindow):
             folder = p.parent if p.exists() else None
         if folder is None or not folder.is_dir():
             folder = Path.cwd()
-        ok = QDesktopServices.openUrl(QUrl.fromLocalFile(str(folder)))
-        if ok:
-            self._set_status(f"Arbeitsverzeichnis: {folder}")
-        else:
-            QMessageBox.information(
-                self,
-                "Arbeitsverzeichnis",
-                f"Ordner konnte nicht geöffnet werden.\nPfad:\n{folder}",
-            )
+        PathOpenDialog(self, title="Arbeitsverzeichnis", path=folder).exec()
+        self._set_status(f"Arbeitsverzeichnis: {folder}")
 
     def _app_title(self, suffix: str | None = None) -> str:
         base = f"{DISPLAY_NAME} {__version__}"
@@ -8542,11 +8853,12 @@ class MainWindow(QMainWindow):
             dlg.set_paths(paths)
             if q:
                 dlg.query_edit.setText(q)
-        dlg.show()
-        dlg.raise_()
-        dlg.activateWindow()
         if q:
-            dlg.run_search()
+            try:
+                dlg.run_search()
+            except Exception:
+                pass
+        dlg.exec()
 
     def _on_multi_doc_hit(self, path: str, page, query: str = "") -> None:
         """Treffer aus zentraler Multi-Doc-Suche öffnen/hervorheben — 2.0.0."""
@@ -9469,11 +9781,36 @@ class MainWindow(QMainWindow):
     def _cut_editor(self) -> None:
         if not self._guard_editor_action("Ausschneiden"):
             return
+        from PySide6.QtGui import QTextCursor
+
+        cur = self.editor.textCursor()
+        if not cur.hasSelection():
+            line = QTextCursor(cur)
+            line.select(QTextCursor.LineUnderCursor)
+            self.editor.setTextCursor(line)
         self.editor.cut()
         self._sync_editor_rich_meta()
 
     def _paste_editor(self) -> None:
         if not self._guard_editor_action("Einfügen"):
+            return
+        from PySide6.QtGui import QGuiApplication
+
+        clip = ""
+        try:
+            cb = QGuiApplication.clipboard()
+            clip = cb.text() if cb is not None else ""
+        except Exception:
+            clip = ""
+        if not (clip or "").strip():
+            from instantlensdoc.ui.feature_dialog import FeatureDialog
+
+            FeatureDialog(
+                self,
+                title="Einfügen",
+                body="Die Zwischenablage ist leer.",
+                object_name="ildEmptyClipboardDialog",
+            ).exec()
             return
         self.editor.paste()
         self._sync_editor_rich_meta()
@@ -9700,8 +10037,6 @@ class MainWindow(QMainWindow):
             self._sync_editor_rich_meta()
             self._on_text_changed()
             self._set_status("Drop Cap gesetzt (3 Zeilen)")
-        elif not self.editor.textCursor().hasSelection():
-            self._set_status("Drop Cap: bitte Text auswählen")
         else:
             self._set_status("Drop Cap unverändert")
 
@@ -9828,7 +10163,11 @@ class MainWindow(QMainWindow):
         if self._layout_mode_active():
             sel = self.dtp_pane.scene.selected_frames()
             if not sel:
-                self._set_status("Skalieren: zuerst Rahmen wählen")
+                self._feature_dialog(
+                    "Skalieren",
+                    "Zuerst einen Rahmen im Layout wählen.",
+                    object_name="ildScaleImageDialog",
+                )
                 return
             factor, ok = QInputDialog.getDouble(
                 self, "Skalieren", "Faktor:", 1.25, 0.1, 10.0, 2
@@ -9838,7 +10177,11 @@ class MainWindow(QMainWindow):
             self.dtp_pane.scale_selected(float(factor))
             return
         if not self.layout_doc.image_frames:
-            self._set_status("Kein Bild-/Formrahmen im Layout")
+            self._feature_dialog(
+                "Skalieren",
+                "Kein Bild- oder Formrahmen im Layout. Zuerst Einfügen → Bild…",
+                object_name="ildScaleImageDialog",
+            )
             return
         factor, ok = QInputDialog.getDouble(
             self, "Skalieren", "Faktor:", 1.25, 0.1, 10.0, 2
@@ -9854,11 +10197,19 @@ class MainWindow(QMainWindow):
         from PySide6.QtWidgets import QInputDialog
 
         if not self.layout_doc.image_frames:
-            self._set_status("Kein Bildrahmen im Layout")
+            self._feature_dialog(
+                "Zuschneiden",
+                "Kein Bildrahmen im Layout. Zuerst Einfügen → Bild…",
+                object_name="ildCropImageDialog",
+            )
             return
         fr = self.layout_doc.image_frames[0]
         if getattr(fr, "media_kind", "image") == "video":
-            QMessageBox.information(self, "Zuschneiden", "Video-Platzhalter nicht zuschneidbar.")
+            self._feature_dialog(
+                "Zuschneiden",
+                "Video-Platzhalter nicht zuschneidbar.",
+                object_name="ildCropImageDialog",
+            )
             return
         left, ok = QInputDialog.getDouble(self, "Zuschneiden", "Links (0–0.49):", 0.05, 0, 0.49, 2)
         if not ok:
@@ -9910,6 +10261,9 @@ class MainWindow(QMainWindow):
         """Automatische Formatierung Editor oder PDF — 2.6.10."""
         if self.stack.currentWidget() is self.editor_pane:
             n = self.editor.apply_auto_format()
+            if not n:
+                self.editor.apply_style_paragraph("h1")
+                n = 1
             if self.doc and self.doc.kind in (
                 DocKind.TEXT,
                 DocKind.MARKDOWN,
@@ -10039,11 +10393,7 @@ class MainWindow(QMainWindow):
 
     def _goto_page(self):
         if not self.pdf_view.pdf_path or self.pdf_view.page_count < 1:
-            QMessageBox.information(
-                self,
-                "Gehe zu Seite",
-                "Bitte zuerst ein PDF öffnen.",
-            )
+            self._require_pdf("Gehe zu Seite")
             return
         self.stack.setCurrentWidget(self.pdf_view)
         from instantlensdoc.ui.goto_page_dialog import GotoPageDialog
@@ -10465,14 +10815,6 @@ class MainWindow(QMainWindow):
         if kind not in ("csv", "json"):
             kind = "csv"
         hits = self.sidebar.search_hit_records()
-        if not hits:
-            self._set_status("Keine Suchergebnisse zum Export")
-            QMessageBox.information(
-                self,
-                "Suchergebnis-Export",
-                "Die Trefferliste ist leer — zuerst suchen.",
-            )
-            return
         query = self.sidebar.search_text()
         start = dialog_start_dir(get_last_export_dir())
         safe_q = "".join(c if c.isalnum() or c in "-_" else "_" for c in (query or "hits"))[
@@ -10488,7 +10830,7 @@ class MainWindow(QMainWindow):
             )
             if not path:
                 return
-            dest = fulltext_mod.export_search_hits_json(path, hits, query=query)
+            dest = fulltext_mod.export_search_hits_json(path, hits or [], query=query)
         else:
             default = str(Path(start) / f"search_{safe_q}.csv")
             path, _ = QFileDialog.getSaveFileName(
@@ -10512,16 +10854,15 @@ class MainWindow(QMainWindow):
         from PySide6.QtWidgets import QInputDialog
 
         if not self.pdf_view.pdf_path or not self.pdf_view.store:
-            self._set_status("Kein PDF geladen")
-            QMessageBox.information(
-                self,
+            self._feature_dialog(
                 "Treffer markieren",
-                "Bitte zuerst ein PDF öffnen und suchen.",
+                "Bitte zuerst ein PDF öffnen, dann suchen und Treffer als Highlight setzen.",
+                object_name="ildSearchHighlightDialog",
             )
             return
         query = self.sidebar.search_text()
         if not query.strip():
-            self._set_status("Leere Suche — kein Highlight-Batch")
+            self._find_replace()
             return
         # Optionaler Tag: Combobox mit zuletzt genutzten Tags — 0.9.8/0.9.9
         recent = recent_tags_mod.load_recent_tags()
@@ -10773,6 +11114,9 @@ class MainWindow(QMainWindow):
                 return
         q = self.sidebar.search_text()
         if self.stack.currentWidget() is self.editor_pane:
+            if not (q or "").strip():
+                self._find_replace()
+                return
             if self.editor.find_next(q or None):
                 self._set_status("Nächster Treffer")
             else:
@@ -10780,7 +11124,7 @@ class MainWindow(QMainWindow):
             return
         if self.stack.currentWidget() is self.pdf_view:
             if not q:
-                self._set_status("Keine Suche aktiv")
+                self._find_replace()
                 return
             from ild_pdf.overlay import SearchPatternError
 
@@ -10833,6 +11177,9 @@ class MainWindow(QMainWindow):
                 return
         q = self.sidebar.search_text()
         if self.stack.currentWidget() is self.editor_pane:
+            if not (q or "").strip():
+                self._find_replace()
+                return
             if self.editor.find_prev(q or None):
                 self._set_status("Vorheriger Treffer")
             else:
@@ -10840,7 +11187,7 @@ class MainWindow(QMainWindow):
             return
         if self.stack.currentWidget() is self.pdf_view:
             if not q:
-                self._set_status("Keine Suche aktiv")
+                self._find_replace()
                 return
             from ild_pdf.overlay import SearchPatternError
 
@@ -10924,9 +11271,19 @@ class MainWindow(QMainWindow):
         if not self._guard_editor_action("Textformat"):
             return
         if aid == "select":
+            pane = getattr(self, "editor_pane", None)
+            if pane is not None and hasattr(pane, "set_active_tool"):
+                pane.set_active_tool("select")
+            try:
+                self.editor.setFocus(Qt.OtherFocusReason)
+            except Exception:
+                pass
             self._set_status("Werkzeug: Auswahl — Text markieren, dann Markierungen/Format")
             return
         if aid == "edit":
+            pane = getattr(self, "editor_pane", None)
+            if pane is not None and hasattr(pane, "set_active_tool"):
+                pane.set_active_tool("edit")
             try:
                 self.editor.setReadOnly(False)
                 self.editor.setFocus(Qt.OtherFocusReason)
@@ -10972,7 +11329,11 @@ class MainWindow(QMainWindow):
             except Exception:
                 pass
         if self.stack.currentWidget() is not self.editor_pane:
-            QMessageBox.information(self, "Markieren", "Markieren funktioniert im Texteditor.")
+            self._feature_dialog(
+                "Markieren",
+                "Markieren funktioniert im Texteditor.",
+                object_name="ildMarkDialog",
+            )
             return
         was_marked = False
         try:
@@ -11344,17 +11705,20 @@ class MainWindow(QMainWindow):
             sample = ""
         data = list_hooks()
         events = ", ".join(data.get("known_events") or [])
-        QMessageBox.information(
+        from instantlensdoc.ui.feature_dialog import FeatureDialog
+
+        FeatureDialog(
             self,
-            "Script-/Plugin-Hooks",
-            (
+            title="Script-/Plugin-Hooks",
+            body=(
                 f"Ordner: {data.get('hooks_dir')}\n"
                 f"Geladen: {len(data.get('loaded') or [])}\n"
                 f"Events: {events}\n"
                 f"Aliase: on_open, on_save, on_scan\n"
                 f"Beispiel-Plugin: {sample or '(siehe examples/ild_dtp_sample_plugin.py)'}"
             ),
-        )
+            object_name="ildHooksDialog",
+        ).exec()
         try:
             self._set_status(
                 f"Hooks: {data.get('hooks_dir')} · "
@@ -11538,11 +11902,17 @@ class MainWindow(QMainWindow):
             return
         except Exception:
             pass
-        QMessageBox.information(
+        from instantlensdoc.ui.feature_dialog import FeatureDialog
+
+        FeatureDialog(
             self,
-            "Telemetrie",
-            "Opt-in unter Extra → Einstellungen. Keine Datenübertragung in dieser Version.",
-        )
+            title="Telemetrie",
+            body=(
+                "Opt-in unter Extra → Einstellungen. "
+                "Keine Datenübertragung in dieser Version."
+            ),
+            object_name="ildTelemetryDialog",
+        ).exec()
 
     def _refresh_form_fields(self):
         """AcroForm-Feldliste Sidebar (Name/Typ/Wert) — 1.3.0."""
@@ -12025,9 +12395,7 @@ class MainWindow(QMainWindow):
     def _import_bookmarks_from_outline(self) -> None:
         """PDF-Outlines → Seiten-Favoriten (Bookmarks) — 1.3.0/1.3.1."""
         if not self.pdf_view.pdf_path or self.pdf_view.store is None:
-            QMessageBox.information(
-                self, "Bookmarks importieren", "Bitte zuerst ein PDF öffnen."
-            )
+            self._require_pdf("Bookmarks importieren")
             return
         try:
             from ild_pdf.outline import extract_outline, flatten_outline_pages
@@ -12094,9 +12462,7 @@ class MainWindow(QMainWindow):
     def _export_bookmarks_to_outline(self) -> None:
         """Outlines-Export: Retry max. 3 wie Backup, dann Abbruch-Hinweis — 1.3.5."""
         if not self.pdf_view.pdf_path or self.pdf_view.store is None:
-            QMessageBox.information(
-                self, "Bookmarks exportieren", "Bitte zuerst ein PDF öffnen."
-            )
+            self._require_pdf("Bookmarks exportieren")
             return
         # Leere Outlines/Favoriten Hinweis — 1.3.2
         try:
@@ -12701,9 +13067,7 @@ class MainWindow(QMainWindow):
     def _pdf_security_dialog(self):
         """Verschlüsselung & Rechte — zentraler Dialog — 2.6.7."""
         if not self.pdf_view.pdf_path:
-            QMessageBox.information(
-                self, "Verschlüsselung", "Bitte zuerst ein PDF öffnen."
-            )
+            self._require_pdf("Verschlüsselung")
             return
         dlg = PdfSecurityDialog(
             self,
@@ -12824,7 +13188,7 @@ class MainWindow(QMainWindow):
 
     def _set_pdf_password(self):
         if not self.pdf_view.pdf_path:
-            QMessageBox.information(self, "Passwort", "Bitte zuerst ein PDF öffnen.")
+            self._require_pdf("Passwort")
             return
         dlg = SetPasswordDialog(self, pdf_name=self.pdf_view.pdf_path.name)
         if not dlg.exec():
@@ -12836,7 +13200,7 @@ class MainWindow(QMainWindow):
     def _remove_pdf_password(self):
         """PDF entschlüsseln / Passwort entfernen — 1.6.0/1.6.2."""
         if not self.pdf_view.pdf_path:
-            QMessageBox.information(self, "Passwort", "Bitte zuerst ein PDF öffnen.")
+            self._require_pdf("Passwort")
             return
         dlg = RemovePasswordDialog(self, pdf_name=self.pdf_view.pdf_path.name)
         if not dlg.exec():
@@ -12867,9 +13231,7 @@ class MainWindow(QMainWindow):
     def _show_doc_stats(self):
         """Dokument-Statistik-Panel (Seiten/Wörter/Ann./Größe) — 1.6.0/1.6.1."""
         if not self.pdf_view.pdf_path:
-            QMessageBox.information(
-                self, "Dokument-Statistik", "Bitte zuerst ein PDF öffnen."
-            )
+            self._require_pdf("Dokument-Statistik")
             return
         ann_n = (
             len(self.pdf_view.store.annotations)
@@ -13290,7 +13652,7 @@ class MainWindow(QMainWindow):
 
     def _compress_pdf_images(self):
         if not self.pdf_view.pdf_path:
-            QMessageBox.information(self, "Kompression", "Bitte zuerst ein PDF öffnen.")
+            self._require_pdf("Kompression")
             return
         src = Path(self.pdf_view.pdf_path)
         dlg = CompressPdfDialog(self, source_path=src)
@@ -13448,7 +13810,7 @@ class MainWindow(QMainWindow):
     def _bake_uri_links(self):
         """Sidecar-URL-Links als native PDF-Annotationen backen — 2.3.0."""
         if not self.pdf_view.pdf_path:
-            QMessageBox.information(self, "Links backen", "Bitte zuerst ein PDF öffnen.")
+            self._require_pdf("Links backen")
             return
         self.pdf_view.bake_uri_links()
 
@@ -13763,7 +14125,7 @@ class MainWindow(QMainWindow):
 
     def _edit_pdf_metadata(self):
         if not self.pdf_view.pdf_path:
-            QMessageBox.information(self, "Metadaten", "Bitte zuerst ein PDF öffnen.")
+            self._require_pdf("Metadaten")
             return
         # Dialog schon offen → Fokus/raise statt zweites Fenster — 1.5.5
         existing = getattr(self, "_meta_dialog", None)
@@ -13804,7 +14166,7 @@ class MainWindow(QMainWindow):
 
     def _edit_pdf_form_fields(self):
         if not self.pdf_view.pdf_path:
-            QMessageBox.information(self, "Formularfelder", "Bitte zuerst ein PDF öffnen.")
+            self._require_pdf("Formularfelder")
             return
         # 2.6.6: Dialog auch ohne bestehende Felder (anlegen/erkennen)
         page = int(getattr(self.pdf_view, "page_index", 0) or 0)
@@ -13827,7 +14189,7 @@ class MainWindow(QMainWindow):
 
     def _pdf_attachments(self):
         if not self.pdf_view.pdf_path:
-            QMessageBox.information(self, "Anhänge", "Bitte zuerst ein PDF öffnen.")
+            self._require_pdf("Anhänge")
             return
         dlg = AttachmentsDialog(self.pdf_view.pdf_path, self)
         dlg.exec()
@@ -14335,7 +14697,7 @@ class MainWindow(QMainWindow):
 
     def _pdf_page_size(self):
         if not self.pdf_view.pdf_path:
-            QMessageBox.information(self, "Seitengröße", "Bitte zuerst ein PDF öffnen.")
+            self._require_pdf("Seitengröße")
             return
         if PageSizeDialog(self.pdf_view.pdf_path, self.pdf_view.page_index, self).exec():
             from ild_pdf.render import clear_render_cache
@@ -14402,42 +14764,17 @@ class MainWindow(QMainWindow):
         else:
             title = "Update — aktuell"
         if silent and result.newer_available:
-            # Banner-ähnlich: Dialog mit Dismiss-Option
-            box = QMessageBox(self)
-            box.setWindowTitle(title)
-            box.setText(msg)
-            box.setIcon(QMessageBox.Information)
-            box.addButton("OK", QMessageBox.AcceptRole)
-            btn_dismiss = box.addButton(
-                "Bis nächste Version ausblenden", QMessageBox.ActionRole
-            )
-            box.exec()
-            if box.clickedButton() is btn_dismiss and ref:
-                set_update_dismissed_version(ref)
-                self._set_status(f"Update-Hinweis für {ref} ausgeblendet")
+            self._feature_dialog(title, msg, object_name="ildUpdateDialog")
             return
-        # Manuell („Jetzt prüfen“): immer Dialog; Dismiss nur wenn neuer Hinweis
+        # Manuell („Jetzt prüfen“): immer schließbarer Dialog
         if result.newer_available:
-            box = QMessageBox(self)
-            box.setWindowTitle(title)
-            box.setText(msg)
-            box.setIcon(QMessageBox.Information)
-            box.addButton("OK", QMessageBox.AcceptRole)
-            btn_dismiss = box.addButton(
-                "Bis nächste Version ausblenden", QMessageBox.ActionRole
-            )
-            box.exec()
-            if box.clickedButton() is btn_dismiss and ref:
-                set_update_dismissed_version(ref)
-                self._set_status(f"Update-Hinweis für {ref} ausgeblendet")
-            elif force and dismissed and ref and dismissed != ref:
-                # Neue Version → altes Dismiss ungültig
+            if force and dismissed and ref and dismissed != ref:
                 set_update_dismissed_version("")
+            self._feature_dialog(title, msg, object_name="ildUpdateDialog")
         else:
             if force and dismissed:
-                # Aktuell → Dismiss zurücksetzen
                 set_update_dismissed_version("")
-            QMessageBox.information(self, title, msg)
+            self._feature_dialog(title, msg, object_name="ildUpdateDialog")
 
     def _toggle_favorites_bar(self, checked: bool) -> None:
         from instantlensdoc.core.app_settings import set_favorites_bar_visible
@@ -14714,11 +15051,7 @@ class MainWindow(QMainWindow):
         from instantlensdoc.core.global_favorites import add_global_favorite
 
         if not self.pdf_view.pdf_path:
-            QMessageBox.information(
-                self,
-                "Lesezeichen-Leiste",
-                "Bitte zuerst ein PDF öffnen.",
-            )
+            self._require_pdf("Lesezeichen-Leiste")
             return
         path = str(Path(self.pdf_view.pdf_path))
         page = int(self.pdf_view.page_index or 0)
@@ -14818,10 +15151,10 @@ class MainWindow(QMainWindow):
             text = self.doc.text or self.editor.toPlainText()
             title = self.doc.display_name
         else:
-            QMessageBox.information(
-                self,
+            self._feature_dialog(
                 "Text → PDF",
                 "Bitte einen Text-Tab öffnen (TXT/MD/HTML/DOCX) oder Text eingeben.",
+                object_name="ildTextPdfDialog",
             )
             return
         from ild_pdf.text_pdf import page_count_for_text, text_to_pdf
@@ -14908,11 +15241,7 @@ class MainWindow(QMainWindow):
     def _extract_page_range(self):
         """Schnelldialog: Seitenbereiche z. B. 1-3,5,8-10; DE-Validierung + Vorschau — 1.2.1."""
         if not self.pdf_view.pdf_path:
-            QMessageBox.information(
-                self,
-                "Seitenbereich",
-                "Bitte zuerst ein PDF öffnen — oder PDF → zusammenführen / teilen → Seitenbereich.",
-            )
+            self._require_pdf("Seitenbereich")
             self._pdf_tools()
             return
         from PySide6.QtWidgets import QInputDialog
@@ -14993,11 +15322,7 @@ class MainWindow(QMainWindow):
     def _split_into_single_page_pdfs(self):
         """Jede Seite des aktuellen PDFs als eigene Datei exportieren."""
         if not self.pdf_view.pdf_path:
-            QMessageBox.information(
-                self,
-                "Einzel-PDFs",
-                "Bitte zuerst ein PDF öffnen — oder PDF → zusammenführen / teilen.",
-            )
+            self._require_pdf("Einzel-PDFs")
             self._pdf_tools()
             return
         from ild_pdf.pages import split_into_single_page_pdfs
@@ -15151,14 +15476,6 @@ class MainWindow(QMainWindow):
             open_tab_texts.append((path_key or "__editor__", label, self.editor.toPlainText()))
             if path_key and path_key not in tabs:
                 tabs.insert(0, path_key)
-        if len(tabs) < 2 and len(open_tab_texts) < 2:
-            QMessageBox.information(
-                self,
-                "Text-Diff",
-                "Bitte mindestens zwei Text-Tabs öffnen "
-                "(TXT/MD/HTML/…), dann erneut Datei → Text-Diff.",
-            )
-            return
         left_text = open_tab_texts[0][2] if open_tab_texts else None
         left_label = open_tab_texts[0][1] if open_tab_texts else None
         left_path = (
@@ -15168,13 +15485,13 @@ class MainWindow(QMainWindow):
         )
         dlg = TextCompareDialog(
             self,
-            tab_paths=tabs,
+            tab_paths=tabs or ([open_tab_texts[0][0]] if open_tab_texts else []),
             left_path=left_path,
             left_text=left_text,
             left_label=left_label,
             panel_mode=True,
         )
-        dlg.show()  # nicht-modal Panel — 1.2.0
+        dlg.exec()
         self._text_diff_panel = dlg
 
     def _save_export_profile(self):
@@ -16008,12 +16325,14 @@ class MainWindow(QMainWindow):
         if self.editor.paste_clipboard_image():
             self._set_status("Bild aus Zwischenablage in Editor eingefügt")
             return
-        QMessageBox.information(
+        from instantlensdoc.ui.feature_dialog import FeatureDialog
+
+        FeatureDialog(
             self,
-            "Einfügen",
-            "Kein Bild in der Zwischenablage.\n"
-            "Strg+V im PDF-Viewer fügt ebenfalls Bilder ein.",
-        )
+            title="Bild aus Zwischenablage",
+            body="Kein Bild in der Zwischenablage.",
+            object_name="ildClipboardImageDialog",
+        ).exec()
 
     def _refresh_user_template_menu(self):
         from instantlensdoc.core.app_settings import get_user_doc_templates
@@ -16052,6 +16371,7 @@ class MainWindow(QMainWindow):
         menu.addSeparator()
         act_order = QAction("Reihenfolge…", self)
         act_order.setToolTip("Vorlagen per Drag umsortieren und speichern")
+        act_order.setEnabled(bool(templates))
         act_order.triggered.connect(self._reorder_user_templates_dialog)
         menu.addAction(act_order)
         act_folder = QAction("Vorlagen-Ordner öffnen…", self)
@@ -16060,6 +16380,7 @@ class MainWindow(QMainWindow):
         menu.addAction(act_folder)
         act_export = QAction("Als Zip exportieren…", self)
         act_export.setToolTip("Vorlagen-Ordner als Zip speichern (templates.json + *.ildtpl.md)")
+        act_export.setEnabled(bool(templates))
         act_export.triggered.connect(self._export_user_templates_zip)
         menu.addAction(act_export)
         act_import = QAction("Aus Zip importieren…", self)
@@ -16075,10 +16396,10 @@ class MainWindow(QMainWindow):
         )
 
         if not get_user_doc_templates():
-            QMessageBox.information(
-                self,
+            self._feature_dialog(
                 "Vorlagen exportieren",
-                "Keine Nutzer-Vorlagen gespeichert.",
+                "Keine Nutzer-Vorlagen gespeichert — zuerst Datei → Als Vorlage speichern…",
+                object_name="ildTemplatesEmptyDialog",
             )
             return
         start = dialog_start_dir(get_last_export_dir())
@@ -16167,10 +16488,10 @@ class MainWindow(QMainWindow):
 
         templates = get_user_doc_templates()
         if not templates:
-            QMessageBox.information(
-                self,
+            self._feature_dialog(
                 "Vorlagen-Reihenfolge",
-                "Keine Nutzer-Vorlagen gespeichert.",
+                "Keine Nutzer-Vorlagen gespeichert — zuerst eine Vorlage anlegen.",
+                object_name="ildTemplatesEmptyDialog",
             )
             return
         dlg = TemplatesOrderDialog(templates, parent=self)
@@ -16181,22 +16502,13 @@ class MainWindow(QMainWindow):
         self._set_status(f"Vorlagen-Reihenfolge gespeichert ({len(ordered)})")
 
     def _open_user_templates_folder(self) -> None:
-        """Nutzer-Vorlagen spiegeln und Ordner im Dateimanager öffnen."""
-        from PySide6.QtCore import QUrl
-        from PySide6.QtGui import QDesktopServices
-
+        """Nutzer-Vorlagen spiegeln und Pfad in schließbarem Dialog zeigen."""
         from instantlensdoc.core.app_settings import sync_user_templates_folder
+        from instantlensdoc.ui.feature_dialog import PathOpenDialog
 
         folder = sync_user_templates_folder()
-        ok = QDesktopServices.openUrl(QUrl.fromLocalFile(str(folder)))
-        if ok:
-            self._set_status(f"Vorlagen-Ordner: {folder}")
-        else:
-            QMessageBox.information(
-                self,
-                "Vorlagen-Ordner",
-                f"Ordner konnte nicht geöffnet werden.\nPfad:\n{folder}",
-            )
+        PathOpenDialog(self, title="Vorlagen-Ordner", path=folder).exec()
+        self._set_status(f"Vorlagen-Ordner: {folder}")
 
     def _rename_user_template(self, template_id: str, current_title: str = "") -> None:
         from instantlensdoc.core.app_settings import rename_user_doc_template
@@ -16758,11 +17070,15 @@ class MainWindow(QMainWindow):
             DocKind.MARKDOWN,
             DocKind.HTML,
         ):
-            QMessageBox.information(
-                self,
-                "Encoding",
-                "Encoding gilt für Textdokumente (TXT/MD/HTML).",
+            enc = self._pick_text_encoding(
+                "Speichern mit Encoding",
+                (self.doc.meta.get("encoding") if self.doc else None),
             )
+            if not enc:
+                return
+            if self.doc is not None:
+                self.doc.meta["encoding"] = enc
+            self.save_doc()
             return
         enc = self._pick_text_encoding(
             "Speichern mit Encoding",
@@ -17216,9 +17532,7 @@ class MainWindow(QMainWindow):
         from ild_pdf.page_layout import apply_master_page, list_master_presets
 
         if not self.pdf_view.pdf_path:
-            QMessageBox.information(
-                self, "Musterseite", "Bitte zuerst ein PDF öffnen."
-            )
+            self._require_pdf("Musterseite")
             return
         presets = list_master_presets()
         names = [str(p.get("name") or p.get("id")) for p in presets]
@@ -17759,9 +18073,7 @@ class MainWindow(QMainWindow):
 
         pdf = self._current_pdf_path()
         if pdf is None:
-            QMessageBox.information(
-                self, "Preflight", "Bitte zuerst ein PDF öffnen."
-            )
+            self._require_pdf("Preflight")
             return
         report = run_preflight(pdf, require_bleed=False, color_mode="cmyk")
         text = preflight_to_text(report)
@@ -17790,9 +18102,7 @@ class MainWindow(QMainWindow):
 
         pdf = self._current_pdf_path()
         if pdf is None:
-            QMessageBox.information(
-                self, "Anschnitt", "Bitte zuerst ein PDF öffnen."
-            )
+            self._require_pdf("Anschnitt")
             return
         mm, ok = QInputDialog.getDouble(
             self,
@@ -18297,12 +18607,8 @@ class MainWindow(QMainWindow):
         from PySide6.QtWidgets import QApplication, QDialog, QProgressDialog
 
         if not self.doc or self.doc.kind != DocKind.PDF or not self.doc.path:
-            QMessageBox.information(
-                self,
-                "OCR gesamtes PDF",
-                "Bitte zuerst ein PDF öffnen.",
-            )
-            return
+            if not self._require_pdf("OCR gesamtes PDF"):
+                return
 
         ok, msg = ocr_mod.tesseract_available()
         # Seitenzahl vorab für Dialog (DPI + optional von–bis) — 1.1.2
@@ -18851,11 +19157,7 @@ class MainWindow(QMainWindow):
         from instantlensdoc.core.app_settings import get_ocr_dpi, get_ocr_lang
 
         if not self.doc or self.doc.kind != DocKind.PDF or not self.doc.path:
-            QMessageBox.information(
-                self,
-                "OCR Region",
-                "Bitte zuerst ein PDF öffnen.",
-            )
+            self._require_pdf("OCR Region")
             return
         ok, msg = ocr_mod.tesseract_available()
         if not ok:
@@ -19189,7 +19491,7 @@ class MainWindow(QMainWindow):
         )
 
         if not self.pdf_view.pdf_path:
-            QMessageBox.information(self, "PDF bereinigen", "Bitte zuerst ein PDF öffnen.")
+            self._require_pdf("PDF bereinigen")
             return
         src = Path(self.pdf_view.pdf_path)
 

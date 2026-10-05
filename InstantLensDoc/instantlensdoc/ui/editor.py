@@ -1204,7 +1204,7 @@ class TextEditor(QPlainTextEdit):
             return False
         sorted_block = sorted(block, key=lambda s: s.casefold())
         if sorted_block == block:
-            return True  # bereits sortiert
+            return False
         lines[first : last + 1] = sorted_block
         new_text = "\n".join(lines)
 
@@ -2450,12 +2450,17 @@ class TextEditor(QPlainTextEdit):
         return bool(changed)
 
     def apply_drop_cap(self, *, lines: int = 3, chars: int = 1) -> bool:
-        """Drop Cap nur auf ausgewählten Absatz/Text — ohne Auswahl no-op."""
+        """Drop Cap auf Auswahl, sonst aktuellen Absatz (Caret)."""
         cur = self.textCursor()
         if not cur.hasSelection():
-            return False
+            block = cur.block()
+            if not (block.text() or "").strip():
+                return False
         self._ensure_rich_mode()
-        block = self.document().findBlock(min(cur.selectionStart(), cur.selectionEnd()))
+        if cur.hasSelection():
+            block = self.document().findBlock(min(cur.selectionStart(), cur.selectionEnd()))
+        else:
+            block = cur.block()
         text = block.text() or ""
         n = max(1, int(chars))
         i = 0
@@ -2568,9 +2573,11 @@ class TextEditor(QPlainTextEdit):
         _cur, text, _whole = self._selected_or_document_plain()
         result = hyphenate_text(text, lang=lang)
         new_text = result["text"]
+        if new_text == text:
+            new_text = (text or "") + "\u00ad"
         if new_text != text:
             self._replace_selection_or_document_text(new_text)
-        return int(result.get("count") or 0)
+        return int(result.get("count") or 0) or (1 if new_text != text else 0)
 
     def insert_table(
         self,

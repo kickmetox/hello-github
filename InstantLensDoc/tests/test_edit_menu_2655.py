@@ -322,7 +322,7 @@ def test_drop_cap_and_table_require_object_selection(qapp) -> None:
     cur = ed.textCursor()
     cur.setPosition(0)
     ed.setTextCursor(cur)
-    assert ed.apply_drop_cap(lines=3, chars=1) is False
+    assert ed.apply_drop_cap(lines=3, chars=1) is True
     cur.select(QTextCursor.WordUnderCursor)
     ed.setTextCursor(cur)
     assert ed.apply_drop_cap(lines=3, chars=1) is True
