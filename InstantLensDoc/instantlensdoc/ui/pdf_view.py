@@ -2383,6 +2383,9 @@ class PdfCanvas(QLabel):
             if not (event.modifiers() & Qt.ShiftModifier):
                 self.set_selected_ids(set())
                 self.annotation_selected.emit("")
+            self._move_ids = set()
+            self._move_origin = None
+            self._move_delta = (0.0, 0.0)
             self._band_start = (x, y)
             self._band_current = (x, y)
             self._repaint_overlay()

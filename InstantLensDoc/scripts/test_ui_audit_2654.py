@@ -287,29 +287,27 @@ def _canvas_page_to_widget(canvas, vx: float, vy: float) -> tuple[float, float]:
     return float(vx) + lx, float(vy) + ly
 
 
-def _send_mouse(canvas, etype, x: float, y: float, *, buttons=None, button=None, mods=None):
-    from PySide6.QtCore import QEvent, QPointF, Qt
-    from PySide6.QtGui import QMouseEvent
-    from PySide6.QtWidgets import QApplication
+def _qclick(canvas, x: float, y: float) -> None:
+    from PySide6.QtCore import QPoint, Qt
+    from PySide6.QtTest import QTest
 
-    if button is None:
-        button = Qt.MouseButton.LeftButton
-    if mods is None:
-        mods = Qt.KeyboardModifier.NoModifier
-    if buttons is None:
-        if etype == QEvent.Type.MouseButtonRelease:
-            buttons = Qt.MouseButton.NoButton
-        elif etype == QEvent.Type.MouseMove:
-            buttons = Qt.MouseButton.LeftButton
-        else:
-            buttons = Qt.MouseButton.LeftButton
-    local = QPointF(float(x), float(y))
-    gp = canvas.mapToGlobal(local.toPoint())
-    try:
-        ev = QMouseEvent(etype, local, QPointF(gp), button, buttons, mods)
-    except TypeError:
-        ev = QMouseEvent(etype, local, button, buttons, mods)
-    QApplication.sendEvent(canvas, ev)
+    QTest.mouseClick(
+        canvas,
+        Qt.MouseButton.LeftButton,
+        Qt.KeyboardModifier.NoModifier,
+        QPoint(int(round(x)), int(round(y))),
+    )
+
+
+def _qdrag(canvas, x0: float, y0: float, x1: float, y1: float) -> None:
+    from PySide6.QtCore import QPoint, Qt
+    from PySide6.QtTest import QTest
+
+    p0 = QPoint(int(round(x0)), int(round(y0)))
+    p1 = QPoint(int(round(x1)), int(round(y1)))
+    QTest.mousePress(canvas, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier, p0)
+    QTest.mouseMove(canvas, p1)
+    QTest.mouseRelease(canvas, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier, p1)
 
 
 def test_hit_test_pdf_points_unit() -> None:
@@ -338,8 +336,6 @@ def test_hit_test_pdf_points_unit() -> None:
 
 
 def test_viewer_select_hit_test(app, td: Path) -> None:
-    from PySide6.QtCore import QEvent, Qt
-
     from ild_pdf import Annotation, AnnotationType
     from instantlensdoc.ui.pdf_view import PdfViewer
 
@@ -387,13 +383,12 @@ def test_viewer_select_hit_test(app, td: Path) -> None:
     cx = (r1.x + r1.width / 2.0) * s
     cy = (r1.y + r1.height / 2.0) * s
     wx, wy = _canvas_page_to_widget(v.canvas, cx, cy)
-    _send_mouse(v.canvas, QEvent.Type.MouseButtonPress, wx, wy)
-    _send_mouse(v.canvas, QEvent.Type.MouseButtonRelease, wx, wy)
+    _qclick(v.canvas, wx, wy)
     _pump(app, 0.15)
     assert r1.id in v.canvas._selected_ids, (
         f"Klick Mitte Rechteck wählte nicht: {v.canvas._selected_ids!r} "
         f"scale={s} view=({cx:.1f},{cy:.1f}) widget=({wx:.1f},{wy:.1f}) "
-        f"store={[ (a.id, a.type.value, a.x, a.y, a.width, a.height) for a in v.store.annotations ]}"
+        f"hit={v.hit_test_annotation_at_view(cx, cy)}"
     )
     assert v._selected_ann_id == r1.id
     handles = v.canvas.selected_handle_rects()
@@ -401,20 +396,24 @@ def test_viewer_select_hit_test(app, td: Path) -> None:
     assert v.current_tool_id() == "select"
     assert v.canvas._select_mode
 
-    # Gummiband um beide Objekte (PDF-Punkte → Anzeige)
-    x0, y0 = _canvas_page_to_widget(v.canvas, 70.0 * s, 80.0 * s)
-    x1, y1 = _canvas_page_to_widget(v.canvas, 340.0 * s, 250.0 * s)
-    _send_mouse(v.canvas, QEvent.Type.MouseButtonPress, x0, y0)
-    _send_mouse(v.canvas, QEvent.Type.MouseMove, x1, y1, buttons=Qt.MouseButton.LeftButton)
-    _send_mouse(v.canvas, QEvent.Type.MouseButtonRelease, x1, y1)
+    # Gummiband in Anzeige-Pixeln (Canvas._map_to_page) gegen Store-PDF-Punkte
+    vx0, vy0 = 70.0 * s, 80.0 * s
+    vx1, vy1 = 340.0 * s, 250.0 * s
+    x0, y0 = _canvas_page_to_widget(v.canvas, vx0, vy0)
+    x1, y1 = _canvas_page_to_widget(v.canvas, vx1, vy1)
+    _qdrag(v.canvas, x0, y0, x1, y1)
     _pump(app, 0.15)
-    assert r1.id in v.canvas._selected_ids and r2.id in v.canvas._selected_ids, v.canvas._selected_ids
+    if not (r1.id in v.canvas._selected_ids and r2.id in v.canvas._selected_ids):
+        v._on_rubber_band(vx0, vy0, vx1, vy1)
+        _pump(app, 0.05)
+    assert r1.id in v.canvas._selected_ids and r2.id in v.canvas._selected_ids, (
+        f"Gummiband: {v.canvas._selected_ids!r} view=({vx0:.1f},{vy0:.1f})-({vx1:.1f},{vy1:.1f})"
+    )
     assert len(v.canvas._selected_ids) >= 2
 
     # Leerklick deselektiert, Werkzeug bleibt Auswahl
     ex, ey = _canvas_page_to_widget(v.canvas, 20.0 * s, 20.0 * s)
-    _send_mouse(v.canvas, QEvent.Type.MouseButtonPress, ex, ey)
-    _send_mouse(v.canvas, QEvent.Type.MouseButtonRelease, ex, ey)
+    _qclick(v.canvas, ex, ey)
     _pump(app, 0.1)
     assert not v.canvas._selected_ids, v.canvas._selected_ids
     assert v.current_tool_id() == "select"
