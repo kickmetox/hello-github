@@ -1,3 +1,11 @@
+## 2.6.40 - Blank PDF View + Windows Build Guard
+
+Patch nach **2.6.39**: Nutzerbericht — Setup nur ~2.9 MB (statt ~49 MB), `dist\InstantLensDoc\InstantLensDoc.exe` fehlt; PDF-Hauptansicht weiss trotz Schnellvorschau-Thumbs, Klick auf Thumbs zeigt keine Seite.
+
+Fix Hauptansicht: **`_ensure_page_painted`** rendert die aktuelle Seite mit Zoom-Fallback (bildlastige Seiten); `refresh()` liefert Erfolg/Fehler; Open ignoriert spurioses Progress-Cancel nach Nesting-Modal; Thumb-Klick wechselt immer zur PDF-Ansicht und erzwingt Paint; Virtual-Thumb-Token bleibt fuer Prefetch erhalten.
+
+Fix Build: Root cause kleines Setup — Pack **2.6.39** enthielt **`run_instantlensdoc.py` nicht** (PyInstaller-Entry) → kein EXE, Inno fiel auf Python-Layout (~2–3 MB). Pack inkl. Entry; **`pack-windows-runnable.py` INCLUDE_TOP**; **`build-windows.ps1`** bricht ohne gueltige EXE ab; Installer-Preflight verlangt EXE (kein stiller Python-Fallback); Setup < 15 MB bei EXE-Layout = Fehler. Pack `InstantLensDoc-2.6.40-pack.zip`; VERSION **2.6.40**.
+
 ## 2.6.39 - Large-PDF Open/Edit Performance
 
 Patch nach **2.6.38**: Nutzerbericht — 536-Seiten-PDF oeffnet mit Dialog "Grosses PDF", haengt danach beim Laden/Bearbeiten. Ursachen: UI-Thread blockiert durch Voll-Scan PageLabels, 536× Thumbnail-Platzhalter mit eigenen Pixmaps, Lazy-Queue rendert alle Seiten im Hintergrund, Doppel-Refresh Thumbs/Outline nach Open, Volltext-Extraktion ohne Cap.

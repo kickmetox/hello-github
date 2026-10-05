@@ -5593,8 +5593,17 @@ class PdfViewer(QWidget):
             self._zoom_timer.stop()
             self.scale = get_default_zoom_scale()
             self.clear_search_highlights()
-            self.refresh()
-            if _canceled():
+            # Erste Seite MUSS in die Hauptansicht — Fallback-Zoom bei Render-Fehler — 2.6.40
+            painted = self._ensure_page_painted()
+            # Open-Generation-Abort (neuer Open) bleibt hart; Progress-Cancel nach
+            # Nesting-Modal („Großes PDF“) kann spurios wasCanceled() setzen — 2.6.40
+            if int(getattr(self, "_open_generation", 0) or 0) != open_gen:
+                return False
+            if not painted and bool(prog is not None and prog.wasCanceled()):
+                self.pdf_path = None
+                self.store = None
+                self.password = None
+                self.page_count = 0
                 return False
 
             prog.setValue(4)
@@ -5609,6 +5618,10 @@ class PdfViewer(QWidget):
             if mode in ("fit_width", "fit_page"):
                 QTimer.singleShot(0, self.apply_default_zoom)
             prog.setValue(5)
+            if not painted:
+                self.status.emit(
+                    "Hauptansicht leer — Zoom verringern oder Seite erneut wählen"
+                )
             return True
         except MemoryError:
             QMessageBox.critical(
@@ -5641,9 +5654,57 @@ class PdfViewer(QWidget):
             if cursor_overridden:
                 QApplication.restoreOverrideCursor()
 
-    def refresh(self):
+    def _canvas_has_page_image(self) -> bool:
+        """True wenn die zentrale Ansicht ein gerendertes Seitenbild trägt — 2.6.40."""
+        try:
+            pm = getattr(self.canvas, "_pixmap", None)
+            if pm is not None and not pm.isNull():
+                return True
+            shown = self.canvas.pixmap()
+            return bool(shown is not None and not shown.isNull())
+        except Exception:
+            return False
+
+    def _ensure_page_painted(self) -> bool:
+        """Aktuelle Seite in die Hauptansicht rendern; bei Fehler Zoom-Fallback — 2.6.40.
+
+        Virtual-Thumbs/Lazy-Open dürfen die zentrale Ansicht nicht leer lassen.
+        Bildlastige Seiten scheitern oft bei Default-Zoom, Thumbs (kleiner Scale) nicht.
+        """
         if not self.pdf_path:
-            return
+            return False
+        if self.refresh(quiet=True):
+            return True
+        saved = float(self.scale or 1.0)
+        last_err: str | None = None
+        for fb in (1.0, 0.75, 0.5, 0.35, 0.25, 0.15):
+            if fb >= saved - 1e-6:
+                continue
+            self.scale = float(fb)
+            if self.refresh(quiet=True):
+                self.status.emit(
+                    f"Seite mit reduziertem Zoom dargestellt ({int(round(fb * 100))} %)"
+                )
+                self.zoom_changed.emit(self.scale)
+                return True
+            err = getattr(self, "_last_refresh_error", None)
+            if err:
+                last_err = str(err)
+        self.scale = saved
+        if self._canvas_has_page_image():
+            return True
+        msg = last_err or "Seite konnte nicht gerendert werden."
+        QMessageBox.warning(
+            self,
+            "PDF-Ansicht",
+            f"{msg}\n\nTipp: Zoom verringern oder Seite erneut in der Schnellvorschau wählen.",
+        )
+        return False
+
+    def refresh(self, *, quiet: bool = False) -> bool:
+        if not self.pdf_path:
+            return False
+        self._last_refresh_error = None
         try:
             from copy import copy
 
@@ -5851,14 +5912,19 @@ class PdfViewer(QWidget):
             )
             self.status.emit(f"PDF: {self.pdf_path.name}{dirty}")
             self._refresh_fav_btn()
+            return True
         except MemoryError:
-            QMessageBox.warning(
-                self,
-                "PDF-Ansicht",
-                "Render fehlgeschlagen (Speicher).\nZoom verringern oder Seite überspringen.",
+            self._last_refresh_error = (
+                "Render fehlgeschlagen (Speicher).\nZoom verringern oder Seite überspringen."
             )
+            if not quiet:
+                QMessageBox.warning(self, "PDF-Ansicht", self._last_refresh_error)
+            return False
         except Exception as e:
-            QMessageBox.warning(self, "PDF-Ansicht", f"Seite konnte nicht gerendert werden:\n{e}")
+            self._last_refresh_error = f"Seite konnte nicht gerendert werden:\n{e}"
+            if not quiet:
+                QMessageBox.warning(self, "PDF-Ansicht", self._last_refresh_error)
+            return False
 
     def goto_page(self, page_index: int):
         if 0 <= page_index < self.page_count:
@@ -5881,9 +5947,12 @@ class PdfViewer(QWidget):
                         )
                         self._scroll_to_continuous_page(page_index)
             if need_refresh:
-                self.refresh()
+                # Fallback-Zoom wenn Default-Render die Hauptansicht leer lässt — 2.6.40
+                self._ensure_page_painted()
                 if self._continuous_scroll:
                     self._scroll_to_continuous_page(page_index)
+            elif not self._canvas_has_page_image():
+                self._ensure_page_painted()
             self.page_changed.emit(self.page_index)
 
     def prev_page(self):

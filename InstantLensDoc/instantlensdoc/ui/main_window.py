@@ -10834,16 +10834,24 @@ class MainWindow(QMainWindow):
         self._thumb_lazy_timer.start()
 
     def _thumb_lazy_tick(self):
-        if not self._thumb_lazy_queue or self._thumb_lazy_token is None:
+        if self._thumb_lazy_token is None:
             self._stop_thumb_lazy()
             return
         if not self.pdf_view.pdf_path:
             self._stop_thumb_lazy()
             return
+        # Leere Queue: Timer stoppen, Token behalten (Virtual-Prefetch bei Scroll) — 2.6.40
+        if not self._thumb_lazy_queue:
+            if self._thumb_lazy_timer is not None:
+                try:
+                    self._thumb_lazy_timer.stop()
+                except Exception:
+                    pass
+                self._thumb_lazy_timer = None
+            return
         idx = self._thumb_lazy_queue.pop(0)
         if idx in self._thumb_lazy_loaded:
             if not self._thumb_lazy_queue:
-                # Timer stoppen, Token behalten für Prefetch bei Scroll
                 if self._thumb_lazy_timer is not None:
                     try:
                         self._thumb_lazy_timer.stop()
@@ -10870,10 +10878,19 @@ class MainWindow(QMainWindow):
                 self._thumb_lazy_timer = None
 
     def _on_thumb_jump(self, page_index: int):
+        """Schnellvorschau-Klick: Seite in Hauptansicht zeigen (auch Virtual-Thumbs) — 2.6.40."""
         if self.stack.currentWidget() is not self.pdf_view:
+            self.stack.setCurrentWidget(self.pdf_view)
+        if not self.pdf_view.pdf_path:
+            self._set_status("Kein PDF geladen")
             return
-        self.pdf_view.goto_page(page_index)
-        self._prefetch_thumbs_around(int(page_index), cancel=False)
+        idx = int(page_index)
+        self.pdf_view.goto_page(idx)
+        # Falls goto short-circuited / Render fehlschlug: Hauptansicht nachziehen
+        if not self.pdf_view._canvas_has_page_image():
+            self.pdf_view._ensure_page_painted()
+        self.sidebar.select_thumb(idx)
+        self._prefetch_thumbs_around(idx, cancel=False)
 
     def _on_thumbs_reordered(self, order: list):
         if self.stack.currentWidget() is not self.pdf_view:

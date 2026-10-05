@@ -35,6 +35,7 @@ INCLUDE_TOP = [
     "run-keygen.bat",
     "run-keygen.ps1",
     "run-ild.bat",
+    "run_instantlensdoc.py",  # PyInstaller entry (ohne Relative-Import) — 2.6.36/2.6.40
     "build-windows.ps1",
     "instantlensdoc.spec",
     "requirements.txt",

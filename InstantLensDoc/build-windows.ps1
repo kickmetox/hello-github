@@ -1,4 +1,4 @@
-﻿# InstantLens Doc - Windows-Build (PyInstaller App + Keygen) 2.6.39
+﻿# InstantLens Doc - Windows-Build (PyInstaller App + Keygen) 2.6.40
 # Eine Zeile:
 #   powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 #
@@ -15,6 +15,9 @@
 # Keygen-EXE: dist\InstantLensKeygen\ + optional dist\InstantLensDoc\InstantLensKeygen.exe
 # (= Installer-Pfad {app}\InstantLensKeygen.exe)
 #
+# Ab 2.6.40: nach App-Build wird InstantLensDoc.exe hart geprueft (Pfad + Mindestgroesse).
+# Ohne gueltige EXE: Exit != 0 - kein stiller Weiterlauf zum Inno-Installer.
+#
 # Runnable Python-Pack (ohne PyInstaller): scripts\pack-windows-runnable.ps1
 
 param(
@@ -30,8 +33,11 @@ $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $Root
 
-Write-Host "=== InstantLens Doc Build 2.6.39 (Windows x64) ==="
+Write-Host "=== InstantLens Doc Build 2.6.40 (Windows x64) ==="
 Write-Host "Root: $Root"
+
+# Mindestgroesse: leere/stub EXE und fehlgeschlagenes onedir entlarven (~49 MB Setup)
+$script:IldMinAppExeBytes = 5MB
 
 # 64-Bit Python erzwingen (bevorzugt fuer Release)
 $archLine = & $Python -c "import struct,platform; print(struct.calcsize('P')*8); print(platform.machine())"
@@ -139,6 +145,14 @@ $AppDist = Join-Path $Root "dist\InstantLensDoc"
 
 if (-not $SkipApp) {
     Write-Host "- App InstantLensDoc (x64) -"
+    $AppEntry = Join-Path $Root "run_instantlensdoc.py"
+    if (-not (Test-Path -LiteralPath $AppEntry)) {
+        throw @"
+App-Entry fehlt: $AppEntry
+Ohne run_instantlensdoc.py kann PyInstaller keine InstantLensDoc.exe bauen (Setup sonst ~2-3 MB).
+Pack/Sync pruefen - Datei muss im App-Root liegen (ab 2.6.36/2.6.40).
+"@
+    }
     $dataArgs = @(
         "--add-data", "assets;assets",
         "--add-data", "FEATURES.md;.",
@@ -156,10 +170,10 @@ if (-not $SkipApp) {
     $appArgs = $Common + $IconArgs + $dataArgs + @(
         "--name", "InstantLensDoc",
         "--windowed",
-        (Join-Path $Root "run_instantlensdoc.py")
+        $AppEntry
     )
     & $Python -m PyInstaller @appArgs
-    if ($LASTEXITCODE -ne 0) { throw "App-Build fehlgeschlagen" }
+    if ($LASTEXITCODE -ne 0) { throw "App-Build fehlgeschlagen (PyInstaller exit $LASTEXITCODE)" }
     # Assets/Docs zusaetzlich absichern (falls --add-data auf Host anders mappt)
     New-Item -ItemType Directory -Force -Path (Join-Path $AppDist "assets") | Out-Null
     if (Test-Path $IconIco) {
@@ -172,6 +186,25 @@ if (-not $SkipApp) {
         $src = Join-Path $Root $doc
         if (Test-Path $src) { Copy-Item -Force $src (Join-Path $AppDist $doc) }
     }
+    # Hart: InstantLensDoc.exe muss existieren und plausibel gross sein - 2.6.40
+    $appExe = Join-Path $AppDist "InstantLensDoc.exe"
+    if (-not (Test-Path -LiteralPath $appExe)) {
+        $alt = Get-ChildItem -Path $AppDist -Filter "InstantLensDoc.exe" -Recurse -ErrorAction SilentlyContinue |
+            Select-Object -First 1
+        if ($alt) { $appExe = $alt.FullName }
+    }
+    if (-not (Test-Path -LiteralPath $appExe)) {
+        throw @"
+App-Build: InstantLensDoc.exe fehlt unter dist\InstantLensDoc\.
+Inno-Setup darf NICHT mit leerem/Python-Fallback laufen (Setup sonst ~2-3 MB).
+Pruefe PyInstaller-Log oben. Erwartet: dist\InstantLensDoc\InstantLensDoc.exe
+"@
+    }
+    $exeLen = (Get-Item -LiteralPath $appExe).Length
+    if ($exeLen -lt $script:IldMinAppExeBytes) {
+        throw "App-Build: InstantLensDoc.exe zu klein ($exeLen Bytes < $script:IldMinAppExeBytes) - Output unvollstaendig."
+    }
+    Write-Host ("OK: {0} ({1} MB)" -f $appExe, [math]::Round($exeLen / 1MB, 2))
     Write-Host "OK: dist\InstantLensDoc\"
 }
 
@@ -207,7 +240,9 @@ if (-not $SkipKeygen) {
     Write-Host "Keygen uebersprungen (-SkipKeygen)"
 }
 
-Write-Host "Fertig (2.6.39). Optional:"
-Write-Host '  powershell -ExecutionPolicy Bypass -File .\installer\build-installer.ps1'
+Write-Host "Fertig (2.6.40). Verify:"
+Write-Host '  Test-Path .\dist\InstantLensDoc\InstantLensDoc.exe'
+Write-Host "Optional Installer:"
+Write-Host '  powershell -ExecutionPolicy Bypass -File .\scripts\build-windows-installer.ps1'
 Write-Host "  (ohne Keygen: -SkipKeygen bzw. ISCC /DIncludeKeygen=0)"
 Write-Host '  python scripts\pack-windows-runnable.py   # Python-Layout-Zip ohne EXE'

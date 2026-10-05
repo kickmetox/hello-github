@@ -1,4 +1,4 @@
-﻿# InstantLens Doc 2.6.38 - Inno-Setup-Installer bauen (Setup.exe)
+﻿# InstantLens Doc 2.6.40 - Inno-Setup-Installer bauen (Setup.exe)
 # Voraussetzung: Inno Setup 6 (iscc.exe) auf Windows x64
 # Aufruf (Einzeiler):
 #   powershell -ExecutionPolicy Bypass -File .\scripts\build-windows-installer.ps1
@@ -6,15 +6,17 @@
 #   powershell -ExecutionPolicy Bypass -File .\installer\build-installer.ps1
 # Optional:
 #   -SourceRoot D:\path\to\pack
-#   -PythonLauncher   # Shortcuts auf run.bat statt InstantLensDoc.exe
+#   -PythonLauncher   # Shortcuts auf run.bat statt InstantLensDoc.exe (explizit)
 #   -NoKeygen         # IncludeKeygen=0 (keine Keygen-Shortcuts)
 #   -IsccPath PATH
 #
-# Nach build-windows.ps1: bevorzugt EXE-Layout (dist\InstantLensDoc\InstantLensDoc.exe),
-# UsePythonLauncher=0 - kein Post-Install von run.bat. -PythonLauncher erzwingt run.bat.
+# Nach build-windows.ps1: EXE-Layout PFLICHT (dist\InstantLensDoc\InstantLensDoc.exe),
+# UsePythonLauncher=0. Ohne EXE: Abbruch (kein stiller Python-Fallback) - 2.6.40.
+# -PythonLauncher erzwingt run.bat-Dev-Layout bewusst.
 #
 # Ergebnis: dist\InstantLensDoc-Setup-<VERSION>.exe
 #   Startmenue + optional Desktop + Uninstall + 64-Bit
+#   EXE-Setup muss plausibel gross sein (sonst throw) - 2.6.40
 #
 # Keygen-EXE: Prefer dist\InstantLensKeygen\InstantLensKeygen.exe,
 # Fallback dist\InstantLensDoc\InstantLensKeygen.exe -> Pack als InstantLensKeygen.exe
@@ -42,7 +44,7 @@ function Get-IldVersion {
     }
     $v = (Get-Content -LiteralPath $VersionFile -Raw).Trim().Split()[0]
     if ($v -notmatch '^\d+\.\d+\.\d+') {
-        throw "VERSION.txt ungültig: $v"
+        throw "VERSION.txt ungueltig: $v"
     }
     return $v
 }
@@ -56,7 +58,7 @@ if (-not (Test-Path $Hinweis)) {
     Write-Host "WARNUNG: installer-hinweis.txt fehlt - InfoAfterFile kann fehlschlagen."
 }
 
-# Icon prüfen (SetupIconFile)
+# Icon pruefen (SetupIconFile)
 $Icon = Join-Path $Root "assets\app.ico"
 if (-not (Test-Path $Icon)) {
     Write-Host "WARNUNG: assets\app.ico fehlt - Inno SetupIconFile kann fehlschlagen."
@@ -94,9 +96,13 @@ if (-not $SourceRoot) {
 
     if ((Test-Path $exeInDist) -and (-not $explicitPython)) {
         # Prefer PyInstaller output from build-windows.ps1 - do not clobber with Python tree
+        $exeLen = (Get-Item -LiteralPath $exeInDist).Length
+        if ($exeLen -lt 5MB) {
+            throw "InstantLensDoc.exe zu klein ($exeLen Bytes) unter $exeInDist - zuerst build-windows.ps1 erneut."
+        }
         $SourceRoot = $Pack
         $PythonLauncher = $false
-        Write-Host "EXE-Layout erkannt: $SourceRoot (UsePythonLauncher=0, Post-Install = InstantLensDoc.exe)"
+        Write-Host "EXE-Layout erkannt: $SourceRoot (UsePythonLauncher=0, Post-Install = InstantLensDoc.exe, $([math]::Round($exeLen/1MB,2)) MB)"
         $kgExe = Join-Path $Root "dist\InstantLensKeygen\InstantLensKeygen.exe"
         if (-not (Test-Path $kgExe)) {
             $kgExe = Join-Path $Pack "InstantLensKeygen.exe"
@@ -105,8 +111,8 @@ if (-not $SourceRoot) {
             Copy-Item -Force $kgExe (Join-Path $Pack "InstantLensKeygen.exe")
             Write-Host "Keygen EXE mitgepackt."
         }
-    } else {
-        # Python-Portable-Layout (kein EXE, oder -PythonLauncher)
+    } elseif ($explicitPython) {
+        # Python-Portable-Layout nur bei explizitem -PythonLauncher - 2.6.40
         New-Item -ItemType Directory -Force -Path $Pack | Out-Null
         $copyItems = @(
             "instantlensdoc", "ild_pdf", "ild", "keygen", "assets", "scripts",
@@ -129,10 +135,16 @@ if (-not $SourceRoot) {
             Write-Host "Keygen EXE mitgepackt."
         }
         $SourceRoot = $Pack
-        if (-not $PSBoundParameters.ContainsKey("PythonLauncher")) {
-            $PythonLauncher = $true
-        }
-        Write-Host "Python-Layout: $SourceRoot (UsePythonLauncher=$PythonLauncher)"
+        $PythonLauncher = $true
+        Write-Host "Python-Layout (explizit -PythonLauncher): $SourceRoot"
+    } else {
+        throw @"
+InstantLensDoc.exe fehlt: $exeInDist
+Zuerst: powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
+Danach erneut: powershell -ExecutionPolicy Bypass -File .\scripts\build-windows-installer.ps1
+(Dev ohne EXE: -PythonLauncher)
+Ohne diese Pruefung entstand Setup ~2-3 MB statt ~49 MB.
+"@
     }
 }
 
@@ -144,10 +156,10 @@ if (-not (Test-Path $SourceRoot)) {
 $hasBat = Test-Path (Join-Path $SourceRoot "run.bat")
 $hasExe = Test-Path (Join-Path $SourceRoot "InstantLensDoc.exe")
 if (-not $hasBat -and -not $hasExe) {
-    Write-Error "SourceRoot enthält weder run.bat noch InstantLensDoc.exe: $SourceRoot"
+    Write-Error "SourceRoot enthaelt weder run.bat noch InstantLensDoc.exe: $SourceRoot"
 }
 if ($PythonLauncher -and -not $hasBat) {
-    Write-Host "WARNUNG: -PythonLauncher gesetzt, aber run.bat fehlt - Shortcuts können fehlschlagen."
+    Write-Host "WARNUNG: -PythonLauncher gesetzt, aber run.bat fehlt - Shortcuts koennen fehlschlagen."
 }
 if ((-not $PythonLauncher) -and (-not $hasExe) -and $hasBat) {
     Write-Host "Hinweis: Keine InstantLensDoc.exe - schalte auf PythonLauncher (run.bat)."
@@ -156,7 +168,7 @@ if ((-not $PythonLauncher) -and (-not $hasExe) -and $hasBat) {
 if ((-not $NoKeygen) -and $PythonLauncher) {
     $kgBat = Join-Path $SourceRoot "run-keygen.bat"
     if (-not (Test-Path $kgBat)) {
-        Write-Host "WARNUNG: run-keygen.bat fehlt - Keygen-Shortcut im Startmenü kann fehlschlagen."
+        Write-Host "WARNUNG: run-keygen.bat fehlt - Keygen-Shortcut im Startmenue kann fehlschlagen."
     }
 }
 
@@ -190,10 +202,15 @@ $SetupName = "InstantLensDoc-Setup-$Version.exe"
 $SetupPath = Join-Path $Dist $SetupName
 Write-Host "Fertig. Setup unter: $Dist"
 if (Test-Path $SetupPath) {
-    $sz = [math]::Round((Get-Item $SetupPath).Length / 1MB, 2)
+    $raw = (Get-Item $SetupPath).Length
+    $sz = [math]::Round($raw / 1MB, 2)
     Write-Host "OK: $SetupPath ($sz MB)"
+    # EXE-Layout-Setup muss das PyInstaller-Bundle enthalten (~voll) - 2.6.40
+    if ((-not $PythonLauncher) -and ($raw -lt 15MB)) {
+        throw "Setup.exe verdaechtig klein ($sz MB < 15 MB) - vermutlich ohne PyInstaller-Bundle. build-windows.ps1 + EXE-Pfad pruefen."
+    }
 } else {
-    Write-Host "Hinweis: Erwartete Datei $SetupName prüfen."
+    throw "Erwartete Datei fehlt: $SetupPath"
 }
 Get-ChildItem $Dist -Filter "InstantLensDoc-Setup-*" | Format-Table Name, Length, LastWriteTime
 exit 0
