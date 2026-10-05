@@ -42,7 +42,7 @@
 #   taskkill /F /IM cmd.exe
 #   # optional Sysinternals: handle.exe D:\AI_Temp\InstantLensDoc
 #   # Frischer Ordner + Swap:
-#   powershell -ExecutionPolicy Bypass -File .\sync-ild.ps1 -LocalPack .\InstantLensDoc-2.6.36-pack.zip -Dest D:\AI_Temp\InstantLensDoc-2636 -Swap -SkipStart
+#   powershell -ExecutionPolicy Bypass -File .\sync-ild.ps1 -LocalPack .\InstantLensDoc-2.6.38-pack.zip -Dest D:\AI_Temp\InstantLensDoc-2636 -Swap -SkipStart
 #
 # Nach Sync (manuell, ohne -BuildInstaller):
 #   cd D:\AI_Temp\InstantLensDoc
@@ -162,11 +162,11 @@ function Write-DestinationLockedHint {
     Write-Host "  # optional Sysinternals Handle:"
     Write-Host "  # handle.exe `"$Dest`""
     Write-Host ""
-    Write-Host "3) Sync erneut (Pack 2.6.36), oder frischer Ordner + Swap:"
+    Write-Host "3) Sync erneut (Pack 2.6.38), oder frischer Ordner + Swap:"
     Write-Host "  cd $safe"
-    Write-Host '  powershell -ExecutionPolicy Bypass -File .\sync-ild.ps1 -LocalPack D:\AI_Temp\InstantLensDoc-2.6.36-pack.zip -SkipStart'
+    Write-Host '  powershell -ExecutionPolicy Bypass -File .\sync-ild.ps1 -LocalPack D:\AI_Temp\InstantLensDoc-2.6.38-pack.zip -SkipStart'
     Write-Host "  # wenn InstantLensDoc weiter gesperrt:"
-    Write-Host '  powershell -ExecutionPolicy Bypass -File .\sync-ild.ps1 -LocalPack D:\AI_Temp\InstantLensDoc-2.6.36-pack.zip -Dest D:\AI_Temp\InstantLensDoc-2636 -Swap -SkipStart'
+    Write-Host '  powershell -ExecutionPolicy Bypass -File .\sync-ild.ps1 -LocalPack D:\AI_Temp\InstantLensDoc-2.6.38-pack.zip -Dest D:\AI_Temp\InstantLensDoc-2636 -Swap -SkipStart'
     Write-Host "Exit-Code 1 = Ziel gesperrt oder Sync-Fehler."
     Write-Host ""
 }
@@ -410,9 +410,9 @@ function Write-LocalPackHint {
     Write-Host ""
     Write-Host "=== Git-Sync fehlgeschlagen ($Reason) ===" -ForegroundColor Yellow
     Write-Host "Fallback: lokales Pack nutzen:"
-    Write-Host '  powershell -ExecutionPolicy Bypass -File .\sync-ild.ps1 -LocalPack D:\AI_Temp\InstantLensDoc-2.6.36-pack.zip -SkipStart'
+    Write-Host '  powershell -ExecutionPolicy Bypass -File .\sync-ild.ps1 -LocalPack D:\AI_Temp\InstantLensDoc-2.6.38-pack.zip -SkipStart'
     Write-Host "oder frischer Ordner + Swap bei Sperre:"
-    Write-Host '  powershell -ExecutionPolicy Bypass -File .\sync-ild.ps1 -LocalPack D:\AI_Temp\InstantLensDoc-2.6.36-pack.zip -Dest D:\AI_Temp\InstantLensDoc-2636 -Swap -SkipStart'
+    Write-Host '  powershell -ExecutionPolicy Bypass -File .\sync-ild.ps1 -LocalPack D:\AI_Temp\InstantLensDoc-2.6.38-pack.zip -Dest D:\AI_Temp\InstantLensDoc-2636 -Swap -SkipStart'
     Write-Host "oder entpackten Ordner:"
     Write-Host '  powershell -ExecutionPolicy Bypass -File .\sync-ild.ps1 -LocalPack D:\AI_Temp\InstantLensDoc-pack -SkipStart'
     Write-Host "Pack-Zip: InstantLensDoc-*-pack.zip (Store docs / Agent-Ausgabe)."
@@ -451,10 +451,10 @@ try {
         $sideCandidates = @(
             (Join-Path $scriptDir "InstantLensDoc-pack.zip"),
             (Join-Path $parentDir "InstantLensDoc-pack.zip"),
-            (Join-Path $parentDir "InstantLensDoc-2.6.36-pack.zip"),
+            (Join-Path $parentDir "InstantLensDoc-2.6.38-pack.zip"),
             (Join-Path $parentDir "InstantLensDoc-2.6.35-pack.zip"),
             (Join-Path $parentDir "InstantLensDoc-2.6.34-pack.zip"),
-            "D:\AI_Temp\InstantLensDoc-2.6.36-pack.zip",
+            "D:\AI_Temp\InstantLensDoc-2.6.38-pack.zip",
             "D:\AI_Temp\InstantLensDoc-2.6.35-pack.zip",
             "D:\AI_Temp\InstantLensDoc-2.6.34-pack.zip",
             "D:\AI_Temp\InstantLensDoc-pack.zip"

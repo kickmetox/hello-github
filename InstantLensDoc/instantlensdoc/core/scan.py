@@ -68,6 +68,15 @@ def _load_rgb(path: Union[str, Path, Image.Image]) -> Image.Image:
     return img
 
 
+# Letzter Acquire-Fehler (DE) — UI kann anzeigen; nie Exception nach aussen noetig
+_LAST_ACQUIRE_ERROR: str = ""
+
+
+def last_acquire_error() -> str:
+    """Letzte Scan-Acquire-Fehlermeldung (leer wenn ok / abgebrochen)."""
+    return _LAST_ACQUIRE_ERROR
+
+
 def acquire_from_scanner(
     device: Optional[DeviceInfo] = None,
     *,
@@ -79,38 +88,56 @@ def acquire_from_scanner(
     Windows: WIA Common Dialog (falls COM verfügbar).
     Linux: ``scanimage`` mit Geräte-ID.
     Ohne Hardware/Backend: leere Liste (UI fällt auf Datei-Import zurück).
+    Wirft nicht — Fehler in ``last_acquire_error()``.
     """
-    out = Path(out_dir) if out_dir else Path(tempfile.mkdtemp(prefix="ild-scan-"))
-    out.mkdir(parents=True, exist_ok=True)
-    system = platform.system()
-
-    if system == "Windows":
-        return _acquire_wia_windows(device, out)
-    return _acquire_sane(device, out)
+    global _LAST_ACQUIRE_ERROR
+    _LAST_ACQUIRE_ERROR = ""
+    try:
+        out = Path(out_dir) if out_dir else Path(tempfile.mkdtemp(prefix="ild-scan-"))
+        out.mkdir(parents=True, exist_ok=True)
+        system = platform.system()
+        if device and device.device_id.startswith("TWAIN"):
+            _LAST_ACQUIRE_ERROR = (
+                "TWAIN-Quelle erkannt, Acquire laeuft ueber WIA-Dialog. "
+                "Falls leer: Bilder importieren oder WIA-Treiber installieren."
+            )
+        if system == "Windows":
+            return _acquire_wia_windows(device, out)
+        return _acquire_sane(device, out)
+    except Exception as e:
+        _LAST_ACQUIRE_ERROR = f"Scan fehlgeschlagen: {e}"
+        return []
 
 
 def _acquire_wia_windows(device: Optional[DeviceInfo], out_dir: Path) -> List[Path]:
     """WIA: ShowAcquireImage / Transfer via PowerShell COM."""
+    global _LAST_ACQUIRE_ERROR
     device_id = (device.device_id if device else "") or ""
+    # TWAIN-IDs sind keine WIA DeviceIDs — Common Dialog nutzen
+    if device_id.startswith("TWAIN"):
+        device_id = ""
     out_lit = str(out_dir).replace("'", "''")
     id_lit = device_id.replace("'", "''")
-    # Speichert ein JPEG; Common Dialog wenn keine DeviceID
     ps = f"""
 $ErrorActionPreference = 'Stop'
 $OutDir = '{out_lit}'
 $DeviceId = '{id_lit}'
 try {{
   $cd = New-Object -ComObject WIA.CommonDialog
-  if ($DeviceId) {{
+  if ($DeviceId -and -not $DeviceId.StartsWith('TWAIN')) {{
     $dm = New-Object -ComObject WIA.DeviceManager
     $info = $null
     foreach ($d in @($dm.DeviceInfos)) {{
       if ([string]$d.DeviceID -eq $DeviceId) {{ $info = $d; break }}
     }}
-    if (-not $info) {{ throw "Scanner nicht gefunden: $DeviceId" }}
-    $dev = $info.Connect()
-    $item = $dev.Items(1)
-    $img = $cd.ShowTransfer($item)
+    if (-not $info) {{
+      # Fallback: Common Dialog statt hartem Fehler
+      $img = $cd.ShowAcquireImage()
+    }} else {{
+      $dev = $info.Connect()
+      $item = $dev.Items(1)
+      $img = $cd.ShowTransfer($item)
+    }}
   }} else {{
     $img = $cd.ShowAcquireImage()
   }}
@@ -125,7 +152,18 @@ try {{
 """
     powershell = shutil.which("powershell") or shutil.which("pwsh")
     if not powershell:
+        _LAST_ACQUIRE_ERROR = "PowerShell nicht gefunden — Scan nicht moeglich."
         return []
+    run_kwargs: dict = {
+        "capture_output": True,
+        "text": True,
+        "timeout": 180,
+        "check": False,
+    }
+    if platform.system() == "Windows":
+        run_kwargs["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
+        run_kwargs["encoding"] = "utf-8"
+        run_kwargs["errors"] = "replace"
     try:
         proc = subprocess.run(
             [
@@ -137,24 +175,35 @@ try {{
                 "-Command",
                 ps,
             ],
-            capture_output=True,
-            text=True,
-            timeout=180,
-            check=False,
+            **run_kwargs,
         )
-    except Exception:
+    except subprocess.TimeoutExpired:
+        _LAST_ACQUIRE_ERROR = "Scan-Timeout (WIA). Bitte erneut versuchen oder Bilder importieren."
+        return []
+    except Exception as e:
+        _LAST_ACQUIRE_ERROR = f"WIA-Scan: {e}"
         return []
     paths: List[Path] = []
     for line in (proc.stdout or "").splitlines():
         p = Path(line.strip().strip('"'))
         if p.is_file():
             paths.append(p)
+    if not paths:
+        err = (proc.stderr or "").strip()
+        if err:
+            _LAST_ACQUIRE_ERROR = err
+        elif proc.returncode not in (0, None):
+            _LAST_ACQUIRE_ERROR = (
+                "Kein Bild vom Scanner (WIA). Treiber pruefen oder Bilder importieren."
+            )
     return paths
 
 
 def _acquire_sane(device: Optional[DeviceInfo], out_dir: Path) -> List[Path]:
+    global _LAST_ACQUIRE_ERROR
     exe = shutil.which("scanimage")
     if not exe:
+        _LAST_ACQUIRE_ERROR = "scanimage (SANE) nicht im PATH."
         return []
     dest = out_dir / "scan.pnm"
     cmd = [exe, "--format=pnm"]
@@ -166,12 +215,15 @@ def _acquire_sane(device: Optional[DeviceInfo], out_dir: Path) -> List[Path]:
         if proc.returncode != 0 or not dest.is_file() or dest.stat().st_size < 32:
             if dest.exists():
                 dest.unlink(missing_ok=True)
+            err = (proc.stderr or b"").decode("utf-8", errors="replace").strip()
+            _LAST_ACQUIRE_ERROR = err or "scanimage lieferte kein Bild."
             return []
         jpg = out_dir / "scan.jpg"
         Image.open(dest).convert("RGB").save(jpg, "JPEG", quality=90)
         dest.unlink(missing_ok=True)
         return [jpg]
-    except Exception:
+    except Exception as e:
+        _LAST_ACQUIRE_ERROR = f"SANE-Scan: {e}"
         return []
 
 

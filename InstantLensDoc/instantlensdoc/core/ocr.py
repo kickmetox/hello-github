@@ -120,15 +120,60 @@ class OcrResult:
     layout: OcrLayoutPage | None = None
 
 
+def _configure_tesseract_cmd(pytesseract) -> None:
+    """Windows: haeufige Installationspfade setzen wenn Runtime nicht im PATH — 2.6.38."""
+    import os
+    import platform
+    import shutil
+
+    try:
+        current = getattr(pytesseract.pytesseract, "tesseract_cmd", None)
+        if current and Path(str(current)).is_file():
+            return
+    except Exception:
+        pass
+    which = shutil.which("tesseract")
+    if which:
+        try:
+            pytesseract.pytesseract.tesseract_cmd = which
+        except Exception:
+            pass
+        return
+    if platform.system() == "Windows":
+        env = os.environ.get("TESSERACT_CMD") or os.environ.get("TESSERACT_PATH")
+        candidates = []
+        if env:
+            candidates.append(env)
+        candidates.extend(TESSERACT_COMMON_PATHS)
+        for cand in candidates:
+            p = Path(cand)
+            if p.is_file():
+                try:
+                    pytesseract.pytesseract.tesseract_cmd = str(p)
+                except Exception:
+                    pass
+                return
+
+
 def tesseract_available() -> tuple[bool, str]:
     try:
         import pytesseract
     except ImportError:
         return False, "pytesseract nicht installiert (pip install pytesseract).\n\n" + INSTALL_HINT_DE
     try:
+        _configure_tesseract_cmd(pytesseract)
         ver = pytesseract.get_tesseract_version()
         return True, f"Tesseract {ver}"
     except Exception as e:
+        # Ein erneuter Pfad-Versuch nach Fehlschlag
+        try:
+            import pytesseract as _pt
+
+            _configure_tesseract_cmd(_pt)
+            ver = _pt.get_tesseract_version()
+            return True, f"Tesseract {ver}"
+        except Exception:
+            pass
         return False, (
             "Tesseract-Runtime fehlt oder ist nicht im PATH.\n\n"
             + INSTALL_HINT_DE

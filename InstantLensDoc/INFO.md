@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **2.6.36** |
+| Version | **2.6.38** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -33,7 +33,7 @@
 
 Skript: [sync-ild.ps1](scripts/sync-ild.ps1) — Branch `cursor/instantlensdoc-2108` (oder `-LocalPack` / Pack-Zip) nach `D:\AI_Temp\InstantLensDoc`, pip, Start. **Nutzer-Icon in `assets` wird nicht überschrieben.**
 
-**FEATURES.md lokal sync:** Nach Sync liegt `FEATURES.md` lokal im App-Ordner (`D:\AI_Temp\InstantLensDoc\FEATURES.md`); About/Stubs öffnen diese lokale Datei — Version **2.6.36**.
+**FEATURES.md lokal sync:** Nach Sync liegt `FEATURES.md` lokal im App-Ordner (`D:\AI_Temp\InstantLensDoc\FEATURES.md`); About/Stubs öffnen diese lokale Datei — Version **2.6.38**.
 
 Ohne Start: `-NoStart` (Alias `-SkipStart`). Exit-Codes: **0** OK · **1** allgemein · **2** Git-Fehler.
 
@@ -68,7 +68,7 @@ Python-Layout-Zip (ohne PyInstaller-EXE):
 powershell -ExecutionPolicy Bypass -File .\scripts\pack-windows-runnable.ps1
 ```
 
-Installer: `.\scripts\build-windows-installer.ps1` bzw. `.\installer\build-installer.ps1` (optional `-NoKeygen`) → `dist\InstantLensDoc-Setup-2.6.36.exe`  
+Installer: `.\scripts\build-windows-installer.ps1` bzw. `.\installer\build-installer.ps1` (optional `-NoKeygen`) → `dist\InstantLensDoc-Setup-2.6.38.exe`  
 Desktop-/Keygen-Shortcuts: `.\scripts\install-ild.ps1` (Keygen wenn `run-keygen.bat` / EXE vorhanden; `-SkipKeygen`)  
 Desktop-Verknüpfung Installer: optionale Checkbox (`desktopicon`, Standard an / `checkedonce`)
 
@@ -104,6 +104,13 @@ powershell -ExecutionPolicy Bypass -File .\scripts\ild.ps1 license generate kund
 
 Anleitung: Store `docs/instantlensdoc-scripting.md` · Beispiel `examples/ild_scripting_demo.py`.
 
+## Neu in 2.6.38
+
+- Windows Drucker/Scanner-Discovery gehaertet (Get-Printer, WIA/PnP/TWAIN, Winspool)
+- Menue **Geraete** (Scanner / Drucker / Erkennen); klare DE-Treiberhinweise
+- Scan-Acquire ohne Crash; Tesseract-Pfad-Autodetect unter Windows
+- Pack: `InstantLensDoc-2.6.38-pack.zip`
+
 ## Neu in 2.6.36
 
 Patch nach **2.6.35** (Sync/Fresh-Dest):
@@ -111,7 +118,7 @@ Patch nach **2.6.35** (Sync/Fresh-Dest):
 - **`InstantLensDoc.exe`:** Relative-Import-Crash behoben (`attempted relative import with no known parent package`)
 - Neuer Entry **`run_instantlensdoc.py`** (absolute Imports); `__main__.py` absolut; Build/Spec umgestellt
 - Hiddenimports/`--collect-submodules instantlensdoc` fuer Package-Daten
-- Pack: `InstantLensDoc-2.6.36-pack.zip`
+- Pack: `InstantLensDoc-2.6.38-pack.zip`
 
 ## Neu in 2.6.35
 

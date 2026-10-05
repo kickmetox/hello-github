@@ -1,4 +1,4 @@
-﻿# InstantLens Doc - Windows-Build (PyInstaller App + Keygen) 2.6.36
+﻿# InstantLens Doc - Windows-Build (PyInstaller App + Keygen) 2.6.38
 # Eine Zeile:
 #   powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 #
@@ -30,7 +30,7 @@ $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $Root
 
-Write-Host "=== InstantLens Doc Build 2.6.36 (Windows x64) ==="
+Write-Host "=== InstantLens Doc Build 2.6.38 (Windows x64) ==="
 Write-Host "Root: $Root"
 
 # 64-Bit Python erzwingen (bevorzugt fuer Release)
@@ -120,8 +120,14 @@ $Common = @(
     "--hidden-import", "pypdfium2",
     "--hidden-import", "pikepdf",
     "--hidden-import", "PIL",
+    "--hidden-import", "pytesseract",
+    "--hidden-import", "PySide6.QtPrintSupport",
     "--hidden-import", "instantlensdoc",
     "--hidden-import", "instantlensdoc.app",
+    "--hidden-import", "instantlensdoc.core.devices",
+    "--hidden-import", "instantlensdoc.core.scan",
+    "--hidden-import", "instantlensdoc.core.ocr",
+    "--hidden-import", "instantlensdoc.ui.scan_dialog",
     "--hidden-import", "ild_pdf",
     "--hidden-import", "ild",
     "--hidden-import", "keygen",
@@ -201,7 +207,7 @@ if (-not $SkipKeygen) {
     Write-Host "Keygen uebersprungen (-SkipKeygen)"
 }
 
-Write-Host "Fertig (2.6.36). Optional:"
+Write-Host "Fertig (2.6.38). Optional:"
 Write-Host '  powershell -ExecutionPolicy Bypass -File .\installer\build-installer.ps1'
 Write-Host "  (ohne Keygen: -SkipKeygen bzw. ISCC /DIncludeKeygen=0)"
 Write-Host '  python scripts\pack-windows-runnable.py   # Python-Layout-Zip ohne EXE'

@@ -1,3 +1,7 @@
+## 2.6.38 - Scanner/Drucker-Erkennung Windows-Haertung
+
+Patch nach **2.6.36**: Nutzer meldete fehlendes Scanner-Modul sowie kaputte Geraete-/Drucker-Erkennung trotz startender App. Fix: **Windows-Discovery** haertet Drucker (Qt + Winspool + Get-Printer + win32print) und Scanner (WIA + PnP + TWAIN-Quellen); PowerShell ohne Konsolenfenster, robustes JSON/ERR-Parsing; klare DE-Hinweise wenn Treiber fehlen. **Scan-Acquire** crasht nicht ohne Geraet (`last_acquire_error`); Tesseract sucht Standard-Windows-Pfade. UI: Menue **Geraete** (Scanner / Drucker / Erkennen); PyInstaller hidden-imports fuer PrintSupport/devices/scan/ocr. Pack `InstantLensDoc-2.6.38-pack.zip`; VERSION **2.6.38**.
+
 ## 2.6.36 - EXE Relative-Import / PyInstaller Entry-Fix
 
 Patch nach **2.6.35**: Installiertes `InstantLensDoc.exe` startete nicht — Unhandled exception `attempted relative import with no known parent package` in gefrorenem `__main__.py` (`from .app import main`). Ursache: PyInstaller startet den Entry als Top-Level-Skript ohne Package-Parent. Fix: duenner Entry **`run_instantlensdoc.py`** mit absolutem Import `from instantlensdoc.app import main`; **`instantlensdoc/__main__.py`** ebenfalls absolut; **`build-windows.ps1`** / **`instantlensdoc.spec`** nutzen den neuen Entry plus `--hidden-import instantlensdoc.app` und `--collect-submodules instantlensdoc`. Smoke: Entry ohne Relative-Imports + Import-Smoke. Pack `InstantLensDoc-2.6.36-pack.zip`; VERSION **2.6.36**.

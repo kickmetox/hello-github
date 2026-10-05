@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Nightly/CI Smoke: CLI + Import-Checks für InstantLens Doc — 2.1.0–2.6.36.
+"""Nightly/CI Smoke: CLI + Import-Checks für InstantLens Doc — 2.1.0–2.6.38.
 
 Leichtgewichtig. Exit-Codes:
   0  OK  (ok=true)
@@ -14,12 +14,12 @@ Aufruf:
   python scripts/smoke_ild.py -h
 
 JSON-Schema (--json), Erfolg:
-  {"ok": true, "version": "2.6.36", "duration_ms": 1234,
+  {"ok": true, "version": "2.6.38", "duration_ms": 1234,
    "checks": ["version", "imports", "cli", "measure_diff_import", "changelog"]}
 
 JSON bei Fail: checks[] enthält Objekt mit error-Text (max 200 Zeichen, Truncate …);
 Exitcode spiegelt ok (0↔true, 1↔false) — 2.2.0:
-  {"ok": false, "version": "2.6.36", "duration_ms": 12,
+  {"ok": false, "version": "2.6.38", "duration_ms": 12,
    "checks": ["version", {"name": "imports", "error": "import x: …"}]}
 """
 
@@ -41,7 +41,7 @@ if str(ROOT) not in sys.path:
 # Headless/CI: Qt ohne Display
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-EXPECTED_VERSION = "2.6.36"
+EXPECTED_VERSION = "2.6.38"
 FAIL_ERROR_MAX_LEN = 200
 
 EXIT_OK = 0
@@ -82,7 +82,7 @@ def check_version() -> None:
         _fail(f"docs/VERSION={docs_ver!r}")
     bw = (ROOT / "build-windows.ps1").read_text(encoding="utf-8")
     if EXPECTED_VERSION not in bw or "Allow32Bit" not in bw:
-        _fail("build-windows.ps1 fehlt 2.6.36/Allow32Bit")
+        _fail("build-windows.ps1 fehlt 2.6.38/Allow32Bit")
     if not (ROOT / "scripts" / "pack-windows-runnable.py").is_file():
         _fail("scripts/pack-windows-runnable.py fehlt")
     if not (ROOT / "run-keygen.bat").is_file():
@@ -134,17 +134,17 @@ def check_version() -> None:
     # 2.6.35+: sync Fresh-Dest + PyInstaller probe
     sync_t = (ROOT / "scripts" / "sync-ild.ps1").read_text(encoding="utf-8-sig")
     if "Dest" not in sync_t or "Swap" not in sync_t:
-        _fail("sync-ild.ps1 fehlt -Dest/-Swap (2.6.36)")
+        _fail("sync-ild.ps1 fehlt -Dest/-Swap (2.6.38)")
     if "Ordner gesperrt" not in sync_t and "in Verwendung" not in sync_t:
-        _fail("sync-ild.ps1 fehlt Ordner-gesperrt-Hinweis (2.6.36)")
+        _fail("sync-ild.ps1 fehlt Ordner-gesperrt-Hinweis (2.6.38)")
     if "build-windows-installer.ps1" not in sync_t:
-        _fail("sync-ild.ps1 fehlt build-windows-installer Pflicht (2.6.36)")
+        _fail("sync-ild.ps1 fehlt build-windows-installer Pflicht (2.6.38)")
     if "Test-PyInstallerImport" not in bw and "PyInstaller Import fehlgeschlagen" not in bw:
-        _fail("build-windows.ps1 fehlt PyInstaller-Probe (2.6.36)")
-    # 2.6.36: PyInstaller absolute-import entry (no relative imports when frozen)
+        _fail("build-windows.ps1 fehlt PyInstaller-Probe (2.6.38)")
+    # 2.6.38: PyInstaller absolute-import entry (no relative imports when frozen)
     entry = ROOT / "run_instantlensdoc.py"
     if not entry.is_file():
-        _fail("run_instantlensdoc.py fehlt (2.6.36 PyInstaller entry)")
+        _fail("run_instantlensdoc.py fehlt (2.6.38 PyInstaller entry)")
     entry_t = entry.read_text(encoding="utf-8")
     entry_code = "\n".join(
         ln for ln in entry_t.splitlines() if not ln.lstrip().startswith(("#", '"""', "'''"))
@@ -154,23 +154,23 @@ def check_version() -> None:
         _end = entry_t.find('"""', 3)
         entry_code = entry_t[_end + 3 :] if _end > 0 else entry_t
     if "\nfrom ." in ("\n" + entry_code) or "\nimport ." in ("\n" + entry_code):
-        _fail("run_instantlensdoc.py darf keine Relative-Imports haben (2.6.36)")
+        _fail("run_instantlensdoc.py darf keine Relative-Imports haben (2.6.38)")
     if "from instantlensdoc.app import main" not in entry_t:
-        _fail("run_instantlensdoc.py fehlt absolute Import instantlensdoc.app (2.6.36)")
+        _fail("run_instantlensdoc.py fehlt absolute Import instantlensdoc.app (2.6.38)")
     main_py = (ROOT / "instantlensdoc" / "__main__.py").read_text(encoding="utf-8")
     main_code = main_py
     if main_py.lstrip().startswith('"""'):
         _end = main_py.find('"""', 3)
         main_code = main_py[_end + 3 :] if _end > 0 else main_py
     if "\nfrom ." in ("\n" + main_code) or main_code.lstrip().startswith("from ."):
-        _fail("instantlensdoc/__main__.py hat noch Relative-Import (2.6.36)")
+        _fail("instantlensdoc/__main__.py hat noch Relative-Import (2.6.38)")
     if "from instantlensdoc.app import main" not in main_py:
-        _fail("instantlensdoc/__main__.py fehlt absolute Import (2.6.36)")
+        _fail("instantlensdoc/__main__.py fehlt absolute Import (2.6.38)")
     if "run_instantlensdoc.py" not in bw:
-        _fail("build-windows.ps1 nutzt nicht run_instantlensdoc.py (2.6.36)")
+        _fail("build-windows.ps1 nutzt nicht run_instantlensdoc.py (2.6.38)")
     spec_t = (ROOT / "instantlensdoc.spec").read_text(encoding="utf-8")
     if "run_instantlensdoc.py" not in spec_t:
-        _fail("instantlensdoc.spec nutzt nicht run_instantlensdoc.py (2.6.36)")
+        _fail("instantlensdoc.spec nutzt nicht run_instantlensdoc.py (2.6.38)")
     # Headless import smoke of absolute entry (does not start GUI)
     import importlib.util
 
@@ -448,6 +448,9 @@ def check_imports(*, with_qt: bool) -> None:
             "list_scanners",
             "DeviceKind",
             "WINDOWS_SCAN_DEPS_HINT",
+            "Get-Printer",
+            "format_discovery_status",
+            "WINDOWS_SCANNER_DRIVER_HINT_DE",
         ),
         ROOT / "instantlensdoc" / "core" / "scan.py": (
             "insert_scan_pages_into_pdf",
@@ -494,7 +497,7 @@ def check_imports(*, with_qt: bool) -> None:
             "Zu ersetzender Pin",
             "hyphenate_fr",
             "hyphenate_it",
-            "2.6.36",
+            "2.6.38",
         ),
         ROOT / "instantlensdoc" / "ui" / "sidebar.py": (
             "Schnellvorschau",
@@ -533,6 +536,10 @@ def check_imports(*, with_qt: bool) -> None:
             "_run_scan_import",
             "_show_devices_dialog",
             "Drucker & Scanner…",
+            "menuDevices",
+            "actDevicesScanner",
+            "actDevicesPrinters",
+            "&Geräte",
             "Ctrl+Alt+Shift+I",
             "Text bearbeiten…",
             "inline_text_edit",
@@ -578,7 +585,7 @@ def check_imports(*, with_qt: bool) -> None:
             "_update_index",
             "HYPHENATION_UI_LANGS",
             "hyphenate_fr",
-            "2.6.36",
+            "2.6.38",
         ),
         ROOT / "instantlensdoc" / "ui" / "batch_dialog.py": (
             "BatchConvertDialog",
@@ -1015,6 +1022,8 @@ def check_measure_and_diff() -> None:
 
 def check_changelog() -> None:
     cl = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    if "## 2.6.38" not in cl:
+        _fail("CHANGELOG fehlt ## 2.6.38")
     if "## 2.6.36" not in cl:
         _fail("CHANGELOG fehlt ## 2.6.36")
     if "## 2.6.35" not in cl:
@@ -1552,9 +1561,15 @@ def check_changelog() -> None:
         "relative import" not in cl
         and "run_instantlensdoc" not in cl
         and "Relative-Import" not in cl
-        and "2.6.36" not in cl
+        and "2.6.38" not in cl
     ):
         _fail("CHANGELOG 2.6.36 fehlt EXE Relative-Import/Entry-Hinweis")
+    if (
+        "Get-Printer" not in cl
+        and "Scanner" not in cl
+        and "2.6.38" not in cl
+    ):
+        _fail("CHANGELOG 2.6.38 fehlt Scanner/Drucker-Hinweis")
     if (
         "Silbentrennung" not in cl
         and "Hyphen" not in cl
@@ -1693,7 +1708,7 @@ def check_changelog() -> None:
     if "## 2.2.0" not in cl:
         _fail("CHANGELOG fehlt ## 2.2.0")
     feat = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
-    if "2.6.36" not in feat:
+    if "2.6.38" not in feat:
         _fail("FEATURES.md fehlt 2.6.36")
     if "2.6.28" not in feat:
         _fail("FEATURES.md fehlt 2.6.28")
@@ -1845,9 +1860,15 @@ def check_changelog() -> None:
     if (
         "Relative-Import" not in feat
         and "run_instantlensdoc" not in feat
-        and "2.6.36" not in feat
+        and "2.6.38" not in feat
     ):
         _fail("FEATURES.md fehlt 2.6.36 EXE Relative-Import/Entry-Hinweis")
+    if (
+        "Get-Printer" not in feat
+        and "Geräte" not in feat
+        and "2.6.38" not in feat
+    ):
+        _fail("FEATURES.md fehlt 2.6.38 Scanner/Drucker-Hinweis")
     if (
         "Silbentrennung" not in feat
         and "Menü/Palette" not in feat
@@ -2292,11 +2313,11 @@ Exit-Codes:
 Laufzeit: am Ende als „Laufzeit: N ms“ (oder duration_ms im JSON).
 
 Beispiel --json (Erfolg):
-  {"ok": true, "version": "2.6.36", "duration_ms": 1234,
+  {"ok": true, "version": "2.6.38", "duration_ms": 1234,
    "checks": ["version", "imports", "cli", "measure_diff_import", "changelog"]}
 
 Beispiel --json (Fail):
-  {"ok": false, "version": "2.6.36", "duration_ms": 12,
+  {"ok": false, "version": "2.6.38", "duration_ms": 12,
    "checks": ["version", {"name": "imports", "error": "import x: …"}]}
 """.rstrip()
     )

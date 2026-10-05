@@ -23,12 +23,15 @@ from PySide6.QtWidgets import (
 )
 
 from instantlensdoc.core.devices import (
+    WINDOWS_PRINTER_DRIVER_HINT_DE,
     WINDOWS_SCAN_DEPS_HINT,
+    WINDOWS_SCANNER_DRIVER_HINT_DE,
     DeviceDiscoveryResult,
     DeviceInfo,
     DeviceKind,
     DeviceScope,
     discover_devices,
+    format_discovery_status,
 )
 from instantlensdoc.core.ocr import (
     INSTALL_HINT_DE,
@@ -40,6 +43,7 @@ from instantlensdoc.core.scan import (
     acquire_from_scanner,
     import_image_paths,
     insert_scan_pages_into_pdf,
+    last_acquire_error,
 )
 
 
@@ -60,13 +64,13 @@ class ScanDialog(QDialog):
         self.resize(560, 640)
         self.setAccessibleName("Scannen und Import")
         self.setAccessibleDescription(
-            "Scanner wählen oder Bilder importieren, optional OCR mit Layout-Erhalt — 2.6.5"
+            "Scanner wählen oder Bilder importieren, optional OCR mit Layout-Erhalt — 2.6.38"
         )
 
         layout = QVBoxLayout(self)
         self.hint = QLabel(
             "Scanner wählen und scannen, oder Seitenbilder importieren. "
-            "OCR mit Layout-Erhalt (Blöcke / Lesereihenfolge; optional hOCR/TSV). — 2.6.5"
+            "OCR mit Layout-Erhalt (Blöcke / Lesereihenfolge; optional hOCR/TSV). — 2.6.38"
         )
         self.hint.setWordWrap(True)
         self.hint.setObjectName("scanDialogHint")
@@ -236,19 +240,39 @@ class ScanDialog(QDialog):
         self.btn_refresh.setEnabled(False)
         self.btn_rescan.setEnabled(False)
         try:
+            try:
+                from PySide6.QtWidgets import QApplication
+
+                app = QApplication.instance()
+                if app is not None:
+                    app.processEvents()
+            except Exception:
+                pass
             self._discovery = discover_devices()
+        except Exception as e:
+            self._discovery = DeviceDiscoveryResult(
+                warnings=[f"Geräteerkennung fehlgeschlagen: {e}"]
+            )
         finally:
             self.btn_refresh.setEnabled(True)
             self.btn_rescan.setEnabled(True)
         self._populate_device_list()
-        n_p = len(self._discovery.printers)
-        n_s = len(self._discovery.scanners)
-        warn = "; ".join(self._discovery.warnings[:2])
-        msg = f"{n_s} Scanner · {n_p} Drucker"
-        if warn:
-            msg += f" — {warn}"
+        msg = format_discovery_status(self._discovery)
         self.device_status.setText(msg)
         self.device_status.setAccessibleName(msg)
+        self.device_status.setToolTip(
+            "\n".join(self._discovery.warnings[:6])
+            if self._discovery.warnings
+            else msg
+        )
+        # Leere Liste: klare DE-Hinweise (Treiber) ohne Crash
+        if not self._discovery.printers and not self._discovery.scanners:
+            tip = WINDOWS_SCAN_DEPS_HINT
+            if not self._discovery.printers:
+                tip = WINDOWS_PRINTER_DRIVER_HINT_DE + "\n\n" + tip
+            if not self._discovery.scanners:
+                tip = WINDOWS_SCANNER_DRIVER_HINT_DE + "\n\n" + tip
+            self.device_status.setToolTip(tip)
 
     def _populate_device_list(self) -> None:
         filt = self.filter_combo.currentData() or "all"
@@ -299,20 +323,37 @@ class ScanDialog(QDialog):
                 "(oder Bilder importieren).",
             )
             return
+        if scanner is None and not self._discovery.scanners:
+            QMessageBox.information(
+                self,
+                "Scanner",
+                "Kein Scanner erkannt.\n\n"
+                + WINDOWS_SCANNER_DRIVER_HINT_DE
+                + "\n\n"
+                + WINDOWS_SCAN_DEPS_HINT,
+            )
+            return
         try:
             paths = acquire_from_scanner(scanner)
         except Exception as e:
-            QMessageBox.warning(self, "Scan", str(e))
-            return
-        if not paths:
-            QMessageBox.information(
+            QMessageBox.warning(
                 self,
                 "Scan",
-                "Kein Bild vom Scanner erhalten.\n\n"
+                f"{e}\n\nDie App bleibt stabil — bitte Bilder importieren "
+                "oder Treiber prüfen.\n\n" + WINDOWS_SCAN_DEPS_HINT,
+            )
+            return
+        if not paths:
+            detail = last_acquire_error()
+            body = "Kein Bild vom Scanner erhalten.\n\n"
+            if detail:
+                body += f"Detail: {detail}\n\n"
+            body += (
                 "Hinweis: Auf Windows wird WIA genutzt; ohne unterstütztes Gerät "
                 "bitte „Bilder importieren…“ verwenden.\n\n"
-                + WINDOWS_SCAN_DEPS_HINT,
+                + WINDOWS_SCAN_DEPS_HINT
             )
+            QMessageBox.information(self, "Scan", body)
             return
         self._pending_images.extend(paths)
         self._update_pending_label()

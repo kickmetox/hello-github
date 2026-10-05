@@ -1,9 +1,12 @@
-InstantLens Doc 2.6.36 - Installation
+InstantLens Doc 2.6.38 - Installation
 
-Neu in 2.6.36:
-- Sync: -Dest frischer Ordner (z.B. InstantLensDoc-2635) wenn Altbau gesperrt
-- ForceClean: Keygen skip-or-retry; build-windows-installer.ps1 im Pack Pflicht
-- build-windows.ps1: PyInstaller-Probe mit klarem pip install + Import-Fehlertext
+Neu in 2.6.38:
+- Scanner/Drucker-Erkennung Windows gehaertet (Get-Printer, WIA/PnP/TWAIN)
+- Menue Geraete (Scanner / Drucker / Erkennen); klare DE-Treiberhinweise
+- Scan-Acquire ohne Crash; Tesseract-Pfad-Autodetect; PyInstaller PrintSupport/devices
+
+Basis 2.6.36/2.6.35:
+- EXE Relative-Import Fix (run_instantlensdoc.py); Sync -Dest Fresh / Ordner-Sperre
 
 Basis 2.6.34/2.6.33:
 - Keygen PYTHONPATH Parent/Vendor; run.bat ASCII-safe; EXE-Layout Prefer

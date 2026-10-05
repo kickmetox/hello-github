@@ -2857,13 +2857,15 @@ class MainWindow(QMainWindow):
             if title == "Scannen / Import…":
                 a.setToolTip(
                     "Scanner oder Bilder importieren · Tesseract-OCR · "
-                    "Geräte lokal/Netzwerk — 2.6.5"
+                    "Geräte lokal/Netzwerk — 2.6.38"
                 )
                 a.setShortcut(QKeySequence("Ctrl+Alt+Shift+I"))
+                a.setObjectName("actScanImport")
             if title == "Drucker & Scanner…":
                 a.setToolTip(
-                    "Lokale und Netzwerk-Drucker/Scanner auflisten · Aktualisieren — 2.6.5"
+                    "Lokale und Netzwerk-Drucker/Scanner auflisten · Aktualisieren — 2.6.38"
                 )
+                a.setObjectName("actDevicesDialog")
             if title == "Text bearbeiten…":
                 a.setToolTip(
                     "Inline-Textbearbeitung: Klick/Doppelklick auf Text · "
@@ -3031,6 +3033,45 @@ class MainWindow(QMainWindow):
                 )
             a.triggered.connect(slot)
             m_pdf.addAction(a)
+
+        # Geraete-Menue: Scanner / Drucker / Erkennung — 2.6.38
+        m_devices = mb.addMenu("&Geräte")
+        m_devices.setObjectName("menuDevices")
+        m_devices.setToolTip(
+            "Scanner, Drucker und lokale/Netzwerk-Geraeteerkennung — 2.6.38"
+        )
+        act_dev_scan = QAction("Scanner / Scannen…", self)
+        act_dev_scan.setObjectName("actDevicesScanner")
+        act_dev_scan.setToolTip(
+            "Scan-Dialog: WIA/SANE oder Bilder · Tesseract-OCR "
+            "(Shortcut: Ctrl+Alt+Shift+I) — 2.6.38"
+        )
+        act_dev_scan.triggered.connect(self._run_scan_import)
+        m_devices.addAction(act_dev_scan)
+        act_dev_printers = QAction("Drucker…", self)
+        act_dev_printers.setObjectName("actDevicesPrinters")
+        act_dev_printers.setToolTip(
+            "Lokale und Netzwerk-Drucker auflisten (Qt/Winspool/Get-Printer) — 2.6.38"
+        )
+        act_dev_printers.triggered.connect(
+            lambda: self._show_devices_dialog(filter_kind="printer")
+        )
+        m_devices.addAction(act_dev_printers)
+        act_dev_all = QAction("Geräte erkennen…", self)
+        act_dev_all.setObjectName("actDevicesDiscover")
+        act_dev_all.setToolTip(
+            "Drucker & Scanner neu suchen (lokal + Netzwerk) — 2.6.38"
+        )
+        act_dev_all.triggered.connect(self._show_devices_dialog)
+        m_devices.addAction(act_dev_all)
+        m_devices.addSeparator()
+        act_dev_refresh = QAction("Aktualisieren / Neu suchen", self)
+        act_dev_refresh.setObjectName("actDevicesRefresh")
+        act_dev_refresh.setToolTip("Geräteliste sofort neu laden — 2.6.38")
+        act_dev_refresh.triggered.connect(
+            lambda: self._show_devices_dialog(auto_refresh=True)
+        )
+        m_devices.addAction(act_dev_refresh)
 
         m_ins = mb.addMenu("&Einfügen")
         a = QAction("Textrahmen", self)
@@ -15190,21 +15231,39 @@ class MainWindow(QMainWindow):
         self._set_status(f"Bild eingefügt: {Path(path).name}")
 
     def _run_scan_import(self):
-        """Scan/Import-Dialog: Scanner oder Bilder · Tesseract-OCR — 2.6.5."""
-        if hasattr(self.pdf_view, "scan_import_dialog"):
-            self.pdf_view.scan_import_dialog()
-        else:
+        """Scan/Import-Dialog: Scanner oder Bilder · Tesseract-OCR — 2.6.38."""
+        try:
+            if hasattr(self.pdf_view, "scan_import_dialog"):
+                self.pdf_view.scan_import_dialog()
+            else:
+                from instantlensdoc.ui.scan_dialog import ScanDialog
+
+                ScanDialog(self.pdf_view, self).exec()
+        except Exception as e:
+            from PySide6.QtWidgets import QMessageBox
+
+            QMessageBox.warning(
+                self,
+                "Scannen / Import",
+                f"Scan-Dialog konnte nicht geöffnet werden:\n{e}\n\n"
+                "Bitte Tesseract/WIA-Treiber prüfen oder App neu starten.",
+            )
+
+    def _show_devices_dialog(self, filter_kind: str | None = None, auto_refresh: bool = False):
+        """Drucker- & Scannerliste mit Aktualisieren (lokal + Netzwerk) — 2.6.38."""
+        from PySide6.QtWidgets import QDialogButtonBox, QMessageBox
+
+        try:
             from instantlensdoc.ui.scan_dialog import ScanDialog
 
-            ScanDialog(self.pdf_view, self).exec()
-
-    def _show_devices_dialog(self):
-        """Drucker- & Scannerliste mit Aktualisieren (lokal + Netzwerk) — 2.6.5."""
-        from PySide6.QtWidgets import QDialogButtonBox
-
-        from instantlensdoc.ui.scan_dialog import ScanDialog
-
-        dlg = ScanDialog(self.pdf_view, self)
+            dlg = ScanDialog(self.pdf_view, self)
+        except Exception as e:
+            QMessageBox.warning(
+                self,
+                "Geräte",
+                f"Geräte-Dialog fehlgeschlagen:\n{e}",
+            )
+            return
         dlg.setWindowTitle("Drucker & Scanner")
         dlg.setObjectName("devicesDialog")
         dlg.btn_acquire.setVisible(False)
@@ -15212,10 +15271,35 @@ class MainWindow(QMainWindow):
         dlg.ocr_enabled.setVisible(False)
         dlg.lang_combo.setVisible(False)
         dlg.tess_hint.setVisible(False)
+        for _w in (
+            getattr(dlg, "layout_hocr", None),
+            getattr(dlg, "layout_tsv", None),
+            getattr(dlg, "word_suite_check", None),
+        ):
+            if _w is not None:
+                try:
+                    _w.setVisible(False)
+                except Exception:
+                    pass
         dlg.pending_label.setText(
             "Druckerliste für Druckziele · Scanner für Scan-Dialog. "
-            "Aktualisieren / Neu suchen. — 2.6.5"
+            "Aktualisieren / Neu suchen. — 2.6.38"
         )
+        if filter_kind == "printer":
+            idx = dlg.filter_combo.findData("printer")
+            if idx >= 0:
+                dlg.filter_combo.setCurrentIndex(idx)
+            dlg.setWindowTitle("Drucker")
+        elif filter_kind == "scanner":
+            idx = dlg.filter_combo.findData("scanner")
+            if idx >= 0:
+                dlg.filter_combo.setCurrentIndex(idx)
+            dlg.setWindowTitle("Scanner")
+        if auto_refresh:
+            try:
+                dlg.refresh_devices()
+            except Exception:
+                pass
         bbox = dlg.findChild(QDialogButtonBox)
         if bbox is not None:
             ok = bbox.button(QDialogButtonBox.Ok)
