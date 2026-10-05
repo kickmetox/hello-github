@@ -16,12 +16,14 @@ from PySide6.QtGui import (
     QTextCharFormat,
     QTextCursor,
     QTransform,
+    QWheelEvent,
 )
 from PySide6.QtWidgets import (
     QColorDialog,
     QComboBox,
     QFileDialog,
     QFontDialog,
+    QFrame,
     QGraphicsItem,
     QGraphicsPathItem,
     QGraphicsRectItem,
@@ -37,6 +39,17 @@ from PySide6.QtWidgets import (
     QToolButton,
     QVBoxLayout,
     QWidget,
+)
+
+from instantlensdoc.dtp.chrome import (
+    BLEED_RED,
+    MARGIN_BLUE,
+    PASTEBOARD,
+    RULER_BG,
+    build_icon_bar,
+    build_menu_bar,
+    build_status_bar,
+    MmRuler,
 )
 
 from instantlensdoc.dtp.geometry import snap_point, snap_value
@@ -467,28 +480,29 @@ class DtpScene(QGraphicsScene):
         self.clear()
         self._items.clear()
         g = self.doc.geometry
-        self.setSceneRect(0, 0, g.width_pt + PAGE_OFFSET * 2, g.height_pt + PAGE_OFFSET * 2)
-        # page paper
+        extra = 320.0
+        self.setSceneRect(0, 0, g.width_pt + PAGE_OFFSET + extra, g.height_pt + PAGE_OFFSET + 80)
+        self.setBackgroundBrush(QBrush(QColor(PASTEBOARD)))
         paper = QGraphicsRectItem(PAGE_OFFSET, PAGE_OFFSET, g.width_pt, g.height_pt)
         paper.setBrush(QBrush(QColor("#ffffff")))
-        paper.setPen(QPen(QColor("#888"), 1.0))
+        paper.setPen(Qt.NoPen)
         paper.setZValue(-20)
         paper.setFlag(QGraphicsItem.ItemIsSelectable, False)
         paper.setFlag(QGraphicsItem.ItemIsMovable, False)
         self.addItem(paper)
-        # bleed
-        if g.bleed_pt:
-            bleed = QGraphicsRectItem(
-                PAGE_OFFSET - g.bleed_pt,
-                PAGE_OFFSET - g.bleed_pt,
-                g.width_pt + 2 * g.bleed_pt,
-                g.height_pt + 2 * g.bleed_pt,
-            )
-            bleed.setBrush(Qt.NoBrush)
-            bleed.setPen(QPen(QColor("#E67E22"), 0.6, Qt.DotLine))
-            bleed.setZValue(-19)
-            self.addItem(bleed)
-        # margins / satzspiegel
+        bleed_pad = max(0.0, float(g.bleed_pt or 0.0))
+        bleed = QGraphicsRectItem(
+            PAGE_OFFSET - bleed_pad,
+            PAGE_OFFSET - bleed_pad,
+            g.width_pt + 2 * bleed_pad,
+            g.height_pt + 2 * bleed_pad,
+        )
+        bleed.setBrush(Qt.NoBrush)
+        bleed.setPen(QPen(QColor(BLEED_RED), 1.0))
+        bleed.setZValue(-19)
+        bleed.setData(0, "bleed")
+        self.addItem(bleed)
+        self.bleed_item = bleed
         margin = QGraphicsRectItem(
             PAGE_OFFSET + g.margin_left_pt,
             PAGE_OFFSET + g.margin_top_pt,
@@ -496,9 +510,11 @@ class DtpScene(QGraphicsScene):
             g.height_pt - g.margin_top_pt - g.margin_bottom_pt,
         )
         margin.setBrush(Qt.NoBrush)
-        margin.setPen(QPen(QColor("#27AE60"), 0.7, Qt.DashLine))
+        margin.setPen(QPen(QColor(MARGIN_BLUE), 1.0))
         margin.setZValue(-18)
+        margin.setData(0, "margin")
         self.addItem(margin)
+        self.margin_item = margin
         if self.doc.grid_visible:
             step = self.doc.grid_pt()
             x = 0.0
@@ -586,7 +602,8 @@ class DtpView(QGraphicsView):
         super().__init__(scene, parent)
         self.setRenderHint(QPainter.Antialiasing, True)
         self.setDragMode(QGraphicsView.RubberBandDrag)
-        self.setBackgroundBrush(QBrush(QColor("#C5CCD6")))
+        self.setBackgroundBrush(QBrush(QColor(PASTEBOARD)))
+        self.setFrameShape(QFrame.NoFrame)
         self.ink_mode = False
         self.recognize_on_finish = False
         self._stroke: list[list[float]] = []
@@ -649,69 +666,22 @@ class DtpView(QGraphicsView):
             return
         super().mouseReleaseEvent(event)
 
+    def wheelEvent(self, event: QWheelEvent) -> None:  # type: ignore[override]
+        if event.modifiers() & Qt.ControlModifier:
+            pane = self.parent()
+            while pane is not None and not hasattr(pane, "set_zoom"):
+                pane = pane.parent()
+            delta = event.angleDelta().y()
+            if pane is not None and delta:
+                fac = 1.1 if delta > 0 else 1 / 1.1
+                pane.set_zoom(getattr(pane, "_zoom", 100.0) * fac)
+                event.accept()
+                return
+        super().wheelEvent(event)
 
-class _Ruler(QWidget):
-    guideRequested = Signal(str, float)
 
-    def __init__(self, orientation: str, *, thickness: int = 22):
-        super().__init__()
-        self.orientation = orientation  # h | v
-        self._scale = 1.0
-        self._offset = PAGE_OFFSET
-        self._length = 595.0
-        if orientation == "h":
-            self.setFixedHeight(thickness)
-            self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        else:
-            self.setFixedWidth(thickness)
-            self.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
-
-    def set_metrics(self, scale: float, offset: float, length: float) -> None:
-        self._scale = max(0.05, float(scale))
-        self._offset = float(offset)
-        self._length = float(length)
-        self.update()
-
-    def paintEvent(self, event) -> None:  # type: ignore[override]
-        p = QPainter(self)
-        p.fillRect(self.rect(), QColor("#EEF2F6"))
-        p.setPen(QColor("#333"))
-        font = QFont()
-        font.setPointSize(7)
-        p.setFont(font)
-        # ticks every 10 mm ≈ 28.35 pt
-        step = 28.346
-        i = 0
-        while True:
-            pt = i * step
-            if pt > self._length + 1:
-                break
-            pos = self._offset * self._scale + pt * self._scale
-            mm = int(round(pt / 2.8346))
-            if self.orientation == "h":
-                h = 12 if i % 5 == 0 else 6
-                p.drawLine(int(pos), self.height() - h, int(pos), self.height())
-                if i % 5 == 0:
-                    p.drawText(int(pos) + 2, 10, str(mm))
-            else:
-                w = 12 if i % 5 == 0 else 6
-                p.drawLine(self.width() - w, int(pos), self.width(), int(pos))
-                if i % 5 == 0:
-                    p.save()
-                    p.translate(10, int(pos) + 10)
-                    p.rotate(-90)
-                    p.drawText(0, 0, str(mm))
-                    p.restore()
-            i += 1
-        p.end()
-
-    def mousePressEvent(self, event) -> None:  # type: ignore[override]
-        if self.orientation == "h":
-            pt = (event.position().x() / self._scale) - self._offset
-            self.guideRequested.emit("vertical", float(pt))
-        else:
-            pt = (event.position().y() / self._scale) - self._offset
-            self.guideRequested.emit("horizontal", float(pt))
+class _Ruler(MmRuler):
+    """Scribus-mm-Lineal."""
 
 
 class DtpPane(QWidget):
@@ -731,19 +701,15 @@ class DtpPane(QWidget):
         self.scene = DtpScene(self.doc)
         self.view = DtpView(self.scene)
         self.view.strokeFinished.connect(self._on_stroke)
+        self._zoom = 100.0
+        self._pasteboard = PASTEBOARD
+        self.setStyleSheet(
+            "QMenuBar { background:#F6F6F6; border-bottom:1px solid #C8C8C8; padding:1px 6px; }"
+            "QWidget#dtpIconBar { background:#F0F0F0; border-bottom:1px solid #C0C0C0; }"
+        )
         root = QVBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 0)
         root.setSpacing(0)
-        bar = QHBoxLayout()
-        bar.setContentsMargins(4, 2, 4, 2)
-
-        def _btn(label: str, slot, tip: str = "") -> QToolButton:
-            b = QToolButton()
-            b.setText(label)
-            b.setToolTip(tip or label)
-            b.clicked.connect(slot)
-            bar.addWidget(b)
-            return b
 
         self.preset_combo = QComboBox()
         self.preset_combo.setObjectName("dtpPreset")
@@ -754,29 +720,12 @@ class DtpPane(QWidget):
         if idx >= 0:
             self.preset_combo.setCurrentIndex(idx)
         self.preset_combo.currentIndexChanged.connect(self._on_preset)
-        bar.addWidget(self.preset_combo)
-        _btn("◀", self.prev_page, "Vorherige Seite")
-        _btn("▶", self.next_page, "Nächste Seite")
-        _btn("+Seite", self.add_page, "Seite hinzufügen")
-        _btn("Textrahmen", self.add_text_frame, "Textrahmen einfügen (Doppelklick = Caret)")
-        _btn("Bildrahmen", self.add_image_frame, "Bildrahmen; Doppelklick ersetzt")
-        _btn("Form", self.add_shape, "Rechteck")
-        _btn("Verketten", self.link_selected, "Zwei Textrahmen verketten und umbrechen")
-        _btn("Import", self.import_text, "TXT/MD/DOCX/OCR in Rahmen")
-        _btn("Bild…", self.replace_image, "Bild in ausgewählten Rahmen")
-        _btn("Grafik", self.import_graphic, "AI/IDML/EPS/SVG/PSD/TIFF/KRA")
-        _btn("Spalten", self.make_columns, "Spaltenkette auf der Seite")
-        _btn("Raster", self.toggle_grid, "Raster ein/aus")
-        _btn("Links", lambda: self.align("left"), "Links ausrichten")
-        _btn("Mitte", lambda: self.align("center"), "Horizontal zentrieren")
-        _btn("Verteilen", lambda: self.distribute("h"), "Horizontal verteilen")
         self.style_combo = QComboBox()
         self.style_combo.setObjectName("dtpStyle")
         self.style_combo.setToolTip("Absatz-/Zeichenformat")
         for sid, st in self.doc.styles.items():
             self.style_combo.addItem(f"{st.id} ({st.kind})", sid)
         self.style_combo.currentIndexChanged.connect(self._on_style)
-        bar.addWidget(self.style_combo)
         self.wrap_combo = QComboBox()
         self.wrap_combo.setObjectName("dtpWrap")
         self.wrap_combo.setToolTip("Textumfluss auf Auswahl, sonst alle Objekte")
@@ -789,47 +738,29 @@ class DtpPane(QWidget):
             self.wrap_combo.addItem(label, mode)
         self._block_wrap = False
         self.wrap_combo.currentIndexChanged.connect(self._on_wrap)
-        bar.addWidget(self.wrap_combo)
-        _btn("Füllen", lambda: self.apply_fill(dialog=True), "Füllfarbe auf Auswahl / alle")
-        _btn("Kontur", lambda: self.apply_stroke(dialog=True), "Kontur auf Auswahl / alle")
-        _btn("Schrift", lambda: self.apply_font(dialog=True), "Schrift auf Caret/Auswahl/Story")
         self.master_combo = QComboBox()
         self.master_combo.setObjectName("dtpMaster")
         self.master_combo.setToolTip("Musterseite auf aktuelle Seite anwenden")
         self._reload_masters()
         self.master_combo.currentIndexChanged.connect(self._on_master)
-        bar.addWidget(self.master_combo)
-        _btn("Envelope", self.apply_envelope, "Envelope Distort auf Auswahl")
-        _btn("3D", self.apply_extrude, "Extrusion auf Auswahl")
-        _btn("Pfadtext", self.apply_text_on_path, "Text auf Ellipse/Linie")
-        _btn("Outlines", self.convert_to_outlines, "Text in Pfade umwandeln")
-        _btn("Clip", self.apply_clip_mask, "Auswahl: Inhalt + Maske")
-        _btn("Füllung", self.apply_live_fill, "Verlauf + Schatten")
-        _btn("Glyphen", self.show_glyph_palette, "Glyphen-Palette")
-        self._ink_btn = _btn("Stift", self.toggle_ink, "Drucksensitiver Stift")
-        self._ink_btn.setCheckable(True)
-        _btn("Erkennen", self.recognize_selected_ink, "Tinte → Form")
-        _btn("Schweißen", self.weld_selected, "Boolean-Union, kein Gruppe")
-        _btn("Symbol", self.symbol_from_selection, "Verknüpfter Master-Klon")
-        _btn("Preflight", self.run_preflight, "Schriften/Low-Res")
-        _btn("PDF/X", self.export_pdfx_dialog, "PDF/X-3")
-        _btn("PDF", self.export_pdf_dialog, "Layout als PDF (QPdfWriter)")
-        bar.addStretch(1)
-        self._info = QLabel("")
-        bar.addWidget(self._info)
-        root.addLayout(bar)
+
+        self.menu_bar = build_menu_bar(self)
+        root.addWidget(self.menu_bar)
+        self.icon_bar = build_icon_bar(self)
+        root.addWidget(self.icon_bar)
 
         body = QHBoxLayout()
         body.setSpacing(0)
         col = QVBoxLayout()
         col.setSpacing(0)
-        self.h_ruler = _Ruler("h")
-        self.v_ruler = _Ruler("v")
+        self.h_ruler = _Ruler("h", thickness=20)
+        self.v_ruler = _Ruler("v", thickness=20)
         self.h_ruler.guideRequested.connect(self._add_guide)
         self.v_ruler.guideRequested.connect(self._add_guide)
         corner = QWidget()
-        corner.setFixedSize(22, 22)
-        corner.setStyleSheet("background:#EEF2F6;")
+        corner.setObjectName("dtpRulerCorner")
+        corner.setFixedSize(20, 20)
+        corner.setStyleSheet(f"background:{RULER_BG};")
         top = QHBoxLayout()
         top.setContentsMargins(0, 0, 0, 0)
         top.setSpacing(0)
@@ -843,7 +774,9 @@ class DtpPane(QWidget):
         mid.addWidget(self.view, 1)
         col.addLayout(mid, 1)
         body.addLayout(col, 1)
-        side = QVBoxLayout()
+        self.side_panel = QWidget()
+        self.side_panel.setObjectName("dtpLayersPanel")
+        side = QVBoxLayout(self.side_panel)
         side.setContentsMargins(4, 4, 4, 4)
         side.addWidget(QLabel("Ebenen"))
         self.layer_list = QListWidget()
@@ -864,10 +797,16 @@ class DtpPane(QWidget):
         _ly_btns.addWidget(up)
         _ly_btns.addWidget(dn)
         side.addLayout(_ly_btns)
-        body.addLayout(side)
+        self.side_panel.setVisible(False)
+        body.addWidget(self.side_panel)
         root.addLayout(body, 1)
+        self.status_bar = build_status_bar(self)
+        root.addWidget(self.status_bar)
+        self.view.horizontalScrollBar().valueChanged.connect(self._sync_rulers)
+        self.view.verticalScrollBar().valueChanged.connect(self._sync_rulers)
         self._refresh_info()
         self._reload_layers()
+        self._sync_rulers()
 
     def set_document(self, doc: DtpDocument) -> None:
         self.doc = doc
@@ -1202,9 +1141,15 @@ class DtpPane(QWidget):
 
     def _refresh_info(self) -> None:
         g = self.doc.geometry
+        page_txt = f"{self.doc.current_page + 1} von {self.doc.page_count}"
         self._info.setText(
-            f"{g.name} · {g.width_pt:.0f}×{g.height_pt:.0f} pt · Seite {self.doc.current_page + 1}/{self.doc.page_count}"
+            f"{g.name} · {g.width_pt:.0f}×{g.height_pt:.0f} pt"
         )
+        if hasattr(self, "_page_label"):
+            self._page_label.setText(page_txt)
+        if hasattr(self, "_zoom_label"):
+            self._zoom_label.setText(f"{self._zoom:.2f} %")
+        self._sync_rulers()
 
     def add_text_frame(self) -> DtpFrame:
         fr = self.doc.add_text_frame("Neuer Text", page=self.doc.current_page)
@@ -1602,3 +1547,86 @@ class DtpPane(QWidget):
 
         dest = export_pdfx3(self.doc, path)
         self.statusMessage.emit(f"PDF/X-3: {dest}")
+
+    def export_sla_dialog(self) -> None:
+        path, _ = QFileDialog.getSaveFileName(self, "DTP als SLA", "layout.sla", "Scribus (*.sla)")
+        if not path:
+            return
+        from instantlensdoc.dtp.sla import export_sla
+
+        dest = export_sla(self.doc, path)
+        self.statusMessage.emit(f"SLA: {dest}")
+
+    def insert_text_table(self) -> None:
+        g = self.doc.geometry
+        cols, rows = 2, 3
+        usable_w = g.width_pt - g.margin_left_pt - g.margin_right_pt
+        usable_h = min(180.0, g.height_pt - g.margin_top_pt - g.margin_bottom_pt)
+        cw, ch = usable_w / cols - 4, usable_h / rows - 4
+        for r in range(rows):
+            for c in range(cols):
+                self.doc.add_text_frame(
+                    "",
+                    x=g.margin_left_pt + c * (cw + 4),
+                    y=g.margin_top_pt + r * (ch + 4),
+                    width=cw,
+                    height=ch,
+                    page=self.doc.current_page,
+                )
+        self.scene.rebuild()
+        self.statusMessage.emit("Tabelle 2×3")
+
+    def toggle_layers(self) -> None:
+        self.side_panel.setVisible(not self.side_panel.isVisible())
+
+    def set_zoom(self, percent: float) -> None:
+        z = max(10.0, min(400.0, float(percent)))
+        self._zoom = z
+        s = z / 100.0
+        self.view.setTransform(QTransform.fromScale(s, s))
+        self._refresh_info()
+
+    def zoom_fit(self) -> None:
+        g = self.doc.geometry
+        self.view.fitInView(
+            QRectF(PAGE_OFFSET - 8, PAGE_OFFSET - 8, g.width_pt + 16, g.height_pt + 16),
+            Qt.KeepAspectRatio,
+        )
+        self._zoom = max(10.0, self.view.transform().m11() * 100.0)
+        self._refresh_info()
+
+    def pick_background(self) -> None:
+        col = QColorDialog.getColor(QColor(self._pasteboard), self, "Hintergrund")
+        if not col.isValid():
+            return
+        self._pasteboard = col.name()
+        self.view.setBackgroundBrush(QBrush(col))
+        self.scene.setBackgroundBrush(QBrush(col))
+        if hasattr(self, "_bg_chip"):
+            self._bg_chip.setStyleSheet(f"background:{self._pasteboard}; border:1px solid #333;")
+
+    def _sync_rulers(self) -> None:
+        if not hasattr(self, "h_ruler"):
+            return
+        scale = self.view.transform().m11() or 1.0
+        origin = self.view.mapFromScene(QPointF(PAGE_OFFSET, PAGE_OFFSET))
+        g = self.doc.geometry
+        self.h_ruler.set_metrics(scale, float(origin.x()), g.width_pt)
+        self.v_ruler.set_metrics(scale, float(origin.y()), g.height_pt)
+
+    def _chrome_new(self) -> None:
+        from instantlensdoc.dtp.presets import apply_book_preset
+
+        doc = DtpDocument(title="Dokument")
+        apply_book_preset(doc, self.doc.geometry.name or "A4")
+        doc.grid_visible = False
+        self.set_document(doc)
+        self.statusMessage.emit("Neues Dokument")
+
+    def _chrome_script(self) -> None:
+        self.statusMessage.emit("Script: Plugin-Hooks (kein Scribus-Scripter)")
+
+    def _chrome_help(self) -> None:
+        self.statusMessage.emit(
+            "Layout-Modus: Menü Datei…Hilfe, mm-Lineale, Anschnitt rot, Satzspiegel blau"
+        )
