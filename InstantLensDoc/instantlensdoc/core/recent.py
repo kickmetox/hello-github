@@ -108,6 +108,14 @@ def remove_recent(path: str | Path, max_items: int | None = None) -> List[str]:
     return load_recent(max_items=limit)
 
 
+def prune_missing_recent(max_items: int | None = None) -> List[str]:
+    """Einträge ohne Datei aus der persistierten Liste entfernen — 2.6.54."""
+    limit = _clamp_max(max_items)
+    kept = [p for p in load_recent(max_items=limit * 2) if Path(p).is_file()]
+    save_recent(kept, max_items=limit)
+    return load_recent(max_items=limit)
+
+
 def clear_recent() -> None:
     save_recent([])
 

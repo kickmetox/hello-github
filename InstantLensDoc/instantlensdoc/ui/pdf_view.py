@@ -44,6 +44,7 @@ from PySide6.QtWidgets import (
     QScrollArea,
     QSizePolicy,
     QSlider,
+    QSpinBox,
     QToolButton,
     QVBoxLayout,
     QWidget,
@@ -728,12 +729,11 @@ class PdfCanvas(QLabel):
         super().clear()
 
     def wheelEvent(self, event):  # noqa: N802
-        """Frame/Canvas-Mausrad: Viewer-Scroll oder Seitenwechsel — 2.6.28.
+        """Frame/Canvas-Mausrad: Zoom (Ctrl), Scroll, Seitenwechsel am Rand — 2.6.54.
 
-        Layout-Frames liegen auf dem Canvas. Rad scrollt die umgebende
-        ``QScrollArea``; ohne Overflow wird an den ``PdfViewer`` zum
-        Seitenwechsel delegiert (Default-Einzelseite / 1S). Continuous bleibt.
-        Trackpad: ``pixelDelta`` wie 2.6.27.
+        Layout-Frames liegen auf dem Canvas. Ohne Ctrl: Continuous/Overflow
+        scrollt die ``QScrollArea``; am oberen/unteren Rand (oder ohne Overflow)
+        wird die Seite gewechselt. Ctrl+Rad = Zoom. Trackpad: ``pixelDelta``.
         """
         pdf_viewer = None
         scroll = None
@@ -746,6 +746,13 @@ class PdfCanvas(QLabel):
                 break
             cur = cur.parentWidget() if hasattr(cur, "parentWidget") else None
             depth += 1
+        if pdf_viewer is not None:
+            try:
+                if pdf_viewer._handle_page_wheel(event):
+                    event.accept()
+                    return
+            except Exception:
+                pass
         delta = 0
         try:
             delta = int(event.pixelDelta().y())
@@ -756,12 +763,10 @@ class PdfCanvas(QLabel):
                 delta = int(event.angleDelta().y())
             except Exception:
                 delta = 0
-        if scroll is not None:
+        if scroll is not None and delta != 0:
             try:
                 bar = scroll.verticalScrollBar()
-                if bar is not None and int(bar.maximum()) > 0 and delta != 0:
-                    step = max(24, int(bar.singleStep()) * 3)
-                    # pixelDelta already in pixels; angleDelta uses step
+                if bar is not None and int(bar.maximum()) > 0:
                     try:
                         px = int(event.pixelDelta().y())
                     except Exception:
@@ -769,14 +774,8 @@ class PdfCanvas(QLabel):
                     if px != 0:
                         bar.setValue(int(bar.value()) - px)
                     else:
+                        step = max(24, int(bar.singleStep()) * 3)
                         bar.setValue(int(bar.value()) + (-step if delta > 0 else step))
-                    event.accept()
-                    return
-            except Exception:
-                pass
-        if pdf_viewer is not None:
-            try:
-                if pdf_viewer._handle_page_wheel(event):
                     event.accept()
                     return
             except Exception:
@@ -2363,7 +2362,18 @@ class PdfCanvas(QLabel):
         super().mouseDoubleClickEvent(event)
 
     def keyPressEvent(self, event):  # noqa: N802
-        """Esc: Apply-Modus / Quick-Stempel abbrechen — 2.4.3."""
+        """Esc: Apply-Modus / Quick-Stempel abbrechen — 2.4.3. Bild auf/ab → Seite — 2.6.54."""
+        if event.key() in (Qt.Key_PageDown, Qt.Key_PageUp):
+            viewer = self.parent()
+            while viewer is not None and not hasattr(viewer, "next_page"):
+                viewer = viewer.parent()
+            if viewer is not None:
+                if event.key() == Qt.Key_PageDown:
+                    viewer.next_page()
+                else:
+                    viewer.prev_page()
+                event.accept()
+                return
         if event.key() == Qt.Key_Escape:
             viewer = self.parent()
             while viewer is not None and not (
@@ -2413,6 +2423,7 @@ class PdfViewer(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.setFocusPolicy(Qt.StrongFocus)
         self._page_count_ready.connect(self._on_page_count_ready)
         self.pdf_path: Optional[Path] = None
         self.page_index = 0
@@ -2535,12 +2546,23 @@ class PdfViewer(QWidget):
 
         toolbar = FlowLayout(margin=2, h_spacing=3, v_spacing=2)
         self._toolbar_layout = toolbar
+        self._page_nav_syncing = False
+        self._page_count_provisional = False
         self.lbl_page = QLabel("—")
+        self.lbl_page.setToolTip("Seite / Seitenanzahl")
+        self.spin_page = QSpinBox()
+        self.spin_page.setRange(1, 1)
+        self.spin_page.setKeyboardTracking(False)
+        self.spin_page.setFixedWidth(64)
+        self.spin_page.setToolTip("Aktuelle Seite — Zahl eingeben oder Pfeile")
+        self.spin_page.valueChanged.connect(self._on_spin_page_changed)
         self.lbl_zoom = QLabel(f"{int(round(self.scale * 100))}%")
-        btn_prev = QPushButton("◀")
-        btn_next = QPushButton("▶")
-        btn_prev.clicked.connect(self.prev_page)
-        btn_next.clicked.connect(self.next_page)
+        self.btn_page_prev = QPushButton("◀")
+        self.btn_page_next = QPushButton("▶")
+        self.btn_page_prev.setToolTip("Seite zurück (Bild auf)")
+        self.btn_page_next.setToolTip("Seite vor (Bild ab)")
+        self.btn_page_prev.clicked.connect(self.prev_page)
+        self.btn_page_next.clicked.connect(self.next_page)
         btn_zoom_in = QPushButton("+")
         btn_zoom_out = QPushButton("−")
         btn_zoom_in.setToolTip("Vergrößern (Ctrl++)")
@@ -3160,9 +3182,10 @@ class PdfViewer(QWidget):
         toolbar.addWidget(self.btn_grid)
         toolbar.addWidget(self.btn_satzspiegel)
 
-        toolbar.addWidget(btn_prev)
+        toolbar.addWidget(self.btn_page_prev)
+        toolbar.addWidget(self.spin_page)
         toolbar.addWidget(self.lbl_page)
-        toolbar.addWidget(btn_next)
+        toolbar.addWidget(self.btn_page_next)
         toolbar.addWidget(btn_undo)
         toolbar.addWidget(btn_redo)
         toolbar.addWidget(btn_hist)
@@ -3250,7 +3273,7 @@ class PdfViewer(QWidget):
                 self.btn_rulers,
                 self.btn_grid,
             ],
-            "nav": [btn_prev, self.lbl_page, btn_next],
+            "nav": [self.btn_page_prev, self.spin_page, self.lbl_page, self.btn_page_next],
             "history": [
                 btn_undo,
                 btn_redo,
@@ -3387,6 +3410,12 @@ class PdfViewer(QWidget):
         std_stamp_sc = QShortcut(QKeySequence("Ctrl+Shift+S"), self)
         std_stamp_sc.setContext(Qt.WidgetWithChildrenShortcut)
         std_stamp_sc.activated.connect(self.arm_standard_stamp)
+        pgdn = QShortcut(QKeySequence(Qt.Key_PageDown), self)
+        pgdn.setContext(Qt.WidgetWithChildrenShortcut)
+        pgdn.activated.connect(self.next_page)
+        pgup = QShortcut(QKeySequence(Qt.Key_PageUp), self)
+        pgup.setContext(Qt.WidgetWithChildrenShortcut)
+        pgup.activated.connect(self.prev_page)
 
     def apply_toolbar_groups(self) -> None:
         """Sichtbarkeit der PDF-Toolbar-Gruppen aus den Einstellungen anwenden."""
@@ -3983,42 +4012,77 @@ class PdfViewer(QWidget):
     def page_by_page_enabled(self) -> bool:
         return bool(self._page_by_page)
 
-    def _wheel_should_flip_page(self) -> bool:
-        """True wenn Rad Seiten wechseln soll (1S oder Default-Einzelseite) — 2.6.28."""
+    def _wheel_delta_y(self, event) -> int:
+        try:
+            d = int(event.pixelDelta().y())
+        except Exception:
+            d = 0
+        if d == 0:
+            try:
+                d = int(event.angleDelta().y())
+            except Exception:
+                d = 0
+        return d
+
+    def _wheel_should_flip_page(self, *, at_edge: bool = False) -> bool:
+        """True wenn Rad Seiten wechseln soll (1S, Default-Einzelseite, Rand) — 2.6.54."""
         if not self.pdf_path or self._continuous_scroll:
             return False
         if self._page_by_page:
             return True
-        # Default-Einzelseite (weder CS noch 1S): Rad → Seite, außer Zoom-Overflow
         try:
             bar = self.scroll.verticalScrollBar()
             if bar is not None and int(bar.maximum()) > 0:
-                return False  # Zoom/Overflow: natives Scrollen behalten
+                return bool(at_edge)
         except Exception:
             pass
         return True
 
     def _handle_page_wheel(self, event) -> bool:
-        """Mausrad → prev/next page. True wenn verarbeitet — 2.6.28 / Trackpad 2.6.27."""
-        if not self._wheel_should_flip_page():
+        """Mausrad: Ctrl=Zoom, Continuous=Scroll (Seite folgt), Einzelseite=Blättern — 2.6.54.
+
+        True wenn das Event vollständig verarbeitet wurde (nicht weiterreichen).
+        """
+        if not self.pdf_path:
             return False
-        delta = 0
         try:
-            delta = int(event.pixelDelta().y())
+            mods = event.modifiers()
         except Exception:
-            delta = 0
+            mods = Qt.NoModifier
+        if mods & Qt.ControlModifier:
+            delta = self._wheel_delta_y(event)
+            if delta > 0:
+                self.zoom_in()
+                return True
+            if delta < 0:
+                self.zoom_out()
+                return True
+            return False
+        if self._continuous_scroll:
+            # Native ScrollArea-Bewegung; ``_on_continuous_scroll`` setzt current_page.
+            return False
+        delta = self._wheel_delta_y(event)
         if delta == 0:
-            try:
-                delta = int(event.angleDelta().y())
-            except Exception:
-                delta = 0
+            return False
+        at_edge = False
+        try:
+            bar = self.scroll.verticalScrollBar()
+            if bar is not None and int(bar.maximum()) > 0:
+                if delta < 0 and int(bar.value()) >= int(bar.maximum()):
+                    at_edge = True
+                elif delta > 0 and int(bar.value()) <= int(bar.minimum()):
+                    at_edge = True
+                elif not at_edge:
+                    return False
+        except Exception:
+            at_edge = False
+        if not self._wheel_should_flip_page(at_edge=at_edge):
+            return False
         if delta > 0:
             self.prev_page()
             return True
-        if delta < 0:
-            self.next_page()
-            return True
-        return False
+        self.next_page()
+        return True
 
     def eventFilter(self, obj, event):  # noqa: N802
         """Mausrad → Seite blättern (1S + Default-Einzelseite) — 2.6.28 / Trackpad 2.6.27."""
@@ -4035,6 +4099,17 @@ class PdfViewer(QWidget):
         except Exception:
             pass
         return super().eventFilter(obj, event)
+
+    def keyPressEvent(self, event):  # noqa: N802
+        if self.pdf_path and event.key() == Qt.Key_PageDown:
+            self.next_page()
+            event.accept()
+            return
+        if self.pdf_path and event.key() == Qt.Key_PageUp:
+            self.prev_page()
+            event.accept()
+            return
+        super().keyPressEvent(event)
 
     def set_continuous_scroll(self, enabled: bool):
         """Continuous Scroll: Seiten untereinander statt Einzelseite."""
@@ -4201,9 +4276,7 @@ class PdfViewer(QWidget):
                 new_page = self._continuous_offsets[-1][0]
         if new_page != self.page_index:
             self.page_index = new_page
-            self.lbl_page.setText(
-                self.format_page_label_text(suffix=" (Scroll)")
-            )
+            self._sync_page_nav_widgets(suffix=" (Scroll)")
             self.page_changed.emit(self.page_index)
 
     def _scroll_to_continuous_page(self, page_index: int):
@@ -5678,6 +5751,7 @@ class PdfViewer(QWidget):
             # Kein Katalog-/PDFium-Wait vor Seite 1 — provisional 1, Refresh im BG — 2.6.45
             pages = 1
             self.page_count = pages
+            self._page_count_provisional = True
             self.status.emit("Seite 1 wird angezeigt — Seitenanzahl folgt…")
             if _canceled():
                 self.pdf_path = None
@@ -5895,9 +5969,12 @@ class PdfViewer(QWidget):
                 )
             except Exception:
                 pass
-        if n <= 0 or n == int(self.page_count or 0):
+        if n <= 0 or (n == int(self.page_count or 0) and not getattr(self, "_page_count_provisional", False)):
+            self._page_count_provisional = False
+            self._sync_page_nav_widgets()
             return
         self.page_count = n
+        self._page_count_provisional = False
         try:
             from ild_pdf.limits import SOFT_PAGE_WARN
 
@@ -5906,11 +5983,7 @@ class PdfViewer(QWidget):
             pass
         self.page_changed.emit(self.page_index)
         self.status.emit(f"{n} Seiten erkannt")
-        # Toolbar-Label „1 / N“ ohne erneuten Render nachziehen — 2.6.53
-        try:
-            self.lbl_page.setText(self.format_page_label_text())
-        except Exception:
-            pass
+        self._sync_page_nav_widgets()
         # Thumbs/Outline an echte Seitenzahl anbinden — 2.6.47
         self.document_changed.emit()
         if not self._canvas_has_page_image():
@@ -6347,100 +6420,143 @@ class PdfViewer(QWidget):
             return False
 
     def goto_page(self, page_index: int):
+        self.set_current_page(page_index)
+
+    @property
+    def current_page(self) -> int:
+        """Autoritative aktuelle Seite (0-basiert) — Thumbs, Nav, Spinbox, Rad — 2.6.54."""
+        return int(self.page_index or 0)
+
+    @current_page.setter
+    def current_page(self, value: int) -> None:
+        self.set_current_page(value)
+
+    def _on_spin_page_changed(self, value: int) -> None:
+        if getattr(self, "_page_nav_syncing", False):
+            return
+        self.set_current_page(int(value) - 1)
+
+    def _sync_page_nav_widgets(self, *, suffix: str = "") -> None:
+        """Spinbox + Label + ◀/▶ an ``page_index``/``page_count`` anbinden (kein Loop)."""
+        self._page_nav_syncing = True
+        try:
+            n = max(0, int(self.page_count or 0))
+            idx = max(0, int(self.page_index or 0))
+            if n <= 0:
+                if hasattr(self, "spin_page"):
+                    self.spin_page.setEnabled(False)
+                    self.spin_page.setRange(1, 1)
+                    self.spin_page.setValue(1)
+                if hasattr(self, "lbl_page"):
+                    self.lbl_page.setText("—")
+                if hasattr(self, "btn_page_prev"):
+                    self.btn_page_prev.setEnabled(False)
+                    self.btn_page_next.setEnabled(False)
+                return
+            idx = min(idx, n - 1)
+            if hasattr(self, "spin_page"):
+                self.spin_page.setEnabled(True)
+                self.spin_page.setRange(1, n)
+                self.spin_page.setValue(idx + 1)
+            if hasattr(self, "lbl_page"):
+                self.lbl_page.setText(self.format_page_label_text(suffix=suffix))
+            if hasattr(self, "btn_page_prev"):
+                self.btn_page_prev.setEnabled(idx > 0)
+                self.btn_page_next.setEnabled(idx + 1 < n or bool(
+                    getattr(self, "_page_count_provisional", False)
+                ))
+        except Exception:
+            pass
+        finally:
+            self._page_nav_syncing = False
+
+    def set_current_page(self, page_index: int) -> bool:
+        """Eine Seite ansteuern — einziger Schreibpfad für die aktuelle Seite — 2.6.54.
+
+        Thumbnails, ◀/▶, Spinbox, Tastatur und Mausrad laufen hierüber. ``page_changed``
+        aktualisiert Sidebar-Thumbs; ``_sync_page_nav_widgets`` die Toolbar. Kein Loop:
+        Spinbox-``valueChanged`` ist während des Syncs blockiert.
+        """
+        if getattr(self, "_page_nav_syncing", False):
+            return False
+        if self.pdf_path is None:
+            return False
         idx = int(page_index)
         if idx < 0:
-            return
-        # Provisional page_count=1 (Fast-Open): Thumb-Jump nicht verwerfen — 2.6.47
-        if idx >= int(self.page_count or 0):
-            if self.pdf_path is None:
-                return
-            self.page_count = max(int(self.page_count or 0), idx + 1)
-        if 0 <= idx < self.page_count:
-            old = self.page_index
-            self.page_index = idx
-            if self._search_query:
-                self._rebuild_search_rects(keep_index=False)
-            need_refresh = True
-            if self._continuous_scroll and self._continuous_offsets:
-                in_window = any(p == idx for p, _, _ in self._continuous_offsets)
-                # Fenster neu, wenn Seite außerhalb oder Range sich ändern würde
-                start, end = self._continuous_page_range()
-                if in_window and start <= old < end and start <= idx < end:
-                    # Nur scrollen, wenn Range gleich bleibt
-                    old_start, old_end = self._continuous_offsets[0][0], self._continuous_offsets[-1][0] + 1
-                    if old_start == start and old_end == end:
-                        need_refresh = False
-                        self.lbl_page.setText(
-                            self.format_page_label_text(suffix=" (Scroll)")
-                        )
-                        self._scroll_to_continuous_page(idx)
-            if need_refresh:
-                # Fallback-Zoom wenn Default-Render die Hauptansicht leer lässt — 2.6.40/2.6.47
-                self._ensure_page_painted(warn=False)
-                if self._continuous_scroll:
+            return False
+        n = int(self.page_count or 0)
+        if idx >= n:
+            # Fast-Open / Thumb-Sprung: Count noch 1 — nicht verwerfen, erweitern — 2.6.47/2.6.54
+            if n <= 0 or bool(getattr(self, "_page_count_provisional", False)) or n == 1:
+                self.page_count = max(n, idx + 1)
+            elif idx >= n:
+                return False
+        idx = min(idx, max(0, int(self.page_count or 1) - 1))
+        old = int(self.page_index or 0)
+        self.page_index = idx
+        if self._search_query:
+            self._rebuild_search_rects(keep_index=False)
+        need_refresh = True
+        if self._continuous_scroll and self._continuous_offsets:
+            in_window = any(p == idx for p, _, _ in self._continuous_offsets)
+            start, end = self._continuous_page_range()
+            if in_window and start <= old < end and start <= idx < end:
+                old_start, old_end = self._continuous_offsets[0][0], self._continuous_offsets[-1][0] + 1
+                if old_start == start and old_end == end:
+                    need_refresh = False
                     self._scroll_to_continuous_page(idx)
-            elif not self._canvas_has_page_image():
-                self._ensure_page_painted(warn=False)
+        if need_refresh:
+            self._ensure_page_painted(warn=False)
+            if self._continuous_scroll:
+                self._scroll_to_continuous_page(idx)
+        elif not self._canvas_has_page_image():
+            self._ensure_page_painted(warn=False)
+        self._sync_page_nav_widgets()
+        if idx != old:
             self.page_changed.emit(self.page_index)
+        return True
 
     def prev_page(self):
         if self.page_index <= 0:
             return
         if self._continuous_scroll:
-            self.goto_page(self.page_index - 1)
+            self.set_current_page(self.page_index - 1)
             return
         if self._book_layout:
-            # Cover ← Pair-Start: 1→0, 3→1, … — 2.6.19
             if self.page_index == 1:
                 target = 0
             else:
                 target = max(0, self.page_index - 2)
-            self.page_index = target
-            if self._search_query:
-                self._rebuild_search_rects(keep_index=False)
-            self.refresh()
-            self.page_changed.emit(self.page_index)
+            self.set_current_page(target)
             return
         step = 2 if self._two_page_spread else 1
-        self.page_index = max(0, self.page_index - step)
-        if self._search_query:
-            self._rebuild_search_rects(keep_index=False)
-        self.refresh()
-        self.page_changed.emit(self.page_index)
+        self.set_current_page(max(0, self.page_index - step))
 
     def next_page(self):
-        if self.page_index + 1 >= self.page_count:
+        n = int(self.page_count or 0)
+        if n > 0 and self.page_index + 1 >= n and not getattr(self, "_page_count_provisional", False):
             return
         if self._continuous_scroll:
-            self.goto_page(self.page_index + 1)
+            self.set_current_page(self.page_index + 1)
             return
         if self._book_layout:
-            # Cover → erste Doppelseite (Index 1); danach +2 — 2.6.19
             if self.page_index == 0:
-                target = 1 if self.page_count > 1 else 0
+                target = 1 if n > 1 or getattr(self, "_page_count_provisional", False) else 0
             else:
                 target = self.page_index + 2
-                if target >= self.page_count:
+                if n > 0 and target >= n:
                     target = self.page_index + 1
-            if target >= self.page_count or target == self.page_index:
+            if target == self.page_index:
                 return
-            self.page_index = target
-            if self._search_query:
-                self._rebuild_search_rects(keep_index=False)
-            self.refresh()
-            self.page_changed.emit(self.page_index)
+            if n > 0 and target >= n and not getattr(self, "_page_count_provisional", False):
+                return
+            self.set_current_page(target)
             return
         step = 2 if self._two_page_spread else 1
         target = self.page_index + step
-        if target >= self.page_count:
+        if n > 0 and target >= n:
             target = self.page_index + 1
-        if target >= self.page_count:
-            return
-        self.page_index = target
-        if self._search_query:
-            self._rebuild_search_rects(keep_index=False)
-        self.refresh()
-        self.page_changed.emit(self.page_index)
+        self.set_current_page(target)
 
     def clear_search_highlights(self):
         self._search_query = ""
@@ -13664,3 +13780,83 @@ class PdfViewer(QWidget):
         self.annotations_changed.emit()
         self.document_changed.emit()
         self.zoom_changed.emit(self.scale)
+
+    def open_generation(self) -> int:
+        """Dokument-Token: ändert sich bei jedem ``load``/``unload`` — 2.6.54."""
+        return int(getattr(self, "_open_generation", 0) or 0)
+
+    def unload(self, *, emit: bool = True) -> None:
+        """Dokument aus dem Viewer lösen (Tab schließen / Wechsel) — nie blockierend — 2.6.54.
+
+        Hintergrund: ``close_current_tab`` setzte bisher nur ``pdf_path``/``store``/
+        ``page_count`` zurück. ``page_index``, Seitenlabel („7 / 536“), PageLabels,
+        Canvas-Bild, Fehler-Banner und Suche blieben vom alten Dokument stehen und
+        klebten am nächsten Tab. Ebenso lief Folgearbeit des alten Dokuments weiter
+        (Seitenanzahl-Worker, Paint-Retries, deferred Sidebar).
+
+        * ``_open_generation`` wird erhöht → alle verzögerten Ergebnisse (Worker,
+          ``QTimer``-Retries, ``_deferred_sidebar``) des alten Dokuments werden
+          verworfen; es wird **nicht** auf Threads gewartet und kein PDFium aufgerufen.
+        * Pending-Sidecar-Debounce: nur flushen wenn der Store dirty ist (nach
+          „Verwerfen“ ist er es nicht → kein Zurückschreiben verworfener Änderungen).
+        * Bytes-/Render-Cache des Dokuments wird freigegeben (reine dict-Operation).
+        """
+        self._open_generation = int(getattr(self, "_open_generation", 0) or 0) + 1
+        old_path = self.pdf_path
+        try:
+            store = self.store
+            if store is not None and bool(getattr(store, "dirty", False)):
+                self.flush_sidecar_save()
+            else:
+                self._sidecar_save_timer.stop()
+                self._sidecar_save_pending = False
+        except Exception:
+            pass
+        try:
+            self._zoom_timer.stop()
+            self._pending_scale = None
+        except Exception:
+            pass
+        self.pdf_path = None
+        self.store = None
+        self.password = None
+        self.page_count = 0
+        self.page_index = 0
+        self._page_count_provisional = False
+        self._page_labels = []
+        self._pending_callout_anchor = None
+        self._selected_ann_id = None
+        self._selected_ann_ids = set()
+        self._blank_view_fallback_active = False
+        self._last_render_blank_ok = False
+        self._last_refresh_error = None
+        try:
+            self.clear_search_highlights()
+        except Exception:
+            pass
+        try:
+            self.clear_page_ops_undo()
+        except Exception:
+            pass
+        try:
+            self.canvas.set_selected_id(None)
+            self.canvas.reset_page_image()
+        except Exception:
+            pass
+        try:
+            self._sync_page_nav_widgets()
+        except Exception:
+            try:
+                self.lbl_page.setText("—")
+            except Exception:
+                pass
+        if old_path is not None:
+            try:
+                from ild_pdf.render import clear_render_cache
+
+                clear_render_cache(old_path)
+            except Exception:
+                pass
+        if emit:
+            self.annotations_changed.emit()
+            self.document_changed.emit()

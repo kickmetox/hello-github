@@ -608,7 +608,8 @@ class WelcomePage(QWidget):
         act_paste_tags = menu.addAction("Tags einfügen\tCtrl+V")
         act_copy_path = menu.addAction("Pfad kopieren\tCtrl+Shift+C")
         menu.addSeparator()
-        act_remove = menu.addAction("Entfernen\tEntf")
+        act_remove = menu.addAction("Aus Liste entfernen\tEntf")
+        act_clear = menu.addAction("Liste leeren")
         act_folder = menu.addAction("Ordner öffnen\tF4")
         act_file = menu.addAction("Datei öffnen\tF5")
         chosen = menu.exec(self.recent_list.mapToGlobal(pos))
@@ -630,6 +631,8 @@ class WelcomePage(QWidget):
             self._copy_path_for_recent(str(path))
         elif chosen is act_remove:
             self.recent_remove_requested.emit(str(path))
+        elif chosen is act_clear:
+            self.clear_recent_requested.emit()
         elif chosen is act_folder:
             self._open_containing_folder(str(path))
         elif chosen is act_file:

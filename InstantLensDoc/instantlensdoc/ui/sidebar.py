@@ -293,6 +293,25 @@ class ThumbnailList(QListWidget):
         if order:
             self.pages_reordered.emit(order)
 
+    def keyPressEvent(self, event):  # noqa: N802
+        """Bild auf/ab und Pfeile blättern die PDF-Seite, nicht nur die Liste — 2.6.54."""
+        key = event.key()
+        if key in (Qt.Key_PageDown, Qt.Key_PageUp, Qt.Key_Right, Qt.Key_Left):
+            win = self.window()
+            pv = getattr(win, "pdf_view", None) if win is not None else None
+            if pv is not None and getattr(pv, "pdf_path", None):
+                if key in (Qt.Key_PageDown, Qt.Key_Right):
+                    pv.next_page()
+                else:
+                    pv.prev_page()
+                try:
+                    pv.canvas.setFocus(Qt.OtherFocusReason)
+                except Exception:
+                    pass
+                event.accept()
+                return
+        super().keyPressEvent(event)
+
 
 class PageFavoriteList(QListWidget):
     """Nummerierte PDF-Favoriten; Drag InternalMove → neue Reihenfolge."""
@@ -445,6 +464,8 @@ class Sidebar(QWidget):
     file_activated = Signal(str)
     recent_activated = Signal(str)
     recent_remove_requested = Signal(str)  # Pfad aus Recent entfernen
+    recent_clear_requested = Signal()  # ganze Liste leeren — 2.6.54
+    recent_prune_requested = Signal()  # fehlende Dateien streichen — 2.6.54
     search_requested = Signal(str)
     search_next_requested = Signal()
     search_prev_requested = Signal()
@@ -643,8 +664,8 @@ class Sidebar(QWidget):
         self.recent = QListWidget()
         self.recent.setMaximumHeight(90)
         self.recent.setToolTip(
-            "Zuletzt geöffnet — Doppelklick öffnet; fehlende Dateien grau; "
-            "Rechtsklick → Entfernen"
+            "Zuletzt geöffnet — Doppelklick öffnet; fehlende Dateien werden beim "
+            "Aktualisieren entfernt; Rechtsklick: Aus Liste entfernen / Liste leeren"
         )
         self.recent.setContextMenuPolicy(Qt.CustomContextMenu)
         self.recent.customContextMenuRequested.connect(self._recent_context_menu)
@@ -1268,25 +1289,29 @@ class Sidebar(QWidget):
 
     def _recent_context_menu(self, pos):
         item = self.recent.itemAt(pos)
-        if item is None:
-            return
-        path = item.data(Qt.UserRole)
-        if path is None:
-            path = item.data(256)
-        if not path:
-            return
         menu = QMenu(self)
-        exists = item.data(Qt.UserRole + 1)
-        if exists is not False and Path(str(path)).is_file():
-            act_open = menu.addAction("Öffnen")
-        else:
-            act_open = None
-        act_remove = menu.addAction("Entfernen")
+        act_open = None
+        act_remove = None
+        path = None
+        if item is not None:
+            path = item.data(Qt.UserRole)
+            if path is None:
+                path = item.data(256)
+            if path:
+                exists = item.data(Qt.UserRole + 1)
+                if exists is not False and Path(str(path)).is_file():
+                    act_open = menu.addAction("Öffnen")
+                act_remove = menu.addAction("Aus Liste entfernen")
+                menu.addSeparator()
+        act_clear = menu.addAction("Liste leeren")
+        act_clear.setToolTip("Persistierte Liste der zuletzt geöffneten Dateien leeren")
         chosen = menu.exec(self.recent.mapToGlobal(pos))
-        if act_open is not None and chosen is act_open:
+        if act_open is not None and chosen is act_open and path:
             self.recent_activated.emit(str(path))
-        elif chosen is act_remove:
+        elif act_remove is not None and chosen is act_remove and path:
             self.recent_remove_requested.emit(str(path))
+        elif chosen is act_clear:
+            self.recent_clear_requested.emit()
 
     def _activate_mark(self, item: QListWidgetItem):
         row = self.marks.row(item)

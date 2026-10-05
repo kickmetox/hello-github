@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import json
+import time
 from pathlib import Path
 
 from PySide6.QtCore import QEvent, Qt, QTimer, Signal
-from PySide6.QtGui import QAction, QColor, QIcon, QKeySequence
+from PySide6.QtGui import QAction, QColor, QIcon, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QCheckBox,
@@ -257,6 +258,17 @@ class MainWindow(QMainWindow):
         self._batch_save_quiet: bool = False  # Alle-speichern: Einzeldialoge unterdrücken
         # Last-Page / Scroll je Tab (path_key → {page, scale, scroll_y}) — 0.9.1
         self._tab_view_state: dict[str, dict] = {}
+        # Geparste Dokumente offener Tabs (path_key → (signatur, Document)) — Tab-Wechsel /
+        # Schließen des Nachbar-Tabs importiert DOCX/RTF/XLSX nicht erneut — 2.6.54
+        self._doc_cache: dict[str, tuple[tuple[int, int], Document]] = {}
+        # Seitengröße-Statustext je (pdf, mtime, seite, einheit) — kein pikepdf-Open pro
+        # Statusupdate (bis zu 7× je Tab-Wechsel) — 2.6.54
+        self._page_size_cache: dict[tuple, str] = {}
+        self._thumb_lazy_open_gen: int = 0  # Dokument-Token des Thumb-Laufs — 2.6.54
+        self._doc_tab_bar_sync_pending = False
+        self._last_tab_close_ms: float = 0.0  # Diagnose: Dauer des letzten Tab-Schließens
+        self._editor_only_actions: list = []
+        self._editor_only_menus: list = []
         self._last_backup_path = None  # Pfad der letzten Backup-Datei — 1.0.1
         self._last_outline_export_dir = None  # Zielordner Outlines-Export — 1.3.4
         self._last_text_pdf_status_path = None  # Text→PDF Status-Klick → Ordner — 1.7.4
@@ -382,6 +394,11 @@ class MainWindow(QMainWindow):
         if not self._confirm_close_current(allow_discard=True, quitting=True):
             event.ignore()
             return
+        # Hintergrund-Thumbs stoppen; kein Warten auf Worker (Daemon-Threads) — 2.6.54
+        try:
+            self._stop_thumb_lazy()
+        except Exception:
+            pass
         try:
             self._save_window_geometry()
         except Exception:
@@ -609,6 +626,75 @@ class MainWindow(QMainWindow):
                     pass
 
             QTimer.singleShot(0, _apply_ed_scroll)
+
+    # ---- Tab-Dokument-Cache (geparste Nicht-PDF-Dokumente offener Tabs) — 2.6.54 ----
+    _DOC_CACHE_KINDS = (DocKind.DOCX, DocKind.RTF, DocKind.XLSX, DocKind.HTML, DocKind.TEXT, DocKind.MARKDOWN)
+
+    @staticmethod
+    def _doc_cache_sig(path: str | Path | None) -> tuple[int, int] | None:
+        try:
+            st = Path(str(path)).stat()
+        except (OSError, TypeError, ValueError):
+            return None
+        return (int(st.st_mtime_ns), int(st.st_size))
+
+    def _doc_cache_put(self, path: str | Path | None, doc: Document | None) -> None:
+        """Dokument für diesen Tab merken (nur Kinds mit teurem Import)."""
+        if doc is None or not path:
+            return
+        if getattr(doc, "kind", None) not in self._DOC_CACHE_KINDS:
+            return
+        key = self._path_key(path)
+        sig = self._doc_cache_sig(path)
+        if not key or sig is None:
+            return
+        self._doc_cache[key] = (sig, doc)
+
+    def _doc_cache_get(self, path: str | Path | None) -> Document | None:
+        """Gecachtes Dokument, falls Datei unverändert — oder dirty (Edits gewinnen)."""
+        key = self._path_key(path) if path else None
+        if not key:
+            return None
+        entry = self._doc_cache.get(key)
+        if not entry:
+            return None
+        sig, doc = entry
+        try:
+            if doc.path is None or self._path_key(doc.path) != key:
+                self._doc_cache.pop(key, None)
+                return None
+        except Exception:
+            self._doc_cache.pop(key, None)
+            return None
+        if bool(getattr(doc, "dirty", False)):
+            return doc
+        if self._doc_cache_sig(path) != sig:
+            # Extern geändert → neu importieren
+            self._doc_cache.pop(key, None)
+            return None
+        return doc
+
+    def _doc_cache_store_current(self) -> None:
+        """Aktuelles Dokument vor einem Tab-Wechsel in den Cache legen (inkl. Edits)."""
+        doc = self.doc
+        if doc is None or not doc.path:
+            return
+        if doc.kind not in self._DOC_CACHE_KINDS:
+            return
+        key = self._path_key(doc.path)
+        if not key:
+            return
+        try:
+            if self.stack.currentWidget() is self.editor_pane and self._current_is_dirty():
+                # Editor-Inhalt (Plain + Rich-HTML) in das Dokument übernehmen
+                self._sync_editor_rich_meta()
+        except Exception:
+            pass
+        entry = self._doc_cache.get(key)
+        sig = entry[0] if entry else self._doc_cache_sig(doc.path)
+        if sig is None:
+            return
+        self._doc_cache[key] = (sig, doc)
 
     def _save_session(self):
         self._capture_current_tab_view_state()
@@ -1091,6 +1177,21 @@ class MainWindow(QMainWindow):
         self.sidebar.document_label_reset_requested.connect(self._on_document_label_reset)
         self.sidebar.recent_activated.connect(self.open_path)
         self.sidebar.recent_remove_requested.connect(self._remove_recent_path)
+        if hasattr(self.sidebar, "recent_clear_requested"):
+            self.sidebar.recent_clear_requested.connect(self._clear_recent)
+        if hasattr(self.sidebar, "recent_prune_requested"):
+            self.sidebar.recent_prune_requested.connect(self._prune_missing_recent)
+        # Tab-Leiste spiegelt die Dokumentliste automatisch: jede Änderung am Listen-
+        # Modell (Tab entfernt/hinzugefügt/geleert/umsortiert) synchronisiert die
+        # QTabBar — auch wenn ein Close-Pfad vorher abbricht — 2.6.54
+        try:
+            files_model = self.sidebar.files.model()
+            files_model.rowsInserted.connect(self._schedule_doc_tab_bar_sync)
+            files_model.rowsRemoved.connect(self._schedule_doc_tab_bar_sync)
+            files_model.rowsMoved.connect(self._schedule_doc_tab_bar_sync)
+            files_model.modelReset.connect(self._schedule_doc_tab_bar_sync)
+        except Exception:
+            pass
         self.sidebar.mark_activated.connect(self._on_mark_activated)
         self.sidebar.annotation_activated.connect(self._on_annotation_activated)
         self.sidebar.outline_activated.connect(self._on_outline_jump)
@@ -1185,6 +1286,15 @@ class MainWindow(QMainWindow):
         self.pdf_view.redo_annotation = _redo_annotation_with_sticky_clear  # type: ignore[method-assign]
         self.pdf_view.page_favorites_changed.connect(self._refresh_page_favorites)
         self.pdf_view.page_changed.connect(self._on_pdf_page_changed)
+        # PageUp/PageDown auch wenn die Thumbnail-Liste den Fokus hat — 2.6.54
+        self._sc_pdf_page_down = QShortcut(QKeySequence(Qt.Key_PageDown), self)
+        self._sc_pdf_page_down.setContext(Qt.WindowShortcut)
+        self._sc_pdf_page_down.activated.connect(lambda: self._pdf_page_shortcut(1))
+        self._sc_pdf_page_down.setEnabled(False)
+        self._sc_pdf_page_up = QShortcut(QKeySequence(Qt.Key_PageUp), self)
+        self._sc_pdf_page_up.setContext(Qt.WindowShortcut)
+        self._sc_pdf_page_up.activated.connect(lambda: self._pdf_page_shortcut(-1))
+        self._sc_pdf_page_up.setEnabled(False)
         self.pdf_view.zoom_changed.connect(self._on_pdf_zoom_changed)
         self.pdf_view.document_changed.connect(self._on_pdf_document_changed)
         self.pdf_view.grayscale_changed.connect(self._sync_grayscale_action)
@@ -1222,6 +1332,7 @@ class MainWindow(QMainWindow):
         self.stack.currentChanged.connect(lambda *_: self._apply_doc_split_sync_scroll())
         self.stack.currentChanged.connect(lambda *_: self._update_doc_status())
         self.stack.currentChanged.connect(lambda *_: self._sync_editor_toolbar_for_stack())
+        self.stack.currentChanged.connect(lambda *_: self._sync_pdf_page_shortcuts())
         # Beim Start ohne Session: Willkommen zeigen (nach Session-Restore ggf. überschrieben)
         self.stack.setCurrentWidget(self.welcome_page)
         self._sync_editor_toolbar_for_stack()
@@ -1777,22 +1888,22 @@ class MainWindow(QMainWindow):
             "Find/Replace (Word: Ctrl+H) — Editor; PDF via Scripting"
         )
         act_find_repl.triggered.connect(self._find_replace)
-        m_edit.addAction(act_find_repl)
+        m_edit.addAction(self._track_editor_action(act_find_repl))
         act_bold = QAction("Fett", self)
         act_bold.setShortcut(QKeySequence("Ctrl+B"))
         act_bold.setToolTip("Fett (QTextCharFormat) — Word/InDesign — 2.6.49")
         act_bold.triggered.connect(self._toggle_bold)
-        m_edit.addAction(act_bold)
+        m_edit.addAction(self._track_editor_action(act_bold))
         act_italic = QAction("Kursiv", self)
         act_italic.setShortcut(QKeySequence("Ctrl+I"))
         act_italic.setToolTip("Kursiv (QTextCharFormat) — 2.6.49")
         act_italic.triggered.connect(self._toggle_italic)
-        m_edit.addAction(act_italic)
+        m_edit.addAction(self._track_editor_action(act_italic))
         act_underline = QAction("Unterstrichen", self)
         act_underline.setShortcut(QKeySequence("Ctrl+U"))
         act_underline.setToolTip("Unterstrichen (QTextCharFormat, Buchstaben inkl.) — 2.6.49")
         act_underline.triggered.connect(self._toggle_underline)
-        m_edit.addAction(act_underline)
+        m_edit.addAction(self._track_editor_action(act_underline))
         act_auto_fmt = QAction("Automatische Formatierung", self)
         act_auto_fmt.setShortcut(QKeySequence("Ctrl+Alt+Shift+F"))
         act_auto_fmt.setToolTip(
@@ -1826,44 +1937,46 @@ class MainWindow(QMainWindow):
         act_align_l.setShortcut(QKeySequence("Ctrl+L"))
         act_align_l.setToolTip("Absatzausrichtung links — 2.6.11")
         act_align_l.triggered.connect(lambda: self._set_paragraph_alignment("left"))
-        m_edit.addAction(act_align_l)
+        m_edit.addAction(self._track_editor_action(act_align_l))
         act_align_c = QAction("Absatz zentriert", self)
         act_align_c.setShortcut(QKeySequence("Ctrl+E"))
         act_align_c.setToolTip("Absatzausrichtung zentriert — 2.6.11")
         act_align_c.triggered.connect(lambda: self._set_paragraph_alignment("center"))
-        m_edit.addAction(act_align_c)
+        m_edit.addAction(self._track_editor_action(act_align_c))
         act_align_r = QAction("Absatz rechts", self)
         act_align_r.setShortcut(QKeySequence("Ctrl+R"))
         act_align_r.setToolTip(
             "Absatzausrichtung rechts (Ctrl+R; Ersetzen: Ctrl+H) — 2.6.11"
         )
         act_align_r.triggered.connect(lambda: self._set_paragraph_alignment("right"))
-        m_edit.addAction(act_align_r)
+        m_edit.addAction(self._track_editor_action(act_align_r))
         act_align_j = QAction("Absatz Blocksatz", self)
         act_align_j.setShortcut(QKeySequence("Ctrl+J"))
         act_align_j.setToolTip("Absatzausrichtung Blocksatz — 2.6.11")
         act_align_j.triggered.connect(lambda: self._set_paragraph_alignment("justify"))
-        m_edit.addAction(act_align_j)
+        m_edit.addAction(self._track_editor_action(act_align_j))
         act_spacing = QAction("Zeilenabstand 1,5", self)
+        act_spacing.setObjectName("actLineSpacing15")
         act_spacing.setToolTip("Zeilenabstand 1,5 für aktuellen Absatz — 2.6.11")
         act_spacing.triggered.connect(lambda: self._set_paragraph_line_spacing(1.5))
-        m_edit.addAction(act_spacing)
+        m_edit.addAction(self._track_editor_action(act_spacing))
         act_spacing15 = QAction("Zeilenabstand 1,15 (Standard)", self)
+        act_spacing15.setObjectName("actLineSpacing115")
         act_spacing15.triggered.connect(lambda: self._set_paragraph_line_spacing(1.15))
-        m_edit.addAction(act_spacing15)
+        m_edit.addAction(self._track_editor_action(act_spacing15))
         act_tracking = QAction("Laufweite +50 (Tracking)", self)
         act_tracking.setToolTip("Tracking +50/1000 em für aktuellen Absatz — 2.6.13")
         act_tracking.triggered.connect(lambda: self._set_typography(tracking=50.0))
-        m_edit.addAction(act_tracking)
+        m_edit.addAction(self._track_editor_action(act_tracking))
         act_leading = QAction("Durchschuss 1,5 (Leading)", self)
         act_leading.setToolTip("Leading 1,5 für aktuellen Absatz — 2.6.13")
         act_leading.triggered.connect(lambda: self._set_typography(leading=1.5))
-        m_edit.addAction(act_leading)
+        m_edit.addAction(self._track_editor_action(act_leading))
         act_dropcap = QAction("Initial / Drop Cap", self)
         act_dropcap.setShortcut(QKeySequence("Ctrl+Alt+Shift+D"))
         act_dropcap.setToolTip("Drop Cap (3 Zeilen, 1 Zeichen) — 2.6.13")
         act_dropcap.triggered.connect(self._apply_drop_cap)
-        m_edit.addAction(act_dropcap)
+        m_edit.addAction(self._track_editor_action(act_dropcap))
         # Silbentrennung: Menü aller 9 UI-Sprachen (Engine seit 2.6.28) — 2.6.36
         from ild_pdf.typography import HYPHENATION_UI_LANGS
 
@@ -1882,6 +1995,7 @@ class MainWindow(QMainWindow):
         m_hyphen.setToolTip(
             "Intelligente Silbentrennung — alle 9 UI-Sprachen (ZH/AR no-break) — 2.6.36"
         )
+        self._editor_only_menus.append(m_hyphen)
         for _lang in HYPHENATION_UI_LANGS:
             _label = _hyphen_labels.get(_lang, _lang.upper())
             _act = QAction(_label, self)
@@ -2047,12 +2161,12 @@ class MainWindow(QMainWindow):
         act_indent.setShortcut(QKeySequence("Ctrl+]"))
         act_indent.setToolTip("Zeilen/Block einrücken (auch Tab)")
         act_indent.triggered.connect(self._indent_selection)
-        m_edit.addAction(act_indent)
+        m_edit.addAction(self._track_editor_action(act_indent))
         act_outdent = QAction("Einrückung verringern", self)
         act_outdent.setShortcut(QKeySequence("Ctrl+["))
         act_outdent.setToolTip("Zeilen/Block ausrücken (auch Shift+Tab)")
         act_outdent.triggered.connect(self._outdent_selection)
-        m_edit.addAction(act_outdent)
+        m_edit.addAction(self._track_editor_action(act_outdent))
         act_clear_marks = QAction("Markierungen löschen", self)
         act_clear_marks.triggered.connect(self._clear_editor_marks)
         m_edit.addAction(act_clear_marks)
@@ -2076,12 +2190,12 @@ class MainWindow(QMainWindow):
             "leichte Grammatik-Hinweise — 2.6.20"
         )
         act_spell.triggered.connect(self._check_spelling)
-        m_edit.addAction(act_spell)
+        m_edit.addAction(self._track_editor_action(act_spell))
         act_spell_sugg = QAction("Rechtschreibvorschläge…", self)
         act_spell_sugg.setShortcut(QKeySequence("Shift+F7"))
         act_spell_sugg.setToolTip("Unbekannte Wörter mit Korrekturvorschlägen auflisten — 2.6.20")
         act_spell_sugg.triggered.connect(self._show_spell_suggestions)
-        m_edit.addAction(act_spell_sugg)
+        m_edit.addAction(self._track_editor_action(act_spell_sugg))
         act_spell_clear = QAction("Rechtschreibmarkierungen löschen", self)
         act_spell_clear.triggered.connect(self._clear_spelling)
         m_edit.addAction(act_spell_clear)
@@ -2465,7 +2579,7 @@ class MainWindow(QMainWindow):
             "Texteditor — Text bricht in Seitenbreite um (DOCX/Word-Suite) — 2.6.53"
         )
         self._page_layout_action.triggered.connect(self._show_page_layout_dialog)
-        m_view.addAction(self._page_layout_action)
+        m_view.addAction(self._track_editor_action(self._page_layout_action))
         self._special_chars_action = QAction("Sonderzeichen anzeigen", self)
         self._special_chars_action.setCheckable(True)
         from instantlensdoc.core.app_settings import get_editor_show_special_chars
@@ -3500,8 +3614,14 @@ class MainWindow(QMainWindow):
         a = QAction("Info…", self)
         a.triggered.connect(lambda: AboutDialog(self).exec())
         m_help.addAction(a)
+        self._sync_editor_only_actions()
 
     def _refresh_recent(self):
+        # Fehlende Dateien aus der persistierten Liste streichen — 2.6.54
+        try:
+            recent_mod.prune_missing_recent()
+        except Exception:
+            pass
         entries = recent_mod.load_recent_entries()
         self.sidebar.set_recent(entries)
         if hasattr(self, "welcome_page") and self.welcome_page is not None:
@@ -3527,7 +3647,8 @@ class MainWindow(QMainWindow):
                 self._recent_menu.addAction(a)
         self._recent_menu.addSeparator()
         clear = QAction("Liste leeren", self)
-        clear.triggered.connect(self._clear_recent)
+        clear.setToolTip("Persistierte Liste der zuletzt geöffneten Dateien leeren")
+        clear.triggered.connect(lambda *_: self._clear_recent())
         self._recent_menu.addAction(clear)
 
     def _remove_recent_path(self, path: str) -> None:
@@ -3535,6 +3656,15 @@ class MainWindow(QMainWindow):
         recent_mod.remove_recent(path)
         self._refresh_recent()
         self._set_status(f"Aus Zuletzt geöffnet entfernt: {Path(path).name}")
+
+    def _prune_missing_recent(self) -> None:
+        """Nur noch existierende Dateien in der Recent-Liste behalten — 2.6.54."""
+        try:
+            kept = recent_mod.prune_missing_recent()
+        except Exception:
+            kept = []
+        self._refresh_recent()
+        self._set_status(f"Zuletzt geöffnet: {len(kept)} vorhandene Datei(en)")
 
     def _refresh_workspaces(self):
         """Projekt-Ordner-Menü (letzte 5 Workspaces) neu aufbauen."""
@@ -3629,7 +3759,18 @@ class MainWindow(QMainWindow):
         except Exception:
             pass
 
-    def _clear_recent(self):
+    def _clear_recent(self, *args, confirm: bool = True):
+        """Persistierte Recent-Liste leeren und alle drei Ansichten aktualisieren — 2.6.54."""
+        if confirm:
+            reply = QMessageBox.question(
+                self,
+                "Zuletzt geöffnet",
+                "Liste der zuletzt geöffneten Dateien wirklich leeren?",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No,
+            )
+            if reply != QMessageBox.Yes:
+                return
         recent_mod.clear_recent()
         self._refresh_recent()
         self._set_status("Zuletzt geöffnet geleert")
@@ -4466,13 +4607,28 @@ class MainWindow(QMainWindow):
         if not self.pdf_view.pdf_path or self.pdf_view.page_count <= 0:
             return ""
         try:
+            path = self.pdf_view.pdf_path
+            page = int(self.pdf_view.page_index or 0)
+            unit = get_page_size_unit()
+            try:
+                mtime = int(Path(path).stat().st_mtime_ns)
+            except OSError:
+                mtime = 0
+            cache_key = (str(path), mtime, page, unit)
+            hit = self._page_size_cache.get(cache_key)
+            if hit is not None:
+                return hit
             from ild_pdf.pages import format_size_pair, get_page_boxes
 
-            boxes = get_page_boxes(self.pdf_view.pdf_path, self.pdf_view.page_index)
+            boxes = get_page_boxes(path, page)
             mb = boxes["mediabox"]
             w = mb[2] - mb[0]
             h = mb[3] - mb[1]
-            return format_size_pair(w, h, get_page_size_unit())
+            text = format_size_pair(w, h, unit)
+            if len(self._page_size_cache) > 64:
+                self._page_size_cache.clear()
+            self._page_size_cache[cache_key] = text
+            return text
         except Exception:
             try:
                 from ild_pdf import PdfDocument
@@ -4958,8 +5114,7 @@ class MainWindow(QMainWindow):
         self._duplicate_line()
 
     def _duplicate_line(self):
-        if self.stack.currentWidget() is not self.editor_pane:
-            self._set_status("Zeile duplizieren nur im Texteditor")
+        if not self._guard_editor_action("Zeile duplizieren"):
             return
         if self.editor.duplicate_line():
             if self.doc and self.doc.kind in (
@@ -4997,8 +5152,7 @@ class MainWindow(QMainWindow):
         self._move_line(1)
 
     def _move_line(self, delta: int):
-        if self.stack.currentWidget() is not self.editor_pane:
-            self._set_status("Zeile verschieben nur im Texteditor")
+        if not self._guard_editor_action("Zeile verschieben"):
             return
         ok = self.editor.move_line_up() if delta < 0 else self.editor.move_line_down()
         if ok:
@@ -5016,8 +5170,7 @@ class MainWindow(QMainWindow):
             self._set_status("Zeile verschieben nicht möglich")
 
     def _sort_lines_az(self):
-        if self.stack.currentWidget() is not self.editor_pane:
-            self._set_status("Zeilen sortieren nur im Texteditor")
+        if not self._guard_editor_action("Zeilen sortieren"):
             return
         if self.editor.sort_lines_az():
             if self.doc and self.doc.kind in (
@@ -5034,8 +5187,7 @@ class MainWindow(QMainWindow):
             self._set_status("Zeilen sortieren nicht möglich")
 
     def _toggle_line_comment(self):
-        if self.stack.currentWidget() is not self.editor_pane:
-            self._set_status("Kommentieren nur im Texteditor")
+        if not self._guard_editor_action("Kommentieren"):
             return
         path = self.doc.path if self.doc else None
         prefix = self.editor.comment_prefix_for_path(path)
@@ -5241,8 +5393,8 @@ class MainWindow(QMainWindow):
             self._refresh_pdf_marks()
 
     def _toggle_line_bookmark(self):
-        if self.stack.currentWidget() is not self.editor_pane:
-            self.stack.setCurrentWidget(self.editor_pane)
+        if not self._guard_editor_action("Zeilen-Lesezeichen"):
+            return
         now = self.editor.toggle_line_bookmark()
         line = self.editor.textCursor().blockNumber() + 1
         self._refresh_line_favorites()
@@ -5253,8 +5405,8 @@ class MainWindow(QMainWindow):
         )
 
     def _goto_next_line_bookmark(self):
-        if self.stack.currentWidget() is not self.editor_pane:
-            self.stack.setCurrentWidget(self.editor_pane)
+        if not self._guard_editor_action("Zeilen-Lesezeichen"):
+            return
         line = self.editor.goto_next_line_bookmark()
         if line:
             self._refresh_line_favorites()
@@ -5263,8 +5415,8 @@ class MainWindow(QMainWindow):
             self._set_status("Keine Zeilen-Lesezeichen")
 
     def _goto_prev_line_bookmark(self):
-        if self.stack.currentWidget() is not self.editor_pane:
-            self.stack.setCurrentWidget(self.editor_pane)
+        if not self._guard_editor_action("Zeilen-Lesezeichen"):
+            return
         line = self.editor.goto_prev_line_bookmark()
         if line:
             self._refresh_line_favorites()
@@ -5273,8 +5425,8 @@ class MainWindow(QMainWindow):
             self._set_status("Keine Zeilen-Lesezeichen")
 
     def _clear_line_bookmarks(self):
-        if self.stack.currentWidget() is not self.editor_pane:
-            self.stack.setCurrentWidget(self.editor_pane)
+        if not self._guard_editor_action("Zeilen-Lesezeichen"):
+            return
         self.editor.clear_line_bookmarks()
         self._refresh_line_favorites()
         self._set_status("Zeilen-Lesezeichen gelöscht")
@@ -5284,8 +5436,8 @@ class MainWindow(QMainWindow):
         from PySide6.QtWidgets import QFileDialog
         from instantlensdoc.ui.file_dialogs import confirm_overwrite_export
 
-        if self.stack.currentWidget() is not self.editor_pane:
-            self.stack.setCurrentWidget(self.editor_pane)
+        if not self._guard_editor_action("Zeilen-Lesezeichen"):
+            return False
         marks = self.editor.list_line_bookmarks_with_labels()
         if not marks:
             QMessageBox.information(
@@ -5326,8 +5478,8 @@ class MainWindow(QMainWindow):
         from PySide6.QtWidgets import QFileDialog
         from instantlensdoc.core.bookmarks import BookmarksImportError
 
-        if self.stack.currentWidget() is not self.editor_pane:
-            self.stack.setCurrentWidget(self.editor_pane)
+        if not self._guard_editor_action("Zeilen-Lesezeichen"):
+            return False
         start = str(Path(self.doc.path).parent) if self.doc and self.doc.path else str(Path.home())
         path, _ = QFileDialog.getOpenFileName(
             self,
@@ -5478,8 +5630,8 @@ class MainWindow(QMainWindow):
         self._set_status(f"Zeilenfavorit → Zeile {ln}")
 
     def _check_spelling(self):
-        if self.stack.currentWidget() is not self.editor_pane:
-            self.stack.setCurrentWidget(self.editor_pane)
+        if not self._guard_editor_action("Rechtschreibung"):
+            return
         from instantlensdoc.core.app_settings import (
             get_spellcheck_dict_path,
             get_spellcheck_use_builtin,
@@ -5521,8 +5673,8 @@ class MainWindow(QMainWindow):
 
     def _show_spell_suggestions(self):
         """Dialog mit unbekannten Wörtern + Vorschlägen — 2.6.20."""
-        if self.stack.currentWidget() is not self.editor_pane:
-            self.stack.setCurrentWidget(self.editor_pane)
+        if not self._guard_editor_action("Rechtschreibung"):
+            return
         self._check_spelling()
         result = self.editor.last_spell_result()
         unknown = list(result.get("unknown") or [])
@@ -5612,6 +5764,8 @@ class MainWindow(QMainWindow):
         self._set_status("Autokorrektur ein" if want else "Autokorrektur aus")
 
     def _clear_spelling(self):
+        if not self._guard_editor_action("Rechtschreibung"):
+            return
         self.editor.clear_spelling()
         self._set_status("Rechtschreibmarkierungen gelöscht")
 
@@ -5795,14 +5949,14 @@ class MainWindow(QMainWindow):
             self._set_status(f"Signiert: {data['out']}")
 
     def _insert_soft_hyphen(self):
-        if self.stack.currentWidget() is not self.editor_pane:
-            self.stack.setCurrentWidget(self.editor_pane)
+        if not self._guard_editor_action("Sonderzeichen"):
+            return
         if self.editor.insert_soft_hyphen():
             self._set_status("Soft-Hyphen eingefügt (U+00AD)")
 
     def _insert_nbsp(self):
-        if self.stack.currentWidget() is not self.editor_pane:
-            self.stack.setCurrentWidget(self.editor_pane)
+        if not self._guard_editor_action("Sonderzeichen"):
+            return
         if self.editor.insert_nbsp():
             self._set_status("Geschütztes Leerzeichen eingefügt (U+202F)")
 
@@ -6923,6 +7077,8 @@ class MainWindow(QMainWindow):
         """Seitenlayout des Texteditors (DTP-Presets, Ränder, Ausrichtung) — 2.6.53."""
         from instantlensdoc.ui.page_layout_dialog import PageLayoutDialog
 
+        if not self._guard_editor_action("Seitenlayout"):
+            return
         current = self.editor.page_layout()
         dlg = PageLayoutDialog(current, self, rich_document=self.editor.rich_mode())
         if dlg.exec() != QDialog.Accepted:
@@ -7053,8 +7209,24 @@ class MainWindow(QMainWindow):
         if path:
             self.open_path(path)
 
+    def _schedule_doc_tab_bar_sync(self, *_args) -> None:
+        """Tab-Leiste nach Modelländerung der Dokumentliste nachziehen (gebündelt) — 2.6.54."""
+        if getattr(self, "_doc_tab_bar_sync_pending", False):
+            return
+        self._doc_tab_bar_sync_pending = True
+
+        def _run() -> None:
+            self._doc_tab_bar_sync_pending = False
+            try:
+                self._refresh_doc_tab_bar()
+            except Exception as e:
+                _log.debug("Tab-Leiste sync: %s", e)
+
+        QTimer.singleShot(0, _run)
+
     def _refresh_doc_tab_bar(self) -> None:
         """Dokument-Tabs aus Sidebar synchronisieren — 2.6.19."""
+        self._doc_tab_bar_sync_pending = False
         if getattr(self, "doc_tab_bar", None) is None:
             return
         from instantlensdoc.core.app_settings import get_doc_tabs_visible
@@ -7415,8 +7587,7 @@ class MainWindow(QMainWindow):
             self._printer_marks_action.blockSignals(False)
 
     def _insert_snippet(self, index: int):
-        if self.stack.currentWidget() is not self.editor_pane:
-            self._set_status("Textbausteine nur im Editor")
+        if not self._guard_editor_action("Textbausteine"):
             return
         from instantlensdoc.core.app_settings import get_editor_snippets
 
@@ -7432,8 +7603,7 @@ class MainWindow(QMainWindow):
         self._set_status(f"Textbaustein {i + 1} eingefügt")
 
     def _save_snippet(self, index: int):
-        if self.stack.currentWidget() is not self.editor_pane:
-            self._set_status("Textbausteine nur im Editor")
+        if not self._guard_editor_action("Textbausteine"):
             return
         from instantlensdoc.core.app_settings import (
             EDITOR_SNIPPET_COUNT,
@@ -7454,8 +7624,7 @@ class MainWindow(QMainWindow):
         self._set_status(f"Textbaustein {i + 1} gespeichert: {preview}")
 
     def _toggle_case_selection(self):
-        if self.stack.currentWidget() is not self.editor_pane:
-            self._set_status("Groß-/Kleinschreibung nur im Texteditor")
+        if not self._guard_editor_action("Groß-/Kleinschreibung"):
             return
         if self.editor.toggle_case_selection():
             self._set_status("Schreibweise umgeschaltet")
@@ -7463,8 +7632,7 @@ class MainWindow(QMainWindow):
             self._set_status("Keine Textauswahl")
 
     def _transform_document_case(self, mode: str):
-        if self.stack.currentWidget() is not self.editor_pane:
-            self._set_status("Alles groß/klein nur im Texteditor")
+        if not self._guard_editor_action("Alles groß/klein"):
             return
         if self.editor.transform_document_case(mode):
             label = "GROSS" if mode == "upper" else "klein"
@@ -7473,8 +7641,7 @@ class MainWindow(QMainWindow):
             self._set_status("Keine Änderung (leer oder schon umgewandelt)")
 
     def _indent_selection(self):
-        if self.stack.currentWidget() is not self.editor_pane:
-            self._set_status("Einrückung nur im Texteditor")
+        if not self._guard_editor_action("Einrückung"):
             return
         if self.editor.indent_selection():
             self._set_status("Einrückung erhöht")
@@ -7482,8 +7649,7 @@ class MainWindow(QMainWindow):
             self._set_status("Einrückung nicht möglich")
 
     def _outdent_selection(self):
-        if self.stack.currentWidget() is not self.editor_pane:
-            self._set_status("Einrückung nur im Texteditor")
+        if not self._guard_editor_action("Einrückung"):
             return
         if self.editor.outdent_selection():
             self._set_status("Einrückung verringert")
@@ -8441,6 +8607,7 @@ class MainWindow(QMainWindow):
             self._clear_recovery_for_current()
             if self.doc.path:
                 self._mark_unsaved(self.doc.path, False)
+                self._doc_cache_put(self.doc.path, self.doc)
             self._set_status(self._autosave_status_saved())
         except Exception:
             self._blink_autosave_error_status()
@@ -8669,6 +8836,7 @@ class MainWindow(QMainWindow):
         # Sticky 0-Treffer-Status bei Dokumentwechsel löschen — 1.1.8
         self._clear_ann_zero_sticky_status()
         self._update_doc_status()
+        self._sync_pdf_page_shortcuts()
         if self.pdf_view.pdf_path:
             # Thumbs/Outline nach Erst-Render deferren — Open bleibt flüssig — 2.6.37
             open_gen = int(getattr(self.pdf_view, "_open_generation", 0) or 0)
@@ -8761,23 +8929,83 @@ class MainWindow(QMainWindow):
         else:
             self.sidebar.search.setFocus()
 
+    def _pdf_tab_active(self) -> bool:
+        """True wenn der aktuelle Tab ein PDF ist (Stack oder DocKind) — 2.6.54."""
+        stack = getattr(self, "stack", None)
+        pdf = getattr(self, "pdf_view", None)
+        if stack is not None and pdf is not None and stack.currentWidget() is pdf:
+            return True
+        doc = getattr(self, "doc", None)
+        if doc is not None and getattr(doc, "kind", None) == DocKind.PDF:
+            return True
+        return False
+
+    def _editor_document_active(self) -> bool:
+        """True nur bei sichtbarem Rich/Text-Editor — nie PDF/Bild/Welcome — 2.6.54.
+
+        Editor-Aktionen (Zeilenabstand, Fett, Einrückung, Seitenlayout, …) dürfen
+        keinen PDF-Tab umschalten, kein Geschwister-DOCX öffnen und kein neues
+        Text-Dokument anlegen.
+        """
+        if self._pdf_tab_active():
+            return False
+        stack = getattr(self, "stack", None)
+        pane = getattr(self, "editor_pane", None)
+        if stack is None or pane is None or stack.currentWidget() is not pane:
+            return False
+        doc = getattr(self, "doc", None)
+        if doc is not None and getattr(doc, "kind", None) in (DocKind.PDF, DocKind.IMAGE):
+            return False
+        return True
+
+    def _guard_editor_action(self, what: str) -> bool:
+        """Editor-only Aktion: bei PDF/anderem Tab no-op, kein Stack-Wechsel — 2.6.54."""
+        if self._editor_document_active():
+            return True
+        self._set_status(f"{what} nur im Editor")
+        return False
+
+    def _track_editor_action(self, act) -> object:
+        lst = getattr(self, "_editor_only_actions", None)
+        if lst is None:
+            self._editor_only_actions = []
+            lst = self._editor_only_actions
+        lst.append(act)
+        return act
+
+    def _sync_editor_only_actions(self, *_args) -> None:
+        on = self._editor_document_active()
+        for act in getattr(self, "_editor_only_actions", None) or []:
+            try:
+                act.setEnabled(on)
+            except Exception:
+                pass
+        for menu in getattr(self, "_editor_only_menus", None) or []:
+            try:
+                menu.setEnabled(on)
+            except Exception:
+                pass
+
     def _toggle_bold(self) -> None:
-        if self.stack.currentWidget() is self.editor_pane:
-            self.editor.toggle_bold_selection()
-            self._sync_editor_rich_meta()
-            self._set_status("Fett (Zeichenformat)")
+        if not self._guard_editor_action("Fett"):
+            return
+        self.editor.toggle_bold_selection()
+        self._sync_editor_rich_meta()
+        self._set_status("Fett (Zeichenformat)")
 
     def _toggle_italic(self) -> None:
-        if self.stack.currentWidget() is self.editor_pane:
-            self.editor.toggle_italic_selection()
-            self._sync_editor_rich_meta()
-            self._set_status("Kursiv (Zeichenformat)")
+        if not self._guard_editor_action("Kursiv"):
+            return
+        self.editor.toggle_italic_selection()
+        self._sync_editor_rich_meta()
+        self._set_status("Kursiv (Zeichenformat)")
 
     def _toggle_underline(self) -> None:
-        if self.stack.currentWidget() is self.editor_pane:
-            self.editor.toggle_underline_selection()
-            self._sync_editor_rich_meta()
-            self._set_status("Unterstrichen (Zeichenformat)")
+        if not self._guard_editor_action("Unterstrichen"):
+            return
+        self.editor.toggle_underline_selection()
+        self._sync_editor_rich_meta()
+        self._set_status("Unterstrichen (Zeichenformat)")
 
     def _sync_editor_rich_meta(self) -> None:
         """Plaintext + HTML-Meta aus dem Editor für DOCX/HTML/RTF-Speichern — 2.6.49."""
@@ -8806,8 +9034,7 @@ class MainWindow(QMainWindow):
         self.doc.dirty = True
 
     def _set_paragraph_alignment(self, alignment: str) -> None:
-        if self.stack.currentWidget() is not self.editor_pane:
-            self._set_status("Absatzformat nur im Editor")
+        if not self._guard_editor_action("Absatzformat"):
             return
         if self.editor.set_paragraph_alignment(alignment):
             if self.doc and self.doc.kind in (
@@ -8824,8 +9051,7 @@ class MainWindow(QMainWindow):
             self._set_status(f"Absatzausrichtung unverändert ({alignment})")
 
     def _set_paragraph_line_spacing(self, line_spacing: float) -> None:
-        if self.stack.currentWidget() is not self.editor_pane:
-            self._set_status("Zeilenabstand nur im Editor")
+        if not self._guard_editor_action("Zeilenabstand"):
             return
         if self.editor.set_paragraph_spacing(line_spacing=line_spacing):
             if self.doc and self.doc.kind in (
@@ -8849,8 +9075,7 @@ class MainWindow(QMainWindow):
         leading: float | None = None,
     ) -> None:
         """Tracking/Kerning/Leading — 2.6.13."""
-        if self.stack.currentWidget() is not self.editor_pane:
-            self._set_status("Typografie nur im Editor")
+        if not self._guard_editor_action("Typografie"):
             return
         if self.editor.apply_typography(
             tracking=tracking, kerning=kerning, leading=leading
@@ -8876,8 +9101,7 @@ class MainWindow(QMainWindow):
             self._set_status("Typografie unverändert")
 
     def _apply_drop_cap(self) -> None:
-        if self.stack.currentWidget() is not self.editor_pane:
-            self._set_status("Drop Cap nur im Editor")
+        if not self._guard_editor_action("Drop Cap"):
             return
         if self.editor.apply_drop_cap(lines=3, chars=1):
             if self.doc and self.doc.kind in (
@@ -8894,8 +9118,7 @@ class MainWindow(QMainWindow):
             self._set_status("Drop Cap unverändert")
 
     def _hyphenate_document(self, lang: str = "de") -> None:
-        if self.stack.currentWidget() is not self.editor_pane:
-            self._set_status("Silbentrennung nur im Editor")
+        if not self._guard_editor_action("Silbentrennung"):
             return
         n = self.editor.hyphenate_document(lang=lang)
         if self.doc and self.doc.kind in (
@@ -8930,8 +9153,8 @@ class MainWindow(QMainWindow):
         """Hyperlink (URL oder Dokumentziel) in Editor — 2.6.26."""
         from instantlensdoc.ui.hyperlink_dialog import HyperlinkDialog
 
-        if self.stack.currentWidget() is not self.editor_pane:
-            self.stack.setCurrentWidget(self.editor_pane)
+        if not self._guard_editor_action("Hyperlink"):
+            return
         cursor = self.editor.textCursor()
         selected = cursor.selectedText().replace("\u2029", "\n").strip()
         dlg = HyperlinkDialog(
@@ -9125,8 +9348,7 @@ class MainWindow(QMainWindow):
 
     def _update_figure_list(self) -> None:
         """Abbildungsverzeichnis aktualisieren — 2.6.28."""
-        if self.stack.currentWidget() is not self.editor_pane:
-            self._set_status("Abbildungsverzeichnis: bitte Texteditor öffnen")
+        if not self._guard_editor_action("Abbildungsverzeichnis"):
             return
         self.editor.update_figure_list()
         if self.doc and self.doc.kind in (
@@ -9142,8 +9364,7 @@ class MainWindow(QMainWindow):
 
     def _update_index(self) -> None:
         """Stichwortverzeichnis aktualisieren — 2.6.28."""
-        if self.stack.currentWidget() is not self.editor_pane:
-            self._set_status("Stichwortverzeichnis: bitte Texteditor öffnen")
+        if not self._guard_editor_action("Stichwortverzeichnis"):
             return
         self.editor.update_index()
         if self.doc and self.doc.kind in (
@@ -9158,12 +9379,7 @@ class MainWindow(QMainWindow):
         self._set_status("Stichwortverzeichnis aktualisiert")
 
     def _find_replace(self):
-        if self.stack.currentWidget() is not self.editor_pane:
-            QMessageBox.information(
-                self,
-                "Suchen und Ersetzen",
-                "Find/Replace ist im Texteditor verfügbar (Ctrl+H / Ctrl+R).",
-            )
+        if not self._guard_editor_action("Suchen und Ersetzen"):
             return
         from instantlensdoc.ui.find_replace_dialog import FindReplaceDialog
 
@@ -9986,10 +10202,16 @@ class MainWindow(QMainWindow):
             pass
 
     def _on_editor_toolbar_action(self, action_id: str) -> None:
-        """Word-Suite-Bearbeitungsleiste → Editor-Aktionen — 2.6.44."""
+        """Word-Suite-Bearbeitungsleiste → Editor-Aktionen — 2.6.44.
+
+        Bei PDF-Tab: kein Stack-Wechsel, kein Geschwister-DOCX, kein neues Text-Tab.
+        """
         aid = str(action_id or "").strip().lower()
-        if self.stack.currentWidget() is not self.editor_pane:
-            self.stack.setCurrentWidget(self.editor_pane)
+        if aid == "mark" and self.stack.currentWidget() is self.pdf_view:
+            self._mark_selection()
+            return
+        if not self._guard_editor_action("Textformat"):
+            return
         if aid == "select":
             self._set_status("Werkzeug: Auswahl — Text markieren, dann Markierungen/Format")
             return
@@ -10054,6 +10276,12 @@ class MainWindow(QMainWindow):
         self._set_status("Auswahl markiert (Textmarker, wird mit DOCX/HTML gespeichert)")
 
     def _clear_editor_marks(self):
+        if self.stack.currentWidget() is self.pdf_view:
+            self._refresh_pdf_marks()
+            self._set_status("Markierungen gelöscht")
+            return
+        if not self._guard_editor_action("Markierungen"):
+            return
         self.editor.clear_extra_selections()
         removed = 0
         try:
@@ -11407,6 +11635,7 @@ class MainWindow(QMainWindow):
         self._thumb_lazy_loaded = set()
         self._thumb_lazy_page_count = page_count
         self._thumb_lazy_virtual = bool(virtual_only)
+        self._thumb_lazy_open_gen = int(getattr(self.pdf_view, "_open_generation", 0) or 0)
         self._thumb_lazy_timer = QTimer(self)
         self._thumb_lazy_timer.setInterval(16)
         self._thumb_lazy_timer.timeout.connect(self._thumb_lazy_tick)
@@ -11417,6 +11646,13 @@ class MainWindow(QMainWindow):
             self._stop_thumb_lazy()
             return
         if not self.pdf_view.pdf_path:
+            self._stop_thumb_lazy()
+            return
+        # Dokument-Token: Lauf gehört zu einem geschlossenen/ersetzten Dokument
+        # (z. B. Tick während processEvents() im nächsten load()) — 2.6.54
+        if int(getattr(self.pdf_view, "_open_generation", 0) or 0) != int(
+            self._thumb_lazy_open_gen or 0
+        ):
             self._stop_thumb_lazy()
             return
         # Leere Queue: Timer stoppen, Token behalten (Virtual-Prefetch bei Scroll) — 2.6.40
@@ -11468,7 +11704,16 @@ class MainWindow(QMainWindow):
             self._set_status("Kein PDF geladen")
             return
         idx = int(page_index)
-        self.pdf_view.goto_page(idx)
+        self.pdf_view.set_current_page(idx)
+        # Fokus zurück auf die PDF-Ansicht, sonst schluckt die Thumbnail-Liste
+        # PageUp/PageDown und die Nav-Shortcuts greifen nicht — 2.6.54
+        try:
+            self.pdf_view.canvas.setFocus(Qt.OtherFocusReason)
+        except Exception:
+            try:
+                self.pdf_view.setFocus(Qt.OtherFocusReason)
+            except Exception:
+                pass
         # Immer Paint erzwingen (auch nach Continuous-Short-Circuit) — 2.6.47
         if not self.pdf_view._ensure_page_painted(warn=False):
             self._set_status(
@@ -11616,6 +11861,32 @@ class MainWindow(QMainWindow):
         self.sidebar.set_annotation_current_page(page_index)
         self._refresh_page_favorites()
         self._update_doc_status()
+
+    def _pdf_page_shortcut(self, direction: int) -> None:
+        """Bild auf/ab: Seite blättern, nur wenn die PDF-Ansicht aktiv ist — 2.6.54."""
+        if self.stack.currentWidget() is not self.pdf_view:
+            return
+        if not self.pdf_view.pdf_path:
+            return
+        if int(direction) < 0:
+            self.pdf_view.prev_page()
+        else:
+            self.pdf_view.next_page()
+
+    def _sync_pdf_page_shortcuts(self, *_args) -> None:
+        on = (
+            not bool(getattr(self, "_presentation_active", False))
+            and self.stack.currentWidget() is self.pdf_view
+            and bool(getattr(self.pdf_view, "pdf_path", None))
+        )
+        for sc in (
+            getattr(self, "_sc_pdf_page_down", None),
+            getattr(self, "_sc_pdf_page_up", None),
+        ):
+            if sc is not None:
+                sc.setEnabled(bool(on))
+        self._sync_editor_only_actions()
+
     def _offer_reload_pdf(
         self,
         out_path,
@@ -12872,35 +13143,139 @@ class MainWindow(QMainWindow):
         if not self._confirm_close_current(allow_discard=True):
             return
         path = str(self.doc.path) if self.doc.path else None
-        if path:
-            self.sidebar.remove_document(path)
-            key = self._path_key(path)
-            if key:
-                self._unsaved_paths.discard(key)
-        remaining = self.sidebar.document_paths()
-        self.doc = None
+        t0 = time.perf_counter()
+        remaining: list[str] = []
         try:
-            self.pdf_view.pdf_path = None
-            self.pdf_view.store = None
-            self.pdf_view.page_count = 0
-        except Exception:
-            pass
-        self.editor.blockSignals(True)
-        self.editor.setPlainText("")
-        self.editor.blockSignals(False)
-        self.sidebar.clear_thumbs()
-        self.sidebar.clear_annotations()
-        self.sidebar.set_marks([])
-        self.setWindowTitle(self._app_title())
-        self._update_doc_status()
-        self._sync_preview_readonly_banner()
+            # Tab-Eintrag zuerst entfernen — bricht die Teardown-Kette ab, bleibt die
+            # Tab-Leiste trotzdem nicht stehen (finally synchronisiert) — 2.6.54
+            if path:
+                self.sidebar.remove_document(path)
+            remaining = list(self.sidebar.document_paths())
+            self._release_current_document(path)
+        finally:
+            self._refresh_doc_tab_bar()
+            try:
+                self.setWindowTitle(self._app_title())
+                self._update_doc_status()
+                self._sync_preview_readonly_banner()
+                self._update_unsaved_status()
+            except Exception as e:
+                _log.debug("close_current_tab UI-Sync: %s", e)
+        self._last_tab_close_ms = (time.perf_counter() - t0) * 1000.0
+        _log.debug("Tab geschlossen in %.1f ms: %s", self._last_tab_close_ms, path)
         if remaining:
             nxt = remaining[0]
-            self.open_path(nxt)
-            self._set_status(f"Geschlossen — gewechselt zu {Path(nxt).name}")
+            # Nachbar-Tab erst im nächsten Event-Loop-Durchlauf laden: Close kehrt
+            # sofort zurück, Tab-Leiste/Status sind bereits aktualisiert — 2.6.54
+            self._set_status(f"Geschlossen — wechsle zu {Path(nxt).name}…")
+            self._activate_tab_deferred(nxt, status=f"Geschlossen — gewechselt zu {Path(nxt).name}")
         else:
             self._show_welcome_if_empty()
             self._set_status("Dokument geschlossen")
+        try:
+            self._save_session()
+        except Exception:
+            pass
+
+    def _release_current_document(self, path: str | None = None) -> None:
+        """Aktuelles Dokument aus Viewer/Editor/Sidebar lösen — nie blockierend — 2.6.54.
+
+        Jeder Schritt ist einzeln abgesichert: Thumb-Lazy-Timer stoppen, Viewer
+        ``unload`` (Dokument-Token erhöhen → späte Worker-Ergebnisse verworfen),
+        Editor leeren, Sidebar-Panels leeren, Caches dieses Tabs freigeben. Es wird
+        auf keinen Thread gewartet und kein PDFium aufgerufen.
+        """
+        key = self._path_key(path) if path else None
+        if key is None and self.doc is not None and self.doc.path:
+            key = self._path_key(self.doc.path)
+        self.doc = None
+        try:
+            self._stop_thumb_lazy()
+        except Exception:
+            pass
+        try:
+            self.pdf_view.unload()
+        except Exception as e:
+            _log.warning("PdfViewer.unload: %s", e)
+            try:
+                self.pdf_view.pdf_path = None
+                self.pdf_view.store = None
+                self.pdf_view.page_count = 0
+                self.pdf_view.page_index = 0
+            except Exception:
+                pass
+        try:
+            self.editor.blockSignals(True)
+            try:
+                self.editor.setPlainText("")
+            finally:
+                self.editor.blockSignals(False)
+        except Exception:
+            pass
+        for fn in (
+            self.sidebar.clear_thumbs,
+            self.sidebar.clear_annotations,
+            lambda: self.sidebar.set_marks([]),
+            lambda: self.sidebar.set_outline([]),
+            self.sidebar.clear_form_fields,
+            self.sidebar.clear_page_favorites,
+        ):
+            try:
+                fn()
+            except Exception:
+                pass
+        if key:
+            self._unsaved_paths.discard(key)
+            self._tab_view_state.pop(key, None)
+            self._doc_cache.pop(key, None)
+        self._page_size_cache.clear()
+
+    def _forget_tab(self, path: str | None) -> None:
+        """Tab-bezogene Zustände eines (nicht aktiven) Pfads verwerfen — 2.6.54."""
+        key = self._path_key(path) if path else None
+        if not key:
+            return
+        self._unsaved_paths.discard(key)
+        self._tab_view_state.pop(key, None)
+        self._doc_cache.pop(key, None)
+
+    def _activate_tab_deferred(self, path: str, *, status: str | None = None) -> None:
+        """Nachbar-Tab nach Close im nächsten Event-Loop-Durchlauf aktivieren — 2.6.54.
+
+        Guard: Wurde der Tab inzwischen ebenfalls geschlossen oder ein anderes
+        Dokument geöffnet, wird der erste verbliebene Tab genommen bzw. die
+        Willkommensseite gezeigt.
+        """
+        want = str(Path(path)) if path else ""
+
+        def _run() -> None:
+            if self.doc is not None:
+                return
+            paths = [str(Path(p)) for p in self.sidebar.document_paths()]
+            target = want if want in paths else (paths[0] if paths else "")
+            if not target or not Path(target).is_file():
+                if target:
+                    try:
+                        self.sidebar.remove_document(target)
+                    except Exception:
+                        pass
+                    self._forget_tab(target)
+                    self._refresh_doc_tab_bar()
+                    paths = [str(Path(p)) for p in self.sidebar.document_paths()]
+                    if paths:
+                        self._activate_tab_deferred(paths[0], status=status)
+                        return
+                self._show_welcome_if_empty()
+                return
+            try:
+                self.open_path(target)
+            except Exception as e:
+                _log.warning("Tab nach Close aktivieren: %s", e)
+                return
+            if status and str(Path(target)) == want:
+                self._set_status(status)
+
+        QTimer.singleShot(0, _run)
 
     def _on_document_pin_toggled(self, path: str, pinned: bool) -> None:
         """Tab anheften/lösen (0.9.2) — visueller Indikator + Schutz vor Alle schließen."""
@@ -12940,12 +13315,13 @@ class MainWindow(QMainWindow):
             self.open_path(target)
             self.close_current_tab()
             return
-        if not self.sidebar.remove_document(target):
-            self._set_status("Tab nicht in der Liste")
-            return
-        if key:
-            self._unsaved_paths.discard(key)
-            self._tab_view_state.pop(key, None)
+        try:
+            if not self.sidebar.remove_document(target):
+                self._set_status("Tab nicht in der Liste")
+                return
+            self._forget_tab(target)
+        finally:
+            self._refresh_doc_tab_bar()
         try:
             self._save_session()
         except Exception:
@@ -12977,18 +13353,18 @@ class MainWindow(QMainWindow):
             return
         closed = 0
         skipped_pin = 0
-        for p in paths:
-            if keep and str(Path(str(p))) == str(Path(keep)):
-                continue
-            if self.sidebar.is_document_pinned(str(p)):
-                skipped_pin += 1
-                continue
-            self.sidebar.remove_document(p)
-            key = self._path_key(p)
-            if key:
-                self._unsaved_paths.discard(key)
-                self._tab_view_state.pop(key, None)
-            closed += 1
+        try:
+            for p in paths:
+                if keep and str(Path(str(p))) == str(Path(keep)):
+                    continue
+                if self.sidebar.is_document_pinned(str(p)):
+                    skipped_pin += 1
+                    continue
+                self.sidebar.remove_document(p)
+                self._forget_tab(p)
+                closed += 1
+        finally:
+            self._refresh_doc_tab_bar()
         if closed == 0:
             if skipped_pin:
                 self._set_status(
@@ -13012,16 +13388,16 @@ class MainWindow(QMainWindow):
         """Hilfsfunktion: Tabs entfernen (ohne Dirty-Dialog, wie close_other_tabs)."""
         closed = 0
         skipped_pin = 0
-        for p in targets:
-            if self.sidebar.is_document_pinned(str(p)):
-                skipped_pin += 1
-                continue
-            self.sidebar.remove_document(p)
-            key = self._path_key(p)
-            if key:
-                self._unsaved_paths.discard(key)
-                self._tab_view_state.pop(key, None)
-            closed += 1
+        try:
+            for p in targets:
+                if self.sidebar.is_document_pinned(str(p)):
+                    skipped_pin += 1
+                    continue
+                self.sidebar.remove_document(p)
+                self._forget_tab(p)
+                closed += 1
+        finally:
+            self._refresh_doc_tab_bar()
         if closed == 0:
             return 0
         try:
@@ -13119,48 +13495,36 @@ class MainWindow(QMainWindow):
             pinned_paths = set()
         cur_path = str(Path(self.doc.path)) if self.doc and self.doc.path else None
         cur_pinned = bool(cur_path and cur_path in pinned_paths)
-        if self.doc and not cur_pinned:
-            if not self._confirm_close_current(allow_discard=True):
-                return
-            path = str(self.doc.path) if self.doc.path else None
-            if path:
-                self.sidebar.remove_document(path)
-                key = self._path_key(path)
-                if key:
-                    self._unsaved_paths.discard(key)
-                    self._tab_view_state.pop(key, None)
-            self.doc = None
-            try:
-                self.pdf_view.pdf_path = None
-                self.pdf_view.store = None
-                self.pdf_view.page_count = 0
-            except Exception:
-                pass
-            self.editor.blockSignals(True)
-            self.editor.setPlainText("")
-            self.editor.blockSignals(False)
-        remaining = list(self.sidebar.document_paths())
+        t0 = time.perf_counter()
         closed = 0
         kept_pin = 0
-        for p in remaining:
-            key_p = str(Path(str(p)))
-            if key_p in pinned_paths:
-                kept_pin += 1
-                continue
-            self.sidebar.remove_document(p)
-            key = self._path_key(p)
-            if key:
-                self._unsaved_paths.discard(key)
-                self._tab_view_state.pop(key, None)
-            closed += 1
-        kept = list(self.sidebar.document_paths())
+        kept: list[str] = []
+        try:
+            if self.doc and not cur_pinned:
+                if not self._confirm_close_current(allow_discard=True):
+                    return
+                path = str(self.doc.path) if self.doc.path else None
+                if path:
+                    self.sidebar.remove_document(path)
+                self._release_current_document(path)
+            remaining = list(self.sidebar.document_paths())
+            for p in remaining:
+                key_p = str(Path(str(p)))
+                if key_p in pinned_paths:
+                    kept_pin += 1
+                    continue
+                self.sidebar.remove_document(p)
+                self._forget_tab(p)
+                closed += 1
+            kept = list(self.sidebar.document_paths())
+        finally:
+            self._refresh_doc_tab_bar()
+        self._last_tab_close_ms = (time.perf_counter() - t0) * 1000.0
+        _log.debug("Alle Tabs geschlossen in %.1f ms (%d zu, %d angeheftet)", self._last_tab_close_ms, closed, kept_pin)
         if kept:
-            # Angeheftete bleiben — ersten anzeigen falls aktuelles Doc weg
+            # Angeheftete bleiben — ersten anzeigen falls aktuelles Doc weg (deferred)
             if not self.doc or not self.doc.path:
-                try:
-                    self.open_path(kept[0])
-                except Exception:
-                    pass
+                self._activate_tab_deferred(kept[0])
             self._update_doc_status()
             try:
                 self._save_session()
@@ -14840,8 +15204,7 @@ class MainWindow(QMainWindow):
             menu.addAction(a)
 
     def _paste_clipboard_history(self, index: int):
-        if self.stack.currentWidget() is not self.editor_pane:
-            self._set_status("Zwischenablage-Verlauf nur im Editor")
+        if not self._guard_editor_action("Zwischenablage-Verlauf"):
             return
         if self.editor.paste_clipboard_history(index):
             self._set_status(f"Verlauf #{index + 1} eingefügt")
@@ -14852,10 +15215,14 @@ class MainWindow(QMainWindow):
         if self.stack.currentWidget() is self.pdf_view and self.pdf_view.pdf_path:
             if self.pdf_view.paste_clipboard_image():
                 return
+            # PDF-Tab: Editor nicht anheben, kein Geschwister-DOCX — 2.6.54
+            self._set_status("Kein Bild in der Zwischenablage (PDF)")
+            return
+        if not self._guard_editor_action("Bild einfügen"):
+            return
         if self.doc and self.doc.path:
             self.editor.set_paste_image_dir(Path(self.doc.path).parent)
         if self.editor.paste_clipboard_image():
-            self.stack.setCurrentWidget(self.editor_pane)
             self._set_status("Bild aus Zwischenablage in Editor eingefügt")
             return
         QMessageBox.information(
@@ -15206,11 +15573,29 @@ class MainWindow(QMainWindow):
             self._capture_current_tab_view_state()
         except Exception:
             pass
+        # Verlassenes Dokument im Tab-Cache halten (DOCX-Import ist teuer) — 2.6.54
         try:
-            self.doc = open_document(path, encoding=encoding)
-        except Exception as e:
-            QMessageBox.critical(self, "Öffnen", f"Datei konnte nicht geöffnet werden:\n{e}")
-            return
+            self._doc_cache_store_current()
+        except Exception:
+            pass
+        cached_dirty = False
+        cached = None if encoding is not None else self._doc_cache_get(path)
+        if cached is not None:
+            self.doc = cached
+            cached_dirty = bool(getattr(cached, "dirty", False))
+        else:
+            try:
+                self.doc = open_document(path, encoding=encoding)
+            except Exception as e:
+                QMessageBox.critical(self, "Öffnen", f"Datei konnte nicht geöffnet werden:\n{e}")
+                return
+            self._doc_cache_put(path, self.doc)
+        # Thumb-Lauf des vorherigen Dokuments beenden — Ticks dürfen nicht in den
+        # Open des nächsten Dokuments hineinlaufen (processEvents in load) — 2.6.54
+        try:
+            self._stop_thumb_lazy()
+        except Exception:
+            pass
 
         path_key = str(Path(path).resolve()) if path else str(path)
         # Merge-Vorschau-Pfade bleiben readonly bis „Zum Bearbeiten öffnen“ — 1.1.5
@@ -15236,7 +15621,16 @@ class MainWindow(QMainWindow):
                 self.stack.setCurrentWidget(self.pdf_view)
                 self.pdf_view.show()
                 if not self.pdf_view.load(path):
+                    # Fehlgeschlagener Open darf den Zustand des vorherigen Dokuments
+                    # (Seite 7/536, Thumbs, Outline, Banner) nicht stehen lassen — 2.6.54
+                    try:
+                        self.pdf_view.unload()
+                    except Exception:
+                        pass
+                    self._stop_thumb_lazy()
                     self.sidebar.clear_thumbs()
+                    self._update_doc_status()
+                    self._refresh_doc_tab_bar()
                     return
                 # Nach Open immer PDF-Stack + erste Seite in der zentralen Ansicht — 2.6.45
                 self.stack.setCurrentWidget(self.pdf_view)
@@ -15307,6 +15701,10 @@ class MainWindow(QMainWindow):
                 finally:
                     self._loading_document = False
                 self.doc.dirty = False
+                if cached_dirty:
+                    # Ungespeicherte Änderungen aus dem Tab-Cache bleiben dirty — 2.6.54
+                    self.doc.dirty = True
+                    self._mark_unsaved(path, True)
                 self.editor.clear_extra_selections()
                 self._suppress_bookmark_persist = True
                 try:
@@ -15541,6 +15939,7 @@ class MainWindow(QMainWindow):
             self._remember_path(self.doc.path)
             self._mark_unsaved(self.doc.path, False)
             self._clear_recovery_for_current()
+            self._doc_cache_put(self.doc.path, self.doc)
             enc = self.doc.meta.get("encoding")
             suffix = f" [{enc}]" if enc else ""
             self._set_status(f"Gespeichert: {self.doc.path}{suffix}")
@@ -15758,12 +16157,7 @@ class MainWindow(QMainWindow):
             text = self.doc.text or self.editor.toPlainText()
             title = self.doc.display_name
         else:
-            QMessageBox.information(
-                self,
-                "Export",
-                "Export gilt für den Texteditor.\n"
-                "Bitte TXT/MD/HTML/DOCX/RTF/XLSX öffnen oder Text eingeben.",
-            )
+            self._set_status("Export nur im Editor")
             return
         filters = {
             "html": ("HTML (*.html)", ".html"),
@@ -15824,8 +16218,8 @@ class MainWindow(QMainWindow):
         """Tabelle einfügen — 2.6.14."""
         from PySide6.QtWidgets import QInputDialog
 
-        if self.stack.currentWidget() is not self.editor_pane:
-            self.stack.setCurrentWidget(self.editor_pane)
+        if not self._guard_editor_action("Tabelle"):
+            return
         rows, ok = QInputDialog.getInt(self, "Tabelle", "Zeilen:", 3, 1, 200)
         if not ok:
             return
@@ -15840,8 +16234,8 @@ class MainWindow(QMainWindow):
     def _format_table_dialog(self) -> None:
         from PySide6.QtWidgets import QInputDialog
 
-        if self.stack.currentWidget() is not self.editor_pane:
-            self.stack.setCurrentWidget(self.editor_pane)
+        if not self._guard_editor_action("Tabelle"):
+            return
         align, ok = QInputDialog.getText(
             self, "Tabelle formatieren", "Ausrichtung (z. B. lcr):", text="lcr"
         )
@@ -15865,8 +16259,8 @@ class MainWindow(QMainWindow):
     def _sort_table_dialog(self) -> None:
         from PySide6.QtWidgets import QInputDialog
 
-        if self.stack.currentWidget() is not self.editor_pane:
-            self.stack.setCurrentWidget(self.editor_pane)
+        if not self._guard_editor_action("Tabelle"):
+            return
         col, ok = QInputDialog.getInt(self, "Tabelle sortieren", "Spalte (0-basiert):", 0, 0, 49)
         if not ok:
             return
@@ -15876,8 +16270,8 @@ class MainWindow(QMainWindow):
             self._set_status("Keine Tabelle im Dokument")
 
     def _import_table_data(self) -> None:
-        if self.stack.currentWidget() is not self.editor_pane:
-            self.stack.setCurrentWidget(self.editor_pane)
+        if not self._guard_editor_action("Tabelle"):
+            return
         path, _ = QFileDialog.getOpenFileName(
             self,
             "Zahlen/Daten importieren",
