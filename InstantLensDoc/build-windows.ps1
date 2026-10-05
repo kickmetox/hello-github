@@ -1,4 +1,4 @@
-# InstantLens Doc — Windows-Build (PyInstaller App + Keygen) 2.6.30
+# InstantLens Doc — Windows-Build (PyInstaller App + Keygen) 2.6.31
 # Eine Zeile:
 #   powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 #
@@ -30,7 +30,7 @@ $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $Root
 
-Write-Host "=== InstantLens Doc Build 2.6.30 (Windows x64) ==="
+Write-Host "=== InstantLens Doc Build 2.6.31 (Windows x64) ==="
 Write-Host "Root: $Root"
 
 # 64-Bit Python erzwingen (bevorzugt für Release)
@@ -163,7 +163,7 @@ if (-not $SkipKeygen) {
     Write-Host "Keygen übersprungen (-SkipKeygen)"
 }
 
-Write-Host "Fertig (2.6.30). Optional:"
+Write-Host "Fertig (2.6.31). Optional:"
 Write-Host '  powershell -ExecutionPolicy Bypass -File .\installer\build-installer.ps1'
 Write-Host "  (ohne Keygen: -SkipKeygen bzw. ISCC /DIncludeKeygen=0)"
 Write-Host '  python scripts\pack-windows-runnable.py   # Python-Layout-Zip ohne EXE'

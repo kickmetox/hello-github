@@ -2,7 +2,7 @@
 
 Moderne Textverarbeitung mit PDF-Annotator, OCR-Bridge und Formulargenerator.
 
-**Version:** 2.6.30  
+**Version:** 2.6.31  
 **Hersteller:** Andreas Meyer · ame@sellerbach.de
 
 ## Quickstart (Windows)
@@ -29,7 +29,7 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 ```
 
 64-Bit-Python erforderlich. Runnable-Pack ohne EXE: `.\scripts\pack-windows-runnable.ps1`.  
-Installer-Einzeiler: `powershell -ExecutionPolicy Bypass -File .\scripts\build-windows-installer.ps1` → `dist\InstantLensDoc-Setup-2.6.30.exe`  
+Installer-Einzeiler: `powershell -ExecutionPolicy Bypass -File .\scripts\build-windows-installer.ps1` → `dist\InstantLensDoc-Setup-2.6.31.exe`  
 (oder `.\installer\build-installer.ps1`, optional `-NoKeygen`)  
 Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an).  
 User-Shortcuts: `.\scripts\install-ild.ps1` (inkl. Keygen) · Deinstallieren: `-Uninstall [-Quiet]` (Exit **0**/OK · **1**/Fehler; Quiet: Kurz-Summary, Exit 0 auch ohne Shortcuts).  
@@ -40,7 +40,7 @@ Scripting: `python -m ild --help` · `.\scripts\ild.ps1` · `run-ild.bat`.
 
 Nightly-Smoke: `python scripts\smoke_ild.py` · optional `--qt` · `--json` (Summary: `ok`, `checks[]`, `duration_ms`, `version`; Fail: `checks[].error` max 200…, Exit=ok). Siehe **CONTRIBUTING.md**; Workflow-Stub `.github/workflows/smoke-ild.yml` (manual only).
 
-## Neu in 2.6.30
+## Neu in 2.6.31
 
 - Sync LocalPack: flat Zip-Root **oder** nested `InstantLensDoc/` (Marker-Check, kein Case-Mixup mit `instantlensdoc\`)
 - ForceClean default + DE-Hinweis wenn Zielordner in Verwendung (`cd D:\AI_Temp`)

@@ -1,3 +1,7 @@
+## 2.6.31 - Sync-Skript Windows-Parser/Encoding-Fix
+
+Patch nach **2.6.30**: **`scripts/sync-ild.ps1`** parst unter Windows PowerShell 5.1 wieder (UTF-8 ohne BOM + Em-Dash/Smart-Quotes in Strings erzeugten Mojibake `â€"` und Folgefehler Try/Catch/Klammern). Fancy Unicode durch ASCII ersetzt; Datei UTF-8 **mit BOM**. Pack `InstantLensDoc-2.6.31-pack.zip` + Store-Kopie aktualisiert.
+
 ## 2.6.30 — Sync LocalPack flat/nested + ForceClean
 
 Patch nach **2.6.29**: **`scripts/sync-ild.ps1`** erkennt Pack-Root per Marker (`VERSION.txt` / `build-windows.ps1` / `requirements.txt`) — flat am Zip-Root **oder** nested `InstantLensDoc/` — und verwechselt unter Windows nicht mehr mit dem Python-Paketordner `instantlensdoc\` (case-insensitive). Default **ForceClean** leert das Ziel vor Copy (Nutzer-Icons bleiben); Ziel gesperrt/in use → klare DE-Meldung (`cd D:\AI_Temp`). Pack neu nested unter `InstantLensDoc/`. Docs/Store-Kopien aktualisiert.
