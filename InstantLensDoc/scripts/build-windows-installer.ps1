@@ -1,4 +1,4 @@
-# InstantLens Doc 2.6.29 — Windows-Installer (Inno Setup → Setup.exe)
+# InstantLens Doc 2.6.30 — Windows-Installer (Inno Setup → Setup.exe)
 #
 # Baut InstantLensDoc-Setup-<VERSION>.exe mit:
 #   - Startmenü-Gruppe (App, optional Keygen, INFO, Deinstallieren)

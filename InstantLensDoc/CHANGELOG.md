@@ -1,3 +1,7 @@
+## 2.6.30 — Sync LocalPack flat/nested + ForceClean
+
+Patch nach **2.6.29**: **`scripts/sync-ild.ps1`** erkennt Pack-Root per Marker (`VERSION.txt` / `build-windows.ps1` / `requirements.txt`) — flat am Zip-Root **oder** nested `InstantLensDoc/` — und verwechselt unter Windows nicht mehr mit dem Python-Paketordner `instantlensdoc\` (case-insensitive). Default **ForceClean** leert das Ziel vor Copy (Nutzer-Icons bleiben); Ziel gesperrt/in use → klare DE-Meldung (`cd D:\AI_Temp`). Pack neu nested unter `InstantLensDoc/`. Docs/Store-Kopien aktualisiert.
+
 ## 2.6.29 — Silbentrennung Menü/Palette (9 Sprachen)
 
 Minor nach **2.6.28**: **Silbentrennung-UI** für alle 9 UI-Sprachen (DE/EN/FR/RU/ES/ZH/PT/AR/IT) im Bearbeiten-Menü und der Command-Palette; Engine/Hook unverändert aus **2.6.28** (ZH/AR no-break). FEATURES: Signieren-Zeile an eIDAS-Trust-Pfad angeglichen; veraltete „Mehrsprach-UI DE/EN teilweise“-Zeile bereinigt. Pack/Docs aktualisiert.

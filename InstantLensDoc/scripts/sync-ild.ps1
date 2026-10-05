@@ -11,12 +11,19 @@
 #   -LocalPack C:\path\to\InstantLensDoc-pack.zip # Pack-Zip (wird nach WorkDir entpackt)
 #   -NoStart / -SkipStart   # App nach Sync nicht starten (synonym)
 #   -SkipPip
+#   -ForceClean             # Zielinhalt vor Copy leeren (Icons bleiben); Default: an
+#   -NoForceClean           # Merge/Overwrite ohne vorheriges Leeren (alte Reste möglich)
 #   -BuildInstaller         # optional: nach Sync Inno-Setup.exe bauen (braucht ISCC)
 #   -SkipInstallHints       # keine DE-Hinweise zu install-ild / Setup.exe nach Sync
 #
+# Pack-Layouts (Zip oder Ordner):
+#   - flat: VERSION.txt / build-windows.ps1 / requirements.txt am Extract-Root
+#   - nested: …\InstantLensDoc\ mit denselben Markern (nicht der Python-Ordner instantlensdoc\)
+#   Windows ist case-insensitive — Marker-Check verhindert Verwechslung mit dem Paketordner.
+#
 # Exit-Codes:
 #   0  Erfolg (Sync fertig; optional App gestartet; Installer-Build optional)
-#   1  Allgemeiner Fehler (LocalPack ungültig, Ziel/requirements fehlen, pip-Fehler, Installer-Build)
+#   1  Allgemeiner Fehler (LocalPack ungültig, Ziel gesperrt/in use, requirements fehlen, pip, Installer)
 #   2  Git-Sync fehlgeschlagen (Clone/Fetch/Checkout) — Fallback: -LocalPack nutzen
 #
 # Fallback wenn Git-Clone/Fetch fehlschlägt (z. B. 401/Auth):
@@ -39,6 +46,8 @@ param(
     [switch]$NoStart,
     [switch]$SkipStart,
     [switch]$SkipPip,
+    [switch]$ForceClean,
+    [switch]$NoForceClean,
     [switch]$BuildInstaller,
     [switch]$SkipInstallHints
 )
@@ -46,6 +55,19 @@ param(
 $ErrorActionPreference = "Stop"
 # -SkipStart ist Alias für -NoStart (beide unterdrücken den App-Start)
 if ($SkipStart) { $NoStart = $true }
+# Clean Sync ist Default (alte Layouts/Reste weg); -NoForceClean deaktiviert
+$doClean = $true
+if ($NoForceClean) { $doClean = $false }
+elseif ($ForceClean) { $doClean = $true }
+
+function Test-AppRoot {
+    param([string]$Path)
+    if (-not $Path -or -not (Test-Path -LiteralPath $Path -PathType Container)) { return $false }
+    foreach ($marker in @("VERSION.txt", "build-windows.ps1", "requirements.txt")) {
+        if (Test-Path -LiteralPath (Join-Path $Path $marker) -PathType Leaf) { return $true }
+    }
+    return $false
+}
 
 function Backup-UserIcons {
     param([string]$Dest)
@@ -59,10 +81,10 @@ function Backup-UserIcons {
     $saved = @()
     foreach ($rel in $names) {
         $p = Join-Path $Dest $rel
-        if (Test-Path $p) {
+        if (Test-Path -LiteralPath $p) {
             $target = Join-Path $backup ($rel -replace "[\\/]", "__")
-            Copy-Item -Force $p $target
-            $saved += [pscustomobject]@{ Rel = $rel; Backup = $target; SrcTime = (Get-Item $p).LastWriteTimeUtc }
+            Copy-Item -Force -LiteralPath $p -Destination $target
+            $saved += [pscustomobject]@{ Rel = $rel; Backup = $target; SrcTime = (Get-Item -LiteralPath $p).LastWriteTimeUtc }
         }
     }
     return [pscustomobject]@{ Dir = $backup; Items = $saved }
@@ -76,30 +98,137 @@ function Restore-UserIcons {
         $destDir = Split-Path -Parent $destPath
         New-Item -ItemType Directory -Force -Path $destDir | Out-Null
         # Nutzer-Icon wiederherstellen wenn vorhanden (nie durch Sync ersetzen)
-        Copy-Item -Force $item.Backup $destPath
+        Copy-Item -Force -LiteralPath $item.Backup -Destination $destPath
         Write-Host "Icon behalten: $($item.Rel)"
     }
-    Remove-Item -Recurse -Force $BackupInfo.Dir -ErrorAction SilentlyContinue
+    Remove-Item -Recurse -Force -LiteralPath $BackupInfo.Dir -ErrorAction SilentlyContinue
+}
+
+function Write-DestinationLockedHint {
+    param([string]$Dest, [string]$Detail = "")
+    $safe = "D:\AI_Temp"
+    Write-Host ""
+    Write-Host "=== Zielordner gesperrt / in Verwendung ===" -ForegroundColor Red
+    Write-Host "Ordner: $Dest"
+    if ($Detail) { Write-Host "Detail: $Detail" -ForegroundColor DarkYellow }
+    Write-Host "PowerShell/Explorer stehen oft noch IN diesem Ordner (cwd)."
+    Write-Host "Bitte zuerst den Ordner verlassen, dann Sync erneut:"
+    Write-Host "  cd $safe"
+    Write-Host "  # optional Backup/Rename wenn noch Reste:"
+    Write-Host "  # Rename-Item '$Dest' ('${Dest}.bak-' + (Get-Date -Format 'yyyyMMdd-HHmmss'))"
+    Write-Host '  powershell -ExecutionPolicy Bypass -File .\sync-ild.ps1 -LocalPack D:\AI_Temp\InstantLensDoc-2.6.30-pack.zip -SkipStart'
+    Write-Host "Exit-Code 1 = Ziel gesperrt oder Sync-Fehler."
+    Write-Host ""
+}
+
+function Assert-DestinationWritable {
+    param([string]$Dest)
+    # Wenn CWD unter Ziel liegt: rauswechseln (sonst Remove/Rename „in use“)
+    try {
+        $cwd = (Get-Location).Path
+        $destFull = [System.IO.Path]::GetFullPath($Dest)
+        if ($cwd -and $destFull -and $cwd.StartsWith($destFull, [System.StringComparison]::OrdinalIgnoreCase)) {
+            $parent = Split-Path -Parent $destFull
+            if (-not $parent) { $parent = "D:\AI_Temp" }
+            Write-Host "CWD liegt im Ziel — wechsle nach $parent"
+            Set-Location $parent
+        }
+    } catch {
+        Write-DestinationLockedHint -Dest $Dest -Detail $_.Exception.Message
+        throw "Zielordner in Verwendung (CWD). Bitte zuerst verlassen: cd D:\AI_Temp"
+    }
+
+    if (-not (Test-Path -LiteralPath $Dest)) { return }
+
+    $probe = Join-Path $Dest (".ild-sync-probe-" + [guid]::NewGuid().ToString("N").Substring(0, 8))
+    try {
+        New-Item -ItemType File -Path $probe -Force | Out-Null
+        Remove-Item -LiteralPath $probe -Force
+    } catch {
+        Write-DestinationLockedHint -Dest $Dest -Detail $_.Exception.Message
+        throw "Zielordner gesperrt/in Verwendung. Bitte zuerst verlassen: cd D:\AI_Temp"
+    }
+}
+
+function Clear-DestinationContents {
+    param([string]$Dest)
+    if (-not (Test-Path -LiteralPath $Dest)) { return }
+    Write-Host "ForceClean: leere Zielinhalt (Icons bereits gesichert)…"
+    Get-ChildItem -LiteralPath $Dest -Force | ForEach-Object {
+        if ($_.Name -in @(".venv", "__pycache__", ".git", ".smoke_license.json")) {
+            return
+        }
+        try {
+            Remove-Item -LiteralPath $_.FullName -Recurse -Force -ErrorAction Stop
+        } catch {
+            Write-DestinationLockedHint -Dest $Dest -Detail $_.Exception.Message
+            throw "Zielordner in Verwendung — kann '$($_.Name)' nicht entfernen. Bitte zuerst verlassen: cd D:\AI_Temp"
+        }
+    }
 }
 
 function Resolve-PackSource {
     param([string]$PackPath, [string]$UnpackRoot)
-    if (-not $PackPath -or -not (Test-Path $PackPath)) { return $null }
-    $item = Get-Item $PackPath
+    if (-not $PackPath -or -not (Test-Path -LiteralPath $PackPath)) { return $null }
+    $item = Get-Item -LiteralPath $PackPath
+
     if ($item.PSIsContainer) {
-        return (Resolve-Path $PackPath).Path
+        $folder = (Resolve-Path -LiteralPath $PackPath).Path
+        if (Test-AppRoot $folder) {
+            Write-Host "Pack-Root (Ordner, flat/app): $folder"
+            return $folder
+        }
+        $nested = Join-Path $folder "InstantLensDoc"
+        if ((Test-Path -LiteralPath $nested -PathType Container) -and (Test-AppRoot $nested)) {
+            Write-Host "Pack-Root (Ordner, nested InstantLensDoc/): $nested"
+            return (Resolve-Path -LiteralPath $nested).Path
+        }
+        Write-Warning "LocalPack-Ordner ohne App-Marker (VERSION.txt / build-windows.ps1 / requirements.txt): $folder"
+        return $null
     }
+
     if ($item.Extension -ieq ".zip") {
         $unpack = Join-Path $UnpackRoot ("pack-" + [guid]::NewGuid().ToString("N").Substring(0, 8))
         New-Item -ItemType Directory -Force -Path $unpack | Out-Null
         Write-Host "Entpacke Pack-Zip: $($item.FullName) → $unpack"
         Expand-Archive -Force -Path $item.FullName -DestinationPath $unpack
-        $nested = Join-Path $unpack "InstantLensDoc"
-        if (Test-Path $nested) { return (Resolve-Path $nested).Path }
-        if (Test-Path (Join-Path $unpack "instantlensdoc")) { return (Resolve-Path $unpack).Path }
-        # Zip enthält Dateien direkt
-        return (Resolve-Path $unpack).Path
+
+        # 1) Flat: Marker am Extract-Root (auch wenn instantlensdoc\ Python-Paket daneben liegt)
+        if (Test-AppRoot $unpack) {
+            Write-Host "Pack-Layout: flat (Marker am Zip-Root)"
+            return (Resolve-Path -LiteralPath $unpack).Path
+        }
+
+        # 2) Nested: InstantLensDoc\ mit App-Markern (nicht bloß Python-Paket)
+        $nestedCandidates = @(
+            (Join-Path $unpack "InstantLensDoc"),
+            (Join-Path $unpack "instantlensdoc")
+        )
+        foreach ($cand in $nestedCandidates) {
+            if ((Test-Path -LiteralPath $cand -PathType Container) -and (Test-AppRoot $cand)) {
+                Write-Host "Pack-Layout: nested → $cand"
+                return (Resolve-Path -LiteralPath $cand).Path
+            }
+        }
+
+        # 3) Eine Ebene tiefer suchen (manchmal Zip/Zip)
+        $dirs = Get-ChildItem -LiteralPath $unpack -Directory -ErrorAction SilentlyContinue
+        foreach ($d in $dirs) {
+            if (Test-AppRoot $d.FullName) {
+                Write-Host "Pack-Layout: Unterordner mit Markern → $($d.FullName)"
+                return (Resolve-Path -LiteralPath $d.FullName).Path
+            }
+            $inner = Join-Path $d.FullName "InstantLensDoc"
+            if ((Test-Path -LiteralPath $inner -PathType Container) -and (Test-AppRoot $inner)) {
+                Write-Host "Pack-Layout: nested unter $($d.Name) → $inner"
+                return (Resolve-Path -LiteralPath $inner).Path
+            }
+        }
+
+        Write-Warning "Pack-Zip ohne App-Root (weder flat noch nested InstantLensDoc/ mit VERSION.txt|build-windows.ps1|requirements.txt): $($item.FullName)"
+        return $null
     }
+
     Write-Warning "LocalPack ist weder Ordner noch .zip: $PackPath"
     return $null
 }
@@ -109,10 +238,10 @@ function Write-LocalPackHint {
     Write-Host ""
     Write-Host "=== Git-Sync fehlgeschlagen ($Reason) ===" -ForegroundColor Yellow
     Write-Host "Fallback: lokales Pack nutzen:"
-    Write-Host '  powershell -ExecutionPolicy Bypass -File .\sync-ild.ps1 -LocalPack D:\AI_Temp\InstantLensDoc-pack.zip -SkipStart'
+    Write-Host '  powershell -ExecutionPolicy Bypass -File .\sync-ild.ps1 -LocalPack D:\AI_Temp\InstantLensDoc-2.6.30-pack.zip -SkipStart'
     Write-Host "oder entpackten Ordner:"
     Write-Host '  powershell -ExecutionPolicy Bypass -File .\sync-ild.ps1 -LocalPack D:\AI_Temp\InstantLensDoc-pack -SkipStart'
-    Write-Host "Pack-Zip: InstantLensDoc-pack.zip (Store artifacts / Agent-Ausgabe)."
+    Write-Host "Pack-Zip: InstantLensDoc-*-pack.zip (Store docs / Agent-Ausgabe)."
     Write-Host "Exit-Code 2 = Git-Fehler; Exit-Code 1 = sonstiger Fehler; 0 = OK."
     Write-Host ""
 }
@@ -121,7 +250,10 @@ try {
     Write-Host "=== InstantLens Doc Sync ==="
     Write-Host "Ziel: $Destination"
     if ($NoStart) { Write-Host "Start: übersprungen (-NoStart/-SkipStart)" }
+    if ($doClean) { Write-Host "Clean: ForceClean (Zielinhalt leeren, Icons behalten)" }
+    else { Write-Host "Clean: aus (-NoForceClean) — Merge/Overwrite" }
 
+    Assert-DestinationWritable -Dest $Destination
     New-Item -ItemType Directory -Force -Path $Destination | Out-Null
     $iconBackup = Backup-UserIcons -Dest $Destination
 
@@ -140,10 +272,18 @@ try {
     # 2) Zip neben dem Skript (Fallback ohne Parameter)
     if (-not $appSrc) {
         $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-        $sideZip = Join-Path $scriptDir "InstantLensDoc-pack.zip"
-        $sideZipAlt = Join-Path (Split-Path $scriptDir -Parent) "InstantLensDoc-pack.zip"
-        foreach ($z in @($sideZip, $sideZipAlt, "D:\AI_Temp\InstantLensDoc-pack.zip")) {
-            if (Test-Path $z) {
+        $parentDir = Split-Path $scriptDir -Parent
+        $sideCandidates = @(
+            (Join-Path $scriptDir "InstantLensDoc-pack.zip"),
+            (Join-Path $parentDir "InstantLensDoc-pack.zip"),
+            (Join-Path $parentDir "InstantLensDoc-2.6.30-pack.zip"),
+            (Join-Path $parentDir "InstantLensDoc-2.6.29-pack.zip"),
+            "D:\AI_Temp\InstantLensDoc-2.6.30-pack.zip",
+            "D:\AI_Temp\InstantLensDoc-2.6.29-pack.zip",
+            "D:\AI_Temp\InstantLensDoc-pack.zip"
+        )
+        foreach ($z in $sideCandidates) {
+            if (Test-Path -LiteralPath $z) {
                 Write-Host "Pack-Zip gefunden: $z"
                 $appSrc = Resolve-PackSource -PackPath $z -UnpackRoot (Split-Path $WorkDir -Parent)
                 if ($appSrc) { break }
@@ -154,7 +294,7 @@ try {
     # 3) Git clone/fetch
     if (-not $appSrc) {
         try {
-            if (-not (Test-Path $WorkDir)) {
+            if (-not (Test-Path -LiteralPath $WorkDir)) {
                 Write-Host "Clone $RepoUrl ($Branch) → $WorkDir"
                 git clone --branch $Branch --single-branch $RepoUrl $WorkDir
                 if ($LASTEXITCODE -ne 0) { throw "git clone exit $LASTEXITCODE" }
@@ -168,12 +308,12 @@ try {
                 Pop-Location
             }
             $candidate = Join-Path $WorkDir "InstantLensDoc"
-            if (Test-Path $candidate) {
+            if (Test-AppRoot $candidate) {
                 $appSrc = $candidate
-            } elseif (Test-Path (Join-Path $WorkDir "instantlensdoc")) {
+            } elseif (Test-AppRoot $WorkDir) {
                 $appSrc = $WorkDir
             } else {
-                throw "App-Quellordner nicht gefunden unter $WorkDir"
+                throw "App-Quellordner nicht gefunden unter $WorkDir (Marker VERSION.txt|build-windows.ps1|requirements.txt)"
             }
         } catch {
             Write-LocalPackHint -Reason $_.Exception.Message
@@ -181,49 +321,77 @@ try {
         }
     }
 
+    if (-not (Test-AppRoot $appSrc)) {
+        Write-Error "Quelle ist kein App-Root (fehlende Marker): $appSrc"
+        exit 1
+    }
+
+    if ($doClean) {
+        Assert-DestinationWritable -Dest $Destination
+        Clear-DestinationContents -Dest $Destination
+    }
+
     Write-Host "Kopiere von $appSrc → $Destination"
-    # Inhalt kopieren; .venv und Nutzer-Caches nicht anfassen wenn möglich
-    Get-ChildItem $appSrc -Force | ForEach-Object {
+    Get-ChildItem -LiteralPath $appSrc -Force | ForEach-Object {
         if ($_.Name -in @(".venv", "__pycache__", ".git", ".smoke_license.json")) {
             return
         }
-        Copy-Item -Recurse -Force $_.FullName $Destination
+        # Alte Pack-Zips im Tree nicht mitkopieren
+        if ($_.Name -like "InstantLensDoc-*-pack.zip") { return }
+        try {
+            Copy-Item -Recurse -Force -LiteralPath $_.FullName -Destination $Destination
+        } catch {
+            Write-DestinationLockedHint -Dest $Destination -Detail $_.Exception.Message
+            throw "Kopieren fehlgeschlagen (Ziel gesperrt?): $($_.Exception.Message)"
+        }
     }
 
     Restore-UserIcons -BackupInfo $iconBackup -Dest $Destination
 
-    # Falls Nutzer-Icon im Root liegt → nach assets spiegeln (ohne vorhandenes neueres assets zu zerstören — Restore schon gemacht)
+    # Falls Nutzer-Icon im Root liegt → nach assets spiegeln
     $rootJpg = Join-Path $Destination "lensDoc.jpg"
-    $assetsIco = Join-Path $Destination "assets\app.ico"
     $assetsPng = Join-Path $Destination "assets\icon.png"
     New-Item -ItemType Directory -Force -Path (Join-Path $Destination "assets") | Out-Null
-    if ((Test-Path $rootJpg) -and -not (Test-Path $assetsPng)) {
-        Copy-Item -Force $rootJpg $assetsPng
+    if ((Test-Path -LiteralPath $rootJpg) -and -not (Test-Path -LiteralPath $assetsPng)) {
+        Copy-Item -Force -LiteralPath $rootJpg -Destination $assetsPng
         Write-Host "Icon aus lensDoc.jpg → assets\icon.png"
     }
 
-    Set-Location $Destination
-    Write-Host "=== Inhalt ==="
-    Get-ChildItem $Destination | Select-Object Name, Length | Format-Table -AutoSize
+    # Listing ohne dauerhaftes Set-Location ins Ziel (vermeidet „in use“ bei späterem Rename)
+    $prevLoc = Get-Location
+    try {
+        Set-Location $Destination
+        Write-Host "=== Inhalt ==="
+        Get-ChildItem $Destination | Select-Object Name, Length | Format-Table -AutoSize
+    } finally {
+        try { Set-Location $prevLoc } catch { Set-Location (Split-Path -Parent $Destination) }
+    }
 
-    if (-not (Test-Path (Join-Path $Destination "requirements.txt"))) {
-        Write-Error "requirements.txt fehlt nach Sync."
-        exit 1
+    foreach ($must in @("requirements.txt", "VERSION.txt", "build-windows.ps1")) {
+        if (-not (Test-Path -LiteralPath (Join-Path $Destination $must))) {
+            Write-Error "$must fehlt nach Sync. Pack-Layout/Clean prüfen. Quelle war: $appSrc"
+            exit 1
+        }
     }
 
     if (-not $SkipPip) {
         Write-Host "pip install -r requirements.txt …"
-        python -m pip install -r requirements.txt
-        if ($LASTEXITCODE -ne 0) {
-            Write-Error "pip install fehlgeschlagen (exit $LASTEXITCODE)"
-            exit 1
+        Push-Location $Destination
+        try {
+            python -m pip install -r requirements.txt
+            if ($LASTEXITCODE -ne 0) {
+                Write-Error "pip install fehlgeschlagen (exit $LASTEXITCODE)"
+                exit 1
+            }
+        } finally {
+            Pop-Location
         }
     }
 
     # Optional: Inno Setup.exe nach Sync (Windows x64 + ISCC)
     if ($BuildInstaller) {
         $buildInst = Join-Path $Destination "scripts\build-windows-installer.ps1"
-        if (-not (Test-Path $buildInst)) {
+        if (-not (Test-Path -LiteralPath $buildInst)) {
             Write-Error "build-windows-installer.ps1 fehlt: $buildInst"
             exit 1
         }
@@ -251,22 +419,29 @@ try {
         Write-Host "Oder Sync mit Installer-Build:"
         Write-Host '  powershell -ExecutionPolicy Bypass -File .\sync-ild.ps1 -BuildInstaller -SkipStart'
         Write-Host "Keygen: run-keygen.bat · Scripting: python -m ild --help · .\scripts\ild.ps1"
+        Write-Host "Verify: Test-Path D:\AI_Temp\InstantLensDoc\build-windows.ps1"
         Write-Host ""
     }
 
     if (-not $NoStart) {
         Write-Host "Starte InstantLens Doc…"
         $run = Join-Path $Destination "run.bat"
-        if (Test-Path $run) {
-            & $run
+        if (Test-Path -LiteralPath $run) {
+            Push-Location $Destination
+            try { & $run } finally { Pop-Location }
         } else {
-            python -m instantlensdoc
+            Push-Location $Destination
+            try { python -m instantlensdoc } finally { Pop-Location }
         }
     }
 
     Write-Host "Sync fertig. (exit 0)"
     exit 0
 } catch {
-    Write-Host "Sync-Fehler: $($_.Exception.Message)" -ForegroundColor Red
+    $msg = $_.Exception.Message
+    Write-Host "Sync-Fehler: $msg" -ForegroundColor Red
+    if ($msg -match "in Verwendung|gesperrt|in use|cannot remove|being used") {
+        Write-DestinationLockedHint -Dest $Destination -Detail $msg
+    }
     exit 1
 }
