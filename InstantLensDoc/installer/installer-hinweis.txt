@@ -1,4 +1,16 @@
-InstantLens Doc 2.6.52 - Installation
+InstantLens Doc 2.6.53 - Installation
+
+Neu in 2.6.53:
+- PDF-Oeffnen robust: Bytes -> Pfad -> pikepdf-Reparatur (Windows "Data format
+  error" bei Umlaut-Pfaden, Locks, beschaedigten/unvollstaendigen PDFs)
+- PDFium nur noch im GUI-Thread (parallele Worker korrumpierten den Parser)
+- Banner nennt Schritt, exakte Exception und pypdfium2/PDFium-Version
+- DOCX: Umbruch am Spaltenrand (kein horizontaler Scroll), Dokument-Schrift
+  statt Consolas, Run-Schriftarten
+- Seitenlayout-Dialog (Ansicht -> Seitenlayout...): A4/Letter/Buchformate,
+  Hoch/Quer, Raender, Satzspiegel; Editor rendert in Seitenbreite
+- Build: pypdfium2_raw + pikepdf eingesammelt, pdfium.dll-Guard
+- scripts\test_ui_audit_2653.py: Offscreen-End-to-End-Test
 
 Neu in 2.6.52 (Voll-Audit):
 - PDF-Hauptansicht endlich sichtbar: PDF-Werkzeugleiste (85 Buttons) erzwang

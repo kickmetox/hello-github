@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Nightly/CI Smoke: CLI + Import-Checks für InstantLens Doc — 2.1.0–2.6.52.
+"""Nightly/CI Smoke: CLI + Import-Checks für InstantLens Doc — 2.1.0–2.6.53.
 
 Leichtgewichtig. Exit-Codes:
   0  OK  (ok=true)
@@ -14,12 +14,12 @@ Aufruf:
   python scripts/smoke_ild.py -h
 
 JSON-Schema (--json), Erfolg:
-  {"ok": true, "version": "2.6.52", "duration_ms": 1234,
+  {"ok": true, "version": "2.6.53", "duration_ms": 1234,
    "checks": ["version", "imports", "cli", "measure_diff_import", "changelog"]}
 
 JSON bei Fail: checks[] enthält Objekt mit error-Text (max 200 Zeichen, Truncate …);
 Exitcode spiegelt ok (0↔true, 1↔false) — 2.2.0:
-  {"ok": false, "version": "2.6.52", "duration_ms": 12,
+  {"ok": false, "version": "2.6.53", "duration_ms": 12,
    "checks": ["version", {"name": "imports", "error": "import x: …"}]}
 """
 
@@ -41,7 +41,7 @@ if str(ROOT) not in sys.path:
 # Headless/CI: Qt ohne Display
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-EXPECTED_VERSION = "2.6.52"
+EXPECTED_VERSION = "2.6.53"
 FAIL_ERROR_MAX_LEN = 200
 
 EXIT_OK = 0
@@ -524,6 +524,48 @@ def check_version() -> None:
     if not (ROOT / "scripts" / "test_ui_audit_2652.py").is_file():
         _fail("scripts/test_ui_audit_2652.py fehlt (2.6.52)")
     _ok("2.6.52 full-audit flowlayout/page-count-signal/merge-format/docx-styles: OK")
+    # 2.6.53: PDFium-Fallback-Kette, kein PDFium im Worker, Seitenlayout, DOCX-Umbruch
+    po = ROOT / "ild_pdf" / "pdfium_open.py"
+    if not po.is_file():
+        _fail("ild_pdf/pdfium_open.py fehlt (2.6.53)")
+    po_src = po.read_text(encoding="utf-8")
+    for need in ("def open_pdfium", "STEP_REPAIR", "PDFIUM_LOCK", "def pdfium_version_info"):
+        if need not in po_src:
+            _fail(f"pdfium_open fehlt {need} (2.6.53)")
+    doc_src = (ROOT / "ild_pdf" / "document.py").read_text(encoding="utf-8")
+    if "open_pdfium(" not in doc_src or "pdfium.PdfDocument(str(self.path)" in doc_src:
+        _fail("ild_pdf/document.py nutzt keine Fallback-Kette (2.6.53 — Data format error)")
+    rd = (ROOT / "ild_pdf" / "render.py").read_text(encoding="utf-8")
+    if "open_pdfium(" not in rd or "PDFIUM_LOCK" not in rd:
+        _fail("ild_pdf/render.py ohne open_pdfium/PDFIUM_LOCK (2.6.53)")
+    sec = (ROOT / "ild_pdf" / "security.py").read_text(encoding="utf-8")
+    probe = sec.split("def needs_password", 1)[-1].split("def _encrypt_marker_heuristic", 1)[0]
+    if "pypdfium2" in probe:
+        _fail("security.needs_password nutzt PDFium im Worker-Thread (2.6.53 — nicht threadsicher)")
+    work = pv.split("def _schedule_page_count_refresh", 1)[-1].split("def _on_page_count_ready", 1)[0]
+    if "PdfDocument(" in work:
+        _fail("pdf_view._schedule_page_count_refresh öffnet PDFium im Worker (2.6.53)")
+    if "reset_page_image" not in pv:
+        _fail("pdf_view fehlt canvas.reset_page_image (2.6.53 — altes Bild zählt als Erfolg)")
+    spec = (ROOT / "instantlensdoc.spec").read_text(encoding="utf-8")
+    if "pypdfium2_raw" not in spec or "pypdfium2_raw" not in bw:
+        _fail("Spec/build-windows.ps1 sammeln pypdfium2_raw nicht (2.6.53 — pdfium.dll)")
+    req = (ROOT / "requirements.txt").read_text(encoding="utf-8")
+    if "pypdfium2==" not in req:
+        _fail("requirements.txt pinnt pypdfium2 nicht (2.6.53)")
+    if "_rich_mode" not in ed_src or "def set_page_layout" not in ed_src or "_relayout_document_width" not in ed_src:
+        _fail("editor fehlt Rich-Umbruch/Seitenlayout (2.6.53)")
+    for rel in ("instantlensdoc/core/editor_page_layout.py", "instantlensdoc/ui/page_layout_dialog.py", "scripts/test_ui_audit_2653.py"):
+        if not (ROOT / rel).is_file():
+            _fail(f"{rel} fehlt (2.6.53)")
+    if '"page_layout"' not in mw or "actPageLayout" not in mw:
+        _fail("main_window fehlt Seitenlayout-Aktion (2.6.53)")
+    rb_src = (ROOT / "instantlensdoc" / "ui" / "ribbon_bar.py").read_text(encoding="utf-8")
+    if '("page_layout"' not in rb_src:
+        _fail("Ribbon fehlt Seitenlayout-Button (2.6.53)")
+    if "def docx_default_font" not in rt or "font-family" not in rt:
+        _fail("richtext_docx fehlt Standardschrift/Run-Fonts (2.6.53)")
+    _ok("2.6.53 pdfium-fallback-chain/no-worker-pdfium/docx-wrap/page-layout: OK")
 
 
 def check_imports(*, with_qt: bool) -> None:
@@ -2886,11 +2928,11 @@ Exit-Codes:
 Laufzeit: am Ende als „Laufzeit: N ms“ (oder duration_ms im JSON).
 
 Beispiel --json (Erfolg):
-  {"ok": true, "version": "2.6.52", "duration_ms": 1234,
+  {"ok": true, "version": "2.6.53", "duration_ms": 1234,
    "checks": ["version", "imports", "cli", "measure_diff_import", "changelog"]}
 
 Beispiel --json (Fail):
-  {"ok": false, "version": "2.6.52", "duration_ms": 12,
+  {"ok": false, "version": "2.6.53", "duration_ms": 12,
    "checks": ["version", {"name": "imports", "error": "import x: …"}]}
 """.rstrip()
     )

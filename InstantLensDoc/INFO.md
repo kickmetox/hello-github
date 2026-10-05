@@ -1,5 +1,9 @@
 # InstantLens Doc — Kurzinfo
 
+### 2.6.53 — PDFium „Data format error“, DOCX-Umbruch/-Schrift, Seitenlayout
+
+PDF-Öffnen mit Fallback-Kette **Bytes → Pfad → pikepdf-Reparatur** (`ild_pdf/pdfium_open.py`), PDFium nur noch im GUI-Thread (Worker-Threads korrumpierten den Parser), Banner mit Schritt/Exception/pypdfium2-Version. DOCX bricht immer am Spaltenrand um, proportionale Schrift aus dem Dokument, Run-Schriftarten. **Seitenlayout**-Dialog (Ansicht → Seitenlayout…): DTP-Presets, Ränder, Ausrichtung, Satzspiegel → Editor rendert in Seitenbreite. Test `scripts/test_ui_audit_2653.py`. Pack `InstantLensDoc-2.6.53-pack.zip`.
+
 ### 2.6.52 — Voll-Audit: PDF-Ansicht sichtbar, Seitenanzahl, B/I/U, Textmarker, DOCX
 
 Ursache der „weißen Hauptansicht“: PDF-Werkzeugleiste erzwang **7286 px** Fenster-Mindestbreite → Seite lag außerhalb des Monitors. Jetzt umbrechende Leiste + scrollbare Sidebar (Minimum 1046×632). Seitenanzahl/Navigation bei mehrseitigen PDFs repariert; Fett/Kursiv/Unterstrichen/Textmarker unabhängig; Textmarker persistent (DOCX); DOCX-Stilformate/Hyperlinks; kein „geändert“ direkt nach Öffnen. Test `scripts/test_ui_audit_2652.py`. Pack `InstantLensDoc-2.6.52-pack.zip`.
@@ -11,7 +15,7 @@ Menü **Geräte** (Scanner / Scannen…, Drucker, Erkennen), PDF → Scannen, To
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **2.6.52** |
+| Version | **2.6.53** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
