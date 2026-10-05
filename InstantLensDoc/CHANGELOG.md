@@ -1,3 +1,9 @@
+## 2.6.48 - Weiße Hauptansicht/Thumbs: PDFium-Buffer detach + sichtbarer Paint
+
+Patch nach **2.6.47** (sichtbarer Fallback): Feldbericht — Text geladen, zentrale Ansicht **weiter weiß**, Schnellvorschau-Thumb grau, **kein** Fallback-Banner. Ursache: `bitmap.to_pil()` teilt bei RGBA/BGRA den PDFium-Buffer; nach `page`/`doc`/`bitmap.close()` Use-after-free → oft weißes Ghost-Pixmap, das als „Erfolg“ zählte (`_canvas_has_page_image` nur internes `_pixmap`). Thumbs blieben Platzhalter.
+
+Fix: **`ild_pdf.render.render_page`** detacht PIL immer mit `.copy()` + `bitmap.close()`; gemeinsame **`image_qt.pil_to_qpixmap`** (tiefe QImage-Kopie) für Canvas + Thumbs; Canvas-Erfolg nur bei **sichtbarem** Label-Pixmap mit Tinte; `QScrollArea.setWidgetResizable(False)`; Show/Resize-`_schedule_paint_retry`; Offscreen-Test `scripts/test_pdf_canvas_not_blank.py`. Pack `InstantLensDoc-2.6.48-pack.zip`; VERSION **2.6.48**.
+
 ## 2.6.47 - Hauptansicht: sichtbarer Render-Fallback (kein stilles Weiß)
 
 Patch nach **2.6.46** (ScanTuxio-UI Launch): Restlücke aus Blank-View — wenn `_ensure_page_painted(warn=False)` scheitert, blieb die zentrale Ansicht **still weiß** (Thumbs funktionierten). Fix: **`PdfCanvas.show_render_fallback`** (gelbes Banner + Hinweis), Status/Log immer; `refresh` gilt nur bei echtem Canvas-Pixmap; Thumb-Klick erzwingt Paint; provisional `page_count` blockiert Goto nicht; nach BG-Seitenanzahl `document_changed` für Thumbs. Pack `InstantLensDoc-2.6.47-pack.zip`; VERSION **2.6.47**.

@@ -2085,13 +2085,12 @@ class Sidebar(QWidget):
         if isinstance(img, QImage):
             return QPixmap.fromImage(img).scaled(w, h, Qt.KeepAspectRatio, Qt.SmoothTransformation)
         try:
-            if img.mode != "RGBA":
-                img = img.convert("RGBA")
-            data = img.tobytes("raw", "RGBA")
-            qimg = QImage(data, img.width, img.height, QImage.Format_RGBA8888)
-            return QPixmap.fromImage(qimg.copy()).scaled(
-                w, h, Qt.KeepAspectRatio, Qt.SmoothTransformation
-            )
+            from instantlensdoc.ui.image_qt import pil_to_qpixmap
+
+            pm = pil_to_qpixmap(img)
+            if pm.isNull():
+                return QPixmap()
+            return pm.scaled(w, h, Qt.KeepAspectRatio, Qt.SmoothTransformation)
         except Exception:
             return QPixmap()
 

@@ -721,6 +721,11 @@ class PdfCanvas(QLabel):
         self.setMouseTracking(True)
         self.setFocusPolicy(Qt.StrongFocus)
 
+    def clear(self) -> None:  # noqa: A003 — QLabel.clear + interner Stand
+        """Anzeige und internes Seitenpixmap leeren — 2.6.48."""
+        self._pixmap = None
+        super().clear()
+
     def wheelEvent(self, event):  # noqa: N802
         """Frame/Canvas-Mausrad: Viewer-Scroll oder Seitenwechsel — 2.6.28.
 
@@ -1262,16 +1267,23 @@ class PdfCanvas(QLabel):
         annotations: list[Annotation] | None = None,
         scale: float = 1.5,
     ):
-        if image.mode != "RGBA":
-            image = image.convert("RGBA")
-        data = image.tobytes("raw", "RGBA")
-        qimg = QImage(data, image.width, image.height, QImage.Format_RGBA8888)
-        self._pixmap = QPixmap.fromImage(qimg.copy())
+        from instantlensdoc.ui.image_qt import pil_to_qpixmap
+
+        pm = pil_to_qpixmap(image)
+        if pm.isNull():
+            # Kein stilles Weiß: internen Stand leeren, Caller sieht Fail — 2.6.48
+            self._pixmap = None
+            self.clear()
+            raise RuntimeError("PIL→QPixmap fehlgeschlagen (leeres Pixmap)")
+        self._pixmap = pm
         self._annotations = annotations or []
         self._scale = scale
         self._drag_start = None
         self._drag_current = None
         self._repaint_overlay()
+        shown = self.pixmap()
+        if shown is None or shown.isNull() or int(shown.width()) < 2:
+            raise RuntimeError("Canvas setPixmap ohne sichtbares Seitenbild")
 
     def show_render_fallback(self, message: str = "") -> None:
         """Sichtbarer Platzhalter statt stiller weißer Fläche — 2.6.47.
@@ -1689,10 +1701,18 @@ class PdfCanvas(QLabel):
         painter.drawPolygon(QPolygonF([p1, p2, p3]))
 
     def _repaint_overlay(self):
-        if self._pixmap is None:
+        if self._pixmap is None or self._pixmap.isNull():
             return
         pm = QPixmap(self._pixmap)
+        if pm.isNull():
+            return
         painter = QPainter(pm)
+        if not painter.isActive():
+            # Fallback: wenigstens Rohseite zeigen — 2.6.48
+            self.setPixmap(self._pixmap)
+            self.adjustSize()
+            self.update()
+            return
         # Temporäre Textsuche-Highlights (unter Annotationen)
         for i, (sx, sy, sw, sh) in enumerate(self._search_rects):
             if i == self._search_active:
@@ -1898,6 +1918,7 @@ class PdfCanvas(QLabel):
         painter.end()
         self.setPixmap(pm)
         self.adjustSize()
+        self.update()
 
     def mousePressEvent(self, event):
         pt = self._map_to_page(event)
@@ -2365,6 +2386,10 @@ class PdfViewer(QWidget):
         self.tool: AnnotationType | None = AnnotationType.HIGHLIGHT
         self.store: Optional[AnnotationStore] = None
         self.password: Optional[str] = None
+        self._blank_view_fallback_active = False
+        self._last_render_blank_ok = False
+        self._last_viewport_wh: tuple[int, int] = (0, 0)
+        self._last_refresh_error: str | None = None
         self._tool_buttons: list[QToolButton] = []
         self._pending_callout_anchor: tuple[float, float] | None = None
         self._pending_callout_page: int = 0
@@ -3231,7 +3256,10 @@ class PdfViewer(QWidget):
         self.apply_toolbar_groups()
 
         self.scroll = QScrollArea()
-        self.scroll.setWidgetResizable(True)
+        # False: Canvas-Größe = Pixmap (Image-Viewer). True streckt QLabel auf
+        # Viewport und kann bei leerem/invalidem Pixmap als weiße Fläche wirken — 2.6.48
+        self.scroll.setWidgetResizable(False)
+        self.scroll.setAlignment(Qt.AlignCenter)
         self.canvas = PdfCanvas()
         self.canvas.set_annotations_visible(self._annotations_visible)
         self.canvas.set_ann_type_visible(get_ann_layer_types_visible())
@@ -5685,6 +5713,9 @@ class PdfViewer(QWidget):
 
             QTimer.singleShot(0, _paint_after_open)
             QTimer.singleShot(50, _paint_after_open)
+            QTimer.singleShot(200, _paint_after_open)
+            # Nach Layout/Show erneut (Viewport oft erst dann >0) — 2.6.48
+            self._schedule_paint_retry(open_gen, delays_ms=(0, 80, 250, 600))
             if not painted:
                 self.status.emit(
                     "Hauptansicht leer — Zoom verringern oder Seite erneut wählen"
@@ -5772,24 +5803,74 @@ class PdfViewer(QWidget):
         ).start()
 
     def _canvas_has_page_image(self) -> bool:
-        """True wenn die zentrale Ansicht ein gerendertes Seitenbild trägt — 2.6.40/2.6.47.
+        """True wenn die zentrale Ansicht ein gerendertes Seitenbild zeigt — 2.6.48.
 
-        Verwirft winzige Pixmaps (<8px) und reine Fallback-Banner nicht als „OK“,
-        wenn sie als Fallback markiert sind.
+        Prüft das **sichtbare** QLabel-Pixmap (nicht nur internes ``_pixmap``),
+        Mindestgröße und Tinte (kein fast-weißes Ghost nach Buffer-UAF).
+        Echte Leerseiten: ``_last_render_blank_ok`` erlaubt Weiß ohne Tinte.
+        Fallback-Banner zählt nicht als OK.
         """
         try:
             if bool(getattr(self, "_blank_view_fallback_active", False)):
                 return False
-            pm = getattr(self.canvas, "_pixmap", None)
-            if pm is not None and not pm.isNull():
-                if int(pm.width()) >= 8 and int(pm.height()) >= 8:
-                    return True
             shown = self.canvas.pixmap()
-            if shown is not None and not shown.isNull():
-                return int(shown.width()) >= 8 and int(shown.height()) >= 8
-            return False
+            if shown is None or shown.isNull():
+                return False
+            if int(shown.width()) < 8 or int(shown.height()) < 8:
+                return False
+            from instantlensdoc.ui.image_qt import qpixmap_has_ink
+
+            if qpixmap_has_ink(shown):
+                return True
+            # Quelle war bereits leer (blank page) und Pixmap ist sichtbar
+            return bool(getattr(self, "_last_render_blank_ok", False))
         except Exception:
             return False
+
+    def _schedule_paint_retry(
+        self, open_gen: int | None = None, *, delays_ms: tuple[int, ...] = (0, 80, 250)
+    ) -> None:
+        """Nach Show/Resize erneut malen wenn Canvas leer — 2.6.48."""
+        gen = (
+            int(open_gen)
+            if open_gen is not None
+            else int(getattr(self, "_open_generation", 0) or 0)
+        )
+
+        def _retry() -> None:
+            if int(getattr(self, "_open_generation", 0) or 0) != gen:
+                return
+            if not self.pdf_path:
+                return
+            if self._canvas_has_page_image():
+                return
+            self._ensure_page_painted(warn=False)
+
+        for ms in delays_ms:
+            QTimer.singleShot(max(0, int(ms)), _retry)
+
+    def showEvent(self, event):  # noqa: N802
+        super().showEvent(event)
+        if self.pdf_path and not self._canvas_has_page_image():
+            self._schedule_paint_retry(delays_ms=(0, 50, 200))
+
+    def resizeEvent(self, event):  # noqa: N802
+        super().resizeEvent(event)
+        try:
+            w = int(self.scroll.viewport().width())
+            h = int(self.scroll.viewport().height())
+        except Exception:
+            w = h = 0
+        prev = getattr(self, "_last_viewport_wh", (0, 0))
+        self._last_viewport_wh = (w, h)
+        # Von 0→sichtbar: Fit/Paint nachholen — 2.6.48
+        if self.pdf_path and (prev[0] < 32 or prev[1] < 32) and w >= 32 and h >= 32:
+            if not self._canvas_has_page_image():
+                self._schedule_paint_retry(delays_ms=(0, 50, 150))
+            else:
+                mode = get_default_zoom_mode()
+                if mode in ("fit_width", "fit_page"):
+                    QTimer.singleShot(0, self.apply_default_zoom)
 
     def _show_blank_view_fallback(self, message: str | None = None) -> None:
         """Status + sichtbarer Canvas-Hinweis statt stiller weißer Hauptansicht — 2.6.47."""
@@ -6066,6 +6147,10 @@ class PdfViewer(QWidget):
             else:
                 self.lbl_page.setText(self.format_page_label_text())
 
+            from instantlensdoc.ui.image_qt import pil_has_ink
+
+            # Quelle leer? Dann Weiß auf dem Canvas OK — sonst UAF/Ghost — 2.6.48
+            self._last_render_blank_ok = not pil_has_ink(img)
             self.canvas.set_page_image(img, anns, scale=self.scale)
             self.canvas.set_uri_links(links)
             self._update_page_box_overlay()
@@ -6083,11 +6168,41 @@ class PdfViewer(QWidget):
             )
             self.status.emit(f"PDF: {self.pdf_path.name}{dirty}")
             self._refresh_fav_btn()
-            # Erfolg nur wenn Canvas wirklich ein Bild trägt — 2.6.47
+            # Erfolg nur bei sichtbarem, nicht-leerem Canvas — 2.6.47/2.6.48
             self._blank_view_fallback_active = False
             if not self._canvas_has_page_image():
-                self._last_refresh_error = "Canvas ohne Pixmap nach Render"
-                return False
+                if bool(getattr(self, "_last_render_blank_ok", False)):
+                    # Echte Leerseite, Pixmap sichtbar
+                    shown = self.canvas.pixmap()
+                    if shown is not None and not shown.isNull() and int(shown.width()) >= 8:
+                        return True
+                # Zweite Chance: frischer Render ohne Cache (UAF/Ghost-Weiß) — 2.6.48
+                try:
+                    from ild_pdf.render import clear_render_cache
+
+                    clear_render_cache(self.pdf_path)
+                    img_retry = render_page(
+                        self.pdf_path,
+                        self.page_index,
+                        scale=self.scale,
+                        password=self.password,
+                        grayscale=self._grayscale,
+                        invert=self._night_mode,
+                        use_cache=False,
+                    )
+                    self._last_render_blank_ok = not pil_has_ink(img_retry)
+                    self.canvas.set_page_image(img_retry, anns, scale=self.scale)
+                except Exception as retry_err:
+                    self._last_refresh_error = (
+                        f"Canvas ohne Pixmap nach Render ({retry_err})"
+                    )
+                    return False
+                if not self._canvas_has_page_image():
+                    self._last_refresh_error = (
+                        "Canvas ohne sichtbares Seitenbild nach Render "
+                        "(weiß/leer trotz PDF-Inhalt)"
+                    )
+                    return False
             return True
         except MemoryError:
             self._last_refresh_error = (
@@ -7931,16 +8046,12 @@ class PdfViewer(QWidget):
         self, page_index: int, scale: float, *, grayscale: bool | None = None
     ):
         """Seite via pypdfium2 rendern und als QPixmap (mit Ann.) zurückgeben."""
-        from PySide6.QtGui import QImage, QPixmap
+        from instantlensdoc.ui.image_qt import pil_to_qpixmap
 
         gray = bool(self._grayscale if grayscale is None else grayscale)
         img = render_page(self.pdf_path, page_index, scale=scale, grayscale=gray)
         anns = self.store.for_page(page_index) if self.store else []
-        if img.mode != "RGBA":
-            img = img.convert("RGBA")
-        data = img.tobytes("raw", "RGBA")
-        qimg = QImage(data, img.width, img.height, QImage.Format_RGBA8888)
-        pm = QPixmap.fromImage(qimg.copy())
+        pm = pil_to_qpixmap(img)
         # Annotationen auf temporärem Canvas zeichnen
         self.canvas.set_page_image(img, anns, scale=scale)
         drawn = self.canvas.pixmap()

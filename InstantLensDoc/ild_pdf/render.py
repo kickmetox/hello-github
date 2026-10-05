@@ -135,7 +135,18 @@ def render_page(
                 if hit is not None:
                     return hit
             bitmap = page.render(scale=eff_scale)
-            img = bitmap.to_pil()
+            try:
+                img = bitmap.to_pil()
+                # Wichtig: to_pil() teilt bei RGBA/RGBX/L den PDFium-Buffer.
+                # Nach page/doc/bitmap.close() wäre das ein Use-after-free →
+                # oft weißes/leeres Pixmap bei „erfolgreichem“ Render (Windows
+                # BGRA-Native). Immer detach bevor Buffer freigegeben wird — 2.6.48
+                img = img.copy()
+            finally:
+                try:
+                    bitmap.close()
+                except Exception:
+                    pass
             if gray:
                 img = _to_grayscale(img)
             if inv:

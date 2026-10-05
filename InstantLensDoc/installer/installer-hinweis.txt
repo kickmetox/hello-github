@@ -1,9 +1,13 @@
-InstantLens Doc 2.6.47 - Installation
+InstantLens Doc 2.6.48 - Installation
+
+Neu in 2.6.48:
+- PDF-Canvas/Thumbs: PDFium-Buffer detach (kein weisses Ghost-Pixmap mehr)
+- Gemeinsamer PIL->Pixmap-Pfad; Show/Resize Paint-Retry; Offscreen-Test
+- Baut auf 2.6.47 (sichtbarer Fallback) + 2.6.46 (ScanTuxio-UI)
 
 Neu in 2.6.47:
 - Sichtbarer Fallback wenn PDF-Hauptansicht nicht rendert (Status + Banner)
 - Thumb-Klick erzwingt Seitenpaint; kein stilles Weiss mehr
-- Baut auf 2.6.46 (ScanTuxio-UI) + 2.6.45 (Open-Preflight)
 
 Neu in 2.6.46:
 - Geraete -> Scanner / Scannen startet ScanTuxio-Hauptfenster

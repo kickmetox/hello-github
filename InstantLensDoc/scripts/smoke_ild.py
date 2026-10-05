@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Nightly/CI Smoke: CLI + Import-Checks für InstantLens Doc — 2.1.0–2.6.47.
+"""Nightly/CI Smoke: CLI + Import-Checks für InstantLens Doc — 2.1.0–2.6.48.
 
 Leichtgewichtig. Exit-Codes:
   0  OK  (ok=true)
@@ -14,12 +14,12 @@ Aufruf:
   python scripts/smoke_ild.py -h
 
 JSON-Schema (--json), Erfolg:
-  {"ok": true, "version": "2.6.47", "duration_ms": 1234,
+  {"ok": true, "version": "2.6.48", "duration_ms": 1234,
    "checks": ["version", "imports", "cli", "measure_diff_import", "changelog"]}
 
 JSON bei Fail: checks[] enthält Objekt mit error-Text (max 200 Zeichen, Truncate …);
 Exitcode spiegelt ok (0↔true, 1↔false) — 2.2.0:
-  {"ok": false, "version": "2.6.47", "duration_ms": 12,
+  {"ok": false, "version": "2.6.48", "duration_ms": 12,
    "checks": ["version", {"name": "imports", "error": "import x: …"}]}
 """
 
@@ -41,7 +41,7 @@ if str(ROOT) not in sys.path:
 # Headless/CI: Qt ohne Display
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-EXPECTED_VERSION = "2.6.47"
+EXPECTED_VERSION = "2.6.48"
 FAIL_ERROR_MAX_LEN = 200
 
 EXIT_OK = 0
@@ -82,7 +82,7 @@ def check_version() -> None:
         _fail(f"docs/VERSION={docs_ver!r}")
     bw = (ROOT / "build-windows.ps1").read_text(encoding="utf-8")
     if EXPECTED_VERSION not in bw or "Allow32Bit" not in bw:
-        _fail("build-windows.ps1 fehlt 2.6.47/Allow32Bit")
+        _fail("build-windows.ps1 fehlt 2.6.48/Allow32Bit")
     if not (ROOT / "scripts" / "pack-windows-runnable.py").is_file():
         _fail("scripts/pack-windows-runnable.py fehlt")
     if not (ROOT / "run-keygen.bat").is_file():
@@ -391,7 +391,7 @@ def check_version() -> None:
         # nested modal for empty scan should be replaced by status
         pass
     _ok("2.6.46 scantuxio-ui-launch/wia-busy-fallback: OK")
-    # 2.6.47: sichtbarer Blank-View-Fallback
+    # 2.6.47: sichtbarer Blank-View-Fallback (behalten)
     if "show_render_fallback" not in pv or "_show_blank_view_fallback" not in pv:
         _fail("pdf_view fehlt show_render_fallback / _show_blank_view_fallback (2.6.47)")
     if "_blank_view_fallback_active" not in pv:
@@ -401,6 +401,32 @@ def check_version() -> None:
     if "_ensure_page_painted(warn=False)" not in mw:
         _fail("main_window._on_thumb_jump erzwingt Paint nicht (2.6.47)")
     _ok("2.6.47 blank-view-visible-fallback/thumb-force-paint: OK")
+    # 2.6.48: PDFium-Buffer detach + sichtbares Canvas/Thumb Paint
+    render_src = (ROOT / "ild_pdf" / "render.py").read_text(encoding="utf-8")
+    if "img = img.copy()" not in render_src and "img.copy()" not in render_src:
+        _fail("ild_pdf.render fehlt PIL detach .copy() nach to_pil (2.6.48)")
+    if "bitmap.close()" not in render_src:
+        _fail("ild_pdf.render fehlt bitmap.close() (2.6.48)")
+    iq = ROOT / "instantlensdoc" / "ui" / "image_qt.py"
+    if not iq.is_file():
+        _fail("image_qt.py fehlt (2.6.48)")
+    iq_src = iq.read_text(encoding="utf-8")
+    if "pil_to_qpixmap" not in iq_src or "qpixmap_has_ink" not in iq_src:
+        _fail("image_qt fehlt pil_to_qpixmap/qpixmap_has_ink (2.6.48)")
+    if "pil_to_qpixmap" not in pv or "qpixmap_has_ink" not in pv:
+        _fail("pdf_view nutzt image_qt Paint-Pfad nicht (2.6.48)")
+    if "setWidgetResizable(False)" not in pv:
+        _fail("pdf_view ScrollArea nicht widgetResizable=False (2.6.48)")
+    if "_schedule_paint_retry" not in pv or "showEvent" not in pv:
+        _fail("pdf_view fehlt show/resize paint-retry (2.6.48)")
+    if "from instantlensdoc.ui.image_qt import pil_to_qpixmap" not in (
+        ROOT / "instantlensdoc" / "ui" / "sidebar.py"
+    ).read_text(encoding="utf-8"):
+        _fail("sidebar Thumbs nutzen image_qt nicht (2.6.48)")
+    test_canvas = ROOT / "scripts" / "test_pdf_canvas_not_blank.py"
+    if not test_canvas.is_file():
+        _fail("scripts/test_pdf_canvas_not_blank.py fehlt (2.6.48)")
+    _ok("2.6.48 pdfium-buffer-detach/canvas-ink/thumb-same-path: OK")
 
 
 def check_imports(*, with_qt: bool) -> None:
@@ -1294,8 +1320,8 @@ def check_measure_and_diff() -> None:
 
 def check_changelog() -> None:
     cl = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-    if "## 2.6.47" not in cl:
-        _fail("CHANGELOG fehlt ## 2.6.47")
+    if "## 2.6.48" not in cl:
+        _fail("CHANGELOG fehlt ## 2.6.48")
     if "## 2.6.46" not in cl:
         _fail("CHANGELOG fehlt ## 2.6.46")
     if "## 2.6.45" not in cl:
@@ -1911,6 +1937,13 @@ def check_changelog() -> None:
     ):
         _fail("CHANGELOG 2.6.47 fehlt sichtbarer Render-Fallback-Hinweis")
     if (
+        "to_pil" not in cl
+        and "Buffer" not in cl
+        and "pixmap" not in cl.lower()
+        and "2.6.48" not in cl
+    ):
+        _fail("CHANGELOG 2.6.48 fehlt PDFium-Buffer/Canvas-Paint-Hinweis")
+    if (
         "Silbentrennung" not in cl
         and "Hyphen" not in cl
         and "Menü" not in cl
@@ -2239,6 +2272,13 @@ def check_changelog() -> None:
         and "sichtbarer" not in feat
     ):
         _fail("FEATURES.md fehlt 2.6.47 Render-Fallback-Hinweis")
+    if "2.6.48" not in feat or (
+        "Buffer" not in feat
+        and "to_pil" not in feat
+        and "Canvas" not in feat
+        and "pixmap" not in feat.lower()
+    ):
+        _fail("FEATURES.md fehlt 2.6.48 Canvas/Buffer-Paint-Hinweis")
     if "2.6.44" not in feat or (
         "ildEditorToolbar" not in feat
         and "Markierungen" not in feat
@@ -2696,11 +2736,11 @@ Exit-Codes:
 Laufzeit: am Ende als „Laufzeit: N ms“ (oder duration_ms im JSON).
 
 Beispiel --json (Erfolg):
-  {"ok": true, "version": "2.6.47", "duration_ms": 1234,
+  {"ok": true, "version": "2.6.48", "duration_ms": 1234,
    "checks": ["version", "imports", "cli", "measure_diff_import", "changelog"]}
 
 Beispiel --json (Fail):
-  {"ok": false, "version": "2.6.47", "duration_ms": 12,
+  {"ok": false, "version": "2.6.48", "duration_ms": 12,
    "checks": ["version", {"name": "imports", "error": "import x: …"}]}
 """.rstrip()
     )

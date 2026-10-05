@@ -104,6 +104,15 @@ powershell -ExecutionPolicy Bypass -File .\scripts\ild.ps1 license generate kund
 
 Anleitung: Store `docs/instantlensdoc-scripting.md` · Beispiel `examples/ild_scripting_demo.py`.
 
+## Neu in 2.6.48
+
+Patch nach **2.6.47** — weiße Hauptansicht + graue Thumbs trotz geladenem Text:
+
+- Root cause: `to_pil()`-Shared-Buffer nach PDFium-`close()` → Ghost-Weiß ohne Fallback
+- `render_page` detacht PIL (`.copy()`); Canvas/Thumbs über `image_qt.pil_to_qpixmap`
+- Erfolg nur bei sichtbarem Pixmap mit Tinte; Show/Resize-Paint-Retry
+- Pack: `InstantLensDoc-2.6.48-pack.zip`
+
 ## Neu in 2.6.47
 
 Patch nach **2.6.46** (ScanTuxio-UI) — Rest: stilles Weiß bei Render-Fail:
