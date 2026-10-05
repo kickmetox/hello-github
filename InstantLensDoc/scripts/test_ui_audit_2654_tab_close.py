@@ -126,6 +126,7 @@ def test_close_500_page_tab_under_budget_and_tab_gone():
         assert win.doc_tab_bar.tabs.count() == 0, (
             f"Tab-Leiste nach Close nicht leer: {win.doc_tab_bar.tabs.count()}"
         )
+        assert not win.doc_tab_bar.isVisible(), "Rest-Tab-Leiste nach letztem Close sichtbar"
         assert not win.sidebar.document_paths()
         assert win.stack.currentWidget() is win.welcome_page
         assert pv.pdf_path is None
@@ -222,6 +223,26 @@ def test_thumb_click_then_next_and_spin_sync():
         assert int(pv.current_page) == 10, f"Next nach Thumb blieb {pv.current_page}"
         assert pv.spin_page.value() == 11
         assert win.sidebar.thumbs.currentRow() == 10
+        from PySide6.QtCore import QEvent, Qt as _Qt
+        from PySide6.QtGui import QKeyEvent
+        from PySide6.QtWidgets import QApplication
+
+        # Originalbug: Thumbs behielten Fokus, PageDown scrollte die Liste
+        win.sidebar.thumbs.setFocus()
+        _pump(app, 0.1)
+        QApplication.sendEvent(
+            win.sidebar.thumbs,
+            QKeyEvent(QEvent.Type.KeyPress, _Qt.Key_PageDown, _Qt.NoModifier),
+        )
+        _pump(app, 0.3)
+        assert int(pv.current_page) == 11, f"PageDown nach Thumb blieb {pv.current_page}"
+        assert pv.spin_page.value() == 12
+        QApplication.sendEvent(
+            win.sidebar.thumbs,
+            QKeyEvent(QEvent.Type.KeyPress, _Qt.Key_PageUp, _Qt.NoModifier),
+        )
+        _pump(app, 0.2)
+        assert int(pv.current_page) == 10
         pv.spin_page.setValue(5)
         _pump(app, 0.3)
         assert int(pv.current_page) == 4
@@ -319,6 +340,7 @@ def test_close_all_and_app_exit_budget():
         assert dt <= CLOSE_BUDGET_MS, f"Alle schließen {dt:.1f} ms"
         _pump(app, 0.5)
         assert win.doc_tab_bar.tabs.count() == 0
+        assert not win.doc_tab_bar.isVisible()
         win.open_path(str(big))
         _wait_pages(app, pv, N_BIG)
         t0 = time.perf_counter()

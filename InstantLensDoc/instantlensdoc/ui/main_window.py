@@ -7970,6 +7970,11 @@ class MainWindow(QMainWindow):
         except Exception:
             pass
         self.stack.setCurrentWidget(self.welcome_page)
+        try:
+            # Letzter Tab: Leiste aus Sidebar neu aufbauen — kein Rest-Tab bei Welcome — 2.6.54
+            self._refresh_doc_tab_bar()
+        except Exception:
+            pass
         self.setWindowTitle(self._app_title())
         self._update_doc_status()
         return True
