@@ -1,7 +1,7 @@
 @echo off
-REM InstantLens Doc — Scripting-CLI (headless)
+REM InstantLens Doc - Scripting-CLI (headless) - ASCII-safe
 cd /d "%~dp0"
-echo InstantLens Doc Scripting 2.6.23
+echo InstantLens Doc Scripting 2.6.33
 echo python -m ild --help
 echo.
 if exist ".venv\Scripts\python.exe" (

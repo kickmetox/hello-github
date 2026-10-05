@@ -1,4 +1,4 @@
-﻿# InstantLens Doc 2.6.32 - Inno-Setup-Installer bauen (Setup.exe)
+﻿# InstantLens Doc 2.6.33 - Inno-Setup-Installer bauen (Setup.exe)
 # Voraussetzung: Inno Setup 6 (iscc.exe) auf Windows x64
 # Aufruf (Einzeiler):
 #   powershell -ExecutionPolicy Bypass -File .\scripts\build-windows-installer.ps1
@@ -10,12 +10,15 @@
 #   -NoKeygen         # IncludeKeygen=0 (keine Keygen-Shortcuts)
 #   -IsccPath PATH
 #
+# Nach build-windows.ps1: bevorzugt EXE-Layout (dist\InstantLensDoc\InstantLensDoc.exe),
+# UsePythonLauncher=0 - kein Post-Install von run.bat. -PythonLauncher erzwingt run.bat.
+#
 # Ergebnis: dist\InstantLensDoc-Setup-<VERSION>.exe
-#   Startmenü + optional Desktop + Uninstall + 64-Bit
+#   Startmenue + optional Desktop + Uninstall + 64-Bit
 #
 # Keygen-EXE: Prefer dist\InstantLensKeygen\InstantLensKeygen.exe,
 # Fallback dist\InstantLensDoc\InstantLensKeygen.exe -> Pack als InstantLensKeygen.exe
-# Installiert: {app}\InstantLensKeygen.exe (+ Startmenü, wenn IncludeKeygen=1)
+# Installiert: {app}\InstantLensKeygen.exe (+ Startmenue, wenn IncludeKeygen=1)
 
 param(
     [string]$SourceRoot = "",
@@ -86,32 +89,50 @@ if (-not $iscc) {
 }
 
 if (-not $SourceRoot) {
-    # Pack-Ordner aus Repo bauen (Python-Launcher-Layout)
-    New-Item -ItemType Directory -Force -Path $Pack | Out-Null
-    $copyItems = @(
-        "instantlensdoc", "ild_pdf", "ild", "keygen", "assets", "scripts",
-        "docs", "examples", "requirements.txt", "VERSION.txt",
-        "run.bat", "run.ps1", "run-keygen.bat", "run-ild.bat",
-        "FEATURES.md", "INFO.md", "README.md", "CHANGELOG.md", "CONTRIBUTING.md"
-    )
-    foreach ($name in $copyItems) {
-        $src = Join-Path $Root $name
-        if (Test-Path $src) {
-            Copy-Item -Recurse -Force $src $Pack
+    $exeInDist = Join-Path $Pack "InstantLensDoc.exe"
+    $explicitPython = $PSBoundParameters.ContainsKey("PythonLauncher") -and $PythonLauncher
+
+    if ((Test-Path $exeInDist) -and (-not $explicitPython)) {
+        # Prefer PyInstaller output from build-windows.ps1 - do not clobber with Python tree
+        $SourceRoot = $Pack
+        $PythonLauncher = $false
+        Write-Host "EXE-Layout erkannt: $SourceRoot (UsePythonLauncher=0, Post-Install = InstantLensDoc.exe)"
+        $kgExe = Join-Path $Root "dist\InstantLensKeygen\InstantLensKeygen.exe"
+        if (-not (Test-Path $kgExe)) {
+            $kgExe = Join-Path $Pack "InstantLensKeygen.exe"
         }
-    }
-    # Optional: gebauter Keygen aus dist mitnehmen
-    $kgExe = Join-Path $Root "dist\InstantLensKeygen\InstantLensKeygen.exe"
-    if (-not (Test-Path $kgExe)) {
-        $kgExe = Join-Path $Root "dist\InstantLensDoc\InstantLensKeygen.exe"
-    }
-    if ((-not $NoKeygen) -and (Test-Path $kgExe)) {
-        Copy-Item -Force $kgExe (Join-Path $Pack "InstantLensKeygen.exe")
-        Write-Host "Keygen EXE mitgepackt."
-    }
-    $SourceRoot = $Pack
-    if (-not $PSBoundParameters.ContainsKey("PythonLauncher")) {
-        $PythonLauncher = $true
+        if ((-not $NoKeygen) -and (Test-Path $kgExe)) {
+            Copy-Item -Force $kgExe (Join-Path $Pack "InstantLensKeygen.exe")
+            Write-Host "Keygen EXE mitgepackt."
+        }
+    } else {
+        # Python-Portable-Layout (kein EXE, oder -PythonLauncher)
+        New-Item -ItemType Directory -Force -Path $Pack | Out-Null
+        $copyItems = @(
+            "instantlensdoc", "ild_pdf", "ild", "keygen", "assets", "scripts",
+            "docs", "examples", "requirements.txt", "VERSION.txt",
+            "run.bat", "run.ps1", "run-keygen.bat", "run-ild.bat",
+            "FEATURES.md", "INFO.md", "README.md", "CHANGELOG.md", "CONTRIBUTING.md"
+        )
+        foreach ($name in $copyItems) {
+            $src = Join-Path $Root $name
+            if (Test-Path $src) {
+                Copy-Item -Recurse -Force $src $Pack
+            }
+        }
+        $kgExe = Join-Path $Root "dist\InstantLensKeygen\InstantLensKeygen.exe"
+        if (-not (Test-Path $kgExe)) {
+            $kgExe = Join-Path $Root "dist\InstantLensDoc\InstantLensKeygen.exe"
+        }
+        if ((-not $NoKeygen) -and (Test-Path $kgExe)) {
+            Copy-Item -Force $kgExe (Join-Path $Pack "InstantLensKeygen.exe")
+            Write-Host "Keygen EXE mitgepackt."
+        }
+        $SourceRoot = $Pack
+        if (-not $PSBoundParameters.ContainsKey("PythonLauncher")) {
+            $PythonLauncher = $true
+        }
+        Write-Host "Python-Layout: $SourceRoot (UsePythonLauncher=$PythonLauncher)"
     }
 }
 

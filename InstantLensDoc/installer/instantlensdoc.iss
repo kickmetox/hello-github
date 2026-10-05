@@ -1,30 +1,30 @@
-; Inno Setup — InstantLens Doc 2.6.32
+; Inno Setup - InstantLens Doc 2.6.33
 ; Voraussetzung: Inno Setup 6 (iscc.exe im PATH oder ISCC_PATH / -IsccPath)
 ;
 ; Build-Varianten:
-;   A) Python-Portable-Layout (empfohlen für Dev):
-;      SourceRoot = Ordner mit run.bat, instantlensdoc\, assets\, …
+;   A) Python-Portable-Layout (Dev):
+;      SourceRoot = Ordner mit run.bat, instantlensdoc\, assets\, ...
 ;      ISCC mit /DSourceRoot=...\InstantLensDoc /DUsePythonLauncher=1
-;      Keygen-Shortcut → {app}\run-keygen.bat
-;   B) Gebündelte EXE (PyInstaller):
+;      Keygen-Shortcut -> {app}\run-keygen.bat
+;   B) Gebuendelte EXE (PyInstaller) - empfohlen nach build-windows.ps1:
 ;      SourceRoot = dist\InstantLensDoc mit InstantLensDoc.exe
 ;      Keygen-EXE-Pfad: {app}\InstantLensKeygen.exe
 ;      (build-windows.ps1 kopiert Keygen dorthin; build-installer.ps1 ebenfalls)
 ;
 ; Optionen:
-;   /DMyAppVersion=x.y.z  — Version überschreiben (Default unten; build-*.ps1 setzt aus VERSION.txt)
-;   /DIncludeKeygen=1     — Keygen mitpacken (run-keygen.bat bzw. InstantLensKeygen.exe)
-;   /DIncludeKeygen=0     — ohne Keygen-Shortcuts/Dateien
+;   /DMyAppVersion=x.y.z  - Version ueberschreiben (Default unten; build-*.ps1 setzt aus VERSION.txt)
+;   /DIncludeKeygen=1     - Keygen mitpacken (run-keygen.bat bzw. InstantLensKeygen.exe)
+;   /DIncludeKeygen=0     - ohne Keygen-Shortcuts/Dateien
 ;
-; Desktop: Task „Desktop-Verknüpfung erstellen“ — optional Checkbox (Flags: checkedonce,
-;   Standard beim ersten Install aktiv; Nutzer kann abwählen). Shortcuts nur bei Tasks: desktopicon.
-; Uninstaller: Startmenü + Systemsteuerung (UninstallDisplay*)
+; Desktop: Task "Desktop-Verknuepfung erstellen" - optional Checkbox (Flags: checkedonce,
+;   Standard beim ersten Install aktiv; Nutzer kann abwaehlen). Shortcuts nur bei Tasks: desktopicon.
+; Uninstaller: Startmenue + Systemsteuerung (UninstallDisplay*)
 ;
-; Siehe: build-installer.ps1 · scripts\build-windows-installer.ps1
+; Siehe: build-installer.ps1  /  scripts\build-windows-installer.ps1
 
 #define MyAppName "InstantLens Doc"
 #ifndef MyAppVersion
-  #define MyAppVersion "2.6.32"
+  #define MyAppVersion "2.6.33"
 #endif
 #define MyAppPublisher "Andreas Meyer"
 #define MyAppURL "mailto:ame@sellerbach.de"
@@ -49,7 +49,7 @@ AppSupportURL={#MyAppURL}
 AppMutex=InstantLensDoc_Setup_Mutex
 DefaultDirName={autopf}\InstantLensDoc
 DefaultGroupName={#MyAppName}
-; Startmenü-Gruppe sichtbar lassen (Icons unten)
+; Startmenue-Gruppe sichtbar lassen (Icons unten)
 DisableProgramGroupPage=no
 AllowNoIcons=yes
 OutputDir=..\dist
@@ -82,9 +82,9 @@ Name: "german"; MessagesFile: "compiler:Languages\German.isl"
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [CustomMessages]
-german.TaskDesktopIcon=Desktop-Verknüpfung erstellen
-german.TaskStartMenu=Einträge im Startmenü belassen
-german.TaskGroup=Verknüpfungen:
+german.TaskDesktopIcon=Desktop-Verknuepfung erstellen
+german.TaskStartMenu=Eintraege im Startmenue belassen
+german.TaskGroup=Verknuepfungen:
 german.LaunchAfterInstall={#MyAppName} jetzt starten
 german.IconAppComment=InstantLens Doc starten
 german.IconKeygenComment=Lizenz-Key erzeugen
@@ -98,7 +98,7 @@ english.IconKeygenComment=Generate license key
 english.IconUninstallComment=Remove InstantLens Doc
 
 [Tasks]
-; Desktop-Verknüpfung standardmäßig aktiv — abwählbar
+; Desktop-Verknuepfung standardmaessig aktiv - abwaehlbar
 Name: "desktopicon"; Description: "{cm:TaskDesktopIcon}"; GroupDescription: "{cm:TaskGroup}"; Flags: checkedonce
 Name: "startmenu"; Description: "{cm:TaskStartMenu}"; GroupDescription: "{cm:TaskGroup}"; Flags: checkedonce
 
@@ -106,7 +106,7 @@ Name: "startmenu"; Description: "{cm:TaskStartMenu}"; GroupDescription: "{cm:Tas
 Source: "{#SourceRoot}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 ; Hinweisdatei immer mitliefern (auch wenn SourceRoot kein INFO hat)
 Source: "installer-hinweis.txt"; DestDir: "{app}"; Flags: ignoreversion
-; Icon für Uninstaller/Shortcuts absichern (falls SourceRoot kein assets hat)
+; Icon fuer Uninstaller/Shortcuts absichern (falls SourceRoot kein assets hat)
 Source: "..\assets\app.ico"; DestDir: "{app}\assets"; Flags: ignoreversion skipifsourcedoesntexist
 
 [Icons]
@@ -130,6 +130,7 @@ Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\InstantLensDoc.exe"; Workin
 
 [Run]
 #if UsePythonLauncher == "1"
+; run.bat is ASCII-safe as of 2.6.33; still prefer nowait + skipifsilent
 Filename: "{app}\run.bat"; Description: "{cm:LaunchAfterInstall}"; Flags: nowait postinstall skipifsilent
 #else
 Filename: "{app}\InstantLensDoc.exe"; Description: "{cm:LaunchAfterInstall}"; Flags: nowait postinstall skipifsilent

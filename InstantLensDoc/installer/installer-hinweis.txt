@@ -1,37 +1,28 @@
-InstantLens Doc 2.6.32 — Installation
+InstantLens Doc 2.6.33 - Installation
 
-Neu in 2.6.32:
+Neu in 2.6.33:
+- Installer/Launcher: run.bat ASCII-safe (kein UTF-8-Mojibake in cmd.exe)
+- Post-Install startet gebuendelte EXE wenn vorhanden (nicht kaputtes run.bat)
+- build-installer bevorzugt dist\InstantLensDoc EXE-Layout nach build-windows.ps1
+
+Basis 2.6.32:
 - Windows-Build/Installer-Skripte: UTF-8 BOM + ASCII-Punctuation (PowerShell 5.1 Parser-Fix)
 
-Basis 2.6.28 — Installation
+Startmenue: Gruppe "InstantLens Doc" mit Programm, optional Keygenerator, INFO und Deinstallieren.
 
-Startmenü: Gruppe „InstantLens Doc“ mit Programm, optional Keygenerator, INFO und Deinstallieren.
+Desktop-Verknuepfung: optionale Checkbox im Installer-Assistenten
+  (Task "desktopicon", Flags checkedonce - Standard beim ersten Install aktiv, abwaehlbar).
+  Ohne Haken: kein Desktop-Icon; Startmenue unabhaengig ueber Task "startmenu".
 
-Desktop-Verknüpfung: optionale Checkbox im Installer-Assistenten
-  (Task „desktopicon“, Flags checkedonce — Standard beim ersten Install aktiv, abwählbar).
-  Ohne Haken: kein Desktop-Icon; Startmenü unabhängig über Task „startmenu“.
-
-64-Bit: Installer läuft im 64-Bit-Modus (ArchitecturesInstallIn64BitMode=x64compatible).
-  Empfohlen: 64-Bit-Python 3.10+ (Python-Layout) bzw. gebündelte x64-EXE.
-
-Neu in 2.6.28 (Audit-Closure):
-- Mausrad Default-PDF + Frame/Canvas; Abbildungs-/Stichwortverzeichnis; F12 Speichern unter
-- .pptx · Abschnittsumbrüche · Grammatik DE/EN · Silbentrennung 9 Sprachen
-- Pantone-ähnlich/Spot · Web-PDF · Print-Preview · eIDAS Trust-Pfad · Realtime-Hub · Handschrift
-- Einzeiler Setup.exe: powershell -ExecutionPolicy Bypass -File .\scripts\build-windows-installer.ps1
-
-Basis 2.6.27:
-- Sync-Flow: sync-ild.ps1 -BuildInstaller; Mausrad Text (`apply_wheel_scroll`)
-
-Basis 2.6.26:
-- Installer-Pfad gehärtet: Version aus VERSION.txt, Preflight, CustomMessages DE/EN
+64-Bit: Installer laeuft im 64-Bit-Modus (ArchitecturesInstallIn64BitMode=x64compatible).
+  Empfohlen: 64-Bit-Python 3.10+ (Python-Layout) bzw. gebuendelte x64-EXE.
 
 Keygenerator (wenn IncludeKeygen=1):
-- Python-Layout: Startmenü → Keygenerator → {app}\run-keygen.bat
-- EXE-Layout: Startmenü → Keygenerator → {app}\InstantLensKeygen.exe
+- Python-Layout: Startmenue -> Keygenerator -> {app}\run-keygen.bat
+- EXE-Layout: Startmenue -> Keygenerator -> {app}\InstantLensKeygen.exe
   (Datei liegt im Installationsordner neben InstantLensDoc.exe)
 
-Deinstallation: Startmenü „InstantLens Doc deinstallieren“ oder Systemsteuerung / Apps.
+Deinstallation: Startmenue "InstantLens Doc deinstallieren" oder Systemsteuerung / Apps.
 
 Build (Windows x64 + Inno Setup 6):
   powershell -ExecutionPolicy Bypass -File .\scripts\build-windows-installer.ps1

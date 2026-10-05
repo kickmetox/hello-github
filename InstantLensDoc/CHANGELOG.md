@@ -1,3 +1,7 @@
+## 2.6.33 - Installer/run.bat cmd-Loop-Fix
+
+Patch nach **2.6.32**: Windows-Installer post-install startete `run.bat`, das **UTF-8 ohne BOM** mit Em-Dash/Ellipsis/Smart-Quotes enthielt. cmd.exe las das als CP1252 → Mojibake `â€"` (eingebettete `"`) → deutsche Hilfe-/Prosa-Fragmente als Befehle (`Deutsch`, `vorhanden`, `hon.exe`, …) in Endlosschleife. Fix: **`run.bat` / `run-ild.bat` / `run-keygen.bat`** pure ASCII, Help per `goto` (keine unescaped `(` in IF-Blöcken), **`installer/build-installer.ps1`** bevorzugt nach `build-windows.ps1` das **EXE-Layout** (`UsePythonLauncher=0`, Post-Install = `InstantLensDoc.exe`), ISS/`installer-hinweis.txt` ASCII. Pack `InstantLensDoc-2.6.33-pack.zip` + Store-Kopie aktualisiert.
+
 ## 2.6.32 - Build-Skripte Windows-Parser/Encoding-Fix
 
 Patch nach **2.6.31**: **`build-windows.ps1`**, **`scripts/build-windows-installer.ps1`**, **`installer/build-installer.ps1`** und weitere Pack-`.ps1` parsen unter Windows PowerShell 5.1 wieder (UTF-8 ohne BOM + Em-Dash/Ellipsis/Pfeile in Strings erzeugten Mojibake und Folgefehler um Klammern/`else`). Fancy Unicode durch ASCII ersetzt; Dateien UTF-8 **mit BOM**. Pack `InstantLensDoc-2.6.32-pack.zip` + Store-Kopie aktualisiert.

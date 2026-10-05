@@ -1,7 +1,7 @@
 @echo off
-REM InstantLens Doc — Keygenerator (separates Extra)
+REM InstantLens Doc - Keygenerator (separates Extra) - ASCII-safe
 cd /d "%~dp0"
-echo InstantLens Doc Keygenerator
+echo InstantLensDoc Keygenerator
 echo Keys: 32 Tage (30+2). Kontakt: ame@sellerbach.de
 echo.
 if exist ".venv\Scripts\python.exe" (

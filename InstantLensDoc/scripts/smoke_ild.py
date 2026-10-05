@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Nightly/CI Smoke: CLI + Import-Checks für InstantLens Doc — 2.1.0–2.6.32.
+"""Nightly/CI Smoke: CLI + Import-Checks für InstantLens Doc — 2.1.0–2.6.33.
 
 Leichtgewichtig. Exit-Codes:
   0  OK  (ok=true)
@@ -14,12 +14,12 @@ Aufruf:
   python scripts/smoke_ild.py -h
 
 JSON-Schema (--json), Erfolg:
-  {"ok": true, "version": "2.6.32", "duration_ms": 1234,
+  {"ok": true, "version": "2.6.33", "duration_ms": 1234,
    "checks": ["version", "imports", "cli", "measure_diff_import", "changelog"]}
 
 JSON bei Fail: checks[] enthält Objekt mit error-Text (max 200 Zeichen, Truncate …);
 Exitcode spiegelt ok (0↔true, 1↔false) — 2.2.0:
-  {"ok": false, "version": "2.6.32", "duration_ms": 12,
+  {"ok": false, "version": "2.6.33", "duration_ms": 12,
    "checks": ["version", {"name": "imports", "error": "import x: …"}]}
 """
 
@@ -41,7 +41,7 @@ if str(ROOT) not in sys.path:
 # Headless/CI: Qt ohne Display
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-EXPECTED_VERSION = "2.6.32"
+EXPECTED_VERSION = "2.6.33"
 FAIL_ERROR_MAX_LEN = 200
 
 EXIT_OK = 0
@@ -82,7 +82,7 @@ def check_version() -> None:
         _fail(f"docs/VERSION={docs_ver!r}")
     bw = (ROOT / "build-windows.ps1").read_text(encoding="utf-8")
     if EXPECTED_VERSION not in bw or "Allow32Bit" not in bw:
-        _fail("build-windows.ps1 fehlt 2.6.32/Allow32Bit")
+        _fail("build-windows.ps1 fehlt 2.6.33/Allow32Bit")
     if not (ROOT / "scripts" / "pack-windows-runnable.py").is_file():
         _fail("scripts/pack-windows-runnable.py fehlt")
     if not (ROOT / "run-keygen.bat").is_file():
@@ -99,6 +99,23 @@ def check_version() -> None:
         _fail("build-windows-installer.ps1 fehlt Version/VERSION.txt")
     if EXPECTED_VERSION not in iss_t or "CustomMessages" not in iss_t or "desktopicon" not in iss_t:
         _fail("instantlensdoc.iss unvollständig (Version/CustomMessages/desktopicon)")
+    # 2.6.33: run.bat / companion bats must be cmd-safe (pure ASCII, no fancy Unicode)
+    for bat_name in ("run.bat", "run-ild.bat", "run-keygen.bat"):
+        bat_path = ROOT / bat_name
+        if not bat_path.is_file():
+            _fail(f"{bat_name} fehlt")
+        bat_raw = bat_path.read_bytes()
+        try:
+            bat_raw.decode("ascii")
+        except UnicodeDecodeError as exc:
+            _fail(f"{bat_name} nicht pure ASCII (cmd Mojibake-Risiko): {exc}")
+        bat_txt = bat_raw.decode("ascii")
+        for bad in ("\u2014", "\u2013", "\u2026", "\u2192", "\u201e", "\u201c", "\u201d"):
+            if bad in bat_txt:
+                _fail(f"{bat_name} enthält Fancy-Unicode")
+    bi = (ROOT / "installer" / "build-installer.ps1").read_text(encoding="utf-8-sig")
+    if "EXE-Layout" not in bi and "UsePythonLauncher=0" not in bi:
+        _fail("build-installer.ps1 fehlt EXE-Layout-Preferenz (2.6.33)")
     _ok(f"version {EXPECTED_VERSION}")
 
 
@@ -412,7 +429,7 @@ def check_imports(*, with_qt: bool) -> None:
             "Zu ersetzender Pin",
             "hyphenate_fr",
             "hyphenate_it",
-            "2.6.32",
+            "2.6.33",
         ),
         ROOT / "instantlensdoc" / "ui" / "sidebar.py": (
             "Schnellvorschau",
@@ -496,7 +513,7 @@ def check_imports(*, with_qt: bool) -> None:
             "_update_index",
             "HYPHENATION_UI_LANGS",
             "hyphenate_fr",
-            "2.6.32",
+            "2.6.33",
         ),
         ROOT / "instantlensdoc" / "ui" / "batch_dialog.py": (
             "BatchConvertDialog",
@@ -933,8 +950,8 @@ def check_measure_and_diff() -> None:
 
 def check_changelog() -> None:
     cl = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-    if "## 2.6.32" not in cl:
-        _fail("CHANGELOG fehlt ## 2.6.32")
+    if "## 2.6.33" not in cl:
+        _fail("CHANGELOG fehlt ## 2.6.33")
     if "## 2.6.28" not in cl:
         _fail("CHANGELOG fehlt ## 2.6.28")
     if "## 2.6.25" not in cl:
@@ -1437,9 +1454,17 @@ def check_changelog() -> None:
         and "flat" not in cl
         and "LocalPack" not in cl
         and "sync-ild" not in cl
-        and "2.6.32" not in cl
+        and "2.6.30" not in cl
     ):
-        _fail("CHANGELOG 2.6.32 fehlt Sync/ForceClean/flat-Hinweis")
+        _fail("CHANGELOG 2.6.30 fehlt Sync/ForceClean/flat-Hinweis")
+    if (
+        "run.bat" not in cl
+        and "cmd" not in cl
+        and "ASCII" not in cl
+        and "Mojibake" not in cl
+        and "2.6.33" not in cl
+    ):
+        _fail("CHANGELOG 2.6.33 fehlt Installer/run.bat cmd-Loop-Hinweis")
     if (
         "Silbentrennung" not in cl
         and "Hyphen" not in cl
@@ -1578,8 +1603,8 @@ def check_changelog() -> None:
     if "## 2.2.0" not in cl:
         _fail("CHANGELOG fehlt ## 2.2.0")
     feat = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
-    if "2.6.32" not in feat:
-        _fail("FEATURES.md fehlt 2.6.32")
+    if "2.6.33" not in feat:
+        _fail("FEATURES.md fehlt 2.6.33")
     if "2.6.28" not in feat:
         _fail("FEATURES.md fehlt 2.6.28")
     if "2.6.13" not in feat:
@@ -1704,9 +1729,16 @@ def check_changelog() -> None:
         "ForceClean" not in feat
         and "flat/nested" not in feat
         and "Pack-Marker" not in feat
-        and "2.6.32" not in feat
+        and "2.6.30" not in feat
     ):
-        _fail("FEATURES.md fehlt 2.6.32 Sync ForceClean/flat-Hinweis")
+        _fail("FEATURES.md fehlt Sync ForceClean/flat-Hinweis")
+    if (
+        "run.bat ASCII" not in feat
+        and "EXE-Layout" not in feat
+        and "cmd-Loop" not in feat
+        and "2.6.33" not in feat
+    ):
+        _fail("FEATURES.md fehlt 2.6.33 Installer/run.bat-Hinweis")
     if (
         "Silbentrennung" not in feat
         and "Menü/Palette" not in feat
@@ -2151,11 +2183,11 @@ Exit-Codes:
 Laufzeit: am Ende als „Laufzeit: N ms“ (oder duration_ms im JSON).
 
 Beispiel --json (Erfolg):
-  {"ok": true, "version": "2.6.32", "duration_ms": 1234,
+  {"ok": true, "version": "2.6.33", "duration_ms": 1234,
    "checks": ["version", "imports", "cli", "measure_diff_import", "changelog"]}
 
 Beispiel --json (Fail):
-  {"ok": false, "version": "2.6.32", "duration_ms": 12,
+  {"ok": false, "version": "2.6.33", "duration_ms": 12,
    "checks": ["version", {"name": "imports", "error": "import x: …"}]}
 """.rstrip()
     )

@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **2.6.32** |
+| Version | **2.6.33** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -33,7 +33,7 @@
 
 Skript: [sync-ild.ps1](scripts/sync-ild.ps1) — Branch `cursor/instantlensdoc-2108` (oder `-LocalPack` / Pack-Zip) nach `D:\AI_Temp\InstantLensDoc`, pip, Start. **Nutzer-Icon in `assets` wird nicht überschrieben.**
 
-**FEATURES.md lokal sync:** Nach Sync liegt `FEATURES.md` lokal im App-Ordner (`D:\AI_Temp\InstantLensDoc\FEATURES.md`); About/Stubs öffnen diese lokale Datei — Version **2.6.32**.
+**FEATURES.md lokal sync:** Nach Sync liegt `FEATURES.md` lokal im App-Ordner (`D:\AI_Temp\InstantLensDoc\FEATURES.md`); About/Stubs öffnen diese lokale Datei — Version **2.6.33**.
 
 Ohne Start: `-NoStart` (Alias `-SkipStart`). Exit-Codes: **0** OK · **1** allgemein · **2** Git-Fehler.
 
@@ -68,7 +68,7 @@ Python-Layout-Zip (ohne PyInstaller-EXE):
 powershell -ExecutionPolicy Bypass -File .\scripts\pack-windows-runnable.ps1
 ```
 
-Installer: `.\scripts\build-windows-installer.ps1` bzw. `.\installer\build-installer.ps1` (optional `-NoKeygen`) → `dist\InstantLensDoc-Setup-2.6.32.exe`  
+Installer: `.\scripts\build-windows-installer.ps1` bzw. `.\installer\build-installer.ps1` (optional `-NoKeygen`) → `dist\InstantLensDoc-Setup-2.6.33.exe`  
 Desktop-/Keygen-Shortcuts: `.\scripts\install-ild.ps1` (Keygen wenn `run-keygen.bat` / EXE vorhanden; `-SkipKeygen`)  
 Desktop-Verknüpfung Installer: optionale Checkbox (`desktopicon`, Standard an / `checkedonce`)
 
@@ -102,6 +102,15 @@ powershell -ExecutionPolicy Bypass -File .\scripts\ild.ps1 license generate kund
 
 Anleitung: Store `docs/instantlensdoc-scripting.md` · Beispiel `examples/ild_scripting_demo.py`.
 
+## Neu in 2.6.33
+
+Patch nach **2.6.32** (Build-PS Encoding):
+
+- **`run.bat` / `run-ild.bat` / `run-keygen.bat`:** pure ASCII (kein UTF-8-Mojibake in cmd.exe)
+- **`installer/build-installer.ps1`:** bevorzugt EXE-Layout nach `build-windows.ps1` (Post-Install = `InstantLensDoc.exe`)
+- ISS / `installer-hinweis.txt` ASCII-safe
+- Pack: `InstantLensDoc-2.6.33-pack.zip`
+
 ## Neu in 2.6.32
 
 Patch nach **2.6.31** (Sync-Parser-Fix):
@@ -116,7 +125,7 @@ Patch nach **2.6.30** (Sync flat/nested):
 
 - **sync-ild.ps1:** Windows PS 5.1 Parser-Fix (ASCII statt Em-Dash/Smart-Quotes; UTF-8 mit BOM)
 - Mojibake / Try-Catch-/String-Fehler behoben
-- Pack: `InstantLensDoc-2.6.32-pack.zip`
+- Pack: `InstantLensDoc-2.6.31-pack.zip`
 
 ## Neu in 2.6.30
 
