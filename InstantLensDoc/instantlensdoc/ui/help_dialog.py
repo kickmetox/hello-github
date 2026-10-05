@@ -257,6 +257,17 @@ HELP_HTML = f"""
     (<code>session.ildshare.json</code>) oder optionalen HTTP-Endpoint; Notizen/Markierungen/
     Stempel/Kommentare austauschbar; Auto-Sync/Polling; Offline bleibt nutzbar;
     kein gehosteter Cloud-Dienst — <b>2.6.26</b></li>
+<li><b>Scannen</b>: Menü <b>Geräte → Scannen…</b> (<code>Ctrl+Shift+S</code>;
+    weiterhin <code>Ctrl+Alt+Shift+I</code>) öffnet <b>einen</b> Dialog:
+    Gerät (Dropdown, merkt letztes Gerät je Backend), DPI/Farbe/Duplex,
+    <b>Scannen</b> (Bild kommt ins Dokument) und <b>ScanTuxio öffnen</b>.
+    Scan-Backend unter <b>Erweitert</b> bzw. <b>Einstellungen → Scannen</b>:
+    Automatisch (ScanTuxio-Ablauf: WIA direkt → NAPS2-Konsole → eSCL → Windows-Dialog),
+    ScanTuxio Win, WIA (direkt), NAPS2, eSCL/AirScan, TWAIN (über NAPS2),
+    externes Programm (Befehlszeile mit <code>{output}</code> <code>{outdir}</code>
+    <code>{dpi}</code> <code>{device}</code> <code>{color}</code> <code>{source}</code>
+    plus Ausgabeordner). Pfad wählen für NAPS2.Console / ScanTuxio.
+    Diagnose: <code>%LOCALAPPDATA%\\InstantLensDoc\\scan.log</code> — <b>2.6.54</b></li>
 <li><b>OCR</b>: Extras → OCR (Seite/Bild) oder <b>OCR gesamtes PDF</b> (Batch mit
     <b>Sprach-Preset</b>-Combobox, Fortschritt/Abbrechen;
     Ergebnis als <b>neue Textdatei-Tab</b> <code>*-ocr.txt</code>) —

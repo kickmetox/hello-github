@@ -158,6 +158,22 @@ def scantuxio_root_candidates() -> List[str]:
         if s and s not in cands:
             cands.append(s)
 
+    # Einstellungen → Scannen → ScanTuxio-Pfad (Datei oder Ordner) — 2.6.54
+    try:
+        from instantlensdoc.core.app_settings import get_scan_settings
+
+        cfg = str(get_scan_settings().get("scan_scantuxio_path") or "").strip()
+    except Exception:
+        cfg = ""
+    if cfg:
+        try:
+            cp = Path(cfg)
+            if cp.is_file():
+                _push(str(cp.parent))
+            else:
+                _push(str(cp))
+        except OSError:
+            _push(cfg)
     for key in ("SCANTUXIO_HOME", "SCANTUXIO_ROOT", "SCANTUXIO_WIN"):
         _push(os.environ.get(key))
     for win_root in SCANTUXIO_WIN_ROOTS:
@@ -254,8 +270,37 @@ def prepare_handshake_dir(out_dir: str | Path | None = None) -> Path:
     return d
 
 
+def scantuxio_base_folder() -> str:
+    """In ScanTuxio eingestellter Basisordner (QSettings „Sellerbach/ScanTuxio“, Schlüssel
+    ``base_folder``) — Windows: Registry HKCU\\Software\\Sellerbach\\ScanTuxio; POSIX:
+    ``~/.config/Sellerbach/ScanTuxio.conf``. Leer, wenn nicht gesetzt — 2.6.54."""
+    if platform.system() == "Windows":
+        try:
+            import winreg  # type: ignore
+
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Sellerbach\ScanTuxio") as k:
+                val, _typ = winreg.QueryValueEx(k, "base_folder")
+                return str(val or "").strip()
+        except Exception:
+            return ""
+    conf = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "Sellerbach" / "ScanTuxio.conf"
+    try:
+        if conf.is_file():
+            for line in conf.read_text(encoding="utf-8", errors="replace").splitlines():
+                if line.strip().startswith("base_folder="):
+                    return line.split("=", 1)[1].strip().strip('"')
+    except OSError:
+        pass
+    return ""
+
+
 def default_watch_dirs(install: Optional[ScanTuxioInstall], handshake: Path) -> List[Path]:
+    """Ordner, in denen ScanTuxio Ergebnisse ablegt (werden **rekursiv** überwacht — ScanTuxio
+    speichert standardmäßig nach ``~/Scans/{Jahr}/{Monat}/{Tag}/…``) — 2.6.54."""
     dirs: List[Path] = [handshake]
+    base = scantuxio_base_folder()
+    if base:
+        dirs.append(Path(base))
     home_scans = Path.home() / "Scans"
     dirs.append(home_scans)
     if install:
@@ -278,29 +323,42 @@ def default_watch_dirs(install: Optional[ScanTuxioInstall], handshake: Path) -> 
     return out
 
 
-def snapshot_scan_files(roots: Sequence[Path]) -> dict[str, tuple[int, int]]:
-    """Pfad → (mtime_ns, size) für Bilder/PDFs."""
+SNAPSHOT_MAX_DEPTH = 4
+
+
+def snapshot_scan_files(roots: Sequence[Path], *, max_depth: int = SNAPSHOT_MAX_DEPTH) -> dict[str, tuple[int, int]]:
+    """Pfad → (mtime_ns, size) für Bilder/PDFs — rekursiv bis ``max_depth`` Ebenen (ScanTuxio-
+    Ordnerschema Jahr/Monat/Tag) — 2.6.54."""
     snap: dict[str, tuple[int, int]] = {}
     for root in roots:
         try:
+            root = Path(root)
             if not root.is_dir():
                 continue
         except OSError:
             continue
-        try:
-            entries = list(root.iterdir())
-        except OSError:
-            continue
-        for p in entries:
+        base_depth = len(root.parts)
+        stack = [root]
+        while stack:
+            d = stack.pop()
             try:
-                if not p.is_file():
-                    continue
-                if p.suffix.lower() not in SCAN_IMPORT_SUFFIXES:
-                    continue
-                st = p.stat()
-                snap[str(p)] = (int(st.st_mtime_ns), int(st.st_size))
+                entries = list(d.iterdir())
             except OSError:
                 continue
+            for p in entries:
+                try:
+                    if p.is_dir():
+                        if len(p.parts) - base_depth < max_depth and not p.name.startswith("."):
+                            stack.append(p)
+                        continue
+                    if not p.is_file():
+                        continue
+                    if p.suffix.lower() not in SCAN_IMPORT_SUFFIXES:
+                        continue
+                    st = p.stat()
+                    snap[str(p)] = (int(st.st_mtime_ns), int(st.st_size))
+                except OSError:
+                    continue
     return snap
 
 

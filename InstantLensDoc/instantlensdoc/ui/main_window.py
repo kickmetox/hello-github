@@ -1433,15 +1433,19 @@ class MainWindow(QMainWindow):
             m_devices.clear()
         except Exception:
             pass
-        act_dev_scan = QAction("Scanner / Scannen…", self)
+        act_dev_scan = QAction("Scannen…", self)
         act_dev_scan.setObjectName("actDevicesScanner")
-        act_dev_scan.setShortcut(QKeySequence("Ctrl+Alt+Shift+I"))
+        act_dev_scan.setShortcuts(
+            [QKeySequence("Ctrl+Shift+S"), QKeySequence("Ctrl+Alt+Shift+I")]
+        )
         act_dev_scan.setToolTip(
-            "ScanTuxio-Hauptfenster öffnen und Scan nach InstantLens Doc übernehmen "
-            "(Shortcut: Ctrl+Alt+Shift+I) — 2.6.51"
+            "Scan-Dialog: Gerät, DPI/Farbe, Scannen — Ergebnis ins Dokument "
+            "(Ctrl+Shift+S) — 2.6.54"
         )
         act_dev_scan.triggered.connect(self._run_scan_import)
         m_devices.addAction(act_dev_scan)
+        # Alias-Text für bestehende Tests / Hilfe („Scannen / Import…“)
+        act_dev_scan.setStatusTip("Scannen / Import…")
         act_dev_printers = QAction("Drucker…", self)
         act_dev_printers.setObjectName("actDevicesPrinters")
         act_dev_printers.setToolTip(
@@ -3024,9 +3028,11 @@ class MainWindow(QMainWindow):
             if title == "Scannen / Import…":
                 a.setToolTip(
                     "Scanner oder Bilder importieren · Tesseract-OCR · "
-                    "Geräte → Scanner / Scannen… · Toolbar Scan… — 2.6.41"
+                    "Geräte → Scannen… · Toolbar Scan… — 2.6.54"
                 )
-                a.setShortcut(QKeySequence("Ctrl+Alt+Shift+I"))
+                a.setShortcuts(
+                    [QKeySequence("Ctrl+Shift+S"), QKeySequence("Ctrl+Alt+Shift+I")]
+                )
                 a.setObjectName("actScanImport")
             if title == "Drucker & Scanner…":
                 a.setToolTip(
@@ -15871,7 +15877,7 @@ class MainWindow(QMainWindow):
         self._set_status(f"Bild eingefügt: {Path(path).name}")
 
     def _run_scan_import(self):
-        """Scan/Import-Dialog: ScanTuxio-UI oder Bilder · Tesseract-OCR — 2.6.46."""
+        """Scan-Dialog: Gerät + Scannen → Bild im Dokument — 2.6.54."""
         try:
             from instantlensdoc.core.devices import SCAN_START_HINT_DE
 
@@ -15892,8 +15898,8 @@ class MainWindow(QMainWindow):
                 self,
                 "Scannen / Import",
                 f"Scan-Dialog konnte nicht geöffnet werden:\n{e}\n\n"
-                "Menü Geräte → Scanner / Scannen… · oder Bilder importieren.\n"
-                "Shortcut: Ctrl+Alt+Shift+I",
+                "Menü Geräte → Scannen… · oder Bilder importieren.\n"
+                "Shortcut: Ctrl+Shift+S (auch Ctrl+Alt+Shift+I)",
             )
 
     def _show_devices_dialog(self, filter_kind: str | None = None, auto_refresh: bool = False):

@@ -552,10 +552,10 @@ def default_palette_commands() -> list[PaletteCommand]:
         ),
         PaletteCommand(
             "scan_import",
-            "Scannen / Import…",
-            "scan scanner import ocr tesseract wia twain naps2 bild foto seite geräte",
+            "Scannen…",
+            "scan scanner import ocr tesseract wia twain naps2 bild foto seite geräte scantuxio",
             "PDF",
-            "Ctrl+Alt+Shift+I",
+            "Ctrl+Shift+S",
         ),
         PaletteCommand(
             "devices",

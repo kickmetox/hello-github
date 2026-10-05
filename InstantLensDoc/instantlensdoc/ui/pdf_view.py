@@ -2721,8 +2721,8 @@ class PdfViewer(QWidget):
         btn_scan = QPushButton("Scan…")
         btn_scan.setObjectName("scanImportToolbarBtn")
         btn_scan.setToolTip(
-            "Scannen / Import · Menü Geräte → Scanner / Scannen… · "
-            "Ctrl+Alt+Shift+I · ScanTuxio-UI — 2.6.46"
+            "Scannen · Menü Geräte → Scannen… · "
+            "Ctrl+Shift+S — 2.6.54"
         )
         btn_scan.clicked.connect(self.scan_import_dialog)
         btn_save_ann = QPushButton("Annot. speichern")

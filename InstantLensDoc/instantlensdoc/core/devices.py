@@ -99,12 +99,11 @@ WINDOWS_SCANNER_DRIVER_HINT_DE = (
     "  • Ohne Hardware: im Scan-Dialog „Bilder importieren…“ nutzen"
 )
 
-# Offensichtliche UI-Einstiege (DE) — Statusleiste / Dialog / Hilfe — 2.6.41
+# Offensichtliche UI-Einstiege (DE) — Statusleiste / Dialog / Hilfe — 2.6.41 / 2.6.54
 SCAN_START_HINT_DE = (
-    "Scannen starten: Menü Geräte → Scanner / Scannen… "
-    "(öffnet ScanTuxio) · oder PDF → Scannen / Import… "
-    "· oder Toolbar „Scan…“ "
-    "· Shortcut Ctrl+Alt+Shift+I"
+    "Scannen: Menü Geräte → Scannen… (Ctrl+Shift+S) "
+    "· Toolbar „Scan…“ · Startseite „Scannen…“ "
+    "— Gerät wählen, „Scannen“ klicken; Backend unter Erweitert / Einstellungen → Scannen"
 )
 
 NO_DEVICE_STATUS_DE = (
@@ -483,17 +482,167 @@ try {
 
 
 def find_naps2_console() -> Optional[str]:
-    """Pfad zu NAPS2.Console.exe — ScanTuxio ``scanner_naps2``."""
+    """Pfad zu NAPS2.Console.exe — Einstellungen → ScanTuxio ``scanner_naps2`` → PATH — 2.6.54."""
     try:
-        from instantlensdoc.core.scantuxio import scanner_naps2 as st_naps2
+        from instantlensdoc.core.scan_transfer import naps2_console_path
 
-        return st_naps2._naps2_console_path()
+        return naps2_console_path()
     except Exception:
         pass
     if platform.system() != "Windows":
         return shutil.which("naps2.console") or shutil.which("naps2-console")
     which = shutil.which("NAPS2.Console") or shutil.which("naps2.console")
     return which
+
+
+# --- Scanner-Auswahl für den Scan-Dialog (gruppiert, je Backend gefiltert) — 2.6.54 ---
+
+
+@dataclass
+class ScannerChoice:
+    """Ein Eintrag im Geräte-Dropdown: physisches Gerät + alternative Backend-Einträge."""
+
+    label: str
+    primary: DeviceInfo
+    alternates: List[DeviceInfo] = field(default_factory=list)
+
+    @property
+    def device_id(self) -> str:
+        return self.primary.device_id or self.primary.name
+
+    def all_devices(self) -> List[DeviceInfo]:
+        return [self.primary] + list(self.alternates)
+
+
+def _device_group_key(d: DeviceInfo) -> str:
+    try:
+        from instantlensdoc.core.scan_transfer import clean_device_name
+    except Exception:  # pragma: no cover
+        def clean_device_name(n: str) -> str:  # type: ignore
+            return n
+
+    name = clean_device_name(d.name or "")
+    did = (d.device_id or "").lower()
+    if did.startswith("naps2:"):
+        rest = did[len("naps2:"):]
+        _drv, _, nm = rest.partition(":")
+        name = clean_device_name(nm) or name
+    key = re.sub(r"\s+", " ", name.strip().lower())
+    return key or did
+
+
+def _device_backend_rank(d: DeviceInfo) -> int:
+    did = (d.device_id or "").lower()
+    be = (d.backend or "").lower()
+    if did.startswith("{") and "}" in did:
+        return 0  # WIA-DeviceID (direkt nutzbar)
+    if did.startswith("naps2:wia:"):
+        return 1
+    if did.startswith(("native-escl:", "escl:")):
+        return 2
+    if did.startswith("naps2:twain:"):
+        return 3
+    if "wia" in be:
+        return 4
+    if did.startswith("mdns:"):
+        return 5
+    if "twain" in be:
+        return 6
+    if "sane" in be:
+        return 2
+    if "pnp" in be:
+        return 7
+    if "cim" in be:
+        return 8
+    return 9
+
+
+def _device_matches_backend(d: DeviceInfo, backend: str) -> bool:
+    """Passt der Geräteeintrag zum gewählten Scan-Backend?"""
+    try:
+        from instantlensdoc.core.scan_transfer import classify_device_id
+    except Exception:  # pragma: no cover
+        return True
+    cls = classify_device_id(d.device_id, d.backend)
+    b = (backend or "auto").lower()
+    if b in ("auto", "external"):
+        return True
+    if b == "scantuxio":
+        return cls in ("naps2", "escl", "sane", "wia", "twain", "pnp", "unknown")
+    if b == "wia":
+        return cls in ("wia", "naps2", "pnp", "twain", "unknown", "dialog")
+    if b == "naps2":
+        return cls in ("naps2", "wia", "pnp", "twain", "unknown")
+    if b == "escl":
+        return cls == "escl"
+    if b == "twain":
+        return cls in ("twain", "naps2", "wia", "pnp", "unknown")
+    return True
+
+
+def scanner_choices(
+    scanners: Sequence[DeviceInfo],
+    *,
+    backend: str = "auto",
+    include_wia_dialog: Optional[bool] = None,
+) -> List[ScannerChoice]:
+    """Scanner für das Dropdown: pro physischem Gerät ein Eintrag (bestes Backend zuerst,
+    Alternativen als Fallback), gefiltert nach Backend; unter Windows zusätzlich der
+    WIA-Dialog-Eintrag — 2.6.54."""
+    groups: dict[str, List[DeviceInfo]] = {}
+    order: List[str] = []
+    for d in scanners:
+        if d is None or d.kind != DeviceKind.SCANNER:
+            continue
+        if not _device_matches_backend(d, backend):
+            continue
+        key = _device_group_key(d)
+        if key not in groups:
+            groups[key] = []
+            order.append(key)
+        groups[key].append(d)
+    out: List[ScannerChoice] = []
+    for key in order:
+        devs = sorted(groups[key], key=_device_backend_rank)
+        primary = devs[0]
+        try:
+            from instantlensdoc.core.scan_transfer import clean_device_name
+
+            base = clean_device_name(primary.name) or primary.name or primary.device_id
+        except Exception:  # pragma: no cover
+            base = primary.name or primary.device_id
+        tags: List[str] = []
+        for d in devs:
+            tag = (d.backend or "").replace("ScanTuxio/", "")
+            if tag and tag not in tags:
+                tags.append(tag)
+        scope = "Netzwerk" if primary.scope == DeviceScope.NETWORK else ""
+        suffix = " · ".join(x for x in ([scope] if scope else []) + tags[:3])
+        label = f"{base} ({suffix})" if suffix else base
+        out.append(ScannerChoice(label=label, primary=primary, alternates=devs[1:]))
+    if include_wia_dialog is None:
+        include_wia_dialog = platform.system() == "Windows" and (backend or "auto") in (
+            "auto",
+            "wia",
+        )
+    if include_wia_dialog:
+        try:
+            from instantlensdoc.core.scan_transfer import WIA_DIALOG_DEVICE_ID, WIA_DIALOG_LABEL_DE
+        except Exception:  # pragma: no cover
+            WIA_DIALOG_DEVICE_ID, WIA_DIALOG_LABEL_DE = "wia:dialog", "Windows-Scannerauswahl (WIA-Dialog)"
+        out.append(
+            ScannerChoice(
+                label=WIA_DIALOG_LABEL_DE,
+                primary=DeviceInfo(
+                    kind=DeviceKind.SCANNER,
+                    name=WIA_DIALOG_LABEL_DE,
+                    device_id=WIA_DIALOG_DEVICE_ID,
+                    scope=DeviceScope.LOCAL,
+                    backend="WIA",
+                ),
+            )
+        )
+    return out
 
 
 def _list_scanners_scantuxio() -> tuple[List[DeviceInfo], List[str], List[str]]:

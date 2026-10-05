@@ -144,7 +144,7 @@ class RibbonBar(QWidget):
             (
                 "Geräte",
                 (
-                    ("scan_import", "Scanner / Scannen…"),
+                    ("scan_import", "Scannen…"),
                     ("devices_printers", "Drucker…"),
                     ("devices_discover", "Geräte erkennen…"),
                     ("devices_refresh", "Neu suchen"),

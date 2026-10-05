@@ -1922,7 +1922,9 @@ class SettingsDialog(QDialog):
         layout.addLayout(reset_row)
 
         stubs_page = self._build_stubs_page()
+        scan_page = self._build_scan_page()
         self.tabs.addTab(general, "Allgemein")
+        self.tabs.addTab(scan_page, "Scannen")
         self.tabs.addTab(stubs_page, "Stubs")
         outer.addWidget(self.tabs)
 
@@ -1930,6 +1932,74 @@ class SettingsDialog(QDialog):
         buttons.accepted.connect(self._save)
         buttons.rejected.connect(self.reject)
         outer.addWidget(buttons)
+
+    def _build_scan_page(self) -> QWidget:
+        """Einstellungen → Scannen: Backend, Pfade, DPI/Farbe/Quelle — 2.6.54."""
+        from instantlensdoc.core.app_settings import get_scan_settings
+        from instantlensdoc.core.scan_transfer import (
+            COLOR_LABELS_DE,
+            COLOR_MODES,
+            DPI_CHOICES,
+            SOURCE_LABELS_DE,
+            SOURCES,
+        )
+        from instantlensdoc.ui.scan_settings import ScanBackendSettingsWidget
+
+        page = QWidget()
+        page.setObjectName("settingsScanPage")
+        layout = QVBoxLayout(page)
+        intro = QLabel(
+            "Welches Scanprogramm „Scannen“ verwendet. Automatik = ScanTuxio-Ablauf "
+            "(WIA direkt → NAPS2 → eSCL → Windows-Scannerdialog). Pfade leer lassen, "
+            "um automatisch zu suchen."
+        )
+        intro.setWordWrap(True)
+        layout.addWidget(intro)
+        self.scan_backend_widget = ScanBackendSettingsWidget(page, apply_immediately=False)
+        layout.addWidget(self.scan_backend_widget)
+
+        cfg = get_scan_settings()
+        opts = QFormLayout()
+        self.scan_dpi_combo = QComboBox()
+        self.scan_dpi_combo.setObjectName("settingsScanDpi")
+        for d in DPI_CHOICES:
+            self.scan_dpi_combo.addItem(f"{d} dpi", int(d))
+        idx = self.scan_dpi_combo.findData(int(cfg.get("scan_dpi") or 300))
+        if idx >= 0:
+            self.scan_dpi_combo.setCurrentIndex(idx)
+        opts.addRow("Standard-Auflösung:", self.scan_dpi_combo)
+        self.scan_color_combo = QComboBox()
+        self.scan_color_combo.setObjectName("settingsScanColor")
+        for m in COLOR_MODES:
+            self.scan_color_combo.addItem(COLOR_LABELS_DE[m], m)
+        cidx = self.scan_color_combo.findData(str(cfg.get("scan_color_mode") or "Color"))
+        if cidx >= 0:
+            self.scan_color_combo.setCurrentIndex(cidx)
+        opts.addRow("Standard-Farbe:", self.scan_color_combo)
+        self.scan_source_combo = QComboBox()
+        self.scan_source_combo.setObjectName("settingsScanSource")
+        for s in SOURCES:
+            self.scan_source_combo.addItem(SOURCE_LABELS_DE[s], s)
+        sidx = self.scan_source_combo.findData(str(cfg.get("scan_source") or "Flatbed"))
+        if sidx >= 0:
+            self.scan_source_combo.setCurrentIndex(sidx)
+        opts.addRow("Standard-Quelle:", self.scan_source_combo)
+        self.scan_output_dir = QLineEdit()
+        self.scan_output_dir.setObjectName("settingsScanOutputDir")
+        self.scan_output_dir.setText(str(cfg.get("scan_output_dir") or ""))
+        self.scan_output_dir.setPlaceholderText("leer = bei Bedarf nachfragen")
+        btn_out = QPushButton("…")
+        btn_out.setFixedWidth(32)
+        btn_out.clicked.connect(lambda: self._pick_dir(self.scan_output_dir))
+        out_row = QWidget()
+        oh = QHBoxLayout(out_row)
+        oh.setContentsMargins(0, 0, 0, 0)
+        oh.addWidget(self.scan_output_dir, 1)
+        oh.addWidget(btn_out)
+        opts.addRow("Scan-PDF-Ordner:", out_row)
+        layout.addLayout(opts)
+        layout.addStretch(1)
+        return page
 
     def _build_stubs_page(self) -> QWidget:
         """Settings-Seite „Stubs“: Status A–Z, FEATURES-Statushinweis, Doppelklick-Info — 1.9.5."""
@@ -4173,6 +4243,18 @@ class SettingsDialog(QDialog):
                 parent._refresh_recent()
             except Exception:
                 pass
+        try:
+            if hasattr(self, "scan_backend_widget"):
+                from instantlensdoc.core.app_settings import set_scan_settings
+
+                vals = dict(self.scan_backend_widget.values())
+                vals["scan_dpi"] = int(self.scan_dpi_combo.currentData() or 300)
+                vals["scan_color_mode"] = str(self.scan_color_combo.currentData() or "Color")
+                vals["scan_source"] = str(self.scan_source_combo.currentData() or "Flatbed")
+                vals["scan_output_dir"] = self.scan_output_dir.text().strip()
+                set_scan_settings(**vals)
+        except Exception:
+            pass
         save_settings(
             {
                 "export_jpeg_quality": int(self.jpeg_q.value()),

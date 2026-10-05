@@ -294,6 +294,20 @@ DEFAULTS: dict[str, Any] = {
         "scan": True,
         "io": True,
     },
+    # Scannen — Backend-Wahl, Pfade, letzte Geräteauswahl je Backend — 2.6.54
+    "scan_backend": "auto",  # auto|scantuxio|wia|naps2|escl|twain|external
+    "scan_external_cmd": "",  # Vorlage mit {output} {outdir} {dpi} {device} {color} {source}
+    "scan_external_outdir": "",  # Ordner, aus dem Ergebnisse des externen Programms gelesen werden
+    "scan_naps2_path": "",  # NAPS2.Console.exe (leer = automatisch suchen)
+    "scan_scantuxio_path": "",  # ScanTuxio.exe oder Ordner (leer = automatisch suchen)
+    "scan_last_device_by_backend": {},  # backend → device_id
+    "scan_dpi": 300,
+    "scan_color_mode": "Color",  # Color|Gray|Lineart
+    "scan_source": "Flatbed",  # Flatbed|ADF|ADF Duplex
+    "scan_output_dir": "",  # Ordner für neue Scan-PDFs (leer = Dokumente/InstantLensDoc-Scans)
+    "scan_ask_next_page": True,
+    "scan_insert_into_current": True,
+    "scan_ocr_enabled": True,
 }
 
 PDF_TOOLBAR_GROUP_LABELS: dict[str, str] = {
@@ -6919,3 +6933,89 @@ def set_pdf_toolbar_groups(groups: dict[str, bool]) -> dict[str, bool]:
                 base[key] = bool(groups[key])
     save_settings({"pdf_toolbar_groups": base})
     return base
+
+
+# --- Scannen (Backend, Pfade, Geräte) — 2.6.54 ---------------------------
+
+SCAN_SETTING_KEYS: tuple[str, ...] = (
+    "scan_backend",
+    "scan_external_cmd",
+    "scan_external_outdir",
+    "scan_naps2_path",
+    "scan_scantuxio_path",
+    "scan_last_device_by_backend",
+    "scan_dpi",
+    "scan_color_mode",
+    "scan_source",
+    "scan_output_dir",
+    "scan_ask_next_page",
+    "scan_insert_into_current",
+    "scan_ocr_enabled",
+)
+
+SCAN_BACKEND_KEYS: tuple[str, ...] = (
+    "auto",
+    "scantuxio",
+    "wia",
+    "naps2",
+    "escl",
+    "twain",
+    "external",
+)
+
+
+def get_scan_settings() -> dict[str, Any]:
+    """Alle Scan-Einstellungen mit Defaults (Typen bereinigt)."""
+    data = load_settings()
+    out: dict[str, Any] = {}
+    for key in SCAN_SETTING_KEYS:
+        out[key] = data.get(key, DEFAULTS.get(key))
+    backend = str(out.get("scan_backend") or "auto").strip().lower()
+    out["scan_backend"] = backend if backend in SCAN_BACKEND_KEYS else "auto"
+    try:
+        out["scan_dpi"] = max(50, min(2400, int(out.get("scan_dpi") or 300)))
+    except (TypeError, ValueError):
+        out["scan_dpi"] = 300
+    if str(out.get("scan_color_mode") or "") not in ("Color", "Gray", "Lineart"):
+        out["scan_color_mode"] = "Color"
+    if str(out.get("scan_source") or "") not in ("Flatbed", "ADF", "ADF Duplex"):
+        out["scan_source"] = "Flatbed"
+    if not isinstance(out.get("scan_last_device_by_backend"), dict):
+        out["scan_last_device_by_backend"] = {}
+    for key in ("scan_external_cmd", "scan_external_outdir", "scan_naps2_path",
+                "scan_scantuxio_path", "scan_output_dir"):
+        out[key] = str(out.get(key) or "")
+    for key in ("scan_ask_next_page", "scan_insert_into_current", "scan_ocr_enabled"):
+        out[key] = bool(out.get(key))
+    return out
+
+
+def set_scan_settings(**updates: Any) -> dict[str, Any]:
+    """Scan-Einstellungen teilweise aktualisieren (nur bekannte Schlüssel)."""
+    clean = {k: v for k, v in updates.items() if k in SCAN_SETTING_KEYS}
+    if "scan_backend" in clean:
+        b = str(clean["scan_backend"] or "auto").strip().lower()
+        clean["scan_backend"] = b if b in SCAN_BACKEND_KEYS else "auto"
+    if clean:
+        save_settings(clean)
+    return get_scan_settings()
+
+
+def get_scan_backend() -> str:
+    return str(get_scan_settings()["scan_backend"])
+
+
+def set_scan_backend(backend: str) -> str:
+    return str(set_scan_settings(scan_backend=backend)["scan_backend"])
+
+
+def get_scan_last_device(backend: str) -> str:
+    """Zuletzt gewähltes Gerät für ein Backend (leer = keins)."""
+    table = get_scan_settings()["scan_last_device_by_backend"]
+    return str(table.get(str(backend or "auto"), "") or "")
+
+
+def set_scan_last_device(backend: str, device_id: str) -> None:
+    table = dict(get_scan_settings()["scan_last_device_by_backend"])
+    table[str(backend or "auto")] = str(device_id or "")
+    save_settings({"scan_last_device_by_backend": table})
