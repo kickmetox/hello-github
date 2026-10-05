@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import os
+import platform
+import shutil
+import sys
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
@@ -40,40 +44,215 @@ LANG_PRESETS: Dict[str, str] = {
 
 TESSERACT_WIKI_URL = "https://github.com/UB-Mannheim/tesseract/wiki"
 
-# Typische Installationspfade (Windows) — Hinweis wenn Runtime nicht im PATH
+# ScanTuxio-Konvention (scantuxio/ocr.py + platform_utils.bundled_tool_dir):
+# Frozen: <exe-dir>/tesseract/tesseract.exe + tessdata/ daneben
+# Quelle: <projekt>/vendor/tesseract/tesseract.exe + tessdata/
+# TESSDATA_PREFIX = dirname(exe)/tessdata  (conda-Build kennt den Prefix sonst nicht)
+SCANTUXIO_WIN_ROOTS = (
+    r"D:\AI_Temp\ScanTuxio Win",
+    r"D:\AI_Temp\ScanTuxio-Win",
+    r"D:\AI_Temp\ScanTuxioWin",
+)
+
 TESSERACT_COMMON_PATHS = (
     r"C:\Program Files\Tesseract-OCR\tesseract.exe",
     r"C:\Program Files (x86)\Tesseract-OCR\tesseract.exe",
 )
 
+_TESS_EXE_NAMES = ("tesseract.exe", "tesseract")
+
+
+def _ild_app_roots() -> List[Path]:
+    """Install-/App-Root: Frozen-EXE, PyInstaller MEIPASS, Paket-Root, CWD."""
+    roots: List[Path] = []
+
+    def _add(raw: object) -> None:
+        if not raw:
+            return
+        try:
+            p = Path(str(raw)).expanduser().resolve()
+        except OSError:
+            p = Path(str(raw))
+        if p not in roots:
+            roots.append(p)
+
+    if getattr(sys, "frozen", False):
+        _add(Path(sys.executable).parent)
+        mei = getattr(sys, "_MEIPASS", None)
+        if mei:
+            _add(mei)
+    # instantlensdoc/core/ocr.py → App-Root InstantLensDoc/
+    _add(Path(__file__).resolve().parents[2])
+    _add(Path.cwd())
+    for env_key in ("ILD_APP_ROOT", "INSTANTLENSDOC_ROOT"):
+        _add(os.environ.get(env_key))
+    return roots
+
+
+def _join_win_or_posix(root: str, *parts: str) -> str:
+    """Join ohne Path.resolve — Windows-Absolutfade (D:\\...) bleiben unter Linux literal."""
+    if not parts:
+        return root
+    # Windows-Root (Laufwerkspfad) immer mit Backslash joinen
+    if len(root) >= 2 and root[1] == ":" and ("\\" in root or root.endswith((":", "/", "\\"))):
+        base = root.rstrip("\\/")
+        return base + "\\" + "\\".join(parts)
+    return str(Path(root).joinpath(*parts))
+
+
+def _exe_paths_under_root(root: str) -> List[str]:
+    """ScanTuxio-relative Layouts unter einem Root (als Strings)."""
+    out: List[str] = []
+    rels = (
+        ("tesseract",),
+        ("vendor", "tesseract"),
+        ("bin",),
+        ("Tesseract-OCR",),
+        ("dist", "tesseract"),
+        ("dist", "ScanTuxio", "tesseract"),
+        (),
+    )
+    for rel in rels:
+        tool = _join_win_or_posix(root, *rel) if rel else root
+        for name in _TESS_EXE_NAMES:
+            out.append(_join_win_or_posix(tool, name))
+    return out
+
+
+def tesseract_lookup_candidates() -> List[str]:
+    """Kandidaten in Lookup-Reihenfolge (existieren nicht zwingend) — 2.6.42."""
+    cands: List[str] = []
+
+    def _push(p: object) -> None:
+        s = str(p)
+        if s and s not in cands:
+            cands.append(s)
+
+    for env_key in ("TESSERACT_CMD", "TESSERACT_PATH"):
+        env = os.environ.get(env_key)
+        if env:
+            _push(env)
+    for root in _ild_app_roots():
+        for p in _exe_paths_under_root(str(root)):
+            _push(p)
+    for win_root in SCANTUXIO_WIN_ROOTS:
+        for p in _exe_paths_under_root(win_root):
+            _push(p)
+        # Sibling neben ILD-Dest, z. B. InstantLensDoc-2642 → ..\ScanTuxio Win
+        leaf = win_root.rstrip("\\/").split("\\")[-1].split("/")[-1]
+        for app in _ild_app_roots():
+            try:
+                sib = str(app.parent / leaf)
+            except OSError:
+                continue
+            if sib.replace("\\", "/").rstrip("/") == win_root.replace("\\", "/").rstrip("/"):
+                continue
+            # nur echte Sibling-Ordner auf dem gleichen Host (kein D:\-Literal unter /workspace)
+            if len(sib) >= 2 and sib[1] == ":" and platform.system() != "Windows":
+                continue
+            if not Path(sib).is_dir() and platform.system() != "Windows":
+                continue
+            for p in _exe_paths_under_root(sib):
+                _push(p)
+    for p in TESSERACT_COMMON_PATHS:
+        _push(p)
+    return cands
+
+
+def tessdata_dir_for(exe: str | os.PathLike[str]) -> Optional[str]:
+    """TESSDATA_PREFIX wie ScanTuxio: tessdata neben tesseract.exe."""
+    try:
+        d = Path(exe).expanduser().resolve().parent
+    except OSError:
+        d = Path(exe).parent
+    for cand in (
+        d / "tessdata",
+        d.parent / "tessdata",
+        d / "tessdata" / "tessdata",
+    ):
+        try:
+            if cand.is_dir():
+                return str(cand)
+        except OSError:
+            continue
+    return None
+
+
+def apply_tessdata_prefix(exe: str | os.PathLike[str]) -> Optional[str]:
+    """Setzt TESSDATA_PREFIX auf das mitgelieferte tessdata (ScanTuxio-Runtime)."""
+    tessdata = tessdata_dir_for(exe)
+    if tessdata:
+        os.environ["TESSDATA_PREFIX"] = tessdata
+        return tessdata
+    return os.environ.get("TESSDATA_PREFIX") or None
+
+
+def resolve_tesseract_executable() -> Optional[str]:
+    """Bundled vendor → ScanTuxio Win → PATH → Program Files."""
+    for cand in tesseract_lookup_candidates():
+        p = Path(cand)
+        try:
+            if p.is_file():
+                return str(p.resolve())
+        except OSError:
+            continue
+    which = shutil.which("tesseract") or shutil.which("tesseract.exe")
+    if which:
+        return which
+    if platform.system() == "Windows":
+        for env_var in ("ProgramFiles", "ProgramFiles(x86)", "ProgramW6432"):
+            base = os.environ.get(env_var)
+            if not base:
+                continue
+            tess_root = Path(base) / "Tesseract-OCR"
+            if not tess_root.is_dir():
+                continue
+            for name in _TESS_EXE_NAMES:
+                hit = tess_root / name
+                if hit.is_file():
+                    return str(hit)
+    return None
+
+
 _PATH_HINT_DE = (
-    "Pfad-Hilfe (falls nicht im PATH):\n"
+    "Pfad-Hilfe (keine Extra-Installation noetig, wenn ScanTuxio-Runtime liegt):\n"
+    "  {app}\\vendor\\tesseract\\tesseract.exe\n"
+    "  {app}\\tesseract\\tesseract.exe   (neben InstantLensDoc.exe, ScanTuxio-Layout)\n"
+    "  D:\\AI_Temp\\ScanTuxio Win\\tesseract\\tesseract.exe\n"
+    "  D:\\AI_Temp\\ScanTuxio Win\\vendor\\tesseract\\tesseract.exe\n"
+    "  D:\\AI_Temp\\ScanTuxio Win\\bin\\tesseract.exe\n"
     + "\n".join(f"  {p}" for p in TESSERACT_COMMON_PATHS)
     + "\n"
-    "  → PATH um den Ordner ergänzen oder TESSDATA_PREFIX setzen."
+    "  tessdata: deu.traineddata + eng.traineddata neben der EXE (TESSDATA_PREFIX).\n"
+    "  Copy-Hint: xcopy /E /I /Y \"D:\\AI_Temp\\ScanTuxio Win\\tesseract\" .\\vendor\\tesseract"
 )
 
 INSTALL_HINT_DE = (
-    "OCR benötigt die Tesseract-Runtime.\n\n"
+    "OCR benötigt die Tesseract-Runtime (ScanTuxio-Bundle oder UB-Mannheim).\n\n"
     "Windows:\n"
-    "  winget install UB-Mannheim.TesseractOCR\n"
+    "  Bevorzugt: Runtime aus ScanTuxio Win (vendor/tesseract oder neben der EXE).\n"
+    "  Fallback: winget install UB-Mannheim.TesseractOCR\n"
     f"  oder Installer: {TESSERACT_WIKI_URL}\n\n"
     f"{_PATH_HINT_DE}\n\n"
     "Danach Python-Paket (falls fehlen):\n"
     "  pip install pytesseract\n\n"
-    "Sprachen: deu + eng empfohlen (im Tesseract-Installer anhaken)."
+    "Sprachen: deu + eng empfohlen."
 )
 
 INSTALL_HINT_HTML = (
-    "<p>OCR benötigt die Tesseract-Runtime.</p>"
-    "<p><b>Windows:</b><br>"
+    "<p>OCR benötigt die Tesseract-Runtime (ScanTuxio-Bundle oder UB-Mannheim).</p>"
+    "<p><b>Windows:</b> Runtime aus ScanTuxio Win "
+    "(<code>vendor\\tesseract\\tesseract.exe</code>) oder "
     "<code>winget install UB-Mannheim.TesseractOCR</code><br>"
     f'oder <a href="{TESSERACT_WIKI_URL}">UB-Mannheim Tesseract (Wiki)</a></p>'
-    "<p><b>Pfad-Hilfe</b> (falls nicht im PATH):<br>"
+    "<p><b>Pfad-Hilfe</b>:<br>"
+    "<code>{app}\\vendor\\tesseract\\tesseract.exe</code><br>"
+    "<code>{app}\\tesseract\\tesseract.exe</code><br>"
+    r"<code>D:\AI_Temp\ScanTuxio Win\tesseract\tesseract.exe</code><br>"
     + "<br>".join(f"<code>{p}</code>" for p in TESSERACT_COMMON_PATHS)
-    + "<br>→ PATH um den Ordner ergänzen oder <code>TESSDATA_PREFIX</code> setzen.</p>"
+    + "<br><code>TESSDATA_PREFIX</code> = tessdata neben der EXE.</p>"
     "<p>Python: <code>pip install pytesseract</code></p>"
-    "<p>Sprachen <code>deu</code> + <code>eng</code> im Installer anhaken.</p>"
+    "<p>Sprachen <code>deu</code> + <code>eng</code>.</p>"
 )
 
 
@@ -121,38 +300,23 @@ class OcrResult:
 
 
 def _configure_tesseract_cmd(pytesseract) -> None:
-    """Windows: haeufige Installationspfade setzen wenn Runtime nicht im PATH — 2.6.38."""
-    import os
-    import platform
-    import shutil
-
+    """pytesseract.tesseract_cmd + TESSDATA_PREFIX (ScanTuxio-Bundle zuerst) — 2.6.42."""
+    exe: Optional[str] = None
     try:
         current = getattr(pytesseract.pytesseract, "tesseract_cmd", None)
         if current and Path(str(current)).is_file():
-            return
+            exe = str(Path(str(current)).resolve())
+    except Exception:
+        exe = None
+    if not exe:
+        exe = resolve_tesseract_executable()
+    if not exe:
+        return
+    try:
+        pytesseract.pytesseract.tesseract_cmd = exe
     except Exception:
         pass
-    which = shutil.which("tesseract")
-    if which:
-        try:
-            pytesseract.pytesseract.tesseract_cmd = which
-        except Exception:
-            pass
-        return
-    if platform.system() == "Windows":
-        env = os.environ.get("TESSERACT_CMD") or os.environ.get("TESSERACT_PATH")
-        candidates = []
-        if env:
-            candidates.append(env)
-        candidates.extend(TESSERACT_COMMON_PATHS)
-        for cand in candidates:
-            p = Path(cand)
-            if p.is_file():
-                try:
-                    pytesseract.pytesseract.tesseract_cmd = str(p)
-                except Exception:
-                    pass
-                return
+    apply_tessdata_prefix(exe)
 
 
 def tesseract_available() -> tuple[bool, str]:

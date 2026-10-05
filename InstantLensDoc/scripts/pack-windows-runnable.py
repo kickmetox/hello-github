@@ -45,6 +45,7 @@ INCLUDE_TOP = [
     "FEATURES.md",
     "CHANGELOG.md",
     "CONTRIBUTING.md",
+    "vendor",  # Tesseract-Runtime Layout / README (Binaries optional) — 2.6.42
 ]
 
 SKIP_DIR_NAMES = {

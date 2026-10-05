@@ -264,7 +264,9 @@ HELP_HTML = f"""
     „durchsuchbares Bild“ (PDF + <code>*.ildocr.txt</code>); Tabellen-Heuristik als Markdown wo möglich.
     Optional Checkbox <b>In Word-Suite öffnen/übernehmen</b> — <b>2.6.15</b>.
     Ohne Tesseract: Install-Hinweis mit Link und <b>Pfad-Hilfe</b>
-    (<a href="https://github.com/UB-Mannheim/tesseract/wiki">UB-Mannheim Wiki</a>,
+    (ScanTuxio-Runtime <code>vendor\\tesseract\\tesseract.exe</code> bzw.
+    <code>D:\\AI_Temp\\ScanTuxio Win\\tesseract\\tesseract.exe</code>;
+    <a href="https://github.com/UB-Mannheim/tesseract/wiki">UB-Mannheim Wiki</a>,
     <code>winget install UB-Mannheim.TesseractOCR</code>,
     typisch <code>C:\\Program Files\\Tesseract-OCR\\tesseract.exe</code>);
     Button <b>„Als Defaults speichern“</b> → Toast (Dauer 1/2/3 s + A11y-Announcement) + Feld-Highlight; optionaler Seitenbereich;

@@ -73,7 +73,9 @@ class DeviceDiscoveryResult:
 # Klare DE-Hinweise wenn Treiber / Backends fehlen
 WINDOWS_SCAN_DEPS_HINT = (
     "Windows Scan/OCR:\n"
-    "  • Tesseract: winget install UB-Mannheim.TesseractOCR (deu+eng anhaken)\n"
+    "  • Tesseract: ScanTuxio-Runtime (vendor\\tesseract oder "
+    "D:\\AI_Temp\\ScanTuxio Win\\tesseract\\tesseract.exe)\n"
+    "  • Fallback: winget install UB-Mannheim.TesseractOCR (deu+eng)\n"
     "  • Python: pip install pytesseract\n"
     "  • Scanner: WIA-Treiber des Herstellers (TWAIN optional)\n"
     "  • Drucker: Windows-Druckerwarteschlange / Get-Printer\n"

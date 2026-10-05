@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Nightly/CI Smoke: CLI + Import-Checks für InstantLens Doc — 2.1.0–2.6.41.
+"""Nightly/CI Smoke: CLI + Import-Checks für InstantLens Doc — 2.1.0–2.6.42.
 
 Leichtgewichtig. Exit-Codes:
   0  OK  (ok=true)
@@ -14,12 +14,12 @@ Aufruf:
   python scripts/smoke_ild.py -h
 
 JSON-Schema (--json), Erfolg:
-  {"ok": true, "version": "2.6.41", "duration_ms": 1234,
+  {"ok": true, "version": "2.6.42", "duration_ms": 1234,
    "checks": ["version", "imports", "cli", "measure_diff_import", "changelog"]}
 
 JSON bei Fail: checks[] enthält Objekt mit error-Text (max 200 Zeichen, Truncate …);
 Exitcode spiegelt ok (0↔true, 1↔false) — 2.2.0:
-  {"ok": false, "version": "2.6.41", "duration_ms": 12,
+  {"ok": false, "version": "2.6.42", "duration_ms": 12,
    "checks": ["version", {"name": "imports", "error": "import x: …"}]}
 """
 
@@ -41,7 +41,7 @@ if str(ROOT) not in sys.path:
 # Headless/CI: Qt ohne Display
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-EXPECTED_VERSION = "2.6.41"
+EXPECTED_VERSION = "2.6.42"
 FAIL_ERROR_MAX_LEN = 200
 
 EXIT_OK = 0
@@ -82,7 +82,7 @@ def check_version() -> None:
         _fail(f"docs/VERSION={docs_ver!r}")
     bw = (ROOT / "build-windows.ps1").read_text(encoding="utf-8")
     if EXPECTED_VERSION not in bw or "Allow32Bit" not in bw:
-        _fail("build-windows.ps1 fehlt 2.6.41/Allow32Bit")
+        _fail("build-windows.ps1 fehlt 2.6.42/Allow32Bit")
     if not (ROOT / "scripts" / "pack-windows-runnable.py").is_file():
         _fail("scripts/pack-windows-runnable.py fehlt")
     if not (ROOT / "run-keygen.bat").is_file():
@@ -181,6 +181,34 @@ def check_version() -> None:
     spec.loader.exec_module(mod)
     if not callable(getattr(mod, "main", None)):
         _fail("run_instantlensdoc.main nicht callable")
+    if "Copy-TesseractVendor" not in bw or "build-keygen" not in bw:
+        _fail("build-windows.ps1 fehlt Tesseract Copy-Hint/build-keygen (2.6.42)")
+    if r"D:\AI_Temp\ScanTuxio Win" not in bw:
+        _fail("build-windows.ps1 fehlt ScanTuxio Win Tesseract-Pfad (2.6.42)")
+    ocr_py = (ROOT / "instantlensdoc" / "core" / "ocr.py").read_text(encoding="utf-8")
+    if "resolve_tesseract_executable" not in ocr_py or "TESSDATA_PREFIX" not in ocr_py:
+        _fail("ocr.py fehlt resolve_tesseract_executable/TESSDATA_PREFIX (2.6.42)")
+    if "SCANTUXIO_WIN_ROOTS" not in ocr_py or "vendor" not in ocr_py:
+        _fail("ocr.py fehlt ScanTuxio/vendor Lookup (2.6.42)")
+    tess_readme = ROOT / "vendor" / "tesseract" / "README.txt"
+    if not tess_readme.is_file():
+        _fail("vendor/tesseract/README.txt fehlt (2.6.42 Layout-Hinweis)")
+    tess_rd = tess_readme.read_text(encoding="utf-8")
+    if "tesseract.exe" not in tess_rd or "tessdata" not in tess_rd:
+        _fail("vendor/tesseract/README.txt unvollständig (2.6.42)")
+    from instantlensdoc.core.ocr import (
+        apply_tessdata_prefix,
+        resolve_tesseract_executable,
+        tesseract_lookup_candidates,
+    )
+    cands = tesseract_lookup_candidates()
+    joined = "\n".join(cands)
+    if r"D:\AI_Temp\ScanTuxio Win" not in joined:
+        _fail("tesseract_lookup_candidates fehlt ScanTuxio Win")
+    if "vendor" not in joined.lower() or "tesseract.exe" not in joined:
+        _fail("tesseract_lookup_candidates fehlt vendor/tesseract.exe")
+    if not callable(resolve_tesseract_executable) or not callable(apply_tessdata_prefix):
+        _fail("ocr tess helpers nicht callable")
     # 2.6.41: Large-PDF perf constants + APIs
     from ild_pdf.limits import (
         THUMB_VIRTUAL_THRESHOLD,
@@ -264,6 +292,7 @@ def check_version() -> None:
         _fail("pack-windows-runnable.py fehlt run_instantlensdoc.py (2.6.40)")
 
     _ok("2.6.41 scantuxio-port/menuDevices/naps2-escl/entry-hints: OK")
+    _ok("2.6.42 tesseract-runtime/vendor/TESSDATA_PREFIX/ScanTuxio-Win: OK")
 
 
 def check_imports(*, with_qt: bool) -> None:
@@ -526,6 +555,7 @@ def check_imports(*, with_qt: bool) -> None:
             "scanEntryBanner",
             "SCAN_START_HINT_DE",
             "2.6.41",
+            "2.6.42",
         ),
         ROOT / "instantlensdoc" / "core" / "devices.py": (
             "discover_devices",
@@ -542,6 +572,7 @@ def check_imports(*, with_qt: bool) -> None:
             "_list_scanners_scantuxio",
             "list_devices_all",
             "2.6.41",
+            "ScanTuxio-Runtime",
         ),
         ROOT / "instantlensdoc" / "core" / "scan.py": (
             "insert_scan_pages_into_pdf",
@@ -1130,6 +1161,8 @@ def check_measure_and_diff() -> None:
 
 def check_changelog() -> None:
     cl = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    if "## 2.6.42" not in cl:
+        _fail("CHANGELOG fehlt ## 2.6.42")
     if "## 2.6.41" not in cl:
         _fail("CHANGELOG fehlt ## 2.6.41")
     if "## 2.6.40" not in cl:
@@ -1692,6 +1725,13 @@ def check_changelog() -> None:
     ):
         _fail("CHANGELOG 2.6.41 fehlt Scan/NAPS2-Hinweis")
     if (
+        "TESSDATA_PREFIX" not in cl
+        and "tesseract.exe" not in cl
+        and "ScanTuxio Win" not in cl
+        and "2.6.42" not in cl
+    ):
+        _fail("CHANGELOG 2.6.42 fehlt Tesseract-Runtime-Hinweis")
+    if (
         "Silbentrennung" not in cl
         and "Hyphen" not in cl
         and "Menü" not in cl
@@ -1829,8 +1869,10 @@ def check_changelog() -> None:
     if "## 2.2.0" not in cl:
         _fail("CHANGELOG fehlt ## 2.2.0")
     feat = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
+    if "2.6.42" not in feat:
+        _fail("FEATURES.md fehlt 2.6.42")
     if "2.6.41" not in feat:
-        _fail("FEATURES.md fehlt 2.6.36")
+        _fail("FEATURES.md fehlt 2.6.41")
     if "2.6.28" not in feat:
         _fail("FEATURES.md fehlt 2.6.28")
     if "2.6.13" not in feat:
@@ -1996,6 +2038,12 @@ def check_changelog() -> None:
         and "2.6.41" not in feat
     ):
         _fail("FEATURES.md fehlt 2.6.41 Scan/NAPS2-Hinweis")
+    if (
+        "ScanTuxio" not in feat
+        and "vendor/tesseract" not in feat
+        and "2.6.42" not in feat
+    ):
+        _fail("FEATURES.md fehlt 2.6.42 Tesseract-Runtime-Hinweis")
     if (
         "Silbentrennung" not in feat
         and "Menü/Palette" not in feat
@@ -2440,11 +2488,11 @@ Exit-Codes:
 Laufzeit: am Ende als „Laufzeit: N ms“ (oder duration_ms im JSON).
 
 Beispiel --json (Erfolg):
-  {"ok": true, "version": "2.6.41", "duration_ms": 1234,
+  {"ok": true, "version": "2.6.42", "duration_ms": 1234,
    "checks": ["version", "imports", "cli", "measure_diff_import", "changelog"]}
 
 Beispiel --json (Fail):
-  {"ok": false, "version": "2.6.41", "duration_ms": 12,
+  {"ok": false, "version": "2.6.42", "duration_ms": 12,
    "checks": ["version", {"name": "imports", "error": "import x: …"}]}
 """.rstrip()
     )

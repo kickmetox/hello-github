@@ -1,4 +1,4 @@
-﻿# InstantLens Doc - Windows-Build (PyInstaller App + Keygen) 2.6.41
+﻿# InstantLens Doc - Windows-Build (PyInstaller App + Keygen) 2.6.42
 # Eine Zeile:
 #   powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 #
@@ -33,11 +33,51 @@ $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $Root
 
-Write-Host "=== InstantLens Doc Build 2.6.41 (Windows x64) ==="
+Write-Host "=== InstantLens Doc Build 2.6.42 (Windows x64) ==="
 Write-Host "Root: $Root"
 
 # Mindestgroesse: leere/stub EXE und fehlgeschlagenes onedir entlarven (~49 MB Setup)
 $script:IldMinAppExeBytes = 5MB
+
+# ScanTuxio Tesseract-Runtime neben EXE / vendor (Binaries oft nicht im Pack-Zip)
+function Copy-TesseractVendor {
+    param([string]$DestRoot)
+    if (-not $DestRoot -or -not (Test-Path -LiteralPath $DestRoot)) { return $false }
+    $srcCandidates = @(
+        (Join-Path $Root "vendor\tesseract"),
+        'D:\AI_Temp\ScanTuxio Win\tesseract',
+        'D:\AI_Temp\ScanTuxio Win\vendor\tesseract',
+        'D:\AI_Temp\ScanTuxio Win\bin',
+        'D:\AI_Temp\ScanTuxio-Win\tesseract',
+        'D:\AI_Temp\ScanTuxio-Win\vendor\tesseract'
+    )
+    foreach ($src in $srcCandidates) {
+        $exe = Join-Path $src "tesseract.exe"
+        if (-not (Test-Path -LiteralPath $exe)) { continue }
+        $destVendor = Join-Path $DestRoot "vendor\tesseract"
+        $destBeside = Join-Path $DestRoot "tesseract"
+        New-Item -ItemType Directory -Force -Path $destVendor | Out-Null
+        New-Item -ItemType Directory -Force -Path $destBeside | Out-Null
+        Copy-Item -Recurse -Force -Path (Join-Path $src "*") -Destination $destVendor
+        Copy-Item -Recurse -Force -Path (Join-Path $src "*") -Destination $destBeside
+        Write-Host "OK: Tesseract-Runtime kopiert: $src -> vendor\tesseract + tesseract\"
+        return $true
+    }
+    Write-Host @"
+HINWEIS: Keine tesseract.exe im Pack (ScanTuxio-Zip = Quellen). OCR sucht zur Laufzeit:
+  1) {app}\vendor\tesseract\tesseract.exe + tessdata\
+  2) {app}\tesseract\tesseract.exe + tessdata\  (ScanTuxio Frozen-Layout)
+  3) D:\AI_Temp\ScanTuxio Win\tesseract\tesseract.exe
+     D:\AI_Temp\ScanTuxio Win\vendor\tesseract\tesseract.exe
+     D:\AI_Temp\ScanTuxio Win\bin\tesseract.exe
+  4) C:\Program Files\Tesseract-OCR\tesseract.exe / PATH
+build-keygen Copy-Hint:
+  xcopy /E /I /Y "D:\AI_Temp\ScanTuxio Win\tesseract" ".\vendor\tesseract"
+  xcopy /E /I /Y "D:\AI_Temp\ScanTuxio Win\tesseract" "$DestRoot\tesseract"
+Erwartet: tesseract.exe, tessdata\deu.traineddata, tessdata\eng.traineddata
+"@
+    return $false
+}
 
 # 64-Bit Python erzwingen (bevorzugt fuer Release)
 $archLine = & $Python -c "import struct,platform; print(struct.calcsize('P')*8); print(platform.machine())"
@@ -206,6 +246,7 @@ Pruefe PyInstaller-Log oben. Erwartet: dist\InstantLensDoc\InstantLensDoc.exe
     }
     Write-Host ("OK: {0} ({1} MB)" -f $appExe, [math]::Round($exeLen / 1MB, 2))
     Write-Host "OK: dist\InstantLensDoc\"
+    [void](Copy-TesseractVendor -DestRoot $AppDist)
 }
 
 $KeygenDist = Join-Path $Root "dist\InstantLensKeygen"
@@ -219,6 +260,11 @@ if (-not $SkipKeygen) {
     & $Python -m PyInstaller @kgArgs
     if ($LASTEXITCODE -ne 0) { throw "Keygen-Build fehlgeschlagen" }
     Write-Host "OK: dist\InstantLensKeygen\"
+    # build-keygen Copy-Hint: gleiche Tesseract-Runtime wie App (OCR unabhaengig vom Keygen)
+    Write-Host "build-keygen: Tesseract-Runtime Copy-Hint (ScanTuxio Win -> vendor\\tesseract)"
+    if (Test-Path $AppDist) {
+        [void](Copy-TesseractVendor -DestRoot $AppDist)
+    }
 
     # Optional: Keygen in App-Dist legen (Installer findet InstantLensKeygen.exe)
     if (-not $NoKeygenInApp -and (Test-Path $AppDist)) {
@@ -240,7 +286,7 @@ if (-not $SkipKeygen) {
     Write-Host "Keygen uebersprungen (-SkipKeygen)"
 }
 
-Write-Host "Fertig (2.6.41). Optional:"
+Write-Host "Fertig (2.6.42). Optional:"
 Write-Host '  powershell -ExecutionPolicy Bypass -File .\installer\build-installer.ps1'
 Write-Host "  (ohne Keygen: -SkipKeygen bzw. ISCC /DIncludeKeygen=0)"
 Write-Host '  python scripts\pack-windows-runnable.py   # Python-Layout-Zip ohne EXE'

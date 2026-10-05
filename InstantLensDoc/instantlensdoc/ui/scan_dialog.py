@@ -1,4 +1,4 @@
-"""Scan/Import-Dialog + Geräteauswahl (Drucker/Scanner) — 2.6.2 / 2.6.41."""
+"""Scan/Import-Dialog + Geräteauswahl (Drucker/Scanner) — 2.6.2 / 2.6.41 / 2.6.42."""
 
 from __future__ import annotations
 
