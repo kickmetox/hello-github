@@ -1,3 +1,17 @@
+## 2.6.52 - Voll-Audit: PDF-Ansicht off-screen, Seitenanzahl, B/I/U, Textmarker, DOCX
+
+End-to-End-Audit (offscreen + Xvfb 1920×1080) statt weiterer Render-Patches. Alle „Fix“-Behauptungen 2.6.40–2.6.51 wurden als unverifiziert behandelt und mit echten MainWindow-Tests nachgestellt (`scripts/test_ui_audit_2652.py`, schlägt auf 2.6.51 reproduzierbar fehl).
+
+- **PDF „weiße Hauptansicht“ — eigentliche Ursache gefunden**: Die PDF-Werkzeugleiste war ein einzeiliges `QHBoxLayout` mit ~85 Buttons → `PdfViewer.minimumSizeHint()` **7041 px**, Hauptfenster-Mindestgröße **7286×2175 px** (Sidebar ohne Scroll ≈ 2000 px hoch). Qt kann das Fenster nicht kleiner machen; die zentrierte Seite lag bei x≈3500 px — auf einem 1920-px-Monitor unsichtbar, Statusleiste ebenfalls off-screen. Rendering/PDFium war nie das Problem (Thumbs links waren sichtbar). Fix: **`ui/flow_layout.FlowLayout`** (umbrechende Leiste, Höhen-Deckel), **Sidebar in `QScrollArea`**, Ribbon-Seiten `QSizePolicy.Ignored`, Statusleiste ohne Mindestbreite. Fenster-Minimum jetzt **1046×632 px**.
+- **Mehrseitige PDFs: Seitenanzahl blieb 1** (seit 2.6.45 Fast-Open): `QTimer.singleShot` aus einem `threading.Thread` feuert nie (kein Event-Loop) → „Seite 1/1“, ▶ tot, nur ein Thumb. Fix: Signal `_page_count_ready` (Queued Connection) → `_on_page_count_ready`.
+- **Fett/Kursiv/Unterstrichen überschrieben sich**: `toggle_char_format` rief nach `mergeCharFormat` zusätzlich `setCurrentCharFormat(teilformat)` → `QTextCursor.setCharFormat` ersetzt bei Auswahl das komplette Format. Fix: `mergeCurrentCharFormat`.
+- **Textmarker (Markieren) im Editor** jetzt persistentes Zeichenformat (`background`) statt flüchtiger ExtraSelection — bleibt beim Tab-Wechsel, wird nach **DOCX (Highlight YELLOW)**/HTML gespeichert, erneutes Markieren hebt auf, „Markierungen löschen“ entfernt Hintergründe; im PDF aktiviert der Befehl das Highlight-Werkzeug.
+- **DOCX-Import**: Formate aus **Zeichen-/Absatzstilen** (Strong, Emphasis, Heading…) via `base_style`-Kette; **Hyperlink-Runs** (vorher komplett verloren); Schriftgröße/Farbe/Word-Highlight; Body-Reihenfolge Absätze/Tabellen; Fehler pro Absatz geloggt statt stilles Plaintext-Fallback (`meta.rich_text_error`). Export: Farbe/Größe/Highlight zurück nach DOCX.
+- **Format-Erbe**: `TextEditor.setPlainText` setzt das Cursor-Zeichenformat zurück (nach fettem DOCX war die nächste TXT komplett fett).
+- **„wurde geändert“ direkt nach Öffnen**: `open_path` wechselte den Stack **vor** dem Laden → `_current_is_dirty` verglich alten Editor-Text mit neuem Dokument und setzte `dirty` dauerhaft (Beenden-Dialog, Zähler). Fix: Inhalt zuerst laden, `_loading_document`-Guard.
+- Geräte/Scan (2.6.51) verifiziert: Menü **Geräte** (4 Aktionen), Ribbon-Tab, Toolbar **Scan…**, ScanDialog/Geräte-Dialog öffnen offscreen ohne Absturz.
+- Tests: `scripts/test_ui_audit_2652.py` (Mindestgröße, Open via MainWindow, Canvas im Viewport, Seitenanzahl, ▶/goto, Thumbs mit Tinte, B/I/U/Marker, DOCX inkl. Roundtrip, Geräte). Pack `InstantLensDoc-2.6.52-pack.zip`; VERSION **2.6.52**.
+
 ## 2.6.51 - Geräte/Scan-UI wiederhergestellt (Menü + Discovery)
 
 Patch nach **2.6.50** (PDF-Canvas-Härtung) auf Tip inkl. **2.6.49** DOCX Rich-Text: Nutzerbericht — **Geräte**/Scan-Erkennung „nicht mehr vorhanden“ (Menüs/Features weg oder tot). Audit: Menü **Geräte** hing hinter dem riesigen PDF-Menü; Toolbar-**Scan…** ohne Toolbar-Gruppe; ScanDialog hart an `scantuxio_ui`→`ocr`/PIL; Ribbon ohne Geräte; PyInstaller ohne ScanTuxio-Hidden-Imports; Menüleiste nach `restoreState` nicht erzwungen sichtbar.

@@ -1,5 +1,9 @@
 # InstantLens Doc — Kurzinfo
 
+### 2.6.52 — Voll-Audit: PDF-Ansicht sichtbar, Seitenanzahl, B/I/U, Textmarker, DOCX
+
+Ursache der „weißen Hauptansicht“: PDF-Werkzeugleiste erzwang **7286 px** Fenster-Mindestbreite → Seite lag außerhalb des Monitors. Jetzt umbrechende Leiste + scrollbare Sidebar (Minimum 1046×632). Seitenanzahl/Navigation bei mehrseitigen PDFs repariert; Fett/Kursiv/Unterstrichen/Textmarker unabhängig; Textmarker persistent (DOCX); DOCX-Stilformate/Hyperlinks; kein „geändert“ direkt nach Öffnen. Test `scripts/test_ui_audit_2652.py`. Pack `InstantLensDoc-2.6.52-pack.zip`.
+
 ### 2.6.51 — Geräte/Scan wiederhergestellt
 
 Menü **Geräte** (Scanner / Scannen…, Drucker, Erkennen), PDF → Scannen, Toolbar **Scan…**, Ribbon Geräte; Windows Discovery (Get-Printer/WIA/NAPS2/ScanTuxio). Pack `InstantLensDoc-2.6.51-pack.zip`.
@@ -7,7 +11,7 @@ Menü **Geräte** (Scanner / Scannen…, Drucker, Erkennen), PDF → Scannen, To
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **2.6.51** |
+| Version | **2.6.52** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |

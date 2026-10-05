@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Nightly/CI Smoke: CLI + Import-Checks für InstantLens Doc — 2.1.0–2.6.51.
+"""Nightly/CI Smoke: CLI + Import-Checks für InstantLens Doc — 2.1.0–2.6.52.
 
 Leichtgewichtig. Exit-Codes:
   0  OK  (ok=true)
@@ -14,12 +14,12 @@ Aufruf:
   python scripts/smoke_ild.py -h
 
 JSON-Schema (--json), Erfolg:
-  {"ok": true, "version": "2.6.51", "duration_ms": 1234,
+  {"ok": true, "version": "2.6.52", "duration_ms": 1234,
    "checks": ["version", "imports", "cli", "measure_diff_import", "changelog"]}
 
 JSON bei Fail: checks[] enthält Objekt mit error-Text (max 200 Zeichen, Truncate …);
 Exitcode spiegelt ok (0↔true, 1↔false) — 2.2.0:
-  {"ok": false, "version": "2.6.51", "duration_ms": 12,
+  {"ok": false, "version": "2.6.52", "duration_ms": 12,
    "checks": ["version", {"name": "imports", "error": "import x: …"}]}
 """
 
@@ -41,7 +41,7 @@ if str(ROOT) not in sys.path:
 # Headless/CI: Qt ohne Display
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-EXPECTED_VERSION = "2.6.51"
+EXPECTED_VERSION = "2.6.52"
 FAIL_ERROR_MAX_LEN = 200
 
 EXIT_OK = 0
@@ -496,6 +496,34 @@ def check_version() -> None:
     if "instantlensdoc.core.scantuxio_ui" not in bw:
         _fail("build-windows.ps1 fehlt scantuxio_ui hidden-import (2.6.51)")
     _ok("2.6.51 devices-menu-restore/ribbon-scan/scantuxio-resilient: OK")
+    # 2.6.52: Voll-Audit — FlowLayout-Toolbar, Sidebar-Scroll, page_count-Signal,
+    # B/I/U-Merge, persistenter Textmarker, DOCX-Stile/Hyperlinks, dirty-Guard
+    fl = ROOT / "instantlensdoc" / "ui" / "flow_layout.py"
+    if not fl.is_file() or "class FlowLayout" not in fl.read_text(encoding="utf-8"):
+        _fail("ui/flow_layout.py fehlt (2.6.52)")
+    pv = (ROOT / "instantlensdoc" / "ui" / "pdf_view.py").read_text(encoding="utf-8")
+    if "FlowLayout(" not in pv or "toolbar = QHBoxLayout()" in pv:
+        _fail("pdf_view Toolbar nutzt kein FlowLayout (2.6.52 — Fenster 7000 px breit)")
+    if "_page_count_ready" not in pv or "_on_page_count_ready" not in pv:
+        _fail("pdf_view fehlt _page_count_ready Signal (2.6.52 — page_count blieb 1)")
+    sb = (ROOT / "instantlensdoc" / "ui" / "sidebar.py").read_text(encoding="utf-8")
+    if "sidebarScroll" not in sb:
+        _fail("sidebar fehlt QScrollArea (2.6.52 — Fenster 2000 px hoch)")
+    ed_src = (ROOT / "instantlensdoc" / "ui" / "editor.py").read_text(encoding="utf-8")
+    tcf = ed_src.split("def toggle_char_format", 1)[-1].split("def toggle_bold_selection", 1)[0]
+    if "self.setCurrentCharFormat(fmt)" in tcf:
+        _fail("editor.toggle_char_format nutzt setCurrentCharFormat (2.6.52 — B/U löschen sich)")
+    if "clear_highlight_formats" not in ed_src or "selection_highlighted" not in ed_src:
+        _fail("editor fehlt persistenter Textmarker (2.6.52)")
+    rt = (ROOT / "instantlensdoc" / "core" / "richtext_docx.py").read_text(encoding="utf-8")
+    if "_effective_tri" not in rt or "_iter_para_runs" not in rt or "highlight_color" not in rt:
+        _fail("richtext_docx fehlt Stil-Vererbung/Hyperlink-Runs/Highlight (2.6.52)")
+    mw = (ROOT / "instantlensdoc" / "ui" / "main_window.py").read_text(encoding="utf-8")
+    if "_loading_document" not in mw:
+        _fail("main_window fehlt _loading_document Guard (2.6.52 — dirty nach Öffnen)")
+    if not (ROOT / "scripts" / "test_ui_audit_2652.py").is_file():
+        _fail("scripts/test_ui_audit_2652.py fehlt (2.6.52)")
+    _ok("2.6.52 full-audit flowlayout/page-count-signal/merge-format/docx-styles: OK")
 
 
 def check_imports(*, with_qt: bool) -> None:
@@ -604,7 +632,7 @@ def check_imports(*, with_qt: bool) -> None:
             "auto_lof",
             "auto_index",
             "ALT_CATEGORY_KEYS",
-            "2.6.28",
+            "QStackedWidget",
         ),
         ROOT / "instantlensdoc" / "core" / "realtime_collab.py": (
             "RealtimeHub",
@@ -762,7 +790,6 @@ def check_imports(*, with_qt: bool) -> None:
             "scanEntryBanner",
             "SCAN_START_HINT_DE",
             "2.6.41",
-            "2.6.42",
             "2.6.46",
         ),
         ROOT / "instantlensdoc" / "core" / "devices.py": (
@@ -859,12 +886,12 @@ def check_imports(*, with_qt: bool) -> None:
             "tool_action",
             "set_active_tool",
             "set_toolbar_visible",
-            "editorToolbar_select",
-            "editorToolbar_edit",
-            "editorToolbar_mark",
             "Auswahl",
             "Text bearbeiten",
             "Markierungen",
+            "editorToolbar_",
+            "clear_highlight_formats",
+            "mergeCurrentCharFormat",
             "2.6.44",
         ),
         ROOT / "instantlensdoc" / "ui" / "main_window.py": (
@@ -1394,6 +1421,8 @@ def check_changelog() -> None:
         _fail("CHANGELOG fehlt ## 2.6.49")
     if "## 2.6.51" not in cl:
         _fail("CHANGELOG fehlt ## 2.6.51")
+    if "## 2.6.52" not in cl or "FlowLayout" not in cl or "_page_count_ready" not in cl:
+        _fail("CHANGELOG fehlt ## 2.6.52 Voll-Audit (FlowLayout/_page_count_ready)")
     if "## 2.6.50" not in cl:
         _fail("CHANGELOG fehlt ## 2.6.50")
     if "## 2.6.48" not in cl:
@@ -2857,11 +2886,11 @@ Exit-Codes:
 Laufzeit: am Ende als „Laufzeit: N ms“ (oder duration_ms im JSON).
 
 Beispiel --json (Erfolg):
-  {"ok": true, "version": "2.6.51", "duration_ms": 1234,
+  {"ok": true, "version": "2.6.52", "duration_ms": 1234,
    "checks": ["version", "imports", "cli", "measure_diff_import", "changelog"]}
 
 Beispiel --json (Fail):
-  {"ok": false, "version": "2.6.51", "duration_ms": 12,
+  {"ok": false, "version": "2.6.52", "duration_ms": 12,
    "checks": ["version", {"name": "imports", "error": "import x: …"}]}
 """.rstrip()
     )

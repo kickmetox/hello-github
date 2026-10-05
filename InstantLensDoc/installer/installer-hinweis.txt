@@ -1,4 +1,14 @@
-InstantLens Doc 2.6.51 - Installation
+InstantLens Doc 2.6.52 - Installation
+
+Neu in 2.6.52 (Voll-Audit):
+- PDF-Hauptansicht endlich sichtbar: PDF-Werkzeugleiste (85 Buttons) erzwang
+  ~7300 px Fenster-Mindestbreite -> Seite lag ausserhalb des Monitors (weiss).
+  Jetzt umbrechende Leiste, Sidebar scrollbar, Fenster passt auf 1366x768.
+- Mehrseitige PDFs: Seitenanzahl/Navigation/Thumbs (Hintergrund-Refresh kam nie an)
+- Fett/Kursiv/Unterstrichen/Textmarker unabhaengig (kein Ueberschreiben)
+- Textmarker im Editor persistent (DOCX/HTML), DOCX-Import: Stil-Formate,
+  Hyperlink-Text, Schriftgroesse/-farbe; Dokument nicht mehr sofort "geaendert"
+- scripts\test_ui_audit_2652.py: Offscreen-End-to-End-Test
 
 Neu in 2.6.51:
 - Menue Geraete wiederhergestellt (Scanner/Scannen, Drucker, Erkennen)
