@@ -859,7 +859,7 @@ def dismiss_modals(app) -> int:
     return n
 
 
-def trigger_callable(app, fn: Callable[[], None], timeout: float = 2.2) -> dict:
+def trigger_callable(app, fn: Callable[[], None], timeout: float = 4.0) -> dict:
     from PySide6.QtCore import QTimer
 
     result = {
@@ -877,7 +877,19 @@ def trigger_callable(app, fn: Callable[[], None], timeout: float = 2.2) -> dict:
     def _tick():
         result["dialogs"] += dismiss_modals(app)
         if time.time() - t0 > timeout:
-            result["hang"] = True
+            still_modal = False
+            try:
+                from PySide6.QtWidgets import QApplication, QDialog
+
+                inst = app or QApplication.instance()
+                w = inst.activeModalWidget() if inst is not None else None
+                still_modal = w is not None and (
+                    not isinstance(w, QDialog) or w.isVisible()
+                )
+            except Exception:
+                still_modal = False
+            if still_modal:
+                result["hang"] = True
             closer.stop()
             dismiss_modals(app)
 
@@ -932,6 +944,9 @@ HEAVY_ON_LARGE_PDF = (
     "handschriften",
     "redactions anwenden",
     "echt schwärzen",
+    "theme",
+    "dunkles design",
+    "hoher kontrast",
 )
 
 

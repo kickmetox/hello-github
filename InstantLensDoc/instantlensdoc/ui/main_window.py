@@ -14596,7 +14596,7 @@ class MainWindow(QMainWindow):
             self._set_status("Keine offenen Tabs zum Umbenennen")
             return
         dlg = BatchRenameDialog(self, paths=paths)
-        if dlg.exec() != dlg.Accepted and not dlg.renamed:
+        if dlg.exec() != QDialog.Accepted and not dlg.renamed:
             return
         current_key = self._path_key(self.doc.path) if self.doc and self.doc.path else ""
         reopen = None
