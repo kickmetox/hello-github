@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
     QCompleter,
+    QFrame,
     QHBoxLayout,
     QInputDialog,
     QLabel,
@@ -505,7 +506,25 @@ class Sidebar(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        layout = QVBoxLayout(self)
+        # Alle Panels in einer Scrollfläche: ohne sie erzwang die Sidebar eine
+        # Fenster-Mindesthöhe von ~2000 px (Statusleiste/untere Panels außerhalb
+        # des Bildschirms, Fenster nicht verkleinerbar) — 2.6.52
+        from PySide6.QtWidgets import QScrollArea
+
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(0)
+        self._scroll = QScrollArea(self)
+        self._scroll.setObjectName("sidebarScroll")
+        self._scroll.setWidgetResizable(True)
+        self._scroll.setFrameShape(QFrame.NoFrame)
+        self._scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self._scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self._content = QWidget()
+        self._content.setObjectName("sidebarContent")
+        self._scroll.setWidget(self._content)
+        outer.addWidget(self._scroll, 1)
+        layout = QVBoxLayout(self._content)
         layout.setContentsMargins(4, 4, 4, 4)
 
         layout.addWidget(QLabel("Suche / Volltext"))

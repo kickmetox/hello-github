@@ -1,4 +1,4 @@
-"""Ribbon-ähnliche Werkzeugleiste — 2.6.51 (Geräte/Scan + F12/Save-as, Alt-Parity)."""
+"""Ribbon-ähnliche Werkzeugleiste — 2.6.52 (Geräte/Scan + F12/Save-as, Alt-Parity)."""
 
 from __future__ import annotations
 
@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
     QPushButton,
+    QSizePolicy,
     QStackedWidget,
     QToolButton,
     QVBoxLayout,
@@ -151,7 +152,7 @@ class RibbonBar(QWidget):
             btn.setObjectName("ribbonCat")
             btn.setCheckable(True)
             btn.setChecked(i == 0)
-            tip = f"{title} — Ribbon 2.6.51"
+            tip = f"{title} — Ribbon 2.6.52"
             if mnemonic:
                 tip += f" (Alt+{mnemonic})"
             btn.setToolTip(tip)
@@ -161,13 +162,16 @@ class RibbonBar(QWidget):
             self._cat_buttons.append(btn)
 
             panel = QFrame()
+            # Ribbon darf die Fenster-Mindestbreite nicht diktieren (13 Buttons
+            # ≈ 1350 px): rechts überzählige Buttons werden geclippt — 2.6.52
+            panel.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
             row = QHBoxLayout(panel)
             row.setContentsMargins(4, 2, 4, 2)
             row.setSpacing(4)
             for aid, label in buttons:
                 tb = QToolButton()
                 tb.setText(label)
-                tb.setToolTip(f"{label} — Ribbon 2.6.51")
+                tb.setToolTip(f"{label} — Ribbon 2.6.52")
                 tb.setAutoRaise(False)
                 if aid in (
                     "book_layout",

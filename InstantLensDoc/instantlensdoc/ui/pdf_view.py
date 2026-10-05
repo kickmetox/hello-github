@@ -42,6 +42,7 @@ from PySide6.QtWidgets import (
     QPlainTextEdit,
     QPushButton,
     QScrollArea,
+    QSizePolicy,
     QSlider,
     QToolButton,
     QVBoxLayout,
@@ -2388,9 +2389,12 @@ class PdfViewer(QWidget):
     page_by_page_changed = Signal(bool)
     # OCR-Region: page (0-basiert), x, y, w, h in Anzeige-Pixeln — 2.5.0
     ocr_region_finished = Signal(int, float, float, float, float)
+    # Worker-Thread → GUI: (page_count, open_generation, path, error) — 2.6.52
+    _page_count_ready = Signal(int, int, str, str)
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        self._page_count_ready.connect(self._on_page_count_ready)
         self.pdf_path: Optional[Path] = None
         self.page_index = 0
         self.page_count = 0
@@ -2505,7 +2509,13 @@ class PdfViewer(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
 
-        toolbar = QHBoxLayout()
+        # Umbrechende Leiste: ein QHBoxLayout mit ~85 Buttons erzwang eine
+        # Fenster-Mindestbreite von ~7000 px → Seite außerhalb des Bildschirms
+        # („weiße Hauptansicht“ auf 1920-px-Monitoren) — 2.6.52
+        from instantlensdoc.ui.flow_layout import FlowLayout
+
+        toolbar = FlowLayout(margin=2, h_spacing=3, v_spacing=2)
+        self._toolbar_layout = toolbar
         self.lbl_page = QLabel("—")
         self.lbl_zoom = QLabel(f"{int(round(self.scale * 100))}%")
         btn_prev = QPushButton("◀")
@@ -3181,8 +3191,18 @@ class PdfViewer(QWidget):
         toolbar.addWidget(btn_img_page)
         toolbar.addWidget(btn_import_text)
         toolbar.addWidget(btn_bake)
-        toolbar.addStretch()
-        layout.addLayout(toolbar)
+        toolbar_host = QWidget()
+        toolbar_host.setObjectName("pdfViewerToolbar")
+        toolbar_host.setLayout(toolbar)
+        toolbar_host.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Minimum)
+        # Höhen-Deckel: bei sehr schmalen Fenstern werden überzählige Zeilen
+        # geclippt statt die Fenster-Mindesthöhe zu sprengen — 2.6.52
+        try:
+            toolbar_host.setMaximumHeight(max(40, int(toolbar.height_for_rows(7))))
+        except Exception:
+            pass
+        self._toolbar_host = toolbar_host
+        layout.addWidget(toolbar_host, 0)
         self._toolbar_group_widgets: dict[str, list] = {
             "tools": list(self._tool_buttons),
             "colors": [
@@ -5768,14 +5788,23 @@ class PdfViewer(QWidget):
                 QApplication.restoreOverrideCursor()
 
     def _schedule_page_count_refresh(self, open_gen: int) -> None:
-        """Seitenanzahl im Hintergrund nachziehen (nie vor Seite 1) — 2.6.45."""
+        """Seitenanzahl im Hintergrund nachziehen (nie vor Seite 1) — 2.6.45.
+
+        Ergebnis kommt per Signal (Queued Connection) in den GUI-Thread.
+        ``QTimer.singleShot`` aus einem ``threading.Thread`` feuert **nie**
+        (kein Event-Loop im Worker) — dadurch blieb ``page_count`` seit 2.6.45
+        auf 1: keine Navigation, nur ein Thumb, „Seite 1/1“ — 2.6.52.
+        """
 
         path = self.pdf_path
         pw = self.password
         if path is None:
             return
+        path_str = str(path)
 
         def _work() -> None:
+            n = 0
+            err = ""
             try:
                 from ild_pdf.limits import catalog_page_count
 
@@ -5785,37 +5814,52 @@ class PdfViewer(QWidget):
 
                     with PdfDocument(path, password=pw) as doc:
                         n = int(len(doc))
-            except Exception:
-                return
-            if int(n) <= 1:
-                return
-
-            def _apply() -> None:
-                if int(getattr(self, "_open_generation", 0) or 0) != open_gen:
-                    return
-                if self.pdf_path != path:
-                    return
-                self.page_count = int(n)
-                try:
-                    from ild_pdf.limits import SOFT_PAGE_WARN
-
-                    self._reload_page_labels(
-                        scan_native=int(n) < int(SOFT_PAGE_WARN)
-                    )
-                except Exception:
-                    pass
-                self.page_changed.emit(self.page_index)
-                self.status.emit(f"{int(n)} Seiten erkannt")
-                # Thumbs/Outline an echte Seitenzahl anbinden — 2.6.47
-                self.document_changed.emit()
-                if not self._canvas_has_page_image():
-                    self._ensure_page_painted(warn=False)
-
-            QTimer.singleShot(0, _apply)
+            except Exception as e:  # pragma: no cover - defensive
+                err = str(e)
+                n = 0
+            try:
+                self._page_count_ready.emit(int(n or 0), int(open_gen), path_str, err)
+            except RuntimeError:
+                # Viewer bereits zerstört
+                pass
 
         threading.Thread(
             target=_work, daemon=True, name="ild-page-count-refresh"
         ).start()
+
+    def _on_page_count_ready(
+        self, n: int, open_gen: int, path_str: str, err: str = ""
+    ) -> None:
+        """GUI-Thread: echte Seitenanzahl übernehmen (Slot zu ``_page_count_ready``)."""
+        if int(getattr(self, "_open_generation", 0) or 0) != int(open_gen):
+            return
+        if self.pdf_path is None or str(self.pdf_path) != str(path_str):
+            return
+        if err:
+            try:
+                import logging
+
+                logging.getLogger("instantlensdoc.pdf_view").warning(
+                    "Seitenanzahl konnte nicht ermittelt werden (%s): %s", path_str, err
+                )
+            except Exception:
+                pass
+        n = int(n or 0)
+        if n <= 0 or n == int(self.page_count or 0):
+            return
+        self.page_count = n
+        try:
+            from ild_pdf.limits import SOFT_PAGE_WARN
+
+            self._reload_page_labels(scan_native=n < int(SOFT_PAGE_WARN))
+        except Exception:
+            pass
+        self.page_changed.emit(self.page_index)
+        self.status.emit(f"{n} Seiten erkannt")
+        # Thumbs/Outline an echte Seitenzahl anbinden — 2.6.47
+        self.document_changed.emit()
+        if not self._canvas_has_page_image():
+            self._ensure_page_painted(warn=False)
 
     def _canvas_has_page_image(self) -> bool:
         """True wenn die zentrale Ansicht ein gerendertes Seitenbild zeigt — 2.6.48.
@@ -10381,7 +10425,16 @@ class PdfViewer(QWidget):
             except Exception:
                 pass
             return img
-        except Exception:
+        except Exception as e:
+            # Grauer Platzhalter — aber nie still: Ursache ins Log — 2.6.52
+            try:
+                import logging
+
+                logging.getLogger("instantlensdoc.pdf_view").warning(
+                    "Thumbnail Seite %s konnte nicht gerendert werden: %s", page_index + 1, e
+                )
+            except Exception:
+                pass
             return Image.new("RGB", (iw, ih), (220, 220, 220))
 
     def _edit_overlay(self, ann_id: str):
