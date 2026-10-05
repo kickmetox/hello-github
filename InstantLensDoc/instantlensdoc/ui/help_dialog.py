@@ -142,11 +142,10 @@ HELP_HTML = f"""
 <li><b>Einfügen → Tabelle / Daten importieren</b>: Tabellen erstellen, formatieren, sortieren; CSV/Excel — <b>2.6.14</b></li>
 <li><b>Datei → Exportieren</b>: DOCX, XLSX, PDF, TXT, RTF, HTML, JPG — <b>2.6.14</b></li>
 <li><b>PDF → Kopf-/Fußzeile</b>: Seitenzahlen, Titel, Ersteller/Autor (<code>{{title}}</code>/<code>{{author}}</code>/<code>{{creator}}</code>) — <b>2.6.11</b></li>
-<li><b>Ansicht → Layout-Modus</b> (Ctrl+Alt+L): DTP-Canvas (QGraphicsScene) mit Textrahmen, Bild-/Formrahmen,
-    Verkettung, Lineal (Guides ziehen), Raster/Snap, Spalten, Satzspiegel, Bleed, Musterseiten (Kopf/Fuß),
-    Ebenen, Formatvorlagen, Envelope Distort, 3D-Extrusion, Text auf Pfad, Text in Pfade, Schnittmasken,
-    Verlauf/Schatten, Glyphen-Palette, drucksensitivem Stift. Export als Vektor-PDF
-    (QPdfWriter, nicht ild_pdf-Writer), DOCX und ODT. Ribbon-Tab <b>DTP</b> (Alt+8). — <b>2.6.54</b></li>
+<li><b>Ansicht → Layout-Modus</b> (Ctrl+Alt+L): DTP-Canvas. Doppelklick in einen Textrahmen setzt den Caret;
+    Eckengriffe skalieren, Lineal zieht Hilfslinien (Snap), Verkettung bricht Overflow um, Buchformat setzt
+    Satzspiegel, Musterseite gilt je Seite, Ebenen-Liste, Stile, Import TXT/DOCX/OCR, Bild ersetzen.
+    Export als Vektor-PDF (QPdfWriter). Ribbon-Tab <b>DTP</b> (Alt+8). — <b>2.6.54</b></li>
 <li><b>Extras → KI-Assistent</b>: Zusammenfassen, umformulieren, übersetzen, Inhaltsverzeichnis vorschlagen.
     OpenAI-kompatibler Endpoint + Schlüssel in Einstellungen; ohne Schlüssel Offline-Modus. — <b>2.6.54</b></li>
 <li><b>Extras → Intelligente Formerkennung / Variable Fonts / Envelope Distort / 3D-Extrusion / E-Signatur PAdES /

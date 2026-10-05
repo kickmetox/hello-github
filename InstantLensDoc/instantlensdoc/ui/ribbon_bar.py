@@ -158,6 +158,8 @@ class RibbonBar(QWidget):
                     ("dtp_link", "Verketten"),
                     ("dtp_grid", "Raster"),
                     ("dtp_export_pdf", "PDF export"),
+                    ("dtp_import", "Import"),
+                    ("dtp_image", "Bild…"),
                     ("dtp_text_path", "Pfadtext"),
                     ("dtp_glyphs", "Glyphen"),
                     ("ki_assistant", "KI-Assistent"),

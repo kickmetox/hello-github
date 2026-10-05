@@ -112,8 +112,13 @@ def paint_page(painter: QPainter, doc, page: int, *, overlays: bool = False) -> 
             y += step
         painter.restore()
 
+    painted: set[str] = set()
     for fr in doc.sorted_frames(page):
         _paint_frame(painter, doc, fr)
+        painted.add(fr.id)
+    for fr in doc.frames:
+        if fr.master and fr.id not in painted:
+            _paint_frame(painter, doc, fr)
     painter.restore()
 
 

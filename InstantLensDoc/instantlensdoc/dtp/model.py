@@ -526,6 +526,19 @@ class DtpDocument:
         style = self.styles.get(fr.style_id) or self.styles.get("body")
         size = fr.font_size or (style.font_size if style else 11.0)
         leading = style.leading if style else 1.2
+        try:
+            from PySide6.QtWidgets import QApplication
+            from PySide6.QtGui import QFontMetricsF
+            from .export import _qfont_for_frame
+
+            if QApplication.instance() is not None:
+                font = _qfont_for_frame(self, fr)
+                fm = QFontMetricsF(font)
+                cpl = max(6, int(fr.width / max(fm.averageCharWidth(), 4.0)))
+                lines = max(1, int(fr.height / max(fm.lineSpacing(), 8.0)))
+                return cpl, cpl * lines
+        except Exception:
+            pass
         factor = 0.55
         cpl = max(8, int(fr.width / max(size * factor, 4)))
         line_h = max(size * max(1.0, float(leading)), 8.0)
@@ -721,6 +734,142 @@ class DtpDocument:
         fr.text = _ins(fr.text or "", glyph)
         return fr
 
+    def chain_head(self, fr: DtpFrame) -> DtpFrame:
+        pred = {f.next_id: f for f in self.frames if f.next_id}
+        cur = fr
+        seen: set[str] = set()
+        while cur.id in pred and cur.id not in seen:
+            seen.add(cur.id)
+            cur = pred[cur.id]
+        return cur
+
+    def chain_members(self, start: DtpFrame) -> list[DtpFrame]:
+        out: list[DtpFrame] = []
+        cur: Optional[DtpFrame] = start
+        seen: set[str] = set()
+        while cur is not None and cur.id not in seen:
+            seen.add(cur.id)
+            out.append(cur)
+            cur = self.frame_by_id(cur.next_id) if cur.next_id else None
+        return out
+
+    def story_text(self, fr: DtpFrame) -> str:
+        parts: list[str] = []
+        for m in self.chain_members(self.chain_head(fr)):
+            t = (m.text or "").replace("\n", " ").strip()
+            if t:
+                parts.append(t)
+        return " ".join(parts)
+
+    def reflow_chain(self, fr: DtpFrame, *, auto_extend: bool = False) -> dict[str, str]:
+        """Gesamten verketteten Text neu umbrechen; Overflow optional auf neue Seite."""
+        head = self.chain_head(fr)
+        full = self.story_text(head)
+        result = self.flow_text(full, head)
+        overflow = result.get("__overflow__") or ""
+        if overflow and auto_extend:
+            members = self.chain_members(head)
+            last = members[-1]
+            page = last.page + 1
+            if page >= self.page_count:
+                self.add_page()
+            nxt = self.add_text_frame(
+                "",
+                x=last.x,
+                y=self.geometry.margin_top_pt,
+                width=last.width,
+                height=min(last.height, self.geometry.height_pt - self.geometry.margin_top_pt - self.geometry.margin_bottom_pt),
+                page=page,
+                style_id=last.style_id,
+            )
+            self.link_frames(last.id, nxt.id)
+            more = self.flow_text(overflow, nxt)
+            result.pop("__overflow__", None)
+            result.update({k: v for k, v in more.items() if k != "__overflow__"})
+            if more.get("__overflow__"):
+                result["__overflow__"] = more["__overflow__"]
+        return result
+
+    def apply_style(self, frame_id: str, style_id: str) -> DtpFrame:
+        fr = self.frame_by_id(frame_id)
+        st = self.styles.get(style_id)
+        if fr is None or st is None:
+            raise KeyError(style_id if fr is not None else frame_id)
+        fr.style_id = style_id
+        if st.kind in ("paragraph", "character"):
+            fr.font_family = st.font_family
+            fr.font_size = st.font_size
+            fr.font_weight = st.weight
+            fr.font_stretch = st.stretch
+        if st.kind == "object" and fr.kind in ("shape", "image"):
+            if st.fill:
+                fr.fill = st.fill
+            if st.stroke:
+                fr.stroke = st.stroke
+            fr.stroke_width = st.stroke_width
+        return fr
+
+    def apply_master(self, master_id: str, pages: list[int] | None = None) -> DtpMaster:
+        m = next((x for x in self.masters if x.id == master_id or x.name == master_id), None)
+        if m is None:
+            raise KeyError(master_id)
+        self._sync_page_master()
+        targets = list(range(self.page_count)) if pages is None else list(pages)
+        for i in targets:
+            if 0 <= i < len(self.page_master):
+                self.page_master[i] = m.id
+        return m
+
+    def add_master(self, name: str, *, header: str = "{title}", footer: str = "{n} / {total}") -> DtpMaster:
+        m = DtpMaster(name=name, header_text=header, footer_text=footer)
+        self.masters.append(m)
+        return m
+
+    def set_image(self, frame_id: str, path: str) -> DtpFrame:
+        fr = self.frame_by_id(frame_id)
+        if fr is None:
+            return self.add_image_frame(path, page=self.current_page)
+        fr.kind = "image"
+        fr.image_path = str(path or "")
+        fr.layer_id = fr.layer_id or "images"
+        return fr
+
+    def import_into_frame(self, frame_id: str, path: str, *, auto_extend: bool = True) -> DtpFrame:
+        from .import_text import read_import_text
+
+        fr = self.frame_by_id(frame_id)
+        if fr is None:
+            fr = self.add_text_frame("", page=self.current_page)
+        fr.kind = "text"
+        fr.text = read_import_text(path)
+        self.reflow_chain(fr, auto_extend=auto_extend)
+        return fr
+
+    def resize_frame(self, frame_id: str, width: float, height: float, *, x: float | None = None, y: float | None = None) -> DtpFrame:
+        fr = self.frame_by_id(frame_id)
+        if fr is None:
+            raise KeyError(frame_id)
+        if x is not None:
+            fr.x = float(x)
+        if y is not None:
+            fr.y = float(y)
+        fr.resize(width, height)
+        if self.grid_snap or self.guides_snap:
+            self.snap_frame(fr)
+        if fr.kind == "text" and fr.next_id:
+            self.reflow_chain(fr)
+        return fr
+
+    def set_layer_visible(self, layer_id: str, visible: bool) -> None:
+        for ly in self.layers:
+            if ly.id == layer_id:
+                ly.visible = bool(visible)
+
+    def set_layer_locked(self, layer_id: str, locked: bool) -> None:
+        for ly in self.layers:
+            if ly.id == layer_id:
+                ly.locked = bool(locked)
+
     def apply_preset(self, name: str) -> None:
         apply_book_preset(self, name)
 
@@ -844,6 +993,8 @@ class DtpDocument:
                       width=90, height=70, page=0)
         doc.add_guide("vertical", doc.geometry.margin_left_pt)
         doc.add_guide("horizontal", doc.geometry.margin_top_pt)
+        chap = doc.add_master("Kapitel", header="Kapitel · {title}", footer="{n}")
+        doc.apply_master(chap.id, pages=[1])
         h1 = doc.add_text_frame("Kapitel 1 — Layout-Modus", page=1, style_id="h1",
                                 x=doc.geometry.margin_left_pt, y=doc.geometry.margin_top_pt,
                                 width=doc.geometry.width_pt - doc.geometry.margin_left_pt - doc.geometry.margin_right_pt,
