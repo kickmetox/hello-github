@@ -160,6 +160,7 @@ class DtpFrame:
     locked: bool = False
     next_id: Optional[str] = None
     text: str = ""
+    rich_html: str = ""
     image_path: str = ""
     shape: str = "rectangle"  # rectangle|ellipse|line|arrow|triangle
     style_id: str = "body"
@@ -271,6 +272,7 @@ class DtpDocument:
     guides_snap: bool = True
     title: str = "Ohne Titel"
     current_page: int = 0
+    active_story_id: str = ""
 
     def __post_init__(self) -> None:
         if not self.layers:
@@ -801,12 +803,114 @@ class DtpDocument:
             fr.font_size = st.font_size
             fr.font_weight = st.weight
             fr.font_stretch = st.stretch
+            if st.italic:
+                fr.font_axes = {**(fr.font_axes or {}), "slnt": -12.0}
+            fr.rich_html = ""
         if st.kind == "object" and fr.kind in ("shape", "image"):
             if st.fill:
                 fr.fill = st.fill
             if st.stroke:
                 fr.stroke = st.stroke
             fr.stroke_width = st.stroke_width
+        return fr
+
+    def text_frames(self, *, include_master: bool = False) -> list[DtpFrame]:
+        return [
+            f
+            for f in self.frames
+            if f.kind == "text" and (include_master or not f.master)
+        ]
+
+    def set_active_story(self, fr: Optional[DtpFrame]) -> None:
+        if fr is None or fr.kind != "text":
+            return
+        self.active_story_id = self.chain_head(fr).id
+
+    def story_frames(self, fr: Optional[DtpFrame] = None) -> list[DtpFrame]:
+        if fr is not None and fr.kind == "text":
+            return self.chain_members(self.chain_head(fr))
+        if self.active_story_id:
+            head = self.frame_by_id(self.active_story_id)
+            if head is not None and head.kind == "text":
+                return self.chain_members(self.chain_head(head))
+        return self.text_frames()
+
+    def apply_fill_color(
+        self,
+        frame_id: str,
+        color: str,
+        *,
+        kind: str = "solid",
+        fill_to: str = "",
+    ) -> DtpFrame:
+        fr = self.frame_by_id(frame_id)
+        if fr is None:
+            raise KeyError(frame_id)
+        fr.fill = str(color or "#4A90D9")
+        k = (kind or "solid").lower()
+        if k not in ("solid", "linear", "radial"):
+            k = "solid"
+        fr.fill_kind = k
+        if fill_to:
+            fr.fill_to = fill_to
+        elif k == "solid":
+            fr.fill_to = ""
+        return fr
+
+    def apply_stroke_color(
+        self, frame_id: str, color: str, *, width: float | None = None
+    ) -> DtpFrame:
+        fr = self.frame_by_id(frame_id)
+        if fr is None:
+            raise KeyError(frame_id)
+        fr.stroke = str(color or "#333333")
+        if width is not None:
+            fr.stroke_width = max(0.25, float(width))
+        return fr
+
+    def apply_font_attrs(
+        self,
+        frame_id: str,
+        *,
+        family: str | None = None,
+        size: float | None = None,
+        weight: int | None = None,
+        italic: bool | None = None,
+        color: str | None = None,
+        clear_rich: bool = True,
+    ) -> DtpFrame:
+        fr = self.frame_by_id(frame_id)
+        if fr is None:
+            raise KeyError(frame_id)
+        if fr.kind != "text":
+            fr.kind = "text"
+        if family:
+            fr.font_family = family
+        if size is not None:
+            fr.font_size = float(size)
+        if weight is not None:
+            fr.font_weight = int(weight)
+        if italic is not None:
+            axes = dict(fr.font_axes or {})
+            if italic:
+                axes["slnt"] = -12.0
+            else:
+                axes.pop("slnt", None)
+            fr.font_axes = axes
+        if color:
+            fr.fill = color
+        if clear_rich:
+            fr.rich_html = ""
+        return fr
+
+    def apply_wrap(self, frame_id: str, mode: str) -> DtpFrame:
+        fr = self.frame_by_id(frame_id)
+        if fr is None:
+            raise KeyError(frame_id)
+        m = (mode or "none").lower()
+        if m not in ("none", "bounding_box", "jump_object", "contour"):
+            m = "bounding_box"
+        fr.wrap = m
         return fr
 
     def apply_master(self, master_id: str, pages: list[int] | None = None) -> DtpMaster:

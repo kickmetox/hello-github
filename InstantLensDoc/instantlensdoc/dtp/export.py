@@ -18,6 +18,7 @@ from PySide6.QtGui import (
     QPainterPath,
     QPdfWriter,
     QPen,
+    QTextDocument,
 )
 
 
@@ -220,13 +221,23 @@ def paint_frame_local(painter: QPainter, doc, fr) -> None:
             painter.setBrush(QColor("#111111"))
             painter.drawPath(path)
         else:
-            painter.setPen(QColor("#111111"))
-            painter.setFont(_qfont_for_frame(doc, fr))
-            painter.drawText(
-                QRectF(2, 2, fr.width - 4, fr.height - 4),
-                Qt.TextWordWrap | Qt.AlignLeft | Qt.AlignTop,
-                fr.text or "",
-            )
+            html = str(getattr(fr, "rich_html", "") or "").strip()
+            if html:
+                td = QTextDocument()
+                td.setHtml(html)
+                td.setTextWidth(max(8.0, fr.width - 4))
+                painter.save()
+                painter.translate(2, 2)
+                td.drawContents(painter, QRectF(0, 0, fr.width - 4, fr.height - 4))
+                painter.restore()
+            else:
+                painter.setPen(QColor("#111111"))
+                painter.setFont(_qfont_for_frame(doc, fr))
+                painter.drawText(
+                    QRectF(2, 2, fr.width - 4, fr.height - 4),
+                    Qt.TextWordWrap | Qt.AlignLeft | Qt.AlignTop,
+                    fr.text or "",
+                )
     painter.restore()
 
 

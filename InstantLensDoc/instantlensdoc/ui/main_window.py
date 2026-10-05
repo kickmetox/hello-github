@@ -3737,7 +3737,9 @@ class MainWindow(QMainWindow):
             except Exception:
                 is_pdf = False
         try:
-            is_editor = bool(self._editor_document_active())
+            is_editor = bool(self._editor_document_active()) or bool(
+                self._layout_mode_active()
+            )
         except Exception:
             try:
                 is_editor = self.stack.currentWidget() is self.editor_pane
@@ -7311,6 +7313,10 @@ class MainWindow(QMainWindow):
             "dtp_export_pdf": self._dtp_export_pdf_dialog,
             "dtp_import": self._dtp_import_text,
             "dtp_image": self._dtp_replace_image,
+            "dtp_fill": self._dtp_apply_fill,
+            "dtp_stroke": self._dtp_apply_stroke,
+            "dtp_font": self._dtp_apply_font,
+            "dtp_wrap": self._dtp_apply_wrap,
             "dtp_text_path": self._dtp_text_on_path,
             "dtp_glyphs": self._dtp_glyph_palette,
             "dtp_clip": self._dtp_clip_mask,
@@ -9220,9 +9226,14 @@ class MainWindow(QMainWindow):
             return False
         return True
 
+    def _layout_mode_active(self) -> bool:
+        pane = getattr(self, "dtp_pane", None)
+        stack = getattr(self, "stack", None)
+        return pane is not None and stack is not None and stack.currentWidget() is pane
+
     def _guard_editor_action(self, what: str) -> bool:
         """Editor-only Aktion: bei PDF/anderem Tab no-op, kein Stack-Wechsel — 2.6.54."""
-        if self._editor_document_active():
+        if self._editor_document_active() or self._layout_mode_active():
             return True
         self._set_status(f"{what} nur im Editor")
         return False
@@ -9236,7 +9247,7 @@ class MainWindow(QMainWindow):
         return act
 
     def _sync_editor_only_actions(self, *_args) -> None:
-        on = self._editor_document_active()
+        on = self._editor_document_active() or self._layout_mode_active()
         for act in getattr(self, "_editor_only_actions", None) or []:
             try:
                 act.setEnabled(on)
@@ -9249,6 +9260,9 @@ class MainWindow(QMainWindow):
                 pass
 
     def _toggle_bold(self) -> None:
+        if self._layout_mode_active():
+            self.dtp_pane.apply_font(bold=True, toggle=True)
+            return
         if not self._guard_editor_action("Fett"):
             return
         self.editor.toggle_bold_selection()
@@ -9256,6 +9270,9 @@ class MainWindow(QMainWindow):
         self._set_status("Fett (Zeichenformat)")
 
     def _toggle_italic(self) -> None:
+        if self._layout_mode_active():
+            self.dtp_pane.apply_font(italic=True, toggle=True)
+            return
         if not self._guard_editor_action("Kursiv"):
             return
         self.editor.toggle_italic_selection()
@@ -9263,6 +9280,9 @@ class MainWindow(QMainWindow):
         self._set_status("Kursiv (Zeichenformat)")
 
     def _toggle_underline(self) -> None:
+        if self._layout_mode_active():
+            self.dtp_pane.apply_font(underline=True, toggle=True)
+            return
         if not self._guard_editor_action("Unterstrichen"):
             return
         self.editor.toggle_underline_selection()
@@ -9296,6 +9316,9 @@ class MainWindow(QMainWindow):
         self.doc.dirty = True
 
     def _set_paragraph_alignment(self, alignment: str) -> None:
+        if self._layout_mode_active():
+            self.dtp_pane.apply_alignment(alignment)
+            return
         if not self._guard_editor_action("Absatzformat"):
             return
         if self.editor.set_paragraph_alignment(alignment):
@@ -9395,7 +9418,10 @@ class MainWindow(QMainWindow):
         self._set_status(f"Silbentrennung ({lang}): {n} Stellen")
 
     def _set_image_text_wrap(self) -> None:
-        """Textumfluss für ersten Bildrahmen (Dialog) — 2.6.13."""
+        """Textumfluss: im Layout-Modus auf Auswahl, sonst layout_doc — 2.6.13/2.6.54."""
+        if self._layout_mode_active():
+            self.dtp_pane.apply_wrap_mode(dialog=True)
+            return
         from PySide6.QtWidgets import QInputDialog
 
         if not self.layout_doc.image_frames:
@@ -11020,6 +11046,27 @@ class MainWindow(QMainWindow):
             pass
         self.stack.setCurrentWidget(pane)
         self._set_status("Layout-Modus (DTP)")
+        try:
+            self._sync_editor_only_actions()
+            self._sync_menu_enablement()
+        except Exception:
+            pass
+
+    def _dtp_apply_fill(self) -> None:
+        self._enter_layout_mode()
+        self.dtp_pane.apply_fill(dialog=True)
+
+    def _dtp_apply_stroke(self) -> None:
+        self._enter_layout_mode()
+        self.dtp_pane.apply_stroke(dialog=True)
+
+    def _dtp_apply_font(self) -> None:
+        self._enter_layout_mode()
+        self.dtp_pane.apply_font(dialog=True)
+
+    def _dtp_apply_wrap(self) -> None:
+        self._enter_layout_mode()
+        self.dtp_pane.apply_wrap_mode(dialog=True)
 
     def _dtp_add_text_frame(self) -> None:
         self._enter_layout_mode()
@@ -11105,9 +11152,9 @@ class MainWindow(QMainWindow):
         if pane is None:
             return
         self._enter_layout_mode()
-        targets = pane.scene.selected_frames() or [
-            f for f in pane.doc.frames if f.kind == "text"
-        ][:1]
+        targets = pane.scene.selected_frames()
+        if not targets:
+            targets = pane.doc.story_frames() or pane.doc.text_frames()
         for fr in targets:
             if fr.kind != "text":
                 continue

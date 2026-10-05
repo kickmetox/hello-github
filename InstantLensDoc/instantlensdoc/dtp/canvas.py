@@ -12,12 +12,16 @@ from PySide6.QtGui import (
     QPainterPath,
     QPen,
     QTabletEvent,
+    QTextBlockFormat,
+    QTextCharFormat,
     QTextCursor,
     QTransform,
 )
 from PySide6.QtWidgets import (
+    QColorDialog,
     QComboBox,
     QFileDialog,
+    QFontDialog,
     QGraphicsItem,
     QGraphicsPathItem,
     QGraphicsRectItem,
@@ -25,6 +29,7 @@ from PySide6.QtWidgets import (
     QGraphicsTextItem,
     QGraphicsView,
     QHBoxLayout,
+    QInputDialog,
     QLabel,
     QListWidget,
     QListWidgetItem,
@@ -37,6 +42,7 @@ from PySide6.QtWidgets import (
 from instantlensdoc.dtp.geometry import snap_point, snap_value
 from instantlensdoc.dtp.model import DtpDocument, DtpFrame, DtpGuide
 from instantlensdoc.dtp.presets import list_book_presets
+from instantlensdoc.dtp.targeting import ToolHit, is_text_tool, story_or_all_text
 
 
 PAGE_OFFSET = 40.0  # Rand um die Seite in der Szene
@@ -153,7 +159,10 @@ class FrameItem(QGraphicsRectItem):
         item = FrameTextItem(self)
         item.setPos(3, 2)
         item.setTextWidth(max(12.0, self.frame.width - 6))
-        item.setPlainText(self.frame.text or "")
+        if (self.frame.rich_html or "").strip():
+            item.setHtml(self.frame.rich_html)
+        else:
+            item.setPlainText(self.frame.text or "")
         item.setDefaultTextColor(QColor("#111111"))
         from instantlensdoc.dtp.export import _qfont_for_frame
 
@@ -226,24 +235,99 @@ class FrameItem(QGraphicsRectItem):
         self.text_item.setTextInteractionFlags(Qt.TextEditorInteraction)
         self.text_item.setFocus()
         cur = self.text_item.textCursor()
-        cur.movePosition(QTextCursor.End)
-        self.text_item.setTextCursor(cur)
+        if not (self.frame.text or self.frame.rich_html):
+            cur.movePosition(QTextCursor.End)
+            self.text_item.setTextCursor(cur)
+        self.doc.set_active_story(self.frame)
 
     def end_edit(self) -> None:
         if self.text_item is None:
             self._editing = False
             return
         self.text_item.setTextInteractionFlags(Qt.NoTextInteraction)
-        self.frame.text = self.text_item.toPlainText()
+        self.commit_rich()
         self._editing = False
         if not self.is_locked():
             self.setFlag(QGraphicsItem.ItemIsMovable, True)
         self.reflow_after_edit()
 
+    def commit_rich(self) -> None:
+        if self.text_item is None:
+            return
+        self.frame.text = self.text_item.toPlainText()
+        self.frame.rich_html = self.text_item.toHtml()
+
     def set_plain_text(self, text: str) -> None:
         self.frame.text = text
+        self.frame.rich_html = ""
         if self.text_item is not None:
             self.text_item.setPlainText(text)
+
+    def caret_cursor(self) -> tuple[QTextCursor, bool]:
+        """Cursor: Auswahl, sonst aktueller Absatz. (cursor, has_selection)."""
+        assert self.text_item is not None
+        cur = QTextCursor(self.text_item.textCursor())
+        if cur.hasSelection():
+            return cur, True
+        cur.movePosition(QTextCursor.StartOfBlock)
+        cur.movePosition(QTextCursor.EndOfBlock, QTextCursor.KeepAnchor)
+        return cur, False
+
+    def apply_char_format(
+        self,
+        *,
+        family: str | None = None,
+        size: float | None = None,
+        bold: bool | None = None,
+        italic: bool | None = None,
+        underline: bool | None = None,
+        color: str | None = None,
+        toggle: bool = False,
+        style=None,
+    ) -> str:
+        """Zeichenformat auf Caret-Auswahl oder aktuellen Absatz."""
+        if self.text_item is None:
+            return ""
+        cur, has_sel = self.caret_cursor()
+        probe = cur.charFormat()
+        fmt = QTextCharFormat()
+        if family:
+            fmt.setFontFamily(family)
+        if size is not None:
+            fmt.setFontPointSize(float(size))
+        if style is not None:
+            if getattr(style, "font_family", ""):
+                fmt.setFontFamily(style.font_family)
+            if getattr(style, "font_size", 0):
+                fmt.setFontPointSize(float(style.font_size))
+            if getattr(style, "weight", 0):
+                w = int(style.weight)
+                fmt.setFontWeight(QFont.Weight.Bold if w >= 600 else QFont.Weight.Normal)
+            if getattr(style, "italic", False):
+                fmt.setFontItalic(True)
+            if getattr(style, "color", ""):
+                fmt.setForeground(QColor(style.color))
+        if bold is not None:
+            make_on = bool(bold)
+            if toggle and bold:
+                make_on = int(probe.fontWeight()) < 600
+            fmt.setFontWeight(QFont.Weight.Bold if make_on else QFont.Weight.Normal)
+        if italic is not None:
+            make_on = bool(italic)
+            if toggle and italic:
+                make_on = not bool(probe.fontItalic())
+            fmt.setFontItalic(bool(make_on))
+        if underline is not None:
+            make_on = bool(underline)
+            if toggle and underline:
+                make_on = not bool(probe.fontUnderline())
+            fmt.setFontUnderline(bool(make_on))
+        if color:
+            fmt.setForeground(QColor(color))
+        cur.mergeCharFormat(fmt)
+        self.text_item.setTextCursor(cur)
+        self.commit_rich()
+        return "caret_selection" if has_sel else "caret_paragraph"
 
     def reflow_after_edit(self) -> None:
         if self.frame.kind != "text":
@@ -370,7 +454,14 @@ class DtpScene(QGraphicsScene):
         super().__init__(parent)
         self.doc = doc
         self._items: dict[str, FrameItem] = {}
+        self.selectionChanged.connect(self._remember_story)
         self.rebuild()
+
+    def _remember_story(self) -> None:
+        for fr in self.selected_frames():
+            if fr.kind == "text":
+                self.doc.set_active_story(fr)
+                return
 
     def rebuild(self) -> None:
         self.clear()
@@ -454,7 +545,11 @@ class DtpScene(QGraphicsScene):
                 continue
             if it._editing:
                 continue
-            if it.text_item.toPlainText() != (fr.text or ""):
+            html = (fr.rich_html or "").strip()
+            if html:
+                if it.text_item.toHtml() != fr.rich_html:
+                    it.text_item.setHtml(fr.rich_html)
+            elif it.text_item.toPlainText() != (fr.text or ""):
                 it.text_item.setPlainText(fr.text or "")
             it.text_item.setTextWidth(max(12.0, fr.width - 6))
             it.apply_style_font()
@@ -632,6 +727,7 @@ class DtpPane(QWidget):
         self._block_master = False
         self._block_style = False
         self._block_layer = False
+        self._block_wrap = False
         self.scene = DtpScene(self.doc)
         self.view = DtpView(self.scene)
         self.view.strokeFinished.connect(self._on_stroke)
@@ -680,6 +776,22 @@ class DtpPane(QWidget):
             self.style_combo.addItem(f"{st.id} ({st.kind})", sid)
         self.style_combo.currentIndexChanged.connect(self._on_style)
         bar.addWidget(self.style_combo)
+        self.wrap_combo = QComboBox()
+        self.wrap_combo.setObjectName("dtpWrap")
+        self.wrap_combo.setToolTip("Textumfluss auf Auswahl, sonst alle Objekte")
+        for mode, label in (
+            ("none", "Umfluss: aus"),
+            ("bounding_box", "Umfluss: Box"),
+            ("jump_object", "Umfluss: Sprung"),
+            ("contour", "Umfluss: Kontur"),
+        ):
+            self.wrap_combo.addItem(label, mode)
+        self._block_wrap = False
+        self.wrap_combo.currentIndexChanged.connect(self._on_wrap)
+        bar.addWidget(self.wrap_combo)
+        _btn("Füllen", lambda: self.apply_fill(dialog=True), "Füllfarbe auf Auswahl / alle")
+        _btn("Kontur", lambda: self.apply_stroke(dialog=True), "Kontur auf Auswahl / alle")
+        _btn("Schrift", lambda: self.apply_font(dialog=True), "Schrift auf Caret/Auswahl/Story")
         self.master_combo = QComboBox()
         self.master_combo.setObjectName("dtpMaster")
         self.master_combo.setToolTip("Musterseite auf aktuelle Seite anwenden")
@@ -764,6 +876,221 @@ class DtpPane(QWidget):
         if idx >= 0:
             self.preset_combo.setCurrentIndex(idx)
         self._block_preset = False
+
+    def editing_item(self) -> FrameItem | None:
+        for it in self.scene._items.values():
+            if it._editing:
+                return it
+        return None
+
+    def resolve_targets(self, role: str = "object") -> ToolHit:
+        """Select-then-tool: Caret → Auswahl/Absatz; Rahmen → Objekt; sonst Story/alles."""
+        role = (role or "object").lower()
+        editing = self.editing_item()
+        selected = list(self.scene.selected_frames())
+        if editing is not None and editing.text_item is not None:
+            if is_text_tool(role) or role in ("fill", "fill_text", "font", "style"):
+                _cur, has_sel = editing.caret_cursor()
+                self.doc.set_active_story(editing.frame)
+                return ToolHit(
+                    scope="caret_selection" if has_sel else "caret_paragraph",
+                    frames=[editing.frame],
+                    item=editing,
+                    has_text_selection=has_sel,
+                    role=role,
+                )
+            return ToolHit(scope="frames", frames=[editing.frame], item=editing, role=role)
+        if selected:
+            for fr in selected:
+                if fr.kind == "text":
+                    self.doc.set_active_story(fr)
+                    break
+            return ToolHit(scope="frames", frames=selected, role=role)
+        if is_text_tool(role) or role in ("font", "style", "fill_text"):
+            frames = story_or_all_text(self.doc)
+            scope = "story" if self.doc.active_story_id else "all_text"
+            if self.doc.active_story_id:
+                story = self.doc.story_frames()
+                if story:
+                    frames = story
+                    scope = "story"
+            return ToolHit(scope=scope, frames=frames, role=role)
+        return ToolHit(scope="all_objects", frames=list(self.doc.frames), role=role)
+
+    def _restore_selection(self, frames: list[DtpFrame]) -> None:
+        ids = {f.id for f in frames}
+        for fid, it in self.scene._items.items():
+            it.setSelected(fid in ids)
+
+    def _refresh_after_tool(self, hit: ToolHit, *, rebuild: bool = False) -> None:
+        if hit.is_caret:
+            return
+        if rebuild:
+            ids = list(hit.ids)
+            self.scene.rebuild()
+            for fid, it in self.scene._items.items():
+                it.setSelected(fid in ids)
+        else:
+            self.scene.sync_text_items()
+
+    def apply_fill(
+        self,
+        color: str | None = "#4A90D9",
+        *,
+        kind: str = "solid",
+        dialog: bool = False,
+    ) -> ToolHit:
+        if dialog:
+            c = QColorDialog.getColor(QColor(color or "#4A90D9"), self, "Füllfarbe")
+            if not c.isValid():
+                return ToolHit(scope="cancelled", frames=[], role="fill")
+            color = c.name()
+        color = color or "#4A90D9"
+        hit = self.resolve_targets("fill")
+        if hit.is_caret and hit.item is not None:
+            hit.item.apply_char_format(color=color)
+            self.statusMessage.emit(f"Füllung {hit.scope}: {color}")
+            return hit
+        for fr in hit.frames:
+            self.doc.apply_fill_color(fr.id, color, kind=kind)
+        self._refresh_after_tool(hit, rebuild=True)
+        self.statusMessage.emit(f"Füllung {hit.scope}: {color} ({len(hit.frames)})")
+        return hit
+
+    def apply_stroke(
+        self,
+        color: str | None = "#1A5276",
+        *,
+        width: float | None = 1.5,
+        dialog: bool = False,
+    ) -> ToolHit:
+        if dialog:
+            c = QColorDialog.getColor(QColor(color or "#1A5276"), self, "Kontur")
+            if not c.isValid():
+                return ToolHit(scope="cancelled", frames=[], role="stroke")
+            color = c.name()
+        color = color or "#1A5276"
+        hit = self.resolve_targets("stroke")
+        for fr in hit.frames:
+            self.doc.apply_stroke_color(fr.id, color, width=width)
+        self._refresh_after_tool(hit, rebuild=True)
+        self.statusMessage.emit(f"Kontur {hit.scope}: {color} ({len(hit.frames)})")
+        return hit
+
+    def apply_font(
+        self,
+        family: str | None = None,
+        size: float | None = None,
+        *,
+        bold: bool | None = None,
+        italic: bool | None = None,
+        underline: bool | None = None,
+        color: str | None = None,
+        toggle: bool = False,
+        dialog: bool = False,
+    ) -> ToolHit:
+        if dialog:
+            ok, font = False, QFont()
+            font, ok = QFontDialog.getFont(QFont(family or "serif"), self, "Schrift")
+            if not ok:
+                return ToolHit(scope="cancelled", frames=[], role="font")
+            family = font.family()
+            size = float(font.pointSizeF() or font.pointSize() or 11)
+            bold = bool(font.bold())
+            italic = bool(font.italic())
+            underline = bool(font.underline())
+        hit = self.resolve_targets("font")
+        if hit.is_caret and hit.item is not None:
+            hit.scope = hit.item.apply_char_format(
+                family=family,
+                size=size,
+                bold=bold,
+                italic=italic,
+                underline=underline,
+                color=color,
+                toggle=toggle,
+            ) or hit.scope
+            self.statusMessage.emit(f"Schrift {hit.scope}")
+            return hit
+        weight = None
+        if bold is True:
+            weight = 700
+        elif bold is False:
+            weight = 400
+        for fr in hit.frames:
+            if fr.kind != "text":
+                continue
+            self.doc.apply_font_attrs(
+                fr.id, family=family, size=size, weight=weight, italic=italic, color=color
+            )
+        self._refresh_after_tool(hit, rebuild=False)
+        self.statusMessage.emit(f"Schrift {hit.scope} ({len(hit.frames)})")
+        return hit
+
+    def apply_wrap_mode(self, mode: str | None = None, *, dialog: bool = False) -> ToolHit:
+        if dialog or not mode:
+            modes = ["none", "bounding_box", "jump_object", "contour"]
+            mode, ok = QInputDialog.getItem(self, "Textumfluss", "Modus:", modes, 1, False)
+            if not ok:
+                return ToolHit(scope="cancelled", frames=[], role="wrap")
+        hit = self.resolve_targets("wrap")
+        targets = hit.frames
+        if hit.scope == "all_objects":
+            targets = [f for f in hit.frames if f.kind in ("image", "shape")]
+            if not targets:
+                targets = hit.frames
+        for fr in targets:
+            self.doc.apply_wrap(fr.id, str(mode))
+        self._refresh_after_tool(hit, rebuild=True)
+        self.statusMessage.emit(f"Umfluss {mode} ({hit.scope})")
+        return hit
+
+    def apply_alignment(self, alignment: str) -> ToolHit:
+        hit = self.resolve_targets("style")
+        mapping = {
+            "left": Qt.AlignLeft,
+            "center": Qt.AlignCenter,
+            "right": Qt.AlignRight,
+            "justify": Qt.AlignJustify,
+        }
+        align = mapping.get((alignment or "left").lower(), Qt.AlignLeft)
+        if hit.is_caret and hit.item is not None and hit.item.text_item is not None:
+            cur, _ = hit.item.caret_cursor()
+            bf = QTextBlockFormat()
+            bf.setAlignment(align)
+            cur.mergeBlockFormat(bf)
+            hit.item.commit_rich()
+            self.statusMessage.emit(f"Absatz {alignment} {hit.scope}")
+            return hit
+        for fr in hit.frames:
+            it = self.scene._items.get(fr.id)
+            if it is None or it.text_item is None:
+                continue
+            cur = it.text_item.textCursor()
+            cur.select(QTextCursor.Document)
+            bf = QTextBlockFormat()
+            bf.setAlignment(align)
+            cur.mergeBlockFormat(bf)
+            it.commit_rich()
+        self.statusMessage.emit(f"Absatz {alignment} {hit.scope}")
+        return hit
+
+    def apply_style_tool(self, style_id: str) -> ToolHit:
+        hit = self.resolve_targets("style")
+        st = self.doc.styles.get(style_id)
+        if hit.is_caret and hit.item is not None and st is not None:
+            hit.item.apply_char_format(style=st)
+            hit.item.frame.style_id = style_id
+            self.statusMessage.emit(f"Stil {style_id} {hit.scope}")
+            return hit
+        for fr in hit.frames:
+            try:
+                self.doc.apply_style(fr.id, style_id)
+            except KeyError:
+                continue
+        self._refresh_after_tool(hit, rebuild=True)
+        self.statusMessage.emit(f"Stil {style_id} {hit.scope} ({len(hit.frames)})")
+        return hit
 
     def _refresh_info(self) -> None:
         g = self.doc.geometry
@@ -858,13 +1185,15 @@ class DtpPane(QWidget):
         sid = str(self.style_combo.currentData() or "")
         if not sid:
             return
-        for fr in self.scene.selected_frames() or [f for f in self.doc.frames_on_page(self.doc.current_page) if f.kind == "text"][:1]:
-            try:
-                self.doc.apply_style(fr.id, sid)
-            except KeyError:
-                pass
-        self.scene.rebuild()
-        self.statusMessage.emit(f"Stil {sid}")
+        self.apply_style_tool(sid)
+
+    def _on_wrap(self, _index: int = 0) -> None:
+        if self._block_wrap:
+            return
+        mode = str(self.wrap_combo.currentData() or "")
+        if not mode:
+            return
+        self.apply_wrap_mode(mode, dialog=False)
 
     def _reload_masters(self) -> None:
         self._block_master = True
@@ -961,41 +1290,44 @@ class DtpPane(QWidget):
         distribute_frames(self.scene.selected_frames(), axis)
         self.scene.rebuild()
 
-    def apply_envelope(self) -> None:
+    def apply_envelope(self) -> ToolHit:
         from instantlensdoc.dtp.envelope import envelope_corners_default
+        from instantlensdoc.dtp.model import EnvelopeMesh
 
-        for fr in self.scene.selected_frames() or self.doc.frames_on_page(self.doc.current_page)[:1]:
-            from instantlensdoc.dtp.model import EnvelopeMesh
-
+        hit = self.resolve_targets("envelope")
+        for fr in hit.frames:
             fr.envelope = EnvelopeMesh(corners=envelope_corners_default(fr.width, fr.height))
-        self.scene.rebuild()
-        self.statusMessage.emit("Envelope Distort angewandt")
+        self._refresh_after_tool(hit, rebuild=True)
+        self.statusMessage.emit(f"Envelope Distort {hit.scope}")
+        return hit
 
-    def apply_extrude(self) -> None:
+    def apply_extrude(self) -> ToolHit:
         from instantlensdoc.dtp.model import ExtrudeSpec
 
-        for fr in self.scene.selected_frames() or [f for f in self.doc.frames if f.kind == "shape"][:1]:
+        hit = self.resolve_targets("extrude")
+        for fr in hit.frames:
             fr.extrude = ExtrudeSpec()
-        self.scene.rebuild()
-        self.statusMessage.emit("3D-Extrusion angewandt")
+        self._refresh_after_tool(hit, rebuild=True)
+        self.statusMessage.emit(f"3D-Extrusion {hit.scope}")
+        return hit
 
-    def apply_text_on_path(self, kind: str = "ellipse") -> None:
-        frames = [f for f in self.scene.selected_frames() if f.kind == "text"]
-        if not frames:
-            frames = [f for f in self.doc.frames_on_page(self.doc.current_page) if f.kind == "text"][:1]
+    def apply_text_on_path(self, kind: str = "ellipse") -> ToolHit:
+        hit = self.resolve_targets("font")
+        frames = [f for f in hit.frames if f.kind == "text"] or hit.frames
         for fr in frames:
             self.doc.apply_text_on_path(fr.id, kind)
-        self.scene.rebuild()
-        self.statusMessage.emit("Text auf Pfad")
+        self._refresh_after_tool(hit, rebuild=True)
+        self.statusMessage.emit(f"Text auf Pfad {hit.scope}")
+        return hit
 
-    def convert_to_outlines(self) -> None:
-        frames = [f for f in self.scene.selected_frames() if f.kind == "text"]
-        if not frames:
-            frames = [f for f in self.doc.frames_on_page(self.doc.current_page) if f.kind == "text"][:1]
+    def convert_to_outlines(self) -> ToolHit:
+        hit = self.resolve_targets("font")
+        frames = [f for f in hit.frames if f.kind == "text"] or hit.frames
         for fr in frames:
             self.doc.convert_text_to_outlines(fr.id)
-        self.scene.rebuild()
-        self.statusMessage.emit("Text in Pfade umgewandelt")
+        self._refresh_after_tool(hit, rebuild=True)
+        self.statusMessage.emit(f"Text in Pfade {hit.scope}")
+        return hit
 
     def apply_clip_mask(self) -> None:
         sel = self.scene.selected_frames()
@@ -1014,14 +1346,14 @@ class DtpPane(QWidget):
                 return
         self.scene.rebuild()
 
-    def apply_live_fill(self) -> None:
-        targets = [f for f in self.scene.selected_frames() if f.kind in ("shape", "image")]
-        if not targets:
-            targets = [f for f in self.doc.frames_on_page(self.doc.current_page) if f.kind == "shape"][:1]
-        for fr in targets:
+    def apply_live_fill(self) -> ToolHit:
+        hit = self.resolve_targets("fill")
+        frames = [f for f in hit.frames if f.kind in ("shape", "image", "text")] or hit.frames
+        for fr in frames:
             self.doc.apply_live_fill(fr.id, kind="linear", shadow=True)
-        self.scene.rebuild()
-        self.statusMessage.emit("Live-Füllung / Schatten")
+        self._refresh_after_tool(hit, rebuild=True)
+        self.statusMessage.emit(f"Live-Füllung {hit.scope}")
+        return hit
 
     def show_glyph_palette(self) -> None:
         from instantlensdoc.features.glyph_dialog import GlyphPaletteDialog
@@ -1036,8 +1368,15 @@ class DtpPane(QWidget):
         glyph = dlg.selected_glyph()
         if not glyph:
             return
-        if not texts:
-            texts = [f for f in self.doc.frames_on_page(self.doc.current_page) if f.kind == "text"][:1]
+        editing = self.editing_item()
+        if editing is not None and editing.text_item is not None:
+            cur = editing.text_item.textCursor()
+            cur.insertText(glyph)
+            editing.commit_rich()
+            self.statusMessage.emit(f"Glyphe an Caret: {glyph}")
+            return
+        hit = self.resolve_targets("font")
+        texts = [f for f in hit.frames if f.kind == "text"]
         if not texts:
             fr = self.add_text_frame()
             texts = [fr]
