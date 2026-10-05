@@ -7,7 +7,9 @@ block_cipher = None
 root = Path(SPECPATH)
 
 a = Analysis(
-    [str(root / "instantlensdoc" / "__main__.py")],
+    # Thin absolute-import entry (not instantlensdoc/__main__.py) — frozen scripts
+    # have no package parent, so relative imports fail at runtime.
+    [str(root / "run_instantlensdoc.py")],
     pathex=[str(root)],
     binaries=[],
     datas=[
@@ -17,7 +19,16 @@ a = Analysis(
         (str(root / "README.md"), "."),
         (str(root / "CHANGELOG.md"), "."),
     ],
-    hiddenimports=["pypdfium2", "pikepdf", "PIL", "instantlensdoc", "ild_pdf"],
+    hiddenimports=[
+        "pypdfium2",
+        "pikepdf",
+        "PIL",
+        "instantlensdoc",
+        "instantlensdoc.app",
+        "ild_pdf",
+        "ild",
+        "keygen",
+    ],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

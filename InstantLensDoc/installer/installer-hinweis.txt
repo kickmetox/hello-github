@@ -1,6 +1,6 @@
-InstantLens Doc 2.6.35 - Installation
+InstantLens Doc 2.6.36 - Installation
 
-Neu in 2.6.35:
+Neu in 2.6.36:
 - Sync: -Dest frischer Ordner (z.B. InstantLensDoc-2635) wenn Altbau gesperrt
 - ForceClean: Keygen skip-or-retry; build-windows-installer.ps1 im Pack Pflicht
 - build-windows.ps1: PyInstaller-Probe mit klarem pip install + Import-Fehlertext

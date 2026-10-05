@@ -2,7 +2,7 @@
 
 Moderne Textverarbeitung mit PDF-Annotator, OCR-Bridge und Formulargenerator.
 
-**Version:** 2.6.35  
+**Version:** 2.6.36  
 **Hersteller:** Andreas Meyer · ame@sellerbach.de
 
 ## Quickstart (Windows)
@@ -29,7 +29,7 @@ powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 ```
 
 64-Bit-Python erforderlich. Runnable-Pack ohne EXE: `.\scripts\pack-windows-runnable.ps1`.  
-Installer-Einzeiler: `powershell -ExecutionPolicy Bypass -File .\scripts\build-windows-installer.ps1` → `dist\InstantLensDoc-Setup-2.6.35.exe`  
+Installer-Einzeiler: `powershell -ExecutionPolicy Bypass -File .\scripts\build-windows-installer.ps1` → `dist\InstantLensDoc-Setup-2.6.36.exe`  
 (oder `.\installer\build-installer.ps1`, optional `-NoKeygen`)  
 Desktop-Verknüpfung: optionale Checkbox (`desktopicon`, Standard an).  
 User-Shortcuts: `.\scripts\install-ild.ps1` (inkl. Keygen) · Deinstallieren: `-Uninstall [-Quiet]` (Exit **0**/OK · **1**/Fehler; Quiet: Kurz-Summary, Exit 0 auch ohne Shortcuts).  
@@ -40,15 +40,20 @@ Scripting: `python -m ild --help` · `.\scripts\ild.ps1` · `run-ild.bat`.
 
 Nightly-Smoke: `python scripts\smoke_ild.py` · optional `--qt` · `--json` (Summary: `ok`, `checks[]`, `duration_ms`, `version`; Fail: `checks[].error` max 200…, Exit=ok). Siehe **CONTRIBUTING.md**; Workflow-Stub `.github/workflows/smoke-ild.yml` (manual only).
 
+## Neu in 2.6.36
+
+- **EXE Relative-Import-Fix:** PyInstaller-Entry `run_instantlensdoc.py` (absolute Imports); `instantlensdoc/__main__.py` absolut; Spec/Build nutzen neuen Entry
+- Pack: `InstantLensDoc-2.6.36-pack.zip`
+
 ## Neu in 2.6.35
 
-- **Keygen Import-Fix:** `run-keygen.bat`/`.ps1` setzen PYTHONPATH (Parent + Keygen); nested/standalone; Vendor `instantlensdoc.license`
+- **Sync Ordner-Sperre / Fresh-Dest:** `-Dest`/`-Swap`, ForceClean-Härtung; PyInstaller-Probe in `build-windows.ps1`
 - Pack: `InstantLensDoc-2.6.35-pack.zip`
 
 ## Neu in 2.6.33
 
 - **Installer/run.bat:** ASCII-safe Launcher (kein cmd-Mojibake-Loop); EXE-Layout nach `build-windows.ps1`
-- Pack: `InstantLensDoc-2.6.35-pack.zip`
+- Pack: `InstantLensDoc-2.6.33-pack.zip`
 
 ## Neu in 2.6.32
 
