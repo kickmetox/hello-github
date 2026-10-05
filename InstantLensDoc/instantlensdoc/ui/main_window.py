@@ -3055,8 +3055,8 @@ class MainWindow(QMainWindow):
         act_dev_scan.setObjectName("actDevicesScanner")
         act_dev_scan.setShortcut(QKeySequence("Ctrl+Alt+Shift+I"))
         act_dev_scan.setToolTip(
-            "Scan-Dialog: WIA/NAPS2/SANE oder Bilder · Tesseract-OCR "
-            "(Shortcut: Ctrl+Alt+Shift+I) — 2.6.41"
+            "ScanTuxio-Hauptfenster öffnen und Scan nach InstantLens Doc übernehmen "
+            "(Shortcut: Ctrl+Alt+Shift+I) — 2.6.46"
         )
         act_dev_scan.triggered.connect(self._run_scan_import)
         m_devices.addAction(act_dev_scan)
@@ -15473,7 +15473,7 @@ class MainWindow(QMainWindow):
         self._set_status(f"Bild eingefügt: {Path(path).name}")
 
     def _run_scan_import(self):
-        """Scan/Import-Dialog: Scanner oder Bilder · Tesseract-OCR — 2.6.41."""
+        """Scan/Import-Dialog: ScanTuxio-UI oder Bilder · Tesseract-OCR — 2.6.46."""
         try:
             from instantlensdoc.core.devices import SCAN_START_HINT_DE
 
@@ -15505,7 +15505,7 @@ class MainWindow(QMainWindow):
         try:
             from instantlensdoc.ui.scan_dialog import ScanDialog
 
-            dlg = ScanDialog(self.pdf_view, self)
+            dlg = ScanDialog(self.pdf_view, self, auto_launch_scantuxio=False)
         except Exception as e:
             QMessageBox.warning(
                 self,
@@ -15517,6 +15517,15 @@ class MainWindow(QMainWindow):
         dlg.setObjectName("devicesDialog")
         dlg.btn_acquire.setVisible(False)
         dlg.btn_import.setVisible(False)
+        for _w in (
+            getattr(dlg, "btn_scantuxio", None),
+            getattr(dlg, "btn_take_scan", None),
+        ):
+            if _w is not None:
+                try:
+                    _w.setVisible(False)
+                except Exception:
+                    pass
         dlg.ocr_enabled.setVisible(False)
         dlg.lang_combo.setVisible(False)
         dlg.tess_hint.setVisible(False)

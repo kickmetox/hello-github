@@ -1,10 +1,11 @@
-"""Scan-/Import-Pipeline mit Tesseract-OCR — 2.6.2 / Layout-Erhalt 2.6.3 / 2.6.41.
+"""Scan-/Import-Pipeline mit Tesseract-OCR — 2.6.2 / Layout-Erhalt 2.6.3 / 2.6.41 / 2.6.46.
 
-Seitenbilder (Scanner-Acquire, Datei-Import, Fotos) → optional OCR →
+Seitenbilder (Scanner-Acquire, Datei-Import, Fotos, ScanTuxio-UI) → optional OCR →
 PDF-Seiten in die aktuelle Session + ``*.ildocr.txt`` (+ optional hOCR/TSV).
 
-Acquire: primaer ScanTuxio ``scan_single_page_dispatch`` (NAPS2 / native-eSCL /
-SANE); Fallback WIA Common Dialog unter Windows.
+Acquire: primär ScanTuxio-Hauptfenster (``scantuxio_ui``); sekundär
+``scan_single_page_dispatch`` (NAPS2 / native-eSCL / SANE) und WIA.
+Bei WIA busy/in-use: andere ScanTuxio-Backends (NAPS2/TWAIN/eSCL) versuchen.
 """
 
 from __future__ import annotations
@@ -116,8 +117,8 @@ def acquire_from_scanner(
     """
     Versucht einen Scan vom gewählten Gerät.
 
-    Primaer: ScanTuxio ``scan_single_page_dispatch`` (NAPS2/eSCL/SANE).
-    Windows-Fallback: WIA Common Dialog.
+    Sekundär (nach ScanTuxio-UI): ``scan_single_page_dispatch`` (NAPS2/eSCL/SANE).
+    Windows: WIA nur als Fallback; bei busy andere ScanTuxio-Backends.
     Ohne Hardware/Backend: leere Liste (UI fällt auf Datei-Import zurück).
     Wirft nicht — Fehler in ``last_acquire_error()``.
     """
@@ -132,6 +133,10 @@ def acquire_from_scanner(
             paths = _acquire_scantuxio(st_id, out)
             if paths:
                 return paths
+            if _wia_busy_acquire_error():
+                alt = _acquire_scantuxio_other_backends(out, skip_ids={st_id})
+                if alt:
+                    return alt
         if device and (device.device_id or "").startswith("TWAIN"):
             _LAST_ACQUIRE_ERROR = (
                 "TWAIN-Quelle: ScanTuxio/NAPS2 ohne Bild — Fallback WIA. "
@@ -141,6 +146,15 @@ def acquire_from_scanner(
             paths = _acquire_wia_windows(device, out)
             if paths:
                 return paths
+            wia_err = _LAST_ACQUIRE_ERROR
+            if _wia_busy_acquire_error():
+                alt = _acquire_scantuxio_other_backends(out, skip_ids={st_id} if st_id else set())
+                if alt:
+                    return alt
+                from instantlensdoc.core.scantuxio_ui import wia_busy_user_hint_de
+
+                _LAST_ACQUIRE_ERROR = wia_busy_user_hint_de(wia_err)
+                return []
             # Letzter Versuch: ScanTuxio NAPS2 ohne feste ID (erstes WIA-Gerät)
             if not st_id:
                 try:
@@ -160,6 +174,53 @@ def acquire_from_scanner(
     except Exception as e:
         _LAST_ACQUIRE_ERROR = f"Scan fehlgeschlagen: {e}"
         return []
+
+
+def _wia_busy_acquire_error() -> bool:
+    from instantlensdoc.core.scantuxio_ui import is_wia_busy_message
+
+    return is_wia_busy_message(_LAST_ACQUIRE_ERROR)
+
+
+def _acquire_scantuxio_other_backends(
+    out_dir: Path,
+    *,
+    skip_ids: Optional[set[str]] = None,
+) -> List[Path]:
+    """NAPS2/TWAIN/eSCL nacheinander, wenn WIA busy ist — 2.6.46."""
+    skip = {s for s in (skip_ids or set()) if s}
+    try:
+        from instantlensdoc.core.scantuxio import scanner as st_scanner
+    except Exception:
+        return []
+    try:
+        devices = list(st_scanner.list_devices_all(timeout=20) or [])
+    except Exception:
+        return []
+
+    def _prio(did: str) -> int:
+        d = (did or "").lower()
+        if d.startswith("naps2:twain:"):
+            return 0
+        if d.startswith("native-escl:") or d.startswith("escl:"):
+            return 1
+        if d.startswith("naps2:"):
+            return 2
+        return 9
+
+    ordered = sorted(
+        devices,
+        key=lambda d: _prio(str(getattr(d, "device_id", "") or "")),
+    )
+    for d in ordered:
+        did = str(getattr(d, "device_id", "") or "").strip()
+        if not did or did in skip:
+            continue
+        paths = _acquire_scantuxio(did, out_dir)
+        if paths:
+            return paths
+        skip.add(did)
+    return []
 
 
 def _acquire_scantuxio(device_id: str, out_dir: Path) -> List[Path]:
@@ -330,6 +391,44 @@ def import_image_paths(paths: Sequence[Union[str, Path]]) -> List[Path]:
         if p.suffix.lower() not in IMAGE_SUFFIXES:
             continue
         out.append(p.resolve())
+    return out
+
+
+def expand_scan_import_paths(
+    paths: Sequence[Union[str, Path]],
+    *,
+    out_dir: str | Path | None = None,
+) -> List[Path]:
+    """Bilder durchreichen; PDF-Seiten als PNG rasterisieren — 2.6.46."""
+    dest = Path(out_dir) if out_dir else Path(tempfile.mkdtemp(prefix="ild-scan-imp-"))
+    dest.mkdir(parents=True, exist_ok=True)
+    out: List[Path] = []
+    for raw in paths:
+        p = Path(raw)
+        try:
+            if not p.is_file():
+                continue
+        except OSError:
+            continue
+        suf = p.suffix.lower()
+        if suf in IMAGE_SUFFIXES:
+            out.append(p.resolve())
+            continue
+        if suf != ".pdf":
+            continue
+        try:
+            from ild_pdf.pages import page_count
+            from ild_pdf.render import render_page
+
+            n = int(page_count(p))
+            for i in range(max(0, n)):
+                img = render_page(p, i, scale=2.0, use_cache=False)
+                png = dest / f"{p.stem}_p{i + 1}.png"
+                img.convert("RGB").save(png, "PNG")
+                if png.is_file() and png.stat().st_size > 32:
+                    out.append(png)
+        except Exception:
+            continue
     return out
 
 

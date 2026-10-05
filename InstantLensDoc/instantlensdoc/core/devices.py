@@ -102,7 +102,7 @@ WINDOWS_SCANNER_DRIVER_HINT_DE = (
 # Offensichtliche UI-Einstiege (DE) — Statusleiste / Dialog / Hilfe — 2.6.41
 SCAN_START_HINT_DE = (
     "Scannen starten: Menü Geräte → Scanner / Scannen… "
-    "· oder PDF → Scannen / Import… "
+    "(öffnet ScanTuxio) · oder PDF → Scannen / Import… "
     "· oder Toolbar „Scan…“ "
     "· Shortcut Ctrl+Alt+Shift+I"
 )

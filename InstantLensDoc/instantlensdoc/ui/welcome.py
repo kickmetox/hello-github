@@ -111,7 +111,7 @@ class WelcomePage(QWidget):
         self.btn_scan.setObjectName("welcomeScanBtn")
         self.btn_scan.setToolTip(
             "Scan-Dialog öffnen (Geräte → Scanner / Scannen… · "
-            "Ctrl+Alt+Shift+I · WIA/NAPS2 oder Bilder) — 2.6.41"
+            "Ctrl+Alt+Shift+I · ScanTuxio-UI oder Bilder) — 2.6.46"
         )
         self.btn_scan.clicked.connect(self.scan_requested.emit)
         btn_row.addWidget(self.btn_scan)

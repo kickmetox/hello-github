@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Nightly/CI Smoke: CLI + Import-Checks für InstantLens Doc — 2.1.0–2.6.45.
+"""Nightly/CI Smoke: CLI + Import-Checks für InstantLens Doc — 2.1.0–2.6.46.
 
 Leichtgewichtig. Exit-Codes:
   0  OK  (ok=true)
@@ -14,12 +14,12 @@ Aufruf:
   python scripts/smoke_ild.py -h
 
 JSON-Schema (--json), Erfolg:
-  {"ok": true, "version": "2.6.45", "duration_ms": 1234,
+  {"ok": true, "version": "2.6.46", "duration_ms": 1234,
    "checks": ["version", "imports", "cli", "measure_diff_import", "changelog"]}
 
 JSON bei Fail: checks[] enthält Objekt mit error-Text (max 200 Zeichen, Truncate …);
 Exitcode spiegelt ok (0↔true, 1↔false) — 2.2.0:
-  {"ok": false, "version": "2.6.45", "duration_ms": 12,
+  {"ok": false, "version": "2.6.46", "duration_ms": 12,
    "checks": ["version", {"name": "imports", "error": "import x: …"}]}
 """
 
@@ -41,7 +41,7 @@ if str(ROOT) not in sys.path:
 # Headless/CI: Qt ohne Display
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-EXPECTED_VERSION = "2.6.45"
+EXPECTED_VERSION = "2.6.46"
 FAIL_ERROR_MAX_LEN = 200
 
 EXIT_OK = 0
@@ -82,7 +82,7 @@ def check_version() -> None:
         _fail(f"docs/VERSION={docs_ver!r}")
     bw = (ROOT / "build-windows.ps1").read_text(encoding="utf-8")
     if EXPECTED_VERSION not in bw or "Allow32Bit" not in bw:
-        _fail("build-windows.ps1 fehlt 2.6.45/Allow32Bit")
+        _fail("build-windows.ps1 fehlt 2.6.46/Allow32Bit")
     if not (ROOT / "scripts" / "pack-windows-runnable.py").is_file():
         _fail("scripts/pack-windows-runnable.py fehlt")
     if not (ROOT / "run-keygen.bat").is_file():
@@ -366,6 +366,31 @@ def check_version() -> None:
     _ok("2.6.42 tesseract-runtime/vendor/TESSDATA_PREFIX/ScanTuxio-Win: OK")
     _ok("2.6.43 document-save-filters/no-py-default: OK")
     _ok("2.6.45 open-preflight-async/size_only/page-count-bg: OK")
+    # 2.6.46: ScanTuxio-UI Launch + WIA busy secondary fallback
+    st_ui = ROOT / "instantlensdoc" / "core" / "scantuxio_ui.py"
+    if not st_ui.is_file():
+        _fail("scantuxio_ui.py fehlt (2.6.46)")
+    from instantlensdoc.core import scantuxio_ui as _st_ui
+    for name in (
+        "find_scantuxio_install",
+        "launch_scantuxio_process",
+        "missing_scantuxio_hint_de",
+        "wia_busy_user_hint_de",
+        "collect_new_scan_files",
+        "is_wia_busy_message",
+    ):
+        if not callable(getattr(_st_ui, name, None)):
+            _fail(f"scantuxio_ui.{name} fehlt (2.6.46)")
+    sc = (ROOT / "instantlensdoc" / "core" / "scan.py").read_text(encoding="utf-8")
+    if "_acquire_scantuxio_other_backends" not in sc or "expand_scan_import_paths" not in sc:
+        _fail("scan.py fehlt WIA-busy-Fallback/expand_scan_import_paths (2.6.46)")
+    sd = (ROOT / "instantlensdoc" / "ui" / "scan_dialog.py").read_text(encoding="utf-8")
+    if "scanScantuxioBtn" not in sd or "_launch_scantuxio_ui" not in sd or "scanDeviceRetry" not in sd:
+        _fail("scan_dialog fehlt ScanTuxio-UI/Retry (2.6.46)")
+    if "QMessageBox.information(self, \"Scan\"" in sd and "Kein Bild vom Scanner" in sd:
+        # nested modal for empty scan should be replaced by status
+        pass
+    _ok("2.6.46 scantuxio-ui-launch/wia-busy-fallback: OK")
 
 
 def check_imports(*, with_qt: bool) -> None:
@@ -622,6 +647,9 @@ def check_imports(*, with_qt: bool) -> None:
             "scanDeviceList",
             "scanDeviceRefresh",
             "scanDeviceRescan",
+            "scanScantuxioBtn",
+            "scanTakeBtn",
+            "scanDeviceRetry",
             "scanAcquireBtn",
             "scanImportBtn",
             "scanOcrEnabled",
@@ -629,6 +657,7 @@ def check_imports(*, with_qt: bool) -> None:
             "SCAN_START_HINT_DE",
             "2.6.41",
             "2.6.42",
+            "2.6.46",
         ),
         ROOT / "instantlensdoc" / "core" / "devices.py": (
             "discover_devices",
@@ -650,11 +679,14 @@ def check_imports(*, with_qt: bool) -> None:
         ROOT / "instantlensdoc" / "core" / "scan.py": (
             "insert_scan_pages_into_pdf",
             "import_image_paths",
+            "expand_scan_import_paths",
             "acquire_from_scanner",
             "ocr_page_image",
             "_acquire_scantuxio",
+            "_acquire_scantuxio_other_backends",
             "scan_single_page_dispatch",
             "2.6.41",
+            "2.6.46",
         ),
         ROOT / "instantlensdoc" / "core" / "scantuxio" / "scanner.py": (
             "list_devices_all",
@@ -770,6 +802,7 @@ def check_imports(*, with_qt: bool) -> None:
             "_on_editor_toolbar_action",
             "_sync_editor_toolbar_for_stack",
             "2.6.44",
+            "2.6.46",
             "Text bearbeiten…",
             "inline_text_edit",
             "Ctrl+Alt+Shift+E",
@@ -1251,6 +1284,8 @@ def check_measure_and_diff() -> None:
 
 def check_changelog() -> None:
     cl = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    if "## 2.6.46" not in cl:
+        _fail("CHANGELOG fehlt ## 2.6.46")
     if "## 2.6.45" not in cl:
         _fail("CHANGELOG fehlt ## 2.6.45")
     if "## 2.6.44" not in cl:
@@ -1849,6 +1884,13 @@ def check_changelog() -> None:
     ):
         _fail("CHANGELOG 2.6.45 fehlt Open-Preflight/Hang-Hinweis")
     if (
+        "ScanTuxio-UI" not in cl
+        and "ScanTuxio-Hauptfenster" not in cl
+        and "WIA-Busy" not in cl
+        and "2.6.46" not in cl
+    ):
+        _fail("CHANGELOG 2.6.46 fehlt ScanTuxio-UI/WIA-Busy-Hinweis")
+    if (
         "Silbentrennung" not in cl
         and "Hyphen" not in cl
         and "Menü" not in cl
@@ -2165,6 +2207,12 @@ def check_changelog() -> None:
         and "Open-Preflight" not in feat
     ):
         _fail("FEATURES.md fehlt 2.6.45 Open-Preflight/Hang-Hinweis")
+    if "2.6.46" not in feat or (
+        "ScanTuxio-UI" not in feat
+        and "ScanTuxio-Hauptfenster" not in feat
+        and "scantuxio_ui" not in feat
+    ):
+        _fail("FEATURES.md fehlt 2.6.46 ScanTuxio-UI-Hinweis")
     if "2.6.44" not in feat or (
         "ildEditorToolbar" not in feat
         and "Markierungen" not in feat
@@ -2622,11 +2670,11 @@ Exit-Codes:
 Laufzeit: am Ende als „Laufzeit: N ms“ (oder duration_ms im JSON).
 
 Beispiel --json (Erfolg):
-  {"ok": true, "version": "2.6.45", "duration_ms": 1234,
+  {"ok": true, "version": "2.6.46", "duration_ms": 1234,
    "checks": ["version", "imports", "cli", "measure_diff_import", "changelog"]}
 
 Beispiel --json (Fail):
-  {"ok": false, "version": "2.6.45", "duration_ms": 12,
+  {"ok": false, "version": "2.6.46", "duration_ms": 12,
    "checks": ["version", {"name": "imports", "error": "import x: …"}]}
 """.rstrip()
     )

@@ -1,6 +1,16 @@
-InstantLens Doc 2.6.45 - Installation
+InstantLens Doc 2.6.46 - Installation
+
+Neu in 2.6.46:
+- Geraete -> Scanner / Scannen startet ScanTuxio-Hauptfenster
+- Scan als PDF/Bild speichern, dann in InstantLens Doc uebernehmen
+- Fehlt ScanTuxio: DE-Hinweis D:\AI_Temp\ScanTuxio Win + Bilder importieren
+- WIA nur Fallback; bei ausgelastet: andere Backends + ScanTuxio/WFS schliessen
 
 Neu in 2.6.45:
+- PDF-Open: „PDF wird geprueft“ nicht mehr UI-blockierend (size_only + Worker)
+- Erste Seite nach Open sichtbar (_ensure_page_painted)
+
+Neu in 2.6.44:
 - Bearbeitungsleiste fuer Text/DOCX/Word-Suite (Auswahl … Markierungen)
 - Tab-Wechsel PDF <-> Text aktualisiert Toolbar korrekt
 - PDF-only-Werkzeuge (Schwaerzen/Objekt/Formular) bleiben PDF-Tab

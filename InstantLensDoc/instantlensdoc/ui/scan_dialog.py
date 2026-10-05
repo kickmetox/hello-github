@@ -1,10 +1,10 @@
-"""Scan/Import-Dialog + Geräteauswahl (Drucker/Scanner) — 2.6.2 / 2.6.41 / 2.6.42."""
+"""Scan/Import-Dialog + Geräteauswahl (Drucker/Scanner) — 2.6.2 / 2.6.41 / 2.6.46."""
 
 from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -43,9 +43,22 @@ from instantlensdoc.core.ocr import (
 )
 from instantlensdoc.core.scan import (
     acquire_from_scanner,
+    expand_scan_import_paths,
     import_image_paths,
     insert_scan_pages_into_pdf,
     last_acquire_error,
+)
+from instantlensdoc.core.scantuxio_ui import (
+    build_launch,
+    collect_new_scan_files,
+    default_watch_dirs,
+    find_scantuxio_install,
+    launch_scantuxio_process,
+    missing_scantuxio_hint_de,
+    prepare_handshake_dir,
+    read_handoff_manifest,
+    snapshot_scan_files,
+    wia_busy_user_hint_de,
 )
 
 
@@ -55,25 +68,30 @@ class ScanDialog(QDialog):
     optional Tesseract-OCR; Geräte-Picker mit Aktualisieren/Neu suchen.
     """
 
-    def __init__(self, pdf_view, parent=None):
+    def __init__(self, pdf_view, parent=None, *, auto_launch_scantuxio: bool = True):
         super().__init__(parent)
         self.pdf_view = pdf_view
         self._discovery = DeviceDiscoveryResult()
         self._pending_images: list[Path] = []
+        self._auto_launch_scantuxio = bool(auto_launch_scantuxio)
+        self._st_proc = None
+        self._st_handshake: Path | None = None
+        self._st_watch: list[Path] = []
+        self._st_snapshot: dict[str, tuple[int, int]] = {}
         self.setWindowTitle("Scannen / Import")
         self.setWindowModality(Qt.WindowModal)
         self.setObjectName("scanDialog")
-        self.resize(560, 640)
+        self.resize(560, 680)
         self.setAccessibleName("Scannen und Import")
         self.setAccessibleDescription(
-            "Scanner wählen oder Bilder importieren, optional OCR mit Layout-Erhalt — 2.6.41"
+            "ScanTuxio-UI starten und Scan übernehmen, oder Bilder importieren — 2.6.46"
         )
 
         layout = QVBoxLayout(self)
         self.hint = QLabel(
             "Scanner wählen und scannen, oder Seitenbilder importieren. "
             "OCR mit Layout-Erhalt (Blöcke / Lesereihenfolge; optional hOCR/TSV).\n"
-            f"{SCAN_START_HINT_DE} — 2.6.41"
+            f"{SCAN_START_HINT_DE} — 2.6.46"
         )
         self.hint.setWordWrap(True)
         self.hint.setObjectName("scanDialogHint")
@@ -113,6 +131,12 @@ class ScanDialog(QDialog):
         self.btn_rescan.setObjectName("scanDeviceRescan")
         self.btn_rescan.setToolTip("Vollständige Neu-Erkennung (lokal + Netzwerk)")
         self.btn_rescan.clicked.connect(self.refresh_devices)
+        self.btn_retry = QPushButton("Erneut versuchen")
+        self.btn_retry.setObjectName("scanDeviceRetry")
+        self.btn_retry.setToolTip(
+            "Geräteliste neu laden und ScanTuxio erneut öffnen — 2.6.46"
+        )
+        self.btn_retry.clicked.connect(self._retry_scan_flow)
         self.filter_combo = QComboBox()
         self.filter_combo.setObjectName("scanDeviceFilter")
         self.filter_combo.addItem("Alle Geräte", "all")
@@ -122,6 +146,7 @@ class ScanDialog(QDialog):
         self.filter_combo.currentIndexChanged.connect(self._populate_device_list)
         btn_row.addWidget(self.btn_refresh)
         btn_row.addWidget(self.btn_rescan)
+        btn_row.addWidget(self.btn_retry)
         btn_row.addWidget(self.filter_combo, 1)
         dev_layout.addLayout(btn_row)
 
@@ -135,16 +160,30 @@ class ScanDialog(QDialog):
         act_box = QGroupBox("Erfassen")
         act_layout = QVBoxLayout(act_box)
         act_btns = QHBoxLayout()
-        self.btn_acquire = QPushButton("Vom Scanner…")
+        self.btn_scantuxio = QPushButton("ScanTuxio öffnen")
+        self.btn_scantuxio.setObjectName("scanScantuxioBtn")
+        self.btn_scantuxio.setToolTip(
+            "ScanTuxio-Hauptfenster starten (D:\\AI_Temp\\ScanTuxio Win) — 2.6.46"
+        )
+        self.btn_scantuxio.clicked.connect(self._launch_scantuxio_ui)
+        self.btn_take_scan = QPushButton("Scan übernehmen")
+        self.btn_take_scan.setObjectName("scanTakeBtn")
+        self.btn_take_scan.setToolTip(
+            "Neue PDF/Bilder aus ScanTuxio-Übergabeordner übernehmen — 2.6.46"
+        )
+        self.btn_take_scan.clicked.connect(self._collect_scantuxio_output)
+        self.btn_acquire = QPushButton("WIA / NAPS2…")
         self.btn_acquire.setObjectName("scanAcquireBtn")
         self.btn_acquire.setToolTip(
-            "Seite vom ausgewählten Scanner erfassen (WIA / NAPS2 / SANE) — 2.6.41"
+            "Sekundär: WIA/NAPS2/eSCL ohne ScanTuxio-UI — 2.6.46"
         )
         self.btn_acquire.clicked.connect(self._acquire_scan)
         self.btn_import = QPushButton("Bilder importieren…")
         self.btn_import.setObjectName("scanImportBtn")
         self.btn_import.setToolTip("PNG/JPEG/TIFF/BMP als Seiten importieren")
         self.btn_import.clicked.connect(self._import_images)
+        act_btns.addWidget(self.btn_scantuxio)
+        act_btns.addWidget(self.btn_take_scan)
         act_btns.addWidget(self.btn_acquire)
         act_btns.addWidget(self.btn_import)
         act_layout.addLayout(act_btns)
@@ -217,7 +256,12 @@ class ScanDialog(QDialog):
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
 
+        self._st_timer = QTimer(self)
+        self._st_timer.setInterval(1200)
+        self._st_timer.timeout.connect(self._poll_scantuxio_output)
         self.refresh_devices()
+        if self._auto_launch_scantuxio:
+            QTimer.singleShot(0, self._launch_scantuxio_ui)
 
     def _sync_scan_ocr_opts(self, *_args) -> None:
         on = bool(self.ocr_enabled.isChecked()) and self.ocr_enabled.isEnabled()
@@ -226,6 +270,14 @@ class ScanDialog(QDialog):
         self.layout_tsv.setEnabled(on)
         if hasattr(self, "word_suite_check"):
             self.word_suite_check.setEnabled(on)
+
+    def closeEvent(self, event) -> None:  # noqa: N802
+        try:
+            if getattr(self, "_st_timer", None) is not None:
+                self._st_timer.stop()
+        except Exception:
+            pass
+        super().closeEvent(event)
 
     def open_in_word_suite(self) -> bool:
         """OCR-Text in Word-Suite übernehmen — 2.6.15."""
@@ -342,47 +394,165 @@ class ScanDialog(QDialog):
             more = f" … (+{n - 5})" if n > 5 else ""
             self.pending_label.setText(f"{n} Seite(n) bereit: {names}{more}")
 
+    def _set_acquire_status(self, text: str) -> None:
+        """Fehler/Hinweise in der Geräteliste, ohne Extra-Modal — 2.6.46."""
+        msg = (text or "").strip()
+        self.device_status.setText(msg)
+        self.device_status.setToolTip(msg)
+        self.device_status.setAccessibleName(msg[:120] if msg else "Gerätestatus")
+
+    def _retry_scan_flow(self) -> None:
+        self.refresh_devices()
+        if self._auto_launch_scantuxio:
+            self._launch_scantuxio_ui(force=True)
+
+    def _scantuxio_alive(self) -> bool:
+        proc = self._st_proc
+        if proc is None:
+            return False
+        try:
+            return proc.poll() is None
+        except Exception:
+            return False
+
+    def _launch_scantuxio_ui(self, force: bool = False) -> None:
+        if self._scantuxio_alive() and not force:
+            self._set_acquire_status(
+                "ScanTuxio läuft bereits. Bitte dort speichern, dann „Scan übernehmen“. "
+                "Oder „Erneut versuchen“."
+            )
+            self._st_timer.start()
+            return
+        inst = find_scantuxio_install()
+        if inst is None:
+            self._set_acquire_status(missing_scantuxio_hint_de())
+            return
+        try:
+            handshake = prepare_handshake_dir()
+            launch = build_launch(inst, handshake)
+            self._st_handshake = handshake
+            self._st_watch = default_watch_dirs(inst, handshake)
+            self._st_snapshot = snapshot_scan_files(self._st_watch)
+            self._st_proc = launch_scantuxio_process(launch)
+        except Exception as e:
+            self._set_acquire_status(
+                f"ScanTuxio konnte nicht gestartet werden: {e}\n\n"
+                + missing_scantuxio_hint_de()
+            )
+            return
+        self._set_acquire_status(
+            f"ScanTuxio geöffnet ({inst.root}).\n"
+            f"Scan dort speichern, dann „Scan übernehmen“.\n"
+            f"Übergabeordner: {handshake}"
+        )
+        self._st_timer.start()
+
+    def _poll_scantuxio_output(self) -> None:
+        if not self._st_watch:
+            return
+        found = self._collect_scantuxio_output(quiet=True)
+        if found:
+            return
+        if self._st_proc is not None:
+            try:
+                rc = self._st_proc.poll()
+            except Exception:
+                rc = 0
+            if rc is not None:
+                self._st_timer.stop()
+                self._collect_scantuxio_output(quiet=False)
+
+    def _collect_scantuxio_output(self, quiet: bool = False) -> bool:
+        handshake = self._st_handshake
+        roots = list(self._st_watch or [])
+        if handshake and handshake not in roots:
+            roots.append(handshake)
+        if not roots:
+            if not quiet:
+                self._set_acquire_status(
+                    "Kein ScanTuxio-Übergabeordner. Bitte ScanTuxio öffnen oder Bilder importieren."
+                )
+            return False
+        snap = self._st_snapshot or {}
+        paths = list(read_handoff_manifest(handshake) if handshake else [])
+        paths.extend(collect_new_scan_files(roots, snap))
+        # dedupe
+        seen: set[str] = set()
+        uniq: list[Path] = []
+        for p in paths:
+            try:
+                key = str(p.resolve())
+            except OSError:
+                key = str(p)
+            if key in seen:
+                continue
+            seen.add(key)
+            uniq.append(p)
+        if not uniq:
+            if not quiet:
+                self._set_acquire_status(
+                    "Noch kein neues Scan-Dokument gefunden.\n"
+                    "In ScanTuxio als PDF/Bild speichern, dann „Scan übernehmen“.\n"
+                    "Ohne ScanTuxio: „Bilder importieren…“."
+                )
+            return False
+        expanded = expand_scan_import_paths(uniq)
+        if not expanded:
+            expanded = import_image_paths(uniq)
+        if not expanded:
+            if not quiet:
+                self._set_acquire_status(
+                    "ScanTuxio-Datei gefunden, aber nicht als Bild/PDF lesbar. "
+                    "Bitte Bilder importieren."
+                )
+            return False
+        self._pending_images.extend(expanded)
+        self._update_pending_label()
+        self._st_snapshot = snapshot_scan_files(roots)
+        self._set_acquire_status(
+            f"{len(expanded)} Scan-Seite(n) übernommen. "
+            "„In Dokument einfügen“ oder weiter scannen."
+        )
+        return True
+
     def _acquire_scan(self) -> None:
         scanner = self.selected_scanner()
         if scanner is None and self._discovery.scanners:
-            QMessageBox.information(
-                self,
-                "Scanner",
+            self._set_acquire_status(
                 "Bitte einen Scanner in der Liste auswählen "
-                "(oder Bilder importieren).",
+                "(oder ScanTuxio öffnen / Bilder importieren)."
             )
             return
         if scanner is None and not self._discovery.scanners:
-            QMessageBox.information(
-                self,
-                "Scanner",
+            self._set_acquire_status(
                 "Kein Scanner erkannt.\n\n"
                 + WINDOWS_SCANNER_DRIVER_HINT_DE
                 + "\n\n"
-                + WINDOWS_SCAN_DEPS_HINT,
+                + missing_scantuxio_hint_de()
             )
             return
         try:
             paths = acquire_from_scanner(scanner)
         except Exception as e:
-            QMessageBox.warning(
-                self,
-                "Scan",
-                f"{e}\n\nDie App bleibt stabil — bitte Bilder importieren "
-                "oder Treiber prüfen.\n\n" + WINDOWS_SCAN_DEPS_HINT,
+            self._set_acquire_status(
+                f"{e}\n\nDie App bleibt stabil — bitte ScanTuxio öffnen "
+                "oder Bilder importieren.\n\n" + WINDOWS_SCAN_DEPS_HINT
             )
             return
         if not paths:
             detail = last_acquire_error()
-            body = "Kein Bild vom Scanner erhalten.\n\n"
-            if detail:
-                body += f"Detail: {detail}\n\n"
-            body += (
-                "Hinweis: Auf Windows wird WIA genutzt; ohne unterstütztes Gerät "
-                "bitte „Bilder importieren…“ verwenden.\n\n"
-                + WINDOWS_SCAN_DEPS_HINT
-            )
-            QMessageBox.information(self, "Scan", body)
+            if "ausgelastet" in (detail or "").lower() or "busy" in (detail or "").lower():
+                body = wia_busy_user_hint_de(detail)
+            else:
+                body = "Kein Bild vom Scanner erhalten.\n\n"
+                if detail:
+                    body += f"Detail: {detail}\n\n"
+                body += (
+                    "Primär: ScanTuxio-Hauptfenster („ScanTuxio öffnen“).\n"
+                    "Ohne Gerät: „Bilder importieren…“.\n\n"
+                    + WINDOWS_SCAN_DEPS_HINT
+                )
+            self._set_acquire_status(body)
             return
         self._pending_images.extend(paths)
         self._update_pending_label()

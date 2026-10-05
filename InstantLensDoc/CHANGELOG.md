@@ -1,3 +1,7 @@
+## 2.6.46 - ScanTuxio-UI als Scan-Einstieg + WIA-Busy-Hinweis
+
+Patch nach **2.6.45** (Open-Preflight async): Nutzer-Scan zeigte „Kein Bild vom Scanner“ / „Das WIA-Gerät ist ausgelastet“ in einem zweiten Modal. Primär startet **Geräte → Scanner / Scannen…** jetzt das **ScanTuxio-Hauptfenster** (`D:\AI_Temp\ScanTuxio Win`, neben ILD, `vendor\ScanTuxio`, PATH). Handshake: Übergabeordner + neue PDF/Bilder in `~\Scans`; „Scan übernehmen“ fügt Seiten ein (OCR/Word-Suite wie bisher). Fehlt ScanTuxio: DE-Hinweis mit erwartetem Pfad + Bilder importieren — ohne gestapelte Fehlerdialoge; Geräteliste + **Erneut versuchen**. WIA/NAPS2 nur sekundär; bei WIA busy andere ScanTuxio-Backends (NAPS2/TWAIN/eSCL) und Hinweis ScanTuxio / Windows Fax und Scan / vorherigen ILD-Scan schließen. Pack `InstantLensDoc-2.6.46-pack.zip`; VERSION **2.6.46**.
+
 ## 2.6.45 - PDF-Open: „PDF wird geprüft“ nie UI-blockierend
 
 Patch nach **2.6.44** (Non-PDF-Toolbar): Nutzerbericht — Open hängt bei **„PDF wird geprüft…“** auch bei kurzen PDFs. Ursache: Preflight rief synchron `inspect_pdf`/`needs_password` (PDFium-`len(doc)` / pikepdf) auf dem UI-Thread auf.

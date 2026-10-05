@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **2.6.45** |
+| Version | **2.6.46** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -33,7 +33,7 @@
 
 Skript: [sync-ild.ps1](scripts/sync-ild.ps1) — Branch `cursor/instantlensdoc-2108` (oder `-LocalPack` / Pack-Zip) nach `D:\AI_Temp\InstantLensDoc`, pip, Start. **Nutzer-Icon in `assets` wird nicht überschrieben.**
 
-**FEATURES.md lokal sync:** Nach Sync liegt `FEATURES.md` lokal im App-Ordner (`D:\AI_Temp\InstantLensDoc\FEATURES.md`); About/Stubs öffnen diese lokale Datei — Version **2.6.45**.
+**FEATURES.md lokal sync:** Nach Sync liegt `FEATURES.md` lokal im App-Ordner (`D:\AI_Temp\InstantLensDoc\FEATURES.md`); About/Stubs öffnen diese lokale Datei — Version **2.6.46**.
 
 Ohne Start: `-NoStart` (Alias `-SkipStart`). Exit-Codes: **0** OK · **1** allgemein · **2** Git-Fehler.
 
@@ -68,7 +68,7 @@ Python-Layout-Zip (ohne PyInstaller-EXE):
 powershell -ExecutionPolicy Bypass -File .\scripts\pack-windows-runnable.ps1
 ```
 
-Installer: `.\scripts\build-windows-installer.ps1` bzw. `.\installer\build-installer.ps1` (optional `-NoKeygen`) → `dist\InstantLensDoc-Setup-2.6.43.exe`  
+Installer: `.\scripts\build-windows-installer.ps1` bzw. `.\installer\build-installer.ps1` (optional `-NoKeygen`) → `dist\InstantLensDoc-Setup-2.6.46.exe`  
 Desktop-/Keygen-Shortcuts: `.\scripts\install-ild.ps1` (Keygen wenn `run-keygen.bat` / EXE vorhanden; `-SkipKeygen`)  
 Desktop-Verknüpfung Installer: optionale Checkbox (`desktopicon`, Standard an / `checkedonce`)
 
@@ -104,6 +104,24 @@ powershell -ExecutionPolicy Bypass -File .\scripts\ild.ps1 license generate kund
 
 Anleitung: Store `docs/instantlensdoc-scripting.md` · Beispiel `examples/ild_scripting_demo.py`.
 
+## Neu in 2.6.46
+
+Patch nach **2.6.45** — Scan über ScanTuxio-Hauptfenster:
+
+- **Geräte → Scanner / Scannen…** startet ScanTuxio (`D:\AI_Temp\ScanTuxio Win` / neben ILD / vendor / PATH)
+- Scan speichern → „Scan übernehmen“ (PDF/Bilder) in ILD inkl. OCR/Word-Suite
+- Fehlt ScanTuxio: DE-Pfadhinweis + **Bilder importieren** (kein zweites Fehler-Modal)
+- WIA nur Fallback; bei „Gerät ausgelastet“ andere Backends + Hinweis ScanTuxio/WFS schließen
+- Pack: `InstantLensDoc-2.6.46-pack.zip`
+
+## Neu in 2.6.45
+
+Patch nach **2.6.44** — PDF-Open ohne UI-Hang:
+
+- Open-Preflight nur Dateigröße synchron; Passwort-Probe mit Timeout im Worker
+- Provisional page_count + Hintergrund-Refresh; erste Seite via `_ensure_page_painted`
+- Pack: `InstantLensDoc-2.6.45-pack.zip`
+
 ## Neu in 2.6.44
 
 Patch nach **2.6.43** (Speichern-unter Dokumentfilter) — Bearbeitungsleiste für Nicht-PDF:
@@ -111,7 +129,7 @@ Patch nach **2.6.43** (Speichern-unter Dokumentfilter) — Bearbeitungsleiste f�
 - **Text/DOCX/Word-Suite:** Toolbar `ildEditorToolbar` — Auswahl · Text bearbeiten · Markierungen · Unterstreichen · Fett/Kursiv · Markierungen löschen · Suchen
 - **Kein PDF-only** in der Text-Leiste (Schwärzen/Objekt/Formular bleiben PDF-Tab)
 - Tab-Wechsel PDF ↔ Text aktualisiert die passende Toolbar
-- Pack: `InstantLensDoc-2.6.45-pack.zip`
+- Pack: `InstantLensDoc-2.6.44-pack.zip`
 
 ## Neu in 2.6.43
 
