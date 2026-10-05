@@ -1273,6 +1273,66 @@ class PdfCanvas(QLabel):
         self._drag_current = None
         self._repaint_overlay()
 
+    def show_render_fallback(self, message: str = "") -> None:
+        """Sichtbarer Platzhalter statt stiller weißer Fläche — 2.6.47.
+
+        Wenn Render/Stack fehlschlägt, bleibt die zentrale Ansicht sonst weiß
+        während Schnellvorschau-Thumbs funktionieren. Hier: gelbes Banner + Text.
+        """
+        msg = (message or "Seite konnte nicht dargestellt werden.").strip()
+        # Feste Mindestgröße: sichtbar auch bei kleinem Viewport
+        w, h = 640, 420
+        try:
+            vp_w = max(int(self.width() or 0), 0)
+            vp_h = max(int(self.height() or 0), 0)
+            if vp_w >= 200:
+                w = max(w, min(vp_w, 1200))
+            if vp_h >= 200:
+                h = max(h, min(vp_h, 900))
+        except Exception:
+            pass
+        pm = QPixmap(w, h)
+        pm.fill(QColor(245, 245, 248))
+        painter = QPainter(pm)
+        try:
+            painter.fillRect(0, 0, w, 56, QColor(255, 236, 150))
+            painter.setPen(QPen(QColor(180, 120, 0), 2))
+            painter.drawRect(1, 1, w - 2, h - 2)
+            painter.setPen(QColor(120, 70, 0))
+            font = QFont()
+            font.setPointSize(12)
+            font.setBold(True)
+            painter.setFont(font)
+            painter.drawText(
+                QRectF(16, 10, w - 32, 36),
+                int(Qt.AlignLeft | Qt.AlignVCenter),
+                "Hauptansicht: Seite nicht gerendert",
+            )
+            font.setBold(False)
+            font.setPointSize(11)
+            painter.setFont(font)
+            painter.setPen(QColor(40, 40, 40))
+            body = (
+                f"{msg}\n\n"
+                "Tipp: Zoom verringern, Thumb in der Schnellvorschau erneut klicken,\n"
+                "oder Datei erneut öffnen. Statusleiste zeigt denselben Hinweis."
+            )
+            painter.drawText(
+                QRectF(24, 72, w - 48, h - 96),
+                int(Qt.AlignLeft | Qt.AlignTop | Qt.TextWordWrap),
+                body,
+            )
+        finally:
+            painter.end()
+        self._pixmap = pm
+        self._annotations = []
+        self._uri_links = []
+        self._search_rects = []
+        self._search_active = -1
+        self.setPixmap(pm)
+        self.adjustSize()
+        self.update()
+
     def _map_to_page(self, event) -> tuple[float, float] | None:
         if self._pixmap is None:
             return None
@@ -2372,6 +2432,7 @@ class PdfViewer(QWidget):
         self._shape_filled = bool(str(self._default_fill_color or "").strip())
         self._paragraph_highlight = False
         self._suppress_default_zoom = False  # Session Zoom pro Tab (0.9.2)
+        self._blank_view_fallback_active = False  # sichtbarer Render-Fail-Banner — 2.6.47
         self._search_case_sensitive = False
         self._search_whole_word = False
         self._search_regex = False
@@ -5699,6 +5760,8 @@ class PdfViewer(QWidget):
                     pass
                 self.page_changed.emit(self.page_index)
                 self.status.emit(f"{int(n)} Seiten erkannt")
+                # Thumbs/Outline an echte Seitenzahl anbinden — 2.6.47
+                self.document_changed.emit()
                 if not self._canvas_has_page_image():
                     self._ensure_page_painted(warn=False)
 
@@ -5709,21 +5772,61 @@ class PdfViewer(QWidget):
         ).start()
 
     def _canvas_has_page_image(self) -> bool:
-        """True wenn die zentrale Ansicht ein gerendertes Seitenbild trägt — 2.6.40."""
+        """True wenn die zentrale Ansicht ein gerendertes Seitenbild trägt — 2.6.40/2.6.47.
+
+        Verwirft winzige Pixmaps (<8px) und reine Fallback-Banner nicht als „OK“,
+        wenn sie als Fallback markiert sind.
+        """
         try:
+            if bool(getattr(self, "_blank_view_fallback_active", False)):
+                return False
             pm = getattr(self.canvas, "_pixmap", None)
             if pm is not None and not pm.isNull():
-                return True
+                if int(pm.width()) >= 8 and int(pm.height()) >= 8:
+                    return True
             shown = self.canvas.pixmap()
-            return bool(shown is not None and not shown.isNull())
+            if shown is not None and not shown.isNull():
+                return int(shown.width()) >= 8 and int(shown.height()) >= 8
+            return False
         except Exception:
             return False
 
+    def _show_blank_view_fallback(self, message: str | None = None) -> None:
+        """Status + sichtbarer Canvas-Hinweis statt stiller weißer Hauptansicht — 2.6.47."""
+        msg = (message or getattr(self, "_last_refresh_error", None) or "").strip()
+        if not msg:
+            msg = "Seite konnte nicht gerendert werden."
+        # Einzeiler für Statusleiste
+        one = " ".join(msg.replace("\n", " ").split())
+        if len(one) > 160:
+            one = one[:157] + "…"
+        self._blank_view_fallback_active = True
+        try:
+            self.canvas.show_render_fallback(msg)
+        except Exception:
+            pass
+        try:
+            self.status.emit(f"Hauptansicht leer: {one}")
+        except Exception:
+            pass
+        try:
+            import logging
+
+            logging.getLogger("instantlensdoc.pdf_view").warning(
+                "Hauptansicht leer (page=%s scale=%s): %s",
+                getattr(self, "page_index", "?"),
+                getattr(self, "scale", "?"),
+                one,
+            )
+        except Exception:
+            pass
+
     def _ensure_page_painted(self, *, warn: bool = True) -> bool:
-        """Aktuelle Seite in die Hauptansicht rendern; bei Fehler Zoom-Fallback — 2.6.40/2.6.45.
+        """Aktuelle Seite in die Hauptansicht rendern; bei Fehler Zoom-Fallback — 2.6.40/2.6.47.
 
         Virtual-Thumbs/Lazy-Open dürfen die zentrale Ansicht nicht leer lassen.
         Bildlastige Seiten scheitern oft bei Default-Zoom, Thumbs (kleiner Scale) nicht.
+        Bei totalem Fehlschlag: sichtbarer Canvas-Fallback + Status (nie stumm weiß).
         """
         if not self.pdf_path:
             return False
@@ -5731,15 +5834,20 @@ class PdfViewer(QWidget):
             self.show()
         except Exception:
             pass
-        if self.refresh(quiet=True):
+        self._blank_view_fallback_active = False
+        if self.refresh(quiet=True) and self._canvas_has_page_image():
             return True
         saved = float(self.scale or 1.0)
         last_err: str | None = None
-        for fb in (1.0, 0.75, 0.5, 0.35, 0.25, 0.15):
+        err0 = getattr(self, "_last_refresh_error", None)
+        if err0:
+            last_err = str(err0)
+        for fb in (1.0, 0.75, 0.5, 0.35, 0.25, 0.15, 0.10):
             if fb >= saved - 1e-6:
                 continue
             self.scale = float(fb)
-            if self.refresh(quiet=True):
+            if self.refresh(quiet=True) and self._canvas_has_page_image():
+                self._blank_view_fallback_active = False
                 self.status.emit(
                     f"Seite mit reduziertem Zoom dargestellt ({int(round(fb * 100))} %)"
                 )
@@ -5750,15 +5858,18 @@ class PdfViewer(QWidget):
                 last_err = str(err)
         self.scale = saved
         if self._canvas_has_page_image():
+            self._blank_view_fallback_active = False
             return True
-        if not warn:
-            return False
         msg = last_err or "Seite konnte nicht gerendert werden."
-        QMessageBox.warning(
-            self,
-            "PDF-Ansicht",
-            f"{msg}\n\nTipp: Zoom verringern oder Seite erneut in der Schnellvorschau wählen.",
-        )
+        self._last_refresh_error = msg
+        # Immer sichtbar melden — auch bei warn=False (Open/Thumb) — 2.6.47
+        self._show_blank_view_fallback(msg)
+        if warn:
+            QMessageBox.warning(
+                self,
+                "PDF-Ansicht",
+                f"{msg}\n\nTipp: Zoom verringern oder Seite erneut in der Schnellvorschau wählen.",
+            )
         return False
 
     def refresh(self, *, quiet: bool = False) -> bool:
@@ -5972,6 +6083,11 @@ class PdfViewer(QWidget):
             )
             self.status.emit(f"PDF: {self.pdf_path.name}{dirty}")
             self._refresh_fav_btn()
+            # Erfolg nur wenn Canvas wirklich ein Bild trägt — 2.6.47
+            self._blank_view_fallback_active = False
+            if not self._canvas_has_page_image():
+                self._last_refresh_error = "Canvas ohne Pixmap nach Render"
+                return False
             return True
         except MemoryError:
             self._last_refresh_error = (
@@ -5987,17 +6103,25 @@ class PdfViewer(QWidget):
             return False
 
     def goto_page(self, page_index: int):
-        if 0 <= page_index < self.page_count:
+        idx = int(page_index)
+        if idx < 0:
+            return
+        # Provisional page_count=1 (Fast-Open): Thumb-Jump nicht verwerfen — 2.6.47
+        if idx >= int(self.page_count or 0):
+            if self.pdf_path is None:
+                return
+            self.page_count = max(int(self.page_count or 0), idx + 1)
+        if 0 <= idx < self.page_count:
             old = self.page_index
-            self.page_index = page_index
+            self.page_index = idx
             if self._search_query:
                 self._rebuild_search_rects(keep_index=False)
             need_refresh = True
             if self._continuous_scroll and self._continuous_offsets:
-                in_window = any(p == page_index for p, _, _ in self._continuous_offsets)
+                in_window = any(p == idx for p, _, _ in self._continuous_offsets)
                 # Fenster neu, wenn Seite außerhalb oder Range sich ändern würde
                 start, end = self._continuous_page_range()
-                if in_window and start <= old < end and start <= page_index < end:
+                if in_window and start <= old < end and start <= idx < end:
                     # Nur scrollen, wenn Range gleich bleibt
                     old_start, old_end = self._continuous_offsets[0][0], self._continuous_offsets[-1][0] + 1
                     if old_start == start and old_end == end:
@@ -6005,14 +6129,14 @@ class PdfViewer(QWidget):
                         self.lbl_page.setText(
                             self.format_page_label_text(suffix=" (Scroll)")
                         )
-                        self._scroll_to_continuous_page(page_index)
+                        self._scroll_to_continuous_page(idx)
             if need_refresh:
-                # Fallback-Zoom wenn Default-Render die Hauptansicht leer lässt — 2.6.40
-                self._ensure_page_painted()
+                # Fallback-Zoom wenn Default-Render die Hauptansicht leer lässt — 2.6.40/2.6.47
+                self._ensure_page_painted(warn=False)
                 if self._continuous_scroll:
-                    self._scroll_to_continuous_page(page_index)
+                    self._scroll_to_continuous_page(idx)
             elif not self._canvas_has_page_image():
-                self._ensure_page_painted()
+                self._ensure_page_painted(warn=False)
             self.page_changed.emit(self.page_index)
 
     def prev_page(self):

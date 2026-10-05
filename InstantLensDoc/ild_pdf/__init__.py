@@ -782,4 +782,4 @@ __all__ = [
     "sections_sidecar_path_for",
 ]
 
-__version__ = "2.6.46"
+__version__ = "2.6.47"

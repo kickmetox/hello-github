@@ -10967,17 +10967,23 @@ class MainWindow(QMainWindow):
                 self._thumb_lazy_timer = None
 
     def _on_thumb_jump(self, page_index: int):
-        """Schnellvorschau-Klick: Seite in Hauptansicht zeigen (auch Virtual-Thumbs) — 2.6.40."""
+        """Schnellvorschau-Klick: Seite in Hauptansicht zeigen (auch Virtual-Thumbs) — 2.6.40/2.6.47."""
         if self.stack.currentWidget() is not self.pdf_view:
             self.stack.setCurrentWidget(self.pdf_view)
+        try:
+            self.pdf_view.show()
+        except Exception:
+            pass
         if not self.pdf_view.pdf_path:
             self._set_status("Kein PDF geladen")
             return
         idx = int(page_index)
         self.pdf_view.goto_page(idx)
-        # Falls goto short-circuited / Render fehlschlug: Hauptansicht nachziehen
-        if not self.pdf_view._canvas_has_page_image():
-            self.pdf_view._ensure_page_painted(warn=False)
+        # Immer Paint erzwingen (auch nach Continuous-Short-Circuit) — 2.6.47
+        if not self.pdf_view._ensure_page_painted(warn=False):
+            self._set_status(
+                "Hauptansicht leer — Zoom verringern oder Seite erneut wählen"
+            )
         self.sidebar.select_thumb(idx)
         self._prefetch_thumbs_around(idx, cancel=False)
 

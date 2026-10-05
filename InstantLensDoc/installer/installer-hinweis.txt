@@ -1,4 +1,9 @@
-InstantLens Doc 2.6.46 - Installation
+InstantLens Doc 2.6.47 - Installation
+
+Neu in 2.6.47:
+- Sichtbarer Fallback wenn PDF-Hauptansicht nicht rendert (Status + Banner)
+- Thumb-Klick erzwingt Seitenpaint; kein stilles Weiss mehr
+- Baut auf 2.6.46 (ScanTuxio-UI) + 2.6.45 (Open-Preflight)
 
 Neu in 2.6.46:
 - Geraete -> Scanner / Scannen startet ScanTuxio-Hauptfenster
@@ -24,20 +29,9 @@ Neu in 2.6.42:
 - TESSDATA_PREFIX = tessdata die neben tesseract.exe liegt
 - Copy-Hint in build-windows.ps1 (build-keygen)
 
-Neu in 2.6.41 (inkl. 2.6.40):
-- ScanTuxio-Port: NAPS2/eSCL/SANE/mDNS + Drucker Qt/CUPS
-- Scan-Einstiege: Menue Geraete -> Scanner / Scannen…
-  PDF -> Scannen / Import…, Toolbar Scan…, Welcome Scannen…, Ctrl+Alt+Shift+I
-- Blank PDF View: _ensure_page_painted + Thumb-Klick erzwingt Paint (2.6.40)
-- Build Guard: Pack inkl. run_instantlensdoc.py; EXE-Preflight; kleines Setup = Fehler (2.6.40)
+Start:
+1. InstantLens Doc aus dem Startmenue
+2. Oder Installationsordner: InstantLensDoc.exe / run.bat
 
-Basis 2.6.39/2.6.38:
-- Large-PDF lazy/virtual Thumbs + cancel Open
-- Scanner/Drucker Windows-Haertung (Get-Printer, WIA/PnP/TWAIN)
-
-Startmenue: Gruppe "InstantLens Doc" mit Programm, optional Keygenerator, INFO und Deinstallieren.
-Desktop-Verknuepfung: optionale Checkbox (Task "desktopicon").
-64-Bit: ArchitecturesInstallIn64BitMode=x64compatible.
-
-Build (Windows x64 + Inno Setup 6):
-  powershell -ExecutionPolicy Bypass -File .\scripts\build-windows-installer.ps1
+Keygenerator (optional): run-keygen.bat
+OCR: tesseract.exe unter vendor\tesseract oder neben der EXE (siehe INFO.md)

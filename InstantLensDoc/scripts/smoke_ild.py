@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Nightly/CI Smoke: CLI + Import-Checks für InstantLens Doc — 2.1.0–2.6.46.
+"""Nightly/CI Smoke: CLI + Import-Checks für InstantLens Doc — 2.1.0–2.6.47.
 
 Leichtgewichtig. Exit-Codes:
   0  OK  (ok=true)
@@ -14,12 +14,12 @@ Aufruf:
   python scripts/smoke_ild.py -h
 
 JSON-Schema (--json), Erfolg:
-  {"ok": true, "version": "2.6.46", "duration_ms": 1234,
+  {"ok": true, "version": "2.6.47", "duration_ms": 1234,
    "checks": ["version", "imports", "cli", "measure_diff_import", "changelog"]}
 
 JSON bei Fail: checks[] enthält Objekt mit error-Text (max 200 Zeichen, Truncate …);
 Exitcode spiegelt ok (0↔true, 1↔false) — 2.2.0:
-  {"ok": false, "version": "2.6.46", "duration_ms": 12,
+  {"ok": false, "version": "2.6.47", "duration_ms": 12,
    "checks": ["version", {"name": "imports", "error": "import x: …"}]}
 """
 
@@ -41,7 +41,7 @@ if str(ROOT) not in sys.path:
 # Headless/CI: Qt ohne Display
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-EXPECTED_VERSION = "2.6.46"
+EXPECTED_VERSION = "2.6.47"
 FAIL_ERROR_MAX_LEN = 200
 
 EXIT_OK = 0
@@ -82,7 +82,7 @@ def check_version() -> None:
         _fail(f"docs/VERSION={docs_ver!r}")
     bw = (ROOT / "build-windows.ps1").read_text(encoding="utf-8")
     if EXPECTED_VERSION not in bw or "Allow32Bit" not in bw:
-        _fail("build-windows.ps1 fehlt 2.6.46/Allow32Bit")
+        _fail("build-windows.ps1 fehlt 2.6.47/Allow32Bit")
     if not (ROOT / "scripts" / "pack-windows-runnable.py").is_file():
         _fail("scripts/pack-windows-runnable.py fehlt")
     if not (ROOT / "run-keygen.bat").is_file():
@@ -391,6 +391,16 @@ def check_version() -> None:
         # nested modal for empty scan should be replaced by status
         pass
     _ok("2.6.46 scantuxio-ui-launch/wia-busy-fallback: OK")
+    # 2.6.47: sichtbarer Blank-View-Fallback
+    if "show_render_fallback" not in pv or "_show_blank_view_fallback" not in pv:
+        _fail("pdf_view fehlt show_render_fallback / _show_blank_view_fallback (2.6.47)")
+    if "_blank_view_fallback_active" not in pv:
+        _fail("pdf_view fehlt _blank_view_fallback_active (2.6.47)")
+    if "Canvas ohne Pixmap nach Render" not in pv:
+        _fail("pdf_view.refresh fehlt Pixmap-Verify (2.6.47)")
+    if "_ensure_page_painted(warn=False)" not in mw:
+        _fail("main_window._on_thumb_jump erzwingt Paint nicht (2.6.47)")
+    _ok("2.6.47 blank-view-visible-fallback/thumb-force-paint: OK")
 
 
 def check_imports(*, with_qt: bool) -> None:
@@ -1284,6 +1294,8 @@ def check_measure_and_diff() -> None:
 
 def check_changelog() -> None:
     cl = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    if "## 2.6.47" not in cl:
+        _fail("CHANGELOG fehlt ## 2.6.47")
     if "## 2.6.46" not in cl:
         _fail("CHANGELOG fehlt ## 2.6.46")
     if "## 2.6.45" not in cl:
@@ -1890,6 +1902,14 @@ def check_changelog() -> None:
         and "2.6.46" not in cl
     ):
         _fail("CHANGELOG 2.6.46 fehlt ScanTuxio-UI/WIA-Busy-Hinweis")
+
+    if (
+        "show_render_fallback" not in cl
+        and "Render-Fallback" not in cl
+        and "stilles Weiß" not in cl
+        and "2.6.47" not in cl
+    ):
+        _fail("CHANGELOG 2.6.47 fehlt sichtbarer Render-Fallback-Hinweis")
     if (
         "Silbentrennung" not in cl
         and "Hyphen" not in cl
@@ -2213,6 +2233,12 @@ def check_changelog() -> None:
         and "scantuxio_ui" not in feat
     ):
         _fail("FEATURES.md fehlt 2.6.46 ScanTuxio-UI-Hinweis")
+    if "2.6.47" not in feat or (
+        "Render-Fallback" not in feat
+        and "show_render_fallback" not in feat
+        and "sichtbarer" not in feat
+    ):
+        _fail("FEATURES.md fehlt 2.6.47 Render-Fallback-Hinweis")
     if "2.6.44" not in feat or (
         "ildEditorToolbar" not in feat
         and "Markierungen" not in feat
@@ -2670,11 +2696,11 @@ Exit-Codes:
 Laufzeit: am Ende als „Laufzeit: N ms“ (oder duration_ms im JSON).
 
 Beispiel --json (Erfolg):
-  {"ok": true, "version": "2.6.46", "duration_ms": 1234,
+  {"ok": true, "version": "2.6.47", "duration_ms": 1234,
    "checks": ["version", "imports", "cli", "measure_diff_import", "changelog"]}
 
 Beispiel --json (Fail):
-  {"ok": false, "version": "2.6.46", "duration_ms": 12,
+  {"ok": false, "version": "2.6.47", "duration_ms": 12,
    "checks": ["version", {"name": "imports", "error": "import x: …"}]}
 """.rstrip()
     )

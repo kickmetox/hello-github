@@ -104,6 +104,15 @@ powershell -ExecutionPolicy Bypass -File .\scripts\ild.ps1 license generate kund
 
 Anleitung: Store `docs/instantlensdoc-scripting.md` · Beispiel `examples/ild_scripting_demo.py`.
 
+## Neu in 2.6.47
+
+Patch nach **2.6.46** (ScanTuxio-UI) — Rest: stilles Weiß bei Render-Fail:
+
+- Sichtbarer Canvas-Fallback (`show_render_fallback`) + Status/Log statt leerer weißer Viewport
+- `refresh` nur erfolgreich mit echtem Pixmap; Thumb-Klick erzwingt Paint
+- Provisional `page_count` blockiert Seitenwechsel nicht; Thumbs nach BG-Count-Refresh
+- Pack: `InstantLensDoc-2.6.47-pack.zip`
+
 ## Neu in 2.6.46
 
 Patch nach **2.6.45** — Scan über ScanTuxio-Hauptfenster:
@@ -121,6 +130,7 @@ Patch nach **2.6.44** — PDF-Open ohne UI-Hang:
 - Open-Preflight nur Dateigröße synchron; Passwort-Probe mit Timeout im Worker
 - Provisional page_count + Hintergrund-Refresh; erste Seite via `_ensure_page_painted`
 - Pack: `InstantLensDoc-2.6.45-pack.zip`
+
 
 ## Neu in 2.6.44
 
