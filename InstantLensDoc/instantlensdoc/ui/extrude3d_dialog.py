@@ -112,7 +112,7 @@ class Extrude3DDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setObjectName("extrude3dDialog")
-        self.setWindowTitle("3D-Extrusion (begrenzt)")
+        self.setWindowTitle("3D-Extrusion")
         self.setModal(True)
         self.resize(560, 420)
 

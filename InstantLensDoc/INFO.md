@@ -1,5 +1,9 @@
 # InstantLens Doc — Kurzinfo
 
+### 2.6.54 — DTP-Layout-Modus & geplante Funktionen
+
+Ansicht → **Layout-Modus** (Ctrl+Alt+L, Ribbon DTP): echter DTP-Canvas mit Rahmen, Lineal, Raster, Musterseiten, Buchformaten. Extras ohne „(geplant)“: KI-Assistent (auch offline), Formerkennung, Variable Fonts, Envelope Distort, 3D-Extrusion, PAdES-B/QES-Hinweis, Stylus, Plugin-Hooks (`on_open`/`on_save`/`on_scan`). VERSION-Pack bleibt 2.6.53 in diesem Lauf.
+
 ### 2.6.53 — PDFium „Data format error“, DOCX-Umbruch/-Schrift, Seitenlayout
 
 PDF-Öffnen mit Fallback-Kette **Bytes → Pfad → pikepdf-Reparatur** (`ild_pdf/pdfium_open.py`), PDFium nur noch im GUI-Thread (Worker-Threads korrumpierten den Parser), Banner mit Schritt/Exception/pypdfium2-Version. DOCX bricht immer am Spaltenrand um, proportionale Schrift aus dem Dokument, Run-Schriftarten. **Seitenlayout**-Dialog (Ansicht → Seitenlayout…): DTP-Presets, Ränder, Ausrichtung, Satzspiegel → Editor rendert in Seitenbreite. Test `scripts/test_ui_audit_2653.py`. Pack `InstantLensDoc-2.6.53-pack.zip`.

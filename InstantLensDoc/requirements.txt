@@ -14,4 +14,7 @@ pytesseract>=0.3.10
 #   Fallback: winget install UB-Mannheim.TesseractOCR  (deu+eng)
 #            C:\Program Files\Tesseract-OCR\tesseract.exe
 #   Scan: WIA-Treiber (Windows) bzw. SANE scanimage (Linux); sonst Bildimport
-# Optional: chardet>=5.0.0  — Encoding-Auto-Erkennung (BOM reicht ohne chardet)
+# Optional DTP/Features 2.6.54 (Windows-Build sollte mitpacken)
+fonttools>=4.50.0
+pyhanko>=0.25.0
+pytest>=8.0.0

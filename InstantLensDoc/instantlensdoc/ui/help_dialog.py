@@ -142,7 +142,15 @@ HELP_HTML = f"""
 <li><b>Einfügen → Tabelle / Daten importieren</b>: Tabellen erstellen, formatieren, sortieren; CSV/Excel — <b>2.6.14</b></li>
 <li><b>Datei → Exportieren</b>: DOCX, XLSX, PDF, TXT, RTF, HTML, JPG — <b>2.6.14</b></li>
 <li><b>PDF → Kopf-/Fußzeile</b>: Seitenzahlen, Titel, Ersteller/Autor (<code>{{title}}</code>/<code>{{author}}</code>/<code>{{creator}}</code>) — <b>2.6.11</b></li>
-<li><b>Seitenformate</b>: US Letter, DIN-A, Buchformate (Taschenbuch/Roman/Sachbuch/Quadrat…) — <b>2.6.11</b></li>
+<li><b>Ansicht → Layout-Modus</b> (Ctrl+Alt+L): DTP-Canvas (QGraphicsScene) mit Textrahmen, Bild-/Formrahmen,
+    Verkettung, Lineal (Guides ziehen), Raster/Snap, Spalten, Satzspiegel, Bleed, Musterseiten (Kopf/Fuß),
+    Ebenen, Formatvorlagen, Envelope Distort, 3D-Extrusion, drucksensitivem Stift. Export als Vektor-PDF
+    (QPdfWriter, nicht ild_pdf-Writer), DOCX und ODT. Ribbon-Tab <b>DTP</b> (Alt+8). — <b>2.6.54</b></li>
+<li><b>Extras → KI-Assistent</b>: Zusammenfassen, umformulieren, übersetzen, Inhaltsverzeichnis vorschlagen.
+    OpenAI-kompatibler Endpoint + Schlüssel in Einstellungen; ohne Schlüssel Offline-Modus. — <b>2.6.54</b></li>
+<li><b>Extras → Intelligente Formerkennung / Variable Fonts / Envelope Distort / 3D-Extrusion / E-Signatur PAdES</b>:
+    keine „(geplant)“-Platzhalter. PAdES-B mit PKCS#12; QES nur mit QTSP-Zertifikat. — <b>2.6.54</b></li>
+<li><b>Seitenformate</b>: US Letter, DIN-A, Buchformate (Taschenbuch/Roman/Sachbuch/Quadrat…) — <b>2.6.11</b> / Layout-Modus <b>2.6.54</b></li>
 <li><b>Bearbeiten → Gehe zu Zeile / Seite</b> (Ctrl+G): Editor → Zeile; PDF → Seite (auch PDF → Gehe zu Seite…, Ctrl+Shift+G)</li>
 <li><b>Datei → Tab duplizieren</b> (Ctrl+Alt+Shift+T): Editor-Inhalt als neues Dokument klonen — 1.4.5;
     <b>Ansicht → Theme zyklisch</b> (Ctrl+Shift+T): System→Hell→Dunkel→System; Status-Toast „Theme: …“;

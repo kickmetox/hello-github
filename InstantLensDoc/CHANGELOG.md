@@ -1,3 +1,16 @@
+## 2.6.54 - DTP-Layout-Modus & geplante Extras (Code; Pack folgt)
+
+Neuer **Layout-Modus** und Umsetzung der Extras-Einträge, die bisher `(geplant)` / `(Hinweis)` / `(begrenzt)` waren. **VERSION.txt bleibt 2.6.53** in diesem Lauf (kein Pack).
+
+- **DTP-Canvas** `instantlensdoc/dtp/`: Seiten-/Musterseitenmodell, Textrahmen/Bildrahmen/Formen frei platzierbar, Verkettung, Lineal mit ziehbaren Guides, Raster/Snap, Spalten/Stege, Bleed/Satzspiegel, Align/Distribute, Ebenen, Absatz-/Objektstile, Buchpresets (Taschenbuch/A5/Roman/Sachbuch/A4/Quadrat). Ribbon-Tab **DTP**, Ansicht → **Layout-Modus**.
+- **Export:** Vektor-PDF über **QPdfWriter/QPainter** (nicht `ild_pdf`-Writer), plus DOCX/ODT.
+- **KI-Assistent:** OpenAI-kompatibler Endpoint + Schlüssel in Einstellungen; ohne Schlüssel Offline-Modus.
+- **Formerkennung:** Tinte → Rechteck/Ellipse/Linie/Pfeil/Dreieck; Hook `recognize_ink_as_shape` für die Annotationsschicht.
+- **Variable Fonts, Envelope Distort, 3D-Extrusion, Stylus (QTabletEvent)** auf dem DTP-Canvas.
+- **PAdES-B** (`features/pades.py`, pyhanko) mit sichtbarem Widget + Validierung; QES-Hinweis (QTSP).
+- **Plugin-Hooks:** Aliase `on_open` / `on_save` / `on_scan`, Menü-Plugins, Beispiel `examples/ild_dtp_sample_plugin.py`.
+- Tests: `tests/test_dtp_2654.py`, `tests/test_features_2654.py` (offscreen).
+
 ## 2.6.53 - PDFium „Data format error“ (Windows), DOCX-Umbruch/-Schrift, Seitenlayout
 
 Nach dem Toolbar-Fix 2.6.52 wurde der eigentliche Ladefehler in der Hauptansicht sichtbar: `PDF-Öffnung fehlgeschlagen: Failed to load document (PDFium: Data format error)` — obwohl Textsuche/pikepdf dieselbe Datei lesen. Außerdem DOCX überbreit (eine Zeile pro Absatz, horizontaler Scroll) und Fließtext in Editor-Monospace. End-to-End-Test `scripts/test_ui_audit_2653.py` (offscreen) reproduziert alle Punkte.

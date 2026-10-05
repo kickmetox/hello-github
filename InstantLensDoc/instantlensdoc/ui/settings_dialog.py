@@ -1889,6 +1889,28 @@ class SettingsDialog(QDialog):
 
         layout.addLayout(form)
 
+        ki_group = QGroupBox("KI-Assistent (OpenAI-kompatibel)")
+        ki_group.setObjectName("kiSettingsGroup")
+        ki_form = QFormLayout(ki_group)
+        from instantlensdoc.features.ki_assistant import get_ki_settings
+
+        _ki = get_ki_settings()
+        self.ki_endpoint = QLineEdit(_ki.get("endpoint") or "")
+        self.ki_endpoint.setObjectName("kiEndpointSetting")
+        self.ki_endpoint.setPlaceholderText("https://api.openai.com/v1")
+        ki_form.addRow("Endpoint-URL", self.ki_endpoint)
+        self.ki_api_key = QLineEdit(_ki.get("api_key") or "")
+        self.ki_api_key.setEchoMode(QLineEdit.Password)
+        self.ki_api_key.setObjectName("kiApiKeySetting")
+        ki_form.addRow("API-Schlüssel", self.ki_api_key)
+        self.ki_model = QLineEdit(_ki.get("model") or "gpt-4o-mini")
+        self.ki_model.setObjectName("kiModelSetting")
+        ki_form.addRow("Modell", self.ki_model)
+        ki_hint = QLabel("Ohne Schlüssel: Offline-Modus (Zusammenfassen/Keywords/Übersetzungsliste).")
+        ki_hint.setWordWrap(True)
+        ki_form.addRow(ki_hint)
+        layout.addWidget(ki_group)
+
         tb_group = QGroupBox("PDF-Toolbar — Gruppen ein-/ausblenden")
         tb_layout = QVBoxLayout(tb_group)
         self._toolbar_group_checks: dict[str, QCheckBox] = {}
@@ -2093,7 +2115,7 @@ class SettingsDialog(QDialog):
         v.addLayout(link_row)
 
         rows = [
-            ("KI-Assistent", "ki", "Stub · Coming soon · keine Aktion"),
+            ("KI-Assistent", "ki", "Produktiv 2.6.54 · Endpoint + Offline-Fallback"),
             (
                 "Gemeinsames Review / Cloud-Ordner",
                 "cloud",
@@ -2102,22 +2124,22 @@ class SettingsDialog(QDialog):
             (
                 "Stylus / Palm Rejection",
                 "stylus",
-                "Produktiv 2.6.27 · Druck + Palm-Rejection",
+                "Produktiv 2.6.54 · DTP-Canvas QTabletEvent + PDF-Freihand",
             ),
             (
                 "3D-Extrusion",
                 "extrude3d",
-                "Produktiv 2.6.27 · Limited Viewer (kein Mesh/OpenGL)",
+                "Produktiv 2.6.54 · DTP-Canvas Extrusion (kein Mesh/OpenGL)",
             ),
             (
                 "Plugin-Hooks",
                 "plugins",
-                "Produktiv 2.6.27 · User-Skripte open/save/export/ocr",
+                "Produktiv 2.6.54 · on_open/on_save/on_scan + Menü-Plugins",
             ),
             (
                 "Document Outline Vorlesen",
                 "outline_read",
-                "Stub · TTS geplant · Pane produktiv 2.6.27",
+                "Nicht im Menü · kein TTS; Outline-Pane produktiv",
             ),
             (
                 "Telemetrie",
@@ -4262,6 +4284,17 @@ class SettingsDialog(QDialog):
                 "export_image_max_edge": int(self.max_edge.value()),
             }
         )
+        if hasattr(self, "ki_endpoint"):
+            try:
+                from instantlensdoc.features.ki_assistant import set_ki_settings
+
+                set_ki_settings(
+                    endpoint=self.ki_endpoint.text(),
+                    api_key=self.ki_api_key.text(),
+                    model=self.ki_model.text(),
+                )
+            except Exception:
+                pass
         batch = self.batch_dir.text().strip()
         if batch:
             set_batch_output_dir(batch)

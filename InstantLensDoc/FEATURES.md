@@ -1,5 +1,9 @@
 # InstantLens Doc — Features
 
+### 2.6.54 — DTP-Layout-Modus & geplante Extras
+
+Neuer **Layout-Modus** (`instantlensdoc/dtp/`): QGraphicsScene-Canvas, Musterseiten, Textrahmen/Bildrahmen frei platzierbar mit Raster-/Guide-Snap, Verkettung, Lineale, Spalten, Bleed, Align/Distribute, Ebenen, Formatvorlagen, Buchpresets, Envelope Distort, 3D-Extrusion, Stylus. PDF-Export über **QPdfWriter** (nicht `ild_pdf`-Writer). **KI-Assistent** (Endpoint + Offline), **Formerkennung**, **Variable Fonts**, **PAdES-B**. Menü ohne „(geplant)/(Hinweis)/(begrenzt)“. Tests `tests/test_dtp_2654.py`. Version bleibt 2.6.53 bis zum nächsten Pack.
+
 ### 2.6.53 — PDFium „Data format error“, DOCX-Umbruch/-Schrift, Seitenlayout
 
 `ild_pdf/pdfium_open.open_pdfium`: Fallback-Kette Bytes → str-Pfad → pikepdf-Reparatur, Bytes-Cache, `PDFIUM_LOCK`, `pdfium_version_info()`; Worker-Threads ohne PDFium (Passwort-Probe/Seitenanzahl nur pikepdf); Banner mit Schritt-Diagnose; Packaging `pypdfium2_raw`/`pikepdf` + Build-Guard; `pypdfium2==5.14.0`. Editor: Rich-Dokumente erzwingen Umbruch, proportionale Standardschrift aus DOCX, Run-Fonts Roundtrip. **Seitenlayout** (`core/editor_page_layout.py`, `ui/page_layout_dialog.py`): DTP-Presets, Hoch/Quer, Ränder, Satzspiegel, Geltung; `QTextDocument.pageSize` + zentrierte Textspalte. Test `scripts/test_ui_audit_2653.py`. Pack `InstantLensDoc-2.6.53-pack.zip`.
@@ -265,17 +269,17 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | Layout-Erhaltung (Scan→edit) | teilweise | Layout-OCR Sidecars **2.6.3**; Inline-Edit Reflow **2.6.4**; OCR→Word-Suite Handoff **2.6.15** (kein volles natives Rewrite) |
 | Freihand | fertig | Maus-Polyline (`ink`) Sidecar `points` + Undo; Toolbar „Freihand“ — **2.2.0**; **Strichstärke/Farbe · letzter Strich löschen · Glätten optional** — **2.2.1**; **Glättungsstärke leicht/mittel/stark · Undo nach Glätten eigener Stack-Eintrag** — **2.2.2**; **Redo nach Glätten ok · Status „Glättung angewandt“** — **2.2.3**; **Status-Toast Dauer Settings · A11y Announcement** — **2.2.4**; **Toast-Klick fokussiert Ink-Tool · Announcement wie OCR** — **2.2.5** (Stylus-Druck 2.6.28) |
 | Dokument-Historie (ildhist-v1) | fertig | Lokale `*.ildhist.json` pro PDF; Zeitstempel; Menü PDF → Dokument-Historie… — **2.2.0**; Panel **letzte 50 · Filter Aktionstyp · Export JSON** — **2.2.1**; **Doppelklick → Seite · Clear mit Bestätigung** — **2.2.2**; **Clear optional nur Filter · Export gefilterte Sicht** — **2.2.3**; **Clear-Zähler „N Einträge entfernt“ · Undo Clear (Session) bzw. Hinweis** — **2.2.4**; **Redo nach Undo Clear · klarer DE-Hinweis ohne Undo** — **2.2.5** |
-| KI-Assistent | Stub | Freier Chat unverändert Stub / „Geplant“; **isolierte Dokument-Wizards** separat fertig — **2.6.16**; Settings-Seite „Stubs“ A–Z · keine Aktion · FEATURES-Statushinweis · Doppelklick Info Kurzbeschreibung+Badge „Geplant“·Esc · Plugin-Hooks **nicht produktiv** **1.9.5** |
-| Signieren (rechtssicher) | fertig | SES/AES produktiv; QES-Import + Trust-Pfad `verify_trust_path` / `eidas_trust_info` (ohne bezahlte TSA) — **2.6.28** (Basis **2.6.22**) |
+| KI-Assistent | fertig | OpenAI-kompatibler Endpoint + Offline-Fallback (Zusammenfassen/Umformulieren/Übersetzen/TOC) — **2.6.54** |
+| Signieren (rechtssicher) | fertig | PAdES-B (PKCS#12, sichtbares Widget, Validierung) — **2.6.54**; SES/AES-Sidecar bleibt; QES nur mit QTSP-Zertifikat |
 | Cloud-Sync | fertig | Ersetzt durch **Gemeinsames Review** (Freigabeordner + optionaler Endpoint) — **2.6.23**; kein gehosteter Cloud-Dienst |
-| Text on Path / Text zu Pfaden | geplant | |
-| Envelope Distort / Text Wrap / Area Type | Stub/geplant | |
-| Schnittmasken | geplant | |
-| Füllungen / Live-Effekte | geplant | |
-| 3D-Extrusion | fertig (begrenzt) | Limited Viewer: isometrische Extrusion Rechteck/Ellipse/Dreieck; kein Mesh/OpenGL — **2.6.28** |
-| Variable Fonts (voll) | Stub | |
-| Glyphen-Palette | geplant | |
-| Stylus / Palm Rejection | fertig | Tablet-Stift Druck→Strichstärke · Palm-Rejection · sonst Freihand — **2.6.28** |
-| Intelligente Formerkennung | Stub | Menü „Geplant“ 0.9.7 |
+| Text on Path / Text zu Pfaden | geplant | nicht im Extras-Menü |
+| Envelope Distort / Text Wrap / Area Type | fertig | Envelope 4-Punkt auf DTP-Canvas — **2.6.54**; Textumfluss im DTP-Modell |
+| Schnittmasken | geplant | nicht im Extras-Menü |
+| Füllungen / Live-Effekte | geplant | nicht im Extras-Menü |
+| 3D-Extrusion | fertig | DTP-Canvas Extrusion (Tiefe/Winkel/Shading) — **2.6.54**; kein Mesh/OpenGL |
+| Variable Fonts (voll) | fertig | fvar-Achsen + Qt wght/wdth/slnt, DTP-Textrahmen — **2.6.54** |
+| Glyphen-Palette | geplant | nicht im Extras-Menü |
+| Stylus / Palm Rejection | fertig | QTabletEvent auf DTP-Canvas + PDF-Freihand — **2.6.54** / **2.6.28** |
+| Intelligente Formerkennung | fertig | Tinte → Rechteck/Ellipse/Linie/Pfeil/Dreieck; Hook `recognize_ink_as_shape` — **2.6.54** |
 
-Nicht behauptet als fertig: KI (freier Chat), Outline-TTS, volle 3D-Engine, Marketplace-Plugins. Live **2.6.53** (Audit **2.6.52/2.6.53**, DOCX **2.6.49**): Stylus, Outline-Pane, Hooks, Telemetrie (lokal), 3D-Limited-Viewer. Cloud-Review: Freigabeordner/Endpoint **2.6.23**.
+Nicht behauptet als fertig: Outline-TTS (kein Menüeintrag), volle 3D-Engine, Marketplace-Plugins, Glyphen-Palette/Text-on-Path. Live **2.6.54** DTP-Layout-Modus + KI/Formerkennung/Variable Fonts/Envelope/PAdES.

@@ -46,6 +46,7 @@ KNOWN_EVENTS: tuple[str, ...] = (
     "document.exported",
     "ocr.finished",
     "annotation.changed",
+    "document.scanned",
 )
 
 EVENT_DESCRIPTIONS: dict[str, str] = {
@@ -55,7 +56,17 @@ EVENT_DESCRIPTIONS: dict[str, str] = {
     "document.exported": "Export abgeschlossen",
     "ocr.finished": "OCR-Lauf beendet",
     "annotation.changed": "Sidecar-Annotation geändert",
+    "document.scanned": "Scan importiert (Hook-Punkt on_scan)",
 }
+
+# Skript-Doku-Aliase: on_open / on_save / on_scan
+_EVENT_HANDLER_ALIASES: dict[str, tuple[str, ...]] = {
+    "document.opened": ("on_document_opened", "on_open"),
+    "document.saved": ("on_document_saved", "on_save"),
+    "document.scanned": ("on_document_scanned", "on_scan"),
+}
+
+_menu_plugins: list[dict] = []
 
 Listener = Callable[..., Any]
 
@@ -190,6 +201,17 @@ def _load_python_hook(path: Path) -> dict[str, Any]:
             fn = getattr(mod, _handler_name(ev), None)
             if callable(fn):
                 handlers.append(_handler_name(ev))
+        for alias in ("on_open", "on_save", "on_scan"):
+            if callable(getattr(mod, alias, None)) and alias not in handlers:
+                handlers.append(alias)
+        # optionale Menü-Registration: register() / register_menu_plugins()
+        registrar = getattr(mod, "register", None) or getattr(mod, "register_menu_plugins", None)
+        if callable(registrar):
+            try:
+                registrar()
+                handlers.append("register")
+            except Exception:
+                pass
         info["handlers"] = handlers
         info["ok"] = True
         info["_module"] = mod
@@ -201,7 +223,10 @@ def _load_python_hook(path: Path) -> dict[str, Any]:
 
 def _invoke_loaded_handlers(event: str, payload: dict[str, Any]) -> int:
     n = 0
+    names = list(_EVENT_HANDLER_ALIASES.get(str(event), ()))
     hname = _handler_name(event)
+    if hname not in names:
+        names.insert(0, hname)
     for rec in list(_loaded_hooks):
         if not rec.get("ok") or rec.get("kind") != "python":
             continue
@@ -209,15 +234,18 @@ def _invoke_loaded_handlers(event: str, payload: dict[str, Any]) -> int:
         if mod is None:
             continue
         try:
-            specific = getattr(mod, hname, None)
-            if callable(specific):
-                specific(**payload)
-                n += 1
+            called = False
+            for nm in names:
+                specific = getattr(mod, nm, None)
+                if callable(specific):
+                    specific(**payload)
+                    n += 1
+                    called = True
             generic = getattr(mod, "_ild_generic_wrap", None)
             if callable(generic):
                 generic(event, payload)
                 n += 1
-            elif callable(getattr(mod, "on_event", None)) and generic is None:
+            elif callable(getattr(mod, "on_event", None)) and generic is None and not called:
                 getattr(mod, "on_event")(event, **payload)
                 n += 1
         except Exception:
@@ -344,6 +372,16 @@ def on_document_exported(**payload):
     pass
 
 def on_ocr_finished(**payload):
+    pass
+
+def on_open(**payload):
+    # Alias document.opened
+    pass
+
+def on_save(**payload):
+    pass
+
+def on_scan(**payload):
     pass
 
 def on_event(event, **payload):

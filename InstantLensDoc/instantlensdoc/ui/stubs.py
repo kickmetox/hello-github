@@ -17,7 +17,10 @@ from instantlensdoc import __version__
 from instantlensdoc.core.i18n import get_lang, tr
 
 PLANNED = {
-    "ki": f"KI-Assistent — Stub {__version__} (Coming soon)",
+    "ki": (
+        f"KI-Assistent — {__version__} produktiv: OpenAI-kompatibler Endpoint "
+        "plus Offline-Fallback (Zusammenfassen/Umformulieren/Übersetzen/TOC)"
+    ),
     "cloud": (
         f"Gemeinsames Review / Cloud-Ordner — {__version__} produktiv: "
         "Freigabeordner-Sync + optionaler HTTP-Endpoint; Notizen/Markierungen/"
@@ -30,7 +33,10 @@ PLANNED = {
         "Tablet-Stift mit Druck→Strichstärke; Palm-Rejection-Heuristik; "
         "ohne Druck = verbesserte Freihand-Integration"
     ),
-    "shapes_ai": f"Intelligente Formerkennung — Stub {__version__}",
+    "shapes_ai": (
+        f"Intelligente Formerkennung — {__version__} produktiv: "
+        "Tinte → Rechteck/Ellipse/Linie/Pfeil/Dreieck (DTP + Hook für Annotationen)"
+    ),
     "extrude3d": (
         f"3D-Extrusion — {__version__} Limited Viewer: isometrische Extrusion "
         "einfacher Formen (kein Mesh-Import, kein OpenGL)"
@@ -48,17 +54,20 @@ PLANNED = {
         "(Toggle default disabled), kein Netzwerk, kein PII, keine Datenübertragung "
         "— nur diagnostics.jsonl; Stubs öffnen · Esc · Fokus · warum lokal"
     ),
-    "varfonts": "Variable Fonts (voll) — geplant",
-    "envelope": "Envelope Distort (voll) — geplant",
+    "varfonts": (
+        f"Variable Fonts — {__version__} produktiv: fvar-Achsen + Qt wght/wdth/slnt"
+    ),
+    "envelope": (
+        f"Envelope Distort — {__version__} produktiv: 4-Punkt-Bilinear-Warp auf DTP-Rahmen"
+    ),
     "esign": (
-        f"E-Signatur QES/QTSP-Trust — {__version__}: "
-        "AES/SES produktiv; Trust-Pfad (verify_trust_path / eidas_trust_info) "
-        "ohne bezahlte TSA; volle QES/Zeitstempel bleibt QTSP"
+        f"E-Signatur PAdES-B — {__version__}: PKCS#12, sichtbares Widget, "
+        "Validierung; QES nur mit QTSP-Zertifikat"
     ),
 }
 
 PLANNED_EN = {
-    "ki": f"AI assistant — stub {__version__} (Coming soon)",
+    "ki": f"AI assistant — {__version__} live: OpenAI-compatible endpoint + offline fallback",
     "cloud": (
         f"Shared review / cloud folder — {__version__} live: "
         "shared-folder sync + optional HTTP endpoint; notes/highlights/"
@@ -71,7 +80,7 @@ PLANNED_EN = {
         "tablet pen with pressure→stroke width; palm-rejection heuristic; "
         "without pressure = improved freehand integration"
     ),
-    "shapes_ai": f"Smart shape recognition — stub {__version__}",
+    "shapes_ai": f"Smart shape recognition — {__version__} live (ink → vector)",
     "extrude3d": (
         f"3D extrusion — {__version__} limited viewer: isometric extrusion "
         "of simple shapes (no mesh import, no OpenGL)"
@@ -89,18 +98,14 @@ PLANNED_EN = {
         "(toggle default disabled), no network, no PII, no data transfer "
         "— diagnostics.jsonl only; open Stubs · Esc · focus · why local"
     ),
-    "varfonts": "Variable fonts (full) — planned",
-    "envelope": "Envelope distort (full) — planned",
-    "esign": (
-        f"E-signature QES/QTSP trust — {__version__}: "
-        "AES/SES live; trust path (verify_trust_path / eidas_trust_info) "
-        "without paid TSA; full QES/timestamp remains QTSP"
-    ),
+    "varfonts": f"Variable fonts — {__version__} live (axes + Qt apply)",
+    "envelope": f"Envelope distort — {__version__} live (4-point warp on DTP)",
+    "esign": f"PAdES-B signature — {__version__}; QES requires QTSP certificate",
 }
 
 # Kurzbeschreibungen für Info-Dialog — 1.9.5 / Live 2.6.28
 STUB_SHORT = {
-    "ki": "Lokaler KI-Assistent für Zusammenfassen und Vorschläge — Stub / nicht produktiv.",
+    "ki": "KI-Assistent für Zusammenfassen, Umformulieren, Übersetzen, TOC — produktiv, Offline ohne Schlüssel.",
     "cloud": (
         "Gemeinsames Review: Freigabeordner + optionaler Endpoint — produktiv 2.6.23+; "
         "kein gehosteter Cloud-Dienst; lokaler Realtime-Hub (CRDT-lite) verfügbar; "
@@ -110,7 +115,7 @@ STUB_SHORT = {
         "Drucksensitiver Stylus mit Palm Rejection — produktiv 2.6.28 "
         "(Tablet-Druck → Strichstärke; sonst Freihand)."
     ),
-    "shapes_ai": "Intelligente Formerkennung beim Zeichnen — Stub / geplant.",
+    "shapes_ai": "Intelligente Formerkennung (Tinte → Vektorform) — produktiv 2.6.54.",
     "extrude3d": (
         "3D-Extrusion Limited Viewer — produktiv 2.6.28 "
         "(isometrisch, einfache Formen; kein Mesh/OpenGL)."
@@ -127,16 +132,16 @@ STUB_SHORT = {
         "Optionale lokale Diagnostik — produktiv 2.6.28: Opt-in Default aus, "
         "kein Netzwerk, kein PII, keine Datenübertragung (diagnostics.jsonl)."
     ),
-    "varfonts": "Vollständige Variable-Fonts-Unterstützung — geplant.",
-    "envelope": "Envelope-Distort-Transformation — geplant.",
+    "varfonts": "Variable Fonts (Achsen wght/wdth/slnt) — produktiv 2.6.54.",
+    "envelope": "Envelope-Distort auf DTP-Rahmen — produktiv 2.6.54.",
     "esign": (
-        "AES/SES-Pfad produktiv (PKCS#12, Sidecar); volle QES-/QTSP-Trust-Validierung "
-        "extern — Extras/PDF → Digitale Signatur."
+        "PAdES-B mit PKCS#12 und sichtbarem Widget — produktiv 2.6.54; "
+        "QES nur mit QTSP-Zertifikat."
     ),
 }
 
 STUB_SHORT_EN = {
-    "ki": "Local AI assistant for summaries and suggestions — stub / not production.",
+    "ki": "AI assistant for summary/rewrite/translate/TOC — live, offline without a key.",
     "cloud": (
         "Shared review: folder sync + optional endpoint — live since 2.6.23; "
         "no hosted cloud service; local realtime hub (CRDT-lite) available; "
@@ -146,7 +151,7 @@ STUB_SHORT_EN = {
         "Pressure-sensitive stylus with palm rejection — live 2.6.28 "
         "(tablet pressure → stroke width; else freehand)."
     ),
-    "shapes_ai": "Smart shape recognition while drawing — stub / planned.",
+    "shapes_ai": "Smart shape recognition (ink → vector) — live 2.6.54.",
     "extrude3d": (
         "3D extrusion limited viewer — live 2.6.28 "
         "(isometric, simple shapes; no mesh/OpenGL)."
@@ -163,11 +168,11 @@ STUB_SHORT_EN = {
         "Optional local diagnostics — live 2.6.28: opt-in default off, "
         "no network, no PII, no data transfer (diagnostics.jsonl)."
     ),
-    "varfonts": "Full variable fonts support — planned.",
-    "envelope": "Envelope distort transform — planned.",
+    "varfonts": "Variable fonts (wght/wdth/slnt axes) — live 2.6.54.",
+    "envelope": "Envelope distort on DTP frames — live 2.6.54.",
     "esign": (
-        "AES/SES path live (PKCS#12, sidecar); full QES/QTSP trust validation "
-        "external — Extras/PDF → Digital signature."
+        "PAdES-B with PKCS#12 and visible widget — live 2.6.54; "
+        "QES only with a QTSP certificate."
     ),
 }
 
@@ -200,7 +205,20 @@ STUB_TITLES_EN = {
 }
 
 # Features die live sind und eigene Dialoge öffnen (nicht Coming-soon)
-_LIVE_KEYS = frozenset({"cloud", "stylus", "extrude3d", "plugins", "telemetry"})
+_LIVE_KEYS = frozenset(
+    {
+        "cloud",
+        "stylus",
+        "extrude3d",
+        "plugins",
+        "telemetry",
+        "ki",
+        "shapes_ai",
+        "varfonts",
+        "envelope",
+        "esign",
+    }
+)
 
 
 class StubInfoDialog(QDialog):
@@ -297,9 +315,22 @@ class StubInfoDialog(QDialog):
 
 
 def show_planned(parent: QWidget | None, key: str) -> None:
-    """Stub-Info oder Live-Feature öffnen — 2.6.28."""
-    if key == "cloud":
-        opener = getattr(parent, "_show_shared_review_dialog", None)
+    """Live-Feature öffnen oder Info-Dialog — 2.6.54."""
+    dispatch = {
+        "ki": "_show_ki_assistant",
+        "shapes_ai": "_run_shape_recognition",
+        "varfonts": "_show_variable_fonts",
+        "envelope": "_apply_envelope_distort",
+        "esign": "_show_pades_dialog",
+        "cloud": "_show_shared_review_dialog",
+        "extrude3d": "_show_extrude3d_dialog",
+        "stylus": "_activate_stylus_tool",
+        "plugins": "_show_hooks_info",
+        "telemetry": "_show_telemetry_settings",
+    }
+    meth = dispatch.get(key)
+    if meth and parent is not None:
+        opener = getattr(parent, meth, None)
         if callable(opener):
             try:
                 opener()
@@ -307,13 +338,6 @@ def show_planned(parent: QWidget | None, key: str) -> None:
             except Exception:
                 pass
     if key == "extrude3d":
-        opener = getattr(parent, "_show_extrude3d_dialog", None)
-        if callable(opener):
-            try:
-                opener()
-                return
-            except Exception:
-                pass
         try:
             from instantlensdoc.ui.extrude3d_dialog import Extrude3DDialog
 
@@ -321,30 +345,6 @@ def show_planned(parent: QWidget | None, key: str) -> None:
             return
         except Exception:
             pass
-    if key == "stylus":
-        opener = getattr(parent, "_activate_stylus_tool", None)
-        if callable(opener):
-            try:
-                opener()
-                return
-            except Exception:
-                pass
-    if key == "plugins":
-        opener = getattr(parent, "_show_hooks_info", None)
-        if callable(opener):
-            try:
-                opener()
-                return
-            except Exception:
-                pass
-    if key == "telemetry":
-        opener = getattr(parent, "_show_telemetry_settings", None)
-        if callable(opener):
-            try:
-                opener()
-                return
-            except Exception:
-                pass
 
     en = get_lang() == "en"
     titles = STUB_TITLES_EN if en else STUB_TITLES

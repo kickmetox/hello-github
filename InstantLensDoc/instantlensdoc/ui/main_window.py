@@ -64,6 +64,7 @@ from instantlensdoc.ui.ocr_dialog import OcrDialog
 from instantlensdoc.ui.pdf_view import PdfViewer
 from instantlensdoc.ui.sidebar import Sidebar
 from instantlensdoc.ui.welcome import WelcomePage
+from instantlensdoc.dtp.canvas import DtpPane
 from instantlensdoc.core import fulltext as fulltext_mod
 from instantlensdoc.core.app_settings import (
     dialog_start_dir,
@@ -213,6 +214,12 @@ class MainWindow(QMainWindow):
         self.license_manager = license_manager
         self.doc: Document | None = None
         self.layout_doc = LayoutDocument()
+        try:
+            from instantlensdoc.dtp.model import DtpDocument
+
+            self.dtp_doc = DtpDocument.sample("A5")
+        except Exception:
+            self.dtp_doc = None
         self._editor_marks: list[str] = []
         self._recent_menu = None
         self._workspace_menu = None
@@ -1205,10 +1212,13 @@ class MainWindow(QMainWindow):
         self.welcome_page.clear_recent_requested.connect(self._clear_recent)
         self.welcome_page.files_dropped.connect(self._welcome_files_dropped)
         self.welcome_page.continue_session_requested.connect(self._continue_last_session)
+        self.dtp_pane = DtpPane(self, doc=getattr(self, "dtp_doc", None))
+        self.dtp_pane.statusMessage.connect(self._set_status)
         self.stack.addWidget(self.editor_pane)  # 0
         self.stack.addWidget(self.pdf_view)  # 1
         self.stack.addWidget(self.image_label)  # 2
         self.stack.addWidget(self.welcome_page)  # 3 — Startseite ohne Tabs (1.0.0)
+        self.stack.addWidget(self.dtp_pane)  # 4 — DTP-Layout-Modus 2.6.54
         self.stack.currentChanged.connect(lambda *_: self._apply_doc_split_sync_scroll())
         self.stack.currentChanged.connect(lambda *_: self._update_doc_status())
         self.stack.currentChanged.connect(lambda *_: self._sync_editor_toolbar_for_stack())
@@ -2368,6 +2378,14 @@ class MainWindow(QMainWindow):
         )
         self._satzspiegel_action.toggled.connect(self._toggle_satzspiegel)
         m_view.addAction(self._satzspiegel_action)
+        self._layout_mode_action = QAction("Layout-Modus", self)
+        self._layout_mode_action.setObjectName("actLayoutMode")
+        self._layout_mode_action.setShortcut(QKeySequence("Ctrl+Alt+L"))
+        self._layout_mode_action.setToolTip(
+            "DTP-Canvas: Rahmen, Lineal, Raster, Musterseiten — 2.6.54"
+        )
+        self._layout_mode_action.triggered.connect(self._enter_layout_mode)
+        m_view.addAction(self._layout_mode_action)
         self._current_line_hl_action = QAction("Aktuelle Zeile hervorheben", self)
         self._current_line_hl_action.setCheckable(True)
         self._current_line_hl_action.setChecked(get_editor_current_line_highlight())
@@ -3369,26 +3387,53 @@ class MainWindow(QMainWindow):
         a.setToolTip("Stylus-Druck + Palm-Rejection aktivieren (Freihand) — 2.6.26")
         a.triggered.connect(self._activate_stylus_tool)
         m_extra.addAction(a)
-        a = QAction("3D-Extrusion (begrenzt)…", self)
+        a = QAction("3D-Extrusion…", self)
         a.setObjectName("actExtrude3d")
-        a.setToolTip("Limited 3D-Viewer: isometrische Extrusion — 2.6.26")
+        a.setToolTip("3D-Extrusion auf DTP-Rahmen (QPainterPath) — 2.6.54")
         a.triggered.connect(self._show_extrude3d_dialog)
         m_extra.addAction(a)
         a = QAction("Script-/Plugin-Hooks…", self)
         a.setObjectName("actPluginHooks")
-        a.setToolTip("User-Hooks open/save/export/ocr — 2.6.26")
+        a.setToolTip("User-Hooks on_open/on_save/on_scan + Menü-Plugins — 2.6.54")
         a.triggered.connect(self._show_hooks_info)
         m_extra.addAction(a)
-        for key, title in [
-            ("ki", "KI-Assistent (geplant)"),
-            ("shapes_ai", "Intelligente Formerkennung (geplant)"),
-            ("varfonts", "Variable Fonts (geplant)"),
-            ("envelope", "Envelope Distort (geplant)"),
-            ("esign", "E-Signatur QES/QTSP-Trust (Hinweis)"),
-        ]:
-            a = QAction(title, self)
-            a.triggered.connect(lambda checked=False, k=key: show_planned(self, k))
-            m_extra.addAction(a)
+        a = QAction("KI-Assistent…", self)
+        a.setObjectName("actKiAssistant")
+        a.setToolTip("Zusammenfassen, umformulieren, übersetzen — Offline ohne Schlüssel")
+        a.triggered.connect(self._show_ki_assistant)
+        m_extra.addAction(a)
+        a = QAction("Intelligente Formerkennung", self)
+        a.setObjectName("actShapeRecognize")
+        a.setToolTip("Tinte auf dem DTP-Canvas als Form erkennen — 2.6.54")
+        a.triggered.connect(self._run_shape_recognition)
+        m_extra.addAction(a)
+        a = QAction("Variable Fonts…", self)
+        a.setObjectName("actVariableFonts")
+        a.setToolTip("Achsen wght/wdth/slnt, System- und Windows-Fonts — 2.6.54")
+        a.triggered.connect(self._show_variable_fonts)
+        m_extra.addAction(a)
+        a = QAction("Envelope Distort…", self)
+        a.setObjectName("actEnvelopeDistort")
+        a.setToolTip("4-Punkt-Envelope auf DTP-Rahmen — 2.6.54")
+        a.triggered.connect(self._apply_envelope_distort)
+        m_extra.addAction(a)
+        a = QAction("E-Signatur PAdES / QES…", self)
+        a.setObjectName("actPadesSign")
+        a.setToolTip("PAdES-B mit PKCS#12; QES nur mit QTSP-Zertifikat — 2.6.54")
+        a.triggered.connect(self._show_pades_dialog)
+        m_extra.addAction(a)
+        try:
+            from instantlensdoc.features.plugins import iter_menu_plugins
+
+            for spec in iter_menu_plugins():
+                title = str(spec.get("title") or "").strip()
+                cb = spec.get("callback")
+                if title and callable(cb):
+                    act_p = QAction(title, self)
+                    act_p.triggered.connect(cb)
+                    m_extra.addAction(act_p)
+        except Exception:
+            pass
 
         m_help = mb.addMenu("&Hilfe")
         a = QAction("Erste Schritte…", self)
@@ -6815,6 +6860,14 @@ class MainWindow(QMainWindow):
             "devices_discover": self._show_devices_dialog,
             "devices_printers": lambda: self._show_devices_dialog(filter_kind="printer"),
             "devices_refresh": lambda: self._show_devices_dialog(auto_refresh=True),
+            "dtp_layout": self._enter_layout_mode,
+            "dtp_text_frame": self._dtp_add_text_frame,
+            "dtp_link": self._dtp_link_frames,
+            "dtp_grid": self._dtp_toggle_grid,
+            "dtp_export_pdf": self._dtp_export_pdf_dialog,
+            "ki_assistant": self._show_ki_assistant,
+            "varfonts": self._show_variable_fonts,
+            "pades_sign": self._show_pades_dialog,
         }
         fn = handlers.get(action_id)
         if callable(fn):
@@ -10263,13 +10316,32 @@ class MainWindow(QMainWindow):
             self._set_status(f"Struktur-Sprung: {e}")
 
     def _show_extrude3d_dialog(self) -> None:
+        if getattr(self, "dtp_pane", None) is not None:
+            try:
+                self._enter_layout_mode()
+                self.dtp_pane.apply_extrude()
+                self._set_status("3D-Extrusion auf DTP-Auswahl")
+                return
+            except Exception:
+                pass
         from instantlensdoc.ui.extrude3d_dialog import Extrude3DDialog
 
         Extrude3DDialog(self).exec()
 
     def _activate_stylus_tool(self) -> None:
-        """Freihand-Werkzeug + Stylus-Hinweis — 2.6.26."""
+        """Drucksensitiver Stift: DTP-Canvas oder PDF-Freihand — 2.6.54."""
         try:
+            if getattr(self, "dtp_pane", None) is not None and (
+                self.stack.currentWidget() is self.dtp_pane
+                or not getattr(self.pdf_view, "pdf_path", None)
+            ):
+                self._enter_layout_mode()
+                self.dtp_pane._ink_btn.setChecked(True)
+                self.dtp_pane.toggle_ink(True)
+                from instantlensdoc.core.stylus import stylus_info
+
+                self._set_status(stylus_info().get("message") or "Stift (DTP)")
+                return
             if hasattr(self, "pdf_view") and hasattr(self.pdf_view, "set_tool"):
                 from ild_pdf.annotate import AnnotationType
 
@@ -10279,20 +10351,34 @@ class MainWindow(QMainWindow):
 
             info = stylus_info()
             self._set_status(info.get("message") or "Stylus aktiv")
-            show_planned(self, "stylus")
         except Exception as e:
-            show_planned(self, "stylus")
             self._set_status(f"Stylus: {e}")
 
     def _show_hooks_info(self) -> None:
         from instantlensdoc.core.plugin_hooks import list_hooks, write_hook_example
+        from instantlensdoc.features.plugins import install_sample_plugin
 
         try:
             write_hook_example()
         except Exception:
             pass
+        try:
+            sample = install_sample_plugin()
+        except Exception:
+            sample = ""
         data = list_hooks()
-        show_planned(self, "plugins")
+        events = ", ".join(data.get("known_events") or [])
+        QMessageBox.information(
+            self,
+            "Script-/Plugin-Hooks",
+            (
+                f"Ordner: {data.get('hooks_dir')}\n"
+                f"Geladen: {len(data.get('loaded') or [])}\n"
+                f"Events: {events}\n"
+                f"Aliase: on_open, on_save, on_scan\n"
+                f"Beispiel-Plugin: {sample or '(siehe examples/ild_dtp_sample_plugin.py)'}"
+            ),
+        )
         try:
             self._set_status(
                 f"Hooks: {data.get('hooks_dir')} · "
@@ -10301,6 +10387,104 @@ class MainWindow(QMainWindow):
             )
         except Exception:
             pass
+
+    def _enter_layout_mode(self) -> None:
+        """Ansicht → Layout-Modus: DTP-Canvas."""
+        pane = getattr(self, "dtp_pane", None)
+        if pane is None:
+            return
+        try:
+            from instantlensdoc.dtp.model import DtpDocument
+
+            if getattr(self, "layout_doc", None) is not None and self.layout_doc.text_frames:
+                pane.set_document(DtpDocument.from_layout_document(self.layout_doc))
+            elif pane.doc is None:
+                pane.set_document(DtpDocument.sample("A5"))
+        except Exception:
+            pass
+        self.stack.setCurrentWidget(pane)
+        self._set_status("Layout-Modus (DTP)")
+
+    def _dtp_add_text_frame(self) -> None:
+        self._enter_layout_mode()
+        self.dtp_pane.add_text_frame()
+
+    def _dtp_link_frames(self) -> None:
+        self._enter_layout_mode()
+        self.dtp_pane.link_selected()
+
+    def _dtp_toggle_grid(self) -> None:
+        self._enter_layout_mode()
+        self.dtp_pane.toggle_grid()
+
+    def _dtp_export_pdf_dialog(self) -> None:
+        self._enter_layout_mode()
+        path, _ = QFileDialog.getSaveFileName(
+            self, "DTP als PDF", "", "PDF (*.pdf)"
+        )
+        if not path:
+            return
+        out = self.dtp_pane.export_pdf_to(path)
+        self._set_status(f"DTP-PDF: {out}")
+
+    def _show_ki_assistant(self) -> None:
+        from instantlensdoc.features.ki_panel import KiAssistantDialog
+
+        selected = ""
+        try:
+            if self.stack.currentWidget() is self.editor_pane:
+                selected = self.editor.textCursor().selectedText()
+                if not selected:
+                    selected = self.editor.toPlainText()[:8000]
+            elif getattr(self, "dtp_pane", None) is not None:
+                frs = self.dtp_pane.scene.selected_frames()
+                selected = "\n".join(f.text for f in frs if f.kind == "text")
+        except Exception:
+            pass
+        KiAssistantDialog(self, selected_text=selected).exec()
+
+    def _run_shape_recognition(self) -> None:
+        self._enter_layout_mode()
+        self.dtp_pane.view.recognize_on_finish = True
+        self.dtp_pane.recognize_selected_ink()
+        self._set_status("Formerkennung (DTP-Tinte)")
+
+    def _show_variable_fonts(self) -> None:
+        from instantlensdoc.features.varfont_dialog import VariableFontsDialog
+        from instantlensdoc.features.variable_fonts import apply_axes_to_frame
+
+        dlg = VariableFontsDialog(self)
+        if dlg.exec() != QDialog.Accepted:
+            return
+        fam = dlg.selected_family().split(" [")[0]
+        pane = getattr(self, "dtp_pane", None)
+        if pane is None:
+            return
+        self._enter_layout_mode()
+        targets = pane.scene.selected_frames() or [
+            f for f in pane.doc.frames if f.kind == "text"
+        ][:1]
+        for fr in targets:
+            if fr.kind != "text":
+                continue
+            fr.font_family = fam
+            apply_axes_to_frame(fr, dlg.axes_values)
+        pane.scene.rebuild()
+        self._set_status(f"Variable Font: {fam}")
+
+    def _apply_envelope_distort(self) -> None:
+        self._enter_layout_mode()
+        self.dtp_pane.apply_envelope()
+
+    def _show_pades_dialog(self) -> None:
+        from instantlensdoc.features.pades_dialog import PadesDialog
+
+        pdf = ""
+        try:
+            pdf = str(getattr(self.pdf_view, "pdf_path", "") or "")
+        except Exception:
+            pdf = ""
+        PadesDialog(self, pdf_path=pdf).exec()
 
     def _show_telemetry_settings(self) -> None:
         """Settings öffnen / Telemetrie-Info — 2.6.26."""
