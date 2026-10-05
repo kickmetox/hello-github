@@ -20,6 +20,8 @@ Dieser Test beweist:
 9. FreeText-Edit schreibt /Contents zurück.
 10. QUndoStack: Anlegen → Undo weg → Redo zurück; Verschieben → Undo stellt /Rect her.
 11. Ribbon Start+Bearbeiten: ↶ Rückgängig / ↷ Wiederholen inkl. Tooltip.
+12. Auswahl-Hit-Test in PDF-Punkten: Klick Mitte Rechteck → selected + 8 Griffe;
+    Gummiband zwei Objekte; Leerklick deselektiert; Werkzeug bleibt Auswahl.
 
 Aufruf: ``QT_QPA_PLATFORM=offscreen python3 scripts/test_ui_audit_2654.py``
 """
@@ -277,6 +279,148 @@ def test_viewer_tools_undo_zoom(app, td: Path) -> None:
     v.close()
 
 
+def _canvas_page_to_widget(canvas, vx: float, vy: float) -> tuple[float, float]:
+    pw, ph = canvas._pixmap_logical_size()
+    cr = canvas.contentsRect()
+    lx = float(cr.x()) + (float(cr.width()) - pw) / 2.0
+    ly = float(cr.y()) + (float(cr.height()) - ph) / 2.0
+    return float(vx) + lx, float(vy) + ly
+
+
+def _send_mouse(canvas, etype, x: float, y: float, *, buttons=None, button=None, mods=None):
+    from PySide6.QtCore import QEvent, QPointF, Qt
+    from PySide6.QtGui import QMouseEvent
+    from PySide6.QtWidgets import QApplication
+
+    if button is None:
+        button = Qt.MouseButton.LeftButton
+    if mods is None:
+        mods = Qt.KeyboardModifier.NoModifier
+    if buttons is None:
+        if etype == QEvent.Type.MouseButtonRelease:
+            buttons = Qt.MouseButton.NoButton
+        elif etype == QEvent.Type.MouseMove:
+            buttons = Qt.MouseButton.LeftButton
+        else:
+            buttons = Qt.MouseButton.LeftButton
+    local = QPointF(float(x), float(y))
+    gp = canvas.mapToGlobal(local.toPoint())
+    try:
+        ev = QMouseEvent(etype, local, QPointF(gp), button, buttons, mods)
+    except TypeError:
+        ev = QMouseEvent(etype, local, button, buttons, mods)
+    QApplication.sendEvent(canvas, ev)
+
+
+def test_hit_test_pdf_points_unit() -> None:
+    from ild_pdf import (
+        Annotation,
+        AnnotationType,
+        annotation_contains_point,
+        hit_test_annotations,
+    )
+
+    rect = Annotation(
+        page=0, type=AnnotationType.RECTANGLE, x=40.0, y=50.0, width=80.0, height=30.0
+    )
+    thin = Annotation(
+        page=0, type=AnnotationType.HIGHLIGHT, x=40.0, y=120.0, width=90.0, height=1.5
+    )
+    ink = Annotation.from_ink_points(0, [(10.0, 10.0), (40.0, 12.0), (70.0, 9.0)])
+    top = Annotation(
+        page=0, type=AnnotationType.ELLIPSE, x=50.0, y=55.0, width=20.0, height=20.0
+    )
+    assert annotation_contains_point(rect, 80.0, 65.0, slop_pt=4.0)
+    assert annotation_contains_point(thin, 85.0, 120.75, slop_pt=4.0)
+    assert annotation_contains_point(ink, 40.0, 12.0, slop_pt=4.0)
+    hit = hit_test_annotations([rect, thin, top], 60.0, 65.0, slop_pt=4.0)
+    assert hit is top, getattr(hit, "type", None)
+
+
+def test_viewer_select_hit_test(app, td: Path) -> None:
+    from PySide6.QtCore import QEvent, Qt
+
+    from ild_pdf import Annotation, AnnotationType
+    from instantlensdoc.ui.pdf_view import PdfViewer
+
+    pdf = td / "select_hit.pdf"
+    _make_multipage_pdf(pdf, ["SelectHitAAA"])
+    v = PdfViewer()
+    v.resize(960, 720)
+    v.show()
+    app.processEvents()
+    assert v.load(pdf), f"load fehlgeschlagen: {v._last_refresh_error!r}"
+    v.set_annotations_locked(False)
+    v._suppress_default_zoom = True
+    _pump(app, 1.2, until=lambda: v._canvas_has_page_image())
+    v.set_scale(1.5, immediate=True)
+    _pump(app, 0.4)
+    v.set_tool(None)
+    assert v.current_tool_id() == "select"
+    assert v.canvas._select_mode
+
+    r1 = Annotation(
+        page=0,
+        type=AnnotationType.RECTANGLE,
+        x=80.0,
+        y=90.0,
+        width=120.0,
+        height=50.0,
+        color="#2980B9",
+        fill_color="",
+    )
+    r2 = Annotation(
+        page=0,
+        type=AnnotationType.STAMP,
+        x=260.0,
+        y=200.0,
+        width=70.0,
+        height=36.0,
+        text="OK",
+        color="#1E8449",
+    )
+    v.store.add(r1)
+    v.store.add(r2)
+    v.refresh()
+    _pump(app, 0.3)
+    s = v._view_scale()
+    cx = (r1.x + r1.width / 2.0) * s
+    cy = (r1.y + r1.height / 2.0) * s
+    wx, wy = _canvas_page_to_widget(v.canvas, cx, cy)
+    _send_mouse(v.canvas, QEvent.Type.MouseButtonPress, wx, wy)
+    _send_mouse(v.canvas, QEvent.Type.MouseButtonRelease, wx, wy)
+    _pump(app, 0.15)
+    assert r1.id in v.canvas._selected_ids, (
+        f"Klick Mitte Rechteck wählte nicht: {v.canvas._selected_ids!r} "
+        f"scale={s} view=({cx:.1f},{cy:.1f}) widget=({wx:.1f},{wy:.1f}) "
+        f"store={[ (a.id, a.type.value, a.x, a.y, a.width, a.height) for a in v.store.annotations ]}"
+    )
+    assert v._selected_ann_id == r1.id
+    handles = v.canvas.selected_handle_rects()
+    assert len(handles) == 8, handles
+    assert v.current_tool_id() == "select"
+    assert v.canvas._select_mode
+
+    # Gummiband um beide Objekte (PDF-Punkte → Anzeige)
+    x0, y0 = _canvas_page_to_widget(v.canvas, 70.0 * s, 80.0 * s)
+    x1, y1 = _canvas_page_to_widget(v.canvas, 340.0 * s, 250.0 * s)
+    _send_mouse(v.canvas, QEvent.Type.MouseButtonPress, x0, y0)
+    _send_mouse(v.canvas, QEvent.Type.MouseMove, x1, y1, buttons=Qt.MouseButton.LeftButton)
+    _send_mouse(v.canvas, QEvent.Type.MouseButtonRelease, x1, y1)
+    _pump(app, 0.15)
+    assert r1.id in v.canvas._selected_ids and r2.id in v.canvas._selected_ids, v.canvas._selected_ids
+    assert len(v.canvas._selected_ids) >= 2
+
+    # Leerklick deselektiert, Werkzeug bleibt Auswahl
+    ex, ey = _canvas_page_to_widget(v.canvas, 20.0 * s, 20.0 * s)
+    _send_mouse(v.canvas, QEvent.Type.MouseButtonPress, ex, ey)
+    _send_mouse(v.canvas, QEvent.Type.MouseButtonRelease, ex, ey)
+    _pump(app, 0.1)
+    assert not v.canvas._selected_ids, v.canvas._selected_ids
+    assert v.current_tool_id() == "select"
+    v.close()
+
+
 def test_ribbon_undo_arrows() -> None:
     from instantlensdoc.ui.ribbon_bar import RibbonBar
 
@@ -525,6 +669,10 @@ def main() -> int:  # noqa: C901
         print("OK  6 native /Rect /Contents + Undo-Rect")
         test_viewer_tools_undo_zoom(app, tdp)
         print("OK  7 viewer Stift/Highlight/Zoom/QUndoStack")
+        test_hit_test_pdf_points_unit()
+        print("OK  7b hit-test PDF-Punkte (dünn/oben)")
+        test_viewer_select_hit_test(app, tdp)
+        print("OK  7c Auswahl Klick/Gummiband/Griffe")
         test_ribbon_undo_arrows()
         print("OK  8 ribbon ↶/↷")
         test_mainwindow_shortcuts(win)

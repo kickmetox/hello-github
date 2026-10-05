@@ -78,6 +78,10 @@ from ild_pdf import (
     render_page,
     uri_link_at,
     scale_annotation,
+    annotation_bounds_pdf,
+    annotation_hit_slop_pt,
+    annotations_intersect_rect,
+    hit_test_annotations,
     write_annotations_to_pdf,
 )
 from ild_pdf.text_edit import (
@@ -835,6 +839,35 @@ class PdfCanvas(QLabel):
         self.setFocusPolicy(Qt.StrongFocus)
         self.setContextMenuPolicy(Qt.CustomContextMenu)
 
+    def _pdf_viewer(self):
+        """PdfViewer über ScrollArea finden (Hit-Test gegen Store in PDF-Punkten)."""
+        cur = self.parentWidget() if hasattr(self, "parentWidget") else None
+        depth = 0
+        while cur is not None and depth < 12:
+            if hasattr(cur, "hit_test_annotation_at_view") and hasattr(cur, "store"):
+                return cur
+            cur = cur.parentWidget() if hasattr(cur, "parentWidget") else None
+            depth += 1
+        return None
+
+    def _pixmap_logical_size(self) -> tuple[float, float]:
+        pm = self.pixmap()
+        if pm is None or pm.isNull():
+            return 0.0, 0.0
+        try:
+            sz = pm.deviceIndependentSize()
+            w, h = float(sz.width()), float(sz.height())
+            if w >= 1.0 and h >= 1.0:
+                return w, h
+        except Exception:
+            pass
+        try:
+            dpr = float(pm.devicePixelRatio() or 1.0)
+        except Exception:
+            dpr = 1.0
+        dpr = max(dpr, 0.01)
+        return float(pm.width()) / dpr, float(pm.height()) / dpr
+
     def clear(self) -> None:  # noqa: A003 — QLabel.clear + interner Stand
         """Anzeige und internes Seitenpixmap leeren — 2.6.48."""
         self._pixmap = None
@@ -1508,18 +1541,24 @@ class PdfCanvas(QLabel):
         self.update()
 
     def _map_to_page(self, event) -> tuple[float, float] | None:
+        """Widget-Klick → Pixmap-Pixel (Anzeige). Hit-Test rechnet danach in PDF-Punkte."""
         if self._pixmap is None:
             return None
-        pos = event.position()
+        pos = event.position() if hasattr(event, "position") else event.pos()
         pm = self.pixmap()
-        if pm is None:
+        if pm is None or pm.isNull():
             return None
-        lx = (self.width() - pm.width()) / 2
-        ly = (self.height() - pm.height()) / 2
-        x = pos.x() - lx
-        y = pos.y() - ly
-        if 0 <= x <= pm.width() and 0 <= y <= pm.height():
-            return float(x), float(y)
+        pw, ph = self._pixmap_logical_size()
+        if pw < 1.0 or ph < 1.0:
+            return None
+        cr = self.contentsRect()
+        lx = float(cr.x()) + (float(cr.width()) - pw) / 2.0
+        ly = float(cr.y()) + (float(cr.height()) - ph) / 2.0
+        x = float(pos.x()) - lx
+        y = float(pos.y()) - ly
+        # 2 px Rand: dünne Objekte am Seitenrand bleiben treffbar
+        if -2.0 <= x <= pw + 2.0 and -2.0 <= y <= ph + 2.0:
+            return max(0.0, min(pw, x)), max(0.0, min(ph, y))
         return None
 
     def _hit_overlay(self, x: float, y: float) -> Annotation | None:
@@ -1536,61 +1575,69 @@ class PdfCanvas(QLabel):
             AnnotationType.UNDERLINE,
             AnnotationType.STRIKEOUT,
         )
-        for ann in reversed(self._annotations):
-            if ann.type not in editable:
-                continue
-            if not self._ann_type_is_visible(ann):
-                continue
-            x0, y0, x1, y1 = self._ann_bounds(ann)
-            if x0 <= x <= x1 and y0 <= y <= y1:
-                return ann
+        hit = self._hit_annotation(x, y)
+        if hit is not None and hit.type in editable:
+            return hit
         return None
 
     @staticmethod
     def _ann_bounds(ann: Annotation) -> tuple[float, float, float, float]:
-        """x0,y0,x1,y1 in Seitenpixeln."""
+        """x0,y0,x1,y1 in Seitenpixeln (Anzeige / nach _ann_to_view)."""
+        x0, y0, x1, y1 = annotation_bounds_pdf(ann)
         if ann.type in (
             AnnotationType.LINE,
             AnnotationType.ARROW,
             AnnotationType.MEASURE,
             AnnotationType.MEASURE_ANGLE,
             AnnotationType.CALLOUT,
+            AnnotationType.INK,
         ):
-            x2, y2 = ann.end_point()
-            xs = [ann.x, x2]
-            ys = [ann.y, y2]
-            if ann.type == AnnotationType.MEASURE_ANGLE:
-                x3 = float(ann.p3_x) if (ann.p3_x or ann.p3_y) else float(ann.x + ann.width)
-                y3 = float(ann.p3_y) if (ann.p3_x or ann.p3_y) else float(ann.y)
-                xs.append(x3)
-                ys.append(y3)
-            if ann.type == AnnotationType.CALLOUT:
-                xs.extend([ann.x + max(ann.width, 100), ann.x])
-                ys.extend([ann.y + max(ann.height, 40), ann.y])
             pad = 6.0
-            return min(xs) - pad, min(ys) - pad, max(xs) + pad, max(ys) + pad
-        if ann.type == AnnotationType.INK:
-            pts = getattr(ann, "ink_points", lambda: [])()
-            if pts:
-                xs = [p[0] for p in pts]
-                ys = [p[1] for p in pts]
-                pad = 6.0
-                return min(xs) - pad, min(ys) - pad, max(xs) + pad, max(ys) + pad
-        w = max(ann.width, 8)
-        h = max(ann.height, 8)
+            return x0 - pad, y0 - pad, x1 + pad, y1 + pad
+        w = max(x1 - x0, 8.0)
+        h = max(y1 - y0, 8.0)
         if ann.type in (AnnotationType.STICKY, AnnotationType.STAMP, AnnotationType.SIGNATURE_FIELD):
             w = max(w, 80)
             h = max(h, 36)
-        return ann.x, ann.y, ann.x + w, ann.y + h
+        return x0, y0, x0 + w, y0 + h
 
     def _hit_annotation(self, x: float, y: float) -> Annotation | None:
-        for ann in reversed(self._annotations):
-            if not self._ann_type_is_visible(ann):
-                continue
-            x0, y0, x1, y1 = self._ann_bounds(ann)
-            if x0 <= x <= x1 and y0 <= y <= y1:
-                return ann
-        return None
+        """Auswahl-Hit-Test: Klick in Anzeige-Pixel, Vergleich in PDF-Punkten."""
+        if not self._annotations_visible:
+            return None
+        viewer = self._pdf_viewer()
+        if viewer is not None and getattr(viewer, "store", None) is not None:
+            store_hit = viewer.hit_test_annotation_at_view(x, y)
+            if store_hit is None:
+                return None
+            for ann in reversed(self._annotations):
+                if ann.id == store_hit.id:
+                    return ann
+            return store_hit
+        s = max(float(getattr(self, "_scale", 1.0) or 1.0), 0.01)
+        slop_pdf = annotation_hit_slop_pt(view_scale=s)
+        px, py = float(x) / s, float(y) / s
+
+        def _vis(a: Annotation) -> bool:
+            return self._ann_type_is_visible(a)
+
+        hit = hit_test_annotations(self._annotations, px, py, slop_pt=slop_pdf, is_visible=_vis)
+        if hit is not None:
+            return hit
+        # Display-Kopien sind bereits ×scale: zweiter Versuch in Anzeigepixeln
+        slop_view = annotation_hit_slop_pt(view_scale=1.0)
+        return hit_test_annotations(self._annotations, x, y, slop_pt=slop_view, is_visible=_vis)
+
+    def selected_handle_rects(self) -> dict[str, tuple[float, float, float, float]]:
+        """8 Griffe der Einzelauswahl (Tests / Overlay)."""
+        selected = self._selected_ids or ({self._selected_id} if self._selected_id else set())
+        if len(selected) != 1:
+            return {}
+        sid = next(iter(selected))
+        for ann in self._annotations:
+            if ann.id == sid:
+                return self._ann_handle_rects(ann)
+        return {}
 
     def _ann_handle_rects(
         self, ann: Annotation, *, dx: float = 0.0, dy: float = 0.0
@@ -2045,7 +2092,7 @@ class PdfCanvas(QLabel):
                     if (
                         self._select_mode
                         and not self._annotations_locked
-                        and len(self._selected_ids) <= 1
+                        and len(self._selected_ids) == 1
                     ):
                         painter.setBrush(QColor(30, 144, 255))
                         painter.setPen(QPen(QColor(255, 255, 255), 1))
@@ -2271,11 +2318,22 @@ class PdfCanvas(QLabel):
             if hit_any:
                 self.annotation_erase_hit.emit(hit_any.id)
             return
-        if self._select_mode and event.button() == Qt.LeftButton:
-            link = self._hit_uri_link(x, y)
-            if link and not (event.modifiers() & Qt.ShiftModifier):
-                self.uri_link_clicked.emit(link.uri)
-                return
+        selecting = bool(self._select_mode) or (
+            self._drag_tool is None
+            and not self._hand_mode
+            and not self._eraser_mode
+            and not self._inline_edit_mode
+            and not self._object_edit_mode
+            and not self._text_mark_mode
+        )
+        if selecting and event.button() == Qt.LeftButton:
+            # Auswahl bleibt Auswahl — kein URI-Diebstahl, kein Werkzeugwechsel
+            self._select_mode = True
+            if event.modifiers() & Qt.ControlModifier:
+                link = self._hit_uri_link(x, y)
+                if link:
+                    self.uri_link_clicked.emit(link.uri)
+                    return
             handle_hit = self._hit_ann_handle(x, y)
             if handle_hit is not None:
                 hname, hann = handle_hit
@@ -2288,11 +2346,10 @@ class PdfCanvas(QLabel):
                 self.setCursor(QCursor(Qt.SizeFDiagCursor))
                 return
             hit_any = self._hit_annotation(x, y)
-            # Sidecar-LINK: Klick öffnet Browser (ohne Shift) — 2.3.0
             if (
                 hit_any is not None
                 and hit_any.type == AnnotationType.LINK
-                and not (event.modifiers() & Qt.ShiftModifier)
+                and bool(event.modifiers() & Qt.ControlModifier)
             ):
                 uri = (hit_any.text or "").strip()
                 if uri:
@@ -2301,17 +2358,14 @@ class PdfCanvas(QLabel):
             if hit_any:
                 shift = bool(event.modifiers() & Qt.ShiftModifier)
                 if shift:
-                    # Mehrfachauswahl umschalten — kein Verschieben
                     self.annotation_selected.emit(hit_any.id)
                     return
-                # Bereits ausgewählt → Mehrfachauswahl behalten und gemeinsam verschieben
-                if hit_any.id in self._selected_ids:
-                    ids = set(self._selected_ids)
-                else:
+                if hit_any.id not in self._selected_ids:
+                    # Outline + 8 Griffe sofort (vor dem Viewer-Slot)
+                    self.set_selected_ids({hit_any.id})
                     self.annotation_selected.emit(hit_any.id)
-                    ids = set(self._selected_ids) if self._selected_ids else {hit_any.id}
+                ids = set(self._selected_ids) if self._selected_ids else {hit_any.id}
                 if not self._annotations_locked:
-                    # Gesperrte Gruppenmitglieder nicht mitverschieben
                     by_id = {a.id: a for a in self._annotations}
                     movable = {
                         i
@@ -2323,9 +2377,11 @@ class PdfCanvas(QLabel):
                         self._move_origin = (x, y)
                         self._move_delta = (0.0, 0.0)
                         self.setCursor(QCursor(Qt.ClosedHandCursor))
+                self._repaint_overlay()
                 return
-            # Leere Fläche → Gummiband-Mehrfachauswahl (Text markieren = eigenes Werkzeug)
+            # Leere Fläche → deselektieren + Gummiband
             if not (event.modifiers() & Qt.ShiftModifier):
+                self.set_selected_ids(set())
                 self.annotation_selected.emit("")
             self._band_start = (x, y)
             self._band_current = (x, y)
@@ -5244,6 +5300,28 @@ class PdfViewer(QWidget):
     def _view_scale(self) -> float:
         return max(float(getattr(self, "scale", 1.0) or 1.0), 0.01)
 
+    def view_px_to_pdf(self, vx: float, vy: float) -> tuple[int, float, float]:
+        """Anzeige-Pixel → (page_index, x_pt, y_pt) Store-Koordinaten."""
+        page, lx, ly = self._spread_resolve(vx, vy)
+        s = max(float(getattr(self.canvas, "_scale", None) or self._view_scale()), 0.01)
+        return int(page), float(lx) / s, float(ly) / s
+
+    def hit_test_annotation_at_view(self, vx: float, vy: float) -> Annotation | None:
+        """Auswahl-Hit-Test gegen den Store in PDF-Punkten (oberste zuerst)."""
+        if not self.store:
+            return None
+        page, x_pt, y_pt = self.view_px_to_pdf(vx, vy)
+        s = max(float(getattr(self.canvas, "_scale", None) or self._view_scale()), 0.01)
+        slop = annotation_hit_slop_pt(view_scale=s)
+        canvas = self.canvas
+
+        def _vis(a: Annotation) -> bool:
+            return canvas._ann_type_is_visible(a)
+
+        return hit_test_annotations(
+            self.store.for_page(page), x_pt, y_pt, slop_pt=slop, is_visible=_vis
+        )
+
     def _ann_to_view_at(
         self,
         ann: Annotation,
@@ -5433,12 +5511,42 @@ class PdfViewer(QWidget):
             return
         rx0, ry0 = min(x0, x1), min(y0, y1)
         rx1, ry1 = max(x0, x1), max(y0, y1)
+        s = max(float(getattr(self.canvas, "_scale", None) or self._view_scale()), 0.01)
+        pages: set[int] = {int(self.page_index)}
+        if self._continuous_scroll and self._continuous_offsets:
+            pages = {int(p) for p, _y0, _h in self._continuous_offsets}
+        elif (
+            self._two_page_spread
+            and self._spread_left_width > 0
+            and self.page_index + 1 < self.page_count
+        ):
+            pages.add(int(self.page_index) + 1)
         ids: list[str] = []
-        for ann in self._display_anns_for_page(self.page_index):
-            ax0, ay0, ax1, ay1 = self.canvas._ann_bounds(ann)
-            if ax1 < rx0 or ax0 > rx1 or ay1 < ry0 or ay0 > ry1:
-                continue
-            ids.append(ann.id)
+        seen: set[str] = set()
+        for page in sorted(pages):
+            ox = oy = 0.0
+            if self._continuous_scroll and self._continuous_offsets:
+                for pi, y_off, _ph in self._continuous_offsets:
+                    if int(pi) == int(page):
+                        oy = float(y_off)
+                        break
+            elif (
+                self._two_page_spread
+                and int(page) == int(self.page_index) + 1
+                and self._spread_left_width > 0
+            ):
+                ox = float(self._spread_left_width) + float(self._spread_gap)
+            bx0, by0 = (rx0 - ox) / s, (ry0 - oy) / s
+            bx1, by1 = (rx1 - ox) / s, (ry1 - oy) / s
+            for ann in self.store.for_page(page):
+                if not self.canvas._ann_type_is_visible(ann):
+                    continue
+                if not annotations_intersect_rect(ann, bx0, by0, bx1, by1):
+                    continue
+                if ann.id in seen:
+                    continue
+                seen.add(ann.id)
+                ids.append(ann.id)
         self._selected_ann_ids = set(ids)
         self._selected_ann_id = ids[0] if ids else None
         self.canvas.set_selected_ids(ids)

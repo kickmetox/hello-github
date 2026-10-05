@@ -880,6 +880,168 @@ def map_annotation_rect(
     return ann
 
 
+def _point_to_segment_dist(
+    px: float, py: float, x0: float, y0: float, x1: float, y1: float
+) -> float:
+    dx = float(x1) - float(x0)
+    dy = float(y1) - float(y0)
+    if abs(dx) < 1e-12 and abs(dy) < 1e-12:
+        return math.hypot(float(px) - float(x0), float(py) - float(y0))
+    t = ((float(px) - float(x0)) * dx + (float(py) - float(y0)) * dy) / (dx * dx + dy * dy)
+    t = max(0.0, min(1.0, t))
+    return math.hypot(float(px) - (float(x0) + t * dx), float(py) - (float(y0) + t * dy))
+
+
+def annotation_hit_slop_pt(
+    stroke_width: float = 2.0,
+    *,
+    min_slop: float = 4.0,
+    view_scale: float = 1.0,
+) -> float:
+    """Treffer-Toleranz in PDF-Punkten (dünne/transparente Striche bleiben klickbar)."""
+    try:
+        sw = float(stroke_width or 0.0)
+    except (TypeError, ValueError):
+        sw = 2.0
+    try:
+        s = max(float(view_scale or 1.0), 0.01)
+    except (TypeError, ValueError):
+        s = 1.0
+    # mind. 8 Anzeige-Pixel bzw. 4 pt + halbe Strichstärke
+    return max(float(min_slop), sw * 0.5 + 2.0, 8.0 / s)
+
+
+def annotation_bounds_pdf(ann: Annotation) -> tuple[float, float, float, float]:
+    """Achsenparalleles Rechteck in der nativen Ann.-Koordinate (Store = PDF-Punkte)."""
+    t = ann.type
+    if t in (
+        AnnotationType.LINE,
+        AnnotationType.ARROW,
+        AnnotationType.MEASURE,
+        AnnotationType.MEASURE_ANGLE,
+        AnnotationType.CALLOUT,
+    ):
+        x2, y2 = ann.end_point()
+        xs = [float(ann.x), float(x2)]
+        ys = [float(ann.y), float(y2)]
+        if t == AnnotationType.MEASURE_ANGLE:
+            x3 = float(ann.p3_x) if (ann.p3_x or ann.p3_y) else float(ann.x + ann.width)
+            y3 = float(ann.p3_y) if (ann.p3_x or ann.p3_y) else float(ann.y)
+            xs.append(x3)
+            ys.append(y3)
+        if t == AnnotationType.CALLOUT:
+            xs.extend([float(ann.x + max(ann.width, 1.0)), float(ann.x)])
+            ys.extend([float(ann.y + max(ann.height, 1.0)), float(ann.y)])
+        return min(xs), min(ys), max(xs), max(ys)
+    if t == AnnotationType.INK:
+        pts = ann.ink_points()
+        if pts:
+            xs = [p[0] for p in pts]
+            ys = [p[1] for p in pts]
+            return min(xs), min(ys), max(xs), max(ys)
+    w = max(float(ann.width), 0.0)
+    h = max(float(ann.height), 0.0)
+    return float(ann.x), float(ann.y), float(ann.x) + w, float(ann.y) + h
+
+
+def annotation_contains_point(
+    ann: Annotation,
+    x: float,
+    y: float,
+    *,
+    slop_pt: float = 4.0,
+) -> bool:
+    """True wenn (x,y) in PDF-Punkten die Annotation trifft (auch dünn/transparent)."""
+    slop = max(float(slop_pt), 0.0)
+    t = ann.type
+    try:
+        stroke = float(getattr(ann, "stroke_width", 2.0) or 2.0)
+    except (TypeError, ValueError):
+        stroke = 2.0
+    pad = slop + max(stroke, 0.0) * 0.5
+
+    if t in (
+        AnnotationType.LINE,
+        AnnotationType.ARROW,
+        AnnotationType.MEASURE,
+    ):
+        x2, y2 = ann.end_point()
+        return _point_to_segment_dist(x, y, ann.x, ann.y, x2, y2) <= pad
+
+    if t == AnnotationType.MEASURE_ANGLE:
+        x2, y2 = ann.end_point()
+        x3 = float(ann.p3_x) if (ann.p3_x or ann.p3_y) else float(ann.x + ann.width)
+        y3 = float(ann.p3_y) if (ann.p3_x or ann.p3_y) else float(ann.y)
+        d1 = _point_to_segment_dist(x, y, x2, y2, ann.x, ann.y)
+        d2 = _point_to_segment_dist(x, y, x2, y2, x3, y3)
+        return min(d1, d2) <= pad
+
+    if t == AnnotationType.INK:
+        pts = ann.ink_points()
+        if len(pts) >= 2:
+            for i in range(1, len(pts)):
+                if _point_to_segment_dist(x, y, pts[i - 1][0], pts[i - 1][1], pts[i][0], pts[i][1]) <= pad:
+                    return True
+            return False
+        if len(pts) == 1:
+            return math.hypot(x - pts[0][0], y - pts[0][1]) <= pad
+
+    if t == AnnotationType.ELLIPSE:
+        w = max(float(ann.width), 1e-6)
+        h = max(float(ann.height), 1e-6)
+        cx = float(ann.x) + w * 0.5
+        cy = float(ann.y) + h * 0.5
+        rx = w * 0.5 + pad
+        ry = h * 0.5 + pad
+        nx = (float(x) - cx) / rx
+        ny = (float(y) - cy) / ry
+        return nx * nx + ny * ny <= 1.0
+
+    x0, y0, x1, y1 = annotation_bounds_pdf(ann)
+    # dünne Markierungen / Outline-Shapes: Mindestgröße = Slop, Innenfläche zählt
+    if (x1 - x0) < pad * 2.0:
+        mid = (x0 + x1) * 0.5
+        x0, x1 = mid - pad, mid + pad
+    if (y1 - y0) < pad * 2.0:
+        mid = (y0 + y1) * 0.5
+        y0, y1 = mid - pad, mid + pad
+    if t in (AnnotationType.STICKY, AnnotationType.STAMP, AnnotationType.SIGNATURE_FIELD):
+        x1 = max(x1, x0 + 24.0)
+        y1 = max(y1, y0 + 12.0)
+    return (x0 - slop) <= float(x) <= (x1 + slop) and (y0 - slop) <= float(y) <= (y1 + slop)
+
+
+def hit_test_annotations(
+    anns: Sequence[Annotation],
+    x: float,
+    y: float,
+    *,
+    slop_pt: float = 4.0,
+    is_visible=None,
+) -> Optional[Annotation]:
+    """Oberste getroffene Annotation (Listenende = vorn). ``x,y`` in derselben Einheit wie die Anns."""
+    for ann in reversed(list(anns or ())):
+        if is_visible is not None and not is_visible(ann):
+            continue
+        if annotation_contains_point(ann, x, y, slop_pt=slop_pt):
+            return ann
+    return None
+
+
+def annotations_intersect_rect(
+    ann: Annotation,
+    x0: float,
+    y0: float,
+    x1: float,
+    y1: float,
+) -> bool:
+    """True wenn das Achsen-Rechteck der Annotation das Band schneidet (PDF-Punkte)."""
+    ax0, ay0, ax1, ay1 = annotation_bounds_pdf(ann)
+    rx0, rx1 = (x0, x1) if x0 <= x1 else (x1, x0)
+    ry0, ry1 = (y0, y1) if y0 <= y1 else (y1, y0)
+    return not (ax1 < rx0 or ax0 > rx1 or ay1 < ry0 or ay0 > ry1)
+
+
 def smooth_ink_points(
     points: Sequence[Sequence[float]],
     *,
