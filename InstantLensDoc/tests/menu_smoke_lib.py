@@ -253,9 +253,18 @@ EDITOR_ONLY_NEEDLES = (
     "editor-minimap",
     "einrückungs-guides",
     "sonderzeichen anzeigen",
-    "fett",
-    "kursiv",
-    "unterstrichen",
+    "durchgestrichen",
+    "schriftart",
+    "schriftgröße",
+    "schriftfarbe",
+    "texthervorhebung",
+    "formatierungen löschen",
+    "formatvorlage",
+    "aufzählungszeichen",
+    "nummerierung",
+    "zeilenumbruch einfügen",
+    "seitenumbruch einfügen",
+    "tabelle einfügen",
     "groß-/klein",
     "alles groß",
     "alles klein",
@@ -281,6 +290,20 @@ EDITOR_ONLY_IDS = frozenset(
         "toggle_bold",
         "toggle_italic",
         "toggle_underline",
+        "toggle_strike",
+        "clear_formatting",
+        "bullet_list",
+        "numbered_list",
+        "insert_break",
+        "font",
+        "font_color",
+        "highlight",
+        "align_left",
+        "align_center",
+        "align_right",
+        "align_justify",
+        "indent",
+        "outdent",
         "para_align_left",
         "para_align_center",
         "para_align_right",
@@ -699,6 +722,7 @@ def install_qt_hooks(records: list[dict]) -> Callable[[], None]:
     from PySide6.QtWidgets import (
         QColorDialog,
         QFileDialog,
+        QFontDialog,
         QInputDialog,
         QMessageBox,
     )
@@ -767,9 +791,14 @@ def install_qt_hooks(records: list[dict]) -> Callable[[], None]:
     QInputDialog.getItem = staticmethod(_get_item)
     QInputDialog.getMultiLineText = staticmethod(lambda *a, **k: ("audit", True))
 
-    from PySide6.QtGui import QColor
+    from PySide6.QtGui import QColor, QFont
 
     QColorDialog.getColor = staticmethod(lambda *a, **k: QColor("#ffcc00"))
+
+    def _get_font(*a, **k):
+        return QFont("Arial", 12), True
+
+    QFontDialog.getFont = staticmethod(_get_font)
     QDesktopServices.openUrl = staticmethod(lambda *_a, **_k: True)
 
     from PySide6.QtCore import QTimer

@@ -1846,18 +1846,34 @@ class MainWindow(QMainWindow):
             pass
         QTimer.singleShot(0, self._sync_undo_redo_enabled)
         m_edit.addSeparator()
-        for name, slot in [
-            ("Ausschneiden", self.editor.cut),
-            ("Kopieren", self._copy),
-            ("Einfügen", self.editor.paste),
-        ]:
-            a = QAction(name, self)
-            if name == "Kopieren":
-                a.setToolTip(
-                    "Editor-Auswahl oder PDF-Textauswahl (Auswahl-Werkzeug + Aufziehen) → Zwischenablage"
-                )
-            a.triggered.connect(slot)
-            m_edit.addAction(a)
+        act_cut = QAction("Ausschneiden", self)
+        act_cut.setShortcut(QKeySequence.Cut)
+        act_cut.setObjectName("actEditCut")
+        act_cut.setToolTip("Auswahl ausschneiden (Ctrl+X) — Editor")
+        act_cut.triggered.connect(self._cut_editor)
+        m_edit.addAction(self._track_editor_action(act_cut))
+        act_copy = QAction("Kopieren", self)
+        act_copy.setShortcut(QKeySequence.Copy)
+        act_copy.setObjectName("actEditCopy")
+        act_copy.setToolTip(
+            "Editor-Auswahl oder PDF-Textauswahl (Auswahl-Werkzeug + Aufziehen) → Zwischenablage"
+        )
+        act_copy.triggered.connect(self._copy)
+        m_edit.addAction(act_copy)
+        act_paste = QAction("Einfügen", self)
+        act_paste.setShortcut(QKeySequence.Paste)
+        act_paste.setObjectName("actEditPaste")
+        act_paste.setToolTip("Zwischenablage einfügen (Ctrl+V) — Editor")
+        act_paste.triggered.connect(self._paste_editor)
+        m_edit.addAction(self._track_editor_action(act_paste))
+        act_select_all = QAction("Alles auswählen", self)
+        act_select_all.setShortcut(QKeySequence.SelectAll)
+        act_select_all.setObjectName("actEditSelectAll")
+        act_select_all.setToolTip(
+            "Editor: gesamten Text; PDF: alle Annotationen der Seite (Ctrl+A)"
+        )
+        act_select_all.triggered.connect(self._select_all_annotations_on_page)
+        m_edit.addAction(act_select_all)
         act_paste_img = QAction("Bild aus Zwischenablage…", self)
         act_paste_img.setShortcut(QKeySequence("Ctrl+Shift+V"))
         act_paste_img.triggered.connect(self._paste_clipboard_image)
@@ -1870,6 +1886,8 @@ class MainWindow(QMainWindow):
         m_edit.addSeparator()
         act_find = QAction("Suchen…", self)
         act_find.setShortcut(QKeySequence.Find)
+        act_find.setObjectName("actEditFind")
+        act_find.setToolTip("Editor: Suchen/Ersetzen; PDF: Sidebar-Suche (Ctrl+F)")
         act_find.triggered.connect(self._focus_search)
         m_edit.addAction(act_find)
         act_find_next = QAction("Weitersuchen", self)
@@ -1909,6 +1927,90 @@ class MainWindow(QMainWindow):
         act_underline.setToolTip("Unterstrichen (QTextCharFormat, Buchstaben inkl.) — 2.6.49")
         act_underline.triggered.connect(self._toggle_underline)
         m_edit.addAction(self._track_editor_action(act_underline))
+        act_strike = QAction("Durchgestrichen", self)
+        act_strike.setShortcut(QKeySequence("Ctrl+Shift+X"))
+        act_strike.setObjectName("actEditStrike")
+        act_strike.setToolTip("Durchgestrichen (QTextCharFormat) — Ctrl+Shift+X")
+        act_strike.triggered.connect(self._toggle_strike)
+        m_edit.addAction(self._track_editor_action(act_strike))
+        act_font = QAction("Schriftart…", self)
+        act_font.setObjectName("actEditFont")
+        act_font.setToolTip("Schriftart und -größe (QFontDialog)")
+        act_font.triggered.connect(self._choose_font)
+        m_edit.addAction(self._track_editor_action(act_font))
+        act_font_size = QAction("Schriftgröße…", self)
+        act_font_size.setObjectName("actEditFontSize")
+        act_font_size.setToolTip("Schriftgröße in Punkt")
+        act_font_size.triggered.connect(self._choose_font_size)
+        m_edit.addAction(self._track_editor_action(act_font_size))
+        act_font_color = QAction("Schriftfarbe…", self)
+        act_font_color.setObjectName("actEditFontColor")
+        act_font_color.setToolTip("Textfarbe (QColorDialog)")
+        act_font_color.triggered.connect(self._choose_font_color)
+        m_edit.addAction(self._track_editor_action(act_font_color))
+        act_highlight = QAction("Texthervorhebung…", self)
+        act_highlight.setObjectName("actEditHighlight")
+        act_highlight.setToolTip("Textmarker-Farbe (QTextCharFormat.background)")
+        act_highlight.triggered.connect(self._choose_highlight_color)
+        m_edit.addAction(self._track_editor_action(act_highlight))
+        act_clear_fmt = QAction("Formatierungen löschen", self)
+        act_clear_fmt.setShortcut(QKeySequence("Ctrl+Space"))
+        act_clear_fmt.setObjectName("actEditClearFormatting")
+        act_clear_fmt.setToolTip("Zeichen- und Absatzformat auf Standard zurücksetzen")
+        act_clear_fmt.triggered.connect(self._clear_formatting)
+        m_edit.addAction(self._track_editor_action(act_clear_fmt))
+        m_styles = m_edit.addMenu("Formatvorlagen")
+        m_styles.setObjectName("menuEditStyles")
+        m_styles.setToolTip("Absatzstile: Normal, Überschrift, Zitat")
+        self._editor_only_menus.append(m_styles)
+        for sid, label in (
+            ("normal", "Normal"),
+            ("h1", "Überschrift 1"),
+            ("h2", "Überschrift 2"),
+            ("h3", "Überschrift 3"),
+            ("quote", "Zitat"),
+        ):
+            a_st = QAction(label, self)
+            a_st.setObjectName(f"actEditStyle_{sid}")
+            a_st.triggered.connect(lambda _c=False, s=sid: self._apply_paragraph_style(s))
+            m_styles.addAction(a_st)
+        act_bullet = QAction("Aufzählungszeichen", self)
+        act_bullet.setShortcut(QKeySequence("Ctrl+Shift+L"))
+        act_bullet.setObjectName("actEditBulletList")
+        act_bullet.setToolTip("Aufzählung ein/aus (• )")
+        act_bullet.triggered.connect(lambda: self._toggle_list(ordered=False))
+        m_edit.addAction(self._track_editor_action(act_bullet))
+        act_number = QAction("Nummerierung", self)
+        act_number.setObjectName("actEditNumberedList")
+        act_number.setToolTip("Nummerierte Liste ein/aus (1. )")
+        act_number.triggered.connect(lambda: self._toggle_list(ordered=True))
+        m_edit.addAction(self._track_editor_action(act_number))
+        act_para_dlg = QAction("Absatz…", self)
+        act_para_dlg.setObjectName("actEditParagraph")
+        act_para_dlg.setToolTip("Zeilenabstand und Abstand davor/danach")
+        act_para_dlg.triggered.connect(self._paragraph_format_dialog)
+        m_edit.addAction(self._track_editor_action(act_para_dlg))
+        act_break_line = QAction("Zeilenumbruch einfügen", self)
+        act_break_line.setObjectName("actEditInsertLineBreak")
+        act_break_line.setToolTip("Harter Zeilenumbruch an der Cursorposition")
+        act_break_line.triggered.connect(lambda: self._insert_break("line"))
+        m_edit.addAction(self._track_editor_action(act_break_line))
+        act_break_page = QAction("Seitenumbruch einfügen", self)
+        act_break_page.setShortcut(QKeySequence("Ctrl+Enter"))
+        act_break_page.setObjectName("actEditInsertPageBreak")
+        act_break_page.setToolTip("Seitenumbruch (Ctrl+Enter)")
+        act_break_page.triggered.connect(lambda: self._insert_break("page"))
+        m_edit.addAction(self._track_editor_action(act_break_page))
+        act_link_edit = QAction("Hyperlink…", self)
+        act_link_edit.setObjectName("actEditHyperlink")
+        act_link_edit.setToolTip("Hyperlink in den Editor einfügen — Ctrl+Shift+K")
+        act_link_edit.triggered.connect(self._insert_hyperlink_dialog)
+        m_edit.addAction(self._track_editor_action(act_link_edit))
+        act_table_edit = QAction("Tabelle einfügen…", self)
+        act_table_edit.setObjectName("actEditInsertTable")
+        act_table_edit.setToolTip("Tabelle an Cursor einfügen")
+        act_table_edit.triggered.connect(self._insert_table_dialog)
+        m_edit.addAction(self._track_editor_action(act_table_edit))
         act_auto_fmt = QAction("Automatische Formatierung", self)
         act_auto_fmt.setShortcut(QKeySequence("Ctrl+Alt+Shift+F"))
         act_auto_fmt.setToolTip(
@@ -2397,9 +2499,9 @@ class MainWindow(QMainWindow):
         act_paste_ann.triggered.connect(self._paste_annotations)
         m_edit.addAction(act_paste_ann)
         act_sel_all_ann = QAction("Alle Annotationen auf Seite auswählen", self)
-        act_sel_all_ann.setShortcut(QKeySequence.SelectAll)  # Ctrl+A
+        act_sel_all_ann.setObjectName("actSelectAllAnnotations")
         act_sel_all_ann.setToolTip(
-            "PDF: alle Annotationen der Seite; Editor: gesamten Text auswählen"
+            "PDF: alle Annotationen der Seite; Editor: gesamten Text (Ctrl+A: Alles auswählen)"
         )
         act_sel_all_ann.triggered.connect(self._select_all_annotations_on_page)
         m_edit.addAction(act_sel_all_ann)
@@ -3683,6 +3785,20 @@ class MainWindow(QMainWindow):
             "fett",
             "kursiv",
             "unterstrichen",
+            "durchgestrichen",
+            "schriftart",
+            "schriftgröße",
+            "schriftfarbe",
+            "texthervorhebung",
+            "formatierungen löschen",
+            "formatvorlage",
+            "aufzählungszeichen",
+            "nummerierung",
+            "absatz…",
+            "zeilenumbruch einfügen",
+            "seitenumbruch einfügen",
+            "tabelle einfügen",
+            "hyperlink",
             "groß-/klein",
             "alles groß",
             "alles klein",
@@ -3855,20 +3971,44 @@ class MainWindow(QMainWindow):
                 "insert_hyperlink",
                 "insert_shape",
                 "insert_snippet",
+                "insert_table",
+                "insert_break",
                 "find_replace",
                 "spellcheck",
                 "auto_toc",
                 "auto_lof",
                 "auto_index",
                 "page_layout",
+                "bold",
+                "italic",
+                "underline",
+                "strike",
+                "highlight",
+                "align_left",
+                "align_center",
+                "align_right",
+                "align_justify",
+                "bullet_list",
+                "numbered_list",
+                "indent",
+                "outdent",
+                "clear_formatting",
+                "font",
+                "font_color",
             }
             for aid, btn in (getattr(rb, "_actions", {}) or {}).items():
                 if aid in always:
-                    btn.setEnabled(True)
+                    on = True
                 elif aid in pdf_ids:
-                    btn.setEnabled(bool(is_pdf))
+                    on = bool(is_pdf)
                 elif aid in editor_ids:
-                    btn.setEnabled(bool(is_editor))
+                    on = bool(is_editor)
+                else:
+                    continue
+                if hasattr(rb, "set_enabled"):
+                    rb.set_enabled(aid, on)
+                else:
+                    btn.setEnabled(on)
 
         pane = getattr(self, "editor_pane", None)
         if pane is not None:
@@ -7262,6 +7402,24 @@ class MainWindow(QMainWindow):
             "spellcheck": self._check_spelling,
             "undo": self._undo,
             "redo": self._redo,
+            "bold": self._toggle_bold,
+            "italic": self._toggle_italic,
+            "underline": self._toggle_underline,
+            "strike": self._toggle_strike,
+            "highlight": self._mark_selection,
+            "align_left": lambda: self._set_paragraph_alignment("left"),
+            "align_center": lambda: self._set_paragraph_alignment("center"),
+            "align_right": lambda: self._set_paragraph_alignment("right"),
+            "align_justify": lambda: self._set_paragraph_alignment("justify"),
+            "bullet_list": lambda: self._toggle_list(ordered=False),
+            "numbered_list": lambda: self._toggle_list(ordered=True),
+            "indent": self._indent_selection,
+            "outdent": self._outdent_selection,
+            "clear_formatting": self._clear_formatting,
+            "font": self._choose_font,
+            "font_color": self._choose_font_color,
+            "insert_table": self._insert_table_dialog,
+            "insert_break": lambda: self._insert_break("page"),
             "autocorrect_toggle": self._toggle_autocorrect,
             "insert_snippet": lambda: self._insert_snippet(0),
             "review_mode": self._show_review_dialog,
@@ -7912,7 +8070,8 @@ class MainWindow(QMainWindow):
     def _indent_selection(self):
         if not self._guard_editor_action("Einrückung"):
             return
-        if self.editor.indent_selection():
+        if self.editor.adjust_block_indent(+24.0):
+            self._sync_editor_rich_meta()
             self._set_status("Einrückung erhöht")
         else:
             self._set_status("Einrückung nicht möglich")
@@ -7920,7 +8079,8 @@ class MainWindow(QMainWindow):
     def _outdent_selection(self):
         if not self._guard_editor_action("Einrückung"):
             return
-        if self.editor.outdent_selection():
+        if self.editor.adjust_block_indent(-24.0):
+            self._sync_editor_rich_meta()
             self._set_status("Einrückung verringert")
         else:
             self._set_status("Einrückung nicht möglich")
@@ -9195,6 +9355,10 @@ class MainWindow(QMainWindow):
         self._set_status(f"Favorit → Seite {int(page_index) + 1}")
 
     def _focus_search(self):
+        """Ctrl+F: Editor → Suchen/Ersetzen; PDF → Sidebar-Suche."""
+        if self._editor_document_active():
+            self._find_replace()
+            return
         self.sidebar.setVisible(True)
         le = self.sidebar.search.lineEdit()
         if le is not None:
@@ -9295,6 +9459,139 @@ class MainWindow(QMainWindow):
         self._sync_editor_rich_meta()
         self._set_status("Unterstrichen (Zeichenformat)")
 
+    def _toggle_strike(self) -> None:
+        if not self._guard_editor_action("Durchgestrichen"):
+            return
+        self.editor.toggle_strike_selection()
+        self._sync_editor_rich_meta()
+        self._set_status("Durchgestrichen (Zeichenformat)")
+
+    def _cut_editor(self) -> None:
+        if not self._guard_editor_action("Ausschneiden"):
+            return
+        self.editor.cut()
+        self._sync_editor_rich_meta()
+
+    def _paste_editor(self) -> None:
+        if not self._guard_editor_action("Einfügen"):
+            return
+        self.editor.paste()
+        self._sync_editor_rich_meta()
+
+    def _choose_font(self) -> None:
+        if not self._guard_editor_action("Schriftart"):
+            return
+        from PySide6.QtWidgets import QFontDialog
+
+        current = self.editor.currentCharFormat().font()
+        if current.family() == "":
+            current = self.editor.document().defaultFont()
+        font, ok = QFontDialog.getFont(current, self, "Schriftart")
+        if not ok:
+            return
+        self.editor.apply_font_family(font.family())
+        size = float(font.pointSizeF() or font.pointSize() or 0)
+        if size > 0:
+            self.editor.apply_font_size(size)
+        self._sync_editor_rich_meta()
+        self._set_status(f"Schriftart: {font.family()} {size:g} pt".strip())
+
+    def _choose_font_size(self) -> None:
+        if not self._guard_editor_action("Schriftgröße"):
+            return
+        from PySide6.QtWidgets import QInputDialog
+
+        probe = self.editor.currentCharFormat()
+        cur_sz = int(probe.fontPointSize() or self.editor.document().defaultFont().pointSize() or 11)
+        size, ok = QInputDialog.getInt(self, "Schriftgröße", "Punkt:", cur_sz, 6, 96)
+        if not ok:
+            return
+        self.editor.apply_font_size(float(size))
+        self._sync_editor_rich_meta()
+        self._set_status(f"Schriftgröße: {size} pt")
+
+    def _choose_font_color(self) -> None:
+        if not self._guard_editor_action("Schriftfarbe"):
+            return
+        from PySide6.QtWidgets import QColorDialog
+
+        color = QColorDialog.getColor(self.editor.currentCharFormat().foreground().color(), self, "Schriftfarbe")
+        if color is None or not color.isValid():
+            return
+        self.editor.apply_font_color(color)
+        self._sync_editor_rich_meta()
+        self._set_status(f"Schriftfarbe: {color.name()}")
+
+    def _choose_highlight_color(self) -> None:
+        if not self._guard_editor_action("Texthervorhebung"):
+            return
+        from PySide6.QtWidgets import QColorDialog
+
+        color = QColorDialog.getColor(
+            QColor(self.editor.HIGHLIGHT_COLOR), self, "Texthervorhebung"
+        )
+        if color is None or not color.isValid():
+            return
+        from PySide6.QtGui import QTextCursor
+
+        cur = self.editor.textCursor()
+        if not cur.hasSelection():
+            cur.select(QTextCursor.WordUnderCursor)
+            self.editor.setTextCursor(cur)
+        self.editor.apply_highlight_color(color)
+        self._sync_editor_rich_meta()
+        self._set_status(f"Texthervorhebung: {color.name()}")
+
+    def _clear_formatting(self) -> None:
+        if not self._guard_editor_action("Formatierungen löschen"):
+            return
+        self.editor.clear_formatting()
+        self._sync_editor_rich_meta()
+        self._set_status("Formatierungen gelöscht")
+
+    def _apply_paragraph_style(self, style_id: str) -> None:
+        if not self._guard_editor_action("Formatvorlage"):
+            return
+        self.editor.apply_style_paragraph(style_id)
+        self._sync_editor_rich_meta()
+        self._set_status(f"Formatvorlage: {style_id}")
+
+    def _toggle_list(self, *, ordered: bool = False) -> None:
+        if not self._guard_editor_action("Liste"):
+            return
+        self.editor.toggle_list(ordered=ordered)
+        self._sync_editor_rich_meta()
+        self._set_status("Nummerierung" if ordered else "Aufzählung")
+
+    def _insert_break(self, kind: str = "line") -> None:
+        if not self._guard_editor_action("Umbruch"):
+            return
+        self.editor.insert_break(kind)
+        self._sync_editor_rich_meta()
+        self._set_status("Seitenumbruch" if kind == "page" else "Zeilenumbruch")
+
+    def _paragraph_format_dialog(self) -> None:
+        if not self._guard_editor_action("Absatz"):
+            return
+        from PySide6.QtWidgets import QInputDialog
+
+        ls, ok = QInputDialog.getDouble(self, "Absatz", "Zeilenabstand:", 1.15, 0.5, 4.0, 2)
+        if not ok:
+            return
+        sb, ok = QInputDialog.getDouble(self, "Absatz", "Abstand davor (pt):", 0.0, 0.0, 72.0, 1)
+        if not ok:
+            return
+        sa, ok = QInputDialog.getDouble(self, "Absatz", "Abstand danach (pt):", 8.0, 0.0, 72.0, 1)
+        if not ok:
+            return
+        self.editor.set_paragraph_spacing(
+            line_spacing=float(ls),
+            space_before_pt=float(sb),
+            space_after_pt=float(sa),
+        )
+        self._sync_editor_rich_meta()
+        self._set_status(f"Absatz: Abstand {ls:g} / {sb:g} / {sa:g} pt")
+
     def _sync_editor_rich_meta(self) -> None:
         """Plaintext + HTML-Meta aus dem Editor für DOCX/HTML/RTF-Speichern — 2.6.49."""
         if not self.doc:
@@ -9313,7 +9610,7 @@ class MainWindow(QMainWindow):
             return
         if self.doc.kind in (DocKind.DOCX, DocKind.HTML, DocKind.RTF) or self.doc.meta.get(
             "rich_text"
-        ):
+        ) or bool(getattr(self.editor, "_rich_mode", False)):
             try:
                 self.doc.meta["html"] = self.editor.to_rich_html()
                 self.doc.meta["rich_text"] = True
@@ -9328,14 +9625,7 @@ class MainWindow(QMainWindow):
         if not self._guard_editor_action("Absatzformat"):
             return
         if self.editor.set_paragraph_alignment(alignment):
-            if self.doc and self.doc.kind in (
-                DocKind.TEXT,
-                DocKind.MARKDOWN,
-                DocKind.HTML,
-                DocKind.DOCX,
-            ):
-                self.doc.text = self.editor.toPlainText()
-                self.doc.dirty = True
+            self._sync_editor_rich_meta()
             self._on_text_changed()
             self._set_status(f"Absatzausrichtung: {alignment}")
         else:
@@ -9348,14 +9638,7 @@ class MainWindow(QMainWindow):
         if not self._guard_editor_action("Zeilenabstand"):
             return
         if self.editor.set_paragraph_spacing(line_spacing=line_spacing):
-            if self.doc and self.doc.kind in (
-                DocKind.TEXT,
-                DocKind.MARKDOWN,
-                DocKind.HTML,
-                DocKind.DOCX,
-            ):
-                self.doc.text = self.editor.toPlainText()
-                self.doc.dirty = True
+            self._sync_editor_rich_meta()
             self._on_text_changed()
             self._set_status(f"Zeilenabstand: {line_spacing:g}")
         else:
@@ -9379,14 +9662,7 @@ class MainWindow(QMainWindow):
         if self.editor.apply_typography(
             tracking=tracking, kerning=kerning, leading=leading
         ):
-            if self.doc and self.doc.kind in (
-                DocKind.TEXT,
-                DocKind.MARKDOWN,
-                DocKind.HTML,
-                DocKind.DOCX,
-            ):
-                self.doc.text = self.editor.toPlainText()
-                self.doc.dirty = True
+            self._sync_editor_rich_meta()
             self._on_text_changed()
             parts = []
             if tracking is not None:
@@ -9406,14 +9682,7 @@ class MainWindow(QMainWindow):
         if not self._guard_editor_action("Drop Cap"):
             return
         if self.editor.apply_drop_cap(lines=3, chars=1):
-            if self.doc and self.doc.kind in (
-                DocKind.TEXT,
-                DocKind.MARKDOWN,
-                DocKind.HTML,
-                DocKind.DOCX,
-            ):
-                self.doc.text = self.editor.toPlainText()
-                self.doc.dirty = True
+            self._sync_editor_rich_meta()
             self._on_text_changed()
             self._set_status("Drop Cap gesetzt (3 Zeilen)")
         else:
@@ -9473,10 +9742,14 @@ class MainWindow(QMainWindow):
         if dlg.exec() != QDialog.Accepted:
             return
         snippet = dlg.result_snippet
-        if selected and cursor.hasSelection():
-            cursor.insertText(snippet)
-        else:
-            self.editor.insertPlainText(snippet if not selected else snippet)
+        label = getattr(dlg, "result_text", "") or selected
+        target = dlg.result_target
+        if not self.editor.insert_hyperlink(label, target) and snippet:
+            if selected and cursor.hasSelection():
+                cursor.insertText(snippet)
+            else:
+                self.editor.insertPlainText(snippet)
+        self._sync_editor_rich_meta()
         if self.doc and self.doc.kind in (
             DocKind.TEXT,
             DocKind.MARKDOWN,
@@ -10655,6 +10928,12 @@ class MainWindow(QMainWindow):
             return
         if aid == "italic":
             self._toggle_italic()
+            return
+        if aid == "strike":
+            self._toggle_strike()
+            return
+        if aid == "clear_format":
+            self._clear_formatting()
             return
         if aid == "clear_marks":
             self._clear_editor_marks()
@@ -13198,6 +13477,15 @@ class MainWindow(QMainWindow):
             "toggle_bold": self._toggle_bold,
             "toggle_italic": self._toggle_italic,
             "toggle_underline": self._toggle_underline,
+            "toggle_strike": self._toggle_strike,
+            "select_all": self._select_all_annotations_on_page,
+            "clear_formatting": self._clear_formatting,
+            "bullet_list": lambda: self._toggle_list(ordered=False),
+            "numbered_list": lambda: self._toggle_list(ordered=True),
+            "insert_break": lambda: self._insert_break("line"),
+            "font": self._choose_font,
+            "font_color": self._choose_font_color,
+            "highlight_color": self._choose_highlight_color,
             "para_align_left": lambda: self._set_paragraph_alignment("left"),
             "para_align_center": lambda: self._set_paragraph_alignment("center"),
             "para_align_right": lambda: self._set_paragraph_alignment("right"),

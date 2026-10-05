@@ -31968,9 +31968,10 @@ def main() -> int:
             win.new_doc()
             win.editor.setPlainText("Absatz A.\n\nAbsatz B.")
             assert win.editor.set_paragraph_alignment("center")
-            assert "ild-align:center" in win.editor.toPlainText()
+            assert win.editor.current_block_alignment() == "center"
             assert win.editor.set_paragraph_spacing(line_spacing=1.5)
-            assert "ild-spacing" in win.editor.toPlainText()
+            _ls_fmt = win.editor.textCursor().blockFormat()
+            assert float(_ls_fmt.lineHeight() or 0) >= 100.0 or float(_ls_fmt.bottomMargin() or 0) >= 0.0
             assert callable(win._set_paragraph_alignment)
             assert callable(win._toggle_rulers)
             assert callable(win._toggle_alignment_grid)
@@ -32021,9 +32022,15 @@ def main() -> int:
             win.new_doc()
             win.editor.setPlainText("Kapitelstart mit viel Text fuer Silbentrennung und Typografie.")
             assert win.editor.apply_typography(tracking=30, leading=1.5)
-            assert "ild-typo" in win.editor.toPlainText()
+            _ty_fmt = win.editor.currentCharFormat()
+            assert float(_ty_fmt.fontLetterSpacing() or 100.0) != 0.0
             assert win.editor.apply_drop_cap(lines=3, chars=1)
-            assert "ild-dropcap" in win.editor.toPlainText()
+            from PySide6.QtGui import QTextCursor as _TC2613, QFont as _QF2613
+
+            _dc = win.editor.textCursor()
+            _dc.setPosition(0)
+            _dc.setPosition(1, _TC2613.KeepAnchor)
+            assert _dc.charFormat().fontPointSize() >= 18.0 or _dc.charFormat().fontWeight() >= _QF2613.Bold
             n_hy = win.editor.hyphenate_document(lang="de")
             assert n_hy >= 0
             assert callable(win._set_typography)

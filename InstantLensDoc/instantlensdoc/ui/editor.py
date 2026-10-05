@@ -12,9 +12,11 @@ from PySide6.QtGui import (
     QFont,
     QImage,
     QPainter,
+    QTextBlockFormat,
     QTextCharFormat,
     QTextCursor,
     QTextDocument,
+    QTextFormat,
     QTextOption,
 )
 from PySide6.QtWidgets import QAbstractScrollArea, QApplication, QPlainTextEdit, QTextEdit, QWidget
@@ -2003,14 +2005,65 @@ class TextEditor(QPlainTextEdit):
             return QTextCharFormat(probe.charFormat())
         return QTextCharFormat(self.currentCharFormat())
 
+    def _ensure_rich_mode(self) -> None:
+        """Zeichen-/Absatzformate sichtbar halten (auch nach Neu/OCR-Text) — 2.6.55."""
+        if bool(getattr(self, "_rich_mode", False)):
+            return
+        self._rich_mode = True
+        try:
+            if getattr(self, "_rich_base_font", None) is None:
+                self._rich_base_font = self._default_rich_font()
+            self.document().setDefaultFont(self._rich_base_font)
+            self.set_soft_wrap(self._soft_wrap)
+        except Exception:
+            pass
+
+    def _iter_selected_blocks(self):
+        """Blöcke der Auswahl bzw. der Cursorzeile (QTextDocument)."""
+        cur = self.textCursor()
+        doc = self.document()
+        if cur.hasSelection():
+            start = min(cur.selectionStart(), cur.selectionEnd())
+            end = max(cur.selectionStart(), cur.selectionEnd())
+            if end > start:
+                end_block = doc.findBlock(end - 1)
+            else:
+                end_block = doc.findBlock(end)
+        else:
+            start = cur.position()
+            end_block = doc.findBlock(start)
+        block = doc.findBlock(start)
+        while block.isValid() and block.blockNumber() <= end_block.blockNumber():
+            yield block
+            block = block.next()
+
+    def _apply_to_selected_blocks(self, mutator) -> int:
+        """``mutator(QTextBlockFormat) -> QTextBlockFormat`` auf Auswahl-Blöcke."""
+        self._ensure_rich_mode()
+        n = 0
+        cur = self.textCursor()
+        cur.beginEditBlock()
+        try:
+            for block in self._iter_selected_blocks():
+                bcur = QTextCursor(block)
+                fmt = QTextBlockFormat(block.blockFormat())
+                mutator(fmt)
+                bcur.setBlockFormat(fmt)
+                n += 1
+        finally:
+            cur.endEditBlock()
+        return n
+
     def toggle_char_format(
         self,
         *,
         bold: bool | None = None,
         italic: bool | None = None,
         underline: bool | None = None,
+        strike: bool | None = None,
     ) -> bool:
         """QTextCharFormat auf Auswahl toggeln — nie Markdown-Marker — 2.6.49."""
+        self._ensure_rich_mode()
         cur = self._selection_or_word_cursor()
         probe = self._selection_probe_format(cur)
         fmt = QTextCharFormat()
@@ -2031,6 +2084,11 @@ class TextEditor(QPlainTextEdit):
                 make_on = not bool(probe.fontUnderline())
             # Unterstreicht Buchstaben inkl. Selection — nicht nur Whitespace
             fmt.setFontUnderline(bool(make_on))
+        if strike is not None:
+            make_on = strike
+            if strike is True:
+                make_on = not bool(probe.fontStrikeOut())
+            fmt.setFontStrikeOut(bool(make_on))
         if not cur.hasSelection():
             self.mergeCurrentCharFormat(fmt)
             return True
@@ -2060,6 +2118,10 @@ class TextEditor(QPlainTextEdit):
         """Unterstrichen via QTextCharFormat (kein ``__``) — 2.6.49."""
         return self.toggle_char_format(underline=True)
 
+    def toggle_strike_selection(self) -> bool:
+        """Durchgestrichen via QTextCharFormat — 2.6.55."""
+        return self.toggle_char_format(strike=True)
+
     def selection_font_bold(self) -> bool:
         return self._selection_probe_format(self.textCursor()).fontWeight() >= QFont.Bold
 
@@ -2068,6 +2130,122 @@ class TextEditor(QPlainTextEdit):
 
     def selection_font_underline(self) -> bool:
         return bool(self._selection_probe_format(self.textCursor()).fontUnderline())
+
+    def selection_font_strike(self) -> bool:
+        return bool(self._selection_probe_format(self.textCursor()).fontStrikeOut())
+
+    def apply_font_family(self, family: str) -> bool:
+        """Schriftart auf Auswahl bzw. Cursor — 2.6.55."""
+        name = (family or "").strip()
+        if not name:
+            return False
+        self._ensure_rich_mode()
+        fmt = QTextCharFormat()
+        fmt.setFontFamily(name)
+        return self._merge_char_format(fmt)
+
+    def apply_font_size(self, point_size: float) -> bool:
+        """Schriftgröße in Punkt auf Auswahl bzw. Cursor — 2.6.55."""
+        size = float(point_size)
+        if size <= 0:
+            return False
+        self._ensure_rich_mode()
+        fmt = QTextCharFormat()
+        fmt.setFontPointSize(size)
+        return self._merge_char_format(fmt)
+
+    def apply_font_color(self, color: str | QColor) -> bool:
+        """Schriftfarbe auf Auswahl bzw. Cursor — 2.6.55."""
+        qcolor = color if isinstance(color, QColor) else QColor(str(color or ""))
+        if not qcolor.isValid():
+            return False
+        self._ensure_rich_mode()
+        fmt = QTextCharFormat()
+        fmt.setForeground(QBrush(qcolor))
+        return self._merge_char_format(fmt)
+
+    def apply_highlight_color(self, color: str | QColor = "#FFE066") -> bool:
+        """Textmarker-Hintergrund setzen (kein Toggle) — 2.6.55."""
+        qcolor = color if isinstance(color, QColor) else QColor(str(color or self.HIGHLIGHT_COLOR))
+        if not qcolor.isValid():
+            qcolor = QColor(self.HIGHLIGHT_COLOR)
+        self._ensure_rich_mode()
+        fmt = QTextCharFormat()
+        fmt.setBackground(QBrush(qcolor))
+        return self._merge_char_format(fmt)
+
+    def _merge_char_format(self, fmt: QTextCharFormat) -> bool:
+        cur = self._selection_or_word_cursor()
+        if not cur.hasSelection():
+            self.mergeCurrentCharFormat(fmt)
+            return True
+        cur.beginEditBlock()
+        try:
+            cur.mergeCharFormat(fmt)
+            self.setTextCursor(cur)
+            self.mergeCurrentCharFormat(fmt)
+        finally:
+            cur.endEditBlock()
+        return True
+
+    def clear_formatting(self) -> bool:
+        """Zeichen- und Absatzformat der Auswahl auf Dokument-Default — 2.6.55."""
+        self._ensure_rich_mode()
+        cur = self.textCursor()
+        if not cur.hasSelection():
+            cur.select(QTextCursor.BlockUnderCursor)
+        base = QFont(self.document().defaultFont())
+        char = QTextCharFormat()
+        char.setFont(base)
+        char.setFontWeight(QFont.Normal)
+        char.setFontItalic(False)
+        char.setFontUnderline(False)
+        char.setFontStrikeOut(False)
+        char.setAnchor(False)
+        char.setAnchorHref("")
+        char.setForeground(QBrush())
+        char.setBackground(QBrush(Qt.NoBrush))
+        cur.beginEditBlock()
+        try:
+            cur.setCharFormat(char)
+            self.setTextCursor(cur)
+            self.setCurrentCharFormat(char)
+
+            def _reset(fmt: QTextBlockFormat) -> None:
+                fmt.setAlignment(Qt.AlignLeft | Qt.AlignAbsolute)
+                fmt.setLeftMargin(0.0)
+                fmt.setRightMargin(0.0)
+                fmt.setTextIndent(0.0)
+                fmt.setTopMargin(0.0)
+                fmt.setBottomMargin(0.0)
+                self._set_block_line_height(fmt, 1.0)
+
+            self._apply_to_selected_blocks(_reset)
+        finally:
+            cur.endEditBlock()
+        return True
+
+    @staticmethod
+    def _set_block_line_height(fmt: QTextBlockFormat, factor: float) -> None:
+        pct = max(50.0, float(factor) * 100.0)
+        try:
+            fmt.setLineHeight(pct, QTextBlockFormat.ProportionalHeight)
+        except Exception:
+            try:
+                kind = int(QTextBlockFormat.LineHeightTypes.ProportionalHeight)
+                fmt.setLineHeight(pct, kind)
+            except Exception:
+                fmt.setBottomMargin(max(0.0, (float(factor) - 1.0) * 12.0))
+
+    def current_block_alignment(self) -> str:
+        align = int(self.textCursor().blockFormat().alignment())
+        if align & int(Qt.AlignJustify):
+            return "justify"
+        if align & int(Qt.AlignHCenter):
+            return "center"
+        if align & int(Qt.AlignRight):
+            return "right"
+        return "left"
 
     def _replace_all_text_undoable(self, new_text: str) -> None:
         """Gesamten Text ersetzen als **ein** Undo-Schritt — ohne den Verlauf zu löschen.
@@ -2108,29 +2286,29 @@ class TextEditor(QPlainTextEdit):
         return int(result.changed_lines)
 
     def current_paragraph_index(self) -> int:
-        """0-basierter Absatzindex unter dem Cursor (Leerzeilen-getrennt)."""
-        text = self.toPlainText().replace("\r\n", "\n")
-        pos = self.textCursor().position()
-        before = text[:pos]
-        # Absätze = Blöcke getrennt durch Leerzeile
-        parts = before.split("\n\n")
-        return max(0, len(parts) - 1)
+        """0-basierter Blockindex unter dem Cursor."""
+        return max(0, int(self.textCursor().blockNumber()))
 
     def set_paragraph_alignment(self, alignment: str, *, all_paragraphs: bool = False) -> bool:
-        """Absatzausrichtung (left/center/right/justify) via Marker — 2.6.11."""
-        from ild_pdf.page_layout import apply_paragraph_format, PARAGRAPH_ALIGNMENTS
+        """Absatzausrichtung visuell via QTextBlockFormat — 2.6.55."""
+        mapping = {
+            "left": Qt.AlignLeft | Qt.AlignAbsolute,
+            "center": Qt.AlignHCenter,
+            "right": Qt.AlignRight | Qt.AlignAbsolute,
+            "justify": Qt.AlignJustify,
+        }
+        align = mapping.get((alignment or "left").lower().strip())
+        if align is None:
+            return False
+        if all_paragraphs:
+            cur = self.textCursor()
+            cur.select(QTextCursor.Document)
+            self.setTextCursor(cur)
 
-        align = (alignment or "left").lower().strip()
-        if align not in PARAGRAPH_ALIGNMENTS:
-            return False
-        idx = None if all_paragraphs else self.current_paragraph_index()
-        new_text = apply_paragraph_format(
-            self.toPlainText(), alignment=align, paragraph_index=idx
-        )
-        if new_text == self.toPlainText():
-            return False
-        self._replace_all_text_undoable(new_text)
-        return True
+        def _mut(fmt: QTextBlockFormat) -> None:
+            fmt.setAlignment(align)
+
+        return self._apply_to_selected_blocks(_mut) > 0
 
     def set_paragraph_spacing(
         self,
@@ -2140,30 +2318,70 @@ class TextEditor(QPlainTextEdit):
         space_after_pt: float | None = None,
         all_paragraphs: bool = False,
     ) -> bool:
-        """Zeilen-/Absatzabstand via Marker — 2.6.11."""
-        from ild_pdf.page_layout import apply_paragraph_format
+        """Zeilen-/Absatzabstand via QTextBlockFormat — 2.6.55."""
+        if all_paragraphs:
+            cur = self.textCursor()
+            cur.select(QTextCursor.Document)
+            self.setTextCursor(cur)
 
-        idx = None if all_paragraphs else self.current_paragraph_index()
-        new_text = apply_paragraph_format(
-            self.toPlainText(),
-            line_spacing=line_spacing,
-            space_before_pt=space_before_pt,
-            space_after_pt=space_after_pt,
-            paragraph_index=idx,
-        )
-        if new_text == self.toPlainText():
+        def _mut(fmt: QTextBlockFormat) -> None:
+            if line_spacing is not None:
+                self._set_block_line_height(fmt, float(line_spacing))
+            if space_before_pt is not None:
+                fmt.setTopMargin(max(0.0, float(space_before_pt)))
+            if space_after_pt is not None:
+                fmt.setBottomMargin(max(0.0, float(space_after_pt)))
+
+        if line_spacing is None and space_before_pt is None and space_after_pt is None:
             return False
-        self._replace_all_text_undoable(new_text)
-        return True
+        return self._apply_to_selected_blocks(_mut) > 0
 
     def apply_style_paragraph(self, style_id: str = "body") -> bool:
-        """Absatzattribute eines Style-Presets anwenden — 2.6.11."""
-        from ild_pdf.page_layout import apply_style_paragraph_defaults
+        """Absatzstil (Normal/Überschrift/Zitat) als QText-Formate — 2.6.55."""
+        sid = (style_id or "body").strip().lower()
+        presets = {
+            "body": {"size": 11.0, "bold": False, "italic": False, "align": "left", "indent": 0.0},
+            "normal": {"size": 11.0, "bold": False, "italic": False, "align": "left", "indent": 0.0},
+            "h1": {"size": 18.0, "bold": True, "italic": False, "align": "left", "indent": 0.0},
+            "heading1": {"size": 18.0, "bold": True, "italic": False, "align": "left", "indent": 0.0},
+            "h2": {"size": 14.0, "bold": True, "italic": False, "align": "left", "indent": 0.0},
+            "heading2": {"size": 14.0, "bold": True, "italic": False, "align": "left", "indent": 0.0},
+            "h3": {"size": 12.0, "bold": True, "italic": True, "align": "left", "indent": 0.0},
+            "heading3": {"size": 12.0, "bold": True, "italic": True, "align": "left", "indent": 0.0},
+            "quote": {"size": 11.0, "bold": False, "italic": True, "align": "left", "indent": 36.0},
+            "zitat": {"size": 11.0, "bold": False, "italic": True, "align": "left", "indent": 36.0},
+        }
+        spec = presets.get(sid, presets["body"])
+        self._ensure_rich_mode()
+        char = QTextCharFormat()
+        char.setFontPointSize(float(spec["size"]))
+        char.setFontWeight(QFont.Bold if spec["bold"] else QFont.Normal)
+        char.setFontItalic(bool(spec["italic"]))
+        if sid in ("quote", "zitat"):
+            char.setForeground(QBrush(QColor("#4B5563")))
+        align_name = str(spec["align"])
+        indent = float(spec["indent"])
+        cur = self.textCursor()
+        if not cur.hasSelection():
+            cur.select(QTextCursor.BlockUnderCursor)
+        cur.beginEditBlock()
+        try:
+            cur.mergeCharFormat(char)
+            self.setTextCursor(cur)
 
-        new_text = apply_style_paragraph_defaults(self.toPlainText(), style_id=style_id)
-        if new_text == self.toPlainText():
-            return False
-        self._replace_all_text_undoable(new_text)
+            def _mut(fmt: QTextBlockFormat) -> None:
+                mapping = {
+                    "left": Qt.AlignLeft | Qt.AlignAbsolute,
+                    "center": Qt.AlignHCenter,
+                    "right": Qt.AlignRight | Qt.AlignAbsolute,
+                    "justify": Qt.AlignJustify,
+                }
+                fmt.setAlignment(mapping.get(align_name, Qt.AlignLeft))
+                fmt.setLeftMargin(indent)
+
+            self._apply_to_selected_blocks(_mut)
+        finally:
+            cur.endEditBlock()
         return True
 
     def apply_typography(
@@ -2177,38 +2395,146 @@ class TextEditor(QPlainTextEdit):
         char_style_id: str | None = None,
         all_paragraphs: bool = False,
     ) -> bool:
-        """Tracking/Kerning/Leading/Drop-Cap — 2.6.13."""
-        from ild_pdf.typography import apply_typography
-
-        idx = None if all_paragraphs else self.current_paragraph_index()
-        new_text = apply_typography(
-            self.toPlainText(),
-            tracking=tracking,
-            kerning=kerning,
-            leading=leading,
-            drop_cap_lines=drop_cap_lines,
-            drop_cap_chars=drop_cap_chars,
-            char_style_id=char_style_id,
-            paragraph_index=idx,
-        )
-        if new_text == self.toPlainText():
-            return False
-        self._replace_all_text_undoable(new_text)
-        return True
+        """Tracking/Kerning/Leading/Drop-Cap visuell — 2.6.55."""
+        changed = False
+        if tracking is not None or kerning is not None:
+            self._ensure_rich_mode()
+            fmt = QTextCharFormat()
+            spacing = 100.0
+            if tracking is not None:
+                spacing += float(tracking) * 0.1
+            if kerning is not None:
+                spacing += float(kerning) * 0.1
+            try:
+                fmt.setFontLetterSpacingType(QFont.PercentageSpacing)
+            except Exception:
+                pass
+            fmt.setFontLetterSpacing(spacing)
+            changed = self._merge_char_format(fmt) or changed
+        if leading is not None:
+            changed = (
+                self.set_paragraph_spacing(line_spacing=float(leading), all_paragraphs=all_paragraphs)
+                or changed
+            )
+        if drop_cap_lines or drop_cap_chars:
+            changed = (
+                self.apply_drop_cap(
+                    lines=int(drop_cap_lines or 3),
+                    chars=int(drop_cap_chars or 1),
+                )
+                or changed
+            )
+        if char_style_id:
+            changed = self.apply_style_paragraph(str(char_style_id)) or changed
+        return bool(changed)
 
     def apply_drop_cap(self, *, lines: int = 3, chars: int = 1) -> bool:
-        """Drop Cap auf aktuellen Absatz — 2.6.13."""
-        from ild_pdf.typography import apply_drop_cap
-
-        new_text = apply_drop_cap(
-            self.toPlainText(),
-            lines=int(lines),
-            chars=int(chars),
-            paragraph_index=self.current_paragraph_index(),
-        )
-        if new_text == self.toPlainText():
+        """Erstes Zeichen des Absatzes visuell vergrößern — 2.6.55."""
+        self._ensure_rich_mode()
+        block = self.textCursor().block()
+        text = block.text() or ""
+        n = max(1, int(chars))
+        i = 0
+        while i < len(text) and text[i].isspace():
+            i += 1
+        if i >= len(text):
             return False
-        self._replace_all_text_undoable(new_text)
+        take = min(n, len(text) - i)
+        cur = QTextCursor(block)
+        cur.setPosition(block.position() + i)
+        cur.setPosition(block.position() + i + take, QTextCursor.KeepAnchor)
+        probe = self._selection_probe_format(cur)
+        base = float(probe.fontPointSize() or 0.0)
+        if base <= 0:
+            base = float(self.document().defaultFont().pointSizeF() or 11.0)
+        fmt = QTextCharFormat()
+        fmt.setFontPointSize(max(18.0, base * max(2.0, float(lines))))
+        fmt.setFontWeight(QFont.Bold)
+        cur.mergeCharFormat(fmt)
+        return True
+
+    def adjust_block_indent(self, delta_px: float = 24.0) -> bool:
+        """Absatzeinzug über linken Rand (Word-ähnlich) — 2.6.55."""
+        delta = float(delta_px)
+
+        def _mut(fmt: QTextBlockFormat) -> None:
+            fmt.setLeftMargin(max(0.0, float(fmt.leftMargin()) + delta))
+
+        return self._apply_to_selected_blocks(_mut) > 0
+
+    def toggle_list(self, *, ordered: bool = False) -> bool:
+        """Aufzählung oder Nummerierung als sichtbare Präfixe — 2.6.55."""
+        import re
+
+        blocks = list(self._iter_selected_blocks())
+        if not blocks:
+            return False
+        bullet_re = re.compile(r"^(\s*)(?:[•\-\*]\s|\d+\.\s)")
+        cur = self.textCursor()
+        cur.beginEditBlock()
+        try:
+            numbered = 1
+            for block in blocks:
+                text = block.text()
+                bcur = QTextCursor(block)
+                bcur.movePosition(QTextCursor.StartOfBlock)
+                m = bullet_re.match(text)
+                if m:
+                    bcur.movePosition(
+                        QTextCursor.Right, QTextCursor.KeepAnchor, len(m.group(0))
+                    )
+                    bcur.removeSelectedText()
+                    continue
+                prefix = f"{numbered}. " if ordered else "• "
+                bcur.insertText(prefix)
+                numbered += 1
+        finally:
+            cur.endEditBlock()
+        return True
+
+    def insert_break(self, kind: str = "line") -> bool:
+        """Zeilen- oder Seitenumbruch an der Cursorposition — 2.6.55."""
+        k = (kind or "line").strip().lower()
+        cur = self.textCursor()
+        cur.beginEditBlock()
+        try:
+            if k in ("page", "seitenumbruch", "pagebreak"):
+                cur.insertBlock()
+                fmt = QTextBlockFormat(cur.blockFormat())
+                try:
+                    fmt.setPageBreakPolicy(QTextFormat.PageBreak_AlwaysBefore)
+                except Exception:
+                    pass
+                cur.setBlockFormat(fmt)
+                cur.insertText("──── Seite ────")
+                cur.insertBlock()
+            else:
+                cur.insertText("\n")
+        finally:
+            cur.endEditBlock()
+        self.setTextCursor(cur)
+        return True
+
+    def insert_hyperlink(self, text: str, url: str) -> bool:
+        """Sichtbarer Hyperlink als Anchor-Zeichenformat — 2.6.55."""
+        label = (text or "").strip() or (url or "").strip()
+        href = (url or "").strip()
+        if not label or not href:
+            return False
+        self._ensure_rich_mode()
+        fmt = QTextCharFormat()
+        fmt.setAnchor(True)
+        fmt.setAnchorHref(href)
+        fmt.setForeground(QBrush(QColor("#0563C1")))
+        fmt.setFontUnderline(True)
+        cur = self.textCursor()
+        if cur.hasSelection():
+            cur.mergeCharFormat(fmt)
+            if cur.selectedText().replace("\u2029", " ").strip() != label:
+                cur.insertText(label, fmt)
+        else:
+            cur.insertText(label, fmt)
+        self.setTextCursor(cur)
         return True
 
     def hyphenate_document(self, *, lang: str = "de") -> int:
@@ -2737,8 +3063,25 @@ class EditorPane(QWidget):
                 False,
                 "Auswahl unterstreichen (QTextCharFormat) — Buchstaben inkl. — 2.6.49",
             ),
-            ("bold", "Fett", False, "Fett (QTextCharFormat) — Ctrl+B — 2.6.49"),
+            (
+                "bold",
+                "Fett",
+                False,
+                "Fett (QTextCharFormat) — Ctrl+B — 2.6.49",
+            ),
             ("italic", "Kursiv", False, "Kursiv (QTextCharFormat) — Ctrl+I — 2.6.49"),
+            (
+                "strike",
+                "Durchgestrichen",
+                False,
+                "Durchgestrichen (QTextCharFormat) — Ctrl+Shift+X",
+            ),
+            (
+                "clear_format",
+                "Format löschen",
+                False,
+                "Zeichen- und Absatzformat zurücksetzen",
+            ),
             (
                 "clear_marks",
                 "Markierungen löschen",
