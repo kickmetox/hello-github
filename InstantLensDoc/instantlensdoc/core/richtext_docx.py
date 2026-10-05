@@ -7,29 +7,268 @@ Exportiert HTML (inkl. Qt-``toHtml()``-Spans) zurück nach DOCX/RTF ohne Markdow
 from __future__ import annotations
 
 import html as html_lib
+import logging
 import re
 from html.parser import HTMLParser
 from pathlib import Path
 from typing import Any, Optional
 
 
+_log = logging.getLogger("instantlensdoc.richtext_docx")
+
+# Word-Highlight-Index → HTML-Farbe (für Textmarker im Editor) — 2.6.52
+_HIGHLIGHT_INDEX_TO_HEX: dict[str, str] = {
+    "YELLOW": "#ffff00",
+    "BRIGHT_GREEN": "#00ff00",
+    "TURQUOISE": "#00ffff",
+    "PINK": "#ff00ff",
+    "BLUE": "#0000ff",
+    "RED": "#ff0000",
+    "DARK_BLUE": "#000080",
+    "TEAL": "#008080",
+    "GREEN": "#008000",
+    "VIOLET": "#800080",
+    "DARK_RED": "#800000",
+    "DARK_YELLOW": "#808000",
+    "GRAY_50": "#808080",
+    "GRAY_25": "#c0c0c0",
+    "BLACK": "#000000",
+    "WHITE": "#ffffff",
+}
+
+
 def _escape(text: str) -> str:
     return html_lib.escape(text or "", quote=False).replace("\n", "<br/>")
 
 
-def _run_to_html(run: Any) -> str:
+def _expand_hex(value: str) -> str | None:
+    v = (value or "").strip().lower()
+    if not v:
+        return None
+    if not v.startswith("#"):
+        v = "#" + v
+    if re.fullmatch(r"#[0-9a-f]{3}", v):
+        v = "#" + "".join(ch * 2 for ch in v[1:])
+    if re.fullmatch(r"#[0-9a-f]{6}", v):
+        return v
+    return None
+
+
+def _closest_highlight_index(hex_color: str):
+    """HTML-Hintergrund → nächstliegender Word-Highlight-Index (WD_COLOR_INDEX)."""
+    from docx.enum.text import WD_COLOR_INDEX
+
+    hx = _expand_hex(hex_color) or "#ffff00"
+    r, g, b = int(hx[1:3], 16), int(hx[3:5], 16), int(hx[5:7], 16)
+    best_name = "YELLOW"
+    best_dist = None
+    for name, ref in _HIGHLIGHT_INDEX_TO_HEX.items():
+        if name in ("BLACK", "WHITE"):
+            continue
+        rr, gg, bb = int(ref[1:3], 16), int(ref[3:5], 16), int(ref[5:7], 16)
+        dist = (r - rr) ** 2 + (g - gg) ** 2 + (b - bb) ** 2
+        if best_dist is None or dist < best_dist:
+            best_dist = dist
+            best_name = name
+    return getattr(WD_COLOR_INDEX, best_name, WD_COLOR_INDEX.YELLOW)
+
+
+def _style_chain(style: Any) -> list[Any]:
+    """Style + base_style-Kette (zyklussicher)."""
+    out: list[Any] = []
+    seen: set[int] = set()
+    cur = style
+    while cur is not None and id(cur) not in seen and len(out) < 16:
+        seen.add(id(cur))
+        out.append(cur)
+        try:
+            cur = cur.base_style
+        except Exception:
+            cur = None
+    return out
+
+
+def _font_attr(font: Any, name: str) -> Any:
+    try:
+        return getattr(font, name)
+    except Exception:
+        return None
+
+
+def _effective_tri(run: Any, para: Any, attr: str) -> bool:
+    """Effektiver Bool-Wert (bold/italic/underline) inkl. Zeichen-/Absatzstil.
+
+    python-docx liefert ``None`` wenn nicht direkt gesetzt (= „erben“). Viele
+    Word-Dokumente formatieren über Stile (Strong, Heading 1, …) — vor 2.6.52
+    ging diese Formatierung komplett verloren („DOCX wie Plaintext“).
+    """
+    # 1) direkt am Run
+    val = _font_attr(getattr(run, "font", None), attr)
+    if val is None:
+        val = getattr(run, attr, None)
+    if val is not None:
+        return bool(val)
+    # 2) Zeichenstil-Kette des Runs
+    try:
+        rstyle = run.style
+    except Exception:
+        rstyle = None
+    for st in _style_chain(rstyle):
+        v = _font_attr(getattr(st, "font", None), attr)
+        if v is not None:
+            return bool(v)
+    # 3) Absatzstil-Kette
+    try:
+        pstyle = para.style if para is not None else None
+    except Exception:
+        pstyle = None
+    for st in _style_chain(pstyle):
+        v = _font_attr(getattr(st, "font", None), attr)
+        if v is not None:
+            return bool(v)
+    return False
+
+
+def _effective_size_pt(run: Any, para: Any) -> float | None:
+    for owner in (run,):
+        sz = _font_attr(getattr(owner, "font", None), "size")
+        if sz is not None:
+            try:
+                return float(sz.pt)
+            except Exception:
+                pass
+    for st in _style_chain(getattr(run, "style", None)):
+        sz = _font_attr(getattr(st, "font", None), "size")
+        if sz is not None:
+            try:
+                return float(sz.pt)
+            except Exception:
+                pass
+    return None
+
+
+def _effective_color_hex(run: Any) -> str | None:
+    try:
+        color = run.font.color
+    except Exception:
+        return None
+    try:
+        rgb = color.rgb if color is not None else None
+    except Exception:
+        rgb = None
+    if rgb is None:
+        return None
+    try:
+        hexv = str(rgb)
+    except Exception:
+        return None
+    if re.fullmatch(r"[0-9A-Fa-f]{6}", hexv):
+        return "#" + hexv.lower()
+    return None
+
+
+def _effective_highlight_hex(run: Any) -> str | None:
+    try:
+        hl = run.font.highlight_color
+    except Exception:
+        return None
+    if hl is None:
+        return None
+    name = getattr(hl, "name", None) or str(hl)
+    name = str(name).split(".")[-1].upper()
+    if name in ("AUTO", "INHERITED", "NONE"):
+        return None
+    return _HIGHLIGHT_INDEX_TO_HEX.get(name)
+
+
+def _run_to_html(run: Any, para: Any = None) -> str:
     text = run.text or ""
     if not text:
         return ""
     piece = _escape(text)
+    styles: list[str] = []
+    try:
+        size = _effective_size_pt(run, para)
+        if size and 4.0 <= size <= 200.0:
+            styles.append(f"font-size:{size:g}pt")
+    except Exception:
+        pass
+    try:
+        color = _effective_color_hex(run)
+        if color and color != "#000000":
+            styles.append(f"color:{color}")
+    except Exception:
+        pass
+    try:
+        hl = _effective_highlight_hex(run)
+        if hl:
+            styles.append(f"background-color:{hl}")
+    except Exception:
+        pass
+    if styles:
+        piece = f'<span style="{";".join(styles)};">{piece}</span>'
     # Unterstrich zuerst innen, dann Kursiv/Fett — wie typische Writer
-    if bool(getattr(run, "underline", False)):
+    if _effective_tri(run, para, "underline"):
         piece = f"<u>{piece}</u>"
-    if bool(getattr(run, "italic", False)):
+    if _effective_tri(run, para, "italic"):
         piece = f"<i>{piece}</i>"
-    if bool(getattr(run, "bold", False)):
+    if _effective_tri(run, para, "bold"):
         piece = f"<b>{piece}</b>"
     return piece
+
+
+def _iter_para_runs(para: Any):
+    """Runs inkl. Hyperlink-Runs (``para.runs`` überspringt Hyperlinks!) — 2.6.52.
+
+    Liefert Tupel (run, href|None).
+    """
+    iter_inner = getattr(para, "iter_inner_content", None)
+    if callable(iter_inner):
+        try:
+            for item in iter_inner():
+                if hasattr(item, "runs") and hasattr(item, "address"):
+                    href = ""
+                    try:
+                        href = str(item.address or "")
+                    except Exception:
+                        href = ""
+                    for r in item.runs:
+                        yield r, (href or None)
+                else:
+                    yield item, None
+            return
+        except Exception as e:  # pragma: no cover - fallback
+            _log.debug("iter_inner_content fehlgeschlagen: %s", e)
+    for r in para.runs:
+        yield r, None
+
+
+def _para_inner_html(para: Any) -> str:
+    bits: list[str] = []
+    link_open: str | None = None
+    for run, href in _iter_para_runs(para):
+        piece = _run_to_html(run, para)
+        if not piece:
+            continue
+        if href != link_open:
+            if link_open is not None:
+                bits.append("</a>")
+            if href:
+                bits.append(f'<a href="{html_lib.escape(href, quote=True)}">')
+            link_open = href
+        bits.append(piece)
+    if link_open is not None:
+        bits.append("</a>")
+    inner = "".join(bits)
+    if not inner:
+        try:
+            txt = para.text or ""
+        except Exception:
+            txt = ""
+        if txt:
+            # Fallback wenn Runs leer, Text aber vorhanden
+            inner = _escape(txt)
+    return inner
 
 
 def _heading_tag(style_name: str | None) -> str:
@@ -37,13 +276,57 @@ def _heading_tag(style_name: str | None) -> str:
     m = re.match(r"Heading\s*([1-6])\b", name, re.I)
     if m:
         return f"h{m.group(1)}"
-    if name.lower() in {"title", "subtitle"}:
-        return "h1" if name.lower() == "title" else "h2"
+    m = re.match(r"Überschrift\s*([1-6])\b", name, re.I)
+    if m:
+        return f"h{m.group(1)}"
+    if name.lower() in {"title", "titel"}:
+        return "h1"
+    if name.lower() in {"subtitle", "untertitel"}:
+        return "h2"
     return "p"
 
 
+def _para_align_style(para: Any) -> str:
+    try:
+        from docx.enum.text import WD_ALIGN_PARAGRAPH
+
+        a = para.alignment
+        if a is None and para.style is not None:
+            try:
+                a = para.style.paragraph_format.alignment
+            except Exception:
+                a = None
+        if a == WD_ALIGN_PARAGRAPH.CENTER:
+            return ' style="text-align:center;"'
+        if a == WD_ALIGN_PARAGRAPH.RIGHT:
+            return ' style="text-align:right;"'
+        if a == WD_ALIGN_PARAGRAPH.JUSTIFY:
+            return ' style="text-align:justify;"'
+    except Exception:
+        pass
+    return ""
+
+
+def _para_to_html(para: Any) -> str:
+    style_name = ""
+    try:
+        style_name = para.style.name if para.style is not None else ""
+    except Exception:
+        style_name = ""
+    tag = _heading_tag(style_name)
+    inner = _para_inner_html(para)
+    if not inner:
+        inner = "<br/>"
+    return f"<{tag}{_para_align_style(para)}>{inner}</{tag}>"
+
+
 def docx_to_html(path: str | Path) -> str:
-    """DOCX → HTML mit <b>/<i>/<u> und Absätzen/Überschriften."""
+    """DOCX → HTML mit <b>/<i>/<u>, Größe/Farbe/Textmarker, Links, Absätzen.
+
+    Fehler in einzelnen Absätzen/Tabellen werden geloggt und degradieren nur
+    diesen Absatz zu Plaintext — nie das ganze Dokument (2.6.52).
+    Dokumentreihenfolge: Absätze und Tabellen wie im Body (``iter_inner_content``).
+    """
     try:
         from docx import Document as DocxDocument
     except ImportError as e:
@@ -53,52 +336,55 @@ def docx_to_html(path: str | Path) -> str:
     parts: list[str] = [
         "<!DOCTYPE html><html><head><meta charset=\"utf-8\"/></head><body>"
     ]
-    for para in d.paragraphs:
-        style_name = ""
-        try:
-            style_name = para.style.name if para.style is not None else ""
-        except Exception:
-            style_name = ""
-        tag = _heading_tag(style_name)
-        runs_html = [_run_to_html(r) for r in para.runs]
-        inner = "".join(runs_html)
-        if not inner and (para.text or ""):
-            # Fallback wenn Runs leer, Text aber vorhanden
-            inner = _escape(para.text)
-        if not inner:
-            inner = "<br/>"
-        align = ""
-        try:
-            from docx.enum.text import WD_ALIGN_PARAGRAPH
+    para_errors = 0
 
-            a = para.alignment
-            if a == WD_ALIGN_PARAGRAPH.CENTER:
-                align = ' style="text-align:center;"'
-            elif a == WD_ALIGN_PARAGRAPH.RIGHT:
-                align = ' style="text-align:right;"'
-            elif a == WD_ALIGN_PARAGRAPH.JUSTIFY:
-                align = ' style="text-align:justify;"'
-        except Exception:
-            pass
-        parts.append(f"<{tag}{align}>{inner}</{tag}>")
+    def _table_html(tbl: Any) -> str:
+        bits = ["<table border=\"1\" cellpadding=\"4\" cellspacing=\"0\">"]
+        for row in tbl.rows:
+            bits.append("<tr>")
+            for cell in row.cells:
+                cell_bits: list[str] = []
+                for p in cell.paragraphs:
+                    try:
+                        cell_bits.append(_para_inner_html(p) or _escape(p.text))
+                    except Exception:
+                        cell_bits.append(_escape(getattr(p, "text", "") or ""))
+                bits.append(f"<td>{'<br/>'.join(cell_bits)}</td>")
+            bits.append("</tr>")
+        bits.append("</table>")
+        return "".join(bits)
 
-    # Tabellen grob als HTML (ohne Zellformate reicht für Lesbarkeit)
-    try:
-        for tbl in d.tables:
-            parts.append("<table border=\"1\" cellpadding=\"4\" cellspacing=\"0\">")
-            for row in tbl.rows:
-                parts.append("<tr>")
-                for cell in row.cells:
-                    cell_bits: list[str] = []
-                    for p in cell.paragraphs:
-                        cell_bits.append("".join(_run_to_html(r) for r in p.runs) or _escape(p.text))
-                    parts.append(f"<td>{'<br/>'.join(cell_bits)}</td>")
-                parts.append("</tr>")
-            parts.append("</table>")
-    except Exception:
-        pass
+    body_items: list[Any] = []
+    iter_inner = getattr(d, "iter_inner_content", None)
+    if callable(iter_inner):
+        try:
+            body_items = list(iter_inner())
+        except Exception as e:
+            _log.debug("Document.iter_inner_content fehlgeschlagen: %s", e)
+            body_items = []
+    if not body_items:
+        body_items = list(d.paragraphs) + list(d.tables)
+
+    for item in body_items:
+        try:
+            if hasattr(item, "rows") and hasattr(item, "columns"):
+                parts.append(_table_html(item))
+            else:
+                parts.append(_para_to_html(item))
+        except Exception as e:
+            para_errors += 1
+            txt = ""
+            try:
+                txt = item.text or ""
+            except Exception:
+                txt = ""
+            parts.append(f"<p>{_escape(txt) or '<br/>'}</p>")
+            if para_errors <= 3:
+                _log.warning("DOCX-Absatz nur als Text übernommen (%s): %s", path, e)
 
     parts.append("</body></html>")
+    if para_errors:
+        _log.warning("DOCX %s: %d Absatz/Tabelle ohne Formatierung übernommen", path, para_errors)
     return "".join(parts)
 
 
@@ -131,6 +417,8 @@ class _HtmlToDocxParser(HTMLParser):
         self._pending_align: str | None = None
         self._heading_level: int | None = None
         self._span_stack: list[tuple[bool, bool, bool]] = []
+        # Farbe / Größe / Textmarker aus Qt-Spans (innerster Wert gewinnt) — 2.6.52
+        self._style_stack: list[dict[str, Any]] = []
 
     def _ensure_para(self) -> Any:
         if self._para is None:
@@ -155,6 +443,14 @@ class _HtmlToDocxParser(HTMLParser):
                     pass
         return self._para
 
+    def _current_extra(self) -> dict[str, Any]:
+        merged: dict[str, Any] = {}
+        for st in self._style_stack:
+            for k, v in st.items():
+                if v is not None:
+                    merged[k] = v
+        return merged
+
     def _add_text(self, text: str) -> None:
         if not text:
             return
@@ -163,13 +459,62 @@ class _HtmlToDocxParser(HTMLParser):
         run.bold = self._bold > 0
         run.italic = self._italic > 0
         run.underline = self._underline > 0
+        extra = self._current_extra()
+        try:
+            size = extra.get("size")
+            if size:
+                from docx.shared import Pt
+
+                run.font.size = Pt(float(size))
+        except Exception:
+            pass
+        try:
+            color = extra.get("color")
+            if color:
+                from docx.shared import RGBColor
+
+                run.font.color.rgb = RGBColor.from_string(str(color).lstrip("#").upper())
+        except Exception:
+            pass
+        try:
+            bg = extra.get("background")
+            if bg:
+                run.font.highlight_color = _closest_highlight_index(str(bg))
+        except Exception:
+            pass
 
     def _style_flags(self, style: str) -> tuple[bool, bool, bool]:
         s = (style or "").lower().replace(" ", "")
-        bold = "font-weight:600" in s or "font-weight:700" in s or "font-weight:bold" in s
+        bold = (
+            "font-weight:600" in s
+            or "font-weight:700" in s
+            or "font-weight:800" in s
+            or "font-weight:900" in s
+            or "font-weight:bold" in s
+        )
         italic = "font-style:italic" in s
         underline = "text-decoration:underline" in s or "text-decoration-line:underline" in s
         return bold, italic, underline
+
+    @staticmethod
+    def _style_extra(style: str) -> dict[str, Any]:
+        """color / font-size / background-color aus einem style-Attribut."""
+        s = (style or "").lower()
+        out: dict[str, Any] = {"color": None, "size": None, "background": None}
+        m = re.search(r"(?<![\w-])color\s*:\s*(#[0-9a-f]{6}|#[0-9a-f]{3})", s)
+        if m:
+            out["color"] = _expand_hex(m.group(1))
+        m = re.search(r"background(?:-color)?\s*:\s*(#[0-9a-f]{6}|#[0-9a-f]{3})", s)
+        if m:
+            out["background"] = _expand_hex(m.group(1))
+        m = re.search(r"font-size\s*:\s*([0-9]+(?:\.[0-9]+)?)\s*(pt|px)", s)
+        if m:
+            val = float(m.group(1))
+            if m.group(2) == "px":
+                val = val * 0.75
+            if 4.0 <= val <= 200.0:
+                out["size"] = val
+        return out
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         t = tag.lower()
@@ -185,7 +530,7 @@ class _HtmlToDocxParser(HTMLParser):
             self._italic += 1
         elif t == "u":
             self._underline += 1
-        elif t == "span":
+        elif t in {"span", "font", "a"}:
             b, i, u = self._style_flags(ad.get("style", ""))
             if b:
                 self._bold += 1
@@ -194,6 +539,10 @@ class _HtmlToDocxParser(HTMLParser):
             if u:
                 self._underline += 1
             self._span_stack.append((b, i, u))
+            extra = self._style_extra(ad.get("style", ""))
+            if t == "font" and ad.get("color"):
+                extra["color"] = _expand_hex(ad.get("color", ""))
+            self._style_stack.append(extra)
         elif t in {"p", "div", "h1", "h2", "h3", "h4", "h5", "h6"}:
             self._para = None
             self._pending_align = None
@@ -229,7 +578,7 @@ class _HtmlToDocxParser(HTMLParser):
             self._italic = max(0, self._italic - 1)
         elif t == "u":
             self._underline = max(0, self._underline - 1)
-        elif t == "span":
+        elif t in {"span", "font", "a"}:
             stack = self._span_stack
             if stack:
                 b, i, u = stack.pop()
@@ -239,6 +588,8 @@ class _HtmlToDocxParser(HTMLParser):
                     self._italic = max(0, self._italic - 1)
                 if u:
                     self._underline = max(0, self._underline - 1)
+            if self._style_stack:
+                self._style_stack.pop()
         elif t in {"p", "div", "h1", "h2", "h3", "h4", "h5", "h6", "li"}:
             if self._para is None:
                 # leerer Absatz
@@ -424,5 +775,7 @@ def html_has_char_formats(html: str) -> bool:
     if re.search(r"(?i)font-style\s*:\s*italic", h):
         return True
     if re.search(r"(?i)text-decoration[^;]*underline", h):
+        return True
+    if re.search(r"(?i)background(-color)?\s*:\s*#", h):
         return True
     return False

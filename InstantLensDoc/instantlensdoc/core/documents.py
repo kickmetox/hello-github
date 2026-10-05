@@ -244,7 +244,16 @@ def open_document(path: str | Path, *, encoding: str | None = None) -> Document:
             doc.text = plain
             doc.meta["html"] = html
             doc.meta["rich_text"] = True
-        except Exception:
+        except Exception as rich_err:
+            # Nicht still degradieren: Grund loggen + im Meta vermerken — 2.6.52
+            import logging
+
+            logging.getLogger("instantlensdoc.documents").warning(
+                "DOCX-Rich-Text-Import fehlgeschlagen, Plaintext-Fallback (%s): %s",
+                path,
+                rich_err,
+            )
+            doc.meta["rich_text_error"] = str(rich_err)
             try:
                 from instantlensdoc.core.export import import_document_text
 
