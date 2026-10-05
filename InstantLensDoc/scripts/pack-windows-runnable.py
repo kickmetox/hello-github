@@ -33,6 +33,7 @@ INCLUDE_TOP = [
     "run.bat",
     "run.ps1",
     "run-keygen.bat",
+    "run-keygen.ps1",
     "run-ild.bat",
     "build-windows.ps1",
     "instantlensdoc.spec",

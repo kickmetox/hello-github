@@ -1696,7 +1696,7 @@ class MainWindow(QMainWindow):
         act_dropcap.setToolTip("Drop Cap (3 Zeilen, 1 Zeichen) — 2.6.13")
         act_dropcap.triggered.connect(self._apply_drop_cap)
         m_edit.addAction(act_dropcap)
-        # Silbentrennung: Menü aller 9 UI-Sprachen (Engine seit 2.6.28) — 2.6.33
+        # Silbentrennung: Menü aller 9 UI-Sprachen (Engine seit 2.6.28) — 2.6.34
         from ild_pdf.typography import HYPHENATION_UI_LANGS
 
         _hyphen_labels = {
@@ -1712,14 +1712,14 @@ class MainWindow(QMainWindow):
         }
         m_hyphen = m_edit.addMenu("Silbentrennung")
         m_hyphen.setToolTip(
-            "Intelligente Silbentrennung — alle 9 UI-Sprachen (ZH/AR no-break) — 2.6.33"
+            "Intelligente Silbentrennung — alle 9 UI-Sprachen (ZH/AR no-break) — 2.6.34"
         )
         for _lang in HYPHENATION_UI_LANGS:
             _label = _hyphen_labels.get(_lang, _lang.upper())
             _act = QAction(_label, self)
             if _lang == "de":
                 _act.setShortcut(QKeySequence("Ctrl+Alt+Shift+H"))
-            _act.setToolTip(f"Silbentrennung {_label} — 2.6.33")
+            _act.setToolTip(f"Silbentrennung {_label} — 2.6.34")
             _act.triggered.connect(
                 lambda _checked=False, lang=_lang: self._hyphenate_document(lang)
             )

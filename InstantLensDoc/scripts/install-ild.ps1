@@ -1,4 +1,4 @@
-﻿# InstantLens Doc 2.6.33 - Benutzer-Installer (ohne Admin wenn möglich)
+﻿# InstantLens Doc 2.6.34 - Benutzer-Installer (ohne Admin wenn möglich)
 # Startmenü-Shortcut + optional Desktop-Link (User-Profil).
 # Keygen-Shortcut im Startmenü, wenn run-keygen.bat oder InstantLensKeygen.exe vorhanden.
 # Idempotent: vorhandene Verknüpfungen werden aktualisiert.
@@ -41,7 +41,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$Version = "2.6.33"
+$Version = "2.6.34"
 $AppName = "InstantLens Doc"
 
 function Write-IldInfo([string]$msg) { Write-Host "[ILD $Version] $msg" }
@@ -241,7 +241,7 @@ if (-not $SkipStartMenu) {
         exit 1
     }
 
-    # Keygen-Shortcut (run-keygen.bat oder InstantLensKeygen.exe) - 2.6.33
+    # Keygen-Shortcut (run-keygen.bat oder InstantLensKeygen.exe) - 2.6.34
     if (-not $SkipKeygen) {
         $kgExe = Join-Path $AppDir "InstantLensKeygen.exe"
         $kgBat = Join-Path $AppDir "run-keygen.bat"

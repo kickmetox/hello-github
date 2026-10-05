@@ -9,6 +9,12 @@ Kompatibel mit dem Trial-/Lizenzschema der App (Trial **28 Tage**, Keys standard
 run-keygen.bat
 ```
 
+Oder PowerShell:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\run-keygen.ps1
+```
+
 Startet die GUI. Ausgabe als **Klartext (ohne QR)** mit **Kopieren**- und
 **Speichern als .txt**-Button; **Gültigkeitstage** neben dem Key (Spinbox / `--days`);
 lokale **History der letzten 10 Keys** + **Clear History** (keine Secrets in Logs);
@@ -17,6 +23,19 @@ Kontakt: **ame@sellerbach.de**.
 
 Voraussetzung: Python 3.10+ und installierte Abhängigkeiten (`pip install -r requirements.txt`
 im App-Root) bzw. gebündelte EXE nach `build-windows.ps1`.
+
+### Import-Pfad (`instantlensdoc`)
+
+`run-keygen.bat` / `run-keygen.ps1` setzen `PYTHONPATH` auf **diesen Ordner** und den
+**Elternordner**. Damit funktioniert:
+
+| Layout | Beispiel |
+|--------|----------|
+| Repo/Pack-Root | `D:\AI_Temp\InstantLensDoc\` (`keygen\` + `instantlensdoc\` nebeneinander) |
+| Nested Store-Zip | `D:\AI_Temp\InstantLensDoc\InstantLensDoc-keygen\` (Parent = App-Root) |
+| Standalone | Keygen-Zip mit mitgeliefertem `instantlensdoc\license.py` |
+
+Fehlt das Paket: klare DE-Fehlermeldung statt `ModuleNotFoundError`.
 
 ## CLI
 

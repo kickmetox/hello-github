@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Nightly/CI Smoke: CLI + Import-Checks für InstantLens Doc — 2.1.0–2.6.33.
+"""Nightly/CI Smoke: CLI + Import-Checks für InstantLens Doc — 2.1.0–2.6.34.
 
 Leichtgewichtig. Exit-Codes:
   0  OK  (ok=true)
@@ -14,12 +14,12 @@ Aufruf:
   python scripts/smoke_ild.py -h
 
 JSON-Schema (--json), Erfolg:
-  {"ok": true, "version": "2.6.33", "duration_ms": 1234,
+  {"ok": true, "version": "2.6.34", "duration_ms": 1234,
    "checks": ["version", "imports", "cli", "measure_diff_import", "changelog"]}
 
 JSON bei Fail: checks[] enthält Objekt mit error-Text (max 200 Zeichen, Truncate …);
 Exitcode spiegelt ok (0↔true, 1↔false) — 2.2.0:
-  {"ok": false, "version": "2.6.33", "duration_ms": 12,
+  {"ok": false, "version": "2.6.34", "duration_ms": 12,
    "checks": ["version", {"name": "imports", "error": "import x: …"}]}
 """
 
@@ -41,7 +41,7 @@ if str(ROOT) not in sys.path:
 # Headless/CI: Qt ohne Display
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-EXPECTED_VERSION = "2.6.33"
+EXPECTED_VERSION = "2.6.34"
 FAIL_ERROR_MAX_LEN = 200
 
 EXIT_OK = 0
@@ -82,7 +82,7 @@ def check_version() -> None:
         _fail(f"docs/VERSION={docs_ver!r}")
     bw = (ROOT / "build-windows.ps1").read_text(encoding="utf-8")
     if EXPECTED_VERSION not in bw or "Allow32Bit" not in bw:
-        _fail("build-windows.ps1 fehlt 2.6.33/Allow32Bit")
+        _fail("build-windows.ps1 fehlt 2.6.34/Allow32Bit")
     if not (ROOT / "scripts" / "pack-windows-runnable.py").is_file():
         _fail("scripts/pack-windows-runnable.py fehlt")
     if not (ROOT / "run-keygen.bat").is_file():
@@ -99,7 +99,7 @@ def check_version() -> None:
         _fail("build-windows-installer.ps1 fehlt Version/VERSION.txt")
     if EXPECTED_VERSION not in iss_t or "CustomMessages" not in iss_t or "desktopicon" not in iss_t:
         _fail("instantlensdoc.iss unvollständig (Version/CustomMessages/desktopicon)")
-    # 2.6.33: run.bat / companion bats must be cmd-safe (pure ASCII, no fancy Unicode)
+    # 2.6.33+: run.bat / companion bats must be cmd-safe (pure ASCII, no fancy Unicode)
     for bat_name in ("run.bat", "run-ild.bat", "run-keygen.bat"):
         bat_path = ROOT / bat_name
         if not bat_path.is_file():
@@ -115,7 +115,22 @@ def check_version() -> None:
                 _fail(f"{bat_name} enthält Fancy-Unicode")
     bi = (ROOT / "installer" / "build-installer.ps1").read_text(encoding="utf-8-sig")
     if "EXE-Layout" not in bi and "UsePythonLauncher=0" not in bi:
-        _fail("build-installer.ps1 fehlt EXE-Layout-Preferenz (2.6.33)")
+        _fail("build-installer.ps1 fehlt EXE-Layout-Preferenz (2.6.33+)")
+    # 2.6.34: keygen PYTHONPATH + nested/standalone bootstrap
+    kg_bat = (ROOT / "run-keygen.bat").read_text(encoding="ascii")
+    if "PYTHONPATH" not in kg_bat:
+        _fail("run-keygen.bat fehlt PYTHONPATH (2.6.34)")
+    if "instantlensdoc" not in kg_bat:
+        _fail("run-keygen.bat fehlt instantlensdoc-Preflight (2.6.34)")
+    kg_ps1 = ROOT / "run-keygen.ps1"
+    if not kg_ps1.is_file():
+        _fail("run-keygen.ps1 fehlt (2.6.34)")
+    kg_ps1_raw = kg_ps1.read_bytes()
+    if not kg_ps1_raw.startswith(b"\xef\xbb\xbf"):
+        _fail("run-keygen.ps1 needs UTF-8 BOM for Windows PS 5.1")
+    kg_main = (ROOT / "keygen" / "__main__.py").read_text(encoding="utf-8")
+    if "_bootstrap_sys_path" not in kg_main and "_has_instantlensdoc" not in kg_main:
+        _fail("keygen/__main__.py fehlt Import-Bootstrap (2.6.34)")
     _ok(f"version {EXPECTED_VERSION}")
 
 
@@ -429,7 +444,7 @@ def check_imports(*, with_qt: bool) -> None:
             "Zu ersetzender Pin",
             "hyphenate_fr",
             "hyphenate_it",
-            "2.6.33",
+            "2.6.34",
         ),
         ROOT / "instantlensdoc" / "ui" / "sidebar.py": (
             "Schnellvorschau",
@@ -513,7 +528,7 @@ def check_imports(*, with_qt: bool) -> None:
             "_update_index",
             "HYPHENATION_UI_LANGS",
             "hyphenate_fr",
-            "2.6.33",
+            "2.6.34",
         ),
         ROOT / "instantlensdoc" / "ui" / "batch_dialog.py": (
             "BatchConvertDialog",
@@ -950,8 +965,8 @@ def check_measure_and_diff() -> None:
 
 def check_changelog() -> None:
     cl = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-    if "## 2.6.33" not in cl:
-        _fail("CHANGELOG fehlt ## 2.6.33")
+    if "## 2.6.34" not in cl:
+        _fail("CHANGELOG fehlt ## 2.6.34")
     if "## 2.6.28" not in cl:
         _fail("CHANGELOG fehlt ## 2.6.28")
     if "## 2.6.25" not in cl:
@@ -1466,6 +1481,13 @@ def check_changelog() -> None:
     ):
         _fail("CHANGELOG 2.6.33 fehlt Installer/run.bat cmd-Loop-Hinweis")
     if (
+        "PYTHONPATH" not in cl
+        and "instantlensdoc" not in cl
+        and "Keygen" not in cl
+        and "2.6.34" not in cl
+    ):
+        _fail("CHANGELOG 2.6.34 fehlt Keygen/PYTHONPATH-Hinweis")
+    if (
         "Silbentrennung" not in cl
         and "Hyphen" not in cl
         and "Menü" not in cl
@@ -1603,8 +1625,8 @@ def check_changelog() -> None:
     if "## 2.2.0" not in cl:
         _fail("CHANGELOG fehlt ## 2.2.0")
     feat = (ROOT / "FEATURES.md").read_text(encoding="utf-8")
-    if "2.6.33" not in feat:
-        _fail("FEATURES.md fehlt 2.6.33")
+    if "2.6.34" not in feat:
+        _fail("FEATURES.md fehlt 2.6.34")
     if "2.6.28" not in feat:
         _fail("FEATURES.md fehlt 2.6.28")
     if "2.6.13" not in feat:
@@ -1739,6 +1761,12 @@ def check_changelog() -> None:
         and "2.6.33" not in feat
     ):
         _fail("FEATURES.md fehlt 2.6.33 Installer/run.bat-Hinweis")
+    if (
+        "PYTHONPATH" not in feat
+        and "run-keygen.ps1" not in feat
+        and "2.6.34" not in feat
+    ):
+        _fail("FEATURES.md fehlt 2.6.34 Keygen/PYTHONPATH-Hinweis")
     if (
         "Silbentrennung" not in feat
         and "Menü/Palette" not in feat
@@ -2183,11 +2211,11 @@ Exit-Codes:
 Laufzeit: am Ende als „Laufzeit: N ms“ (oder duration_ms im JSON).
 
 Beispiel --json (Erfolg):
-  {"ok": true, "version": "2.6.33", "duration_ms": 1234,
+  {"ok": true, "version": "2.6.34", "duration_ms": 1234,
    "checks": ["version", "imports", "cli", "measure_diff_import", "changelog"]}
 
 Beispiel --json (Fail):
-  {"ok": false, "version": "2.6.33", "duration_ms": 12,
+  {"ok": false, "version": "2.6.34", "duration_ms": 12,
    "checks": ["version", {"name": "imports", "error": "import x: …"}]}
 """.rstrip()
     )

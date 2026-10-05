@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **2.6.33** |
+| Version | **2.6.34** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -33,7 +33,7 @@
 
 Skript: [sync-ild.ps1](scripts/sync-ild.ps1) — Branch `cursor/instantlensdoc-2108` (oder `-LocalPack` / Pack-Zip) nach `D:\AI_Temp\InstantLensDoc`, pip, Start. **Nutzer-Icon in `assets` wird nicht überschrieben.**
 
-**FEATURES.md lokal sync:** Nach Sync liegt `FEATURES.md` lokal im App-Ordner (`D:\AI_Temp\InstantLensDoc\FEATURES.md`); About/Stubs öffnen diese lokale Datei — Version **2.6.33**.
+**FEATURES.md lokal sync:** Nach Sync liegt `FEATURES.md` lokal im App-Ordner (`D:\AI_Temp\InstantLensDoc\FEATURES.md`); About/Stubs öffnen diese lokale Datei — Version **2.6.34**.
 
 Ohne Start: `-NoStart` (Alias `-SkipStart`). Exit-Codes: **0** OK · **1** allgemein · **2** Git-Fehler.
 
@@ -68,7 +68,7 @@ Python-Layout-Zip (ohne PyInstaller-EXE):
 powershell -ExecutionPolicy Bypass -File .\scripts\pack-windows-runnable.ps1
 ```
 
-Installer: `.\scripts\build-windows-installer.ps1` bzw. `.\installer\build-installer.ps1` (optional `-NoKeygen`) → `dist\InstantLensDoc-Setup-2.6.33.exe`  
+Installer: `.\scripts\build-windows-installer.ps1` bzw. `.\installer\build-installer.ps1` (optional `-NoKeygen`) → `dist\InstantLensDoc-Setup-2.6.34.exe`  
 Desktop-/Keygen-Shortcuts: `.\scripts\install-ild.ps1` (Keygen wenn `run-keygen.bat` / EXE vorhanden; `-SkipKeygen`)  
 Desktop-Verknüpfung Installer: optionale Checkbox (`desktopicon`, Standard an / `checkedonce`)
 
@@ -90,6 +90,8 @@ python -m keygen kunde@example.com
 python -m keygen --verify "ILD1...."
 ```
 
+PowerShell: `powershell -ExecutionPolicy Bypass -File .\run-keygen.ps1`  
+`run-keygen.bat`/`.ps1` setzen `PYTHONPATH` auf diesen Ordner und den Parent (nested `InstantLensDoc-keygen` unter App-Root; Standalone mit Vendor `instantlensdoc\`).  
 Trial 28 Tage · Keys 32 Tage (HMAC `ILD1.…`). Details: `keygen/README.md`.
 
 ## Scripting
@@ -102,6 +104,15 @@ powershell -ExecutionPolicy Bypass -File .\scripts\ild.ps1 license generate kund
 
 Anleitung: Store `docs/instantlensdoc-scripting.md` · Beispiel `examples/ild_scripting_demo.py`.
 
+## Neu in 2.6.34
+
+Patch nach **2.6.33** (Installer/run.bat cmd-Loop):
+
+- **`run-keygen.bat` / `run-keygen.ps1`:** PYTHONPATH = Keygen-Ordner + Parent; DE-Fehler wenn `instantlensdoc` fehlt
+- **`keygen/__main__.py`:** App-Root-/Vendor-Suche; History ohne `config` (Standalone)
+- Store-Zip `InstantLensDoc-keygen` mit Minimal-Vendor `instantlensdoc.license`
+- Pack: `InstantLensDoc-2.6.34-pack.zip`
+
 ## Neu in 2.6.33
 
 Patch nach **2.6.32** (Build-PS Encoding):
@@ -109,7 +120,7 @@ Patch nach **2.6.32** (Build-PS Encoding):
 - **`run.bat` / `run-ild.bat` / `run-keygen.bat`:** pure ASCII (kein UTF-8-Mojibake in cmd.exe)
 - **`installer/build-installer.ps1`:** bevorzugt EXE-Layout nach `build-windows.ps1` (Post-Install = `InstantLensDoc.exe`)
 - ISS / `installer-hinweis.txt` ASCII-safe
-- Pack: `InstantLensDoc-2.6.33-pack.zip`
+- Pack: `InstantLensDoc-2.6.34-pack.zip`
 
 ## Neu in 2.6.32
 

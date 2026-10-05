@@ -1,3 +1,7 @@
+## 2.6.34 - Keygen PYTHONPATH / nested+standalone Import-Fix
+
+Patch nach **2.6.33**: Store-/Nested-Keygen (`InstantLensDoc-keygen` unter App-Root) und Standalone-Zip scheiterten mit `ModuleNotFoundError: No module named 'instantlensdoc'`, weil `sys.path` nur den Keygen-Ordner enthielt. Fix: **`run-keygen.bat` / `run-keygen.ps1`** setzen `PYTHONPATH` auf Keygen-Ordner **und** Parent; klare DE-Fehlermeldung wenn Paket fehlt; **`keygen/__main__.py`** sucht App-Root (Parent) + vendored `instantlensdoc`; History-Fallback ohne `config`; Standalone-Zip mit Minimal-Vendor `instantlensdoc.license`. Pack `InstantLensDoc-2.6.34-pack.zip` + Store-Keygen aktualisiert.
+
 ## 2.6.33 - Installer/run.bat cmd-Loop-Fix
 
 Patch nach **2.6.32**: Windows-Installer post-install startete `run.bat`, das **UTF-8 ohne BOM** mit Em-Dash/Ellipsis/Smart-Quotes enthielt. cmd.exe las das als CP1252 → Mojibake `â€"` (eingebettete `"`) → deutsche Hilfe-/Prosa-Fragmente als Befehle (`Deutsch`, `vorhanden`, `hon.exe`, …) in Endlosschleife. Fix: **`run.bat` / `run-ild.bat` / `run-keygen.bat`** pure ASCII, Help per `goto` (keine unescaped `(` in IF-Blöcken), **`installer/build-installer.ps1`** bevorzugt nach `build-windows.ps1` das **EXE-Layout** (`UsePythonLauncher=0`, Post-Install = `InstantLensDoc.exe`), ISS/`installer-hinweis.txt` ASCII. Pack `InstantLensDoc-2.6.33-pack.zip` + Store-Kopie aktualisiert.

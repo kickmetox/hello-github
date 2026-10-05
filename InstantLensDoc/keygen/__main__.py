@@ -6,12 +6,64 @@ import argparse
 import sys
 from pathlib import Path
 
-# Repo-Root auf sys.path
-_ROOT = Path(__file__).resolve().parents[1]
-if str(_ROOT) not in sys.path:
-    sys.path.insert(0, str(_ROOT))
 
-from instantlensdoc.license import KEY_DAYS, generate_key, verify_key
+def _has_instantlensdoc(root: Path) -> bool:
+    pkg = root / "instantlensdoc"
+    return (pkg / "license.py").is_file() or (pkg / "__init__.py").is_file()
+
+
+def _bootstrap_sys_path() -> Path | None:
+    """Find InstantLensDoc / pack root so `instantlensdoc` imports.
+
+    Layouts:
+    - Repo/pack: ``<root>/keygen/__main__.py`` + ``<root>/instantlensdoc/``
+    - Nested store zip: ``<root>/InstantLensDoc-keygen/keygen/`` + ``<root>/instantlensdoc/``
+    - Standalone: vendored ``InstantLensDoc-keygen/instantlensdoc/``
+    """
+    here = Path(__file__).resolve()
+    keygen_pkg = here.parent
+    keygen_home = keygen_pkg.parent
+    candidates = (
+        keygen_home,  # repo / pack / standalone (vendored beside keygen/)
+        keygen_home.parent,  # nested under InstantLensDoc root
+        Path.cwd(),
+        Path.cwd().parent,
+    )
+    found: Path | None = None
+    for root in candidates:
+        try:
+            root = root.resolve()
+        except OSError:
+            continue
+        if not _has_instantlensdoc(root):
+            continue
+        found = root
+        break
+    # Always keep keygen_home on path for `import keygen`
+    for root in (found, keygen_home):
+        if root is None:
+            continue
+        s = str(root)
+        if s not in sys.path:
+            sys.path.insert(0, s)
+    return found
+
+
+_ROOT = _bootstrap_sys_path()
+try:
+    from instantlensdoc.license import KEY_DAYS, generate_key, verify_key
+except ModuleNotFoundError as exc:
+    if getattr(exc, "name", "") == "instantlensdoc" or "instantlensdoc" in str(exc):
+        hint = (
+            "Paket 'instantlensdoc' nicht gefunden.\n"
+            "Erwartet: Elternordner mit instantlensdoc\\ (z.B. InstantLensDoc) "
+            "oder lokales instantlensdoc\\ im Keygen-Ordner.\n"
+            "Tipp: PYTHONPATH auf den App-Root setzen oder run-keygen.bat/.ps1 nutzen."
+        )
+        print(f"FEHLER: {hint}", file=sys.stderr)
+        raise SystemExit(1) from exc
+    raise
+
 from keygen.history import (
     HISTORY_MAX,
     add_history,
@@ -96,11 +148,27 @@ def run_gui(*, days: int | None = None) -> int:
         print("PySide6 fehlt — pip install PySide6", file=sys.stderr)
         return 1
 
-    from instantlensdoc.core.app_settings import (
-        KEYGEN_REVEAL_AUTO_HIDE_CHOICES,
-        get_keygen_reveal_auto_hide_sec,
-        set_keygen_reveal_auto_hide_sec,
-    )
+    try:
+        from instantlensdoc.core.app_settings import (
+            KEYGEN_REVEAL_AUTO_HIDE_CHOICES,
+            get_keygen_reveal_auto_hide_sec,
+            set_keygen_reveal_auto_hide_sec,
+        )
+    except ImportError:
+        # Standalone-Keygen mit nur vendored license.py — Defaults ohne App-Settings
+        KEYGEN_REVEAL_AUTO_HIDE_CHOICES = (5, 10, 30)
+
+        def get_keygen_reveal_auto_hide_sec() -> int:
+            return 10
+
+        def set_keygen_reveal_auto_hide_sec(seconds: int) -> int:
+            try:
+                val = int(seconds)
+            except (TypeError, ValueError):
+                val = 10
+            if val not in KEYGEN_REVEAL_AUTO_HIDE_CHOICES:
+                val = 10
+            return val
 
     class KeygenWindow(QMainWindow):
         def __init__(self):

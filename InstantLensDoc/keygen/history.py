@@ -21,9 +21,21 @@ def mask_key(key: str) -> str:
 
 
 def history_path() -> Path:
-    from instantlensdoc.config import config_dir
+    try:
+        from instantlensdoc.config import config_dir
 
-    return config_dir() / "keygen_history.json"
+        return config_dir() / "keygen_history.json"
+    except ImportError:
+        # Standalone-Keygen (nur vendored license): gleiche AppData/XDG-Basis
+        import os
+
+        if os.name == "nt":
+            base = Path(os.environ.get("APPDATA", Path.home() / "AppData" / "Roaming"))
+        else:
+            base = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config"))
+        d = base / "InstantLensDoc"
+        d.mkdir(parents=True, exist_ok=True)
+        return d / "keygen_history.json"
 
 
 def load_history(max_items: int = HISTORY_MAX) -> List[dict[str, Any]]:

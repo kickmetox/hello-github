@@ -1,6 +1,6 @@
-InstantLens Doc 2.6.33 - Installation
+InstantLens Doc 2.6.34 - Installation
 
-Neu in 2.6.33:
+Neu in 2.6.34:
 - Installer/Launcher: run.bat ASCII-safe (kein UTF-8-Mojibake in cmd.exe)
 - Post-Install startet gebuendelte EXE wenn vorhanden (nicht kaputtes run.bat)
 - build-installer bevorzugt dist\InstantLensDoc EXE-Layout nach build-windows.ps1
