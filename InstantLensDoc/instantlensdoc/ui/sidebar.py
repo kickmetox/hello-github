@@ -1236,10 +1236,8 @@ class Sidebar(QWidget):
         self.portfolio_empty_hint.setVisible(False)
 
     def _outline_read_stub(self) -> None:
-        """Document Outline Vorlesen — Stub / TTS geplant; Pane produktiv — 2.6.27."""
-        from instantlensdoc.ui.stubs import show_planned
-
-        show_planned(self, "outline_read")
+        """Vorlesen bleibt unverkabelt (Button disabled). Methode bleibt für Smoke-API."""
+        return
 
     def _filter_document_outline(self, text: str = "") -> None:
         """Filtert Tree-Einträge nach Titel-Substring — 2.6.27."""

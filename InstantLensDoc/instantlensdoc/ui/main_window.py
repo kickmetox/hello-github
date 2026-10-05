@@ -176,7 +176,6 @@ from instantlensdoc.ui.doc_tab_bar import DocumentTabBar
 from instantlensdoc.ui.ribbon_bar import RibbonBar
 from instantlensdoc.ui.text_compare_dialog import TextCompareDialog
 from instantlensdoc.ui.settings_dialog import SettingsDialog
-from instantlensdoc.ui.stubs import show_planned
 from instantlensdoc.ui.theme import (
     apply_theme,
     cycle_theme_mode,
@@ -11091,8 +11090,14 @@ class MainWindow(QMainWindow):
         """Settings öffnen / Telemetrie-Info — 2.6.26."""
         try:
             self._settings()
+            return
         except Exception:
-            show_planned(self, "telemetry")
+            pass
+        QMessageBox.information(
+            self,
+            "Telemetrie",
+            "Opt-in unter Extra → Einstellungen. Keine Datenübertragung in dieser Version.",
+        )
 
     def _refresh_form_fields(self):
         """AcroForm-Feldliste Sidebar (Name/Typ/Wert) — 1.3.0."""
