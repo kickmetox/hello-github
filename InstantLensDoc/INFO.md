@@ -109,7 +109,7 @@ Anleitung: Store `docs/instantlensdoc-scripting.md` · Beispiel `examples/ild_sc
 Patch nach **2.6.39** (Large-PDF Perf):
 
 - **Hauptansicht:** Seite wird nach Open/Thumb-Klick gerendert (Zoom-Fallback bei Render-Fehler; kein weisses Viewport mehr)
-- **Windows-Build:** EXE-Pflicht vor Inno; kein stiller Python-Fallback; Setup < 15 MB = Fehler
+- **Windows-Build:** Pack inkl. `run_instantlensdoc.py` (fehlte in 2.6.39 → Setup ~2–3 MB); EXE-Pflicht vor Inno; Setup < 15 MB = Fehler
 - Pack: `InstantLensDoc-2.6.40-pack.zip`
 
 ## Neu in 2.6.39
