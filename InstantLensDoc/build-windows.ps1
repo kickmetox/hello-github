@@ -1,4 +1,4 @@
-﻿# InstantLens Doc - Windows-Build (PyInstaller App + Keygen) 2.6.52
+﻿# InstantLens Doc - Windows-Build (PyInstaller App + Keygen) 2.6.53
 # Eine Zeile:
 #   powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 #
@@ -33,7 +33,7 @@ $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $Root
 
-Write-Host "=== InstantLens Doc Build 2.6.52 (Windows x64) ==="
+Write-Host "=== InstantLens Doc Build 2.6.53 (Windows x64) ==="
 Write-Host "Root: $Root"
 
 # Mindestgroesse: leere/stub EXE und fehlgeschlagenes onedir entlarven (~49 MB Setup)
@@ -164,6 +164,7 @@ $Common = @(
     "--clean",
     "--paths", $Root,
     "--hidden-import", "pypdfium2",
+    "--hidden-import", "pypdfium2_raw",
     "--hidden-import", "pikepdf",
     "--hidden-import", "PIL",
     "--hidden-import", "pytesseract",
@@ -186,6 +187,9 @@ $Common = @(
     "--hidden-import", "ild",
     "--hidden-import", "keygen",
     "--collect-all", "pypdfium2",
+    # pdfium.dll + version.json liegen in pypdfium2_raw (eigenes Top-Level-Paket) - 2.6.53
+    "--collect-all", "pypdfium2_raw",
+    "--collect-all", "pikepdf",
     "--collect-submodules", "instantlensdoc"
 )
 
@@ -268,6 +272,33 @@ Ohne dll bleibt die PDF-Hauptansicht weiss und Thumbs grau.
 "@
     }
     Write-Host ("OK: PDFium-Binary vorhanden ({0})" -f $pdfiumHits[0].FullName)
+    # pypdfium2 5.x laedt ausschliesslich <pkg>\pypdfium2_raw\pdfium.dll (bindings.py: './pdfium.dll',
+    # search_sys=False). Liegt die DLL woanders, startet die EXE, aber jedes PDF schlaegt fehl - 2.6.53
+    $rawDirs = @(Get-ChildItem -Path $AppDist -Recurse -Directory -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -eq 'pypdfium2_raw' })
+    $rawOk = $false
+    foreach ($rd in $rawDirs) {
+        if ((Test-Path -LiteralPath (Join-Path $rd.FullName 'pdfium.dll')) -and
+            (Test-Path -LiteralPath (Join-Path $rd.FullName 'version.json'))) {
+            $rawOk = $true
+            Write-Host ("OK: pypdfium2_raw komplett ({0})" -f $rd.FullName)
+            break
+        }
+    }
+    if (-not $rawOk) {
+        throw @"
+App-Build: pypdfium2_raw\pdfium.dll + version.json fehlen unter dist\InstantLensDoc\.
+PyInstaller muss --collect-all pypdfium2_raw nutzen (build-windows.ps1 / Spec, 2.6.53).
+Ohne diese Dateien meldet jedes PDF 'Failed to load document' bzw. ImportError pdfium.
+"@
+    }
+    $qpdfHits = @(Get-ChildItem -Path $AppDist -Recurse -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -match '(?i)^qpdf.*\.dll$' -or $_.Name -match '(?i)^_core.*\.pyd$' })
+    if ($qpdfHits.Count -lt 1) {
+        Write-Warning "pikepdf/qpdf-Binary nicht gefunden - PDF-Reparatur-Fallback (Schritt 3) steht in der EXE nicht zur Verfuegung."
+    } else {
+        Write-Host ("OK: pikepdf/qpdf-Binary vorhanden ({0})" -f $qpdfHits[0].FullName)
+    }
     Write-Host "OK: dist\InstantLensDoc\"
     [void](Copy-TesseractVendor -DestRoot $AppDist)
 }
@@ -309,7 +340,7 @@ if (-not $SkipKeygen) {
     Write-Host "Keygen uebersprungen (-SkipKeygen)"
 }
 
-Write-Host "Fertig (2.6.52). Optional:"
+Write-Host "Fertig (2.6.53). Optional:"
 Write-Host '  powershell -ExecutionPolicy Bypass -File .\installer\build-installer.ps1'
 Write-Host "  (ohne Keygen: -SkipKeygen bzw. ISCC /DIncludeKeygen=0)"
 Write-Host '  python scripts\pack-windows-runnable.py   # Python-Layout-Zip ohne EXE'
