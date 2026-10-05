@@ -7,6 +7,7 @@ Neuer **Layout-Modus** und Umsetzung der Extras-Einträge, die bisher `(geplant)
 - **KI-Assistent:** OpenAI-kompatibler Endpoint + Schlüssel in Einstellungen; ohne Schlüssel Offline-Modus.
 - **Formerkennung:** Tinte → Rechteck/Ellipse/Linie/Pfeil/Dreieck; Hook `recognize_ink_as_shape` für die Annotationsschicht.
 - **Variable Fonts, Envelope Distort, 3D-Extrusion, Stylus (QTabletEvent)** auf dem DTP-Canvas.
+- **Text auf Pfad / Text in Pfade, Schnittmasken, Live-Füllungen** (Verlauf/Deckkraft/Schatten), **Glyphen-Palette**.
 - **PAdES-B** (`features/pades.py`, pyhanko) mit sichtbarem Widget + Validierung; QES-Hinweis (QTSP).
 - **Plugin-Hooks:** Aliase `on_open` / `on_save` / `on_scan`, Menü-Plugins, Beispiel `examples/ild_dtp_sample_plugin.py`.
 - Tests: `tests/test_dtp_2654.py`, `tests/test_features_2654.py` (offscreen).

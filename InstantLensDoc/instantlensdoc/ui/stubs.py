@@ -64,6 +64,20 @@ PLANNED = {
         f"E-Signatur PAdES-B — {__version__}: PKCS#12, sichtbares Widget, "
         "Validierung; QES nur mit QTSP-Zertifikat"
     ),
+    "textpath": (
+        f"Text auf Pfad / Text zu Pfaden — {__version__} produktiv: "
+        "Ellipse/Linie auf dem DTP-Canvas, Outlines via QPainterPath"
+    ),
+    "clipmask": (
+        f"Schnittmasken — {__version__} produktiv: Inhalt wird mit Formrahmen geclippt"
+    ),
+    "livefx": (
+        f"Füllungen / Live-Effekte — {__version__} produktiv: "
+        "linear/radial Verlauf, Deckkraft, Schlagschatten"
+    ),
+    "glyphs": (
+        f"Glyphen-Palette — {__version__} produktiv: Unicode-Blöcke der Systemschrift"
+    ),
 }
 
 PLANNED_EN = {
@@ -101,6 +115,10 @@ PLANNED_EN = {
     "varfonts": f"Variable fonts — {__version__} live (axes + Qt apply)",
     "envelope": f"Envelope distort — {__version__} live (4-point warp on DTP)",
     "esign": f"PAdES-B signature — {__version__}; QES requires QTSP certificate",
+    "textpath": f"Text on path / outlines — {__version__} live on DTP canvas",
+    "clipmask": f"Clip masks — {__version__} live (content clipped to shape)",
+    "livefx": f"Fills / live effects — {__version__} live (gradient, opacity, shadow)",
+    "glyphs": f"Glyph palette — {__version__} live (Unicode blocks)",
 }
 
 # Kurzbeschreibungen für Info-Dialog — 1.9.5 / Live 2.6.28
@@ -138,6 +156,10 @@ STUB_SHORT = {
         "PAdES-B mit PKCS#12 und sichtbarem Widget — produktiv 2.6.54; "
         "QES nur mit QTSP-Zertifikat."
     ),
+    "textpath": "Text auf Pfad / Text in Pfade — produktiv 2.6.54 (DTP-Canvas).",
+    "clipmask": "Schnittmasken — produktiv 2.6.54 (Inhalt clippt an Formrahmen).",
+    "livefx": "Verlauf, Deckkraft, Schlagschatten — produktiv 2.6.54.",
+    "glyphs": "Glyphen-Palette — produktiv 2.6.54 (Unicode der Systemschrift).",
 }
 
 STUB_SHORT_EN = {
@@ -174,6 +196,10 @@ STUB_SHORT_EN = {
         "PAdES-B with PKCS#12 and visible widget — live 2.6.54; "
         "QES only with a QTSP certificate."
     ),
+    "textpath": "Text on path / outlines — live 2.6.54 (DTP canvas).",
+    "clipmask": "Clip masks — live 2.6.54 (content clipped to a shape).",
+    "livefx": "Gradient, opacity, drop shadow — live 2.6.54.",
+    "glyphs": "Glyph palette — live 2.6.54 (system-font Unicode).",
 }
 
 STUB_TITLES = {
@@ -188,6 +214,10 @@ STUB_TITLES = {
     "varfonts": "Variable Fonts",
     "envelope": "Envelope Distort",
     "esign": "E-Signatur",
+    "textpath": "Text auf Pfad",
+    "clipmask": "Schnittmaske",
+    "livefx": "Füllung / Live-Effekt",
+    "glyphs": "Glyphen-Palette",
 }
 
 STUB_TITLES_EN = {
@@ -202,6 +232,10 @@ STUB_TITLES_EN = {
     "varfonts": "Variable fonts",
     "envelope": "Envelope distort",
     "esign": "E-signature",
+    "textpath": "Text on path",
+    "clipmask": "Clip mask",
+    "livefx": "Fill / live effect",
+    "glyphs": "Glyph palette",
 }
 
 # Features die live sind und eigene Dialoge öffnen (nicht Coming-soon)
@@ -217,6 +251,10 @@ _LIVE_KEYS = frozenset(
         "varfonts",
         "envelope",
         "esign",
+        "textpath",
+        "clipmask",
+        "livefx",
+        "glyphs",
     }
 )
 
@@ -322,6 +360,10 @@ def show_planned(parent: QWidget | None, key: str) -> None:
         "varfonts": "_show_variable_fonts",
         "envelope": "_apply_envelope_distort",
         "esign": "_show_pades_dialog",
+        "textpath": "_dtp_text_on_path",
+        "clipmask": "_dtp_clip_mask",
+        "livefx": "_dtp_live_fill",
+        "glyphs": "_dtp_glyph_palette",
         "cloud": "_show_shared_review_dialog",
         "extrude3d": "_show_extrude3d_dialog",
         "stylus": "_activate_stylus_tool",

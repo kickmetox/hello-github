@@ -2,7 +2,7 @@
 
 ### 2.6.54 — DTP-Layout-Modus & geplante Extras
 
-Neuer **Layout-Modus** (`instantlensdoc/dtp/`): QGraphicsScene-Canvas, Musterseiten, Textrahmen/Bildrahmen frei platzierbar mit Raster-/Guide-Snap, Verkettung, Lineale, Spalten, Bleed, Align/Distribute, Ebenen, Formatvorlagen, Buchpresets, Envelope Distort, 3D-Extrusion, Stylus. PDF-Export über **QPdfWriter** (nicht `ild_pdf`-Writer). **KI-Assistent** (Endpoint + Offline), **Formerkennung**, **Variable Fonts**, **PAdES-B**. Menü ohne „(geplant)/(Hinweis)/(begrenzt)“. Tests `tests/test_dtp_2654.py`. Version bleibt 2.6.53 bis zum nächsten Pack.
+Neuer **Layout-Modus** (`instantlensdoc/dtp/`): QGraphicsScene-Canvas, Musterseiten, Textrahmen/Bildrahmen frei platzierbar mit Raster-/Guide-Snap, Verkettung, Lineale, Spalten, Bleed, Align/Distribute, Ebenen, Formatvorlagen, Buchpresets, Envelope Distort, 3D-Extrusion, Text auf Pfad, Text in Pfade, Schnittmasken, Live-Füllungen (Verlauf/Schatten), Glyphen-Palette, Stylus. PDF-Export über **QPdfWriter** (nicht `ild_pdf`-Writer). **KI-Assistent** (Endpoint + Offline), **Formerkennung**, **Variable Fonts**, **PAdES-B**. Menü ohne „(geplant)/(Hinweis)/(begrenzt)“. Tests `tests/test_dtp_2654.py`. Version bleibt 2.6.53 bis zum nächsten Pack.
 
 ### 2.6.53 — PDFium „Data format error“, DOCX-Umbruch/-Schrift, Seitenlayout
 
@@ -245,7 +245,7 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | OCR Ausgabe: Tabelle als CSV | fertig | Heuristik → CSV; Trennzeichen `;`/`,`/Tab · UTF-8-BOM · Zielordner · Vorschau 5 Zeilen · Abbruch · Zeilen/Spalten-Zähler · Trennzeichen live · Persistenz erst Speichern · Vorschau-Reset Abbruch · Combobox synchron zurück · A11y Speichern · `*_table.csv` **1.9.5** (Basis **1.9.4**/**1.9.3**/**1.9.2**/**1.9.1**/**1.9.0**) |
 | Plugin-Hooks | fertig | User-/Script-Hooks + Event-Bus; Events: `app.started`, `document.opened`, `document.saved`, `document.exported`, `ocr.finished`, `annotation.changed`; Hooks-Ordner + ild/PS — **2.6.28** (Basis Bus **1.9.x**) |
 | Formulargenerator → HTML/PDF | fertig | Mehr Feldtypen; Definition speichern/laden |
-| Layout: Textrahmen + Verkettung | teilweise | `flow_text_chain` |
+| Layout: Textrahmen + Verkettung | fertig | `flow_text_chain` + DTP-Canvas Verketten — **2.6.54** |
 | Layout: einfacher Umbruch | fertig | Wortgrenzen |
 | Lizenz Trial 28d / Keys 32d | fertig | Statusleiste farbig + Tooltip; **<7 Tage prominent** 0.2.6; Dialog Resttage/Ablauf 0.3.3; **Resttage Status+About konsistent** (`resttage_phrase`) **1.0.2**; **Ablauf TT.MM.JJJJ** About+Status (`format_ablaufdatum`) **1.0.3**; **Warnung ≤3 Tage 1×/Tag nicht modal** **1.0.4**; **Banner Klick→About, Dismiss bis morgen** **1.0.5**; **Banner i18n + Farbe Warnung/abgelaufen** **1.0.6**; **Icon + Dismiss + Schließen-X, Persistenz `dismiss_date`** **1.0.7**; **Esc schließt + AccessibleName** **1.0.8** + **Fokus-Ring + Enter→Aktivierung** **1.0.9** |
 | Keygenerator (CLI/GUI) | fertig | `run-keygen.bat`/`.ps1` + PYTHONPATH Parent/Vendor **2.6.34**; HMAC `ILD1.…` · **Klartext ohne QR + Kopieren-Button** **1.1.0** + **Gültigkeitstage neben Key** **1.1.1** + **Speichern als .txt + CLI `--days`** **1.1.2** + **History letzte 10 Keys + Clear History** **1.1.3** + **Maskierung (letzte 4) / Hover·Reveal / Doppelklick kopiert** **1.1.4** + **Reveal Auto-Hide 10s / Esc** **1.1.5** + **Auto-Hide 5/10/30 s + Countdown** **1.1.6** + **Countdown Pause bei Fokusverlust** **1.1.7** + **Label „pausiert“ am Countdown** **1.1.8** + **Tooltip „Countdown pausiert (Fenster ohne Fokus)“** **1.1.9** · Store-/Pack-Doku DE **2.6.8** |
@@ -272,14 +272,14 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | KI-Assistent | fertig | OpenAI-kompatibler Endpoint + Offline-Fallback (Zusammenfassen/Umformulieren/Übersetzen/TOC) — **2.6.54** |
 | Signieren (rechtssicher) | fertig | PAdES-B (PKCS#12, sichtbares Widget, Validierung) — **2.6.54**; SES/AES-Sidecar bleibt; QES nur mit QTSP-Zertifikat |
 | Cloud-Sync | fertig | Ersetzt durch **Gemeinsames Review** (Freigabeordner + optionaler Endpoint) — **2.6.23**; kein gehosteter Cloud-Dienst |
-| Text on Path / Text zu Pfaden | geplant | nicht im Extras-Menü |
+| Text on Path / Text zu Pfaden | fertig | Ellipse/Linie auf DTP-Canvas + Outlines (`dtp/text_path.py`) — **2.6.54** |
 | Envelope Distort / Text Wrap / Area Type | fertig | Envelope 4-Punkt auf DTP-Canvas — **2.6.54**; Textumfluss im DTP-Modell |
-| Schnittmasken | geplant | nicht im Extras-Menü |
-| Füllungen / Live-Effekte | geplant | nicht im Extras-Menü |
+| Schnittmasken | fertig | Inhalt clippt an Formrahmen (`clip_id`) — **2.6.54** |
+| Füllungen / Live-Effekte | fertig | linear/radial Verlauf, Deckkraft, Schlagschatten — **2.6.54** |
 | 3D-Extrusion | fertig | DTP-Canvas Extrusion (Tiefe/Winkel/Shading) — **2.6.54**; kein Mesh/OpenGL |
 | Variable Fonts (voll) | fertig | fvar-Achsen + Qt wght/wdth/slnt, DTP-Textrahmen — **2.6.54** |
-| Glyphen-Palette | geplant | nicht im Extras-Menü |
+| Glyphen-Palette | fertig | Unicode-Blöcke der Systemschrift, Einfügen in Textrahmen — **2.6.54** |
 | Stylus / Palm Rejection | fertig | QTabletEvent auf DTP-Canvas + PDF-Freihand — **2.6.54** / **2.6.28** |
 | Intelligente Formerkennung | fertig | Tinte → Rechteck/Ellipse/Linie/Pfeil/Dreieck; Hook `recognize_ink_as_shape` — **2.6.54** |
 
-Nicht behauptet als fertig: Outline-TTS (kein Menüeintrag), volle 3D-Engine, Marketplace-Plugins, Glyphen-Palette/Text-on-Path. Live **2.6.54** DTP-Layout-Modus + KI/Formerkennung/Variable Fonts/Envelope/PAdES.
+Nicht behauptet als fertig: Outline-TTS (kein Menüeintrag), volle 3D-Engine, Marketplace-Plugins. Live **2.6.54** DTP-Layout-Modus + KI/Formerkennung/Variable Fonts/Envelope/PAdES/Text-auf-Pfad/Schnittmasken/Live-Füllungen/Glyphen.

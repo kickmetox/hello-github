@@ -117,23 +117,51 @@ def paint_page(painter: QPainter, doc, page: int, *, overlays: bool = False) -> 
     painter.restore()
 
 
-def _paint_frame(painter: QPainter, doc, fr) -> None:
+def _paint_text_on_path(painter: QPainter, doc, fr) -> None:
+    from .text_path import place_text_on_path, polyline_for_kind
+
+    font = _qfont_for_frame(doc, fr)
+    size = float(font.pointSizeF() or 11.0)
+    pts = polyline_for_kind(fr.path_kind, fr.width, fr.height)
+    glyphs = place_text_on_path(fr.text or "", pts, font_size=size)
+    color = QColor("#111111")
+    painter.setFont(font)
+    painter.setPen(color)
+    painter.setBrush(color)
+    for g in glyphs:
+        painter.save()
+        painter.translate(g["x"], g["y"])
+        painter.rotate(g["angle"])
+        if fr.as_outlines:
+            gp = QPainterPath()
+            gp.addText(0.0, 0.0, font, g["char"])
+            painter.fillPath(gp, color)
+        else:
+            painter.drawText(0, 0, g["char"])
+        painter.restore()
+
+
+def paint_frame_local(painter: QPainter, doc, fr) -> None:
+    """Rahmeninhalt in lokalen Koordinaten (0,0 = Rahmenecke)."""
+    from .effects import apply_clip, apply_opacity, fill_brush, paint_drop_shadow
     from .envelope import warp_painter_path
     from .extrude import extrude_path, path_for_shape
 
     painter.save()
-    painter.translate(fr.x, fr.y)
+    apply_opacity(painter, fr)
+    apply_clip(painter, doc, fr)
     if fr.rotation:
         painter.rotate(fr.rotation)
 
     path = _shape_path(fr) if fr.kind in ("shape", "image") else QPainterPath()
     if fr.kind == "text":
         path = _text_path(doc, fr)
-        # clip to frame for overflow
         painter.setClipRect(QRectF(0, 0, fr.width, fr.height), Qt.IntersectClip)
 
     if fr.envelope and fr.envelope.corners:
         path = warp_painter_path(path, width=fr.width, height=fr.height, corners=fr.envelope.corners)
+
+    paint_drop_shadow(painter, path, fr)
 
     if fr.extrude and fr.kind in ("shape", "text"):
         fill = fr.fill or "#4A90D9"
@@ -161,7 +189,7 @@ def _paint_frame(painter: QPainter, doc, fr) -> None:
         else:
             painter.fillRect(QRectF(0, 0, fr.width, fr.height), QColor(fr.fill or "#e8e8e8"))
     elif fr.kind == "shape":
-        painter.setBrush(QColor(fr.fill or "#D0E8FF"))
+        painter.setBrush(fill_brush(fr, fr.width, fr.height))
         painter.setPen(QPen(QColor(fr.stroke or "#1A5276"), max(0.4, fr.stroke_width)))
         painter.drawPath(path if path.elementCount() else path_for_shape(fr.shape, fr.width, fr.height))
     elif fr.kind == "ink" and fr.ink_points:
@@ -180,17 +208,27 @@ def _paint_frame(painter: QPainter, doc, fr) -> None:
                 pts[i][1] - fr.y,
             )
     elif fr.kind == "text":
-        painter.setPen(QColor("#111111"))
-        painter.setFont(_qfont_for_frame(doc, fr))
-        if fr.envelope and fr.envelope.corners:
-            painter.setBrush(QColor("#111"))
+        if fr.path_kind:
+            _paint_text_on_path(painter, doc, fr)
+        elif fr.as_outlines or (fr.envelope and fr.envelope.corners):
+            painter.setPen(Qt.NoPen)
+            painter.setBrush(QColor("#111111"))
             painter.drawPath(path)
         else:
+            painter.setPen(QColor("#111111"))
+            painter.setFont(_qfont_for_frame(doc, fr))
             painter.drawText(
                 QRectF(2, 2, fr.width - 4, fr.height - 4),
                 Qt.TextWordWrap | Qt.AlignLeft | Qt.AlignTop,
                 fr.text or "",
             )
+    painter.restore()
+
+
+def _paint_frame(painter: QPainter, doc, fr) -> None:
+    painter.save()
+    painter.translate(fr.x, fr.y)
+    paint_frame_local(painter, doc, fr)
     painter.restore()
 
 

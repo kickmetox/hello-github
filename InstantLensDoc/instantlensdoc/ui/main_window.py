@@ -3422,6 +3422,31 @@ class MainWindow(QMainWindow):
         a.setToolTip("PAdES-B mit PKCS#12; QES nur mit QTSP-Zertifikat — 2.6.54")
         a.triggered.connect(self._show_pades_dialog)
         m_extra.addAction(a)
+        a = QAction("Text auf Pfad…", self)
+        a.setObjectName("actTextOnPath")
+        a.setToolTip("DTP: Text entlang Ellipse oder Linie — 2.6.54")
+        a.triggered.connect(self._dtp_text_on_path)
+        m_extra.addAction(a)
+        a = QAction("Text in Pfade umwandeln", self)
+        a.setObjectName("actTextToOutlines")
+        a.setToolTip("DTP: Glyphen als QPainterPath — 2.6.54")
+        a.triggered.connect(self._dtp_text_to_outlines)
+        m_extra.addAction(a)
+        a = QAction("Schnittmaske", self)
+        a.setObjectName("actClipMask")
+        a.setToolTip("DTP: Inhalt mit Formrahmen clippen — 2.6.54")
+        a.triggered.connect(self._dtp_clip_mask)
+        m_extra.addAction(a)
+        a = QAction("Füllung / Live-Effekt…", self)
+        a.setObjectName("actLiveFill")
+        a.setToolTip("DTP: Verlauf, Deckkraft, Schlagschatten — 2.6.54")
+        a.triggered.connect(self._dtp_live_fill)
+        m_extra.addAction(a)
+        a = QAction("Glyphen-Palette…", self)
+        a.setObjectName("actGlyphPalette")
+        a.setToolTip("Unicode-Glyphen der Systemschrift in Textrahmen — 2.6.54")
+        a.triggered.connect(self._dtp_glyph_palette)
+        m_extra.addAction(a)
         try:
             from instantlensdoc.features.plugins import iter_menu_plugins
 
@@ -6865,6 +6890,10 @@ class MainWindow(QMainWindow):
             "dtp_link": self._dtp_link_frames,
             "dtp_grid": self._dtp_toggle_grid,
             "dtp_export_pdf": self._dtp_export_pdf_dialog,
+            "dtp_text_path": self._dtp_text_on_path,
+            "dtp_glyphs": self._dtp_glyph_palette,
+            "dtp_clip": self._dtp_clip_mask,
+            "dtp_live_fill": self._dtp_live_fill,
             "ki_assistant": self._show_ki_assistant,
             "varfonts": self._show_variable_fonts,
             "pades_sign": self._show_pades_dialog,
@@ -10426,6 +10455,26 @@ class MainWindow(QMainWindow):
             return
         out = self.dtp_pane.export_pdf_to(path)
         self._set_status(f"DTP-PDF: {out}")
+
+    def _dtp_text_on_path(self) -> None:
+        self._enter_layout_mode()
+        self.dtp_pane.apply_text_on_path("ellipse")
+
+    def _dtp_text_to_outlines(self) -> None:
+        self._enter_layout_mode()
+        self.dtp_pane.convert_to_outlines()
+
+    def _dtp_clip_mask(self) -> None:
+        self._enter_layout_mode()
+        self.dtp_pane.apply_clip_mask()
+
+    def _dtp_live_fill(self) -> None:
+        self._enter_layout_mode()
+        self.dtp_pane.apply_live_fill()
+
+    def _dtp_glyph_palette(self) -> None:
+        self._enter_layout_mode()
+        self.dtp_pane.show_glyph_palette()
 
     def _show_ki_assistant(self) -> None:
         from instantlensdoc.features.ki_panel import KiAssistantDialog

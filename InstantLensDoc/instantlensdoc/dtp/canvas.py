@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Optional
-
-from PySide6.QtCore import QPointF, QRectF, Qt, Signal
+from PySide6.QtCore import QPointF, Qt, Signal
 from PySide6.QtGui import (
     QBrush,
     QColor,
@@ -13,7 +11,6 @@ from PySide6.QtGui import (
     QPainterPath,
     QPen,
     QTabletEvent,
-    QTransform,
 )
 from PySide6.QtWidgets import (
     QGraphicsItem,
@@ -30,10 +27,6 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from instantlensdoc.core.stylus import pressure_to_stroke_width
-from instantlensdoc.dtp.envelope import warp_painter_path
-from instantlensdoc.dtp.export import paint_page
-from instantlensdoc.dtp.extrude import path_for_shape
 from instantlensdoc.dtp.geometry import snap_point
 from instantlensdoc.dtp.model import DtpDocument, DtpFrame
 
@@ -57,61 +50,26 @@ class FrameItem(QGraphicsRectItem):
 
     def _refresh_look(self) -> None:
         if self.frame.kind == "text":
-            self.setBrush(QBrush(QColor(255, 255, 255, 230)))
+            self.setBrush(QBrush(QColor(255, 255, 255, 40)))
             self.setPen(QPen(QColor("#3B6DB5"), 0.8, Qt.DashLine))
         elif self.frame.kind == "shape":
-            self.setBrush(QBrush(QColor(self.frame.fill or "#D0E8FF")))
+            self.setBrush(Qt.NoBrush)
             self.setPen(QPen(QColor(self.frame.stroke or "#1A5276"), max(0.6, self.frame.stroke_width)))
         else:
             self.setBrush(QBrush(QColor("#F4F7FB")))
             self.setPen(QPen(QColor("#888"), 0.8))
 
     def paint(self, painter: QPainter, option, widget=None) -> None:  # type: ignore[override]
-        super().paint(painter, option, widget)
-        fr = self.frame
+        from instantlensdoc.dtp.export import paint_frame_local
+
         painter.save()
-        if fr.kind == "text":
-            font = QFont(fr.font_family or "serif")
-            size = fr.font_size or 11.0
-            font.setPointSizeF(float(size))
-            if fr.font_weight >= 600:
-                font.setBold(True)
-            painter.setFont(font)
-            painter.setPen(QColor("#111"))
-            if fr.envelope and fr.envelope.corners:
-                path = QPainterPath()
-                path.addText(4, size + 4, font, (fr.text or "")[:400])
-                path = warp_painter_path(
-                    path, width=fr.width, height=fr.height, corners=fr.envelope.corners
-                )
-                painter.fillPath(path, QColor("#111"))
-            else:
-                painter.drawText(
-                    QRectF(4, 4, fr.width - 8, fr.height - 8),
-                    Qt.TextWordWrap | Qt.AlignLeft | Qt.AlignTop,
-                    fr.text or "",
-                )
-        elif fr.kind == "shape":
-            path = path_for_shape(fr.shape, fr.width, fr.height)
-            if fr.envelope and fr.envelope.corners:
-                path = warp_painter_path(
-                    path, width=fr.width, height=fr.height, corners=fr.envelope.corners
-                )
-            painter.setBrush(QColor(fr.fill or "#D0E8FF"))
-            painter.setPen(QPen(QColor(fr.stroke or "#1A5276"), max(0.6, fr.stroke_width)))
-            painter.drawPath(path)
-        elif fr.kind == "ink" and fr.ink_points:
-            pen = QPen(QColor("#111"), 1.2)
-            pen.setCapStyle(Qt.RoundCap)
-            painter.setPen(pen)
-            pts = fr.ink_points
-            for i in range(1, len(pts)):
-                painter.drawLine(
-                    pts[i - 1][0] - fr.x,
-                    pts[i - 1][1] - fr.y,
-                    pts[i][0] - fr.x,
-                    pts[i][1] - fr.y,
-                )
+        if self.isSelected():
+            painter.setPen(QPen(QColor("#0B3D91"), 1.15, Qt.DashLine))
+        else:
+            painter.setPen(self.pen())
+        painter.setBrush(self.brush() if self.frame.kind == "text" else Qt.NoBrush)
+        painter.drawRect(self.rect())
+        paint_frame_local(painter, self.doc, self.frame)
         painter.restore()
 
     def itemChange(self, change, value):  # type: ignore[override]
@@ -418,6 +376,11 @@ class DtpPane(QWidget):
         _btn("Verteilen", lambda: self.distribute("h"), "Horizontal verteilen")
         _btn("Envelope", self.apply_envelope, "Envelope Distort auf Auswahl")
         _btn("3D", self.apply_extrude, "Extrusion auf Auswahl")
+        _btn("Pfadtext", self.apply_text_on_path, "Text auf Ellipse/Linie")
+        _btn("Outlines", self.convert_to_outlines, "Text in Pfade umwandeln")
+        _btn("Clip", self.apply_clip_mask, "Auswahl: Inhalt + Maske")
+        _btn("Füllung", self.apply_live_fill, "Verlauf + Schatten")
+        _btn("Glyphen", self.show_glyph_palette, "Glyphen-Palette")
         self._ink_btn = _btn("Stift", self.toggle_ink, "Drucksensitiver Stift")
         self._ink_btn.setCheckable(True)
         _btn("Erkennen", self.recognize_selected_ink, "Tinte → Form")
@@ -535,6 +498,75 @@ class DtpPane(QWidget):
             fr.extrude = ExtrudeSpec()
         self.scene.rebuild()
         self.statusMessage.emit("3D-Extrusion angewandt")
+
+    def apply_text_on_path(self, kind: str = "ellipse") -> None:
+        frames = [f for f in self.scene.selected_frames() if f.kind == "text"]
+        if not frames:
+            frames = [f for f in self.doc.frames_on_page(self.doc.current_page) if f.kind == "text"][:1]
+        for fr in frames:
+            self.doc.apply_text_on_path(fr.id, kind)
+        self.scene.rebuild()
+        self.statusMessage.emit("Text auf Pfad")
+
+    def convert_to_outlines(self) -> None:
+        frames = [f for f in self.scene.selected_frames() if f.kind == "text"]
+        if not frames:
+            frames = [f for f in self.doc.frames_on_page(self.doc.current_page) if f.kind == "text"][:1]
+        for fr in frames:
+            self.doc.convert_text_to_outlines(fr.id)
+        self.scene.rebuild()
+        self.statusMessage.emit("Text in Pfade umgewandelt")
+
+    def apply_clip_mask(self) -> None:
+        sel = self.scene.selected_frames()
+        if len(sel) >= 2:
+            self.doc.apply_clip_mask(sel[0].id, sel[1].id)
+            self.statusMessage.emit(f"Schnittmaske {sel[0].id} ← {sel[1].id}")
+        else:
+            page = self.doc.frames_on_page(self.doc.current_page)
+            shapes = [f for f in page if f.kind == "shape"]
+            others = [f for f in page if f.kind != "shape"]
+            if shapes and others:
+                self.doc.apply_clip_mask(others[0].id, shapes[0].id)
+                self.statusMessage.emit("Schnittmaske (Seite)")
+            else:
+                self.statusMessage.emit("Schnittmaske: zwei Rahmen wählen")
+                return
+        self.scene.rebuild()
+
+    def apply_live_fill(self) -> None:
+        targets = [f for f in self.scene.selected_frames() if f.kind in ("shape", "image")]
+        if not targets:
+            targets = [f for f in self.doc.frames_on_page(self.doc.current_page) if f.kind == "shape"][:1]
+        for fr in targets:
+            self.doc.apply_live_fill(fr.id, kind="linear", shadow=True)
+        self.scene.rebuild()
+        self.statusMessage.emit("Live-Füllung / Schatten")
+
+    def show_glyph_palette(self) -> None:
+        from instantlensdoc.features.glyph_dialog import GlyphPaletteDialog
+
+        fam = ""
+        texts = [f for f in self.scene.selected_frames() if f.kind == "text"]
+        if texts:
+            fam = texts[0].font_family or ""
+        dlg = GlyphPaletteDialog(self, family=fam)
+        if dlg.exec() != 1:  # QDialog.Accepted
+            return
+        glyph = dlg.selected_glyph()
+        if not glyph:
+            return
+        if not texts:
+            texts = [f for f in self.doc.frames_on_page(self.doc.current_page) if f.kind == "text"][:1]
+        if not texts:
+            fr = self.add_text_frame()
+            texts = [fr]
+        for fr in texts:
+            self.doc.insert_glyph(fr.id, glyph)
+            if dlg.selected_family() and not fr.font_family:
+                fr.font_family = dlg.selected_family()
+        self.scene.rebuild()
+        self.statusMessage.emit(f"Glyphe eingefügt: {glyph}")
 
     def toggle_ink(self, checked: bool = False) -> None:
         self.view.ink_mode = bool(self._ink_btn.isChecked() if hasattr(self, "_ink_btn") else checked)

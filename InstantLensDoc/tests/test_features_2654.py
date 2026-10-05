@@ -133,3 +133,14 @@ def test_plugin_aliases_and_sample(tmp_path: Path):
     assert n >= 0
     names = ph.list_hooks(tmp_path)["known_events"]
     assert "document.scanned" in names
+
+
+def test_glyph_palette_blocks():
+    from instantlensdoc.features.glyph_palette import list_glyph_blocks, list_glyphs
+
+    blocks = list_glyph_blocks()
+    assert "latin" in blocks and "arrows" in blocks
+    arrows = list_glyphs(blocks=("arrows",), limit=40)
+    assert any(g["char"] == "→" for g in arrows)
+    mathg = list_glyphs(blocks=("math",), limit=20)
+    assert mathg and mathg[0]["hex"].startswith("U+")

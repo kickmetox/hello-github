@@ -126,3 +126,78 @@ def test_dtp_pane_offscreen(qapp):
     pix = pane.grab()
     assert pix.width() > 100
     pane.close()
+
+
+def test_text_on_path_and_outlines():
+    from instantlensdoc.dtp.text_path import (
+        ellipse_polyline,
+        path_length,
+        place_text_on_path,
+        polyline_for_kind,
+    )
+
+    pts = ellipse_polyline(200, 80)
+    assert len(pts) > 16
+    assert path_length(pts) > 100
+    placed = place_text_on_path("InstantLens", pts, font_size=12)
+    assert len(placed) >= 8
+    assert placed[0]["char"] == "I"
+    assert "angle" in placed[0]
+    line = polyline_for_kind("line", 180, 40)
+    assert line[0][0] < line[-1][0]
+    doc = DtpDocument.sample("A5")
+    fr = doc.add_text_frame("Pfad", page=0, x=40, y=40, width=160, height=70)
+    doc.apply_text_on_path(fr.id, "ellipse")
+    assert fr.path_kind == "ellipse"
+    doc.convert_text_to_outlines(fr.id)
+    assert fr.as_outlines is True
+    dumped = DtpDocument.from_dict(doc.to_dict())
+    again = dumped.frame_by_id(fr.id)
+    assert again is not None and again.path_kind == "ellipse" and again.as_outlines
+
+
+def test_clip_mask_and_live_fill():
+    doc = DtpDocument()
+    content = doc.add_shape("rectangle", x=20, y=20, width=120, height=80, fill="#FF0000")
+    mask = doc.add_shape("ellipse", x=40, y=30, width=80, height=60, fill="#00FF00")
+    doc.apply_clip_mask(content.id, mask.id)
+    assert content.clip_id == mask.id
+    doc.apply_live_fill(mask.id, kind="radial", fill="#4A90D9", fill_to="#111111", opacity=0.8)
+    assert mask.fill_kind == "radial"
+    assert mask.fill_to == "#111111"
+    assert abs(mask.opacity - 0.8) < 1e-6
+    doc.apply_drop_shadow(mask.id, dx=5, dy=6)
+    assert mask.shadow and mask.shadow_dx == 5
+    try:
+        doc.apply_clip_mask(content.id, content.id)
+        assert False, "self-clip should fail"
+    except ValueError:
+        pass
+
+
+def test_glyph_insert_on_frame():
+    from instantlensdoc.features.glyph_palette import insert_glyph, list_glyphs
+
+    glyphs = list_glyphs(blocks=("latin",), limit=80)
+    chars = {g["char"] for g in glyphs}
+    assert "A" in chars
+    currency = {g["char"] for g in list_glyphs(blocks=("currency",), limit=40)}
+    assert "€" in currency
+    assert insert_glyph("ab", "€", index=1) == "a€b"
+    doc = DtpDocument()
+    fr = doc.add_text_frame("Hallo", page=0)
+    doc.insert_glyph(fr.id, "—")
+    assert fr.text.endswith("—")
+
+
+def test_export_pdf_path_clip_fill(qapp, tmp_path: Path):
+    from instantlensdoc.dtp.export import export_pdf
+
+    doc = DtpDocument.sample("A5")
+    dest = tmp_path / "dtp-path-clip.pdf"
+    export_pdf(doc, dest)
+    assert dest.is_file() and dest.stat().st_size > 200
+    import pikepdf
+
+    with pikepdf.open(dest) as pdf:
+        assert len(pdf.pages) >= 2

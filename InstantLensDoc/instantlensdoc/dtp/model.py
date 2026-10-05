@@ -177,6 +177,17 @@ class DtpFrame:
     extrude: Optional[ExtrudeSpec] = None
     ink_points: list[list[float]] = field(default_factory=list)  # [x,y,pressure?]
     master: bool = False
+    path_kind: str = ""  # "" | ellipse | line
+    as_outlines: bool = False
+    clip_id: str = ""
+    opacity: float = 1.0
+    fill_kind: str = "solid"  # solid | linear | radial
+    fill_to: str = ""
+    fill_angle: float = 90.0
+    shadow: bool = False
+    shadow_dx: float = 3.0
+    shadow_dy: float = 3.0
+    shadow_color: str = "#00000066"
 
     def move(self, x: float, y: float) -> None:
         if self.locked:
@@ -625,6 +636,91 @@ class DtpDocument:
         rest = " ".join(words[n:])
         return chunk, rest
 
+    def apply_text_on_path(self, frame_id: str, kind: str = "ellipse") -> DtpFrame:
+        fr = self.frame_by_id(frame_id)
+        if fr is None:
+            raise KeyError(frame_id)
+        k = (kind or "ellipse").lower()
+        if k not in ("ellipse", "line"):
+            k = "ellipse"
+        fr.path_kind = k
+        if fr.kind != "text":
+            fr.kind = "text"
+        if not (fr.text or "").strip():
+            fr.text = "Text auf Pfad"
+        return fr
+
+    def convert_text_to_outlines(self, frame_id: str) -> DtpFrame:
+        fr = self.frame_by_id(frame_id)
+        if fr is None:
+            raise KeyError(frame_id)
+        fr.as_outlines = True
+        if fr.kind != "text":
+            fr.kind = "text"
+        return fr
+
+    def apply_clip_mask(self, content_id: str, mask_id: str) -> DtpFrame:
+        content = self.frame_by_id(content_id)
+        mask = self.frame_by_id(mask_id)
+        if content is None or mask is None:
+            raise KeyError("Inhalt oder Maske nicht gefunden")
+        if content_id == mask_id:
+            raise ValueError("Rahmen kann sich nicht selbst clippen")
+        content.clip_id = mask.id
+        return content
+
+    def clear_clip_mask(self, frame_id: str) -> None:
+        fr = self.frame_by_id(frame_id)
+        if fr is not None:
+            fr.clip_id = ""
+
+    def apply_live_fill(
+        self,
+        frame_id: str,
+        *,
+        kind: str = "linear",
+        fill: str = "#4A90D9",
+        fill_to: str = "#0E4D73",
+        angle: float = 90.0,
+        opacity: float | None = None,
+        shadow: bool | None = None,
+    ) -> DtpFrame:
+        fr = self.frame_by_id(frame_id)
+        if fr is None:
+            raise KeyError(frame_id)
+        k = (kind or "linear").lower()
+        if k not in ("solid", "linear", "radial"):
+            k = "linear"
+        fr.fill_kind = k
+        fr.fill = fill
+        fr.fill_to = fill_to
+        fr.fill_angle = float(angle)
+        if opacity is not None:
+            fr.opacity = max(0.05, min(1.0, float(opacity)))
+        if shadow is not None:
+            fr.shadow = bool(shadow)
+        return fr
+
+    def apply_drop_shadow(self, frame_id: str, *, dx: float = 3.0, dy: float = 4.0) -> DtpFrame:
+        fr = self.frame_by_id(frame_id)
+        if fr is None:
+            raise KeyError(frame_id)
+        fr.shadow = True
+        fr.shadow_dx = float(dx)
+        fr.shadow_dy = float(dy)
+        return fr
+
+    def insert_glyph(self, frame_id: str, glyph: str) -> DtpFrame:
+        from instantlensdoc.features.glyph_palette import insert_glyph as _ins
+
+        fr = self.frame_by_id(frame_id)
+        if fr is None:
+            raise KeyError(frame_id)
+        if fr.kind != "text":
+            fr.kind = "text"
+        fr.text = _ins(fr.text or "", glyph)
+        return fr
+
     def apply_preset(self, name: str) -> None:
         apply_book_preset(self, name)
 
@@ -754,6 +850,43 @@ class DtpDocument:
                                 height=36)
         h1.font_size = 16
         h1.font_weight = 700
+        path_fr = doc.add_text_frame(
+            "InstantLens Doc",
+            page=1,
+            x=doc.geometry.margin_left_pt,
+            y=doc.geometry.margin_top_pt + 50,
+            width=220,
+            height=90,
+        )
+        path_fr.path_kind = "ellipse"
+        path_fr.font_size = 11
+        mask = doc.add_shape(
+            "ellipse",
+            x=doc.geometry.width_pt * 0.52,
+            y=doc.geometry.margin_top_pt + 48,
+            width=130,
+            height=90,
+            page=1,
+            fill="#8E44AD",
+            stroke="#4A235A",
+        )
+        mask.fill_kind = "linear"
+        mask.fill_to = "#F4D03F"
+        mask.shadow = True
+        clipped = doc.add_shape(
+            "rectangle",
+            x=mask.x - 10,
+            y=mask.y - 8,
+            width=150,
+            height=110,
+            page=1,
+            fill="#1ABC9C",
+            stroke="#0E6655",
+        )
+        clipped.clip_id = mask.id
+        clipped.fill_kind = "radial"
+        clipped.fill_to = "#145A32"
+        clipped.opacity = 0.92
         return doc
 
 

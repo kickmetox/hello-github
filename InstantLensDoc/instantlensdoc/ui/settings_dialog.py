@@ -2146,6 +2146,26 @@ class SettingsDialog(QDialog):
                 "telemetry",
                 "Produktiv 2.6.27 · Opt-in lokal · kein Netzwerk/PII",
             ),
+            (
+                "Text auf Pfad / Text zu Pfaden",
+                "textpath",
+                "Produktiv 2.6.54 · DTP Ellipse/Linie + Outlines",
+            ),
+            (
+                "Schnittmasken",
+                "clipmask",
+                "Produktiv 2.6.54 · Inhalt clippt an Formrahmen",
+            ),
+            (
+                "Füllungen / Live-Effekte",
+                "livefx",
+                "Produktiv 2.6.54 · Verlauf, Deckkraft, Schatten",
+            ),
+            (
+                "Glyphen-Palette",
+                "glyphs",
+                "Produktiv 2.6.54 · Unicode der Systemschrift",
+            ),
         ]
         # Sortierung A–Z nach Feature-Name — 1.9.3
         rows = sorted(rows, key=lambda r: r[0].casefold())

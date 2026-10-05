@@ -2,7 +2,7 @@
 
 ### 2.6.54 — DTP-Layout-Modus & geplante Funktionen
 
-Ansicht → **Layout-Modus** (Ctrl+Alt+L, Ribbon DTP): echter DTP-Canvas mit Rahmen, Lineal, Raster, Musterseiten, Buchformaten. Extras ohne „(geplant)“: KI-Assistent (auch offline), Formerkennung, Variable Fonts, Envelope Distort, 3D-Extrusion, PAdES-B/QES-Hinweis, Stylus, Plugin-Hooks (`on_open`/`on_save`/`on_scan`). VERSION-Pack bleibt 2.6.53 in diesem Lauf.
+Ansicht → **Layout-Modus** (Ctrl+Alt+L, Ribbon DTP): echter DTP-Canvas mit Rahmen, Lineal, Raster, Musterseiten, Buchformaten, Text auf Pfad, Schnittmasken, Live-Füllungen, Glyphen-Palette. Extras ohne „(geplant)“: KI-Assistent (auch offline), Formerkennung, Variable Fonts, Envelope Distort, 3D-Extrusion, PAdES-B/QES-Hinweis, Stylus, Plugin-Hooks (`on_open`/`on_save`/`on_scan`). VERSION-Pack bleibt 2.6.53 in diesem Lauf.
 
 ### 2.6.53 — PDFium „Data format error“, DOCX-Umbruch/-Schrift, Seitenlayout
 

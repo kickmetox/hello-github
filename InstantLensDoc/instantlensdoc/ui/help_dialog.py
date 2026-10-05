@@ -144,11 +144,13 @@ HELP_HTML = f"""
 <li><b>PDF → Kopf-/Fußzeile</b>: Seitenzahlen, Titel, Ersteller/Autor (<code>{{title}}</code>/<code>{{author}}</code>/<code>{{creator}}</code>) — <b>2.6.11</b></li>
 <li><b>Ansicht → Layout-Modus</b> (Ctrl+Alt+L): DTP-Canvas (QGraphicsScene) mit Textrahmen, Bild-/Formrahmen,
     Verkettung, Lineal (Guides ziehen), Raster/Snap, Spalten, Satzspiegel, Bleed, Musterseiten (Kopf/Fuß),
-    Ebenen, Formatvorlagen, Envelope Distort, 3D-Extrusion, drucksensitivem Stift. Export als Vektor-PDF
+    Ebenen, Formatvorlagen, Envelope Distort, 3D-Extrusion, Text auf Pfad, Text in Pfade, Schnittmasken,
+    Verlauf/Schatten, Glyphen-Palette, drucksensitivem Stift. Export als Vektor-PDF
     (QPdfWriter, nicht ild_pdf-Writer), DOCX und ODT. Ribbon-Tab <b>DTP</b> (Alt+8). — <b>2.6.54</b></li>
 <li><b>Extras → KI-Assistent</b>: Zusammenfassen, umformulieren, übersetzen, Inhaltsverzeichnis vorschlagen.
     OpenAI-kompatibler Endpoint + Schlüssel in Einstellungen; ohne Schlüssel Offline-Modus. — <b>2.6.54</b></li>
-<li><b>Extras → Intelligente Formerkennung / Variable Fonts / Envelope Distort / 3D-Extrusion / E-Signatur PAdES</b>:
+<li><b>Extras → Intelligente Formerkennung / Variable Fonts / Envelope Distort / 3D-Extrusion / E-Signatur PAdES /
+    Text auf Pfad / Schnittmaske / Füllung / Glyphen-Palette</b>:
     keine „(geplant)“-Platzhalter. PAdES-B mit PKCS#12; QES nur mit QTSP-Zertifikat. — <b>2.6.54</b></li>
 <li><b>Seitenformate</b>: US Letter, DIN-A, Buchformate (Taschenbuch/Roman/Sachbuch/Quadrat…) — <b>2.6.11</b> / Layout-Modus <b>2.6.54</b></li>
 <li><b>Bearbeiten → Gehe zu Zeile / Seite</b> (Ctrl+G): Editor → Zeile; PDF → Seite (auch PDF → Gehe zu Seite…, Ctrl+Shift+G)</li>
@@ -342,11 +344,14 @@ Deutsche Anleitung im Project-Store: <code>docs/instantlensdoc-scripting.md</cod
 <code>D:\\AI_Temp\\InstantLensDoc</code>, pip, optional Start (<code>-SkipStart</code>/<code>-NoStart</code> unterdrückt Start).
 Exit-Codes: 0 OK, 1 allgemein, 2 Git-Fehler. Eigenes Icon in <code>assets</code> bleibt erhalten.</p>
 <h3>Geplante Features</h3>
-<p>KI-Assistent, Cloud-Sync, Stylus/Palm Rejection, 3D u. a. sind im Menü als „Geplant“ markiert
-(Stub {__version__}) — siehe FEATURES.md.</p>
-<p><b>Plugin-Hooks</b> sind ein Stub und <b>nicht produktiv</b> (interner Event-Bus + no-op Loader).
-Dokumentierte Event-Namen: <code>app.started</code>, <code>document.opened</code>,
-<code>document.saved</code>, <code>annotation.changed</code>, <code>ocr.finished</code>
+<p>Die früheren Extras-Platzhalter (KI, Formerkennung, Variable Fonts, Envelope, 3D, PAdES,
+Text auf Pfad, Schnittmasken, Live-Füllungen, Glyphen-Palette) sind im Layout-Modus produktiv.
+Outline-TTS bleibt ohne Engine und ohne Menüeintrag — siehe FEATURES.md.</p>
+<p><b>Plugin-Hooks</b> sind produktiv (Event-Bus + User-Skripte, Aliase
+<code>on_open</code>/<code>on_save</code>/<code>on_scan</code>, Menü-Plugins).
+Kein Marketplace. Dokumentierte Event-Namen: <code>app.started</code>, <code>document.opened</code>,
+<code>document.saved</code>, <code>document.exported</code>, <code>ocr.finished</code>,
+<code>annotation.changed</code>, <code>document.scanned</code>
 — siehe FEATURES.md.</p>
 """
 
