@@ -1,3 +1,16 @@
+## 2.6.50 - PDF-Hauptansicht weiter weiß: harter Detach + PDFium-Packaging
+
+Feldbericht nach **2.6.48/2.6.49**: PDFs in der Hauptansicht **weiter nicht sichtbar** (vermutlich kein Rebuild und/oder Fix unvollständig). Nachschärfung:
+
+- **`ild_pdf.render`**: nach `to_pil()` **`Image.frombytes(...tobytes())`** + undurchsichtiges **RGB** (nicht nur `.copy()`); opaker `fill_color`
+- **`image_qt`**: PIL→Qt über **RGB888→RGB32** (kein Alpha-Ghost); adaptive Ink-Erkennung inkl. hellgrauer Thumb-Placeholder
+- Canvas/`update_thumb`: Convert ohne Tinte → Fail (kein stilles Weiß/Grau)
+- **PyInstaller**: Spec `collect_all("pypdfium2")`; `build-windows.ps1` bricht ab wenn **pdfium.dll** fehlt
+- **deps_check**: Mini-Render-Probe (nicht nur Import)
+- Offscreen-Test multipage + `grab()` nicht all-white
+
+Pack `InstantLensDoc-2.6.50-pack.zip`; VERSION **2.6.50**.
+
 ## 2.6.49 - Word-Suite/DOCX: echte Rich-Text-Formate (kein Markdown)
 
 Patch nach **2.6.48** (PDFium-Buffer): Nutzerbericht — DOCX öffnete als Plaintext ohne Fett/Kursiv/Absätze; Toolbar Fett/Kursiv setzte `**`/`*`-Marker; Unterstreichen wirkte nur auf Lücken/`__`. Fix: **`richtext_docx`** lädt DOCX via python-docx → HTML mit `<b>/<i>/<u>`; Editor **`QTextCharFormat`** (fontWeight/italic/underline) statt Markdown-Wrapper; Underline auf Buchstaben; Speichern DOCX/HTML/RTF erhält Formate aus `meta.html`. Smoke `scripts/test_docx_richtext.py`. Pack `InstantLensDoc-2.6.49-pack.zip`; VERSION **2.6.49**.

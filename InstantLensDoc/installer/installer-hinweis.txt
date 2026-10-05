@@ -1,4 +1,10 @@
-InstantLens Doc 2.6.49 - Installation
+InstantLens Doc 2.6.50 - Installation
+
+Neu in 2.6.50:
+- PDF-Canvas weiter weiss nach 2.6.48: harter PDFium-Detach (frombytes+RGB)
+- Qt-Convert RGB32 (kein Alpha-Ghost); Thumb/Ink-Checks; Render-Probe in Deps
+- PyInstaller Spec collect_all pypdfium2 + Build-Guard pdfium.dll
+- Multipage Offscreen-Test (grab nicht all-white)
 
 Neu in 2.6.49:
 - DOCX/Word-Suite: echte Rich-Text-Formate (QTextCharFormat, kein Markdown)
@@ -22,24 +28,3 @@ Neu in 2.6.46:
 Neu in 2.6.45:
 - PDF-Open: „PDF wird geprueft“ nicht mehr UI-blockierend (size_only + Worker)
 - Erste Seite nach Open sichtbar (_ensure_page_painted)
-
-Neu in 2.6.44:
-- Bearbeitungsleiste fuer Text/DOCX/Word-Suite (Auswahl … Markierungen)
-- Tab-Wechsel PDF <-> Text aktualisiert Toolbar korrekt
-- PDF-only-Werkzeuge (Schwaerzen/Objekt/Formular) bleiben PDF-Tab
-
-Neu in 2.6.43:
-- Speichern unter: Dokumentfilter .ild/.txt/.docx/.pdf/.rtf/.html (kein .py-Default)
-
-Neu in 2.6.42:
-- OCR nutzt ScanTuxio-Tesseract-Runtime (kein separates Tesseract noetig)
-- Lookup: {app}\vendor\tesseract, {app}\tesseract, D:\AI_Temp\ScanTuxio Win\...
-- TESSDATA_PREFIX = tessdata die neben tesseract.exe liegt
-- Copy-Hint in build-windows.ps1 (build-keygen)
-
-Start:
-1. InstantLens Doc aus dem Startmenue
-2. Oder Installationsordner: InstantLensDoc.exe / run.bat
-
-Keygenerator (optional): run-keygen.bat
-OCR: tesseract.exe unter vendor\tesseract oder neben der EXE (siehe INFO.md)

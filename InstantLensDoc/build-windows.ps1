@@ -1,4 +1,4 @@
-﻿# InstantLens Doc - Windows-Build (PyInstaller App + Keygen) 2.6.49
+﻿# InstantLens Doc - Windows-Build (PyInstaller App + Keygen) 2.6.50
 # Eine Zeile:
 #   powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 #
@@ -33,7 +33,7 @@ $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $Root
 
-Write-Host "=== InstantLens Doc Build 2.6.49 (Windows x64) ==="
+Write-Host "=== InstantLens Doc Build 2.6.50 (Windows x64) ==="
 Write-Host "Root: $Root"
 
 # Mindestgroesse: leere/stub EXE und fehlgeschlagenes onedir entlarven (~49 MB Setup)
@@ -245,6 +245,21 @@ Pruefe PyInstaller-Log oben. Erwartet: dist\InstantLensDoc\InstantLensDoc.exe
         throw "App-Build: InstantLensDoc.exe zu klein ($exeLen Bytes < $script:IldMinAppExeBytes) - Output unvollstaendig."
     }
     Write-Host ("OK: {0} ({1} MB)" -f $appExe, [math]::Round($exeLen / 1MB, 2))
+    # PDFium-Binary muss im onedir-Output liegen — sonst weisse Canvas/Thumbs — 2.6.50
+    $pdfiumHits = @(Get-ChildItem -Path $AppDist -Recurse -ErrorAction SilentlyContinue |
+        Where-Object {
+            $_.Name -match '(?i)^pdfium(\.dll|\.so|\.dylib)?$' -or
+            $_.Name -match '(?i)pdfium.*\.(dll|so|dylib)$' -or
+            ($_.Name -match '(?i)pypdfium2' -and $_.Extension -match '(?i)\.(dll|pyd|so)$')
+        })
+    if ($pdfiumHits.Count -lt 1) {
+        throw @"
+App-Build: PDFium/pypdfium2-Binary fehlt unter dist\InstantLensDoc\.
+PyInstaller muss --collect-all pypdfium2 nutzen (build-windows.ps1 / Spec).
+Ohne dll bleibt die PDF-Hauptansicht weiss und Thumbs grau.
+"@
+    }
+    Write-Host ("OK: PDFium-Binary vorhanden ({0})" -f $pdfiumHits[0].FullName)
     Write-Host "OK: dist\InstantLensDoc\"
     [void](Copy-TesseractVendor -DestRoot $AppDist)
 }
@@ -286,7 +301,7 @@ if (-not $SkipKeygen) {
     Write-Host "Keygen uebersprungen (-SkipKeygen)"
 }
 
-Write-Host "Fertig (2.6.49). Optional:"
+Write-Host "Fertig (2.6.50). Optional:"
 Write-Host '  powershell -ExecutionPolicy Bypass -File .\installer\build-installer.ps1'
 Write-Host "  (ohne Keygen: -SkipKeygen bzw. ISCC /DIncludeKeygen=0)"
 Write-Host '  python scripts\pack-windows-runnable.py   # Python-Layout-Zip ohne EXE'

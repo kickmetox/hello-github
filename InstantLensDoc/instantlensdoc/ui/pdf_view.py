@@ -1267,7 +1267,7 @@ class PdfCanvas(QLabel):
         annotations: list[Annotation] | None = None,
         scale: float = 1.5,
     ):
-        from instantlensdoc.ui.image_qt import pil_to_qpixmap
+        from instantlensdoc.ui.image_qt import pil_has_ink, pil_to_qpixmap, qpixmap_has_ink
 
         pm = pil_to_qpixmap(image)
         if pm.isNull():
@@ -1275,6 +1275,11 @@ class PdfCanvas(QLabel):
             self._pixmap = None
             self.clear()
             raise RuntimeError("PIL→QPixmap fehlgeschlagen (leeres Pixmap)")
+        # Quelle hat Tinte, Pixmap nicht → Konvertierung/Buffer-Fail — 2.6.49
+        if pil_has_ink(image) and not qpixmap_has_ink(pm):
+            self._pixmap = None
+            self.clear()
+            raise RuntimeError("PIL→QPixmap ohne Tinte (Ghost/Weiß nach Convert)")
         self._pixmap = pm
         self._annotations = annotations or []
         self._scale = scale
@@ -1284,6 +1289,14 @@ class PdfCanvas(QLabel):
         shown = self.pixmap()
         if shown is None or shown.isNull() or int(shown.width()) < 2:
             raise RuntimeError("Canvas setPixmap ohne sichtbares Seitenbild")
+        # Overlay-Pfad darf Tinte nicht verlieren (Painter-Fail → Rohpixmap) — 2.6.49
+        if pil_has_ink(image) and not qpixmap_has_ink(shown):
+            self.setPixmap(pm)
+            self.adjustSize()
+            self.update()
+            shown = self.pixmap()
+            if shown is None or shown.isNull() or not qpixmap_has_ink(shown):
+                raise RuntimeError("Canvas Overlay/setPixmap ohne sichtbare Tinte")
 
     def show_render_fallback(self, message: str = "") -> None:
         """Sichtbarer Platzhalter statt stiller weißer Fläche — 2.6.47.

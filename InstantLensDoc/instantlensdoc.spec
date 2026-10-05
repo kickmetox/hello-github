@@ -3,24 +3,32 @@
 
 from pathlib import Path
 
+from PyInstaller.utils.hooks import collect_all
+
 block_cipher = None
 root = Path(SPECPATH)
+
+# PDFium-Binary + Datenpakete mitpacken (sonst EXE öffnet PDF, Canvas bleibt weiß) — 2.6.49
+_pdfium_datas, _pdfium_binaries, _pdfium_hidden = collect_all("pypdfium2")
 
 a = Analysis(
     # Thin absolute-import entry (not instantlensdoc/__main__.py) — frozen scripts
     # have no package parent, so relative imports fail at runtime.
     [str(root / "run_instantlensdoc.py")],
     pathex=[str(root)],
-    binaries=[],
+    binaries=list(_pdfium_binaries),
     datas=[
         (str(root / "assets"), "assets"),
         (str(root / "FEATURES.md"), "."),
         (str(root / "INFO.md"), "."),
         (str(root / "README.md"), "."),
         (str(root / "CHANGELOG.md"), "."),
-    ],
+    ]
+    + list(_pdfium_datas),
     hiddenimports=[
         "pypdfium2",
+        "pypdfium2.raw",
+        "pypdfium2._helpers",
         "pikepdf",
         "PIL",
         "pytesseract",
@@ -34,7 +42,8 @@ a = Analysis(
         "ild_pdf",
         "ild",
         "keygen",
-    ],
+    ]
+    + list(_pdfium_hidden),
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

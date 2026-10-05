@@ -50,6 +50,30 @@ def _cache_put(key: Tuple[str, int, int, float, bool, bool], img: Image.Image) -
         _CACHE.popitem(last=False)
 
 
+def _detach_pil_from_pdfium(img: Image.Image) -> Image.Image:
+    """PDFium-Buffer hart lösen — .copy() reicht unter Windows/BGRA nicht immer.
+
+    ``bitmap.to_pil()`` nutzt ``Image.frombuffer``. Bei RGBA/RGBX/L teilt Pillow
+    den PDFium-Speicher (``owndata=False``). Nach ``bitmap.close()`` / Page/Doc-
+    Close entsteht Use-after-free → oft weißes Ghost-Pixmap, das als „Erfolg“
+    zählt. ``Image.frombytes(... tobytes())`` erzwingt eigenen Buffer; danach
+    undurchsichtiges RGB (kein Alpha-Ghost in Qt) — 2.6.49.
+    """
+    if img is None:
+        raise RuntimeError("PDFium lieferte kein Bild")
+    mode = getattr(img, "mode", None) or "RGB"
+    size = getattr(img, "size", None)
+    if not size or int(size[0]) < 1 or int(size[1]) < 1:
+        raise RuntimeError("PDFium-Bitmap ohne gültige Größe")
+    # Harte Kopie der Pixelbytes — unabhängig von Pillow-frombuffer-Semantik
+    raw = img.tobytes()
+    detached = Image.frombytes(mode, (int(size[0]), int(size[1])), raw)
+    # Undurchsichtiges RGB: vermeidet transparente Ghosts in QLabel/QPixmap
+    if detached.mode != "RGB":
+        detached = detached.convert("RGB")
+    return detached
+
+
 def _to_grayscale(img: Image.Image) -> Image.Image:
     """Farbe → Graustufen (RGBA beibehalten wenn vorhanden)."""
     if img.mode == "RGBA":
@@ -134,14 +158,18 @@ def render_page(
                 hit = _cache_get(cache_key)
                 if hit is not None:
                     return hit
-            bitmap = page.render(scale=eff_scale)
+            # Opaker weißer Fill → keine Alpha-Ghosts; detach vor close — 2.6.49
+            try:
+                bitmap = page.render(
+                    scale=eff_scale,
+                    fill_color=(255, 255, 255, 255),
+                )
+            except TypeError:
+                # Ältere pypdfium2 ohne fill_color
+                bitmap = page.render(scale=eff_scale)
             try:
                 img = bitmap.to_pil()
-                # Wichtig: to_pil() teilt bei RGBA/RGBX/L den PDFium-Buffer.
-                # Nach page/doc/bitmap.close() wäre das ein Use-after-free →
-                # oft weißes/leeres Pixmap bei „erfolgreichem“ Render (Windows
-                # BGRA-Native). Immer detach bevor Buffer freigegeben wird — 2.6.48
-                img = img.copy()
+                img = _detach_pil_from_pdfium(img)
             finally:
                 try:
                     bitmap.close()

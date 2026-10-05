@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Nightly/CI Smoke: CLI + Import-Checks für InstantLens Doc — 2.1.0–2.6.49.
+"""Nightly/CI Smoke: CLI + Import-Checks für InstantLens Doc — 2.1.0–2.6.50.
 
 Leichtgewichtig. Exit-Codes:
   0  OK  (ok=true)
@@ -14,12 +14,12 @@ Aufruf:
   python scripts/smoke_ild.py -h
 
 JSON-Schema (--json), Erfolg:
-  {"ok": true, "version": "2.6.49", "duration_ms": 1234,
+  {"ok": true, "version": "2.6.50", "duration_ms": 1234,
    "checks": ["version", "imports", "cli", "measure_diff_import", "changelog"]}
 
 JSON bei Fail: checks[] enthält Objekt mit error-Text (max 200 Zeichen, Truncate …);
 Exitcode spiegelt ok (0↔true, 1↔false) — 2.2.0:
-  {"ok": false, "version": "2.6.49", "duration_ms": 12,
+  {"ok": false, "version": "2.6.50", "duration_ms": 12,
    "checks": ["version", {"name": "imports", "error": "import x: …"}]}
 """
 
@@ -41,7 +41,7 @@ if str(ROOT) not in sys.path:
 # Headless/CI: Qt ohne Display
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-EXPECTED_VERSION = "2.6.49"
+EXPECTED_VERSION = "2.6.50"
 FAIL_ERROR_MAX_LEN = 200
 
 EXIT_OK = 0
@@ -82,7 +82,7 @@ def check_version() -> None:
         _fail(f"docs/VERSION={docs_ver!r}")
     bw = (ROOT / "build-windows.ps1").read_text(encoding="utf-8")
     if EXPECTED_VERSION not in bw or "Allow32Bit" not in bw:
-        _fail("build-windows.ps1 fehlt 2.6.49/Allow32Bit")
+        _fail("build-windows.ps1 fehlt 2.6.50/Allow32Bit")
     if not (ROOT / "scripts" / "pack-windows-runnable.py").is_file():
         _fail("scripts/pack-windows-runnable.py fehlt")
     if not (ROOT / "run-keygen.bat").is_file():
@@ -401,10 +401,8 @@ def check_version() -> None:
     if "_ensure_page_painted(warn=False)" not in mw:
         _fail("main_window._on_thumb_jump erzwingt Paint nicht (2.6.47)")
     _ok("2.6.47 blank-view-visible-fallback/thumb-force-paint: OK")
-    # 2.6.48: PDFium-Buffer detach + sichtbares Canvas/Thumb Paint
+    # 2.6.48: PDFium-Buffer detach + sichtbares Canvas/Thumb Paint (Basis)
     render_src = (ROOT / "ild_pdf" / "render.py").read_text(encoding="utf-8")
-    if "img = img.copy()" not in render_src and "img.copy()" not in render_src:
-        _fail("ild_pdf.render fehlt PIL detach .copy() nach to_pil (2.6.48)")
     if "bitmap.close()" not in render_src:
         _fail("ild_pdf.render fehlt bitmap.close() (2.6.48)")
     iq = ROOT / "instantlensdoc" / "ui" / "image_qt.py"
@@ -450,6 +448,30 @@ def check_version() -> None:
     if not test_rt.is_file():
         _fail("scripts/test_docx_richtext.py fehlt (2.6.49)")
     _ok("2.6.49 docx-richtext/qtextcharformat-no-markdown: OK")
+    # 2.6.50: harter frombytes-Detach + RGB32 + pdfium collect/guard + render-probe
+    if "_detach_pil_from_pdfium" not in render_src or "frombytes" not in render_src:
+        _fail("ild_pdf.render fehlt hard detach _detach_pil_from_pdfium/frombytes (2.6.50)")
+    if "Format_RGB32" not in iq_src and "Format_RGB888" not in iq_src:
+        _fail("image_qt fehlt RGB888/RGB32 Convert (2.6.50)")
+    if "Ghost/Weiß nach Convert" not in pv and "ohne sichtbare Tinte" not in pv:
+        _fail("pdf_view.set_page_image fehlt Tinte-Verify (2.6.50)")
+    bw = (ROOT / "build-windows.ps1").read_text(encoding="utf-8")
+    if "pdfium" not in bw.lower() or "collect-all" not in bw:
+        _fail("build-windows.ps1 fehlt collect-all/pdfium Guard (2.6.50)")
+    if "PDFium-Binary" not in bw and "pdfium.dll" not in bw.lower():
+        _fail("build-windows.ps1 fehlt PDFium-Binary-Check (2.6.50)")
+    spec = (ROOT / "instantlensdoc.spec").read_text(encoding="utf-8")
+    if "collect_all" not in spec or "pypdfium2" not in spec:
+        _fail("instantlensdoc.spec fehlt collect_all(pypdfium2) (2.6.50)")
+    deps = (ROOT / "instantlensdoc" / "core" / "deps_check.py").read_text(encoding="utf-8")
+    if "render_page" not in deps or "Render OK" not in deps:
+        _fail("deps_check fehlt pypdfium2 Render-Probe (2.6.50)")
+    sb = (ROOT / "instantlensdoc" / "ui" / "sidebar.py").read_text(encoding="utf-8")
+    if "Thumb ohne Tinte" not in sb and "pil_has_ink" not in sb:
+        _fail("sidebar.update_thumb fehlt Ink-Reject (2.6.50)")
+    if "_make_multipage_pdf" not in test_canvas.read_text(encoding="utf-8"):
+        _fail("test_pdf_canvas_not_blank fehlt multipage PDF (2.6.50)")
+    _ok("2.6.50 hard-detach/rgb32/pdfium-pack/render-probe: OK")
 
 
 def check_imports(*, with_qt: bool) -> None:
@@ -1346,6 +1368,8 @@ def check_changelog() -> None:
     cl = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
     if "## 2.6.49" not in cl:
         _fail("CHANGELOG fehlt ## 2.6.49")
+    if "## 2.6.50" not in cl:
+        _fail("CHANGELOG fehlt ## 2.6.50")
     if "## 2.6.48" not in cl:
         _fail("CHANGELOG fehlt ## 2.6.48")
     if "## 2.6.46" not in cl:
@@ -1970,6 +1994,14 @@ def check_changelog() -> None:
     ):
         _fail("CHANGELOG 2.6.48 fehlt PDFium-Buffer/Canvas-Paint-Hinweis")
     if (
+        "frombytes" not in cl
+        and "hard" not in cl.lower()
+        and "Detach" not in cl
+        and "pdfium.dll" not in cl
+        and "2.6.50" not in cl
+    ):
+        _fail("CHANGELOG 2.6.50 fehlt hard-Detach/pdfium-pack-Hinweis")
+    if (
         "QTextCharFormat" not in cl
         and "richtext" not in cl.lower()
         and "DOCX" not in cl
@@ -2319,6 +2351,14 @@ def check_changelog() -> None:
         and "Word-Suite" not in feat
     ):
         _fail("FEATURES.md fehlt 2.6.49 DOCX/Rich-Text-Hinweis")
+    if "2.6.50" not in feat or (
+        "hard-detach" not in feat
+        and "frombytes" not in feat
+        and "pdfium.dll" not in feat
+        and "RGB32" not in feat
+        and "Detach" not in feat
+    ):
+        _fail("FEATURES.md fehlt 2.6.50 hard-detach/pdfium-pack-Hinweis")
     if "2.6.44" not in feat or (
         "ildEditorToolbar" not in feat
         and "Markierungen" not in feat
@@ -2776,11 +2816,11 @@ Exit-Codes:
 Laufzeit: am Ende als „Laufzeit: N ms“ (oder duration_ms im JSON).
 
 Beispiel --json (Erfolg):
-  {"ok": true, "version": "2.6.49", "duration_ms": 1234,
+  {"ok": true, "version": "2.6.50", "duration_ms": 1234,
    "checks": ["version", "imports", "cli", "measure_diff_import", "changelog"]}
 
 Beispiel --json (Fail):
-  {"ok": false, "version": "2.6.49", "duration_ms": 12,
+  {"ok": false, "version": "2.6.50", "duration_ms": 12,
    "checks": ["version", {"name": "imports", "error": "import x: …"}]}
 """.rstrip()
     )

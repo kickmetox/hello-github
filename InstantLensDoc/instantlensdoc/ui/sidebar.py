@@ -2052,8 +2052,19 @@ class Sidebar(QWidget):
         if item is None:
             return False
         pm = self._to_pixmap(image)
-        if not pm.isNull():
-            item.setIcon(QIcon(pm))
+        # Grauer Placeholder bleibt, wenn Convert null/ohne Tinte trotz Quelle — 2.6.49
+        if pm.isNull():
+            item.setToolTip(f"Seite {page_index + 1} — Thumb-Render fehlgeschlagen")
+            return False
+        try:
+            from instantlensdoc.ui.image_qt import pil_has_ink, qpixmap_has_ink
+
+            if pil_has_ink(image) and not qpixmap_has_ink(pm):
+                item.setToolTip(f"Seite {page_index + 1} — Thumb ohne Tinte")
+                return False
+        except Exception:
+            pass
+        item.setIcon(QIcon(pm))
         item.setToolTip(f"Seite {page_index + 1} — ziehen zum Neuordnen")
         return True
 
