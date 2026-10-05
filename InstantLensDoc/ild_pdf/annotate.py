@@ -1878,6 +1878,19 @@ class AnnotationStore:
         return self.update_many(ann_ids, stroke_width=w)
 
     @staticmethod
+    def _normalize_font_size(value: object) -> float:
+        try:
+            sz = float(value)  # type: ignore[arg-type]
+        except (TypeError, ValueError):
+            sz = 12.0
+        return round(max(6.0, min(96.0, sz)), 1)
+
+    def set_font_sizes(self, ann_ids: Sequence[str], size: float) -> int:
+        """Batch-Schriftgröße für FreeText/Notiz/Stempel (6–96 pt)."""
+        sz = self._normalize_font_size(size)
+        return self.update_many(ann_ids, font_size=sz)
+
+    @staticmethod
     def _normalize_fill_color(value: object) -> str:
         c = str(value or "").strip()
         if not c:

@@ -299,12 +299,20 @@ def read_ild_annots(
                 rect = obj.get("/Rect")
                 rect_l = [float(rect[i]) for i in range(4)] if rect is not None else []
                 contents = str(obj.get("/Contents") or "")
+                c_arr = obj.get("/C")
+                color_c: list[float] | None = None
+                try:
+                    if c_arr is not None and len(c_arr) >= 3:
+                        color_c = [float(c_arr[0]), float(c_arr[1]), float(c_arr[2])]
+                except Exception:
+                    color_c = None
                 out.append(
                     {
                         "nm": nm,
                         "subtype": subtype,
                         "rect": rect_l,
                         "contents": contents,
+                        "c": color_c,
                         "quad": (
                             [float(x) for x in obj.get("/QuadPoints")]
                             if obj.get("/QuadPoints") is not None

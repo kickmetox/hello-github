@@ -22,6 +22,7 @@ Dieser Test beweist:
 11. Ribbon Start+Bearbeiten: ↶ Rückgängig / ↷ Wiederholen inkl. Tooltip.
 12. Auswahl-Hit-Test in PDF-Punkten: Klick Mitte Rechteck → selected + 8 Griffe;
     Gummiband zwei Objekte; Leerklick deselektiert; Werkzeug bleibt Auswahl.
+13. Auswahl → Ribbon-Farbe mutiert ``/C``; ohne Auswahl Select-All (Seite).
 
 Aufruf: ``QT_QPA_PLATFORM=offscreen python3 scripts/test_ui_audit_2654.py``
 """
@@ -420,6 +421,92 @@ def test_viewer_select_hit_test(app, td: Path) -> None:
     v.close()
 
 
+def test_viewer_style_selection(app, td: Path) -> None:
+    from ild_pdf import Annotation, AnnotationType, read_ild_annots
+    from instantlensdoc.ui.pdf_view import PdfViewer
+
+    pdf = td / "style_sel.pdf"
+    _make_multipage_pdf(pdf, ["StyleSelAAA"])
+    v = PdfViewer()
+    v.resize(960, 720)
+    v.show()
+    app.processEvents()
+    assert v.load(pdf), f"load fehlgeschlagen: {v._last_refresh_error!r}"
+    v.set_annotations_locked(False)
+    v._suppress_default_zoom = True
+    _pump(app, 1.2, until=lambda: v._canvas_has_page_image())
+    v.set_scale(1.5, immediate=True)
+    _pump(app, 0.3)
+    v.set_tool(None)
+
+    rect = Annotation(
+        page=0,
+        type=AnnotationType.RECTANGLE,
+        x=80.0,
+        y=90.0,
+        width=120.0,
+        height=50.0,
+        color="#2980B9",
+    )
+    note = Annotation(
+        page=0,
+        type=AnnotationType.TEXT,
+        x=40.0,
+        y=200.0,
+        width=140.0,
+        height=28.0,
+        text="Hallo",
+        color="#1A1A1A",
+        font_size=12.0,
+    )
+    v.store.add(rect)
+    v.store.add(note)
+    v.refresh()
+    _pump(app, 0.2)
+
+    s = v._view_scale()
+    cx = (rect.x + rect.width / 2.0) * s
+    cy = (rect.y + rect.height / 2.0) * s
+    wx, wy = _canvas_page_to_widget(v.canvas, cx, cy)
+    _qclick(v.canvas, wx, wy)
+    _pump(app, 0.1)
+    assert rect.id in v.canvas._selected_ids, v.canvas._selected_ids
+    n = v.apply_toolbar_color("#C0392B")
+    assert n >= 1, n
+    stored = v.store.get(rect.id)
+    assert stored is not None and stored.color.upper() == "#C0392B", stored.color
+    note_after = v.store.get(note.id)
+    assert note_after is not None and note_after.color.upper() != "#C0392B", (
+        "Farbe darf unselektierte Objekte nicht mitändern"
+    )
+    v.save_annotations()
+    native = read_ild_annots(pdf, page_index=0)
+    rec = next(x for x in native if x["nm"] == f"ild:{rect.id}")
+    assert rec.get("c") is not None, rec
+    r, g, b = rec["c"]
+    assert r > 0.6 and g < 0.35 and b < 0.35, rec["c"]
+
+    v.set_tool(AnnotationType.INK)
+    _pump(app, 0.05)
+    assert rect.id in v.canvas._selected_ids, "Create-Tool darf Auswahl nicht aufheben"
+    assert v.canvas._select_mode
+    nfont = v.apply_font_size(18.0)
+    assert nfont == 0, "Rect ist kein FreeText — Schrift nur auf Text-Typen"
+    v.canvas.set_selected_ids({note.id})
+    v._selected_ann_ids = {note.id}
+    v._selected_ann_id = note.id
+    assert v.apply_font_size(18.0) == 1
+    assert abs(float(v.store.get(note.id).font_size) - 18.0) < 0.2
+
+    v.canvas.set_selected_ids(set())
+    v._selected_ann_ids = set()
+    v._selected_ann_id = None
+    n_all = v.select_all_text_or_annotations()
+    assert n_all == 2, n_all
+    assert rect.id in v.canvas._selected_ids and note.id in v.canvas._selected_ids
+    v.close()
+
+
 def test_ribbon_undo_arrows() -> None:
     from instantlensdoc.ui.ribbon_bar import RibbonBar
 
@@ -672,6 +759,8 @@ def main() -> int:  # noqa: C901
         print("OK  7b hit-test PDF-Punkte (dünn/oben)")
         test_viewer_select_hit_test(app, tdp)
         print("OK  7c Auswahl Klick/Gummiband/Griffe")
+        test_viewer_style_selection(app, tdp)
+        print("OK  7d Ribbon-Farbe auf Auswahl, Select-All global")
         test_ribbon_undo_arrows()
         print("OK  8 ribbon ↶/↷")
         test_mainwindow_shortcuts(win)

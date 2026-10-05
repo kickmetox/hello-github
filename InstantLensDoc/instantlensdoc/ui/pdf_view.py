@@ -245,6 +245,18 @@ ANN_TOOL_ACTION_MAP = (
     ("annTool_signature_field", "signature_field"),
 )
 
+# Klick-Platzierung (kein Drag-Rechteck)
+CREATE_PLACE_TYPES = frozenset(
+    {
+        AnnotationType.STAMP,
+        AnnotationType.STICKY,
+        AnnotationType.TEXT,
+        AnnotationType.TEXT_OVERLAY,
+        AnnotationType.SIGNATURE_FIELD,
+        AnnotationType.SIGNATURE,
+    }
+)
+
 
 class _StoreUndoCommand(QUndoCommand):
     """Eine Store-Mutation, die bereits angewandt ist; undo/redo über Snapshots."""
@@ -774,6 +786,7 @@ class PdfCanvas(QLabel):
         self._hand_mode = False
         self._eraser_mode = False
         self._text_mark_mode = False
+        self._place_on_empty = False
         self._inline_edit_mode = False  # Inline-Textbearbeitung — 2.6.5
         self._object_edit_mode = False  # Objektmanipulation — 2.6.5
         self._object_sel: DocumentObject | None = None
@@ -1332,17 +1345,20 @@ class PdfCanvas(QLabel):
         hand_mode: bool = False,
         eraser_mode: bool = False,
         text_mark_mode: bool = False,
+        place_on_empty: bool = False,
     ):
         exclusive = bool(inline_edit_mode) or bool(object_edit_mode)
         self._hand_mode = bool(hand_mode) and not exclusive
         self._eraser_mode = bool(eraser_mode) and not exclusive and not self._hand_mode
         self._text_mark_mode = bool(text_mark_mode) and not exclusive
+        self._place_on_empty = bool(place_on_empty) and not exclusive and not self._hand_mode
         self._select_mode = bool(select_mode) and not exclusive and not self._hand_mode and not self._eraser_mode
         self._inline_edit_mode = bool(inline_edit_mode) and not object_edit_mode
         self._object_edit_mode = bool(object_edit_mode) and not inline_edit_mode
+        # Create-Tool darf neben Auswahl aktiv bleiben (Leerklick beginnt Zeichnen)
         self._drag_tool = (
             tool
-            if (tool in DRAG_TYPES and not select_mode and not exclusive and not self._hand_mode and not self._eraser_mode)
+            if (tool in DRAG_TYPES and not exclusive and not self._hand_mode and not self._eraser_mode)
             else None
         )
         if self._text_mark_mode:
@@ -2379,13 +2395,25 @@ class PdfCanvas(QLabel):
                         self.setCursor(QCursor(Qt.ClosedHandCursor))
                 self._repaint_overlay()
                 return
-            # Leere Fläche → deselektieren + Gummiband
+            # Leere Fläche: Create-Tool → deselektieren und zeichnen/platzieren
             if not (event.modifiers() & Qt.ShiftModifier):
                 self.set_selected_ids(set())
                 self.annotation_selected.emit("")
             self._move_ids = set()
             self._move_origin = None
             self._move_delta = (0.0, 0.0)
+            if self._place_on_empty or self._drag_tool:
+                if self._drag_tool == AnnotationType.INK:
+                    self._ink_points = [(x, y)]
+                    self._drag_start = (x, y)
+                    self._drag_current = (x, y)
+                    return
+                if self._drag_tool:
+                    self._drag_start = (x, y)
+                    self._drag_current = (x, y)
+                    return
+                self.annotation_placed.emit(x, y)
+                return
             self._band_start = (x, y)
             self._band_current = (x, y)
             self._repaint_overlay()
@@ -3388,13 +3416,15 @@ class PdfViewer(QWidget):
         toolbar.addWidget(self.btn_measure_snap)
 
         self.btn_hl_color = QPushButton("HL")
-        self.btn_hl_color.setToolTip("Highlight-Farbe (Color-Picker) — 2.6.10")
+        self.btn_hl_color.setToolTip(
+            "Farbe: Auswahl umfärben, sonst ganze Seite / Default für neue Highlights — 2.6.54"
+        )
         self.btn_hl_color.setFixedWidth(36)
         self.btn_hl_color.clicked.connect(self._pick_highlight_color)
         self._style_color_btn(self.btn_hl_color, self._highlight_color)
         self.btn_pen_color = QPushButton("Strich")
         self.btn_pen_color.setToolTip(
-            "Strichfarbe für Stift/Formen/Freihand (Color-Picker) — nicht das Stift-Werkzeug — 2.6.54"
+            "Strichfarbe: Auswahl umfärben, sonst Seite / Default — nicht das Stift-Werkzeug — 2.6.54"
         )
         self.btn_pen_color.setFixedWidth(44)
         self.btn_pen_color.clicked.connect(self._pick_pen_color)
@@ -3918,12 +3948,9 @@ class PdfViewer(QWidget):
 
     def _pick_highlight_color(self):
         initial = QColor(self._highlight_color)
-        color = QColorDialog.getColor(initial, self, "Highlight-Farbe")
+        color = QColorDialog.getColor(initial, self, "Farbe (Auswahl oder Seite)")
         if color.isValid():
-            self._highlight_color = color.name()
-            set_ann_highlight_color(self._highlight_color)
-            self._style_color_btn(self.btn_hl_color, self._highlight_color)
-            self.status.emit(f"Highlight-Farbe: {self._highlight_color}")
+            self.apply_toolbar_color(color.name())
 
     def _sync_ink_preview_style(self) -> None:
         """Freihand-Vorschau: aktuelle Stiftfarbe + Strichstärke — 2.2.1."""
@@ -3954,22 +3981,20 @@ class PdfViewer(QWidget):
 
     def _pick_pen_color(self):
         initial = QColor(self._pen_color)
-        color = QColorDialog.getColor(initial, self, "Stift-Farbe")
+        color = QColorDialog.getColor(initial, self, "Strichfarbe (Auswahl oder Seite)")
         if color.isValid():
-            self._pen_color = color.name()
-            set_ann_pen_color(self._pen_color)
-            self._style_color_btn(self.btn_pen_color, self._pen_color)
-            self._sync_ink_preview_style()
-            self.status.emit(f"Stift-Farbe: {self._pen_color}")
+            self.apply_toolbar_color(color.name())
 
     def _pick_note_color(self):
         initial = QColor(self._note_color)
-        color = QColorDialog.getColor(initial, self, "Notizfarbe")
+        color = QColorDialog.getColor(initial, self, "Notizfarbe (Auswahl oder Seite)")
         if color.isValid():
             self._note_color = color.name()
             set_ann_note_color(self._note_color)
             self._style_color_btn(self.btn_note_color, self._note_color)
-            self.status.emit(f"Notizfarbe: {self._note_color}")
+            n = self.apply_toolbar_color(color.name())
+            if n <= 0:
+                self.status.emit(f"Notizfarbe: {self._note_color}")
 
     def _refresh_preset_btns(self):
         presets = get_ann_color_presets()
@@ -3988,14 +4013,103 @@ class PdfViewer(QWidget):
         )
         return [i for i in ids if i]
 
+    def _style_target_ids(self) -> tuple[list[str], str]:
+        """Ziele für Ribbon/Menü-Stil: Auswahl, sonst alle Annotationen der Seite."""
+        ids = self._selected_annotation_ids()
+        if ids:
+            return ids, "selection"
+        if self.store:
+            page_ids = [a.id for a in self.store.for_page(self.page_index)]
+            if page_ids:
+                return page_ids, "page"
+        return [], "none"
+
+    def apply_toolbar_color(self, color: str) -> int:
+        """Ribbon/Toolbar-Farbe: mutiert Auswahl, sonst die ganze Seite; setzt Default."""
+        c = str(color or "").strip()
+        if not c:
+            return 0
+        if not c.startswith("#"):
+            c = "#" + c
+        c = c.upper()
+        self._highlight_color = c
+        self._pen_color = c
+        try:
+            set_ann_highlight_color(c)
+            set_ann_pen_color(c)
+        except Exception:
+            pass
+        if hasattr(self, "btn_hl_color"):
+            self._style_color_btn(self.btn_hl_color, c)
+        if hasattr(self, "btn_pen_color"):
+            self._style_color_btn(self.btn_pen_color, c)
+        self._sync_ink_preview_style()
+        ids, scope = self._style_target_ids()
+        if not self.store or not ids:
+            self.status.emit(f"Standardfarbe: {c}")
+            return 0
+        n = self.store.set_colors(ids, c)
+        if n <= 0:
+            return 0
+        try:
+            self.schedule_sidecar_save(force=True)
+        except Exception:
+            pass
+        self.refresh()
+        if scope == "selection":
+            self.canvas.set_selected_ids(ids)
+            self._selected_ann_ids = set(ids)
+        self.annotations_changed.emit()
+        where = "Auswahl" if scope == "selection" else f"Seite {self.page_index + 1}"
+        self.status.emit(f"Farbe {c} für {n} Annotation(en) ({where})")
+        return n
+
+    def apply_font_size(self, size: float) -> int:
+        """Schriftgröße für ausgewählte FreeText/Notizen, sonst die Seite."""
+        if not self.store:
+            return 0
+        ids, scope = self._style_target_ids()
+        text_types = {
+            AnnotationType.TEXT,
+            AnnotationType.TEXT_OVERLAY,
+            AnnotationType.STICKY,
+            AnnotationType.CALLOUT,
+            AnnotationType.STAMP,
+        }
+        targets = [
+            i
+            for i in ids
+            if (ann := self.store.get(i)) is not None and ann.type in text_types
+        ]
+        if not targets:
+            self.status.emit("Keine Text-Annotation in der Auswahl/Seite")
+            return 0
+        n = self.store.set_font_sizes(targets, size)
+        if n <= 0:
+            return 0
+        try:
+            self.schedule_sidecar_save(force=True)
+        except Exception:
+            pass
+        self.refresh()
+        if scope == "selection":
+            self.canvas.set_selected_ids(self._selected_annotation_ids())
+        self.annotations_changed.emit()
+        self.status.emit(f"Schriftgröße {float(size):.0f} pt für {n} Annotation(en)")
+        return n
+
+    def select_all_text_or_annotations(self) -> int:
+        """Globale Aktion ohne Auswahl: alle Annotationen der Seite."""
+        return self.select_all_annotations_on_page()
+
     def apply_preset_stroke_color(self, color: str) -> int:
         """Strichfarbe für Auswahl setzen (Commit + Undo) — Quick-Bar 0.9.5."""
         if not self.store:
             self.status.emit("Kein PDF geladen")
             return 0
-        ids = self._selected_annotation_ids()
+        ids = self._style_target_ids()[0]
         if not ids:
-            self.status.emit("Keine Annotation ausgewählt")
+            self.status.emit("Keine Annotation auf der Seite")
             return 0
         c = str(color or "").strip()
         if not c:
@@ -4013,6 +4127,8 @@ class PdfViewer(QWidget):
             QMessageBox.warning(self, "Strichfarbe", str(e))
             return 0
         self.refresh()
+        if self._selected_ann_ids:
+            self.canvas.set_selected_ids(self._selected_ann_ids)
         self.annotations_changed.emit()
         self.status.emit(f"Strichfarbe {c} für {n} Annotation(en)")
         return n
@@ -4022,9 +4138,9 @@ class PdfViewer(QWidget):
         if not self.store:
             self.status.emit("Kein PDF geladen")
             return 0
-        ids = self._selected_annotation_ids()
+        ids = self._style_target_ids()[0]
         if not ids:
-            self.status.emit("Keine Annotation ausgewählt")
+            self.status.emit("Keine Annotation auf der Seite")
             return 0
         c = str(color or "").strip()
         if not c:
@@ -4057,12 +4173,12 @@ class PdfViewer(QWidget):
             return
         color = presets[index]
         mods = QApplication.keyboardModifiers()
-        # Mit Auswahl: Stroke/Fill Quick-Bar (0.9.5)
-        if self._selected_annotation_ids() and self.store is not None:
+        ids, _scope = self._style_target_ids()
+        if ids and self.store is not None:
             if mods & Qt.ShiftModifier:
                 self.apply_preset_fill_color(color)
             else:
-                self.apply_preset_stroke_color(color)
+                self.apply_toolbar_color(color)
             return
         if mods & Qt.ControlModifier:
             self._note_color = color
@@ -4141,34 +4257,20 @@ class PdfViewer(QWidget):
             set_ann_note_color(color)
             self._style_color_btn(self.btn_note_color, color)
             self.status.emit(f"Notizfarbe ({label}): {color}")
-        elif mods & Qt.ShiftModifier:
-            self._pen_color = color
-            set_ann_pen_color(color)
-            self._style_color_btn(self.btn_pen_color, color)
-            self.status.emit(f"Stift-Farbe ({label}): {color}")
-        else:
-            self._highlight_color = color
-            set_ann_highlight_color(color)
-            self._style_color_btn(self.btn_hl_color, color)
-            self.status.emit(f"Highlight-Farbe ({label}): {color}")
+            return
+        self.apply_toolbar_color(color)
+        self.status.emit(f"{label}: {color}")
 
     def cycle_annotation_color(self) -> str:
         """Nächste Farbe aus der festen Palette (Ctrl+Shift+C)."""
         color = cycle_ann_palette_color()
-        # Modifier beim Shortcut oft schon Shift/Ctrl — hier nur Highlight setzen
-        self._highlight_color = color
-        set_ann_highlight_color(color)
-        self._style_color_btn(self.btn_hl_color, color)
-        self.status.emit(f"Palette-Zyklus: {color}")
+        self.apply_toolbar_color(color)
         return color
 
     def randomize_annotation_color(self) -> str:
         """Zufällige Palette-Farbe (Ctrl+Alt+Shift+C)."""
         color = random_ann_palette_color()
-        self._highlight_color = color
-        set_ann_highlight_color(color)
-        self._style_color_btn(self.btn_hl_color, color)
-        self.status.emit(f"Farbe random: {color}")
+        self.apply_toolbar_color(color)
         return color
 
     def _sync_opacity_controls(self, value: float, *, from_slider: bool = False):
@@ -4188,15 +4290,13 @@ class PdfViewer(QWidget):
             self.spin_opacity.blockSignals(False)
 
     def _selected_opacity_ids(self) -> list[str]:
-        ids = list(self._selected_ann_ids) if self._selected_ann_ids else (
-            [self._selected_ann_id] if self._selected_ann_id else []
-        )
-        return [i for i in ids if i]
+        ids, _scope = self._style_target_ids()
+        return ids
 
     def _apply_toolbar_opacity(self, value: float, *, commit: bool = True) -> None:
         """
-        Opacity-Slider/Spin: bei Auswahl nur ausgewählte Objekte;
-        ohne Auswahl → Standard-Deckkraft für neue Annotationen.
+        Opacity-Slider/Spin: bei Auswahl die ausgewählten Objekte;
+        ohne Auswahl die ganze Seite, sonst Standard-Deckkraft für neue Annotationen.
         commit=False: Live-Vorschau ohne Undo/Sidecar-Force (Slider-Drag).
         """
         op = max(0.05, min(1.0, float(value)))
@@ -4288,8 +4388,9 @@ class PdfViewer(QWidget):
 
     def _apply_toolbar_stroke(self, value: float, *, commit: bool = True) -> None:
         """
-        Stroke-Slider: bei Auswahl nur ausgewählte Shapes;
-        ohne Auswahl → Standard-Strichstärke. commit=False: Live ohne Undo/Sidecar.
+        Stroke-Slider: bei Auswahl die ausgewählten Shapes;
+        ohne Auswahl die ganze Seite, sonst Standard-Strichstärke.
+        commit=False: Live ohne Undo/Sidecar.
         """
         w = max(1.0, min(12.0, float(value)))
         ids = self._selected_stroke_ids()
@@ -6135,7 +6236,9 @@ class PdfViewer(QWidget):
         if tool in (None, "", UI_TOOL_SELECT, "none", "auswahl"):
             self.tool = None
             self._sync_tool_buttons("select")
-            self.canvas.set_drag_tool(None, select_mode=True, inline_edit_mode=False)
+            self.canvas.set_drag_tool(None, select_mode=True, inline_edit_mode=False, place_on_empty=False)
+            if self._selected_annotation_ids():
+                self.canvas.set_selected_ids(self._selected_annotation_ids())
             self.status.emit(
                 "Werkzeug: Auswahl — Klick/Gummiband, ziehen, Griffe, Pfeiltasten, Entf"
             )
@@ -6143,21 +6246,33 @@ class PdfViewer(QWidget):
         if tool == UI_TOOL_HAND or tool == "pan":
             self.tool = UI_TOOL_HAND
             self._sync_tool_buttons("hand")
+            ids = self._selected_annotation_ids()
             self.canvas.set_drag_tool(None, hand_mode=True)
+            if ids:
+                self.canvas.set_selected_ids(ids)
             self.status.emit("Werkzeug: Hand — Seite schieben")
             return
         if tool == UI_TOOL_ERASER:
             self.tool = UI_TOOL_ERASER
             self._sync_tool_buttons("eraser")
+            ids = self._selected_annotation_ids()
             self.canvas.set_drag_tool(None, eraser_mode=True)
+            if ids:
+                self.canvas.set_selected_ids(ids)
             self.status.emit("Werkzeug: Radierer — Annotation anklicken oder überstreichen")
             return
         if tool == UI_TOOL_TEXT_MARK:
             self.tool = UI_TOOL_TEXT_MARK
             self._sync_tool_buttons("text_mark")
+            ids = self._selected_annotation_ids()
             self.canvas.set_drag_tool(
-                AnnotationType.HIGHLIGHT, select_mode=False, text_mark_mode=True
+                AnnotationType.HIGHLIGHT,
+                select_mode=bool(ids),
+                text_mark_mode=True,
+                place_on_empty=True,
             )
+            if ids:
+                self.canvas.set_selected_ids(ids)
             self.status.emit("Werkzeug: Text markieren — Passage aufziehen")
             return
         if isinstance(tool, str):
@@ -6168,11 +6283,17 @@ class PdfViewer(QWidget):
         self.tool = tool
         tid = str(tool.value)
         self._sync_tool_buttons(tid)
+        ids = self._selected_annotation_ids()
+        keep_sel = bool(ids)
+        is_create = tool in DRAG_TYPES or tool in CREATE_PLACE_TYPES
         self.canvas.set_drag_tool(
             tool if tool in DRAG_TYPES else None,
-            select_mode=False,
+            select_mode=keep_sel,
             inline_edit_mode=False,
+            place_on_empty=is_create,
         )
+        if keep_sel:
+            self.canvas.set_selected_ids(ids)
         if tool == AnnotationType.REDACTION:
             n = self.redaction_count()
             self.status.emit(
@@ -7263,6 +7384,8 @@ class PdfViewer(QWidget):
             self._last_render_blank_ok = not pil_has_ink(img)
             self.canvas.set_page_image(img, anns, scale=self.scale)
             self.canvas.set_uri_links(links)
+            if self._selected_ann_ids:
+                self.canvas.set_selected_ids(self._selected_ann_ids)
             self._update_page_box_overlay()
             self._update_printer_marks_overlay()
             self._update_layout_overlays()
