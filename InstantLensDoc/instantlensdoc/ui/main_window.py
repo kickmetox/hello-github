@@ -9336,6 +9336,9 @@ class MainWindow(QMainWindow):
             self._set_status(f"Absatzausrichtung unverändert ({alignment})")
 
     def _set_paragraph_line_spacing(self, line_spacing: float) -> None:
+        if self._layout_mode_active():
+            self.dtp_pane.apply_line_spacing(line_spacing)
+            return
         if not self._guard_editor_action("Zeilenabstand"):
             return
         if self.editor.set_paragraph_spacing(line_spacing=line_spacing):
@@ -9360,6 +9363,11 @@ class MainWindow(QMainWindow):
         leading: float | None = None,
     ) -> None:
         """Tracking/Kerning/Leading — 2.6.13."""
+        if self._layout_mode_active():
+            self.dtp_pane.apply_typography(
+                tracking=tracking, kerning=kerning, leading=leading
+            )
+            return
         if not self._guard_editor_action("Typografie"):
             return
         if self.editor.apply_typography(
@@ -9386,6 +9394,9 @@ class MainWindow(QMainWindow):
             self._set_status("Typografie unverändert")
 
     def _apply_drop_cap(self) -> None:
+        if self._layout_mode_active():
+            self.dtp_pane.apply_drop_cap(lines=3, chars=1)
+            return
         if not self._guard_editor_action("Drop Cap"):
             return
         if self.editor.apply_drop_cap(lines=3, chars=1):
@@ -9403,6 +9414,9 @@ class MainWindow(QMainWindow):
             self._set_status("Drop Cap unverändert")
 
     def _hyphenate_document(self, lang: str = "de") -> None:
+        if self._layout_mode_active():
+            self.dtp_pane.hyphenate(lang=lang)
+            return
         if not self._guard_editor_action("Silbentrennung"):
             return
         n = self.editor.hyphenate_document(lang=lang)
@@ -9481,6 +9495,10 @@ class MainWindow(QMainWindow):
         if shape not in SHAPE_KINDS:
             self._set_status(f"Unbekannte Form: {shape}")
             return
+        if self._layout_mode_active():
+            self.dtp_pane.add_shape(str(shape))
+            self._set_status(f"Form {shape} (DTP)")
+            return
         try:
             fr = self.layout_doc.add_shape(shape)
         except Exception as e:
@@ -9511,6 +9529,18 @@ class MainWindow(QMainWindow):
         """Bild-/Formrahmen skalieren — 2.6.26."""
         from PySide6.QtWidgets import QInputDialog
 
+        if self._layout_mode_active():
+            sel = self.dtp_pane.scene.selected_frames()
+            if not sel:
+                self._set_status("Skalieren: zuerst Rahmen wählen")
+                return
+            factor, ok = QInputDialog.getDouble(
+                self, "Skalieren", "Faktor:", 1.25, 0.1, 10.0, 2
+            )
+            if not ok:
+                return
+            self.dtp_pane.scale_selected(float(factor))
+            return
         if not self.layout_doc.image_frames:
             self._set_status("Kein Bild-/Formrahmen im Layout")
             return

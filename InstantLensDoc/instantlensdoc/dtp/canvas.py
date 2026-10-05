@@ -1092,6 +1092,109 @@ class DtpPane(QWidget):
         self.statusMessage.emit(f"Stil {style_id} {hit.scope} ({len(hit.frames)})")
         return hit
 
+    def _rewrite_targeted_text(self, fn, *, role: str = "font") -> ToolHit:
+        """Plaintext-Werkzeug auf Caret-Auswahl/Absatz, sonst Story/allem Text."""
+        hit = self.resolve_targets(role)
+        if hit.is_caret and hit.item is not None and hit.item.text_item is not None:
+            cur, has_sel = hit.item.caret_cursor()
+            src = cur.selectedText().replace("\u2029", "\n")
+            new = fn(src)
+            if new != src:
+                cur.insertText(new)
+                hit.item.commit_rich()
+            hit.has_text_selection = has_sel
+            return hit
+        for fr in hit.frames:
+            if fr.kind != "text":
+                continue
+            src = fr.text or ""
+            new = fn(src)
+            if new != src:
+                fr.text = new
+                fr.rich_html = ""
+        self._refresh_after_tool(hit, rebuild=False)
+        return hit
+
+    def apply_typography(
+        self,
+        *,
+        tracking: float | None = None,
+        kerning: float | None = None,
+        leading: float | None = None,
+    ) -> ToolHit:
+        from ild_pdf.typography import apply_typography as _typo
+
+        def _fn(src: str) -> str:
+            return _typo(
+                src or "",
+                tracking=tracking,
+                kerning=kerning,
+                leading=leading,
+                paragraph_index=0,
+            )
+
+        hit = self._rewrite_targeted_text(_fn, role="typography")
+        self.statusMessage.emit(f"Typografie {hit.scope}")
+        return hit
+
+    def apply_drop_cap(self, *, lines: int = 3, chars: int = 1) -> ToolHit:
+        from ild_pdf.typography import apply_drop_cap as _dc
+
+        def _fn(src: str) -> str:
+            return _dc(src or "", lines=int(lines), chars=int(chars), paragraph_index=0)
+
+        hit = self._rewrite_targeted_text(_fn, role="dropcap")
+        self.statusMessage.emit(f"Drop Cap {hit.scope}")
+        return hit
+
+    def hyphenate(self, lang: str = "de") -> ToolHit:
+        from ild_pdf.typography import hyphenate_text
+
+        total = 0
+
+        def _fn(src: str) -> str:
+            nonlocal total
+            res = hyphenate_text(src or "", lang=lang)
+            total += int(res.get("count") or 0)
+            return str(res.get("text") or src)
+
+        hit = self._rewrite_targeted_text(_fn, role="hyphenate")
+        self.statusMessage.emit(f"Silbentrennung {hit.scope}: {total}")
+        return hit
+
+    def apply_line_spacing(self, line_spacing: float) -> ToolHit:
+        hit = self.resolve_targets("leading")
+        factor = max(0.8, float(line_spacing))
+        if hit.is_caret and hit.item is not None and hit.item.text_item is not None:
+            cur, _ = hit.item.caret_cursor()
+            bf = QTextBlockFormat()
+            try:
+                bf.setLineHeight(factor * 100.0, QTextBlockFormat.ProportionalHeight)
+            except Exception:
+                bf.setLineHeight(factor * 100.0, 0)
+            cur.mergeBlockFormat(bf)
+            hit.item.commit_rich()
+            self.statusMessage.emit(f"Zeilenabstand {factor:g} {hit.scope}")
+            return hit
+        hit = self.apply_typography(leading=factor)
+        self.statusMessage.emit(f"Zeilenabstand {factor:g} {hit.scope}")
+        return hit
+
+    def scale_selected(self, factor: float) -> ToolHit:
+        hit = self.resolve_targets("object")
+        fac = max(0.1, float(factor))
+        frames = hit.frames
+        if hit.scope == "all_objects":
+            frames = [f for f in frames if f.kind in ("image", "shape")]
+            if not frames:
+                self.statusMessage.emit("Skalieren: Rahmen wählen")
+                return ToolHit(scope="none", frames=[], role="object")
+        for fr in frames:
+            fr.resize(fr.width * fac, fr.height * fac)
+        self._refresh_after_tool(hit, rebuild=True)
+        self.statusMessage.emit(f"Skaliert ×{fac:g} ({hit.scope})")
+        return hit
+
     def _refresh_info(self) -> None:
         g = self.doc.geometry
         self._info.setText(
@@ -1110,9 +1213,10 @@ class DtpPane(QWidget):
         self.statusMessage.emit(f"Bildrahmen {fr.id}")
         return fr
 
-    def add_shape(self) -> DtpFrame:
-        fr = self.doc.add_shape("rectangle", page=self.doc.current_page)
+    def add_shape(self, kind: str = "rectangle") -> DtpFrame:
+        fr = self.doc.add_shape(kind or "rectangle", page=self.doc.current_page)
         self.scene.rebuild()
+        self.statusMessage.emit(f"Form {fr.shape}")
         return fr
 
     def prev_page(self) -> None:

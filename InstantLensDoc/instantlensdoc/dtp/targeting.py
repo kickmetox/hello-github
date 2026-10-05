@@ -6,7 +6,21 @@ from dataclasses import dataclass, field
 from typing import Any, Iterable, Optional
 
 
-TEXT_TOOLS = frozenset({"font", "style", "text", "bold", "italic", "underline", "fill_text"})
+TEXT_TOOLS = frozenset(
+    {
+        "font",
+        "style",
+        "text",
+        "bold",
+        "italic",
+        "underline",
+        "fill_text",
+        "typography",
+        "dropcap",
+        "hyphenate",
+        "leading",
+    }
+)
 OBJECT_TOOLS = frozenset({"fill", "stroke", "wrap", "object", "envelope", "extrude", "clip"})
 
 

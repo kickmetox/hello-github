@@ -147,7 +147,8 @@ HELP_HTML = f"""
     Satzspiegel, Musterseite gilt je Seite, Ebenen-Liste, Stile, Import TXT/DOCX/OCR, Bild ersetzen.
     Export als Vektor-PDF (QPdfWriter). Werkzeuge (Füllung/Kontur/Schrift/Umfluss/Stil)
     gelten auf dem gewählten Rahmen; ohne Auswahl auf der aktiven Story bzw. allem Text;
-    Caret im Textrahmen auf der Textauswahl oder dem aktuellen Absatz. Ribbon-Tab <b>DTP</b> (Alt+8). — <b>2.6.54</b></li>
+    Caret im Textrahmen auf der Textauswahl oder dem aktuellen Absatz.
+    Menü Typografie/Drop-Cap/Silbentrennung/Zeilenabstand ebenso. Ribbon-Tab <b>DTP</b> (Alt+8). — <b>2.6.54</b></li>
 <li><b>Extras → KI-Assistent</b>: Zusammenfassen, umformulieren, übersetzen, Inhaltsverzeichnis vorschlagen.
     OpenAI-kompatibler Endpoint + Schlüssel in Einstellungen; ohne Schlüssel Offline-Modus. — <b>2.6.54</b></li>
 <li><b>Extras → Intelligente Formerkennung / Variable Fonts / Envelope Distort / 3D-Extrusion / E-Signatur PAdES /
