@@ -761,15 +761,13 @@ class Sidebar(QWidget):
         )
         self.btn_outline_refresh.clicked.connect(self.outline_refresh_requested.emit)
         self.btn_outline_read = QPushButton("Vorlesen")
-        self.btn_outline_read.setObjectName("outlineReadStubBtn")
+        self.btn_outline_read.setObjectName("outlineReadUnavailableBtn")
+        self.btn_outline_read.setEnabled(False)
         self.btn_outline_read.setToolTip(
-            "Document Outline Vorlesen — Stub / TTS geplant — 2.6.27 "
-            "(Pane selbst produktiv)"
+            "Nicht verfügbar: Vorlesen (TTS) ist in dieser Version nicht implementiert. "
+            "Die Struktur-Ansicht selbst ist nutzbar."
         )
-        self.btn_outline_read.setAccessibleName(
-            "Document Outline Vorlesen Stub — TTS nicht produktiv"
-        )
-        self.btn_outline_read.clicked.connect(self._outline_read_stub)
+        self.btn_outline_read.setAccessibleName("Document Outline Vorlesen — nicht verfügbar")
         ol_btns.addWidget(self.btn_outline_add)
         ol_btns.addWidget(self.btn_outline_del)
         ol_btns.addWidget(self.btn_outline_refresh)

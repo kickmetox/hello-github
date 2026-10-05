@@ -117,7 +117,7 @@ class RibbonBar(QWidget):
                     ("page_layout", "Seitenlayout…"),
                     ("book_layout", "Buch-Layout"),
                     ("page_by_page", "Seite-für-Seite"),
-                    ("continuous_scroll", "Continuous"),
+                    ("continuous_scroll", "Fortlaufend"),
                     ("toggle_doc_tabs", "Dokument-Tabs"),
                     ("toggle_ribbon", "Ribbon"),
                 ),
@@ -135,7 +135,7 @@ class RibbonBar(QWidget):
                 (
                     ("compare_pdfs", "PDF vergleichen"),
                     ("preflight", "Preflight"),
-                    ("apply_bleed", "Bleed"),
+                    ("apply_bleed", "Anschnitt"),
                     ("export_pdfx", "PDF/X"),
                     ("scan_import", "Scannen…"),
                     ("devices_discover", "Geräte erkennen"),

@@ -1333,6 +1333,7 @@ class MainWindow(QMainWindow):
         self.stack.currentChanged.connect(lambda *_: self._update_doc_status())
         self.stack.currentChanged.connect(lambda *_: self._sync_editor_toolbar_for_stack())
         self.stack.currentChanged.connect(lambda *_: self._sync_pdf_page_shortcuts())
+        self.stack.currentChanged.connect(lambda *_: self._sync_menu_enablement())
         # Beim Start ohne Session: Willkommen zeigen (nach Session-Restore ggf. überschrieben)
         self.stack.setCurrentWidget(self.welcome_page)
         self._sync_editor_toolbar_for_stack()
@@ -1912,9 +1913,9 @@ class MainWindow(QMainWindow):
         act_auto_fmt.triggered.connect(self._auto_format_document)
         m_edit.addAction(act_auto_fmt)
         act_auto_toc = QAction("Inhaltsverzeichnis aktualisieren", self)
-        act_auto_toc.setShortcut(QKeySequence("Ctrl+Alt+Shift+T"))
         act_auto_toc.setToolTip(
-            "TOC aus Überschriften: Editor→Markdown · PDF→Outline/Sidebar — 2.6.10"
+            "TOC aus Überschriften: Editor→Markdown · PDF→Outline/Sidebar — 2.6.10 "
+            "(ohne Ctrl+Alt+Shift+T: das Kürzel bleibt Tab duplizieren)"
         )
         act_auto_toc.triggered.connect(self._update_auto_toc)
         m_edit.addAction(act_auto_toc)
@@ -2134,10 +2135,17 @@ class MainWindow(QMainWindow):
         m_snippets = m_edit.addMenu("Textbausteine")
         for i in range(9):
             a_ins = QAction(f"Einfügen {i + 1}", self)
-            if i < 9:
-                # Ctrl+Alt+1..9 — Slot 1–9 — 2.6.20
+            # Ctrl+Alt+1–4 = Annotation-Typen (PDF); Bausteine 1–4 ohne Kürzel — 2.6.54
+            if i >= 4:
                 a_ins.setShortcut(QKeySequence(f"Ctrl+Alt+{i + 1}"))
-            a_ins.setToolTip(f"Gespeicherten Textbaustein {i + 1} an Cursor einfügen")
+            a_ins.setToolTip(
+                f"Gespeicherten Textbaustein {i + 1} an Cursor einfügen"
+                + (
+                    " (Ctrl+Alt+1–4: Annotation-Typen)"
+                    if i < 4
+                    else f" (Ctrl+Alt+{i + 1})"
+                )
+            )
             a_ins.triggered.connect(lambda checked=False, idx=i: self._insert_snippet(idx))
             m_snippets.addAction(a_ins)
         m_snippets.addSeparator()
@@ -2211,9 +2219,10 @@ class MainWindow(QMainWindow):
         act_shared.triggered.connect(self._show_shared_review_dialog)
         m_review.addAction(act_shared)
         act_review = QAction("Änderungen nachverfolgen…", self)
-        act_review.setShortcut(QKeySequence("Ctrl+Shift+E"))
+        act_review.setShortcut(QKeySequence("Ctrl+Alt+Shift+R"))
         act_review.setToolTip(
-            "Review-Modus: Einfügen/Löschen je Autor protokollieren (lokal) — 2.6.21"
+            "Review-Modus: Einfügen/Löschen je Autor protokollieren (lokal) — 2.6.21 "
+            "(Ctrl+Alt+Shift+R; Ctrl+Shift+E = Arbeitsverzeichnis)"
         )
         act_review.triggered.connect(self._show_review_dialog)
         m_review.addAction(act_review)
@@ -2430,7 +2439,7 @@ class MainWindow(QMainWindow):
         self._panel_bookmark_action.toggled.connect(self._toggle_panel_bookmark)
         m_view.addAction(self._panel_bookmark_action)
         # Workspace-Layouts: Name + Panel-Sichtbarkeit + Splitter — 1.6.0
-        self._workspace_layout_menu = m_view.addMenu("Workspace-Layouts")
+        self._workspace_layout_menu = m_view.addMenu("Arbeitsbereich-Layouts")
         self._refresh_workspace_layout_menu()
         self._line_numbers_action = QAction("Zeilennummern", self)
         self._line_numbers_action.setCheckable(True)
@@ -2522,8 +2531,11 @@ class MainWindow(QMainWindow):
         self._md_preview_action = QAction("Markdown-Vorschau", self)
         self._md_preview_action.setCheckable(True)
         self._md_preview_action.setChecked(get_editor_markdown_preview())
-        self._md_preview_action.setToolTip("Editor-Split: Markdown-Vorschau ein/aus")
-        self._md_preview_action.setShortcut(QKeySequence("Ctrl+Shift+M"))
+        self._md_preview_action.setToolTip(
+            "Editor-Split: Markdown-Vorschau ein/aus (Ctrl+Alt+Shift+M; "
+            "Ctrl+Shift+M = Seitenmanagement)"
+        )
+        self._md_preview_action.setShortcut(QKeySequence("Ctrl+Alt+Shift+M"))
         self._md_preview_action.toggled.connect(self._toggle_markdown_preview)
         m_view.addAction(self._md_preview_action)
         self._doc_split_action = QAction("Fenster teilen (zwei Docs)", self)
@@ -2567,9 +2579,10 @@ class MainWindow(QMainWindow):
         self._soft_wrap_action.setCheckable(True)
         self._soft_wrap_action.setChecked(get_editor_soft_wrap())
         self._soft_wrap_action.setToolTip(
-            "Wortumbruch (Soft-Wrap) am Fensterrand im Texteditor — persistiert"
+            "Wortumbruch am Fensterrand im Texteditor — persistiert "
+            "(Ctrl+Alt+W; Ctrl+Shift+W = andere Tabs schließen)"
         )
-        self._soft_wrap_action.setShortcut(QKeySequence("Ctrl+Shift+W"))
+        self._soft_wrap_action.setShortcut(QKeySequence("Ctrl+Alt+W"))
         self._soft_wrap_action.toggled.connect(self._toggle_soft_wrap)
         m_view.addAction(self._soft_wrap_action)
         self._page_layout_action = QAction("Seitenlayout…", self)
@@ -2626,21 +2639,21 @@ class MainWindow(QMainWindow):
             get_ribbon_visible as _get_ribbon,
         )
 
-        self._book_layout_action = QAction("Buch-Layout (Book Layout)", self)
+        self._book_layout_action = QAction("Buch-Layout", self)
         self._book_layout_action.setCheckable(True)
         self._book_layout_action.setChecked(get_pdf_book_layout())
         self._book_layout_action.setObjectName("actBookLayout")
         self._book_layout_action.setToolTip(
-            "Buch-Layout: Cover allein, danach Doppelseiten (Ctrl+Alt+2) — 2.6.19"
+            "Buch-Layout: Cover allein, danach Doppelseiten (Ctrl+Alt+Shift+2) — 2.6.54"
         )
-        self._book_layout_action.setShortcut(QKeySequence("Ctrl+Alt+2"))
+        self._book_layout_action.setShortcut(QKeySequence("Ctrl+Alt+Shift+2"))
         self._book_layout_action.toggled.connect(self._toggle_book_layout)
         m_view.addAction(self._book_layout_action)
-        self._continuous_action = QAction("Continuous Scroll", self)
+        self._continuous_action = QAction("Fortlaufend scrollen", self)
         self._continuous_action.setCheckable(True)
         self._continuous_action.setChecked(get_pdf_continuous_scroll())
         self._continuous_action.setToolTip(
-            "Seiten untereinander scrollen statt Einzelseite (Ctrl+3 / Toolbar CS); schließt Spread aus"
+            "Seiten untereinander scrollen statt Einzelseite (Ctrl+3); schließt Doppelseite aus"
         )
         self._continuous_action.setShortcut(QKeySequence("Ctrl+3"))
         self._continuous_action.toggled.connect(self._toggle_continuous_scroll)
@@ -2650,9 +2663,9 @@ class MainWindow(QMainWindow):
         self._page_by_page_action.setChecked(get_pdf_page_by_page())
         self._page_by_page_action.setObjectName("actPageByPage")
         self._page_by_page_action.setToolTip(
-            "Mausrad blättert Seiten (kein Continuous) — Ctrl+Alt+3 — 2.6.19"
+            "Mausrad blättert Seiten (kein fortlaufendes Scrollen) — Ctrl+Alt+Shift+3 — 2.6.54"
         )
-        self._page_by_page_action.setShortcut(QKeySequence("Ctrl+Alt+3"))
+        self._page_by_page_action.setShortcut(QKeySequence("Ctrl+Alt+Shift+3"))
         self._page_by_page_action.toggled.connect(self._toggle_page_by_page)
         m_view.addAction(self._page_by_page_action)
         self._doc_tabs_action = QAction("Dokument-Tabs", self)
@@ -2812,14 +2825,14 @@ class MainWindow(QMainWindow):
         act_zo.setShortcut(QKeySequence.ZoomOut)
         act_zo.triggered.connect(self._zoom_out)
         m_view.addAction(act_zo)
-        act_fit = QAction("Seite einpassen (Fit-Page)", self)
+        act_fit = QAction("Seite einpassen", self)
         act_fit.setShortcut(QKeySequence("Ctrl+0"))
-        act_fit.setToolTip("Aktuelle Seite in Viewport einpassen (Ctrl+0)")
+        act_fit.setToolTip("Aktuelle Seite in den sichtbaren Bereich einpassen (Ctrl+0)")
         act_fit.triggered.connect(self._fit_page)
         m_view.addAction(act_fit)
-        act_fit_w = QAction("Breite einpassen (Fit-Width)", self)
+        act_fit_w = QAction("Breite einpassen", self)
         act_fit_w.setShortcut(QKeySequence("Ctrl+9"))
-        act_fit_w.setToolTip("Seitenbreite an Viewport anpassen (Ctrl+9)")
+        act_fit_w.setToolTip("Seitenbreite an den sichtbaren Bereich anpassen (Ctrl+9)")
         act_fit_w.triggered.connect(self._fit_width)
         m_view.addAction(act_fit_w)
         act_fit_h = QAction("Höhe einpassen", self)
@@ -2861,7 +2874,7 @@ class MainWindow(QMainWindow):
         act_theme_cycle.triggered.connect(self._cycle_theme_mode)
         m_view.addAction(act_theme_cycle)
         self._theme_cycle_action = act_theme_cycle
-        self._high_contrast_action = QAction("High-Contrast Theme", self)
+        self._high_contrast_action = QAction("Hoher Kontrast", self)
         self._high_contrast_action.setCheckable(True)
         self._high_contrast_action.setShortcut(QKeySequence("Ctrl+Alt+H"))
         self._high_contrast_action.setToolTip(
@@ -3138,10 +3151,6 @@ class MainWindow(QMainWindow):
                 "Formularfelder erkennen…",
                 lambda: self.pdf_view.form_field_detect_dialog(),
             ),
-            (
-                "Verschlüsselung & Rechte…",
-                lambda: self._pdf_security_dialog(),
-            ),
             ("Seiten neu anordnen…", lambda: self.pdf_view.reorder_dialog()),
             ("Seite als Bild exportieren…", lambda: self.pdf_view.extract_page_as_image()),
             ("Seiten als Bilder exportieren…", lambda: self.pdf_view.export_pages_as_images()),
@@ -3396,8 +3405,8 @@ class MainWindow(QMainWindow):
         a.triggered.connect(self._insert_hyperlink_dialog)
         m_ins.addAction(a)
         a = QAction("Tabelle einfügen…", self)
-        a.setShortcut(QKeySequence("Ctrl+Alt+Shift+T"))
-        a.setToolTip("Markdown-Tabelle erstellen (Zeilen/Spalten) — 2.6.14")
+        a.setShortcut(QKeySequence("Ctrl+Alt+Shift+8"))
+        a.setToolTip("Markdown-Tabelle erstellen (Zeilen/Spalten) — Ctrl+Alt+Shift+8 — 2.6.54")
         a.triggered.connect(self._insert_table_dialog)
         m_ins.addAction(a)
         a = QAction("Tabelle formatieren…", self)
@@ -3615,6 +3624,253 @@ class MainWindow(QMainWindow):
         a.triggered.connect(lambda: AboutDialog(self).exec())
         m_help.addAction(a)
         self._sync_editor_only_actions()
+        self._sync_menu_enablement()
+
+    def _set_action_available(self, act, available: bool, reason: str) -> None:
+        """Enable/Disable mit Tooltip-Grund, ohne Tooltip zu stapeln — 2.6.54."""
+        if act is None:
+            return
+        try:
+            src = act.property("ildAvailTip")
+            if not src:
+                src = act.toolTip() or ""
+                act.setProperty("ildAvailTip", src)
+            act.setEnabled(bool(available))
+            if available:
+                act.setToolTip(str(src))
+            else:
+                extra = str(reason or "").strip()
+                base = str(src).strip()
+                act.setToolTip(f"{base} — {extra}".strip(" —") if base else extra)
+        except Exception:
+            try:
+                act.setEnabled(bool(available))
+            except Exception:
+                pass
+
+    @staticmethod
+    def _label_is_editor_only(label: str) -> bool:
+        """Absatz/Stil/Einrückung/Typografie — nicht für PDF-Ansicht — 2.6.54."""
+        t = (label or "").strip().lower()
+        needles = (
+            "zeilenabstand",
+            "absatz links",
+            "absatz zentriert",
+            "absatz rechts",
+            "absatz blocksatz",
+            "laufweite",
+            "durchschuss",
+            "tracking",
+            "leading",
+            "initial",
+            "drop cap",
+            "silbentrennung",
+            "einrückung",
+            "textbaustein",
+            "sonderzeichen einfügen",
+            "automatische formatierung",
+            "inhaltsverzeichnis",
+            "abbildungsverzeichnis",
+            "stichwortverzeichnis",
+            "formatvorlage",
+            "absatzstil",
+            "zeichenstil",
+            "stil-preset",
+            "fett",
+            "kursiv",
+            "unterstrichen",
+            "groß-/klein",
+            "alles groß",
+            "alles klein",
+            "autokorrektur",
+            "zeile nach oben",
+            "zeile nach unten",
+            "zeilen sortieren",
+            "zeile kommentieren",
+            "weiches trennzeichen",
+            "geschütztes leerzeichen",
+            "deutsch (de)",
+            "english (en)",
+            "français",
+            "русский",
+            "español",
+            "中文",
+            "português",
+            "العربية",
+            "italiano",
+        )
+        return any(n in t for n in needles)
+
+    @staticmethod
+    def _label_is_editor_view_only(label: str) -> bool:
+        t = (label or "").strip().lower()
+        needles = (
+            "seitenlayout",
+            "zeilennummern",
+            "editor-minimap",
+            "minimap",
+            "wortumbruch",
+            "markdown-vorschau",
+            "einrückungs-guides",
+            "sonderzeichen anzeigen",
+        )
+        return any(n in t for n in needles)
+
+    def _sync_menu_enablement(self) -> None:
+        """PDF-only / Editor-only Menüs an den aktuellen Dokumenttyp koppeln — 2.6.54."""
+        is_pdf = False
+        is_editor = False
+        try:
+            is_pdf = bool(self._pdf_tab_active()) and bool(
+                getattr(self.pdf_view, "pdf_path", None)
+            )
+        except Exception:
+            try:
+                is_pdf = (
+                    self.stack.currentWidget() is self.pdf_view
+                    and bool(getattr(self.pdf_view, "pdf_path", None))
+                )
+            except Exception:
+                is_pdf = False
+        try:
+            is_editor = bool(self._editor_document_active())
+        except Exception:
+            try:
+                is_editor = self.stack.currentWidget() is self.editor_pane
+            except Exception:
+                is_editor = False
+
+        def _walk(menu, mode: str) -> None:
+            if menu is None:
+                return
+            for a in menu.actions():
+                if a.isSeparator():
+                    continue
+                sub = a.menu() if hasattr(a, "menu") else None
+                if sub is not None:
+                    _walk(sub, mode)
+                    continue
+                t = (a.text() or "").replace("&", "").lower()
+                if mode == "pdf":
+                    if any(x in t for x in ("scan", "drucker", "gerät")):
+                        a.setEnabled(True)
+                        continue
+                    self._set_action_available(
+                        a, is_pdf, "Nur bei geöffnetem PDF verfügbar"
+                    )
+                elif mode == "insert":
+                    self._set_action_available(
+                        a, is_editor, "Nur im Text- oder DOCX-Editor verfügbar"
+                    )
+                elif mode == "edit":
+                    src = ""
+                    try:
+                        src = str(a.property("ild_i18n_src") or "")
+                    except Exception:
+                        src = ""
+                    label = (src or t).replace("&", "").lower()
+                    if self._label_is_editor_only(label):
+                        self._set_action_available(
+                            a,
+                            is_editor,
+                            "Nur im Text- oder DOCX-Editor verfügbar",
+                        )
+                elif mode == "view-editor":
+                    src = ""
+                    try:
+                        src = str(a.property("ild_i18n_src") or "")
+                    except Exception:
+                        src = ""
+                    label = (src or t).replace("&", "").lower()
+                    if self._label_is_editor_view_only(label):
+                        self._set_action_available(
+                            a,
+                            is_editor,
+                            "Nur im Text- oder DOCX-Editor verfügbar",
+                        )
+                elif mode == "export":
+                    want = is_editor
+                    if "pdf" in t and "text" not in t:
+                        want = is_pdf or is_editor
+                    self._set_action_available(
+                        a, want, "Nur bei geöffnetem Dokument verfügbar"
+                    )
+
+        try:
+            mb = self.menuBar()
+        except Exception:
+            return
+        for top in mb.actions():
+            menu = top.menu() if hasattr(top, "menu") else None
+            title = ""
+            try:
+                title = (menu.title() if menu is not None else top.text() or "")
+            except Exception:
+                title = ""
+            title = title.replace("&", "")
+            if title == "PDF":
+                _walk(menu, "pdf")
+            elif title == "Einfügen":
+                _walk(menu, "insert")
+            elif title in ("Bearbeiten", "Edit"):
+                _walk(menu, "edit")
+            elif title in ("Ansicht", "View"):
+                _walk(menu, "view-editor")
+            elif title == "Datei" and menu is not None:
+                for a in menu.actions():
+                    sub = a.menu() if hasattr(a, "menu") else None
+                    if sub is not None and "export" in (sub.title() or "").lower():
+                        _walk(sub, "export")
+
+        rb = getattr(self, "ribbon_bar", None)
+        if rb is not None:
+            always = {
+                "open",
+                "scan_import",
+                "devices_discover",
+                "devices_printers",
+                "devices_refresh",
+                "toggle_ribbon",
+                "toggle_doc_tabs",
+                "settings",
+            }
+            pdf_ids = {
+                "compare_pdfs",
+                "preflight",
+                "apply_bleed",
+                "export_pdfx",
+                "book_layout",
+                "page_by_page",
+                "continuous_scroll",
+            }
+            editor_ids = {
+                "export_epub",
+                "export_pptx",
+                "insert_hyperlink",
+                "insert_shape",
+                "insert_snippet",
+                "find_replace",
+                "spellcheck",
+                "auto_toc",
+                "auto_lof",
+                "auto_index",
+                "page_layout",
+            }
+            for aid, btn in (getattr(rb, "_actions", {}) or {}).items():
+                if aid in always:
+                    btn.setEnabled(True)
+                elif aid in pdf_ids:
+                    btn.setEnabled(bool(is_pdf))
+                elif aid in editor_ids:
+                    btn.setEnabled(bool(is_editor))
+
+        pane = getattr(self, "editor_pane", None)
+        if pane is not None:
+            for _aid, tb in (getattr(pane, "_tool_buttons", {}) or {}).items():
+                try:
+                    tb.setEnabled(bool(is_editor))
+                except Exception:
+                    pass
 
     def _refresh_recent(self):
         # Fehlende Dateien aus der persistierten Liste streichen — 2.6.54
@@ -7035,6 +7291,10 @@ class MainWindow(QMainWindow):
             "preflight": self._run_preflight,
             "apply_bleed": self._apply_bleed_dialog,
             "export_pdfx": self._export_pdfx,
+            "export_epub": lambda: self._export_editor("epub"),
+            "export_pptx": lambda: self._export_editor("pptx"),
+            "insert_hyperlink": self._insert_hyperlink_dialog,
+            "insert_shape": self._insert_shape_frame,
             "scan_import": self._run_scan_import,
             "devices_discover": self._show_devices_dialog,
             "devices_printers": lambda: self._show_devices_dialog(filter_kind="printer"),
@@ -7055,6 +7315,8 @@ class MainWindow(QMainWindow):
         fn = handlers.get(action_id)
         if callable(fn):
             fn()
+        else:
+            self._set_status(f"Ribbon-Aktion ohne Handler: {action_id}")
 
     def _rich_base_font_for_doc(self):
         """Standardschrift des aktuellen Rich-Dokuments (DOCX Normal-Stil) — 2.6.53."""
@@ -9162,7 +9424,7 @@ class MainWindow(QMainWindow):
             initial_text=selected,
             document_text=self.editor.toPlainText(),
         )
-        if dlg.exec() != dlg.Accepted:
+        if dlg.exec() != QDialog.Accepted:
             return
         snippet = dlg.result_snippet
         if selected and cursor.hasSelection():
@@ -9190,7 +9452,14 @@ class MainWindow(QMainWindow):
         )
         if not ok:
             return
-        fr = self.layout_doc.add_shape(shape)
+        if shape not in SHAPE_KINDS:
+            self._set_status(f"Unbekannte Form: {shape}")
+            return
+        try:
+            fr = self.layout_doc.add_shape(shape)
+        except Exception as e:
+            QMessageBox.warning(self, "Form", str(e))
+            return
         self._set_status(f"Form {shape} eingefügt ({fr.id})")
 
     def _insert_video_placeholder(self) -> None:
@@ -14479,8 +14748,8 @@ class MainWindow(QMainWindow):
 
     def _manage_export_presets(self):
         """Export-Presets: ★ · RMB Ordner · Entf · Summary/Pfad kopieren — 2.5.9."""
-        from PySide6.QtCore import QEvent, QObject
-        from PySide6.QtGui import QDesktopServices, QKeyEvent, QUrl
+        from PySide6.QtCore import QEvent, QObject, QUrl
+        from PySide6.QtGui import QDesktopServices, QKeyEvent
         from PySide6.QtWidgets import (
             QApplication,
             QDialog,
@@ -16264,10 +16533,13 @@ class MainWindow(QMainWindow):
         col, ok = QInputDialog.getInt(self, "Tabelle sortieren", "Spalte (0-basiert):", 0, 0, 49)
         if not ok:
             return
-        if self.editor.sort_current_table(col):
-            self._set_status(f"Tabelle nach Spalte {col} sortiert")
-        else:
-            self._set_status("Keine Tabelle im Dokument")
+        try:
+            if self.editor.sort_current_table(col):
+                self._set_status(f"Tabelle nach Spalte {col} sortiert")
+            else:
+                self._set_status("Keine Tabelle im Dokument")
+        except Exception as e:
+            self._set_status(f"Tabelle sortieren: {e}")
 
     def _import_table_data(self) -> None:
         if not self._guard_editor_action("Tabelle"):
@@ -16361,6 +16633,9 @@ class MainWindow(QMainWindow):
         ]
         choice, ok = QInputDialog.getItem(self, title, "Rahmen:", labels, 0, False)
         if not ok:
+            return None
+        if choice not in labels:
+            self._set_status("Rahmen-Auswahl ungültig")
             return None
         idx = labels.index(choice)
         return str(frames[idx]["id"])

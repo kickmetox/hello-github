@@ -99,7 +99,6 @@ def default_palette_commands() -> list[PaletteCommand]:
             "Inhaltsverzeichnis aktualisieren",
             "toc inhaltsverzeichnis outline verzeichnis",
             "Bearbeiten",
-            "Ctrl+Alt+Shift+T",
         ),
         PaletteCommand(
             "auto_lof",
@@ -286,7 +285,7 @@ def default_palette_commands() -> list[PaletteCommand]:
             "Tabelle einfügen…",
             "tabelle table erstellen grid",
             "Einfügen",
-            "Ctrl+Alt+Shift+T",
+            "Ctrl+Alt+Shift+8",
         ),
         PaletteCommand(
             "format_table",
@@ -394,17 +393,17 @@ def default_palette_commands() -> list[PaletteCommand]:
         ),
         PaletteCommand(
             "book_layout",
-            "Buch-Layout (Book Layout)",
+            "Buch-Layout",
             "book layout buch doppelseite cover spread",
             "Ansicht",
-            "Ctrl+Alt+2",
+            "Ctrl+Alt+Shift+2",
         ),
         PaletteCommand(
             "page_by_page",
             "Seite-für-Seite-Scrollen",
             "page scroll blättern einzelseite",
             "Ansicht",
-            "Ctrl+Alt+3",
+            "Ctrl+Alt+Shift+3",
         ),
         PaletteCommand(
             "toggle_doc_tabs",
@@ -449,7 +448,7 @@ def default_palette_commands() -> list[PaletteCommand]:
             "Review / Änderungen nachverfolgen…",
             "review track changes änderungen nachverfolgen accept reject",
             "Review",
-            "Ctrl+Shift+E",
+            "Ctrl+Alt+Shift+R",
         ),
         PaletteCommand(
             "doc_comments",

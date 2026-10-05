@@ -1,0 +1,1 @@
+# Test package for InstantLens Doc menu smoke.
