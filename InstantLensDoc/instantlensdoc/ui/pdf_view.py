@@ -8032,16 +8032,13 @@ class PdfViewer(QWidget):
         return out
 
     def recolor_stroke_selected_annotations(self) -> int:
-        """Strichfarbe für ausgewähltes Shape setzen (getrennt von Füllung; Commit + Undo) — 0.9.4."""
+        """Strichfarbe für Auswahl, sonst ganze Seite (Commit + Undo) — 0.9.4."""
         if not self.store:
             self.status.emit("Kein PDF geladen")
             return 0
-        ids = list(self._selected_ann_ids) if self._selected_ann_ids else (
-            [self._selected_ann_id] if self._selected_ann_id else []
-        )
-        ids = [i for i in ids if i]
+        ids, scope = self._style_target_ids()
         if not ids:
-            self.status.emit("Keine Annotation ausgewählt")
+            self.status.emit("Keine Annotation auf der Seite")
             return 0
         initial = QColor(self._highlight_color or "#FFE066")
         first = self.store.get(ids[0])
@@ -8067,21 +8064,21 @@ class PdfViewer(QWidget):
             QMessageBox.warning(self, "Strichfarbe", str(e))
             return 0
         self.refresh()
+        if scope == "selection":
+            self.canvas.set_selected_ids(ids)
+            self._selected_ann_ids = set(ids)
         self.annotations_changed.emit()
         self.status.emit(f"Strichfarbe {color} für {n} Annotation(en)")
         return n
 
     def recolor_fill_selected_annotations(self) -> int:
-        """Füllfarbe für ausgewähltes Shape setzen (Commit + Undo) — 0.9.3."""
+        """Füllfarbe für Auswahl, sonst ganze Seite (Commit + Undo) — 0.9.3."""
         if not self.store:
             self.status.emit("Kein PDF geladen")
             return 0
-        ids = list(self._selected_ann_ids) if self._selected_ann_ids else (
-            [self._selected_ann_id] if self._selected_ann_id else []
-        )
-        ids = [i for i in ids if i]
+        ids, scope = self._style_target_ids()
         if not ids:
-            self.status.emit("Keine Annotation ausgewählt")
+            self.status.emit("Keine Annotation auf der Seite")
             return 0
         initial = QColor("#FFE066")
         first = self.store.get(ids[0])
@@ -8115,6 +8112,9 @@ class PdfViewer(QWidget):
             QMessageBox.warning(self, "Füllfarbe", str(e))
             return 0
         self.refresh()
+        if scope == "selection":
+            self.canvas.set_selected_ids(ids)
+            self._selected_ann_ids = set(ids)
         self.annotations_changed.emit()
         self.status.emit(f"Füllfarbe {color} für {n} Annotation(en)")
         return n
@@ -8671,18 +8671,15 @@ class PdfViewer(QWidget):
         return self.recolor_stroke_selected_annotations()
 
     def set_opacity_selected_annotations(self) -> int:
-        """Batch-Deckkraft für ausgewählte Annotation(en) ändern."""
+        """Batch-Deckkraft: Auswahl, sonst alle Annotationen der Seite."""
         from PySide6.QtWidgets import QInputDialog
 
         if not self.store:
             self.status.emit("Kein PDF geladen")
             return 0
-        ids = list(self._selected_ann_ids) if self._selected_ann_ids else (
-            [self._selected_ann_id] if self._selected_ann_id else []
-        )
-        ids = [i for i in ids if i]
+        ids, scope = self._style_target_ids()
         if not ids:
-            self.status.emit("Keine Annotation ausgewählt")
+            self.status.emit("Keine Annotation auf der Seite")
             return 0
         initial = float(self._default_opacity)
         first = self.store.get(ids[0])
@@ -8715,6 +8712,9 @@ class PdfViewer(QWidget):
             QMessageBox.warning(self, "Annotation-Deckkraft", str(e))
             return 0
         self.refresh()
+        if scope == "selection":
+            self.canvas.set_selected_ids(ids)
+            self._selected_ann_ids = set(ids)
         self.annotations_changed.emit()
         self.status.emit(f"Deckkraft {float(value):.2f} für {n} Annotation(en)")
         return n

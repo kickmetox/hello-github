@@ -501,6 +501,10 @@ def test_viewer_style_selection(app, td: Path) -> None:
     v.canvas.set_selected_ids(set())
     v._selected_ann_ids = set()
     v._selected_ann_id = None
+    n_page = v.apply_toolbar_color("#27AE60")
+    assert n_page == 2, n_page
+    assert v.store.get(rect.id).color.upper() == "#27AE60"
+    assert v.store.get(note.id).color.upper() == "#27AE60"
     n_all = v.select_all_text_or_annotations()
     assert n_all == 2, n_all
     assert rect.id in v.canvas._selected_ids and note.id in v.canvas._selected_ids
@@ -760,7 +764,7 @@ def main() -> int:  # noqa: C901
         test_viewer_select_hit_test(app, tdp)
         print("OK  7c Auswahl Klick/Gummiband/Griffe")
         test_viewer_style_selection(app, tdp)
-        print("OK  7d Ribbon-Farbe auf Auswahl, Select-All global")
+        print("OK  7d Ribbon-Farbe auf Auswahl, Seite ohne Auswahl, Select-All global")
         test_ribbon_undo_arrows()
         print("OK  8 ribbon ↶/↷")
         test_mainwindow_shortcuts(win)
