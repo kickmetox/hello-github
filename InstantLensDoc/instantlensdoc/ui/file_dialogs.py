@@ -3,13 +3,173 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
-from PySide6.QtWidgets import QFileDialog, QMessageBox, QWidget
+if TYPE_CHECKING:
+    from instantlensdoc.core.documents import DocKind
+
+# Dokument-Speichern (Text/Word-Suite) — 2.6.43
+# Windows + python.exe hängt sonst bei namen ohne Endung oft *.py an.
+DOC_SAVE_FILTER_ENTRIES: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("ILD Dokument", (".ild",)),
+    ("Text", (".txt",)),
+    ("Markdown", (".md",)),
+    ("HTML", (".html", ".htm")),
+    ("DOCX", (".docx",)),
+    ("RTF", (".rtf",)),
+    ("PDF", (".pdf",)),
+    ("Excel", (".xlsx",)),
+)
+
+_DOC_SAVE_KNOWN_EXTS = frozenset(
+    ext for _label, exts in DOC_SAVE_FILTER_ENTRIES for ext in exts
+) | frozenset({".markdown", ".htm"})
+
+
+def document_save_name_filters() -> str:
+    """Qt-Name-Filter für Speichern/Speichern unter (Dokumente, kein *.py)."""
+    parts: list[str] = []
+    for label, exts in DOC_SAVE_FILTER_ENTRIES:
+        globs = " ".join(f"*{e}" for e in exts)
+        parts.append(f"{label} ({globs})")
+    parts.append("Alle Dateien (*)")
+    return ";;".join(parts)
+
+
+def document_save_default_suffix(kind: "DocKind | str | None" = None) -> str:
+    """Standard-Endung für unbenannte Dokumente (nie .py)."""
+    from instantlensdoc.core.documents import DocKind
+
+    if kind is None:
+        return ".ild"
+    key = kind.value if isinstance(kind, DocKind) else str(kind).strip().lower()
+    return {
+        DocKind.TEXT.value: ".ild",
+        DocKind.MARKDOWN.value: ".md",
+        DocKind.HTML.value: ".html",
+        DocKind.DOCX.value: ".docx",
+        DocKind.RTF.value: ".rtf",
+        DocKind.XLSX.value: ".xlsx",
+        DocKind.PDF.value: ".pdf",
+    }.get(key, ".ild")
+
+
+def document_save_suggested_name(
+    display_name: str | None,
+    *,
+    kind: "DocKind | str | None" = None,
+    path: str | Path | None = None,
+) -> str:
+    """Vorschlagsdateiname inkl. sinnvoller Endung (gegen Windows-.py-Default)."""
+    if path is not None:
+        p = Path(path)
+        if p.name:
+            return p.name
+    raw = (display_name or "").strip() or "Unbenannt"
+    stem_path = Path(raw)
+    suf = stem_path.suffix.lower()
+    if suf in _DOC_SAVE_KNOWN_EXTS:
+        return stem_path.name
+    # „Unbenannt.py“ / fremde Skript-Endungen → Dokument-Default
+    if suf in {".py", ".pyw", ".pyc"}:
+        return stem_path.stem + document_save_default_suffix(kind)
+    if suf:
+        # Unbekannte Endung belassen (Nutzer hat evtl. bewusst gewählt)
+        return stem_path.name
+    return stem_path.name + document_save_default_suffix(kind)
+
+
+def document_save_ext_from_filter(selected_filter: str | None) -> str | None:
+    """Erste Endung aus dem gewählten Qt-Filter, sonst None."""
+    sel = (selected_filter or "").lower()
+    if not sel or sel.startswith("alle dateien") or "(*)" in sel:
+        return None
+    for _label, exts in DOC_SAVE_FILTER_ENTRIES:
+        for ext in exts:
+            token = f"*{ext}"
+            if token in sel:
+                return ext
+    return None
+
+
+def ensure_document_save_extension(
+    path: str | Path,
+    selected_filter: str | None = None,
+    *,
+    default_suffix: str = ".ild",
+) -> Path:
+    """Endung aus Filter/Default setzen, wenn fehlend oder .py vom Host."""
+    dest = Path(path)
+    suf = dest.suffix.lower()
+    wanted = document_save_ext_from_filter(selected_filter)
+    if wanted is None:
+        wanted = default_suffix if default_suffix.startswith(".") else f".{default_suffix}"
+    if not suf or suf in {".py", ".pyw", ".pyc"}:
+        return dest.with_suffix(wanted)
+    return dest
+
+
+def document_save_filters_are_safe(filter_str: str | None = None) -> bool:
+    """True wenn Dokument-Filter die Pflichtformate hat und *.py nicht primär ist."""
+    text = filter_str if filter_str is not None else document_save_name_filters()
+    low = text.lower()
+    required = (".ild", ".txt", ".docx", ".pdf", ".rtf", ".html")
+    if any(ext not in low for ext in required):
+        return False
+    # Dedizierter Python-Filter oder *.py als erstes Glob → unzulässig für Docs
+    first = text.split(";;", 1)[0].lower()
+    if "*.py" in first or "python (" in first:
+        return False
+    if "python (*" in low:
+        return False
+    return True
+
+
+def get_document_save_file_name(
+    parent: Any,
+    title: str,
+    directory: str | Path,
+    suggested_name: str,
+    *,
+    default_suffix: str = ".ild",
+    name_filter: str | None = None,
+) -> tuple[str, str]:
+    """
+    Speichern-unter-Dialog für Text/Word-Suite-Dokumente.
+    Setzt DefaultSuffix + Vorschlagsname mit Endung (kein Windows-.py-Default).
+    """
+    from PySide6.QtWidgets import QFileDialog
+
+    filt = name_filter or document_save_name_filters()
+    suffix = (default_suffix or ".ild").lstrip(".") or "ild"
+    start_dir = str(directory)
+    dlg = QFileDialog(parent, title, start_dir)
+    dlg.setAcceptMode(QFileDialog.AcceptSave)
+    dlg.setFileMode(QFileDialog.AnyFile)
+    dlg.setNameFilters([p for p in filt.split(";;") if p.strip()])
+    dlg.setDefaultSuffix(suffix)
+    # Ersten Dokument-Filter wählen (ILD), nie „Alle Dateien“
+    filters = dlg.nameFilters()
+    if filters:
+        dlg.selectNameFilter(filters[0])
+    dlg.selectFile(suggested_name)
+    if not dlg.exec():
+        return "", ""
+    files = dlg.selectedFiles()
+    path = files[0] if files else ""
+    selected = dlg.selectedNameFilter()
+    if path:
+        path = str(
+            ensure_document_save_extension(
+                path, selected, default_suffix=f".{suffix}"
+            )
+        )
+    return path, selected
 
 
 def confirm_overwrite_export(
     dest: str | Path,
-    parent: QWidget | None = None,
+    parent: Any = None,
     *,
     title: str = "Datei überschreiben?",
 ) -> bool:
@@ -18,6 +178,8 @@ def confirm_overwrite_export(
     Existiert die Zieldatei nicht → True.
     Existiert sie → Ja/Nein-Dialog (Default: Nein).
     """
+    from PySide6.QtWidgets import QMessageBox
+
     path = Path(dest)
     if not path.is_file():
         return True
@@ -33,7 +195,7 @@ def confirm_overwrite_export(
 
 def resolve_template_zip_conflicts(
     conflict_titles: list[str],
-    parent: QWidget | None = None,
+    parent: Any = None,
     *,
     dry_run_rows: list[dict] | None = None,
 ) -> str:
@@ -44,6 +206,8 @@ def resolve_template_zip_conflicts(
       (action overwrite/add) — zeigt was überschrieben würde.
     Optional: Konfliktliste als TXT exportieren.
     """
+    from PySide6.QtWidgets import QMessageBox
+
     titles = [str(t).strip() for t in conflict_titles if str(t).strip()]
     if not titles and not dry_run_rows:
         return "overwrite"
@@ -111,12 +275,13 @@ def resolve_template_zip_conflicts(
 
 
 def _export_dry_run_conflict_txt(
-    parent: QWidget | None,
+    parent: Any = None,
     *,
     dry_run_rows: list[dict] | None = None,
     conflict_titles: list[str] | None = None,
 ) -> Path | None:
     """Konfliktliste als TXT speichern (Dateidialog)."""
+    from PySide6.QtWidgets import QFileDialog, QMessageBox
     from instantlensdoc.core.app_settings import (
         dialog_start_dir,
         export_dry_run_conflict_list_txt,

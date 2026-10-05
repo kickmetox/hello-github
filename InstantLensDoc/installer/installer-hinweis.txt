@@ -1,4 +1,7 @@
-InstantLens Doc 2.6.42 - Installation
+InstantLens Doc 2.6.43 - Installation
+
+Neu in 2.6.43:
+- Speichern unter: Dokumentfilter .ild/.txt/.docx/.pdf/.rtf/.html (kein .py-Default)
 
 Neu in 2.6.42:
 - OCR nutzt ScanTuxio-Tesseract-Runtime (kein separates Tesseract noetig)

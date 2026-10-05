@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **2.6.42** |
+| Version | **2.6.43** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
@@ -33,7 +33,7 @@
 
 Skript: [sync-ild.ps1](scripts/sync-ild.ps1) — Branch `cursor/instantlensdoc-2108` (oder `-LocalPack` / Pack-Zip) nach `D:\AI_Temp\InstantLensDoc`, pip, Start. **Nutzer-Icon in `assets` wird nicht überschrieben.**
 
-**FEATURES.md lokal sync:** Nach Sync liegt `FEATURES.md` lokal im App-Ordner (`D:\AI_Temp\InstantLensDoc\FEATURES.md`); About/Stubs öffnen diese lokale Datei — Version **2.6.42**.
+**FEATURES.md lokal sync:** Nach Sync liegt `FEATURES.md` lokal im App-Ordner (`D:\AI_Temp\InstantLensDoc\FEATURES.md`); About/Stubs öffnen diese lokale Datei — Version **2.6.43**.
 
 Ohne Start: `-NoStart` (Alias `-SkipStart`). Exit-Codes: **0** OK · **1** allgemein · **2** Git-Fehler.
 
@@ -68,7 +68,7 @@ Python-Layout-Zip (ohne PyInstaller-EXE):
 powershell -ExecutionPolicy Bypass -File .\scripts\pack-windows-runnable.ps1
 ```
 
-Installer: `.\scripts\build-windows-installer.ps1` bzw. `.\installer\build-installer.ps1` (optional `-NoKeygen`) → `dist\InstantLensDoc-Setup-2.6.42.exe`  
+Installer: `.\scripts\build-windows-installer.ps1` bzw. `.\installer\build-installer.ps1` (optional `-NoKeygen`) → `dist\InstantLensDoc-Setup-2.6.43.exe`  
 Desktop-/Keygen-Shortcuts: `.\scripts\install-ild.ps1` (Keygen wenn `run-keygen.bat` / EXE vorhanden; `-SkipKeygen`)  
 Desktop-Verknüpfung Installer: optionale Checkbox (`desktopicon`, Standard an / `checkedonce`)
 
@@ -104,6 +104,16 @@ powershell -ExecutionPolicy Bypass -File .\scripts\ild.ps1 license generate kund
 
 Anleitung: Store `docs/instantlensdoc-scripting.md` · Beispiel `examples/ild_scripting_demo.py`.
 
+## Neu in 2.6.43
+
+Patch nach **2.6.42** (Tesseract-Runtime) — Speichern unter für Text/Word-Suite:
+
+- **Kein `.py`-Default** mehr bei neuem Text (Windows/`python.exe`)
+- Filter: `.ild` (nativ), `.txt`, `.md`, `.html`, `.docx`, `.rtf`, `.pdf`, `.xlsx`
+- `setDefaultSuffix` + Vorschlagsname mit Endung (`Unbenannt.ild` / `.md` …)
+- Text → PDF über Export; Öffnen inkl. `*.ild`
+- Pack: `InstantLensDoc-2.6.43-pack.zip`
+
 ## Neu in 2.6.42
 
 Patch nach **2.6.41**: OCR ohne separates Tesseract, wenn ScanTuxio-Runtime vorhanden.
@@ -122,7 +132,6 @@ Patch nach **2.6.40** (Blank-View/Build Guard) — enthaelt dessen Fixes:
 - Acquire: ScanTuxio dispatch → WIA-Fallback; leere Geräteliste mit DE-Status
 - Enthaelt **2.6.40**: `_ensure_page_painted`, Pack-Entry `run_instantlensdoc.py`, EXE-Build-Guard
 - Pack: `InstantLensDoc-2.6.41-pack.zip`
-Pack: `InstantLensDoc-2.6.41-pack.zip`
 
 ## Neu in 2.6.40
 

@@ -187,7 +187,8 @@ class Document:
 
 def detect_kind(path: Path) -> DocKind:
     ext = path.suffix.lower()
-    if ext in {".txt", ".log", ".csv"}:
+    if ext in {".txt", ".log", ".csv", ".ild"}:
+        # .ild = natives InstantLens-Doc (UTF-8-Text) — 2.6.43
         return DocKind.TEXT
     if ext in {".md", ".markdown"}:
         return DocKind.MARKDOWN

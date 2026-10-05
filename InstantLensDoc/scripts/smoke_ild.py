@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Nightly/CI Smoke: CLI + Import-Checks für InstantLens Doc — 2.1.0–2.6.42.
+"""Nightly/CI Smoke: CLI + Import-Checks für InstantLens Doc — 2.1.0–2.6.43.
 
 Leichtgewichtig. Exit-Codes:
   0  OK  (ok=true)
@@ -14,12 +14,12 @@ Aufruf:
   python scripts/smoke_ild.py -h
 
 JSON-Schema (--json), Erfolg:
-  {"ok": true, "version": "2.6.42", "duration_ms": 1234,
+  {"ok": true, "version": "2.6.43", "duration_ms": 1234,
    "checks": ["version", "imports", "cli", "measure_diff_import", "changelog"]}
 
 JSON bei Fail: checks[] enthält Objekt mit error-Text (max 200 Zeichen, Truncate …);
 Exitcode spiegelt ok (0↔true, 1↔false) — 2.2.0:
-  {"ok": false, "version": "2.6.42", "duration_ms": 12,
+  {"ok": false, "version": "2.6.43", "duration_ms": 12,
    "checks": ["version", {"name": "imports", "error": "import x: …"}]}
 """
 
@@ -41,7 +41,7 @@ if str(ROOT) not in sys.path:
 # Headless/CI: Qt ohne Display
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-EXPECTED_VERSION = "2.6.42"
+EXPECTED_VERSION = "2.6.43"
 FAIL_ERROR_MAX_LEN = 200
 
 EXIT_OK = 0
@@ -82,7 +82,7 @@ def check_version() -> None:
         _fail(f"docs/VERSION={docs_ver!r}")
     bw = (ROOT / "build-windows.ps1").read_text(encoding="utf-8")
     if EXPECTED_VERSION not in bw or "Allow32Bit" not in bw:
-        _fail("build-windows.ps1 fehlt 2.6.42/Allow32Bit")
+        _fail("build-windows.ps1 fehlt 2.6.43/Allow32Bit")
     if not (ROOT / "scripts" / "pack-windows-runnable.py").is_file():
         _fail("scripts/pack-windows-runnable.py fehlt")
     if not (ROOT / "run-keygen.bat").is_file():
@@ -284,8 +284,41 @@ def check_version() -> None:
         _fail("welcome fehlt Scannen-Button (2.6.41)")
     if "menuDevices" not in mw or "SCAN_START_HINT_DE" not in mw:
         _fail("main_window fehlt Geräte-Menü/SCAN_START_HINT (2.6.41)")
+    # 2.6.43: Dokument-Speichern ohne .py-Default
+    from instantlensdoc.ui.file_dialogs import (
+        document_save_default_suffix,
+        document_save_filters_are_safe,
+        document_save_name_filters,
+        document_save_suggested_name,
+        ensure_document_save_extension,
+    )
+
+    filt2643 = document_save_name_filters()
+    if not document_save_filters_are_safe(filt2643):
+        _fail("document_save_name_filters unsicher / fehlt Pflichtformat (2.6.43)")
+    if "*.py" in filt2643.split(";;", 1)[0].lower():
+        _fail("Dokument-Save-Filter beginnt mit *.py (2.6.43)")
+    if "python (" in filt2643.lower():
+        _fail("Dokument-Save-Filter enthält Python-Eintrag (2.6.43)")
+    for ext in (".ild", ".txt", ".docx", ".pdf", ".rtf", ".html"):
+        if ext not in filt2643.lower():
+            _fail(f"Dokument-Save-Filter fehlt {ext} (2.6.43)")
+    if document_save_default_suffix("text") != ".ild":
+        _fail("Default-Suffix Text ≠ .ild (2.6.43)")
+    if document_save_suggested_name("Unbenannt", kind="text") != "Unbenannt.ild":
+        _fail("Vorschlagsname Unbenannt ohne Endung falsch (2.6.43)")
+    if document_save_suggested_name("Unbenannt.py", kind="text") != "Unbenannt.ild":
+        _fail("Vorschlagsname Unbenannt.py nicht korrigiert (2.6.43)")
+    fixed = ensure_document_save_extension("foo.py", "Text (*.txt)", default_suffix=".txt")
+    if str(fixed).lower().endswith(".py") or not str(fixed).lower().endswith(".txt"):
+        _fail("ensure_document_save_extension lässt .py stehen (2.6.43)")
+    if "get_document_save_file_name" not in mw or "document_save_suggested_name" not in mw:
+        _fail("main_window.save_as nutzt keine Dokument-Save-Helfer (2.6.43)")
+    docs_py = (ROOT / "instantlensdoc" / "core" / "documents.py").read_text(encoding="utf-8")
+    if '".ild"' not in docs_py and "'.ild'" not in docs_py:
+        _fail("detect_kind erkennt .ild nicht (2.6.43)")
     _ok(f"version {EXPECTED_VERSION}")
-        # 2.6.40 blank-view / pack entry (kept)
+    # 2.6.40 blank-view / pack entry (kept)
     if "_ensure_page_painted" not in pv:
         _fail("pdf_view fehlt _ensure_page_painted (2.6.40)")
     if "run_instantlensdoc.py" not in (ROOT / "scripts" / "pack-windows-runnable.py").read_text(encoding="utf-8"):
@@ -293,6 +326,7 @@ def check_version() -> None:
 
     _ok("2.6.41 scantuxio-port/menuDevices/naps2-escl/entry-hints: OK")
     _ok("2.6.42 tesseract-runtime/vendor/TESSDATA_PREFIX/ScanTuxio-Win: OK")
+    _ok("2.6.43 document-save-filters/no-py-default: OK")
 
 
 def check_imports(*, with_qt: bool) -> None:
@@ -1161,6 +1195,8 @@ def check_measure_and_diff() -> None:
 
 def check_changelog() -> None:
     cl = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    if "## 2.6.43" not in cl:
+        _fail("CHANGELOG fehlt ## 2.6.43")
     if "## 2.6.42" not in cl:
         _fail("CHANGELOG fehlt ## 2.6.42")
     if "## 2.6.41" not in cl:
@@ -1732,6 +1768,13 @@ def check_changelog() -> None:
     ):
         _fail("CHANGELOG 2.6.42 fehlt Tesseract-Runtime-Hinweis")
     if (
+        "Speichern unter" not in cl
+        and ".py" not in cl
+        and "document_save" not in cl
+        and "2.6.43" not in cl
+    ):
+        _fail("CHANGELOG 2.6.43 fehlt Speichern-unter/.py-Hinweis")
+    if (
         "Silbentrennung" not in cl
         and "Hyphen" not in cl
         and "Menü" not in cl
@@ -2038,6 +2081,10 @@ def check_changelog() -> None:
         and "2.6.41" not in feat
     ):
         _fail("FEATURES.md fehlt 2.6.41 Scan/NAPS2-Hinweis")
+    if "2.6.43" not in feat or (
+        ".py" not in feat and ".ild" not in feat and "Speichern unter" not in feat
+    ):
+        _fail("FEATURES.md fehlt 2.6.43 Speichern-unter/Dokumentfilter-Hinweis")
     if (
         "ScanTuxio" not in feat
         and "vendor/tesseract" not in feat
@@ -2488,11 +2535,11 @@ Exit-Codes:
 Laufzeit: am Ende als „Laufzeit: N ms“ (oder duration_ms im JSON).
 
 Beispiel --json (Erfolg):
-  {"ok": true, "version": "2.6.42", "duration_ms": 1234,
+  {"ok": true, "version": "2.6.43", "duration_ms": 1234,
    "checks": ["version", "imports", "cli", "measure_diff_import", "changelog"]}
 
 Beispiel --json (Fail):
-  {"ok": false, "version": "2.6.42", "duration_ms": 12,
+  {"ok": false, "version": "2.6.43", "duration_ms": 12,
    "checks": ["version", {"name": "imports", "error": "import x: …"}]}
 """.rstrip()
     )

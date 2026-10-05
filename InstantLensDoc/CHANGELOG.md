@@ -1,3 +1,9 @@
+## 2.6.43 - Speichern unter: Dokumentformate statt .py-Default
+
+Patch nach **2.6.42** (Tesseract-Runtime): Nutzerbericht — neu eingegebener Text ließ sich unter Windows oft nur als ``*.py`` speichern (Save/Speichern unter). Ursache: Vorschlagsname ``Unbenannt`` ohne Endung; unter ``python.exe`` setzt der native Windows-Dialog dann die Host-Endung ``.py``.
+
+Fix: gemeinsame Helfer in ``file_dialogs.py`` — Dokument-Filter (``.ild``/nativ, ``.txt``, ``.md``, ``.html``, ``.docx``, ``.rtf``, ``.pdf``, ``.xlsx``), ``setDefaultSuffix``, Vorschlagsname mit Endung, kein dedizierter Python-Filter; ``save_as`` nutzt den Dialog; Text→PDF über Export; ``detect_kind`` erkennt ``.ild``. Smoke prüft Filter ohne ``*.py`` als Primärformat. Pack `InstantLensDoc-2.6.43-pack.zip`; VERSION **2.6.43**.
+
 ## 2.6.42 - ScanTuxio Tesseract-Runtime für OCR (ohne Extra-Install)
 
 Patch nach **2.6.41**: OCR/Scan braucht kein separates Tesseract, wenn die Runtime in **ScanTuxio Win** liegt. `docs/ScanTuxio-Win.zip` ist Quellcode (keine `tesseract.exe`). Lookup wie ScanTuxio `bundled_tool_dir("tesseract")` + `ocr._tesseract_path`: **1)** `{app}/vendor/tesseract/tesseract.exe` **2)** `{app}/tesseract/tesseract.exe` (neben InstantLensDoc.exe) **3)** `D:\AI_Temp\ScanTuxio Win\tesseract|vendor\tesseract|bin\tesseract.exe` **4)** Program Files / PATH. `pytesseract.tesseract_cmd` + `TESSDATA_PREFIX=<exe-dir>\tessdata`. Erwartet: `tesseract.exe`, `tessdata\deu.traineddata`, `tessdata\eng.traineddata`. `build-windows.ps1` kopiert die Runtime wenn vorhanden; sonst **build-keygen Copy-Hint** (`xcopy` nach `vendor\tesseract`). Pack `InstantLensDoc-2.6.42-pack.zip`; VERSION **2.6.42**.

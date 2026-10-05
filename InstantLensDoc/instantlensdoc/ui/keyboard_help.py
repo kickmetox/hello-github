@@ -61,7 +61,7 @@ SHORTCUTS_HTML = """
 <tr><td>Öffnen</td><td><code>Ctrl+O</code></td></tr>
 <tr><td>Speichern</td><td><code>Ctrl+S</code> — flush Sidecar-Debounce sofort</td></tr>
 <tr><td>Alles speichern</td><td><code>Ctrl+Alt+Shift+S</code></td></tr>
-<tr><td>Speichern unter…</td><td><code>F12</code> / <code>Ctrl+Alt+Shift+U</code> — 2.6.28 (früher nur Ctrl+Alt+Shift+U)</td></tr>
+<tr><td>Speichern unter…</td><td><code>F12</code> / <code>Ctrl+Alt+Shift+U</code> — 2.6.28; Dokumentfilter <code>.ild</code>/<code>.txt</code>/<code>.docx</code>/… (kein <code>.py</code>-Default) — <b>2.6.43</b></td></tr>
 <tr><td>Standard-Stempel ★ (Quick)</td><td><code>Ctrl+Shift+S</code> — PDF Quick-Stempel Standard ★ — 1.9.5</td></tr>
 <tr><td>Als Kopie speichern…</td><td><code>Ctrl+Alt+S</code></td></tr>
 <tr><td>Drucken</td><td><code>Ctrl+P</code></td></tr>

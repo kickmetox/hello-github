@@ -14581,7 +14581,8 @@ class MainWindow(QMainWindow):
             self,
             "Öffnen",
             start,
-            "Dokumente (*.txt *.md *.html *.htm *.docx *.pdf *.png *.jpg *.jpeg);;Alle (*.*)",
+            "Dokumente (*.ild *.txt *.md *.html *.htm *.docx *.rtf *.pdf *.png *.jpg *.jpeg);;"
+            "Alle (*.*)",
         )
         if path:
             remember_recent_dir(path)
@@ -14941,12 +14942,25 @@ class MainWindow(QMainWindow):
             if self.pdf_view.save_annotations_as():
                 self._set_status("Annotation-Sidecar gespeichert unter…")
             return
-        path, _ = QFileDialog.getSaveFileName(
+        from instantlensdoc.ui.file_dialogs import (
+            document_save_default_suffix,
+            document_save_suggested_name,
+            get_document_save_file_name,
+        )
+
+        # Default-Endung + Filter ohne *.py — sonst hängt Windows/python.exe .py an — 2.6.43
+        default_suf = document_save_default_suffix(self.doc.kind)
+        suggested = document_save_suggested_name(
+            self.doc.display_name,
+            kind=self.doc.kind,
+            path=self.doc.path,
+        )
+        path, selected = get_document_save_file_name(
             self,
             "Speichern unter",
-            str(Path(dialog_start_dir()) / self.doc.display_name),
-            "Text (*.txt);;Markdown (*.md);;HTML (*.html);;DOCX (*.docx);;"
-            "RTF (*.rtf);;Excel (*.xlsx);;PDF (*.pdf);;Alle (*.*)",
+            dialog_start_dir(),
+            suggested,
+            default_suffix=default_suf,
         )
         if not path:
             return
@@ -14962,11 +14976,29 @@ class MainWindow(QMainWindow):
             self._sync_editor_text_before_save()
             self.doc.text = self.editor.toPlainText()
         try:
-            save_document(self.doc, Path(path))
-            self.sidebar.add_document(path)
-            self._remember_path(path)
+            dest = Path(path)
+            # Text → PDF über Export (kein leeres Copy ohne Quell-PDF)
+            if dest.suffix.lower() == ".pdf" and self.doc.kind != DocKind.PDF:
+                from instantlensdoc.core import export as exp
+
+                title = self.doc.title or self.doc.display_name or "InstantLens Doc"
+                exp.export_document(
+                    self.doc.text or "",
+                    dest,
+                    fmt="pdf",
+                    title=title,
+                )
+                self.doc.path = dest
+                self.doc.kind = DocKind.PDF
+                self.doc.dirty = False
+                self.doc.title = dest.name
+            else:
+                save_document(self.doc, dest)
+            self.sidebar.add_document(str(dest))
+            self._remember_path(str(dest))
             self.setWindowTitle(self._app_title(self.doc.display_name))
-            self._set_status(f"Gespeichert: {path}")
+            filt_hint = f" [{selected}]" if selected else ""
+            self._set_status(f"Gespeichert: {dest}{filt_hint}")
         except Exception as e:
             QMessageBox.critical(self, "Speichern", f"Speichern fehlgeschlagen:\n{e}")
 
